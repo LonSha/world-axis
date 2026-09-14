@@ -18,7 +18,7 @@ function section(t) { console.log('\n■ ' + t); }
 const ctx = vm.createContext(global);
 const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
-  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/calendar.js', 'engines/memory.js',
+  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
@@ -198,6 +198,19 @@ const WA = global.WorldAxis;
   WA.store.transact(d => { d.evolution.round = 100; WA.enemies.apply(d, [{ name: '血刀门门主', status: '已终结' }]); });
   WA.store.transact(d => { d.evolution.round = 200; WA.enemies.apply(d, []); });
   assert(!WA.store.get().evolution.enemies.some(e => e.name === '血刀门门主'), '已终结仇敌20轮后自动清除');
+
+  // ── regional (v0.4) ──
+  section('engines/regional v0.4');
+  WA.regional.setSettings({ enabled: true, chancePercent: 100, durationRounds: 2 });
+  WA.store.transact(d => { WA.regional.applyIncident(d, { active: true, title: '青石关匪患', type: 'bandit', scope: '青石关商路', impact: '商队被劫，路断' }); });
+  const activeInc = WA.regional.active();
+  assert(activeInc && activeInc.title === '青石关匪患' && activeInc.typeLabel === '匪患/劫掠', '区域突发事件入账+类型映射');
+  const rollOngoing = WA.regional.roll();
+  assert(rollOngoing && rollOngoing.ongoing === true && rollOngoing.prompt.includes('持续中'), '持续中事件roll返回ongoing提示');
+  WA.regional.tick(); WA.regional.tick();
+  assert(!WA.regional.active(), '区域事件持续轮次耗尽自动平息');
+  assert(WA.store.get().chronicle.some(c => c.kind === 'regional'), '平息入纪事');
+
   section('engines/opinion');
   WA.store.transact(d => {
     d.currents.push({ id: 'cu1', title: '镇外骑兵队逼近', summary: '', visibility: 'trace', publicity: 'public', public_trace: '马蹄声', stage: '发展', createdAt: Date.now(), updatedAt: Date.now() });

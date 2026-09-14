@@ -230,12 +230,14 @@
         ' "enemies": [{"name":"...","reason":"...","type":"blood|grudge","status":"追踪中|策划中|执行中|已终结"}],',
         ' "blackbox": {"secretActions":[{"action":"...","witnesses":"..."}],"secretAssets":[{"name":"...","exposure":0-100,"status":"有效|过期|暴露|失效"}]},',
         ' "worldTrends": [{"name":"...","scope":"...","status":"持续中|已结束","description":"...","source":"..."}],',
+        ' "regionalIncident": {"active":true,"title":"...","type":"bandit|plague|market|faction_clash|official|sect|infrastructure|ominous","scope":"...","impact":"..."}或null,',
         ' "next_turn_injection": {"required":[],"conditional":[],"suppress":[]}',
         '}',
         '宁缺毋滥：无变化就给空数组。绝不代写玩家言行。绝不剧透suppress列内容。'
       ].filter(Boolean).join('\n');
       const user = [
         '【世界快照】' + JSON.stringify(snap),
+        (WA.regional ? (() => { const roll = WA.regional.roll(); return roll ? '\n' + roll.prompt : ''; })() : ''),
         '【近期正文（最新锚点=m' + anchor.idx + '）】',
         recentText(8)
       ].join('\n');
@@ -381,6 +383,8 @@
         if (r.blackbox) WA.enemies.applyBlackbox(draft, r.blackbox);
         if (r.worldTrends) WA.enemies.applyWorldTrends(draft, r.worldTrends);
       }
+      // 区域突发事件入账
+      if (WA.regional && r.regionalIncident) WA.regional.applyIncident(draft, r.regionalIncident);
 
       // next_turn_injection 持久化（before链读取）
       if (r.next_turn_injection && typeof r.next_turn_injection === 'object') {

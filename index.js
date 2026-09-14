@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -60,6 +60,7 @@
     'engines/backstage.js',
     'engines/evolution.js',
     'engines/enemies.js',
+    'engines/regional.js',
     'engines/chapters.js',
     'engines/direct-event.js',
     'engines/calendar.js',
