@@ -8,6 +8,22 @@
   const mainDoc = WA.mainDoc || document;
   const mainWin = WA.mainWin || window;
 
+  // v0.6 新增组件样式注入
+  (function injectStyles() {
+    const css = `
+      .wa-digest { font-style: italic; opacity: .85; line-height: 1.6; padding: 8px 10px; border-left: 3px solid #7c6af7; margin: 4px 0; }
+      .wa-rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .wa-rep-cell { text-align: center; padding: 6px 4px; background: rgba(255,255,255,.04); border-radius: 4px; }
+      .wa-enemy-blood { background: #c62828 !important; color: #fff !important; }
+      .wa-enemy-grudge { background: #e65100 !important; color: #fff !important; }
+    `;
+    try {
+      const el = mainDoc.createElement('style');
+      el.textContent = css;
+      (mainDoc.head || mainDoc.documentElement).appendChild(el);
+    } catch (e) {}
+  })();
+
   const PAGES = [
     { id: 'overview', icon: '◈', label: '概览' },
     { id: 'world', icon: '🌐', label: '世界' },
@@ -85,13 +101,60 @@
 
   function renderEvents() {
     const s = WA.store.get();
+    const ev = s.evolution || {};
     const active = (s.directEvents || []).find(e => e.status === 'active');
+    const esc = t => String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    // 势力徽章色
+    const factionBadge = st => ({'鼎盛':'🟡','强盛':'🟢','平稳':'⚪','衰退':'🟠','动荡':'🔴','瓦解':'⚫'}[st]||'⚪');
+    const relBadge = r => ({'血盟':'💞','盟友':'🤝','友好':'😊','中立':'😐','冷淡':'😒','敌对':'⚔️','世仇':'💀'}[r]||'😐');
+    const repColor = l => ({'万众敬仰':'#4caf50','受人敬重':'#8bc34a','小有名气':'#ffc107','默默无闻':'#9e9e9e','声名狼藉':'#ff5722','天怒人怨':'#f44336'}[l]||'#9e9e9e');
+    const ecoColor = c => ({'繁荣':'#4caf50','平稳':'#2196f3','萧条':'#ff9800','危机':'#f44336'}[c]||'#2196f3');
+
+    const factions = ev.factions || [];
+    const rep = ev.reputation || {};
+    const eco = ev.economy || {};
+    const enemies = (ev.enemies || []).filter(e => e.status !== '已终结');
+    const trends = (ev.worldTrends || []).filter(t => t.status === '持续中');
+    const winds = (ev.winds || []).filter(w => !w.quiet);
+    const hz = (ev.horizon) || {};
+    const digest = ev.worldDigest;
+
     return `
       <div class="wa-sec">突发事件（一轮生成·多轮解封）</div>
       ${active ? `<div class="wa-item"><b>${esc(active.title)}</b> <span class="wa-badge">第${active.currentTurn}/${active.totalTurns}轮</span><div class="wa-dim">对手：${esc(active.opponent || '未通报')}</div><button class="wa-btn wa-mini" id="wa-de-abort">中止事件</button></div>`
         : `<div class="wa-row"><input id="wa-de-prompt" class="wa-input" placeholder="事件要求（可空）…"/><input id="wa-de-turns" class="wa-input wa-w60" type="number" value="6" min="1" max="30"/><button class="wa-btn" id="wa-de-create">生成事件</button></div>`}
-      <div class="wa-sec">演化事件（${s.evolution.events.length}）</div>
-      <div class="wa-list">${s.evolution.events.slice(-10).reverse().map(e => `<div class="wa-item"><span class="wa-badge">${esc(e.type === 'conflict' ? '冲突' : '进度')}</span> <b>${esc(e.title)}</b> <span class="wa-dim">${esc(e.stage)}</span></div>`).join('') || '<div class="wa-empty">暂无</div>'}</div>
+
+      ${digest && digest.text ? `<div class="wa-sec">世界推演叙事</div><div class="wa-item wa-digest">${esc(digest.text)}</div>` : ''}
+
+      <div class="wa-sec">势力（${factions.length}）</div>
+      <div class="wa-list">${factions.slice(0,6).map(f => `<div class="wa-item">${factionBadge(f.status)} <b>${esc(f.name)}</b> <span class="wa-badge">${esc(f.status)}</span> <span class="wa-dim">${relBadge(f.relation)}${esc(f.relation)}</span>${f.currentGoal ? `<div class="wa-dim">目标：${esc(f.currentGoal)}</div>` : ''}</div>`).join('') || '<div class="wa-empty">暂无势力</div>'}</div>
+
+      <div class="wa-sec">声誉四维</div>
+      <div class="wa-item wa-rep-grid">${['authority','common','shadow','circuit'].map(dim => {
+        const labels = {authority:'朝堂',common:'民间',shadow:'江湖',circuit:'商界'};
+        const lv = rep[dim] || '默默无闻';
+        return `<div class="wa-rep-cell"><div class="wa-dim">${labels[dim]}</div><div style="color:${repColor(lv)}">${esc(lv)}</div></div>`;
+      }).join('')}</div>
+
+      <div class="wa-sec">经济气候</div>
+      <div class="wa-item"><span style="color:${ecoColor(eco.climate)}">●</span> <b>${esc(eco.climate || '平稳')}</b>${(eco.signals||[]).length ? `<div class="wa-dim">${eco.signals.slice(0,3).map(sg=>esc(sg)).join(' · ')}</div>` : ''}</div>
+
+      ${enemies.length ? `<div class="wa-sec">仇敌录（${enemies.length}）</div>
+      <div class="wa-list">${enemies.slice(0,4).map(e => `<div class="wa-item"><span class="wa-badge wa-enemy-${e.type}">${e.type==='blood'?'血仇':'怨结'}</span> <b>${esc(e.name)}</b> <span class="wa-dim">${esc(e.status)}</span><div class="wa-dim">${esc(e.reason||'')}</div></div>`).join('')}</div>` : ''}
+
+      ${trends.length ? `<div class="wa-sec">天下大势（${trends.length}）</div>
+      <div class="wa-list">${trends.slice(0,3).map(t => `<div class="wa-item"><b>${esc(t.name)}</b> <span class="wa-badge">${esc(t.scope)}</span><div class="wa-dim">${esc((t.description||'').slice(0,80))}</div></div>`).join('')}</div>` : ''}
+
+      ${winds.length ? `<div class="wa-sec">风声（${winds.length}）</div>
+      <div class="wa-list">${winds.slice(0,4).map(w => `<div class="wa-item">${'🌀'.repeat(Math.min(w.level||1,3))} <b>${esc(w.topic)}</b> <span class="wa-dim">Lv${w.level||1}</span><div class="wa-dim">${esc((w.content||'').slice(0,60))}</div></div>`).join('')}</div>` : ''}
+
+      <div class="wa-sec">远方/近端事件泳道</div>
+      <div class="wa-item wa-dim">${hz.distant ? `远方 ledger=${hz.distant.ledger} cd=${hz.distant.cooldown}${hz.distant.pending?' ⏳':''}` : '远方 —'}<br>${hz.near ? `近端 ledger=${hz.near.ledger} cd=${hz.near.cooldown}${hz.near.pending?' ⏳':''}` : '近端 —'}</div>
+
+      <div class="wa-sec">演化事件（${(ev.events||[]).length}）</div>
+      <div class="wa-list">${(ev.events||[]).slice(-10).reverse().map(e => `<div class="wa-item"><span class="wa-badge">${esc(e.type === 'conflict' ? '冲突' : '进度')}</span> <b>${esc(e.title)}</b> <span class="wa-dim">${esc(e.stage)}${e.stall?' ⏸':''}</span></div>`).join('') || '<div class="wa-empty">暂无</div>'}</div>
+
       <div class="wa-sec">章节</div>
       ${s.chapters.current ? `<div class="wa-item"><b>${esc(s.chapters.current.title)}</b><div class="wa-dim">${esc((s.chapters.current.script || '').slice(0, 150))}</div><button class="wa-btn wa-mini" id="wa-ch-end">结束本章</button></div>`
         : `<div class="wa-row"><input id="wa-ch-title" class="wa-input" placeholder="章节标题…"/><button class="wa-btn" id="wa-ch-start">开始章节</button></div>`}`;
