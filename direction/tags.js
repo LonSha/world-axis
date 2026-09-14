@@ -1,20 +1,48 @@
-/** WorldAxis direction/tags.js — 导演标签注入器（缝合 TH-剧情推进 <request>分组标签）骨架 */
+/** WorldAxis direction/tags.js — 导演标签/快捷指令（缝合 剧情指导） */
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
-  const mainWin = WA.mainWin || window;
-  const LS_KEY = 'worldaxis_director_tags_v1';
-  WA.tags = {
-    getActive() { try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '[]'); } catch (e) { return []; } },
-    setActive(arr) { mainWin.localStorage.setItem(LS_KEY, JSON.stringify(arr || [])); }
+
+  // 快捷导演指令：玩家消息中以 [[wa:xxx]] 形式触发
+  const TAGS = {
+    'wa:advance': { desc: '推进世界半天', apply(ctx) {
+      WA.store.transact(d => { d.clock.label = (d.clock.label || '') + '→+半日'; d.clock.source = 'user'; });
+      return '世界时间推进半天';
+    }},
+    'wa:storm': { desc: '提升世界脉搏到2', apply(ctx) {
+      WA.store.transact(d => { d.worldPulse = { pressure: 2, trend: 'rising', note: '用户手动加压', at: Date.now() }; });
+      return '世界脉搏已加压';
+    }},
+    'wa:calm': { desc: '降低世界脉搏到0', apply(ctx) {
+      WA.store.transact(d => { d.worldPulse = { pressure: 0, trend: 'falling', note: '用户手动平息', at: Date.now() }; });
+      return '世界脉搏已平息';
+    }},
+    'wa:sim': { desc: '立即触发一次世界推演', apply(ctx) {
+      WA.backstage.forceSimulate();
+      return '已触发世界推演';
+    }}
   };
+
+  WA.tags = {
+    TAGS,
+    /** 扫描玩家输入中的导演标签并执行（before链） */
+    scan(text) {
+      const hits = [];
+      Object.keys(TAGS).forEach(k => {
+        if (text.includes('[[' + k + ']]')) { const r = TAGS[k].apply(); hits.push(k + ' → ' + r); }
+      });
+      return hits;
+    }
+  };
+
   WA.workflow.register({
-    id: 'tags.request', chain: 'before', order: 60, label: '导演标签<request>',
+    id: 'tags.scan', chain: 'before', order: 5, label: '导演标签扫描',
     async run(ctx) {
-      const act = WA.tags.getActive();
-      if (!act.length) return;
-      const body = act.map(t => '<request:' + (t.title || '导演') + '>' + t.content + '</request>').join('\n');
-      ctx.injections.push({ source: '导演标签', position: 'after_last_user', depth: 0, content: body });
+      const chat = ctx.chat || [];
+      const last = chat[chat.length - 1];
+      if (!last || !last.is_user) return;
+      const hits = WA.tags.scan(String(last.mes || ''));
+      if (hits.length) WA.log('info', '导演标签执行：' + hits.join('；'));
     }
   });
 })();

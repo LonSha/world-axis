@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -63,9 +63,11 @@
     'engines/direct-event.js',
     'engines/calendar.js',
     'engines/memory.js',
+    'engines/opinion.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
+    'actors/profile.js',
     'direction/oracle.js',
     'direction/tags.js',
     'direction/choices.js',
@@ -75,6 +77,7 @@
     'compat/mvu.js',
     'compat/th-helper.js',
     'ui/panel.js',
+    'ui/settings.js',
     'ui/assistant.js',
   ];
 

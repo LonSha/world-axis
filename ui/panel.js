@@ -14,7 +14,9 @@
     { id: 'people', icon: '👤', label: '人物' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
+    { id: 'settings', icon: '⚙️', label: '设置' },
     { id: 'connect', icon: '🔌', label: '连接' },
+    { id: 'assistant', icon: '💬', label: '助手' },
     { id: 'logs', icon: '📋', label: '日志' }
   ];
 
@@ -131,7 +133,19 @@
       <div class="wa-logbox">${WA.eventLog.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, events: renderEvents, director: renderDirector, connect: renderConnect, logs: renderLogs };
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, events: renderEvents, director: renderDirector, connect: renderConnect, logs: renderLogs,
+    settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
+    assistant: renderAssistant };
+
+  function renderAssistant() {
+    return `
+      <div class="wa-sec">世界助手（就世界状态问答，上帝视角）</div>
+      <div class="wa-row"><input id="wa-ask-input" class="wa-input" placeholder="问世界/人物/暗流/舆情…"/><button class="wa-btn" id="wa-ask-btn">问</button></div>
+      <div id="wa-ask-out" class="wa-out"></div>
+      <div class="wa-sec">番外小剧场</div>
+      <div class="wa-row"><input id="wa-theater-input" class="wa-input" placeholder="剧场指令（可空）…"/><button class="wa-btn" id="wa-theater-btn">生成番外</button></div>
+      <div id="wa-theater-out" class="wa-out"></div>`;
+  }
 
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
@@ -159,6 +173,13 @@
     on('#wa-gen-choices', async () => { const out = $('#wa-choices-out'); out.textContent = '生成中…'; const cs = await WA.choices.generate(4); out.innerHTML = cs.length ? cs.map((c, i) => `<div class="wa-item">${i + 1}. ${esc(c)}</div>`).join('') : '（未配置choices通道或生成失败）'; });
     on('#wa-log-copy', () => { navigator.clipboard && navigator.clipboard.writeText(WA.eventLog.map(l => `[${new Date(l.t).toLocaleTimeString()}][${l.level}] ${l.msg} ${l.data || ''}`).join('\n')); });
     const conc = $('#wa-conc'); if (conc) conc.oninput = () => { WA.apiRouter.setConcurrency(+conc.value); $('#wa-conc-v').textContent = conc.value; };
+    // 设置页绑定
+    if (currentPage === 'settings' && WA.uiSettings) WA.uiSettings.bind(panelEl);
+    // 助手页绑定
+    const askBtn = $('#wa-ask-btn');
+    if (askBtn) askBtn.onclick = async () => { const q = $('#wa-ask-input').value.trim(); if (!q) return; const out = $('#wa-ask-out'); out.textContent = '思考中…'; const r = await WA.assistant.ask(q); out.textContent = r.ok ? r.text : ('失败：' + r.reason); };
+    const thBtn = $('#wa-theater-btn');
+    if (thBtn) thBtn.onclick = async () => { const out = $('#wa-theater-out'); out.textContent = '剧场编排中…'; const r = await WA.theater.generate($('#wa-theater-input').value.trim()); out.textContent = r.ok ? r.text : ('失败：' + (r.reason || (r.error && r.error.message))); };
     panelEl.querySelectorAll('.wa-chan').forEach(box => {
       box.querySelector('.wa-ch-save').onclick = () => {
         WA.apiRouter.setChannel(box.dataset.chan, { baseUrl: box.querySelector('.wa-ch-base').value.trim(), apiKey: box.querySelector('.wa-ch-key').value.trim(), model: box.querySelector('.wa-ch-model').value.trim() });

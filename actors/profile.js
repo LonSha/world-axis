@@ -1,0 +1,91 @@
+/**
+ * WorldAxis actors/profile.js (v0.2)
+ * NPC档案自动维护：after链从正文/推演结果中提取档案增量写回registry
+ * 缝合来源：SoulLink 档案契约（personality/worldview/family/relationships/memory分节）
+ */
+(function () {
+  'use strict';
+  const WA = window.WorldAxis = window.WorldAxis || {};
+
+  const PROFILE_SYS = `你是「档案维护」子agent。对比NPC现有档案与最新剧情，产出档案增量更新。规则：
+1. 只补充剧情中新显露的信息；不臆造未表现的性格/关系。
+2. 每节输出增量条目（不是全量重写）；无变化给空数组。
+3. 分节：personality(性格)/worldview(观念)/family(家庭)/relationships(关系动态)/memory(关键经历)。
+4. relationships 条目格式 {"target":"对象名","relation":"关系","dynamic":"最新动态"}。
+只输出JSON：{"personality":["..."],"worldview":["..."],"family":["..."],"relationships":[{"target":"...","relation":"...","dynamic":"..."}],"memory":["..."]}`;
+
+  function getCtx() { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } }
+  function recentText(n) {
+    const ctx = getCtx(); const chat = (ctx && ctx.chat) || [];
+    return chat.slice(Math.max(0, chat.length - (n || 6))).map(m => (m.is_user ? '【玩家】' : '【正文】') + String(m.mes || '').slice(0, 800)).join('\n---\n');
+  }
+
+  WA.profile = {
+    /** 对指定NPC执行档案增量维护 */
+    async maintain(name) {
+      const cfg = WA.apiRouter.getChannel('digest');
+      if (!cfg.baseUrl || !cfg.model) return { ok: false, reason: 'no-channel' };
+      const old = WA.registry.getProfile(name);
+      const compactOld = {
+        personality: (old.personality || []).slice(-8),
+        worldview: (old.worldview || []).slice(-5),
+        family: (old.family || []).slice(-5),
+        relationships: (old.relationships || []).slice(-8),
+        memory: (old.memory || []).slice(-8)
+      };
+      const r = await WA.apiRouter.call('digest', [
+        { role: 'system', content: PROFILE_SYS },
+        { role: 'user', content: '【NPC】' + name + '\n【现有档案】' + JSON.stringify(compactOld) + '\n【近期剧情】\n' + recentText(6) }
+      ], { json: true, maxTokens: 1200, temperature: 0.4 }).catch(() => null);
+      if (!r) return { ok: false, reason: 'api-fail' };
+      const now = Date.now();
+      WA.store.transact(draft => {
+        const id = 'p_' + name;
+        const p = draft.people[id] = draft.people[id] || { id, name, knowledge: {} };
+        const prof = p.profile = p.profile || { fields: { name }, personality: [], worldview: [], family: [], relationships: [], memory: [] };
+        const push = (sec, items, cap) => {
+          (items || []).filter(x => x && String(x).trim()).forEach(x => { prof[sec].push({ text: String(x).slice(0, 200), at: now }); });
+          prof[sec] = prof[sec].slice(-(cap || 20));
+        };
+        push('personality', r.personality, 15);
+        push('worldview', r.worldview, 10);
+        push('family', r.family, 10);
+        push('memory', r.memory, 25);
+        (r.relationships || []).slice(0, 5).forEach(rel => {
+          if (!rel || !rel.target) return;
+          const old_rel = prof.relationships.find(x => x.target === rel.target);
+          if (old_rel) { old_rel.relation = rel.relation || old_rel.relation; old_rel.dynamic = rel.dynamic || old_rel.dynamic; old_rel.at = now; }
+          else prof.relationships.push({ target: rel.target, relation: rel.relation || '', dynamic: rel.dynamic || '', at: now });
+        });
+        prof.relationships = prof.relationships.slice(-15);
+        p.updatedAt = now;
+      });
+      WA.log('info', '档案维护完成：' + name);
+      return { ok: true };
+    },
+
+    /** after链批量：对注册了且近期正文提到的NPC执行维护 */
+    async maintainActive() {
+      const names = WA.registry.list();
+      if (!names.length) return;
+      const cfg = WA.apiRouter.getChannel('digest');
+      if (!cfg.baseUrl || !cfg.model) return;
+      const text = recentText(6);
+      const active = names.filter(n => text.includes(n));
+      for (const n of active.slice(0, 3)) { // 单轮最多维护3人
+        await this.maintain(n).catch(e => WA.log('warn', '档案维护失败 ' + n, e.message));
+      }
+    }
+  };
+
+  // 每4轮触发一次档案维护（避免每轮都调用）
+  let maintainCounter = 0;
+  WA.workflow.register({
+    id: 'actors.profileMaintain', chain: 'after', order: 60, label: 'NPC档案自动维护（每4轮）',
+    async run() {
+      maintainCounter++;
+      if (maintainCounter % 4 !== 0) return;
+      await WA.profile.maintainActive();
+    }
+  });
+})();

@@ -1,0 +1,59 @@
+/** WorldAxis ui/settings.js (v0.2) — 推演设置页（尺度/时间/脉搏/预算/舆情） */
+(function () {
+  'use strict';
+  const WA = window.WorldAxis = window.WorldAxis || {};
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '"' }[c])); }
+
+  WA.uiSettings = {
+    render() {
+      const bs = WA.backstage.getSettings();
+      const op = WA.opinion.getSettings();
+      const modes = [['light', '轻量'], ['balanced', '均衡'], ['deep', '深度'], ['manual', '手动']];
+      const times = [['explicit', '严格'], ['cautious', '谨慎'], ['open', '开放'], ['world', '世界钟']];
+      const pulses = [['quiet', '安静'], ['normal', '正常'], ['turbulent', '激荡']];
+      return `
+        <div class="wa-sec">世界推演设置</div>
+        <div class="wa-set-row"><span>推演尺度</span><select id="wa-set-mode" class="wa-input">${modes.map(m => `<option value="${m[0]}" ${bs.simulationMode === m[0] ? 'selected' : ''}>${m[1]}</option>`).join('')}</select></div>
+        <div class="wa-set-row"><span>时间策略</span><select id="wa-set-time" class="wa-input">${times.map(t => `<option value="${t[0]}" ${bs.timePolicy === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('')}</select></div>
+        <div class="wa-set-row"><span>世界脉搏活跃度</span><select id="wa-set-pulse" class="wa-input">${pulses.map(p => `<option value="${p[0]}" ${bs.pulseActivity === p[0] ? 'selected' : ''}>${p[1]}</option>`).join('')}</select></div>
+        <div class="wa-set-row"><span>NPC预算 <b id="wa-set-npcv">${bs.npcBudget}</b></span><input type="range" min="1" max="16" value="${bs.npcBudget}" id="wa-set-npc" class="wa-range"/></div>
+        <label class="wa-node"><input type="checkbox" id="wa-set-auto" ${bs.autoSimulate ? 'checked' : ''}/><span class="wa-node-label">每轮自动推演（关闭则仅手动）</span></label>
+        <div class="wa-sec">自定义推演指令（追加到系统提示）</div>
+        <textarea id="wa-set-custom" class="wa-ta" placeholder="例如：本世界魔法衰退，推演时注意时代背景…">${esc(bs.customInstruction)}</textarea>
+        <button class="wa-btn" id="wa-set-save">保存推演设置</button>
+        <div class="wa-sec">舆情引擎</div>
+        <label class="wa-node"><input type="checkbox" id="wa-op-enable" ${op.enabled ? 'checked' : ''}/><span class="wa-node-label">启用舆情观察（新闻/论坛）</span></label>
+        <label class="wa-node"><input type="checkbox" id="wa-op-sandbox" ${op.sandboxEnabled ? 'checked' : ''}/><span class="wa-node-label">启用闲逛沙盒（NON-CANON氛围碎片）</span></label>
+        <div class="wa-set-row"><span>每N轮生成</span><input type="number" min="1" max="10" value="${op.everyNRounds}" id="wa-op-n" class="wa-input wa-w60"/></div>
+        <div class="wa-row">
+          <button class="wa-btn" id="wa-op-now">立即生成舆情</button>
+          <button class="wa-btn" id="wa-sim-now">立即推演世界</button>
+        </div>
+        <div id="wa-set-out" class="wa-out"></div>`;
+    },
+    bind(panelEl) {
+      const $ = sel => panelEl.querySelector(sel);
+      const out = () => $('#wa-set-out');
+      const npc = $('#wa-set-npc');
+      if (npc) npc.oninput = () => { $('#wa-set-npcv').textContent = npc.value; };
+      const saveBtn = $('#wa-set-save');
+      if (saveBtn) saveBtn.onclick = () => {
+        WA.backstage.setSettings({
+          simulationMode: $('#wa-set-mode').value,
+          timePolicy: $('#wa-set-time').value,
+          pulseActivity: $('#wa-set-pulse').value,
+          npcBudget: +npc.value,
+          autoSimulate: $('#wa-set-auto').checked,
+          customInstruction: $('#wa-set-custom').value.trim()
+        });
+        WA.opinion.setSettings({ enabled: $('#wa-op-enable').checked, sandboxEnabled: $('#wa-op-sandbox').checked, everyNRounds: +$('#wa-op-n').value || 3 });
+        out().textContent = '✓ 设置已保存';
+      };
+      const opNow = $('#wa-op-now');
+      if (opNow) opNow.onclick = async () => { out().textContent = '舆情生成中…'; const r = await WA.opinion.generate(); out().textContent = r.ok ? `✓ 新闻${r.news}条 论坛${r.forums}主题` : ('失败：' + r.reason); };
+      const simNow = $('#wa-sim-now');
+      if (simNow) simNow.onclick = () => { WA.backstage.forceSimulate(); out().textContent = '已触发世界推演（见日志）'; };
+    }
+  };
+})();

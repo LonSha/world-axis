@@ -1,79 +1,91 @@
-/**
- * WorldAxis engines/direct-event.js
- * 突发事件引擎：一轮生成多轮解封 + 小纸条暗箱 + 客观外部推力 + Action Hook
- * 缝合来源：st-direct-event（一轮生成多轮享受/暗箱/终局判定/敌方身份通报）
- */
+/** WorldAxis engines/direct-event.js (v0.2) — 突发事件（缝合 st-direct-event：一轮生成·多轮解封） */
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
 
-  const directEvent = WA.directEvent = {
-    active() { return WA.store.get().directEvents.find(e => e.status === 'active') || null; },
+  const BOX_SYS = `你是「突发事件暗箱」生成器。生成一个分轮解封的突发事件。规则：
+1. 事件共N轮，每轮揭示一层（真相逐层剥开）；
+2. 绝不代写玩家言行；只描述环境、NPC动作与线索；
+3. 每轮结尾留一个钩子牵引玩家进入下一轮；
+4. 首轮需通报【登场对手身份】（可化名/伪装）。
+只输出JSON：{"title":"...","opponent":"对手身份","box":"暗箱内情（完整真相，仅引擎可见）","notes":["第1轮小纸条","第2轮小纸条",...]}`;
 
-    /** 生成一个完整事件档案（副模型单次推理：暗箱+分轮小纸条+终局条件） */
+  function getCtx() { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } }
+
+  WA.directEvent = {
+    /** 生成一个突发事件（一轮API调用，产出全部小纸条） */
     async create(opts) {
       opts = opts || {};
+      const cfg = WA.apiRouter.getChannel('inference');
+      if (!cfg.baseUrl || !cfg.model) { WA.log('warn', '突发事件：推演通道未配置'); return { ok: false }; }
       const turns = Math.max(1, Math.min(30, opts.turns || 6));
-      const sys = [
-        '你是事件导演。一次推演完整事件链，输出严格JSON。',
-        '铁律：小纸条绝不代写/预设玩家任何言行、内心或态度；只写【客观环境剧变/物理危机】与【NPC主动作为】；每张纸条结尾停在NPC具体动作或抉择点（Action Hook）。',
-        '首行必须通报：【登场对手身份】：<姓名/代号>（所属势力/定位战力/装束动机）。',
-        'JSON结构：{"title":"","opponent":"","box":"暗箱核心机密（主模型不可见的完整脉络与分支结局条件）","notes":["第1轮小纸条","第2轮小纸条",...共' + turns + '张],"goodEnd":"","badEnd":""}'
-      ].join('\n');
-      const s = WA.store.get();
-      const worldSnap = JSON.stringify({ clock: s.clock, currents: s.currents.slice(-5).map(c => c.title) });
-      try {
-        const r = await WA.apiRouter.call('inference', [
-          { role: 'system', content: sys },
-          { role: 'user', content: '【世界快照】' + worldSnap + '\n【要求】' + (opts.prompt || '生成一个贴合当前世界状态的突发事件') }
-        ], { json: true, maxTokens: 6000, temperature: 0.85 });
-        if (!r || !Array.isArray(r.notes) || !r.notes.length) throw new Error('事件档案为空');
-        const ev = {
-          id: 'de' + Date.now(), title: r.title || '突发事件', opponent: r.opponent || '',
-          totalTurns: r.notes.length, currentTurn: 0, status: 'active',
-          box: r.box || '', notes: r.notes, goodEnd: r.goodEnd || '', badEnd: r.badEnd || '', createdAt: Date.now()
-        };
-        WA.store.transact(draft => { draft.directEvents.push(ev); });
-        WA.emit('direct-event:created', ev);
-        return { ok: true, event: ev };
-      } catch (e) { WA.log('error', '突发事件生成失败', e && e.message); return { ok: false, error: e }; }
+      const ctx = getCtx(); const chat = (ctx && ctx.chat) || [];
+      const recent = chat.slice(-2).map(m => String(m.mes || '').slice(0, 400)).join('\n');
+      const r = await WA.apiRouter.call('inference', [
+        { role: 'system', content: BOX_SYS.replace('N轮', turns + '轮') },
+        { role: 'user', content: '【事件要求】' + (opts.prompt || '（自由生成一个突发事件）') + '\n【近期剧情参考】\n' + recent }
+      ], { json: true, maxTokens: 4000, temperature: 0.9 }).catch(e => { WA.log('error', '突发事件生成失败', e.message); return null; });
+      if (!r || !r.notes || !r.notes.length) return { ok: false };
+      WA.store.transact(d => {
+        // 同时只允许一个活跃突发事件
+        (d.directEvents || []).forEach(e => { if (e.status === 'active') e.status = 'aborted'; });
+        d.directEvents.push({
+          id: 'de' + Date.now(), title: r.title || '突发事件',
+          totalTurns: Math.min(turns, r.notes.length), currentTurn: 0,
+          status: 'active', opponent: r.opponent || '', box: r.box || '',
+          notes: r.notes.map(n => String(n).slice(0, 500)), createdAt: Date.now()
+        });
+      });
+      WA.emit('directEvent:started');
+      WA.log('info', '突发事件已生成：' + (r.title || '') + ' 共' + r.notes.length + '轮');
+      return { ok: true };
     },
 
-    /** 取当前轮小纸条并推进（before链调用，注入用） */
-    peekNote() {
+    active() { return (WA.store.read('directEvents', []) || []).find(e => e.status === 'active'); },
+
+    abort() {
+      WA.store.transact(d => { (d.directEvents || []).forEach(e => { if (e.status === 'active') e.status = 'aborted'; }); });
+      WA.emit('directEvent:ended');
+    },
+
+    /** 解封当前轮小纸条（before链注入，零剧透：只给当前轮） */
+    currentNote() {
       const ev = this.active();
       if (!ev) return null;
-      if (ev.currentTurn >= ev.totalTurns) return null;
-      return { ev, note: ev.notes[ev.currentTurn], turn: ev.currentTurn + 1, total: ev.totalTurns };
+      return ev.notes[ev.currentTurn] || null;
     },
+
+    /** 推进一轮（after链） */
     advance() {
-      const ev = this.active(); if (!ev) return;
-      WA.store.transact(draft => {
-        const d = draft.directEvents.find(x => x.id === ev.id);
-        if (d) { d.currentTurn++; if (d.currentTurn >= d.totalTurns) d.status = 'done'; }
+      const ev = this.active();
+      if (!ev) return;
+      WA.store.transact(d => {
+        const e = (d.directEvents || []).find(x => x.id === ev.id);
+        if (!e) return;
+        e.currentTurn++;
+        if (e.currentTurn >= e.totalTurns) { e.status = 'done'; WA.emit('directEvent:ended'); }
       });
-    },
-    abort(id) {
-      WA.store.transact(draft => { const d = draft.directEvents.find(x => x.id === (id || (this.active() || {}).id)); if (d) d.status = 'aborted'; });
     }
   };
 
-  // before链：有active事件时把当前轮小纸条注入（零剧透：只递当前轮）
+  // before链：注入当前轮小纸条（不含暗箱内情，零剧透）
   WA.workflow.register({
-    id: 'direct-event.note', chain: 'before', order: 30, label: '突发事件·本轮小纸条',
+    id: 'directEvent.note', chain: 'before', order: 20, label: '突发事件·本轮小纸条',
     async run(ctx) {
-      const p = WA.directEvent.peekNote();
-      if (!p) return;
+      const note = WA.directEvent.currentNote();
+      const ev = WA.directEvent.active();
+      if (!note || !ev) return;
       ctx.injections.push({
-        source: '突发事件·' + p.ev.title + '（第' + p.turn + '/' + p.total + '轮）',
+        source: '突发事件·第' + (ev.currentTurn + 1) + '轮',
         position: 'after_last_user', depth: 0,
-        content: '<direct_event_note>\n【后台事件推进·仅你可见，不要复述给玩家】\n' + p.note + '\n</direct_event_note>'
+        content: '<direct_event>\n【突发事件·进行中】' + ev.title + '\n【登场对手】' + ev.opponent + '\n【本轮展开】' + note + '\n【铁律】绝不代写玩家言行；围绕本轮展开推进。\n</direct_event>'
       });
     }
   });
-  // after链：回复完成后推进轮次
+
+  // after链：推进一轮
   WA.workflow.register({
-    id: 'direct-event.advance', chain: 'after', order: 40, label: '突发事件·轮次推进',
+    id: 'directEvent.advance', chain: 'after', order: 15, label: '突发事件·推进',
     async run() { WA.directEvent.advance(); }
   });
 })();
