@@ -43,7 +43,14 @@
         blackbox: { secretActions: [], secretAssets: [] }, worldTrends: [], regionalIncident: null,
         reputation: { authority: '默默无闻', common: '默默无闻', shadow: '默默无闻', circuit: '默默无闻', lastChange: '' },
         economy: { climate: '平稳', signals: [] },
-        round: 0, digest: ''
+        round: 0, digest: '',
+        // v0.5 远方/近端事件泳道
+        horizon: {
+          distant: { ledger: 0, cooldown: 0, pending: null, lastFired: 0 },
+          near:    { ledger: 0, cooldown: 0, pending: null, lastFired: 0 }
+        },
+        // v0.5 world_digest叙事
+        worldDigest: null
       },
       // 章节叙事（beat-tracker：章/节/故事线/关系）
       chapters: {

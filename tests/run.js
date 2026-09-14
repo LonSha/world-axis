@@ -18,7 +18,7 @@ function section(t) { console.log('\n■ ' + t); }
 const ctx = vm.createContext(global);
 const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
-  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/calendar.js', 'engines/memory.js',
+  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
@@ -210,6 +210,75 @@ const WA = global.WorldAxis;
   WA.regional.tick(); WA.regional.tick();
   assert(!WA.regional.active(), '区域事件持续轮次耗尽自动平息');
   assert(WA.store.get().chronicle.some(c => c.kind === 'regional'), '平息入纪事');
+
+  // ── horizon (v0.5) ──
+  section('engines/horizon v0.5');
+  // 强制distant触发：直接灌满ledger
+  WA.store.transact(d => { d.evolution.horizon.distant.ledger = 10; });
+  const dRoll = WA.horizon.rollLane('distant');
+  assert(dRoll.fired === true && dRoll.forced === true, '远方事件ledger≥10强制触发');
+  assert(WA.store.get().evolution.horizon.distant.pending !== null, '触发后pending挂起');
+  assert(WA.store.get().evolution.horizon.distant.cooldown === 5, '触发后冷却5轮');
+  // 接受distant event结果
+  const okD = WA.horizon.acceptResult('distant', { type: 'event', title: '北境雪灾', desc: '大雪封山三月' });
+  assert(okD === true, '远方事件结果入账成功');
+  assert(WA.store.get().evolution.horizon.distant.pending === null, '入账后pending清除');
+  assert(WA.store.get().chronicle.some(c => c.kind === 'horizon_distant' && c.title === '北境雪灾'), '远方事件入纪事');
+  // 接受near结果
+  const okN = WA.horizon.acceptResult('near', { title: '城门戒严', desc: '官府严查过往行人', urgent: true });
+  assert(okN === true, '近端事件结果入账成功');
+  assert(WA.store.get().nextTurnInjection && WA.store.get().nextTurnInjection.nearEvent, '近端事件写入nextTurnInjection');
+  // 无效结果保留pending
+  WA.store.transact(d => { d.evolution.horizon.near.pending = { result: { type: 'event' }, retries: 0 }; });
+  const okBad = WA.horizon.acceptResult('near', null);
+  assert(okBad === false, '无效结果拒绝入账');
+  // 临时标记剥离
+  WA.store.transact(d => { d.evolution.horizon.distant.cooldown = 0; d.evolution.horizon.distant.ledger = 10; d.evolution.horizon.distant.pending = null; });
+  WA.horizon.rollLane('distant');
+  WA.horizon.acceptResult('distant', { type: 'event', title: '南海风暴', _distantGenerated: true, _temp: true });
+  const lastChron = WA.store.get().chronicle.slice(-1)[0];
+  assert(!lastChron._distantGenerated && !lastChron._temp, '临时标记已剥离');
+  // 冷却中不触发
+  const cdRoll = WA.horizon.rollLane('distant');
+  assert(cdRoll.fired === false && cdRoll.reason.startsWith('cooldown'), '冷却中不触发');
+
+  // ── digest (v0.5) ──
+  section('engines/digest v0.5');
+  WA.store.transact(d => {
+    d.worldPulse = { pressure: 2 };
+    d.evolution.events = [{ title: '青石关匪患', stage: 'rising', status: 'active' }];
+    d.evolution.winds = [{ topic: '血刀门', level: 3, quiet: false }];
+    d.evolution.factions = [{ name: '血刀门', status: '鼎盛' }];
+    d.evolution.economy = { climate: '萧条', signals: [] };
+  });
+  const digestText = WA.digest.generate();
+  assert(digestText.length >= 100, `digest长度≥100(实际${digestText.length})`);
+  assert(!digestText.includes('你') && !digestText.includes('玩家'), 'digest不含玩家引用');
+  assert(WA.store.get().evolution.worldDigest && WA.store.get().evolution.worldDigest.text, 'digest已入账');
+  assert(WA.digest.buildBlock().includes('[世界推演]'), 'digest注入块格式正确');
+
+  // ── limits (v0.5) ──
+  section('engines/limits v0.5');
+  const longTitle = '这是一个超过三十个汉字的事件标题用于测试截断功能是否正常工作';
+  const clamped = WA.limits.clamp('events.title', longTitle);
+  assert(clamped.length <= 30, `events.title截断至≤30(实际${clamped.length})`);
+  const clampedArr = WA.limits.clampArray('events', [{ title: longTitle, desc: '短' }], ['title', 'desc']);
+  assert(clampedArr[0].title.length <= 30, 'clampArray批量截断');
+  // ID稳定：按title匹配
+  const existing = [{ id: 'ev1', title: '旧标题', type: 'conflict' }];
+  const loc = WA.limits.locateStable(existing, { title: '旧标题', desc: '新描述' });
+  assert(loc.idx === 0 && loc.stable === true, 'ID稳定：按title定位');
+  // type禁改
+  WA.limits.applyStableUpdate(existing[0], { type: 'progress', desc: '更新' });
+  assert(existing[0].type === 'conflict', 'type一旦确定禁改');
+  // stall标记
+  WA.limits.applyStableUpdate(existing[0], { stall: true, stallReason: '关键人物失踪' });
+  assert(existing[0].stall === true && existing[0].desc.includes('关键人物失踪'), 'stall停滞标记写入desc');
+  // clampBackstageResult
+  const mockResult = { events_create: [{ title: longTitle, desc: 'ok' }], winds: [{ topic: '超长话题名称超过十字限制测试', content: 'ok' }] };
+  const cr = WA.limits.clampBackstageResult(mockResult);
+  assert(cr.events_create[0].title.length <= 30, 'clampBackstageResult截断events');
+  assert(cr.winds[0].topic.length <= 10, 'clampBackstageResult截断winds.topic');
 
   section('engines/opinion');
   WA.store.transact(d => {

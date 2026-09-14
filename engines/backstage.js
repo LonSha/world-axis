@@ -171,7 +171,9 @@
         const result = await this._runInference(anchor, ac.signal);
         if (ac.signal.aborted) return { ok: false, aborted: true };
         if (result) {
-          const tx = WA.store.transact(draft => { this.applyResult(draft, result, anchor); });
+          // 字数限制截断（v0.5 limits引擎）
+          const clamped = WA.limits ? WA.limits.clampBackstageResult(result) : result;
+          const tx = WA.store.transact(draft => { this.applyResult(draft, clamped, anchor); });
           if (tx.ok) WA.log('info', '世界推演结算完成 anchor=m' + anchor.idx);
           else WA.log('error', '世界推演结算事务失败，未提交');
         }
@@ -231,6 +233,8 @@
         ' "blackbox": {"secretActions":[{"action":"...","witnesses":"..."}],"secretAssets":[{"name":"...","exposure":0-100,"status":"有效|过期|暴露|失效"}]},',
         ' "worldTrends": [{"name":"...","scope":"...","status":"持续中|已结束","description":"...","source":"..."}],',
         ' "regionalIncident": {"active":true,"title":"...","type":"bandit|plague|market|faction_clash|official|sect|infrastructure|ominous","scope":"...","impact":"..."}或null,',
+         ' "distantEvent": {"type":"event|wind","title":"...","desc":"...","topic":"...","content":"...","level":1-5}或null,',
+         ' "nearEvent": {"title":"...","desc":"...","urgent":true|false}或null,',
         ' "next_turn_injection": {"required":[],"conditional":[],"suppress":[]}',
         '}',
         '宁缺毋滥：无变化就给空数组。绝不代写玩家言行。绝不剧透suppress列内容。'
@@ -238,6 +242,7 @@
       const user = [
         '【世界快照】' + JSON.stringify(snap),
         (WA.regional ? (() => { const roll = WA.regional.roll(); return roll ? '\n' + roll.prompt : ''; })() : ''),
+        (WA.horizon ? (() => { const block = WA.horizon.buildPromptBlock(); return block ? '\n' + block : ''; })() : ''),
         '【近期正文（最新锚点=m' + anchor.idx + '）】',
         recentText(8)
       ].join('\n');
@@ -385,6 +390,13 @@
       }
       // 区域突发事件入账
       if (WA.regional && r.regionalIncident) WA.regional.applyIncident(draft, r.regionalIncident);
+      // 远方/近端事件结果入账（v0.5 horizon引擎）
+      if (WA.horizon) {
+        if (r.distantEvent) WA.horizon.acceptResult('distant', r.distantEvent);
+        if (r.nearEvent)    WA.horizon.acceptResult('near',    r.nearEvent);
+      }
+      // world_digest叙事生成（v0.5，结算后触发）
+      if (WA.digest) WA.digest.generate();
 
       // next_turn_injection 持久化（before链读取）
       if (r.next_turn_injection && typeof r.next_turn_injection === 'object') {
