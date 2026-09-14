@@ -21,7 +21,8 @@
     const ctx = getCtx();
     const len = ctx && ctx.chat ? ctx.chat.length : 0;
     const last = len && ctx.chat[len - 1];
-    return len + ':' + (last && last.mes ? String(last.mes).length : 0) + ':' + Date.now().toString(36).slice(-4);
+    // 去重签名：同一聊天长度+最后消息内容+swipe_id 视为同一轮（不含时间戳，否则永不命中）
+    return len + ':' + (last && last.mes ? String(last.mes).length : 0) + ':' + (last && last.swipe_id != null ? last.swipe_id : 0);
   }
 
   // 主拦截：SillyTavern 在组装prompt前 await 此函数
@@ -62,7 +63,16 @@
         if (afterEvt && !afterHooked) {
           afterHooked = true;
           ctx.eventSource.on(afterEvt, async (...args) => {
-            const actx = { args, store: WA.store ? WA.store.get() : null, branchId: WA.store ? WA.store.currentBranchId() : 'b0' };
+            // 重新构建与before链同源的ctx（含chat/branchId），供after链节点使用
+            const c = getCtx();
+            const actx = {
+              args,
+              type: 'after',
+              chat: (c && c.chat) || [],
+              store: WA.store ? WA.store.get() : null,
+              branchId: WA.store ? WA.store.currentBranchId() : 'b0',
+              injections: []
+            };
             try { await WA.workflow.run('after', actx); }
             catch (e) { WA.log('error', 'after链执行异常', e); }
           });

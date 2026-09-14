@@ -46,7 +46,7 @@
       if (!r) return { ok: false, reason: 'api-fail' };
       const now = Date.now();
       const validTitles = new Set(candidates.map(c => c.t));
-      const news = (r.news || []).slice(0, 3).filter(n => n && n.title && validTitles.has(n.related_event_id) || (n && validTitles.has(n.related_event_id)))
+      const news = (r.news || []).slice(0, 3).filter(n => n && n.title && validTitles.has(n.related_event_id))
         .map(n => ({ title: String(n.title).slice(0, 80), body: String(n.body || '').slice(0, 300), related_event_id: n.related_event_id, claim_status: ['fact', 'mixed', 'rumor'].includes(n.claim_status) ? n.claim_status : 'rumor', scope: n.scope || 'local', at: now, kind: 'news' }));
       const forums = (r.forums || []).slice(0, 4).filter(f => f && f.topic && validTitles.has(f.related_event_id))
         .map(f => ({ board: String(f.board || '综合').slice(0, 30), topic: String(f.topic).slice(0, 80), related_event_id: f.related_event_id, claim_status: ['fact', 'mixed', 'rumor'].includes(f.claim_status) ? f.claim_status : 'rumor', audience_tags: (f.audience_tags || []).slice(0, 5), replies: (f.replies || []).slice(0, 4).map(x => ({ author: String(x.author || '匿名').slice(0, 20), text: String(x.text || '').slice(0, 150) })), at: now, kind: 'forum' }));

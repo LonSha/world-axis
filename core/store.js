@@ -53,6 +53,10 @@
       directEvents: [],         // {id,title,totalTurns,currentTurn,status:active|done|aborted,opponent,box,notes:[],createdAt}
       // 一致性记录（冲突诊断，不静默覆盖）
       consistency: [],          // {kind, detail, at}
+      // 世界脉搏（backstage结算）
+      worldPulse: null,         // {pressure:0-3, trend:rising|falling|steady, note, at}
+      // 下轮注入三列引用（after链产出，before链一次性消费）
+      nextTurnInjection: null,  // {required:[], conditional:[], suppress:[], at, anchor}
       // 元信息
       meta: { createdAt: Date.now(), updatedAt: Date.now(), lastAnchor: null }
     };

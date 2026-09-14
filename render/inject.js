@@ -50,8 +50,9 @@
       (ctx.injections || []).forEach(i => items.push(i));
       const combined = items.map(i => i.content).join('\n');
       try {
+        // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
-        WA.log('info', '注入落地：' + items.map(i => i.source).join(' + '));
+        if (combined) WA.log('info', '注入落地：' + items.map(i => i.source).join(' + '));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
     }
   };
