@@ -1,0 +1,14 @@
+{
+  "display_name": "世界枢轴 WorldAxis",
+  "loading_order": 90,
+  "requires": [],
+  "optional": [],
+  "dependencies": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "LonSha & sutured sources",
+  "version": "0.1.0",
+  "auto_update": false,
+  "minimum_client_version": "1.12.0",
+  "generate_interceptor": "worldAxisGenerateInterceptor"
+}
