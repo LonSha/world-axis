@@ -280,6 +280,20 @@ const WA = global.WorldAxis;
   assert(cr.events_create[0].title.length <= 30, 'clampBackstageResult截断events');
   assert(cr.winds[0].topic.length <= 10, 'clampBackstageResult截断winds.topic');
 
+  // ── inject v0.7: digest+nearEvent一次性消费 ──
+  section('render/inject v0.7');
+  // 灌入digest和nearEvent
+  WA.store.transact(d => {
+    d.evolution.worldDigest = { text: '各方暗流涌动，张力已近临界点。血刀门声势正隆。', round: 1, at: Date.now() };
+    d.nextTurnInjection = { nearEvent: { title: '城门失火', desc: '火势蔓延', urgent: true } };
+  });
+  const mockCtx = { injections: [] };
+  WA.render.applyInjections(mockCtx);
+  const lastPrompt = (global.__lastExtensionPrompt && global.__lastExtensionPrompt.text) || '';
+  assert(lastPrompt.includes('世界推演') || lastPrompt.includes('[世界推演]'), 'digest注入到扩展提示');
+  assert(lastPrompt.includes('城门失火'), 'nearEvent注入到扩展提示');
+  assert(!WA.store.get().nextTurnInjection || !WA.store.get().nextTurnInjection.nearEvent, 'nearEvent一次性消费已清除');
+
   section('engines/opinion');
   WA.store.transact(d => {
     d.currents.push({ id: 'cu1', title: '镇外骑兵队逼近', summary: '', visibility: 'trace', publicity: 'public', public_trace: '马蹄声', stage: '发展', createdAt: Date.now(), updatedAt: Date.now() });

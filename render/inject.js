@@ -47,6 +47,16 @@
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
       // 舆情块
       if (vis.opinion && WA.opinion) { const ob = WA.opinion.buildOpinionBlock(); if (ob) items.push({ source: '舆情', content: ob }); }
+      // v0.7: world_digest块
+      if (WA.digest) { const db = WA.digest.buildBlock(); if (db) items.push({ source: '世界推演', content: db }); }
+      // v0.7: 近端事件一次性消费
+      const st = WA.store.get();
+      if (st && st.nextTurnInjection && st.nextTurnInjection.nearEvent) {
+        const ne = st.nextTurnInjection.nearEvent;
+        items.push({ source: '近端事件', content: `[突发事件] ${ne.title}${ne.urgent ? '（紧急）' : ''}：${ne.desc}` });
+        // 一次性消费：清除
+        WA.store.transact(d => { if (d.nextTurnInjection) delete d.nextTurnInjection.nearEvent; });
+      }
       (ctx.injections || []).forEach(i => items.push(i));
       const combined = items.map(i => i.content).join('\n');
       try {
