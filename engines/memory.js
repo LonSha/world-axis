@@ -1,14 +1,15 @@
 /**
- * WorldAxis engines/memory.js (v0.2)
+ * WorldAxis engines/memory.js (v0.3)
  * 记忆引擎：L0单轮摘要 / L1近期巩固 / L2章节回顾 / L3长线沉淀 + facts更迭 + 伏笔生命周期
- * 缝合来源：世界背面记忆分层 + WNE事实版本管理
  */
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const CAP = { l0: 20, l1: 30, l2: 40, l3: 60, facts: 100, foreshadows: 30 };
-  const CONSOLIDATE_EVERY = 5;  // 每5轮L0触发一次L1巩固
+  const L1_EVERY = 5;   // L0攒5条→L1
+  const L2_EVERY = 4;   // L1攒4条→L2
+  const L3_EVERY = 3;   // L2攒3条→L3
 
   function getCtx() { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } }
   function recentText(n) {
@@ -17,13 +18,11 @@
   }
 
   const memory = WA.memory = {
-    /** L0：单轮摘要（after链每轮执行，复用digest通道，无配置则跳过） */
     async digestRound() {
       const cfg = WA.apiRouter.getChannel('digest');
       if (!cfg.baseUrl || !cfg.model) return null;
-      const sys = '你是记忆摘要器。把最近一段剧情压缩为一条≤80字的客观摘要（第三人称、含关键事实与状态变化）。只输出JSON：{"summary":"..."}';
       const r = await WA.apiRouter.call('digest', [
-        { role: 'system', content: sys },
+        { role: 'system', content: '你是记忆摘要器。把最近一段剧情压缩为一条≤80字的客观摘要（第三人称、含关键事实与状态变化）。只输出JSON：{"summary":"..."}' },
         { role: 'user', content: recentText(3) }
       ], { json: true, maxTokens: 300, temperature: 0.3 }).catch(() => null);
       if (!r || !r.summary) return null;
@@ -34,17 +33,15 @@
       return r.summary;
     },
 
-    /** L1：近期巩固（L0攒够CONSOLIDATE_EVERY条时触发，合成一条L1） */
     async consolidateL1() {
       const s = WA.store.get();
       const l0 = s.memory.l0 || [];
-      if (l0.length < CONSOLIDATE_EVERY) return false;
+      if (l0.length < L1_EVERY) return false;
       const cfg = WA.apiRouter.getChannel('digest');
       if (!cfg.baseUrl || !cfg.model) return false;
-      const batch = l0.slice(-CONSOLIDATE_EVERY);
-      const sys = '你是记忆巩固器。把多条单轮摘要合成一条阶段性回顾（≤150字，保留关键转折与人物状态）。同时提取≤3条长期事实候选与≤1条伏笔候选。只输出JSON：{"recap":"...","facts":[{"key":"...","value":"..."}],"foreshadow":{"content":"..."}或null}';
+      const batch = l0.slice(-L1_EVERY);
       const r = await WA.apiRouter.call('digest', [
-        { role: 'system', content: sys },
+        { role: 'system', content: '你是记忆巩固器。把多条单轮摘要合成一条阶段性回顾（≤150字，保留关键转折与人物状态）。同时提取≤3条长期事实候选与≤1条伏笔候选。只输出JSON：{"recap":"...","facts":[{"key":"...","value":"..."}],"foreshadow":{"content":"..."}或null}' },
         { role: 'user', content: batch.map((b, i) => (i + 1) + '. ' + b.s).join('\n') }
       ], { json: true, maxTokens: 600, temperature: 0.3 }).catch(() => null);
       if (!r || !r.recap) return false;
@@ -53,18 +50,59 @@
         draft.memory.l1 = draft.memory.l1.slice(-CAP.l1);
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'digest'); });
         if (r.foreshadow && r.foreshadow.content) {
-          (draft.memory.foreshadows = draft.memory.foreshadows || []).push({
-            id: 'fs' + Date.now() + Math.random().toString(36).slice(2, 5),
-            content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: [], at: Date.now()
-          });
+          (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: 'fs' + Date.now() + Math.random().toString(36).slice(2, 5), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: [], at: Date.now() });
           draft.memory.foreshadows = draft.memory.foreshadows.slice(-CAP.foreshadows);
         }
-        draft.memory.l0 = draft.memory.l0.slice(0, draft.memory.l0.length - CONSOLIDATE_EVERY); // 已巩固的移出L0
+        draft.memory.l0 = draft.memory.l0.slice(0, draft.memory.l0.length - L1_EVERY);
       });
       return true;
     },
 
-    /** facts版本化更迭（被backstage与digest共用） */
+    /** L2：章节回顾（L1攒L2_EVERY条触发，合并为长线叙事段落） */
+    async consolidateL2() {
+      const s = WA.store.get();
+      const l1 = s.memory.l1 || [];
+      if (l1.length < L2_EVERY) return false;
+      const cfg = WA.apiRouter.getChannel('digest');
+      if (!cfg.baseUrl || !cfg.model) return false;
+      const batch = l1.slice(-L2_EVERY);
+      const r = await WA.apiRouter.call('digest', [
+        { role: 'system', content: '你是章节回顾器。把多条阶段回顾合并为一条章节级叙事（≤250字，呈现主线进展与重大转折）。同时更新≤3条长期事实。只输出JSON：{"chapter":"...","facts":[{"key":"...","value":"..."}]}' },
+        { role: 'user', content: batch.map((b, i) => (i + 1) + '. ' + b.s).join('\n') }
+      ], { json: true, maxTokens: 800, temperature: 0.3 }).catch(() => null);
+      if (!r || !r.chapter) return false;
+      WA.store.transact(draft => {
+        draft.memory.l2.push({ t: Date.now(), s: String(r.chapter).slice(0, 350) });
+        draft.memory.l2 = draft.memory.l2.slice(-CAP.l2);
+        (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'l2'); });
+        draft.memory.l1 = draft.memory.l1.slice(0, draft.memory.l1.length - L2_EVERY);
+      });
+      WA.log('info', 'L2章节回顾入账');
+      return true;
+    },
+
+    /** L3：长线沉淀（L2攒L3_EVERY条触发，沉淀为世界底层基调/长期主题） */
+    async consolidateL3() {
+      const s = WA.store.get();
+      const l2 = s.memory.l2 || [];
+      if (l2.length < L3_EVERY) return false;
+      const cfg = WA.apiRouter.getChannel('digest');
+      if (!cfg.baseUrl || !cfg.model) return false;
+      const batch = l2.slice(-L3_EVERY);
+      const r = await WA.apiRouter.call('digest', [
+        { role: 'system', content: '你是长线沉淀器。把多条章节回顾提炼为贯穿性长线主题/世界底层变化（≤200字，如势力格局演变、角色关系网定型、时代基调）。只输出JSON：{"theme":"...","worldShift":"..."}' },
+        { role: 'user', content: batch.map((b, i) => (i + 1) + '. ' + b.s).join('\n') }
+      ], { json: true, maxTokens: 600, temperature: 0.3 }).catch(() => null);
+      if (!r || !r.theme) return false;
+      WA.store.transact(draft => {
+        draft.memory.l3.push({ t: Date.now(), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200) });
+        draft.memory.l3 = draft.memory.l3.slice(-CAP.l3);
+        draft.memory.l2 = draft.memory.l2.slice(0, draft.memory.l2.length - L3_EVERY);
+      });
+      WA.log('info', 'L3长线沉淀入账');
+      return true;
+    },
+
     upsertFact(draft, key, value, source) {
       const facts = draft.memory.facts;
       const old = facts.find(f => f.key === key && f.active);
@@ -79,10 +117,12 @@
       return true;
     },
 
-    /** 供注入的记忆块（before链） */
+    /** 供注入的记忆块（L3主题+L1回顾+facts+发展中伏笔） */
     buildMemoryBlock() {
       const s = WA.store.get();
       const parts = [];
+      const l3 = (s.memory.l3 || []).slice(-1)[0];
+      if (l3) parts.push('【长线主题】' + l3.theme + (l3.worldShift ? ' / ' + l3.worldShift : ''));
       const fs = (s.memory.facts || []).filter(f => f.active).slice(-10);
       if (fs.length) parts.push('【长期事实】' + fs.map(f => f.key + '=' + f.value).join('；'));
       const l1 = (s.memory.l1 || []).slice(-3);
@@ -95,10 +135,12 @@
   };
 
   WA.workflow.register({
-    id: 'memory.digest', chain: 'after', order: 40, label: '记忆L0摘要+L1巩固',
+    id: 'memory.digest', chain: 'after', order: 40, label: '记忆L0→L1→L2→L3分层巩固',
     async run() {
       await WA.memory.digestRound();
       await WA.memory.consolidateL1();
+      await WA.memory.consolidateL2();
+      await WA.memory.consolidateL3();
     }
   });
 })();

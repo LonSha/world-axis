@@ -18,7 +18,7 @@ function section(t) { console.log('\n■ ' + t); }
 const ctx = vm.createContext(global);
 const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
-  'engines/backstage.js', 'engines/evolution.js', 'engines/calendar.js', 'engines/memory.js',
+  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
@@ -133,16 +133,71 @@ const WA = global.WorldAxis;
   assert(f2.length === 2 && f2[0].active === false && f2[1].active === true && f2[1].version === 2, 'facts版本化更迭 v1→v2');
   const mb = WA.memory.buildMemoryBlock();
   assert(mb.includes('world_axis_memory') && mb.includes('玩家处境'), '记忆块构建');
+  // L2/L3 分层巩固
+  WA.store.transact(d => { d.memory.l1 = []; for (let i = 0; i < 4; i++) d.memory.l1.push({ t: Date.now(), s: '阶段回顾' + i }); });
+  global.__pushApiJson({ chapter: '玩家从入镇到卷入血刀门冲突', facts: [{ key: '主线', value: '血刀门冲突' }] });
+  const l2ok = await WA.memory.consolidateL2();
+  assert(l2ok === true && WA.store.get().memory.l2.some(x => x.s.includes('血刀门')), 'L2章节回顾入账');
+  WA.store.transact(d => { d.memory.l2 = []; for (let i = 0; i < 3; i++) d.memory.l2.push({ t: Date.now(), s: '章节' + i }); });
+  global.__pushApiJson({ theme: '血刀门与玩家的长期对抗', worldShift: '青石关势力格局重组' });
+  const l3ok = await WA.memory.consolidateL3();
+  assert(l3ok === true && WA.store.get().memory.l3.some(x => x.theme.includes('血刀门')), 'L3长线沉淀入账');
 
-  // ── evolution ──
-  section('engines/evolution');
-  WA.evolution.addEvent({ title: '蒙面人追杀', type: 'conflict', stage: '萌芽' });
-  for (let i = 0; i < 5; i++) WA.evolution.tick(); // 5轮：第4轮应自动推进
-  const ev1 = WA.store.get().evolution.events.find(e => e.title === '蒙面人追杀');
-  assert(ev1 && ev1.stage === '发酵', '停滞4轮自动推进一阶段 (实:' + ev1.stage + ')');
-  assert(typeof WA.evolution.activeSnapshot() === 'object', 'activeSnapshot可读');
+  // ── evolution (v0.3 完整版) ──
+  section('engines/evolution v0.3');
+  WA.store.transact(d => { d.evolution.events = []; d.evolution.round = 0; });
+  WA.evolution.setSettings({ diceEnabled: true, diceModifier: 0 });
+  WA.evolution.addEvent({ name: '血刀门复仇', type: 'conflict', level: 2, stage: '萌芽', stageRound: 8 });
+  WA.evolution.addEvent({ name: '护送商队', type: 'progress', level: 1, stage: '筹备', stageRound: 1 });
+  // 强制保底：consecutiveFails拉满
+  WA.store.transact(d => { d.evolution.events[1].consecutiveFails = 99; });
+  const rollRes = WA.evolution.tick();
+  const ev_blood = WA.store.get().evolution.events.find(e => e.name === '血刀门复仇');
+  assert(ev_blood, '事件链入账(name字段)');
+  assert(rollRes.some(r => r.name === '护送商队' && r.result === '成功(保底)'), '保底机制触发(连续失败强制成功)');
+  // 势力/声誉/经济结算
+  WA.store.transact(d => {
+    WA.evolution.applyFactions(d, [{ name: '血刀门', scope: '青石关一带', status: '稳固', relation: '敌对', currentGoal: '追杀玩家', core_person: '门主', powerPillars: ['武力威慑', '山路控制'] }]);
+    WA.evolution.applyReputation(d, { shadow: '受人尊敬', lastChange: '草莽因玩家对抗血刀门而敬重' });
+    WA.evolution.applyEconomy(d, { climate: '动荡', signals: [{ summary: '商路被血刀门封锁，粮价上涨', scope: '青石关' }] });
+    WA.evolution.applyInfluenceChain(d, [{ trigger: '血刀门复仇', impact: '商路中断', fallout: '周边物价上涨' }]);
+  });
+  const sev = WA.store.get().evolution;
+  assert(sev.factions.some(f => f.name === '血刀门' && f.status === '稳固' && f.relation === '敌对' && f.powerPillars.length === 2), '势力入账(六态/七级关系/权力支柱)');
+  assert(sev.reputation.shadow === '受人尊敬', '声誉四维入账(草莽)');
+  assert(sev.economy.climate === '动荡' && sev.economy.signals.length === 1, '经济气候+信号入账');
+  assert(sev.trends.some(t => t.trigger === '血刀门复仇'), '影响链入账');
+  // 风声归并+消散
+  WA.evolution.addWind({ topic: '血刀门追杀令', type: 'rumor', level: 2, content: '血刀门悬赏玩家', scope: '青石关' });
+  WA.evolution.addWind({ topic: '血刀门追杀令', type: 'rumor', level: 3, content: '血刀门加码悬赏', scope: '全区' });
+  const winds = WA.store.get().evolution.winds.filter(w => w.topic === '血刀门追杀令');
+  assert(winds.length === 1 && winds[0].level === 3 && winds[0].content === '血刀门加码悬赏', '风声同主题归并(不新建,等级取高)');
+  // 消散骰（level1 rumor grace1，多轮后大概率消散）
+  WA.store.transact(d => { d.evolution.winds.forEach(w => { w.quietRounds = 20; w.level = 1; }); });
+  const decayed = WA.evolution.decayWinds();
+  assert(decayed.includes('血刀门追杀令'), '风声长期沉寂后消散');
+  // 演化注入块
+  const evBlock = WA.evolution.buildEvolutionBlock();
+  assert(evBlock.includes('world_axis_evolution') && evBlock.includes('血刀门'), '演化注入块构建');
+  assert(typeof WA.evolution.activeSnapshot === 'function' && WA.evolution.activeSnapshot().events.length >= 0, 'activeSnapshot可读');
 
-  // ── opinion ──
+  // ── enemies/blackbox/worldTrends (v0.3) ──
+  section('engines/enemies v0.3');
+  WA.store.transact(d => {
+    WA.enemies.apply(d, [{ name: '血刀门门主', reason: '玩家杀死其师弟', type: 'blood', status: '追踪中' }]);
+    WA.enemies.applyBlackbox(d, { secretActions: [{ action: '玩家夜探血刀门分舵', witnesses: '无' }], secretAssets: [{ name: '藏身的破庙', exposure: 20, status: '有效' }] });
+    WA.enemies.applyWorldTrends(d, [{ name: '血刀门扩张', scope: '青石关周边', status: '持续中', description: '血刀门吞并周边小帮派', source: 'Lv4冲突已爆发' }]);
+  });
+  const sen = WA.store.get().evolution;
+  assert(sen.enemies.some(e => e.name === '血刀门门主' && e.type === 'blood' && e.status === '追踪中'), '仇敌录入账(blood/追踪中)');
+  assert(sen.blackbox.secretActions.length === 1 && sen.blackbox.secretAssets[0].exposure === 20, '黑盒入账(隐秘行为+资产曝光度)');
+  assert(sen.worldTrends.some(t => t.name === '血刀门扩张' && t.status === '持续中'), '天下大势入账');
+  const enBlock = WA.enemies.buildEnemiesBlock();
+  assert(enBlock.includes('world_axis_enemies') && enBlock.includes('血刀门门主') && enBlock.includes('天下大势'), '仇敌/大势注入块构建');
+  // 已终结仇敌保留20轮后清除
+  WA.store.transact(d => { d.evolution.round = 100; WA.enemies.apply(d, [{ name: '血刀门门主', status: '已终结' }]); });
+  WA.store.transact(d => { d.evolution.round = 200; WA.enemies.apply(d, []); });
+  assert(!WA.store.get().evolution.enemies.some(e => e.name === '血刀门门主'), '已终结仇敌20轮后自动清除');
   section('engines/opinion');
   WA.store.transact(d => {
     d.currents.push({ id: 'cu1', title: '镇外骑兵队逼近', summary: '', visibility: 'trace', publicity: 'public', public_trace: '马蹄声', stage: '发展', createdAt: Date.now(), updatedAt: Date.now() });

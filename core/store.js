@@ -37,9 +37,10 @@
         foreshadows: [],        // 伏笔 {id,content,status:waiting|developing|triggered|recycled|dropped,links:[],at}
         l0: [], l1: [], l2: [], l3: []   // 分层经历摘要
       },
-      // 事件演化（World引擎：冲突/进度阶段机 + 势力/声誉/经济）
+      // 事件演化（World引擎：冲突/进度阶段机 + 势力/声誉/经济/仇敌/黑盒/天下大势）
       evolution: {
-        events: [], factions: [], winds: [], trends: [],
+        events: [], factions: [], winds: [], trends: [], enemies: [],
+        blackbox: { secretActions: [], secretAssets: [] }, worldTrends: [],
         reputation: { authority: '默默无闻', common: '默默无闻', shadow: '默默无闻', circuit: '默默无闻', lastChange: '' },
         economy: { climate: '平稳', signals: [] },
         round: 0, digest: ''

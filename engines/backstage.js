@@ -124,7 +124,7 @@
       echoes_recent: (s.echoes || []).slice(-5).map(e => ({ r: e.refCurrent, res: (e.result || '').slice(0, 80) })),
       foreshadows: (s.memory.foreshadows || []).filter(f => f.status === 'waiting' || f.status === 'developing').slice(0, 8).map(f => ({ id: f.id, c: f.content.slice(0, 60), st: f.status })),
       opinion_top: (s.opinion.canon || []).slice(-3).map(o => ({ t: o.title || o, cl: o.claim_status || '' })),
-      evolution_active: (s.evolution.events || []).filter(e => !(WA.evolution.TERMINAL[e.type] || []).includes(e.stage)).slice(0, 6).map(e => ({ t: e.title, ty: e.type, st: e.stage }))
+      evolution_active: (WA.evolution && WA.evolution.activeSnapshot) ? WA.evolution.activeSnapshot() : { events: [], factions: [], winds: [] }
     };
   }
 
@@ -222,6 +222,14 @@
         ' "echoes": [{"refCurrent":"事件标题","result":"...","exposure":"subtle|obvious"}],',
         ' "chronicle": [{"kind":"event|fact|pulse","title":"...","summary":"..."}],',
         ' "foreshadows": [{"id":"...","content":"...","status":"waiting|developing|triggered|recycled|dropped"}],',
+        ' "factions": [{"name":"...","scope":"...","status":"鼎盛|稳固|倾轧|困顿|衰落|瓦解","relation":"血盟|盟友|友好|中立|冷淡|敌对|世仇","currentGoal":"...","core_person":"...","powerPillars":["..."]}],',
+        ' "reputation": {"authority":"天怒人怨|声名狼藉|默默无闻|受人尊敬|万众敬仰","common":"...","shadow":"...","circuit":"...","lastChange":"..."},',
+        ' "economy": {"climate":"繁荣|平稳|衰退|动荡","signals":[{"summary":"...","scope":"..."}]},',
+        ' "winds": [{"topic":"...","type":"announcement|report|rumor|sentiment","level":1-4,"content":"...","scope":"...","source":"..."}],',
+        ' "influenceChain": [{"trigger":"...","impact":"...","fallout":"..."}],',
+        ' "enemies": [{"name":"...","reason":"...","type":"blood|grudge","status":"追踪中|策划中|执行中|已终结"}],',
+        ' "blackbox": {"secretActions":[{"action":"...","witnesses":"..."}],"secretAssets":[{"name":"...","exposure":0-100,"status":"有效|过期|暴露|失效"}]},',
+        ' "worldTrends": [{"name":"...","scope":"...","status":"持续中|已结束","description":"...","source":"..."}],',
         ' "next_turn_injection": {"required":[],"conditional":[],"suppress":[]}',
         '}',
         '宁缺毋滥：无变化就给空数组。绝不代写玩家言行。绝不剧透suppress列内容。'
@@ -352,6 +360,27 @@
         if (old) { old.status = f.status || old.status; old.content = f.content || old.content; }
         else (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: f.id, content: f.content || '', status: f.status || 'waiting', links: f.links || [], at: now });
       });
+
+      // 演化系统入账（势力/声誉/经济/风声/影响链）
+      if (WA.evolution) {
+        if (r.factions) WA.evolution.applyFactions(draft, r.factions);
+        if (r.reputation) WA.evolution.applyReputation(draft, r.reputation);
+        if (r.economy) WA.evolution.applyEconomy(draft, r.economy);
+        if (r.influenceChain) WA.evolution.applyInfluenceChain(draft, r.influenceChain);
+        (r.winds || []).slice(0, 4).forEach(w => {
+          if (!w || !w.topic) return;
+          draft.evolution.winds = draft.evolution.winds || [];
+          const old = draft.evolution.winds.find(x => x.topic === w.topic);
+          if (old) { old.content = w.content || old.content; old.level = Math.max(old.level || 1, w.level || 1); old.scope = w.scope || old.scope; old.quietRounds = 0; }
+          else draft.evolution.winds.push({ id: 'w' + now + Math.random().toString(36).slice(2, 5), topic: w.topic, type: w.type || 'rumor', level: w.level || 1, content: w.content || '', scope: w.scope || '', source: w.source || '', quietRounds: 0 });
+        });
+      }
+      // 仇敌/黑盒/天下大势入账
+      if (WA.enemies) {
+        if (r.enemies) WA.enemies.apply(draft, r.enemies);
+        if (r.blackbox) WA.enemies.applyBlackbox(draft, r.blackbox);
+        if (r.worldTrends) WA.enemies.applyWorldTrends(draft, r.worldTrends);
+      }
 
       // next_turn_injection 持久化（before链读取）
       if (r.next_turn_injection && typeof r.next_turn_injection === 'object') {

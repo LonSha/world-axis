@@ -30,6 +30,11 @@
           <button class="wa-btn" id="wa-op-now">立即生成舆情</button>
           <button class="wa-btn" id="wa-sim-now">立即推演世界</button>
         </div>
+        <div class="wa-sec">事件演化（本地骰子）</div>
+        <label class="wa-node"><input type="checkbox" id="wa-ev-dice" ${WA.evolution.getSettings().diceEnabled ? 'checked' : ''}/><span class="wa-node-label">启用事件链本地骰子推进</span></label>
+        <div class="wa-set-row"><span>骰子修正 <b id="wa-ev-modv">${WA.evolution.getSettings().diceModifier}</b></span><input type="range" min="-30" max="30" value="${WA.evolution.getSettings().diceModifier}" id="wa-ev-mod" class="wa-range"/></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-ev-roll">立即掷一轮演化骰</button></div>
+        <div id="wa-ev-out" class="wa-out"></div>
         <div id="wa-set-out" class="wa-out"></div>`;
     },
     bind(panelEl) {
@@ -54,6 +59,15 @@
       if (opNow) opNow.onclick = async () => { out().textContent = '舆情生成中…'; const r = await WA.opinion.generate(); out().textContent = r.ok ? `✓ 新闻${r.news}条 论坛${r.forums}主题` : ('失败：' + r.reason); };
       const simNow = $('#wa-sim-now');
       if (simNow) simNow.onclick = () => { WA.backstage.forceSimulate(); out().textContent = '已触发世界推演（见日志）'; };
+      // 演化设置
+      const evMod = $('#wa-ev-mod');
+      if (evMod) evMod.oninput = () => { $('#wa-ev-modv').textContent = evMod.value; };
+      const evRoll = $('#wa-ev-roll');
+      if (evRoll) evRoll.onclick = () => {
+        WA.evolution.setSettings({ diceEnabled: $('#wa-ev-dice').checked, diceModifier: +evMod.value });
+        const results = WA.evolution.tick();
+        $('#wa-ev-out').innerHTML = results.length ? results.map(r => `<div class="wa-item">${esc(r.name)}：<b>${esc(r.result)}</b> ${r.stage ? '→ ' + esc(r.stage) : ''} ${r.dice ? '(骰' + r.dice + '/阈' + r.threshold + ')' : ''}</div>`).join('') : '<div class="wa-dim">（无活跃事件链，可在backstage推演中生成）</div>';
+      };
     }
   };
 })();
