@@ -24,7 +24,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1474,6 +1474,78 @@ const WA = global.WorldAxis;
   WA.store.transact(d => { d.memory.pmem = []; });
   assert(WA.backstage.getSettings().memSamplerLimit === 8, '采样配置保持默认（测试隔离）');
 
+
+  // ══════════ v0.1.0 采样器自检（sampler-check）══════════
+  v010: {
+    assert(typeof WA.samplerCheck === 'object', 'samplerCheck 已加载');
+  assert(WA.samplerCheck.TRIALS === 200, '自检试验次数 200');
+  assert(WA.samplerCheck.RECENT_RATIO === 0.5, '近期偏置阈值 0.5');
+  // mulberry 确定性伪随机：同种子同输出
+  const scRng1 = WA.samplerCheck.mulberry(42);
+  const scRng2 = WA.samplerCheck.mulberry(42);
+  const scSeq1 = [scRng1(), scRng1(), scRng1()];
+  const scSeq2 = [scRng2(), scRng2(), scRng2()];
+  assertDeepEq(scSeq1, scSeq2, 'mulberry 同种子序列一致（可复现）');
+  const scRng3 = WA.samplerCheck.mulberry(7);
+  const scSeq3 = [scRng3(), scRng3(), scRng3()];
+  assert(scSeq1.some((v, i) => scSeq3[i] !== v), 'mulberry 不同种子序列不同');
+  // ── statSample: 命中率统计 ──
+  const scEntries = [];
+  for (let i = 0; i < 12; i++) scEntries.push({ holders: ['人物' + i], text: '记忆' + i, time: '第' + i + '日' });
+  WA.store.init();
+  const scStat = WA.samplerCheck.statSample(scEntries, {
+    state: WA.store.get(), limit: 4, relevanceFilter: 'off'
+  });
+  assert(scStat.trials === 200, 'statSample 跑满 200 次');
+  assert(scStat.rates.length === 12, '每条记忆都有命中率记录');
+  assert(scStat.rates.every(r => r.hitRate >= 0 && r.hitRate <= 1), '命中率在 [0,1] 区间');
+  // 命中总数 = limit * trials（每次采 4 条）
+  const scTotalHits = scStat.rates.reduce((a, r) => a + r.hitRate * scStat.trials, 0);
+  assert(Math.abs(scTotalHits - 4 * 200) < 1, '命中总数 = limit*trials: ' + scTotalHits.toFixed(0));
+  // 近期偏置：后半段平均命中率 > 前半段
+  const scHalf = 6;
+  const scFirst = scStat.rates.slice(0, scHalf).reduce((a, r) => a + r.hitRate, 0) / scHalf;
+  const scLast = scStat.rates.slice(scHalf).reduce((a, r) => a + r.hitRate, 0) / scHalf;
+  assert(scLast > scFirst, '指数衰减近期偏置: 前' + (scFirst * 100).toFixed(1) + '% < 后' + (scLast * 100).toFixed(1) + '%');
+  // ── runChecks: 全量自检 ──
+  const scReport = WA.samplerCheck.runChecks({
+    entries: scEntries, state: WA.store.get(),
+    recentText: '人物0和人物5在酒馆对话', limit: 4
+  });
+  assert(scReport.verdict.ok === true, '采样器自检全部通过: ' + scReport.verdict.pass + '/' + scReport.verdict.total);
+  const scCheckNames = scReport.checks.map(c => c.name);
+  assert(scCheckNames.indexOf('采样器已加载') >= 0 && scCheckNames.indexOf('引用保持') >= 0, '自检含加载与引用保持项');
+  assert(scCheckNames.indexOf('近期偏置') >= 0 && scCheckNames.indexOf('相关性过滤') >= 0, '自检含近期偏置与相关性过滤项');
+  assert(scCheckNames.indexOf('limit 边界') >= 0 && scCheckNames.indexOf('无副作用') >= 0, '自检含边界与无副作用项');
+  // 引用保持单项必须真过（非跳过）
+  const scRefCheck = scReport.checks.filter(c => c.name === '引用保持')[0];
+  assert(scRefCheck.ok === true && scRefCheck.detail.indexOf('跳过') < 0, '引用保持真实验证（非跳过）: ' + scRefCheck.detail);
+  // 相关性过滤真实验证
+  const scRelCheck = scReport.checks.filter(c => c.name === '相关性过滤')[0];
+  assert(scRelCheck.ok === true && scRelCheck.detail.indexOf('生效') >= 0, '相关性过滤生效: ' + scRelCheck.detail);
+  // 近期偏置真实验证（12 条 >= 8，走统计分支）
+  const scBiasCheck = scReport.checks.filter(c => c.name === '近期偏置')[0];
+  assert(scBiasCheck.ok === true && scBiasCheck.detail.indexOf('试验') >= 0, '近期偏置走统计分支: ' + scBiasCheck.detail);
+  // 无副作用真实验证
+  const scSideCheck = scReport.checks.filter(c => c.name === '无副作用')[0];
+  assert(scSideCheck.ok === true && scSideCheck.detail.indexOf('未被修改') >= 0, '采样不修改入参: ' + scSideCheck.detail);
+  // ── 降级路径：采样器不可用时自检报失败但不抛异常 ──
+  const keepSampler = WA.memorySampler;
+  delete WA.memorySampler;
+  const scBroken = WA.samplerCheck.runChecks({ entries: scEntries, state: WA.store.get() });
+  assert(scBroken.verdict.ok === false && scBroken.verdict.total === 1, '采样器缺失时自检报失败');
+  const scLoadCheck = scBroken.checks.filter(c => c.name === '采样器已加载')[0];
+  assert(scLoadCheck.ok === false, '缺失时首项为「采样器已加载」失败');
+  WA.memorySampler = keepSampler;
+  // ── 空条目降级 ──
+  const scEmpty = WA.samplerCheck.runChecks({ entries: [], state: WA.store.get(), recentText: 'x' });
+  assert(scEmpty.verdict.ok === true, '空条目时自检全跳过（trivially pass）: ' + scEmpty.verdict.pass + '/' + scEmpty.verdict.total);
+  // ── statSample 降级 ──
+  assertDeepEq(WA.samplerCheck.statSample(null, {}), { trials: 0, hits: {}, rates: [] }, 'statSample 空入参降级');
+  // ── 诊断清单登记校验 ──
+  assert(WA.toolDiag.MODULE_EXPORTS['engines/sampler-check.js'] === 'samplerCheck', '诊断清单已登记 sampler-check');
+
+  } // end v0.1.0 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
