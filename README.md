@@ -67,6 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 
 ## 版本历史
+- **v0.1.6** — 诊断输出槽位落地信息：tool-diag 的 secInject 补 slots/slotConsistent/slotIssues（来自 injectSlotAudit 对账），flatten 的 injectSlots 行在不一致时升级为 warn；620 断言全过
 - **v0.1.5** — 检查器对齐归零语义：inspector-state 的 inject.badShape（检查三列是否为数组）改为 inject.emptyShell（检查四字段是否全无内容），因为 v0.1.4 后空壳对象不应再存在——残留即异常；空数组 [] 是合法形态不再误报；608 断言全过
 - **v0.1.4** — 近端事件消费归零：修复 nextTurnInjection.nearEvent 消费后只删键不归零、留下空壳对象的缺陷（inspector-state 的 inject.badShape 会误报）；现在删键后检查三列是否全空，空则整体置 null；600 断言全过
 - **v0.1.3** — 注入槽位落地审计：新增 engines/inject-slot-audit.js（snapshotSlots 采集槽位计划/落地数/字符数，audit 对账 appliedMismatch 与孤儿槽位）；render/inject.js 的 lastInjection 快照补 slots 字段，排查「约束注入丢了」时可区分「路由失败并入主块」与「路由成功但槽位被宿主覆盖」；591 断言全过

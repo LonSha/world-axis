@@ -135,6 +135,16 @@
         injectEnabled: snap.injectEnabled, registeredAtSend: snap.registeredAtSend
       };
       if (snap.apiType === 'chat') { out.messageCount = snap.messageCount; out.ourIndex = snap.ourIndex; out.ourContentLen = snap.ourContentLen; }
+      // v0.1.6: 补槽位落地信息（来自 injectSlotAudit 对 lastInjection 的对账结果）
+      const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
+      if (li && li.slots) {
+        out.slots = li.slots;
+        const slotAudit = WA.injectSlotAudit ? WA.injectSlotAudit.audit(li) : null;
+        if (slotAudit) {
+          out.slotConsistent = slotAudit.consistent;
+          if (slotAudit.issues.length) out.slotIssues = slotAudit.issues;
+        }
+      }
       else { out.promptLength = snap.promptLength; out.ourExcerptLen = snap.ourExcerptLen; }
       return out;
     }, {});
@@ -278,6 +288,11 @@
     const out = ((d.verdict && d.verdict.issues) || []).map(function (i) { return { level: i.level, key: i.key, detail: i.detail }; });
     out.push({ level: 'info', key: 'meta', detail: '版本 ' + ((d.meta || {}).extVersion || '?') + '，模块 ' + ((d.modules || {}).loadedCount || 0) + ' 个已导出' });
     out.push({ level: 'info', key: 'inject', detail: ((d.inject || {}).statusText) || '无注入记录' });
+    // v0.1.6: 槽位落地摘要
+    const inj = d.inject || {};
+    if (inj.slots) {
+      out.push({ level: inj.slotConsistent === false ? 'warn' : 'info', key: 'injectSlots', detail: '槽位 ' + inj.slots.applied + '/' + inj.slots.count + ' 落地' + (inj.slotConsistent === false ? '（不一致）' : '') });
+    }
     return out;
   }
   function download() {

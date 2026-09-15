@@ -1852,6 +1852,46 @@ const WA = global.WorldAxis;
   assert(esIssues.filter(function (x) { return x.code === 'inject.badShape'; }).length === 0, 'inject.badShape 已移除');
 
   } // end v0.1.5 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.6 — tool-diag 诊断输出槽位落地信息
+  // ═══════════════════════════════════════════════════════════
+  v016: {
+  // ── 先制造一次带槽位落地的注入 ──
+  global.__lastExtensionPrompt = null;
+  global.__extPromptLog = [];
+  WA.render.applyInjections({ injections: [
+    { source: '连续性约束', content: '<d16/>约束', position: 'after_last_user', depth: 0 },
+    { source: '章节', content: '<d16/>章节', position: 'after_last_user', depth: 2 }
+  ]});
+  const d16Li = WA.store.get().lastInjection;
+  assert(!!d16Li && !!d16Li.slots, 'v0.1.6 前置：lastInjection 含 slots');
+  // ── collect 的 inject 段含槽位信息 ──
+  const d16Diag = WA.toolDiag.collect();
+  const d16Inject = d16Diag.inject || {};
+  assert(!!d16Inject.slots, '诊断 collect 的 inject 段含 slots');
+  assert(d16Inject.slots.count === 1, '诊断 inject.slots.count=1（after_last_user 一桶）');
+  assert(d16Inject.slotConsistent === true, '诊断 slotConsistent=true（一致）');
+  assert(!d16Inject.slotIssues, '一致时无 slotIssues');
+  // ── flatten 输出含 injectSlots 行 ──
+  const d16Flat = WA.toolDiag.flatten(d16Diag);
+  const d16SlotRow = d16Flat.filter(function (x) { return x.key === 'injectSlots'; })[0];
+  assert(!!d16SlotRow, 'flatten 输出含 injectSlots 行');
+  assert(d16SlotRow.detail.indexOf('1/1') >= 0, 'injectSlots 详情含 1/1 落地数');
+  assert(d16SlotRow.level === 'info', '一致时 injectSlots 级别 info');
+  // ── 不一致时 flatten 报 warn ──
+  WA.store.transact(function (d) {
+    if (d.lastInjection && d.lastInjection.slots) d.lastInjection.slots.applied = 0;
+  });
+  const d16Diag2 = WA.toolDiag.collect();
+  assert(d16Diag2.inject.slotConsistent === false, '篡改 applied 后 slotConsistent=false');
+  assert(!!d16Diag2.inject.slotIssues, '不一致时输出 slotIssues');
+  const d16Flat2 = WA.toolDiag.flatten(d16Diag2);
+  const d16SlotRow2 = d16Flat2.filter(function (x) { return x.key === 'injectSlots'; })[0];
+  assert(!!d16SlotRow2 && d16SlotRow2.level === 'warn', '不一致时 injectSlots 级别 warn');
+  assert(d16SlotRow2.detail.indexOf('0/1') >= 0, '不一致时详情含 0/1');
+  // 清理：恢复一致状态避免污染后续测试
+  WA.store.transact(function (d) { d.lastInjection = null; });
+  } // end v0.1.6 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
