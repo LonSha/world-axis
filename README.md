@@ -19,6 +19,11 @@
 | st-theater / titania-theater | 番外小剧场 |
 | The-Veridis-Lion/Veridis-Rewrite | 输出净化规则引擎 |
 | WNE引擎 / TH-剧情推进 / 创世工坊 | 多API分流·事实版本管理 |
+| DlSNlGHT/World (worldbook) | 世界书蓝绿灯触发引擎·按聊天隔离条目选择·覆写 |
+| DlSNlGHT/World (ledger) | 重大事件账本·推演前后差分记录 |
+| DlSNlGHT/World (inject-inspector) | 注入自检查看器·哨兵着陆检测·纯只读 |
+| DlSNlGHT/World (memory-timeline) | 来源身份·FNV双哈希·引用审计 |
+| DlSNlGHT/World (entity memory) | 四类实体记忆库·别名索引·防重复创建 |
 
 ## 安装
 1. 下载 Release 的 `WorldAxis.zip` 解压到 `SillyTavern/public/scripts/extensions/third-party/WorldAxis/`
