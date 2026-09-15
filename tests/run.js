@@ -2759,6 +2759,71 @@ WA.loadScript = _ls.loadScript;
   WA.workflow.setEnabled('ctest.barrier', true); // 清开关持久化残留
   try { JSON.parse(global.localStorage.getItem('worldaxis_workflow_v1') || '{}'); } catch (e) {}
   } // end v0.1.26 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.27 — API 通道调用台账（callStats / 归因 / 诊断分级）
+  // ═══════════════════════════════════════════════════════════
+  v0127: {
+  assert(typeof WA.apiRouter.callStats === 'function' && typeof WA.apiRouter.resetCallStats === 'function', 'callStats/resetCallStats 已导出');
+  WA.apiRouter.resetCallStats();
+  // 未配置通道 → not-configured 也入账
+  WA.apiRouter.setChannel('digest', { baseUrl: '', model: '' });
+  let threwCfg = false;
+  try { await WA.apiRouter.call('digest', [{ role: 'user', content: 'hi' }]); } catch (e) { threwCfg = true; }
+  assert(threwCfg, '未配置通道调用抛错');
+  let cs27 = WA.apiRouter.callStats();
+  assert(cs27.tracked === 1 && cs27.channels[0].channel === 'digest', '配置失败也记录通道台账');
+  assert(cs27.channels[0].errors === 1 && cs27.channels[0].ok === 0, '配置失败计入 errors');
+  assert(cs27.channels[0].errorKinds.indexOf('not-configured') >= 0, '归因 not-configured');
+  // 成功调用 → ok+1
+  WA.apiRouter.setChannel('digest', { baseUrl: 'https://api.test/v1', model: 'm-mini', apiKey: 'sk-test-123456' });
+  global.__pushApiJson('结算完成');
+  const out27 = await WA.apiRouter.call('digest', [{ role: 'user', content: 'hi' }]);
+  assert(out27 === '结算完成', 'digest 通道调用成功');
+  cs27 = WA.apiRouter.callStats();
+  const dRow = cs27.channels.find(r => r.channel === 'digest');
+  assert(dRow.count === 2 && dRow.ok === 1 && dRow.errors === 1, '成功与失败各自计数（不重复计）');
+  assert(typeof dRow.lastMs === 'number' && typeof dRow.avgMs === 'number', '耗时统计产出');
+  // HTTP 5xx → http 归因
+  global.__fetchResponses.push({ ok: false, status: 503, body: 'service down' });
+  let threw5 = false;
+  try { await WA.apiRouter.call('digest', [{ role: 'user', content: 'hi' }]); } catch (e) { threw5 = true; assert(e.kind === 'http' && e.status === 503, '503 归类 http'); }
+  assert(threw5, '5xx 抛错');
+  cs27 = WA.apiRouter.callStats();
+  const dRow2 = cs27.channels.find(r => r.channel === 'digest');
+  assert(dRow2.errors === 2 && dRow2.errorKinds.indexOf('http') >= 0, 'http 错误入台账');
+  assert(dRow2.lastError && dRow2.lastError.indexOf('503') >= 0, '末错摘要含状态码');
+  // 429 → rate-limit
+  global.__fetchResponses.push({ ok: false, status: 429, body: 'slow down' });
+  try { await WA.apiRouter.call('digest', [{ role: 'user', content: 'hi' }]); } catch (e) {}
+  cs27 = WA.apiRouter.callStats();
+  assert(cs27.channels.find(r => r.channel === 'digest').errorKinds.indexOf('rate-limit') >= 0, '429 归类 rate-limit');
+  // 排序：错误多的通道在前
+  WA.apiRouter.setChannel('inference', { baseUrl: 'https://api.test/v1', model: 'm-fast' });
+  global.__pushApiJson('推理结果');
+  await WA.apiRouter.call('inference', [{ role: 'user', content: 'hi' }]);
+  cs27 = WA.apiRouter.callStats();
+  assert(cs27.tracked === 2 && cs27.channels[0].channel === 'digest', '报错通道优先排前');
+  // tool-diag 接入 + verdict（digest 全失败率但 ok>0 → warn；若某通道全败 → error）
+  WA.apiRouter.setChannel('judge', { baseUrl: 'https://api.test/v1', model: 'm-judge' });
+  global.__fetchResponses.push({ ok: false, status: 401, body: 'bad key' });
+  try { await WA.apiRouter.call('judge', [{ role: 'user', content: 'x' }]); } catch (e) {}
+  const dg27 = WA.toolDiag.collect();
+  const calls27 = ((dg27.runtime || {}).apiRouter || {}).calls || {};
+  assert(calls27.tracked >= 3, '诊断 calls.tracked 产出');
+  assert(calls27.channels.some(r => r.channel === 'judge' && r.errors === 1 && r.ok === 0), 'judge 全败行存在');
+  const apiIssues27 = (dg27.verdict.issues || []).filter(i => i.key === 'api');
+  assert(apiIssues27.length === 1 && apiIssues27[0].level === 'error' && apiIssues27[0].detail.indexOf('judge') >= 0, '全败通道 → api error 并点名');
+  assert(apiIssues27[0].detail.indexOf('auth') >= 0, '错误归因写入诊断文本');
+  // key 不泄露：诊断包只有掩码
+  const json27 = JSON.stringify(dg27);
+  assert(json27.indexOf('sk-test-123456') < 0, '诊断包不含明文 API Key');
+  // 清理
+  WA.apiRouter.resetCallStats();
+  assert(WA.apiRouter.callStats().tracked === 0, 'resetCallStats 清空');
+  WA.apiRouter.setChannel('digest', { baseUrl: '', model: '' });
+  WA.apiRouter.setChannel('inference', { baseUrl: '', model: '' });
+  WA.apiRouter.setChannel('judge', { baseUrl: '', model: '' });
+  } // end v0.1.27 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

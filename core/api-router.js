@@ -34,6 +34,22 @@
     if (next) { running++; next(); }
   }
 
+  // v0.1.27: 通道调用台账——成功/失败按归因分类计数 + 耗时（排查「推演为什么没跑」）
+  const callLedger = new Map(); // channel -> {count, ok, errors, byKind, lastAt, lastMs, lastError, totalMs}
+  function recCall(channel, ms, err) {
+    try {
+      const key = channel || 'default';
+      const st = callLedger.get(key) || { count: 0, ok: 0, errors: 0, byKind: {}, lastAt: 0, lastMs: 0, totalMs: 0, lastError: null };
+      st.count++; st.totalMs += ms; st.lastMs = ms; st.lastAt = Date.now();
+      if (err) {
+        st.errors++;
+        const kind = (err && err.kind) || (String((err && err.message) || err).match(/timeout|abort/i) ? 'timeout' : 'unknown');
+        st.byKind[kind] = (st.byKind[kind] || 0) + 1;
+        st.lastError = String((err && err.message) || err).slice(0, 180);
+      } else { st.ok++; }
+      callLedger.set(key, st);
+    } catch (e) { /* 台账失败不影响调用 */ }
+  }
   const router = WA.apiRouter = {
     CHANNELS,
 
@@ -67,9 +83,19 @@
      */
     async call(channel, messages, opts) {
       opts = opts || {};
+      const t0 = Date.now();
+      try {
+        return await this._callInner(channel, messages, opts, t0);
+      } catch (e) {
+        // v0.1.27: 配置类失败（未配置 BaseURL/模型）也要入账
+        if (!e || !e.__ledgered) recCall(channel, Date.now() - t0, e);
+        throw e;
+      }
+    },
+    async _callInner(channel, messages, opts, t0Call) {
       const cfg = this.getChannel(channel);
-      if (!cfg.baseUrl) throw new Error('通道[' + channel + ']未配置Base URL');
-      if (!cfg.model) throw new Error('通道[' + channel + ']未配置模型');
+      if (!cfg.baseUrl) { const e = new Error('通道[' + channel + ']未配置Base URL'); e.kind = 'not-configured'; throw e; }
+      if (!cfg.model) { const e = new Error('通道[' + channel + ']未配置模型'); e.kind = 'not-configured'; throw e; }
 
       await acquire();
       const ac = new AbortController();
@@ -80,7 +106,8 @@
       }
       const timeoutMs = opts.timeoutMs || 120000;
       const timer = setTimeout(() => ac.abort(new Error('timeout')), timeoutMs);
-
+      const t0 = Date.now();
+      let callErr = null;
       try {
         const url = cfg.baseUrl + '/chat/completions';
         const body = {
@@ -114,11 +141,28 @@
           return parsed;
         }
         return content;
+      } catch (e) {
+        callErr = e;
+        e.__ledgered = true;   // v0.1.27: 内层已入账，外层包装不重复计
+        throw e;
       } finally {
         clearTimeout(timer);
         release();
+        recCall(channel, Date.now() - t0, callErr);
       }
     },
+    /** v0.1.27: 通道调用台账只读视图（tool-diag 消费） */
+    callStats(topN) {
+      const rows = [];
+      callLedger.forEach(function (st, ch) {
+        const kinds = Object.keys(st.byKind).map(function (k) { return k + ':' + st.byKind[k]; }).join('/');
+        rows.push({ channel: ch, count: st.count, ok: st.ok, errors: st.errors, errorKinds: kinds || null, lastMs: st.lastMs, avgMs: Math.round(st.totalMs / Math.max(1, st.count)), lastAt: st.lastAt, lastError: st.lastError });
+      });
+      rows.sort(function (a, b) { return b.errors - a.errors || b.lastAt - a.lastAt; });
+      const n = topN && topN > 0 ? topN : 8;
+      return { channels: rows.slice(0, n), tracked: rows.length };
+    },
+    resetCallStats() { callLedger.clear(); },
 
     // 确定性JSON提取：去尾逗号、转义裸控制字符；截断不猜测补全
     extractJson(text) {

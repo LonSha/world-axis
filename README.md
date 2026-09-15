@@ -66,6 +66,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.27** — API 通道调用台账：apiRouter 每次 call 按通道记录成功/失败计数、错误归因（http/rate-limit/auth/invalid-json/output-limit/not-configured/timeout）、平均与最近耗时、末错摘要；配置类失败也入账；apiRouter.callStats()/resetCallStats() 只读视图；tool-diag runtime.apiRouter.calls 输出，verdict 分级：全失败 error、有失败率 warn。
 - **v0.1.26** — 取消语义闭环：before 链节点可置 ctx.canceled + ctx.cancelReason 短路本轮注入（一致性屏障有了真正的否决权）——拦截器丢弃全部注入项、markRegistered(0) 并保持上一份已确认状态，warn 日志记录原因与丢弃数，生成不被中止；台账可见 cancelled 轮次。
 - **v0.1.25** — 启动完整性审计：loadScript 全源失败不再静默（state.failed 记录 rel/尝试源数/时间戳，模块级重试成功后自动清除），loaderStatus 暴露 failedModules；init 末尾点名加载失败模块并写入 WA.loadFailures；tool-diag 输出 failedCount/failedModules，verdict 对照导出缺失清单分级（导出也缺 = error，仅历史失败 = warn）。
 - **v0.1.24** — 注入预算账单入诊断：lastInjection.budget 快照补全（contextSize/remain/inputTokens/saved/overBudget/keptCount + folded/dropped 带 reason 明细）；tool-diag inject 节输出 budget 子块与 summary，verdict 分级：超预算 error、有丢弃 warn（点名源）、仅折叠 info。

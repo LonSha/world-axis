@@ -225,7 +225,13 @@
           channels: list.map(function (c) {
             const e = c.effective || {};
             return { name: c.name, configured: !!(e.baseUrl && e.model), keyMasked: redact(e.apiKey), model: e.model || null };
-          })
+          }),
+          // v0.1.27: 通道调用台账（成功/失败归因/耗时）
+          calls: (function () {
+            if (!WA.apiRouter.callStats) return null;
+            const st = WA.apiRouter.callStats(6);
+            return { tracked: st.tracked, channels: st.channels };
+          })()
         };
       }, {}),
       // v0.1.20: CDN 加载器状态（已加载模块数、CDN 容灾命中的模块、失败源冷却）
@@ -370,6 +376,15 @@
       if (bgt.overBudget) issues.push({ level: 'error', key: 'budget', detail: '上轮注入超出预算（' + bgt.used + '/' + bgt.cap + 't，档源 ' + bgt.source + '）' });
       else if (bgt.droppedCount) issues.push({ level: 'warn', key: 'budget', detail: '预算裁决丢弃 ' + bgt.droppedCount + ' 源：' + ((bgt.dropped || []).map(function (d) { return d.source; }).join('、')) });
       else if (bgt.foldedCount) issues.push({ level: 'info', key: 'budget', detail: '预算裁决折叠 ' + bgt.foldedCount + ' 源（' + bgt.summary + '）' });
+    }
+    // v0.1.27: API 通道健康——只统计已配置且有调用的通道
+    const apiSec = ((diag.runtime || {}).apiRouter || {});
+    const callRows = ((apiSec.calls || {}).channels || []);
+    const badCh = callRows.filter(function (r) { return r.errors > 0 && r.ok === 0 && r.count > 0; });
+    if (badCh.length) issues.push({ level: 'error', key: 'api', detail: badCh.map(function (r) { return r.channel + ' 通道 ' + r.count + ' 次调用全失败（' + (r.errorKinds || '未知') + '）'; }).join('；') });
+    else {
+      const lossy = callRows.filter(function (r) { return r.errors > 0; });
+      if (lossy.length) issues.push({ level: 'warn', key: 'api', detail: lossy.map(function (r) { return r.channel + ' 有 ' + r.errors + '/' + r.count + ' 次失败（' + r.errorKinds + '）'; }).join('；') });
     }
     const ldr = (diag.runtime || {}).loader || {};
     // v0.1.25: 加载失败的模块点名（对照装载清单升级为 error）
