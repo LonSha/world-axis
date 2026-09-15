@@ -88,7 +88,7 @@
   // v0.1.33: 嵌套事务栈——非空时内层 transact 直接在最外层 draft 上修改，提交延迟到最外层
   const __tx = [];
   // v0.1.30: 事务计量——按提交状态聚合计数与耗时
-  const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, batched: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
+  const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, batched: 0, deferred: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
   function recTx(ms, status) {
     try {
       __txStat.count++; __txStat.totalMs += ms; __txStat.lastMs = ms; __txStat.lastAt = Date.now(); __txStat.lastStatus = status;
@@ -97,6 +97,7 @@
       else if (status === 'aborted') __txStat.aborted++;
       else if (status === 'save-failed') __txStat.saveFailed++;
       else if (status === 'ok-batched') { __txStat.ok++; __txStat.batched++; }
+      else if (status === 'ok-deferred') { __txStat.deferred++; }
     } catch (e) {}
   }
   // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
@@ -164,9 +165,9 @@
       }
     },
     /** v0.1.30: 事务计量只读视图（tool-diag 消费） */
-    txStat() { return { count: __txStat.count, ok: __txStat.ok, errors: __txStat.errors, aborted: __txStat.aborted, saveFailed: __txStat.saveFailed, batched: __txStat.batched, lastStatus: __txStat.lastStatus, avgMs: Math.round(__txStat.totalMs / Math.max(1, __txStat.count)), lastMs: __txStat.lastMs, lastAt: __txStat.lastAt }; },
+    txStat() { return { count: __txStat.count, ok: __txStat.ok, errors: __txStat.errors, aborted: __txStat.aborted, saveFailed: __txStat.saveFailed, batched: __txStat.batched, deferred: __txStat.deferred, lastStatus: __txStat.lastStatus, avgMs: Math.round(__txStat.totalMs / Math.max(1, __txStat.count)), lastMs: __txStat.lastMs, lastAt: __txStat.lastAt }; },
     /** v0.1.30: 清零事务计量（诊断重置入口） */
-    resetTxStat() { __txStat.count = 0; __txStat.ok = 0; __txStat.errors = 0; __txStat.aborted = 0; __txStat.saveFailed = 0; __txStat.batched = 0; __txStat.totalMs = 0; __txStat.lastMs = 0; __txStat.lastAt = 0; __txStat.lastStatus = null; },
+    resetTxStat() { __txStat.count = 0; __txStat.ok = 0; __txStat.errors = 0; __txStat.aborted = 0; __txStat.saveFailed = 0; __txStat.batched = 0; __txStat.deferred = 0; __txStat.totalMs = 0; __txStat.lastMs = 0; __txStat.lastAt = 0; __txStat.lastStatus = null; },
     /**
      * v0.1.31: 写合并批作用域——fn 内的 transact 只推进内存（保留每事务深拷贝隔离），
      * 批退出时统一落盘一次。异步安全：支持 async fn 与嵌套（depth 计数）。
@@ -219,7 +220,9 @@
         let result;
         try { result = mutator(outer); }
         catch (e) { recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact嵌套修改异常（外层事务继续）', e); return { ok: false, error: e }; }
-        if (result === false) return { ok: false, aborted: true, deferred: true };
+        if (result === false) { recTx(Date.now() - t0, 'aborted'); return { ok: false, aborted: true, deferred: true }; }
+        // v0.1.34: 嵌套事务纳入计量（deferred=随外层提交的内层数）
+        recTx(Date.now() - t0, 'ok-deferred');
         return { ok: true, deferred: true, state: outer, result };
       }
       const draft = JSON.parse(JSON.stringify(memCache));

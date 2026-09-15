@@ -3136,6 +3136,47 @@ WA.loadScript = _ls.loadScript;
   // 清理
   WA.store.transact(d => { delete d.meta.outerMark; delete d.meta.innerMark; delete d.meta.outerKeep; delete d.meta.outerStill; delete d.__applyTag; });
   } // end v0.1.33 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.34 — 嵌套事务计量（deferred）+ 真实结算链路端到端
+  // ═══════════════════════════════════════════════════════════
+  v0134: {
+  WA.store.resetTxStat();
+  // 场景1：嵌套计量——1 外层 + 2 内层（1 ok + 1 中止）
+  WA.store.transact(d => {
+    d.meta.t134 = 'outer';
+    WA.store.transact(x => { x.meta.t134inner = 1; });
+    WA.store.transact(() => false);
+  });
+  let tx134 = WA.store.txStat();
+  assert(tx134.count === 3 && tx134.deferred === 1 && tx134.aborted === 1 && tx134.ok === 1, '嵌套事务全额计量（deferred=' + tx134.deferred + '）');
+  assert(tx134.lastStatus === 'ok', '外层提交后 lastStatus 记录 ok（recTx 时序：外层最后记账）');
+  // 场景2：真实结算链路端到端——distantEvent(风声) + nearEvent + digest 全走嵌套路径
+  WA.store.transact(d => {
+    d.evolution = d.evolution || {};
+    d.evolution.horizon = { distant: { ledger: 0, cooldown: 0, pending: { result: { type: 'wind', kind: 'distant' }, retries: 0 }, lastFired: 0 }, near: { ledger: 0, cooldown: 0, pending: { result: { type: 'event', kind: 'near' }, retries: 0 }, lastFired: 0 } };
+    d.chronicle = [];
+    d.evolution.winds = [];
+    d.evolution.factions = [{ name: '血刀门', status: '鼎盛' }];
+    d.evolution.economy = { climate: '萧条', signals: [] };
+  });
+  const sim134 = {
+    distantEvent: { type: 'wind', topic: '北疆异动', content: '商队传言北疆有军队集结。', level: 3 },
+    nearEvent: { title: '渡口盘查', desc: '官兵逐一盘问过河旅人。', urgent: false }
+  };
+  WA.store.transact(d => WA.backstage.applyResult(d, sim134, { idx: 134 }));
+  const st134 = WA.store.get();
+  assert(st134.evolution.horizon.distant.pending === null && st134.evolution.horizon.near.pending === null, '双泳道 pending 在外层提交后清除');
+  assert(st134.evolution.winds.some(w => w.topic === '北疆异动'), '风声经嵌套 addWind 入账存活');
+  assert(st134.nextTurnInjection && st134.nextTurnInjection.nearEvent && st134.nextTurnInjection.nearEvent.title === '渡口盘查', '近端事件经嵌套写入存活');
+  assert(st134.chronicle.some(c => c.kind === 'horizon_near' && c.title === '渡口盘查'), '近端纪事条目存活');
+  assert(st134.evolution.worldDigest && st134.evolution.worldDigest.text && st134.evolution.worldDigest.text.length >= 100, 'digest 经嵌套入账存活');
+  assert(JSON.parse(global.localStorage.getItem('worldaxis_state_test_chat_001')).evolution.worldDigest.text === st134.evolution.worldDigest.text, '嵌套产物全部落盘');
+  // 场景3：诊断透出 deferred
+  const dg134 = WA.toolDiag.collect();
+  assert(dg134.worldState.storage.transactions.deferred >= 4, '诊断透出 deferred 计数');
+  // 清理
+  WA.store.transact(d => { delete d.meta.t134; delete d.meta.t134inner; });
+  } // end v0.1.34 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
