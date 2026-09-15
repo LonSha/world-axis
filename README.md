@@ -67,6 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 
 ## 版本历史
+- **v0.1.16** — CDN 多源容灾加载桩（缝合小狸 Live 加载器）：index.js 的 loadScript 原本只有一个本地源，加载失败就静默丢失模块；现在主源（本地扩展目录）失败时依次回退 jsDelivr 三域（cdn/fastly/testingcf），每源 12s 超时闸刀（AbortController 式保护，卡住的脚本会被移除并判失败），全源失败才记 error；成功走 CDN 时记 warn 便于排障；746 断言全过
 - **v0.1.15** — uninject 真撤销 + store 深合并审计：P3-① render/inject.js 新增 uninject()——旧的「写空串覆盖」只清主槽位，独立槽位路由落地的那部分会残留到下一轮；现在从 store.lastInjection 快照取实际用过的全部 slot key 逐一清空，幂等无副作用；P2-② 审计结论：store.transact 深拷贝 draft + save 整体替换、chatcache.stripHeavy 显式 delete，两侧均无深合并复活风险（附回归断言锁定）；731 断言全过
 - **v0.1.14** — wb 变量镜像注入通道（缝合附本生成器）：新增 engines/wb-inject.js——第三条注入通道。setExtensionPrompt 把所有约束类注入挤在同一 position 槽位里互相覆盖，wb 通道改为把约束写进【聊天变量】，由配套世界书条目用 EJS 在精确 order 位置读取：order 支持 1~1000 任意整数（可插进 212/213/214 密集位置），空变量时 @@if 排除 = 0 token；写回一律用 replaceVariables 整表替换（insertOrAssignVariables 深度合并会让已删 key 复活）；ensureEntry 用 TH.getWorldbook/createWorldbookEntries 自动补配套条目并复查防静默失败；与 inject-channel 正交（wb 管「持久约束类」，槽位路由管「即时渲染类」）；719 断言全过
 - **v0.1.13** — 外部素材缝合批次（P0+P1）：P0-① inject-inspector 事件订阅改重试等待（宿主启动时序竞态下 eventSource 未就绪时不再一次性放弃，40 次 500ms 重试）+ 事件名大小写多别名兼容；P0-② direct-event.advance 加 busy 锁（GENERATION_ENDED 回调里再触发生成会无限自激）；P1-① 新增 engines/proactive.js（缝合 NPC.json 引擎_主动拉动机制：语义枯竭检测+主动拉动注入+冷却轮数防每轮都拽）；P1-② buildWorldSnapshot 尾部追加呈现铁律（缝合 NPC.json 引擎_活体世界核心法则：状态变化必须经 NPC 视角过滤、禁系统旁白与数值面板）；691 断言全过

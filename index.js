@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.1.15';
+  const VERSION = '0.1.16';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -52,6 +52,7 @@
     return '/scripts/extensions/third-party/WorldAxis';
   }
   WA.baseUrl = getBaseUrl();
+  WA.loadScript = loadScript;
 
   const LOAD_ORDER = [
     'core/store.js',
@@ -104,14 +105,48 @@
     'ui/assistant.js',
   ];
 
-  function loadScript(rel) {
+  // v0.1.16: 多源容灾——主源（本地扩展目录）失败时依次回退 jsDelivr 三域，每源 12s 闸刀
+  const CDN_BASES = [
+    'https://cdn.jsdelivr.net/gh/LonSha/world-axis@main',
+    'https://fastly.jsdelivr.net/gh/LonSha/world-axis@main',
+    'https://testingcf.jsdelivr.net/gh/LonSha/world-axis@main',
+  ];
+  const SCRIPT_TIMEOUT_MS = 12000;
+  function loadScriptOnce(src, timeoutMs) {
     return new Promise((resolve) => {
-      const s = mainDoc.createElement('script');
-      s.src = WA.baseUrl + '/' + rel + '?v=' + VERSION;
-      s.onload = () => resolve({ rel, ok: true });
-      s.onerror = (e) => { WA.log('warn', '模块加载失败（骨架期允许缺失）: ' + rel); resolve({ rel, ok: false }); };
-      mainDoc.head.appendChild(s);
+      let settled = false;
+      const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+      let timer = null;
+      try {
+        const s = mainDoc.createElement('script');
+        s.src = src;
+        s.onload = () => { if (timer) clearTimeout(timer); done({ ok: true, src: src }); };
+        s.onerror = (e) => { if (timer) clearTimeout(timer); done({ ok: false, src: src, error: 'onerror' }); };
+        timer = setTimeout(() => {
+          try { if (s.parentNode) s.parentNode.removeChild(s); } catch (e) {}
+          done({ ok: false, src: src, error: 'timeout' });
+        }, timeoutMs || SCRIPT_TIMEOUT_MS);
+        mainDoc.head.appendChild(s);
+      } catch (e) { done({ ok: false, src: src, error: String(e && (e.message || e)) }); }
     });
+  }
+  function loadScript(rel) {
+    return (async () => {
+      const tag = '?v=' + VERSION;
+      const localSrc = WA.baseUrl + '/' + rel + tag;
+      const r0 = await loadScriptOnce(localSrc);
+      if (r0.ok) return { rel: rel, ok: true, src: r0.src };
+      for (let i = 0; i < CDN_BASES.length; i++) {
+        const cdnSrc = CDN_BASES[i] + '/' + rel + tag;
+        const r = await loadScriptOnce(cdnSrc);
+        if (r.ok) {
+          WA.log('warn', '模块走 CDN 容灾加载成功: ' + rel + ' <- ' + CDN_BASES[i]);
+          return { rel: rel, ok: true, src: r.src, fallback: CDN_BASES[i] };
+        }
+      }
+      WA.log('error', '模块全部源加载失败: ' + rel);
+      return { rel: rel, ok: false };
+    })();
   }
 
   // ── 主初始化 ────────────────────────────────────────────

@@ -13,12 +13,24 @@ global.localStorage = {
 
 // window/document 最小mock
 global.window = global;
+global.__scriptEls = [];
+global.__headScripts = [];
+global.__headScriptsHolder = { name: '__head__' };
 global.document = {
-  createElement: () => ({ style: {}, classList: { add(){},remove(){},toggle(){} }, addEventListener(){}, setAttribute(){}, appendChild(){}, querySelector: () => null, querySelectorAll: () => [] }),
+  createElement: (tag) => {
+    if (tag === 'script') {
+      const el = { tagName: 'SCRIPT', src: null, onload: null, onerror: null, parentNode: null,
+        style: {}, classList: { add(){},remove(){},toggle(){} }, addEventListener(){}, setAttribute(){},
+        appendChild(){}, querySelector: () => null, querySelectorAll: () => [] };
+      global.__scriptEls.push(el);
+      return el;
+    }
+    return { style: {}, classList: { add(){},remove(){},toggle(){} }, addEventListener(){}, setAttribute(){}, appendChild(){}, querySelector: () => null, querySelectorAll: () => [] };
+  },
   getElementById: () => null,
   getElementsByTagName: () => [],
   addEventListener(){},
-  head: { appendChild(){} },
+  head: { appendChild(el){ if (el && el.tagName==='SCRIPT') { global.__headScripts.push(el); el.parentNode = global.__headScriptsHolder; } } },
   body: { appendChild(){} },
   readyState: 'complete'
 };

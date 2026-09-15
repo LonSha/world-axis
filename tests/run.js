@@ -36,7 +36,16 @@ for (const rel of LOAD) {
   catch (e) { console.log('加载失败 ' + rel + ': ' + e.message); process.exit(1); }
 }
 const WA = global.WorldAxis;
-
+// v0.1.16: index.js loadScript not in vm chain; extract impl from source for assertions
+const _idxSrc = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+const _i1 = _idxSrc.indexOf('function loadScriptOnce(');
+const _i2 = _idxSrc.indexOf('function loadScript(', _i1);
+const _fnStart = _i1;
+const _fnEnd = _idxSrc.indexOf('  async function init()', _i2);
+assert(_fnStart > 0 && _fnEnd > _fnStart, 'index.js has loadScript impl');
+const _frag = _idxSrc.slice(_fnStart, _fnEnd).replace(/WA\./g, 'window.WorldAxis.');const _code =  '(function(){' + ' const mainDoc = window.WorldAxis.mainDoc;' + ' const VERSION = window.WorldAxis.version;' + ' const CDN_BASES = ["https://cdn.jsdelivr.net/gh/LonSha/world-axis@main","https://fastly.jsdelivr.net/gh/LonSha/world-axis@main","https://testingcf.jsdelivr.net/gh/LonSha/world-axis@main"];' + ' const SCRIPT_TIMEOUT_MS = 12000;' + _frag + ' return { loadScript: loadScript }; })();';
+const _ls = vm.runInContext(_code, ctx, { filename: 'index.js#loadScript' });
+WA.loadScript = _ls.loadScript;
 (async () => {
   // ── store ──
   section('core/store');
@@ -1827,6 +1836,62 @@ const WA = global.WorldAxis;
   assert(JSON.parse(stripped).lastInjection === undefined, 'stripHeavy 删除 lastInjection');
   assert(JSON.parse(stripped).nextTurnInjection === undefined, 'stripHeavy 删除 nextTurnInjection');
   assert(JSON.parse(stripped).keep === 'me', 'stripHeavy 保留非 heavy key');
+  v0116: {
+  // ── v0.1.16: CDN 多源容灾加载桩 ──
+  // mock 的 document.createElement(script) 产出可控元素：
+  //   __scriptEls 记录全部创建、__headScripts 记录已 appendChild
+  global.__scriptEls = []; global.__headScripts = [];
+  const savedBaseUrl = WA.baseUrl;
+  WA.baseUrl = '/scripts/extensions/third-party/WorldAxis';
+  // 场景1：主源 onload 成功
+  let p1;
+  try { p1 = WA.loadScript('core/store.js'); } catch (e) { console.log('DBG loadScript threw:' + e.message); }
+  await new Promise(r => setTimeout(r, 10));  // 等 createElement 微任务执行
+  const el1 = global.__scriptEls[global.__scriptEls.length - 1];
+  assert(el1 && el1.src.indexOf(WA.baseUrl + '/core/store.js') === 0, '主源 src 拼接 baseUrl');
+  assert(el1.src.indexOf('?v=') >= 0, 'src 带版本戳');
+  assert(typeof el1.onload === 'function', 'onerror/onload 已挂载');
+  el1.onload();
+  const r1 = await p1;
+  assert(r1.ok === true, '主源成功返回 ok');
+  assert(r1.rel === 'core/store.js', '返回体带 rel');
+  assert(r1.fallback === undefined, '主源成功无 fallback 字段');
+  assert(global.__headScripts.length === 1, '主源元素被 appendChild 到 head');
+  // 场景2：主源失败 → CDN 依次回退
+  global.__scriptEls = []; global.__headScripts = [];
+  const p2 = WA.loadScript('engines/wb-inject.js');
+  const ls = global.__scriptEls.slice();
+  assert(ls.length >= 1, '至少创建 1 个元素（主源）');
+  ls[0].onerror(); // 主源失败
+  await new Promise(r => setTimeout(r, 5));
+  // CDN 链依次失败直到成功
+  let ls2 = global.__scriptEls.slice();
+  while (ls2.length < 4) {
+    const el = global.__scriptEls[global.__scriptEls.length - 1];
+    el.onerror();
+    await new Promise(r => setTimeout(r, 5));
+    ls2 = global.__scriptEls.slice();
+  }
+  const elLast = global.__scriptEls[global.__scriptEls.length - 1];
+  elLast.onload();
+  const r2 = await p2;
+  assert(r2.ok === true, 'CDN 回退最终成功');
+  assert(r2.fallback !== undefined, '成功时记录 fallback 源');
+  assert(typeof r2.fallback === 'string' && r2.fallback.indexOf('jsdelivr') >= 0, 'fallback 是 jsDelivr 域');
+  assert(global.__headScripts.length === 4, '主源 + 3 个 CDN 源共 4 次 appendChild');
+  // 场景3：全部源失败
+  global.__scriptEls = []; global.__headScripts = [];
+  const p3 = WA.loadScript('core/missing.js');
+  for (let k = 0; k < 4; k++) {
+    await new Promise(r => setTimeout(r, 5));
+    const el = global.__scriptEls[global.__scriptEls.length - 1];
+    if (el && !el.__fired) { el.__fired = true; el.onerror(); }
+  }
+  const r3 = await p3;
+  assert(r3.ok === false, '全源失败返回 ok:false');
+  assert(r3.rel === 'core/missing.js', '失败也返回 rel');
+  WA.baseUrl = savedBaseUrl;
+  } // end v0.1.16 block
   } // end v0.1.15 block
 
   // ═══════════════════════════════════════════════════════════
