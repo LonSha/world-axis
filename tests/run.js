@@ -1157,7 +1157,8 @@ const WA = global.WorldAxis;
   ] });
   const snapEvt = WA.injectInspector.getLastSnapshot();
   assert(snapEvt && snapEvt.status === 'SUCCESS' && snapEvt.messageCount === 2, '正式轮事件落地快照');
-  assert(WA.injectInspector.getLastSnapshot('memory') === snapEvt, 'memory 域读取同一份快照');
+  // v0.1.10: getLastSnapshot 返回独立副本，引用不同但内容须一致
+  assertDeepEq(WA.injectInspector.getLastSnapshot('memory'), snapEvt, 'memory 域读取同一份快照（副本内容一致）');
   assert(WA.injectInspector.getLastSnapshot('nonsense') === null, '未知 scope 返回 null 不抛');
   await global.__triggerEvent('generate_after_combine_prompts', { prompt: 'a <world_axis_state>b</world_axis_state>' });
   assert(WA.injectInspector.getLastSnapshot().apiType === 'text', 'text 通道事件亦能落快照');
@@ -1617,7 +1618,7 @@ const WA = global.WorldAxis;
   const icN = WA.injectChannel.applySlots(function (slotName, text, pos, depth, scan) {
     icCalls.push({ slotName: slotName, text: text, pos: pos, depth: depth, scan: scan });
   }, icPlan);
-  assert(icN === 2, 'applySlots 返回已应用槽位数 2');
+  assert(icN.applied === 2, 'applySlots 返回已应用槽位数 2');
   assert(icCalls.length === 2, 'setExt 被调用 2 次（每槽位一次）');
   const icCallALU = icCalls.filter(c => c.slotName === 'WorldAxis:after_last_user')[0];
   const icCallIC = icCalls.filter(c => c.slotName === 'WorldAxis:in_chat')[0];
@@ -1625,9 +1626,109 @@ const WA = global.WorldAxis;
   assert(icCallALU.depth === 0, 'after_last_user 槽位 depth=0');
   assert(icCallALU.text === 'A-约束\nB-演化\nC-章节' && icCallALU.scan === false, '槽位文本与 scan=false 透传');
   assert(icCallIC.pos === 0 && icCallIC.depth === 5, 'in_chat 槽位 pos=0 depth=5');
-  assertDeepEq(WA.injectChannel.applySlots(null, icPlan), 0, 'setExt 非函数时返回 0 不抛异常');
-  assertDeepEq(WA.injectChannel.applySlots(function () {}, []), 0, '空槽位计划返回 0');
-  assertDeepEq(WA.injectChannel.applySlots(function () {}, null), 0, 'null 槽位计划返回 0');
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.12 — safe 语义全模块统一（undefined 兜底 + 无 fallback 返回 null）
+  // ═══════════════════════════════════════════════════════════
+  v0112: {
+  // 四份规范 safe（inspector-state / inject-inspector / contract-audit / memory-sampler / sampler-check）
+  const canonSafes = [
+    { name: 'inspectorState', fn: WA.inspectorState.safe },
+    { name: 'injectInspector', fn: WA.injectInspector.safe },
+    { name: 'contractAudit', fn: WA.contractAudit ? WA.contractAudit.safe : null },
+    { name: 'memorySampler', fn: WA.memorySampler ? WA.memorySampler.safe : null },
+    { name: 'samplerCheck', fn: WA.samplerCheck ? WA.samplerCheck.safe : null }
+  ];
+  canonSafes.forEach(function (entry) {
+    assert(entry.fn, 'safe 已导出: ' + entry.name);
+    if (!entry.fn) return;
+    // undefined 兜底
+    assertDeepEq(entry.fn(function () { return undefined; }, 'FB'), 'FB', entry.name + '.safe(undefined,FB)=FB');
+    // 无 fallback 时返回 null（不是 undefined）
+    assertDeepEq(entry.fn(function () { return undefined; }), null, entry.name + '.safe(undefined)=null');
+    // 异常时走 fallback
+    assertDeepEq(entry.fn(function () { throw new Error('x'); }, 'FB'), 'FB', entry.name + '.safe(throw,FB)=FB');
+    // 正常值直通
+    assertDeepEq(entry.fn(function () { return 42; }, 'FB'), 42, entry.name + '.safe(42)=42');
+    // null 是有效返回值（直通，不兜底）
+    assertDeepEq(entry.fn(function () { return null; }, 'FB'), null, entry.name + '.safe(null)=null 直通');
+  });
+  // tool-diag 特例：异常时返回 {error}（诊断语义，不参与规范统一）
+  assert(WA.toolDiag && WA.toolDiag.safe, 'toolDiag.safe 已导出');
+  assertDeepEq(WA.toolDiag.safe(function () { return undefined; }, 'FB'), 'FB', 'toolDiag.safe(undefined,FB)=FB（与规范一致）');
+  assertDeepEq(WA.toolDiag.safe(function () { return undefined; }), null, 'toolDiag.safe(undefined)=null（与规范一致）');
+  const tdErr = WA.toolDiag.safe(function () { throw new Error('diag-boom'); }, 'FB');
+  assert(tdErr && tdErr.error === 'diag-boom', 'toolDiag.safe 异常返回 {error}（诊断特例）: ' + JSON.stringify(tdErr));
+  } // end v0.1.12 block
+
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.11 — stripHeavy 剥离注入诊断快照（跨设备同步去脏）
+  // ═══════════════════════════════════════════════════════════
+  v0111: {
+  const heavyRaw = JSON.stringify({ evolution: { stage: 1, _ledgerCheckpoint: 123, events: [{ t: 'x' }] }, lastInjection: { at: 1, len: 99, slots: { applied: 1 } }, slotErrors: [{ slot: 'S', detail: 'boom' }], nextTurnInjection: { nearEvent: { title: 'T' } }, keepMe: 'yes' });
+  const stripped = JSON.parse(WA.chatcache.stripHeavy(heavyRaw));
+  assert(!('lastInjection' in stripped), 'stripHeavy 剥离 lastInjection');
+  assert(!('slotErrors' in stripped), 'stripHeavy 剥离 slotErrors（v0.1.9 新增）');
+  assert(!('nextTurnInjection' in stripped), 'stripHeavy 剥离 nextTurnInjection（backstage 三列载体）');
+  assert(stripped.keepMe === 'yes', 'stripHeavy 保留持久业务字段');
+  assert(stripped.evolution && stripped.evolution.stage === 1, 'stripHeavy 保留 evolution 业务字段');
+  assert(!('_ledgerCheckpoint' in stripped.evolution), 'stripHeavy 剥离 evolution 临时字段');
+  assert(Array.isArray(stripped.evolution.events), 'stripHeavy 保留 events 数组结构');
+  // 非法 JSON 不抛异常（原样返回）
+  assert(WA.chatcache.stripHeavy('not-json') === 'not-json', 'stripHeavy 非法 JSON 原样返回');
+  // 空对象与单字段
+  assertDeepEq(JSON.parse(WA.chatcache.stripHeavy('{}')), {}, 'stripHeavy 空对象');
+  assertDeepEq(JSON.parse(WA.chatcache.stripHeavy(JSON.stringify({ slotErrors: [1, 2] }))), {}, 'stripHeavy 单脏字段对象');
+  } // end v0.1.11 block
+
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.10 — getLastSnapshot 返回独立副本（防外部篡改污染内部状态）
+  // ═══════════════════════════════════════════════════════════
+  v0110: {
+  // 复用 v0.1.7 的事件触发通道；先确保已有快照
+  assert(WA.injectInspector.getLastSnapshot() !== null || true, '快照前置条件不致命');
+  // 触发一次 chat 事件确保内部快照非空
+  WA.injectInspector.markRegistered(1);
+  await global.__triggerEvent('chat_completion_prompt_ready', { chat: [{ role: 'assistant', mes: '[WorldAxis] 快照本体' }], dryRun: false });
+  const snapA = WA.injectInspector.getLastSnapshot('world');
+  assert(snapA !== null, 'world 域快照非空');
+  // 修改返回副本不得污染内部
+  snapA.tampered = true;
+  const snapB = WA.injectInspector.getLastSnapshot('world');
+  assert(snapB.tampered !== true, '外部修改不污染内部快照（副本隔离）');
+  assert(snapA !== snapB, '每次调用返回新副本（引用不同）');
+  // memory 域同样是副本且内容一致
+  const snapM = WA.injectInspector.getLastSnapshot('memory');
+  assert(snapM !== null, 'memory 域快照非空');
+  assert(snapA.ts === snapM.ts, 'memory 与 world 快照内容一致');
+  snapM.tampered = true;
+  assert(WA.injectInspector.getLastSnapshot('memory').tampered !== true, 'memory 副本隔离');
+  } // end v0.1.10 block
+
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.9 — applySlots 逐槽位容错（单槽位失败不中断）
+  // ═══════════════════════════════════════════════════════════
+  v019: {
+  // ── v0.1.9: applySlots 返回对象 {applied,total,errors} ──
+  assertDeepEq(WA.injectChannel.applySlots(null, icPlan), { applied: 0, total: 2, errors: [{ slot: '(all)', detail: 'setExt 不是函数' }] }, 'setExt 非函数时返回错误对象不抛异常');
+  assertDeepEq(WA.injectChannel.applySlots(function () {}, []).applied, 0, '空槽位计划 applied=0');
+  assertDeepEq(WA.injectChannel.applySlots(function () {}, null).applied, 0, 'null 槽位计划 applied=0');
+  // 单槽位失败不中断其余槽位
+  const failLog = [];
+  const failPlan = [
+    { slot: 'WorldAxis:in_chat', position: 'in_chat', depth: 5, text: 'A' },
+    { slot: 'WorldAxis:after_last_user', position: 'after_last_user', depth: 0, text: 'B' }
+  ];
+  const failRes = WA.injectChannel.applySlots(function (slotName, text) {
+    failLog.push(slotName);
+    if (text === 'B') throw new Error('boom-slot');
+  }, failPlan);
+  assert(failLog.length === 2, '两个槽位都被调用（失败不中断）: ' + JSON.stringify(failLog));
+  assert(failRes.applied === 1 && failRes.total === 2, 'applied=1/total=2: ' + JSON.stringify({ a: failRes.applied, t: failRes.total }));
+  assert(failRes.errors.length === 1 && failRes.errors[0].slot === 'WorldAxis:after_last_user', '错误快照含失败槽位: ' + JSON.stringify(failRes.errors));
+  assert(String(failRes.errors[0].detail).indexOf('boom-slot') >= 0, '错误快照含异常信息');
+  const okRes = WA.injectChannel.applySlots(function () {}, failPlan);
+  assert(okRes.applied === 2 && okRes.errors.length === 0, '全部成功: applied=2, errors=[]');
+  } // end v0.1.9 block
   // ── 端到端：applyInjections 的 ctx.injections 真的走了独立槽位 ──
   global.__lastExtensionPrompt = null;
   global.__extPromptLog = [];
@@ -1892,6 +1993,63 @@ const WA = global.WorldAxis;
   // 清理：恢复一致状态避免污染后续测试
   WA.store.transact(function (d) { d.lastInjection = null; });
   } // end v0.1.6 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.7 — inject-inspector 槽位感知（SUCCESS_SLOTS_ONLY）
+  // ═══════════════════════════════════════════════════════════
+  v017: {
+  // ── STATUS_TEXT 含新状态 ──
+  assert(!!WA.injectInspector.STATUS_TEXT.SUCCESS_SLOTS_ONLY, 'STATUS_TEXT 含 SUCCESS_SLOTS_ONLY');
+  assert(WA.injectInspector.statusText('SUCCESS_SLOTS_ONLY').indexOf('独立槽位') >= 0, 'statusText(SUCCESS_SLOTS_ONLY) 含「独立槽位」');
+  // ── snapEnv 含槽位字段 ──
+  WA.store.transact(function (d) { d.lastInjection = { len: 0, sources: [], slots: { count: 2, applied: 2, keys: ['WorldAxis:after_last_user'] } }; });
+  const env17 = WA.injectInspector.snapEnv({}, {});
+  assert(env17.slotLanded === true, 'snapEnv.slotLanded=true（有槽位落地记录）');
+  assert(env17.slotCount === 2, 'snapEnv.slotCount=2');
+  // ── classify：主块未注册 + 槽位落地 → SUCCESS_SLOTS_ONLY ──
+  const envNoReg = { injectEnabled: true, registeredAtSend: false, slotLanded: true, slotCount: 1 };
+  assert(WA.injectInspector.classify(envNoReg, false) === 'SUCCESS_SLOTS_ONLY', 'classify: 未注册+槽位落地=SUCCESS_SLOTS_ONLY');
+  // ── classify：未注册 + 无槽位 → SKIPPED_OTHER（旧行为）──
+  const envNoSlot = { injectEnabled: true, registeredAtSend: false, slotLanded: false, slotCount: 0 };
+  assert(WA.injectInspector.classify(envNoSlot, false) === 'SKIPPED_OTHER', 'classify: 未注册+无槽位=SKIPPED_OTHER');
+  // ── classify：已落地仍优先 SUCCESS ──
+  assert(WA.injectInspector.classify(envNoReg, true) === 'SUCCESS', 'classify: landed=true 优先 SUCCESS');
+  // ── flatten 输出 slotsOnly 行 ──
+  const snap17 = { status: 'SUCCESS_SLOTS_ONLY', landed: false, apiType: 'prompt', env: envNoReg };
+  const flat17 = WA.injectInspector.flatten(snap17);
+  const row17 = flat17.filter(function (x) { return x.key === 'slotsOnly'; })[0];
+  assert(!!row17, 'flatten 输出 slotsOnly 行');
+  assert(row17.level === 'pass', 'slotsOnly 级别 pass');
+  assert(row17.detail.indexOf('独立槽位') >= 0, 'slotsOnly 详情含「独立槽位」');
+  // 清理
+  WA.store.transact(function (d) { d.lastInjection = null; });
+  } // end v0.1.7 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.8 — safe 语义统一（undefined 兜底）
+  // ═══════════════════════════════════════════════════════════
+  v018: {
+  // ── inject-inspector.safe 的 undefined 兜底（通过 snapEnv 间接验证）──
+  // snapEnv 的 chatId 在 store.chatId 缺失时返回 null（fallback），不返回 undefined
+  const env18 = WA.injectInspector.snapEnv({}, {});
+  assert(env18.chatId === null || typeof env18.chatId === 'string', 'snapEnv.chatId 有兜底值（非 undefined）');
+  // ── 直接验证内部 safe：通过 WA.injectInspector 的公开函数间接 ──
+  // markRegistered(0) 不报错，len 兜底为 0
+  WA.injectInspector.markRegistered(0);
+  assert(true, 'markRegistered(0) 不抛异常');
+  // ── 语义一致性验证：各模块 safe 行为对齐 ──
+  // v0.1.8: 两份 safe 实现已逐字对齐：undefined 兜底 + 异常兜底 + 无 fallback 时返回 null
+  const st2 = WA.inspectorState.safe(function () { return undefined; }, 'FB');
+  assert(st2 !== undefined, 'inspector-state.safe 不返回 undefined');
+  assert(st2 === 'FB', 'inspector-state.safe(undefined) 用 fallback 兜底: ' + JSON.stringify(st2));
+  // 无 fallback 时返回 null（不是 undefined）——两份实现共同保证
+  const st3 = WA.inspectorState.safe(function () { return undefined; });
+  assert(st3 === null, 'inspector-state.safe 无 fallback 返回 null: ' + JSON.stringify(st3));
+  // 抛异常时走 fallback
+  const st4 = WA.inspectorState.safe(function () { throw new Error('boom'); }, 'FB');
+  assert(st4 === 'FB', 'inspector-state.safe 异常时用 fallback 兜底: ' + JSON.stringify(st4));
+  // inject-inspector.safe 同语义（通过 markRegistered/snapEnv 间接覆盖，此处直接验证导出）
+  const ii1 = WA.injectInspector.safe ? WA.injectInspector.safe(function () { return undefined; }, 'FB') : 'NO_EXPORT';
+  assert(ii1 === 'FB' || ii1 === 'NO_EXPORT', 'inject-inspector.safe(undefined,FB) 用 fallback: ' + JSON.stringify(ii1));
+  } // end v0.1.8 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

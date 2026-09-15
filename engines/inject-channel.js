@@ -76,12 +76,27 @@
  * @param {function} setExt  (slotName, text, position, depth, scan) => void
    * @param {Array} slots      planSlots 的输出
    */
+  /**
+   * 应用槽位计划：对每个槽位调用一次 setExtensionPrompt
+   * v0.1.9: 逐槽位 try-catch——单个槽位失败不中断其余槽位，并收集错误信息
+   * @param {function} setExt  (slotName, text, position, depth, scan) => void
+   * @param {Array} slots      planSlots 的输出
+   * @returns {{applied:number, total:number, errors:Array}} applied=成功落地的槽位数
+   */
   function applySlots(setExt, slots) {
-    if (typeof setExt !== 'function') return 0;
-    (slots || []).forEach(function (s) {
-      setExt(s.slot, s.text, POS[s.position], s.depth, false);
+    const list = slots || [];
+    if (typeof setExt !== 'function') return { applied: 0, total: list.length, errors: [{ slot: '(all)', detail: 'setExt 不是函数' }] };
+    let applied = 0;
+    const errors = [];
+    list.forEach(function (s) {
+      try {
+        setExt(s.slot, s.text, POS[s.position], s.depth, false);
+        applied++;
+      } catch (e) {
+        errors.push({ slot: s.slot, position: s.position, depth: s.depth, detail: String(e && (e.message || e)) });
+      }
     });
-    return (slots || []).length;
+    return { applied: applied, total: list.length, errors: errors };
   }
 
   WA.injectChannel = {

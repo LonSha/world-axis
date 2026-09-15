@@ -20,7 +20,7 @@
   const TRIALS = 200;           // 采样试验次数（统计显著性）
   const RECENT_RATIO = 0.5;     // 近期偏置验收阈值：后半段命中率应 ≥ 前半段的此倍数
 
-  function safe(fn, fb) { try { const v = fn(); return v === undefined ? fb : v; } catch (e) { return fb; } }
+  function safe(fn, fb) { try { const v = fn(); if (v !== undefined) return v; } catch (e) {} return fb === undefined ? null : fb; }
 
   /**
    * 统计实验：对 pmem 数组采样 TRIALS 次，输出每条记忆的命中率
@@ -152,7 +152,8 @@
 
   WA.samplerCheck = {
     TRIALS: TRIALS, RECENT_RATIO: RECENT_RATIO,
-    mulberry: mulberry, statSample: statSample, runChecks: runChecks
+    mulberry: mulberry, statSample: statSample, runChecks: runChecks,
+    safe: safe  // v0.1.12: 导出供语义一致性单测
   };
   if (WA.log) WA.log('info', '采样器自检已加载');
 })();

@@ -18,7 +18,8 @@
   const SEVERITY_ORDER = { error: 0, warn: 1, info: 2 };
 
   function read(state) { return state || WA.store.get(); }
-  function safe(fn, fallback) { try { return fn(); } catch (e) { return fallback === undefined ? { __error: String(e && e.message || e) } : fallback; } }
+  // v0.1.8: 统一 safe 语义——fn 返回 undefined 时也兜底（与 inject-inspector/tool-diag 对齐）
+  function safe(fn, fallback) { try { const v = fn(); if (v !== undefined) return v; } catch (e) {} return fallback === undefined ? null : fallback; }
 
   // ── checker 1：事件链合法性（类型/阶段/等级/轮次） ─
   function checkEvents(state) {
@@ -297,7 +298,7 @@
     CHECKERS, SEVERITY_ORDER,
     checkEvents, checkFactions, checkPulse, checkPeople, checkMemory, checkRefs,
     checkInjection, checkPmem, checkDirectEvents,
-    inspect, flatten, summaryText
+    inspect, flatten, summaryText, safe
   };
   if (WA.log) WA.log('info', '状态检查器已加载');
 })();

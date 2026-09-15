@@ -67,6 +67,13 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 
 ## 版本历史
+- **v0.1.12** — safe 语义全模块统一：contract-audit/memory-sampler/sampler-check 的 safe 原本在 fn 返回 undefined 时直接返回 undefined（与 inspector-state/inject-inspector 不一致）；统一为「undefined 兜底 + 异常兜底 + 无 fallback 时返回 null」，并为 contract-audit/memory-sampler/sampler-check/tool-diag 补导出 safe 供单测；tool-diag 保留异常时返回 {error} 的诊断特例；663 断言全过
+- **v0.1.11** — 跨设备同步去脏：chatcache.stripHeavy 原本只剥离 lastInjection，未剥离 v0.1.9 新增的 slotErrors 与 backstage 的 nextTurnInjection——这些注入诊断快照只服务于当前轮排障，跨设备同步既浪费带宽又会在对端复活成脏数据；改为 HEAVY_KEYS 列表统一剥离并导出 stripHeavy 供单测；656 断言全过
+- **v0.1.10** — 快照副本隔离：inject-inspector.getLastSnapshot 原本直接返回内部 _last/_lastMemory 引用，调用方（tool-diag）读取后追加字段会污染内部状态；改为返回浅拷贝副本，memory 与 world 两份快照内容一致但引用独立；648 断言全过
+- **v0.1.9** — applySlots 逐槽位容错：render/inject.js 的槽位路由原本对 setExtensionPrompt 无错误捕获——单个槽位抛异常会中断其余槽位，且调用方只拿到返回数字无法察觉失败；applySlots 改为逐槽位 try-catch 并返回 {applied,total,errors}，部分失败时错误快照写入 lastInjection.slotErrors，tool-diag 输出并升级为 warn；642 断言全过
+- **v0.1.8** — safe 语义统一（inspector-state/inject-inspector）：两份 safe 实现不一致（inject-inspector 在 fn 返回 undefined 且无 fallback 时返回 undefined）；统一为同一实现并互相导出对齐；inspector-state.js:174 的 `!audit || audit.__error` 兼容性确认（null 被 !audit 覆盖，语义成立）；637 断言全过
+- **v0.1.7** — inject-inspector 槽位感知：snapEnv/classify 完全不感知槽位路由，主块为空但槽位路由成功时被误判 SKIPPED_OTHER；STATUS_TEXT 补 SUCCESS_SLOTS_ONLY，snapEnv 补 slotLanded/slotCount，classify 在未注册时先判槽位落地，flatten 补 slotsOnly 行（pass 级）；630 断言全过
+
 - **v0.1.6** — 诊断输出槽位落地信息：tool-diag 的 secInject 补 slots/slotConsistent/slotIssues（来自 injectSlotAudit 对账），flatten 的 injectSlots 行在不一致时升级为 warn；620 断言全过
 - **v0.1.5** — 检查器对齐归零语义：inspector-state 的 inject.badShape（检查三列是否为数组）改为 inject.emptyShell（检查四字段是否全无内容），因为 v0.1.4 后空壳对象不应再存在——残留即异常；空数组 [] 是合法形态不再误报；608 断言全过
 - **v0.1.4** — 近端事件消费归零：修复 nextTurnInjection.nearEvent 消费后只删键不归零、留下空壳对象的缺陷（inspector-state 的 inject.badShape 会误报）；现在删键后检查三列是否全空，空则整体置 null；600 断言全过

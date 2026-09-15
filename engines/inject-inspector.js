@@ -28,6 +28,7 @@
     SKIPPED_REROLL: '本轮按设计未注入：同层重 roll（swipe/重新生成）',
     SKIPPED_OTHER: '本轮未注入：尚未触发推演或无世界状态',
     SUCCESS: '本轮世界状态已进入正文',
+    SUCCESS_SLOTS_ONLY: '本轮主块未注册但剧情约束已通过独立槽位落地（v0.1.1 槽位路由）',
     MISSING: '已注册却没进最终 prompt —— 真注入失败（疑被其它扩展清除/深度越界）'
   };
 
@@ -36,7 +37,8 @@
   let _lastMemory = null;
   let _registered = null;
 
-  function safe(fn, fallback) { try { return fn(); } catch (e) { return fallback; } }
+  // v0.1.8: 统一 safe 语义——fn 返回 undefined 时也兜底（与 tool-diag/contract-audit 对齐）
+  function safe(fn, fallback) { try { const v = fn(); if (v !== undefined) return v; } catch (e) {} return fallback === undefined ? null : fallback; }
   function textOf(m) {
     if (m == null) return '';
     if (typeof m === 'string') return m;
@@ -72,6 +74,15 @@
       registeredAtSend: !!_registered,
       registeredLen: _registered ? _registered.len : 0,
       sameLayerReroll: !!(meta && meta.sameLayerReroll),
+      // v0.1.7: 补槽位落地信息——主块为空但槽位路由成功时，classify 不应误判为 SKIPPED_OTHER
+      slotLanded: safe(function () {
+        const li = WA.store && WA.store.get ? WA.store.get().lastInjection : null;
+        return !!(li && li.slots && li.slots.applied > 0);
+      }, false),
+      slotCount: safe(function () {
+        const li = WA.store && WA.store.get ? WA.store.get().lastInjection : null;
+        return (li && li.slots) ? li.slots.applied : 0;
+      }, 0),
       chatId: safe(function () { return WA.store && WA.store.chatId && WA.store.chatId(); }, null)
     };
   }
@@ -82,7 +93,11 @@
     if (!env) return 'NOT_YET';
     if (!env.injectEnabled) return 'SKIPPED_DISABLED';
     if (env.sameLayerReroll) return 'SKIPPED_REROLL';
-    if (!env.registeredAtSend) return 'SKIPPED_OTHER';
+    if (!env.registeredAtSend) {
+      // v0.1.7: 主块未注册但槽位路由成功——约束类注入已独立落地，不是 MISSING
+      if (env.slotLanded) return 'SUCCESS_SLOTS_ONLY';
+      return 'SKIPPED_OTHER';
+    }
     return 'MISSING';
   }
 
@@ -168,9 +183,17 @@
     }
   }
 
+  // v0.1.10: 返回快照的独立副本——调用方对返回对象的修改不得污染内部状态
+  //         （tool-diag 读快照后可能追加字段；memory/world 两份生命周期独立）
+  function cloneSnap(snap) {
+    if (!snap || typeof snap !== 'object') return snap;
+    const out = {};
+    Object.keys(snap).forEach(function (k) { out[k] = snap[k]; });
+    return out;
+  }
   function getLastSnapshot(scope) {
-    if (scope === 'memory') return _lastMemory;
-    if (scope == null || scope === '' || scope === 'world') return _last;
+    if (scope === 'memory') return cloneSnap(_lastMemory);
+    if (scope == null || scope === '' || scope === 'world') return cloneSnap(_last);
     return null;
   }
   function statusText(status, scope) {
@@ -187,6 +210,7 @@
     if (snap.status === 'MISSING') out.push({ level: 'error', key: 'miss', detail: '注入已注册但未出现在最终 prompt，检查其它扩展是否清空 prompt 或 depth 越界' });
     if (snap.status === 'SKIPPED_DISABLED') out.push({ level: 'warn', key: 'disabled', detail: '设置页注入可见性全部关闭，世界状态不会进正文' });
     if (snap.status === 'SKIPPED_REROLL') out.push({ level: 'info', key: 'reroll', detail: 'swipe/重答沿用了本轮已有注入，属预期行为' });
+    if (snap.status === 'SUCCESS_SLOTS_ONLY') out.push({ level: 'pass', key: 'slotsOnly', detail: '剧情约束已由独立槽位落地（' + (snap.env ? snap.env.slotCount : 0) + ' 路），主世界状态块为空属预期' });
     return out;
   }
   function reset() { _last = null; _lastMemory = null; _registered = null; }
@@ -194,7 +218,7 @@
   WA.injectInspector = {
     SENTINEL, STATUS_TEXT,
     init, markRegistered, snapEnv, classify, snapshotChat, snapshotText,
-    getLastSnapshot, statusText, flatten, reset
+    getLastSnapshot, statusText, flatten, reset, safe
   };
   if (WA.log) WA.log('info', '注入自检引擎已加载');
 })();

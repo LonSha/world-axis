@@ -45,10 +45,13 @@
   let _lastAutoRound = null;
 
   // ── slot打包/安装 ──────────────────────────────────────
+  // v0.1.11: 扩大临时字段剥离范围——注入诊断快照只服务于当前轮渲染排障，
+  //         跨设备同步它们既浪费带宽又会在对端复活成脏数据
+  const HEAVY_KEYS = ['lastInjection', 'slotErrors', 'nextTurnInjection'];
   function stripHeavy(rawJson) {
     try {
       const o = JSON.parse(rawJson);
-      delete o.lastInjection;
+      HEAVY_KEYS.forEach(function (k) { delete o[k]; });
       if (o.evolution) delete o.evolution._ledgerCheckpoint;  // 纯临时字段
       return JSON.stringify(o);
     } catch (e) { return rawJson; }
@@ -291,7 +294,7 @@
 
   WA.chatcache = {
     NS, init, scheduleTick, runTick, pushLiveNow,
-    packChat, installPack, pruneSnapshots, writeNamespace,
+    stripHeavy, packChat, installPack, pruneSnapshots, writeNamespace,
     addSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot,
     readNamespace, ensureNamespace
   };

@@ -22,8 +22,9 @@
   const PACKAGE_VERSION = 2;
 
   function safe(fn, fallback) {
-    try { const v = fn(); return v === undefined ? fallback : v; }
+    try { const v = fn(); if (v !== undefined) return v; }
     catch (e) { return { error: String((e && e.message) || e) }; }
+    return fallback === undefined ? null : fallback;
   }
   function len(a) { return Array.isArray(a) ? a.length : 0; }
   function redact(v) {
@@ -145,6 +146,8 @@
           if (slotAudit.issues.length) out.slotIssues = slotAudit.issues;
         }
       }
+      // v0.1.9: 槽位路由错误快照（部分失败时存在）
+      if (li && li.slotErrors) out.slotErrors = li.slotErrors;
       else { out.promptLength = snap.promptLength; out.ourExcerptLen = snap.ourExcerptLen; }
       return out;
     }, {});
@@ -293,6 +296,10 @@
     if (inj.slots) {
       out.push({ level: inj.slotConsistent === false ? 'warn' : 'info', key: 'injectSlots', detail: '槽位 ' + inj.slots.applied + '/' + inj.slots.count + ' 落地' + (inj.slotConsistent === false ? '（不一致）' : '') });
     }
+    // v0.1.9: 槽位路由错误快照（部分失败时升级为 warn）
+    if (inj.slotErrors && inj.slotErrors.length) {
+      out.push({ level: 'warn', key: 'injectSlotErrors', detail: '槽位路由错误 ' + inj.slotErrors.length + ' 处：' + inj.slotErrors.map(function (e) { return e.slot; }).join('、') });
+    }
     return out;
   }
   function download() {
@@ -318,7 +325,8 @@
     PACKAGE_FORMAT, PACKAGE_VERSION, MODULE_EXPORTS, UI_BINDINGS,
     collect, verdict, toJSON, summaryText, flatten, download,
     OPTIONAL_EXPORTS,
-    secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities
+    secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities,
+    safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');
 })();

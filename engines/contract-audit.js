@@ -23,7 +23,7 @@
   const WA = G.WorldAxis = G.WorldAxis || {};
   const PROBE_TAG = '__audit_';
   function deepClone(o) { try { return JSON.parse(JSON.stringify(o)); } catch (e) { return null; } }
-  function safe(fn, fb) { try { const v = fn(); return v === undefined ? fb : v; } catch (e) { return fb; } }
+  function safe(fn, fb) { try { const v = fn(); if (v !== undefined) return v; } catch (e) {} return fb === undefined ? null : fb; }
 
   // ── 哨兵探针：每个字段一个足以引发状态变化的合成值（标记 PROBE_TAG 便于追踪）──
   const PROBES = {
@@ -322,7 +322,8 @@
 
   WA.contractAudit = {
     PROBE_TAG, PROBES, FIELDS, ENUM_ALIGN, CROSS_MODULE,
-    parseContract, consumedFields, audit, summaryText, flatten
+    parseContract, consumedFields, audit, summaryText, flatten,
+    safe  // v0.1.12: 导出供语义一致性单测
   };
   if (WA.log) WA.log('info', '推演契约对账器已加载');
 })();

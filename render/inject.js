@@ -100,19 +100,23 @@
       let slotCount = 0;
       let routedKeys = [];
       let lastSlots = null;
+      let slotErrors = [];   // v0.1.9: 槽位路由错误快照
       try {
         const routable = ctxInj.filter(function (i) { return !!(i && i.position); });
         if (WA.injectChannel && routable.length) {
           const slots = WA.injectChannel.planSlots(routable);
-          const applied = WA.injectChannel.applySlots(function (slotName, text, pos, depth, scan) {
+          const slotRes = WA.injectChannel.applySlots(function (slotName, text, pos, depth, scan) {
             c.setExtensionPrompt(slotName, text, pos, depth, scan);
           }, slots);
-          // 原子語義：只有 applySlots 全部成功后才标记接管，避免「注入了但没标记」的丢失
+          const applied = slotRes.applied;
+          // 原子语义：只有 applySlots 全部成功后才标记接管，避免「注入了但没标记」的丢失
           if (applied === slots.length) {
             slotCount = applied;
             routedKeys = slots.map(function (sl) { return sl.slot; });
             lastSlots = slots;
           } else {
+            // v0.1.9: 部分失败时收集错误快照，供 tool-diag 排障
+            slotErrors = (slotRes.errors || []).slice();
             WA.log('warn', '槽位路由部分失败（' + applied + '/' + slots.length + '），约束注入并入主块');
           }
         }
@@ -139,7 +143,7 @@
           const slotSnap = (WA.injectSlotAudit && lastSlots)
             ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null, slots: slotSnap }; });
+          WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }

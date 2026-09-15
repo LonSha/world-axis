@@ -103,7 +103,7 @@
     } catch (e) { /* 快照构建失败只影响相关性过滤，不阻断 */ }
     return parts.join('\n');
   }
-  function safe(fn, fb) { try { const v = fn(); return v === undefined ? fb : v; } catch (e) { return fb; } }
+  function safe(fn, fb) { try { const v = fn(); if (v !== undefined) return v; } catch (e) {} return fb === undefined ? null : fb; }
 
   /**
    * 主入口：采样生成注入段落
@@ -164,6 +164,7 @@
     DEFAULT_LIMIT: DEFAULT_LIMIT, MIN_LIMIT: MIN_LIMIT, MAX_LIMIT: MAX_LIMIT,
     exponentialSample: exponentialSample,
     loadSamplerSettings: loadSamplerSettings,
+    safe: safe,  // v0.1.12: 导出供语义一致性单测
     filterRelevant: filterRelevant,
     buildHaystack: buildHaystack,
     sampleEntries: sampleEntries,
