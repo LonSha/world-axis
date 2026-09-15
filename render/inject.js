@@ -68,7 +68,11 @@
         // 一次性消费：清除
         WA.store.transact(d => { if (d.nextTurnInjection) delete d.nextTurnInjection.nearEvent; });
       }
-      (ctx.injections || []).forEach(i => items.push(i));
+      // v0.1.1: 剧情约束类注入由槽位路由独立落地，不并入主块（避免重复注入）
+      const ctxInj = (ctx.injections || []);
+      // 无 position 的项保持旧行为（并入主块）；带 position 的项默认也并入主块，
+      // 仅当槽位路由成功接管后才从主块移除——保证任何降级路径都不丢注入
+      ctxInj.forEach(function (i) { if (i && i.content) items.push(i); });
       // v0.9.3: 注入预算裁决（pinned 保底 / optional 先折叠后丢弃；0=不限）
       let planInfo = null;
       let finalItems = items;
@@ -84,13 +88,43 @@
           }
         }
       } catch (e) { WA.log('warn', '预算裁决失败，回退全量注入', e); planInfo = null; finalItems = items; }
-      const combined = finalItems.map(i => i.content).join('\n');
+      // v0.1.1: 槽位路由——显式带 position 的剧情约束类走独立槽位，
+      // 不与主世界状态块互相覆盖；预算裁决只作用于主槽位
+      // 无 position 的注入项保持旧行为（并入主块），保证向后兼容
+      let slotCount = 0;
+      let routedKeys = [];
+      try {
+        const routable = ctxInj.filter(function (i) { return !!(i && i.position); });
+        if (WA.injectChannel && routable.length) {
+          const slots = WA.injectChannel.planSlots(routable);
+          const applied = WA.injectChannel.applySlots(function (slotName, text, pos, depth, scan) {
+            c.setExtensionPrompt(slotName, text, pos, depth, scan);
+          }, slots);
+          // 原子語義：只有 applySlots 全部成功后才标记接管，避免「注入了但没标记」的丢失
+          if (applied === slots.length) {
+            slotCount = applied;
+            routedKeys = slots.map(function (sl) { return sl.slot; });
+          } else {
+            WA.log('warn', '槽位路由部分失败（' + applied + '/' + slots.length + '），约束注入并入主块');
+          }
+        }
+      } catch (e) { WA.log('warn', '槽位路由失败，约束注入并入主块', e); }
+      // 未被槽位路由接管的项（含路由失败时回退的 routable 项）才并入主块
+      // 注意：预算裁决可能剥离 position，因此用「已被路由接管的原始项集合」做内容指纹过滤
+      const routedSet = routedKeys.length ? WA.injectChannel.planSlots(ctxInj) : [];
+      const routedContents = routedSet.length
+        ? routedSet.reduce(function (acc, sl) { return acc.concat(sl.text.split('\n')); }, [])
+        : [];
+      const mainItems = routedContents.length
+        ? finalItems.filter(function (i) { return routedContents.indexOf(i.content) < 0; })
+        : finalItems;
+      const combined = mainItems.map(i => i.content).join('\n');
       try {
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(combined.length);
-        try { WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: finalItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null }; }); } catch (e) { /* 快照失败不影响注入 */ }
-        if (combined) WA.log('info', '注入落地：' + finalItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）');
+        try { WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null }; }); } catch (e) { /* 快照失败不影响注入 */ }
+        if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
     }
   };

@@ -46,7 +46,12 @@ global.SillyTavern = {
       emit: async (evt, ...args) => { for (const fn of (eventHandlers[evt] || [])) await fn(...args); }
     },
     eventTypes: { APP_READY: 'app_ready', GENERATION_ENDED: 'gen_ended', MESSAGE_RECEIVED: 'msg_recv', CHAT_CHANGED: 'chat_changed' },
-    setExtensionPrompt: (key, text, pos, depth, scan) => { global.__lastExtensionPrompt = { key, text, pos, depth, scan }; }
+    setExtensionPrompt: (key, text, pos, depth, scan) => {
+      if (!global.__extPromptLog) global.__extPromptLog = [];
+      const rec = { key: key, text: text, pos: pos, depth: depth, scan: scan };
+      global.__extPromptLog.push(rec);
+      global.__lastExtensionPrompt = rec;
+    }
   })
 };
 global.__triggerEvent = async (evt, ...args) => { for (const fn of (eventHandlers[evt] || [])) await fn(...args); };

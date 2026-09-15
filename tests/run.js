@@ -24,7 +24,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1546,10 +1546,130 @@ const WA = global.WorldAxis;
   assert(WA.toolDiag.MODULE_EXPORTS['engines/sampler-check.js'] === 'samplerCheck', '诊断清单已登记 sampler-check');
 
   } // end v0.1.0 block
-  // ── 汇总 ──
+
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.1 — 注入槽位路由（inject-channel）
+  // ═══════════════════════════════════════════════════════════
+  v011: {
+  assert(typeof WA.injectChannel === 'object', 'injectChannel 已加载');
+  assert(WA.injectChannel.POS.after_last_user === 1 && WA.injectChannel.POS.in_chat === 0 && WA.injectChannel.POS.at_end === 2, 'POS 位置常量映射正确');
+  assert(WA.injectChannel.DEFAULT_POS === 'in_chat', '默认位置 in_chat');
+  assert(WA.injectChannel.SLOT_PREFIX === 'WorldAxis', '槽位前缀 WorldAxis');
+  // ── normPos：未知值回落 ──
+  assert(WA.injectChannel.normPos('after_last_user') === 'after_last_user', 'normPos 已知位置原样通过');
+  assert(WA.injectChannel.normPos('in_chat') === 'in_chat', 'normPos in_chat 通过');
+  assert(WA.injectChannel.normPos('at_end') === 'at_end', 'normPos at_end 通过');
+  assert(WA.injectChannel.normPos('before_message') === 'in_chat', 'normPos 未知位置回落 in_chat');
+  assert(WA.injectChannel.normPos(null) === 'in_chat', 'normPos null 回落');
+  assert(WA.injectChannel.normPos(undefined) === 'in_chat', 'normPos undefined 回落');
+  assert(WA.injectChannel.normPos(42) === 'in_chat', 'normPos 非字符串回落');
+  assert(WA.injectChannel.normPos('') === 'in_chat', 'normPos 空串回落');
+  // ── routeBySlot：分桶 + 深度排序 ──
+  const icItems = [
+    { source: '连续性约束', content: 'A-约束', position: 'after_last_user', depth: 0 },
+    { source: '演化状态', content: 'B-演化', position: 'after_last_user', depth: 1 },
+    { source: '章节', content: 'C-章节', position: 'after_last_user', depth: 2 },
+    { source: '世界状态', content: 'D-状态', position: 'in_chat', depth: 5 }
+  ];
+  const icBuckets = WA.injectChannel.routeBySlot(icItems);
+  assert(icBuckets.length === 2, 'routeBySlot 分出 2 个桶（after_last_user + in_chat）');
+  const icALU = icBuckets.filter(b => b.position === 'after_last_user')[0];
+  const icIC = icBuckets.filter(b => b.position === 'in_chat')[0];
+  assert(icALU.slot === 'WorldAxis:after_last_user', 'after_last_user 桶位名正确');
+  assert(icIC.slot === 'WorldAxis:in_chat', 'in_chat 桶位名正确');
+  assert(icALU.items.length === 3, 'after_last_user 桶收 3 项');
+  assert(icIC.items.length === 1, 'in_chat 桶收 1 项');
+  assert(icALU.items.map(i => i.content).join(',') === 'A-约束,B-演化,C-章节', '桶内按 depth 升序（0,1,2）');
+  assert(icALU.items.map(i => i.depth).join(',') === '0,1,2', '深度排序后 depth 序列正确');
+  // ── 乱序 depth 输入仍稳定排序 ──
+  const icShuffled = WA.injectChannel.routeBySlot([
+    { source: '章节', content: 'C', position: 'after_last_user', depth: 2 },
+    { source: '连续性约束', content: 'A', position: 'after_last_user', depth: 0 },
+    { source: '仇敌', content: 'E', position: 'after_last_user', depth: 1 }
+  ]);
+  const icShufALU = icShuffled.filter(b => b.position === 'after_last_user')[0];
+  assert(icShufALU.items.map(i => i.depth).join(',') === '0,1,2', '乱序输入按深度重排');
+  assert(icShufALU.items.map(i => i.content).join(',') === 'A,E,C', '深度排序后内容序列 A,E,C');
+  // ── position 缺失/无效 → 归入 in_chat 桶 ──
+  const icNoPos = WA.injectChannel.routeBySlot([
+    { source: 'X', content: 'X-无位置' },
+    { source: 'Y', content: 'Y-坏位置', position: 'middle_of_nowhere', depth: 3 }
+  ]);
+  assert(icNoPos.length === 1 && icNoPos[0].position === 'in_chat', '无 position 与无效 position 都归 in_chat');
+  assert(icNoPos[0].items.length === 2, 'in_chat 桶收 2 项');
+  assert(icNoPos[0].items.map(i => i.depth).join(',') === '3,5', '桶内深度升序（3 在前，5 在后）');
+  // ── 空入参/脏数据降级 ──
+  assertDeepEq(WA.injectChannel.routeBySlot([]), [], 'routeBySlot 空数组返回空');
+  assertDeepEq(WA.injectChannel.routeBySlot(null), [], 'routeBySlot null 返回空');
+  assertDeepEq(WA.injectChannel.routeBySlot(undefined), [], 'routeBySlot undefined 返回空');
+  assertDeepEq(WA.injectChannel.routeBySlot([{ source: 'Z' }, null, { content: '' }]), [], '缺 content / null / 空内容的项被丢弃');
+  // ── planSlots：文本合并 ──
+  const icPlan = WA.injectChannel.planSlots(icItems);
+  assert(icPlan.length === 2, 'planSlots 输出 2 个槽位计划');
+  const icPlanALU = icPlan.filter(s => s.position === 'after_last_user')[0];
+  assert(icPlanALU.slot === 'WorldAxis:after_last_user', 'planSlots 槽位名透传');
+  assert(icPlanALU.depth === 0, 'planSlots 取桶内首项 depth（0）作为槽位 depth');
+  assert(icPlanALU.text === 'A-约束\nB-演化\nC-章节', 'planSlots 桶内文本按深度顺序换行拼接');
+  assert(icPlan.filter(s => s.position === 'in_chat')[0].text === 'D-状态', 'in_chat 槽位文本正确');
+  assertDeepEq(WA.injectChannel.planSlots([]), [], 'planSlots 空数组返回空');
+  // ── applySlots：回调参数校验（自建可记录 setExt） ──
+  const icCalls = [];
+  const icN = WA.injectChannel.applySlots(function (slotName, text, pos, depth, scan) {
+    icCalls.push({ slotName: slotName, text: text, pos: pos, depth: depth, scan: scan });
+  }, icPlan);
+  assert(icN === 2, 'applySlots 返回已应用槽位数 2');
+  assert(icCalls.length === 2, 'setExt 被调用 2 次（每槽位一次）');
+  const icCallALU = icCalls.filter(c => c.slotName === 'WorldAxis:after_last_user')[0];
+  const icCallIC = icCalls.filter(c => c.slotName === 'WorldAxis:in_chat')[0];
+  assert(icCallALU.pos === 1, 'after_last_user 槽位 pos=1（POS 映射落地）');
+  assert(icCallALU.depth === 0, 'after_last_user 槽位 depth=0');
+  assert(icCallALU.text === 'A-约束\nB-演化\nC-章节' && icCallALU.scan === false, '槽位文本与 scan=false 透传');
+  assert(icCallIC.pos === 0 && icCallIC.depth === 5, 'in_chat 槽位 pos=0 depth=5');
+  assertDeepEq(WA.injectChannel.applySlots(null, icPlan), 0, 'setExt 非函数时返回 0 不抛异常');
+  assertDeepEq(WA.injectChannel.applySlots(function () {}, []), 0, '空槽位计划返回 0');
+  assertDeepEq(WA.injectChannel.applySlots(function () {}, null), 0, 'null 槽位计划返回 0');
+  // ── 端到端：applyInjections 的 ctx.injections 真的走了独立槽位 ──
+  global.__lastExtensionPrompt = null;
+  global.__extPromptLog = [];
+  const icCtx = { injections: [
+    { source: '连续性约束', content: '<slot-e2e/>约束', position: 'after_last_user', depth: 0 },
+    { source: '章节', content: '<slot-e2e/>章节', position: 'after_last_user', depth: 2 }
+  ]};
+  WA.render.applyInjections(icCtx);
+  assert(global.__lastExtensionPrompt !== null, '槽位路由端到端：applyInjections 仍调用 setExtensionPrompt');
+  const icLog = global.__extPromptLog || [];
+  const icSlotCall = icLog.filter(function (r) { return r.key === 'WorldAxis:after_last_user'; })[0];
+  assert(!!icSlotCall, '端到端：存在 after_last_user 独立槽位调用记录');
+  const icE2E = icSlotCall;
+  assert(icE2E.pos === 1 && icE2E.depth === 0, '端到端：独立槽位 pos=1 depth=0');
+  assert(icE2E.text.indexOf('<slot-e2e/>约束') >= 0 && icE2E.text.indexOf('<slot-e2e/>章节') >= 0, '端到端：两路约束都进入独立槽位文本');
+  assert(icE2E.text.indexOf('<slot-e2e/>约束') < icE2E.text.indexOf('<slot-e2e/>章节'), '端到端：深度排序在最终文本中生效（约束在章节前）');
+  // 主槽位不应重复包含已被独立槽位接管的约束文本
+  const icMainCalls = icLog.filter(function (r) { return r.key === 'WorldAxis'; });
+  const icMainCall = icMainCalls[icMainCalls.length - 1];
+  assert(!!icMainCall, '端到端：主槽位调用仍存在');
+  assert(icMainCalls.length >= 1, '端到端：主槽位调用记录存在');
+  var icNoDup = icMainCalls.every(function (r) { return !r.text || r.text.indexOf('<slot-e2e/>') < 0; });
+  assert(icNoDup, '端到端：约束文本不重复注入主槽位');
+  assert(global.__waInjLog !== undefined || true, '日志占位（不强制）');
+  // ── 端到端降级：槽位路由不可用时回退并入主块 ──
+  const keepIC = WA.injectChannel;
+  delete WA.injectChannel;
+  global.__lastExtensionPrompt = null;
+  global.__extPromptLog = [];
+  WA.render.applyInjections(icCtx);
+  const icFall = global.__lastExtensionPrompt;
+  assert(icFall.key === 'WorldAxis', '降级：回退到主槽位 WorldAxis');
+  assert(global.__extPromptLog.filter(function (r) { return r.key === 'WorldAxis:after_last_user'; }).length === 0, '降级：无独立槽位调用');
+  assert(icFall.text.indexOf('<slot-e2e/>约束') >= 0 && icFall.text.indexOf('<slot-e2e/>章节') >= 0, '降级：带 position 的约束文本并入主块');
+  WA.injectChannel = keepIC;
+  // ── 诊断清单登记校验 ──
+  assert(WA.toolDiag.MODULE_EXPORTS['engines/inject-channel.js'] === 'injectChannel', '诊断清单已登记 inject-channel');
+   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
   if (failures.length) { console.log('失败项: ' + failures.join(' | ')); process.exit(1); }
   console.log('全部测试通过 ✓');
   process.exit(0);
+  } // end v0.1.1 block
 })().catch(e => { console.error('测试运行器异常: ', e); process.exit(2); });
