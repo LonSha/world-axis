@@ -33,11 +33,14 @@ const mockChat = [
 
 // SillyTavern context mock
 const eventHandlers = {};
+const mockChatMetadata = {}; // 跨 getContext 调用持久（chatcache 依赖真实持久化）
 global.SillyTavern = {
   getContext: () => ({
     chat: mockChat,
     chatId: 'test_chat_001',
-    chatMetadata: {},
+    chatMetadata: mockChatMetadata,
+    updateChatMetadata: (patch) => { Object.assign(mockChatMetadata, patch); },
+    saveMetadataDebounced: () => {},
     eventSource: {
       on: (evt, fn) => { (eventHandlers[evt] = eventHandlers[evt] || []).push(fn); },
       emit: async (evt, ...args) => { for (const fn of (eventHandlers[evt] || [])) await fn(...args); }

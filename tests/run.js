@@ -19,7 +19,7 @@ const ctx = vm.createContext(global);
 const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
-  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js',
+  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
@@ -515,6 +515,66 @@ const WA = global.WorldAxis;
   WA.preset.deleteCustomPreset(WA.preset.getAllPresets().find(p => p.name === '武侠增强').id);
   WA.preset.setActivePresetId('default');
 
+  // ── chatcache (v0.8) ──
+  section('engines/chatcache v0.8');
+  // 复用mock的真实聊天上下文（chatId=test_chat_001，chatMetadata持久）
+  WA.store.transact(d => { d.meta.round = 3; d.clock.label = '第3日·夜'; });
+  WA.store.save();
+  const cid = global.SillyTavern.getContext().chatId; // test_chat_001
+  // packChat
+  const packed = WA.chatcache.packChat(cid);
+  assert(packed.state && typeof packed.state === 'string', 'packChat打包state slot');
+  // pushLiveNow + 内容去重
+  const push1 = WA.chatcache.pushLiveNow(null, false);
+  assert(push1 === true, '首次推送live成功');
+  const ns1 = WA.chatcache.readNamespace();
+  assert(ns1 && ns1.live && ns1.live.chatId === cid && ns1.live.rev === 1, 'live结构完整 rev=1');
+  const push2 = WA.chatcache.pushLiveNow(null, false);
+  const ns2 = WA.chatcache.readNamespace();
+  assert(ns2.live.rev === 1, '内容无变化不bump rev（去重）');
+  // 状态变化后rev递增
+  WA.store.transact(d => { d.meta.round = 4; });
+  WA.store.save();
+  WA.chatcache.pushLiveNow(null, false);
+  assert(WA.chatcache.readNamespace().live.rev === 2, '状态变化rev递增至2');
+  // Lamport冲突解决：聊天端rev更高则拉取
+  const ns3 = WA.chatcache.ensureNamespace();
+  ns3.live.rev = 5;
+  ns3.live.data = { state: JSON.stringify({ meta: { round: 99 } }) };
+  WA.chatcache.writeNamespace(ns3);
+  // 拉取发生在runTick，但runTick会先本地推送判断。直接验证installPack路径：聊天rev更高→安装回本地
+  // 手动触发：先清本地rev模拟本地落后
+  global.localStorage.setItem('worldaxis_state_' + cid + '_syncrev', '2');
+  // 直接验证写回本地（模拟聊天较新场景的install）
+  WA.chatcache.installPack(ns3.live.data, cid);
+  const pulled = JSON.parse(global.localStorage.getItem('worldaxis_state_' + cid));
+  assert(pulled.meta.round === 99, 'Lamport冲突：聊天较新则拉取安装');
+  // 手动存档+恢复
+  WA.store.transact(d => { d.clock.label = '存档点时刻'; });
+  WA.store.save();
+  const snapResult = WA.chatcache.addSnapshot('测试存档');
+  assert(snapResult.ok === true, '手动存档成功');
+  const snapList = WA.chatcache.listSnapshots();
+  assert(snapList.length === 1 && snapList[0].name === '测试存档' && !snapList[0].auto, '存档列表正确');
+  // 修改当前状态后恢复
+  WA.store.transact(d => { d.clock.label = '被改掉的时刻'; });
+  WA.store.save();
+  const restoreResult = WA.chatcache.restoreSnapshot(snapList[0].id);
+  assert(restoreResult.ok === true, '恢复存档成功');
+  const restoredRaw = global.localStorage.getItem('worldaxis_state_' + cid);
+  assert(restoredRaw && restoredRaw.includes('存档点时刻'), '恢复后状态回到存档点');
+  // 自动备份滚动窗口
+  const ccNs = WA.chatcache.ensureNamespace();
+  for (let i = 0; i < 6; i++) {
+    ccNs.snapshots.push({ id: 'auto_test' + i, name: '自动' + i, auto: true, at: Date.now(), data: { state: '{}' } });
+  }
+  WA.chatcache.pruneSnapshots(ccNs);
+  const autoLeft = ccNs.snapshots.filter(s => s.auto).length;
+  assert(autoLeft <= 3, `自动备份滚动窗口≤3(实际${autoLeft})`);
+  // 删除存档
+  const delResult = WA.chatcache.deleteSnapshot(snapList[0].id);
+  assert(delResult === true, '删除存档执行');
+
   section('engines/opinion');
   WA.store.transact(d => {
     d.currents.push({ id: 'cu1', title: '镇外骑兵队逼近', summary: '', visibility: 'trace', publicity: 'public', public_trace: '马蹄声', stage: '发展', createdAt: Date.now(), updatedAt: Date.now() });
@@ -568,6 +628,7 @@ const WA = global.WorldAxis;
 
   // ── render/inject ──
   section('render/inject');
+  WA.store.transact(d => { d.clock.label = '第1日·入夜'; });
   const snap = WA.render.buildWorldSnapshot();
   assert(snap.includes('world_axis_state') && snap.includes('第1日·入夜'), '世界快照构建(含时钟)');
   assert(snap.includes('世界脉搏'), '世界快照含脉搏');
