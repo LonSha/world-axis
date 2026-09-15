@@ -138,6 +138,8 @@
       if (snap.apiType === 'chat') { out.messageCount = snap.messageCount; out.ourIndex = snap.ourIndex; out.ourContentLen = snap.ourContentLen; }
       // v0.1.6: 补槽位落地信息（来自 injectSlotAudit 对 lastInjection 的对账结果）
       const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
+      // v0.1.29: 快照已撤销时标注——槽位证据保留但注入已不在场
+      if (li && li.injected === false) { out.injected = false; out.clearedAt = li.clearedAt || null; out.clearedBy = li.clearedBy || null; }
       if (li && li.slots) {
         out.slots = li.slots;
         const slotAudit = WA.injectSlotAudit ? WA.injectSlotAudit.audit(li) : null;

@@ -8,10 +8,10 @@
   const mainWin = WA.mainWin || window;
   const LS_KEY = 'worldaxis_inject_visibility_v1';
 
-  const SOURCES = ['clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse'];
+  const SOURCES = ['clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse', 'ledger', 'digest'];
 
   function loadVis() {
-    const def = { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true };
+    const def = { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true };
     try { return Object.assign(def, JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
   }
   // v0.1.19: 撤销台账——记录每次 uninject 的时间、触发源、结果（最多 20 条环形）
@@ -41,9 +41,13 @@
         const cs = s.currents.filter(c => c.visibility !== 'hidden').slice(0, 6);
         if (cs.length) parts.push('【可感知暗流】' + cs.map(c => c.visibility === 'trace' ? (c.public_trace || c.title + '（异常迹象）') : c.title).join('；'));
       }
-      parts.push('〔呈现铁律〕以上状态只供你构建舞台。输出时必须全部经过 NPC 视角过滤：信息只可由 NPC 口述/信件/公告/路人议论呈现，绝不使用系统旁白；禁止输出属性面板、好感度数值、经济指标或声望分数。')
-      return parts.length
-      ? '<world_axis_state>\n' + parts.join('\n') + '\n</world_axis_state>' : '';
+      // v0.1.29: 呈现铁律只在真有状态内容时追加——此前无条件 push 导致
+      // parts.length 恒真、可见性全关仍注入 221 字空壳（开关对世界状态失效）
+      if (parts.length) {
+        parts.push('〔呈现铁律〕以上状态只供你构建舞台。输出时必须全部经过 NPC 视角过滤：信息只可由 NPC 口述/信件/公告/路人议论呈现，绝不使用系统旁白；禁止输出属性面板、好感度数值、经济指标或声望分数。')
+        return '<world_axis_state>\n' + parts.join('\n') + '\n</world_axis_state>';
+      }
+      return '';
     },
 
     applyInjections(ctx) {
@@ -67,9 +71,11 @@
       // 舆情块
       if (vis.opinion && WA.opinion) { const ob = WA.opinion.buildOpinionBlock(); if (ob) items.push({ source: '舆情', content: ob }); }
       // v0.8: 重大事件账本块
-      if (WA.ledger) { const lb = WA.ledger.buildLedgerText(); if (lb) items.push({ source: '账本', content: '[重大事件账本]\n' + lb }); }
+      // v0.1.29: 账本/世界推演此前不受可见性控制（不在 SOURCES 内），
+      // 关掉所有注入源仍会注入账本与推演块——补齐开关覆盖，默认开保持旧行为
+      if (vis.ledger && WA.ledger) { const lb = WA.ledger.buildLedgerText(); if (lb) items.push({ source: '账本', content: '[重大事件账本]\n' + lb }); }
       // v0.7: world_digest块
-      if (WA.digest) { const db = WA.digest.buildBlock(); if (db) items.push({ source: '世界推演', content: db }); }
+      if (vis.digest && WA.digest) { const db = WA.digest.buildBlock(); if (db) items.push({ source: '世界推演', content: db }); }
       // v0.7: 近端事件一次性消费
       const st = WA.store.get();
       if (st && st.nextTurnInjection && st.nextTurnInjection.nearEvent) {
@@ -153,7 +159,7 @@
           const slotSnap = (WA.injectSlotAudit && lastSlots)
             ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null }; });
+          WA.store.transact(d => { d.lastInjection = { at: Date.now(), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
@@ -176,6 +182,13 @@
         slotKeys.forEach(function (k) { try { c.setExtensionPrompt(k, '', 1, 0, false); cleared.push(k); } catch (e) {} });
         try { c.setExtensionPrompt('WorldAxis', '', 1, 0, false); cleared.push('WorldAxis'); } catch (e) {}
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(0);
+        // v0.1.29: 撤销状态回写快照——槽位已清空但证据保留（幂等重放依赖 keys），
+        // 诊断读到这里不应再把上一轮注入当作「仍在生效」的活证据
+        try {
+          if (WA.store && cleared.length) WA.store.transact(function (d) {
+            if (d.lastInjection) { d.lastInjection.injected = false; d.lastInjection.clearedAt = Date.now(); d.lastInjection.clearedBy = trigger || 'manual'; }
+          });
+        } catch (e) {}
         if (WA.log) WA.log('info', 'uninject 清空 ' + cleared.length + ' 个槽位（trigger=' + (trigger || 'manual') + '）');
         const r = { ok: true, cleared: cleared };
         recordUninject(trigger, r);

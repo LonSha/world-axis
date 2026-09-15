@@ -2892,6 +2892,46 @@ WA.loadScript = _ls.loadScript;
   // 清理：摘掉测试监听器，避免污染总线总监听器统计
   WA.off('t.bus.demo', fn28);
   } // end v0.1.28 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.29 — 撤销状态回写（lastInjection.injected 语义诚实）
+  // ═══════════════════════════════════════════════════════════
+  v0129: {
+  // 落地一轮注入 → 快照 injected=true
+  WA.store.transact(d => { d.lastInjection = null; });
+  WA.render.applyInjections({ injections: [{ source: '世界状态', content: 'v129 状态块' }] });
+  const li29 = WA.store.get().lastInjection;
+  assert(li29 && li29.injected === true, '落地轮快照标注 injected=true');
+  // 撤销 → injected=false + 时间与触发源回写，槽位证据保留（幂等重放依赖 keys）
+  const unj29 = WA.render.uninject('manual-v129');
+  assert(unj29.ok === true && unj29.cleared.length >= 1, '撤销执行');
+  const li29b = WA.store.get().lastInjection;
+  assert(li29b.injected === false, '撤销后 injected=false');
+  assert(li29b.clearedBy === 'manual-v129' && li29b.clearedAt >= li29b.at, '回写 clearedBy/clearedAt');
+  assert(li29b.slots !== undefined || li29b.len >= 0, '证据字段保留（不整体清空）');
+  // 幂等仍成立：第二次撤销依旧清同批槽位
+  const unj29c = WA.render.uninject('manual-v129');
+  assert(unj29c.ok === true && unj29c.cleared.length === unj29.cleared.length, '重复撤销幂等保留');
+  // tool-diag 消费：inject 节透出撤销态
+  const dg29 = WA.toolDiag.collect();
+  assert(dg29.inject.injected === false && dg29.inject.clearedBy === 'manual-v129', '诊断标注注入已撤销');
+  // 世界状态在场时，即使 ctx.injections 为空也算生效（快照自带内容）
+  WA.store.transact(d => { d.lastInjection = null; });
+  WA.render.applyInjections({ injections: [] });
+  const li29d = WA.store.get().lastInjection || {};
+  assert(li29d.injected === true, '世界状态在场 → injected=true（不因 ctx 为空误判）');
+  // 全部可见源关闭 + 无 ctx 注入 → 真空轮，injected=false
+  const vis29 = WA.render.getVisibility();
+  WA.render.SOURCES.forEach(function (k) { WA.render.setVisibility(k, false); });
+  WA.store.transact(d => { d.lastInjection = null; });
+  WA.render.applyInjections({ injections: [] });
+    const li29e = WA.store.get().lastInjection || {};
+  assert(li29e.injected === false, '全源关闭的真空轮 injected=false');
+  // v0.1.29 修复锁定：可见性全关时不再产出 221 字呈现铁律空壳
+  assert(WA.render.buildWorldSnapshot() === '', '全源关闭时世界快照为空串（开关真实生效）');
+  Object.keys(vis29).forEach(function (k) { WA.render.setVisibility(k, vis29[k]); });
+  // 清理现场
+  WA.store.transact(d => { d.lastInjection = null; });
+  } // end v0.1.29 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
