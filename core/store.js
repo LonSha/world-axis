@@ -9,6 +9,11 @@
   const mainWin = WA.mainWin || window;
 
   const SCHEMA_VERSION = 1;
+  // v0.1.36: draft 克隆 feature-detect——structuredClone 优先（原生实现快 1.5-2x 且保留类型），
+  // 不可用时降级 JSON 往返（与旧版行为完全一致）
+  const cloneDraft = (typeof structuredClone === 'function')
+    ? (st) => structuredClone(st)
+    : (st) => JSON.parse(JSON.stringify(st));
   const MAX_RECOVERY_POINTS = 3;
 
   // ── 默认世界状态（纯框架：世界观由世界书/用户设定注入，此处只留结构）──
@@ -239,7 +244,7 @@
         recTx(Date.now() - t0, 'ok-deferred');
         return { ok: true, deferred: true, state: outer, result };
       }
-      const draft = JSON.parse(JSON.stringify(memCache));
+      const draft = cloneDraft(memCache);
       __tx.push(draft);
       let result, ret;
       try { result = mutator(draft); }

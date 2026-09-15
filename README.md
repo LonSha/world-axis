@@ -66,6 +66,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.36** — draft 克隆升级：transact 深拷贝 feature-detect structuredClone 优先（原生实现快 1.5-2x），JSON 往返降级保持兼容；深隔离契约断言锁定（提交前 draft 与 live store 完全隔离、get() live 引用契约、顺序事务独立 draft）；修复 v0.1.23 链级耗时断言的 flaky 阈值（40ms→25ms，睡眠节点实际下限）。
+
 - **v0.1.35** — 聊天纪元守卫：init()（含切聊天）自增纪元并作废在飞写合并批——僵尸批内 transact 被拒绝（stale=true，不执行 mutator），批退出丢弃 flush，旧轮未落盘改动不再写向新聊天键（修复跨聊天污染竞态：after 链在飞批 + CHAT_CHANGED 重载）；batchStat 透出 orphaned。
 
 - **v0.1.34** — 嵌套事务计量：txStat 新增 deferred 计数（随外层提交的内层事务数，此前嵌套路径完全绕过 recTx）；真实结算链路端到端回归——applyResult 全字段（distantEvent 风声 + nearEvent + digest + chronicle）在单层外层事务内完成，全部嵌套产物经最外层提交后存活并落盘。

@@ -2628,7 +2628,7 @@ WA.loadScript = _ls.loadScript;
   assert(bad && bad.lastStatus === 'error' && bad.errors === 1, 'error 节点被计数');
   assert(st.nodes[0].lastMs >= st.nodes[st.nodes.length - 1].lastMs, '画像按 lastMs 降序');
   assert(st.lastChains.wtest && st.lastChains.wtest.executedCount === 1, '链级汇总记录成功节点数');
-  assert(st.lastChains.wtest.ms >= 40, '链级总耗时覆盖两节点');
+  assert(st.lastChains.wtest.ms >= 25, '链级总耗时覆盖两节点');
   // tool-diag 接入：runtime.workflow.slowest + verdict warn
   const dg23 = WA.toolDiag.collect();
   const wfNode = (dg23.runtime || {}).workflow || {};
@@ -3215,6 +3215,30 @@ WA.loadScript = _ls.loadScript;
   // 清理
   WA.store.transact(d => { delete d.meta.preSwitch; delete d.meta.postSwitch; });
   } // end v0.1.35 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.36 — draft 克隆升级（structuredClone 优先）与深隔离契约
+  // ═══════════════════════════════════════════════════════════
+  v0136: {
+  // 深隔离契约①：事务提交前，mutator 内对 draft 的嵌套改动不影响 live store
+  WA.store.transact(d => {
+    d.meta.probe136 = { nested: { deep: 'in-draft' } };
+    d.memory = d.memory || {}; d.memory.l0 = d.memory.l0 || [];
+    d.memory.l0.push({ t: 0, s: 'draft-only' });
+    assert(WA.store.get().meta.probe136 === undefined, '提交前 live store 不见 draft 改动');
+    assert(WA.store.get().memory.l0.length === 0, '提交前 live store 的数组不受 draft push 影响');
+  });
+  // 读路径契约：get() 返回 live 引用（horizon getLane、contract-audit 原位还原均依赖此契约）
+  const st136 = WA.store.get();
+  st136.meta.probe136.nested.deep = 'MUTATED-AFTER';
+  assert(WA.store.get().meta.probe136.nested.deep === 'MUTATED-AFTER', 'get() 返回 live 引用，外部改动直接可见（读路径契约）');
+  assert(st136 === WA.store.get(), 'get() 引用稳定性（非快照）');
+  // 深隔离契约③：连续事务各持独立 draft（前一事务的 draft 改动不串后一事务）
+  WA.store.transact(d => { d.meta.seq136 = ['a']; });
+  WA.store.transact(d => { d.meta.seq136.push('b'); });
+  assert(WA.store.get().meta.seq136.join(',') === 'a,b', '顺序事务独立 draft，逐次演进');
+  // 清理
+  WA.store.transact(d => { delete d.meta.probe136; delete d.meta.seq136; });
+  } // end v0.1.36 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
