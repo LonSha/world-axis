@@ -2640,6 +2640,52 @@ WA.loadScript = _ls.loadScript;
   WA.workflow.resetStats();
   assert(WA.workflow.stats().tracked === 0, 'resetStats 清空画像');
   } // end v0.1.23 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.24 — 注入预算账单入诊断（budget 快照 + 分级告警）
+  // ═══════════════════════════════════════════════════════════
+  v0124: {
+  // 预算裁决：小预算迫使「舆情」（rank 8）丢弃
+  const tinyItems = [
+    { source: '世界状态', content: '核心世界状态内容，rank2 不可折叠。' + '字'.repeat(200) },
+    { source: '舆情', content: '可丢弃的舆情块。' + '字'.repeat(200) }
+  ];
+  const plan24 = WA.injectBudget.plan(tinyItems, { budget: 80 });
+  assert(plan24.dropped.length === 1 && plan24.dropped[0].source === '舆情', '小预算丢弃低优先级源');
+  assert(typeof plan24.saved === 'number' && plan24.saved > 0, 'plan 输出 saved 省下的 token');
+  assert(typeof plan24.remain === 'number', 'plan 输出 remain 余量');
+  assert(plan24.inputTokens > plan24.used, 'inputTokens 大于实际落地 used');
+  // 经完整注入链落地后，lastInjection.budget 字段齐全
+  WA.backstage.setSettings({ injectBudget: 80 });
+  const ctx24 = { injections: tinyItems.map(i => Object.assign({}, i)) };
+  WA.render.applyInjections(ctx24);
+  const li24 = WA.store.get().lastInjection || {};
+  assert(li24.budget && typeof li24.budget.used === 'number', '快照含 budget.used');
+  assert(li24.budget.cap === 80 && li24.budget.source === 'manual', '快照记录预算档与来源');
+  assert(typeof li24.budget.remain === 'number' && typeof li24.budget.inputTokens === 'number', '快照含 remain/inputTokens');
+  assert(Array.isArray(li24.budget.dropped) && li24.budget.dropped.length >= 1 && li24.budget.dropped.some(x => x.source === '舆情' && x.reason === 'no_budget' && x.tokens > 0), '快照丢弃项带 source+reason+tokens');
+  assert(Array.isArray(li24.budget.folded), '快照 folded 为数组');
+  assert(typeof li24.budget.overBudget === 'boolean', '快照 overBudget 为布尔');
+  assert(li24.budget.keptCount >= 1, '快照 keptCount 至少计入核心源');
+  // tool-diag: inject 节 budget 子块 + verdict warn（有丢弃）
+  const dg24 = WA.toolDiag.collect();
+  const bill = (dg24.inject || {}).budget || null;
+  assert(bill && bill.droppedCount === li24.budget.dropped.length && bill.droppedCount >= 1, '诊断账单 droppedCount 与快照一致');
+  assert(bill.foldedCount === li24.budget.folded.length && bill.keptCount >= 1, '诊断账单 folded/kept 计数一致');
+  assert(bill.overBudget === false && bill.used <= bill.cap, '诊断账单未超支');
+  assert(bill.summary && String(bill.summary).indexOf('t') >= 0, '诊断账单带 summary 文本');
+  const bgtIssues = (dg24.verdict.issues || []).filter(i => i.key === 'budget');
+  assert(bgtIssues.length === 1 && bgtIssues[0].level === 'warn' && bgtIssues[0].detail.indexOf('舆情') >= 0, '丢弃源触发 budget warn 并点名');
+  // 超预算场景 → error 级（手工构造快照）
+  WA.store.transact(d => { d.lastInjection = Object.assign({}, d.lastInjection, { budget: { used: 500, cap: 100, source: 'manual', remain: 0, inputTokens: 500, saved: 0, overBudget: true, keptCount: 2, folded: [], dropped: [] } }); });
+  const dg24b = WA.toolDiag.collect();
+  const bgtErr = (dg24b.verdict.issues || []).filter(i => i.key === 'budget' && i.level === 'error');
+  assert(bgtErr.length === 1, '超预算 → budget error');
+  // 恢复预算设置与快照，清理现场
+  WA.backstage.setSettings({ injectBudget: -1 });
+  WA.store.transact(d => { d.lastInjection = null; });
+  const dg24c = WA.toolDiag.collect();
+  assert((dg24c.verdict.issues || []).filter(i => i.key === 'budget').length === 0, '无账单时 budget 静默');
+  } // end v0.1.24 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

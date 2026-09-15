@@ -66,6 +66,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.24** — 注入预算账单入诊断：lastInjection.budget 快照补全（contextSize/remain/inputTokens/saved/overBudget/keptCount + folded/dropped 带 reason 明细）；tool-diag inject 节输出 budget 子块与 summary，verdict 分级：超预算 error、有丢弃 warn（点名源）、仅折叠 info。
 - **v0.1.23** — 工作流执行画像：workflow.run 逐节点计时并记录跨运行统计（count/lastMs/avgMs/errors/lastStatus + 链级耗时汇总），workflow.stats()/resetStats() 只读视图；tool-diag runtime.workflow 输出最慢 Top5 与历史报错节点，verdict 对节点报错判 warn。
 - **v0.1.22** — 持久化可观测：store.save 失败不再静默（配额耗尽归因 quota + 失败计数，内存态仍推进避免半份状态），新增 store.saveStat() 与 store.sizeProfile() 顶层分区体积画像；tool-diag worldState 节加 storage 子节，verdict 对最近落盘失败判 error、历史失败判 warn。
 - **v0.1.21** — wb 通道诊断：tool-diag 新增 wbChannel 节（配置可见 + companionName 解析 + 活跃 waslot order 清单与总字数）；wbInject.activeOrders() 只读列出非空镜像变量。

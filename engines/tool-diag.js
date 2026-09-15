@@ -146,6 +146,13 @@
           if (slotAudit.issues.length) out.slotIssues = slotAudit.issues;
         }
       }
+      // v0.1.24: 上轮注入预算账单（超支/折叠/丢弃明细）
+      if (li && li.budget) {
+        const b = li.budget;
+        out.budget = { used: b.used, cap: b.cap, source: b.source, contextSize: b.contextSize || null, remain: b.remain, inputTokens: b.inputTokens, saved: b.saved, overBudget: !!b.overBudget, keptCount: b.keptCount || 0, foldedCount: (b.folded || []).length, droppedCount: (b.dropped || []).length };
+        if ((b.dropped || []).length) out.budget.dropped = b.dropped;
+        out.budget.summary = WA.injectBudget && WA.injectBudget.summaryText ? WA.injectBudget.summaryText({ used: b.used, budget: b.cap, folded: b.folded || [], dropped: b.dropped || [], saved: b.saved }) : null;
+      }
       // v0.1.9: 槽位路由错误快照（部分失败时存在）
       if (li && li.slotErrors) out.slotErrors = li.slotErrors;
       else { out.promptLength = snap.promptLength; out.ourExcerptLen = snap.ourExcerptLen; }
@@ -355,6 +362,13 @@
       const wfSt = ((diag.runtime || {}).workflow || {});
       const errNodes = (wfSt.slowest || []).filter(function (r) { return r.errors > 0; });
       if (errNodes.length) issues.push({ level: 'warn', key: 'workflow', detail: errNodes.length + ' 个工作流节点历史报错：' + errNodes.map(function (r) { return r.id + '(' + r.errors + ')'; }).join('、') });
+    // v0.1.24: 预算账单分级告警
+    const bgt = inj.budget || null;
+    if (bgt) {
+      if (bgt.overBudget) issues.push({ level: 'error', key: 'budget', detail: '上轮注入超出预算（' + bgt.used + '/' + bgt.cap + 't，档源 ' + bgt.source + '）' });
+      else if (bgt.droppedCount) issues.push({ level: 'warn', key: 'budget', detail: '预算裁决丢弃 ' + bgt.droppedCount + ' 源：' + ((bgt.dropped || []).map(function (d) { return d.source; }).join('、')) });
+      else if (bgt.foldedCount) issues.push({ level: 'info', key: 'budget', detail: '预算裁决折叠 ' + bgt.foldedCount + ' 源（' + bgt.summary + '）' });
+    }
     const ldr = (diag.runtime || {}).loader || {};
     if (ldr.cdnCooldowns && ldr.cdnCooldowns.length >= 3) issues.push({ level: 'warn', key: 'loader', detail: '全部 3 个 CDN 容灾源均在冷却中（60s 内不重试），期间加载失败模块将彻底失败' });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;
