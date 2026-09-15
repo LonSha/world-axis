@@ -3266,6 +3266,38 @@ WA.loadScript = _ls.loadScript;
   assert(okRestore === true, 'restore 正常执行');
   assert(WA.store.recoveryStat().count === 3, 'restore 后恢复点数保持封顶');
   } // end v0.1.37 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.38 — 状态键损坏隔离（load 失败不再静默覆盖）
+  // ═══════════════════════════════════════════════════════════
+  v0138: {
+  assert(typeof WA.store.loadStat === 'function', 'loadStat 已导出');
+  // 场景：状态键被写坏（模拟部分写入/扩展冲突）→ load 隔离原始 payload，返回 null
+  const good = JSON.stringify(WA.store.get());
+  global.localStorage.setItem('worldaxis_state_test_chat_001', '{"schemaVersion":1,"meta":{"trunc');
+  const st138 = WA.store.load();
+  assert(st138 === null, '损坏 payload 返回 null');
+  const ls138 = WA.store.loadStat();
+  assert(ls138.errors >= 1 && ls138.lastError && ls138.lastError.length > 0, '损坏计入 loadStat.errors 并留错误摘要');
+  // 隔离键存在且内容 == 原始损坏 payload（mock 枚举走 _dump()）
+  const corKeys = Object.keys(global.localStorage._dump()).filter(k => k.startsWith('worldaxis_state_test_chat_001_corrupt_'));
+  assert(corKeys.length >= 1, '损坏 payload 已隔离到 *_corrupt_* 键');
+  const rawQuarantined = global.localStorage.getItem(corKeys[corKeys.length - 1]);
+  assert(rawQuarantined === '{"schemaVersion":1,"meta":{"trunc', '隔离内容与损坏现场逐字节一致');
+  // 后续 save 不再静默覆盖（损坏现场仍在隔离键中）
+  WA.store.transact(d => { d.meta.postCorrupt = true; });
+  assert(global.localStorage.getItem(corKeys[corKeys.length - 1]) === '{"schemaVersion":1,"meta":{"trunc', '隔离键不受后续 save 影响');
+  // 正常路径仍命中
+  const before138 = WA.store.loadStat().hits;
+  assert(WA.store.load() && WA.store.loadStat().hits === before138 + 1, '正常 load 仍计入 hits');
+  // 诊断透出 + verdict warn（独立 load 键）
+  const dg138 = WA.toolDiag.collect();
+  assert(dg138.worldState.storage.load && dg138.worldState.storage.load.errors >= 1, '诊断透出 load 节');
+  const loadWarn = (dg138.verdict.issues || []).filter(i => i.key === 'load' && i.level === 'warn');
+  assert(loadWarn.length === 1 && loadWarn[0].detail.indexOf('*_corrupt_*') >= 0, '曾损坏 → load warn 议题');
+  // 清理隔离键与探针字段
+  corKeys.forEach(k => global.localStorage.removeItem(k));
+  WA.store.transact(d => { delete d.meta.postCorrupt; });
+  } // end v0.1.38 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

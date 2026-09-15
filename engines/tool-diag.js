@@ -191,6 +191,7 @@
             transactions: WA.store.txStat ? WA.store.txStat() : null,
             batch: WA.store.batchStat ? WA.store.batchStat() : null,
             recovery: WA.store.recoveryStat ? WA.store.recoveryStat() : null,
+            load: WA.store.loadStat ? WA.store.loadStat() : null,
             sizeProfile: prof
           };
         }, null)
@@ -391,6 +392,9 @@
     // v0.1.30: 事务健康——独立 transactions 键（与 lastSave 议题解耦）：
     //   lastStatus='save-failed' → error（当下在丢数据）；saveFailed>0 但已恢复 → warn（历史失败）；errors>0 → warn（修改器抛错但状态未提交）
     // v0.1.37: 恢复点满额 → info（环形覆盖属正常行为，但用户应知晓最旧快照将被丢弃）
+    // v0.1.38: 状态键曾损坏 → warn（隔离键存在但默认状态已接管，需人工检查 *_corrupt_*）
+    const lst = (((diag.worldState || {}).storage || {}).load) || null;
+    if (lst && lst.errors > 0) issues.push({ level: 'warn', key: 'load', detail: '状态加载发生过 ' + lst.errors + ' 次失败（最近：' + (lst.lastError || '?') + '）：损坏现场已隔离到 *_corrupt_* 键，请人工导出后清理' });
     const rstat = (((diag.worldState || {}).storage || {}).recovery) || null;
     if (rstat && rstat.full) issues.push({ level: 'info', key: 'recovery', detail: '恢复点已达上限（' + rstat.count + '/' + rstat.max + '，共 ' + rstat.bytes + ' 字节）：下次创建时最旧快照将被覆盖' });
     const txs = (((diag.worldState || {}).storage || {}).transactions) || null;

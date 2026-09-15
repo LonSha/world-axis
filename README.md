@@ -66,6 +66,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.38** — 状态键损坏隔离：load() 解析失败不再静默——原始 payload 逐字节存入 *_corrupt_<ts> 隔离键，默认状态接管前先保护可恢复现场（防下次 save 覆盖）；loadStat()（loads/hits/misses/errors/lastError）计量；tool-diag storage.load 子节 + 独立 load 键 warn 议题。
+
 - **v0.1.37** — 恢复点计量：store.recoveryStat()（count/max/full/bytes/lastAt，环形覆盖可视）；tool-diag storage.recovery 子节透出，满额时 verdict 出独立 recovery 键 info 议题（与 storage 键解耦，不干扰既有精确计数断言）。
 
 - **v0.1.36** — draft 克隆升级：transact 深拷贝 feature-detect structuredClone 优先（原生实现快 1.5-2x），JSON 往返降级保持兼容；深隔离契约断言锁定（提交前 draft 与 live store 完全隔离、get() live 引用契约、顺序事务独立 draft）；修复 v0.1.23 链级耗时断言的 flaky 阈值（40ms→25ms，睡眠节点实际下限）。

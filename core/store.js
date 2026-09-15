@@ -108,6 +108,8 @@
   }
   // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
   const __saveStat = { at: 0, ok: null, bytes: 0, reason: null, failCount: 0 };
+  // v0.1.38: 加载观测——状态键损坏时隔离原始 payload 而非静默丢弃
+  const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, lastError: null, lastAt: 0 };
   function classifySaveError(e) {
     const name = (e && e.name) || '';
     const msg = String((e && e.message) || e);
@@ -151,11 +153,23 @@
     },
 
     load(chatId) {
+      // v0.1.38: 解析失败不再静默——原始 payload 存入 *_corrupt_<ts> 隔离键，
+      // 避免默认状态在下次 save 时覆盖可恢复现场（部分写入/扩展冲突等导致的状态键损坏）
+      __loadStat.loads++; __loadStat.lastAt = Date.now();
+      let raw = null;
+      try { raw = mainWin.localStorage.getItem(storageKey(chatId)); }
+      catch (e) { __loadStat.errors++; __loadStat.lastError = String((e && e.message) || e); WA.log('error', 'store.load读取失败', e); return null; }
+      if (!raw) { __loadStat.misses++; return null; }
       try {
-        const raw = mainWin.localStorage.getItem(storageKey(chatId));
-        if (!raw) return null;
-        return JSON.parse(raw);
-      } catch (e) { WA.log('error', 'store.load失败', e); return null; }
+        const st = JSON.parse(raw);
+        __loadStat.hits++;
+        return st;
+      } catch (pe) {
+        __loadStat.errors++; __loadStat.lastError = String((pe && pe.message) || pe);
+        try { mainWin.localStorage.setItem(storageKey(chatId) + '_corrupt_' + Date.now(), raw); } catch (e2) {}
+        WA.log('error', 'store.load解析失败：状态键已隔离（*_corrupt_*），下次保存不会覆盖原始现场', pe);
+        return null;
+      }
     },
 
     save(state, chatId) {
@@ -209,6 +223,8 @@
     batchStat() { return { depth: __batch.depth, dirty: __batch.dirty, flushes: __batch.flushes, lastFlushAt: __batch.lastFlushAt, orphaned: __batch.orphaned }; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
+    /** v0.1.38: 加载观测只读视图（tool-diag 消费）——errors>0 意味着发生过状态键损坏 */
+    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, lastError: __loadStat.lastError, lastAt: __loadStat.lastAt }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
     sizeProfile(topN) {
       const rows = [];
