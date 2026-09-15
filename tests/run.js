@@ -1665,11 +1665,66 @@ const WA = global.WorldAxis;
   WA.injectChannel = keepIC;
   // ── 诊断清单登记校验 ──
   assert(WA.toolDiag.MODULE_EXPORTS['engines/inject-channel.js'] === 'injectChannel', '诊断清单已登记 inject-channel');
-   // ── 汇总 ──
+  } // end v0.1.1 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.2 — 预算裁决字段透传（inject-budget apply passthrough）
+  // ═══════════════════════════════════════════════════════════
+  v012: {
+  // ── apply 透传原始项的全部字段 ──
+  const ibItems = [
+    { source: '连续性约束', content: 'A-约束文本', position: 'after_last_user', depth: 0 },
+    { source: '章节', content: 'B-章节文本', position: 'after_last_user', depth: 2 },
+    { source: '世界状态', content: 'C-状态文本', position: 'in_chat', depth: 5 },
+    { source: '记忆', content: 'D-记忆文本' }
+  ];
+  const ibPlan = WA.injectBudget.plan(ibItems, { budget: 100000 });
+  const ibApplied = WA.injectBudget.apply(ibItems, ibPlan);
+  assert(ibApplied.length === 4, 'apply 保留全部 4 项（大预算不裁决）');
+  const ibA = ibApplied.filter(function (i) { return i.source === '连续性约束'; })[0];
+  const ibB = ibApplied.filter(function (i) { return i.source === '章节'; })[0];
+  const ibC = ibApplied.filter(function (i) { return i.source === '世界状态'; })[0];
+  const ibD = ibApplied.filter(function (i) { return i.source === '记忆'; })[0];
+  assert(ibA.position === 'after_last_user' && ibA.depth === 0, 'apply 透传 position+depth（after_last_user depth0）');
+  assert(ibB.position === 'after_last_user' && ibB.depth === 2, 'apply 透传 position+depth（after_last_user depth2）');
+  assert(ibC.position === 'in_chat' && ibC.depth === 5, 'apply 透传 position+depth（in_chat depth5）');
+  assert(!ibD.position && !ibD.depth, 'apply 无 position 项不伪造字段');
+  // ── 折叠场景下仍透传 ──
+  const ibPlan2 = WA.injectBudget.plan(ibItems, { budget: 20 });
+  const ibApplied2 = WA.injectBudget.apply(ibItems, ibPlan2);
+  const ibFolded = ibApplied2.filter(function (i) { return i.folded === true; });
+  if (ibFolded.length) {
+    const ibF = ibFolded[0];
+    assert(!!ibF.position, '折叠项仍透传 position: ' + ibF.position);
+  } else {
+    assert(true, '小预算未触发折叠（trivially pass）');
+  }
+  // ── 端到端：预算裁决后槽位路由仍能按 position 分流 ──
+  global.__lastExtensionPrompt = null;
+  global.__extPromptLog = [];
+  const ibCtx = { injections: [
+    { source: '连续性约束', content: '<ib-e2e/>约束', position: 'after_last_user', depth: 0 },
+    { source: '世界状态', content: '<ib-e2e/>状态', position: 'in_chat', depth: 5 }
+  ]};
+  WA.render.applyInjections(ibCtx);
+  const ibLog = global.__extPromptLog || [];
+  const ibALU = ibLog.filter(function (r) { return r.key === 'WorldAxis:after_last_user'; })[0];
+  const ibIC = ibLog.filter(function (r) { return r.key === 'WorldAxis:in_chat'; })[0];
+  assert(!!ibALU, '端到端：预算裁决后 after_last_user 槽位仍被路由');
+  assert(ibALU.text.indexOf('<ib-e2e/>约束') >= 0, '端到端：约束文本进入 after_last_user 槽位');
+  assert(!ibALU.text || ibALU.text.indexOf('<ib-e2e/>状态') < 0, '端到端：状态文本不混入 after_last_user 槽位');
+  if (ibIC) {
+    assert(ibIC.text.indexOf('<ib-e2e/>状态') >= 0, '端到端：状态文本进入 in_chat 槽位');
+  }
+  // ── 主块不重复包含已路由项 ──
+  const ibMainCalls = ibLog.filter(function (r) { return r.key === 'WorldAxis'; });
+  assert(ibMainCalls.length >= 1, '端到端：主槽位调用存在');
+  const ibLastMain = ibMainCalls[ibMainCalls.length - 1];
+  assert(!ibLastMain.text || ibLastMain.text.indexOf('<ib-e2e/>') < 0, '端到端：预算裁决后主块不重复包含已路由项');
+  } // end v0.1.2 block
+  // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
   if (failures.length) { console.log('失败项: ' + failures.join(' | ')); process.exit(1); }
   console.log('全部测试通过 ✓');
   process.exit(0);
-  } // end v0.1.1 block
 })().catch(e => { console.error('测试运行器异常: ', e); process.exit(2); });

@@ -137,10 +137,12 @@
     const keepSet = {};
     p.kept.forEach(function (k) { keepSet[k.source] = true; });
     let seq = 0;
+    // v0.1.2: 透传原始项的全部字段（position/depth 等），槽位路由依赖这些字段
     return (Array.isArray(items) ? items : []).map(function (it) {
       const source = (it && it.source) || '未命名';
-      if (bySource[source] !== undefined) return { source: source, content: bySource[source], folded: true, seq: seq++ };
-      if (keepSet[source]) return { source: source, content: String((it && it.content) || ''), folded: false, seq: seq++ };
+      const base = (it && typeof it === 'object') ? it : {};
+      if (bySource[source] !== undefined) return Object.assign({}, base, { source: source, content: bySource[source], folded: true, seq: seq++ });
+      if (keepSet[source]) return Object.assign({}, base, { source: source, content: String((it && it.content) || ''), folded: false, seq: seq++ });
       return null;
     }).filter(Boolean);
   }

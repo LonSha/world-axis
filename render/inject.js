@@ -110,13 +110,16 @@
         }
       } catch (e) { WA.log('warn', '槽位路由失败，约束注入并入主块', e); }
       // 未被槽位路由接管的项（含路由失败时回退的 routable 项）才并入主块
-      // 注意：预算裁决可能剥离 position，因此用「已被路由接管的原始项集合」做内容指纹过滤
+      // v0.1.2: 预算裁决已透传原始字段，优先用 position 过滤；内容指纹作双保险
       const routedSet = routedKeys.length ? WA.injectChannel.planSlots(ctxInj) : [];
       const routedContents = routedSet.length
         ? routedSet.reduce(function (acc, sl) { return acc.concat(sl.text.split('\n')); }, [])
         : [];
-      const mainItems = routedContents.length
-        ? finalItems.filter(function (i) { return routedContents.indexOf(i.content) < 0; })
+      const mainItems = routedKeys.length
+        ? finalItems.filter(function (i) {
+            if (i.position && routedKeys.indexOf(WA.injectChannel.SLOT_PREFIX + ':' + WA.injectChannel.normPos(i.position)) >= 0) return false;
+            return routedContents.indexOf(i.content) < 0;
+          })
         : finalItems;
       const combined = mainItems.map(i => i.content).join('\n');
       try {
