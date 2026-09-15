@@ -86,21 +86,29 @@
     'engines/tool-analyzer.js': 'toolAnalyzer', 'engines/tool-import.js': 'toolImport',
     'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag',
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
-    'render/inject.js': 'render', 'render/theater.js': 'theater'
+    'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
+    'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
+    'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
+    'direction/oracle.js': 'oracle', 'direction/tags.js': 'tags', 'direction/choices.js': 'choices',
+    'compat/mvu.js': 'compatMvu', 'compat/th-helper.js': 'compatTH',
+    'ui/panel.js': 'ui', 'ui/settings.js': 'uiSettings', 'ui/assistant.js': 'assistant'
   };
-  const OPTIONAL_EXPORTS = ['purifier', 'assistant', 'uiSettings', 'theater'];
+  // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
+  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant'];
   function secModules() {
-    const missing = [], loaded = [];
+    const missing = [], loaded = [], optionalMissing = [];
     Object.keys(MODULE_EXPORTS).forEach(function (file) {
       const key = MODULE_EXPORTS[file];
       if (WA[key]) loaded.push({ file: file, key: key });
+      else if (OPTIONAL_EXPORTS.indexOf(key) >= 0) optionalMissing.push({ file: file, key: key });
       else missing.push({ file: file, key: key });
     });
     return {
       loadedCount: loaded.length,
       missingCount: missing.length,
       missing: missing,
-      optionalMissing: OPTIONAL_EXPORTS.filter(function (k) { return !WA[k]; }),
+      optionalMissingList: optionalMissing,
+      optionalMissing: optionalMissing.map(function (x) { return x.key; }),
       registeredModules: safe(function () { return Object.keys(WA.modules || {}); }, [])
     };
   }
@@ -294,6 +302,7 @@
   WA.toolDiag = {
     PACKAGE_FORMAT, PACKAGE_VERSION, MODULE_EXPORTS, UI_BINDINGS,
     collect, verdict, toJSON, summaryText, flatten, download,
+    OPTIONAL_EXPORTS,
     secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');

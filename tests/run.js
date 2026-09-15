@@ -1173,6 +1173,21 @@ const WA = global.WorldAxis;
   assert(dg.env.tavernApi.setExtensionPrompt === true, '宿主能力探测：setExtensionPrompt 可用');
   assert(dg.modules.loadedCount >= 30 && dg.modules.missingCount === 0, '模块装载清单零缺失');
   assert(WA.toolDiag.UI_BINDINGS.filter(g => g.page === 'tools')[0].ids.includes('wa-diag-run'), '自检控件已纳入UI绑定校验清单');
+  // 全树盘查：诊断清单必须覆盖磁盘上每一个 js 模块（防漏登记）
+  const realFiles = [];
+  ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'].forEach(dir => {
+    fs.readdirSync(path.join(BASE, dir)).filter(f => f.endsWith('.js')).forEach(f => realFiles.push(dir + '/' + f));
+  });
+  const listed = Object.keys(WA.toolDiag.MODULE_EXPORTS);
+  const uncovered = realFiles.filter(f => listed.indexOf(f) < 0);
+  const ghost = listed.filter(f => realFiles.indexOf(f) < 0);
+  assert(uncovered.length === 0, '诊断清单覆盖全部磁盘模块' + (uncovered.length ? '（缺 ' + uncovered.join(',') + '）' : ''));
+  assert(ghost.length === 0, '诊断清单无幽灵条目' + (ghost.length ? '（多 ' + ghost.join(',') + '）' : ''));
+  assert(listed.length >= 48, '诊断清单条目数达全员（' + listed.length + '）');
+  assert(dg.modules.optionalMissing.indexOf('ui') >= 0, '无头环境 UI 项归入可选项（不计入阻断）');
+  const realKeys = {};
+  listed.forEach(f => { realKeys[WA.toolDiag.MODULE_EXPORTS[f]] = true; });
+  assert(Object.keys(realKeys).length === listed.length, '诊断清单的导出键无重复（一文件一导出）');
   assert(dg.modules.missing.length === 0, '缺失清单为空数组');
   assert(dg.ui.note ? true : dg.ui.allOk === false, '非浏览器环境 UI 节给出跳过说明');
   const capKeys = dg.capabilities.map(c => c.key);
