@@ -24,7 +24,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1721,6 +1721,109 @@ const WA = global.WorldAxis;
   const ibLastMain = ibMainCalls[ibMainCalls.length - 1];
   assert(!ibLastMain.text || ibLastMain.text.indexOf('<ib-e2e/>') < 0, '端到端：预算裁决后主块不重复包含已路由项');
   } // end v0.1.2 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.3 — 注入槽位落地审计（inject-slot-audit）
+  // ═══════════════════════════════════════════════════════════
+  v013: {
+  assert(typeof WA.injectSlotAudit === 'object', 'injectSlotAudit 已加载');
+  assert(typeof WA.injectSlotAudit.snapshotSlots === 'function', 'snapshotSlots 是函数');
+  assert(typeof WA.injectSlotAudit.audit === 'function', 'audit 是函数');
+  // ── snapshotSlots 采集 ──
+  const saPlan = WA.injectChannel.planSlots([
+    { source: '连续性约束', content: '约束A', position: 'after_last_user', depth: 0 },
+    { source: '世界状态', content: '状态B', position: 'in_chat', depth: 5 }
+  ]);
+  const saSnap = WA.injectSlotAudit.snapshotSlots(saPlan, 2);
+  assert(saSnap.count === 2, 'snapshotSlots 记录计划槽位数 2');
+  assert(saSnap.applied === 2, 'snapshotSlots 记录落地数 2');
+  assert(saSnap.keys.length === 2 && saSnap.keys[0] === 'WorldAxis:after_last_user', 'snapshotSlots keys 正确');
+  assert(saSnap.totalChars === ('约束A' + '状态B').length, 'snapshotSlots 总字符数正确');
+  assert(saSnap.perSlot.length === 2, 'snapshotSlots perSlot 有 2 项');
+  assert(saSnap.perSlot[0].chars === 3, 'snapshotSlots perSlot[0] 字符数 3（约束A）');
+  // ── snapshotSlots 降级 ──
+  assertDeepEq(WA.injectSlotAudit.snapshotSlots(null, 0).perSlot, [], 'snapshotSlots null 入参降级');
+  assertDeepEq(WA.injectSlotAudit.snapshotSlots([], 0).count, 0, 'snapshotSlots 空计划 count=0');
+  assert(WA.injectSlotAudit.snapshotSlots(saPlan).applied === 0, 'applied 缺省为 0');
+  // ── audit：一致情况 ──
+  const saOk = WA.injectSlotAudit.audit({ len: 10, sources: ['世界状态'], slots: saSnap });
+  assert(saOk.consistent === true, 'audit 计划=落地时一致');
+  assert(saOk.issues.length === 0, 'audit 一致时无 issues');
+  // ── audit：无槽位快照（旧记录）──
+  const saLegacy = WA.injectSlotAudit.audit({ len: 10, sources: ['世界状态'] });
+  assert(saLegacy.consistent === true, 'audit 无 slots 字段时一致（兼容旧记录）');
+  assert(!!saLegacy.note, 'audit 旧记录带 note 说明');
+  assertDeepEq(WA.injectSlotAudit.audit(null).consistent, true, 'audit null 入参一致');
+  // ── audit：落地数不足 → appliedMismatch + orphan ──
+  const saPartial = WA.injectSlotAudit.snapshotSlots(saPlan, 1);
+  const saBad = WA.injectSlotAudit.audit({ len: 10, sources: [], slots: saPartial });
+  assert(saBad.consistent === false, 'audit 计划2/落地1 时不一致');
+  const saMis = saBad.issues.filter(function (x) { return x.code === 'slot.appliedMismatch'; })[0];
+  assert(!!saMis, 'audit 报 appliedMismatch');
+  const saOrphan = saBad.issues.filter(function (x) { return x.code === 'slot.orphan'; })[0];
+  assert(!!saOrphan, 'audit 报 slot.orphan（孤儿槽位）');
+  // ── 端到端：lastInjection 快照含 slots ──
+  global.__lastExtensionPrompt = null;
+  global.__extPromptLog = [];
+  const saCtx = { injections: [
+    { source: '连续性约束', content: '<sa-e2e/>约束', position: 'after_last_user', depth: 0 }
+  ]};
+  WA.render.applyInjections(saCtx);
+  const saLi = WA.store.get().lastInjection;
+  assert(!!saLi, '端到端：lastInjection 快照已写入');
+  assert(!!saLi.slots, '端到端：lastInjection 快照含 slots 字段');
+  assert(saLi.slots.count === 1, '端到端：快照 slots.count=1（一路约束）');
+  assert(saLi.slots.applied === 1, '端到端：快照 slots.applied=1（路由成功）');
+  assert(saLi.slots.keys[0] === 'WorldAxis:after_last_user', '端到端：快照 slots.keys 含 after_last_user');
+  // 端到端 audit 一致
+  const saE2EAudit = WA.injectSlotAudit.audit(saLi);
+  assert(saE2EAudit.consistent === true, '端到端：audit 一致（计划=落地）');
+  // ── 诊断清单登记校验 ──
+  assert(WA.toolDiag.MODULE_EXPORTS['engines/inject-slot-audit.js'] === 'injectSlotAudit', '诊断清单已登记 inject-slot-audit');
+  } // end v0.1.3 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.4 — 近端事件消费后归零（nextTurnInjection 空壳修复）
+  // ═══════════════════════════════════════════════════════════
+  v014: {
+  // ── 场景1：仅有 nearEvent，消费后应整体归零 ──
+  WA.store.transact(function (d) {
+    d.nextTurnInjection = { nearEvent: { title: '突发', desc: '测试事件', urgent: true } };
+  });
+  global.__lastExtensionPrompt = null;
+  global.__extPromptLog = [];
+  WA.render.applyInjections({ injections: [] });
+  assert(WA.store.get().nextTurnInjection === null, '仅 nearEvent 时消费后 nextTurnInjection 整体归零（无空壳）');
+  // ── 场景2：nearEvent + 三列并存，消费后保留三列 ──
+  WA.store.transact(function (d) {
+    d.nextTurnInjection = {
+      required: ['必须体现A'],
+      conditional: [],
+      suppress: ['禁止B'],
+      nearEvent: { title: '突2', desc: '测试2', urgent: false }
+    };
+  });
+  WA.render.applyInjections({ injections: [] });
+  const nti2 = WA.store.get().nextTurnInjection;
+  assert(!!nti2, 'nearEvent+三列并存时消费后保留 nextTurnInjection');
+  assert(!nti2.nearEvent, 'nearEvent 已被清除');
+  assert(nti2.required.length === 1 && nti2.required[0] === '必须体现A', '三列 required 保留');
+  assert(nti2.suppress[0] === '禁止B', '三列 suppress 保留');
+  // 清理
+  WA.store.transact(function (d) { d.nextTurnInjection = null; });
+  // ── 场景3：无 nextTurnInjection 时不报错 ──
+  WA.store.transact(function (d) { d.nextTurnInjection = null; });
+  WA.render.applyInjections({ injections: [] });
+  assert(WA.store.get().nextTurnInjection === null, '无 nti 时保持 null（不报错）');
+  // ── 场景4：nearEvent 注入文本确实进入主块 ──
+  WA.store.transact(function (d) {
+    d.nextTurnInjection = { nearEvent: { title: '马蹄声', desc: '远处传来马蹄', urgent: true } };
+  });
+  global.__lastExtensionPrompt = null;
+  WA.render.applyInjections({ injections: [] });
+  const neMain = global.__lastExtensionPrompt;
+  assert(!!neMain && neMain.key === 'WorldAxis', 'nearEvent 走主槽位');
+  assert(neMain.text.indexOf('[突发事件] 马蹄声（紧急）：远处传来马蹄') >= 0, 'nearEvent 文本进入主块');
+  assert(WA.store.get().nextTurnInjection === null, 'nearEvent 注入后归零');
+  } // end v0.1.4 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

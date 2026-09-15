@@ -65,8 +65,14 @@
       if (st && st.nextTurnInjection && st.nextTurnInjection.nearEvent) {
         const ne = st.nextTurnInjection.nearEvent;
         items.push({ source: '近端事件', content: `[突发事件] ${ne.title}${ne.urgent ? '（紧急）' : ''}：${ne.desc}` });
-        // 一次性消费：清除
-        WA.store.transact(d => { if (d.nextTurnInjection) delete d.nextTurnInjection.nearEvent; });
+        // 一次性消费：清除 nearEvent；若三列也为空则整体归零（v0.1.4：避免留下空壳对象）
+        WA.store.transact(d => {
+          if (!d.nextTurnInjection) return;
+          delete d.nextTurnInjection.nearEvent;
+          const nti = d.nextTurnInjection;
+          const empty = !nti.required && !nti.conditional && !nti.suppress && !nti.nearEvent;
+          if (empty) d.nextTurnInjection = null;
+        });
       }
       // v0.1.1: 剧情约束类注入由槽位路由独立落地，不并入主块（避免重复注入）
       const ctxInj = (ctx.injections || []);
@@ -93,6 +99,7 @@
       // 无 position 的注入项保持旧行为（并入主块），保证向后兼容
       let slotCount = 0;
       let routedKeys = [];
+      let lastSlots = null;
       try {
         const routable = ctxInj.filter(function (i) { return !!(i && i.position); });
         if (WA.injectChannel && routable.length) {
@@ -104,6 +111,7 @@
           if (applied === slots.length) {
             slotCount = applied;
             routedKeys = slots.map(function (sl) { return sl.slot; });
+            lastSlots = slots;
           } else {
             WA.log('warn', '槽位路由部分失败（' + applied + '/' + slots.length + '），约束注入并入主块');
           }
@@ -126,7 +134,13 @@
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(combined.length);
-        try { WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null }; }); } catch (e) { /* 快照失败不影响注入 */ }
+        try {
+          // v0.1.3: 快照补 slots 字段——排查「约束注入丢了」时可区分路由失败与槽位被覆盖
+          const slotSnap = (WA.injectSlotAudit && lastSlots)
+            ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotCount)
+            : null;
+          WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null, slots: slotSnap }; });
+        } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
     }

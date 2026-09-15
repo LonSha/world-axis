@@ -67,6 +67,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 
 ## 版本历史
+- **v0.1.4** — 近端事件消费归零：修复 nextTurnInjection.nearEvent 消费后只删键不归零、留下空壳对象的缺陷（inspector-state 的 inject.badShape 会误报）；现在删键后检查三列是否全空，空则整体置 null；600 断言全过
+- **v0.1.3** — 注入槽位落地审计：新增 engines/inject-slot-audit.js（snapshotSlots 采集槽位计划/落地数/字符数，audit 对账 appliedMismatch 与孤儿槽位）；render/inject.js 的 lastInjection 快照补 slots 字段，排查「约束注入丢了」时可区分「路由失败并入主块」与「路由成功但槽位被宿主覆盖」；591 断言全过
 - **v0.1.2** — 预算裁决字段透传：修复 inject-budget.apply 重建对象时剥离 position/depth 的根因缺陷（v0.1.1 被迫用内容指纹绕过）；apply 改为 Object.assign 透传原始项全部字段；render/inject.js 过滤改为 position 优先 + 内容指纹双保险；567 断言全过
 - **v0.1.1** — 注入槽位路由：修复 before 链各节点推入 ctx.injections 时携带的 position/depth 被完全忽略的真实缺陷——applyInjections 原本把所有注入无差别合并成一个字符串塞进同一个 setExtensionPrompt。新增 engines/inject-channel.js（position 分桶 + 桶内 depth 升序 + 每槽位独立 setExtensionPrompt）；render/inject.js 接线要点：无 position 的项保持旧行为并入主块，带 position 的项默认并入主块、仅当槽位路由 applySlots 全部成功后才用内容指纹从主块移除（预算裁决会剥离 position，不能用 position 过滤），路由失败时原子回退；mock 改为单例 + __extPromptLog 记录全部 setExtensionPrompt 调用以验证多槽位落地；555 断言全过
 - **v0.1.0** — 采样器自检：概率性采样无法靠静态看代码验证，改用统计实验——200 次确定性伪随机（mulberry32）采样后校验引用保持/近期偏置（后半命中率 52.3% vs 前半 14.3%）/相关性过滤/limit 边界/无副作用五项，采样器缺失时报失败不抛异常；507 断言全过
