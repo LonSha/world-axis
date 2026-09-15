@@ -19,7 +19,7 @@ const ctx = vm.createContext(global);
 const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
-  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js',
+  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
@@ -214,8 +214,13 @@ const WA = global.WorldAxis;
 
   // ── horizon (v0.5) ──
   section('engines/horizon v0.5');
-  // 强制distant触发：直接灌满ledger
-  WA.store.transact(d => { d.evolution.horizon.distant.ledger = 10; });
+  // 清空两泳道状态后重测（其他section可能已消耗泳道）
+  WA.store.transact(d => {
+    d.evolution.horizon = {
+      distant: { ledger: 10, cooldown: 0, pending: null, lastFired: 0 },
+      near:    { ledger: 0, cooldown: 0, pending: null, lastFired: 0 }
+    };
+  });
   const dRoll = WA.horizon.rollLane('distant');
   assert(dRoll.fired === true && dRoll.forced === true, '远方事件ledger≥10强制触发');
   assert(WA.store.get().evolution.horizon.distant.pending !== null, '触发后pending挂起');
@@ -464,6 +469,51 @@ const WA = global.WorldAxis;
   WA.store.transact(d => {
     assert(WA.entities.upsert(d, 'invalid_type', { name: 'X' }) === 'skipped', '非法类型跳过');
   });
+
+  // ── preset (v0.8) ──
+  section('engines/preset v0.8');
+  // 默认预设：全null快路径
+  const ov0 = WA.preset.getSegmentOverrides();
+  assert(Object.values(ov0).every(v => v === null), '默认预设全null快路径');
+  // 创建自定义预设
+  const p1 = WA.preset.saveCustomPreset({
+    name: '武侠增强',
+    segments: { 'engine-role': '你是武侠世界推演引擎。', 'reasoning': null, 'output-format': '', 'json-notes': null }
+  });
+  assert(p1.id.startsWith('custom_'), '自定义预设生成id');
+  // 空串段规整为null
+  assert(p1.segments['output-format'] === null, '空串段规整为null');
+  // 激活
+  WA.preset.setActivePresetId(p1.id);
+  const ov1 = WA.preset.getSegmentOverrides();
+  assert(ov1['engine-role'] === '你是武侠世界推演引擎。', '覆写段生效');
+  assert(ov1['reasoning'] === null, '未覆写段保持null');
+  // getSegmentOverride单段
+  assert(WA.preset.getSegmentOverride('engine-role') === '你是武侠世界推演引擎。', '单段覆写查询');
+  assert(WA.preset.getSegmentOverride('reasoning') === null, '单段无覆写返回null');
+  assert(WA.preset.getSegmentOverride('bad-key') === null, '非法段key返回null');
+  // 另存为
+  const p2 = WA.preset.saveAsCustomPreset(p1, '武侠增强V2');
+  assert(p2.id !== p1.id && p2.name === '武侠增强V2', '另存为生成新id新名');
+  // 切换回默认
+  WA.preset.setActivePresetId('default');
+  assert(WA.preset.getSegmentOverride('engine-role') === null, '切回默认后无覆写');
+  // 指向已删除id自动回退
+  WA.preset.setActivePresetId(p2.id);
+  WA.preset.deleteCustomPreset(p2.id);
+  assert(WA.preset.getActivePresetId() === 'default', '删除激活预设自动回退默认');
+  // 内置不可删
+  assert(WA.preset.deleteCustomPreset('default') === false, '内置预设不可删除');
+  // 导出导入
+  const exported = WA.preset.exportPresets();
+  assert(exported.includes('武侠增强'), '导出含自定义预设');
+  WA.preset.deleteCustomPreset(p1.id);
+  assert(WA.preset.getAllPresets().length === 1, '删除后仅剩默认');
+  assert(WA.preset.importPresets(exported) === true, '导入成功');
+  assert(WA.preset.getAllPresets().some(p => p.name === '武侠增强'), '导入后预设恢复');
+  // 清理测试预设
+  WA.preset.deleteCustomPreset(WA.preset.getAllPresets().find(p => p.name === '武侠增强').id);
+  WA.preset.setActivePresetId('default');
 
   section('engines/opinion');
   WA.store.transact(d => {

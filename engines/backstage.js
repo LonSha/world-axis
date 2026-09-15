@@ -203,16 +203,22 @@
       const st = loadSettings();
       const s = WA.store.get();
       const snap = compactState(s, st.npcBudget);
+      // v0.8: 预设覆写（默认全null时使用内置段）
+      const ov = WA.preset ? WA.preset.getSegmentOverrides() : {};
+      const segEngineRole = ov['engine-role'] || '你是「世界背面」推演引擎：镜头之外，世界仍在继续。你不续写正文，只做世界结算。';
+      const segReasoning = ov['reasoning'] || REASONING_PROTOCOL;
+      const segOutFmt = ov['output-format'] || INJECTION_RULES;
+      const segJsonNotes = ov['json-notes'] || '';
       const sys = [
-        '你是「世界背面」推演引擎：镜头之外，世界仍在继续。你不续写正文，只做世界结算。',
+        segEngineRole,
         '',
-        REASONING_PROTOCOL,
+        segReasoning,
         '',
         VISIBILITY_SEMANTICS,
         '',
         STRUCTURAL_RULES,
         '',
-        INJECTION_RULES,
+        segOutFmt,
         '',
         SIM_MODES[st.simulationMode] || SIM_MODES.balanced,
         TIME_POLICIES[st.timePolicy] || TIME_POLICIES.cautious,
