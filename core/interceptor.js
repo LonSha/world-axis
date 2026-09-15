@@ -31,6 +31,7 @@
     if (type && type !== 'normal' && type !== 'regenerate' && type !== 'swipe') return;
     const sig = roundSig();
     if (sig === lastRoundSig) { WA.log('info', '拦截器去重：本轮before链已执行'); return; }
+    try { if (WA.render && WA.render.uninject) WA.render.uninject(); } catch (e) { WA.log('warn', 'pre-uninject failed', e); }
     lastRoundSig = sig;
     try { if (WA.store && contextSize) WA.store.transact(d => { d.meta = d.meta || {}; d.meta.contextSize = contextSize; }); } catch (e) { /* 预算推导用，失败不影响推演 */ }
 
@@ -81,6 +82,7 @@
         // 切聊天：重载store + 旧异步失效
         if (et.CHAT_CHANGED) {
           ctx.eventSource.on(et.CHAT_CHANGED, () => {
+            try { if (WA.render && WA.render.uninject) WA.render.uninject(); } catch (e) { WA.log('warn', 'chat uninject failed', e); }
             try { WA.store.init(); } catch (e) { WA.log('error', '切聊天重载store失败', e); }
             WA.emit && WA.emit('chat:changed');
           });

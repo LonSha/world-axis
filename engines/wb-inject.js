@@ -148,6 +148,19 @@
     return null;
   }
 
+  // v0.1.17: only explicit delivery='wb' items use the variable mirror.
+  if (WA.workflow && WA.workflow.register) WA.workflow.register({
+    id: 'wbInject.mirror', chain: 'before', order: 17, label: '世界书变量镜像', critical: false,
+    async run(ctx) {
+      if (!enabled() || !ctx || !Array.isArray(ctx.injections)) return;
+      const marked = ctx.injections.filter(function (i) { return i && i.delivery === 'wb' && validOrder(i.order); });
+      if (!marked.length) return;
+      const result = syncAll(marked);
+      if (!result.ok) { WA.log('warn', '世界书变量镜像失败，保留原注入项回退', result); return; }
+      marked.forEach(function (item) { const at = ctx.injections.indexOf(item); if (at >= 0) ctx.injections.splice(at, 1); });
+      ctx.wbMirrored = (ctx.wbMirrored || []).concat(result.orders);
+    }
+  });
   WA.wbInject = {
     VAR_PREFIX: VAR_PREFIX, ORDER_MIN: ORDER_MIN, ORDER_MAX: ORDER_MAX,
     orderKey: orderKey, validOrder: validOrder, wbEntryContent: wbEntryContent,

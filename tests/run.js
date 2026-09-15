@@ -1891,6 +1891,33 @@ WA.loadScript = _ls.loadScript;
   assert(r3.ok === false, '全源失败返回 ok:false');
   assert(r3.rel === 'core/missing.js', '失败也返回 rel');
   WA.baseUrl = savedBaseUrl;
+  v0117: {
+  // ── v0.1.17：生命周期闭环 ──
+  const wbNode = WA.workflow.list('before').find(n => n.id === 'wbInject.mirror');
+  assert(!!wbNode, 'wbInject.mirror 工作流节点已注册');
+  assert(wbNode && wbNode.order === 17, 'wb 镜像节点位于即时注入之前');
+  const wbCtx = { injections: [
+    { source: '持久约束', content: '约束甲', delivery: 'wb', order: 212 },
+    { source: '即时渲染', content: '保留乙', position: 'after_last_user' }
+  ] };
+  const wbRun = await wbNode.run(wbCtx);
+  assert(wbCtx.injections.length === 1 && wbCtx.injections[0].content === '保留乙', '镜像后仅移除 wb 标记项');
+  assert(global.__vars['waslot_0212'] === '约束甲', '工作流镜像写入 waslot_0212');
+  assert(Array.isArray(wbCtx.wbMirrored) && wbCtx.wbMirrored.indexOf('212') >= 0, '记录已镜像 order');
+  const plainCtx = { injections: [{ source: '普通', content: '不应进入 wb', order: 213 }] };
+  await wbNode.run(plainCtx);
+  assert(plainCtx.injections.length === 1 && global.__vars['waslot_0213'] !== '不应进入 wb', '未标记项不进入 wb 通道');
+  // 拦截器生成前自动 uninject：替换 render API 监视调用，不运行完整注入链。
+  let preUninject = 0;
+  const oldUninject = WA.render.uninject;
+  WA.render.uninject = () => { preUninject++; return { ok: true }; };
+  global.__mockChat.push({ is_user: true, mes: '生命周期测试', swipe_id: 99 });
+  await global.worldAxisGenerateInterceptor(global.__mockChat, 4096, null, 'normal');
+  assert(preUninject === 1, '新一轮生成前自动 uninject');
+  WA.render.uninject = oldUninject;
+  // CHAT_CHANGED 也应触发撤销（重新安装前使用独立事件源）
+  assert(WA.interceptor && typeof WA.interceptor.install === 'function', '拦截器生命周期 API 可用');
+  } // end v0.1.17 block
   } // end v0.1.16 block
   } // end v0.1.15 block
 
