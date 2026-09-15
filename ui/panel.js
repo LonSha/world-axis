@@ -152,8 +152,26 @@
       <div class="wa-sec">远方/近端事件泳道</div>
       <div class="wa-item wa-dim">${hz.distant ? `远方 ledger=${hz.distant.ledger} cd=${hz.distant.cooldown}${hz.distant.pending?' ⏳':''}` : '远方 —'}<br>${hz.near ? `近端 ledger=${hz.near.ledger} cd=${hz.near.cooldown}${hz.near.pending?' ⏳':''}` : '近端 —'}</div>
 
-      <div class="wa-sec">演化事件（${(ev.events||[]).length}）</div>
-      <div class="wa-list">${(ev.events||[]).slice(-10).reverse().map(e => `<div class="wa-item"><span class="wa-badge">${esc(e.type === 'conflict' ? '冲突' : '进度')}</span> <b>${esc(e.title)}</b> <span class="wa-dim">${esc(e.stage)}${e.stall?' ⏸':''}</span></div>`).join('') || '<div class="wa-empty">暂无</div>'}</div>
+<div class="wa-sec">演化事件（${(ev.events||[]).length}）</div>
+      <div class="wa-list">${(ev.events||[]).slice(-10).reverse().map(e => `<div class="wa-item"><span class="wa-badge">${esc(e.type === 'conflict' ? '冲突' : '进度')}</span> <b>${esc(e.name || e.title || '')}</b> <span class="wa-dim">${esc(e.stage)}${e.stall?' ':''}</span></div>`).join('') || '<div class="wa-empty">暂无</div>'}</div>
+
+      <div class="wa-sec">势力编辑器（结构化手动增删改）</div>
+      ${WA.editorFaction ? `
+        <div class="wa-row"><input id="wa-ef-name" class="wa-input" placeholder="名称"/><input id="wa-ef-scope" class="wa-input wa-w60" placeholder="范围"/></div>
+        <div class="wa-row"><input id="wa-ef-goal" class="wa-input" placeholder="当前目标"/><input id="wa-ef-core" class="wa-input wa-w60" placeholder="核心人物"/></div>
+        <div class="wa-row"><input id="wa-ef-pillars" class="wa-input" placeholder="权力支柱（逗号分隔，≤4字）"/><button class="wa-btn" id="wa-ef-add">新增势力</button></div>
+        <div class="wa-list">${(WA.editorFaction.list(s) || []).map((f, i) => `<div class="wa-item"><b>${esc(f.name)}</b> <span class="wa-badge">${esc(f.status)}</span> <span class="wa-dim">${esc(f.relation)} · ${esc(f.scope||'—')}</span>
+          <div class="wa-dim">支柱：${esc((f.powerPillars||[]).join('、')||'—')}</div>
+          <button class="wa-btn wa-mini" data-ef-edit="${i}">改状态</button><button class="wa-btn wa-mini" data-ef-copy="${i}">复制</button><button class="wa-btn wa-mini" data-ef-del="${i}">删除</button></div>`).join('') || '<div class="wa-empty">暂无势力</div>'}</div>
+        <div class="wa-dim">声誉总压：${WA.editorFaction.reputationPressure(s).pressure} / ±${WA.editorFaction.reputationPressure(s).cap}</div>` : '<div class="wa-empty">势力编辑器未加载</div>'}
+      <div class="wa-sec">事件编辑器</div>
+      ${WA.editorEvents ? `
+        <div class="wa-row"><input id="wa-ee-name" class="wa-input" placeholder="事件名"/><select id="wa-ee-type" class="wa-input wa-w60"><option value="conflict">冲突型</option><option value="progress">推进型</option></select><button class="wa-btn" id="wa-ee-add">新增事件</button></div>
+        <div class="wa-list">${(WA.editorEvents.list(s) || []).map((e, i) => `<div class="wa-item"><b>${esc(e.name)}</b> <span class="wa-badge">${e.type === 'conflict' ? '冲突' : '进度'} Lv.${e.level}</span> <span class="wa-dim">${esc(e.stage)} ${e.stageRound||1}/9</span>
+          <button class="wa-btn wa-mini" data-ee-prev="${i}">阶段</button><button class="wa-btn wa-mini" data-ee-next="${i}">阶段▶</button><button class="wa-btn wa-mini" data-ee-del="${i}">删除</button></div>`).join('') || '<div class="wa-empty">暂无事件</div>'}</div>` : '<div class="wa-empty">事件编辑器未加载</div>'}
+      <div class="wa-sec">状态一致性体检</div>
+      <button class="wa-btn" id="wa-inspect-run">立即体检（纯只读）</button>
+      <div id="wa-inspect-out" class="wa-out"></div>
 
       <div class="wa-sec">章节</div>
       ${s.chapters.current ? `<div class="wa-item"><b>${esc(s.chapters.current.title)}</b><div class="wa-dim">${esc((s.chapters.current.script || '').slice(0, 150))}</div><button class="wa-btn wa-mini" id="wa-ch-end">结束本章</button></div>`
@@ -228,6 +246,49 @@
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
     on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); btn.textContent = '生成中…'; await WA.directEvent.create({ prompt: p, turns: t }); renderBody(); });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });
+    // 势力/事件编辑器绑定（v0.9.0）
+    if (currentPage === 'events') {
+      const efAdd = $('#wa-ef-add');
+      if (efAdd && WA.editorFaction) efAdd.onclick = () => {
+        const pillars = ($('#wa-ef-pillars').value || '').split(/[,，]/).map(x => x.trim()).filter(Boolean);
+        const r = WA.store.transact(d => WA.editorFaction.add(d, {
+          name: $('#wa-ef-name').value, scope: $('#wa-ef-scope').value,
+          currentGoal: $('#wa-ef-goal').value, core_person: $('#wa-ef-core').value,
+          powerPillars: pillars
+        })).result;
+        if (!r.ok) WA.log('warn', '势力新增失败：' + r.reason);
+        renderBody();
+      };
+      panelEl.querySelectorAll('[data-ef-del]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorFaction.remove(d, +b.dataset.efDel)); renderBody(); });
+      panelEl.querySelectorAll('[data-ef-copy]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorFaction.copy(d, +b.dataset.efCopy)); renderBody(); });
+      panelEl.querySelectorAll('[data-ef-edit]').forEach(b => b.onclick = () => {
+        const arr = WA.editorFaction.list();
+        const cur = arr[+b.dataset.efEdit];
+        const next = prompt('运势（' + WA.editorFaction.STATUSES.join('/') + '）：', cur && cur.status);
+        if (next != null) {
+          const rel = prompt('关系（' + WA.editorFaction.RELATIONS.join('/') + '）：', cur && cur.relation);
+          WA.store.transact(d => WA.editorFaction.update(d, +b.dataset.efEdit, { status: next, relation: rel == null ? undefined : rel }));
+          renderBody();
+        }
+      });
+      const eeAdd = $('#wa-ee-add');
+      if (eeAdd && WA.editorEvents) eeAdd.onclick = () => {
+        const r = WA.store.transact(d => WA.editorEvents.add(d, { name: $('#wa-ee-name').value, type: $('#wa-ee-type').value })).result;
+        if (!r.ok) WA.log('warn', '事件新增失败：' + r.reason);
+        renderBody();
+      };
+      panelEl.querySelectorAll('[data-ee-next]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorEvents.shiftStage(d, +b.dataset.eeNext, 1)); renderBody(); });
+      panelEl.querySelectorAll('[data-ee-prev]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorEvents.shiftStage(d, +b.dataset.eePrev, -1)); renderBody(); });
+      panelEl.querySelectorAll('[data-ee-del]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorEvents.remove(d, +b.dataset.eeDel)); renderBody(); });
+      const insRun = $('#wa-inspect-run');
+      if (insRun && WA.inspectorState) insRun.onclick = () => {
+        const rep = WA.inspectorState.inspect();
+        const flat = WA.inspectorState.flatten(rep);
+        const out = $('#wa-inspect-out');
+        out.innerHTML = '<div class="wa-item"><b>' + esc(WA.inspectorState.summaryText(rep)) + '</b></div>' +
+          (flat.length ? flat.slice(0, 20).map(it => '<div class="wa-dim">[' + it.level + '] ' + esc(it.detail) + '</div>').join('') : '');
+      };
+    }
     on('#wa-ch-start', () => { WA.chapters.start($('#wa-ch-title').value.trim()); renderBody(); });
     on('#wa-ch-end', () => { WA.chapters.end(); renderBody(); });
     on('#wa-plan-start', () => { const lines = $('#wa-plan-beats').value.split('\n').map(s => s.trim()).filter(Boolean).map(g => ({ goal: g })); if (lines.length) { WA.oracle.setPlan({ kind: 'sequence', beats: lines, current: 0 }); renderBody(); } });

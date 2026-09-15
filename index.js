@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.8.3';
+  const VERSION = '0.9.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -67,6 +67,9 @@
 'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
     'engines/chapters.js',
     'engines/direct-event.js',
+    'engines/editor-faction.js',
+    'engines/editor-events.js',
+    'engines/inspector-state.js',
     'engines/calendar.js',
     'engines/memory.js',
     'engines/opinion.js',

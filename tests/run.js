@@ -20,7 +20,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -705,6 +705,126 @@ const WA = global.WorldAxis;
   blk = WA.summarizer.buildBlock();
   assert(blk.includes('近期纪要') && blk.includes('纪要甲'), '无总述回退纪要');
   assert(WA.summarizer.SMALL_SYSTEM.includes('谁—做了什么') && WA.summarizer.BIG_SYSTEM.includes('空壳句'), '双层提示词保留反空泛铁律');
+
+  // ─ editor-faction (v0.9.0) ──
+  section('engines/editor-faction v0.9.0');
+  WA.store.transact(d => { d.evolution.factions = []; });
+  const efAdd = WA.store.transact(d => WA.editorFaction.add(d, {
+    name: '北镇抚司', scope: '京师', status: '稳固', relation: '敌对',
+    currentGoal: '肃清锦衣卫暗桩', core_person: '陆文昭', powerPillars: ['刑狱', '密探', '诏令']
+  })).result;
+  assert(efAdd.ok === true && WA.store.get().evolution.factions.length === 1, '势力新增成功');
+  assert(WA.editorFaction.validate({ name: '空壳帮' }).ok === false, '五要件缺失拦截');
+  const efDup = WA.store.transact(d => WA.editorFaction.add(d, {
+    name: '北镇抚司', scope: '京师', currentGoal: 'x', core_person: 'y', powerPillars: ['甲']
+  })).result;
+  assert(efDup.ok === false && efDup.reason.includes('同名'), '重名势力拒绝（防推演归并串味）');
+  const fid = WA.store.get().evolution.factions[0].id;
+  const efUpd = WA.store.transact(d => WA.editorFaction.update(d, fid, { status: '鼎盛' })).result;
+  const updFaction = WA.store.get().evolution.factions[0];
+  assert(efUpd.ok === true && updFaction.status === '鼎盛' && updFaction.currentGoal === '肃清锦衣卫暗桩', '局部更新不抹其他字段');
+  const efBadEnum = WA.store.transact(d => WA.editorFaction.update(d, fid, { relation: '暧昧', status: '超神' })).result;
+  const badFaction = WA.store.get().evolution.factions[0];
+  assert(efBadEnum.ok === true && badFaction.relation === '敌对' && badFaction.status === '鼎盛', '非法枚举被拒绝回退原值');
+  const efCopy = WA.store.transact(d => WA.editorFaction.copy(d, fid)).result;
+  assert(efCopy.ok === true && efCopy.faction.name === '北镇抚司·副本' && efCopy.faction.id !== fid, '复制换新id且改名防归并');
+  const efRel = WA.store.transact(d => WA.editorFaction.shiftRelation(d, fid, -2)).result;
+  assert(efRel.ok === true && WA.store.get().evolution.factions[0].relation === '中立', '关系相对位移（敌对→中立）');
+  const efCap = WA.store.transact(d => { for (let i = 0; i < 30; i++) WA.editorFaction.add(d, { name: '势力' + i, scope: 'S', currentGoal: 'G', core_person: 'C', powerPillars: ['P'] }); }).result;
+  assert(WA.store.get().evolution.factions.length === WA.editorFaction.MAX_FACTIONS, `势力上限${WA.editorFaction.MAX_FACTIONS}封顶`);
+  const efDel = WA.store.transact(d => WA.editorFaction.remove(d, 0)).result;
+  assert(efDel.ok === true && WA.store.get().evolution.factions.length === WA.editorFaction.MAX_FACTIONS - 1, '势力删除成功');
+  const efRep = WA.editorFaction.reputationPressure(WA.store.get());
+  assert(efRep.cap === 35 && Math.abs(efRep.pressure) <= 35, '声誉总压封顶±35');
+  const efBlock = WA.editorFaction.buildBlock(WA.store.get());
+  assert(efBlock.includes('势力名录') && efBlock.includes('支柱'), '势力名录注入块含支柱');
+
+  // ─ editor-events (v0.9.0) ─
+  section('engines/editor-events v0.9.0');
+  WA.store.transact(d => { d.evolution.events = []; d.evolution.round = 0; });
+  const eeAdd = WA.store.transact(d => WA.editorEvents.add(d, {
+    type: 'conflict', name: '粮道之争', level: 2, desc: '两支商队争夺同一批粮'
+  })).result;
+  assert(eeAdd.ok === true && WA.store.get().evolution.events.length === 1, '事件新增成功');
+  assert(eeAdd.event.stage === '萌芽' && eeAdd.event.stageRound === 1, '冲突型默认首阶段');
+  assert(WA.editorEvents.add(WA.store.get(), { name: '无类型' }).ok === false, '缺类型拒绝');
+  const epAdd = WA.store.transact(d => WA.editorEvents.add(d, { type: 'progress', name: '密道开凿' })).result;
+  assert(epAdd.event.stage === '筹备', '推进型默认首阶段不同');
+  const eeid = WA.store.get().evolution.events[0].id;
+  const eeTypePatch = WA.store.transact(d => WA.editorEvents.update(d, eeid, { type: 'progress' })).result;
+  assert(eeTypePatch.warnings && eeTypePatch.warnings.length && WA.store.get().evolution.events[0].type === 'conflict', 'type禁改并告警');
+  const eeStageBad = WA.store.transact(d => WA.editorEvents.update(d, eeid, { stage: '筹备' })).result;
+  assert(eeStageBad.warnings && WA.store.get().evolution.events[0].stage === '萌芽', '跨类型非法阶段被拒回退');
+  const eeShift = WA.store.transact(d => WA.editorEvents.shiftStage(d, eeid, 1)).result;
+  assert(eeShift.ok === true && WA.store.get().evolution.events[0].stage === '发酵', '阶段推进一档');
+  const eeShiftBack = WA.store.transact(d => WA.editorEvents.shiftStage(d, eeid, -1)).result;
+  assert(eeShiftBack.ok === true && WA.store.get().evolution.events[0].stage === '萌芽', '阶段可手动回退');
+  const eeEdge = WA.store.transact(d => WA.editorEvents.shiftStage(d, eeid, -5)).result;
+  assert(eeEdge.ok === false && eeEdge.reason.includes('端点'), '阶段序列端点不越界');
+  const eeToTerminal = WA.store.transact(d => WA.editorEvents.update(d, eeid, { stage: '已爆发' })).result;
+  const termEv = WA.store.get().evolution.events[0];
+  assert(eeToTerminal.ok === true && termEv._terminalSince !== undefined, '正面终局登记_terminalSince(倒计时用)');
+  assert(WA.editorEvents.isTerminal(WA.store.get().evolution.events[1]) === false, '非终局事件判定正确');
+  const eeSt = WA.editorEvents.stats(WA.store.get());
+  assert(eeSt.total === 2 && eeSt.byType.conflict === 1 && eeSt.byType.progress === 1, '事件统计按类型分桶');
+  const eeDup = WA.store.transact(d => WA.editorEvents.add(d, { type: 'progress', name: '密道开凿' })).result;
+  assert(eeDup.ok === false && eeDup.reason.includes('同名'), '同名事件拒绝（防串链）');
+  const eeDesc = WA.store.transact(d => WA.editorEvents.update(d, eeid, { desc: 'x'.repeat(80) })).result;
+  assert(WA.store.get().evolution.events[0].desc.length === WA.editorEvents.DESC_MAXLEN, `描述截断至${WA.editorEvents.DESC_MAXLEN}字`);
+  WA.store.transact(d => WA.editorEvents.update(d, eeid, { stage: '已消散' }));
+  const eeBlock = WA.editorEvents.buildBlock(WA.store.get());
+  assert(eeBlock.includes('活跃事件链') && !eeBlock.includes('粮道之争') && eeBlock.includes('密道开凿'), '注入块只含非终局事件（已消散剔除/筹备保留）');
+  const eeDel = WA.store.transact(d => WA.editorEvents.remove(d, 0)).result;
+  assert(eeDel.ok === true && WA.store.get().evolution.events.length === 1, '事件删除成功');
+
+  // ─ inspector-state (v0.9.0) 
+  section('engines/inspector-state v0.9.0');
+  // 构造一个「多处违规」的状态，验证 checker 能全抓
+  WA.store.transact(d => {
+    d.evolution.events = [
+      { id: 'e1', type: 'conflict', name: '同事件', level: 9, stage: '筹备', stageRound: 99 },
+      { id: 'e2', type: 'progress', name: '同事件', level: 2, stage: '执行', stageRound: 1 },
+      { id: '', type: 'weird', name: '怪类型', level: 1, stage: '萌芽', stageRound: 1 }
+    ];
+    d.evolution.factions = [
+      { id: 'f1', name: '甲', scope: '', status: '超神', relation: '暧昧', currentGoal: '', core_person: '' },
+      { id: 'f2', name: '甲', scope: 'S', status: '稳固', relation: '中立', currentGoal: 'x'.repeat(60), core_person: 'C' }
+    ];
+    d.worldPulse = { pressure: 9, trend: 'flying', note: '' };
+    d.evolution.round = -3;
+    d.people = { p1: { name: '沈炼', location: '', knowledge: { '内鬼身份': { route: 'inferred', strength: 'fact' } } } };
+    d.memory.facts = [{ key: '粮价', value: 'A', active: true }, { key: '粮价', value: 'B', active: true }];
+    d.memory.foreshadows = [{ id: 'fs1', content: 'x', status: 'imaginary', links: [] }];
+    d.memory.pmem = [{ id: 'dup', text: '甲记', time: '', holders: ['沈炼'], known_by: ['沈炼', '陌路人'] },
+                     { id: 'dup', text: '', time: '', holders: ['沈炼'], known_by: [] }];
+    d.directEvents = [{ id: 'd1', title: '追捕', totalTurns: 3, currentTurn: 5, status: 'active' }];
+    d.nextTurnInjection = { required: [], at: Date.now() };
+  });
+  const rep = WA.inspectorState.inspect(WA.store.get());
+  assert(rep.ok === false && rep.counts.error > 0, '体检捕获到错误级问题');
+  const codes = WA.inspectorState.flatten(rep).map(x => x.code);
+  assert(codes.includes('event.dupName') && codes.includes('event.badStage'), '事件重名与跨类型非法阶段被抓');
+  assert(codes.includes('faction.badStatus') && codes.includes('faction.badRelation') && codes.includes('faction.dupName'), '势力非法枚举与重名被抓');
+  assert(codes.includes('pulse.badPressure') && codes.includes('round.negative'), '脉搏越界与负轮次被抓');
+  assert(codes.includes('people.inferredAsFact'), '认知边界违规(inferred标fact)被抓');
+  assert(codes.includes('facts.multiActive'), '长期事实多active版本被抓');
+  assert(codes.includes('foreshadow.badStatus'), '伏笔非法状态被抓');
+  assert(codes.includes('pmem.dupId'), '主观记忆id重复被抓');
+  assert(codes.includes('direct.turnOverflow'), '突发事件轮次溢出被抓');
+  const onlyEvents = WA.inspectorState.inspect(WA.store.get(), { only: ['events'] });
+  assert(onlyEvents.sections.length === 1 && onlyEvents.sections[0].code === 'events', 'only 参数限定检查范围');
+  const flat = WA.inspectorState.flatten(rep);
+  assert(flat[0].level === 'error', '扁平化按严重度排序(error优先)');
+  assert(WA.inspectorState.summaryText(rep).includes('错误'), '体检摘要文本含错误计数');
+  // 干净状态
+  WA.store.transact(d => { d.evolution.events = []; d.evolution.factions = []; d.worldPulse = null; d.evolution.round = 0; d.people = {}; d.memory.facts = []; d.memory.foreshadows = []; d.memory.pmem = []; d.directEvents = []; d.nextTurnInjection = null; });
+  const clean = WA.inspectorState.inspect(WA.store.get());
+  assert(clean.clean === true && WA.inspectorState.summaryText(clean).includes('自洽'), '干净状态判定自洽');
+  // 只读保证：体检前后 state 深比较一致
+  WA.store.transact(d => { d.evolution.events = [{ id: 'x', type: 'conflict', name: 'N', level: 1, stage: '萌芽', stageRound: 1 }]; });
+  const snapshotBefore = JSON.stringify(WA.store.get());
+  WA.inspectorState.inspect(WA.store.get());
+  assert(JSON.stringify(WA.store.get()) === snapshotBefore, '体检纯只读（state零改动）');
 
   section('engines/opinion');
   WA.store.transact(d => {
