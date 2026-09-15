@@ -2520,6 +2520,34 @@ WA.loadScript = _ls.loadScript;
   const st20 = WA.loaderStatus();
   assert(ldr20.loadedCount === (st20.loaded || []).length, '诊断 loadedCount 与 loaderStatus 一致');
   } // end v0.1.20 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.21 — wb 通道诊断（activeOrders + wbChannel 节）
+  // ═══════════════════════════════════════════════════════════
+  v0121: {
+  // activeOrders 只读清单
+  assert(typeof WA.wbInject.activeOrders === 'function', 'wbInject.activeOrders 已导出');
+  // 先造两个非空镜像再验证清单
+  WA.wbInject.setConfig({ enabled: true });
+  WA.wbInject.syncOrder(310, [{ content: '诊断甲' }]);
+  WA.wbInject.syncOrder(320, [{ content: '诊断乙' }]);
+  WA.wbInject.clearOrder(320); // 清空的不应出现
+  const ao = WA.wbInject.activeOrders();
+  assert(Array.isArray(ao) && ao.some(x => x.order === 310 && x.chars === 3), 'activeOrders 列出非空 order');
+  assert(!ao.some(x => x.order === 320), '清空后的 order 不在清单');
+  assert(ao.every(x => x.key && x.key.indexOf('waslot_') === 0), '清单带 key 字段');
+  // 升序排列
+  const orders21 = ao.map(x => x.order);
+  const sorted21 = orders21.slice().sort((a, b) => a - b);
+  assert(JSON.stringify(orders21) === JSON.stringify(sorted21), '清单按 order 升序');
+  // wbChannel 诊断节
+  const dg21 = WA.toolDiag.collect();
+  assert(dg21.wbChannel && dg21.wbChannel.enabled === true, 'wbChannel 节产出且 enabled 正确');
+  assert(dg21.wbChannel.activeOrderCount === ao.length, 'wbChannel 活跃计数与 activeOrders 一致');
+  assert(typeof dg21.wbChannel.totalChars === 'number', 'wbChannel 总字数产出');
+  assert(dg21.wbChannel.worldbookName === '(auto)' || typeof dg21.wbChannel.worldbookName === 'string', 'wbChannel 世界书名可见');
+  // 清理测试变量
+  WA.wbInject.clearOrder(310);
+  } // end v0.1.21 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

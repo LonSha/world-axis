@@ -277,13 +277,30 @@
       return WA.render.injectionLedger();
     }, {});
   }
+  // ── 12. v0.1.21: wb 变量镜像通道（配置 + 活跃 order 清单） ──
+  function secWbChannel() {
+    return safe(function () {
+      if (!WA.wbInject) return { error: 'wbInject 模块不可用' };
+      const cfg = WA.wbInject.getConfig ? WA.wbInject.getConfig() : null;
+      const orders = WA.wbInject.activeOrders ? WA.wbInject.activeOrders() : [];
+      return {
+        enabled: cfg ? cfg.enabled : null,
+        worldbookName: cfg ? (cfg.worldbookName || '(auto)') : null,
+        autoEnsure: cfg ? cfg.autoEnsure : null,
+        companionName: safe(function () { return WA.wbInject.findCompanionName(); }, null),
+        activeOrders: orders,
+        activeOrderCount: orders.length,
+        totalChars: orders.reduce(function (a, x) { return a + (x.chars || 0); }, 0)
+      };
+    }, {});
+  }
   // ── 汇总 ──
   function collect() {
     const diag = {
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
-      host: secHost(), uninjectLedger: secUninjectLedger()
+      host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel()
     };
     diag.verdict = verdict(diag);
     return diag;

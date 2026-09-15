@@ -190,7 +190,21 @@
     syncOrder: syncOrder, syncAll: syncAll, clearOrder: clearOrder,
     ensureEntry: ensureEntry, findCompanionName: findCompanionName,
     getConfig: wbSettings, setConfig: setConfig,
-    isEnabled: enabled
+    isEnabled: enabled,
+    /** v0.1.21: 活跃镜像清单——当前 waslot_* 变量里非空的 order 与长度（诊断用，只读） */
+    activeOrders() {
+      const vars = getVars();
+      const out = [];
+      Object.keys(vars).forEach(function (k) {
+        if (k.indexOf(VAR_PREFIX) !== 0) return;
+        const v = vars[k];
+        if (v == null || String(v) === '') return;
+        const n = Number(k.slice(VAR_PREFIX.length));
+        out.push({ order: n, key: k, chars: String(v).length });
+      });
+      out.sort(function (a, b) { return a.order - b.order; });
+      return out;
+    }
   };
 
   if (WA.log) WA.log('info', '世界书变量镜像注入通道已加载');
