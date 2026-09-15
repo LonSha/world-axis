@@ -2824,6 +2824,74 @@ WA.loadScript = _ls.loadScript;
   WA.apiRouter.setChannel('inference', { baseUrl: '', model: '' });
   WA.apiRouter.setChannel('judge', { baseUrl: '', model: '' });
   } // end v0.1.27 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.28 — 事件总线健康（去重/off/快照/死信号/泄漏/异常聚合）
+  // ═══════════════════════════════════════════════════════════
+  v0128: {
+  assert(typeof WA.busStats === 'function' && typeof WA.off === 'function', 'busStats/off 已导出');
+  // 去重：同一函数重复订阅只计一次
+  let hits28 = 0;
+  const fn28 = function () { hits28++; };
+  WA.on('t.bus.demo', fn28);
+  WA.on('t.bus.demo', fn28);
+  const bs28a = WA.busStats().events.find(r => r.event === 't.bus.demo');
+  assert(bs28a && bs28a.listeners === 1, '重复订阅被去重');
+  const dupWarn = WA.eventLog.filter(l => l.msg.indexOf('重复订阅') >= 0);
+  assert(dupWarn.length === 1, '重复订阅产生一次告警日志');
+  // emit 返回实际调用数
+  const called28 = WA.emit('t.bus.demo', { v: 1 });
+  assert(called28 === 1 && hits28 === 1, 'emit 派发并返回调用数');
+  // off 句柄 + WA.off 双路解绑
+  const offFn = WA.on('t.bus.demo2', fn28);
+  offFn();
+  assert(WA.emit('t.bus.demo2', null) === 0, 'on 返回的句柄可解绑');
+  WA.on('t.bus.demo3', fn28);
+  assert(WA.off('t.bus.demo3', fn28) === true && WA.emit('t.bus.demo3', null) === 0, 'WA.off 解绑生效');
+  assert(WA.off('t.bus.demo3', fn28) === false, '重复 off 返回 false');
+  // 异常聚合：抛错不中断兄弟监听器，且计数留存
+  let siblingRan = 0;
+  WA.on('t.bus.err', function () { throw new Error('listener-boom'); });
+  WA.on('t.bus.err', function () { siblingRan++; });
+  WA.emit('t.bus.err', null);
+  assert(siblingRan === 1, '单监听器抛错不影响兄弟');
+  const errRow = WA.busStats().events.find(r => r.event === 't.bus.err');
+  assert(errRow.errors === 1 && errRow.lastError.indexOf('listener-boom') >= 0, '异常计数与末错留存');
+  // 快照派发：监听器内部解绑不影响本轮
+  let a2Ran = 0, b2Ran = 0;
+  const bFn = function () { b2Ran++; };
+  const aFn = function () { a2Ran++; WA.off('t.bus.snap', bFn); };
+  WA.on('t.bus.snap', aFn);
+  WA.on('t.bus.snap', bFn);
+  WA.emit('t.bus.snap', null);
+  assert(a2Ran === 1 && b2Ran === 1, '派发用快照：本轮自删不影响已排队的监听器');
+  assert(WA.emit('t.bus.snap', null) === 1, '下轮才生效（b 已被移除）');
+  // 死信号：有发出无监听
+  WA.emit('t.bus.nowhere', null);
+  const deadRow = WA.busStats().events.find(r => r.event === 't.bus.nowhere');
+  assert(deadRow && deadRow.dead === 1 && deadRow.listeners === 0, '无人监听计入 dead');
+  // 泄漏告警：超过阈值只警一次
+  const leakFns = [];
+  for (let i = 0; i < 26; i++) { leakFns.push((function (n) { return function () { return n; }; })(i)); }
+  leakFns.forEach(f => WA.on('t.bus.leak', f));
+  const leakLogs = WA.eventLog.filter(l => l.msg.indexOf('疑似泄漏') >= 0);
+  assert(leakLogs.length === 1, '泄漏只告警一次');
+  const leakRow = WA.busStats().events.find(r => r.event === 't.bus.leak');
+  assert(leakRow.leakSuspect === true, 'leakSuspect 标记产出');
+  leakFns.forEach(f => WA.off('t.bus.leak', f));
+  // tool-diag bus 节 + verdict 三类 warn
+  const dg28 = WA.toolDiag.collect();
+  assert(dg28.bus && typeof dg28.bus.totalListeners === 'number', '诊断 bus 节产出');
+  assert(dg28.bus.failing.some(r => r.event === 't.bus.err'), 'failing 汇总进诊断');
+  assert(dg28.bus.deadSignals.some(r => r.event === 't.bus.nowhere'), 'deadSignals 进诊断');
+  const busIssues = (dg28.verdict.issues || []).filter(i => i.key === 'bus');
+  assert(busIssues.length >= 2 && busIssues.every(i => i.level === 'warn'), '总线问题均为 warn 级（不阻断）');
+  assert(busIssues.some(i => i.detail.indexOf('t.bus.err') >= 0), '抛错事件被点名');
+  // JSON 体积可控：诊断包总线行数有上限
+  const busJson = JSON.stringify(dg28.bus.top);
+  assert(dg28.bus.top.length <= 6 && busJson.length < 2000, '总线诊断只保留 Top 行');
+  // 清理：摘掉测试监听器，避免污染总线总监听器统计
+  WA.off('t.bus.demo', fn28);
+  } // end v0.1.28 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

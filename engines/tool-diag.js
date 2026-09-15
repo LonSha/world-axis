@@ -310,6 +310,23 @@
       return WA.render.injectionLedger();
     }, {});
   }
+  // ── 13. v0.1.28: 事件总线健康（监听器数 / 异常计数 / 死信号 / 泄漏嫌疑） ──
+  function secBus() {
+    return safe(function () {
+      if (!WA.busStats) return { error: '事件总线统计不可用（interceptor 未加载）' };
+      const st = WA.busStats(20);
+      const failing = st.events.filter(function (r) { return r.errors > 0; });
+      const dead = st.events.filter(function (r) { return r.dead > 0; });
+      const leaking = st.events.filter(function (r) { return r.leakSuspect; });
+      return {
+        totalListeners: st.totalListeners, tracked: st.tracked,
+        failing: failing.map(function (r) { return { event: r.event, errors: r.errors, lastError: r.lastError }; }),
+        deadSignals: dead.map(function (r) { return { event: r.event, dead: r.dead }; }),
+        leakSuspects: leaking.map(function (r) { return { event: r.event, listeners: r.listeners }; }),
+        top: st.events.slice(0, 6).map(function (r) { return { event: r.event, listeners: r.listeners, emits: r.emits, errors: r.errors }; })
+      };
+    }, {});
+  }
   // ── 12. v0.1.21: wb 变量镜像通道（配置 + 活跃 order 清单） ──
   function secWbChannel() {
     return safe(function () {
@@ -333,7 +350,7 @@
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
-      host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel()
+      host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus()
     };
     diag.verdict = verdict(diag);
     return diag;
@@ -386,6 +403,11 @@
       const lossy = callRows.filter(function (r) { return r.errors > 0; });
       if (lossy.length) issues.push({ level: 'warn', key: 'api', detail: lossy.map(function (r) { return r.channel + ' 有 ' + r.errors + '/' + r.count + ' 次失败（' + r.errorKinds + '）'; }).join('；') });
     }
+    // v0.1.28: 事件总线异常分级——监听器抛错 warn、有发出无监听 warn、泄漏嫌疑 warn
+    const bus = diag.bus || {};
+    if ((bus.failing || []).length) issues.push({ level: 'warn', key: 'bus', detail: '事件监听器抛错：' + bus.failing.map(function (r) { return r.event + '(' + r.errors + ')'; }).join('、') });
+    if ((bus.deadSignals || []).length) issues.push({ level: 'warn', key: 'bus', detail: '事件有发出但无人监听（接线断裂）：' + bus.deadSignals.map(function (r) { return r.event + '×' + r.dead; }).join('、') });
+    if ((bus.leakSuspects || []).length) issues.push({ level: 'warn', key: 'bus', detail: '监听器数量异常（疑似重复订阅未解绑）：' + bus.leakSuspects.map(function (r) { return r.event + '=' + r.listeners; }).join('、') });
     const ldr = (diag.runtime || {}).loader || {};
     // v0.1.25: 加载失败的模块点名（对照装载清单升级为 error）
     if (ldr.failedModules && ldr.failedModules.length) {

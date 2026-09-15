@@ -103,7 +103,57 @@
   };
 
   // 轻量事件总线（模块间解耦通信）
+  // v0.1.28: 总线健康——异常聚合计数、监听器去重与泄漏告警、emit 快照防自增删破坏
   const listeners = {};
-  WA.on = (evt, fn) => { (listeners[evt] = listeners[evt] || []).push(fn); };
-  WA.emit = (evt, data) => { (listeners[evt] || []).forEach(fn => { try { fn(data); } catch (e) { WA.log('warn', '事件监听异常 ' + evt, e); } }); };
+  const LEAK_THRESHOLD = 24;
+  const busStat = {}; // evt -> {emits, errors, lastError, leakedWarned}
+  function stat(evt) { return busStat[evt] || (busStat[evt] = { emits: 0, dead: 0, errors: 0, lastError: null, lastAt: 0, leakedWarned: false }); }
+  WA.on = (evt, fn) => {
+    if (!evt || typeof fn !== 'function') return function () {};
+    const arr = listeners[evt] || (listeners[evt] = []);
+    if (arr.indexOf(fn) >= 0) { WA.log('warn', '事件重复订阅已忽略: ' + evt); return function () {}; }
+    arr.push(fn);
+    const st = stat(evt);
+    if (arr.length > LEAK_THRESHOLD && !st.leakedWarned) {
+      st.leakedWarned = true;
+      WA.log('warn', '事件监听器疑似泄漏: ' + evt + ' 已有 ' + arr.length + ' 个监听器（检查是否有每轮注册未解绑）');
+    }
+    return function off() {
+      try { const i = arr.indexOf(fn); if (i >= 0) arr.splice(i, 1); } catch (e) {}
+    };
+  };
+  WA.off = (evt, fn) => {
+    const arr = listeners[evt];
+    if (!arr) return false;
+    const i = arr.indexOf(fn);
+    if (i < 0) return false;
+    arr.splice(i, 1);
+    return true;
+  };
+  WA.emit = (evt, data) => {
+    const st = stat(evt);
+    st.emits++;
+    const arr = listeners[evt];
+    if (!arr || !arr.length) { st.dead++; return 0; }   // v0.1.28: 无人监听 = 死信号
+    let called = 0;
+    arr.slice().forEach(fn => {   // 快照：监听器内部 on/off 不影响本轮派发
+      try { fn(data); called++; }
+      catch (e) {
+        st.errors++; st.lastAt = Date.now();
+        st.lastError = String((e && (e.message || e)) || e).slice(0, 180);
+        WA.log('warn', '事件监听异常 ' + evt, e);
+      }
+    });
+    return called;
+  };
+  WA.busStats = function (topN) {
+    const rows = Object.keys(busStat).map(function (evt) {
+      const st = busStat[evt];
+      return { event: evt, listeners: (listeners[evt] || []).length, emits: st.emits, dead: st.dead || 0, errors: st.errors, lastError: st.lastError, lastAt: st.lastAt, leakSuspect: (listeners[evt] || []).length > LEAK_THRESHOLD };
+    });
+    rows.sort(function (a, b) { return (b.errors - a.errors) || (b.listeners - a.listeners); });
+    const n = topN && topN > 0 ? topN : 12;
+    return { events: rows.slice(0, n), tracked: rows.length, totalListeners: Object.keys(listeners).reduce(function (s, k) { return s + listeners[k].length; }, 0) };
+  };
+  WA.LEAK_THRESHOLD = LEAK_THRESHOLD;
 })();
