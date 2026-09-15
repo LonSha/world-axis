@@ -15,6 +15,7 @@
   function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
   WA.enemies = {
+    ENEMY_STATUS: ENEMY_STATUS, ENEMY_TYPE: ENEMY_TYPE, ASSET_STATUS: ASSET_STATUS,
     /** 仇敌录入账（backstage applyResult调用） */
     apply(draft, enemies) {
       (enemies || []).slice(0, 6).forEach(e => {

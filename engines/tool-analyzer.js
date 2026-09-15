@@ -23,7 +23,10 @@
     conflict: { 萌芽: 0.2, 发酵: 0.5, 逼近: 0.8, 已爆发: 1, 已消散: 0 },
     progress: { 筹备: 0.2, 执行: 0.5, 关键: 0.8, 已完成: 1, 已失败: 0 }
   };
-  const ECON_SCORE = { 繁荣: 1, 平稳: 0.2, 萧条: -0.6, 危机: -1 };
+  // v0.9.6: 气候枚举对齐 evolution.ECONOMY_CLIMATE（繁荣|平稳|衰退|动荡），
+  // 消除与 backstage 契约的跨模块漂移——模型按契约产出「衰退/动荡」时此处查表落空、
+  // 静默回落 0.2（等同平稳），压力计算长期偏移。衰退=负压、动荡=强负压。
+  const ECON_SCORE = { 繁荣: 1, 平稳: 0.2, 衰退: -0.6, 动荡: -1 };
   const OVERHEAT = 45, OVERCOOL = -25;
 
   function read(state) { return state || WA.store.get(); }

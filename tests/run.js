@@ -20,7 +20,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1217,6 +1217,75 @@ const WA = global.WorldAxis;
   WA.toolAnalyzer = keepAnalyzer;
   assert(WA.toolDiag.collect().verdict.ok === true, '恢复模块后判语复原（自检可逆）');
   assert(dg.meta.extVersion === (global.WorldAxis.VERSION || global.WorldAxis.version) && String(dg.meta.extVersion).length > 0, '诊断包读到扩展版本号');
+
+
+  // ══════════ v0.9.6 推演契约对账器（contract-audit）══════════
+  // 前置：对账器依赖已初始化的 store（探针要在真实 state 上跑）
+  WA.store.init();
+  assert(typeof WA.contractAudit === 'object' && WA.contractAudit.FIELDS.length === 22, 'contractAudit 已加载且字段表为 22 项');
+  assert(WA.contractAudit.PROBE_TAG === '__audit_', '探针哨兵标记常量正确');
+  assert(Array.isArray(WA.contractAudit.ENUM_ALIGN) && WA.contractAudit.ENUM_ALIGN.length >= 10, '枚举对齐表条目齐全');
+  assert(Array.isArray(WA.contractAudit.CROSS_MODULE) && WA.contractAudit.CROSS_MODULE.length === 6, '跨模块漂移扫描表 6 组');
+  // ── 契约解析：从真实 buildPrompt 提取声明字段 ──
+  const caPrompt = WA.backstage.buildPrompt({ idx: 1, text: '' }, '');
+  const caContract = WA.contractAudit.parseContract(caPrompt);
+  assert(caContract.fields['clock'] && caContract.fields['world_pulse'] && caContract.fields['next_turn_injection'], '契约解析提取到核心字段');
+  assert(caContract.fields['distantEvent'] && caContract.fields['nearEvent'] && caContract.fields['entities'], '契约解析提取到 horizon/entities 字段');
+  assert(Object.keys(caContract.fields).length >= 22, '契约声明字段数 >= 22: ' + Object.keys(caContract.fields).length);
+  assert(caContract.enums['factions'] && caContract.enums['factions'].includes('鼎盛'), '契约枚举聚合 factions 包含鼎盛');
+  assert(caContract.enums['economy'] && caContract.enums['economy'].includes('动荡'), '契约枚举聚合 economy 包含动荡');
+  assert(caContract.enums['currents'] && caContract.enums['currents'].includes('hidden') && caContract.enums['currents'].includes('private'), '契约枚举聚合 currents 含可见性与公开度两套');
+  // ── 消费实测：探针逐字段喂 applyResult ──
+  const caBase = JSON.parse(JSON.stringify(WA.store.get()));
+  const caConsumed = WA.contractAudit.consumedFields({ baseState: caBase });
+  const caConsumedList = Object.keys(caConsumed).filter(f => caConsumed[f].consumed);
+  assert(caConsumedList.length === 22, '22 个契约字段全部被消费端实测消费: ' + caConsumedList.length + ' -> ' + JSON.stringify(caConsumedList.filter(f => !caConsumed[f].consumed)));
+  // horizon 委托字段必须被正确识别为已消费（acceptResult 写 live store 而非 draft）
+  assert(caConsumed['distantEvent'].consumed === true && caConsumed['nearEvent'].consumed === true, 'distantEvent/nearEvent 经 horizon.acceptResult 消费');
+  // 探针不污染真实存档：消费实测后 live store 不含哨兵标记
+  assert(JSON.stringify(WA.store.get()).indexOf('__audit_') < 0, '探针哨兵不残留于真实存档');
+  // ── 全量对账 ──
+  // 用冻结的基线 + 显式 applyFn 闸门：避免 audit 内部再次触发 horizon 掷骰等随机副作用
+  const caReport = WA.contractAudit.audit({ baseState: caBase, applyFn: function (d, r, a) { WA.backstage.applyResult(d, r, a); } });
+  assert(caReport.declared.length >= 22 && caReport.consumed.length === 22, '对账报告 declared>=22 / consumed=22');
+  assert(caReport.drift.declaredNotConsumed.length === 0, '无「声明但未消费」漂移');
+  assert(caReport.drift.probeNotDeclared.length === 0, '无「消费但未声明」漂移');
+  caReport.enums.forEach(e => assert(e.status === 'aligned', '枚举对齐: ' + e.field + ' -> ' + e.status + ' extra=' + JSON.stringify(e.extra || [])));
+  // ── 漂移检出能力复核（用注入的伪漂移源验证扫描器灵敏度，不依赖真实缺陷）──
+  const keepEcon = WA.evolution.ECONOMY_CLIMATE;
+  WA.evolution.ECONOMY_CLIMATE = ['繁荣', '平稳', '萧条'];
+  const caDriftReport = WA.contractAudit.audit({ baseState: caBase, applyFn: function (d, r, a) { WA.backstage.applyResult(d, r, a); } });
+  const caDriftCross = caDriftReport.crossModule.filter(c => c.name === 'economy.climate')[0];
+  assert(caDriftCross && caDriftCross.diffs.evolution && caDriftCross.diffs.evolution.includes('萧条'), '注入伪漂移后扫描器仍能检出（灵敏度保持）');
+  const caDriftIssue = caDriftReport.issues.filter(i => i.code === 'cross_module_drift' && String(i.detail).includes('萧条'))[0];
+  assert(caDriftIssue, '伪漂移进入 issue 清单');
+  assert(caDriftReport.verdict.ok === false, '伪漂移使判语转为存在阻断项');
+  WA.evolution.ECONOMY_CLIMATE = keepEcon;
+  const caRestored = WA.contractAudit.audit({ baseState: caBase, applyFn: function (d, r, a) { WA.backstage.applyResult(d, r, a); } });
+  assert(caRestored.verdict.ok === true, '伪漂移清除后判语复原（扫描可逆）');
+  // 跨模块漂移：economy.climate 是已知真实漂移（analyzer 用萧条/危机），必须被检出
+  const caCrossEcon = caReport.crossModule.filter(c => c.name === 'economy.climate')[0];
+  assert(caCrossEcon && Object.keys(caCrossEcon.diffs).length === 0, '跨模块漂移扫描：economy.climate 各源已对齐');
+  const caEconIssue = caReport.issues.filter(i => i.code === 'cross_module_drift')[0];
+  assert(!caEconIssue, '修复后无跨模块漂移 issue');
+  assert(caReport.verdict.ok === true && caReport.verdict.errorCount === 0, '跨模块漂移已修复，判语转全绿');
+  assert(WA.toolAnalyzer.ECON_SCORE['衰退'] === -0.6 && WA.toolAnalyzer.ECON_SCORE['动荡'] === -1, 'ECON_SCORE 已对齐 evolution 枚举');
+  // ── 工具方法 ──
+  assert(typeof WA.contractAudit.summaryText(caReport) === 'string' && WA.contractAudit.summaryText(caReport).length > 0, 'summaryText 输出可读判语');
+  const caFlat = WA.contractAudit.flatten(caReport);
+  assert(Array.isArray(caFlat) && caFlat.some(i => i.key === 'coverage'), 'flatten 输出含覆盖率信息条');
+  // ── 无副作用复核：对账前后 store 一致性 ──
+  assert(JSON.stringify(WA.store.get()).indexOf('__audit_') < 0, '对账后 live store 无哨兵残留');
+  // horizon 泳道在对账期间可能因 buildPrompt 的 rollLane 自然推进，这是引擎正常行为而非探针污染
+  const caHorizonAfter = WA.store.get().evolution.horizon;
+  assert(caHorizonAfter.distant && caHorizonAfter.near && typeof caHorizonAfter.distant.ledger === 'number', '对账后 horizon 泳道结构完整');
+  // ── 降级路径 ──
+  const caBroken = WA.contractAudit.consumedFields({ applyFn: null });
+  assert(Object.keys(caBroken).length === 22 && caBroken['clock'].consumed === false, 'applyFn 不可用时全部降级为未消费');
+  const caNoBase = WA.contractAudit.consumedFields({ baseState: null, applyFn: function () {} });
+  assert(caNoBase['clock'].consumed === false && String(caNoBase['clock'].reason || '').indexOf('state') >= 0, '无基准 state 时降级提示');
+  // ── 诊断清单登记校验（v0.9.5 防漏机制延续）──
+  assert(WA.toolDiag.MODULE_EXPORTS['engines/contract-audit.js'] === 'contractAudit', '诊断清单已登记 contract-audit');
 
   // ── 汇总 ──
   console.log('\n══════════════════════');
