@@ -11,6 +11,10 @@
 只输出JSON：{"title":"...","opponent":"对手身份","box":"暗箱内情（完整真相，仅引擎可见）","notes":["第1轮小纸条","第2轮小纸条",...]}`;
 
   function getCtx() { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } }
+  // v0.1.13: 生成中 busy 锁（缝合 ggd 小剧场 _sgnAutoActionBusy）——
+  // after 链在 GENERATION_ENDED 回调里触发自动推进，若推进本身再触发生成，
+  // 回调会再次命中 ENDED 形成无限自激。一把布尔锁即可切断。
+  let _advanceBusy = false;
 
   WA.directEvent = {
     /** 生成一个突发事件（一轮API调用，产出全部小纸条） */
@@ -55,16 +59,20 @@
       return ev.notes[ev.currentTurn] || null;
     },
 
-    /** 推进一轮（after链） */
+    /** 推进一轮（after链）。v0.1.13: busy 锁防重入——同一轮 ENDED 只推进一次 */
     advance() {
+      if (_advanceBusy) return;
       const ev = this.active();
       if (!ev) return;
-      WA.store.transact(d => {
-        const e = (d.directEvents || []).find(x => x.id === ev.id);
-        if (!e) return;
-        e.currentTurn++;
-        if (e.currentTurn >= e.totalTurns) { e.status = 'done'; WA.emit('directEvent:ended'); }
-      });
+      _advanceBusy = true;
+      try {
+        WA.store.transact(d => {
+          const e = (d.directEvents || []).find(x => x.id === ev.id);
+          if (!e) return;
+          e.currentTurn++;
+          if (e.currentTurn >= e.totalTurns) { e.status = 'done'; WA.emit('directEvent:ended'); }
+        });
+      } finally { _advanceBusy = false; }
     }
   };
 

@@ -22,6 +22,10 @@
   const EV_CHAT = 'chat_completion_prompt_ready';
   const EV_TEXT = 'generate_after_combine_prompts';
   const MAX_EXCERPT = 400;
+  // v0.1.13: 事件订阅重试（缝合 ggd 小剧场 setupAutoActionHook：宿主启动时序竞态下 eventSource 可能尚未就绪）
+  const SUB_RETRY_MAX = 40;       // 最多重试 40 次
+  const SUB_RETRY_DELAY = 500;    // 每次 500ms
+  let _retryTimer = null;
   const STATUS_TEXT = {
     NOT_YET: '尚未生成，暂无注入记录',
     SKIPPED_DISABLED: '本轮未注入：注入正文已关闭（可见性全关）',
@@ -163,19 +167,38 @@
     });
   }
 
-  function init() {
+  // v0.1.13: 事件名兼容——宿主不同版本大小写/命名可能漂移，多别名并推
+  function pickEventName(et, names) {
+    for (let i = 0; i < names.length; i++) {
+      const v = et ? et[names[i]] : undefined;
+      if (typeof v === 'string' && v) return v;
+    }
+    return null;
+  }
+  function init(retry) {
     if (_subscribed) return false;
+    retry = retry || 0;
     const ctx = getCtx();
     if (!ctx || !ctx.eventSource || typeof ctx.eventSource.on !== 'function') {
-      if (WA.log) WA.log('warn', '注入自检：eventSource 不可用，跳过订阅');
+      // v0.1.13: 不再一次性放弃——扩展加载早于 eventSource 就绪时会静默丢失全部自检
+      if (retry < SUB_RETRY_MAX) {
+        if (_retryTimer) clearTimeout(_retryTimer);
+        _retryTimer = setTimeout(function () { init(retry + 1); }, SUB_RETRY_DELAY);
+        if (retry === 0 && WA.log) WA.log('info', '注入自检：eventSource 暂不可用，等待重试');
+      } else if (WA.log) {
+        WA.log('warn', '注入自检：eventSource 重试 ' + SUB_RETRY_MAX + ' 次后仍不可用，放弃订阅');
+      }
       return false;
     }
     try {
       const et = ctx.eventTypes || ctx.event_types || {};
-      ctx.eventSource.on(et.CHAT_COMPLETION_PROMPT_READY || EV_CHAT, onChatReady);
-      ctx.eventSource.on(et.GENERATE_AFTER_COMBINE_PROMPTS || EV_TEXT, onTextReady);
+      const evChat = pickEventName(et, ['CHAT_COMPLETION_PROMPT_READY', 'chat_completion_prompt_ready']) || EV_CHAT;
+      const evText = pickEventName(et, ['GENERATE_AFTER_COMBINE_PROMPTS', 'generate_after_combine_prompts']) || EV_TEXT;
+      ctx.eventSource.on(evChat, onChatReady);
+      ctx.eventSource.on(evText, onTextReady);
       _subscribed = true;
-      if (WA.log) WA.log('info', '注入自检就绪（只读订阅 prompt-ready）');
+      if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
+      if (WA.log) WA.log('info', '注入自检就绪（只读订阅 prompt-ready' + (retry ? '，重试 ' + retry + ' 次后成功' : '') + '）');
       return true;
     } catch (e) {
       if (WA.log) WA.log('warn', '注入自检订阅失败（非致命）', e);
@@ -213,7 +236,7 @@
     if (snap.status === 'SUCCESS_SLOTS_ONLY') out.push({ level: 'pass', key: 'slotsOnly', detail: '剧情约束已由独立槽位落地（' + (snap.env ? snap.env.slotCount : 0) + ' 路），主世界状态块为空属预期' });
     return out;
   }
-  function reset() { _last = null; _lastMemory = null; _registered = null; }
+  function reset() { _last = null; _lastMemory = null; _registered = null; if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; } }
 
   WA.injectInspector = {
     SENTINEL, STATUS_TEXT,

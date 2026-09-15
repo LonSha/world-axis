@@ -33,7 +33,9 @@
         const cs = s.currents.filter(c => c.visibility !== 'hidden').slice(0, 6);
         if (cs.length) parts.push('【可感知暗流】' + cs.map(c => c.visibility === 'trace' ? (c.public_trace || c.title + '（异常迹象）') : c.title).join('；'));
       }
-      return parts.length ? '<world_axis_state>\n' + parts.join('\n') + '\n</world_axis_state>' : '';
+      parts.push('〔呈现铁律〕以上状态只供你构建舞台。输出时必须全部经过 NPC 视角过滤：信息只可由 NPC 口述/信件/公告/路人议论呈现，绝不使用系统旁白；禁止输出属性面板、好感度数值、经济指标或声望分数。')
+      return parts.length
+      ? '<world_axis_state>\n' + parts.join('\n') + '\n</world_axis_state>' : '';
     },
 
     applyInjections(ctx) {

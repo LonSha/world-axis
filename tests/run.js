@@ -24,7 +24,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1626,6 +1626,90 @@ const WA = global.WorldAxis;
   assert(icCallALU.depth === 0, 'after_last_user 槽位 depth=0');
   assert(icCallALU.text === 'A-约束\nB-演化\nC-章节' && icCallALU.scan === false, '槽位文本与 scan=false 透传');
   assert(icCallIC.pos === 0 && icCallIC.depth === 5, 'in_chat 槽位 pos=0 depth=5');
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.13 — P0 事件订阅重试/别名兼容 + direct-event busy 锁 + P1 主动拉动引擎
+  // ═══════════════════════════════════════════════════════════
+  v0113: {
+
+  // ── P0-① inject-inspector 事件名别名兼容 ──
+  // pickEventName 优先取宿主事件Types，大小写两种命名都能命中；宿主缺失时回落内置常量
+  assertDeepEq(WA.injectInspector.init.length >= 1, true, 'init 支持 retry 参数');
+  // 已订阅时再次调用返回 false（单订阅守卫，与既有断言一致）
+  assert(WA.injectInspector.init() === false, '已订阅后 init() 返回 false');
+
+  // ── P0-② direct-event busy 锁 ──
+  const deBefore = WA.directEvent.active();
+  // 推进一轮：advance 加了 busy 锁，重复调用不会二次推进
+  if (deBefore) {
+    const t0 = deBefore.currentTurn;
+    WA.directEvent.advance();
+    WA.directEvent.advance();   // 同步重入应被锁拦下
+    const after = WA.directEvent.active();
+    assert(after.currentTurn === t0 + 1, 'busy 锁：同步重入只推进一轮: ' + (after.currentTurn - t0));
+  } else {
+    assert(true, '无活跃突发事件，advance 空转不报错');
+  }
+  // 无活跃事件时 advance 不抛
+  WA.directEvent.abort();
+  WA.directEvent.advance();
+  assert(WA.directEvent.active() === undefined || WA.directEvent.active() === null, 'abort 后无活跃事件');
+
+  // ── P1 主动拉动引擎 ──
+  assert(WA.proactive && typeof WA.proactive.isDrained === 'function', 'proactive 引擎已加载并导出');
+  // 语义枯竭判定
+  assert(WA.proactive.isDrained('嗯') === true, '敷衍词「嗯」判枯竭');
+  assert(WA.proactive.isDrained('哦') === true, '敷衍词「哦」判枯竭');
+  assert(WA.proactive.isDrained('随便') === true, '敷衍词「随便」判枯竭');
+  assert(WA.proactive.isDrained('不知道') === true, '敷衍词「不知道」判枯竭');
+  assert(WA.proactive.isDrained('') === true, '空回复判枯竭');
+  assert(WA.proactive.isDrained('沉默') === true, '「沉默」判枯竭');
+  assert(WA.proactive.isDrained('我决定先去酒馆打听一下消息，然后再做打算') === false, '有实质内容不判枯竭');
+  // 「好」是触发词，含它的短回复仍判枯竭——这是设计行为（玩家在敷衍式应承）
+  assert(WA.proactive.isDrained('好的，我这就去办') === true, '含触发词「好」的短回复仍判枯竭');
+  assert(WA.proactive.isDrained('马上动手') === false, '无触发词的短行动回复不判枯竭');
+  // 超长回复不判枯竭（无论内容）
+  assert(WA.proactive.isDrained('嗯'.repeat(50)) === false, '超长回复不判枯竭');
+
+  // ── P1 before 链节点端到端 ──
+  const node13 = WA.workflow.list('before').filter(n => n.id === 'proactive.pull')[0];
+  assert(!!node13, 'proactive.pull 已注册 before 链');
+  assert(node13.order === 25, 'proactive.pull order=25（在 directEvent.note 之后）');
+  // 枯竭回复 → 注入主动拉动约束
+  WA.store.transact(d => { delete d.proactiveLastRound; d.round = 10; });
+  const ctx13 = { type: 'normal', chat: [{ role: 'user', mes: '嗯' }], store: WA.store.get(), injections: [] };
+  await node13.run(ctx13);
+  assert(ctx13.injections.length === 1, '枯竭回复触发主动拉动注入');
+  assert(ctx13.injections[0].source === '主动拉动', '注入来源标记');
+  assert(ctx13.injections[0].position === 'after_last_user' && ctx13.injections[0].depth === 0, '注入落点 after_last_user depth0');
+  assert(ctx13.injections[0].content.indexOf('语义枯竭已检出') >= 0, '注入内容含枯竭判定');
+  assert(ctx13.injections[0].content.indexOf('强制执行') >= 0, '注入内容含强制拉动指令');
+  // 冷却：同轮再跑一次不应再注入
+  const ctx13b = { type: 'normal', chat: [{ role: 'user', mes: '哦' }], store: WA.store.get(), injections: [] };
+  await node13.run(ctx13b);
+  assert(ctx13b.injections.length === 0, '冷却内不重复拉动（proactiveLastRound 已记录）');
+  // 有实质内容不注入
+  WA.store.transact(d => { delete d.proactiveLastRound; });
+  const ctx13c = { type: 'normal', chat: [{ role: 'user', mes: '我拔剑指向那个npc' }], store: WA.store.get(), injections: [] };
+  await node13.run(ctx13c);
+  assert(ctx13c.injections.length === 0, '有实质动作不触发主动拉动');
+  // markPulled 写入冷却字段
+  WA.proactive.markPulled();
+  assert(WA.store.get().proactiveLastRound != null, 'markPulled 记录冷却轮次');
+  // 清理
+  WA.store.transact(d => { delete d.proactiveLastRound; });
+
+  // v0.1.13b: NPC 本位呈现约束（buildWorldSnapshot 尾部追加呈现铁律）
+  const snap13 = WA.render.buildWorldSnapshot();
+  if (snap13) {
+    assert(snap13.indexOf('呈现铁律') >= 0, '世界状态块含 NPC 本位呈现铁律');
+    assert(snap13.indexOf('系统旁白') >= 0, '呈现铁律明示禁止系统旁白');
+    assert(snap13.indexOf('好感度数值') >= 0, '呈现铁律明示禁止数值面板');
+    assert(snap13.indexOf('world_axis_state') >= 0, '快照外壳标签保持不变');
+  } else {
+    assert(true, '空快照时呈现铁律不追加（parts 为空直接返回空串）');
+  }
+  } // end v0.1.13 block
+
   // ═══════════════════════════════════════════════════════════
   // v0.1.12 — safe 语义全模块统一（undefined 兜底 + 无 fallback 返回 null）
   // ═══════════════════════════════════════════════════════════

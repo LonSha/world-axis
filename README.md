@@ -67,6 +67,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 
 ## 版本历史
+- **v0.1.13** — 外部素材缝合批次（P0+P1）：P0-① inject-inspector 事件订阅改重试等待（宿主启动时序竞态下 eventSource 未就绪时不再一次性放弃，40 次 500ms 重试）+ 事件名大小写多别名兼容；P0-② direct-event.advance 加 busy 锁（GENERATION_ENDED 回调里再触发生成会无限自激）；P1-① 新增 engines/proactive.js（缝合 NPC.json 引擎_主动拉动机制：语义枯竭检测+主动拉动注入+冷却轮数防每轮都拽）；P1-② buildWorldSnapshot 尾部追加呈现铁律（缝合 NPC.json 引擎_活体世界核心法则：状态变化必须经 NPC 视角过滤、禁系统旁白与数值面板）；691 断言全过
+
 - **v0.1.12** — safe 语义全模块统一：contract-audit/memory-sampler/sampler-check 的 safe 原本在 fn 返回 undefined 时直接返回 undefined（与 inspector-state/inject-inspector 不一致）；统一为「undefined 兜底 + 异常兜底 + 无 fallback 时返回 null」，并为 contract-audit/memory-sampler/sampler-check/tool-diag 补导出 safe 供单测；tool-diag 保留异常时返回 {error} 的诊断特例；663 断言全过
 - **v0.1.11** — 跨设备同步去脏：chatcache.stripHeavy 原本只剥离 lastInjection，未剥离 v0.1.9 新增的 slotErrors 与 backstage 的 nextTurnInjection——这些注入诊断快照只服务于当前轮排障，跨设备同步既浪费带宽又会在对端复活成脏数据；改为 HEAVY_KEYS 列表统一剥离并导出 stripHeavy 供单测；656 断言全过
 - **v0.1.10** — 快照副本隔离：inject-inspector.getLastSnapshot 原本直接返回内部 _last/_lastMemory 引用，调用方（tool-diag）读取后追加字段会污染内部状态；改为返回浅拷贝副本，memory 与 world 两份快照内容一致但引用独立；648 断言全过
