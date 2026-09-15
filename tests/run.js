@@ -28,7 +28,7 @@ const LOAD = [
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
-  'compat/mvu.js', 'compat/th-helper.js'
+  'compat/host.js', 'compat/mvu.js', 'compat/th-helper.js'
 ];
 for (const rel of LOAD) {
   const code = fs.readFileSync(path.join(BASE, rel), 'utf8');
@@ -43,7 +43,7 @@ const _i2 = _idxSrc.indexOf('function loadScript(', _i1);
 const _fnStart = _i1;
 const _fnEnd = _idxSrc.indexOf('  async function init()', _i2);
 assert(_fnStart > 0 && _fnEnd > _fnStart, 'index.js has loadScript impl');
-const _frag = _idxSrc.slice(_fnStart, _fnEnd).replace(/WA\./g, 'window.WorldAxis.');const _code =  '(function(){' + ' const mainDoc = window.WorldAxis.mainDoc;' + ' const VERSION = window.WorldAxis.version;' + ' const CDN_BASES = ["https://cdn.jsdelivr.net/gh/LonSha/world-axis@main","https://fastly.jsdelivr.net/gh/LonSha/world-axis@main","https://testingcf.jsdelivr.net/gh/LonSha/world-axis@main"];' + ' const SCRIPT_TIMEOUT_MS = 12000;' + _frag + ' return { loadScript: loadScript }; })();';
+const _frag = _idxSrc.slice(_fnStart, _fnEnd).replace(/WA\.(?!\{)/g, 'window.WorldAxis.');const _code =  '(function(){' + ' const mainDoc = window.WorldAxis.mainDoc;' + ' const VERSION = window.WorldAxis.version;' + ' const CDN_BASES = ["https://cdn.jsdelivr.net/gh/LonSha/world-axis@main","https://fastly.jsdelivr.net/gh/LonSha/world-axis@main","https://testingcf.jsdelivr.net/gh/LonSha/world-axis@main"];' + ' const SCRIPT_TIMEOUT_MS = 12000;' + _frag + ' return { loadScript: loadScript }; })();';
 const _ls = vm.runInContext(_code, ctx, { filename: 'index.js#loadScript' });
 WA.loadScript = _ls.loadScript;
 (async () => {
@@ -1879,6 +1879,12 @@ WA.loadScript = _ls.loadScript;
   assert(r2.fallback !== undefined, '成功时记录 fallback 源');
   assert(typeof r2.fallback === 'string' && r2.fallback.indexOf('jsdelivr') >= 0, 'fallback 是 jsDelivr 域');
   assert(global.__headScripts.length === 4, '主源 + 3 个 CDN 源共 4 次 appendChild');
+  // 缓存写入幂等：同源成功只写一次，不挤占其他模块的缓存条目
+  const beforeEntries = WA.loaderStatus().loaded.length;
+  await WA.loadScript('engines/wb-inject.js');
+  await WA.loadScript('engines/wb-inject.js');
+  const afterEntries = WA.loaderStatus().loaded.length;
+  assert(afterEntries === beforeEntries, '重复加载不新增缓存条目（幂等）');
   // 场景3：全部源失败
   global.__scriptEls = []; global.__headScripts = [];
   const p3 = WA.loadScript('core/missing.js');
@@ -2345,6 +2351,118 @@ WA.loadScript = _ls.loadScript;
   const ii1 = WA.injectInspector.safe ? WA.injectInspector.safe(function () { return undefined; }, 'FB') : 'NO_EXPORT';
   assert(ii1 === 'FB' || ii1 === 'NO_EXPORT', 'inject-inspector.safe(undefined,FB) 用 fallback: ' + JSON.stringify(ii1));
   } // end v0.1.8 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.18 — P4 宿主兼容探测 / P5 wb 配置化 / P6 加载去重+冷却
+  // ═══════════════════════════════════════════════════════════
+  v0118: {
+  // ── P4：宿主能力探测与降级诊断 ──
+  assert(WA.compat && typeof WA.compat.detect === 'function', 'compat/host 导出 detect');
+  const cap = WA.compat.detect();
+  assert(cap && typeof cap === 'object', '探测返回能力对象');
+  assert(cap.sillyTavern === true, 'mock 环境下识别 SillyTavern context');
+  assert(cap.eventSource === true, '识别 eventSource');
+  assert(cap.extensionPrompt === true, '识别 setExtensionPrompt');
+  assert(cap.tavernHelper === true, '识别 TavernHelper');
+  assert(cap.variables === true, '识别变量读写能力');
+  assert(cap.worldbook === true, '识别世界书 API');
+  const ev = WA.compat.events();
+  assert(!!ev.ready && !!ev.generation && !!ev.chatChanged, '事件名别名表完整');
+  const snap = WA.compat.snapshot();
+  assert(snap.at && snap.at <= Date.now(), '快照带时间戳');
+  // 无宿主时安全降级（不抛异常）
+  const savedGetContext = global.SillyTavern.getContext;
+  global.SillyTavern.getContext = () => { throw new Error('no host'); };
+  let capDown = null;
+  try { capDown = WA.compat.detect(); } catch (e) { capDown = { threw: true }; }
+  assert(!capDown.threw && capDown.sillyTavern === false, '宿主异常时安全降级');
+  global.SillyTavern.getContext = savedGetContext;
+  // ── P5：wb 通道配置化 ──
+  assert(typeof WA.wbInject.getConfig === 'function' && typeof WA.wbInject.setConfig === 'function', 'wb 配置读写 API 已导出');
+  WA.backstage.setSettings({ wbInject: true, wbWorldbookName: '', wbAutoEnsure: false });
+  const cfg0 = WA.wbInject.getConfig();
+  assert(cfg0.enabled === true, '默认启用 wb 通道');
+  assert(cfg0.worldbookName === '' && cfg0.autoEnsure === false, '默认配置项初值');
+  // 配置世界书名优先于自动探测
+  const cfg1 = WA.wbInject.setConfig({ worldbookName: '我的世界轴' });
+  assert(cfg1.worldbookName === '我的世界轴', '配置世界书名可读回');
+  assert(WA.wbInject.findCompanionName() === '我的世界轴', 'findCompanionName 优先读配置');
+  // 只传 enabled 不污染其他字段
+  const cfg2 = WA.wbInject.setConfig({ enabled: false });
+  assert(cfg2.enabled === false, 'setConfig 关闭通道');
+  assert(cfg2.worldbookName === '我的世界轴', '部分更新不清空已配置世界书名');
+  assert(WA.wbInject.syncOrder(700, [{ content: 'X' }]).reason === 'disabled', '关闭后 syncOrder 被拒');
+  WA.wbInject.setConfig({ enabled: true });
+  // autoEnsure 开启时工作流节点自动建条目（mock 世界书可创建）
+  WA.wbInject.setConfig({ autoEnsure: true, worldbookName: '' });
+  global.__wbEntries['WorldAxis'] = [];
+  const aeCtx = { injections: [{ source: '持久约束', content: '自动建条目', delivery: 'wb', order: 800 }] };
+  const wbNode18 = WA.workflow.list('before').find(n => n.id === 'wbInject.mirror');
+  await wbNode18.run(aeCtx);
+  assert(aeCtx.injections.length === 0, 'autoEnsure 模式下 wb 项仍被镜像移除');
+  assert(global.__vars['waslot_0800'] === '自动建条目', '变量写入 waslot_0800');
+  const wbList = await global.TavernHelper.getWorldbook('WorldAxis');
+  const has800 = (wbList || []).some(e => e && e.position && Number(e.position.order) === 800);
+  assert(has800 === true, 'autoEnsure 自动创建 order=800 条目');
+  WA.wbInject.setConfig({ autoEnsure: false });
+  // ── P6：加载去重与失败源冷却 ──
+  // 设计要点：把「成功路径的幂等/去重」与「失败路径的冷却」拆成两个互不污染的子场景。
+  // 冷却记录是全局状态（60s 窗口），失败子场景必须先于成功子场景执行，
+  // 否则遗留的冷却记录会让成功子场景的主源也被跳过。
+  const savedBaseUrl18 = WA.baseUrl;
+  WA.baseUrl = '/scripts/extensions/third-party/WorldAxis';
+  // ── P6-a 失败源冷却（先跑，冷却记录写入全局状态）──
+  WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map() };
+  for (let _q = 0; _q < 8; _q++) await new Promise(r => setTimeout(r, 5));
+  global.__scriptEls = []; global.__headScripts = [];
+  const pFail = WA.loadScript('engines/calendar.js');
+  const elsA = global.__scriptEls.slice();
+  elsA[0].onerror(); // 主源失败
+  await new Promise(r => setTimeout(r, 5));
+  const cdnEl = global.__scriptEls[global.__scriptEls.length - 1];
+  cdnEl.onerror(); // 第一个 CDN 也失败 → 进入冷却
+  await new Promise(r => setTimeout(r, 5));
+  const afterFail = WA.loaderStatus().cdnFailures;
+  assert(afterFail.length >= 1 && afterFail[0][0].indexOf('jsdelivr') >= 0, '失败源被记录');
+  // 冷却中的 CDN 源本轮不再被创建元素
+  const srcsA = global.__scriptEls.map(e => e.src || '');
+  const dupCd = srcsA.filter(s => s.indexOf(afterFail[0][0]) >= 0);
+  assert(dupCd.length === 1, '冷却中的失败源本轮只出现 1 次（失败那次本身）');
+  // 让当前最后一个源成功收尾
+  const lastEl = global.__scriptEls[global.__scriptEls.length - 1];
+  lastEl.onload();
+  const rFail = await pFail;
+  assert(rFail.ok === true, '冷却跳过失败源后由其他源成功');
+  // 冷却期内失败源不再被尝试：新模块主源失败时，冷却中的 CDN 不应出现
+  global.__scriptEls = []; global.__headScripts = [];
+  const pCool = WA.loadScript('engines/memory.js');
+  const elsB = global.__scriptEls.slice();
+  elsB[0].onerror();
+  await new Promise(r => setTimeout(r, 5));
+  const srcsB = global.__scriptEls.map(e => e.src || '');
+  const cooldownSrc = srcsB.filter(s => s.indexOf(afterFail[0][0]) >= 0);
+  assert(cooldownSrc.length === 0, '冷却期内失败源不再被尝试');
+  const tail = global.__scriptEls[global.__scriptEls.length - 1];
+  tail.onload();
+  await pCool;
+  // ── P6-b 去重与幂等（冷却记录已被前序场景清出本块作用域）──
+  // 用独立模块名避开 v0.1.16 场景的缓存与本块 a 段的冷却记录
+  WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map() };
+  for (let _q = 0; _q < 8; _q++) await new Promise(r => setTimeout(r, 5));
+  global.__scriptEls = []; global.__headScripts = [];
+  // 主源元素在 loadScript 调用后同步创建；不 fire onload 会让每个源空等 12s 超时
+  const pDup = WA.loadScript('engines/limits.js');
+  const elMain = global.__scriptEls[global.__scriptEls.length - 1];
+  elMain.onload(); // 主源成功
+  const dupA = await pDup;
+  const elsAfterFirst = global.__scriptEls.length;
+  const dupB = await WA.loadScript('engines/limits.js');
+  assert(dupA.ok === true && dupB.ok === true, '重复加载两次均成功');
+  assert(elsAfterFirst === 1, '首次加载创建 1 个 script 元素');
+  assert(global.__scriptEls.length === elsAfterFirst, '缓存命中：第二次不再新增 script 元素');
+  assert(WA.loaderStatus && Array.isArray(WA.loaderStatus().loaded), 'loaderStatus 可观测');
+  assert(WA.loaderStatus().loaded.some(e => e.rel === 'engines/limits.js'), 'loaderStatus 记录已加载模块');
+  WA.baseUrl = savedBaseUrl18;
+  } // end v0.1.18 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

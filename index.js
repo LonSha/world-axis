@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.1.17';
+  const VERSION = '0.1.18';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -98,6 +98,7 @@
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',
+    'compat/host.js',
     'compat/mvu.js',
     'compat/th-helper.js',
     'ui/panel.js',
@@ -112,6 +113,9 @@
     'https://testingcf.jsdelivr.net/gh/LonSha/world-axis@main',
   ];
   const SCRIPT_TIMEOUT_MS = 12000;
+  const CDN_COOLDOWN_MS = 60000;
+  const loadedScripts = new Map();
+  const failedCdnAt = new Map();
   function loadScriptOnce(src, timeoutMs) {
     return new Promise((resolve) => {
       let settled = false;
@@ -132,22 +136,40 @@
   }
   function loadScript(rel) {
     return (async () => {
+      if (!WA.__loaderState) WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map() };
+      const loaded = WA.__loaderState.loaded;
+      const failed = WA.__loaderState.failedCdnAt;
+      const cooldownMs = 60000;
       const tag = '?v=' + VERSION;
       const localSrc = WA.baseUrl + '/' + rel + tag;
+      const cacheKey = rel + '@' + VERSION;
+      const state = WA.__loaderState;
+      if (state.loaded.has(cacheKey)) return state.loaded.get(cacheKey);
       const r0 = await loadScriptOnce(localSrc);
-      if (r0.ok) return { rel: rel, ok: true, src: r0.src };
+      if (r0.ok) {
+        const result = { rel: rel, ok: true, src: r0.src };
+        state.loaded.set(cacheKey, result);
+        return result;
+      }
       for (let i = 0; i < CDN_BASES.length; i++) {
-        const cdnSrc = CDN_BASES[i] + '/' + rel + tag;
+        const base = CDN_BASES[i];
+        const lastFail = state.failedCdnAt.get(base) || 0;
+        if (Date.now() - lastFail < cooldownMs) continue;
+        const cdnSrc = base + '/' + rel + tag;
         const r = await loadScriptOnce(cdnSrc);
         if (r.ok) {
-          WA.log('warn', '模块走 CDN 容灾加载成功: ' + rel + ' <- ' + CDN_BASES[i]);
-          return { rel: rel, ok: true, src: r.src, fallback: CDN_BASES[i] };
+          const result = { rel: rel, ok: true, src: r.src, fallback: base };
+          state.loaded.set(cacheKey, result);
+          WA.log('warn', '模块走 CDN 容灾加载成功: ' + rel + ' <- ' + base);
+          return result;
         }
+        state.failedCdnAt.set(base, Date.now());
       }
       WA.log('error', '模块全部源加载失败: ' + rel);
       return { rel: rel, ok: false };
     })();
   }
+  WA.loaderStatus = function () { return { loaded: Array.from((WA.__loaderState&&WA.__loaderState.loaded||new Map()).values()), cdnFailures: Array.from((WA.__loaderState&&WA.__loaderState.failedCdnAt||new Map()).entries()) }; };
 
   // ── 主初始化 ────────────────────────────────────────────
   async function init() {

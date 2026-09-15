@@ -27,9 +27,24 @@
     try { return mainWin.SillyTavern && mainWin.SillyTavern.getContext ? mainWin.SillyTavern.getContext() : null; }
     catch (e) { return null; }
   }
+  function wbSettings() {
+    try {
+      const s = WA.backstage && WA.backstage.getSettings ? WA.backstage.getSettings() : {};
+      return { enabled: s.wbInject !== false, worldbookName: s.wbWorldbookName || '', autoEnsure: s.wbAutoEnsure === true };
+    } catch (e) { return { enabled: true, worldbookName: '', autoEnsure: false }; }
+  }
+  function setConfig(patch) {
+    patch = patch || {};
+    const out = {};
+    if (patch.enabled !== undefined) out.wbInject = !!patch.enabled;
+    if (patch.worldbookName !== undefined) out.wbWorldbookName = String(patch.worldbookName || '');
+    if (patch.autoEnsure !== undefined) out.wbAutoEnsure = !!patch.autoEnsure;
+    if (WA.backstage && WA.backstage.setSettings) WA.backstage.setSettings(out);
+    return wbSettings();
+  }
   function enabled() {
-    try { return WA.backstage && WA.backstage.getSettings ? WA.backstage.getSettings().wbInject !== false : true; }
-    catch (e) { return true; }   // 默认开
+    try { return wbSettings().enabled; }
+    catch (e) { return true; }
   }
 
   /** order → 补零到 4 位的变量名 */
@@ -141,6 +156,8 @@
 
   /** 找配套世界书名（容忍改名，含关键词即视为配套） */
   function findCompanionName() {
+    const configured = wbSettings().worldbookName;
+    if (configured) return configured;
     const ctx = getCtx();
     const names = (ctx && ctx.worldInfoSettings && Array.isArray(ctx.worldInfoSettings.world_names)) ? ctx.worldInfoSettings.world_names : [];
     if (names.indexOf(WB_NAME_MATCH) >= 0) return WB_NAME_MATCH;
@@ -155,6 +172,12 @@
       if (!enabled() || !ctx || !Array.isArray(ctx.injections)) return;
       const marked = ctx.injections.filter(function (i) { return i && i.delivery === 'wb' && validOrder(i.order); });
       if (!marked.length) return;
+      if (wbSettings().autoEnsure) {
+        for (const item of marked) {
+          const ensured = await ensureEntry(item.order);
+          if (!ensured.ok && ensured.reason !== 'no-th') WA.log('warn', '世界书条目自动创建失败，继续变量镜像', ensured);
+        }
+      }
       const result = syncAll(marked);
       if (!result.ok) { WA.log('warn', '世界书变量镜像失败，保留原注入项回退', result); return; }
       marked.forEach(function (item) { const at = ctx.injections.indexOf(item); if (at >= 0) ctx.injections.splice(at, 1); });
@@ -166,6 +189,7 @@
     orderKey: orderKey, validOrder: validOrder, wbEntryContent: wbEntryContent,
     syncOrder: syncOrder, syncAll: syncAll, clearOrder: clearOrder,
     ensureEntry: ensureEntry, findCompanionName: findCompanionName,
+    getConfig: wbSettings, setConfig: setConfig,
     isEnabled: enabled
   };
 

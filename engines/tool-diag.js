@@ -91,11 +91,11 @@
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
     'direction/oracle.js': 'oracle', 'direction/tags.js': 'tags', 'direction/choices.js': 'choices',
-    'compat/mvu.js': 'compatMvu', 'compat/th-helper.js': 'compatTH',
+    'compat/host.js': 'compat', 'compat/mvu.js': 'compatMvu', 'compat/th-helper.js': 'compatTH',
     'ui/panel.js': 'ui', 'ui/settings.js': 'uiSettings', 'ui/assistant.js': 'assistant'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
-  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant'];
+  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat'];
   function secModules() {
     const missing = [], loaded = [], optionalMissing = [];
     Object.keys(MODULE_EXPORTS).forEach(function (file) {

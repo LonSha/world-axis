@@ -65,8 +65,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
-
 ## 版本历史
+- **v0.1.18** — P4-P6 一体化迭代：新增宿主能力探测与降级诊断（compat/host），wb 通道支持配置化世界书名、自动 ensureEntry 与运行时配置读写；加载器增加模块去重、CDN 失败源冷却与加载状态诊断。
 - **v0.1.17** — 生命周期闭环：拦截器在每轮新生成前自动调用 render.uninject()，清除上一轮主槽位与独立槽位残留；CHAT_CHANGED 前同样撤销，避免切聊天污染；engines/wb-inject.js 注册 wbInject.mirror before 节点，但仅消费显式 delivery='wb' 的持久约束，写入 waslot_NNNN 后从即时注入数组移除，普通注入保持原槽位路由；754 断言全过
 - **v0.1.16** — CDN 多源容灾加载桩（缝合小狸 Live 加载器）：index.js 的 loadScript 原本只有一个本地源，加载失败就静默丢失模块；现在主源（本地扩展目录）失败时依次回退 jsDelivr 三域（cdn/fastly/testingcf），每源 12s 超时闸刀（AbortController 式保护，卡住的脚本会被移除并判失败），全源失败才记 error；成功走 CDN 时记 warn 便于排障；746 断言全过
 - **v0.1.15** — uninject 真撤销 + store 深合并审计：P3-① render/inject.js 新增 uninject()——旧的「写空串覆盖」只清主槽位，独立槽位路由落地的那部分会残留到下一轮；现在从 store.lastInjection 快照取实际用过的全部 slot key 逐一清空，幂等无副作用；P2-② 审计结论：store.transact 深拷贝 draft + save 整体替换、chatcache.stripHeavy 显式 delete，两侧均无深合并复活风险（附回归断言锁定）；731 断言全过

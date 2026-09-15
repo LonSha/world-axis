@@ -22,6 +22,7 @@ global.document = {
       const el = { tagName: 'SCRIPT', src: null, onload: null, onerror: null, parentNode: null,
         style: {}, classList: { add(){},remove(){},toggle(){} }, addEventListener(){}, setAttribute(){},
         appendChild(){}, querySelector: () => null, querySelectorAll: () => [] };
+      Object.defineProperty(el, '__fired', { value: false, writable: true, enumerable: false });
       global.__scriptEls.push(el);
       return el;
     }
