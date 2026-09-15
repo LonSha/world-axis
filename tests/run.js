@@ -2411,7 +2411,7 @@ WA.loadScript = _ls.loadScript;
   const savedBaseUrl18 = WA.baseUrl;
   WA.baseUrl = '/scripts/extensions/third-party/WorldAxis';
   // ── P6-a 失败源冷却（先跑，冷却记录写入全局状态）──
-  WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map() };
+  WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map(), failed: new Map() };
   for (let _q = 0; _q < 8; _q++) await new Promise(r => setTimeout(r, 5));
   global.__scriptEls = []; global.__headScripts = [];
   const pFail = WA.loadScript('engines/calendar.js');
@@ -2446,7 +2446,7 @@ WA.loadScript = _ls.loadScript;
   await pCool;
   // ── P6-b 去重与幂等（冷却记录已被前序场景清出本块作用域）──
   // 用独立模块名避开 v0.1.16 场景的缓存与本块 a 段的冷却记录
-  WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map() };
+  WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map(), failed: new Map() };
   for (let _q = 0; _q < 8; _q++) await new Promise(r => setTimeout(r, 5));
   global.__scriptEls = []; global.__headScripts = [];
   // 主源元素在 loadScript 调用后同步创建；不 fire onload 会让每个源空等 12s 超时
@@ -2686,6 +2686,79 @@ WA.loadScript = _ls.loadScript;
   const dg24c = WA.toolDiag.collect();
   assert((dg24c.verdict.issues || []).filter(i => i.key === 'budget').length === 0, '无账单时 budget 静默');
   } // end v0.1.24 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.25 — 启动完整性审计（加载失败点名，不再静默丢失）
+  // ═══════════════════════════════════════════════════════════
+  v0125: {
+  // 重置加载器状态（含新的 failed 表）
+  WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map(), failed: new Map() };
+  const savedBase25 = WA.baseUrl;
+  WA.baseUrl = '/scripts/extensions/third-party/WorldAxis';
+  // 全源失败：4 个源（本地 + 3 CDN）依次 onerror
+  global.__scriptEls = []; global.__headScripts = [];
+  const pLost = WA.loadScript('engines/ghost-engine.js');
+  for (let k = 0; k < 4; k++) {
+    await new Promise(r => setTimeout(r, 5));
+    const el = global.__scriptEls[global.__scriptEls.length - 1];
+    if (el && !el.__fired) { el.__fired = true; el.onerror(); }
+  }
+  const rLost = await pLost;
+  assert(rLost.ok === false && rLost.failed === true, '全源失败返回 failed 标记');
+  const fm25 = WA.loaderStatus().failedModules;
+  assert(Array.isArray(fm25) && fm25.length === 1, 'failedModules 记录失败模块');
+  assert(fm25[0].rel === 'engines/ghost-engine.js', '失败模块点名 rel');
+  assert(fm25[0].sourcesTried === 4 && fm25[0].at > 0, '记录尝试源数与时间戳');
+  // 诊断点名：该模块未在导出清单缺位（未加载过），按 warn 提示
+  const dg25 = WA.toolDiag.collect();
+  const ldr25 = (dg25.runtime || {}).loader || {};
+  assert(ldr25.failedCount === 1 && ldr25.failedModules[0].rel === 'engines/ghost-engine.js', '诊断 loader 输出失败模块');
+  const ldIssues25 = (dg25.verdict.issues || []).filter(i => i.key === 'loader' && i.detail.indexOf('ghost-engine') >= 0);
+  assert(ldIssues25.length === 1 && ldIssues25[0].level === 'warn', '加载失败模块进 verdict（导出未缺 → warn）');
+  // 后续重试成功：failed 记录清除（模块级容灾恢复）
+  const pRetry = WA.loadScript('engines/ghost-engine.js');
+  await new Promise(r => setTimeout(r, 5));
+  const retryEls = global.__scriptEls.filter(e => !e.__fired);
+  retryEls[0].onload();
+  const rRetry = await pRetry;
+  assert(rRetry.ok === true, '重试加载成功');
+  assert(WA.loaderStatus().failedModules.length === 0, '成功后清除失败记录');
+  const dg25b = WA.toolDiag.collect();
+  assert(((dg25b.runtime || {}).loader || {}).failedCount === 0, '诊断失败计数归零');
+  // 未触发错误路径时 state.failed 不影响旧断言语义
+  WA.baseUrl = savedBase25;
+  WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map(), failed: new Map() };
+  } // end v0.1.25 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.26 — before 链取消语义（ctx.canceled 短路注入）
+  // ═══════════════════════════════════════════════════════════
+  v0126: {
+  // 注册一个取消节点（order 999，链尾）
+  WA.workflow.register({ id: 'ctest.barrier', chain: 'before', order: 999, label: '测试屏障', critical: false,
+    run(ctx) { ctx.canceled = true; ctx.cancelReason = '测试一致性屏障'; } });
+  let applyCalled = 0;
+  const oldApply = WA.render.applyInjections;
+  WA.render.applyInjections = function () { applyCalled++; };
+  const ledBefore26 = WA.render.injectionLedger().count;
+  global.__mockChat.push({ is_user: true, mes: 'v126 取消语义测试', swipe_id: 127 });
+  await global.worldAxisGenerateInterceptor(global.__mockChat, 4096, null, 'normal');
+  assert(applyCalled === 0, 'canceled 轮不落地注入');
+  const logs26 = WA.eventLog.filter(l => l.msg.indexOf('取消本轮注入') >= 0);
+  assert(logs26.length === 1 && logs26[0].msg.indexOf('测试一致性屏障') >= 0, '取消日志带原因');
+  assert(logs26[0].msg.indexOf('丢弃 0 项') >= 0 || logs26[0].msg.indexOf('丢弃') >= 0, '取消日志带丢弃数');
+  assert(WA.render.injectionLedger().count >= ledBefore26, '撤销链仍先于取消执行（pre-uninject 保留）');
+  WA.render.applyInjections = oldApply;
+  // 取消节点关闭后恢复正常落地
+  WA.workflow.setEnabled('ctest.barrier', false);
+  let applyCalled2 = 0;
+  WA.render.applyInjections = function () { applyCalled2++; };
+  global.__mockChat.push({ is_user: true, mes: 'v126 恢复测试', swipe_id: 128 });
+  await global.worldAxisGenerateInterceptor(global.__mockChat, 4096, null, 'normal');
+  assert(applyCalled2 === 1, '屏障关闭后注入恢复正常落地');
+  WA.render.applyInjections = oldApply;
+  WA.workflow.unregister('ctest.barrier');
+  WA.workflow.setEnabled('ctest.barrier', true); // 清开关持久化残留
+  try { JSON.parse(global.localStorage.getItem('worldaxis_workflow_v1') || '{}'); } catch (e) {}
+  } // end v0.1.26 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

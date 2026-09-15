@@ -66,6 +66,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.26** — 取消语义闭环：before 链节点可置 ctx.canceled + ctx.cancelReason 短路本轮注入（一致性屏障有了真正的否决权）——拦截器丢弃全部注入项、markRegistered(0) 并保持上一份已确认状态，warn 日志记录原因与丢弃数，生成不被中止；台账可见 cancelled 轮次。
+- **v0.1.25** — 启动完整性审计：loadScript 全源失败不再静默（state.failed 记录 rel/尝试源数/时间戳，模块级重试成功后自动清除），loaderStatus 暴露 failedModules；init 末尾点名加载失败模块并写入 WA.loadFailures；tool-diag 输出 failedCount/failedModules，verdict 对照导出缺失清单分级（导出也缺 = error，仅历史失败 = warn）。
 - **v0.1.24** — 注入预算账单入诊断：lastInjection.budget 快照补全（contextSize/remain/inputTokens/saved/overBudget/keptCount + folded/dropped 带 reason 明细）；tool-diag inject 节输出 budget 子块与 summary，verdict 分级：超预算 error、有丢弃 warn（点名源）、仅折叠 info。
 - **v0.1.23** — 工作流执行画像：workflow.run 逐节点计时并记录跨运行统计（count/lastMs/avgMs/errors/lastStatus + 链级耗时汇总），workflow.stats()/resetStats() 只读视图；tool-diag runtime.workflow 输出最慢 Top5 与历史报错节点，verdict 对节点报错判 warn。
 - **v0.1.22** — 持久化可观测：store.save 失败不再静默（配额耗尽归因 quota + 失败计数，内存态仍推进避免半份状态），新增 store.saveStat() 与 store.sizeProfile() 顶层分区体积画像；tool-diag worldState 节加 storage 子节，verdict 对最近落盘失败判 error、历史失败判 warn。

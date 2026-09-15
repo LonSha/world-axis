@@ -235,7 +235,9 @@
         return {
           loadedCount: (st.loaded || []).length,
           cdnFallbacks: (st.loaded || []).filter(function (x) { return x && x.fallback; }).map(function (x) { return { rel: x.rel, fallback: x.fallback }; }),
-          cdnCooldowns: (st.cdnFailures || []).map(function (x) { return { base: x[0], failedAt: x[1] }; })
+          cdnCooldowns: (st.cdnFailures || []).map(function (x) { return { base: x[0], failedAt: x[1] }; }),
+          failedModules: (st.failedModules || []).map(function (x) { return { rel: x.rel, at: x.at, sourcesTried: x.sourcesTried }; }),
+          failedCount: (st.failedModules || []).length
         };
       }, {})
     };
@@ -370,6 +372,12 @@
       else if (bgt.foldedCount) issues.push({ level: 'info', key: 'budget', detail: '预算裁决折叠 ' + bgt.foldedCount + ' 源（' + bgt.summary + '）' });
     }
     const ldr = (diag.runtime || {}).loader || {};
+    // v0.1.25: 加载失败的模块点名（对照装载清单升级为 error）
+    if (ldr.failedModules && ldr.failedModules.length) {
+      const failedRels = ldr.failedModules.map(function (f) { return f.rel; });
+      const hit = (m.missing || []).filter(function (x) { return failedRels.indexOf(x.file) >= 0; });
+      issues.push({ level: hit.length ? 'error' : 'warn', key: 'loader', detail: hit.length ? '加载失败且导出缺失的模块：' + hit.map(function (x) { return x.file; }).join('、') : '曾加载失败但导出齐全（可能已恢复）：' + failedRels.join('、') });
+    }
     if (ldr.cdnCooldowns && ldr.cdnCooldowns.length >= 3) issues.push({ level: 'warn', key: 'loader', detail: '全部 3 个 CDN 容灾源均在冷却中（60s 内不重试），期间加载失败模块将彻底失败' });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;
     return { ok: errs === 0, errorCount: errs, warnCount: issues.length - errs, issues: issues };

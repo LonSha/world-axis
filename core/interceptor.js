@@ -49,6 +49,14 @@
     } catch (e) {
       WA.log('error', 'before链关键失败，本轮沿用上一份已确认世界状态', e);
     }
+    // v0.1.26: 取消短路——before 链节点（如一致性屏障）置 canceled 后，
+    // 丢弃本轮全部注入并留日志；生成继续，只是世界状态不进 prompt
+    if (ctx.canceled) {
+      WA.log('warn', 'before链取消本轮注入：' + (ctx.cancelReason || '未注明原因') + '（丢弃 ' + ctx.injections.length + ' 项）');
+      ctx.injections = [];
+      try { if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(0); } catch (e) {}
+      return;
+    }
     // 注入统一落地（render/inject 节点也可是链条之一；这里兜底处理injections数组）
     try { WA.render && WA.render.applyInjections && WA.render.applyInjections(ctx); } catch (e) { WA.log('error', '注入落地失败', e); }
   };
