@@ -111,20 +111,36 @@
    * relevanceFilter: 'on'（默认，先过滤相关再采样）| 'off'（全量采样）
    * @returns {Array} 选中的 pmem 条目（按原序）
    */
+  // v0.9.9: 从 backstage 设置读取采样参数（未配置时回落内置默认值）
+  function loadSamplerSettings() {
+    const fallback = { memSamplerLimit: DEFAULT_LIMIT, memSamplerDice: DEFAULT_DICE_SIDES, memSamplerRelevance: 'on' };
+    try {
+      const st = (WA.backstage && WA.backstage.getSettings) ? WA.backstage.getSettings() : null;
+      if (st) return {
+        memSamplerLimit: parseInt(st.memSamplerLimit) || fallback.memSamplerLimit,
+        memSamplerDice: parseInt(st.memSamplerDice) || fallback.memSamplerDice,
+        memSamplerRelevance: st.memSamplerRelevance === 'off' ? 'off' : 'on'
+      };
+    } catch (e) {}
+    return fallback;
+  }
   function sampleEntries(opts) {
     const o = opts || {};
+    const cfg = loadSamplerSettings();
     const st = o.state || safe(function () { return WA.store.get(); }, null) || {};
     const pmem = (st.memory && st.memory.pmem) || [];
     if (!pmem.length) return [];
-    const limit = clamp(parseInt(o.limit) || DEFAULT_LIMIT, MIN_LIMIT, MAX_LIMIT);
+    const limit = clamp(parseInt(o.limit) || cfg.memSamplerLimit, MIN_LIMIT, MAX_LIMIT);
+    const diceSides = clamp(parseInt(o.diceSides) || cfg.memSamplerDice, MIN_SIDES, MAX_SIDES);
+    const relevance = (o.relevanceFilter === 'off' || o.relevanceFilter === 'on') ? o.relevanceFilter : cfg.memSamplerRelevance;
     const hay = buildHaystack(o.recentText, st);
     let candidates = pmem;
-    if (o.relevanceFilter !== 'off') {
+    if (relevance !== 'off') {
       const rel = filterRelevant(pmem, hay);
       // 相关条目不足以填满 limit 时，用全量回退补足（不丢早期关键记忆）
       candidates = rel.length >= Math.min(limit, 3) ? rel : pmem;
     }
-    return exponentialSample(candidates, limit, o.randomFn, o.diceSides);
+    return exponentialSample(candidates, limit, o.randomFn, diceSides);
   }
 
   /**
@@ -147,6 +163,7 @@
     DEFAULT_DICE_SIDES: DEFAULT_DICE_SIDES, MIN_SIDES: MIN_SIDES, MAX_SIDES: MAX_SIDES,
     DEFAULT_LIMIT: DEFAULT_LIMIT, MIN_LIMIT: MIN_LIMIT, MAX_LIMIT: MAX_LIMIT,
     exponentialSample: exponentialSample,
+    loadSamplerSettings: loadSamplerSettings,
     filterRelevant: filterRelevant,
     buildHaystack: buildHaystack,
     sampleEntries: sampleEntries,

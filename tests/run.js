@@ -1436,6 +1436,44 @@ const WA = global.WorldAxis;
   // 清理
   WA.store.transact(d => { d.memory.pmem = []; });
 
+
+  // ══════════ v0.9.9 采样器可配置化（backstage 设置联动）══════════
+  // loadSamplerSettings: 从 backstage 读取，未配置时回落内置默认
+  const msCfg = WA.memorySampler.loadSamplerSettings();
+  assert(typeof msCfg === 'object' && msCfg.memSamplerLimit === 8, '采样器配置默认 limit=8: ' + JSON.stringify(msCfg));
+  assert(msCfg.memSamplerDice === 10000 && msCfg.memSamplerRelevance === 'on', '采样器配置默认 dice=10000 relevance=on');
+  // backstage 默认值已含采样参数
+  const bsSettings = WA.backstage.getSettings();
+  assert(bsSettings.memSamplerLimit === 8 && bsSettings.memSamplerDice === 10000, 'backstage 默认设置含采样参数');
+  assert(bsSettings.memSamplerRelevance === 'on', 'backstage 默认 relevance=on');
+  // 设置改动后采样器立即生效
+  WA.backstage.setSettings({ memSamplerLimit: 3, memSamplerDice: 2000, memSamplerRelevance: 'off' });
+  const msCfg2 = WA.memorySampler.loadSamplerSettings();
+  assert(msCfg2.memSamplerLimit === 3 && msCfg2.memSamplerDice === 2000 && msCfg2.memSamplerRelevance === 'off', 'setSettings 后采样器配置即时更新');
+  // sampleEntries 使用新 limit
+  WA.store.transact(d => {
+    d.memory.pmem = [];
+    for (let i = 0; i < 12; i++) d.memory.pmem.push({ holders: ['人物' + i], text: '记忆' + i, time: '第' + i + '日' });
+  });
+  const msCfgSel = WA.memorySampler.sampleEntries({ state: WA.store.get(), relevanceFilter: 'off' });
+  assert(msCfgSel.length === 3, 'limit=3 生效，采样 3 条: ' + msCfgSel.length);
+  // opts 显式参数仍覆盖配置（调用方优先）
+  const msCfgSel2 = WA.memorySampler.sampleEntries({ state: WA.store.get(), limit: 5, relevanceFilter: 'off' });
+  assert(msCfgSel2.length === 5, 'opts.limit 覆盖配置 limit');
+  // 极限值夹取
+  WA.backstage.setSettings({ memSamplerLimit: 999, memSamplerDice: 99999 });
+  const msCfg3 = WA.memorySampler.loadSamplerSettings();
+  assert(msCfg3.memSamplerLimit === 999, 'limit 999 读入（sampleEntries 内夹取）');
+  const msCfgSel3 = WA.memorySampler.sampleEntries({ state: WA.store.get(), relevanceFilter: 'off' });
+  assert(msCfgSel3.length === 12, 'limit 超候选数时返回全部 12 条');
+  // 恢复默认
+  WA.backstage.setSettings({ memSamplerLimit: 8, memSamplerDice: 10000, memSamplerRelevance: 'on' });
+  const msCfg4 = WA.memorySampler.loadSamplerSettings();
+  assert(msCfg4.memSamplerLimit === 8 && msCfg4.memSamplerRelevance === 'on', '恢复默认配置');
+  // 设置污染检查：测试改动的设置不影响后续 store
+  WA.store.transact(d => { d.memory.pmem = []; });
+  assert(WA.backstage.getSettings().memSamplerLimit === 8, '采样配置保持默认（测试隔离）');
+
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

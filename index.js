@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.9.8';
+  const VERSION = '0.9.9';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 

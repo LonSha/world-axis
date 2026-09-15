@@ -27,6 +27,10 @@
         </select></div>
         <div class="wa-set-row"><span>手动上限 <b id="wa-set-budgetv">${bs.injectBudget > 0 ? bs.injectBudget + 't' : '—'}</b></span><input type="range" min="200" max="6000" step="200" value="${bs.injectBudget > 0 ? bs.injectBudget : 2400}" id="wa-set-budget" class="wa-range"/></div>
         <div class="wa-dim">预算裁决：核心块（世界状态/近端事件）优先保底；记忆/摘要/账本/舆情超预算时先折叠后丢弃。自动档从宿主上下文窗口推导，夹在 800–4000t。</div>
+        <div class="wa-sec">主观记忆采样（v0.9.9）</div>
+        <div class="wa-set-row"><span>采样上限 <b id="wa-set-mslimitv">${bs.memSamplerLimit || 8}</b></span><input type="range" min="1" max="30" value="${bs.memSamplerLimit || 8}" id="wa-set-mslimit" class="wa-range"/></div>
+        <div class="wa-set-row"><span>骰子面数 <b id="wa-set-msdicev">${bs.memSamplerDice || 10000}</b></span><input type="range" min="1000" max="10000" step="500" value="${bs.memSamplerDice || 10000}" id="wa-set-msdice" class="wa-range"/></div>
+        <label class="wa-node"><input type="checkbox" id="wa-set-msrel" ${bs.memSamplerRelevance !== 'off' ? 'checked' : ''}/><span class="wa-node-label">上下文相关召回（只注入当前剧情相关的人物记忆，关闭则全量采样）</span></label>
         <div class="wa-sec">自定义推演指令（追加到系统提示）</div>
         <textarea id="wa-set-custom" class="wa-ta" placeholder="例如：本世界魔法衰退，推演时注意时代背景…">${esc(bs.customInstruction)}</textarea>
         <button class="wa-btn" id="wa-set-save">保存推演设置</button>
@@ -60,6 +64,10 @@
       if (bgMode) bgMode.onchange = syncBudgetRow;
       if (bg) bg.oninput = () => { if ($('#wa-set-budgetv') && (!$('#wa-set-budget-mode') || $('#wa-set-budget-mode').value === 'manual')) $('#wa-set-budgetv').textContent = bg.value + 't'; };
       syncBudgetRow();
+      const msl = $('#wa-set-mslimit');
+      if (msl) msl.oninput = () => { const v = $('#wa-set-mslimitv'); if (v) v.textContent = msl.value; };
+      const msd = $('#wa-set-msdice');
+      if (msd) msd.oninput = () => { const v = $('#wa-set-msdicev'); if (v) v.textContent = msd.value; };
       const saveBtn = $('#wa-set-save');
       if (saveBtn) saveBtn.onclick = () => {
         WA.backstage.setSettings({
@@ -70,6 +78,9 @@
           autoSimulate: $('#wa-set-auto').checked,
           fullRules: $('#wa-set-fullrules').checked,
           injectBudget: (() => { const m = $('#wa-set-budget-mode'); const v = m ? m.value : 'auto'; if (v === 'unlimited') return 0; if (v === 'manual') return Math.max(200, +($('#wa-set-budget') ? $('#wa-set-budget').value : 2400) || 2400); return -1; })(),
+          memSamplerLimit: +($('#wa-set-mslimit') ? $('#wa-set-mslimit').value : 8) || 8,
+          memSamplerDice: +($('#wa-set-msdice') ? $('#wa-set-msdice').value : 10000) || 10000,
+          memSamplerRelevance: $('#wa-set-msrel') && $('#wa-set-msrel').checked ? 'on' : 'off',
           customInstruction: $('#wa-set-custom').value.trim()
         });
         WA.opinion.setSettings({ enabled: $('#wa-op-enable').checked, sandboxEnabled: $('#wa-op-sandbox').checked, everyNRounds: +$('#wa-op-n').value || 3 });

@@ -82,6 +82,9 @@
       autoSimulate: true,           // after_reply 自动推演
       fullRules: false,             // v0.8.3: true=注入12模块完整规则全文, false=精简守则
       injectBudget: -1,             // v0.9.4: 注入预算；-1=自动(按上下文窗口6%)，0=不限，正数=手动上限
+      memSamplerLimit: 8,            // v0.9.9: 主观记忆每轮注入采样上限
+      memSamplerDice: 10000,         // v0.9.9: 采样骰子面数（1000-10000，越大越平滑）
+      memSamplerRelevance: 'on',   // v0.9.9: 上下文相关召回 on/off
       customInstruction: ''         // 用户自定义推演指令（追加到系统提示）
     };
     try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_SETTINGS) || '{}')); } catch (e) { return def; }
