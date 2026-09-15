@@ -34,28 +34,44 @@ const mockChat = [
 // SillyTavern context mock
 const eventHandlers = {};
 const mockChatMetadata = {}; // 跨 getContext 调用持久（chatcache 依赖真实持久化）
+const mockCtx = {};
 global.SillyTavern = {
-  getContext: () => ({
-    chat: mockChat,
-    chatId: 'test_chat_001',
-    chatMetadata: mockChatMetadata,
-    updateChatMetadata: (patch) => { Object.assign(mockChatMetadata, patch); },
-    saveMetadataDebounced: () => {},
-    eventSource: {
-      on: (evt, fn) => { (eventHandlers[evt] = eventHandlers[evt] || []).push(fn); },
-      emit: async (evt, ...args) => { for (const fn of (eventHandlers[evt] || [])) await fn(...args); }
-    },
-    eventTypes: { APP_READY: 'app_ready', GENERATION_ENDED: 'gen_ended', MESSAGE_RECEIVED: 'msg_recv', CHAT_CHANGED: 'chat_changed' },
-    setExtensionPrompt: (key, text, pos, depth, scan) => {
-      if (!global.__extPromptLog) global.__extPromptLog = [];
-      const rec = { key: key, text: text, pos: pos, depth: depth, scan: scan };
-      global.__extPromptLog.push(rec);
-      global.__lastExtensionPrompt = rec;
-    }
-  })
+  getContext: () => mockCtx,
 };
+Object.assign(mockCtx, {
+  chat: mockChat,
+  chatId: 'test_chat_001',
+  chatMetadata: mockChatMetadata,
+  updateChatMetadata: (patch) => { Object.assign(mockChatMetadata, patch); },
+  saveMetadataDebounced: () => {},
+  eventSource: {
+    on: (evt, fn) => { (eventHandlers[evt] = eventHandlers[evt] || []).push(fn); },
+    emit: async (evt, ...args) => { for (const fn of (eventHandlers[evt] || [])) await fn(...args); }
+  },
+  eventTypes: { APP_READY: 'app_ready', GENERATION_ENDED: 'gen_ended', MESSAGE_RECEIVED: 'msg_recv', CHAT_CHANGED: 'chat_changed' },
+  setExtensionPrompt: (key, text, pos, depth, scan) => {
+    if (!global.__extPromptLog) global.__extPromptLog = [];
+    const rec = { key: key, text: text, pos: pos, depth: depth, scan: scan };
+    global.__extPromptLog.push(rec);
+    global.__lastExtensionPrompt = rec;
+  }
+});
 global.__triggerEvent = async (evt, ...args) => { for (const fn of (eventHandlers[evt] || [])) await fn(...args); };
 global.__mockChat = mockChat;
+
+// TavernHelper mock for wb-inject
+const __vars = {};
+const __wbEntries = {};
+global.TavernHelper = {
+  getVariables: function (o) { return Object.assign({}, __vars); },
+  replaceVariables: function (all, o) { Object.keys(all).forEach(function (k) { __vars[k] = all[k]; }); return true; },
+  insertOrAssignVariables: function (patch, o) { Object.keys(patch).forEach(function (k) { __vars[k] = patch[k]; }); return true; },
+  deleteVariable: function (path, o) { delete __vars[path]; return true; },
+  getWorldbook: async function (name) { return __wbEntries[name] || []; },
+  createWorldbookEntries: async function (name, entries) { (__wbEntries[name] = __wbEntries[name] || []).push.apply(__wbEntries[name], entries); return entries; }
+};
+global.__vars = __vars;
+global.__wbEntries = __wbEntries;
 
 // fetch mock（由测试注入响应）
 global.__fetchResponses = [];

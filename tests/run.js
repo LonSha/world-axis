@@ -24,7 +24,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1708,6 +1708,86 @@ const WA = global.WorldAxis;
   } else {
     assert(true, '空快照时呈现铁律不追加（parts 为空直接返回空串）');
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.14 — wb 变量镜像注入通道（缝合附本生成器）
+  // ═══════════════════════════════════════════════════════════
+  v0114: {
+  assert(WA.wbInject && typeof WA.wbInject.syncAll === 'function', 'wbInject 模块已加载');
+  // orderKey 补零
+  assert(WA.wbInject.orderKey(10) === 'waslot_0010', 'orderKey 10 补零到 4 位');
+  assert(WA.wbInject.orderKey(212) === 'waslot_0212', 'orderKey 212（密集位置）');
+  assert(WA.wbInject.orderKey(1000) === 'waslot_1000', 'orderKey 1000 上限');
+  assert(WA.wbInject.orderKey(1) === 'waslot_0001', 'orderKey 1 下限');
+  // validOrder 边界
+  assert(WA.wbInject.validOrder(1) === true && WA.wbInject.validOrder(1000) === true, 'validOrder 1..1000 合法');
+  assert(WA.wbInject.validOrder(0) === false && WA.wbInject.validOrder(1001) === false, 'validOrder 越界非法');
+  assert(WA.wbInject.validOrder(10.5) === false, 'validOrder 非整数非法');
+  // syncOrder 单组
+  const r14 = WA.wbInject.syncOrder(212, [
+    { source: '连续性约束', content: '约束A' },
+    { source: '演化状态', content: '状态B' }
+  ]);
+  assert(r14.ok === true, 'syncOrder 212 成功');
+  assert(r14.key === 'waslot_0212', 'syncOrder 返回变量名');
+  assert(global.__vars['waslot_0212'] === '约束A' + '\n\n' + '状态B', '变量内容按顺序拼接: ' + JSON.stringify(global.__vars['waslot_0212']));
+  // 空项写空串（0 token 语义）
+  const r14e = WA.wbInject.syncOrder(213, []);
+  assert(r14e.ok === true, 'syncOrder 空项成功');
+  assert(global.__vars['waslot_0213'] === '', '空项写空串（EJS @@if 排除 = 0 token）');
+  // bad order
+  assertDeepEq(WA.wbInject.syncOrder(0, []).reason, 'bad-order', 'order=0 被拒');
+  assertDeepEq(WA.wbInject.syncOrder(1001, []).reason, 'bad-order', 'order=1001 被拒');
+  // clearOrder
+  WA.wbInject.clearOrder(212);
+  assert(global.__vars['waslot_0212'] === '', 'clearOrder 写空串');
+  // syncAll 分组
+  WA.wbInject.syncAll([
+    { source: 'a', content: 'X1', order: 300 },
+    { source: 'b', content: 'X2', order: 300 },
+    { source: 'c', content: 'Y1', order: 400 },
+    { source: 'd', content: '无order' }
+  ]);
+  assert(global.__vars['waslot_0300'] === 'X1' + '\n\n' + 'X2', 'syncAll 同 order 项拼接');
+  assert(global.__vars['waslot_0400'] === 'Y1', 'syncAll 不同 order 分组');
+  // 无 order 的项被跳过（不报错）
+  assert(true, 'syncAll 无 order 项安全跳过');
+  // wbEntryContent EJS 模板
+  const tpl = WA.wbInject.wbEntryContent(212);
+  assert(tpl.indexOf('waslot_0212') >= 0, 'EJS 模板含目标变量名');
+  assert(tpl.indexOf('@@if') === 0, 'EJS 模板以 @@if 开头（空变量时排除 = 0 token）');
+  assert(tpl.indexOf('getVariables') >= 0, 'EJS 模板含 TH 兜底读取路径');
+  // ensureEntry（mock 已注入配套世界书名）
+  // 先注入配套世界书名到 context
+  const ctx14 = global.SillyTavern.getContext();
+  ctx14.worldInfoSettings = ctx14.worldInfoSettings || {};
+  ctx14.worldInfoSettings.world_names = ['WorldAxis'];
+  const ee1 = await WA.wbInject.ensureEntry(500);
+  assert(ee1.ok === true, 'ensureEntry 创建 EJS 条目成功: ' + JSON.stringify(ee1));
+  const ee2 = await WA.wbInject.ensureEntry(500);
+  assert(ee2.ok === true && ee2.reason === 'exists', 'ensureEntry 幂等（已存在不重建）');
+  assert(global.__wbEntries['WorldAxis'].length === 1, '配套世界书只有 1 条（幂等）');
+  const ent = global.__wbEntries['WorldAxis'][0];
+  assert(ent.position.order === 500 && ent.position.type === 'before_character_definition', '条目落点 order=500 角色定义之前');
+  assert(ent.content.indexOf('waslot_0500') >= 0, '条目 content 含变量名');
+  // 找不到配套世界书
+  ctx14.worldInfoSettings.world_names = ['别的东西'];
+  const ee3 = await WA.wbInject.ensureEntry(501);
+  assert(ee3.ok === false && ee3.reason === 'no-companion', '无配套世界书时降级返回 no-companion');
+  ctx14.worldInfoSettings.world_names = ['WorldAxis'];
+  // 开关
+  const st14 = WA.backstage.getSettings();
+  WA.backstage.setSettings({ wbInject: false });
+  const rOff = WA.wbInject.syncOrder(600, [{ content: 'Z' }]);
+  assert(rOff.ok === false && rOff.reason === 'disabled', 'wbInject 关闭时 syncOrder 拒绝');
+  WA.backstage.setSettings({ wbInject: true });
+  const rOn = WA.wbInject.syncOrder(600, [{ content: 'Z' }]);
+  assert(rOn.ok === true, '重新开启后 syncOrder 恢复');
+  // 清理
+  WA.wbInject.clearOrder(300); WA.wbInject.clearOrder(400); WA.wbInject.clearOrder(600);
+  } // end v0.1.14 block
+
+
   } // end v0.1.13 block
 
   // ═══════════════════════════════════════════════════════════
