@@ -35,8 +35,12 @@
     const st = WA.store.get();
     if (!st.evolution) st.evolution = {};
     if (!st.evolution.horizon) {
-      st.evolution.horizon = { distant: defaultLane(), near: defaultLane() };
-      WA.store.save(st);
+      // v0.1.33: 事务化创建（原先直改 live store + 裸 save）
+      WA.store.transact(d => {
+        if (!d.evolution) d.evolution = {};
+        if (!d.evolution.horizon) d.evolution.horizon = { distant: defaultLane(), near: defaultLane() };
+      });
+      return WA.store.get();
     }
     return st;
   }
@@ -47,51 +51,46 @@
    * @returns {{ fired:boolean, forced:boolean, type?:'event'|'wind', reason:string }}
    */
   function rollLane(kind) {
-    // 每次操作前重新get，避免transact替换memCache后引用失效
-    const getLane = () => { const s = WA.store.get(); return s.evolution.horizon[kind]; };
-    const save = () => WA.store.save(WA.store.get());
-    const st0 = WA.store.get();
-    const round = (st0.meta && st0.meta.round) || 0;
-
-    let lane = getLane();
-
-    if (lane.cooldown > 0) {
-      lane.cooldown--;
-      save();
-      return { fired: false, forced: false, reason: `cooldown(${lane.cooldown + 1}→${lane.cooldown})` };
-    }
-
-    if (lane.pending) {
-      if (lane.pending.retries >= RETRY_MAX) {
-        lane.pending = null;
-        save();
-        return { fired: false, forced: false, reason: 'pending_dropped' };
+    // v0.1.33: 整体单事务——掷骰各分支只改 draft，由 transact 统一落盘
+    // （原先「直改 live store + 裸 save」绕过事务计量与批作用域，批内会提前打破写合并）
+    let out = null;
+    WA.store.transact(d => {
+      const lane = d.evolution.horizon[kind];
+      const round = (d.meta && d.meta.round) || 0;
+      if (lane.cooldown > 0) {
+        lane.cooldown--;
+        out = { fired: false, forced: false, reason: `cooldown(${lane.cooldown + 1}→${lane.cooldown})` };
+        return;
       }
-      lane.pending.retries++;
-      save();
-      return {
-        fired: true, forced: true,
-        type: lane.pending.result && lane.pending.result.type || 'event',
-        reason: `pending_retry(${lane.pending.retries}/${RETRY_MAX})`
-      };
-    }
-
-    lane.ledger++;
-    const forced = lane.ledger >= LEDGER_THRESHOLD;
-    const fired  = forced || roll01() < BASE_CHANCE;
-
-    if (fired) {
-      lane.ledger     = 0;
-      lane.cooldown   = COOLDOWN_ROUNDS;
-      lane.lastFired  = round;
-      const type = roll01() < 0.5 ? 'event' : 'wind';
-      lane.pending = { result: { type, kind }, retries: 0 };
-      save();
-      return { fired: true, forced, type, reason: forced ? `ledger>=${LEDGER_THRESHOLD}` : `chance(${BASE_CHANCE})` };
-    }
-
-    save();
-    return { fired: false, forced: false, reason: `ledger=${lane.ledger}` };
+      if (lane.pending) {
+        if (lane.pending.retries >= RETRY_MAX) {
+          lane.pending = null;
+          out = { fired: false, forced: false, reason: 'pending_dropped' };
+          return;
+        }
+        lane.pending.retries++;
+        out = {
+          fired: true, forced: true,
+          type: lane.pending.result && lane.pending.result.type || 'event',
+          reason: `pending_retry(${lane.pending.retries}/${RETRY_MAX})`
+        };
+        return;
+      }
+      lane.ledger++;
+      const forced = lane.ledger >= LEDGER_THRESHOLD;
+      const fired  = forced || roll01() < BASE_CHANCE;
+      if (fired) {
+        lane.ledger     = 0;
+        lane.cooldown   = COOLDOWN_ROUNDS;
+        lane.lastFired  = round;
+        const type = roll01() < 0.5 ? 'event' : 'wind';
+        lane.pending = { result: { type, kind }, retries: 0 };
+        out = { fired: true, forced, type, reason: forced ? `ledger>=${LEDGER_THRESHOLD}` : `chance(${BASE_CHANCE})` };
+        return;
+      }
+      out = { fired: false, forced: false, reason: `ledger=${lane.ledger}` };
+    });
+    return out;
   }
 
   // ── backstage结果入账 ─────────────────────────────────
@@ -124,7 +123,8 @@
     delete result._temp;
 
     // 清除pending（重新get确保引用新鲜）
-    WA.store.get().evolution.horizon[kind].pending = null;
+    // v0.1.33: 事务化清除 pending（原先直改 live store，靠后续分支的 transact 兜底持久化）
+    WA.store.transact(d => { const lane = d.evolution && d.evolution.horizon && d.evolution.horizon[kind]; if (lane) lane.pending = null; });
 
     // 写入正式状态
     if (kind === 'distant') {
@@ -137,7 +137,14 @@
             level:   Math.min(5, Math.max(1, parseInt(result.level) || 2)),
             source:  'horizon_distant'
           });
-        }
+        } else {
+            // v0.1.33: evolution 模块缺失时的兜底入账（原先此分支无任何写路径）
+            WA.store.transact(tx => {
+              tx.chronicle = tx.chronicle || [];
+              tx.chronicle.push({ kind: 'horizon_distant', title: String(result.topic || result.title || '').slice(0, 30), desc: String(result.content || '').slice(0, 50), at: Date.now(), round: (tx.meta && tx.meta.round) || 0, horizon: true });
+              if (tx.chronicle.length > 80) tx.chronicle = tx.chronicle.slice(-80);
+            });
+          }
       } else {
         // 事件入chronicle
         WA.store.transact(tx => {
@@ -175,7 +182,7 @@
       });
     }
 
-    WA.store.save();
+    // v0.1.33: 移除收尾裸 save——上方各分支已通过 transact 落盘（嵌套时延迟到最外层统一提交）
     WA.log('info', `horizon[${kind}] 结果已入账`, { title: result.title || result.topic });
     return true;
   }

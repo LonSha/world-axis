@@ -118,8 +118,7 @@
         at:      Date.now()
       };
     });
-    WA.store.save();
-
+    // v0.1.33: 移除裸 save——transact 已落盘（嵌套时延迟到最外层统一提交）
     WA.log('info', `world_digest已生成(${digest.length}字)`);
     return digest;
   }

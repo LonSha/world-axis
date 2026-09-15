@@ -85,6 +85,8 @@
   let memCache = {}; // 内存态（当前聊天的权威副本）
   // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
   const __batch = { depth: 0, dirty: false, flushes: 0, lastFlushAt: 0 };
+  // v0.1.33: 嵌套事务栈——非空时内层 transact 直接在最外层 draft 上修改，提交延迟到最外层
+  const __tx = [];
   // v0.1.30: 事务计量——按提交状态聚合计数与耗时
   const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, batched: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
   function recTx(ms, status) {
@@ -209,21 +211,36 @@
     transact(mutator, opts) {
       // v0.1.30: 事务计量——每轮生成触发多少次 transact、耗时多少（排查链式落盘）
       const t0 = Date.now();
+      // v0.1.33: 嵌套事务——内层 mutator 直接在最外层 draft 上修改，提交延迟到最外层统一 save。
+      // 修复：外层 save(draft) 用外层开始时的旧快照整体覆盖内层已提交改动
+      // （backstage.applyResult → horizon.acceptResult/digest.generate 链路的静默丢失）
+      if (__tx.length) {
+        const outer = __tx[__tx.length - 1];
+        let result;
+        try { result = mutator(outer); }
+        catch (e) { recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact嵌套修改异常（外层事务继续）', e); return { ok: false, error: e }; }
+        if (result === false) return { ok: false, aborted: true, deferred: true };
+        return { ok: true, deferred: true, state: outer, result };
+      }
       const draft = JSON.parse(JSON.stringify(memCache));
-      let result;
+      __tx.push(draft);
+      let result, ret;
       try { result = mutator(draft); }
-      catch (e) { recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
-      if (result === false) { recTx(Date.now() - t0, 'aborted'); return { ok: false, aborted: true }; }
+      catch (e) { __tx.pop(); recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
+      if (result === false) { __tx.pop(); recTx(Date.now() - t0, 'aborted'); return { ok: false, aborted: true }; }
       // v0.1.31: 批作用域内只推进内存，落盘延迟到批退出（写合并）
       if (__batch.depth > 0) {
         memCache = draft; __batch.dirty = true;
         recTx(Date.now() - t0, 'ok-batched');
-        return { ok: true, persisted: null, batched: true, state: draft, result };
+        ret = { ok: true, persisted: null, batched: true, state: draft, result };
+      } else {
+        const saved = this.save(draft);
+        recTx(Date.now() - t0, saved ? 'ok' : 'save-failed');
+        // ok=内存事务语义（v0.1.22 契约：落盘失败不回滚内存）；persisted=v0.1.30 新增落盘结果
+        ret = { ok: true, persisted: saved, state: draft, result };
       }
-      const saved = this.save(draft);
-      recTx(Date.now() - t0, saved ? 'ok' : 'save-failed');
-      // ok=内存事务语义（v0.1.22 契约：落盘失败不回滚内存）；persisted=v0.1.30 新增落盘结果
-      return { ok: true, persisted: saved, state: draft, result };
+      __tx.pop();
+      return ret;
     },
 
     // ── 恢复点 ──

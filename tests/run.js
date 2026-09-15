@@ -3089,6 +3089,53 @@ WA.loadScript = _ls.loadScript;
   // 清理
   WA.store.transact(d => { delete d.meta.probe132; delete d.meta.probeAfter; });
   } // end v0.1.32 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.33 — 嵌套事务语义 + horizon 写路径事务化
+  // ═══════════════════════════════════════════════════════════
+  v0133: {
+  // 场景1：嵌套事务——内层改动进外层 draft，最外层提交后可见（v0.1.32 及以前会静默丢失）
+  await WA.store.batch(async function () {
+    WA.store.transact(d => { d.meta.outerMark = 'v133'; });
+    WA.store.transact(d => { d.meta.innerMark = 'nested'; });   // 嵌套：进外层 draft
+    assert(WA.store.get().meta.innerMark === 'nested', '嵌套事务立即写入内存 draft');
+  });
+  assert(JSON.parse(global.localStorage.getItem('worldaxis_state_test_chat_001')).meta.innerMark === 'nested', '嵌套改动随最外层落盘');
+  // 场景2：真实数据丢失回归——外层 applyResult 链路调用 horizon.acceptResult，
+  // 内层的 chronicle 条目与 pending 清除必须在外层提交后存活
+  WA.store.transact(d => {
+    d.evolution.horizon = { distant: { ledger: 10, cooldown: 0, pending: { result: { type: 'event' }, retries: 0 }, lastFired: 0 }, near: { ledger: 0, cooldown: 0, pending: null, lastFired: 0 } };
+    d.chronicle = [];
+  });
+  WA.store.transact(d => { d.__applyTag = true; WA.horizon.acceptResult('distant', { type: 'event', title: '嵌套入账事件', desc: '外层事务内的horizon写入' }); });
+  const st133 = WA.store.get();
+  assert(st133.chronicle.some(c => c.kind === 'horizon_distant' && c.title === '嵌套入账事件'), '外层事务内 acceptResult 的 chronicle 存活');
+  assert(st133.evolution.horizon.distant.pending === null, '外层事务内 pending 清除存活');
+  assert(st133.__applyTag === true, '外层自身改动正常提交');
+  // 场景3：嵌套中止（return false）只拒绝内层，外层继续
+  const outerRes = WA.store.transact(d => {
+    d.meta.outerKeep = 'yes';
+    const inner = WA.store.transact(() => false);
+    assert(inner.ok === false && inner.deferred === true, '嵌套中止返回 deferred');
+    return 'outer-ok';
+  });
+  assert(outerRes.ok === true && outerRes.result === 'outer-ok', '内层中止不波及外层提交');
+  assert(WA.store.get().meta.outerKeep === 'yes', '外层改动随最外层落盘');
+  // 场景4：嵌套异常——transact 吞掉异常返回 ok=false，外层照常提交
+  WA.store.transact(d => {
+    d.meta.outerStill = 'fine';
+    const rBoom = WA.store.transact(() => { throw new Error('inner-boom'); });
+    assert(rBoom.ok === false && rBoom.error && rBoom.error.message === 'inner-boom', '内层异常被吞并记账');
+    assert(d.meta.outerStill === 'fine', '内层异常未污染外层 draft（事务中 live store 尚未提交）');
+  });
+  assert(WA.store.get().meta.outerStill === 'fine', '内层异常后外层照常提交');
+  // 场景5：horizon 直改模式清除——rollLane/acceptResult 后落盘内容与内存一致
+  WA.store.transact(d => { d.evolution.horizon.distant = { ledger: 10, cooldown: 0, pending: null, lastFired: 0 }; });
+  WA.horizon.rollLane('distant');
+  const persisted133 = JSON.parse(global.localStorage.getItem('worldaxis_state_test_chat_001'));
+  assert(persisted133.evolution.horizon.distant.pending !== null, 'rollLane 触发后 pending 立即落盘（不再依赖后续 transact 兜底）');
+  // 清理
+  WA.store.transact(d => { delete d.meta.outerMark; delete d.meta.innerMark; delete d.meta.outerKeep; delete d.meta.outerStill; delete d.__applyTag; });
+  } // end v0.1.33 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

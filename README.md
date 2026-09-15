@@ -66,6 +66,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.33** — 嵌套事务语义：内层 transact 直接在最外层 draft 上修改，提交延迟到最外层统一 save（修复外层 save 用旧快照覆盖内层已提交改动的静默丢失，backstage.applyResult→horizon/digest 链路）；horizon 写路径事务化（ensureState/rollLane/pending 清除，清除 evolution 缺失分支的零写路径死角）；digest 裸 save 移除。嵌套返回 deferred 标记，内层中止/异常不波及外层提交。
+
 - **v0.1.32** — 批健康计量：store.batchStat()（depth/dirty/flushes/lastFlushAt），flushes 即写合并后的实际落盘次数（对照 txStat.batched 观察合并率）；tool-diag storage.batch 子节透出；测试实测 install + gen_ended 触发真实 after 链在批作用域内运行并一次 flush。
 
 - **v0.1.31** — store.batch 写合并：批作用域内 transact 只推进内存（保留每事务深拷贝隔离），批退出统一落盘一次；拦截器整轮单批（撤销回写+contextSize+before链+注入落地合并，每轮生成从 ~15 次全量落盘降至 1 次）；txStat 新增 batched 计数，transact 批内返回 batched=true/persisted=null。
