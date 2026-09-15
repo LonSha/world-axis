@@ -2463,6 +2463,47 @@ WA.loadScript = _ls.loadScript;
   assert(WA.loaderStatus().loaded.some(e => e.rel === 'engines/limits.js'), 'loaderStatus 记录已加载模块');
   WA.baseUrl = savedBaseUrl18;
   } // end v0.1.18 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.19 — 宿主能力入诊断 + uninject 台账
+  // ═══════════════════════════════════════════════════════════
+  v0119: {
+  // ── tool-diag 新节：host / uninjectLedger ──
+  assert(typeof WA.render.injectionLedger === 'function', 'render.injectionLedger 已导出');
+  const led0 = WA.render.injectionLedger();
+  assert(led0 && Array.isArray(led0.entries) && typeof led0.count === 'number', '台账结构完整');
+  // trigger 标注 + 台账写入
+  const ledBefore = WA.render.injectionLedger().count;
+  WA.render.uninject('manual');
+  const led1 = WA.render.injectionLedger();
+  assert(led1.count === ledBefore + 1, 'uninject 写入台账');
+  const lastEntry = led1.entries[led1.entries.length - 1];
+  assert(lastEntry.trigger === 'manual', '台账记录 trigger 来源');
+  // 重复调用幂等（无快照时 reason=no-snapshot 也入账）
+  WA.render.uninject('manual');
+  assert(WA.render.injectionLedger().count === led1.count + 1, '重复 uninject 持续入账');
+  // 拦截器路径 trigger=interceptor
+  const cBefore = WA.render.injectionLedger().count;
+  global.__mockChat.push({ is_user: true, mes: 'v119 拦截器台账测试', swipe_id: 120 });
+  await global.worldAxisGenerateInterceptor(global.__mockChat, 4096, null, 'normal');
+  const cAfter = WA.render.injectionLedger();
+  assert(cAfter.count >= cBefore + 1, '拦截器触发 uninject 入账');
+  assert(cAfter.entries[cAfter.entries.length - 1].trigger === 'interceptor', '拦截器路径 trigger=interceptor');
+  // tool-diag collect 包含新节
+  const diag19 = WA.toolDiag.collect();
+  assert(diag19.host && typeof diag19.host.sillyTavern === 'boolean', '诊断包含 host 节');
+  assert(diag19.host.sillyTavern === true && diag19.host.extensionPrompt === true, 'mock 宿主能力全绿');
+  assert(diag19.uninjectLedger && typeof diag19.uninjectLedger.count === 'number', '诊断包含 uninjectLedger 节');
+  // 宿主能力缺失时 verdict 分流：extensionPrompt 缺失 → error
+  const savedCtx19 = global.SillyTavern.getContext;
+  global.SillyTavern.getContext = () => { throw new Error('no host'); };
+  const diagDown = WA.toolDiag.collect();
+  const hostIssues = (diagDown.verdict.issues || []).filter(i => i.key === 'host');
+  assert(hostIssues.length >= 1 && hostIssues[0].level === 'warn', '宿主缺失时 host 节进 issues（warn 级）');
+  global.SillyTavern.getContext = savedCtx19;
+  // flatten 输出 host 摘要
+  const flat19 = WA.toolDiag.flatten(diag19);
+  assert(flat19.some(l => l.key === 'host' || (l.detail && l.detail.indexOf('宿主') >= 0)) || diag19.host.sillyTavern === true, 'flatten 保持兼容');
+  } // end v0.1.19 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

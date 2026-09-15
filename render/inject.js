@@ -14,6 +14,14 @@
     const def = { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true };
     try { return Object.assign(def, JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
   }
+  // v0.1.19: 撤销台账——记录每次 uninject 的时间、触发源、结果（最多 20 条环形）
+  const __uninjectLedger = [];
+  function recordUninject(trigger, result) {
+    try {
+      __uninjectLedger.push({ at: Date.now(), trigger: trigger || 'unknown', ok: !!result.ok, reason: result.reason || null, cleared: result.cleared || [] });
+      if (__uninjectLedger.length > 20) __uninjectLedger.splice(0, __uninjectLedger.length - 20);
+    } catch (e) {}
+  }
 
   WA.render = {
     SOURCES,
@@ -155,21 +163,26 @@
      * 旧的写空串只清主槽位，独立槽位路由落地的那部分会残留到下一轮；
      * 这里从 store.lastInjection 快照取实际用过的全部 slot key 逐一清空。
      * 幂等：无快照或无 setExtensionPrompt 时安全跳过，重复调用不报错。
+     * v0.1.19: trigger 参数标注撤销来源（interceptor/chat-changed/manual），并写入台账。
      */
-    uninject() {
+    uninject(trigger) {
       try {
         const c = (WA.mainWin && WA.mainWin.SillyTavern && WA.mainWin.SillyTavern.getContext) ? WA.mainWin.SillyTavern.getContext() : null;
-        if (!c || !c.setExtensionPrompt) return { ok: false, reason: 'no-host' };
+        if (!c || !c.setExtensionPrompt) { const r = { ok: false, reason: 'no-host' }; recordUninject(trigger, r); return r; }
         const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
-        if (!li) return { ok: false, reason: 'no-snapshot' };
+        if (!li) { const r = { ok: false, reason: 'no-snapshot' }; recordUninject(trigger, r); return r; }
         const cleared = [];
         const slotKeys = (li.slots && Array.isArray(li.slots.keys)) ? li.slots.keys.slice() : [];
         slotKeys.forEach(function (k) { try { c.setExtensionPrompt(k, '', 1, 0, false); cleared.push(k); } catch (e) {} });
         try { c.setExtensionPrompt('WorldAxis', '', 1, 0, false); cleared.push('WorldAxis'); } catch (e) {}
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(0);
-        if (WA.log) WA.log('info', 'uninject 清空 ' + cleared.length + ' 个槽位');
-        return { ok: true, cleared: cleared };
-      } catch (e) { if (WA.log) WA.log('warn', 'uninject 异常', e); return { ok: false, reason: 'error', error: String(e && (e.message || e)) }; }
-    }
+        if (WA.log) WA.log('info', 'uninject 清空 ' + cleared.length + ' 个槽位（trigger=' + (trigger || 'manual') + '）');
+        const r = { ok: true, cleared: cleared };
+        recordUninject(trigger, r);
+        return r;
+      } catch (e) { if (WA.log) WA.log('warn', 'uninject 异常', e); const r = { ok: false, reason: 'error', error: String(e && (e.message || e)) }; recordUninject(trigger, r); return r; }
+    },
+    /** v0.1.19: 撤销台账只读视图（tool-diag 消费） */
+    injectionLedger() { return { count: __uninjectLedger.length, entries: __uninjectLedger.slice() }; }
   };
 })();

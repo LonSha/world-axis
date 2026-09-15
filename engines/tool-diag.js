@@ -247,12 +247,33 @@
     });
   }
 
+  // ── 10. v0.1.19: 宿主能力探测（compat/host 的结构化输出接入诊断） ──
+  function secHost() {
+    return safe(function () {
+      if (!WA.compat || !WA.compat.snapshot) return { error: 'compat/host 模块不可用' };
+      const s = WA.compat.snapshot();
+      return {
+        sillyTavern: s.sillyTavern, eventSource: s.eventSource, appReady: s.appReady,
+        generation: s.generation, chatChanged: s.chatChanged, extensionPrompt: s.extensionPrompt,
+        tavernHelper: s.tavernHelper, variables: s.variables, worldbook: s.worldbook,
+        probedAt: s.at
+      };
+    }, {});
+  }
+  // ── 11. v0.1.19: 撤销台账（谁在什么时候撤了什么） ──
+  function secUninjectLedger() {
+    return safe(function () {
+      if (!WA.render || !WA.render.injectionLedger) return { error: 'render.injectionLedger 不可用' };
+      return WA.render.injectionLedger();
+    }, {});
+  }
   // ── 汇总 ──
   function collect() {
     const diag = {
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
-      ui: secUi(), capabilities: secCapabilities()
+      ui: secUi(), capabilities: secCapabilities(),
+      host: secHost(), uninjectLedger: secUninjectLedger()
     };
     diag.verdict = verdict(diag);
     return diag;
@@ -272,6 +293,13 @@
     const vis = diag.visibility || {};
     if (!vis.enabledCount) issues.push({ level: 'warn', key: 'visibility', detail: '所有注入源均关闭' });
     if (diag.ui && diag.ui.allOk === false) issues.push({ level: 'warn', key: 'ui', detail: '部分面板控件未绑定（见 ui.groups）' });
+    // v0.1.19: 宿主能力缺失 → warn（降级仍可运行但功能受限）
+    const h = diag.host || {};
+    if (h && h.sillyTavern === false) issues.push({ level: 'warn', key: 'host', detail: '未检测到 SillyTavern 宿主（无事件源，仅拦截器函数可用）' });
+    else if (h && h.eventSource === false) issues.push({ level: 'warn', key: 'host', detail: '宿主无事件源：after 链与切聊天重载将不生效' });
+    if (h && h.extensionPrompt === false) issues.push({ level: 'error', key: 'host', detail: '宿主无 setExtensionPrompt：注入通道完全不可用' });
+    if (h && h.variables === false) issues.push({ level: 'warn', key: 'host', detail: 'TavernHelper 变量 API 缺失：wb 变量镜像通道降级为即时注入' });
+    if (h && h.worldbook === false) issues.push({ level: 'warn', key: 'host', detail: 'TavernHelper 世界书 API 缺失：wb 条目自动创建不可用' });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;
     return { ok: errs === 0, errorCount: errs, warnCount: issues.length - errs, issues: issues };
   }
