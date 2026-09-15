@@ -66,6 +66,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.20** — 加载诊断入包：tool-diag runtime 节新增 loader 子节（已加载模块数、CDN 容灾命中清单、失败源冷却时间戳）；verdict 在全部 3 个 CDN 源进入冷却时输出 warn。
 - **v0.1.19** — 可观测性深化：tool-diag 新增 host 节（接入 compat/host 探测结果，宿主能力缺失按级别分流：无 setExtensionPrompt 判 error、无事件源/变量/世界书 API 判 warn）与 uninjectLedger 节；uninject 支持 trigger 参数标注撤销来源（interceptor/chat-changed/manual）并写入 20 条环形台账，render.injectionLedger() 只读视图供诊断消费。
 - **v0.1.18** — P4-P6 一体化迭代：新增宿主能力探测与降级诊断（compat/host），wb 通道支持配置化世界书名、自动 ensureEntry 与运行时配置读写；加载器增加模块去重、CDN 失败源冷却与加载状态诊断。
 - **v0.1.17** — 生命周期闭环：拦截器在每轮新生成前自动调用 render.uninject()，清除上一轮主槽位与独立槽位残留；CHAT_CHANGED 前同样撤销，避免切聊天污染；engines/wb-inject.js 注册 wbInject.mirror before 节点，但仅消费显式 delivery='wb' 的持久约束，写入 waslot_NNNN 后从即时注入数组移除，普通注入保持原槽位路由；754 断言全过

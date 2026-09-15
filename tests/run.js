@@ -2504,6 +2504,22 @@ WA.loadScript = _ls.loadScript;
   const flat19 = WA.toolDiag.flatten(diag19);
   assert(flat19.some(l => l.key === 'host' || (l.detail && l.detail.indexOf('宿主') >= 0)) || diag19.host.sillyTavern === true, 'flatten 保持兼容');
   } // end v0.1.19 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.20 — 加载诊断入包（tool-diag runtime.loader）
+  // ═══════════════════════════════════════════════════════════
+  v0120: {
+  const dg20 = WA.toolDiag.collect();
+  const ldr20 = (dg20.runtime || {}).loader || {};
+  assert(typeof ldr20.loadedCount === 'number' && ldr20.loadedCount >= 0, 'runtime.loader 子节已产出');
+  assert(Array.isArray(ldr20.cdnFallbacks) && Array.isArray(ldr20.cdnCooldowns), 'loader 子节字段齐全');
+  // 冷却中的源在 verdict 侧可见（若此前测试让 3 源全冷却）
+  const diag20b = WA.toolDiag.collect();
+  const loaderIssues = (diag20b.verdict.issues || []).filter(i => i.key === 'loader');
+  assert(loaderIssues.length === 0 || loaderIssues[0].level === 'warn', 'loader 议题最多 warn 级');
+  // loaderStatus 与诊断数据一致
+  const st20 = WA.loaderStatus();
+  assert(ldr20.loadedCount === (st20.loaded || []).length, '诊断 loadedCount 与 loaderStatus 一致');
+  } // end v0.1.20 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

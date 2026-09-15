@@ -176,7 +176,7 @@
     }, {});
   }
 
-  // ── 7. 缓存 / 工作流 / API 通道 ─
+// ── 7. 缓存 / 工作流 / API 通道 / 加载器 ──
   function secRuntime() {
     return {
       chatcache: safe(function () {
@@ -201,6 +201,16 @@
             const e = c.effective || {};
             return { name: c.name, configured: !!(e.baseUrl && e.model), keyMasked: redact(e.apiKey), model: e.model || null };
           })
+        };
+      }, {}),
+      // v0.1.20: CDN 加载器状态（已加载模块数、CDN 容灾命中的模块、失败源冷却）
+      loader: safe(function () {
+        if (!WA.loaderStatus) return { error: 'loaderStatus 不可用' };
+        const st = WA.loaderStatus();
+        return {
+          loadedCount: (st.loaded || []).length,
+          cdnFallbacks: (st.loaded || []).filter(function (x) { return x && x.fallback; }).map(function (x) { return { rel: x.rel, fallback: x.fallback }; }),
+          cdnCooldowns: (st.cdnFailures || []).map(function (x) { return { base: x[0], failedAt: x[1] }; })
         };
       }, {})
     };
@@ -300,6 +310,9 @@
     if (h && h.extensionPrompt === false) issues.push({ level: 'error', key: 'host', detail: '宿主无 setExtensionPrompt：注入通道完全不可用' });
     if (h && h.variables === false) issues.push({ level: 'warn', key: 'host', detail: 'TavernHelper 变量 API 缺失：wb 变量镜像通道降级为即时注入' });
     if (h && h.worldbook === false) issues.push({ level: 'warn', key: 'host', detail: 'TavernHelper 世界书 API 缺失：wb 条目自动创建不可用' });
+    // v0.1.20: CDN 失败源全数冷却 → warn（当前会话内 CDN 容灾已耗尽）
+    const ldr = (diag.runtime || {}).loader || {};
+    if (ldr.cdnCooldowns && ldr.cdnCooldowns.length >= 3) issues.push({ level: 'warn', key: 'loader', detail: '全部 3 个 CDN 容灾源均在冷却中（60s 内不重试），期间加载失败模块将彻底失败' });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;
     return { ok: errs === 0, errorCount: errs, warnCount: issues.length - errs, issues: issues };
   }
