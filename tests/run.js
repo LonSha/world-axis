@@ -3239,6 +3239,33 @@ WA.loadScript = _ls.loadScript;
   // 清理
   WA.store.transact(d => { delete d.meta.probe136; delete d.meta.seq136; });
   } // end v0.1.36 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.37 — 恢复点计量（recoveryStat）与满额提示
+  // ═══════════════════════════════════════════════════════════
+  v0137: {
+  assert(typeof WA.store.recoveryStat === 'function', 'recoveryStat 已导出');
+  const rs0 = WA.store.recoveryStat();
+  assert(rs0.max === 3 && rs0.count >= 0 && rs0.count <= 3, 'recoveryStat 返回 count/max（max=3）');
+  assert(typeof rs0.bytes === 'number' && typeof rs0.full === 'boolean', 'bytes 与 full 字段产出');
+  // 环形覆盖：连续创建 4 个恢复点，count 封顶 3 且 lastAt 前移
+  const at0 = rs0.lastAt;
+  WA.store.createRecoveryPoint();
+  const rs1 = WA.store.recoveryStat();
+  assert(rs1.count === Math.min(rs0.count + 1, 3), '创建后计数推进（封顶3）');
+  WA.store.createRecoveryPoint(); WA.store.createRecoveryPoint();
+  const rs2 = WA.store.recoveryStat();
+  assert(rs2.count === 3 && rs2.full === true, '连续创建后满额（full=true）');
+  if (rs0.count >= 1) assert(rs2.lastAt > at0, '满额覆盖后 lastAt 前移（最旧被挤出）');
+  // 诊断透出 + verdict info（独立 recovery 键）
+  const dg137 = WA.toolDiag.collect();
+  assert(dg137.worldState.storage.recovery && dg137.worldState.storage.recovery.count === 3, '诊断透出 recovery 节');
+  const recInfo = (dg137.verdict.issues || []).filter(i => i.key === 'recovery' && i.level === 'info');
+  assert(recInfo.length === 1 && recInfo[0].detail.indexOf('恢复点已达上限') >= 0, '满额 → recovery info 议题');
+  // restore 后恢复点计量仍正常（restore 内部也建恢复点，封顶不变）
+  const okRestore = WA.store.restore(0);
+  assert(okRestore === true, 'restore 正常执行');
+  assert(WA.store.recoveryStat().count === 3, 'restore 后恢复点数保持封顶');
+  } // end v0.1.37 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

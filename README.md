@@ -66,6 +66,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.37** — 恢复点计量：store.recoveryStat()（count/max/full/bytes/lastAt，环形覆盖可视）；tool-diag storage.recovery 子节透出，满额时 verdict 出独立 recovery 键 info 议题（与 storage 键解耦，不干扰既有精确计数断言）。
+
 - **v0.1.36** — draft 克隆升级：transact 深拷贝 feature-detect structuredClone 优先（原生实现快 1.5-2x），JSON 往返降级保持兼容；深隔离契约断言锁定（提交前 draft 与 live store 完全隔离、get() live 引用契约、顺序事务独立 draft）；修复 v0.1.23 链级耗时断言的 flaky 阈值（40ms→25ms，睡眠节点实际下限）。
 
 - **v0.1.35** — 聊天纪元守卫：init()（含切聊天）自增纪元并作废在飞写合并批——僵尸批内 transact 被拒绝（stale=true，不执行 mutator），批退出丢弃 flush，旧轮未落盘改动不再写向新聊天键（修复跨聊天污染竞态：after 链在飞批 + CHAT_CHANGED 重载）；batchStat 透出 orphaned。

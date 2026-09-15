@@ -285,6 +285,13 @@
       try { return JSON.parse(mainWin.localStorage.getItem(recoveryKey(chatId)) || '[]'); }
       catch (e) { return []; }
     },
+    /** v0.1.37: 恢复点计量只读视图（tool-diag 消费）——bytes 为序列化总体积，count===max 提示环形覆盖将发生 */
+    recoveryStat(chatId) {
+      const list = this.listRecoveryPoints(chatId);
+      let bytes = 0;
+      try { bytes = JSON.stringify(list).length; } catch (e) { bytes = -1; }
+      return { count: list.length, max: MAX_RECOVERY_POINTS, full: list.length >= MAX_RECOVERY_POINTS, bytes: bytes, lastAt: list.length ? list[0].at : 0 };
+    },
     restore(index, chatId) {
       const list = this.listRecoveryPoints(chatId);
       if (!list[index]) return false;

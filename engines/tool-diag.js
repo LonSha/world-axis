@@ -190,6 +190,7 @@
             lastSave: { at: stat.at, ok: stat.ok, bytes: stat.bytes, reason: stat.reason, failCount: stat.failCount },
             transactions: WA.store.txStat ? WA.store.txStat() : null,
             batch: WA.store.batchStat ? WA.store.batchStat() : null,
+            recovery: WA.store.recoveryStat ? WA.store.recoveryStat() : null,
             sizeProfile: prof
           };
         }, null)
@@ -389,6 +390,9 @@
     else if (lsav && lsav.failCount > 0) issues.push({ level: 'warn', key: 'storage', detail: 'store 历史落盘失败 ' + lsav.failCount + ' 次（当前已恢复）' });
     // v0.1.30: 事务健康——独立 transactions 键（与 lastSave 议题解耦）：
     //   lastStatus='save-failed' → error（当下在丢数据）；saveFailed>0 但已恢复 → warn（历史失败）；errors>0 → warn（修改器抛错但状态未提交）
+    // v0.1.37: 恢复点满额 → info（环形覆盖属正常行为，但用户应知晓最旧快照将被丢弃）
+    const rstat = (((diag.worldState || {}).storage || {}).recovery) || null;
+    if (rstat && rstat.full) issues.push({ level: 'info', key: 'recovery', detail: '恢复点已达上限（' + rstat.count + '/' + rstat.max + '，共 ' + rstat.bytes + ' 字节）：下次创建时最旧快照将被覆盖' });
     const txs = (((diag.worldState || {}).storage || {}).transactions) || null;
     if (txs && txs.lastStatus === 'save-failed') issues.push({ level: 'error', key: 'transactions', detail: '最近一次事务落盘失败（' + txs.saveFailed + '/' + txs.count + ' 次历史失败）：内存态已推进但 localStorage 未持久化，建议导出快照' });
     else if (txs && txs.saveFailed > 0) issues.push({ level: 'warn', key: 'transactions', detail: '历史事务落盘失败 ' + txs.saveFailed + ' 次（当前已恢复）' });
