@@ -20,8 +20,13 @@
         <div class="wa-set-row"><span>NPC预算 <b id="wa-set-npcv">${bs.npcBudget}</b></span><input type="range" min="1" max="16" value="${bs.npcBudget}" id="wa-set-npc" class="wa-range"/></div>
         <label class="wa-node"><input type="checkbox" id="wa-set-auto" ${bs.autoSimulate ? 'checked' : ''}/><span class="wa-node-label">每轮自动推演（关闭则仅手动）</span></label>
         <label class="wa-node"><input type="checkbox" id="wa-set-fullrules" ${bs.fullRules ? 'checked' : ''}/><span class="wa-node-label">注入世界规则全文（12模块铁律；关闭则仅精简守则，省token）</span></label>
-        <div class="wa-set-row"><span>注入预算 <b id="wa-set-budgetv">${bs.injectBudget === 0 ? '不限' : bs.injectBudget + 't'}</b></span><input type="range" min="0" max="6000" step="200" value="${bs.injectBudget == null ? 2400 : bs.injectBudget}" id="wa-set-budget" class="wa-range"/></div>
-        <div class="wa-dim">预算裁决：核心块（世界状态/近端事件）优先保底；记忆/摘要/账本/舆情超预算时先折叠后丢弃。设为 0 即不限（全量注入）。</div>
+        <div class="wa-set-row"><span>注入预算</span><select id="wa-set-budget-mode" class="wa-input">
+          <option value="auto" ${bs.injectBudget == null || bs.injectBudget < 0 ? 'selected' : ''}>自动（按上下文窗口 6%）</option>
+          <option value="unlimited" ${bs.injectBudget === 0 ? 'selected' : ''}>不限（全量注入）</option>
+          <option value="manual" ${bs.injectBudget > 0 ? 'selected' : ''}>手动上限</option>
+        </select></div>
+        <div class="wa-set-row"><span>手动上限 <b id="wa-set-budgetv">${bs.injectBudget > 0 ? bs.injectBudget + 't' : '—'}</b></span><input type="range" min="200" max="6000" step="200" value="${bs.injectBudget > 0 ? bs.injectBudget : 2400}" id="wa-set-budget" class="wa-range"/></div>
+        <div class="wa-dim">预算裁决：核心块（世界状态/近端事件）优先保底；记忆/摘要/账本/舆情超预算时先折叠后丢弃。自动档从宿主上下文窗口推导，夹在 800–4000t。</div>
         <div class="wa-sec">自定义推演指令（追加到系统提示）</div>
         <textarea id="wa-set-custom" class="wa-ta" placeholder="例如：本世界魔法衰退，推演时注意时代背景…">${esc(bs.customInstruction)}</textarea>
         <button class="wa-btn" id="wa-set-save">保存推演设置</button>
@@ -46,7 +51,15 @@
       const npc = $('#wa-set-npc');
       if (npc) npc.oninput = () => { $('#wa-set-npcv').textContent = npc.value; };
       const bg = $('#wa-set-budget');
-      if (bg) bg.oninput = () => { $('#wa-set-budgetv').textContent = (+bg.value === 0 ? '不限' : bg.value + 't'); };
+      const bgMode = $('#wa-set-budget-mode');
+      const syncBudgetRow = () => {
+        const mode = bgMode ? bgMode.value : 'auto';
+        if (bg) bg.disabled = (mode !== 'manual');
+        if ($('#wa-set-budgetv')) $('#wa-set-budgetv').textContent = mode === 'auto' ? '自动' : (mode === 'unlimited' ? '不限' : (bg ? bg.value + 't' : '—'));
+      };
+      if (bgMode) bgMode.onchange = syncBudgetRow;
+      if (bg) bg.oninput = () => { if ($('#wa-set-budgetv') && (!$('#wa-set-budget-mode') || $('#wa-set-budget-mode').value === 'manual')) $('#wa-set-budgetv').textContent = bg.value + 't'; };
+      syncBudgetRow();
       const saveBtn = $('#wa-set-save');
       if (saveBtn) saveBtn.onclick = () => {
         WA.backstage.setSettings({
@@ -56,7 +69,7 @@
           npcBudget: +npc.value,
           autoSimulate: $('#wa-set-auto').checked,
           fullRules: $('#wa-set-fullrules').checked,
-          injectBudget: +($('#wa-set-budget') ? $('#wa-set-budget').value : 2400) || 0,
+          injectBudget: (() => { const m = $('#wa-set-budget-mode'); const v = m ? m.value : 'auto'; if (v === 'unlimited') return 0; if (v === 'manual') return Math.max(200, +($('#wa-set-budget') ? $('#wa-set-budget').value : 2400) || 2400); return -1; })(),
           customInstruction: $('#wa-set-custom').value.trim()
         });
         WA.opinion.setSettings({ enabled: $('#wa-op-enable').checked, sandboxEnabled: $('#wa-op-sandbox').checked, everyNRounds: +$('#wa-op-n').value || 3 });

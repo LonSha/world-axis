@@ -32,6 +32,7 @@
     const sig = roundSig();
     if (sig === lastRoundSig) { WA.log('info', '拦截器去重：本轮before链已执行'); return; }
     lastRoundSig = sig;
+    try { if (WA.store && contextSize) WA.store.transact(d => { d.meta = d.meta || {}; d.meta.contextSize = contextSize; }); } catch (e) { /* 预算推导用，失败不影响推演 */ }
 
     const ctx = {
       type: type || 'normal',

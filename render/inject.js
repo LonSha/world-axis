@@ -70,7 +70,7 @@
       try {
         const budget = (WA.backstage && WA.backstage.getSettings) ? WA.backstage.getSettings().injectBudget : null;
         if (WA.injectBudget && budget !== 0 && items.length) {
-          planInfo = WA.injectBudget.plan(items, { budget: budget == null ? WA.injectBudget.DEFAULT_BUDGET : budget });
+          planInfo = WA.injectBudget.plan(items, { budget: (budget == null ? -1 : budget) });
           finalItems = WA.injectBudget.apply(items, planInfo);
           if (planInfo.folded.length || planInfo.dropped.length) {
             WA.log('info', '注入预算裁决：' + WA.injectBudget.summaryText(planInfo)
@@ -84,7 +84,7 @@
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(combined.length);
-        try { WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: finalItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null }; }); } catch (e) { /* 快照失败不影响注入 */ }
+        try { WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: finalItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null }; }); } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + finalItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）');
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
     }

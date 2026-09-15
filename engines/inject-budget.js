@@ -79,7 +79,8 @@
 
   function plan(items, opts) {
     const o = opts || {};
-    const budget = Math.max(0, o.budget != null ? o.budget : DEFAULT_BUDGET);
+    const rb = resolveBudget(o.budget);
+    const budget = Math.max(0, rb.budget);
     const list = (Array.isArray(items) ? items : []).map(function (it) {
       const source = (it && it.source) || '未命名';
       const content = String((it && it.content) || '');
@@ -120,7 +121,7 @@
     });
 
     return {
-      budget: budget, used: used, remain: Math.max(0, budget - used),
+      budget: budget, budgetSource: rb.source, contextSize: rb.contextSize, used: used, remain: Math.max(0, budget - used),
       overBudget: used > budget,
       kept: kept, folded: folded, dropped: dropped,
       inputTokens: list.reduce(function (s, x) { return s + x.tokens; }, 0),
@@ -144,6 +145,33 @@
     }).filter(Boolean);
   }
 
+  /** 自动预算档：从宿主上下文窗口推导（比例 6%，夹在 [800,4000]） */
+  const AUTO_RATIO = 0.06, AUTO_MIN = 800, AUTO_MAX = 4000;
+  function resolveContextSize() {
+    const tryVal = function (v) { return (typeof v === 'number' && isFinite(v) && v > 512) ? v : null; };
+    try {
+      const W = (typeof window !== 'undefined') ? window : global;
+      const cand = [
+        W.oai_settings && W.oai_settings.openai_max_context,
+        W.SillyTavern && W.SillyTavern.getContext && (function () { try { const c = W.SillyTavern.getContext(); return c && (c.maxContext || (c.chatMetadata && c.chatMetadata.maxContext)); } catch (e) { return null; } })(),
+        WA.store && WA.store.read && WA.store.read('meta.contextSize')
+      ];
+      for (let i = 0; i < cand.length; i++) { const v = tryVal(cand[i]); if (v) return v; }
+    } catch (e) { /* 非浏览器环境回落 */ }
+    return null;
+  }
+  function autoBudget(contextSize) {
+    const cs = (typeof contextSize === 'number' && isFinite(contextSize) && contextSize > 512) ? contextSize : resolveContextSize();
+    if (!cs) return { budget: DEFAULT_BUDGET, source: 'default', contextSize: null };
+    const raw = Math.round(cs * AUTO_RATIO);
+    return { budget: Math.max(AUTO_MIN, Math.min(AUTO_MAX, raw)), source: 'auto', contextSize: cs };
+  }
+  /** 统一入口：budget 为负数/未给 → 自动档 */
+  function resolveBudget(budget) {
+    if (budget == null || budget < 0) return autoBudget();
+    return { budget: budget | 0, source: 'manual', contextSize: null };
+  }
+
   function summaryText(p) {
     if (!p) return '未规划';
     const tail = p.folded.length ? '｜折叠 ' + p.folded.length : '';
@@ -152,7 +180,8 @@
   }
 
   WA.injectBudget = {
-    DEFAULT_BUDGET, MIN_KEEP_TOKENS, FOLD_FLOOR_TOKENS, PRIORITY,
+    DEFAULT_BUDGET, MIN_KEEP_TOKENS, FOLD_FLOOR_TOKENS, PRIORITY, AUTO_RATIO, AUTO_MIN, AUTO_MAX,
+    autoBudget, resolveBudget, resolveContextSize,
     tokensOf, rankOf, foldable, trim, plan, apply, summaryText
   };
   if (WA.log) WA.log('info', '注入预算裁判已加载');
