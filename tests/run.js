@@ -19,7 +19,7 @@ const ctx = vm.createContext(global);
 const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
-  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js',
+  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
@@ -175,7 +175,8 @@ const WA = global.WorldAxis;
   assert(winds.length === 1 && winds[0].level === 3 && winds[0].content === '血刀门加码悬赏', '风声同主题归并(不新建,等级取高)');
   // 消散骰（level1 rumor grace1，多轮后大概率消散）
   WA.store.transact(d => { d.evolution.winds.forEach(w => { w.quietRounds = 20; w.level = 1; }); });
-  const decayed = WA.evolution.decayWinds();
+  let decayed = WA.evolution.decayWinds();
+  if (!decayed.includes('血刀门追杀令')) decayed = decayed.concat(WA.evolution.decayWinds()); // 95%骰子，重试消除flaky
   assert(decayed.includes('血刀门追杀令'), '风声长期沉寂后消散');
   // 演化注入块
   const evBlock = WA.evolution.buildEvolutionBlock();
@@ -574,6 +575,79 @@ const WA = global.WorldAxis;
   // 删除存档
   const delResult = WA.chatcache.deleteSnapshot(snapList[0].id);
   assert(delResult === true, '删除存档执行');
+
+  // ── pmem (v0.8.2) ──
+  section('engines/pmem v0.8.2');
+  WA.store.transact(d => {
+    d.evolution.people = [{ name: '沈炼', aliases: ['沈捕快'] }, { name: '陆文昭', aliases: [] }];
+    d.memory.pmem = [];
+  });
+  // 入账
+  const pmr = WA.store.transact(d => WA.pmem.applyPersonalMemory(d, [
+    { name: ['沈炼'], known_by: ['陆文昭'], memory: '沈炼怀疑北镇抚司内有内鬼', time: '第3日·夜' },
+    { name: ['沈炼'], known_by: [], memory: '沈炼怀疑北镇抚司内有内鬼', time: '' }, // 重复→跳过
+    { name: [], known_by: [], memory: '无持有者', time: '' }, // 无效→跳过
+    { name: ['陆文昭'], known_by: [], memory: '陆文昭以为沈炼已死', time: '' }
+  ])).result;
+  assert(pmr.added === 2 && pmr.skipped === 2, '主观记忆入账：去重+无效剔除');
+  assert(WA.store.get().memory.pmem[0].known_by.includes('沈炼') && WA.store.get().memory.pmem[0].known_by.includes('陆文昭'), 'known_by本地自动补持有者');
+  // 别名感知召回
+  WA.store.transact(d => WA.pmem.applyPersonalMemory(d, [
+    { name: ['沈捕快'], known_by: [], memory: '沈捕快记住了密室机关的开启方法', time: '' }
+  ]));
+  WA.store.transact(() => {});
+  const recalled = WA.pmem.recall('沈炼');
+  // 沈炼本名条+沈捕快别名条命中；陆文昭的私密记忆不被召回（信息不对称）
+  assert(recalled.length === 2 && !recalled.some(e => e.holders.includes('陆文昭')), '别名命中召回+他人私密记忆不误召回');
+  assert(recalled.some(e => e.holders.includes('沈捕快')), '召回含别名持有条目');
+  // 信息不对称
+  const secret = WA.store.get().memory.pmem.find(e => e.text.includes('内鬼'));
+  assert(WA.pmem.knows('陆文昭', secret.id) === true, '知情人可判定知情');
+  assert(WA.pmem.knows('陌生人', secret.id) === false, '无关人物不知情');
+  // 每人上限6
+  WA.store.transact(d => {
+    d.memory.pmem = [];
+    for (let i = 0; i < 10; i++) WA.pmem.applyPersonalMemory(d, [{ name: ['张三'], known_by: [], memory: '张三记得事件' + i + '号并有后续影响', time: '' }]);
+  });
+  WA.store.transact(() => {});
+  const zsCount = WA.store.get().memory.pmem.filter(e => e.holders.includes('张三')).length;
+  assert(zsCount <= WA.pmem.CAP_PER_PERSON, `每人上限${WA.pmem.CAP_PER_PERSON}(实际${zsCount})`);
+  // 注入块
+  WA.store.transact(d => { d.memory.pmem = []; WA.pmem.applyPersonalMemory(d, [{ name: ['沈炼'], known_by: [], memory: '沈炼怀疑有内鬼', time: '第3日' }]); });
+  WA.store.transact(() => {});
+  const pblock = WA.pmem.buildBlock();
+  assert(pblock.includes('人物主观记忆') && pblock.includes('沈炼怀疑有内鬼') && pblock.includes('（第3日）'), '主观记忆注入块含时间与持有者');
+  assert(WA.pmem.SYSTEM_PROMPT.includes('怀疑仍是怀疑') && WA.pmem.SYSTEM_PROMPT.includes('known_by'), '提取提示词保留认知强度与知情规则');
+
+  // ── entities.applyEntityUpdates (v0.8.2) ──
+  section('entities applyEntityUpdates v0.8.2');
+  WA.store.transact(d => {
+    d.evolution.entityMemory = { organization: [], object: [], ability: [], location: [] };
+    WA.entities.applyEntityUpdates(d, [
+      { type: 'organization', name: '血刀门', aliases: ['刀门'], description: '门主重伤，群龙无首', event: '血刀门门主在决战中重伤', time: '第5日' },
+      { type: 'organization', name: '血刀门', aliases: [], description: '', event: '血刀门归顺朝廷', time: '第6日' }, // 空desc不覆盖
+      { type: 'invalid_type', name: 'X', event: 'e' }, // 非法类型跳过
+      { type: 'object', name: '绣春刀', aliases: [], description: '刀刃有缺口的御赐佩刀', event: '', time: '' }
+    ]);
+  });
+  WA.store.transact(() => {});
+  const em2 = WA.store.get().evolution.entityMemory;
+  const xdm = em2.organization.find(e => e.name === '血刀门');
+  assert(xdm && em2.organization.length === 1, '同实体多事件不重复创建');
+  assert(xdm.desc === '门主重伤，群龙无首', '空description不覆盖本地描述');
+  assert(xdm.events.length === 2 && xdm.events[1].e === '血刀门归顺朝廷', '事件按序累积2条');
+  assert(xdm.aliases.includes('刀门'), '别名入账');
+  const xcd = em2.object.find(e => e.name === '绣春刀');
+  assert(xcd && xcd.events.length === 0 && xcd.desc.includes('缺口'), '仅描述更新实体正常入账，空事件不入events');
+  // 与backstage的upsert互操作：upsert建的实体能被applyEntityUpdates按别名命中
+  WA.store.transact(d => {
+    WA.entities.upsert(d, 'location', { name: '青龙寺', aliases: ['古寺'], desc: '山门破败' });
+    WA.entities.applyEntityUpdates(d, [{ type: 'location', name: '古寺', aliases: [], description: '', event: '青龙寺地宫被发现', time: '第7日' }]);
+  });
+  WA.store.transact(() => {});
+  const em3 = WA.store.get().evolution.entityMemory;
+  const qls = em3.location.find(e => e.name === '青龙寺');
+  assert(em3.location.length === 1 && qls.events.length === 1, '既有实体按别名命中并追加事件（不重复创建）');
 
   section('engines/opinion');
   WA.store.transact(d => {

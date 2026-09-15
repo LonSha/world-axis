@@ -45,6 +45,8 @@
       if (snap) items.push({ source: '世界状态', content: snap });
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
+      // v0.8.2: 人物主观记忆块（认知与信息不对称）
+      if (vis.memory && WA.pmem) { const pb = WA.pmem.buildBlock(); if (pb) items.push({ source: '主观记忆', content: pb }); }
       // 舆情块
       if (vis.opinion && WA.opinion) { const ob = WA.opinion.buildOpinionBlock(); if (ob) items.push({ source: '舆情', content: ob }); }
       // v0.8: 重大事件账本块

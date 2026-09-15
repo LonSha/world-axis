@@ -135,6 +135,70 @@
   }
 
   /**
+   * 记忆提取结果的实体更新入账（区别于backstage的applyEntities）
+   * 源码语义：description空=不覆盖本地描述；event累积进历史（同文本去重，每人上限8条）
+   * 同一实体的多项事件复用同一实体条目，不因逐项返回而重复创建
+   * @returns {number} 处理的更新条数
+   */
+  function applyEntityUpdates(draft, list) {
+    if (!Array.isArray(list)) return 0;
+    const em = ensureState(draft);
+    const idx = em._index || rebuildIndex(em);
+    const touched = new Map(); // type:normName → entity
+    let count = 0;
+    for (const raw of list.slice(0, 8)) {
+      if (!raw || !ENTITY_TYPES.includes(raw.type)) continue;
+      const name = clean(raw.name);
+      if (!name) continue;
+      const key = raw.type + ':' + normalized(name);
+      let ent = touched.get(key) || null;
+      if (!ent) {
+        let id = idx[key] || null;
+        if (!id) {
+          for (const a of strArr(raw.aliases)) {
+            id = idx[`${raw.type}:${normalized(a)}`] || null;
+            if (id) break;
+          }
+        }
+        if (id) ent = em[raw.type].find(e => e.id === id) || null;
+      }
+      if (ent) {
+        // 合并别名
+        ent.aliases = unique([ent.name, ...(ent.aliases || []), ...strArr(raw.aliases)])
+          .filter(a => normalized(a) !== normalized(ent.name)).slice(0, 6);
+        // 空description=不更新本地描述（源码语义）
+        const desc = clean(raw.description);
+        if (desc) ent.desc = desc.slice(0, 200);
+      } else {
+        ent = {
+          id: `${raw.type[0]}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+          name, aliases: strArr(raw.aliases).filter(a => normalized(a) !== normalized(name)).slice(0, 6),
+          desc: clean(raw.description).slice(0, 200),
+          events: [], updatedAt: Date.now()
+        };
+        em[raw.type].push(ent);
+        if (em[raw.type].length > CAP_PER_TYPE) em[raw.type] = em[raw.type].slice(-CAP_PER_TYPE);
+        rebuildIndex(em);
+      }
+      touched.set(key, ent);
+      // event累积（去重，保留最新8条）
+      const ev = clean(raw.event);
+      if (ev) {
+        ent.events = ent.events || [];
+        if (!ent.events.some(x => normalized(x.e) === normalized(ev))) {
+          ent.events.push({ e: ev.slice(0, 60), t: clean(raw.time).slice(0, 40), at: Date.now() });
+          if (ent.events.length > 8) ent.events.splice(0, ent.events.length - 8);
+        }
+      }
+      ent.updatedAt = Date.now();
+      count++;
+    }
+    return count;
+  }
+
+  const strArr = v => (Array.isArray(v) ? v : (v == null || v === '' ? [] : [v])).map(x => String(x == null ? '' : x).trim()).filter(Boolean);
+
+  /**
    * 注入块：按类型分组列出既有实体（防止推演重复造实体）
    */
   function buildEntitiesBlock() {
@@ -155,5 +219,5 @@
     return '【既有实体库】推演必须复用以下实体，不得重复创建同义实体：\n' + lines.join('\n');
   }
 
-  WA.entities = { ENTITY_TYPES, TYPE_LABELS, upsert, applyEntities, findId, buildEntitiesBlock, ensureState, rebuildIndex };
+  WA.entities = { ENTITY_TYPES, TYPE_LABELS, upsert, applyEntities, applyEntityUpdates, findId, buildEntitiesBlock, ensureState, rebuildIndex };
 })();
