@@ -9,7 +9,8 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.9.1';
+  const VERSION = '0.9.2';
+  WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -73,6 +74,8 @@
     'engines/tool-snapshot.js',
     'engines/tool-analyzer.js',
     'engines/tool-import.js',
+    'engines/inject-inspector.js',
+    'engines/tool-diag.js',
     'engines/calendar.js',
     'engines/memory.js',
     'engines/opinion.js',
@@ -112,6 +115,7 @@
     // 模块全部加载后：初始化store、注册拦截器、建UI
     try { WA.store && WA.store.init && WA.store.init(); } catch (e) { WA.log('error', 'store初始化失败', e); }
     try { WA.interceptor && WA.interceptor.install && WA.interceptor.install(); } catch (e) { WA.log('error', '拦截器安装失败', e); }
+    try { WA.injectInspector && WA.injectInspector.init && WA.injectInspector.init(); } catch (e) { WA.log('warn', '注入自检初始化失败', e); }
     try { WA.ui && WA.ui.mount && WA.ui.mount(); } catch (e) { WA.log('error', 'UI挂载失败', e); }
     WA.log('info', '世界枢轴初始化完成。已注册模块: ' + Object.keys(WA.modules).join(', '));
   }

@@ -223,7 +223,11 @@
       <div class="wa-dim">支持：全量存档 / 区域事件 / 势力清单 / 事件链清单 / 人物主观记忆 / 世界书条目组（自动判别）</div>
       <textarea id="wa-imp-text" class="wa-ta" placeholder="或直接粘贴 JSON 内容…"></textarea>
       <button class="wa-btn" id="wa-imp-run">预检并导入</button>
-      <div id="wa-imp-out" class="wa-out"></div>`;
+      <div id="wa-imp-out" class="wa-out"></div>
+      <div class="wa-sec">扩展自检（模块/注入/UI/运行环境）</div>
+      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button></div>
+      <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
+      <div id="wa-diag-out" class="wa-out"></div>`;
   }
 
   function renderLogs() {
@@ -349,6 +353,18 @@
           impFile.value = '';
         };
       }
+      const dgRun = $('#wa-diag-run');
+      if (dgRun && WA.toolDiag) dgRun.onclick = () => {
+        const d = WA.toolDiag.collect();
+        const flat = WA.toolDiag.flatten(d);
+        $('#wa-diag-out').innerHTML = '<div class="wa-item"><b>' + esc(WA.toolDiag.summaryText(d)) + '</b></div>' +
+          flat.map(x => '<div class="wa-log wa-log-' + (x.level === 'error' ? 'error' : (x.level === 'warn' ? 'warn' : 'info')) + '">[' + esc(x.key) + '] ' + esc(x.detail) + '</div>').join('');
+      };
+      const dgDl = $('#wa-diag-dl');
+      if (dgDl && WA.toolDiag) dgDl.onclick = () => {
+        const r = WA.toolDiag.download();
+        $('#wa-diag-out').textContent = r.ok ? ('诊断包已导出 ' + Math.round(r.bytes / 1024) + 'KB') : ('导出失败：' + r.reason);
+      };
       const impRun = $('#wa-imp-run');
       if (impRun && WA.toolImport) impRun.onclick = () => {
         const out = $('#wa-imp-out');

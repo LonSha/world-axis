@@ -20,7 +20,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/tool-diag.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1029,6 +1029,107 @@ const WA = global.WorldAxis;
   section('render/purifier');
   const purified = WA.purifier.apply('正文<think>内心戏</think>继续');
   assert(!purified.includes('think'), '净化·思考块移除');
+
+  // ─ inject-inspector v0.9.2 ──
+  section('engines/inject-inspector v0.9.2');
+  WA.injectInspector.reset();
+  assert(WA.injectInspector.SENTINEL === 'world_axis_state', '哨兵标记与注入块同源');
+  assert(WA.injectInspector.statusText('NOT_YET').includes('尚未'), '未生成时给出状态文本');
+  assert(WA.injectInspector.statusText('MISSING').includes('注入失败'), 'MISSING 提示真注入失败');
+  assert(WA.injectInspector.statusText('SUCCESS', 'memory').includes('记忆信息'), 'memory 域文案替换世界状态');
+  assert(WA.injectInspector.getLastSnapshot() === null, '初始快照为空');
+  const envNoReg = WA.injectInspector.snapEnv(null, {});
+  assert(WA.injectInspector.classify(envNoReg, false) === 'SKIPPED_OTHER', '未注册注入判为 SKIPPED_OTHER');
+  assert(WA.injectInspector.classify(envNoReg, true) === 'SUCCESS', '落地即真相：即便未注册也判 SUCCESS');
+  const visBackup = WA.render.getVisibility();
+  Object.keys(visBackup).forEach(k => WA.render.setVisibility(k, false));
+  const envOff = WA.injectInspector.snapEnv(null, {});
+  assert(envOff.injectEnabled === false, '可见性全关被环境快照捕获');
+  assert(WA.injectInspector.classify(envOff, false) === 'SKIPPED_DISABLED', '全关判 SKIPPED_DISABLED');
+  Object.keys(visBackup).forEach(k => WA.render.setVisibility(k, visBackup[k]));
+  WA.injectInspector.markRegistered(123);
+  const envReg = WA.injectInspector.snapEnv(null, {});
+  assert(envReg.registeredAtSend === true && envReg.registeredLen === 123, 'markRegistered 记录注册长度');
+  const chatMiss = WA.injectInspector.snapshotChat([{ role: 'system', mes: '别的内容' }], envReg);
+  assert(chatMiss.status === 'MISSING', '注册了却没进 prompt 判 MISSING');
+  const chatHit = WA.injectInspector.snapshotChat([
+    { role: 'system', mes: '背景' },
+    { role: 'system', mes: '<world_axis_state>【世界时间】第5日</world_axis_state>' }
+  ], envReg);
+  assert(chatHit.status === 'SUCCESS' && chatHit.ourIndex === 1, 'chat形态命中哨兵判SUCCESS并定位下标');
+  assert(chatHit.ourContentLen > 0 && chatHit.ourContent.slice(0, 3) === '<wo', 'chat形态只留摘录不导全文');
+  const chatFlag = WA.injectInspector.snapshotChat([{ role: 'system', mes: 'x', is_extension_prompt: true }], envReg);
+  assert(chatFlag.status === 'SUCCESS' && chatFlag.ourIndex === 0, 'chat形态识别宿主注入消息标记');
+  const textMiss = WA.injectInspector.snapshotText('一大段没有标记的 prompt', envReg);
+  assert(textMiss.status === 'MISSING' && textMiss.ourIndex === -1, 'text形态未命中判 MISSING');
+  const textHit = WA.injectInspector.snapshotText('prefix <world_axis_state>【世界脉搏】</world_axis_state> suffix', envReg);
+  assert(textHit.status === 'SUCCESS' && textHit.ourIndex === textHit.promptLength - 'suffix'.length - '<world_axis_state>【世界脉搏】</world_axis_state>'.length
+    && textHit.promptLength > 0 && textHit.ourExcerptLen > 0, 'text形态命中并记录位置与总长');
+  const envRoll = WA.injectInspector.snapEnv(null, { sameLayerReroll: true });
+  assert(WA.injectInspector.classify(envRoll, false) === 'SKIPPED_REROLL', '同层重roll判 SKIPPED_REROLL');
+  WA.injectInspector.reset();
+  assert(WA.injectInspector.init() === true, '在事件源可用时订阅成功');
+  assert(WA.injectInspector.init() === false, '重复订阅被单订阅守卫拦下');
+  await global.__triggerEvent('chat_completion_prompt_ready', { chat: [
+    { role: 'system', mes: '<world_axis_state>【世界时间】第6日</world_axis_state>' },
+    { role: 'user', mes: '继续' }
+  ], dryRun: true });
+  assert(WA.injectInspector.getLastSnapshot() === null, 'dryRun 预热轮不落快照');
+  await global.__triggerEvent('chat_completion_prompt_ready', { chat: [
+    { role: 'system', mes: '<world_axis_state>【世界时间】第6日</world_axis_state>' },
+    { role: 'user', mes: '继续' }
+  ] });
+  const snapEvt = WA.injectInspector.getLastSnapshot();
+  assert(snapEvt && snapEvt.status === 'SUCCESS' && snapEvt.messageCount === 2, '正式轮事件落地快照');
+  assert(WA.injectInspector.getLastSnapshot('memory') === snapEvt, 'memory 域读取同一份快照');
+  assert(WA.injectInspector.getLastSnapshot('nonsense') === null, '未知 scope 返回 null 不抛');
+  await global.__triggerEvent('generate_after_combine_prompts', { prompt: 'a <world_axis_state>b</world_axis_state>' });
+  assert(WA.injectInspector.getLastSnapshot().apiType === 'text', 'text 通道事件亦能落快照');
+  const flatInj = WA.injectInspector.flatten(snapEvt);
+  assert(flatInj.length >= 3 && flatInj[0].detail.includes('进入正文'), 'flatten 首条给出落地结论');
+  assert(WA.injectInspector.flatten(null)[0].detail.includes('尚未'), 'flatten 空快照给提示');
+  const beforeInj = JSON.stringify(WA.store.get());
+  WA.injectInspector.snapshotChat([{ role: 'user', mes: 'x' }], WA.injectInspector.snapEnv(null, {}));
+  assert(JSON.stringify(WA.store.get()) === beforeInj, '注入自检纯只读（state零改动）');
+
+  // ── tool-diag v0.9.2 ──
+  section('engines/tool-diag v0.9.2');
+  assert(WA.toolDiag && typeof WA.toolDiag.collect === 'function', '诊断引擎已导出');
+  const dg = WA.toolDiag.collect();
+  assert(dg.meta.packageFormat === 'worldaxis-diag' && dg.meta.packageVersion === 2, '诊断包格式标识与版本');
+  assert(typeof dg.env === 'object' && dg.env.chatId === 'test_chat_001', '环境节读到 host chatId');
+  assert(dg.env.tavernApi.setExtensionPrompt === true, '宿主能力探测：setExtensionPrompt 可用');
+  assert(dg.modules.loadedCount >= 30 && dg.modules.missingCount === 0, '模块装载清单零缺失');
+  assert(WA.toolDiag.UI_BINDINGS.filter(g => g.page === 'tools')[0].ids.includes('wa-diag-run'), '自检控件已纳入UI绑定校验清单');
+  assert(dg.modules.missing.length === 0, '缺失清单为空数组');
+  assert(dg.ui.note ? true : dg.ui.allOk === false, '非浏览器环境 UI 节给出跳过说明');
+  const capKeys = dg.capabilities.map(c => c.key);
+  assert(capKeys.includes('injectInspector') && capKeys.includes('toolDiag'), '能力清单纳入 v0.9.2 新模块');
+  assert(dg.capabilities.filter(c => c.key === 'injectInspector')[0].ok === true, '注入自检 API 齐备');
+  assert(dg.capabilities.filter(c => c.key === 'toolSnapshot')[0].ok === true, '快照工具 API 齐备');
+  assert(typeof dg.worldState.counts === 'object' && dg.worldState.counts.factions >= 0, '世界状态计数节可用');
+  assert(dg.worldState.lastInjection === null || typeof dg.worldState.lastInjection === 'object', '上轮注入打点可读');
+  assert(dg.runtime.workflow.nodeCount > 0, '工作流节点统计非零');
+  assert(dg.runtime.apiRouter.concurrency >= 1 && dg.runtime.apiRouter.queue >= 0, 'API 通道并发/队列可读');
+  assert(dg.runtime.apiRouter.channels.some(c => c.name === 'inference' && c.model === 'm'), '通道清单含已配置模型');
+  assert(!dg.runtime.apiRouter.channels.some(c => c.keyMasked === 'k'), 'API Key 已脱敏不出现明文');
+  assert(dg.verdict.ok === true && dg.verdict.errorCount === 0, '当前环境判语无阻断项');
+  const dgJson = WA.toolDiag.toJSON(true);
+  assert(JSON.parse(dgJson).meta.packageVersion === 2, '诊断包 toJSON 可被解析');
+  assert(WA.toolDiag.summaryText(dg).length > 0, '摘要文本非空');
+  assert(WA.toolDiag.flatten(dg).some(x => x.key === 'inject'), 'flatten 含注入节摘要');
+  const dgDlDl = WA.toolDiag.download();
+  assert(dgDlDl.ok === false && String(dgDlDl.reason).includes('非浏览器'), '无Blob环境下载降级为提示');
+  const keepAnalyzer = WA.toolAnalyzer;
+  delete WA.toolAnalyzer;
+  const dgBroken = WA.toolDiag.collect();
+  assert(dgBroken.modules.missing.some(m => m.key === 'toolAnalyzer'), '缺件被模块清单检出');
+  assert(dgBroken.verdict.ok === false && dgBroken.verdict.errorCount >= 1, '缺件时判语转为存在阻断项');
+  assert(dgBroken.capabilities.filter(c => c.key === 'toolAnalyzer')[0].ok === false, '缺件时能力项置不可用');
+  assert(WA.toolDiag.verdict(dgBroken).issues.some(i => i.key === 'modules'), '问题清单含 modules 条目');
+  WA.toolAnalyzer = keepAnalyzer;
+  assert(WA.toolDiag.collect().verdict.ok === true, '恢复模块后判语复原（自检可逆）');
+  assert(dg.meta.extVersion === (global.WorldAxis.VERSION || global.WorldAxis.version) && String(dg.meta.extVersion).length > 0, '诊断包读到扩展版本号');
 
   // ── 汇总 ──
   console.log('\n══════════════════════');

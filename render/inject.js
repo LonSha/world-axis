@@ -68,7 +68,9 @@
       try {
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
-        if (combined) WA.log('info', '注入落地：' + items.map(i => i.source).join(' + '));
+        if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(combined.length);
+        try { WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: items.map(i => i.source) }; }); } catch (e) { /* 快照失败不影响注入 */ }
+        if (combined) WA.log('info', '注入落地：' + items.map(i => i.source).join(' + ') + '（' + combined.length + '字）');
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
     }
   };
