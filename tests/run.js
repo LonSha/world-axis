@@ -19,6 +19,7 @@ const ctx = vm.createContext(global);
 const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
+  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
@@ -293,6 +294,176 @@ const WA = global.WorldAxis;
   assert(lastPrompt.includes('世界推演') || lastPrompt.includes('[世界推演]'), 'digest注入到扩展提示');
   assert(lastPrompt.includes('城门失火'), 'nearEvent注入到扩展提示');
   assert(!WA.store.get().nextTurnInjection || !WA.store.get().nextTurnInjection.nearEvent, 'nearEvent一次性消费已清除');
+
+  // ── ledger (v0.8) ──
+  section('engines/ledger v0.8');
+  // 建立存档点：事件Lv3推进 + 风声Lv3新增场景
+  WA.store.transact(d => {
+    d.evolution.events = [
+      { id: 'evA', title: '叛军集结', type: 'conflict', level: 3, stage: '潜伏' },
+      { id: 'evB', title: '低级事件', type: 'progress', level: 1, stage: '起步' }
+    ];
+    d.evolution.winds = [{ id: 'w1', topic: '旧风声', level: 2, content: '旧' }];
+  });
+  WA.ledger.saveCheckpoint();
+  // 模拟推演后：evA阶段推进、evB低级不变、新增Lv3事件、新增Lv3风声
+  WA.store.transact(d => {
+    d.evolution.events[0].stage = '爆发';
+    d.evolution.events.push({ id: 'evC', title: '新战事', type: 'conflict', level: 3, stage: '潜伏' });
+    d.evolution.winds.push({ id: 'w2', topic: '血月传闻', level: 3, content: '血月将现' });
+  });
+  WA.ledger.recordChanges();
+  const led = WA.store.get().evolution.ledger;
+  assert(led && led.length === 1 && led[0].changes.length === 3, `账本记录3条变化(实际${led ? led[0].changes.length : 0})`);
+  const changeTypes = led[0].changes.map(c => c.type).sort().join(',');
+  assert(changeTypes === 'event_advance,event_new,wind_new', '账本变化类型齐全: ' + changeTypes);
+  // 低级事件不记录
+  assert(!led[0].changes.some(c => c.name === '低级事件'), 'Lv1事件不入账本');
+  // 注入文本
+  const ledText = WA.ledger.buildLedgerText();
+  assert(ledText.includes('叛军集结') && ledText.includes('潜伏->爆发'), '账本注入文本含推进记录');
+  assert(ledText.includes('血月传闻'), '账本注入文本含风声记录');
+  // 同轮重roll覆盖
+  WA.ledger.recordChanges();
+  assert(WA.store.get().evolution.ledger.length === 1, '同轮重复记录被覆盖不堆积');
+  // 终局记录（即使Lv1）
+  WA.store.transact(d => { d.evolution.events = []; });
+  WA.ledger.saveCheckpoint();
+  WA.store.transact(d => { d.evolution.events = [{ id: 'evD', title: '小事件终结', type: 'progress', level: 1, stage: '已完成' }]; });
+  WA.ledger.recordChanges();
+  const led2 = WA.store.get().evolution.ledger;
+  assert(led2[0].changes.some(c => c.type === 'event_terminal' && c.name === '小事件终结'), '任何等级终局都入账本');
+
+  // ── worldbook (v0.8) ──
+  section('engines/worldbook v0.8');
+  // matchKey基础匹配
+  assert(WA.worldbook.matchKey('江湖上传言血刀门行事狠辣', '血刀门', false, false) === true, 'matchKey中文子串匹配');
+  assert(WA.worldbook.matchKey('hello world', 'HELLO', false, false) === true, 'matchKey大小写不敏感');
+  assert(WA.worldbook.matchKey('hello world', 'HELLO', true, false) === false, 'matchKey大小写敏感');
+  assert(WA.worldbook.matchKey('a cat sat', 'cat', false, true) === true, 'matchKey ASCII整词匹配');
+  assert(WA.worldbook.matchKey('concatenate', 'cat', false, true) === false, 'matchKey整词不匹配子串');
+  assert(WA.worldbook.matchKey('测试正则', '/测.*则/', false, false) === true, 'matchKey正则键');
+  // activationOf：常驻/关键词/次键四逻辑
+  const wbEntry = {
+    constant: false, vectorized: false, selective: true, selectiveLogic: 0,
+    keys: ['血刀门'], secondaryKeys: ['江湖', '武林'], caseSensitive: false, matchWholeWords: false
+  };
+  assert(WA.worldbook.activationOf(wbEntry, '血刀门在江湖中', 'auto').active === true, '主键命中+次键AND_ANY命中');
+  assert(WA.worldbook.activationOf(wbEntry, '血刀门在朝廷', 'auto').active === false, '主键命中但次键AND_ANY未命中');
+  const wbNotAny = Object.assign({}, wbEntry, { selectiveLogic: 2 });
+  assert(WA.worldbook.activationOf(wbNotAny, '血刀门在朝廷', 'auto').active === true, 'NOT_ANY逻辑：次键未命中则激活');
+  assert(WA.worldbook.activationOf(wbEntry, '血刀门出现', 'const').active === true, '覆写const强制常驻');
+  assert(WA.worldbook.activationOf(wbEntry, '血刀门出现', 'off').active === false, '覆写off强制关闭');
+  const wbConst = Object.assign({}, wbEntry, { constant: true });
+  assert(WA.worldbook.activationOf(wbConst, '无关键词文本', 'auto').active === true, '🔵常驻条目auto直接激活');
+  // 选择持久化
+  WA.worldbook.saveSelection(['wb1::1', 'wb1::2'], { 'wb1::1': 'const' });
+  assert(WA.worldbook.getSelectedIds().length === 2, '世界书选择持久化');
+  assert(WA.worldbook.getOverrides()['wb1::1'] === 'const', '触发覆写持久化');
+  WA.worldbook.saveSelectedIds(['wb1::1']);
+  assert(WA.worldbook.getSelectedIds().length === 1, 'saveSelectedIds保留覆写');
+  assert(WA.worldbook.getOverrides()['wb1::1'] === 'const', '覆写在仅改选择时保留');
+
+  // ── inspector (v0.8) ──
+  section('engines/inspector v0.8');
+  assert(WA.inspector.SENTINEL === '<world_axis_state>', '哨兵与buildWorldSnapshot开头一致');
+  // 模拟chat prompt ready：包含哨兵 → SUCCESS
+  const fakeCtx = { extensionPrompts: { WorldAxis: { value: '<world_axis_state>【世界时间】第1日' } } };
+  const snapEnv = (function () {
+    // 直接驱动私有handler：通过暴露的getLastSnapshot前需触发事件，改用直接构造验证deriveStatus逻辑
+    return null;
+  })();
+  // 快照状态文本映射
+  assert(WA.inspector.statusText('SUCCESS').includes('✅'), 'SUCCESS状态文本');
+  assert(WA.inspector.statusText('MISSING').includes('❌'), 'MISSING状态文本');
+  assert(WA.inspector.statusText('SKIPPED_DISABLED').includes('关闭'), 'SKIPPED状态文本');
+  assert(WA.inspector.statusText('UNKNOWN_X').includes('尚未'), '未知状态回退NOT_YET');
+
+  // ── timeline (v0.8) ──
+  section('engines/timeline v0.8');
+  // 哈希稳定性与差异检测
+  const h1 = WA.timeline.hashText('同一段文本');
+  const h2 = WA.timeline.hashText('同一段文本');
+  const h3 = WA.timeline.hashText('同一段文本！');
+  assert(h1 === h2 && h1 !== h3, 'hashText稳定且区分差异');
+  assert(h1.length === 16, 'hashText输出16位hex');
+  // 消息ID稳定
+  const msg = { is_user: false, name: '旁白', mes: '夜色渐深。' };
+  const id1 = WA.timeline.ensureMessageId(msg);
+  const id2 = WA.timeline.ensureMessageId(msg);
+  assert(id1 === id2 && id1.startsWith('wax_'), 'ensureMessageId稳定生成');
+  assert(msg.extra && msg.extra[WA.timeline.SOURCE_ID_KEY] === id1, '来源ID写入message.extra');
+  // sourceRef结构
+  const ref = WA.timeline.sourceRef(msg, 5);
+  assert(ref && ref.layer === 5 && ref.messageId === id1 && ref.hash.length === 16, 'sourceRef结构完整');
+  // 捕获+审计：mockChat上下文
+  const tctx = global.SillyTavern.getContext();
+  const chatLen = tctx.chat.length;
+  if (chatLen > 0) {
+    const refs = WA.timeline.captureRange(0, chatLen - 1);
+    assert(refs.length === chatLen, 'captureRange捕获全部楼层');
+    const audit1 = WA.timeline.auditRefs(refs);
+    assert(audit1.valid === true, '引用集初次审计有效');
+    // 内容变化 → changed
+    const origMes = tctx.chat[0].mes;
+    tctx.chat[0].mes = origMes + '（被编辑）';
+    const audit2 = WA.timeline.auditRefs(refs);
+    assert(audit2.valid === false && audit2.changed.length === 1, '编辑楼层→changed检测');
+    // 恢复后重新有效
+    tctx.chat[0].mes = origMes;
+    const audit3 = WA.timeline.auditRefs(refs);
+    assert(audit3.valid === true, '恢复内容→重新有效');
+    // digestRefs指纹
+    const fp1 = WA.timeline.digestRefs(refs);
+    const fp2 = WA.timeline.digestRefs(refs);
+    assert(fp1 === fp2, 'digestRefs指纹稳定');
+  }
+  // unionRefs去重
+  const ra = [{ chatId: 'c1', messageId: 'm1', layer: 0 }, { chatId: 'c1', messageId: 'm2', layer: 1 }];
+  const rb = [{ chatId: 'c1', messageId: 'm2', layer: 1 }, { chatId: 'c1', messageId: 'm3', layer: 2 }];
+  const union = WA.timeline.unionRefs([ra, rb]);
+  assert(union.length === 3 && union[0].layer === 0, 'unionRefs去重并按层排序');
+  // 空引用审计
+  assert(WA.timeline.auditRefs([]).valid === false && WA.timeline.auditRefs([]).reason === 'no_sources', '空引用集审计无效');
+
+  // ── entities (v0.8) ──
+  section('engines/entities v0.8');
+  // 新建
+  WA.store.transact(d => {
+    WA.entities.upsert(d, 'organization', { name: '血刀门', aliases: ['血刀派'], desc: '西域魔教分支' });
+    WA.entities.upsert(d, 'location', { name: '青石关', desc: '西部商路要塞' });
+  });
+  assert(WA.entities.findId('organization', '血刀门') !== null, '实体新建+索引可查');
+  assert(WA.entities.findId('organization', '血刀派') !== null, '别名入索引');
+  assert(WA.entities.findId('organization', '不存在门') === null, '未命中返回null');
+  // 别名命中更新（不重复创建）
+  WA.store.transact(d => {
+    WA.entities.upsert(d, 'organization', { name: '血刀派', desc: '更新后的描述' });
+  });
+  const orgs = WA.store.get().evolution.entityMemory.organization;
+  assert(orgs.length === 1, '别名命中更新不重复创建');
+  assert(orgs[0].name === '血刀门' && orgs[0].aliases.includes('血刀派'), '别名命中更新保留原名与别名');
+  assert(orgs[0].desc === '更新后的描述', '更新刷新描述');
+  // applyEntities批量入账
+  WA.store.transact(d => {
+    WA.entities.applyEntities(d, {
+      organization: [{ name: '漕帮', desc: '运河水运行会' }],
+      object: [{ name: '玄铁令', aliases: ['铁令'] }],
+      ability: [],
+      location: [{ name: '青石关' }]  // 已存在→updated
+    });
+  });
+  const em = WA.store.get().evolution.entityMemory;
+  assert(em.organization.length === 2 && em.object.length === 1, 'applyEntities批量新建');
+  assert(em.location.length === 1, 'applyEntities命中已存在不重复');
+  // 注入块
+  const entBlock = WA.entities.buildEntitiesBlock();
+  assert(entBlock.includes('血刀门') && entBlock.includes('玄铁令'), '实体注入块含名称');
+  assert(entBlock.includes('不得重复创建'), '实体注入块含复用指令');
+  // 类型校验
+  WA.store.transact(d => {
+    assert(WA.entities.upsert(d, 'invalid_type', { name: 'X' }) === 'skipped', '非法类型跳过');
+  });
 
   section('engines/opinion');
   WA.store.transact(d => {

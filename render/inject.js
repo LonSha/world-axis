@@ -47,6 +47,8 @@
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
       // 舆情块
       if (vis.opinion && WA.opinion) { const ob = WA.opinion.buildOpinionBlock(); if (ob) items.push({ source: '舆情', content: ob }); }
+      // v0.8: 重大事件账本块
+      if (WA.ledger) { const lb = WA.ledger.buildLedgerText(); if (lb) items.push({ source: '账本', content: '[重大事件账本]\n' + lb }); }
       // v0.7: world_digest块
       if (WA.digest) { const db = WA.digest.buildBlock(); if (db) items.push({ source: '世界推演', content: db }); }
       // v0.7: 近端事件一次性消费
