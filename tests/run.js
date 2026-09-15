@@ -2932,6 +2932,57 @@ WA.loadScript = _ls.loadScript;
   // 清理现场
   WA.store.transact(d => { d.lastInjection = null; });
   } // end v0.1.29 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.30 — store.transact 计量与落盘结果透出（persisted）
+  // ═══════════════════════════════════════════════════════════
+  v0130: {
+  assert(typeof WA.store.txStat === 'function' && typeof WA.store.resetTxStat === 'function', 'txStat/resetTxStat 已导出');
+  WA.store.resetTxStat();
+  // 正常路径：ok 计数 + 耗时记录
+  WA.store.transact(d => { d.meta.probe130 = 1; });
+  WA.store.transact(d => { d.meta.probe130 = 2; });
+  let s30 = WA.store.txStat();
+  assert(s30.count === 2 && s30.ok === 2 && s30.errors === 0 && s30.saveFailed === 0, '两次成功事务计数正确');
+  assert(typeof s30.avgMs === 'number' && s30.avgMs >= 0, '平均耗时为非负数');
+  assert(s30.lastAt > 0, '末次时间戳记录');
+  // persisted 字段：正常路径 true；quota 路径 false 且 ok 仍为 true（v0.1.22 内存语义契约）
+  const savedSetItem30 = global.localStorage.setItem;
+  let rOk30 = WA.store.transact(d => { d.meta.probe130 = 3; });
+  assert(rOk30.ok === true && rOk30.persisted === true, '正常事务 persisted=true');
+  global.localStorage.setItem = function () { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; };
+  let rQuota30 = WA.store.transact(d => { d.meta.probe130 = 4; });
+  assert(rQuota30.ok === true && rQuota30.persisted === false, '配额失败：ok=true（内存已提交）persisted=false（未落盘）');
+  // txStat 分支：save-failed 计数
+  s30 = WA.store.txStat();
+  assert(s30.count === 4 && s30.ok === 3 && s30.saveFailed === 1, 'save-failed 事务计入独立分支');
+  assert(s30.lastStatus === 'save-failed', 'lastStatus 反映最近一次事务状态');
+  // 此时 quota 仍在生效、最近一次事务就是 save-failed → verdict 应出 error
+  const dg30a = WA.toolDiag.collect();
+  const txErr30a = (dg30a.verdict.issues || []).filter(i => i.key === 'transactions' && i.level === 'error');
+  assert(txErr30a.length === 1 && txErr30a[0].detail.indexOf('最近一次事务落盘失败') >= 0, '最近事务落盘失败 → transactions error 议题');
+  // 修改器异常路径：errors 计数
+  const txFail30 = WA.store.transact(function () { throw new Error('boom130'); });
+  assert(txFail30.ok === false, '异常事务返回 ok=false');
+  s30 = WA.store.txStat();
+  assert(s30.count === 5 && s30.errors === 1, '异常事务计入 errors 分支');
+  // tool-diag 消费：verdict 分级（此刻 quota 已恢复 + boom 已入账，只应有 warn 议题）
+  const dg30 = WA.toolDiag.collect();
+  assert(dg30.worldState.storage.transactions && dg30.worldState.storage.transactions.saveFailed === 1, '诊断透出事务计量');
+  const txErr30 = (dg30.verdict.issues || []).filter(i => i.key === 'transactions' && i.level === 'error');
+  assert(txErr30.length === 0, '恢复后无 transactions error（当下无数据丢失）');
+  const txWarn30 = (dg30.verdict.issues || []).filter(i => i.key === 'transactions' && i.level === 'warn');
+  assert(txWarn30.length === 2, '历史 saveFailed + 修改器异常 → 两条 transactions warn');
+  // 恢复正常后：save-failed 保留为历史（count 不回退）
+  global.localStorage.setItem = savedSetItem30;
+  WA.store.transact(d => { d.meta.probe130 = 5; });
+  s30 = WA.store.txStat();
+  assert(s30.count === 6 && s30.ok === 4 && s30.saveFailed === 1, '恢复后 ok 继续累加，saveFailed 保留历史');
+  assert(WA.store.saveStat().ok === true, '清理：恢复正常保存');
+  // aborted 路径（mutator 返回 false）
+  WA.store.transact(d => { d.meta.probe130 = 99; return false; });
+  s30 = WA.store.txStat();
+  assert(s30.count === 7 && s30.aborted === 1 && WA.store.get().meta.probe130 === 5, '中止事务计数且不提交');
+  } // end v0.1.30 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

@@ -83,6 +83,17 @@
   function recoveryKey(chatId) { return 'worldaxis_recovery_' + (chatId || getChatId()); }
 
   let memCache = {}; // 内存态（当前聊天的权威副本）
+  // v0.1.30: 事务计量——按提交状态聚合计数与耗时
+  const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
+  function recTx(ms, status) {
+    try {
+      __txStat.count++; __txStat.totalMs += ms; __txStat.lastMs = ms; __txStat.lastAt = Date.now(); __txStat.lastStatus = status;
+      if (status === 'ok') __txStat.ok++;
+      else if (status === 'error') __txStat.errors++;
+      else if (status === 'aborted') __txStat.aborted++;
+      else if (status === 'save-failed') __txStat.saveFailed++;
+    } catch (e) {}
+  }
   // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
   const __saveStat = { at: 0, ok: null, bytes: 0, reason: null, failCount: 0 };
   function classifySaveError(e) {
@@ -147,6 +158,10 @@
         return false;
       }
     },
+    /** v0.1.30: 事务计量只读视图（tool-diag 消费） */
+    txStat() { return { count: __txStat.count, ok: __txStat.ok, errors: __txStat.errors, aborted: __txStat.aborted, saveFailed: __txStat.saveFailed, lastStatus: __txStat.lastStatus, avgMs: Math.round(__txStat.totalMs / Math.max(1, __txStat.count)), lastMs: __txStat.lastMs, lastAt: __txStat.lastAt }; },
+    /** v0.1.30: 清零事务计量（诊断重置入口） */
+    resetTxStat() { __txStat.count = 0; __txStat.ok = 0; __txStat.errors = 0; __txStat.aborted = 0; __txStat.saveFailed = 0; __txStat.totalMs = 0; __txStat.lastMs = 0; __txStat.lastAt = 0; __txStat.lastStatus = null; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
@@ -169,13 +184,17 @@
 
     // 事务式更新：传入修改函数，成功才持久化（失败不留半份状态）
     transact(mutator, opts) {
+      // v0.1.30: 事务计量——每轮生成触发多少次 transact、耗时多少（排查链式落盘）
+      const t0 = Date.now();
       const draft = JSON.parse(JSON.stringify(memCache));
       let result;
       try { result = mutator(draft); }
-      catch (e) { WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
-      if (result === false) return { ok: false, aborted: true };
-      this.save(draft);
-      return { ok: true, state: draft, result };
+      catch (e) { recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
+      if (result === false) { recTx(Date.now() - t0, 'aborted'); return { ok: false, aborted: true }; }
+      const saved = this.save(draft);
+      recTx(Date.now() - t0, saved ? 'ok' : 'save-failed');
+      // ok=内存事务语义（v0.1.22 契约：落盘失败不回滚内存）；persisted=v0.1.30 新增落盘结果
+      return { ok: true, persisted: saved, state: draft, result };
     },
 
     // ── 恢复点 ──

@@ -66,6 +66,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.30** — store.transact 事务计量：按 ok/save-failed/error/aborted 四态计数与耗时（txStat/resetTxStat），tool-diag storage 节新增 transactions 子块；verdict 独立 transactions 键分级（最近一次落盘失败 error、历史失败/修改器异常 warn，key 与既有 storage 议题解耦）；transact 返回值新增 persisted 字段（ok 保持 v0.1.22 内存事务语义不变）。
+
 - **v0.1.29** — 撤销语义诚实化 + 可见性开关真实生效（两处真 bug）：① 呈现铁律此前无条件 push，导致 parts.length 恒真、关光所有源仍注入 221 字空壳；② 账本/世界推演不在 SOURCES 内，完全不受开关控制。现在铁律随状态内容有条件追加、ledger/digest 纳入 SOURCES（默认开保持旧行为）；另 uninject 成功后回写 injected:false + clearedAt + clearedBy(trigger)，槽位证据保留维持幂等重放，tool-diag 透出撤销态。注入落地时 lastInjection 记录 injected（主块非空或有槽位落地才算生效）；uninject 成功后回写 injected:false + clearedAt + clearedBy(trigger)，槽位证据保留以维持幂等重放；tool-diag inject 节透出撤销态，诊断不再把已撤销的上一轮注入当作在场证据。
 - **v0.1.28** — 事件总线健康层：WA.on 去重（重复订阅忽略并告警）+ 返回解绑句柄、新增 WA.off、监听器数超阈值(24)一次性泄漏告警；WA.emit 派发用快照（监听器内部增删不影响本轮）并返回实际调用数，异常按事件聚合计数与末错留存；发出但无人监听计入 deadSignals；WA.busStats() 只读视图接入 tool-diag bus 节，三类问题（监听抛错 / 接线断裂 / 泄漏嫌疑）均进 verdict warn。
 - **v0.1.27** — API 通道调用台账：apiRouter 每次 call 按通道记录成功/失败计数、错误归因（http/rate-limit/auth/invalid-json/output-limit/not-configured/timeout）、平均与最近耗时、末错摘要；配置类失败也入账；apiRouter.callStats()/resetCallStats() 只读视图；tool-diag runtime.apiRouter.calls 输出，verdict 分级：全失败 error、有失败率 warn。

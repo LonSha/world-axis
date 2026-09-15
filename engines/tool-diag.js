@@ -188,6 +188,7 @@
           const prof = WA.store.sizeProfile ? WA.store.sizeProfile(6) : null;
           return {
             lastSave: { at: stat.at, ok: stat.ok, bytes: stat.bytes, reason: stat.reason, failCount: stat.failCount },
+            transactions: WA.store.txStat ? WA.store.txStat() : null,
             sizeProfile: prof
           };
         }, null)
@@ -385,6 +386,12 @@
     const lsav = wsStor.lastSave || null;
     if (lsav && lsav.ok === false) issues.push({ level: 'error', key: 'storage', detail: '最近一次 store 落盘失败（' + (lsav.reason || 'error') + '，累计 ' + lsav.failCount + ' 次）：内存态已更新但未持久化' });
     else if (lsav && lsav.failCount > 0) issues.push({ level: 'warn', key: 'storage', detail: 'store 历史落盘失败 ' + lsav.failCount + ' 次（当前已恢复）' });
+    // v0.1.30: 事务健康——独立 transactions 键（与 lastSave 议题解耦）：
+    //   lastStatus='save-failed' → error（当下在丢数据）；saveFailed>0 但已恢复 → warn（历史失败）；errors>0 → warn（修改器抛错但状态未提交）
+    const txs = (((diag.worldState || {}).storage || {}).transactions) || null;
+    if (txs && txs.lastStatus === 'save-failed') issues.push({ level: 'error', key: 'transactions', detail: '最近一次事务落盘失败（' + txs.saveFailed + '/' + txs.count + ' 次历史失败）：内存态已推进但 localStorage 未持久化，建议导出快照' });
+    else if (txs && txs.saveFailed > 0) issues.push({ level: 'warn', key: 'transactions', detail: '历史事务落盘失败 ' + txs.saveFailed + ' 次（当前已恢复）' });
+    if (txs && txs.errors > 0) issues.push({ level: 'warn', key: 'transactions', detail: '事务修改器异常 ' + txs.errors + ' 次（未提交，世界状态保持一致）' });
     // v0.1.23: 工作流节点有历史报错 → warn（不阻断但需排查）
       const wfSt = ((diag.runtime || {}).workflow || {});
       const errNodes = (wfSt.slowest || []).filter(function (r) { return r.errors > 0; });
