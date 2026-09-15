@@ -66,6 +66,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.22** — 持久化可观测：store.save 失败不再静默（配额耗尽归因 quota + 失败计数，内存态仍推进避免半份状态），新增 store.saveStat() 与 store.sizeProfile() 顶层分区体积画像；tool-diag worldState 节加 storage 子节，verdict 对最近落盘失败判 error、历史失败判 warn。
 - **v0.1.21** — wb 通道诊断：tool-diag 新增 wbChannel 节（配置可见 + companionName 解析 + 活跃 waslot order 清单与总字数）；wbInject.activeOrders() 只读列出非空镜像变量。
 - **v0.1.20** — 加载诊断入包：tool-diag runtime 节新增 loader 子节（已加载模块数、CDN 容灾命中清单、失败源冷却时间戳）；verdict 在全部 3 个 CDN 源进入冷却时输出 warn。
 - **v0.1.19** — 可观测性深化：tool-diag 新增 host 节（接入 compat/host 探测结果，宿主能力缺失按级别分流：无 setExtensionPrompt 判 error、无事件源/变量/世界书 API 判 warn）与 uninjectLedger 节；uninject 支持 trigger 参数标注撤销来源（interceptor/chat-changed/manual）并写入 20 条环形台账，render.injectionLedger() 只读视图供诊断消费。

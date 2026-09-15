@@ -171,7 +171,17 @@
         },
         pulse: st.worldPulse ? { pressure: st.worldPulse.pressure, trend: st.worldPulse.trend } : null,
         lastInjection: st.lastInjection || null,
-        recoveryPoints: safe(function () { return WA.store.listRecoveryPoints ? WA.store.listRecoveryPoints().length : null; }, null)
+        recoveryPoints: safe(function () { return WA.store.listRecoveryPoints ? WA.store.listRecoveryPoints().length : null; }, null),
+        // v0.1.22: 持久化观测——落盘状态、体积画像与失败归因
+        storage: safe(function () {
+          if (!WA.store || !WA.store.saveStat) return null;
+          const stat = WA.store.saveStat();
+          const prof = WA.store.sizeProfile ? WA.store.sizeProfile(6) : null;
+          return {
+            lastSave: { at: stat.at, ok: stat.ok, bytes: stat.bytes, reason: stat.reason, failCount: stat.failCount },
+            sizeProfile: prof
+          };
+        }, null)
       };
     }, {});
   }
@@ -328,6 +338,11 @@
     if (h && h.variables === false) issues.push({ level: 'warn', key: 'host', detail: 'TavernHelper 变量 API 缺失：wb 变量镜像通道降级为即时注入' });
     if (h && h.worldbook === false) issues.push({ level: 'warn', key: 'host', detail: 'TavernHelper 世界书 API 缺失：wb 条目自动创建不可用' });
     // v0.1.20: CDN 失败源全数冷却 → warn（当前会话内 CDN 容灾已耗尽）
+    // v0.1.22: 最近一次落盘失败 → error（世界状态未持久化，刷新即丢）
+    const wsStor = ((diag.worldState || {}).storage || {});
+    const lsav = wsStor.lastSave || null;
+    if (lsav && lsav.ok === false) issues.push({ level: 'error', key: 'storage', detail: '最近一次 store 落盘失败（' + (lsav.reason || 'error') + '，累计 ' + lsav.failCount + ' 次）：内存态已更新但未持久化' });
+    else if (lsav && lsav.failCount > 0) issues.push({ level: 'warn', key: 'storage', detail: 'store 历史落盘失败 ' + lsav.failCount + ' 次（当前已恢复）' });
     const ldr = (diag.runtime || {}).loader || {};
     if (ldr.cdnCooldowns && ldr.cdnCooldowns.length >= 3) issues.push({ level: 'warn', key: 'loader', detail: '全部 3 个 CDN 容灾源均在冷却中（60s 内不重试），期间加载失败模块将彻底失败' });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;

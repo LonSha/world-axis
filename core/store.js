@@ -83,6 +83,20 @@
   function recoveryKey(chatId) { return 'worldaxis_recovery_' + (chatId || getChatId()); }
 
   let memCache = {}; // 内存态（当前聊天的权威副本）
+  // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
+  const __saveStat = { at: 0, ok: null, bytes: 0, reason: null, failCount: 0 };
+  function classifySaveError(e) {
+    const name = (e && e.name) || '';
+    const msg = String((e && e.message) || e);
+    if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED' || /quota|exceed|full/i.test(msg)) return 'quota';
+    return 'error';
+  }
+  function byteLen(s) {
+    try {
+      if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(s).length;
+      return s.length * 3; // 中文兜底估算（UTF-8 最多 3 字节）
+    } catch (e) { return s.length * 3; }
+  }
 
   const store = WA.store = {
     SCHEMA_VERSION,
@@ -120,10 +134,35 @@
         const s = state || memCache;
         s.meta = s.meta || {};
         s.meta.updatedAt = Date.now();
-        mainWin.localStorage.setItem(storageKey(chatId), JSON.stringify(s));
+        const payload = JSON.stringify(s);
+        mainWin.localStorage.setItem(storageKey(chatId), payload);
         memCache = s;
+        __saveStat.at = Date.now(); __saveStat.ok = true; __saveStat.bytes = byteLen(payload); __saveStat.reason = null;
         return true;
-      } catch (e) { WA.log('error', 'store.save失败', e); return false; }
+      } catch (e) {
+        // v0.1.22: save 失败归因 + 计数；内存副本仍推进，避免本轮结算在半份状态里丢失
+        __saveStat.at = Date.now(); __saveStat.ok = false; __saveStat.reason = classifySaveError(e); __saveStat.failCount++;
+        const s = state || memCache; if (s) memCache = s;
+        WA.log('error', __saveStat.reason === 'quota' ? 'store.save失败：localStorage 配额耗尽，世界状态未能落盘（导出快照并清理旧聊天数据）' : 'store.save失败', e);
+        return false;
+      }
+    },
+    /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
+    saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
+    /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
+    sizeProfile(topN) {
+      const rows = [];
+      try {
+        Object.keys(memCache || {}).forEach(function (k) {
+          if (k === 'meta') return;
+          let b = 0;
+          try { b = byteLen(JSON.stringify(memCache[k])); } catch (e) { b = -1; }
+          rows.push({ path: k, bytes: b });
+        });
+        rows.sort(function (a, b) { return b.bytes - a.bytes; });
+      } catch (e) { return { error: String(e && e.message || e) }; }
+      const n = topN && topN > 0 ? topN : 8;
+      return { total: __saveStat.bytes, top: rows.slice(0, n) };
     },
 
     get() { return memCache; },

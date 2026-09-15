@@ -2548,6 +2548,65 @@ WA.loadScript = _ls.loadScript;
   // 清理测试变量
   WA.wbInject.clearOrder(310);
   } // end v0.1.21 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.22 — 持久化可观测（saveStat / sizeProfile / 配额归因）
+  // ═══════════════════════════════════════════════════════════
+  v0122: {
+  assert(typeof WA.store.saveStat === 'function', 'store.saveStat 已导出');
+  assert(typeof WA.store.sizeProfile === 'function', 'store.sizeProfile 已导出');
+  // 正常保存：ok=true 且 bytes 记录真实 UTF-8 体积
+  WA.store.transact(d => { d.background.text = '体积画像测试背景文本，中文按 UTF-8 计。'; });
+  const st1 = WA.store.saveStat();
+  assert(st1.ok === true && st1.bytes > 0, '成功保存记录 ok/bytes');
+  assert(st1.reason === null && st1.failCount === 0, '成功保存无失败归因');
+  // 体积画像：顶层分区降序
+  const prof = WA.store.sizeProfile(4);
+  assert(Array.isArray(prof.top) && prof.top.length > 0, 'sizeProfile 产出 top 列表');
+  assert(prof.top.every(r => typeof r.bytes === 'number' && typeof r.path === 'string'), '画像行含 path/bytes');
+  const bs = prof.top.map(r => r.bytes);
+  assert(bs.every((v, i) => i === 0 || bs[i - 1] >= v), '画像按字节数降序');
+  assert(!prof.top.some(r => r.path === 'meta'), 'meta 分区不计入画像');
+  assert(prof.total === st1.bytes, '画像 total 等于上次落盘体积');
+  // 配额耗尽：save 失败但不抛、内存态仍推进、归因 quota
+  const savedSetItem = global.localStorage.setItem;
+  global.localStorage.setItem = function () {
+    const err = new Error('The quota has been exceeded.'); err.name = 'QuotaExceededError'; throw err;
+  };
+  const txBefore = WA.store.get().round;
+  const rQuota = WA.store.transact(d => { d.round = txBefore + 5; });
+  const st2 = WA.store.saveStat();
+  assert(st2.ok === false, '配额耗尽时 save 判失败');
+  assert(st2.reason === 'quota', '失败归因为 quota');
+  assert(st2.failCount >= 1, '失败计数累加');
+  assert(WA.store.get().round === txBefore + 5, '落盘失败仍推进内存态（不留半份状态）');
+  assert(rQuota.ok === true, 'transact 不因持久化失败而回滚内存事务');
+  // 非配额错误归因为 error
+  global.localStorage.setItem = function () { throw new TypeError('permission denied'); };
+  WA.store.transact(d => { d.round = d.round + 1; });
+  assert(WA.store.saveStat().reason === 'error', '非配额异常归因 error');
+  // 恢复正常后 ok 翻回 true、reason 清空，failCount 保留历史
+  global.localStorage.setItem = savedSetItem;
+  WA.store.transact(d => { d.round = d.round + 1; });
+  const st3 = WA.store.saveStat();
+  assert(st3.ok === true && st3.reason === null, '恢复后保存成功且归因清空');
+  assert(st3.failCount >= 2, '历史失败次数保留');
+  // tool-diag 接入：storage 子节 + verdict 分级
+  WA.store.transact(d => { d.round = d.round + 1; });
+  const dg22 = WA.toolDiag.collect();
+  assert(dg22.worldState.storage && dg22.worldState.storage.lastSave.ok === true, '诊断 storage.lastSave 产出');
+  assert(Array.isArray(dg22.worldState.storage.sizeProfile.top), '诊断含体积画像');
+  const storIssues22 = (dg22.verdict.issues || []).filter(i => i.key === 'storage');
+  assert(storIssues22.length === 1 && storIssues22[0].level === 'warn', '历史失败但当前恢复 → storage warn');
+  // 模拟最近一次失败 → error
+  global.localStorage.setItem = function () { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; };
+  WA.store.transact(d => { d.round = d.round + 1; });
+  const dg22b = WA.toolDiag.collect();
+  const err22 = (dg22b.verdict.issues || []).filter(i => i.key === 'storage' && i.level === 'error');
+  assert(err22.length === 1 && err22[0].detail.indexOf('quota') >= 0, '最近落盘失败 → storage error 且带归因');
+  global.localStorage.setItem = savedSetItem;
+  WA.store.transact(d => { d.round = d.round + 1; });
+  assert(WA.store.saveStat().ok === true, '清理：恢复正常保存');
+  } // end v0.1.22 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
