@@ -189,6 +189,7 @@
           return {
             lastSave: { at: stat.at, ok: stat.ok, bytes: stat.bytes, reason: stat.reason, failCount: stat.failCount },
             transactions: WA.store.txStat ? WA.store.txStat() : null,
+            batch: WA.store.batchStat ? WA.store.batchStat() : null,
             sizeProfile: prof
           };
         }, null)

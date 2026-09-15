@@ -84,7 +84,7 @@
 
   let memCache = {}; // 内存态（当前聊天的权威副本）
   // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
-  const __batch = { depth: 0, dirty: false };
+  const __batch = { depth: 0, dirty: false, flushes: 0, lastFlushAt: 0 };
   // v0.1.30: 事务计量——按提交状态聚合计数与耗时
   const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, batched: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
   function recTx(ms, status) {
@@ -177,12 +177,14 @@
         __batch.depth--;
         if (__batch.depth === 0 && __batch.dirty) {
           __batch.dirty = false;
-          try { this.save(); } catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
+          try { this.save(); __batch.flushes++; __batch.lastFlushAt = Date.now(); } catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
         }
       }
     },
     /** v0.1.31: 批深度只读视图（诊断用：>0 表示当前处于写合并作用域） */
     batchDepth() { return __batch.depth; },
+    /** v0.1.32: 批健康只读视图——flushes 即「写合并后实际落盘次数」（对照 txStat.batched 观察合并率） */
+    batchStat() { return { depth: __batch.depth, dirty: __batch.dirty, flushes: __batch.flushes, lastFlushAt: __batch.lastFlushAt }; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */

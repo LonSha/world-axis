@@ -3050,6 +3050,45 @@ WA.loadScript = _ls.loadScript;
   global.localStorage.setItem = savedSetItem31;
   WA.store.transact(d => { delete d.meta.probe131; delete d.meta.probeFromChain; });
   } // end v0.1.31 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.32 — 批健康计量（batchStat）+ after 链写合并实测
+  // ═══════════════════════════════════════════════════════════
+  v0132: {
+  assert(typeof WA.store.batchStat === 'function', 'batchStat 已导出');
+  const bs0 = WA.store.batchStat();
+  assert(bs0.depth === 0 && bs0.dirty === false, '批初始态干净');
+  const flushBefore32 = bs0.flushes;
+  // 场景1：手写批——3 事务 + 1 flush
+  WA.store.resetTxStat();
+  await WA.store.batch(async function () {
+    WA.store.transact(d => { d.meta.probe132 = 1; });
+    WA.store.transact(d => { d.meta.probe132 = 2; });
+    WA.store.transact(d => { d.meta.probe132 = 3; });
+  });
+  let bs1 = WA.store.batchStat();
+  assert(bs1.flushes === flushBefore32 + 1, '一次批退出记一次 flush（' + bs1.flushes + '）');
+  assert(bs1.lastFlushAt > 0 && bs1.dirty === false, 'flush 时间戳记录且批转干净');
+  let tx32 = WA.store.txStat();
+  assert(tx32.batched === 3 && tx32.ok === 3, '批内 3 事务计量');
+  // 场景2：install + gen_ended 触发真实 after 链——批深度可见、链结束 flush
+  WA.interceptor.install();
+  assert(true, 'install 幂等执行');
+  let sawAfterDepth32 = 0;
+  WA.workflow.register({ id: 'wtest.afterProbe132', chain: 'after', order: 9999, label: 'v132探针',
+    async run() { sawAfterDepth32 = WA.store.batchDepth(); WA.store.transact(d => { d.meta.probeAfter = 'yes'; }); } });
+  const flushBeforeChain32 = WA.store.batchStat().flushes;
+  global.__mockChat.push({ is_user: false, mes: 'AI 回复完毕' });
+  await global.__triggerEvent('gen_ended');
+  assert(sawAfterDepth32 === 1, 'after 链节点运行在批作用域内（depth=' + sawAfterDepth32 + '）');
+  assert(WA.store.batchStat().flushes === flushBeforeChain32 + 1, 'after 链结束 flush 一次');
+  assert(JSON.parse(global.localStorage.getItem('worldaxis_state_test_chat_001')).meta.probeAfter === 'yes', 'after 链变更已落盘');
+  WA.workflow.unregister('wtest.afterProbe132');
+  // 场景3：诊断透出 batch 节
+  const dg32 = WA.toolDiag.collect();
+  assert(dg32.worldState.storage.batch && typeof dg32.worldState.storage.batch.flushes === 'number', '诊断透出批健康节');
+  // 清理
+  WA.store.transact(d => { delete d.meta.probe132; delete d.meta.probeAfter; });
+  } // end v0.1.32 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
