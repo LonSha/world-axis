@@ -2607,6 +2607,39 @@ WA.loadScript = _ls.loadScript;
   WA.store.transact(d => { d.round = d.round + 1; });
   assert(WA.store.saveStat().ok === true, '清理：恢复正常保存');
   } // end v0.1.22 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.23 — 工作流节点执行画像（workflow.stats）
+  // ═══════════════════════════════════════════════════════════
+  v0123: {
+  assert(typeof WA.workflow.stats === 'function', 'workflow.stats 已导出');
+  assert(typeof WA.workflow.resetStats === 'function', 'workflow.resetStats 已导出');
+  WA.workflow.resetStats();
+  // 注册一条隔离测试链：一个耗时节点 + 一个抛错节点（非 critical）
+  WA.workflow.register({ id: 'wtest.slow', chain: 'wtest', order: 1, label: '慢节点',
+    async run() { await new Promise(r => setTimeout(r, 25)); } });
+  WA.workflow.register({ id: 'wtest.bad', chain: 'wtest', order: 2, label: '错节点', critical: false,
+    async run() { await new Promise(r => setTimeout(r, 15)); throw new Error('boom-node'); } });
+  await WA.workflow.run('wtest', {});
+  const st = WA.workflow.stats();
+  assert(st.tracked === 2 && st.nodes.length === 2, '画像记录了两个节点');
+  const slow = st.nodes.find(n => n.id === 'wtest.slow');
+  const bad = st.nodes.find(n => n.id === 'wtest.bad');
+  assert(slow && slow.lastStatus === 'ok' && slow.errors === 0 && slow.count === 1, 'ok 节点画像正确');
+  assert(bad && bad.lastStatus === 'error' && bad.errors === 1, 'error 节点被计数');
+  assert(st.nodes[0].lastMs >= st.nodes[st.nodes.length - 1].lastMs, '画像按 lastMs 降序');
+  assert(st.lastChains.wtest && st.lastChains.wtest.executedCount === 1, '链级汇总记录成功节点数');
+  assert(st.lastChains.wtest.ms >= 40, '链级总耗时覆盖两节点');
+  // tool-diag 接入：runtime.workflow.slowest + verdict warn
+  const dg23 = WA.toolDiag.collect();
+  const wfNode = (dg23.runtime || {}).workflow || {};
+  assert(Array.isArray(wfNode.slowest) && wfNode.slowest.some(r => r.id === 'wtest.bad' && r.errors === 1), '诊断输出报错节点');
+  const wfIssues23 = (dg23.verdict.issues || []).filter(i => i.key === 'workflow');
+  assert(wfIssues23.length === 1 && wfIssues23[0].level === 'warn' && wfIssues23[0].detail.indexOf('wtest.bad') >= 0, '报错节点触发 workflow warn');
+  // 清理测试链与画像，避免污染后续
+  WA.workflow.unregister('wtest.slow'); WA.workflow.unregister('wtest.bad');
+  WA.workflow.resetStats();
+  assert(WA.workflow.stats().tracked === 0, 'resetStats 清空画像');
+  } // end v0.1.23 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

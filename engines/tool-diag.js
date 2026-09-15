@@ -199,7 +199,15 @@
         const nodes = WA.workflow.list ? (WA.workflow.list() || []) : [];
         const byChain = {};
         nodes.forEach(function (nd) { const c = nd.chain || '?'; byChain[c] = (byChain[c] || 0) + 1; });
-        return { nodeCount: nodes.length, byChain: byChain, disabled: nodes.filter(function (nd) { return nd.enabled === false; }).map(function (nd) { return nd.id; }) };
+        const out = { nodeCount: nodes.length, byChain: byChain, disabled: nodes.filter(function (nd) { return nd.enabled === false; }).map(function (nd) { return nd.id; }) };
+        // v0.1.23: 节点执行画像（最慢节点 + 报错节点 + 链耗时）
+        if (WA.workflow.stats) {
+          const st = WA.workflow.stats(5);
+          out.slowest = st.nodes.map(function (r) { return { id: r.id, lastMs: r.lastMs, avgMs: r.avgMs, count: r.count, errors: r.errors, lastStatus: r.lastStatus }; });
+          out.tracked = st.tracked;
+          out.chains = st.lastChains;
+        }
+        return out;
       }, {}),
       apiRouter: safe(function () {
         if (!WA.apiRouter) return { error: 'apiRouter 不可用' };
@@ -343,6 +351,10 @@
     const lsav = wsStor.lastSave || null;
     if (lsav && lsav.ok === false) issues.push({ level: 'error', key: 'storage', detail: '最近一次 store 落盘失败（' + (lsav.reason || 'error') + '，累计 ' + lsav.failCount + ' 次）：内存态已更新但未持久化' });
     else if (lsav && lsav.failCount > 0) issues.push({ level: 'warn', key: 'storage', detail: 'store 历史落盘失败 ' + lsav.failCount + ' 次（当前已恢复）' });
+    // v0.1.23: 工作流节点有历史报错 → warn（不阻断但需排查）
+      const wfSt = ((diag.runtime || {}).workflow || {});
+      const errNodes = (wfSt.slowest || []).filter(function (r) { return r.errors > 0; });
+      if (errNodes.length) issues.push({ level: 'warn', key: 'workflow', detail: errNodes.length + ' 个工作流节点历史报错：' + errNodes.map(function (r) { return r.id + '(' + r.errors + ')'; }).join('、') });
     const ldr = (diag.runtime || {}).loader || {};
     if (ldr.cdnCooldowns && ldr.cdnCooldowns.length >= 3) issues.push({ level: 'warn', key: 'loader', detail: '全部 3 个 CDN 容灾源均在冷却中（60s 内不重试），期间加载失败模块将彻底失败' });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;
