@@ -187,8 +187,11 @@
     const issues = [];
     const n = state?.nextTurnInjection;
     if (n) {
-      if (!Array.isArray(n.required) && !Array.isArray(n.conditional) && !Array.isArray(n.suppress)) {
-        issues.push({ level: 'warn', code: 'inject.badShape', detail: 'nextTurnInjection 缺三列结构' });
+      // v0.1.5: 对齐 v0.1.4 归零语义——空壳已不可能存在，检查改为「四字段全无内容」
+      const hasCol = Array.isArray(n.required) || Array.isArray(n.conditional) || Array.isArray(n.suppress);
+      const hasNear = !!(n.nearEvent && (n.nearEvent.title || n.nearEvent.desc));
+      if (!hasCol && !hasNear) {
+        issues.push({ level: 'warn', code: 'inject.emptyShell', detail: 'nextTurnInjection 四字段全空（v0.1.4 后应已归零，残留即异常）' });
       }
       if (n.at && state.meta && state.meta.updatedAt && Number(n.at) > Number(state.meta.updatedAt) + 1000) {
         issues.push({ level: 'info', code: 'inject.futureStamp', detail: 'nextTurnInjection 时间戳晚于 meta.updatedAt' });

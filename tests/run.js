@@ -1824,6 +1824,34 @@ const WA = global.WorldAxis;
   assert(neMain.text.indexOf('[突发事件] 马蹄声（紧急）：远处传来马蹄') >= 0, 'nearEvent 文本进入主块');
   assert(WA.store.get().nextTurnInjection === null, 'nearEvent 注入后归零');
   } // end v0.1.4 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.5 — inspector-state 检查对齐归零语义（emptyShell）
+  // ═══════════════════════════════════════════════════════════
+  v015: {
+  // v0.1.5 断言修正：四字段全无内容指「字段不存在或全空」，不是「空数组」
+  const esState = { meta: { updatedAt: Date.now() }, nextTurnInjection: {} };
+  const esIssues = WA.inspectorState.checkInjection(esState);
+  const esShell = esIssues.filter(function (x) { return x.code === 'inject.emptyShell'; })[0];
+  assert(!!esShell, '四字段全无报 inject.emptyShell');
+  assert(esShell.level === 'warn', 'emptyShell 级别 warn');
+  const esState2 = { meta: { updatedAt: Date.now() }, nextTurnInjection: { required: ['x'], conditional: [], suppress: [] } };
+  const esIssues2 = WA.inspectorState.checkInjection(esState2);
+  assert(!esIssues2.filter(function (x) { return x.code === 'inject.emptyShell'; })[0], 'required 有内容时不报 emptyShell');
+  const esState3 = { meta: { updatedAt: Date.now() }, nextTurnInjection: { nearEvent: { title: 't', desc: 'd' } } };
+  const esIssues3 = WA.inspectorState.checkInjection(esState3);
+  assert(!esIssues3.filter(function (x) { return x.code === 'inject.emptyShell'; })[0], '仅 nearEvent 时不报 emptyShell');
+  const esState4 = { meta: { updatedAt: Date.now() }, nextTurnInjection: { nearEvent: {} } };
+  const esIssues4 = WA.inspectorState.checkInjection(esState4);
+  assert(!!esIssues4.filter(function (x) { return x.code === 'inject.emptyShell'; })[0], 'nearEvent 空对象且无三列时报 emptyShell');
+  const esState5 = { meta: { updatedAt: Date.now() }, nextTurnInjection: null };
+  const esIssues5 = WA.inspectorState.checkInjection(esState5);
+  assert(!esIssues5.filter(function (x) { return x.code === 'inject.emptyShell'; })[0], 'nextTurnInjection=null 时不报 emptyShell');
+  const esState6 = { meta: { updatedAt: 1000 }, nextTurnInjection: { required: ['x'], at: 5000 } };
+  const esIssues6 = WA.inspectorState.checkInjection(esState6);
+  assert(!!esIssues6.filter(function (x) { return x.code === 'inject.futureStamp'; })[0], '时间戳晚于 meta.updatedAt 仍报 inject.futureStamp');
+  assert(esIssues.filter(function (x) { return x.code === 'inject.badShape'; }).length === 0, 'inject.badShape 已移除');
+
+  } // end v0.1.5 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
