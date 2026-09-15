@@ -84,7 +84,7 @@
     'engines/editor-faction.js': 'editorFaction', 'engines/editor-events.js': 'editorEvents',
     'engines/inspector-state.js': 'inspectorState', 'engines/tool-snapshot.js': 'toolSnapshot',
     'engines/tool-analyzer.js': 'toolAnalyzer', 'engines/tool-import.js': 'toolImport',
-    'engines/inject-inspector.js': 'injectInspector', 'engines/tool-diag.js': 'toolDiag',
+    'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag',
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
     'render/inject.js': 'render', 'render/theater.js': 'theater'
   };
@@ -215,6 +215,7 @@
       { key: 'toolImport', api: ['detect', 'preview', 'importData'], label: '外部导入器' },
       { key: 'injectInspector', api: ['init', 'getLastSnapshot', 'statusText'], label: '注入自检' },
       { key: 'pmem', api: ['applyPersonalMemory', 'recall', 'knows', 'buildBlock'], label: '人物主观记忆' },
+{ key: 'injectBudget', api: ['plan', 'apply', 'trim', 'summaryText'], label: '注入预算裁判' },
       { key: 'toolDiag', api: ['collect', 'verdict', 'toJSON', 'summaryText', 'flatten'], label: '自检诊断包' }
     ];
     return caps.map(function (c) {

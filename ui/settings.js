@@ -20,6 +20,8 @@
         <div class="wa-set-row"><span>NPC预算 <b id="wa-set-npcv">${bs.npcBudget}</b></span><input type="range" min="1" max="16" value="${bs.npcBudget}" id="wa-set-npc" class="wa-range"/></div>
         <label class="wa-node"><input type="checkbox" id="wa-set-auto" ${bs.autoSimulate ? 'checked' : ''}/><span class="wa-node-label">每轮自动推演（关闭则仅手动）</span></label>
         <label class="wa-node"><input type="checkbox" id="wa-set-fullrules" ${bs.fullRules ? 'checked' : ''}/><span class="wa-node-label">注入世界规则全文（12模块铁律；关闭则仅精简守则，省token）</span></label>
+        <div class="wa-set-row"><span>注入预算 <b id="wa-set-budgetv">${bs.injectBudget === 0 ? '不限' : bs.injectBudget + 't'}</b></span><input type="range" min="0" max="6000" step="200" value="${bs.injectBudget == null ? 2400 : bs.injectBudget}" id="wa-set-budget" class="wa-range"/></div>
+        <div class="wa-dim">预算裁决：核心块（世界状态/近端事件）优先保底；记忆/摘要/账本/舆情超预算时先折叠后丢弃。设为 0 即不限（全量注入）。</div>
         <div class="wa-sec">自定义推演指令（追加到系统提示）</div>
         <textarea id="wa-set-custom" class="wa-ta" placeholder="例如：本世界魔法衰退，推演时注意时代背景…">${esc(bs.customInstruction)}</textarea>
         <button class="wa-btn" id="wa-set-save">保存推演设置</button>
@@ -43,6 +45,8 @@
       const out = () => $('#wa-set-out');
       const npc = $('#wa-set-npc');
       if (npc) npc.oninput = () => { $('#wa-set-npcv').textContent = npc.value; };
+      const bg = $('#wa-set-budget');
+      if (bg) bg.oninput = () => { $('#wa-set-budgetv').textContent = (+bg.value === 0 ? '不限' : bg.value + 't'); };
       const saveBtn = $('#wa-set-save');
       if (saveBtn) saveBtn.onclick = () => {
         WA.backstage.setSettings({
@@ -52,6 +56,7 @@
           npcBudget: +npc.value,
           autoSimulate: $('#wa-set-auto').checked,
           fullRules: $('#wa-set-fullrules').checked,
+          injectBudget: +($('#wa-set-budget') ? $('#wa-set-budget').value : 2400) || 0,
           customInstruction: $('#wa-set-custom').value.trim()
         });
         WA.opinion.setSettings({ enabled: $('#wa-op-enable').checked, sandboxEnabled: $('#wa-op-sandbox').checked, everyNRounds: +$('#wa-op-n').value || 3 });

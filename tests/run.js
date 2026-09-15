@@ -20,7 +20,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/tool-diag.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1030,6 +1030,63 @@ const WA = global.WorldAxis;
   const purified = WA.purifier.apply('正文<think>内心戏</think>继续');
   assert(!purified.includes('think'), '净化·思考块移除');
 
+  // ── inject-budget v0.9.3 ─
+  section('engines/inject-budget v0.9.3');
+  assert(WA.injectBudget && typeof WA.injectBudget.plan === 'function', '注入预算裁判已导出');
+  assert(WA.injectBudget.tokensOf('中文四字') === 4, 'token 估算：纯中文 1字≈1t');
+  assert(WA.injectBudget.tokensOf('abcd') === 1, 'token 估算：4个西文字符≈1t');
+  assert(WA.injectBudget.tokensOf('中文abcd') === 3, 'token 估算：中英混排分别计');
+  assert(WA.injectBudget.rankOf('世界状态') < WA.injectBudget.rankOf('舆情'), '核心源优先级高于舆情');
+  assert(WA.injectBudget.foldable('世界状态') === false && WA.injectBudget.foldable('舆情') === true, 'pinned 不可折叠 / optional 可折叠');
+  const bRaw = '第一段内容。第二段内容。第三段内容。第四段内容。第五段内容。第六段内容。';
+  const bTrim = WA.injectBudget.trim(bRaw, 20);
+  assert(WA.injectBudget.tokensOf(bTrim) <= 20, 'trim 结果严格不超预算');
+  assert(WA.injectBudget.tokensOf(bTrim) < WA.injectBudget.tokensOf(bRaw) && bTrim.includes('折叠'), 'trim 截断并加折叠标记');
+  assert(WA.injectBudget.trim(bRaw, 6) === '', '预算连标记都放不下时返回空（不透支预算）');
+  assert(WA.injectBudget.trim('短文', 50) === '短文', '预算充足时 trim 原样返回');
+  const bIn = WA.injectBudget.tokensOf('x') === 0 ? [] : [
+    { source: '世界状态', content: '甲'.repeat(200) },
+    { source: '主观记忆', content: '乙'.repeat(300) },
+    { source: '舆情', content: '丙'.repeat(200) }
+  ];
+  const bPlanLoose = WA.injectBudget.plan(bIn, { budget: 10000 });
+  assert(bPlanLoose.dropped.length === 0 && bPlanLoose.folded.length === 0, '预算充足时不折叠不丢弃');
+  assert(bPlanLoose.used === 700 && bPlanLoose.saved === 0, '预算充足时用量等于输入');
+  const bPlanTight = WA.injectBudget.plan(bIn, { budget: 400 });
+  assert(bPlanTight.kept.some(k => k.source === '世界状态'), '核心块（世界状态）在紧预算下仍保底保留');
+  assert(bPlanTight.folded.some(f => f.source === '主观记忆'), '次优先块超预算时被折叠而非丢弃');
+  assert(bPlanTight.dropped.length > 0, '最低优先块（舆情）预算耗尽被丢弃');
+  assert(bPlanTight.used <= bPlanTight.budget, '裁决结果不超预算');
+  assert(bPlanTight.saved > 0, '裁决产生节省量统计');
+  const bPlanPinned = WA.injectBudget.plan([{ source: '世界状态', content: '甲'.repeat(900) }], { budget: 100 });
+  assert(bPlanPinned.kept.some(k => k.source === '世界状态'), 'pinned 即便自身超预算也不静默丢弃');
+  assert(bPlanPinned.folded.some(f => f.reason === 'pinned_over_budget'), 'pinned 超预算走折叠路径并标注原因');
+  const bPlanZero = WA.injectBudget.plan(bIn, { budget: 0 });
+  assert(bPlanZero.kept.length === 0 || bPlanZero.dropped.length > 0, '零预算时不放行任何 optional');
+  // apply：保序 + 折叠文本替换 + 丢弃剔除
+  const bApplied = WA.injectBudget.apply(bIn, bPlanTight);
+  assert(bApplied.length < bIn.length, 'apply 剔除被丢弃项');
+  assert(bApplied[0].source === '世界状态' && bApplied[bApplied.length - 1].source === '主观记忆', 'apply 保持原始顺序（折叠项留在原位）');
+  assert(bApplied.some(x => x.folded === true), 'apply 标记折叠项');
+  assert(WA.injectBudget.apply(bIn, bPlanTight).map(x => x.source).join(',') === bIn.filter(x => bPlanTight.kept.some(k => k.source === x.source)).map(x => x.source).join(','), 'apply 输出与 kept 计划一致');
+  assert(WA.injectBudget.summaryText(bPlanTight).includes('注入'), '摘要文本含注入用量');
+  assert(WA.injectBudget.summaryText(null) === '未规划', '空计划摘要降级');
+  // 与 inject.js 集成：落地文本受预算约束
+  WA.store.transact(d => { d.clock.label = '第9日·正午'; });
+  const budgetBackup = WA.backstage.getSettings().injectBudget;
+  WA.backstage.setSettings({ injectBudget: 2400 });
+  WA.render.applyInjections({ injections: [] });
+  const landBig = global.__lastExtensionPrompt.text.length;
+  WA.backstage.setSettings({ injectBudget: 60 });
+  WA.render.applyInjections({ injections: [] });
+  const landSmall = global.__lastExtensionPrompt.text.length;
+  assert(landSmall <= landBig, '收紧预算后落地文本不增长');
+  assert(JSON.stringify(WA.store.get().lastInjection).includes('cap'), '落地打点记录预算裁决信息');
+  WA.backstage.setSettings({ injectBudget: 0 });
+  WA.render.applyInjections({ injections: [] });
+  assert(WA.store.get().lastInjection.budget === null, '预算设为0（不限）时不裁决');
+  WA.backstage.setSettings({ injectBudget: budgetBackup });
+  assert(WA.backstage.getSettings().injectBudget === 2400, '默认预算值为 2400t');
   // ─ inject-inspector v0.9.2 ──
   section('engines/inject-inspector v0.9.2');
   WA.injectInspector.reset();

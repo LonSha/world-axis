@@ -64,13 +64,28 @@
         WA.store.transact(d => { if (d.nextTurnInjection) delete d.nextTurnInjection.nearEvent; });
       }
       (ctx.injections || []).forEach(i => items.push(i));
-      const combined = items.map(i => i.content).join('\n');
+      // v0.9.3: 注入预算裁决（pinned 保底 / optional 先折叠后丢弃；0=不限）
+      let planInfo = null;
+      let finalItems = items;
+      try {
+        const budget = (WA.backstage && WA.backstage.getSettings) ? WA.backstage.getSettings().injectBudget : null;
+        if (WA.injectBudget && budget !== 0 && items.length) {
+          planInfo = WA.injectBudget.plan(items, { budget: budget == null ? WA.injectBudget.DEFAULT_BUDGET : budget });
+          finalItems = WA.injectBudget.apply(items, planInfo);
+          if (planInfo.folded.length || planInfo.dropped.length) {
+            WA.log('info', '注入预算裁决：' + WA.injectBudget.summaryText(planInfo)
+              + '｜折叠 ' + planInfo.folded.map(f => f.source).join('/')
+              + (planInfo.dropped.length ? '｜丢弃 ' + planInfo.dropped.map(d => d.source).join('/') : ''));
+          }
+        }
+      } catch (e) { WA.log('warn', '预算裁决失败，回退全量注入', e); planInfo = null; finalItems = items; }
+      const combined = finalItems.map(i => i.content).join('\n');
       try {
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(combined.length);
-        try { WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: items.map(i => i.source) }; }); } catch (e) { /* 快照失败不影响注入 */ }
-        if (combined) WA.log('info', '注入落地：' + items.map(i => i.source).join(' + ') + '（' + combined.length + '字）');
+        try { WA.store.transact(d => { d.lastInjection = { at: Date.now(), len: combined.length, sources: finalItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, folded: planInfo.folded.map(f => f.source), dropped: planInfo.dropped.map(x => x.source) } : null }; }); } catch (e) { /* 快照失败不影响注入 */ }
+        if (combined) WA.log('info', '注入落地：' + finalItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）');
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
     }
   };

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.9.2';
+  const VERSION = '0.9.3';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -75,6 +75,7 @@
     'engines/tool-analyzer.js',
     'engines/tool-import.js',
     'engines/inject-inspector.js',
+    'engines/inject-budget.js',
     'engines/tool-diag.js',
     'engines/calendar.js',
     'engines/memory.js',

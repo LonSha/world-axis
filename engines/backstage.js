@@ -81,6 +81,7 @@
       npcBudget: 8,                 // 单轮推演最多结算NPC数
       autoSimulate: true,           // after_reply 自动推演
       fullRules: false,             // v0.8.3: true=注入12模块完整规则全文, false=精简守则
+      injectBudget: 2400,           // v0.9.3: 单轮注入预算(token粗估)；0=不限
       customInstruction: ''         // 用户自定义推演指令（追加到系统提示）
     };
     try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_SETTINGS) || '{}')); } catch (e) { return def; }
