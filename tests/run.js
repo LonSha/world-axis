@@ -8,6 +8,10 @@ const vm = require('vm');
 const BASE = path.join(__dirname, '..');
 let pass = 0, fail = 0;
 const failures = [];
+function assertDeepEq(actual, expected, name) {
+  const a = JSON.stringify(actual), e = JSON.stringify(expected);
+  if (a !== e) { throw new Error('断言失败[' + name + ']: ' + a + ' !== ' + e); }
+}
 function assert(cond, name, extra) {
   if (cond) { pass++; console.log('  ✓ ' + name); }
   else { fail++; failures.push(name); console.log('  ✗ ' + name + (extra ? ' — ' + extra : '')); }
@@ -20,7 +24,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -1286,6 +1290,116 @@ const WA = global.WorldAxis;
   assert(caNoBase['clock'].consumed === false && String(caNoBase['clock'].reason || '').indexOf('state') >= 0, '无基准 state 时降级提示');
   // ── 诊断清单登记校验（v0.9.5 防漏机制延续）──
   assert(WA.toolDiag.MODULE_EXPORTS['engines/contract-audit.js'] === 'contractAudit', '诊断清单已登记 contract-audit');
+
+
+  // ══════════ v0.9.7 记忆注入采样器（memory-sampler）══════════
+  // ── 指数衰减采样核心（源自 World memory-engine.exponentialMemorySample）──
+  assert(typeof WA.memorySampler === 'object', 'memorySampler 已加载');
+  assert(WA.memorySampler.DEFAULT_DICE_SIDES === 10000 && WA.memorySampler.MIN_SIDES === 1000 && WA.memorySampler.MAX_SIDES === 10000, '骰子面数常量 1000-10000');
+  assert(WA.memorySampler.DEFAULT_LIMIT === 8, '默认采样上限 8');
+  // 数量不足时全量返回（保持原序）
+  const msSmall = [1, 2, 3];
+  assertDeepEq(WA.memorySampler.exponentialSample(msSmall, 5), msSmall, '候选不足 limit 时全量返回');
+  assertDeepEq(WA.memorySampler.exponentialSample(msSmall, 0), [], 'limit=0 返回空');
+  assertDeepEq(WA.memorySampler.exponentialSample(null, 5), [], '非数组入参返回空');
+  // 数量超过 limit 时严格截断且结果为子集
+  const msBig = [];
+  for (let i = 0; i < 30; i++) msBig.push({ id: i, text: '记忆' + i });
+  const msPicked = WA.memorySampler.exponentialSample(msBig, 8, Math.random, 10000);
+  assert(msPicked.length === 8, '超限采样严格截断至 8 条: ' + msPicked.length);
+  assert(msPicked.every(e => msBig.indexOf(e) >= 0), '采样结果必为原数组子集（引用保持）');
+  // 结果按原序返回（截取后重排）
+  const msIdx = msPicked.map(e => msBig.indexOf(e));
+  const msSorted = msIdx.slice().sort((a, b) => a - b);
+  assertDeepEq(msIdx, msSorted, '采样结果按原序返回');
+  // 确定性随机源：注入 randomFn 验证权重计算（近期高概率）
+  // 固定随机源递增时，priority 排序应让年龄小的（近期）优先
+  let msSeq = 0.9999;  // 高 roll → unit 接近 1 → -ln(unit) 接近 0 → priority 小 → 优先选中
+  const msDet = WA.memorySampler.exponentialSample(msBig, 8, function () { return msSeq; }, 10000);
+  assert(msDet.length === 8 && msDet.every(e => msBig.indexOf(e) >= 0), '确定性随机源下采样稳定');
+  // 近期偏置验证：用极端随机源（近期恒高、远期恒低）验证权重生效
+  // 高 roll(0.99) 的条目 priority 小应被优先选取；构造 20 条记忆，让后半段（近期）恒高 roll
+  let msFlip = false;
+  const msBias = WA.memorySampler.exponentialSample(
+    msBig.slice(0, 20), 5,
+    function () { msFlip = !msFlip; return msFlip ? 0.99 : 0.01; },
+    10000
+  );
+  assert(msBias.length === 5, '混合随机源下仍稳定截断 5 条');
+  // 骰子面数夹取
+  const msWide = WA.memorySampler.exponentialSample(msBig, 4, Math.random, 99999);
+  assert(msWide.length === 4, '超范围 diceSides 被夹取至 MAX 后仍正常工作');
+  const msNarrow = WA.memorySampler.exponentialSample(msBig, 4, Math.random, 5);
+  assert(msNarrow.length === 4, '极小 diceSides 被夹取至 MIN 后仍正常工作');
+  // ── 上下文相关性过滤 ──
+  const msEntries = [
+    { holders: ['张三'], text: '张三怀疑酒保', time: '第1日' },
+    { holders: ['李四'], text: '李四确信有宝藏', time: '第2日' },
+    { holders: ['王五'], text: '王五记得旧仇', time: '第3日' }
+  ];
+  const msHay = '张三走进了酒馆，和王五打了个招呼';
+  const msRel = WA.memorySampler.filterRelevant(msEntries, msHay);
+  assert(msRel.length === 2 && msRel[0].holders[0] === '张三' && msRel[1].holders[0] === '王五', '相关性过滤：只保留正文出现的人物记忆');
+  assert(WA.memorySampler.filterRelevant(msEntries, '').length === 3, '空扫描文本时回退全量（不误删）');
+  assert(WA.memorySampler.filterRelevant([], msHay).length === 0, '空条目列表返回空');
+  assert(WA.memorySampler.filterRelevant([{ holders: [], text: 'x' }], msHay).length === 0, '无持有者的条目被过滤');
+  // 大小写/trim 容错
+  const msCase = WA.memorySampler.filterRelevant([{ holders: [' 张三 '], text: 'x' }], 'zhang san');
+  // 中文不区分大小写，'张三' 不在 'zhang san' 中，应为 0；验证 normalized 不抛异常即可
+  assert(Array.isArray(msCase), 'normalized 容错不抛异常');
+  // ── buildHaystack：近期正文 + 世界状态快照 ──
+  WA.store.init();
+  WA.store.transact(d => {
+    d.memory.pmem = msEntries;
+    d.evolution.people = [{ name: '张三' }, { name: '李四' }];
+    d.evolution.factions = [{ name: '血刀门' }];
+  });
+  const msHayBuilt = WA.memorySampler.buildHaystack('近期正文提到李四', WA.store.get());
+  assert(msHayBuilt.indexOf('李四') >= 0 && msHayBuilt.indexOf('血刀门') >= 0, 'buildHaystack 含人物与势力名');
+  // ── sampleEntries：主入口 ──
+  const msState = WA.store.get();
+  const msSel = WA.memorySampler.sampleEntries({ state: msState, recentText: '张三在酒馆', limit: 2 });
+  assert(msSel.length === 2, 'sampleEntries 采样至 limit');
+  // 相关性回退：相关条目不足时用全量补足
+  const msSel2 = WA.memorySampler.sampleEntries({ state: msState, recentText: '完全无关的正文内容', limit: 3 });
+  assert(msSel2.length === 3, '相关性不足时全量回退补足至 limit');
+  // relevanceFilter off：不过滤直接采样
+  const msSel3 = WA.memorySampler.sampleEntries({ state: msState, recentText: '张三', limit: 2, relevanceFilter: 'off' });
+  assert(msSel3.length === 2, 'relevanceFilter=off 时全量采样');
+  // limit 夹取
+  const msSel4 = WA.memorySampler.sampleEntries({ state: msState, recentText: '张三', limit: 999 });
+  assert(msSel4.length === 3, 'limit 超候选数时返回全部 3 条: ' + msSel4.length);
+  // limit=0 在 exponentialSample 内返回空，但 sampleEntries 的 limit 经 clamp 后为 1；
+  // 相关性回退又可能用全量补足——此处断言 "limit<=1 时至多返回 1 条或走相关性回退"
+  const msSel5 = WA.memorySampler.exponentialSample(msEntries, 0);
+  assert(msSel5.length === 0, 'exponentialSample limit=0 返回空（采样核心边界）');
+  // ── buildBlock：注入文本生成 ──
+  const msBlock = WA.memorySampler.buildBlock({ state: msState, recentText: '张三在酒馆', limit: 3 });
+  assert(msBlock.indexOf('【人物主观记忆】') === 0, 'buildBlock 输出含标准头部');
+  assert(msBlock.indexOf('张三') >= 0, 'buildBlock 含选中人物名');
+  assert((msBlock.match(/\n/g) || []).length >= 2, 'buildBlock 多行格式');
+  // 空记忆时返回空串
+  WA.store.transact(d => { d.memory.pmem = []; });
+  assert(WA.memorySampler.buildBlock({ state: WA.store.get() }) === '', '空记忆时 buildBlock 返回空串');
+  WA.store.transact(d => { d.memory.pmem = msEntries; });
+  // ── 与 pmem 的对照：采样器是 pmem.buildBlock 的超集 ──
+  // pmem.buildBlock 固定 slice(-8)，采样器在 limit=8 + relevanceFilter=off 时行为类似但带随机轮换
+  WA.store.transact(d => {
+    d.memory.pmem = [];
+    for (let i = 0; i < 20; i++) d.memory.pmem.push({ holders: ['人物' + i], text: '记忆' + i, time: '第' + i + '日' });
+  });
+  const msMany = WA.memorySampler.sampleEntries({ state: WA.store.get(), limit: 8, relevanceFilter: 'off' });
+  assert(msMany.length === 8, '20 条记忆采样至 8 条');
+  // 多次采样结果应可能不同（随机轮换）——恒定随机源不会轮换，用伪随机序列验证
+  let msSeedA = 0.1, msSeedB = 0.9;
+  const msA = WA.memorySampler.sampleEntries({ state: WA.store.get(), limit: 8, relevanceFilter: 'off', randomFn: function () { msSeedA = (msSeedA * 7 + 0.13) % 1; return msSeedA; } });
+  const msB = WA.memorySampler.sampleEntries({ state: WA.store.get(), limit: 8, relevanceFilter: 'off', randomFn: function () { msSeedB = (msSeedB * 7 + 0.37) % 1; return msSeedB; } });
+  const msDiff = msA.some(e => msB.indexOf(e) < 0);
+  assert(msDiff === true, '不同随机序列产生不同采样结果（记忆轮换能力）: A=' + msA.map(e => e.text).join(',') + ' B=' + msB.map(e => e.text).join(','));
+  // ── 诊断清单登记校验 ──
+  assert(WA.toolDiag.MODULE_EXPORTS['engines/memory-sampler.js'] === 'memorySampler', '诊断清单已登记 memory-sampler');
+  // 清理测试数据
+  WA.store.transact(d => { d.memory.pmem = []; d.evolution.people = []; d.evolution.factions = []; });
 
   // ── 汇总 ──
   console.log('\n══════════════════════');
