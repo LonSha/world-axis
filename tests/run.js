@@ -1786,9 +1786,48 @@ const WA = global.WorldAxis;
   // 清理
   WA.wbInject.clearOrder(300); WA.wbInject.clearOrder(400); WA.wbInject.clearOrder(600);
   } // end v0.1.14 block
-
-
   } // end v0.1.13 block
+  v0115: {
+  // ── v0.1.15: uninject 真撤销 + store 深合并回归 ──
+  assert(typeof WA.render.uninject === 'function', 'uninject 方法已挂载');
+  // 无快照时安全降级
+  WA.store.transact(d => { d.lastInjection = null; });
+  assertDeepEq(WA.render.uninject().reason, 'no-snapshot', '无 lastInjection 快照时 no-snapshot');
+  // 构造带独立槽位的快照
+  WA.store.transact(d => {
+    d.lastInjection = { at: Date.now(), len: 120, sources: ['连续性约束'], budget: null,
+      slots: { count: 2, applied: 2, keys: ['WorldAxis:after_last_user', 'WorldAxis:before_character_definition'], totalChars: 120, perSlot: [] },
+      slotErrors: null };
+  });
+  global.__extPromptLog = [];
+  const unj = WA.render.uninject();
+  assert(unj.ok === true, 'uninject 返回 ok');
+  assert(unj.cleared.length === 3, '清空 2 个独立槽位 + 1 个主槽位 = 3');
+  const clearedKeys = unj.cleared.slice().sort();
+  assertDeepEq(clearedKeys, ['WorldAxis', 'WorldAxis:after_last_user', 'WorldAxis:before_character_definition'].sort(), '清空全部已落地槽位 key');
+  // 每个清空调用都写空串
+  assert(global.__extPromptLog.length === 3, 'setExtensionPrompt 被调用 3 次');
+  assert(global.__extPromptLog.every(r => r.text === ''), '清空写入空串');
+  // 幂等：重复调用不报错且仍清空
+  const unj2 = WA.render.uninject();
+  assert(unj2.ok === true && unj2.cleared.length === 3, 'uninject 幂等');
+  // P2-② 回归：transact 删除 key 后不复活（深合并陷阱不存在）
+  WA.store.transact(d => { d.tempProbe = { a: 1, b: 2 }; });
+  assert(WA.store.get().tempProbe.b === 2, '写入嵌套对象');
+  WA.store.transact(d => { delete d.tempProbe.b; });
+  assert(WA.store.get().tempProbe.b === undefined, 'delete 后 key 不复活');
+  // 整表替换语义：save 是整体替换不是合并
+  WA.store.transact(d => { d.tempProbe = { c: 3 }; });
+  assertDeepEq(WA.store.get().tempProbe, { c: 3 }, 'save 整体替换：旧 key a/b 不残留');
+  WA.store.transact(d => { delete d.tempProbe; });
+  assert(WA.store.get().tempProbe === undefined, '清理探针');
+  // chatcache.stripHeavy 是显式删除不是合并
+  const heavy = JSON.stringify({ lastInjection: { len: 999 }, nextTurnInjection: { x: 1 }, keep: 'me' });
+  const stripped = WA.chatcache.stripHeavy(heavy);
+  assert(JSON.parse(stripped).lastInjection === undefined, 'stripHeavy 删除 lastInjection');
+  assert(JSON.parse(stripped).nextTurnInjection === undefined, 'stripHeavy 删除 nextTurnInjection');
+  assert(JSON.parse(stripped).keep === 'me', 'stripHeavy 保留非 heavy key');
+  } // end v0.1.15 block
 
   // ═══════════════════════════════════════════════════════════
   // v0.1.12 — safe 语义全模块统一（undefined 兜底 + 无 fallback 返回 null）

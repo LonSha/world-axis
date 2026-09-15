@@ -149,6 +149,27 @@
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
+    },
+    /**
+     * v0.1.15: 真撤销。按上一轮落地记录清空全部已注入槽位。
+     * 旧的写空串只清主槽位，独立槽位路由落地的那部分会残留到下一轮；
+     * 这里从 store.lastInjection 快照取实际用过的全部 slot key 逐一清空。
+     * 幂等：无快照或无 setExtensionPrompt 时安全跳过，重复调用不报错。
+     */
+    uninject() {
+      try {
+        const c = (WA.mainWin && WA.mainWin.SillyTavern && WA.mainWin.SillyTavern.getContext) ? WA.mainWin.SillyTavern.getContext() : null;
+        if (!c || !c.setExtensionPrompt) return { ok: false, reason: 'no-host' };
+        const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
+        if (!li) return { ok: false, reason: 'no-snapshot' };
+        const cleared = [];
+        const slotKeys = (li.slots && Array.isArray(li.slots.keys)) ? li.slots.keys.slice() : [];
+        slotKeys.forEach(function (k) { try { c.setExtensionPrompt(k, '', 1, 0, false); cleared.push(k); } catch (e) {} });
+        try { c.setExtensionPrompt('WorldAxis', '', 1, 0, false); cleared.push('WorldAxis'); } catch (e) {}
+        if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(0);
+        if (WA.log) WA.log('info', 'uninject 清空 ' + cleared.length + ' 个槽位');
+        return { ok: true, cleared: cleared };
+      } catch (e) { if (WA.log) WA.log('warn', 'uninject 异常', e); return { ok: false, reason: 'error', error: String(e && (e.message || e)) }; }
     }
   };
 })();
