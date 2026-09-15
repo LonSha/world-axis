@@ -33,6 +33,7 @@
     { id: 'settings', icon: '⚙️', label: '设置' },
     { id: 'connect', icon: '🔌', label: '连接' },
     { id: 'assistant', icon: '💬', label: '助手' },
+    { id: 'tools', icon: '🧰', label: '工具' },
     { id: 'logs', icon: '📋', label: '日志' }
   ];
 
@@ -208,13 +209,30 @@
       <input type="range" min="1" max="10" value="${WA.apiRouter.getConcurrency()}" id="wa-conc" class="wa-range"/>`;
   }
 
+  function renderTools() {
+    return `
+      <div class="wa-sec">世界态势分析（纯只读体检）</div>
+      <button class="wa-btn" id="wa-an-run">立即分析</button>
+      <div id="wa-an-out" class="wa-out"></div>
+      <div class="wa-sec">状态快照导出 / 恢复</div>
+      <div class="wa-row"><button class="wa-btn" id="wa-snap-dl">导出 JSON</button><button class="wa-btn" id="wa-snap-up">导入 JSON</button><input type="file" id="wa-snap-file" accept=".json" style="display:none"/></div>
+      <div class="wa-dim">导出剔除运行时脏字段；导入先校验（格式/schema/字段完整性），通过才写入并自动留恢复点。</div>
+      <div id="wa-snap-out" class="wa-out"></div>
+      <div class="wa-sec">外部数据导入（自动识别类型）</div>
+      <div class="wa-row"><button class="wa-btn" id="wa-imp-pick">选择 JSON 文件</button><input type="file" id="wa-imp-file" accept=".json" style="display:none"/></div>
+      <div class="wa-dim">支持：全量存档 / 区域事件 / 势力清单 / 事件链清单 / 人物主观记忆 / 世界书条目组（自动判别）</div>
+      <textarea id="wa-imp-text" class="wa-ta" placeholder="或直接粘贴 JSON 内容…"></textarea>
+      <button class="wa-btn" id="wa-imp-run">预检并导入</button>
+      <div id="wa-imp-out" class="wa-out"></div>`;
+  }
+
   function renderLogs() {
     return `<div class="wa-sec">运行日志（最近${WA.eventLog.length}条）</div>
       <button class="wa-btn wa-mini" id="wa-log-copy">复制</button>
       <div class="wa-logbox">${WA.eventLog.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, events: renderEvents, director: renderDirector, connect: renderConnect, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -287,6 +305,60 @@
         const out = $('#wa-inspect-out');
         out.innerHTML = '<div class="wa-item"><b>' + esc(WA.inspectorState.summaryText(rep)) + '</b></div>' +
           (flat.length ? flat.slice(0, 20).map(it => '<div class="wa-dim">[' + it.level + '] ' + esc(it.detail) + '</div>').join('') : '');
+      };
+    }
+    // 工具页绑定（v0.9.1）
+    if (currentPage === 'tools') {
+      const anRun = $('#wa-an-run');
+      if (anRun && WA.toolAnalyzer) anRun.onclick = () => {
+        const r = WA.toolAnalyzer.analyze();
+        const p = r.pressure;
+        $('#wa-an-out').innerHTML =
+          '<div class="wa-item"><b>' + esc(WA.toolAnalyzer.summaryText(r)) + '</b></div>' +
+          '<div class="wa-dim">事件' + p.event + ' / 风声' + p.wind + ' / 大势' + p.trend + ' / 势力' + p.faction + ' / 经济' + p.econ + ' / 区域' + p.region + '</div>' +
+          Object.entries(r.load.blocks).map(([k, v]) => '<div class="wa-dim">' + esc(k) + '：' + (v.tokens || 0) + 't / ' + (v.chars || 0) + '字</div>').join('') +
+          r.risks.map(x => '<div class="wa-log wa-log-' + x.level + '">[' + x.level + '] ' + esc(x.detail) + '</div>').join('');
+      };
+      const dl = $('#wa-snap-dl');
+      if (dl && WA.toolSnapshot) dl.onclick = () => {
+        const r = WA.toolSnapshot.download();
+        $('#wa-snap-out').textContent = r.ok ? ('已导出 ' + Math.round(r.bytes / 1024) + 'KB') : ('导出失败：' + r.reason);
+      };
+      const up = $('#wa-snap-up');
+      const upFile = $('#wa-snap-file');
+      if (up && upFile) {
+        up.onclick = () => upFile.click();
+        upFile.onchange = async () => {
+          const f = upFile.files[0]; if (!f) return;
+          const txt = await f.text();
+          const r = WA.toolSnapshot.restore(txt);
+          $('#wa-snap-out').textContent = r.ok
+            ? ('恢复成功（恢复点' + (r.recoveryCreated ? '已留' : '未留') + '）：' + JSON.stringify(r.counts))
+            : ('校验/写入失败：' + r.reason);
+          if (r.ok) renderBody();
+          upFile.value = '';
+        };
+      }
+      const impPick = $('#wa-imp-pick');
+      const impFile = $('#wa-imp-file');
+      if (impPick && impFile) {
+        impPick.onclick = () => impFile.click();
+        impFile.onchange = async () => {
+          const f = impFile.files[0]; if (!f) return;
+          $('#wa-imp-text').value = await f.text();
+          impFile.value = '';
+        };
+      }
+      const impRun = $('#wa-imp-run');
+      if (impRun && WA.toolImport) impRun.onclick = () => {
+        const out = $('#wa-imp-out');
+        const raw = ($('#wa-imp-text').value || '').trim();
+        if (!raw) { out.textContent = '请先选择文件或粘贴 JSON'; return; }
+        const pv = WA.toolImport.preview(raw);
+        const r = WA.toolImport.importData(raw);
+        out.textContent = (r.ok ? '✓ [' + pv.kind + '] ' : '✗ [' + pv.kind + '] ')
+          + (r.reason || ('新增 ' + (r.added || 0) + ' 条' + (r.skipped ? '，跳过 ' + r.skipped + ' 条' : '') + (r.reasons && r.reasons.length ? '（' + r.reasons.join('；') + '）' : '')));
+        if (r.ok && r.added) renderBody();
       };
     }
     on('#wa-ch-start', () => { WA.chapters.start($('#wa-ch-title').value.trim()); renderBody(); });

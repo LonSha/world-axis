@@ -87,6 +87,7 @@
   const store = WA.store = {
     SCHEMA_VERSION,
     defaultWorldState,
+    chatId: getChatId,        // v0.9.1: 供导出/诊断读取当前聊天id
 
     init() {
       memCache = this.load() || defaultWorldState();

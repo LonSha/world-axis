@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.9.0';
+  const VERSION = '0.9.1';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -70,6 +70,9 @@
     'engines/editor-faction.js',
     'engines/editor-events.js',
     'engines/inspector-state.js',
+    'engines/tool-snapshot.js',
+    'engines/tool-analyzer.js',
+    'engines/tool-import.js',
     'engines/calendar.js',
     'engines/memory.js',
     'engines/opinion.js',

@@ -20,7 +20,7 @@ const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -825,6 +825,127 @@ const WA = global.WorldAxis;
   const snapshotBefore = JSON.stringify(WA.store.get());
   WA.inspectorState.inspect(WA.store.get());
   assert(JSON.stringify(WA.store.get()) === snapshotBefore, '体检纯只读（state零改动）');
+
+  // ─ tools v0.9.1 
+  section('engines/tool-snapshot v0.9.1');
+  WA.store.transact(d => {
+    d.clock.label = '第5日·清晨';
+    d.evolution.events = [{ id: 'e1', type: 'conflict', name: '河口对峙', level: 2, stage: '发酵', stageRound: 3 }];
+    d.evolution.factions = [{ id: 'f1', name: '漕帮', scope: '运河', status: '稳固', relation: '友好', currentGoal: '垄断漕运', core_person: '钱舵主', powerPillars: ['船队', '码头', '盐引'] }];
+    d.memory.facts = [{ key: '漕运税', value: '加三成', active: true }];
+    d.memory.__volatile = 'should-be-dropped';
+    d.evolution.__cache = { tmp: 1 };
+  });
+  const snapPayload = WA.toolSnapshot.buildPayload();
+  assert(snapPayload.worldaxis === 2 && snapPayload.state && snapPayload.meta.counts.events === 1, '快照载荷结构正确');
+  assert(!JSON.stringify(snapPayload.state).includes('__volatile') && !JSON.stringify(snapPayload.state).includes('__cache'), '导出剔除运行时脏字段');
+  const snapJson = WA.toolSnapshot.toJSON();
+  assert(JSON.parse(snapJson).meta.counts.factions === 1, 'toJSON 可被解析且计数正确');
+  const vOk = WA.toolSnapshot.validate(snapJson);
+  assert(vOk.ok === true && vOk.format === 2, '自产快照通过校验');
+  const vBadJson = WA.toolSnapshot.validate('{not json');
+  assert(vBadJson.ok === false && vBadJson.problems[0].includes('JSON'), '非法JSON被拦截');
+  const vNoFmt = WA.toolSnapshot.validate({ foo: 1 });
+  assert(vNoFmt.ok === false && vNoFmt.problems.some(p => p.includes('worldaxis')), '缺格式标识被拦截');
+  const vHighSchema = WA.toolSnapshot.validate({ worldaxis: 2, state: { schemaVersion: 99, clock: {}, memory: {}, evolution: {} } });
+  assert(vHighSchema.ok === false && vHighSchema.problems.some(p => p.includes('schema')), '更高schema版本被拦截');
+  // 修改当前状态 → 再恢复 → 应回到快照点
+  WA.store.transact(d => { d.clock.label = '被改脏了'; d.evolution.factions = []; });
+  assert(WA.store.get().clock.label === '被改脏了', '修改生效(前置)');
+  const rest = WA.toolSnapshot.restore(snapJson);
+  assert(rest.ok === true && rest.recoveryCreated === true, '恢复成功且留了恢复点');
+  assert(WA.store.get().clock.label === '第5日·清晨' && WA.store.get().evolution.factions.length === 1, '恢复后回到快照点');
+  assert(WA.store.get().memory.__volatile === undefined, '恢复后脏字段不回流');
+  // chatId 落进导出载荷（store.chatId 提供者存在性）
+  assert(typeof WA.store.chatId === 'function' && snapPayload.chatId === WA.store.chatId(), '导出载荷 chatId 与 store 一致');
+  const v1Compat = WA.toolSnapshot.validate({ version: '1.2', state: { schemaVersion: 1, clock: {}, memory: {}, evolution: {} } });
+  assert(v1Compat.ok === true && v1Compat.format === 1, '兼容读取旧版(version)存档');
+
+  section('engines/tool-analyzer v0.9.1');
+  WA.store.transact(d => {
+    d.evolution.events = [
+      { id: 'a', type: 'conflict', name: 'A', level: 4, stage: '逼近', stageRound: 5 },
+      { id: 'b', type: 'progress', name: 'B', level: 2, stage: '已失败', stageRound: 9 }
+    ];
+    d.evolution.winds = [{ topic: 'w1', level: 3, quiet: false }, { topic: 'w2', level: 2, quiet: true }];
+    d.evolution.worldTrends = [{ name: 'T', status: '持续中' }];
+    d.evolution.factions = [{ id: 'f', name: '敌营', scope: 'S', status: '鼎盛', relation: '世仇', currentGoal: 'G', core_person: 'C', powerPillars: ['P'] }];
+    d.evolution.economy = { climate: '危机', signals: [] };
+    d.evolution.regionalIncident = { active: true, title: '水患', impact: '粮价涨' };
+    d.currents = [{ id: 'c1', title: '暗流', visibility: 'hidden', stage: '发展' }, { id: 'c2', title: '明流', visibility: 'public', stage: '发展' }];
+    d.memory.foreshadows = Array.from({ length: 9 }, (_, i) => ({ id: 'fs' + i, content: '伏笔' + i, status: 'waiting', links: [] }));
+    d.people = {};
+  });
+  const repAn = WA.toolAnalyzer.analyze();
+  assert(repAn.pressure.event > 0 && repAn.pressure.event <= WA.toolAnalyzer.WEIGHTS.event, '事件压力在权重上限内');
+  assert(repAn.pressure.wind === 3.6, '风声压力只计未消散项(level3×1.2)');
+  assert(repAn.pressure.region === WA.toolAnalyzer.WEIGHTS.region, '区域事件active取满权重');
+  assert(repAn.pressure.faction > 0, '世仇势力产生正张力');
+  assert(repAn.momentum.activeEvents === 1 && repAn.momentum.terminalEvents === 1, '活跃/终结事件判定正确');
+  assert(repAn.momentum.hiddenCurrents === 1 && repAn.momentum.publicCurrents === 1, '暗流可见性分桶正确');
+  assert(repAn.risks.some(r => r.code === 'foreshadow_dam'), '伏笔堰塞(9条waiting)被识别');
+  assert(repAn.load.runtimeTokens > 0, '负载估算产出常驻token数');
+  const tk = WA.toolAnalyzer.estimateTokens('中文测试abcd');
+  assert(tk >= 3 && tk <= 10, 'token估算在合理区间');
+  WA.store.transact(d => { d.evolution.events = []; d.evolution.winds = []; d.evolution.worldTrends = []; d.evolution.factions = []; d.evolution.regionalIncident = null; d.evolution.economy = { climate: '平稳', signals: [] }; d.memory.foreshadows = []; d.currents = []; });
+  const repAn2 = WA.toolAnalyzer.analyze();
+  assert(repAn2.pressure.total < 5, '清空后压力回落');
+  assert(repAn2.risks.some(r => r.code === 'stalled'), '无活跃事件+无公开暗流触发停滞告警');
+  const beforeAnalyze = JSON.stringify(WA.store.get());
+  WA.toolAnalyzer.analyze();
+  assert(JSON.stringify(WA.store.get()) === beforeAnalyze, '分析器纯只读');
+  assert(WA.toolAnalyzer.summaryText(repAn).includes('压力'), '摘要文本含压力值');
+
+  section('engines/tool-import v0.9.1');
+  assert(WA.toolImport.detect({ worldaxis: 2, state: {} }).kind === 'snapshot', '识别全量存档');
+  assert(WA.toolImport.detect({ active: true, title: '蝗灾', impact: '缺粮' }).kind === 'regional', '识别区域事件单件');
+  assert(WA.toolImport.detect([{ name: '帮会', status: '稳固', relation: '中立' }]).kind === 'factions', '识别势力清单');
+  assert(WA.toolImport.detect([{ type: 'conflict', name: '冲突' }]).kind === 'events', '识别事件链清单');
+  assert(WA.toolImport.detect([{ name: ['沈炼'], memory: '记住了暗号' }]).kind === 'pmem', '识别主观记忆');
+  assert(WA.toolImport.detect([{ keys: ['词'], content: '内容' }]).kind === 'worldbook', '识别世界书条目组');
+  assert(WA.toolImport.detect('{bad').kind === 'invalid', '非法JSON判别');
+  assert(WA.toolImport.detect({ a: 1 }).kind === 'unknown', '未知结构判别');
+  // 势力导入
+  WA.store.transact(d => { d.evolution.factions = []; });
+  const impF = WA.toolImport.importData([
+    { name: '漕帮', scope: '运河', status: '鼎盛', relation: '友好', currentGoal: '扩码头', core_person: '钱舵主', powerPillars: ['船队'] },
+    { name: '漕帮', scope: '运河', status: '稳固', relation: '中立', currentGoal: '重复', core_person: 'X', powerPillars: ['Y'] },
+    { name: '缺件帮' }
+  ]);
+  assert(impF.ok === true && impF.added === 1 && impF.skipped === 2, '势力批量导入：准入+重名+缺件均拦截');
+  // 事件导入
+  WA.store.transact(d => { d.evolution.events = []; });
+  const impE = WA.toolImport.importData({ events: [
+    { type: 'conflict', name: '河口对峙', level: 3 },
+    { type: 'progress', name: '修堤', stage: '非法阶段' }
+  ] });
+  assert(impE.ok === true && impE.added === 2, '事件批量导入容错(非法阶段回落首阶段)');
+  assert(WA.store.get().evolution.events[1].stage === '筹备', '非法阶段回落该类型首阶段');
+  // 主观记忆导入
+  WA.store.transact(d => { d.memory.pmem = []; d.evolution.people = []; });
+  const impP = WA.toolImport.importData([
+    { name: ['沈炼'], known_by: ['陆文昭'], memory: '沈炼记住了暗号' },
+    { name: [], memory: '无持有者' }
+  ]);
+  assert(impP.ok === true && impP.added === 1 && impP.skipped === 1, '主观记忆导入：无效剔除');
+  // 区域事件导入
+  const impR = WA.toolImport.importData({ active: 'true', title: '水患', type: 'disaster', scope: '南郡', impact: '粮价涨', cooldown: '3' });
+  assert(impR.ok === true && WA.store.get().evolution.regionalIncident.active === true && WA.store.get().evolution.regionalIncident.cooldown === 3, '区域事件导入(字符串布尔/数字强转)');
+  // 世界书：不落 store 只提示
+  const beforeWb = JSON.stringify(WA.store.get().evolution);
+  const impW = WA.toolImport.importData({ entries: [{ keys: ['甲'], content: '乙' }, { comment: '丙', content: '' }] });
+  assert(impW.ok === true && impW.applied === false && impW.reason.includes('worldbook'), '世界书条目只诊断不写入');
+  assert(JSON.stringify(WA.store.get().evolution) === beforeWb, '世界书导入零改动');
+  // 全量快照导入回环
+  const roundTrip = WA.toolSnapshot.toJSON();
+  WA.store.transact(d => { d.clock.label = '别处'; });
+  const impS = WA.toolImport.importData(roundTrip);
+  assert(impS.ok === true && impS.kind === 'snapshot' && WA.store.get().clock.label !== '别处', '全量快照导入回环生效');
+  // kind 指定不符拦截
+  const impMismatch = WA.toolImport.importData([{ type: 'conflict', name: 'X' }], { kind: 'factions' });
+  assert(impMismatch.ok === false && impMismatch.reason.includes('不符'), 'kind指定不符时拒绝');
+  const pv = WA.toolImport.preview([{ name: 'A', status: '稳固', relation: '中立' }]);
+  assert(pv.kind === 'factions' && pv.count === 1, 'preview 返回类型与条数');
 
   section('engines/opinion');
   WA.store.transact(d => {
