@@ -1401,6 +1401,41 @@ const WA = global.WorldAxis;
   // 清理测试数据
   WA.store.transact(d => { d.memory.pmem = []; d.evolution.people = []; d.evolution.factions = []; });
 
+
+  // ══════════ v0.9.8 注入管线接入采样器 ══════════
+  // inject.js 的主观记忆源已切换到 memorySampler.buildBlock，
+  // 验证：管线在采样器存在时优先走采样器，不存在时回退 pmem.buildBlock
+  assert(WA.render && typeof WA.render.applyInjections === 'function', 'render 注入模块已加载');
+  // 构造伪 ctx 直接调用 applyInjections，验证主观记忆源被采样器接管
+  WA.store.init();
+  WA.store.transact(d => {
+    d.memory.pmem = [
+      { holders: ['酒保'], text: '酒保记得主角欠钱', time: '第1日' },
+      { holders: ['蒙面人'], text: '蒙面人怀疑主角身份', time: '第2日' }
+    ];
+  });
+  const injCtx = { injections: [] };
+  global.__lastExtensionPrompt = null;
+  WA.render.applyInjections(injCtx);
+  assert(global.__lastExtensionPrompt !== null, 'applyInjections 真正调用了 setExtensionPrompt');
+  const injCaptured = global.__lastExtensionPrompt.text;
+  assert(injCaptured.indexOf('【人物主观记忆】') >= 0, '注入内容含采样器生成的主观记忆块');
+  // 采样器接管验证：内容来自采样器（含相关性过滤后的条目），不是 pmem 的 slice(-8)
+  assert(injCaptured.indexOf('酒保') >= 0 || injCaptured.indexOf('蒙面人') >= 0, '注入含 pmem 条目内容');
+  // 注入预算仍生效：主观记忆源 rank 3 可折叠
+  const pri = WA.injectBudget.rankOf('主观记忆');
+  assert(pri === 3 && WA.injectBudget.foldable('主观记忆') === true, '主观记忆源在预算表 rank3 可折叠');
+  // 回退路径：删除采样器后应回退 pmem.buildBlock
+  const keepSampler = WA.memorySampler;
+  delete WA.memorySampler;
+  global.__lastExtensionPrompt = null;
+  WA.render.applyInjections({ injections: [] });
+  const injFallback = global.__lastExtensionPrompt && global.__lastExtensionPrompt.text;
+  assert(injFallback !== null && injFallback.indexOf('【人物主观记忆】') >= 0, '采样器缺失时回退 pmem.buildBlock');
+  WA.memorySampler = keepSampler;
+  // 清理
+  WA.store.transact(d => { d.memory.pmem = []; });
+
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

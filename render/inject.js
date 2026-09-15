@@ -46,7 +46,12 @@
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）
-      if (vis.memory && WA.pmem) { const pb = WA.pmem.buildBlock(); if (pb) items.push({ source: '主观记忆', content: pb }); }
+      // v0.9.8: 采样器接管——指数衰减采样 + 上下文相关召回，替代 slice(-8) 无差别截取
+      if (vis.memory && WA.memorySampler) {
+        const recent = WA.pmem && WA.pmem.recentText ? WA.pmem.recentText(4) : '';
+        const pb = WA.memorySampler.buildBlock({ recentText: recent });
+        if (pb) items.push({ source: '主观记忆', content: pb });
+      } else if (vis.memory && WA.pmem) { const pb = WA.pmem.buildBlock(); if (pb) items.push({ source: '主观记忆', content: pb }); }
       // v0.8.3: 双层叙事摘要块（优先总述回退纪要）
       if (vis.memory && WA.summarizer) { const sb = WA.summarizer.buildBlock(); if (sb) items.push({ source: '叙事摘要', content: sb }); }
       // 舆情块

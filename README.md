@@ -67,6 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 
 ## 版本历史
+- **v0.9.8** — 注入管线接入采样器：render/inject.js 的主观记忆源切换到 memorySampler.buildBlock（注入时取近期正文做相关性过滤，采样器缺失时平滑回退 pmem.buildBlock）；预算表「主观记忆」rank3 可折叠自动生效；475 断言全过
 - **v0.9.7** — 记忆注入采样器：缝合 World memory-engine 的指数衰减采样（weight=e^(-age/scale)+骰子，近期高概率保留、远期按指数概率唤醒、每次轮换）+ 上下文相关召回（只注入持有者出现在正文/世界快照中的记忆，不足时全量回退）；替代 pmem.buildBlock 的 slice(-8) 无差别截取，长局不再「失忆」；469 断言全过
 - **v0.9.6** — 推演契约对账器：不靠 grep 靠实测，22 个哨兵探针逐字段喂 applyResult 判定真实消费面（含 horizon 委托字段的 live-store 兜底识别）；12 组枚举对齐 + 6 组跨模块漂移扫描；探针 live store 全量还原零残留。检出并修复真实缺陷：tool-analyzer ECON_SCORE 第三套枚举（萧条/危机）与契约的衰退/动荡漂移，analyzer 查表落空静默回落平稳分；442 断言全过
 - **v0.9.5** — 诊断清单全树覆盖：MODULE_EXPORTS 扩至 50 模块（补 actors/direction/compat/ui/purifier），UI 三项归可选项；新增全树盘查断言（磁盘↔清单双向零漏零幽灵）；402 断言全过
