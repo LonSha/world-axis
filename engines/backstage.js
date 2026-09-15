@@ -80,6 +80,7 @@
       pulseActivity: 'normal',      // quiet|normal|turbulent
       npcBudget: 8,                 // 单轮推演最多结算NPC数
       autoSimulate: true,           // after_reply 自动推演
+      fullRules: false,             // v0.8.3: true=注入12模块完整规则全文, false=精简守则
       customInstruction: ''         // 用户自定义推演指令（追加到系统提示）
     };
     try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_SETTINGS) || '{}')); } catch (e) { return def; }
@@ -209,10 +210,14 @@
       const segReasoning = ov['reasoning'] || REASONING_PROTOCOL;
       const segOutFmt = ov['output-format'] || INJECTION_RULES;
       const segJsonNotes = ov['json-notes'] || '';
+      // v0.8.3: 世界规则库（12模块铁律）——默认注入精简守则，全量模式注入完整规则
+      const rulesBlock = WA.rules ? (st.fullRules ? WA.rules.getAll() : WA.rules.coreSummary()) : '';
       const sys = [
         segEngineRole,
         '',
         segReasoning,
+        '',
+        rulesBlock,
         '',
         VISIBILITY_SEMANTICS,
         '',

@@ -55,3 +55,9 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
+
+## 版本历史
+- **v0.8.3** (2025-01) — 人物主观记忆引擎(pmem)：别名感知召回、信息不对称、去重入账
+- **v0.8.2** (2025-01) — chatcache存档系统：跨设备同步、快照滚动窗口、命名空间隔离
+- **v0.8.1** (2025-01) — 完整测试覆盖218断言全过、世界快照构建含时钟
+- **v0.8.0** (2025-01) — 七大核心引擎(horizon/digest/limits/worldbook/ledger/preset/chatcache)、四大记忆引擎(inspector/timeline/entities/pmem)、九页面板UI

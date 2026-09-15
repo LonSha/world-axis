@@ -19,7 +19,7 @@ const ctx = vm.createContext(global);
 const LOAD = [
   'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
-  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js',
+  'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
@@ -648,6 +648,63 @@ const WA = global.WorldAxis;
   const em3 = WA.store.get().evolution.entityMemory;
   const qls = em3.location.find(e => e.name === '青龙寺');
   assert(em3.location.length === 1 && qls.events.length === 1, '既有实体按别名命中并追加事件（不重复创建）');
+
+  // ── rules (v0.8.3) ──
+  section('engines/rules v0.8.3');
+  assert(WA.rules.getRuleCount() === 12, '12模块规则齐备');
+  const all = WA.rules.getAll();
+  assert(all.includes('<world_engine>') && all.includes('<event_chain>') && all.includes('<world_trends>') && all.includes('<blackbox>'), '全量规则含全部标签段');
+  assert(all.includes('萌芽 → 发酵 → 逼近') === false && all.includes('萌芽→发酵→逼近'), '事件链四阶段顺序保留');
+  assert(all.includes('特权跃升') && all.includes('血盟') && all.includes('瓦解'), '关键硬约束词在文');
+  const core = WA.rules.coreSummary();
+  assert(core.includes('世界非中心化') && core.length < all.length / 3, '精简守则显著短于全文');
+  assert(core.includes('四圈层') && core.includes('归纳优先'), '守则含声誉圈层与事件归纳');
+  // backstage 注入：默认精简守则
+  WA.store.transact(d => { d.evolution.events = []; });
+  global.localStorage.setItem('worldaxis_backstage_settings_v1', JSON.stringify({ simulationMode: 'balanced', autoSimulate: true, fullRules: false, npcBudget: 8 }));
+  let msgs = WA.backstage.buildPrompt({ idx: 1, text: 'x' }, '');
+  let sysText = msgs[0].content;
+  assert(sysText.includes('世界引擎·正文行为守则'), '默认注入精简守则');
+  assert(!sysText.includes('<world_trends>'), '默认不注入全量规则全文');
+  global.localStorage.setItem('worldaxis_backstage_settings_v1', JSON.stringify({ simulationMode: 'balanced', autoSimulate: true, fullRules: true, npcBudget: 8 }));
+  msgs = WA.backstage.buildPrompt({ idx: 1, text: 'x' }, '');
+  assert(msgs[0].content.includes('<world_trends>') && msgs[0].content.includes('<influence_chain>'), '全量模式注入12模块全文');
+  global.localStorage.removeItem('worldaxis_backstage_settings_v1');
+
+  // ── summarizer (v0.8.3) ──
+  section('engines/summarizer v0.8.3');
+  WA.store.transact(d => { d.memory.smallSummaries = []; d.memory.bigSummaries = []; });
+  WA.apiRouter.setChannel('digest', { baseUrl: 'http://mock', model: 'm', apiKey: 'k' });
+  const mc = global.__mockChat;
+  function pushSmall(n) {
+    mc.push({ is_user: n % 2 === 1, name: '旁白', mes: '剧情推进片段' + n + '。', swipe_id: 0 });
+    global.__pushApiJson({ small_summary: '纪要' + n + '：沈炼追查内鬼，在库房发现被撕掉的巡夜名录，与陆文昭的口供矛盾，遂将其列为嫌疑。' });
+  }
+  // 逐条压缩（push一条chat+一条响应→立即消费，保持fetch队列对齐）
+  for (let i = 1; i <= 4; i++) { pushSmall(i); await WA.summarizer.makeSmallSummary(); }
+  const smalls = WA.store.get().memory.smallSummaries;
+  assert(smalls.length >= 1, '纪要入账（含楼层区间）');
+  assert(smalls[0].content.includes('沈炼'), '纪要保留人物与具体事件');
+  assert(typeof smalls[0].startLayer === 'number' && typeof smalls[0].endLayer === 'number', '纪要记录楼层区间');
+  // 补齐4条未消费纪要后触发总述
+  WA.store.transact(d => {
+    d.memory.smallSummaries = [];
+    for (let i = 0; i < 4; i++) d.memory.smallSummaries.push({ startLayer: i * 3, endLayer: i * 3 + 2, content: '纪要' + i + '：沈炼查获线索并推进调查，结果明确。', at: Date.now() + i, used: false });
+  });
+  global.__pushApiJson({ big_summary: '阶段纪事：沈炼自库房发现撕毁的巡夜名录起疑，逐步将调查指向陆文昭，最终在第三次对质中确认内鬼身份并将其拿下，血刀门安插的眼线被拔除。' });
+  const bigOk = await WA.summarizer.makeBigSummary();
+  assert(bigOk === true, '纪要攒满后总述入账');
+  const bigs = WA.store.get().memory.bigSummaries;
+  assert(bigs.length === 1 && bigs[0].startLayer === 0 && bigs[0].endLayer === 11, '总述覆盖区间正确合并');
+  assert(WA.store.get().memory.smallSummaries.every(x => x.used), '被消费的纪要标记used');
+  // 注入优先总述
+  let blk = WA.summarizer.buildBlock();
+  assert(blk.includes('前情阶段史') && blk.includes('拔除'), '注入优先大总述');
+  // 无总述时回退近期纪要
+  WA.store.transact(d => { d.memory.bigSummaries = []; d.memory.smallSummaries = [{ startLayer: 0, endLayer: 2, content: '近期纪要甲：事件已发生并有结果。', at: 1, used: false }]; });
+  blk = WA.summarizer.buildBlock();
+  assert(blk.includes('近期纪要') && blk.includes('纪要甲'), '无总述回退纪要');
+  assert(WA.summarizer.SMALL_SYSTEM.includes('谁—做了什么') && WA.summarizer.BIG_SYSTEM.includes('空壳句'), '双层提示词保留反空泛铁律');
 
   section('engines/opinion');
   WA.store.transact(d => {
