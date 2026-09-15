@@ -83,8 +83,10 @@
   function recoveryKey(chatId) { return 'worldaxis_recovery_' + (chatId || getChatId()); }
 
   let memCache = {}; // 内存态（当前聊天的权威副本）
+  // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
+  const __batch = { depth: 0, dirty: false };
   // v0.1.30: 事务计量——按提交状态聚合计数与耗时
-  const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
+  const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, batched: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
   function recTx(ms, status) {
     try {
       __txStat.count++; __txStat.totalMs += ms; __txStat.lastMs = ms; __txStat.lastAt = Date.now(); __txStat.lastStatus = status;
@@ -92,6 +94,7 @@
       else if (status === 'error') __txStat.errors++;
       else if (status === 'aborted') __txStat.aborted++;
       else if (status === 'save-failed') __txStat.saveFailed++;
+      else if (status === 'ok-batched') { __txStat.ok++; __txStat.batched++; }
     } catch (e) {}
   }
   // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
@@ -159,9 +162,27 @@
       }
     },
     /** v0.1.30: 事务计量只读视图（tool-diag 消费） */
-    txStat() { return { count: __txStat.count, ok: __txStat.ok, errors: __txStat.errors, aborted: __txStat.aborted, saveFailed: __txStat.saveFailed, lastStatus: __txStat.lastStatus, avgMs: Math.round(__txStat.totalMs / Math.max(1, __txStat.count)), lastMs: __txStat.lastMs, lastAt: __txStat.lastAt }; },
+    txStat() { return { count: __txStat.count, ok: __txStat.ok, errors: __txStat.errors, aborted: __txStat.aborted, saveFailed: __txStat.saveFailed, batched: __txStat.batched, lastStatus: __txStat.lastStatus, avgMs: Math.round(__txStat.totalMs / Math.max(1, __txStat.count)), lastMs: __txStat.lastMs, lastAt: __txStat.lastAt }; },
     /** v0.1.30: 清零事务计量（诊断重置入口） */
-    resetTxStat() { __txStat.count = 0; __txStat.ok = 0; __txStat.errors = 0; __txStat.aborted = 0; __txStat.saveFailed = 0; __txStat.totalMs = 0; __txStat.lastMs = 0; __txStat.lastAt = 0; __txStat.lastStatus = null; },
+    resetTxStat() { __txStat.count = 0; __txStat.ok = 0; __txStat.errors = 0; __txStat.aborted = 0; __txStat.saveFailed = 0; __txStat.batched = 0; __txStat.totalMs = 0; __txStat.lastMs = 0; __txStat.lastAt = 0; __txStat.lastStatus = null; },
+    /**
+     * v0.1.31: 写合并批作用域——fn 内的 transact 只推进内存（保留每事务深拷贝隔离），
+     * 批退出时统一落盘一次。异步安全：支持 async fn 与嵌套（depth 计数）。
+     * 批退出 save 失败不抛（save 内部已归因 saveStat）。
+     */
+    async batch(fn) {
+      __batch.depth++;
+      try { return await fn(); }
+      finally {
+        __batch.depth--;
+        if (__batch.depth === 0 && __batch.dirty) {
+          __batch.dirty = false;
+          try { this.save(); } catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
+        }
+      }
+    },
+    /** v0.1.31: 批深度只读视图（诊断用：>0 表示当前处于写合并作用域） */
+    batchDepth() { return __batch.depth; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
@@ -191,6 +212,12 @@
       try { result = mutator(draft); }
       catch (e) { recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
       if (result === false) { recTx(Date.now() - t0, 'aborted'); return { ok: false, aborted: true }; }
+      // v0.1.31: 批作用域内只推进内存，落盘延迟到批退出（写合并）
+      if (__batch.depth > 0) {
+        memCache = draft; __batch.dirty = true;
+        recTx(Date.now() - t0, 'ok-batched');
+        return { ok: true, persisted: null, batched: true, state: draft, result };
+      }
       const saved = this.save(draft);
       recTx(Date.now() - t0, saved ? 'ok' : 'save-failed');
       // ok=内存事务语义（v0.1.22 契约：落盘失败不回滚内存）；persisted=v0.1.30 新增落盘结果

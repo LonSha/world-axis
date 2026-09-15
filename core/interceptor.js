@@ -31,10 +31,10 @@
     if (type && type !== 'normal' && type !== 'regenerate' && type !== 'swipe') return;
     const sig = roundSig();
     if (sig === lastRoundSig) { WA.log('info', '拦截器去重：本轮before链已执行'); return; }
-    try { if (WA.render && WA.render.uninject) WA.render.uninject('interceptor'); } catch (e) { WA.log('warn', 'pre-uninject failed', e); }
     lastRoundSig = sig;
-    try { if (WA.store && contextSize) WA.store.transact(d => { d.meta = d.meta || {}; d.meta.contextSize = contextSize; }); } catch (e) { /* 预算推导用，失败不影响推演 */ }
-
+    // v0.1.31: 写合并——整轮（撤销回写+contextSize记账+before链+注入落地）只推进内存，轮末统一落盘一次
+    const runRound = async () => {
+    try { if (WA.render && WA.render.uninject) WA.render.uninject('interceptor'); } catch (e) { WA.log('warn', 'pre-uninject failed', e); }
     const ctx = {
       type: type || 'normal',
       chat,
@@ -45,6 +45,7 @@
       canceled: false
     };
     try {
+      try { if (WA.store && contextSize) WA.store.transact(d => { d.meta = d.meta || {}; d.meta.contextSize = contextSize; }); } catch (e) { /* 预算推导用，失败不影响推演 */ }
       await WA.workflow.run('before', ctx);
     } catch (e) {
       WA.log('error', 'before链关键失败，本轮沿用上一份已确认世界状态', e);
@@ -59,6 +60,8 @@
     }
     // 注入统一落地（render/inject 节点也可是链条之一；这里兜底处理injections数组）
     try { WA.render && WA.render.applyInjections && WA.render.applyInjections(ctx); } catch (e) { WA.log('error', '注入落地失败', e); }
+    }; // end runRound
+    if (WA.store && WA.store.batch) await WA.store.batch(runRound); else await runRound();
   };
 
   const interceptor = WA.interceptor = {
@@ -83,7 +86,11 @@
               branchId: WA.store ? WA.store.currentBranchId() : 'b0',
               injections: []
             };
-            try { await WA.workflow.run('after', actx); }
+            // v0.1.31: 写合并——after 链同样只推进内存，链结束统一落盘一次
+            try {
+              const runAfter = () => WA.workflow.run('after', actx);
+              if (WA.store && WA.store.batch) await WA.store.batch(runAfter); else await runAfter();
+            }
             catch (e) { WA.log('error', 'after链执行异常', e); }
           });
         }

@@ -66,6 +66,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.31** — store.batch 写合并：批作用域内 transact 只推进内存（保留每事务深拷贝隔离），批退出统一落盘一次；拦截器整轮单批（撤销回写+contextSize+before链+注入落地合并，每轮生成从 ~15 次全量落盘降至 1 次）；txStat 新增 batched 计数，transact 批内返回 batched=true/persisted=null。
+
 - **v0.1.30** — store.transact 事务计量：按 ok/save-failed/error/aborted 四态计数与耗时（txStat/resetTxStat），tool-diag storage 节新增 transactions 子块；verdict 独立 transactions 键分级（最近一次落盘失败 error、历史失败/修改器异常 warn，key 与既有 storage 议题解耦）；transact 返回值新增 persisted 字段（ok 保持 v0.1.22 内存事务语义不变）。
 
 - **v0.1.29** — 撤销语义诚实化 + 可见性开关真实生效（两处真 bug）：① 呈现铁律此前无条件 push，导致 parts.length 恒真、关光所有源仍注入 221 字空壳；② 账本/世界推演不在 SOURCES 内，完全不受开关控制。现在铁律随状态内容有条件追加、ledger/digest 纳入 SOURCES（默认开保持旧行为）；另 uninject 成功后回写 injected:false + clearedAt + clearedBy(trigger)，槽位证据保留维持幂等重放，tool-diag 透出撤销态。注入落地时 lastInjection 记录 injected（主块非空或有槽位落地才算生效）；uninject 成功后回写 injected:false + clearedAt + clearedBy(trigger)，槽位证据保留以维持幂等重放；tool-diag inject 节透出撤销态，诊断不再把已撤销的上一轮注入当作在场证据。

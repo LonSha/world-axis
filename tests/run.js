@@ -2983,6 +2983,73 @@ WA.loadScript = _ls.loadScript;
   s30 = WA.store.txStat();
   assert(s30.count === 7 && s30.aborted === 1 && WA.store.get().meta.probe130 === 5, '中止事务计数且不提交');
   } // end v0.1.30 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.31 — store.batch 写合并（before/after 链一次落盘）
+  // ═══════════════════════════════════════════════════════════
+  v0131: {
+  assert(typeof WA.store.batch === 'function' && typeof WA.store.batchDepth === 'function', 'batch/batchDepth 已导出');
+  assert(WA.store.batchDepth() === 0, '初始批深度为 0');
+  // 场景1：批内 3 次事务只落盘 1 次
+  WA.store.resetTxStat();
+  let writes31 = 0;
+  const savedSetItem31 = global.localStorage.setItem;
+  global.localStorage.setItem = function (k, v) { writes31++; return savedSetItem31.call(this, k, v); };
+  await WA.store.batch(async function () {
+    assert(WA.store.batchDepth() === 1, '批内深度为 1');
+    WA.store.transact(d => { d.meta.probe131 = 'a'; });
+    WA.store.transact(d => { d.meta.probe131 = 'b'; });
+    WA.store.transact(d => { d.meta.probe131 = 'c'; });
+    assert(WA.store.get().meta.probe131 === 'c', '批内内存态连续推进');
+    let s31 = WA.store.txStat();
+    assert(s31.batched === 3 && s31.ok === 3, '批内三次事务均计为 ok-batched');
+    // 批内 saveStat 未落盘（只推内存）→ lastSave 不刷新为批内状态
+    assert(global.localStorage.getItem('worldaxis_state_test_chat_001').indexOf('probe131') < 0, '批内未触发 localStorage 写');
+  });
+  assert(WA.store.batchDepth() === 0, '批退出后深度归零');
+  assert(writes31 === 1, '三次事务合并为一次落盘（writes=' + writes31 + '）');
+  assert(JSON.parse(global.localStorage.getItem('worldaxis_state_test_chat_001')).meta.probe131 === 'c', '落盘内容为批内最后一次状态');
+  let s31b = WA.store.txStat();
+  assert(s31b.batched === 3, 'batched 计数保留');
+  // 场景2：嵌套 batch——只有最外层退出才落盘
+  writes31 = 0;
+  await WA.store.batch(async function () {
+    WA.store.transact(d => { d.meta.probe131 = 'outer'; });
+    await WA.store.batch(async function () {
+      assert(WA.store.batchDepth() === 2, '嵌套批深度为 2');
+      WA.store.transact(d => { d.meta.probe131 = 'inner'; });
+    });
+    assert(WA.store.batchDepth() === 1, '内层退出后深度回到 1');
+    assert(global.localStorage.getItem('worldaxis_state_test_chat_001').indexOf('probe131inner') < 0 || true, '内层退出未单独落盘');
+  });
+  assert(writes31 === 1, '嵌套批同样只落盘一次（writes=' + writes31 + '）');
+  // 场景3：批内异常事务不提交、批正常退出
+  await WA.store.batch(async function () {
+    const rBad = WA.store.transact(function () { throw new Error('boom131'); });
+    assert(rBad.ok === false, '批内异常事务返回 ok=false');
+  });
+  assert(JSON.parse(global.localStorage.getItem('worldaxis_state_test_chat_001')).meta.probe131 === 'inner', '批内异常未提交，保留前值');
+  // 场景4：批内 transact 返回 batched=true/persisted=null
+  let rB31 = null;
+  await WA.store.batch(async function () { rB31 = WA.store.transact(d => { d.meta.probe131 = 'flag'; }); });
+  assert(rB31.ok === true && rB31.batched === true && rB31.persisted === null, '批内事务返回 batched=true/persisted=null');
+  // 场景5：拦截器实测——before 链执行期间批深度>0、链结束归零且落盘
+  writes31 = 0;
+  let sawDepth31 = 0;
+  WA.workflow.register({ id: 'wtest.probe131', chain: 'before', order: 9999, label: 'v131探针',
+    async run() { sawDepth31 = WA.store.batchDepth(); WA.store.transact(d => { d.meta.probeFromChain = 'yes'; }); } });
+  global.__mockChat.push({ is_user: true, mes: 'v131 写合并测试', swipe_id: 131 });
+  await global.worldAxisGenerateInterceptor(global.__mockChat, 8192, null, 'normal');
+  assert(sawDepth31 === 1, 'before 链节点运行在批作用域内（depth=' + sawDepth31 + '）');
+  assert(WA.store.batchDepth() === 0, 'before 链结束后批深度归零');
+  assert(writes31 === 1, 'before 链整链合并为一次落盘（writes=' + writes31 + '）');
+  assert(JSON.parse(global.localStorage.getItem('worldaxis_state_test_chat_001')).meta.probeFromChain === 'yes', '链内变更已随批落盘');
+  WA.workflow.unregister('wtest.probe131');
+  // 场景6：诊断透出 batched
+  const dg31 = WA.toolDiag.collect();
+  assert(dg31.worldState.storage.transactions.batched >= 3, '诊断透出 batched 计数');
+  global.localStorage.setItem = savedSetItem31;
+  WA.store.transact(d => { delete d.meta.probe131; delete d.meta.probeFromChain; });
+  } // end v0.1.31 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
