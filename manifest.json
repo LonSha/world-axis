@@ -7,7 +7,7 @@
   "js": "index.js",
   "css": "style.css",
   "author": "LonSha & sutured sources",
-  "version": "0.1.34",
+  "version": "0.1.35",
   "auto_update": false,
   "minimum_client_version": "1.12.0",
   "generate_interceptor": "worldAxisGenerateInterceptor"

@@ -3177,6 +3177,44 @@ WA.loadScript = _ls.loadScript;
   // 清理
   WA.store.transact(d => { delete d.meta.t134; delete d.meta.t134inner; });
   } // end v0.1.34 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.35 — 聊天纪元守卫（批跨 init 作废）
+  // ═══════════════════════════════════════════════════════════
+  v0135: {
+  assert(WA.store.batchStat().orphaned === false, '初始无孤儿批');
+  const flush135Before = WA.store.batchStat().flushes;
+  // 场景：批进行中发生 init()（模拟切聊天）——
+  // ① 批内旧逻辑的 transact 被拒绝（stale）；② 批退出不 flush；③ 新聊天状态不被旧批污染
+  let staleHit135 = false;
+  const roundResult135 = await WA.store.batch(async function () {
+    // 批开启后正常事务
+    const r1 = WA.store.transact(d => { d.meta.preSwitch = 'old-chat'; });
+    assert(r1.ok === true && r1.batched === true, '纪元内批事务正常');
+    // 模拟切聊天：init() 触发纪元自增 + 作废在飞批
+    WA.store.init();
+    assert(WA.store.batchStat().orphaned === true, 'init 后在飞批被标记 orphaned');
+    // 僵尸批内继续 transact（模拟旧轮在飞逻辑恢复执行）
+    const r2 = WA.store.transact(d => { d.meta.preSwitch = 'ZOMBIE-WRITE'; d.meta.crossChat = true; });
+    staleHit135 = r2.stale === true;
+    assert(r2.ok === false && r2.stale === true, '僵尸批内 transact 被拒绝且不执行 mutator');
+  });
+  assert(staleHit135, 'stale 标记透出');
+  assert(WA.store.batchStat().flushes === flush135Before, '跨纪元批退出不产生 flush');
+  assert(WA.store.batchStat().dirty === false, '跨纪元批退出后脏标记清空');
+  // 关键断言：旧批的未落盘改动没有写进任何键——新纪元的 save 只含新纪元内容
+  const persisted135 = JSON.parse(global.localStorage.getItem('worldaxis_state_test_chat_001'));
+  assert(persisted135.meta.crossChat === undefined, '僵尸写入未落盘（crossChat 缺失）');
+  assert(persisted135.meta.preSwitch !== 'ZOMBIE-WRITE', '僵尸改写未覆盖已落盘值');
+  assert(typeof WA.store.get().meta.crossChat === 'undefined' || WA.store.get().meta.crossChat !== true, '内存态亦无僵尸写入');
+  // 正常批恢复：新纪元内批事务+flush 照常
+  await WA.store.batch(async function () {
+    const r3 = WA.store.transact(d => { d.meta.postSwitch = 'ok'; });
+    assert(r3.ok === true, '新纪元批事务正常');
+  });
+  assert(WA.store.batchStat().flushes === flush135Before + 1, '新纪元批正常 flush');
+  // 清理
+  WA.store.transact(d => { delete d.meta.preSwitch; delete d.meta.postSwitch; });
+  } // end v0.1.35 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

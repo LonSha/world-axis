@@ -84,7 +84,8 @@
 
   let memCache = {}; // 内存态（当前聊天的权威副本）
   // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
-  const __batch = { depth: 0, dirty: false, flushes: 0, lastFlushAt: 0 };
+  let __epoch = 0; // v0.1.35: 聊天纪元——init()（含切聊天）自增，在飞批跨纪元即作废
+  const __batch = { depth: 0, dirty: false, flushes: 0, lastFlushAt: 0, epoch: 0, orphaned: false };
   // v0.1.33: 嵌套事务栈——非空时内层 transact 直接在最外层 draft 上修改，提交延迟到最外层
   const __tx = [];
   // v0.1.30: 事务计量——按提交状态聚合计数与耗时
@@ -121,6 +122,12 @@
     chatId: getChatId,        // v0.9.1: 供导出/诊断读取当前聊天id
 
     init() {
+      // v0.1.35: 聊天切换/重载时，作废在飞写合并批——旧聊天的未落盘改动不再写向新聊天键
+      __epoch++;
+      if (__batch.depth > 0) {
+        __batch.orphaned = true; __batch.dirty = false;
+        WA.log('warn', '聊天切换时存在在飞写合并批：已作废其未落盘改动（防跨聊天污染）');
+      }
       memCache = this.load() || defaultWorldState();
       if (!memCache.schemaVersion || memCache.schemaVersion < SCHEMA_VERSION) {
         this.createRecoveryPoint(); // 升级前先留恢复点
@@ -174,20 +181,27 @@
      * 批退出 save 失败不抛（save 内部已归因 saveStat）。
      */
     async batch(fn) {
+      if (__batch.depth === 0) { __batch.orphaned = false; __batch.epoch = __epoch; }
       __batch.depth++;
       try { return await fn(); }
       finally {
         __batch.depth--;
-        if (__batch.depth === 0 && __batch.dirty) {
-          __batch.dirty = false;
-          try { this.save(); __batch.flushes++; __batch.lastFlushAt = Date.now(); } catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
+        if (__batch.depth === 0) {
+          // v0.1.35: 批横跨了聊天纪元（init 发生在批进行中）→ 丢弃 flush
+          if (__batch.orphaned || __batch.epoch !== __epoch) {
+            __batch.dirty = false; __batch.orphaned = false;
+            WA.log('warn', '写合并批跨聊天纪元退出：未落盘改动已丢弃');
+          } else if (__batch.dirty) {
+            __batch.dirty = false;
+            try { this.save(); __batch.flushes++; __batch.lastFlushAt = Date.now(); } catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
+          }
         }
       }
     },
     /** v0.1.31: 批深度只读视图（诊断用：>0 表示当前处于写合并作用域） */
     batchDepth() { return __batch.depth; },
     /** v0.1.32: 批健康只读视图——flushes 即「写合并后实际落盘次数」（对照 txStat.batched 观察合并率） */
-    batchStat() { return { depth: __batch.depth, dirty: __batch.dirty, flushes: __batch.flushes, lastFlushAt: __batch.lastFlushAt }; },
+    batchStat() { return { depth: __batch.depth, dirty: __batch.dirty, flushes: __batch.flushes, lastFlushAt: __batch.lastFlushAt, orphaned: __batch.orphaned }; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
@@ -232,6 +246,12 @@
       catch (e) { __tx.pop(); recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
       if (result === false) { __tx.pop(); recTx(Date.now() - t0, 'aborted'); return { ok: false, aborted: true }; }
       // v0.1.31: 批作用域内只推进内存，落盘延迟到批退出（写合并）
+      if (__batch.depth > 0 && __batch.orphaned) {
+        // v0.1.35: 跨纪元僵尸批——不执行 mutator（防旧轮逻辑改写新聊天状态）
+        __tx.pop();
+        recTx(Date.now() - t0, 'aborted');
+        return { ok: false, aborted: true, stale: true };
+      }
       if (__batch.depth > 0) {
         memCache = draft; __batch.dirty = true;
         recTx(Date.now() - t0, 'ok-batched');
