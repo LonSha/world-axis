@@ -230,10 +230,15 @@
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
 
+  let __logErrOnly = false;
   function renderLogs() {
-    return `<div class="wa-sec">运行日志（最近${WA.eventLog.length}条）</div>
+    const errCount = (WA.errorLog || []).length;
+    const src = __logErrOnly && WA.errorLog ? WA.errorLog : WA.eventLog;
+    const label = __logErrOnly ? `错误日志（最近${errCount}条，子环保留≤50）` : `运行日志（最近${WA.eventLog.length}条）`;
+    return `<div class="wa-sec">${label}</div>
+      <button class="wa-btn wa-mini" id="wa-log-err">${__logErrOnly ? '显示全部' : `仅看错误${errCount ? '(' + errCount + ')' : ''}`}</button>
       <button class="wa-btn wa-mini" id="wa-log-copy">复制</button>
-      <div class="wa-logbox">${WA.eventLog.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
+      <div class="wa-logbox">${src.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
   }
 
   const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
@@ -384,6 +389,7 @@
     on('#wa-plan-clear', () => { WA.oracle.clear(); renderBody(); });
     on('#wa-gen-choices', async () => { const out = $('#wa-choices-out'); out.textContent = '生成中…'; const cs = await WA.choices.generate(4); out.innerHTML = cs.length ? cs.map((c, i) => `<div class="wa-item">${i + 1}. ${esc(c)}</div>`).join('') : '（未配置choices通道或生成失败）'; });
     on('#wa-log-copy', () => { navigator.clipboard && navigator.clipboard.writeText(WA.eventLog.map(l => `[${new Date(l.t).toLocaleTimeString()}][${l.level}] ${l.msg} ${l.data || ''}`).join('\n')); });
+    on('#wa-log-err', () => { __logErrOnly = !__logErrOnly; renderBody(); });
     on('#wa-audit-copy', () => { if (navigator.clipboard && WA.store && WA.store.exportAuditReport) { navigator.clipboard.writeText(WA.store.exportAuditReport()); const out = $('#wa-diag-out'); if (out) out.textContent = '✓ 内存/持久化审计报告 (sizeAudit) 已复制到剪贴板！'; } });
     // v0.1.52: 存储键体检——dry-run 计划 + 确认执行（二次确认制，apply 权在用户）
     const keyChk = $('#wa-key-check');

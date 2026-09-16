@@ -121,6 +121,7 @@
     state: /^worldaxis_state_(.+)$/,
     recovery: /^worldaxis_recovery_(.+)$/,
     diag_eventLog: /^worldaxis_event_log_(.+)$/,
+    diag_errorLog: /^worldaxis_error_log_(.+)$/,
     diag_wfHistory: /^worldaxis_wf_history_(.+)$/,
     diag_uninjectLedger: /^worldaxis_uninject_ledger_(.+)$/,
     corrupt: /^worldaxis_state_(.+)_corrupt_\d+$/,
@@ -132,6 +133,7 @@
     if ((m = key.match(KEY_FAMILIES.state))) return { family: 'state', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.recovery))) return { family: 'recovery', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_eventLog))) return { family: 'diagnostic', kind: 'event_log', chat: m[1] };
+    if ((m = key.match(KEY_FAMILIES.diag_errorLog))) return { family: 'diagnostic', kind: 'error_log', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_wfHistory))) return { family: 'diagnostic', kind: 'wf_history', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_uninjectLedger))) return { family: 'diagnostic', kind: 'uninject_ledger', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.wb))) return { family: 'wb', chat: m[1] };

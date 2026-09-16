@@ -4166,6 +4166,71 @@ WA.loadScript = _ls.loadScript;
   WA.eventLog.length = 0;
   evtLogBefore152.forEach(l => WA.eventLog.push(l));
   } // end v0.1.52 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.53 — error 日志子环：关键故障证据不被 info 噪音挤出
+  // ═══════════════════════════════════════════════════════════
+  v0153: {
+  assert(Array.isArray(WA.errorLog), 'WA.errorLog 子环已导出');
+
+  // ── 1. info 噪音灌满混合环，error 证据仍存活 ──
+  const evtBefore153 = WA.eventLog.slice();
+  const errBefore153 = WA.errorLog.slice();
+  WA.log('error', 'v153 关键故障A', 'boom');
+  for (let i = 0; i < 320; i++) WA.log('info', 'v153 噪音' + i);   // 灌满并翻转混合环
+  assert(WA.eventLog.length <= 300, '混合环仍守 300 上限（实 ' + WA.eventLog.length + '）');
+  assert(WA.errorLog.some(l => l.msg === 'v153 关键故障A'), 'error 证据在子环中存活（不受 info 挤出）');
+  assert(!WA.eventLog.some(l => l.msg === 'v153 关键故障A'), '混合环中已被噪音挤出（证伪前提成立）');
+
+  // ── 2. error 子环自身环形（>50 翻转）──
+  for (let i = 0; i < 55; i++) WA.log('error', 'v153 err' + i);
+  assert(WA.errorLog.length <= 50, 'error 子环守 50 上限（实 ' + WA.errorLog.length + '）');
+  assert(WA.errorLog.some(l => l.msg === 'v153 err54'), 'error 子环保留最新');
+  assert(!WA.errorLog.some(l => l.msg === 'v153 err0'), 'error 子环丢弃最旧');
+
+  // ── 3. 持久化与跨会话恢复 ──
+  const cid153 = WA.store.chatId();
+  const persistedErr153 = global.localStorage.getItem('worldaxis_error_log_' + cid153);
+  assert(persistedErr153 && persistedErr153.includes('v153 err54'), 'error 子环已落盘（worldaxis_error_log_ 键）');
+  WA.loadEventLog(cid153);
+  assert(WA.errorLog.length >= 1 && WA.errorLog.some(l => l.msg === 'v153 err54'), 'loadEventLog 同步恢复 error 子环');
+
+  // ── 4. 切聊天隔离 ──
+  const otherChat153 = 'chat_test_v153_b';
+  WA.loadEventLog(otherChat153);
+  assert(WA.errorLog.length === 0, '切至无日志聊天，error 子环清空（分域隔离）');
+  WA.loadEventLog(cid153);
+  assert(WA.errorLog.some(l => l.msg === 'v153 err54'), '切回原聊天，error 子环恢复');
+
+  // ── 5. 键卫生分类归属 ──
+  const stat153 = WA.store.storageStat();
+  assert(stat153.families.diagnostic >= 1, 'error_log 键计入 diagnostic 家族（防 sweep 漏判）');
+  // 构造过期冷聊天的 error_log 键验证 sweep 纳管（当前聊天键受保护不进计划，属预期）
+  const coldChat153 = 'v153_cold_chat';
+  global.localStorage.setItem('worldaxis_state_' + coldChat153, JSON.stringify({ meta: { updatedAt: Date.now() - 40 * 86400000 } }));
+  global.localStorage.setItem('worldaxis_error_log_' + coldChat153, '[]');
+  const sweepPlan153 = WA.store.sweepStaleKeys({ maxIdleDays: 30 });
+  assert(sweepPlan153.remove.some(r => r.key === 'worldaxis_error_log_' + coldChat153), 'sweep 计划纳入冷聊天 error_log 键（与 event_log 同域同规）');
+  global.localStorage.removeItem('worldaxis_state_' + coldChat153);
+  global.localStorage.removeItem('worldaxis_error_log_' + coldChat153);
+
+  // ── 6. clearEventLog 双清 ──
+  WA.clearEventLog(cid153);
+  assert(WA.errorLog.length === 0 && global.localStorage.getItem('worldaxis_error_log_' + cid153) === null, 'clearEventLog 同时清内存与持久 error 子环');
+
+  // ── 7. 面板「仅看错误」开关（源码断言）──
+  const panelSrc153 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(/wa-log-err/.test(panelSrc153) && /仅看错误/.test(panelSrc153), '面板含「仅看错误」开关');
+  // 边界严格断言：WA.errorLog 后不得紧跟标识符字符（防 errorLogGone 类前缀蒙混）
+  assert(/WA\.errorLog[^A-Za-z0-9_]/.test(panelSrc153) && /__logErrOnly\s*=\s*!__logErrOnly/.test(panelSrc153), '开关切换 errorLog 子环视图');
+  assert(/id="wa-log-err"/.test(panelSrc153) && /on\('#wa-log-err'/.test(panelSrc153), '开关按钮 id 与绑定成对存在');
+
+  // ── 清理：还原日志现场 ──
+  WA.eventLog.length = 0;
+  evtBefore153.forEach(l => WA.eventLog.push(l));
+  WA.errorLog.length = 0;
+  errBefore153.forEach(l => WA.errorLog.push(l));
+  WA.log('info', 'v153 现场还原');
+  } // end v0.1.53 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

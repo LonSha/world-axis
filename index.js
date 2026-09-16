@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.1.52';
+  const VERSION = '0.1.53';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -30,12 +30,15 @@
   WA.mainWin = mainWin;
   WA.mainDoc = mainDoc;
   WA.modules = {};      // 模块注册表（引擎/UI各自登记）
-  WA.eventLog = [];     // 轻量运行日志（内存环形，最多300条）
+  WA.eventLog = [];     // 轻量运行日志（内存环形，最多300条，info/warn/error 混装）
+  WA.errorLog = [];    // v0.1.53: error 专属子环（最多50条）——info 噪音挤掉混合环也不丢关键故障证据
+  const ERROR_LOG_MAX = 50;
   let __logSaveTimer = null;
   function persistEventLog() {
     try {
       const chatId = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
       mainWin.localStorage.setItem('worldaxis_event_log_' + chatId, JSON.stringify(WA.eventLog.slice(-300)));
+      mainWin.localStorage.setItem('worldaxis_error_log_' + chatId, JSON.stringify(WA.errorLog.slice(-ERROR_LOG_MAX)));
     } catch (e) {}
   }
   function scheduleLogSave() {
@@ -45,11 +48,15 @@
     const entry = { t: Date.now(), level, msg, data: data === undefined ? null : String(data).slice(0, 500) };
     WA.eventLog.push(entry);
     if (WA.eventLog.length > 300) WA.eventLog.splice(0, WA.eventLog.length - 300);
+    if (level === 'error') {
+      WA.errorLog.push(entry);
+      if (WA.errorLog.length > ERROR_LOG_MAX) WA.errorLog.splice(0, WA.errorLog.length - ERROR_LOG_MAX);
+    }
     scheduleLogSave();
     const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
     fn(LOG, msg, data ?? '');
   };
-  // v0.1.49: 恢复/清理日志
+  // v0.1.49: 恢复/清理日志（v0.1.53: 同步恢复/清理 error 子环）
   WA.loadEventLog = function (chatId) {
     try {
       const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
@@ -58,13 +65,20 @@
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) WA.eventLog = arr.slice(-300);
       }
+      const rawErr = mainWin.localStorage.getItem('worldaxis_error_log_' + cid);
+      if (rawErr) {
+        const arrErr = JSON.parse(rawErr);
+        if (Array.isArray(arrErr)) WA.errorLog = arrErr.slice(-ERROR_LOG_MAX);
+      }
     } catch (e) {}
   };
   WA.clearEventLog = function (chatId) {
     WA.eventLog = [];
+    WA.errorLog = [];
     try {
       const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
       mainWin.localStorage.removeItem('worldaxis_event_log_' + cid);
+      mainWin.localStorage.removeItem('worldaxis_error_log_' + cid);
     } catch (e) {}
   };
 

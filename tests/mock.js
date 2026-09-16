@@ -127,15 +127,23 @@ WA.mainWin = global;
 WA.mainDoc = global.document;
 WA.modules = {};
 WA.eventLog = [];
+WA.errorLog = [];   // v0.1.53: 与 index.js 对齐的 error 子环
+const MOCK_ERROR_LOG_MAX = 50;
 function persistMockLog() {
   try {
     const chatId = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
     global.localStorage.setItem('worldaxis_event_log_' + chatId, JSON.stringify(WA.eventLog.slice(-300)));
+    global.localStorage.setItem('worldaxis_error_log_' + chatId, JSON.stringify(WA.errorLog.slice(-MOCK_ERROR_LOG_MAX)));
   } catch (e) {}
 }
 WA.log = function (level, msg, data) {
-  WA.eventLog.push({ t: Date.now(), level, msg, data });
+  const entry = { t: Date.now(), level, msg, data };
+  WA.eventLog.push(entry);
   if (WA.eventLog.length > 300) WA.eventLog.splice(0, WA.eventLog.length - 300);
+  if (level === 'error') {
+    WA.errorLog.push(entry);
+    if (WA.errorLog.length > MOCK_ERROR_LOG_MAX) WA.errorLog.splice(0, WA.errorLog.length - MOCK_ERROR_LOG_MAX);
+  }
   persistMockLog();
 };
 WA.loadEventLog = function (chatId) {
@@ -148,13 +156,22 @@ WA.loadEventLog = function (chatId) {
     } else {
       WA.eventLog = [];
     }
+    const rawErr = global.localStorage.getItem('worldaxis_error_log_' + cid);
+    if (rawErr) {
+      const arrErr = JSON.parse(rawErr);
+      if (Array.isArray(arrErr)) WA.errorLog = arrErr.slice(-MOCK_ERROR_LOG_MAX);
+    } else {
+      WA.errorLog = [];
+    }
   } catch (e) {}
 };
 WA.clearEventLog = function (chatId) {
   WA.eventLog = [];
+  WA.errorLog = [];
   try {
     const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
     global.localStorage.removeItem('worldaxis_event_log_' + cid);
+    global.localStorage.removeItem('worldaxis_error_log_' + cid);
   } catch (e) {}
 };
 const __listeners = {};
