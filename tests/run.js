@@ -3307,8 +3307,13 @@ WA.loadScript = _ls.loadScript;
   const auditRes = WA.contractAudit.consumedFields({ baseState: JSON.parse(before139) });
   assert(auditRes && typeof auditRes === 'object', 'consumedFields 探针可运行');
   const after139 = JSON.stringify(WA.store.get());
-  // 逐字段还原对比（剔除 meta.updatedAt——save() 每次落盘都会盖新时间戳，属预期行为）
-  const strip = (s) => { const o = JSON.parse(s); if (o.meta) delete o.meta.updatedAt; return JSON.stringify(o); };
+  // 逐字段还原对比（剔除易变写入元数据——save() 每次落盘都会盖新时间戳/序号/写入者，属预期行为）
+  // v0.5.0: 新增 meta.writer / writeSeq / stateRev 与 updatedAt 同属「每次写入必变」的元数据
+  const strip = (s) => {
+    const o = JSON.parse(s);
+    if (o.meta) { delete o.meta.updatedAt; delete o.meta.writer; delete o.meta.writeSeq; delete o.meta.stateRev; }
+    return JSON.stringify(o);
+  };
   assert(strip(after139) === strip(before139), '探针后 live store 逐字段还原（时间戳除外，事务化恢复路径）');
   // 计量一致性：还原事务计入 txStat（原先裸 save 完全不可见）
   const tx139a = WA.store.txStat().count;
@@ -5020,6 +5025,281 @@ WA.loadScript = _ls.loadScript;
   WA.eventLog.length = 0;
   evtBefore400.forEach(function (l) { WA.eventLog.push(l); });
   } // end v0.4.0 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.5.0 — 多实例并发一致性（写入者标识 / 冲突检出与保全 / 跨实例感知 / 治理接入）
+  //   缺陷背景（探针实证）：localStorage 为多标签页共享，双窗口同时推进同一聊天时
+  //   后写静默覆盖前写，save 返回 true 且零告警——用户数轮进度永久丢失却无从察觉。
+  // ═══════════════════════════════════════════════════════════
+  v050: {
+  const LS500 = global.localStorage;
+  const junkBefore500 = JSON.parse(JSON.stringify(LS500._dump()));
+  const evtBefore500 = WA.eventLog.slice();
+  const errBefore500 = WA.errorLog.slice();
+  const ctx500 = global.SillyTavern.getContext();
+  const prevChat500 = ctx500.chatId;
+  const CID500 = 'v500_chat';
+  const SK500 = 'worldaxis_state_' + CID500;
+  function resetLogs500() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh500() { resetLogs500(); LS500.clear(); ctx500.chatId = CID500; WA.store.init(); }
+  function conflictKeys500() { return Object.keys(LS500._dump()).filter(k => k.indexOf('worldaxis_conflict_') === 0); }
+  function hygieneWarns500() { return WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0).length; }
+
+  // ── 1. API 与写入者标识 ──
+  fresh500();
+  assert(typeof WA.store.conflictStat === 'function' && typeof WA.store.lastConflict === 'function', 'v0.5.0 冲突观测 API 已导出');
+  assert(typeof WA.store.listConflicts === 'function' && typeof WA.store.dropConflict === 'function', 'v0.5.0 冲突现场处置 API 已导出');
+  assert(typeof WA.store.exportConflict === 'function' && typeof WA.store.externalWriteStat === 'function' && typeof WA.store.staleSinceExternal === 'function', 'v0.5.0 提取与跨实例感知 API 已导出');
+  WA.store.transact(d => { d.clock.label = 'v500-a'; });
+  const m500a = JSON.parse(LS500.getItem(SK500)).meta;
+  assert(typeof m500a.writer === 'string' && m500a.writer.length > 1, '每次写入打上写入者标识（meta.writer）');
+  assert(typeof m500a.writeSeq === 'number' && m500a.writeSeq >= 1, '写入序号 writeSeq 落盘');
+  assert(typeof m500a.stateRev === 'number' && m500a.stateRev >= 1, '全局单调序号 stateRev 落盘');
+  assert(LS500.getItem('worldaxis_writer_id') === m500a.writer, 'writer_id 键与 meta.writer 一致（存储侧可追溯）');
+
+  // ── 2. stateRev 单调递增 / writeSeq 递增 / 标识稳定 ──
+  fresh500();
+  const revs500 = [];
+  for (let i = 0; i < 3; i++) { WA.store.transact(d => { d.clock.r = i; }); revs500.push(JSON.parse(LS500.getItem(SK500)).meta.stateRev); }
+  assert(revs500.every((v, i) => i === 0 || v > revs500[i - 1]), 'stateRev 单调递增（' + JSON.stringify(revs500) + '）');
+  assert(revs500[2] - revs500[0] === 2 * (revs500[1] - revs500[0]), 'stateRev 步长稳定（每轮 transact+save 各一次）');
+  const w500a = JSON.parse(LS500.getItem(SK500)).meta.writer;
+  WA.store.transact(d => { d.clock.s = 1; });
+  assert(JSON.parse(LS500.getItem(SK500)).meta.writer === w500a, '同一实例写入者标识稳定不变');
+  const cs500a = WA.store.conflictStat();
+  assert(cs500a.writer === w500a && cs500a.writeSeq >= 1, 'conflictStat 透出本实例标识与写入量');
+
+  // ── 3. 冲突检出与保全（核心：数据不再永久丢失）──
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'MINE-BASE'; });
+  const seen500 = WA.store.conflictStat().seenRev;
+  const detBefore500 = WA.store.conflictStat().detected;
+  // 模拟「另一实例」写入：writer 不同、序号抬高
+  const foreign500 = JSON.parse(LS500.getItem(SK500));
+  foreign500.clock.label = 'FOREIGN-PROGRESS-3ROUNDS';
+  foreign500.meta.writer = 'wFOREIGN500';
+  foreign500.meta.stateRev = seen500 + 3;
+  LS500.setItem(SK500, JSON.stringify(foreign500));
+  WA.store.transact(d => { d.clock.label = 'MINE-AFTER'; });
+  const cs500b = WA.store.conflictStat();
+  assert(cs500b.detected === detBefore500 + 1, '他实例写入被检出（detected 递增）');
+  assert(cs500b.quarantined >= 1, '他实例 payload 被保全为冲突现场（quarantined 递增）');
+  assert(typeof cs500b.lastKeptKey === 'string' && cs500b.lastKeptKey.indexOf('worldaxis_conflict_') === 0, '保全键名符合冲突现场命名空间');
+  assert(LS500.getItem(cs500b.lastKeptKey).indexOf('FOREIGN-PROGRESS-3ROUNDS') >= 0, '★他实例进度完整保全（而非静默丢弃）');
+  const sites500 = WA.store.listConflicts();
+  assert(sites500.length === 1 && sites500[0].parseable === true, 'listConflicts 返回可解析现场');
+  assert(sites500[0].head === 'FOREIGN-PROGRESS-3ROUNDS', '现场摘要取自持久化 payload（非伪造）');
+  const lc500 = WA.store.lastConflict();
+  assert(lc500 && lc500.detected === true && lc500.otherRev === seen500 + 3 && lc500.myRev === seen500, 'lastConflict 精确记录双方序号');
+  assert(JSON.parse(LS500.getItem(SK500)).clock.label === 'MINE-AFTER', '本实例写入仍成功（不阻塞可用性）');
+
+  // ── 4. 键名唯一性 + 环形保留 ──
+  fresh500();
+  for (let i = 0; i < 5; i++) {
+    WA.store.transact(d => { d.clock.i = i; });
+    const c = JSON.parse(LS500.getItem(SK500));
+    c.meta.stateRev = c.meta.stateRev + 2;
+    LS500.setItem(SK500, JSON.stringify(c));
+  }
+  const ck500 = conflictKeys500();
+  assert(ck500.length === 3, '冲突现场环形保留上限 3（实 ' + ck500.length + '）');
+  assert(new Set(ck500).size === ck500.length, '键名互不重复（同毫秒冲突不互相覆盖）');
+  const seqs500 = ck500.map(k => parseInt(k.split('_').slice(-1)[0], 10)).filter(n => !isNaN(n));
+  assert(seqs500.length === 3 && new Set(seqs500).size === 3, '键名含唯一序号（防同毫秒碰撞）');
+
+  // ── 5. 处置守卫 ──
+  const g0_500 = ck500[0];
+  assert(WA.store.dropConflict('worldaxis_state_' + CID500).ok === false, 'dropConflict 拒绝非冲突现场键');
+  assert(WA.store.dropConflict('worldaxis_conflict_zzz_1_1').ok === false, 'dropConflict 拒绝不存在的键');
+  assert(WA.store.exportConflict('worldaxis_writer_id').ok === false, 'exportConflict 拒绝非冲突现场键');
+  const ex500 = WA.store.exportConflict(g0_500);
+  assert(ex500.ok === true && ex500.kind === 'conflict-site' && ex500.parseable === true && !!ex500.state, 'exportConflict 输出完整可解析快照');
+  assert(ex500.bytes > 0 && typeof ex500.raw === 'string', 'exportConflict 含原始字节与体积');
+  assert(WA.store.dropConflict(g0_500).ok === true && conflictKeys500().length === 2, 'dropConflict 按显式键删除且仅删一个');
+
+  // ── 6. 跨实例实时感知（storage 事件）──
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'live'; });
+  const ext0_500 = WA.store.externalWriteStat();
+  assert(ext0_500.hookInstalled === true, 'init 安装 storage 事件钩子');
+  assert((global.__winHandlers.storage || []).length >= 1, 'window 上存在 storage 监听');
+  assert(ext0_500.count === 0 && WA.store.staleSinceExternal() === false, '无外部写入时标记为空');
+  const eh0_500 = (global.__winHandlers.storage || []).length;
+  WA.store.init(); WA.store.init();
+  assert((global.__winHandlers.storage || []).length === eh0_500, '钩子安装幂等（重复 init 不叠加监听）');
+  const fExt500 = JSON.parse(LS500.getItem(SK500));
+  fExt500.meta.writer = 'wFOREIGN-LIVE';
+  fExt500.meta.stateRev = 777;
+  LS500._emitStorage(SK500, 'old', JSON.stringify(fExt500));
+  const ext1_500 = WA.store.externalWriteStat();
+  assert(ext1_500.count === 1 && ext1_500.lastRev === 777 && ext1_500.lastWriter === 'wFOREIGN-LIVE', '外部写入被实时记录（序号/来源精确）');
+  assert(WA.store.staleSinceExternal() === true, 'staleSinceExternal 提示内存态落后');
+  assert(WA.eventLog.some(l => l.level === 'warn' && l.msg.indexOf('另一实例') >= 0), '外部写入产生 warn 告警（提示刷新）');
+  // 误报守卫
+  const extB_500 = WA.store.externalWriteStat().count;
+  LS500._emitStorage('worldaxis_state_other_chat_500', 'a', 'b');
+  assert(WA.store.externalWriteStat().count === extB_500, '其他聊天的键不触发（不误报）');
+  LS500._emitStorage('worldaxis_settings_v1', 'a', 'b');
+  assert(WA.store.externalWriteStat().count === extB_500, '非 state 键不触发（不误报）');
+  LS500._emitStorage(SK500, 'x', JSON.stringify({ meta: { writer: WA.store.conflictStat().writer } }));
+  assert(WA.store.externalWriteStat().count === extB_500, '本实例自己的写入不触发（writer 相同）');
+  LS500._emitStorage(null, null, null);
+  assert(WA.store.externalWriteStat().count === extB_500, 'clear 事件（key=null）不触发');
+  LS500._emitStorage(SK500, 'x', '{broken');
+  assert(WA.store.externalWriteStat().count === extB_500 + 1, '损坏 payload 仍记一次（异常写入也须可见）');
+
+  // ── 7. init 清零外部写入（I 块：防顽固误报）──
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'w'; });
+  const fw500 = JSON.parse(LS500.getItem(SK500)); fw500.meta.writer = 'wF2'; LS500._emitStorage(SK500, 'o', JSON.stringify(fw500));
+  assert(WA.store.externalWriteStat().count === 1, '外部写入已记录');
+  assert(WA.store.maintain({}).issues.some(i => i.key === 'concurrent.external'), '未同步前报 concurrent.external');
+  WA.store.init();
+  assert(WA.store.externalWriteStat().count === 0, 'init（以磁盘重新同步）清零外部写入标记');
+  assert(!WA.store.maintain({}).issues.some(i => i.key === 'concurrent.external'), '同步后不再报 concurrent.external（误报消除）');
+
+  // ── 8. maintain 第 6 段：并发接入治理 ──
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'k'; });
+  const mClean500 = WA.store.maintain({});
+  assert(!mClean500.issues.some(i => i.key.indexOf('concurrent.') === 0 && i.level === 'warn'), '干净库无并发 warn 议题');
+  assert(mClean500.signals.conflictSites === 0 && mClean500.signals.externalWrites === 0, 'signals 并发计量归零');
+  assert('conflictSites' in mClean500.signals && 'externalWrites' in mClean500.signals && 'conflictDetected' in mClean500.signals && 'conflictQuarantined' in mClean500.signals, 'signals 含四项并发计量');
+  // 造冲突现场
+  const fc500 = JSON.parse(LS500.getItem(SK500)); fc500.meta.stateRev = fc500.meta.stateRev + 3; LS500.setItem(SK500, JSON.stringify(fc500));
+  WA.store.transact(d => { d.clock.label = 'k2'; });
+  const mConf500 = WA.store.maintain({});
+  assert(mConf500.signals.conflictSites === 1, 'signals.conflictSites 精确为 1');
+  const ci500 = mConf500.issues.filter(i => i.key === 'concurrent.conflict');
+  assert(ci500.length === 1 && ci500[0].level === 'warn', '未处置冲突现场 → warn 议题');
+  assert(mConf500.actions.some(a => a.id === 'review-conflict'), '冲突现场产生 review-conflict 建议动作');
+  assert(mConf500.score < mClean500.score, '冲突现场使健康分下降（' + mClean500.score + ' → ' + mConf500.score + '）');
+  // 外部写入议题
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'k'; });
+  const fe500 = JSON.parse(LS500.getItem(SK500)); fe500.meta.writer = 'wF3'; LS500._emitStorage(SK500, 'o', JSON.stringify(fe500));
+  const mExt500 = WA.store.maintain({});
+  assert(mExt500.signals.externalWrites === 1 && mExt500.actions.some(a => a.id === 'reload-page'), '外部写入 → reload-page 建议动作');
+  assert(mExt500.issues.filter(i => i.key === 'concurrent.external' && i.level === 'warn').length === 1, '外部写入 → warn 议题');
+
+  // ── 9. 家族归位 + 体积语义（E/F 块）──
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'x'; });
+  const baseBytes500 = WA.store.storageStat().currentChatBytes;
+  const fx500 = JSON.parse(LS500.getItem(SK500)); fx500.meta.stateRev = fx500.meta.stateRev + 3; LS500.setItem(SK500, JSON.stringify(fx500));
+  WA.store.transact(d => { d.clock.label = 'y'; });
+  const st500 = WA.store.storageStat();
+  assert(st500.families.conflict === 1, 'conflict 家族被正确识别（不误归 settings）');
+  assert(st500.families.settings === 0, 'settings 家族不含未识别键');
+  assert(st500.conflictKeys === 1 && st500.conflictBytes > 0, 'storageStat 透出 conflict 计量');
+  assert(st500.conflictBytes === conflictKeys500().reduce((a, k) => a + new TextEncoder().encode(LS500.getItem(k) || '').length, 0), 'conflictBytes 与现场实际字节一致（UTF-8 值字节口径）');
+  assert(st500.currentChatBytes < baseBytes500 + st500.conflictBytes, 'currentChatBytes 不混入冲突现场副本（活跃体积语义正确）');
+  assert(st500.totalBytes >= st500.conflictBytes, 'totalBytes 仍完整覆盖（不因归位而漏计）');
+  LS500.removeItem('worldaxis_writer_id');
+  assert(WA.store.storageStat().families.writerId === 0, 'writerId 键被删后家族计量归零');
+  WA.store.transact(d => { d.clock.label = 'y2'; });
+  assert(LS500.getItem('worldaxis_writer_id') !== null, 'writerId 键被外部删除后自动重建（J 块）');
+  assert(WA.store.storageStat().families.writerId === 1, '重建后家族计量恢复 1（不重复计数）');
+
+  // ── 10. 自动清理边界（E 块显式 keep）──
+  const keepSrc500 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  assert(keepSrc500.indexOf("if (c.family === 'conflict' || c.family === 'writerId') { plan.keep.push(k); return; }") >= 0, 'sweep 源码显式 keep 冲突现场与写入者标识（不依赖默认分支兜底）');
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'z'; });
+  const fz500 = JSON.parse(LS500.getItem(SK500)); fz500.meta.stateRev = fz500.meta.stateRev + 3; LS500.setItem(SK500, JSON.stringify(fz500));
+  WA.store.transact(d => { d.clock.label = 'z2'; });
+  const keepBefore500 = conflictKeys500();
+  const plan500 = WA.store.sweepStaleKeys({});
+  assert(!plan500.remove.some(r => r.key.indexOf('worldaxis_conflict_') === 0), 'sweep 计划绝不包含冲突现场');
+  assert(plan500.keep.some(k => k.indexOf('worldaxis_conflict_') === 0), 'sweep 显式 keep 冲突现场（不依赖偶然分类）');
+  assert(plan500.keep.indexOf('worldaxis_writer_id') >= 0, 'sweep 显式 keep 写入者标识键');
+  WA.store.maintain({ apply: true, minFreedBytes: 1 });
+  assert(keepBefore500.every(k => LS500.getItem(k) !== null), 'maintain 自动回收不误删冲突现场');
+  assert(LS500.getItem('worldaxis_writer_id') !== null, 'maintain 自动回收不误删写入者标识');
+
+  // ── 11. 恢复点来源标识（G 块）──
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'p'; });
+  WA.store.createRecoveryPoint();
+  const pts500 = WA.store.listRecoveryPoints();
+  assert(pts500.length === 1 && typeof pts500[0].by === 'string' && pts500[0].by.length > 1, '恢复点记录来源实例 by');
+  assert(typeof pts500[0].rev === 'number' && pts500[0].rev >= 1, '恢复点记录当时 stateRev');
+  assert(pts500[0].by === WA.store.conflictStat().writer, '恢复点来源与当前实例一致');
+  const rs500 = WA.store.recoveryStat();
+  assert(rs500.writers === 1 && rs500.multiInstance === false && rs500.lastBy === pts500[0].by, 'recoveryStat 透出单实例状态');
+  // 伪造一个他实例的恢复点 → multiInstance 置真
+  const list500 = WA.store.listRecoveryPoints();
+  list500.unshift({ at: Date.now(), by: 'wOTHER-RP', rev: 5, state: list500[0].state });
+  LS500.setItem('worldaxis_recovery_' + CID500, JSON.stringify(list500));
+  const rs500b = WA.store.recoveryStat();
+  assert(rs500b.writers === 2 && rs500b.multiInstance === true, 'recoveryStat 检出跨实例留点（multiInstance）');
+
+  // ── 12. 卫生指纹收敛（L 块：修告警疲劳）──
+  const stSrc500 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  assert(stSrc500.indexOf('/^(hygiene|quarantine|state)\\./') >= 0, 'L 块：卫生巡检指纹收敛到卫生范畴议题');
+  assert(stSrc500.indexOf("m.issues.map(function (x) { return x.key; }).sort().join('|')") < 0, 'L 块：旧「全部议题键」签名已移除');
+  assert(stSrc500.indexOf('/^(hygiene|quarantine|state)\\./.test(x.key)') >= 0 && stSrc500.indexOf("x.key + ':' + x.level") >= 0, 'L 块：签名含卫生议题的键+等级（等级变化仍可感知）');
+  fresh500();
+  const huge500 = 'y'.repeat(300 * 1024);
+  LS500.setItem('worldaxis_state_v500_cold', JSON.stringify({ meta: { updatedAt: Date.now() - 40 * 86400000 } }));
+  LS500.setItem('worldaxis_event_log_v500_cold', huge500);
+  WA.store.init();
+  const hw1_500 = hygieneWarns500();
+  assert(hw1_500 >= 1, '大额可回收垃圾首见告警（实 ' + hw1_500 + '）');
+  WA.store.init(); WA.store.init();
+  const hw2_500 = hygieneWarns500();
+  assert(hw2_500 === hw1_500, '同垃圾集重复 init 静默（' + hw1_500 + ' 恒定）');
+  // 叠加无关议题（写隔离现场 → state.corrupt/quarantine 之外先造一个 integrity 抖动）
+  WA.log('error', 'v500 无关议题抖动');
+  WA.store.init();
+  const hw3_500 = hygieneWarns500();
+  assert(hw3_500 === hw2_500, '无关议题抖动不重复触发卫生告警（指纹收敛生效，实 ' + hw3_500 + '）');
+  // 真正的新垃圾集仍须告警
+  const huge500b = 'z'.repeat(300 * 1024);
+  LS500.setItem('worldaxis_state_v500_cold_b', JSON.stringify({ meta: { updatedAt: Date.now() - 50 * 86400000 } }));
+  LS500.setItem('worldaxis_event_log_v500_cold_b', huge500b);
+  WA.store.init();
+  assert(hygieneWarns500() > hw3_500, '新垃圾集出现仍必告警（收敛未削弱检出能力）');
+
+  // ── 13. 诊断出口（D 块）──
+  fresh500();
+  WA.store.transact(d => { d.clock.label = 'd'; });
+  if (WA.toolDiag && WA.toolDiag.collect) {
+    const dg500 = WA.toolDiag.collect();
+    assert(!!(dg500.worldState && dg500.worldState.storage && dg500.worldState.storage.concurrency), '诊断 collect 透出 concurrency 段');
+    const conc500 = dg500.worldState.storage.concurrency;
+    assert(!!conc500.conflict && !!conc500.external && Array.isArray(conc500.sites), 'concurrency 含 conflict/external/sites');
+  } else { assert(true, 'toolDiag 未加载时跳过 collect 断言'); }
+  const diagSrc500 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  assert(diagSrc500.indexOf('## 并发一致性') >= 0, '错误报告含「## 并发一致性」段');
+  assert(diagSrc500.indexOf('外部写入（其他标签页）') >= 0, '报告透出外部写入计量');
+  assert(diagSrc500.indexOf('冲突现场: 无') >= 0, '报告在无现场时给出明确「无」');
+  const panelSrc500 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(panelSrc500.indexOf('id="wa-conf-view"') >= 0 && panelSrc500.indexOf('冲突现场') >= 0, '面板含「冲突现场」入口（D 块）');
+  assert(panelSrc500.indexOf('wa-conf-dl') >= 0 && panelSrc500.indexOf('wa-conf-drop') >= 0, '面板提供提取/丢弃两个出口');
+  assert(panelSrc500.indexOf('exportConflict') >= 0 && panelSrc500.indexOf('dropConflict') >= 0, '面板接线到 exportConflict/dropConflict API');
+
+  // ── 14. mock 基建（storage 事件 + 插入序）──
+  assert(typeof LS500._emitStorage === 'function' && typeof LS500._beginExternal === 'function', 'mock 提供 storage 事件模拟能力');
+  assert(typeof global.addEventListener === 'function' && typeof global.removeEventListener === 'function', 'mock 提供 window 事件系统');
+  LS500.clear();
+  LS500.setItem('k_dup_test', 'v1');
+  LS500.removeItem('k_dup_test');
+  LS500.setItem('k_dup_test', 'v2');
+  let dupCount = 0;
+  for (let i = 0; i < LS500.length; i++) if (LS500.key(i) === 'k_dup_test') dupCount++;
+  assert(dupCount === 1, 'mock removeItem 同步清理插入序（删除后重插不重复计数）');
+  assert(LS500.length === 1, 'mock 枚举长度与去重后键数一致');
+
+  // ── 清理现场 ──
+  resetLogs500();
+  LS500.clear();
+  Object.keys(junkBefore500).forEach(function (k) { LS500.setItem(k, junkBefore500[k]); });
+  ctx500.chatId = prevChat500;
+  WA.eventLog.length = 0;
+  evtBefore500.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore500.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v0.5.0 block
   } // end v0.2.2 block
   // ── 汇总 ──
   console.log('\n══════════════════════');

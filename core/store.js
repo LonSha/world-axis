@@ -120,6 +120,129 @@
   // 与 writes/verified/mismatches 等「历史经历」计数分离——
   // 健康分只看当前态，否则一次瞬时毒化会把健康分永久压低（误报警）。
   const __integrityStat = { writes: 0, verified: 0, mismatches: 0, retried: 0, recoveredByRetry: 0, lastAt: 0, lastReason: null, lastOk: null, lastFailAt: 0 };
+  // ── v0.5.0: 多实例并发防护 ──────────────────────────────────
+  // 背景：localStorage 为多标签页共享；两个窗口同时推进同一聊天时，后写会静默覆盖前写，
+  // 且 save 返回 true、无任何告警——用户数轮进度永久丢失却无从察觉。
+  // 对策：① 每次写入打上「写入者 + 全局单调序号」；② 写入前比对磁盘序号与本实例上次所见，
+  //      不一致即判定「他实例已写过且本次将覆盖其改动」→ 先把对方 payload 存为冲突隔离键（不丢数据），
+  //      再写入自己的版本，并计数/告警/进健康分。
+  // 说明：浏览器 localStorage 无 CAS/锁原语，故不阻塞写入（阻塞会毁掉可用性），
+  //      改为「覆盖前先保全 + 事后可观测 + 提供冲突现场出口」。
+  const CONFLICT_KEEP = 3;   // 每聊天保留最近 N 个冲突现场
+  let __conflictSeq = 0;
+  // 键名必须唯一：仅用 Date.now() 时，同毫秒内的多次冲突会共用同一键 → 现场互相覆盖
+  // （先发生的冲突被静默丢弃，与「不静默丢数据」的初衷相悖）。故追加单调序号。
+  function conflictKey(chatId, ts) { return 'worldaxis_conflict_' + (chatId || getChatId()) + '_' + ts + '_' + (++__conflictSeq); }
+  const __conflictStat = { detected: 0, quarantined: 0, lastAt: 0, lastChat: null, lastLostBytes: 0, lastKeptKey: null };
+  let __writerId = null;      // 本实例标识（惰性生成，会话级稳定）
+  let __lastConflict = null;  // 最近一次 save 检出的冲突（只读观测用）
+  // v0.5.0: 跨实例实时感知——他实例写入本聊天 state 键时立即记录（不等本实例下次 save）
+  const __externalWrite = { count: 0, lastAt: 0, lastKey: null, lastRev: 0, lastWriter: null, staleSince: 0 };
+  let __storageHookInstalled = false;
+  /** 判断某键是否为「本实例关心的聊天」的状态键 */
+  function keyChatId(key) {
+    const c = classifyKey(key);
+    if (!c || !c.chat) return null;
+    if (c.family === 'state' || c.family === 'stateDerived') return c.chat;
+    return null;
+  }
+  function installStorageHook() {
+    if (__storageHookInstalled) return;
+    try {
+      if (!mainWin.addEventListener) return;
+      mainWin.addEventListener('storage', function (e) {
+        try {
+          if (!e || !e.key) return;
+          const chat = keyChatId(e.key);
+          if (!chat) return;
+          // 只关心当前聊天的状态键（其他聊天落盘不影响本实例内存态）
+          if (chat !== getChatId()) return;
+          let rev = 0, writer = null;
+          try {
+            const st = JSON.parse(e.newValue || 'null');
+            if (st && st.meta) { rev = st.meta.stateRev || 0; writer = st.meta.writer || null; }
+          } catch (err) {}
+          // 自己的写入不会产生 storage 事件；若 writer 与本实例相同则视为误触发（mock/兼容场景）
+          if (writer && writer === __writerId) return;
+          __externalWrite.count++;
+          __externalWrite.lastAt = Date.now();
+          __externalWrite.lastKey = e.key;
+          __externalWrite.lastRev = rev;
+          __externalWrite.lastWriter = writer;
+          __externalWrite.staleSince = __externalWrite.staleSince || Date.now();
+          WA.log('warn', '检测到另一实例更新了当前聊天的世界状态（序号 ' + rev + '）：'
+            + '本窗口内存态可能已落后——继续推进会覆盖对方进度。建议刷新页面以载入最新状态'
+            + '（若已覆盖，诊断面板「冲突现场」保留了对方快照）');
+        } catch (err) {}
+      });
+      __storageHookInstalled = true;
+    } catch (e) {}
+  }
+  let __writeSeq = 0;         // 本实例写入序号
+  let __seenRev = 0;          // 本实例上次见到/写入的全局 stateRev（用于检出他方写入）
+  function writerId() {
+    if (__writerId) {
+      // v0.5.0: 键被外部清除（清站点数据/配额回收）时重建——否则标识在存储侧永久消失
+      try { if (mainWin.localStorage.getItem('worldaxis_writer_id') !== __writerId) mainWin.localStorage.setItem('worldaxis_writer_id', __writerId); } catch (e) {}
+      return __writerId;
+    }
+    try {
+      let w = mainWin.localStorage.getItem('worldaxis_writer_id');
+      if (!w) {
+        w = 'w' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+        mainWin.localStorage.setItem('worldaxis_writer_id', w);
+      }
+      __writerId = w;
+    } catch (e) { __writerId = 'w-mem-' + Math.random().toString(36).slice(2, 8); }
+    return __writerId;
+  }
+  /** 读取磁盘上某聊天的 stateRev（0 = 不存在/不可解析） */
+  function diskRev(chatId) {
+    try {
+      const raw = mainWin.localStorage.getItem(storageKey(chatId));
+      if (!raw) return 0;
+      const st = JSON.parse(raw);
+      return (st && st.meta && typeof st.meta.stateRev === 'number') ? st.meta.stateRev : 0;
+    } catch (e) { return 0; }
+  }
+  /** 保全他实例 payload 为冲突现场（不覆盖已有同名键） */
+  function quarantineConflict(chatId, disc, mine) {
+    const ts = Date.now();
+    const key = conflictKey(chatId, ts);
+    let bytes = 0;
+    try {
+      bytes = byteLen(disc);
+      mainWin.localStorage.setItem(key, disc);
+      __conflictStat.quarantined++;
+      __conflictStat.lastKeptKey = key;
+      __conflictStat.lastLostBytes = bytes;
+      // 环形保留
+      let all = [];
+      try {
+        const ls = mainWin.localStorage;
+        for (let i = 0; i < ls.length; i++) {
+          const k = ls.key(i);
+          if (k && k.indexOf('worldaxis_conflict_' + chatId + '_') === 0) all.push(k);
+        }
+      } catch (e) {}
+      // 排序：先按时间戳段（第 4 段）再按序号段（第 5 段）——字符串序天然满足
+      all.sort(function (a, b) {
+        const pa = a.split('_'), pb = b.split('_');
+        const ta = parseInt(pa[pa.length - 2], 10) || 0, tb = parseInt(pb[pb.length - 2], 10) || 0;
+        if (ta !== tb) return ta - tb;
+        return (parseInt(pa[pa.length - 1], 10) || 0) - (parseInt(pb[pb.length - 1], 10) || 0);
+      });
+      while (all.length > CONFLICT_KEEP) {
+        try { mainWin.localStorage.removeItem(all.shift()); } catch (e) {}
+      }
+    } catch (e) {
+      // 保全失败绝不能阻断写入（否则一撞配额就写不进去）——如实留痕
+      WA.log('warn', '并发冲突现场保全失败（空间不足？）：他实例改动可能被覆盖', e);
+      return null;
+    }
+    return { key: key, bytes: bytes };
+  }
+
   // v0.4.0: 自动治理巡视状态——上次巡视签名（防重复告警）+ 历次自动动作审计
   let __maintainSig = '';
   const __maintainStat = { scans: 0, lastAt: 0, lastScore: 100, lastLevel: 'ok', autoApplies: 0, lastAutoFreedKeys: 0, lastAutoFreedBytes: 0 };
@@ -139,6 +262,10 @@
     diag_errorLog: /^worldaxis_error_log_(.+)$/,
     diag_wfHistory: /^worldaxis_wf_history_(.+)$/,
     diag_uninjectLedger: /^worldaxis_uninject_ledger_(.+)$/,
+    // v0.5.0: 冲突现场键（另一实例被覆盖前的 payload）——key = worldaxis_conflict_<chat>_<ts>_<seq>
+    conflict: /^worldaxis_conflict_(.+)_(\d+)_(\d+)$/,
+    // v0.5.0: 本实例写入者标识（全局单键，非聊天隔离）
+    writerId: /^worldaxis_writer_id$/,
     corrupt: /^worldaxis_state_(.+)_corrupt_(\d+)$/,
     corruptSettings: /^worldaxis_(?!state_)([a-z_0-9]+)_corrupt_\d+$/,
     wb: /^worldaxis_wb_selection_(.+)$/,
@@ -148,6 +275,9 @@
     let m;
     // v0.2.3: 隔离键必须保留 chat 归属——否则「当前聊天的键永不被清理」不变量对隔离副本失效
     // （当前聊天唯一幸存的可恢复现场被 sweep 当溢出删除），且隔离聊天的 recovery 快照被判孤儿删除
+    // v0.5.0: 冲突现场与写入者标识须先于 state 判定（否则 worldaxis_conflict_* 不会被识别）
+    if ((m = key.match(KEY_FAMILIES.conflict))) return { family: 'conflict', chat: m[1], at: parseInt(m[2], 10) || 0, seq: parseInt(m[3], 10) || 0 };
+    if (KEY_FAMILIES.writerId.test(key)) return { family: 'writerId', chat: null };
     if ((m = key.match(KEY_FAMILIES.corrupt))) return { family: 'corrupt', chat: m[1], quarantine: 'state' };
     if (KEY_FAMILIES.corruptSettings.test(key)) return { family: 'corrupt', chat: null, quarantine: 'settings' };
     if ((m = key.match(KEY_FAMILIES.stateDerived))) return { family: 'stateDerived', kind: m[2], chat: m[1] };
@@ -325,6 +455,12 @@
       }
       memCache = this.load() || defaultWorldState();
       __migrateReport = null;   // v0.1.47: 报告以「本次载入」为边界，不跨载入粘留（防议题永久挂红）
+      // v0.5.0: 跨实例实时感知钩子（幂等安装）
+      try { installStorageHook(); } catch (e) {}
+      try { if (memCache && memCache.meta && typeof memCache.meta.stateRev === 'number') __seenRev = memCache.meta.stateRev; } catch (e) {}
+      // v0.5.0: init = 以磁盘为准重新同步内存 → 「内存已落后」条件此刻消解，清零外部写入标记。
+      // 否则用户按提示刷新/切换聊天后警告仍不消失（顽固误报）。冲突审计与现场列表属历史事实，保留。
+      try { __externalWrite.count = 0; __externalWrite.lastAt = 0; __externalWrite.lastKey = null; __externalWrite.lastRev = 0; __externalWrite.lastWriter = null; __externalWrite.staleSince = 0; } catch (e) {}
       // v0.1.49: 恢复当前聊天的事件日志与工作流历史
       try { if (WA.loadEventLog) WA.loadEventLog(); } catch (e) {}
       try { if (WA.workflow && WA.workflow.loadHistory) WA.workflow.loadHistory(); } catch (e) {}
@@ -339,7 +475,13 @@
           // 自动边界（严格保守）：仅回收过期诊断/孤儿恢复点/隔离溢出；当前聊天、settings、wb、
           // state 本体、可解析隔离现场永不自动动。动作全部进 maintainStat 审计。
           const m = WA.store.maintain({ apply: true, deep: false, minFreedBytes: 256 * 1024 });
-          const sig = (m.planKeys || []).join('|') + '#' + m.issues.map(function (x) { return x.key; }).sort().join('|');
+          // v0.5.0: 指纹只取「卫生范畴」议题——否则 diag.budget / integrity / concurrent / rescue
+          // 等无关议题的等级抖动会改变签名，使同一垃圾集反复告警（告警疲劳）。
+          const hySig = m.issues
+            .filter(function (x) { return /^(hygiene|quarantine|state)\./.test(x.key); })
+            .map(function (x) { return x.key + ':' + x.level; })
+            .sort().join('|');
+          const sig = (m.planKeys || []).join('|') + '#' + hySig;
           const changed = sig !== __keyHygieneScanSig;
           __keyHygieneScanSig = sig;
           // 分级（严格沿用 v0.1.52 告警门槛「可回收 >256KB」）：
@@ -457,7 +599,34 @@
         const s = state || memCache;
         s.meta = s.meta || {};
         s.meta.updatedAt = Date.now();
+        // v0.5.0: 写入者标识与全局单调序号（多实例并发防护的可观测基础）
+        const cidW = chatId || getChatId();
+        let conflict = null;
+        try {
+          const dRev = diskRev(cidW);
+          // 磁盘序号与本实例上次所见不一致 → 他实例写过。若此刻直接写，其改动将被覆盖。
+          if (__seenRev > 0 && dRev > __seenRev) {
+            let rawDisc = null;
+            try { rawDisc = mainWin.localStorage.getItem(storageKey(cidW)); } catch (e) { rawDisc = null; }
+            if (rawDisc) {
+              const kept = quarantineConflict(cidW, rawDisc, s);
+              __conflictStat.detected++; __conflictStat.lastAt = Date.now(); __conflictStat.lastChat = cidW;
+              conflict = { detected: true, otherRev: dRev, myRev: __seenRev, kept: kept };
+              if (kept) {
+                WA.log('warn', '检测到并发写入：另一实例已写入该聊天（序号 ' + dRev + ' > 本实例所见 ' + __seenRev
+                  + '），本次保存将覆盖其改动——对方 payload 已保全为冲突现场（' + Math.round(kept.bytes / 1024)
+                  + 'KB），诊断面板「冲突现场」可查看/提取');
+              }
+            }
+          }
+          if (dRev > __seenRev) __seenRev = dRev;
+        } catch (e) {}
+        s.meta.writer = writerId();
+        s.meta.writeSeq = ++__writeSeq;
+        s.meta.stateRev = (__seenRev || 0) + 1;
+        __seenRev = s.meta.stateRev;
         const payload = JSON.stringify(s);
+        if (conflict) __lastConflict = conflict;
         // v0.4.0: 写后读回校验（含一次重试）——替换裸 setItem，静默截断不再被当成成功
         const w = writeVerified(storageKey(chatId), payload);
         if (!w.ok && w.reason === 'verify') {
@@ -628,6 +797,27 @@
         issues.push({ level: 'info', key: 'integrity.ok', detail: '写入完整性校验 ' + is.verified + ' 次全部通过' });
       }
 
+      // ── 6. 多实例并发一致性 ──
+      //   ① 存在未处置的冲突现场 → 当前态缺陷（有他实例数据等待用户决策）→ 扣分 warn
+      //   ② 本实例内存态已落后他实例（收到过 storage 事件）→ 提示刷新 → 扣分 warn
+      //   ③ 历史曾冲突但现场已清 → info 可追溯（不扣分，与 v0.4.0 语义裁决一致）
+      let conflictSites = [];
+      try { conflictSites = this.listConflicts(); } catch (e) { conflictSites = []; }
+      const extW = __externalWrite.count;
+      if (conflictSites.length > 0) {
+        score -= Math.min(12, conflictSites.length * 4);
+        issues.push({ level: 'warn', key: 'concurrent.conflict', detail: '存在 ' + conflictSites.length + ' 个并发冲突现场（另一实例的进度快照未处置）——面板「冲突现场」可查看/提取/丢弃' });
+        actions.push({ id: 'review-conflict', safe: false, detail: '另一实例的改动已被保全，确认无用后可丢弃（需人工判断保留哪一份）' });
+      }
+      if (__externalWrite.count > 0) {
+        score -= 8;
+        issues.push({ level: 'warn', key: 'concurrent.external', detail: '本会话期间另一实例更新过当前聊天 ' + extW + ' 次——本窗口内存态可能已落后，建议刷新页面' });
+        actions.push({ id: 'reload-page', safe: false, detail: '刷新页面以载入他实例的最新状态（避免本窗口继续推进时覆盖）' });
+      }
+      if (conflictSites.length === 0 && __externalWrite.count === 0 && __conflictStat.detected > 0) {
+        issues.push({ level: 'info', key: 'concurrent.history', detail: '历史检出并发写入 ' + __conflictStat.detected + ' 次（现场已处置），当前无冲突' });
+      }
+
       score = Math.max(0, Math.min(100, score));
       const level = score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'degraded';
       let applied = null;
@@ -673,10 +863,71 @@
           quarantineSites: qs ? qs.stateSites : 0, quarantineParseable: qs ? qs.parseable : 0,
           chatsChecked: va ? va.total : 0, chatsProblem: va ? va.problems.length : 0,
           rescueFailed: rs ? rs.failed : 0, rescueFailing: rescueNow,
+          conflictSites: conflictSites.length, conflictDetected: __conflictStat.detected,
+          externalWrites: extW, conflictQuarantined: __conflictStat.quarantined,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }
       };
+    },
+    /** v0.5.0: 并发冲突观测（detected=检出次数，quarantined=成功保全次数） */
+    conflictStat() {
+      const c = __conflictStat;
+      return { detected: c.detected, quarantined: c.quarantined, lastAt: c.lastAt, lastChat: c.lastChat, lastLostBytes: c.lastLostBytes, lastKeptKey: c.lastKeptKey, writer: (function () { try { return writerId(); } catch (e) { return null; } })(), writeSeq: __writeSeq, seenRev: __seenRev };
+    },
+    /** v0.5.0: 跨实例外部写入观测（count>0 = 本会话期间他实例改过当前聊天） */
+    externalWriteStat() {
+      const x = __externalWrite;
+      return { count: x.count, lastAt: x.lastAt, lastKey: x.lastKey, lastRev: x.lastRev, lastWriter: x.lastWriter, staleSince: x.staleSince, hookInstalled: __storageHookInstalled };
+    },
+    /** v0.5.0: 本实例内存态是否可能已落后他实例（供 UI 提示刷新） */
+    staleSinceExternal() { return __externalWrite.count > 0; },
+    /** v0.5.0: 最近一次 save 的冲突详情（null = 无冲突） */
+    lastConflict() { return __lastConflict ? JSON.parse(JSON.stringify(__lastConflict)) : null; },
+    /** v0.5.0: 冲突现场清单（只读）——含键/时间/体积/可解析性/摘要 */
+    listConflicts(chatId) {
+      const cid = chatId || getChatId();
+      const out = [];
+      try {
+        const ls = mainWin.localStorage;
+        const prefix = 'worldaxis_conflict_' + cid + '_';
+        for (let i = 0; i < ls.length; i++) {
+          const k = ls.key(i);
+          if (!k || k.indexOf(prefix) !== 0) continue;
+          const raw = ls.getItem(k) || '';
+          let at = 0;
+          const parts = k.split('_');
+          at = parseInt(parts[parts.length - 2], 10) || 0;
+          let parseable = false, head = '';
+          try {
+            const st = JSON.parse(raw);
+            parseable = !!(st && typeof st === 'object');
+            head = String((st && st.clock && st.clock.label) || '').slice(0, 60);
+          } catch (e) { parseable = false; head = raw.slice(0, 60); }
+          out.push({ key: k, chat: cid, at: at, bytes: byteLen(raw), parseable: parseable, head: head });
+        }
+      } catch (e) {}
+      return out;
+    },
+    /** v0.5.0: 冲突现场丢弃（需显式指定键，防误用为通用删除器） */
+    dropConflict(key) {
+      try {
+        if (typeof key !== 'string' || key.indexOf('worldaxis_conflict_') !== 0) return { ok: false, reason: '非冲突现场键，拒绝删除' };
+        if (mainWin.localStorage.getItem(key) === null) return { ok: false, reason: '键不存在' };
+        mainWin.localStorage.removeItem(key);
+        return { ok: true };
+      } catch (e) { return { ok: false, reason: String((e && e.message) || e) }; }
+    },
+    /** v0.5.0: 提取冲突现场全文（离机备份用） */
+    exportConflict(key) {
+      try {
+        if (typeof key !== 'string' || key.indexOf('worldaxis_conflict_') !== 0) return { ok: false, reason: '非冲突现场键' };
+        const raw = mainWin.localStorage.getItem(key);
+        if (raw === null) return { ok: false, reason: '键不存在' };
+        let st = null, parseable = false;
+        try { st = JSON.parse(raw); parseable = true; } catch (e) {}
+        return { ok: true, worldaxis: true, kind: 'conflict-site', key: key, exportedAt: new Date().toISOString(), bytes: byteLen(raw), parseable: parseable, raw: raw, state: st };
+      } catch (e) { return { ok: false, reason: String((e && e.message) || e) }; }
     },
     /** v0.4.0: 巡视计量视图（面板/报告消费） */
     maintainStat() { const m = __maintainStat; return { scans: m.scans, lastAt: m.lastAt, lastScore: m.lastScore, lastLevel: m.lastLevel, autoApplies: m.autoApplies, lastAutoFreedKeys: m.lastAutoFreedKeys, lastAutoFreedBytes: m.lastAutoFreedBytes }; },
@@ -992,7 +1243,13 @@
       try {
         const key = recoveryKey(chatId);
         const list = JSON.parse(mainWin.localStorage.getItem(key) || '[]');
-        list.unshift({ at: Date.now(), state: JSON.parse(JSON.stringify(memCache || defaultWorldState())) });
+        // v0.5.0: 记录来源实例与当时序号——多窗口并存时可辨认「这份点谁建的」
+        list.unshift({
+          at: Date.now(),
+          by: (function () { try { return writerId(); } catch (e) { return null; } })(),
+          rev: (function () { const g = memCache; return (g && g.meta && typeof g.meta.stateRev === 'number') ? g.meta.stateRev : 0; })(),
+          state: JSON.parse(JSON.stringify(memCache || defaultWorldState()))
+        });
         while (list.length > MAX_RECOVERY_POINTS) list.pop();
         mainWin.localStorage.setItem(key, JSON.stringify(list));
       } catch (e) { WA.log('warn', '创建恢复点失败', e); }
@@ -1010,9 +1267,10 @@
       const maxIdleMs = (typeof o.maxIdleDays === 'number' && o.maxIdleDays >= 0 ? o.maxIdleDays : 30) * 86400000;
       const cur = getChatId();
       const keys = listWorldAxisKeys();
-      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, settings: 0, wb: 0, other: 0 };
-      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, settings: 0, wb: 0, other: 0 };
+      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, wb: 0, other: 0 };
+      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, wb: 0, other: 0 };
       let totalBytes = 0, stateKeys = 0, stateDerivedKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0, curQuarantines = 0;
+      let conflictKeys = 0, conflictBytes = 0;
       const staleDiagCandidates = [];   // 仅超期项（与 sweepStaleKeys 同阈值）：{ key, chat, kind, idleMs }
       const now = Date.now();
       keys.forEach(function (k) {
@@ -1030,12 +1288,15 @@
             if (idleMs > maxIdleMs) staleDiagCandidates.push({ key: k, chat: cls.chat, kind: cls.kind, lastActiveAt: act, idleMs: idleMs });
           }
         }
+        if (cls.family === 'conflict') { conflictKeys++; conflictBytes += b; }
         if (cls.family === 'corrupt') {
           corruptKeys++;
           // v0.2.3: 当前聊天的隔离副本受保护（sweep 不清理）——单独计量以便面板透出与手动处置
           if (cls.chat === cur) curQuarantines++;
         }
-        if (cls.chat === cur) curBytes += b;
+        // v0.5.0: 活跃体积只计「活跃家族」——冲突现场是他实例副本（待处置），
+        // 计入会让用户误判当前存档膨胀（实测虚高一倍）
+        if (cls.chat === cur && cls.family !== 'conflict') curBytes += b;
       });
       return {
         totalKeys: keys.length,
@@ -1049,6 +1310,8 @@
         diagKeys: diagKeys,
         corruptKeys: corruptKeys,
         currentChatQuarantines: curQuarantines,
+        conflictKeys: conflictKeys,
+        conflictBytes: conflictBytes,
         staleDiagCandidates: staleDiagCandidates.sort(function (a, b2) { return a.idleMs - b2.idleMs; }),
         enumerable: typeof mainWin.localStorage.length === 'number' && mainWin.localStorage.length >= 0
       };
@@ -1108,6 +1371,9 @@
           return;
         }
         if (c.family === 'stateDerived') { plan.keep.push(k); return; }   // v0.2.3: state 派生键跟随存档本体保留
+        // v0.5.0: 冲突现场与写入者标识永不自动清理（前者是他实例唯一幸存的进度快照，
+        // 后者是并发防护的身份基础；删除一律属用户经面板的显式决策）
+        if (c.family === 'conflict' || c.family === 'writerId') { plan.keep.push(k); return; }
         plan.keep.push(k);   // state（其他聊天的存档本体，默认保留——清理属用户决策）与未过期 recovery
       });
       plan.remove.forEach(function (r) { plan.freedBytes += r.bytes; plan.byFamily[r.reason] = (plan.byFamily[r.reason] || 0) + 1; });
@@ -1179,7 +1445,11 @@
       const list = this.listRecoveryPoints(chatId);
       let bytes = 0;
       try { bytes = JSON.stringify(list).length; } catch (e) { bytes = -1; }
-      return { count: list.length, max: MAX_RECOVERY_POINTS, full: list.length >= MAX_RECOVERY_POINTS, bytes: bytes, lastAt: list.length ? list[0].at : 0 };
+      // v0.5.0: 多实例可见性——累计出现过的来源实例数（>1 表示曾跨窗口留点）
+      let writers = {};
+      try { list.forEach(function (p) { if (p && p.by) writers[p.by] = 1; }); } catch (e) {}
+      const wCount = Object.keys(writers).length;
+      return { count: list.length, max: MAX_RECOVERY_POINTS, full: list.length >= MAX_RECOVERY_POINTS, bytes: bytes, lastAt: list.length ? list[0].at : 0, lastBy: list.length ? (list[0].by || null) : null, writers: wCount, multiInstance: wCount > 1 };
     },
     /**
      * v0.3.0: 隔离现场清单（只读）——state/settings 损坏时保存的原始字节现场。

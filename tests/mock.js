@@ -15,15 +15,51 @@ global.localStorage = {
   key: i => KEY_ORDER.filter(k => (k in store))[i] || null,
   getItem: k => (k in store ? store[k] : null),
   setItem: (k, v) => { ls_touch(k); store[k] = String(v); },
-  removeItem: k => { delete store[k]; delete storeMtime[k]; },
+  // v0.5.0: removeItem 须同步清理插入序——否则「删除后重插」会使同键在枚举序中出现两次
+  // （storageStat 经 ls.key(i) 枚举会重复计数，totalBytes/families 虚高）
+  removeItem: k => { delete store[k]; delete storeMtime[k]; const __i = KEY_ORDER.indexOf(k); if (__i >= 0) KEY_ORDER.splice(__i, 1); },
   clear: () => { Object.keys(store).forEach(k => { delete store[k]; delete storeMtime[k]; }); KEY_ORDER.length = 0; },
   _dump: () => ({ ...store }),
   _mtimes: () => ({ ...storeMtime }),
   _setMtime: (k, t) => { if (k in store) storeMtime[k] = t; }
 };
+// v0.5.0: storage 事件 mock——模拟「其他标签页写入」触发当前页 window 的 storage 事件。
+// 浏览器语义要点：setItem 只在本页生效不触发本页 storage 事件；只有**别的**实例写入才触发。
+// 故此处提供 _emitStorage(key, oldValue, newValue) 供测试显式模拟「外部写入」。
+(() => {
+  const _ls = global.localStorage;
+  const _rawSet = _ls.setItem;
+  let __suppress = 0;
+  _ls._beginExternal = () => { __suppress++; };
+  _ls._endExternal = () => { __suppress = Math.max(0, __suppress - 1); };
+  _ls._emitStorage = (key, oldValue, newValue) => {
+    const ev = { key: key, oldValue: oldValue === undefined ? null : oldValue, newValue: newValue === undefined ? null : newValue, storageArea: _ls };
+    global.__dispatchWindow('storage', ev);
+  };
+  _ls.setItem = function (k, v) {
+    const old = (k in store) ? store[k] : null;
+    _rawSet(k, v);
+    if (__suppress === 0 && global.__storageAutoEmit) {
+      _ls._emitStorage(k, old, String(v));
+    }
+  };
+})();
 
 // window/document 最小mock
 global.window = global;
+// v0.5.0: window 事件系统 mock（storage 事件监听所需）
+(() => {
+  const __winHandlers = {};
+  global.__winHandlers = __winHandlers;
+  global.addEventListener = function (type, fn) { (__winHandlers[type] = __winHandlers[type] || []).push(fn); };
+  global.removeEventListener = function (type, fn) {
+    const a = __winHandlers[type]; if (!a) return;
+    const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1);
+  };
+  global.__dispatchWindow = function (type, ev) {
+    (__winHandlers[type] || []).slice().forEach(function (fn) { try { fn(ev); } catch (e) {} });
+  };
+})();
 global.__scriptEls = [];
 global.__headScripts = [];
 global.__headScriptsHolder = { name: '__head__' };

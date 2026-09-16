@@ -225,7 +225,7 @@
       <button class="wa-btn" id="wa-imp-run">预检并导入</button>
       <div id="wa-imp-out" class="wa-out"></div>
       <div class="wa-sec">扩展自检（模块/注入/UI/运行环境）</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button><button class="wa-btn" id="wa-audit-copy">复制内存审计</button><button class="wa-btn" id="wa-key-check">存储键体检</button><button class="wa-btn" id="wa-quar-view">隔离现场</button><button class="wa-btn" id="wa-recovery-dl">导出恢复点</button><button class="wa-btn" id="wa-maintain">健康巡视</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button><button class="wa-btn" id="wa-audit-copy">复制内存审计</button><button class="wa-btn" id="wa-key-check">存储键体检</button><button class="wa-btn" id="wa-quar-view">隔离现场</button><button class="wa-btn" id="wa-recovery-dl">导出恢复点</button><button class="wa-btn" id="wa-maintain">健康巡视</button><button class="wa-btn" id="wa-conf-view">冲突现场</button></div>
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
@@ -473,6 +473,49 @@
         if (!m.issues.length && !m.actions.length) html += '<div class="wa-log wa-log-info">✓ 无议题、无建议动作（存储键空间与状态库健康）</div>';
         out.innerHTML = html;
       } catch (e) { out.textContent = '健康巡视失败：' + (e && e.message); }
+    };
+    // v0.5.0: 冲突现场——另一实例被覆盖前的进度快照（提取/丢弃，需人工决策保留哪一份）
+    const cfBtn = $('#wa-conf-view');
+    if (cfBtn) cfBtn.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.store || !WA.store.listConflicts) return;
+      try {
+        const sites = WA.store.listConflicts();
+        const xs = WA.store.externalWriteStat ? WA.store.externalWriteStat() : null;
+        let html = '';
+        if (xs && xs.count > 0) {
+          html += '<div class="wa-log wa-log-warn">⚠ 本会话期间另一实例更新过当前聊天 ' + xs.count + ' 次（最近序号 ' + xs.lastRev + '）——本窗口内存态可能已落后，建议刷新页面</div>';
+        }
+        if (!sites.length) {
+          html += '<div class="wa-log wa-log-info">✓ 无并发冲突现场（从未发生多实例同时写入，或已处置）</div>';
+          out.innerHTML = html; return;
+        }
+        html += '<div class="wa-log wa-log-warn">检测到 ' + sites.length + ' 个冲突现场：另一实例的改动在下一次保存时被覆盖前已被保全。请确认要保留哪一份。</div>';
+        sites.forEach(x => {
+          html += '<div class="wa-item"><b>' + esc(String(x.head || '(无摘要)')) + '</b><br>'
+            + esc(new Date(x.at).toLocaleString()) + ' · ' + Math.round(x.bytes / 1024) + 'KB · ' + (x.parseable ? '可解析' : '不可解析') + '</div>';
+        });
+        const first = sites[sites.length - 1];
+        html += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-conf-dl">提取最近一份</button>'
+          + '<button class="wa-btn wa-mini" id="wa-conf-drop">丢弃最近一份</button></div>';
+        out.innerHTML = html;
+        const dl = $('#wa-conf-dl');
+        if (dl) dl.onclick = () => {
+          const pack = WA.store.exportConflict(first.key);
+          if (!pack.ok) { $('#wa-diag-out').innerHTML = '<div class="wa-log wa-log-err">提取失败：' + esc(pack.reason) + '</div>'; return; }
+          const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'worldaxis-conflict-' + Date.now() + '.json';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          out.innerHTML = '<div class="wa-log wa-log-info">✓ 已提取冲突快照（' + Math.round(pack.bytes / 1024) + 'KB）——含另一实例的完整世界状态，可离线核对</div>';
+        };
+        const dp = $('#wa-conf-drop');
+        if (dp) dp.onclick = () => {
+          const r = WA.store.dropConflict(first.key);
+          out.innerHTML = '<div class="wa-log wa-log-' + (r.ok ? 'info' : 'err') + '">' + (r.ok ? '✓ 已丢弃该冲突现场' : '丢弃失败：' + esc(r.reason)) + '</div>';
+        };
+      } catch (e) { out.textContent = '冲突现场读取失败：' + (e && e.message); }
     };
     const conc = $('#wa-conc'); if (conc) conc.oninput = () => { WA.apiRouter.setConcurrency(+conc.value); $('#wa-conc-v').textContent = conc.value; };
     // 设置页绑定

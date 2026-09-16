@@ -201,6 +201,17 @@
             maintain: WA.store.maintain ? (function () { try { return WA.store.maintain({ deep: false }); } catch (e) { return null; } })() : null,
             maintainStat: WA.store.maintainStat ? WA.store.maintainStat() : null,
             integrity: WA.store.integrityStat ? WA.store.integrityStat() : null,
+            // v0.5.0: 多实例并发观测（写入者标识 / 冲突检出 / 现场 / 外部写入）
+            concurrency: (WA.store.conflictStat && WA.store.externalWriteStat) ? (function () {
+              try {
+                return {
+                  conflict: WA.store.conflictStat(),
+                  external: WA.store.externalWriteStat(),
+                  sites: WA.store.listConflicts ? WA.store.listConflicts() : [],
+                  lastConflict: WA.store.lastConflict ? WA.store.lastConflict() : null
+                };
+              } catch (e) { return null; }
+            })() : null,
             sizeProfile: prof,
             // v0.1.47: 诊断走自动续扫编排（消费方不必手写 cursor 循环）
             sizeAudit: WA.store.sizeAuditFull ? WA.store.sizeAuditFull({ minBytes: 512, chunkNodes: 800 }) : (WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null)
@@ -627,6 +638,23 @@
       const ig = WA.store.integrityStat ? WA.store.integrityStat() : null;
       if (ig) lines.push('- 写入完整性: 校验 ' + ig.verified + '/' + ig.writes + ' 次 · 不一致 ' + ig.mismatches + ' · 重试自愈 ' + ig.recoveredByRetry + ' · 当前态 ' + (ig.lastOk === null ? '未采样' : ig.lastOk ? '正常' : '失败(' + (ig.lastReason || '?') + ')'));
     } catch (e) {}
+    // ── v0.5.0: 多实例并发一致性 ──
+    lines.push('');
+    lines.push('## 并发一致性');
+    try {
+      const cs = WA.store.conflictStat ? WA.store.conflictStat() : null;
+      if (cs) lines.push('- 本实例写入者: ' + cs.writer + ' · 本会话写入 ' + cs.writeSeq + ' 次 · 当前序号 ' + cs.seenRev);
+      if (cs) lines.push('- 冲突检出: ' + cs.detected + ' 次 · 已保全 ' + cs.quarantined + ' 份' + (cs.lastAt ? ' · 最近 ' + new Date(cs.lastAt).toLocaleTimeString() : ''));
+      const xs = WA.store.externalWriteStat ? WA.store.externalWriteStat() : null;
+      if (xs) lines.push('- 外部写入（其他标签页）: ' + xs.count + ' 次' + (xs.count ? ' · 最近序号 ' + xs.lastRev + ' —— 本窗口内存态可能已落后，建议刷新' : ''));
+      const sites = WA.store.listConflicts ? WA.store.listConflicts() : [];
+      if (sites.length) {
+        lines.push('- 冲突现场 ' + sites.length + ' 个（另一实例的进度快照，面板「冲突现场」可提取/丢弃）:');
+        sites.forEach(function (x) { lines.push('  - ' + x.key + ' · ' + Math.round(x.bytes / 1024) + 'KB · ' + (x.parseable ? '可解析' : '不可解析') + (x.head ? ' · ' + x.head : '')); });
+      } else {
+        lines.push('- 冲突现场: 无');
+      }
+    } catch (e) { lines.push('- 并发观测异常: ' + String(e && e.message)); }
     return lines.join('\n');
   }
 
