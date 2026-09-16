@@ -12,6 +12,8 @@
 
   // 通道：推演/摘要/裁判/选项/观测 可分别配置；未配置回落 default
   const CHANNELS = ['default', 'inference', 'digest', 'judge', 'choices', 'observe'];
+  // v0.1.41: 通道配置变更计量（tool-diag 消费）
+  const __cfgStat = { changes: 0, baseUrlChanges: 0, lastAt: 0, lastChannel: null };
 
   function loadCfg() {
     try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
@@ -67,10 +69,17 @@
     },
     setChannel(name, obj) {
       const cfg = loadCfg();
+      const prev = cfg[name] || null;
       cfg[name] = Object.assign({}, cfg[name] || {}, obj || {});
       saveCfg(cfg);
+      // v0.1.41: 配置变更计量 + 总线广播（热切换可观测；payload 不含 apiKey）
+      __cfgStat.changes++; __cfgStat.lastAt = Date.now(); __cfgStat.lastChannel = name;
+      if (!prev || !prev.baseUrl || prev.baseUrl !== cfg[name].baseUrl) __cfgStat.baseUrlChanges++;
+      if (WA.emit) try { WA.emit('api:channel-changed', { channel: name, fields: Object.keys(obj || {}), hadPrevious: !!prev }); } catch (e) {}
     },
     listChannels() { const cfg = loadCfg(); return CHANNELS.map(n => ({ name: n, cfg: cfg[n] || null, effective: this.getChannel(n) })); },
+    /** v0.1.41: 配置变更计量只读视图 */
+    cfgStat() { return { changes: __cfgStat.changes, baseUrlChanges: __cfgStat.baseUrlChanges, lastAt: __cfgStat.lastAt, lastChannel: __cfgStat.lastChannel }; },
     setConcurrency(n) { maxConcurrent = Math.max(1, Math.min(10, n | 0)); },
     getConcurrency() { return maxConcurrent; },
     queueLength() { return queue.length; },

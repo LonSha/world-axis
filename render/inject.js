@@ -23,7 +23,39 @@
     } catch (e) {}
   }
 
+  /**
+   * v0.1.41: 撤销-槽位关联审计（只读）——对照撤销台账、lastInjection 槽位 keys 与
+   * 宿主实际注册状态，检测「快照说在场但台账已撤销」「keys 残留未清」等不一致。
+   */
+  function uninjectAudit() {
+    const issues = [];
+    const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
+    const ledger = __uninjectLedger.slice();
+    const lastUnj = ledger.length ? ledger[ledger.length - 1] : null;
+    // 快照在场声明 vs 撤销台账末条：台账比快照新且成功 → 快照过期
+    let staleSnapshot = false;
+    if (li && li.injected === true && lastUnj && lastUnj.ok && lastUnj.at > (li.at || 0)) staleSnapshot = true;
+    if (staleSnapshot) issues.push({ code: 'stale-snapshot', detail: '快照声明 injected=true 但台账在其后已有成功撤销（trigger=' + (lastUnj.trigger || '?') + '）' });
+    // clearedBy 与台账末条 trigger 不一致 → 回写异常
+    if (li && li.injected === false && li.clearedBy && lastUnj && lastUnj.ok && lastUnj.trigger !== li.clearedBy) {
+      issues.push({ code: 'cleared-by-mismatch', detail: '快照 clearedBy=' + li.clearedBy + ' 与台账末条 trigger=' + lastUnj.trigger + ' 不一致' });
+    }
+    // 注入声明在场但从未有撤销记录且台账非空且末条晚于快照——已由 stale-snapshot 覆盖；
+    // 这里查反向：快照已撤销但撤销发生在快照写入之前（回写时序异常）
+    if (li && li.injected === false && li.clearedAt && (li.at || 0) > li.clearedAt) {
+      issues.push({ code: 'writeback-before-land', detail: 'clearedAt 早于快照 at：撤销回写时序异常' });
+    }
+    return {
+      snapshotInjected: li ? li.injected : null,
+      snapshotKeys: (li && li.slots && Array.isArray(li.slots.keys)) ? li.slots.keys.slice() : [],
+      ledgerCount: ledger.length,
+      lastUninject: lastUnj ? { at: lastUnj.at, trigger: lastUnj.trigger, ok: lastUnj.ok, cleared: (lastUnj.cleared || []).length } : null,
+      issues: issues
+    };
+  }
   WA.render = {
+    /** v0.1.41: 撤销-槽位关联审计只读视图（tool-diag 消费） */
+    uninjectAudit: uninjectAudit,
     SOURCES,
     getVisibility() { return loadVis(); },
     setVisibility(k, on) { const v = loadVis(); v[k] = !!on; mainWin.localStorage.setItem(LS_KEY, JSON.stringify(v)); },

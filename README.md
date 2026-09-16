@@ -66,6 +66,8 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.41** — 撤销-槽位关联审计 + 通道配置可观测：render.uninjectAudit()（快照在场声明 × 撤销台账 × keys 交叉核对，检出 stale-snapshot/cleared-by-mismatch/writeback-before-land），tool-diag inject 节透出 uninjectIssues；apiRouter.setChannel 变更计量 cfgStat()（changes/baseUrlChanges/lastChannel）+ 总线广播 api:channel-changed（payload 不含明文 apiKey），诊断 apiRouter.cfg 子节透出。
+
 - **v0.1.39** — contract-audit 探针还原路径事务化：原位还原改走 transact（深改写在 draft 上进行），全库裸 save 清零，还原动作纳入 txStat 计量与统一落盘路径。
 - **v0.1.40** — 记忆巩固链路计时：memory.digest 节点逐层计时（L1/L2/L3 各自 ms 与 ran 标记），memory.stats()（rounds/lastMs/avgMs/layers）；tool-diag runtime.memory 子节透出；巩固链各层异常不中断后续层。
 

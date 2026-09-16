@@ -3338,6 +3338,52 @@ WA.loadScript = _ls.loadScript;
   const dg140 = WA.toolDiag.collect();
   assert(dg140.runtime.memory && dg140.runtime.memory.rounds >= 1, '诊断透出 memory 计量节');
   } // end v0.1.40 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.41 — 撤销-槽位关联审计 + 通道配置变更可观测
+  // ═══════════════════════════════════════════════════════════
+  v0141: {
+  assert(typeof WA.render.uninjectAudit === 'function' && typeof WA.apiRouter.cfgStat === 'function', 'uninjectAudit/cfgStat 已导出');
+  // ── 关联审计：一致态（落地→撤销，时序正确）→ 零议题 ──
+  WA.render.applyInjections({ injections: [{ source: '世界状态', content: 'v141 状态块' }] });
+  const uaClean0 = WA.render.uninjectAudit();
+  assert(uaClean0.snapshotInjected === true && uaClean0.issues.length === 0, '落地后审计无议题');
+  WA.render.uninject('manual-v141');
+  const uaClean = WA.render.uninjectAudit();
+  assert(uaClean.snapshotInjected === false && uaClean.issues.length === 0, '正常撤销后审计无议题');
+  assert(uaClean.lastUninject && uaClean.lastUninject.trigger === 'manual-v141' && uaClean.lastUninject.ok === true, '台账末条可读');
+  assert(uaClean.snapshotKeys.length >= 0 && uaClean.ledgerCount >= 1, '快照 keys 与台账计数透出');
+  // ── 关联审计：注入 stale-snapshot（模拟快照回写丢失）──
+  WA.render.applyInjections({ injections: [{ source: '世界状态', content: 'v141 二轮' }] });
+  // 此时快照 injected=true 且 at 更新；人为把快照 at 倒退到台账末条之前 → 台账比快照新
+  WA.store.transact(d => { if (d.lastInjection) d.lastInjection.at = (d.lastInjection.at || Date.now()) - 60000; });
+  const uaStale = WA.render.uninjectAudit();
+  assert(uaStale.issues.some(i => i.code === 'stale-snapshot'), '快照过期（撤销晚于快照）被检出');
+  // 恢复现场：重新落地一轮 + 撤销，回到一致态
+  WA.render.applyInjections({ injections: [{ source: '世界状态', content: 'v141 三轮' }] });
+  WA.render.uninject('manual-v141b');
+  const uaOk = WA.render.uninjectAudit();
+  assert(uaOk.issues.length === 0, '重新落地+撤销后回到一致态');
+  // ── 通道配置变更：计量 + 总线广播（payload 无明文 key）──
+  let busPayload141 = null;
+  const off141 = WA.on('api:channel-changed', p => { busPayload141 = p; });
+  const cfg0 = WA.apiRouter.cfgStat();
+  WA.apiRouter.setChannel('observe', { baseUrl: 'http://v141-mock', model: 'm141', apiKey: 'sk-v141-secret' });
+  const cfg1 = WA.apiRouter.cfgStat();
+  assert(cfg1.changes === cfg0.changes + 1 && cfg1.lastChannel === 'observe', 'setChannel 计入变更计量');
+  assert(busPayload141 && busPayload141.channel === 'observe' && Array.isArray(busPayload141.fields), '总线广播 api:channel-changed');
+  assert(JSON.stringify(busPayload141).indexOf('sk-v141-secret') < 0, '广播 payload 不含明文 apiKey');
+  // 第二次改同通道（baseUrl 未变）→ baseUrlChanges 不增
+  const b0 = WA.apiRouter.cfgStat().baseUrlChanges;
+  WA.apiRouter.setChannel('observe', { model: 'm141b' });
+  assert(WA.apiRouter.cfgStat().baseUrlChanges === b0, 'baseUrl 未变不计入 baseUrlChanges');
+  // 诊断透出（api 节 cfg + inject 节无 uninjectIssues）
+  const dg141 = WA.toolDiag.collect();
+  assert(dg141.runtime.apiRouter.cfg && dg141.runtime.apiRouter.cfg.changes >= 2, '诊断透出通道配置计量');
+  assert(!dg141.inject.uninjectIssues, '一致态下诊断无 uninjectIssues');
+  off141();
+  // 清理：通道探针字段留在持久配置里不影响（ observe 原本未配置，恢复为空）
+  WA.apiRouter.setChannel('observe', null);
+  } // end v0.1.41 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

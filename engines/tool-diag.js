@@ -140,6 +140,8 @@
       const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
       // v0.1.29: 快照已撤销时标注——槽位证据保留但注入已不在场
       if (li && li.injected === false) { out.injected = false; out.clearedAt = li.clearedAt || null; out.clearedBy = li.clearedBy || null; }
+      // v0.1.41: 撤销-槽位关联审计
+      if (WA.render && WA.render.uninjectAudit) { const ua = WA.render.uninjectAudit(); if (ua.issues.length) out.uninjectIssues = ua.issues; }
       if (li && li.slots) {
         out.slots = li.slots;
         const slotAudit = WA.injectSlotAudit ? WA.injectSlotAudit.audit(li) : null;
@@ -233,6 +235,8 @@
         return {
           concurrency: WA.apiRouter.getConcurrency ? WA.apiRouter.getConcurrency() : null,
           queue: WA.apiRouter.queueLength ? WA.apiRouter.queueLength() : null,
+          // v0.1.41: 通道配置变更计量
+          cfg: WA.apiRouter.cfgStat ? WA.apiRouter.cfgStat() : null,
           channels: list.map(function (c) {
             const e = c.effective || {};
             return { name: c.name, configured: !!(e.baseUrl && e.model), keyMasked: redact(e.apiKey), model: e.model || null };
