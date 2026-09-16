@@ -129,13 +129,37 @@ WA.modules = {};
 WA.eventLog = [];
 WA.errorLog = [];   // v0.1.53: 与 index.js 对齐的 error 子环
 const MOCK_ERROR_LOG_MAX = 50;
-function persistMockLog() {
+let __mockLogTimer = null;      // v0.2.1: 与 index.js 对齐的防抖落盘
+let __mockLogChat = null;
+const MOCK_LOG_DEBOUNCE_MS = 500;
+function persistMockLog(chatId) {
   try {
-    const chatId = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
-    global.localStorage.setItem('worldaxis_event_log_' + chatId, JSON.stringify(WA.eventLog.slice(-300)));
-    global.localStorage.setItem('worldaxis_error_log_' + chatId, JSON.stringify(WA.errorLog.slice(-MOCK_ERROR_LOG_MAX)));
+    const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+    global.localStorage.setItem('worldaxis_event_log_' + cid, JSON.stringify(WA.eventLog.slice(-300)));
+    global.localStorage.setItem('worldaxis_error_log_' + cid, JSON.stringify(WA.errorLog.slice(-MOCK_ERROR_LOG_MAX)));
   } catch (e) {}
 }
+function scheduleMockLogSave(immediate) {
+  if (immediate) {
+    const target = __mockLogChat || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+    if (__mockLogTimer) { clearTimeout(__mockLogTimer); __mockLogTimer = null; }
+    persistMockLog(target); __mockLogChat = null;
+    return;
+  }
+  if (!__mockLogChat) __mockLogChat = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
+  if (__mockLogTimer) return;
+  __mockLogTimer = setTimeout(function () {
+    const target = __mockLogChat; __mockLogTimer = null; __mockLogChat = null;
+    persistMockLog(target);
+  }, MOCK_LOG_DEBOUNCE_MS);
+}
+WA.flushLog = function () {
+  if (!__mockLogTimer) return;   // v0.2.1: 无挂起写入 = 全部已落盘，不得动磁盘（防覆盖）
+  clearTimeout(__mockLogTimer); __mockLogTimer = null;
+  const target = __mockLogChat || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+  __mockLogChat = null;
+  persistMockLog(target);
+};
 WA.log = function (level, msg, data) {
   const entry = { t: Date.now(), level, msg, data };
   WA.eventLog.push(entry);
@@ -144,10 +168,11 @@ WA.log = function (level, msg, data) {
     WA.errorLog.push(entry);
     if (WA.errorLog.length > MOCK_ERROR_LOG_MAX) WA.errorLog.splice(0, WA.errorLog.length - MOCK_ERROR_LOG_MAX);
   }
-  persistMockLog();
+  scheduleMockLogSave(level === 'error');   // v0.2.1: error 立即落盘；info/warn 走防抖窗口
 };
 WA.loadEventLog = function (chatId) {
   try {
+    WA.flushLog();
     const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
     const raw = global.localStorage.getItem('worldaxis_event_log_' + cid);
     if (raw) {
@@ -168,6 +193,9 @@ WA.loadEventLog = function (chatId) {
 WA.clearEventLog = function (chatId) {
   WA.eventLog = [];
   WA.errorLog = [];
+  // v0.2.1: 取消挂起的防抖写入，防止已清空日志被定时器复活写回
+  if (__mockLogTimer) { clearTimeout(__mockLogTimer); __mockLogTimer = null; }
+  __mockLogChat = null;
   try {
     const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
     global.localStorage.removeItem('worldaxis_event_log_' + cid);

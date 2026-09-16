@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.2.0';
+  const VERSION = '0.2.1';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -34,15 +34,29 @@
   WA.errorLog = [];    // v0.1.53: error 专属子环（最多50条）——info 噪音挤掉混合环也不丢关键故障证据
   const ERROR_LOG_MAX = 50;
   let __logSaveTimer = null;
-  function persistEventLog() {
+  let __logSaveChat = null;   // v0.2.1: 挂起日志所属聊天（防抖窗口内切聊天时写错目标）
+  const LOG_SAVE_DEBOUNCE_MS = 500;
+  function persistEventLog(chatId) {
     try {
-      const chatId = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
-      mainWin.localStorage.setItem('worldaxis_event_log_' + chatId, JSON.stringify(WA.eventLog.slice(-300)));
-      mainWin.localStorage.setItem('worldaxis_error_log_' + chatId, JSON.stringify(WA.errorLog.slice(-ERROR_LOG_MAX)));
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      mainWin.localStorage.setItem('worldaxis_event_log_' + cid, JSON.stringify(WA.eventLog.slice(-300)));
+      mainWin.localStorage.setItem('worldaxis_error_log_' + cid, JSON.stringify(WA.errorLog.slice(-ERROR_LOG_MAX)));
     } catch (e) {}
   }
-  function scheduleLogSave() {
-    persistEventLog();
+  // v0.2.1: 防抖批量落盘——高频 info 日志合并窗口内只写一次，error 立即落盘保关键证据
+  function scheduleLogSave(immediate) {
+    if (immediate) {
+      const target = __logSaveChat || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      if (__logSaveTimer) { clearTimeout(__logSaveTimer); __logSaveTimer = null; }
+      persistEventLog(target); __logSaveChat = null;
+      return;
+    }
+    if (!__logSaveChat) __logSaveChat = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
+    if (__logSaveTimer) return;
+    __logSaveTimer = setTimeout(function () {
+      const target = __logSaveChat; __logSaveTimer = null; __logSaveChat = null;
+      persistEventLog(target);
+    }, LOG_SAVE_DEBOUNCE_MS);
   }
   WA.log = function (level, msg, data) {
     const entry = { t: Date.now(), level, msg, data: data === undefined ? null : String(data).slice(0, 500) };
@@ -52,13 +66,22 @@
       WA.errorLog.push(entry);
       if (WA.errorLog.length > ERROR_LOG_MAX) WA.errorLog.splice(0, WA.errorLog.length - ERROR_LOG_MAX);
     }
-    scheduleLogSave();
+    scheduleLogSave(level === 'error');   // v0.2.1: error 立即落盘；info/warn 走防抖窗口
     const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
     fn(LOG, msg, data ?? '');
   };
-  // v0.1.49: 恢复/清理日志（v0.1.53: 同步恢复/清理 error 子环）
+  // v0.2.1: 恢复/清理日志（v0.1.53: 同步恢复/清理 error 子环）
+  //          切换聊天/清理前先冲刷挂起的防抖写入，防止未落盘日志丢失
+  WA.flushLog = function () {
+    if (!__logSaveTimer) return;   // v0.2.1: 无挂起写入 = 全部已落盘，不得动磁盘（防用已切换的内存覆盖已持久化数据）
+    clearTimeout(__logSaveTimer); __logSaveTimer = null;
+    const target = __logSaveChat || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+    __logSaveChat = null;
+    persistEventLog(target);
+  };
   WA.loadEventLog = function (chatId) {
     try {
+      WA.flushLog();   // 先落盘当前聊天挂起日志
       const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
       const raw = mainWin.localStorage.getItem('worldaxis_event_log_' + cid);
       if (raw) {
@@ -75,6 +98,9 @@
   WA.clearEventLog = function (chatId) {
     WA.eventLog = [];
     WA.errorLog = [];
+    // v0.2.1: 取消挂起的防抖写入，防止已清空日志被定时器复活写回
+    if (__logSaveTimer) { clearTimeout(__logSaveTimer); __logSaveTimer = null; }
+    __logSaveChat = null;
     try {
       const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
       mainWin.localStorage.removeItem('worldaxis_event_log_' + cid);

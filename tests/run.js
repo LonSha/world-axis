@@ -4334,6 +4334,7 @@ WA.loadScript = _ls.loadScript;
   const cur200 = WA.store.chatId();
   const big200 = new Array(60).join('x');
   for (let i = 0; i < 40; i++) WA.log('info', 'pad' + i, big200);
+  WA.flushLog();   // v0.2.1: 防抖语义——需确定落盘的计量场景必须显式冲刷
   const db200 = WA.store.diagBudget({ maxPct: 5 });
   assert(typeof db200.diagBytes === 'number' && typeof db200.stateBytes === 'number' && typeof db200.diagPct === 'number', 'diagBudget 返回结构完整');
   assert(db200.diagBytes > 0 && db200.chat === cur200, 'diagBudget 计量当前聊天诊断字节');
@@ -4362,6 +4363,62 @@ WA.loadScript = _ls.loadScript;
   // 清理现场
   anyCorruptOp200.forEach(function (k) { global.localStorage.removeItem(k); });
   } // end v0.2.0 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.2.1 — 诊断环持久化防抖（info/warn 合并写，error 立即落盘，flush 显式冲刷）
+  // ═══════════════════════════════════════════════════════════
+  section('v0.2.1 诊断环持久化防抖');
+  v0210: {
+  assert(typeof WA.flushLog === 'function', 'WA.flushLog 冲刷入口已导出');
+  const idxSrc210 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+  assert(idxSrc210.indexOf('LOG_SAVE_DEBOUNCE_MS') > 0, 'index.js 含防抖窗口常量');
+  assert(idxSrc210.indexOf("scheduleLogSave(level === 'error')") > 0, 'error 级立即落盘接线');
+  const cur210 = WA.store.chatId();
+  const keyEvt210 = 'worldaxis_event_log_' + cur210;
+  const keyErr210 = 'worldaxis_error_log_' + cur210;
+  const diskEvt210 = () => { try { return JSON.parse(global.localStorage.getItem(keyEvt210) || '[]'); } catch (e) { return []; } };
+
+  // ── 1. info/warn 走防抖窗口：不立即落盘，flushLog 后可见 ──
+  WA.clearEventLog(cur210);
+  WA.log('info', 'v210 防抖日志A');
+  WA.log('warn', 'v210 防抖日志B');
+  assert(diskEvt210().every(l => l.msg !== 'v210 防抖日志A'), 'info 日志在防抖窗口内未立即落盘');
+  WA.flushLog();
+  assert(diskEvt210().some(l => l.msg === 'v210 防抖日志A') && diskEvt210().some(l => l.msg === 'v210 防抖日志B'), 'flushLog 后挂起日志落盘');
+
+  // ── 2. error 立即落盘（保关键故障证据，不等窗口）──
+  WA.clearEventLog(cur210);
+  WA.log('error', 'v210 关键故障');
+  assert(diskEvt210().some(l => l.msg === 'v210 关键故障'), 'error 日志立即落盘（无需 flush）');
+  WA.clearEventLog(cur210);
+
+  // ── 3. clearEventLog 取消挂起定时器：已清日志不被复活 ──
+  WA.log('info', 'v210 将被清理的日志');
+  WA.clearEventLog(cur210);
+  assert(global.localStorage.getItem(keyEvt210) === null && global.localStorage.getItem(keyErr210) === null, 'clearEventLog 清持久键');
+  await new Promise(r => setTimeout(r, 620));   // 越过 500ms 防抖窗口
+  assert(global.localStorage.getItem(keyEvt210) === null, '防抖窗口过期后定时器不复活已清日志');
+
+  // ── 4. 防覆盖不变量：挂起中切聊天，flush 写原聊天而非新聊天 ──
+  WA.log('info', 'v210 跨聊天日志');
+  const other210 = cur210 + '_v210_other';
+  WA.loadEventLog(other210);   // flush 把挂起日志写回 cur210，随后加载 other（空）
+  assert(diskEvt210().some(l => l.msg === 'v210 跨聊天日志'), '挂起中切聊天：挂起日志写回原聊天');
+  assert(WA.eventLog.length === 0, '切换到 other 聊天后内存为空');
+  WA.loadEventLog(cur210);
+  assert(WA.eventLog.some(l => l.msg === 'v210 跨聊天日志'), '切回原聊天日志完整恢复');
+  WA.clearEventLog(cur210);
+  WA.clearEventLog(other210);
+
+  // ── 5. 防覆盖不变量：无挂起时 flushLog 不动磁盘 ──
+  WA.log('info', 'v210 底线日志');
+  WA.flushLog();
+  const snapshot210 = global.localStorage.getItem(keyEvt210);
+  WA.eventLog.length = 0;      // 模拟内存已被切走清空
+  WA.flushLog();               // 无挂起 → 必须是 no-op
+  assert(global.localStorage.getItem(keyEvt210) === snapshot210, '无挂起时 flushLog 不覆盖磁盘（防覆盖不变量）');
+  global.localStorage.setItem(keyEvt210, snapshot210);   // 还原现场
+  WA.eventLog.length = 0;
+  } // end v0.2.1 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
