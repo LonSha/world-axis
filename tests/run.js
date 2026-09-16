@@ -3598,6 +3598,116 @@ WA.loadScript = _ls.loadScript;
   const aClean144 = WA.store.sizeAudit({ minBytes: 64 });
   assert(aClean144.drifted.length === 0, '复原后无漂移议题');
   } // end v0.1.44 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.45 — 旧存档结构自愈 + 扫描截断可见性
+  // ═══════════════════════════════════════════════════════════
+  v0145: {
+  const ctx145 = global.SillyTavern.getContext();
+  const chatKey145 = 'worldaxis_state_' + WA.store.chatId();
+  const saved145 = global.localStorage.getItem(chatKey145);
+  const healed0 = WA.store.loadStat().healed;
+  // ── 旧存档：schemaVersion 已是最新，但 memory 缺 l0-l3、clock 缺 source、chapters 缺 seq ──
+  const legacy = {
+    schemaVersion: WA.store.SCHEMA_VERSION,
+    clock: { iso: '', label: '旧纪元', dayIndex: 3 },
+    memory: { facts: [{ key: '旧事实', value: 'v', version: 1, active: true }], foreshadows: [] },
+    chapters: { active: false, current: null, history: [{ no: 4, title: '第四章' }, { no: 5, title: '第五章' }], storylines: [], relations: {} },
+    worldFacts: [{ key: 'w', value: '1' }],
+    people: { hero: { id: 'hero', name: '主角', location: '酒馆' } }
+  };
+  global.localStorage.setItem(chatKey145, JSON.stringify(legacy));
+  WA.store.init();
+  const st145 = WA.store.get();
+  assert(st145.memory && Array.isArray(st145.memory.l0) && Array.isArray(st145.memory.l3), '旧存档载入后 memory.l0-l3 已补齐');
+  assert(st145.clock.source === 'unset', 'clock.source 缺失被补齐为默认值');
+  assert(st145.chapters.seq === 0, 'chapters.seq 缺失被补齐为 0');
+  // 原有数据一字不动（ensureShape 只填空位）
+  assert(st145.clock.label === '旧纪元' && st145.clock.dayIndex === 3, '旧 clock 值未被覆盖');
+  assert(st145.memory.facts.length === 1 && st145.memory.facts[0].key === '旧事实', '旧 memory.facts 完整保留');
+  assert(st145.worldFacts.length === 1 && Object.keys(st145.people).length === 1, '旧 worldFacts/people 保留');
+  assert(st145.chapters.history.length === 2 && st145.chapters.history[1].no === 5, '旧章节史保留且未被裁剪');
+  // ── 核心回归：无守卫写入必须真的落盘（修复前抛错被 transact 吞成 {ok:false}）──
+  const w145 = WA.store.transact(function (d) { d.memory.l1.push({ t: 1, s: '巩固产物' }); });
+  assert(w145.ok === true, '补齐后写 memory.l1 事务成功');
+  assert((WA.store.get().memory.l1 || []).length === 1 && WA.store.get().memory.l1[0].s === '巩固产物', '写入真落盘（非静默丢弃）');
+  // 引擎侧真实链路：L0 巩固（memory.js:34 的 draft.memory.l0.push 正是崩溃点）
+  global.__mockChat.push({ is_user: true, mes: 'v145 旧存档回归 ' + 'q'.repeat(40), swipe_id: 5145 });
+  const dgCfg145 = WA.apiRouter.getChannel('digest');
+  WA.apiRouter.setChannel('digest', { baseUrl: 'http://mock', model: 'm', apiKey: 'k' });
+  const l0Before = WA.store.get().memory.l0.length;
+  global.__pushApiJson({ summary: 'v145 巩固摘要' });
+  const l0Sum = await WA.memory.digestRound();
+  const l0After = WA.store.get().memory.l0;
+  assert(l0Sum === 'v145 巩固摘要', 'digestRound 经真实通道产出摘要');
+  assert(Array.isArray(l0After) && l0After.length === l0Before + 1 && l0After[l0After.length - 1].s === 'v145 巩固摘要', 'L0 巩固真落盘（修复前此处静默丢失）');
+  WA.apiRouter.setChannel('digest', dgCfg145 && dgCfg145.baseUrl && dgCfg145.model ? { baseUrl: dgCfg145.baseUrl, model: dgCfg145.model, apiKey: dgCfg145.apiKey } : null);
+  // 自愈留痕
+  const ls145 = WA.store.loadStat();
+  assert(ls145.healed > healed0, '自愈字段数计入 loadStat.healed');
+  assert(ls145.shapeConflicts === 0, '纯缺字段场景无类型冲突');
+  assert(ls145.lastFix && ls145.lastFix.filled > 0, '本次载入 lastFix.filled 记录补齐量');
+  // ── 幂等性：补齐已落盘，再次 init 不再 save（防每轮写放大回归）──
+  const saveCnt145 = [0];
+  const origSave145 = WA.store.save;
+  WA.store.save = function () { saveCnt145[0]++; return origSave145.apply(WA.store, arguments); };
+  WA.store.init();
+  const reSave1 = saveCnt145[0];
+  WA.store.init();
+  const reSave2 = saveCnt145[0];
+  WA.store.save = origSave145;
+  assert(WA.store.loadStat().lastFix.filled === 0, '补齐落盘后重复 init：lastFix.filled 归零');
+  assert(reSave1 === 0 && reSave2 === 0, '重复 init 不再触发 save（幂等，每轮零开销，实得 ' + reSave1 + '/' + reSave2 + '）');
+  // 章号续编不从 1 重启
+  WA.chapters.start('续章');
+  assert(WA.store.get().chapters.current.no === 6, '旧存档续章号 = history 最大 no + 1（实得 ' + WA.store.get().chapters.current.no + '）');
+  WA.chapters.end('收尾');
+  // ── 类型冲突：不擅自改写用户数据，但要记账上报 ──
+  global.localStorage.setItem(chatKey145, JSON.stringify({
+    schemaVersion: WA.store.SCHEMA_VERSION,
+    memory: { facts: [], foreshadows: [], l0: '被外部写坏的字符串', l1: [], l2: [], l3: [], pmem: [] },
+    chronicle: 42
+  }));
+  WA.store.init();
+  const st145c = WA.store.get();
+  assert(st145c.memory.l0 === '被外部写坏的字符串', '类型冲突字段保留原值（不擅自改写）');
+  assert(st145c.chronicle === 42, '顶层类型冲突同样保留');
+  assert(st145c.memory.l1 !== undefined && st145c.clock && st145c.clock.source === 'unset', '冲突不影响其它缺失字段的补齐');
+  const ls145c = WA.store.loadStat();
+  assert(ls145c.shapeConflicts >= 2, '类型冲突计入 loadStat.shapeConflicts（实得 ' + ls145c.shapeConflicts + '）');
+  const conflictLog = WA.eventLog.filter(function (l) { return String(l.msg).indexOf('类型与默认结构不符') >= 0; });
+  assert(conflictLog.length >= 1 && conflictLog[0].level === 'error', '类型冲突以 error 级留痕');
+  const dg145 = WA.toolDiag.collect();
+  assert(((dg145.verdict || {}).issues || []).some(function (x) { return x.key === 'stateShape' && x.level === 'error'; }), '诊断报 stateShape error 议题');
+  // ── lastFix 语义：议题只反映最近一次载入，不永久挂红 ──
+  assert(ls145c.lastFix && ls145c.lastFix.conflicts >= 2, 'lastFix.conflicts 反映本次载入冲突数');
+  assert(ls145c.shapeConflicts >= 2, 'shapeConflicts 保留历史累计');
+  // 同一份状态再次载入：缺字段已在上次补齐并落盘，filled 归零，冲突仍在
+  WA.store.init();
+  const ls145re = WA.store.loadStat();
+  assert(ls145re.lastFix.filled === 0, '重复载入已修状态：lastFix.filled 归零（不再挂 info 议题）');
+  assert(ls145re.lastFix.conflicts >= 2, '类型冲突未自动修好则持续上报（不擅自改写用户数据）');
+  assert(ls145re.shapeConflicts >= ls145c.shapeConflicts, '累计冲突数不回退');
+  // ── sizeAudit 截断可见性 ──
+  const aNorm = WA.store.sizeAudit({ minBytes: 64 });
+  assert(aNorm.truncated === false && typeof aNorm.scannedNodes === 'number' && aNorm.nodeBudget === 800, '正常扫描不置 truncated');
+  assert(aNorm.depthCap === 3, 'depthCap 透出实际生效值');
+  const aTrunc = WA.store.sizeAudit({ minBytes: 64, maxNodes: 3 });
+  assert(aTrunc.truncated === true, '预算耗尽时置 truncated=true（不再静默全绿）');
+  const aTruncDeep = WA.store.sizeAudit({ minBytes: 64, maxDepth: 1 });
+  assert(aTruncDeep.depthCap === 1 && aTruncDeep.arrays.every(function (x) { return x.path.indexOf('.') < 0; }), 'depthCap 生效：仅顶层数组被扫到');
+  // 截断必须升级为议题
+  const origAudit145 = WA.store.sizeAudit;
+  WA.store.sizeAudit = function (o) { return origAudit145.call(WA.store, { minBytes: 64, maxNodes: 3 }); };
+  const dg145t = WA.toolDiag.collect();
+  const truncIssue = ((dg145t.verdict || {}).issues || []).filter(function (x) { return x.key === 'sizeScanTruncated'; })[0];
+  assert(truncIssue && truncIssue.level === 'warn' && /unbounded\/suspects 不完整/.test(truncIssue.detail), '截断报 warn 议题并声明结果不完整');
+  WA.store.sizeAudit = origAudit145;
+  // ── 复原：还原测试前状态，不污染后续用例 ──
+  if (saved145 === null) { try { delete global.localStorage[chatKey145]; } catch (e) {} }
+  else global.localStorage.setItem(chatKey145, saved145);
+  WA.store.init();
+  assert(WA.store.get().memory && Array.isArray(WA.store.get().memory.l0), '复原后 store 仍可用');
+  } // end v0.1.45 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

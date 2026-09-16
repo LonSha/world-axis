@@ -60,7 +60,8 @@
       // 章节叙事（beat-tracker：章/节/故事线/关系）
       chapters: {
         active: false, current: null,  // {no,title,script,notes,startedAt}
-        history: [], storylines: [], relations: {}
+        history: [], storylines: [], relations: {},
+        seq: 0                         // v0.1.43/45: 章号计数器，与 history 长度解耦
       },
       // 突发事件（direct-event：一轮生成多轮解封的小纸条）
       directEvents: [],         // {id,title,totalTurns,currentTurn,status:active|done|aborted,opponent,box,notes:[],createdAt}
@@ -109,7 +110,7 @@
   // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
   const __saveStat = { at: 0, ok: null, bytes: 0, reason: null, failCount: 0 };
   // v0.1.38: 加载观测——状态键损坏时隔离原始 payload 而非静默丢弃
-  const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, lastError: null, lastAt: 0 };
+  const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
   function classifySaveError(e) {
     const name = (e && e.name) || '';
     const msg = String((e && e.message) || e);
@@ -125,6 +126,39 @@
 
   // v0.1.44: 有界容器登记表——path -> { cap: 裁剪后长度硬上限, site: 源码裁剪点 }
   // cap 值必须与源码中的裁剪常量一致，tests/run.js 会反查源码，防止登记表与代码漂移。
+  /**
+   * v0.1.45: 结构自愈——按默认状态递归补齐「缺失的嵌套字段」。
+   * 背景：migrate() 是浅合并（Object.assign），旧存档整体替换顶层键后，
+   *      后续版本新增的嵌套字段（memory.l0-l3 等）不会被补齐；而引擎侧
+   *      存在 draft.memory.l1.push(...) 这类无守卫写入，会抛错并被 transact
+   *      的 catch 吞成 {ok:false} —— 表现为「记忆巩固每轮静默丢失」且永不自愈
+   *      （旧存档 schemaVersion 已等于当前值，根本不会走 migrate 分支）。
+   * 语义：只填 undefined 的空位，绝不覆盖任何已有值；类型不符时保留原值。
+   */
+  function ensureShape(target, fresh) {
+    let filled = 0, conflicts = 0;
+    if (!target || typeof target !== 'object' || Array.isArray(target)) return { state: target, filled: 0, conflicts: 0 };
+    Object.keys(fresh || {}).forEach(function (k) {
+      const dv = fresh[k], tv = target[k];
+      if (tv === undefined) {
+        try { target[k] = JSON.parse(JSON.stringify(dv)); } catch (e) { target[k] = dv; }
+        filled++;
+        return;
+      }
+      const dArr = Array.isArray(dv), tArr = Array.isArray(tv);
+      const dObj = dv !== null && typeof dv === 'object' && !dArr;
+      const tObj = tv !== null && typeof tv === 'object' && !tArr;
+      if (dObj && tObj) {
+        const sub = ensureShape(tv, dv);
+        filled += sub.filled; conflicts += sub.conflicts;
+        return;
+      }
+      // 仅当默认期望容器（对象/数组）而实测不是，才算污染；
+      // 默认为 null 的字段（lastInjection/worldPulse 等）运行时变对象属正常演进，不判冲突
+      if ((dObj || dArr) && !(tObj || tArr)) conflicts++;
+    });
+    return { state: target, filled: filled, conflicts: conflicts };
+  }
   const __BOUNDED_CAPS = {
     'chronicle': { cap: 200, site: 'backstage.js slice(-200)' },
     'currents': { cap: 40, site: 'backstage.js slice(-40)' },
@@ -164,6 +198,21 @@
         memCache = this.migrate(memCache);
         this.save();
       }
+      // v0.1.45: 结构自愈——版本号相同但字段较旧（分阶段演进的历史存档）同样补齐
+      const shapeFix = ensureShape(memCache, defaultWorldState());
+      // v0.1.45: lastFix 记录本次载入结果（议题据此报，避免状态恢复后永久挂红）；
+      // healed/shapeConflicts 为历史累计，供回溯「是否曾发生过」
+      __loadStat.lastFix = { filled: shapeFix.filled, conflicts: shapeFix.conflicts, at: Date.now() };
+      if (shapeFix.filled > 0) {
+        __loadStat.healed += shapeFix.filled;
+        WA.log('warn', '载入状态缺失 ' + shapeFix.filled + ' 个字段，已按默认值补齐（旧存档兼容）');
+        this.save();
+      }
+      // 类型冲突不擅自改写用户数据，但必须留下可见痕迹（否则又回到静默失败）
+      if (shapeFix.conflicts > 0) {
+        __loadStat.shapeConflicts += shapeFix.conflicts;
+        WA.log('error', '载入状态有 ' + shapeFix.conflicts + ' 处字段类型与默认结构不符，已保留原值（查状态键是否被外部写入污染）');
+      }
       WA.log('info', 'store就绪 chat=' + getChatId() + ' schema=' + memCache.schemaVersion);
     },
 
@@ -171,6 +220,7 @@
       // 未来schema升级走这里；当前v1直接补齐缺字段
       const fresh = defaultWorldState();
       const out = Object.assign(fresh, state);
+      ensureShape(out, defaultWorldState());   // v0.1.45: 升级路径同样补齐嵌套缺字段
       out.schemaVersion = SCHEMA_VERSION;
       return out;
     },
@@ -247,7 +297,7 @@
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
     /** v0.1.38: 加载观测只读视图（tool-diag 消费）——errors>0 意味着发生过状态键损坏 */
-    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, lastError: __loadStat.lastError, lastAt: __loadStat.lastAt }; },
+    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, lastError: __loadStat.lastError, lastAt: __loadStat.lastAt }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
     sizeProfile(topN) {
       const rows = [];
@@ -275,12 +325,15 @@
       const o = opts || {};
       const minBytes = typeof o.minBytes === 'number' ? o.minBytes : 256;
       const maxDepth = typeof o.maxDepth === 'number' ? o.maxDepth : 3;
+      const maxNodes = typeof o.maxNodes === 'number' && o.maxNodes > 0 ? o.maxNodes : 800;
       // path -> { cap: 裁剪后长度硬上限, site: 裁剪点出处 }
       const BOUNDED = __BOUNDED_CAPS;
       const arrays = [];
       let visited = 0;
+      let truncated = false;   // v0.1.45: 预算耗尽即承认「看不见」，不再静默返回全绿
       function walk(node, pathStr, depth) {
-        if (depth > maxDepth || visited > 800) return;
+        if (depth > maxDepth) return;
+        if (visited > maxNodes) { truncated = true; return; }
         if (Array.isArray(node)) {
           let b = 0;
           try { b = byteLen(JSON.stringify(node)); } catch (e) { b = -1; }
@@ -309,6 +362,10 @@
         total: currentBytes >= 0 ? currentBytes : ((WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0),
         persisted: (WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0,
         scanned: arrays.length,
+        scannedNodes: visited,
+        nodeBudget: maxNodes,
+        depthCap: maxDepth,
+        truncated: truncated,
         trackedBounded: Object.keys(BOUNDED).length,
         arrays: arrays.slice().sort(function (a, b) { return b.bytes - a.bytes; }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
         unbounded: unregistered.map(function (a) { return a.path; }),

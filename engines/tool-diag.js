@@ -436,6 +436,18 @@
     if (aud && Array.isArray(aud.drifted) && aud.drifted.length) {
       issues.push({ level: 'error', key: 'sizeDrift', detail: aud.drifted.length + ' 个容器超出登记的裁剪上限（守卫失效）：' + aud.drifted.map(function (x) { return x.path + '(' + x.len + '>' + x.cap + '，见 ' + x.site + ')'; }).join('、') });
     }
+    // v0.1.45: 扫描预算耗尽——此时 unbounded/suspects 是「没看见」而非「真没有」，不得当作全绿
+    if (aud && aud.truncated) {
+      issues.push({ level: 'warn', key: 'sizeScanTruncated', detail: '无界增长扫描已触顶（访问 ' + aud.scannedNodes + '/' + aud.nodeBudget + ' 节点，深度上限 ' + (aud.depthCap || 3) + '），本轮 unbounded/suspects 不完整' });
+    }
+    // v0.1.45: 旧存档结构自愈留痕——补过字段说明存档比代码旧，类型冲突说明状态键被外部污染
+    const ldStat = (((diag.worldState || {}).storage || {}).load) || null;
+    const fix = (ldStat && ldStat.lastFix) || null;
+    if (fix && fix.conflicts > 0) {
+      issues.push({ level: 'error', key: 'stateShape', detail: '最近载入有 ' + fix.conflicts + ' 处字段类型与默认结构不符（已保留原值，未擅自改写）' });
+    } else if (fix && fix.filled > 0) {
+      issues.push({ level: 'info', key: 'stateShape', detail: '旧存档兼容：本次载入补齐 ' + fix.filled + ' 个缺失字段' });
+    }
     // v0.1.27: API 通道健康——只统计已配置且有调用的通道
     const apiSec = ((diag.runtime || {}).apiRouter || {});
     const callRows = ((apiSec.calls || {}).channels || []);
