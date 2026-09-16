@@ -3708,6 +3708,93 @@ WA.loadScript = _ls.loadScript;
   WA.store.init();
   assert(WA.store.get().memory && Array.isArray(WA.store.get().memory.l0), '复原后 store 仍可用');
   } // end v0.1.45 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.46 — 版本链步进迁移 + sizeAudit 断点续扫
+  // ═══════════════════════════════════════════════════════════
+  v0146: {
+  // ── A. 版本链迁移 ──
+  assert(typeof WA.store.registerMigration === 'function' && typeof WA.store.migrations === 'function', 'registerMigration/migrations 已导出');
+  assert(WA.store.registerMigration('x', function () {}) === false, '非法版本参数被拒');
+  assert(WA.store.registerMigration(2, null) === false, '非函数迁移步被拒');
+  assert(WA.store.migrations().length === 0, '初始迁移注册表为空');
+  // 两步链（target=2 显式指定，使链长于当前 SCHEMA_VERSION 也能被测到）
+  const order146 = [];
+  const off146a = WA.store.registerMigration(0, function (st) { order146.push(0); st._m0 = 'a'; });
+  const off146b = WA.store.registerMigration(1, function (st) { order146.push(1); st._m1 = st._m0 + 'b'; });
+  assert(typeof off146a === 'function' && typeof off146b === 'function', 'registerMigration 返回反注册函数');
+  assert(WA.store.migrations().join(',') === '0,1', 'migrations() 按版本升序返回');
+  const chain146 = WA.store.migrate({ schemaVersion: 0, clock: { iso: '', label: '旧纪元', dayIndex: 2 } }, 2);
+  assert(order146.join(',') === '0,1', '两步按版本序依次执行（实得 ' + order146.join(',') + '）');
+  assert(chain146._m1 === 'ab', '后步可见前步写入（链式传递）');
+  assert(chain146.clock.label === '旧纪元' && chain146.clock.dayIndex === 2, '迁移保留既有业务数据');
+  assert(chain146.clock.source === 'unset' && Array.isArray(chain146.memory.l0), '迁移后补齐缺字段（含嵌套）');
+  assert(chain146.schemaVersion === WA.store.SCHEMA_VERSION, '迁移后版本号归一为当前值');
+  assert(chain146._migratedFrom && chain146._migratedFrom.from === 0 && chain146._migratedFrom.path.join(',') === '0->1,1->2', '透出迁移路径供排障');
+  // 已达当前版本的存档：默认 target 下不空转任何步
+  order146.length = 0;
+  const skip146 = WA.store.migrate({ schemaVersion: WA.store.SCHEMA_VERSION, worldFacts: [{ key: 'a', value: '1' }] });
+  assert(order146.length === 0, '已是当前版本时不执行迁移步');
+  assert(skip146.worldFacts.length === 1, '跳过迁移仍保留数据');
+  // 迁移步异常被隔离，链不中断
+  const off146c = WA.store.registerMigration(3, function () { throw new Error('故意炸'); });
+  const err146 = WA.store.migrate({ schemaVersion: 3, clock: { label: 'x' } }, 4);
+  assert(err146.schemaVersion === WA.store.SCHEMA_VERSION && err146.clock.source === 'unset', '迁移步抛错被 catch，版本仍归一且字段补齐');
+  const migErrLog = WA.eventLog.filter(function (l) { return String(l.msg).indexOf('迁移步') >= 0; });
+  assert(migErrLog.length >= 1 && migErrLog[0].level === 'error', '迁移步异常以 error 级留痕');
+  // 反注册清理：注册表须回到空（防测试污染真实迁移链）
+  off146a(); off146b(); off146c();
+  assert(WA.store.migrations().length === 0, '反注册后迁移表清空');
+  const order146d = [];
+  WA.store.migrate({ schemaVersion: 0 }, 2);
+  assert(order146d.length === 0, '清理后的表不再被调用');
+  // ── B. sizeAudit 断点续扫 ──
+  // 探针子树：数组节点落在默认 maxDepth(3) 可见范围内
+  WA.store.transact(function (d) {
+    d.__deep = { a: { b: [{ x: 1 }, { y: 2 }], c: [1, 2, 3] }, d: [4], e: { f: [5, 6] } };
+  });
+  // 集合比对必须用足量 topN（arrays 默认只留 Top12，是排序视图而非全量清单）
+  const OPT146 = { minBytes: 0, topN: 5000 };
+  const audit146 = function (extra) { return WA.store.sizeAudit(Object.assign({}, OPT146, extra || {})); };
+  const pFull146 = audit146({ maxNodes: 100000 });
+  assert(pFull146.truncated === false && pFull146.cursor === null, '充足预算不截断且 cursor 为 null');
+  const fullPaths146 = Array.from(new Set(pFull146.arrays.map(function (x) { return x.path; }))).sort();
+  assert(fullPaths146.indexOf('__deep.a.b') >= 0 && fullPaths146.indexOf('__deep.e.f') >= 0, '全量扫描触达探针各层数组');
+  assert(pFull146.arrays.length > 12 && audit146({ maxNodes: 100000, topN: 2 }).arrays.length === 2, 'arrays 受 topN 截断（默认视图非全量清单）');
+  // 数据驱动预算取半：确保两趟各自都扫到数组（预算过小会退化成只扫对象节点）
+  const half146 = Math.max(1, Math.ceil(pFull146.scannedNodes / 2));
+  const p1 = audit146({ maxNodes: half146 });
+  assert(p1.truncated === true, '半量预算触发截断');
+  assert(Array.isArray(p1.cursor) && p1.cursor.length > 0, '截断时返回非空断点游标');
+  assert(p1.scannedNodes === half146, '首趟访问数恰等于预算（实得 ' + p1.scannedNodes + '/' + half146 + '）');
+  assert(p1.arrays.length > 0 && p1.arrays.length < fullPaths146.length, '首趟扫到部分而非全部数组（分割非退化）');
+  const p2 = audit146({ maxNodes: 100000, resumeCursor: p1.cursor });
+  assert(p2.truncated === false && p2.cursor === null, '续扫在充足预算下跑完');
+  const p1Paths = p1.arrays.map(function (x) { return x.path; });
+  const p2Paths = p2.arrays.map(function (x) { return x.path; });
+  const uniqMerged = Array.from(new Set(p1Paths.concat(p2Paths))).sort();
+  assert(uniqMerged.join(',') === fullPaths146.join(','), '两趟并集与全量扫描等价（无遗漏无重复）：' + uniqMerged.length + ' vs ' + fullPaths146.length);
+  assert(p1Paths.filter(function (p) { return p2Paths.indexOf(p) >= 0; }).length === 0, '首趟与续扫无重叠节点（游标不回头）');
+  assert(p1.scannedNodes + p2.scannedNodes === pFull146.scannedNodes, '两趟访问节点数之和等于全量（' + (p1.scannedNodes + p2.scannedNodes) + '）');
+  // 三趟分割同样收敛
+  const t1 = audit146({ maxNodes: Math.ceil(pFull146.scannedNodes / 3) });
+  const t2 = audit146({ maxNodes: Math.ceil(pFull146.scannedNodes / 3), resumeCursor: t1.cursor });
+  const t3 = audit146({ maxNodes: 100000, resumeCursor: t2.cursor });
+  const uniq3 = Array.from(new Set(t1.arrays.map(function (x) { return x.path; }).concat(t2.arrays.map(function (x) { return x.path; })).concat(t3.arrays.map(function (x) { return x.path; })))).sort();
+  assert(uniq3.join(',') === fullPaths146.join(','), '三趟分片并集仍等价全量');
+  assert(t3.truncated === false, '末趟以全预算收敛');
+  // startCursor：分片扫描入口
+  const shard146 = audit146({ startCursor: ['__deep.a'], maxNodes: 100000 });
+  assert(shard146.arrays.length === 2 && shard146.arrays.every(function (x) { return x.path.indexOf('__deep.a.') === 0; }), 'startCursor 限定只扫指定子树（实得 ' + shard146.arrays.map(function (x) { return x.path; }).join('|') + '）');
+  // maxDepth 生效性
+  assert(audit146({ maxNodes: 100000, maxDepth: 1 }).arrays.every(function (x) { return x.path.indexOf('.') < 0; }), 'maxDepth=1 只看顶层数组');
+  // 游标边界：空游标降级全量、非法游标不崩
+  assert(Array.from(new Set(audit146({ maxNodes: 100000, resumeCursor: [] }).arrays.map(function (x) { return x.path; }))).sort().join(',') === fullPaths146.join(','), '空 resumeCursor 降级为全量扫描');
+  const bogus146 = audit146({ maxNodes: 100000, resumeCursor: ['nonexistent.path'] });
+  assert(bogus146.arrays.length === 0 && bogus146.truncated === false, '游标指向不存在路径：产出为空但不崩不截断');
+  // 探针字段清理
+  WA.store.transact(function (d) { delete d.__deep; });
+  assert(audit146({ maxNodes: 100000 }).arrays.every(function (x) { return x.path.indexOf('__deep') < 0; }), '探针字段清理完毕');
+  } // end v0.1.46 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

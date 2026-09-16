@@ -111,6 +111,8 @@
   const __saveStat = { at: 0, ok: null, bytes: 0, reason: null, failCount: 0 };
   // v0.1.38: 加载观测——状态键损坏时隔离原始 payload 而非静默丢弃
   const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
+  // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
+  const __migrations = {};
   function classifySaveError(e) {
     const name = (e && e.name) || '';
     const msg = String((e && e.message) || e);
@@ -216,12 +218,36 @@
       WA.log('info', 'store就绪 chat=' + getChatId() + ' schema=' + memCache.schemaVersion);
     },
 
-    migrate(state) {
-      // 未来schema升级走这里；当前v1直接补齐缺字段
-      const fresh = defaultWorldState();
-      const out = Object.assign(fresh, state);
+    /**
+     * v0.1.46: 版本链步进迁移——registerMigration(from, fn) 注册 from→from+1 的转换步，
+     *        migrate() 沿链逐版本应用直到 SCHEMA_VERSION，再统一补齐嵌套缺字段。
+     *        这样后续版本升 schema 时只需新增一步，老存档可跨多版本连续升级。
+     */
+    registerMigration(fromVersion, fn) {
+      if (typeof fromVersion !== 'number' || typeof fn !== 'function') return false;
+      __migrations[fromVersion] = fn;
+      return function () { if (__migrations[fromVersion] === fn) delete __migrations[fromVersion]; };
+    },
+    migrations() { return Object.keys(__migrations).map(Number).sort(function (a, b) { return a - b; }); },
+    migrate(state, targetVersion) {
+      // 起始版本必须读 state 原值：Object.assign 会让缺 schemaVersion 的远古存档
+      // 继承默认值(SCHEMA_VERSION)，从而跳过整条版本链
+      const fromV = (state && typeof state.schemaVersion === 'number') ? state.schemaVersion : 0;
+      const out = Object.assign(defaultWorldState(), state);
+      // targetVersion 可显式指定（默认当前版本）：便于跨多版本链的测试与调试
+      const target = typeof targetVersion === 'number' && targetVersion >= 0 ? targetVersion : SCHEMA_VERSION;
+      let v = fromV;
+      const steps = [];
+      // 沿版本链步进（防死循环：步数不超过版本跨度）
+      let guard = 0;
+      while (v < target && guard++ <= target + 1) {
+        const step = __migrations[v];
+        if (step) { try { step(out); steps.push(v + '->' + (v + 1)); } catch (e) { WA.log('error', '迁移步 ' + v + '->' + (v + 1) + ' 失败', e); } }
+        v++;
+      }
       ensureShape(out, defaultWorldState());   // v0.1.45: 升级路径同样补齐嵌套缺字段
       out.schemaVersion = SCHEMA_VERSION;
+      out._migratedFrom = steps.length ? { from: fromV, to: SCHEMA_VERSION, path: steps } : out._migratedFrom;
       return out;
     },
 
@@ -330,25 +356,53 @@
       const BOUNDED = __BOUNDED_CAPS;
       const arrays = [];
       let visited = 0;
-      let truncated = false;   // v0.1.45: 预算耗尽即承认「看不见」，不再静默返回全绿
-      function walk(node, pathStr, depth) {
+      // v0.1.46: 游标化 DFS——预算耗尽时把待访路径写入 cursor，resumeCursor 可从断点续扫
+      let truncated = false;
+      const pending = [];   // 待访问路径栈（DFS 后进先出）
+      function schedule(node, pathStr, depth) {
         if (depth > maxDepth) return;
-        if (visited > maxNodes) { truncated = true; return; }
         if (Array.isArray(node)) {
           let b = 0;
           try { b = byteLen(JSON.stringify(node)); } catch (e) { b = -1; }
           const meta = Object.prototype.hasOwnProperty.call(BOUNDED, pathStr) ? BOUNDED[pathStr] : null;
           const top = pathStr.indexOf('[') < 0;
           arrays.push({ path: pathStr, len: node.length, bytes: b, bounded: !!meta && top, cap: meta ? meta.cap : null, site: meta ? meta.site : null });
-          if (depth < maxDepth) { visited++; node.slice(0, 3).forEach(function (it, ix) { walk(it, pathStr + '[' + ix + ']', depth + 1); }); }
+          if (depth < maxDepth) { for (let ix = Math.min(2, node.length - 1); ix >= 0; ix--) pending.push(pathStr + '[' + ix + ']'); }
           return;
         }
         if (node && typeof node === 'object') {
-          visited++;
-          Object.keys(node).forEach(function (k) { walk(node[k], pathStr ? pathStr + '.' + k : k, depth + 1); });
+          const ks = Object.keys(node);
+          for (let i = ks.length - 1; i >= 0; i--) pending.push(pathStr ? pathStr + '.' + ks[i] : ks[i]);
         }
       }
-      try { walk(memCache || {}, '', 1); } catch (e) { return { error: String(e && e.message || e) }; }
+      function resolvePath(root, pathStr) {
+        if (!pathStr) return root;
+        const segs = pathStr.replace(/\[(\d+)\]/g, '.$1').split('.');
+        let cur = root;
+        for (let i = 0; i < segs.length; i++) {
+          if (cur === null || cur === undefined) return undefined;
+          const k = segs[i];
+          cur = /^\d+$/.test(k) && Array.isArray(cur) ? cur[Number(k)] : cur[k];
+        }
+        return cur;
+      }
+      // 初始化：resumeCursor 优先，其次 startCursor（供外部分片），否则从根开始
+      const startPaths = (o.resumeCursor && Array.isArray(o.resumeCursor) && o.resumeCursor.length) ? o.resumeCursor.slice()
+        : (o.startCursor && Array.isArray(o.startCursor) && o.startCursor.length) ? o.startCursor.slice() : [''];
+      for (let pi = startPaths.length - 1; pi >= 0; pi--) pending.push(startPaths[pi]);
+      try {
+        while (pending.length) {
+          if (visited >= maxNodes) { truncated = true; break; }
+          const pth = pending.pop();
+          const node = resolvePath(memCache || {}, pth);
+          visited++;
+          // schedule 会把子路径压栈；深度超限时内部直接忽略
+          const depth = pth ? (pth.replace(/\[(\d+)\]/g, '.$1').split('.').length) : 0;
+          schedule(node, pth, depth);
+        }
+      } catch (e) { return { error: String(e && e.message || e) }; }
+      // 截断时剩余 pending 即断点游标（供下次续扫）
+      const cursor = truncated ? pending.slice() : null;
       // 顶层路径才参与有界判定（a.b[0].c 这类元素内嵌数组由父容器隐式约束）
       const topRows = arrays.filter(function (a) { return a.path.indexOf('[') < 0; });
       const unregistered = topRows.filter(function (a) { return !a.bounded && a.len > 0; });
@@ -366,6 +420,7 @@
         nodeBudget: maxNodes,
         depthCap: maxDepth,
         truncated: truncated,
+        cursor: cursor,                // v0.1.46: 断点游标，resumeCursor 续扫
         trackedBounded: Object.keys(BOUNDED).length,
         arrays: arrays.slice().sort(function (a, b) { return b.bytes - a.bytes; }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
         unbounded: unregistered.map(function (a) { return a.path; }),
