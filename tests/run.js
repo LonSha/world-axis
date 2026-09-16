@@ -3440,8 +3440,8 @@ WA.loadScript = _ls.loadScript;
   const audit0 = WA.store.sizeAudit({ minBytes: 64 });
   assert(Array.isArray(audit0.arrays) && typeof audit0.scanned === 'number', 'sizeAudit 返回数组清单与扫描数');
   assert(audit0.arrays.every(a => typeof a.path === 'string' && typeof a.bytes === 'number'), 'sizeAudit 每项含 path/bytes');
-  // 白名单内的有界容器灌满 → 不误报
-  WA.store.transact(d => { for (let i = 0; i < 150; i++) d.worldFacts.push({ key: 'k' + i, value: 'v'.repeat(30) }); });
+  // 白名单内的有界容器灌到源码上限（100；超容即属漂移，见 v0.1.44）→ 不误报
+  WA.store.transact(d => { d.worldFacts = []; for (let i = 0; i < 100; i++) d.worldFacts.push({ key: 'k' + i, value: 'v'.repeat(30) }); });
   const auditBounded = WA.store.sizeAudit({ minBytes: 64 });
   assert(auditBounded.unbounded.indexOf('worldFacts') < 0, '白名单容器(worldFacts)不算无界');
   assert(auditBounded.suspects.every(x => x.path !== 'worldFacts'), '白名单容器不进 suspects');
@@ -3520,6 +3520,84 @@ WA.loadScript = _ls.loadScript;
   // 兼容性：{all:true} 仍可取全量
   assert(WA.render.injectionLedger({ all: true }).count >= WA.render.injectionLedger().count, 'injectionLedger({all}) 取全量');
   } // end v0.1.43 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.44 — 有界登记表可验证化：cap 漂移检测 + 源码反查
+  // ═══════════════════════════════════════════════════════════
+  v0144: {
+  assert(typeof WA.store.sizeCaps === 'function', 'store.sizeCaps 已导出');
+  const caps = WA.store.sizeCaps();
+  assert(caps['memory.l0'] && caps['memory.l0'].cap === 20, 'memory.l0 已登记（修 v0.1.43 假阳性）');
+  assert(typeof caps['consistency'].cap === 'number', 'consistency 登记 cap=0（无写入方）');
+  // ── 源码反查：登记表的 cap 必须等于源码裁剪常量，源码为唯一真相源 ──
+  const CAP_RULES = {
+    'chronicle': ['engines/backstage.js', /draft\.chronicle\s*=\s*draft\.chronicle\.slice\(-(\d+)\)/],
+    'currents': ['engines/backstage.js', /draft\.currents\s*=\s*draft\.currents\.slice\(-(\d+)\)/],
+    'echoes': ['engines/backstage.js', /draft\.echoes\s*=\s*draft\.echoes\.slice\(-(\d+)\)/],
+    'worldFacts': ['engines/backstage.js', /draft\.worldFacts\s*=\s*draft\.worldFacts\.slice\(-(\d+)\)/],
+    'memory.l0': ['engines/memory.js', /const CAP = \{[^}]*l0:\s*(\d+)/],
+    'memory.l1': ['engines/memory.js', /const CAP = \{[^}]*l1:\s*(\d+)/],
+    'memory.l2': ['engines/memory.js', /const CAP = \{[^}]*l2:\s*(\d+)/],
+    'memory.l3': ['engines/memory.js', /const CAP = \{[^}]*l3:\s*(\d+)/],
+    'memory.facts': ['engines/memory.js', /const CAP = \{[^}]*facts:\s*(\d+)/],
+    'memory.foreshadows': ['engines/memory.js', /const CAP = \{[^}]*foreshadows:\s*(\d+)/],
+    'memory.pmem': ['engines/pmem.js', /const CAP_TOTAL\s*=\s*(\d+)/],
+    'opinion.canon': ['engines/opinion.js', /\.concat\(news\)\.slice\(-(\d+)\)/],
+    'evolution.events': ['engines/editor-events.js', /const MAX_EVENTS\s*=\s*(\d+)/],
+    'evolution.factions': ['engines/editor-faction.js', /const MAX_FACTIONS\s*=\s*(\d+)/],
+    'chapters.history': ['engines/chapters.js', /const MAX_HISTORY\s*=\s*(\d+)/],
+    // 终态 KEEP_DONE 条 + 至多 1 条活跃
+    'directEvents': ['engines/direct-event.js', /const KEEP_DONE\s*=\s*(\d+)/, function (k) { return k + 1; }]
+  };
+  const srcCache = {};
+  const readSrc = function (rel) {
+    if (!srcCache[rel]) srcCache[rel] = fs.readFileSync(path.join(BASE, rel), 'utf8');
+    return srcCache[rel];
+  };
+  const mismatches = [];
+  Object.keys(CAP_RULES).forEach(function (k) {
+    const rule = CAP_RULES[k], m = readSrc(rule[0]).match(rule[1]);
+    if (!m) { mismatches.push(k + '(源码裁剪表达式未找到)'); return; }
+    const srcCap = rule[2] ? rule[2](Number(m[1])) : Number(m[1]);
+    if (!caps[k] || caps[k].cap !== srcCap) mismatches.push(k + '(登记 ' + (caps[k] && caps[k].cap) + ' vs 源码 ' + srcCap + ')');
+  });
+  assert(mismatches.length === 0, '登记表 cap 与源码裁剪常量逐条一致' + (mismatches.length ? '：' + mismatches.join('、') : ''));
+  // 登记表与反查规则须覆盖同一集合（consistency 无源码裁剪点，单列）
+  const ruleKeys = Object.keys(CAP_RULES).concat(['consistency']).sort().join(',');
+  assert(Object.keys(caps).sort().join(',') === ruleKeys, '登记表与源码反查集合同集合（无漏登/多登）');
+  // ── 假阳性回归：memory 四层灌至各自上限，不得进 unbounded/suspects ──
+  WA.store.transact(d => {
+    d.memory.l0 = []; d.memory.l1 = []; d.memory.l2 = []; d.memory.l3 = [];
+    for (let i = 0; i < 20; i++) d.memory.l0.push({ t: Date.now(), text: 'L0摘要' + i + ' ' + 'a'.repeat(30) });
+    for (let i = 0; i < 30; i++) d.memory.l1.push({ t: Date.now(), text: 'L1' + i });
+    for (let i = 0; i < 40; i++) d.memory.l2.push({ t: Date.now(), text: 'L2' + i });
+    for (let i = 0; i < 60; i++) d.memory.l3.push({ t: Date.now(), theme: 'L3' + i });
+  });
+  const aFull = WA.store.sizeAudit({ minBytes: 64 });
+  ['memory.l0', 'memory.l1', 'memory.l2', 'memory.l3'].forEach(function (k) {
+    assert(aFull.unbounded.indexOf(k) < 0 && aFull.suspects.every(x => x.path !== k), k + ' 满载仍不误报无界');
+    assert(aFull.drifted.every(x => x.path !== k), k + ' 满载恰好等于 cap，不算漂移');
+  });
+  // ── 漂移检测：绕过裁剪写入超限容器 ──
+  WA.store.transact(d => { d.memory.l3 = []; for (let i = 0; i < 75; i++) d.memory.l3.push({ t: Date.now(), theme: 'L3' + i }); });
+  const aDrift = WA.store.sizeAudit({ minBytes: 64 });
+  assert(aDrift.drifted.some(x => x.path === 'memory.l3' && x.len === 75 && x.cap === 60), '超 cap 容器进 drifted（75>60）');
+  assert(aDrift.unbounded.indexOf('memory.l3') < 0, '已登记容器漂移时不重复计为无界');
+  const driftRow = aDrift.arrays.find(x => x.path === 'memory.l3');
+  assert(driftRow && driftRow.bounded === true && driftRow.cap === 60, 'arrays 明细透出登记的 cap');
+  // 诊断议题：漂移为 error 级
+  const dg144 = WA.toolDiag.collect();
+  assert(dg144.worldState.storage.sizeAudit.drifted.length >= 1, '诊断透出 drifted');
+  const driftIssue = ((dg144.verdict || {}).issues || []).filter(function (x) { return x.key === 'sizeDrift'; })[0];
+  assert(driftIssue && driftIssue.level === 'error' && /memory\.l3\(75>60/.test(driftIssue.detail), '漂移报 error 级议题并给出超限明细');
+  // ── total 反映当前内存态，persisted 保留落盘量 ──
+  assert(typeof aDrift.total === 'number' && aDrift.total > 0, 'sizeAudit.total 为当前体积');
+  assert(typeof aDrift.persisted === 'number', 'sizeAudit.persisted 透出落盘体积');
+  assert(aDrift.total >= aDrift.persisted || aDrift.persisted === 0, '内存态不小于已落盘态（写合并下成立）');
+  // 复原，避免污染后续
+  WA.store.transact(d => { d.memory.l0 = []; d.memory.l1 = []; d.memory.l2 = []; d.memory.l3 = []; d.worldFacts = []; });
+  const aClean144 = WA.store.sizeAudit({ minBytes: 64 });
+  assert(aClean144.drifted.length === 0, '复原后无漂移议题');
+  } // end v0.1.44 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

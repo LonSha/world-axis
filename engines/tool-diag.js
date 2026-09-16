@@ -432,6 +432,10 @@
     if (aud && Array.isArray(aud.suspects) && aud.suspects.length) {
       issues.push({ level: 'warn', key: 'sizeAudit', detail: aud.suspects.length + ' 个未见裁剪的持久数组：' + aud.suspects.map(function (x) { return x.path + '(' + x.len + '项/' + x.bytes + 'B)'; }).join('、') });
     }
+    // v0.1.44: 白名单漂移——已登记容器超出其源码 cap，意味着裁剪代码失效或被绕过写入
+    if (aud && Array.isArray(aud.drifted) && aud.drifted.length) {
+      issues.push({ level: 'error', key: 'sizeDrift', detail: aud.drifted.length + ' 个容器超出登记的裁剪上限（守卫失效）：' + aud.drifted.map(function (x) { return x.path + '(' + x.len + '>' + x.cap + '，见 ' + x.site + ')'; }).join('、') });
+    }
     // v0.1.27: API 通道健康——只统计已配置且有调用的通道
     const apiSec = ((diag.runtime || {}).apiRouter || {});
     const callRows = ((apiSec.calls || {}).channels || []);
