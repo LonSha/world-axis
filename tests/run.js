@@ -4122,6 +4122,50 @@ WA.loadScript = _ls.loadScript;
   LS.clear();
   Object.keys(junkBefore151).forEach(k => LS.setItem(k, junkBefore151[k]));
   } // end v0.1.51 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.52 — 存储键卫生入口化：静默巡检告警（节流） + 面板体检按钮
+  // ═══════════════════════════════════════════════════════════
+  v0152: {
+  // ── 1. panel 源码断言：按钮 + 二次确认绑定已注入 ──
+  const panelSrc152 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(panelSrc152.indexOf('wa-key-check') >= 0 && panelSrc152.indexOf('存储键体检') >= 0, '面板含「存储键体检」按钮');
+  assert(panelSrc152.indexOf('wa-key-sweep-go') >= 0 && panelSrc152.indexOf('确认清理（不可撤销）') >= 0, '体检走二次确认制（dry-run 计划先展示）');
+  assert(panelSrc152.indexOf('sweepStaleKeys({})') >= 0 && panelSrc152.indexOf('sweepStaleKeys({ apply: true })') >= 0, '体检先 dry-run 后 apply 两段式');
+
+  // ── 2. init 静默巡检：大额可回收触发告警 + 节流只一次 ──
+  const LS152 = global.localStorage;
+  const junkBefore152 = JSON.parse(JSON.stringify(LS152._dump()));
+  const evtLogBefore152 = WA.eventLog.slice();
+  const hugeStr152 = 'x'.repeat(300 * 1024);   // 单键 >256KB 触发阈值
+  const coldChat152 = 'v152_cold_chat';
+  LS152.setItem('worldaxis_state_' + coldChat152, JSON.stringify({ meta: { updatedAt: Date.now() - 40 * 86400000 } }));
+  LS152.setItem('worldaxis_event_log_' + coldChat152, hugeStr152);
+  WA.store.init();
+  const warns152 = WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0);
+  assert(warns152.length >= 1, '大额可回收（>256KB）触发一次告警（实 ' + warns152.length + '）');
+  WA.store.init();
+  WA.store.init();
+  const warnsAfter152 = WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0);
+  assert(warnsAfter152.length === warns152.length, '节流生效：后续 init 不重复告警（' + warns152.length + ' 恒定）');
+  assert(LS152.getItem('worldaxis_event_log_' + coldChat152) === hugeStr152, '静默巡检绝不自动删除（仅告警）');
+
+  // ── 3. 小额可回收：低于阈值不告警 ──
+  // 先模拟用户通过面板执行了清理（大额垃圾已回收），再注小额键验证静默
+  WA.store.sweepStaleKeys({ apply: true });
+  const evtLog2Before152 = WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0).length;
+  const smallChat152 = 'v152_small_chat';
+  LS152.setItem('worldaxis_state_' + smallChat152, JSON.stringify({ meta: { updatedAt: Date.now() - 60 * 86400000 } }));
+  LS152.setItem('worldaxis_event_log_' + smallChat152, '[]');   // 仅 2B，远低于阈值
+  WA.store.init();
+  const evtLog2After152 = WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0).length;
+  assert(evtLog2After152 === evtLog2Before152, '小额可回收不产生告警（阈值 + 节流双闸）');
+
+  // ── 清理：还原键空间与日志现场 ──
+  LS152.clear();
+  Object.keys(junkBefore152).forEach(k => LS152.setItem(k, junkBefore152[k]));
+  WA.eventLog.length = 0;
+  evtLogBefore152.forEach(l => WA.eventLog.push(l));
+  } // end v0.1.52 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
