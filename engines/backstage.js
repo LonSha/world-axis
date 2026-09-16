@@ -442,6 +442,34 @@
       draft.chronicle = draft.chronicle.slice(-200);
       draft.worldFacts = draft.worldFacts.slice(-100);
       draft.currents = draft.currents.slice(-40);
+      // v0.6.0: 演化容器容量治理——
+      // ① 终局事件回收：终局即剧情已完结，正文触面已由 echoes 承载；快照此前只做呈现过滤，
+      //    本体永驻会让长局 events 无限膨胀（探针实证 10 个终局全部留存）。回收前信息已入 chronicle。
+      if (WA.evolution) {
+        const evArr = draft.evolution.events = draft.evolution.events || [];
+        for (let i = evArr.length - 1; i >= 0; i--) {
+          const ev = evArr[i];
+          if (!ev) continue;
+          const term = (WA.editorEvents && WA.editorEvents.TERMINAL && WA.editorEvents.TERMINAL[ev.type]) || [];
+          if (term.includes(ev.stage)) evArr.splice(i, 1);
+        }
+        // ② 有机容器环形 cap（与编辑器容量一致；挤出最早创建，不阻塞入账）
+        const evMax = (WA.editorEvents && WA.editorEvents.MAX_EVENTS) || 16;
+        if (evArr.length > evMax) evArr.splice(0, evArr.length - evMax);
+        const faArr = draft.evolution.factions = draft.evolution.factions || [];
+        const faMax = (WA.editorFaction && WA.editorFaction.MAX_FACTIONS) || 16;
+        if (faArr.length > faMax) faArr.splice(0, faArr.length - faMax);
+        // ③ 风声兜底 cap（衰减引擎是常态收敛，单源 MAX_WINDS 防漂移）
+        const wArr = draft.evolution.winds = draft.evolution.winds || [];
+        const wMax = WA.evolution.MAX_WINDS || 12;
+        if (wArr.length > wMax) wArr.splice(0, wArr.length - wMax);
+        // ④ 天下大势：终态已结束的从本体回收（快照/注入均按「持续中」过滤，本体留存只占容量）
+        const wtArr = draft.evolution.worldTrends = draft.evolution.worldTrends || [];
+        for (let i = wtArr.length - 1; i >= 0; i--) {
+          if (wtArr[i] && wtArr[i].status === '已结束') wtArr.splice(i, 1);
+        }
+        if (wtArr.length > 12) wtArr.splice(0, wtArr.length - 12);
+      }
     },
 
     /** before链：消费 next_turn_injection，生成连续性约束注入 */

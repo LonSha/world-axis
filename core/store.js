@@ -407,6 +407,10 @@
     'memory.foreshadows': { cap: 30, site: 'memory.js slice(-CAP.foreshadows)' },
     'memory.pmem': { cap: 60, site: 'pmem.js CAP_TOTAL=60' },
     'opinion.canon': { cap: 20, site: 'opinion.js slice(-20)' },
+    'opinion.forum': { cap: 20, site: 'opinion.js concat slice(-20)' },
+    'evolution.winds': { cap: 12, site: 'evolution.js MAX_WINDS=12 + backstage splice' },
+    'evolution.worldTrends': { cap: 12, site: 'backstage.js wtArr splice 12' },
+    'evolution.economy.signals': { cap: 3, site: 'evolution.js applyEconomy slice(0,3)' },
     'evolution.events': { cap: 16, site: 'editor-events.js MAX_EVENTS=16' },
     'evolution.factions': { cap: 16, site: 'editor-faction.js MAX_FACTIONS=16' },
     'directEvents': { cap: 4, site: 'direct-event.js pruneDirect(KEEP_DONE=3 + 1 活跃)' },
@@ -818,6 +822,45 @@
         issues.push({ level: 'info', key: 'concurrent.history', detail: '历史检出并发写入 ' + __conflictStat.detected + ' 次（现场已处置），当前无冲突' });
       }
 
+      // ── 7. 状态容量治理（v0.6.0）──
+      // 轻量盘点：只枚举顶层与 4 个父对象的直接子键长度（不做全 state 序列化，init 高频路径零负担）。
+      // 与 sizeAudit 的关系：sizeAudit 深扫（含 suspects 字节级明细），此处只做 maintain 高频可负担的
+      // drifted/unregistered 判定；两者登记表同源（__BOUNDED_CAPS）。
+      let capDrifted = 0, capUnregistered = 0;
+      try {
+        const st7 = memCache || {};
+        const rows7 = [];
+        Object.keys(st7).forEach(function (k) {
+          if (Array.isArray(st7[k])) rows7.push({ path: k, len: st7[k].length });
+        });
+        ['memory', 'opinion', 'evolution', 'chapters'].forEach(function (pk) {
+          const sub = st7[pk];
+          if (sub && typeof sub === 'object' && !Array.isArray(sub)) {
+            Object.keys(sub).forEach(function (k) {
+              if (Array.isArray(sub[k])) rows7.push({ path: pk + '.' + k, len: sub[k].length });
+            });
+          }
+        });
+        const drift7 = [], unreg7 = [];
+        rows7.forEach(function (r) {
+          const reg = __BOUNDED_CAPS[r.path];
+          if (reg) { if (typeof reg.cap === 'number' && reg.cap > 0 && r.len > reg.cap) drift7.push(r.path + '(' + r.len + '>' + reg.cap + ')'); }
+          else if (r.len > 0) unreg7.push(r.path + '(' + r.len + '项)');
+        });
+        capDrifted = drift7.length; capUnregistered = unreg7.length;
+        if (drift7.length) {
+          // 已登记容器超出自身 cap = 裁剪站点失效（编辑器拒绝制被绕过/新路径未接入），最重扣分
+          score -= Math.min(15, drift7.length * 5);
+          issues.push({ level: 'error', key: 'capacity.drift', detail: drift7.length + ' 个已登记容器超出容量：' + drift7.slice(0, 4).join('、') + (drift7.length > 4 ? ' 等' : '') + '——下一次结算会自动挤出，或用编辑器手动清理' });
+          actions.push({ id: 'trim-containers', safe: true, detail: '继续推进一轮（结算链尾部容量控制自动挤出超限部分）' });
+        }
+        if (unreg7.length) {
+          // 未登记非空数组：要么登记表漏登（登记义务），要么运行时新演进容器（需要确认是否有界）
+          score -= Math.min(10, unreg7.length * 2);
+          issues.push({ level: 'warn', key: 'capacity.unregistered', detail: unreg7.length + ' 个非空数组未登记容量：' + unreg7.slice(0, 4).join('、') + (unreg7.length > 4 ? ' 等' : '') + '——若无界增长会拖垮存档，请确认后登记 __BOUNDED_CAPS' });
+        }
+      } catch (e) { WA.log('warn', '容量盘点异常（不阻断巡视）', e); }
+
       score = Math.max(0, Math.min(100, score));
       const level = score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'degraded';
       let applied = null;
@@ -865,6 +908,7 @@
           rescueFailed: rs ? rs.failed : 0, rescueFailing: rescueNow,
           conflictSites: conflictSites.length, conflictDetected: __conflictStat.detected,
           externalWrites: extW, conflictQuarantined: __conflictStat.quarantined,
+          capacityDrifted: capDrifted, capacityUnregistered: capUnregistered,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }

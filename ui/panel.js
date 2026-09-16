@@ -470,6 +470,11 @@
         m.actions.forEach(a => { html += '<div class="wa-item">建议：' + esc(a.detail) + (a.safe ? '（安全）' : '（需人工确认）') + '</div>'; });
         const ig = WA.store.integrityStat ? WA.store.integrityStat() : null;
         if (ig) html += '<div class="wa-log wa-log-info">写入完整性：校验 ' + ig.verified + '/' + ig.writes + ' 次 · 不一致 ' + ig.mismatches + ' · 重试自愈 ' + ig.recoveredByRetry + ' · 当前态 ' + (ig.lastOk === null ? '未采样' : ig.lastOk ? '正常' : '失败') + '</div>';
+        // v0.6.0: 容量治理信号透出——超限/未登记容器计数（D 块 maintain 信号 → 面板可见）
+        const sg = m.signals || {};
+        if ((sg.capacityDrifted || 0) > 0 || (sg.capacityUnregistered || 0) > 0) {
+          html += '<div class="wa-log wa-log-warn">容量：超限容器 ' + (sg.capacityDrifted || 0) + ' 个 · 未登记容器 ' + (sg.capacityUnregistered || 0) + ' 个（建议执行 trim-containers 或补登记）</div>';
+        }
         if (!m.issues.length && !m.actions.length) html += '<div class="wa-log wa-log-info">✓ 无议题、无建议动作（存储键空间与状态库健康）</div>';
         out.innerHTML = html;
       } catch (e) { out.textContent = '健康巡视失败：' + (e && e.message); }

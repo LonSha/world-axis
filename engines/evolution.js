@@ -36,6 +36,7 @@
 
   function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+  const MAX_WINDS = 12;   // v0.6.0: 风声环形容量（衰减引擎是常态收敛，入账点兜底）
   const evolution = WA.evolution = {
     STAGE_MAP, TERMINAL, REPUTATION_LEVELS, FACTION_STATUS, FACTION_RELATION, ECONOMY_CLIMATE,
     getSettings: loadSettings,
@@ -46,6 +47,15 @@
     // ════════════════════════════════════════════════════
     addEvent(ev) {
       return WA.store.transact(draft => {
+        // v0.6.0: 容量治理——编辑器容量上限对有机路径同样生效（探针实证直推可绕过）。
+        // 挤出优先级：终局事件（剧情档案价值低）> 最早创建（保留最新剧情张力）。
+        const evArr = draft.evolution.events = draft.evolution.events || [];
+        const evMax = (WA.editorEvents && WA.editorEvents.MAX_EVENTS) || 16;
+        while (evArr.length >= evMax) {
+          let evIdx = evArr.findIndex(e => e && (TERMINAL[e.type] || []).includes(e.stage));
+          if (evIdx < 0) evIdx = 0;
+          evArr.splice(evIdx, 1);
+        }
         draft.evolution.events.push(Object.assign({
           id: uid('ev'), type: 'conflict', name: '', level: 1, stage: '萌芽', stageRound: 1,
           desc: '', stall: false, consecutiveFails: 0, createdRound: draft.evolution.round
@@ -114,13 +124,20 @@
     // ════════════════════════════════════════════════════
     // 风声传播 + 消散骰（移植 decayWinds）
     // ════════════════════════════════════════════════════
+    // v0.6.0: 风声环形容量（模块级 MAX_WINDS，此字段供 backstage/测试引用，单源防漂移）
+    MAX_WINDS: MAX_WINDS,
+
     addWind(wind) {
       return WA.store.transact(draft => {
         const w = Object.assign({ id: uid('w'), topic: '', type: 'rumor', level: 1, content: '', scope: '', source: '', quietRounds: 0 }, wind);
         // 同主题归并
         const old = (draft.evolution.winds || []).find(x => x.topic === w.topic);
         if (old) { old.content = w.content || old.content; old.level = Math.max(old.level, w.level); old.scope = w.scope || old.scope; old.quietRounds = 0; }
-        else (draft.evolution.winds = draft.evolution.winds || []).push(w);
+        else {
+          const wArr = draft.evolution.winds = draft.evolution.winds || [];
+          while (wArr.length >= MAX_WINDS) wArr.shift();   // v0.6.0: 环形容量（衰减引擎是常态收敛，此处是兜底）
+          wArr.push(w);
+        }
       });
     },
 
@@ -159,7 +176,11 @@
           old.currentGoal = f.currentGoal || old.currentGoal; old.core_person = f.core_person || old.core_person;
           old.powerPillars = Array.isArray(f.powerPillars) ? f.powerPillars.slice(0, 3) : old.powerPillars;
         } else {
-          draft.evolution.factions.push({ id: uid('fa'), name: f.name, scope: f.scope || '', status, relation, currentGoal: f.currentGoal || '', core_person: f.core_person || '', powerPillars: Array.isArray(f.powerPillars) ? f.powerPillars.slice(0, 3) : [] });
+          // v0.6.0: 容量治理——有机入账与编辑器同容量（环形挤出最早创建，不阻塞入账）
+          const faArr = draft.evolution.factions = draft.evolution.factions || [];
+          const faMax = (WA.editorFaction && WA.editorFaction.MAX_FACTIONS) || 16;
+          while (faArr.length >= faMax) faArr.shift();
+          faArr.push({ id: uid('fa'), name: f.name, scope: f.scope || '', status, relation, currentGoal: f.currentGoal || '', core_person: f.core_person || '', powerPillars: Array.isArray(f.powerPillars) ? f.powerPillars.slice(0, 3) : [] });
         }
       });
     },

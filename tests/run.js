@@ -3547,6 +3547,10 @@ WA.loadScript = _ls.loadScript;
     'memory.foreshadows': ['engines/memory.js', /const CAP = \{[^}]*foreshadows:\s*(\d+)/],
     'memory.pmem': ['engines/pmem.js', /const CAP_TOTAL\s*=\s*(\d+)/],
     'opinion.canon': ['engines/opinion.js', /\.concat\(news\)\.slice\(-(\d+)\)/],
+    'opinion.forum': ['engines/opinion.js', /\.concat\(forums\)\.slice\(-(\d+)\)/],
+    'evolution.winds': ['engines/evolution.js', /const MAX_WINDS = (\d+)/],
+    'evolution.worldTrends': ['engines/backstage.js', /wtArr\.length > (\d+)\)/],
+    'evolution.economy.signals': ['engines/evolution.js', /eco\.signals\.slice\(0,\s*(\d+)\)/],
     'evolution.events': ['engines/editor-events.js', /const MAX_EVENTS\s*=\s*(\d+)/],
     'evolution.factions': ['engines/editor-faction.js', /const MAX_FACTIONS\s*=\s*(\d+)/],
     'chapters.history': ['engines/chapters.js', /const MAX_HISTORY\s*=\s*(\d+)/],
@@ -5300,6 +5304,130 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore500.forEach(function (l) { WA.errorLog.push(l); });
   } // end v0.5.0 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.6.0 — 长局容量治理（有机路径强制约束 / 结算尾部回收 / 治理闭环感知）
+  //   探针实证：编辑器路径有 MAX_EVENTS=16 拒绝制，但有机路径（addEvent/applyFactions）
+  //   零上限（实测 20>16 绕过）、终局事件永驻 state（快照只过滤呈现）、
+  //   worldTrends 只增不删、sizeAudit 未接入治理闭环（maintain 零感知）。
+  // ═══════════════════════════════════════════════════════════
+  v060: {
+  const LS600 = global.localStorage;
+  const junkBefore600 = JSON.parse(JSON.stringify(LS600._dump()));
+  const evtBefore600 = WA.eventLog.slice();
+  const errBefore600 = WA.errorLog.slice();
+  const ctx600 = global.SillyTavern.getContext();
+  const prevChat600 = ctx600.chatId;
+  const CID600 = 'v600_chat';
+  function resetLogs600() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh600() { resetLogs600(); LS600.clear(); ctx600.chatId = CID600; WA.store.init(); }
+
+  // ── 1. 有机 addEvent cap（A 块）──
+  fresh600();
+  for (let i = 0; i < 25; i++) WA.evolution.addEvent({ name: '有机事件' + i, type: 'conflict', level: 1 });
+  const evs600 = WA.store.read('evolution.events', []);
+  assert(evs600.length <= 16, '有机 addEvent 受编辑器同容量约束（实 ' + evs600.length + ' ≤ 16）');
+  assert(evs600[evs600.length - 1].name === '有机事件24', '环形挤出保留最新（新事件在末位）');
+
+  // ── 2. 挤出优先终局（A 块）──
+  // 终局置于队中（非队首）——若实现退化为「总挤最早」，本场景精准失败
+  WA.store.transact(d => {
+    const mid600 = Math.floor(d.evolution.events.length / 2);
+    d.evolution.events[mid600].stage = '已消散'; d.evolution.events[mid600].stageRound = 9;
+    d.evolution.events[mid600].name = '中部终局';
+  });
+  const evsHead600 = WA.store.read('evolution.events', [])[0].name;
+  WA.evolution.addEvent({ name: '挤出测试X', type: 'conflict', level: 1 });
+  const evs600b = WA.store.read('evolution.events', []);
+  assert(evs600b.length <= 16 && evs600b.some(e => e.name === '挤出测试X'), '重新入账仍受 16 约束');
+  assert(!evs600b.some(e => e.stage === '已消散'), '事件挤出优先终局（已消散先被挤，即使不在队首）');
+  assert(evs600b.some(e => e.name === evsHead600), '优先挤出终局不误伤最早活跃事件（保留队首）');
+
+  // ── 3. applyFactions / addWind cap（A 块）──
+  WA.store.transact(d => { d.evolution.factions = []; });
+  WA.evolution.applyFactions(WA.store.get(), [{ name: '势力1', status: '敌对', relation: '敌对' }, { name: '势力2', status: '敌对', relation: '敌对' }]);
+  WA.store.transact(d => { for (let i = 0; i < 20; i++) d.evolution.factions.push({ id: 'fa' + i, name: 'F' + i }); });
+  WA.evolution.applyFactions(WA.store.get(), [{ name: '势力Z', status: '敌对', relation: '敌对' }]);
+  const fas600 = WA.store.read('evolution.factions', []);
+  assert(fas600.length <= 16 && fas600[fas600.length - 1].name === '势力Z', 'applyFactions 有机入账受 16 约束且新势力在末位');
+  WA.store.transact(d => { d.evolution.winds = []; });
+  for (let i = 0; i < 15; i++) WA.evolution.addWind({ topic: '风声' + i, level: 1 });
+  const wds600 = WA.store.read('evolution.winds', []);
+  assert(wds600.length <= WA.evolution.MAX_WINDS, 'addWind 受 MAX_WINDS 约束（实 ' + wds600.length + ' ≤ ' + WA.evolution.MAX_WINDS + '）');
+  assert(WA.evolution.MAX_WINDS === 12, 'MAX_WINDS 常量值 12');
+  WA.evolution.addWind({ topic: '风声14', level: 3 });   // 同主题归并，不新建
+  assert(WA.store.read('evolution.winds', []).length <= WA.evolution.MAX_WINDS, '同主题归并不触发新增（不挤出）');
+
+  // ── 4. 结算尾部终局回收（B 块）──
+  fresh600();
+  WA.store.transact(d => {
+    for (let i = 0; i < 8; i++) d.evolution.events.push({ id: 'ev' + i, type: 'conflict', name: '事件' + i, stage: '萌芽', stageRound: 1 });
+    d.evolution.events.push({ id: 'evD', type: 'conflict', name: '已消散事件', stage: '已消散', stageRound: 9 });
+    d.evolution.worldTrends.push({ id: 'wtA', name: '已结束大势', status: '已结束' });
+    d.evolution.worldTrends.push({ id: 'wtB', name: '持续大势', status: '持续中' });
+  });
+  WA.store.transact(d => WA.backstage.applyResult(d, { clock: '午后' }, null));   // 生产路径：transact 内传 draft
+  const evs600c = WA.store.read('evolution.events', []);
+  assert(!evs600c.some(e => e.stage === '已消散') && evs600c.some(e => e.name === '事件0'), '结算尾部回收已消散事件（活跃事件保留）');
+  const wts600 = WA.store.read('evolution.worldTrends', []);
+  assert(!wts600.some(t => t.status === '已结束') && wts600.some(t => t.name === '持续大势'), '结算尾部回收已结束大势（持续中保留）');
+
+  // ── 5. 结算尾部有机 cap（B 块容控段）──
+  WA.store.transact(d => {
+    for (let i = 0; i < 20; i++) { d.evolution.events.push({ id: 'ov' + i, type: 'conflict', name: '超量' + i, stage: '萌芽', stageRound: 1 }); }
+    for (let i = 0; i < 18; i++) d.evolution.factions.push({ id: 'fx' + i, name: '势力' + i });
+    for (let i = 0; i < 18; i++) d.evolution.winds.push({ id: 'wx' + i, topic: '风' + i, level: 1, quietRounds: 0 });
+  });
+  WA.store.transact(d => WA.backstage.applyResult(d, { clock: '黄昏' }, null));
+  assert(WA.store.read('evolution.events', []).length <= 16, '结算尾部 events 环形到 16（实 ' + WA.store.read('evolution.events', []).length + '）');
+  assert(WA.store.read('evolution.factions', []).length <= 16, '结算尾部 factions 环形到 16');
+  assert(WA.store.read('evolution.winds', []).length <= 12, '结算尾部 winds 环形到 12');
+
+  // ── 6. 登记表 + 反查（C 块）──
+  const caps600 = WA.store.sizeCaps();
+  assert(caps600['evolution.winds'] && caps600['evolution.winds'].cap === 12, 'evolution.winds 已登记 cap=12');
+  assert(caps600['evolution.worldTrends'] && caps600['evolution.worldTrends'].cap === 12, 'evolution.worldTrends 已登记 cap=12');
+  assert(caps600['opinion.forum'] && caps600['opinion.forum'].cap === 20, 'opinion.forum 已登记 cap=20');
+  assert(caps600['evolution.economy.signals'] && caps600['evolution.economy.signals'].cap === 3, 'evolution.economy.signals 已登记 cap=3');
+
+  // ── 7. maintain 容量治理（D 块）──
+  fresh600();
+  WA.store.transact(d => { d.clock.label = 'clean'; });
+  const mClean600 = WA.store.maintain({});
+  assert(!mClean600.issues.some(i => i.key.indexOf('capacity.') === 0), '干净库无容量议题');
+  assert(mClean600.signals.capacityDrifted === 0 && mClean600.signals.capacityUnregistered === 0, '干净库容量计量归零');
+  // 造 drift：直推 events 到 18（>16）
+  WA.store.transact(d => {
+    for (let i = 0; i < 18; i++) d.evolution.events.push({ id: 'dr' + i, type: 'conflict', name: 'D' + i, stage: '萌芽', stageRound: 1 });
+    d.unregisteredArray = [{ a: 1 }];
+  });
+  const mDrift600 = WA.store.maintain({});
+  assert(mDrift600.issues.some(i => i.key === 'capacity.drift' && i.level === 'error'), '超容量容器 → capacity.drift error');
+  assert(mDrift600.issues.some(i => i.key === 'capacity.unregistered' && i.level === 'warn'), '未登记非空数组 → capacity.unregistered warn');
+  assert(mDrift600.signals.capacityDrifted === 1 && mDrift600.signals.capacityUnregistered === 1, 'signals 容量计量精确（1/1）');
+  assert(mDrift600.actions.some(a => a.id === 'trim-containers'), 'drift 产生 trim-containers 建议动作');
+  const mCleanScore600 = mClean600.score, mDriftScore600 = mDrift600.score;
+  assert(mDriftScore600 < mCleanScore600, '容量问题使健康分下降（' + mCleanScore600 + ' → ' + mDriftScore600 + '）');
+  // 结算后 drift 自愈（cap 挤出）
+  WA.store.transact(d => WA.backstage.applyResult(d, { clock: '夜间' }, null));
+  const mAfter600 = WA.store.maintain({});
+  assert(mAfter600.signals.capacityDrifted === 0, '结算尾部挤出后 drift 归零（自动治理闭环）');
+  // 未登记容器随结算保留（新演进容器，不做自动删除——登记义务属开发者）
+  assert(WA.store.read('unregisteredArray', null) !== null, '未登记容器不被结算自动删除（登记义务不隐含强删）');
+
+  // ── 8. 面板接线（D 块动作渲染）──
+  const panelSrc600 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(panelSrc600.indexOf('capacityDrifted') >= 0, '面板透出容量治理信号（signals → 容量行）');
+
+  // ── 清理现场 ──
+  resetLogs600();
+  LS600.clear();
+  Object.keys(junkBefore600).forEach(function (k) { LS600.setItem(k, junkBefore600[k]); });
+  ctx600.chatId = prevChat600;
+  WA.eventLog.length = 0;
+  evtBefore600.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore600.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v0.6.0 block
   } // end v0.2.2 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
