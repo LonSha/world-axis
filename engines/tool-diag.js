@@ -542,9 +542,60 @@
     }, {});
   }
 
+  /**
+   * v0.1.54: 错误报告包——一键生成可贴给开发者的故障报告（纯文本）。
+   * 组装：版本/环境头 + error 子环 + 自检议题（error/warn 级）+ sizeAudit 摘要 + 存储键统计。
+   */
+  function buildErrorReport() {
+    const lines = [];
+    const v = (WA.version || '?');
+    const chatId = (WA.store && WA.store.chatId) ? WA.store.chatId() : '?';
+    lines.push('# WorldAxis 错误报告');
+    lines.push('- 版本: v' + v + ' · 生成时间: ' + new Date().toLocaleString() + ' · 聊天: ' + chatId);
+    lines.push('');
+    // ── error 子环（v0.1.53，≤50 条）──
+    const errs = Array.isArray(WA.errorLog) ? WA.errorLog.slice() : [];
+    lines.push('## 错误日志（error 子环，' + errs.length + ' 条）');
+    if (!errs.length) lines.push('（无 error 级日志）');
+    errs.forEach(function (l) {
+      lines.push('- [' + new Date(l.t).toLocaleTimeString() + '] ' + l.msg + (l.data ? ' | ' + l.data : ''));
+    });
+    lines.push('');
+    // ── 自检议题（仅 error/warn 级）──
+    lines.push('## 自检议题（error/warn 级）');
+    try {
+      const dg = collect();
+      const flat = flatten(dg);
+      const ew = flat.filter(function (x) { return x.level === 'error' || x.level === 'warn'; });
+      if (!ew.length) lines.push('（无 error/warn 级议题）');
+      ew.forEach(function (x) { lines.push('- [' + x.level + '] ' + x.key + ': ' + x.detail); });
+    } catch (e) { lines.push('- （自检不可用: ' + String(e && e.message) + '）'); }
+    lines.push('');
+    // ── sizeAudit 摘要（复用 v0.1.48 派生结论，不再全量重扫）──
+    lines.push('## 内存审计摘要');
+    try {
+      const aud = WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null;
+      if (aud && !aud.error) {
+        lines.push('- 总体积: ' + ((aud.total && aud.total.bytes) || '?') + 'B · 超限: ' + ((aud.drifted || []).length) + ' · 疑似无界: ' + ((aud.suspects || []).length) + (aud.complete === false ? ' ·（分片未收敛，数据不完整）' : ''));
+        (aud.drifted || []).forEach(function (x) { lines.push('  - drifted ' + x.path + '(' + x.len + '>' + x.cap + ')'); });
+        (aud.suspects || []).slice(0, 10).forEach(function (x) { lines.push('  - suspect ' + x.path + '(' + x.len + '项/' + x.bytes + 'B)'); });
+      } else lines.push('- sizeAudit 不可用');
+    } catch (e) { lines.push('- sizeAudit 异常: ' + String(e && e.message)); }
+    lines.push('');
+    // ── 存储键统计 ──
+    lines.push('## 存储键统计');
+    try {
+      const sk = WA.store.storageStat ? WA.store.storageStat() : null;
+      if (sk && sk.enumerable) {
+        lines.push('- worldaxis_* 键: ' + sk.totalKeys + ' 个 / ' + Math.round(sk.totalBytes / 1024) + 'KB · 过期诊断键候选: ' + (sk.staleDiagCandidates || []).length);
+      } else lines.push('- storageStat 不可用');
+    } catch (e) { lines.push('- storageStat 异常: ' + String(e && e.message)); }
+    return lines.join('\n');
+  }
+
   WA.toolDiag = {
     PACKAGE_FORMAT, PACKAGE_VERSION, MODULE_EXPORTS, UI_BINDINGS,
-    collect, verdict, toJSON, summaryText, flatten, download,
+    collect, verdict, toJSON, summaryText, flatten, download, buildErrorReport,
     OPTIONAL_EXPORTS,
     secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities,
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）

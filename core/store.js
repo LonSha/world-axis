@@ -113,8 +113,7 @@
   const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
   const __migrations = {};
-  let __keyHygieneWarned = false;   // v0.1.52: 存储键卫生告警节流（每会话一次）
-  let __keyHygieneLastSig = null;   // v0.1.52: 存储键卫生告警节流——上次告警的清理计划指纹（键集合 hash）
+  let __keyHygieneScanSig = null;    // v0.1.54: 上次 dry-run 扫描的清理计划指纹（纯指纹幂等：变化才告警，同指纹静默）
   // ── v0.1.51: 存储键卫生（key hygiene）────────────────────────
   // worldaxis_* 键空间分类：state/recovery/diagnostic/corrupt/settings/wb/other
   const KEY_FAMILIES = {
@@ -280,27 +279,17 @@
       try { if (WA.workflow && WA.workflow.loadHistory) WA.workflow.loadHistory(); } catch (e) {}
       // v0.1.50: 恢复当前聊天的撤销台账
       try { if (WA.render && WA.render.loadUninjectLedger) WA.render.loadUninjectLedger(); } catch (e) {}
-      // v0.1.52: 存储键卫生静默巡检——init 时 dry-run 一次，大额可回收仅留痕告警（不自动删，删否属用户决策）
-      try {
-        if (!__keyHygieneWarned && WA.store.sweepStaleKeys) {
-          const plan = WA.store.sweepStaleKeys({});   // dry-run
-          if (plan.remove.length && plan.freedBytes > 256 * 1024) {
-            WA.log('warn', '存储键卫生：发现 ' + plan.remove.length + ' 个过期键可回收 ' + Math.round(plan.freedBytes / 1024) + 'KB（过期诊断 ' + (plan.byFamily['diag-idle'] || 0) + '/隔离溢出 ' + (plan.byFamily['corrupt-overflow'] || 0) + '/孤儿恢复点 ' + (plan.byFamily['orphan-recovery'] || 0) + '），诊断面板「存储键体检」可执行清理');
-          }
-          __keyHygieneWarned = true;   // 每会话只告警一次（init 每轮触发，防 eventLog 刷屏）
-        }
-      } catch (e) {}
-      // v0.1.52: 存储键卫生静默巡检——init 时 dry-run 一次，大额可回收仅留痕告警（不自动删，删否属用户决策）。
-      // 节流按「计划指纹」而非布尔：同批垃圾重复 init 不重复告警；新的大额垃圾出现（指纹变化）则再告。
+      // v0.1.52→0.1.54: 存储键卫生静默巡检——init 时 dry-run 一次，大额可回收仅留痕告警（不自动删，删否属用户决策）。
+      // 节流纯指纹幂等（v0.1.54 定稿）：每次 init 都 dry-run（枚举 <10ms，无需时间窗——时间窗会制造「窗内新垃圾不可见」陷阱），
+      // 清理计划指纹变化（新垃圾集出现/清理后消失）才告警；同指纹重复 init 静默。
       try {
         if (WA.store.sweepStaleKeys) {
           const plan = WA.store.sweepStaleKeys({});   // dry-run
-          if (plan.remove.length && plan.freedBytes > 256 * 1024) {
-            const sig = plan.remove.map(function (r) { return r.key; }).sort().join('|');
-            if (sig !== __keyHygieneLastSig) {
-              WA.log('warn', '存储键卫生：发现 ' + plan.remove.length + ' 个过期键可回收 ' + Math.round(plan.freedBytes / 1024) + 'KB（过期诊断 ' + (plan.byFamily['diag-idle'] || 0) + '/隔离溢出 ' + (plan.byFamily['corrupt-overflow'] || 0) + '/孤儿恢复点 ' + (plan.byFamily['orphan-recovery'] || 0) + '），诊断面板「存储键体检」可执行清理');
-              __keyHygieneLastSig = sig;
-            }
+          const sig = (plan.remove || []).map(function (r) { return r.key; }).sort().join('|');
+          const changed = sig !== __keyHygieneScanSig;
+          __keyHygieneScanSig = sig;
+          if (changed && plan.remove.length && plan.freedBytes > 256 * 1024) {
+            WA.log('warn', '存储键卫生：发现 ' + plan.remove.length + ' 个过期键可回收 ' + Math.round(plan.freedBytes / 1024) + 'KB（过期诊断 ' + (plan.byFamily['diag-idle'] || 0) + '/隔离溢出 ' + (plan.byFamily['corrupt-overflow'] || 0) + '/孤儿恢复点 ' + (plan.byFamily['orphan-recovery'] || 0) + '），诊断面板「存储键体检」可执行清理');
           }
         }
       } catch (e) {}

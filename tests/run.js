@@ -4231,6 +4231,69 @@ WA.loadScript = _ls.loadScript;
   errBefore153.forEach(l => WA.errorLog.push(l));
   WA.log('info', 'v153 现场还原');
   } // end v0.1.53 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.54 — 错误报告包导出 + 巡检段收敛（去重/纯指纹幂等）
+  // ═══════════════════════════════════════════════════════════
+  v0154: {
+  // ── 1. buildErrorReport 组装完整性 ──
+  assert(typeof WA.toolDiag.buildErrorReport === 'function', 'toolDiag.buildErrorReport 已导出');
+  const evtBefore154 = WA.eventLog.slice();
+  const errBefore154 = WA.errorLog.slice();
+  WA.log('error', 'v154 报告样本错误', 'boom-detail');
+  const rpt154 = WA.toolDiag.buildErrorReport();
+  const rptLines154 = rpt154.split('\n');
+  assert(rptLines154[0] === '# WorldAxis 错误报告', '报告首行精确匹配标准头（防前缀蒙混）');
+  assert(rpt154.indexOf('v154 报告样本错误') >= 0 && rpt154.indexOf('boom-detail') >= 0, '报告含 error 子环条目与 data');
+  assert(rpt154.indexOf('## 自检议题') >= 0 && rpt154.indexOf('## 内存审计摘要') >= 0 && rpt154.indexOf('## 存储键统计') >= 0, '报告含自检议题/审计/存储键三段');
+  assert(rpt154.indexOf('版本: v') >= 0, '报告含版本头');
+
+  // ── 2. 巡检段收敛（源码断言）──
+  const storeSrc154 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  assert((storeSrc154.match(/存储键卫生静默巡检/g) || []).length === 1, '巡检段唯一（v0.1.52 双段残留已清除）');
+  assert(!/__keyHygieneWarned|__keyHygieneLastSig|__keyHygieneLastScanAt/.test(storeSrc154), '旧节流变量无残留（布尔/双指纹/时间窗均收敛为单指纹）');
+
+  // ── 3. 纯指纹幂等：新垃圾集首见告警一次，重复 init 静默 ──
+  const LS154 = global.localStorage;
+  const junkBefore154 = JSON.parse(JSON.stringify(LS154._dump()));
+  const logBefore154 = WA.eventLog.slice();
+  const huge154 = 'y'.repeat(300 * 1024);
+  const cold154 = 'v154_cold_chat';
+  LS154.setItem('worldaxis_state_' + cold154, JSON.stringify({ meta: { updatedAt: Date.now() - 40 * 86400000 } }));
+  LS154.setItem('worldaxis_event_log_' + cold154, huge154);
+  WA.store.init();   // 新垃圾集首见 → 告警一次
+  const w1_154 = WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0).length;
+  assert(w1_154 >= 1, '新垃圾集首见告警一次（实 ' + w1_154 + '）');
+  WA.store.init();
+  WA.store.init();
+  const w2_154 = WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0).length;
+  assert(w2_154 === w1_154, '同指纹重复 init 静默（' + w1_154 + ' 恒定，无时间窗依赖）');
+
+  // ── 4. 指纹变化必告（追加新大额垃圾）──
+  const cold154b = 'v154_cold_chat_b';
+  LS154.setItem('worldaxis_state_' + cold154b, JSON.stringify({ meta: { updatedAt: Date.now() - 50 * 86400000 } }));
+  LS154.setItem('worldaxis_event_log_' + cold154b, 'z'.repeat(300 * 1024));
+  WA.store.init();
+  const w3_154 = WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0).length;
+  assert(w3_154 > w2_154, '指纹变化（新大额垃圾）再次告警（' + w2_154 + '→' + w3_154 + '）');
+
+  // ── 5. 清理后空集不告警 ──
+  WA.store.sweepStaleKeys({ apply: true });
+  WA.store.init();
+  const w4_154 = WA.eventLog.filter(l => l.level === 'warn' && l.msg.indexOf('存储键卫生') >= 0).length;
+  assert(w4_154 === w3_154, '清理后空集不告警（' + w3_154 + ' 恒定）');
+
+  // ── 6. 面板按钮（源码断言，词边界严格版）──
+  const panelSrc154 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(/id="wa-err-report"/.test(panelSrc154) && /on\('#wa-err-report'/.test(panelSrc154), '「复制错误报告」按钮 id 与绑定成对');
+  assert(/buildErrorReport[^A-Za-z0-9_]/.test(panelSrc154), '面板调用 buildErrorReport（词边界）');
+
+  // ── 清理：还原键空间与日志现场 ──
+  LS154.clear();
+  Object.keys(junkBefore154).forEach(k => LS154.setItem(k, junkBefore154[k]));
+  WA.eventLog.length = 0;
+  logBefore154.forEach(l => WA.eventLog.push(l));
+  WA.log('info', 'v154 现场还原');
+  } // end v0.1.54 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
