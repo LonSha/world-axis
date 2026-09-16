@@ -20,10 +20,42 @@
   function ledgerChatId() {
     try { return (WA.store && WA.store.chatId) ? WA.store.chatId() : null; } catch (e) { return null; }
   }
+  function persistUninjectLedger() {
+    try {
+      const cid = ledgerChatId() || 'wa_default';
+      const curEntries = __uninjectLedger.filter(function (e) { return !e.chat || e.chat === cid; });
+      const mainWin = (typeof window !== 'undefined' ? window : global);
+      mainWin.localStorage.setItem('worldaxis_uninject_ledger_' + cid, JSON.stringify(curEntries.slice(-20)));
+    } catch (e) {}
+  }
   function recordUninject(trigger, result) {
     try {
       __uninjectLedger.push({ at: Date.now(), chat: ledgerChatId(), trigger: trigger || 'unknown', ok: !!result.ok, reason: result.reason || null, cleared: result.cleared || [] });
       if (__uninjectLedger.length > 20) __uninjectLedger.splice(0, __uninjectLedger.length - 20);
+      persistUninjectLedger();
+    } catch (e) {}
+  }
+  function loadUninjectLedger(chatId) {
+    try {
+      const cid = chatId || ledgerChatId() || 'wa_default';
+      const mainWin = (typeof window !== 'undefined' ? window : global);
+      const raw = mainWin.localStorage.getItem('worldaxis_uninject_ledger_' + cid);
+      const otherEntries = __uninjectLedger.filter(function (e) { return e.chat && e.chat !== cid; });
+      const curEntries = raw ? JSON.parse(raw) : [];
+      const merged = otherEntries.concat(Array.isArray(curEntries) ? curEntries : []);
+      merged.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+      __uninjectLedger.length = 0;
+      merged.slice(-20).forEach(function (x) { __uninjectLedger.push(x); });
+    } catch (e) {}
+  }
+  function clearUninjectLedger(chatId) {
+    const cid = chatId || ledgerChatId() || 'wa_default';
+    const remain = __uninjectLedger.filter(function (e) { return e.chat && e.chat !== cid; });
+    __uninjectLedger.length = 0;
+    remain.forEach(function (x) { __uninjectLedger.push(x); });
+    try {
+      const mainWin = (typeof window !== 'undefined' ? window : global);
+      mainWin.localStorage.removeItem('worldaxis_uninject_ledger_' + cid);
     } catch (e) {}
   }
   /** 取当前聊天域的台账条目（无域标识的历史条目视为同域，向后兼容） */
@@ -253,5 +285,7 @@
       const scoped = (opts && opts.all) ? __uninjectLedger.slice() : ledgerForCurrentChat();
       return { count: scoped.length, entries: scoped, total: __uninjectLedger.length, foreign: __uninjectLedger.length - scoped.length };
     },
+    loadUninjectLedger: loadUninjectLedger,
+    clearUninjectLedger: clearUninjectLedger,
   };
 })();

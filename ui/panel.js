@@ -225,7 +225,7 @@
       <button class="wa-btn" id="wa-imp-run">预检并导入</button>
       <div id="wa-imp-out" class="wa-out"></div>
       <div class="wa-sec">扩展自检（模块/注入/UI/运行环境）</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button><button class="wa-btn" id="wa-audit-copy">复制内存审计</button></div>
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
@@ -384,6 +384,7 @@
     on('#wa-plan-clear', () => { WA.oracle.clear(); renderBody(); });
     on('#wa-gen-choices', async () => { const out = $('#wa-choices-out'); out.textContent = '生成中…'; const cs = await WA.choices.generate(4); out.innerHTML = cs.length ? cs.map((c, i) => `<div class="wa-item">${i + 1}. ${esc(c)}</div>`).join('') : '（未配置choices通道或生成失败）'; });
     on('#wa-log-copy', () => { navigator.clipboard && navigator.clipboard.writeText(WA.eventLog.map(l => `[${new Date(l.t).toLocaleTimeString()}][${l.level}] ${l.msg} ${l.data || ''}`).join('\n')); });
+    on('#wa-audit-copy', () => { if (navigator.clipboard && WA.store && WA.store.exportAuditReport) { navigator.clipboard.writeText(WA.store.exportAuditReport()); const out = $('#wa-diag-out'); if (out) out.textContent = '✓ 内存/持久化审计报告 (sizeAudit) 已复制到剪贴板！'; } });
     const conc = $('#wa-conc'); if (conc) conc.oninput = () => { WA.apiRouter.setConcurrency(+conc.value); $('#wa-conc-v').textContent = conc.value; };
     // 设置页绑定
     if (currentPage === 'settings' && WA.uiSettings) WA.uiSettings.bind(panelEl);

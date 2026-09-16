@@ -3998,6 +3998,48 @@ WA.loadScript = _ls.loadScript;
   WA.workflow.resetHistory(currentChatId);
   WA.workflow.resetHistory(mockChatB);
   } // end v0.1.49 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.50 — sizeAudit 报告导出 + 撤销台账跨会话/切聊天持久化
+  // ═══════════════════════════════════════════════════════════
+  v0150: {
+  // ── 1. exportAuditReport 格式化报告导出 ──
+  assert(typeof WA.store.exportAuditReport === 'function', 'store.exportAuditReport 已导出');
+  const report150 = WA.store.exportAuditReport({ minBytes: 64 });
+  assert(typeof report150 === 'string' && report150.includes('# WorldAxis 内存/持久化审计报告'), '报告包含标题标头');
+  assert(report150.includes('总内存/状态体积') && report150.includes('状态统计概览'), '报告包含概览与统计');
+  assert(report150.includes('Top 容器内存占用排行'), '报告包含 Top 容器排行');
+
+  // ── 2. uninjectLedger 撤销台账持久化与恢复 ──
+  const cid150 = WA.store.chatId();
+  if (WA.render.clearUninjectLedger) WA.render.clearUninjectLedger(cid150);
+  
+  WA.render.uninject('test_v150_trigger');
+  const leg150 = WA.render.injectionLedger();
+  assert(leg150.count >= 1, 'uninject 后产生撤销台账记录');
+  
+  // 真实切换 SillyTavern context 的 chatId
+  const mockChat150 = 'chat_test_v150_b';
+  const stCtx = global.SillyTavern.getContext();
+  const origChatId = stCtx.chatId;
+  stCtx.chatId = mockChat150;
+  
+  if (WA.render.loadUninjectLedger) {
+    WA.render.loadUninjectLedger(mockChat150);
+    const legChatB = WA.render.injectionLedger();
+    assert(legChatB.entries.length === 0, '切至无台账聊天后，台账数据为空');
+    
+    // 切回原聊天
+    stCtx.chatId = origChatId;
+    WA.render.loadUninjectLedger(cid150);
+    const legRestored = WA.render.injectionLedger();
+    assert(legRestored.entries.length >= 1, '切回原聊天，撤销台账成功恢复');
+    assert(legRestored.entries.some(function (e) { return e.trigger === 'test_v150_trigger'; }), '恢复的撤销记录触发源吻合');
+    
+    // 清理
+    WA.render.clearUninjectLedger(cid150);
+    WA.render.clearUninjectLedger(mockChat150);
+  }
+  } // end v0.1.50 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

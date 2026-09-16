@@ -228,6 +228,8 @@
       // v0.1.49: 恢复当前聊天的事件日志与工作流历史
       try { if (WA.loadEventLog) WA.loadEventLog(); } catch (e) {}
       try { if (WA.workflow && WA.workflow.loadHistory) WA.workflow.loadHistory(); } catch (e) {}
+      // v0.1.50: 恢复当前聊天的撤销台账
+      try { if (WA.render && WA.render.loadUninjectLedger) WA.render.loadUninjectLedger(); } catch (e) {}
       if (!memCache.schemaVersion || memCache.schemaVersion < SCHEMA_VERSION) {
         this.createRecoveryPoint(); // 升级前先留恢复点
         memCache = this.migrate(memCache);
@@ -468,6 +470,40 @@
      *          另设 chunks 上限与「无进展」检测作双保险，异常时如实报告而非静默返回部分结果。
      * complete=false 表示未扫完（触顶或卡住），此时 unbounded/suspects 不可当作全量结论。
      */
+    exportAuditReport(opts) {
+      const audit = this.sizeAuditFull(opts);
+      if (audit.error) return 'Error generating size audit report: ' + audit.error;
+      const lines = [];
+      lines.push('# WorldAxis 内存/持久化审计报告 (sizeAudit)');
+      lines.push('生成时间: ' + new Date().toLocaleString());
+      lines.push('总内存/状态体积: ' + (audit.total ? audit.total.bytes + ' Bytes' : '未知'));
+      lines.push('扫描完整度: ' + (audit.complete ? '完全扫描 (' + audit.chunks + ' 分片 / ' + audit.visitedNodes + ' 节点)' : '部分扫描 (分片触顶/截断)'));
+      lines.push('');
+      lines.push('## 状态统计概览');
+      lines.push('- 有界注册容器: ' + audit.registeredCount + ' 个');
+      lines.push('- 异常超限 (drifted): ' + audit.drifted.length + ' 个');
+      lines.push('- 未规整无界风险 (suspects): ' + audit.suspects.length + ' 个');
+      lines.push('');
+      if (audit.drifted.length > 0) {
+        lines.push('## ⚠️ 异常超限容器 (Drifted)');
+        audit.drifted.forEach(function (r) {
+          lines.push('- **' + r.path + '**: 实际 ' + r.len + ' 项 / 上限 ' + r.cap + ' 项 (' + r.bytes + ' Bytes) | 出处: ' + r.site);
+        });
+        lines.push('');
+      }
+      if (audit.suspects.length > 0) {
+        lines.push('## ⚠️ 未规整风险容器 (Suspects)');
+        audit.suspects.forEach(function (r) {
+          lines.push('- **' + r.path + '**: ' + r.len + ' 项 (' + r.bytes + ' Bytes)');
+        });
+        lines.push('');
+      }
+      lines.push('## 📊 Top 容器内存占用排行');
+      (audit.arrays || []).slice(0, 15).forEach(function (r, i) {
+        lines.push((i + 1) + '. `' + r.path + '`: ' + r.len + ' 项 (' + r.bytes + 'B)' + (r.bounded ? ' [有界 cap=' + r.cap + ']' : ' [无界]'));
+      });
+      return lines.join('\n');
+    },
     sizeAuditFull(opts) {
       const o = opts || {};
       const chunkNodes = typeof o.chunkNodes === 'number' && o.chunkNodes > 0 ? o.chunkNodes : 800;
