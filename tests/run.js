@@ -4065,8 +4065,11 @@ WA.loadScript = _ls.loadScript;
   const orphanC = 'v151_orphan_c';
   LS.setItem('worldaxis_recovery_' + orphanC, '[]');
   LS.setItem('worldaxis_event_log_' + orphanC, '[]');
-  // corrupt 键 ×7（应保留最近 5 个）
-  for (let ci = 0; ci < 7; ci++) LS.setItem('worldaxis_state_' + cur151 + '_corrupt_' + (Date.now() - ci * 1000), '{}');
+  // corrupt 键 ×7 归非当前聊天（应保留最近 5 个 → 溢出 2 个）
+  const qHost151 = 'v151_quarantine_host';
+  for (let ci = 0; ci < 7; ci++) LS.setItem('worldaxis_state_' + qHost151 + '_corrupt_' + (Date.now() - ci * 1000), '{}');
+  // 当前聊天的隔离副本 ×2（v0.2.3：受保护——损坏现场是唯一可回滚数据，不得当溢出清理）
+  for (let ci = 0; ci < 2; ci++) LS.setItem('worldaxis_state_' + cur151 + '_corrupt_' + (Date.now() - 1000000 - ci * 1000), '{}');
   // settings / wb 键（永不清理）
   LS.setItem('worldaxis_backstage_settings_v1', '{}');
   LS.setItem('worldaxis_wb_selection_' + coldA, '{}');
@@ -4076,7 +4079,7 @@ WA.loadScript = _ls.loadScript;
   assert(stat151.enumerable === true, 'mock localStorage 支持枚举');
   assert(stat151.totalKeys >= 15, '键总数计入（实 ' + stat151.totalKeys + '）');
   assert(stat151.families.state >= 3 && stat151.families.diagnostic >= 5, 'state/diagnostic 家族分类计数');
-  assert(stat151.families.corrupt === 7, 'corrupt 家族计数（实 ' + stat151.families.corrupt + '）');
+  assert(stat151.families.corrupt === 9, 'corrupt 家族计数（7 宿主 + 2 当前聊天副本，实 ' + stat151.families.corrupt + '）');
   assert(stat151.families.settings >= 1 && stat151.families.wb >= 1, 'settings/wb 家族分类');
   assert(stat151.currentChat === cur151 && stat151.currentChatBytes > 0, '当前聊天键计量（' + stat151.currentChatBytes + 'B）');
   const staleKeys151 = stat151.staleDiagCandidates.map(x => x.key);
@@ -4094,6 +4097,7 @@ WA.loadScript = _ls.loadScript;
   assert(rem151.some(r => r.key === 'worldaxis_recovery_' + orphanC && r.reason === 'orphan-recovery'), '孤儿 recovery 进计划（聊天无 state）');
   assert(!rem151.some(r => r.key === 'worldaxis_event_log_' + warmB), '活跃聊天 B 诊断键保留');
   assert(!rem151.some(r => r.chat === cur151), '当前聊天任何键保留（含 corrupt）');
+  assert(!rem151.some(r => r.reason === 'corrupt-overflow' && r.chat === cur151), '当前聊天隔离副本不受 corrupt 溢出管辖（v0.2.3 数据保护）');
   assert(!rem151.some(r => r.key === 'worldaxis_backstage_settings_v1') && !rem151.some(r => r.key === 'worldaxis_wb_selection_' + coldA), 'settings/wb 键永不清理');
   const corruptRem151 = rem151.filter(r => r.reason === 'corrupt-overflow');
   assert(corruptRem151.length === 2, 'corrupt 超出保留窗口 2 个（7-5）');
@@ -4106,7 +4110,7 @@ WA.loadScript = _ls.loadScript;
   assert(LS.getItem('worldaxis_event_log_' + warmB) !== null && LS.getItem('worldaxis_state_' + warmB) !== null, '活跃聊天键完好');
   assert(LS.getItem('worldaxis_backstage_settings_v1') !== null && LS.getItem('worldaxis_wb_selection_' + coldA) !== null, 'settings/wb 完好');
   const afterStat151 = WA.store.storageStat();
-  assert(afterStat151.families.corrupt === 5, 'corrupt 保留最近 5 个（实 ' + afterStat151.families.corrupt + '）');
+  assert(afterStat151.families.corrupt === 7, 'corrupt 保留 5 宿主 + 2 当前聊天副本（实 ' + afterStat151.families.corrupt + '）');
   assert(afterStat151.totalKeys === stat151.totalKeys - planApply151.remove.length, '删后键总数精确对账');
 
   // ── 4. toolDiag 集成 ──
@@ -4470,6 +4474,61 @@ WA.loadScript = _ls.loadScript;
   // 清理现场
   LS220.clear();
   Object.keys(junkBefore220).forEach(function (k) { LS220.setItem(k, junkBefore220[k]); });
+  // ═══════════════════════════════════════════════════════════
+  // v0.2.3 — 隔离键归属修复 + state 派生键治理
+  // 缺陷链：corrupt 家族返回 chat:null → ①「当前聊天键永不被清理」不变量对隔离副本失效
+  //         ② 隔离聊天的 recovery 快照被判孤儿删除（用户唯一可回滚数据丢失）
+  // ═══════════════════════════════════════════════════════════
+  section('v0.2.3 隔离键归属修复');
+  v0230: {
+  const LS230 = global.localStorage;
+  const junkBefore230 = JSON.parse(JSON.stringify(LS230._dump()));
+  const cur230 = WA.store.chatId();
+  const base230 = WA.store.storageStat();
+  // ── 1. state 派生键（chatcache syncrev）与存档本体分离计量 ──
+  const cid230 = 'v230_chat';
+  LS230.setItem('worldaxis_state_' + cid230, JSON.stringify({ meta: { round: 1 } }));
+  LS230.setItem('worldaxis_state_' + cid230 + '_syncrev', '2');
+  const stat230 = WA.store.storageStat();
+  assert(stat230.chats - base230.chats === 1, '新增 1 个存档本体只 +1 聊天（派生槽不计入，实 +' + (stat230.chats - base230.chats) + '）');
+  assert(stat230.stateDerivedKeys - base230.stateDerivedKeys === 1, 'syncrev 派生键单独计量（实 +' + (stat230.stateDerivedKeys - base230.stateDerivedKeys) + '）');
+  assert(stat230.families.state - base230.families.state === 1, 'state 家族只计存档本体');
+  assert(stat230.families.stateDerived - base230.families.stateDerived === 1, 'families 含 stateDerived 家族计数');
+  const plan230 = WA.store.sweepStaleKeys({});
+  assert(plan230.keep.indexOf('worldaxis_state_' + cid230 + '_syncrev') >= 0, 'stateDerived 键归 keep（跟随存档本体）');
+  // ── 2. 关键：隔离键保留 chat 归属（v0.2.3 缺陷核心——chat:null 导致归属丢失）──
+  const qOld230 = Date.now() - 1000000;
+  const curQKey230 = 'worldaxis_state_' + cur230 + '_corrupt_' + qOld230;
+  LS230.setItem(curQKey230, '{"meta":{"round":7}}');
+  // 另 5 个更新的隔离副本（其他聊天）→ 若无归属保护，当前聊天副本会被挤成溢出
+  for (let i = 1; i <= 5; i++) LS230.setItem('worldaxis_state_v230_other' + i + '_corrupt_' + (Date.now() - i * 1000), '{}');
+  const stat230b = WA.store.storageStat();
+  assert(stat230b.currentChatQuarantines >= 1, 'storageStat 透出当前聊天隔离副本计量（实 ' + stat230b.currentChatQuarantines + '）');
+  const plan230b = WA.store.sweepStaleKeys({ keepCorrupt: 5 });
+  assert(plan230b.keep.indexOf(curQKey230) >= 0, '隔离副本受「当前聊天保护」约束（不变量对隔离键成立）');
+  assert(!plan230b.remove.some(r => r.key === curQKey230), '当前聊天唯一幸存隔离现场不被当溢出删除');
+  const hostRem230 = plan230b.remove.filter(r => r.reason === 'corrupt-overflow' && r.quarantine === 'state');
+  assert(hostRem230.every(r => r.chat !== cur230), 'corrupt-overflow 只作用于非当前聊天（归属正确）');
+  // ── 3. 关键：隔离聊天的 recovery 快照不得判为孤儿 ──
+  // state 损坏被隔离 = 保命而非删除 → 该聊天存档视为仍存在
+  const qChat230 = 'v230_quarantined';
+  LS230.setItem('worldaxis_state_' + qChat230 + '_corrupt_' + Date.now(), '{broken');
+  LS230.setItem('worldaxis_recovery_' + qChat230, JSON.stringify([{ at: Date.now(), data: { meta: { round: 42 } } }]));
+  const plan230c = WA.store.sweepStaleKeys({});
+  assert(!plan230c.remove.some(r => r.reason === 'orphan-recovery' && r.chat === qChat230), '隔离聊天的 recovery 不被判孤儿（唯一可回滚数据受保护）');
+  // ── 4. 反向不误伤：真正孤儿（既无 state 本体也无隔离副本）仍须回收 ──
+  const deadChat230 = 'v230_dead';
+  LS230.setItem('worldaxis_recovery_' + deadChat230, JSON.stringify([{ at: Date.now(), data: {} }]));
+  const plan230d = WA.store.sweepStaleKeys({});
+  assert(plan230d.remove.some(r => r.reason === 'orphan-recovery' && r.chat === deadChat230), '真正孤儿 recovery 仍被正确回收（修复未过度保护）');
+  // ── 5. 幂等 ──
+  const r1 = JSON.stringify(WA.store.sweepStaleKeys({}).byFamily);
+  const r2 = JSON.stringify(WA.store.sweepStaleKeys({}).byFamily);
+  assert(r1 === r2, 'dry-run 幂等（多次扫描结果一致）');
+  // 清理现场
+  LS230.clear();
+  Object.keys(junkBefore230).forEach(function (k) { LS230.setItem(k, junkBefore230[k]); });
+  } // end v0.2.3 block
   } // end v0.2.2 block
   // ── 汇总 ──
   console.log('\n══════════════════════');

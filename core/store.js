@@ -117,21 +117,26 @@
   // ── v0.1.51: 存储键卫生（key hygiene）────────────────────────
   // worldaxis_* 键空间分类：state/recovery/diagnostic/corrupt/settings/wb/other
   const KEY_FAMILIES = {
-    state: /^worldaxis_state_(.+)$/,
+    state: /^worldaxis_state_(?!.+_(?:syncrev|corrupt_\d+)$)(.+)$/,
+    // v0.2.3: state 派生键（同聊天的附属槽位，非独立聊天）——chatcache 同步修订号等
+    stateDerived: /^worldaxis_state_(.+)_(syncrev)$/,
     recovery: /^worldaxis_recovery_(.+)$/,
     diag_eventLog: /^worldaxis_event_log_(.+)$/,
     diag_errorLog: /^worldaxis_error_log_(.+)$/,
     diag_wfHistory: /^worldaxis_wf_history_(.+)$/,
     diag_uninjectLedger: /^worldaxis_uninject_ledger_(.+)$/,
-    corrupt: /^worldaxis_state_(.+)_corrupt_\d+$/,
+    corrupt: /^worldaxis_state_(.+)_corrupt_(\d+)$/,
     corruptSettings: /^worldaxis_(?!state_)([a-z_0-9]+)_corrupt_\d+$/,
     wb: /^worldaxis_wb_selection_(.+)$/,
     settingsSettings: /^worldaxis_(backstage_settings_v1|evolution_settings_v1|opinion_settings_v1|regional_settings_v1|api_channels_v1|workflow_v1|inject_visibility_v1|purifier_rules_v1|npc_registry_v1|oracle_plan_v1|active_preset|custom_presets)$/
   };
   function classifyKey(key) {
-    if (KEY_FAMILIES.corrupt.test(key)) return { family: 'corrupt', chat: null };
-    if (KEY_FAMILIES.corruptSettings.test(key)) return { family: 'corrupt', chat: null, quarantine: 'settings' };
     let m;
+    // v0.2.3: 隔离键必须保留 chat 归属——否则「当前聊天的键永不被清理」不变量对隔离副本失效
+    // （当前聊天唯一幸存的可恢复现场被 sweep 当溢出删除），且隔离聊天的 recovery 快照被判孤儿删除
+    if ((m = key.match(KEY_FAMILIES.corrupt))) return { family: 'corrupt', chat: m[1], quarantine: 'state' };
+    if (KEY_FAMILIES.corruptSettings.test(key)) return { family: 'corrupt', chat: null, quarantine: 'settings' };
+    if ((m = key.match(KEY_FAMILIES.stateDerived))) return { family: 'stateDerived', kind: m[2], chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.state))) return { family: 'state', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.recovery))) return { family: 'recovery', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_eventLog))) return { family: 'diagnostic', kind: 'event_log', chat: m[1] };
@@ -569,9 +574,9 @@
       try {
         const ss = this.storageStat();
         lines.push('- worldaxis_* 键总数: ' + ss.totalKeys + '（' + ss.totalBytes + ' Bytes）');
-        lines.push('- state(存档): ' + ss.families.state + ' 键 / ' + ss.perFamilyBytes.state + 'B · recovery(恢复点): ' + ss.families.recovery + ' / ' + ss.perFamilyBytes.recovery + 'B');
+        lines.push('- state(存档): ' + ss.families.state + ' 键 / ' + ss.perFamilyBytes.state + 'B · 派生槽(同步修订号): ' + ss.families.stateDerived + ' 键 · recovery(恢复点): ' + ss.families.recovery + ' / ' + ss.perFamilyBytes.recovery + 'B');
         lines.push('- diagnostic(诊断): ' + ss.families.diagnostic + ' 键 / ' + ss.perFamilyBytes.diagnostic + 'B · corrupt(隔离): ' + ss.families.corrupt + ' / ' + ss.perFamilyBytes.corrupt + 'B');
-        lines.push('- settings(设置): ' + ss.families.settings + ' 键 · wb(世界书): ' + ss.families.wb + ' 键');
+        lines.push('- settings(设置): ' + ss.families.settings + ' 键 · wb(世界书): ' + ss.families.wb + ' 键' + (ss.currentChatQuarantines > 0 ? ' · 当前聊天隔离副本: ' + ss.currentChatQuarantines + ' 个（受保护，需人工处置）' : ''));
         lines.push('- 跨聊天过期诊断键候选: ' + (ss.staleDiagCandidates || []).length + ' 个（store.sweepStaleKeys() 可清理）');
       } catch (e) { lines.push('- storageStat 不可用: ' + String(e && e.message)); }
       lines.push('');
@@ -699,9 +704,9 @@
       const maxIdleMs = (typeof o.maxIdleDays === 'number' && o.maxIdleDays >= 0 ? o.maxIdleDays : 30) * 86400000;
       const cur = getChatId();
       const keys = listWorldAxisKeys();
-      const families = { state: 0, recovery: 0, diagnostic: 0, corrupt: 0, settings: 0, wb: 0, other: 0 };
-      const perFamilyBytes = { state: 0, recovery: 0, diagnostic: 0, corrupt: 0, settings: 0, wb: 0, other: 0 };
-      let totalBytes = 0, stateKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0;
+      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, settings: 0, wb: 0, other: 0 };
+      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, settings: 0, wb: 0, other: 0 };
+      let totalBytes = 0, stateKeys = 0, stateDerivedKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0, curQuarantines = 0;
       const staleDiagCandidates = [];   // 仅超期项（与 sweepStaleKeys 同阈值）：{ key, chat, kind, idleMs }
       const now = Date.now();
       keys.forEach(function (k) {
@@ -710,6 +715,7 @@
         totalBytes += b;
         families[cls.family]++; perFamilyBytes[cls.family] += b;
         if (cls.family === 'state') stateKeys++;
+        if (cls.family === 'stateDerived') stateDerivedKeys++;
         if (cls.family === 'diagnostic') {
           diagKeys++;
           if (cls.chat !== cur) {
@@ -718,7 +724,11 @@
             if (idleMs > maxIdleMs) staleDiagCandidates.push({ key: k, chat: cls.chat, kind: cls.kind, lastActiveAt: act, idleMs: idleMs });
           }
         }
-        if (cls.family === 'corrupt') corruptKeys++;
+        if (cls.family === 'corrupt') {
+          corruptKeys++;
+          // v0.2.3: 当前聊天的隔离副本受保护（sweep 不清理）——单独计量以便面板透出与手动处置
+          if (cls.chat === cur) curQuarantines++;
+        }
         if (cls.chat === cur) curBytes += b;
       });
       return {
@@ -729,8 +739,10 @@
         currentChat: cur,
         currentChatBytes: curBytes,
         chats: stateKeys,
+        stateDerivedKeys: stateDerivedKeys,
         diagKeys: diagKeys,
         corruptKeys: corruptKeys,
+        currentChatQuarantines: curQuarantines,
         staleDiagCandidates: staleDiagCandidates.sort(function (a, b2) { return a.idleMs - b2.idleMs; }),
         enumerable: typeof mainWin.localStorage.length === 'number' && mainWin.localStorage.length >= 0
       };
@@ -740,7 +752,8 @@
      * 规则（保守优先，宁可漏删不可误删）：
      *  - diagnostic 键：所属聊天超过 maxIdleDays 天未活跃（state.meta.updatedAt 基准）→ 候选
      *  - corrupt 键：state 损坏隔离与 settingsBus 设置损坏隔离统一只保留最近 keepCorrupt 个（按键名时间戳排序），更老的候选
-     *  - state/recovery：聊天已完全不存在 state 键且其 diagnostic 键全冷 → 一并清理（孤儿恢复点）
+     *  - state/recovery：聊天既无 state 本体也无 state 隔离副本 → 一并清理（孤儿恢复点）
+     *  - 隔离副本（*_corrupt_*）：与 state 本体同样受「当前聊天保护」约束
      *  - settings/wb：永不清理（用户数据）
      *  - 当前聊天的任何键：永不清理
      */
@@ -763,7 +776,12 @@
       function act(chat) { if (!(chat in actCache)) actCache[chat] = chatActivityAt(chat); return actCache[chat]; }
       // ── 孤儿 recovery 判定：聊天无 state 键（state 被清/从未写）→ recovery 为孤儿 ──
       const stateChats = {};
-      keys.forEach(function (k) { const c = classifyKey(k); if (c.family === 'state') stateChats[c.chat] = true; });
+      // v0.2.3: state 隔离键（corrupt/quarantine=state）视为该聊天存档仍存在——隔离是为保命而非删除，
+      // 其 recovery 快照不得判为孤儿（否则用户唯一可回滚的数据被清理）
+      keys.forEach(function (k) {
+        const c = classifyKey(k);
+        if (c.family === 'state' || (c.family === 'corrupt' && c.quarantine === 'state')) stateChats[c.chat] = true;
+      });
       keys.forEach(function (k) {
         const c = classifyKey(k);
         if (c.chat === cur || c.family === 'settings' || c.family === 'wb') { plan.keep.push(k); return; }
@@ -783,6 +801,7 @@
           plan.remove.push({ key: k, reason: 'orphan-recovery', family: c.family, chat: c.chat, bytes: keyBytes(k) });
           return;
         }
+        if (c.family === 'stateDerived') { plan.keep.push(k); return; }   // v0.2.3: state 派生键跟随存档本体保留
         plan.keep.push(k);   // state（其他聊天的存档本体，默认保留——清理属用户决策）与未过期 recovery
       });
       plan.remove.forEach(function (r) { plan.freedBytes += r.bytes; plan.byFamily[r.reason] = (plan.byFamily[r.reason] || 0) + 1; });
