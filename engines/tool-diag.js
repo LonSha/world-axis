@@ -197,6 +197,10 @@
             // v0.1.51: 存储键卫生——worldaxis_* 键空间分类计量与孤儿候选
             storageKeys: WA.store.storageStat ? WA.store.storageStat() : null,
             diagBudget: (WA.store.diagBudget && WA.store.storageStat) ? (function () { try { return WA.store.diagBudget(); } catch (e) { return null; } })() : null,
+            // v0.4.0: 统一健康巡视（只读不 apply）+ 写入完整性审计
+            maintain: WA.store.maintain ? (function () { try { return WA.store.maintain({ deep: false }); } catch (e) { return null; } })() : null,
+            maintainStat: WA.store.maintainStat ? WA.store.maintainStat() : null,
+            integrity: WA.store.integrityStat ? WA.store.integrityStat() : null,
             sizeProfile: prof,
             // v0.1.47: 诊断走自动续扫编排（消费方不必手写 cursor 循环）
             sizeAudit: WA.store.sizeAuditFull ? WA.store.sizeAuditFull({ minBytes: 512, chunkNodes: 800 }) : (WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null)
@@ -606,6 +610,23 @@
         lines.push('- 损坏隔离键: ' + (sk.families.corrupt || 0) + ' 个（state/settings 统一保留最近 5 个）· settings 迁移: ' + ((WA.settingsBus && WA.settingsBus.stats.upgrades) || 0) + ' 次 · 损坏隔离累计: ' + ((WA.settingsBus && WA.settingsBus.stats.quarantines) || 0) + ' 次');
       } else lines.push('- storageStat 不可用');
     } catch (e) { lines.push('- storageStat 异常: ' + String(e && e.message)); }
+    // ── v0.4.0: 健康巡视（统一裁决视图 + 写入完整性）──
+    lines.push('');
+    lines.push('## 健康巡视');
+    try {
+      const mt = WA.store.maintain ? WA.store.maintain({ deep: false }) : null;
+      if (mt) {
+        lines.push('- 健康分: ' + mt.score + '/100（' + mt.level + '）· 议题 ' + mt.issues.length + ' 项 · 建议动作 ' + mt.actions.length + ' 项');
+        mt.issues.slice(0, 8).forEach(function (x) { lines.push('  - [' + x.level + '] ' + x.key + ': ' + x.detail); });
+        if (mt.applied) lines.push('- 本次自动回收: ' + mt.applied.removed + ' 键 / ' + Math.round(mt.applied.freedBytes / 1024) + 'KB');
+        const ms = WA.store.maintainStat ? WA.store.maintainStat() : null;
+        if (ms) lines.push('- 巡视累计: ' + ms.scans + ' 次 · 自动动作 ' + ms.autoApplies + ' 次');
+      } else lines.push('- maintain 不可用');
+    } catch (e) { lines.push('- maintain 异常: ' + String(e && e.message)); }
+    try {
+      const ig = WA.store.integrityStat ? WA.store.integrityStat() : null;
+      if (ig) lines.push('- 写入完整性: 校验 ' + ig.verified + '/' + ig.writes + ' 次 · 不一致 ' + ig.mismatches + ' · 重试自愈 ' + ig.recoveredByRetry + ' · 当前态 ' + (ig.lastOk === null ? '未采样' : ig.lastOk ? '正常' : '失败(' + (ig.lastReason || '?') + ')'));
+    } catch (e) {}
     return lines.join('\n');
   }
 

@@ -112,7 +112,17 @@
   // v0.3.0: 隔离现场处置审计（只读观测 + 恢复/丢弃动作留痕）
   const __quarantineStat = { restores: 0, drops: 0, lastRestoreAt: 0, lastDropAt: 0, lastKey: null };
   // v0.3.0: 配额救援审计——save 遇配额耗尽时的自动回收与重试结果
-  const __rescueStat = { attempts: 0, recovered: 0, failed: 0, lastFreedBytes: 0, lastAt: 0, lastRemoved: 0 };
+  // v0.4.0: lastOk = 「当前态」信号（最近一次救援是否成功），与累积 failed 分离——
+  // 健康分只看当前态，否则历史一次配额失败会把健康分永久压低（与 integrity 同类裁决）。
+  const __rescueStat = { attempts: 0, recovered: 0, failed: 0, lastFreedBytes: 0, lastAt: 0, lastRemoved: 0, lastOk: null, lastFailAt: 0 };
+  // v0.4.0: 写入完整性审计——写后读回校验（检测静默截断/丢弃写入）
+  // v0.4.0: lastOk/lastFailAt = 「当前态」信号（最近一次写后校验结果），
+  // 与 writes/verified/mismatches 等「历史经历」计数分离——
+  // 健康分只看当前态，否则一次瞬时毒化会把健康分永久压低（误报警）。
+  const __integrityStat = { writes: 0, verified: 0, mismatches: 0, retried: 0, recoveredByRetry: 0, lastAt: 0, lastReason: null, lastOk: null, lastFailAt: 0 };
+  // v0.4.0: 自动治理巡视状态——上次巡视签名（防重复告警）+ 历次自动动作审计
+  let __maintainSig = '';
+  const __maintainStat = { scans: 0, lastAt: 0, lastScore: 100, lastLevel: 'ok', autoApplies: 0, lastAutoFreedKeys: 0, lastAutoFreedBytes: 0 };
   // v0.1.38: 加载观测——状态键损坏时隔离原始 payload 而非静默丢弃
   const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
@@ -182,6 +192,34 @@
     const msg = String((e && e.message) || e);
     if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED' || /quota|exceed|full/i.test(msg)) return 'quota';
     return 'error';
+  }
+  /**
+   * v0.4.0: 写后读回校验——setItem 不抛错 ≠ 数据真的落盘。
+   * 移动端浏览器/SillyTavern 在配额临界、写入毒化、后台回收等情况下可能静默截断或丢弃写入。
+   * 此处写后立刻读回并逐字符比对，不一致则重试一次；两次都不一致 → 如实报告失败（不再假装成功）。
+   * 返回 { ok, verified, retried, reason }
+   */
+  function writeVerified(key, payload) {
+    __integrityStat.writes++;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try { mainWin.localStorage.setItem(key, payload); }
+      catch (e) { __integrityStat.lastOk = false; __integrityStat.lastFailAt = Date.now(); return { ok: false, verified: false, retried: attempt > 0, reason: 'write', error: e }; }
+      let back = null;
+      try { back = mainWin.localStorage.getItem(key); } catch (e) { back = null; }
+      if (back === payload) {
+        if (attempt > 0) { __integrityStat.retried++; __integrityStat.recoveredByRetry++; }
+        __integrityStat.verified++; __integrityStat.lastAt = Date.now();
+        __integrityStat.lastOk = true;   // 当前态：最近一次写入校验通过（含重试自愈）
+        return { ok: true, verified: true, retried: attempt > 0, reason: null };
+      }
+      // 读回不一致：磁盘上的副本不是我们写的东西
+      __integrityStat.mismatches++; __integrityStat.lastAt = Date.now();
+      __integrityStat.lastReason = back === null ? 'missing-after-write'
+        : (typeof back === 'string' && typeof payload === 'string' && back.length !== payload.length) ? 'length-mismatch' : 'content-mismatch';
+      if (attempt === 0) continue;   // 重试一次（瞬时写入毒化/回收常可自愈）
+    }
+    __integrityStat.lastOk = false; __integrityStat.lastFailAt = Date.now();   // 当前态：最近一次写入校验失败
+    return { ok: false, verified: false, retried: true, reason: 'verify' };
   }
   function byteLen(s) {
     try {
@@ -296,13 +334,36 @@
       // 节流纯指纹幂等（v0.1.54 定稿）：每次 init 都 dry-run（枚举 <10ms，无需时间窗——时间窗会制造「窗内新垃圾不可见」陷阱），
       // 清理计划指纹变化（新垃圾集出现/清理后消失）才告警；同指纹重复 init 静默。
       try {
-        if (WA.store.sweepStaleKeys) {
-          const plan = WA.store.sweepStaleKeys({});   // dry-run
+        if (WA.store.maintain) {
+          // v0.4.0: 统一健康巡视——把分散信号收敛为健康分，并在体积超阈值时自动执行安全回收子集。
+          // 自动边界（严格保守）：仅回收过期诊断/孤儿恢复点/隔离溢出；当前聊天、settings、wb、
+          // state 本体、可解析隔离现场永不自动动。动作全部进 maintainStat 审计。
+          const m = WA.store.maintain({ apply: true, deep: false, minFreedBytes: 256 * 1024 });
+          const sig = (m.planKeys || []).join('|') + '#' + m.issues.map(function (x) { return x.key; }).sort().join('|');
+          const changed = sig !== __keyHygieneScanSig;
+          __keyHygieneScanSig = sig;
+          // 分级（严格沿用 v0.1.52 告警门槛「可回收 >256KB」）：
+          //   ① 已自动回收 → warn（动作必留痕）
+          //   ② 大额可回收（>256KB）→ warn（v0.1.52 契约；指纹节流，首见一次）
+          //   ③ 健康降级 → warn（新增能力；指纹节流）
+          //   ④ 其余（小额可回收 / 轻微议题）→ info，不污染 warn 计数
+          const bigReclaim = m.signals.reclaimable > 0 && m.signals.reclaimableBytes > 256 * 1024;
+          if (m.applied && m.applied.removed > 0) {
+            WA.log('warn', '存储键卫生：已自动回收 ' + m.applied.removed + ' 个「聊天已消失」的残留键 / ' + Math.round(m.applied.freedBytes / 1024) + 'KB（健康分 ' + m.score + '，' + m.level + '）——现有聊天/设置/世界书/隔离现场未动');
+          } else if (changed && bigReclaim) {
+            WA.log('warn', '存储键卫生：发现 ' + m.signals.reclaimable + ' 个过期键可回收 ' + Math.round(m.signals.reclaimableBytes / 1024) + 'KB（健康分 ' + m.score + '）——诊断面板「存储键体检」可执行清理');
+          } else if (changed && m.level === 'degraded') {
+            WA.log('warn', '存储键卫生：健康分 ' + m.score + '（降级），' + m.issues.length + ' 项议题' + (m.issues.length ? '——' + m.issues[0].detail : ''));
+          } else if (changed && m.issues.length) {
+            WA.log('info', '存储键卫生：健康分 ' + m.score + '，' + m.issues.length + ' 项议题——' + m.issues[0].detail);
+          }
+        } else if (WA.store.sweepStaleKeys) {
+          const plan = WA.store.sweepStaleKeys({});   // 回退路径：仅在缺 maintain 时保留旧 dry-run 指纹告警
           const sig = (plan.remove || []).map(function (r) { return r.key; }).sort().join('|');
           const changed = sig !== __keyHygieneScanSig;
           __keyHygieneScanSig = sig;
           if (changed && plan.remove.length && plan.freedBytes > 256 * 1024) {
-            WA.log('warn', '存储键卫生：发现 ' + plan.remove.length + ' 个过期键可回收 ' + Math.round(plan.freedBytes / 1024) + 'KB（过期诊断 ' + (plan.byFamily['diag-idle'] || 0) + '/隔离溢出 ' + (plan.byFamily['corrupt-overflow'] || 0) + '/孤儿恢复点 ' + (plan.byFamily['orphan-recovery'] || 0) + '），诊断面板「存储键体检」可执行清理');
+            WA.log('warn', '存储键卫生：发现 ' + plan.remove.length + ' 个过期键可回收 ' + Math.round(plan.freedBytes / 1024) + 'KB，诊断面板「存储键体检」可执行清理');
           }
         }
       } catch (e) {}
@@ -397,7 +458,15 @@
         s.meta = s.meta || {};
         s.meta.updatedAt = Date.now();
         const payload = JSON.stringify(s);
-        mainWin.localStorage.setItem(storageKey(chatId), payload);
+        // v0.4.0: 写后读回校验（含一次重试）——替换裸 setItem，静默截断不再被当成成功
+        const w = writeVerified(storageKey(chatId), payload);
+        if (!w.ok && w.reason === 'verify') {
+          __saveStat.at = Date.now(); __saveStat.ok = false; __saveStat.reason = 'verify'; __saveStat.failCount++;
+          memCache = s;
+          WA.log('error', 'store.save 写后读回校验失败（' + __integrityStat.lastReason + '）：磁盘副本与内存不一致，重试一次仍失败——数据可能未真正落盘');
+          return false;
+        }
+        if (!w.ok) throw (w.error || new Error('write failed'));
         memCache = s;
         __saveStat.at = Date.now(); __saveStat.ok = true; __saveStat.bytes = byteLen(payload); __saveStat.reason = null;
         return true;
@@ -465,25 +534,212 @@
         removed = plan.remove.length; freed = plan.freedBytes;
       } catch (e) { removed = 0; freed = 0; }
       __rescueStat.lastRemoved = removed; __rescueStat.lastFreedBytes = freed;
-      if (!removed) { __rescueStat.failed++; return false; }
+      if (!removed) { __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = Date.now(); return false; }
       // 重试落盘
       try {
         const s = state || memCache;
         s.meta = s.meta || {};
         s.meta.updatedAt = Date.now();
         const payload = JSON.stringify(s);
-        mainWin.localStorage.setItem(storageKey(chatId), payload);
+        const w2 = writeVerified(storageKey(chatId), payload);
+        if (!w2.ok) { __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = Date.now(); return false; }
         memCache = s;
         __saveStat.bytes = byteLen(payload);
         __rescueStat.recovered++;
+        __rescueStat.lastOk = true;   // 当前态：最近一次救援成功
         return true;
       } catch (e2) {
-        __rescueStat.failed++;
+        __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = Date.now();
         return false;
       }
     },
+    /**
+     * v0.4.0: 统一健康巡视——把分散的治理信号（存储计量/键卫生/诊断预算/隔离现场/救援/写入完整性/全库状态）
+     * 收敛为「一个健康分 + 分级议题 + 建议动作」。这是治理层从「各自出数」走向「统一裁决」的关键一步。
+     * 只读（apply:false 默认）；apply:true 时仅执行安全子集（过期诊断/孤儿恢复点/隔离溢出回收）。
+     */
+    maintain(opts) {
+      const o = opts || {};
+      const apply = o.apply === true;
+      __maintainStat.scans++; __maintainStat.lastAt = Date.now();
+      const issues = [];
+      const actions = [];
+      let score = 100;
+
+      // ── 1. 存储计量 + 键卫生 ──
+      let stat = null, plan = null;
+      try { stat = this.storageStat(); } catch (e) {}
+      try { plan = this.sweepStaleKeys({}); } catch (e) {}
+      if (plan && plan.remove.length) {
+        const freedKB = Math.round(plan.freedBytes / 1024);
+        if (plan.freedBytes > 512 * 1024) { score -= 12; issues.push({ level: 'warn', key: 'hygiene.reclaimable', detail: '可回收 ' + plan.remove.length + ' 键 / ' + freedKB + 'KB' }); }
+        else { score -= 3; issues.push({ level: 'info', key: 'hygiene.reclaimable', detail: '可回收 ' + plan.remove.length + ' 键 / ' + freedKB + 'KB' }); }
+        actions.push({ id: 'sweep', safe: true, detail: '回收过期诊断/孤儿恢复点/隔离溢出（' + plan.remove.length + ' 键）' });
+      }
+
+      // ── 2. 诊断体积预算 ──
+      let db = null;
+      try { db = this.diagBudget(); } catch (e) {}
+      if (db && db.exceeded) { score -= 8; issues.push({ level: 'warn', key: 'diag.budget', detail: '当前聊天诊断 ' + db.diagPct + '% > ' + db.maxPct + '%' }); actions.push({ id: 'trim-diag', safe: true, detail: '诊断环自适应收紧（由 index.js logCaps 执行）' }); }
+      else if (db && db.diagPct > 10) { issues.push({ level: 'info', key: 'diag.budget', detail: '诊断占比 ' + db.diagPct + '%' }); }
+
+      // ── 3. 隔离现场（需人工决策，不可自动）──
+      let qs = null;
+      try { qs = this.quarantineStat(); } catch (e) {}
+      if (qs && qs.stateSites > 0) {
+        score -= Math.min(10, qs.stateSites * 3);
+        issues.push({ level: qs.parseable > 0 ? 'warn' : 'info', key: 'quarantine.sites', detail: qs.stateSites + ' 个 state 隔离现场（可解析 ' + qs.parseable + '）——面板「隔离现场」可恢复/丢弃' });
+        if (qs.parseable > 0) actions.push({ id: 'restore-quarantine', safe: false, detail: '存在可解析现场，可能可恢复更多进度（需人工确认）' });
+      }
+
+      // ── 4. 全库状态健康 ──
+      let va = null;
+      try { va = this.verifyAll({ deep: o.deep === true }); } catch (e) {}
+      if (va && va.problems.length) {
+        score -= Math.min(20, va.problems.length * 6);
+        issues.push({ level: 'error', key: 'state.corrupt', detail: va.problems.length + ' 个聊天状态有问题（' + va.problems.map(function (p) { return p.chat + ':' + p.reason; }).slice(0, 3).join(', ') + '）' });
+      }
+
+      // ── 5. 救援/完整性经历 ──
+      const rs = (function () { try { return __rescueStat; } catch (e) { return null; } })();
+      // v0.4.0 语义统一（与 integrity 同类裁决）：
+      //   ① 最近一次救援失败 → 当前空间不足（扣分 warn）
+      //   ② 历史失败但当前无碍 → info 议题（可追溯，不扣分、不污染分级）
+      // 关键：rescue.lastOk 只在「救援被调用」时更新；历史失败后再未触发救援它会一直停在 false。
+      // 故当前态必须叠加「最近一次 save 是否仍因配额失败」——save 成功即证明空间问题已缓解。
+      const rescueNow = !!(rs && rs.lastOk === false && __saveStat.ok === false && __saveStat.reason === 'quota');
+      if (rescueNow) {
+        score -= Math.min(15, Math.max(5, rs.failed * 5));
+        issues.push({ level: 'warn', key: 'rescue.failing', detail: '最近一次配额救援失败且落盘仍失败（空间不足）——历史失败累计 ' + rs.failed + ' 次' });
+      } else if (rs && rs.failed > 0) {
+        issues.push({ level: 'info', key: 'rescue.history', detail: '历史配额救援失败 ' + rs.failed + ' 次（曾空间不足），当前落盘正常' });
+      }
+      const is = (function () { try { return __integrityStat; } catch (e) { return null; } })();
+      // v0.4.0 语义裁决：健康分 = 「当前状态」，审计计数 = 「历史经历」。
+      //   ① 最近一次写入校验失败 → 当前缺陷（扣分 warn）：磁盘副本可能落后于内存
+      //   ② 历史失败但当前正常 → info 议题（可追溯，不扣分、不污染告警分级）
+      //   ③ 全部通过 → info 议题
+      if (is && is.lastOk === false) {
+        score -= 15;
+        issues.push({ level: 'warn', key: 'integrity.failing', detail: '最近一次写入校验失败（' + (is.lastReason || 'unknown') + '）——磁盘副本可能落后于内存' });
+      } else if (is && is.mismatches > 0) {
+        issues.push({ level: 'info', key: 'integrity.history', detail: '历史写后校验不一致 ' + is.mismatches + ' 次（重试自愈 ' + is.recoveredByRetry + '），当前写入正常' });
+      } else if (is && is.verified > 0) {
+        issues.push({ level: 'info', key: 'integrity.ok', detail: '写入完整性校验 ' + is.verified + ' 次全部通过' });
+      }
+
+      score = Math.max(0, Math.min(100, score));
+      const level = score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'degraded';
+      let applied = null;
+      // v0.4.0: 自动回收门槛（保守优先，与 v0.1.52「删除属用户决策」契约兼容）——
+      // 只自动回收「聊天已彻底消失」的键：既无 state 本体、也无 state 隔离副本。
+      //   ① 该聊天的过期诊断键（宿主不存在，纯噪音）
+      //   ② 该聊天的孤儿恢复点（无处可回滚）
+      // 绝不自动回收：仍存在聊天的诊断键（用户可能要看日志）、隔离溢出（可能是唯一幸存现场）、
+      // 当前聊天 / settings / wb / state 本体。
+      const minFreed = typeof o.minFreedBytes === 'number' && o.minFreedBytes > 0 ? o.minFreedBytes : 0;
+      let eligible = [];
+      if (apply && plan && plan.remove.length) {
+        const liveChats = {};
+        listWorldAxisKeys().forEach(function (k) {
+          const c = classifyKey(k);
+          if (c.family === 'state' || (c.family === 'corrupt' && c.quarantine === 'state')) liveChats[c.chat] = true;
+        });
+        eligible = plan.remove.filter(function (r) {
+          return r.reason !== 'corrupt-overflow' && r.chat && !liveChats[r.chat] && r.chat !== getChatId();
+        });
+        const eligibleBytes = eligible.reduce(function (acc, r) { return acc + (r.bytes || 0); }, 0);
+        if (eligibleBytes < minFreed) eligible = [];
+      }
+      if (eligible.length) {
+        let removed = 0, freed = 0;
+        eligible.forEach(function (r) {
+          try { mainWin.localStorage.removeItem(r.key); removed++; freed += (r.bytes || 0); }
+          catch (e) {}
+        });
+        applied = { removed: removed, freedBytes: freed };
+        __maintainStat.autoApplies++; __maintainStat.lastAutoFreedKeys = removed; __maintainStat.lastAutoFreedBytes = freed;
+      }
+      __maintainStat.lastScore = score; __maintainStat.lastLevel = level;
+      return {
+        score: score, level: level, issues: issues, actions: actions, applied: applied,
+        // v0.4.0: 可回收键名清单（供 init 指纹节流；与 v0.1.54「键名排序串」契约同粒度——
+        // 只报议题名会让新垃圾集签名不变，导致指纹告警失效）
+        planKeys: (plan && plan.remove ? plan.remove.map(function (r) { return r.key; }).sort() : []),
+        signals: {
+          totalKeys: stat ? stat.totalKeys : 0, totalBytes: stat ? stat.totalBytes : 0,
+          reclaimable: plan ? plan.remove.length : 0, reclaimableBytes: plan ? plan.freedBytes : 0,
+          diagPct: db ? db.diagPct : 0,
+          quarantineSites: qs ? qs.stateSites : 0, quarantineParseable: qs ? qs.parseable : 0,
+          chatsChecked: va ? va.total : 0, chatsProblem: va ? va.problems.length : 0,
+          rescueFailed: rs ? rs.failed : 0, rescueFailing: rescueNow,
+          rescueRecovered: rs ? rs.recovered : 0,
+          integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
+        }
+      };
+    },
+    /** v0.4.0: 巡视计量视图（面板/报告消费） */
+    maintainStat() { const m = __maintainStat; return { scans: m.scans, lastAt: m.lastAt, lastScore: m.lastScore, lastLevel: m.lastLevel, autoApplies: m.autoApplies, lastAutoFreedKeys: m.lastAutoFreedKeys, lastAutoFreedBytes: m.lastAutoFreedBytes }; },
+    /**
+     * v0.4.0: 完整性审计视图（只读）——writes 为写后校验次数，mismatches>0 说明本会话出现过静默写入失败
+     */
+    integrityStat() {
+      const i = __integrityStat;
+      return { writes: i.writes, verified: i.verified, mismatches: i.mismatches, retried: i.retried, recoveredByRetry: i.recoveredByRetry, lastAt: i.lastAt, lastReason: i.lastReason, lastOk: i.lastOk, lastFailAt: i.lastFailAt };
+    },
+    /**
+     * v0.4.0: 单聊天状态体检（只读）——解析可用性 + 结构完整度 + 体积。
+     * deep:true 时额外按默认结构比对缺失字段（不修改任何数据）。
+     */
+    verifyState(chatId, opts) {
+      const o = opts || {};
+      const cid = chatId || getChatId();
+      const key = 'worldaxis_state_' + cid;
+      let raw = null;
+      try { raw = mainWin.localStorage.getItem(key); } catch (e) { return { chat: cid, exists: false, ok: false, reason: 'read-failed' }; }
+      if (raw === null) return { chat: cid, exists: false, ok: false, reason: 'missing' };
+      let parsed = null;
+      try { parsed = JSON.parse(raw); }
+      catch (e) { return { chat: cid, exists: true, ok: false, parseable: false, bytes: byteLen(raw), reason: 'unparseable' }; }
+      const out = { chat: cid, exists: true, ok: true, parseable: true, bytes: byteLen(raw), schemaVersion: parsed && parsed.schemaVersion };
+      if (o.deep) {
+        const fresh = defaultWorldState();
+        const probe = JSON.parse(JSON.stringify(parsed));
+        const r = ensureShape(probe, fresh);
+        out.missingFields = r.filled;
+        out.typeConflicts = r.conflicts;
+        out.shapeOk = r.filled === 0;
+      }
+      return out;
+    },
+    /**
+     * v0.4.0: 全库状态巡检（只读）——枚举所有聊天的 state 键，逐一验证解析与结构。
+     * 这是「治理层能自证健康」的关键：单个聊天载入成功不代表整个键空间无腐坏。
+     */
+    verifyAll(opts) {
+      const o = opts || {};
+      const keys = listWorldAxisKeys();
+      const chats = [];
+      const problems = [];
+      keys.forEach(function (k) {
+        const c = classifyKey(k);
+        if (c.family !== 'state') return;
+        const r = this.verifyState(c.chat, { deep: o.deep === true });
+        chats.push(r);
+        if (!r.ok) problems.push({ chat: c.chat, reason: r.reason, bytes: r.bytes || 0 });
+        else if (o.deep === true && r.shapeOk === false) problems.push({ chat: c.chat, reason: 'missing-fields', missingFields: r.missingFields, typeConflicts: r.typeConflicts });
+      }, this);
+      let bytes = 0;
+      chats.forEach(function (r) { bytes += r.bytes || 0; });
+      return {
+        total: chats.length, healthy: chats.filter(function (r) { return r.ok; }).length,
+        problems: problems, bytes: bytes, deep: o.deep === true,
+        currentChat: getChatId(),
+        currentOk: (function (self) { const r = self.verifyState(); return r; })(this)
+      };
+    },
     /** v0.3.0: 配额救援观测（tool-diag/面板消费）——attempts>0 表示本会话曾撞配额墙 */
-    rescueStat() { const r = __rescueStat; return { attempts: r.attempts, recovered: r.recovered, failed: r.failed, lastRemoved: r.lastRemoved, lastFreedBytes: r.lastFreedBytes, lastAt: r.lastAt }; },
+    rescueStat() { const r = __rescueStat; return { attempts: r.attempts, recovered: r.recovered, failed: r.failed, lastRemoved: r.lastRemoved, lastFreedBytes: r.lastFreedBytes, lastAt: r.lastAt, lastOk: r.lastOk, lastFailAt: r.lastFailAt }; },
     /** v0.3.0: 隔离现场处置审计视图 */
     quarantineAudit() { const q = __quarantineStat; return { restores: q.restores, drops: q.drops, lastRestoreAt: q.lastRestoreAt, lastDropAt: q.lastDropAt, lastKey: q.lastKey }; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */

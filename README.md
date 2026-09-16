@@ -66,6 +66,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.4.0** — 自动治理闭环 + 写入完整性：治理层从「各自出数」走向「统一裁决 + 自动响应 + 写后自证」。① **写入完整性**：store 全部落盘改走 writeVerified（写后立刻读回逐字符比对，不一致重试一次；失败分类 missing-after-write / length-mismatch / content-mismatch，两次不一致如实返回 false 并不再假装成功）+ verifyState（单聊天解析/体积/结构体检，deep 模式只读比对缺失字段）+ verifyAll（全库 state 键巡检——单聊天载入成功 ≠ 键空间健康）+ integrityStat 计量。② **诊断环自适应**：事件/错误环上限按存储水位动态收紧（常规 300/50、紧张 120/30、危急 60/20，软水位 4MB / 硬水位 8MB），裁剪量进 logTrimStat 可观测，不再硬编码。③ **统一健康巡视**：maintain() 把存储计量/键卫生/诊断预算/隔离现场/全库状态/救援/完整性收敛为一个健康分 + 分级议题 + 建议动作（ok/warn/degraded）；apply:true 时仅自动回收「聊天已彻底消失」的残留键（既无 state 本体也无隔离副本），当前聊天/settings/wb/state 本体/隔离现场永不自动动，minFreedBytes 门槛保守优先。④ **健康分语义裁决**：健康分只反映「当前状态」，历史写入失败/历史配额救援失败降为 info 议题（不扣分、不污染告警分级）——修复一次瞬时毒化把健康分永久压低、制造无谓告警的缺陷。⑤ **闭环接线**：面板「健康巡视」入口（分级议题 + 建议动作 + 写入完整性），错误报告新增「健康巡视」段。1528 断言全过（3 轮稳定），10 项负向验证精准爆红。
 - **v0.1.41** — 撤销-槽位关联审计 + 通道配置可观测：render.uninjectAudit()（快照在场声明 × 撤销台账 × keys 交叉核对，检出 stale-snapshot/cleared-by-mismatch/writeback-before-land），tool-diag inject 节透出 uninjectIssues；apiRouter.setChannel 变更计量 cfgStat()（changes/baseUrlChanges/lastChannel）+ 总线广播 api:channel-changed（payload 不含明文 apiKey），诊断 apiRouter.cfg 子节透出。
 
 - **v0.1.39** — contract-audit 探针还原路径事务化：原位还原改走 transact（深改写在 draft 上进行），全库裸 save 清零，还原动作纳入 txStat 计量与统一落盘路径。

@@ -4668,6 +4668,358 @@ WA.loadScript = _ls.loadScript;
   Object.keys(junkBefore300).forEach(function (k) { LS300.setItem(k, junkBefore300[k]); });
   } // end v0.3.0 block
   } // end v0.2.3 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.4.0 — 自动治理闭环 + 写入完整性（统一裁决 / 自动响应 / 写后自证）
+  // ═══════════════════════════════════════════════════════════
+  v0400: {
+  const LS400 = global.localStorage;
+  const junkBefore400 = JSON.parse(JSON.stringify(LS400._dump()));
+  const realSet400 = LS400.setItem;
+  const evtBefore400 = WA.eventLog.slice();
+  // v0.4.0 测试隔离：store.init() 内部会 loadEventLog→flushLog，
+  // 把上一段残留的内存日志落盘（诊断键复活 → diagBudget 占比虚高 → 健康分被扣）。
+  // 故实例化新键空间前先冲刷挂起写入并清空内存日志。
+  function resetLogs400() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+
+  // ── 1. A 块：写后读回校验（正常路径自证）──
+  resetLogs400();
+  LS400.clear();
+  WA.store.init();
+  const cid400 = WA.store.chatId();
+  const sk400 = 'worldaxis_state_' + cid400;
+  assert(typeof WA.store.integrityStat === 'function' && typeof WA.store.verifyState === 'function'
+    && typeof WA.store.verifyAll === 'function' && typeof WA.store.maintain === 'function'
+    && typeof WA.store.maintainStat === 'function', 'v0.4.0 新增治理 API 全部就位');
+  const iA0 = WA.store.integrityStat();
+  WA.store.transact(d => { d.clock.label = '写后自证'; });
+  const okA = WA.store.save();
+  const iA1 = WA.store.integrityStat();
+  assert(okA === true && iA1.verified > iA0.verified, '正常写入后读回校验通过（verified 增长）');
+  assert(iA1.writes > iA0.writes, '写后校验计入 writes 计量');
+  assert(iA1.lastOk === true, '当前态标记为「最近一次写入校验通过」');
+
+  // ── 2. A 块：静默截断必须被抓到（不再假装成功）──
+  const iB0 = WA.store.integrityStat();
+  LS400.setItem = function (k, v) {
+    if (k === sk400) return realSet400(k, String(v).slice(0, Math.floor(String(v).length / 2)));   // 模拟移动端静默截断
+    return realSet400(k, v);
+  };
+  const okB = WA.store.save();
+  const iB1 = WA.store.integrityStat();
+  LS400.setItem = realSet400;
+  assert(okB === false, '静默截断被识别并如实返回失败（不再假装成功）');
+  assert(WA.store.saveStat().reason === 'verify', '失败归因为 verify（区别于 quota）');
+  assert(iB1.mismatches >= iB0.mismatches + 2, '两次校验均计入不一致（实 +' + (iB1.mismatches - iB0.mismatches) + '）');
+  assert(iB1.lastReason === 'length-mismatch', '失败分类为 length-mismatch（长度不符）');
+  assert(iB1.lastOk === false, '当前态标记为失败');
+
+  // ── 3. A 块：三种失败分类可归因 ──
+  // 3a. missing-after-write：写入被丢弃（读回 null）
+  LS400.removeItem(sk400);
+  LS400.setItem = function (k, v) { if (k === sk400) return; return realSet400(k, v); };
+  WA.store.save();
+  const iC1 = WA.store.integrityStat();
+  LS400.setItem = realSet400;
+  assert(iC1.lastReason === 'missing-after-write', '写入被完全丢弃 → missing-after-write');
+  // 3b. content-mismatch：等长但内容不同（最隐蔽的毒化——长度检查抓不到）
+  const TAG400 = 'CONTENTX';   // 8 字符
+  const SUB400 = 'CHANGEDX';   // 8 字符（等长）
+  assert(TAG400.length === SUB400.length, '等长替换常量自检');
+  LS400.setItem = function (k, v) {
+    if (k === sk400) return realSet400(k, String(v).replace(TAG400, SUB400));
+    return realSet400(k, v);
+  };
+  WA.store.transact(d => { d.clock.label = TAG400; });
+  const okC = WA.store.save();
+  const iC2 = WA.store.integrityStat();
+  LS400.setItem = realSet400;
+  assert(okC === false && iC2.lastReason === 'content-mismatch', '等长异内容 → content-mismatch（长度检查抓不到）');
+
+  // ── 4. A 块：瞬时毒化可自愈，且自愈痕迹不丢 ──
+  resetLogs400();
+  LS400.clear(); WA.store.init();
+  const iD0 = WA.store.integrityStat();
+  let poison400 = true;
+  LS400.setItem = function (k, v) {
+    if (k === sk400 && poison400) { poison400 = false; return realSet400(k, String(v).slice(0, 10)); }   // 仅首次写坏
+    return realSet400(k, v);
+  };
+  WA.store.transact(d => { d.clock.label = '自愈'; });
+  const okD = WA.store.save();
+  const iD1 = WA.store.integrityStat();
+  LS400.setItem = realSet400;
+  assert(okD === true, '瞬时毒化经重试后落盘成功（不误报失败）');
+  assert(iD1.retried > iD0.retried && iD1.recoveredByRetry > iD0.recoveredByRetry, '重试与自愈均留痕（不静默）');
+  assert(iD1.mismatches > iD0.mismatches, '首次不一致仍计入计量（自愈不掩盖历史）');
+  assert(JSON.parse(LS400.getItem(sk400)).clock.label === '自愈', '重试后磁盘值正确');
+
+  // ── 5. A 块：verifyState 单聊天体检 ──
+  resetLogs400();
+  LS400.clear(); WA.store.init();
+  WA.store.transact(d => { d.clock.label = '体检'; }); WA.store.save();
+  const vOk400 = WA.store.verifyState();
+  assert(vOk400.ok === true && vOk400.parseable === true && vOk400.exists === true, '健康聊天体检通过');
+  assert(vOk400.schemaVersion === 1 && vOk400.bytes > 0, '体检透出版本与体积');
+  const vMiss400 = WA.store.verifyState('v400_nope_chat');
+  assert(vMiss400.exists === false && vMiss400.ok === false && vMiss400.reason === 'missing', '不存在的聊天如实报 missing');
+  LS400.setItem('worldaxis_state_v400_bad_chat', '{oops');
+  const vBad400 = WA.store.verifyState('v400_bad_chat');
+  assert(vBad400.ok === false && vBad400.parseable === false && vBad400.reason === 'unparseable', '不可解析状态如实报 unparseable');
+  // deep：结构完整度（不修改数据）
+  const curN400 = WA.store.chatId();
+  const fullJson400 = LS400.getItem('worldaxis_state_' + curN400);
+  const partial400 = JSON.parse(fullJson400);
+  delete partial400.clock; delete partial400.memory;
+  LS400.setItem('worldaxis_state_v400_shallow_chat', JSON.stringify(partial400));
+  const vDeep400 = WA.store.verifyState('v400_shallow_chat', { deep: true });
+  assert(vDeep400.missingFields === 2 && vDeep400.shapeOk === false, 'deep 体检检出缺失字段数（实 ' + vDeep400.missingFields + '）');
+  assert(LS400.getItem('worldaxis_state_v400_shallow_chat') === JSON.stringify(partial400), 'deep 体检只读不修改数据');
+
+  // ── 6. A 块：verifyAll 全库巡检（单聊天载入成功 ≠ 键空间健康）──
+  const vaShallow400 = WA.store.verifyAll({});
+  assert(vaShallow400.total === 3 && vaShallow400.healthy === 2, '全库巡检枚举全部 state 键并统计健康数');
+  assert(vaShallow400.problems.length === 1 && vaShallow400.problems[0].chat === 'v400_bad_chat', '浅巡检只报不可解析项');
+  assert(vaShallow400.deep === false && vaShallow400.currentOk.ok === true, '浅巡检标记 deep=false 并透出当前聊天体检');
+  const vaDeep400 = WA.store.verifyAll({ deep: true });
+  assert(vaDeep400.deep === true, '深巡检标记 deep=true');
+  assert(vaDeep400.problems.length === 2 && vaDeep400.problems.some(p => p.reason === 'missing-fields'), '深巡检额外检出结构缺失');
+
+  // ── 7. B 块：诊断环上限按存储水位自适应（源码契约）──
+  const idxSrc400 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+  assert(idxSrc400.indexOf('const LOG_ADAPT') >= 0, '诊断环上限集中登记（LOG_ADAPT）');
+  assert(/baseEvent:\s*300/.test(idxSrc400) && /baseError:\s*50/.test(idxSrc400), '常规档位 300/50');
+  assert(/tightEvent:\s*120/.test(idxSrc400) && /tightError:\s*30/.test(idxSrc400), '紧张档位 120/30');
+  assert(/minuteEvent:\s*60/.test(idxSrc400) && /minuteError:\s*20/.test(idxSrc400), '危急档位 60/20');
+  assert(/bytesSoft:\s*4\s*\*\s*1024\s*\*\s*1024/.test(idxSrc400) && /bytesHard:\s*8\s*\*\s*1024\s*\*\s*1024/.test(idxSrc400), '软/硬水位 4MB/8MB');
+  assert(idxSrc400.indexOf('WA.logCaps = logCaps') >= 0 && idxSrc400.indexOf('WA.logTrimStat = logTrimStatView') >= 0, '动态上限与裁剪计量对外可观测');
+  assert(idxSrc400.indexOf('const caps = logCaps();') >= 0, 'WA.log 实际消费动态上限（非硬编码）');
+  // 沙箱实跑：三档水位判定
+  const iLo400 = idxSrc400.indexOf('const LOG_ADAPT');
+  const iHi400 = idxSrc400.indexOf('let __logSaveTimer');
+  assert(iLo400 > 0 && iHi400 > iLo400, '提取 LOG_ADAPT..logTrimStatView 段');
+  const logSeg400 = idxSrc400.slice(iLo400, iHi400);
+  function capsAt400(totalBytes, exceeded) {
+    const box = {};
+    vm.runInContext('var WA = { store: { diagBudget: function () { return { exceeded: ' + (exceeded ? 'true' : 'false') + ', diagPct: ' + (exceeded ? 30 : 1) + ', maxPct: 20 }; }, storageStat: function () { return { totalBytes: ' + totalBytes + ' }; } } };\n'
+      + logSeg400 + '\nglobalThis.__caps = logCaps();', vm.createContext(box));
+    return box.__caps;
+  }
+  const capNorm400 = capsAt400(1000, false);
+  assert(capNorm400.level === 'normal' && capNorm400.event === 300 && capNorm400.error === 50, '常规水位 → 300/50');
+  const capSoft400 = capsAt400(5 * 1024 * 1024, false);
+  assert(capSoft400.level === 'tight' && capSoft400.event === 120 && capSoft400.error === 30, '超软水位 → 自动收紧到 120/30');
+  assert(capSoft400.why.join(',').indexOf('totalBytes>') >= 0, '收紧原因可归因（不只给结果）');
+  const capHard400 = capsAt400(9 * 1024 * 1024, true);
+  assert(capHard400.level === 'minute' && capHard400.event === 60 && capHard400.error === 20, '超硬水位+超预算 → 危急档 60/20');
+
+  // ── 8. C 块：maintain 统一裁决（健康分 + 分级议题）──
+  resetLogs400();
+  LS400.clear(); WA.store.init();
+  WA.store.transact(d => { d.clock.label = '干净库'; }); WA.store.save();
+  const mClean400 = WA.store.maintain({});
+  assert(mClean400.score === 100 && mClean400.level === 'ok', '干净库健康分 100 / ok');
+  assert(mClean400.planKeys.length === 0 && mClean400.actions.length === 0, '干净库无可回收键、无建议动作');
+  assert(typeof mClean400.signals.totalKeys === 'number' && typeof mClean400.signals.reclaimable === 'number'
+    && typeof mClean400.signals.diagPct === 'number' && typeof mClean400.signals.chatsChecked === 'number', 'signals 透出全套治理计量');
+  assert(mClean400.issues.every(x => x.level === 'info'), '干净库议题全为 info（不污染告警）');
+  // 大额可回收 → 议题 + 建议动作
+  LS400.setItem('worldaxis_state_v400_dead', JSON.stringify({ meta: { updatedAt: Date.now() - 40 * 86400000 } }));
+  LS400.setItem('worldaxis_event_log_v400_dead', 'y'.repeat(400 * 1024));
+  const mDirty400 = WA.store.maintain({});
+  assert(mDirty400.signals.reclaimable === 1 && mDirty400.signals.reclaimableBytes === 409600, '可回收键与字节被量化（实 ' + mDirty400.signals.reclaimableBytes + 'B）');
+  assert(mDirty400.planKeys.length === 1 && mDirty400.planKeys[0] === 'worldaxis_event_log_v400_dead', 'planKeys 为可回收键名清单（指纹节流粒度）');
+  assert(mDirty400.actions.some(a => a.id === 'sweep' && a.safe === true), '产出安全建议动作（sweep）');
+  // 分档：>512KB 扣分升档
+  LS400.setItem('worldaxis_event_log_v400_dead2', 'z'.repeat(600 * 1024));
+  const mHuge400 = WA.store.maintain({});
+  assert(mHuge400.signals.reclaimableBytes > 512 * 1024 && mHuge400.issues.some(x => x.key === 'hygiene.reclaimable' && x.level === 'warn'), '超大额可回收升为 warn 议题');
+
+  // ── 9. C 块：自动回收的安全边界（v0.1.52「删除属用户决策」契约的精确化）──
+  // 9a. 真孤儿（聊天既无 state 本体也无隔离副本）→ 自动回收
+  resetLogs400();
+  LS400.clear(); WA.store.init(); WA.store.save();
+  const mStat0 = WA.store.maintainStat();
+  LS400.setItem('worldaxis_event_log_v400_ghost', 'g'.repeat(400 * 1024));
+  LS400.setItem('worldaxis_recovery_v400_ghost', JSON.stringify([{ at: Date.now(), state: {} }]));
+  const mGhost400 = WA.store.maintain({ apply: true, minFreedBytes: 1 });
+  assert(mGhost400.applied && mGhost400.applied.removed === 2, '真孤儿残留被自动回收（实 ' + JSON.stringify(mGhost400.applied) + '）');
+  assert(LS400.getItem('worldaxis_event_log_v400_ghost') === null && LS400.getItem('worldaxis_recovery_v400_ghost') === null, '孤儿诊断键与孤儿恢复点均已清除');
+  const mStat1 = WA.store.maintainStat();
+  assert(mStat1.autoApplies > mStat0.autoApplies && mStat1.lastAutoFreedBytes === 409633, '自动动作进入审计计量（' + mStat1.lastAutoFreedBytes + 'B）');
+  // 9b. 有 state 本体的聊天 → 诊断键绝不自动回收（用户可能要看日志）
+  resetLogs400();
+  LS400.clear(); WA.store.init();
+  LS400.setItem('worldaxis_state_v400_liver', JSON.stringify({ meta: { updatedAt: Date.now() - 90 * 86400000 } }));
+  LS400.setItem('worldaxis_event_log_v400_liver', 'l'.repeat(500 * 1024));
+  const mLiver400 = WA.store.maintain({ apply: true, minFreedBytes: 1 });
+  assert(mLiver400.applied === null, '仍存在聊天的过期诊断键不被自动回收');
+  assert(LS400.getItem('worldaxis_event_log_v400_liver') !== null && LS400.getItem('worldaxis_state_v400_liver') !== null, '其诊断键与 state 本体均保留');
+  // 9c. 隔离现场 → 绝不自动回收（可能是唯一幸存现场 / 可恢复）
+  const cu400 = WA.store.chatId();
+  const qCur400 = 'worldaxis_state_' + cu400 + '_corrupt_400101';
+  const qOther400 = 'worldaxis_state_v400_other_corrupt_400102';
+  LS400.setItem(qCur400, '当前聊天唯一幸存现场');
+  LS400.setItem(qOther400, JSON.stringify({ schemaVersion: 1 }));
+  const mQuar400 = WA.store.maintain({ apply: true, minFreedBytes: 1 });
+  assert(mQuar400.applied === null, '隔离现场不被自动回收');
+  assert(LS400.getItem(qCur400) !== null, '当前聊天的隔离副本受保护（文档不变量：当前聊天键永不清理）');
+  assert(LS400.getItem(qOther400) !== null, '可解析隔离现场保留待人工恢复');
+  // 9d. 隔离溢出（corrupt-overflow）→ 不自动回收（删除属用户决策）
+  resetLogs400();
+  LS400.clear(); WA.store.init();
+  for (let i = 1; i <= 8; i++) LS400.setItem('worldaxis_state_v400_gone_corrupt_' + (400200 + i), 'x'.repeat(50 * 1024));
+  const mOver400 = WA.store.maintain({ apply: true, minFreedBytes: 1 });
+  assert(mOver400.applied === null, '隔离溢出不被自动回收（仅由用户经面板决策）');
+  assert(Object.keys(LS400._dump()).filter(k => k.indexOf('_corrupt_') > 0).length === 8, '全部 8 个隔离键原样保留');
+  // 9e. 门槛：回收量低于门槛则不动（保守优先，避免频繁微小删除）
+  resetLogs400();
+  LS400.clear(); WA.store.init(); WA.store.save();
+  LS400.setItem('worldaxis_event_log_v400_small', 's'.repeat(10 * 1024));
+  const mThr400 = WA.store.maintain({ apply: true, minFreedBytes: 256 * 1024 });
+  assert(mThr400.applied === null && LS400.getItem('worldaxis_event_log_v400_small') !== null, '低于 minFreedBytes 门槛不执行回收');
+  const mThr2_400 = WA.store.maintain({ apply: true, minFreedBytes: 1 });
+  assert(mThr2_400.applied && mThr2_400.applied.freedBytes === 10240, '放低门槛后回收（门槛确为唯一闸门）');
+  // 9f. dry-run 不删：无 apply 时只报不做
+  resetLogs400();
+  LS400.clear(); WA.store.init(); WA.store.save();
+  LS400.setItem('worldaxis_event_log_v400_dry', 'd'.repeat(400 * 1024));
+  const mDry400 = WA.store.maintain({});
+  assert(mDry400.applied === null && LS400.getItem('worldaxis_event_log_v400_dry') !== null, '无 apply 时绝不删除（rescue/巡视默认只读）');
+
+  // ── 10. E 块：健康分语义 =「当前状态」而非「历史经历」──
+  resetLogs400();
+  LS400.clear(); WA.store.init();
+  const cidE400 = WA.store.chatId();
+  LS400.setItem = function (k, v) { if (k === 'worldaxis_state_' + cidE400) return; return realSet400(k, v); };
+  WA.store.transact(d => { d.clock.label = '当前失败'; });
+  WA.store.save();
+  LS400.setItem = realSet400;
+  const mFail400 = WA.store.maintain({});
+  assert(mFail400.issues.some(x => x.key === 'integrity.failing' && x.level === 'warn'), '最近一次写入校验失败 → warn 议题');
+  assert(mFail400.score <= 85, '当前写入缺陷计入扣分（实 ' + mFail400.score + '）');
+  WA.store.transact(d => { d.clock.label = '恢复'; });
+  WA.store.save();
+  const mHeal400 = WA.store.maintain({});
+  assert(!mHeal400.issues.some(x => x.key === 'integrity.failing'), '写入恢复后不再报当前缺陷');
+  assert(mHeal400.issues.some(x => x.key === 'integrity.history' && x.level === 'info'), '历史失败降级为 info 议题（可追溯、不扣分）');
+  assert(mHeal400.score > mFail400.score, '健康分随当前态回升（不被历史经历永久压低）');
+
+  // ── 10b. I 块：救援失败的「当前态 vs 历史经历」（与完整性同类裁决）──
+  assert(typeof WA.store.rescueStat().lastOk !== 'undefined', '救援计量透出当前态字段（lastOk）');
+  // 先制造一次「历史救援失败」（本段自有，不依赖前序段），再恢复正常落盘
+  resetLogs400(); LS400.clear();
+  WA.store.init();
+  const cidH400 = WA.store.chatId();
+  WA.store.transact(d => { d.clock.label = '历史配额失败'; }); WA.store.save();
+  {
+    const realSetH400 = LS400.setItem;
+    LS400.setItem = function (k, v) {
+      if (k === 'worldaxis_state_' + cidH400) {
+        const e = new Error('quota exceeded'); e.name = 'QuotaExceededError'; throw e;
+      }
+      return realSetH400(k, v);
+    };
+    WA.store.transact(d => { d.clock.label = '历史配额失败2'; });
+    WA.store.save();   // 撞配额 → 触发救援 → 无可回收键 → failed++
+    LS400.setItem = realSetH400;
+  }
+  const rHist400 = WA.store.rescueStat();
+  assert(rHist400.failed > 0 && rHist400.lastOk === false, '历史救援失败已留痕（failed=' + rHist400.failed + '）');
+  // 恢复正常落盘 → 当前态必须回到正常
+  resetLogs400(); LS400.clear();
+  WA.store.init();
+  WA.store.transact(d => { d.clock.label = '当前正常'; }); WA.store.save();
+  {
+    const mRes = WA.store.maintain({});
+    assert(WA.store.saveStat().ok === true, '当前落盘成功（前置条件）');
+    assert(!mRes.issues.some(x => x.key === 'rescue.failing'), '历史救援失败且当前落盘正常 → 不报当前缺陷');
+    assert(mRes.issues.some(x => x.key === 'rescue.history' && x.level === 'info'), '历史救援失败降级为 info 议题（可追溯、不扣分）');
+    assert(mRes.score === 100 && mRes.level === 'ok', '健康分不被历史救援失败压低（实 ' + mRes.score + '/' + mRes.level + '）');
+    assert(mRes.signals.rescueFailing === false, 'signals 透出救援当前态为正常');
+    assert(mRes.signals.rescueFailed === rHist400.failed, 'signals 仍保留历史失败计数（审计不丢）');
+  }
+  // 反向：最近一次 save 因配额失败 → 必须报当前缺陷并扣分
+  {
+    const cidR400 = WA.store.chatId();
+    const realSetR400 = LS400.setItem;
+    const mBeforeR = WA.store.maintain({});
+    LS400.setItem = function (k, v) {
+      if (k === 'worldaxis_state_' + cidR400) {
+        const e = new Error('quota exceeded'); e.name = 'QuotaExceededError'; throw e;
+      }
+      return realSetR400(k, v);
+    };
+    WA.store.transact(d => { d.clock.label = '当前配额失败'; });
+    const okQuota = WA.store.save();
+    LS400.setItem = realSetR400;
+    assert(okQuota === false && WA.store.saveStat().reason === 'quota', '当前 save 因配额失败（前置条件）');
+    const mAfterR = WA.store.maintain({});
+    assert(mAfterR.issues.some(x => x.key === 'rescue.failing' && x.level === 'warn'), '当前救援失败 → warn 议题（不因历史而豁免）');
+    assert(mAfterR.score < mBeforeR.score, '当前空间缺陷计入扣分（' + mBeforeR.score + ' → ' + mAfterR.score + '）');
+    assert(mAfterR.signals.rescueFailing === true, 'signals 透出救援当前态异常');
+  }
+
+  // ── 11. D 块：init 巡警分级（严格沿用 v0.1.52 告警门槛）──
+  function hygieneLogs400() { return WA.eventLog.filter(l => l.msg.indexOf('存储键卫生') >= 0); }
+  function lastHygiene400() { const a = hygieneLogs400(); return a.length ? a[a.length - 1] : null; }
+  // 11a. 大额可回收（>256KB，但有 state 本体故不自动回收）→ warn
+  resetLogs400();
+  LS400.clear(); WA.store.init(); WA.store.save();
+  WA.eventLog.length = 0;
+  LS400.setItem('worldaxis_state_v400_cold', JSON.stringify({ meta: { updatedAt: Date.now() - 50 * 86400000 } }));
+  LS400.setItem('worldaxis_event_log_v400_cold', 'c'.repeat(300 * 1024));
+  WA.store.init();
+  const hBig400 = lastHygiene400();
+  assert(hBig400 && hBig400.level === 'warn', '大额可回收触发 warn（v0.1.52 门槛：>256KB）');
+  assert(hBig400.msg.indexOf('可回收') >= 0 && hBig400.msg.indexOf('存储键体检') >= 0, '大额告警指出可回收量与面板出口');
+  // 11b. 小额可回收 → info，不产生告警
+  WA.eventLog.length = 0;
+  const warnBefore400 = hygieneLogs400().filter(l => l.level === 'warn').length;
+  resetLogs400();
+  LS400.clear(); WA.store.init(); WA.store.save(); WA.eventLog.length = 0;
+  LS400.setItem('worldaxis_event_log_v400_tiny', 't'.repeat(2 * 1024));
+  WA.store.init();
+  assert(hygieneLogs400().filter(l => l.level === 'warn').length === 0, '小额可回收不产生告警（阈值闸）');
+  const hSmall400 = lastHygiene400();
+  assert(!hSmall400 || hSmall400.level === 'info', '小额可回收最多降为 info 留痕');
+  // 11c. 真孤儿被自动回收 → warn 留痕（动作必留痕）
+  resetLogs400();
+  LS400.clear(); WA.store.init(); WA.store.save(); WA.eventLog.length = 0;
+  LS400.setItem('worldaxis_event_log_v400_ghost2', 'q'.repeat(400 * 1024));
+  WA.store.init();
+  const hAuto400 = lastHygiene400();
+  assert(hAuto400 && hAuto400.level === 'warn' && hAuto400.msg.indexOf('已自动回收') >= 0, '自动回收动作必留 warn 痕迹');
+  assert(LS400.getItem('worldaxis_event_log_v400_ghost2') === null, 'init 无人值守自愈真的生效（键已清）');
+  // 11d. 指纹含 planKeys（v0.1.54 键名排序串契约，否则新垃圾集签名不变）
+  const stSrc400 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  assert(stSrc400.indexOf("(m.planKeys || []).join('|')") >= 0, '巡视签名含可回收键名串（防新垃圾集指纹失效）');
+  assert(stSrc400.indexOf('WA.store.maintain({ apply: true') >= 0 && /minFreedBytes:\s*256\s*\*\s*1024/.test(stSrc400), 'init 以保守门槛（256KB）接入自动治理');
+
+  // ── 12. F 块：闭环接线（报告 + 面板）──
+  const diagSrc400 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  assert(diagSrc400.indexOf('## 健康巡视') >= 0, '错误报告含「健康巡视」段（裁决视图可带走）');
+  assert(diagSrc400.indexOf('maintain: WA.store.maintain') >= 0 || diagSrc400.indexOf('maintain: WA.store.maintain ?') >= 0, '诊断包透出健康巡视');
+  assert(diagSrc400.indexOf('integrity: WA.store.integrityStat') >= 0, '诊断包透出写入完整性审计');
+  assert(diagSrc400.indexOf('写入完整性: 校验') >= 0, '报告文本含写入完整性行');
+  try {
+    WA.store.transact(d => { d.clock.label = '报告'; }); WA.store.save();
+    const rep400 = WA.toolDiag.buildErrorReport();
+    assert(rep400.indexOf('## 健康巡视') >= 0 && rep400.indexOf('健康分: ') >= 0, '实跑报告产出健康巡视内容');
+    assert(rep400.indexOf('写入完整性:') >= 0, '实跑报告产出写入完整性内容');
+  } catch (e) { assert(false, '错误报告实跑失败: ' + e.message); }
+  const panelSrc400 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(panelSrc400.indexOf('id="wa-maintain"') >= 0 && panelSrc400.indexOf('健康巡视') >= 0, '面板含「健康巡视」入口');
+  assert(panelSrc400.indexOf('maintain({ deep: true })') >= 0, '面板以 deep 模式巡视（含结构缺失）');
+  assert(panelSrc400.indexOf('m.issues.forEach') >= 0 && panelSrc400.indexOf('m.actions.forEach') >= 0, '面板渲染分级议题与建议动作');
+  assert(panelSrc400.indexOf('integrityStat') >= 0, '面板渲染写入完整性');
+
+  // ── 清理现场 ──
+  resetLogs400();
+  LS400.clear();
+  Object.keys(junkBefore400).forEach(function (k) { LS400.setItem(k, junkBefore400[k]); });
+  WA.eventLog.length = 0;
+  evtBefore400.forEach(function (l) { WA.eventLog.push(l); });
+  } // end v0.4.0 block
   } // end v0.2.2 block
   // ── 汇总 ──
   console.log('\n══════════════════════');

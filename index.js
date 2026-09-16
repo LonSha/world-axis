@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -33,6 +33,40 @@
   WA.eventLog = [];     // 轻量运行日志（内存环形，最多300条，info/warn/error 混装）
   WA.errorLog = [];    // v0.1.53: error 专属子环（最多50条）——info 噪音挤掉混合环也不丢关键故障证据
   const ERROR_LOG_MAX = 50;
+  // v0.4.0: 诊断环自适应——上限按存储水位动态收紧/放宽。
+  // 压力来源：① 当前聊天诊断占比超预算（diagBudget.exceeded）② 全库 worldaxis 键总体积越水位。
+  // 收紧后既省体积又不静默丢证据：裁剪量进 logTrimStat 可观测。
+  const LOG_ADAPT = {
+    baseEvent: 300, baseError: 50,       // 常规上限
+    tightEvent: 120, tightError: 30,     // 紧张时上限
+    minuteEvent: 60, minuteError: 20,    // 危急时上限
+    bytesSoft: 4 * 1024 * 1024,          // 软水位 4MB（worldaxis_* 全体）
+    bytesHard: 8 * 1024 * 1024           // 硬水位 8MB
+  };
+  const __logTrimStat = { eventTrims: 0, errorTrims: 0, lastAt: 0, level: 'normal' };
+  function logCaps() {
+    let level = 'normal', why = [];
+    try {
+      if (WA.store && WA.store.diagBudget) {
+        const db = WA.store.diagBudget();
+        if (db && db.exceeded) { level = 'tight'; why.push('diagPct=' + db.diagPct + '%>' + db.maxPct + '%'); }
+      }
+      if (WA.store && WA.store.storageStat) {
+        const st = WA.store.storageStat();
+        const tot = (st && st.totalBytes) || 0;
+        if (tot > LOG_ADAPT.bytesHard) { level = 'minute'; why.push('totalBytes>' + LOG_ADAPT.bytesHard); }
+        else if (tot > LOG_ADAPT.bytesSoft && level === 'normal') { level = 'tight'; why.push('totalBytes>' + LOG_ADAPT.bytesSoft); }
+      }
+    } catch (e) {}
+    __logTrimStat.level = level;
+    const ev = level === 'minute' ? LOG_ADAPT.minuteEvent : level === 'tight' ? LOG_ADAPT.tightEvent : LOG_ADAPT.baseEvent;
+    const er = level === 'minute' ? LOG_ADAPT.minuteError : level === 'tight' ? LOG_ADAPT.tightError : LOG_ADAPT.baseError;
+    return { level: level, event: ev, error: er, why: why };
+  }
+  function logTrimStatView() {
+    const caps = logCaps();
+    return { eventTrims: __logTrimStat.eventTrims, errorTrims: __logTrimStat.errorTrims, lastAt: __logTrimStat.lastAt, level: caps.level, eventCap: caps.event, errorCap: caps.error, why: caps.why };
+  }
   let __logSaveTimer = null;
   let __logSaveChat = null;   // v0.2.1: 挂起日志所属聊天（防抖窗口内切聊天时写错目标）
   const LOG_SAVE_DEBOUNCE_MS = 500;
@@ -61,15 +95,27 @@
   WA.log = function (level, msg, data) {
     const entry = { t: Date.now(), level, msg, data: data === undefined ? null : String(data).slice(0, 500) };
     WA.eventLog.push(entry);
-    if (WA.eventLog.length > 300) WA.eventLog.splice(0, WA.eventLog.length - 300);
+    // v0.4.0: 按存储水位动态裁剪（常规 300 / 紧张 120 / 危急 60）
+    const caps = logCaps();   // 函数声明提升：加载期调用也安全
+    if (WA.eventLog.length > caps.event) {
+      const drop = WA.eventLog.length - caps.event;
+      WA.eventLog.splice(0, drop);
+      __logTrimStat.eventTrims += drop; __logTrimStat.lastAt = Date.now();
+    }
     if (level === 'error') {
       WA.errorLog.push(entry);
-      if (WA.errorLog.length > ERROR_LOG_MAX) WA.errorLog.splice(0, WA.errorLog.length - ERROR_LOG_MAX);
+      if (WA.errorLog.length > caps.error) {
+        const dropE = WA.errorLog.length - caps.error;
+        WA.errorLog.splice(0, dropE);
+        __logTrimStat.errorTrims += dropE; __logTrimStat.lastAt = Date.now();
+      }
     }
     scheduleLogSave(level === 'error');   // v0.2.1: error 立即落盘；info/warn 走防抖窗口
     const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
     fn(LOG, msg, data ?? '');
   };
+  WA.logCaps = logCaps;          // v0.4.0: 当前诊断环动态上限（供测试/诊断消费）
+  WA.logTrimStat = logTrimStatView;
   // v0.2.1: 恢复/清理日志（v0.1.53: 同步恢复/清理 error 子环）
   //          切换聊天/清理前先冲刷挂起的防抖写入，防止未落盘日志丢失
   WA.flushLog = function () {
@@ -86,7 +132,7 @@
       const raw = mainWin.localStorage.getItem('worldaxis_event_log_' + cid);
       if (raw) {
         const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) WA.eventLog = arr.slice(-300);
+        if (Array.isArray(arr)) WA.eventLog = arr.slice(-LOG_ADAPT.baseEvent);
       }
       const rawErr = mainWin.localStorage.getItem('worldaxis_error_log_' + cid);
       if (rawErr) {
