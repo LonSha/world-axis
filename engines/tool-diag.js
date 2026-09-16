@@ -195,7 +195,8 @@
             recovery: WA.store.recoveryStat ? WA.store.recoveryStat() : null,
             load: WA.store.loadStat ? WA.store.loadStat() : null,
             sizeProfile: prof,
-            sizeAudit: WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null
+            // v0.1.47: 诊断走自动续扫编排（消费方不必手写 cursor 循环）
+            sizeAudit: WA.store.sizeAuditFull ? WA.store.sizeAuditFull({ minBytes: 512, chunkNodes: 800 }) : (WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null)
           };
         }, null)
       };
@@ -437,8 +438,8 @@
       issues.push({ level: 'error', key: 'sizeDrift', detail: aud.drifted.length + ' 个容器超出登记的裁剪上限（守卫失效）：' + aud.drifted.map(function (x) { return x.path + '(' + x.len + '>' + x.cap + '，见 ' + x.site + ')'; }).join('、') });
     }
     // v0.1.45: 扫描预算耗尽——此时 unbounded/suspects 是「没看见」而非「真没有」，不得当作全绿
-    if (aud && aud.truncated) {
-      issues.push({ level: 'warn', key: 'sizeScanTruncated', detail: '无界增长扫描已触顶（访问 ' + aud.scannedNodes + '/' + aud.nodeBudget + ' 节点，深度上限 ' + (aud.depthCap || 3) + '），本轮 unbounded/suspects 不完整' });
+    if (aud && aud.complete === false) {
+      issues.push({ level: 'warn', key: 'sizeScanTruncated', detail: '无界增长扫描未收敛（' + aud.chunks + ' 片 / 访问 ' + aud.visitedNodes + ' 节点，片数上限 ' + aud.maxChunks + (aud.stalled ? '，已停滞' : '') + '），本轮 unbounded/suspects 不完整' });
     }
     // v0.1.45: 旧存档结构自愈留痕——补过字段说明存档比代码旧，类型冲突说明状态键被外部污染
     const ldStat = (((diag.worldState || {}).storage || {}).load) || null;
@@ -447,6 +448,15 @@
       issues.push({ level: 'error', key: 'stateShape', detail: '最近载入有 ' + fix.conflicts + ' 处字段类型与默认结构不符（已保留原值，未擅自改写）' });
     } else if (fix && fix.filled > 0) {
       issues.push({ level: 'info', key: 'stateShape', detail: '旧存档兼容：本次载入补齐 ' + fix.filled + ' 个缺失字段' });
+    }
+    // v0.1.47: 跨版本迁移留痕——失败步必须报红（否则只存在于瞬时日志）
+    const mig = (ldStat && ldStat.migrated) || null;
+    if (mig && (mig.failed > 0 || mig.steps > 0)) {
+      if (mig.failed > 0) {
+        issues.push({ level: 'error', key: 'schemaMigrate', detail: '存档迁移有 ' + mig.failed + ' 步失败（v' + mig.from + '→v' + mig.to + '），部分字段可能未转换' });
+      } else {
+        issues.push({ level: 'info', key: 'schemaMigrate', detail: '存档已跨版本迁移：v' + mig.from + '→v' + mig.to + '（' + mig.steps + ' 步）' });
+      }
     }
     // v0.1.27: API 通道健康——只统计已配置且有调用的通道
     const apiSec = ((diag.runtime || {}).apiRouter || {});

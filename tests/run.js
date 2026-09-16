@@ -3695,7 +3695,8 @@ WA.loadScript = _ls.loadScript;
   assert(aTrunc.truncated === true, '预算耗尽时置 truncated=true（不再静默全绿）');
   const aTruncDeep = WA.store.sizeAudit({ minBytes: 64, maxDepth: 1 });
   assert(aTruncDeep.depthCap === 1 && aTruncDeep.arrays.every(function (x) { return x.path.indexOf('.') < 0; }), 'depthCap 生效：仅顶层数组被扫到');
-  // 截断必须升级为议题
+  // 截断必须升级为议题（v0.1.47 语义更新：诊断改走 sizeAuditFull，
+  // 故此处覆写底层 sizeAudit 使每片只能扫 3 节点——自动续扫仍无法收敛时应如实报未完整）
   const origAudit145 = WA.store.sizeAudit;
   WA.store.sizeAudit = function (o) { return origAudit145.call(WA.store, { minBytes: 64, maxNodes: 3 }); };
   const dg145t = WA.toolDiag.collect();
@@ -3729,7 +3730,10 @@ WA.loadScript = _ls.loadScript;
   assert(chain146.clock.label === '旧纪元' && chain146.clock.dayIndex === 2, '迁移保留既有业务数据');
   assert(chain146.clock.source === 'unset' && Array.isArray(chain146.memory.l0), '迁移后补齐缺字段（含嵌套）');
   assert(chain146.schemaVersion === WA.store.SCHEMA_VERSION, '迁移后版本号归一为当前值');
-  assert(chain146._migratedFrom && chain146._migratedFrom.from === 0 && chain146._migratedFrom.path.join(',') === '0->1,1->2', '透出迁移路径供排障');
+  // v0.1.47: 迁移路径改由观测层承载，state 上不再留 _migratedFrom（防污染持久 payload）
+  assert(chain146._migratedFrom === undefined, '迁移报告不写进 state');
+  const mr146 = WA.store.migrateReport();
+  assert(mr146 && mr146.from === 0 && mr146.to === WA.store.SCHEMA_VERSION && mr146.path.join(',') === '0->1,1->2', 'migrateReport 透出迁移路径供排障');
   // 已达当前版本的存档：默认 target 下不空转任何步
   order146.length = 0;
   const skip146 = WA.store.migrate({ schemaVersion: WA.store.SCHEMA_VERSION, worldFacts: [{ key: 'a', value: '1' }] });
@@ -3795,6 +3799,108 @@ WA.loadScript = _ls.loadScript;
   WA.store.transact(function (d) { delete d.__deep; });
   assert(audit146({ maxNodes: 100000 }).arrays.every(function (x) { return x.path.indexOf('__deep') < 0; }), '探针字段清理完毕');
   } // end v0.1.46 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.47 — 迁移可观测闭环 + 分片扫描编排入口
+  // ═══════════════════════════════════════════════════════════
+  v0147: {
+  assert(typeof WA.store.migrateReport === 'function' && typeof WA.store.sizeAuditFull === 'function', 'migrateReport/sizeAuditFull 已导出');
+  // ── A. 迁移报告落观测层而非 state ──
+  const recOff = WA.store.registerMigration(0, function (st) { st._r147 = 'a'; });
+  const boomOff = WA.store.registerMigration(1, function () { throw new Error('boom147'); });
+  const mig147 = WA.store.migrate({ schemaVersion: 0, clock: { label: 'x' } }, 2);
+  assert(mig147._migratedFrom === undefined, '迁移报告不写入 state（防污染持久 payload）');
+  assert(mig147._r147 === 'a', '成功步的写入被保留');
+  const rep147 = WA.store.migrateReport();
+  assert(rep147 && rep147.from === 0 && rep147.to === WA.store.SCHEMA_VERSION, '报告含起止版本');
+  assert(rep147.path.join(',') === '0->1', '报告只记成功步');
+  assert(rep147.failed.length === 1 && rep147.failed[0].at === 1 && /boom147/.test(rep147.failed[0].error), '失败步进报告（哪一步炸了不再只存于瞬时日志）');
+  const repCopy = WA.store.migrateReport();
+  repCopy.failed.push({ at: 99 });
+  assert(WA.store.migrateReport().failed.length === 1, 'migrateReport 返回深拷贝（外部不可篡改内部状态）');
+  const ls147 = WA.store.loadStat();
+  assert(ls147.migrated && ls147.migrated.steps === 1 && ls147.migrated.failed === 1, 'loadStat.migrated 汇总步数与失败数');
+  const dg147 = WA.toolDiag.collect();
+  const migIssue = ((dg147.verdict || {}).issues || []).filter(function (x) { return x.key === 'schemaMigrate'; })[0];
+  assert(migIssue && migIssue.level === 'error' && /1 步失败/.test(migIssue.detail), '迁移失败步报 error 议题');
+  // 纯成功迁移 → info 级；无迁移 → 不报
+  boomOff();
+  const ok147 = WA.store.migrate({ schemaVersion: 0 }, 1);
+  assert(ok147._migratedFrom === undefined, '成功迁移同样不污染 state');
+  const dg147b = WA.toolDiag.collect();
+  const migIssueB = ((dg147b.verdict || {}).issues || []).filter(function (x) { return x.key === 'schemaMigrate'; })[0];
+  assert(migIssueB && migIssueB.level === 'info' && /1 步/.test(migIssueB.detail), '无失败时迁移降为 info 议题');
+  recOff();
+  assert(WA.store.migrations().length === 0, '测试迁移步已反注册清理');
+  WA.store.migrate({ schemaVersion: WA.store.SCHEMA_VERSION });
+  const dg147c = WA.toolDiag.collect();
+  assert(!((dg147c.verdict || {}).issues || []).some(function (x) { return x.key === 'schemaMigrate'; }), '未发生迁移时不出该议题');
+  // ── B. sizeAuditFull 分片编排 ──
+  WA.store.transact(function (d) {
+    d.__p147 = { a: { b: [{ x: 1 }, { y: 2 }], c: [1, 2, 3] }, d: [4], e: { f: [5, 6] } };
+  });
+  const OPT147 = { minBytes: 0, topN: 5000 };
+  const oneShot = WA.store.sizeAudit(Object.assign({}, OPT147, { maxNodes: 100000 }));
+  const oneSet = Array.from(new Set(oneShot.arrays.map(function (x) { return x.path; }))).sort().join(',');
+  const fullBig = WA.store.sizeAuditFull(Object.assign({}, OPT147, { chunkNodes: 100000 }));
+  assert(fullBig.complete === true && fullBig.chunks === 1 && fullBig.stalled === false, '大片段：一趟收敛');
+  assert(Array.from(new Set(fullBig.arrays.map(function (x) { return x.path; }))).sort().join(',') === oneSet, 'sizeAuditFull 与单次大预算集合等价');
+  assert(fullBig.visitedNodes === oneShot.scannedNodes, '编排访问节点数与单次一致（无重扫）');
+  // 小片段：多趟接力后仍与全量等价（这是编排入口存在的意义）
+  const halfN = Math.max(1, Math.ceil(oneShot.scannedNodes / 2));
+  const fullSplit = WA.store.sizeAuditFull(Object.assign({}, OPT147, { chunkNodes: halfN }));
+  assert(fullSplit.chunks >= 2, '小片段自动接力为多趟（实得 ' + fullSplit.chunks + ' 片）');
+  assert(fullSplit.complete === true && fullSplit.stalled === false, '多趟仍完整收敛（无需调用方手写循环）');
+  assert(Array.from(new Set(fullSplit.arrays.map(function (x) { return x.path; }))).sort().join(',') === oneSet, '分片并集与全量集合等价');
+  assert(fullSplit.visitedNodes === oneShot.scannedNodes, '分片总访问量等于全量（无重复无遗漏）');
+  // chunk=3 需较多趟数才能覆盖被前序测试灌大的 state，故放宽 maxChunks（触顶行为由下方 capped 用例专测）
+  const tiny = WA.store.sizeAuditFull(Object.assign({}, OPT147, { chunkNodes: 3, maxChunks: 5000 }));
+  assert(Array.from(new Set(tiny.arrays.map(function (x) { return x.path; }))).sort().join(',') === oneSet, '极小片段(3)仍收敛到全量集合');
+  assert(tiny.chunks > fullSplit.chunks, '片段越小所需趟数越多（实得 ' + tiny.chunks + '）');
+  // maxChunks 触顶：如实报告未扫完，绝不假装全绿
+  const capped = WA.store.sizeAuditFull(Object.assign({}, OPT147, { chunkNodes: 3, maxChunks: 2 }));
+  assert(capped.complete === false && capped.stalled === true && capped.chunks === 2, '片数触顶报 complete=false/stalled=true');
+  assert(Array.from(new Set(capped.arrays.map(function (x) { return x.path; }))).join(',').split(',').length < oneSet.split(',').length, '触顶时结果确实不完整（未假装扫完）');
+  // 结论级派生字段与 sizeAudit 同语义
+  const cleanFull = WA.store.sizeAuditFull({ minBytes: 64 });
+  assert(Array.isArray(cleanFull.unbounded) && Array.isArray(cleanFull.suspects) && Array.isArray(cleanFull.drifted), '编排结果含 unbounded/suspects/drifted');
+  assert(cleanFull.complete === true && cleanFull.truncated === undefined, '编排结果以 complete 表达收敛（truncated 属单片语义）');
+  assert(cleanFull.trackedBounded === Object.keys(WA.store.sizeCaps()).length, 'trackedBounded 与登记表条数一致');
+  // 无界容器经编排仍被抓出（与 v0.1.43 单片行为一致）
+  WA.store.transact(function (d) { d.__p147 = null; d.__journal147 = []; for (let i = 0; i < 30; i++) d.__journal147.push('r' + i + ' ' + 'w'.repeat(40)); });
+  const withBad = WA.store.sizeAuditFull({ minBytes: 64, chunkNodes: 5 });
+  assert(withBad.complete === true && withBad.unbounded.indexOf('__journal147') >= 0, '编排扫描仍抓出未登记容器');
+  assert(withBad.suspects.some(function (x) { return x.path === '__journal147'; }), '该容器进 suspects');
+  WA.store.transact(function (d) { delete d.__journal147; delete d.__p147; });
+  // 诊断消费编排入口且默认态干净
+  const dg147d = WA.toolDiag.collect();
+  const aud147 = ((dg147d.worldState || {}).storage || {}).sizeAudit;
+  assert(aud147 && typeof aud147.complete === 'boolean' && typeof aud147.chunks === 'number', '诊断走 sizeAuditFull（透出 complete/chunks）');
+  assert(aud147.complete === true && (!aud147.suspects || aud147.suspects.length === 0), '默认态诊断：扫描完整且无无界嫌疑');
+  assert(!((dg147d.verdict || {}).issues || []).some(function (x) { return x.key === 'sizeScanTruncated'; }), '收敛时不报未收敛议题');
+  WA.store.transact(function (d) { delete d.__p147; });
+  // ── C. 迁移报告不跨载入粘留（与 v0.1.45 lastFix 同一类故障的守卫）──
+  const keyC147 = 'worldaxis_state_' + WA.store.chatId();
+  const saveC147 = global.localStorage.getItem(keyC147);
+  const offC = WA.store.registerMigration(0, function (st) { st._c147 = 'ran'; });
+  // 真实 init 迁移分支：存档版本 0 < SCHEMA_VERSION(1)
+  global.localStorage.setItem(keyC147, JSON.stringify({ schemaVersion: 0, clock: { label: 'L' } }));
+  WA.store.init();
+  const repC1 = WA.store.migrateReport();
+  assert(repC1 && repC1.from === 0 && repC1.steps === 1, '载入时真实走迁移链并出报告');
+  assert(WA.store.get()._c147 === 'ran', '迁移步的转换确实落到载入后的 state');
+  assert(WA.store.get().clock.label === 'L', '迁移载入保留原数据');
+  assert(((WA.toolDiag.collect().verdict || {}).issues || []).some(function (x) { return x.key === 'schemaMigrate'; }), '迁移发生当次载入出议题');
+  // 同一份存档已升到当前版本：再次载入不再迁移，报告须为 null 而非上一次的残留
+  WA.store.init();
+  assert(WA.store.migrateReport() === null, '重复载入不再迁移：报告为 null（不粘留）');
+  assert(!((WA.toolDiag.collect().verdict || {}).issues || []).some(function (x) { return x.key === 'schemaMigrate'; }), '议题随载入结束消失（不永久挂红）');
+  assert(WA.store.loadStat().migrated === null, 'loadStat.migrated 同步归零');
+  offC();
+  if (saveC147 === null) { try { delete global.localStorage[keyC147]; } catch (e) {} }
+  else global.localStorage.setItem(keyC147, saveC147);
+  WA.store.init();
+  assert(WA.store.migrations().length === 0, '迁移步与存档现场均已复原');
+  } // end v0.1.47 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

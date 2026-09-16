@@ -113,6 +113,8 @@
   const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
   const __migrations = {};
+  // v0.1.47: 最近一次 migrate 的报告（观测层承载，不写进 state，避免污染持久 payload）
+  let __migrateReport = null;
   function classifySaveError(e) {
     const name = (e && e.name) || '';
     const msg = String((e && e.message) || e);
@@ -195,6 +197,7 @@
         WA.log('warn', '聊天切换时存在在飞写合并批：已作废其未落盘改动（防跨聊天污染）');
       }
       memCache = this.load() || defaultWorldState();
+      __migrateReport = null;   // v0.1.47: 报告以「本次载入」为边界，不跨载入粘留（防议题永久挂红）
       if (!memCache.schemaVersion || memCache.schemaVersion < SCHEMA_VERSION) {
         this.createRecoveryPoint(); // 升级前先留恢复点
         memCache = this.migrate(memCache);
@@ -229,6 +232,8 @@
       return function () { if (__migrations[fromVersion] === fn) delete __migrations[fromVersion]; };
     },
     migrations() { return Object.keys(__migrations).map(Number).sort(function (a, b) { return a - b; }); },
+    /** v0.1.47: 最近一次跨版本迁移报告（tool-diag 消费） */
+    migrateReport() { return __migrateReport ? JSON.parse(JSON.stringify(__migrateReport)) : null; },
     migrate(state, targetVersion) {
       // 起始版本必须读 state 原值：Object.assign 会让缺 schemaVersion 的远古存档
       // 继承默认值(SCHEMA_VERSION)，从而跳过整条版本链
@@ -237,17 +242,24 @@
       // targetVersion 可显式指定（默认当前版本）：便于跨多版本链的测试与调试
       const target = typeof targetVersion === 'number' && targetVersion >= 0 ? targetVersion : SCHEMA_VERSION;
       let v = fromV;
-      const steps = [];
+      const steps = [], failed = [];
       // 沿版本链步进（防死循环：步数不超过版本跨度）
       let guard = 0;
       while (v < target && guard++ <= target + 1) {
         const step = __migrations[v];
-        if (step) { try { step(out); steps.push(v + '->' + (v + 1)); } catch (e) { WA.log('error', '迁移步 ' + v + '->' + (v + 1) + ' 失败', e); } }
+        if (step) {
+          try { step(out); steps.push(v + '->' + (v + 1)); }
+          // v0.1.47: 失败步也要进报告——否则「哪一步炸了」只存在于瞬时日志里
+          catch (e) { failed.push({ at: v, error: String((e && e.message) || e) }); WA.log('error', '迁移步 ' + v + '->' + (v + 1) + ' 失败', e); }
+        }
         v++;
       }
       ensureShape(out, defaultWorldState());   // v0.1.45: 升级路径同样补齐嵌套缺字段
       out.schemaVersion = SCHEMA_VERSION;
-      out._migratedFrom = steps.length ? { from: fromV, to: SCHEMA_VERSION, path: steps } : out._migratedFrom;
+      // v0.1.47: 迁移结果不再落到 state（曾以 _migratedFrom 永久留在持久 payload 里，
+      // 无人消费且每次载入都自我延续），改为写观测层并显式剥离历史残留
+      __migrateReport = { from: fromV, to: SCHEMA_VERSION, path: steps, steps: steps.length, failed: failed, at: Date.now() };
+      delete out._migratedFrom;
       return out;
     },
 
@@ -323,7 +335,7 @@
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
     /** v0.1.38: 加载观测只读视图（tool-diag 消费）——errors>0 意味着发生过状态键损坏 */
-    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, lastError: __loadStat.lastError, lastAt: __loadStat.lastAt }; },
+    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, at: __migrateReport.at } : null, lastError: __loadStat.lastError, lastAt: __loadStat.lastAt }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
     sizeProfile(topN) {
       const rows = [];
@@ -423,6 +435,64 @@
         cursor: cursor,                // v0.1.46: 断点游标，resumeCursor 续扫
         trackedBounded: Object.keys(BOUNDED).length,
         arrays: arrays.slice().sort(function (a, b) { return b.bytes - a.bytes; }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
+        unbounded: unregistered.map(function (a) { return a.path; }),
+        suspects: suspects.map(function (a) { return { path: a.path, len: a.len, bytes: a.bytes }; }),
+        drifted: drifted.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; })
+      };
+    },
+    /**
+     * v0.1.47: 分片扫描编排——自动用 cursor 接力 sizeAudit 直到扫完，调用方不必手写循环。
+     * 收敛保证：每趟至少弹出一个待访路径（visited 递增、pending 严格递减），故必然收敛；
+     *          另设 chunks 上限与「无进展」检测作双保险，异常时如实报告而非静默返回部分结果。
+     * complete=false 表示未扫完（触顶或卡住），此时 unbounded/suspects 不可当作全量结论。
+     */
+    sizeAuditFull(opts) {
+      const o = opts || {};
+      const chunkNodes = typeof o.chunkNodes === 'number' && o.chunkNodes > 0 ? o.chunkNodes : 800;
+      const maxChunks = typeof o.maxChunks === 'number' && o.maxChunks > 0 ? o.maxChunks : 64;
+      const minBytes = typeof o.minBytes === 'number' ? o.minBytes : 256;
+      const merged = {};   // path -> row（同路径取较大体积，保守上报）
+      let cursor = null, chunks = 0, visitedSum = 0, truncated = false, stalled = false;
+      let depthCap = null;
+      for (;;) {
+        const pass = WA.store.sizeAudit({
+          minBytes: minBytes, maxNodes: chunkNodes,
+          maxDepth: typeof o.maxDepth === 'number' ? o.maxDepth : 3,
+          topN: 1000000, resumeCursor: cursor
+        });
+        if (pass && pass.error) return { error: pass.error };
+        chunks++;
+        if (depthCap === null) depthCap = pass.depthCap;
+        (pass.arrays || []).forEach(function (r) {
+          const prev = merged[r.path];
+          if (!prev || r.bytes >= prev.bytes) merged[r.path] = r;
+        });
+        visitedSum += pass.scannedNodes;
+        truncated = !!pass.truncated;
+        cursor = pass.cursor;
+        if (!cursor || !cursor.length) { cursor = null; break; }      // 扫完
+        if (pass.scannedNodes === 0) { stalled = true; break; }        // 无进展（防御）
+        if (chunks >= maxChunks) { stalled = true; break; }            // 片数触顶
+      }
+      const rows = Object.keys(merged).map(function (k) { return merged[k]; });
+      const topRows = rows.filter(function (a) { return a.path.indexOf('[') < 0; });
+      const unregistered = topRows.filter(function (a) { return !a.bounded && a.len > 0; });
+      const suspects = unregistered.filter(function (a) { return a.bytes >= minBytes; }).sort(function (x, y) { return y.bytes - x.bytes; });
+      const drifted = topRows.filter(function (a) { return a.bounded && a.cap !== null && a.len > a.cap; })
+        .sort(function (x, y) { return (y.len - y.cap) - (x.len - x.cap); });
+      const complete = !truncated && !stalled;
+      return {
+        complete: complete,
+        chunks: chunks,
+        visitedNodes: visitedSum,
+        chunkNodes: chunkNodes,
+        maxChunks: maxChunks,
+        depthCap: depthCap,
+        stalled: stalled,
+        total: (WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0,
+        scanned: rows.length,
+        trackedBounded: Object.keys(__BOUNDED_CAPS).length,
+        arrays: rows.slice().sort(function (a, b) { return b.bytes - a.bytes; }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
         unbounded: unregistered.map(function (a) { return a.path; }),
         suspects: suspects.map(function (a) { return { path: a.path, len: a.len, bytes: a.bytes }; }),
         drifted: drifted.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; })
