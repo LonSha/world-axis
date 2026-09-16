@@ -594,6 +594,7 @@
       const sk = WA.store.storageStat ? WA.store.storageStat() : null;
       if (sk && sk.enumerable) {
         lines.push('- worldaxis_* 键: ' + sk.totalKeys + ' 个 / ' + Math.round(sk.totalBytes / 1024) + 'KB · 过期诊断键候选: ' + (sk.staleDiagCandidates || []).length);
+        lines.push('- 损坏隔离键: ' + (sk.families.corrupt || 0) + ' 个（state/settings 统一保留最近 5 个）· settings 迁移: ' + ((WA.settingsBus && WA.settingsBus.stats.upgrades) || 0) + ' 次 · 损坏隔离累计: ' + ((WA.settingsBus && WA.settingsBus.stats.quarantines) || 0) + ' 次');
       } else lines.push('- storageStat 不可用');
     } catch (e) { lines.push('- storageStat 异常: ' + String(e && e.message)); }
     return lines.join('\n');

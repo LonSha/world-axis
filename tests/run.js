@@ -4419,6 +4419,58 @@ WA.loadScript = _ls.loadScript;
   global.localStorage.setItem(keyEvt210, snapshot210);   // 还原现场
   WA.eventLog.length = 0;
   } // end v0.2.1 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.2.2 — 隔离键治理（settingsBus 隔离产出纳入键卫生体系）
+  // ═══════════════════════════════════════════════════════════
+  section('v0.2.2 隔离键治理');
+  v0220: {
+  const LS220 = global.localStorage;
+  const junkBefore220 = JSON.parse(JSON.stringify(LS220._dump()));
+  const cur220 = WA.store.chatId();
+
+  // ── 1. 回归复现：settingsBus 损坏隔离产出被正确归类 ──
+  // v0.2.0 缺陷：隔离键不匹配 state 专用 corrupt 正则 → 落入 settings 兜底 → sweep 永不清理
+  const qkey220 = 'worldaxis_opinion_settings_v1_corrupt_' + Date.now();
+  LS220.setItem(qkey220, '{broken-raw-bytes');
+  const stat220 = WA.store.storageStat();
+  assert(stat220.families.corrupt >= 1, 'settings 隔离键计入 corrupt 家族（不再落 settings 兜底，实 ' + stat220.families.corrupt + '）');
+  const plan220 = WA.store.sweepStaleKeys({ keepCorrupt: 5 });
+  const keep220 = plan220.keep.filter(function (k) { return k === qkey220; });
+  assert(keep220.length === 1, 'settings 隔离键受 sweep 管辖（保留窗口内 → keep 而非 settings 永久豁免）');
+
+  // ── 2. 隔离键溢出：state 与 settings 隔离键统一保留最近 keepCorrupt 个 ──
+  for (let i = 1; i <= 6; i++) LS220.setItem('worldaxis_opinion_settings_v1_corrupt_' + (Date.now() + i), '{}');
+  const planOver220 = WA.store.sweepStaleKeys({ keepCorrupt: 5 });
+  const overflow220 = planOver220.remove.filter(function (r) { return r.reason === 'corrupt-overflow'; });
+  assert(overflow220.length >= 2, '隔离键超出保留窗口进清理计划（实 ' + overflow220.length + '）');
+  const settingsQ220 = overflow220.filter(function (r) { return r.quarantine === 'settings'; });
+  assert(settingsQ220.length >= 2, '清理项标注 quarantine=settings 来源（实 ' + settingsQ220.length + '）');
+
+  // ── 3. 关键不变量：非隔离的 settings 键仍永久豁免 ──
+  LS220.setItem('worldaxis_backstage_settings_v1', '{}');
+  const planKeep220 = WA.store.sweepStaleKeys({ keepCorrupt: 5 });
+  assert(!planKeep220.remove.some(function (r) { return r.key === 'worldaxis_backstage_settings_v1'; }), '普通 settings 键仍永不清理（隔离键治理不误伤）');
+
+  // ── 4. apply 真删：隔离键实际移除 ──
+  const planApply220 = WA.store.sweepStaleKeys({ keepCorrupt: 5, apply: true });
+  const stats220 = WA.store.storageStat();
+  assert(stats220.families.corrupt <= 5, 'apply 后隔离键收敛到保留窗口内（实 ' + stats220.families.corrupt + '）');
+  assert(LS220.getItem('worldaxis_backstage_settings_v1') !== null, 'apply 不误删普通 settings 键');
+
+  // ── 5. 报告透出：隔离键计量 + settingsBus 统计 ──
+  const rpt220 = WA.toolDiag.buildErrorReport();
+  assert(rpt220.indexOf('损坏隔离键:') >= 0, '错误报告含隔离键计量行');
+  assert(/settings 迁移: \d+ 次/.test(rpt220) && /损坏隔离累计: \d+ 次/.test(rpt220), '报告含 settingsBus 迁移/隔离累计统计');
+
+  // ── 6. 面板源码断言：体检输出透出 settingsBus 统计 ──
+  const panelSrc220 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(panelSrc220.indexOf('settingsBus.stats.quarantines') >= 0, '面板体检透出 settingsBus 隔离累计');
+  assert(/保留最近 5 个/.test(panelSrc220), '面板标注隔离键保留窗口');
+
+  // 清理现场
+  LS220.clear();
+  Object.keys(junkBefore220).forEach(function (k) { LS220.setItem(k, junkBefore220[k]); });
+  } // end v0.2.2 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

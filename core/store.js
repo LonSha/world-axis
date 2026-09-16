@@ -124,11 +124,13 @@
     diag_wfHistory: /^worldaxis_wf_history_(.+)$/,
     diag_uninjectLedger: /^worldaxis_uninject_ledger_(.+)$/,
     corrupt: /^worldaxis_state_(.+)_corrupt_\d+$/,
+    corruptSettings: /^worldaxis_(?!state_)([a-z_0-9]+)_corrupt_\d+$/,
     wb: /^worldaxis_wb_selection_(.+)$/,
     settingsSettings: /^worldaxis_(backstage_settings_v1|evolution_settings_v1|opinion_settings_v1|regional_settings_v1|api_channels_v1|workflow_v1|inject_visibility_v1|purifier_rules_v1|npc_registry_v1|oracle_plan_v1|active_preset|custom_presets)$/
   };
   function classifyKey(key) {
     if (KEY_FAMILIES.corrupt.test(key)) return { family: 'corrupt', chat: null };
+    if (KEY_FAMILIES.corruptSettings.test(key)) return { family: 'corrupt', chat: null, quarantine: 'settings' };
     let m;
     if ((m = key.match(KEY_FAMILIES.state))) return { family: 'state', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.recovery))) return { family: 'recovery', chat: m[1] };
@@ -737,7 +739,7 @@
      * v0.1.51: 过期存储键清理（默认 dry-run）。返回清理计划；apply:true 才真正删除。
      * 规则（保守优先，宁可漏删不可误删）：
      *  - diagnostic 键：所属聊天超过 maxIdleDays 天未活跃（state.meta.updatedAt 基准）→ 候选
-     *  - corrupt 键：只保留最近 keepCorrupt 个（按键名时间戳排序），更老的候选
+     *  - corrupt 键：state 损坏隔离与 settingsBus 设置损坏隔离统一只保留最近 keepCorrupt 个（按键名时间戳排序），更老的候选
      *  - state/recovery：聊天已完全不存在 state 键且其 diagnostic 键全冷 → 一并清理（孤儿恢复点）
      *  - settings/wb：永不清理（用户数据）
      *  - 当前聊天的任何键：永不清理
@@ -751,7 +753,7 @@
       const keys = listWorldAxisKeys();
       const now = Date.now();
       const plan = { remove: [], keep: [], byFamily: { diagnostic: 0, corrupt: 0, orphanRecovery: 0 }, freedBytes: 0, apply: apply };
-      // ── corrupt：按键名时间戳排序留最近 keepCorrupt 个 ──
+      // ── corrupt：state 隔离键与 settings 隔离键（settingsBus 损坏隔离产出）统一按键名时间戳排序，留最近 keepCorrupt 个 ──
       const corruptKeysSorted = keys.filter(function (k) { return classifyKey(k).family === 'corrupt'; })
         .sort(function (a, b2) { return (parseInt((b2.match(/_corrupt_(\d+)$/) || [])[1], 10) || 0) - (parseInt((a.match(/_corrupt_(\d+)$/) || [])[1], 10) || 0); });
       const corruptKeepSet = {};
@@ -767,7 +769,7 @@
         if (c.chat === cur || c.family === 'settings' || c.family === 'wb') { plan.keep.push(k); return; }
         if (c.family === 'corrupt') {
           if (corruptKeepSet[k]) { plan.keep.push(k); return; }
-          plan.remove.push({ key: k, reason: 'corrupt-overflow', family: c.family, bytes: keyBytes(k) });
+          plan.remove.push({ key: k, reason: 'corrupt-overflow', family: c.family, quarantine: c.quarantine || 'state', bytes: keyBytes(k) });
           return;
         }
         if (c.family === 'diagnostic') {
