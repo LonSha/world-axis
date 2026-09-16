@@ -3384,6 +3384,54 @@ WA.loadScript = _ls.loadScript;
   // 清理：通道探针字段留在持久配置里不影响（ observe 原本未配置，恢复为空）
   WA.apiRouter.setChannel('observe', null);
   } // end v0.1.41 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.42 — workflow 环形历史 + 槽位 depth 覆盖审计
+  // ═══════════════════════════════════════════════════════════
+  v0142: {
+  assert(typeof WA.workflow.history === 'function' && typeof WA.workflow.resetHistory === 'function', 'workflow.history/resetHistory 已导出');
+  WA.workflow.resetHistory();
+  // 两次链运行：成功节点 + 非关键异常节点，锁定逐节点序列与错误计数
+  WA.workflow.register({ id: 'wtest.hist.fast', chain: 'wtest142', order: 1, label: '历史快节点', async run() {} });
+  WA.workflow.register({ id: 'wtest.hist.slow', chain: 'wtest142', order: 2, label: '历史慢节点', async run() { await new Promise(r => setTimeout(r, 30)); } });
+  WA.workflow.register({ id: 'wtest.hist.bad', chain: 'wtest142', order: 3, label: '历史错节点', critical: false, async run() { throw new Error('history142'); } });
+  await WA.workflow.run('wtest142', {});
+  await WA.workflow.run('wtest142', {});
+  const wh142 = WA.workflow.history(5);
+  assert(wh142.tracked === 2 && wh142.max === 20 && wh142.runs.length === 2, 'workflow 历史保留两次运行');
+  assert(wh142.runs[0].chain === 'wtest142' && wh142.runs[0].nodeCount === 3, '历史运行含链名与节点数');
+  assert(wh142.runs[0].slowest.some(n => n.id === 'wtest.hist.slow' && n.ms >= 20), '历史 slowest 保留逐节点耗时');
+  assert(wh142.runs[0].errors === 1, '历史运行记录非关键错误数');
+  const dg142wf = WA.toolDiag.collect();
+  assert(dg142wf.runtime.workflow.history && dg142wf.runtime.workflow.history.tracked === 2, 'tool-diag 透出 workflow.history');
+  WA.workflow.unregister('wtest.hist.fast'); WA.workflow.unregister('wtest.hist.slow'); WA.workflow.unregister('wtest.hist.bad');
+  WA.workflow.resetHistory();
+  assert(WA.workflow.history().tracked === 0, 'resetHistory 清空环形历史');
+  // 槽位审计：同 position 多源 depth 冲突被检出，未知 position 与真实路由同样回落 in_chat
+  assert(typeof WA.injectSlotAudit.routeAudit === 'function', 'routeAudit 已导出');
+  const raClean142 = WA.injectSlotAudit.routeAudit([
+    { source: 'A', position: 'in_chat', depth: 4, content: 'a' },
+    { source: 'B', position: 'in_chat', depth: 4, content: 'b' },
+    { source: 'C', position: 'after_last_user', depth: 2, content: 'c' }
+  ]);
+  assert(raClean142.positions === 2 && raClean142.conflicts.length === 0, '同 position 同 depth 无覆盖议题');
+  const raConflict142 = WA.injectSlotAudit.routeAudit([
+    { source: 'world', position: 'after_last_user', depth: 1, content: 'world' },
+    { source: 'rule', position: 'after_last_user', depth: 5, content: 'rule' },
+    { source: 'unknown', position: 'future_position', depth: 3, content: 'fallback' }
+  ]);
+  assert(raConflict142.positions === 2 && raConflict142.conflicts.length === 1, '同 position 不同 depth 检出一条冲突');
+  assert(raConflict142.conflicts[0].position === 'after_last_user' && raConflict142.conflicts[0].effective === 1, '冲突报告 position/effective depth');
+  assert(raConflict142.conflicts[0].sources.join(',') === 'world,rule', '冲突报告保留源顺序');
+  // applyInjections 接线：冲突应进入 eventLog，但不阻断真实落地
+  const warn142Before = WA.eventLog.filter(l => l.msg.indexOf('槽位深度覆盖') >= 0).length;
+  WA.render.applyInjections({ injections: [
+    { source: 'world', position: 'after_last_user', depth: 1, content: 'route world' },
+    { source: 'rule', position: 'after_last_user', depth: 5, content: 'route rule' }
+  ] });
+  const warn142After = WA.eventLog.filter(l => l.msg.indexOf('槽位深度覆盖') >= 0).length;
+  assert(warn142After > warn142Before, '实际注入接线记录 depth 覆盖告警');
+  assert(WA.store.get().lastInjection && WA.store.get().lastInjection.slots, '覆盖告警不阻断槽位快照落地');
+  } // end v0.1.42 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

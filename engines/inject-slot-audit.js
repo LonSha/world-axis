@@ -71,9 +71,46 @@
     return { consistent: issues.length === 0, issues: issues };
   }
 
+  /**
+   * v0.1.42: 路由覆盖审计（只读）——同 position 多源合并时，桶深度取首项，
+   * 其余项的显式 depth 会被静默覆盖；显式检出，避免多源约束在宿主排序语义上漂移。
+   * @param {Array} items 原始注入项 [{source, position?, depth?, content?}]
+   */
+  function routeAudit(items) {
+    const buckets = {};
+    (items || []).forEach(function (i) {
+      if (!i || !i.content) return;
+      // 与真实路由同源：走 injectChannel.normPos（未知值回落 in_chat），模块缺席时兜底
+      const norm = (WA.injectChannel && WA.injectChannel.normPos) ? WA.injectChannel.normPos : function (x) { return (typeof x === 'string' && x) ? x : 'in_chat'; };
+      const pos = norm(i.position);
+      (buckets[pos] = buckets[pos] || []).push(i);
+    });
+    const conflicts = [];
+    Object.keys(buckets).forEach(function (pos) {
+      const list = buckets[pos];
+      if (list.length < 2) return;
+      const depths = list.map(function (x) { return (typeof x.depth === 'number') ? x.depth : null; });
+      const uniq = [];
+      depths.forEach(function (d) { if (d !== null && uniq.indexOf(d) < 0) uniq.push(d); });
+      if (uniq.length > 1) {
+        const effective = (typeof list[0].depth === 'number') ? list[0].depth : null;
+        conflicts.push({
+          position: pos,
+          slot: 'WorldAxis' + ':' + pos,
+          sources: list.map(function (x) { return x.source || '?'; }),
+          depths: depths,
+          effective: effective,
+          detail: '同 position 多源深度不一致，桶深度取首项 ' + effective + '，其余 ' + (uniq.length - 1) + ' 个显式 depth 被覆盖'
+        });
+      }
+    });
+    return { positions: Object.keys(buckets).length, conflicts: conflicts };
+  }
+
   WA.injectSlotAudit = {
     snapshotSlots: snapshotSlots,
-    audit: audit
+    audit: audit,
+    routeAudit: routeAudit
   };
   if (WA.log) WA.log('info', '注入槽位审计已加载');
 })();

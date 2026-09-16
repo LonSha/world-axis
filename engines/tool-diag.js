@@ -227,6 +227,11 @@
           out.tracked = st.tracked;
           out.chains = st.lastChains;
         }
+        // v0.1.42: 链运行历史（最近 5 次运行的逐节点耗时序列）
+        if (WA.workflow.history) {
+          const hh = WA.workflow.history(5);
+          out.history = { tracked: hh.tracked, max: hh.max, runs: hh.runs };
+        }
         return out;
       }, {}),
       apiRouter: safe(function () {

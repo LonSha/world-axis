@@ -151,6 +151,15 @@
       let slotErrors = [];   // v0.1.9: 槽位路由错误快照
       try {
         const routable = ctxInj.filter(function (i) { return !!(i && i.position); });
+        // v0.1.42: 路由覆盖审计——同 position 多源 depth 不一致时显式告警（不改变路由行为）
+        if (routable.length > 1 && WA.injectSlotAudit && WA.injectSlotAudit.routeAudit) {
+          try {
+            const ra = WA.injectSlotAudit.routeAudit(routable);
+            (ra.conflicts || []).forEach(function (cf) {
+              WA.log('warn', '槽位深度覆盖[' + cf.position + ']: ' + cf.detail + '（源: ' + cf.sources.join('/') + '）');
+            });
+          } catch (e) { /* 审计失败不影响注入落地 */ }
+        }
         if (WA.injectChannel && routable.length) {
           const slots = WA.injectChannel.planSlots(routable);
           const slotRes = WA.injectChannel.applySlots(function (slotName, text, pos, depth, scan) {

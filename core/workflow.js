@@ -19,6 +19,18 @@
     try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
   }
   function saveSwitches(sw) { mainWin.localStorage.setItem(LS_KEY, JSON.stringify(sw)); }
+  // v0.1.42: 链运行环形历史——最近 N 次运行的逐节点耗时/状态序列（趋势观察）
+  const HISTORY_MAX = 20;
+  const __chainHistory = [];
+  function recChain(chain, nodes, tStart) {
+    try {
+      __chainHistory.push({
+        chain: chain, at: Date.now(), ms: Date.now() - tStart,
+        nodes: nodes.map(function (n) { return { id: n.id, ms: n.ms, status: n.status }; })
+      });
+      while (__chainHistory.length > HISTORY_MAX) __chainHistory.shift();
+    } catch (e) { /* 历史留痕失败不影响链执行 */ }
+  }
   function recStat(id, ms, status) {
     try {
       const st = stats.get(id) || { count: 0, errors: 0, lastMs: 0, totalMs: 0, lastAt: 0, lastStatus: null };
@@ -52,6 +64,7 @@
     async run(chain, ctx) {
       const tChain = Date.now();
       const executed = [];
+      const trace142 = [];
       const list = this.list(chain).filter(n => n.enabled);
       WA.log('info', `工作流[${chain}] 执行 ${list.length} 个节点`);
       for (const node of list) {
@@ -60,9 +73,11 @@
           await node.run(ctx);
           executed.push(node);
           recStat(node.id, Date.now() - t0, 'ok');
+          trace142.push({ id: node.id, ms: Date.now() - t0, status: 'ok' });
           WA.log('info', `  ✓ ${node.label || node.id} (${Date.now() - t0}ms)`);
         } catch (e) {
           recStat(node.id, Date.now() - t0, 'error');
+          trace142.push({ id: node.id, ms: Date.now() - t0, status: 'error' });
           WA.log('error', `  ✗ ${node.label || node.id}: ` + (e && e.message || e));
           if (node.critical) {
             // 关键节点失败：逆序回滚已执行节点
@@ -75,6 +90,7 @@
       }
       try {
         lastChains[chain] = { at: Date.now(), nodeCount: list.length, executedCount: executed.length, ms: Date.now() - tChain };
+        recChain(chain, trace142, tChain);
       } catch (e) {}
       return executed;
     },
@@ -88,6 +104,17 @@
       const n = topN && topN > 0 ? topN : 10;
       return { nodes: rows.slice(0, n), tracked: rows.length, lastChains: Object.assign({}, lastChains) };
     },
-    resetStats() { stats.clear(); Object.keys(lastChains).forEach(function (k) { delete lastChains[k]; }); }
+    resetStats() { stats.clear(); Object.keys(lastChains).forEach(function (k) { delete lastChains[k]; }); },
+    /** v0.1.42: 链运行历史只读视图（tool-diag 消费）——最近 N 次运行的逐节点耗时序列 */
+    history(topN) {
+      const n = (typeof topN === 'number' && topN > 0) ? topN : 5;
+      const rows = __chainHistory.slice(-n).map(function (h) {
+        return { chain: h.chain, at: h.at, ms: h.ms, nodeCount: h.nodes.length,
+          slowest: h.nodes.slice().sort(function (a, b) { return b.ms - a.ms; }).slice(0, 3),
+          errors: h.nodes.filter(function (x) { return x.status === 'error'; }).length };
+      });
+      return { tracked: __chainHistory.length, max: HISTORY_MAX, runs: rows };
+    },
+    resetHistory() { __chainHistory.length = 0; }
   };
 })();
