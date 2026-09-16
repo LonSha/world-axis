@@ -194,6 +194,8 @@
             batch: WA.store.batchStat ? WA.store.batchStat() : null,
             recovery: WA.store.recoveryStat ? WA.store.recoveryStat() : null,
             load: WA.store.loadStat ? WA.store.loadStat() : null,
+            // v0.1.51: 存储键卫生——worldaxis_* 键空间分类计量与孤儿候选
+            storageKeys: WA.store.storageStat ? WA.store.storageStat() : null,
             sizeProfile: prof,
             // v0.1.47: 诊断走自动续扫编排（消费方不必手写 cursor 循环）
             sizeAudit: WA.store.sizeAuditFull ? WA.store.sizeAuditFull({ minBytes: 512, chunkNodes: 800 }) : (WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null)
@@ -436,6 +438,17 @@
     // v0.1.44: 白名单漂移——已登记容器超出其源码 cap，意味着裁剪代码失效或被绕过写入
     if (aud && Array.isArray(aud.drifted) && aud.drifted.length) {
       issues.push({ level: 'error', key: 'sizeDrift', detail: aud.drifted.length + ' 个容器超出登记的裁剪上限（守卫失效）：' + aud.drifted.map(function (x) { return x.path + '(' + x.len + '>' + x.cap + '，见 ' + x.site + ')'; }).join('、') });
+    }
+    // v0.1.51: 存储键堆积——诊断键跨聊天无限堆积或 corrupt 隔离键超保留数
+    const skStat = (((diag.worldState || {}).storage || {}).storageKeys) || null;
+    if (skStat && skStat.enumerable) {
+      const staleCount = (skStat.staleDiagCandidates || []).length;
+      if (staleCount > 20) {
+        issues.push({ level: 'warn', key: 'storageKeys', detail: staleCount + ' 个跨聊天诊断键超出活跃期（最大闲置 ' + Math.round((skStat.staleDiagCandidates[0] && skStat.staleDiagCandidates[0].idleMs !== Infinity) ? skStat.staleDiagCandidates[0].idleMs / 86400000 : 999) + ' 天），可用 store.sweepStaleKeys() 清理' });
+      }
+      if (skStat.totalKeys > 200) {
+        issues.push({ level: 'warn', key: 'storageKeysTotal', detail: 'worldaxis_* 键总数 ' + skStat.totalKeys + '（' + Math.round(skStat.totalBytes / 1024) + 'KB），建议运行 sweepStaleKeys 复核' });
+      }
     }
     // v0.1.45: 扫描预算耗尽——此时 unbounded/suspects 是「没看见」而非「真没有」，不得当作全绿
     if (aud && aud.complete === false) {

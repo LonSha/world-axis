@@ -113,6 +113,52 @@
   const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
   const __migrations = {};
+  // ── v0.1.51: 存储键卫生（key hygiene）────────────────────────
+  // worldaxis_* 键空间分类：state/recovery/diagnostic/corrupt/settings/wb/other
+  const KEY_FAMILIES = {
+    state: /^worldaxis_state_(.+)$/,
+    recovery: /^worldaxis_recovery_(.+)$/,
+    diag_eventLog: /^worldaxis_event_log_(.+)$/,
+    diag_wfHistory: /^worldaxis_wf_history_(.+)$/,
+    diag_uninjectLedger: /^worldaxis_uninject_ledger_(.+)$/,
+    corrupt: /^worldaxis_state_(.+)_corrupt_\d+$/,
+    wb: /^worldaxis_wb_selection_(.+)$/
+  };
+  function classifyKey(key) {
+    if (KEY_FAMILIES.corrupt.test(key)) return { family: 'corrupt', chat: null };
+    let m;
+    if ((m = key.match(KEY_FAMILIES.state))) return { family: 'state', chat: m[1] };
+    if ((m = key.match(KEY_FAMILIES.recovery))) return { family: 'recovery', chat: m[1] };
+    if ((m = key.match(KEY_FAMILIES.diag_eventLog))) return { family: 'diagnostic', kind: 'event_log', chat: m[1] };
+    if ((m = key.match(KEY_FAMILIES.diag_wfHistory))) return { family: 'diagnostic', kind: 'wf_history', chat: m[1] };
+    if ((m = key.match(KEY_FAMILIES.diag_uninjectLedger))) return { family: 'diagnostic', kind: 'uninject_ledger', chat: m[1] };
+    if ((m = key.match(KEY_FAMILIES.wb))) return { family: 'wb', chat: m[1] };
+    return { family: 'settings', chat: null };
+  }
+  function listWorldAxisKeys() {
+    const ls = mainWin.localStorage;
+    const out = [];
+    try {
+      const n = typeof ls.length === 'number' ? ls.length : 0;
+      for (let i = 0; i < n; i++) {
+        const k = ls.key(i);
+        if (typeof k === 'string' && k.indexOf('worldaxis_') === 0) out.push(k);
+      }
+    } catch (e) { /* 枚举失败（非标准实现）→ 空清单，不炸 */ }
+    return out;
+  }
+  function keyBytes(key) {
+    try { return byteLen(mainWin.localStorage.getItem(key) || ''); } catch (e) { return 0; }
+  }
+  /** 聊天活跃时间：读 state 键 payload 的 meta.updatedAt（无 state 键/解析失败回退 0 = 最冷） */
+  function chatActivityAt(chat) {
+    try {
+      const raw = mainWin.localStorage.getItem('worldaxis_state_' + chat);
+      if (!raw) return 0;
+      const st = JSON.parse(raw);
+      return (st && st.meta && typeof st.meta.updatedAt === 'number') ? st.meta.updatedAt : 0;
+    } catch (e) { return 0; }
+  }
   // v0.1.47: 最近一次 migrate 的报告（观测层承载，不写进 state，避免污染持久 payload）
   let __migrateReport = null;
   function classifySaveError(e) {
@@ -498,6 +544,16 @@
         });
         lines.push('');
       }
+      lines.push('## 📦 存储键空间（localStorage）');
+      try {
+        const ss = this.storageStat();
+        lines.push('- worldaxis_* 键总数: ' + ss.totalKeys + '（' + ss.totalBytes + ' Bytes）');
+        lines.push('- state(存档): ' + ss.families.state + ' 键 / ' + ss.perFamilyBytes.state + 'B · recovery(恢复点): ' + ss.families.recovery + ' / ' + ss.perFamilyBytes.recovery + 'B');
+        lines.push('- diagnostic(诊断): ' + ss.families.diagnostic + ' 键 / ' + ss.perFamilyBytes.diagnostic + 'B · corrupt(隔离): ' + ss.families.corrupt + ' / ' + ss.perFamilyBytes.corrupt + 'B');
+        lines.push('- settings(设置): ' + ss.families.settings + ' 键 · wb(世界书): ' + ss.families.wb + ' 键');
+        lines.push('- 跨聊天过期诊断键候选: ' + (ss.staleDiagCandidates || []).length + ' 个（store.sweepStaleKeys() 可清理）');
+      } catch (e) { lines.push('- storageStat 不可用: ' + String(e && e.message)); }
+      lines.push('');
       lines.push('## 📊 Top 容器内存占用排行');
       (audit.arrays || []).slice(0, 15).forEach(function (r, i) {
         lines.push((i + 1) + '. `' + r.path + '`: ' + r.len + ' 项 (' + r.bytes + 'B)' + (r.bounded ? ' [有界 cap=' + r.cap + ']' : ' [无界]'));
@@ -612,6 +668,105 @@
     listRecoveryPoints(chatId) {
       try { return JSON.parse(mainWin.localStorage.getItem(recoveryKey(chatId)) || '[]'); }
       catch (e) { return []; }
+    },
+    /**
+     * v0.1.51: 存储键卫生观测（只读）——枚举 worldaxis_* 键空间，按 family/chat 分类计量。
+     * diagnostic 键按其聊天活跃时间（state.meta.updatedAt）标记 stale 候选。
+     */
+    storageStat(opts) {
+      const o = opts || {};
+      const maxIdleMs = (typeof o.maxIdleDays === 'number' && o.maxIdleDays >= 0 ? o.maxIdleDays : 30) * 86400000;
+      const cur = getChatId();
+      const keys = listWorldAxisKeys();
+      const families = { state: 0, recovery: 0, diagnostic: 0, corrupt: 0, settings: 0, wb: 0, other: 0 };
+      const perFamilyBytes = { state: 0, recovery: 0, diagnostic: 0, corrupt: 0, settings: 0, wb: 0, other: 0 };
+      let totalBytes = 0, stateKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0;
+      const staleDiagCandidates = [];   // 仅超期项（与 sweepStaleKeys 同阈值）：{ key, chat, kind, idleMs }
+      const now = Date.now();
+      keys.forEach(function (k) {
+        const cls = classifyKey(k);
+        const b = keyBytes(k);
+        totalBytes += b;
+        families[cls.family]++; perFamilyBytes[cls.family] += b;
+        if (cls.family === 'state') stateKeys++;
+        if (cls.family === 'diagnostic') {
+          diagKeys++;
+          if (cls.chat !== cur) {
+            const act = chatActivityAt(cls.chat);
+            const idleMs = act > 0 ? now - act : Infinity;   // 无 state 键 = 冷透（聊天已删或从未落盘）
+            if (idleMs > maxIdleMs) staleDiagCandidates.push({ key: k, chat: cls.chat, kind: cls.kind, lastActiveAt: act, idleMs: idleMs });
+          }
+        }
+        if (cls.family === 'corrupt') corruptKeys++;
+        if (cls.chat === cur) curBytes += b;
+      });
+      return {
+        totalKeys: keys.length,
+        totalBytes: totalBytes,
+        families: families,
+        perFamilyBytes: perFamilyBytes,
+        currentChat: cur,
+        currentChatBytes: curBytes,
+        chats: stateKeys,
+        diagKeys: diagKeys,
+        corruptKeys: corruptKeys,
+        staleDiagCandidates: staleDiagCandidates.sort(function (a, b2) { return a.idleMs - b2.idleMs; }),
+        enumerable: typeof mainWin.localStorage.length === 'number' && mainWin.localStorage.length >= 0
+      };
+    },
+    /**
+     * v0.1.51: 过期存储键清理（默认 dry-run）。返回清理计划；apply:true 才真正删除。
+     * 规则（保守优先，宁可漏删不可误删）：
+     *  - diagnostic 键：所属聊天超过 maxIdleDays 天未活跃（state.meta.updatedAt 基准）→ 候选
+     *  - corrupt 键：只保留最近 keepCorrupt 个（按键名时间戳排序），更老的候选
+     *  - state/recovery：聊天已完全不存在 state 键且其 diagnostic 键全冷 → 一并清理（孤儿恢复点）
+     *  - settings/wb：永不清理（用户数据）
+     *  - 当前聊天的任何键：永不清理
+     */
+    sweepStaleKeys(opts) {
+      const o = opts || {};
+      const apply = o.apply === true;
+      const maxIdleMs = (typeof o.maxIdleDays === 'number' && o.maxIdleDays >= 0 ? o.maxIdleDays : 30) * 86400000;
+      const keepCorrupt = typeof o.keepCorrupt === 'number' && o.keepCorrupt >= 0 ? o.keepCorrupt : 5;
+      const cur = getChatId();
+      const keys = listWorldAxisKeys();
+      const now = Date.now();
+      const plan = { remove: [], keep: [], byFamily: { diagnostic: 0, corrupt: 0, orphanRecovery: 0 }, freedBytes: 0, apply: apply };
+      // ── corrupt：按键名时间戳排序留最近 keepCorrupt 个 ──
+      const corruptKeysSorted = keys.filter(function (k) { return classifyKey(k).family === 'corrupt'; })
+        .sort(function (a, b2) { return (parseInt((b2.match(/_corrupt_(\d+)$/) || [])[1], 10) || 0) - (parseInt((a.match(/_corrupt_(\d+)$/) || [])[1], 10) || 0); });
+      const corruptKeepSet = {};
+      corruptKeysSorted.slice(0, keepCorrupt).forEach(function (k) { corruptKeepSet[k] = true; });
+      // ── 每聊天活跃度缓存 ──
+      const actCache = {};
+      function act(chat) { if (!(chat in actCache)) actCache[chat] = chatActivityAt(chat); return actCache[chat]; }
+      // ── 孤儿 recovery 判定：聊天无 state 键（state 被清/从未写）→ recovery 为孤儿 ──
+      const stateChats = {};
+      keys.forEach(function (k) { const c = classifyKey(k); if (c.family === 'state') stateChats[c.chat] = true; });
+      keys.forEach(function (k) {
+        const c = classifyKey(k);
+        if (c.chat === cur || c.family === 'settings' || c.family === 'wb') { plan.keep.push(k); return; }
+        if (c.family === 'corrupt') {
+          if (corruptKeepSet[k]) { plan.keep.push(k); return; }
+          plan.remove.push({ key: k, reason: 'corrupt-overflow', family: c.family, bytes: keyBytes(k) });
+          return;
+        }
+        if (c.family === 'diagnostic') {
+          const last = act(c.chat);
+          const idleMs = last > 0 ? now - last : Infinity;
+          if (idleMs > maxIdleMs) plan.remove.push({ key: k, reason: 'diag-idle', family: c.family, kind: c.kind, chat: c.chat, idleMs: idleMs, lastActiveAt: last, bytes: keyBytes(k) });
+          else plan.keep.push(k);
+          return;
+        }
+        if (c.family === 'recovery' && !stateChats[c.chat]) {
+          plan.remove.push({ key: k, reason: 'orphan-recovery', family: c.family, chat: c.chat, bytes: keyBytes(k) });
+          return;
+        }
+        plan.keep.push(k);   // state（其他聊天的存档本体，默认保留——清理属用户决策）与未过期 recovery
+      });
+      plan.remove.forEach(function (r) { plan.freedBytes += r.bytes; plan.byFamily[r.reason] = (plan.byFamily[r.reason] || 0) + 1; });
+      if (apply) plan.remove.forEach(function (r) { try { mainWin.localStorage.removeItem(r.key); } catch (e) {} });
+      return plan;
     },
     /** v0.1.37: 恢复点计量只读视图（tool-diag 消费）——bytes 为序列化总体积，count===max 提示环形覆盖将发生 */
     recoveryStat(chatId) {

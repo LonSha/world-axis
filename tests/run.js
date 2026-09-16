@@ -4040,6 +4040,88 @@ WA.loadScript = _ls.loadScript;
     WA.render.clearUninjectLedger(mockChat150);
   }
   } // end v0.1.50 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.51 — 存储键卫生：storageStat 分类计量 + sweepStaleKeys 过期清理
+  // ═══════════════════════════════════════════════════════════
+  v0151: {
+  assert(typeof WA.store.storageStat === 'function' && typeof WA.store.sweepStaleKeys === 'function', 'storageStat/sweepStaleKeys 已导出');
+
+  // ── 场景构造：多聊天键空间 ──
+  const cur151 = WA.store.chatId();
+  const LS = global.localStorage;
+  const junkBefore151 = JSON.parse(JSON.stringify(LS._dump()));
+  // 冷聊天 A：state 活跃时间 40 天前（过期）
+  const coldA = 'v151_cold_a';
+  LS.setItem('worldaxis_state_' + coldA, JSON.stringify({ meta: { updatedAt: Date.now() - 40 * 86400000 } }));
+  LS.setItem('worldaxis_event_log_' + coldA, '[]');
+  LS.setItem('worldaxis_wf_history_' + coldA, '[]');
+  LS.setItem('worldaxis_uninject_ledger_' + coldA, '[]');
+  LS.setItem('worldaxis_recovery_' + coldA, '[]');
+  // 活跃聊天 B：state 活跃时间 1 天前（未过期）
+  const warmB = 'v151_warm_b';
+  LS.setItem('worldaxis_state_' + warmB, JSON.stringify({ meta: { updatedAt: Date.now() - 1 * 86400000 } }));
+  LS.setItem('worldaxis_event_log_' + warmB, '[]');
+  // 孤儿聊天 C：无 state 键，只有 recovery + 诊断键（聊天已删残留）
+  const orphanC = 'v151_orphan_c';
+  LS.setItem('worldaxis_recovery_' + orphanC, '[]');
+  LS.setItem('worldaxis_event_log_' + orphanC, '[]');
+  // corrupt 键 ×7（应保留最近 5 个）
+  for (let ci = 0; ci < 7; ci++) LS.setItem('worldaxis_state_' + cur151 + '_corrupt_' + (Date.now() - ci * 1000), '{}');
+  // settings / wb 键（永不清理）
+  LS.setItem('worldaxis_backstage_settings_v1', '{}');
+  LS.setItem('worldaxis_wb_selection_' + coldA, '{}');
+
+  // ── 1. storageStat 分类计量 ──
+  const stat151 = WA.store.storageStat();
+  assert(stat151.enumerable === true, 'mock localStorage 支持枚举');
+  assert(stat151.totalKeys >= 15, '键总数计入（实 ' + stat151.totalKeys + '）');
+  assert(stat151.families.state >= 3 && stat151.families.diagnostic >= 5, 'state/diagnostic 家族分类计数');
+  assert(stat151.families.corrupt === 7, 'corrupt 家族计数（实 ' + stat151.families.corrupt + '）');
+  assert(stat151.families.settings >= 1 && stat151.families.wb >= 1, 'settings/wb 家族分类');
+  assert(stat151.currentChat === cur151 && stat151.currentChatBytes > 0, '当前聊天键计量（' + stat151.currentChatBytes + 'B）');
+  const staleKeys151 = stat151.staleDiagCandidates.map(x => x.key);
+  assert(staleKeys151.indexOf('worldaxis_event_log_' + coldA) >= 0, '冷聊天 A 诊断键入 stale 候选');
+  assert(staleKeys151.indexOf('worldaxis_event_log_' + orphanC) >= 0, '孤儿聊天 C 诊断键入 stale 候选（idleMs=Infinity 排最前）');
+  assert(staleKeys151.indexOf('worldaxis_event_log_' + warmB) < 0, '活跃聊天 B 诊断键不入候选');
+
+  // ── 2. sweepStaleKeys dry-run（默认不删）──
+  const plan151 = WA.store.sweepStaleKeys({ maxIdleDays: 30, keepCorrupt: 5 });
+  assert(plan151.apply === false, '默认 dry-run');
+  assert(LS.getItem('worldaxis_event_log_' + coldA) !== null, 'dry-run 不实际删除');
+  const rem151 = plan151.remove;
+  assert(rem151.some(r => r.key === 'worldaxis_event_log_' + coldA) && rem151.some(r => r.key === 'worldaxis_wf_history_' + coldA) && rem151.some(r => r.key === 'worldaxis_uninject_ledger_' + coldA), '冷聊天 A 三个诊断键全进清理计划');
+  assert(rem151.some(r => r.key === 'worldaxis_event_log_' + orphanC), '孤儿聊天 C 诊断键进计划');
+  assert(rem151.some(r => r.key === 'worldaxis_recovery_' + orphanC && r.reason === 'orphan-recovery'), '孤儿 recovery 进计划（聊天无 state）');
+  assert(!rem151.some(r => r.key === 'worldaxis_event_log_' + warmB), '活跃聊天 B 诊断键保留');
+  assert(!rem151.some(r => r.chat === cur151), '当前聊天任何键保留（含 corrupt）');
+  assert(!rem151.some(r => r.key === 'worldaxis_backstage_settings_v1') && !rem151.some(r => r.key === 'worldaxis_wb_selection_' + coldA), 'settings/wb 键永不清理');
+  const corruptRem151 = rem151.filter(r => r.reason === 'corrupt-overflow');
+  assert(corruptRem151.length === 2, 'corrupt 超出保留窗口 2 个（7-5）');
+  assert(plan151.freedBytes > 0, '可释放字节计量（' + plan151.freedBytes + 'B）');
+
+  // ── 3. apply 真删 + 删后复核 ──
+  const planApply151 = WA.store.sweepStaleKeys({ maxIdleDays: 30, keepCorrupt: 5, apply: true });
+  assert(planApply151.apply === true && planApply151.remove.length === rem151.length, 'apply 计划与 dry-run 一致');
+  assert(LS.getItem('worldaxis_event_log_' + coldA) === null && LS.getItem('worldaxis_recovery_' + orphanC) === null, '过期诊断键与孤儿 recovery 已实际删除');
+  assert(LS.getItem('worldaxis_event_log_' + warmB) !== null && LS.getItem('worldaxis_state_' + warmB) !== null, '活跃聊天键完好');
+  assert(LS.getItem('worldaxis_backstage_settings_v1') !== null && LS.getItem('worldaxis_wb_selection_' + coldA) !== null, 'settings/wb 完好');
+  const afterStat151 = WA.store.storageStat();
+  assert(afterStat151.families.corrupt === 5, 'corrupt 保留最近 5 个（实 ' + afterStat151.families.corrupt + '）');
+  assert(afterStat151.totalKeys === stat151.totalKeys - planApply151.remove.length, '删后键总数精确对账');
+
+  // ── 4. toolDiag 集成 ──
+  const diag151 = WA.toolDiag.collect();
+  const skDiag151 = (((diag151.worldState || {}).storage || {}).storageKeys) || null;
+  assert(skDiag151 && typeof skDiag151.totalKeys === 'number', 'toolDiag 透出 storageKeys 计量');
+
+  // ── 5. exportAuditReport 存储键段 ──
+  const rpt151 = WA.store.exportAuditReport({ minBytes: 64 });
+  assert(rpt151.includes('## 📦 存储键空间') && rpt151.includes('worldaxis_* 键总数'), '审计报告含存储键分类段');
+
+  // ── 清理：还原为进入本块前的键空间快照 ──
+  LS.clear();
+  Object.keys(junkBefore151).forEach(k => LS.setItem(k, junkBefore151[k]));
+  } // end v0.1.51 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

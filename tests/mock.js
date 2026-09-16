@@ -2,13 +2,24 @@
 'use strict';
 
 // localStorage mock
+// v0.1.51: 对齐浏览器标准枚举 API（length/key()）+ 键级 mtime 观测（storageStat 衰减判定测试用）
 const store = {};
+const storeMtime = {};   // key -> last setItem 时间戳
+const KEY_ORDER = [];    // 插入顺序（模拟浏览器枚举序）
+function ls_touch(k) {
+  if (!(k in store)) KEY_ORDER.push(k);
+  storeMtime[k] = Date.now();
+}
 global.localStorage = {
+  get length() { return KEY_ORDER.filter(k => (k in store)).length; },
+  key: i => KEY_ORDER.filter(k => (k in store))[i] || null,
   getItem: k => (k in store ? store[k] : null),
-  setItem: (k, v) => { store[k] = String(v); },
-  removeItem: k => { delete store[k]; },
-  clear: () => { Object.keys(store).forEach(k => delete store[k]); },
-  _dump: () => ({ ...store })
+  setItem: (k, v) => { ls_touch(k); store[k] = String(v); },
+  removeItem: k => { delete store[k]; delete storeMtime[k]; },
+  clear: () => { Object.keys(store).forEach(k => { delete store[k]; delete storeMtime[k]; }); KEY_ORDER.length = 0; },
+  _dump: () => ({ ...store }),
+  _mtimes: () => ({ ...storeMtime }),
+  _setMtime: (k, t) => { if (k in store) storeMtime[k] = t; }
 };
 
 // window/document 最小mock
