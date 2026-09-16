@@ -225,7 +225,7 @@
       <button class="wa-btn" id="wa-imp-run">预检并导入</button>
       <div id="wa-imp-out" class="wa-out"></div>
       <div class="wa-sec">扩展自检（模块/注入/UI/运行环境）</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button><button class="wa-btn" id="wa-audit-copy">复制内存审计</button><button class="wa-btn" id="wa-key-check">存储键体检</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button><button class="wa-btn" id="wa-audit-copy">复制内存审计</button><button class="wa-btn" id="wa-key-check">存储键体检</button><button class="wa-btn" id="wa-quar-view">隔离现场</button><button class="wa-btn" id="wa-recovery-dl">导出恢复点</button></div>
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
@@ -412,6 +412,51 @@
         out.innerHTML = html;
         const go = $('#wa-key-sweep-go'); if (go) go.onclick = doIt;
       } catch (e) { out.textContent = '体检失败：' + (e && e.message); }
+    };
+    // v0.3.0: 隔离现场救援出口——损坏时保存的原始现场可查看/恢复/丢弃（此前只进不出）
+    const qv = $('#wa-quar-view');
+    if (qv) qv.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.store || !WA.store.listQuarantineSites) return;
+      try {
+        const sites = WA.store.listQuarantineSites();
+        const qs = WA.store.quarantineStat();
+        if (!sites.length) { out.innerHTML = '<div class="wa-log wa-log-info">✓ 无隔离现场（从未发生状态键损坏，或已被处置）</div>'; return; }
+        let html = '<div class="wa-item"><b>隔离现场</b>：共 ' + qs.total + ' 个 / ' + Math.round(qs.bytes / 1024) + 'KB（state ' + qs.stateSites + ' · settings ' + qs.settingsSites + ' · 可解析 ' + qs.parseable + ' · 本聊天 ' + qs.currentChatSites + '）</div>';
+        html += '<div class="wa-dim">state 损坏时保存的原始字节现场。「可解析」的现场可直接恢复（写前自动留恢复点）；真损坏字节只能丢弃。</div>';
+        html += sites.slice(0, 6).map(s2 => '<div class="wa-log wa-log-' + (s2.parseable ? 'warn' : 'info') + '">' + esc(s2.key) + '<br><span class="wa-dim">' + Math.round(s2.bytes / 1024) + 'KB · ' + (s2.at ? new Date(s2.at).toLocaleString() : '未知时间') + (s2.chat ? ' · 聊天 ' + esc(s2.chat) : '') + (s2.parseable ? ' · 可解析' : s2.quarantine === 'state' ? ' · 真损坏' : '') + '</span></div>').join('');
+        const parseable = sites.filter(s2 => s2.parseable === true);
+        if (parseable.length) html += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-q-restore">恢复最近可解析现场（' + esc(parseable[0].key) + '）</button></div>';
+        html += '<div class="wa-dim">恢复成功后隔离现场仍保留（审计证据），确认无用可用下方按钮丢弃。</div>';
+        html += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-q-drop">丢弃最早现场</button></div>';
+        out.innerHTML = html;
+        const rb = $('#wa-q-restore');
+        if (rb) rb.onclick = () => {
+          const r = WA.store.restoreQuarantine(parseable[0].key);
+          out.innerHTML = '<div class="wa-log wa-log-' + (r.ok ? 'info' : 'err') + '">' + (r.ok ? '✓ 已恢复（' + r.bytes + 'B，写前已留恢复点）' : '恢复失败：' + esc(r.reason)) + '</div>';
+        };
+        const db = $('#wa-q-drop');
+        if (db) db.onclick = () => {
+          const target = sites[sites.length - 1];
+          const r = WA.store.dropQuarantine(target.key);
+          out.innerHTML = '<div class="wa-log wa-log-' + (r.ok ? 'info' : 'err') + '">' + (r.ok ? '✓ 已丢弃 ' + esc(target.key) : '丢弃失败：' + esc(r.reason)) + '</div>';
+        };
+      } catch (e) { out.textContent = '隔离现场读取失败：' + (e && e.message); }
+    };
+    // v0.3.0: 恢复点导出（离机备份出口——3 个环形窗口内数据一旦被覆盖/清浏览器数据即永久丢失）
+    const rdl = $('#wa-recovery-dl');
+    if (rdl) rdl.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.store || !WA.store.exportRecoveryPoints) return;
+      try {
+        const pack = WA.store.exportRecoveryPoints();
+        if (!pack.count) { out.innerHTML = '<div class="wa-log wa-log-info">当前聊天暂无恢复点（首次升级/首次存档时创建）</div>'; return; }
+        const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'worldaxis-recovery-' + Date.now() + '.json';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        out.innerHTML = '<div class="wa-log wa-log-info">✓ 已导出 ' + pack.count + ' 个恢复点（' + Math.round(pack.bytes / 1024) + 'KB）</div>';
+      } catch (e) { out.textContent = '恢复点导出失败：' + (e && e.message); }
     };
     const conc = $('#wa-conc'); if (conc) conc.oninput = () => { WA.apiRouter.setConcurrency(+conc.value); $('#wa-conc-v').textContent = conc.value; };
     // 设置页绑定

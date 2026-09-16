@@ -109,6 +109,10 @@
   }
   // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
   const __saveStat = { at: 0, ok: null, bytes: 0, reason: null, failCount: 0 };
+  // v0.3.0: 隔离现场处置审计（只读观测 + 恢复/丢弃动作留痕）
+  const __quarantineStat = { restores: 0, drops: 0, lastRestoreAt: 0, lastDropAt: 0, lastKey: null };
+  // v0.3.0: 配额救援审计——save 遇配额耗尽时的自动回收与重试结果
+  const __rescueStat = { attempts: 0, recovered: 0, failed: 0, lastFreedBytes: 0, lastAt: 0, lastRemoved: 0 };
   // v0.1.38: 加载观测——状态键损坏时隔离原始 payload 而非静默丢弃
   const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
@@ -401,7 +405,19 @@
         // v0.1.22: save 失败归因 + 计数；内存副本仍推进，避免本轮结算在半份状态里丢失
         __saveStat.at = Date.now(); __saveStat.ok = false; __saveStat.reason = classifySaveError(e); __saveStat.failCount++;
         const s = state || memCache; if (s) memCache = s;
-        WA.log('error', __saveStat.reason === 'quota' ? 'store.save失败：localStorage 配额耗尽，世界状态未能落盘（导出快照并清理旧聊天数据）' : 'store.save失败', e);
+        // v0.3.0: 配额耗尽不再只记日志——先尝试安全回收（过期诊断/孤儿恢复点/隔离溢出），成功则立刻重试落盘。
+        // 救援只动「可安全回收」的键（当前聊天/settings/wb/state 本体永不参与），失败则保持可见错误。
+        if (__saveStat.reason === 'quota') {
+          const rescued = this.__rescueQuota(state, chatId);
+          if (rescued) {
+            __saveStat.ok = true; __saveStat.reason = null;
+            WA.log('warn', 'store.save 遇配额耗尽：已自动回收 ' + __rescueStat.lastRemoved + ' 个可回收键（释放 ' + Math.round(__rescueStat.lastFreedBytes / 1024) + 'KB）并重试落盘成功');
+            return true;
+          }
+          WA.log('error', 'store.save失败：配额耗尽且自动回收未能释放足够空间（可回收 ' + __rescueStat.lastRemoved + ' 个键 / ' + Math.round(__rescueStat.lastFreedBytes / 1024) + 'KB 仍不足）——导出快照并手动清理旧聊天数据', e);
+          return false;
+        }
+        WA.log('error', 'store.save失败', e);
         return false;
       }
     },
@@ -436,6 +452,40 @@
     batchDepth() { return __batch.depth; },
     /** v0.1.32: 批健康只读视图——flushes 即「写合并后实际落盘次数」（对照 txStat.batched 观察合并率） */
     batchStat() { return { depth: __batch.depth, dirty: __batch.dirty, flushes: __batch.flushes, lastFlushAt: __batch.lastFlushAt, orphaned: __batch.orphaned }; },
+    /**
+     * v0.3.0: 配额救援（内部）——配额耗尽时回收可安全释放的键并重试一次落盘。
+     * 安全边界：复用 sweepStaleKeys 的保守规则（绝不碰当前聊天/settings/wb/state 本体）。
+     * 返回 true 表示重试成功。
+     */
+    __rescueQuota(state, chatId) {
+      __rescueStat.attempts++; __rescueStat.lastAt = Date.now();
+      let removed = 0, freed = 0;
+      try {
+        const plan = this.sweepStaleKeys({ apply: true });   // 只回收过期诊断/孤儿恢复点/隔离溢出
+        removed = plan.remove.length; freed = plan.freedBytes;
+      } catch (e) { removed = 0; freed = 0; }
+      __rescueStat.lastRemoved = removed; __rescueStat.lastFreedBytes = freed;
+      if (!removed) { __rescueStat.failed++; return false; }
+      // 重试落盘
+      try {
+        const s = state || memCache;
+        s.meta = s.meta || {};
+        s.meta.updatedAt = Date.now();
+        const payload = JSON.stringify(s);
+        mainWin.localStorage.setItem(storageKey(chatId), payload);
+        memCache = s;
+        __saveStat.bytes = byteLen(payload);
+        __rescueStat.recovered++;
+        return true;
+      } catch (e2) {
+        __rescueStat.failed++;
+        return false;
+      }
+    },
+    /** v0.3.0: 配额救援观测（tool-diag/面板消费）——attempts>0 表示本会话曾撞配额墙 */
+    rescueStat() { const r = __rescueStat; return { attempts: r.attempts, recovered: r.recovered, failed: r.failed, lastRemoved: r.lastRemoved, lastFreedBytes: r.lastFreedBytes, lastAt: r.lastAt }; },
+    /** v0.3.0: 隔离现场处置审计视图 */
+    quarantineAudit() { const q = __quarantineStat; return { restores: q.restores, drops: q.drops, lastRestoreAt: q.lastRestoreAt, lastDropAt: q.lastDropAt, lastKey: q.lastKey }; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
     /** v0.1.38: 加载观测只读视图（tool-diag 消费）——errors>0 意味着发生过状态键损坏 */
@@ -833,6 +883,41 @@
     orphanSettingsKeys() {
       try { return WA.settingsBus && WA.settingsBus.pendingOrphan ? WA.settingsBus.pendingOrphan() : []; } catch (e) { return []; }
     },
+    /**
+     * v0.3.0: 导出全部恢复点（可下载 JSON，离机备份出口）。
+     * 缺陷背景：恢复点环形窗口仅 3 个且只存于 localStorage——一旦配额清理或用户清浏览器数据即全部丢失。
+     */
+    exportRecoveryPoints(chatId) {
+      const cid = chatId || getChatId();
+      const list = this.listRecoveryPoints(cid);
+      let bytes = 0;
+      try { bytes = JSON.stringify(list).length; } catch (e) { bytes = -1; }
+      return {
+        worldaxis: SCHEMA_VERSION,
+        kind: 'recovery-points',
+        exportedAt: new Date().toISOString(),
+        chatId: cid,
+        count: list.length,
+        max: MAX_RECOVERY_POINTS,
+        bytes: bytes,
+        points: list
+      };
+    },
+    /**
+     * v0.3.0: 丢弃单个恢复点（按索引）——用户确认某点已无用时可腾出环形窗口，
+     * 而不必等它被新点挤出（避免「想保留新点却被旧点占位」）。
+     */
+    dropRecoveryPoint(chatId, index) {
+      const cid = chatId || getChatId();
+      const list = this.listRecoveryPoints(cid);
+      const i = typeof index === 'number' ? index : -1;
+      if (i < 0 || i >= list.length) return { ok: false, reason: '索引越界（当前 ' + list.length + ' 个恢复点）' };
+      const dropped = list.splice(i, 1)[0];
+      try { mainWin.localStorage.setItem(recoveryKey(cid), JSON.stringify(list)); }
+      catch (e) { return { ok: false, reason: '写入失败：' + ((e && e.message) || e) }; }
+      WA.log('info', '已丢弃 1 个恢复点（' + new Date(dropped.at).toLocaleString() + '），剩余 ' + list.length + ' 个');
+      return { ok: true, remaining: list.length, droppedAt: dropped.at };
+    },
     /** v0.1.37: 恢复点计量只读视图（tool-diag 消费）——bytes 为序列化总体积，count===max 提示环形覆盖将发生 */
     recoveryStat(chatId) {
       const list = this.listRecoveryPoints(chatId);
@@ -840,6 +925,100 @@
       try { bytes = JSON.stringify(list).length; } catch (e) { bytes = -1; }
       return { count: list.length, max: MAX_RECOVERY_POINTS, full: list.length >= MAX_RECOVERY_POINTS, bytes: bytes, lastAt: list.length ? list[0].at : 0 };
     },
+    /**
+     * v0.3.0: 隔离现场清单（只读）——state/settings 损坏时保存的原始字节现场。
+     * 缺陷背景：隔离机制把损坏现场存进 *_corrupt_<ts> 后无任何读回通道，
+     * 「数据被保存了」不等于「数据可恢复」。此处提供可发现性 + 内容摘要。
+     */
+    listQuarantineSites(opts) {
+      const o = opts || {};
+      const keys = listWorldAxisKeys();
+      const out = [];
+      keys.forEach(function (k) {
+        const c = classifyKey(k);
+        if (c.family !== 'corrupt') return;
+        let raw = '';
+        try { raw = mainWin.localStorage.getItem(k) || ''; } catch (e) { raw = ''; }
+        const ts = parseInt((k.match(/_corrupt_(\d+)$/) || [])[1], 10) || 0;
+        let parseable = null;   // state 隔离现场：损坏字节通常不可解析，但值得试探（部分写入可能仍可解析）
+        if (c.quarantine === 'state') { try { JSON.parse(raw); parseable = true; } catch (e) { parseable = false; } }
+        out.push({
+          key: k, chat: c.chat, quarantine: c.quarantine, at: ts,
+          bytes: byteLen(raw), parseable: parseable,
+          isCurrentChat: c.chat === getChatId(),
+          head: raw.slice(0, 120)   // 摘要（不泄露全文，供人工判断现场性质）
+        });
+      });
+      out.sort(function (a, b) { return b.at - a.at; });
+      return o.chat ? out.filter(function (x) { return x.chat === o.chat; }) : out;
+    },
+    /** v0.3.0: 隔离现场聚合计量（面板/报告消费） */
+    quarantineStat() {
+      const sites = this.listQuarantineSites();
+      const byChat = {};
+      sites.forEach(function (x) {
+        const cid = x.chat || '(settings)';
+        byChat[cid] = (byChat[cid] || 0) + 1;
+      });
+      const parseable = sites.filter(function (x) { return x.parseable === true; }).length;
+      let bytes = 0;
+      sites.forEach(function (x) { bytes += x.bytes; });
+      return {
+        total: sites.length, bytes: bytes, byChat: byChat,
+        stateSites: sites.filter(function (x) { return x.quarantine === 'state'; }).length,
+        settingsSites: sites.filter(function (x) { return x.quarantine === 'settings'; }).length,
+        parseable: parseable,
+        currentChatSites: sites.filter(function (x) { return x.isCurrentChat; }).length,
+        restores: __quarantineStat.restores, drops: __quarantineStat.drops,
+        lastRestoreAt: __quarantineStat.lastRestoreAt, lastDropAt: __quarantineStat.lastDropAt
+      };
+    },
+    /**
+     * v0.3.0: 从隔离现场恢复（数据救援出口）。
+     * 现场可解析 → 写回 state 本体（写前自动留恢复点，防二次损坏无退路）；
+     * 现场不可解析（真损坏字节）→ 拒绝写入并说明原因（不把垃圾灌回 state）。
+     * 恢复成功后隔离现场保留（作为审计证据），由 dropQuarantine 显式丢弃。
+     */
+    restoreQuarantine(key, chatId) {
+      if (typeof key !== 'string') return { ok: false, reason: '缺少隔离键' };
+      const c = classifyKey(key);
+      if (c.family !== 'corrupt' || c.quarantine !== 'state') {
+        return { ok: false, reason: '非 state 隔离现场（settings 隔离现场请用设置面板重置）' };
+      }
+      let raw = null;
+      try { raw = mainWin.localStorage.getItem(key); } catch (e) { return { ok: false, reason: '读取隔离键失败：' + ((e && e.message) || e) }; }
+      if (!raw) return { ok: false, reason: '隔离现场不存在' };
+      let parsed = null;
+      try { parsed = JSON.parse(raw); }
+      catch (e) { return { ok: false, reason: '隔离现场为真损坏字节（无法解析），不可恢复——如确认放弃可 dropQuarantine 删除' }; }
+      const target = chatId || c.chat;
+      try {
+        this.createRecoveryPoint(target);   // 写前留点：即使恢复的内容不对也有退路
+        memCache = parsed;
+        const saved = this.save(memCache, target);
+        if (!saved) return { ok: false, reason: '恢复内容已载入内存，但落盘失败（配额？）——请先清理存储键空间' };
+      } catch (e) {
+        return { ok: false, reason: '恢复写入失败：' + ((e && e.message) || e) };
+      }
+      __quarantineStat.restores++; __quarantineStat.lastRestoreAt = Date.now(); __quarantineStat.lastKey = key;
+      WA.log('warn', '已从隔离现场恢复 state（' + key + '，聊天 ' + target + '）——原隔离键保留作为审计证据');
+      return { ok: true, chat: target, bytes: byteLen(raw) };
+    },
+    /** v0.3.0: 显式丢弃隔离现场（用户确认无需再恢复）——审计留痕，不静默删 */
+    dropQuarantine(key) {
+      if (typeof key !== 'string') return { ok: false, reason: '缺少隔离键' };
+      const c = classifyKey(key);
+      if (c.family !== 'corrupt') return { ok: false, reason: '非隔离键，拒绝删除（防误用成通用删除器）' };
+      let existed = null;
+      try { existed = mainWin.localStorage.getItem(key); } catch (e) {}
+      if (existed === null) return { ok: false, reason: '隔离现场不存在（可能已被清理或键名有误）' };
+      try { mainWin.localStorage.removeItem(key); }
+      catch (e) { return { ok: false, reason: '删除失败：' + ((e && e.message) || e) }; }
+      __quarantineStat.drops++; __quarantineStat.lastDropAt = Date.now();
+      WA.log('info', '已丢弃隔离现场（用户确认）: ' + key);
+      return { ok: true, key: key, quarantine: c.quarantine };
+    },
+
     restore(index, chatId) {
       const list = this.listRecoveryPoints(chatId);
       if (!list[index]) return false;

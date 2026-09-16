@@ -4528,6 +4528,145 @@ WA.loadScript = _ls.loadScript;
   // 清理现场
   LS230.clear();
   Object.keys(junkBefore230).forEach(function (k) { LS230.setItem(k, junkBefore230[k]); });
+  // ═══════════════════════════════════════════════════════════
+  // v0.3.0 — 存储救援体系（隔离现场出口 / 配额自动救援 / 恢复点离机备份）
+  // 缺陷背景：① 隔离现场只进不出（无任何读回 API）；② 配额耗尽仅记日志、磁盘态永久落后；
+  //          ③ 恢复点环形窗口仅 3 个且无法导出（清浏览器数据即永久丢失）
+  // ═══════════════════════════════════════════════════════════
+  section('v0.3.0 存储救援体系');
+  v0300: {
+  const LS300 = global.localStorage;
+  const junkBefore300 = JSON.parse(JSON.stringify(LS300._dump()));
+  LS300.clear();
+  WA.store.init();
+  const cur300 = WA.store.chatId();
+
+  // ── 1. 隔离现场可发现（含归属/可解析性/大小/摘要）──
+  const goodKey300 = 'worldaxis_state_' + cur300 + '_corrupt_' + (Date.now() - 5000);
+  const badKey300 = 'worldaxis_state_' + cur300 + '_corrupt_' + Date.now();
+  LS300.setItem(goodKey300, JSON.stringify({ clock: { label: '隔离现场进度' }, meta: {} }));
+  LS300.setItem(badKey300, '{"broken');
+  LS300.setItem('worldaxis_opinion_settings_v1_corrupt_' + Date.now(), '{"oops');
+  const sites300 = WA.store.listQuarantineSites();
+  assert(sites300.length === 3, '隔离现场清单枚举全部 corrupt 键（实 ' + sites300.length + '）');
+  assert(sites300.every(x => typeof x.key === 'string' && typeof x.bytes === 'number' && x.at > 0), '每条含 key/bytes/时间戳');
+  const goodSite300 = sites300.filter(x => x.key === goodKey300)[0];
+  assert(goodSite300 && goodSite300.parseable === true, '可解析现场被正确标记（parseable=true）');
+  assert(goodSite300.isCurrentChat === true && goodSite300.chat === cur300, '隔离现场保留聊天归属（v0.2.3 归属修复的下游消费）');
+  const badSite300 = sites300.filter(x => x.key === badKey300)[0];
+  assert(badSite300 && badSite300.parseable === false, '真损坏现场标记 parseable=false');
+  const setSite300 = sites300.filter(x => x.quarantine === 'settings')[0];
+  assert(setSite300 && setSite300.parseable === null, 'settings 隔离现场不做 state 解析标记（null）');
+  // 聚合计量
+  const qs300 = WA.store.quarantineStat();
+  assert(qs300.total === 3 && qs300.stateSites === 2 && qs300.settingsSites === 1, '聚合计量按来源分流（state/settings）');
+  assert(qs300.parseable === 1 && qs300.currentChatSites >= 2, '聚合透出可解析数与本聊天现场数');
+  assert(qs300.byChat[cur300] === 2, '按聊天归组计量');
+
+  // ── 2. 恢复出口：可解析现场写回 state；真损坏拒绝写入 ──
+  const rBad300 = WA.store.restoreQuarantine(badKey300);
+  assert(rBad300.ok === false && /真损坏/.test(rBad300.reason), '真损坏现场拒绝恢复（不把垃圾灌回 state）');
+  const stateBefore300 = LS300.getItem('worldaxis_state_' + cur300);
+  assert(stateBefore300 === null, '拒绝恢复未凭空创建 state 键（init 后本无 state）');
+  WA.store.transact(d => { d.clock.label = '拒绝恢复前的状态'; });
+  WA.store.save();
+  const stateAfterSave300 = LS300.getItem('worldaxis_state_' + cur300);
+  assert(WA.store.restoreQuarantine(badKey300).ok === false, '再次拒绝真损坏现场');
+  assert(LS300.getItem('worldaxis_state_' + cur300) === stateAfterSave300, '拒绝恢复后 state 键未被覆盖（值逐字节不变）');
+  // 把可解析现场内容也写入 state 本体（模拟已有其他状态），验证恢复确实替换
+  WA.store.transact(d => { d.clock.label = '恢复前状态'; });
+  WA.store.save();
+  const rGood300 = WA.store.restoreQuarantine(goodKey300);
+  assert(rGood300.ok === true, '可解析现场恢复成功');
+  assert(JSON.parse(LS300.getItem('worldaxis_state_' + cur300)).clock.label === '隔离现场进度', 'state 本体恢复为隔离现场内容');
+  assert(WA.store.read('clock.label') === '隔离现场进度', '内存态同步恢复');
+  assert(WA.store.listRecoveryPoints().length >= 1, '恢复前自动留恢复点（防二次损坏无退路）');
+  assert(LS300.getItem(goodKey300) !== null, '恢复后隔离现场保留作为审计证据');
+  // settings 现场不可用 state 恢复通道
+  const rSet300 = WA.store.restoreQuarantine(setSite300.key);
+  assert(rSet300.ok === false && /非 state 隔离现场/.test(rSet300.reason), 'settings 隔离现场拒绝走 state 恢复通道');
+  // 丢弃
+  const dBad300 = WA.store.dropQuarantine(badKey300);
+  assert(dBad300.ok === true && LS300.getItem(badKey300) === null, '显式丢弃隔离现场生效');
+  const dMiss300 = WA.store.dropQuarantine('worldaxis_state_x_corrupt_99999');
+  assert(dMiss300.ok === false && /不存在/.test(dMiss300.reason), '丢弃不存在的现场报错（防假成功）');
+  const dNon300 = WA.store.dropQuarantine('worldaxis_backstage_settings_v1');
+  assert(dNon300.ok === false && /非隔离键/.test(dNon300.reason), 'dropQuarantine 不可被误用为通用删除器');
+  const audit300 = WA.store.quarantineAudit();
+  assert(audit300.restores === 1 && audit300.drops === 1, '处置动作留痕（恢复/丢弃各计 1 次）');
+
+  // ── 3. 配额自动救援：撞配额 → 回收可回收键 → 重试落盘成功 ──
+  LS300.clear();
+  WA.store.init();
+  const cid300 = WA.store.chatId();
+  WA.store.transact(d => { d.clock.label = '初始'; });
+  WA.store.save();
+  LS300.setItem('worldaxis_event_log_cold300', 'x'.repeat(3000));       // 过期诊断（无 state 宿主 → 冷透）
+  LS300.setItem('worldaxis_recovery_dead300', '[]');                     // 孤儿恢复点
+  const before3 = WA.store.rescueStat();
+  const realSet300 = LS300.setItem.bind(LS300);
+  let blocked = 0;
+  LS300.setItem = function (k, v) {
+    if (k.indexOf('worldaxis_state_') === 0 && k.indexOf('_corrupt_') < 0 && k.indexOf('_syncrev') < 0
+        && String(v).indexOf('配额后进度') >= 0 && blocked < 1) {
+      blocked++;
+      const e = new Error('quota exceeded'); e.name = 'QuotaExceededError'; throw e;
+    }
+    return realSet300(k, v);
+  };
+  WA.store.transact(d => { d.clock.label = '配额后进度'; });
+  const okSave300 = WA.store.save();
+  LS300.setItem = realSet300;
+  assert(okSave300 === true, '配额耗尽后自动救援并重试落盘成功（save 返回 true）');
+  assert(JSON.parse(LS300.getItem('worldaxis_state_' + cid300)).clock.label === '配额后进度', '磁盘态已追上内存态（不再静默落后）');
+  assert(LS300.getItem('worldaxis_event_log_cold300') === null && LS300.getItem('worldaxis_recovery_dead300') === null, '救援回收了冷诊断与孤儿恢复点');
+  const after3 = WA.store.rescueStat();
+  assert(after3.attempts === before3.attempts + 1 && after3.recovered === before3.recovered + 1, '救援计量记录尝试与成功');
+  assert(after3.lastRemoved >= 2 && after3.lastFreedBytes > 0, '救援计量记录回收键数与释放字节');
+  // 救援失败路径：无可回收键时必须仍返回 false 且计量失败
+  const beforeFail300 = WA.store.rescueStat();
+  LS300.setItem = function (k, v) {
+    // 该值全拦（含救援重试）——模拟「配额确实无空间可腾」，验证救援失败不假装成功
+    if (k.indexOf('worldaxis_state_') === 0 && k.indexOf('_corrupt_') < 0 && k.indexOf('_syncrev') < 0
+        && String(v).indexOf('无法救援') >= 0) {
+      const e = new Error('quota exceeded'); e.name = 'QuotaExceededError'; throw e;
+    }
+    return realSet300(k, v);
+  };
+  WA.store.transact(d => { d.clock.label = '无法救援'; });
+  const okFail300 = WA.store.save();
+  LS300.setItem = realSet300;
+  assert(okFail300 === false, '无可回收键时救援失败并如实返回 false（不假装成功）');
+  // transact 内部 save 与本处 save 各撞一次配额（真实会话行为），故增量 >= 1 且 attempts 同步增长
+  assert(WA.store.rescueStat().failed >= beforeFail300.failed + 1, '救援失败计入 failed 计量（实 +' + (WA.store.rescueStat().failed - beforeFail300.failed) + '）');
+  assert(WA.store.rescueStat().attempts > beforeFail300.attempts, '每次撞配额都计入 attempts（不吞掉重试痕迹）');
+  assert(WA.store.saveStat().reason === 'quota' || WA.store.saveStat().ok === true, '失败原因可归因（quota）');
+
+  // ── 4. 恢复点导出与单点处置 ──
+  LS300.clear();
+  WA.store.init();
+  for (let i = 0; i < 3; i++) { WA.store.transact(d => { d.clock.round = i + 1; }); WA.store.createRecoveryPoint(); }
+  const pack300 = WA.store.exportRecoveryPoints();
+  assert(pack300.kind === 'recovery-points' && pack300.count === 3 && pack300.points.length === 3, '恢复点导出含全部点与元信息');
+  assert(pack300.max === 3 && typeof pack300.exportedAt === 'string' && pack300.chatId, '导出含窗口上限/时间/聊天标识');
+  assert(pack300.points[0].state && pack300.points[0].state.clock, '导出点含完整状态快照（可离机备份）');
+  const dropP300 = WA.store.dropRecoveryPoint(null, 1);
+  assert(dropP300.ok === true && dropP300.remaining === 2, '单点处置生效（剩余 2）');
+  assert(WA.store.listRecoveryPoints().length === 2, '磁盘上恢复点已同步减少');
+  assert(WA.store.dropRecoveryPoint(null, 9).ok === false, '越界索引被拒绝');
+
+  // ── 5. 面板/报告接线（源码断言）──
+  const panelSrc300 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(panelSrc300.indexOf('wa-quar-view') >= 0 && panelSrc300.indexOf('隔离现场') >= 0, '面板含「隔离现场」入口');
+  assert(panelSrc300.indexOf('wa-recovery-dl') >= 0 && panelSrc300.indexOf('导出恢复点') >= 0, '面板含「导出恢复点」入口');
+  assert(panelSrc300.indexOf('restoreQuarantine') >= 0 && panelSrc300.indexOf('dropQuarantine') >= 0, '面板接线恢复/丢弃动作');
+  const diagSrc300 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  assert(diagSrc300.indexOf('quarantineStat') >= 0 && diagSrc300.indexOf('rescueStat') >= 0, '错误报告透出隔离现场与救援统计');
+
+  // 清理现场
+  LS300.clear();
+  Object.keys(junkBefore300).forEach(function (k) { LS300.setItem(k, junkBefore300[k]); });
+  } // end v0.3.0 block
   } // end v0.2.3 block
   } // end v0.2.2 block
   // ── 汇总 ──
