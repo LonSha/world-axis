@@ -149,11 +149,13 @@
       // 探针期间 horizon/chronicle 等委托写入会污染 live store，
       // 全量原位还原（保留 memCache 引用，避免破坏 store 的引用一致性）
       if (liveSnapshot) safe(function () {
-        const cur = WA.store.get();
-        Object.keys(cur).forEach(function (k) { delete cur[k]; });
-        const snap = deepClone(liveSnapshot) || {};
-        Object.keys(snap).forEach(function (k) { cur[k] = snap[k]; });
-        if (typeof WA.store.save === 'function') safe(function () { WA.store.save(); });
+        // v0.1.39: 还原走事务栈——深改写在 transact draft 上进行（原先裸改 live store + 裸 save），
+        // 计量/批作用域/审计语义与常规写路径一致
+        WA.store.transact(function (d) {
+          Object.keys(d).forEach(function (k) { delete d[k]; });
+          const snap = deepClone(liveSnapshot) || {};
+          Object.keys(snap).forEach(function (k) { d[k] = snap[k]; });
+        });
       });
       if (keepDigest) WA.digest = keepDigest;
     }

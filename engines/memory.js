@@ -17,7 +17,11 @@
     return chat.slice(Math.max(0, chat.length - (n || 4))).map(m => (m.is_user ? '【玩家】' : '【正文】') + String(m.mes || '').slice(0, 900)).join('\n---\n');
   }
 
-  const memory = WA.memory = {
+  // v0.1.40: 分层巩固计量——每层耗时与最近结果（tool-diag 消费）
+  const __memStat = { rounds: 0, lastMs: 0, totalMs: 0, layers: {}, lastAt: 0 };
+const memory = WA.memory = {
+    /** v0.1.40: 分层巩固计量只读视图（tool-diag 消费） */
+    stats() { return { rounds: __memStat.rounds, lastMs: __memStat.lastMs, avgMs: Math.round(__memStat.totalMs / Math.max(1, __memStat.rounds)), lastAt: __memStat.lastAt, layers: JSON.parse(JSON.stringify(__memStat.layers)) }; },
     async digestRound() {
       const cfg = WA.apiRouter.getChannel('digest');
       if (!cfg.baseUrl || !cfg.model) return null;
@@ -137,10 +141,17 @@
   WA.workflow.register({
     id: 'memory.digest', chain: 'after', order: 40, label: '记忆L0→L1→L2→L3分层巩固',
     async run() {
-      await WA.memory.digestRound();
-      await WA.memory.consolidateL1();
-      await WA.memory.consolidateL2();
-      await WA.memory.consolidateL3();
+      // v0.1.40: 分层计时——每层耗时入 __memStat，供诊断观察巩固链路开销
+      const t0 = Date.now();
+      let l1r = false, l2r = false, l3r = false;
+      try { await WA.memory.digestRound(); } catch (e) { WA.log('warn', 'digestRound 异常（巩固链继续）', e); }
+      try { l1r = await WA.memory.consolidateL1() !== false; } catch (e) { WA.log('warn', 'consolidateL1 异常（巩固链继续）', e); }
+      const t1 = Date.now(); __memStat.layers.l1 = { ms: t1 - t0, ran: l1r };
+      try { l2r = await WA.memory.consolidateL2() !== false; } catch (e) { WA.log('warn', 'consolidateL2 异常（巩固链继续）', e); }
+      const t2 = Date.now(); __memStat.layers.l2 = { ms: t2 - t1, ran: l2r };
+      try { l3r = await WA.memory.consolidateL3() !== false; } catch (e) { WA.log('warn', 'consolidateL3 异常（巩固链继续）', e); }
+      __memStat.layers.l3 = { ms: Date.now() - t2, ran: l3r };
+      __memStat.rounds++; __memStat.lastMs = Date.now() - t0; __memStat.totalMs += __memStat.lastMs; __memStat.lastAt = Date.now();
     }
   });
 })();

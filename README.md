@@ -66,6 +66,9 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
 ## 版本历史
+- **v0.1.39** — contract-audit 探针还原路径事务化：原位还原改走 transact（深改写在 draft 上进行），全库裸 save 清零，还原动作纳入 txStat 计量与统一落盘路径。
+- **v0.1.40** — 记忆巩固链路计时：memory.digest 节点逐层计时（L1/L2/L3 各自 ms 与 ran 标记），memory.stats()（rounds/lastMs/avgMs/layers）；tool-diag runtime.memory 子节透出；巩固链各层异常不中断后续层。
+
 - **v0.1.38** — 状态键损坏隔离：load() 解析失败不再静默——原始 payload 逐字节存入 *_corrupt_<ts> 隔离键，默认状态接管前先保护可恢复现场（防下次 save 覆盖）；loadStat()（loads/hits/misses/errors/lastError）计量；tool-diag storage.load 子节 + 独立 load 键 warn 议题。
 
 - **v0.1.37** — 恢复点计量：store.recoveryStat()（count/max/full/bytes/lastAt，环形覆盖可视）；tool-diag storage.recovery 子节透出，满额时 verdict 出独立 recovery 键 info 议题（与 storage 键解耦，不干扰既有精确计数断言）。

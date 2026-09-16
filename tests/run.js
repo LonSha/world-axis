@@ -3298,6 +3298,46 @@ WA.loadScript = _ls.loadScript;
   corKeys.forEach(k => global.localStorage.removeItem(k));
   WA.store.transact(d => { delete d.meta.postCorrupt; });
   } // end v0.1.38 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.39 — contract-audit 还原路径事务化（写卫生收口）
+  // ═══════════════════════════════════════════════════════════
+  v0139: {
+  // 端到端：consumedFields 探针运行后 live store 必须与探针前一致（原位还原仍生效）
+  const before139 = JSON.stringify(WA.store.get());
+  const auditRes = WA.contractAudit.consumedFields({ baseState: JSON.parse(before139) });
+  assert(auditRes && typeof auditRes === 'object', 'consumedFields 探针可运行');
+  const after139 = JSON.stringify(WA.store.get());
+  // 逐字段还原对比（剔除 meta.updatedAt——save() 每次落盘都会盖新时间戳，属预期行为）
+  const strip = (s) => { const o = JSON.parse(s); if (o.meta) delete o.meta.updatedAt; return JSON.stringify(o); };
+  assert(strip(after139) === strip(before139), '探针后 live store 逐字段还原（时间戳除外，事务化恢复路径）');
+  // 计量一致性：还原事务计入 txStat（原先裸 save 完全不可见）
+  const tx139a = WA.store.txStat().count;
+  WA.contractAudit.consumedFields({ baseState: JSON.parse(after139) });
+  assert(WA.store.txStat().count > tx139a, '还原事务纳入 txStat 计量');
+  // 还原后 saveStat 正常（transact 统一落盘路径）
+  assert(WA.store.saveStat().ok === true, '还原走标准 save 路径');
+  } // end v0.1.39 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.40 — 记忆巩固链路计时（memory.stats）
+  // ═══════════════════════════════════════════════════════════
+  v0140: {
+  assert(typeof WA.memory.stats === 'function', 'memory.stats 已导出');
+  // 基线：v0.1.32 的 gen_ended 已真实跑过一次巩固链，rounds >= 1 是合法起点
+  const ms0 = WA.memory.stats();
+  assert(ms0.rounds >= 0 && ms0.layers && typeof ms0.layers === 'object', 'stats 结构完整');
+  const rounds0 = ms0.rounds;
+  // 真实运行 memory.digest 节点（无通道配置 → 各层安全跳过，但计时照常）
+  const node40 = WA.workflow.list('after').find(n => n.id === 'memory.digest');
+  assert(node40, 'memory.digest 节点已注册');
+  await node40.run({});
+  const ms1 = WA.memory.stats();
+  assert(ms1.rounds === rounds0 + 1 && ms1.lastMs >= 0 && typeof ms1.avgMs === 'number', '一轮巩固后 rounds 递增、lastMs/avgMs 记录');
+  assert(ms1.layers.l1 && ms1.layers.l2 && ms1.layers.l3, '三层计时条目产出');
+  assert(ms1.layers.l1.ms >= 0 && ms1.layers.l2.ms >= 0 && ms1.layers.l3.ms >= 0, '各层耗时非负');
+  // 诊断透出
+  const dg140 = WA.toolDiag.collect();
+  assert(dg140.runtime.memory && dg140.runtime.memory.rounds >= 1, '诊断透出 memory 计量节');
+  } // end v0.1.40 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

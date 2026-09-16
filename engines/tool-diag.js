@@ -207,6 +207,11 @@
         const snaps = WA.chatcache.listSnapshots() || [];
         return { count: snaps.length, latest: snaps.length ? { id: snaps[0].id, name: snaps[0].name, auto: !!snaps[0].auto, round: snaps[0].round } : null };
       }, {}),
+        // v0.1.40: 记忆巩固链路计时（L0→L1→L2→L3）
+        memory: safe(function () {
+          if (!WA.memory || !WA.memory.stats) return null;
+          return WA.memory.stats();
+        }, null),
       workflow: safe(function () {
         if (!WA.workflow) return { error: 'workflow 不可用' };
         const nodes = WA.workflow.list ? (WA.workflow.list() || []) : [];
