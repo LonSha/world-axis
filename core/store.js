@@ -182,6 +182,33 @@
     'directEvents': { cap: 4, site: 'direct-event.js pruneDirect(KEEP_DONE=3 + 1 活跃)' },
     'chapters.history': { cap: 20, site: 'chapters.js pruneHistory(MAX_HISTORY=20)' }
   };
+  // v0.1.48: 派生逻辑单一实现——sizeAudit 与 sizeAuditFull 共用，防两处语义单边漂移
+  function memStateBytes() {
+    try { return byteLen(JSON.stringify(memCache)); } catch (e) { return -1; }
+  }
+  function auditTotal() {
+    const b = memStateBytes();
+    return b >= 0 ? b : ((WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0);
+  }
+  /** 由数组明细派生 unbounded/suspects/drifted 结论 */
+  function deriveAuditRows(arrays, minBytes) {
+    // 顶层路径才参与有界判定（a.b[0].c 这类元素内嵌数组由父容器隐式约束）
+    const topRows = (arrays || []).filter(function (a) { return a.path.indexOf('[') < 0; });
+    const unregistered = topRows.filter(function (a) { return !a.bounded && a.len > 0; });
+    // v0.1.48: 排序一律带 path 次级键——主键（bytes / 超容量）可能并列，
+    // 而 sizeAudit(栈式DFS) 与 sizeAuditFull(分片合并) 的输入序不同，
+    // 不稳定排序会让两入口结论逐字节不等。
+    function byBytesDesc(x, y) { return (y.bytes - x.bytes) || (x.path < y.path ? -1 : x.path > y.path ? 1 : 0); }
+    function byExcessDesc(x, y) { return ((y.len - y.cap) - (x.len - x.cap)) || (x.path < y.path ? -1 : x.path > y.path ? 1 : 0); }
+    const suspects = unregistered.filter(function (a) { return a.bytes >= minBytes; }).sort(byBytesDesc);
+    // v0.1.44 漂移：已登记容器长度超出 cap —— 白名单自身失效的信号
+    const drifted = topRows.filter(function (a) { return a.bounded && a.cap !== null && a.len > a.cap; }).sort(byExcessDesc);
+    return {
+      unbounded: unregistered.map(function (a) { return a.path; }),
+      suspects: suspects.map(function (a) { return { path: a.path, len: a.len, bytes: a.bytes }; }),
+      drifted: drifted.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; })
+    };
+  }
   const store = WA.store = {
     SCHEMA_VERSION,
     /** v0.1.44: 有界容器登记表只读副本（测试反查源码一致性用） */
@@ -415,17 +442,9 @@
       } catch (e) { return { error: String(e && e.message || e) }; }
       // 截断时剩余 pending 即断点游标（供下次续扫）
       const cursor = truncated ? pending.slice() : null;
-      // 顶层路径才参与有界判定（a.b[0].c 这类元素内嵌数组由父容器隐式约束）
-      const topRows = arrays.filter(function (a) { return a.path.indexOf('[') < 0; });
-      const unregistered = topRows.filter(function (a) { return !a.bounded && a.len > 0; });
-      const suspects = unregistered.filter(function (a) { return a.bytes >= minBytes; }).sort(function (x, y) { return y.bytes - x.bytes; });
-      // v0.1.44 漂移：已登记容器长度超出 cap —— 白名单自身失效的信号
-      const drifted = topRows.filter(function (a) { return a.bounded && a.cap !== null && a.len > a.cap; })
-        .sort(function (x, y) { return (y.len - y.cap) - (x.len - x.cap); });
-      let currentBytes = 0;
-      try { currentBytes = byteLen(JSON.stringify(memCache)); } catch (e) { currentBytes = -1; }
+      const concl = deriveAuditRows(arrays, minBytes);
       return {
-        total: currentBytes >= 0 ? currentBytes : ((WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0),
+        total: auditTotal(),
         persisted: (WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0,
         scanned: arrays.length,
         scannedNodes: visited,
@@ -434,10 +453,10 @@
         truncated: truncated,
         cursor: cursor,                // v0.1.46: 断点游标，resumeCursor 续扫
         trackedBounded: Object.keys(BOUNDED).length,
-        arrays: arrays.slice().sort(function (a, b) { return b.bytes - a.bytes; }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
-        unbounded: unregistered.map(function (a) { return a.path; }),
-        suspects: suspects.map(function (a) { return { path: a.path, len: a.len, bytes: a.bytes }; }),
-        drifted: drifted.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; })
+        arrays: arrays.slice().sort(function (a, b) { return (b.bytes - a.bytes) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0); }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
+        unbounded: concl.unbounded,
+        suspects: concl.suspects,
+        drifted: concl.drifted
       };
     },
     /**
@@ -475,11 +494,7 @@
         if (chunks >= maxChunks) { stalled = true; break; }            // 片数触顶
       }
       const rows = Object.keys(merged).map(function (k) { return merged[k]; });
-      const topRows = rows.filter(function (a) { return a.path.indexOf('[') < 0; });
-      const unregistered = topRows.filter(function (a) { return !a.bounded && a.len > 0; });
-      const suspects = unregistered.filter(function (a) { return a.bytes >= minBytes; }).sort(function (x, y) { return y.bytes - x.bytes; });
-      const drifted = topRows.filter(function (a) { return a.bounded && a.cap !== null && a.len > a.cap; })
-        .sort(function (x, y) { return (y.len - y.cap) - (x.len - x.cap); });
+      const concl = deriveAuditRows(rows, minBytes);   // v0.1.48: 与 sizeAudit 同一派生实现
       const complete = !truncated && !stalled;
       return {
         complete: complete,
@@ -489,13 +504,14 @@
         maxChunks: maxChunks,
         depthCap: depthCap,
         stalled: stalled,
-        total: (WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0,
+        total: auditTotal(),       // v0.1.48: 改读当前内存态（此前用 saveStat.bytes，写合并下滞后）
+        persisted: (WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0,
         scanned: rows.length,
         trackedBounded: Object.keys(__BOUNDED_CAPS).length,
-        arrays: rows.slice().sort(function (a, b) { return b.bytes - a.bytes; }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
-        unbounded: unregistered.map(function (a) { return a.path; }),
-        suspects: suspects.map(function (a) { return { path: a.path, len: a.len, bytes: a.bytes }; }),
-        drifted: drifted.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; })
+        arrays: rows.slice().sort(function (a, b) { return (b.bytes - a.bytes) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0); }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
+        unbounded: concl.unbounded,
+        suspects: concl.suspects,
+        drifted: concl.drifted
       };
     },
     get() { return memCache; },

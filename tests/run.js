@@ -3901,6 +3901,45 @@ WA.loadScript = _ls.loadScript;
   WA.store.init();
   assert(WA.store.migrations().length === 0, '迁移步与存档现场均已复原');
   } // end v0.1.47 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.48 — 派生逻辑单一实现（sizeAudit 与 sizeAuditFull 结论一致）
+  // ═══════════════════════════════════════════════════════════
+  v0148: {
+  // 造一份含「未登记容器 + 漂移容器」的 state，令两入口都需派生同一结论
+  WA.store.transact(function (d) {
+    d.__bad148 = []; for (let i = 0; i < 25; i++) d.__bad148.push('x' + i + ' ' + 'k'.repeat(30));
+    d.memory.l3 = []; for (let i = 0; i < 70; i++) d.memory.l3.push({ t: Date.now(), theme: 'L3' + i });
+    d.worldFacts = []; for (let i = 0; i < 100; i++) d.worldFacts.push({ key: 'k' + i, value: 'v'.repeat(20) });
+  });
+  const MIN148 = 64;
+  const sa148 = WA.store.sizeAudit({ minBytes: MIN148, maxNodes: 100000, topN: 5000 });
+  const sf148 = WA.store.sizeAuditFull({ minBytes: MIN148, chunkNodes: 100000, topN: 5000 });
+  assert(sa148.total === sf148.total, '两入口 total 一致（v0.1.48 前 sizeAuditFull 用滞后的 saveStat.bytes）');
+  assert(sf148.total === sf148.persisted || sa148.total > sa148.persisted, 'total 反映当前内存态而非滞后落盘量');
+  const setOf = function (arr) { return Array.from(new Set(arr)).sort().join(','); };
+  assert(setOf(sa148.unbounded) === setOf(sf148.unbounded), 'unbounded 结论两处一致（按集合比对：两入口遍历顺序不同）');
+  assert(JSON.stringify(sa148.suspects) === JSON.stringify(sf148.suspects), 'suspects 结论两处一致');
+  assert(JSON.stringify(sa148.drifted) === JSON.stringify(sf148.drifted), 'drifted 结论两处一致');
+  // 结论本身正确（派生收敛未丢功能）：未登记被抓、漂移被抓、有界不误报
+  assert(sa148.unbounded.indexOf('__bad148') >= 0 && sa148.suspects.some(function (x) { return x.path === '__bad148'; }), '未登记容器经共享派生仍被抓出');
+  assert(sa148.drifted.some(function (x) { return x.path === 'memory.l3' && x.len === 70 && x.cap === 60; }), '超 cap 容器经共享派生仍报漂移');
+  assert(sa148.drifted.every(function (x) { return x.path !== 'worldFacts'; }), '满载有界容器(worldFacts=100=cap)不误报');
+  // 极端 chunk：多片接力后结论与单片大预算完全相同
+  const sSmall = WA.store.sizeAuditFull({ minBytes: MIN148, chunkNodes: 4, maxChunks: 5000, topN: 5000 });
+  assert(sSmall.chunks > 1 && sSmall.complete === true, '小 chunk 多片自动接力收敛（实得 ' + sSmall.chunks + ' 片）');
+  assert(setOf(sSmall.unbounded) === setOf(sa148.unbounded) && JSON.stringify(sSmall.suspects) === JSON.stringify(sa148.suspects) && JSON.stringify(sSmall.drifted) === JSON.stringify(sa148.drifted), '分片结论与单片一致（suspects/drifted 已排序）');
+  assert(sSmall.total === sa148.total, '分片 total 同样与单片一致');
+  // 诊断消费链：verdict 议题仍由派生结论正确生成
+  const dg148 = WA.toolDiag.collect();
+  const iss148 = ((dg148.verdict || {}).issues || []);
+  assert(iss148.some(function (x) { return x.key === 'sizeAudit'; }), '未登记容器经诊断报 sizeAudit 议题');
+  assert(iss148.some(function (x) { return x.key === 'sizeDrift'; }), '漂移经诊断报 sizeDrift 议题');
+  WA.store.transact(function (d) { delete d.__bad148; d.memory.l3 = []; d.worldFacts = []; });
+  const after148 = WA.store.sizeAudit({ minBytes: MIN148, maxNodes: 100000 });
+  assert(after148.suspects.every(function (x) { return x.path.indexOf('__bad') < 0; }), '本探针容器清理后不再进 suspects');
+  assert(after148.drifted.every(function (x) { return x.path !== 'memory.l3'; }), 'l3 归零后不再报漂移');
+  assert(after148.arrays.every(function (x) { return x.path.indexOf('__bad') < 0; }), '探针字段清理完毕');
+  } // end v0.1.48 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
