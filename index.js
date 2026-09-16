@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.6.0';
+  const VERSION = '0.7.0';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -174,6 +174,7 @@
     'core/store.js',
     'core/api-router.js',
     'core/workflow.js',
+    'core/settle-guard.js',
     'core/interceptor.js',
     'engines/backstage.js',
     'engines/evolution.js',

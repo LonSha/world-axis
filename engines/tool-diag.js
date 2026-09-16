@@ -73,7 +73,7 @@
 
   // ── 3. 模块装载完整性（文件 ↔ 导出对象） ─
   const MODULE_EXPORTS = {
-    'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/workflow.js': 'workflow', 'core/interceptor.js': 'interceptor',
+    'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     'core/api-router.js': 'apiRouter',
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',
     'engines/regional.js': 'regional', 'engines/horizon.js': 'horizon', 'engines/digest.js': 'digest',
@@ -201,6 +201,8 @@
             maintain: WA.store.maintain ? (function () { try { return WA.store.maintain({ deep: false }); } catch (e) { return null; } })() : null,
             maintainStat: WA.store.maintainStat ? WA.store.maintainStat() : null,
             integrity: WA.store.integrityStat ? WA.store.integrityStat() : null,
+            // v0.7.0: 楼层结算守卫观测（settles/skips 归因 / 最后结算楼层）
+            settleGuard: WA.settleGuard ? (function () { try { return WA.settleGuard.stat(); } catch (e) { return null; } })() : null,
             // v0.5.0: 多实例并发观测（写入者标识 / 冲突检出 / 现场 / 外部写入）
             concurrency: (WA.store.conflictStat && WA.store.externalWriteStat) ? (function () {
               try {

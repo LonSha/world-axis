@@ -72,7 +72,7 @@
       // 下轮注入三列引用（after链产出，before链一次性消费）
       nextTurnInjection: null,  // {required:[], conditional:[], suppress:[], at, anchor}
       // 元信息
-      meta: { createdAt: Date.now(), updatedAt: Date.now(), lastAnchor: null }
+      meta: { createdAt: Date.now(), updatedAt: Date.now(), lastAnchor: null, lastSettle: null }
     };
   }
 

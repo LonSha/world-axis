@@ -21,7 +21,7 @@ function section(t) { console.log('\n■ ' + t); }
 // 按依赖顺序加载扩展JS到同一vm上下文（跳过index.js与UI）
 const ctx = vm.createContext(global);
 const LOAD = [
-  'core/settings-bus.js', 'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
+  'core/settings-bus.js', 'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
@@ -5428,6 +5428,134 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore600.forEach(function (l) { WA.errorLog.push(l); });
   } // end v0.6.0 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.7.0 — 楼层结算守卫（世界推进每楼层至多一次）
+  //   探针实证：after 链对每次 gen_ended 全量执行且无守卫——swipe/重掷使
+  //   evolution.round 1→2→3 虚增、骰子多掷、风声多衰减。与 before 链既有
+  //   口径（重掷沿用本轮注入 SKIPPED_REROLL）自相矛盾（注入按同轮、结算却重复）。
+  // ═══════════════════════════════════════════════════════════
+  v070: {
+  const LS700 = global.localStorage;
+  const junkBefore700 = JSON.parse(JSON.stringify(LS700._dump()));
+  const evtBefore700 = WA.eventLog.slice();
+  const errBefore700 = WA.errorLog.slice();
+  const ctx700 = global.SillyTavern.getContext();
+  const prevChat700 = ctx700.chatId;
+  const CID700 = 'v700_chat';
+  const chat700 = global.__mockChat;
+  const bsSet700 = (WA.backstage && WA.backstage.getSettings) ? WA.backstage.getSettings() : null;
+  function resetLogs700() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh700() { resetLogs700(); LS700.clear(); ctx700.chatId = CID700; chat700.length = 0; WA.store.init(); }
+
+  // ── 1. API 形状 + 指纹 ──
+  assert(WA.settleGuard && typeof WA.settleGuard.begin === 'function' && typeof WA.settleGuard.commit === 'function' && typeof WA.settleGuard.forceNext === 'function', 'settleGuard API 可用（begin/commit/forceNext）');
+  assert(typeof WA.settleGuard.fnv1a === 'function' && WA.settleGuard.fnv1a('abc') === WA.settleGuard.fnv1a('abc') && WA.settleGuard.fnv1a('abc') !== WA.settleGuard.fnv1a('abd'), 'fnv1a 内容指纹稳定且敏感');
+  fresh700();
+  assert('lastSettle' in WA.store.get().meta && WA.store.get().meta.lastSettle === null, '默认 meta 含 lastSettle 且为 null');
+
+  // ── 2. 首轮 fresh 结算 + commit ──
+  chat700.push({ is_user: true, mes: 'u1' });
+  chat700.push({ is_user: false, mes: 'a1', swipe_id: 0 });
+  const g700a = WA.settleGuard.begin();
+  assert(g700a.settle === true && g700a.reason === 'fresh', '无记录 → fresh 结算');
+  assert(g700a.rec.floor === 1 && g700a.rec.swipe === 0, 'rec 记录楼层与 swipe');
+  WA.settleGuard.commit(g700a.rec);
+  const ls700 = WA.store.read('meta.lastSettle', null);
+  assert(ls700 && ls700.floor === 1 && ls700.chatId === CID700, 'commit 记录 lastSettle（floor/chatId）');
+
+  // ── 3. 同楼层同内容 → dup 跳过 ──
+  const g700b = WA.settleGuard.begin();
+  assert(g700b.settle === false && g700b.reason === 'dup', '同楼层同内容 → dup 跳过');
+
+  // ── 4. 同楼层内容变化（重掷）→ reroll 跳过 ──
+  chat700[chat700.length - 1].mes = 'a1 v2（重掷）';
+  chat700[chat700.length - 1].swipe_id = 1;
+  const g700c = WA.settleGuard.begin();
+  assert(g700c.settle === false && g700c.reason === 'reroll', '同楼层重掷 → reroll 跳过（防双计）');
+
+  // ── 5. 新楼层 → new-floor 结算 ──
+  chat700.push({ is_user: true, mes: 'u2' });
+  chat700.push({ is_user: false, mes: 'a2' });
+  const g700d = WA.settleGuard.begin();
+  assert(g700d.settle === true && g700d.reason === 'new-floor', '楼层增长 → new-floor 结算');
+  WA.settleGuard.commit(g700d.rec);
+
+  // ── 6. 回退（删楼）→ rewind 跳过 ──
+  chat700.pop(); chat700.pop(); chat700.pop();
+  const g700e = WA.settleGuard.begin();
+  assert(g700e.settle === false && g700e.reason === 'rewind', '回退重玩 → rewind 跳过（不重复推进）');
+
+  // ── 7. forceNext 旁路（一次性）──
+  WA.settleGuard.forceNext();
+  assert(WA.settleGuard.peekForce() === true, 'peekForce 可观');
+  const g700f = WA.settleGuard.begin();
+  assert(g700f.settle === true && g700f.reason === 'forced', 'forceNext → forced 结算（旁路）');
+  assert(WA.settleGuard.peekForce() === false, 'forceNext 一次性消费');
+  WA.settleGuard.commit(g700f.rec);
+
+  // ── 8. 跨聊天不继承（chatId 隔离）──
+  WA.store.transact(d => { d.meta.lastSettle = { chatId: 'other_chat_x', floor: 99, sig: 'zzz', at: Date.now() }; });
+  const g700g = WA.settleGuard.begin();
+  assert(g700g.settle === true && g700g.reason === 'fresh', '跨聊天记录 → fresh（不继承他聊天水位）');
+
+  // ── 9. 空聊天边界 ──
+  const chatKeep700 = chat700.slice();
+  chat700.length = 0;
+  const g700h = WA.settleGuard.begin();
+  assert(g700h.settle === false && g700h.reason === 'no-chat', '空聊天 → no-chat 拒绝结算');
+  chatKeep700.forEach(m => chat700.push(m));
+
+  // ── 10. 端到端：gen_ended 闸门（重掷不推进世界）──
+  fresh700();
+  try { WA.backstage.setSettings({ autoSimulate: false }); } catch (e) {}
+  chat700.push({ is_user: true, mes: 'u1' });
+  chat700.push({ is_user: false, mes: 'a1', swipe_id: 0 });
+  await global.__triggerEvent('gen_ended');
+  const r700a = WA.store.read('evolution.round', 0);
+  chat700[chat700.length - 1].mes = 'a1 重掷版';
+  chat700[chat700.length - 1].swipe_id = 1;
+  await global.__triggerEvent('gen_ended');
+  const r700b = WA.store.read('evolution.round', 0);
+  assert(r700a === 1 && r700b === 1, '端到端：首轮推进 1，重掷不再推进（round ' + r700a + '→' + r700b + '）');
+  chat700.push({ is_user: true, mes: 'u2' });
+  chat700.push({ is_user: false, mes: 'a2' });
+  await global.__triggerEvent('gen_ended');
+  assert(WA.store.read('evolution.round', 0) === 2, '端到端：新楼层继续推进（round 2）');
+
+  // ── 11. 守卫缺失时 after 链不阻断（优雅降级）──
+  const keepG700 = WA.settleGuard; delete WA.settleGuard;
+  chat700.push({ is_user: true, mes: 'u3' });
+  chat700.push({ is_user: false, mes: 'a3' });
+  await global.__triggerEvent('gen_ended');
+  assert(WA.store.read('evolution.round', 0) === 3, '守卫缺失时保持旧行为（不阻断）');
+  WA.settleGuard = keepG700;
+
+  // ── 12. 接线断言（源码级）──
+  const icSrc700 = fs.readFileSync(path.join(BASE, 'core/interceptor.js'), 'utf8');
+  assert(icSrc700.indexOf('settleGuard.begin') >= 0 && icSrc700.indexOf('settleGuard.commit') >= 0, '拦截器接线结算守卫（begin/commit）');
+  const idxSrc700 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+  const pSg700 = idxSrc700.indexOf("'core/settle-guard.js'");
+  const pIc700 = idxSrc700.indexOf("'core/interceptor.js'");
+  assert(pSg700 >= 0 && pSg700 < pIc700, 'index.js 加载序：settle-guard 先于 interceptor');
+  const dg700 = WA.toolDiag.collect();
+  assert(dg700.worldState.storage.settleGuard && typeof dg700.worldState.storage.settleGuard.settles === 'number', '诊断透出 settleGuard 节');
+  const panelSrc700 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(panelSrc700.indexOf('id="wa-settle-view">结算守卫</button>') >= 0, '面板渲染结算守卫按钮（按钮行）');
+  assert(panelSrc700.indexOf('wa-settle-force') >= 0 && panelSrc700.indexOf('forceNext') >= 0, '面板接线结算守卫处理器（forceNext 逃生门）');
+  assert(WA.settleGuard.stat().skips.reroll >= 1, '归因计数：reroll 跳过被计量');
+
+  // ── 清理现场 ──
+  WA.settleGuard.reset();
+  try { if (bsSet700) WA.backstage.setSettings(bsSet700); } catch (e) {}
+  resetLogs700();
+  LS700.clear();
+  Object.keys(junkBefore700).forEach(function (k) { LS700.setItem(k, junkBefore700[k]); });
+  ctx700.chatId = prevChat700;
+  WA.eventLog.length = 0;
+  evtBefore700.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore700.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v0.7.0 block
   } // end v0.2.2 block
   // ── 汇总 ──
   console.log('\n══════════════════════');

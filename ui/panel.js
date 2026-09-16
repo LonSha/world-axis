@@ -225,7 +225,7 @@
       <button class="wa-btn" id="wa-imp-run">预检并导入</button>
       <div id="wa-imp-out" class="wa-out"></div>
       <div class="wa-sec">扩展自检（模块/注入/UI/运行环境）</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button><button class="wa-btn" id="wa-audit-copy">复制内存审计</button><button class="wa-btn" id="wa-key-check">存储键体检</button><button class="wa-btn" id="wa-quar-view">隔离现场</button><button class="wa-btn" id="wa-recovery-dl">导出恢复点</button><button class="wa-btn" id="wa-maintain">健康巡视</button><button class="wa-btn" id="wa-conf-view">冲突现场</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button><button class="wa-btn" id="wa-audit-copy">复制内存审计</button><button class="wa-btn" id="wa-key-check">存储键体检</button><button class="wa-btn" id="wa-quar-view">隔离现场</button><button class="wa-btn" id="wa-recovery-dl">导出恢复点</button><button class="wa-btn" id="wa-maintain">健康巡视</button><button class="wa-btn" id="wa-conf-view">冲突现场</button><button class="wa-btn" id="wa-settle-view">结算守卫</button></div>
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
@@ -521,6 +521,26 @@
           out.innerHTML = '<div class="wa-log wa-log-' + (r.ok ? 'info' : 'err') + '">' + (r.ok ? '✓ 已丢弃该冲突现场' : '丢弃失败：' + esc(r.reason)) + '</div>';
         };
       } catch (e) { out.textContent = '冲突现场读取失败：' + (e && e.message); }
+    };
+    // v0.7.0: 结算守卫——查看归因计数 + 强制下一轮结算（escape hatch）
+    const sgBtn = $('#wa-settle-view');
+    if (sgBtn) sgBtn.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.settleGuard) return;
+      try {
+        const st = WA.settleGuard.stat();
+        const ls = st.lastSettle;
+        let html = '<div class="wa-log wa-log-info">结算守卫：已结算 ' + st.settles + ' 轮 · 跳过（重复 ' + st.skips.dup + ' / 重掷 ' + st.skips.reroll + ' / 回退 ' + st.skips.rewind + '）'
+          + (st.forced ? ' · 强制 ' + st.forced : '')
+          + (ls ? '<br>最后结算：楼层 ' + ls.floor + ' · 第 ' + ls.round + ' 轮 · ' + new Date(ls.at).toLocaleString() : '')
+          + '<br>语义：同一楼层至多结算一次（swipe/重掷/重复通知不再虚增世界时间）</div>';
+        html += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-settle-force">强制下一轮结算</button></div>';
+        out.innerHTML = html;
+        const fb = $('#wa-settle-force');
+        if (fb) fb.onclick = () => {
+          WA.settleGuard.forceNext();
+          out.innerHTML = '<div class="wa-log wa-log-warn">✓ 已请求强制结算：下一次回复完成时将无视楼层守卫推进世界（用于删改消息后重对齐）</div>';
+        };
+      } catch (e) { out.textContent = '结算守卫读取失败：' + (e && e.message); }
     };
     const conc = $('#wa-conc'); if (conc) conc.oninput = () => { WA.apiRouter.setConcurrency(+conc.value); $('#wa-conc-v').textContent = conc.value; };
     // 设置页绑定

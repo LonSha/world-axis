@@ -76,6 +76,20 @@
         if (afterEvt && !afterHooked) {
           afterHooked = true;
           ctx.eventSource.on(afterEvt, async (...args) => {
+            // v0.7.0: 楼层结算守卫——世界推进（round++/骰子/风声/推演）每楼层至多一次。
+            // 重掷（swipe）/重复通知不再虚增世界时间（探针实证 round 1→2→3 虚增）。
+            let settleRec = null, guardWhy = null;
+            if (WA.settleGuard) {
+              const g = WA.settleGuard.begin();
+              if (!g.settle) {
+                guardWhy = g.reason;
+                WA.settleGuard.markSkip(guardWhy);
+                WA.log('info', '楼层结算守卫：跳过本轮世界推进（' + guardWhy + '；forceNext 可强制）');
+                // 保留 lastRoundSig 语义的一致性：after 链未执行不更新（下次同楼层仍跳过）
+                return;
+              }
+              settleRec = g.rec;
+            }
             // 重新构建与before链同源的ctx（含chat/branchId），供after链节点使用
             const c = getCtx();
             const actx = {
@@ -88,7 +102,11 @@
             };
             // v0.1.31: 写合并——after 链同样只推进内存，链结束统一落盘一次
             try {
-              const runAfter = () => WA.workflow.run('after', actx);
+              const runAfter = async () => {
+                await WA.workflow.run('after', actx);
+                // v0.7.0: 结算完成才记录楼层（批内提交，随批落盘；失败阻断则下轮重试）
+                if (WA.settleGuard && settleRec) WA.settleGuard.commit(settleRec);
+              };
               if (WA.store && WA.store.batch) await WA.store.batch(runAfter); else await runAfter();
             }
             catch (e) { WA.log('error', 'after链执行异常', e); }
