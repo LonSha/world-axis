@@ -225,6 +225,9 @@
       }
       memCache = this.load() || defaultWorldState();
       __migrateReport = null;   // v0.1.47: 报告以「本次载入」为边界，不跨载入粘留（防议题永久挂红）
+      // v0.1.49: 恢复当前聊天的事件日志与工作流历史
+      try { if (WA.loadEventLog) WA.loadEventLog(); } catch (e) {}
+      try { if (WA.workflow && WA.workflow.loadHistory) WA.workflow.loadHistory(); } catch (e) {}
       if (!memCache.schemaVersion || memCache.schemaVersion < SCHEMA_VERSION) {
         this.createRecoveryPoint(); // 升级前先留恢复点
         memCache = this.migrate(memCache);

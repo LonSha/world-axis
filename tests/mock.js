@@ -116,9 +116,35 @@ WA.mainWin = global;
 WA.mainDoc = global.document;
 WA.modules = {};
 WA.eventLog = [];
+function persistMockLog() {
+  try {
+    const chatId = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
+    global.localStorage.setItem('worldaxis_event_log_' + chatId, JSON.stringify(WA.eventLog.slice(-300)));
+  } catch (e) {}
+}
 WA.log = function (level, msg, data) {
   WA.eventLog.push({ t: Date.now(), level, msg, data });
   if (WA.eventLog.length > 300) WA.eventLog.splice(0, WA.eventLog.length - 300);
+  persistMockLog();
+};
+WA.loadEventLog = function (chatId) {
+  try {
+    const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+    const raw = global.localStorage.getItem('worldaxis_event_log_' + cid);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) WA.eventLog = arr.slice(-300);
+    } else {
+      WA.eventLog = [];
+    }
+  } catch (e) {}
+};
+WA.clearEventLog = function (chatId) {
+  WA.eventLog = [];
+  try {
+    const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+    global.localStorage.removeItem('worldaxis_event_log_' + cid);
+  } catch (e) {}
 };
 const __listeners = {};
 WA.on = (evt, fn) => { (__listeners[evt] = __listeners[evt] || []).push(fn); };

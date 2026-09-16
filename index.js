@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.1.48';
+  const VERSION = '0.1.49';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -31,12 +31,41 @@
   WA.mainDoc = mainDoc;
   WA.modules = {};      // 模块注册表（引擎/UI各自登记）
   WA.eventLog = [];     // 轻量运行日志（内存环形，最多300条）
+  let __logSaveTimer = null;
+  function persistEventLog() {
+    try {
+      const chatId = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
+      mainWin.localStorage.setItem('worldaxis_event_log_' + chatId, JSON.stringify(WA.eventLog.slice(-300)));
+    } catch (e) {}
+  }
+  function scheduleLogSave() {
+    persistEventLog();
+  }
   WA.log = function (level, msg, data) {
     const entry = { t: Date.now(), level, msg, data: data === undefined ? null : String(data).slice(0, 500) };
     WA.eventLog.push(entry);
     if (WA.eventLog.length > 300) WA.eventLog.splice(0, WA.eventLog.length - 300);
+    scheduleLogSave();
     const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
     fn(LOG, msg, data ?? '');
+  };
+  // v0.1.49: 恢复/清理日志
+  WA.loadEventLog = function (chatId) {
+    try {
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      const raw = mainWin.localStorage.getItem('worldaxis_event_log_' + cid);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) WA.eventLog = arr.slice(-300);
+      }
+    } catch (e) {}
+  };
+  WA.clearEventLog = function (chatId) {
+    WA.eventLog = [];
+    try {
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      mainWin.localStorage.removeItem('worldaxis_event_log_' + cid);
+    } catch (e) {}
   };
 
   // ── 加载子模块（按依赖顺序）─────────────────────────────

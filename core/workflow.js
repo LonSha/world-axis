@@ -22,6 +22,13 @@
   // v0.1.42: 链运行环形历史——最近 N 次运行的逐节点耗时/状态序列（趋势观察）
   const HISTORY_MAX = 20;
   const __chainHistory = [];
+  function persistWorkflowHistory() {
+    try {
+      const chatId = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
+      const mainWin = (typeof window !== 'undefined' ? window : global);
+      mainWin.localStorage.setItem('worldaxis_wf_history_' + chatId, JSON.stringify(__chainHistory.slice(-HISTORY_MAX)));
+    } catch (e) {}
+  }
   function recChain(chain, nodes, tStart) {
     try {
       __chainHistory.push({
@@ -29,6 +36,7 @@
         nodes: nodes.map(function (n) { return { id: n.id, ms: n.ms, status: n.status }; })
       });
       while (__chainHistory.length > HISTORY_MAX) __chainHistory.shift();
+      persistWorkflowHistory();
     } catch (e) { /* 历史留痕失败不影响链执行 */ }
   }
   function recStat(id, ms, status) {
@@ -115,6 +123,27 @@
       });
       return { tracked: __chainHistory.length, max: HISTORY_MAX, runs: rows };
     },
-    resetHistory() { __chainHistory.length = 0; }
+    resetHistory(chatId) {
+      __chainHistory.length = 0;
+      try {
+        const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+        const mainWin = (typeof window !== 'undefined' ? window : global);
+        mainWin.localStorage.removeItem('worldaxis_wf_history_' + cid);
+      } catch (e) {}
+    },
+    loadHistory(chatId) {
+      try {
+        const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+        const mainWin = (typeof window !== 'undefined' ? window : global);
+        const raw = mainWin.localStorage.getItem('worldaxis_wf_history_' + cid);
+        __chainHistory.length = 0;
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            arr.slice(-HISTORY_MAX).forEach(function (x) { __chainHistory.push(x); });
+          }
+        }
+      } catch (e) {}
+    }
   };
 })();

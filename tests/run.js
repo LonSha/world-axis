@@ -2993,7 +2993,7 @@ WA.loadScript = _ls.loadScript;
   WA.store.resetTxStat();
   let writes31 = 0;
   const savedSetItem31 = global.localStorage.setItem;
-  global.localStorage.setItem = function (k, v) { writes31++; return savedSetItem31.call(this, k, v); };
+  global.localStorage.setItem = function (k, v) { if (!k || k.startsWith('worldaxis_state_')) writes31++; return savedSetItem31.call(this, k, v); };
   await WA.store.batch(async function () {
     assert(WA.store.batchDepth() === 1, '批内深度为 1');
     WA.store.transact(d => { d.meta.probe131 = 'a'; });
@@ -3559,6 +3559,11 @@ WA.loadScript = _ls.loadScript;
     if (!m) { mismatches.push(k + '(源码裁剪表达式未找到)'); return; }
     const srcCap = rule[2] ? rule[2](Number(m[1])) : Number(m[1]);
     if (!caps[k] || caps[k].cap !== srcCap) mismatches.push(k + '(登记 ' + (caps[k] && caps[k].cap) + ' vs 源码 ' + srcCap + ')');
+    // v0.1.49: site 字段文件名反查——登记的 site 自由文本必须包含实际规则文件名的基准名（如 backstage.js）
+    const expectedFile = path.basename(rule[0]);
+    if (!caps[k] || !caps[k].site || caps[k].site.indexOf(expectedFile) < 0) {
+      mismatches.push(k + '(site 声明 "' + (caps[k] && caps[k].site) + '" 缺失期望文件名 ' + expectedFile + ')');
+    }
   });
   assert(mismatches.length === 0, '登记表 cap 与源码裁剪常量逐条一致' + (mismatches.length ? '：' + mismatches.join('、') : ''));
   // 登记表与反查规则须覆盖同一集合（consistency 无源码裁剪点，单列）
@@ -3940,6 +3945,59 @@ WA.loadScript = _ls.loadScript;
   assert(after148.drifted.every(function (x) { return x.path !== 'memory.l3'; }), 'l3 归零后不再报漂移');
   assert(after148.arrays.every(function (x) { return x.path.indexOf('__bad') < 0; }), '探针字段清理完毕');
   } // end v0.1.48 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.49 — site 自由文本反查校验 + 日志/工作流历史跨重启恢复
+  // ═══════════════════════════════════════════════════════════
+  v0149: {
+  // ── 1. site 声明反查 ──
+  const caps149 = WA.store.sizeCaps();
+  assert(caps149.chronicle && caps149.chronicle.site.includes('backstage.js'), 'chronicle 的 site 正确引用 backstage.js');
+  assert(caps149['memory.l0'] && caps149['memory.l0'].site.includes('memory.js'), 'memory.l0 的 site 正确引用 memory.js');
+  
+  // ── 2. eventLog 跨会话/切聊天持久化与恢复 ──
+  const currentChatId = WA.store.chatId();
+  WA.clearEventLog(currentChatId);
+  assert(WA.eventLog.length === 0, 'clearEventLog 清空当前内存与持久日志');
+  
+  WA.log('info', 'v149 测试日志 1', 'data1');
+  WA.log('warn', 'v149 测试日志 2', 'data2');
+  assert(WA.eventLog.length === 2, 'WA.log 正常推进内存环形队列');
+  
+  // 模拟切聊天/初始化触发 loadEventLog
+  const mockChatB = 'chat_test_v149_b';
+  WA.loadEventLog(mockChatB);
+  assert(WA.eventLog.length === 0, '切换到无日志的聊天后，内存 eventLog 为空');
+  
+  // 切回原始聊天，加载持久化日志
+  WA.loadEventLog(currentChatId);
+  assert(WA.eventLog.length === 2, '切回原始聊天后，持久化的 2 条日志完整恢复');
+  assert(WA.eventLog[0].msg === 'v149 测试日志 1', '恢复日志内容与顺序一致');
+  
+  WA.clearEventLog(currentChatId);
+  WA.clearEventLog(mockChatB);
+  
+  // ── 3. workflow 历史跨会话/切聊天持久化与恢复 ──
+  WA.workflow.resetHistory(currentChatId);
+  assert(WA.workflow.history().runs.length === 0, 'resetHistory 清空当前聊天历史与持久记录');
+  
+  WA.workflow.register({ id: 'wtest149.node', chain: 'wtest149', order: 1, label: 'v149 节点', async run() {} });
+  await WA.workflow.run('wtest149', {});
+  assert(WA.workflow.history().runs.length === 1, '运行工作流后产生 1 条历史记录');
+  
+  // 切换聊天，加载另一聊天的 history
+  WA.workflow.loadHistory(mockChatB);
+  assert(WA.workflow.history().runs.length === 0, '切换至新聊天，工作流历史为空');
+  
+  // 切回原始聊天
+  WA.workflow.loadHistory(currentChatId);
+  assert(WA.workflow.history().runs.length === 1, '切回原始聊天，工作流历史完整恢复');
+  assert(WA.workflow.history().runs[0].chain === 'wtest149', '恢复的工作流历史链名一致');
+  
+  // 清理测试节点与历史
+  WA.workflow.unregister('wtest149.node');
+  WA.workflow.resetHistory(currentChatId);
+  WA.workflow.resetHistory(mockChatB);
+  } // end v0.1.49 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
