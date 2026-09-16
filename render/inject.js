@@ -14,6 +14,8 @@
     const def = { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true };
     try { return Object.assign(def, JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
   }
+  const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true }, module: 'inject' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   // v0.1.19: 撤销台账——记录每次 uninject 的时间、触发源、结果（最多 20 条环形）
   const __uninjectLedger = [];
   // v0.1.43: 撤销台账按聊天分域——切聊天后旧聊天的撤销记录不得参与新聊天的一致性判定
@@ -102,7 +104,7 @@
     uninjectAudit: uninjectAudit,
     SOURCES,
     getVisibility() { return loadVis(); },
-    setVisibility(k, on) { const v = loadVis(); v[k] = !!on; mainWin.localStorage.setItem(LS_KEY, JSON.stringify(v)); },
+    setVisibility(k, on) { const v = loadVis(); v[k] = !!on; WA.settingsBus.save(__REG, v); },
 
     buildWorldSnapshot() {
       const vis = loadVis(); const s = WA.store.get(); const parts = [];

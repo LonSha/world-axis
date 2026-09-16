@@ -8,7 +8,9 @@
   const mainWin = WA.mainWin || window;
 
   function loadAll() { try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; } }
-  function saveAll(m) { mainWin.localStorage.setItem(LS_KEY, JSON.stringify(m)); }
+  const __REG = { key: LS_KEY, def: {}, module: 'registry' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  function saveAll(m) { WA.settingsBus.save(__REG, m); }
   function chatId() { try { const c = WA.mainWin.SillyTavern.getContext(); return c.chatId || 'default'; } catch (e) { return 'default'; } }
 
   WA.registry = {

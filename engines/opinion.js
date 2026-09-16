@@ -12,7 +12,9 @@
     const def = { enabled: false, sandboxEnabled: false, everyNRounds: 3 };
     try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
   }
-  function saveSettings(s) { WA.mainWin.localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+  const __REG = { key: LS_KEY, def: { enabled: false, sandboxEnabled: false, everyNRounds: 3 }, module: 'opinion' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  function saveSettings(s) { WA.settingsBus.save(__REG, s); }
 
   const OPINION_SYS = `你是「舆情观察器」，只读世界状态与暗流，产出公众舆论层内容。规则：
 1. 你不改变世界事实，只描述公众能看到/传言的部分。

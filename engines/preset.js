@@ -75,8 +75,10 @@
     } catch (e) { return []; }
   }
 
+  const __REG_CUSTOM = { key: KEY_CUSTOM, def: [], module: 'preset' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_CUSTOM]);
   function saveCustomPresetsArray(arr) {
-    mainWin.localStorage.setItem(KEY_CUSTOM, JSON.stringify(arr || []));
+    WA.settingsBus.save(__REG_CUSTOM, arr || []);
   }
 
   function getActivePresetId() {
@@ -89,6 +91,8 @@
     return id;
   }
 
+  const __REG_ACTIVE = { key: KEY_ACTIVE, def: null, module: 'preset', orphan: true };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_ACTIVE]);
   function setActivePresetId(id) { mainWin.localStorage.setItem(KEY_ACTIVE, id || DEFAULT_ID); }
 
   function getAllPresets() { return [buildDefaultPreset()].concat(loadCustomPresets()); }

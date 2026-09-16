@@ -30,7 +30,9 @@
     };
     try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
   }
-  function saveSettings(s) { WA.mainWin.localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+  const __REG = { key: LS_KEY, def: null, module: 'evolution' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  function saveSettings(s) { WA.settingsBus.save(__REG, s); }
 
   function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 

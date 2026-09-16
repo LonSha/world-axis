@@ -21,7 +21,7 @@ function section(t) { console.log('\n■ ' + t); }
 // 按依赖顺序加载扩展JS到同一vm上下文（跳过index.js与UI）
 const ctx = vm.createContext(global);
 const LOAD = [
-  'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
+  'core/settings-bus.js', 'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
@@ -4294,6 +4294,74 @@ WA.loadScript = _ls.loadScript;
   logBefore154.forEach(l => WA.eventLog.push(l));
   WA.log('info', 'v154 现场还原');
   } // end v0.1.54 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.2.0 — 存储层统一治理（settings 版本协商 + 诊断体积预算 + orphan 检测）
+  // ═══════════════════════════════════════════════════════════
+  section('v0.2.0 存储层统一治理');
+  v0200: {
+  assert(WA.settingsBus && typeof WA.settingsBus.read === 'function' && typeof WA.settingsBus.save === 'function', 'settingsBus 侧车已导出');
+  const regs200 = WA.settingsBus.registry();
+  assert(regs200.length >= 12, '注册表覆盖 ≥12 个 settings 模块（实 ' + regs200.length + '）');
+  assert(regs200.some(r => r.key === 'worldaxis_backstage_settings_v1') && regs200.some(r => r.key === 'worldaxis_workflow_v1') && regs200.some(r => r.key === 'worldaxis_custom_presets'), '注册表含 backstage/workflow/custom_presets 键');
+
+  // ── A. settingsBus 版本协商：读旧写新 + 旧键回收（专用键对，避免与既有 backstage 键冲突）──
+  global.localStorage.setItem('worldaxis_settingsbus_test_v0', JSON.stringify({ probeValue: 42 }));
+  const regLegacy200 = { key: 'worldaxis_settingsbus_test_v1', legacy: ['worldaxis_settingsbus_test_v0'], legacyRemove: true, orphan: false, def: {} };
+  const up200 = WA.settingsBus.read(regLegacy200);
+  assert(up200 && up200.probeValue === 42, 'settingsBus.read 从 legacy v0 键读入值');
+  assert(global.localStorage.getItem('worldaxis_settingsbus_test_v0') === null, 'legacy v0 键读后被回收');
+  assert(global.localStorage.getItem('worldaxis_settingsbus_test_v1') !== null && JSON.parse(global.localStorage.getItem('worldaxis_settingsbus_test_v1')).probeValue === 42, '读旧写新：值写入 v1 键');
+  assert(WA.settingsBus.stats.upgrades >= 1, 'upgrades 计量 ≥1（实 ' + WA.settingsBus.stats.upgrades + '）');
+  // save 仍写当前键（非 legacy）
+  WA.settingsBus.save(regLegacy200, { probeValue: 7 });
+  assert(JSON.parse(global.localStorage.getItem('worldaxis_settingsbus_test_v1')).probeValue === 7, 'save 写当前键');
+  global.localStorage.removeItem('worldaxis_settingsbus_test_v1');
+
+  // ── B. settingsBus 损坏隔离：corrupt 留痕 + 重置默认 + 可观测 ──
+  const qs200 = WA.settingsBus.stats.quarantines;
+  global.localStorage.setItem('worldaxis_opinion_settings_v1', '{broken-json');
+  const opReg200 = regs200.filter(function (r) { return r.key === 'worldaxis_opinion_settings_v1'; })[0];
+  const op200 = WA.settingsBus.read(opReg200);
+  assert(op200 && op200.enabled === false && op200.sandboxEnabled === false, '损坏 opinion 键 → 重置默认（enabled=false）');
+  const corruptOp200 = global.localStorage.getItem('worldaxis_opinion_settings_v1_corrupt_' + Date.now().toString().slice(0, 8));
+  const anyCorruptOp200 = (function () { const ks = []; for (let i = 0; i < global.localStorage.length; i++) { const k = global.localStorage.key(i); if (k && k.indexOf('worldaxis_opinion_settings_v1_corrupt_') === 0) ks.push(k); } return ks; })();
+  assert(anyCorruptOp200.length >= 1, '损坏 opinion 键已隔离为 corrupt_<ts> 键');
+  assert(global.localStorage.getItem('worldaxis_opinion_settings_v1') === null, '损坏 opinion 原键已移除');
+  assert(WA.settingsBus.stats.quarantines > qs200, 'quarantines 计量递增');
+  assert(WA.errorLog.some(function (e) { return e.level === 'error' && /settingsBus: worldaxis_opinion_settings_v1 损坏已隔离/.test(e.msg); }), 'corrupt 事件进 error 子环（' + WA.errorLog.length + ' 条）');
+
+  // ── C. diagBudget：诊断键体积占比 + 超阈值告警 ──
+  const cur200 = WA.store.chatId();
+  const big200 = new Array(60).join('x');
+  for (let i = 0; i < 40; i++) WA.log('info', 'pad' + i, big200);
+  const db200 = WA.store.diagBudget({ maxPct: 5 });
+  assert(typeof db200.diagBytes === 'number' && typeof db200.stateBytes === 'number' && typeof db200.diagPct === 'number', 'diagBudget 返回结构完整');
+  assert(db200.diagBytes > 0 && db200.chat === cur200, 'diagBudget 计量当前聊天诊断字节');
+  assert(db200.exceeded === true && db200.diagPct > 5, '超阈值告警（diagPct=' + db200.diagPct + ' > maxPct=5）');
+  const dbOk200 = WA.store.diagBudget({ maxPct: 99 });
+  assert(dbOk200.exceeded === false, '正常占比不报 exceeded');
+  // verdict 议题：超阈值推 warn
+  const vd200 = WA.toolDiag.verdict(WA.toolDiag.collect());
+  assert(vd200.issues.some(function (x) { return x.level === 'warn' && x.key === 'storage.diagBudget'; }), 'diagBudget 超阈值进 verdict 议题（warn）');
+
+  // ── D. orphan 检测：注册 orphan:true 且键不存在 ──
+  global.localStorage.removeItem('worldaxis_oracle_plan_v1');   // 清 L1007 setPlan 残留，构造「键不存在」现场
+  const orph200 = WA.store.orphanSettingsKeys();
+  assert(Array.isArray(orph200), 'orphanSettingsKeys 返回数组');
+  // oracle 注册项标记 orphan:true，测试环境从未写过该键 → 必为 orphan
+  assert(orph200.some(function (o) { return o.key === 'worldaxis_oracle_plan_v1'; }), 'oracle_plan 键从未写过 → orphan 候选');
+  // 非 orphan 键（backstage）不应在 orphan 列表
+  assert(!orph200.some(function (o) { return o.key === 'worldaxis_backstage_settings_v1'; }), 'backstage 非 orphan 不在 orphan 列表');
+
+  // ── E. 负向验证锚点：diagBudget 应拒绝损坏的 eventLog（源断言）──
+  global.localStorage.setItem('worldaxis_event_log_' + cur200, '{bad');
+  const dbCorrupt200 = WA.store.diagBudget({ maxPct: 99 });
+  assert(typeof dbCorrupt200.diagPct === 'number', 'diagBudget 面对损坏 eventLog 不崩溃');
+  global.localStorage.removeItem('worldaxis_event_log_' + cur200);
+
+  // 清理现场
+  anyCorruptOp200.forEach(function (k) { global.localStorage.removeItem(k); });
+  } // end v0.2.0 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

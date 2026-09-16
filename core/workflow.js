@@ -18,7 +18,9 @@
   function loadSwitches() {
     try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
   }
-  function saveSwitches(sw) { mainWin.localStorage.setItem(LS_KEY, JSON.stringify(sw)); }
+  const __REG = { key: LS_KEY, def: {}, module: 'workflow' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  function saveSwitches(sw) { WA.settingsBus.save(__REG, sw); }
   // v0.1.42: 链运行环形历史——最近 N 次运行的逐节点耗时/状态序列（趋势观察）
   const HISTORY_MAX = 20;
   const __chainHistory = [];

@@ -73,7 +73,7 @@
 
   // ── 3. 模块装载完整性（文件 ↔ 导出对象） ─
   const MODULE_EXPORTS = {
-    'core/store.js': 'store', 'core/workflow.js': 'workflow', 'core/interceptor.js': 'interceptor',
+    'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/workflow.js': 'workflow', 'core/interceptor.js': 'interceptor',
     'core/api-router.js': 'apiRouter',
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',
     'engines/regional.js': 'regional', 'engines/horizon.js': 'horizon', 'engines/digest.js': 'digest',
@@ -196,6 +196,7 @@
             load: WA.store.loadStat ? WA.store.loadStat() : null,
             // v0.1.51: 存储键卫生——worldaxis_* 键空间分类计量与孤儿候选
             storageKeys: WA.store.storageStat ? WA.store.storageStat() : null,
+            diagBudget: (WA.store.diagBudget && WA.store.storageStat) ? (function () { try { return WA.store.diagBudget(); } catch (e) { return null; } })() : null,
             sizeProfile: prof,
             // v0.1.47: 诊断走自动续扫编排（消费方不必手写 cursor 循环）
             sizeAudit: WA.store.sizeAuditFull ? WA.store.sizeAuditFull({ minBytes: 512, chunkNodes: 800 }) : (WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null)
@@ -405,6 +406,11 @@
     // v0.1.22: 最近一次落盘失败 → error（世界状态未持久化，刷新即丢）
     const wsStor = ((diag.worldState || {}).storage || {});
     const lsav = wsStor.lastSave || null;
+    try {
+      const db = (diag && diag.diagBudget) || (WA.store.diagBudget ? WA.store.diagBudget() : null);
+      if (db && db.exceeded) issues.push({ level: 'warn', key: 'storage.diagBudget', detail: '当前聊天诊断键 ' + Math.round(db.diagBytes / 1024) + 'KB / 存档 ' + Math.round(db.stateBytes / 1024) + 'KB（' + db.diagPct + '%，阈值 ' + db.maxPct + '%）超预算——诊断环过大，建议清理或提高 maxPct' });
+      else if (db && db.diagPct > 10) issues.push({ level: 'info', key: 'storage.diagBudget', detail: '当前聊天诊断键 ' + db.diagPct + '%（' + Math.round(db.diagBytes / 1024) + 'KB / ' + Math.round(db.totalBytes / 1024) + 'KB），正常' });
+    } catch (e) {}
     if (lsav && lsav.ok === false) issues.push({ level: 'error', key: 'storage', detail: '最近一次 store 落盘失败（' + (lsav.reason || 'error') + '，累计 ' + lsav.failCount + ' 次）：内存态已更新但未持久化' });
     else if (lsav && lsav.failCount > 0) issues.push({ level: 'warn', key: 'storage', detail: 'store 历史落盘失败 ' + lsav.failCount + ' 次（当前已恢复）' });
     // v0.1.30: 事务健康——独立 transactions 键（与 lastSave 议题解耦）：

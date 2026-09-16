@@ -7,7 +7,9 @@
   function loadPlan() {
     try { return JSON.parse(WA.mainWin.localStorage.getItem(LS_PLAN) || 'null'); } catch (e) { return null; }
   }
-  function savePlan(p) { if (p) WA.mainWin.localStorage.setItem(LS_PLAN, JSON.stringify(p)); else WA.mainWin.localStorage.removeItem(LS_PLAN); }
+  const __REG = { key: LS_PLAN, def: null, module: 'oracle', orphan: true };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  function savePlan(p) { if (p) WA.settingsBus.save(__REG, p); else WA.mainWin.localStorage.removeItem(LS_PLAN); }
 
   WA.oracle = {
     plan: loadPlan(),

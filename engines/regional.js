@@ -24,7 +24,9 @@
     const def = { enabled: false, chancePercent: 15, durationRounds: 3, distantEnabled: false, nearEnabled: false, distantChance: 20, nearChance: 20, cooldown: 5 };
     try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
   }
-  function saveSettings(s) { WA.mainWin.localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+  const __REG = { key: LS_KEY, def: { enabled: false, chancePercent: 15, durationRounds: 3, distantEnabled: false, nearEnabled: false, distantChance: 20, nearChance: 20, cooldown: 5 }, module: 'regional' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  function saveSettings(s) { WA.settingsBus.save(__REG, s); }
 
   function weightedPick(items) {
     const total = items.reduce((s, i) => s + i.weight, 0);

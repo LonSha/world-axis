@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '0.1.54';
+  const VERSION = '0.2.0';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -98,6 +98,7 @@
   WA.loadScript = loadScript;
 
   const LOAD_ORDER = [
+    'core/settings-bus.js',
     'core/store.js',
     'core/api-router.js',
     'core/workflow.js',

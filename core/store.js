@@ -124,7 +124,8 @@
     diag_wfHistory: /^worldaxis_wf_history_(.+)$/,
     diag_uninjectLedger: /^worldaxis_uninject_ledger_(.+)$/,
     corrupt: /^worldaxis_state_(.+)_corrupt_\d+$/,
-    wb: /^worldaxis_wb_selection_(.+)$/
+    wb: /^worldaxis_wb_selection_(.+)$/,
+    settingsSettings: /^worldaxis_(backstage_settings_v1|evolution_settings_v1|opinion_settings_v1|regional_settings_v1|api_channels_v1|workflow_v1|inject_visibility_v1|purifier_rules_v1|npc_registry_v1|oracle_plan_v1|active_preset|custom_presets)$/
   };
   function classifyKey(key) {
     if (KEY_FAMILIES.corrupt.test(key)) return { family: 'corrupt', chat: null };
@@ -136,6 +137,7 @@
     if ((m = key.match(KEY_FAMILIES.diag_wfHistory))) return { family: 'diagnostic', kind: 'wf_history', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_uninjectLedger))) return { family: 'diagnostic', kind: 'uninject_ledger', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.wb))) return { family: 'wb', chat: m[1] };
+    if (KEY_FAMILIES.settingsSettings.test(key)) return { family: 'settings', settings: true, chat: null };
     return { family: 'settings', chat: null };
   }
   function listWorldAxisKeys() {
@@ -784,6 +786,31 @@
       plan.remove.forEach(function (r) { plan.freedBytes += r.bytes; plan.byFamily[r.reason] = (plan.byFamily[r.reason] || 0) + 1; });
       if (apply) plan.remove.forEach(function (r) { try { mainWin.localStorage.removeItem(r.key); } catch (e) {} });
       return plan;
+    },
+    /**
+     * v0.2.0: 诊断体积预算——storageStat 现成计量上增加「当前聊天诊断键体积占比」。
+     * 诊断环（eventLog/errorLog/wfHistory/uninjectLedger）随轮次增长，超阈值提示精简/扩容。
+     */
+    diagBudget(opts) {
+      const o = opts || {};
+      const maxPct = typeof o.maxPct === 'number' && o.maxPct > 0 ? o.maxPct : 20;
+      const stat = this.storageStat();
+      const cur = stat.currentChat;
+      const keys = listWorldAxisKeys();
+      let diagBytes = 0, stateBytes = 0;
+      keys.forEach(function (k) {
+        const c = classifyKey(k);
+        if (c.chat !== cur) return;
+        if (c.family === 'diagnostic') diagBytes += keyBytes(k);
+        else if (c.family === 'state') stateBytes += keyBytes(k);
+      });
+      const total = diagBytes + stateBytes;
+      const pct = total > 0 ? Math.round(diagBytes * 1000 / total) / 10 : 0;
+      return { chat: cur, diagBytes: diagBytes, stateBytes: stateBytes, totalBytes: total, diagPct: pct, maxPct: maxPct, exceeded: pct > maxPct };
+    },
+    /** v0.2.0: orphan settings 候选——注册表标记 orphan 且键已不存在的项（幽灵配置，建议面板一键移除注册） */
+    orphanSettingsKeys() {
+      try { return WA.settingsBus && WA.settingsBus.pendingOrphan ? WA.settingsBus.pendingOrphan() : []; } catch (e) { return []; }
     },
     /** v0.1.37: 恢复点计量只读视图（tool-diag 消费）——bytes 为序列化总体积，count===max 提示环形覆盖将发生 */
     recoveryStat(chatId) {

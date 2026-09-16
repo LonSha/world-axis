@@ -18,7 +18,9 @@
   function loadCfg() {
     try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
   }
-  function saveCfg(cfg) { mainWin.localStorage.setItem(LS_KEY, JSON.stringify(cfg)); }
+  const __REG = { key: LS_KEY, def: {}, module: 'apiRouter' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  function saveCfg(cfg) { WA.settingsBus.save(__REG, cfg); }
 
   // 并发限制（默认3，可改）
   let maxConcurrent = 3;

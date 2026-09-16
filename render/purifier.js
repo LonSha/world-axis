@@ -17,7 +17,9 @@
     } catch (e) {}
     return BUILTIN.slice();
   }
-  function saveRules(rules) { WA.mainWin.localStorage.setItem(LS_KEY, JSON.stringify(rules)); }
+    const __REG = { key: LS_KEY, def: null, module: 'purifier' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
 
   WA.purifier = {
     rules: loadRules(),
