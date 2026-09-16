@@ -16,11 +16,21 @@
   }
   // v0.1.19: 撤销台账——记录每次 uninject 的时间、触发源、结果（最多 20 条环形）
   const __uninjectLedger = [];
+  // v0.1.43: 撤销台账按聊天分域——切聊天后旧聊天的撤销记录不得参与新聊天的一致性判定
+  function ledgerChatId() {
+    try { return (WA.store && WA.store.chatId) ? WA.store.chatId() : null; } catch (e) { return null; }
+  }
   function recordUninject(trigger, result) {
     try {
-      __uninjectLedger.push({ at: Date.now(), trigger: trigger || 'unknown', ok: !!result.ok, reason: result.reason || null, cleared: result.cleared || [] });
+      __uninjectLedger.push({ at: Date.now(), chat: ledgerChatId(), trigger: trigger || 'unknown', ok: !!result.ok, reason: result.reason || null, cleared: result.cleared || [] });
       if (__uninjectLedger.length > 20) __uninjectLedger.splice(0, __uninjectLedger.length - 20);
     } catch (e) {}
+  }
+  /** 取当前聊天域的台账条目（无域标识的历史条目视为同域，向后兼容） */
+  function ledgerForCurrentChat() {
+    const cur = ledgerChatId();
+    if (!cur) return __uninjectLedger.slice();
+    return __uninjectLedger.filter(function (e) { return !e.chat || e.chat === cur; });
   }
 
   /**
@@ -30,7 +40,8 @@
   function uninjectAudit() {
     const issues = [];
     const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
-    const ledger = __uninjectLedger.slice();
+    const ledger = ledgerForCurrentChat();
+    const foreignCount = __uninjectLedger.length - ledger.length;   // v0.1.43: 被域隔离的跨聊天条目数
     const lastUnj = ledger.length ? ledger[ledger.length - 1] : null;
     // 快照在场声明 vs 撤销台账末条：台账比快照新且成功 → 快照过期
     let staleSnapshot = false;
@@ -49,7 +60,8 @@
       snapshotInjected: li ? li.injected : null,
       snapshotKeys: (li && li.slots && Array.isArray(li.slots.keys)) ? li.slots.keys.slice() : [],
       ledgerCount: ledger.length,
-      lastUninject: lastUnj ? { at: lastUnj.at, trigger: lastUnj.trigger, ok: lastUnj.ok, cleared: (lastUnj.cleared || []).length } : null,
+      foreignEntries: foreignCount,
+      lastUninject: lastUnj ? { at: lastUnj.at, chat: lastUnj.chat || null, trigger: lastUnj.trigger, ok: lastUnj.ok, cleared: (lastUnj.cleared || []).length } : null,
       issues: issues
     };
   }
@@ -237,6 +249,9 @@
       } catch (e) { if (WA.log) WA.log('warn', 'uninject 异常', e); const r = { ok: false, reason: 'error', error: String(e && (e.message || e)) }; recordUninject(trigger, r); return r; }
     },
     /** v0.1.19: 撤销台账只读视图（tool-diag 消费） */
-    injectionLedger() { return { count: __uninjectLedger.length, entries: __uninjectLedger.slice() }; }
+    injectionLedger(opts) {
+      const scoped = (opts && opts.all) ? __uninjectLedger.slice() : ledgerForCurrentChat();
+      return { count: scoped.length, entries: scoped, total: __uninjectLedger.length, foreign: __uninjectLedger.length - scoped.length };
+    },
   };
 })();

@@ -16,6 +16,17 @@
   // 回调会再次命中 ENDED 形成无限自激。一把布尔锁即可切断。
   let _advanceBusy = false;
 
+    // v0.1.43: 突发事件有界化——活跃项全留，终态项仅保留最近 3 条且剥离 notes（notes 是体积大头）
+    const KEEP_DONE = 3;
+    function pruneDirect(list) {
+      const active = list.filter(function (e) { return e && e.status === 'active'; });
+      const ended = list.filter(function (e) { return e && e.status !== 'active'; })
+        .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); })
+        .slice(0, KEEP_DONE)
+        .map(function (e) { const c = Object.assign({}, e); delete c.notes; return c; });
+      const kept = active.concat(ended).sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+      return kept;
+    }
   WA.directEvent = {
     /** 生成一个突发事件（一轮API调用，产出全部小纸条） */
     async create(opts) {
@@ -39,6 +50,7 @@
           status: 'active', opponent: r.opponent || '', box: r.box || '',
           notes: r.notes.map(n => String(n).slice(0, 500)), createdAt: Date.now()
         });
+        d.directEvents = pruneDirect(d.directEvents || []);   // v0.1.43
       });
       WA.emit('directEvent:started');
       WA.log('info', '突发事件已生成：' + (r.title || '') + ' 共' + r.notes.length + '轮');
@@ -48,7 +60,7 @@
     active() { return (WA.store.read('directEvents', []) || []).find(e => e.status === 'active'); },
 
     abort() {
-      WA.store.transact(d => { (d.directEvents || []).forEach(e => { if (e.status === 'active') e.status = 'aborted'; }); });
+      WA.store.transact(d => { (d.directEvents || []).forEach(e => { if (e.status === 'active') e.status = 'aborted'; }); d.directEvents = pruneDirect(d.directEvents || []); });  // v0.1.43
       WA.emit('directEvent:ended');
     },
 
@@ -70,7 +82,7 @@
           const e = (d.directEvents || []).find(x => x.id === ev.id);
           if (!e) return;
           e.currentTurn++;
-          if (e.currentTurn >= e.totalTurns) { e.status = 'done'; WA.emit('directEvent:ended'); }
+          if (e.currentTurn >= e.totalTurns) { e.status = 'done'; WA.emit('directEvent:ended'); d.directEvents = pruneDirect(d.directEvents || []); }  // v0.1.43
         });
       } finally { _advanceBusy = false; }
     }

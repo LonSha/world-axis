@@ -194,7 +194,8 @@
             batch: WA.store.batchStat ? WA.store.batchStat() : null,
             recovery: WA.store.recoveryStat ? WA.store.recoveryStat() : null,
             load: WA.store.loadStat ? WA.store.loadStat() : null,
-            sizeProfile: prof
+            sizeProfile: prof,
+            sizeAudit: WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null
           };
         }, null)
       };
@@ -425,6 +426,11 @@
       if (bgt.overBudget) issues.push({ level: 'error', key: 'budget', detail: '上轮注入超出预算（' + bgt.used + '/' + bgt.cap + 't，档源 ' + bgt.source + '）' });
       else if (bgt.droppedCount) issues.push({ level: 'warn', key: 'budget', detail: '预算裁决丢弃 ' + bgt.droppedCount + ' 源：' + ((bgt.dropped || []).map(function (d) { return d.source; }).join('、')) });
       else if (bgt.foldedCount) issues.push({ level: 'info', key: 'budget', detail: '预算裁决折叠 ' + bgt.foldedCount + ' 源（' + bgt.summary + '）' });
+    }
+    // v0.1.43: 无界增长守卫——白名单外的数组路径长到一定体积即报议题
+    const aud = (((diag.worldState || {}).storage || {}).sizeAudit) || null;
+    if (aud && Array.isArray(aud.suspects) && aud.suspects.length) {
+      issues.push({ level: 'warn', key: 'sizeAudit', detail: aud.suspects.length + ' 个未见裁剪的持久数组：' + aud.suspects.map(function (x) { return x.path + '(' + x.len + '项/' + x.bytes + 'B)'; }).join('、') });
     }
     // v0.1.27: API 通道健康——只统计已配置且有调用的通道
     const apiSec = ((diag.runtime || {}).apiRouter || {});

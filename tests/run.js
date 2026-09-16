@@ -3432,6 +3432,94 @@ WA.loadScript = _ls.loadScript;
   assert(warn142After > warn142Before, '实际注入接线记录 depth 覆盖告警');
   assert(WA.store.get().lastInjection && WA.store.get().lastInjection.slots, '覆盖告警不阻断槽位快照落地');
   } // end v0.1.42 block
+  // ═══════════════════════════════════════════════════════════
+  // v0.1.43 — 无界增长审计 + 撤销台账跨聊天分域
+  // ═══════════════════════════════════════════════════════════
+  v0143: {
+  assert(typeof WA.store.sizeAudit === 'function', 'store.sizeAudit 已导出');
+  const audit0 = WA.store.sizeAudit({ minBytes: 64 });
+  assert(Array.isArray(audit0.arrays) && typeof audit0.scanned === 'number', 'sizeAudit 返回数组清单与扫描数');
+  assert(audit0.arrays.every(a => typeof a.path === 'string' && typeof a.bytes === 'number'), 'sizeAudit 每项含 path/bytes');
+  // 白名单内的有界容器灌满 → 不误报
+  WA.store.transact(d => { for (let i = 0; i < 150; i++) d.worldFacts.push({ key: 'k' + i, value: 'v'.repeat(30) }); });
+  const auditBounded = WA.store.sizeAudit({ minBytes: 64 });
+  assert(auditBounded.unbounded.indexOf('worldFacts') < 0, '白名单容器(worldFacts)不算无界');
+  assert(auditBounded.suspects.every(x => x.path !== 'worldFacts'), '白名单容器不进 suspects');
+  // 新出现的未裁剪数组必须被抓出
+  WA.store.transact(d => { d.memory.journal = []; for (let i = 0; i < 40; i++) d.memory.journal.push('记录' + i + ' ' + 'y'.repeat(40)); });
+  const auditNew = WA.store.sizeAudit({ minBytes: 64 });
+  assert(auditNew.unbounded.indexOf('memory.journal') >= 0, '未登记的新数组被判为无界');
+  assert(auditNew.suspects.some(x => x.path === 'memory.journal' && x.len === 40), '达阈值的无界数组进 suspects');
+  const wfRow = auditNew.arrays.find(a => a.path === 'worldFacts');
+  assert(wfRow && wfRow.bounded === true, 'arrays 明细标注 bounded 位');
+  WA.store.transact(d => { delete d.memory.journal; d.worldFacts = []; });
+  // directEvents 有界化：全部经真实 API 路径（spawn / advance），不复刻裁剪逻辑
+  WA.store.transact(d => { d.directEvents = []; });
+  const mkEv = (i, status, extra) => Object.assign({ id: 'de' + i, title: '事件' + i, totalTurns: 2, currentTurn: 0, status, notes: ['纸条' + 'x'.repeat(200)], createdAt: 1000 + i }, extra || {});
+  // ① create 触发裁剪：预置 4 条旧终态，经真实通道生成新活跃事件
+  const cfg143 = WA.apiRouter.getChannel('inference');
+  WA.apiRouter.setChannel('inference', { baseUrl: 'http://mock', model: 'm', apiKey: 'k' });
+  WA.store.transact(d => { d.directEvents = [mkEv(1, 'done'), mkEv(2, 'aborted'), mkEv(3, 'done'), mkEv(4, 'done')]; });
+  global.__pushApiJson({ title: '突袭', opponent: '对手甲', box: '暗箱', notes: ['纸条一', '纸条二'] });
+  const created143 = await WA.directEvent.create({ turns: 2 });
+  assert(created143 && created143.ok === true, 'create 经真实通道成功产出事件');
+  const afterSpawn = WA.store.get().directEvents;
+  const act143 = afterSpawn.filter(e => e.status === 'active');
+  assert(act143.length === 1 && Array.isArray(act143[0].notes) && act143[0].notes.length === 2, 'create 后活跃事件存在且 notes 完整');
+  assert(afterSpawn.length === 4, 'create 触发裁剪：1 活跃 + 最近 3 终态（实得 ' + afterSpawn.length + '）');
+  const endedSpawn = afterSpawn.filter(e => e.status !== 'active');
+  assert(endedSpawn.map(e => e.id).join(',') === 'de2,de3,de4', '终态保留最近三条（最旧 de1 出局）');
+  assert(endedSpawn.every(e => !e.notes), '终态事件已剥离 notes 大头');
+  // ② advance 转 done 时同样裁剪（不新增事件，仅状态迁移）
+  WA.store.transact(d => { d.directEvents = [mkEv(11, 'done'), mkEv(12, 'done'), mkEv(13, 'done'), mkEv(14, 'done'), mkEv(15, 'active', { currentTurn: 1, totalTurns: 2 })]; });
+  await WA.directEvent.advance();
+  const afterAdv = WA.store.get().directEvents;
+  assert(afterAdv.length === 3 && afterAdv.every(e => e.status !== 'active'), 'advance 转 done 后触发裁剪且无残留活跃项');
+  assert(afterAdv.map(e => e.id).join(',') === 'de13,de14,de15', 'advance 路径同样保留最近三条');
+  assert(afterAdv.every(e => !e.notes), 'advance 路径剥离终态 notes');
+  WA.apiRouter.setChannel('inference', cfg143 && cfg143.baseUrl && cfg143.model ? { baseUrl: cfg143.baseUrl, model: cfg143.model, apiKey: cfg143.apiKey } : null);
+  WA.store.transact(d => { d.directEvents = []; });
+  // 章号在裁剪后仍唯一递增
+  WA.store.transact(d => { d.chapters.history = []; d.chapters.current = null; d.chapters.seq = 0; });
+  for (let i = 0; i < 26; i++) { WA.chapters.start('章' + i); WA.chapters.end('结' + i); }
+  const chs = WA.store.get().chapters;
+  assert(chs.history.length === 20, 'chapters.history 有界于 20（实得 ' + chs.history.length + '）');
+  const nos = chs.history.map(h => h.no);
+  assert(new Set(nos).size === nos.length, '裁剪后章号无重复');
+  assert(nos[0] === 7 && nos[nos.length - 1] === 26, '保留最近 20 章且号序连续（' + nos[0] + '→' + nos[nos.length - 1] + '）');
+  assert(chs.seq === 26, 'seq 计数器与最大章号同步');
+  WA.chapters.start('续章');
+  assert(WA.store.get().chapters.current.no === 27, '新章号从 seq 续起而非 history.length+1');
+  WA.chapters.end('收尾');
+  WA.store.transact(d => { d.chapters.history = []; d.chapters.current = null; delete d.chapters.seq; });
+  // 诊断透出 + 议题：干净态无 suspects
+  const dg143 = WA.toolDiag.collect();
+  assert(dg143.worldState.storage.sizeAudit && Array.isArray(dg143.worldState.storage.sizeAudit.arrays), '诊断透出 sizeAudit');
+  const cleanSuspects = dg143.worldState.storage.sizeAudit.suspects;
+  assert(Array.isArray(cleanSuspects), 'sizeAudit suspects 为数组');
+  // ── 撤销台账跨聊天分域 ──
+  assert(typeof WA.render.injectionLedger === 'function', 'injectionLedger 仍在');
+  const ctx143 = global.SillyTavern.getContext();
+  const origChat143 = ctx143.chatId;
+  WA.render.applyInjections({ injections: [{ source: '世界状态', content: 'v143 A 域注入' }] });
+  WA.render.uninject('manual-v143-A');
+  const ledA = WA.render.injectionLedger();
+  assert(ledA.entries[ledA.entries.length - 1].chat === origChat143, '台账条目带 chat 域标识');
+  // 切到另一聊天：旧域撤销记录不得参与新域一致性判定
+  ctx143.chatId = 'v143_other_chat';
+  WA.store.init();
+  WA.render.applyInjections({ injections: [{ source: '世界状态', content: 'v143 B 域注入' }] });
+  const ledB = WA.render.injectionLedger();
+  const uaB = WA.render.uninjectAudit();
+  assert(ledB.count === 0 && ledB.total >= 1 && ledB.foreign >= 1, 'B 域台账为空但全量计数保留');
+  assert(uaB.ledgerCount === 0 && uaB.foreignEntries >= 1, '审计只见本域、跨域量单独透出');
+  assert(!uaB.issues.some(i => i.code === 'cleared-by-mismatch'), '跨域撤销不回写本域快照（无误报）');
+  ctx143.chatId = origChat143;
+  WA.store.init();
+  try { delete global.localStorage['worldaxis_state_v143_other_chat']; } catch (e) {}
+  // 兼容性：{all:true} 仍可取全量
+  assert(WA.render.injectionLedger({ all: true }).count >= WA.render.injectionLedger().count, 'injectionLedger({all}) 取全量');
+  } // end v0.1.43 block
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

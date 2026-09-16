@@ -3,6 +3,20 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
 
+  // v0.1.43: 章节史有界化——仅保留最近 MAX_HISTORY 章；编号改由 seq 计数器驱动，
+  // 与 history 长度解耦，裁剪后不会出现重复章号（旧数据无 seq 时从现存最大 no 续起）。
+  const MAX_HISTORY = 20;
+  function pruneHistory(list) {
+    return (list || []).slice(-MAX_HISTORY);
+  }
+  function nextNo(d) {
+    const hist = d.chapters.history || [];
+    let mx = d.chapters.seq || 0;
+    hist.forEach(function (h) { if (h && typeof h.no === 'number' && h.no > mx) mx = h.no; });
+    if (d.chapters.current && typeof d.chapters.current.no === 'number' && d.chapters.current.no > mx) mx = d.chapters.current.no;
+    d.chapters.seq = mx + 1;
+    return d.chapters.seq;
+  }
   WA.chapters = {
     start(title, opts) {
       opts = opts || {};
@@ -10,8 +24,10 @@
         if (d.chapters.current) { // 自动结束旧章
           d.chapters.history.push(Object.assign({}, d.chapters.current, { endedAt: Date.now() }));
         }
-        d.chapters.current = { no: (d.chapters.history.length + 1), title: title || ('第' + (d.chapters.history.length + 1) + '章'), script: opts.script || '', notes: opts.notes || '', startedAt: Date.now() };
+        const no = nextNo(d);
+        d.chapters.current = { no: no, title: title || ('第' + no + '章'), script: opts.script || '', notes: opts.notes || '', startedAt: Date.now() };
         d.chapters.active = true;
+        d.chapters.history = pruneHistory(d.chapters.history);   // v0.1.43
       });
       WA.emit('chapters:changed');
     },
@@ -21,6 +37,7 @@
         d.chapters.current.endedAt = Date.now();
         d.chapters.current.endNote = note || '';
         d.chapters.history.push(d.chapters.current);
+        d.chapters.history = pruneHistory(d.chapters.history);   // v0.1.43
         d.chapters.current = null;
         d.chapters.active = false;
       });

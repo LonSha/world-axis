@@ -241,6 +241,58 @@
       return { total: __saveStat.bytes, top: rows.slice(0, n) };
     },
 
+    /**
+     * v0.1.43: 无界增长审计——递归扫描 state 中所有数组路径，与「已核实有界」白名单比对。
+     * 白名单每条附源码裁剪点，防长线熵增：某处新增 push 未加裁剪即被检出。
+     * 只读：不写 store、不落盘。
+     */
+    sizeAudit(opts) {
+      const o = opts || {};
+      const minBytes = typeof o.minBytes === 'number' ? o.minBytes : 256;
+      const maxDepth = typeof o.maxDepth === 'number' ? o.maxDepth : 3;
+      const BOUNDED = {
+        'chronicle': 'backstage.js:443 slice(-200)',
+        'currents': 'backstage.js:445 slice(-40)',
+        'echoes': 'backstage.js:442 slice(-40)',
+        'worldFacts': 'backstage.js:444 slice(-100)',
+        'consistency': '无写入方（默认空数组）',
+        'memory.facts': 'memory.js:120 slice(-CAP.facts)',
+        'memory.foreshadows': 'memory.js:58 slice(-CAP.foreshadows)',
+        'memory.pmem': 'pmem.js:124 splice(0, len-CAP_TOTAL)',
+        'opinion.canon': 'opinion.js:54 slice(-20)',
+        'evolution.events': 'editor-events.js MAX_EVENTS=16',
+        'evolution.factions': 'editor-faction.js MAX_FACTIONS=16',
+        'directEvents': 'direct-event.js pruneDirect(KEEP_DONE=3)',
+        'chapters.history': 'chapters.js pruneHistory(MAX_HISTORY=20)'
+      };
+      const arrays = [];
+      let visited = 0;
+      function walk(node, pathStr, depth) {
+        if (depth > maxDepth || visited > 800) return;
+        if (Array.isArray(node)) {
+          let b = 0;
+          try { b = byteLen(JSON.stringify(node)); } catch (e) { b = -1; }
+          arrays.push({ path: pathStr, len: node.length, bytes: b, bounded: Object.prototype.hasOwnProperty.call(BOUNDED, pathStr) });
+          if (depth < maxDepth) { visited++; node.slice(0, 3).forEach(function (it, ix) { walk(it, pathStr + '[' + ix + ']', depth + 1); }); }
+          return;
+        }
+        if (node && typeof node === 'object') {
+          visited++;
+          Object.keys(node).forEach(function (k) { walk(node[k], pathStr ? pathStr + '.' + k : k, depth + 1); });
+        }
+      }
+      try { walk(memCache || {}, '', 1); } catch (e) { return { error: String(e && e.message || e) }; }
+      // 顶层路径才参与有界判定（a.b[0].c 这类元素内嵌数组由父容器隐式约束）
+      const unbounded = arrays.filter(function (a) { return !a.bounded && a.len > 0 && a.path.indexOf('[') < 0; });
+      const suspects = unbounded.filter(function (a) { return a.bytes >= minBytes; }).sort(function (x, y) { return y.bytes - x.bytes; });
+      return {
+        total: (WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0,
+        scanned: arrays.length,
+        arrays: arrays.slice().sort(function (a, b) { return b.bytes - a.bytes; }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
+        unbounded: unbounded.map(function (a) { return a.path; }),
+        suspects: suspects.map(function (a) { return { path: a.path, len: a.len, bytes: a.bytes }; })
+      };
+    },
     get() { return memCache; },
 
     // 事务式更新：传入修改函数，成功才持久化（失败不留半份状态）
