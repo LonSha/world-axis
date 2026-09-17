@@ -6068,6 +6068,59 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1200.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.2.0 block
+  // ═══════════════════════════════════════════════════════════
+  // v1.3.0 — chronicle 多口径统一（Cross-path Cap Unification）
+  //   探针实证：chronicle 登记口径 cap=200（backstage slice(-200)），但 horizon.js
+  //   3 处内联 slice(-80)——horizon 远方/近端事件入账一次即把满载 200 条纪事静默砍到 80
+  //   （丢失 120 条，且按数组位置丢最旧，190 条带 refs 溯源的 kind:event 仅残留 69 条，
+  //   无溯源的 horizon 兜底条目反而全保留）。修复：horizon 新增 CHRONICLE_CAP=200 与
+  //   登记表/backstage 同源，3 处内联口径统一；登记表 site 注明双路径同源。
+  // ═══════════════════════════════════════════════════════════
+  v1300: {
+  const LS1300 = global.localStorage;
+  const junkBefore1300 = JSON.parse(JSON.stringify(LS1300._dump()));
+  const evtBefore1300 = WA.eventLog.slice();
+  const errBefore1300 = WA.errorLog.slice();
+  const ctx1300 = global.SillyTavern.getContext();
+  const prevChat1300 = ctx1300.chatId;
+  const CID1300 = 'v1300_chat';
+  const chat1300 = global.__mockChat;
+  function resetLogs1300() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1300() { resetLogs1300(); LS1300.clear(); ctx1300.chatId = CID1300; chat1300.length = 0; WA.store.init(); }
+  // ── A. 口径同源（源码断言）──
+  fresh1300();
+  const hzSrc1300 = fs.readFileSync(path.join(BASE, 'engines/horizon.js'), 'utf8');
+  assert((hzSrc1300.match(/tx\.chronicle\.length > 80/g) || []).length === 0, 'horizon 内联 80 口径零残留');
+  assert((hzSrc1300.match(/\.length > CHRONICLE_CAP\)/g) || []).length === 3, 'horizon 条件引用恰好 3 处（CHRONICLE_CAP 同源）');
+  assert((hzSrc1300.match(/slice\(-CHRONICLE_CAP\)/g) || []).length === 3, 'horizon 截断引用恰好 3 处');
+  const caps1300 = WA.store.sizeCaps();
+  assert(caps1300['chronicle'].cap === 200, '登记表 chronicle cap=200');
+  assert(caps1300['chronicle'].site.indexOf('horizon.js') >= 0, '登记 site 注明 horizon 同源');
+  // ── B. 满载行为：horizon 入账不再砍到 80 ──
+  WA.store.transact(d => {
+    d.chronicle = [];
+    for (let i = 0; i < 190; i++) d.chronicle.push({ id: 'ch' + i, kind: 'event', title: '纪事' + i, summary: '带溯源' + i, at: i, refs: [{ messageId: 'm' + i, chatId: 'c1' }] });
+    for (let i = 0; i < 10; i++) d.chronicle.push({ id: 'hz' + i, kind: 'horizon_distant', title: '远方' + i, desc: 'd', at: 500 + i, horizon: true });
+  });
+  WA.store.transact(d => { WA.horizon.acceptResult('near', { title: '近端事件X', description: '描述', urgent: false }); });
+  const st1300 = WA.store.get();
+  assert(st1300.chronicle.length === 200, '满载入账后仍为 200（不再砍到 80）');
+  assert(!st1300.chronicle.some(c => c.id === 'ch0'), '挤出的是最旧 1 条（环形语义正常）');
+  assert(st1300.chronicle.some(c => c.title === '近端事件X'), '新 horizon 条目入账成功');
+  assert(st1300.chronicle.filter(c => c.kind === 'event' && c.refs).length === 189, '带溯源条目仅自然挤出 1 条（不再大量丢弃）');
+  // ── C. distant 事件路径同口径 ──
+  WA.store.transact(d => { WA.horizon.acceptResult('distant', { title: '远方事件Y', description: '描述Y' }); });
+  assert(WA.store.get().chronicle.length === 200, 'distant 事件入账后仍 200（同口径）');
+  // ── 清理现场 ──
+  resetLogs1300();
+  LS1300.clear();
+  Object.keys(junkBefore1300).forEach(function (k) { LS1300.setItem(k, junkBefore1300[k]); });
+  ctx1300.chatId = prevChat1300;
+  WA.eventLog.length = 0;
+  evtBefore1300.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1300.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.3.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block

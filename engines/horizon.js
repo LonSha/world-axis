@@ -13,11 +13,13 @@
  */
 (function () {
   const WA = (window.WorldAxis = window.WorldAxis || {});
-
   const LEDGER_THRESHOLD = 10;   // 未触发累计轮数阈值，达到则强制触发
   const COOLDOWN_ROUNDS  = 5;    // 触发后的冷却轮数
   const RETRY_MAX        = 3;    // pending 结果最大重试轮数，超过丢弃
   const BASE_CHANCE      = 0.18; // 每轮自然触发基础概率（Ledger未达阈值时）
+  // v1.3.0: chronicle 容量同源化——此前 3 处内联 cap=80 与登记表/backstage 的 200 冲突，
+  // horizon 入账一次即把满载 200 条纪事砍到 80（静默丢失 120 条，且按位置丢最旧的带溯源条目）。
+  const CHRONICLE_CAP = 200;     // 与 __BOUNDED_CAPS['chronicle'] 登记同源（backstage slice(-200)）
 
   // ── 工具 ──────────────────────────────────────────────
   function roll01() { return Math.random(); }
@@ -142,7 +144,7 @@
             WA.store.transact(tx => {
               tx.chronicle = tx.chronicle || [];
               tx.chronicle.push({ kind: 'horizon_distant', title: String(result.topic || result.title || '').slice(0, 30), desc: String(result.content || '').slice(0, 50), at: Date.now(), round: (tx.meta && tx.meta.round) || 0, horizon: true });
-              if (tx.chronicle.length > 80) tx.chronicle = tx.chronicle.slice(-80);
+              if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
             });
           }
       } else {
@@ -157,7 +159,7 @@
             round: (tx.meta && tx.meta.round) || 0,
             horizon: true
           });
-          if (tx.chronicle.length > 80) tx.chronicle = tx.chronicle.slice(-80);
+          if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
         });
       }
     } else {
@@ -178,7 +180,7 @@
           round: (tx.meta && tx.meta.round) || 0,
           horizon: true
         });
-        if (tx.chronicle.length > 80) tx.chronicle = tx.chronicle.slice(-80);
+        if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
       });
     }
 

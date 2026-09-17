@@ -394,7 +394,7 @@
     return { state: target, filled: filled, conflicts: conflicts };
   }
   const __BOUNDED_CAPS = {
-    'chronicle': { cap: 200, site: 'backstage.js slice(-200)' },
+    'chronicle': { cap: 200, site: 'backstage.js slice(-200) + horizon.js CHRONICLE_CAP 同源（v1.3.0）' },
     'currents': { cap: 40, site: 'backstage.js slice(-40)' },
     'echoes': { cap: 40, site: 'backstage.js slice(-40)' },
     'worldFacts': { cap: 100, site: 'backstage.js slice(-100)' },
