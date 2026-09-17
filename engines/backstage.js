@@ -108,6 +108,12 @@
     const m = chat[idx];
     return { idx, swipe: m.swipe_id || 0, hash: String(m.mes || '').length + ':' + String(m.mes || '').slice(-32) };
   }
+  // v0.9.0: 分支标识统一构造——worldFacts/currents 的 branchId 存「分支标识」（m{idx}_s{swipe}，
+  // 与 store.currentBranchId() 同构），而非裸楼层号。旧实现仅存 anchor.idx，命名-语义错位。
+  function anchorBranchId(anchor) {
+    if (!anchor || typeof anchor.idx !== 'number') return '';
+    return 'm' + anchor.idx + '_s' + (anchor.swipe || 0);
+  }
 
   // ── 世界快照裁剪（控制token）──
   function compactState(s, budget) {
@@ -319,7 +325,7 @@
             old.value = f.value; old.at = now;
           }
         } else {
-          draft.worldFacts.push({ id: 'wf' + now + Math.random().toString(36).slice(2, 6), key: f.key, value: f.value, scope: f.scope || 'world', source: 'engine', at: now, branchId: anchor && anchor.idx });
+          draft.worldFacts.push({ id: 'wf' + now + Math.random().toString(36).slice(2, 6), key: f.key, value: f.value, scope: f.scope || 'world', source: 'engine', at: now, branchId: anchorBranchId(anchor) });
         }
       });
 
@@ -374,17 +380,27 @@
             public_trace: c.public_trace || '',
             causes: c.causes || [], participants: c.participants || [],
             stage: c.stage || '发展', createdAt: now, updatedAt: now,
-            branchId: anchor && anchor.idx
+            branchId: anchorBranchId(anchor)
           });
         }
       });
 
       // 回声/纪事
       (r.echoes || []).forEach(e => {
-        if (e && e.result) draft.echoes.push({ id: 'ec' + now + Math.random().toString(36).slice(2, 6), refCurrent: e.refCurrent || '', result: e.result, exposure: e.exposure || 'subtle', at: now });
+        if (!e || !e.result) return;
+        const ecTitle = String(e.refCurrent || '');
+        // v0.9.0: 软引用生产方——记录入账时目标暗流是否在场（danglingAtWrite），
+        // 区分「AI幻觉/数据损坏（入账即悬空，可检出）」与「暗流正常生命周期消失（入账后裁剪/终局，不告警）」。
+        const ecDangling = ecTitle ? !(Array.isArray(draft.currents) ? draft.currents : []).some(c => c && c.title === ecTitle) : false;
+        draft.echoes.push({ id: 'ec' + now + Math.random().toString(36).slice(2, 6), refCurrent: ecTitle, result: e.result, exposure: e.exposure || 'subtle', danglingAtWrite: ecDangling, at: now });
       });
       (r.chronicle || []).slice(0, LIMITS.chronicle).forEach(c => {
-        if (c && c.title) draft.chronicle.push({ id: 'ch' + now + Math.random().toString(36).slice(2, 6), kind: c.kind || 'event', title: c.title, summary: c.summary || '', at: now, refs: c.refs || [] });
+        if (!c || !c.title) return;
+        // v0.9.0: 纪事来源引用生产方——AI schema 无 refs 字段时锚定结算楼层溯源（可审计）
+        const cRefs = (Array.isArray(c.refs) && c.refs.length)
+          ? c.refs
+          : ((WA.timeline && WA.timeline.captureRange) ? WA.timeline.captureRange(Math.max(0, (anchor && anchor.idx) || 0), (anchor && anchor.idx) || 0) : []);
+        draft.chronicle.push({ id: 'ch' + now + Math.random().toString(36).slice(2, 6), kind: c.kind || 'event', title: c.title, summary: c.summary || '', at: now, refs: cRefs });
       });
 
       // 伏笔生命周期

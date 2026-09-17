@@ -830,7 +830,7 @@ WA.loadScript = _ls.loadScript;
   assert(flat[0].level === 'error', '扁平化按严重度排序(error优先)');
   assert(WA.inspectorState.summaryText(rep).includes('错误'), '体检摘要文本含错误计数');
   // 干净状态
-  WA.store.transact(d => { d.evolution.events = []; d.evolution.factions = []; d.worldPulse = null; d.evolution.round = 0; d.people = {}; d.memory.facts = []; d.memory.foreshadows = []; d.memory.pmem = []; d.directEvents = []; d.nextTurnInjection = null; });
+  WA.store.transact(d => { d.evolution.events = []; d.evolution.factions = []; d.worldPulse = null; d.evolution.round = 0; d.people = {}; d.memory.facts = []; d.memory.foreshadows = []; d.memory.pmem = []; d.directEvents = []; d.nextTurnInjection = null; d.echoes = []; });
   const clean = WA.inspectorState.inspect(WA.store.get());
   assert(clean.clean === true && WA.inspectorState.summaryText(clean).includes('自洽'), '干净状态判定自洽');
   // 只读保证：体检前后 state 深比较一致
@@ -5681,6 +5681,147 @@ WA.loadScript = _ls.loadScript;
   evtBefore800.forEach(function (l) { WA.eventLog.push(l); });
   WA.errorLog.length = 0;
   errBefore800.forEach(function (l) { WA.errorLog.push(l); });
+  // ═══════════════════════════════════════════════════════════
+  // v0.9.0 — 软引用完整性（回声悬空检测 / 纪事溯源 / 分支标识语义）
+  //   探针实证：① echoes.refCurrent 为裸标题软引用——AI 幻觉标题原样入账、
+  //   无校验无检出（checkRefs 只审 refs 字段，inspector 源码不含 echoes）；
+  //   ② 暗流尾部裁剪后早期回声成孤儿无标记；③ chronicle.refs AI schema 无此字段
+  //   → 恒空且不在审计范围；④ worldFacts/currents 的 branchId 存的是裸楼层号
+  //   （anchor.idx），命名-语义错位。
+  // ═══════════════════════════════════════════════════════════
+  v090: {
+  const LS900 = global.localStorage;
+  const junkBefore900 = JSON.parse(JSON.stringify(LS900._dump()));
+  const evtBefore900 = WA.eventLog.slice();
+  const errBefore900 = WA.errorLog.slice();
+  const ctx900 = global.SillyTavern.getContext();
+  const prevChat900 = ctx900.chatId;
+  const CID900 = 'v900_chat';
+  const chat900 = global.__mockChat;
+  function resetLogs900() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh900() { resetLogs900(); LS900.clear(); ctx900.chatId = CID900; chat900.length = 0; WA.store.init(); }
+  // ── 1. A 块：danglingAtWrite 生产方（入账时目标在场性）──
+  fresh900();
+  chat900.push({ is_user: true, mes: '开场。', swipe_id: 0 });
+  chat900.push({ is_user: false, mes: '镇外骑兵逼近。', swipe_id: 0 });
+  WA.store.transact(d => {
+    WA.backstage.applyResult(d, {
+      currents: [{ title: '骑兵压境', summary: '', stage: '发展', visibility: 'trace' }],
+      echoes: [{ refCurrent: '骑兵压境', result: '粮价上涨', exposure: 'subtle' }]
+    }, { idx: 1, swipe: 0 });
+  });
+  WA.store.transact(d => {
+    WA.backstage.applyResult(d, {
+      echoes: [{ refCurrent: '不存在的事件XYZ', result: '错位回声', exposure: 'subtle' }]
+    }, { idx: 1, swipe: 0 });
+  });
+  let st900 = WA.store.get();
+  const ecGood900 = st900.echoes.find(e => e.refCurrent === '骑兵压境');
+  const ecBad900 = st900.echoes.find(e => e.refCurrent === '不存在的事件XYZ');
+  assert(ecGood900 && ecGood900.danglingAtWrite === false, '正常回声 danglingAtWrite=false（目标在场）');
+  assert(ecBad900 && ecBad900.danglingAtWrite === true, '幻觉回声 danglingAtWrite=true（入账即悬空）');
+  // 目标先入账（同批）不误标
+  fresh900();
+  chat900.push({ is_user: true, mes: '开场。', swipe_id: 0 });
+  WA.store.transact(d => {
+    WA.backstage.applyResult(d, {
+      currents: [{ title: '同批事件', summary: '', stage: '发展', visibility: 'hidden' }],
+      echoes: [{ refCurrent: '同批事件', result: 'R', exposure: 'subtle' }]
+    }, { idx: 0, swipe: 0 });
+  });
+  const sameBatch900 = WA.store.get().echoes.find(e => e.refCurrent === '同批事件');
+  assert(sameBatch900 && sameBatch900.danglingAtWrite === false, '同批入账目标先建后回声不误标');
+  // ── 2. B 块：checkSoftRefs（只报幻觉，不报生命周期消失）──
+  const insSrc900 = fs.readFileSync(path.join(BASE, 'engines/inspector-state.js'), 'utf8');
+  assert(insSrc900.indexOf('checkSoftRefs') >= 0 && insSrc900.indexOf("code: 'softRefs'") >= 0, 'checkSoftRefs 注册（CHECKERS + 导出）');
+  fresh900();
+  chat900.push({ is_user: true, mes: '开场。', swipe_id: 0 });
+  WA.store.transact(d => {
+    WA.backstage.applyResult(d, {
+      currents: [{ title: '有效暗流', summary: '', stage: '发展', visibility: 'trace' }],
+      echoes: [
+        { refCurrent: '有效暗流', result: '正常回声', exposure: 'subtle' },
+        { refCurrent: '幻觉标题ZZZ', result: '错位回声', exposure: 'subtle' }
+      ]
+    }, { idx: 0, swipe: 0 });
+  });
+  const rep900 = WA.inspectorState.inspect(null);
+  const softSec900 = rep900.sections.find(x => x.code === 'softRefs');
+  assert(!!softSec900, 'softRefs 节存在（inspect 报告）');
+  assert(softSec900.issues.some(i => i.code === 'softref.dangling' && i.detail.indexOf('幻觉标题ZZZ') >= 0), '幻觉回声被检出（softref.dangling）');
+  assert(!softSec900.issues.some(i => i.detail.indexOf('有效暗流') >= 0), '正常回声不误报');
+  // 生命周期消失（入账时在场、之后 currents 清空）→ 不告警
+  WA.store.transact(d => { d.currents = []; });
+  const rep900b = WA.inspectorState.inspect(null);
+  const softSec900b = rep900b.sections.find(x => x.code === 'softRefs');
+  assert(!softSec900b.issues.some(i => i.detail.indexOf('有效暗流') >= 0), '生命周期消失不告警（danglingAtWrite=false，防告警疲劳）');
+  // 回声目标在 evolution.events 中（按名匹配）也不误报
+  WA.store.transact(d => {
+    d.currents = [];
+    d.echoes = [{ id: 'ecx', refCurrent: '事件链名', result: 'R', exposure: 'subtle', danglingAtWrite: true, at: 1 }];
+    d.evolution.events = [{ id: 'ex', type: 'conflict', name: '事件链名', level: 1, stage: '萌芽', stageRound: 1 }];
+  });
+  const rep900c = WA.inspectorState.inspect(null);
+  const softSec900c = rep900c.sections.find(x => x.code === 'softRefs');
+  assert(!softSec900c.issues.some(i => i.detail.indexOf('事件链名') >= 0), '目标在 evolution.events 名中不误报');
+  // 空 refCurrent → info
+  WA.store.transact(d => { d.echoes = [{ id: 'ece', refCurrent: '', result: 'R', exposure: 'subtle', at: 1 }]; d.evolution.events = []; });
+  const rep900d = WA.inspectorState.inspect(null);
+  const softSec900d = rep900d.sections.find(x => x.code === 'softRefs');
+  assert(softSec900d.issues.some(i => i.code === 'softref.empty'), '空 refCurrent 报 info（无溯源锚点）');
+  // ── 3. C 块：chronicle.refs 生产方 + 审计 ──
+  const bsSrc900 = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
+  assert(bsSrc900.indexOf('纪事来源引用生产方') >= 0, 'chronicle refs 生产方（锚定结算楼层）');
+  assert(insSrc900.indexOf('chronicle#') >= 0, 'checkRefs 扫描 chronicle.refs');
+  fresh900();
+  chat900.push({ is_user: true, mes: '开场。', swipe_id: 0 });
+  chat900.push({ is_user: false, mes: '正文一句。', swipe_id: 0 });
+  WA.store.transact(d => {
+    WA.backstage.applyResult(d, { chronicle: [{ kind: 'event', title: '纪事A', summary: '摘要' }] }, { idx: 1, swipe: 0 });
+  });
+  st900 = WA.store.get();
+  const chron900 = st900.chronicle.find(c => c.title === '纪事A');
+  assert(chron900 && Array.isArray(chron900.refs) && chron900.refs.length >= 1, 'chronicle 入账带 refs（楼层溯源）');
+  assert(chron900.refs[0].chatId === CID900, 'chronicle refs 的 chatId 为稳定聊天 id');
+  // 删楼后 chronicle refs 孤儿被检出
+  fresh900();
+  chat900.push({ is_user: true, mes: '开场。', swipe_id: 0 });
+  chat900.push({ is_user: false, mes: '正文一句。', swipe_id: 0 });
+  WA.store.transact(d => {
+    WA.backstage.applyResult(d, { chronicle: [{ kind: 'event', title: '纪事B', summary: '摘要' }] }, { idx: 1, swipe: 0 });
+  });
+  chat900.length = 0;
+  const rep900e = WA.inspectorState.inspect(null);
+  const refsSec900 = rep900e.sections.find(x => x.code === 'refs');
+  assert(refsSec900.issues.some(i => i.detail.indexOf('chronicle#') >= 0), '删楼后 chronicle refs 孤儿被检出');
+  // ── 4. D 块：branchId 语义修正 ──
+  fresh900();
+  chat900.push({ is_user: true, mes: '开场。', swipe_id: 0 });
+  WA.store.transact(d => {
+    d.worldFacts = [];
+    WA.backstage.applyResult(d, {
+      worldFacts: [{ key: '粮价', value: '上涨' }],
+      currents: [{ title: '新暗流', summary: '', stage: '发展', visibility: 'hidden' }]
+    }, { idx: 7, swipe: 2 });
+  });
+  st900 = WA.store.get();
+  const wf900 = st900.worldFacts.find(f => f.key === '粮价');
+  const cu900 = st900.currents.find(c => c.title === '新暗流');
+  assert(wf900 && wf900.branchId === 'm7_s2', 'worldFacts.branchId 为分支标识（m{idx}_s{swipe}）');
+  assert(cu900 && cu900.branchId === 'm7_s2', 'currents.branchId 为分支标识（非裸楼层号）');
+  WA.store.transact(d => { WA.backstage.applyResult(d, { worldFacts: [{ key: '无锚', value: 'v' }] }, null); });
+  const wf900b = WA.store.get().worldFacts.find(f => f.key === '无锚');
+  assert(wf900b && wf900b.branchId === '', '无 anchor 时 branchId 空串（防御）');
+  // ── 清理现场 ──
+  resetLogs900();
+  LS900.clear();
+  Object.keys(junkBefore900).forEach(function (k) { LS900.setItem(k, junkBefore900[k]); });
+  ctx900.chatId = prevChat900;
+  WA.eventLog.length = 0;
+  evtBefore900.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore900.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
   } // end v0.2.2 block

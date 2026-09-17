@@ -180,6 +180,10 @@
         if (entity && Array.isArray(entity.refs) && entity.refs.length) scan.push({ where: `entity:${type}#${i}`, refs: entity.refs });
       });
     });
+    // v0.9.0: 扩大扫描覆盖面——纪事来源引用（backstage 结算入账，可审计楼层删除/改动）
+    (state?.chronicle || []).forEach((c, i) => {
+      if (c && Array.isArray(c.refs) && c.refs.length) scan.push({ where: `chronicle#${i}`, refs: c.refs });
+    });
     for (const item of scan) {
       const audit = safe(() => WA.timeline.auditRefs(item.refs));
       if (!audit || audit.__error) continue;
@@ -193,7 +197,27 @@
     }
     return issues;
   }
-
+  // ── checker 6b：软引用完整性（回声 refCurrent 指向暗流标题）──
+  // v0.9.0: 只检出「入账即悬空」（danglingAtWrite，AI幻觉/数据损坏），
+  // 不报「入账后暗流正常生命周期消失」（终局回收/容量裁剪）——后者是设计行为，报则告警疲劳。
+  function checkSoftRefs(state) {
+    const issues = [];
+    const currents = state?.currents || [];
+    const titles = new Set(currents.map(c => c && String(c.title || '').trim()).filter(Boolean));
+    const liveSet = state?.evolution?.events || [];
+    const evNames = new Set(liveSet.map(e => e && String(e.name || '').trim()).filter(Boolean));
+    const echoes = state?.echoes || [];
+    echoes.forEach((e, i) => {
+      const t = String(e && e.refCurrent || '').trim();
+      if (!t) { issues.push({ level: 'info', code: 'softref.empty', detail: `回声#${i} refCurrent 为空（无溯源锚点）` }); return; }
+      // 目标可能在 currents（标题）或 evolution.events（名）中——任一在场即有效
+      const targetLive = titles.has(t) || evNames.has(t);
+      if (!targetLive && e.danglingAtWrite) {
+        issues.push({ level: 'warn', code: 'softref.dangling', detail: `回声#${i}「${t.slice(0, 12)}」入账时目标暗流即不存在（疑似幻觉/损坏，非生命周期消失）` });
+      }
+    });
+    return issues;
+  }
   // ── checker 7：注入队列（一次性消费） ──
   function checkInjection(state) {
     const issues = [];
@@ -259,6 +283,7 @@
     { code: 'people', label: '人物认知', fn: checkPeople },
     { code: 'memory', label: '记忆/伏笔', fn: checkMemory },
     { code: 'refs', label: '来源引用', fn: checkRefs },
+    { code: 'softRefs', label: '软引用完整性', fn: checkSoftRefs },
     { code: 'injection', label: '注入队列', fn: checkInjection },
     { code: 'pmem', label: '主观记忆', fn: checkPmem },
     { code: 'directEvents', label: '突发事件', fn: checkDirectEvents }
@@ -308,6 +333,7 @@
   WA.inspectorState = {
     CHECKERS, SEVERITY_ORDER,
     checkEvents, checkFactions, checkPulse, checkPeople, checkMemory, checkRefs,
+    checkSoftRefs,
     checkInjection, checkPmem, checkDirectEvents,
     inspect, flatten, summaryText, safe
   };
