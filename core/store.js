@@ -35,7 +35,7 @@
       // 纪事（归档历史）
       chronicle: [],            // {id,kind,title,summary,at,refs}
       // 舆情（新闻/论坛/闲逛，闲逛=NON-CANON）
-      opinion: { canon: [], forum: [], sandbox: [], signature: '', updatedAt: 0 },
+      opinion: { canon: [], forum: [], sandbox: [], updatedAt: 0 },
       // 记忆分层 L0-L3
       memory: {
         facts: [],              // 长期事实 {key,value,version,active,reason,at}
@@ -60,7 +60,7 @@
       // 章节叙事（beat-tracker：章/节/故事线/关系）
       chapters: {
         active: false, current: null,  // {no,title,script,notes,startedAt}
-        history: [], storylines: [], relations: {},
+        history: [],
         seq: 0                         // v0.1.43/45: 章号计数器，与 history 长度解耦
       },
       // 突发事件（direct-event：一轮生成多轮解封的小纸条）
@@ -72,7 +72,7 @@
       // 下轮注入三列引用（after链产出，before链一次性消费）
       nextTurnInjection: null,  // {required:[], conditional:[], suppress:[], at, anchor}
       // 元信息
-      meta: { createdAt: Date.now(), updatedAt: Date.now(), lastAnchor: null, lastSettle: null }
+      meta: { createdAt: Date.now(), updatedAt: Date.now(), lastSettle: null }
     };
   }
 
@@ -423,8 +423,48 @@
     'evolution.events': { cap: 16, site: 'editor-events.js MAX_EVENTS=16' },
     'evolution.factions': { cap: 16, site: 'editor-faction.js MAX_FACTIONS=16' },
     'directEvents': { cap: 4, site: 'direct-event.js pruneDirect(KEEP_DONE=3 + 1 活跃)' },
-    'chapters.history': { cap: 20, site: 'chapters.js pruneHistory(MAX_HISTORY=20)' }
+    'chapters.history': { cap: 20, site: 'chapters.js pruneHistory(MAX_HISTORY=20)' },
+    // v1.4.0 补登：entityMemory 四类实体库（entities.js CAP_PER_TYPE=30 双处裁剪）——此前漏登致 sizeAudit 误报 unbounded、maintain 盲区
+    'evolution.entityMemory.organization': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
+    'evolution.entityMemory.object': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
+    'evolution.entityMemory.ability': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
+    'evolution.entityMemory.location': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
+    // v1.4.0 新增：通配登记——嵌套动态路径（每实体 events 环，精确键无法枚举；'*' 段吃 1..n 段）
+    'evolution.entityMemory.*.events': { cap: 8, wildcard: true, site: 'entities.js 实体事件环（保留最新 8 条）' }
   };
+  // v1.4.0: 容量查找单一实现——精确键 → 下标归一化精确键 → 通配键 → null。
+  // 通配键（wildcard:true）中 '*' 段匹配 1..n 个路径段（如 entityMemory.<type>.<idx>）；
+  // sizeAudit（数组/对象分支）与 maintain 未登记判定共用本实现，防多路查找语义漂移。
+  function matchWildcard(kSegs, pSegs) {
+    const star = kSegs.indexOf('*');
+    if (star < 0) return false;
+    if (pSegs.length < kSegs.length) return false;   // '*' 至少吃 1 段
+    const starExtra = pSegs.length - (kSegs.length - 1);
+    for (let eat = 1; eat <= starExtra; eat++) {
+      let ok = true;
+      for (let si = 0; si < kSegs.length && ok; si++) {
+        if (si === star) continue;
+        const pi = si < star ? si : si + eat - 1;
+        if (kSegs[si] !== pSegs[pi]) ok = false;
+      }
+      if (ok) return true;
+    }
+    return false;
+  }
+  function capsFor(pathStr) {
+    if (!pathStr) return null;
+    if (Object.prototype.hasOwnProperty.call(__BOUNDED_CAPS, pathStr)) return __BOUNDED_CAPS[pathStr];
+    const norm = String(pathStr).replace(/\[(\d+)\]/g, '.$1');
+    if (norm !== pathStr && Object.prototype.hasOwnProperty.call(__BOUNDED_CAPS, norm)) return __BOUNDED_CAPS[norm];
+    const pSegs = norm.split('.');
+    const ks = Object.keys(__BOUNDED_CAPS);
+    for (let i = 0; i < ks.length; i++) {
+      const m = __BOUNDED_CAPS[ks[i]];
+      if (!m || !m.wildcard) continue;
+      if (matchWildcard(ks[i].split('.'), pSegs)) return m;
+    }
+    return null;
+  }
   // v0.1.48: 派生逻辑单一实现——sizeAudit 与 sizeAuditFull 共用，防两处语义单边漂移
   function memStateBytes() {
     try { return byteLen(JSON.stringify(memCache)); } catch (e) { return -1; }
@@ -455,7 +495,8 @@
   const store = WA.store = {
     SCHEMA_VERSION,
     /** v0.1.44: 有界容器登记表只读副本（测试反查源码一致性用）；v1.0.0: 透传 kind（array|object） */
-    sizeCaps() { const c = {}; Object.keys(__BOUNDED_CAPS).forEach(function (k) { c[k] = { cap: __BOUNDED_CAPS[k].cap, site: __BOUNDED_CAPS[k].site, kind: __BOUNDED_CAPS[k].kind || 'array' }; }); return c; },
+    capsFor: capsFor,
+    sizeCaps() { const c = {}; Object.keys(__BOUNDED_CAPS).forEach(function (k) { c[k] = { cap: __BOUNDED_CAPS[k].cap, site: __BOUNDED_CAPS[k].site, kind: __BOUNDED_CAPS[k].kind || 'array', wildcard: __BOUNDED_CAPS[k].wildcard === true ? true : undefined }; }); return c; },
     defaultWorldState,
     chatId: getChatId,        // v0.9.1: 供导出/诊断读取当前聊天id
 
@@ -850,13 +891,23 @@
           const sub = st7[pk];
           if (sub && typeof sub === 'object' && !Array.isArray(sub)) {
             Object.keys(sub).forEach(function (k) {
-              if (Array.isArray(sub[k])) rows7.push({ path: pk + '.' + k, len: sub[k].length });
+              const v = sub[k];
+              if (Array.isArray(v)) { rows7.push({ path: pk + '.' + k, len: v.length }); return; }
+              // v1.4.0: 二层扩展——父键子对象（如 evolution.entityMemory）之下的数组纳入盘点，
+              // 实体型孙节点（entityMemory.<type>[i]）的 events 环也纳入（通配 cap 8）
+              if (v && typeof v === 'object' && !Array.isArray(v)) {
+                Object.keys(v).forEach(function (k2) {
+                  const v2 = v[k2];
+                  if (Array.isArray(v2)) { rows7.push({ path: pk + '.' + k + '.' + k2, len: v2.length }); return; }
+                  if (v2 && typeof v2 === 'object' && Array.isArray(v2.events)) rows7.push({ path: pk + '.' + k + '.' + k2 + '.events', len: v2.events.length });
+                });
+              }
             });
           }
         });
         const drift7 = [], unreg7 = [];
         rows7.forEach(function (r) {
-          const reg = __BOUNDED_CAPS[r.path];
+          const reg = capsFor(r.path);
           if (reg) { if (typeof reg.cap === 'number' && reg.cap > 0 && r.len > reg.cap) drift7.push(r.path + '(' + r.len + '>' + reg.cap + ')'); }
           else if (r.len > 0) unreg7.push(r.path + '(' + r.len + '项)');
         });
@@ -1094,16 +1145,15 @@
         if (Array.isArray(node)) {
           let b = 0;
           try { b = byteLen(JSON.stringify(node)); } catch (e) { b = -1; }
-          const meta = Object.prototype.hasOwnProperty.call(BOUNDED, pathStr) ? BOUNDED[pathStr] : null;
-          const top = pathStr.indexOf('[') < 0;
-          arrays.push({ path: pathStr, len: node.length, bytes: b, bounded: !!meta && top, cap: meta ? meta.cap : null, site: meta ? meta.site : null });
+          const meta = capsFor(pathStr);
+          arrays.push({ path: pathStr, len: node.length, bytes: b, bounded: !!meta, cap: meta ? meta.cap : null, site: meta ? meta.site : null });
           if (depth < maxDepth) { for (let ix = Math.min(2, node.length - 1); ix >= 0; ix--) pending.push(pathStr + '[' + ix + ']'); }
           return;
         }
         if (node && typeof node === 'object') {
           // v1.0.0: 对象型容器可见性——登记为 kind:'object' 的对象参与容量盘点
           // （修复审计盲区：此前 schedule 只收集数组，people 等对象型容器膨胀对 sizeAudit 完全不可见）
-          const metaO = Object.prototype.hasOwnProperty.call(BOUNDED, pathStr) ? BOUNDED[pathStr] : null;
+          const metaO = capsFor(pathStr);
           if (metaO && metaO.kind === 'object' && pathStr.indexOf('[') < 0) {
             let b = 0;
             try { b = byteLen(JSON.stringify(node)); } catch (e) { b = -1; }

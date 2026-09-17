@@ -56,7 +56,6 @@
         draft.opinion.canon = (draft.opinion.canon || []).concat(news).slice(-20);
         draft.opinion.forum = (draft.opinion.forum || []).concat(forums).slice(-20);
         draft.opinion.updatedAt = now;
-        draft.opinion.signature = String(now);
       });
       WA.log('info', `舆情结算：新闻${news.length}条 论坛${forums.length}主题`);
       return { ok: true, news: news.length, forums: forums.length };

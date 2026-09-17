@@ -3564,7 +3564,13 @@ WA.loadScript = _ls.loadScript;
     // 对象型容器：cap 由源码具名常量反查（kind:'object'，len=Object.keys().length）
     'people': ['engines/backstage.js', /const PEOPLE_CAP\s*=\s*(\d+)/],
     // 总量硬上限 = 活跃 MAX_ACTIVE + 终结保留 TERMINATED_MAX（双捕获组求和）
-    'evolution.enemies': ['engines/enemies.js', /const TERMINATED_MAX\s*=\s*(\d+);?[\s\S]*?const MAX_ACTIVE\s*=\s*(\d+)/, function (k, m) { return Number(m[1]) + Number(m[2]); }]
+    'evolution.enemies': ['engines/enemies.js', /const TERMINATED_MAX\s*=\s*(\d+);?[\s\S]*?const MAX_ACTIVE\s*=\s*(\d+)/, function (k, m) { return Number(m[1]) + Number(m[2]); }],
+    // v1.4.0 补登：entityMemory 四类实体库（CAP_PER_TYPE 双处裁剪）+ 每实体事件环（通配）
+    'evolution.entityMemory.organization': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
+    'evolution.entityMemory.object': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
+    'evolution.entityMemory.ability': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
+    'evolution.entityMemory.location': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
+    'evolution.entityMemory.*.events': ['engines/entities.js', /ent\.events\.length > (\d+)/]
   };
   const srcCache = {};
   const readSrc = function (rel) {
@@ -6121,6 +6127,72 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1300.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.3.0 block
+  v1400: {
+  const LS1400 = global.localStorage;
+  const junkBefore1400 = JSON.parse(JSON.stringify(LS1400._dump()));
+  const evtBefore1400 = WA.eventLog.slice();
+  const errBefore1400 = WA.errorLog.slice();
+  const ctx1400 = global.SillyTavern.getContext();
+  const prevChat1400 = ctx1400.chatId;
+  const CID1400 = 'v1400_chat';
+  const chat1400 = global.__mockChat;
+  function resetLogs1400() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1400() { resetLogs1400(); LS1400.clear(); ctx1400.chatId = CID1400; chat1400.length = 0; WA.store.init(); }
+  // ── A. 登记完整性（登记表 + 源码断言）──
+  fresh1400();
+  const caps1400 = WA.store.sizeCaps();
+  assert(caps1400['evolution.entityMemory.organization'] && caps1400['evolution.entityMemory.organization'].cap === 30, 'entityMemory.organization 登记且 cap=30');
+  assert(['object', 'ability', 'location'].every(t => caps1400['evolution.entityMemory.' + t] && caps1400['evolution.entityMemory.' + t].cap === 30), 'entityMemory object/ability/location 登记且 cap=30');
+  assert(caps1400['evolution.entityMemory.*.events'] && caps1400['evolution.entityMemory.*.events'].cap === 8 && caps1400['evolution.entityMemory.*.events'].wildcard === true, '通配键 events 登记且 cap=8 wildcard=true');
+  const stSrc1400 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  const entSrc1400 = fs.readFileSync(path.join(BASE, 'engines/entities.js'), 'utf8');
+  assert((stSrc1400.match(/function capsFor\(/g) || []).length === 1, 'capsFor 单一定义（单一查找实现）');
+  assert((stSrc1400.match(/hasOwnProperty\.call\(BOUNDED/g) || []).length === 0, 'sizeAudit 旧精确查找模式零残留（全走 capsFor）');
+  assert((stSrc1400.match(/__BOUNDED_CAPS\[r\.path\]/g) || []).length === 0, 'maintain 旧直接索引零残留（走 capsFor）');
+  assert((entSrc1400.match(/ent\.events\.length > (\d+)/) || [])[1] === '8', '源码实体事件环 cap=8（通配键反查同源）');
+  assert((entSrc1400.match(/const CAP_PER_TYPE\s*=\s*(\d+)/) || [])[1] === '30', '源码 CAP_PER_TYPE=30（登记反查同源）');
+  // ── B. 超限可观测（31 项容器 + 9 条 events）──
+  WA.store.transact(d => {
+    d.evolution.entityMemory = { organization: [], object: [], ability: [], location: [] };
+    for (let i = 0; i < 31; i++) {
+      const evs1400 = [];
+      if (i === 0) for (let j = 0; j < 9; j++) evs1400.push({ e: '事件' + j, t: 't', at: j });
+      d.evolution.entityMemory.organization.push({ id: 'o' + i, name: '组织' + i, aliases: [], desc: 'd' + i, events: evs1400, updatedAt: i });
+    }
+  });
+  const audit1400 = WA.store.sizeAudit({ minBytes: 0 });
+  const row1400 = (audit1400.arrays || []).find(r => r.path === 'evolution.entityMemory.organization');
+  assert(row1400 && row1400.bounded === true && row1400.cap === 30, 'sizeAudit 31 项容器标 bounded=true cap=30');
+  assert((audit1400.drifted || []).some(r => (typeof r === 'string' ? r : (r && r.path) || '').indexOf('evolution.entityMemory.organization') >= 0), 'drifted 检出 organization 超限（31>30 裁剪站点失效可观测）');
+  assert(!(audit1400.unbounded || []).some(r => (typeof r === 'string' ? r : (r && r.path) || '').indexOf('entityMemory') >= 0), 'unbounded 不再误报 entityMemory');
+  const auditDeep1400 = WA.store.sizeAudit({ minBytes: 0, maxDepth: 8 });
+  const evRow1400 = (auditDeep1400.arrays || []).find(r => r.path === 'evolution.entityMemory.organization[0].events');
+  assert(evRow1400 && evRow1400.bounded === true && evRow1400.cap === 8, '深扫 events 行 bounded=true cap=8（通配登记可观测）');
+  const m1400 = WA.store.maintain({});
+  assert(m1400.signals.capacityDrifted >= 1, 'maintain capacityDrifted>=1（entityMemory 盲区消除）');
+  assert(m1400.signals.capacityUnregistered === 0, 'maintain capacityUnregistered=0（不再误报未登记）');
+  // ── C. capsFor 三态 ──
+  assert(typeof WA.store.capsFor === 'function', 'WA.store.capsFor 已挂出');
+  assert(WA.store.capsFor('evolution.entityMemory.ability') && WA.store.capsFor('evolution.entityMemory.ability').cap === 30, 'capsFor 精确键命中 cap=30');
+  assert(WA.store.capsFor('evolution.entityMemory.organization[3].events') && WA.store.capsFor('evolution.entityMemory.organization[3].events').cap === 8, 'capsFor 通配命中（带下标）cap=8');
+  assert(WA.store.capsFor('evolution.entityMemory.ability.5.events') && WA.store.capsFor('evolution.entityMemory.ability.5.events').cap === 8, 'capsFor 通配命中（多段吃进）cap=8');
+  assert(WA.store.capsFor('evolution.entityMemory.organization[3]') === null && WA.store.capsFor('evolution.entityMemory.organization.3') === null, 'capsFor 实体元素路径判 null（括号/点分一致，不误报）');
+  assert(WA.store.capsFor('memory.l0[9].sub') === null && WA.store.capsFor('') === null, 'capsFor 未知路径/空路径返回 null');
+  // ── D. 死存储清理 ──
+  const opSrc1400 = fs.readFileSync(path.join(BASE, 'engines/opinion.js'), 'utf8');
+  assert((opSrc1400.match(/signature/g) || []).length === 0, 'opinion.signature 写入零残留');
+  assert((stSrc1400.match(/storylines|lastAnchor/g) || []).length === 0, 'chapters.storylines / meta.lastAnchor 零残留');
+  assert((stSrc1400.match(/opinion: \{ canon: \[\], forum: \[\], sandbox: \[\], updatedAt: 0 \}/g) || []).length === 1, 'opinion schema signature 死字段已移除');
+  // ── 清理现场 ──
+  resetLogs1400();
+  LS1400.clear();
+  Object.keys(junkBefore1400).forEach(function (k) { LS1400.setItem(k, junkBefore1400[k]); });
+  ctx1400.chatId = prevChat1400;
+  WA.eventLog.length = 0;
+  evtBefore1400.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1400.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.4.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
