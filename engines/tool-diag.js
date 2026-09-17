@@ -231,6 +231,28 @@
         const snaps = WA.chatcache.listSnapshots() || [];
         return { count: snaps.length, latest: snaps.length ? { id: snaps[0].id, name: snaps[0].name, auto: !!snaps[0].auto, round: snaps[0].round } : null };
       }, {}),
+        // v2.2.0: 设置键登记表与孤儿候选（此前 registry/pendingOrphan 全库零消费）
+        settingsBus: safe(function () {
+          if (!WA.settingsBus) return { error: 'settingsBus 不可用' };
+          const st = WA.settingsBus.registryStat ? WA.settingsBus.registryStat() : null;
+          const orphans = WA.store && WA.store.orphanSettingsKeys ? WA.store.orphanSettingsKeys() : [];
+          return { registry: st, orphans: orphans, stats: WA.settingsBus.stats };
+        }, {}),
+        // v2.2.0: 隔离处置史与存档迁移报告（此前 quarantineAudit/migrateReport 零消费）
+        quarantineAudit: safe(function () { return WA.store && WA.store.quarantineAudit ? WA.store.quarantineAudit() : null; }, null),
+        migrateReport: safe(function () { return WA.store && WA.store.migrateReport ? WA.store.migrateReport() : null; }, null),
+        // v2.2.0: 推演入账计量（事件链是否真的进 state —— 此前 events_create 被整条丢弃）
+        backstage: safe(function () {
+          if (!WA.backstage || !WA.backstage.applyStat) return { error: 'backstage 不可用' };
+          const st = WA.backstage.applyStat();
+          const evs = (WA.store && WA.store.read) ? (WA.store.read('evolution.events', []) || []) : [];
+          return { apply: st, eventsInState: evs.length, fromBackstage: evs.filter(function (e) { return e && e.source === 'backstage'; }).length };
+        }, {}),
+        // v2.2.0: 人物档案覆盖率（人设写入链是否真的在用）
+        actors: safe(function () {
+          if (!WA.registry || !WA.registry.profileStat) return { error: 'registry 不可用' };
+          return WA.registry.profileStat();
+        }, {}),
         // v0.1.40: 记忆巩固链路计时（L0→L1→L2→L3）
         memory: safe(function () {
           if (!WA.memory || !WA.memory.stats) return null;
@@ -292,8 +314,29 @@
   }
 
   // ── 8. UI 绑定一致性（渲染出的控件 id ↔ 绑定代码引用的 id） ─
+  // v2.2.0 块8：守卫分层——
+  //   ids    ：无条件渲染的控件（面板/页面打开即在场；缺失 = 真断裂）
+  //   cond   ：条件渲染的控件（依赖状态，如「有活跃事件才渲染中止按钮」；缺失不必然是缺陷）
+  //   dynamic：由 JS 动态生成的节点集合，按其容器/模板锚点守（容器缺失才是断裂）
   const UI_BINDINGS = [
-    { page: 'tools', ids: ['wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out'] },
+    { page: 'tools', ids: ['wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
+      // v2.2.0: 诊断出口收口——三个新增控件同样纳入「渲染 ↔ 绑定」一致性校验
+      'wa-stat-reset', 'wa-compat-view', 'wa-wf-reset',
+      // v2.2.0 块5：存档恢复点 / 设置键卫生
+      'wa-recovery-view', 'wa-orphan-view',
+      // v2.2.0 块8：工具页既有控件（此前全在守卫之外 → 绑定断裂无人发现）
+      'wa-audit-copy', 'wa-key-check', 'wa-quar-view', 'wa-recovery-dl', 'wa-maintain', 'wa-conf-view', 'wa-settle-view'],
+      cond: ['wa-orph-all', 'wa-settle-unforce'],
+      dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel'] },
+    { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg'], dynamic: ['wa-conc-v'] },
+    { page: 'people', ids: ['wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out'],
+      dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
+    { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out'],
+      cond: ['wa-de-abort', 'wa-ch-end', 'wa-ch-title', 'wa-ch-start'] },
+    { page: 'director', ids: ['wa-plan-beats', 'wa-plan-start', 'wa-or-goal', 'wa-or-beats', 'wa-or-gen', 'wa-or-out', 'wa-gen-choices', 'wa-choices-out'],
+      cond: ['wa-beat-next', 'wa-plan-clear'] },
+    { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
+    { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
     { page: 'connect', ids: ['wa-conc'] }
@@ -302,11 +345,33 @@
     return safe(function () {
       const doc = (WA.mainDoc || (mainWin && mainWin.document)) || null;
       if (!doc || !doc.getElementById) return { note: '无 document 可查（非浏览器环境），UI 项跳过' };
+      // 面板一次只渲染「当前页」——非当前页的控件必然不在 DOM（这是渲染模型，不是缺陷）。
+      // 不做该区分的话，除当前页外全组误报 missing（历史上守卫只覆盖 tools 页正是此因）。
+      const cur = (WA.ui && typeof WA.ui.currentPage === 'function') ? WA.ui.currentPage() : null;
       const out = UI_BINDINGS.map(function (grp) {
-        const missing = grp.ids.filter(function (id) { return !doc.getElementById(id); });
-        return { page: grp.page, expected: grp.ids.length, missing: missing, ok: missing.length === 0 };
+        const active = !cur || grp.page === cur;   // 无页面信息（未挂载）时按全量检查
+        const miss = function (id) { return !doc.getElementById(id); };
+        const missing = grp.ids.filter(miss);
+        // 条件渲染：依赖态，缺失只记不判失败（否则静态检查必然误报）
+        const condMissing = (grp.cond || []).filter(miss);
+        // 动态生成：只在容器在场时校验（容器不在 ⇒ 该域未展开，不算断裂）
+        const dynMissing = (grp.dynamic || []).filter(miss);
+        return {
+          page: grp.page, active: active,
+          expected: grp.ids.length, missing: missing, ok: !active || missing.length === 0,
+          condExpected: (grp.cond || []).length, condMissing: condMissing,
+          dynamicExpected: (grp.dynamic || []).length, dynamicMissing: dynMissing
+        };
       });
-      return { groups: out, allOk: out.every(function (g) { return g.ok; }) };
+      const activeGroups = out.filter(function (g) { return g.active; });
+      return {
+        groups: out, currentPage: cur,
+        allOk: activeGroups.every(function (g) { return g.ok; }),
+        // 全量口径：只统计当前页（其余页不在 DOM，无法校验）
+        totalExpected: activeGroups.reduce(function (a, g) { return a + g.expected; }, 0),
+        totalMissing: activeGroups.reduce(function (a, g) { return a + g.missing.length; }, 0),
+        totalGroups: out.length
+      };
     }, {});
   }
 
@@ -330,6 +395,25 @@
       const lack = c.api.filter(function (m) { return typeof mod[m] !== 'function'; });
       return { label: c.label, key: c.key, ok: lack.length === 0, missingApi: lack };
     });
+  }
+
+  // ── 9b. v2.2.0: 宿主兼容层激活态（MVU / TavernHelper 桥接） ──
+  //   背景：compatMvu.status / compatTH.status 自 v2.0.0 定义起注释写着「供巡视/诊断消费」，
+  //        但全库零消费——兼容层是活是死、为什么没激活，从未出现在任何报告里。
+  //   「已加载但未激活」与「加载都没加载」必须可区分：前者是环境（宿主没开 MVU），后者是故障。
+  function secCompat() {
+    return safe(function () {
+      const out = { mvuLoaded: !!(WA.compatMvu && typeof WA.compatMvu.status === 'function'), thLoaded: !!(WA.compatTH && typeof WA.compatTH.status === 'function') };
+      if (out.mvuLoaded) {
+        const m = WA.compatMvu.status();
+        out.mvu = { active: !!m.active, reason: m.lastReason, syncCount: m.syncCount, lastSyncAt: m.lastSyncAt, failed: String(m.lastReason || '').indexOf('error:') === 0 };
+      } else out.mvu = { error: 'compat/mvu.js 未加载或 status 缺失（兼容层成死代码）' };
+      if (out.thLoaded) {
+        const t = WA.compatTH.status();
+        out.th = { active: !!t.active, reason: t.lastReason, exposedAt: t.exposedAt, isTH: !!t.isTH, failed: String(t.lastReason || '').indexOf('error:') === 0 };
+      } else out.th = { error: 'compat/th-helper.js 未加载或 status 缺失（兼容层成死代码）' };
+      return out;
+    }, {});
   }
 
   // ── 10. v0.1.19: 宿主能力探测（compat/host 的结构化输出接入诊断） ──
@@ -392,7 +476,8 @@
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
-      host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus()
+      host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
+      compat: secCompat()
     };
     diag.verdict = verdict(diag);
     return diag;
@@ -411,7 +496,11 @@
     else if (inj.status === 'SKIPPED_DISABLED') issues.push({ level: 'warn', key: 'inject', detail: '注入可见性全关，世界状态不会进正文' });
     const vis = diag.visibility || {};
     if (!vis.enabledCount) issues.push({ level: 'warn', key: 'visibility', detail: '所有注入源均关闭' });
-    if (diag.ui && diag.ui.allOk === false) issues.push({ level: 'warn', key: 'ui', detail: '部分面板控件未绑定（见 ui.groups）' });
+    // v2.2.0 块8: 分层口径——无条件渲染控件缺失才是断裂（warn）；
+    //   条件渲染控件缺失只作 info 提示（依赖状态，静态检查下必然缺席）
+    if (diag.ui && diag.ui.allOk === false) issues.push({ level: 'warn', key: 'ui', detail: '当前页（' + ((diag.ui || {}).currentPage || '?') + '）部分控件未渲染——绑定会静默失效，用户点击无反应（见 ui.groups）' });
+    const uiCondMiss = (((diag.ui || {}).groups) || []).reduce(function (a, g) { return a + ((g.condMissing || []).length); }, 0);
+    if (uiCondMiss > 0 && diag.ui && diag.ui.groups) issues.push({ level: 'info', key: 'ui.cond', detail: uiCondMiss + ' 个条件渲染控件当前不在场（依赖世界状态，非缺陷）' });
     // v0.1.19: 宿主能力缺失 → warn（降级仍可运行但功能受限）
     const h = diag.host || {};
     if (h && h.sillyTavern === false) issues.push({ level: 'warn', key: 'host', detail: '未检测到 SillyTavern 宿主（无事件源，仅拦截器函数可用）' });
@@ -516,6 +605,23 @@
       issues.push({ level: hit.length ? 'error' : 'warn', key: 'loader', detail: hit.length ? '加载失败且导出缺失的模块：' + hit.map(function (x) { return x.file; }).join('、') : '曾加载失败但导出齐全（可能已恢复）：' + failedRels.join('、') });
     }
     if (ldr.cdnCooldowns && ldr.cdnCooldowns.length >= 3) issues.push({ level: 'warn', key: 'loader', detail: '全部 3 个 CDN 容灾源均在冷却中（60s 内不重试），期间加载失败模块将彻底失败' });
+    // v2.2.0: 兼容层——桥上不去要能说话（此前「MVU 没同步」在任何报告里都看不见）
+    //   口径：status 缺失 = error（死代码回归）；reason 以 error: 开头 = error（真故障）；
+    //        其余（no-chat-metadata / mvu-not-enabled）= info（宿主没开该能力，不是扩展的错）。
+    const cp = diag.compat || {};
+    if (cp.mvuLoaded === false) issues.push({ level: 'warn', key: 'compat.mvu', detail: 'compatMvu 模块不可用：世界状态不会镜像进 MVU stat_data' });
+    else if (cp.mvu && cp.mvu.failed) issues.push({ level: 'error', key: 'compat.mvu', detail: 'MVU 兼容层异常：' + cp.mvu.reason });
+    else if (cp.mvu && !cp.mvu.active) issues.push({ level: 'info', key: 'compat.mvu', detail: 'MVU 未激活（' + (cp.mvu.reason || '未知') + '）：宿主未启用 MVU 变量框架，镜像通道待命' });
+    else if (cp.mvu && cp.mvu.active) issues.push({ level: 'info', key: 'compat.mvu', detail: 'MVU 已激活：已同步 ' + cp.mvu.syncCount + ' 次' });
+    if (cp.thLoaded === false) issues.push({ level: 'warn', key: 'compat.th', detail: 'compatTH 模块不可用：TH 脚本/正则无法读取世界状态快照' });
+    else if (cp.th && cp.th.failed) issues.push({ level: 'error', key: 'compat.th', detail: 'TH 桥接异常：' + cp.th.reason });
+    else if (cp.th && cp.th.active) issues.push({ level: 'info', key: 'compat.th', detail: 'TH 桥接已暴露 WorldAxisSnapshot()' });
+    // v2.2.0: 设置键卫生——孤儿候选是「模块自己声明废弃却还挂在登记表里」的幽灵配置
+    const sbDiag = ((diag.runtime || {}).settingsBus) || {};
+    const orphanN = (sbDiag.orphans || []).length;
+    if (orphanN > 0) issues.push({ level: 'info', key: 'settingsBus.orphan', detail: orphanN + ' 个孤儿设置键登记（模块已声明废弃）：' + (sbDiag.orphans || []).slice(0, 4).map(function (o) { return o.key; }).join('、') + '——面板「工具」→「设置键」可注销' });
+    const qaD = ((diag.runtime || {}).quarantineAudit) || null;
+    if (qaD && (qaD.restores > 0 || qaD.drops > 0)) issues.push({ level: 'info', key: 'quarantine.history', detail: '隔离现场处置史：恢复 ' + qaD.restores + ' 次 / 丢弃 ' + qaD.drops + ' 次' + (qaD.lastKey ? '（最近 ' + qaD.lastKey + '）' : '') });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;
     return { ok: errs === 0, errorCount: errs, warnCount: issues.length - errs, issues: issues };
   }
@@ -535,6 +641,14 @@
     const out = ((d.verdict && d.verdict.issues) || []).map(function (i) { return { level: i.level, key: i.key, detail: i.detail }; });
     out.push({ level: 'info', key: 'meta', detail: '版本 ' + ((d.meta || {}).extVersion || '?') + '，模块 ' + ((d.modules || {}).loadedCount || 0) + ' 个已导出' });
     out.push({ level: 'info', key: 'inject', detail: ((d.inject || {}).statusText) || '无注入记录' });
+    // v2.2.0: 兼容层摘要行——否则 flatten 出来的清单里「MVU/TH 桥是死是活」完全缺席
+    const cpF = d.compat || {};
+    if (cpF.mvuLoaded !== undefined) {
+      const mv = cpF.mvu || {}, th = cpF.th || {};
+      out.push({ level: (mv.failed || th.failed) ? 'error' : 'info', key: 'compat',
+        detail: 'MVU ' + (mv.active ? '已激活(同步 ' + mv.syncCount + ')' : '未激活(' + (mv.reason || '?') + ')')
+          + ' · TH ' + (th.active ? '已暴露' : '未激活(' + (th.reason || '?') + ')') });
+    }
     // v0.1.6: 槽位落地摘要
     const inj = d.inject || {};
     if (inj.slots) {
@@ -664,7 +778,7 @@
     PACKAGE_FORMAT, PACKAGE_VERSION, MODULE_EXPORTS, UI_BINDINGS,
     collect, verdict, toJSON, summaryText, flatten, download, buildErrorReport,
     OPTIONAL_EXPORTS,
-    secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities,
+    secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities, secCompat,
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');

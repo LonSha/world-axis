@@ -11,6 +11,9 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function savePlan(p) { if (p) WA.settingsBus.save(__REG, p); else WA.mainWin.localStorage.removeItem(LS_PLAN); }
 
+  // v2.1.0: 参谋运行观测
+  const __orStat = { runs: 0, generated: 0, failed: 0, advanced: 0, lastReason: null, lastCount: 0, lastAt: 0, lastApiError: null };
+
   WA.oracle = {
     plan: loadPlan(),
     setPlan(p) { this.plan = p; savePlan(p); WA.emit('oracle:plan', p); },
@@ -19,9 +22,46 @@
     advance() {
       if (!this.plan) return false;
       this.plan.current++;
+      __orStat.advanced++;
       if (this.plan.current >= this.plan.beats.length) { this.clear(); return true; }
       savePlan(this.plan);
       return false;
+    },
+    /** v2.1.0: 参谋运行观测（此前 generatePlan 零调用 = AI 弧线能力形同虚设） */
+    stat() {
+      return { generated: __orStat.generated, failed: __orStat.failed, lastReason: __orStat.lastReason,
+        lastCount: __orStat.lastCount, lastAt: __orStat.lastAt, advanced: __orStat.advanced,
+        hasPlan: !!this.plan, current: this.plan ? this.plan.current : -1,
+        beats: this.plan ? this.plan.beats.length : 0 };
+    },
+    /**
+     * v2.1.0: 安全生成（面板入口用）——统一守卫与留痕
+     *   - goal 为空 → 拒绝（不浪费通道配额）
+     *   - 通道未配置 → 明确 reason（不吞错）
+     *   - 生成失败/空拍 → 计 failed 并返回原因
+     */
+    async generatePlanSafe(goal, beatCount) {
+      const g = String(goal == null ? '' : goal).trim();
+      __orStat.runs++;
+      __orStat.lastAt = Date.now();
+      if (!g) { __orStat.failed++; __orStat.lastReason = 'empty-goal'; return { ok: false, reason: 'empty-goal' }; }
+      const cfg = WA.apiRouter.getChannel('judge');
+      if (!cfg.baseUrl || !cfg.model) { __orStat.failed++; __orStat.lastReason = 'judge-not-configured'; return { ok: false, reason: 'judge-not-configured' }; }
+      let r = null;
+      try { r = await this.generatePlan(g, beatCount); }
+      catch (e) { __orStat.failed++; __orStat.lastReason = 'throw'; WA.log('warn', '剧情参谋生成异常', e); return { ok: false, reason: 'throw' }; }
+      if (!r || !r.ok) {
+        __orStat.failed++;
+        const base = (r && r.reason) || 'api-fail';
+        __orStat.lastReason = (base === 'api-fail' && __orStat.lastApiError) ? base + ':' + __orStat.lastApiError : base;
+        return { ok: false, reason: __orStat.lastReason };
+      }
+      __orStat.generated++;
+      __orStat.lastReason = null;
+      __orStat.lastApiError = null;
+      __orStat.lastCount = r.count;
+      WA.log('info', '剧情参谋生成弧线：' + r.count + ' 拍（目标：' + g.slice(0, 30) + '）');
+      return { ok: true, count: r.count };
     },
     /** 用AI参谋生成一个多拍序列（基于剧情+目标） */
     async generatePlan(goal, beatCount) {
@@ -34,7 +74,11 @@
       const r = await WA.apiRouter.call('judge', [
         { role: 'system', content: '你是剧情参谋。基于当前剧情与用户的剧情目标，拆分为' + n + '个循序渐进的剧情节拍。每拍给出 goal(本拍目标≤30字) 与 instruction(给正文的隐形引导指令≤60字)。只输出JSON：{"beats":[{"goal":"...","instruction":"..."}]}' },
         { role: 'user', content: '【剧情目标】' + goal + '\n【近期剧情】\n' + (recent || '（开场）') }
-      ], { json: true, maxTokens: 1200, temperature: 0.7 }).catch(() => null);
+      ], { json: true, maxTokens: 1200, temperature: 0.7 }).catch((e) => {
+        // v2.1.0: 失败归因留痕（此前裸 .catch(()=>null) 把网络/配额/时间超时等全洗成笼统 api-fail）
+        __orStat.lastApiError = String((e && (e.kind || e.message)) || e).slice(0, 60);
+        return null;
+      });
       if (!r || !r.beats || !r.beats.length) return { ok: false, reason: 'api-fail' };
       this.setPlan({ kind: 'sequence', goal, beats: r.beats.slice(0, n), current: 0, createdAt: Date.now() });
       return { ok: true, count: this.plan.beats.length };

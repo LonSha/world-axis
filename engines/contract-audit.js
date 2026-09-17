@@ -50,9 +50,29 @@
     distantEvent: { type: 'event', title: PROBE_TAG + 'distant', desc: PROBE_TAG + 'distant', topic: PROBE_TAG + 'distant', content: PROBE_TAG + 'distant', level: 2 },
     nearEvent: { title: PROBE_TAG + 'near', desc: PROBE_TAG + 'near', description: PROBE_TAG + 'near', urgent: true },
     entities: { organization: [{ name: PROBE_TAG + 'org', aliases: [], desc: 'd' }] },
-    next_turn_injection: { required: [PROBE_TAG + 'constraint'], conditional: [], suppress: [] }
+    next_turn_injection: { required: [PROBE_TAG + 'constraint'], conditional: [], suppress: [] },
+    // v2.2.0: 事件链两字段——此前 PROBES 漏登，导致对账器抓不到
+    //   「applyResult 消费了 events_* 而契约未声明」这一漂移（哨兵自己失明）
+    events_create: [{ title: PROBE_TAG + 'event', type: 'conflict', level: 2, desc: PROBE_TAG + 'desc' }],
+    events_update: [{ id: PROBE_TAG + 'seedEv', title: PROBE_TAG + 'seedEv', stage: '酽酿', desc: PROBE_TAG + 'upd' }]
   };
   const FIELDS = Object.keys(PROBES);
+  // ── 更新类探针的基线种子 ──
+  // 更新探针必须能命中已存在事件，否则 applyResult 找不到目标（只计入 eventsLoose），
+  // 状态无变化 → 会被误判成「消费端不读」（假阴性）。故种一条与探针 id 同名的事件，
+  // 且 before/draft 两侧同时种，保证状态差分只反映「更新是否真的落地」。
+  // v2.2.0: live 兜底白名单——只有这些字段把结果写进 live store 而非入参 draft
+  //   （horizon.acceptResult 写 store.get().evolution.horizon[kind]）。
+  //   其余字段若也被 live 兜底命中，只可能是跨轮哨兵残留 + 无关 live 变化造成的假阳性，
+  //   会把「消费端其实没读」误判成已消费（哨兵漏报），故必须限定范围。
+  const LIVE_DELEGATED = ['distantEvent', 'nearEvent'];
+  const SEEDS = {
+    events_update: function (st) {
+      st.evolution = st.evolution || {};
+      st.evolution.events = st.evolution.events || [];
+      st.evolution.events.push({ id: PROBE_TAG + 'seedEv', type: 'conflict', name: PROBE_TAG + 'seedEv', title: PROBE_TAG + 'seedEv', level: 1, stage: '萌芽', stageRound: 1, desc: '' });
+    }
+  };
 
   // ── 契约解析：从真实 buildPrompt 输出提取声明字段与枚举候选值 ──
   // 字段行形如：  "fieldName": {...} 或 "fieldName": [...] 或 "fieldName": "...",
@@ -121,6 +141,11 @@
         if (f === 'people' || f === 'entities' || f === 'knowledge_updates') probe[f] = JSON.parse(JSON.stringify(PROBES[f]));
         const before = deepClone(baseState);
         const draft = deepClone(baseState);
+        // 更新类探针：两侧同时种基线，保证差分只反映更新效果（种子本身不算消费）
+        if (SEEDS[f]) { safe(function () { SEEDS[f](before); }); safe(function () { SEEDS[f](draft); }); }
+        // 本轮开始前的 live 快照：live 兜底必须用「本轮前后差分」而不是「相对整个循环起点」——
+        //   循环内前面的字段会把哨兵留在 live，用全局差分会让后续字段恒真（假阳性漏报漂移）。
+        const liveBefore = safe(function () { return deepClone(WA.store.get()); }, null);
         // 喂探针前把 live store 压回干净基线（acceptResult 会绕过 draft 直接写 store）
         safe(function () {
           const ls = WA.store.get();
@@ -138,8 +163,11 @@
         const marked = JSON.stringify(draft || {}).indexOf(PROBE_TAG) >= 0
           || JSON.stringify(liveAfter).indexOf(PROBE_TAG) >= 0;
         // horizon 委托字段：写 live store 而非 draft，用 live 变化兜底判定
+        // live 兜底：仅限委托字段，且必须是「本轮前后 live 真发生差异」（字段特异，抗前轮残留）
+        const liveIterChanged = liveBefore ? diffState(liveBefore, liveAfter) : false;
+        const liveOk = LIVE_DELEGATED.indexOf(f) >= 0 && liveIterChanged && marked;
         result[f] = {
-          consumed: !!((changed && marked) || (liveChanged && marked)),
+          consumed: !!((changed && marked) || liveOk),
           changed: !!changed,
           marked: marked,
           error: err
@@ -323,7 +351,7 @@
   }
 
   WA.contractAudit = {
-    PROBE_TAG, PROBES, FIELDS, ENUM_ALIGN, CROSS_MODULE,
+    PROBE_TAG, PROBES, FIELDS, SEEDS, LIVE_DELEGATED, ENUM_ALIGN, CROSS_MODULE,
     parseContract, consumedFields, audit, summaryText, flatten,
     safe  // v0.1.12: 导出供语义一致性单测
   };

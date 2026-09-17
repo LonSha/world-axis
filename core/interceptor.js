@@ -11,6 +11,9 @@
   let installed = false;
   let lastRoundSig = '';           // 去重：同一轮生成只跑一次before链
   let afterHooked = false;
+  let purifyHooked = false;   // v2.1.0: 输出净化挂载哨兵
+  // v2.1.0: 净化原文快照（WeakMap：不写进 chat 存档，随消息对象回收）
+  const __purifiedRaw = new WeakMap();
 
   function getCtx() {
     try { return mainWin.SillyTavern && mainWin.SillyTavern.getContext ? mainWin.SillyTavern.getContext() : null; }
@@ -92,10 +95,16 @@
             }
             // 重新构建与before链同源的ctx（含chat/branchId），供after链节点使用
             const c = getCtx();
+            const chatArr = (c && c.chat) || [];
+            // v2.1.0: 口径保护——本楼层若已被输出净化改写过 mes，世界推进期间临时还原原文
+            //   （MESSAGE_RECEIVED 早于 GENERATION_ENDED 派发，不还原则推进读到净化文本）
+            const tailMsg = chatArr.length ? chatArr[chatArr.length - 1] : null;
+            const purifiedText = (tailMsg && __purifiedRaw.has(tailMsg)) ? tailMsg.mes : null;
+            if (purifiedText != null) tailMsg.mes = __purifiedRaw.get(tailMsg);
             const actx = {
               args,
               type: 'after',
-              chat: (c && c.chat) || [],
+              chat: chatArr,
               store: WA.store ? WA.store.get() : null,
               branchId: WA.store ? WA.store.currentBranchId() : 'b0',
               injections: []
@@ -110,6 +119,28 @@
               if (WA.store && WA.store.batch) await WA.store.batch(runAfter); else await runAfter();
             }
             catch (e) { WA.log('error', 'after链执行异常', e); }
+            finally { if (purifiedText != null && tailMsg) tailMsg.mes = purifiedText; }   // v2.1.0: 恢复净化文本
+          });
+        }
+        // v2.1.0: 输出侧净化——purifier.apply 此前全库零调用（功能整体失效）
+        //   只改显示文本、不动世界结算口径：世界推进基于原文，净化仅影响用户所见。
+        if (et.MESSAGE_RECEIVED && !purifyHooked) {
+          purifyHooked = true;
+          ctx.eventSource.on(et.MESSAGE_RECEIVED, () => {
+            try {
+              if (!WA.purifier || typeof WA.purifier.applySafe !== 'function') return;
+              const c = getCtx();
+              const chat = (c && c.chat) || [];
+              const last = chat[chat.length - 1];
+              if (!last || last.is_user || typeof last.mes !== 'string' || !last.mes) return;
+              const out = WA.purifier.applySafe(last.mes);
+              if (out !== last.mes) {
+                __purifiedRaw.set(last, last.mes);   // 原文快照：世界推进仍基于原文
+                last.mes = out;
+                // 通知宿主重绘该楼层（ST 侧 API 存在才调用，缺失不报错）
+                try { if (c && typeof c.updateMessageBlock === 'function') c.updateMessageBlock(chat.length - 1, last); } catch (e) { /* 宿主重绘非必需 */ }
+              }
+            } catch (e) { WA.log('warn', '输出净化失败（不影响生成结果）', e); }
           });
         }
         // 切聊天：重载store + 旧异步失效

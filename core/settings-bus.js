@@ -80,6 +80,34 @@
         return { key: r.key, legacy: (r.legacy || []).slice(), legacyRemove: !!r.legacyRemove, orphan: !!r.orphan, def: r.def, module: r.module };
       });
     },
+    /**
+     * v2.2.0: 注销「模块自己声明废弃」的键登记（幽灵配置清理出口）。
+     *   安全边界：只接受 orphan:true 的项——模块已在定义处声明该键不再使用；
+     *   对仍在使用的键（orphan 非 true）一律拒绝，避免制造「登记表与实际行为不一致」。
+     */
+    deregisterOrphan(key) {
+      if (typeof key !== 'string' || !key) return { ok: false, reason: 'missing-key' };
+      const arr = WA.__settingsRegs || [];
+      const hit = arr.filter(function (r) { return r.key === key; })[0];
+      if (!hit) return { ok: false, reason: 'not-found' };
+      if (!hit.orphan) return { ok: false, reason: 'not-orphan（该键仍在使用，拒绝注销）' };
+      WA.__settingsRegs = arr.filter(function (r) { return r.key !== key; });
+      stats.deregisters = (stats.deregisters || 0) + 1;
+      if (WA.log) WA.log('info', 'settingsBus：已注销孤儿设置键登记 ' + key + '（' + (hit.module || '?') + '）');
+      return { ok: true, key: key, module: hit.module || null };
+    },
+    /** v2.2.0: 登记表计量只读视图（面板/诊断消费）——此前 registry 全库零调用 */
+    registryStat() {
+      const rows = this.registry();
+      const byModule = {};
+      let legacy = 0, orphan = 0;
+      rows.forEach(function (r) {
+        byModule[r.module || '(未声明)'] = (byModule[r.module || '(未声明)'] || 0) + 1;
+        if (r.legacy && r.legacy.length) legacy++;
+        if (r.orphan) orphan++;
+      });
+      return { total: rows.length, byModule: byModule, legacy: legacy, orphan: orphan, deregisters: stats.deregisters || 0 };
+    },
     /** orphan 候选：标记 orphan:true 且键已不存在（已删/从未写）的注册项 */
     pendingOrphan() {
       const ls = (WA.mainWin || window).localStorage;

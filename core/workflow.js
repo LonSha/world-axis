@@ -41,6 +41,18 @@
       persistWorkflowHistory();
     } catch (e) { /* 历史留痕失败不影响链执行 */ }
   }
+  // v2.1.0: 节点失败台账（此前失败只进日志与计数，原因不可查、巡视不可见）
+  const FAIL_MAX = 30;
+  const __wfFails = [];
+  // v2.1.0: 单调消费序号——游标不依赖 Date.now（毫秒精度歧义 + 时钟回拨会漏报）；
+  //   跨 resetHistory 不回退（清台账不等于让消费方重复计历史）。
+  let __wfSeq = 0;
+  function recFail(id, label, chain, msg) {
+    try {
+      __wfFails.push({ seq: ++__wfSeq, id: id, label: label || id, chain: chain, at: Date.now(), msg: String(msg == null ? '' : msg).slice(0, 160) });
+      while (__wfFails.length > FAIL_MAX) __wfFails.shift();
+    } catch (e) { /* 台账自身失败不影响链执行 */ }
+  }
   function recStat(id, ms, status) {
     try {
       const st = stats.get(id) || { count: 0, errors: 0, lastMs: 0, totalMs: 0, lastAt: 0, lastStatus: null };
@@ -87,6 +99,7 @@
           WA.log('info', `  ✓ ${node.label || node.id} (${Date.now() - t0}ms)`);
         } catch (e) {
           recStat(node.id, Date.now() - t0, 'error');
+          recFail(node.id, node.label, chain, (e && e.message) || e);   // v2.1.0: 失败原因入台账
           trace142.push({ id: node.id, ms: Date.now() - t0, status: 'error' });
           WA.log('error', `  ✗ ${node.label || node.id}: ` + (e && e.message || e));
           if (node.critical) {
@@ -115,6 +128,25 @@
       return { nodes: rows.slice(0, n), tracked: rows.length, lastChains: Object.assign({}, lastChains) };
     },
     resetStats() { stats.clear(); Object.keys(lastChains).forEach(function (k) { delete lastChains[k]; }); },
+    /**
+     * v2.1.0: 节点失败台账（只读）——失败原因此前只进日志，无任何程序化出口。
+     *   items 按时间倒序（最近优先）；since 为**单调序号游标**，只取 seq > since 的失败
+     *   （巡视据此算「本轮新增」；用序号而不用时间戳，避免毫秒同刻重复计入与时钟回拨漏报）。
+     */
+    fails(topN, since) {
+      const n = (typeof topN === 'number' && topN > 0) ? topN : 10;
+      const src = (typeof since === 'number' && since > 0) ? __wfFails.filter(function (f) { return f.seq > since; }) : __wfFails;
+      return {
+        tracked: __wfFails.length,
+        items: src.slice(-n).reverse().map(function (f) { return { seq: f.seq, id: f.id, label: f.label, chain: f.chain, at: f.at, msg: f.msg }; })
+      };
+    },
+    /** v2.1.0: 失败台账只读快照（巡视与诊断共用同一份口径） */
+    failStats() {
+      const byId = {};
+      __wfFails.forEach(function (f) { byId[f.id] = (byId[f.id] || 0) + 1; });
+      return { tracked: __wfFails.length, max: FAIL_MAX, byId: byId, seq: __wfSeq, lastAt: __wfFails.length ? __wfFails[__wfFails.length - 1].at : 0 };
+    },
     /** v0.1.42: 链运行历史只读视图（tool-diag 消费）——最近 N 次运行的逐节点耗时序列 */
     history(topN) {
       const n = (typeof topN === 'number' && topN > 0) ? topN : 5;
@@ -127,6 +159,7 @@
     },
     resetHistory(chatId) {
       __chainHistory.length = 0;
+      __wfFails.length = 0;   // v2.1.0: 台账随历史一并重置（语义：清空运行痕迹）
       try {
         const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
         const mainWin = (typeof window !== 'undefined' ? window : global);

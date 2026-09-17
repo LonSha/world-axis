@@ -166,6 +166,9 @@
     }).join('\n---\n');
   }
 
+  // v2.2.0: 事件链入账计量——「推演说要发生的事件」是否真进了 state，此前完全不可观测
+  //   （applyResult 对 events_create/events_update 零消费，整条链静默丢弃）
+  const __applyStat = { eventsCreated: 0, eventsUpdated: 0, eventsLoose: 0, lastAt: 0 };
   const backstage = WA.backstage = {
     getSettings: loadSettings,
     setSettings(obj) { const s = Object.assign(loadSettings(), obj || {}); saveSettings(s); WA.emit('backstage:settings', s); },
@@ -280,6 +283,8 @@
          ' "distantEvent": {"type":"event|wind","title":"...","desc":"...","topic":"...","content":"...","level":1-5}或null,',
          ' "nearEvent": {"title":"...","desc":"...","urgent":true|false}或null,',
          ' "entities": {"organization":[{"name":"...","aliases":[],"desc":"..."}],"object":[],"ability":[],"location":[]}或省略,',
+        ' "events_create": [{"title":"事件名≤30字","type":"conflict|progress","level":1-4,"desc":"≤50字"}],',
+        ' "events_update": [{"title":"要更新的已有事件名（改名不换链）","name":"改名后的新名（可选）","stage":"该类型合法阶段","desc":"≤50字","stall":true|false,"stallReason":"停滞原因"}],',
         ' "next_turn_injection": {"required":[],"conditional":[],"suppress":[]}',
         '}',
         '宁缺毋滥：无变化就给空数组。绝不代写玩家言行。绝不剧透suppress列内容。'
@@ -445,6 +450,70 @@
         else (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: f.id, content: f.content || '', status: f.status || 'waiting', links, at: now });
       });
 
+      // v2.2.0: 推演事件链入账 —— 此前 events_create / events_update 被完全丢弃：
+      //   提示词要求 AI 输出它们、limits 为它们写了截断与「改名不换链/type禁改」稳定契约，
+      //   但 applyResult 没有消费端 → AI 宣告的「将要发生的事件」全部消失，
+      //   「世界在自己运转」这一核心能力断链且不可观测。
+      //   复用 limits 契约（locateStable 定位 / applyStableUpdate 稳定写），避免第二套实现漂移。
+      if (Array.isArray(r.events_create) && r.events_create.length) {
+        draft.evolution.events = draft.evolution.events || [];
+        const evArr = draft.evolution.events;
+        const TERM_OF = (WA.editorEvents && WA.editorEvents.TERMINAL) || {};
+        const evMax = (WA.editorEvents && WA.editorEvents.MAX_EVENTS) || 16;
+        r.events_create.slice(0, 6).forEach(function (e) {
+          if (!e) return;
+          const name = String(e.title || e.name || '').trim().slice(0, 30);
+          if (!name) return;
+          if (evArr.some(function (x) { return x && x.name === name; })) return; // 同名归并（推演侧契约）
+          while (evArr.length >= evMax) {
+            // 挤出优先级与 evolution.addEvent 一致：终局 > 最早
+            let ix = evArr.findIndex(function (x) { return x && (TERM_OF[x.type] || []).includes(x.stage); });
+            if (ix < 0) ix = 0;
+            evArr.splice(ix, 1);
+          }
+          const stages = (WA.editorEvents && WA.editorEvents.stagesOf) ? WA.editorEvents.stagesOf(e.type) : null;
+          const type = (e.type === 'progress') ? 'progress' : 'conflict';
+          const fallback = type === 'progress' ? ['筹备', '执行', '关键', '已完成', '已失败'] : ['萌芽', '发酵', '逼近', '已爆发', '已消散'];
+          const useStages = stages || fallback;
+          const stage = (e.stage && useStages.indexOf(e.stage) >= 0) ? e.stage : useStages[0];
+          evArr.push({
+            id: 'ev' + now + Math.random().toString(36).slice(2, 6),
+            // title 与 name 双写：limits.locateStable 按 title 匹配（「改名不换链」契约），
+            // 而编辑器/推演读的是 name —— 只写其一会让 events_update 永远匹配不上（静默失效）。
+            title: name, type: type, name: name, level: Math.max(1, Math.min(4, Number(e.level) || 1)),
+            stage: stage, stageRound: 1, desc: String(e.desc || '').slice(0, 50),
+            stall: false, consecutiveFails: 0, createdRound: (draft.evolution && draft.evolution.round) || 0,
+            source: 'backstage', at: now
+          });
+          __applyStat.eventsCreated++;
+        });
+        __applyStat.lastAt = now;
+      }
+      if (Array.isArray(r.events_update) && r.events_update.length) {
+        draft.evolution.events = draft.evolution.events || [];
+        const evArr = draft.evolution.events;
+        r.events_update.slice(0, 10).forEach(function (u) {
+          if (!u) return;
+          const upd = Object.assign({}, u, { title: u.title || u.name });
+          let hit = -1;
+          if (WA.limits && WA.limits.locateStable) hit = WA.limits.locateStable(evArr, upd).idx;
+          if (hit < 0) {
+            // 兜底按引用名匹配：u.title 是「指向哪个已有事件」的引用（约定），u.name 才是新名字——
+            // state 里可能只有 name（limits.locateStable 只认 title），只写其一即断链。
+            const want = String(u.title || u.name || '').trim();
+            if (want) hit = evArr.findIndex(function (x) { return x && (x.name === want || x.title === want); });
+          }
+          if (hit < 0 || !evArr[hit]) { __applyStat.eventsLoose++; return; }   // 无对应事件：计数不臆造
+          if (WA.limits && WA.limits.applyStableUpdate) {
+            WA.limits.applyStableUpdate(evArr[hit], upd);
+          } else {
+            Object.keys(u).forEach(function (k) { if (k !== 'id' && k !== 'type' && u[k] !== undefined) evArr[hit][k] = u[k]; });
+          }
+          __applyStat.eventsUpdated++;
+        });
+        __applyStat.lastAt = now;
+      }
+
       // 演化系统入账（势力/声誉/经济/风声/影响链）
       if (WA.evolution) {
         if (r.factions) WA.evolution.applyFactions(draft, r.factions);
@@ -563,6 +632,11 @@
       if (nti.suppress && nti.suppress.length) parts.push('本轮禁止暴露：' + nti.suppress.join('、'));
       if (!parts.length) return null;
       return '<world_axis_continuity>\n【世界连续性约束】\n' + parts.join('\n') + '\n</world_axis_continuity>';
+    },
+
+    /** v2.2.0: 推演入账计量只读视图（诊断/面板消费）——入账链是否真的在跑，此前不可观测 */
+    applyStat() {
+      return { eventsCreated: __applyStat.eventsCreated, eventsUpdated: __applyStat.eventsUpdated, eventsLoose: __applyStat.eventsLoose, lastAt: __applyStat.lastAt };
     },
 
     /** 清空已消费的注入（生成后调用，避免重复注入） */

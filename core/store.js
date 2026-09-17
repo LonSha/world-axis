@@ -265,6 +265,13 @@
   // v0.4.0: 自动治理巡视状态——上次巡视签名（防重复告警）+ 历次自动动作审计
   let __maintainSig = '';
   const __maintainStat = { scans: 0, lastAt: 0, lastScore: 100, lastLevel: 'ok', autoApplies: 0, lastAutoFreedKeys: 0, lastAutoFreedBytes: 0 };
+  // v2.1.0: 巡视消费游标——工作流失败台账的**单调序号**（本轮末尾才推进）。
+  //   ① 不能复用 __maintainStat.lastAt：它在巡视开头就被刷新，用它当 since 会把
+  //      游标推成本轮开始时刻，使「上轮结束 → 本轮开始」窗口内的失败被永久漏检；
+  //   ② 也不能用时间戳游标：毫秒同刻的失败会被下一轮重复计入，且系统时钟回拨
+  //      （NTP 校时）会让游标回退、已发生的失败静默漏报。
+  //   -1 = 尚未建立基线：首轮巡视只建立游标、不追溯存量失败（沿用 v1.9.0 存量不追溯原则）。
+  let __lastPatrolSeq = -1;
   // v1.9.0: 世界逻辑瑕疵基线——载入期存量记为基线不扣分（避免历史脏数据把健康分永久锁死），
   //   基线之上的新增才扣分；codes 为 error 级 code 集合签名，用于识别「量不变但劣化项易主」。
   const __logicBaseline = { codes: null };
@@ -466,11 +473,11 @@
     // v1.4.0 新增：通配登记——嵌套动态路径（每实体 events 环，精确键无法枚举；'*' 段吃 1..n 段）
     'evolution.entityMemory.*.events': { cap: 8, wildcard: true, site: 'entities.js 实体事件环（保留最新 8 条）' },
     // v1.5.0 补登：people.<id>.profile 五节（profile.js 档案维护切片 cap）——此前漏登致深扫误报 unbounded、drifted/maintain 盲区
-    'people.*.profile.personality': { cap: 15, wildcard: true, site: 'profile.js 档案五节切片' },
-    'people.*.profile.worldview': { cap: 10, wildcard: true, site: 'profile.js 档案五节切片' },
-    'people.*.profile.family': { cap: 10, wildcard: true, site: 'profile.js 档案五节切片' },
-    'people.*.profile.memory': { cap: 25, wildcard: true, site: 'profile.js 档案五节切片' },
-    'people.*.profile.relationships': { cap: 15, wildcard: true, site: 'profile.js 档案五节切片' },
+    'people.*.profile.personality': { cap: 15, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
+    'people.*.profile.worldview': { cap: 10, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
+    'people.*.profile.family': { cap: 10, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
+    'people.*.profile.memory': { cap: 25, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
+    'people.*.profile.relationships': { cap: 15, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
     // v1.5.0 补登：people.<id>.knowledge 对象键容器（backstage 按 at 排序逐出，保留 30 键）
     'people.*.knowledge': { cap: 30, kind: 'object', wildcard: true, site: 'backstage.js knowledge 容量30逐出' }
   };
@@ -1164,6 +1171,7 @@
       //   purifier（净化规则有效性）。它们正是「引擎自己的体检」，本该由巡视统一裁决。
       //   deep 专属：全量契约扫描与多轮采样有可观开销，高频巡视路径不跑。
       let contractErrors = 0, contractWarns = 0, samplerPass = 0, samplerTotal = 0, samplerOk = true, purifierBad = 0, selfCheckRan = false;
+      let purifyRuns = 0, purifyChanged = 0, purifyRuleErrors = 0;   // v2.1.0
       if (o.deep === true) {
         try {
           if (WA.contractAudit && typeof WA.contractAudit.audit === 'function') {
@@ -1204,6 +1212,13 @@
               if (!r || !r.enabled) return;
               try { new RegExp(r.find, r.flags || 'g'); } catch (e) { purifierBad++; }
             });
+            // v2.1.0: 净化运行观测——规则存在但从未命中/规则异常，都要看得见
+            const ps = (typeof WA.purifier.stat === 'function') ? WA.purifier.stat() : null;
+            if (ps) { purifyRuns = ps.runs || 0; purifyChanged = ps.changed || 0; purifyRuleErrors = ps.ruleErrors || 0; }
+            if (purifyRuleErrors > 0) {
+              score -= Math.min(6, purifyRuleErrors * 2);
+              issues.push({ level: 'warn', key: 'engine.purifier', detail: purifyRuleErrors + ' 次净化规则执行异常（正则非法或替换值异常）——该规则已跳过，输出未按其预期净化' });
+            }
             if (purifierBad > 0) {
               score -= Math.min(9, purifierBad * 3);
               issues.push({ level: 'warn', key: 'engine.purifier', detail: purifierBad + ' 条启用中的净化规则正则非法——该规则在 apply() 时静默失效，输出文本未按预期净化' });
@@ -1212,6 +1227,136 @@
           }
         } catch (e) { markDegraded('purifier', e); }
       }
+      // ── 13. 世界钟自动推进（v2.1.0）──
+      //   calendar.suggestAdvance 此前零消费 = 世界钟功能整体失效（只能手动设时间）。
+      //   接入 after 链后：模块缺失（时钟永远不会自动走）与「跑了但从未推进」必须可区分。
+      let calendarAuto = false, calendarAdvances = 0, calendarRuns = 0;
+      try {
+        if (WA.calendar && typeof WA.calendar.stat === 'function') {
+          const cs = WA.calendar.stat();
+          calendarAuto = !!cs.auto; calendarAdvances = cs.advanced || 0; calendarRuns = cs.runs || 0;
+        } else {
+          score -= 4;
+          issues.push({ level: 'warn', key: 'engine.calendar', detail: '世界钟模块缺失——after 链无时间推进节点，世界时间只能手动设定（正文写「次日」也不会推进）' });
+        }
+      } catch (e) { markDegraded('calendar', e); }
+      // ── 14. 剧情参谋（v2.1.0）──
+      //   generatePlan 此前零调用 = AI 弧线能力形同虚设（面板只能手写节拍）。
+      //   注意：judge 通道未配置属用户配置缺失，不是故障——不扣分，只提示。
+      let oracleGenerated = 0, oracleFailed = 0, oracleLastReason = null;
+      try {
+        if (WA.oracle && typeof WA.oracle.stat === 'function') {
+          const os = WA.oracle.stat();
+          oracleGenerated = os.generated || 0; oracleFailed = os.failed || 0; oracleLastReason = os.lastReason || null;
+          if (oracleFailed > 0 && oracleLastReason && oracleLastReason !== 'judge-not-configured' && oracleLastReason !== 'empty-goal') {
+            score -= Math.min(4, oracleFailed * 2);
+            issues.push({ level: 'warn', key: 'engine.oracle', detail: oracleFailed + ' 次剧情参谋生成失败（原因：' + oracleLastReason + '）——弧线只能手写节拍' });
+          }
+        }
+      } catch (e) { markDegraded('oracle', e); }
+      // ── 15. 事件总线死信号（v2.1.0）──
+      //   广播出去无人接收 = 世界推进的痕迹丢失（曾有 9 个死事件长期存在且完全不可见）。
+      //   计分门控：只在实际挂载 UI 的运行时计分——测试/无头环境不加载面板，
+      //   否则会把「环境没装 UI」当成故障扣分（污染基线）。
+      let busDead = 0, busDeadEvents = [];
+      try {
+        if (WA.ui && WA.ui.mounted === true && typeof WA.busStats === 'function') {
+          const bs = WA.busStats(999);
+          const rows = (bs && bs.events) || [];
+          // 口径：「曾经无人接」不算病——dead 是累计计数，扩展加载期（UI 未挂载）的广播会被永久计入；
+          //   真正的病是「现在仍然无人接」（dead>0 且 listeners===0）——否则挂载后永久误报。
+          busDeadEvents = rows.filter(function (r) { return (r.dead || 0) > 0 && (r.listeners || 0) === 0; }).map(function (r) { return r.event + '(' + r.dead + ')'; });
+          busDead = busDeadEvents.length;
+          if (busDead > 0) {
+            score -= Math.min(6, busDead * 2);
+            issues.push({ level: 'warn', key: 'bus.dead', detail: busDead + ' 个事件只广播无接收（状态变了界面/引擎都不知情）：' + busDeadEvents.slice(0, 4).join('、') + (busDead > 4 ? ' 等' : '') });
+          }
+        }
+      } catch (e) { markDegraded('busStats', e); }
+      // ── 16. 工作流节点失败（v2.1.0）──
+      //   非 critical 节点失败不中断链（设计如此），但此前**巡视完全看不见**：
+      //   世界推演/记忆巩固/演化等节点静默失败时，健康分照样满分。
+      //   口径：只对「本轮新增」失败扣分（存量不追溯——沿用 v1.9.0 原则，防历史失败永久挂红）。
+      let wfNewFails = 0, wfFailNodes = [], wfFailSample = null;
+      try {
+        if (WA.workflow && typeof WA.workflow.fails === 'function') {
+          // v2.1.0: 首轮（-1）只建立基线不追溯；此后只算「上一轮之后新增」的失败。
+          const fl = (__lastPatrolSeq < 0) ? { items: [] } : WA.workflow.fails(6, __lastPatrolSeq);
+          wfNewFails = (fl.items || []).length;
+          wfFailNodes = Array.from(new Set((fl.items || []).map(function (f) { return f.id; })));
+          wfFailSample = (fl.items && fl.items[0]) || null;
+          if (wfNewFails > 0) {
+            score -= Math.min(8, wfNewFails * 3);
+            const who = (fl.items || []).slice(0, 3).map(function (f) { return f.label + '（' + f.msg.slice(0, 40) + '）'; }).join('；');
+            issues.push({ level: 'warn', key: 'engine.workflow', detail: '本轮 ' + wfNewFails + ' 次工作流节点失败（单节点失败不中断链，但该环节本轮未生效）：' + who });
+            actions.push({ id: 'review-workflow-fail', safe: false, detail: '面板「日志」页查看失败留痕，或「概览」关闭该节点' });
+          }
+        }
+      } catch (e) { markDegraded('workflowFails', e); }
+      // ── 17. 宿主兼容层（v2.2.0）──
+      //   背景：compatMvu.sync / compatTH.expose 在 v2.0.0 才被 init 激活，但「桥是否真的接上」
+      //        仍无巡视可见性——MVU 没同步、TH 桥没暴露，健康分照样满分。
+      //   计分口径（关键）：只对**真故障**扣分。宿主未启用 MVU（mvu-not-enabled）或未跑在
+      //        TH 沙箱（非 TH 环境）属环境差异，不是扩展的缺陷——与「环境差异不得当故障扣分」
+      //        （v1.9.0 原则、块4 的 WA.ui.mounted 门控）保持一致，否则每台机器基线都被压低。
+      let compatMvuActive = null, compatThActive = null, compatMvuReason = null, compatThReason = null, compatFails = 0;
+      try {
+        if (WA.compatMvu && typeof WA.compatMvu.status === 'function') {
+          const ms = WA.compatMvu.status();
+          compatMvuActive = !!ms.active; compatMvuReason = ms.lastReason || null;
+          if (String(compatMvuReason || '').indexOf('error:') === 0) {
+            compatFails++;
+            issues.push({ level: 'error', key: 'engine.compat', detail: 'MVU 兼容层异常：' + compatMvuReason + '——世界状态不再镜像进 stat_data' });
+          }
+        }
+        if (WA.compatTH && typeof WA.compatTH.status === 'function') {
+          const ts = WA.compatTH.status();
+          compatThActive = !!ts.active; compatThReason = ts.lastReason || null;
+          if (String(compatThReason || '').indexOf('error:') === 0) {
+            compatFails++;
+            issues.push({ level: 'error', key: 'engine.compat', detail: 'TH 桥接异常：' + compatThReason + '——TH 脚本/正则读不到世界状态快照' });
+          }
+        }
+        if (compatFails > 0) {
+          score -= Math.min(6, compatFails * 3);
+          actions.push({ id: 'review-compat', safe: false, detail: '面板「工具」→「宿主兼容层」查看激活原因与同步计数' });
+        }
+      } catch (e) { markDegraded('compat', e); }
+      // ── 18. 人物档案覆盖率（v2.2.0）──
+      //   背景：registry.setProfile 是唯一人设写入 API 却全库零调用，用户无从建档，
+      //        独白/观测子agent 的「性格锚点」永远显示「未建立」而无人知晓。
+      //   计分口径：不扣分——「不建档」是用户的合法选择（纯剧情流也可能不需要档案），
+      //        这里只把「注册了 NPC 却零档案」这一可用性缺口报成 info 可行动信号。
+      let profRegistered = 0, profWith = 0, profEntries = 0;
+      try {
+        if (WA.registry && typeof WA.registry.profileStat === 'function') {
+          const ps = WA.registry.profileStat();
+          profRegistered = ps.registered || 0; profWith = ps.withProfile || 0; profEntries = ps.entries || 0;
+          if (profRegistered > 0 && profWith === 0) {
+            issues.push({ level: 'info', key: 'actors.profile', detail: '已注册 ' + profRegistered + ' 个 NPC 但档案全空——独白/观测子agent 的性格锚点将退化为「未建立」，推演缺少人设约束' });
+            actions.push({ id: 'edit-npc-profile', safe: false, detail: '面板「人物」页点某人「档案」录入性格/观念/家庭/关系/经历（供推演作为认知边界）' });
+          } else if (profRegistered > 0) {
+            issues.push({ level: 'info', key: 'actors.profile', detail: profWith + '/' + profRegistered + ' 个 NPC 已建档（共 ' + profEntries + ' 条档案条目）' });
+          }
+        }
+      } catch (e) { markDegraded('actorsProfile', e); }
+      // ── 19. 设置键卫生（v2.2.0）──
+      //   背景：settingsBus.pendingOrphan / store.orphanSettingsKeys 零消费——模块自己声明废弃的
+      //        幽灵设置键既不可见也不可清；隔离处置史（quarantineAudit）同样没有出口。
+      //   计分口径：不扣分（幽灵键是历史残留、不占运行成本），报 info 并给出清理入口。
+      let orphanKeys = [], quarantineRestores = 0, quarantineDrops = 0;
+      try {
+        if (typeof this.orphanSettingsKeys === 'function') orphanKeys = this.orphanSettingsKeys() || [];
+        if (typeof this.quarantineAudit === 'function') {
+          const qa = this.quarantineAudit();
+          quarantineRestores = qa.restores || 0; quarantineDrops = qa.drops || 0;
+        }
+        //   口径（关键）：这里**只采集、不产议题**。orphan 候选的含义是「orphan:true 且键尚未落盘」，
+        //   而 preset/oracle 两处内置注册天然满足该条件（用户还没建自定义预设/还没设弧线）——
+        //   把它报成议题会让每个新库永久挂一条不可消除的 info（告警疲劳，且非用户可行动项）。
+        //   可见性改由按需路径承担：面板「工具」→「设置键」与诊断 runtime.settingsBus / verdict。
+        //   隔离处置史同理：一旦处置过一次就永久 >0，属历史事实而非当前缺陷。
+      } catch (e) { markDegraded('settingsHygiene', e); }
       // ── 10. 巡视自身完整性（v2.0.0）──
       //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
       let degradedN = 0;
@@ -1261,6 +1406,8 @@
         __maintainStat.autoApplies++; __maintainStat.lastAutoFreedKeys = removed; __maintainStat.lastAutoFreedBytes = freed;
       }
       __maintainStat.lastScore = score; __maintainStat.lastLevel = level;
+      // v2.1.0: 游标推进到当前台账序号（下一轮的 since）。台账缺失时保持不动，避免误推。
+      try { if (WA.workflow && typeof WA.workflow.failStats === 'function') { const _fsq = WA.workflow.failStats(); if (_fsq && typeof _fsq.seq === 'number') __lastPatrolSeq = _fsq.seq; } } catch (e) {}
       return {
         score: score, level: level, issues: issues, actions: actions, applied: applied,
         // v0.4.0: 可回收键名清单（供 init 指纹节流；与 v0.1.54「键名排序串」契约同粒度——
@@ -1284,6 +1431,15 @@
           moduleFailedList: modFailedList.slice(0, 12),
           contractErrors: contractErrors, contractWarns: contractWarns,  // v2.0.0
           samplerOk: samplerOk, samplerPass: samplerPass, samplerTotal: samplerTotal, purifierBadRules: purifierBad, selfCheckRan: selfCheckRan,
+          purifyRuns: purifyRuns, purifyChanged: purifyChanged, purifyRuleErrors: purifyRuleErrors,  // v2.1.0
+          calendarAuto: calendarAuto, calendarAdvances: calendarAdvances, calendarRuns: calendarRuns,  // v2.1.0
+          oracleGenerated: oracleGenerated, oracleFailed: oracleFailed,  // v2.1.0
+          busDead: busDead, busDeadEvents: busDeadEvents.slice(0, 8),  // v2.1.0
+          wfNewFails: wfNewFails, wfFailNodes: wfFailNodes.slice(0, 6), wfFailSample: wfFailSample,  // v2.1.0
+          compatMvuActive: compatMvuActive, compatThActive: compatThActive,  // v2.2.0
+          compatMvuReason: compatMvuReason, compatThReason: compatThReason, compatFails: compatFails,
+          profRegistered: profRegistered, profWith: profWith, profEntries: profEntries,  // v2.2.0
+          orphanSettings: orphanKeys.length, quarantineRestores: quarantineRestores, quarantineDrops: quarantineDrops,  // v2.2.0
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }

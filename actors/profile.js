@@ -38,30 +38,15 @@
         { role: 'user', content: '【NPC】' + name + '\n【现有档案】' + JSON.stringify(compactOld) + '\n【近期剧情】\n' + recentText(6) }
       ], { json: true, maxTokens: 1200, temperature: 0.4 }).catch(() => null);
       if (!r) return { ok: false, reason: 'api-fail' };
-      const now = Date.now();
-      WA.store.transact(draft => {
-        const id = 'p_' + name;
-        const p = draft.people[id] = draft.people[id] || { id, name, knowledge: {} };
-        const prof = p.profile = p.profile || { fields: { name }, personality: [], worldview: [], family: [], relationships: [], memory: [] };
-        const push = (sec, items, cap) => {
-          (items || []).filter(x => x && String(x).trim()).forEach(x => { prof[sec].push({ text: String(x).slice(0, 200), at: now }); });
-          prof[sec] = prof[sec].slice(-(cap || 20));
-        };
-        push('personality', r.personality, 15);
-        push('worldview', r.worldview, 10);
-        push('family', r.family, 10);
-        push('memory', r.memory, 25);
-        (r.relationships || []).slice(0, 5).forEach(rel => {
-          if (!rel || !rel.target) return;
-          const old_rel = prof.relationships.find(x => x.target === rel.target);
-          if (old_rel) { old_rel.relation = rel.relation || old_rel.relation; old_rel.dynamic = rel.dynamic || old_rel.dynamic; old_rel.at = now; }
-          else prof.relationships.push({ target: rel.target, relation: rel.relation || '', dynamic: rel.dynamic || '', at: now });
-        });
-        prof.relationships = prof.relationships.slice(-15);
-        p.updatedAt = now;
+      // v2.2.0: 改走 registry.setProfileSafe 契约（此前直接改 store = 与 getProfile/setProfile 双写漂移：
+      //   registry 的剪裁上限来自容量登记表，直写方却写死常量，任一处调整即产生 drifted 误报）。
+      const res = WA.registry.setProfileSafe(name, {
+        personality: r.personality, worldview: r.worldview, family: r.family,
+        memory: r.memory, relationships: (r.relationships || []).slice(0, 5)
       });
+      if (!res || !res.ok) return { ok: false, reason: (res && res.reason) || 'write-fail' };
       WA.log('info', '档案维护完成：' + name);
-      return { ok: true };
+      return { ok: true, added: res.added };
     },
 
     /** after链批量：对注册了且近期正文提到的NPC执行维护 */

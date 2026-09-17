@@ -34,6 +34,25 @@
         <div class="wa-sec">自定义推演指令（追加到系统提示）</div>
         <textarea id="wa-set-custom" class="wa-ta" placeholder="例如：本世界魔法衰退，推演时注意时代背景…">${esc(bs.customInstruction)}</textarea>
         <button class="wa-btn" id="wa-set-save">保存推演设置</button>
+        <div class="wa-sec">输出净化规则（缝合 Veridis 规则引擎）</div>
+        ${(() => {
+          // v2.2.0: 规则治理口（此前 addRule/removeRule/setEnabled/loadPreset 全零调用，
+          //   用户只能去 localStorage 手改 JSON —— 规则引擎有治理能力却无治理入口）
+          if (!WA.purifier || typeof WA.purifier.stat !== 'function') return '<div class="wa-empty">净化模块未加载</div>';
+          const ps = WA.purifier.stat();
+          const rules = (WA.purifier.rules || []);
+          const rows = rules.length ? rules.map((r, i) => `<div class="wa-item">
+              <label class="wa-node"><input type="checkbox" data-prm-on="${esc(r.id)}" ${r.enabled !== false ? 'checked' : ''}/><span class="wa-node-label">${esc(r.name || r.id)}</span></label>
+              <div class="wa-dim">find: ${esc(String(r.find || '').slice(0, 60))} → ${esc(String(r.replace || '（删）').slice(0, 24))}</div>
+              <button class="wa-btn wa-mini" data-prm-del="${esc(r.id)}">删除</button></div>`).join('')
+            : '<div class="wa-empty">无规则（净化不会做任何事）</div>';
+          return rows + `<div class="wa-dim">共 ${rules.length} 条 · 已净化 ${ps.runs} 次（命中 ${ps.changed} · 省 ${ps.charsSaved} 字符 · 拦空 ${ps.blocked} · 规则错 ${ps.ruleErrors}）${ps.imported ? ' · 已导入 ' + ps.imported + ' 条' : ''}${ps.lastImport ? ' · 最近导入：' + esc(ps.lastImport) : ''}</div>`;
+        })()}
+        <div class="wa-row"><input id="wa-prm-find" class="wa-input" placeholder="正则 find（如 &lt;think&gt;[\\s\\S]*?&lt;/think&gt;）"/><input id="wa-prm-repl" class="wa-input wa-w60" placeholder="替换为（留空=删除）"/></div>
+        <div class="wa-row"><button class="wa-btn wa-mini" id="wa-prm-add">新增规则</button><button class="wa-btn wa-mini" id="wa-prm-reset">恢复内置</button></div>
+        <div class="wa-row"><button class="wa-btn wa-mini" id="wa-prm-import">导入预设 JSON</button></div>
+        <textarea id="wa-prm-json" class="wa-ta" placeholder='粘贴 Veridis 预设或规则数组，如 [{"find":"…","replace":""}]'></textarea>
+        <div id="wa-prm-out" class="wa-out"></div>
         <div class="wa-sec">舆情引擎</div>
         <label class="wa-node"><input type="checkbox" id="wa-op-enable" ${op.enabled ? 'checked' : ''}/><span class="wa-node-label">启用舆情观察（新闻/论坛）</span></label>
         <label class="wa-node"><input type="checkbox" id="wa-op-sandbox" ${op.sandboxEnabled ? 'checked' : ''}/><span class="wa-node-label">启用闲逛沙盒（NON-CANON氛围碎片）</span></label>
@@ -52,6 +71,45 @@
     bind(panelEl) {
       const $ = sel => panelEl.querySelector(sel);
       const out = () => $('#wa-set-out');
+      // v2.2.0: 净化规则治理绑定（此前这些能力零调用 = 治理无入口）
+      if (WA.purifier) {
+        const pOut = () => { const o = $('#wa-prm-out'); return o; };
+        panelEl.querySelectorAll('[data-prm-on]').forEach(cb => cb.onchange = () => {
+          WA.purifier.setEnabled(cb.dataset.prmOn, cb.checked);
+          if (WA.log) WA.log('info', '净化规则「' + cb.dataset.prmOn + '」已' + (cb.checked ? '启用' : '停用'));
+        });
+        panelEl.querySelectorAll('[data-prm-del]').forEach(btn => btn.onclick = () => {
+          const r = WA.purifier.removeRuleSafe(btn.dataset.prmDel);
+          const o = pOut(); if (o) o.textContent = r.ok ? '✓ 已删除，剩 ' + r.remaining + ' 条' : ('删除失败：' + r.reason);
+          renderPruneRefresh();
+        });
+        const prmAdd = $('#wa-prm-add');
+        if (prmAdd) prmAdd.onclick = () => {
+          const r = WA.purifier.addRuleSafe({ find: $('#wa-prm-find').value, replace: $('#wa-prm-repl').value });
+          const o = pOut(); if (o) o.textContent = r.ok ? '✓ 已新增规则（共 ' + r.total + ' 条）' : ('新增失败：' + r.reason);
+          if (r.ok) renderPruneRefresh();
+        };
+        const prmReset = $('#wa-prm-reset');
+        if (prmReset) prmReset.onclick = () => {
+          const r = WA.purifier.resetToBuiltin();
+          const o = pOut(); if (o) o.textContent = '✓ 已恢复内置规则（' + r.total + ' 条）';
+          renderPruneRefresh();
+        };
+        const prmImp = $('#wa-prm-import');
+        if (prmImp) prmImp.onclick = () => {
+          const r = WA.purifier.importPresetSafe($('#wa-prm-json').value);
+          const o = pOut(); if (o) o.textContent = r.ok ? ('✓ 导入 ' + r.added + ' 条' + (r.rejected ? '（拒收 ' + r.rejected + '：' + (r.reasons || []).join('、') + '）' : '')) : ('导入失败：' + r.reason);
+          if (r.ok) renderPruneRefresh();
+        };
+      }
+      function renderPruneRefresh() {
+        try {
+          if (typeof WA.uiSettings.render === 'function' && WA.ui && WA.ui.mounted) {
+            const body = panelEl.querySelector('.wa-body');
+            if (body && body.querySelector('#wa-prm-find')) { body.innerHTML = WA.uiSettings.render(); WA.uiSettings.bind(panelEl); }
+          }
+        } catch (e) {}
+      }
       const npc = $('#wa-set-npc');
       if (npc) npc.oninput = () => { $('#wa-set-npcv').textContent = npc.value; };
       const bg = $('#wa-set-budget');

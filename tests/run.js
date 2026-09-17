@@ -1236,7 +1236,9 @@ WA.loadScript = _ls.loadScript;
   // ══════════ v0.9.6 推演契约对账器（contract-audit）══════════
   // 前置：对账器依赖已初始化的 store（探针要在真实 state 上跑）
   WA.store.init();
-  assert(typeof WA.contractAudit === 'object' && WA.contractAudit.FIELDS.length === 22, 'contractAudit 已加载且字段表为 22 项');
+  assert(typeof WA.contractAudit === 'object' && WA.contractAudit.FIELDS.length >= 22, 'contractAudit 已加载且字段表不少于 22 项（实 ' + (WA.contractAudit && WA.contractAudit.FIELDS.length) + '）');
+  assert(WA.contractAudit.PROBES.events_create && WA.contractAudit.PROBES.events_update, 'v2.2.0 探针表已补事件链两字段（否则对账器对本类漂移失明）');
+  assert(!!(WA.contractAudit.SEEDS && WA.contractAudit.SEEDS.events_update), '更新类探针带基线种子（防假阴性）');
   assert(WA.contractAudit.PROBE_TAG === '__audit_', '探针哨兵标记常量正确');
   assert(Array.isArray(WA.contractAudit.ENUM_ALIGN) && WA.contractAudit.ENUM_ALIGN.length >= 10, '枚举对齐表条目齐全');
   assert(Array.isArray(WA.contractAudit.CROSS_MODULE) && WA.contractAudit.CROSS_MODULE.length === 6, '跨模块漂移扫描表 6 组');
@@ -1253,7 +1255,7 @@ WA.loadScript = _ls.loadScript;
   const caBase = JSON.parse(JSON.stringify(WA.store.get()));
   const caConsumed = WA.contractAudit.consumedFields({ baseState: caBase });
   const caConsumedList = Object.keys(caConsumed).filter(f => caConsumed[f].consumed);
-  assert(caConsumedList.length === 22, '22 个契约字段全部被消费端实测消费: ' + caConsumedList.length + ' -> ' + JSON.stringify(caConsumedList.filter(f => !caConsumed[f].consumed)));
+  assert(caConsumedList.length === WA.contractAudit.FIELDS.length, '全部契约字段被消费端实测消费: ' + caConsumedList.length + '/' + WA.contractAudit.FIELDS.length + ' -> ' + JSON.stringify(caConsumedList.filter(f => !caConsumed[f].consumed)));
   // horizon 委托字段必须被正确识别为已消费（acceptResult 写 live store 而非 draft）
   assert(caConsumed['distantEvent'].consumed === true && caConsumed['nearEvent'].consumed === true, 'distantEvent/nearEvent 经 horizon.acceptResult 消费');
   // 探针不污染真实存档：消费实测后 live store 不含哨兵标记
@@ -1261,7 +1263,7 @@ WA.loadScript = _ls.loadScript;
   // ── 全量对账 ──
   // 用冻结的基线 + 显式 applyFn 闸门：避免 audit 内部再次触发 horizon 掷骰等随机副作用
   const caReport = WA.contractAudit.audit({ baseState: caBase, applyFn: function (d, r, a) { WA.backstage.applyResult(d, r, a); } });
-  assert(caReport.declared.length >= 22 && caReport.consumed.length === 22, '对账报告 declared>=22 / consumed=22');
+  assert(caReport.declared.length >= 22 && caReport.consumed.length === WA.contractAudit.FIELDS.length, '对账报告 declared>=22 / consumed=' + caReport.consumed.length);
   assert(caReport.drift.declaredNotConsumed.length === 0, '无「声明但未消费」漂移');
   assert(caReport.drift.probeNotDeclared.length === 0, '无「消费但未声明」漂移');
   caReport.enums.forEach(e => assert(e.status === 'aligned', '枚举对齐: ' + e.field + ' -> ' + e.status + ' extra=' + JSON.stringify(e.extra || [])));
@@ -1295,7 +1297,7 @@ WA.loadScript = _ls.loadScript;
   assert(caHorizonAfter.distant && caHorizonAfter.near && typeof caHorizonAfter.distant.ledger === 'number', '对账后 horizon 泳道结构完整');
   // ── 降级路径 ──
   const caBroken = WA.contractAudit.consumedFields({ applyFn: null });
-  assert(Object.keys(caBroken).length === 22 && caBroken['clock'].consumed === false, 'applyFn 不可用时全部降级为未消费');
+  assert(Object.keys(caBroken).length === WA.contractAudit.FIELDS.length && caBroken['clock'].consumed === false, 'applyFn 不可用时全部降级为未消费');
   const caNoBase = WA.contractAudit.consumedFields({ baseState: null, applyFn: function () {} });
   assert(caNoBase['clock'].consumed === false && String(caNoBase['clock'].reason || '').indexOf('state') >= 0, '无基准 state 时降级提示');
   // ── 诊断清单登记校验（v0.9.5 防漏机制延续）──
@@ -3571,12 +3573,9 @@ WA.loadScript = _ls.loadScript;
     'evolution.entityMemory.ability': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
     'evolution.entityMemory.location': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
     'evolution.entityMemory.*.events': ['engines/entities.js', /ent\.events\.length > (\d+)/],
-    // v1.5.0 补登：people.<id>.profile 五节（profile.js 档案切片 cap）
-    'people.*.profile.personality': ['actors/profile.js', /push\('personality',\s*r\.personality,\s*(\d+)\)/],
-    'people.*.profile.worldview': ['actors/profile.js', /push\('worldview',\s*r\.worldview,\s*(\d+)\)/],
-    'people.*.profile.family': ['actors/profile.js', /push\('family',\s*r\.family,\s*(\d+)\)/],
-    'people.*.profile.memory': ['actors/profile.js', /push\('memory',\s*r\.memory,\s*(\d+)\)/],
-    'people.*.profile.relationships': ['actors/profile.js', /relationships\.slice\(-(\d+)\)/],
+    // v2.2.0: people.<id>.profile 五节改为「运行时单一真源」——不再与源码字面常量比对，
+    //   改由下方 RUNTIME_CAP_RULES 校验：消费端（registry）写入时从容量登记表取上限，
+    //   且全库不得存在第二处写死该节上限（消除 profile.js 直写 store 造成的双写漂移）。
     'people.*.knowledge': ['engines/backstage.js', /keys\.slice\(0,\s*keys\.length\s*-\s*(\d+)\)/]
   };
   const srcCache = {};
@@ -3598,7 +3597,11 @@ WA.loadScript = _ls.loadScript;
   });
   assert(mismatches.length === 0, '登记表 cap 与源码裁剪常量逐条一致' + (mismatches.length ? '：' + mismatches.join('、') : ''));
   // 登记表与反查规则须覆盖同一集合（consistency 无源码裁剪点，单列）
-  const ruleKeys = Object.keys(CAP_RULES).concat(['consistency']).sort().join(',');
+  // v2.2.0: 档案五节的裁剪上限改为「运行时单一真源」（消费端 actors/registry.js 查本登记表，
+  //   全库无第二处写死），不再是源码字面常量正则反查项。集合比对须把它们计入「已覆盖」，
+  //   否则会被误判为漏登（其运行时校验见 v1.5.0 块的 RUNTIME_CAP_RULES_1500）。
+  const RUNTIME_CAP_KEYS = ['people.*.profile.personality', 'people.*.profile.worldview', 'people.*.profile.family', 'people.*.profile.memory', 'people.*.profile.relationships'];
+  const ruleKeys = Object.keys(CAP_RULES).concat(['consistency']).concat(RUNTIME_CAP_KEYS).sort().join(',');
   assert(Object.keys(caps).sort().join(',') === ruleKeys, '登记表与源码反查集合同集合（无漏登/多登）');
   // ── 假阳性回归：memory 四层灌至各自上限，不得进 unbounded/suspects ──
   WA.store.transact(d => {
@@ -6258,7 +6261,20 @@ WA.loadScript = _ls.loadScript;
   const profSrc1500 = fs.readFileSync(path.join(BASE, 'actors/profile.js'), 'utf8');
   assert((stSrc1500.match(/people\.\*\.profile\./g) || []).length >= 5, '登记表含 profile 五节通配键');
   assert(stSrc1500.indexOf("'people.*.knowledge'") >= 0, '登记表含 knowledge 通配键');
-  assert(profSrc1500.indexOf("push('personality', r.personality, 15)") >= 0 && profSrc1500.indexOf('prof.relationships.slice(-15)') >= 0, 'profile.js 源码切片常量与登记同源');
+  // v2.2.0: 档案节上限从「源码字面常量」升级为「运行时单一真源」——
+  //   旧断言查 profile.js 里的 push('personality', ..., 15) 字面量；现在消费端统一从容量登记表取，
+  //   字面量消失是预期结果（写死常量才是缺陷：登记值与直写值任一处调整即产生 drifted 误报）。
+  const regSrc1500 = fs.readFileSync(path.join(BASE, 'actors/registry.js'), 'utf8');
+  assert(regSrc1500.indexOf("capsFor('people.p_x.profile.' + sec)") > 0, 'registry 写入时从容量登记表取档案节上限（单一真源）');
+  assert(regSrc1500.indexOf('const cap = capOf(sec) || ') > 0 && regSrc1500.indexOf("capOf('relationships') || ") > 0, 'registry 五节上限均走 capOf（含兜底）');
+  assert(profSrc1500.indexOf('WA.registry.setProfileSafe') > 0, 'profile.js 已改走 registry 契约（消除双写漂移）');
+  const RUNTIME_CAP_RULES_1500 = { 'personality': /capOf\(sec\)/, 'worldview': /capOf\(sec\)/, 'family': /capOf\(sec\)/, 'memory': /capOf\(sec\)/, 'relationships': /capOf\('relationships'\)/ };
+  const runtimeBad1500 = [];
+  Object.keys(RUNTIME_CAP_RULES_1500).forEach(function (sec) {
+    if (!RUNTIME_CAP_RULES_1500[sec].test(regSrc1500)) runtimeBad1500.push(sec + '(消费端未查登记表)');
+    if (profSrc1500.indexOf("push('" + sec + "'") >= 0) runtimeBad1500.push(sec + '(profile.js 仍写死上限)');
+  });
+  assert(runtimeBad1500.length === 0, '档案五节为运行时单一真源（消费端查登记表 + 无第二处写死）' + (runtimeBad1500.length ? '：' + runtimeBad1500.join('、') : ''));
   assert(runSrc1500.indexOf("'people.*.knowledge'") >= 0 && runSrc1500.indexOf("'people.*.profile.relationships'") >= 0, 'CAP_RULES 同步 6 条 people 规则');
   assert(stSrc1500.indexOf('v1.5.0: people 档案盘点') >= 0, 'maintain people 盘点分支存在');
   assert(stSrc1500.indexOf('pmem: [],') >= 0, 'schema pmem 物化行存在');
@@ -6799,6 +6815,1351 @@ WA.loadScript = _ls.loadScript;
   ctx2000.chatId = prevChat2000;
   LS2000.clear();
   } // end v2.0.0 block
+  v2100: {
+  const LS2100 = global.localStorage;
+  const ctx2100 = global.SillyTavern.getContext();
+  const prevChat2100 = ctx2100.chatId;
+  const iSrc2100 = fs.readFileSync(path.join(BASE, 'core/interceptor.js'), 'utf8');
+  const pSrc2100 = fs.readFileSync(path.join(BASE, 'render/purifier.js'), 'utf8');
+  const sSrc2100 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  function fresh2100() { LS2100.clear(); ctx2100.chatId = 'v2100_chat'; global.__mockChat.length = 0; WA.store.init(); }
+  function purStat2100() { return WA.purifier.stat(); }
+
+  // ── A. 块1：输出净化接入（此前 apply 全库零调用 = 功能整体失效）──
+  fresh2100();
+  section('v2.1.0 块1：输出净化接入（修功能级失效）');
+  assert(typeof WA.purifier.applySafe === 'function', 'purifier.applySafe 存在（安全入口）');
+  assert(typeof WA.purifier.stat === 'function', 'purifier.stat 存在（可观测通道）');
+  assert(iSrc2100.indexOf('MESSAGE_RECEIVED && !purifyHooked') > 0, '输出侧挂载在位（MESSAGE_RECEIVED）');
+  assert(iSrc2100.indexOf('__purifiedRaw = new WeakMap()') > 0, '原文快照容器在位（WeakMap，不污染 chat 存档）');
+  assert(pSrc2100.indexOf('__purifyStat.charsSaved') > 0, 'purifier 观测对象在位');
+  assert(sSrc2100.indexOf('purifyRuleErrors') > 0, 'store 消费净化统计在位');
+  assert(iSrc2100.indexOf("WA.emit('purify:changed'") < 0, '不自造新死事件（stat() 通道已足够）');
+
+  // A1. 功能级生效：AI 回复真的被净化
+  const chat2100 = global.__mockChat;
+  WA.interceptor.install();
+  const ORIG2100 = '\u8499\u9762\u4eba\u538b\u4f4e\u58f0\u97f3\uff1a\u300c\u4f60\u4e0d\u8be5\u6765\u8fd9\u91cc\u3002\u300d<think>\u6211\u5e94\u8be5\u8ba9\u4ed6\u5f00\u53e3</think>\u7a97\u5916\u7a81\u7136\u4f20\u6765\u9a6c\u8e44\u58f0\u3002';
+  chat2100.push({ is_user: false, name: '\u65c1\u767d', mes: ORIG2100, swipe_id: 0 });
+  const stB2100 = purStat2100();
+  await global.__triggerEvent('msg_recv', chat2100.length - 1);
+  const stA2100 = purStat2100();
+  assert(stA2100.runs === stB2100.runs + 1, '事件触发后净化真的跑了（runs+1）');
+  assert(stA2100.changed === stB2100.changed + 1, '命中计数可见（changed+1）');
+  assert(chat2100[chat2100.length - 1].mes.indexOf('<think>') < 0, 'AI 回复中的思考块已被移除（此前原样进入消息）');
+  assert(chat2100[chat2100.length - 1].mes.indexOf('\u9a6c\u8e44\u58f0') > 0, '正文保留（不是被整条删）');
+  assert(stA2100.charsSaved >= 20, '省下字符数可见');
+  assert(stA2100.lastRules.indexOf('think_block') >= 0, '命中规则 id 可追溯');
+
+  // A2. 口径隔离：世界推进读原文，不读净化后文本
+  const origRun2100 = WA.workflow.run;
+  let seen2100 = null;
+  WA.workflow.run = async function (phase, actx) {
+    if (phase === 'after' && actx && actx.chat && actx.chat.length) seen2100 = actx.chat[actx.chat.length - 1].mes;
+    return origRun2100.apply(this, arguments);
+  };
+  chat2100[chat2100.length - 1].mes = ORIG2100;
+  await global.__triggerEvent('msg_recv', chat2100.length - 1);
+  const purified2100 = chat2100[chat2100.length - 1].mes;
+  await global.__triggerEvent('gen_ended');
+  WA.workflow.run = origRun2100;
+  assert(seen2100 === ORIG2100, '世界推进读到的是原文（含思考块）——显示层未污染推进口径');
+  assert(chat2100[chat2100.length - 1].mes === purified2100, '推进结束后恢复净化文本（用户所见不回退）');
+  assert(purified2100.indexOf('<think>') < 0, '恢复的确实是净化后文本');
+
+  // A3. 空结果守卫：规则过宽不能吞掉整条回复
+  const savedR2100 = WA.purifier.rules.slice();
+  WA.purifier.rules = [{ id: 'probe_eat_all', find: '[\\s\\S]*', replace: '', flags: 'g', enabled: true }];
+  const stG2100 = purStat2100();
+  const TXT2100 = '\u8fd9\u662f\u4e00\u6761\u5f88\u957f\u7684\u6b63\u6587\uff0c\u4e0d\u80fd\u88ab\u541e\u3002';
+  assert(WA.purifier.applySafe(TXT2100) === TXT2100, '净化后为空时回退原文（防整条消失）');
+  assert(purStat2100().blocked === stG2100.blocked + 1, 'blocked 计数可见');
+  assert(purStat2100().changed === stG2100.changed, '被拦下不计入 changed（不误报成功）');
+  WA.purifier.rules = savedR2100;
+
+  // A4. 规则异常可见（静态正则扫描抓不到运行时异常）
+  const savedR2_2100 = WA.purifier.rules.slice();
+  WA.purifier.rules = [{ id: 'probe_bad_re', find: '[', replace: '', flags: 'g', enabled: true }];
+  let threw2100 = false;
+  const stE2100 = purStat2100();
+  try { WA.purifier.applySafe('\u6b63\u6587'); } catch (e) { threw2100 = true; }
+  assert(!threw2100, '非法正则不抛出（不能弄挂生成流程）');
+  assert(purStat2100().ruleErrors === stE2100.ruleErrors + 1, 'ruleErrors 计数可见');
+  WA.purifier.rules = [{ id: 'probe_rt_err', find: '\u6b63\u6587', replace: function () { throw new Error('probe-rt'); }, flags: 'g', enabled: true }];
+  const stR2100 = purStat2100();
+  let threw2100b = false, outR2100 = null;
+  try { outR2100 = WA.purifier.applySafe('\u6b63\u6587'); } catch (e) { threw2100b = true; }
+  assert(!threw2100b, '替换值运行时抛错也不弄挂流程');
+  assert(purStat2100().ruleErrors === stR2100.ruleErrors + 1, '运行时异常计入 ruleErrors（静态扫描抓不到）');
+  assert(outR2100 === '\u6b63\u6587', '异常规则被跳过后正文原样返回');
+  WA.purifier.rules = savedR2_2100;
+
+  // A5. 巡视消费净化统计（engine.purifier 扩展）
+  const m0_2100 = WA.store.maintain({ deep: true });
+  assert(m0_2100.signals.purifyRuns > 0, 'deep 巡视透出净化运行数（此前无任何消费）');
+  assert(m0_2100.signals.purifyChanged > 0, 'deep 巡视透出命中数');
+  const base2100 = m0_2100.score;
+  const savedR3_2100 = WA.purifier.rules.slice();
+  WA.purifier.rules = [{ id: 'probe_rt_err2', find: '\u6b63\u6587', replace: function () { throw new Error('probe-rt2'); }, flags: 'g', enabled: true }];
+  WA.purifier.applySafe('\u6b63\u6587');
+  const m1_2100 = WA.store.maintain({ deep: true });
+  WA.purifier.rules = savedR3_2100;
+  assert(m1_2100.signals.purifierBadRules === 0, '静态非法规则为 0（排除旧通道掩盖）');
+  assert(!!(m1_2100.issues || []).find(function (i) { return i.key === 'engine.purifier'; }), '规则异常产 engine.purifier 议题');
+  assert(m1_2100.signals.purifyRuleErrors > 0, 'signals.purifyRuleErrors 可见');
+  assert(m1_2100.score < base2100, '健康分不假绿（低于基线）');
+  assert(m1_2100.score >= 0, '分数不为负');
+  assert(sSrc2100.indexOf('Math.min(6, purifyRuleErrors * 2)') > 0, '净化异常扣分公式在位（封顶 6）');
+
+  // A6. 边界：用户消息不被净化 / 空文本 / 未装配降级
+  chat2100.push({ is_user: true, mes: '\u6211\u7684\u8f93\u5165<think>\u4e0d\u8be5\u52a8</think>', swipe_id: 0 });
+  const stU2100 = purStat2100();
+  await global.__triggerEvent('msg_recv', chat2100.length - 1);
+  assert(chat2100[chat2100.length - 1].mes.indexOf('<think>') >= 0, '用户消息不被净化（不改用户输入）');
+  assert(purStat2100().runs === stU2100.runs, '用户消息不计入净化运行数');
+  chat2100.pop();
+  const stZ2100 = purStat2100();
+  WA.purifier.applySafe('');
+  assert(purStat2100().runs === stZ2100.runs + 1 && purStat2100().changed === stZ2100.changed, '空文本不误报为命中');
+  assert(iSrc2100.indexOf("typeof WA.purifier.applySafe !== 'function'") > 0, '净化模块缺失时安全降级（不抛错）');
+  assert(/catch \(e\) \{ WA\.log\('warn', '\u8f93\u51fa\u51c0\u5316\u5931\u8d25/.test(iSrc2100), '净化异常不影响生成结果');
+  assert(!/^(hygiene|quarantine|state)\./.test('engine.purifier'), '议题键 engine.purifier 避开卫生指纹正则');
+
+  // ── 清理现场 ──
+  ctx2100.chatId = prevChat2100;
+  LS2100.clear();
+  // ── B. 块2：世界钟自动推进（此前 suggestAdvance 零消费 = 功能整体失效）──
+  fresh2100();
+  section('v2.1.0 块2：世界钟自动推进（修功能级失效）');
+  const cSrc2100 = fs.readFileSync(path.join(BASE, 'engines/calendar.js'), 'utf8');
+  const pSrcCal2100 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(typeof WA.calendar.autoAdvance === 'function', 'calendar.autoAdvance 存在');
+  assert(typeof WA.calendar.stat === 'function', 'calendar.stat 存在（可观测）');
+  const calNode2100 = WA.workflow.list('after').find(function (n) { return n.id === 'calendar.autoAdvance'; });
+  assert(!!calNode2100, 'after 链注册了 calendar.autoAdvance 节点');
+  assert(calNode2100 && calNode2100.order === 12, '节点 order 12（先于演化/记忆）');
+  assert(WA.calendar.suggestAdvance('\u6b21\u65e5\u6e05\u6668\uff0c\u4ed6\u8d70\u51fa\u5c4b\u95e8\u3002') === 'day', '「次日」→ day');
+  assert(WA.calendar.suggestAdvance('\u9ec4\u660f\u65f6\u5206\u96e8\u505c\u4e86\u3002') === 'evening', '「黄昏」→ evening');
+  assert(WA.calendar.suggestAdvance('\u7834\u6653\u524d\u7684\u98ce\u5f88\u51b7\u3002') === 'dawn', '「破晓」→ dawn');
+  assert(WA.calendar.suggestAdvance(null) === null, '空值不报错');
+
+  // B1. 功能级生效：世界钟真的走了
+  WA.store.transact(function (d) { d.clock = { iso: '', label: '\u7b2c1\u65e5\u00b7\u9ec4\u660f', dayIndex: 1, source: 'user' }; });
+  const stCal0 = WA.calendar.stat();
+  const rc2100 = WA.calendar.autoAdvance('\u6b21\u65e5\uff0c\u9633\u5149\u7167\u8fdb\u7a97\u5185\u3002');
+  assert(rc2100.ok === true && rc2100.kind === 'day', '正文「次日」推进成功（kind=day）');
+  assert(WA.store.read('clock.dayIndex', 0) === 2, 'dayIndex 1 → 2（此前永远不动）');
+  assert(WA.store.read('clock.label', '') === '\u7b2c2\u65e5\u00b7\u9ec4\u660f', '跳日保留时段信息（第1日·黄昏 → 第2日·黄昏）');
+  assert(WA.store.read('clock.source', '') === 'text', 'source 记为 text（区分手动 user）');
+  assert(WA.calendar.stat().advanced === stCal0.advanced + 1, 'advanced 计数可见');
+
+  // B2. 无时间词不推进
+  const calBefore2100 = WA.store.read('clock.label', '');
+  const rn2100 = WA.calendar.autoAdvance('\u4ed6\u62ac\u8d77\u5934\uff0c\u770b\u4e86\u4e00\u773c\u3002');
+  assert(rn2100.ok === false && rn2100.reason === 'no-time-word', '无时间词不推进（不噪声推进）');
+  assert(WA.store.read('clock.label', '') === calBefore2100, '世界钟原地不动');
+  assert(WA.calendar.stat().noSignal > 0, 'noSignal 计数可见');
+
+  // B3. 去重：重掷不双计
+  const dupT2100 = '\u9ec4\u660f\u65f6\u5206\uff0c\u706f\u706b\u4eae\u8d77\u3002';
+  const rd1_2100 = WA.calendar.autoAdvance(dupT2100);
+  const lbl1_2100 = WA.store.read('clock.label', '');
+  const rd2_2100 = WA.calendar.autoAdvance(dupT2100);
+  assert(rd1_2100.ok === true, '首次推进成功');
+  assert(rd2_2100.ok === false && rd2_2100.reason === 'dedup', '同文本重复不双计（dedup）');
+  assert(WA.store.read('clock.label', '') === lbl1_2100, '世界钟未被双推');
+  assert(WA.calendar.stat().deduped > 0, 'deduped 计数可见');
+
+  // B4. 可关闭（面板开关）
+  WA.calendar.setSettings({ auto: false });
+  assert(WA.calendar.stat().auto === false, 'stat().auto 反映开关状态');
+  const rOff2100 = WA.calendar.autoAdvance('\u6b21\u65e5\u53c8\u4e0b\u96e8\u4e86\u3002');
+  assert(rOff2100.ok === false && rOff2100.reason === 'disabled', '关闭后不推进');
+  const rForce2100 = WA.calendar.autoAdvance('\u6b21\u65e5\u53c8\u4e0b\u96e8\u4e86\u3002', { force: true });
+  assert(rForce2100.ok === true, 'force 可旁路关闭（手动追推入口）');
+  WA.calendar.setSettings({ auto: true });
+  assert(WA.calendar.stat().auto === true, '重新开启生效');
+
+  // B5. 端到端：真实 after 链驱动
+  WA.interceptor.install();
+  chat2100.push({ is_user: false, name: '\u65c1\u767d', mes: '\u6b21\u65e5\uff0c\u4ed6\u63a8\u5f00\u9152\u9986\u7684\u95e8\u3002', swipe_id: 0 });
+  const dayE2E2100 = WA.store.read('clock.dayIndex', 0);
+  await global.__triggerEvent('gen_ended');
+  assert(WA.store.read('clock.dayIndex', 0) === dayE2E2100 + 1, '端到端：gen_ended 后世界钟真的推了一天（此前链里无任何时间推进）');
+
+  // B6. 巡视可见
+  const mCal2100 = WA.store.maintain({});
+  assert(mCal2100.signals.calendarAdvances > 0, '巡视透出自动推进次数');
+  assert(mCal2100.signals.calendarRuns > 0, '巡视透出检查次数');
+  assert(mCal2100.signals.calendarAuto === true, '巡视透出开关状态');
+  const savedCalMod2100 = WA.calendar;
+  WA.calendar = null;
+  const mCalNo2100 = WA.store.maintain({});
+  WA.calendar = savedCalMod2100;
+  assert(!!(mCalNo2100.issues || []).find(function (i) { return i.key === 'engine.calendar'; }), '世界钟模块缺失产 engine.calendar 议题');
+  assert(!/^(hygiene|quarantine|state)\./.test('engine.calendar'), '议题键 engine.calendar 避开卫生指纹正则');
+  assert(cSrc2100.indexOf('worldaxis_calendar_settings_v1') > 0, '设置键走 settingsBus（可迁移/损坏隔离）');
+  assert(pSrcCal2100.indexOf('wa-cal-auto') > 0, '面板开关已接线');
+  assert(pSrcCal2100.indexOf('calendar.stat') > 0, '面板展示推进留痕');
+  // ── C. 块3：AI 剧情弧线接入（此前 generatePlan 零调用 = AI 参谋形同虚设）──
+  fresh2100();
+  section('v2.1.0 块3：AI 剧情弧线接入（修功能级失效）');
+  const oSrc2100 = fs.readFileSync(path.join(BASE, 'direction/oracle.js'), 'utf8');
+  const uSrc2100 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  assert(typeof WA.oracle.generatePlanSafe === 'function', 'oracle.generatePlanSafe 存在（面板入口）');
+  assert(typeof WA.oracle.stat === 'function', 'oracle.stat 存在（可观测）');
+  assert(uSrc2100.indexOf('wa-or-gen') > 0, '面板渲染了「AI 生成弧线」按钮');
+  assert(/on\('#wa-or-gen',[\s\S]{0,400}generatePlanSafe/.test(uSrc2100), '按钮已绑定到安全入口（有按钮无绑定 = 死按钮）');
+  assert(/on\('#wa-beat-next'[\s\S]{0,200}WA\.oracle\.advance\(\)/.test(uSrc2100), '面板「完成本拍」改走 advance()（单一实现）');
+  assert(uSrc2100.indexOf('WA.oracle.plan.current++') < 0, '旧的直接 current++ 已移除');
+
+  // C1. 守卫：空目标 / 通道未配置
+  LS2100.removeItem('worldaxis_oracle_plan_v1');
+  WA.oracle.setPlan(null);
+  const rEmpty2100 = await WA.oracle.generatePlanSafe('   ', 5);
+  assert(rEmpty2100.ok === false && rEmpty2100.reason === 'empty-goal', '空目标拒绝（不浪费通道配额）');
+  const savedJudge2100 = JSON.parse(JSON.stringify(WA.apiRouter.getChannel('judge')));
+  WA.apiRouter.setChannel && WA.apiRouter.setChannel('judge', { baseUrl: '', model: '' });
+  const rNoCfg2100 = await WA.oracle.generatePlanSafe('\u63ed\u5f00\u8499\u9762\u4eba\u8eab\u4efd', 5);
+  assert(rNoCfg2100.ok === false && rNoCfg2100.reason === 'judge-not-configured', '通道未配置给出明确原因（不吞错）');
+
+  // C2. 功能级生效：真的从通道生成弧线
+  WA.apiRouter.setChannel && WA.apiRouter.setChannel('judge', Object.assign({}, savedJudge2100, { baseUrl: 'http://probe.local/v1', model: 'probe-model' }));
+  global.__pushApiJson({ beats: [
+    { goal: '\u63a5\u8fd1\u8499\u9762\u4eba', instruction: '\u8ba9\u73a9\u5bb6\u5728\u9152\u9986\u62fe\u5230\u5b57\u6761' },
+    { goal: '\u5957\u8bdd', instruction: '\u5bf9\u8bdd\u4e2d\u900f\u9732\u7ebf\u7d22' },
+    { goal: '\u63ed\u9762', instruction: '\u7a81\u53d1\u4e8b\u4ef6\u903c\u8feb\u5bf9\u65b9\u644a\u724c' }
+  ] });
+  const stOr0 = WA.oracle.stat();
+  const rGen2100 = await WA.oracle.generatePlanSafe('\u63ed\u5f00\u8499\u9762\u4eba\u8eab\u4efd', 3);
+  assert(rGen2100.ok === true && rGen2100.count === 3, '生成成功且拍数正确（此前零调用）');
+  assert(!!WA.oracle.plan && WA.oracle.plan.beats.length === 3, '弧线已落入 oracle.plan');
+  assert(WA.oracle.currentBeat().goal === '\u63a5\u8fd1\u8499\u9762\u4eba', '当前拍为第一拍');
+  assert(WA.oracle.stat().generated === stOr0.generated + 1, 'generated 计数可见');
+  assert(!!LS2100.getItem('worldaxis_oracle_plan_v1'), '弧线已落盘（刷新不丢）');
+
+  // C3. before 链真的注入了当前拍
+  const bctx2100 = { type: 'normal', chat: chat2100, store: WA.store.get(), branchId: 'b0', injections: [], canceled: false };
+  await WA.workflow.run('before', bctx2100);
+  const inj2100 = (bctx2100.injections || []).map(function (x) { return x.content; }).join('\n');
+  assert(inj2100.indexOf('\u63a5\u8fd1\u8499\u9762\u4eba') > 0, 'before 链注入了当前拍目标');
+  assert(inj2100.indexOf('plot_guidance') > 0, '注入带隔离标签（仅 AI 可见）');
+
+  // C4. 推进与末拍清理
+  const stAd0 = WA.oracle.stat();
+  assert(WA.oracle.advance() === false, '非末拍：advance 返回 false');
+  assert(WA.oracle.currentBeat().goal === '\u5957\u8bdd', '当前拍已推进');
+  assert(WA.oracle.stat().advanced === stAd0.advanced + 1, 'advanced 计数可见');
+  WA.oracle.advance();
+  assert(WA.oracle.advance() === true, '末拍：advance 返回 true（清理语义）');
+  assert(WA.oracle.plan === null, '末拍后计划已清理（此前面板直接 current++ 不会触发）');
+  assert(!LS2100.getItem('worldaxis_oracle_plan_v1'), '清理后落盘键已删');
+
+  // C5. 失败不吞：空拍 / 抛错（且归因带真实错误类型）
+  global.__pushApiJson({ beats: [] });
+  const rEmptyBeats2100 = await WA.oracle.generatePlanSafe('\u65e0\u6548\u76ee\u6807', 3);
+  assert(rEmptyBeats2100.ok === false && rEmptyBeats2100.reason === 'api-fail', '空拍返回 api-fail（不建立空计划）');
+  assert(WA.oracle.plan === null, '失败时不污染现有计划');
+  const origCall2100 = WA.apiRouter.call;
+  WA.apiRouter.call = async function () { throw new Error('probe-boom'); };
+  const rThrow2100 = await WA.oracle.generatePlanSafe('\u629b\u9519\u76ee\u6807', 3);
+  WA.apiRouter.call = origCall2100;
+  assert(rThrow2100.ok === false && String(rThrow2100.reason).indexOf('api-fail') === 0, '抛错被捕获并归因（不崩面板）');
+  assert(String(rThrow2100.reason).indexOf('probe-boom') > 0, '归因带真实错误类型（此前裸 catch 洗成笼统 api-fail）');
+
+  // C6. 巡视可见（配置缺失不扣分，真实失败才扣）
+  const mOrReal2100 = WA.store.maintain({});
+  assert(mOrReal2100.signals.oracleGenerated >= 1, '巡视透出生成成功数');
+  assert(mOrReal2100.signals.oracleFailed >= 1, '巡视透出失败数');
+  const origStatOr2100 = WA.oracle.stat;
+  WA.oracle.stat = function () { return Object.assign(origStatOr2100.call(WA.oracle), { failed: 0, lastReason: null }); };
+  const mOrBase2100 = WA.store.maintain({});
+  WA.oracle.stat = origStatOr2100;
+  WA.oracle.stat = function () { return Object.assign(origStatOr2100.call(WA.oracle), { failed: 3, lastReason: 'judge-not-configured' }); };
+  const mOrCfg2100 = WA.store.maintain({});
+  WA.oracle.stat = origStatOr2100;
+  assert(!(mOrCfg2100.issues || []).find(function (i) { return i.key === 'engine.oracle'; }), '通道未配置不产议题（属用户配置非故障）');
+  assert(mOrCfg2100.score === mOrBase2100.score, '配置缺失不扣分（不污染基线）');
+  WA.oracle.stat = function () { return Object.assign(origStatOr2100.call(WA.oracle), { failed: 3, lastReason: 'api-fail' }); };
+  const mOrFail2100 = WA.store.maintain({});
+  WA.oracle.stat = origStatOr2100;
+  assert(!!(mOrFail2100.issues || []).find(function (i) { return i.key === 'engine.oracle'; }), '真实生成失败产 engine.oracle 议题');
+  assert(mOrFail2100.score < mOrBase2100.score, '真实失败扣分（不假绿）');
+  assert(!/^(hygiene|quarantine|state)\./.test('engine.oracle'), '议题键 engine.oracle 避开卫生指纹正则');
+  assert(oSrc2100.indexOf('__orStat') > 0, 'oracle 观测对象在位');
+  // ── D. 块4：死事件治理（9 个「只广播无接收」）──
+  fresh2100();
+  section('v2.1.0 块4：死事件治理（修功能级失效）');
+  {
+    const uSrcD2100 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    const sSrcD2100 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    assert(uSrcD2100.indexOf('STATE_EVENTS.forEach') > 0, '面板订阅已接线');
+    assert(uSrcD2100.indexOf('__rerStat.ran') > 0, '重绘计数在位');
+    assert(sSrcD2100.indexOf('Math.min(6, busDead * 2)') > 0, '扣分上限公式在位');
+    assert(sSrcD2100.indexOf('WA.ui.mounted === true') > 0, '计分门控在位');
+    assert(sSrcD2100.indexOf('(r.listeners || 0) === 0') > 0, '死信号口径为「当前仍无接收方」（防挂载后永久误报）');
+    assert(!/^(hygiene|quarantine|state)\./.test('bus.dead'), '议题键 bus.dead 避开卫生指纹正则');
+
+    // 轻量 DOM stub + 显式加载 panel.js（run.js 的 LOAD 跳过 UI）
+    const mkEl2100 = function (tag) {
+      const el = {
+        tagName: String(tag || 'div').toUpperCase(), children: [], style: {}, dataset: {},
+        value: '', textContent: '', innerHTML: '', disabled: false, onclick: null, onchange: null,
+        classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+          toggle(c, f) { if (f === undefined) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); } else if (f) this._s.add(c); else this._s.delete(c); },
+          contains(c) { return this._s.has(c); } },
+        appendChild(c) { this.children.push(c); return c; },
+        setAttribute(k, v) { this[k] = v; },
+        addEventListener() {}, setPointerCapture() {},
+        getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0 }; },
+        querySelector() { return mkEl2100('div'); }, querySelectorAll() { return []; }, contains() { return false; },
+        get firstElementChild() {
+          if (!global.__firstChildEl2100) { const e = mkEl2100('div'); e.id = 'wa-panel'; e.classList.add('wa-hidden'); global.__firstChildEl2100 = e; }
+          return global.__firstChildEl2100;
+        }
+      };
+      return el;
+    };
+    const savedDoc2100 = global.document;
+    const savedActive2100 = global.document.activeElement;
+    global.document.head = mkEl2100('head');
+    global.document.documentElement = mkEl2100('html');
+    global.document.body = mkEl2100('body');
+    global.document.createElement = (t) => mkEl2100(t);
+    global.document.getElementById = () => null;
+    global.document.activeElement = null;
+    global.__firstChildEl2100 = null;
+    vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+    const EV2100 = WA.ui.STATE_EVENTS.slice();
+    assert(Array.isArray(EV2100) && EV2100.length === 9, '状态事件清单为 9 个');
+    assert(WA.ui.mounted === false, '挂载前 mounted=false');
+
+    // D1. 断链现场 → 挂载后全部被接收
+    EV2100.forEach(function (e) { WA.emit(e); });
+    const bsA2100 = WA.busStats(999), mapA2100 = {};
+    (bsA2100.events || []).forEach(function (r) { mapA2100[r.event] = r.dead || 0; });
+    const deadBefore2100 = EV2100.filter(function (e) { return (mapA2100[e] || 0) > 0; });
+    assert(deadBefore2100.length === 9, '挂载前 9 个事件全是死信号（断链现场）');
+    WA.store.init();
+    WA.ui.mount();
+    assert(WA.ui.mounted === true, '挂载后 mounted=true');
+    EV2100.forEach(function (e) { WA.emit(e); });
+    const bsB2100 = WA.busStats(999), mapB2100 = {};
+    (bsB2100.events || []).forEach(function (r) { mapB2100[r.event] = r.dead || 0; });
+    assert(EV2100.every(function (e) { return (mapB2100[e] || 0) === (mapA2100[e] || 0); }), '全部 9 个事件挂载后 dead 零增长（死信号已治理）');
+
+    // D2. 重绘语义：隐藏不重绘 / 节流 / 输入中不重绘
+    const rsA2100 = WA.ui.rerenderStat();
+    WA.emit('clock:changed', '\u7b2c2\u65e5');
+    const rsB2100 = WA.ui.rerenderStat();
+    assert(rsB2100.scheduled === rsA2100.scheduled + 1, '状态事件已调度重绘');
+    assert(rsB2100.skippedHidden === rsA2100.skippedHidden + 1, '面板隐藏时不重绘（避免无效渲染）');
+    assert(rsB2100.lastWhy === 'clock:changed', '重绘原因可追溯');
+
+    WA.ui.open();
+    const rsC2100 = WA.ui.rerenderStat();
+    WA.emit('chapters:changed'); WA.emit('registry:changed'); WA.emit('oracle:plan');
+    await new Promise(function (r) { setTimeout(r, 320); });
+    const rsD2100 = WA.ui.rerenderStat();
+    assert(rsD2100.scheduled === rsC2100.scheduled + 3, '三次变更都被调度');
+    assert(rsD2100.ran === rsC2100.ran + 1, '节流：窗口内多次变更只重绘一次（防重绘风暴）');
+
+    const fakeInput2100 = mkEl2100('input');
+    const panelEl2100 = global.__firstChildEl2100;
+    const origContains2100 = panelEl2100.contains;
+    panelEl2100.contains = function (x) { return x === fakeInput2100; };
+    global.document.activeElement = fakeInput2100;
+    const rsE2100 = WA.ui.rerenderStat();
+    WA.emit('chat:changed');
+    const rsF2100 = WA.ui.rerenderStat();
+    assert(rsF2100.skippedTyping === rsE2100.skippedTyping + 1, '面板内输入中不重绘（防抹掉未提交输入）');
+    global.document.activeElement = null;
+    panelEl2100.contains = origContains2100;
+
+    // D3. 巡视可见（含门控）
+    const mClean2100 = WA.store.maintain({});
+    // 口径：本测试文件前序块发射过合成事件（t.bus.*）用于验证 busStats 本身，
+    //   它们不是产品事件；此处只看产品事件维度（真实运行时不存在合成事件）。
+    const prodDead2100 = (mClean2100.signals.busDeadEvents || []).filter(function (e) {
+      return EV2100.some(function (s) { return e.indexOf(s + '(') === 0; });
+    });
+    assert(prodDead2100.length === 0, '9 个产品事件均不在死信号清单（已治理）', JSON.stringify(prodDead2100));
+    const busIssue2100 = (mClean2100.issues || []).find(function (i) { return i.key === 'bus.dead'; });
+    assert(!busIssue2100 || prodDead2100.length === 0, '产品事件不产 bus.dead 议题');
+    const savedMounted2100 = WA.ui.mounted;
+    WA.ui.mounted = false;
+    WA.emit('__probe_headless_dead__');
+    const mHeadless2100 = WA.store.maintain({});
+    WA.ui.mounted = savedMounted2100;
+    assert(mHeadless2100.signals.busDead === 0, '未挂载 UI 时不计分（不把环境差异当故障）');
+    WA.emit('__probe_headless_dead__');
+    const mRealDead2100 = WA.store.maintain({});
+    assert(mRealDead2100.signals.busDead >= 1, '挂载状态下真有死信号则可见');
+    assert(!!(mRealDead2100.issues || []).find(function (i) { return i.key === 'bus.dead'; }), '产 bus.dead 议题');
+    assert(mRealDead2100.signals.busDeadEvents.join(',').indexOf('__probe_headless_dead__') >= 0, '议题点名具体事件');
+    const mBaseClean2100 = WA.store.maintain({});
+    assert(mRealDead2100.score <= mBaseClean2100.score, '死信号扣分（不假绿）');
+
+    // 还原 document
+    global.document = savedDoc2100;
+    global.document.activeElement = savedActive2100;
+    global.__firstChildEl2100 = null;
+    delete WA.ui.mounted;
+    WA.ui.mounted = true;   // 保持挂载态，避免影响后续块
+  }
+  // ── E. 块5：工作流节点失败入巡视（此前失败原因不可查、巡视看不见）──
+  fresh2100();
+  section('v2.1.0 块5：工作流节点失败入巡视（修可观测性断链）');
+  {
+    const wSrcE2100 = fs.readFileSync(path.join(BASE, 'core/workflow.js'), 'utf8');
+    const sSrcE2100 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    assert(typeof WA.workflow.fails === 'function', 'workflow.fails 存在（失败台账只读视图）');
+    assert(typeof WA.workflow.failStats === 'function', 'workflow.failStats 存在');
+    assert(wSrcE2100.indexOf('recFail(node.id, node.label, chain') > 0, '失败入台账已接线（语义：台账写入调用在位）');
+    assert(wSrcE2100.indexOf('const FAIL_MAX = 30;') > 0, '台账有界（cap 30）');
+    assert(wSrcE2100.indexOf('let __wfSeq = 0;') > 0, '单调序号游标在位（不依赖 Date.now，免疫毫秒同刻与时钟回拨）');
+    assert(sSrcE2100.indexOf('let __lastPatrolSeq = -1;') > 0, '巡视游标首轮哨兵 -1（首轮只建基线不追溯）');
+
+    // E1. 断链现场：节点失败不中断链（设计如此）但原因要可查
+    const NID2100 = '__probe_fail_node__';
+    WA.workflow.register({ id: NID2100, chain: 'probechain_e', order: 1, label: '探针失败节点', async run() { throw new Error('probe-node-boom'); } });
+    WA.workflow.register({ id: '__probe_ok_node__', chain: 'probechain_e', order: 2, label: '探针正常节点', async run() {} });
+    const f0E2100 = WA.workflow.fails(10);
+    let s1Leaked2100 = false;
+    try { await WA.workflow.run('probechain_e', {}); } catch (e) { s1Leaked2100 = true; }
+    const f1E2100 = WA.workflow.fails(10);
+    assert(!s1Leaked2100, '非 critical 失败不中断链（§1 现场不 reject）');
+    assert(f1E2100.tracked === f0E2100.tracked + 1, '失败已记入台账（此前只有日志与计数）');
+    assert(f1E2100.items[0].id === NID2100, '台账点名失败节点');
+    assert(f1E2100.items[0].msg.indexOf('probe-node-boom') >= 0, '台账带失败原因（此前原因不可查）');
+    assert(f1E2100.items[0].chain === 'probechain_e', '台账记链名');
+    assert(WA.workflow.failStats().byId[NID2100] === 1, 'failStats 按节点汇总');
+    assert(WA.workflow.failStats().max === 30, '上限可见');
+    assert(typeof WA.workflow.failStats().seq === 'number', 'failStats 透出台账序号（供巡视游标推进）');
+
+    // E2. 中断语义双向契约（对照组：确保断言真在测语义，而非被异常逃逸欺骗）
+    WA.workflow.register({ id: '__probe_crit__', chain: 'probechain_crit_e', order: 1, label: '关键节点', critical: true, async run() { throw new Error('probe-crit-boom'); } });
+    let critThrew2100 = false;
+    try { await WA.workflow.run('probechain_crit_e', {}); } catch (e) { critThrew2100 = true; }
+    assert(critThrew2100, 'critical 节点失败必须中断链（对照组）');
+    WA.workflow.register({ id: '__probe_nc__', chain: 'probechain_nc_e', order: 1, label: '非关键节点', async run() { throw new Error('probe-nc-boom'); } });
+    let ncThrew2100 = false;
+    try { await WA.workflow.run('probechain_nc_e', {}); } catch (e) { ncThrew2100 = true; }
+    assert(!ncThrew2100, '非 critical 失败不中断链（不外抛）');
+
+    // E3. 巡视：本轮新增失败可见且扣分（存量不追溯）
+    WA.store.maintain({});                       // 消化前序失败，推进游标
+    const mBaseE2100 = WA.store.maintain({});    // 干净基线
+    try { await WA.workflow.run('probechain_e', {}); } catch (e) {}
+    const mFailE2100 = WA.store.maintain({});
+    assert(mFailE2100.signals.wfNewFails >= 1, '巡视透出本轮新增失败数（此前完全看不见）');
+    assert(mFailE2100.signals.wfFailNodes.indexOf(NID2100) >= 0, '透出失败节点 id');
+    assert(!!mFailE2100.signals.wfFailSample && mFailE2100.signals.wfFailSample.msg.indexOf('probe-node-boom') >= 0, '透出失败原因样本');
+    const issE2100 = (mFailE2100.issues || []).find(function (i) { return i.key === 'engine.workflow'; });
+    assert(!!issE2100, '产 engine.workflow 议题');
+    assert(issE2100 && issE2100.detail.indexOf('probe-node-boom') >= 0, '议题带失败原因');
+    assert(mFailE2100.score < mBaseE2100.score, '健康分不假绿（低于基线）');
+    assert((mFailE2100.actions || []).some(function (a) { return a.id === 'review-workflow-fail'; }), '产修复入口动作');
+
+    // E4. 存量不追溯：同一批失败不重复计入下一轮（游标为单调序号，非时间戳）
+    const mAgainE2100 = WA.store.maintain({});
+    assert(mAgainE2100.signals.wfNewFails === 0, '同一批失败不重复计入下一轮');
+    assert(!(mAgainE2100.issues || []).find(function (i) { return i.key === 'engine.workflow'; }), '下一轮不再报（不跨轮粘滞）');
+    assert(mAgainE2100.score === mBaseE2100.score, '恢复到基线分');
+    assert(WA.workflow.failStats().tracked >= 2, '台账历史不回退（仍可追溯）');
+
+    // E5. 台账有界 + 重置
+    for (let i = 0; i < 40; i++) { try { await WA.workflow.run('probechain_e', {}); } catch (e) {} }
+    assert(WA.workflow.failStats().tracked === 30, '台账上限生效（不无限膨胀）');
+    assert(WA.workflow.failStats().byId[NID2100] >= 30, '同节点频繁失败可汇总');
+    WA.workflow.resetHistory();
+    assert(WA.workflow.failStats().tracked === 0, 'resetHistory 一并清空台账');
+    assert(WA.workflow.fails(5).items.length === 0, 'fails() 同步清空');
+
+    // E6. 边界：无失败不产议题 / 台账读取异常不吞
+    const mCleanE2100 = WA.store.maintain({});
+    assert(mCleanE2100.signals.wfNewFails === 0, '无新增失败时为 0');
+    assert(!(mCleanE2100.issues || []).find(function (i) { return i.key === 'engine.workflow'; }), '无新增失败不产议题');
+    const savedFailsE2100 = WA.workflow.fails;
+    WA.workflow.fails = function () { throw new Error('probe-fails-boom'); };
+    const mBoomE2100 = WA.store.maintain({});
+    WA.workflow.fails = savedFailsE2100;
+    assert(mBoomE2100.signals.patrolDegradedSections.indexOf('workflowFails') >= 0, '台账读取异常进降级台账（不吞）');
+
+    // E7. 位置契约
+    assert(!/^(hygiene|quarantine|state)\./.test('engine.workflow'), '议题键 engine.workflow 避开卫生指纹正则');
+    assert(sSrcE2100.indexOf('Math.min(8, wfNewFails * 3)') > 0, '扣分公式在位');
+    assert(sSrcE2100.indexOf('wfNewFails: wfNewFails') > 0, 'signals 透出在位');
+
+    // ── 清理现场 ──
+    WA.workflow.unregister(NID2100);
+    WA.workflow.unregister('__probe_ok_node__');
+    WA.workflow.unregister('__probe_crit__');
+    WA.workflow.unregister('__probe_nc__');
+    WA.workflow.resetHistory();
+    WA.store.maintain({});
+  }
+  // ══════════ v2.2.0 ══════════
+  v2200: {
+  const LS2200 = global.localStorage;
+  const ctx2200 = global.SillyTavern.getContext();
+  const prevChat2200 = ctx2200.chatId;
+  function fresh2200() { LS2200.clear(); ctx2200.chatId = 'v2200_chat'; global.__mockChat.length = 0; WA.store.init(); }
+
+  // ── A. 块1：小剧场对外接口（此前 theater.wrap 零调用 = 产物送不出去）──
+  fresh2200();
+  section('v2.2.0 块1：小剧场对外接口（修功能级失效）');
+  {
+    const uSrcA2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    const tSrcA2200 = fs.readFileSync(path.join(BASE, 'render/theater.js'), 'utf8');
+    assert(typeof WA.theater.send === 'function', 'theater.send 存在（剧场产物出口）');
+    assert(typeof WA.theater.stat === 'function', 'theater.stat 存在（可观测）');
+    assert(/<button[^>]*id="wa-theater-insert"/.test(uSrcA2200), '面板真渲染了「插入输入框」控件');
+    assert(/if \(thIns\) thIns\.onclick = /.test(uSrcA2200), '插入按钮真绑定（无短路守卫）');
+    assert(/thIns\.onclick[\s\S]{0,400}theater\.send/.test(uSrcA2200), '绑定体内真调 theater.send（不是空函数）');
+    assert(/if \(thCopy\) thCopy\.onclick = /.test(uSrcA2200), '复制按钮绑定存在');
+    assert(tSrcA2200.indexOf('sendFailed') > 0, 'theater 内部送达失败计数在位');
+
+    // A1. 功能级生效：产物真的送进输入框
+    const mkInputA2200 = () => {
+      const el = { id: 'send_textarea', value: '', _ev: [], tagName: 'TEXTAREA' };
+      el.dispatchEvent = function (e) { this._ev.push(e); return true; };
+      return el;
+    };
+    const inA2200 = mkInputA2200();
+    const savedDocA2200 = global.document;
+    global.document.getElementById = (id) => (id === 'send_textarea' ? inA2200 : null);
+    WA.mainDoc = global.document;
+
+    const stA0_2200 = WA.theater.stat();
+    const rA1_2200 = WA.theater.send('雨夜的酒馆里，两人对坐无言。', { title: '雨夜闲谈' });
+    assert(rA1_2200.ok === true, 'send 成功返回（从前只能在面板里看）');
+    assert(inA2200.value.indexOf('雨夜闲谈') > 0, '标题已写入输入框');
+    assert(inA2200.value.indexOf('两人对坐无言') > 0, '正文已写入输入框');
+    assert(inA2200.value.indexOf('<details') >= 0, '以折叠块包装（wrap 真的被调用了）');
+    assert(inA2200._ev.length === 1 && inA2200._ev[0].type === 'input', '派发 input 事件（宿主感知输入框变化）');
+    assert(WA.theater.stat().sent === stA0_2200.sent + 1, 'stat().sent 计数可见');
+    assert(WA.theater.stat().wrapped === stA0_2200.wrapped + 1, 'stat().wrapped 可见（此前零调用）');
+
+    // A2. 迭加与空值守卫
+    const rA2_2200 = WA.theater.send('第二段。');
+    assert(rA2_2200.ok === true && inA2200.value.indexOf('两人对坐无言') > 0 && inA2200.value.indexOf('第二段') > 0, '默认追加（不吞掉已有输入）');
+    const rA3_2200 = WA.theater.send('覆盖模式。', { append: false });
+    assert(rA3_2200.ok === true && inA2200.value.indexOf('两人对坐无言') < 0, 'append:false 时覆盖');
+    const stA1_2200 = WA.theater.stat();
+    const rA4_2200 = WA.theater.send('   ');
+    assert(rA4_2200.ok === false && rA4_2200.reason === 'empty-text', '空文本拒绝（不写空块）');
+    assert(WA.theater.stat().sent === stA1_2200.sent, '拒绝不计入送达');
+    assert(WA.theater.stat().sendFailed === stA1_2200.sendFailed + 1, 'sendFailed 可见');
+
+    // A3. 输入框不可达：明确归因（不静默）
+    global.document.getElementById = () => null;
+    const stA2_2200 = WA.theater.stat();
+    const rA5_2200 = WA.theater.send('无输入框场景。');
+    assert(rA5_2200.ok === false && rA5_2200.reason === 'no-input-el', '输入框不可达时明确归因');
+    assert(typeof rA5_2200.text === 'string' && rA5_2200.text.indexOf('无输入框场景') > 0, '仍返回可复制文本（不白干）');
+    assert(WA.theater.stat().sendFailed === stA2_2200.sendFailed + 1, 'sendFailed 计数');
+    assert(WA.theater.stat().lastReason === 'no-input-el', 'lastReason 可追溯');
+
+    // A4. wrap 结构契约
+    const blkA2200 = WA.theater.wrap('T', 'B');
+    assert(blkA2200.indexOf('<details') === 0 && blkA2200.indexOf('</details>') > 0, 'wrap 产出合法折叠块');
+    assert(blkA2200.indexOf('<summary>') > 0, '带 summary（折叠标题）');
+    assert(WA.theater.wrap(null, 'x').indexOf('番外小剧场') > 0, '标题缺省有默认值');
+
+    // A5. 面板留痕契约
+    assert(/WA\.theater\.stat\(\)/.test(uSrcA2200) && /id="wa-theater-out"/.test(uSrcA2200), '面板展示剧场产出留痕');
+    assert(uSrcA2200.indexOf('thLast') > 0, '面板持有最近产物（插入前置）');
+    assert(/<button[^>]*id="wa-theater-copy"/.test(uSrcA2200), '提供复制兜底入口');
+
+    global.document = savedDocA2200;
+    global.document.getElementById = () => null;
+  }
+
+  // ── B. 块2：净化规则治理口（此前 addRule/removeRule/setEnabled/loadPreset 全零调用）──
+  section('v2.2.0 块2：净化规则治理口（修功能级失效）');
+  {
+    fresh2200();
+    const pSrcB2200 = fs.readFileSync(path.join(BASE, 'render/purifier.js'), 'utf8');
+    const sSrcB2200 = fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8');
+    const savedPrm2200 = WA.purifier.rules.slice();
+
+    // B1. 接入位：治理函数 + 面板真接线（精确锚点，防"注释掉/短路"假接线）
+    assert(typeof WA.purifier.importPresetSafe === 'function', 'importPresetSafe 存在（安全导入入口）');
+    assert(typeof WA.purifier.removeRuleSafe === 'function', 'removeRuleSafe 存在');
+    assert(typeof WA.purifier.addRuleSafe === 'function', 'addRuleSafe 存在');
+    assert(typeof WA.purifier.resetToBuiltin === 'function', 'resetToBuiltin 存在');
+    assert(/data-prm-on/.test(sSrcB2200), '面板渲染规则启用开关（此前净化零 UI）');
+    assert(/<button[^>]*id="wa-prm-import"/.test(sSrcB2200), '面板真渲染「导入预设」控件');
+    assert(/<button[^>]*id="wa-prm-add"/.test(sSrcB2200), '面板真渲染「新增规则」控件');
+    assert(/<button[^>]*id="wa-prm-reset"/.test(sSrcB2200), '面板真渲染「恢复内置」控件');
+    assert(/if \(prmAdd\) prmAdd\.onclick = /.test(sSrcB2200), '新增按钮真绑定（无短路守卫）');
+    assert(/if \(prmImp\) prmImp\.onclick = /.test(sSrcB2200), '导入按钮真绑定（无短路守卫）');
+    assert(/prmImp\.onclick[\s\S]{0,400}importPresetSafe/.test(sSrcB2200), '导入绑定体内真调 importPresetSafe');
+    assert(/data-prm-del[\s\S]{0,400}removeRuleSafe/.test(sSrcB2200), '删除按钮绑定到 removeRuleSafe');
+    assert(/data-prm-on[\s\S]{0,400}setEnabled/.test(sSrcB2200), '开关绑定到 setEnabled');
+    assert(/WA\.purifier\.rules/.test(sSrcB2200), '面板渲染规则清单（不再靠手改 localStorage）');
+    assert(pSrcB2200.indexOf('missing-find') > 0 && pSrcB2200.indexOf('bad-regex') > 0, '准入判据在位（missing-find / bad-regex）');
+
+    // B2. 功能级生效：导入预设真的落盘、真的参与净化
+    WA.purifier.rules = [];
+    const stB0_2200 = WA.purifier.stat();
+    const rImpB2200 = WA.purifier.importPresetSafe(JSON.stringify({ type: 'veridis-rewrite-preset', rules: [
+      { name: '去探针标记', find: '<<PRMTEST>>', replace: '' },
+      { name: '探针替换', find: 'ZZPRMAB', replace: 'YYPRMAB' }
+    ] }));
+    assert(rImpB2200.ok === true && rImpB2200.added === 2, '导入成功且条数正确（此前 loadPreset 零调用）');
+    assert(WA.purifier.rules.length === 2, '规则真的进了内存');
+    assert(!!WA.mainWin.localStorage.getItem('worldaxis_purifier_rules_v1'), '规则已落盘（刷新不丢）');
+    assert(WA.purifier.stat().imported === stB0_2200.imported + 2, 'imported 计数可见');
+    assert(WA.purifier.applySafe('正文<<PRMTEST>>结尾').indexOf('<<PRMTEST>>') < 0, '导入的规则真的在净化中生效（删除型）');
+    assert(WA.purifier.applySafe('AAZZPRMABBB').indexOf('YYPRMAB') > 0, '导入的规则真的在净化中生效（替换型）');
+
+    // B3. 准入：非法规则不得写进存档（防一条坏正则拖垮整体净化）
+    const beforeB2200 = WA.purifier.rules.length;
+    const rBadB2200 = WA.purifier.importPresetSafe(JSON.stringify({ rules: [
+      { find: 'ok_pattern_probe', replace: '' },
+      { find: '[', replace: '' },
+      { find: '', replace: 'no-find' }
+    ] }));
+    assert(rBadB2200.ok === true && rBadB2200.added === 1 && rBadB2200.rejected === 2, '逐条准入（合法收 1、非法拒 2）');
+    assert(WA.purifier.rules.length === beforeB2200 + 1, '只有合法规则进存档');
+    assert(Array.isArray(rBadB2200.reasons) && rBadB2200.reasons.length > 0, '拒收原因可追溯');
+    const rAllBadB2200 = WA.purifier.importPresetSafe(JSON.stringify({ rules: [{ find: '[', replace: '' }] }));
+    assert(rAllBadB2200.ok === false && rAllBadB2200.reason === 'all-rejected', '全拒时明确失败（不假成功）');
+    const rParseB2200 = WA.purifier.importPresetSafe('{ 不是 json');
+    assert(rParseB2200.ok === false && rParseB2200.reason === 'parse-fail', '解析失败明确归因');
+    const rNoRulesB2200 = WA.purifier.importPresetSafe(JSON.stringify({ foo: 1 }));
+    assert(rNoRulesB2200.ok === false && rNoRulesB2200.reason === 'no-rules', '无 rules 字段明确归因');
+    assert(WA.purifier.stat().importFailed >= 3, 'importFailed 计数可见');
+    assert(String(WA.purifier.stat().lastImport).indexOf('no-rules') === 0, 'lastImport 可追溯');
+
+    // B4. 新增 / 删除 / 开关（此前三函数全零调用）
+    const rAddB2200 = WA.purifier.addRuleSafe({ find: 'probe_x_str', replace: 'probe_y_str' });
+    assert(rAddB2200.ok === true && WA.purifier.rules.some(function (r) { return r.id === rAddB2200.id; }), '新增成功且 id 可用');
+    const rAddBadB2200 = WA.purifier.addRuleSafe({ find: '[' });
+    assert(rAddBadB2200.ok === false && String(rAddBadB2200.reason).indexOf('bad-regex') === 0, '非法正则拒绝（不写坏规则）');
+    const rAddEmptyB2200 = WA.purifier.addRuleSafe({});
+    assert(rAddEmptyB2200.ok === false && rAddEmptyB2200.reason === 'missing-find', '缺 find 拒绝');
+    const rDelB2200 = WA.purifier.removeRuleSafe(rAddB2200.id);
+    assert(rDelB2200.ok === true && !WA.purifier.rules.some(function (r) { return r.id === rAddB2200.id; }), '删除生效（此前 removeRule 零调用）');
+    const rDel2B2200 = WA.purifier.removeRuleSafe(rAddB2200.id);
+    assert(rDel2B2200.ok === false && rDel2B2200.reason === 'not-found', '删不存在的规则明确归因');
+    const enB2200 = WA.purifier.rules.filter(function (r) { return r.find === 'ok_pattern_probe'; })[0];
+    assert(!!enB2200, '前提：被准入的规则存在（供开关测试）');
+    WA.purifier.setEnabled(enB2200.id, false);
+    assert(WA.purifier.rules.filter(function (r) { return r.id === enB2200.id; })[0].enabled === false, 'setEnabled 真的生效（且落盘）');
+    assert(!!WA.mainWin.localStorage.getItem('worldaxis_purifier_rules_v1'), '开关变更也落盘（面板刷新后状态一致）');
+
+    // B5. 恢复内置
+    const rResetB2200 = WA.purifier.resetToBuiltin();
+    assert(rResetB2200.ok === true && rResetB2200.total >= 2, '恢复内置成功');
+    assert(WA.purifier.rules.some(function (r) { return r.id === 'think_block'; }), '内置 think_block 回来了');
+    assert(!!WA.mainWin.localStorage.getItem('worldaxis_purifier_rules_v1'), '恢复后也落盘');
+
+    // B6. stat 透出治理维度
+    const stB2200 = WA.purifier.stat();
+    assert(stB2200.ruleCount === WA.purifier.rules.length, 'stat().ruleCount 与实际一致');
+    assert('imported' in stB2200 && 'importFailed' in stB2200 && 'lastImport' in stB2200, 'stat 透出导入治理三维');
+
+    fresh2200();
+    WA.purifier.rules = savedPrm2200;
+  }
+
+  // ── C. 块3：诊断出口收口（此前 compatMvu/TH.status 零消费、resetTxStat/resetCallStats/settleGuard.reset/resetStats 无入口）──
+  section('v2.2.0 块3：诊断出口收口（修功能级失效）');
+  {
+    fresh2200();
+    const dSrcC2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const sSrcC2200 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    const pSrcC2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+
+    // C1. 接入位（源码锚点：防「注释掉 / 短路守卫」假接线）
+    assert(typeof WA.toolDiag.secCompat === 'function', 'toolDiag.secCompat 已导出（可被外部消费）');
+    assert(dSrcC2200.indexOf('function secCompat') > 0, 'tool-diag 新增 secCompat 节');
+    assert(/compat: secCompat\(\)/.test(dSrcC2200), 'collect() 汇总已接入 compat 节');
+    assert(dSrcC2200.indexOf("'compat.mvu'") > 0 && dSrcC2200.indexOf("'compat.th'") > 0, 'verdict 兼容层议题在位');
+    assert(/!cp\.mvu\.active\) issues\.push\(\{ level: 'info'/.test(dSrcC2200), 'verdict：未激活属 info（环境差异不报错）');
+    const idsC2200 = (WA.toolDiag.UI_BINDINGS.filter(g => g.page === 'tools')[0] || {}).ids || [];
+    assert(idsC2200.indexOf('wa-stat-reset') >= 0 && idsC2200.indexOf('wa-compat-view') >= 0 && idsC2200.indexOf('wa-wf-reset') >= 0, '三个新控件已纳入 UI_BINDINGS（渲染↔绑定一致性守卫）');
+    assert(sSrcC2200.indexOf('// \u2500\u2500 17. \u5bbf\u4e3b\u517c\u5bb9\u5c42\uff08v2.2.0\uff09\u2500\u2500') > 0, '巡视新增第 17 节（宿主兼容层）');
+    assert(sSrcC2200.indexOf("key: 'engine.compat'") > 0, '巡视议题键 engine.compat 在位');
+    assert(sSrcC2200.indexOf('compatMvuActive: compatMvuActive') > 0, '巡视 signals 透出兼容层维度');
+    assert(!/^(hygiene|quarantine|state)\./.test('engine.compat'), '议题键 engine.compat 避开卫生指纹正则');
+    assert(pSrcC2200.indexOf('id="wa-stat-reset"') > 0 && pSrcC2200.indexOf('id="wa-compat-view"') > 0 && pSrcC2200.indexOf('id="wa-wf-reset"') > 0, '三个控件真在面板模板里（非注释）');
+    assert(pSrcC2200.indexOf('id="wa-settle-unforce"') > 0, '「取消强制标记」控件真在模板里');
+    assert(/if \(srBtn\) srBtn\.onclick = /.test(pSrcC2200), '清零按钮绑定无短路守卫');
+    assert(/srBtn\.onclick[\s\S]{0,400}resetTxStat/.test(pSrcC2200) && /srBtn\.onclick[\s\S]{0,400}resetCallStats/.test(pSrcC2200), '清零绑定体内真调两个清零函数');
+    assert(/if \(cvBtn\) cvBtn\.onclick = /.test(pSrcC2200) && /cvBtn\.onclick[\s\S]{0,400}compatMvu\.status/.test(pSrcC2200), '兼容层按钮绑定无短路且真读 status');
+    assert(/if \(uf\) uf\.onclick = /.test(pSrcC2200) && /uf\.onclick[\s\S]{0,300}settleGuard\.reset/.test(pSrcC2200), '取消标记绑定真调 settleGuard.reset');
+    assert(/if \(wfrBtn\) wfrBtn\.onclick = /.test(pSrcC2200) && /wfrBtn\.onclick[\s\S]{0,400}resetStats/.test(pSrcC2200), '清空痕迹绑定真调 resetStats');
+    assert(/peekForce[\s\S]{0,200}\u672a\u751f\u6548\u7684\u5f3a\u5236\u7ed3\u7b97\u6807\u8bb0/.test(pSrcC2200), '面板真展示待生效强制标记');
+
+    // C2. 诊断数据契约（不依赖 DOM）
+    const cpA2200 = WA.toolDiag.secCompat();
+    assert(cpA2200.mvuLoaded === true && cpA2200.thLoaded === true, 'secCompat 识别兼容层已加载');
+    assert(cpA2200.mvu && typeof cpA2200.mvu.active === 'boolean' && cpA2200.th && typeof cpA2200.th.active === 'boolean', 'secCompat 透出双侧激活态');
+
+    const mctx2200 = ctx2200;
+    const savedStatData2200 = mctx2200.chatMetadata.stat_data;
+    // 真故障路径：宿主 API 抛错 → 必须标 failed 且进 verdict/巡视
+    const origGC2200t = global.SillyTavern.getContext;
+    global.SillyTavern.getContext = function () { throw new Error('block3-mvu-boom'); };
+    WA.compatMvu.init();
+    const cpFail2200 = WA.toolDiag.secCompat();
+    assert(cpFail2200.mvu.failed === true, 'secCompat 标记真故障（reason 以 error: 开头）');
+    const vdFail2200 = WA.toolDiag.verdict(WA.toolDiag.collect());
+    assert(vdFail2200.issues.some(i => i.key === 'compat.mvu' && i.level === 'error'), '诊断 verdict 报兼容层故障（此前完全不可见）');
+    const flFail2200 = WA.toolDiag.flatten();
+    const rowFail2200 = flFail2200.filter(x => x.key === 'compat')[0];
+    assert(!!rowFail2200 && rowFail2200.level === 'error', 'flatten 带 compat 摘要行且级别与 verdict 一致');
+    const mFail2200 = WA.store.maintain({});
+    assert(mFail2200.signals.compatFails >= 1 && mFail2200.signals.compatMvuActive === false, '巡视 signals 透出兼容层故障与激活态');
+    assert(mFail2200.issues.some(i => i.key === 'engine.compat' && i.level === 'error'), '巡视报 engine.compat 议题');
+    assert(mFail2200.actions.some(a => a.id === 'review-compat'), '巡视给出复查动作');
+    global.SillyTavern.getContext = origGC2200t;
+
+    // 环境差异路径：宿主未启用 MVU → 不计故障、不报议题（沿用「环境差异不得当故障扣分」）
+    delete mctx2200.chatMetadata.stat_data;
+    WA.compatMvu.init();
+    const mNa2200 = WA.store.maintain({});
+    assert(mNa2200.signals.compatFails === 0, '宿主未启用 MVU 不计为故障（环境差异）');
+    assert(!mNa2200.issues.some(i => i.key === 'engine.compat'), '环境差异不产 engine.compat 议题');
+    assert(mNa2200.signals.compatMvuReason === 'mvu-not-enabled', '未激活原因可追溯（mvu-not-enabled）');
+    // 激活路径：宿主开启 MVU
+    mctx2200.chatMetadata.stat_data = savedStatData2200 || {};
+    WA.compatMvu.init();
+    const mOk2200 = WA.store.maintain({});
+    assert(mOk2200.signals.compatFails === 0, '激活后无故障计数（不误报）');
+
+    // C3. 端到端（真 DOM）：出口真能点通
+    let JSDOMC2200 = null;
+    try { JSDOMC2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMC2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMC2200 = null; } }
+    if (!JSDOMC2200) {
+      console.log('  \u26a0 jsdom 不可用，跳过端到端断言（源码锚点已覆盖接线）');
+    } else {
+      const dom2200 = new JSDOMC2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
+      const savedDoc2200 = global.document;
+      global.document = dom2200.window.document;
+      try { global.Node = dom2200.window.Node; } catch (e) {}
+      WA.mainDoc = global.document;
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+      WA.store.init();
+      WA.ui.mount();
+      WA.ui.open();
+      const tabsC2200 = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
+      const toolsTabC2200 = tabsC2200.filter(t => t.dataset.page === 'tools')[0];
+      assert(!!toolsTabC2200, '面板存在「工具」页签');
+      toolsTabC2200.onclick();
+      const $c = sel => global.document.querySelector(sel);
+      assert(!!$c('#wa-stat-reset') && !!$c('#wa-compat-view') && !!$c('#wa-wf-reset'), '工具页真渲染三个出口控件');
+      assert(typeof $c('#wa-stat-reset').onclick === 'function' && typeof $c('#wa-compat-view').onclick === 'function' && typeof $c('#wa-wf-reset').onclick === 'function', '三个出口控件真绑定');
+
+      // C3a. 清零计量：真清零且不伤世界状态
+      WA.store.transact(d => { d.round = (d.round || 0) + 1; });
+      try { await WA.apiRouter.call('judge', []); } catch (e) { /* 未配置也应入台账 */ }
+      assert(WA.store.txStat().count > 0 && WA.apiRouter.callStats(9).tracked > 0, '前提：事务计量与通道台账均已累积');
+      const btnReset2200 = $c('#wa-stat-reset'); if (btnReset2200 && btnReset2200.onclick) btnReset2200.onclick();
+      assert(WA.store.txStat().count === 0, '清零后事务计量归零（resetTxStat 真被调用）');
+      assert(WA.apiRouter.callStats(9).tracked === 0, '清零后通道台账归零（resetCallStats 真被调用）');
+      assert((($c('#wa-diag-out') || {}).innerHTML || '').indexOf('\u5df2\u6e05\u96f6') > 0, '面板给出清零反馈（不静默）');
+      assert(WA.store.get().round > 0, '清零不伤世界状态（只重置计数器）');
+
+      // C3b. 结算守卫：强制标记可见且可取消
+      WA.settleGuard.forceNext();
+      const btnSv2200 = $c('#wa-settle-view'); if (btnSv2200 && btnSv2200.onclick) btnSv2200.onclick();
+      assert(((($c('#wa-diag-out') || {}).innerHTML) || '').indexOf('\u672a\u751f\u6548\u7684\u5f3a\u5236\u7ed3\u7b97\u6807\u8bb0') > 0, '待生效强制标记在面板可见（peekForce 接入 UI）');
+      assert(!!$c('#wa-settle-unforce'), '提供「取消该标记」出口');
+      assert(WA.settleGuard.peekForce() === true, '取消前标记仍在（前置成立）');
+      const btnUf2200 = $c('#wa-settle-unforce'); if (btnUf2200 && btnUf2200.onclick) btnUf2200.onclick();
+      assert(WA.settleGuard.peekForce() === false, '点击后强制标记真被清除（settleGuard.reset 真被调用）');
+      assert(((($c('#wa-diag-out') || {}).innerHTML) || '').indexOf('\u5df2\u53d6\u6d88\u5f3a\u5236\u6807\u8bb0') > 0, '面板给出取消反馈');
+
+      // C3c. 清空运行痕迹
+      WA.workflow.register({ id: '__t2200c_node__', chain: 'before', label: 't', order: 1, run: function () {} });
+      try { await WA.workflow.run('before', {}); } catch (e) { }
+      assert(WA.workflow.stats(999).tracked > 0 && WA.workflow.history(99).tracked > 0, '前提：节点画像与运行历史已建立');
+      const btnWf2200 = $c('#wa-wf-reset'); if (btnWf2200 && btnWf2200.onclick) btnWf2200.onclick();
+      assert(WA.workflow.stats(999).tracked === 0, '清空后节点画像归零（resetStats 真被调用）');
+      assert(WA.workflow.history(99).tracked === 0, '清空后运行历史归零（resetHistory 真被调用）');
+      assert(((($c('#wa-diag-out') || {}).innerHTML) || '').indexOf('\u5df2\u6e05\u7a7a\u5de5\u4f5c\u6d41\u8282\u70b9\u753b\u50cf') > 0, '面板给出清空反馈');
+      WA.workflow.unregister('__t2200c_node__');
+
+      global.document = savedDoc2200;
+      global.document.getElementById = () => null;
+    }
+
+    WA.workflow.resetHistory();
+    fresh2200();
+  }
+
+  // ── D. 块4：人物档案（人设）写入链（此前 registry.setProfile 唯一写入 API 却零调用）──
+  section('v2.2.0 块4：人物档案写入链（修功能级失效）');
+  {
+    fresh2200();
+    const regSrcD2200 = fs.readFileSync(path.join(BASE, 'actors/registry.js'), 'utf8');
+    const profSrcD2200 = fs.readFileSync(path.join(BASE, 'actors/profile.js'), 'utf8');
+    const dSrcD2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const sSrcD2200 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    const pSrcD2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+
+    // D1. 接入位 + 静态锚点（防假接线）
+    assert(typeof WA.registry.setProfileSafe === 'function', 'registry.setProfileSafe 存在（安全写入入口）');
+    assert(typeof WA.registry.clearProfile === 'function', 'registry.clearProfile 存在');
+    assert(typeof WA.registry.profileStat === 'function', 'registry.profileStat 存在（覆盖率计量）');
+    assert(pSrcD2200.indexOf('data-prof=') > 0, '人物页渲染「档案」入口');
+    assert(pSrcD2200.indexOf('function renderProfileEditor') > 0, '面板含档案编辑器实现');
+    assert(/panelEl\.querySelectorAll\('\[data-prof\]'\)\.forEach/.test(pSrcD2200), '档案按钮按节点集合绑定');
+    assert(/data-prof[\s\S]{0,400}setProfileSafe/.test(pSrcD2200), '绑定体内真调 setProfileSafe');
+    assert(pSrcD2200.indexOf('id="wa-prof-save"') > 0 && pSrcD2200.indexOf('id="wa-prof-clear"') > 0, '编辑器含保存/清空控件');
+    assert(dSrcD2200.indexOf('actors: safe(') > 0, '诊断新增 actors 档案节');
+    assert(sSrcD2200.indexOf("key: 'actors.profile'") > 0, '巡视新增 actors.profile 议题');
+    assert(!/^(hygiene|quarantine|state)\./.test('actors.profile'), '议题键 actors.profile 避开卫生指纹正则');
+    assert(profSrcD2200.indexOf('WA.registry.setProfileSafe') > 0, 'profile.js 已改走 registry 契约（消除双写漂移）');
+    assert(profSrcD2200.indexOf("push('personality', r.personality") < 0, 'profile.js 不再直写 store');
+    assert(regSrcD2200.indexOf("capsFor('people.p_x.profile.' + sec)") > 0, 'registry 从容量登记表取上限（单一真源）');
+    assert(sSrcD2200.indexOf('actors/registry.js 档案节写入') > 0, '登记表 site 文案指向真实写入方');
+    ['personality', 'worldview', 'family', 'memory', 'relationships'].forEach(function (sec) {
+      assert(profSrcD2200.indexOf("push('" + sec + "'") < 0, 'profile.js 无 ' + sec + ' 节写死上限');
+    });
+
+    // D2. 功能级生效：档案真写进去、消费端读得到
+    const NMD = '\u63a2\u9488\u4e59';
+    WA.registry.register(NMD);
+    assert(WA.registry.getProfile(NMD).personality.length === 0, '前置：新建 NPC 档案为空（性格锚点将是「未建立」）');
+    const wD1 = WA.registry.setProfileSafe(NMD, {
+      personality: ['\u51b7\u9759', '\u591a\u7591'],
+      worldview: ['\u529f\u5229\u81f3\u4e0a'],
+      memory: '\u66fe\u5728\u57ce\u897f\u5f00\u8fc7\u5f53\u94fa',
+      relationships: '\u6c88\u70bc | \u65e7\u53cb | \u5f7c\u6b64\u8fdc\u4e86'
+    });
+    assert(wD1.ok === true, 'setProfileSafe 写入成功（此前该路径零调用）');
+    const prD1 = WA.registry.getProfile(NMD);
+    assert(prD1.personality.length === 2 && prD1.personality[0].text === '\u51b7\u9759', '性格锚点真进档（消费端不再必然「未建立」）');
+    assert(prD1.worldview.length === 1 && prD1.memory.length === 1, '观念/经历两节写入');
+    assert(prD1.relationships.length === 1 && prD1.relationships[0].target === '\u6c88\u70bc' && prD1.relationships[0].relation === '\u65e7\u53cb', '关系条目按目标归并写入');
+    assert(WA.store.get().people['p_' + NMD].updatedAt > 0, '人物条目 updatedAt 已刷新');
+    const psD1 = WA.registry.profileStat();
+    assert(psD1.registered >= 1 && psD1.withProfile >= 1 && psD1.entries >= 4, 'profileStat 覆盖率计量正确');
+
+    // D3. 准入：坏档案不得写进去
+    assert(WA.registry.setProfileSafe('', {}).reason === 'missing-name', '空名拒绝（missing-name）');
+    assert(WA.registry.setProfileSafe(NMD, ['x']).reason === 'not-object', '非对象入参拒绝（not-object）');
+    assert(WA.registry.setProfileSafe(NMD, { foo: 1 }).reason === 'no-sections', '无有效节拒绝（no-sections）');
+    const badShD = WA.registry.setProfileSafe(NMD, { personality: 123 });
+    assert(badShD.ok === false && badShD.rejected.some(function (r) { return r.section === 'personality' && r.reason === 'bad-shape'; }), '非数组/非字符串拒绝（防写坏结构）');
+    const lenBeforeD = WA.registry.getProfile(NMD).personality.length;
+    const wLongD = WA.registry.setProfileSafe(NMD, { personality: ['x'.repeat(260), '\u5408\u6cd5\u6761\u76ee'] });
+    assert(wLongD.ok === true && wLongD.rejected.some(function (r) { return r.reason === 'length-or-empty'; }), '超长条目拒收并归因');
+    assert(WA.registry.getProfile(NMD).personality.length === lenBeforeD + 1, '只有合法条目进档');
+    const wRelD = WA.registry.setProfileSafe(NMD, { relationships: [' | a | b'] });
+    assert(wRelD.rejected.some(function (r) { return r.section === 'relationships' && r.reason === 'missing-target'; }), '关系缺目标拒收（missing-target）');
+    const wDupD = WA.registry.setProfileSafe(NMD, { personality: ['\u51b7\u9759'] });
+    assert(wDupD.ok === true && wDupD.added.personality === 0, '默认追加合并且同文本去重');
+
+    // D4. 剪裁上限取自容量登记表（单一真源）
+    const capPD = WA.store.capsFor('people.p_x.profile.personality').cap;
+    const capMD = WA.store.capsFor('people.p_x.profile.memory').cap;
+    const capRD = WA.store.capsFor('people.p_x.profile.relationships').cap;
+    const manyPD = []; for (let i = 0; i < capPD + 8; i++) manyPD.push('\u6027\u683c\u6761' + i);
+    WA.registry.setProfileSafe(NMD, { personality: manyPD });
+    assert(WA.registry.getProfile(NMD).personality.length === capPD, '性格节剪裁到登记表上限（' + capPD + '）——单一真源生效');
+    const manyMD = []; for (let i = 0; i < capMD + 9; i++) manyMD.push('\u7ecf\u5386' + i);
+    WA.registry.setProfileSafe(NMD, { memory: manyMD });
+    assert(WA.registry.getProfile(NMD).memory.length === capMD, '经历节剪裁到登记表上限（' + capMD + '）');
+    const manyRD = []; for (let i = 0; i < capRD + 7; i++) manyRD.push('\u76ee\u6807' + i + ' | \u5173\u7cfb | \u52a8\u6001');
+    WA.registry.setProfileSafe(NMD, { relationships: manyRD });
+    assert(WA.registry.getProfile(NMD).relationships.length === capRD, '关系节剪裁到登记表上限（' + capRD + '）');
+    assert(WA.store.sizeAudit({ minBytes: 0, maxDepth: 8 }).drifted.every(function (r) { return r.path.indexOf('profile') < 0; }), '写入后无 drifted（登记与实现同源）');
+
+    // D5. replace 与清空
+    const wRepD = WA.registry.setProfileSafe(NMD, { personality: ['\u552f\u4e00\u65b0\u6761'] }, { replace: true });
+    assert(wRepD.ok === true && WA.registry.getProfile(NMD).personality.length === 1, 'replace:true 整节替换');
+    const clrD = WA.registry.clearProfile(NMD);
+    assert(clrD.ok === true, 'clearProfile 成功');
+    const prD2 = WA.registry.getProfile(NMD);
+    assert(prD2.personality.length === 0 && prD2.relationships.length === 0, '清空后档案各节为空');
+    assert(WA.registry.list().indexOf(NMD) >= 0, '清空档案不注销 NPC 本身');
+
+    // D6. 巡视与诊断可见性
+    const mNoProfD = WA.store.maintain({});
+    assert(mNoProfD.signals.profRegistered >= 1 && mNoProfD.signals.profWith === 0, 'signals 透出「有注册、零档案」');
+    const issNoD = mNoProfD.issues.filter(function (i) { return i.key === 'actors.profile'; })[0];
+    assert(!!issNoD && issNoD.level === 'info', '「有 NPC 却零档案」被报为可行动信号');
+    assert(mNoProfD.actions.some(function (a) { return a.id === 'edit-npc-profile'; }), '巡视给出建档动作指引');
+    WA.registry.setProfileSafe(NMD, { personality: ['\u4e00\u6761'], memory: ['\u53c8\u4e00\u6761'] });
+    const mHasD = WA.store.maintain({});
+    assert(mHasD.signals.profWith >= 1 && mHasD.signals.profEntries >= 2, '建档后 signals 覆盖率回升');
+    const dgD = WA.toolDiag.collect();
+    assert(dgD.runtime && dgD.runtime.actors && typeof dgD.runtime.actors.registered === 'number', '诊断 runtime 透出 actors 档案节');
+
+    // D7. 端到端（真 DOM）：面板入口真能建档
+    let JSDOMD2200 = null;
+    try { JSDOMD2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMD2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMD2200 = null; } }
+    if (!JSDOMD2200) {
+      console.log('  \u26a0 jsdom 不可用，跳过块4 端到端断言（源码锚点已覆盖接线）');
+    } else {
+      const domD2200 = new JSDOMD2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
+      const savedDocD2200 = global.document;
+      global.document = domD2200.window.document;
+      try { global.Node = domD2200.window.Node; } catch (e) {}
+      WA.mainDoc = global.document;
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+      WA.store.init();
+      WA.ui.mount();
+      WA.ui.open();
+      const tabsD2200 = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
+      const peopleTabD2200 = tabsD2200.filter(function (t) { return t.dataset.page === 'people'; })[0];
+      assert(!!peopleTabD2200, '面板存在「人物」页签');
+      const $d = function (sel) { return global.document.querySelector(sel); };
+      const NMD2 = '\u63a2\u9488\u4e19';
+      WA.registry.setProfileSafe(NMD2, { personality: ['\u521d\u59cb'] });
+      peopleTabD2200.onclick();
+      const btnD = global.document.querySelector('[data-prof="' + NMD2 + '"]');
+      assert(!!btnD, '人物列表渲染出该 NPC 的「档案」按钮');
+      if (btnD && btnD.onclick) btnD.onclick();
+      assert(!!$d('#wa-prof-personality') && !!$d('#wa-prof-save'), '点击后编辑器真渲染');
+      const pInD = $d('#wa-prof-personality');
+      assert(!!pInD && pInD.value.indexOf('\u521d\u59cb') >= 0, '编辑器预填现有档案（不丢已录内容）');
+      const setVD = function (sel, v) { const el = $d(sel); if (el) el.value = v; };
+      setVD('#wa-prof-personality', ['\u7b2c\u4e00\u6761', '\u7b2c\u4e8c\u6761'].join(String.fromCharCode(10)));
+      setVD('#wa-prof-memory', '\u8bb0\u5fc6\u4e00');
+      setVD('#wa-prof-relationships', '\u7532 | \u540c\u4f34 | \u540c\u884c');
+      const svD = $d('#wa-prof-save'); if (svD && svD.onclick) svD.onclick();
+      const prED = WA.registry.getProfile(NMD2);
+      assert(prED.personality.length === 2 && prED.personality[0].text === '\u7b2c\u4e00\u6761', '面板保存真写入档案（整节替换）');
+      assert(prED.memory.length === 1 && prED.relationships.length === 1, '多节同时保存生效');
+      peopleTabD2200.onclick();
+      const btnD2 = global.document.querySelector('[data-prof="' + NMD2 + '"]');
+      if (btnD2 && btnD2.onclick) btnD2.onclick();
+      const clD = $d('#wa-prof-clear'); if (clD && clD.onclick) clD.onclick();
+      assert(WA.registry.getProfile(NMD2).personality.length === 0, '面板「清空档案」真生效');
+      peopleTabD2200.onclick();
+      const miniD = $d('#wa-prof-mini');
+      assert(!!miniD && /[0-9]+\/[0-9]+/.test(miniD.textContent || ''), '人物页展示档案覆盖率（可解释「性格锚点未建立」）');
+      global.document = savedDocD2200;
+      global.document.getElementById = () => null;
+    }
+
+    WA.workflow.resetHistory();
+    fresh2200();
+  }
+
+  // ── E. 块5：存档恢复出口 + 设置卫生出口（restore/dropRecoveryPoint/orphanSettingsKeys/registry 此前零调用）──
+  section('v2.2.0 块5：存档恢复与设置卫生出口（修功能级失效）');
+  {
+    fresh2200();
+    const sbSrcE2200 = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+    const sSrcE2200 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    const pSrcE2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    const dSrcE2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+
+    // E1. 接入位 + 静态锚点
+    assert(typeof WA.settingsBus.deregisterOrphan === 'function', 'settingsBus.deregisterOrphan 存在（孤儿注销出口）');
+    assert(typeof WA.settingsBus.registryStat === 'function', 'settingsBus.registryStat 存在（登记表计量）');
+    const idsE2200 = (WA.toolDiag.UI_BINDINGS.filter(g => g.page === 'tools')[0] || {}).ids || [];
+    assert(idsE2200.indexOf('wa-recovery-view') >= 0 && idsE2200.indexOf('wa-orphan-view') >= 0, '两个新控件纳入 UI_BINDINGS');
+    assert(dSrcE2200.indexOf('settingsBus: safe(') > 0, '诊断新增 settingsBus 节');
+    assert(dSrcE2200.indexOf('quarantineAudit: safe(') > 0, '诊断新增 quarantineAudit 节');
+    assert(dSrcE2200.indexOf('migrateReport: safe(') > 0, '诊断新增 migrateReport 节');
+    assert(dSrcE2200.indexOf("key: 'settingsBus.orphan'") > 0, 'verdict 报孤儿设置键议题');
+    assert(/if \(rvBtn\) rvBtn\.onclick = /.test(pSrcE2200) && /if \(orphBtn\) orphBtn\.onclick = /.test(pSrcE2200), '两个按钮绑定无短路守卫');
+    assert(/rvBtn\.onclick[\s\S]{0,900}listRecoveryPoints/.test(pSrcE2200), '恢复点绑定体内真调 listRecoveryPoints');
+    assert(/data-rv-restore[\s\S]{0,700}store\.restore/.test(pSrcE2200), '回滚按钮真调 store.restore');
+    assert(/data-rv-drop[\s\S]{0,500}dropRecoveryPoint/.test(pSrcE2200), '丢弃按钮真调 dropRecoveryPoint');
+    assert(pSrcE2200.indexOf('id="wa-rv-confirm"') > 0 && pSrcE2200.indexOf('id="wa-rv-cancel"') > 0, '破坏性回滚提供二次确认控件');
+    assert(/data-orph-del[\s\S]{0,400}deregisterOrphan/.test(pSrcE2200), '孤儿注销真调 deregisterOrphan');
+    assert(/if \(!hit\.orphan\) return \{ ok: false, reason: 'not-orphan/.test(sbSrcE2200), '注销有 orphan 门禁（防误删在用键登记）');
+    assert(sbSrcE2200.indexOf('WA.__settingsRegs = arr.filter') > 0, '注销只改登记表数组（不动磁盘配置）');
+    assert(sSrcE2200.indexOf('// \u2500\u2500 19. \u8bbe\u7f6e\u952e\u536b\u751f\uff08v2.2.0\uff09\u2500\u2500') > 0, '巡视新增第 19 节（设置键卫生）');
+    assert(sSrcE2200.indexOf('orphanSettings: orphanKeys.length') > 0, 'signals 采集孤儿键计数');
+
+    // E2. 恢复点：真回滚（此前只能导出成 JSON，无法回滚）
+    WA.store.transact(d => { d.round = 1; d.clock.label = '\u7b2c1\u65e5'; });
+    WA.store.save();
+    WA.store.createRecoveryPoint();
+    WA.store.transact(d => { d.round = 2; d.clock.label = '\u7b2c2\u65e5'; });
+    WA.store.save();
+    assert(WA.store.listRecoveryPoints().length >= 1 && WA.store.get().round === 2, '前置：存在恢复点且当前状态已前进');
+    const rvListE2200 = WA.store.listRecoveryPoints();
+    const rvIdxE2200 = rvListE2200.findIndex(p => p.state && p.state.round === 1);
+    assert(rvIdxE2200 >= 0, '前置：存在 round=1 的快照点');
+    const restOkE2200 = WA.store.restore(rvIdxE2200);
+    assert(restOkE2200 === true, 'store.restore 真回滚（此前零生产调用）');
+    assert(WA.store.get().round === 1, '回滚后状态真被替换（round 回到 1）');
+    assert(WA.store.listRecoveryPoints().length >= 1, '回滚前自动留点（防二次丢失无退路）');
+
+    // E3. 丢弃恢复点（腾环形窗口）
+    const beforeDropE2200 = WA.store.listRecoveryPoints().length;
+    const dropE2200 = WA.store.dropRecoveryPoint(undefined, 0);
+    assert(dropE2200.ok === true && WA.store.listRecoveryPoints().length === beforeDropE2200 - 1, '丢弃真生效（此前 dropRecoveryPoint 零调用）');
+    const dropBadE2200 = WA.store.dropRecoveryPoint(undefined, 99);
+    assert(dropBadE2200.ok === false, '越界索引明确失败（不静默）');
+
+    // E4. 设置键：登记表 / 孤儿注销 / 安全门禁
+    const rsE2200 = WA.settingsBus.registryStat();
+    assert(rsE2200.total > 0 && typeof rsE2200.byModule === 'object', 'registryStat 透出登记表计量（此前 registry 零调用）');
+    assert(rsE2200.orphan >= 1, '登记表含 orphan 声明项');
+    const orphansE2200 = WA.store.orphanSettingsKeys();
+    assert(Array.isArray(orphansE2200) && orphansE2200.length >= 1, 'orphanSettingsKeys 返回幽灵登记清单（此前零消费）');
+    const regFirstE2200 = WA.settingsBus.registry().filter(r => !r.orphan)[0].key;
+    assert(WA.settingsBus.deregisterOrphan(regFirstE2200).ok === false, '在用键拒绝注销（不制造登记表与行为不一致）');
+    assert(WA.settingsBus.deregisterOrphan('').reason === 'missing-key', '空键拒绝（missing-key）');
+    assert(WA.settingsBus.deregisterOrphan('worldaxis_non_existent_key').reason === 'not-found', '不存在的键明确归因（not-found）');
+    const orphanN0E2200 = orphansE2200.length;
+    const okOrphE2200 = WA.settingsBus.deregisterOrphan(orphansE2200[0].key);
+    assert(okOrphE2200.ok === true, '孤儿键注销成功');
+    assert(WA.store.orphanSettingsKeys().length === orphanN0E2200 - 1, '注销后孤儿清单真减少');
+    assert(WA.settingsBus.registryStat().deregisters >= 1, '注销计数可观测');
+
+    // E5. 诊断可见性（此前 quarantineAudit / migrateReport 零出口）
+    const dgE2200 = WA.toolDiag.collect();
+    assert(dgE2200.runtime && dgE2200.runtime.settingsBus && dgE2200.runtime.settingsBus.registry, '诊断透出 settingsBus 节');
+    assert(dgE2200.runtime.quarantineAudit !== undefined, '诊断透出 quarantineAudit（隔离处置史）');
+    assert(dgE2200.runtime.migrateReport !== undefined, '诊断透出 migrateReport（存档迁移报告）');
+    const vdE2200 = WA.toolDiag.verdict(dgE2200);
+    const orphanIssueE2200 = vdE2200.issues.filter(i => i.key === 'settingsBus.orphan');
+    if (WA.store.orphanSettingsKeys().length > 0) assert(orphanIssueE2200.length === 1 && orphanIssueE2200[0].level === 'info', '有孤儿时 verdict 报 info 议题');
+    else assert(orphanIssueE2200.length === 0, '无孤儿时 verdict 不报议题（不制造噪声）');
+
+    // E6. 巡视只采集不产议题（防「新库永久挂一条不可消除 info」）
+    const mE2200 = WA.store.maintain({});
+    assert(mE2200.signals.orphanSettings === WA.store.orphanSettingsKeys().length, 'signals 孤儿键计数与实际一致');
+    assert(!mE2200.issues.some(i => i.key === 'settings.orphan'), '巡视不因内置 orphan 注册产议题（新库噪声防护）');
+    assert(!mE2200.issues.some(i => i.key === 'settings.quarantineHistory'), '巡视不因历史处置史产议题');
+    assert(typeof mE2200.score === 'number' && !!mE2200.level, '巡视照常给出结论');
+
+    // E7. 端到端（真 DOM）：出口真能点通，且反馈不被重绘冲掉
+    let JSDOME2200 = null;
+    try { JSDOME2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOME2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOME2200 = null; } }
+    if (!JSDOME2200) {
+      console.log('  \u26a0 jsdom 不可用，跳过块5 端到端断言（源码锚点已覆盖接线）');
+    } else {
+      const domE2200 = new JSDOME2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
+      const savedDocE2200 = global.document;
+      global.document = domE2200.window.document;
+      try { global.Node = domE2200.window.Node; } catch (e) {}
+      WA.mainDoc = global.document;
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+      WA.store.init();
+      WA.ui.mount();
+      WA.ui.open();
+      const tabsE2200 = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
+      const toolsTabE2200 = tabsE2200.filter(t => t.dataset.page === 'tools')[0];
+      assert(!!toolsTabE2200, '面板存在「工具」页签');
+      toolsTabE2200.onclick();
+      const $e = sel => global.document.querySelector(sel);
+      const callE2200 = el => { if (el && typeof el.onclick === 'function') el.onclick(); };
+      assert(!!$e('#wa-recovery-view') && !!$e('#wa-orphan-view'), '工具页真渲染两个新控件');
+      // 造一个恢复点
+      WA.store.transact(d => { d.round = 7; }); WA.store.save();
+      WA.store.createRecoveryPoint();
+      WA.store.transact(d => { d.round = 8; }); WA.store.save();
+      callE2200($e('#wa-recovery-view'));
+      assert((($e('#wa-diag-out') || {}).innerHTML || '').indexOf('\u5b58\u6863\u6062\u590d\u70b9') > 0, '面板列出恢复点');
+      const rvBtnE2200 = global.document.querySelector('[data-rv-restore]');
+      assert(!!rvBtnE2200, '提供「恢复到此点」入口');
+      callE2200(rvBtnE2200);
+      assert(WA.store.get().round === 8, '点「恢复」先出确认（未一步执行破坏性回滚）');
+      assert(!!$e('#wa-rv-confirm') && !!$e('#wa-rv-cancel'), '确认/取消控件已渲染');
+      callE2200($e('#wa-rv-confirm'));
+      assert(WA.store.get().round === 7, '确认后真回滚（世界状态被替换）');
+      assert(((($e('#wa-diag-out') || {}).innerHTML) || '').indexOf('\u5df2\u56de\u6eda') > 0, '面板给出回滚反馈（不被重绘冲掉）');
+      const beforeDropUIE2200 = WA.store.listRecoveryPoints().length;
+      callE2200($e('#wa-recovery-view'));
+      callE2200(global.document.querySelector('[data-rv-drop]'));
+      assert(WA.store.listRecoveryPoints().length === beforeDropUIE2200 - 1, '面板丢弃真生效');
+      assert(((($e('#wa-diag-out') || {}).innerHTML) || '').indexOf('\u5df2\u4e22\u5f03') > 0, '面板给出丢弃反馈（不被重绘冲掉）');
+      callE2200($e('#wa-orphan-view'));
+      assert(((($e('#wa-diag-out') || {}).innerHTML) || '').indexOf('\u8bbe\u7f6e\u952e\u767b\u8bb0\u8868') > 0, '面板展示设置键登记表');
+      global.document = savedDocE2200;
+      global.document.getElementById = () => null;
+    }
+
+    WA.workflow.resetHistory();
+    fresh2200();
+  }
+
+  // ── F. 块6：推演事件链入账（此前 applyResult 对 events_create/events_update 零消费 = 主链断裂）──
+  section('v2.2.0 块6：推演事件链入账（修主链断裂）');
+  {
+    fresh2200();
+    const bsSrcF2200 = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
+    const dSrcF2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const pSrcF2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+
+    // F1. 接入位
+    assert(typeof WA.backstage.applyResult === 'function' && typeof WA.backstage.applyStat === 'function', 'applyResult / applyStat 可用');
+    assert(/this\.applyResult\(draft, clamped, anchor\)/.test(bsSrcF2200), '结算路径真经过 applyResult');
+    assert(bsSrcF2200.indexOf('r.events_create') > 0 && bsSrcF2200.indexOf('r.events_update') > 0, 'applyResult 真消费 events_create/events_update（此前零消费）');
+    assert(bsSrcF2200.indexOf('WA.limits.locateStable') > 0 && bsSrcF2200.indexOf('WA.limits.applyStableUpdate') > 0, '更新走 limits 稳定契约（不另起实现）');
+    assert(dSrcF2200.indexOf('backstage: safe(') > 0, '诊断新增 backstage 入账节');
+    assert(pSrcF2200.indexOf('WA.backstage.applyStat()') > 0, '事件页渲染入账留痕');
+
+    // F2. 功能级生效：推演事件真进 state
+    WA.store.transact(d => { d.evolution.events = []; d.evolution.round = 3; });
+    const stF0 = WA.backstage.applyStat();
+    WA.store.transact(d => WA.backstage.applyResult(d, { events_create: [
+      { title: '\u8840\u5200\u95e8\u5bfb\u4ec7', type: 'conflict', level: 2, desc: '\u5bfb\u4e0a\u95e8\u6765' },
+      { title: '\u62a4\u9001\u5546\u961f', type: 'progress', level: 9, desc: '\u5f80\u5317\u53bb' }
+    ] }, { idx: 1 }));
+    const evsF1 = WA.store.read('evolution.events', []);
+    assert(evsF1.length === 2, '两事件真进 state（此前整条丢弃）');
+    const bloodF = evsF1.find(e => e.name === '\u8840\u5200\u95e8\u5bfb\u4ec7');
+    const escortF = evsF1.find(e => e.name === '\u62a4\u9001\u5546\u961f');
+    assert(!!bloodF && bloodF.type === 'conflict' && bloodF.stage === '\u840c\u82bd' && bloodF.level === 2, '名字/类型/首阶段/等级入账正确');
+    assert(!!escortF && escortF.type === 'progress' && escortF.stage === '\u7b79\u5907', '进度型事件按自己的阶段序列起步');
+    assert(!!escortF && escortF.level === 4, '等级越界被夹到 4（与编辑器 MAX_LEVEL 同口径）');
+    assert(!!bloodF && bloodF.source === 'backstage', '来源标记 backstage（可追溯）');
+    assert(WA.backstage.applyStat().eventsCreated === stF0.eventsCreated + 2, 'eventsCreated 计数可见');
+
+    // F3. 同名归并 / 容量 / 挤出
+    const stDupF = WA.backstage.applyStat();
+    WA.store.transact(d => WA.backstage.applyResult(d, { events_create: [{ title: '\u8840\u5200\u95e8\u5bfb\u4ec7', type: 'conflict' }] }, { idx: 1 }));
+    assert(WA.store.read('evolution.events', []).length === 2, '同名事件不重复入账（推演按名归并契约）');
+    assert(WA.backstage.applyStat().eventsCreated === stDupF.eventsCreated, '同名跳过不计入新增');
+    WA.store.transact(d => {
+      d.evolution.events = [];
+      for (let i = 0; i < 16; i++) d.evolution.events.push({ id: 'x' + i, type: 'conflict', name: '\u586b\u5145' + i, level: 1, stage: i === 8 ? '\u5df2\u6d88\u6563' : '\u840c\u82bd', stageRound: 1 });
+    });
+    WA.store.transact(d => WA.backstage.applyResult(d, { events_create: [{ title: '\u65b0\u4e8b\u4ef6', type: 'conflict' }] }, { idx: 1 }));
+    const evsF2 = WA.store.read('evolution.events', []);
+    assert(evsF2.length <= 16 && evsF2.some(e => e.name === '\u65b0\u4e8b\u4ef6'), '容量仍受 16 约束（实 ' + evsF2.length + '）且新事件入账');
+    assert(!evsF2.some(e => e.stage === '\u5df2\u6d88\u6563'), '挤出优先终局（与 evolution.addEvent 同口径）');
+    assert(evsF2.some(e => e.name === '\u586b\u5145' + 0), '不误伤最早活跃事件');
+    WA.store.transact(d => d.evolution.events = []);
+    WA.store.transact(d => WA.backstage.applyResult(d, { events_create: Array.from({ length: 12 }, (_, i) => ({ title: '\u6ea2\u51fa' + i, type: 'conflict' })) }, { idx: 1 }));
+    assert(WA.store.read('evolution.events', []).length === 6, '单轮新增上限 6（与提示词 events_create≤6 同口径）');
+
+    // F4. events_update：稳定定位与频道保护
+    WA.store.transact(d => { d.evolution.events = [{ id: 'evA', type: 'conflict', name: '\u65e7\u6807\u9898', level: 1, stage: '\u840c\u82bd', stageRound: 1, desc: '' }]; });
+    const stF2 = WA.backstage.applyStat();
+    WA.store.transact(d => WA.backstage.applyResult(d, { events_update: [
+      { title: '\u65e7\u6807\u9898', name: '\u65b0\u6807\u9898', type: 'progress', stage: '\u917d\u917f', desc: '\u903c\u8fd1\u4e86' }
+    ] }, { idx: 1 }));
+    const upF = WA.store.read('evolution.events', [])[0] || {};
+    assert(upF.id === 'evA' && upF.name === '\u65b0\u6807\u9898', '按 title 定位：改名不换链（id 不变且确实改名）');
+    assert(upF.type === 'conflict', 'type 禁改（推演侧铁律）');
+    assert(upF.stage === '\u917d\u917f' && upF.desc === '\u903c\u8fd1\u4e86', '阶段与描述按更新写入');
+    assert(WA.backstage.applyStat().eventsUpdated === stF2.eventsUpdated + 1, 'eventsUpdated 计数可见');
+    assert(WA.backstage.applyStat().eventsLoose === stF2.eventsLoose, '命中时不计入未匹配（防假命中）');
+    const stF3 = WA.backstage.applyStat();
+    WA.store.transact(d => WA.backstage.applyResult(d, { events_update: [{ title: '\u4e0d\u5b58\u5728\u7684\u4e8b\u4ef6', stage: '\u917d\u917f' }] }, { idx: 1 }));
+    assert(WA.backstage.applyStat().eventsLoose === stF3.eventsLoose + 1, '无对应事件只计数');
+    assert(WA.store.read('evolution.events', []).length === 1, '未命中更新不产生新条目');
+
+    // F5. 边界与卫兵
+    const stF4 = WA.backstage.applyStat();
+    WA.store.transact(d => WA.backstage.applyResult(d, { events_create: [null, { title: '   ' }, { desc: '\u65e0\u540d' }, { title: '\u5408\u6cd5' }] }, { idx: 1 }));
+    assert(WA.store.read('evolution.events', []).filter(e => e.name === '\u5408\u6cd5').length === 1, '空名/无名条目被跳过');
+    assert(WA.backstage.applyStat().eventsCreated === stF4.eventsCreated + 1, '跳过条目不计入新增');
+    WA.store.transact(d => WA.backstage.applyResult(d, { events_create: [{ title: '\u975e\u6cd5\u9636\u6bb5', type: 'progress', stage: '\u840c\u82bd' }] }, { idx: 1 }));
+    const badF = WA.store.read('evolution.events', []).find(e => e.name === '\u975e\u6cd5\u9636\u6bb5');
+    assert(!!badF && badF.stage === '\u7b79\u5907', '非法阶段回落到该类型首阶段（不写脏阶段）');
+
+    // F6. 可观测性
+    const dgF = WA.toolDiag.collect();
+    assert(!!(dgF.runtime && dgF.runtime.backstage && dgF.runtime.backstage.apply), '诊断透出入账计量');
+    assert(dgF.runtime.backstage.apply.eventsCreated >= 1, '诊断透出新增计数');
+    assert(typeof dgF.runtime.backstage.fromBackstage === 'number' && dgF.runtime.backstage.fromBackstage >= 1, '诊断透出 state 中来自推演的事件数（端到端可见）');
+
+    // F7. 端到端（真 DOM）：事件页留痕
+    let JSDOMF2200 = null;
+    try { JSDOMF2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMF2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMF2200 = null; } }
+    if (!JSDOMF2200) {
+      console.log('  \u26a0 jsdom 不可用，跳过块6 端到端断言（源码锚点已覆盖接线）');
+    } else {
+      const domF2200 = new JSDOMF2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
+      const savedDocF2200 = global.document;
+      global.document = domF2200.window.document;
+      try { global.Node = domF2200.window.Node; } catch (e) {}
+      WA.mainDoc = global.document;
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+      WA.store.init();
+      WA.ui.mount();
+      WA.ui.open();
+      const tabsF2200 = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
+      const evTabF2200 = tabsF2200.filter(t => t.dataset.page === 'events')[0];
+      assert(!!evTabF2200, '面板存在「事件」页签');
+      WA.store.transact(d => WA.backstage.applyResult(d, { events_create: [{ title: '\u7aef\u5230\u7aef\u4e8b\u4ef6', type: 'conflict' }] }, { idx: 1 }));
+      evTabF2200.onclick();
+      const bodyF2200 = (global.document.querySelector('.wa-body') || {}).innerHTML || '';
+      assert(bodyF2200.indexOf('\u6f14\u5316\u4e8b\u4ef6') > 0, '事件页照常渲染');
+      assert(bodyF2200.indexOf('\u63a8\u6f14\u4e8b\u4ef6\u5165\u8d26') > 0, '事件页展示推演入账留痕（此前断链毫无提示）');
+      assert(/\u65b0\u589e \d+/.test(bodyF2200), '留痕含新增条数');
+      global.document = savedDocF2200;
+      global.document.getElementById = () => null;
+    }
+
+    WA.workflow.resetHistory();
+    fresh2200();
+  }
+
+  // ── G. 块7：推演契约对账闭环（events_create/events_update 两侧补齐；含对账器自身缺陷修复）──
+  section('v2.2.0 块7：推演契约对账闭环');
+  {
+    fresh2200();
+    const caSrcG2200 = fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8');
+    const bsSrcG2200 = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
+    const lmSrcG2200 = fs.readFileSync(path.join(BASE, 'engines/limits.js'), 'utf8');
+
+    // G1. 两条缺失字段两侧补齐
+    assert(!!(WA.contractAudit && WA.contractAudit.PROBES.events_create && WA.contractAudit.PROBES.events_update), '对账器探针表含事件链两字段（此前漏登=对本类漂移失明）');
+    assert(!!(WA.contractAudit.SEEDS && WA.contractAudit.SEEDS.events_update), '更新类探针带基线种子（防假阴性）');
+    assert(JSON.stringify(WA.contractAudit.PROBES.events_create).indexOf('__audit_') >= 0, '探针值带哨兵标记（差分可判是否真落地）');
+    assert(bsSrcG2200.indexOf('"events_create":') > 0 && bsSrcG2200.indexOf('"events_update":') > 0, '提示词契约声明了两字段（模型才会产出）');
+    assert(lmSrcG2200.indexOf('out.events_create') > 0 && lmSrcG2200.indexOf('out.events_update') > 0, 'limits 截断两字段');
+    assert(caSrcG2200.indexOf('LIVE_DELEGATED') > 0 && caSrcG2200.indexOf('liveIterChanged') > 0, 'live 兜底限定委托白名单 + 本轮差分（防跨轮污染假阳性）');
+
+    // G2. 契约解析：真实提示词声明了两字段
+    const promptG = WA.backstage.buildPrompt({ idx: 1, text: '' }, '');
+    const contractG = WA.contractAudit.parseContract(promptG);
+    assert(!!contractG.fields.events_create && !!contractG.fields.events_update, 'parseContract 识别事件链两字段');
+    assert(Object.keys(contractG.fields).length >= 24, '契约字段数不少于 24（实 ' + Object.keys(contractG.fields).length + '）');
+    const promptTextG = JSON.stringify(promptG);
+    assert(promptTextG.indexOf('conflict|progress') > 0, '契约写明事件类型枚举');
+    assert(promptTextG.indexOf('\u6539\u540d\u4e0d\u6362\u94fe') > 0, '契约写明「改名不换链」语义');
+
+    // G3. 消费实测（只读：哨兵不残留）
+    const baseG = JSON.parse(JSON.stringify(WA.store.get()));
+    const consumedG = WA.contractAudit.consumedFields({ baseState: baseG });
+    assert(!!consumedG.events_create && consumedG.events_create.consumed === true, 'events_create 实测被消费');
+    assert(!!consumedG.events_update && consumedG.events_update.consumed === true, 'events_update 实测被消费（种子机制让更新真命中）');
+    assert(!!consumedG.events_update && consumedG.events_update.changed === true, '更新真改了状态（非 live 兜底误判）');
+    assert(JSON.stringify(WA.store.get()).indexOf('__audit_') < 0, '探针哨兵不残留于真实存档');
+
+    // G4. 全量对账：双向无漂移
+    const repG = WA.contractAudit.audit({ baseState: baseG, applyFn: (d, r, a) => WA.backstage.applyResult(d, r, a) });
+    assert(repG.drift.declaredNotConsumed.length === 0 && repG.drift.probeNotDeclared.length === 0, '双向无漂移（声明↔消费）');
+    assert(repG.verdict.errorCount === 0, '对账结论无阻断项');
+    assert(repG.declared.length === repG.consumed.length, '声明数与消费数一致（' + repG.declared.length + '/' + repG.consumed.length + '）');
+
+    // G5. 哨兵灵敏度复核（注入伪漂移必须被抓）
+    const fakePromptG = JSON.parse(JSON.stringify(promptG));
+    fakePromptG.forEach(m => { if (typeof m.content === 'string') m.content = m.content.replace(/ *"events_create":[^\n]*\n/, '\n'); });
+    assert(!!WA.contractAudit.parseContract(fakePromptG).fields.events_update, '伪契约只删 events_create（前置成立）');
+    const repG2 = WA.contractAudit.audit({ baseState: baseG, promptFn: () => fakePromptG, applyFn: (d, r, a) => WA.backstage.applyResult(d, r, a) });
+    assert(repG2.drift.probeNotDeclared.indexOf('events_create') >= 0, '哨兵抓出「消费但未声明」（消费端在读而模型永不发）');
+    assert(repG2.issues.some(i => i.code === 'probe_not_declared' && i.level === 'error'), '该漂移定为阻断级');
+    const repG3 = WA.contractAudit.audit({ baseState: baseG, applyFn: () => { } });
+    assert(repG3.drift.declaredNotConsumed.indexOf('events_create') >= 0, '哨兵抓出「声明但未消费」（白产出）');
+    const selectiveG = (d, r, a) => { const p = JSON.parse(JSON.stringify(r)); delete p.events_create; WA.backstage.applyResult(d, p, a); };
+    const repG4 = WA.contractAudit.audit({ baseState: baseG, applyFn: selectiveG });
+    assert(repG4.drift.declaredNotConsumed.indexOf('events_create') >= 0, '哨兵抓出「选择性未消费」（残留哨兵不得让它误判已消费）');
+    const repG5 = WA.contractAudit.audit({ baseState: baseG, promptFn: () => [], applyFn: (d, r, a) => WA.backstage.applyResult(d, r, a) });
+    assert(repG5.declared.length === 0 && repG5.drift.probeNotDeclared.length >= 20, '空契约下不得虚报对齐');
+
+    // G6. 下游消费：摘要 / 诊断 / 巡视
+    assert(typeof WA.contractAudit.summaryText(repG) === 'string', '对账摘要可用');
+    assert(WA.contractAudit.flatten(repG).some(x => x.key === 'coverage'), 'flatten 含覆盖率行');
+    assert(!!WA.toolDiag.collect().runtime, '诊断照常采集');
+    const mG = WA.store.maintain({ deep: true });
+    assert(typeof mG.score === 'number' && !!mG.level, '巡视（deep）照常给出结论');
+    assert(!mG.issues.some(i => i.key === 'engine.contract' && i.level === 'error'), '契约无阻断议题');
+
+    WA.workflow.resetHistory();
+    fresh2200();
+  }
+
+  // ── H. 块8：UI 绑定守卫全覆盖（此前 UI_BINDINGS 只登记 24 个控件，panel 实际渲染 91 个）──
+  section('v2.2.0 块8：UI 绑定守卫全覆盖');
+  {
+    fresh2200();
+    const dSrcH2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const pSrcH2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+
+    // H1. 分层结构
+    const grpH = WA.toolDiag.UI_BINDINGS;
+    assert(Array.isArray(grpH) && grpH.length >= 6, 'UI_BINDINGS 覆盖多页（实 ' + grpH.length + ' 组）');
+    const gIds = new Set(), gCond = new Set(), gDyn = new Set();
+    grpH.forEach(g => { (g.ids || []).forEach(x => gIds.add(x)); (g.cond || []).forEach(x => gCond.add(x)); (g.dynamic || []).forEach(x => gDyn.add(x)); });
+    assert(gIds.size >= 60, '无条件渲染控件纳入守卫数不少于 60（实 ' + gIds.size + '，此前仅 24）');
+    assert(gCond.size >= 5, '条件渲染控件单独分层（实 ' + gCond.size + '）');
+    assert(gDyn.size >= 5, '动态生成节点按锚点分层（实 ' + gDyn.size + '）');
+    assert(dSrcH2200.indexOf('condMissing') > 0 && dSrcH2200.indexOf('dynamicMissing') > 0, 'secUi 支持条件/动态分层统计');
+
+    // H2. 不变量：panel 渲染的控件全部在守卫表内 + 无僵尸条目
+    const renderedH = [];
+    const reH = /id="(wa-[a-z0-9\-]+)"/g;
+    let mH;
+    while ((mH = reH.exec(pSrcH2200))) { if (renderedH.indexOf(mH[1]) < 0) renderedH.push(mH[1]); }
+    const EXEMPT_H = ['wa-panel', 'wa-orb'];
+    const uncoveredH = renderedH.filter(id => !gIds.has(id) && !gCond.has(id) && !gDyn.has(id) && EXEMPT_H.indexOf(id) < 0);
+    assert(uncoveredH.length === 0, 'panel 渲染的每个控件都在守卫表内（未覆盖：' + JSON.stringify(uncoveredH) + '）');
+    assert(renderedH.length >= 80, 'panel 渲染控件总量不少于 80（实 ' + renderedH.length + '）');
+    const zombieH = [];
+    grpH.forEach(g => { (g.ids || []).concat(g.cond || []).concat(g.dynamic || []).forEach(id => { if (renderedH.indexOf(id) < 0) zombieH.push(id); }); });
+    assert(zombieH.length === 0, '守卫表无僵尸条目（' + JSON.stringify(zombieH) + '）');
+
+    // H3. secUi 只对当前页判定（面板一次只渲染当前页）
+    const uiSrcH = WA.toolDiag.secUi();
+    assert(uiSrcH.currentPage === null || typeof uiSrcH.currentPage === 'string', 'secUi 透出当前页（无头环境为 null）');
+    assert(uiSrcH.totalGroups >= 6, '守卫表总组数（' + uiSrcH.totalGroups + '）');
+    const groupsH = uiSrcH.groups;
+    assert(groupsH.length === grpH.length, 'secUi 按组返回（' + groupsH.length + '）');
+
+    // H4. 真 DOM：轮转全部带守卫的页，逐页无缺失
+    let JSDOMH2200 = null;
+    try { JSDOMH2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMH2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMH2200 = null; } }
+    if (!JSDOMH2200) {
+      console.log('  \u26a0 jsdom 不可用，跳过块8 端到端断言（静态锚点已覆盖）');
+    } else {
+      const domH2200 = new JSDOMH2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
+      const savedDocH2200 = global.document;
+      global.document = domH2200.window.document;
+      try { global.Node = domH2200.window.Node; } catch (e) {}
+      WA.mainDoc = global.document;
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+      WA.store.init();
+      WA.ui.mount();
+      WA.ui.open();
+      assert(typeof WA.ui.currentPage === 'function' && typeof WA.ui.pages === 'function', 'panel 暴露当前页/页列');
+      const gp = {}; grpH.forEach(g => { gp[g.page] = true; });
+      const pageListH = WA.ui.pages().filter(p => gp[p]);
+      assert(pageListH.length >= 6, '带守卫的页数不少于 6（实 ' + pageListH.length + '）');
+      const tabsH = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
+      const byPageH = {};
+      tabsH.forEach(t => { byPageH[t.dataset.page] = t; });
+      const badH = [];
+      pageListH.forEach(function (pg) {
+        const tab = byPageH[pg];
+        if (!tab) return;
+        tab.onclick();
+        const u = WA.toolDiag.secUi();
+        const g = u.groups.filter(x => x.active)[0];
+        if (!g || !g.ok) badH.push(pg + ':' + JSON.stringify(g ? g.missing : null));
+      });
+      assert(badH.length === 0, '逐页无缺失（未通过：' + JSON.stringify(badH) + '）');
+      byPageH['tools'].onclick();
+      const toolsH = WA.toolDiag.secUi().groups.filter(g => g.page === 'tools')[0];
+      assert(!!toolsH && toolsH.ok === true && toolsH.expected >= 20, '工具页控件全在场且规模充足（' + (toolsH && toolsH.expected) + '）');
+      assert(WA.toolDiag.secUi().totalMissing === 0, '当前页零缺失');
+
+      // H5. 分层口径：无条件缺失=warn；条件缺失=info
+      let dgH = WA.toolDiag.collect();
+      assert(!dgH.verdict.issues.some(i => i.key === 'ui' && i.level === 'warn'), '健康面板不产 ui 断裂告警');
+      const savedGetH = global.document.getElementById;
+      const missIdH = 'wa-diag-run';
+      global.document.getElementById = function (id) { return id === missIdH ? null : savedGetH.call(global.document, id); };
+      dgH = WA.toolDiag.collect();
+      const uiWarnH = dgH.verdict.issues.filter(i => i.key === 'ui' && i.level === 'warn')[0];
+      assert(!!uiWarnH && uiWarnH.detail.indexOf('\u70b9\u51fb\u65e0\u53cd\u5e94') > 0, '无条件控件缺失 → 断裂告警并说明后果');
+      global.document.getElementById = savedGetH;
+      assert(WA.toolDiag.secUi().totalMissing === 0, '还原后无缺失');
+      global.document = savedDocH2200;
+      global.document.getElementById = () => null;
+    }
+
+    // H6. 静态锚点
+    assert(dSrcH2200.indexOf('totalExpected') > 0 && dSrcH2200.indexOf('totalMissing') > 0, '全量口径字段在位');
+    assert(dSrcH2200.indexOf('ui.cond') > 0, '条件分层议题键在位');
+    assert(!/^(hygiene|quarantine|state)\./.test('ui.cond') && !/^(hygiene|quarantine|state)\./.test('ui'), '议题键避开卫生指纹正则');
+
+    WA.workflow.resetHistory();
+    fresh2200();
+  }
+  } // end v2.2.0 block
+  } // end v2.1.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
