@@ -3,9 +3,21 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
 
+  // v2.0.0: 激活状态观测（init 探测并暴露只读快照接口）
+  const __thState = { active: false, exposedAt: 0, lastReason: 'not-initialized' };
   // 检测TH环境并向父窗口暴露世界状态只读接口
   WA.compatTH = {
     isTH() { try { return window.parent && window.parent !== window; } catch (e) { return false; } },
+    /** v2.0.0: 激活——暴露只读快照接口（init 调用，幂等） */
+    init() {
+      try {
+        this.expose();
+        __thState.active = true; __thState.exposedAt = Date.now(); __thState.lastReason = 'exposed';
+        return true;
+      } catch (e) { __thState.active = false; __thState.lastReason = 'error:' + (e && e.message); WA.log('warn', 'TH 桥接暴露失败', e); return false; }
+    },
+    /** v2.0.0: 激活状态查询（供巡视/诊断消费） */
+    status() { return { active: __thState.active, lastReason: __thState.lastReason, exposedAt: __thState.exposedAt, isTH: (function () { try { return this.isTH(); } catch (e) { return false; } }).call(this) }; },
     expose() {
       // 供TH脚本/正则读取的世界状态快照
       WA.mainWin.WorldAxisSnapshot = function () {

@@ -16,6 +16,22 @@
     : (st) => JSON.parse(JSON.stringify(st));
   const MAX_RECOVERY_POINTS = 3;
 
+  // ── 模块注册表（v2.0.0）──────────────────────────────────
+  //   契约下沉到数据层：此前定义在入口文件 index.js，凡不经 index.js 的加载路径
+  //   （vm 测试链、TH 脚本按需加载）注册表都不存在，tool-diag 的 registeredModules 恒空。
+  //   store 是加载序列第 2 位、且所有路径必经，故放这里；index.js 保留同名转发。
+  WA.modules = WA.modules || {};
+  if (typeof WA.registerModule !== 'function') {
+    WA.registerModule = function (name, meta) {
+      if (!name) return null;
+      const rec = { name: name, at: Date.now(), ver: (meta && meta.ver) || WA.version || 'unknown', kind: (meta && meta.kind) || 'engine' };
+      WA.modules[name] = rec;
+      return rec;
+    };
+  }
+  if (typeof WA.moduleRegistry !== 'function') {
+    WA.moduleRegistry = function () { return Object.keys(WA.modules || {}).sort(); };
+  }
   // ── 默认世界状态（纯框架：世界观由世界书/用户设定注入，此处只留结构）──
   function defaultWorldState() {
     return {
@@ -252,8 +268,18 @@
   // v1.9.0: 世界逻辑瑕疵基线——载入期存量记为基线不扣分（避免历史脏数据把健康分永久锁死），
   //   基线之上的新增才扣分；codes 为 error 级 code 集合签名，用于识别「量不变但劣化项易主」。
   const __logicBaseline = { codes: null };
+  /** v2.0.0: 标记巡视采集节降级（失败节不静默——否则 signals 归零伪装成健康） */
+  function markDegraded(section, err) {
+    try {
+      __maintainDegraded.sections.push({ section: section, at: Date.now(), msg: String(err && (err.message || err)).slice(0, 120) });
+      if (__maintainDegraded.sections.length > 12) __maintainDegraded.sections.splice(0, __maintainDegraded.sections.length - 12);
+      __maintainDegraded.lastAt = Date.now(); __maintainDegraded.total++;
+    } catch (e) { /* 台账自身失败不得影响巡视 */ }
+  }
   // v1.9.0: 引擎故障观测快照（errorLog 巡视间增量 + 逻辑瑕疵计量），经 maintainStat() 透出
   const __faultWatch = { total: 0, recent: 0, recentCodes: [], logicErrors: 0, logicWarns: 0, logicNewErrors: 0, scansWithFault: 0, cursor: null, primed: false, primedAt: 0 };
+  // v2.0.0: 巡视自身降级台账——采集节抛错即记录（此前裸 catch 使「巡视半瞎」与「一切正常」不可区分）
+  const __maintainDegraded = { sections: [], lastAt: 0, total: 0 };
   // v0.1.38: 加载观测——状态键损坏时隔离原始 payload 而非静默丢弃
   const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
@@ -829,20 +855,25 @@
      * v1.9.0: 巡视范畴从「存储治理」扩展到「世界逻辑 + 引擎健康」——消费 inspectorState.inspect() 的
      * 10 组检查器（logic.consistency）与 errorLog 增量（engine.faultRate），两者均按基线/游标口径判定
      * 「是否恶化」，载入期存量不追溯扣分、同一恶化不重复惩罚。
+     * v2.0.0: 巡视自身也可观测——采集节抛错进 __maintainDegraded 台账并出 patrol.degraded 议题
+     * （此前五个采集点全为裸空 catch，任一节失败都会让 signals 归零、健康分保持 100 假绿，
+     * 使「巡视半瞎」与「真健康」不可区分）；同时新增 module.integrity（模块装载失败/注册缺口）
+     * 与 deep 专属的 engine.contract/engine.sampler/engine.purifier（三个自检能力此前零运行时消费）。
      * 只读（apply:false 默认）；apply:true 时仅执行安全子集（过期诊断/孤儿恢复点/隔离溢出回收）。
      */
     maintain(opts) {
       const o = opts || {};
       const apply = o.apply === true;
       __maintainStat.scans++; __maintainStat.lastAt = Date.now();
+      __maintainDegraded.sections.length = 0;   // v2.0.0: 巡视降级台账按轮计，不跨轮粘留
       const issues = [];
       const actions = [];
       let score = 100;
 
       // ── 1. 存储计量 + 键卫生 ──
       let stat = null, plan = null;
-      try { stat = this.storageStat(); } catch (e) {}
-      try { plan = this.sweepStaleKeys({}); } catch (e) {}
+      try { stat = this.storageStat(); } catch (e) { markDegraded('storageStat', e); }
+      try { plan = this.sweepStaleKeys({}); } catch (e) { markDegraded('sweepStaleKeys', e); }
       if (plan && plan.remove.length) {
         const freedKB = Math.round(plan.freedBytes / 1024);
         if (plan.freedBytes > 512 * 1024) { score -= 12; issues.push({ level: 'warn', key: 'hygiene.reclaimable', detail: '可回收 ' + plan.remove.length + ' 键 / ' + freedKB + 'KB' }); }
@@ -852,13 +883,13 @@
 
       // ── 2. 诊断体积预算 ──
       let db = null;
-      try { db = this.diagBudget(); } catch (e) {}
+      try { db = this.diagBudget(); } catch (e) { markDegraded('diagBudget', e); }
       if (db && db.exceeded) { score -= 8; issues.push({ level: 'warn', key: 'diag.budget', detail: '当前聊天诊断 ' + db.diagPct + '% > ' + db.maxPct + '%' }); actions.push({ id: 'trim-diag', safe: true, detail: '诊断环自适应收紧（由 index.js logCaps 执行）' }); }
       else if (db && db.diagPct > 10) { issues.push({ level: 'info', key: 'diag.budget', detail: '诊断占比 ' + db.diagPct + '%' }); }
 
       // ── 3. 隔离现场（需人工决策，不可自动）──
       let qs = null;
-      try { qs = this.quarantineStat(); } catch (e) {}
+      try { qs = this.quarantineStat(); } catch (e) { markDegraded('quarantineStat', e); }
       if (qs && qs.stateSites > 0) {
         score -= Math.min(10, qs.stateSites * 3);
         issues.push({ level: qs.parseable > 0 ? 'warn' : 'info', key: 'quarantine.sites', detail: qs.stateSites + ' 个 state 隔离现场（可解析 ' + qs.parseable + '）——面板「隔离现场」可恢复/丢弃' });
@@ -867,7 +898,7 @@
 
       // ── 4. 全库状态健康 ──
       let va = null;
-      try { va = this.verifyAll({ deep: o.deep === true }); } catch (e) {}
+      try { va = this.verifyAll({ deep: o.deep === true }); } catch (e) { markDegraded('verifyAll', e); }
       if (va && va.problems.length) {
         score -= Math.min(20, va.problems.length * 6);
         issues.push({ level: 'error', key: 'state.corrupt', detail: va.problems.length + ' 个聊天状态有问题（' + va.problems.map(function (p) { return p.chat + ':' + p.reason; }).slice(0, 3).join(', ') + '）' });
@@ -1103,6 +1134,100 @@
       __faultWatch.logicErrors = logicErrors; __faultWatch.logicWarns = logicWarns; __faultWatch.logicNewErrors = logicNewErrors;
       if (errRecent > 0 || logicErrors > 0) __faultWatch.scansWithFault++;
 
+      // ── 11. 模块装载完整性（v2.0.0）──
+      //   模块加载失败 = 该引擎整块缺席（render 失败则插图全丢），但此前对健康分毫无影响。
+      //   注册表（v2.0.0 块1 建立）也要校验：已加载 / 已注册 / 清单声明 是否三方对齐。
+      let modDeclared = 0, modLoaded = 0, modFailed = 0, modMissing = 0, modFailedList = [];
+      try {
+        const decl = Array.isArray(WA.__loadOrder) ? WA.__loadOrder : null;
+        if (decl && decl.length) {
+          modDeclared = decl.length;
+          modFailedList = (Array.isArray(WA.__loadFailed) ? WA.__loadFailed : []).slice();
+          modFailed = modFailedList.length;
+          modLoaded = modDeclared - modFailed;
+          const reg = WA.modules || {};
+          const missing = decl.filter(function (rel) { return !reg[rel] && modFailedList.indexOf(rel) < 0; });
+          modMissing = missing.length;
+          if (modFailed > 0) {
+            score -= Math.min(24, modFailed * 8);
+            issues.push({ level: 'error', key: 'module.integrity', detail: modFailed + '/' + modDeclared + ' 个模块加载失败（' + modFailedList.slice(0, 5).join('、') + (modFailed > 5 ? ' 等' : '') + '）——对应引擎整块缺席，本世界可能功能残缺，健康分不能代表完整体检' });
+            actions.push({ id: 'review-modules', safe: false, detail: '面板「诊断」查看加载失败模块与尝试来源（多为文件缺失或语法错误）' });
+          }
+          if (modMissing > 0) {
+            score -= Math.min(9, modMissing * 3);
+            issues.push({ level: 'warn', key: 'module.integrity', detail: modMissing + ' 个模块已加载却未登记注册表（' + missing.slice(0, 5).join('、') + (modMissing > 5 ? ' 等' : '') + '）——装载审计与实际不符，插件清单可能被外部改写' });
+          }
+        }
+      } catch (e) { /* 装载信息读取失败不阻断巡视 */ }
+      // ── 12. 引擎自检能力接入（v2.0.0，deep 专属）──
+      //   三个自检能力此前零运行时消费：contractAudit（推演契约对账）、samplerCheck（采样器自检）、
+      //   purifier（净化规则有效性）。它们正是「引擎自己的体检」，本该由巡视统一裁决。
+      //   deep 专属：全量契约扫描与多轮采样有可观开销，高频巡视路径不跑。
+      let contractErrors = 0, contractWarns = 0, samplerPass = 0, samplerTotal = 0, samplerOk = true, purifierBad = 0, selfCheckRan = false;
+      if (o.deep === true) {
+        try {
+          if (WA.contractAudit && typeof WA.contractAudit.audit === 'function') {
+            selfCheckRan = true;
+            const ca = WA.contractAudit.audit();
+            const v = (ca && ca.verdict) || {};
+            contractErrors = v.errorCount || 0; contractWarns = v.warnCount || 0;
+            if (contractErrors > 0) {
+              score -= Math.min(15, contractErrors * 5);
+              const ci = (ca.issues || []).filter(function (i) { return i.level === 'error'; }).slice(0, 3).map(function (i) { return i.code; }).join('、');
+              issues.push({ level: 'error', key: 'engine.contract', detail: contractErrors + ' 项推演契约阻断（' + ci + '）——契约声明与消费端已漂移，推演可能读到未声明字段' });
+              actions.push({ id: 'review-contract', safe: false, detail: '面板「诊断」查看契约对账明细（声明/实测消费/枚举/跨模块漂移）' });
+            } else if (contractWarns > 0) {
+              // 存量提醒不扣分（与 v1.9.0「载入期存量不追溯扣分」一致）：declared_not_consumed
+              // 等属长期观察项，每轮 deep 扣分会成噪音并污染基线分。
+              issues.push({ level: 'info', key: 'engine.contract', detail: contractWarns + ' 项契约提醒（可用但需留意）：' + (ca.issues || []).filter(function (i) { return i.level !== 'error'; }).slice(0, 3).map(function (i) { return i.code; }).join('、') });
+            }
+          }
+        } catch (e) { markDegraded('contractAudit', e); }
+        try {
+          if (WA.samplerCheck && typeof WA.samplerCheck.runChecks === 'function') {
+            selfCheckRan = true;
+            const sc = WA.samplerCheck.runChecks({});
+            const sv = (sc && sc.verdict) || {};
+            samplerPass = sv.pass || 0; samplerTotal = sv.total || 0; samplerOk = sv.ok !== false;
+            if (!samplerOk) {
+              const bad = (sc.checks || []).filter(function (c) { return !c.ok; }).map(function (c) { return c.name; }).join('、');
+              score -= Math.min(12, (samplerTotal - samplerPass) * 4);
+              issues.push({ level: 'warn', key: 'engine.sampler', detail: '记忆采样器自检未通过（' + samplerPass + '/' + samplerTotal + '）：' + bad + '——注入的记忆挑选可能偏离预期（引用丢失/近期偏置失效）' });
+            }
+          }
+        } catch (e) { markDegraded('samplerCheck', e); }
+        try {
+          if (WA.purifier && typeof WA.purifier.getRules === 'function') {
+            selfCheckRan = true;
+            const rules = WA.purifier.getRules() || [];
+            rules.forEach(function (r) {
+              if (!r || !r.enabled) return;
+              try { new RegExp(r.find, r.flags || 'g'); } catch (e) { purifierBad++; }
+            });
+            if (purifierBad > 0) {
+              score -= Math.min(9, purifierBad * 3);
+              issues.push({ level: 'warn', key: 'engine.purifier', detail: purifierBad + ' 条启用中的净化规则正则非法——该规则在 apply() 时静默失效，输出文本未按预期净化' });
+              actions.push({ id: 'review-purifier', safe: false, detail: '面板「净化规则」修正非法正则（转义遗漏最常见）' });
+            }
+          }
+        } catch (e) { markDegraded('purifier', e); }
+      }
+      // ── 10. 巡视自身完整性（v2.0.0）──
+      //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
+      let degradedN = 0;
+      try {
+        degradedN = __maintainDegraded.sections.length;
+        if (degradedN > 0) {
+          const names = __maintainDegraded.sections.map(function (x) { return x.section; });
+          score -= Math.min(20, degradedN * 6);
+          issues.push({ level: 'error', key: 'patrol.degraded', detail: degradedN + ' 个巡视采集节异常（' + names.join('、') + '）——本轮健康分不完整，对应信号已归零，不能据此判定世界健康' });
+          actions.push({ id: 'review-degraded', safe: false, detail: '面板「诊断」查看生成器异常明细（采集节抛错通常意味着上游数据损坏）' });
+          // v2.0.0 fix: 降级轮分数封顶——采集节失败会把该节 signals 归零，连带抹掉它本应产生的扣分
+          // （曾出现「降级只扣 12，却抹掉 8 分 diag warn，净 Δ 仅 4」）。若被抹掉的是更大额扣分，
+          // 分数会不降反升——巡视坏了反而更「健康」。故有降级时不得报 ok 档（≥90）。
+          score = Math.min(score, 89);   // 封顶 89：保留降级分级粒度
+        }
+      } catch (e) { /* 台账读取失败不阻断 */ }
       score = Math.max(0, Math.min(100, score));
       const level = score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'degraded';
       let applied = null;
@@ -1154,6 +1279,11 @@
           capacityBloat: capBloat, schemaPollution: schemaPollution,  // v1.8.0
           logicErrors: logicErrors, logicWarns: logicWarns, logicNewErrors: logicNewErrors,
           engineErrors: errTotal, engineErrorsRecent: errRecent,  // v1.9.0
+          patrolDegraded: degradedN, patrolDegradedSections: __maintainDegraded.sections.map(function (x) { return x.section; }),  // v2.0.0
+          moduleDeclared: modDeclared, moduleLoaded: modLoaded, moduleFailed: modFailed, moduleMissing: modMissing,  // v2.0.0
+          moduleFailedList: modFailedList.slice(0, 12),
+          contractErrors: contractErrors, contractWarns: contractWarns,  // v2.0.0
+          samplerOk: samplerOk, samplerPass: samplerPass, samplerTotal: samplerTotal, purifierBadRules: purifierBad, selfCheckRan: selfCheckRan,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }
@@ -1219,7 +1349,7 @@
       } catch (e) { return { ok: false, reason: String((e && e.message) || e) }; }
     },
     /** v0.4.0: 巡视计量视图（面板/报告消费） */
-    maintainStat() { const m = __maintainStat; const w = __faultWatch; return { scans: m.scans, lastAt: m.lastAt, lastScore: m.lastScore, lastLevel: m.lastLevel, autoApplies: m.autoApplies, lastAutoFreedKeys: m.lastAutoFreedKeys, lastAutoFreedBytes: m.lastAutoFreedBytes, faultWatch: { total: w.total, recent: w.recent, recentCodes: w.recentCodes.slice(0, 5), logicErrors: w.logicErrors, logicWarns: w.logicWarns, logicNewErrors: w.logicNewErrors, scansWithFault: w.scansWithFault } }; },
+    maintainStat() { const m = __maintainStat; const w = __faultWatch; return { scans: m.scans, lastAt: m.lastAt, lastScore: m.lastScore, lastLevel: m.lastLevel, autoApplies: m.autoApplies, lastAutoFreedKeys: m.lastAutoFreedKeys, lastAutoFreedBytes: m.lastAutoFreedBytes, patrol: { degraded: __maintainDegraded.total, lastSections: __maintainDegraded.sections.map(function (x) { return x.section; }) }, modules: { declared: (Array.isArray(WA.__loadOrder) ? WA.__loadOrder.length : 0), registered: Object.keys(WA.modules || {}).length, failed: (Array.isArray(WA.__loadFailed) ? WA.__loadFailed.length : 0) }, faultWatch: { total: w.total, recent: w.recent, recentCodes: w.recentCodes.slice(0, 5), logicErrors: w.logicErrors, logicWarns: w.logicWarns, logicNewErrors: w.logicNewErrors, scansWithFault: w.scansWithFault } }; },
     /**
      * v0.4.0: 完整性审计视图（只读）——writes 为写后校验次数，mismatches>0 说明本会话出现过静默写入失败
      */

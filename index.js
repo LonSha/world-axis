@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '1.9.0';
+  const VERSION = '2.0.0';
   WA.VERSION = VERSION;
   const LOG = '[世界枢轴]';
 
@@ -29,7 +29,18 @@
   WA.version = VERSION;
   WA.mainWin = mainWin;
   WA.mainDoc = mainDoc;
-  WA.modules = {};      // 模块注册表（引擎/UI各自登记）
+  // v2.0.0: 模块注册表契约已下沉至 core/store.js（注册表必须在所有加载路径下存在，
+  // 而非仅在入口文件）——此处保留转发兜底，防旧加载顺序下未定义。
+  if (typeof WA.registerModule !== 'function') {
+    WA.modules = WA.modules || {};
+    WA.registerModule = function (name, meta) {
+      if (!name) return null;
+      const rec = { name: name, at: Date.now(), ver: (meta && meta.ver) || VERSION, kind: (meta && meta.kind) || 'engine' };
+      WA.modules[name] = rec;
+      return rec;
+    };
+  }
+  if (typeof WA.moduleRegistry !== 'function') WA.moduleRegistry = function () { return Object.keys(WA.modules || {}).sort(); };
   WA.eventLog = [];     // 轻量运行日志（内存环形，最多300条，info/warn/error 混装）
   WA.errorLog = [];    // v0.1.53: error 专属子环（最多50条）——info 噪音挤掉混合环也不丢关键故障证据
   const ERROR_LOG_MAX = 50;
@@ -313,7 +324,24 @@
     try { WA.interceptor && WA.interceptor.install && WA.interceptor.install(); } catch (e) { WA.log('error', '拦截器安装失败', e); }
     try { WA.injectInspector && WA.injectInspector.init && WA.injectInspector.init(); } catch (e) { WA.log('warn', '注入自检初始化失败', e); }
     try { WA.ui && WA.ui.mount && WA.ui.mount(); } catch (e) { WA.log('error', 'UI挂载失败', e); }
-    WA.log('info', '世界枢轴初始化完成。已注册模块: ' + Object.keys(WA.modules).join(', '));
+    // v2.0.0: 装载审计——「已加载 / 已注册 / 清单声明」三方对齐，注册表不再空转
+    try {
+      const failedRels = (WA.loadFailures || []).map(function (f) { return f.rel; });
+      const loadedRels = LOAD_ORDER.filter(function (rel) { return failedRels.indexOf(rel) < 0; });
+      loadedRels.forEach(function (rel) {
+        const kind = rel.indexOf('core/') === 0 ? 'core' : (rel.indexOf('ui/') === 0 ? 'ui' : (rel.indexOf('compat/') === 0 ? 'compat' : 'engine'));
+        WA.registerModule(rel, { kind: kind, ver: VERSION });
+      });
+      WA.__loadOrder = LOAD_ORDER.slice();
+      WA.__loadFailed = failedRels.slice();
+      WA.log('info', '世界枢轴初始化完成。已注册模块 ' + Object.keys(WA.modules).length + '/' + LOAD_ORDER.length
+        + (failedRels.length ? '（失败 ' + failedRels.length + '：' + failedRels.join('、') + '）' : ''));
+    } catch (e) { WA.log('warn', '模块注册审计异常', e); }
+    // v2.0.0: 兼容层激活——此前 compatMvu.sync / compatTH.expose 定义了却无人调用（能力死代码）
+    try {
+      if (WA.compatMvu && WA.compatMvu.init) WA.compatMvu.init();
+      if (WA.compatTH && WA.compatTH.init) WA.compatTH.init();
+    } catch (e) { WA.log('warn', '兼容层初始化失败', e); }
   }
 
   // SillyTavern APP_READY 后再初始化（保证宿主事件源可用）

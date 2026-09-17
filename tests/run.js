@@ -6624,6 +6624,181 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1900.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.9.0 block
+  v2000: {
+  const LS2000 = global.localStorage;
+  const ctx2000 = global.SillyTavern.getContext();
+  const prevChat2000 = ctx2000.chatId;
+  const stSrc2000 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  const idxSrc2000 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+  const mvuSrc2000 = fs.readFileSync(path.join(BASE, 'compat/mvu.js'), 'utf8');
+  const thSrc2000 = fs.readFileSync(path.join(BASE, 'compat/th-helper.js'), 'utf8');
+  function fresh2000() { LS2000.clear(); ctx2000.chatId = 'v2000_chat'; global.__mockChat.length = 0; WA.store.init(); }
+  function iss2000(m, key) { return (m.issues || []).find(function (x) { return x.key === key; }); }
+
+  // ── A. 块1：注册表契约（此前零写方，装载审计恒空）──
+  fresh2000();
+  assert(typeof WA.registerModule === 'function', 'registerModule 存在');
+  assert(typeof WA.moduleRegistry === 'function', 'moduleRegistry 存在');
+  assert(stSrc2000.indexOf('WA.registerModule = function') > 0, '注册表契约已下沉到 core/store.js（所有加载路径可见）');
+  assert(idxSrc2000.indexOf("typeof WA.registerModule !== 'function'") > 0, 'index.js 保留转发兜底（防旧加载顺序）');
+  const regRec2000 = WA.registerModule('__probe_mod.js', { kind: 'engine', ver: 'test' });
+  assert(regRec2000 && regRec2000.name === '__probe_mod.js' && regRec2000.kind === 'engine', 'registerModule 返回记录且字段正确');
+  assert(WA.moduleRegistry().indexOf('__probe_mod.js') >= 0, 'moduleRegistry 列出已注册模块');
+  assert(WA.registerModule('') === null, '空名注册返回 null（不污染注册表）');
+  delete WA.modules['__probe_mod.js'];
+  const regCountBefore2000 = Object.keys(WA.modules).length;
+  assert(WA.toolDiag && WA.toolDiag.collect, 'toolDiag.collect 存在（注册表消费方）');
+  const dg2000 = WA.toolDiag.collect();
+  assert(dg2000.modules && Array.isArray(dg2000.modules.registeredModules), 'tool-diag 消费注册表为数组');
+  assert(dg2000.modules.registeredModules.length === regCountBefore2000, 'tool-diag 读数与注册表同源（不再恒空）');
+
+  // ── B. 块2：兼容层激活（此前 sync/expose 定义却无人调用）──
+  assert(typeof WA.compatMvu.init === 'function' && typeof WA.compatMvu.status === 'function', 'compatMvu 有 init/status');
+  assert(typeof WA.compatTH.init === 'function' && typeof WA.compatTH.status === 'function', 'compatTH 有 init/status');
+  const ms2000 = WA.compatMvu.status();
+  assert(ms2000 && typeof ms2000.active === 'boolean', 'compatMvu.status 透出 active 布尔');
+  const ts2000 = WA.compatTH.status();
+  assert(ts2000 && typeof ts2000.active === 'boolean', 'compatTH.status 透出 active 布尔');
+  assert(idxSrc2000.indexOf('WA.compatMvu.init') > 0 && idxSrc2000.indexOf('WA.compatTH.init') > 0, 'index.js 启动时调用兼容层 init（死代码激活）');
+  assert(mvuSrc2000.indexOf('__mvuState') > 0, 'compatMvu 观测状态在位');
+  assert(thSrc2000.indexOf('__thState') > 0, 'compatTH 观测状态在位');
+
+  // ── C. 块3：巡视自身降级（元级可观测性）──
+  fresh2000();
+  WA.store.maintain({});
+  const baseC2000 = WA.store.maintain({}).score;
+  const mC0 = WA.store.maintain({});
+  assert(!iss2000(mC0, 'patrol.degraded'), '无降级时不产 patrol.degraded');
+  assert(mC0.signals.patrolDegraded === 0, 'signals.patrolDegraded 初始 0');
+  const oStorage2000 = WA.store.storageStat;
+  WA.store.storageStat = function () { throw new Error('boom'); };
+  const mC1 = WA.store.maintain({});
+  WA.store.storageStat = oStorage2000;
+  const pd2000 = iss2000(mC1, 'patrol.degraded');
+  assert(!!pd2000 && pd2000.level === 'error', '采集节抛错产 error 级 patrol.degraded（此前裸 catch 静默）');
+  assert(/storageStat/.test(String(pd2000.detail)), 'detail 点名失败节');
+  assert(mC1.score < baseC2000, '健康分不假绿');
+  assert(mC1.level !== 'ok', '降级轮不报 ok 档（防倒挂）');
+  assert(mC1.actions.some(function (a) { return a.id === 'review-degraded'; }), '产 review-degraded 修复入口');
+  assert(mC1.signals.patrolDegradedSections.indexOf('storageStat') >= 0, 'signals 透出失败节名');
+  const mC2 = WA.store.maintain({});
+  assert(!iss2000(mC2, 'patrol.degraded') && mC2.signals.patrolDegraded === 0, '按轮计：恢复后不粘留');
+  assert(mC2.score === baseC2000, '恢复后回基线分');
+  const stC2000 = WA.store.maintainStat();
+  assert(stC2000.patrol && stC2000.patrol.degraded >= 1, 'maintainStat 累计降级可追溯');
+  assert(stC2000.patrol.lastSections.length === 0, 'lastSections 按轮更新（本轮已恢复为空）');
+  const oDiag2000 = WA.store.diagBudget, oVer2000 = WA.store.verifyAll, oQuar2000 = WA.store.quarantineStat, oSweep2000 = WA.store.sweepStaleKeys;
+  WA.store.diagBudget = function () { throw new Error('b'); };
+  WA.store.verifyAll = function () { throw new Error('b'); };
+  WA.store.quarantineStat = function () { throw new Error('b'); };
+  WA.store.sweepStaleKeys = function () { throw new Error('b'); };
+  const mC3 = WA.store.maintain({});
+  WA.store.diagBudget = oDiag2000; WA.store.verifyAll = oVer2000; WA.store.quarantineStat = oQuar2000; WA.store.sweepStaleKeys = oSweep2000;
+  assert(mC3.signals.patrolDegraded >= 4, '五采集节逐一可捕获（无漏网）');
+  assert(mC3.score >= 0, '降级扣分不为负');
+  assert(stSrc2000.indexOf('__maintainDegraded') > 0 && stSrc2000.indexOf('function markDegraded') > 0, '台账与标记函数在位');
+  assert(stSrc2000.indexOf('__maintainDegraded.sections.length = 0') > 0, '每轮清空台账在位');
+  assert(stSrc2000.indexOf('score = Math.min(score, 89)') > 0, '降级轮分数封顶 89 在位（修倒挂：巡视坏了分数反而更高）');
+  assert((stSrc2000.match(/markDegraded\('/g) || []).length >= 5, '五个采集点均接入 markDegraded');
+
+  // ── D. 块4：模块装载完整性入巡视 ──
+  fresh2000();
+  WA.store.maintain({});
+  const baseD2000 = WA.store.maintain({}).score;
+  const oLO2000 = WA.__loadOrder, oLF2000 = WA.__loadFailed;
+  const mD0 = WA.store.maintain({});
+  assert(!iss2000(mD0, 'module.integrity') && mD0.signals.moduleDeclared === 0, '无装载信息时不产 module.integrity（vm 测试链无假阳性）');
+  WA.__loadOrder = ['core/store.js', 'engines/render-illust.js', 'engines/actors.js', 'ui/panel.js'];
+  WA.__loadFailed = ['engines/render-illust.js'];
+  ['core/store.js', 'engines/actors.js', 'ui/panel.js'].forEach(function (r) { WA.registerModule(r, { kind: 'engine' }); });
+  const mD1 = WA.store.maintain({});
+  const mi2000 = iss2000(mD1, 'module.integrity');
+  assert(!!mi2000 && mi2000.level === 'error', '模块加载失败产 error 级 module.integrity');
+  assert(/render-illust/.test(String(mi2000.detail)), 'detail 点名失败模块');
+  assert(mD1.signals.moduleFailed === 1 && mD1.signals.moduleDeclared === 4 && mD1.signals.moduleLoaded === 3, 'signals 透出失败/声明/已载三元组');
+  assert(baseD2000 - mD1.score === 8, '单模块失败扣 8 分');
+  assert(mD1.actions.some(function (a) { return a.id === 'review-modules'; }), '产 review-modules 修复入口');
+  WA.__loadFailed = [];
+  const mD2 = WA.store.maintain({});
+  const mi2 = iss2000(mD2, 'module.integrity');
+  assert(!!mi2 && mi2.level === 'warn' && mD2.signals.moduleMissing === 1, '已加载未注册 → warn 级注册缺口议题');
+  assert(baseD2000 - mD2.score === 3, '单缺口扣 3 分');
+  WA.registerModule('engines/render-illust.js', { kind: 'engine' });
+  const mD3 = WA.store.maintain({});
+  assert(!iss2000(mD3, 'module.integrity') && mD3.score === baseD2000, '三方对齐后安静且分数回基线');
+  WA.__loadOrder = Array.from({ length: 10 }, function (_, i) { return 'm' + i + '.js'; });
+  WA.__loadFailed = WA.__loadOrder.slice();
+  const mD4 = WA.store.maintain({});
+  assert(baseD2000 - mD4.score <= 24, '模块失败扣分上限 24');
+  assert(mD4.score >= 0, '模块失败扣分不为负');
+  WA.__loadOrder = oLO2000; WA.__loadFailed = oLF2000;
+  assert(stSrc2000.indexOf('Math.min(24, modFailed * 8)') > 0 && stSrc2000.indexOf('Math.min(9, modMissing * 3)') > 0, '模块扣分公式在位');
+  const stD2000 = WA.store.maintainStat();
+  assert(stD2000.modules && typeof stD2000.modules.declared === 'number' && typeof stD2000.modules.registered === 'number', 'maintainStat 透出模块三元组');
+
+  // ── E. 块5：deep 引擎自检接入 ──
+  fresh2000();
+  WA.store.maintain({});
+  const mEbase0 = WA.store.maintain({});
+  const mE0 = WA.store.maintain({ deep: true });
+  assert(mE0.signals.selfCheckRan === true, 'deep 跑引擎自检');
+  assert(mE0.signals.contractErrors === 0 && mE0.signals.samplerOk === true && mE0.signals.purifierBadRules === 0, '基线三能力全干净（接入无假阳性）');
+  assert(mE0.score >= mEbase0.score - 6, 'deep 不引入额外扣分（存量提醒不扣分）');
+  const mEnon0 = WA.store.maintain({});
+  assert(mEnon0.signals.selfCheckRan === false, '非 deep 路径不跑自检');
+  // 每次注入前紧邻重取同型基线（卫生噪音与扣分断言脱钩）
+  function deepBase2000() { WA.store.maintain({ deep: true }); return WA.store.maintain({ deep: true }).score; }
+  const oCA2000 = WA.contractAudit.audit;
+  const bd1 = deepBase2000();
+  WA.contractAudit.audit = function () { return { verdict: { ok: false, errorCount: 3, warnCount: 1 }, issues: [{ level: 'error', code: 'cross_module_drift', detail: 'x' }] }; };
+  const mE2 = WA.store.maintain({ deep: true });
+  WA.contractAudit.audit = oCA2000;
+  const ec2000 = iss2000(mE2, 'engine.contract');
+  assert(!!ec2000 && ec2000.level === 'error' && mE2.signals.contractErrors === 3, '契约阻断 → error 级 engine.contract');
+  assert(bd1 - mE2.score === 15, '契约阻断 3 × 5 = 15 分');
+  assert(mE2.actions.some(function (a) { return a.id === 'review-contract'; }), '产 review-contract 修复入口');
+  const oSC2000 = WA.samplerCheck.runChecks;
+  const bd2 = deepBase2000();
+  WA.samplerCheck.runChecks = function () { return { checks: [{ name: 'ref', ok: false }, { name: 'bias', ok: false }, { name: 'pure', ok: true }], verdict: { ok: false, pass: 1, total: 3 } }; };
+  const mE3 = WA.store.maintain({ deep: true });
+  WA.samplerCheck.runChecks = oSC2000;
+  const sc2000 = iss2000(mE3, 'engine.sampler');
+  assert(!!sc2000 && sc2000.level === 'warn' && mE3.signals.samplerOk === false, '采样器自检不过 → warn 级 engine.sampler');
+  assert(bd2 - mE3.score === 8, '采样器 2 项失败 × 4 = 8 分');
+  const oGR2000 = WA.purifier.getRules;
+  const bd3 = deepBase2000();
+  WA.purifier.getRules = function () { return [{ id: 'a', find: 'ok.*', flags: 'g', enabled: true }, { id: 'b', find: '([', flags: 'g', enabled: true }, { id: 'c', find: '([', flags: 'g', enabled: false }]; };
+  const mE4 = WA.store.maintain({ deep: true });
+  WA.purifier.getRules = oGR2000;
+  const pu2000 = iss2000(mE4, 'engine.purifier');
+  assert(!!pu2000 && pu2000.level === 'warn' && mE4.signals.purifierBadRules === 1, '非法净化规则 → warn 级（禁用规则不计）');
+  assert(bd3 - mE4.score === 3, '非法规则 1 条 × 3 = 3 分');
+  assert(mE4.actions.some(function (a) { return a.id === 'review-purifier'; }), '产 review-purifier 修复入口');
+  const oCA2 = WA.contractAudit.audit;
+  WA.contractAudit.audit = function () { throw new Error('boom'); };
+  const mE5 = WA.store.maintain({ deep: true });
+  WA.contractAudit.audit = oCA2;
+  assert(iss2000(mE5, 'patrol.degraded'), '自检抛错入降级台账（不被吞）');
+  assert(mE5.signals.patrolDegradedSections.indexOf('contractAudit') >= 0, '台账点名 contractAudit（节序：自检先于完整性聚合）');
+  assert(mE5.score <= 89, '自检失败时降级封顶生效');
+
+  // ── F. 源码契约与语义隔离 ──
+  assert(stSrc2000.indexOf('Math.min(15, contractErrors * 5)') > 0, '契约扣分公式在位');
+  assert(stSrc2000.indexOf('Math.min(12, (samplerTotal - samplerPass) * 4)') > 0, '采样器扣分公式在位');
+  assert(stSrc2000.indexOf('Math.min(9, purifierBad * 3)') > 0, '净化扣分公式在位');
+  assert(stSrc2000.indexOf('o.deep === true') > 0 && stSrc2000.indexOf('selfCheckRan') > 0, 'deep 门控与自检信号在位');
+  ['patrol.degraded', 'module.integrity', 'engine.contract', 'engine.sampler', 'engine.purifier'].forEach(function (k) {
+    assert(!/^(hygiene|quarantine|state)\./.test(k), k + ' 避开卫生指纹正则');
+  });
+  // 节序：自检节必须先于「巡视自身完整性」聚合节（否则自检失败对巡视不可见）
+  const posSelf2000 = stSrc2000.indexOf('\u5f15\u64ce\u81ea\u68c0\u80fd\u529b\u63a5\u5165');
+  const posAgg2000 = stSrc2000.indexOf('\u5de1\u89c6\u81ea\u8eab\u5b8c\u6574\u6027');
+  assert(posSelf2000 > 0 && posAgg2000 > 0 && posSelf2000 < posAgg2000, '节序正确：引擎自检在巡视完整性聚合之前');
+
+  // ── 清理现场 ──
+  ctx2000.chatId = prevChat2000;
+  LS2000.clear();
+  } // end v2.0.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
