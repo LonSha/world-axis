@@ -499,7 +499,8 @@
       } else if (!Array.isArray(cur)) { bad = true; reason = '类型错配（应为数组）'; }
       if (bad) missing.push({ path: k, cap: meta.cap, site: meta.site || '', kind: wantObj ? 'object' : 'array', reason: reason });
     }
-    return { checked: ks.filter(k => !__BOUNDED_CAPS[k].wildcard).length, missing: missing, ok: missing.length === 0 };
+    const checkedKeys = ks.filter(k => !__BOUNDED_CAPS[k].wildcard);
+    return { checked: checkedKeys.length, checkedKeys: checkedKeys, missing: missing, ok: missing.length === 0 };
   }
   // v0.1.48: 派生逻辑单一实现——sizeAudit 与 sizeAuditFull 共用，防两处语义单边漂移
   function memStateBytes() {
@@ -510,7 +511,8 @@
     return b >= 0 ? b : ((WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0);
   }
   /** 由数组明细派生 unbounded/suspects/drifted 结论 */
-  function deriveAuditRows(arrays, minBytes) {
+  function deriveAuditRows(arrays, minBytes, bloatBytes) {
+    const BLOAT_MIN = (typeof bloatBytes === 'number' && bloatBytes > 0) ? bloatBytes : 65536;  // v1.8.0：字节膨胀告警阈值（默认 64KB）
     // 顶层路径才参与有界判定（a.b[0].c 这类元素内嵌数组由父容器隐式约束）
     const topRows = (arrays || []).filter(function (a) { return a.path.indexOf('[') < 0; });
     const unregistered = topRows.filter(function (a) { return !a.bounded && a.len > 0; });
@@ -522,10 +524,13 @@
     const suspects = unregistered.filter(function (a) { return a.bytes >= minBytes; }).sort(byBytesDesc);
     // v0.1.44 漂移：已登记容器长度超出 cap —— 白名单自身失效的信号
     const drifted = topRows.filter(function (a) { return a.bounded && a.cap !== null && a.len > a.cap; }).sort(byExcessDesc);
+    // v1.8.0：字节膨胀维度——已登记容器条数合规（未进 drifted）但序列化字节超阈，体积风险此前静默
+    const bloat = topRows.filter(function (a) { return a.bounded && typeof a.cap === 'number' && a.cap > 0 && a.len <= a.cap && a.bytes >= BLOAT_MIN; }).sort(byBytesDesc);
     return {
       unbounded: unregistered.map(function (a) { return a.path; }),
       suspects: suspects.map(function (a) { return { path: a.path, len: a.len, bytes: a.bytes }; }),
-      drifted: drifted.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; })
+      drifted: drifted.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; }),
+      bloat: bloat.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; })
     };
   }
   const store = WA.store = {
@@ -913,7 +918,7 @@
       // 轻量盘点：只枚举顶层与 4 个父对象的直接子键长度（不做全 state 序列化，init 高频路径零负担）。
       // 与 sizeAudit 的关系：sizeAudit 深扫（含 suspects 字节级明细），此处只做 maintain 高频可负担的
       // drifted/unregistered 判定；两者登记表同源（__BOUNDED_CAPS）。
-      let capDrifted = 0, capUnregistered = 0;
+      let capDrifted = 0, capUnregistered = 0, capBloat = 0, schemaPollution = 0;  // v1.8.0
       try {
         const st7 = memCache || {};
         const rows7 = [];
@@ -986,6 +991,22 @@
           score -= Math.min(10, unreg7.length * 2);
           issues.push({ level: 'warn', key: 'capacity.unregistered', detail: unreg7.length + ' 个非空数组未登记容量：' + unreg7.slice(0, 4).join('、') + (unreg7.length > 4 ? ' 等' : '') + '——若无界增长会拖垮存档，请确认后登记 __BOUNDED_CAPS' });
         }
+        // v1.8.0 块2：schema 类型污染可观测——ensureShape 检出但刻意保守保留原值的冲突，此前只沉睡在 loadStat
+        const ls8 = this.loadStat();
+        schemaPollution = (ls8 && ls8.lastFix && ls8.lastFix.conflicts) || 0;
+        if (schemaPollution > 0) {
+          score -= Math.min(12, schemaPollution * 4);
+          issues.push({ level: 'warn', key: 'schema.pollution', detail: '本次载入检出 ' + schemaPollution + ' 处字段类型与默认结构不符（已保留原值未自动改写，防误删用户数据）——请用编辑器或 WA.store 核对这些容器是否被外部写入污染' });
+        }
+        // v1.8.0 块3：字节膨胀巡视（deep 模式专属，避免高频路径全量序列化）——条数合规但体积超阈的登记容器
+        if (o.deep === true) {
+          const bz8 = this.sizeAudit({ minBytes: 0, maxDepth: 8, bloatBytes: o.bloatBytes });
+          if (bz8.bloat && bz8.bloat.length) {
+            capBloat = bz8.bloat.length;
+            score -= Math.min(8, capBloat * 2);
+            issues.push({ level: 'warn', key: 'capacity.bloat', detail: capBloat + ' 个登记容器条数合规但字节超阈（体积膨胀）：' + bz8.bloat.slice(0, 4).map(function (b) { return b.path + '(' + Math.round(b.bytes / 1024) + 'KB)'; }).join('、') + (capBloat > 4 ? ' 等' : '') + '——单条过大，考虑收紧条目体积或调低 cap' });
+          }
+        }
       } catch (e) { WA.log('warn', '容量盘点异常（不阻断巡视）', e); }
 
       score = Math.max(0, Math.min(100, score));
@@ -1036,6 +1057,7 @@
           conflictSites: conflictSites.length, conflictDetected: __conflictStat.detected,
           externalWrites: extW, conflictQuarantined: __conflictStat.quarantined,
           capacityDrifted: capDrifted, capacityUnregistered: capUnregistered,
+          capacityBloat: capBloat, schemaPollution: schemaPollution,  // v1.8.0
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }
@@ -1254,7 +1276,7 @@
       } catch (e) { return { error: String(e && e.message || e) }; }
       // 截断时剩余 pending 即断点游标（供下次续扫）
       const cursor = truncated ? pending.slice() : null;
-      const concl = deriveAuditRows(arrays, minBytes);
+      const concl = deriveAuditRows(arrays, minBytes, o.bloatBytes);
       return {
         total: auditTotal(),
         persisted: (WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0,
@@ -1268,7 +1290,8 @@
         arrays: arrays.slice().sort(function (a, b) { return (b.bytes - a.bytes) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0); }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
         unbounded: concl.unbounded,
         suspects: concl.suspects,
-        drifted: concl.drifted
+        drifted: concl.drifted,
+        bloat: concl.bloat
       };
     },
     /**
@@ -1350,7 +1373,7 @@
         if (chunks >= maxChunks) { stalled = true; break; }            // 片数触顶
       }
       const rows = Object.keys(merged).map(function (k) { return merged[k]; });
-      const concl = deriveAuditRows(rows, minBytes);   // v0.1.48: 与 sizeAudit 同一派生实现
+      const concl = deriveAuditRows(rows, minBytes, o.bloatBytes);   // v0.1.48: 与 sizeAudit 同一派生实现
       const complete = !truncated && !stalled;
       return {
         complete: complete,
@@ -1367,7 +1390,8 @@
         arrays: rows.slice().sort(function (a, b) { return (b.bytes - a.bytes) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0); }).slice(0, (o.topN && o.topN > 0) ? o.topN : 12),
         unbounded: concl.unbounded,
         suspects: concl.suspects,
-        drifted: concl.drifted
+        drifted: concl.drifted,
+        bloat: concl.bloat
       };
     },
     get() { return memCache; },

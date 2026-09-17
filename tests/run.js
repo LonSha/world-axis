@@ -6417,6 +6417,82 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1700.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.7.0 block
+  v1800: {
+  const LS1800 = global.localStorage;
+  const junkBefore1800 = JSON.parse(JSON.stringify(LS1800._dump()));
+  const evtBefore1800 = WA.eventLog.slice();
+  const errBefore1800 = WA.errorLog.slice();
+  const ctx1800 = global.SillyTavern.getContext();
+  const prevChat1800 = ctx1800.chatId;
+  const CID1800 = 'v1800_chat';
+  const chat1800 = global.__mockChat;
+  function resetLogs1800() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1800() { resetLogs1800(); LS1800.clear(); ctx1800.chatId = CID1800; chat1800.length = 0; WA.store.init(); }
+  const caps1800 = WA.store.sizeCaps();
+  const precise1800 = Object.keys(caps1800).filter(k => !caps1800[k].wildcard).sort();
+  const stSrc1800 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  // ── A. checkedKeys 暴露（候选1：可定位/可契约化）──
+  fresh1800();
+  const rpA1800 = WA.store.registryParity();
+  assert(Array.isArray(rpA1800.checkedKeys), 'registryParity 暴露 checkedKeys 数组');
+  assert(rpA1800.checkedKeys.length === rpA1800.checked, 'checkedKeys.length 与 checked 数字一致');
+  assert(rpA1800.checkedKeys.slice().sort().join(',') === precise1800.join(','), 'checkedKeys 集合与登记表非通配键同集合（可契约化）');
+  assert(rpA1800.checkedKeys.indexOf('people') >= 0 && !rpA1800.checkedKeys.some(k => k.indexOf('*') >= 0), 'checkedKeys 含精确 object 键 people、不含通配（边界）');
+  // ── B. schema.pollution 议题（候选2：唤醒沉睡的 shapeConflicts）──
+  fresh1800();
+  WA.store.transact(d => { d.chronicle = 'polluted-not-array'; });
+  WA.store.init();
+  assert(WA.store.loadStat().lastFix.conflicts >= 1, 'ensureShape 检出 chronicle 类型冲突（string 非容器）');
+  assert(WA.store.get().chronicle === 'polluted-not-array', '污染值被保留（保守：不擅自改写用户数据）');
+  const mB1800 = WA.store.maintain({});
+  const spB1800 = (mB1800.issues || []).filter(i => i.key === 'schema.pollution');
+  assert(spB1800.length === 1 && spB1800[0].level === 'warn', 'maintain 检出 schema.pollution（warn，巡视不再盲）');
+  assert(spB1800[0] && spB1800[0].detail.indexOf('类型与默认结构不符') >= 0, 'schema.pollution detail 含保守说明');
+  assert(mB1800.signals && mB1800.signals.schemaPollution >= 1, 'signals.schemaPollution 透出');
+  WA.store.transact(d => { d.chronicle = []; });
+  WA.store.init();
+  assert(!(WA.store.maintain({}).issues || []).some(i => i.key === 'schema.pollution'), '纠正 chronicle 后 schema.pollution 消失（可自愈可验证）');
+  // ── C. capacity.bloat 议题（候选3：字节膨胀维度，核心）──
+  fresh1800();
+  WA.store.transact(d => { d.memory.facts = []; for (let i = 0; i < 50; i++) d.memory.facts.push({ key: 'k' + i, value: 'x'.repeat(3000), active: true, at: Date.now() }); });
+  const aC1800 = WA.store.sizeAudit({ minBytes: 0, maxDepth: 8 });
+  assert(Array.isArray(aC1800.bloat) && aC1800.bloat.some(b => b.path === 'memory.facts'), 'sizeAudit 新增 bloat 维度（facts 字节膨胀入列）');
+  const brC1800 = aC1800.bloat.find(b => b.path === 'memory.facts');
+  assert(brC1800 && brC1800.len === 50 && brC1800.cap === 100 && brC1800.bytes > 100000, 'bloat 项带 len≤cap + bytes 溯源（条数合规体积超阈）');
+  assert(!(aC1800.drifted || []).some(x => x.path === 'memory.facts'), 'bloat 与 drifted 互斥分工（条数合规不重复计漂移）');
+  const mC1800 = WA.store.maintain({ deep: true });
+  const blC1800 = (mC1800.issues || []).filter(i => i.key === 'capacity.bloat');
+  assert(blC1800.length === 1 && blC1800[0].detail.indexOf('memory.facts') >= 0, 'maintain deep 检出 capacity.bloat（带路径）');
+  assert(blC1800[0] && blC1800[0].detail.indexOf('字节超阈') >= 0 && blC1800[0].detail.indexOf('KB') >= 0, 'bloat detail 带字节阈值 + KB 体积');
+  assert(mC1800.signals && mC1800.signals.capacityBloat >= 1, 'signals.capacityBloat 透出');
+  assert(!(WA.store.maintain({}).issues || []).some(i => i.key === 'capacity.bloat'), '非 deep 不跑 bloat 全量序列化（高频路径零负担）');
+  assert(!WA.store.sizeAudit({ minBytes: 0, maxDepth: 8, bloatBytes: 999999999 }).bloat.some(b => b.path === 'memory.facts'), 'bloatBytes 极高 → 不再误纳（阈值可控）');
+  // ── D. 常态不误报（干净态 deep 也干净）──
+  fresh1800();
+  const mD1800 = WA.store.maintain({ deep: true });
+  assert(!(mD1800.issues || []).some(i => i.key === 'capacity.bloat' || i.key === 'schema.pollution'), '干净态 deep 无 bloat/pollution（不误报）');
+  // ── E. 双入口一致（deriveAuditRows 单一实现）──
+  fresh1800();
+  WA.store.transact(d => { d.memory.facts = []; for (let i = 0; i < 50; i++) d.memory.facts.push({ key: 'k' + i, value: 'x'.repeat(3000), active: true, at: Date.now() }); });
+  const afE1800 = WA.store.sizeAuditFull({ minBytes: 0, maxDepth: 8 });
+  const saE1800 = WA.store.sizeAudit({ minBytes: 0, maxDepth: 8 });
+  assert(Array.isArray(afE1800.bloat) && afE1800.bloat.some(b => b.path === 'memory.facts'), 'sizeAuditFull 同样透出 bloat（双入口一致）');
+  assert(saE1800.bloat.map(b => b.path).sort().join(',') === afE1800.bloat.map(b => b.path).sort().join(','), '两入口 bloat 集合逐一致（防语义单边漂移）');
+  // ── F. 源码契约 ──
+  assert(stSrc1800.indexOf('checkedKeys: checkedKeys') >= 0, 'checkedKeys 透出在位');
+  assert((stSrc1800.match(/bloat: concl.bloat/g) || []).length === 2, 'bloat 双入口各透出一次（单一实现）');
+  assert((stSrc1800.match(/deriveAuditRows\(/g) || []).length >= 3, 'deriveAuditRows 定义 + 两入口调用（单源）');
+  assert(stSrc1800.indexOf("key: 'schema.pollution'") >= 0 && stSrc1800.indexOf("key: 'capacity.bloat'") >= 0, '两议题键在位');
+  // ── 清理现场 ──
+  resetLogs1800();
+  LS1800.clear();
+  Object.keys(junkBefore1800).forEach(function (k) { LS1800.setItem(k, junkBefore1800[k]); });
+  ctx1800.chatId = prevChat1800;
+  WA.eventLog.length = 0;
+  evtBefore1800.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1800.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.8.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
