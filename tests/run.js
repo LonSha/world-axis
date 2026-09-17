@@ -3570,7 +3570,14 @@ WA.loadScript = _ls.loadScript;
     'evolution.entityMemory.object': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
     'evolution.entityMemory.ability': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
     'evolution.entityMemory.location': ['engines/entities.js', /const CAP_PER_TYPE\s*=\s*(\d+)/],
-    'evolution.entityMemory.*.events': ['engines/entities.js', /ent\.events\.length > (\d+)/]
+    'evolution.entityMemory.*.events': ['engines/entities.js', /ent\.events\.length > (\d+)/],
+    // v1.5.0 补登：people.<id>.profile 五节（profile.js 档案切片 cap）
+    'people.*.profile.personality': ['actors/profile.js', /push\('personality',\s*r\.personality,\s*(\d+)\)/],
+    'people.*.profile.worldview': ['actors/profile.js', /push\('worldview',\s*r\.worldview,\s*(\d+)\)/],
+    'people.*.profile.family': ['actors/profile.js', /push\('family',\s*r\.family,\s*(\d+)\)/],
+    'people.*.profile.memory': ['actors/profile.js', /push\('memory',\s*r\.memory,\s*(\d+)\)/],
+    'people.*.profile.relationships': ['actors/profile.js', /relationships\.slice\(-(\d+)\)/],
+    'people.*.knowledge': ['engines/backstage.js', /keys\.slice\(0,\s*keys\.length\s*-\s*(\d+)\)/]
   };
   const srcCache = {};
   const readSrc = function (rel) {
@@ -6193,6 +6200,78 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1400.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.4.0 block
+  v1500: {
+  const LS1500 = global.localStorage;
+  const junkBefore1500 = JSON.parse(JSON.stringify(LS1500._dump()));
+  const evtBefore1500 = WA.eventLog.slice();
+  const errBefore1500 = WA.errorLog.slice();
+  const ctx1500 = global.SillyTavern.getContext();
+  const prevChat1500 = ctx1500.chatId;
+  const CID1500 = 'v1500_chat';
+  const chat1500 = global.__mockChat;
+  function resetLogs1500() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1500() { resetLogs1500(); LS1500.clear(); ctx1500.chatId = CID1500; chat1500.length = 0; WA.store.init(); }
+  // ── A. schema 物化 memory.pmem（直 push 不再炸事务）──
+  fresh1500();
+  const r1_1500 = WA.store.transact(d => { d.memory.pmem.push({ id: 'pm1', holder: '沈炼', text: '记忆', refs: [{ messageId: 'm1', chatId: 'c1' }], at: 1 }); });
+  assert(r1_1500.ok === true, 'memory.pmem 直 push 事务 ok=true（此前 TypeError 回滚）');
+  assert(Array.isArray(WA.store.get().memory.pmem) && WA.store.get().memory.pmem.length === 1, 'memory.pmem 物化为数组且入账 1 条');
+  assert(WA.store.sizeCaps()['memory.pmem'] && WA.store.sizeCaps()['memory.pmem'].cap === 60, 'memory.pmem 登记 cap=60 不变');
+  // ── B. profile 五节 + knowledge 通配登记 ──
+  const caps1500 = WA.store.sizeCaps();
+  assert(['personality', 'worldview', 'family', 'memory', 'relationships'].every(sec => caps1500['people.*.profile.' + sec] && caps1500['people.*.profile.' + sec].wildcard === true), 'profile 五节全部通配登记');
+  assert(caps1500['people.*.profile.personality'].cap === 15 && caps1500['people.*.profile.memory'].cap === 25 && caps1500['people.*.profile.worldview'].cap === 10, 'profile 各节 cap 与 profile.js 源码切片一致');
+  assert(caps1500['people.*.knowledge'] && caps1500['people.*.knowledge'].cap === 30 && caps1500['people.*.knowledge'].kind === 'object' && caps1500['people.*.knowledge'].wildcard === true, 'knowledge 通配 object 登记 cap=30');
+  // ── C. capsFor 通配命中（people 动态 id）──
+  assert(WA.store.capsFor('people.p_沈炼.profile.personality') && WA.store.capsFor('people.p_沈炼.profile.personality').cap === 15, 'capsFor profile.personality 通配命中 cap=15');
+  assert(WA.store.capsFor('people.p_韩叙.profile.memory') && WA.store.capsFor('people.p_韩叙.profile.memory').cap === 25, 'capsFor 不同 id 同样命中 cap=25');
+  assert(WA.store.capsFor('people.p_沈炼.knowledge') && WA.store.capsFor('people.p_沈炼.knowledge').cap === 30, 'capsFor knowledge 通配命中 cap=30');
+  assert(WA.store.capsFor('people.p_沈炼.profile') === null, 'capsFor profile 中间层判 null（不误报）');
+  // ── D. 超限可观测 ──
+  WA.store.transact(d => {
+    d.people['p_沈炼'] = {
+      id: 'p_沈炼', name: '沈炼',
+      knowledge: Array.from({ length: 33 }, (_, i) => 'k' + i).reduce((o, k) => (o[k] = { route: 'told', at: 1 }, o), {}),
+      profile: {
+        personality: Array.from({ length: 16 }, (_, i) => ({ text: '性' + i, at: i })),
+        memory: Array.from({ length: 26 }, (_, i) => ({ text: '忆' + i, at: i })),
+        relationships: Array.from({ length: 16 }, (_, i) => ({ target: 't' + i, at: i }))
+      }
+    };
+  });
+  const audit1500 = WA.store.sizeAudit({ minBytes: 0, maxDepth: 8, topN: 999 });
+  const dr1500 = (audit1500.drifted || []).map(r => (typeof r === 'string' ? r : (r && r.path) || ''));
+  assert(dr1500.some(p => p.indexOf('profile.personality') >= 0), 'drifted 检出 profile.personality（16>15）');
+  assert(dr1500.some(p => p.indexOf('profile.memory') >= 0), 'drifted 检出 profile.memory（26>25）');
+  assert(dr1500.some(p => p.indexOf('knowledge') >= 0), 'drifted 检出 knowledge（33>30）');
+  assert(!(audit1500.unbounded || []).some(r => (typeof r === 'string' ? r : (r && r.path) || '').indexOf('people') >= 0), 'unbounded 不再误报 people 路径');
+  const rowP1500 = (audit1500.arrays || []).find(r => r.path === 'people.p_沈炼.profile.personality');
+  assert(rowP1500 && rowP1500.bounded === true && rowP1500.cap === 15, 'profile 行标 bounded=true cap=15');
+  const rowK1500 = (audit1500.arrays || []).find(r => r.path === 'people.p_沈炼.knowledge');
+  assert(rowK1500 && rowK1500.bounded === true && rowK1500.cap === 30 && rowK1500.len === 33, 'knowledge 行标 bounded=true cap=30（object 型 len=键数）');
+  const m1500 = WA.store.maintain({});
+  assert(m1500.signals.capacityDrifted >= 1, 'maintain capacityDrifted>=1（people 档案节已进盘点）');
+  assert(m1500.signals.capacityUnregistered === 0, 'maintain capacityUnregistered=0（无新漏登）');
+  // ── E. 契约同步（源码 + CAP_RULES）──
+  const stSrc1500 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  const runSrc1500 = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
+  const profSrc1500 = fs.readFileSync(path.join(BASE, 'actors/profile.js'), 'utf8');
+  assert((stSrc1500.match(/people\.\*\.profile\./g) || []).length >= 5, '登记表含 profile 五节通配键');
+  assert(stSrc1500.indexOf("'people.*.knowledge'") >= 0, '登记表含 knowledge 通配键');
+  assert(profSrc1500.indexOf("push('personality', r.personality, 15)") >= 0 && profSrc1500.indexOf('prof.relationships.slice(-15)') >= 0, 'profile.js 源码切片常量与登记同源');
+  assert(runSrc1500.indexOf("'people.*.knowledge'") >= 0 && runSrc1500.indexOf("'people.*.profile.relationships'") >= 0, 'CAP_RULES 同步 6 条 people 规则');
+  assert(stSrc1500.indexOf('v1.5.0: people 档案盘点') >= 0, 'maintain people 盘点分支存在');
+  assert(stSrc1500.indexOf('pmem: [],') >= 0, 'schema pmem 物化行存在');
+  // ── 清理现场 ──
+  resetLogs1500();
+  LS1500.clear();
+  Object.keys(junkBefore1500).forEach(function (k) { LS1500.setItem(k, junkBefore1500[k]); });
+  ctx1500.chatId = prevChat1500;
+  WA.eventLog.length = 0;
+  evtBefore1500.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1500.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.5.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block

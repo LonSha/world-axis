@@ -39,6 +39,7 @@
       // 记忆分层 L0-L3
       memory: {
         facts: [],              // 长期事实 {key,value,version,active,reason,at}
+        pmem: [],               // v1.5.0 物化：个人主观记忆（登记 cap 60，pmem.js 写入方自此前置自愈，直写不再炸事务）
         foreshadows: [],        // 伏笔 {id,content,status:waiting|developing|triggered|recycled|dropped,links:[],at}
         l0: [], l1: [], l2: [], l3: []   // 分层经历摘要
       },
@@ -430,7 +431,15 @@
     'evolution.entityMemory.ability': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
     'evolution.entityMemory.location': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
     // v1.4.0 新增：通配登记——嵌套动态路径（每实体 events 环，精确键无法枚举；'*' 段吃 1..n 段）
-    'evolution.entityMemory.*.events': { cap: 8, wildcard: true, site: 'entities.js 实体事件环（保留最新 8 条）' }
+    'evolution.entityMemory.*.events': { cap: 8, wildcard: true, site: 'entities.js 实体事件环（保留最新 8 条）' },
+    // v1.5.0 补登：people.<id>.profile 五节（profile.js 档案维护切片 cap）——此前漏登致深扫误报 unbounded、drifted/maintain 盲区
+    'people.*.profile.personality': { cap: 15, wildcard: true, site: 'profile.js 档案五节切片' },
+    'people.*.profile.worldview': { cap: 10, wildcard: true, site: 'profile.js 档案五节切片' },
+    'people.*.profile.family': { cap: 10, wildcard: true, site: 'profile.js 档案五节切片' },
+    'people.*.profile.memory': { cap: 25, wildcard: true, site: 'profile.js 档案五节切片' },
+    'people.*.profile.relationships': { cap: 15, wildcard: true, site: 'profile.js 档案五节切片' },
+    // v1.5.0 补登：people.<id>.knowledge 对象键容器（backstage 按 at 排序逐出，保留 30 键）
+    'people.*.knowledge': { cap: 30, kind: 'object', wildcard: true, site: 'backstage.js knowledge 容量30逐出' }
   };
   // v1.4.0: 容量查找单一实现——精确键 → 下标归一化精确键 → 通配键 → null。
   // 通配键（wildcard:true）中 '*' 段匹配 1..n 个路径段（如 entityMemory.<type>.<idx>）；
@@ -887,6 +896,24 @@
             rows7.push({ path: k, len: Object.keys(st7[k]).length });
           }
         });
+        // v1.5.0: people 档案盘点——profile 五节数组 + knowledge 对象键容器（此前二/三层嵌套完全不可见）
+        (function () {
+          const ppl = st7.people;
+          if (!ppl || typeof ppl !== 'object') return;
+          Object.keys(ppl).forEach(function (pid) {
+            const p = ppl[pid];
+            if (!p || typeof p !== 'object') return;
+            const prof = p.profile;
+            if (prof && typeof prof === 'object') {
+              ['personality', 'worldview', 'family', 'memory', 'relationships'].forEach(function (sec) {
+                if (Array.isArray(prof[sec])) rows7.push({ path: 'people.' + pid + '.profile.' + sec, len: prof[sec].length });
+              });
+            }
+            if (p.knowledge && typeof p.knowledge === 'object' && !Array.isArray(p.knowledge)) {
+              rows7.push({ path: 'people.' + pid + '.knowledge', len: Object.keys(p.knowledge).length });
+            }
+          });
+        })();
         ['memory', 'opinion', 'evolution', 'chapters'].forEach(function (pk) {
           const sub = st7[pk];
           if (sub && typeof sub === 'object' && !Array.isArray(sub)) {
