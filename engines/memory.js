@@ -16,6 +16,20 @@
     const ctx = getCtx(); const chat = (ctx && ctx.chat) || [];
     return chat.slice(Math.max(0, chat.length - (n || 4))).map(m => (m.is_user ? '【玩家】' : '【正文】') + String(m.mes || '').slice(0, 900)).join('\n---\n');
   }
+  // v0.8.0: 捕获最近 n 层楼层的来源引用（供记忆层入账写 refs，修复「审计空转」）
+  function recentRefs(n) {
+    try {
+      const ctx = getCtx(); const chat = (ctx && ctx.chat) || [];
+      if (!chat.length) return [];
+      const start = Math.max(0, chat.length - (n || 3));
+      return (WA.timeline && WA.timeline.captureRange) ? WA.timeline.captureRange(start, chat.length - 1) : [];
+    } catch (e) { return []; }
+  }
+  // v0.8.0: 从若干记忆条目继承并集来源引用（L1/L2/L3 合并时保留溯源）
+  function inheritRefs(entries) {
+    if (!WA.timeline || !WA.timeline.unionRefs) return [];
+    return WA.timeline.unionRefs((entries || []).map(e => (e && Array.isArray(e.refs)) ? e.refs : []));
+  }
 
   // v0.1.40: 分层巩固计量——每层耗时与最近结果（tool-diag 消费）
   const __memStat = { rounds: 0, lastMs: 0, totalMs: 0, layers: {}, lastAt: 0 };
@@ -31,7 +45,7 @@ const memory = WA.memory = {
       ], { json: true, maxTokens: 300, temperature: 0.3 }).catch(() => null);
       if (!r || !r.summary) return null;
       WA.store.transact(draft => {
-        draft.memory.l0.push({ t: Date.now(), s: String(r.summary).slice(0, 120) });
+        draft.memory.l0.push({ t: Date.now(), s: String(r.summary).slice(0, 120), refs: recentRefs(3) });
         draft.memory.l0 = draft.memory.l0.slice(-CAP.l0);
       });
       return r.summary;
@@ -50,11 +64,11 @@ const memory = WA.memory = {
       ], { json: true, maxTokens: 600, temperature: 0.3 }).catch(() => null);
       if (!r || !r.recap) return false;
       WA.store.transact(draft => {
-        draft.memory.l1.push({ t: Date.now(), s: String(r.recap).slice(0, 200) });
+        draft.memory.l1.push({ t: Date.now(), s: String(r.recap).slice(0, 200), refs: inheritRefs(batch) });
         draft.memory.l1 = draft.memory.l1.slice(-CAP.l1);
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'digest'); });
         if (r.foreshadow && r.foreshadow.content) {
-          (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: 'fs' + Date.now() + Math.random().toString(36).slice(2, 5), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: [], at: Date.now() });
+          (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: 'fs' + Date.now() + Math.random().toString(36).slice(2, 5), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: inheritRefs(batch), at: Date.now() });
           draft.memory.foreshadows = draft.memory.foreshadows.slice(-CAP.foreshadows);
         }
         draft.memory.l0 = draft.memory.l0.slice(0, draft.memory.l0.length - L1_EVERY);
@@ -76,7 +90,7 @@ const memory = WA.memory = {
       ], { json: true, maxTokens: 800, temperature: 0.3 }).catch(() => null);
       if (!r || !r.chapter) return false;
       WA.store.transact(draft => {
-        draft.memory.l2.push({ t: Date.now(), s: String(r.chapter).slice(0, 350) });
+        draft.memory.l2.push({ t: Date.now(), s: String(r.chapter).slice(0, 350), refs: inheritRefs(batch) });
         draft.memory.l2 = draft.memory.l2.slice(-CAP.l2);
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'l2'); });
         draft.memory.l1 = draft.memory.l1.slice(0, draft.memory.l1.length - L2_EVERY);
@@ -99,7 +113,7 @@ const memory = WA.memory = {
       ], { json: true, maxTokens: 600, temperature: 0.3 }).catch(() => null);
       if (!r || !r.theme) return false;
       WA.store.transact(draft => {
-        draft.memory.l3.push({ t: Date.now(), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200) });
+        draft.memory.l3.push({ t: Date.now(), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200), refs: inheritRefs(batch) });
         draft.memory.l3 = draft.memory.l3.slice(-CAP.l3);
         draft.memory.l2 = draft.memory.l2.slice(0, draft.memory.l2.length - L3_EVERY);
       });

@@ -391,8 +391,15 @@
       (r.foreshadows || []).slice(0, LIMITS.foreshadows).forEach(f => {
         if (!f || !f.id) return;
         const old = (draft.memory.foreshadows || []).find(x => x.id === f.id);
-        if (old) { old.status = f.status || old.status; old.content = f.content || old.content; }
-        else (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: f.id, content: f.content || '', status: f.status || 'waiting', links: f.links || [], at: now });
+        // v0.8.0: 伏笔 links 生产方补齐——推演结果未给 links 时捕获当前楼层溯源
+        const links = (Array.isArray(f.links) && f.links.length)
+          ? f.links
+          : ((WA.timeline && WA.timeline.captureRange) ? WA.timeline.captureRange(Math.max(0, (anchor && anchor.idx) || 0), (anchor && anchor.idx) || 0) : []);
+        if (old) {
+          old.status = f.status || old.status; old.content = f.content || old.content;
+          if (links.length) old.links = WA.timeline && WA.timeline.unionRefs ? WA.timeline.unionRefs([old.links || [], links]) : (old.links || []).concat(links);
+        }
+        else (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: f.id, content: f.content || '', status: f.status || 'waiting', links, at: now });
       });
 
       // 演化系统入账（势力/声誉/经济/风声/影响链）

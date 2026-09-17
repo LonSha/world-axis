@@ -169,6 +169,17 @@
     (mem.smallSummaries || []).forEach((entry, i) => {
       if (entry && Array.isArray(entry.refs) && entry.refs.length) scan.push({ where: `small#${i}`, refs: entry.refs });
     });
+    // v0.8.0: 扩大扫描覆盖面——foreshadows.links（记忆层伏笔溯源）+ entities.refs（实体来源）
+    (mem.foreshadows || []).forEach((f, i) => {
+      if (f && Array.isArray(f.links) && f.links.length) scan.push({ where: `foreshadow#${i}`, refs: f.links });
+    });
+    const em = state?.evolution?.entityMemory || {};
+    Object.keys(em).forEach(type => {
+      if (type === '_index') return;
+      (em[type] || []).forEach((entity, i) => {
+        if (entity && Array.isArray(entity.refs) && entity.refs.length) scan.push({ where: `entity:${type}#${i}`, refs: entity.refs });
+      });
+    });
     for (const item of scan) {
       const audit = safe(() => WA.timeline.auditRefs(item.refs));
       if (!audit || audit.__error) continue;

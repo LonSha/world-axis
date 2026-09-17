@@ -30,7 +30,9 @@
 
   function getCtx() { try { return mainWin.SillyTavern.getContext(); } catch (e) { return null; } }
   function chat() { try { return (getCtx() && getCtx().chat) || []; } catch (e) { return []; } }
-  function chatId() { try { return WA.store.currentBranchId ? ('c' + WA.store.currentBranchId()) : 'default'; } catch (e) { return 'default'; } }
+  // v0.8.0: chatId 归属必须是「稳定聊天id」，而非楼层级 currentBranchId（m{index}_s{swipe}）。
+  // 旧实现导致同一聊天内旧 refs 的 chatId 随末楼漂移 → auditRefs 全判 inherited 跳过审计（refs.missing 不可达）。
+  function chatId() { try { return WA.store.chatId ? WA.store.chatId() : 'default'; } catch (e) { return 'default'; } }
 
   // FNV-1a双哈希：仅用于变化检测
   function hashText(value) {

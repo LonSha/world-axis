@@ -5555,6 +5555,133 @@ WA.loadScript = _ls.loadScript;
   evtBefore700.forEach(function (l) { WA.eventLog.push(l); });
   WA.errorLog.length = 0;
   errBefore700.forEach(function (l) { WA.errorLog.push(l); });
+  // ═══════════════════════════════════════════════════════════
+  // v0.8.0 — 跨容器引用完整性（记忆层 refs 生产方接入 / 引用审计覆盖面扩大）
+  //   探针实证：checkRefs 扫描 l0-l3 的 refs 但 memory 层入账 {t,s} 从不写 refs
+  //   （审计空转）；foreshadows.links 恒为空数组且无审计；entities.refs 生产方缺失；
+  //   更根本——timeline.chatId() 误用楼层级 currentBranchId（m{idx}_s{swipe}），
+  //   旧 refs 的 chatId 随末楼漂移 → auditRefs 全判 inherited 跳过（refs.missing 不可达）。
+  // ═══════════════════════════════════════════════════════════
+  v080: {
+  const LS800 = global.localStorage;
+  const junkBefore800 = JSON.parse(JSON.stringify(LS800._dump()));
+  const evtBefore800 = WA.eventLog.slice();
+  const errBefore800 = WA.errorLog.slice();
+  const ctx800 = global.SillyTavern.getContext();
+  const prevChat800 = ctx800.chatId;
+  const CID800 = 'v800_chat';
+  const chat800 = global.__mockChat;
+  function resetLogs800() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh800() { resetLogs800(); LS800.clear(); ctx800.chatId = CID800; chat800.length = 0; WA.store.init(); }
+  // ── 1. chatId 归属稳定（根本修复）──
+  fresh800();
+  chat800.push({ is_user: true, mes: '第一条用户消息。', swipe_id: 0 });
+  chat800.push({ is_user: false, mes: '第一条正文。', swipe_id: 0 });
+  const cid800a = WA.timeline.chatId();
+  assert(cid800a === CID800, 'timeline.chatId() 返回稳定聊天 id（非楼层级 currentBranchId）');
+  const ref800a = WA.timeline.sourceRef(chat800[1], 1);
+  assert(ref800a.chatId === CID800, 'sourceRef 的 chatId 为稳定聊天 id');
+  // 新增楼层后 chatId 不漂移
+  chat800.push({ is_user: true, mes: '第二条用户消息。', swipe_id: 0 });
+  chat800.push({ is_user: false, mes: '第二条正文。', swipe_id: 0 });
+  assert(WA.timeline.chatId() === cid800a, '新增楼层后 chatId 不漂移');
+  // 末楼 swipe 切换后 chatId 仍不漂移（关键：旧 refs 不会被判 inherited）
+  const last800 = chat800[chat800.length - 1];
+  const origSwipe800 = last800.swipe_id;
+  last800.swipe_id = 1;
+  assert(WA.timeline.chatId() === cid800a, '末楼 swipe 切换后 chatId 不漂移');
+  last800.swipe_id = origSwipe800;
+  // 删楼后 auditRefs 能报 missing（修复前：全判 inherited → missing 不可达）
+  const refs800 = WA.timeline.captureRange(0, chat800.length - 1);
+  const refsCopy800 = JSON.parse(JSON.stringify(refs800));
+  chat800.length = 0;
+  const audit800 = WA.timeline.auditRefs(refsCopy800);
+  assert(audit800.valid === false && audit800.missing.length === refsCopy800.length, '删楼后 auditRefs 精准报 missing（chatId 稳定后可达）');
+  chat800.push({ is_user: true, mes: '恢复消息。', swipe_id: 0 });
+  chat800.push({ is_user: false, mes: '恢复正文。', swipe_id: 0 });
+  // ── 2. 记忆层 refs 生产方（L0/L1/L2/L3 入账写 refs）──
+  const memSrc800 = fs.readFileSync(path.join(BASE, 'engines/memory.js'), 'utf8');
+  assert(memSrc800.indexOf('refs: recentRefs(3)') >= 0, 'L0 入账写 refs（recentRefs 溯源）');
+  assert(memSrc800.indexOf("l1.push({ t: Date.now(), s: String(r.recap).slice(0, 200), refs: inheritRefs(batch) });") >= 0, 'L1 合并继承 refs');
+  assert(memSrc800.indexOf("l2.push({ t: Date.now(), s: String(r.chapter).slice(0, 350), refs: inheritRefs(batch) });") >= 0, 'L2 合并继承 refs');
+  assert(memSrc800.indexOf("l3.push({ t: Date.now(), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200), refs: inheritRefs(batch) });") >= 0, 'L3 合并继承 refs');
+  // 运行时验证：直接模拟入账后条目带 refs（recentRefs 走 timeline.captureRange）
+  const memChat800 = chat800;
+  const refsProbe800 = WA.timeline.captureRange(0, memChat800.length - 1);
+  assert(Array.isArray(refsProbe800) && refsProbe800.length === memChat800.length, 'captureRange 可用于记忆层溯源');
+  WA.store.transact(d => {
+    d.memory.l0.push({ t: Date.now(), s: '带溯源L0', refs: refsProbe800 });
+    d.memory.l1.push({ t: Date.now(), s: '带溯源L1', refs: WA.timeline.unionRefs([refsProbe800]) });
+  });
+  const st800 = WA.store.get();
+  assert(Array.isArray(st800.memory.l0[0].refs) && st800.memory.l0[0].refs.length === memChat800.length, 'L0 条目 refs 已入账');
+  assert(Array.isArray(st800.memory.l1[0].refs) && st800.memory.l1[0].refs.length === memChat800.length, 'L1 条目 refs 已入账');
+  // 端到端：digestRound 真实链路（mock API）→ L0 入账自动带 refs
+  WA.apiRouter.setChannel('digest', { baseUrl: 'http://mock', model: 'm', apiKey: 'k' });
+  global.__pushApiJson({ summary: '端到端摘要：骑兵逼近，粮价上涨。' });
+  const dr800 = await WA.memory.digestRound();
+  assert(dr800 !== null, 'digestRound 端到端入账成功');
+  const l0e2e = WA.store.get().memory.l0.slice(-1)[0];
+  assert(Array.isArray(l0e2e.refs) && l0e2e.refs.length >= 1, '端到端：L0 入账自动带 refs（recentRefs 捕获）');
+  assert(l0e2e.refs.every(r => r.chatId === CID800), '端到端：L0 refs 的 chatId 为稳定聊天 id');
+  // ── 3. entities.refs 生产方（upsert 新建写 refs、更新合并 refs）──
+  const entSrc800 = fs.readFileSync(path.join(BASE, 'engines/entities.js'), 'utf8');
+  assert(entSrc800.indexOf('entity.refs = WA.timeline.unionRefs') >= 0, 'entities.upsert 更新分支合并 refs');
+  assert(entSrc800.indexOf('refs: (WA.timeline && WA.timeline.unionRefs') >= 0, 'entities.upsert 新建分支写 refs');
+  WA.store.transact(d => { WA.entities.upsert(d, 'organization', { name: '测试组织A', desc: '描述', refs: refsProbe800 }); });
+  const ent800 = WA.store.get().evolution.entityMemory.organization[0];
+  assert(ent800 && Array.isArray(ent800.refs) && ent800.refs.length === memChat800.length, 'entities 新建写 refs');
+  // 更新时传入「不在原集合的新来源」——破坏合并逻辑时总数不符，防断言盲区
+  const newRef800 = { chatId: CID800, messageId: 'wax_extra800', layer: 99, role: 'assistant', swipeId: 0, hash: 'abcdef0123456789' };
+  WA.store.transact(d => { WA.entities.upsert(d, 'organization', { name: '测试组织A', desc: '更新', refs: [newRef800] }); });
+  const ent800b = WA.store.get().evolution.entityMemory.organization[0];
+  assert(ent800b && ent800b.refs.length === memChat800.length + 1, 'entities 更新合并 refs（新来源并入）');
+  assert(ent800b.refs.some(r => r.messageId === 'wax_extra800'), 'entities 更新后新来源 ref 可检出');
+  // ── 4. checkRefs 扫描覆盖面扩大（foreshadows.links + entities.refs）──
+  const insSrc800 = fs.readFileSync(path.join(BASE, 'engines/inspector-state.js'), 'utf8');
+  assert(insSrc800.indexOf('foreshadow#') >= 0, 'checkRefs 扫描 foreshadows.links');
+  assert(insSrc800.indexOf('entityMemory') >= 0, 'checkRefs 扫描 entities.refs');
+  // 运行时：删楼后三类孤儿引用（l0/foreshadow/entity）都被检出
+  fresh800();
+  chat800.push({ is_user: true, mes: '源用户消息。', swipe_id: 0 });
+  chat800.push({ is_user: false, mes: '源正文消息。', swipe_id: 0 });
+  const srcRef800 = WA.timeline.sourceRef(chat800[1], 1);
+  WA.store.transact(d => {
+    d.memory.l0.push({ t: Date.now(), s: '源L0', refs: [srcRef800] });
+    d.memory.foreshadows.push({ id: 'fs800', content: '源伏笔', status: 'waiting', links: [srcRef800], at: Date.now() });
+    d.evolution = d.evolution || {};
+    d.evolution.entityMemory = d.evolution.entityMemory || { organization: [], object: [], ability: [], location: [] };
+    d.evolution.entityMemory.organization.push({ id: 'org800', name: '源组织', desc: '', refs: [srcRef800], updatedAt: Date.now() });
+  });
+  chat800.length = 0;
+  const rep800 = WA.inspectorState.inspect(null);
+  const refsSec800 = rep800.sections.find(x => x.code === 'refs');
+  const details800 = refsSec800.issues.map(i => i.detail);
+  assert(refsSec800.issues.length >= 3, '删楼后 refs 节检出 >=3 类孤儿引用');
+  assert(details800.some(x => x.indexOf('l0#') >= 0), 'L0 refs 孤儿被检出');
+  assert(details800.some(x => x.indexOf('foreshadow#') >= 0), 'foreshadows.links 孤儿被检出');
+  assert(details800.some(x => x.indexOf('entity:') >= 0), 'entities.refs 孤儿被检出');
+  // ── 5. backstage 伏笔 links 生产方补齐 ──
+  const bsSrc800 = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
+  assert(bsSrc800.indexOf('links = (Array.isArray(f.links)') >= 0, 'backstage 伏笔入账补 links（未给时捕获锚点溯源）');
+  // 运行时：模拟 applyResult 无 links 的伏笔 → 入账后带 links
+  fresh800();
+  chat800.push({ is_user: true, mes: '伏笔源用户消息。', swipe_id: 0 });
+  chat800.push({ is_user: false, mes: '伏笔源正文消息。', swipe_id: 0 });
+  const anchor800 = { idx: 1, swipe: 0, hash: 'x' };
+  WA.store.transact(d => { WA.backstage.applyResult(d, { foreshadows: [{ id: 'fs801', content: '新伏笔', status: 'waiting' }] }, anchor800); });
+  const fs800 = WA.store.get().memory.foreshadows.find(x => x.id === 'fs801');
+  assert(fs800 && Array.isArray(fs800.links) && fs800.links.length >= 1, 'backstage 伏笔无 links 入账时补写锚点溯源');
+  // ── 清理现场 ──
+  resetLogs800();
+  LS800.clear();
+  Object.keys(junkBefore800).forEach(function (k) { LS800.setItem(k, junkBefore800[k]); });
+  ctx800.chatId = prevChat800;
+  WA.eventLog.length = 0;
+  evtBefore800.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore800.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v0.8.0 block
   } // end v0.7.0 block
   } // end v0.2.2 block
   // ── 汇总 ──

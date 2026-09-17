@@ -90,21 +90,24 @@
     if (id) entity = em[type].find(e => e.id === id);
 
     if (entity) {
-      // 更新：合并别名、刷新描述
+      // 更新：合并别名、刷新描述，并合并来源引用（v0.8.0：修复 refs 生产方缺失）
       entity.aliases = unique([entity.name, ...(entity.aliases || []), ...aliases])
         .filter(a => normalized(a) !== normalized(entity.name)).slice(0, 6);
       if (data.desc) entity.desc = String(data.desc).slice(0, 150);
+      if (WA.timeline && WA.timeline.unionRefs && Array.isArray(data.refs)) {
+        entity.refs = WA.timeline.unionRefs([entity.refs || [], data.refs]);
+      }
       entity.updatedAt = Date.now();
       rebuildIndex(em);
       return 'updated';
     }
-
     // 新建
     const newId = `${type[0]}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     em[type].push({
       id: newId, name,
       aliases,
       desc: String((data && data.desc) || '').slice(0, 150),
+      refs: (WA.timeline && WA.timeline.unionRefs && Array.isArray(data.refs)) ? WA.timeline.unionRefs([data.refs]) : [],
       updatedAt: Date.now()
     });
     // 容量裁剪（保留最新的）
