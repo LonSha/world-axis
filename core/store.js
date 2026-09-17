@@ -477,23 +477,29 @@
     return null;
   }
   // v1.6.0: 登记表↔schema 物化一致性自检（单一实现）——找出「登记表声明但状态中不存在」的容器。
-  // 通配键（按定义不在默认状态）与 kind:'object' 键（键名集合由运行时决定）不参与判定。
+  // 通配键（按定义不在默认状态）不参与判定；精确键（array + object）一律纳入，
+  // object 键同时校验「未物化」与「类型错配」（v1.7.0：与 array 同构收口，此前整体 continue 是盲区）。
   function registryParity() {
     const missing = [];
     const ks = Object.keys(__BOUNDED_CAPS);
     for (let i = 0; i < ks.length; i++) {
       const k = ks[i], meta = __BOUNDED_CAPS[k];
       if (!meta || meta.wildcard) continue;
-      if (meta.kind === 'object') continue;
+      const wantObj = meta.kind === 'object';
       const segs = k.split('.');
       let cur = memCache, okPath = true;
       for (let j = 0; j < segs.length; j++) {
         if (cur === null || cur === undefined || typeof cur !== 'object' || !(segs[j] in cur)) { okPath = false; break; }
         cur = cur[segs[j]];
       }
-      if (!okPath || !Array.isArray(cur)) missing.push({ path: k, cap: meta.cap, site: meta.site || '' });
+      let bad = false, reason = '';
+      if (!okPath) { bad = true; reason = '未在骨架物化'; }
+      else if (wantObj) {
+        if (cur === null || typeof cur !== 'object' || Array.isArray(cur)) { bad = true; reason = '类型错配（应为普通对象）'; }
+      } else if (!Array.isArray(cur)) { bad = true; reason = '类型错配（应为数组）'; }
+      if (bad) missing.push({ path: k, cap: meta.cap, site: meta.site || '', kind: wantObj ? 'object' : 'array', reason: reason });
     }
-    return { checked: ks.filter(k => !__BOUNDED_CAPS[k].wildcard && __BOUNDED_CAPS[k].kind !== 'object').length, missing: missing, ok: missing.length === 0 };
+    return { checked: ks.filter(k => !__BOUNDED_CAPS[k].wildcard).length, missing: missing, ok: missing.length === 0 };
   }
   // v0.1.48: 派生逻辑单一实现——sizeAudit 与 sizeAuditFull 共用，防两处语义单边漂移
   function memStateBytes() {
@@ -972,7 +978,7 @@
           const rp = registryParity();
           if (rp.missing.length) {
             score -= Math.min(6, rp.missing.length);
-            issues.push({ level: 'warn', key: 'capacity.unmaterialized', detail: rp.missing.length + ' 个已登记容器未在状态骨架物化（容量治理对其空转、直写会回滚事务）：' + rp.missing.slice(0, 4).map(m => m.path).join('、') + (rp.missing.length > 4 ? ' 等' : '') + '——请在 defaultWorldState 补骨架声明' });
+            issues.push({ level: 'warn', key: 'capacity.unmaterialized', detail: rp.missing.length + ' 个已登记容器与状态骨架不一致（容量治理对其空转、直写会回滚事务）：' + rp.missing.slice(0, 4).map(m => m.path + '[' + (m.reason || '未物化') + ']').join('、') + (rp.missing.length > 4 ? ' 等' : '') + '——数组请在 defaultWorldState 补 []、对象补 {}' });
           }
         } catch (e) { WA.log('warn', '物化一致性自检异常（不阻断巡视）', e); }
         if (unreg7.length) {

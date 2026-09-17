@@ -6337,6 +6337,86 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1600.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.6.0 block
+  v1700: {
+  const LS1700 = global.localStorage;
+  const junkBefore1700 = JSON.parse(JSON.stringify(LS1700._dump()));
+  const evtBefore1700 = WA.eventLog.slice();
+  const errBefore1700 = WA.errorLog.slice();
+  const ctx1700 = global.SillyTavern.getContext();
+  const prevChat1700 = ctx1700.chatId;
+  const CID1700 = 'v1700_chat';
+  const chat1700 = global.__mockChat;
+  function resetLogs1700() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1700() { resetLogs1700(); LS1700.clear(); ctx1700.chatId = CID1700; chat1700.length = 0; WA.store.init(); }
+  const caps1700 = WA.store.sizeCaps();
+  const arrayKeys1700 = Object.keys(caps1700).filter(k => !caps1700[k].wildcard && caps1700[k].kind !== 'object');
+  const objKeys1700 = Object.keys(caps1700).filter(k => !caps1700[k].wildcard && caps1700[k].kind === 'object');
+  const stSrc1700 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  // ── A. checked 纳入 object 键 ──
+  fresh1700();
+  const rpA1700 = WA.store.registryParity();
+  assert(rpA1700.ok === true && rpA1700.missing.length === 0, '正常态 registryParity ok=true missing=0');
+  assert(rpA1700.checked === arrayKeys1700.length + objKeys1700.length, 'checked 纳入精确 object 键（不再是仅 array）');
+  assert(rpA1700.checked === 31, 'checked 精确值 31（v1.6.0 时 30，+people）');
+  // ── B. object 键漏物化检出（v1.6.0 盲区修复）──
+  fresh1700();
+  WA.store.transact(d => { delete d.people; });
+  const rpB1700 = WA.store.registryParity();
+  assert(rpB1700.ok === false && rpB1700.missing.some(m => m.path === 'people'), '删除 people 后 registryParity 检出（此前 object 键被 continue 漏检）');
+  const pmB1700 = rpB1700.missing.find(m => m.path === 'people');
+  assert(pmB1700 && pmB1700.kind === 'object' && pmB1700.cap === 48 && pmB1700.site.indexOf('backstage.js') >= 0, 'missing 项带 kind=object + cap + site 溯源');
+  assert(pmB1700 && pmB1700.reason && pmB1700.reason.indexOf('未在骨架物化') >= 0, 'missing 项带 reason=未在骨架物化');
+  const mB1700 = WA.store.maintain({});
+  const umB1700 = (mB1700.issues || []).filter(i => i.key === 'capacity.unmaterialized');
+  assert(umB1700.length === 1 && umB1700[0].detail.indexOf('people') >= 0, 'maintain 检出 people unmaterialized 议题（带路径）');
+  assert(umB1700[0].level === 'warn', 'unmaterialized 议题 level=warn');
+  WA.store.transact(d => { d.people = {}; });
+  assert(WA.store.registryParity().ok === true, '补 people={} 后 registryParity 回归 ok（可自愈）');
+  assert(!(WA.store.maintain({}).issues || []).some(i => i.key === 'capacity.unmaterialized'), '补齐后 maintain 议题消失（自愈可验证）');
+  // ── C. object 键类型错配检出 ──
+  fresh1700();
+  WA.store.transact(d => { d.people = []; });
+  const rpC1700 = WA.store.registryParity();
+  assert(rpC1700.ok === false && rpC1700.missing.some(m => m.path === 'people'), 'people 被污染为数组后检出（类型错配）');
+  const pmC1700 = rpC1700.missing.find(m => m.path === 'people');
+  assert(pmC1700 && pmC1700.reason.indexOf('类型错配') >= 0, '错配项 reason 含「类型错配」');
+  WA.store.transact(d => { d.people = {}; });
+  assert(WA.store.registryParity().ok === true, '纠错为 {} 后回归 ok');
+  // ── D. array 键行为不回退（v1.6.0 契约保持）──
+  fresh1700();
+  WA.store.transact(d => { delete d.memory.facts; });
+  const rpD1700 = WA.store.registryParity();
+  const mfD1700 = rpD1700.missing.find(m => m.path === 'memory.facts');
+  assert(mfD1700 && mfD1700.kind === 'array' && mfD1700.cap === 100 && mfD1700.site.indexOf('memory.js') >= 0, 'array 漏物化仍检出 + kind=array + cap/site 溯源');
+  assert(mfD1700 && mfD1700.reason.indexOf('未在骨架物化') >= 0, 'array 漏物化 reason 正确');
+  // array 键被污染为对象也检出（双向类型校验）
+  fresh1700();
+  WA.store.transact(d => { d.memory.l0 = {}; });
+  const rpD2_1700 = WA.store.registryParity();
+  const l0D1700 = rpD2_1700.missing.find(m => m.path === 'memory.l0');
+  assert(l0D1700 && l0D1700.reason.indexOf('类型错配') >= 0, 'array 键被污染为对象也检出（双向类型校验）');
+  // ── E. 豁免边界：通配键不参与 ──
+  fresh1700();
+  const rpE1700 = WA.store.registryParity();
+  assert(!rpE1700.missing.some(m => m.path.indexOf('*') >= 0), '通配键不参与判定（豁免）');
+  assert(!rpE1700.missing.some(m => m.path.indexOf('knowledge') >= 0), 'object 通配键 people.*.knowledge 不误报');
+  WA.store.transact(d => { d.people['p_x'] = { id: 'p_x', name: 'X', knowledge: { a: 1 } }; });
+  assert(WA.store.registryParity().ok === true, '写入带 knowledge 的人物后仍 ok（通配 object 不参与）');
+  // ── F. 源码契约 ──
+  assert((stSrc1700.match(/function registryParity\(/g) || []).length === 1, 'registryParity 仍单一定义');
+  assert(stSrc1700.indexOf("if (meta.kind === 'object') continue;") < 0, '旧 object-continue 盲区语句已移除');
+  assert(stSrc1700.indexOf('类型错配（应为普通对象）') >= 0, 'object 错配分支在位');
+  assert(stSrc1700.indexOf('v1.7.0') >= 0, 'v1.7.0 注释在位');
+  // ── 清理现场 ──
+  resetLogs1700();
+  LS1700.clear();
+  Object.keys(junkBefore1700).forEach(function (k) { LS1700.setItem(k, junkBefore1700[k]); });
+  ctx1700.chatId = prevChat1700;
+  WA.eventLog.length = 0;
+  evtBefore1700.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1700.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.7.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
