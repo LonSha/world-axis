@@ -5911,6 +5911,86 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1000.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.0.0 block
+  // ═══════════════════════════════════════════════════════════
+  // v1.1.0 — 人设载体贯通（人设字段入账 / pmem 读权威本体 / 导出补全 / 名单统一）
+  //   探针实证：① evolution.people 零写入方（3 处消费、0 处生产）→ 人口记忆 pmem 的
+  //   持有者归属与 memory-sampler 采样名单恒空（人物失忆）；② people 入账仅保留
+  //   7 个基础字段，丢失 avatar/resources/personalityAnchor/speakingStyle/
+  //   behaviorBoundaries/innerVoice/aliases（人设载体断裂）；③ knownPeopleNames
+  //   未从 pmem 导出（隐藏缺陷，调用即 TypeError）；④ memory-sampler 名单同样依赖
+  //   死字段。A: backstage 人物结算字段贯通 + 别名并集去重；B: pmem 改读 state.people
+  //   （本地兼容旧档 evolution.people 残留）；C: 导出补全；D: memory-sampler 名单统一。
+  // ═══════════════════════════════════════════════════════════
+  v1100: {
+  const LS1100 = global.localStorage;
+  const junkBefore1100 = JSON.parse(JSON.stringify(LS1100._dump()));
+  const evtBefore1100 = WA.eventLog.slice();
+  const errBefore1100 = WA.errorLog.slice();
+  const ctx1100 = global.SillyTavern.getContext();
+  const prevChat1100 = ctx1100.chatId;
+  const CID1100 = 'v1100_chat';
+  const chat1100 = global.__mockChat;
+  function resetLogs1100() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1100() { resetLogs1100(); LS1100.clear(); ctx1100.chatId = CID1100; chat1100.length = 0; WA.store.init(); }
+  // ── A. people 入账字段贯通 ──
+  fresh1100();
+  WA.store.transact(d => {
+    d.people = {};
+    WA.backstage.applyResult(d, {
+      people: [{ name: '陆文昭', avatar: 'a.png', location: '诏狱', action: '审问', intent: '套话',
+                 body: { hp: 80 }, resources: { gold: 10 }, personalityAnchor: '冷静',
+                 speakingStyle: '文言', behaviorBoundaries: '不滥杀', innerVoice: '疑虑', aliases: ['陆大人'] }],
+      echoes: [], chronicle: [], foreshadows: []
+    }, { idx: 0, swipe: 0 });
+  });
+  const p1100a = WA.store.get().people['p_陆文昭'];
+  const miss1100 = ['avatar', 'resources', 'personalityAnchor', 'speakingStyle', 'behaviorBoundaries', 'innerVoice', 'aliases'].filter(k => !(p1100a && k in p1100a));
+  assert(miss1100.length === 0, 'people 入账贯通全部人设字段（缺失: ' + miss1100.join(',') + '）');
+  assert(!!p1100a && p1100a.avatar === 'a.png' && p1100a.personalityAnchor === '冷静' && p1100a.speakingStyle === '文言' && p1100a.innerVoice === '疑虑', '人物人设字段值正确');
+  assert(!!p1100a && Array.isArray(p1100a.aliases) && p1100a.aliases.indexOf('陆大人') >= 0, '人物 aliases 入账');
+  // ── B. pmem 改读 state.people（别名可达）──
+  WA.store.transact(d => {
+    d.memory.pmem = [{ id: 'm1', holders: ['沈炼'], text: '记住了暗号', at: Date.now() }];
+    d.people = { p_沈炼: { id: 'p_沈炼', name: '沈炼', aliases: ['沈捕快', '百户大人'], knowledge: {} } };
+    d.evolution = d.evolution || {};
+    d.evolution.people = [];
+  });
+  const hs1100 = WA.pmem.holderSet('沈捕快');
+  assert(hs1100.has('沈炼') && hs1100.has('沈捕快'), 'holderSet 别名归属可达（读 state.people，死字段已清空）');
+  assert(WA.pmem.recall('沈捕快').length > 0, 'recall 用别名召回持有者记忆命中（别名感知生效）');
+  assert(WA.pmem.knows('沈捕快', 'm1') === false, 'knows 语义：别名不等于 known_by（认知边界不受别名影响）');
+  // ── C. 导出补全 + 旧档兼容 ──
+  assert(typeof WA.pmem.knownPeopleNames === 'function', 'knownPeopleNames 已从 pmem 导出（隐藏缺陷修复）');
+  assert(typeof WA.pmem.peopleList === 'function', 'peopleList 已导出');
+  const names1100 = WA.pmem.knownPeopleNames();
+  assert(Array.isArray(names1100) && names1100.indexOf('沈炼') >= 0, 'knownPeopleNames 反映 people 表');
+  WA.store.transact(d => { d.evolution = d.evolution || {}; d.evolution.people = [{ name: '旧档人物', aliases: ['老名字'] }]; });
+  assert(WA.pmem.knownPeopleNames().indexOf('旧档人物') >= 0, '兼容旧存档 evolution.people 残留（不丢历史人物）');
+  // ── D. 别名并集去重 ──
+  WA.store.transact(d => {
+    d.people = {};
+    WA.backstage.applyResult(d, { people: [{ name: '沈炼', aliases: ['沈捕快'] }], echoes: [], chronicle: [], foreshadows: [] }, { idx: 0, swipe: 0 });
+    WA.backstage.applyResult(d, { people: [{ name: '沈炼', aliases: ['百户大人', '沈捕快'] }], echoes: [], chronicle: [], foreshadows: [] }, { idx: 1, swipe: 0 });
+  });
+  const p1100d = WA.store.get().people['p_沈炼'];
+  assert(!!p1100d && p1100d.aliases.length === 2 && p1100d.aliases.indexOf('沈捕快') >= 0 && p1100d.aliases.indexOf('百户大人') >= 0, '多次别名并集去重（无重复、无丢失）');
+  // ── E. memory-sampler 名单统一读 state.people ──
+  WA.store.transact(d => {
+    d.people = { p_张三: { id: 'p_张三', name: '张三', knowledge: {} } };
+    d.evolution = d.evolution || {}; d.evolution.people = [];
+  });
+  const hs1100e = WA.memorySampler.buildHaystack('正文', WA.store.get());
+  assert(hs1100e.indexOf('张三') >= 0, 'memory-sampler 人物名单来自 state.people（死字段已清空）');
+  // ── 清理现场 ──
+  resetLogs1100();
+  LS1100.clear();
+  Object.keys(junkBefore1100).forEach(function (k) { LS1100.setItem(k, junkBefore1100[k]); });
+  ctx1100.chatId = prevChat1100;
+  WA.eventLog.length = 0;
+  evtBefore1100.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1100.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.1.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block

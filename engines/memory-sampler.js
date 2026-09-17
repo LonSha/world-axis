@@ -88,8 +88,11 @@
     const parts = [String(recentText || '')];
     const st = state || safe(function () { return WA.store.get(); }, null) || {};
     try {
-      const people = (st.evolution && st.evolution.people) || [];
-      parts.push(people.map(function (p) { return p && p.name || ''; }).join(' '));
+      // v1.1.0: 人物清单统一读权威本体 state.people（兼容旧存档 evolution.people 残留）
+      const byId = st.people || {};
+      Object.keys(byId).forEach(function (k) { if (byId[k] && byId[k].name) parts.push(byId[k].name); });
+      const legacy = (st.evolution && st.evolution.people) || [];
+      if (Array.isArray(legacy)) legacy.forEach(function (p) { if (p && p.name) parts.push(p.name); });
       const em = st.evolution && st.evolution.entityMemory;
       if (em) {
         ['organization', 'object', 'ability', 'location'].forEach(function (t) {

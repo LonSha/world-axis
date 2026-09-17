@@ -9,6 +9,16 @@
   const LS_SETTINGS = 'worldaxis_backstage_settings_v1';
   // v1.0.0: 人物容器容量（与 __BOUNDED_CAPS['people'] 登记同源）
   const PEOPLE_CAP = 48;
+  // v1.1.0: 别名并集去重（人设载体贯通——AI 多次返回别名时累积）
+  function unionAliases(a, b) {
+    const out = [];
+    const seen = new Set();
+    [].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : []).forEach(function (x) {
+      const v = String(x == null ? '' : x).trim();
+      if (v && !seen.has(v)) { seen.add(v); out.push(v); }
+    });
+    return out;
+  }
 
   // ════════════════════════════════════════════════════════
   // 七步判断协议（世界背面推理协议移植，不输出思考过程）
@@ -336,13 +346,22 @@
         if (!p || !p.name) return;
         const id = 'p_' + String(p.name);
         const old = draft.people[id] || { id, name: p.name, knowledge: {} };
+        // v1.1.0: 人设载体贯通——补齐 schema 声明但此前未入账的字段（AI 未给则保留旧值）
+        const mergedAliases = unionAliases(old.aliases, p.aliases);
         draft.people[id] = Object.assign(old, {
           location: p.location || old.location,
           action: p.action || old.action,
           intent: p.intent || old.intent,
           body: p.body || old.body,
+          avatar: p.avatar || old.avatar,
+          resources: p.resources || old.resources,
+          personalityAnchor: p.personalityAnchor || old.personalityAnchor,
+          speakingStyle: p.speakingStyle || old.speakingStyle,
+          behaviorBoundaries: p.behaviorBoundaries || old.behaviorBoundaries,
+          innerVoice: p.innerVoice || old.innerVoice,
           updatedAt: now
         });
+        if (mergedAliases.length) draft.people[id].aliases = mergedAliases;
       });
 
       // 认知边界入账（knowledge_updates，inferred只能suspected）

@@ -126,10 +126,23 @@
   }
 
   // ── 查询与注入 ────────────────────────────────────────
+  // v1.1.0: 人物清单统一来源——优先读权威本体 state.people（v1.0.0 已做容量治理），
+  // 兼容旧存档残留的 evolution.people（历史数据仍有值时不丢别名）。
+  function peopleList(st) {
+    const out = [];
+    const byId = (st && st.people) || {};
+    Object.keys(byId).forEach(function (k) {
+      const p = byId[k];
+      if (p && p.name) out.push(p);
+    });
+    const legacy = (st && st.evolution && st.evolution.people) || [];
+    if (Array.isArray(legacy)) legacy.forEach(function (p) { if (p && p.name) out.push(p); });
+    return out;
+  }
   function holderSet(name) {
-    // 别名感知：命中st.evolution.people的name或aliases
+    // 别名感知：命中 state.people 的 name 或 aliases（v1.1.0 改读权威本体）
     const st = WA.store.get();
-    const people = (st && st.evolution && st.evolution.people) || [];
+    const people = peopleList(st);
     const target = normalized(name);
     const out = new Set([clean(name)]);
     for (const p of people) {
@@ -180,7 +193,7 @@
 
   function knownPeopleNames() {
     const st = WA.store.get();
-    const people = (st.evolution && st.evolution.people) || [];
+    const people = peopleList(st);
     return people.map(p => p.name).filter(Boolean).slice(0, 20);
   }
 
@@ -225,6 +238,7 @@
   WA.pmem = {
     SYSTEM_PROMPT, buildUserPrompt,
     applyPersonalMemory, recall, knows, buildBlock, extractRound, holderSet,
+    knownPeopleNames, peopleList,   // v1.1.0: 导出人物清单（别名可达性 + 测试/调试）
     CAP_TOTAL, CAP_PER_PERSON, BATCH_MAX
   };
 
