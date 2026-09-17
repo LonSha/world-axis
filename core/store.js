@@ -47,6 +47,8 @@
       evolution: {
         events: [], factions: [], winds: [], trends: [], enemies: [],
         blackbox: { secretActions: [], secretAssets: [] }, worldTrends: [], regionalIncident: null,
+        // v1.6.0 物化：实体记忆库（登记四键 cap 30 此前未在骨架声明——冷启动审计不可见、直写即炸事务）
+        entityMemory: { organization: [], object: [], ability: [], location: [] },
         reputation: { authority: '默默无闻', common: '默默无闻', shadow: '默默无闻', circuit: '默默无闻', lastChange: '' },
         economy: { climate: '平稳', signals: [] },
         round: 0, digest: '',
@@ -474,6 +476,25 @@
     }
     return null;
   }
+  // v1.6.0: 登记表↔schema 物化一致性自检（单一实现）——找出「登记表声明但状态中不存在」的容器。
+  // 通配键（按定义不在默认状态）与 kind:'object' 键（键名集合由运行时决定）不参与判定。
+  function registryParity() {
+    const missing = [];
+    const ks = Object.keys(__BOUNDED_CAPS);
+    for (let i = 0; i < ks.length; i++) {
+      const k = ks[i], meta = __BOUNDED_CAPS[k];
+      if (!meta || meta.wildcard) continue;
+      if (meta.kind === 'object') continue;
+      const segs = k.split('.');
+      let cur = memCache, okPath = true;
+      for (let j = 0; j < segs.length; j++) {
+        if (cur === null || cur === undefined || typeof cur !== 'object' || !(segs[j] in cur)) { okPath = false; break; }
+        cur = cur[segs[j]];
+      }
+      if (!okPath || !Array.isArray(cur)) missing.push({ path: k, cap: meta.cap, site: meta.site || '' });
+    }
+    return { checked: ks.filter(k => !__BOUNDED_CAPS[k].wildcard && __BOUNDED_CAPS[k].kind !== 'object').length, missing: missing, ok: missing.length === 0 };
+  }
   // v0.1.48: 派生逻辑单一实现——sizeAudit 与 sizeAuditFull 共用，防两处语义单边漂移
   function memStateBytes() {
     try { return byteLen(JSON.stringify(memCache)); } catch (e) { return -1; }
@@ -505,6 +526,7 @@
     SCHEMA_VERSION,
     /** v0.1.44: 有界容器登记表只读副本（测试反查源码一致性用）；v1.0.0: 透传 kind（array|object） */
     capsFor: capsFor,
+    registryParity: registryParity,
     sizeCaps() { const c = {}; Object.keys(__BOUNDED_CAPS).forEach(function (k) { c[k] = { cap: __BOUNDED_CAPS[k].cap, site: __BOUNDED_CAPS[k].site, kind: __BOUNDED_CAPS[k].kind || 'array', wildcard: __BOUNDED_CAPS[k].wildcard === true ? true : undefined }; }); return c; },
     defaultWorldState,
     chatId: getChatId,        // v0.9.1: 供导出/诊断读取当前聊天id
@@ -945,6 +967,14 @@
           issues.push({ level: 'error', key: 'capacity.drift', detail: drift7.length + ' 个已登记容器超出容量：' + drift7.slice(0, 4).join('、') + (drift7.length > 4 ? ' 等' : '') + '——下一次结算会自动挤出，或用编辑器手动清理' });
           actions.push({ id: 'trim-containers', safe: true, detail: '继续推进一轮（结算链尾部容量控制自动挤出超限部分）' });
         }
+        // v1.6.0: 登记表↔schema 物化一致性——登记声明但状态中不存在的容器（审计空转隐患）
+        try {
+          const rp = registryParity();
+          if (rp.missing.length) {
+            score -= Math.min(6, rp.missing.length);
+            issues.push({ level: 'warn', key: 'capacity.unmaterialized', detail: rp.missing.length + ' 个已登记容器未在状态骨架物化（容量治理对其空转、直写会回滚事务）：' + rp.missing.slice(0, 4).map(m => m.path).join('、') + (rp.missing.length > 4 ? ' 等' : '') + '——请在 defaultWorldState 补骨架声明' });
+          }
+        } catch (e) { WA.log('warn', '物化一致性自检异常（不阻断巡视）', e); }
         if (unreg7.length) {
           // 未登记非空数组：要么登记表漏登（登记义务），要么运行时新演进容器（需要确认是否有界）
           score -= Math.min(10, unreg7.length * 2);

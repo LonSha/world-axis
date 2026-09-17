@@ -6272,6 +6272,71 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1500.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.5.0 block
+  v1600: {
+  const LS1600 = global.localStorage;
+  const junkBefore1600 = JSON.parse(JSON.stringify(LS1600._dump()));
+  const evtBefore1600 = WA.eventLog.slice();
+  const errBefore1600 = WA.errorLog.slice();
+  const ctx1600 = global.SillyTavern.getContext();
+  const prevChat1600 = ctx1600.chatId;
+  const CID1600 = 'v1600_chat';
+  const chat1600 = global.__mockChat;
+  function resetLogs1600() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1600() { resetLogs1600(); LS1600.clear(); ctx1600.chatId = CID1600; chat1600.length = 0; WA.store.init(); }
+  // ── A. entityMemory 物化 ──
+  fresh1600();
+  const dft1600 = WA.store.defaultWorldState();
+  assert(dft1600.evolution.entityMemory && Array.isArray(dft1600.evolution.entityMemory.organization) && Array.isArray(dft1600.evolution.entityMemory.ability), 'defaultWorldState 物化 entityMemory 四数组');
+  const stSrc1600 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  assert(stSrc1600.indexOf('entityMemory: { organization: [], object: [], ability: [], location: [] }') >= 0, 'schema 骨架声明与登记四键同集合');
+  // ── B. 冷启动审计可见 + 直写不再炸 ──
+  const a1600 = WA.store.sizeAudit({ minBytes: 0, maxDepth: 8, topN: 999 });
+  const emRows1600 = (a1600.arrays || []).filter(r => r.path.indexOf('evolution.entityMemory.') === 0);
+  assert(emRows1600.length === 4, '冷启动 sizeAudit 纳 4 个 entityMemory 行（此前 0）');
+  assert(emRows1600.every(r => r.bounded === true && r.cap === 30), '四行均标 bounded=true cap=30（登记生效）');
+  const r1_1600 = WA.store.transact(d => {
+    d.chronicle.push({ id: 'c_y1600', kind: 'event', title: '测试' });
+    d.evolution.entityMemory.organization.push({ id: 'o1', name: '行会', events: [] });
+  });
+  const st1600 = WA.store.get();
+  assert(r1_1600.ok === true, '直写 entityMemory 事务 ok=true（此前 TypeError 回滚）');
+  assert(st1600.evolution.entityMemory.organization.length === 1, '实体入账成功');
+  assert(st1600.chronicle.some(c => c.id === 'c_y1600'), '同批无关写入未被连带丢弃（原子性恢复正常）');
+  // ── C. registryParity 单一自检 ──
+  assert(typeof WA.store.registryParity === 'function', 'WA.store.registryParity 已挂出');
+  const rp1600 = WA.store.registryParity();
+  assert(rp1600.ok === true && rp1600.missing.length === 0, '当前状态一致性通过（missing=0）');
+  assert(rp1600.checked >= 30, 'checked 覆盖全部非通配非 object 键');
+  WA.store.transact(d => { delete d.memory.facts; });
+  const rp1600b = WA.store.registryParity();
+  assert(rp1600b.ok === false && rp1600b.missing.some(m => m.path === 'memory.facts'), '删除 memory.facts 后检出 missing');
+  const mf1600 = rp1600b.missing.find(m => m.path === 'memory.facts');
+  assert(mf1600 && mf1600.cap === 100 && mf1600.site.indexOf('memory.js') >= 0, 'missing 项带 cap 与 site 溯源');
+  assert(!rp1600b.missing.some(m => m.path.indexOf('*') >= 0), '通配键不参与判定（豁免）');
+  assert(!rp1600b.missing.some(m => m.path === 'people'), 'kind:object 顶层键豁免');
+  // ── D. maintain 接入 capacity.unmaterialized ──
+  const m1600 = WA.store.maintain({});
+  const um1600 = (m1600.issues || []).filter(i => i.key === 'capacity.unmaterialized');
+  assert(um1600.length === 1, 'maintain 检出 capacity.unmaterialized 议题');
+  assert(um1600[0].detail.indexOf('memory.facts') >= 0 && um1600[0].level === 'warn', '议题带路径明示 + level=warn');
+  WA.store.transact(d => { d.memory.facts = []; });
+  const m1600b = WA.store.maintain({});
+  assert(!(m1600b.issues || []).some(i => i.key === 'capacity.unmaterialized'), '补齐后议题消失（自愈可验证）');
+  assert(WA.store.registryParity().ok === true, '补齐后 registryParity 回归 ok');
+  // ── E. 源码契约 ──
+  assert((stSrc1600.match(/function registryParity\(/g) || []).length === 1, 'registryParity 单一定义');
+  assert((stSrc1600.match(/registryParity\(\)/g) || []).length >= 2, 'maintain 接入调用（定义外至少 1 处）');
+  assert(stSrc1600.indexOf('v1.6.0: 登记表↔schema 物化一致性') >= 0, 'maintain 接入注释在位');
+  // ── 清理现场 ──
+  resetLogs1600();
+  LS1600.clear();
+  Object.keys(junkBefore1600).forEach(function (k) { LS1600.setItem(k, junkBefore1600[k]); });
+  ctx1600.chatId = prevChat1600;
+  WA.eventLog.length = 0;
+  evtBefore1600.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1600.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.6.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
