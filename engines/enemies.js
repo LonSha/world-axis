@@ -11,6 +11,8 @@
   const ENEMY_TYPE = ['blood', 'grudge'];
   const ASSET_STATUS = ['有效', '过期', '暴露', '失效'];
   const TERMINATED_KEEP = 20; // 已终结仇敌保留20轮
+  const TERMINATED_MAX = 20; // v1.0.0: 终结态数量兜底（20轮窗口内海量终结时仍不超量）
+  const MAX_ACTIVE = 24;     // v1.0.0: 活跃仇敌环形容量（与 __BOUNDED_CAPS['evolution.enemies'] 登记同源）
 
   function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -39,6 +41,25 @@
         }
         return true;
       });
+      // v1.0.0: 活跃态环形剪枝——此前活跃仇敌（追踪中/策划中/执行中）无回收上限，
+      // 长局无限累积且注入块全量展开；超 MAX_ACTIVE 时挤出最早创建者（终结者走独立生命周期，不在此列）。
+      const enArr = draft.evolution.enemies = draft.evolution.enemies || [];
+      const active = enArr.filter(e => e && e.status !== '已终结');
+      if (active.length > MAX_ACTIVE) {
+        const totalExcess = active.length - MAX_ACTIVE;
+        active.sort((a, b) => (a.createdRound || 0) - (b.createdRound || 0));
+        const toDrop = new Set(active.slice(0, totalExcess).map(e => e.id));
+        draft.evolution.enemies = enArr.filter(e => !e || !toDrop.has(e.id));
+        WA.log('info', '活跃仇敌容量治理：挤出最早创建的 ' + totalExcess + ' 个（保留 ' + MAX_ACTIVE + ' 个活跃上限）');
+      }
+      // v1.0.0: 终结态数量兜底——20 轮窗口内海量终结时按终结时间最旧挤出（总量硬上限兜底）
+      const term = (draft.evolution.enemies || []).filter(e => e && e.status === '已终结');
+      if (term.length > TERMINATED_MAX) {
+        term.sort((a, b) => (a.terminatedRound || 0) - (b.terminatedRound || 0));
+        const dropT = new Set(term.slice(0, term.length - TERMINATED_MAX).map(e => e.id));
+        draft.evolution.enemies = (draft.evolution.enemies || []).filter(e => !e || !dropT.has(e.id));
+        WA.log('info', '终结仇敌数量治理：挤出最早的 ' + (term.length - TERMINATED_MAX) + ' 个（保留 ' + TERMINATED_MAX + ' 个终结记录）');
+      }
     },
 
     /** 黑盒入账 */
@@ -81,7 +102,12 @@
       const s = WA.store.get();
       const parts = [];
       const enemies = (s.evolution.enemies || []).filter(e => e.status !== '已终结');
-      if (enemies.length) parts.push('【活跃仇敌】' + enemies.map(e => e.name + '(' + e.type + '/' + e.status + ')').join('；'));
+      if (enemies.length) {
+        // v1.0.0: 有界展开——超上限时截取前 12 个并标注余量（防长局注入膨胀）
+        const shown = enemies.slice(0, 12);
+        const more = enemies.length - shown.length;
+        parts.push('【活跃仇敌】' + shown.map(e => e.name + '(' + e.type + '/' + e.status + ')').join('；') + (more > 0 ? '；…等' + more + '个' : ''));
+      }
       const wt = (s.evolution.worldTrends || []).filter(t => t.status === '持续中');
       if (wt.length) parts.push('【天下大势】' + wt.map(t => t.name + '：' + (t.description || '').slice(0, 40)).join('；'));
       const exposedAssets = ((s.evolution.blackbox || {}).secretAssets || []).filter(a => a.status === '暴露');

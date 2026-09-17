@@ -7,6 +7,8 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_SETTINGS = 'worldaxis_backstage_settings_v1';
+  // v1.0.0: 人物容器容量（与 __BOUNDED_CAPS['people'] 登记同源）
+  const PEOPLE_CAP = 48;
 
   // ════════════════════════════════════════════════════════
   // 七步判断协议（世界背面推理协议移植，不输出思考过程）
@@ -492,6 +494,19 @@
           if (wtArr[i] && wtArr[i].status === '已结束') wtArr.splice(i, 1);
         }
         if (wtArr.length > 12) wtArr.splice(0, wtArr.length - 12);
+      }
+      // v1.0.0: 人物容器容量治理（对象型）——此前 people 无人数上限，长局 NPC 无界膨胀；
+      // 按 updatedAt 最旧优先挤出（保留近期活跃者），日志留痕。cap 与登记表同源 PEOPLE_CAP。
+      if (draft.people && typeof draft.people === 'object') {
+        const pKeys = Object.keys(draft.people);
+        if (pKeys.length > PEOPLE_CAP) {
+          pKeys.sort((a, b) => ((draft.people[a] && draft.people[a].updatedAt) || 0) - ((draft.people[b] && draft.people[b].updatedAt) || 0));
+          pKeys.slice(0, pKeys.length - PEOPLE_CAP).forEach(k => {
+            const pname = draft.people[k] && draft.people[k].name;
+            delete draft.people[k];
+            WA.log('info', '人物容量治理：挤出长期未更新 NPC ' + (pname || k));
+          });
+        }
       }
     },
 

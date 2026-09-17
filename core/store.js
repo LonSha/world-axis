@@ -408,6 +408,15 @@
     'memory.pmem': { cap: 60, site: 'pmem.js CAP_TOTAL=60' },
     'opinion.canon': { cap: 20, site: 'opinion.js slice(-20)' },
     'opinion.forum': { cap: 20, site: 'opinion.js concat slice(-20)' },
+    // v1.0.0 补登：有界但漏登 → sizeAudit 误报 unbounded
+    'evolution.trends': { cap: 20, site: 'evolution.js slice(-20)' },
+    'evolution.blackbox.secretActions': { cap: 15, site: 'enemies.js slice(-15)' },
+    'evolution.blackbox.secretAssets': { cap: 15, site: 'enemies.js slice(-15)' },
+    'opinion.sandbox': { cap: 4, site: 'opinion.js slice(0,4)' },
+    // v1.0.0 新增：对象型容器（kind:'object'，len = Object.keys().length）
+    'people': { cap: 48, kind: 'object', site: 'backstage.js 人物入账剪枝（v1.0.0）' },
+    // 活跃 MAX_ACTIVE(24) + 终结保留 TERMINATED_MAX(20) → 总量硬上限 44
+    'evolution.enemies': { cap: 44, site: 'enemies.js 活跃/终结双口径剪枝（v1.0.0）' },
     'evolution.winds': { cap: 12, site: 'evolution.js MAX_WINDS=12 + backstage splice' },
     'evolution.worldTrends': { cap: 12, site: 'backstage.js wtArr splice 12' },
     'evolution.economy.signals': { cap: 3, site: 'evolution.js applyEconomy slice(0,3)' },
@@ -445,8 +454,8 @@
   }
   const store = WA.store = {
     SCHEMA_VERSION,
-    /** v0.1.44: 有界容器登记表只读副本（测试反查源码一致性用） */
-    sizeCaps() { const c = {}; Object.keys(__BOUNDED_CAPS).forEach(function (k) { c[k] = { cap: __BOUNDED_CAPS[k].cap, site: __BOUNDED_CAPS[k].site }; }); return c; },
+    /** v0.1.44: 有界容器登记表只读副本（测试反查源码一致性用）；v1.0.0: 透传 kind（array|object） */
+    sizeCaps() { const c = {}; Object.keys(__BOUNDED_CAPS).forEach(function (k) { c[k] = { cap: __BOUNDED_CAPS[k].cap, site: __BOUNDED_CAPS[k].site, kind: __BOUNDED_CAPS[k].kind || 'array' }; }); return c; },
     defaultWorldState,
     chatId: getChatId,        // v0.9.1: 供导出/诊断读取当前聊天id
 
@@ -832,6 +841,10 @@
         const rows7 = [];
         Object.keys(st7).forEach(function (k) {
           if (Array.isArray(st7[k])) rows7.push({ path: k, len: st7[k].length });
+          // v1.0.0: 对象型容器可见性——登记 kind:'object' 的顶层对象参与容量盘点
+          else if (st7[k] && typeof st7[k] === 'object' && __BOUNDED_CAPS[k] && __BOUNDED_CAPS[k].kind === 'object') {
+            rows7.push({ path: k, len: Object.keys(st7[k]).length });
+          }
         });
         ['memory', 'opinion', 'evolution', 'chapters'].forEach(function (pk) {
           const sub = st7[pk];
@@ -1088,6 +1101,14 @@
           return;
         }
         if (node && typeof node === 'object') {
+          // v1.0.0: 对象型容器可见性——登记为 kind:'object' 的对象参与容量盘点
+          // （修复审计盲区：此前 schedule 只收集数组，people 等对象型容器膨胀对 sizeAudit 完全不可见）
+          const metaO = Object.prototype.hasOwnProperty.call(BOUNDED, pathStr) ? BOUNDED[pathStr] : null;
+          if (metaO && metaO.kind === 'object' && pathStr.indexOf('[') < 0) {
+            let b = 0;
+            try { b = byteLen(JSON.stringify(node)); } catch (e) { b = -1; }
+            arrays.push({ path: pathStr, len: Object.keys(node).length, bytes: b, bounded: true, cap: metaO.cap, site: metaO.site, kind: 'object' });
+          }
           const ks = Object.keys(node);
           for (let i = ks.length - 1; i >= 0; i--) pending.push(pathStr ? pathStr + '.' + ks[i] : ks[i]);
         }

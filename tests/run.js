@@ -3555,7 +3555,16 @@ WA.loadScript = _ls.loadScript;
     'evolution.factions': ['engines/editor-faction.js', /const MAX_FACTIONS\s*=\s*(\d+)/],
     'chapters.history': ['engines/chapters.js', /const MAX_HISTORY\s*=\s*(\d+)/],
     // 终态 KEEP_DONE 条 + 至多 1 条活跃
-    'directEvents': ['engines/direct-event.js', /const KEEP_DONE\s*=\s*(\d+)/, function (k) { return k + 1; }]
+    'directEvents': ['engines/direct-event.js', /const KEEP_DONE\s*=\s*(\d+)/, function (k) { return k + 1; }],
+    // v1.0.0 补登项（有界但漏登）+ 新增对象型容器
+    'evolution.trends': ['engines/evolution.js', /draft\.evolution\.trends\s*=\s*draft\.evolution\.trends\.slice\(-(\d+)\)/],
+    'evolution.blackbox.secretActions': ['engines/enemies.js', /box\.secretActions\s*=\s*box\.secretActions\.slice\(-(\d+)\)/],
+    'evolution.blackbox.secretAssets': ['engines/enemies.js', /box\.secretAssets\s*=\s*box\.secretAssets\.slice\(-(\d+)\)/],
+    'opinion.sandbox': ['engines/opinion.js', /draft\.opinion\.sandbox\s*=\s*\(r\.fragments \|\| \[\]\)\.slice\(0,\s*(\d+)\)/],
+    // 对象型容器：cap 由源码具名常量反查（kind:'object'，len=Object.keys().length）
+    'people': ['engines/backstage.js', /const PEOPLE_CAP\s*=\s*(\d+)/],
+    // 总量硬上限 = 活跃 MAX_ACTIVE + 终结保留 TERMINATED_MAX（双捕获组求和）
+    'evolution.enemies': ['engines/enemies.js', /const TERMINATED_MAX\s*=\s*(\d+);?[\s\S]*?const MAX_ACTIVE\s*=\s*(\d+)/, function (k, m) { return Number(m[1]) + Number(m[2]); }]
   };
   const srcCache = {};
   const readSrc = function (rel) {
@@ -3566,7 +3575,7 @@ WA.loadScript = _ls.loadScript;
   Object.keys(CAP_RULES).forEach(function (k) {
     const rule = CAP_RULES[k], m = readSrc(rule[0]).match(rule[1]);
     if (!m) { mismatches.push(k + '(源码裁剪表达式未找到)'); return; }
-    const srcCap = rule[2] ? rule[2](Number(m[1])) : Number(m[1]);
+    const srcCap = rule[2] ? rule[2](Number(m[1]), m) : Number(m[1]);
     if (!caps[k] || caps[k].cap !== srcCap) mismatches.push(k + '(登记 ' + (caps[k] && caps[k].cap) + ' vs 源码 ' + srcCap + ')');
     // v0.1.49: site 字段文件名反查——登记的 site 自由文本必须包含实际规则文件名的基准名（如 backstage.js）
     const expectedFile = path.basename(rule[0]);
@@ -5821,6 +5830,87 @@ WA.loadScript = _ls.loadScript;
   evtBefore900.forEach(function (l) { WA.eventLog.push(l); });
   WA.errorLog.length = 0;
   errBefore900.forEach(function (l) { WA.errorLog.push(l); });
+  // ═══════════════════════════════════════════════════════════
+  // v1.0.0 — 治理覆盖收口（对象型容器审计可见性 / 容量登记补全 / 有界剪枝 / 有界注入）
+  //   探针实证：① people 对象容器无人数上限且 sizeAudit 只扫数组 → 完全不可见；
+  //   ② evolution.enemies 活跃态无回收上限；③ evolution.trends/blackbox 有界漏登 →
+  //   误报 unbounded；④ buildEnemiesBlock 全量展开活跃仇敌（注入膨胀）。
+  //   A: 登记表 kind:'object' + 补登；B: sizeAudit/maintain 对象可见性；
+  //   C: people/enemies 有界剪枝；D: 注入侧有界展开。
+  // ═══════════════════════════════════════════════════════════
+  v1000: {
+  const LS1000 = global.localStorage;
+  const junkBefore1000 = JSON.parse(JSON.stringify(LS1000._dump()));
+  const evtBefore1000 = WA.eventLog.slice();
+  const errBefore1000 = WA.errorLog.slice();
+  const ctx1000 = global.SillyTavern.getContext();
+  const prevChat1000 = ctx1000.chatId;
+  const CID1000 = 'v1000_chat';
+  const chat1000 = global.__mockChat;
+  function resetLogs1000() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1000() { resetLogs1000(); LS1000.clear(); ctx1000.chatId = CID1000; chat1000.length = 0; WA.store.init(); }
+  // ── A. 登记表 kind + 补登 ──
+  fresh1000();
+  const caps1000 = WA.store.sizeCaps();
+  assert(caps1000['people'] && caps1000['people'].cap === 48 && caps1000['people'].kind === 'object', 'people 登记为对象型容器（cap=48 kind=object）');
+  assert(caps1000['evolution.enemies'] && caps1000['evolution.enemies'].cap === 44, 'evolution.enemies 登记总量上限 44（活跃24+终结20）');
+  assert(caps1000['evolution.trends'] && caps1000['evolution.trends'].cap === 20, 'evolution.trends 补登 cap=20');
+  assert(caps1000['evolution.blackbox.secretActions'] && caps1000['evolution.blackbox.secretActions'].cap === 15, 'blackbox.secretActions 补登 cap=15');
+  assert(caps1000['evolution.blackbox.secretAssets'] && caps1000['evolution.blackbox.secretAssets'].cap === 15, 'blackbox.secretAssets 补登 cap=15');
+  assert(caps1000['opinion.sandbox'] && caps1000['opinion.sandbox'].cap === 4, 'opinion.sandbox 补登 cap=4');
+  assert(caps1000['chronicle'].kind === 'array', '未标 kind 的容器默认 array（向后兼容）');
+  // ── B. people 有界剪枝 + 审计可见性 ──
+  WA.store.transact(d => {
+    d.people = {};
+    for (let i = 0; i < 60; i++) d.people['p_NPC_' + i] = { id: 'p_NPC_' + i, name: 'NPC_' + i, location: 'L' + i, updatedAt: 1000 + i };
+    // 触发一次结算以执行尾部容量治理（applyResult 剪枝路径）
+    WA.backstage.applyResult(d, { people: [], echoes: [], chronicle: [], foreshadows: [] }, { idx: 0, swipe: 0 });
+  });
+  const st1000 = WA.store.get();
+  assert(Object.keys(st1000.people || {}).length === 48, 'people 超 cap 自动挤出至 48');
+  assert(!!st1000.people['p_NPC_59'] && !st1000.people['p_NPC_0'], '挤出按 updatedAt 最旧优先（保留近期、剔除最早）');
+  const audit1000 = WA.store.sizeAudit({ minBytes: 1, topN: 100000 });
+  const pRow1000 = (audit1000.arrays || []).find(a => a.path === 'people');
+  assert(!!pRow1000 && pRow1000.kind === 'object' && pRow1000.bounded === true && pRow1000.cap === 48, 'sizeAudit 明细纳入 people（对象型可见 + cap 透出）');
+  assert(audit1000.unbounded.indexOf('people') < 0, 'people 不再被判为无界');
+  // ── C. enemies 活跃 + 终结双口径剪枝 ──
+  WA.store.transact(d => {
+    d.evolution = d.evolution || {}; d.evolution.enemies = []; d.evolution.round = 0;
+    for (let i = 0; i < 30; i++) { d.evolution.round = i; WA.enemies.apply(d, [{ name: '活跃敌' + i, status: '追踪中' }]); }
+    for (let i = 0; i < 25; i++) { d.evolution.round = 100 + i; WA.enemies.apply(d, [{ name: '终结敌' + i, status: '已终结' }]); }
+  });
+  const en1000 = WA.store.get().evolution.enemies || [];
+  assert(en1000.filter(e => e.status !== '已终结').length === 24, '活跃仇敌剪枝至 24');
+  assert(en1000.filter(e => e.status === '已终结').length === 20, '终结仇敌数量兜底至 20');
+  assert(en1000.length <= 44, '仇敌总量不超过登记 cap 44');
+  // ── D. 注入侧有界展开 ──
+  WA.store.transact(d => {
+    d.evolution = d.evolution || {}; d.evolution.enemies = [];
+    for (let i = 0; i < 24; i++) d.evolution.enemies.push({ id: 'en' + i, name: '仇敌' + i, type: 'grudge', status: '追踪中' });
+  });
+  const blk1000 = WA.enemies.buildEnemiesBlock();
+  assert((blk1000.match(/仇敌\d+/g) || []).length === 12, '注入块只展开前 12 个活跃仇敌');
+  assert(blk1000.indexOf('…等12个') >= 0, '超出部分以「…等N个」标注（不静默截断）');
+  // ── E. maintain 容量盘点覆盖对象型 ──
+  WA.store.transact(d => {
+    d.people = {};
+    for (let i = 0; i < 60; i++) d.people['p_x' + i] = { id: 'p_x' + i, name: 'X' + i, updatedAt: i };
+    d.unregisteredArrV1000 = [{ a: 1 }];
+  });
+  const m1000 = WA.store.maintain({});
+  const drift1000 = m1000.issues.filter(i => i.key === 'capacity.drift').map(i => i.detail).join('|');
+  assert(/people\(60>48/.test(drift1000), 'maintain 检出 people 漂移（对象型可见性生效）');
+  assert(m1000.issues.some(i => i.key === 'capacity.unregistered'), '未登记数组仍报 unregistered（回归）');
+  // ── 清理现场 ──
+  resetLogs1000();
+  LS1000.clear();
+  Object.keys(junkBefore1000).forEach(function (k) { LS1000.setItem(k, junkBefore1000[k]); });
+  ctx1000.chatId = prevChat1000;
+  WA.eventLog.length = 0;
+  evtBefore1000.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1000.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.0.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
