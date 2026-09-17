@@ -11,6 +11,19 @@
   const L2_EVERY = 4;   // L1攒4条→L2
   const L3_EVERY = 3;   // L2攒3条→L3
 
+  // v1.2.0: 伏笔终态回收（单一实现）——已回收/已放弃语义上已终止，回收先于 cap 截断，
+  // 防活跃伏笔被终态伏笔挤出（与 backstage 容量控制段同口径）。
+  const FS_TERMINAL = ['recycled', 'dropped'];
+  function pruneForeshadows(arr) {
+    const a = Array.isArray(arr) ? arr : [];
+    for (let i = a.length - 1; i >= 0; i--) {
+      const st = a[i] && a[i].status;
+      if (FS_TERMINAL.indexOf(st) >= 0) a.splice(i, 1);
+    }
+    if (a.length > CAP.foreshadows) a.splice(0, a.length - CAP.foreshadows);
+    return a;
+  }
+
   function getCtx() { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } }
   function recentText(n) {
     const ctx = getCtx(); const chat = (ctx && ctx.chat) || [];
@@ -34,6 +47,8 @@
   // v0.1.40: 分层巩固计量——每层耗时与最近结果（tool-diag 消费）
   const __memStat = { rounds: 0, lastMs: 0, totalMs: 0, layers: {}, lastAt: 0 };
 const memory = WA.memory = {
+    /** v1.2.0: 终态伏笔回收（单一实现，backstage 容量控制段复用，防两处口径漂移） */
+    pruneForeshadows: pruneForeshadows,
     /** v0.1.40: 分层巩固计量只读视图（tool-diag 消费） */
     stats() { return { rounds: __memStat.rounds, lastMs: __memStat.lastMs, avgMs: Math.round(__memStat.totalMs / Math.max(1, __memStat.rounds)), lastAt: __memStat.lastAt, layers: JSON.parse(JSON.stringify(__memStat.layers)) }; },
     async digestRound() {
@@ -69,7 +84,8 @@ const memory = WA.memory = {
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'digest'); });
         if (r.foreshadow && r.foreshadow.content) {
           (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: 'fs' + Date.now() + Math.random().toString(36).slice(2, 5), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: inheritRefs(batch), at: Date.now() });
-          draft.memory.foreshadows = draft.memory.foreshadows.slice(-CAP.foreshadows);
+          // v1.2.0: 终态回收先于截断（单一实现 pruneForeshadows，与 backstage 容量控制段同口径）
+          pruneForeshadows(draft.memory.foreshadows);
         }
         draft.memory.l0 = draft.memory.l0.slice(0, draft.memory.l0.length - L1_EVERY);
       });

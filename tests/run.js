@@ -3536,7 +3536,7 @@ WA.loadScript = _ls.loadScript;
   // ── 源码反查：登记表的 cap 必须等于源码裁剪常量，源码为唯一真相源 ──
   const CAP_RULES = {
     'chronicle': ['engines/backstage.js', /draft\.chronicle\s*=\s*draft\.chronicle\.slice\(-(\d+)\)/],
-    'currents': ['engines/backstage.js', /draft\.currents\s*=\s*draft\.currents\.slice\(-(\d+)\)/],
+    'currents': ['engines/backstage.js', /draft\.currents\s*=\s*curArr\.slice\(-(\d+)\)/],
     'echoes': ['engines/backstage.js', /draft\.echoes\s*=\s*draft\.echoes\.slice\(-(\d+)\)/],
     'worldFacts': ['engines/backstage.js', /draft\.worldFacts\s*=\s*draft\.worldFacts\.slice\(-(\d+)\)/],
     'memory.l0': ['engines/memory.js', /const CAP = \{[^}]*l0:\s*(\d+)/],
@@ -5991,6 +5991,83 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1100.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.1.0 block
+  // ═══════════════════════════════════════════════════════════
+  // v1.2.0 — 终态容器回收（Terminal Reclamation）
+  //   探针实证：带终态语义的容器此前只做「按数组位置的环形截断」，无终态回收——
+  //   ① currents（stage 已结束/closed）终态暗流永驻占位，把长期活跃暗流挤出（40 槽位里
+  //   34 条是终态）；② foreshadows 的 backstage 写入路径无 cap，7 轮突破登记上限 30
+  //   （登记表与实现脱节）；③ memory.js 巩固路径 slice(-30) 只按位置截断，活跃伏笔
+  //   （developing）被 29 条终态伏笔（recycled/dropped）挤出；④ 同构不一致——events
+  //   （v0.6.0 终局回收）/ worldTrends（v0.6.0 已结束回收）已有终态治理，currents/
+  //   foreshadows 缺失。A: currents 终态回收（回收先于截断）；B: foreshadows 单一实现
+  //   pruneForeshadows（终态回收 + cap 30，backstage 与 memory.js 共用）；C: 同构一致。
+  // ═══════════════════════════════════════════════════════════
+  v1200: {
+  const LS1200 = global.localStorage;
+  const junkBefore1200 = JSON.parse(JSON.stringify(LS1200._dump()));
+  const evtBefore1200 = WA.eventLog.slice();
+  const errBefore1200 = WA.errorLog.slice();
+  const ctx1200 = global.SillyTavern.getContext();
+  const prevChat1200 = ctx1200.chatId;
+  const CID1200 = 'v1200_chat';
+  const chat1200 = global.__mockChat;
+  function resetLogs1200() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1200() { resetLogs1200(); LS1200.clear(); ctx1200.chatId = CID1200; chat1200.length = 0; WA.store.init(); }
+  // ── A. currents 终态回收 ──
+  fresh1200();
+  WA.store.transact(d => {
+    d.currents = [];
+    d.currents.push({ id: 'cu_active', title: '长期暗流', summary: '仍在推进', stage: '发展', visibility: 'trace', publicity: 'trace', createdAt: 1, updatedAt: 1 });
+    for (let i = 0; i < 39; i++) d.currents.push({ id: 'cu_dead' + i, title: '终态暗流' + i, summary: '已收束', stage: '已结束', visibility: 'hidden', publicity: 'private', createdAt: 100 + i, updatedAt: 100 + i });
+  });
+  WA.store.transact(d => {
+    const r = { currents: [], echoes: [], chronicle: [], foreshadows: [] };
+    for (let i = 0; i < 6; i++) r.currents.push({ title: '新活跃' + i, summary: 's', stage: '发展', visibility: 'trace' });
+    WA.backstage.applyResult(d, r, { idx: 40, swipe: 0 });
+  });
+  const cs1200 = WA.store.get().currents || [];
+  assert(cs1200.some(c => c.title === '长期暗流'), 'currents 终态回收后长期活跃暗流存活（未被终态挤出）');
+  assert(cs1200.every(c => c.stage !== '已结束' && c.stage !== 'closed'), 'currents 终态暗流全部回收（回收只针对终态）');
+  assert(cs1200.length <= 40, 'currents cap=40 仍生效');
+  // ── B. foreshadows backstage 路径有界 ──
+  WA.store.transact(d => { d.memory = d.memory || {}; d.memory.foreshadows = []; d.evolution = d.evolution || {}; });
+  for (let round = 0; round < 7; round++) {
+    WA.store.transact(d => {
+      const r = { foreshadows: [], echoes: [], chronicle: [] };
+      for (let i = 0; i < 5; i++) r.foreshadows.push({ id: 'fs_r' + round + '_' + i, content: '伏笔' + round + '_' + i, status: 'waiting' });
+      WA.backstage.applyResult(d, r, { idx: 100 + round, swipe: 0 });
+    });
+  }
+  assert((WA.store.get().memory.foreshadows || []).length <= 30, 'foreshadows backstage 路径有界（≤ 登记 cap 30）');
+  // ── C. memory.js 单一实现 pruneForeshadows ──
+  assert(typeof WA.memory.pruneForeshadows === 'function', 'memory.pruneForeshadows 单一实现已导出');
+  const arr1200 = [{ id: 'fs_live', content: '活跃伏笔', status: 'developing', links: [], at: 1 }];
+  for (let i = 0; i < 35; i++) arr1200.push({ id: 'fs_dead' + i, content: '废弃' + i, status: (i % 2 ? 'recycled' : 'dropped'), links: [], at: 100 + i });
+  WA.memory.pruneForeshadows(arr1200);
+  assert(arr1200.some(f => f.id === 'fs_live'), 'pruneForeshadows 终态回收先于截断（活跃伏笔存活）');
+  assert(arr1200.filter(f => f.status === 'recycled' || f.status === 'dropped').length === 0, 'pruneForeshadows 终态伏笔全部回收');
+  const many1200 = [];
+  for (let i = 0; i < 40; i++) many1200.push({ id: 'x' + i, status: 'waiting', at: i });
+  WA.memory.pruneForeshadows(many1200);
+  assert(many1200.length === 30 && many1200[0].id === 'x10', 'pruneForeshadows 超量活跃伏笔按位置截断保留最新 30');
+  // ── D. 同构一致性（源码断言）──
+  const bsSrc1200 = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
+  assert(bsSrc1200.indexOf('CURRENT_TERMINAL_STAGES') >= 0, 'currents 终态口径常量存在');
+  assert(bsSrc1200.indexOf('pruneForeshadows') >= 0, 'backstage 复用 foreshadows 单一实现');
+  assert(bsSrc1200.indexOf("wtArr[i].status === '已结束'") >= 0, 'worldTrends 终态回收仍在（同构未回归）');
+  assert(bsSrc1200.indexOf('term.includes(ev.stage)') >= 0, 'events 终态回收仍在（同构未回归）');
+  const memSrc1200 = fs.readFileSync(path.join(BASE, 'engines/memory.js'), 'utf8');
+  assert(memSrc1200.indexOf('function pruneForeshadows') >= 0, 'memory.js 定义单一实现');
+  // ── 清理现场 ──
+  resetLogs1200();
+  LS1200.clear();
+  Object.keys(junkBefore1200).forEach(function (k) { LS1200.setItem(k, junkBefore1200[k]); });
+  ctx1200.chatId = prevChat1200;
+  WA.eventLog.length = 0;
+  evtBefore1200.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1200.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.2.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block

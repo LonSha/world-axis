@@ -9,6 +9,12 @@
   const LS_SETTINGS = 'worldaxis_backstage_settings_v1';
   // v1.0.0: 人物容器容量（与 __BOUNDED_CAPS['people'] 登记同源）
   const PEOPLE_CAP = 48;
+  // v1.2.0: 终态容器回收——带终态语义的容器此前只做「按数组位置的环形截断」，
+  // 已终结条目永驻占位、把长期活跃条目挤出（与 events/worldTrends 的 v0.6.0 终态回收同构缺失）。
+  const CURRENT_TERMINAL_STAGES = ['已结束', 'closed'];   // 与快照过滤口径同源（buildSimulationPrompt）
+  const FS_TERMINAL_STATUSES = ['recycled', 'dropped'];   // 伏笔终态（已回收/已放弃）
+  const FS_CAP = 30;                                       // 与 __BOUNDED_CAPS['memory.foreshadows'] 登记同源
+
   // v1.1.0: 别名并集去重（人设载体贯通——AI 多次返回别名时累积）
   function unionAliases(a, b) {
     const out = [];
@@ -485,7 +491,24 @@
       draft.echoes = draft.echoes.slice(-40);
       draft.chronicle = draft.chronicle.slice(-200);
       draft.worldFacts = draft.worldFacts.slice(-100);
-      draft.currents = draft.currents.slice(-40);
+      // v1.2.0: 终态暗流回收——stage 已结束/closed 的暗流正文触面已由 echoes 承载，
+      // 本体永驻会挤出长期活跃暗流（探针实证活跃暗流被 34 条终态暗流挤出）。回收先于截断。
+      const curArr = draft.currents = draft.currents || [];
+      for (let i = curArr.length - 1; i >= 0; i--) {
+        if (curArr[i] && CURRENT_TERMINAL_STAGES.indexOf(curArr[i].stage) >= 0) curArr.splice(i, 1);
+      }
+      draft.currents = curArr.slice(-40);
+      // v1.2.0: 伏笔终态回收——已回收/已放弃（recycled/dropped）语义上已终止，
+      // 其信息在回收时点已被剧情消化；本体永驻会挤出活跃伏笔（探针实证活跃伏笔被 29 条终态伏笔挤出）。
+      // 单一实现 WA.memory.pruneForeshadows（与 memory.js 巩固路径同口径，防两处漂移）。
+      const fsArr = (draft.memory && draft.memory.foreshadows) || [];
+      if (WA.memory && WA.memory.pruneForeshadows) WA.memory.pruneForeshadows(fsArr);
+      else {
+        for (let i = fsArr.length - 1; i >= 0; i--) {
+          if (fsArr[i] && FS_TERMINAL_STATUSES.indexOf(fsArr[i].status) >= 0) fsArr.splice(i, 1);
+        }
+        if (fsArr.length > FS_CAP) fsArr.splice(0, fsArr.length - FS_CAP);
+      }
       // v0.6.0: 演化容器容量治理——
       // ① 终局事件回收：终局即剧情已完结，正文触面已由 echoes 承载；快照此前只做呈现过滤，
       //    本体永驻会让长局 events 无限膨胀（探针实证 10 个终局全部留存）。回收前信息已入 chronicle。
