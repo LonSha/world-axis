@@ -249,6 +249,11 @@
   // v0.4.0: 自动治理巡视状态——上次巡视签名（防重复告警）+ 历次自动动作审计
   let __maintainSig = '';
   const __maintainStat = { scans: 0, lastAt: 0, lastScore: 100, lastLevel: 'ok', autoApplies: 0, lastAutoFreedKeys: 0, lastAutoFreedBytes: 0 };
+  // v1.9.0: 世界逻辑瑕疵基线——载入期存量记为基线不扣分（避免历史脏数据把健康分永久锁死），
+  //   基线之上的新增才扣分；codes 为 error 级 code 集合签名，用于识别「量不变但劣化项易主」。
+  const __logicBaseline = { codes: null };
+  // v1.9.0: 引擎故障观测快照（errorLog 巡视间增量 + 逻辑瑕疵计量），经 maintainStat() 透出
+  const __faultWatch = { total: 0, recent: 0, recentCodes: [], logicErrors: 0, logicWarns: 0, logicNewErrors: 0, scansWithFault: 0, cursor: null, primed: false, primedAt: 0 };
   // v0.1.38: 加载观测——状态键损坏时隔离原始 payload 而非静默丢弃
   const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
@@ -821,6 +826,9 @@
     /**
      * v0.4.0: 统一健康巡视——把分散的治理信号（存储计量/键卫生/诊断预算/隔离现场/救援/写入完整性/全库状态）
      * 收敛为「一个健康分 + 分级议题 + 建议动作」。这是治理层从「各自出数」走向「统一裁决」的关键一步。
+     * v1.9.0: 巡视范畴从「存储治理」扩展到「世界逻辑 + 引擎健康」——消费 inspectorState.inspect() 的
+     * 10 组检查器（logic.consistency）与 errorLog 增量（engine.faultRate），两者均按基线/游标口径判定
+     * 「是否恶化」，载入期存量不追溯扣分、同一恶化不重复惩罚。
      * 只读（apply:false 默认）；apply:true 时仅执行安全子集（过期诊断/孤儿恢复点/隔离溢出回收）。
      */
     maintain(opts) {
@@ -1009,6 +1017,92 @@
         }
       } catch (e) { WA.log('warn', '容量盘点异常（不阻断巡视）', e); }
 
+      // ── 8. 世界逻辑自洽（v1.9.0）──
+      //   inspector-state 的 10 组只读检查器（事件/势力/脉搏/认知/记忆/引用/软引用/注入/主观记忆/突发）
+      //   此前只有人工点面板「状态体检」才会跑，自动巡视完全不知道世界有没有逻辑矛盾——治理层
+      //   与检查层的断链接入后消除：世界坏了，巡视必须有人知道。
+      let logicErrors = 0, logicWarns = 0, logicNewErrors = 0;
+      try {
+        if (WA.inspectorState && typeof WA.inspectorState.inspect === 'function') {
+          const repL = WA.inspectorState.inspect(memCache || undefined);
+          const cL = (repL && repL.counts) || {};
+          logicErrors = cL.error || 0; logicWarns = cL.warn || 0;
+          // 按 code 聚合的出现次数多重集：可区分「同类变多」与「旧项修掉但新项顶替」两种劣化
+          const tallyL = (function () {
+            const t = {};
+            (repL.sections || []).forEach(function (sec) {
+              (sec.issues || []).forEach(function (it) {
+                if (it.level !== 'error') return;
+                const ck = sec.code + ':' + it.code;
+                t[ck] = (t[ck] || 0) + 1;
+              });
+            });
+            return t;
+          })();
+          if (__logicBaseline.codes === null) {
+            __logicBaseline.codes = tallyL;                       // 首次可见：整份记为基线，不追溯扣分
+          } else {
+            const baseL = __logicBaseline.codes;
+            Object.keys(tallyL).forEach(function (ck) {
+              const prev = baseL[ck] || 0;
+              if (tallyL[ck] > prev) logicNewErrors += tallyL[ck] - prev;
+            });
+          }
+          const worstL = (function () {
+            const flat = WA.inspectorState.flatten(repL).filter(function (it) { return it.level === 'error'; });
+            return flat.length ? String(flat[0].detail || '').slice(0, 60) : '';
+          })();
+          if (logicErrors > 0) {
+            if (logicNewErrors > 0) {
+              score -= Math.min(15, logicNewErrors * 5);
+              issues.push({ level: 'error', key: 'logic.consistency', detail: logicErrors + ' 处世界逻辑瑕疵（较载入基线新增 ' + logicNewErrors + '）：' + worstL + '——推演/注入正基于矛盾数据，面板「状态体检」有逐条定位与修法' });
+              actions.push({ id: 'review-logic', safe: false, detail: '面板「状态体检」查看 ' + logicErrors + ' 条明细并逐条修正（涉及取值判断，不自动改写）' });
+            } else {
+              issues.push({ level: 'info', key: 'logic.consistency', detail: logicErrors + ' 处历史遗留逻辑瑕疵（自载入基线以来未恶化，不扣健康分）：' + worstL });
+            }
+          }
+          __logicBaseline.codes = tallyL;  // 基线滚动：恶化按次计，不重复惩罚同一存量
+        }
+      } catch (e) { WA.log('warn', '世界逻辑巡视异常（不阻断巡视）', e); }
+
+      // ── 9. 引擎故障率（v1.9.0）──
+      //   errorLog 此前只在面板显示条数，巡视不看；55 处静默 catch 也吞掉了引擎异常。
+      //   口径取「自上次巡视以来的新增」而非绝对存量：存量可能是载入期历史，重复扣分会让分数永久锁死。
+      //   游标用条目对象身份而非时间戳：Date.now() 为毫秒精度，同一批故障会跨两次巡视重复计入。
+      //   游标失位（环被裁剪到底/切换聊天重载入）时按「整环皆新增」处理——宁可多报一次也不静默丢故障。
+      let errTotal = 0, errRecent = 0, errSamples = [];
+      try {
+        const el = Array.isArray(WA.errorLog) ? WA.errorLog : [];
+        errTotal = el.length;
+        let recent = el;
+        if (!__faultWatch.primed) {
+          recent = [];                                          // 从未巡视过：只建基线，不追溯载入期历史
+          __faultWatch.primedAt = Date.now();
+        } else {
+          const ix = el.indexOf(__faultWatch.cursor);
+          // 游标可用 → 精确切片；失位（上次环空/环被重建）→ 退到「基线时刻之后产生」的时间口径，
+          //   这样 loadEventLog 恢复的历史条目（t 早于基线）不会被误判为本周期新增。
+          if (ix >= 0) recent = el.slice(ix + 1);
+          else recent = el.filter(function (x) { return x && Number(x.t) >= __faultWatch.primedAt; });
+        }
+        errRecent = recent.length;
+        errSamples = recent.slice(0, 3).map(function (x) { return String((x && x.msg) || '').slice(0, 24); });
+        if (errRecent >= 3) {
+          score -= Math.min(15, errRecent * 3);
+          issues.push({ level: 'error', key: 'engine.faultRate', detail: '自上次巡视以来新增 ' + errRecent + ' 次引擎异常（error 环共 ' + errTotal + ' 条）：' + errSamples.join('、') + '——引擎在失败而非仅变慢，世界可能未按预期推进' });
+          actions.push({ id: 'review-faults', safe: true, detail: '面板「诊断」查看错误环明细与来源模块' });
+        } else if (errRecent > 0) {
+          score -= 2;
+          issues.push({ level: 'warn', key: 'engine.faultRate', detail: '自上次巡视以来新增 ' + errRecent + ' 条引擎异常：' + errSamples[0] });
+        }
+        __faultWatch.cursor = el.length ? el[el.length - 1] : null;  // 推进游标（空环时不保留失效引用）
+        __faultWatch.primed = true;   // 与 cursor 分离：空环也要记住「已建立过基线」
+      } catch (e) { WA.log('warn', '引擎故障巡视异常（不阻断巡视）', e); }
+      __faultWatch.total = errTotal; __faultWatch.recent = errRecent;
+      __faultWatch.recentCodes = errSamples;
+      __faultWatch.logicErrors = logicErrors; __faultWatch.logicWarns = logicWarns; __faultWatch.logicNewErrors = logicNewErrors;
+      if (errRecent > 0 || logicErrors > 0) __faultWatch.scansWithFault++;
+
       score = Math.max(0, Math.min(100, score));
       const level = score >= 90 ? 'ok' : score >= 70 ? 'warn' : 'degraded';
       let applied = null;
@@ -1058,6 +1152,8 @@
           externalWrites: extW, conflictQuarantined: __conflictStat.quarantined,
           capacityDrifted: capDrifted, capacityUnregistered: capUnregistered,
           capacityBloat: capBloat, schemaPollution: schemaPollution,  // v1.8.0
+          logicErrors: logicErrors, logicWarns: logicWarns, logicNewErrors: logicNewErrors,
+          engineErrors: errTotal, engineErrorsRecent: errRecent,  // v1.9.0
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }
@@ -1123,7 +1219,7 @@
       } catch (e) { return { ok: false, reason: String((e && e.message) || e) }; }
     },
     /** v0.4.0: 巡视计量视图（面板/报告消费） */
-    maintainStat() { const m = __maintainStat; return { scans: m.scans, lastAt: m.lastAt, lastScore: m.lastScore, lastLevel: m.lastLevel, autoApplies: m.autoApplies, lastAutoFreedKeys: m.lastAutoFreedKeys, lastAutoFreedBytes: m.lastAutoFreedBytes }; },
+    maintainStat() { const m = __maintainStat; const w = __faultWatch; return { scans: m.scans, lastAt: m.lastAt, lastScore: m.lastScore, lastLevel: m.lastLevel, autoApplies: m.autoApplies, lastAutoFreedKeys: m.lastAutoFreedKeys, lastAutoFreedBytes: m.lastAutoFreedBytes, faultWatch: { total: w.total, recent: w.recent, recentCodes: w.recentCodes.slice(0, 5), logicErrors: w.logicErrors, logicWarns: w.logicWarns, logicNewErrors: w.logicNewErrors, scansWithFault: w.scansWithFault } }; },
     /**
      * v0.4.0: 完整性审计视图（只读）——writes 为写后校验次数，mismatches>0 说明本会话出现过静默写入失败
      */

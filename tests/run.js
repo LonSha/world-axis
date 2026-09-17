@@ -6493,6 +6493,137 @@ WA.loadScript = _ls.loadScript;
   WA.errorLog.length = 0;
   errBefore1800.forEach(function (l) { WA.errorLog.push(l); });
   } // end v1.8.0 block
+  v1900: {
+  const LS1900 = global.localStorage;
+  const junkBefore1900 = JSON.parse(JSON.stringify(LS1900._dump()));
+  const evtBefore1900 = WA.eventLog.slice();
+  const errBefore1900 = WA.errorLog.slice();
+  const ctx1900 = global.SillyTavern.getContext();
+  const prevChat1900 = ctx1900.chatId;
+  const CID1900 = 'v1900_chat';
+  const chat1900 = global.__mockChat;
+  function resetLogs1900() { WA.flushLog(); WA.eventLog.length = 0; WA.errorLog.length = 0; }
+  function fresh1900() { resetLogs1900(); LS1900.clear(); ctx1900.chatId = CID1900; chat1900.length = 0; WA.store.init(); }
+  const stSrc1900 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+  function logicOf1900(m) { return (m.issues || []).find(function (x) { return x.key === 'logic.consistency'; }); }
+  function faultOf1900(m) { return (m.issues || []).find(function (x) { return x.key === 'engine.faultRate'; }); }
+  function ev1900(id, name, type, stage) { return { id: id, name: name, type: type, stage: stage, level: 2, stageRound: 1 }; }
+  function okEv1900(id, name) { return ev1900(id, name, 'conflict', '\u840c\u82bd'); }
+  function setEvents1900(arr) { WA.store.transact(function (d) { d.evolution.events = arr; }); }
+  // ── A. 干净世界接入不污染常态 ──
+  fresh1900();
+  const mA1900 = WA.store.maintain({});
+  assert(!logicOf1900(mA1900) && !faultOf1900(mA1900), '干净世界无 logic/engine 议题（接入不误报）');
+  assert(mA1900.signals.logicErrors === 0 && mA1900.signals.logicWarns === 0, 'signals 逻辑计量归零');
+  assert(mA1900.signals.engineErrors === 0 && mA1900.signals.engineErrorsRecent === 0, 'signals 故障计量归零');
+  // ── B. 世界逻辑劣化进巡视（inspector→maintain 断链修复）──
+  setEvents1900([okEv1900(1, '\u5df7\u6218'), okEv1900(2, '\u5df7\u6218')]);
+  const mB1900 = WA.store.maintain({});
+  const liB1900 = logicOf1900(mB1900);
+  assert(!!liB1900 && liB1900.level === 'error', '运行时矛盾（事件重名）→ error 议题（此前巡视不可见）');
+  assert(mB1900.signals.logicErrors === 1 && mB1900.signals.logicNewErrors === 1, 'logicErrors/logicNewErrors 精确 1/1');
+  assert(mB1900.score < mA1900.score, '劣化真扣健康分（' + mA1900.score + '→' + mB1900.score + '）');
+  assert(mB1900.actions.some(function (a) { return a.id === 'review-logic'; }), '产出 review-logic 建议动作');
+  assert(liB1900.detail.indexOf('\u4f53\u68c0') >= 0, '议题带修复入口指引');
+  // ── C. 基线滚动：同一恶化不重复惩罚 ──
+  const mC1900 = WA.store.maintain({});
+  const liC1900 = logicOf1900(mC1900);
+  assert(!!liC1900 && liC1900.level === 'info', '同一存量恶化下一周期回升 info（不永久锁死）');
+  assert(mC1900.score > mB1900.score, '惩罚一次性、随后回升（' + mB1900.score + '→' + mC1900.score + '）');
+  assert(mC1900.signals.logicErrors === 1, '回升不丢计量（logicErrors 仍 1）');
+  // ── D. 自愈：修提示题消失（无需重启动）──
+  setEvents1900([okEv1900(1, '\u7532'), okEv1900(2, '\u4e59')]);
+  const mD1900 = WA.store.maintain({});
+  assert(!logicOf1900(mD1900) && mD1900.signals.logicErrors === 0, '改名修复后议题自动消失（自愈可验证）');
+  // ── E. 劣化按 code 多重集识别：换型也报、变多也报 ──
+  setEvents1900([ev1900(1, 'E1', 'bogusType', '\u840c\u82bd')]);
+  const mE1900 = WA.store.maintain({});
+  assert(!!logicOf1900(mE1900) && mE1900.signals.logicErrors === 1 && mE1900.signals.logicNewErrors === 1, '空基线后引入 badType → 1 错 1 新增');
+  setEvents1900([ev1900(1, 'E1', 'bogusType', '\u840c\u82bd'), okEv1900(2, '\u5df7\u6218'), okEv1900(3, '\u5df7\u6218')]);
+  const mE21900 = WA.store.maintain({});
+  assert(mE21900.signals.logicErrors === 2 && mE21900.signals.logicNewErrors === 1, '基线之上多出新类型（badType+dupName=2 错，仅 1 新增）');
+  setEvents1900([ev1900(9, 'E9', 'bogusType', '\u840c\u82bd')]);
+  const mE31900 = WA.store.maintain({});
+  assert(mE31900.signals.logicErrors === 1 && mE31900.signals.logicNewErrors === 0, '修掉 dupName 只剩 badType（同类存量）→ 不判新增恶化');
+  setEvents1900([okEv1900(1, 'E1'), okEv1900(2, 'E1')]);
+  const mE41900 = WA.store.maintain({});
+  assert(mE41900.signals.logicErrors === 1 && mE41900.signals.logicNewErrors === 1, '总数不变但劣化项易主（badType→dupName）仍判恶化（换型漏报防线）');
+  assert(!!logicOf1900(mE41900) && logicOf1900(mE41900).level === 'error', '易主型恶化直接升 error（不被存量外表掩盖）');
+    // ── F. 引擎故障接入（对象身份游标口径）──
+  WA.errorLog.length = 0;
+  WA.store.maintain({});
+  const mF01900 = WA.store.maintain({});
+  assert(!faultOf1900(mF01900) && mF01900.signals.engineErrorsRecent === 0, '空环连续巡视静默（primed 与 cursor 分离）');
+  for (let i = 0; i < 5; i++) WA.log('error', 'v1900 boom' + i);
+  const mF1900 = WA.store.maintain({});
+  const fiF1900 = faultOf1900(mF1900);
+  assert(!!fiF1900 && fiF1900.level === 'error', '本周期新增 5 次故障 → error 议题');
+  assert(mF1900.signals.engineErrorsRecent === 5 && mF1900.signals.engineErrors === 5, 'recent/total 精确 5/5');
+  assert(mF1900.actions.some(function (a) { return a.id === 'review-faults'; }), '产出 review-faults 建议动作');
+  assert(fiF1900.detail.indexOf('v1900 boom') >= 0, '议题附带故障样本（可定位）');
+  const mF21900 = WA.store.maintain({});
+  assert(!faultOf1900(mF21900) && mF21900.signals.engineErrorsRecent === 0, '同毫秒连续巡视不重复计数（旧时间戳口径缺陷已消）');
+  assert(mF21900.signals.engineErrors === 5, '存量口径保留（审计不丢）');
+  // ── G. 载入期历史不追溯；游标失位退回时间口径 ──
+  WA.errorLog.length = 0;
+  WA.store.maintain({});
+  const gNow1900 = Date.now();
+  WA.errorLog.push({ t: gNow1900 - 60000, level: 'error', msg: 'v1900 legacy' });
+  WA.errorLog.push({ t: gNow1900 - 30000, level: 'error', msg: 'v1900 legacy2' });
+  WA.errorLog.push({ t: Date.now(), level: 'error', msg: 'v1900 fresh' });
+  const mG1900 = WA.store.maintain({});
+  assert(mG1900.signals.engineErrors === 3 && mG1900.signals.engineErrorsRecent === 1, '历史恢复条目不计入本周期（3 存量 / 1 新增）');
+  assert(!!faultOf1900(mG1900) && faultOf1900(mG1900).level === 'warn', '低量故障分档 warn（不升 error）');
+  const gCursorLost1900 = WA.errorLog[2];
+  WA.errorLog = WA.errorLog.slice(0, 2).concat([gCursorLost1900, { t: Date.now() + 5, level: 'error', msg: 'v1900 ghost' }]);
+  WA.errorLog = WA.errorLog.slice(0, 3).concat([WA.errorLog[3]]);
+  const mGx1900 = WA.store.maintain({});
+  assert(mGx1900.signals.engineErrorsRecent === 1, '游标推进后仅计基线后新增（实 ' + mGx1900.signals.engineErrorsRecent + '）');
+  WA.errorLog = WA.errorLog.slice(-1);   // 截断使游标对象失位
+  const mG21900 = WA.store.maintain({});
+  assert(mG21900.signals.engineErrorsRecent === 0, '游标失位退回时间口径：环内仅剩基线后 1 条且已被消费 → 不重复报');
+  WA.log('error', 'v1900 after-cursor-lost');
+  const mG31900 = WA.store.maintain({});
+  assert(!!faultOf1900(mG31900) && mG31900.signals.engineErrorsRecent === 1, '失位后新增故障仍可见（退回时间口径不静默）');
+  // ── H. 降级安全：inspector 模块缺失不炸巡视 ──
+  const keepIns1900 = WA.inspectorState;
+  WA.inspectorState = undefined;
+  const mH1900 = WA.store.maintain({});
+  assert(typeof mH1900.score === 'number' && mH1900.signals.logicErrors === 0, 'inspector 缺失时巡视照常、计量不误报');
+  assert(!logicOf1900(mH1900), 'inspector 缺失时不产逻辑议题（无源不编造）');
+  WA.inspectorState = keepIns1900;
+  assert(typeof WA.store.maintain({ deep: true }).score === 'number', 'deep 模式与新板块共存');
+  // ── I. 高频负担 ──
+  WA.errorLog.length = 0; WA.store.maintain({});
+  const t0_1900 = Date.now();
+  for (let i = 0; i < 30; i++) WA.store.maintain({});
+  const per1900 = (Date.now() - t0_1900) / 30;
+  assert(per1900 < 5, '接入后 maintain 平均 ' + per1900.toFixed(2) + 'ms（高频可负担）');
+  // ── J. faultWatch 与 signals 同口径 ──
+  const mJ1900 = WA.store.maintain({});
+  const fw1900 = WA.store.maintainStat().faultWatch;
+  assert(fw1900 && typeof fw1900.total === 'number' && typeof fw1900.scansWithFault === 'number', 'maintainStat 透出 faultWatch');
+  assert(Array.isArray(fw1900.recentCodes), 'faultWatch.recentCodes 为数组');
+  assert(fw1900.logicErrors === mJ1900.signals.logicErrors && fw1900.logicWarns === mJ1900.signals.logicWarns, 'faultWatch 逻辑计量与 signals 同口径');
+  assert(fw1900.total === mJ1900.signals.engineErrors && fw1900.recent === mJ1900.signals.engineErrorsRecent, 'faultWatch 故障计量与 signals 同口径');
+  // ── K. 源码契约 ──
+  assert(stSrc1900.indexOf('WA.inspectorState.inspect(') >= 0, 'maintain 消费 inspectorState.inspect（断链修复契约）');
+  assert(stSrc1900.indexOf('__faultWatch.primed') >= 0, 'primed 哨兵在位（冷启动空环不判载入期历史）');
+  assert(stSrc1900.indexOf('indexOf(__faultWatch.cursor)') >= 0, '对象身份游标在位（毫秒同刻不重复计数）');
+  assert(stSrc1900.indexOf("key: 'logic.consistency'") >= 0 && stSrc1900.indexOf("key: 'engine.faultRate'") >= 0, '两议题键在位');
+  assert(!/^(hygiene|quarantine|state)\./.test('logic.consistency') && !/^(hygiene|quarantine|state)\./.test('engine.faultRate'), '新议题键不入卫生指纹范畴（L 块语义隔离）');
+  assert(stSrc1900.indexOf('const tallyL') >= 0, '按 code 多重集基线在位（换型劣化可识别）');
+  assert(!/logicBaseline\.count/.test(stSrc1900), '旧的总量差值口径已移除（防回潮）');
+  // ── 清理现场 ──
+  resetLogs1900();
+  LS1900.clear();
+  Object.keys(junkBefore1900).forEach(function (k) { LS1900.setItem(k, junkBefore1900[k]); });
+  ctx1900.chatId = prevChat1900;
+  WA.eventLog.length = 0;
+  evtBefore1900.forEach(function (l) { WA.eventLog.push(l); });
+  WA.errorLog.length = 0;
+  errBefore1900.forEach(function (l) { WA.errorLog.push(l); });
+  } // end v1.9.0 block
   } // end v0.9.0 block
   } // end v0.8.0 block
   } // end v0.7.0 block
