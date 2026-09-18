@@ -64,10 +64,21 @@
       });
     },
 
+    /**
+     * v2.4.0: 数值子键回落（函数级自持单一真源）。
+     *   背景：settingsBus.read 已补子键默认值，但**算术消费点**必须自己也不产生 NaN——
+     *   实测旧存档（磁盘只有 {"diceEnabled":true}）下 st.diceModifier 为 undefined →
+     *   threshold = Math.round(... - undefined) = NaN → `dice > NaN` 与 `dice < NaN*0.4` 恒假 →
+     *   200/300 次掷骰全判「保持」，事件演化骰子整条链静默失效（用户只看到事件永不动）。
+     *   回落源一律取登记的 def（不在此复写默认值，避免又造第二真源）。
+     */
+    _num(v, def) { const n = Number(v); return isFinite(n) ? n : def; },
     getMaxFails(ev) {
       const st = loadSettings();
       const level = ev.level || 1;
-      return ev.type === 'progress' ? st.progressFailBase + level : Math.max(1, st.conflictFailBase - level);
+      const pf = this._num(st.progressFailBase, __REG.def.progressFailBase);
+      const cf = this._num(st.conflictFailBase, __REG.def.conflictFailBase);
+      return ev.type === 'progress' ? pf + level : Math.max(1, cf - level);
     },
 
     advanceStageRound(ev) {
@@ -106,12 +117,16 @@
           const base = (STAGE_BASE[ev.type] || STAGE_BASE.conflict)[ev.stage] || 85;
           const level = ev.level || 1;
           const levelAdjust = ev.type === 'progress' ? (level - 1) * 10 : -((level - 1) * 10);
-          const threshold = Math.round(base - 200 * r * (1 - r) + levelAdjust - st.diceModifier);
+          // v2.4.0: 两个数值子键都必须过回落——任一是 undefined 就让 threshold 变 NaN，
+          //   而 NaN 比较恒假，会把「成功/受挫」两个分支同时静默吞掉（只余「保持」）。
+          const mod = this._num(st.diceModifier, __REG.def.diceModifier);
+          const setback = this._num(st.setbackRatio, __REG.def.setbackRatio);
+          const threshold = Math.round(base - 200 * r * (1 - r) + levelAdjust - mod);
           const dice = Math.floor(Math.random() * 100) + 1;
           if (dice > threshold) {
             this.advanceStageRound(ev); ev.consecutiveFails = 0; ev.evolveResult = '成功';
             results.push({ name: ev.name || ev.title, result: '成功', stage: ev.stage, dice, threshold });
-          } else if (dice < threshold * (st.setbackRatio / 100)) {
+          } else if (dice < threshold * (setback / 100)) {
             ev.stageRound = Math.max(1, ev.stageRound - 1); ev.consecutiveFails++; ev.evolveResult = '受挫';
             results.push({ name: ev.name || ev.title, result: '受挫', stage: ev.stage, dice, threshold });
           } else {

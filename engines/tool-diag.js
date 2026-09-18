@@ -253,8 +253,21 @@
           const coherent = WA.settingsBus.selfCheck ? WA.settingsBus.selfCheck() : null;
           const drift = WA.settingsBus.verifyDefaults ? WA.settingsBus.verifyDefaults({ providers: DEFAULT_PROVIDERS }) : null;
           const dormant = WA.settingsBus.dormantGhosts ? WA.settingsBus.dormantGhosts() : [];
+          // v2.4.0: 子键缺口盘点——「整键在、子键缺」此前完全没有出口：
+          //   它不像 JSON 损坏那样留痕，只是让消费端拿到 undefined 后静默改变行为。
+          const subkeys = WA.settingsBus.subkeyAudit ? WA.settingsBus.subkeyAudit() : null;
           return { registry: st, orphans: orphans, stats: WA.settingsBus.stats,
-            coherent: coherent, defaultDrift: drift, dormant: dormant };
+            coherent: coherent, defaultDrift: drift, dormant: dormant, subkeys: subkeys };
+        }, {}),
+        // v2.4.0: 可见性配置健康度——「源在 SOURCES 里却没有默认值声明」是子键级死配置
+        visibility: safe(function () {
+          if (!WA.render || typeof WA.render.visibilityStat !== 'function') return { error: 'render.visibilityStat 不可用' };
+          return WA.render.visibilityStat();
+        }, {}),
+        // v2.4.0: 采样配置回落留痕（配置不可解析时读到的值从哪来）
+        samplerCfg: safe(function () {
+          if (!WA.memorySampler || typeof WA.memorySampler.samplerCfgStat !== 'function') return { error: 'memorySampler.samplerCfgStat 不可用' };
+          return WA.memorySampler.samplerCfgStat();
         }, {}),
         // v2.3.0 块3: 随机事件通道运行视图（此前「通道关了」与「掷了没中」不可区分）
         horizon: safe(function () {
@@ -695,6 +708,17 @@
     }
     const dormantD = (sbDiag.dormant || []);
     if (dormantD.length) issues.push({ level: 'info', key: 'settingsBus.dormant', detail: dormantD.length + ' 个休眠登记（模块声明废弃但从未落盘）：' + dormantD.slice(0, 3).map(function (o) { return o.key; }).join('、') });
+    // v2.4.0: 子键缺口——老存档缺新字段。运行时已自愈（read 补默认值），但用户实际配置
+    //   仍少几项，属需要告知的状态（不是 error：行为已按默认值正确回落）。
+    const skD = sbDiag.subkeys || null;
+    if (skD && skD.keys && skD.keys.length) {
+      issues.push({ level: 'info', key: 'settingsBus.subkeys', detail: skD.keys.length + ' 个设置键存在子键缺口（共缺 ' + skD.totalMissing + ' 项，运行已按声明补默认值）：' + skD.keys.slice(0, 3).map(function (x) { return (x.module || '?') + '.' + x.missing.slice(0, 3).join('/'); }).join('、') + '——下次保存设置即写回完整结构' });
+    }
+    // v2.4.0: 可见性声明完整性——SOURCES 声明了但 def 未给默认值的源，无法归一化
+    const visD = ((diag.runtime || {}).visibility) || null;
+    if (visD && visD.undeclared && visD.undeclared.length) {
+      issues.push({ level: 'error', key: 'inject.visibilityUndeclared', detail: '注入可见性存在未声明默认值的源（' + visD.undeclared.join('、') + '）：这些开关没有默认值可回落，旧存档下会被判为「关」' });
+    }
     const qaD = ((diag.runtime || {}).quarantineAudit) || null;
     if (qaD && (qaD.restores > 0 || qaD.drops > 0)) issues.push({ level: 'info', key: 'quarantine.history', detail: '隔离现场处置史：恢复 ' + qaD.restores + ' 次 / 丢弃 ' + qaD.drops + ' 次' + (qaD.lastKey ? '（最近 ' + qaD.lastKey + '）' : '') });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;

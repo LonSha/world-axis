@@ -12,7 +12,30 @@
 
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
-  function loadVis() { return WA.settingsBus.read(__REG); }
+  /**
+   * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
+   *   本键的消费语义是「真值即注入」：旧存档缺某子键时该值为 undefined（假值）= 静默关闭。
+   *   实测磁盘只写 {"clock":false} 时，其余 9 个源全部读到 undefined ⇒ 一次性全关，
+   *   而面板开关显示为「未勾选」，用户会以为是自己关的。
+   *   这里在 settingsBus 补子键（整键级回落）之上再做一层：按 SOURCES 逐项确保真值，
+   *   并把「def 未声明但 SOURCES 声明了」的漏登项记入缺陷视图（守卫可静态断言其为空）。
+   */
+  const __visStat = { filled: 0, undeclared: [], lastAt: 0 };
+  function loadVis() {
+    const v = WA.settingsBus.read(__REG) || {};
+    const def = __REG.def;
+    let filled = 0;
+    SOURCES.forEach(function (k) {
+      if (!Object.prototype.hasOwnProperty.call(def, k)) {
+        // 声明缺口：源在 SOURCES 里却没有默认值 → 无法归一化，显式记账而非静默
+        if (__visStat.undeclared.indexOf(k) < 0) __visStat.undeclared.push(k);
+        return;
+      }
+      if (v[k] === undefined) { v[k] = def[k]; filled++; }
+    });
+    if (filled) { __visStat.filled += filled; __visStat.lastAt = Date.now(); }
+    return v;
+  }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   // v0.1.19: 撤销台账——记录每次 uninject 的时间、触发源、结果（最多 20 条环形）
   const __uninjectLedger = [];
@@ -101,6 +124,8 @@
     /** v0.1.41: 撤销-槽位关联审计只读视图（tool-diag 消费） */
     uninjectAudit: uninjectAudit,
     SOURCES,
+    /** v2.4.0: 可见性配置健康度只读视图（诊断消费）——undeclared 非空即「源存在但无默认值声明」 */
+    visibilityStat() { return { sources: SOURCES.length, declared: Object.keys(__REG.def).length, filled: __visStat.filled, undeclared: __visStat.undeclared.slice(), lastAt: __visStat.lastAt, key: LS_KEY }; },
     getVisibility() { return loadVis(); },
     setVisibility(k, on) { const v = loadVis(); v[k] = !!on; WA.settingsBus.save(__REG, v); },
 

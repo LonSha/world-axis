@@ -114,14 +114,25 @@
    * relevanceFilter: 'on'（默认，先过滤相关再采样）| 'off'（全量采样）
    * @returns {Array} 选中的 pmem 条目（按原序）
    */
+  // v2.4.0: 回落留痕——「读到的采样参数不可解析」必须可观测，否则用户改了设置却看到旧行为无从排查
+  const __msStat = { fallbacks: 0, lastField: null, lastRaw: null };
+  function pickInt(raw, def, field) {
+    if (raw === undefined || raw === null) { __msStat.fallbacks++; __msStat.lastField = field; __msStat.lastRaw = String(raw); return def; }
+    const n = parseInt(raw, 10);
+    if (!isFinite(n)) { __msStat.fallbacks++; __msStat.lastField = field; __msStat.lastRaw = String(raw).slice(0, 24); return def; }
+    return n;   // 含显式 0：交由调用方 clamp 决定区间语义，不再被 `||` 吞掉
+  }
   // v0.9.9: 从 backstage 设置读取采样参数（未配置时回落内置默认值）
   function loadSamplerSettings() {
     const fallback = { memSamplerLimit: DEFAULT_LIMIT, memSamplerDice: DEFAULT_DICE_SIDES, memSamplerRelevance: 'on' };
     try {
       const st = (WA.backstage && WA.backstage.getSettings) ? WA.backstage.getSettings() : null;
       if (st) return {
-        memSamplerLimit: parseInt(st.memSamplerLimit) || fallback.memSamplerLimit,
-        memSamplerDice: parseInt(st.memSamplerDice) || fallback.memSamplerDice,
+        // v2.4.0: `parseInt(x) || fallback` 会把**显式配置的 0** 当成「没配」而回落，
+        //   也会把 undefined（旧存档缺子键）与 NaN（手改脏值）一并吞掉而不留痕。
+        //   改为：只有「不可解析」才回落，并在回落时记一笔（诊断可见）。
+        memSamplerLimit: pickInt(st.memSamplerLimit, fallback.memSamplerLimit, 'memSamplerLimit'),
+        memSamplerDice: pickInt(st.memSamplerDice, fallback.memSamplerDice, 'memSamplerDice'),
         memSamplerRelevance: st.memSamplerRelevance === 'off' ? 'off' : 'on'
       };
     } catch (e) {}
@@ -167,6 +178,8 @@
     DEFAULT_LIMIT: DEFAULT_LIMIT, MIN_LIMIT: MIN_LIMIT, MAX_LIMIT: MAX_LIMIT,
     exponentialSample: exponentialSample,
     loadSamplerSettings: loadSamplerSettings,
+    /** v2.4.0: 采样配置回落留痕（诊断消费） */
+    samplerCfgStat() { return { fallbacks: __msStat.fallbacks, lastField: __msStat.lastField, lastRaw: __msStat.lastRaw }; },
     safe: safe,  // v0.1.12: 导出供语义一致性单测
     filterRelevant: filterRelevant,
     buildHaystack: buildHaystack,

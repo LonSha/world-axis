@@ -95,11 +95,15 @@
     id: 'opinion.tick', chain: 'after', order: 50, label: '舆情观察（每N轮）',
     async run() {
       const st = loadSettings();
-      if (!st.enabled) return;
+      // v2.4.0: 三处子键都走归一化/回落——`!st.enabled` 对 undefined 与 'false' 同为「关」，
+      //   `Math.max(1, undefined)` = NaN，而 `n % NaN !== 0` 恒真 → 舆情生成被永久跳过。
+      if (!WA.settingsBus.toBool(st.enabled, __REG.def.enabled)) return;
       roundCount++;
-      if (roundCount % Math.max(1, st.everyNRounds) !== 0) return;
+      const n = Number(st.everyNRounds);
+      const every = Math.max(1, isFinite(n) && n > 0 ? n : __REG.def.everyNRounds);
+      if (roundCount % every !== 0) return;
       await WA.opinion.generate();
-      if (st.sandboxEnabled) await WA.opinion.generateSandbox();
+      if (WA.settingsBus.toBool(st.sandboxEnabled, __REG.def.sandboxEnabled)) await WA.opinion.generateSandbox();
     }
   });
 })();

@@ -8804,6 +8804,300 @@ WA.loadScript = _ls.loadScript;
     fresh2300();
   }
   } // end v2.3.0 block
+  // ══════════ v2.4.0 ══════════
+  v2400: {
+  const LS2400 = global.localStorage;
+  const ctx2400 = global.SillyTavern.getContext();
+  const PROD2400 = ['core/store.js', 'core/settings-bus.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
+    'engines/backstage.js', 'engines/evolution.js', 'engines/opinion.js', 'engines/regional.js', 'engines/horizon.js',
+    'engines/calendar.js', 'engines/memory-sampler.js', 'engines/tool-diag.js',
+    'render/inject.js', 'render/purifier.js', 'ui/panel.js', 'ui/settings.js'];
+  const SRC2400 = PROD2400.map(function (rel) { return { rel: rel, text: fs.readFileSync(path.join(BASE, rel), 'utf8') }; });
+  function fresh2400() { LS2400.clear(); ctx2400.chatId = 'v2400_chat'; global.__mockChat.length = 0; WA.store.init(); }
+  function srcOf2400(rel) { const hit = SRC2400.filter(function (x) { return x.rel === rel; })[0]; return hit ? hit.text : ''; }
+  function allSrc2400() { return SRC2400.map(function (x) { return x.text; }).join('\n'); }
+  // 键名提升到 v2400 块顶层：F/G/H 三段共用（此前在 F 段块作用域内声明，G 段不可见）
+  const evoKey2400 = 'worldaxis_evolution_settings_v1';
+  const bcKey2400 = 'worldaxis_backstage_settings_v1';
+  const visKey2400 = 'worldaxis_inject_visibility_v1';
+  const opKey2400 = 'worldaxis_opinion_settings_v1';
+  function regOf2400(key) { return WA.__settingsRegs.filter(function (r) { return r.key === key; })[0]; }
+  // 子键级「旧存档」夹具：磁盘只有第一个子键，其余全缺
+  function fixture2400(key, def, keepN) {
+    const ks = Object.keys(def);
+    const o = {}; ks.slice(0, keepN || 1).forEach(function (k) { o[k] = def[k]; });
+    LS2400.setItem(key, JSON.stringify(o));
+    return o;
+  }
+
+  // ── F. 块1：settingsBus 子键级默认值补齐（本轮命题）──
+  fresh2400();
+  section('v2.4.0 块1：子键级默认值契约（settingsBus.applyDefaults）');
+  {
+    // F1. 静态锚点：read 出口必须经过补齐
+    const busSrc2400 = srcOf2400('core/settings-bus.js');
+    assert(busSrc2400.indexOf('function applyDefaults(reg, val)') > 0, 'settingsBus 存在子键补齐实现（单一实现）');
+    assert(busSrc2400.indexOf('val = applyDefaults(r, val);') > 0, 'read() 出口接入子键补齐（整键回落之外的第二层）');
+    assert(busSrc2400.indexOf('subkeyFills') > 0, '补齐有计量（静默自愈必须可观测）');
+    assert(/if \(val\[k\] !== undefined\) return;/.test(busSrc2400), '补齐口径：只补 undefined（false/0/\'\'/null 为显式选择，必须保留）');
+    assert(busSrc2400.indexOf('JSON.parse(JSON.stringify(dv))') > 0, '补进去的是深拷贝（判定表不得被调用方改写）');
+
+    // F2. 行为实证：磁盘缺子键 → read 返回值与整键缺失时一致
+    const regEvo2400 = regOf2400(evoKey2400);
+    const regBc2400 = regOf2400(bcKey2400);
+    const regVis2400 = regOf2400(visKey2400);
+    fixture2400(evoKey2400, regEvo2400.def, 1);
+    assert(JSON.stringify(WA.evolution.getSettings()) === JSON.stringify(regEvo2400.def),
+      '磁盘缺子键时读回结构与声明默认值完全一致（此前缺 4 子键 → undefined）');
+    fixture2400(bcKey2400, regBc2400.def, 1);
+    const bc2400 = WA.backstage.getSettings();
+    assert(bc2400.npcBudget === regBc2400.def.npcBudget && bc2400.injectBudget === regBc2400.def.injectBudget
+      && bc2400.autoSimulate === regBc2400.def.autoSimulate, 'backstage 11 子键全部补齐（npcBudget/injectBudget/autoSimulate 非 undefined）');
+    fixture2400(visKey2400, regVis2400.def, 1);
+    const vis2400 = WA.render.getVisibility();
+    assert(Object.keys(vis2400).length === Object.keys(regVis2400.def).length, '可见性 10 源全部有值（此前 9 源 undefined = 静默全关）');
+
+    // F3. 负向：显式假值不得被补齐覆盖（否则用户「明确关掉」会被系统打开）
+    LS2400.setItem(visKey2400, JSON.stringify({ clock: false, echoes: true }));
+    const visNeg2400 = WA.render.getVisibility();
+    assert(visNeg2400.clock === false, '（负向）显式 false 保留（不被默认值覆盖）');
+    assert(visNeg2400.echoes === true, '（负向）显式 true 保留（def 为 false 也不覆盖）');
+    LS2400.setItem(evoKey2400, JSON.stringify({ diceEnabled: false, diceModifier: 0 }));
+    const evoNeg2400 = WA.evolution.getSettings();
+    assert(evoNeg2400.diceEnabled === false && evoNeg2400.diceModifier === 0, '（负向）显式 false/0 保留');
+
+    // F4. 负向：def 深拷贝——调用方改写返回值不得污染判定表
+    const defSnap2400 = JSON.stringify(regVis2400.def);
+    const visMut2400 = WA.render.getVisibility();
+    visMut2400.clock = 'MUTATED';
+    Object.keys(visMut2400).forEach(function (k) { visMut2400[k] = 'MUTATED'; });
+    assert(JSON.stringify(regVis2400.def) === defSnap2400, '（负向）改写 read 返回值不污染登记表 def（深拷贝生效）');
+    assert(JSON.stringify(WA.render.SOURCES) !== JSON.stringify(visMut2400), '（负向）SOURCES 判定表未被别名污染');
+
+    // F5. 观测：补齐计数与缺口盘点
+    fresh2400();
+    const stBefore2400 = WA.settingsBus.stats.subkeyFills;
+    fixture2400(bcKey2400, regBc2400.def, 1);
+    WA.backstage.getSettings();
+    assert(WA.settingsBus.stats.subkeyFills > stBefore2400, '补齐计数增长（subkeyFills 可观测）');
+    assert(WA.settingsBus.stats.lastSubkeyKey === bcKey2400, '记录最近补齐的键名');
+    const audit2400 = WA.settingsBus.subkeyAudit();
+    assert(audit2400.keys.some(function (x) { return x.key === bcKey2400; }), 'subkeyAudit 盘点出真实缺口（只读，不触发补齐）');
+    const bcRow2400 = audit2400.keys.filter(function (x) { return x.key === bcKey2400; })[0];
+    assert(bcRow2400.declared === Object.keys(regBc2400.def).length && bcRow2400.missing.length === Object.keys(regBc2400.def).length - 1,
+      '缺口项数 = 声明数 − 磁盘实际子键数');
+    LS2400.removeItem(bcKey2400);
+    assert(!WA.settingsBus.subkeyAudit().keys.some(function (x) { return x.key === bcKey2400; }),
+      '整键缺失不计为子键缺口（那是整键回落，属另一条路径）');
+
+    // F6. 单源不变量仍成立（补齐不得破坏 v2.3.0 的整键回落断言）
+    WA.settingsBus.registry().forEach(function (r) {
+      if (r.orphan) return;
+      LS2400.removeItem(r.key);
+      assert(JSON.stringify(WA.settingsBus.read(r)) === JSON.stringify(r.def), r.key + ' 整键回落仍 === 声明（v2.3.0 不变量保持）');
+    });
+  }
+
+  // ── G. 块2：消费端语义收口（数值 NaN 与布尔归一化）──
+  fresh2400();
+  section('v2.4.0 块2：消费端自持回落（NaN 防治 + 布尔归一化）');
+  {
+    // G1. evolution 阈值算术：缺子键曾让 «成功/受挫» 两个分支同时静默消失
+    const regEvo2400b = regOf2400(evoKey2400);
+    fixture2400(evoKey2400, regEvo2400b.def, 1);
+    const mf2400 = WA.evolution.getMaxFails({ type: 'progress', level: 1 });
+    assert(isFinite(mf2400) && mf2400 === regEvo2400b.def.progressFailBase + 1, 'getMaxFails 缺子键下不产生 NaN（保底机制存活）');
+    const mfC2400 = WA.evolution.getMaxFails({ type: 'conflict', level: 1 });
+    assert(isFinite(mfC2400) && mfC2400 === Math.max(1, regEvo2400b.def.conflictFailBase - 1), '冲突型保底上限同样不产生 NaN');
+    // 行为实证：多次掷骰必须出现多种结果（曾 300 次全判「保持」= 静默失效）
+    //   v2.4.0: 注入**确定性随机源**而非依赖真 Math.random —— 不确定性断言等于不确定的回归。
+    //   阈值口径（conflict/level1/stageRound5/萌芽）：threshold = round(85 - 200*(5/9)*(4/9)) = 36；
+    //   序列 [0.01, 0.20, 0.99] ⇒ dice=2/21/100 ⇒ 受挫 / 保持 / 成功 三分支**必然**各命中一次。
+    const dist2400 = {};
+    const _mr2400 = Math.random;
+    const _seq2400 = [0.01, 0.20, 0.99];
+    let _k2400 = 0;
+    Math.random = function () { return _seq2400[(_k2400++) % _seq2400.length]; };
+    try {
+      for (let i = 0; i < 300; i++) {
+        WA.store.transact(function (d) { d.evolution.events = [{ id: 'e1', type: 'conflict', name: 'T', level: 1, stage: '萌芽', stageRound: 5, consecutiveFails: 0 }]; });
+        const res2400 = WA.evolution.rollEvents();
+        const k2400 = (res2400[0] && res2400[0].result) || '?';
+        dist2400[k2400] = (dist2400[k2400] || 0) + 1;
+      }
+    } finally { Math.random = _mr2400; }
+    assert(dist2400['受挫'] === 100 && dist2400['保持'] === 100 && dist2400['成功'] === 100,
+      '确定性随机源下三分支各命中 100 次（实 ' + JSON.stringify(dist2400) + '）——受挫/保持/成功全部可达');
+    assert(Object.keys(dist2400).length >= 2, '缺子键下掷骰结果不再单一（实分布 ' + JSON.stringify(dist2400) + '）');
+    assert((dist2400['成功'] || 0) > 0 && (dist2400['保持'] || 0) > 0, '「成功」分支可达（此前 NaN 比较恒假，成功永不发生）');
+    // 负向：数值子键被写成脏值时同样不产生 NaN
+    LS2400.setItem(evoKey2400, JSON.stringify({ diceModifier: 'abc', setbackRatio: null, progressFailBase: {}, conflictFailBase: [] }));
+    const mfDirty2400 = WA.evolution.getMaxFails({ type: 'progress', level: 2 });
+    assert(isFinite(mfDirty2400), '（负向）脏值下 getMaxFails 仍为有限数（回落声明默认值）');
+
+    // G2. backstage 自动推演：缺子键曾把 autoSimulate 判为「关」
+    const regBc2400b = regOf2400(bcKey2400);
+    fixture2400(bcKey2400, regBc2400b.def, 1);
+    WA.store.transact(function (d) { d.meta = d.meta || {}; d.meta.round = 1; });
+    global.__mockChat.push({ is_user: false, name: 'A', mes: 'test' });
+    const auto2400 = WA.backstage.requestSimulate('after-reply');
+    assert(auto2400 && auto2400.reason !== 'auto-off', '缺子键时自动推演不再被判「关停」（此前 reason=auto-off）');
+    // 负向：显式关闭仍必须尊重
+    LS2400.setItem(bcKey2400, JSON.stringify({ autoSimulate: false }));
+    const autoOff2400 = WA.backstage.requestSimulate('after-reply');
+    assert(autoOff2400 && autoOff2400.reason === 'auto-off', '（负向）显式 autoSimulate=false 仍拒绝自动推演');
+    LS2400.setItem(bcKey2400, JSON.stringify({ autoSimulate: 'false' }));
+    const autoStr2400 = WA.backstage.requestSimulate('after-reply');
+    assert(autoStr2400 && autoStr2400.reason === 'auto-off', '（负向）字符串 \'false\' 经归一化同样判关（此前靠隐式真值侥幸正确）');
+
+    // G3. opinion：`roundCount % undefined` 曾恒真 → 舆情永不生成
+    const opSrc2400 = srcOf2400('engines/opinion.js');
+    assert(opSrc2400.indexOf('WA.settingsBus.toBool(st.enabled, __REG.def.enabled)') > 0, 'opinion enabled 走统一布尔归一化');
+    assert(opSrc2400.indexOf('__REG.def.everyNRounds') > 0, 'opinion everyNRounds 有回落（不写死第二份默认值）');
+    assert(!/Math\.max\(1, st\.everyNRounds\)/.test(opSrc2400), '（负向）不再直接用未回落值参与模运算（NaN 源已移除）');
+    LS2400.setItem(opKey2400, JSON.stringify({ enabled: true }));
+    assert(WA.opinion.getSettings().everyNRounds === 3, '缺子键时 everyNRounds 补齐为 3');
+
+    // G4. 数值回落实现为单一入口（防各模块各写一套）
+    const evoSrc2400 = srcOf2400('engines/evolution.js');
+    assert(evoSrc2400.indexOf('_num(v, def)') > 0, 'evolution 有统一数值回落入口 _num');
+    assert(evoSrc2400.indexOf('this._num(st.diceModifier, __REG.def.diceModifier)') > 0, 'diceModifier 经回落（NaN 根因）');
+    assert(evoSrc2400.indexOf('this._num(st.setbackRatio, __REG.def.setbackRatio)') > 0, 'setbackRatio 经回落');
+    // 算术消费点共 4 处：getMaxFails 的 progress/conflict 基数 + rollEvents 的 modifier/setbackRatio
+    const numFallbacks2400 = (evoSrc2400.match(/this\._num\(/g) || []).length;
+    assert(numFallbacks2400 === 4, '数值回落点恰好覆盖 4 个算术消费（实 ' + numFallbacks2400 + '；多一处意味着有重复实现，少一处意味着有裸用）');
+    // 反向核对：算术表达式里不得再出现未包落的 st.<数值键>
+    ['progressFailBase', 'conflictFailBase', 'diceModifier', 'setbackRatio'].forEach(function (k) {
+      assert(evoSrc2400.indexOf('this._num(st.' + k + ', __REG.def.' + k + ')') > 0, '数值键 ' + k + ' 经统一回落入口');
+    });
+
+    // G5. 采样器：显式 0 不再被 `||` 吞掉，回落有留痕
+    const msSrc2400 = srcOf2400('engines/memory-sampler.js');
+    assert(msSrc2400.indexOf('function pickInt(raw, def, field)') > 0, '采样器有显式落值判定 pickInt');
+    assert(msSrc2400.indexOf('samplerCfgStat') > 0, '采样回落有只读留痕出口');
+    LS2400.setItem(bcKey2400, JSON.stringify({ memSamplerLimit: 0, memSamplerDice: 0 }));
+    const msCfg2400 = WA.memorySampler.loadSamplerSettings();
+    assert(msCfg2400.memSamplerLimit === 0 && msCfg2400.memSamplerDice === 0, '（负向）显式 0 原样读出（此前被 || 回落成 8/10000）');
+    LS2400.setItem(bcKey2400, JSON.stringify({ memSamplerLimit: 'zzz' }));
+    const msBad2400 = WA.memorySampler.loadSamplerSettings();
+    assert(msBad2400.memSamplerLimit === 8, '（负向）不可解析值回落默认 8');
+    assert(WA.memorySampler.samplerCfgStat().fallbacks > 0, '回落被记账（诊断可见，不静默）');
+
+    // G6. 可见性 def 完整性：SOURCES 每一项都必须在 def 里有默认值
+    const visStat2400 = WA.render.visibilityStat();
+    assert(visStat2400.undeclared.length === 0, '可见性声明完整（SOURCES 全部有默认值；漏项：' + (visStat2400.undeclared.join('、') || '无') + '）');
+    assert(visStat2400.sources === visStat2400.declared, 'SOURCES 数与我 def 声明数一致（' + visStat2400.sources + '/' + visStat2400.declared + '）');
+  }
+
+  // ── H. 块4：全域「子键消费点」守卫（缺陷形态内化）──
+  fresh2400();
+  section('v2.4.0 块4：子键契约回归守卫（形态内化）');
+  {
+    // H1. 全库不再存在「未回落值直接参与算术」的已知危险形态
+    const ALL2400 = allSrc2400();
+    const DANGER2400 = [
+      ['st.diceModifier', /st\.diceModifier\s*\)/, 'evolution 阈值算术的裸用'],
+      ['st.setbackRatio', /threshold \* \(st\.setbackRatio/, 'evolution 受挫判据的裸用']
+    ];
+    DANGER2400.forEach(function (pair) {
+      assert(!pair[1].test(ALL2400), '（负向）不存在裸用形态：' + pair[0] + '（' + pair[2] + '）');
+    });
+    // H2. 每个多子键登记项都必须声明 def（无 def 则无从补齐）
+    let multi2400 = 0;
+    WA.settingsBus.registry().forEach(function (r) {
+      if (r.orphan || !r.def || typeof r.def !== 'object' || Array.isArray(r.def)) return;
+      if (Object.keys(r.def).length < 2) return;
+      multi2400++;
+      assert(Object.keys(r.def).every(function (k) { return r.def[k] !== undefined; }),
+        r.key + ' 的多子键 def 无 undefined 值（否则补齐会把 undefined 补进去）');
+    });
+    assert(multi2400 >= 6, '多子键登记项已覆盖（实 ' + multi2400 + ' 个，v2.4.0 基线 6）');
+    // H3. 全量：凡多子键登记项，磁盘只留第一个子键时读回必须与声明等值
+    //   （这是本轮的命题断言——一次覆盖 6 个键、43 个子键，新增设置忘记回落即失败）
+    let covered2400 = 0;
+    WA.settingsBus.registry().forEach(function (r) {
+      if (r.orphan || !r.def || typeof r.def !== 'object' || Array.isArray(r.def)) return;
+      const ks = Object.keys(r.def);
+      if (ks.length < 2) return;
+      LS2400.setItem(r.key, JSON.stringify({ [ks[0]]: r.def[ks[0]] }));
+      covered2400 += ks.length;
+      assert(JSON.stringify(WA.settingsBus.read(r)) === JSON.stringify(r.def),
+        r.key + ' 旧存档（仅 1 子键）读回 === 声明 ' + ks.length + ' 子键');
+      LS2400.removeItem(r.key);
+    });
+    assert(covered2400 >= 40, '单键夹具覆盖子键数（实 ' + covered2400 + '，v2.4.0 基线 40）');
+    // H4. 诊断出口接线（子键缺口必须能被看见）
+    const diagSrc2400 = srcOf2400('engines/tool-diag.js');
+    assert(diagSrc2400.indexOf('subkeyAudit') > 0, 'tool-diag 采集子键缺口盘点');
+    assert(diagSrc2400.indexOf("key: 'settingsBus.subkeys'") > 0, 'verdict 报子键缺口议题');
+    assert(diagSrc2400.indexOf("key: 'inject.visibilityUndeclared'") > 0, 'verdict 报可见性漏声明议题（error 级）');
+    assert(diagSrc2400.indexOf('visibilityStat') > 0 && diagSrc2400.indexOf('samplerCfgStat') > 0,
+      '诊断采集可见性健康度与采样回落留痕');
+    // H5. 缺口盘点不得自我触发补齐（否则报告恒为空）
+    fresh2400();
+    fixture2400(bcKey2400, regOf2400(bcKey2400).def, 1);
+    const gapBefore2400 = WA.settingsBus.subkeyAudit().totalMissing;
+    WA.settingsBus.subkeyAudit(); WA.settingsBus.subkeyAudit();
+    assert(WA.settingsBus.subkeyAudit().totalMissing === gapBefore2400, '（负向）反复盘点不改变缺口（只读，不自我修复）');
+    // H6. 补齐与整键回落两条路径不得互相污染
+    fresh2400();
+    LS2400.setItem(bcKey2400, 'NOT-JSON{{{');
+    const broken2400 = WA.backstage.getSettings();
+    assert(broken2400 && broken2400.simulationMode === 'balanced', '（负向）整键损坏仍走隔离 → 回落声明默认值');
+    assert(WA.settingsBus.stats.quarantines > 0, '损坏隔离仍留痕（v2.3.0 不变量保持）');
+  }
+  // ══════════ v2.4.0 块5：入口文件可装载性（填补「tests 跳过 index.js」盲区）══════════
+  section('v2.4.0 块5：入口文件可执行性（TDZ 守卫 + 真实装载实证）');
+  {
+    const idxSrc2500 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+    // I1. 静态守卫：不得在 `const WA` 声明**之前**引用 WA（严格模式下是 TDZ ReferenceError）
+    const declPos2500 = idxSrc2500.indexOf('const WA = window.WorldAxis');
+    assert(declPos2500 > 0, 'index.js 含 WA 命名空间声明（pos=' + declPos2500 + '）');
+    const head2500 = idxSrc2500.slice(0, declPos2500);
+    const earlyHits2500 = head2500.match(/\bWA\s*\./g) || [];
+    assert(earlyHits2500.length === 0,
+      '（负向）index.js 在 const WA 声明之前零 WA 引用（发现 ' + earlyHits2500.length + ' 处：'
+      + (head2500.match(/\bWA\s*\.[A-Za-z_$]*/g) || []).join('、') + '）——此前 WA.VERSION 写在第 13 行、声明在第 28 行，入口必崩');
+    // 旧键 WA.VERSION 必须仍在（tool-diag 以 `WA.VERSION || WA.version` 消费，删掉会让诊断读空）
+    assert(idxSrc2500.indexOf('WA.VERSION = VERSION') > declPos2500, 'WA.VERSION 赋值仍在声明之后（保留旧键，未因修 TDZ 而删除）');
+    // I2. 动态实证：真执行入口文件，不得抛错且必须建立命名空间
+    const doc2500 = {
+      getElementsByTagName: function () { return []; },
+      addEventListener: function () {},
+      readyState: 'complete',
+      createElement: function () { return { style: {}, setAttribute: function () {}, appendChild: function () {}, addEventListener: function () {} }; },
+      head: { appendChild: function () {} },
+      body: { appendChild: function () {} },
+      getElementById: function () { return null; }
+    };
+    const ls2500 = {
+      _s: {}, getItem: function (k) { return (k in this._s) ? this._s[k] : null; },
+      setItem: function (k, v) { this._s[k] = String(v); }, removeItem: function (k) { delete this._s[k]; }
+    };
+    const sb2500 = { console: console, document: doc2500, localStorage: ls2500, JSON: JSON, Date: Date, Math: Math, Promise: Promise, setTimeout: function () { return 0; }, clearTimeout: function () {} };
+    sb2500.window = sb2500;
+    const ctxI2500 = vm.createContext(sb2500);
+    let entryErr2500 = null;
+    try { vm.runInContext(idxSrc2500, ctxI2500, { filename: 'index.js' }); } catch (e) { entryErr2500 = e; }
+    assert(!entryErr2500, '入口 index.js 可执行（此前抛 TDZ ReferenceError；实际错误：' + (entryErr2500 && entryErr2500.message) + '）');
+    assert(!!(ctxI2500.WorldAxis && ctxI2500.WorldAxis.version), '入口执行后建立 WorldAxis 命名空间并写入 version（实 ' + (ctxI2500.WorldAxis && ctxI2500.WorldAxis.version) + '）');
+    assert(!!ctxI2500.WorldAxis.VERSION, 'WA.VERSION 亦已写入（tool-diag 诊断读版本依赖该键）');
+    assert(ctxI2500.__WORLD_AXIS_LOADED__ === true, '入口设置 __WORLD_AXIS_LOADED__ 哨兵（重复加载防护生效）');
+    assert(ctxI2500.WorldAxis.version === ctxI2500.WorldAxis.VERSION, 'version 与 VERSION 两键一致（防再次分叉）');
+    // I3. 版本号三方对齐：index.js / manifest.json / 回归期望
+    let mf2500 = null;
+    try { mf2500 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8')); } catch (e) {}
+    assert(!!mf2500, 'manifest.json 可解析');
+    assert(mf2500.version === ctxI2500.WorldAxis.VERSION, 'manifest.version 与 index.js VERSION 一致（' + mf2500.version + ' vs ' + ctxI2500.WorldAxis.VERSION + '）');
+    assert((idxSrc2500.match(/const VERSION = '([\d.]+)'/) || [])[1] === mf2500.version, 'index.js VERSION 常量与 manifest 同源同值');
+    // I4. 防回归：入口的加载清单必须与磁盘实际文件一致（清单漏项 = 模块永不加载）
+    const order2500 = (idxSrc2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
+    const rels2500 = (order2500.match(/'([^']+\.js)'/g) || []).map(function (x) { return x.replace(/'/g, ''); });
+    assert(rels2500.length >= 50, 'LOAD_ORDER 解析出 ' + rels2500.length + ' 个模块');
+    const missing2500 = rels2500.filter(function (rel) { return !fs.existsSync(path.join(BASE, rel)); });
+    assert(missing2500.length === 0, 'LOAD_ORDER 列出的模块在磁盘上全部存在（缺：' + (missing2500.join('、') || '无') + '）');
+  }
+  } // end v2.4.0 block
   } // end v2.2.0 block
   } // end v2.1.0 block
   } // end v0.9.0 block

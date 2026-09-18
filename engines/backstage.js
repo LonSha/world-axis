@@ -177,7 +177,10 @@
 
     requestSimulate(reason) {
       const st = loadSettings();
-      if (!st.autoSimulate && reason === 'after-reply') return { ok: false, reason: 'auto-off' };
+      // v2.4.0: 布尔配置归一化。此前 `!st.autoSimulate` 把 undefined（旧存档缺该子键）
+      //   与字符串 'false' 一并判为「关」，自动推演被静默关停且用户看不到任何开关变化。
+      //   回落值取登记 def（单一真源），不在此另写一份默认值。
+      if (!WA.settingsBus.toBool(st.autoSimulate, __REG_B.def.autoSimulate) && reason === 'after-reply') return { ok: false, reason: 'auto-off' };
       if (st.simulationMode === 'manual' && reason === 'after-reply') return { ok: false, reason: 'manual-mode' };
       const anchor = latestAnchor();
       if (!anchor) return { ok: false, reason: 'no-chat' };

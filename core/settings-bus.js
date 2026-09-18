@@ -1,5 +1,7 @@
 /**
- * WorldAxis core/settings-bus.js (v0.2.0) — settings 存储统一治理（迁移器侧车）。
+ * WorldAxis core/settings-bus.js (v2.4.0) — settings 存储统一治理（迁移器侧车）。
+ * v2.4.0: 补齐「子键级」默认值契约——整键回落已于 v0.2.0 建立，但整键存在而子键缺失
+ *   时消费端仍会拿到 undefined（详见 applyDefaults 注释）。
  * 背景：12 个模块各自持有 worldaxis_*_settings_v1 等键，读写各自实现——
  *   裸 try/catch 静默吞掉 JSON 损坏（用户配置悄悄重置默认，无任何留痕），
  *   键名带 _v1 但没有 v2 迁移路径（未来改结构时旧键静默孤儿化）。
@@ -16,7 +18,74 @@
     if (Array.isArray(v)) return 'array';
     return typeof v;
   }
-  const stats = { upgrades: 0, quarantines: 0, reads: 0, failures: 0 };
+  const stats = { upgrades: 0, quarantines: 0, reads: 0, failures: 0,
+    // v2.4.0: 子键补齐计量——「读到的配置比声明少」是静默失效的源头，必须可观测
+    //   fills = 补齐动作累计次数（同一键每读一次未回写就再补一次）；
+    //   fillKeys = 补过的**不同键**数（诊断真正关心的量级）。
+    subkeyFills: 0, subkeyFillKeys: 0, lastSubkeyKey: null, lastSubkeyMissing: [] };
+  // v2.4.0: 补齐告警去重——补齐发生在**返回值副本**上，磁盘未回写前每次读取都会再补一次。
+  //   若每次补齐都打日志，热路径（loadSettings 每轮每事件调用）会刷屏：实测 300 轮掷骰产生
+  //   900+ 条同内容 warn。故按「键」去重，本会话每个键只提示一次，计数不受影响。
+  const __fillWarned = {};
+  /**
+   * v2.4.0: 子键级默认值补齐（单一实现）。
+   *
+   * 背景（本轮命题）：v2.0.0 引入 settingsBus 统一了**整键**的读写与默认值回落，
+   *   但「整键存在而某个**子键**缺失」是另一回事——read() 只在整键缺席时回落 reg.def，
+   *   磁盘上有一条 `{"simulationMode":"balanced"}` 的旧值时，返回对象里其余子键全是 undefined。
+   *   而本插件每个版本都会往设置里加新字段，老存档**必然**缺新子键，于是：
+   *     · `!st.autoSimulate`（undefined 为假值）→ 自动推演被静默关成「关」
+   *     · `st.diceModifier` 参与算术 → 阈值变 NaN → 事件演化骰子整条失效（300 次全判「保持」）
+   *     · `vis.background`（undefined）在可见性判定里等价于关
+   *   更糟的是 setSettings 走 Object.assign(read(), patch)，缺失子键被原样写回 → **永久固化，无自愈**。
+   *
+   * 补齐口径：
+   *   a. 只在「当前值为 undefined」时补（null/false/0/'' 都是用户显式选择，必须保留）
+   *   b. def 的子键缺席时也补（同样成因：登记声明写于旧版本）
+   *   c. 补进去的值是 def 的深拷贝，防调用方改到判定表本身
+   *   d. 动态子键（def 中无该名）不臆造默认值，只计数（由消费方自持回落）
+   */
+  function applyDefaults(reg, val) {
+    const r = reg || {};
+    const def = r.def;
+    if (!def || typeof def !== 'object' || Array.isArray(def)) return val;
+    if (!val || typeof val !== 'object' || Array.isArray(val)) return val;
+    let filled = 0;
+    const missing = [];
+    Object.keys(def).forEach(function (k) {
+      if (val[k] !== undefined) return;
+      let dv = def[k];
+      // 深拷贝：判定表（如 inject 的 SOURCES 顺序、preset 的 SEG_KEYS）不得被调用方改写
+      try { dv = JSON.parse(JSON.stringify(dv)); } catch (e) {}
+      val[k] = dv;
+      filled++;
+      missing.push(k);
+    });
+    if (filled) {
+      stats.subkeyFills += filled;
+      stats.lastSubkeyKey = r.key || null;
+      stats.lastSubkeyMissing = missing.slice(0, 12);
+      if (r.key && !__fillWarned[r.key]) {
+        __fillWarned[r.key] = 1;
+        stats.subkeyFillKeys++;
+        if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 缺子键已补默认值 ' + filled + ' 个（' + missing.slice(0, 6).join('、') + '）——旧版本存档结构升级，属正常自愈（本会话同键不再重复提示）');
+      }
+    }
+    return val;
+  }
+  /**
+   * v2.4.0: 子键缺口只读盘点（不写、不补）——诊断用。
+   *   与补齐的差别：本函数只报告「磁盘值与声明差多少」，供 verdict 判「老存档已自愈但仍缺声明项」。
+   */
+  function subkeyGap(reg, val) {
+    const r = reg || {};
+    const def = r.def;
+    if (!def || typeof def !== 'object' || Array.isArray(def)) return { declared: 0, missing: [] };
+    const declared = Object.keys(def);
+    if (!val || typeof val !== 'object' || Array.isArray(val)) return { declared: declared.length, missing: declared.slice() };
+    const missing = declared.filter(function (k) { return val[k] === undefined; });
+    return { declared: declared.length, missing: missing };
+  }
   // v2.3.0: 观测史——记录「本会话中真实读到过」的键。
   //   用途：把「已废弃且曾存在后被删除」的幽灵键，与「声明废弃但从未落盘」的休眠登记区分开。
   //   否则移除键与从未写过无法分辨，要么漏报幽灵键、要么把休眠登记永久报成待清理项。
@@ -105,8 +174,13 @@
         }
       } catch (e) { stats.failures++; }
       if (val === null || val === undefined) val = r.def;
+      // v2.4.0: 整键之外还要补**子键**——旧存档缺新字段时子键为 undefined，
+      //   会在消费端静默改变语义（见 applyDefaults 注释）。补齐后再返回独立拷贝。
+      val = applyDefaults(r, val);
       try { return JSON.parse(JSON.stringify(val)); } catch (e) { return val; }
     },
+    /** v2.4.0: 子键补齐导出（模块侧自定义加载路径可复用同一实现，避免二次分叉） */
+    applyDefaults(reg, val) { return applyDefaults(reg, val); },
     /**
      * v2.3.0: 原始读取（不解析、不隔离、不回落默认值）。
      *   用途：格式迁移——历史版本可能把「标量值」以裸字符串写入（非 JSON 契约），
@@ -150,6 +224,30 @@
       if (WA.log) WA.log('info', 'settingsBus：已注销孤儿设置键登记 ' + key + '（' + (hit.module || '?') + '）');
       return { ok: true, key: key, module: hit.module || null };
     },
+    /**
+     * v2.4.0: 子键缺口全表盘点（只读）——登记声明的子键里，磁盘值缺哪些。
+     *   与 applyDefaults 的分工：补齐发生在读取时（自愈），本盘点发生在诊断时（报告）。
+     *   只读磁盘原文，不触发补齐，因此报告的恒是「用户存档真实缺口」。
+     */
+    subkeyAudit() {
+      const ls = (WA.mainWin || window).localStorage;
+      const rows = [];
+      (WA.__settingsRegs || []).forEach(function (r) {
+        if (!r || !r.key || r.orphan) return;
+        if (!r.def || typeof r.def !== 'object' || Array.isArray(r.def)) return;
+        let raw = null;
+        try { raw = ls.getItem(r.key); } catch (e) { return; }
+        if (raw === null || raw === undefined) return;   // 无磁盘值 → 整键回落，不属子键缺口
+        let parsed = null, ok = true;
+        try { parsed = JSON.parse(raw); } catch (e) { ok = false; }
+        if (!ok || !parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+        const g = subkeyGap(r, parsed);
+        if (g.missing.length) rows.push({ key: r.key, module: r.module || null, declared: g.declared, missing: g.missing });
+      });
+      return { keys: rows, totalMissing: rows.reduce(function (s, x) { return s + x.missing.length; }, 0), fills: stats.subkeyFills, fillKeys: stats.subkeyFillKeys };
+    },
+    /** v2.4.0: 单键子键缺口（供 verifyDefaults 复用） */
+    subkeyGap(reg, val) { return subkeyGap(reg, val); },
     /** v2.2.0: 登记表计量只读视图（面板/诊断消费）——此前 registry 全库零调用 */
     registryStat() {
       const rows = this.registry();

@@ -9,8 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.3.0';
-  WA.VERSION = VERSION;
+  const VERSION = '2.4.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -26,6 +25,11 @@
 
   // ── 命名空间 ─────────────────────────────────────────────
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.4.0: `WA.VERSION` 此前在 `const WA` 声明**之前**赋值 —— 严格模式命中 TDZ
+  //   （ReferenceError: Cannot access 'WA' before initialization），入口文件抛错即崩、
+  //   扩展整体无法装载。旧键 WS.VERSION 由 tool-diag 消费（`WA.VERSION || WA.version`），
+  //   故在命名空间建立后补回，避免消费端读空。tests/run.js 跳过 index.js，故长期未被回归发现。
+  WA.VERSION = VERSION;
   WA.version = VERSION;
   WA.mainWin = mainWin;
   WA.mainDoc = mainDoc;
