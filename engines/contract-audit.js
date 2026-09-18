@@ -259,6 +259,15 @@
       sources: {
         contract: ['bandit', 'plague', 'market', 'faction_clash', 'official', 'sect', 'infrastructure', 'ominous'],
         // v2.10.0: 读侧完整性契约的留痕点——本文件是跨模块契约审计的唯一消费端。
+        // v2.12.0: UI render-path gate contract trace. tests/run.js LOAD omits ui/* on purpose,
+        //   and its inline DOM stub is a hollow shell, so the render path had zero coverage
+        //   (only the overview renderer executed, its output dropped). New in this version:
+        //   tests/ui-dom.js (dependency-free mini-DOM: parseable innerHTML, queryable tree,
+        //   clickable controls), tests/ui-gate.js (standalone G17 gate, 42 assertions) and
+        //   tests/ui-gate-sync.js (load semantics shared with run.js, no copy). The cases are
+        //   embedded verbatim into run.js block 5, and negative injections (renderer throw /
+        //   tab binding cut) prove the gate is not a false green. No npm dependency is added:
+        //   a gate that silently skips on other machines is no gate at all.
         // v2.11.0: 「活性面治理」契约留痕——三面同时收口：
         //   面A 裸读点收口（全库 40 处 `localStorage.getItem` 全部归因，跨模块经
         //        `store.reportReadFail` 单一投递；G16 门禁冻结逐文件清单，与 G13/G14/G15

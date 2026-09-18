@@ -1,6 +1,9 @@
 // WorldAxis tests/run.js — 无头测试运行器
 'use strict';
 require('./mock.js');
+// v2.12.0: UI render-path gate host environment (mini-DOM + isolated UI load). fresh()/checkPages() are reused verbatim by the v2.12.0 block below.
+const __uiGate = require('./ui-gate-sync.js');
+const __uiGateFresh = __uiGate.fresh, __uiGateCheckPages = __uiGate.checkPages;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -9571,7 +9574,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10115,7 +10118,7 @@ assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.11.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.12.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10406,7 +10409,7 @@ assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.11.0', '入口版本为 2.11.0（实 ' + ver + '）');
+    assert(ver === '2.12.0', '入口版本为 2.12.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -10928,7 +10931,7 @@ assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.11.0', '入口版本为 2.11.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.12.0', '入口版本为 2.12.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11316,7 +11319,7 @@ assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.11.0', '入口版本为 2.11.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.12.0', '入口版本为 2.12.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11686,7 +11689,7 @@ assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.11.0', '入口版本为 2.11.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.12.0', '入口版本为 2.12.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12051,7 +12054,7 @@ assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.11.0', '入口版本为 2.11.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.12.0', '入口版本为 2.12.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -12059,6 +12062,183 @@ assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单�
       '读点收口 + 指纹状态机留痕');
     assert(fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8').indexOf('v2.11.0') > 0, 'store 读点归因留痕');
     assert(fs.readFileSync(path.join(BASE, 'engines/calendar.js'), 'utf8').indexOf('v2.11.0') > 0, '整日推进单一实现留痕');
+  }
+
+  // v2.12.0: UI render-path gate (G17).
+  //   tests/run.js LOAD deliberately omits ui/*, and its inline DOM stub is a hollow shell:
+  //   querySelector() returns a fresh detached div, querySelectorAll() returns [], and
+  //   firstElementChild comes from a global slot. So `body.innerHTML = render()` did run,
+  //   but parsing and queries were all virtual - only the overview renderer executed and
+  //   its output was dropped; the other nine renderers, the tab/control bindings, the
+  //   conditional rendering and the rerender scheduling had zero execution coverage.
+  //   This block embeds the tests/ui-gate.js cases verbatim (same implementation, no copy)
+  //   so that `node tests/run.js` covers the render path.
+  section('v2.12.0 块5：UI 渲染路径门禁（G17，真实 DOM 解析）');
+  {
+  async function __uiGateBlocks() {
+    const pass = [], fail = [];
+    function assert(cond, name, extra) {
+      if (cond) { pass.push(name); console.log('  \u2713 ' + name); }
+      else { fail.push(name); console.log('  \u2717 ' + name + (extra ? ' \u2014 ' + extra : '')); }
+    }
+    function section(t) { console.log('\n\u25a0 ' + t); }
+    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    const countControls = function (html) { return (html.match(/<(button|input|select|textarea)\b/g) || []).length; };
+
+    const env = __uiGateFresh();
+    const WA = env.WA, dom = env.dom;
+    const panel = dom.getElementById('wa-panel');
+
+    section('G17-A 面板与悬浮球挂载（buildPanel / buildOrb 真实执行）');
+    assert(!!panel, '#wa-panel 已注入 DOM（buildPanel 走到 appendChild）');
+    assert(!!dom.getElementById('wa-orb'), '#wa-orb 悬浮球已注入 DOM');
+    assert(!!panel && panel.querySelectorAll('.wa-tab').length === (WA.ui.pages() || []).length,
+      '页签数量与 pages() 一致（实 ' + (panel ? panel.querySelectorAll('.wa-tab').length : -1) + '）');
+    assert(!!panel && !!panel.querySelector('.wa-close'), '关闭按钮成树（点击绑定不空转）');
+    assert(!!panel && !!panel.querySelector('.wa-body'), '内容容器成树（renderBody 的挂载点）');
+    assert(!!panel && panel.classList.contains('wa-hidden') === true, '初始为隐藏态（未点开时不占屏）');
+
+    section('G17-B 十个渲染器逐页真实执行（点击 → renderBody → innerHTML 解析 → bindBody）');
+    WA.ui.open();
+    assert(panel.classList.contains('wa-hidden') === false, 'open() 后翻为可见');
+    const pages = __uiGateCheckPages(env, countControls);
+    assert(pages.tested === 10, 'RENDERERS 覆盖的页面数为 10（实 ' + pages.tested + '）');
+    assert(pages.failures.length === 0, '十个页面全部渲染成树且控件可在树中找到', pages.failures.join('；'));
+    console.log('    ' + pages.details.join('  '));
+    assert(WA.ui.currentPage() === (WA.ui.pages() || []).slice(-1)[0],
+      '切换按 pages() 原始顺序推进（末页实 ' + WA.ui.currentPage() + '）');
+
+    section('G17-C 控件绑定真实生效（bindBody：点了有反应，而不是空转）');
+    {
+      const tabOf = function (p) { return panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === p; })[0]; };
+      tabOf('overview').click();
+      assert(WA.ui.currentPage() === 'overview', '（正向）页签点击后 currentPage 跟随');
+      tabOf('settings').click();
+      const sBody = panel.querySelector('.wa-body');
+      const sCtl = sBody.querySelectorAll('button,input,select').length;
+      assert(sBody.innerHTML.indexOf('未加载') < 0 && sCtl > 0,
+        '设置页是真实面板（非「模块未加载」占位，控件在树中 ' + sCtl + ' 个）');
+      tabOf('overview').click();
+      const oBody = panel.querySelector('.wa-body');
+      assert(oBody.querySelectorAll('.wa-stat').length >= 6, '概览页统计网格在树中可查询（wa-stat 命中 ≥6）');
+      assert(oBody.querySelectorAll('[data-node]').length >= 1, '概览页工作流节点开关进入引用面（data-node 命中 ≥1）');
+      assert(oBody.querySelectorAll('.wa-tab').length === 0, '渲染容器与页签容器互不污染（子树边界正确）');
+      tabOf('events').click();
+      const evBody = panel.querySelector('.wa-body');
+      assert(evBody.querySelectorAll('.wa-rep-cell').length === 4, '事件页声誉四维网格在树中可查询（wa-rep-cell 恰 4）');
+      assert(evBody.querySelectorAll('.wa-sec').length >= 3, '事件页分节标题进入引用面（wa-sec 命中 ≥3）');
+      const orb = dom.getElementById('wa-orb');
+      let orbErr = null;
+      try { orb.dispatchEvent({ type: 'pointerup' }); } catch (e) { orbErr = e; }
+      assert(!orbErr && panel.classList.contains('wa-hidden') === true, '悬浮球 pointerup → toggle() 收起面板（orb 事件链贯通）');
+      orb.dispatchEvent({ type: 'pointerdown', clientX: 5, clientY: 5, pointerId: 1 });
+      orb.dispatchEvent({ type: 'pointermove', clientX: 60, clientY: 70, pointerId: 1 });
+      orb.dispatchEvent({ type: 'pointerup' });
+      assert(panel.classList.contains('wa-hidden') === true, '（正向）拖动后的 pointerup 不误触发开合（moved 阈值生效）');
+      WA.ui.open();
+    }
+
+    section('G17-D 事件页运行态条件渲染与「中止推演」链路（v2.11.0 面C 接线）');
+    {
+      const tabOf = function (p) { return panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === p; })[0]; };
+      tabOf('events').click();
+      const eBody = panel.querySelector('.wa-body');
+      assert(!eBody.querySelector('#wa-bs-abort'), '（负向）空闲态不渲染中止按钮（与 isRunning 一致）');
+      assert(typeof WA.backstage.forceSimulate === 'function', 'backstage.forceSimulate 可调用');
+      let inflight = 0;
+      const origFetch = global.fetch;
+      global.fetch = function (url, o) {
+        return new Promise(function (res, rej) {
+          inflight++;
+          const sg = o && o.signal;
+          if (sg) sg.addEventListener('abort', function () { rej(new Error('aborted')); });
+        });
+      };
+      try { WA.backstage.forceSimulate(); } catch (e) {}
+      const dl = Date.now() + 2500;
+      while (!WA.backstage.isRunning() && Date.now() < dl) await sleep(10);
+      assert(WA.backstage.isRunning() === true,
+        '（正向）推演进行中 isRunning()===true（在途请求未回）',
+        'inflight=' + inflight + ' last=' + JSON.stringify((WA.eventLog || []).slice(-1)[0] || null));
+      tabOf('events').click();
+      const abortBtn = panel.querySelector('.wa-body #wa-bs-abort');
+      assert(!!abortBtn, '运行态渲染出「中止推演」按钮（条件渲染命中运行分支）');
+      let abortErr = null;
+      try { if (abortBtn) abortBtn.click(); } catch (e) { abortErr = e; }
+      assert(!abortErr, '点击中止不抛异常（绑定真实命中）');
+      const dl2 = Date.now() + 2500;
+      while (WA.backstage.isRunning() && Date.now() < dl2) await sleep(10);
+      assert(WA.backstage.isRunning() === false, '中止后 isRunning() 归 false（信号贯通到在途请求）');
+      assert((WA.eventLog || []).some(function (l) { return /中止|abort/i.test(l.msg || ''); }), '中止动作已写入事件日志');
+      global.fetch = origFetch;
+    }
+
+    section('G17-E 状态事件 → 自动重绘（节流 / 隐藏跳过）');
+    {
+      panel.querySelector('.wa-close').click();
+      assert(panel.classList.contains('wa-hidden') === true, '（正向）关闭按钮点击 → 面板收起（close 绑定真实生效）');
+      const s0 = WA.ui.rerenderStat();
+      WA.emit('clock:changed', 'ui-gate-probe');
+      const s1 = WA.ui.rerenderStat();
+      assert(s1.scheduled === s0.scheduled + 1, '状态事件被调度重绘');
+      assert(s1.skippedHidden === s0.skippedHidden + 1, '面板隐藏时不重绘（避免无效渲染）');
+      WA.ui.open();
+      const s2 = WA.ui.rerenderStat();
+      WA.emit('chapters:changed'); WA.emit('registry:changed');
+      await sleep(350);
+      const s3 = WA.ui.rerenderStat();
+      assert(s3.scheduled === s2.scheduled + 2, '两次变更都进调度');
+      assert(s3.ran === s2.ran + 1, '节流：一窗多变更只重绘一次（防重绘风暴）');
+    }
+
+    section('G17-F 连续切换不留异常（渲染状态不泄漏）');
+    {
+      const arr = WA.ui.pages();
+      for (let i = 0; i < 30; i++) {
+        const p = arr[i % arr.length];
+        panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === p; })[0].click();
+      }
+      assert(WA.ui.currentPage() === arr[29 % arr.length], '30 次切换后停在预期页（实 ' + WA.ui.currentPage() + '）');
+      const b = panel.querySelector('.wa-body');
+      assert(!!b && b.innerHTML.length > 0, '30 次切换后渲染产物非空');
+    }
+
+    section('G17-G 探针自证：解析器关键能力 + 负向注入必须被抓到');
+    {
+      const probe = dom.createElement('div');
+      probe.innerHTML = '<input id="p1" value="abc"/><input id="p2" type="checkbox" checked/><input id="p3">';
+      assert(probe.querySelectorAll('input').length === 3, '（自证）自闭合标签逐个成节点且不吞兄弟节点');
+      assert(probe.querySelector('#p1').value === 'abc', '（自证）解析器保留 value 属性（否则控件读取全空却「渲染正常」）');
+      assert(probe.querySelector('#p2').checked === true, '（自证）解析器保留 checked 属性');
+      const r0 = __uiGateCheckPages(env, countControls);
+      assert(r0.failures.length === 0, '（基线）未破坏时逐页探针零失败（实 ' + r0.tested + ' 页）');
+      const src = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+      const doctored = src.replace('function renderLogs() {', 'function renderLogs() { throw new Error(\'ui-gate-probe\');');
+      assert(doctored !== src, '（自证）注入点 A 命中（renderLogs）');
+      const env2 = __uiGateFresh({ srcOverride: { 'ui/panel.js': doctored } });
+      const r2 = __uiGateCheckPages(env2, countControls);
+      assert(r2.failures.length > 0, '（负向）渲染器抛异常被逐页探针抓到（实失败 ' + r2.failures.length + ' 项）');
+      const doctored2 = src.replace('data-page="${p.id}"', 'data-page-x="${p.id}"');
+      assert(doctored2 !== src, '（自证）注入点 B 命中（页签 data-page）');
+      const env3 = __uiGateFresh({ srcOverride: { 'ui/panel.js': doctored2 } });
+      const r3 = __uiGateCheckPages(env3, countControls);
+      assert(r3.failures.length > 0, '（负向）页签绑定断掉被逐页探针抓到（实失败 ' + r3.failures.length + ' 项）');
+      const envShell = __uiGateFresh({ files: [] });
+      assert(envShell.dom.getElementById('wa-panel') === null,
+        '（负向）未装载 UI 时面板不存在（探针判据来自真实渲染，不是常量）');
+    }
+
+    console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
+    console.log('UI 渲染路径门禁：通过 ' + pass.length + ' / 失败 ' + fail.length);
+    if (fail.length) { console.log('失败项: ' + fail.join(' | ')); }
+    console.log('全部通过 ✓（渲染路径已被真实执行）');
+    return { pass: pass.length, fail: fail.length, failures: fail.slice() };
+  }
+    const __uiGateRes = await __uiGateBlocks();
+    assert(__uiGateRes.pass >= 40, '（正向）G17 断言数 ≥ 40（实 ' + __uiGateRes.pass + '）');
+    assert(__uiGateRes.fail === 0, '（正向）UI 渲染路径门禁全绿（渲染器/绑定/条件渲染均真实执行）', __uiGateRes.failures.join('；'));
+    pass += __uiGateRes.pass;
+    fail += __uiGateRes.fail;
   }
   } // end v2.11.0 block
   } // end v2.10.0 block
