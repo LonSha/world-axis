@@ -89,11 +89,42 @@
     return n;
   }
 
+  // v2.7.0: 安装写盘计量——「安装成功」与「安装失败」此前不可区分。
+  //   installPack 是全库 state 直写点里**唯一没有写后读回校验**的一处（其余 store 主路径均走
+  //   writeVerified / 校验出口），而它恰恰是**跨设备恢复**的落点：对端写来的存档装不进去时
+  //   没有任何信号，用户看到「恢复完成」而磁盘上仍是旧状态，下一次刷新进度整段回退。
+  //   （该缺口在 v2.6.0 收口时已作为「已知残留缺口」登记备查，本版补齐。）
+  const __installStat = { attempts: 0, ok: 0, failed: 0, lastAt: 0, lastReason: null, lastKey: null, lastBytes: 0 };
   function installPack(data, id) {
     data = data || {};
     _suspend = true;
     try {
-      if (data.state != null) mainWin.localStorage.setItem(stateKey(id), data.state);
+      if (data.state != null) {
+        const key = stateKey(id);
+        // 与 store.writeVerified 同判据：立刻读回逐字符比对。
+        //   刻意**不做**就地重试——重试交给下一次同步 tick（幂等），在 _suspend 窗口里硬重试
+        //   会把「安装挂起」与「重试写盘」耦合出更难查的时序问题（本仓库已有一次同型教训）。
+        try {
+          mainWin.localStorage.setItem(key, data.state);
+          let back = null;
+          try { back = mainWin.localStorage.getItem(key); } catch (eR) { back = null; }
+          __installStat.attempts++; __installStat.lastAt = Date.now();
+          __installStat.lastKey = key; __installStat.lastBytes = data.state.length;
+          if (back === data.state) {
+            __installStat.ok++;
+          } else {
+            const why = (back === null || back === undefined) ? 'missing-after-write'
+              : (typeof back === 'string' && back.length !== data.state.length) ? 'length-mismatch' : 'content-mismatch';
+            __installStat.failed++; __installStat.lastReason = why;
+            if (WA.log) WA.log('error', 'chatcache: 存档安装写盘未落住（' + why + '）——磁盘仍是旧状态，本次恢复未真正生效');
+          }
+        } catch (e) {
+          __installStat.attempts++; __installStat.failed++;
+          __installStat.lastAt = Date.now(); __installStat.lastKey = key;
+          __installStat.lastReason = 'write:' + String((e && e.message) || e).slice(0, 80);
+          if (WA.log) WA.log('error', 'chatcache: 存档安装写盘失败（配额/隐私模式）——本次恢复未生效', e);
+        }
+      }
       // 注意：WorldAxis单slot，state缺失时保留本地值（安全语义，等同原版checkpoint保护）
     } finally { _suspend = false; }
   }
@@ -296,6 +327,8 @@
     NS, init, scheduleTick, runTick, pushLiveNow,
     stripHeavy, packChat, installPack, pruneSnapshots, writeNamespace,
     addSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot,
-    readNamespace, ensureNamespace
+    readNamespace, ensureNamespace,
+    /** v2.7.0: 存档安装写盘台账（只读）——「恢复成功」与「恢复了但没写进去」必须可分辨 */
+    installStat() { return Object.assign({}, __installStat); }
   };
 })();

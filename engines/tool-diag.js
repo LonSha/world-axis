@@ -242,7 +242,11 @@
       chatcache: safe(function () {
         if (!WA.chatcache || !WA.chatcache.listSnapshots) return { error: 'chatcache 不可用' };
         const snaps = WA.chatcache.listSnapshots() || [];
-        return { count: snaps.length, latest: snaps.length ? { id: snaps[0].id, name: snaps[0].name, auto: !!snaps[0].auto, round: snaps[0].round } : null };
+        // v2.7.0: 存档安装写盘台账——跨设备恢复此前只有「恢复完成」这一个信号，
+        //   装配失败时用户看到的是成功而磁盘上还是旧状态（下次刷新进度整段回退）。
+        const inst = WA.chatcache.installStat ? WA.chatcache.installStat() : null;
+        return { count: snaps.length, install: inst,
+          latest: snaps.length ? { id: snaps[0].id, name: snaps[0].name, auto: !!snaps[0].auto, round: snaps[0].round } : null };
       }, {}),
         // v2.2.0: 设置键登记表与孤儿候选（此前 registry/pendingOrphan 全库零消费）
         settingsBus: safe(function () {
@@ -409,6 +413,9 @@
       'wa-set-npcv', 'wa-set-budgetv', 'wa-set-mslimitv', 'wa-set-msdicev', 'wa-ev-modv',
       'wa-hz-d-chancev', 'wa-hz-d-cdv', 'wa-hz-d-ledgerv',
       'wa-hz-n-chancev', 'wa-hz-n-cdv', 'wa-hz-n-ledgerv',
+      // v2.7.0: 区域突发事件配置（生效值视图接入界面后的新增出口）
+      'wa-rg-enable', 'wa-rg-chance', 'wa-rg-dur', 'wa-rg-save', 'wa-rg-out',
+      'wa-rg-chancev', 'wa-rg-durv',
       'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] }
   ];
@@ -768,6 +775,15 @@
           + (codeBug ? '：其中含**实现缺陷**（登记项未声明 key / 值不可序列化），须改调用方，清存储无效'
                      : '：配额已满/隐私模式/键被拒绝时，用户改动不会落盘且界面无提示') });
     }
+    // v2.7.0: 「写盘被拒」与「写进去又没留住」分列——setItem 不抛错 ≠ 数据在盘上。
+    //   两者处置完全不同：前者清空间/关隐私模式即可，后者是存储层静默截断（只能留证/换键）。
+    if (wD && wD.verifyFailed > 0) {
+      const stg = wD.staged || {};
+      issues.push({ level: 'error', key: 'settingsBus.writeStaged',
+        detail: '设置写盘 ' + wD.verifyFailed + ' 次**写完读回不一致**（最近 ' + (stg.key || '?') + '：' + (stg.reason || '?') + '）'
+          + '——setItem 没报错但磁盘上的值不是刚写的那份：移动端配额临界/写入毒化/后台回收下会静默发生。'
+          + '此类失败重试无效，请先导出配置与诊断包留证' });
+    }
     if (wD && wD.subkeyDrift && wD.subkeyDrift.count > 0) {
       const lp = wD.subkeyDrift.last || {};
       issues.push({ level: 'warn', key: 'settingsBus.subkeyDrift',
@@ -777,6 +793,13 @@
     const visD = ((diag.runtime || {}).visibility) || null;
     if (visD && visD.undeclared && visD.undeclared.length) {
       issues.push({ level: 'error', key: 'inject.visibilityUndeclared', detail: '注入可见性存在未声明默认值的源（' + visD.undeclared.join('、') + '）：这些开关没有默认值可回落，旧存档下会被判为「关」' });
+    }
+    // v2.7.0: 存档安装写盘失败——「恢复完成」与「恢复其实没写进去」必须可分辨
+    const instD = ((diag.runtime || {}).chatcache || {}).install || null;
+    if (instD && instD.failed > 0) {
+      issues.push({ level: 'error', key: 'chatcache.install',
+        detail: '存档安装写盘失败 ' + instD.failed + '/' + instD.attempts + ' 次（最近 ' + (instD.lastKey || '?') + '：' + (instD.lastReason || '?') + '）'
+          + '——跨设备恢复的存档没装进本地，界面提示的成功不代表磁盘上真的换了' });
     }
     const qaD = ((diag.runtime || {}).quarantineAudit) || null;
     if (qaD && (qaD.restores > 0 || qaD.drops > 0)) issues.push({ level: 'info', key: 'quarantine.history', detail: '隔离现场处置史：恢复 ' + qaD.restores + ' 次 / 丢弃 ' + qaD.drops + ' 次' + (qaD.lastKey ? '（最近 ' + qaD.lastKey + '）' : '') });

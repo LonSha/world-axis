@@ -103,7 +103,32 @@
             memSamplerDice: 10000,         // v0.9.9: 采样骰子面数（1000-10000，越大越平滑）
             memSamplerRelevance: 'on',   // v0.9.9: 上下文相关召回 on/off
             customInstruction: ''         // 用户自定义推演指令（追加到系统提示）
-          }, module: 'backstage' };
+          },
+          // v2.7.0（收口）: 区间与枚举声明上收到登记表——此前这些合法范围**只存在于设置页的
+          //   `<input min max>` 与 `<select>` 选项里**，引擎一侧承认的只有少数几个（且分散）：
+          //     · npcBudget 全库零夹取 —— 填 -5 会让 `sorted.slice(0, -5)` 返回**空数组**，
+          //       NPC 一个都不结算，而界面照显「-5」且无任何提示（静默失效，最难查的一类）；
+          //     · memSamplerLimit / memSamplerDice 的区间常量住在**另一个文件**
+          //       （engines/memory-sampler.js 的 MIN_LIMIT/MIN_SIDES），声明与消费跨文件——
+          //       改一处忘一处就是「滑块能拖到的值被引擎夹掉」；
+          //     · injectBudget 是三态值（-1 自动 / 0 不限 / 正数手动），**不是**普通区间 ——
+          //       直接按区间夹取会把「自动档」变成「手动 200t」（静默改变用户意图），
+          //       故它只声明哨兵（见下方 sentinels），正数部分原样透传。
+          //   声明收到此处后，UI 与引擎取同一份（`WA.settingsBus.boundsOf(key)`）。
+          bounds: { npcBudget: [1, 16], memSamplerLimit: [1, 30], memSamplerDice: [1000, 10000] },
+          //   injectBudget 刻意**不声明区间**：它是三态值（-1 自动 / 0 不限 / 正数手动），
+          //   而「正数」的合法域在 UI 上是 200-6000——但引擎与既有测试都用过 60/80 这类小值
+          //   来表达「极紧的预算」并断言落盘值等于该值。若在此声明 [200,6000]，那些写入会被
+          //   静默改成 200，等于**在写路径上改动调用方语义**，与「归一不是猜用户想要什么」相悖。
+          //   故只声明哨兵（-1/0 原样保留），正数原样透传 —— 归一只收窄「已确认是契约」的域。
+          sentinels: { injectBudget: [-1, 0] },
+          enums: {
+            simulationMode: ['light', 'balanced', 'deep', 'manual'],
+            timePolicy: ['explicit', 'cautious', 'open', 'world'],
+            pulseActivity: ['quiet', 'normal', 'turbulent'],
+            memSamplerRelevance: ['on', 'off']
+          },
+          module: 'backstage' };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_B]);
   function loadSettings() { return WA.settingsBus.read(__REG_B); }
   // v2.6.0: 走 saveOrThrow 以便回传失败原因（save() 的布尔不足以说明「为什么没落盘」）
@@ -173,7 +198,12 @@
   const backstage = WA.backstage = {
     getSettings: loadSettings,
     // v2.6.0: 回传写入结果——面板据此区分「真保存」与「被环境吞掉」，不再无条件报成功。
-    setSettings(obj) { const s = Object.assign(loadSettings(), obj || {}); const w = saveSettings(s); WA.emit('backstage:settings', s); return w; },
+    // v2.7.0: 落盘前先归一（`settingsBus.normalize`）——区间/枚举的声明已在 __REG_B 上，
+    //   写进去的就是界面显示的那份，不再有「磁盘 -5、引擎按 1 算」的隐性第二套值。
+    setSettings(obj) {
+      const s = WA.settingsBus.normalize(__REG_B, Object.assign(loadSettings(), obj || {}));
+      const w = saveSettings(s); WA.emit('backstage:settings', s); return w;
+    },
     isRunning: () => !!currentTask,
     pending: () => pendingAnchor,
 

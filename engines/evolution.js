@@ -36,7 +36,12 @@
   //   （子键补齐只加不减、`setSettings` 走 `Object.assign(read(),patch)` 读到什么写回什么
   //   ⇒ 每次保存都给死键续命），而它们既非「损坏」也非「未登记键」，任何治理出口都看不见。
   //   迁移逻辑走 settingsBus.subkeyPruner 单一实现（两份内联必然分叉）。
-  const __REG = { key: LS_KEY, def: EVO_DEF, module: 'evolution', migrateObjects: true,
+  const __REG = { key: LS_KEY, def: EVO_DEF,
+    // v2.7.0（收口）: 区间声明上收到登记表。此前 `diceModifier` 的合法范围只写在设置页的
+    //   `min="-30" max="30"` 上，引擎侧 `_num` 只做「不可解析才回落」，越界值原样参与
+    //   阈值算术（填 300 会让 threshold 恒负、演化永不成功，而界面照显「300」）。
+    bounds: { diceModifier: [-30, 30], setbackRatio: [0, 100], progressFailBase: [1, 20], conflictFailBase: [1, 20] },
+    module: 'evolution', migrateObjects: true,
     migrate: WA.settingsBus.subkeyPruner(EVO_DEF) };
   function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
@@ -50,7 +55,8 @@
     STAGE_MAP, TERMINAL, REPUTATION_LEVELS, FACTION_STATUS, FACTION_RELATION, ECONOMY_CLIMATE,
     getSettings: loadSettings,
     // v2.6.0: 回传写入结果（见 backstage.setSettings 注释）
-    setSettings(o) { return saveSettings(Object.assign(loadSettings(), o || {})); },
+    // v2.7.0（收口）: 幂等归一——与其余四模块同规格（区间声明在 __REG.bounds 上）。
+    setSettings(o) { return saveSettings(WA.settingsBus.normalize(__REG, Object.assign(loadSettings(), o || {}))); },
 
     // ════════════════════════════════════════════════════
     // 事件链 CRUD + 骰子推进（移植 forceTriggerEvents）

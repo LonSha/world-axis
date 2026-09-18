@@ -50,7 +50,15 @@
     // v2.6.0（收口）: 写失败**来源分类**——「配额已满」（环境问题，提示用户清理）与「登记项未声明
     //   key」「值不可序列化」（代码缺陷，须改实现）是两类完全不同的故障；只留一个 lastError 字符串
     //   会让诊断把编程错误报成环境问题，用户照着提示修永远修不好。
-    writeFailedBy: { missingKey: 0, stringify: 0, setItem: 0, writeback: 0, rawRevive: 0, quarantine: 0, legacy: 0, stamp: 0 },
+    writeFailedBy: { missingKey: 0, stringify: 0, setItem: 0, writeback: 0, rawRevive: 0, quarantine: 0, legacy: 0, stamp: 0, verify: 0 },
+    // v2.7.0: 「写进去」与「存住了」是两件事——setItem 不抛错 ≠ 数据真的落盘。
+    //   本仓库 store 侧自 v0.4.0 就有 writeVerified（写后立刻读回逐字符比对、不一致重试一次、
+    //   两次都不一致则如实报失败），而**设置家族键完全没有这一层**：lsWrite 在 setItem 返回后
+    //   直接置 ok:true。移动端在配额临界、写入毒化、后台回收下可能静默截断或丢弃写入——
+    //   此时设置台账会显示「全部落盘」，而磁盘上是空的/旧的，用户下次打开配置回退却无从取证。
+    //   本字段记录「setItem 未抛错但读回不一致」的次数（独立于 setItem 桶：前者是写被拒，
+    //   后者是写被接受却没留住，两者的处置完全不同——前者清空间，后者只能重试/换键）。
+    verifyFailed: 0, lastStaged: null,
     // v2.6.0: 写入侧死键计量——`save()` 收到「不在登记 def 里的子键」的次数与最近键名。
     //   v2.5.0 的缩减型迁移只解决了**存量**（老存档里已有的死子键），**增量**仍在继续：
     //   `Object.assign(read(), patch)` 把运行时算出的旧字段一并写回、`setChannel` 无白名单地
@@ -368,11 +376,35 @@
    * @param {string} [from] 来源标签（走 writeFailedBy 分类）
    * @returns {{ok:boolean, error?:*, bytes:number}}
    */
-  function lsWrite(key, payload, from) {
+  function lsWrite(key, payload, from, opts) {
     const ls = (WA.mainWin || window).localStorage;
     const bytes = payload ? payload.length : 0;
+    const o = opts || {};
     try {
       ls.setItem(key, payload);
+      // v2.7.0: 写盘成功计量必须放在**校验之后**——与 v2.6.0 定下的口径一致（自增在真实成功之后）。
+      //   否则「写进去又被静默丢弃」会同时计一次 writes（成功 N 次虚高）与一次 verifyFailed，
+      //   读诊断的人会以为「绝大多数都成功了，只是偶尔丢一次」，而真实情况是那些写入压根没留住。
+      // v2.7.0: 写后读回校验——「setItem 没抛错」不等于「值在盘上」。
+      //   与 store.writeVerified 同规格的判据：立刻读回、逐字符比对。不一致即视为**本次写入
+      //   没有发生**（ok:false），因为消费端下次 read 拿到的就不是刚写的东西。
+      //   刻意不在此重试：设置键的写点分布在 read 热路径（迁移回写/盖章）与用户点击路径上，
+      //   热路径重试会放大 IO；而失败已记账且下次 read 天然重试（迁移/盖章本就幂等），
+      //   把重试交给幂等机制比在这里硬重试更干净。store 主状态路径仍保留其自有的重试。
+      //   opts.verify === false 供测试/极端场景显式关闭（默认开启：诚实是默认值）。
+      if (o.verify !== false) {
+        let back = null;
+        try { back = ls.getItem(key); } catch (eR) { back = null; }
+        if (back !== payload) {
+          const why = back === null || back === undefined ? 'missing-after-write'
+            : (typeof back === 'string' && typeof payload === 'string' && back.length !== payload.length)
+              ? 'length-mismatch:' + back.length + '≠' + payload.length : 'content-mismatch';
+          stats.verifyFailed++;
+          stats.lastStaged = { key: key, at: now(), reason: why, bytes: bytes };
+          noteFail('verify', why, 'verify: ');
+          return { ok: false, error: { message: why }, bytes: bytes, staged: true, reason: why };
+        }
+      }
       stats.writes++;
       stats.lastWrite = { key: key, bytes: bytes, at: now() };
       stats.lastWriteError = null;
@@ -388,11 +420,11 @@
    *   循环引用 vs 配额，但同样意味着「这次写入没有发生」）。
    *   **契约：永不抛**——故调用方无需再包 try，也不会出现「漏包 try 就漏记账」的断档。
    */
-  function ls_set(key, value, from) {
+  function ls_set(key, value, from, opts) {
     let payload = null;
     try { payload = JSON.stringify(value === undefined ? null : value); }
     catch (eS) { noteFail(from || 'writeback', eS, 'stringify: '); return { ok: false, error: eS }; }
-    return lsWrite(key, payload, from || 'writeback');
+    return lsWrite(key, payload, from || 'writeback', opts);
   }
   function ls_keys() {
     const ls = (WA.mainWin || window).localStorage;
@@ -586,9 +618,77 @@
     }
     return !!v;
   }
+  /**
+   * v2.7.0（收口）: 数值归一——**唯一实现**。
+   *   与 normChancePct 的历史判据收窄一致（见 engines/horizon.js 的收窄说明）：
+   *   `parseFloat` 后取整、再按声明区间夹取；不可解析则回落默认值。
+   *   刻意**不再**把 ≤1 的正数解释为小数比率——那会让区间下限 1 与「1%」语义塌陷重合。
+   * @param {*} v 原值 @param {number} def 默认 @param {number} min @param {number} max
+   */
+  function clampNum(v, def, min, max) {
+    const n = parseFloat(v);
+    if (!isFinite(n)) return def;
+    return Math.min(max, Math.max(min, Math.round(n)));
+  }
+  /**
+   * v2.7.0: 生效值归一（**读写同源的单一实现**）。
+   *
+   * 为什么要有它（本版正向审计的结论，非设计偏好）：v2.7.0 主体把 regional / horizon 的
+   *   `setSettings` 改成「写入即归一」，但同一形态的缺陷在库内**不是两处，而是一簇**——
+   *   `opinion.everyNRounds`（读路径 `Math.max(1, …)` 夹取下界、UI 声明 1-10、写路径落原值）、
+   *   `backstage.npcBudget`（UI 声明 1-16，写路径落原值；填 -5 时 `slice(0,-5)` 返回**空数组**，
+   *   NPC 全部不结算 = 静默失效）、`backstage.memSamplerLimit/memSamplerDice`（区间常量住在
+   *   **另一个文件** `memory-sampler.js`，声明与消费跨文件）、`evolution.diceModifier` 等。
+   *   逐个模块各写一份 `clampXxx` 只会把「两套口径」变成「五套口径」，故本版把**区间声明**
+   *   上收到登记表（`reg.bounds` / `reg.enums`），归一逻辑收敛到这一处：
+   *     · 读路径（生效视图）与写路径（落盘）都调它 ⇒ 界面显示的 = 磁盘存的 = 引擎用的；
+   *     · 未声明区间的子键**原样透传**（绝不臆测——归一不是「猜用户想要什么」）；
+   *     · 布尔域由 `def` 的类型自动判定（`typeof def[k] === 'boolean'` 即走 toBool），
+   *       不额外引入第二份「哪些子键是布尔」的清单。
+   * @param {object} reg 登记项（读 reg.def / reg.bounds / reg.enums）
+   * @param {*} value 待归一的整值（通常 `Object.assign(read(reg), patch)`）
+   * @returns {object} 归一后的浅拷贝（未声明的子键原样保留，不增不减）
+   */
+  function normalize(reg, value) {
+    const r = reg || {};
+    const def = (r.def && typeof r.def === 'object' && !Array.isArray(r.def)) ? r.def : {};
+    const src = (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
+    const bd = (r.bounds && typeof r.bounds === 'object') ? r.bounds : {};
+    const en = (r.enums && typeof r.enums === 'object') ? r.enums : {};
+    // v2.7.0: 哨兵值——「区间之外的合法取值」（如 injectBudget 的 -1=自动 / 0=不限，
+    //   与正数区间 200-6000 并存）。命中哨兵即原样保留，绝不当作越界值夹回区间：
+    //   把 -1 夹成 200 会让「自动档」变成「手动 200t」，是静默改变用户意图。
+    const sn = (r.sentinels && typeof r.sentinels === 'object') ? r.sentinels : {};
+    const out = {};
+    Object.keys(src).forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(en, k) && Array.isArray(en[k])) {
+        out[k] = (en[k].indexOf(src[k]) >= 0) ? src[k] : def[k];         // 枚举白名单
+      } else if (Array.isArray(sn[k]) && sn[k].indexOf(src[k]) >= 0) {
+        out[k] = src[k];                                                 // 哨兵值原样
+      } else if (Object.prototype.hasOwnProperty.call(bd, k) && Array.isArray(bd[k])) {
+        out[k] = clampNum(src[k], def[k], bd[k][0], bd[k][1]);           // 声明区间
+      } else if (typeof def[k] === 'boolean') {
+        out[k] = toBool(src[k], def[k]);                                 // 布尔域由 def 推断
+      } else {
+        out[k] = src[k];                                                 // 未声明 → 原样
+      }
+    });
+    return out;
+  }
+  /** v2.7.0: 按键取区间声明（UI 生成控件 / 跨文件消费点取用，避免界面与引擎各写一份 min/max） */
+  function boundsOf(key) {
+    const rows = WA.__settingsRegs || [];
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].key === key) return rows[i].bounds || {};
+    }
+    return {};
+  }
   WA.settingsBus = {
     stats: stats,
     toBool: toBool,
+    clampNum: clampNum,
+    normalize: normalize,
+    boundsOf: boundsOf,
     read(reg) {
       const r = Object.assign({ legacy: [], legacyRemove: true, orphan: false, def: null }, reg || {});
       const ls = (WA.mainWin || window).localStorage;
@@ -703,9 +803,10 @@
      *   这条边界的意义在于诚实：台账说「全部落盘」时，它指的是**设置键**全部落盘；
      *   把口径模糊成整个扩展的所有写盘，就是另一种计量不实。
      *
-     * 已知残留缺口（本版未修，登记备查）：`engines/chatcache.js:96` 的 `installPack` 写 state
-     *   未做写后读回校验（其余 store 主路径均经 writeVerified / 校验出口），跨设备对账时
-     *   「安装成功」与「安装失败」不可区分 —— 属 state 家族，归下一轮。
+     * v2.7.0 起：该缺口已补齐 —— `engines/chatcache.js` 的 `installPack` 写 state 后同样做
+     *   写后读回逐字符比对（`__installStat`：missing-after-write / length-mismatch /
+     *   content-mismatch 三分类），并接入 `WA.toolDiag` 的 `chatcache.install` 议题。
+     *   故「state 家族旁路点自带写后校验」这句在本版起对**全部** state 直写点成立。
      *
      * 为什么需要（本轮命题）：读侧已有 reads / subkeyFills / migrations / rawRevives / schemaStamps
      *   五组计量，**写侧一个都没有**。而「保存了却没生效」是用户唯一会当场察觉、却最难取证的一类故障——
@@ -713,7 +814,7 @@
      *   「功能没实现」在诊断包里长得一模一样。本视图把三个失败来源（缺 key / 序列化 / setItem）
      *   与最近成功写入一起摊开，使「写不进去」第一次可判定。
      * @returns {{writes:number, writeFailed:number, ok:boolean, last:object|null, lastError:string|null,
-     *   subkeyDrift:{count:number, last:object|null}}}
+     *   verifyFailed:number, staged:object|null, subkeyDrift:{count:number, last:object|null}}}
      */
     writeStat() {
       // v2.6.0（收口）: ok 的语义只有在本计量**覆盖全部写路径**时才成立——这也是本版收口的原因
@@ -724,6 +825,9 @@
       return { writes: stats.writes, writeFailed: stats.writeFailed,
         ok: stats.writeFailed === 0, last: stats.lastWrite, lastError: stats.lastWriteError,
         bySource: bySource,
+        // v2.7.0: 「写盘被拒」与「写进去又没留住」必须分开呈现——前者用户清空间即可，
+        //   后者是存储层/环境的静默截断，用户唯一能做的是把配置导出留证。
+        verifyFailed: stats.verifyFailed || 0, staged: stats.lastStaged,
         subkeyDrift: { count: stats.extraSubkeys, last: stats.lastExtra } };
     },
     /**
@@ -836,7 +940,11 @@
         return { key: r.key, legacy: (r.legacy || []).slice(), legacyRemove: !!r.legacyRemove,
           optional: !!r.optional, orphan: !!r.orphan, def: r.def, module: r.module,
           // v2.5.0: 生命周期能力声明也要可盘点，否则「能力实现了却无人行使」在治理层照样隐形
-          hasMigrate: typeof r.migrate === 'function', rawRevive: !!r.rawRevive };
+          hasMigrate: typeof r.migrate === 'function', rawRevive: !!r.rawRevive,
+          // v2.7.0: 生效值域声明（区间/枚举/哨兵）——此前「设置项的合法范围」在库里**没有声明面**：
+          //   它只活在设置页的 `<input min max>` 与各模块自己的夹取常量里（甚至跨文件）。
+          //   不透出的话，诊断与测试都无法回答「这个子键的契约区间是什么」。
+          bounds: r.bounds || null, enums: r.enums || null, sentinels: r.sentinels || null };
       });
     },
     /** v2.3.0: 本会话是否真实读到过该键（幽灵键判定的历史依据） */
@@ -941,6 +1049,37 @@
         seenKeys[key] = true;
         if (r.orphan && r.optional) issues.push({ code: 'orphan_optional_conflict', level: 'error', detail: key + ' 同时标 orphan 与 optional（语义矛盾）' });
         if (!Object.prototype.hasOwnProperty.call(r, 'def')) issues.push({ code: 'missing-def', level: 'warn', detail: key + ' 未声明 def（缺失键时读到 undefined）' });
+        // v2.7.0: 生效值域声明的自洽性——「声明了区间/枚举，但字段在 def 里不存在」是
+        //   典型的声明漂移：归一按键名逐字段作用，键名写错时它**永远不会被命中**，
+        //   于是「已声明」变成一句空话（静默失效，与死键同型）。此处把它变成可见的 error。
+        try {
+          const bd = r.bounds || {}, en = r.enums || {}, sn = r.sentinels || {};
+          const defKeys = (r.def && typeof r.def === 'object' && !Array.isArray(r.def)) ? Object.keys(r.def) : [];
+          [['bounds', bd], ['enums', en], ['sentinels', sn]].forEach(function (pair) {
+            Object.keys(pair[1]).forEach(function (f) {
+              if (defKeys.indexOf(f) < 0) {
+                issues.push({ code: 'domain-unknown-field', level: 'error',
+                  detail: key + ' 的 ' + pair[0] + '.' + f + ' 在 def 中不存在（归一永不命中该声明 = 声明空转）' });
+              }
+            });
+            // 区间/哨兵本身的自洽：min<=max、哨兵不得落在区间内部（两者重叠时语义有歧义）
+            if (pair[0] === 'bounds') Object.keys(pair[1]).forEach(function (f) {
+              const a = pair[1][f];
+              if (!Array.isArray(a) || a.length !== 2 || !(a[0] <= a[1])) {
+                issues.push({ code: 'bad-bounds', level: 'error', detail: key + '.' + f + ' 区间声明非法（应为 [min,max] 且 min<=max）' });
+              }
+            });
+          });
+          Object.keys(sn).forEach(function (f) {
+            const a = sn[f], b = bd[f];
+            if (Array.isArray(a) && Array.isArray(b)) {
+              a.forEach(function (v) {
+                if (v >= b[0] && v <= b[1]) issues.push({ code: 'sentinel-in-bounds', level: 'error',
+                  detail: key + '.' + f + ' 哨兵 ' + v + ' 落在区间 [' + b[0] + ',' + b[1] + '] 内（语义歧义）' });
+              });
+            }
+          });
+        } catch (eD) { /* 域声明校验失败不影响其余自检项 */ }
         if (r.orphan && typeof o.readerProbe === 'function') {
           try {
             if (o.readerProbe(key)) issues.push({ code: 'orphan_still_read', level: 'error', detail: key + ' 已声明废弃但模块仍在读取' });

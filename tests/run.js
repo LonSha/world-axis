@@ -1473,9 +1473,16 @@ WA.loadScript = _ls.loadScript;
   const msCfgSel2 = WA.memorySampler.sampleEntries({ state: WA.store.get(), limit: 5, relevanceFilter: 'off' });
   assert(msCfgSel2.length === 5, 'opts.limit 覆盖配置 limit');
   // 极限值夹取
+  // v2.7.0（收口）: 口径变更——旧断言是「limit 999 读入（sampleEntries 内夹取）」，
+  //   即「写原值、读时夹」：磁盘上留 999、引擎按 30 用，两套数并存（本版要修掉的正是它）。
+  //   现在写路径即归一（区间声明在 __REG_B.bounds，与 memory-sampler 的 MIN/MAX 同源），
+  //   故落盘就是 30 —— 界面显示 30、磁盘 30、引擎 30，只有一份。
   WA.backstage.setSettings({ memSamplerLimit: 999, memSamplerDice: 99999 });
   const msCfg3 = WA.memorySampler.loadSamplerSettings();
-  assert(msCfg3.memSamplerLimit === 999, 'limit 999 读入（sampleEntries 内夹取）');
+  assert(msCfg3.memSamplerLimit === 30, 'limit 999 落盘即归一为区间上限 30（此前写原值、读时夹，磁盘留 999）');
+  assert(JSON.parse(global.localStorage.getItem('worldaxis_backstage_settings_v1')).memSamplerLimit === 30,
+    '（磁盘）存的就是生效值 30（不再是「磁盘 999 / 引擎 30」两套数）');
+  assert(msCfg3.memSamplerDice === 10000, 'dice 99999 同样归一到上限 10000');
   const msCfgSel3 = WA.memorySampler.sampleEntries({ state: WA.store.get(), relevanceFilter: 'off' });
   assert(msCfgSel3.length === 12, 'limit 超候选数时返回全部 12 条');
   // 恢复默认
@@ -8434,7 +8441,12 @@ WA.loadScript = _ls.loadScript;
     WA.horizon.setSettings({ distantChance: 500 });
     assert(WA.horizon.stat().config.distant.chancePct === 100, '越界概率 500 → 夹取到上限 100');
     WA.horizon.setSettings({ distantChance: 0.5 });
-    assert(WA.horizon.stat().config.distant.chancePct === 50, '小数比率写法 0.5 → 归一为 50%');
+    // v2.7.0: 口径**有意收窄**（旧断言是「0.5 → 归一为 50%」）。
+    //   原因：概率区间下限恰好是 1，旧的 `n > 0 && n <= 1 → ×100` 让「1」与「100%」不可区分——
+    //   填 1 得 100%（拉满），填 0.5 得 50%，相邻两个合法输入相差 50 倍。本版「写入即归一」
+    //   把归一搬到了写路径上，若沿用旧判据会把用户填的 1% **静默存成 100%**。
+    //   故：小数写法不再被解释为分数，与百分比同口径（0.5 夹取到下限 1）。
+    assert(WA.horizon.stat().config.distant.chancePct === 1, '小数写法不再被解释为分数（与百分比同口径；有意收窄，防 1% 被静默存成 100%）');
     WA.horizon.setSettings({ distantChance: -3 });
     assert(WA.horizon.stat().config.distant.chancePct === 1, '负概率 → 夹取到下限 1（不会挖出恒真/恒假洞）');
     WA.horizon.setSettings({ distantCooldown: 99 });
@@ -9555,7 +9567,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.6.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.7.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10099,11 +10111,302 @@ assert(verF2500 === '2.6.0' && mfF2500.version === verF2500, '入口与清单同
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.6.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.7.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
   } // end v2.6.0 block
+
+  // ══════════ v2.7.0 ══════════
+  v2700: {
+  const LS2700 = global.localStorage;
+  const ctx2700 = global.SillyTavern.getContext();
+  const PROD2700 = ['core/store.js', 'core/settings-bus.js', 'engines/chatcache.js', 'engines/regional.js',
+    'engines/horizon.js', 'engines/tool-diag.js', 'engines/backstage.js', 'engines/opinion.js',
+    'engines/evolution.js', 'engines/memory-sampler.js', 'ui/settings.js', 'ui/panel.js'];
+  const SRC2700 = PROD2700.map(function (rel) { return { rel: rel, text: fs.readFileSync(path.join(BASE, rel), 'utf8') }; });
+  function src2700(rel) { const h = SRC2700.filter(function (x) { return x.rel === rel; })[0]; return h ? h.text : ''; }
+  function fresh2700() { LS2700.clear(); ctx2700.chatId = 'v2700_chat'; global.__mockChat.length = 0; WA.store.init(); }
+  function wstat2700() { return WA.settingsBus.writeStat(); }
+
+  // ── 块1：写入侧完整性——「写进去」与「存住了」是两件事 ──
+  fresh2700();
+  section('v2.7.0 块1：写后读回校验（写盘被拒 vs 写进去没留住）');
+  {
+    const w0 = wstat2700();
+    assert(typeof w0.verifyFailed === 'number', '写入台账透出 verifyFailed（写完读回不一致的计数）');
+    // 正向：正常写入既计入 writes，也不计 verifyFailed
+    const kOk = 'worldaxis_v2700_ok_v1';
+    const regOk = { key: kOk, def: { a: 1 }, module: 'test' };
+    const vf0 = wstat2700().verifyFailed, wr0 = wstat2700().writes;
+    assert(WA.settingsBus.save(regOk, { a: 1 }) === true, '（正向）写盘+读回一致 ⇒ save 返回 true');
+    assert(wstat2700().writes === wr0 + 1, '（正向）校验通过的写入计入 writes');
+    assert(wstat2700().verifyFailed === vf0, '（正向）校验通过不计 verifyFailed');
+    assert(LS2700.getItem(kOk) === JSON.stringify({ a: 1 }), '（正向）值确实在盘上（计量不是唯一证据）');
+    // 负向：setItem 不抛错，但读回与写入不一致 ⇒ 必须判失败（而不是记成功）
+    const kStaged = 'worldaxis_v2700_staged_v1';
+    const regStaged = { key: kStaged, def: { a: 1 }, module: 'test' };
+    const rawSet = LS2700.setItem, rawGet = LS2700.getItem;
+    let caught = null;
+    try {
+      // 模拟「写被接受但没留住」：setItem 静默丢弃（真实成因：配额临界/写入毒化/后台回收）
+      LS2700.setItem = function (k, v) { if (k === kStaged) return; return rawSet.call(LS2700, k, v); };
+      LS2700.getItem = function (k) { return rawGet.call(LS2700, k); };
+      const vf1 = wstat2700().verifyFailed, wr1 = wstat2700().writes;
+      const ok1 = WA.settingsBus.save(regStaged, { a: 1 });
+      assert(ok1 === false, '（负向）写完读回不一致 ⇒ save 判失败（不再假装写成功）');
+      assert(wstat2700().verifyFailed === vf1 + 1, '写完读回不一致计入 verifyFailed');
+      assert(wstat2700().writes === wr1, '（关键）staged 写入**不得**计入 writes——否则「成功 N 次」虚高，读的人以为只是偶尔丢一次');
+      assert(LS2700.getItem(kStaged) === null, '（环境）确实没写进去（setItem 被静默丢弃）');
+      const sr = WA.settingsBus.saveOrThrow(regStaged, { a: 2 });
+      assert(sr.ok === false && /verify|missing-after-write/.test(String(sr.reason)), '严格写入回传可归因（实 ' + sr.reason + '）');
+      assert(/missing-after-write|length-mismatch|content-mismatch/.test(String(wstat2700().lastError)),
+        '归因桶区分「写被拒」与「写进去没留住」（实 ' + wstat2700().lastError + '）');
+      assert((wstat2700().bySource || {}).verify >= 1, 'verify 独立成桶（不与 setItem 桶混同，两者处置不同）');
+    } catch (e) { caught = e; } finally { LS2700.setItem = rawSet; LS2700.getItem = rawGet; }
+    assert(caught === null, '（负向）校验失败路径不抛异常（' + (caught && caught.message) + '）');
+    // 不变量：唯一写出口只自增一次 writes，且位于校验之后
+    const busS = src2700('core/settings-bus.js');
+    assert((busS.match(/stats\.writes\+\+/g) || []).length === 1, 'writes 自增收敛为单一实现（一处）');
+    assert(busS.indexOf('if (o.verify !== false)') > 0, '写后读回校验在位（默认开启）');
+    const iSet = busS.indexOf('ls.setItem(key, payload);');
+    const iWr = busS.indexOf('stats.writes++;');
+    const iVf = busS.indexOf('stats.verifyFailed++;');
+    assert(iSet > 0 && iWr > iSet && iVf > iSet, '锚点齐全（setItem / writes / verifyFailed）');
+    assert(iWr > iVf, 'writes 自增在校验分支之后（顺序即口径：只有校验通过才算成功）');
+  }
+
+  // ── 块2：生效值单源——落盘的就是系统执行的值 ──
+  fresh2700();
+  section('v2.7.0 块2：写入即归一（界面上显示的 = 磁盘上的 = 引擎用的）');
+  {
+    // 背景：regionl / horizon 此前「读时夹取、写时存原值」——磁盘上是 500，引擎按 100 掷骰，
+    //   而界面把引擎夹取后的数显示出来，于是「界面 100 / 磁盘 500」两套数并存且无人提示。
+    const rk = 'worldaxis_regional_settings_v1';
+    WA.regional.setSettings({ enabled: true, chancePercent: 500, durationRounds: 999 });
+    const rawDisc = JSON.parse(LS2700.getItem(rk));
+    assert(rawDisc.chancePercent === 100, 'regional 越界概率落盘即归一（实 ' + rawDisc.chancePercent + '，此前存 500）');
+    assert(rawDisc.durationRounds === 20, 'regional 越界轮次落盘即归一（实 ' + rawDisc.durationRounds + '，此前存 999）');
+    const rEff = WA.regional.effectiveSettings();
+    assert(rEff.chancePercent === rawDisc.chancePercent && rEff.durationRounds === rawDisc.durationRounds,
+      '生效视图 === 磁盘值（同一份数，不再有两套）');
+    assert(WA.regional.getSettings().chancePercent === rEff.chancePercent, 'getSettings（诊断/界面读的）也是同一个数');
+    // 旧存量（手改存档的越界值）：读路径仍夹取，但**不静默改写用户数据**——写归一只作用于写路径
+    LS2700.setItem(rk, JSON.stringify({ enabled: true, chancePercent: 500, durationRounds: 999 }));
+    assert(WA.regional.effectiveSettings().chancePercent === 100, '（存量）旧越界值读取时仍夹取（判定不被越界值污染）');
+    assert(WA.regional.getSettings().chancePercent === 500, '（存量）读取不改写用户数据（归一不越界到读路径）');
+    WA.regional.setSettings({ chancePercent: 15 });
+    assert(JSON.parse(LS2700.getItem(rk)).chancePercent === 15, '再次保存即把旧越界存量归一落盘（自愈，无需用户手改）');
+    // horizon 同型
+    const hk = 'worldaxis_horizon_settings_v1';
+    WA.horizon.setSettings({ distantChance: 500, distantCooldown: 99, distantLedger: 999 });
+    const hRaw = JSON.parse(LS2700.getItem(hk));
+    assert(hRaw.distantChance === 100 && hRaw.distantCooldown === 20 && hRaw.distantLedger === 30,
+      'horizon 越界值落盘即归一（实 ' + hRaw.distantChance + '/' + hRaw.distantCooldown + '/' + hRaw.distantLedger + '）');
+    assert(WA.horizon.laneCfg('distant').chancePct === hRaw.distantChance, 'horizon 生效值 === 磁盘值');
+    // 边界：填 1 就是 1%（此前被 ×100 判成 100%——与区间下限重合导致的语义塌陷）
+    WA.horizon.setSettings({ distantChance: 1 });
+    assert(WA.horizon.laneCfg('distant').chancePct === 1, '（边界）填 1 ⇒ 1%，不再被当作小数比率放成 100%');
+    assert(JSON.parse(LS2700.getItem(hk)).distantChance === 1, '（边界）落盘的也是 1（1% 不会被静默存成 100%）');
+    // UI 边界取自引擎单一真源（避免界面硬编码第二份 min/max）
+    const setS = src2700('ui/settings.js');
+    assert(setS.indexOf('WA.horizon.bounds') > 0 && setS.indexOf('WA.regional.bounds') > 0, 'UI 的区间边界取自引擎单一真源（bounds）');
+    assert(setS.indexOf('min="${hb.chancePct[0]}"') > 0, '滑块 min/max 已改为引擎提供（不再是界面里的第二份声明）');
+  }
+
+  // ── 块3：UI 出口（生效视图接入界面 + 写失败话术） ──
+  section('v2.7.0 块3：生效视图与写入结果接入界面');
+  {
+    const setS = src2700('ui/settings.js');
+    assert(setS.indexOf('WA.regional.effectiveSettings') > 0, '区域生效视图接入界面（此前该 API 零产品消费，注释声称「面板/诊断据此显示」却是空的）');
+    assert(setS.indexOf('wa-rg-save') > 0 && setS.indexOf('wa-rg-enable') > 0, '区域配置有可操作出口（此前只能手改 localStorage）');
+    assert(setS.indexOf('WA.regional.setSettings') > 0, '区域保存走同一条写入出口');
+    // 写失败不得报成功：三处保存出口都必须检查回传
+    assert(setS.indexOf('wRg.ok === false') > 0, '区域保存检查回传（失败不报成功）');
+    assert(setS.indexOf('wHz.ok === false') > 0, '随机事件保存检查回传');
+    // 话术必须与「写入即归一」的实际行为一致（此前说「生效值经区间夹取」，而落盘的是原值）
+    assert(/写入即归一/.test(setS), '界面话术与「落盘即生效值」的实际行为一致');
+    assert(setS.indexOf('生效值经区间夹取') < 0, '（负向）不再留着与实现不符的旧话术');
+    // regional.setSettings 必须回传结果（否则界面拿不到失败）
+    const rgS = src2700('engines/regional.js');
+    assert(rgS.indexOf('saveOrThrow') > 0, 'regional 保存回传写入结果');
+  }
+
+  // ── 块4：无校验直写点收口（state 家族） ──
+  section('v2.7.0 块4：安装写盘校验（跨设备恢复不再「假成功」）');
+  {
+    const ccS = src2700('engines/chatcache.js');
+    assert(ccS.indexOf('function installPack') > 0 && ccS.indexOf('__installStat') > 0, 'installPack 带写盘计量');
+    assert(ccS.indexOf('installStat()') > 0, '安装台账导出（只读）');
+    // 行为验证：正常安装计入 ok
+    const st0 = WA.chatcache.installStat();
+    assert(typeof st0.attempts === 'number' && typeof st0.failed === 'number', '安装台账字段齐全');
+    WA.chatcache.installPack({ state: '{"x":1}' }, 'v2700_cc');
+    const st1 = WA.chatcache.installStat();
+    assert(st1.attempts === st0.attempts + 1 && st1.ok === st0.ok + 1, '正常安装计入 ok');
+    assert(LS2700.getItem('worldaxis_state_v2700_cc') === '{"x":1}', '安装确实落盘');
+    // 负向：写不进去必须计 failed（此前静默——用户看到「恢复完成」而磁盘未变）
+    const rawSet2 = LS2700.setItem;
+    let threw = null;
+    try {
+      LS2700.setItem = function (k, v) { if (k === 'worldaxis_state_v2700_cc2') return; return rawSet2.call(LS2700, k, v); };
+      WA.chatcache.installPack({ state: '{"y":2}' }, 'v2700_cc2');
+      const st2 = WA.chatcache.installStat();
+      assert(st2.failed >= 1, '（负向）安装写盘未落住计入 failed（此前无任何信号）');
+      assert(/missing-after-write|length-mismatch|content-mismatch/.test(String(st2.lastReason)),
+        '安装失败可归因（实 ' + st2.lastReason + '）');
+    } catch (e) { threw = e; } finally { LS2700.setItem = rawSet2; }
+    assert(threw === null, '（负向）安装失败路径不抛异常（安装是跨设备同步热路径）');
+  }
+
+  // ── 块5：诊断与面板出口 + 空转守卫 ──
+  section('v2.7.0 块5：诊断接线与面板出口');
+  {
+    const dgS = src2700('engines/tool-diag.js');
+    assert(dgS.indexOf('settingsBus.writeStaged') > 0, '诊断对「写完读回不一致」单列议题（与「写盘被拒」分开）');
+    assert(dgS.indexOf('chatcache.install') > 0, '诊断透出安装写盘失败');
+    assert(dgS.indexOf('installStat') > 0, '诊断 runtime 采集安装台账');
+    // 行为：安装失败时诊断必须报出（而不只是采集）
+    const rawSet3 = LS2700.setItem;
+    let vd = null;
+    try {
+      LS2700.setItem = function (k, v) { if (k === 'worldaxis_state_v2700_diag') return; return rawSet3.call(LS2700, k, v); };
+      WA.chatcache.installPack({ state: '{"z":3}' }, 'v2700_diag');
+      const d = WA.toolDiag.collect();
+      const v = WA.toolDiag.verdict(d);
+      assert((v.issues || []).some(function (i) { return i.key === 'chatcache.install'; }), '安装失败进 verdict 议题（可被使用者看见）');
+      vd = (v.issues || []).filter(function (i) { return i.key === 'chatcache.install'; })[0];
+    } finally { LS2700.setItem = rawSet3; }
+    assert(vd && /没装进本地|恢复/.test(vd.detail), '议题文案指明后果（恢复未真正生效）');
+    const pS = src2700('ui/panel.js');
+    assert(pS.indexOf('verifyFailed') > 0 && pS.indexOf('写完读回不一致') > 0, '面板给出「写进去没留住」的出口');
+    // 空转守卫：本版新增的每个计量/能力都必须有产品消费面
+    assert(dgS.indexOf('verifyFailed') > 0, 'verifyFailed 有诊断消费（不是只实现不接线）');
+    assert(pS.indexOf('wSt.staged') > 0, 'staged 有面板消费');
+    const rgS2 = src2700('engines/regional.js');
+    assert(rgS2.indexOf('bounds()') > 0 && src2700('ui/settings.js').indexOf('.bounds') > 0, 'bounds 有 UI 消费（避免「新增 API 却零调用」）');
+  }
+
+  // ── 块7：生效值域单一真源（区间声明上收到登记表） ──
+  fresh2700();
+  section('v2.7.0 块7：值域声明单一真源（区间/枚举上收到登记表）');
+  {
+    const regRow = k => WA.settingsBus.registry().filter(r => r.key === k)[0];
+    // 声明面存在且被透出（此前「设置项的合法范围」在库里没有任何声明面）
+    const rB = regRow('worldaxis_backstage_settings_v1');
+    assert(!!rB.bounds && !!rB.enums && !!rB.sentinels, 'backstage 登记项透出 bounds/enums/sentinels 三类值域声明');
+    assert(JSON.stringify(rB.bounds.npcBudget) === '[1,16]', 'npcBudget 区间声明为 [1,16]（此前只写在设置页 <input min max>）');
+    assert(rB.enums.simulationMode.indexOf('balanced') >= 0 && rB.enums.simulationMode.indexOf('nope') < 0,
+      'simulationMode 枚举白名单（此前合法取值只存在于 <select> 的 option 里）');
+    // 归一器：区间 / 枚举 / 哨兵 / 布尔 四条分支各验一次，未声明的字段必须原样透传
+    const norm = WA.settingsBus.normalize;
+    const nB = norm(rB, { npcBudget: -5, simulationMode: 'nope', autoSimulate: 'false', customInstruction: 'x', injectBudget: -1 });
+    assert(nB.npcBudget === 1, '（区间）npcBudget -5 → 夹到下限 1（此前 slice(0,-5) 返回空数组 = NPC 全不结算）');
+    assert(nB.simulationMode === 'balanced', '（枚举）非法取值回落声明默认（此前会原样落盘并被 SIM_MODES[x]||fallback 兜住）');
+    assert(nB.autoSimulate === false, '（布尔）"false" 字符串按 toBool 归一（与读路径同源）');
+    assert(nB.injectBudget === -1, '（哨兵）-1 原样保留（自动档不被夹成 200 —— 那会静默改变用户意图）');
+    assert(nB.customInstruction === 'x', '（未声明）自由文本原样透传（归一只收窄已确认的域）');
+    assert(norm(rB, { injectBudget: 60 }).injectBudget === 60,
+      '（未声明区间）injectBudget 正数原样透传（引擎/测试用 60 表极紧预算，声明区间会静默改语义）');
+    // 越界落盘与生效值一致（写路径 = 读路径 = 磁盘）
+    WA.backstage.setSettings({ npcBudget: -5, memSamplerLimit: 999, memSamplerDice: 1, simulationMode: 'nope', timePolicy: 'zzz', pulseActivity: 'turbulent' });
+    const disk = JSON.parse(LS2700.getItem('worldaxis_backstage_settings_v1'));
+    assert(disk.npcBudget === 1 && disk.memSamplerLimit === 30 && disk.memSamplerDice === 1000,
+      '（磁盘）越界值落盘即归一（实 npc=' + disk.npcBudget + ' limit=' + disk.memSamplerLimit + ' dice=' + disk.memSamplerDice + '）');
+    assert(disk.simulationMode === 'balanced' && disk.timePolicy === 'cautious',
+      '（磁盘）非法枚举回落默认，不留非法值（修复：此前磁盘与引擎各一套解释）');
+    assert(disk.pulseActivity === 'turbulent', '（磁盘）合法枚举值保留（归一不误伤）');
+    assert(WA.backstage.getSettings().npcBudget === disk.npcBudget, '生效视图 === 磁盘值（不再两套数）');
+    // 读路径对存量越界值仍然夹取，但不改写用户数据（归一不越界到读路径）
+    LS2700.setItem('worldaxis_backstage_settings_v1', JSON.stringify({ npcBudget: -5, simulationMode: 'nope' }));
+    WA.backstage.getSettings();
+    assert(JSON.parse(LS2700.getItem('worldaxis_backstage_settings_v1')).npcBudget === -5,
+      '（存量）读取不改写磁盘（归一不是「读时偷偷修」）');
+    WA.backstage.setSettings({ autoSimulate: true });
+    assert(JSON.parse(LS2700.getItem('worldaxis_backstage_settings_v1')).npcBudget === 1,
+      '（自愈）再次保存即把存量越界值归一落盘（无需用户手改）');
+    // opinion / evolution 同规格
+    WA.opinion.setSettings({ everyNRounds: 0 });
+    assert(JSON.parse(LS2700.getItem('worldaxis_opinion_settings_v1')).everyNRounds === 1,
+      'opinion.everyNRounds 越界落盘即归一（此前只夹读路径下界）');
+    WA.evolution.setSettings({ diceModifier: 300, setbackRatio: 999 });
+    const eDisk = JSON.parse(LS2700.getItem('worldaxis_evolution_settings_v1'));
+    assert(eDisk.diceModifier === 30 && eDisk.setbackRatio === 100,
+      'evolution 越界值落盘即归一（实 ' + eDisk.diceModifier + '/' + eDisk.setbackRatio + '；此前 300 会让阈值恒负）');
+    // 区间声明的唯一真源：引擎的 bounds() 与 UI 都不再持有第二份字面量
+    assert(JSON.stringify(WA.horizon.bounds().chancePct) === '[1,100]', 'horizon.bounds() 由登记表映射而来');
+    assert(WA.settingsBus.boundsOf('worldaxis_horizon_settings_v1').distantChance[1] === 100, 'boundsOf 可直接取到声明');
+    const rgB = src2700('engines/regional.js');
+    assert(rgB.indexOf('bounds() { return WA.settingsBus.boundsOf(LS_KEY); }') > 0,
+      'regional.bounds() 直接从登记表取（本文件不再持有 min/max 字面量）');
+  }
+  // ── 块8：UI 区间不再硬编码（消除界面里的第二份声明） ──
+  section('v2.7.0 块8：界面控件区间取自引擎单一真源');
+  {
+    const setS = src2700('ui/settings.js');
+    assert(setS.indexOf('WA.settingsBus.boundsOf') > 0, 'UI 经 boundsOf 取区间声明');
+    ['bB.npcBudget', 'bB.memSamplerLimit', 'bB.memSamplerDice', 'bO.everyNRounds', 'bE.diceModifier']
+      .forEach(function (f) { assert(setS.indexOf(f) > 0, f + ' 的控件区间取自声明（不再硬编码第二份）'); });
+    assert(setS.indexOf('min="1" max="16"') < 0, '（负向）npcBudget 的硬编码 min/max 已消除');
+    assert(setS.indexOf('min="1" max="30"') < 0, '（负向）memSamplerLimit 的硬编码 min/max 已消除');
+    assert(setS.indexOf('min="-30" max="30"') < 0, '（负向）diceModifier 的硬编码 min/max 已消除');
+    // mnemonic 守卫：UI 里的每个区间都必须能在登记表里找到同一份来源
+    const bdAll = WA.settingsBus.registry().filter(function (r) { return r.bounds; });
+    assert(bdAll.length >= 4, '登记表里有 4 个以上键声明了值域（实 ' + bdAll.length + '）');
+  }
+  // ── 块9：值域声明空转守卫（声明了却永不命中 = 与死键同型） ──
+  section('v2.7.0 块9：值域声明的自洽校验（空转即报错）');
+  {
+    // 正向：当前登记表自洽（含新增的 domain 校验项）
+    const scOk = WA.settingsBus.selfCheck();
+    assert(scOk.ok === true, '登记表自洽（含值域声明校验；实 issues=' + JSON.stringify(scOk.issues) + '）');
+    // 负向：造一个「声明了 def 里不存在的字段」的登记项 → 必须报 error
+    const badReg = { key: 'worldaxis_v2700_badomain_v1', def: { a: 1 }, bounds: { notAField: [1, 2] }, module: 'test' };
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([badReg]);
+    try {
+      const scBad = WA.settingsBus.selfCheck();
+      const hit = scBad.issues.filter(function (i) { return i.code === 'domain-unknown-field'; })[0];
+      assert(!!hit && hit.level === 'error', '声明字段不在 def 中 → error（归一永不命中该声明）');
+      assert(scBad.ok === false, '（负向）空转声明使自检判为不自洽');
+    } finally {
+      WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) { return r.key !== 'worldaxis_v2700_badomain_v1'; });
+    }
+    // 负向：非法区间（min>max）与「哨兵落在区间内部」都必须被报出
+    const badReg2 = { key: 'worldaxis_v2700_badbounds_v1', def: { a: 1 },
+      bounds: { a: [1, 10] }, sentinels: { a: [5] }, module: 'test' };
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([badReg2]);
+    try {
+      const scBad2 = WA.settingsBus.selfCheck();
+      assert(scBad2.issues.some(function (i) { return i.code === 'sentinel-in-bounds'; }), '哨兵 5 落在合法区间 [1,10] 内被报出（语义歧义）');
+    } finally {
+      WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) { return r.key !== 'worldaxis_v2700_badbounds_v1'; });
+    }
+    const badReg3 = { key: 'worldaxis_v2700_badbounds2_v1', def: { a: 1 }, bounds: { a: [9, 1] }, module: 'test' };
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([badReg3]);
+    try {
+      assert(WA.settingsBus.selfCheck().issues.some(function (i) { return i.code === 'bad-bounds'; }), '非法区间 [9,1] 被报出');
+    } finally {
+      WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) { return r.key !== 'worldaxis_v2700_badbounds2_v1'; });
+    }
+    assert(WA.settingsBus.selfCheck().ok === true, '清理后登记表恢复自洽（校验无副作用）');
+    // 空转守卫：归一器本身必须有产品消费面（不止测试）
+    let normUse = 0;
+    ['engines/backstage.js', 'engines/opinion.js', 'engines/regional.js', 'engines/horizon.js', 'engines/evolution.js']
+      .forEach(function (f) { normUse += (src2700(f).match(/settingsBus\.normalize/g) || []).length; });
+    assert(normUse >= 5, 'normalize 被五个模块写路径消费（实 ' + normUse + ' 处；防「新增 API 却零调用」）');
+    assert(WA.settingsBus.boundsOf && WA.settingsBus.clampNum, 'clampNum/boundsOf 已导出（跨文件消费点取用）');
+  }
+  // ── 块6：版本三方对齐（随版本升级） ──
+  section('v2.7.0 块6：版本三方对齐');
+  {
+    const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+    const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
+    const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
+    assert(ver === '2.7.0', '入口版本为 2.7.0（实 ' + ver + '）');
+    assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
+    assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
+  }
+  } // end v2.7.0 block
   } // end v2.2.0 block
   } // end v2.1.0 block
   } // end v0.9.0 block

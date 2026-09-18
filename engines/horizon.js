@@ -29,6 +29,13 @@
   const __REG = { key: LS_KEY, def: {
     distantEnabled: true, distantChance: Math.round(BASE_CHANCE * 100), distantCooldown: COOLDOWN_ROUNDS, distantLedger: LEDGER_THRESHOLD,
     nearEnabled:    true, nearChance:    Math.round(BASE_CHANCE * 100), nearCooldown:    COOLDOWN_ROUNDS, nearLedger:    LEDGER_THRESHOLD
+  },
+  // v2.7.0（收口）: 区间声明上收到登记表——写路径（`normalize`）与 UI（`bounds()`）取同一份。
+  //   键名用 **def 子键名**（distantChance 而非 UI 的 chancePct）：归一是按键名逐字段作用的，
+  //   声明若不与 def 对齐就永远匹配不上（这正是「两套口径」的典型来源）。
+  bounds: {
+    distantChance: [MIN_CHANCE_PCT, MAX_CHANCE_PCT], distantCooldown: [MIN_COOLDOWN, MAX_COOLDOWN], distantLedger: [MIN_LEDGER, MAX_LEDGER],
+    nearChance:    [MIN_CHANCE_PCT, MAX_CHANCE_PCT], nearCooldown:    [MIN_COOLDOWN, MAX_COOLDOWN], nearLedger:    [MIN_LEDGER, MAX_LEDGER]
   }, module: 'horizon' };
   function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
@@ -36,17 +43,29 @@
   function saveSettings(s) { return WA.settingsBus.saveOrThrow(__REG, s); }
 
   /** 区间夹取：历史存档/手改值越界（如概率写成 500）会让判定永久为真——读入即夹取 */
-  function clampInt(v, def, min, max) {
-    const n = parseInt(v, 10);
-    if (!isFinite(n)) return def;
-    return Math.min(max, Math.max(min, n));
-  }
-  /** 概率归一：兼容「百分比」(>1) 与「小数比率」(≤1) 两种写法 */
+  /** 区间夹取（读路径用）：委托 settingsBus.clampNum —— v2.7.0 起本库只有一份数学实现。
+   *   （与 regional 的同名函数、设置页的 min/max 此前是「同一条规则的三份拷贝」。） */
+  function clampInt(v, def, min, max) { return WA.settingsBus.clampNum(v, def, min, max); }
+  /**
+   * 概率归一（v2.7.0 收窄）——**只做区间夹取，不再把 ≤1 的正数解释为小数比率**。
+   *
+   * 为什么收窄（本版实测的歧义）：旧判据是 `n > 0 && n <= 1 → ×100`，而概率区间下限恰好是
+   *   **1**，于是语义在边界上塌陷：填 `1` 得 100%（拉满），填 `0.5` 得 50%——两个相邻输入
+   *   相差 50 倍，且用户无从预期。本版「写入即归一」把这个歧义摆到了写路径上：落盘前就要
+   *   归一，若沿用旧判据，**用户填 1% 会被静默存成 100%**（随机事件触发率被拉满）。
+   *
+   * 收窄是否安全（判定依据，非估计）：本插件写入的概率值**从来都是百分比**——
+   *   登记 def 是 `distantChance: 18`，设置页滑块 `min=1 max=100`；仓库内所有落盘值
+   *   均为 1..100 的整数。小数比率写法只可能来自手改 localStorage，而它现在会得到
+   *   与「百分比」一致的解释（0.5 → 夹取到 1 = 1%），不再有第二种读法。
+   *   代价是明确的：手写的 0.5 不再等于 50%。这是**有意收窄**，用一条断言钉住
+   *   （见 v2.7.0 块：'小数写法不再被解释为分数'），以免日后有人「宽容地」把 ×100 加回来。
+   */
   function normChancePct(v, defPct) {
-    let n = parseFloat(v);
-    if (!isFinite(n)) return defPct;
-    if (n > 0 && n <= 1) n = n * 100;   // 小数比率写法（0.18 → 18）
-    return Math.min(MAX_CHANCE_PCT, Math.max(MIN_CHANCE_PCT, Math.round(n)));
+    // v2.7.0（收口）: 判据收敛到 settingsBus.clampNum 单一实现——此处只保留「概率」这个
+    //   语义名字与上面的收窄说明。两份 parseFloat+round+夹取 从来不是「同一个规则写两遍」，
+    //   而是两个会各自漂移的口径（本仓库已有多次同型实证）。
+    return WA.settingsBus.clampNum(v, defPct, MIN_CHANCE_PCT, MAX_CHANCE_PCT);
   }
   /** 单泳道生效配置（已夹取）。kind: 'distant'|'near' */
   function laneCfg(kind, cfg) {
@@ -309,8 +328,29 @@
   WA.horizon = {
     rollLane, acceptResult, buildPromptBlock, snapshot, stat, laneCfg,
     getSettings: loadSettings,
-    // v2.6.0: 回传写入结果（见 backstage.setSettings 注释）
-    setSettings(o) { return saveSettings(Object.assign(loadSettings(), o || {})); },
+    /**
+     * v2.7.0: 写入即归一——与 regional 同型缺陷，同版一并收口。
+     *   此前 `setSettings` 把**调用方原值**直接落盘，而引擎一律用 laneCfg()（normChancePct +
+     *   clampInt）夹取后判定：概率填 500 时，磁盘上是 500、引擎按 100 掷骰，而面板那句
+     *   「已保存（生效值经区间夹取：概率 1-100%…）」说的是**另一个数**——用户看到的、磁盘存的、
+     *   系统执行的可以三不一致。落盘的就是生效值，界面上那句话才不是空话。
+     */
+    setSettings(o) {
+      // v2.7.0（收口）: 归并到 settingsBus.normalize（区间取自登记表声明 __REG.bounds）。
+      //   此前本文件自持一份 toBool+normChancePct+clampInt，与 regional 各写一遍 ——
+      //   而 laneCfg（读）与 setSettings（写）又各是一份，同一条规则在本文件里就有两处实现。
+      return saveSettings(WA.settingsBus.normalize(__REG, Object.assign(loadSettings(), o || {})));
+    },
+    /** v2.7.0: 夹取边界（UI 取用）。由登记表声明映射而来——UI 侧的键名（chancePct/cooldown/ledger）
+     *   与 def 子键名（distantChance/distantCooldown/distantLedger）不是同一个命名空间，
+     *   故此处做一次**显式**的键名映射；map 里若出现 def 不认识的字段，说明两边命名已漂移（此时
+     *   返回的数组仍是引擎真正使用的区间，UI 只是标签过时，不会导致「滑块能拖到的值被夹掉」）。 */
+    bounds() {
+      const b = WA.settingsBus.boundsOf(LS_KEY);
+      return { chancePct: b.distantChance || [MIN_CHANCE_PCT, MAX_CHANCE_PCT],
+        cooldown: b.distantCooldown || [MIN_COOLDOWN, MAX_COOLDOWN],
+        ledger: b.distantLedger || [MIN_LEDGER, MAX_LEDGER] };
+    },
     LEDGER_THRESHOLD, COOLDOWN_ROUNDS, BASE_CHANCE,
     MIN_CHANCE_PCT, MAX_CHANCE_PCT, MIN_COOLDOWN, MAX_COOLDOWN, MIN_LEDGER, MAX_LEDGER
   };

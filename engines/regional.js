@@ -26,6 +26,10 @@
   const MIN_CHANCE_PCT = 1, MAX_CHANCE_PCT = 100;
   const MIN_DURATION = 1, MAX_DURATION = 20;
   const REG_DEF = { enabled: false, chancePercent: 15, durationRounds: 3 };
+  // v2.7.0: 区间声明上收到登记表（唯一真源）。此前 MIN_/MAX_ 常量虽在本文件，但
+  //   「谁是契约」这件事没有任何声明面——UI 侧另有一份硬编码，跨文件消费方无法取用。
+  const REG_BOUNDS = { chancePercent: [MIN_CHANCE_PCT, MAX_CHANCE_PCT],
+    durationRounds: [MIN_DURATION, MAX_DURATION] };
   // v2.5.0: 缩减型结构演化的**首个真实消费者**（此前 migrate 钩子全库零调用）。
   //   缺的是什么：v2.3.0 块3 从 def 里剔除了 5 个零消费死键，但**只在声明侧剔除了**——
   //   老存档磁盘上那 5 个子键原封不动，而且此后永远动不了：
@@ -35,19 +39,23 @@
   //   即「只加不减」是结构演化的结构性缺陷，必须能声明缩减型迁移。
   //   声明口径：`migrateObjects:true`（显式开启对象形态迁移）+ 白名单式保留；删除幂等。
   //   迁移逻辑走 settingsBus.subkeyPruner 单一实现（两份内联必然分叉，本版已实测过）。
-  const __REG = { key: LS_KEY, def: REG_DEF, module: 'regional', migrateObjects: true,
+  const __REG = { key: LS_KEY, def: REG_DEF, bounds: REG_BOUNDS, module: 'regional', migrateObjects: true,
     migrate: WA.settingsBus.subkeyPruner(REG_DEF) };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——配置损坏此前静默重置为「未启用」
   function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  function saveSettings(s) { WA.settingsBus.save(__REG, s); }
+  // v2.7.0: 回传写入结果（与 calendar/backstage/opinion/horizon 口径一致）——
+  //   此前返回值被丢弃，调用方无法判断「拨了没生效」是没写进去还是没读回来。
+  function saveSettings(s) {
+    try { if (WA.settingsBus) return WA.settingsBus.saveOrThrow(__REG, s); } catch (e) { return { ok: false, reason: String((e && e.message) || e) }; }
+    return { ok: false, reason: 'settingsBus 未装载' };
+  }
 
   /** v2.3.0 块3: 区间夹取——历史存档越界值（如概率 500）会让区域事件判定永久为真 */
-  function clampInt(v, def, min, max) {
-    const n = parseInt(v, 10);
-    if (!isFinite(n)) return def;
-    return Math.min(max, Math.max(min, n));
-  }
+  /** 区间夹取（读路径用）：委托 settingsBus.clampNum —— v2.7.0 起本库只有一份数学实现。
+   *   历史注记：此处原为自持的 `parseInt + Math.min/max`，与 horizon 的同名函数各写一遍；
+   *   两者与设置页的 min/max 事实上是「同一条规则的三份拷贝」，改一处忘一处即静默不一致。 */
+  function clampInt(v, def, min, max) { return WA.settingsBus.clampNum(v, def, min, max); }
   /** 生效配置（已夹取） */
   function effSettings() {
     const s = loadSettings() || {};
@@ -73,7 +81,23 @@
     // v2.3.0 块3: 只读生效视图（夹取后）——面板/诊断据此显示真实生效值
     effectiveSettings: effSettings,
     MIN_CHANCE_PCT, MAX_CHANCE_PCT, MIN_DURATION, MAX_DURATION,
-    setSettings(o) { saveSettings(Object.assign(loadSettings(), o || {})); },
+    /**
+     * v2.7.0: 写入即归一——此前**落盘的是原值**（越界值原样存），而引擎一律用 effSettings()
+     *   夹取后再判定，于是「磁盘上的数」与「真正生效的数」是两套：概率手填 500 时，引擎按 100
+     *   掷骰，而设置盘点（tool-diag DEFAULT_PROVIDERS → getSettings）与面板显示的都是 500。
+     *   用户看到的与系统执行的是两个数，且没有任何地方提示被夹取过。
+     *   现在保存前先归一（toBool + clampInt），落到磁盘的就是**生效值本身**——单源，不再有第二份。
+     */
+    setSettings(o) {
+      // v2.7.0（收口）: 与 settingsBus.normalize 同源——本文件此前自持一份 toBool+clampInt，
+      //   与 horizon 各写一遍（「两份实现必然分叉」，本仓库已有多次实证）。归并到登记表声明的
+      //   唯一实现后，写路径落盘的就是生效值本身，且「区间改在哪」只有一个答案。
+      return saveSettings(WA.settingsBus.normalize(__REG, Object.assign(loadSettings(), o || {})));
+    },
+    /** v2.7.0: 夹取边界（UI 生成控件时取用）。取自登记表声明（`boundsOf`）——本文件**不再**
+     *   持有第二份 min/max 字面量：`REG_BOUNDS` 是声明、`normalize` 是执行、此处是取用，
+     *   三者同一份。API 形状（`{field:[min,max]}`）保持不变，既有 UI 消费点无需改动。 */
+    bounds() { return WA.settingsBus.boundsOf(LS_KEY); },
 
     /** 掷骰：本轮是否触发区域突发事件（返回提示词注入或null） */
     roll() {

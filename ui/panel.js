@@ -816,6 +816,14 @@
           } else {
             html += '<div class="wa-dim">写入侧：' + wSt.writes + ' 次写盘全部落盘' + (wSt.last ? '（最近 ' + esc(wSt.last.key) + ' ' + wSt.last.bytes + 'B）' : '') + '。</div>';
           }
+          // v2.7.0: 「写盘被拒」之外还要说「写进去没留住」——两者都是失败，但下一步动作不同：
+          //   前者清空间/关隐私模式，后者重试无用、只能留证（存储层静默截断）。
+          if (wSt.verifyFailed > 0) {
+            const stg = wSt.staged || {};
+            html += '<div class="wa-log wa-log-err">写入侧另有 ' + wSt.verifyFailed + ' 次**写完读回不一致**'
+              + (stg.key ? '（最近 ' + esc(stg.key) + '：' + esc(stg.reason || '') + '）' : '')
+              + '：setItem 没报错，但磁盘上的不是刚写的值（移动端配额临界/写入毒化会静默发生）。重试无效，请先导出配置与诊断包留证。</div>';
+          }
           if (wSt.subkeyDrift && wSt.subkeyDrift.count > 0) {
             const lp = wSt.subkeyDrift.last || {};
             html += '<div class="wa-log wa-log-warn">写入侧出现 ' + wSt.subkeyDrift.count + ' 个声明之外的子键' + (lp.key ? '（最近 ' + esc(lp.key) + '）' : '') + '：属调用点未收口，非老存档遗留。</div>';
