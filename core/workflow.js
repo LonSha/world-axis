@@ -15,10 +15,10 @@
   const stats = new Map(); // id -> {count, errors, lastMs, totalMs, lastAt, lastStatus}
   const lastChains = { before: null, after: null }; // 最近一次各链的汇总
 
-  function loadSwitches() {
-    try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
-  }
   const __REG = { key: LS_KEY, def: {}, module: 'workflow' };
+  // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——开关表损坏此前静默回落
+  //   「全部节点按注册默认值」（等价于用户所有开关都被重置），且无任何留痕
+  function loadSwitches() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function saveSwitches(sw) { WA.settingsBus.save(__REG, sw); }
   // v0.1.42: 链运行环形历史——最近 N 次运行的逐节点耗时/状态序列（趋势观察）

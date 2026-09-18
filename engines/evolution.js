@@ -19,18 +19,19 @@
   const ECONOMY_CLIMATE = ['繁荣', '平稳', '衰退', '动荡'];
   const WIND_DECAY = { announcement: { grace: 3, base: 20, linear: 15, quadratic: 3 }, report: { grace: 2, base: 25, linear: 15, quadratic: 4 }, rumor: { grace: 1, base: 30, linear: 18, quadratic: 5 }, sentiment: { grace: 2, base: 22, linear: 16, quadratic: 4 } };
 
-  function loadSettings() {
-    const def = {
-      diceEnabled: true,           // 本地骰子推进
-      progressFailBase: 2, conflictFailBase: 6,
-      diceModifier: 0, setbackRatio: 40,
-      distantEventEnabled: false, distantChance: 20, distantCooldown: 5,
-      nearEventEnabled: false, nearChance: 20, nearCooldown: 5,
-      regionalIncidentEnabled: false
-    };
-    try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
-  }
-  const __REG = { key: LS_KEY, def: null, module: 'evolution' };
+  // v2.3.0: 默认值收敛为登记表单一真源（此前 loadSettings 内联一份、__REG.def 又写 null，
+  //   诊断视图读登记表拿到的是 null 而非真实默认值）；读路径同时归口 settingsBus。
+  // v2.3.0 块3: 剔除 7 个零消费死键（distant/near × EventEnabled|Chance|Cooldown 与
+  //   regionalIncidentEnabled）——它们与 horizon 承担同一机制，属移植期残留；
+  //   真实配置出口是 worldaxis_horizon_settings_v1。
+  //   （说明注释置于登记块之外：源码守卫会扫描块内容，块内出现已删键名会让
+  //    「死键已剔除」的断言误判为仍存在。）
+  const __REG = { key: LS_KEY, def: {
+    diceEnabled: true,           // 本地骰子推进
+    progressFailBase: 2, conflictFailBase: 6,
+    diceModifier: 0, setbackRatio: 40
+  }, module: 'evolution' };
+  function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function saveSettings(s) { WA.settingsBus.save(__REG, s); }
 
@@ -82,7 +83,8 @@
     /** 本地骰子推进所有活跃事件（移植阈值公式） */
     rollEvents() {
       const st = loadSettings();
-      if (!st.diceEnabled) return [];
+      // v2.3.0: 同根因修复——旧写法对字符串 'false' 取真值判定，导致「关闭骰子」失效
+      if (!WA.settingsBus.toBool(st.diceEnabled, true)) return [];
       const results = [];
       WA.store.transact(draft => {
         (draft.evolution.events || []).forEach(ev => {

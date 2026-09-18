@@ -7,8 +7,10 @@
   const LS_KEY = 'worldaxis_npc_registry_v1';
   const mainWin = WA.mainWin || window;
 
-  function loadAll() { try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; } }
   const __REG = { key: LS_KEY, def: {}, module: 'registry' };
+  // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——人物档案损坏此前静默清空，
+  //   用户看到的是「所有NPC凭空消失」而不是「存档损坏已隔离」
+  function loadAll() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function saveAll(m) { WA.settingsBus.save(__REG, m); }
   function chatId() { try { const c = WA.mainWin.SillyTavern.getContext(); return c.chatId || 'default'; } catch (e) { return 'default'; } }

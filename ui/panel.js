@@ -167,7 +167,19 @@
       <div class="wa-list">${winds.slice(0,4).map(w => `<div class="wa-item">${'🌀'.repeat(Math.min(w.level||1,3))} <b>${esc(w.topic)}</b> <span class="wa-dim">Lv${w.level||1}</span><div class="wa-dim">${esc((w.content||'').slice(0,60))}</div></div>`).join('')}</div>` : ''}
 
       <div class="wa-sec">远方/近端事件泳道</div>
-      <div class="wa-item wa-dim">${hz.distant ? `远方 ledger=${hz.distant.ledger} cd=${hz.distant.cooldown}${hz.distant.pending?' ⏳':''}` : '远方 —'}<br>${hz.near ? `近端 ledger=${hz.near.ledger} cd=${hz.near.cooldown}${hz.near.pending?' ⏳':''}` : '近端 —'}</div>
+      ${(() => {
+        // v2.3.0 块3: 通道开关与掷骰留痕上线——此前只显示 ledger/cooldown，
+        //   「通道被关闭」与「通道开着但一直没掷中」在面板上完全一样（都只是 ledger 在涨）。
+        const hzEn = (WA.horizon && WA.horizon.stat) ? WA.horizon.stat() : null;
+        const badge = k => (hzEn && hzEn.enabled && hzEn.enabled[k] === false) ? ' <span class="wa-badge">关</span>' : '';
+        const lane = (k, label) => {
+          const l = hz[k];
+          if (!l) return label + ' —';
+          return label + badge(k) + ` ledger=${l.ledger} cd=${l.cooldown}${l.pending ? ' ⏳' : ''}`;
+        };
+        const tail = hzEn ? `<div class="wa-dim">掷骰 ${hzEn.rolls} 次 · 触发 远${hzEn.distantFired}/近${hzEn.nearFired} · 跳过（关） ${hzEn.skipped}${hzEn.lastReason ? ' · 最近：' + esc(hzEn.lastReason) : ''}</div>` : '';
+        return `<div class="wa-item wa-dim">${lane('distant', '远方')}<br>${lane('near', '近端')}${tail}</div>`;
+      })()}
 
 <div class="wa-sec">演化事件（${(ev.events||[]).length}）</div>
       ${(() => {

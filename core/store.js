@@ -1345,8 +1345,20 @@
       //        幽灵设置键既不可见也不可清；隔离处置史（quarantineAudit）同样没有出口。
       //   计分口径：不扣分（幽灵键是历史残留、不占运行成本），报 info 并给出清理入口。
       let orphanKeys = [], quarantineRestores = 0, quarantineDrops = 0;
+      let sbIncoherent = 0, sbDormant = 0;
       try {
         if (typeof this.orphanSettingsKeys === 'function') orphanKeys = this.orphanSettingsKeys() || [];
+        // v2.3.0: 登记表自洽性与休眠登记——只采集不产议题（同 orphan 口径：
+        //   自洽问题只在登记表被改坏时出现，休眠登记是「声明废弃但从未落盘」的正常状态，
+        //   二者对普通用户都不是可行动项，报议题会造成告警疲劳）
+        try {
+          if (WA.settingsBus && typeof WA.settingsBus.selfCheck === 'function') {
+            sbIncoherent = (WA.settingsBus.selfCheck().issues || []).length;
+          }
+          if (WA.settingsBus && typeof WA.settingsBus.dormantGhosts === 'function') {
+            sbDormant = (WA.settingsBus.dormantGhosts() || []).length;
+          }
+        } catch (eSb) {}
         if (typeof this.quarantineAudit === 'function') {
           const qa = this.quarantineAudit();
           quarantineRestores = qa.restores || 0; quarantineDrops = qa.drops || 0;
@@ -1440,6 +1452,7 @@
           compatMvuReason: compatMvuReason, compatThReason: compatThReason, compatFails: compatFails,
           profRegistered: profRegistered, profWith: profWith, profEntries: profEntries,  // v2.2.0
           orphanSettings: orphanKeys.length, quarantineRestores: quarantineRestores, quarantineDrops: quarantineDrops,  // v2.2.0
+          sbIncoherent: sbIncoherent, sbDormant: sbDormant,  // v2.3.0
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }

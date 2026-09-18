@@ -61,28 +61,42 @@
     };
   }
 
-  function loadCustomPresets() {
-    const raw = mainWin.localStorage.getItem(KEY_CUSTOM);
-    if (!raw) return [];
-    try {
-      const arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) return [];
-      const out = [];
-      for (const item of arr) {
-        try { out.push(normalizePreset(item)); } catch (e) {}
-      }
-      return out;
-    } catch (e) { return []; }
-  }
-
+  // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——自定义预设损坏此前被
+  //   静默当成「没有自定义预设」（用户看到预设凭空消失，而不是「已隔离、可去现场查看」）。
+  //   登记项上移，避免 loadCustomPresets 在模块初始化期被调用时踩 TDZ。
   const __REG_CUSTOM = { key: KEY_CUSTOM, def: [], module: 'preset' };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_CUSTOM]);
+  function loadCustomPresets() {
+    const arr = WA.settingsBus.read(__REG_CUSTOM);
+    if (!Array.isArray(arr)) return [];
+    const out = [];
+    for (const item of arr) {
+      try { out.push(normalizePreset(item)); } catch (e) {}
+    }
+    return out;
+  }
   function saveCustomPresetsArray(arr) {
     WA.settingsBus.save(__REG_CUSTOM, arr || []);
   }
 
+  // v2.3.0: 原标 orphan:true 属误声明——本键由 setActivePresetId 主动写入、getActivePresetId 主动读取，
+  //   是「用户尚未选过预设时才缺席」的可选键，不是废弃键。误标后果：面板「全部注销」会把它从登记表清掉。
+  //   声明位置同时上移：本键的读写现在都经 settingsBus，而 const 登记项无提升。
+  const __REG_ACTIVE = { key: KEY_ACTIVE, def: null, module: 'preset', optional: true };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_ACTIVE]);
+  // v2.3.0: 一次性格式迁移——历史版本把 id 以**裸字符串**写入本键，而本总线是 JSON 契约，
+  //   首个 read 会把裸串判为损坏并隔离，用户选中的预设会静默回到默认。迁移必须在任何读取之前完成。
+  (function migrateActiveKeyFormat() {
+    try {
+      const raw = WA.settingsBus.readRaw(KEY_ACTIVE);
+      if (raw === null || raw === undefined) return;
+      try { JSON.parse(raw); return; } catch (e) { /* 非合法 JSON → 确需迁移 */ }
+      WA.settingsBus.save(__REG_ACTIVE, raw);
+      if (WA.log) WA.log('info', 'preset：预设选中键由裸字符串迁移为 JSON 格式（防被误判为损坏）');
+    } catch (e) {}
+  })();
   function getActivePresetId() {
-    const id = mainWin.localStorage.getItem(KEY_ACTIVE);
+    const id = WA.settingsBus.read(__REG_ACTIVE);
     if (!id || typeof id !== 'string') return DEFAULT_ID;
     if (id !== DEFAULT_ID) {
       const found = loadCustomPresets().some(p => p.id === id);
@@ -91,9 +105,7 @@
     return id;
   }
 
-  const __REG_ACTIVE = { key: KEY_ACTIVE, def: null, module: 'preset', orphan: true };
-  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_ACTIVE]);
-  function setActivePresetId(id) { mainWin.localStorage.setItem(KEY_ACTIVE, id || DEFAULT_ID); }
+  function setActivePresetId(id) { WA.settingsBus.save(__REG_ACTIVE, id || DEFAULT_ID); }
 
   function getAllPresets() { return [buildDefaultPreset()].concat(loadCustomPresets()); }
 
@@ -154,7 +166,9 @@
    */
   function getSegmentOverrides() {
     const out = { 'engine-role': null, 'reasoning': null, 'output-format': null, 'json-notes': null };
-    const id = mainWin.localStorage.getItem(KEY_ACTIVE);
+    // v2.3.0: 走统一入口 getActivePresetId()。此前裸读本键，而存储格式已由裸字符串变为 JSON，
+    //   裸读拿到的是带引号的串 → 与 DEFAULT_ID 比对失败、getPresetById 查不到 → 覆写静默全部失效。
+    const id = getActivePresetId();
     if (!id || id === DEFAULT_ID) return out;
     const p = getPresetById(id);
     if (!p) { setActivePresetId(DEFAULT_ID); return out; }

@@ -66,6 +66,31 @@
         <div class="wa-set-row"><span>骰子修正 <b id="wa-ev-modv">${WA.evolution.getSettings().diceModifier}</b></span><input type="range" min="-30" max="30" value="${WA.evolution.getSettings().diceModifier}" id="wa-ev-mod" class="wa-range"/></div>
         <div class="wa-row"><button class="wa-btn" id="wa-ev-roll">立即掷一轮演化骰</button></div>
         <div id="wa-ev-out" class="wa-out"></div>
+        <div class="wa-sec">远方 / 近端随机事件（v2.3.0）</div>
+        ${(() => {
+          // v2.3.0 块3: 此前「开关/触发率/冷却/保底轮数」是 horizon 的模块常量 ——
+          //   用户既不能关掉随机事件，也不能调触发率（一个会打断叙事的机制没有开关）。
+          if (!WA.horizon || typeof WA.horizon.getSettings !== 'function') return '<div class="wa-empty">远方/近端引擎未加载</div>';
+          const c = WA.horizon.getSettings();
+          const st = WA.horizon.stat ? WA.horizon.stat() : null;
+          const dis = v => (v === false ? 'disabled' : '');
+          const dEn = c.distantEnabled !== false, nEn = c.nearEnabled !== false;
+          const tail = st ? `<div class="wa-dim">本会话掷骰 ${st.rolls} 次 · 远方触发 ${st.distantFired} · 近端触发 ${st.nearFired} · 跳过（通道关） ${st.skipped}${st.lastReason ? ' · 最近：' + esc(st.lastReason) : ''}</div>` : '';
+          // id 一律写成字面量（而非 `${k}-en` 式拼接）：守卫表靠源码字面量发现控件，
+          //   拼接出的 id 运行时存在、静态守卫里隐形（会被报成僵尸或漏覆盖）。
+          return `
+            <label class="wa-node"><input type="checkbox" id="wa-hz-d-en" ${dEn ? 'checked' : ''}/><span class="wa-node-label">远方通道</span></label>
+            <div class="wa-set-row"><span>触发率 <b id="wa-hz-d-chancev">${c.distantChance}</b>%</span><input type="range" min="1" max="100" value="${c.distantChance}" id="wa-hz-d-chance" class="wa-range" ${dis(c.distantEnabled)}/></div>
+            <div class="wa-set-row"><span>冷却 <b id="wa-hz-d-cdv">${c.distantCooldown}</b>轮</span><input type="range" min="0" max="20" value="${c.distantCooldown}" id="wa-hz-d-cd" class="wa-range" ${dis(c.distantEnabled)}/></div>
+            <div class="wa-set-row"><span>保底 <b id="wa-hz-d-ledgerv">${c.distantLedger}</b>轮</span><input type="range" min="3" max="30" value="${c.distantLedger}" id="wa-hz-d-ledger" class="wa-range" ${dis(c.distantEnabled)}/></div>
+            <label class="wa-node"><input type="checkbox" id="wa-hz-n-en" ${nEn ? 'checked' : ''}/><span class="wa-node-label">近端通道</span></label>
+            <div class="wa-set-row"><span>触发率 <b id="wa-hz-n-chancev">${c.nearChance}</b>%</span><input type="range" min="1" max="100" value="${c.nearChance}" id="wa-hz-n-chance" class="wa-range" ${dis(c.nearEnabled)}/></div>
+            <div class="wa-set-row"><span>冷却 <b id="wa-hz-n-cdv">${c.nearCooldown}</b>轮</span><input type="range" min="0" max="20" value="${c.nearCooldown}" id="wa-hz-n-cd" class="wa-range" ${dis(c.nearEnabled)}/></div>
+            <div class="wa-set-row"><span>保底 <b id="wa-hz-n-ledgerv">${c.nearLedger}</b>轮</span><input type="range" min="3" max="30" value="${c.nearLedger}" id="wa-hz-n-ledger" class="wa-range" ${dis(c.nearEnabled)}/></div>
+            <div class="wa-dim">保底：连续未触发达该轮数即强制触发一次；关闭通道后连掷骰都不进行（不消耗冷却与保底计数）。</div>
+            <div class="wa-row"><button class="wa-btn" id="wa-hz-save">保存随机事件设置</button></div><div id="wa-hz-out" class="wa-out"></div>`
+            + tail;
+        })()}
         <div id="wa-set-out" class="wa-out"></div>`;
     },
     bind(panelEl) {
@@ -151,6 +176,32 @@
       // 演化设置
       const evMod = $('#wa-ev-mod');
       if (evMod) evMod.oninput = () => { $('#wa-ev-modv').textContent = evMod.value; };
+      // v2.3.0 块3: 远方/近端通道配置绑定（含「关闭 ⇒ 概率/冷却控件禁用」的可见降级）
+      // ⚠ 选择器必须带 '#'：`$('wa-hz-d-en')` 是**标签名**选择器（找 <wa-hz-d-en> 元素），
+      //   永远返回 null，绑定会静默失效（控件渲染正常、参数却不联动、滑块不回显）。
+      const byId = id => $('#' + id);
+      const hzIds = ['wa-hz-d', 'wa-hz-n'];
+      hzIds.forEach(k => {
+        const pair = { en: byId(k + '-en'), ch: byId(k + '-chance'), cd: byId(k + '-cd'), lg: byId(k + '-ledger') };
+        const sync = () => {
+          const on = (pair.en || {}).checked !== false;
+          [pair.ch, pair.cd, pair.lg].forEach(el => { if (el) el.disabled = !on; });
+        };
+        if (pair.en) pair.en.onchange = sync;
+        if (pair.ch) pair.ch.oninput = () => { const v = byId(k + '-chancev'); if (v) v.textContent = pair.ch.value; };
+        if (pair.cd) pair.cd.oninput = () => { const v = byId(k + '-cdv'); if (v) v.textContent = pair.cd.value; };
+        if (pair.lg) pair.lg.oninput = () => { const v = byId(k + '-ledgerv'); if (v) v.textContent = pair.lg.value; };
+        sync();
+      });
+      const hzSave = $('#wa-hz-save');
+      if (hzSave) hzSave.onclick = () => {
+        WA.horizon.setSettings({
+          distantEnabled: $('#wa-hz-d-en').checked, distantChance: +$('#wa-hz-d-chance').value, distantCooldown: +$('#wa-hz-d-cd').value, distantLedger: +$('#wa-hz-d-ledger').value,
+          nearEnabled: $('#wa-hz-n-en').checked, nearChance: +$('#wa-hz-n-chance').value, nearCooldown: +$('#wa-hz-n-cd').value, nearLedger: +$('#wa-hz-n-ledger').value
+        });
+        const o = $('#wa-hz-out');
+        if (o) o.textContent = '✓ 已保存（生效值经区间夹取：概率 1-100%、冷却 0-20 轮、保底 3-30 轮）';
+      };
       const evRoll = $('#wa-ev-roll');
       if (evRoll) evRoll.onclick = () => {
         WA.evolution.setSettings({ diceEnabled: $('#wa-ev-dice').checked, diceModifier: +evMod.value });

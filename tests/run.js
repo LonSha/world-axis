@@ -4383,14 +4383,25 @@ WA.loadScript = _ls.loadScript;
   const vd200 = WA.toolDiag.verdict(WA.toolDiag.collect());
   assert(vd200.issues.some(function (x) { return x.level === 'warn' && x.key === 'storage.diagBudget'; }), 'diagBudget 超阈值进 verdict 议题（warn）');
 
-  // ── D. orphan 检测：注册 orphan:true 且键不存在 ──
+  // ── D. orphan 检测：注册 orphan:true 且键不存在（v2.3.0 口径收紧） ──
+  //   v2.3.0 前：oracle_plan 被误标 orphan:true，仅靠「键不存在」就判为孤儿候选。
+  //   语义收窄后 orphan 专指「模块已声明废弃的幽灵键」，而 oracle_plan 是可选键（用户没规划弧线时本就缺席），
+  //   已改标 optional。因此本段改为：可选键绝不出现在 orphan 候选里，休眠登记另有出口。
   global.localStorage.removeItem('worldaxis_oracle_plan_v1');   // 清 L1007 setPlan 残留，构造「键不存在」现场
   const orph200 = WA.store.orphanSettingsKeys();
   assert(Array.isArray(orph200), 'orphanSettingsKeys 返回数组');
-  // oracle 注册项标记 orphan:true，测试环境从未写过该键 → 必为 orphan
-  assert(orph200.some(function (o) { return o.key === 'worldaxis_oracle_plan_v1'; }), 'oracle_plan 键从未写过 → orphan 候选');
+  assert(WA.settingsBus.registry().some(function (r) { return r.key === 'worldaxis_oracle_plan_v1' && r.optional; }), 'oracle_plan 已改标 optional（可选键，非废弃键）');
+  assert(!orph200.some(function (o) { return o.key === 'worldaxis_oracle_plan_v1'; }), '可选键即使未落盘也不进孤儿候选（不再误报）');
+  assert(WA.settingsBus.registry().every(function (r) { return !(r.orphan && r.optional); }), '登记表无「既 orphan 又 optional」的矛盾项');
   // 非 orphan 键（backstage）不应在 orphan 列表
   assert(!orph200.some(function (o) { return o.key === 'worldaxis_backstage_settings_v1'; }), 'backstage 非 orphan 不在 orphan 列表');
+  // 真幽灵出口：登记一个 orphan 键 → 读到（留下观测痕迹）→ 删掉 → 必进候选
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([{ key: 'worldaxis_ghost_probe_v1', def: null, module: 'test', orphan: true }]);
+  global.localStorage.setItem('worldaxis_ghost_probe_v1', JSON.stringify({ x: 1 }));
+  WA.settingsBus.read({ key: 'worldaxis_ghost_probe_v1' });       // 建立「曾存在」痕迹
+  global.localStorage.removeItem('worldaxis_ghost_probe_v1');
+  assert(WA.store.orphanSettingsKeys().some(function (o) { return o.key === 'worldaxis_ghost_probe_v1'; }), '曾存在后被删除的废弃键 → 真幽灵候选');
+  WA.__settingsRegs = WA.__settingsRegs.filter(function (r) { return r.key !== 'worldaxis_ghost_probe_v1'; });
 
   // ── E. 负向验证锚点：diagBudget 应拒绝损坏的 eventLog（源断言）──
   global.localStorage.setItem('worldaxis_event_log_' + cur200, '{bad');
@@ -7799,17 +7810,25 @@ WA.loadScript = _ls.loadScript;
     // E4. 设置键：登记表 / 孤儿注销 / 安全门禁
     const rsE2200 = WA.settingsBus.registryStat();
     assert(rsE2200.total > 0 && typeof rsE2200.byModule === 'object', 'registryStat 透出登记表计量（此前 registry 零调用）');
-    assert(rsE2200.orphan >= 1, '登记表含 orphan 声明项');
+    assert(rsE2200.optional >= 1, '登记表含 optional（可选键）声明项');
+    // v2.3.0: 先造一个真幽灵（声明 orphan + 曾读到 + 已删除），再走注销链路。
+    //   旧断言直接用内置 orphan 项，而内置项在语义收窄后已全部改标 optional —— 改为现场构造。
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([{ key: 'worldaxis_e2200_ghost', def: null, module: 'test', orphan: true }]);
+    global.localStorage.setItem('worldaxis_e2200_ghost', '{}');
+    WA.settingsBus.read({ key: 'worldaxis_e2200_ghost' });
+    global.localStorage.removeItem('worldaxis_e2200_ghost');
     const orphansE2200 = WA.store.orphanSettingsKeys();
-    assert(Array.isArray(orphansE2200) && orphansE2200.length >= 1, 'orphanSettingsKeys 返回幽灵登记清单（此前零消费）');
-    const regFirstE2200 = WA.settingsBus.registry().filter(r => !r.orphan)[0].key;
+    assert(Array.isArray(orphansE2200) && orphansE2200.some(o => o.key === 'worldaxis_e2200_ghost'), 'orphanSettingsKeys 返回真幽灵登记清单');
+    const regFirstE2200 = WA.settingsBus.registry().filter(r => !r.orphan && !r.optional)[0].key;
     assert(WA.settingsBus.deregisterOrphan(regFirstE2200).ok === false, '在用键拒绝注销（不制造登记表与行为不一致）');
+    const optKeyE2200 = WA.settingsBus.registry().filter(r => r.optional)[0].key;
+    assert(WA.settingsBus.deregisterOrphan(optKeyE2200).reason.indexOf('optional-key') === 0, '可选键拒绝注销（此前被误标 orphan 可被一键清除）');
     assert(WA.settingsBus.deregisterOrphan('').reason === 'missing-key', '空键拒绝（missing-key）');
     assert(WA.settingsBus.deregisterOrphan('worldaxis_non_existent_key').reason === 'not-found', '不存在的键明确归因（not-found）');
     const orphanN0E2200 = orphansE2200.length;
-    const okOrphE2200 = WA.settingsBus.deregisterOrphan(orphansE2200[0].key);
-    assert(okOrphE2200.ok === true, '孤儿键注销成功');
-    assert(WA.store.orphanSettingsKeys().length === orphanN0E2200 - 1, '注销后孤儿清单真减少');
+    const okOrphE2200 = WA.settingsBus.deregisterOrphan('worldaxis_e2200_ghost');
+    assert(okOrphE2200.ok === true, '真幽灵键注销成功');
+    assert(WA.store.orphanSettingsKeys().length === orphanN0E2200 - 1, '注销后幽灵清单真减少');
     assert(WA.settingsBus.registryStat().deregisters >= 1, '注销计数可观测');
 
     // E5. 诊断可见性（此前 quarantineAudit / migrateReport 零出口）
@@ -7818,9 +7837,16 @@ WA.loadScript = _ls.loadScript;
     assert(dgE2200.runtime.quarantineAudit !== undefined, '诊断透出 quarantineAudit（隔离处置史）');
     assert(dgE2200.runtime.migrateReport !== undefined, '诊断透出 migrateReport（存档迁移报告）');
     const vdE2200 = WA.toolDiag.verdict(dgE2200);
-    const orphanIssueE2200 = vdE2200.issues.filter(i => i.key === 'settingsBus.orphan');
-    if (WA.store.orphanSettingsKeys().length > 0) assert(orphanIssueE2200.length === 1 && orphanIssueE2200[0].level === 'info', '有孤儿时 verdict 报 info 议题');
-    else assert(orphanIssueE2200.length === 0, '无孤儿时 verdict 不报议题（不制造噪声）');
+    // v2.3.0: 现场造一个真幽灵，保证 verdict 议题分支必被走到（不再依赖内置项凑巧存在）
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([{ key: 'worldaxis_e2200_ghost2', def: null, module: 'test', orphan: true }]);
+    global.localStorage.setItem('worldaxis_e2200_ghost2', '{}');
+    WA.settingsBus.read({ key: 'worldaxis_e2200_ghost2' });
+    global.localStorage.removeItem('worldaxis_e2200_ghost2');
+    const vdGhostE2200 = WA.toolDiag.verdict(WA.toolDiag.collect());
+    const orphanIssueE2200 = vdGhostE2200.issues.filter(i => i.key === 'settingsBus.orphan');
+    if (WA.store.orphanSettingsKeys().length > 0) assert(orphanIssueE2200.length === 1 && orphanIssueE2200[0].level === 'info', '有幽灵键时 verdict 报 info 议题');
+    else assert(orphanIssueE2200.length === 0, '无幽灵键时 verdict 不报议题（不制造噪声）');
+    WA.__settingsRegs = WA.__settingsRegs.filter(r => r.key !== 'worldaxis_e2200_ghost2');
 
     // E6. 巡视只采集不产议题（防「新库永久挂一条不可消除 info」）
     const mE2200 = WA.store.maintain({});
@@ -8078,15 +8104,23 @@ WA.loadScript = _ls.loadScript;
     assert(gDyn.size >= 5, '动态生成节点按锚点分层（实 ' + gDyn.size + '）');
     assert(dSrcH2200.indexOf('condMissing') > 0 && dSrcH2200.indexOf('dynamicMissing') > 0, 'secUi 支持条件/动态分层统计');
 
-    // H2. 不变量：panel 渲染的控件全部在守卫表内 + 无僵尸条目
+    // H2. 不变量：面板渲染的控件全部在守卫表内 + 无僵尸条目
+    //   v2.3.0 块3 口径修正：渲染 id 此前只从 ui/panel.js 采集，而**设置页全部控件由
+    //   ui/settings.js 渲染** —— 于是任何设置页控件一旦写入守卫表就必被报成「僵尸条目」。
+    //   这正是 v2.2.0 块8 把设置页整页留在守卫之外的根因（写进去必然失败）。
+    //   采集范围扩展到全部 ui/*.js 后，守卫表才可能真正覆盖设置页。
     const renderedH = [];
     const reH = /id="(wa-[a-z0-9\-]+)"/g;
+    const uiFilesH = ['ui/panel.js', 'ui/settings.js', 'ui/assistant.js'];
+    const uiSrcJoinH = uiFilesH.map(function (f) {
+      try { return fs.readFileSync(path.join(BASE, f), 'utf8'); } catch (e) { return ''; }
+    }).join('\n');
     let mH;
-    while ((mH = reH.exec(pSrcH2200))) { if (renderedH.indexOf(mH[1]) < 0) renderedH.push(mH[1]); }
+    while ((mH = reH.exec(uiSrcJoinH))) { if (renderedH.indexOf(mH[1]) < 0) renderedH.push(mH[1]); }
     const EXEMPT_H = ['wa-panel', 'wa-orb'];
     const uncoveredH = renderedH.filter(id => !gIds.has(id) && !gCond.has(id) && !gDyn.has(id) && EXEMPT_H.indexOf(id) < 0);
     assert(uncoveredH.length === 0, 'panel 渲染的每个控件都在守卫表内（未覆盖：' + JSON.stringify(uncoveredH) + '）');
-    assert(renderedH.length >= 80, 'panel 渲染控件总量不少于 80（实 ' + renderedH.length + '）');
+    assert(renderedH.length >= 80, '面板渲染控件总量不少于 80（实 ' + renderedH.length + '）');
     const zombieH = [];
     grpH.forEach(g => { (g.ids || []).concat(g.cond || []).concat(g.dynamic || []).forEach(id => { if (renderedH.indexOf(id) < 0) zombieH.push(id); }); });
     assert(zombieH.length === 0, '守卫表无僵尸条目（' + JSON.stringify(zombieH) + '）');
@@ -8110,6 +8144,9 @@ WA.loadScript = _ls.loadScript;
       try { global.Node = domH2200.window.Node; } catch (e) {}
       WA.mainDoc = global.document;
       vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+      // v2.3.0 块3: 设置页由 ui/settings.js 渲染，不加载它则 settings 页只能渲染出
+      //   「模块未加载」占位 —— 该页因此永远无法被端到端校验（块8 覆盖不到它的技术原因）。
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8'), ctx, { filename: 'ui/settings.js' });
       WA.store.init();
       WA.ui.mount();
       WA.ui.open();
@@ -8158,6 +8195,615 @@ WA.loadScript = _ls.loadScript;
     WA.workflow.resetHistory();
     fresh2200();
   }
+
+  // ══════════ v2.3.0 ══════════
+  v2300: {
+  const LS2300 = global.localStorage;
+  const ctx2300 = global.SillyTavern.getContext();
+  function fresh2300() { LS2300.clear(); ctx2300.chatId = 'v2300_chat'; global.__mockChat.length = 0; WA.store.init(); }
+
+  // ── A. 块1：设置读路径收口（写路径已迁移、读路径仍裸 localStorage → 损坏隔离/旧键迁移对这些模块失效）──
+  fresh2300();
+  section('v2.3.0 块1：设置读路径收口（10 模块归口 settingsBus）');
+  {
+    // A1. 静态锚点：这 10 个模块不得再出现裸 localStorage.getItem 读设置键
+    const MODS2300 = ['engines/opinion.js', 'render/inject.js', 'render/purifier.js', 'direction/oracle.js',
+      'core/workflow.js', 'core/api-router.js', 'actors/registry.js', 'engines/regional.js',
+      'engines/evolution.js', 'engines/preset.js'];
+    MODS2300.forEach(function (rel) {
+      const s = fs.readFileSync(path.join(BASE, rel), 'utf8');
+      assert(s.indexOf('settingsBus.read(') > 0, rel + ' 读路径已归口 settingsBus.read');
+      // 设置键读取一律不得走裸 getItem（诊断/日志/缓存类键除外，它们本就不是 settings）
+      const bare = s.split('\n').filter(function (l) {
+        return l.indexOf('localStorage.getItem(LS_KEY') >= 0 || l.indexOf('localStorage.getItem(LS_PLAN') >= 0
+          || l.indexOf('localStorage.getItem(KEY_CUSTOM') >= 0 || l.indexOf('localStorage.getItem(KEY_ACTIVE') >= 0;
+      });
+      assert(bare.length === 0, rel + ' 无裸 localStorage.getItem 读设置键（实 ' + bare.length + ' 处）');
+    });
+
+    // A2. 行为实证：损坏 → 隔离 + 重置默认 + error 留痕（旧实现静默吞掉、无痕迹）
+    const CASES2300 = [
+      { key: 'worldaxis_opinion_settings_v1', mod: 'opinion', probe: function () { return WA.opinion.getSettings().enabled === false; } },
+      { key: 'worldaxis_inject_visibility_v1', mod: 'inject', probe: function () { return WA.render.getVisibility().clock === true; } },
+      { key: 'worldaxis_workflow_v1', mod: 'workflow', probe: function () { WA.workflow.register({ id: '__probe2300_wf__', chain: 'after', order: 999 }); const n = WA.workflow.list().length > 0; WA.workflow.unregister('__probe2300_wf__'); return n; } },
+      { key: 'worldaxis_api_channels_v1', mod: 'apiRouter', probe: function () { return WA.apiRouter.listChannels().length > 0; } },
+      { key: 'worldaxis_regional_settings_v1', mod: 'regional', probe: function () { return WA.regional.getSettings().enabled === false; } },
+      { key: 'worldaxis_custom_presets', mod: 'preset', probe: function () { return Array.isArray(WA.preset.getAllPresets()); } }
+    ];
+    CASES2300.forEach(function (c) {
+      WA.eventLog.length = 0;
+      const q0 = WA.settingsBus.stats.quarantines;
+      LS2300.setItem(c.key, '{broken-json***');
+      assert(c.probe() === true, c.mod + '：损坏键读出默认值（不抛异常、不静默崩溃）');
+      const qks = [];
+      for (let i = 0; i < LS2300.length; i++) { const k = LS2300.key(i); if (k && k.indexOf(c.key + '_corrupt_') === 0) qks.push(k); }
+      assert(qks.length >= 1, c.mod + '：损坏键已隔离为 corrupt_<ts>（v2.3.0 新增能力）');
+      assert(LS2300.getItem(c.key) === null, c.mod + '：损坏原键已移除');
+      assert(WA.settingsBus.stats.quarantines > q0, c.mod + '：quarantines 计量递增');
+      assert(WA.errorLog.some(function (e) { return e.level === 'error' && e.msg.indexOf(c.key + ' 损坏已隔离') > 0; }), c.mod + '：损坏事件进 error 子环（留痕）');
+    });
+
+    // A3. 行为实证：legacy 旧键迁移对这些模块真正生效（此前读路径不经过 settingsBus → 迁移基建形同虚设）
+    LS2300.setItem('worldaxis_legacy_probe_v0', JSON.stringify({ enabled: true, sandboxEnabled: true, everyNRounds: 7 }));
+    const legacyRead2300 = WA.settingsBus.read({ key: 'worldaxis_legacy_probe_v1', legacy: ['worldaxis_legacy_probe_v0'], def: { enabled: false } });
+    assert(legacyRead2300.enabled === true && legacyRead2300.everyNRounds === 7, 'legacy 键值被读入当前键');
+    assert(LS2300.getItem('worldaxis_legacy_probe_v0') === null && LS2300.getItem('worldaxis_legacy_probe_v1') !== null, '读旧写新 + 旧键回收');
+
+    // A4. 任一模块的读路径都必须经过同一闸门（统一计量入口，便于统计「哪些键真被读过」）
+    const rdBefore2300 = WA.settingsBus.stats.reads;
+    WA.opinion.getSettings(); WA.render.getVisibility(); WA.regional.getSettings(); WA.evolution.getSettings();
+    LS2300.setItem('worldaxis_opinion_settings_v1', JSON.stringify({ enabled: true }));
+    WA.opinion.getSettings();
+    assert(WA.settingsBus.stats.reads > rdBefore2300, '模块读设置统一计入 settingsBus 计量（此前这些读完全不可观测）');
+  }
+
+  // ── B. 块2：设置登记表语义收口 + 自洽校验 ──
+  fresh2300();
+  section('v2.3.0 块2：登记表语义收口（orphan/optional 分离 + 自洽校验）');
+  {
+    // B1. orphan 与 optional 语义分离：在用可选键不得被注销
+    const regs2300 = WA.settingsBus.registry();
+    assert(regs2300.every(function (r) { return !(r.orphan && r.optional); }), '登记表不存在「既 orphan 又 optional」的矛盾项');
+    const oracleReg2300 = regs2300.filter(function (r) { return r.key === 'worldaxis_oracle_plan_v1'; })[0];
+    assert(oracleReg2300 && oracleReg2300.optional === true && !oracleReg2300.orphan, 'oracle_plan 改标 optional（原误标 orphan）');
+    const presetAct2300 = regs2300.filter(function (r) { return r.key === 'worldaxis_active_preset'; })[0];
+    assert(presetAct2300 && presetAct2300.optional === true && !presetAct2300.orphan, 'preset_active 改标 optional（原误标 orphan）');
+    const st2300 = WA.settingsBus.registryStat();
+    assert(typeof st2300.optional === 'number' && st2300.optional >= 2, 'registryStat 透出 optional 计数');
+
+    // B2. 「全部注销」旧行为会清除在用键 —— 现在必须被拦下
+    assert(WA.settingsBus.deregisterOrphan('worldaxis_active_preset').ok === false, '在用可选键拒绝注销');
+    assert(WA.settingsBus.deregisterOrphan('worldaxis_active_preset').reason.indexOf('optional-key') === 0, '拒绝原因明确为 optional-key');
+    const totalBefore2300 = WA.settingsBus.registry().length;
+    assert(WA.settingsBus.deregisterOrphan('worldaxis_oracle_plan_v1').ok === false, 'oracle_plan 拒绝注销');
+    assert(WA.settingsBus.registry().length === totalBefore2300, '被拒绝的注销不改变登记表（无副作用）');
+
+    // B3. 真幽灵仍可注销；休眠登记不误报
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([
+      { key: 'worldaxis_dormant_ghost_v1', def: null, module: 'probe', orphan: true },
+      { key: 'worldaxis_real_ghost_v1', def: null, module: 'probe', orphan: true }
+    ]);
+    LS2300.setItem('worldaxis_real_ghost_v1', '{}');
+    WA.settingsBus.read({ key: 'worldaxis_real_ghost_v1' });   // 留下「曾存在」痕迹
+    LS2300.removeItem('worldaxis_real_ghost_v1');
+    const ghosts2300 = WA.store.orphanSettingsKeys();
+    assert(ghosts2300.some(function (g) { return g.key === 'worldaxis_real_ghost_v1'; }), '曾存在后被删除的废弃键 → 真幽灵');
+    assert(!ghosts2300.some(function (g) { return g.key === 'worldaxis_dormant_ghost_v1'; }), '从未落盘的废弃登记 → 休眠（不误报待清理）');
+    assert(WA.settingsBus.dormantGhosts().some(function (g) { return g.key === 'worldaxis_dormant_ghost_v1'; }), '休眠登记有独立出口（诊断可见）');
+    assert(WA.settingsBus.deregisterOrphan('worldaxis_real_ghost_v1').ok === true, '真幽灵可注销');
+    WA.__settingsRegs = WA.__settingsRegs.filter(function (r) { return r.key.indexOf('worldaxis_dormant_ghost_v1') !== 0 && r.key.indexOf('worldaxis_real_ghost_v1') !== 0; });
+
+    // B4. 自洽校验器：抓出重复登记 / 矛盾声明 / 缺 def
+    const scOk2300 = WA.settingsBus.selfCheck();
+    assert(scOk2300.ok === true, '内置登记表自洽（无 error 级问题）');
+    assert(scOk2300.total >= 12, '自洽校验覆盖全部登记项');
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([
+      { key: 'worldaxis_backstage_settings_v1', def: {}, module: 'dup' },        // 重复登记
+      { key: 'worldaxis_conflict_probe_v1', def: null, module: 'p', orphan: true, optional: true },  // 矛盾
+      { key: 'worldaxis_nodef_probe_v1', module: 'p' }                            // 缺 def
+    ]);
+    const scBad2300 = WA.settingsBus.selfCheck();
+    assert(scBad2300.ok === false, '自洽校验发现阻断项');
+    assert(scBad2300.issues.some(function (i) { return i.code === 'duplicate-key'; }), '抓出重复登记键');
+    assert(scBad2300.issues.some(function (i) { return i.code === 'orphan_optional_conflict'; }), '抓出 orphan/optional 矛盾声明');
+    assert(scBad2300.issues.some(function (i) { return i.code === 'missing-def'; }), '抓出缺 def 声明');
+    assert(scBad2300.issues.some(function (i) { return i.code === 'missing-def' && i.level === 'warn'; }), '缺 def 定级 warn（不阻断启动）');
+    assert(scBad2300.issues.some(function (i) { return i.code === 'duplicate-key' && i.detail.indexOf('worldaxis_backstage_settings_v1') >= 0; }), '重复项归因到具体键');
+    // 只读保证：校验不得改动登记表
+    const nBefore2300 = WA.__settingsRegs.length;
+    WA.settingsBus.selfCheck();
+    assert(WA.__settingsRegs.length === nBefore2300, '自洽校验纯只读（不改登记表）');
+    WA.__settingsRegs = WA.__settingsRegs.filter(function (r) {
+      return r.key !== 'worldaxis_conflict_probe_v1' && r.key !== 'worldaxis_nodef_probe_v1';
+    });
+    // 去重：剔除刚补进来的重复 backstage 项
+    const seenK2300 = {};
+    WA.__settingsRegs = WA.__settingsRegs.filter(function (r) {
+      const hit = seenK2300[r.key]; seenK2300[r.key] = true; return !hit;
+    });
+    assert(WA.settingsBus.selfCheck().ok === true, '清理后登记表恢复自洽');
+
+    // B5. 默认值校验（能力边界已被负向验证界定清楚）
+    //   背景：verifyDefaults 第一版用 read(reg) 与 reg.def 比对 —— 而 read 在磁盘无值时**恰好回落到
+    //   reg.def**，两边同源，断言恒真（典型「看起来在验证、其实什么都没验」）。
+    //   块1 把读路径统一到 settingsBus 之后，模块已不再持有独立内联默认值：
+    //   因此「声明 ↔ 实际默认值漂移」在当前结构下**不可能发生**，这本身是收益，必须显式声明而不是假装在验。
+    //   本检查保留两个仍然非平凡的能力：
+    //     ① 磁盘结构一致性：磁盘存量必须与登记声明同构（类型/数组性），真实可漂移
+    //     ② 单源不变量守卫：磁盘无值时 read(reg) 必须严格等于声明 —— 若将来有人重新引入
+    //        「模块内联默认值并覆盖 read 回落」的写法，这条不变量会立刻破，从而暴露回归
+    const evoKey2300 = 'worldaxis_evolution_settings_v1';
+    const regEvo2300 = WA.__settingsRegs.filter(function (r) { return r.key === evoKey2300; })[0];
+    assert(!!regEvo2300, 'evolution 登记项存在');
+
+    // B5a. 单源不变量：所有非 orphan 登记项在磁盘无值时，read 回落值必须严格等于声明
+    const fresh2300keys = [];
+    WA.settingsBus.registry().forEach(function (r) {
+      if (r.orphan) return;
+      LS2300.removeItem(r.key);
+      fresh2300keys.push(r.key);
+      const fallback = WA.settingsBus.read(r);
+      assert(JSON.stringify(fallback) === JSON.stringify(r.def), r.key + ' 单源不变量：read 回落值 === 登记声明');
+    });
+    assert(fresh2300keys.length >= 10, '单源不变量覆盖全部在用登记项（实 ' + fresh2300keys.length + '）');
+
+    // B5b. 回归模拟：模块侧若重新持有独立默认值且与声明不一致 → 必须被抓出
+    //   （直接改模块源码不现实，用 providers 注入「被改坏的默认值」精确模拟该回归形态）
+    const prov2300 = {};
+    prov2300[evoKey2300] = function () { return WA.evolution.getSettings(); };
+    const vdOk2300 = WA.settingsBus.verifyDefaults({ keys: [evoKey2300], providers: prov2300 });
+    assert(vdOk2300.checked === 1 && vdOk2300.rows[0].source === 'provider', '提供者分支生效（磁盘无值 → 比对模块自报默认值）');
+    assert(vdOk2300.ok === true, '当前无漂移');
+    const provBad2300 = {};
+    provBad2300[evoKey2300] = function () { const s = WA.evolution.getSettings(); s.diceEnabled = 'HACKED'; return s; };
+    const vdBad2300 = WA.settingsBus.verifyDefaults({ keys: [evoKey2300], providers: provBad2300 });
+    assert(vdBad2300.ok === false && vdBad2300.drift.length === 1, '模块侧默认值偏离声明 → 被抓出（回归形态可检出）');
+    assert(vdBad2300.drift[0].key === evoKey2300 && vdBad2300.drift[0].source === 'provider', '漂移项归因到具体键 + 来源');
+
+    // B5c. 磁盘分支：磁盘已有值 → 与登记声明的类型/结构比对（真实可漂移面）
+    LS2300.setItem(evoKey2300, JSON.stringify([1, 2, 3]));   // 数组 vs 声明对象 → 结构不符
+    const vdB2300 = WA.settingsBus.verifyDefaults({ keys: [evoKey2300], providers: prov2300 });
+    assert(vdB2300.checked === 1 && vdB2300.rows[0].source === 'disk', '磁盘分支生效（有磁盘值时不再看提供者）');
+    assert(vdB2300.ok === false, '磁盘存量与登记声明结构不符被抓出');
+    LS2300.setItem(evoKey2300, JSON.stringify(regEvo2300.def));
+    assert(WA.settingsBus.verifyDefaults({ keys: [evoKey2300] }).ok === true, '磁盘值与声明结构相符 → 通过');
+    LS2300.removeItem(evoKey2300);
+    assert(WA.settingsBus.verifyDefaults({ keys: [evoKey2300] }).checked === 0, '无提供者且无磁盘值时跳过判定（不误报）');
+
+    // B5d. 方法论锚点：把「自比」口径钉死，防止后人重蹈
+    const selfCompare2300 = JSON.stringify(WA.settingsBus.read(regEvo2300)) === JSON.stringify(regEvo2300.def);
+    assert(selfCompare2300 === true, '（方法论锚点）read(reg) 与 def 自比恒真——报告与校验都不得采用该口径');
+
+    // B6. evolution 登记表 def 不再是 null（此前诊断视图读到 null 而非真实默认值）
+    assert(regEvo2300.def !== null && regEvo2300.def.diceEnabled === true, 'evolution 登记声明真实默认值（原为 null）');
+    assert(WA.evolution.getSettings().diceEnabled === true, 'evolution 实际默认值与声明一致');
+
+    WA.workflow.resetHistory();
+    fresh2300();
+  }
+  // ── C. 块3：死配置复活（常量旋钮 → 设置键；移植残留死键剔除） ──
+  fresh2300();
+  section('v2.3.0 块3：死配置复活（horizon 旋钮可配 + 死键剔除）');
+  {
+    // C1. 静态锚点：horizon 的触发参数不得再是硬编码常量
+    const hzSrc2300 = fs.readFileSync(path.join(BASE, 'engines/horizon.js'), 'utf8');
+    assert(hzSrc2300.indexOf("worldaxis_horizon_settings_v1") > 0, 'horizon 设置键已声明');
+    assert(hzSrc2300.indexOf('settingsBus.read(') > 0, 'horizon 读路径走 settingsBus');
+    assert(hzSrc2300.indexOf('roll01() < BASE_CHANCE') < 0, '触发率不再是硬编码常量（改读生效配置）');
+    assert(hzSrc2300.indexOf('lane.ledger >= LEDGER_THRESHOLD') < 0, '保底轮数不再是硬编码常量');
+    assert(hzSrc2300.indexOf('lane.cooldown   = COOLDOWN_ROUNDS') < 0, '冷却轮数不再是硬编码常量');
+
+    // C2. 默认行为不变：无磁盘值时生效值 === 原常量语义（迁移不改行为，只开出口）
+    const hzCfg2300 = WA.horizon.stat().config;
+    assert(hzCfg2300.distant.chancePct === 18 && hzCfg2300.near.chancePct === 18, '默认触发率 18%（=== 原 BASE_CHANCE 0.18）');
+    assert(hzCfg2300.distant.cooldown === 5 && hzCfg2300.near.cooldown === 5, '默认冷却 5 轮（=== 原 COOLDOWN_ROUNDS）');
+    assert(hzCfg2300.distant.ledger === 10 && hzCfg2300.near.ledger === 10, '默认保底 10 轮（=== 原 LEDGER_THRESHOLD）');
+    assert(hzCfg2300.distant.enabled === true, '默认两通道开启（=== 原「无开关即常开」行为）');
+    assert(WA.horizon.LEDGER_THRESHOLD === 10 && WA.horizon.COOLDOWN_ROUNDS === 5, '常量仍导出（向后兼容外部引用）');
+
+    // C3. 通道关闭 ⇒ **完全不掷骰**：不消耗保底计数、不消耗冷却、连随机数都不取
+    //   （旧实现：用户无法拒绝随机事件——即便把概率调 0，ledger 保底仍会在第 10 轮强制触发）
+    WA.horizon.setSettings({ distantEnabled: false, nearEnabled: false });
+    WA.store.transact(function (d) {
+      d.evolution.horizon.distant = { ledger: 0, cooldown: 0, pending: null, lastFired: 0 };
+      d.evolution.horizon.near = { ledger: 0, cooldown: 0, pending: null, lastFired: 0 };
+    });
+    //   随机数计数只包住 rollLane（store 内部实现细节不应干扰「零掷骰」这一断言）
+    const _mr2300 = Math.random; let rndCalls2300 = 0;
+    Math.random = function () { rndCalls2300++; return 0.5; };
+    let offRoll2300 = null;
+    try { offRoll2300 = WA.horizon.rollLane('distant'); } finally { Math.random = _mr2300; }
+    const offBlock2300 = WA.horizon.buildPromptBlock();
+    assert(offRoll2300.fired === false && offRoll2300.skipped === true && offRoll2300.reason === 'disabled', '关闭通道：rollLane 明确回报 disabled（而非伪装成「没掷中」）');
+    assert(rndCalls2300 === 0, '关闭通道：连随机数都不取（真正零成本，非「取了不用」）');
+    assert(WA.horizon.stat().skipped >= 1, '跳过次数进留痕（「关了」与「掷了没中」可区分）');
+    assert(WA.store.get().evolution.horizon.distant.ledger === 0, '关闭通道不消耗保底计数（改设置不产生副作用）');
+    assert(offBlock2300 === null, '双通道关闭时 buildPromptBlock 不产出任何指令块');
+    //   ⚠ 负向锚点：保底必须真的失效——否则「关了还在第 N 轮强制触发」会被漏过
+    WA.store.transact(function (d) { d.evolution.horizon.distant.ledger = 999; });
+    assert(WA.horizon.rollLane('distant').fired === false, '（负向）保底拉满 999 轮也不触发——关闭必须压过保底');
+
+    // C4. 触发率可配 + 区间夹取（越界值会让判定永久为真/永久为假）
+    fresh2300();
+    WA.horizon.setSettings({ distantEnabled: true, distantChance: 100, distantCooldown: 0, distantLedger: 30 });
+    WA.store.transact(function (d) { d.evolution.horizon.distant = { ledger: 0, cooldown: 0, pending: null, lastFired: 0 }; });
+    assert(WA.horizon.rollLane('distant').fired === true, '触发率 100% ⇒ 必中（用户可强制拉动随机事件）');
+    assert(WA.horizon.stat().config.distant.chancePct === 100, '生效值上报 100');
+    WA.horizon.setSettings({ distantChance: 500 });
+    assert(WA.horizon.stat().config.distant.chancePct === 100, '越界概率 500 → 夹取到上限 100');
+    WA.horizon.setSettings({ distantChance: 0.5 });
+    assert(WA.horizon.stat().config.distant.chancePct === 50, '小数比率写法 0.5 → 归一为 50%');
+    WA.horizon.setSettings({ distantChance: -3 });
+    assert(WA.horizon.stat().config.distant.chancePct === 1, '负概率 → 夹取到下限 1（不会挖出恒真/恒假洞）');
+    WA.horizon.setSettings({ distantCooldown: 99 });
+    assert(WA.horizon.stat().config.distant.cooldown === 20, '冷却越界 → 夹取到 20');
+    WA.horizon.setSettings({ distantLedger: 1 });
+    assert(WA.horizon.stat().config.distant.ledger === 3, '保底越界 → 夹取到 3');
+
+    // C5. 保底轮数真的被消费（可配值必须影响判定，而非只是展示）
+    fresh2300();
+    WA.horizon.setSettings({ distantEnabled: true, distantChance: 1, distantCooldown: 0, distantLedger: 3 });
+    WA.store.transact(function (d) { d.evolution.horizon.distant = { ledger: 2, cooldown: 0, pending: null, lastFired: 0 }; });
+    const forced2300 = WA.horizon.rollLane('distant');
+    assert(forced2300.fired === true && forced2300.forced === true, '保底 3 轮：ledger=2 时下轮即强制触发（可配值生效）');
+    assert(forced2300.reason.indexOf('ledger>=3') >= 0, '触发原因回报具体阈值（可归因）');
+    // C6. 冷却真的被消费
+    fresh2300();
+    WA.horizon.setSettings({ distantEnabled: true, distantChance: 100, distantCooldown: 7, distantLedger: 30 });
+    WA.store.transact(function (d) { d.evolution.horizon.distant = { ledger: 0, cooldown: 0, pending: null, lastFired: 0 }; });
+    assert(WA.horizon.rollLane('distant').fired === true, '冷却用例前置：概率 100% 确已触发');
+    WA.horizon.setSettings({ distantChance: 18 });   // 复位，避免影响后续断言
+    WA.store.transact(function (d) { d.evolution.horizon.distant.pending = null; });
+    assert(WA.store.get().evolution.horizon.distant.cooldown === 7, '冷却 7 轮生效（可配值写入泳道）');
+
+    // C7. snapshot / stat 反映通道开关与留痕（面板与诊断的取值来源）
+    fresh2300();
+    WA.horizon.setSettings({ distantEnabled: false, nearEnabled: true });
+    assert(WA.horizon.snapshot().indexOf('distant（关）') === 0, 'snapshot 标注关闭通道（此前看不出通道是关的）');
+    const hzStat2300 = WA.horizon.stat();
+    assert(typeof hzStat2300.rolls === 'number' && typeof hzStat2300.lastReason === 'string', 'stat() 上报掷骰留痕');
+
+    // C8. 死键剔除：移植期残留键不得再出现在任何注册声明里
+    const DEAD2300 = ['distantEnabled', 'nearEnabled', 'distantChance', 'nearChance', 'distantCooldown',
+      'nearCooldown', 'distantEventEnabled', 'nearEventEnabled', 'regionalIncidentEnabled'];
+    const degSrc2300 = fs.readFileSync(path.join(BASE, 'engines/evolution.js'), 'utf8');
+    const regSrc2300 = fs.readFileSync(path.join(BASE, 'engines/regional.js'), 'utf8');
+    function regBlock2300(src) {
+      const m = src.indexOf('const __REG = {');
+      if (m < 0) return '';
+      let d = 0, j = src.indexOf('{', m);
+      for (; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}') { d--; if (!d) { j++; break; } } }
+      return src.slice(m, j);
+    }
+    const evRegBlk2300 = regBlock2300(degSrc2300);
+    const rgRegBlk2300 = regBlock2300(regSrc2300);
+    DEAD2300.forEach(function (k) {
+      assert(evRegBlk2300.indexOf(k) < 0, 'evolution 登记不再声明死键 ' + k);
+    });
+    ['distantEnabled', 'nearEnabled', 'distantChance', 'nearChance', 'cooldown', 'distantEventEnabled', 'nearEventEnabled'].forEach(function (k) {
+      assert(rgRegBlk2300.indexOf(k) < 0, 'regional 登记不再声明死键 ' + k);
+    });
+    //   注册表实况：死键必须真的从登记 def 里消失（不是改了个注释）
+    const regRows2300 = WA.settingsBus.registry();
+    const evReg2300 = regRows2300.filter(function (r) { return r.key === 'worldaxis_evolution_settings_v1'; })[0];
+    const rgReg2300 = regRows2300.filter(function (r) { return r.key === 'worldaxis_regional_settings_v1'; })[0];
+    const hzReg2300 = regRows2300.filter(function (r) { return r.key === 'worldaxis_horizon_settings_v1'; })[0];
+    assert(hzReg2300 && hzReg2300.def && hzReg2300.def.distantChance === 18, 'horizon 登记表暴露真实默认值（新出口可见）');
+    assert(!Object.prototype.hasOwnProperty.call(evReg2300.def, 'distantEventEnabled'), 'evolution 登记表 def 已无死键');
+    assert(!Object.prototype.hasOwnProperty.call(rgReg2300.def, 'cooldown'), 'regional 登记表 def 已无死键');
+    //   ⚠ 保留键不得被误删（死键剔除最容易连带删掉在用键）
+    assert(rgReg2300.def.chancePercent === 15 && rgReg2300.def.durationRounds === 3, 'regional 在用键 survived（chancePercent/durationRounds 未误删）');
+    assert(evReg2300.def.diceEnabled === true && evReg2300.def.setbackRatio === 40, 'evolution 在用键 survived（diceEnabled/setbackRatio 未误删）');
+
+    // C9. regional 越界值夹取（历史存档把概率写成 500 会让区域事件永久触发）
+    fresh2300();
+    LS2300.setItem('worldaxis_regional_settings_v1', JSON.stringify({ enabled: true, chancePercent: 500, durationRounds: 999 }));
+    const rgEff2300 = WA.regional.effectiveSettings();
+    assert(rgEff2300.chancePercent === 100, 'regional 概率越界 → 夹取 100（原值 500 会让判定永久为真）');
+    assert(rgEff2300.durationRounds === 20, 'regional 持续轮次越界 → 夹取 20（原值 999 会让事件永不平息）');
+    assert(WA.regional.getSettings().chancePercent === 500, '原始读值不改写（夹取只作用于生效视图，不破坏用户数据）');
+    //   负向：夹取必须真的被消费，而非只在 effectiveSettings 里好看
+    const rgRollSrc2300 = fs.readFileSync(path.join(BASE, 'engines/regional.js'), 'utf8');
+    assert(rgRollSrc2300.indexOf('const st = effSettings()') > 0, 'regional.roll 消费生效视图（夹取真正生效）');
+    assert(rgRollSrc2300.indexOf('loadSettings().durationRounds') < 0, 'regional.applyIncident 不再裸读未夹取值');
+
+    // C10. UI 出口：常量旋钮必须真的有可操作入口（否则「可配」只存在于 API 层）
+    const setSrc2300 = fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8');
+    ['wa-hz-d-en', 'wa-hz-d-chance', 'wa-hz-d-cd', 'wa-hz-d-ledger',
+      'wa-hz-n-en', 'wa-hz-n-chance', 'wa-hz-n-cd', 'wa-hz-n-ledger', 'wa-hz-save'].forEach(function (id) {
+        assert(setSrc2300.indexOf(id) > 0, '设置页有随机事件控件 ' + id);
+      });
+    assert(setSrc2300.indexOf('WA.horizon.setSettings(') > 0, '设置页写回走 horizon.setSettings（单一真源）');
+    const panelSrc2300 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    assert(panelSrc2300.indexOf('WA.horizon.stat()') > 0, '概览页泳道消费 stat()（通道开关对用户可见）');
+    //   ⚠ 静态锚点只证明「控件渲染出来了」，不证明「控件能点」——必须真 DOM 验绑定。
+    //   （本批正是因为发现块3b 绑定漏了 '#' 前缀而补此断言：id 选择器写错时控件照常渲染、
+    //    源码照常含 id，静态断言全绿，而用户拖滑块毫无反应。）
+    let JSDOMB2300 = null;
+    try { JSDOMB2300 = require('jsdom').JSDOM; } catch (e) { try { JSDOMB2300 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMB2300 = null; } }
+    if (!JSDOMB2300) {
+      console.log('  \u26a0 jsdom 不可用，跳过随机事件控件绑定断言');
+    } else {
+      const domB2300 = new JSDOMB2300('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
+      const savedDocB2300 = global.document;
+      global.document = domB2300.window.document;
+      try { global.Node = domB2300.window.Node; } catch (e) {}
+      WA.mainDoc = global.document;
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8'), ctx, { filename: 'ui/settings.js' });
+      WA.store.init();
+      WA.ui.mount(); WA.ui.open();
+      const tabsB2300 = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
+      const setTabB2300 = tabsB2300.filter(function (t) { return t.dataset.page === 'settings'; })[0];
+      if (setTabB2300) {
+        setTabB2300.onclick();
+        const qB2300 = function (id) { return global.document.querySelector('#' + id); };
+        // 1) 处理器必须真挂上（选择器写错时这里必然为 null）
+        assert(typeof qB2300('wa-hz-d-en').onchange === 'function', '（真 DOM）远方通道复选框绑定生效');
+        assert(typeof qB2300('wa-hz-n-en').onchange === 'function', '（真 DOM）近端通道复选框绑定生效');
+        assert(typeof qB2300('wa-hz-d-chance').oninput === 'function', '（真 DOM）触发率滑块绑定生效');
+        assert(typeof qB2300('wa-hz-d-ledger').oninput === 'function', '（真 DOM）保底滑块绑定生效');
+        assert(typeof qB2300('wa-hz-save').onclick === 'function', '（真 DOM）保存按钮绑定生效');
+        // 2) 联动真生效：关掉通道 → 三个参数控件被禁用
+        qB2300('wa-hz-d-en').checked = false;
+        qB2300('wa-hz-d-en').onchange();
+        assert(qB2300('wa-hz-d-chance').disabled === true && qB2300('wa-hz-d-cd').disabled === true
+          && qB2300('wa-hz-d-ledger').disabled === true, '（真 DOM）关闭通道后参数控件真被禁用（不只是「渲染成禁用」）');
+        qB2300('wa-hz-d-en').checked = true;
+        qB2300('wa-hz-d-en').onchange();
+        assert(qB2300('wa-hz-d-chance').disabled === false, '（真 DOM）重新开启后参数控件恢复可用');
+        // 3) 回显真更新
+        qB2300('wa-hz-d-chance').value = '73';
+        qB2300('wa-hz-d-chance').oninput();
+        assert(qB2300('wa-hz-d-chancev').textContent === '73', '（真 DOM）拖动滑块数值回显真更新');
+        // 4) 保存链路端到端：界面操作 → localStorage → 生效视图
+        qB2300('wa-hz-n-chance').value = '61';
+        qB2300('wa-hz-save').onclick();
+        const savedB2300 = JSON.parse(global.localStorage.getItem('worldaxis_horizon_settings_v1'));
+        assert(savedB2300 && savedB2300.distantChance === 73 && savedB2300.nearChance === 61,
+          '（真 DOM）界面操作经保存真实落盘（不是只在内存里好看）');
+        assert(WA.horizon.stat().config.distant.chancePct === 73, '（真 DOM）保存后生效视图同步（端到端闭环）');
+      } else {
+        assert(false, '设置页签缺失（无法校验随机事件控件绑定）');
+      }
+      global.document = savedDocB2300;
+      global.document.getElementById = function () { return null; };
+      WA.mainDoc = global.document;
+      fresh2300();
+    }
+
+    // C11. UI 守卫覆盖全部页面（v2.2.0 块8 只守了 8/9 页——设置页整页在守卫之外）
+    const pagesSrc2300 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    const pageIds2300 = [];
+    const pageRe2300 = /\{ id: '([a-z]+)', icon:/g;
+    let pm2300;
+    while ((pm2300 = pageRe2300.exec(pagesSrc2300))) pageIds2300.push(pm2300[1]);
+    assert(pageIds2300.length >= 10, '解析到面板页清单（实 ' + pageIds2300.length + '）');
+    const boundPages2300 = {};
+    WA.toolDiag.UI_BINDINGS.forEach(function (g) { boundPages2300[g.page] = true; });
+    const uncovered2300 = pageIds2300.filter(function (id) { return id !== 'overview' && !boundPages2300[id]; });
+    assert(uncovered2300.length === 0, 'UI 绑定守卫覆盖全部有控件的页（未覆盖：' + (uncovered2300.join('/') || '无') + '）');
+    assert(boundPages2300['settings'] === true, '设置页已纳入守卫（v2.2.0 遗漏项）');
+    const setGroup2300 = WA.toolDiag.UI_BINDINGS.filter(function (g) { return g.page === 'settings'; })[0];
+    assert(setGroup2300 && setGroup2300.cond.indexOf('wa-prm-find') >= 0, '净化规则区归入 cond（purifier 未加载时整段不渲染，缺失不判失败）');
+
+    // C12. 诊断出口：runtime.horizon + verdict 通告（「随机事件不会发生」必须可归因）
+    fresh2300();
+    WA.horizon.setSettings({ distantEnabled: false, nearEnabled: false });
+    const diagHz2300 = WA.toolDiag.collect();
+    assert(diagHz2300.runtime && diagHz2300.runtime.horizon && typeof diagHz2300.runtime.horizon.rolls === 'number', '诊断包暴露 runtime.horizon 运行视图');
+    assert(diagHz2300.runtime.horizon.enabled.distant === false, '诊断包反映通道开关真相');
+    const hzIssue2300 = (diagHz2300.verdict.issues || []).filter(function (i) { return i.key === 'horizon'; })[0];
+    assert(hzIssue2300 && hzIssue2300.level === 'info', '双通道关闭 → verdict 出 info 级通告（是设置，不是故障）');
+    assert(hzIssue2300.detail.indexOf('这是设置') > 0, '通告文案明确区别于故障（防用户误判引擎坏了）');
+    //   负向：通道开着时不得误报
+    WA.horizon.setSettings({ distantEnabled: true, nearEnabled: true });
+    const diagHzOn2300 = WA.toolDiag.collect();
+    assert(!(diagHzOn2300.verdict.issues || []).some(function (i) { return i.key === 'horizon' && i.detail.indexOf('均已关闭') > 0; }), '（负向）通道开启时不误报关闭通告');
+
+    // C13. 持久化往返：配置真的落到 localStorage 并可读回（不是内存态幻觉）
+    fresh2300();
+    WA.horizon.setSettings({ distantChance: 42, nearLedger: 17 });
+    const raw2100 = JSON.parse(LS2300.getItem('worldaxis_horizon_settings_v1'));
+    assert(raw2100.distantChance === 42 && raw2100.nearLedger === 17, '随机事件配置真实落盘');
+    fresh2300();   // 清 localStorage 后再写回，模拟重载
+    LS2300.setItem('worldaxis_horizon_settings_v1', JSON.stringify(raw2100));
+    assert(WA.horizon.stat().config.distant.chancePct === 42 && WA.horizon.stat().config.near.ledger === 17, '重载后配置读回（跨会话保持）');
+    //   损坏隔离对这些新键同样生效（读路径归口的既有能力）
+    LS2300.setItem('worldaxis_horizon_settings_v1', '{broken***');
+    const hzFallback2300 = WA.horizon.getSettings();
+    assert(hzFallback2300.distantChance === 18, 'horizon 配置损坏 → 隔离并回落默认（v2.3.0 读路径归口带来的能力）');
+
+    WA.workflow.resetHistory();
+    fresh2300();
+  }
+  // ── D. 块3 审计固化（逆向审计发现的缺陷 + 死键扫描器内化） ──
+  fresh2300();
+  section('v2.3.0 块3 审计：布尔配置归一化 + 死键扫描内化');
+  {
+    // D1. 布尔归一化单一实现（消除 `!== false` / `=== true` / `!v` 三套语义）
+    assert(typeof WA.settingsBus.toBool === 'function', 'settingsBus.toBool 存在（布尔配置归一化单一实现）');
+    const tb2300 = WA.settingsBus.toBool;
+    //   显式假：字符串/数字写法都必须归为关闭（此前 `!== false` 把 'false' 判成开启）
+    [false, 0, '0', 'false', 'FALSE', ' false ', 'no', 'off', '', null].forEach(function (v, i) {
+      assert(tb2300(v, true) === false, 'toBool 归类为假 #' + i + '（' + JSON.stringify(v) + '）');
+    });
+    [true, 1, '1', 'true', 'TRUE', ' true ', 'yes', 'on', 2, -1].forEach(function (v, i) {
+      assert(tb2300(v, false) === true, 'toBool 归类为真 #' + i + '（' + JSON.stringify(v) + '）');
+    });
+    assert(tb2300(undefined, true) === true && tb2300(undefined, false) === false, 'toBool 值缺席时回落调用方声明的默认值');
+
+    // D2. 三处布尔消费必须走统一归一化（静态锚点：防再次分叉出第二套语义）
+    const hzSrcD2300 = fs.readFileSync(path.join(BASE, 'engines/horizon.js'), 'utf8');
+    const rgSrcD2300 = fs.readFileSync(path.join(BASE, 'engines/regional.js'), 'utf8');
+    const evSrcD2300 = fs.readFileSync(path.join(BASE, 'engines/evolution.js'), 'utf8');
+    assert(hzSrcD2300.indexOf('settingsBus.toBool') > 0 && hzSrcD2300.indexOf('c.distantEnabled : c.nearEnabled) !== false') < 0,
+      'horizon 通道开关走统一归一化（不再用 `!== false`：字符串 "false" 会被判为开启）');
+    assert(rgSrcD2300.indexOf('s.enabled === true') < 0, 'regional 不再用 `=== true`（会把旧存档的 "true" 判为未启用）');
+    assert(rgSrcD2300.indexOf('settingsBus.toBool(s.enabled') > 0, 'regional 启用态走统一归一化');
+    assert(evSrcD2300.indexOf('!st.diceEnabled') < 0 && evSrcD2300.indexOf('settingsBus.toBool(st.diceEnabled') > 0,
+      'evolution 骰子开关走统一归一化（`!st.diceEnabled` 对字符串 "false" 是真值 = 关闭失效）');
+
+    // D3. 行为实证：字符串写法真的生效/真的失效（不只是「调用了归一化函数」）
+    fresh2300();
+    LS2300.setItem('worldaxis_horizon_settings_v1', JSON.stringify({ distantEnabled: 'false', nearEnabled: 'false' }));
+    assert(WA.horizon.stat().enabled.distant === false, '字符串 "false" 真被当作关闭（关闭意图不再静默失效）');
+    assert(WA.horizon.rollLane('distant').skipped === true, '字符串 "false" 时通道真跳过掷骰');
+    LS2300.setItem('worldaxis_regional_settings_v1', JSON.stringify({ enabled: 'true', chancePercent: 15, durationRounds: 3 }));
+    assert(WA.regional.effectiveSettings().enabled === true, '旧存档字符串 "true" 仍被识别为启用（不收窄既有语义）');
+    fresh2300();
+    LS2300.setItem('worldaxis_evolution_settings_v1', JSON.stringify({ diceEnabled: 'false' }));
+    assert(WA.evolution.rollEvents().length === 0, '字符串 "false" 真能关掉事件链骰子');
+
+    // D4. 越界/畸形组合一律夹取到安全区间（不得出现 NaN 传播、恒真、恒假）
+    fresh2300();
+    const WEIRD2300 = [
+      { distantChance: NaN, distantCooldown: -1, distantLedger: 0 },
+      { distantChance: Infinity, distantCooldown: 1e9, distantLedger: 1e9 },
+      { distantChance: -Infinity, distantCooldown: 0, distantLedger: 3 },
+      { distantChance: undefined, distantCooldown: undefined, distantLedger: undefined },
+      { distantChance: '0.18', distantCooldown: '7.9', distantLedger: '12.5' },
+      { distantChance: {}, distantCooldown: [], distantLedger: 'abc' }
+    ];
+    let weirdSafe2300 = true, weirdDet2300 = '';
+    WEIRD2300.forEach(function (w, i) {
+      WA.horizon.setSettings(w);
+      const c = WA.horizon.stat().config.distant;
+      const safe = Number.isFinite(c.chancePct) && c.chancePct >= 1 && c.chancePct <= 100
+        && Number.isFinite(c.cooldown) && c.cooldown >= 0 && c.cooldown <= 20
+        && Number.isFinite(c.ledger) && c.ledger >= 3 && c.ledger <= 30;
+      if (!safe) { weirdSafe2300 = false; weirdDet2300 += '#' + i + ':' + JSON.stringify(c) + ' '; }
+    });
+    assert(weirdSafe2300, '6 组越界/畸形组合全部夹取到安全区间（无 NaN、无恒真恒假）' + (weirdDet2300 ? ' — ' + weirdDet2300 : ''));
+    fresh2300();
+
+    // D5. 关闭 → 重开 不欠账（关闭期间不得累积，否则重开瞬间一次性爆发）
+    WA.horizon.setSettings({ distantEnabled: false, nearEnabled: false });
+    WA.store.transact(function (d) { d.evolution.horizon.distant = { ledger: 0, cooldown: 0, pending: null, lastFired: 0 }; });
+    for (let i = 0; i < 50; i++) WA.horizon.rollLane('distant');
+    assert(WA.store.get().evolution.horizon.distant.ledger === 0, '关闭期间 50 轮不累积保底计数');
+    WA.horizon.setSettings({ distantEnabled: true, distantChance: 1, distantLedger: 30 });
+    assert(WA.horizon.rollLane('distant').forced !== true, '重开首轮不被「欠账」强制触发（欠账未跨关闭期累积）');
+    fresh2300();
+
+    // D6. 死键扫描内化：登记表声明的每个 def 子键都必须在生产代码里有消费点。
+    //   把一次性脚本（/tmp/wa_setkeys2.py）沉淀为回归基建 —— 否则将来会重新长出死开关，
+    //   而「声明了却零消费」正是本轮命题本身。
+    const PROD2300 = [];
+    (function walk2300(dir) {
+      fs.readdirSync(dir).forEach(function (n) {
+        if (n === '.git' || n === 'node_modules' || n === 'tests') return;
+        const fp = path.join(dir, n);
+        const st = fs.statSync(fp);
+        if (st.isDirectory()) walk2300(fp);
+        else if (/\.js$/.test(n)) PROD2300.push(fp);
+      });
+    })(BASE);
+    const prodSrc2300 = PROD2300.map(function (fp) { return fs.readFileSync(fp, 'utf8'); });
+    /** 定位 `const __REG = {...}` 声明块的行范围（块内出现键名不算消费点） */
+    function regBlockRange2300(src) {
+      const i = src.indexOf('const __REG = {');
+      if (i < 0) return null;
+      let d = 0, j = src.indexOf('{', i);
+      for (; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}') { d--; if (!d) { j++; break; } } }
+      return [i, j];
+    }
+    function lineOf2300(src, pos) { return src.slice(0, pos).split('\n').length; }
+    const deadKeys2300 = [];
+    WA.settingsBus.registry().forEach(function (r) {
+      if (r.orphan || !r.def || typeof r.def !== 'object') return;
+      Object.keys(r.def).forEach(function (k) {
+        let hits = 0;
+        prodSrc2300.forEach(function (src, si) {
+          const re = new RegExp('\\.' + k + '\\b', 'g');
+          let m;
+          while ((m = re.exec(src))) {
+            // 剔除与注册声明块重叠的命中（那是声明本身，不是消费）
+            const blk = regBlockRange2300(src);
+            if (blk) {
+              const ln = lineOf2300(src, m.index);
+              const blkStartLn = lineOf2300(src, blk[0]), blkEndLn = lineOf2300(src, blk[1]);
+              if (ln >= blkStartLn && ln <= blkEndLn) continue;
+            }
+            hits++;
+          }
+        });
+        if (hits === 0) deadKeys2300.push((r.module || '?') + '.' + k + '（' + r.key + '）');
+      });
+    });
+    assert(deadKeys2300.length === 0, '登记表 def 子键全部有生产消费点（死键扫描内化；发现：' + (deadKeys2300.join('、') || '无') + '）');
+    assert(WA.settingsBus.registry().length >= 14, '登记项规模（实 ' + WA.settingsBus.registry().length + '，v2.3.0 新增 horizon 后 14）');
+
+    // D7. 反查：本轮的 11 个死键不得回到任何登记 def 里（逐个点名，防「换个写法又加回来」）
+    const KILLED2300 = [
+      ['worldaxis_regional_settings_v1', ['distantEnabled', 'nearEnabled', 'distantChance', 'nearChance', 'cooldown']],
+      ['worldaxis_evolution_settings_v1', ['distantEventEnabled', 'distantChance', 'distantCooldown',
+        'nearEventEnabled', 'nearChance', 'nearCooldown', 'regionalIncidentEnabled']]
+    ];
+    KILLED2300.forEach(function (pair) {
+      const row = WA.settingsBus.registry().filter(function (r) { return r.key === pair[0]; })[0];
+      pair[1].forEach(function (k) {
+        assert(!row || !Object.prototype.hasOwnProperty.call(row.def, k), pair[0] + ' 不再声明死键 ' + k);
+      });
+    });
+
+    WA.workflow.resetHistory();
+    fresh2300();
+  }
+  // ── E. 块3 端到端：面板泳道区真 DOM 反映通道开关 ──
+  fresh2300();
+  section('v2.3.0 块3 端到端：面板泳道区（真 DOM）');
+  {
+    let JSDoM2300 = null;
+    try { JSDoM2300 = require('jsdom').JSDOM; } catch (e) { try { JSDoM2300 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDoM2300 = null; } }
+    if (!JSDoM2300) {
+      console.log('  \u26a0 jsdom 不可用，跳过泳道区端到端断言（静态锚点已覆盖接线）');
+    } else {
+      const domE2300 = new JSDoM2300('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
+      const savedDocE2300 = global.document;
+      global.document = domE2300.window.document;
+      try { global.Node = domE2300.window.Node; } catch (e) {}
+      WA.mainDoc = global.document;
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
+      vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8'), ctx, { filename: 'ui/settings.js' });
+      WA.store.init();
+      WA.ui.mount(); WA.ui.open();
+      const tabsE2300 = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
+      const evTabE2300 = tabsE2300.filter(function (t) { return t.dataset.page === 'events'; })[0];
+      const bodyE2300 = function () { return global.document.querySelector('.wa-body').innerHTML; };
+      assert(!!evTabE2300, '存在「事件」页签（泳道区所在页）');
+      if (evTabE2300) {
+        // 通道开启：不得出现「关」标记（负向先行，防「无条件渲染关」蒙混过关）
+        WA.horizon.setSettings({ distantEnabled: true, nearEnabled: true });
+        evTabE2300.onclick();
+        const onBodyE2300 = bodyE2300();
+        assert(onBodyE2300.indexOf('远方/近端事件泳道') >= 0, '（真 DOM）事件页渲染泳道区');
+        assert(onBodyE2300.indexOf('wa-badge">关</span>') < 0, '（负向）通道开启时泳道区无「关」标记');
+        // 关闭远端：必须出现「关」标记
+        WA.horizon.setSettings({ distantEnabled: false, nearEnabled: true });
+        evTabE2300.onclick();
+        const offBodyE2300 = bodyE2300();
+        assert(offBodyE2300.indexOf('wa-badge">关</span>') >= 0, '（真 DOM）关闭通道后泳道区出现「关」标记（此前关了与没中在面板上无区别）');
+        // 掷骰留痕：真掷一次，面板应显示次数与跳过计数
+        WA.horizon.rollLane('distant');
+        WA.horizon.rollLane('near', { force: true });
+        evTabE2300.onclick();
+        const statBodyE2300 = bodyE2300();
+        assert(statBodyE2300.indexOf('掷骰') >= 0, '（真 DOM）泳道区展示掷骰次数');
+        assert(statBodyE2300.indexOf('跳过（关）') >= 0, '（真 DOM）泳道区展示跳过计数（「关了」与「没中」可区分）');
+        // 开关改回后标记消失（可逆，不粘留）
+        WA.horizon.setSettings({ distantEnabled: true, nearEnabled: true });
+        evTabE2300.onclick();
+        assert(bodyE2300().indexOf('wa-badge">关</span>') < 0, '（真 DOM）通道重开后「关」标记消失（不粘留）');
+      }
+      global.document = savedDocE2300;
+      global.document.getElementById = function () { return null; };
+      WA.mainDoc = global.document;
+    }
+    WA.workflow.resetHistory();
+    fresh2300();
+  }
+  } // end v2.3.0 block
   } // end v2.2.0 block
   } // end v2.1.0 block
   } // end v0.9.0 block

@@ -8,11 +8,10 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_opinion_settings_v1';
 
-  function loadSettings() {
-    const def = { enabled: false, sandboxEnabled: false, everyNRounds: 3 };
-    try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
-  }
   const __REG = { key: LS_KEY, def: { enabled: false, sandboxEnabled: false, everyNRounds: 3 }, module: 'opinion' };
+  // v2.3.0: 读路径统一走 settingsBus（写路径 v0.2.0 已迁移）——此前本键 JSON 损坏会静默重置
+  //   为默认（无隔离留痕），legacy 旧键迁移规则也完全不生效。
+  function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function saveSettings(s) { WA.settingsBus.save(__REG, s); }
 

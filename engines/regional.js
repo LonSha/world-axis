@@ -20,13 +20,35 @@
     { type: 'ominous', label: '凶兆/异象', weight: 11, guide: '不详征兆引发恐慌' }
   ];
 
-  function loadSettings() {
-    const def = { enabled: false, chancePercent: 15, durationRounds: 3, distantEnabled: false, nearEnabled: false, distantChance: 20, nearChance: 20, cooldown: 5 };
-    try { return Object.assign(def, JSON.parse(WA.mainWin.localStorage.getItem(LS_KEY) || '{}')); } catch (e) { return def; }
-  }
-  const __REG = { key: LS_KEY, def: { enabled: false, chancePercent: 15, durationRounds: 3, distantEnabled: false, nearEnabled: false, distantChance: 20, nearChance: 20, cooldown: 5 }, module: 'regional' };
+  // v2.3.0 块3: 剔除 5 个零消费死键（distantEnabled / nearEnabled / distantChance /
+  //   nearChance / cooldown —— 远方/近端机制已由 horizon 承担，这是移植期残留；
+  //   保留死键会让设置页/登记表显示一组拨了没反应的旋钮）。
+  const MIN_CHANCE_PCT = 1, MAX_CHANCE_PCT = 100;
+  const MIN_DURATION = 1, MAX_DURATION = 20;
+  const __REG = { key: LS_KEY, def: { enabled: false, chancePercent: 15, durationRounds: 3 }, module: 'regional' };
+  // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——配置损坏此前静默重置为「未启用」
+  function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function saveSettings(s) { WA.settingsBus.save(__REG, s); }
+
+  /** v2.3.0 块3: 区间夹取——历史存档越界值（如概率 500）会让区域事件判定永久为真 */
+  function clampInt(v, def, min, max) {
+    const n = parseInt(v, 10);
+    if (!isFinite(n)) return def;
+    return Math.min(max, Math.max(min, n));
+  }
+  /** 生效配置（已夹取） */
+  function effSettings() {
+    const s = loadSettings() || {};
+    const d = __REG.def;
+    return {
+      // v2.3.0: 归一化，且**不得收窄**既有语义——原实现 `if (!st.enabled)` 对 'true'
+      //   等真值字符串是「启用」，若改成 `=== true` 会让旧存档配置无声失效。
+      enabled: WA.settingsBus.toBool(s.enabled, false),
+      chancePercent: clampInt(s.chancePercent, d.chancePercent, MIN_CHANCE_PCT, MAX_CHANCE_PCT),
+      durationRounds: clampInt(s.durationRounds, d.durationRounds, MIN_DURATION, MAX_DURATION)
+    };
+  }
 
   function weightedPick(items) {
     const total = items.reduce((s, i) => s + i.weight, 0);
@@ -37,11 +59,14 @@
 
   const regional = WA.regional = {
     getSettings: loadSettings,
+    // v2.3.0 块3: 只读生效视图（夹取后）——面板/诊断据此显示真实生效值
+    effectiveSettings: effSettings,
+    MIN_CHANCE_PCT, MAX_CHANCE_PCT, MIN_DURATION, MAX_DURATION,
     setSettings(o) { saveSettings(Object.assign(loadSettings(), o || {})); },
 
     /** 掷骰：本轮是否触发区域突发事件（返回提示词注入或null） */
     roll() {
-      const st = loadSettings();
+      const st = effSettings();
       if (!st.enabled) return null;
       const s = WA.store.get();
       const incident = s.evolution.regionalIncident;
@@ -71,7 +96,7 @@
         active: true, title: incident.title || '区域异动', type: incident.type || 'bandit',
         typeLabel: found ? found.label : incident.type,
         scope: incident.scope || '', impact: incident.impact || '',
-        duration: loadSettings().durationRounds, createdRound: draft.evolution.round
+        duration: effSettings().durationRounds, createdRound: draft.evolution.round
       };
       WA.log('info', '区域突发事件触发：' + incident.title);
     },

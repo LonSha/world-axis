@@ -13,14 +13,14 @@
     { id: 'json_fence', name: '移除孤立JSON代码块', find: '```json\\s*[\\s\\S]*?```', replace: '', flags: 'g', enabled: false }
   ];
 
+  const __REG = { key: LS_KEY, def: null, module: 'purifier' };
+  // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）。
+  //   此前自写 try/catch 看似稳健实则掩盖损坏：JSON 坏掉时静默回落内置规则，
+  //   用户自定义规则无声消失且不留任何痕迹。迁后由 settingsBus 隔离为 <key>_corrupt_<ts>。
   function loadRules() {
-    try {
-      const saved = JSON.parse(WA.mainWin.localStorage.getItem(LS_KEY) || 'null');
-      if (saved && Array.isArray(saved)) return saved;
-    } catch (e) {}
-    return BUILTIN.slice();
+    const saved = WA.settingsBus.read(__REG);
+    return Array.isArray(saved) ? saved : BUILTIN.slice();
   }
-    const __REG = { key: LS_KEY, def: null, module: 'purifier' };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
 

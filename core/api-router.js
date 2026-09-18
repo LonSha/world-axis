@@ -15,10 +15,10 @@
   // v0.1.41: 通道配置变更计量（tool-diag 消费）
   const __cfgStat = { changes: 0, baseUrlChanges: 0, lastAt: 0, lastChannel: null };
 
-  function loadCfg() {
-    try { return JSON.parse(mainWin.localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
-  }
   const __REG = { key: LS_KEY, def: {}, module: 'apiRouter' };
+  // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——通道配置损坏此前静默全回落
+  //   默认通道，用户填的 baseUrl/apiKey/model 无声丢失（且看不出是配置丢了还是没配）
+  function loadCfg() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function saveCfg(cfg) { WA.settingsBus.save(__REG, cfg); }
 

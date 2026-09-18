@@ -4,10 +4,12 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_PLAN = 'worldaxis_oracle_plan_v1';
 
-  function loadPlan() {
-    try { return JSON.parse(WA.mainWin.localStorage.getItem(LS_PLAN) || 'null'); } catch (e) { return null; }
-  }
-  const __REG = { key: LS_PLAN, def: null, module: 'oracle', orphan: true };
+  // v2.3.0: optional——用户尚未规划弧线时该键本就缺席，属正常而非废弃。
+  const __REG = { key: LS_PLAN, def: null, module: 'oracle', optional: true };
+  // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——弧线损坏此前静默丢弃且无留痕。
+  //   同时修正登记声明：本键由 savePlan 主动写入、loadPlan 主动读取，并非废弃键，
+  //   原先标 orphan:true 属误声明，会被面板「孤儿键注销」当成幽灵登记清掉。
+  function loadPlan() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function savePlan(p) { if (p) WA.settingsBus.save(__REG, p); else WA.mainWin.localStorage.removeItem(LS_PLAN); }
 

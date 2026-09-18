@@ -223,7 +223,20 @@
     }, {});
   }
 
-// ── 7. 缓存 / 工作流 / API 通道 / 加载器 ──
+// v2.3.0: 默认值真源提供者——每个键返回「模块在磁盘无值时的实际默认值」。
+  //   校验意义：loadSettings 内联默认值 与 登记表 def 是两处手写文本，任一改动漏同步都不可见。
+  const DEFAULT_PROVIDERS = {
+    // v2.3.0 块3: 随机事件通道配置（新增键必须同时登记提供者，否则 verifyDefaults
+    //   会因「无提供者」跳过它 —— 新键在默认值漂移校验里静默无人守）
+    'worldaxis_horizon_settings_v1': function () { return WA.horizon && WA.horizon.getSettings ? WA.horizon.getSettings() : undefined; },
+    'worldaxis_evolution_settings_v1': function () { return WA.evolution && WA.evolution.getSettings ? WA.evolution.getSettings() : undefined; },
+    'worldaxis_opinion_settings_v1': function () { return WA.opinion && WA.opinion.getSettings ? WA.opinion.getSettings() : undefined; },
+    'worldaxis_regional_settings_v1': function () { return WA.regional && WA.regional.getSettings ? WA.regional.getSettings() : undefined; },
+    'worldaxis_calendar_settings_v1': function () { return WA.calendar && WA.calendar.getSettings ? WA.calendar.getSettings() : undefined; },
+    'worldaxis_backstage_settings_v1': function () { return WA.backstage && WA.backstage.getSettings ? WA.backstage.getSettings() : undefined; }
+  };
+
+  // ── 7. 缓存 / 工作流 / API 通道 / 加载器 ──
   function secRuntime() {
     return {
       chatcache: safe(function () {
@@ -236,7 +249,20 @@
           if (!WA.settingsBus) return { error: 'settingsBus 不可用' };
           const st = WA.settingsBus.registryStat ? WA.settingsBus.registryStat() : null;
           const orphans = WA.store && WA.store.orphanSettingsKeys ? WA.store.orphanSettingsKeys() : [];
-          return { registry: st, orphans: orphans, stats: WA.settingsBus.stats };
+          // v2.3.0: 登记表自洽性 + 默认值单一真源漂移（两者此前都无从观测）
+          const coherent = WA.settingsBus.selfCheck ? WA.settingsBus.selfCheck() : null;
+          const drift = WA.settingsBus.verifyDefaults ? WA.settingsBus.verifyDefaults({ providers: DEFAULT_PROVIDERS }) : null;
+          const dormant = WA.settingsBus.dormantGhosts ? WA.settingsBus.dormantGhosts() : [];
+          return { registry: st, orphans: orphans, stats: WA.settingsBus.stats,
+            coherent: coherent, defaultDrift: drift, dormant: dormant };
+        }, {}),
+        // v2.3.0 块3: 随机事件通道运行视图（此前「通道关了」与「掷了没中」不可区分）
+        horizon: safe(function () {
+          if (!WA.horizon || typeof WA.horizon.stat !== 'function') return { error: 'horizon 不可用' };
+          const st = WA.horizon.stat();
+          return { enabled: st.enabled, config: st.config, rolls: st.rolls,
+            distantFired: st.distantFired, nearFired: st.nearFired, skipped: st.skipped,
+            lastReason: st.lastReason || null };
         }, {}),
         // v2.2.0: 隔离处置史与存档迁移报告（此前 quarantineAudit/migrateReport 零消费）
         quarantineAudit: safe(function () { return WA.store && WA.store.quarantineAudit ? WA.store.quarantineAudit() : null; }, null),
@@ -339,7 +365,28 @@
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
-    { page: 'connect', ids: ['wa-conc'] }
+    { page: 'connect', ids: ['wa-conc'] },
+    // v2.3.0 块3: 设置页整页此前在守卫之外——10 页里只守了 8 页，设置页 30 余个控件
+    //   （含推演尺度/预算/净化规则/舆情/演化/随机事件）绑定断裂无人发现。
+    //   净化规则区在 purifier 未加载时整段不渲染 → 归入 cond（依赖态，缺失不判失败）。
+    { page: 'settings', ids: [
+      'wa-set-mode', 'wa-set-time', 'wa-set-pulse', 'wa-set-npc',
+      'wa-set-auto', 'wa-set-fullrules', 'wa-set-budget-mode', 'wa-set-budget',
+      'wa-set-mslimit', 'wa-set-msdice', 'wa-set-msrel', 'wa-set-custom', 'wa-set-save',
+      'wa-op-enable', 'wa-op-sandbox', 'wa-op-n', 'wa-op-now', 'wa-sim-now',
+      'wa-ev-dice', 'wa-ev-mod', 'wa-ev-roll', 'wa-ev-out',
+      // v2.3.0 块3: 随机事件通道配置（新增出口）
+      'wa-hz-d-en', 'wa-hz-d-chance', 'wa-hz-d-cd', 'wa-hz-d-ledger',
+      'wa-hz-n-en', 'wa-hz-n-chance', 'wa-hz-n-cd', 'wa-hz-n-ledger',
+      'wa-hz-save', 'wa-hz-out',
+      // v2.3.0 块3: 数值回显 span 同样是「在场控件」——它们一直渲染在设置页，
+      //   只是该页此前整体在守卫之外，从未被发现。既然纳管就一并登记（缺失同样意味着
+      //   滑块拖动时数值不更新，属真缺陷）。
+      'wa-set-npcv', 'wa-set-budgetv', 'wa-set-mslimitv', 'wa-set-msdicev', 'wa-ev-modv',
+      'wa-hz-d-chancev', 'wa-hz-d-cdv', 'wa-hz-d-ledgerv',
+      'wa-hz-n-chancev', 'wa-hz-n-cdv', 'wa-hz-n-ledgerv',
+      'wa-set-out'],
+      cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] }
   ];
   function secUi() {
     return safe(function () {
@@ -503,6 +550,17 @@
     if (uiCondMiss > 0 && diag.ui && diag.ui.groups) issues.push({ level: 'info', key: 'ui.cond', detail: uiCondMiss + ' 个条件渲染控件当前不在场（依赖世界状态，非缺陷）' });
     // v0.1.19: 宿主能力缺失 → warn（降级仍可运行但功能受限）
     const h = diag.host || {};
+    // v2.3.0 块3: 随机事件通道全关——info 级。这是合法配置（用户就是不想要随机事件），
+    //   但「推演从不产生远方/近端事件」必须可归因，否则会被当成引擎坏了。
+    try {
+      const hz = (diag.runtime || {}).horizon || {};
+      const en = hz.enabled || {};
+      if (en.distant === false && en.near === false) {
+        issues.push({ level: 'info', key: 'horizon', detail: '远方与近端随机事件通道均已关闭：推演不会产生 viewport 外的偶发事件（这是设置，不是故障）' });
+      } else if (hz.skipped > 0 && (hz.distantFired || 0) + (hz.nearFired || 0) === 0 && hz.rolls > 0) {
+        issues.push({ level: 'info', key: 'horizon', detail: '随机事件本会话掷骰 ' + hz.rolls + ' 次但零触发（最近：' + (hz.lastReason || '?') + '）' });
+      }
+    } catch (eHz) {}
     if (h && h.sillyTavern === false) issues.push({ level: 'warn', key: 'host', detail: '未检测到 SillyTavern 宿主（无事件源，仅拦截器函数可用）' });
     else if (h && h.eventSource === false) issues.push({ level: 'warn', key: 'host', detail: '宿主无事件源：after 链与切聊天重载将不生效' });
     if (h && h.extensionPrompt === false) issues.push({ level: 'error', key: 'host', detail: '宿主无 setExtensionPrompt：注入通道完全不可用' });
@@ -620,6 +678,23 @@
     const sbDiag = ((diag.runtime || {}).settingsBus) || {};
     const orphanN = (sbDiag.orphans || []).length;
     if (orphanN > 0) issues.push({ level: 'info', key: 'settingsBus.orphan', detail: orphanN + ' 个孤儿设置键登记（模块已声明废弃）：' + (sbDiag.orphans || []).slice(0, 4).map(function (o) { return o.key; }).join('、') + '——面板「工具」→「设置键」可注销' });
+    // v2.3.0: 登记表自洽性——重复登记/矛盾声明会让「哪条登记在生效」变得不可判定，属真故障
+    //   口径：orphan_still_read / duplicate-key / orphan_optional_conflict = error（登记表与实际行为不一致）
+    //         missing-def = warn（缺失键时读到 undefined，但不阻断运行）
+    const cohD = sbDiag.coherent || null;
+    if (cohD && cohD.issues && cohD.issues.length) {
+      const errsC = cohD.issues.filter(function (i) { return i.level === 'error'; });
+      const warnsC = cohD.issues.filter(function (i) { return i.level === 'warn'; });
+      if (errsC.length) issues.push({ level: 'error', key: 'settingsBus.coherent', detail: '设置登记表不自洽（' + errsC.length + ' 项）：' + errsC.slice(0, 3).map(function (i) { return i.detail; }).join('；') });
+      else if (warnsC.length) issues.push({ level: 'warn', key: 'settingsBus.coherent', detail: '设置登记表待补声明（' + warnsC.length + ' 项）：' + warnsC.slice(0, 3).map(function (i) { return i.detail; }).join('；') });
+    }
+    // v2.3.0: 默认值漂移——「用户没配置时的实际行为」与「登记表展示的默认值」不一致
+    const driftD = sbDiag.defaultDrift || null;
+    if (driftD && driftD.drift && driftD.drift.length) {
+      issues.push({ level: 'warn', key: 'settingsBus.defaultDrift', detail: driftD.drift.length + ' 项设置默认值与登记声明不一致：' + driftD.drift.slice(0, 3).map(function (x) { return x.key + '(' + x.source + ')'; }).join('、') + '——诊断展示的默认值已过时' });
+    }
+    const dormantD = (sbDiag.dormant || []);
+    if (dormantD.length) issues.push({ level: 'info', key: 'settingsBus.dormant', detail: dormantD.length + ' 个休眠登记（模块声明废弃但从未落盘）：' + dormantD.slice(0, 3).map(function (o) { return o.key; }).join('、') });
     const qaD = ((diag.runtime || {}).quarantineAudit) || null;
     if (qaD && (qaD.restores > 0 || qaD.drops > 0)) issues.push({ level: 'info', key: 'quarantine.history', detail: '隔离现场处置史：恢复 ' + qaD.restores + ' 次 / 丢弃 ' + qaD.drops + ' 次' + (qaD.lastKey ? '（最近 ' + qaD.lastKey + '）' : '') });
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;
