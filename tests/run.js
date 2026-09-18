@@ -9567,7 +9567,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10111,7 +10111,7 @@ assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.9.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.10.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10402,7 +10402,7 @@ assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.9.0', '入口版本为 2.9.0（实 ' + ver + '）');
+    assert(ver === '2.10.0', '入口版本为 2.10.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -10507,6 +10507,177 @@ assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同
         '（负向）G14 探针：新加一个裸删文件会被检出（实检出 ' + caughtG14 + ' 个，期望 1）');
       assert(fs.existsSync(probeAbs) === false, '（环境）探针文件已清理，不残留');
     }
+    // ── G15（v2.10.0）：读侧完整性契约——「三面」中最后一面必须与另两面同规格 ──
+    //   与 G13（写侧旁路清单）/ G14（删侧出口唯一性）构成完整的三面对偶：
+    //     G13 钉「裸 setItem 只剩白名单内的非 settings 旁路」；
+    //     G14 钉「裸 removeItem 只剩受控出口内部那一处」；
+    //     G15 钉「读侧失败归因**收敛为单一实现**且**有真实消费端**」。
+    //   为什么读侧要单独一条：读失败不产生任何可见症状，它只让**结论**悄悄失真
+    //   （容量表偏小、把用户配置读成默认值），所以它既不会被用户报故障、也不会被功能测试
+    //   发现——只有结构性断言能钉住它。本版实测的现场正是：全库只有一个来源不明的单桶
+    //   `stats.failures`，且产品侧零消费。
+    {
+      const busG15 = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+      const storeG15 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+      // ① 归因记账收敛为单一实现（与 noteFail / noteRemoveFail 同规格）
+      assert((busG15.match(/function noteReadFail\(/g) || []).length === 1,
+        '读失败记账收敛为单一实现（settings-bus：noteReadFail）');
+      assert((storeG15.match(/function noteStoreReadFail\(/g) || []).length === 1,
+        '读失败记账收敛为单一实现（store：noteStoreReadFail）');
+      assert((busG15.match(/stats\.readFailed\+\+/g) || []).length === 1,
+        '读失败主计量（readFailed）只在单一实现内自增（实 '
+        + (busG15.match(/stats\.readFailed\+\+/g) || []).length + ' 处）');
+      assert((storeG15.match(/__readStat\.readFailed\+\+/g) || []).length === 1,
+        'store 读失败主计量只在单一实现内自增（实 '
+        + (storeG15.match(/__readStat\.readFailed\+\+/g) || []).length + ' 处）');
+      // ② 三层对偶的第三层必须存在（写侧 verifyFailed / 删侧 removeVerified / 读侧来源追踪）
+      assert(busG15.indexOf('readSources') > 0 && busG15.indexOf('defaultAfterFailure') > 0,
+        '读侧有「来源追踪」层（disk/legacy/default/defaultAfterFailure）——与写侧 verifyFailed 对偶');
+      assert(busG15.indexOf('default-after-failure') > 0,
+        '读侧区分「读失败后回落默认值」与「从未配置」（这是本版命题的核心判据）');
+      // ②b v2.10.0（逆向审计自纠）: 声明了分桶就必须有**消费点**——本版首轮在 readFailedBy
+      //   里声明了 migrate/parse/read/copy 四个桶，其中 migrate 桶零消费（迁移失败只记
+      //   migrationFailed），且 rawRevive 的读抛错分支既不归因也不标 src。
+      //   两个缺陷都由本版自身的逆向审计抓出并当版修掉；这两条断言把「消费点存在」固化下来，
+      //   防它日后被删掉（「声明面空转」是本仓库反复出现的同型问题，不能靠记性防）。
+      assert(busG15.indexOf("noteReadFail('migrate'") > 0,
+        'readFailedBy.migrate 有真实消费点（迁移失败进读侧归因，非声明空转）');
+      assert(busG15.indexOf("noteReadFail('parse'") > 0,
+        'readFailedBy.parse 有真实消费点（值解析失败进读侧归因）');
+      assert(busG15.indexOf("noteReadFail('copy'") > 0,
+        'readFailedBy.copy 有真实消费点（返回值深拷贝降级进读侧归因）');
+      assert(busG15.indexOf("'no-storage'") > 0,
+        'rawRevive 的读抛错分支被显式识别（否则该路径的读失败会伪装成「从未配置」）');
+      // ②c v2.10.0（逆向审计自纠第二轮）: 三处自纠缺陷的防回归钉子
+      //   · ok 必须只反映**硬失败**（read/parse），降级（migrate/copy）单列——否则
+      //     「迁移回写失败」会被报成「读不到配置」，用户去查存储而实际要查迁移钩子；
+      //   · 旧单桶 stats.failures 必须在新视图里有出口（否则它继续零消费）；
+      //   · storageStat 的分桶明细必须与 keysReadFailed **同口径**（本次盘点差值），
+      //     否则消费端拿累计值做判据会让「修好后分数复原」不成立（v0.4.0 裁决）；
+      //   · readEx 必须有真实消费端（声明了没消费＝声明面空转）。
+      assert(busG15.indexOf('hardFailed') > 0 && busG15.indexOf('degraded') > 0,
+        'readStat 区分「硬失败（没读到用户配置）」与「降级（值仍可用）」——归因不实比缺失归因更坏');
+      assert(busG15.indexOf('legacyFailures') > 0,
+        'v0.1.x 遗留单桶 stats.failures 在新视图里有出口（不再零消费）');
+      const storeD = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+      assert(storeD.indexOf('__byBefore') > 0 && storeD.indexOf('readFailedCumulative') > 0,
+        'store 读侧分桶明细与 keysReadFailed 同口径（本次差值 + 累计分列）');
+      assert(storeD.indexOf('__byBefore') > 0, 'store 读侧分桶有差值基线');
+      {
+        // 口径一致性（本版第三次同型自纠）：差值基线必须在 storageStat 内**任何读取之前**取，
+        //   否则枚举失败（最严重的失真：全部键看不见、表面却「存储很干净」）被排除在本次盘点口径外。
+        const iSF = storeD.indexOf('    storageStat(opts) {');
+        const iSE = storeD.indexOf('     * v0.1.51: 过期存储键清理', iSF);
+        const segSF = storeD.slice(iSF, iSE > iSF ? iSE : iSF + 6000);
+        const iB = segSF.indexOf('const __rfBefore = __readStat.readFailed;');
+        const iE = segSF.indexOf('const keys = listWorldAxisKeys();');
+        assert(iB >= 0 && iE >= 0 && iB < iE,
+          '差值基线取在枚举之前（base@' + iB + ' < enum@' + iE + '）——否则枚举失败不进「本次盘点」口径');
+      }
+      {
+        // 与撤销删除侧的同类断言对偶：当前态判据不得退化为累计判据
+        const ssD = WA.store.storageStat();
+        assert(ssD.readFailedDetail && typeof ssD.readFailedDetail.bytes === 'number',
+          'storageStat.readFailedDetail 为本次盘点差值（可作当前态判据）');
+        assert(ssD.readFailedCumulative && typeof ssD.readFailedCumulative.bytes === 'number',
+          'storageStat.readFailedCumulative 单列（历史经历可追溯，但不参与打分）');
+      }
+      {
+        // readEx 的真实消费端：诊断侧必须做现场抽查（否则 readEx 是死导出）
+        const diagSpot = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+        assert(diagSpot.indexOf('readEx') > 0 && diagSpot.indexOf('readSpotCheck') > 0,
+          'readEx 有真实消费端（诊断现场抽查），非声明面空转');
+        // 语义：现造一个「有磁盘值但读不出来」的键，抽查必须抓到它
+        const spotKey = 'worldaxis_g15_spot_v1';
+        const lsSp = (WA.mainWin || window).localStorage;
+        lsSp.setItem(spotKey, '{"q":7}');
+        const REGSP = { key: spotKey, def: { q: 0 } };
+        WA.__settingsRegs.push(REGSP);
+        const origGetSp = lsSp.getItem;
+        lsSp.getItem = function (k) { if (k === spotKey) throw new Error('g15-spot-throw'); return origGetSp.call(this, k); };
+        let exSp = null;
+        try { exSp = WA.settingsBus.readEx(REGSP); } finally { lsSp.getItem = origGetSp; }
+        assert(exSp && exSp.ok === false && exSp.source === 'default-after-failure',
+          '（正向）readEx 对「有值但读不出」的键返回 ok:false（实 ' + JSON.stringify(exSp) + '）');
+        const exOkSp = WA.settingsBus.readEx(REGSP);
+        assert(exOkSp.ok === true && exOkSp.source === 'disk' && exOkSp.value.q === 7,
+          '（负向）readEx 对可读键返回 ok:true 且来源为 disk');
+        const exAbsSp = WA.settingsBus.readEx({ key: 'worldaxis_g15_spot_absent_v1', def: { q: 0 } });
+        assert(exAbsSp.ok === true && exAbsSp.source === 'default',
+          '（负向）readEx 对「键不存在」为 ok:true（从未配置不是故障，实 ' + exAbsSp.source + '）');
+      }
+      assert(storeG15.indexOf('readFailedKeys') > 0,
+        'store 占用表透出读失败键数（容量结论可信度的直接判据）');
+      // ②d（逆向审计第四轮）: 读侧裸读点**全覆盖**归因 + 「读失败不得伪装成业务结论」。
+      //   为什么单列：本版命题的表层是「用户配置读坏了被当成没配过」，但逆向审计发现
+      //   同类裸读点的失败后果**更重**——diskRev 读失败 ⇒ 多实例覆盖静默发生；
+      //   createRecoveryPoint 清单读失败 ⇒ 全部历史恢复点被静默覆盖丢弃。
+      //   只治表层而漏掉这些，等于「治了症状、留了重症」。
+      assert(storeG15.indexOf("noteStoreReadFail('diskRev'") > 0
+        && storeG15.indexOf("noteStoreReadFail('recovery'") > 0
+        && storeG15.indexOf("noteStoreReadFail('verify'") > 0
+        && storeG15.indexOf("noteStoreReadFail('conflict'") > 0
+        && storeG15.indexOf("noteStoreReadFail('quarantine'") > 0
+        && storeG15.indexOf("noteStoreReadFail('writerId'") > 0,
+        '读失败归因覆盖全部读点来源（diskRev / recovery / verify / conflict / quarantine / writerId）');
+      assert(storeG15.indexOf('return { ok: true, rev: 0 }') > 0 && storeG15.indexOf('dRevRes.ok && __seenRev > 0') > 0,
+        '磁盘序号读失败与「键不存在」可分辨，且读失败时不参与冲突判定（防读失败掩盖多实例覆盖）');
+      assert(storeG15.indexOf('为避免覆盖丢弃全部历史恢复点') > 0,
+        '恢复点清单读失败时不覆盖写入（防静默丢弃全部历史恢复点）');
+      assert(storeG15.indexOf("'readback-failed'") > 0,
+        '写后校验 / 删后复核的读失败有独立原因码（归因不得失实）');
+      assert(storeG15.indexOf('const by = {};') > 0 && storeG15.indexOf('bySource: by') > 0,
+        'store.readStat().bySource 全量透出（新增来源不得「有归因但看不见」）');
+      // ③ 单一出口对外可见（与 writeStat / removeStat 三面对称）
+      assert(typeof WA.settingsBus.readStat === 'function', 'settingsBus.readStat 已导出');
+      assert(typeof WA.store.readStat === 'function', 'store.readStat 已导出');
+      // ④ 双消费端接线：诊断 + 健康分（「新规则必须接双消费端」）
+      const diagG15 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+      const storeSrcG15 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+      const panelG15 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+      assert(diagG15.indexOf('settingsBus.readFailed') > 0 && diagG15.indexOf('store.readFailed') > 0,
+        '诊断消费读侧结论（两域各一条议题）');
+      assert(storeSrcG15.indexOf('storage.readFailed') > 0 && storeSrcG15.indexOf('storage.readActivity') > 0,
+        '健康分消费读侧结论（占用表偏小 + 误判最冷两条）');
+      assert(panelG15.indexOf('读取侧') > 0, '面板透出读侧结论（用户可见出口）');
+      // ⑤ 语义断言：读失败后回落默认值必须被如实标为「读失败」，而不是混进正常默认值
+      {
+        const rkG15 = 'worldaxis_g15_readfail_v1';
+        const REGG15 = { key: rkG15, def: { z: 0 } };
+        WA.__settingsRegs.push(REGG15);
+        const origGetG15 = (WA.mainWin || window).localStorage.getItem;
+        const lsG15 = (WA.mainWin || window).localStorage;
+        lsG15.setItem(rkG15, '{"z":42}');
+        const beforeSrc = Object.assign({}, WA.settingsBus.stats.readSources);
+        lsG15.getItem = function (k) { if (k === rkG15) throw new Error('g15-read-throw'); return origGetG15.call(this, k); };
+        let valG15 = null;
+        try { valG15 = WA.settingsBus.read(REGG15); } finally { lsG15.getItem = origGetG15; }
+        const afterSrc = WA.settingsBus.stats.readSources;
+        assert(valG15 && valG15.z === 0, '（正向）读失败后返回默认值（读取不中断）');
+        assert((afterSrc.defaultAfterFailure || 0) === (beforeSrc.defaultAfterFailure || 0) + 1,
+          '（正向）读失败后回落默认值计入 defaultAfterFailure（而不是混进正常 default）');
+        assert(WA.settingsBus.stats.lastRead.source === 'default-after-failure',
+          '（正向）lastRead 记下本次来源＝default-after-failure（实 '
+          + (WA.settingsBus.stats.lastRead || {}).source + '）');
+        assert(WA.settingsBus.stats.lastReadFail && WA.settingsBus.stats.lastReadFail.tag === 'read',
+          '（正向）最近读失败带来源归因（实 '
+          + JSON.stringify((WA.settingsBus.stats.lastReadFail || {}).tag) + '）');
+        // （负向）正常读取**不得**被误报成读失败——归因不实比缺失归因更坏
+        const beforeBad = WA.settingsBus.stats.readFailed;
+        const okValG15 = WA.settingsBus.read(REGG15);
+        assert(WA.settingsBus.stats.readFailed === beforeBad && okValG15.z === 42,
+          '（负向）正常读取不计入读失败（z=42 读回，readFailed 未增）');
+        assert(WA.settingsBus.stats.lastRead.source === 'disk', '（负向）正常读取来源标 disk');
+        // （负向）「键不存在」是正常回落，不是读失败
+        const beforeMiss = WA.settingsBus.stats.readFailed;
+        const missValG15 = WA.settingsBus.read({ key: 'worldaxis_g15_absent_v1', def: { m: 1 } });
+        assert(WA.settingsBus.stats.readFailed === beforeMiss && missValG15.m === 1,
+          '（负向）键不存在时回落默认值**不计**读失败（从未配置不是故障）');
+        assert(WA.settingsBus.stats.lastRead.source === 'default' && WA.settingsBus.stats.lastRead.reason === null,
+          '（负向）键不存在的来源是 default 且无失败原因（实 '
+          + JSON.stringify(WA.settingsBus.stats.lastRead) + '）');
+      }
+    }
     const diagSrc2800 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
     const mi2800 = diagSrc2800.indexOf('const MODULE_EXPORTS = {');
     const mj2800 = diagSrc2800.indexOf('\n  };', mi2800);
@@ -10568,7 +10739,7 @@ assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:applyResult applyStat buildPrompt forceSimulate getSettings setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add list remove shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy list remove reputationPressure update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read recoveryStat removeStat removeVerified rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:applyResult applyStat buildPrompt forceSimulate getSettings setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add list remove shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy list remove reputationPressure update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -10684,7 +10855,7 @@ assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.9.0', '入口版本为 2.9.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.10.0', '入口版本为 2.10.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11072,7 +11243,7 @@ assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.9.0', '入口版本为 2.9.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.10.0', '入口版本为 2.10.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11080,6 +11251,378 @@ assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同
       '两域基线均留痕（settings-bus 删除出口 / store 受控删除）');
     assert(src2900('ui/panel.js').indexOf('删除侧') > 0, '面板透出删除侧结论（用户可见出口）');
   }
+  // ══════════════════════════════════════════════════════════════════════════
+  // v2.10.0：读侧完整性（第三面）—— 严格对偶于写入侧（lsWrite）与删除侧（rmRemove）
+  //
+  //   命题：写侧有 writes / writeFailedBy / verifyFailed（「写进去了吗」），
+  //   删侧有 removes / removeFailedBy / removeVerified（「真删掉了吗」），
+  //   **读侧一个归因字段都没有**——全库只有一个来源不明的单桶 stats.failures，
+  //   且实测产品侧零消费。于是「用户配置读坏了、回落成默认值」与「用户从来没配过」
+  //   在界面上、诊断包里、健康分上**完全一样**。而前者是唯一会被用户当成
+  //   「我的设置被程序改回去了」的故障，也是本仓库后果最严重的静默失效。
+  //   本版把读侧补齐为严格对偶的第三面，并按既有方法论接双消费端 + G15 门禁。
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+  const LSV2100 = global.localStorage;
+  const ctxV2100 = global.SillyTavern.getContext();
+  function frV2100() { LSV2100.clear(); ctxV2100.chatId = 'v2100b_chat'; global.__mockChat.length = 0; WA.store.init(); }
+  function cnt2100(s2, needle) { return String(s2).split(needle).length - 1; }
+  // ── 块1：读侧出口（唯一实现 + 三层对称 + 来源追踪） ──
+  section('v2.10.0 块1：读侧出口（唯一实现 + 三层对称 + 来源追踪）');
+  {
+    const busS = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+    const storeS = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    // 1. 读失败记账收敛为单一实现（三兄弟的第三面）
+    assert(cnt2100(busS, 'function noteReadFail(') === 1,
+      '读失败记账收敛为单一实现（noteReadFail）——与 noteFail（写侧）/ noteRemoveFail（删侧）三兄弟齐备');
+    assert(cnt2100(busS, 'stats.readFailed++') === 1,
+      '读失败主计量只在单一实现内自增（实 ' + cnt2100(busS, 'stats.readFailed++') + ' 处）');
+    assert(cnt2100(storeS, 'function noteStoreReadFail(') === 1,
+      'store 域读失败记账同样是单一实现（noteStoreReadFail）');
+    assert(cnt2100(storeS, '__readStat.readFailed++') === 1,
+      'store 读失败主计量只在单一实现内自增（实 ' + cnt2100(storeS, '__readStat.readFailed++') + ' 处）');
+    assert(busS.indexOf('readFailedBy: { read: 0, parse: 0, migrate: 0, copy: 0 }') > 0,
+      '读失败按来源分桶（read / parse / migrate / copy 四来源）');
+    // 2. 三层对偶的第三层：来源追踪（写侧 verifyFailed / 删侧 removeVerified）
+    assert(busS.indexOf('readSources: { disk: 0, legacy: 0, default: 0, defaultAfterFailure: 0 }') > 0,
+      '读侧「来源追踪」层在位（disk/legacy/default/defaultAfterFailure）——与写侧 verifyFailed 严格对偶');
+    assert(busS.indexOf('default-after-failure') > 0,
+      '区分「有数据但没读到」与「从未配置」（本版命题的核心判据）');
+    assert(busS.indexOf('readonlyCopyFallback') > 0,
+      '深拷贝降级计量在位（返回值与内部对象共享引用此前**静默**发生）');
+    // 3. 对外视图（与 writeStat / removeStat 三面对称）
+    const stR = WA.settingsBus.readStat();
+    assert(typeof stR.reads === 'number' && typeof stR.readFailed === 'number', 'readStat 暴露 reads / readFailed');
+    assert('hardFailed' in stR && 'degraded' in stR, 'readStat 分列硬失败与降级（归因不实比缺失归因更坏）');
+    assert(typeof stR.defaultAfterFailure === 'number', 'readStat 单列「有数据但没读到」（数据丢失率的直接判据）');
+    assert(stR.ok === (stR.hardFailed === 0), 'ok 只由硬失败决定（降级不影响「配置是否可信」）');
+    assert(typeof stR.legacyFailures === 'number', 'v0.1.x 遗留单桶 stats.failures 在新视图里有出口（此前产品零消费）');
+    assert(stR.hardFailed + stR.degraded === stR.readFailed, '硬失败 + 降级 = 读失败总数（分类完备，无落桶外）');
+    // 4. 语义 A：有值可读 → disk
+    frV2100();
+    const kDisk = 'worldaxis_v2100_disk_v1';
+    LSV2100.setItem(kDisk, JSON.stringify({ n: 5 }));
+    const vDisk = WA.settingsBus.read({ key: kDisk, def: { n: 0 } });
+    assert(vDisk.n === 5 && WA.settingsBus.stats.lastRead.source === 'disk',
+      '（A「用户配置」）有值可读 → 来源 disk（实 ' + (WA.settingsBus.stats.lastRead || {}).source + '）');
+    // 5. 语义 B：从未配置 → default，且不计失败、不制造假故障
+    const beforeB = WA.settingsBus.stats.readFailed;
+    const vAbs = WA.settingsBus.read({ key: 'worldaxis_v2100_absent_v1', def: { n: 9 } });
+    assert(vAbs.n === 9 && WA.settingsBus.stats.lastRead.source === 'default',
+      '（B「从未配置」）无值 → 来源 default（不是故障）');
+    assert(WA.settingsBus.stats.lastRead.reason === null, '（B）无值回落时原因为空（不制造假故障）');
+    assert(WA.settingsBus.stats.readFailed === beforeB,
+      '（B）**不计**读失败（从未配置不是故障——归因不实比缺失归因更坏）');
+    // 6. 语义 C：磁盘有值但读不出来（本版要治的核心故障）
+    const srcBeforeC = Object.assign({}, WA.settingsBus.stats.readSources);
+    const rawGetC = LSV2100.getItem;
+    LSV2100.getItem = function (k) { if (k === kDisk) throw new Error('v2100-read-throw'); return rawGetC.call(this, k); };
+    let vFailC = null;
+    try { vFailC = WA.settingsBus.read({ key: kDisk, def: { n: 0 } }); } finally { LSV2100.getItem = rawGetC; }
+    const srcAfterC = WA.settingsBus.stats.readSources;
+    assert(vFailC.n === 0, '（C「读失败」）读取不中断，返回兜底默认值');
+    assert((srcAfterC.defaultAfterFailure || 0) === (srcBeforeC.defaultAfterFailure || 0) + 1,
+      '（C）与「从未配置」严格可分辨：计入 defaultAfterFailure 而非 default');
+    assert(WA.settingsBus.stats.lastRead.source === 'default-after-failure',
+      '（C）lastRead 记下本次来源＝default-after-failure');
+    assert(WA.settingsBus.stats.lastReadFail && WA.settingsBus.stats.lastReadFail.tag === 'read',
+      '（C）归因到 read 桶（存储层读取失败，实 ' + JSON.stringify((WA.settingsBus.stats.lastReadFail || {}).tag) + '）');
+    assert(WA.settingsBus.stats.readFailedBy.read >= 1,
+      '（C）read 桶有真实计数（实 ' + WA.settingsBus.stats.readFailedBy.read + '）');
+    // 7. 解析失败（值损坏）走同层归因但不混桶
+    const kCorrupt = 'worldaxis_v2100_corrupt_v1';
+    LSV2100.setItem(kCorrupt, '{not-json');
+    const beforeParse = WA.settingsBus.stats.readFailedBy.parse || 0;
+    const vCorrupt = WA.settingsBus.read({ key: kCorrupt, def: { c: 1 } });
+    assert(vCorrupt.c === 1, '损坏值回落默认值（读取不中断）');
+    assert((WA.settingsBus.stats.readFailedBy.parse || 0) === beforeParse + 1,
+      '损坏归入 parse 桶（不与存储层读取失败 read 混桶）');
+    assert(WA.settingsBus.stats.lastRead.source === 'default-after-failure',
+      '（损坏）同样标记为 default-after-failure（有值但没读到）');
+    // 8. readEx：结构化交还来源——调用方唯一能判定「我拿到的是兜底」的出口
+    LSV2100.setItem(kDisk, JSON.stringify({ n: 7 }));
+    const exOk = WA.settingsBus.readEx({ key: kDisk, def: { n: 0 } });
+    assert(exOk.ok === true && exOk.source === 'disk' && exOk.value.n === 7, 'readEx 可读键 → ok:true / disk / 真值');
+    LSV2100.getItem = function (k) { if (k === kDisk) throw new Error('v2100-read-throw2'); return rawGetC.call(this, k); };
+    let exBad = null;
+    try { exBad = WA.settingsBus.readEx({ key: kDisk, def: { n: 0 } }); } finally { LSV2100.getItem = rawGetC; }
+    assert(exBad.ok === false && exBad.source === 'default-after-failure',
+      'readEx 读失败键 → ok:false（调用方唯一能判定「我拿到的是兜底」的出口）');
+    const exAbs = WA.settingsBus.readEx({ key: 'worldaxis_v2100_absent_v1', def: { n: 9 } });
+    assert(exAbs.ok === true && exAbs.source === 'default', 'readEx 缺席键 → ok:true（从未配置不是故障）');
+    // 9. 永不抛（出口的契约）
+    let threw = false;
+    try { WA.settingsBus.read({ key: null, def: { q: 1 } }); } catch (e) { threw = true; }
+    assert(threw === false, '（结构性）read 永不炸调用方（登记项缺 key 也不抛）');
+    // 10. store 域读侧视图
+    const stStore = WA.store.readStat();
+    assert(typeof stStore.readFailed === 'number' && stStore.ok === (stStore.readFailed === 0),
+      'store.readStat 暴露读侧台账（与 integrityStat 写侧 / removeStat 删侧三面对称）');
+    assert(typeof stStore.bySource.bytes === 'number' && typeof stStore.bySource.activity === 'number'
+      && typeof stStore.bySource.enumerate === 'number',
+      'store 读侧按来源分桶（按字节 / 活跃时间 / 键枚举）');
+  }
+  // ── 块2：store 读侧现场（占用表偏小 + 误判最冷 ⇒ 误删风险） ──
+  section('v2.10.0 块2：store 读侧现场（占用表偏小 + 误判最冷 ⇒ 误删风险）');
+  {
+    const storeS = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    assert(storeS.indexOf("catch (e) { noteStoreReadFail('bytes', key, e); return 0; }") > 0,
+      '（现场证据）keyBytes 的读失败已归因（此前裸 catch 吞成 0 字节——「键是空的」与「读不出来」不可分辨）');
+    assert(storeS.indexOf("noteStoreReadFail('activity'") > 0 && storeS.indexOf("noteStoreReadFail('enumerate'") > 0,
+      '活跃时间 / 键枚举的读失败同样归因（两处此前都是静默回落）');
+    frV2100();
+    LSV2100.setItem('worldaxis_state_v2100_probe', JSON.stringify({ meta: { updatedAt: Date.now() } }));
+    LSV2100.setItem('worldaxis_event_log_v2100_other', '{}');
+    const s1 = WA.store.storageStat();
+    assert(s1.readFailedKeys === 0, '（基线）无故障时 readFailedKeys = 0（实 ' + s1.readFailedKeys + '）');
+    const rawGet2 = LSV2100.getItem;
+    LSV2100.getItem = function (k) { if (String(k).indexOf('worldaxis_') === 0) throw new Error('v2100-store-read'); return rawGet2.call(this, k); };
+    let s2 = null;
+    try { s2 = WA.store.storageStat(); } finally { LSV2100.getItem = rawGet2; }
+    assert(s2.readFailedKeys > 1, '读失败时 readFailedKeys > 0（实 ' + s2.readFailedKeys + '）——「这份占用表可信吗」可判定');
+    assert(s2.readFailedDetail.bytes > 0, '按字节分桶如实计数（实 ' + s2.readFailedDetail.bytes + '）');
+    assert(s2.readFailedDetail.activity > 0,
+      '活跃时间读失败被单列归因（实 ' + s2.readFailedDetail.activity + '）——回落 0 等于「最冷」，会让该聊天进可回收候选');
+    assert(s2.readFailedCumulative.bytes >= s2.readFailedDetail.bytes,
+      '累计值单列（历史可追溯，但不参与当前态判据）');
+    assert(typeof s2.totalBytes === 'number', '（口径）占用表仍产出数值（键读失败按 0 计入 ⇒ 表偏小）');
+    const s3 = WA.store.storageStat();
+    assert(s3.readFailedKeys === 0, '（可逆性）存储恢复后 readFailedKeys 复原为 0——当前态判据不得退化为累计判据');
+    assert(s3.readFailedCumulative.bytes > 0, '（可追溯）累计值仍保留本次会话的历史经历');
+    assert(s3.readFailedCumulative.bytes >= s3.readFailedDetail.bytes, '累计 ≥ 本次差值（口径自洽）');
+    // 键枚举失败：比单键读失败更严重的失真（全部键都看不见，面板却照样报「存储很干净」）
+    const rawKeyFn = LSV2100.key;
+    let s4 = null;
+    try {
+      LSV2100.key = function () { throw new Error('v2100-enum'); };
+      s4 = WA.store.storageStat();
+    } finally { LSV2100.key = rawKeyFn; }
+    assert(s4.readFailedDetail.enumerate > 0, '键枚举失败被单列归因（实 ' + s4.readFailedDetail.enumerate + ' 次）');
+    assert(s4.totalKeys === 0, '（后果）枚举失败时「0 个键 / 0 字节」——面板会照样报出一份「存储很干净」的结论');
+    // v2.10.0（逆向审计自纠第三处）: 枚举失败必须计入**本次盘点**的 readFailedKeys。
+    //   首版把差值基线取在 `listWorldAxisKeys()` **之后**，而枚举本身就是一次读取 ⇒ 最严重的
+    //   失真（全部键看不见）反而被排除在「本次盘点」口径之外，且主计数与分桶明细不同源。
+    //   同型坑（口径不一致）本版已踩第三次：删除侧 P9、store 读侧 D-c、本次枚举基线。
+    assert(s4.readFailedKeys > 0,
+      '键枚举失败计入本次盘点的 readFailedKeys（实 ' + s4.readFailedKeys + '）——基线取在任何读取之前');
+    assert(s2.readFailedKeys === s2.readFailedDetail.bytes + s2.readFailedDetail.activity + s2.readFailedDetail.enumerate,
+      '主计数与分桶明细同口径（readFailedKeys = 各来源之和，两处口径不得分叉）');
+    assert(s4.readFailedKeys === s4.readFailedDetail.enumerate,
+      '（枚举现场）本次盘点只有枚举失败 ⇒ 主计数等于 enumerate 分桶（实 '
+      + s4.readFailedKeys + ' vs ' + s4.readFailedDetail.enumerate + '）');
+  }
+  // ── 块3：双消费端（诊断 + 健康分 + 面板）——防「声明面空转」 ──
+  section('v2.10.0 块3：双消费端（诊断 + 健康分 + 面板）——防「声明面空转」');
+  {
+    const dgS = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const stS = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    const pnS = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    assert(dgS.indexOf('WA.settingsBus.readStat') > 0, '诊断采集 settingsBus 读侧台账');
+    assert(dgS.indexOf('WA.store.readStat') > 0, '诊断采集 store 读侧台账（两域独立裸读点，只报一处另一半仍不可见）');
+    assert(dgS.indexOf("key: 'settingsBus.readFailed'") > 0, '诊断出 settingsBus 读侧议题');
+    assert(dgS.indexOf("key: 'store.readFailed'") > 0, '诊断出 store 读侧议题');
+    assert(dgS.indexOf("key: 'settingsBus.readSpotCheck'") > 0, '诊断出 readEx 现场抽查议题（readEx 的真实消费端）');
+    assert(dgS.indexOf('defaultAfterFailure > 0') > 0, '诊断分级：回落默认值走 error（当下失真，不是历史经历）');
+    assert(stS.indexOf("key: 'storage.readFailed'") > 0, '健康分消费「占用表偏小」结论');
+    assert(stS.indexOf("key: 'storage.readActivity'") > 0, '健康分消费「误判最冷 / 误删风险」结论');
+    assert(stS.indexOf('score -= 7') > 0 && stS.indexOf('score -= 5') > 0,
+      '两条读侧结论均带明确扣分（不是只写进 issues 就算接线）');
+    assert(pnS.indexOf('读取侧') > 0, '面板透出读侧结论（用户可见出口）');
+    assert(pnS.indexOf('defaultAfterFailure') > 0, '面板区分「读失败回落默认值」与「未配置」');
+    // 端到端：造读失败现场 → 健康巡视必须报出读侧议题，且存储恢复后议题消失
+    frV2100();
+    LSV2100.setItem('worldaxis_state_v2100_maint', JSON.stringify({ meta: { updatedAt: Date.now() } }));
+    LSV2100.setItem('worldaxis_event_log_v2100_maint', '{}');
+    WA.store.maintain({ deep: false });
+    const mBase = WA.store.maintain({ deep: false });
+    assert(!(mBase.issues || []).some(function (i) { return i.key === 'storage.readFailed' || i.key === 'storage.readActivity'; }),
+      '（基线）无故障时读侧议题不出现');
+    const rawGetM = LSV2100.getItem;
+    let m1 = null;
+    try {
+      LSV2100.getItem = function (k) { if (String(k).indexOf('worldaxis_') === 0) throw new Error('v2100-maint'); return rawGetM.call(this, k); };
+      m1 = WA.store.maintain({ deep: false });
+    } finally { LSV2100.getItem = rawGetM; }
+    const keys1 = (m1.issues || []).map(function (i) { return i.key; });
+    assert(keys1.indexOf('storage.readFailed') >= 0,
+      '（端到端）读失败现场 → 健康巡视报出「占用表偏小」（实 ' + keys1.join(',') + '）');
+    assert(keys1.indexOf('storage.readActivity') >= 0, '（端到端）同时报出「误判最冷 / 误删风险」');
+    assert(m1.score < mBase.score, '健康分随之下调（' + mBase.score + ' → ' + m1.score + '）');
+    const m2 = WA.store.maintain({ deep: false });
+    assert(!(m2.issues || []).some(function (i) { return i.key === 'storage.readFailed' || i.key === 'storage.readActivity'; }),
+      '（可逆性）存储恢复后读侧议题消失——判据是当前态而非历史累计');
+    assert(m2.score === mBase.score, '健康分复原（' + m2.score + ' = ' + mBase.score + '）——规则无副作用');
+    // 诊断包：readEx 抽查是该出口的唯一真实消费端
+    const dg1 = WA.toolDiag.collect();
+    assert(dg1.runtime.settingsBus.reads && typeof dg1.runtime.settingsBus.reads.readFailed === 'number',
+      '诊断包采集 settingsBus 读侧台账（runtime.settingsBus.reads）');
+    assert(dg1.worldState.storage.read && typeof dg1.worldState.storage.read.readFailed === 'number',
+      '诊断包采集 store 读侧台账（worldState.storage.read）');
+    assert(dg1.runtime.settingsBus.readSpotCheck && typeof dg1.runtime.settingsBus.readSpotCheck.checked === 'number',
+      '诊断包带 readEx 现场抽查结果（readEx 有真实消费端，非死导出）');
+    // 现场抽查语义：只查有磁盘值的键，损坏值必须被抓成「没读到用户配置」
+    const savedRegs2100 = WA.__settingsRegs.slice();
+    const kSpot = 'worldaxis_v2100_spot_v1';
+    WA.__settingsRegs.length = 0;
+    WA.__settingsRegs.push({ key: kSpot, def: { q: 0 } });
+    LSV2100.setItem(kSpot, '{broken-json');
+    let dg2 = null;
+    try { dg2 = WA.toolDiag.collect(); }
+    finally { WA.__settingsRegs.length = 0; savedRegs2100.forEach(function (x) { WA.__settingsRegs.push(x); }); }
+    const spot2 = dg2.runtime.settingsBus.readSpotCheck;
+    assert(spot2.checked === 1 && spot2.misses.length === 1,
+      '（端到端）抽查只覆盖有磁盘值的键、且抓到「有值却读不回来」的键（实 checked=' + spot2.checked
+      + ' / misses=' + spot2.misses.length + '）');
+    assert(spot2.misses[0].key === kSpot && spot2.misses[0].source === 'default-after-failure',
+      '抽查结论带键名与来源（可检索、可归因）');
+    const vSp = WA.toolDiag.verdict(dg2).issues.filter(function (i) { return i.key === 'settingsBus.readSpotCheck'; });
+    assert(vSp.length === 1 && vSp[0].level === 'error', '诊断包对现场抽查失败报 error（当前态失真，不是历史经历）');
+    assert(/没读到用户配置/.test(vSp[0].detail), '判语点出失败形态（可检索、可归因）');
+    // v2.10.0（逆向审计自纠第四轮）: 恢复点保护失效是**当下缺陷**，必须在两个消费端都报 error。
+    frV2100();
+    LSV2100.setItem('worldaxis_state_v2100_rb', JSON.stringify({ meta: { updatedAt: Date.now() } }));
+    LSV2100.setItem('worldaxis_recovery_v2100_rb', '{broken-rb');
+    WA.store.createRecoveryPoint('v2100_rb');       // 触发 recovery 桶计数
+    const dgRB = WA.toolDiag.collect();
+    assert(dgRB.worldState.storage.read.bySource.recovery > 0
+      && dgRB.worldState.storage.read.lastFail.source === 'recovery',
+      '（端到端）恢复点读失败被采集进诊断台账、且成为「最近一次」失败（实 '
+      + JSON.stringify(dgRB.worldState.storage.read.bySource) + ' / '
+      + JSON.stringify((dgRB.worldState.storage.read.lastFail || {}).source) + '）');
+    const vRB = WA.toolDiag.verdict(dgRB).issues.filter(function (i) { return i.key === 'store.readRecoveryBlocked'; });
+    assert(vRB.length === 1 && vRB[0].level === 'error',
+      '诊断包对「恢复点保护失效」报 error（当下无回退能力，不是历史经历）');
+    assert(/没有恢复点保护|无恢复点保护/.test(vRB[0].detail), '判语点明后果（可检索、可归因）');
+    const mRB = WA.store.maintain({ deep: false });
+    const kRB2 = (mRB.issues || []).filter(function (i) { return i.key === 'storage.readRecoveryBlocked'; });
+    assert(kRB2.length === 1 && kRB2[0].level === 'error', '健康巡视同样报出「恢复点保护失效」（error 级）');
+    assert(pnS.indexOf('没有恢复点保护') > 0, '面板透出该结论（用户可见出口）');
+  }
+  // ── 块4：归因不实防线（本版逆向审计抓出的四处自身缺陷） ──
+  section('v2.10.0 块4：归因不实防线（本版逆向审计抓出的四处自身缺陷）');
+  {
+    const busS = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+    const storeS = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    // ① 迁移失败必须有消费点（否则 readFailedBy.migrate 是「声明了却没人写」的死桶）
+    assert(busS.indexOf("noteReadFail('migrate'") > 0,
+      '（自纠1）迁移失败进读侧归因——readFailedBy.migrate 不再是死桶');
+    assert(busS.indexOf("noteReadFail('read'") > 0 && busS.indexOf("noteReadFail('parse'") > 0
+      && busS.indexOf("noteReadFail('copy'") > 0,
+      '（自纠1）read / parse / copy 桶同样各有消费点（四桶全通，无声明空转）');
+    // ② rawRevive 的读抛错必须被识别（否则该路径的读失败伪装成「键从未配置」）
+    assert(busS.indexOf("'no-storage'") > 0,
+      '（自纠2）rawRevive 的读抛错分支被显式识别，不再伪装成「键不存在」');
+    // ③ ok 只反映硬失败；降级单列（否则「迁移回写失败」被报成「读不到配置」）
+    const rstat = WA.settingsBus.readStat();
+    assert(rstat.ok === (rstat.hardFailed === 0), '（自纠3）ok 只由硬失败决定');
+    assert(rstat.readFailed >= rstat.hardFailed, '（自纠3）readFailed 含降级（总数不小于硬失败数）');
+    // 语义：驱动一次真实降级（迁移钩子抛错）——ok 不得因此变差，硬失败计数不得变
+    frV2100();
+    const rBefore = WA.settingsBus.readStat();
+    const kMig = 'worldaxis_v2100_mig_v1';
+    LSV2100.setItem(kMig, JSON.stringify(5));
+    const REGMIG = { key: kMig, def: { a: 1 }, migrate: function () { throw new Error('v2100-mig-throw'); } };
+    WA.settingsBus.read(REGMIG);
+    const rAfter = WA.settingsBus.readStat();
+    assert(rAfter.degraded === rBefore.degraded + 1,
+      '迁移失败计入 degraded（实 +' + (rAfter.degraded - rBefore.degraded) + '）');
+    assert(rAfter.readFailed === rBefore.readFailed + 1, '迁移失败计入 readFailed 总数（分类完备，无落桶外）');
+    assert(rAfter.hardFailed === rBefore.hardFailed,
+      '（归因不实防线）迁移失败**不**增加硬失败计数——它只是降级，不是「没读到用户配置」');
+    assert(rBefore.ok === false || rAfter.ok === true,
+      '（归因不实防线）迁移失败不把 ok 拉黑（前 ' + rBefore.ok + ' → 后 ' + rAfter.ok
+      + '；本会话硬失败 ' + rAfter.hardFailed + '）——用户要查的是迁移钩子，不是存储');
+    // ④ store 侧差值口径（消费端不得拿累计值做当前态判据）
+    assert(storeS.indexOf('__byBefore') > 0, '（自纠4）store 分桶明细带「本次盘点」差值基线');
+    assert(storeS.indexOf('readFailedCumulative') > 0, '（自纠4）累计值单列，与当前态判据分离');
+    const ssD = WA.store.storageStat();
+    assert(ssD.readFailedDetail && typeof ssD.readFailedDetail.bytes === 'number'
+      && ssD.readFailedCumulative && typeof ssD.readFailedCumulative.bytes === 'number',
+      '（自纠4）storageStat 同时给出「本次差值」与「累计」（两者都是数）');
+    // ⑤–⑧（逆向审计第四轮）: 命题之外的读侧裸读点——它们的失败后果比「配置读成默认值」更重：
+    //   · diskRev 读失败被当成 rev=0 ⇒ 并发检测恒不成立 ⇒ **多实例覆盖静默发生**；
+    //   · createRecoveryPoint 清单读失败 ⇒ 下一次写入把全部历史恢复点**静默覆盖丢弃**；
+    //   · 写后读回校验 / 删后复核的「读」失败被算成「内容不匹配 / 键仍在」⇒ 归因不实。
+    assert(storeS.indexOf('function diskRev(chatId)') > 0 && storeS.indexOf('return { ok: true, rev: 0 }') > 0,
+      '（自纠5）diskRev 返回结构化 {ok, rev}——「磁盘序号不可知」不再伪装成 rev=0');
+    assert(storeS.indexOf('dRevRes.ok && __seenRev > 0') > 0,
+      '（自纠5）磁盘序号读失败时不做冲突判定（「不可知」不得当成「没有冲突」——那是静默覆盖）');
+    assert(storeS.indexOf("noteStoreReadFail('diskRev'") > 0,
+      '（自纠5）磁盘序号读失败进读侧台账（否则多实例覆盖无任何痕迹）');
+    assert(storeS.indexOf('为避免覆盖丢弃全部历史恢复点') > 0,
+      '（自纠6）恢复点清单读失败时**不写入**——此前会把 [新点] 整份覆盖，静默丢弃全部历史恢复点');
+    assert(storeS.indexOf("'readback-failed'") > 0,
+      '（自纠7）写后校验 / 删后复核的读失败有独立原因码（不与「内容不匹配 / 键仍在」混同）');
+    // 语义：删后复核的读失败必须与「键静默仍在」可分辨
+    frV2100();
+    const kRB = 'worldaxis_v2100_readback_v1';
+    LSV2100.setItem(kRB, '1');
+    const rawG3 = LSV2100.getItem;
+    let rbCall = 0;
+    LSV2100.getItem = function (k) {
+      if (k === kRB) { rbCall++; if (rbCall >= 2) throw new Error('v2100-readback'); }
+      return rawG3.call(this, k);
+    };
+    let rbRes = null;
+    try { rbRes = WA.store.removeVerified(kRB); } finally { LSV2100.getItem = rawG3; }
+    assert(rbRes.ok === false && rbRes.reason === 'readback-failed',
+      '（自纠7）删后复核读失败 → reason=readback-failed（实 ' + rbRes.reason + '），不再误报「删除静默无效」');
+    // 语义：恢复点清单损坏时**保命优先**（键内容不得被覆盖）
+    frV2100();
+    const kRec2100 = 'worldaxis_recovery_v2100b_chat';
+    LSV2100.setItem(kRec2100, '{broken-recovery-list');
+    const recRawBefore = LSV2100.getItem(kRec2100);
+    const recRes = WA.store.createRecoveryPoint('v2100b_chat');
+    assert(recRes === null, '（自纠6）读失败时不建点（返回 null，实 ' + JSON.stringify(recRes) + '）');
+    assert(LSV2100.getItem(kRec2100) === recRawBefore,
+      '（自纠6）损坏的恢复点清单**逐字节未被覆盖**——用户历史恢复点保住了');
+    assert((WA.store.readStat().bySource.recovery || 0) > 0,
+      '（自纠6）恢复点读失败进读侧台账（recovery 桶，实 ' + JSON.stringify(WA.store.readStat().bySource) + '）');
+    // 语义：新增来源必须在 readStat().bySource 里可见（否则「有归因但看不见」＝又一处空转）
+    frV2100();
+    LSV2100.setItem('worldaxis_state_v2100b_dr', JSON.stringify({ meta: { updatedAt: Date.now() } }));
+    const rawG4 = LSV2100.getItem;
+    LSV2100.getItem = function (k) { if (String(k).indexOf('worldaxis_state_') === 0) throw new Error('v2100-dr'); return rawG4.call(this, k); };
+    try { WA.store.save(WA.store.get()); } catch (e) { /* save 失败无妨：本断言只看归因是否可见 */ }
+    finally { LSV2100.getItem = rawG4; }
+    const byAll = WA.store.readStat().bySource;
+    assert(typeof byAll.diskRev === 'number' && byAll.diskRev > 0,
+      '（自纠8）新增读点来源在 readStat().bySource 里全量可见（实 ' + JSON.stringify(byAll) + '）');
+    assert((byAll.verify || 0) > 0, '（自纠8）写后读回校验的读失败同样可见（verify 桶）');
+  }
+  // ── 块5：读侧适用范围（G15）与版本三方对齐 ──
+  section('v2.10.0 块5：读侧适用范围（G15）与版本三方对齐');
+  {
+    const runS = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
+    assert(runS.indexOf('G15（v2.10.0）：读侧完整性契约') > 0,
+      'G15 门禁在位（与 G13 写侧旁路清单 / G14 删侧出口唯一性构成三面对偶）');
+    assert(runS.indexOf('readFailedBy.migrate 有真实消费点') > 0, 'G15 钉「分桶必须有消费点」（防声明面空转）');
+    assert(runS.indexOf('readEx 有真实消费端') > 0, 'G15 钉「readEx 有真实消费端」');
+    assert(runS.indexOf('readStat 区分「硬失败') > 0, 'G15 钉「归因不得失实」');
+    assert(runS.indexOf("noteReadFail('migrate'") > 0, 'G15 钉「迁移桶有消费点」（同型坑不复发）');
+    // 全库读侧结构核验（防「多处自增」绕过单一实现）
+    const busS = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+    const storeS = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    assert(cnt2100(busS, 'stats.readFailed++') === 1,
+      '读失败主计量只在单一实现内自增（实 ' + cnt2100(busS, 'stats.readFailed++') + ' 处）');
+    assert(cnt2100(busS, 'default-after-failure') >= 3,
+      '三处回落路径（读抛错 / 值解析失败 / legacy 解析失败）都标同一来源（实 '
+      + cnt2100(busS, 'default-after-failure') + ' 处）');
+    assert(cnt2100(storeS, '__readStat.readFailed++') === 1, 'store 读失败主计量只在单一实现内自增');
+    // 版本三方对齐
+    const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+    const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
+    const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
+    assert(ver2100v === '2.10.0', '入口版本为 2.10.0（实 ' + ver2100v + '）');
+    assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
+    assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
+      '读侧完整性契约留痕（可回溯）');
+    assert(busS.indexOf('v2.10.0') > 0, 'settings-bus 读侧出口留痕');
+    assert(storeS.indexOf('v2.10.0') > 0, 'store 读侧归因留痕');
+    assert(fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8').indexOf('v2.10.0') > 0, '诊断消费端留痕');
+    assert(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8').indexOf('v2.10.0') > 0, '面板消费端留痕');
+  }
+  } // end v2.10.0 block
   } // end v2.9.0 block
 
   } // end v2.7.0 block

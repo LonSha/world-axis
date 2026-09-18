@@ -139,6 +139,31 @@
   // 与 writes/verified/mismatches 等「历史经历」计数分离——
   // 健康分只看当前态，否则一次瞬时毒化会把健康分永久压低（误报警）。
   const __integrityStat = { writes: 0, verified: 0, mismatches: 0, retried: 0, recoveredByRetry: 0, lastAt: 0, lastReason: null, lastOk: null, lastFailAt: 0 };
+  // v2.10.0: 读侧计量（与 __integrityStat 的**写侧**、v2.9.0 的 __removeStat **删侧**构成三面）。
+  //   现场：`keyBytes` 的 `catch (e) { return 0 }` 把「读失败」吞成「0 字节」——于是容量体检里
+  //   「这个键是空的」与「这个键读不出来」长得一模一样；实测该路径的读失败会让 `totalBytes`
+  //   少算、让 `sweepStaleKeys` 判不出体积、让面板报出一份**偏小**的占用表，而用户照着它清理
+  //   永远清不出空间（与 v2.9.0 修掉的「删除计数虚高」是同一类「结论不实」）。
+  const __readStat = { readFailed: 0, lastReadFail: null, bySource: { bytes: 0, activity: 0, enumerate: 0 } };
+  /**
+   * v2.10.0: 存储层读失败记账的**单一实现**——与 settings-bus 的 noteReadFail、
+   *   noteFail（写侧）/ noteRemoveFail（删侧）同规格：一处实现、一处自增、一处归因。
+   *   为什么必须单一实现：本仓库的写侧与删侧都因为「各点各写一份」漏过路径（写侧漏四条、
+   *   删侧被包在空 catch 里），读侧若不收口必然重演——而读侧的漏点恰恰是最难发现的，
+   *   因为读失败**不会产生任何可见症状**，它只让结论悄悄失真。
+   *   语义：永不抛（记账本身不得打断读取）。
+   * @param {string} source 来源（bytes / activity / enumerate）
+   * @param {string} key 涉及的键（枚举失败用 '(enumerate)'）
+   * @param {*} err 原始错误
+   */
+  function noteStoreReadFail(source, key, err) {
+    try {
+      const src = source || 'bytes';
+      __readStat.readFailed++;
+      __readStat.bySource[src] = (__readStat.bySource[src] || 0) + 1;
+      __readStat.lastReadFail = { key: key, source: src, at: Date.now(), error: String((err && err.message) || err).slice(0, 120) };
+    } catch (e) { /* 记账失败不影响读取 */ }
+  }
   // ── v2.9.0: 删除侧完整性计量 ─────────────────────────────────
   // 背景（本版命题）：写入侧自 v0.4.0 就有 writeVerified（写后读回逐字符比对 + 一次重试），
   //   而**删除侧完全没有对应物**——全库 13 处 localStorage.removeItem 直调，清完之后谁也不复核
@@ -169,8 +194,16 @@
     if (!existed) { __removeStat.verified++; return { ok: true, removed: false, reason: 'absent' }; }
     try { mainWin.localStorage.removeItem(key); }
     catch (e) { __removeStat.failed++; __removeStat.lastReason = 'remove-threw'; return { ok: false, removed: false, reason: 'remove-threw' }; }
-    let back = null;
-    try { back = mainWin.localStorage.getItem(key); } catch (e) { back = null; }
+    let back = null, backReadErr = null;
+    try { back = mainWin.localStorage.getItem(key); } catch (e) { back = null; backReadErr = e; }
+    if (backReadErr) {
+      // v2.10.0: 删后复核失败（复核本身就是一次读取）**不能**与「键仍在」共用同一个结论——
+      //   前者要查存储可读性，后者要查删除权限/策略。此前后者还会被当成 staged-still-present
+      //   推进「静默无效删除」的计数与健康分扣分（归因不实）。
+      noteStoreReadFail('verify', key, backReadErr);
+      __removeStat.failed++; __removeStat.lastReason = 'readback-failed';
+      return { ok: false, removed: false, reason: 'readback-failed' };
+    }
     if (back !== null && back !== undefined) {
       // 静默无效：removeItem 没抛错，但键还在。这是删除侧最危险的形态——调用方会以为清掉了。
       __removeStat.staged++; __removeStat.failed++; __removeStat.lastReason = 'staged-still-present';
@@ -242,7 +275,9 @@
   function writerId() {
     if (__writerId) {
       // v0.5.0: 键被外部清除（清站点数据/配额回收）时重建——否则标识在存储侧永久消失
-      try { if (mainWin.localStorage.getItem('worldaxis_writer_id') !== __writerId) mainWin.localStorage.setItem('worldaxis_writer_id', __writerId); } catch (e) {}
+      // v2.10.0: 读失败同样归因——此前空 catch 吞掉，「标识被外部清除」与「读不出来」不可分辨。
+      try { if (mainWin.localStorage.getItem('worldaxis_writer_id') !== __writerId) mainWin.localStorage.setItem('worldaxis_writer_id', __writerId); }
+      catch (e) { noteStoreReadFail('writerId', 'worldaxis_writer_id', e); }
       return __writerId;
     }
     try {
@@ -252,17 +287,28 @@
         mainWin.localStorage.setItem('worldaxis_writer_id', w);
       }
       __writerId = w;
-    } catch (e) { __writerId = 'w-mem-' + Math.random().toString(36).slice(2, 8); }
+    } catch (e) { noteStoreReadFail('writerId', 'worldaxis_writer_id', e); __writerId = 'w-mem-' + Math.random().toString(36).slice(2, 8); }
     return __writerId;
   }
-  /** 读取磁盘上某聊天的 stateRev（0 = 不存在/不可解析） */
+  /**
+   * 读取磁盘上某聊天的 stateRev。
+   * v2.10.0（逆向审计自纠）: 返回值改为结构化 `{ ok, rev }`。此前读失败与「键不存在」
+   *   都返回 0，于是并发检测里 `dRev > __seenRev` 恒不成立——**多实例覆盖会静默发生**
+   *   （用户数轮进度被另一个窗口覆盖而无任何告警），这比本版命题本身更严重，故当版修掉：
+   *   读失败必须与「磁盘上确实没有」可分辨，且失败进读侧台账（诊断/健康分可见）。
+   * @returns {{ok:boolean, rev:number, error?:*}}
+   */
   function diskRev(chatId) {
     try {
       const raw = mainWin.localStorage.getItem(storageKey(chatId));
-      if (!raw) return 0;
+      if (!raw) return { ok: true, rev: 0 };
       const st = JSON.parse(raw);
-      return (st && st.meta && typeof st.meta.stateRev === 'number') ? st.meta.stateRev : 0;
-    } catch (e) { return 0; }
+      return { ok: true, rev: (st && st.meta && typeof st.meta.stateRev === 'number') ? st.meta.stateRev : 0 };
+    } catch (e) {
+      // 解析失败与读取抛错都算「磁盘序号不可知」——两者都不该被当成 rev=0 参与冲突判定。
+      noteStoreReadFail('diskRev', String(chatId || ''), e);
+      return { ok: false, rev: 0, error: e };
+    }
   }
   /** 保全他实例 payload 为冲突现场（不覆盖已有同名键） */
   function quarantineConflict(chatId, disc, mine) {
@@ -411,11 +457,19 @@
         const k = ls.key(i);
         if (typeof k === 'string' && k.indexOf('worldaxis_') === 0) out.push(k);
       }
-    } catch (e) { /* 枚举失败（非标准实现）→ 空清单，不炸 */ }
+    } catch (e) {
+      // v2.10.0: 枚举失败回落空清单 —— 后果是**全部键都看不见**（体积 0、无孤儿、无可回收），
+      //   而面板会照样报出一份「存储很干净」的结论。这是比单键读失败更严重的失真，必须归因。
+      noteStoreReadFail('enumerate', '(enumerate)', e);
+    }
     return out;
   }
   function keyBytes(key) {
-    try { return byteLen(mainWin.localStorage.getItem(key) || ''); } catch (e) { return 0; }
+    // v2.10.0: 读失败必须与「值就是空」可分辨——此前两者都返回 0。
+    //   返回 0 的语义保持不变（不破坏容量表结构），但故障进 __readStat 并且调用方
+    //   （storageStat）会把它计入 `readFailedKeys`，让「这份占用表是否可信」可判定。
+    try { return byteLen(mainWin.localStorage.getItem(key) || ''); }
+    catch (e) { noteStoreReadFail('bytes', key, e); return 0; }
   }
   /** 聊天活跃时间：读 state 键 payload 的 meta.updatedAt（无 state 键/解析失败回退 0 = 最冷） */
   function chatActivityAt(chat) {
@@ -424,7 +478,12 @@
       if (!raw) return 0;
       const st = JSON.parse(raw);
       return (st && st.meta && typeof st.meta.updatedAt === 'number') ? st.meta.updatedAt : 0;
-    } catch (e) { return 0; }
+    } catch (e) {
+      // v2.10.0: 读失败回落 0 = 「最冷」→ 该聊天的诊断键会被判为可回收。
+      //   这是**破坏性后果**（读失败可能诱发误回收），必须与「确实没有 state 键」区分开归因。
+      noteStoreReadFail('activity', 'worldaxis_state_' + chat, e);
+      return 0;
+    }
   }
   // v0.1.47: 最近一次 migrate 的报告（观测层承载，不写进 state，避免污染持久 payload）
   let __migrateReport = null;
@@ -445,8 +504,11 @@
     for (let attempt = 0; attempt < 2; attempt++) {
       try { mainWin.localStorage.setItem(key, payload); }
       catch (e) { __integrityStat.lastOk = false; __integrityStat.lastFailAt = Date.now(); return { ok: false, verified: false, retried: attempt > 0, reason: 'write', error: e }; }
-      let back = null;
-      try { back = mainWin.localStorage.getItem(key); } catch (e) { back = null; }
+      let back = null, backReadErr = null;
+      try { back = mainWin.localStorage.getItem(key); } catch (e) { back = null; backReadErr = e; }
+      // v2.10.0: 写后读回校验的「读」本身也会失败——此前与「读回内容不匹配」混成一个形态
+      //   （missing-after-write），归因不实会把用户引向「写入被截断」而实际是读取被拒。
+      if (backReadErr) noteStoreReadFail('verify', key, backReadErr);
       if (back === payload) {
         if (attempt > 0) { __integrityStat.retried++; __integrityStat.recoveredByRetry++; }
         __integrityStat.verified++; __integrityStat.lastAt = Date.now();
@@ -455,8 +517,9 @@
       }
       // 读回不一致：磁盘上的副本不是我们写的东西
       __integrityStat.mismatches++; __integrityStat.lastAt = Date.now();
-      __integrityStat.lastReason = back === null ? 'missing-after-write'
-        : (typeof back === 'string' && typeof payload === 'string' && back.length !== payload.length) ? 'length-mismatch' : 'content-mismatch';
+      __integrityStat.lastReason = backReadErr ? 'readback-failed'
+        : back === null ? 'missing-after-write'
+          : (typeof back === 'string' && typeof payload === 'string' && back.length !== payload.length) ? 'length-mismatch' : 'content-mismatch';
       if (attempt === 0) continue;   // 重试一次（瞬时写入毒化/回收常可自愈）
     }
     __integrityStat.lastOk = false; __integrityStat.lastFailAt = Date.now();   // 当前态：最近一次写入校验失败
@@ -807,9 +870,14 @@
         const cidW = chatId || getChatId();
         let conflict = null;
         try {
-          const dRev = diskRev(cidW);
+          const dRevRes = diskRev(cidW);
+          const dRev = dRevRes.ok ? dRevRes.rev : 0;
+          // v2.10.0: 磁盘序号读失败时**不做冲突判定**。此前 diskRev 把读失败返回成 0，
+          //   而 0 > __seenRev 恒不成立 ⇒ 冲突检测被静默跳过 ⇒ 他实例 payload 不保全、
+          //   本实例直接覆盖且无痕迹（**读失败掩盖并发覆盖**）。宁可本次不判定（故障已在
+          //   读侧台账里可见），也不能把「不可知」当成「没有冲突」。
           // 磁盘序号与本实例上次所见不一致 → 他实例写过。若此刻直接写，其改动将被覆盖。
-          if (__seenRev > 0 && dRev > __seenRev) {
+          if (dRevRes.ok && __seenRev > 0 && dRev > __seenRev) {
             let rawDisc = null;
             try { rawDisc = mainWin.localStorage.getItem(storageKey(cidW)); } catch (e) { rawDisc = null; }
             if (rawDisc) {
@@ -1026,6 +1094,51 @@
         issues.push({ level: 'warn', key: 'storage.removeFailed', detail: '最近一次受控删除未成功（原因：' + rmS.lastReason + '；本会话累计失败 ' + rmS.failed + ' 次，成功 ' + rmS.removed + ' 次）——' + (rmS.lastReason === 'remove-threw' ? '删除被拒（权限/策略）' : '删除未生效，相关键仍在磁盘上') });
       } else if (rmS && rmS.removed > 0) {
         issues.push({ level: 'info', key: 'storage.removeOk', detail: '受控删除 ' + rmS.removed + ' 次全部复核通过（键确已移除）' });
+      }
+      // ── 5.6 v2.10.0 读侧完整性 ──
+      //   与前两面严格对偶：写侧判「写进去了吗」（integrity）、删侧判「真删掉了吗」（remove），
+      //   读侧判「**拿到的是用户配置还是兜底值**」。这是唯一会被用户当成「设置被程序改回去」
+      //   的故障，而它此前在诊断与健康分里完全不存在。
+      //   ① `storageStat.readFailedKeys > 0` ⇒ 占用表偏小：容量结论不可用（warn）。
+      //      注意判据用**本次盘点**引发的读失败数，而非累计——累计数只增不减，
+      //      会让「存储修好后分数复原」无法成立（与 v2.9.0 删除侧同一裁决）。
+      //   ② 活跃时间读失败 ⇒ 该聊天会被判「最冷」而进可回收候选 ⇒ 有**误删风险**（warn，更重）。
+      let ssRead = null;
+      try { ssRead = this.storageStat(); } catch (e) { markDegraded('storageStat.read', e); }
+      if (ssRead && ssRead.readFailedKeys > 0) {
+        score -= 7;
+        const rdSrc = ssRead.readFailedDetail || {};
+        // v2.10.0（逆向审计自纠第四轮）: 分桶明细**全量列出**（此前只列三个已知来源）。
+        const LAB = { bytes: '按字节', activity: '活跃时间', enumerate: '枚举', diskRev: '磁盘序号',
+          verify: '写后校验/删后复核读回', recovery: '恢复点清单', conflict: '冲突现场',
+          quarantine: '隔离现场', writerId: '写入者标识' };
+        const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
+          .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');
+        issues.push({ level: 'warn', key: 'storage.readFailed',
+          detail: '存储读取失败 ' + ssRead.readFailedKeys + ' 个键（' + rTxt + '）——读失败的键被按 0 字节计，占用表**偏小**，'
+            + '据此判断「已释放多少 / 还剩多少」不可靠' });
+        actions.push({ id: 'review-storage', safe: true, detail: '存储读取被环境静默拒绝，先导出诊断包留证（占用数据当前不完整）' });
+      }
+      if (ssRead && ssRead.readFailedDetail && ssRead.readFailedDetail.activity > 0) {
+        score -= 5;
+        issues.push({ level: 'warn', key: 'storage.readActivity',
+          detail: '聊天活跃时间读取失败 ' + ssRead.readFailedDetail.activity + ' 次——回落 0 等于「最冷」，'
+            + '这些聊天的诊断键会被列为可回收候选，清理时**可能误删仍在使用的聊天**' });
+      }
+      // v2.10.0（逆向审计自纠第四轮）: 「恢复点保护失效」——清单读失败时创建被跳过（保命优先），
+      //   用户此刻**没有恢复点保护**，属当下缺陷（error 级，扣分重于容量失真）。
+      //   判据用**最近一次读失败事件**（`lastFail.source`）而非累计数：累计数只增不减，会让
+      //   「历史失败」把分数永久压低（v0.4.0 裁决；本版已因同型坑自纠三次）。
+      //   注意也不可用 `readFailedDetail.recovery`——那是「本次盘点」差值，而盘点本身不读恢复点键，
+      //   恒为 0（这正是本版第三次自纠踩过的同型口径错误）。
+      if (__readStat.lastReadFail && __readStat.lastReadFail.source === 'recovery') {
+        score -= 12;
+        issues.push({ level: 'error', key: 'storage.readRecoveryBlocked',
+          detail: '**最近一次**存储读取失败发生在恢复点清单上（本会话累计 '
+            + ((ssRead && ssRead.readFailedCumulative && ssRead.readFailedCumulative.recovery) || 1)
+            + ' 次）——为避免覆盖丢弃全部历史恢复点，恢复点创建已被跳过（读不到就不写），'
+            + '当前**没有恢复点保护**，推进后无法回退' });
+        actions.push({ id: 'export-diag', safe: true, detail: '先导出诊断包留证，再排查存储可读性（恢复点保护当前不可用）' });
       }
       // ── 6. 多实例并发一致性 ──
       //   ① 存在未处置的冲突现场 → 当前态缺陷（有他实例数据等待用户决策）→ 扣分 warn
@@ -1573,7 +1686,8 @@
         for (let i = 0; i < ls.length; i++) {
           const k = ls.key(i);
           if (!k || k.indexOf(prefix) !== 0) continue;
-          const raw = ls.getItem(k) || '';
+          let raw = '';
+          try { raw = ls.getItem(k) || ''; } catch (eR) { noteStoreReadFail('conflict', k, eR); }
           let at = 0;
           const parts = k.split('_');
           at = parseInt(parts[parts.length - 2], 10) || 0;
@@ -1592,19 +1706,33 @@
     dropConflict(key) {
       try {
         if (typeof key !== 'string' || key.indexOf('worldaxis_conflict_') !== 0) return { ok: false, reason: '非冲突现场键，拒绝删除' };
-        if (mainWin.localStorage.getItem(key) === null) return { ok: false, reason: '键不存在' };
+        let cur = null, curErr = null;
+        try { cur = mainWin.localStorage.getItem(key); } catch (e0) { curErr = e0; }
+        if (curErr) {
+          // v2.10.0: 读失败此前直接冒到外层 catch，被当成通用失败原因回显；且与「键不存在」
+          //   不可分辨。归因后「读不出来」与「本来就没有」分开，前者不该被当成已丢弃。
+          noteStoreReadFail('conflict', key, curErr);
+          return { ok: false, reason: '读取冲突现场失败（无法确认其是否存在，本次未做任何删除）：' + ((curErr && curErr.message) || curErr) };
+        }
+        if (cur === null) return { ok: false, reason: '键不存在' };
         // v2.9.0: 受控删除 + 复核。此前删除若静默无效会返回 ok:true（界面报「已丢弃」而键仍在，
         //   用户以为处理完了、实际冲突现场永远不会消失）。
         const r = removeVerified(key);
         if (!r.ok) return { ok: false, reason: '删除失败：' + r.reason };
         return { ok: true, removed: r.removed };
-      } catch (e) { return { ok: false, reason: String((e && e.message) || e) }; }
+      } catch (e) { noteStoreReadFail('conflict', key, e); return { ok: false, reason: String((e && e.message) || e) }; }
     },
     /** v0.5.0: 提取冲突现场全文（离机备份用） */
     exportConflict(key) {
       try {
         if (typeof key !== 'string' || key.indexOf('worldaxis_conflict_') !== 0) return { ok: false, reason: '非冲突现场键' };
-        const raw = mainWin.localStorage.getItem(key);
+        let raw = null, rawErr = null;
+        try { raw = mainWin.localStorage.getItem(key); } catch (e0) { rawErr = e0; }
+        if (rawErr) {
+          // v2.10.0: 导出（离机备份）是用户处理冲突的最后手段——读失败必须与「键不存在」分开。
+          noteStoreReadFail('conflict', key, rawErr);
+          return { ok: false, reason: '读取冲突现场失败（导出未完成）：' + ((rawErr && rawErr.message) || rawErr) };
+        }
         if (raw === null) return { ok: false, reason: '键不存在' };
         let st = null, parseable = false;
         try { st = JSON.parse(raw); parseable = true; } catch (e) {}
@@ -1948,7 +2076,25 @@
     createRecoveryPoint(chatId) {
       try {
         const key = recoveryKey(chatId);
-        const list = JSON.parse(mainWin.localStorage.getItem(key) || '[]');
+        let list = [];
+        try {
+          const rawList = mainWin.localStorage.getItem(key);
+          if (rawList === null || rawList === undefined) list = [];
+          else {
+            const parsedList = JSON.parse(rawList);
+            if (!Array.isArray(parsedList)) throw new Error('recovery-list-not-array（现有恢复点清单不是数组）');
+            list = parsedList;
+          }
+        } catch (eR) {
+          // v2.10.0（逆向审计自纠，保命优先）: 恢复点清单读取失败时**绝不覆盖写入**。
+          //   此前写法 `JSON.parse(getItem(key) || '[]')`：读到损坏字节（或读被拒）时抛错 →
+          //   外层 catch 只打一条 warn → 恢复点一个都不建；紧接着的 `setItem` 会把
+          //   「只有新点的数组」整份覆盖上去 ⇒ **用户全部历史恢复点被静默丢弃**，
+          //   且失败路径没有任何可检索痕迹。读不到就不写，并如实归因。
+          noteStoreReadFail('recovery', key, eR);
+          WA.log('error', '创建恢复点失败：现有恢复点清单读取失败，为避免覆盖丢弃全部历史恢复点，本次**不写入**（键：' + key + '）', eR);
+          return null;
+        }
         // v0.5.0: 记录来源实例与当时序号——多窗口并存时可辨认「这份点谁建的」
         list.unshift({
           at: Date.now(),
@@ -1962,21 +2108,52 @@
     },
     listRecoveryPoints(chatId) {
       try { return JSON.parse(mainWin.localStorage.getItem(recoveryKey(chatId)) || '[]'); }
-      catch (e) { return []; }
+      catch (e) {
+        // v2.10.0: 此前读失败与「确实没有恢复点」都返回空数组，用户会以为「没有历史点可
+        //   恢复」而实际是读不出来（诊断里也查不到）。归因后两者可分辨。
+        noteStoreReadFail('recovery', recoveryKey(chatId), e);
+        return [];
+      }
     },
     /**
      * v0.1.51: 存储键卫生观测（只读）——枚举 worldaxis_* 键空间，按 family/chat 分类计量。
      * diagnostic 键按其聊天活跃时间（state.meta.updatedAt）标记 stale 候选。
      */
+    /**
+     * v2.10.0: 存储层读侧台账（只读）——与 integrityStat（写侧）/ removeStat（删侧）三面对称。
+     *   `ok` 语义：本会话**存储层读取从未失败**。读失败在本仓库有两个破坏性后果：
+     *     ① 体积表偏小（容量结论不实）；② 活跃时间回落 0 = 最冷（可能诱发误回收）。
+     *   故这不是「统计好看不好看」的问题，而是**结论是否可用**的问题。
+     */
+    readStat() {
+      // v2.10.0（逆向审计自纠）: bySource 改为**全量透出**。此前只列举 bytes/activity/enumerate
+      //   三个已知来源，而 noteStoreReadFail 支持动态建桶 ⇒ 本版新增的来源（diskRev / verify /
+      //   recovery / quarantine / conflict / writerId）会「有归因但看不见」，等于又一处声明面空转。
+      const by = {};
+      try {
+        const src = __readStat.bySource || {};
+        Object.keys(src).forEach(function (k) { by[k] = src[k]; });
+      } catch (e) {}
+      return { readFailed: __readStat.readFailed, ok: __readStat.readFailed === 0,
+        bySource: by, lastFail: __readStat.lastReadFail };
+    },
     storageStat(opts) {
       const o = opts || {};
       const maxIdleMs = (typeof o.maxIdleDays === 'number' && o.maxIdleDays >= 0 ? o.maxIdleDays : 30) * 86400000;
       const cur = getChatId();
+      // v2.10.0（逆向审计自纠）: 差值基线必须在**任何读取之前**取。`listWorldAxisKeys()` 本身
+      //   就是一次读取（枚举），基线若取在它之后，枚举失败会被排除在「本次盘点」口径之外——
+      //   而枚举失败恰恰是最严重的失真：全部键都看不见，`totalKeys/totalBytes` 全 0，
+      //   面板却照样报出一份「存储很干净」的结论；消费端拿到的 `readFailedKeys` 也不含它。
+      //   口径不一致（主计数与分桶明细不同源）是本版第三次踩到的同型坑，故当版修掉并加断言钉住。
+      const __rfBefore = __readStat.readFailed;
+      const __byBefore = { bytes: __readStat.bySource.bytes, activity: __readStat.bySource.activity, enumerate: __readStat.bySource.enumerate };
       const keys = listWorldAxisKeys();
       const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, other: 0 };
       const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, other: 0 };
       let totalBytes = 0, stateKeys = 0, stateDerivedKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0, curQuarantines = 0;
       let conflictKeys = 0, conflictBytes = 0;
+      let keysReadFailed = 0;           // v2.10.0: 本次盘点中读失败的键数（体积表可信度判据）
       const staleDiagCandidates = [];   // 仅超期项（与 sweepStaleKeys 同阈值）：{ key, chat, kind, idleMs }
       const now = Date.now();
       keys.forEach(function (k) {
@@ -2004,6 +2181,7 @@
         // 计入会让用户误判当前存档膨胀（实测虚高一倍）
         if (cls.chat === cur && cls.family !== 'conflict') curBytes += b;
       });
+      keysReadFailed = __readStat.readFailed - __rfBefore;   // 本次盘点引发的读失败数
       return {
         totalKeys: keys.length,
         totalBytes: totalBytes,
@@ -2018,6 +2196,22 @@
         currentChatQuarantines: curQuarantines,
         conflictKeys: conflictKeys,
         conflictBytes: conflictBytes,
+        // v2.10.0: 读侧完整性——本份占用表在生成过程中有多少个键**读失败**（按 0 字节计入）。
+        //   `readFailedKeys > 0` 意味着 totalBytes / perFamilyBytes **偏小**，
+        //   「已释放 / 剩余空间」这类结论在此数非零时不可信。
+        readFailedKeys: keysReadFailed,
+        // v2.10.0（逆向审计自纠）: 三个分桶必须与 keysReadFailed **同口径**（都是「本次盘点」的差值）。
+        //   首版填的是累计值，于是消费端（store.maintain / tool-diag）拿它做 `activity > 0` 判据时，
+        //   实际上是在读**历史累计**——一旦曾经发生过一次活跃时间读失败，健康分就会永久带着这个
+        //   warn，而用户把存储问题修好后分数不会复原。这正是 v0.4.0 立下的裁决
+        //   （「健康分只看当前态，否则历史一次失败会把分数永久压低」）所要禁止的形态，
+        //   本版删除侧（P9）刚修过一次，store 读侧这里又踩了一遍，故当版修掉。
+        readFailedDetail: {
+          bytes: __readStat.bySource.bytes - __byBefore.bytes,
+          activity: __readStat.bySource.activity - __byBefore.activity,
+          enumerate: __readStat.bySource.enumerate - __byBefore.enumerate
+        },
+        readFailedCumulative: { bytes: __readStat.bySource.bytes, activity: __readStat.bySource.activity, enumerate: __readStat.bySource.enumerate },
         staleDiagCandidates: staleDiagCandidates.sort(function (a, b2) { return a.idleMs - b2.idleMs; }),
         enumerable: typeof mainWin.localStorage.length === 'number' && mainWin.localStorage.length >= 0
       };
@@ -2202,7 +2396,13 @@
         const c = classifyKey(k);
         if (c.family !== 'corrupt') return;
         let raw = '';
-        try { raw = mainWin.localStorage.getItem(k) || ''; } catch (e) { raw = ''; }
+        try { raw = mainWin.localStorage.getItem(k) || ''; }
+        catch (e) {
+          // v2.10.0: 读失败此前回落空串 ⇒ 隔离现场被显示成「0 字节、不可解析」，
+          //   用户会据此判断「这个现场没内容、可以丢」，而实际只是读不出来。
+          noteStoreReadFail('quarantine', k, e);
+          raw = '';
+        }
         const ts = parseInt((k.match(/_corrupt_(\d+)$/) || [])[1], 10) || 0;
         let parseable = null;   // state 隔离现场：损坏字节通常不可解析，但值得试探（部分写入可能仍可解析）
         if (c.quarantine === 'state') { try { JSON.parse(raw); parseable = true; } catch (e) { parseable = false; } }
@@ -2273,8 +2473,14 @@
       if (typeof key !== 'string') return { ok: false, reason: '缺少隔离键' };
       const c = classifyKey(key);
       if (c.family !== 'corrupt') return { ok: false, reason: '非隔离键，拒绝删除（防误用成通用删除器）' };
-      let existed = null;
-      try { existed = mainWin.localStorage.getItem(key); } catch (e) {}
+      let existed = null, existReadErr = null;
+      try { existed = mainWin.localStorage.getItem(key); } catch (e) { existReadErr = e; }
+      if (existReadErr) {
+        // v2.10.0: 读失败与「不存在」此前都报「隔离现场不存在（可能已被清理）」——
+        //   用户会以为现场已被清理，实际是读不出来（且本次确实没做任何删除）。
+        noteStoreReadFail('quarantine', key, existReadErr);
+        return { ok: false, reason: '读取隔离现场失败（无法确认其是否存在，本次未做任何删除）：' + ((existReadErr && existReadErr.message) || existReadErr) };
+      }
       if (existed === null) return { ok: false, reason: '隔离现场不存在（可能已被清理或键名有误）' };
       // v2.9.0: 受控删除 + 复核（此前只包住「抛错」，静默无效会被当成成功丢弃）。
       //   隔离现场的丢弃是**不可逆**操作（原键已不在），报「已丢弃」而实际没删是双重误导。

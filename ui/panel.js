@@ -855,6 +855,42 @@
             html += '<div class="wa-dim">删除侧：' + rmSt.removes + ' 次受控删除全部复核通过（键确已移除）' + (rmSt.lastRemove ? '（最近 ' + esc(rmSt.lastRemove.key) + '）' : '') + '。</div>';
           }
         }
+        // v2.10.0: 读侧——写入侧自 v2.6.0 有三行（落盘/写回不一致/子键漂移），删除侧自 v2.9.0
+        //   有两行，**读侧一行都没有**。而读侧失真是唯一会被用户当成「设置被程序改回去了」
+        //   的故障：他看到的「配置」其实是兜底的默认值，与「从未配置」在界面上完全一样。
+        const rdSt = (WA.settingsBus && typeof WA.settingsBus.readStat === 'function') ? WA.settingsBus.readStat() : null;
+        if (rdSt) {
+          if (rdSt.defaultAfterFailure > 0) {
+            const lf = rdSt.lastFail || {};
+            html += '<div class="wa-log wa-log-err">读取侧：' + rdSt.defaultAfterFailure + ' 次读取**没读到用户配置、回落了默认值**'
+              + (lf.tag ? '（最近来源：' + esc(lf.tag) + '）' : '')
+              + '——界面上显示的设置并不是你配的那个，而它看起来与「从未配置」完全一样。若是隐私模式/存储被拒，请先导出诊断包留证。</div>';
+          } else if (rdSt.readFailed > 0) {
+            const byRd = rdSt.bySource || {};
+            const rdSrcTxt = Object.keys(byRd).filter(function (k) { return byRd[k] > 0; })
+              .map(function (k) { return ({ read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝' }[k] || k) + '×' + byRd[k]; }).join('、');
+            html += '<div class="wa-log wa-log-warn">读取侧：' + rdSt.readFailed + ' 次读取未命中用户配置'
+              + (rdSrcTxt ? '（来源：' + esc(rdSrcTxt) + '）' : '')
+              + (rdSt.lastError ? '，最近：' + esc(String(rdSt.lastError).slice(0, 80)) : '') + '。</div>';
+          } else if (rdSt.reads > 0) {
+            html += '<div class="wa-dim">读取侧：' + rdSt.reads + ' 次设置读取全部命中磁盘'
+              + (rdSt.last && rdSt.last.key ? '（最近 ' + esc(rdSt.last.key) + '，来源 ' + esc(rdSt.last.source || 'disk') + '）' : '') + '。</div>';
+          }
+        }
+        // v2.10.0: store 域读侧——两个域各有独立裸读点，只展示一处会让另一半的
+        //   「容量表偏小 / 误判最冷」继续对用户不可见（与删除侧两域都报同一理由）。
+        const rdStore2 = (WA.store && typeof WA.store.readStat === 'function') ? (function () { try { return WA.store.readStat(); } catch (e) { return null; } })() : null;
+        if (rdStore2 && !rdStore2.ok) {
+          // v2.10.0（逆向审计自纠第四轮）: 恢复点保护失效单独一行（error 级）——「读不到就不写」
+          //   虽然保住了历史恢复点，但用户此刻没有恢复点保护，必须比容量数字失真更醒目。
+          if (rdStore2.bySource && rdStore2.bySource.recovery > 0) {
+            html += '<div class="wa-log wa-log-err">读取侧（存储域）：恢复点清单读取失败 ' + rdStore2.bySource.recovery
+              + ' 次——恢复点创建已被跳过（读不到就不写，避免覆盖丢弃历史恢复点），当前**没有恢复点保护**</div>';
+          }
+          html += '<div class="wa-log wa-log-warn">读取侧（存储域）：' + rdStore2.readFailed + ' 次读取失败（按字节 '
+            + ((rdStore2.bySource || {}).bytes || 0) + '、活跃时间 ' + ((rdStore2.bySource || {}).activity || 0)
+            + '、键枚举 ' + ((rdStore2.bySource || {}).enumerate || 0) + '）——占用统计偏小；活跃时间读失败会被判为「最冷」而进入可回收候选。</div>';
+        }
         // v2.9.0: store 侧受控删除台账——此前 store.removeStat() 零产品消费（纯声明面）。
         //   两个域各有独立的裸删点（settings-bus 管设置键、store 管冲突现场/隔离/诊断键），
         //   只展示一处会让另一半的「清理了却没清掉」继续对用户不可见。

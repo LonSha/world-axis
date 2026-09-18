@@ -89,7 +89,27 @@
     removeAbsent: 0,
     // v2.9.0: 删除后复核——removeItem 不抛错不等于键真的没了（与写入侧 verifyFailed 同规格）。
     //   复核判据：删完立刻读回，仍能读到即视为**这次删除没有发生**。
-    removeVerified: 0, removeStaged: 0, lastRemoveStaged: null };
+    removeVerified: 0, removeStaged: 0, lastRemoveStaged: null,
+    // v2.10.0: 读侧计量（**第三面**）——写侧自 v2.6.0 有 writes/writeFailed/writeFailedBy、
+    //   删侧自 v2.9.0 有 removes/removeFailed/removeFailedBy，**读侧一个归因字段都没有**：
+    //   全库只有一个 `stats.failures`（v0.1.x 遗留的**单桶**，存储层读抛错与 JSON 解析失败
+    //   混在一起、来源不明），且实测**产品代码零消费**（没有任何模块读它、诊断不报、面板不显示）。
+    //   后果就是本版命题的现场：`read()` 在磁盘有值却读失败时回落 `r.def`，调用方**无法区分**
+    //   「用户从没配过，这是默认值」与「用户的配置读坏了，这是默认值」——**默认值伪装成用户配置**，
+    //   而这恰恰是用户唯一会当场察觉（「我的设置怎么自己变回去了」）却最难取证的一类故障。
+    //   命名口径：readFailed = 读失败次数（存储层抛错 + 解析失败 + 深拷贝往返失败）；
+    //   readFailedBy 按来源分桶；readSources 记录**读到的到底是什么**
+    //   （disk / legacy / default / defaultAfterFailure）——其中 defaultAfterFailure
+    //   就是「数据丢失现场」的计数，它必须能被单独看见，绝不能混进正常回落。
+    readFailed: 0, lastReadError: null, lastRead: null, lastReadFail: null,
+    readFailedBy: { read: 0, parse: 0, migrate: 0, copy: 0 },
+    readSources: { disk: 0, legacy: 0, default: 0, defaultAfterFailure: 0 },
+    // v2.10.0: 深拷贝往返降级计量——`read()` 的返回值副本靠 JSON 往返生成，往返失败时
+    //   既有实现**静默**返回内部对象的直接引用（`catch (e) { return stripStamp(val); }`）。
+    //   后果不是「读不到」而是「读到的东西与总线内部对象共享引用」：库内最常见的调用惯例
+    //   `setSettings(o){ save(Object.assign(read(), o)) }` 一旦改动返回值，就会**改到内部对象**，
+    //   而磁盘上一个字节都没变——下次 read 会「莫名其妙」看到上一次的改动。属静默失效。
+    readonlyCopyFallback: 0, lastCopyFallback: null };
   // v2.4.0: 补齐告警去重——补齐发生在**返回值副本**上，磁盘未回写前每次读取都会再补一次。
   //   若每次补齐都打日志，热路径（loadSettings 每轮每事件调用）会刷屏：实测 300 轮掷骰产生
   //   900+ 条同内容 warn。故按「键」去重，本会话每个键只提示一次，计数不受影响。
@@ -400,6 +420,28 @@
     } catch (eC) { /* 分类计量失败不影响主计量 */ }
     const msg = String((err && (err.message || err)) || err);
     stats.lastRemoveError = (prefix || ((tag || 'setItem') + ': ')) + msg.slice(0, 160);
+  }
+  /**
+   * v2.10.0: 读失败归类记账——`noteFail`（写侧）/ `noteRemoveFail`（删侧）的**第三面**，单一实现。
+   *   为什么必须单一实现：写侧自 v2.6.0 收口后踩过一次「同一类故障的记账在多个点各写一遍 ⇒
+   *   没人记得去补的地方就断档」；删除侧 v2.9.0 立了 noteRemoveFail 就是为了不重演。读侧此前
+   *   连一个归因点都没有（只有单桶 `stats.failures`），若不收口，本版必然造出第四种口径。
+   *   语义：**永不抛**——读失败记账发生在 read 热路径上，让记账本身把读打断是把小故障放大。
+   * @param {string} tag 分类标签（read / parse / migrate / copy）
+   * @param {*} err 原始错误
+   * @param {string} [prefix] 覆盖默认前缀
+   */
+  function noteReadFail(tag, err, prefix) {
+    stats.readFailed++;
+    try {
+      const t = tag || 'read';
+      const by = stats.readFailedBy;
+      // 未知来源动态建桶（与 noteRemoveFail 同口径）：新增读点时不丢归因，也不必改声明表。
+      if (by) by[t] = (by[t] || 0) + 1;
+    } catch (eC) { /* 分类计量失败不影响主计量 */ }
+    const msg = String((err && (err.message || err)) || err);
+    stats.lastReadError = (prefix || ((tag || 'read') + ': ')) + msg.slice(0, 160);
+    stats.lastReadFail = { tag: tag || 'read', at: now(), message: msg.slice(0, 160) };
   }
   /**
    * v2.9.0: **唯一删除出口**——设置家族键的每一次真实删除都必须经过这里。
@@ -827,6 +869,12 @@
       const r = Object.assign({ legacy: [], legacyRemove: true, orphan: false, def: null }, reg || {});
       const ls = (WA.mainWin || window).localStorage;
       let raw = null, val = null, legacyHit = false;
+      // v2.10.0（读后复核）: 本次读取的**来源**追踪。三面对偶的第三层——
+      //   写侧有 `verifyFailed`（「写进去 ≠ 存住了」）、删侧有 `removeVerified`（「删成功 ≠ 真没了」），
+      //   读侧的对应判据是「**拿到的是真配置还是兜底**」。没有它，回落默认值与用户配置不可区分。
+      //   `__src` ∈ disk / legacy / default；`__why` 非空即表示这次读取**失败**（来源降级为
+      //   default-after-failure）；`__note` 记非失败备注（如磁盘上显式存了 null）。
+      let __src = 'default', __why = null, __note = null;
       try {
         raw = ls.getItem(r.key);
         if (raw !== null && raw !== undefined) {
@@ -836,14 +884,29 @@
           //   旧版本把裸字符串写进本键时，JSON.parse 会抛错并把**用户真实配置**判为损坏、
           //   隔离、回落默认。reg.rawRevive 声明「本键存在这种历史格式」，只对声明过的键生效。
           const __rev = rawReviveDef(r, false);
+          // v2.10.0（逆向审计自纠）: rawReviveDef 在 getItem 抛错时返回 {reason:'no-storage'}
+          //   且**不归因**——若此处不看这个原因，本次读取会以「磁盘上没有值」的身份静默回落
+          //   默认值，readSources.defaultAfterFailure 漏记一次真实读失败。这正是本版要治的
+          //   「读失败伪装成从未配置」，却由本版自己的新代码造成，故当版修掉。
+          if (__rev.reason === 'no-storage') {
+            __src = 'default-after-failure'; __why = 'read-throw';
+            noteReadFail('read', 'rawRevive-getItem-threw', 'rawRevive: ');
+          }
           if (__rev.revived) {
+            __src = 'disk';   // v2.10.0: 复活成功读到的是**用户真实配置**，来源就是磁盘
+
             // 复活成功 → 直接用复活后的值。**不能**留 val=null：那会回落 r.def，
             //   把刚从旧格式救回来的用户配置又丢掉（本版首轮实现即犯此错，由逆向审计抓出）。
             val = __rev.value;
             raw = JSON.stringify(val);
           } else {
-            try { val = JSON.parse(raw); }
+            try { val = JSON.parse(raw); __src = 'disk'; }
             catch (e) {
+              // v2.10.0: 读侧归因——磁盘**有值**却解析不出来，最终会回落 r.def，这正是
+              //   「默认值伪装成用户配置」的现场，必须进 readFailedBy.parse 与
+              //   readSources.defaultAfterFailure（而不是像此前那样只加一个来源不明的总数）。
+              __src = 'default-after-failure'; __why = 'corrupt';
+              noteReadFail('parse', e, 'parse: ');
               // 当前键损坏：留痕 + 隔离（sweep 可归置）
               stats.quarantines++;
               const qk = r.key + '_corrupt_' + now();
@@ -874,6 +937,7 @@
             legacyHit = true;
             try {
               val = JSON.parse(lraw);
+              __src = 'legacy';   // v2.10.0: 从旧键迁移读到，来源是 legacy（不是 disk）
               stats.upgrades++;
               if (WA.log) WA.log('warn', 'settingsBus: ' + lk + ' 迁移 → ' + r.key, null);
               // v2.6.0（收口）: 此前 `catch(e4){}` 完全静默——旧键已解析出值、本次仍可用，
@@ -884,6 +948,9 @@
               //   但「每次启动都重迁一遍」这件事必须可观测，否则台账显示迁移完成而磁盘上旧键还在。
               if (r.legacyRemove !== false) rmRemove(lk, 'legacy');
             } catch (e) {
+              // v2.10.0: 与当前键解析失败同规格归因（此前两处各自静默，归因口径不一）
+              __src = 'default-after-failure'; __why = 'legacy-corrupt';
+              noteReadFail('parse', e, 'legacy-parse: ');
               // legacy 键也损坏：隔离留痕（防 v2 发布后误读老损坏格式）
               stats.quarantines++;
               const qk = lk + '_corrupt_' + now();
@@ -897,19 +964,61 @@
             break;
           }
         }
-      } catch (e) { stats.failures++; }
-      if (val === null || val === undefined) val = r.def;
+      } catch (e) {
+        // v2.10.0: 存储层读抛错（隐私模式 / 策略拒绝 / 配额临界下的 getItem）此前只加一个
+        //   `stats.failures`——**单桶、来源不明、产品代码零消费**。改为走读侧归因单一实现。
+        __src = 'default-after-failure'; __why = 'read-throw';
+        noteReadFail('read', e, 'read: ');
+        stats.failures++;   // 历史字段保留（v0.1.x 起存在，下游旧断言仍读它）
+      }
+      if (val === null || val === undefined) {
+        // v2.10.0: 磁盘上**显式存了 null**（`JSON.parse('null')` → null）时，val 也是 null，
+        //   但与「键不存在」语义不同：前者是用户数据（表示「空」），后者是「从未配置」。
+        //   此处把来源降级为 default 并记非失败备注，避免把「读到了 null」报成「读失败」——
+        //   归因**不实**比缺失归因更坏（用户会去查一个不存在的损坏）。
+        if (__src === 'disk' && !__why) { __src = 'default'; __note = 'disk-null'; }
+        val = r.def;
+      }
       // v2.5.0: 顺序至关重要——迁移 → 结构指纹 → 子键补齐。
       //   · 迁移在最前：它可能改变值的**形状**（标量 → 对象），必须在形状被补齐逻辑依赖之前完成。
       //   · 指纹在补齐之前：指纹记录的是「磁盘上**真实存在**的结构」，若先补齐再盖指纹，
       //     指纹就会把「运行时补出来的默认值」也当成用户存档的一部分（指纹随即失真）。
       //   · 补齐在最后、且只作用于返回值副本（v2.4.0 既定口性：磁盘不因读取而回写补齐值）。
+      // v2.10.0（逆向审计自纠）: 迁移失败的归因此前只落在 migrationFailed /
+      //   migrationStat（v2.5.0 建的专用出口），而本版在 readFailedBy 里声明了 `migrate` 桶后
+      //   **没有任何调用点消费它**——这就是「声明了却零消费」的空转，与 v2.9.0 首版
+      //   removeFailedBy 声明 {guarded,missing,setItem} 而真实调用点全落兜底桶同型。
+      //   修法：迁移失败同时进读侧归因（它确实是一次「读了但没读到应有的结构」），
+      //   但**不改变 __src**——迁移失败时旧值仍可用，不是「拿到兜底值」，两者归因层级不同。
+      const __migFailBefore = stats.migrationFailed;
       val = migrateIfNeeded(r, val);
+      if (stats.migrationFailed > __migFailBefore) {
+        let __migWhy = null;
+        try { __migWhy = __migFailed[r.key] || null; } catch (eMG) { __migWhy = null; }
+        noteReadFail('migrate', __migWhy || 'migration-failed', 'migrate: ');
+      }
       schemaStamp(r, val);
       // v2.4.0: 整键之外还要补**子键**——旧存档缺新字段时子键为 undefined，
       //   会在消费端静默改变语义（见 applyDefaults 注释）。补齐后再返回独立拷贝。
       val = applyDefaults(r, val);
-      try { return JSON.parse(JSON.stringify(stripStamp(val))); } catch (e) { return stripStamp(val); }
+      // v2.10.0（读后复核落账）: 把本次读取的**来源**记进 lastRead / readSources，使
+      //   「默认值伪装成用户配置」第一次可判定。这是与写侧 verifyFailed、删侧 removeVerified
+      //   严格对偶的第三层，且是**唯一**能回答「我拿到的是用户配置还是兜底」的字段。
+      const __finalSrc = __why ? 'default-after-failure' : __src;
+      const __bucket = (__finalSrc === 'default-after-failure') ? 'defaultAfterFailure' : __finalSrc;
+      try { stats.readSources[__bucket] = (stats.readSources[__bucket] || 0) + 1; } catch (eB) { /* 计量失败不影响读取 */ }
+      stats.lastRead = { key: r.key, source: __finalSrc, reason: __why || __note || null, at: now() };
+      try { return JSON.parse(JSON.stringify(stripStamp(val))); }
+      catch (e) {
+        // v2.10.0: 深拷贝往返失败**不得静默降级**为「返回内部对象引用」。
+        //   静默返回引用会让消费端改返回值即改总线内部状态（而磁盘无变化），是典型静默失效；
+        //   这里如实记账 + 打日志，返回值语义保持不变（不破坏既有调用方），但故障**可见**。
+        stats.readonlyCopyFallback++;
+        stats.lastCopyFallback = { key: r.key, at: now(), error: String((e && e.message) || e).slice(0, 120) };
+        noteReadFail('copy', e, 'copy: ');
+        if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 返回值深拷贝往返失败——本次返回内部引用（消费端改动会影响后续读取，但磁盘不变）', e);
+        return stripStamp(val);
+      }
     },
     /** v2.4.0: 子键补齐导出（模块侧自定义加载路径可复用同一实现，避免二次分叉） */
     applyDefaults(reg, val) { return applyDefaults(reg, val); },
@@ -974,6 +1083,54 @@
         subkeyDrift: { count: stats.extraSubkeys, last: stats.lastExtra } };
     },
     /**
+     * v2.10.0: 读侧只读观测视图——与 writeStat / removeStat 构成三面对称。
+     *   `ok` 的语义：**本会话从未发生过读失败**。注意它不掩盖「读到了默认值」——那由
+     *   sources.default 如实呈现（用户没配过不是故障），而 sources.defaultAfterFailure
+     *   才是「有数据但没读到」的故障计数。
+     */
+    readStat() {
+      const by = {};
+      try { const src = stats.readFailedBy || {}; Object.keys(src).forEach(function (k) { by[k] = src[k]; }); } catch (e) {}
+      const sources = {};
+      try { const src2 = stats.readSources || {}; Object.keys(src2).forEach(function (k) { sources[k] = src2[k]; }); } catch (e) {}
+      // v2.10.0（逆向审计自纠）: `ok` 的判据不能是「readFailed === 0」——readFailed 里混着
+      //   两类**性质完全不同**的故障：
+      //     · 硬失败（read / parse）＝**没读到用户配置**，拿到的是兜底值（用户会以为设置被改回去了）；
+      //     · 降级（migrate / copy）＝值本身是对的，只是结构迁移没落盘 / 返回值与内部对象共享引用。
+      //   把两者合成一个 ok，会让「迁移回写失败」被报成「读不到配置」——用户会去查存储，
+      //   而实际要查的是迁移钩子。归因**不实**比缺失归因更坏（本版 P7/P9 两次踩到同型）。
+      const hardFail = (by.read || 0) + (by.parse || 0);
+      const degraded = (by.migrate || 0) + (by.copy || 0);
+      return { reads: stats.reads, readFailed: stats.readFailed, ok: hardFail === 0,
+        hardFailed: hardFail, degraded: degraded,
+        bySource: by, sources: sources,
+        // v2.10.0: 「有数据但没读到」单列——它与 reads 的比值就是数据丢失率，必须一眼可见。
+        defaultAfterFailure: sources.defaultAfterFailure || 0,
+        copyFallback: stats.readonlyCopyFallback || 0, lastCopyFallback: stats.lastCopyFallback,
+        // D-b（逆向审计自纠）: v0.1.x 遗留的单桶 `stats.failures` 在本版之前**产品零消费**
+        //   （它是「读侧无归因」的直接证据）。本版既已把它拆成可归因的 readFailedBy，
+        //   就不该把这个旧字段丢在原地继续零消费——它仍在自增（向后兼容旧断言），
+        //   在此给它一个真实出口，使「旧字段还在涨但没人看」这件事不再成立。
+        legacyFailures: stats.failures,
+        lastError: stats.lastReadError, last: stats.lastRead, lastFail: stats.lastReadFail };
+    },
+    /**
+     * v2.10.0: 带来源的结构化读取——回答「我拿到的是用户配置，还是兜底」。
+     *
+     * 与 read() 的关系：read() 的契约不变（返回值即配置值），本函数只是把它**顺带算出来的
+     *   来源**结构化交还。`ok === false` 意味着**调用方拿到的是兜底值**（磁盘上曾有数据但
+     *   没读成功），此时用户看到的「配置」并不是他配的东西——这是本仓库里唯一能判定的、
+     *   且后果最严重的一类静默失效（用户会以为自己的设置被程序改回去了）。
+     * @returns {{ok:boolean, value:*, source:string, reason:string|null, key:string|null}}
+     */
+    readEx(reg) {
+      const value = this.read(reg);
+      const info = stats.lastRead || {};
+      const src = info.source || 'default';
+      return { ok: src !== 'default-after-failure', value: value,
+        source: src, reason: info.reason || null, key: info.key || null };
+    },
+    /**
      * v2.6.0: 严格写入——失败即返回原因，供「必须知道自己有没有存进去」的调用点使用。
      *
      * 与 save() 的关系：save() 的契约是「尽力写、返回布尔」，适合热路径与尽力而为的保存；
@@ -1002,7 +1159,11 @@
      *   仅限格式迁移使用；常规读取一律走 read()。
      */
     readRaw(key) {
-      try { return (WA.mainWin || window).localStorage.getItem(key); } catch (e) { return null; }
+      // v2.10.0: 原始读取的失败同样要归因——它此前 `catch (e) { return null }`，而调用方
+      //   （格式迁移）无法区分「键不存在（null）」与「读取被拒（也 null）」，于是「迁移已完成」
+      //   的结论可能建立在一次失败读取之上。归因后两者可分辨。
+      try { return (WA.mainWin || window).localStorage.getItem(key); }
+      catch (e) { noteReadFail('read', e, 'raw: '); return null; }
     },
     save(reg, value) {
       const r = Object.assign({ key: null, orphan: false }, reg || {});

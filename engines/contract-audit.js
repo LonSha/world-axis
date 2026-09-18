@@ -258,6 +258,10 @@
       name: 'regional.incidentTypes',
       sources: {
         contract: ['bandit', 'plague', 'market', 'faction_clash', 'official', 'sect', 'infrastructure', 'ominous'],
+        // v2.10.0: 读侧完整性契约的留痕点——本文件是跨模块契约审计的唯一消费端。
+        //   写侧（writes）与删侧（removes）收口后**读侧仍是空白面**：全库只有一个来源不明的
+        //   单桶 `stats.failures` 且产品零消费，于是「用户配置读坏了、回落默认值」与
+        //   「用户从未配置」在诊断与界面上完全一样。本版把读侧补齐为三面的第三面。
         // v2.9.0: 删除侧完整性契约的留痕点——本文件是跨模块契约审计的唯一消费端，
         //   删除侧空白面（全库裸 removeItem 零计量/零复核/零归因）正是靠它这类跨模块
         //   一致性审计才能被发现：写入侧有 lsWrite 单出口与 verifyFailed，删除侧什么都没有。

@@ -205,6 +205,11 @@
             //   此前 store.removeStat() 是纯声明面：导出了却零产品消费（本版逆向审计抓出），
             //   接入此处后「清理类操作到底删掉没有」第一次能被诊断包回答。
             remove: WA.store.removeStat ? WA.store.removeStat() : null,
+            // v2.10.0: 读侧台账（store 域）——与 integrity（写侧）/ remove（删侧）三面对称。
+            //   读失败在 store 域有两个破坏性后果：① 体积表偏小（容量结论不实）；
+            //   ② 活跃时间回落 0 = 最冷 ⇒ 该聊天的诊断键会被判为可回收（**读失败诱发误删除**）。
+            //   故必须与「值就是空」严格可分辨，否则用户按诊断清空间会清错东西。
+            read: WA.store.readStat ? WA.store.readStat() : null,
             // v0.7.0: 楼层结算守卫观测（settles/skips 归因 / 最后结算楼层）
             settleGuard: WA.settleGuard ? (function () { try { return WA.settleGuard.stat(); } catch (e) { return null; } })() : null,
             // v0.5.0: 多实例并发观测（写入者标识 / 冲突检出 / 现场 / 外部写入）
@@ -278,9 +283,37 @@
           //   而**删除侧零计量**：删成功没计数、删失败没归因、删完没复核（全库 13 处裸 removeItem）。
           //   删除是破坏性操作，它不可观测比写入不可观测更危险——「已清理 N 项」可能是假的。
           const removes = WA.settingsBus.removeStat ? WA.settingsBus.removeStat() : null;
+          // v2.10.0: 读侧台账——写入侧自 v2.6.0（writes）/ v2.7.0（verifyFailed）有两条口径，
+          //   删除侧自 v2.9.0（removes/removeVerified）有一条，**读侧零归因**：全库只有一个
+          //   `stats.failures` 单桶，且实测产品侧零消费。于是「用户配置读坏了、回落成默认值」
+          //   与「用户从没配过」在诊断包里长得一模一样——而前者是唯一会被用户当成
+          //   「我的设置被程序改回去了」的故障，也是本仓库里后果最严重的静默失效。
+          const reads = WA.settingsBus.readStat ? WA.settingsBus.readStat() : null;
+          // v2.10.0（逆向审计自纠）: `readEx`（带来源的结构化读取）若只导出不给消费端，
+          //   就是本版命题所治的「声明面空转」——一个没人用的出口等于没有。此处做**真实抽查**：
+          //   对登记表里有磁盘值的若干键走 readEx，回答「诊断包里我看到的配置是不是用户配的」。
+          //   只抽查有磁盘值的键（无值时回落默认值是正常语义，不该报「没读到」），且限量 8 个
+          //   （热路径成本可控，且 read 本身幂等——迁移/盖章只做一次）。
+          const spot = (function () {
+            if (typeof WA.settingsBus.readEx !== 'function') return null;
+            const ls = (WA.mainWin || window).localStorage;
+            const rows = (WA.__settingsRegs || []).filter(function (r) {
+              if (!r || !r.key || r.orphan) return false;
+              try { return ls.getItem(r.key) !== null; } catch (e) { return false; }
+            }).slice(0, 8);
+            const misses = [];
+            rows.forEach(function (r) {
+              try {
+                const ex = WA.settingsBus.readEx(r);
+                if (!ex.ok) misses.push({ key: r.key, source: ex.source, reason: ex.reason });
+              } catch (e) { /* 抽查失败不影响其余诊断 */ }
+            });
+            return { checked: rows.length, misses: misses };
+          })();
           return { registry: st, orphans: orphans, stats: WA.settingsBus.stats,
             coherent: coherent, defaultDrift: drift, dormant: dormant, subkeys: subkeys,
-            lifecycle: lifecycle, migrations: mig, ghosts: ghosts, writes: writes, removes: removes };
+            lifecycle: lifecycle, migrations: mig, ghosts: ghosts, writes: writes, removes: removes,
+            reads: reads, readSpotCheck: spot };
         }, {}),
         // v2.4.0: 可见性配置健康度——「源在 SOURCES 里却没有默认值声明」是子键级死配置
         visibility: safe(function () {
@@ -819,6 +852,75 @@
           + (srcRTxt ? '，来源：' + srcRTxt : '')
           + (rmD.lastRemoveError ? '，最近原因 ' + String(rmD.lastRemoveError).slice(0, 80) : '')
           + '：删除失败时相关键仍在磁盘上占据空间，而清理策略已把它计入「已释放」' });
+    }
+    // v2.10.0: 读侧失败——「拿到的是默认值而不是用户配置」是唯一会被用户当成
+    //   「设置被程序改回去了」的故障，而此前它在诊断包里**完全不存在**（单桶 failures 零消费）。
+    //   分级裁决：`defaultAfterFailure > 0` ⇒ error（用户当前看到的配置不是他配的，属当下失真）；
+    //   仅有 copyFallback ⇒ warn（返回值与内部对象共享引用，改动可能「莫名生效」）。
+    const rdD = sbDiag.reads || null;
+    if (rdD && rdD.defaultAfterFailure > 0) {
+      const lf = rdD.lastFail || {};
+      issues.push({ level: 'error', key: 'settingsBus.readFailed',
+        detail: '设置读取失败 ' + rdD.defaultAfterFailure + ' 次**回落了默认值**（读取总次数 ' + rdD.reads
+          + (lf.tag ? '，最近来源 ' + lf.tag : '') + '）：磁盘上曾有用户配置但没读成功，用户看到的「设置」并不是他配的东西'
+          + '——与「从未配置」在界面上完全一样。若是配额/隐私模式导致，先导出诊断包留证再排查' });
+    } else if (rdD && rdD.readFailed > 0) {
+      const byRd = rdD.bySource || {};
+      const srcTxt = Object.keys(byRd).filter(function (k) { return byRd[k] > 0; })
+        .map(function (k) { return ({ read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝' }[k] || k) + '×' + byRd[k]; }).join('、');
+      issues.push({ level: 'warn', key: 'settingsBus.readFailed',
+        detail: '设置读取失败 ' + rdD.readFailed + ' 次' + (srcTxt ? '（来源：' + srcTxt + '）' : '')
+          + (rdD.lastError ? '，最近原因 ' + String(rdD.lastError).slice(0, 80) : '')
+          + '：这些读取未命中用户配置（多数已回落默认值或旧值）' });
+    }
+    // v2.10.0（逆向审计自纠）: 抽查结论——这是 `readEx` 的真实消费端，也是唯一能回答
+    //   「诊断包里那份配置可信吗」的判据（readStat 只说发生过多少次，抽查说的是**现在**）。
+    const rdSpot = sbDiag.readSpotCheck || null;
+    if (rdSpot && rdSpot.misses && rdSpot.misses.length) {
+      issues.push({ level: 'error', key: 'settingsBus.readSpotCheck',
+        detail: '现场抽查 ' + rdSpot.checked + ' 个有值的设置键，其中 ' + rdSpot.misses.length
+          + ' 个**没读到用户配置**（' + rdSpot.misses.slice(0, 3).map(function (m) { return m.key + ':' + (m.reason || m.source); }).join('、')
+          + '）：这些键在磁盘上有数据却读不回来，诊断与界面展示的是兜底默认值' });
+    }
+    if (rdD && rdD.copyFallback > 0) {
+      issues.push({ level: 'warn', key: 'settingsBus.readonlyCopy',
+        detail: '设置读取返回值深拷贝降级 ' + rdD.copyFallback + ' 次（最近 '
+          + String(((rdD.lastCopyFallback || {}).key) || '?').slice(0, 60) + '）：返回的是总线内部对象的引用，'
+          + '消费端改动它会影响后续读取，而磁盘上一个字节都没变（改动「莫名生效」的来源之一）' });
+    }
+    // v2.10.0: store 域读侧失败——与 settingsBus 侧同判据、同分级。两处都报的理由与删除侧相同：
+    //   两个域有各自独立的裸读点，只报一处会让另一半的「容量表偏小 / 误判最冷」继续不可见。
+    const rdStore = ((diag.worldState || {}).storage || {}).read || null;
+    if (rdStore && !rdStore.ok) {
+      const byS = rdStore.bySource || {};
+      // v2.10.0（逆向审计自纠第四轮）: 来源明细**全量列出**。此前只列 bytes/activity/enumerate
+      //   三个已知来源，而 noteStoreReadFail 支持动态建桶 ⇒ 本版新增的读点（diskRev / verify /
+      //   recovery / conflict / quarantine / writerId）会「有归因但在诊断里看不见」。
+      //   每个来源的后果不同（有的只是容量数字失真，有的是静默覆盖/丢恢复点），必须逐项可读。
+      const SRC_LABEL = {
+        bytes: '容量计量', activity: '活跃时间', enumerate: '键枚举',
+        diskRev: '磁盘序号（读失败 ⇒ 并发覆盖检测失效）',
+        verify: '写后校验/删后复核的读回', recovery: '恢复点清单',
+        conflict: '冲突现场', quarantine: '隔离现场', writerId: '写入者标识'
+      };
+      const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
+        .map(function (k) { return (SRC_LABEL[k] || k) + '×' + byS[k]; }).join('、');
+      issues.push({ level: 'warn', key: 'store.readFailed',
+        detail: '存储读取失败 ' + rdStore.readFailed + ' 次（' + srcTxt + '）：读失败的键被按 0 字节计入，占用表**偏小**；'
+          + '活跃时间回落 0 会被判为「最冷」而进入可回收候选——据此清理存储可能误删仍在用的聊天' });
+    }
+    // v2.10.0（逆向审计自纠第四轮）: 「恢复点保护失效」单列 error。
+    //   恢复点清单读失败时 createRecoveryPoint **拒绝写入**（保命优先：宁可不建点，也不覆盖丢弃
+    //   用户全部历史恢复点）。但「保护住了」不等于「没事」——此刻用户实际处于**无恢复点保护**
+    //   状态，一旦继续推进就再也退不回来。这是当下缺陷（不是历史经历），故为 error。
+    // 判据用**最近一次读失败事件**（与健康分的 lastReason/lastOk 同规格）：累计数只增不减，
+    //   拿它做当前态判据会让「历史失败」永久挂红（v0.4.0 裁决）；累计值只进 detail 作可追溯。
+    if (rdStore && rdStore.lastFail && rdStore.lastFail.source === 'recovery') {
+      issues.push({ level: 'error', key: 'store.readRecoveryBlocked',
+        detail: '**最近一次**存储读取失败发生在恢复点清单上（本会话累计 '
+          + ((rdStore.bySource || {}).recovery || 1) + ' 次）：为避免覆盖丢弃全部历史恢复点，'
+          + '本会话的恢复点创建已被**跳过**（读不到就不写）——用户当前处于无恢复点保护状态，'
+          + '继续推进将无法回退。请先导出诊断包留证再排查存储可读性' });
     }
     // v2.9.0: store 侧受控删除结论——与 settingsBus 侧同判据、同分级。
     //   为什么两处都要报：两个域各自有独立的裸删点（settings-bus 管设置键、store 管
