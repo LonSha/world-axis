@@ -128,6 +128,12 @@
     const repColor = l => ({'万众敬仰':'#4caf50','受人敬重':'#8bc34a','小有名气':'#ffc107','默默无闻':'#9e9e9e','声名狼藉':'#ff5722','天怒人怨':'#f44336'}[l]||'#9e9e9e');
     const ecoColor = c => ({'繁荣':'#4caf50','平稳':'#2196f3','萧条':'#ff9800','危机':'#f44336'}[c]||'#2196f3');
 
+    // v2.11.0: 编辑态接线——`editorFaction.getEditingId` / `editorEvents.getEditingId` 此前
+    //   全库零调用（真功能断链）：编辑器把「我在改哪一项」存在模块级变量里，但那个变量
+    //   对外只有一个读写口而**没有任何消费端**，于是「改到一半切走页面再回来」时，
+    //   用户无法知道自己刚才在编辑哪一项（列表里每一项长得一样）。
+    const __efCur = (WA.editorFaction && typeof WA.editorFaction.getEditingId === 'function') ? WA.editorFaction.getEditingId() : null;
+    const __eeCur = (WA.editorEvents && typeof WA.editorEvents.getEditingId === 'function') ? WA.editorEvents.getEditingId() : null;
     const factions = ev.factions || [];
     const rep = ev.reputation || {};
     const eco = ev.economy || {};
@@ -181,7 +187,26 @@
         return `<div class="wa-item wa-dim">${lane('distant', '远方')}<br>${lane('near', '近端')}${tail}</div>`;
       })()}
 
-<div class="wa-sec">演化事件（${(ev.events||[]).length}）</div>
+<div class="wa-sec">世界推演</div>
+      ${(() => {
+        // v2.11.0: 运行态/排队态/中止能力接线——`backstage.isRunning` / `pending` / `abort`
+        //   三个导出此前**全库零调用**（真功能断链）：推演是多轮异步任务，运行期间用户既看不到
+        //   「在跑」，也**无法中止**（只能刷新页面），而 AbortController 早就实现在引擎里
+        //   （`abort()` 会 signal 到 `_runInference`，`_start` 里有 `ac.signal.aborted` 判据）。
+        //   代价说明：`_start` 的 finally 里会把 `currentTask` 清空并在有 pending 时自动接续——
+        //   中止后排队项仍会执行，这是既有语义（catch-up），面板如实显示排队原因而不隐藏它。
+        if (!WA.backstage || typeof WA.backstage.isRunning !== 'function') return '<div class="wa-dim">推演引擎不可用</div>';
+        const __bsRun = WA.backstage.isRunning();
+        const __bsPend = (typeof WA.backstage.pending === 'function') ? WA.backstage.pending() : null;
+        return '<div class="wa-item">'
+          + (__bsRun ? '<span class="wa-badge wa-on">运行中</span> 世界推演正在结算（镜头之外的世界仍在继续）'
+                     : '<span class="wa-badge">空闲</span> 世界推演未运行')
+          + (__bsPend ? '<div class="wa-dim">已排队 1 次——当前任务结束后接续（原因：' + esc(__bsPend.reason || 'catch-up') + '）</div>' : '')
+          + (__bsRun ? '<button class="wa-btn wa-mini" id="wa-bs-abort">中止推演</button>' : '')
+          + '</div>';
+      })()}
+
+      <div class="wa-sec">演化事件（${(ev.events||[]).length}）</div>
       ${(() => {
         // v2.2.0: 入账留痕——此前推演宣告的事件（events_create）被整条丢弃而面板毫无提示
         if (!WA.backstage || typeof WA.backstage.applyStat !== 'function') return '';
@@ -196,14 +221,14 @@
         <div class="wa-row"><input id="wa-ef-name" class="wa-input" placeholder="名称"/><input id="wa-ef-scope" class="wa-input wa-w60" placeholder="范围"/></div>
         <div class="wa-row"><input id="wa-ef-goal" class="wa-input" placeholder="当前目标"/><input id="wa-ef-core" class="wa-input wa-w60" placeholder="核心人物"/></div>
         <div class="wa-row"><input id="wa-ef-pillars" class="wa-input" placeholder="权力支柱（逗号分隔，≤4字）"/><button class="wa-btn" id="wa-ef-add">新增势力</button></div>
-        <div class="wa-list">${(WA.editorFaction.list(s) || []).map((f, i) => `<div class="wa-item"><b>${esc(f.name)}</b> <span class="wa-badge">${esc(f.status)}</span> <span class="wa-dim">${esc(f.relation)} · ${esc(f.scope||'—')}</span>
+        <div class="wa-list">${(WA.editorFaction.list(s) || []).map((f, i) => `<div class="wa-item${__efCur === i ? ' wa-editing' : ''}"><b>${esc(f.name)}</b> <span class="wa-badge">${esc(f.status)}</span> <span class="wa-dim">${esc(f.relation)} · ${esc(f.scope||'—')}</span>${__efCur === i ? ' <span class="wa-badge wa-on">编辑中</span>' : ''}
           <div class="wa-dim">支柱：${esc((f.powerPillars||[]).join('、')||'—')}</div>
           <button class="wa-btn wa-mini" data-ef-edit="${i}">改状态</button><button class="wa-btn wa-mini" data-ef-copy="${i}">复制</button><button class="wa-btn wa-mini" data-ef-del="${i}">删除</button></div>`).join('') || '<div class="wa-empty">暂无势力</div>'}</div>
         <div class="wa-dim">声誉总压：${WA.editorFaction.reputationPressure(s).pressure} / ±${WA.editorFaction.reputationPressure(s).cap}</div>` : '<div class="wa-empty">势力编辑器未加载</div>'}
       <div class="wa-sec">事件编辑器</div>
       ${WA.editorEvents ? `
         <div class="wa-row"><input id="wa-ee-name" class="wa-input" placeholder="事件名"/><select id="wa-ee-type" class="wa-input wa-w60"><option value="conflict">冲突型</option><option value="progress">推进型</option></select><button class="wa-btn" id="wa-ee-add">新增事件</button></div>
-        <div class="wa-list">${(WA.editorEvents.list(s) || []).map((e, i) => `<div class="wa-item"><b>${esc(e.name)}</b> <span class="wa-badge">${e.type === 'conflict' ? '冲突' : '进度'} Lv.${e.level}</span> <span class="wa-dim">${esc(e.stage)} ${e.stageRound||1}/9</span>
+        <div class="wa-list">${(WA.editorEvents.list(s) || []).map((e, i) => `<div class="wa-item${__eeCur === i ? ' wa-editing' : ''}"><b>${esc(e.name)}</b> <span class="wa-badge">${e.type === 'conflict' ? '冲突' : '进度'} Lv.${e.level}</span> <span class="wa-dim">${esc(e.stage)} ${e.stageRound||1}/9</span>${__eeCur === i ? ' <span class="wa-badge wa-on">编辑中</span>' : ''}
           <button class="wa-btn wa-mini" data-ee-prev="${i}">阶段</button><button class="wa-btn wa-mini" data-ee-next="${i}">阶段▶</button><button class="wa-btn wa-mini" data-ee-del="${i}">删除</button></div>`).join('') || '<div class="wa-empty">暂无事件</div>'}</div>` : '<div class="wa-empty">事件编辑器未加载</div>'}
       <div class="wa-sec">状态一致性体检</div>
       <button class="wa-btn" id="wa-inspect-run">立即体检（纯只读）</button>
@@ -380,6 +405,8 @@
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
     on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); btn.textContent = '生成中…'; await WA.directEvent.create({ prompt: p, turns: t }); renderBody(); });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });
+    // v2.11.0: 推演中止——引擎侧 `abort()` 已实现却无人调用（用户只能刷页面打断）
+    on('#wa-bs-abort', () => { WA.backstage.abort(); WA.log('warn', '世界推演已请求中止'); renderBody(); });
     // 势力/事件编辑器绑定（v0.9.0）
     if (currentPage === 'events') {
       const efAdd = $('#wa-ef-add');
@@ -393,9 +420,11 @@
         if (!r.ok) WA.log('warn', '势力新增失败：' + r.reason);
         renderBody();
       };
-      panelEl.querySelectorAll('[data-ef-del]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorFaction.remove(d, +b.dataset.efDel)); renderBody(); });
+      panelEl.querySelectorAll('[data-ef-del]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorFaction.remove(d, +b.dataset.efDel)); if (typeof WA.editorFaction.setEditingId === 'function') WA.editorFaction.setEditingId(null); renderBody(); });
       panelEl.querySelectorAll('[data-ef-copy]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorFaction.copy(d, +b.dataset.efCopy)); renderBody(); });
       panelEl.querySelectorAll('[data-ef-edit]').forEach(b => b.onclick = () => {
+        // v2.11.0: 编辑态唯一的写入口（此前 setEditingId 零调用 ⇒ 阅读态永远无标记可显示）
+        if (typeof WA.editorFaction.setEditingId === 'function') WA.editorFaction.setEditingId(+b.dataset.efEdit);
         const arr = WA.editorFaction.list();
         const cur = arr[+b.dataset.efEdit];
         const next = prompt('运势（' + WA.editorFaction.STATUSES.join('/') + '）：', cur && cur.status);
@@ -411,9 +440,9 @@
         if (!r.ok) WA.log('warn', '事件新增失败：' + r.reason);
         renderBody();
       };
-      panelEl.querySelectorAll('[data-ee-next]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorEvents.shiftStage(d, +b.dataset.eeNext, 1)); renderBody(); });
-      panelEl.querySelectorAll('[data-ee-prev]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorEvents.shiftStage(d, +b.dataset.eePrev, -1)); renderBody(); });
-      panelEl.querySelectorAll('[data-ee-del]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorEvents.remove(d, +b.dataset.eeDel)); renderBody(); });
+      panelEl.querySelectorAll('[data-ee-next]').forEach(b => b.onclick = () => { if (typeof WA.editorEvents.setEditingId === 'function') WA.editorEvents.setEditingId(+b.dataset.eeNext); WA.store.transact(d => WA.editorEvents.shiftStage(d, +b.dataset.eeNext, 1)); renderBody(); });
+      panelEl.querySelectorAll('[data-ee-prev]').forEach(b => b.onclick = () => { if (typeof WA.editorEvents.setEditingId === 'function') WA.editorEvents.setEditingId(+b.dataset.eePrev); WA.store.transact(d => WA.editorEvents.shiftStage(d, +b.dataset.eePrev, -1)); renderBody(); });
+      panelEl.querySelectorAll('[data-ee-del]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorEvents.remove(d, +b.dataset.eeDel)); if (typeof WA.editorEvents.setEditingId === 'function') WA.editorEvents.setEditingId(null); renderBody(); });
       const insRun = $('#wa-inspect-run');
       if (insRun && WA.inspectorState) insRun.onclick = () => {
         const rep = WA.inspectorState.inspect();
@@ -877,19 +906,78 @@
               + (rdSt.last && rdSt.last.key ? '（最近 ' + esc(rdSt.last.key) + '，来源 ' + esc(rdSt.last.source || 'disk') + '）' : '') + '。</div>';
           }
         }
+        // v2.11.0（面B 消费端）: 结构指纹陈旧——warn 级用「本会话经历过」（累计口径，
+        //   与 readFailed 同规格）；它已被重盖动作自愈，故只提示、不阻断。
+        //   用户视角的解释是「这条配置是旧版本的结构，引擎已按新结构重盖」；为什么值得一行：
+        //   缩减型结构变更会让旧子键被写回，而界面上看不出任何异常（显示的是兜底值）。
+        if (rdSt && rdSt.schema && rdSt.schema.lastStale) {
+          const lsP = rdSt.schema.lastStale;
+          html += '<div class="wa-log wa-log-warn">结构指纹：设置键 ' + esc(String(lsP.key || '?'))
+            + ' 的磁盘结构来自旧版本（本会话累计 ' + String((rdSt.schema.status || {}).stale || 1)
+            + ' 次；指纹不符，已按当前结构重盖）'
+            + (lsP.prevAt ? '（旧结构写入于 ' + esc(new Date(lsP.prevAt).toLocaleString()) + '）' : '')
+            + '。若该结构变更是「删过子键」型，旧子键可能被原样写回，可在诊断包里核对。</div>';
+        }
+        // v2.11.0（R3 自纠）: 结构读不出来（error 级）——与「从未配置」分开说，
+        //   因为用户要做的事完全不同（导出诊断包留证 + 重建该键 vs 无需处理）。
+        if (rdSt && rdSt.schema && rdSt.schema.status && rdSt.schema.status.unreadable > 0) {
+          html += '<div class="wa-log wa-log-err">结构指纹：有 ' + rdSt.schema.status.unreadable
+            + ' 次读取遇到**磁盘上有值但读不出结构**——损坏值已隔离留证并回落默认值，'
+            + '这些键当前的配置不是您配的那一份。请先导出诊断包留证，再决定是否重建该键。</div>';
+        }
+        if (rdSt && rdSt.schema && rdSt.schema.status && rdSt.schema.status.failed > 0) {
+          html += '<div class="wa-log wa-log-warn">结构指纹：写入失败 ' + rdSt.schema.status.failed
+            + ' 次——「这份值属于哪个结构版本」在磁盘上不可查，后续结构变更将无法判定新旧形状。</div>';
+        }
         // v2.10.0: store 域读侧——两个域各有独立裸读点，只展示一处会让另一半的
         //   「容量表偏小 / 误判最冷」继续对用户不可见（与删除侧两域都报同一理由）。
         const rdStore2 = (WA.store && typeof WA.store.readStat === 'function') ? (function () { try { return WA.store.readStat(); } catch (e) { return null; } })() : null;
         if (rdStore2 && !rdStore2.ok) {
+          // v2.11.0: 结论级读失败单列（error 级）——与 store.maintain / tool-diag 三处同判据。
+          //   容量数字失真只是「算不准」，这几种是「结论本身不成立」：存档没载入却照常运行、
+          //   并发覆盖没保住对方、巡检结论建立在失败读取上。用户必须能在面板上直接看到。
+          const lfSrcP = (rdStore2.lastFail && rdStore2.lastFail.source) || null;
+          if (lfSrcP === 'load') {
+            html += '<div class="wa-log wa-log-err">读取侧（存储域）：最近一次读取失败发生在**存档载入**上'
+              + '——当前聊天整份存档对本实例不可见，界面呈现的是默认世界而磁盘上仍有你的进度。'
+              + '<b>此时不要保存</b>：任何保存都会用空状态覆盖真档。请先导出诊断包留证。</div>';
+          }
+          if (lfSrcP === 'saveConflict') {
+            html += '<div class="wa-log wa-log-err">读取侧（存储域）：最近一次读取失败发生在**并发覆盖前的保全读回**上'
+              + '——已确认另一实例写过该聊天、本次保存将覆盖其改动，而对方内容读不出来，'
+              + '<b>本次覆盖未能保全对方进度</b>（他实例的改动已被静默吞掉，无现场可查）。</div>';
+          }
+          if (lfSrcP === 'verifyState') {
+            html += '<div class="wa-log wa-log-err">读取侧（存储域）：最近一次读取失败发生在**存档巡检**上'
+              + '——「所有聊天存档可解析」这个结论建立在一次失败的读取之上，该聊天既没被判定正常、也没被判定损坏。</div>';
+          }
+          if (lfSrcP === 'chatcacheInstallBack') {
+            html += '<div class="wa-log wa-log-warn">读取侧（存储域）：最近一次读取失败发生在**快照安装回读**上'
+              + '——安装后无法确认磁盘内容与安装值一致（静默截断与读失败在本会话内不可分辨）。</div>';
+          }
           // v2.10.0（逆向审计自纠第四轮）: 恢复点保护失效单独一行（error 级）——「读不到就不写」
           //   虽然保住了历史恢复点，但用户此刻没有恢复点保护，必须比容量数字失真更醒目。
           if (rdStore2.bySource && rdStore2.bySource.recovery > 0) {
             html += '<div class="wa-log wa-log-err">读取侧（存储域）：恢复点清单读取失败 ' + rdStore2.bySource.recovery
               + ' 次——恢复点创建已被跳过（读不到就不写，避免覆盖丢弃历史恢复点），当前**没有恢复点保护**</div>';
           }
-          html += '<div class="wa-log wa-log-warn">读取侧（存储域）：' + rdStore2.readFailed + ' 次读取失败（按字节 '
-            + ((rdStore2.bySource || {}).bytes || 0) + '、活跃时间 ' + ((rdStore2.bySource || {}).activity || 0)
-            + '、键枚举 ' + ((rdStore2.bySource || {}).enumerate || 0) + '）——占用统计偏小；活跃时间读失败会被判为「最冷」而进入可回收候选。</div>';
+          // v2.11.0: 来源明细**全量列出**（此前只列三个已知桶 ⇒ 本版新增的 20 余个来源
+          //   在面板上「有归因但看不见」，与 v2.10.0 修掉的同型缺陷）。
+          const LAB_P = { bytes: '按字节', activity: '活跃时间', enumerate: '枚举', diskRev: '磁盘序号',
+            verify: '写后/删后复核读回', recovery: '恢复点清单', conflict: '冲突现场',
+            quarantine: '隔离现场', writerId: '写入者标识',
+            load: '存档载入', saveConflict: '并发覆盖前保全', verifyState: '存档巡检',
+            rmExisted: '删除前探测', verifyBack: '复核读回', legacyRead: '旧键读取',
+            saveInherit: '指纹继承', subkeyAudit: '子键盘点', pendingOrphan: '幽灵盘点',
+            verifyDefaults: '默认值校验', lsRaw: '幽灵原文', chatcacheState: '聊天快照',
+            chatcacheRev: '同步序号', chatcacheInstallBack: '安装回读',
+            worldbookSelection: '世界书选择', workflowHistory: '工作流历史',
+            uninjectLedger: '撤销账本', eventLog: '事件日志', errorLog: '错误日志' };
+          const byP = rdStore2.bySource || {};
+          const srcTxtP = Object.keys(byP).filter(function (k) { return byP[k] > 0; })
+            .map(function (k) { return (LAB_P[k] || k) + ' ' + byP[k]; }).join(' / ');
+          html += '<div class="wa-log wa-log-warn">读取侧（存储域）：' + rdStore2.readFailed + ' 次读取失败（'
+            + srcTxtP + '）——读失败的键被按 0 字节计，占用统计偏小；活跃时间读失败会被判为「最冷」而进入可回收候选。</div>';
         }
         // v2.9.0: store 侧受控删除台账——此前 store.removeStat() 零产品消费（纯声明面）。
         //   两个域各有独立的裸删点（settings-bus 管设置键、store 管冲突现场/隔离/诊断键），
@@ -1032,8 +1120,11 @@
       catch (e) { __rerStat.failed++; if (WA.log) WA.log('warn', '面板自动重绘失败', e); }
     }, 150);
   }
+  // v2.11.0: `backstage:started` / `backstage:settled` 此前只被悬浮球（呼吸动画）订阅，
+  //   面板自身不重绘 ⇒ 运行态行只会停留在渲染那一刻的值（点了中止也不会变回「空闲」）。
   const STATE_EVENTS = ['clock:changed', 'chapters:changed', 'registry:changed', 'oracle:plan',
-    'directEvent:started', 'directEvent:ended', 'chat:changed', 'api:channel-changed', 'backstage:settings'];
+    'directEvent:started', 'directEvent:ended', 'chat:changed', 'api:channel-changed', 'backstage:settings',
+    'backstage:started', 'backstage:settled'];
   WA.ui = {
     STATE_EVENTS: STATE_EVENTS,
     // v2.2.0: 当前页只读访问（UI 绑定守卫需要区分「非当前页控件不在 DOM」与「真断裂」）

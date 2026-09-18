@@ -62,7 +62,14 @@
     try {
       const cid = chatId || ledgerChatId() || 'wa_default';
       const mainWin = (typeof window !== 'undefined' ? window : global);
-      const raw = mainWin.localStorage.getItem('worldaxis_uninject_ledger_' + cid);
+      // v2.11.0: 读失败此前被外层空 catch 吞掉、并**照样合并**（raw=null ⇒ 当前聊天账本为空）
+      //   ⇒ 「撤销账本读不出来」表现为「这个聊天没撤销过注入」，重复注入风险不可见。
+      let raw = null;
+      try { raw = mainWin.localStorage.getItem('worldaxis_uninject_ledger_' + cid); }
+      catch (eR) {
+        try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail('uninjectLedger', 'worldaxis_uninject_ledger_' + cid, eR); } catch (e2) {}
+        return;   // 读不到就不合并（保留内存既有账本，避免把「读失败」写成「无账本」）
+      }
       const otherEntries = __uninjectLedger.filter(function (e) { return e.chat && e.chat !== cid; });
       const curEntries = raw ? JSON.parse(raw) : [];
       const merged = otherEntries.concat(Array.isArray(curEntries) ? curEntries : []);

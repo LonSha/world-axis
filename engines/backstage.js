@@ -102,7 +102,21 @@
             memSamplerLimit: 8,            // v0.9.9: 主观记忆每轮注入采样上限
             memSamplerDice: 10000,         // v0.9.9: 采样骰子面数（1000-10000，越大越平滑）
             memSamplerRelevance: 'on',   // v0.9.9: 上下文相关召回 on/off
-            customInstruction: ''         // 用户自定义推演指令（追加到系统提示）
+            customInstruction: '',        // 用户自定义推演指令（追加到系统提示）
+            // v2.11.0（面C · 声明缺失修复）: 以下 4 个子键**一直被子系统读取**，却从未进 def：
+            //   · proactive      ← engines/proactive.js `settings().proactive !== false`（主动拉动总开关）
+            //   · wbInject       ← engines/wb-inject.js  `s.wbInject !== false`（世界书变量镜像总开关）
+            //   · wbWorldbookName← 镜像目标世界书名
+            //   · wbAutoEnsure   ← 是否自动补建配套世界书条目
+            //   后果（三重）：① 子键补齐/声明完备性检查**看不见它们**，「这条配置从哪来」无从回答；
+            //   ② 任何写入它们的路径都会新造 def 之外子键（v2.6.0 治的正是这个增量死键源头）；
+            //   ③ `verifyDefaults` 拿磁盘值与 def 比对时，这 4 个键必被报成「声明与存量不符」——
+            //   一个**永远为真**的告警，读的人会逐渐无视整个校验器（这才是最贵的损失）。
+            //   默认值与各自消费端的语义逐字对齐（均「默认开」，故写 true）。
+            proactive: true,
+            wbInject: true,
+            wbWorldbookName: '',
+            wbAutoEnsure: false
           },
           // v2.7.0（收口）: 区间与枚举声明上收到登记表——此前这些合法范围**只存在于设置页的
           //   `<input min max>` 与 `<select>` 选项里**，引擎一侧承认的只有少数几个（且分散）：

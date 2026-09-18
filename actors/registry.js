@@ -34,14 +34,15 @@
       const p = s.people['p_' + name];
       return (p && p.profile) || { fields: { name }, personality: [], worldview: [], family: [], relationships: [], memory: [] };
     },
-    setProfile(name, profile) {
-      WA.store.transact(draft => {
-        const id = 'p_' + name;
-        draft.people[id] = draft.people[id] || { id, name, knowledge: {} };
-        draft.people[id].profile = profile;
-        draft.people[id].updatedAt = Date.now();
-      });
-    },
+    /**
+     * v2.11.0（面C · 死面治理）: 此处原有 `setProfile(name, profile)` ——**裸整份覆盖、无准入**。
+     *   它自 v2.2.0 起就已被 `setProfileSafe` 取代（唯一写入路径：面板档案编辑器 → Safe），
+     *   全库**零调用点**。留着它的实际风险不是「多一个 API」，而是**下一个调用者会挑错的那个**：
+     *   误传 `{personality:'字符串'}` 会写坏结构，而 getProfile 的消费端（独白/观测的性格锚点）
+     *   拿到非数组后**静默降级**——这正是 v2.2.0 引入 Safe 版要治的缺陷。本版如实收回该导出，
+     *   保留 name/profile 两参数语义的**带准入替代**即 setProfileSafe（本文件内已说明映射关系）。
+     *   私有实现随之删除：没有调用者的写入路径 = 下一处「声明面空转」。
+     */
     /**
      * v2.2.0: 安全档案写入（准入 + 按节合并 + 剪裁取自容量登记表）。
      *   缺陷背景：裸 setProfile 整份覆盖且无准入——误传 {personality:'字符串'} 会写坏结构，

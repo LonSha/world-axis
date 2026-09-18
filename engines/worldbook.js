@@ -48,8 +48,22 @@
     return { ids: [], t: 0, overrides: {} };
   }
 
-  function readStored() { return parseStored(mainWin.localStorage.getItem(getSelectionKey())); }
-  function hasSelection() { return mainWin.localStorage.getItem(getSelectionKey()) !== null; }
+  // v2.11.0: 读失败与「用户没选过条目」必须分开。此前两者都得到 {ids:[]} / false，
+  //   于是「选择的世界书条目读不出来」会表现为「用户没选任何条目」——注入静默少一块，
+  //   而界面上没有任何异常（与 workflow/inject/index 三处日志静默清空同型）。
+  function noteWbRead(key, err) {
+    try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail('worldbookSelection', key, err); } catch (e) {}
+  }
+  function readStored() {
+    let raw = null;
+    try { raw = mainWin.localStorage.getItem(getSelectionKey()); }
+    catch (e) { noteWbRead(getSelectionKey(), e); return { ids: [], t: 0, overrides: {}, readFailed: true }; }
+    return parseStored(raw);
+  }
+  function hasSelection() {
+    try { return mainWin.localStorage.getItem(getSelectionKey()) !== null; }
+    catch (e) { noteWbRead(getSelectionKey(), e); return false; }
+  }
   function getSelectedIds() { return readStored().ids; }
   function getOverrides() { return readStored().overrides; }
 

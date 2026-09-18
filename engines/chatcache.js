@@ -37,7 +37,16 @@
   // 当前聊天唯一的存档slot：与 core/store 保持一致（worldaxis_state_<chatId>）
   function stateKey(id) { return `worldaxis_state_${id}`; }
   function revKey(id) { return `worldaxis_state_${id}_syncrev`; }
-  function getState(id) { return mainWin.localStorage.getItem(stateKey(id)); }
+  // v2.11.0（结论不实 · 现场五）: 读失败此前返回 null ⇒ 与「本地没有这份存档」**完全同形**。
+  //   hasAnyLocal() 直接以它判「有没有本地快照」，而「读不出来」会被报成「没有」——
+  //   于是安装/覆盖决策建立在一个不成立的结论上。
+  function noteRead(source, key, err) {
+    try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail(source, key, err); } catch (e) {}
+  }
+  function getState(id) {
+    try { return mainWin.localStorage.getItem(stateKey(id)); }
+    catch (e) { noteRead('chatcacheState', stateKey(id), e); return null; }
+  }
   function hasAnyLocal(id) { return getState(id) != null; }
 
   let _suspend = false;   // 安装存档期间挂起同步，防回弹
@@ -106,8 +115,11 @@
         //   会把「安装挂起」与「重试写盘」耦合出更难查的时序问题（本仓库已有一次同型教训）。
         try {
           mainWin.localStorage.setItem(key, data.state);
-          let back = null;
-          try { back = mainWin.localStorage.getItem(key); } catch (eR) { back = null; }
+          let back = null, backErr = null;
+          // v2.11.0: 安装后的回读校验——读失败不能与「内容不一致」共用结论（要查的是
+          //   存储可读性，不是写入毒化）。方向仍保守（一律判失败），但归因必须诚实。
+          try { back = mainWin.localStorage.getItem(key); } catch (eR) { back = null; backErr = eR; }
+          if (backErr) { noteRead('chatcacheInstallBack', key, backErr); __installStat.readBackFailed = (__installStat.readBackFailed || 0) + 1; }
           __installStat.attempts++; __installStat.lastAt = Date.now();
           __installStat.lastKey = key; __installStat.lastBytes = data.state.length;
           if (back === data.state) {
@@ -168,7 +180,13 @@
 
   // ── Lamport修订号 ──────────────────────────────────────
   function localRev(id) {
-    const v = parseInt(mainWin.localStorage.getItem(revKey(id)) || '0', 10);
+    // v2.11.0（结论不实 · 现场六）: 本键是**跨实例同步修订号**（Lamport）。读失败此前
+    //   回落 0 ⇒ 「本地修订号为 0」这个结论会把序号判成倒退，同步决策随之失真；
+    //   与 v2.10.0 在 store.diskRev 修的同型缺陷（那里导致并发覆盖检测失效）。
+    let raw = null;
+    try { raw = mainWin.localStorage.getItem(revKey(id)); }
+    catch (e) { noteRead('chatcacheRev', revKey(id), e); return 0; }
+    const v = parseInt(raw || '0', 10);
     return Number.isFinite(v) ? v : 0;
   }
   function setLocalRev(id, rev) {

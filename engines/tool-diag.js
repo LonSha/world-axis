@@ -299,7 +299,14 @@
             const ls = (WA.mainWin || window).localStorage;
             const rows = (WA.__settingsRegs || []).filter(function (r) {
               if (!r || !r.key || r.orphan) return false;
-              try { return ls.getItem(r.key) !== null; } catch (e) { return false; }
+              // v2.11.0: 本行是「列目录」性质（决定哪些键进入抽查范围），读失败此前静默
+              //   返回 false ⇒ 该键被排除在抽查之外，抽查结论「checked 个键全部命中」的
+              //   覆盖面悄悄缩小。归因后「有键没进抽查」这件事在台账里可见。
+              try { return ls.getItem(r.key) !== null; }
+              catch (e) {
+                try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail('readSpotCheck', r.key, e); } catch (e2) {}
+                return false;
+              }
             }).slice(0, 8);
             const misses = [];
             rows.forEach(function (r) {
@@ -313,7 +320,10 @@
           return { registry: st, orphans: orphans, stats: WA.settingsBus.stats,
             coherent: coherent, defaultDrift: drift, dormant: dormant, subkeys: subkeys,
             lifecycle: lifecycle, migrations: mig, ghosts: ghosts, writes: writes, removes: removes,
-            reads: reads, readSpotCheck: spot };
+            reads: reads, readSpotCheck: spot,
+            // v2.11.0: 结构指纹状态（面B 的读侧消费口）——与读失败台账并列，
+            //   才可判定「配置读到了，但它可能是另一个结构版本写的」。
+            schema: (reads && reads.schema) ? reads.schema : null };
         }, {}),
         // v2.4.0: 可见性配置健康度——「源在 SOURCES 里却没有默认值声明」是子键级死配置
         visibility: safe(function () {
@@ -339,9 +349,26 @@
         // v2.2.0: 推演入账计量（事件链是否真的进 state —— 此前 events_create 被整条丢弃）
         backstage: safe(function () {
           if (!WA.backstage || !WA.backstage.applyStat) return { error: 'backstage 不可用' };
+          // v2.11.0: 运行态接线——`isRunning` / `pending` 此前零调用，于是「推演卡住了」这件事
+          //   在诊断包里完全不可见（用户看到的是界面不动，而唯一能回答「它还在跑吗、有没有
+          //   排队堆积」的出口没人用）。本项只读，不触发任何推演。
+          const __runState = (typeof WA.backstage.isRunning === 'function') ? WA.backstage.isRunning() : null;
+          const __pend0 = (typeof WA.backstage.pending === 'function') ? WA.backstage.pending() : null;
           const st = WA.backstage.applyStat();
           const evs = (WA.store && WA.store.read) ? (WA.store.read('evolution.events', []) || []) : [];
-          return { apply: st, eventsInState: evs.length, fromBackstage: evs.filter(function (e) { return e && e.source === 'backstage'; }).length };
+          return { apply: st, eventsInState: evs.length, fromBackstage: evs.filter(function (e) { return e && e.source === 'backstage'; }).length,
+            running: __runState, pending: __pend0 ? { reason: __pend0.reason || null, anchorIdx: (__pend0.anchor && __pend0.anchor.idx != null) ? __pend0.anchor.idx : null } : null };
+        }, {}),
+        // v2.11.0: 开关状态接线——`proactive.isEnabled` / `wbInject.isEnabled` 此前全库零调用。
+        //   两者都会让**功能整体不注入**（主动拉动约束 / 世界书条目镜像）而界面无任何提示：
+        //   诊断必须能回答「它到底开没开」，否则「这轮没注入」永远查不出原因。
+        switches: safe(function () {
+          const out = {};
+          out.proactive = (WA.proactive && typeof WA.proactive.isEnabled === 'function') ? WA.proactive.isEnabled() : null;
+          out.wbInject = (WA.wbInject && typeof WA.wbInject.isEnabled === 'function') ? WA.wbInject.isEnabled() : null;
+          // 世界书镜像的实际活跃量（与开关并列才可判定「开着但没生效」）
+          out.wbActiveOrders = (WA.wbInject && typeof WA.wbInject.activeOrders === 'function') ? (WA.wbInject.activeOrders() || []).length : null;
+          return out;
         }, {}),
         // v2.2.0: 人物档案覆盖率（人设写入链是否真的在用）
         actors: safe(function () {
@@ -427,7 +454,10 @@
     { page: 'people', ids: ['wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out'],
-      cond: ['wa-de-abort', 'wa-ch-end', 'wa-ch-title', 'wa-ch-start'] },
+      // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
+      //   与 wa-de-abort（有活跃突发事件才渲染）同一语义。纳入守卫表后，「按钮渲染了但
+      //   绑定代码引用了别的 id」这类断裂会被发现（本版新增的绑定正需要这道守）。
+      cond: ['wa-de-abort', 'wa-ch-end', 'wa-ch-title', 'wa-ch-start', 'wa-bs-abort'] },
     { page: 'director', ids: ['wa-plan-beats', 'wa-plan-start', 'wa-or-goal', 'wa-or-beats', 'wa-or-gen', 'wa-or-out', 'wa-gen-choices', 'wa-choices-out'],
       cond: ['wa-beat-next', 'wa-plan-clear'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
@@ -882,6 +912,49 @@
           + ' 个**没读到用户配置**（' + rdSpot.misses.slice(0, 3).map(function (m) { return m.key + ':' + (m.reason || m.source); }).join('、')
           + '）：这些键在磁盘上有数据却读不回来，诊断与界面展示的是兜底默认值' });
     }
+    // v2.11.0（面B 消费端）: 结构指纹陈旧——回答「这份磁盘值是**哪一个结构版本**写的」。
+    //   此前 `.d` / `.at` 零消费、无任何出口：指纹不符时引擎静默重盖，于是「键的结构在上个
+    //   版本变过而迁移钩子未行使」这件事只能靠人猜。它的后果不是读不到，而是**在错的形状上
+    //   生效**：缩减型结构变更会让旧子键被原样写回，新增型则由补齐逻辑兜住（两者后果不同，
+    //   故 detail 里逐条写明）；而指纹写入失败意味着「结构版本」这一维度在磁盘上不可查。
+    //   判据裁决：指纹陈旧是**已被重盖动作自愈**的经历，属 warn——与 readFailed 同规格的
+    //   「warn 用经历（累计）、error 用当前态」（v0.4.0 裁决）。此前本处注释自称「当前态判据」
+    //   而实现取 lastStale 的存在性＝累计语义，是**归因不实**（本版自身命题所治的毛病），
+    //   故当版改正：detail 里如实给出「本会话发生过几次」，避免只看最近一次会把「一次」
+    //   读成「一直在」。详情字段（prevDigest / prevAt）自 v2.5.0 写盘起首次被消费。
+    const rdSchema = sbDiag.schema || null;
+    if (rdSchema && rdSchema.lastStale) {
+      const lsS = rdSchema.lastStale;
+      issues.push({ level: 'warn', key: 'settingsBus.schemaStale',
+        detail: '设置键 ' + String(lsS.key || '?') + ' 的磁盘结构指纹与当前声明不符（本会话累计 '
+          + String((rdSchema.status || {}).stale || 1) + ' 次；最近一次旧结构摘要 '
+          + String(lsS.prevDigest || String(lsS.prevFp || '?').slice(0, 8))
+          + (lsS.prevAt ? '，于 ' + new Date(lsS.prevAt).toLocaleString() + ' 写入' : '')
+          + '）：已按当前结构重盖。这通常意味着该键的结构在上个版本变过、而迁移钩子未行使——'
+          + '若该变更是**缩减型**（删过子键），旧子键会被原样写回；若为**新增型**，'
+          + '旧存档缺的子键由补齐逻辑兜住（后者无害，前者需在迁移钩子里补一次显式清除）' });
+    }
+    if (rdSchema && rdSchema.status && rdSchema.status.failed > 0) {
+      issues.push({ level: 'warn', key: 'settingsBus.schemaStampFailed',
+        detail: '结构指纹写入失败 ' + rdSchema.status.failed + ' 次：每次读取都会重算并重试，'
+          + '因此「这份值属于哪个结构版本」在磁盘上始终不可查——'
+          + '后续结构变更将无法判定该键是「旧形状」还是「本就未盖章」，'
+          + '缩减型迁移会被跳过。若为配额/隐私模式导致，请先导出诊断包留证' });
+    }
+    // v2.11.0（R3 自纠）: 结构**读不出来**与「从未配置」分开报（error 级）。
+    //   为什么是 error 而不是 warn：读侧既有的 `defaultAfterFailure > 0` 口径已把
+    //   「磁盘上有用户数据却没读到」定为 error（用户当前看到的配置不是他配的）。
+    //   本项是同一件事在**结构维度**上的呈现，且它意味着这些键此刻正以默认值运行——
+    //   不报出来用户就会按「我没配过」处理，而不是去导出诊断包留证。
+    //   但**不与上面那条合并计数**：`unreadable` 表示「值读不出来」，`failed` 表示
+    //   「值读得出来、只是结构标识写不进盘」——前者用户需要重建该键，后者只需留意。
+    if (rdSchema && rdSchema.status && rdSchema.status.unreadable > 0) {
+      issues.push({ level: 'error', key: 'settingsBus.schemaUnreadable',
+        detail: '有 ' + rdSchema.status.unreadable + ' 次设置读取遇到**磁盘上有值但读不出结构**：'
+          + '损坏值已被隔离副本留证并回落默认值，因此本次运行中这些键的配置**不是用户配的那份**。'
+          + '「有配置被读坏」与「从未配置」是两种事故——前者请导出诊断包留证（含隔离副本）'
+          + '再决定是否重建该键，后者无需处理' });
+    }
     if (rdD && rdD.copyFallback > 0) {
       issues.push({ level: 'warn', key: 'settingsBus.readonlyCopy',
         detail: '设置读取返回值深拷贝降级 ' + rdD.copyFallback + ' 次（最近 '
@@ -897,17 +970,67 @@
       //   三个已知来源，而 noteStoreReadFail 支持动态建桶 ⇒ 本版新增的读点（diskRev / verify /
       //   recovery / conflict / quarantine / writerId）会「有归因但在诊断里看不见」。
       //   每个来源的后果不同（有的只是容量数字失真，有的是静默覆盖/丢恢复点），必须逐项可读。
+      // v2.11.0: 标签表必须覆盖**全部**归因点。本版新增的来源包括 core 侧的
+      //   load / saveConflict / verifyState / rmExisted / verifyBack / legacyRead /
+      //   saveInherit / subkeyAudit / pendingOrphan / verifyDefaults / lsRaw，
+      //   以及引擎侧 chatcache* / worldbookSelection / workflowHistory / uninjectLedger /
+      //   eventLog / errorLog。缺标签 ⇒ 消费端退回裸桶名 ⇒ 「有归因但看不懂」。
       const SRC_LABEL = {
         bytes: '容量计量', activity: '活跃时间', enumerate: '键枚举',
         diskRev: '磁盘序号（读失败 ⇒ 并发覆盖检测失效）',
         verify: '写后校验/删后复核的读回', recovery: '恢复点清单',
-        conflict: '冲突现场', quarantine: '隔离现场', writerId: '写入者标识'
+        conflict: '冲突现场', quarantine: '隔离现场', writerId: '写入者标识',
+        load: '存档载入（读失败 ⇒ 整份存档不可见）',
+        saveConflict: '并发覆盖前的保全读回（读失败 ⇒ 对方进度未被保全）',
+        verifyState: '存档巡检', rmExisted: '受控删除的存在性探测',
+        verifyBack: '写后/删后复核读回', legacyRead: 'legacy 旧键读取',
+        saveInherit: '保存时继承结构指纹', subkeyAudit: '子键缺口盘点',
+        pendingOrphan: '幽灵键盘点', verifyDefaults: '默认值声明校验',
+        lsRaw: '幽灵设置盘点原文',
+        // v2.11.0（逆向审计自纠）: `readSpotCheck` 是本版新增的 store 域归因来源
+        //   （tool-diag 自己的抽查列目录读失败），首版漏进本表 ⇒ 消费端退回裸桶名，
+        //   读者只看到 `readSpotCheck×1` 而不知其后果。归因**不可读**等于归因不实
+        //   （本仓库既有裁决），故补标签并加断言钉住「凡是投递进 store 台账的来源都得有标签」。
+        readSpotCheck: '诊断抽查列目录',
+        chatcacheState: '聊天快照',
+        chatcacheRev: '同步修订号（读失败 ⇒ 同步序号判成倒退）',
+        chatcacheInstallBack: '快照安装回读（唯一能发现静默截断处）',
+        worldbookSelection: '世界书条目选择（读失败 ⇒ 注入静默少一块）',
+        workflowHistory: '工作流历史', uninjectLedger: '撤销注入账本（读失败 ⇒ 重复注入）',
+        eventLog: '事件日志载入', errorLog: '错误日志载入'
       };
       const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
         .map(function (k) { return (SRC_LABEL[k] || k) + '×' + byS[k]; }).join('、');
       issues.push({ level: 'warn', key: 'store.readFailed',
         detail: '存储读取失败 ' + rdStore.readFailed + ' 次（' + srcTxt + '）：读失败的键被按 0 字节计入，占用表**偏小**；'
           + '活跃时间回落 0 会被判为「最冷」而进入可回收候选——据此清理存储可能误删仍在用的聊天' });
+    }
+    // v2.11.0: 结论级读失败——容量数字失真只是「算不准」，以下几种是「结论本身不成立」，
+    //   故必须单列且分级更重（与 store.maintain 同判据、同分级，两处都报）。
+    //   判据一律取**最近一次读失败事件**（lastFail.source）：累计数只增不减，会让历史失败
+    //   永久挂红（v0.4.0 裁决；本仓库已因同型坑自纠四次）。
+    const lfSrc = (rdStore && rdStore.lastFail && rdStore.lastFail.source) || null;
+    if (lfSrc === 'load') {
+      issues.push({ level: 'error', key: 'store.readLoadBlocked',
+        detail: '**最近一次**存储读取失败发生在存档载入上：当前聊天整份存档对本实例不可见，'
+          + '诊断包呈现的是默认世界而磁盘上仍有用户进度——此时**任何保存都会用空状态覆盖真档**。'
+          + '请先导出诊断包留证，再排查存储可读性' });
+    }
+    if (lfSrc === 'saveConflict') {
+      issues.push({ level: 'error', key: 'store.coverageUnpreserved',
+        detail: '**最近一次**存储读取失败发生在并发覆盖前的保全读回上：已确认另一实例写过该聊天、'
+          + '本次保存将覆盖其改动，而对方 payload 读不出来 ⇒ **本次覆盖未能保全对方进度**，'
+          + '他实例的改动已被静默吞掉且无现场可查（与「已保全为冲突现场」是两回事）' });
+    }
+    if (lfSrc === 'verifyState') {
+      issues.push({ level: 'error', key: 'store.readVerifyBlocked',
+        detail: '**最近一次**存储读取失败发生在存档巡检上：巡检报告「所有聊天存档可解析」这一结论'
+          + '建立在一次失败的读取之上——该聊天既未被判定正常、也未被判定损坏（结论留了空档）' });
+    }
+    if (lfSrc === 'chatcacheInstallBack') {
+      issues.push({ level: 'warn', key: 'store.readInstallBlocked',
+        detail: '**最近一次**存储读取失败发生在快照安装回读上：安装后无法确认磁盘内容与安装值一致，'
+          + '静默截断与读失败在本会话内不可分辨（这是唯一能发现安装被截断的检查）' });
     }
     // v2.10.0（逆向审计自纠第四轮）: 「恢复点保护失效」单列 error。
     //   恢复点清单读失败时 createRecoveryPoint **拒绝写入**（保命优先：宁可不建点，也不覆盖丢弃

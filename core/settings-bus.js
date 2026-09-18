@@ -109,7 +109,23 @@
     //   后果不是「读不到」而是「读到的东西与总线内部对象共享引用」：库内最常见的调用惯例
     //   `setSettings(o){ save(Object.assign(read(), o)) }` 一旦改动返回值，就会**改到内部对象**，
     //   而磁盘上一个字节都没变——下次 read 会「莫名其妙」看到上一次的改动。属静默失效。
-    readonlyCopyFallback: 0, lastCopyFallback: null };
+    readonlyCopyFallback: 0, lastCopyFallback: null,
+    // v2.11.0: 结构指纹的**读侧消费**——v2.5.0 建立了指纹写入（schemaStamp），但全库只有
+    //   `val._schema.fp === fp` 一个读判据，`.d`（摘要）与 `.at`（写入时间）**从未被任何
+    //   消费端读过**；而「指纹存在但与当前 def 不同」这个最有信息量的状态（说明这份磁盘值
+    //   是**另一个结构版本**写的）此前既不计也不报——盖章会直接把它覆盖掉，旧指纹静默消失。
+    //   本版把指纹当**状态机**对待，并把「陈旧」单列：
+    //     current  已与当前 def 一致（零写入）
+    //     stamped  本次盖章成功（此前缺失或不符）
+    //     stale    磁盘指纹存在但与当前 def 不同（旧结构写的 → 盖章前记下旧 fp/at）
+    //     failed   识别出需要盖章但写盘失败（指纹永久缺失，每次读都重算）
+    //     unshaped 非对象 def / 非对象值 → 本机制不适用（如实计入，不伪装成 current）
+    // v2.11.0（R3 自纠）: `unreadable` 单列——「磁盘上有值但读不出结构」与「压根没有值」
+    //   （unshaped）是两种事：前者用户**有配置**、只是读坏了（本次已回落默认），
+    //   后者是「从未配置」。此前损坏路径会走 schemaStamp(def) 并把 def 的指纹判成
+    //   current，于是「这份值结构正确」这句结论直接建立在兜底值上（归因不实）。
+    schemaStatus: { current: 0, stamped: 0, stale: 0, failed: 0, unshaped: 0, unreadable: 0 },
+    lastStamp: null, lastStale: null };
   // v2.4.0: 补齐告警去重——补齐发生在**返回值副本**上，磁盘未回写前每次读取都会再补一次。
   //   若每次补齐都打日志，热路径（loadSettings 每轮每事件调用）会刷屏：实测 300 轮掷骰产生
   //   900+ 条同内容 warn。故按「键」去重，本会话每个键只提示一次，计数不受影响。
@@ -234,7 +250,10 @@
     if (!r.rawRevive || !r.key) return { revived: false, reason: 'not-enabled' };
     const ls = (WA.mainWin || window).localStorage;
     let raw = null;
-    try { raw = ls.getItem(r.key); } catch (e) { return { revived: false, reason: 'no-storage' }; }
+    // v2.11.0: 本行是**读**抛错，此前只返回 no-storage 而不进读侧归因——调用方
+    //   （read 主路径）虽能识别，但读侧台账里查不到这次失败，诊断只显示「从未配置」。
+    try { raw = ls.getItem(r.key); }
+    catch (e) { noteReadFail('read', e, 'rawRevive: '); return { revived: false, reason: 'no-storage' }; }
     if (raw === null || raw === undefined) return { revived: false, reason: 'absent' };
     try { JSON.parse(raw); return { revived: false, reason: 'already-json' }; } catch (e) { /* 非 JSON → 需要复活 */ }
     // 空串是特例：`JSON.parse('')` 抛错，但它不是「被写坏的 JSON」而是「空值」，
@@ -466,7 +485,19 @@
     const ls = (WA.mainWin || window).localStorage;
     const o = opts || {};
     let existed = false;
-    try { existed = ls.getItem(key) !== null && ls.getItem(key) !== undefined; } catch (e0) { existed = false; }
+    // v2.11.0（结论不实 · 现场一）: 「读不出来」与「键不存在」必须分开。
+    //   此前读抛错即 existed=false ⇒ 受控删除走 removeAbsent 分支报「键本来就不存在
+    //   （幂等无操作）」——而真相是存储读取被拒、键可能仍在磁盘上。用户据此以为
+    //   「没什么可删的」，清理却永远清不动；与 store.removeVerified 的 read-failed 同型。
+    let existReadErr = null;
+    try { existed = ls.getItem(key) !== null && ls.getItem(key) !== undefined; }
+    catch (e0) { existed = false; existReadErr = e0; }
+    if (existReadErr) {
+      noteReadFail('rmExisted', existReadErr, 'rmRemove-existed: ');
+      stats.lastRemove = { key: key, at: now(), readFailed: true };
+      stats.lastRemoveError = 'read-failed: ' + String((existReadErr && existReadErr.message) || existReadErr).slice(0, 120);
+      return { ok: false, error: existReadErr, existed: false, reason: 'read-failed' };
+    }
     // v2.9.0（当前态口径）: 每次删除先把「最近一次结果」清零。
     //   为什么必须清零：消费端（maintain / tool-diag）的分级判据必须是**当前态**信号——
     //   v0.4.0 已就此立过裁决（`lastOk`/`lastFailAt` 与历史计数分离：「健康分只看当前态，
@@ -486,8 +517,16 @@
       ls.removeItem(key);
       // 删除后复核：与写入侧 verifyFailed 同规格——删完读回还在 = 这次删除没有发生。
       if (o.verify !== false) {
-        let back = null;
-        try { back = ls.getItem(key); } catch (eR) { back = null; }
+        // v2.11.0（结论不实 · 现场二）: 复核本身是一次**读取**——读失败不能与
+        //   「键确实没了」共用结论。此前 back=null 直接判「删除成功」，而真相是
+        //   「读不出来，删没删掉不知道」。与 v2.10.0 在 store.removeVerified 修的同型缺陷。
+        let back = null, backReadErr = null;
+        try { back = ls.getItem(key); } catch (eR) { back = null; backReadErr = eR; }
+        if (backReadErr) {
+          noteReadFail('verifyBack', backReadErr, 'rmRemove-verify: ');
+          noteRemoveFail('verifyBack', 'read-back-failed', 'verifyBack: ');
+          return { ok: false, error: backReadErr, existed: existed, unverified: true, reason: 'read-back-failed' };
+        }
         if (back !== null && back !== undefined) {
           stats.removeStaged++;
           stats.lastRemoveStaged = { key: key, at: now(), bytes: (typeof back === 'string' ? back.length : 0) };
@@ -544,8 +583,18 @@
       //   把重试交给幂等机制比在这里硬重试更干净。store 主状态路径仍保留其自有的重试。
       //   opts.verify === false 供测试/极端场景显式关闭（默认开启：诚实是默认值）。
       if (o.verify !== false) {
-        let back = null;
-        try { back = ls.getItem(key); } catch (eR) { back = null; }
+        // v2.11.0（归因不实）: 复核读失败与「写完丢了」是两件事。此前都落进
+        //   missing-after-write ⇒ 用户被引导去查配额，而实际要查的是存储可读性。
+        //   结论方向仍保守（一律报失败），但原因必须诚实。
+        let back = null, backReadErr = null;
+        try { back = ls.getItem(key); } catch (eR) { back = null; backReadErr = eR; }
+        if (backReadErr) {
+          noteReadFail('verifyBack', backReadErr, 'lsWrite-verify: ');
+          stats.verifyFailed++;
+          stats.lastStaged = { key: key, at: now(), reason: 'read-back-failed', bytes: bytes };
+          noteFail('verify', 'read-back-failed', 'verify: ');
+          return { ok: false, error: backReadErr, bytes: bytes, staged: true, reason: 'read-back-failed' };
+        }
         if (back !== payload) {
           const why = back === null || back === undefined ? 'missing-after-write'
             : (typeof back === 'string' && typeof payload === 'string' && back.length !== payload.length)
@@ -589,7 +638,12 @@
     } catch (e) { /* 非标准实现 → 空清单，不炸 */ }
     return out;
   }
-  function ls_raw(key) { try { return (WA.mainWin || window).localStorage.getItem(key); } catch (e) { return null; } }
+  function ls_raw(key) {
+    // v2.11.0: 读失败与「键不存在」都返回 null，调用方（幽灵盘点）无法分辨——
+    //   读被拒的键会被判成 absent（shape='absent'），盘点结论「这些键不存在」不实。
+    try { return (WA.mainWin || window).localStorage.getItem(key); }
+    catch (e) { noteReadFail('lsRaw', e, 'ls_raw: '); return null; }
+  }
   /** 已知命名空间（非 settings 的家族）——幽灵盘点时须排除，否则会把诊断键报成「未登记设置」。
    *
    * v2.5.0: 本清单**降级为回退**。原先它是唯一判据，这与本轮在 core/store.js 里刚删掉的
@@ -657,19 +711,42 @@
    * 留痕：stats.schemaStamps 记录写入次数（该数长期为 0 = 所有键都是当前结构，属正常状态）。
    * @param {object} reg 登记项
    * @param {*} val 已解析（且已迁移）的磁盘值
-   * @returns {boolean} 是否真的写了盘
+   * v2.11.0（R3 自纠）: 返回值自此为 `{ wrote, res }`——`res` 是**本次调用**的结果对象。
+   *   为什么必须换：结果此前只存在模块级槽 `__schemaStampResult`，而本函数的写盘动作会同步
+   *   进入 `ls_set`，其间若发生重入（同一同步栈内的另一次 `read`——真实场景是 storage 事件
+   *   回调、面板刷新、诊断采集在写盘通知里顺带读配置），外层 read 随后落账时读到的是
+   *   **另一个键**的 status/fp/prevAt，把 A 的陈旧指纹记成 B 的（R3 探针实测复现）。
+   *   模块级槽保留给「最后一次盖章」这类观察用途，但**落账一律用捕获的 `res`**。
+   * @returns {{wrote:boolean, res:object}} wrote=是否真的写了盘；res=本次结果（含 status/fp/prev*）
    */
   function schemaStamp(reg, val) {
     const r = reg || {};
     const def = r.def;
     const fp = schemaFingerprint(def);
-    if (!fp || !r.key) return false;
-    if (!val || typeof val !== 'object' || Array.isArray(val)) return false;
-    if (val._schema && val._schema.fp === fp) return false;      // 已是当前结构 → 零写入
+    // v2.11.0: 本函数改为**状态机**并把结果写进模块级 __schemaStampResult（供 read 路径落账）。
+    //   返回值语义保持不变（truthy = 真的写了盘），避免任何既有调用点的行为漂移。
+    __schemaStampResult = { status: 'unshaped', fp: fp, prevFp: null, prevAt: null, prevDigest: null, key: (r.key || null) };
+    const __res0 = __schemaStampResult;      // v2.11.0（R3 自纠）: 本次结果的对象引用（随函数返回）
+    if (!fp || !r.key) return { wrote: false, res: __res0 };
+    if (!val || typeof val !== 'object' || Array.isArray(val)) return { wrote: false, res: __res0 };
+    // v2.11.0: 消费 `.d` / `.at`——它们此前从未被读过。此处记下**旧指纹是谁、什么时候盖的**，
+    //   使「结构漂移发生过、且没被迁移掉」第一次可追溯（而不是被新指纹覆盖得一干二净）。
+    const __prev = (val._schema && typeof val._schema === 'object') ? val._schema : null;
+    if (__prev) {
+      __res0.prevFp = __prev.fp || null;
+      __res0.prevAt = (typeof __prev.at === 'number') ? __prev.at : null;
+      // v2.11.0: `.d` 是给**人看**的那一份（fp 是完整子键名+类型串，长度随 def 增长；
+      //   `d` 是它的 32 位 FNV 摘要）。此前写侧算完就丢，读侧从不取用——
+      //   于是诊断/面板要展示「旧结构是哪一份」时只能用 fp 截断（截断后不可比对）。
+      __res0.prevDigest = __prev.d || null;
+    }
+    if (__prev && __prev.fp === fp) { __res0.status = 'current'; return { wrote: false, res: __res0 }; }   // 已是当前结构 → 零写入
     const cur = Object.keys(val).filter(function (k) { return k !== '_schema'; });
     if (cur.length && schemaFingerprint((function () { const o = {}; cur.forEach(function (k) { o[k] = val[k]; }); return o; })()) === fp) {
-      return false;                                               // 子键全集与声明一致 → 零写入
+      __res0.status = 'current';                                    // 子键全集与声明一致 → 零写入
+      return { wrote: false, res: __res0 };
     }
+    if (__prev && __prev.fp && __prev.fp !== fp) __res0.status = 'stale';
     // v2.5.0: 本处**刻意不设**「每会话每键至多写一次」守卫。
     //   首版曾加该守卫以防写盘风暴，但实测立刻暴露它与 v2.3.0 的既有缺陷同型：
     //     · 一旦首次盖章失败（配额/异常），本会话此后永不重试 → 指纹永久缺失；
@@ -685,12 +762,18 @@
       const stRes = ls_set(r.key, val, 'stamp');
       if (!stRes.ok) {
         if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 结构指纹写入失败（本次未落盘）：下次读取会重算并再试', stRes.error);
-        return false;
+        __res0.status = 'failed';
+        return { wrote: false, res: __res0 };
       }
       stats.schemaStamps++;
-      return true;
-    } catch (e) { return false; }
+      // 状态机：陈旧指纹的盖章记为 stale（它与「首次盖章」的信息量完全不同——前者证明
+      //   磁盘值来自另一个结构版本，后者只是从未盖过）。stamped 只在原本缺失时用。
+      if (__res0.status !== 'stale') __res0.status = 'stamped';
+      return { wrote: true, res: __res0 };
+    } catch (e) { __res0.status = 'failed'; return { wrote: false, res: __res0 }; }
   }
+  /** v2.11.0: schemaStamp 的结果槽（模块级，避免改变该函数的返回契约） */
+  let __schemaStampResult = { status: 'unshaped', fp: null, prevFp: null, prevAt: null, key: null };
   /**
    * v2.5.0: 未登记设置键（幽灵设置）盘点——磁盘上存在、前缀 worldaxis_、且**既不在登记表、
    *   也不属于任一已知非 settings 家族**的键。
@@ -931,8 +1014,11 @@
         if (val === null) {
           for (let i = 0; i < (r.legacy || []).length; i++) {
             const lk = r.legacy[i];
-            let lraw = null;
-            try { lraw = ls.getItem(lk); } catch (e) {}
+            let lraw = null, lrawErr = null;
+            // v2.11.0: 此前 catch 为空 ⇒ 读被拒与「旧键不存在」不可分辨，用户配置
+            //   可能仍躺在旧键里而总线报「没有 legacy 值可迁」。归因后两者可分辨。
+            try { lraw = ls.getItem(lk); } catch (e) { lrawErr = e; }
+            if (lrawErr) noteReadFail('legacyRead', lrawErr, 'legacy-read: ');
             if (lraw === null || lraw === undefined) continue;
             legacyHit = true;
             try {
@@ -997,7 +1083,40 @@
         try { __migWhy = __migFailed[r.key] || null; } catch (eMG) { __migWhy = null; }
         noteReadFail('migrate', __migWhy || 'migration-failed', 'migrate: ');
       }
-      schemaStamp(r, val);
+      // v2.11.0: 指纹状态的读侧落账——此前 `schemaStamp(r, val);` 的返回值被丢弃，
+      //   「这份磁盘值是不是另一个结构版本写的」在整条读路径上无人过问。
+      // v2.11.0（R3 自纠）: 两处修正，均在逆向审计探针下复现：
+      //   ① **损坏值不盖章**——磁盘值解析失败时 `val` 已在上面回落 `r.def`，若照常调用
+      //      `schemaStamp(r, val)`，它会把 **def 的指纹**当成「磁盘上真实存在的结构」而判
+      //      `current`（第二条判据必然命中），于是「这份值结构正确」这句结论建立在兜底值上，
+      //      而真相是「这份值根本读不出来」。故损坏路径传 `null`（不写盘、不判定），
+      //      状态单列 `unreadable`——用户有配置、只是读坏了，与「从未配置」严格可分辨。
+      //   ② **落账用捕获的结果，不用模块级槽**——槽在写盘重入时会被后来者覆盖
+      //      （R3 探针：A 的 stamped 落账里出现 B 的 fp/prevAt）。
+      //   判据取「本次确实以兜底值告终」：`__why` 标了损坏**且** `__src` 仍停在
+      //      default-after-failure。只看 `__why` 会误伤「当前键损坏、但 legacy 旧键迁移成功」
+      //      的情形——那次读取拿到的是真实用户配置（`__src === 'legacy'`），按 unreadable 报
+      //      又会反过来误导排查方向。
+      const __corruptVal = (__why === 'corrupt' || __why === 'legacy-corrupt')
+        && __src === 'default-after-failure';
+      const __stR = schemaStamp(r, __corruptVal ? null : val);
+      try {
+        const __sr = (__stR && __stR.res) || __schemaStampResult || {};
+        const __sk = __corruptVal ? 'unreadable' : (__sr.status || 'unshaped');
+        stats.schemaStatus[__sk] = (stats.schemaStatus[__sk] || 0) + 1;
+        // 损坏时 fp 记 null：此刻 `__sr.fp` 是 **def 的**指纹（schemaStamp 早期就从 reg.def
+        //   算出来），而 lastStamp 这个字段的语义是「磁盘上那份结构的指纹」——把声明结构的
+        //   指纹填进去，等于又一次用「看起来合理」的值替换了「实际为未知」的真相。
+        stats.lastStamp = { key: r.key, at: now(), status: __sk,
+          fp: __corruptVal ? null : (__sr.fp || null), prevAt: __sr.prevAt || null };
+        if (__sk === 'stale') {
+          stats.lastStale = { key: r.key, at: now(), prevFp: __sr.prevFp || null,
+            prevDigest: __sr.prevDigest || null, prevAt: __sr.prevAt || null };
+          if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 磁盘结构指纹与当前声明不符（旧指纹 ' + String(__sr.prevFp).slice(0, 40)
+            + (__sr.prevAt ? '，于 ' + new Date(__sr.prevAt).toLocaleString() + ' 写入' : '') + '）——已按当前结构重盖；'
+            + '这通常意味着该键的结构在上个版本变过而迁移钩子未行使');
+        }
+      } catch (eSS) { /* 记账失败不影响读取 */ }
       // v2.4.0: 整键之外还要补**子键**——旧存档缺新字段时子键为 undefined，
       //   会在消费端静默改变语义（见 applyDefaults 注释）。补齐后再返回独立拷贝。
       val = applyDefaults(r, val);
@@ -1112,6 +1231,22 @@
         //   就不该把这个旧字段丢在原地继续零消费——它仍在自增（向后兼容旧断言），
         //   在此给它一个真实出口，使「旧字段还在涨但没人看」这件事不再成立。
         legacyFailures: stats.failures,
+        // v2.11.0（面B 读侧消费）: 结构指纹状态出口。`_schema` 自 v2.5.0 就在写侧存在，
+        //   而读侧只有 `val._schema.fp === fp` 一个判据——**`.d`（短摘要）与 `.at`（写入时间）
+        //   从未被任何代码读过**，而「这份磁盘值是另一个结构版本写的」更是无人可问：
+        //   指纹不符时引擎静默重盖，没有人知道磁盘上曾经是旧形状（若那次变更是缩减型，
+        //   旧子键会被永久写回）。此处把状态机结果交给消费端。
+        //   判据分级必须与仓库既有口径一致：**warn 级允许用「本会话经历过」（累计）**
+        //   （与 settingsBus.readFailed / store.readFailed 同规格），**error 级必须用当前态**
+        //   （v0.4.0 裁决）。指纹陈旧属前者——它已被「重盖」这一动作自愈，故消费端报
+        //   「本会话发生过几次 + 最近一次是谁」；详情取 lastStale（含旧摘要 prevDigest、
+        //   旧写入时间 prevAt、旧指纹 prevFp）。
+        //   `unreadable`（R3 自纠新增）: 磁盘**有值但读不出结构**——本次已回落默认值，
+        //   用户是「有配置、被读坏了」，与 unshaped（从未配置/值非对象）必须分开报，
+        //   否则用户会按「我没配过」处理，而实际要做的是导出诊断包留证再重建该键。
+        schema: { status: Object.assign({ current: 0, stamped: 0, stale: 0, failed: 0, unshaped: 0, unreadable: 0 },
+            (stats.schemaStatus || {})),
+          lastStamp: stats.lastStamp || null, lastStale: stats.lastStale || null },
         lastError: stats.lastReadError, last: stats.lastRead, lastFail: stats.lastReadFail };
     },
     /**
@@ -1153,18 +1288,15 @@
      */
     subkeyPruner(def) { return makeSubkeyPruner(def); },
     /**
-     * v2.3.0: 原始读取（不解析、不隔离、不回落默认值）。
-     *   用途：格式迁移——历史版本可能把「标量值」以裸字符串写入（非 JSON 契约），
-     *   迁移到本总线前必须先看到原文，否则首次 read 会把旧值判为损坏并隔离，用户配置静默丢失。
-     *   仅限格式迁移使用；常规读取一律走 read()。
+     * v2.11.0（面C · 死面治理）: 此处原有 `readRaw(key)`——v2.3.0 为**一次性格式迁移**
+     *   （`worldaxis_active_preset` 的历史裸字符串）提供的过渡出口。
+     *   该用例已由 v2.5.0 的 `rawRevive` **声明式**承接（`reg.rawRevive:true`，
+     *   幂等、可重复、跨会话，且在 parse 之前生效），preset.js 里的一次性 IIFE 与
+     *   readRaw 调用同步移除（该文件留有现场注释）。此后 readRaw 全库零调用。
+     *   收回理由：它是**绕过总线全部契约**的读取口（不解析、不隔离、不回落默认）——
+     *   留着一个「想读原文时可以用」的出口，下一个调用者就会绕过归因与隔离。
+     *   需要原文时的正确做法是读取侧落账后的 `readEx`（带来源）或声明 rawRevive。
      */
-    readRaw(key) {
-      // v2.10.0: 原始读取的失败同样要归因——它此前 `catch (e) { return null }`，而调用方
-      //   （格式迁移）无法区分「键不存在（null）」与「读取被拒（也 null）」，于是「迁移已完成」
-      //   的结论可能建立在一次失败读取之上。归因后两者可分辨。
-      try { return (WA.mainWin || window).localStorage.getItem(key); }
-      catch (e) { noteReadFail('read', e, 'raw: '); return null; }
-    },
     save(reg, value) {
       const r = Object.assign({ key: null, orphan: false }, reg || {});
       // v2.6.0: 三个失败来源必须都可见——「静默写不进去」是配置丢失里最难查的一类。
@@ -1187,7 +1319,12 @@
             const prev = JSON.parse(rawPrev);
             if (prev && typeof prev === 'object' && prev._schema) inherit = prev._schema;
           }
-        } catch (eP) { /* 上一版读不出来 → 不继承，下次 read 会重新盖章 */ }
+        } catch (eP) {
+          // v2.11.0: 此处读失败此前完全静默（注释只解释了「不继承」，没说这会被**错误地**
+          //   与「上一版确实没有指纹」混为一谈）。后果：指纹丢失看起来像「首次写入」，
+          //   诊断无法区分。归因后「读不出来 ⇒ 没继承」这条降级路径可见。
+          noteReadFail('saveInherit', eP, 'save-inherit: ');
+        }
         // v2.5.0: 必须**先拷贝再挂**，绝不原地改写调用方对象。
         //   本仓库的调用惯例是 `setSettings(o){ save(Object.assign(loadSettings(), o)) }`——
         //   传入的多是临时对象，但 registry/settings 页等处会复用同一引用；一旦原地挂上
@@ -1280,11 +1417,20 @@
     subkeyAudit() {
       const ls = (WA.mainWin || window).localStorage;
       const rows = [];
+      // v2.11.0: 读不出来的键单列——「没有缺口」与「没读到」必须可分辨（见下方读点注释）。
+      const unreadable = [];
       (WA.__settingsRegs || []).forEach(function (r) {
         if (!r || !r.key || r.orphan) return;
         if (!r.def || typeof r.def !== 'object' || Array.isArray(r.def)) return;
-        let raw = null;
-        try { raw = ls.getItem(r.key); } catch (e) { return; }
+        let raw = null, rawErr = null;
+        // v2.11.0: 读失败此前静默 return（跳过）⇒ 该键在缺口表里**整个消失**，
+        //   而调用方无法分辨「这键没缺口」与「这键没读到」。读失败必须单列为一类结论。
+        try { raw = ls.getItem(r.key); } catch (e) { rawErr = e; }
+        if (rawErr) {
+          noteReadFail('subkeyAudit', rawErr, 'subkeyAudit: ');
+          unreadable.push({ key: r.key, module: r.module || null, reason: 'read-failed' });
+          return;
+        }
         if (raw === null || raw === undefined) return;   // 无磁盘值 → 整键回落，不属子键缺口
         // v2.5.0: 把 **原始串** 交给 subkeyGap，而非先 JSON.parse 再判。
         //   此前「解析失败 → parsed=null → return（跳过）」会把「磁盘上是非 JSON 原值」
@@ -1292,7 +1438,10 @@
         const g = subkeyGap(r, raw);
         if (g.missing.length) rows.push({ key: r.key, module: r.module || null, declared: g.declared, missing: g.missing, unparsable: !!g.unparsable });
       });
-      return { keys: rows, totalMissing: rows.reduce(function (s, x) { return s + x.missing.length; }, 0), fills: stats.subkeyFills, fillKeys: stats.subkeyFillKeys };
+      return { keys: rows, totalMissing: rows.reduce(function (s, x) { return s + x.missing.length; }, 0),
+        // v2.11.0: 读失败单列（不是「无缺口」，而是「本轮无法判定」）
+        unreadable: unreadable, unreadableCount: unreadable.length,
+        fills: stats.subkeyFills, fillKeys: stats.subkeyFillKeys };
     },
     /** v2.4.0: 单键子键缺口（供 verifyDefaults 复用） */
     subkeyGap(reg, val) { return subkeyGap(reg, val); },
@@ -1321,7 +1470,10 @@
       return (WA.__settingsRegs || []).filter(function (r) {
         if (!r.orphan || !r.key) return false;
         if (!__seenKeys[r.key]) return false;   // 从未观测到存在 → 休眠登记，不是幽灵
-        try { return ls.getItem(r.key) === null; } catch (e) { return false; }
+        // v2.11.0: 读失败此前与「键仍在」共用 false（保守方向正确），但台账里查不到——
+        //   幽灵清理是**删用户数据**的路径，此处每一次无法判定都必须留痕。
+        try { return ls.getItem(r.key) === null; }
+        catch (e) { noteReadFail('pendingOrphan', e, 'pendingOrphan: '); return false; }
       }).map(function (r) { return { key: r.key, module: r.module }; });
     },
     /** 休眠登记：声明 orphan:true 但从未落盘（不产议题，仅诊断视图可见） */
@@ -1422,8 +1574,18 @@
         if (o.keys && o.keys.indexOf(r.key) < 0) return;
         if (r.orphan) return;                       // 幽灵键不参与
         if (!Object.prototype.hasOwnProperty.call(r, 'def')) return;
-        let raw = null;
-        try { raw = ls.getItem(r.key); } catch (e) { raw = null; }
+        let raw = null, rawErr = null;
+        // v2.11.0（结论不实 · 现场三）: 读失败此前被当成「磁盘无值」⇒ 校验器改走
+        //   「与 providers 的实际默认值比对」分支。而该分支的前提是**确实没有磁盘值**；
+        //   读被拒时它会把「有磁盘值但读不出来」判成「声明与默认值不符/相符」的一堆结论，
+        //   全是无根据的。必须先分清「没有值」与「读不到值」。
+        try { raw = ls.getItem(r.key); }
+        catch (e) { raw = null; rawErr = e; }
+        if (rawErr) {
+          noteReadFail('verifyDefaults', rawErr, 'verifyDefaults: ');
+          out.push({ key: r.key, module: r.module || null, checked: false, reason: 'read-failed', ok: null });
+          return;
+        }
         if (raw !== null && raw !== undefined) {
           // 有磁盘值：登记声明必须与实际存量形状一致，否则声明已过时。
           //   ⚠ 脱敏：绝不回显磁盘内容——通道配置键含 apiKey，原文一旦进诊断包即明文泄露。

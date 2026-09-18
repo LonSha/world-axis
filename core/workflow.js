@@ -171,7 +171,14 @@
       try {
         const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
         const mainWin = (typeof window !== 'undefined' ? window : global);
-        const raw = mainWin.localStorage.getItem('worldaxis_wf_history_' + cid);
+        // v2.11.0: 读失败此前被外层 `catch (e) {}` 吞掉，而 __chainHistory 已被清空 ⇒
+        //   「工作流历史读不出来」表现为「本会话没有历史」（面板显示空、诊断无痕）。
+        let raw = null;
+        try { raw = mainWin.localStorage.getItem('worldaxis_wf_history_' + cid); }
+        catch (eR) {
+          try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail('workflowHistory', 'worldaxis_wf_history_' + cid, eR); } catch (e2) {}
+          return;   // 读不到就**不动**内存里的既有历史（清空会让结论更失真）
+        }
         __chainHistory.length = 0;
         if (raw) {
           const arr = JSON.parse(raw);

@@ -189,8 +189,15 @@
     //   使维持健康分的判据是当前态而非历史累计（见 v0.4.0 的 lastOk/lastFailAt 裁决）。
     __removeStat.lastReason = null;
     let existed = false;
+    // v2.11.0: 本行已是「读失败 ⇒ 结论为失败」的诚实实现，但**没有进读侧台账**——
+    //   消费端 readStat() 看不到它，诊断只能从 removeStat 的 lastReason 间接猜。
+    //   同一件事（一次失败的读取）必须只有一个记账入口。
     try { const cur = mainWin.localStorage.getItem(key); existed = (cur !== null && cur !== undefined); }
-    catch (e) { __removeStat.failed++; __removeStat.lastReason = 'read-failed'; return { ok: false, removed: false, reason: 'read-failed' }; }
+    catch (e) {
+      noteStoreReadFail('verify', key, e);
+      __removeStat.failed++; __removeStat.lastReason = 'read-failed';
+      return { ok: false, removed: false, reason: 'read-failed' };
+    }
     if (!existed) { __removeStat.verified++; return { ok: true, removed: false, reason: 'absent' }; }
     try { mainWin.localStorage.removeItem(key); }
     catch (e) { __removeStat.failed++; __removeStat.lastReason = 'remove-threw'; return { ok: false, removed: false, reason: 'remove-threw' }; }
@@ -847,7 +854,14 @@
       __loadStat.loads++; __loadStat.lastAt = Date.now();
       let raw = null;
       try { raw = mainWin.localStorage.getItem(storageKey(chatId)); }
-      catch (e) { __loadStat.errors++; __loadStat.lastError = String((e && e.message) || e); WA.log('error', 'store.load读取失败', e); return null; }
+      catch (e) {
+        // v2.11.0: 载入失败此前只进 __loadStat.errors（载入域），而读侧台账（__readStat）
+        //   查不到。后果：诊断报「存储读取全部成功」的同时，当前聊天其实**根本没载入**。
+        //   载入失败是读失败里后果最重的一种（整份存档不可见），必须两个域都可见。
+        noteStoreReadFail('load', String(chatId || ''), e);
+        __loadStat.errors++; __loadStat.lastError = String((e && e.message) || e);
+        WA.log('error', 'store.load读取失败', e); return null;
+      }
       if (!raw) { __loadStat.misses++; return null; }
       try {
         const st = JSON.parse(raw);
@@ -878,8 +892,19 @@
           //   读侧台账里可见），也不能把「不可知」当成「没有冲突」。
           // 磁盘序号与本实例上次所见不一致 → 他实例写过。若此刻直接写，其改动将被覆盖。
           if (dRevRes.ok && __seenRev > 0 && dRev > __seenRev) {
-            let rawDisc = null;
-            try { rawDisc = mainWin.localStorage.getItem(storageKey(cidW)); } catch (e) { rawDisc = null; }
+            // v2.11.0（结论不实 · 现场四）: 本分支已确认「他实例写过、本次保存将覆盖其改动」，
+            //   保全对方的唯一手段就是读出其磁盘 payload。此处读失败此前被压成 rawDisc=null ⇒
+            //   走「if (rawDisc)」的 else 路径，即**静默跳过保全**——他实例的进度就这么没了，
+            //   而 __conflictStat.detected 也不计，诊断与面板上都看不到「有一次覆盖没保住对方」。
+            //   与 v2.10.0 修的 diskRev 读失败同源，但后果更重：连保全机会都没有。
+            let rawDisc = null, rawDiscErr = null;
+            try { rawDisc = mainWin.localStorage.getItem(storageKey(cidW)); } catch (e) { rawDisc = null; rawDiscErr = e; }
+            if (rawDiscErr) {
+              noteStoreReadFail('saveConflict', storageKey(cidW), rawDiscErr);
+              try { __conflictStat.unpreserved = (__conflictStat.unpreserved || 0) + 1; __conflictStat.lastUnpreservedAt = Date.now(); } catch (eU) {}
+              WA.log('error', '检测到并发写入（对方序号 ' + dRev + ' > 本实例所见 ' + __seenRev
+                + '）但对方 payload **读取失败**，本次覆盖**未能保全**其改动（键：' + storageKey(cidW) + '）', rawDiscErr);
+            }
             if (rawDisc) {
               const kept = quarantineConflict(cidW, rawDisc, s);
               __conflictStat.detected++; __conflictStat.lastAt = Date.now(); __conflictStat.lastChat = cidW;
@@ -1109,9 +1134,23 @@
         score -= 7;
         const rdSrc = ssRead.readFailedDetail || {};
         // v2.10.0（逆向审计自纠第四轮）: 分桶明细**全量列出**（此前只列三个已知来源）。
+        // v2.11.0: 来源标签必须覆盖**全部**归因点。本版把引擎侧 7 处裸读点接入同一台账
+        //   （chatcacheState / chatcacheRev / worldbookSelection / workflowHistory /
+        //   uninjectLedger / eventLog / errorLog），以及 core 侧 5 处（rmExisted / verifyBack /
+        //   legacyRead / saveInherit / subkeyAudit / pendingOrphan / verifyDefaults / load /
+        //   saveConflict / verifyState）。标签缺失会让这些来源在消费端退回裸桶名——
+        //   与 v2.10.0 修掉的「有归因但看不见」是同一个坑。
         const LAB = { bytes: '按字节', activity: '活跃时间', enumerate: '枚举', diskRev: '磁盘序号',
           verify: '写后校验/删后复核读回', recovery: '恢复点清单', conflict: '冲突现场',
-          quarantine: '隔离现场', writerId: '写入者标识' };
+          quarantine: '隔离现场', writerId: '写入者标识',
+          load: '存档载入（整份存档不可见）', saveConflict: '并发覆盖前的保全读回',
+          verifyState: '存档巡检', rmExisted: '受控删除的存在性探测', verifyBack: '写后/删后复核读回',
+          legacyRead: 'legacy 旧键读取', saveInherit: '保存时继承结构指纹',
+          subkeyAudit: '子键缺口盘点', pendingOrphan: '幽灵键盘点', verifyDefaults: '默认值声明校验',
+          lsRaw: '幽灵设置盘点原文', chatcacheState: '聊天快照', chatcacheRev: '同步修订号',
+          chatcacheInstallBack: '快照安装回读', worldbookSelection: '世界书条目选择',
+          workflowHistory: '工作流历史', uninjectLedger: '撤销注入账本',
+          eventLog: '事件日志载入', errorLog: '错误日志载入' };
         const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
           .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');
         issues.push({ level: 'warn', key: 'storage.readFailed',
@@ -1139,6 +1178,45 @@
             + ' 次）——为避免覆盖丢弃全部历史恢复点，恢复点创建已被跳过（读不到就不写），'
             + '当前**没有恢复点保护**，推进后无法回退' });
         actions.push({ id: 'export-diag', safe: true, detail: '先导出诊断包留证，再排查存储可读性（恢复点保护当前不可用）' });
+      }
+      // ── 5.7 v2.11.0 读侧完整性扩展：结论级读失败（比容量数字失真重得多）──
+      //   ① 存档载入读失败 ⇒ **当前聊天整份存档不可见**（默认状态顶上）。这是读失败里
+      //      后果最重的一种：用户看到的是一个空世界，而磁盘上他的进度还在。error。
+      //   ② 存档巡检读失败 ⇒ 「所有聊天存档可解析」这句结论建立在失败的读取上。error。
+      //   ③ 并发覆盖未保全 ⇒ 已确认他实例写过、本次保存将覆盖其改动，而对方 payload
+      //      **读不出来** ⇒ 连保全机会都没有。他实例进度被静默吞掉，是本版修掉的最严重现场。
+      //   ④ 快照安装回读失败 ⇒ 安装后无法确认内容一致（只有这一处能发现静默截断）。
+      //   判据一律用**最近一次读失败事件**（lastFail.source）而非累计数——累计数只增不减，
+      //   会让「历史失败」把分数永久压低（v0.4.0 裁决；本仓库已因同型坑自纠四次）。
+      const lfSrc = (__readStat.lastReadFail && __readStat.lastReadFail.source) || null;
+      if (lfSrc === 'load') {
+        score -= 15;
+        issues.push({ level: 'error', key: 'storage.readLoadBlocked',
+          detail: '**最近一次**存储读取失败发生在存档载入上（当前聊天）：整份存档对本实例不可见，'
+            + '界面呈现的是默认世界而磁盘上仍有你的进度——此时**不要保存**，任何保存都会用空状态覆盖真档。'
+            + '请先导出诊断包留证并排查存储可读性' });
+        actions.push({ id: 'export-diag', safe: true, detail: '存档未载入（读失败）——先导出诊断包留证，暂勿保存以免覆盖真档' });
+      }
+      if (lfSrc === 'saveConflict') {
+        score -= 12;
+        issues.push({ level: 'error', key: 'storage.coverageUnpreserved',
+          detail: '**最近一次**存储读取失败发生在并发覆盖前的保全读回上：已确认另一实例写过该聊天、'
+            + '本次保存将覆盖其改动，而对方的 payload 读不出来 ⇒ **本次覆盖未能保全对方进度**'
+            + '（本会话累计 ' + ((__conflictStat && __conflictStat.unpreserved) || 1) + ' 次）。'
+            + '他实例的改动已被静默吞掉，无现场可查' });
+        actions.push({ id: 'review-conflict', safe: false, detail: '存在未能保全的并发覆盖（对方 payload 读失败），建议先导出诊断包留证' });
+      }
+      if (lfSrc === 'verifyState') {
+        score -= 6;
+        issues.push({ level: 'error', key: 'storage.readVerifyBlocked',
+          detail: '**最近一次**存储读取失败发生在存档巡检上：「所有聊天存档可解析」这一结论建立在一次失败的读取之上，'
+            + '该聊天既没被判定为正常、也没被判定为损坏（巡检留了空档）' });
+      }
+      if (lfSrc === 'chatcacheInstallBack') {
+        score -= 6;
+        issues.push({ level: 'warn', key: 'storage.readInstallBlocked',
+          detail: '**最近一次**存储读取失败发生在快照安装回读上：安装后无法确认磁盘内容与安装值一致，'
+            + '静默截断（写入被接受但只落了一部分）与读失败在本会话内不可分辨' });
       }
       // ── 6. 多实例并发一致性 ──
       //   ① 存在未处置的冲突现场 → 当前态缺陷（有他实例数据等待用户决策）→ 扣分 warn
@@ -1772,7 +1850,10 @@
       const cid = chatId || getChatId();
       const key = 'worldaxis_state_' + cid;
       let raw = null;
-      try { raw = mainWin.localStorage.getItem(key); } catch (e) { return { chat: cid, exists: false, ok: false, reason: 'read-failed' }; }
+      // v2.11.0: 返回的 reason 已诚实区分 read-failed / missing，但没用计量出口——
+      //   「存储巡检报告『所有聊天存档可解析』」这句话的可信度取决于读没读到，必须可见。
+      try { raw = mainWin.localStorage.getItem(key); }
+      catch (e) { noteStoreReadFail('verifyState', key, e); return { chat: cid, exists: false, ok: false, reason: 'read-failed' }; }
       if (raw === null) return { chat: cid, exists: false, ok: false, reason: 'missing' };
       let parsed = null;
       try { parsed = JSON.parse(raw); }
@@ -2137,6 +2218,21 @@
       return { readFailed: __readStat.readFailed, ok: __readStat.readFailed === 0,
         bySource: by, lastFail: __readStat.lastReadFail };
     },
+    /**
+     * v2.11.0: **跨模块读侧归因出口**——其他模块（chatcache / worldbook / workflow /
+     *   render.inject / index 宿主）有自己的裸读点，它们的读失败同样只让结论悄悄失真。
+     *
+     * 为什么不给每个模块发一份自己的计量：本仓库反复出现的同型缺陷是「各点各写一份」
+     *   （写侧漏四条、删侧被包在空 catch 里、v2.10.0 读侧 15 处漏网）。**一份实现 + 一个计量**
+     *   才是台账能对账的前提。本出口就是那个「一份实现」对外的那扇门。
+     *
+     * 语义：永不抛（记账本身不得打断读取），且**只投放**——不改变调用方的控制流。
+     *   调用方仍须自己决定「读不到就不算没有」（本版已在各点落实）。
+     * @param {string} source 来源标签（chatcache / worldbook / workflow / inject / host …）
+     * @param {string} key 涉及的键
+     * @param {*} err 原始错误
+     */
+    reportReadFail(source, key, err) { noteStoreReadFail(source, key, err); return true; },
     storageStat(opts) {
       const o = opts || {};
       const maxIdleMs = (typeof o.maxIdleDays === 'number' && o.maxIdleDays >= 0 ? o.maxIdleDays : 30) * 86400000;
@@ -2450,7 +2546,9 @@
         return { ok: false, reason: '非 state 隔离现场（settings 隔离现场请用设置面板重置）' };
       }
       let raw = null;
-      try { raw = mainWin.localStorage.getItem(key); } catch (e) { return { ok: false, reason: '读取隔离键失败：' + ((e && e.message) || e) }; }
+      // v2.11.0: 恢复隔离现场是**唯一的用户数据回滚手段**——读失败必须归因（此前只回显字符串）。
+      try { raw = mainWin.localStorage.getItem(key); }
+      catch (e) { noteStoreReadFail('quarantine', key, e); return { ok: false, reason: '读取隔离键失败：' + ((e && e.message) || e) }; }
       if (!raw) return { ok: false, reason: '隔离现场不存在' };
       let parsed = null;
       try { parsed = JSON.parse(raw); }

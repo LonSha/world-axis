@@ -27,20 +27,22 @@ function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
   WA.purifier = {
     rules: loadRules(),
     getRules() { return this.rules; },
-    addRule(rule) { this.rules.push(Object.assign({ id: 'r' + Date.now(), flags: 'g', enabled: true }, rule)); saveRules(this.rules); },
-    removeRule(id) { this.rules = this.rules.filter(r => r.id !== id); saveRules(this.rules); },
+    /**
+     * v2.11.0（面C · 死面治理）: 此处原有 `addRule(rule)` / `removeRule(id)` 两个**裸入口**——
+     *   addRule 无准入（`Object.assign` 直塞任意对象，非法 `find` 会写进存档，
+     *   让整个净化环节静默失效）、removeRule 无归因（删不存在的 id 静默返回）。
+     *   两者自 v2.2.0 起已被 `addRuleSafe` / `removeRuleSafe` 取代，全库**零调用点**。
+     *   收回理由与 setProfile 同型：留着裸入口，下一个调用者挑错的那个就会绕过准入。
+     *   注意：`rules` 数据成员本身**保留**（读取面：规则清单/统计都读它，不是死面）。
+     */
     setEnabled(id, on) { const r = this.rules.find(x => x.id === id); if (r) { r.enabled = !!on; saveRules(this.rules); } },
-    /** 导入Veridis预设 */
-    loadPreset(preset) {
-      if (preset && preset.type === 'veridis-rewrite-preset' && Array.isArray(preset.rules)) {
-        const imported = preset.rules.filter(r => r && r.find).map(r => ({ id: 'vr_' + (r.id || Date.now() + Math.random().toString(36).slice(2, 5)), name: r.name || r.find.slice(0, 20), find: r.find, replace: r.replace || '', flags: r.flags || 'g', enabled: true }));
-        this.rules = this.rules.concat(imported);
-        saveRules(this.rules);
-        WA.log('info', '净化规则导入 ' + imported.length + ' 条');
-        return imported.length;
-      }
-      return 0;
-    },
+    /**
+     * v2.11.0（面C · 死面治理）: 此处原有 `loadPreset(preset)`——只认 Veridis 预设且
+     *   入参形态判断极窄（`preset.type === 'veridis-rewrite-preset'`），不满足即**静默返回 0**
+     *   （调用方看不出「格式不对」还是「一条都没导入」）。它自 v2.2.0 起已被
+     *   `importPresetSafe` 取代（兼容两种形态：Veridis 预设与裸规则数组；逐条准入；
+     *   解析/缺 rules/全被拒各有归因），全库零调用。收回。
+     */
     /**
      * v2.2.0: 安全导入预设（此前 loadPreset 零调用 = 导入能力无入口）。
      *   入参可为 JSON 字符串或对象；逐条准入（必须有 find，正则可编译），

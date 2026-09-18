@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.10.0';
+  const VERSION = '2.11.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -140,16 +140,26 @@
     __logSaveChat = null;
     persistEventLog(target);
   };
+  // v2.11.0: 宿主级读失败投递（与各模块同口径——单一台账、多模块投递）
+  function reportHostReadFail(source, key, err) {
+    try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail(source, key, err); } catch (e) {}
+  }
   WA.loadEventLog = function (chatId) {
     try {
       WA.flushLog();   // 先落盘当前聊天挂起日志
       const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
-      const raw = mainWin.localStorage.getItem('worldaxis_event_log_' + cid);
+      // v2.11.0: 两处日志载入此前共用一个空 catch ⇒ 读失败表现为「本会话没有历史日志」，
+      //   而日志正是排查其它故障的唯一证据面——它自己读不出来时必须是可见的。
+      let raw = null;
+      try { raw = mainWin.localStorage.getItem('worldaxis_event_log_' + cid); }
+      catch (eH) { reportHostReadFail('eventLog', 'worldaxis_event_log_' + cid, eH); }
       if (raw) {
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) WA.eventLog = arr.slice(-LOG_ADAPT.baseEvent);
       }
-      const rawErr = mainWin.localStorage.getItem('worldaxis_error_log_' + cid);
+      let rawErr = null;
+      try { rawErr = mainWin.localStorage.getItem('worldaxis_error_log_' + cid); }
+      catch (eH2) { reportHostReadFail('errorLog', 'worldaxis_error_log_' + cid, eH2); }
       if (rawErr) {
         const arrErr = JSON.parse(rawErr);
         if (Array.isArray(arrErr)) WA.errorLog = arrErr.slice(-ERROR_LOG_MAX);

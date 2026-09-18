@@ -15,11 +15,29 @@
       });
       WA.emit('clock:changed', label);
     },
-    /** 推进一天 */
-    advanceDay() {
-      const s = WA.store.get();
-      const next = (s.clock.dayIndex || 0) + 1;
-      this.setClock('第' + next + '日', { source: 'engine', dayIndex: next });
+    /**
+     * 推进一天（整日推进入口）。
+     *
+     * v2.11.0: 本函数此前**全库零调用**——而 `autoAdvance` 的 `kind==='day'` 分支里
+     *   另写了一份「跳日」逻辑（保留原时段 `第1日·黄昏` → `第2日·黄昏`），两份实现必然漂移：
+     *   面板「下一日」按钮（本版上线）走这里、正文时间词走 autoAdvance，同样的语义会写出
+     *   两种标签（一个丢时段、一个留时段）。现收敛为**单一实现**：autoAdvance 的 day 分支
+     *   改为调用本函数（带 keepPart），标签口径由本函数一处决定。
+     * @param {{keepPart?:boolean, source?:string}} [opts] keepPart=true 保留原时段后缀
+     * @returns {number} 推进后的 dayIndex（-1 表示世界钟缺失，未推进）
+     */
+    advanceDay(opts) {
+      const o = opts || {};
+      const st = WA.store.get();
+      const clock = (st && st.clock) || null;
+      if (!clock) return -1;                      // 世界钟结构缺失：明确返回哨兵，不静默推一天
+      const prev = String(clock.label || '');
+      const part = (o.keepPart && prev.indexOf('·') >= 0) ? prev.split('·')[1] : '';
+      const day = (clock.dayIndex || 0) + 1;
+      this.setClock('第' + day + '日' + (part ? '·' + part : ''), { source: o.source || 'engine', dayIndex: day });
+      // v2.11.0: 计量放在**单一实现**里（autoAdvance 的 day 分支不再自己 ++，否则同一件事计两次）
+      try { __calStat.dayAdvances++; } catch (e) { /* 计量失败不影响推进 */ }
+      return day;
     },
     /** 解析正文中的时间词并建议推进（骨架：只做常见模式） */
     suggestAdvance(text) {
@@ -60,12 +78,8 @@
       __calStat.lastSig = sig;
       let label;
       if (kind === 'day') {
-        // 跳日：保留原时段信息（『第1日·黄昏』→『第2日·黄昏』），source 记为 text
-        const cur = WA.store.get();
-        const prev = String((cur.clock && cur.clock.label) || '');
-        const part = prev.indexOf('·') >= 0 ? prev.split('·')[1] : '';
-        const day = (cur.clock.dayIndex || 0) + 1;
-        this.setClock('第' + day + '日' + (part ? '·' + part : ''), { source: 'text', dayIndex: day });
+        // 跳日：保留原时段信息（『第1日·黄昏』→『第2日·黄昏』）——**收敛到 advanceDay 单一实现**
+        this.advanceDay({ keepPart: true, source: 'text' });
         label = WA.store.read('clock.label', '');
       } else { this.advancePart(kind); label = WA.store.read('clock.label', ''); }
       __calStat.advanced++;
@@ -79,6 +93,9 @@
       return { runs: __calStat.runs, advanced: __calStat.advanced, deduped: __calStat.deduped,
         noSignal: __calStat.noSignal, skipped: __calStat.skipped,
         lastKind: __calStat.lastKind, lastLabel: __calStat.lastLabel, lastAt: __calStat.lastAt,
+        // v2.11.0: `dayAdvances` 单独计量——整日推进（面板按钮 / 正文时间词）与时段推进
+        //   后果不同（跨日会推进所有按日结算的子系统），此前两者混在一个 advanced 里。
+        dayAdvances: __calStat.dayAdvances || 0,
         auto: loadSettings().auto !== false };
     },
     getSettings: loadSettings,
@@ -90,7 +107,8 @@
     }
   };
   // v2.1.0: 自动推进观测对象
-  const __calStat = { runs: 0, advanced: 0, deduped: 0, noSignal: 0, skipped: 0, lastKind: null, lastLabel: '', lastAt: 0, lastSig: '' };
+  const __calStat = { runs: 0, advanced: 0, deduped: 0, noSignal: 0, skipped: 0, lastKind: null, lastLabel: '', lastAt: 0, lastSig: '',
+    dayAdvances: 0 };
   function __hash(str) {
     let h = 0x811c9dc5;
     for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 0x01000193) >>> 0; }

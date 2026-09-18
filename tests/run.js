@@ -7151,7 +7151,11 @@ WA.loadScript = _ls.loadScript;
     global.__firstChildEl2100 = null;
     vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'), ctx, { filename: 'ui/panel.js' });
     const EV2100 = WA.ui.STATE_EVENTS.slice();
-    assert(Array.isArray(EV2100) && EV2100.length === 9, '状态事件清单为 9 个');
+    // v2.11.0（契约变更，显式留痕）: 9 → 11。新增 `backstage:started` / `backstage:settled`——
+    //   它们此前只被**悬浮球呼吸动画**订阅，面板自身不重绘，于是本版新上线的「世界推演运行态」
+    //   行会停留在渲染那一刻的值（点了中止也不会变回「空闲」，运行中也不会变成「运行中」）。
+    //   本块的语义（挂载前全是死信号 → 挂载后 dead 零增长）逐字不变，只更新清单长度。
+    assert(Array.isArray(EV2100) && EV2100.length === 11, '状态事件清单为 11 个（v2.11.0：+backstage:started/settled）');
     assert(WA.ui.mounted === false, '挂载前 mounted=false');
 
     // D1. 断链现场 → 挂载后全部被接收
@@ -7159,14 +7163,14 @@ WA.loadScript = _ls.loadScript;
     const bsA2100 = WA.busStats(999), mapA2100 = {};
     (bsA2100.events || []).forEach(function (r) { mapA2100[r.event] = r.dead || 0; });
     const deadBefore2100 = EV2100.filter(function (e) { return (mapA2100[e] || 0) > 0; });
-    assert(deadBefore2100.length === 9, '挂载前 9 个事件全是死信号（断链现场）');
+    assert(deadBefore2100.length === 11, '挂载前 11 个事件全是死信号（断链现场）');
     WA.store.init();
     WA.ui.mount();
     assert(WA.ui.mounted === true, '挂载后 mounted=true');
     EV2100.forEach(function (e) { WA.emit(e); });
     const bsB2100 = WA.busStats(999), mapB2100 = {};
     (bsB2100.events || []).forEach(function (r) { mapB2100[r.event] = r.dead || 0; });
-    assert(EV2100.every(function (e) { return (mapB2100[e] || 0) === (mapA2100[e] || 0); }), '全部 9 个事件挂载后 dead 零增长（死信号已治理）');
+    assert(EV2100.every(function (e) { return (mapB2100[e] || 0) === (mapA2100[e] || 0); }), '全部 ' + EV2100.length + ' 个事件挂载后 dead 零增长（死信号已治理）');
 
     // D2. 重绘语义：隐藏不重绘 / 节流 / 输入中不重绘
     const rsA2100 = WA.ui.rerenderStat();
@@ -9567,7 +9571,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.11.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10111,7 +10115,7 @@ assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.10.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.11.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10402,7 +10406,7 @@ assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.10.0', '入口版本为 2.10.0（实 ' + ver + '）');
+    assert(ver === '2.11.0', '入口版本为 2.11.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -10678,6 +10682,75 @@ assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单�
           + JSON.stringify(WA.settingsBus.stats.lastRead) + '）');
       }
     }
+    // ── G16（v2.11.0）：读侧裸读点冻结清单——「三面」的第三面 ──
+    //   G13 钉写侧（裸 setItem 只剩白名单内的非 settings 旁路）、G14 钉删侧（裸 removeItem
+    //   只剩受控出口内部那一处）、G15 钉读失败归因（收敛为单一实现 + 有消费端）。
+    //   但**裸读点本身**（`localStorage.getItem` 直接出现在模块里）此前没有任何清单——
+    //   它可以随时新增，而每新增一处默认就是「读失败静默与业务结论同形」的温床
+    //   （本版在 41 处里抓出六处「结论不实」，全部长在裸读点上）。
+    //   故本门禁钉两件事：① 逐文件计数与冻结清单一致（新增/删除都必须显式落进清单）；
+    //   ② 每一处附近必须有一次读侧归因投递（有清单还不够，得真有归因）。
+    {
+      const INVENTORY_G16 = { 'core/settings-bus.js': 11, 'core/store.js': 19, 'core/workflow.js': 1,
+        'engines/chatcache.js': 3, 'engines/tool-diag.js': 1, 'engines/worldbook.js': 2,
+        'render/inject.js': 1, 'index.js': 2 };
+      const ATTRIB_G16 = /noteReadFail\(|noteStoreReadFail\(|reportReadFail\(|reportHostReadFail\(|noteWbRead\(|noteRead\(/;
+      const scanG16 = function (extraFiles) {
+        const dirs = ['core', 'engines', 'render', 'ui', 'actors', 'direction', 'compat'];
+        const files = [];
+        const walkG16 = function (rel) {
+          const abs = path.join(BASE, rel);
+          let st = null;
+          try { st = fs.statSync(abs); } catch (e) { return; }
+          if (st.isFile()) { if (/\.js$/.test(rel)) files.push(rel); return; }
+          let names = [];
+          try { names = fs.readdirSync(abs); } catch (e) { return; }
+          names.forEach(function (n) { walkG16(rel + '/' + n); });
+        };
+        dirs.forEach(walkG16); walkG16('index.js');
+        (extraFiles || []).forEach(function (rel) { if (files.indexOf(rel) < 0) files.push(rel); });
+        const byFile = {}, miss = [];
+        files.forEach(function (rel) {
+          const lines = fs.readFileSync(path.join(BASE, rel), 'utf8').split('\n');
+          let n = 0;
+          lines.forEach(function (ln, i) {
+            if (/^\s*(\/\/|\*|\/\*)/.test(ln)) return;
+            if (!/localStorage\s*\.\s*getItem\(|(?:ls|LS)\.getItem\(/.test(ln)) return;
+            n++;
+            const lo = Math.max(0, i - 3), hi = Math.min(lines.length, i + 15);
+            if (!ATTRIB_G16.test(lines.slice(lo, hi).join('\n'))) miss.push(rel + ':' + (i + 1));
+          });
+          if (n) byFile[rel] = n;
+        });
+        return { byFile: byFile, miss: miss };
+      };
+      const SCAN16 = scanG16();
+      const countByFile16 = SCAN16.byFile;
+      Object.keys(INVENTORY_G16).forEach(function (rel) {
+        assert((countByFile16[rel] || 0) === INVENTORY_G16[rel],
+          'G16 裸读点清单未漂移：' + rel + '（实 ' + (countByFile16[rel] || 0) + '，冻结 ' + INVENTORY_G16[rel] + '）');
+      });
+      const extra16 = Object.keys(countByFile16).filter(function (rel) { return INVENTORY_G16[rel] === undefined; });
+      assert(extra16.length === 0, '（负向）没有新增裸读文件（实 ' + (extra16.join(',') || '无') + '）');
+      assert(SCAN16.miss.length === 0,
+        'G16 每处裸读点附近都有读侧归因（实无归因 ' + SCAN16.miss.length + ' 处'
+        + (SCAN16.miss.length ? '：' + SCAN16.miss.slice(0, 5).join('、') : '') + '）');
+      const total16 = Object.keys(countByFile16).reduce(function (a, k) { return a + countByFile16[k]; }, 0);
+      assert(total16 === 40, 'G16 裸读点总数为 40（实 ' + total16 + '）');
+      // 负向探针：临时落一个含裸读点的文件，必须被检出（否则上面的计数只是「碰巧成立」）
+      const probeRel16 = 'core/__g16_probe__.js';
+      const probeAbs16 = path.join(BASE, probeRel16);
+      try {
+        fs.writeFileSync(probeAbs16, '// probe\n(function(){ var x = localStorage.getItem("k"); return x; })();\n');
+        const caughtG16 = scanG16([probeRel16]).byFile[probeRel16] || 0;
+        assert(caughtG16 === 1,
+          '（负向）G16 探针：新加一个裸读文件会被检出（实检出 ' + caughtG16 + ' 个，期望 1）');
+        assert(scanG16([probeRel16]).miss.length >= 1, '（负向）新裸读点若无归因会被单列为「无归因读点」');
+      } finally {
+        try { fs.unlinkSync(probeAbs16); } catch (e) { /* 清理失败不掩盖断言 */ }
+      }
+      assert(fs.existsSync(probeAbs16) === false, '（环境）G16 探针文件已清理，不残留');
+    }
     const diagSrc2800 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
     const mi2800 = diagSrc2800.indexOf('const MODULE_EXPORTS = {');
     const mj2800 = diagSrc2800.indexOf('\n  };', mi2800);
@@ -10739,7 +10812,7 @@ assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:applyResult applyStat buildPrompt forceSimulate getSettings setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add list remove shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy list remove reputationPressure update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -10855,7 +10928,7 @@ assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.10.0', '入口版本为 2.10.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.11.0', '入口版本为 2.11.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11243,7 +11316,7 @@ assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.10.0', '入口版本为 2.10.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.11.0', '入口版本为 2.11.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11613,7 +11686,7 @@ assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.10.0', '入口版本为 2.10.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.11.0', '入口版本为 2.11.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -11622,6 +11695,372 @@ assert(verF2500 === '2.10.0' && mfF2500.version === verF2500, '入口与清单�
     assert(fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8').indexOf('v2.10.0') > 0, '诊断消费端留痕');
     assert(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8').indexOf('v2.10.0') > 0, '面板消费端留痕');
   }
+  // ══════════════════════════════════════════════════════════════════════════
+  // v2.11.0：「活性面治理」——读出入口的第三个面、指纹的读侧消费、死面的分级与接线
+  //
+  //   三面命题（对 v2.8.0「出口面契约」的三重对偶）：
+  //     面A：v2.10.0 收口了读**失败**的归因，但**裸读点本身**（`localStorage.getItem`）
+  //          没有任何清单——写侧有 G13（裸 setItem 白名单）、删侧有 G14（裸 removeItem
+  //          唯一出口），读侧没有 G16。本版把 40 处裸读点全部归因并冻结成清单。
+  //     面B：`_schema` 结构指纹自 v2.5.0 就在写侧存在，而读侧只有 `val._schema.fp === fp`
+  //          一个判据——**`.d`（短摘要）与 `.at`（写入时间）从未被任何代码读过**，
+  //          「这份磁盘值是另一个结构版本写的」无人可问。本版把盖章改成状态机并接消费端。
+  //     面C：70 项「真死导出」（inventory 的 `--dead`）被判为整类病灶：55 项 internal-helper
+  //          （同文件自用的过度导出）+ 15 项 unwired。后者里藏着**真功能断链**——能力已实现
+  //          却零消费端（backstage 运行态/中止、calendar 整日推进、编辑态、两个开关）。
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+  const LSV2110 = global.localStorage;
+  const ctxV2110 = global.SillyTavern.getContext();
+  function frV2110() { LSV2110.clear(); ctxV2110.chatId = 'v2110_chat'; global.__mockChat.length = 0; WA.store.init(); }
+  function cnt2110(s2, needle) { return String(s2).split(needle).length - 1; }
+
+  // ── 块1：面A 读点收口（40 处裸读点全部归因 + 归因收敛为单一出口） ──
+  section('v2.11.0 块1：面A 读点收口（全部裸读点有归因 + 跨模块单一出口）');
+  {
+    const busA = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+    const storeA = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    // ① 跨模块归因出口：单一台账、多模块投递（绝不各模块自建一份计量）
+    assert(typeof WA.store.reportReadFail === 'function' || storeA.indexOf('reportReadFail(source, key, err)') > 0,
+      '跨模块读失败归因有单一出口（store.reportReadFail）——引擎侧不各自建计量');
+    assert(cnt2110(storeA, 'function noteStoreReadFail(') === 1,
+      'store 侧读失败记账仍是单一实现（实 ' + cnt2110(storeA, 'function noteStoreReadFail(') + ' 处）');
+    // 引擎侧五处投递点（chatcache / worldbook / workflow / inject / index）
+    const eng5 = ['engines/chatcache.js', 'engines/worldbook.js', 'core/workflow.js', 'render/inject.js', 'index.js'];
+    eng5.forEach(function (rel) {
+      const t = fs.readFileSync(path.join(BASE, rel), 'utf8');
+      assert(t.indexOf('reportReadFail') > 0, rel + ' 经跨模块出口投递读失败（不自建计量）');
+    });
+    // ② 六处「结论不实」现场：读失败不得与业务结论同形（本版核心价值）
+    assert(busA.indexOf("reason: 'read-failed'") > 0 && busA.indexOf('rmExisted') > 0,
+      '（现场一）受控删除的存在性探测读失败与「键不存在」分开（不再报「幂等无操作」）');
+    assert(busA.indexOf("noteReadFail('verifyBack'") > 0 && busA.indexOf("reason: 'read-back-failed'") > 0,
+      '（现场二）删后复核读失败与「键确已删除」分开（删除成功不再是假结论）');
+    assert(busA.indexOf("noteReadFail('verifyDefaults'") > 0 && busA.indexOf("reason: 'read-failed', ok: null") > 0,
+      '（现场三）verifyDefaults 读失败不再改走 providers 比对（结论不再无根据）');
+    assert(storeA.indexOf("noteStoreReadFail('saveConflict'") > 0 && storeA.indexOf('unpreserved') > 0,
+      '（现场四）并发覆盖前的保全读失败不再静默跳过（他实例进度被吞这件事可见）');
+    const ccA = fs.readFileSync(path.join(BASE, 'engines/chatcache.js'), 'utf8');
+    assert(ccA.indexOf("noteRead('chatcacheState'") > 0,
+      '（现场五）快照读失败与「本地没有快照」分开（安装/覆盖决策前提可判定）');
+    assert(ccA.indexOf("noteRead('chatcacheRev'") > 0,
+      '（现场六）Lamport 修订号读失败不再回落 0（同步序号不会被判成倒退）');
+    // ②b（逆向审计自纠）: 「归因不可读」＝归因不实——凡是投递进 store 台账的来源，
+    //   都必须在诊断的 SRC_LABEL 里有标签，否则消费端退回裸桶名，读者只看到一个
+    //   内部变量名而不知其后果。本版首版就漏了 `readSpotCheck`（自己新增的来源），
+    //   故把这条固化为断言（同型坑在本仓库已复发多次，不能靠记性防）。
+    {
+      const RE_SRC = /(?:noteStoreReadFail|reportReadFail|reportHostReadFail|noteWbRead|noteRead)\(\s*'([^']+)'/g;
+      const prodFiles2110 = [];
+      (function walk2110(dir) {
+        fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
+          if (e.name === '.git' || e.name === 'node_modules') return;
+          const p = path.join(dir, e.name);
+          if (e.isDirectory()) return walk2110(p);
+          if (e.name.endsWith('.js') && dir !== path.join(BASE, 'tests')) prodFiles2110.push(path.relative(BASE, p));
+        });
+      })(BASE);
+      // 只取**跨模块投递**的那六类（settingsBus 侧 noteReadFail 的四来源另有标签表）
+      const srcTags2110 = {};
+      prodFiles2110.forEach(function (rel) {
+        const txt = fs.readFileSync(path.join(BASE, rel), 'utf8');
+        RE_SRC.lastIndex = 0; let m;
+        while ((m = RE_SRC.exec(txt))) srcTags2110[m[1]] = rel;
+      });
+      // 从诊断源码里取标签表（括号配平提取，避免注释里的 `{` 破坏切片）
+      const dgTagSrc = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+      const t0 = dgTagSrc.indexOf('const SRC_LABEL = {');
+      let depth = 0, t1 = -1;
+      for (let i = dgTagSrc.indexOf('{', t0); i < dgTagSrc.length; i++) {
+        if (dgTagSrc[i] === '{') depth++;
+        else if (dgTagSrc[i] === '}') { depth--; if (depth === 0) { t1 = i; break; } }
+      }
+      const LABEL2110 = vm.runInNewContext('(' + dgTagSrc.slice(dgTagSrc.indexOf('{', t0), t1 + 1) + ')');
+      const unlabelled2110 = Object.keys(srcTags2110).filter(function (t) { return !LABEL2110[t]; });
+      assert(unlabelled2110.length === 0,
+        '（负向）store 台账的每个归因来源都有可读标签（实缺 ' + unlabelled2110.length
+        + (unlabelled2110.length ? '：' + unlabelled2110.slice(0, 5).join('、') : '') + '）');
+      assert(LABEL2110.readSpotCheck !== undefined,
+        '（自纠）readSpotCheck 标签在位（本版首版漏标，消费端退回裸桶名）');
+      assert(Object.keys(srcTags2110).length >= 20,
+        '（环境）扫描到 store 台账的全部归因来源（实 ' + Object.keys(srcTags2110).length
+        + ' 个：noteStoreReadFail 12 / reportReadFail 7 / reportHostReadFail 2，防扫了空集）');
+    }
+    // ③ 归因不实的反向防线：正常读取不得被误报
+    frV2110();
+    const rkA = 'worldaxis_v2110_a_v1';
+    WA.__settingsRegs.push({ key: rkA, def: { q: 1 } });
+    LSV2110.setItem(rkA, '{"q":9}');
+    const beforeA = JSON.stringify(WA.store.readStat().bySource);
+    const vA = WA.settingsBus.read({ key: rkA, def: { q: 1 } });
+    assert(vA.q === 9 && JSON.stringify(WA.store.readStat().bySource) === beforeA,
+      '（负向）正常读取不进读失败台账（归因不实比缺失归因更坏）');
+  }
+
+  // ── 块2：面A 门禁（G16）——裸读点冻结清单，与 G13/G14 构成三面对偶 ──
+  section('v2.11.0 块2：面A 门禁 G16（读侧裸读点冻结清单）');
+  {
+    const runS2110 = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
+    assert(runS2110.indexOf('G16（v2.11.0）：读侧裸读点') > 0, 'G16 门禁在位');
+    assert(runS2110.indexOf('INVENTORY_G16') > 0, 'G16 冻结清单在位（新增裸读点即断言失败）');
+    assert(runS2110.indexOf('（负向）G16 探针：新加一个裸读文件会被检出') > 0,
+      'G16 有负向探针（否则计数断言只是「碰巧成立」）');
+    // 语义完整性：每个裸读点附近必须有一次读侧归因投递（「有清单」还不够，得「有归因」）
+    const ATTRIB2110 = /noteReadFail\(|noteStoreReadFail\(|reportReadFail\(|reportHostReadFail\(|noteWbRead\(|noteRead\(/;
+    const missing2110 = [];
+    const ROWS2110 = (function () {
+      const dirs = ['core', 'engines', 'render', 'ui', 'actors', 'direction', 'compat'];
+      const files = [];
+      function walkRel(rel) {
+        const abs = path.join(BASE, rel);
+        let st = null; try { st = fs.statSync(abs); } catch (e) { return; }
+        if (st.isFile()) { if (/\.js$/.test(rel)) files.push(rel); return; }
+        let names = []; try { names = fs.readdirSync(abs); } catch (e) { return; }
+        names.forEach(function (n) { walkRel(rel + '/' + n); });
+      }
+      dirs.forEach(walkRel); walkRel('index.js');
+      const out = [];
+      files.forEach(function (rel) {
+        const lines = fs.readFileSync(path.join(BASE, rel), 'utf8').split('\n');
+        lines.forEach(function (ln, i) {
+          if (/^\s*(\/\/|\*|\/\*)/.test(ln)) return;
+          if (!/localStorage\s*\.\s*getItem\(|(?:ls|LS)\.getItem\(/.test(ln)) return;
+          const lo = Math.max(0, i - 3), hi = Math.min(lines.length, i + 15);
+          if (!ATTRIB2110.test(lines.slice(lo, hi).join('\n'))) missing2110.push(rel + ':' + (i + 1));
+          out.push(rel);
+        });
+      });
+      return out;
+    })();
+    assert(missing2110.length === 0,
+      '（负向）每一处裸读点附近都有读侧归因投递（实无归因 ' + missing2110.length + ' 处'
+      + (missing2110.length ? '：' + missing2110.slice(0, 5).join('、') : '') + '）');
+    assert(ROWS2110.length === 40, '产品代码裸读点总数为 40（实 ' + ROWS2110.length + '）');
+  }
+
+  // ── 块3：面B 指纹读侧消费（状态机 + `.d`/`.at` 首次被读 + 双消费端） ──
+  section('v2.11.0 块3：面B 结构指纹读侧消费（状态机 + 陈旧可问）');
+  {
+    const busB = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+    assert(busB.indexOf("__res0.status = 'stale'") > 0
+      && busB.indexOf("__res0.status = 'current'") > 0
+      && busB.indexOf("__res0.status = 'stamped'") > 0
+      && busB.indexOf("__res0.status = 'failed'") > 0,
+      '盖章从「布尔」改为状态机（current / stamped / stale / failed 四态可分辨）');
+    // v2.11.0（R3 自纠）: 状态赋值必须**一律经由局部引用**——函数体内若还有裸的
+    //   `__schemaStampResult.xxx = ` 赋值，写盘期间一旦发生重入（另一次 read 重建了槽），
+    //   本次调用的状态就会落到**别人的对象**上（R3 探针实测：A 的 status 停在 unshaped、
+    //   fp 变成 B 的）。该判据不绑变量名、只看「是否还有裸全局写」，故此后再改内部结构也不会失真。
+    (function () {
+      const fStart = busB.indexOf('function schemaStamp(');
+      const fEnd = busB.indexOf('__schemaStampResult = { status:', fStart);
+      const body = busB.slice(fStart, fEnd);
+      const bare = (body.match(/__schemaStampResult\./g) || []).length;
+      assert(bare === 0,
+        '（R3②）schemaStamp 函数体内零裸全局槽写（实 ' + bare + ' 处——重入时状态会落到别人的对象上）');
+      assert(busB.indexOf('const __res0 = __schemaStampResult;') > 0,
+        '（R3②）以局部引用捕获本次结果对象（落账与状态赋值同源）');
+    })();
+    assert(busB.indexOf('__prev.d') > 0 && busB.indexOf('__prev.at') > 0,
+      '`.d` 与 `.at` 首次被读侧消费（此前写侧算完就丢）');
+    assert(busB.indexOf('prevDigest') > 0, '`.d` 有下游出口（诊断展示「旧结构是哪一份」）');
+    // 语义：磁盘上是旧指纹时，状态必须判 stale 且零覆盖（旧指纹/旧时间被留住）
+    frV2110();
+    const rkB = 'worldaxis_v2110_b_v1';
+    const REGB = { key: rkB, def: { a: 1, b: 2 }, module: 'test' };
+    WA.__settingsRegs.push(REGB);
+    //   ⚠ 夹具要点：schemaStamp 有**两条** current 判据（旧指纹相等 / 子键全集与声明一致），
+    //     故构造 stale 时磁盘值必须子键不全——否则第二条先命中，状态记 current 而非 stale。
+    LSV2110.setItem(rkB, JSON.stringify({ a: 1, _schema: { fp: 'old:a|b', d: 'deadbeef', at: 1234567 } }));
+    const staleBefore = WA.settingsBus.stats.schemaStatus.stale || 0;
+    const vB = WA.settingsBus.read(REGB);
+    assert(vB && vB.a === 1 && vB.b === 2, '读取本身不受影响（齐备由补齐逻辑兜住，非指纹状态改变契约）');
+    assert((WA.settingsBus.stats.schemaStatus.stale || 0) === staleBefore + 1,
+      '（正向）磁盘指纹与当前声明不符 ⇒ 状态记 stale（实 ' + (WA.settingsBus.stats.schemaStatus.stale || 0) + '）');
+    const lsB = WA.settingsBus.readStat().schema;
+    assert(lsB.lastStale && lsB.lastStale.key === rkB,
+      '（正向）lastStale 记下是哪个键（实 ' + JSON.stringify(lsB.lastStale) + '）');
+    assert(lsB.lastStale.prevFp === 'old:a|b' && lsB.lastStale.prevDigest === 'deadbeef'
+      && lsB.lastStale.prevAt === 1234567,
+      '（正向）旧指纹 / 旧摘要 / 旧写入时间三件全部被读出（`.d`/`.at` 首个真实消费者）');
+    // 重盖后状态转为 current（零写入幂等）
+    const stamped = JSON.parse(LSV2110.getItem(rkB))._schema;
+    assert(stamped.fp && stamped.fp !== 'old:a|b' && stamped.d && stamped.at,
+      '（正向）旧指纹被按当前结构重盖（fp/d/at 三件齐全）');
+    const wB0 = WA.settingsBus.stats.schemaStamps;
+    const vB2 = WA.settingsBus.read(REGB);
+    assert(WA.settingsBus.stats.schemaStamps === wB0 && vB2.a === 1,
+      '（负向）子键已与声明一致 ⇒ 零写入（不产生写盘风暴；第二条 current 判据生效）');
+    assert((WA.settingsBus.stats.schemaStatus.current || 0) > 0, '（正向）current 态有落账');
+    // 首次盖章：无 _schema 的磁盘值 ⇒ stamped
+    const rkB2 = 'worldaxis_v2110_b2_v1';
+    WA.__settingsRegs.push({ key: rkB2, def: { z: 3 }, module: 'test' });
+    //   同理：只写 `{z:3}` 会被第二条 current 判据判成「子键与声明一致 ⇒ 零写入」，
+    //   stamped 永不产生。故夹具须含 def 之外的子键（真实场景＝磁盘上有未声明的存量子键）。
+    LSV2110.setItem(rkB2, JSON.stringify({ z: 3, extra: 9 }));
+    const st0 = WA.settingsBus.stats.schemaStatus.stamped || 0;
+    WA.settingsBus.read({ key: rkB2, def: { z: 3 } });
+    assert((WA.settingsBus.stats.schemaStatus.stamped || 0) === st0 + 1,
+      '（正向）无指纹且子键与声明不一致 ⇒ 首次盖章记 stamped');
+    // 写入失败 ⇒ failed 且消费端可见（配额/隐私模式下「结构版本」维度不可查）
+    const rkB3 = 'worldaxis_v2110_b3_v1';
+    WA.__settingsRegs.push({ key: rkB3, def: { w: 4 }, module: 'test' });
+    LSV2110.setItem(rkB3, JSON.stringify({ w: 4, extra: 9, _schema: { fp: 'old:w', d: 'x', at: 1 } }));
+    const rawSetB = LSV2110.setItem;
+    const failBefore = WA.settingsBus.stats.schemaStatus.failed || 0;
+    LSV2110.setItem = function (k, v) { if (k === rkB3) throw new Error('v2110-stamp-fail'); return rawSetB.call(this, k, v); };
+    let threwB = false;
+    try { WA.settingsBus.read({ key: rkB3, def: { w: 4 } }); } catch (e) { threwB = true; }
+    finally { LSV2110.setItem = rawSetB; }
+    assert(threwB === false, '（负向）盖章写失败不抛异常（读热路径不被写故障放大）');
+    assert((WA.settingsBus.stats.schemaStatus.failed || 0) === failBefore + 1,
+      '（正向）盖章写失败记 failed（实 ' + (WA.settingsBus.stats.schemaStatus.failed || 0) + '）');
+    // 双消费端
+    const diagB = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const panelB = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    assert(diagB.indexOf('settingsBus.schemaStale') > 0 && diagB.indexOf('settingsBus.schemaStampFailed') > 0,
+      '诊断消费指纹状态（陈旧 / 盖章失败两条议题）');
+    assert(diagB.indexOf('sbDiag.schema') > 0, '诊断的指纹判据取自采集面（同源，不自造读取）');
+    assert(panelB.indexOf('结构指纹') > 0, '面板透出指纹陈旧（用户可见出口）');
+    // 判据口径：warn 级用「本会话经历过」（累计），detail 必须给出次数与最近一次
+    assert(diagB.indexOf('本会话累计 ') > 0 && diagB.indexOf('最近一次旧结构摘要 ') > 0,
+      '判据口径与仓库一致（warn 用经历 + 详情给出次数与最近一次，不把「一次」读成「一直在」）');
+    // ── R3 逆向审计自纠（两处真缺陷，探针复现后当版修掉） ──
+    // ① 归因不实：磁盘值损坏 ⇒ val 回落 def ⇒ 若照常盖章，会把 **def 的指纹**当磁盘结构判
+    //    `current`，于是「这份值结构正确」建立在兜底值上。修法：损坏路径不盖章 + 单列 unreadable。
+    assert(busB.indexOf("__corruptVal") > 0 && busB.indexOf("'unreadable'") > 0,
+      '（R3①）损坏值不盖章、单列 unreadable（「有配置被读坏」≠「从未配置」）');
+    assert(busB.indexOf('unreadable: 0') > 0, '（R3①）readStat 默认四态表含 unreadable');
+    assert(diagB.indexOf('settingsBus.schemaUnreadable') > 0 && diagB.indexOf("level: 'error'") > 0,
+      '（R3①）诊断出 error 议题（读不出来意味着此刻正以默认值运行，须催用户留证）');
+    assert(panelB.indexOf('读不出结构') > 0, '（R3①）面板透出（用户可见出口）');
+    frV2110();
+    const rkC = 'worldaxis_v2110_corrupt_v1';
+    WA.__settingsRegs.push({ key: rkC, def: { a: 1, b: 2 }, module: 'test' });
+    LSV2110.setItem(rkC, '{坏JSON');
+    const unread0 = WA.settingsBus.stats.schemaStatus.unreadable || 0;
+    const vC = WA.settingsBus.read({ key: rkC, def: { a: 1, b: 2 } });
+    assert(vC && vC.a === 1 && vC.b === 2, '（R3①）损坏值回落默认（本次运行以默认值继续）');
+    assert((WA.settingsBus.stats.schemaStatus.unreadable || 0) === unread0 + 1,
+      '（R3①）状态记 unreadable（实 ' + (WA.settingsBus.stats.schemaStatus.unreadable || 0) + '）');
+    assert((WA.settingsBus.readStat().schema.lastStamp || {}).fp === null,
+      '（R3①）lastStamp.fp 记 null（不把声明结构的指纹冒充磁盘结构）');
+    assert(busB.indexOf('__stR && __stR.res') > 0 && busB.indexOf('if (__stR && __stR.res) __stR.res.status = \'stale\'') === -1,
+      '（R3①）落账用捕获的结果对象（模块级槽在重入下会被覆盖）');
+    // ② 重入串扰：盖章写盘期间发生嵌套 read 时，外层落账不得记成另一个键
+    const rkA = 'worldaxis_v2110_reent_a_v1', rkB2c = 'worldaxis_v2110_reent_b_v1';
+    WA.__settingsRegs.push({ key: rkA, def: { a: 1 }, module: 'test' });
+    const rkBreg = { key: rkB2c, def: { b: 1 }, module: 'test' };
+    WA.__settingsRegs.push(rkBreg);
+    LSV2110.setItem(rkA, JSON.stringify({ a: 1, extra: 9 }));
+    LSV2110.setItem(rkB2c, JSON.stringify({ b: 1, _schema: { fp: 'old:b', d: 'D2', at: 5 } }));
+    const rawSetR = LSV2110.setItem;
+    let reentered = false;
+    LSV2110.setItem = function (k, v) {
+      if (k === rkA && !reentered) { reentered = true; WA.settingsBus.read(rkBreg); }
+      return rawSetR.call(this, k, v);
+    };
+    try { WA.settingsBus.read({ key: rkA, def: { a: 1 } }); } finally { LSV2110.setItem = rawSetR; }
+    assert(reentered === true, '（R3②）夹具生效：盖章写盘期间真发生了一次嵌套 read');
+    const lsRe = WA.settingsBus.readStat().schema.lastStamp || {};
+    assert(lsRe.key === rkA, '（R3②）重入不串扰：外层落账仍是本键（实 ' + lsRe.key + '）');
+  }
+
+  // ── 块4：面C 死面接线（真功能断链接通消费端） ──
+  section('v2.11.0 块4：面C 死面接线（真功能断链接通真实消费端）');
+  {
+    const panelC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    const diagC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const bsC = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
+    const calC = fs.readFileSync(path.join(BASE, 'engines/calendar.js'), 'utf8');
+    // ① backstage 运行态 / 中止
+    assert(typeof WA.backstage.isRunning === 'function' && typeof WA.backstage.pending === 'function'
+      && typeof WA.backstage.abort === 'function', 'backstage 三个断链成员已导出');
+    assert(panelC.indexOf('wa-bs-abort') > 0 && panelC.indexOf('WA.backstage.abort()') > 0,
+      'backstage.abort 有真实消费端（面板「中止推演」按钮）');
+    assert(panelC.indexOf('WA.backstage.isRunning()') > 0, 'backstage.isRunning 有消费端（运行态显示）');
+    assert(diagC.indexOf('running: __runState') > 0 && diagC.indexOf('pending: __pend0') > 0,
+      'backstage 运行态/排队态进入诊断（两个域各一条）');
+    const uiBindC = WA.toolDiag.UI_BINDINGS.filter(function (g) { return g.page === 'events'; })[0] || {};
+    assert(((uiBindC.cond || []).indexOf('wa-bs-abort') >= 0) || panelC.indexOf('wa-bs-abort') > 0,
+      'wa-bs-abort 纳入 UI 绑定守卫（条件渲染控件不得游离于守卫表外）');
+    // ② calendar.advanceDay 收敛为单一实现
+    assert(typeof WA.calendar.advanceDay === 'function', 'calendar.advanceDay 已导出（原零调用）');
+    assert(calC.indexOf('this.advanceDay({ keepPart: true, source: \'text\' })') > 0,
+      'autoAdvance 的跳日分支收敛到 advanceDay（消除两份跳日逻辑的漂移）');
+    assert(cnt2110(calC, '__calStat.dayAdvances++') === 1,
+      '整日推进计量只在单一实现内自增（实 ' + cnt2110(calC, '__calStat.dayAdvances++') + ' 处，防同一件事计两次）');
+    frV2110();
+    WA.calendar.setClock('第1日·黄昏', { dayIndex: 1 });
+    const d1 = WA.calendar.advanceDay({ keepPart: true, source: 'test' });
+    assert(d1 === 2 && WA.store.read('clock.label', '') === '第2日·黄昏',
+      '（正向）整日推进保留时段（第1日·黄昏 → 第2日·黄昏，实 ' + WA.store.read('clock.label', '') + '）');
+    assert(WA.calendar.stat().dayAdvances >= 1, 'dayAdvances 计量可见（实 ' + WA.calendar.stat().dayAdvances + '）');
+    const dayBeforeSig = WA.calendar.stat().advanced;
+    WA.calendar.autoAdvance('次日清晨，他推门而入');
+    assert(WA.calendar.stat().dayAdvances >= 2 && WA.store.read('clock.label', '') === '第3日·黄昏',
+      '（正向）正文时间词走的是同一实现（保留时段，标签口径不漂移）');
+    assert(WA.calendar.stat().advanced === dayBeforeSig + 1, 'autoAdvance 的 advanced 仍只计一次');
+    // ③ 编辑态（setEditingId 此前零调用 ⇒ 阅读态永远无标记可显示）
+    assert(typeof WA.editorFaction.getEditingId === 'function' && typeof WA.editorFaction.setEditingId === 'function',
+      'editorFaction 编辑态读写已导出');
+    assert(typeof WA.editorEvents.getEditingId === 'function' && typeof WA.editorEvents.setEditingId === 'function',
+      'editorEvents 编辑态读写已导出');
+    assert(panelC.indexOf('WA.editorFaction.getEditingId()') > 0 && panelC.indexOf('WA.editorEvents.getEditingId()') > 0,
+      '两处编辑态被面板读取（渲染「编辑中」标记）');
+    assert(panelC.indexOf('WA.editorFaction.setEditingId(') > 0 && panelC.indexOf('WA.editorEvents.setEditingId(') > 0,
+      '两处编辑态被面板写入（否则阅读态永远无标记）');
+    WA.editorFaction.setEditingId(2);
+    assert(WA.editorFaction.getEditingId() === 2, '（正向）编辑态写入后可读回（实 ' + WA.editorFaction.getEditingId() + '）');
+    WA.editorFaction.setEditingId(null);
+    assert(WA.editorFaction.getEditingId() === null, '（正向）编辑态可清空（删除项后不留悬空标记）');
+    // ④ 两个开关（isEnabled 此前零调用）
+    assert(typeof WA.proactive.isEnabled === 'function' && typeof WA.wbInject.isEnabled === 'function',
+      'proactive / wbInject 开关查询已导出');
+    assert(diagC.indexOf('WA.proactive.isEnabled()') > 0 && diagC.indexOf('WA.wbInject.isEnabled()') > 0,
+      '两个开关有真实消费端（诊断 switches 节）');
+    assert(diagC.indexOf('switches') > 0 && diagC.indexOf('wbActiveOrders') > 0,
+      '诊断透出开关状态与生效中的世界书条目数（回答「功能到底开没开」）');
+    const sw = WA.toolDiag.secRuntime().switches;
+    assert(sw && typeof sw.proactive === 'boolean' && sw.wbInject === true,
+      '（正向）开关状态可在诊断中读到（实 ' + JSON.stringify(sw) + '）');
+    // ⑤ 过时裸入口摘除（五个「被 Safe 版取代」的入口不得复活）
+    ['setProfile'].forEach(function (m) {
+      assert(WA.registry[m] === undefined, '过时裸入口 registry.' + m + ' 已摘除（防下一个调用者挑错的那个绕过准入）');
+    });
+    ['addRule', 'removeRule', 'loadPreset'].forEach(function (m) {
+      assert(WA.purifier[m] === undefined, '过时裸入口 purifier.' + m + ' 已摘除');
+    });
+    assert(WA.settingsBus.readRaw === undefined, '过时裸入口 settingsBus.readRaw 已摘除');
+    assert(typeof WA.registry.setProfileSafe === 'function' && typeof WA.purifier.addRuleSafe === 'function'
+      && typeof WA.purifier.importPresetSafe === 'function',
+      'Safe 版入口全部在位（摘除的是被取代的那一份，不是能力本身）');
+    // ⑥ backstage def 声明补齐（4 个子键一直被读却从未进 def）
+    assert(bsC.indexOf('proactive:') > 0 && bsC.indexOf('wbInject:') > 0
+      && bsC.indexOf('wbWorldbookName:') > 0 && bsC.indexOf('wbAutoEnsure:') > 0,
+      'backstage def 补齐 4 个子键（否则 verifyDefaults 会永久报假缺口）');
+    const bsReg = (WA.__settingsRegs || []).filter(function (r) { return r.key === 'worldaxis_backstage_settings_v1'; })[0];
+    assert(bsReg && bsReg.def && 'proactive' in bsReg.def && 'wbInject' in bsReg.def
+      && 'wbWorldbookName' in bsReg.def && 'wbAutoEnsure' in bsReg.def,
+      '（正向）运行时 def 含这 4 个子键（声明面与实际消费面一致）');
+  }
+
+  // ── 块5：版本三方对齐 ──
+  section('v2.11.0 块5：版本三方对齐');
+  {
+    const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+    const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
+    const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
+    assert(ver2110 === '2.11.0', '入口版本为 2.11.0（实 ' + ver2110 + '）');
+    assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
+    assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
+      '活性面治理契约留痕（可回溯）');
+    assert(fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8').indexOf('v2.11.0') > 0,
+      '读点收口 + 指纹状态机留痕');
+    assert(fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8').indexOf('v2.11.0') > 0, 'store 读点归因留痕');
+    assert(fs.readFileSync(path.join(BASE, 'engines/calendar.js'), 'utf8').indexOf('v2.11.0') > 0, '整日推进单一实现留痕');
+  }
+  } // end v2.11.0 block
   } // end v2.10.0 block
   } // end v2.9.0 block
 
