@@ -1,12 +1,22 @@
 /**
- * WorldAxis core/settings-bus.js (v2.4.0) — settings 存储统一治理（迁移器侧车）。
+ * WorldAxis core/settings-bus.js (v2.5.0) — settings 存储统一治理（迁移器侧车）。
+ * v2.5.0: 补齐「键的**生命周期**」契约——v2.4.0 解决了「子键缺失」，但键本身的生命周期
+ *   仍是空白：12 个 `_v1` 键的历史修改次数是 1–8 次（backstage 8 次、opinion 6 次、
+ *   workflow/oracle 各 4 次），键名说 v1 而结构已经改了六七轮。本版补三件事：
+ *     · 结构指纹（schemaStamp）——磁盘值自带「我是哪个 def 形状写的」标识；
+ *     · 结构迁移引擎（migrateIfNeeded）——registry 的 migrate 钩子此前零调用，本版让它真正生效；
+ *     · 原始格式复活（rawReviveDef）——把 v2.3.0 的一次性迁移升级为声明式、可重复、幂等；
+ *   外加未登记键（幽灵设置）盘点（ghostScan）——此前登记表与清理规则都管不到这类键，
+ *   实证案例 worldaxis_director_tags_v1（v0.1.0 存在 → v0.2.0 移除 → 永久滞留用户磁盘）。
+ *
  * v2.4.0: 补齐「子键级」默认值契约——整键回落已于 v0.2.0 建立，但整键存在而子键缺失
  *   时消费端仍会拿到 undefined（详见 applyDefaults 注释）。
  * 背景：12 个模块各自持有 worldaxis_*_settings_v1 等键，读写各自实现——
  *   裸 try/catch 静默吞掉 JSON 损坏（用户配置悄悄重置默认，无任何留痕），
  *   键名带 _v1 但没有 v2 迁移路径（未来改结构时旧键静默孤儿化）。
+ *   v2.5.0 起：迁移路径已实装（migrate / rawRevive），且「结构长什么样」记在磁盘值里（_schema）。
  * 原则：本侧车只做"读旧写新 + 损坏留痕/隔离 + 暴露 pending 键"的薄逻辑；
- *   具体 v1→v2 结构升级由各模块自己负责（未来新增 upgrade 钩子）。
+ *   具体结构升级由各模块以 `migrate({value,key,def}) -> {changed,value,reason}` 声明（单一实现）。
  */
 (function () {
   'use strict';
@@ -22,7 +32,12 @@
     // v2.4.0: 子键补齐计量——「读到的配置比声明少」是静默失效的源头，必须可观测
     //   fills = 补齐动作累计次数（同一键每读一次未回写就再补一次）；
     //   fillKeys = 补过的**不同键**数（诊断真正关心的量级）。
-    subkeyFills: 0, subkeyFillKeys: 0, lastSubkeyKey: null, lastSubkeyMissing: [] };
+    subkeyFills: 0, subkeyFillKeys: 0, lastSubkeyKey: null, lastSubkeyMissing: [],
+    // v2.5.0: 生命周期计量——结构迁移（migrations）/ 迁移失败（migrationFailed）/
+    //   原始格式复活（rawRevives）/ 结构指纹写入（schemaStamps）/ 幽灵键清理（ghostRemoved）。
+    //   此前「迁移了几个键」「迁移失败了吗」只能靠翻日志，退出即散。
+    migrations: 0, migrationFailed: 0, lastMigration: null,
+    rawRevives: 0, schemaStamps: 0, ghostRemoved: 0, ghostBytes: 0 };
   // v2.4.0: 补齐告警去重——补齐发生在**返回值副本**上，磁盘未回写前每次读取都会再补一次。
   //   若每次补齐都打日志，热路径（loadSettings 每轮每事件调用）会刷屏：实测 300 轮掷骰产生
   //   900+ 条同内容 warn。故按「键」去重，本会话每个键只提示一次，计数不受影响。
@@ -74,17 +89,352 @@
     return val;
   }
   /**
-   * v2.4.0: 子键缺口只读盘点（不写、不补）——诊断用。
-   *   与补齐的差别：本函数只报告「磁盘值与声明差多少」，供 verdict 判「老存档已自愈但仍缺声明项」。
+   * v2.5.0: 子键缺口只读盘点（不写、不补）——诊断用。
+   *   与补齐的差别：本函数只报告「磁盘值与声明差多少」。
+   *   v2.5.0 起 val 可为 **JSON 原文串**：磁盘上存着非 JSON（历史版本写裸串）时，
+   *   解析成功才是对象；解析失败即「整键形态不符」，此时报告 **declared 个子键全缺**
+   *   （此前返回 parsed=null → 被上层 skip ⇒ 该键在缺口表里静默消失）。
    */
   function subkeyGap(reg, val) {
     const r = reg || {};
     const def = r.def;
     if (!def || typeof def !== 'object' || Array.isArray(def)) return { declared: 0, missing: [] };
     const declared = Object.keys(def);
+    if (typeof val === 'string') {
+      try { val = JSON.parse(val); }
+      catch (e) { return { declared: declared.length, missing: declared.slice(), unparsable: true }; }
+    }
     if (!val || typeof val !== 'object' || Array.isArray(val)) return { declared: declared.length, missing: declared.slice() };
     const missing = declared.filter(function (k) { return val[k] === undefined; });
     return { declared: declared.length, missing: missing };
+  }
+  /**
+   * v2.5.0: 结构指纹字符串（**非哈希**，不依赖 crypto）。
+   *   指纹 = def 的子键名与各自 typeof，按「SHA1 算法本身不变」的稳定性排序后拼接。
+   *   用途不是防篡改，而是「这份磁盘值是**哪一个结构版本**写的」——单向不可逆即可（无需还原），
+   *   子键名不属用户隐私（隐私在**值**里，值不参与指纹）。
+   *   排序而非定义序：避免「只是调整了 def 里字段的书写顺序」被误判为结构变更。
+   * @param {*} def 默认值对象
+   * @returns {string|null} 形如 'clock:boolean|people:boolean|...'；def 非对象时 null
+   */
+  function schemaFingerprint(def) {
+    if (!def || typeof def !== 'object' || Array.isArray(def)) return null;
+    try {
+      return Object.keys(def).sort().map(function (k) { return k + ':' + typeof def[k]; }).join('|');
+    } catch (e) { return null; }
+  }
+  /**
+   * v2.5.0: 摘要（FNV-1a 32 位）——给指纹配一个短编号，供「同一指纹出现几次」快速比对。
+   *   不做安全检查，故不引入 crypto 依赖、也不该用于任何安全判定。
+   */
+  function fingerprintDigest(fp) {
+    if (!fp) return null;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < fp.length; i++) {
+      h ^= fp.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h.toString(16);
+  }
+  /**
+   * v2.5.0: 原始格式复活（rawRevive）。
+   *
+   * 背景（本轮命题）：v2.3.0 引入了**一次性**迁移（preset 的 `active_preset` 由裸字符串迁为 JSON），
+   *   但它写在 preset.js 里、只覆盖一个键、且**只有一次机会**——那一次若因任何原因未完成
+   *   （迁移前抛错、用户用别的实例/旧版本又写了一次裸串、清过 localStorage 后又被旧版本写入），
+   *   此后每次 read 都会把裸串判为「损坏」→ 隔离 + 回落默认 + 记 error，**用户数据每次启动丢一次**，
+   *   且没有任何自愈路径。「迁移是一次性的」这件事本身就是缺陷。
+   *
+   * 本函数把该能力上升为**声明式**且**祛魅**（不是一次性）：
+   *   reg.rawRevive 声明「本键在历史版本里以**原始字符串**（非 JSON）存放，其字符串值语义等价于
+   *   把该原文作为字符串值的 JSON」——即 `raw → JSON.stringify(raw)`（`"abc"`）。这与 v2.3.0
+   *   的既有语义逐字等价（既有的 `save(reg, raw)` 实现就是 `JSON.stringify(raw)`），因此不是新语义发明，
+   *   而是把既有的隐式约定显式化、通用化、可重复。
+   *   · 幂等：已是合法 JSON 就原样返回，绝不二次包装
+   *   · 只读检查：`probe:true` 时不写盘（盘点用），故诊断不会产生副作用
+   *   · 留痕：stats.rawRevives 与日志（这是**用户数据被救回**的证据，必须可见）
+   * @param {object} reg 登记项（需 rawRevive:true）
+   * @param {boolean} [probe] true=只检查不写盘
+   * @returns {{revived:boolean, raw?:string, value?:*, reason?:string}}
+   */
+  function rawReviveDef(reg, probe) {
+    const r = reg || {};
+    if (!r.rawRevive || !r.key) return { revived: false, reason: 'not-enabled' };
+    const ls = (WA.mainWin || window).localStorage;
+    let raw = null;
+    try { raw = ls.getItem(r.key); } catch (e) { return { revived: false, reason: 'no-storage' }; }
+    if (raw === null || raw === undefined) return { revived: false, reason: 'absent' };
+    try { JSON.parse(raw); return { revived: false, reason: 'already-json' }; } catch (e) { /* 非 JSON → 需要复活 */ }
+    // 空串是特例：`JSON.parse('')` 抛错，但它不是「被写坏的 JSON」而是「空值」，
+    //   包装成 "\"\"" 会把「没值」变成「空字符串值」，语义反而变了 → 不复活。
+    if (raw === '') return { revived: false, reason: 'empty-string' };
+    let value = raw;
+    try { value = JSON.parse(JSON.stringify(raw)); } catch (e) { return { revived: false, reason: 'stringify-failed' }; }
+    if (!probe) {
+      let ok = false;
+      try { ls.setItem(r.key, JSON.stringify(value)); ok = true; } catch (e2) { ok = false; }
+      if (ok) {
+        stats.rawRevives++;
+        if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 检测到历史原始格式（非 JSON 原文），已复活为 JSON 契约值——旧版本写入的裸值不再被判为损坏而丢弃');
+      }
+      return { revived: ok, raw: raw, value: value, reason: ok ? 'revived' : 'write-failed' };
+    }
+    return { revived: true, raw: raw, value: value, reason: 'revivable' };
+  }
+  /**
+   * v2.5.0: 结构迁移引擎（enabled）。registry 里 declarative 登记项的 `migrate` 函数此前**零调用**
+   *   ——settings-bus 头部自述「未来新增 upgrade 钩子」而从未实现，20+ 行 legacy 迁移代码也因
+   *   零登记而结构性死掉（全库无一个 `legacy: [...]`）。本引擎让声明式迁移真正生效。
+   *
+   * 契约（关键，决定了它不会成为新的静默失效源）：
+   *   · 形状不符即跳过——只有磁盘值**不是对象**（或为空）时才尝试迁移；已是对象则返回 unchanged。
+   *     这条保证「用户正常配置永远不会被迁移函数碰到」：迁移只处理「旧结构/异形」。
+   *   · 例外：登记项显式声明 `migrateObjects:true` 时，对象形态也会被交给迁移函数。
+   *     理由（本轮实证）：`worldaxis_regional_settings_v1` 的 def 在 v2.3.0 从 8 个子键**缩减**
+   *     为 3 个（剔除 5 个零消费死键），而老存档里那 5 个死子键既不会被子键补齐删掉（补齐只加不减），
+   *     又被 `Object.assign(read(), patch)` 式保存**每次原样写回** —— 死键永久驻留。
+   *     缩减型演化必须能声明迁移，否则「只加不减」是结构性缺陷。
+   *   · 每个键对**同一份值形态**每会话至多尝试一次（无论成败）——迁移抛错时不得变成每次 read 都重试的热路径。
+   *     为什么是「同一份值形态」而不是「每键每会话」：首版按「每键每会话」写，实测立刻暴露结构性缺陷——
+   *     热路径上第一次 read（磁盘无值 → 回落到 def）就会把该键记为 skip，此后**整个会话**即便磁盘真值
+   *     变成旧结构也不再尝试迁移（顺序耦合：谁先读谁决定）。改为按值形态记账后，同一份坏值仍只试一次
+   *     （失败不会重试），而值真的换了形态时获得恰一次新机会。形态串只含子键名与类型/长度，不含值内容。
+   *   · 抛错的键永久标记为「未迁移」并在诊断里以 error 报出（绝不静默）。
+   *   · 迁移后立即回写，并记 stats.migrations / lastMigration（可观测）。
+   *   · 返回值只用于统计；**绝不改写用户的正常值**。
+   * @param {object} reg 登记项（需 migrate:function）
+   * @param {*} val 已解析的磁盘值
+   * @returns {*} 迁移后的值（跳过/失败/未启用时原样返回）
+   */
+  const __migTried = Object.create(null);   // '<key>|<值形态>' -> { status:'ok'|'skip'|'fail', at, reason }
+  /**
+   * v2.5.0: 迁移记账用的「值形态串」——只含类型与结构，**不含任何值内容**（无隐私外泄面）。
+   *   为什么不能只按 key 记账：见上文契约第三条（热路径上「先读到空值」会把整会话机会占掉）。
+   *   对象取子键名集合（排序后）+ 数组取长度，足以区分「同一份坏值」与「换了形态的新值」。
+   */
+  function migShapeKey(v) {
+    if (v === undefined) return 'undef';
+    if (v === null) return 'null';
+    if (Array.isArray(v)) return 'arr:' + v.length;
+    if (typeof v === 'object') {
+      try {
+        // 必须排除 _schema：它是**存储层元数据**，而 schemaStamp 会在 read 路径把它写进磁盘值。
+        // 若不排除，则「首次 read 迁移抛错（未回写）」与「再次 read（磁盘已被盖章改了形态）」
+        // 会被判成两份不同的值形态 → 守卫失效 → 坏值每次 read 都重试（正是本节要防的热路径）。
+        // 本版实测即由此交互抓出（两个新机制的耦合缺陷）。
+        return 'obj:' + Object.keys(v).filter(function (k) { return k !== '_schema'; }).sort().join(',');
+      } catch (e) { return 'obj'; }
+    }
+    return typeof v + ':' + String(v).length;
+  }
+  function migrateIfNeeded(reg, val) {
+    const r = reg || {};
+    if (typeof r.migrate !== 'function' || !r.key) return val;
+    const isObj = val && typeof val === 'object' && !Array.isArray(val);
+    if (isObj && r.migrateObjects !== true) return val;   // 正常结构 → 迁移函数一律不碰（除非显式声明缩减型演化）
+    const mk = r.key + '|' + migShapeKey(val);
+    if (__migTried[mk]) return val;            // 同一份值形态本会话已尝试过（含失败）→ 不重试
+    if (val === null || val === undefined) { __migTried[mk] = { status: 'skip', at: now(), reason: 'absent' }; return val; }
+    let out = val, status = 'skip', reason = null;
+    try {
+      const res = r.migrate({ value: val, key: r.key, def: r.def });
+      if (res && res.changed === true) {
+        out = res.value;
+        status = 'ok'; reason = res.reason || null;
+        stats.migrations++;
+        stats.lastMigration = { key: r.key, at: now(), reason: reason, from: shapeOf(val), to: shapeOf(out) };
+        try { ls_set(r.key, out); } catch (eW) {}
+        if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 结构迁移 ' + shapeOf(val) + ' → ' + shapeOf(out) + (reason ? '（' + reason + '）' : ''));
+      } else {
+        status = 'skip'; reason = (res && res.reason) || 'no-change';
+      }
+    } catch (eM) {
+      status = 'fail'; reason = String((eM && (eM.message || eM)) || eM).slice(0, 160);
+      stats.migrationFailed++;
+      stats.lastMigration = { key: r.key, at: now(), reason: reason, failed: true };
+      // 失败必须可见：迁移没跑成 = 旧结构继续被当作「畸形值」消费，属需要人处理的状况
+      try { __migFailed[r.key] = reason; } catch (e0) {}
+      if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 结构迁移失败（' + reason + '）——本键按原值继续，诊断会持续报出');
+    }
+    __migTried[mk] = { status: status, at: now(), reason: reason };
+    return out;
+  }
+  const __migFailed = Object.create(null);
+  /**
+   * v2.5.0: 缩减型演化迁移器工厂（单一实现）。
+   *
+   * 为什么要有工厂：本轮有两个键需要同一种迁移（regional / evolution —— 都是 v2.3.0
+   *   只在声明侧剔除死键、老存档磁盘上的死子键永久驻留）。若各自内联一份「白名单式保留」
+   *   逻辑，就是本版反复批评的**第二份真源**形态（两份实现日后必然分叉）。
+   * 口径：只保留 def 声明的子键（`_schema` 为存储层元数据，必须一并保留），
+   *   无死子键时返回 `changed:false`（迁移函数被调用但无事可做的正常情形，幂等）。
+   * @param {object} def 该键的声明默认值
+   * @returns {function} 符合 migrateIfNeeded 契约的 migrate 钩子
+   */
+  function makeSubkeyPruner(def) {
+    return function (ctx) {
+      const v = ctx && ctx.value;
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return { changed: false, reason: 'not-object' };
+      const keep = {}; const dropped = [];
+      Object.keys(v).forEach(function (k) {
+        if (k === '_schema' || Object.prototype.hasOwnProperty.call(def, k)) keep[k] = v[k];
+        else dropped.push(k);
+      });
+      if (!dropped.length) return { changed: false, reason: 'no-stale-subkeys' };
+      return { changed: true, value: keep, reason: 'dropped-stale-subkeys:' + dropped.join(',') };
+    };
+  }
+  /** 内部：写盘（迁移回写专用，避免在本段依赖 save 的登记项形状） */
+  function ls_set(key, value) {
+    const ls = (WA.mainWin || window).localStorage;
+    ls.setItem(key, JSON.stringify(value === undefined ? null : value));
+  }
+  function ls_keys() {
+    const ls = (WA.mainWin || window).localStorage;
+    const out = [];
+    try {
+      const n = typeof ls.length === 'number' ? ls.length : 0;
+      for (let i = 0; i < n; i++) {
+        const k = ls.key(i);
+        if (typeof k === 'string' && k.indexOf('worldaxis_') === 0) out.push(k);
+      }
+    } catch (e) { /* 非标准实现 → 空清单，不炸 */ }
+    return out;
+  }
+  function ls_raw(key) { try { return (WA.mainWin || window).localStorage.getItem(key); } catch (e) { return null; } }
+  /** 已知命名空间（非 settings 的家族）——幽灵盘点时须排除，否则会把诊断键报成「未登记设置」。
+   *
+   * v2.5.0: 本清单**降级为回退**。原先它是唯一判据，这与本轮在 core/store.js 里刚删掉的
+   *   `settingsSettings` 白名单属**同型缺陷**（第二份真源必漂移）：store.js 的 KEY_FAMILIES
+   *   才是「键归属哪个家族」的真源，本文件另存一份前缀清单，日后新增家族（如 stateDerived
+   *   这类）就必然分叉。现在优先消费 `WA.store.classifyKey`（单一真源），仅当 store 不可用
+   *   （settings-bus 在 LOAD_ORDER 中先于 store，加载期及单测早期可能不在）才退回本清单。
+   *   注：本清单当前与 KEY_FAMILIES 的家族前缀集合逐一核对一致（见 v2.5.0 测试 D9 的一致性断言）。
+   */
+  const KNOWN_PREFIXES = ['worldaxis_state_', 'worldaxis_recovery_', 'worldaxis_event_log_', 'worldaxis_error_log_',
+    'worldaxis_wf_history_', 'worldaxis_uninject_ledger_', 'worldaxis_wb_selection_', 'worldaxis_conflict_',
+    'worldaxis_writer_id'];
+  /**
+   * v2.5.0: 懒查 store 的家族分类（单一真源）。返回 null 表示分类器不可用 → 调用方走回退清单。
+   *   刻意不写成加载期依赖：settings-bus 先于 store 加载，任何顶层引用都会踩 TDZ/未定义。
+   */
+  function familyOf(key) {
+    try {
+      if (WA.store && typeof WA.store.classifyKey === 'function') {
+        const c = WA.store.classifyKey(key);
+        return (c && c.family) ? c.family : null;
+      }
+    } catch (e) { /* store 不可用 → null，交由回退清单判定 */ }
+    return null;
+  }
+  /** 格式化/历史遗留的键名后缀（非模块登记，但确实是本扩展写的） */
+  const KNOWN_SUFFIX_RE = /(_corrupt_\d+|_corrupt_\d+_corrupt_\d+)$/;
+  /**
+   * v2.5.0: 剥掉结构指纹元数据（返回给消费端的视图用）。
+   *
+   * 为什么必须剥：`_schema` 是**存储层元数据**，不是设置项。若随 read() 返回给消费端，
+   *   会立刻污染两类既有契约——① `ui/settings.js` 等以「子键数等于 def 声明数」校验形态的
+   *   代码；② `Object.assign(read(), patch)` 式保存会把元数据当成用户设置项回写；
+   *   ③ `verifyDefaults` 的形状比对会把「多了 _schema」当成声明漂移。
+   *   （本版首轮实测即由既有的「可见性 10 源全部有值」断言当场挡下：返回对象多了第 11 个键。）
+   * 做法：**浅拷贝顶层并剔除 _schema**，绝不改动传入对象（磁盘真值仍带 _schema，
+   *   以便 save() 在回写时把它原样带回去）。只处理顶层——本仓库的登记键值均为顶层对象。
+   * @param {*} val
+   * @returns {*} 无 _schema 的浅拷贝；非对象原样返回
+   */
+  function stripStamp(val) {
+    if (!val || typeof val !== 'object' || Array.isArray(val)) return val;
+    if (!Object.prototype.hasOwnProperty.call(val, '_schema')) return val;
+    const out = {};
+    Object.keys(val).forEach(function (k) { if (k !== '_schema') out[k] = val[k]; });
+    return out;
+  }
+  /**
+   * v2.5.0: 结构指纹写入（schemaStamp）——把「这份磁盘值是哪个 def 形状写的」记进键的值里。
+   *
+   * 为什么需要：本插件 12 个 `_v1` 设置键的历史修改次数是 1–8 次（backstage 8 次、opinion 6 次、
+   *   workflow / oracle 各 4 次），也就是说**这些键的 `_v1` 后缀早已名不副实**——键名说 v1，
+   *   内容却经历了多轮结构增补。而此前磁盘值里**没有任何结构标识**，于是一个「本插件读不出来的
+   *   版本」的键只能表现为「值看起来对、行为不对」或「被 JSON.parse 判为损坏」两种极端，
+   *   无法回答最基本的问题：这份磁盘值是哪个版本写的？
+   *
+   * 做法：只在「磁盘值与声明形状不符」时才写。判据两条——① `_schema` 字段缺失；② 用对象自身
+   *   子键（排除 `_schema`）算出的指纹与当前 def 指纹不同。两条都不满足则**一个字节不写**，
+   *   因此「用户正常配置」永远不会被本函数碰到（不会污染、不会触发额外 IO）。
+   *
+   * 形态：`{ ...用户子键..., _schema: { fp: '<指纹>', d: '<FNV 短摘要>', at: <写入时间> } }`
+   *   · 键名刻意不在任何 `def` 里，故 applyDefaults / 消费端 / verifyDefaults 全部不会碰到它；
+   *   · `selfCheck` 的 `def` 声明完备性检查只比对 def 侧，不受影响；
+   *   · 指纹只含**子键名与 typeof**，不含任何值——用户配置内容不进指纹（无隐私外泄面）。
+   * 留痕：stats.schemaStamps 记录写入次数（该数长期为 0 = 所有键都是当前结构，属正常状态）。
+   * @param {object} reg 登记项
+   * @param {*} val 已解析（且已迁移）的磁盘值
+   * @returns {boolean} 是否真的写了盘
+   */
+  function schemaStamp(reg, val) {
+    const r = reg || {};
+    const def = r.def;
+    const fp = schemaFingerprint(def);
+    if (!fp || !r.key) return false;
+    if (!val || typeof val !== 'object' || Array.isArray(val)) return false;
+    if (val._schema && val._schema.fp === fp) return false;      // 已是当前结构 → 零写入
+    const cur = Object.keys(val).filter(function (k) { return k !== '_schema'; });
+    if (cur.length && schemaFingerprint((function () { const o = {}; cur.forEach(function (k) { o[k] = val[k]; }); return o; })()) === fp) {
+      return false;                                               // 子键全集与声明一致 → 零写入
+    }
+    // v2.5.0: 本处**刻意不设**「每会话每键至多写一次」守卫。
+    //   首版曾加该守卫以防写盘风暴，但实测立刻暴露它与 v2.3.0 的既有缺陷同型：
+    //     · 一旦首次盖章失败（配额/异常），本会话此后永不重试 → 指纹永久缺失；
+    //     · 更严重的是**顺序耦合**——守卫按「键名」记账，跨会话/跨标签页的状态重置
+    //       （用户清缓存、另一标签页写值、测试内 fresh）后不再盖章，行为取决于谁先读。
+    //   正确做法是依赖上面两条**精确**幂等判据：盖章成功后 `val._schema.fp === fp` 立即成立，
+    //   后续每次 read 都会在第一个条件处直接返回，天然零写入（不需要时间维度的记忆）。
+    try {
+      val._schema = { fp: fp, d: fingerprintDigest(fp), at: now() };
+      ls_set(r.key, val);
+      stats.schemaStamps++;
+      return true;
+    } catch (e) { return false; }
+  }
+  /**
+   * v2.5.0: 未登记设置键（幽灵设置）盘点——磁盘上存在、前缀 worldaxis_、且**既不在登记表、
+   *   也不属于任一已知非 settings 家族**的键。
+   *
+   * 为什么需要（本轮实证）：`worldaxis_director_tags_v1` 在 v0.1.0 真实存放「启用的导演标签」，
+   *   v0.2.0 整个功能被移除，但该键**从未登记**也**从未清理**。而 `sweepStaleKeys` 的规则是
+   *   「settings 家族永不清理（用户数据）」+ 白名单外的键一律走 `return { family:'settings' }` 兜底
+   *   ⇒ 这类键**永远不会被任何人清理**，永久滞留用户磁盘。登记表管不到它（没登记），
+   *   清理规则也管不到它（被当用户数据保护），责任真空。
+   *
+   * 口径保守（宁可漏报不可误报）：只报告，不删除；家族前缀命中即跳过；`*_corrupt_*` 跳过
+   *   （那是隔离副本，另有一条清理规则）。真删除一律走 sweepStaleKeys({ apply:true })。
+   * @returns {{keys:Array<{key:string,bytes:number,shape:string}>, total:number, bytes:number}}
+   */
+  function ghostScan() {
+    const regs = WA.__settingsRegs || [];
+    const known = Object.create(null);
+    regs.forEach(function (r) { if (r && r.key) known[r.key] = true; });
+    const rows = [], seen = [];
+    ls_keys().forEach(function (k) {
+      if (known[k]) return;
+      if (KNOWN_SUFFIX_RE.test(k)) return;
+      // v2.5.0: 优先问 store 家族分类（单一真源）；不可用时退回本地前缀清单（见 familyOf 注释）
+      const fam = familyOf(k);
+      if (fam !== null) {
+        // 真源判定：凡不是「设置」家族的键都不算幽灵设置（含 settings 本身 —— 那属在册键，
+        //   走 known[] 那条分支；此处兜底防御登记表与分类器短暂不一致的时序）。
+        if (fam !== 'settingsUnregistered') return;
+      } else {
+        for (let i = 0; i < KNOWN_PREFIXES.length; i++) {
+          if (k.indexOf(KNOWN_PREFIXES[i]) === 0) return;
+        }
+      }
+      const raw = ls_raw(k);
+      rows.push({ key: k, bytes: raw ? raw.length : 0, shape: raw === null ? 'absent' : (/^\s*[[{]/.test(raw) ? 'json' : 'raw') });
+      seen.push(k);
+    });
+    rows.sort(function (a, b) { return b.bytes - a.bytes; });
+    return { keys: rows, total: rows.length, bytes: rows.reduce(function (s, x) { return s + x.bytes; }, 0) };
   }
   // v2.3.0: 观测史——记录「本会话中真实读到过」的键。
   //   用途：把「已废弃且曾存在后被删除」的幽灵键，与「声明废弃但从未落盘」的休眠登记区分开。
@@ -136,15 +486,26 @@
         if (raw !== null && raw !== undefined) {
           stats.reads++;
           try { __seenKeys[r.key] = true; } catch (eSeen) {}
-          try { val = JSON.parse(raw); }
-          catch (e) {
-            // 当前键损坏：留痕 + 隔离（sweep 可归置）
-            stats.quarantines++;
-            const qk = r.key + '_corrupt_' + now();
-            try { ls.setItem(qk, raw); } catch (e2) {}
-            try { ls.removeItem(r.key); } catch (e3) {}
-            if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 损坏已隔离 → ' + qk + '（重置默认）', String(raw).slice(0, 200));
-            val = null;
+          // v2.5.0: 历史原始格式复活（幂等、可重复）——必须在 JSON.parse **之前**：
+          //   旧版本把裸字符串写进本键时，JSON.parse 会抛错并把**用户真实配置**判为损坏、
+          //   隔离、回落默认。reg.rawRevive 声明「本键存在这种历史格式」，只对声明过的键生效。
+          const __rev = rawReviveDef(r, false);
+          if (__rev.revived) {
+            // 复活成功 → 直接用复活后的值。**不能**留 val=null：那会回落 r.def，
+            //   把刚从旧格式救回来的用户配置又丢掉（本版首轮实现即犯此错，由逆向审计抓出）。
+            val = __rev.value;
+            raw = JSON.stringify(val);
+          } else {
+            try { val = JSON.parse(raw); }
+            catch (e) {
+              // 当前键损坏：留痕 + 隔离（sweep 可归置）
+              stats.quarantines++;
+              const qk = r.key + '_corrupt_' + now();
+              try { ls.setItem(qk, raw); } catch (e2) {}
+              try { ls.removeItem(r.key); } catch (e3) {}
+              if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 损坏已隔离 → ' + qk + '（重置默认）', String(raw).slice(0, 200));
+              val = null;
+            }
           }
         }
         // 版本协商：当前无值 → 尝试 legacy 键
@@ -174,13 +535,43 @@
         }
       } catch (e) { stats.failures++; }
       if (val === null || val === undefined) val = r.def;
+      // v2.5.0: 顺序至关重要——迁移 → 结构指纹 → 子键补齐。
+      //   · 迁移在最前：它可能改变值的**形状**（标量 → 对象），必须在形状被补齐逻辑依赖之前完成。
+      //   · 指纹在补齐之前：指纹记录的是「磁盘上**真实存在**的结构」，若先补齐再盖指纹，
+      //     指纹就会把「运行时补出来的默认值」也当成用户存档的一部分（指纹随即失真）。
+      //   · 补齐在最后、且只作用于返回值副本（v2.4.0 既定口性：磁盘不因读取而回写补齐值）。
+      val = migrateIfNeeded(r, val);
+      schemaStamp(r, val);
       // v2.4.0: 整键之外还要补**子键**——旧存档缺新字段时子键为 undefined，
       //   会在消费端静默改变语义（见 applyDefaults 注释）。补齐后再返回独立拷贝。
       val = applyDefaults(r, val);
-      try { return JSON.parse(JSON.stringify(val)); } catch (e) { return val; }
+      try { return JSON.parse(JSON.stringify(stripStamp(val))); } catch (e) { return stripStamp(val); }
     },
     /** v2.4.0: 子键补齐导出（模块侧自定义加载路径可复用同一实现，避免二次分叉） */
     applyDefaults(reg, val) { return applyDefaults(reg, val); },
+    /** v2.5.0: 结构指纹（只读）——当前 def 的形状摘要与短编号。注意不掩盖非法入参（传 null 即 null） */
+    schemaFingerprint(def) { const fp = schemaFingerprint(def); return { fp: fp, digest: fingerprintDigest(fp) }; },
+    /** v2.5.0: 结构迁移引擎（只读触发点，供自检/面板对单个登记项显式迁移） */
+    migrate(reg, val) { return migrateIfNeeded(reg, val); },
+    /** v2.5.0: 迁移尝试台账（只读）——本会话每个「键+值形态」的迁移结果，含失败的 */
+    migrationStat() {
+      const tried = {};
+      Object.keys(__migTried).forEach(function (k) { tried[k] = __migTried[k]; });
+      return { tried: tried, count: Object.keys(tried).length, ok: stats.migrations,
+        failed: stats.migrationFailed, failedKeys: Object.keys(__migFailed), last: stats.lastMigration };
+    },
+    /** v2.5.0: 历史原始格式复活（只读检查 / 显式执行） */
+    rawRevive(reg, probe) { return rawReviveDef(reg, probe === true); },
+    /** v2.5.0: 未登记设置键（幽灵设置）只读盘点——登记表与清理规则都管不到的键 */
+    ghostScan() { return ghostScan(); },
+    /**
+     * v2.5.0: 缩减型演化迁移器（单一实现，供各模块在登记项上引用）。
+     *
+     * 用法：`const __REG = { key, def: DEF, migrateObjects: true, migrate: WA.settingsBus.subkeyPruner(DEF) }`
+     * 注意须在 settingsBus 已加载后取用（各模块均在其后加载）；`def` 必须是同一份 DEF 对象，
+     * 否则「保留白名单」会与「登记表声明」分叉。
+     */
+    subkeyPruner(def) { return makeSubkeyPruner(def); },
     /**
      * v2.3.0: 原始读取（不解析、不隔离、不回落默认值）。
      *   用途：格式迁移——历史版本可能把「标量值」以裸字符串写入（非 JSON 契约），
@@ -194,13 +585,41 @@
       const r = Object.assign({ key: null, orphan: false }, reg || {});
       if (!r.key) return false;
       const ls = (WA.mainWin || window).localStorage;
-      try { ls.setItem(r.key, JSON.stringify(value === undefined ? null : value)); return true; } catch (e) { return false; }
+      let out = (value === undefined ? null : value);
+      // v2.5.0: 回写时继承磁盘上的结构指纹——消费端拿到的 read() 结果里**没有** _schema
+      //   （见 stripStamp），若 save 直接覆盖，用户每保存一次设置就会把指纹抹掉，
+      //   于是下次 read 又要重新盖章（指纹变成「最后保存时间」而非「结构版本」，失去意义）。
+      //   只补不覆盖：值里已带 _schema 时以调用方为准（schemaStamp 自己会写）。
+      if (out && typeof out === 'object' && !Array.isArray(out) && !Object.prototype.hasOwnProperty.call(out, '_schema')) {
+        let inherit = null;
+        try {
+          const rawPrev = ls.getItem(r.key);
+          if (rawPrev) {
+            const prev = JSON.parse(rawPrev);
+            if (prev && typeof prev === 'object' && prev._schema) inherit = prev._schema;
+          }
+        } catch (eP) { /* 上一版读不出来 → 不继承，下次 read 会重新盖章 */ }
+        // v2.5.0: 必须**先拷贝再挂**，绝不原地改写调用方对象。
+        //   本仓库的调用惯例是 `setSettings(o){ save(Object.assign(loadSettings(), o)) }`——
+        //   传入的多是临时对象，但 registry/settings 页等处会复用同一引用；一旦原地挂上
+        //   _schema，该对象后续再被传给别处就会带上存储层元数据（与 def 别名污染同型：
+        //   模块侧无法区分「这是我的设置项」与「这是存储层塞进来的元数据」）。
+        if (inherit) {
+          const copy = {};
+          Object.keys(out).forEach(function (k) { copy[k] = out[k]; });
+          copy._schema = inherit;
+          out = copy;
+        }
+      }
+      try { ls.setItem(r.key, JSON.stringify(out)); return true; } catch (e) { return false; }
     },
     /** 注册表（只读拷贝）：{ key, legacy, legacyRemove, optional, orphan, def, module } */
     registry() {
       return (WA.__settingsRegs || []).map(function (r) {
         return { key: r.key, legacy: (r.legacy || []).slice(), legacyRemove: !!r.legacyRemove,
-          optional: !!r.optional, orphan: !!r.orphan, def: r.def, module: r.module };
+          optional: !!r.optional, orphan: !!r.orphan, def: r.def, module: r.module,
+          // v2.5.0: 生命周期能力声明也要可盘点，否则「能力实现了却无人行使」在治理层照样隐形
+          hasMigrate: typeof r.migrate === 'function', rawRevive: !!r.rawRevive };
       });
     },
     /** v2.3.0: 本会话是否真实读到过该键（幽灵键判定的历史依据） */
@@ -238,11 +657,11 @@
         let raw = null;
         try { raw = ls.getItem(r.key); } catch (e) { return; }
         if (raw === null || raw === undefined) return;   // 无磁盘值 → 整键回落，不属子键缺口
-        let parsed = null, ok = true;
-        try { parsed = JSON.parse(raw); } catch (e) { ok = false; }
-        if (!ok || !parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
-        const g = subkeyGap(r, parsed);
-        if (g.missing.length) rows.push({ key: r.key, module: r.module || null, declared: g.declared, missing: g.missing });
+        // v2.5.0: 把 **原始串** 交给 subkeyGap，而非先 JSON.parse 再判。
+        //   此前「解析失败 → parsed=null → return（跳过）」会把「磁盘上是非 JSON 原值」
+        //   这一**最严重的**形态缺口从表里整个抹掉——而它恰恰是旧版本写裸值留下的现场。
+        const g = subkeyGap(r, raw);
+        if (g.missing.length) rows.push({ key: r.key, module: r.module || null, declared: g.declared, missing: g.missing, unparsable: !!g.unparsable });
       });
       return { keys: rows, totalMissing: rows.reduce(function (s, x) { return s + x.missing.length; }, 0), fills: stats.subkeyFills, fillKeys: stats.subkeyFillKeys };
     },
@@ -312,7 +731,13 @@
         }
       });
       const errors = issues.filter(function (i) { return i.level === 'error'; }).length;
-      return { ok: errors === 0, total: rows.length, issues: issues, errorCount: errors, warnCount: issues.length - errors };
+      const warns = issues.length - errors;
+      return { ok: errors === 0, total: rows.length, issues: issues, errorCount: errors, warnCount: warns,
+        // v2.5.0: 生命周期声明覆盖——「结构迁移能力」与「原始格式复活能力」是否被登记项行使。
+        //   两者长期零行使（migrate 零调用、rawRevive 不存在），而治理层当时**看不见**这种空转。
+        lifecycle: { migrate: rows.filter(function (r) { return typeof r.migrate === 'function'; }).length,
+          rawRevive: rows.filter(function (r) { return r.rawRevive; }).length,
+          legacy: rows.filter(function (r) { return r.legacy && r.legacy.length; }).length } };
     },
     /**
      * v2.3.0: 默认值单一真源校验——比对「模块 loadSettings 实际回报的默认值」与「登记表声明的 def」。

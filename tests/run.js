@@ -4168,7 +4168,9 @@ WA.loadScript = _ls.loadScript;
   const panelSrc152 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
   assert(panelSrc152.indexOf('wa-key-check') >= 0 && panelSrc152.indexOf('存储键体检') >= 0, '面板含「存储键体检」按钮');
   assert(panelSrc152.indexOf('wa-key-sweep-go') >= 0 && panelSrc152.indexOf('确认清理（不可撤销）') >= 0, '体检走二次确认制（dry-run 计划先展示）');
-  assert(panelSrc152.indexOf('sweepStaleKeys({})') >= 0 && panelSrc152.indexOf('sweepStaleKeys({ apply: true })') >= 0, '体检先 dry-run 后 apply 两段式');
+  // v2.5.0: apply 段的参数随「幽灵设置键」出口扩了一维（ghostSettings），
+  //   故断言从「逐字相等」放宽为「前缀命中」——仍校验两段式（先 dry-run 计划、后 apply 执行）。
+  assert(panelSrc152.indexOf('sweepStaleKeys({})') >= 0 && /sweepStaleKeys\(\{ apply: true/.test(panelSrc152), '体检先 dry-run 后 apply 两段式');
 
   // ── 2. init 静默巡检：大额可回收触发告警 + 节流只一次 ──
   const LS152 = global.localStorage;
@@ -9098,6 +9100,466 @@ WA.loadScript = _ls.loadScript;
     assert(missing2500.length === 0, 'LOAD_ORDER 列出的模块在磁盘上全部存在（缺：' + (missing2500.join('、') || '无') + '）');
   }
   } // end v2.4.0 block
+  // ══════════ v2.5.0 ══════════
+  v2500: {
+  const LS2500 = global.localStorage;
+  const ctx2500 = global.SillyTavern.getContext();
+  const PROD2500 = ['core/store.js', 'core/settings-bus.js', 'core/api-router.js', 'core/workflow.js',
+    'engines/backstage.js', 'engines/evolution.js', 'engines/opinion.js', 'engines/regional.js', 'engines/horizon.js',
+    'engines/calendar.js', 'engines/preset.js', 'engines/tool-diag.js',
+    'render/inject.js', 'render/purifier.js', 'ui/panel.js'];
+  const SRC2500 = PROD2500.map(function (rel) { return { rel: rel, text: fs.readFileSync(path.join(BASE, rel), 'utf8') }; });
+  function fresh2500() { LS2500.clear(); ctx2500.chatId = 'v2500_chat'; global.__mockChat.length = 0; WA.store.init(); }
+  function srcOf2500(rel) { const h = SRC2500.filter(function (x) { return x.rel === rel; })[0]; return h ? h.text : ''; }
+  const rgKey2500 = 'worldaxis_regional_settings_v1';
+  const activeKey2500 = 'worldaxis_active_preset';
+  function reg2500(key) { return (WA.__settingsRegs || []).filter(function (r) { return r.key === key; })[0] || null; }
+  function disk2500(key) { try { return LS2500.getItem(key); } catch (e) { return null; } }
+  function diskObj2500(key) { try { return JSON.parse(disk2500(key)); } catch (e) { return null; } }
+  // 顶层键引用（A~F 段共用；在此处集中声明，避免各段的块作用域遮蔽）
+  const r2500A = reg2500(rgKey2500);
+  const r2500B = r2500A;
+  const r2500C = reg2500(activeKey2500);
+
+  // ── A. 块1：结构指纹（schemaFingerprint / _schema 盖章）──
+  fresh2500();
+  section('v2.5.0 块1：结构指纹与 _schema 盖章');
+  {
+    const fpA = WA.settingsBus.schemaFingerprint({ b: true, a: 1, c: 'x' });
+    const fpB = WA.settingsBus.schemaFingerprint({ c: 'y', a: 2, b: false });
+    assert(fpA.fp === 'a:number|b:boolean|c:string', '指纹 = 子键名:typeof 按名排序（实 ' + fpA.fp + '）');
+    assert(fpA.fp === fpB.fp, '（负向）仅调整字段书写顺序不改变指纹（免疫重排误报）');
+    assert(fpA.fp !== WA.settingsBus.schemaFingerprint({ a: 1, b: true }).fp, '子键增删即指纹变化（结构变更可判）');
+    assert(typeof fpA.digest === 'string' && fpA.digest.length >= 4, '指纹配短摘要（实 ' + fpA.digest + '）');
+    assert(WA.settingsBus.schemaFingerprint(null).fp === null, '（负向）非对象 def → 指纹为 null（不臆造）');
+    const secretA = 'sk-SECRET-TOKEN-9988';
+    const fpS = WA.settingsBus.schemaFingerprint({ apiKey: secretA, enabled: true }).fp;
+    assert(fpS.indexOf(secretA) < 0 && fpS.indexOf('SECRET') < 0, '（隐私）指纹不含值内容（密钥不进指纹）');
+    assert(fpS === 'apiKey:string|enabled:boolean', '指纹只保留 名:类型');
+    fresh2500();
+    // 夹具选 backstage 键（无 migrate 声明 → 不会被迁移改写）：磁盘只存一个子键，
+    //   与声明的 12 子键形状不同 → 应盖章。（此前的夹具用了 regional，而 regional 的
+    //   死子键迁移恰好把形状修回与 def 一致 → 设计上就该零写入，属夹具选错而非实现缺陷。）
+    const bcKey2500 = 'worldaxis_backstage_settings_v1';
+    const r2500A = reg2500(bcKey2500);
+    LS2500.setItem(bcKey2500, JSON.stringify({ simulationMode: 'deep' }));
+    const vA2500 = WA.settingsBus.read(r2500A);
+    assert(vA2500._schema === undefined, '（负向）消费端视图不含 _schema（元数据不泄漏给调用方）');
+    assert(Object.keys(vA2500).indexOf('_schema') < 0, '（负向）返回值键集合里没有 _schema');
+    const dA2500 = diskObj2500(bcKey2500);
+    assert(dA2500 && dA2500._schema && typeof dA2500._schema.fp === 'string', '磁盘值已带结构指纹 _schema（实 ' + JSON.stringify(dA2500._schema) + '）');
+    assert(WA.settingsBus.stats.schemaStamps >= 1, '盖章留痕（stats.schemaStamps=' + WA.settingsBus.stats.schemaStamps + '）');
+    const stampsBeforeA = WA.settingsBus.stats.schemaStamps;
+    const diskBeforeA = disk2500(bcKey2500);
+    WA.settingsBus.read(r2500A); WA.settingsBus.read(r2500A);
+    assert(WA.settingsBus.stats.schemaStamps === stampsBeforeA, '（负向）结构已相符时反复读不再盖章（零写入）');
+    assert(disk2500(bcKey2500) === diskBeforeA, '（负向）反复读不改动磁盘字节');
+    // A4b. 结构本就相符 → 一个字节都不写
+    fresh2500();
+    const regFullA = reg2500(bcKey2500);
+    WA.settingsBus.save(regFullA, JSON.parse(JSON.stringify(regFullA.def)));   // 写入与声明完全同形状的值
+    const stampsBeforeA2 = WA.settingsBus.stats.schemaStamps;
+    const diskBeforeA2 = disk2500(bcKey2500);
+    WA.settingsBus.read(regFullA);
+    assert(disk2500(bcKey2500) === diskBeforeA2, '（负向）结构与声明相符时零写入（不污染、不产生额外 IO）');
+    assert(WA.settingsBus.stats.schemaStamps === stampsBeforeA2, '（负向）相符态不计数盖章');
+    // A5. save 继承磁盘指纹：保存用户设置不得抹掉结构标识
+    fresh2500();
+    LS2500.setItem(bcKey2500, JSON.stringify({ simulationMode: 'deep' }));
+    WA.settingsBus.read(r2500A);
+    const fpDiskA = (diskObj2500(bcKey2500)._schema || {}).fp;
+    const patchA = JSON.parse(JSON.stringify(reg2500(bcKey2500).def));
+    patchA.simulationMode = 'light';
+    WA.settingsBus.save(r2500A, patchA);
+    const afterSaveA = diskObj2500(bcKey2500);
+    assert(afterSaveA.simulationMode === 'light', '保存写入用户值');
+    assert(afterSaveA._schema && afterSaveA._schema.fp === fpDiskA, '（负向）保存后磁盘指纹仍在（否则每次保存都要重盖，指纹退化为「最后保存时间」）');
+    assert(WA.settingsBus.read({ key: 'worldaxis_nonexistent_v1', def: { a: 1 } })._schema === undefined, '（负向）无 _schema 时不产生该键');
+    assert(WA.settingsBus.read({ key: 'worldaxis_nonexistent_v2', def: null }) === null, '（负向）def:null 且无磁盘值 → 返回 null（不被包装成对象）');
+  }
+  // ── B. 块2：结构迁移引擎（migrateIfNeeded 契约）──
+  fresh2500();
+  section('v2.5.0 块2：结构迁移引擎（缩减型演化 + 契约四条）');
+  {
+    // B 段用 regional 登记项（其 def 在 v2.3.0 经历过「缩减型演化」，是本轮迁移引擎的目标案例）
+    const r2500B = reg2500(rgKey2500);
+    assert(!!r2500B && typeof r2500B.migrate === 'function', 'regional 登记项已声明 migrate（全库首个真实消费者）');
+    assert(r2500B.migrateObjects === true, 'regional 声明 migrateObjects（缩减型演化需显式开启对象形态迁移）');
+    const legacyVal2500 = {
+      enabled: true, chancePercent: 25, durationRounds: 5,
+      distantEnabled: true, nearEnabled: true, distantChance: 20, nearChance: 20, cooldown: 5
+    };
+    LS2500.setItem(rgKey2500, JSON.stringify(legacyVal2500));
+    const readB2500 = WA.settingsBus.read(r2500B);
+    assert(readB2500.enabled === true && readB2500.chancePercent === 25 && readB2500.durationRounds === 5, '迁移保留 def 声明的用户值（enabled/chancePercent/durationRounds 原样）');
+    ['distantEnabled', 'nearEnabled', 'distantChance', 'nearChance', 'cooldown'].forEach(function (k) {
+      assert(readB2500[k] === undefined, '（负向）移植期死子键 ' + k + ' 已从读值中剔除');
+    });
+    const diskB2500 = diskObj2500(rgKey2500);
+    ['distantEnabled', 'nearEnabled', 'distantChance', 'nearChance', 'cooldown'].forEach(function (k) {
+      assert(!Object.prototype.hasOwnProperty.call(diskB2500, k), '（负向）死子键已从磁盘剔除 ' + k + '（此前只在声明侧剔除，磁盘永久驻留）');
+    });
+    assert(WA.settingsBus.stats.migrations >= 1, '迁移留痕（stats.migrations=' + WA.settingsBus.stats.migrations + '）');
+    const lastMig2500 = WA.settingsBus.stats.lastMigration || {};
+    assert(lastMig2500.key === rgKey2500 && /dropped-stale-subkeys/.test(String(lastMig2500.reason)), '迁移原因串点名被删子键（可溯源，实 ' + lastMig2500.reason + '）');
+    const migCountB2500 = WA.settingsBus.stats.migrations;
+    WA.settingsBus.read(r2500B); WA.settingsBus.read(r2500B);
+    assert(WA.settingsBus.stats.migrations === migCountB2500, '（负向）结构已升级后反复读不再迁移（幂等）');
+    fresh2500();
+    LS2500.setItem(rgKey2500, JSON.stringify({ enabled: true, chancePercent: 33, durationRounds: 2 }));
+    const migBeforeB3 = WA.settingsBus.stats.migrations;
+    const vB3 = WA.settingsBus.read(r2500B);
+    assert(vB3.chancePercent === 33 && vB3.durationRounds === 2, '（负向）已是当前结构的配置原样读出');
+    assert(WA.settingsBus.stats.migrations === migBeforeB3, '（负向）无死子键时不触发迁移（用户正常配置零打扰）');
+    fresh2500();
+    const boomReg2500 = { key: 'worldaxis_mig_boom_v1', def: { a: 1 }, module: 'test', migrateObjects: true,
+      migrate: function () { throw new Error('boom-2500'); } };
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([boomReg2500]);
+    try {
+      LS2500.setItem('worldaxis_mig_boom_v1', JSON.stringify({ a: 2, dead: 3 }));
+      let readErr2500 = null, vB4 = null;
+      try { vB4 = WA.settingsBus.read(boomReg2500); } catch (e) { readErr2500 = e; }
+      assert(!readErr2500, '（负向）迁移抛错不外抛（read 仍返回可用值）');
+      assert(vB4 && vB4.a === 2, '（负向）迁移失败时按原值继续被消费（不静默清空用户数据）');
+      const stB4 = WA.settingsBus.migrationStat();
+      assert(stB4.failed >= 1 && stB4.failedKeys.indexOf('worldaxis_mig_boom_v1') >= 0, '迁移失败入台账并有键名（实 ' + JSON.stringify(stB4.failedKeys) + '）');
+      const failedBeforeB4 = WA.settingsBus.stats.migrationFailed;
+      let callsB4 = 0;
+      const countingReg2500 = { key: 'worldaxis_mig_boom_v1', def: { a: 1 }, module: 'test', migrateObjects: true,
+        migrate: function () { callsB4++; throw new Error('boom-again'); } };
+      WA.settingsBus.read(countingReg2500);
+      assert(callsB4 === 0, '（负向）同一份坏值不重试（抛错的迁移不会变成每次 read 都重试的热路径）');
+      assert(WA.settingsBus.stats.migrationFailed === failedBeforeB4, '（负向）不重试 → 失败计数不膨胀');
+    } finally {
+      WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) { return r.key !== 'worldaxis_mig_boom_v1'; });
+    }
+    fresh2500();
+    const shapeReg2500 = { key: 'worldaxis_mig_shape_v1', def: { a: 1 }, module: 'test', migrateObjects: true,
+      migrate: function (c) {
+        if (!c.value || typeof c.value !== 'object' || c.value.a === 1) return { changed: false, reason: 'no-change' };
+        return { changed: true, value: { a: c.value.a }, reason: 'shape-test' };
+      } };
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([shapeReg2500]);
+    try {
+      WA.settingsBus.read(shapeReg2500);
+      LS2500.setItem('worldaxis_mig_shape_v1', JSON.stringify({ a: 7, junk: 1 }));
+      const vB5 = WA.settingsBus.read(shapeReg2500);
+      assert(vB5 && vB5.a === 7, '先读过空值后写入的异形值仍被迁移处理（实 a=' + (vB5 && vB5.a) + '）');
+      assert(!Object.prototype.hasOwnProperty.call(vB5, 'junk'), '（负向）异形子键已被剔除（形态变化获得恰一次新机会）');
+    } finally {
+      WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) { return r.key !== 'worldaxis_mig_shape_v1'; });
+    }
+    const busSrc2500 = srcOf2500('core/settings-bus.js');
+    assert(busSrc2500.indexOf('function migShapeKey') > 0, '记账按值形态的函数在位（migShapeKey）');
+    assert(/if \(__migTried\[mk\]\)/.test(busSrc2500), '守卫查的是「键+形态」键位（不是裸 key）');
+    assert(busSrc2500.indexOf('__stamped') < 0, '（负向）盖章的一次性守卫已移除（它与「每键每会话」同型缺陷：首次失败后本会话永不重试）');
+  }
+
+  // ── C. 块3：原始格式复活（rawRevive）──
+  fresh2500();
+  section('v2.5.0 块3：原始格式复活（rawRevive 声明式迁移）');
+  {
+    assert(!!r2500C && r2500C.rawRevive === true, 'preset 活动键已声明 rawRevive（首个真实消费者）');
+    const preSrc2500 = srcOf2500('engines/preset.js');
+    assert(preSrc2500.indexOf('migrateActiveKeyFormat') < 0, '（负向）一次性迁移 IIFE 已移除（能力上收单一实现）');
+    assert(/rawRevive: true/.test(preSrc2500), 'preset 登记项声明式复活在位');
+    const customId2500 = 'custom_rev_test_2500';
+    LS2500.setItem(activeKey2500, customId2500);
+    // 先探针确认可复活，再显式执行（顺序有讲究：走 getActivePresetId 时，复活的 id 查不到
+    //   对应预设 → 该函数会把值改写成 'default'，于是看不到「复活成的原文」，属查表逻辑而非复活失败）
+    const probeC12500 = WA.settingsBus.rawRevive(r2500C, true);
+    assert(probeC12500.revived === true && probeC12500.value === customId2500, '探针从裸串解析出原文（value === 原裸串）');
+    const doneC12500 = WA.settingsBus.rawRevive(r2500C, false);
+    assert(doneC12500.revived === true && doneC12500.reason === 'revived', '显式复活执行成功');
+    assert(disk2500(activeKey2500) === JSON.stringify(customId2500), '磁盘值已复活为 JSON 契约（实 ' + disk2500(activeKey2500) + '）');
+    assert(WA.settingsBus.stats.rawRevives >= 1, '复活留痕（stats.rawRevives=' + WA.settingsBus.stats.rawRevives + '）');
+    // C1b. 复活后 read 走正常路径（不被判损坏、不产生隔离）
+    const qBeforeC12500 = WA.settingsBus.stats.quarantines;
+    const idAfterRevive2500 = WA.settingsBus.read(r2500C);
+    assert(idAfterRevive2500 === customId2500, '复活后 read 拿到的是 JSON 字符串值（=== 原裸串）');
+    assert(WA.settingsBus.stats.quarantines === qBeforeC12500, '（负向）复活后不再被判损坏（此前每次启动隔离一次 + 回落默认 → 用户选择每次丢一次）');
+    const revCountC2500 = WA.settingsBus.stats.rawRevives;
+    const probeC2500 = WA.settingsBus.rawRevive(r2500C, true);
+    assert(probeC2500.revived === false && probeC2500.reason === 'already-json', '（负向）已是 JSON → 不复活（reason=already-json）');
+    assert(WA.settingsBus.stats.rawRevives === revCountC2500, '（负向）幂等：反复复活不产生额外写入');
+    fresh2500();
+    LS2500.setItem(activeKey2500, 'raw-probe-value');
+    const beforeC3 = disk2500(activeKey2500);
+    const probeC3 = WA.settingsBus.rawRevive(r2500C, true);
+    assert(probeC3.revived === true && probeC3.reason === 'revivable', 'probe 回报可复活');
+    assert(disk2500(activeKey2500) === beforeC3, '（负向）probe 不写盘（盘点零副作用）');
+    LS2500.setItem(activeKey2500, '');
+    const probeC4b = WA.settingsBus.rawRevive(r2500C, true);
+    assert(probeC4b.revived === false && probeC4b.reason === 'empty-string', '（负向）空串不复活（语义是空值，包装会改变语义）');
+    fresh2500();
+    LS2500.setItem(rgKey2500, 'not-json-raw');
+    const vC5 = WA.settingsBus.read(r2500A);
+    assert(WA.settingsBus.rawRevive({ key: rgKey2500, def: {} }, true).reason === 'not-enabled', '（负向）未声明的键不复活（reason=not-enabled）');
+    assert(vC5 && vC5.enabled === false, '（负向）未声明键的坏值仍走原路径（隔离 + 回落默认，不越权复活）');
+    fresh2500();
+    const savedC6 = WA.preset.saveCustomPreset({ name: '复活验证预设', segments: { reasoning: '自定义推理段-2500' } });
+    LS2500.setItem(activeKey2500, savedC6.id);
+    assert(WA.preset.getActivePresetId() === savedC6.id, '（端到端）裸串写入的用户选择被救回并命中自定义预设');
+    assert(WA.preset.getSegmentOverrides().reasoning === '自定义推理段-2500', '（端到端）复活后预设覆写真生效（此前裸串被判损坏 → 覆写静默全失效）');
+  }
+  // ── D. 块4：幽灵设置键（ghostScan / 未登记家族）──
+  fresh2500();
+  section('v2.5.0 块4：未登记设置键（幽灵设置）盘点与出口');
+  {
+    fresh2500();
+    LS2500.setItem('worldaxis_director_tags_v1', JSON.stringify(['tagA', 'tagB']));
+    LS2500.setItem('worldaxis_user_handmade_v1', '{"x":1}');
+    const gs2500 = WA.settingsBus.ghostScan();
+    const ghostKeys2500 = gs2500.keys.map(function (x) { return x.key; });
+    assert(ghostKeys2500.indexOf('worldaxis_director_tags_v1') >= 0, '幽灵盘点抓到 director_tags（登记表与清理规则都不覆盖的责任真空）');
+    assert(ghostKeys2500.indexOf('worldaxis_user_handmade_v1') >= 0, '幽灵盘点抓到用户手写键（未登记即报，不假设来源）');
+    assert(gs2500.total >= 2 && gs2500.bytes > 0, '幽灵键带条数与字节量（实 ' + gs2500.total + ' 个 / ' + gs2500.bytes + 'B）');
+    fresh2500();
+    LS2500.setItem('worldaxis_event_log_v2500_chat', '[]');
+    LS2500.setItem('worldaxis_state_v2500_chat', '{}');
+    LS2500.setItem('worldaxis_wb_selection_c2500', '[]');
+    LS2500.setItem('worldaxis_writer_id', 'w1');
+    const gs2500b = WA.settingsBus.ghostScan();
+    ['worldaxis_event_log_v2500_chat', 'worldaxis_state_v2500_chat', 'worldaxis_wb_selection_c2500', 'worldaxis_writer_id'].forEach(function (k) {
+      assert(gs2500b.keys.map(function (x) { return x.key; }).indexOf(k) < 0, '（负向）已知家族键不报为幽灵设置：' + k);
+    });
+    fresh2500();
+    LS2500.setItem('worldaxis_backstage_settings_v1_corrupt_123456', '{bad');
+    const gs2500c = WA.settingsBus.ghostScan();
+    assert(gs2500c.keys.map(function (x) { return x.key; }).filter(function (k) { return /_corrupt_/.test(k); }).length === 0, '（负向）隔离副本不报为幽灵设置');
+    fresh2500();
+    WA.settingsBus.save(r2500A, JSON.parse(JSON.stringify(r2500A.def)));
+    WA.settingsBus.save(reg2500(rgKey2500), { enabled: false, chancePercent: 15, durationRounds: 3 });
+    const gs2500d = WA.settingsBus.ghostScan();
+    ['worldaxis_backstage_settings_v1', rgKey2500].forEach(function (k) {
+      assert(gs2500d.keys.map(function (x) { return x.key; }).indexOf(k) < 0, '（负向）在册设置键不报为幽灵：' + k);
+    });
+    const storeSrc2500 = srcOf2500('core/store.js');
+    // 判据是「白名单不是代码」而非「这个名字不存在」——本轮删除它时同步留下了
+    //   解释原因的注释（注释里必然还会提到这个名字），故用正则定位真正的旧定义。
+    assert(!/settingsSettings\s*:/.test(storeSrc2500), '（负向）硬编码 settings 白名单定义已删除（第二份真源必漂移）');
+    assert(/v2\.5\.0: 删除 `settingsSettings` 硬编码白名单/.test(storeSrc2500), '删除原因留痕在位（现场证据，防日后又被加回）');
+    assert(storeSrc2500.indexOf('function isRegisteredSettingsKey') > 0, '改由 isRegisteredSettingsKey 查登记表判定');
+    fresh2500();
+    LS2500.setItem('worldaxis_director_tags_v1', '["t"]');
+    WA.settingsBus.save(r2500A, JSON.parse(JSON.stringify(r2500A.def)));
+    const st2500b = WA.store.storageStat();
+    assert(typeof st2500b.families.settingsUnregistered === 'number', 'storageStat 新增 settingsUnregistered 家族计量');
+    assert(typeof st2500b.perFamilyBytes.settingsUnregistered === 'number', 'perFamilyBytes 同步新增（防两表漂移）');
+    assert(st2500b.families.settingsUnregistered >= 1, '未登记键计入 settingsUnregistered（实 ' + st2500b.families.settingsUnregistered + '）');
+    assert(st2500b.families.settings >= 1, '在册设置键计入 settings（实 ' + st2500b.families.settings + '）');
+    fresh2500();
+    LS2500.setItem('worldaxis_director_tags_v1', '["t"]');
+    const planKeepD2500 = WA.store.sweepStaleKeys({});
+    assert(!planKeepD2500.remove.some(function (r) { return r.key === 'worldaxis_director_tags_v1'; }), '（负向）默认计划不含幽灵设置键（保守，宁可漏删不可误删）');
+    assert(planKeepD2500.keep.indexOf('worldaxis_director_tags_v1') >= 0, '默认计划显式 keep 幽灵设置键');
+    const planGhostD2500 = WA.store.sweepStaleKeys({ ghostSettings: true });
+    const hitD2500 = planGhostD2500.remove.filter(function (r) { return r.key === 'worldaxis_director_tags_v1'; })[0];
+    assert(!!hitD2500 && hitD2500.reason === 'unregistered-setting', '显式开启后纳入候选（reason=unregistered-setting，实 ' + (hitD2500 && hitD2500.reason) + '）');
+    const gsBeforeD2500 = (WA.settingsBus.ghostScan().keys || []).length;
+    const appliedD2500 = WA.store.sweepStaleKeys({ ghostSettings: true, apply: true });
+    assert(appliedD2500.remove.length >= 1 && !LS2500.getItem('worldaxis_director_tags_v1'), '真删除须显式 apply（幽灵键已从磁盘清除）');
+    assert((WA.settingsBus.ghostScan().keys || []).length < gsBeforeD2500, '清除后幽灵盘点同步减少（可验证闭环）');
+    fresh2500();
+    LS2500.setItem('worldaxis_conflict_v2500_chat_123_1', '{}');
+    assert(!WA.store.sweepStaleKeys({}).remove.some(function (r) { return r.key.indexOf('worldaxis_conflict_') === 0; }), '（负向）冲突现场仍受保护（历史不变量保持）');
+    // D9. 逆向审计补丁：幽灵盘点不得自持第二份家族真源
+    const busSrcD2500 = srcOf2500('core/settings-bus.js');
+    assert(typeof WA.store.classifyKey === 'function', 'store 导出 classifyKey（家族分类单一真源）');
+    assert(busSrcD2500.indexOf('function familyOf') > 0 && busSrcD2500.indexOf('WA.store.classifyKey') > 0, '幽灵盘点优先消费真源分类器（familyOf）');
+    assert(/if \(fam !== null\)/.test(busSrcD2500), '真源可用时不看本地前缀清单（回退仅在分类器缺席时启用）');
+    //   一致性：回退清单声明的每个前缀，在**符合该家族格式**时真源都必须判为非设置域
+    //   （探针须按真源正则的格式构造：conflict 需 _<chat>_<ts>_<seq>，state 需 chat 段等）
+    const fbPrefixes2500 = [
+      ['worldaxis_state_', 'worldaxis_state_probe_chat'],
+      ['worldaxis_recovery_', 'worldaxis_recovery_probe_chat'],
+      ['worldaxis_event_log_', 'worldaxis_event_log_probe_chat'],
+      ['worldaxis_error_log_', 'worldaxis_error_log_probe_chat'],
+      ['worldaxis_wf_history_', 'worldaxis_wf_history_probe_chat'],
+      ['worldaxis_uninject_ledger_', 'worldaxis_uninject_ledger_probe_chat'],
+      ['worldaxis_wb_selection_', 'worldaxis_wb_selection_probe'],
+      ['worldaxis_conflict_', 'worldaxis_conflict_probe_100_1'],
+      ['worldaxis_writer_id', 'worldaxis_writer_id']
+    ];
+    fbPrefixes2500.forEach(function (pair) {
+      const fam = (WA.store.classifyKey(pair[1]) || {}).family;
+      assert(fam !== 'settings' && fam !== 'settingsUnregistered', '回退清单前缀与真源一致（' + pair[1] + ' → ' + fam + '）');
+    });
+    //   (反向) 真源判为 settingsUnregistered 的键，回退清单里**没有**任何前缀会命中
+    //   （否则真源缺席时会漏报 —— 但这不构成等价：见下面的「宽度差异」实录）
+    const probeGhost2500 = 'worldaxis_director_tags_v1';
+    assert((WA.store.classifyKey(probeGhost2500) || {}).family === 'settingsUnregistered', '真源把未登记键判为 settingsUnregistered');
+    assert(!fbPrefixes2500.some(function (p) { return probeGhost2500.indexOf(p[0]) === 0; }), '（负向）回退清单不命中幽灵键');
+    // D9b. 宽度差异实录（逆向审计抓出的真实分歧，说明「为什么必须用真源」）：
+    //   回退清单按**前缀**排除，真源按**精确正则**排除。于是「前缀对但格式不合规」的键
+    //   （例：worldaxis_conflict_probe —— 缺 _ts_seq）在真源里落进 settingsUnregistered（确实无人负责），
+    //   在回退清单里却被前缀挡住。两者结论不同 ⇒ 回退清单是比真源**更宽**的排除口径（会漏报）。
+    //   故它只能在真源不可用时兜底，不能当等价实现。
+    const famDegenerate2500 = (WA.store.classifyKey('worldaxis_conflict_probe') || {}).family;
+    assert(famDegenerate2500 === 'settingsUnregistered', '（差异实录）格式不合规的 conflict 键被真源判为未登记设置（实 ' + famDegenerate2500 + '）');
+    assert(fbPrefixes2500.some(function (p) { return 'worldaxis_conflict_probe'.indexOf(p[0]) === 0; }), '（差异实录）同一键在回退清单里被前缀挡住 —— 两套口径不等价，故真源必须优先');
+    assert(WA.settingsBus.ghostScan().keys.map(function (x) { return x.key; }).indexOf(probeGhost2500) < 0, '（负向）该键在 clean 态下不出现在幽灵盘点（前置条件自检）');
+    // D10. 缩减型迁移器的非对象 def 不变量（本轮新增能力的边界）
+    //   evolution 与 regional 同型（v2.3.0 从 12 子键砍到 5 子键，7 个死键同样只在声明侧剔除）。
+    const evoReg2500 = reg2500('worldaxis_evolution_settings_v1');
+    assert(evoReg2500 && typeof evoReg2500.migrate === 'function' && evoReg2500.migrateObjects === true, 'evolution 亦已声明缩减型迁移（正向审计扫出的同型漏网者）');
+    assert(/subkeyPruner/.test(srcOf2500('engines/evolution.js')) && /subkeyPruner/.test(srcOf2500('engines/regional.js')), '两个缩减型键的迁移器均由工厂产出（拒绝两份内联实现分叉）');
+    assert(typeof WA.settingsBus.subkeyPruner === 'function' && typeof WA.settingsBus.subkeyPruner({ a: 1 }) === 'function', '工厂导出可用且返回函数（供各模块登记项引用）');
+    fresh2500();
+    LS2500.setItem('worldaxis_evolution_settings_v1', JSON.stringify({
+      diceEnabled: false, progressFailBase: 3, conflictFailBase: 7, diceModifier: 2, setbackRatio: 30,
+      distantEventEnabled: true, distantChance: 20, distantCooldown: 5,
+      nearEventEnabled: true, nearChance: 20, nearCooldown: 5, regionalIncidentEnabled: true
+    }));
+    const vEvo2500 = WA.settingsBus.read(evoReg2500);
+    assert(vEvo2500.diceEnabled === false && vEvo2500.diceModifier === 2 && vEvo2500.setbackRatio === 30, 'evolution 迁移保留声明子键的用户值');
+    const evoDisk2500 = diskObj2500('worldaxis_evolution_settings_v1');
+    ['distantEventEnabled', 'distantChance', 'distantCooldown', 'nearEventEnabled', 'nearChance', 'nearCooldown', 'regionalIncidentEnabled'].forEach(function (k) {
+      assert(!Object.prototype.hasOwnProperty.call(evoDisk2500, k), '（负向）evolution 移植期死键已从磁盘剔除 ' + k);
+    });
+    //   数组型 def（custom_presets）：迁移器工厂对其为 no-op，绝不可把数组改成对象
+    const prunerArr2500 = WA.settingsBus.subkeyPruner([]);
+    const arrOut2500 = prunerArr2500({ value: ['a', 'b'], key: 'x', def: [] });
+    assert(arrOut2500.changed === false, '（负向）数组值不被缩减迁移触碰（changed:false，不把数组改成对象）');
+    const prunerNull2500 = WA.settingsBus.subkeyPruner(null);
+    assert(prunerNull2500({ value: 'scalar', key: 'x', def: null }).changed === false, '（负向）非对象值不被迁移触碰');
+    //   盖章边界：数组 / 标量 def 都不写 _schema
+    fresh2500();
+    const customKey2500 = 'worldaxis_custom_presets';
+    LS2500.setItem(customKey2500, JSON.stringify([{ id: 'x', name: 'n' }]));
+    const stampsPre2500 = WA.settingsBus.stats.schemaStamps;
+    WA.settingsBus.read(reg2500(customKey2500));
+    assert(disk2500(customKey2500).indexOf('_schema') < 0, '（负向）数组 def 不写 _schema（元数据只属对象形态的设置）');
+    assert(WA.settingsBus.stats.schemaStamps === stampsPre2500, '（负向）数组 def 不计数盖章');
+    // D11. save 不得原地污染调用方对象（与「def 别名污染」同型）
+    fresh2500();
+    const bcKeyD11 = 'worldaxis_backstage_settings_v1';
+    const regD11 = reg2500(bcKeyD11);
+    LS2500.setItem(bcKeyD11, JSON.stringify({ simulationMode: 'deep' }));
+    WA.settingsBus.read(regD11);                       // 触发盖章
+    const caller11500 = JSON.parse(JSON.stringify(regD11.def));
+    WA.settingsBus.save(regD11, caller11500);
+    assert(!Object.prototype.hasOwnProperty.call(caller11500, '_schema'), '（负向）save 不把存储层元数据挂到调用方对象上');
+    assert((diskObj2500(bcKeyD11) || {})._schema, '（正向）磁盘仍继承了指纹（先拷贝再挂，两不误）');
+    // D12. save 传入数组 / 标量时不试图继承
+    fresh2500();
+    WA.settingsBus.save(reg2500('worldaxis_custom_presets'), [{ id: 'a' }]);
+    assert(Array.isArray(diskObj2500('worldaxis_custom_presets')), '（负向）数组值原样落盘（不被包装成对象）');
+    WA.settingsBus.save(reg2500(activeKey2500), 'default');
+    assert(diskObj2500(activeKey2500) === 'default', '（负向）标量值原样落盘');
+  }
+
+  // ── E. 块5：诊断与面板出口 ──
+  fresh2500();
+  section('v2.5.0 块5：诊断接线与面板出口');
+  {
+    fresh2500();
+    const dg2500 = WA.toolDiag.collect();
+    const sb2500 = (dg2500.runtime || {}).settingsBus || {};
+    assert(!!sb2500.lifecycle, '诊断包透出 lifecycle（生命周期声明覆盖）');
+    assert(typeof sb2500.lifecycle.migrate === 'number' && typeof sb2500.lifecycle.rawRevive === 'number', 'lifecycle 带 migrate / rawRevive 声明数（实 ' + JSON.stringify(sb2500.lifecycle) + '）');
+    assert(!!sb2500.migrations && typeof sb2500.migrations.failed === 'number', '诊断包透出 migrations 且带失败计数');
+    assert(!!sb2500.ghosts, '诊断包透出 ghosts（幽灵键盘点）');
+    assert(sb2500.lifecycle.migrate >= 1 && sb2500.lifecycle.rawRevive >= 1, 'migrate / rawRevive 均已有真实消费者（实 ' + JSON.stringify(sb2500.lifecycle) + '）');
+    fresh2500();
+    const boomRegE2500 = { key: 'worldaxis_mig_diag_v1', def: { a: 1 }, module: 'test', migrateObjects: true,
+      migrate: function () { throw new Error('diag-boom'); } };
+    WA.__settingsRegs = (WA.__settingsRegs || []).concat([boomRegE2500]);
+    try {
+      LS2500.setItem('worldaxis_mig_diag_v1', JSON.stringify({ a: 1, dead: 2 }));
+      WA.settingsBus.read(boomRegE2500);
+      const issuesE2500 = (WA.toolDiag.verdict(WA.toolDiag.collect()).issues || []).filter(function (i) { return i.key === 'settingsBus.migration'; });
+      assert(issuesE2500.length === 1 && issuesE2500[0].level === 'error', 'verdict 报迁移失败为 error 级（迁移没跑成属需人处理）');
+    } finally {
+      WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) { return r.key !== 'worldaxis_mig_diag_v1'; });
+    }
+    fresh2500();
+    LS2500.setItem('worldaxis_director_tags_v1', '["t"]');
+    const issuesE3 = (WA.toolDiag.verdict(WA.toolDiag.collect()).issues || []).filter(function (i) { return i.key === 'settingsBus.ghosts'; });
+    assert(issuesE3.length === 1 && issuesE3[0].level === 'warn', 'verdict 报幽灵设置为 warn');
+    assert(/director_tags/.test(issuesE3[0].detail), '议题点名具体键（可定位，实 ' + issuesE3[0].detail.slice(0, 70) + '）');
+    assert(/存储键体检/.test(issuesE3[0].detail), '议题给出处置入口指引（不只报告问题）');
+    const dgSrc2500 = srcOf2500('engines/tool-diag.js');
+    assert(dgSrc2500.indexOf("key: 'settingsBus.migration'") > 0, 'verdict 有迁移议题');
+    assert(dgSrc2500.indexOf("key: 'settingsBus.ghosts'") > 0, 'verdict 有幽灵键议题');
+    assert(dgSrc2500.indexOf("key: 'settingsBus.lifecycle'") > 0, 'verdict 有生命周期空转议题');
+    const pSrc2500 = srcOf2500('ui/panel.js');
+    assert(pSrc2500.indexOf('settingsUnregistered') > 0, '体检视图展示未登记设置家族计数');
+    assert(pSrc2500.indexOf('wa-key-sweep-ghost') > 0 && pSrc2500.indexOf('ghostSettings: withGhost') > 0, '体检提供「清理并包含未登记设置键」出口');
+    assert(pSrc2500.indexOf('ghostScan') > 0, '体检消费 ghostScan（真实盘点，不是另算一份）');
+    assert(pSrc2500.indexOf('migrationStat') > 0 && pSrc2500.indexOf('生命周期声明') > 0, '设置键页展示生命周期与迁移台账');
+    assert(pSrc2500.indexOf('if (life.migrate === 0 && life.rawRevive === 0)') > 0, '（负向哨兵）生命周期全空时面板明确点名（防能力再次退化而不可见）');
+    const dynIds2500 = [];
+    (WA.toolDiag.UI_BINDINGS || []).forEach(function (g) { (g.dynamic || []).forEach(function (id) { dynIds2500.push(id); }); });
+    assert(dynIds2500.indexOf('wa-key-sweep-ghost') >= 0, '新控件 wa-key-sweep-ghost 纳入 UI_BINDINGS.dynamic');
+    let JSD2500 = null;
+    try { JSD2500 = require('jsdom').JSDOM; } catch (e) { try { JSD2500 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSD2500 = null; } }
+    if (!JSD2500) {
+      console.log('  \\u26a0 jsdom 不可用，跳过面板端到端（静态锚点已覆盖接线）');
+    } else {
+      fresh2500();   // 面板端到端从干净磁盘起（上方 E3 为验 verdict 议题写过幽灵键，不清会污染「无幽灵」负向断言）
+      const domE2500 = new JSD2500('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
+      const savedDocE2500 = global.document;
+      global.document = domE2500.window.document;
+      try { global.Node = domE2500.window.Node; } catch (e) {}
+      WA.mainDoc = global.document;
+      vm.runInContext(srcOf2500('ui/panel.js'), ctx, { filename: 'ui/panel.js' });
+      WA.store.init();
+      WA.ui.mount(); WA.ui.open();
+      const toolsTab2500 = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab')).filter(function (t) { return t.dataset.page === 'tools'; })[0];
+      assert(!!toolsTab2500, '存在「工具」页签（体检与设置键入口所在页）');
+      if (toolsTab2500) {
+        toolsTab2500.onclick();
+        const keyBtn2500 = global.document.querySelector('#wa-key-check');
+        const orphBtn2500 = global.document.querySelector('#wa-orphan-view');
+        assert(!!keyBtn2500 && !!orphBtn2500, '（真 DOM）工具页渲染体检与设置键按钮');
+        if (keyBtn2500) {
+          keyBtn2500.onclick();
+          const outNo2500 = global.document.querySelector('#wa-diag-out').innerHTML;
+          assert(outNo2500.indexOf('存储键体检') >= 0, '（真 DOM）体检渲染摘要（无幽灵时也正常）');
+          assert(outNo2500.indexOf('未登记设置') >= 0, '（真 DOM）体检摘要含未登记设置家族计数');
+          assert(!global.document.querySelector('#wa-key-sweep-ghost'), '（负向）无幽灵键时不渲染幽灵清理按钮（不诱导误操作）');
+        }
+        LS2500.setItem('worldaxis_director_tags_v1', '["t"]');
+        if (keyBtn2500) {
+          keyBtn2500.onclick();
+          const ghostBtn2500 = global.document.querySelector('#wa-key-sweep-ghost');
+          assert(!!ghostBtn2500, '（真 DOM）存在幽灵键时渲染幽灵清理按钮');
+          if (ghostBtn2500) {
+            ghostBtn2500.onclick();
+            assert(!LS2500.getItem('worldaxis_director_tags_v1'), '（真 DOM）点击幽灵清理按钮后键被真删（端到端闭环）');
+          }
+        }
+        if (orphBtn2500) {
+          orphBtn2500.onclick();
+          const outOr2500 = global.document.querySelector('#wa-diag-out').innerHTML;
+          assert(outOr2500.indexOf('设置键登记表') >= 0, '（真 DOM）设置键页渲染登记表摘要');
+          assert(outOr2500.indexOf('生命周期声明') >= 0, '（真 DOM）设置键页渲染生命周期声明行');
+          assert(/结构迁移 [1-9]/.test(outOr2500), '（真 DOM）生命周期行报出「结构迁移 ≥1 个键」（实 ' + (outOr2500.match(/结构迁移 \d+ 个键/) || ['?'])[0] + '）');
+        }
+      }
+      global.document = savedDocE2500;
+      global.document.getElementById = function () { return null; };
+      WA.mainDoc = global.document;
+    }
+  }
+
+  // ── F. 块6：版本号三方对齐 ──
+  fresh2500();
+  section('v2.5.0 块6：版本号三方对齐与模块装载');
+  {
+    const idxSrcF2500 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+    const mfF2500 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
+    const verF2500 = (idxSrcF2500.match(/const VERSION = '([\d.]+)'/) || [])[1];
+    assert(verF2500 === mfF2500.version, 'index.js VERSION 与 manifest.version 一致（' + verF2500 + ' vs ' + mfF2500.version + '）');
+    // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
+    //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
+    assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
+assert(verF2500 === '2.5.0' && mfF2500.version === verF2500, '入口与清单同源同值（实 ' + verF2500 + '）');
+    const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
+    assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
+  }
+  } // end v2.5.0 block
   } // end v2.2.0 block
   } // end v2.1.0 block
   } // end v0.9.0 block

@@ -518,17 +518,32 @@
       try {
         const st = WA.store.storageStat();
         if (!st.enumerable) { out.textContent = '当前环境 localStorage 不支持键枚举，无法体检'; return; }
-        const plan = WA.store.sweepStaleKeys({});   // dry-run
-        let html = '<div class="wa-item"><b>存储键体检</b>：worldaxis_* 键 ' + st.totalKeys + ' 个 / ' + Math.round(st.totalBytes / 1024) + 'KB（存档 ' + st.families.state + ' · 派生槽 ' + (st.families.stateDerived || 0) + ' · 恢复点 ' + st.families.recovery + ' · 诊断 ' + st.families.diagnostic + ' · 隔离 ' + st.families.corrupt + ' · 设置 ' + st.families.settings + ' · 世界书 ' + st.families.wb + '）</div>';
+        const ghosts = (WA.settingsBus && WA.settingsBus.ghostScan) ? WA.settingsBus.ghostScan() : { keys: [], total: 0, bytes: 0 };
+        const plan = WA.store.sweepStaleKeys({});   // dry-run（v2.5.0 起未登记设置键默认保留，与旧版行为一致）
+        let html = '<div class="wa-item"><b>存储键体检</b>：worldaxis_* 键 ' + st.totalKeys + ' 个 / ' + Math.round(st.totalBytes / 1024) + 'KB（存档 ' + st.families.state + ' · 派生槽 ' + (st.families.stateDerived || 0) + ' · 恢复点 ' + st.families.recovery + ' · 诊断 ' + st.families.diagnostic + ' · 隔离 ' + st.families.corrupt + ' · 设置 ' + st.families.settings + ' · 未登记设置 ' + (st.families.settingsUnregistered || 0) + ' · 世界书 ' + st.families.wb + '）</div>';
         if (st.currentChatQuarantines > 0) html += '<div class="wa-dim">当前聊天隔离副本 ' + st.currentChatQuarantines + ' 个（受保护不自动清理——损坏时的原始现场，确认无需回滚后可手动删除）</div>';
         if (WA.settingsBus && WA.settingsBus.stats && WA.settingsBus.stats.quarantines > 0) html += '<div class="wa-dim">settingsBus：迁移 ' + WA.settingsBus.stats.upgrades + ' 次 · 损坏隔离累计 ' + WA.settingsBus.stats.quarantines + ' 次（隔离键保留最近 5 个）</div>';
-        if (!plan.remove.length) { html += '<div class="wa-log wa-log-info">✓ 无过期键可清理（当前聊天 / 设置 / 世界书键受保护）</div>'; out.innerHTML = html; return; }
-        html += '<div class="wa-log wa-log-warn">可回收 ' + plan.remove.length + ' 个过期键 / ' + Math.round(plan.freedBytes / 1024) + 'KB：过期诊断 ' + (plan.byFamily['diag-idle'] || 0) + ' · 隔离溢出 ' + (plan.byFamily['corrupt-overflow'] || 0) + ' · 孤儿恢复点 ' + (plan.byFamily['orphan-recovery'] || 0) + '</div>';
-        html += '<div class="wa-dim">' + plan.remove.slice(0, 8).map(r => esc(r.key)).join('<br>') + (plan.remove.length > 8 ? '<br>…等 ' + plan.remove.length + ' 项' : '') + '</div>';
-        const doIt = () => { try { const done = WA.store.sweepStaleKeys({ apply: true }); $('#wa-diag-out').innerHTML = '<div class="wa-log wa-log-info">✓ 已清理 ' + done.remove.length + ' 个键，释放 ' + Math.round(done.freedBytes / 1024) + 'KB（当前聊天与设置键未动）</div>'; } catch (e) { $('#wa-diag-out').textContent = '清理失败：' + (e && e.message); } };
-        html += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-key-sweep-go">确认清理（不可撤销）</button></div>';
+        // v2.5.0: 未登记设置键（幽灵设置）——登记表管不到它（没登记）、清理规则也管不到它（被当用户数据保护），
+        //   此前在面板与诊断里都没有出口（实证案例 worldaxis_director_tags_v1：v0.1.0 写入、v0.2.0 功能移除后永久滞留）。
+        //   处置口径：**默认保留**，必须由用户显式选择才进清理计划——"永不清理"与"无人可清理"是两回事。
+        if (ghosts.total) {
+          html += '<div class="wa-log wa-log-warn">未登记设置键 ' + ghosts.total + ' 个 / ' + Math.round(ghosts.bytes / 1024 * 10) / 10 + 'KB（扩展不认识、登记表未覆盖，因此既不会被自动清理也不会被自动迁移）</div>';
+          html += '<div class="wa-dim">' + ghosts.keys.slice(0, 6).map(g => esc(g.key) + ' <span class="wa-dim">' + g.bytes + 'B · ' + g.shape + '</span>').join('<br>') + (ghosts.keys.length > 6 ? '<br>…等 ' + ghosts.keys.length + ' 项' : '') + '</div>';
+        }
+        const sweepGo = (withGhost) => { try { const done = WA.store.sweepStaleKeys({ apply: true, ghostSettings: withGhost }); $('#wa-diag-out').innerHTML = '<div class="wa-log wa-log-info">✓ 已清理 ' + done.remove.length + ' 个键，释放 ' + Math.round(done.freedBytes / 1024) + 'KB（当前聊天与在册设置键未动' + (withGhost ? '；已含未登记设置键）' : '）') + '</div>'; } catch (e) { $('#wa-diag-out').textContent = '清理失败：' + (e && e.message); } };
+        if (!plan.remove.length && !ghosts.total) { html += '<div class="wa-log wa-log-info">✓ 无过期键可清理（当前聊天 / 设置 / 世界书键受保护）</div>'; out.innerHTML = html; return; }
+        if (plan.remove.length) {
+          html += '<div class="wa-log wa-log-warn">可回收 ' + plan.remove.length + ' 个过期键 / ' + Math.round(plan.freedBytes / 1024) + 'KB：过期诊断 ' + (plan.byFamily['diag-idle'] || 0) + ' · 隔离溢出 ' + (plan.byFamily['corrupt-overflow'] || 0) + ' · 孤儿恢复点 ' + (plan.byFamily['orphan-recovery'] || 0) + '</div>';
+          html += '<div class="wa-dim">' + plan.remove.slice(0, 8).map(r => esc(r.key)).join('<br>') + (plan.remove.length > 8 ? '<br>…等 ' + plan.remove.length + ' 项' : '') + '</div>';
+        } else {
+          html += '<div class="wa-log wa-log-info">✓ 无过期键可回收（未登记设置键不在自动计划内）</div>';
+        }
+        html += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-key-sweep-go">确认清理（不可撤销）</button>';
+        if (ghosts.total) html += '<button class="wa-btn wa-mini" id="wa-key-sweep-ghost">清理并包含未登记设置键（' + ghosts.total + '）</button>';
+        html += '</div>';
         out.innerHTML = html;
-        const go = $('#wa-key-sweep-go'); if (go) go.onclick = doIt;
+        const go = $('#wa-key-sweep-go'); if (go) go.onclick = () => sweepGo(false);
+        const goG = $('#wa-key-sweep-ghost'); if (goG) goG.onclick = () => sweepGo(true);
       } catch (e) { out.textContent = '体检失败：' + (e && e.message); }
     };
     // v0.3.0: 隔离现场救援出口——损坏时保存的原始现场可查看/恢复/丢弃（此前只进不出）
@@ -772,8 +787,24 @@
       try {
         const regStat = (WA.settingsBus && WA.settingsBus.registryStat) ? WA.settingsBus.registryStat() : null;
         const orphans = WA.store.orphanSettingsKeys ? (WA.store.orphanSettingsKeys() || []) : [];
+        // v2.5.0: 键生命周期视图——「有几个键声明了结构迁移/原始格式复活」「本会话迁移了几个」。
+        //   此前这些能力在面板完全没有出口（migrate 字段零调用、rawRevive 根本不存在都看不出来）。
+        const life = (WA.settingsBus && WA.settingsBus.selfCheck) ? (WA.settingsBus.selfCheck().lifecycle || null) : null;
+        const migSt = (WA.settingsBus && WA.settingsBus.migrationStat) ? WA.settingsBus.migrationStat() : null;
+        const ghostN = (WA.settingsBus && WA.settingsBus.ghostScan) ? WA.settingsBus.ghostScan() : null;
         let html = '<div class="wa-item"><b>设置键登记表</b>：' + (regStat ? regStat.total : '?') + ' 项（带 legacy 旧键 ' + (regStat ? regStat.legacy : 0) + ' · 孤儿 ' + orphans.length + '）</div>';
         html += '<div class="wa-dim">登记表＝扩展认识的 worldaxis_* 设置键清单（含旧键迁移规则）。孤儿＝模块已声明废弃（orphan）且键已不在磁盘上的幽灵登记，注销只影响登记表，不动任何在用配置。</div>';
+        if (life) {
+          html += '<div class="wa-dim">生命周期声明：结构迁移 ' + life.migrate + ' 个键 · 原始格式复活 ' + life.rawRevive + ' 个键 · legacy 旧键 ' + life.legacy + ' 个。'
+            + (migSt && migSt.ok > 0 ? '本会话已迁移 ' + migSt.ok + ' 个（最近 ' + esc((migSt.last || {}).key || '?') + '）' : '本会话尚无结构迁移发生')
+            + (migSt && migSt.failed > 0 ? '；<b>迁移失败 ' + migSt.failed + ' 个</b>（' + esc((migSt.failedKeys || []).join('、')) + '）——这些键按原值继续被消费' : '') + '</div>';
+          if (life.migrate === 0 && life.rawRevive === 0) {
+            html += '<div class="wa-log wa-log-warn">全部登记项都未声明生命周期钩子：本插件结构仍在演化，无键声明升级路径意味着缺声明或能力再次空转</div>';
+          }
+        }
+        if (ghostN && ghostN.total > 0) {
+          html += '<div class="wa-log wa-log-warn">另有 ' + ghostN.total + ' 个未登记设置键（扩展不认识、登记表未覆盖）：' + ghostN.keys.slice(0, 4).map(function (g) { return esc(g.key) + '(' + g.bytes + 'B)'; }).join('、') + '——处置入口在「存储键体检」</div>';
+        }
         if (regStat && regStat.byModule) {
           html += '<div class="wa-dim">按模块：' + Object.keys(regStat.byModule).map(function (k) { return esc(k) + '(' + regStat.byModule[k] + ')'; }).join(' · ') + '</div>';
         }

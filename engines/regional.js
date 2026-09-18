@@ -25,7 +25,18 @@
   //   保留死键会让设置页/登记表显示一组拨了没反应的旋钮）。
   const MIN_CHANCE_PCT = 1, MAX_CHANCE_PCT = 100;
   const MIN_DURATION = 1, MAX_DURATION = 20;
-  const __REG = { key: LS_KEY, def: { enabled: false, chancePercent: 15, durationRounds: 3 }, module: 'regional' };
+  const REG_DEF = { enabled: false, chancePercent: 15, durationRounds: 3 };
+  // v2.5.0: 缩减型结构演化的**首个真实消费者**（此前 migrate 钩子全库零调用）。
+  //   缺的是什么：v2.3.0 块3 从 def 里剔除了 5 个零消费死键，但**只在声明侧剔除了**——
+  //   老存档磁盘上那 5 个子键原封不动，而且此后永远动不了：
+  //     · 子键补齐（v2.4.0 applyDefaults）**只加不减**，不会删掉不在 def 里的子键；
+  //     · 保存路径是 `Object.assign(read(), patch)`，读到什么就写回什么 → 死键每次保存被续命；
+  //     · 它们既不是「损坏」也不是「未登记键」，任何治理出口都看不见。
+  //   即「只加不减」是结构演化的结构性缺陷，必须能声明缩减型迁移。
+  //   声明口径：`migrateObjects:true`（显式开启对象形态迁移）+ 白名单式保留；删除幂等。
+  //   迁移逻辑走 settingsBus.subkeyPruner 单一实现（两份内联必然分叉，本版已实测过）。
+  const __REG = { key: LS_KEY, def: REG_DEF, module: 'regional', migrateObjects: true,
+    migrate: WA.settingsBus.subkeyPruner(REG_DEF) };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——配置损坏此前静默重置为「未启用」
   function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

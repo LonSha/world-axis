@@ -26,11 +26,18 @@
   //   真实配置出口是 worldaxis_horizon_settings_v1。
   //   （说明注释置于登记块之外：源码守卫会扫描块内容，块内出现已删键名会让
   //    「死键已剔除」的断言误判为仍存在。）
-  const __REG = { key: LS_KEY, def: {
+  const EVO_DEF = {
     diceEnabled: true,           // 本地骰子推进
     progressFailBase: 2, conflictFailBase: 6,
     diceModifier: 0, setbackRatio: 40
-  }, module: 'evolution' };
+  };
+  // v2.5.0: 缩减型结构演化迁移（与 regional 同型，本版正向审计扫出的第二个漏网者）。
+  //   那 7 个死键在 v2.3.0 **只在声明侧**被剔除，老存档磁盘上的同名子键原封不动且永远动不了
+  //   （子键补齐只加不减、`setSettings` 走 `Object.assign(read(),patch)` 读到什么写回什么
+  //   ⇒ 每次保存都给死键续命），而它们既非「损坏」也非「未登记键」，任何治理出口都看不见。
+  //   迁移逻辑走 settingsBus.subkeyPruner 单一实现（两份内联必然分叉）。
+  const __REG = { key: LS_KEY, def: EVO_DEF, module: 'evolution', migrateObjects: true,
+    migrate: WA.settingsBus.subkeyPruner(EVO_DEF) };
   function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function saveSettings(s) { WA.settingsBus.save(__REG, s); }

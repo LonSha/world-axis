@@ -82,19 +82,16 @@
   // v2.3.0: 原标 orphan:true 属误声明——本键由 setActivePresetId 主动写入、getActivePresetId 主动读取，
   //   是「用户尚未选过预设时才缺席」的可选键，不是废弃键。误标后果：面板「全部注销」会把它从登记表清掉。
   //   声明位置同时上移：本键的读写现在都经 settingsBus，而 const 登记项无提升。
-  const __REG_ACTIVE = { key: KEY_ACTIVE, def: null, module: 'preset', optional: true };
+  // v2.5.0: 增声明 `rawRevive:true` —— 历史版本把 id 以**裸字符串**写入本键。
+  //   v2.3.0 曾用一个**一次性 IIFE** 兜这件事（先 readRaw 看原文、是裸串就 save 成 JSON）。
+  //   一次性即缺陷：那次若未跑成（迁移前抛错 / 用户换旧版本又写了一次裸串 / 清过 localStorage
+  //   后被旧版本写入），此后每次 read 都把裸串判为损坏 → 隔离 + 回落默认 + 记 error，
+  //   **用户选中的预设每次启动丢一次**且永不自愈。改为声明式后由 settingsBus 在 **parse 之前**
+  //   幂等复活：可重复、跨会话、且与「已被判为损坏的现场」互补（不依赖谁先跑）。
+  const __REG_ACTIVE = { key: KEY_ACTIVE, def: null, module: 'preset', optional: true, rawRevive: true };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_ACTIVE]);
-  // v2.3.0: 一次性格式迁移——历史版本把 id 以**裸字符串**写入本键，而本总线是 JSON 契约，
-  //   首个 read 会把裸串判为损坏并隔离，用户选中的预设会静默回到默认。迁移必须在任何读取之前完成。
-  (function migrateActiveKeyFormat() {
-    try {
-      const raw = WA.settingsBus.readRaw(KEY_ACTIVE);
-      if (raw === null || raw === undefined) return;
-      try { JSON.parse(raw); return; } catch (e) { /* 非合法 JSON → 确需迁移 */ }
-      WA.settingsBus.save(__REG_ACTIVE, raw);
-      if (WA.log) WA.log('info', 'preset：预设选中键由裸字符串迁移为 JSON 格式（防被误判为损坏）');
-    } catch (e) {}
-  })();
+  // v2.5.0: 此处原有的一次性迁移 IIFE 已移除——能力上收到 settingsBus.rawRevive（单一实现）。
+  //   保留本注释作为「为什么不再需要一次性迁移」的现场证据。
   function getActivePresetId() {
     const id = WA.settingsBus.read(__REG_ACTIVE);
     if (!id || typeof id !== 'string') return DEFAULT_ID;

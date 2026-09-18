@@ -256,8 +256,16 @@
           // v2.4.0: 子键缺口盘点——「整键在、子键缺」此前完全没有出口：
           //   它不像 JSON 损坏那样留痕，只是让消费端拿到 undefined 后静默改变行为。
           const subkeys = WA.settingsBus.subkeyAudit ? WA.settingsBus.subkeyAudit() : null;
+          // v2.5.0: 键的生命周期——「结构迁移能力是否被行使」「幽灵设置键有几个」。
+          //   此前 registry 有 migrate 字段却零调用、rawRevive 根本不存在，
+          //   而治理层看不到这种空转；未登记键更是登记表与清理规则都不覆盖的责任真空。
+          const lifecycle = (WA.settingsBus.registryStat && WA.settingsBus.selfCheck)
+            ? (WA.settingsBus.selfCheck().lifecycle || null) : null;
+          const mig = WA.settingsBus.migrationStat ? WA.settingsBus.migrationStat() : null;
+          const ghosts = WA.settingsBus.ghostScan ? WA.settingsBus.ghostScan() : null;
           return { registry: st, orphans: orphans, stats: WA.settingsBus.stats,
-            coherent: coherent, defaultDrift: drift, dormant: dormant, subkeys: subkeys };
+            coherent: coherent, defaultDrift: drift, dormant: dormant, subkeys: subkeys,
+            lifecycle: lifecycle, migrations: mig, ghosts: ghosts };
         }, {}),
         // v2.4.0: 可见性配置健康度——「源在 SOURCES 里却没有默认值声明」是子键级死配置
         visibility: safe(function () {
@@ -366,7 +374,7 @@
       // v2.2.0 块8：工具页既有控件（此前全在守卫之外 → 绑定断裂无人发现）
       'wa-audit-copy', 'wa-key-check', 'wa-quar-view', 'wa-recovery-dl', 'wa-maintain', 'wa-conf-view', 'wa-settle-view'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
-      dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel'] },
+      dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg'], dynamic: ['wa-conc-v'] },
     { page: 'people', ids: ['wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
@@ -713,6 +721,26 @@
     const skD = sbDiag.subkeys || null;
     if (skD && skD.keys && skD.keys.length) {
       issues.push({ level: 'info', key: 'settingsBus.subkeys', detail: skD.keys.length + ' 个设置键存在子键缺口（共缺 ' + skD.totalMissing + ' 项，运行已按声明补默认值）：' + skD.keys.slice(0, 3).map(function (x) { return (x.module || '?') + '.' + x.missing.slice(0, 3).join('/'); }).join('、') + '——下次保存设置即写回完整结构' });
+    }
+    // v2.5.0: 结构迁移失败——迁移抛错 = 旧结构继续被当作畸形值消费，属真故障（必须人处理）
+    const migD = sbDiag.migrations || null;
+    if (migD && migD.failed > 0) {
+      issues.push({ level: 'error', key: 'settingsBus.migration', detail: migD.failed + ' 个设置键的结构迁移抛错（' + (migD.failedKeys || []).slice(0, 3).join('、') + '）：这些键会按原值继续被消费，结构升级未完成' });
+    } else if (migD && migD.ok > 0) {
+      issues.push({ level: 'info', key: 'settingsBus.migration', detail: '已成功迁移 ' + migD.ok + ' 个设置键的存储结构（最近 ' + ((migD.last || {}).key || '?') + '）' });
+    }
+    // v2.5.0: 生命周期空转——「登记表声明了迁移能力却一个键都没行使」是治理盲区（此前正是如此：
+    //   migrate 字段零调用、rawRevive 根本不存在，而面板与诊断都看不见这种空转）。
+    //   口径：info 级（新装用户本就不该有迁移发生），但一旦某类能力声明数为 0 就点名，防止再次退化。
+    const lcD = sbDiag.lifecycle || null;
+    if (lcD && lcD.migrate === 0 && lcD.rawRevive === 0) {
+      issues.push({ level: 'info', key: 'settingsBus.lifecycle', detail: '全部 ' + ((sbDiag.registry || {}).total || '?') + ' 个设置键都未声明生命周期钩子（migrate / rawRevive 均为 0）：本插件结构仍在演化，无键声明升级路径意味着缺声明或能力再次空转' });
+    }
+    // v2.5.0: 幽灵设置键——未登记（登记表管不到）且被当用户数据保护（清理规则管不到）的责任真空。
+    //   实证案例 worldaxis_director_tags_v1：v0.1.0 引入 → v0.2.0 移除 → 至今永久滞留用户磁盘。
+    const ghD = sbDiag.ghosts || null;
+    if (ghD && ghD.total > 0) {
+      issues.push({ level: 'warn', key: 'settingsBus.ghosts', detail: ghD.total + ' 个未登记设置键滞留磁盘（共 ' + Math.round(ghD.bytes / 1024 * 10) / 10 + 'KB，登记表与清理规则都不覆盖）：' + ghD.keys.slice(0, 3).map(function (x) { return x.key.replace(/^worldaxis_/, '') + '(' + x.bytes + 'B)'; }).join('、') + '——如需清理，用「存储键体检」并显式开启幽灵设置项' });
     }
     // v2.4.0: 可见性声明完整性——SOURCES 声明了但 def 未给默认值的源，无法归一化
     const visD = ((diag.runtime || {}).visibility) || null;

@@ -309,8 +309,15 @@
     writerId: /^worldaxis_writer_id$/,
     corrupt: /^worldaxis_state_(.+)_corrupt_(\d+)$/,
     corruptSettings: /^worldaxis_(?!state_)([a-z_0-9]+)_corrupt_\d+$/,
-    wb: /^worldaxis_wb_selection_(.+)$/,
-    settingsSettings: /^worldaxis_(backstage_settings_v1|evolution_settings_v1|opinion_settings_v1|regional_settings_v1|api_channels_v1|workflow_v1|inject_visibility_v1|purifier_rules_v1|npc_registry_v1|oracle_plan_v1|active_preset|custom_presets)$/
+    wb: /^worldaxis_wb_selection_(.+)$/
+    // v2.5.0: 删除 `settingsSettings` 硬编码白名单。原因（实测口径）：
+    //   ① 它是「12 个设置键」的第二份真源，必然漂移——实查已漏掉 calendar_settings_v1 与
+    //      horizon_settings_v1 两个既存键（后者正是 v2.3.0 新加的）；
+    //   ② 它唯一的产物标记 `settings: true` **全库无人消费**——classifyKey 的调用方只读
+    //      `.family/.chat/.kind/.quarantine`，而白名单外的键走兜底 `return { family:'settings' }`
+    //      **结果完全一致**。即：删掉它不改变任何行为，只消除一份会过期的副本。
+    //   ③ 真源在 `WA.__settingsRegs`（各模块自持登记），需要「这个键是不是设置」时应查登记表，
+    //      而不是维护第十三条清单。
   };
   function classifyKey(key) {
     let m;
@@ -329,8 +336,28 @@
     if ((m = key.match(KEY_FAMILIES.diag_wfHistory))) return { family: 'diagnostic', kind: 'wf_history', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_uninjectLedger))) return { family: 'diagnostic', kind: 'uninject_ledger', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.wb))) return { family: 'wb', chat: m[1] };
-    if (KEY_FAMILIES.settingsSettings.test(key)) return { family: 'settings', settings: true, chat: null };
-    return { family: 'settings', chat: null };
+    // v2.5.0: 键卫生——settings 家族细分 `settings`(已登记) / `settingsUnregistered`(幽灵设置)。
+    //   细分让「设置键 xx 个」不再把「功能已删除、却永久留在用户磁盘上的旧键」算成用户配置：
+    //   后者此前**无人负责**——登记表管不到（从未登记），sweepStaleKeys 也管不到
+    //   （白名单外的键一律兜底成 settings 家族，而 settings 家族「永不清理」）。
+    //   实证：worldaxis_director_tags_v1 由 v0.1.0 写入、v0.2.0 功能移除，此后永久滞留。
+    if (KEY_FAMILIES.wb.test(key)) return { family: 'wb', chat: key.match(KEY_FAMILIES.wb)[1] };
+    if (isRegisteredSettingsKey(key)) return { family: 'settings', chat: null };
+    return { family: 'settingsUnregistered', chat: null };
+  }
+  /**
+   * v2.5.0: 该键是否在 settingsBus 登记表内（= 仍是本扩展在用的设置键）。
+   *   真源是 `WA.__settingsRegs`（各模块自持），而非本文件的键名清单——
+   *   此前那份硬编码白名单既漏了 calendar/horizon 两键，产物标记也无人消费，已删。
+   */
+  function isRegisteredSettingsKey(key) {
+    try {
+      const regs = WA.__settingsRegs || [];
+      for (let i = 0; i < regs.length; i++) {
+        if (regs[i] && regs[i].key === key) return true;
+      }
+    } catch (e) { /* 登记表不可用 → 保守视为未登记（只影响归类与诊断，不影响清理） */ }
+    return false;
   }
   function listWorldAxisKeys() {
     const ls = mainWin.localStorage;
@@ -1864,8 +1891,8 @@
       const maxIdleMs = (typeof o.maxIdleDays === 'number' && o.maxIdleDays >= 0 ? o.maxIdleDays : 30) * 86400000;
       const cur = getChatId();
       const keys = listWorldAxisKeys();
-      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, wb: 0, other: 0 };
-      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, wb: 0, other: 0 };
+      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, other: 0 };
+      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, other: 0 };
       let totalBytes = 0, stateKeys = 0, stateDerivedKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0, curQuarantines = 0;
       let conflictKeys = 0, conflictBytes = 0;
       const staleDiagCandidates = [];   // 仅超期项（与 sweepStaleKeys 同阈值）：{ key, chat, kind, idleMs }
@@ -1921,6 +1948,9 @@
      *  - state/recovery：聊天既无 state 本体也无 state 隔离副本 → 一并清理（孤儿恢复点）
      *  - 隔离副本（*_corrupt_*）：与 state 本体同样受「当前聊天保护」约束
      *  - settings/wb：永不清理（用户数据）
+     *  - settingsUnregistered（v2.5.0）：**默认保留**（可能是用户手改或旧版本写的，仍属用户数据），
+     *    仅当显式 `o.ghostSettings === true` 时列为候选——「永不清理」与「无人可清理」是两回事，
+     *    本参数给出真实出口，默认行为不变（宁可漏删不可误删）。
      *  - 当前聊天的任何键：永不清理
      */
     sweepStaleKeys(opts) {
@@ -1951,6 +1981,13 @@
       keys.forEach(function (k) {
         const c = classifyKey(k);
         if (c.chat === cur || c.family === 'settings' || c.family === 'wb') { plan.keep.push(k); return; }
+        // v2.5.0: 未登记设置键（幽灵设置）——默认保留（保守），显式开启才纳入候选。
+        //   这些键此前**责任真空**：不在登记表（登记表管不到），兜底成 settings 家族（清理规则也管不到）。
+        if (c.family === 'settingsUnregistered') {
+          if (o.ghostSettings === true) plan.remove.push({ key: k, reason: 'unregistered-setting', family: c.family, bytes: keyBytes(k) });
+          else plan.keep.push(k);
+          return;
+        }
         if (c.family === 'corrupt') {
           if (corruptKeepSet[k]) { plan.keep.push(k); return; }
           plan.remove.push({ key: k, reason: 'corrupt-overflow', family: c.family, quarantine: c.quarantine || 'state', bytes: keyBytes(k) });
@@ -2002,6 +2039,18 @@
     orphanSettingsKeys() {
       try { return WA.settingsBus && WA.settingsBus.pendingOrphan ? WA.settingsBus.pendingOrphan() : []; } catch (e) { return []; }
     },
+    /**
+     * v2.5.0: 键家族分类器导出（单一真源）。
+     *
+     * 为什么必须导出：本轮在 settings-bus.js 里新增了「未登记设置键」盘点（幽灵设置），它需要
+     *   回答「这个键属于哪个家族」，而 KEY_FAMILIES/classifyKey 的真源就在本文件。若 settings-bus
+     *   另存一份前缀清单，就与本轮刚从本文件删掉的 `settingsSettings` 白名单属**同型缺陷**
+     *   （第二份真源必漂移）。故把分类器开出来，由 settings-bus 懒查（它先于本文件加载，
+     *   顶层引用会踩 TDZ，所以只能懒查）。
+     * 返回：{ family, chat?, kind?, at?, seq?, quarantine? }；`settingsUnregistered` 表示
+     *   前缀是本扩展的、但不在 __settingsRegs 登记表里（幽灵设置）。
+     */
+    classifyKey(key) { return classifyKey(key); },
     /**
      * v0.3.0: 导出全部恢复点（可下载 JSON，离机备份出口）。
      * 缺陷背景：恢复点环形窗口仅 3 个且只存于 localStorage——一旦配额清理或用户清浏览器数据即全部丢失。
