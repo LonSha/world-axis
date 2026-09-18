@@ -1701,6 +1701,10 @@
         }
       } catch (eEv) { markDegraded('evict', eEv); }
       let bridgePublishesN = 0, bridgeFailuresN = 0, bridgeExternalReadsN = 0, bridgeEnabledN = false; // v2.16.0: 对外桥
+      // v2.17.0: 记忆桥消费面——上面那组信号答的是「我发得出去吗」，这组答「我读得进来吗」。
+      //   两者是同一套互操作的两条边：只有发文没有读入，说明这个扩展只把世界摆在门口，
+      //   却不看另一个插件记的那本账，「两个钟对不上」就永远没人发现。
+      let lonshaAvailableN = false, lonshaVerdictN = '', lonshaDaysN = null;
       // ── 9.6 随机源（v2.14.0）──
       //   为什么健康分要看随机源：它本身不是「世界坏了」，但它决定**其余所有体检结论能不能被复核**。
       //   v2.13.0 让「长局里丢的是谁」可见，而丢的那个「谁」正是随机采样挑中的——
@@ -1766,6 +1770,27 @@
           }
         }
       } catch (eBd) { markDegraded('bridge', eBd); }
+      // ── 9.9 记忆桥消费面（v2.17.0）──
+      //   与 9.8 是同一套互操作的两条边。分级：读不到＝info（对方未装是常见合法配置，
+      //   且 reason 已可归因，不必扣分）；两钟不一致＝info（不是故障——正文校准的钟与
+      //   推演钟本来就各自演化，但它必须可见，否则「两边对不上」永远只是用户的感觉）。
+      try {
+        if (WA.lonshaReader && typeof WA.lonshaReader.readLonshaSnapshot === 'function') {
+          const lrd = WA.lonshaReader.readLonshaSnapshot({ refresh: false });
+          lonshaAvailableN = !!lrd.ok;
+          if (lrd.ok) {
+            const ldf = WA.lonshaReader.diffWithLonsha(lrd.snapshot);
+            lonshaVerdictN = ldf.verdict; lonshaDaysN = ldf.days;
+            if (ldf.verdict === 'world-ahead' || ldf.verdict === 'world-behind') {
+              issues.push({ level: 'info', key: 'lonsha.drift', detail: '记忆桥对账：两个钟相差 ' + ldf.days + ' 天（本扩展 ' + (ldf.worldDate || '?') + ' vs LonSha ' + (ldf.lonshaDate || '?') + '）——不是故障，是此前根本看不见的事实' });
+            } else if (ldf.verdict === 'lonsha-empty') {
+              issues.push({ level: 'info', key: 'lonsha', detail: '记忆桥已就绪，但对方尚未记录时间（等它即可，与本扩展的无公历钟是两件事）' });
+            }
+          } else {
+            lonshaVerdictN = lrd.reason;
+          }
+        }
+      } catch (eLs2) { markDegraded('lonsha', eLs2); }
       // ── 10. 巡视自身完整性（v2.0.0）──
       //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
       let degradedN = 0;
@@ -1866,6 +1891,10 @@
             //   （对方拿到的永远是 null），bridgeFailures>0 才是缺陷。
             bridgePublishes: bridgePublishesN, bridgeFailures: bridgeFailuresN,
             bridgeExternalReads: bridgeExternalReadsN, bridgeEnabled: bridgeEnabledN,
+            // v2.17.0: 记忆桥消费面——lonshaAvailable=false 且 lonshaVerdict 为归因字符串时，
+            //   说明「读不到」这件事本身是**可归因**的（未装/未就绪/契约不匹配各有其名），
+            //   而不是一个无名的 null。lonshaDays 为真不一致时的天数。
+            lonshaAvailable: lonshaAvailableN, lonshaVerdict: lonshaVerdictN, lonshaDays: lonshaDaysN,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }

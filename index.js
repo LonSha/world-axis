@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.16.0';
+  const VERSION = '2.17.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -246,6 +246,10 @@
     // v2.16.0: 对外只读互操作桥（worldaxis_bridge_v1）。须在 store/settingsBus/interceptor/workflow
     //   之后装载——它读 store、写设置走 settingsBus、订阅总线、并在 after 链注册发布节点。
     'engines/bridge.js',
+    // v2.17.0: 记忆桥消费面（读 window.lonsha_memory_bridge_v1）。须在 core/store 之后装载
+    //   ——它读 store.clock 做对账；与 bridge.js（对外的**供货**面）互为镜像：桥发得出去、
+    //   也读得进来，这套互操作才算通了整条。
+    'engines/lonsha-reader.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

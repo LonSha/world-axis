@@ -142,6 +142,47 @@
       '开闸：<code>WorldAxis.bridge.setSettings({ enabled: true })</code>；外部取数：<code>WorldAxis.bridge.snapshot()</code>（返回深拷贝，受 ' + st.floorGap + ' 楼间隔与去抖保护）。<br>' +
       '默认休眠的理由：快照要 clone 世界状态，无事时不该付出这份开销。</div></div>';
   }
+  // v2.17.0: 记忆桥消费面（另一个插件记的那本账，本扩展读不读得到）——纯展示。
+  //   与上面的 bridgeBlock 互为镜像：那一块讲「我发得出去吗」，这一块讲「我读得进来吗」。
+  //   此前本扩展对 lonsha_memory_bridge_v1 的引用**全在注释与提示文本里**，产品代码零消费，
+  //   于是「LonSha 记的今天是几号」在本扩展侧完全不可观测。这一块把它摆出来。
+  function lonshaBlock() {
+    let hasLonsha = false;
+    try { hasLonsha = !!(WA.lonshaReader && typeof WA.lonshaReader.readLonshaSnapshot === 'function'); } catch (e) { hasLonsha = false; }
+    if (!hasLonsha) {
+      return '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
+        '<div class="wa-kv">消费面未加载（读不到另一个插件记的那本账）</div></div>';
+    }
+    const read = WA.lonshaReader.readLonshaSnapshot({ refresh: false });
+    if (!read.ok) {
+      return '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
+        '<div class="wa-kv">不可读：' + esc(WA.lonshaReader.describeLonsha(read)) + '</div>' +
+        '<div class="wa-hint">归因 <code>' + esc(String(read.reason || '?')) + '</code>——'
+        + '"对方还没就绪"（稍后再读）与"对方坏了"（该查）是两件事，不该同形。<br>'
+        + 'LonSha 未安装是常见合法配置；已安装却读不到，才需要看它的 <code>sourceState</code> / <code>lastError</code>。</div></div>';
+    }
+    const sum = WA.lonshaReader.summarizeSnapshot(read.snapshot);
+    const d = WA.lonshaReader.diffWithLonsha(read.snapshot);
+    const VD = {
+      same: '两钟同日', 'world-ahead': '本扩展世界钟在前 ' + Math.abs(Number(d.days) || 0) + ' 天',
+      'world-behind': '本扩展世界钟在后 ' + Math.abs(Number(d.days) || 0) + ' 天',
+      'lonsha-empty': '对方尚未记录时间',
+      'world-uncomparable': '本扩展世界钟为自由标签（本就不比）',
+      unparsable: '日期串读不出'
+    };
+    const bad = (d.verdict === 'world-ahead' || d.verdict === 'world-behind');
+    return '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
+      '<div class="wa-kv">对账：' + (bad ? '<span class="wa-bad">' : '') + esc(VD[d.verdict] || d.verdict) + (bad ? '</span>' : '') + '</div>' +
+      '<div class="wa-kv">本扩展 ' + esc(d.worldDate || '（无公历钟）') + ' ｜LonSha ' + esc(d.lonshaDate || '（未记录）') + '</div>' +
+      '<div class="wa-kv">对方快照：floor=' + (sum.floor || 0) + '｜' + (sum.selfBytes || 0) + ' 字节｜契约 '
+      + esc(sum.contract || '未自述') + (sum.pluginVersion ? '｜版本 ' + esc(sum.pluginVersion) : '') + '</div>' +
+      (sum.absent.length || sum.nullish.length
+        ? '<div class="wa-kv">未外供 ' + esc(sum.absent.join('、') || '—') + '｜显式为空 ' + esc(sum.nullish.join('、') || '—') + '</div>'
+        : '') +
+      '<div class="wa-hint">这是本扩展对 LonSha 记忆桥的**唯一**消费点（此前全库零消费，引用只在注释里）。<br>' +
+      '只读：不写对方的账本、不改本扩展的世界钟——两个钟对不上只报不管，<b>谁拍板由用户决定</b>。<br>' +
+      '「未外供」与「显式为空」是两件事（本扩展尊重对方 v3.174 的三态自述），故分别列出。</div></div>';
+  }
   function renderOverview() {
     const s = WA.store.get();
     const nodes = WA.workflow.list();
@@ -155,7 +196,7 @@
         <div class="wa-stat"><div class="wa-stat-v">${s.evolution.round}</div><div class="wa-stat-k">演化回合</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${beforeN}+${afterN}</div><div class="wa-stat-k">工作流节点</div></div>
       </div>
-      ${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}
+      ${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}
       <div class="wa-sec">工作流节点开关</div>
       <div class="wa-node-list">${nodes.map(n => `
         <label class="wa-node">

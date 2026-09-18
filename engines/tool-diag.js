@@ -89,6 +89,7 @@
     'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag', 'engines/contract-audit.js': 'contractAudit', 'engines/memory-sampler.js': 'memorySampler', 'engines/sampler-check.js': 'samplerCheck', 'engines/inject-channel.js': 'injectChannel', 'engines/inject-slot-audit.js': 'injectSlotAudit', 'engines/proactive.js': 'proactive', 'engines/wb-inject.js': 'wbInject',
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
     'engines/bridge.js': 'bridge',
+    'engines/lonsha-reader.js': 'lonshaReader',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -709,6 +710,41 @@
       };
     }, {});
   }
+  // v2.17.0: 记忆桥消费面（另一个插件记的那本账，本扩展读不读得到）
+  //   为什么要有这一节：v2.16.0 把本扩展的**出口**做出来了（外部能读到这个世界），
+  //   但反向那条边一直是断的——全库 grep lonsha_memory_bridge_v1 的命中**全在注释与
+  //   面板提示文本里**，产品代码零消费。于是「同一场剧情里，LonSha 记的那本账」
+  //   在本扩展侧完全不可观测，两个「现在」对不上也没人知道。本节就是那个观测口。
+  //   分级：未装载＝info（LonSha 没装是常见合法配置）；桥在但读不到＝info 且带归因
+  //   （「对方还没就绪」与「对方坏了」必须分开——这正是 LonSha v3.174 的 sourceState 想解决的）；
+  //   两钟不一致＝info（不是故障：正文校准的钟与推演钟本来就可能不同步，但它必须**可见**）。
+  function secLonsha() {
+    return safe(function () {
+      if (!WA.lonshaReader || typeof WA.lonshaReader.readLonshaSnapshot !== 'function') {
+        return { error: 'engines/lonsha-reader.js 未加载（读不到另一个插件记的那本账）' };
+      }
+      // 诊断是**旁观**：不强制对方重建快照（refresh:false），只看它此刻持有什么。
+      //   强制重建会把「我这轮体检」变成「我顺手命令另一个插件干活」——诊断不该有副作用。
+      const read = WA.lonshaReader.readLonshaSnapshot({ refresh: false });
+      const src = read.source || safe(function () { return WA.lonshaReader.lonshaSource(WA.lonshaReader.LONSHA_BRIDGE_ID); }, {});
+      const out = {
+        mounted: !!src.mounted, ok: !!read.ok, reason: read.reason,
+        sourceState: src.sourceState || null, lastError: src.lastError || null,
+        describe: WA.lonshaReader.describeLonsha(read)
+      };
+      if (read.ok) {
+        const sum = WA.lonshaReader.summarizeSnapshot(read.snapshot);
+        const diff = WA.lonshaReader.diffWithLonsha(read.snapshot);
+        out.floor = sum.floor; out.pluginVersion = sum.pluginVersion; out.contract = sum.contract;
+        out.selfBytes = sum.selfBytes; out.strictJsonOk = sum.strictJsonOk;
+        out.hasFieldTypes = sum.hasFieldTypes;
+        out.absent = sum.absent; out.nullish = sum.nullish;
+        out.verdict = diff.verdict; out.days = diff.days;
+        out.worldDate = diff.worldDate; out.lonshaDate = diff.lonshaDate;
+      }
+      return out;
+    }, {});
+  }
   // ── 汇总 ──
   function collect() {
     const diag = {
@@ -717,6 +753,7 @@
       ui: secUi(), capabilities: secCapabilities(),
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
       bridge: secBridge(),
+      lonsha: secLonsha(),
       compat: secCompat()
     };
     diag.verdict = verdict(diag);
@@ -743,6 +780,18 @@
     if (uiCondMiss > 0 && diag.ui && diag.ui.groups) issues.push({ level: 'info', key: 'ui.cond', detail: uiCondMiss + ' 个条件渲染控件当前不在场（依赖世界状态，非缺陷）' });
     // v0.1.19: 宿主能力缺失 → warn（降级仍可运行但功能受限）
     const h = diag.host || {};
+    // v2.17.0: 记忆桥对账——两个钟不同步＝info（不是故障，但必须可见）。
+    //   正文校准的 GameClock 与推演出的世界钟本来就可能不同步；此前这件事在本扩展侧
+    //   完全不可观测（产品代码对 lonsha 桥零消费）。现在它至少能被念出来。
+    try {
+      const ls = diag.lonsha || {};
+      if (ls.ok && (ls.verdict === 'world-ahead' || ls.verdict === 'world-behind')) {
+        issues.push({ level: 'info', key: 'lonsha.drift',
+          detail: '两个钟不同步：' + ls.describe + '（本扩展 ' + (ls.worldDate || '?')
+            + ' vs LonSha ' + (ls.lonshaDate || '?') + '，差 ' + (ls.days || 0)
+            + ' 天）——正文校准的钟与推演钟各自演化，此事此前不可观测，现在只报不管（谁拍板由用户决定）' });
+      }
+    } catch (eLs) {}
     // v2.3.0 块3: 随机事件通道全关——info 级。这是合法配置（用户就是不想要随机事件），
     //   但「推演从不产生远方/近端事件」必须可归因，否则会被当成引擎坏了。
     try {
@@ -1286,6 +1335,29 @@
           + (bdF.invalidations || 0) + ' 次（最近：' + (bdF.lastInvalidateReason || '—') + '）'
           + (bdF.failures > 0 ? '｜失败 ' + bdF.failures + ' 次' : '')
       });
+    }
+    // v2.17.0: 记忆桥消费面摘要行——否则 flatten 出来的清单里「另一个插件记的那本账」
+    //   完全缺席（与上面 bridge 行互为镜像：一发一收，缺任一边这套互操作都是半条）。
+    const lsF = d.lonsha || {};
+    if (lsF.error) {
+      out.push({ level: 'info', key: 'lonsha', detail: '记忆桥消费面未加载：' + lsF.error });
+    } else if (!lsF.ok) {
+      out.push({ level: 'info', key: 'lonsha',
+        detail: '记忆桥不可读（' + (lsF.reason || '?') + '）：' + (lsF.describe || '')
+          + '（LonSha 未装是常见合法配置；已装却读不到才需查）' });
+    } else {
+      const vd = lsF.verdict;
+      const vdTxt = (vd === 'same') ? '两钟同日'
+        : (vd === 'world-ahead') ? '本扩展世界钟在前 ' + Math.abs(Number(lsF.days) || 0) + ' 天'
+        : (vd === 'world-behind') ? '本扩展世界钟在后 ' + Math.abs(Number(lsF.days) || 0) + ' 天'
+        : (vd === 'lonsha-empty') ? '对方尚未记录时间'
+        : (vd === 'world-uncomparable') ? '本扩展世界钟无公历形态（自由标签，本就不比）'
+        : '日期串读不出';
+      out.push({ level: (vd === 'same' || vd === 'world-uncomparable') ? 'info' : 'warn', key: 'lonsha',
+        detail: '记忆桥就绪（floor=' + (lsF.floor || 0) + '，' + (lsF.selfBytes || 0) + ' 字节'
+          + (lsF.pluginVersion ? '，对方 ' + lsF.pluginVersion : '') + '）｜对账：' + vdTxt
+          + (lsF.absent && lsF.absent.length ? '｜对方未外供 ' + lsF.absent.join('/') : '')
+          + (lsF.nullish && lsF.nullish.length ? '｜对方显式为空 ' + lsF.nullish.join('/') : '') });
     }
     // v0.1.6: 槽位落地摘要
     const inj = d.inject || {};

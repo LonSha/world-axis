@@ -29,7 +29,7 @@ const LOAD = [
   'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -9817,7 +9817,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10361,7 +10361,7 @@ assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.16.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.17.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10652,7 +10652,7 @@ assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.16.0', '入口版本为 2.16.0（实 ' + ver + '）');
+    assert(ver === '2.17.0', '入口版本为 2.17.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11058,7 +11058,7 @@ assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:LONSHA_BRIDGE_ID describeLonsha diffWithLonsha lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11175,7 +11175,7 @@ assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.16.0', '入口版本为 2.16.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.17.0', '入口版本为 2.17.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11563,7 @@ assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.16.0', '入口版本为 2.16.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.17.0', '入口版本为 2.17.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11933,7 @@ assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.16.0', '入口版本为 2.16.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.17.0', '入口版本为 2.17.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12298,7 @@ assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.16.0', '入口版本为 2.16.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.17.0', '入口版本为 2.17.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -13570,6 +13570,216 @@ assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单�
     console.log('  ✓ 消费侧齐备（after 链节点/诊断节/flatten/健康分 signals/面板块）｜零消费出口摘除');
     console.log('  ✓ 负向自证 3 项（原版对照 + 拆任一条判定都必然现形）');
   } // end v2.16.0 block
+// ══════════════════════════════════════════════════════════════════
+  // v2.17.0 块：记忆桥消费面（第十一面：跨插件账本的可读性）
+  //
+  // 命题：v2.16.0 把本扩展的**出口**做出来了（外部能读到这个世界），但反向那条边是断的：
+  //   全库 grep `lonsha_memory_bridge_v1` 的命中**全在注释、文档与面板提示文本里**，
+  //   产品代码**零消费**。于是「同一场剧情里，另一个插件记的那本账」在本扩展侧完全不可观测，
+  //   两个「现在」对不上也没人知道——而这恰恰是这套三插件体系存在的理由。
+  //
+  // 本块立五件事：① 只读（只调对方的读取面，绝不写桥/改对方账本，也不动本扩展世界钟）
+  //   ② 不抛（未装/未就绪/取快照抛错/快照畸形/宿主怪异 getter 一律降级为可归因的 reason）
+  //   ③ 来源可归因（把 LonSha v3.174 的 sourceState 状态机映成外部 reason——
+  //      「对方还没就绪，稍后再读」与「对方坏了，该报」必须分开）
+  //   ④ 三态尊重（对方的 meta.fieldTypes：未外供 / 显式为空 / 有值，三态不得压成一态）
+  //   ⑤ 对账不硬比（本扩展世界钟没有公历形态是**常态**，不与公历硬比；对方没记也与读不出分开）
+  // ══════════════════════════════════════════════════════════════════
+  {
+    console.log('\n■ G22 记忆桥消费面（第十一面：跨插件账本的可读性）');
+    const LR = WA.lonshaReader;
+    assert(!!LR && LR.LONSHA_BRIDGE_ID === 'lonsha_memory_bridge_v1' && LR.LONSHA_BRIDGE_VERSION === 1,
+      '消费面已装载且桥名/契约版本与上游自洽（id=' + (LR && LR.LONSHA_BRIDGE_ID) + ' v=' + (LR && LR.LONSHA_BRIDGE_VERSION) + '）');
+    assert(typeof LR.readLonshaSnapshot === 'function' && typeof LR.lonshaSource === 'function'
+      && typeof LR.diffWithLonsha === 'function' && typeof LR.fieldState === 'function'
+      && typeof LR.summarizeSnapshot === 'function' && typeof LR.describeLonsha === 'function',
+      '六个判定入口齐备（readLonshaSnapshot/lonshaSource/diffWithLonsha/fieldState/summarizeSnapshot/describeLonsha）');
+    assert(WA.toolDiag.MODULE_EXPORTS['engines/lonsha-reader.js'] === 'lonshaReader',
+      'MODULE_EXPORTS 已登记（装载缺失会被 secModules 报出来，而不是静默少一个模块）');
+    // ── ① 未装 → not-mounted（不是「对方没账」，是本扩展旁边的桥不在）──
+    const rNo = LR.readLonshaSnapshot({ win: {} });
+    assert(rNo.ok === false && rNo.reason === 'not-mounted', '未装 ⇒ not-mounted（实 ' + rNo.reason + '）');
+    assert(LR.lonshaSource(LR.LONSHA_BRIDGE_ID, {}).mounted === false, '来源探针：未挂载如实报 false');
+    // ── ③ 来源可归因：把对方的 sourceState 五态逐一映出来 ──
+    const mkWin = function (st, snapVal, api) {
+      const b = { sourceState: st, lastError: api && api.err ? api.err : null, snapshot: snapVal === undefined ? null : snapVal };
+      if (api && api.throwing) { b.refresh = function () { throw new Error('boom'); }; }
+      else { b.refresh = function () { return snapVal === undefined ? null : snapVal; }; }
+      return { lonsha_memory_bridge_v1: b };
+    };
+    const ST = [
+      ['engine-absent', 'engine-absent'], ['engine-empty', 'engine-empty'],
+      ['thrown', 'thrown'], ['idle', 'no-snapshot'], ['ready', 'no-snapshot']
+    ];
+    let stAll = true;
+    ST.forEach(function (pair) {
+      const src = LR.lonshaSource(LR.LONSHA_BRIDGE_ID, mkWin(pair[0], null));
+      if (src.reason !== pair[1]) { stAll = false; console.log('    · 期望 ' + pair[0] + '⇒' + pair[1] + '，实 ' + src.reason); }
+    });
+    assert(stAll, '对方的 sourceState 五态逐一对映到本侧 reason（未就绪与坏了不同形——这正是 v3.174 那台状态机的用处）');
+    const rThrown = LR.readLonshaSnapshot({ win: mkWin('thrown', null) });
+    assert(rThrown.ok === false && rThrown.reason === 'thrown',
+      '对方自述 thrown ⇒ 本侧 thrown（不硬去拉，直接归因）');
+    // ── ② 不抛：宿主怪异 getter / 桥取快照抛错 ──
+    let threw = false, rG = null;
+    try {
+      rG = LR.readLonshaSnapshot({ get win() { throw new Error('host'); } });
+      LR.lonshaSource(LR.LONSHA_BRIDGE_ID, { get lonsha_memory_bridge_v1() { throw new Error('y'); } });
+    } catch (e) { threw = true; }
+    assert(threw === false, '宿主怪异 getter 绝不外抛（「不抛」是声明，不是期望）');
+    assert(rG && rG.ok === false && (rG.reason === 'not-mounted' || rG.reason === 'thrown'),
+      '怪异宿主降级且可归因（实 ' + (rG && rG.reason) + '）——取 opts.win 本身就抛时走外层兜底，'
+      + 'reason=thrown 也说清了「为什么读不到」，与 not-mounted 一样是可归因的降级');
+    const rBoom = LR.readLonshaSnapshot({ win: mkWin('ready', undefined, { throwing: true }) });
+    assert(rBoom.ok === false && (rBoom.reason === 'pull-failed' || rBoom.reason === 'no-snapshot'),
+      '对方 refresh 抛错 ⇒ 降级不抛（实 ' + rBoom.reason + '）');
+    // ── ③ 就绪 + 契约版本门 ──
+    const GOOD = { version: 1, bridge: 'lonsha_memory_bridge_v1', pluginVersion: '3.175.0', floor: 42,
+      clock: { date: '2026-09-13' }, characters: {}, recallAudit: {},
+      meta: { contract: 'v3.174', selfBytes: 1234, strictJsonOk: true,
+        fieldTypes: { protagonist: { present: true, kind: 'object' }, lifeDetails: { present: false, kind: 'undefined' },
+          characters: { present: true, kind: 'object' }, moneyLedger: { present: true, kind: 'null' },
+          outline: { present: true, kind: 'object' }, worldProg: { present: true, kind: 'object' },
+          clock: { present: true, kind: 'object' }, recallAudit: { present: true, kind: 'object' } } } };
+    const rOk = LR.readLonshaSnapshot({ win: mkWin('ready', GOOD) });
+    assert(rOk.ok === true && rOk.reason === 'ok', '就绪 ⇒ ok（实 ' + rOk.reason + '）');
+    const rMism = LR.readLonshaSnapshot({ win: mkWin('ready', { version: 99, clock: {} }) });
+    assert(rMism.ok === false && rMism.reason === 'contract-mismatch',
+      '上游契约版本**显式**不匹配 ⇒ contract-mismatch（升版后静默按旧契约解读是两端都不报错的缺陷）');
+    const rOld = LR.readLonshaSnapshot({ win: mkWin('ready', { clock: { date: '2026-09-13' } }) });
+    assert(rOld.ok === true, '无 version 字段（旧版/精简版）⇒ 放行（只拦显式不匹配）');
+    // ── ④ 三态尊重：未外供 / 显式为空 / 有值 必须互不相同 ──
+    const fAbs = LR.fieldState(GOOD, 'lifeDetails'), fNul = LR.fieldState(GOOD, 'moneyLedger'), fVal = LR.fieldState(GOOD, 'characters');
+    assert(fAbs.present === false && fAbs.kind === 'absent',
+      '未外供 ⇒ present=false（对方压根没这项，本扩展须视作「没有」而不是「空的」）');
+    assert(fNul.present === true && fNul.kind === 'null',
+      '显式为空 ⇒ present=true + kind=null（「有这项、值是空」——与「没有这项」是两件事）');
+    assert(fVal.present === true && fVal.kind === 'value', '有值 ⇒ present=true + kind=value');
+    assert(JSON.stringify(fAbs) !== JSON.stringify(fNul),
+      '★ 三态不得压成一态：未外供与显式为空在读数上必须可分辨（否则这份读数等于没有）');
+    const sumOK = LR.summarizeSnapshot(GOOD);
+    assert(sumOK.hasFieldTypes === true && sumOK.absent.length === 1 && sumOK.absent[0] === 'lifeDetails'
+      && sumOK.nullish.length === 1 && sumOK.nullish[0] === 'moneyLedger' && sumOK.present.length === 6,
+      '形状摘要按三态分组（未外供 ' + sumOK.absent.join('/') + '；显式为空 ' + sumOK.nullish.join('/') + '；有值 '
+      + sumOK.present.length + ' 项），floor/字节/契约/版本一并带出');
+    assert(sumOK.floor === 42 && sumOK.selfBytes === 1234 && sumOK.contract === 'v3.174' && sumOK.pluginVersion === '3.175.0',
+      '摘要带出对方快照的自述（floor=42 / 1234 字节 / 契约 v3.174 / 版本 3.175.0）');
+    // ── ⑤ 对账：可比条件下才比，不可比如实说 ──
+    //   注：本块的 store 时钟在本块内显式设定，测完复位（避免污染后续块）。
+    const backupClock = JSON.parse(JSON.stringify(WA.store.get().clock));
+    WA.store.transact(function (d) { d.clock.label = '第12日·黄昏'; d.clock.iso = ''; d.clock.dayIndex = 12; });
+    const dNC = LR.diffWithLonsha({ clock: { date: '2026-09-13' } });
+    assert(dNC.comparable === false && dNC.verdict === 'world-uncomparable',
+      '★ 本扩展世界钟是自由标签（无公历形态）⇒ world-uncomparable——**本就不该比**，绝不硬比出一个假的不一致');
+    WA.store.transact(function (d) { d.clock.iso = '2026-09-13T00:00:00.000Z'; });
+    const dSame = LR.diffWithLonsha({ clock: { date: '2026-09-13' } });
+    assert(dSame.comparable === true && dSame.verdict === 'same' && dSame.days === 0, '两侧同日 ⇒ same（days=0）');
+    const dAhead = LR.diffWithLonsha({ clock: { date: '2026-09-18' } });
+    assert(dAhead.verdict === 'world-ahead' && dAhead.days === 5, '对方记的日期在后 ⇒ world-ahead(+5)');
+    const dBehind = LR.diffWithLonsha({ clock: { date: '2026-09-08' } });
+    assert(dBehind.verdict === 'world-behind' && dBehind.days === -5, '对方记的日期在前 ⇒ world-behind(-5)');
+    const dEmpty = LR.diffWithLonsha({ clock: {} });
+    assert(dEmpty.comparable === false && dEmpty.verdict === 'lonsha-empty',
+      '对方未记录时间 ⇒ lonsha-empty（与「记了个读不出的日期」分开——前者等它，后者是两套历法）');
+    const dBad = LR.diffWithLonsha({ clock: { date: '天顺三年春' } });
+    assert(dBad.comparable === false && dBad.verdict === 'unparsable' && dBad.verdict !== 'lonsha-empty',
+      '对方记了但读不出（古历串）⇒ unparsable，且不得与 lonsha-empty 同形');
+    // ── ① 只读：读一遍不得改动任何一方 ──
+    const worldBefore22 = JSON.stringify(WA.store.get());
+    const lonshaSnap22 = JSON.parse(JSON.stringify(GOOD));
+    const rRO = LR.readLonshaSnapshot({ win: mkWin('ready', lonshaSnap22) });
+    assert(rRO.ok === true && JSON.stringify(WA.store.get()) === worldBefore22,
+      '只读契约：读对方账本绝不改本扩展世界状态（含世界钟）');
+    assert(JSON.stringify(lonshaSnap22) === JSON.stringify(GOOD),
+      '只读契约：也不改对方快照的内容（消费方不代对方记账）');
+    // ── 消费侧齐备：诊断节 / flatten / 健康分 signals / 面板块 ──
+    const dg22 = WA.toolDiag.collect();
+    assert(dg22.lonsha && typeof dg22.lonsha === 'object' && dg22.lonsha.ok === false
+      && typeof dg22.lonsha.reason === 'string',
+      '诊断节 secLonsha 采到消费面真实状态（实 reason=' + ((dg22.lonsha || {}).reason) + '——测试环境无 LonSha，正是「未装」态）');
+    const fl22 = WA.toolDiag.flatten(dg22);
+    assert(fl22.filter(function (r) { return r.key === 'lonsha'; }).length >= 1,
+      'flatten 清单里有记忆桥摘要行——否则「另一个插件记的那本账」在总览里完全缺席');
+    const mt22 = WA.store.maintain({});
+    assert(mt22.signals && 'lonshaAvailable' in mt22.signals && 'lonshaVerdict' in mt22.signals,
+      '健康分 signals 透出 lonshaAvailable/lonshaVerdict（读不到也可归因，实 '
+      + mt22.signals.lonshaVerdict + '）');
+    assert(mt22.signals.lonshaAvailable === false && mt22.signals.lonshaVerdict === 'not-mounted',
+      '无 LonSha 环境下健康分如实报「未装」（不是扣分项，也不是无名 null）');
+    const panelSrc22 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    assert(panelSrc22.indexOf('function lonshaBlock()') >= 0 && panelSrc22.indexOf('${lonshaBlock()}') >= 0,
+      '面板概览已挂 lonshaBlock()（UI 层在无头测试里不装载，故只做源码级钉——实机表现须另行核验）');
+    const modSrc22 = fs.readFileSync(path.join(BASE, 'engines/lonsha-reader.js'), 'utf8');
+    // ── 复位本块设定的时钟（必须在负向自证**之前**：判据三问的是「本扩展无公历钟时不硬比」，
+    //    若时钟还停在刚才设的公历值上，原版对照会因为环境没复位而假红）──
+    WA.store.transact(function (d) {
+      d.clock.label = backupClock.label || ''; d.clock.iso = backupClock.iso || '';
+      d.clock.dayIndex = backupClock.dayIndex || 0; d.clock.source = backupClock.source || 'unset';
+    });
+    // ── 负向自证：真源码破坏 → 破坏副本 → 同款真判据（原版对照 + 逐项现形）──
+    const ANCH = {
+      collapse: "if (!b) {\n      return { mounted: false, sourceState: null, lastError: null, hasSnapshot: false, reason: 'not-mounted' };\n    }",
+      threeState: "return { present: true, kind: (rec.kind === 'null') ? 'null' : 'value' };",
+      comparable: "if (!String(worldDate || '').trim()) {\n      return Object.assign(base, { comparable: false, verdict: 'world-uncomparable', days: null });\n    }",
+      swallow: "return { ok: false, reason: 'thrown', source: null, snapshot: null };"
+    };
+    const mkBroken22 = function (anchor, to, noReplace) {
+      let s = modSrc22;
+      if (!noReplace) {
+        if (s.indexOf(anchor) < 0) { throw new Error('锚点不存在（负控制是假的）'); }
+        s = s.replace(anchor, to);
+        if (s === modSrc22) { throw new Error('替换未改变源码（负控制是假的）'); }
+      }
+      const g = {};
+      new Function('window', 'global', s)(g, g);
+      if (!g.WorldAxis || !g.WorldAxis.lonshaReader) { throw new Error('破坏副本装载失败'); }
+      return g.WorldAxis.lonshaReader;
+    };
+    const judge22 = function (api) {
+      const out = {};
+      // 判据一：未装与未就绪必须可分辨（**两条路都要走**——只问未就绪的话，
+      //   「未挂载早退」被拆掉也照样成立，负控制就恒真了）
+      const rMountedAbsent = api.lonshaSource('lonsha_memory_bridge_v1',
+        { lonsha_memory_bridge_v1: { sourceState: 'engine-absent', snapshot: null, refresh: function () { return null; } } }).reason;
+      const rNotMounted = api.lonshaSource('lonsha_memory_bridge_v1', {}).reason;
+      out.sourceDistinct = (rNotMounted === 'not-mounted') && (rMountedAbsent === 'engine-absent')
+        && (rNotMounted !== rMountedAbsent);
+      // 判据二：三态可分（未外供 ≠ 显式为空）。两个字段都必须走**同一条**判定行——
+      //   拿 present:false 的字段去比会走早退分支，破坏那一行就永远打不到判据。
+      out.threeState = JSON.stringify(api.fieldState(GOOD, 'moneyLedger')) !== JSON.stringify(api.fieldState(GOOD, 'characters'));
+      // 判据三：本扩展无公历钟时不硬比
+      out.noHardCompare = api.diffWithLonsha({ clock: { date: '2026-09-13' } }).verdict === 'world-uncomparable';
+      // 判据四：不外抛
+      let t = false;
+      try { api.readLonshaSnapshot({ get win() { throw new Error('x'); } }); } catch (e) { t = true; }
+      out.noThrow = !t;
+      return out;
+    };
+    try {
+      const jReal22 = judge22(LR);
+      assert(jReal22.sourceDistinct === true && jReal22.threeState === true
+        && jReal22.noHardCompare === true && jReal22.noThrow === true,
+        '（负向自证·原版对照）真源码上四条判据全部干净——否则下面的「破坏后现形」可能只是判据恒真');
+      const jA = judge22(mkBroken22(ANCH.collapse,
+        "if (false) {\n      return { mounted: false, sourceState: null, lastError: null, hasSnapshot: false, reason: 'not-mounted' };\n    }"));
+      assert(jA.sourceDistinct === false,
+        '（负向自证）把「未挂载」这一早退拆掉后，未装与未就绪塌成一态——正是本模块最初要治的那个「都拿不到」');
+      assert(jA.noHardCompare === true, '（负向自证）破坏一不连坐对账口径');
+      const jB = judge22(mkBroken22(ANCH.threeState, "return { present: true, kind: 'value' };"));
+      assert(jB.threeState === false, '（负向自证）把三态塌成一态后，「未外供」与「显式为空」不再可分辨（读数等于没有）');
+      const jC = judge22(mkBroken22(ANCH.comparable, 'if (false) {\n    }'));
+      assert(jC.noHardCompare === false, '（负向自证）拆掉「本扩展无公历钟」的分支后，会硬比出一个假的不一致');
+      const jD = judge22(mkBroken22(ANCH.swallow, 'throw _e;'));
+      assert(jD.noThrow === false, '（负向自证）把整函数兜底换成重抛后，宿主怪异 getter 会把异常抛给调用方');
+      assert(jD.threeState === true, '（负向自证）破坏四只动兜底，不连坐三态');
+    } catch (e22) {
+      assert(false, '（负向自证）破坏副本构建失败：' + (e22 && e22.message));
+    }
+    console.log('  ✓ 只读（不写对方账本/不改本扩展世界钟）｜不抛（未装/未就绪/抛错/畸形/怪异宿主一律降级可归因）');
+    console.log('  ✓ 来源可归因（对方 sourceState 五态逐一对映，未就绪与坏了不同形）｜契约版本显式不匹配才拦');
+    console.log('  ✓ 三态尊重（未外供/显式为空/有值互不相同）｜对账不硬比（自由标签≠坏掉；对方未记≠读不出）');
+    console.log('  ✓ 消费侧齐备（诊断节/flatten/健康分 signals/面板块）｜负向自证 4 项（原版对照 + 拆任一条判定都现形）');
+  } // end v2.17.0 block
   } // end v2.11.0 block
   } // end v2.10.0 block
   } // end v2.9.0 block
