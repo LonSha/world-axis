@@ -242,7 +242,8 @@
         const old = draft.evolution.trends.find(x => x.trigger === c.trigger);
         if (old) { old.impact = c.impact || old.impact; old.fallout = c.fallout || old.fallout; }
         else draft.evolution.trends.push({ id: uid('ic'), trigger: String(c.trigger).slice(0, 60), impact: String(c.impact || '').slice(0, 80), fallout: String(c.fallout || '').slice(0, 80), at: Date.now() });
-        draft.evolution.trends = draft.evolution.trends.slice(-20);
+        if (WA.evict) WA.evict.array(draft.evolution.trends, 'evolution.trends');
+        else draft.evolution.trends = draft.evolution.trends.slice(-20);
       });
     },
 

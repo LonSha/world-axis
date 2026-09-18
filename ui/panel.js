@@ -44,6 +44,36 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '"' }[c])); }
 
   // ── 页面渲染 ──
+  // v2.13.0: 挤出侧可见出口（概览页）。
+  //   为什么必须放在这里：挤出是本仓库唯一「按设计把数据丢掉」的路径，而它是静默的——
+  //   「长局 200 轮后 NPC 只剩 48 个」「伏笔被终态条目挤掉」此前在面板上毫无痕迹，
+  //   用户只能凭记忆发现少了谁。本块把「谁在丢、丢了多少、最近丢的是谁」摆到概览页。
+  //   刻意**不引入任何控件**（纯展示）：UI 绑定守卫要求每个控件都有绑定，而这里不需要交互；
+  //   需要动作时去「诊断」页看逐站点明细。
+  function evictBlock() {
+    try {
+      const st = (WA.evict && typeof WA.evict.evictStat === 'function') ? WA.evict.evictStat() : null;
+      if (!st) return '';
+      if (!st.evicts && !st.evictFailed) {
+        return '<div class="wa-sec">容量收纳</div><div class="wa-list"><div class="wa-item wa-dim">本轮尚未发生容量挤出（' + st.sites + ' 个站点在位，数据均在各自上限内）</div></div>';
+      }
+      if (st.evictFailed > 0) {
+        return '<div class="wa-sec">容量收纳</div><div class="wa-list">'
+          + '<div class="wa-item"><b>挤出失败 ' + st.evictFailed + ' 次</b>（' + esc(JSON.stringify(st.failedBy || {}))
+          + '）——站点未登记或参数非法，数据未被截断而是继续超限增长，须改代码。</div></div>';
+      }
+      const rows = Object.keys(st.bySite || {}).sort(function (a, b) { return st.bySite[b].dropped - st.bySite[a].dropped; }).slice(0, 6)
+        .map(function (k) {
+          const b = st.bySite[k];
+          return '<div class="wa-item"><span class="wa-dim">' + esc(k) + '</span> 丢弃 ' + b.dropped + ' 项 / ' + b.evicts + ' 次</div>';
+        }).join('');
+      const what = (st.lastDropped || []).slice(-3).map(function (x) { return esc(x.site + '→' + x.what); }).join('、');
+      return '<div class="wa-sec">容量收纳（共挤出 ' + st.evicts + ' 次 / 丢弃 ' + st.evicted + ' 项）</div>'
+        + '<div class="wa-list">' + rows
+        + (what ? '<div class="wa-item wa-dim">最近被挤出：' + what + '</div>' : '')
+        + '</div>';
+    } catch (e) { return ''; }
+  }
   function renderOverview() {
     const s = WA.store.get();
     const nodes = WA.workflow.list();
@@ -57,6 +87,7 @@
         <div class="wa-stat"><div class="wa-stat-v">${s.evolution.round}</div><div class="wa-stat-k">演化回合</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${beforeN}+${afterN}</div><div class="wa-stat-k">工作流节点</div></div>
       </div>
+      ${evictBlock()}
       <div class="wa-sec">工作流节点开关</div>
       <div class="wa-node-list">${nodes.map(n => `
         <label class="wa-node">

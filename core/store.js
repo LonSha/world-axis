@@ -57,6 +57,10 @@
         facts: [],              // 长期事实 {key,value,version,active,reason,at}
         pmem: [],               // v1.5.0 物化：个人主观记忆（登记 cap 60，pmem.js 写入方自此前置自愈，直写不再炸事务）
         foreshadows: [],        // 伏笔 {id,content,status:waiting|developing|triggered|recycled|dropped,links:[],at}
+        // v2.13.0 物化：阶段纪要 / 大总述环形（登记 cap 24/8 此前未在骨架声明）。
+        //   与 v1.6.0 补登 entityMemory 同类：登记了却不在骨架里，registryParity 会报
+        //   「未在骨架物化」，冷启动直写也会炸事务——登记不等于物化，两件事都要做。
+        smallSummaries: [], bigSummaries: [],
         l0: [], l1: [], l2: [], l3: []   // 分层经历摘要
       },
       // 事件演化（World引擎：冲突/进度阶段机 + 势力/声誉/经济/仇敌/黑盒/天下大势）
@@ -540,7 +544,11 @@
   }
 
   // v0.1.44: 有界容器登记表——path -> { cap: 裁剪后长度硬上限, site: 源码裁剪点 }
-  // cap 值必须与源码中的裁剪常量一致，tests/run.js 会反查源码，防止登记表与代码漂移。
+  // v2.13.0: 口径已换。原先注释写「tests/run.js 会反查源码」——那条**源码正则反查**
+  //   只能证明字面量出现过，证明不了「运行时真按这个 cap 裁」（cap 改成变量、走函数、
+  //   或同一容器第二个写入方各自裁剪，正则一概看不出来）。现由挤出侧单一出口接管：
+  //   站点表 core/evict.js SITES 是可执行的 cap 真源，门禁做**运行时声明即执行实测**；
+  //   本登记表保留为「体检/漂移检测」口径，与站点表逐键对账。
   /**
    * v0.1.45: 结构自愈——按默认状态递归补齐「缺失的嵌套字段」。
    * 背景：migrate() 是浅合并（Object.assign），旧存档整体替换顶层键后，
@@ -619,7 +627,19 @@
     'people.*.profile.memory': { cap: 25, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
     'people.*.profile.relationships': { cap: 15, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
     // v1.5.0 补登：people.<id>.knowledge 对象键容器（backstage 按 at 排序逐出，保留 30 键）
-    'people.*.knowledge': { cap: 30, kind: 'object', wildcard: true, site: 'backstage.js knowledge 容量30逐出' }
+    'people.*.knowledge': { cap: 30, kind: 'object', wildcard: true, site: 'backstage.js knowledge 容量30逐出' },
+    // v2.13.0 补登（挤出侧广谱侦察发现的**真盲区**）：阶段纪要 / 大总述环形。
+    //   此前这两条**根本没在本登记表上**，于是 sizeAudit 把它们报成 unbounded
+    //   （全库唯一两条），而代码其实一直在 slice(-N) 静默裁剪——「被误判为无界」
+    //   与「裁剪无人知晓」两个缺陷同时存在。上限与 summarizer.js 的 CAP_SMALL/CAP_BIG 同源。
+    'memory.smallSummaries': { cap: 24, site: 'summarizer.js CAP_SMALL=24（v2.13.0 补登 + 接挤出台账）' },
+    'memory.bigSummaries': { cap: 8, site: 'summarizer.js CAP_BIG=8（v2.13.0 补登 + 接挤出台账）' },
+    // v2.13.0: 人物档案节（people.<id>.profile.<节>）的上限**逐节不同**，上面五条具名
+    //   登记已足够说明「这些数组归谁管」；挤出侧站点 people.profile 的 path 是
+    //   people.*.profile.*（per-call，写的时候才由 registry 逐节取值传入），
+    //   不需要在登记表里再补一条通配键——补了反而会让 registryParity 的
+    //   「每项登记都要有写入方」计数多算一项（实测触发 11 条既有断言失败）。
+    //   （这条注释本身是留痕：撤掉的是**看起来更全**、实则会破坏既有对账的那条。）
   };
   // v1.4.0: 容量查找单一实现——精确键 → 下标归一化精确键 → 通配键 → null。
   // 通配键（wildcard:true）中 '*' 段匹配 1..n 个路径段（如 entityMemory.<type>.<idx>）；
@@ -1625,6 +1645,7 @@
       //   计分口径：不扣分（幽灵键是历史残留、不占运行成本），报 info 并给出清理入口。
       let orphanKeys = [], quarantineRestores = 0, quarantineDrops = 0;
       let sbIncoherent = 0, sbDormant = 0;
+      let evictsN = 0, evictFailedN = 0, evictSitesN = 0;   // v2.13.0: 挤出侧三计量
       try {
         if (typeof this.orphanSettingsKeys === 'function') orphanKeys = this.orphanSettingsKeys() || [];
         // v2.3.0: 登记表自洽性与休眠登记——只采集不产议题（同 orphan 口径：
@@ -1648,6 +1669,27 @@
         //   可见性改由按需路径承担：面板「工具」→「设置键」与诊断 runtime.settingsBus / verdict。
         //   隔离处置史同理：一旦处置过一次就永久 >0，属历史事实而非当前缺陷。
       } catch (e) { markDegraded('settingsHygiene', e); }
+      // ── 9.5 挤出侧（v2.13.0）──
+      //   为什么健康分要看它：挤出是本仓库唯一「按设计把数据丢掉」的路径，
+      //   而它此前零计量——长局跑了 200 轮之后 NPC 只剩 48 个、伏笔被终态条目挤掉，
+      //   面板/诊断/健康分上都没有出口，用户只能凭记忆发现「少了谁」。
+      //   分级口径与写侧/删侧一致：**失败**是缺陷（未知站点/参数非法＝代码问题）报 error；
+      //   正常挤出是设计行为，只报 info 并点名最近被丢的是谁。
+      try {
+        const es = (WA.evict && typeof WA.evict.evictStat === 'function') ? WA.evict.evictStat() : null;
+        if (es) {
+          evictsN = es.evicts; evictFailedN = es.evictFailed; evictSitesN = es.sites;
+          if (es.evictFailed > 0) {
+            score -= 6;
+            issues.push({ level: 'error', key: 'evict.failed', detail: '挤出侧有 ' + es.evictFailed + ' 次失败（' + JSON.stringify(es.failedBy) + '）：未知站点/参数非法＝代码缺陷，数据未被截断而是继续超限增长——最近：' + ((es.lastFail || {}).site || '?') + '/' + ((es.lastFail || {}).reason || '?') });
+            actions.push({ id: 'review-evict-fail', safe: false, detail: '面板「诊断」查看挤出失败明细（须改代码或补站点登记，不是清存储能解决的）' });
+          } else if (es.evicts > 0) {
+            const top = Object.keys(es.bySite).sort(function (a, b) { return es.bySite[b].dropped - es.bySite[a].dropped; })[0];
+            const what = (es.lastDropped || []).slice(-2).map(function (x) { return x.what; }).join('、');
+            issues.push({ level: 'info', key: 'evict', detail: '本轮已发生 ' + es.evicts + ' 次容量挤出，共丢弃 ' + es.evicted + ' 项（最频繁：' + (top || '?') + '，最近丢弃：' + (what || '—') + '）——这是设计内的有界收纳，但「丢了什么」应当可见' });
+          }
+        }
+      } catch (eEv) { markDegraded('evict', eEv); }
       // ── 10. 巡视自身完整性（v2.0.0）──
       //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
       let degradedN = 0;
@@ -1735,6 +1777,8 @@
           profRegistered: profRegistered, profWith: profWith, profEntries: profEntries,  // v2.2.0
           orphanSettings: orphanKeys.length, quarantineRestores: quarantineRestores, quarantineDrops: quarantineDrops,  // v2.2.0
           sbIncoherent: sbIncoherent, sbDormant: sbDormant,  // v2.3.0
+           // v2.13.0: 挤出侧（七面治理最后一面）——evicts>0 是设计内行为，evictFailed>0 是代码缺陷
+           evicts: evictsN, evictFailed: evictFailedN, evictSites: evictSitesN,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }

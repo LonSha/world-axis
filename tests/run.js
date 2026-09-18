@@ -24,7 +24,7 @@ function section(t) { console.log('\n■ ' + t); }
 // 按依赖顺序加载扩展JS到同一vm上下文（跳过index.js与UI）
 const ctx = vm.createContext(global);
 const LOAD = [
-  'core/settings-bus.js', 'core/store.js', 'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
+  'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
@@ -3593,26 +3593,220 @@ WA.loadScript = _ls.loadScript;
     if (!srcCache[rel]) srcCache[rel] = fs.readFileSync(path.join(BASE, rel), 'utf8');
     return srcCache[rel];
   };
-  const mismatches = [];
-  Object.keys(CAP_RULES).forEach(function (k) {
-    const rule = CAP_RULES[k], m = readSrc(rule[0]).match(rule[1]);
-    if (!m) { mismatches.push(k + '(源码裁剪表达式未找到)'); return; }
-    const srcCap = rule[2] ? rule[2](Number(m[1]), m) : Number(m[1]);
-    if (!caps[k] || caps[k].cap !== srcCap) mismatches.push(k + '(登记 ' + (caps[k] && caps[k].cap) + ' vs 源码 ' + srcCap + ')');
-    // v0.1.49: site 字段文件名反查——登记的 site 自由文本必须包含实际规则文件名的基准名（如 backstage.js）
-    const expectedFile = path.basename(rule[0]);
-    if (!caps[k] || !caps[k].site || caps[k].site.indexOf(expectedFile) < 0) {
-      mismatches.push(k + '(site 声明 "' + (caps[k] && caps[k].site) + '" 缺失期望文件名 ' + expectedFile + ')');
+  // ── v2.13.0：cap 的单一真源改为 **运行时站点表**（evict.SITES），不再是源码正则 ──
+  //   为什么换：v0.1.44 起这里靠**源码正则**反查 cap，而站点接线后源码里已经没有
+  //   `slice(-N)` 字面量了（改走 WA.evict.array 单一出口）——继续扫源码只会把
+  //   「接线成功」误报成「源码裁剪表达式未找到」。但真正的病根更深：
+  //   正则反查**永远只能证明「某个字面量出现过」**，证明不了「运行时真的按这个 cap 裁」。
+  //   换成运行时表之后，声明与执行第一次是同一份东西：
+  //     ① evict.SITES（cap 真源）↔ store.sizeCaps()（容量登记表）逐键比对；
+  //     ② evict.SITES 的 cap 必须等于 **执行站点实测的 cap**（喂超限数组跑一次单出口，
+  //        看它真丢了多少）——这是「声明即执行」的直接证据，正则做不到这件事。
+  //     ③ 双集合同集合：有界登记表里的每项都必须能被挤出侧解释（站点 / 非挤出声明 /
+  //        运行时单源 / 只读无写入方 四类之一），防「登记了却没人执行」。
+  const SITE_DECLS = WA.evict.siteDecls();
+  const NON_EVICT_DECLS = WA.evict.nonEvictDecls();
+  // 允许 evict.SITES 的 path 与 store 登记键不同名（如 entities.perType ↔
+  //   evolution.entityMemory.organization）：按集合覆盖判定，不按字面键相等。
+  const SITE_CAP_BY_CAP = {};   // cap 值 -> 站点名列表（用于与登记表逐值对账）
+  Object.keys(SITE_DECLS).forEach(function (st) { (SITE_CAP_BY_CAP[SITE_DECLS[st].cap] = SITE_CAP_BY_CAP[SITE_DECLS[st].cap] || []).push(st); });
+  // v2.13.0: 站点 path 含 `*`（如 evolution.entityMemory.*）时按**路径段通配**匹配登记键
+  //   （evolution.entityMemory.organization）——`*` 至少吃 1 段，与 store.matchWildcard 同语义。
+  const sitePathMatch = function (p, k) {
+    if (p === k) return true;
+    if (p.indexOf('*') < 0) return false;
+    const ps = p.split('.'), ks = k.split('.');
+    const i = ps.indexOf('*');
+    if (ks.length < ps.length) return false;
+    for (let eat = 1; eat <= ks.length - (ps.length - 1); eat++) {
+      let ok = true;
+      for (let si = 0; si < ps.length && ok; si++) {
+        if (si === i) continue;
+        const ki = si < i ? si : si + eat - 1;
+        if (ps[si] !== ks[ki]) ok = false;
+      }
+      if (ok) return true;
     }
+    return false;
+  };
+  const capMismatch = [];
+  // ① 登记表与站点表逐键对账（只比对两边都声明了的键）
+  Object.keys(SITE_DECLS).forEach(function (st) {
+    const decl = SITE_DECLS[st];
+    // per-call 站点（上限逐次不同，如人物档案各节 15/10/10/25/15）没有单一登记值可比，
+    //   其正确性由 ② 的「显式传上限 + 传漏归因」负向探针单独考核。
+    if (decl.cap === 'per-call') return;
+    const keys = Object.keys(caps).filter(function (k) { return sitePathMatch(decl.path, k) || k === st; });
+    keys.forEach(function (k) {
+      const c = caps[k];
+      // 登记侧标了通配（people.*.profile.personality）时，站点 path 与它同属一个规则族：
+      //   只要站点 path 的 `*` 段能覆盖登记键的形状，就按「同族」放行，不比 cap 字面值
+      //   （避免把「某容器的通配登记」与「另一容器的具名站点」错配成漂移）。
+      if (c.wildcard && sitePathMatch(decl.path, k) && decl.path.indexOf('*') >= 0) return;
+      if (c.cap !== decl.cap) capMismatch.push(k + '(登记 ' + c.cap + ' vs 站点 ' + decl.cap + ')');
+    });
   });
-  assert(mismatches.length === 0, '登记表 cap 与源码裁剪常量逐条一致' + (mismatches.length ? '：' + mismatches.join('、') : ''));
+  assert(capMismatch.length === 0, 'v2.13.0 容量登记表与挤出站点表逐键一致' + (capMismatch.length ? '：' + capMismatch.join('、') : ''));
+  // ② 声明即执行：喂一个超限数组跑真站点，实测丢弃数必须等于「长度 - 声明 cap」
+  const execProbe = [];
+  ['memory.l0', 'memory.l1', 'memory.l2', 'memory.l3', 'memory.facts', 'backstage.chronicle',
+   'backstage.worldFacts', 'backstage.echoes', 'backstage.currents', 'evolution.trends',
+   'evolution.enemies', 'evolution.worldTrends', 'opinion.canon', 'opinion.forum',
+   'memory.pmem', 'evolution.ledger', 'chapters.history', 'directEvents',
+   'evolution.blackboxActions', 'evolution.blackboxAssets',
+   // v2.13.0 补漏站点：真盲区（纪要/总述曾整条不在登记表上）与被漏接的第二写入方
+   'memory.smallSummary', 'memory.bigSummary', 'backstage.chronicle'].forEach(function (st) {
+    const decl = SITE_DECLS[st];
+    if (!decl) { execProbe.push(st + '(站点未登记)'); return; }
+    const over = decl.cap + 3;
+    const arr = [];
+    for (let i = 0; i < over; i++) arr.push({ name: 'probe' + i });
+    const st0 = WA.evict.evictStat();
+    const r = WA.evict.array(arr, st);
+    const st1 = WA.evict.evictStat();
+    if (!r.ok || r.dropped !== 3 || arr.length !== decl.cap) {
+      execProbe.push(st + '(实测 dropped=' + r.dropped + ' len=' + arr.length + ' 期望 3/' + decl.cap + ')');
+    }
+    if ((st1.evicts - st0.evicts) !== 1) execProbe.push(st + '(未记账)');
+    WA.evict.resetEvictStat();
+  });
+  assert(execProbe.length === 0, 'v2.13.0 站点「声明即执行」：实测丢弃数须等于超限数' + (execProbe.length ? '：' + execProbe.join('、') : '（20 站点逐站实测通过）'));
+  // ③ 双集合同集合：登记表每一项都必须能被挤出侧解释
+  const RUNSITE_KEYS = Object.keys(SITE_DECLS).map(function (s) { return SITE_DECLS[s].path; });
+  const explained = function (k) {
+    // 站点 path 可能含 `*`：用路径段通配匹配，而不是字符串前缀
+    //   （否则 evolution.entityMemory.organization 永远对不上 evolution.entityMemory.*，
+    //    会被误报成「未解释」——这正是本门禁首版的假失败）。
+    if (RUNSITE_KEYS.some(function (p) { return sitePathMatch(p, k); })) return true;
+    if (NON_EVICT_DECLS[k]) return true;
+    if (k.indexOf('people.*.profile.') === 0) return true;          // 运行时单源（registry 查本登记表）
+    if (k === 'consistency') return true;                            // 无写入方
+    return false;
+  };
+  const unexplainedCaps = Object.keys(caps).filter(function (k) { return !explained(k); });
+  assert(unexplainedCaps.length === 0,
+    'v2.13.0 有界登记表每项都能被挤出侧解释（站点/非挤出/运行时单源/无写入方）'
+    + (unexplainedCaps.length ? '——未解释：' + unexplainedCaps.join('、') : ''));
+  assert(typeof WA.evict.evictStat === 'function' && typeof WA.evict.siteDecls === 'function',
+    'v2.13.0 挤出侧单一出口与站点表已导出');
+  // 旧口径（源码正则反查）退役为**负向对照**，但必须写成**诚实判据**：
+  //   本版各站点都保留了 `else { ... slice(-CAP) ... }` 降级路径，字面量当然还在，
+  //   所以「全库已无 slice(-N)」是**假判据**（本门禁首版即由此自误报）。
+  //   真正该钉住的事实是两条，且都不可由「碰巧」通过：
+  //     ① 记台账的调用确实存在（否则站点表就是自说自话）；
+  //     ② 站点表每个站点都在产品源码里有调用点（无「声明了却没人用」的悬空站点）。
+  //   遍历用本块自建的 PROD_G18（v2.8.0 块的 PROD2800 在其块内，不可跨块引用）。
+  const PROD_G18 = [];
+  (function walkG18(dir) {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
+      if (e.name === '.git' || e.name === 'node_modules') return;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) return walkG18(p);
+      if (e.name.endsWith('.js') && dir !== path.join(BASE, 'tests')) PROD_G18.push(path.relative(BASE, p));
+    });
+  })(BASE);
+  const CALL_RE_G18 = /WA\s*\.\s*evict\s*\.\s*(array|object)\s*\(\s*[^,()]+,\s*'([^']+)'/g;
+  // note() 的站点名在**第一**参数（note('site', dropped[, cap])），与 array/object 相反：
+  //   第一版只写了「第二参数是站点名」的一条正则，于是 note 型站点（仇敌/章节史/突发事件）
+  //   全被判成「声明悬空」——判据错，不是代码错。两种形态分开扫。
+  const NOTE_RE_G18 = /WA\s*\.\s*evict\s*\.\s*note\s*\(\s*'([^']+)'/g;
+  const G18_SITES = {};
+  let G18_CALLS = 0;
+  PROD_G18.forEach(function (rel) {
+    if (rel === 'core/evict.js') return;
+    fs.readFileSync(path.join(BASE, rel), 'utf8').split('\n').forEach(function (line) {
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+      CALL_RE_G18.lastIndex = 0; let m;
+      while ((m = CALL_RE_G18.exec(line))) { G18_CALLS++; G18_SITES[m[2]] = (G18_SITES[m[2]] || 0) + 1; }
+      NOTE_RE_G18.lastIndex = 0; let n;
+      while ((n = NOTE_RE_G18.exec(line))) { G18_CALLS++; G18_SITES[n[1]] = (G18_SITES[n[1]] || 0) + 1; }
+    });
+  });
+  assert(G18_CALLS > 0, 'v2.13.0 挤出侧单一出口确有调用（实测 ' + G18_CALLS + ' 处 WA.evict.* 调用点）');
+  const siteNoCall = Object.keys(SITE_DECLS).filter(function (st) { return !G18_SITES[st]; });
+  assert(siteNoCall.length === 0, '站点表每项都在产品源码里有调用点（无声明悬空站点）'
+    + (siteNoCall.length ? '——零调用：' + siteNoCall.join('、') : '（' + Object.keys(SITE_DECLS).length + ' 个站点全部在用）'));
+  // 旧反查集的作用域仍在（readSrc 仍被使用，不是遗留死代码）
+  assert(readSrc('core/store.js').indexOf('__BOUNDED_CAPS') >= 0, '旧反查集的作用域（store 登记表）仍在');
   // 登记表与反查规则须覆盖同一集合（consistency 无源码裁剪点，单列）
   // v2.2.0: 档案五节的裁剪上限改为「运行时单一真源」（消费端 actors/registry.js 查本登记表，
   //   全库无第二处写死），不再是源码字面常量正则反查项。集合比对须把它们计入「已覆盖」，
   //   否则会被误判为漏登（其运行时校验见 v1.5.0 块的 RUNTIME_CAP_RULES_1500）。
   const RUNTIME_CAP_KEYS = ['people.*.profile.personality', 'people.*.profile.worldview', 'people.*.profile.family', 'people.*.profile.memory', 'people.*.profile.relationships'];
+  // v2.13.0: 原先是「登记表 ↔ 旧源码反查集」逐键**全等**。旧 CAP_RULES 逐项被站点接管后
+  //   全等已无意义（登记表是每容器上限，站点表在同名容器上给出同一 cap，但键形状不同）。
+  //   改为双向包含，两条都不可由碰巧通过：
+  //     ① 登记表每个键都必须有解释方（站点 path / 非挤出声明 / 运行时单源 / 无写入方）；
+  //     ② 旧反查集每个键仍必须在登记表上（防「规则还在守一个已注销的容器」）。
   const ruleKeys = Object.keys(CAP_RULES).concat(['consistency']).concat(RUNTIME_CAP_KEYS).sort().join(',');
-  assert(Object.keys(caps).sort().join(',') === ruleKeys, '登记表与源码反查集合同集合（无漏登/多登）');
+  const capsNoExplain = Object.keys(caps).filter(function (k) { return !explained(k); });
+  assert(capsNoExplain.length === 0, '登记表每键都有解释方（站点/非挤出/运行时单源/无写入方）'
+    + (capsNoExplain.length ? '——未解释：' + capsNoExplain.join('、') : ''));
+  const ruleNotInCaps = ruleKeys.split(',').filter(function (k) { return !Object.prototype.hasOwnProperty.call(caps, k); });
+  assert(ruleNotInCaps.length === 0, '旧反查集每键仍在登记表上（无「守着一个已注销的容器」）'
+    + (ruleNotInCaps.length ? '：' + ruleNotInCaps.join('、') : ''));
+  // ── 双消费端：新规则必须同时有「诊断议题」与「面板出口」 ──
+  //   本仓库铁律（v2.11.0 活性面审计结论）：只写采集端、不接消费端的台账，用户永远看不到。
+  //   挤出侧尤其如此——它丢的是真数据，而丢完「看起来一切正常」，没有任何自证手段。
+  const diagEv0 = WA.toolDiag.collect();
+  assert(diagEv0.runtime && diagEv0.runtime.evict && typeof diagEv0.runtime.evict.sites === 'number',
+    '（消费端①）诊断 runtime.evict 透出站点数与台账（此前挤出侧在诊断包里完全不存在）');
+  const panelSrc1300 = readSrc('ui/panel.js');
+  assert(panelSrc1300.indexOf('evictBlock()') > 0, '（消费端②）面板概览真的调用了挤出渲染块（不只是定义了函数）');
+  assert(panelSrc1300.indexOf('容量收纳') > 0, '（消费端②）面板有「容量收纳」可见出口（丢的是谁要摆到用户眼前）');
+  assert(readSrc('core/store.js').indexOf('evicts: evictsN') > 0, '（消费端③）健康分 signals 透出挤出三计量');
+  // ── 负向探针：本模块三条口径全靠它们成立，缺一条就退化成「悄悄丢数据」 ──
+  WA.evict.resetEvictStat();
+  // ① 未知站点是缺陷，不是后备：**不做任何截断**
+  const beforeUnknown = [1, 2, 3, 4, 5];
+  const rUnknown = WA.evict.array(beforeUnknown, 'site.that.does.not.exist');
+  assert(rUnknown.ok === false && rUnknown.reason === 'unknown-site', '（负向）未登记站点被拒绝（unknown-site）');
+  assert(beforeUnknown.length === 5, '（负向）未登记站点**不做任何截断**——「先丢掉再说」是最贵的一类默认值');
+  assert(WA.evict.evictStat().evictFailed === 1 && WA.evict.evictStat().failedBy['unknown-site'] === 1,
+    '（负向）未登记站点进 failedBy 分桶（可归因，不是静默忽略）');
+  // ② 参数非法归因，而不是糊过去
+  const rBad = WA.evict.array(null, 'memory.l0');
+  assert(rBad.ok === false && rBad.reason === 'not-array', '（负向）非数组输入归因 not-array');
+  // ③ per-call 站点漏传上限 → bad-cap（不许悄悄回落默认值），且仍不截断
+  const arrPerCall = [];
+  for (let i = 0; i < 40; i++) arrPerCall.push({ text: '档' + i });
+  const rNoLimit = WA.evict.array(arrPerCall, 'people.profile');
+  assert(rNoLimit.ok === false && rNoLimit.reason === 'bad-cap', '（负向）per-call 站点漏传上限 → bad-cap（不回落默认值）');
+  assert(arrPerCall.length === 40, '（负向）漏传上限时不截断（宁可超限也不静默丢弃）');
+  const rLimit = WA.evict.array(arrPerCall, 'people.profile', 15);
+  assert(rLimit.ok === true && rLimit.dropped === 25 && arrPerCall.length === 15,
+    '（正向）显式传上限后按该上限裁（40 → 15，丢 25）');
+  // ④ 「丢了什么」必须可读——只记条数等于什么都没说
+  WA.evict.resetEvictStat();
+  const namedDrop = [];
+  for (let i = 0; i < 45; i++) namedDrop.push({ name: '角色' + i });
+  WA.evict.array(namedDrop, 'memory.l0');        // cap 20 → 丢 25 个
+  const mp1300 = WA.evict.evictStat();
+  assert(mp1300.evicted === 25 && mp1300.lastDropped.length > 0 && /角色/.test(mp1300.lastDropped[0].what),
+    '（正向）lastDropped 记元素摘要（「丢的是谁」而非只记条数）');
+  assert(WA.evict.evictStat().bySite['memory.l0'] && WA.evict.evictStat().bySite['memory.l0'].dropped === 25,
+    '（正向）bySite 逐站点归因（谁在丢东西）');
+  // ⑤ 诊断议题分级：正常挤出 = info 且点名站点；失败 = error
+  const dgEv = WA.toolDiag.collect();
+  const evIssue = ((dgEv.verdict || {}).issues || []).filter(function (x) { return x.key === 'evict'; })[0];
+  assert(evIssue && evIssue.level === 'info' && /memory\.l0/.test(evIssue.detail),
+    '（消费端①·分级）正常挤出 → info 议题并点名站点（设计内行为不报红）');
+  assert(dgEv.runtime.evict.lastDropped.length > 0, '诊断包透出「最近丢弃物」明细');
+  // ⑥ 健康巡视：正常挤出只报 info；失败报 error（代码缺陷须上升为告警）
+  const mtEv = WA.store.maintain();
+  const mtEvInfo = (mtEv.issues || []).filter(function (x) { return x.key === 'evict'; })[0];
+  assert(mtEvInfo && mtEvInfo.level === 'info', '（消费端③·分级）正常挤出在健康巡视里只报 info');
+  assert(mtEv.signals.evicts === 1 && mtEv.signals.evictFailed === 0, '（消费端③）signals 记录本次挤出');
+  WA.evict.array([1, 2], 'nope.nope');
+  const mtFail = WA.store.maintain();
+  const mtEvErr = (mtFail.issues || []).filter(function (x) { return x.key === 'evict.failed'; })[0];
+  assert(mtEvErr && mtEvErr.level === 'error', '（消费端③·负向）挤出失败在健康巡视里报 error（须改代码，不是清存储）');
+  // 探针自清：台账归零 + 清掉探针自己产生的日志，避免污染后续「干净态」断言
+  WA.evict.resetEvictStat();
+  if (typeof WA.flushLog === 'function') WA.flushLog();
+  if (Array.isArray(WA.eventLog)) WA.eventLog.length = 0;
+  if (Array.isArray(WA.errorLog)) WA.errorLog.length = 0;
+  assert(WA.evict.evictStat().evicts === 0 && WA.evict.evictStat().evictFailed === 0, '（自清）探针台账已归零');
   // ── 假阳性回归：memory 四层灌至各自上限，不得进 unbounded/suspects ──
   WA.store.transact(d => {
     d.memory.l0 = []; d.memory.l1 = []; d.memory.l2 = []; d.memory.l3 = [];
@@ -6396,7 +6590,7 @@ WA.loadScript = _ls.loadScript;
   const rpA1700 = WA.store.registryParity();
   assert(rpA1700.ok === true && rpA1700.missing.length === 0, '正常态 registryParity ok=true missing=0');
   assert(rpA1700.checked === arrayKeys1700.length + objKeys1700.length, 'checked 纳入精确 object 键（不再是仅 array）');
-  assert(rpA1700.checked === 31, 'checked 精确值 31（v1.6.0 时 30，+people）');
+  assert(rpA1700.checked === 33, 'checked 精确值 33（v1.6.0 时 30，+people；v2.13.0 再 +smallSummaries/bigSummaries 两条真盲区）');
   // ── B. object 键漏物化检出（v1.6.0 盲区修复）──
   fresh1700();
   WA.store.transact(d => { delete d.people; });
@@ -9574,7 +9768,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10118,7 +10312,7 @@ assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.12.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.13.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10409,7 +10603,7 @@ assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.12.0', '入口版本为 2.12.0（实 ' + ver + '）');
+    assert(ver === '2.13.0', '入口版本为 2.13.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -10815,7 +11009,7 @@ assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -10839,7 +11033,8 @@ assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单�
       });
       assert(false, '出口面契约：依赖面发生漂移——新增 [' + added.slice(0, 12).join('、') + '] 减少 ['
         + removed.slice(0, 12).join('、') + ']（这是**有意的**门禁：接口面变动必须显式落进冻结串，'
-        + '防「成员被悄悄改名/删掉，调用方静默降级」；确认无误后按 tests/_gen_contract.js 重新生成）');
+        + '防「成员被悄悄改名/删掉，调用方静默降级」；确认无误后运行 `node tests/export-contract.js`，'
+        + '把它写出的 /tmp/export_contract.txt 逐字回填到本块的 FROZEN2800）');
     }
 
     // 负向：错名不该被当成「存在」——这正是 regional.INCIDENT_TYPES 长期悬空的原因
@@ -10931,7 +11126,7 @@ assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.12.0', '入口版本为 2.12.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.13.0', '入口版本为 2.13.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11319,7 +11514,7 @@ assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.12.0', '入口版本为 2.12.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.13.0', '入口版本为 2.13.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11689,7 +11884,7 @@ assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.12.0', '入口版本为 2.12.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.13.0', '入口版本为 2.13.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12054,7 +12249,7 @@ assert(verF2500 === '2.12.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.12.0', '入口版本为 2.12.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.13.0', '入口版本为 2.13.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');

@@ -435,7 +435,9 @@
         const keys = Object.keys(person.knowledge);
         if (keys.length > 30) { // 每人知识容量
           keys.sort((a, b) => (person.knowledge[a].at || 0) - (person.knowledge[b].at || 0));
-          keys.slice(0, keys.length - 30).forEach(x => delete person.knowledge[x]);
+          // v2.13.0: 认知边界对象型挤出走单一出口（此前静默删除「这个人知道的事」最早条目）
+          if (WA.evict) WA.evict.object(person.knowledge, 'people.knowledge', keys);
+          else keys.slice(0, keys.length - 30).forEach(x => delete person.knowledge[x]);
         }
       });
 
@@ -606,16 +608,24 @@
       }
 
       // 容量控制
-      draft.echoes = draft.echoes.slice(-40);
-      draft.chronicle = draft.chronicle.slice(-200);
-      draft.worldFacts = draft.worldFacts.slice(-100);
+      // v2.13.0: 四处截断改走挤出侧单一出口——此前是静默破坏性丢弃，
+      //   用户「我的编年史/事实怎么少了」在面板与诊断上完全没有出口。cap 来自 evict.SITES 单一真源。
+      if (WA.evict) {
+        WA.evict.array(draft.echoes, 'backstage.echoes');
+        WA.evict.array(draft.chronicle, 'backstage.chronicle');
+        WA.evict.array(draft.worldFacts, 'backstage.worldFacts');
+      } else {
+        draft.echoes = draft.echoes.slice(-40);
+        draft.chronicle = draft.chronicle.slice(-200);
+        draft.worldFacts = draft.worldFacts.slice(-100);
+      }
       // v1.2.0: 终态暗流回收——stage 已结束/closed 的暗流正文触面已由 echoes 承载，
       // 本体永驻会挤出长期活跃暗流（探针实证活跃暗流被 34 条终态暗流挤出）。回收先于截断。
       const curArr = draft.currents = draft.currents || [];
       for (let i = curArr.length - 1; i >= 0; i--) {
         if (curArr[i] && CURRENT_TERMINAL_STAGES.indexOf(curArr[i].stage) >= 0) curArr.splice(i, 1);
       }
-      draft.currents = curArr.slice(-40);
+      draft.currents = WA.evict ? (WA.evict.array(curArr, 'backstage.currents'), curArr) : curArr.slice(-40);
       // v1.2.0: 伏笔终态回收——已回收/已放弃（recycled/dropped）语义上已终止，
       // 其信息在回收时点已被剧情消化；本体永驻会挤出活跃伏笔（探针实证活跃伏笔被 29 条终态伏笔挤出）。
       // 单一实现 WA.memory.pruneForeshadows（与 memory.js 巩固路径同口径，防两处漂移）。
@@ -625,7 +635,8 @@
         for (let i = fsArr.length - 1; i >= 0; i--) {
           if (fsArr[i] && FS_TERMINAL_STATUSES.indexOf(fsArr[i].status) >= 0) fsArr.splice(i, 1);
         }
-        if (fsArr.length > FS_CAP) fsArr.splice(0, fsArr.length - FS_CAP);
+        if (WA.evict) WA.evict.array(fsArr, 'memory.foreshadows');
+        else if (fsArr.length > FS_CAP) fsArr.splice(0, fsArr.length - FS_CAP);
       }
       // v0.6.0: 演化容器容量治理——
       // ① 终局事件回收：终局即剧情已完结，正文触面已由 echoes 承载；快照此前只做呈现过滤，
@@ -639,21 +650,22 @@
           if (term.includes(ev.stage)) evArr.splice(i, 1);
         }
         // ② 有机容器环形 cap（与编辑器容量一致；挤出最早创建，不阻塞入账）
+        // v2.13.0: 改走挤出侧单一出口（cap 与 editorEvents/editorFaction/MAX_WINDS 同源，见 evict.SITES）
         const evMax = (WA.editorEvents && WA.editorEvents.MAX_EVENTS) || 16;
-        if (evArr.length > evMax) evArr.splice(0, evArr.length - evMax);
+        if (WA.evict) WA.evict.array(evArr, 'evolution.events'); else if (evArr.length > evMax) evArr.splice(0, evArr.length - evMax);
         const faArr = draft.evolution.factions = draft.evolution.factions || [];
         const faMax = (WA.editorFaction && WA.editorFaction.MAX_FACTIONS) || 16;
-        if (faArr.length > faMax) faArr.splice(0, faArr.length - faMax);
+        if (WA.evict) WA.evict.array(faArr, 'evolution.factions'); else if (faArr.length > faMax) faArr.splice(0, faArr.length - faMax);
         // ③ 风声兜底 cap（衰减引擎是常态收敛，单源 MAX_WINDS 防漂移）
         const wArr = draft.evolution.winds = draft.evolution.winds || [];
         const wMax = WA.evolution.MAX_WINDS || 12;
-        if (wArr.length > wMax) wArr.splice(0, wArr.length - wMax);
+        if (WA.evict) WA.evict.array(wArr, 'evolution.winds'); else if (wArr.length > wMax) wArr.splice(0, wArr.length - wMax);
         // ④ 天下大势：终态已结束的从本体回收（快照/注入均按「持续中」过滤，本体留存只占容量）
         const wtArr = draft.evolution.worldTrends = draft.evolution.worldTrends || [];
         for (let i = wtArr.length - 1; i >= 0; i--) {
           if (wtArr[i] && wtArr[i].status === '已结束') wtArr.splice(i, 1);
         }
-        if (wtArr.length > 12) wtArr.splice(0, wtArr.length - 12);
+        if (WA.evict) WA.evict.array(wtArr, 'evolution.worldTrends'); else if (wtArr.length > 12) wtArr.splice(0, wtArr.length - 12);
       }
       // v1.0.0: 人物容器容量治理（对象型）——此前 people 无人数上限，长局 NPC 无界膨胀；
       // 按 updatedAt 最旧优先挤出（保留近期活跃者），日志留痕。cap 与登记表同源 PEOPLE_CAP。
@@ -661,11 +673,17 @@
         const pKeys = Object.keys(draft.people);
         if (pKeys.length > PEOPLE_CAP) {
           pKeys.sort((a, b) => ((draft.people[a] && draft.people[a].updatedAt) || 0) - ((draft.people[b] && draft.people[b].updatedAt) || 0));
-          pKeys.slice(0, pKeys.length - PEOPLE_CAP).forEach(k => {
-            const pname = draft.people[k] && draft.people[k].name;
-            delete draft.people[k];
-            WA.log('info', '人物容量治理：挤出长期未更新 NPC ' + (pname || k));
-          });
+          // v2.13.0: 挤出侧单一出口——对象型容器同样须记账（「挤出长期未更新 NPC」此前只留日志）
+          if (WA.evict) {
+            const rEvP = WA.evict.object(draft.people, 'people', pKeys);
+            if (rEvP.ok && rEvP.dropped) WA.log('info', '人物容量治理：挤出 ' + rEvP.dropped + ' 个长期未更新 NPC（上限 ' + PEOPLE_CAP + '）');
+          } else {
+            pKeys.slice(0, pKeys.length - PEOPLE_CAP).forEach(k => {
+              const pname = draft.people[k] && draft.people[k].name;
+              delete draft.people[k];
+              WA.log('info', '人物容量治理：挤出长期未更新 NPC ' + (pname || k));
+            });
+          }
         }
       }
     },

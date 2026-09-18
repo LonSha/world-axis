@@ -77,7 +77,9 @@
     // 同轮重roll覆盖：移除同round旧账本记录
     const ledger = (ev.ledger || []).filter(m => m.round !== round);
     ledger.unshift({ round, changes });
-    if (ledger.length > KEEP_ROUNDS) ledger.length = KEEP_ROUNDS;
+    // v2.13.0: 账本轮数挤出走单一出口（此前 length=CAP 静默丢弃最旧轮）
+    if (WA.evict) WA.evict.array(ledger, 'evolution.ledger');
+    else if (ledger.length > KEEP_ROUNDS) ledger.length = KEEP_ROUNDS;
 
     WA.store.transact(d => { d.evolution.ledger = ledger; });
     WA.log('info', `账本: 第${round}轮记录${changes.length}条变化`);

@@ -105,6 +105,9 @@
           base.push({ text: t, at: now });
         });
         const cap = capOf(sec) || 25;
+        // v2.13.0: 档案节挤出走单一出口（上限逐节不同 → 站点 cap 声明为 per-call，
+        //   须显式传入本次上限；传漏会以 bad-cap 归因，而不是随手回落到 25）。
+        if (WA.evict) WA.evict.array(base, 'people.profile', cap);
         next[sec] = base.slice(-cap);
         out.added[sec] = Math.max(0, next[sec].length - (o.replace === true ? 0 : (old[sec] || []).length));
         changed = true;
@@ -120,6 +123,8 @@
             else base.push({ target: rl.target, relation: rl.relation, dynamic: rl.dynamic, at: now });
           });
           const capR = capOf('relationships') || 15;
+          // v2.13.0: 关系节同上——逐节上限来自登记表，挤出经单一出口记账。
+          if (WA.evict) WA.evict.array(base, 'people.profile', capR);
           next.relationships = base.slice(-capR);
           out.added.relationships = Math.max(0, next.relationships.length - (o.replace === true ? 0 : (old.relationships || []).length));
           changed = true;

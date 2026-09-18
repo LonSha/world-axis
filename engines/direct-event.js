@@ -25,6 +25,13 @@
         .slice(0, KEEP_DONE)
         .map(function (e) { const c = Object.assign({}, e); delete c.notes; return c; });
       const kept = active.concat(ended).sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+      // v2.13.0: 终态突发事件环形挤出记账（此前静默丢弃最旧的终态纸条，用户无从得知）
+      if (WA.evict) {
+        const keptIds = {};
+        kept.forEach(function (e) { if (e && e.id) keptIds[e.id] = true; });
+        const dropped = (list || []).filter(function (e) { return e && !keptIds[e.id]; });
+        if (dropped.length) WA.evict.note('directEvents', dropped);
+      }
       return kept;
     }
   WA.directEvent = {

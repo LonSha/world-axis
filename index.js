@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.12.0';
+  const VERSION = '2.13.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -202,6 +202,7 @@
   const LOAD_ORDER = [
     'core/settings-bus.js',
     'core/store.js',
+    'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）
     'core/api-router.js',
     'core/workflow.js',
     'core/settle-guard.js',

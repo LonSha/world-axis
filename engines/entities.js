@@ -111,7 +111,11 @@
       updatedAt: Date.now()
     });
     // 容量裁剪（保留最新的）
-    if (em[type].length > CAP_PER_TYPE) em[type] = em[type].slice(-CAP_PER_TYPE);
+    // v2.13.0: 改走挤出侧单一出口。此前这里是**主路径**裸 slice——同一容器在
+    //   applyEntityUpdates（backstage 入账）已接台账，而这条「直接建实体」的路径漏接，
+    //   于是「长局里最早的实体被丢掉」这件事只在部分路径可见。同一容器只认一个站点。
+    if (WA.evict) WA.evict.array(em[type], 'evolution.entityMemory');
+    else if (em[type].length > CAP_PER_TYPE) em[type] = em[type].slice(-CAP_PER_TYPE);
     rebuildIndex(em);
     return 'created';
   }
@@ -180,7 +184,9 @@
           events: [], updatedAt: Date.now()
         };
         em[raw.type].push(ent);
-        if (em[raw.type].length > CAP_PER_TYPE) em[raw.type] = em[raw.type].slice(-CAP_PER_TYPE);
+        // v2.13.0: 实体库挤出走单一出口（cap 与 __BOUNDED_CAPS 同源）
+        if (WA.evict) WA.evict.array(em[raw.type], 'evolution.entityMemory');
+        else if (em[raw.type].length > CAP_PER_TYPE) em[raw.type] = em[raw.type].slice(-CAP_PER_TYPE);
         rebuildIndex(em);
       }
       touched.set(key, ent);
@@ -190,7 +196,8 @@
         ent.events = ent.events || [];
         if (!ent.events.some(x => normalized(x.e) === normalized(ev))) {
           ent.events.push({ e: ev.slice(0, 60), t: clean(raw.time).slice(0, 40), at: Date.now() });
-          if (ent.events.length > 8) ent.events.splice(0, ent.events.length - 8);
+          if (WA.evict) WA.evict.array(ent.events, 'evolution.entityEvents');
+          else if (ent.events.length > 8) ent.events.splice(0, ent.events.length - 8);
         }
       }
       ent.updatedAt = Date.now();

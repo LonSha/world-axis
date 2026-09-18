@@ -121,7 +121,9 @@
       });
       added++;
     }
-    if (pmem.length > CAP_TOTAL) pmem.splice(0, pmem.length - CAP_TOTAL);
+    // v2.13.0: 主观记忆总量挤出走单一出口
+    if (WA.evict) WA.evict.array(pmem, 'memory.pmem');
+    else if (pmem.length > CAP_TOTAL) pmem.splice(0, pmem.length - CAP_TOTAL);
     return { added, skipped };
   }
 

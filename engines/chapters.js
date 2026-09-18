@@ -7,7 +7,13 @@
   // 与 history 长度解耦，裁剪后不会出现重复章号（旧数据无 seq 时从现存最大 no 续起）。
   const MAX_HISTORY = 20;
   function pruneHistory(list) {
-    return (list || []).slice(-MAX_HISTORY);
+    const a = list || [];
+    // v2.13.0: 章节史挤出走单一出口（此前 slice(-N) 静默丢弃最旧章节）
+    if (WA.evict && Array.isArray(a) && a.length > MAX_HISTORY) {
+      const tail = a.slice(0, a.length - MAX_HISTORY);
+      WA.evict.note('chapters.history', tail);
+    }
+    return a.slice(-MAX_HISTORY);
   }
   function nextNo(d) {
     const hist = d.chapters.history || [];

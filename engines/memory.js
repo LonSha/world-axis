@@ -20,7 +20,9 @@
       const st = a[i] && a[i].status;
       if (FS_TERMINAL.indexOf(st) >= 0) a.splice(i, 1);
     }
-    if (a.length > CAP.foreshadows) a.splice(0, a.length - CAP.foreshadows);
+    // v2.13.0: cap 截断改走挤出侧单一出口（此前静默丢弃活跃伏笔，无任何留痕）
+    if (WA.evict) WA.evict.array(a, 'memory.foreshadows');
+    else if (a.length > CAP.foreshadows) a.splice(0, a.length - CAP.foreshadows);
     return a;
   }
 
@@ -61,7 +63,7 @@ const memory = WA.memory = {
       if (!r || !r.summary) return null;
       WA.store.transact(draft => {
         draft.memory.l0.push({ t: Date.now(), s: String(r.summary).slice(0, 120), refs: recentRefs(3) });
-        draft.memory.l0 = draft.memory.l0.slice(-CAP.l0);
+        if (WA.evict) WA.evict.array(draft.memory.l0, 'memory.l0'); else draft.memory.l0 = draft.memory.l0.slice(-CAP.l0);
       });
       return r.summary;
     },
@@ -80,7 +82,7 @@ const memory = WA.memory = {
       if (!r || !r.recap) return false;
       WA.store.transact(draft => {
         draft.memory.l1.push({ t: Date.now(), s: String(r.recap).slice(0, 200), refs: inheritRefs(batch) });
-        draft.memory.l1 = draft.memory.l1.slice(-CAP.l1);
+        if (WA.evict) WA.evict.array(draft.memory.l1, 'memory.l1'); else draft.memory.l1 = draft.memory.l1.slice(-CAP.l1);
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'digest'); });
         if (r.foreshadow && r.foreshadow.content) {
           (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: 'fs' + Date.now() + Math.random().toString(36).slice(2, 5), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: inheritRefs(batch), at: Date.now() });
@@ -107,7 +109,7 @@ const memory = WA.memory = {
       if (!r || !r.chapter) return false;
       WA.store.transact(draft => {
         draft.memory.l2.push({ t: Date.now(), s: String(r.chapter).slice(0, 350), refs: inheritRefs(batch) });
-        draft.memory.l2 = draft.memory.l2.slice(-CAP.l2);
+        if (WA.evict) WA.evict.array(draft.memory.l2, 'memory.l2'); else draft.memory.l2 = draft.memory.l2.slice(-CAP.l2);
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'l2'); });
         draft.memory.l1 = draft.memory.l1.slice(0, draft.memory.l1.length - L2_EVERY);
       });
@@ -130,7 +132,7 @@ const memory = WA.memory = {
       if (!r || !r.theme) return false;
       WA.store.transact(draft => {
         draft.memory.l3.push({ t: Date.now(), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200), refs: inheritRefs(batch) });
-        draft.memory.l3 = draft.memory.l3.slice(-CAP.l3);
+        if (WA.evict) WA.evict.array(draft.memory.l3, 'memory.l3'); else draft.memory.l3 = draft.memory.l3.slice(-CAP.l3);
         draft.memory.l2 = draft.memory.l2.slice(0, draft.memory.l2.length - L3_EVERY);
       });
       WA.log('info', 'L3长线沉淀入账');
@@ -147,7 +149,8 @@ const memory = WA.memory = {
       } else {
         facts.push({ key, value, version: 1, active: true, reason: source || '', at: Date.now() });
       }
-      draft.memory.facts = facts.slice(-CAP.facts);
+      if (WA.evict) { WA.evict.array(facts, 'memory.facts'); draft.memory.facts = facts; }
+      else draft.memory.facts = facts.slice(-CAP.facts);
       return true;
     },
 

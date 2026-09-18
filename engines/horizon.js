@@ -86,7 +86,7 @@
   const __hzStat = { rolls: 0, distantFired: 0, nearFired: 0, skipped: 0, lastReason: '', lastAt: 0 };
   // v1.3.0: chronicle 容量同源化——此前 3 处内联 cap=80 与登记表/backstage 的 200 冲突，
   // horizon 入账一次即把满载 200 条纪事砍到 80（静默丢失 120 条，且按位置丢最旧的带溯源条目）。
-  const CHRONICLE_CAP = 200;     // 与 __BOUNDED_CAPS['chronicle'] 登记同源（backstage slice(-200)）
+  const CHRONICLE_CAP = 200;     // v2.13.0: 仅作降级兜底；真源为 core/evict.js 站点表 backstage.chronicle
 
   // ── 工具 ──────────────────────────────────────────────
   function roll01() { return Math.random(); }
@@ -226,7 +226,9 @@
             WA.store.transact(tx => {
               tx.chronicle = tx.chronicle || [];
               tx.chronicle.push({ kind: 'horizon_distant', title: String(result.topic || result.title || '').slice(0, 30), desc: String(result.content || '').slice(0, 50), at: Date.now(), round: (tx.meta && tx.meta.round) || 0, horizon: true });
-              if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
+              // v2.13.0: 第二写入方同样走单一出口（同一容器 = 同一站点 backstage.chronicle）。
+          if (WA.evict) WA.evict.array(tx.chronicle, 'backstage.chronicle');
+          else if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
             });
           }
       } else {
@@ -241,7 +243,9 @@
             round: (tx.meta && tx.meta.round) || 0,
             horizon: true
           });
-          if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
+          // v2.13.0: 第二写入方同样走单一出口（同一容器 = 同一站点 backstage.chronicle）。
+          if (WA.evict) WA.evict.array(tx.chronicle, 'backstage.chronicle');
+          else if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
         });
       }
     } else {
@@ -262,7 +266,9 @@
           round: (tx.meta && tx.meta.round) || 0,
           horizon: true
         });
-        if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
+        // v2.13.0: 第二写入方同样走单一出口（同一容器 = 同一站点 backstage.chronicle）。
+          if (WA.evict) WA.evict.array(tx.chronicle, 'backstage.chronicle');
+          else if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
       });
     }
 

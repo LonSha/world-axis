@@ -59,8 +59,16 @@
       const forums = (r.forums || []).slice(0, 4).filter(f => f && f.topic && validTitles.has(f.related_event_id))
         .map(f => ({ board: String(f.board || '综合').slice(0, 30), topic: String(f.topic).slice(0, 80), related_event_id: f.related_event_id, claim_status: ['fact', 'mixed', 'rumor'].includes(f.claim_status) ? f.claim_status : 'rumor', audience_tags: (f.audience_tags || []).slice(0, 5), replies: (f.replies || []).slice(0, 4).map(x => ({ author: String(x.author || '匿名').slice(0, 20), text: String(x.text || '').slice(0, 150) })), at: now, kind: 'forum' }));
       WA.store.transact(draft => {
-        draft.opinion.canon = (draft.opinion.canon || []).concat(news).slice(-20);
-        draft.opinion.forum = (draft.opinion.forum || []).concat(forums).slice(-20);
+        // v2.13.0: 舆情环形挤出走单一出口（此前静默丢弃旧新闻/旧话题）
+        if (WA.evict) {
+          draft.opinion.canon = (draft.opinion.canon || []).concat(news);
+          WA.evict.array(draft.opinion.canon, 'opinion.canon');
+          draft.opinion.forum = (draft.opinion.forum || []).concat(forums);
+          WA.evict.array(draft.opinion.forum, 'opinion.forum');
+        } else {
+          draft.opinion.canon = (draft.opinion.canon || []).concat(news).slice(-20);
+          draft.opinion.forum = (draft.opinion.forum || []).concat(forums).slice(-20);
+        }
         draft.opinion.updatedAt = now;
       });
       WA.log('info', `舆情结算：新闻${news.length}条 论坛${forums.length}主题`);

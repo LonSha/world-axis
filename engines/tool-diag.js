@@ -73,7 +73,7 @@
 
   // ── 3. 模块装载完整性（文件 ↔ 导出对象） ─
   const MODULE_EXPORTS = {
-    'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
+    'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     'core/api-router.js': 'apiRouter',
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',
     'engines/regional.js': 'regional', 'engines/horizon.js': 'horizon', 'engines/digest.js': 'digest',
@@ -248,6 +248,21 @@
   // ── 7. 缓存 / 工作流 / API 通道 / 加载器 ──
   function secRuntime() {
     return {
+      // v2.13.0: 挤出侧（七面治理最后一面）——本仓库唯一「按设计丢数据」的路径。
+      //   此前零出口：写侧/删侧/读侧/活性面都有台账，唯独挤出没有，于是
+      //   「长局 200 轮后 NPC 只剩 48 个」在诊断包里完全不可见。
+      //   这里透出「谁在丢、丢了多少、最近丢的是什么」，供 verdict 分级与面板展示。
+      evict: safe(function () {
+        if (!WA.evict || typeof WA.evict.evictStat !== 'function') return { error: 'core/evict.js 未加载（挤出侧无台账，破坏性丢弃将静默发生）' };
+        const s = WA.evict.evictStat();
+        return {
+          evicts: s.evicts, evicted: s.evicted, evictNoops: s.evictNoops,
+          evictFailed: s.evictFailed, failedBy: s.failedBy,
+          sites: s.sites, activeSites: Object.keys(s.bySite || {}).length,
+          bySite: s.bySite, lastEvict: s.lastEvict, lastFail: s.lastFail,
+          lastDropped: s.lastDropped
+        };
+      }, {}),
       chatcache: safe(function () {
         if (!WA.chatcache || !WA.chatcache.listSnapshots) return { error: 'chatcache 不可用' };
         const snaps = WA.chatcache.listSnapshots() || [];
@@ -757,6 +772,21 @@
     if ((bus.failing || []).length) issues.push({ level: 'warn', key: 'bus', detail: '事件监听器抛错：' + bus.failing.map(function (r) { return r.event + '(' + r.errors + ')'; }).join('、') });
     if ((bus.deadSignals || []).length) issues.push({ level: 'warn', key: 'bus', detail: '事件有发出但无人监听（接线断裂）：' + bus.deadSignals.map(function (r) { return r.event + '×' + r.dead; }).join('、') });
     if ((bus.leakSuspects || []).length) issues.push({ level: 'warn', key: 'bus', detail: '监听器数量异常（疑似重复订阅未解绑）：' + bus.leakSuspects.map(function (r) { return r.event + '=' + r.listeners; }).join('、') });
+    // v2.13.0: 挤出侧议题（七面治理最后一面）。
+    //   为什么诊断必须看它：挤出是本仓库唯一「按设计丢数据」的路径。写失败用户看得出
+    //   （数据没变），删失败复核能发现（数据还在），而**挤出成功 → 数据真的没了，且这正是
+    //   代码的本意**——于是「长局 200 轮后 NPC 只剩 48 个」在面板/诊断/健康分上全无出口。
+    //   分级：evictFailed>0 是缺陷（未知站点/参数非法＝代码问题）报 error；
+    //   正常挤出报 info，但**必须点名站点与最近丢弃物**（只说「丢了 N 条」等于什么都没说）。
+    const ev = diag.runtime && diag.runtime.evict;
+    if (ev && typeof ev.evictFailed === 'number' && ev.evictFailed > 0) {
+      issues.push({ level: 'error', key: 'evict.failed', detail: '挤出侧 ' + ev.evictFailed + ' 次失败（' + JSON.stringify(ev.failedBy || {}) + '）：站点未登记或参数非法，数据未被截断而是继续超限增长——须改代码，不是清存储' });
+    } else if (ev && ev.evicts > 0) {
+      const _topSites = Object.keys(ev.bySite || {}).sort(function (a, b) { return ev.bySite[b].dropped - ev.bySite[a].dropped; }).slice(0, 3)
+        .map(function (s) { return s + '(' + ev.bySite[s].dropped + ')'; });
+      const _what = (ev.lastDropped || []).slice(-3).map(function (x) { return x.what; }).join('、');
+      issues.push({ level: 'info', key: 'evict', detail: '容量挤出 ' + ev.evicts + ' 次 / 丢弃 ' + ev.evicted + ' 项（涉及 ' + Object.keys(ev.bySite || {}).length + ' 个站点，最频繁：' + (_topSites.join('、') || '—') + '）；最近被挤出的是：' + (_what || '—') + '——有界收纳属设计内，但「丢的是谁」应可见' });
+    }
     const ldr = (diag.runtime || {}).loader || {};
     // v0.1.25: 加载失败的模块点名（对照装载清单升级为 error）
     if (ldr.failedModules && ldr.failedModules.length) {

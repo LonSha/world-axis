@@ -259,6 +259,17 @@
       sources: {
         contract: ['bandit', 'plague', 'market', 'faction_clash', 'official', 'sect', 'infrastructure', 'ominous'],
         // v2.10.0: 读侧完整性契约的留痕点——本文件是跨模块契约审计的唯一消费端。
+        // v2.13.0: 挤出侧完整性契约留痕——七面治理的最后一面。
+        //   跨模块契约点：挤出是本仓库唯一「按设计丢数据」的路径，而在本版之前它**零出口**：
+        //   core/evict.js 的站点表 SITES 是 cap 的可执行真源，业务侧 14 个文件（backstage/
+        //   memory/enemies/entities/evolution/opinion/pmem/ledger/chapters/direct-event/
+        //   summarizer/horizon/registry/profile）的截断全部改走 `WA.evict.array/note`，
+        //   诊断经 toolDiag.runtime.evict 透出，健康分经 maintain().signals.evicts 计量，
+        //   面板概览经 ui/panel.js 的「容量收纳」块展示。**消费端契约**：本文件与
+        //   tests/run.js v2.13.0 块共同冻结「站点表 ↔ 容量登记表 ↔ 源码调用点」三方对账。
+        //   本版同时修掉四类真缺陷（登记表盲区 smallSummaries/bigSummaries、第二写入方
+        //   horizon.chronicle、主路径裸裁剪 entities.create、采样端上限漂移 profile.compactOld），
+        //   并把两条假判据（「全库已无 slice(-N)」与 note 型站点悬空）改写为诚实判据。
         // v2.12.0: UI render-path gate contract trace. tests/run.js LOAD omits ui/* on purpose,
         //   and its inline DOM stub is a hollow shell, so the render path had zero coverage
         //   (only the overview renderer executed, its output dropped). New in this version:

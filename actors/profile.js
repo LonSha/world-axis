@@ -26,12 +26,19 @@
       const cfg = WA.apiRouter.getChannel('digest');
       if (!cfg.baseUrl || !cfg.model) return { ok: false, reason: 'no-channel' };
       const old = WA.registry.getProfile(name);
+      // v2.13.0: 原先这里写死 slice(-8)，而 store 容量登记表给的是 personality 15 /
+      //   memory 25 —— 同一份档案在**采样端**和**写入端**两套上限，注入给模型看到的
+      //   与真正留存的对不上（漂移型缺陷）。改为按登记上限取尾部（单一真源）。
+      const capOfSec = function (sec, fb) {
+        try { const c = WA.store.capsFor('people.*.profile.' + sec); return (c && c.cap) || fb; } catch (e) { return fb; }
+      };
+      const tail = function (arr, sec, fb) { const a = arr || []; return a.slice(-capOfSec(sec, fb)); };
       const compactOld = {
-        personality: (old.personality || []).slice(-8),
-        worldview: (old.worldview || []).slice(-5),
-        family: (old.family || []).slice(-5),
-        relationships: (old.relationships || []).slice(-8),
-        memory: (old.memory || []).slice(-8)
+        personality: tail(old.personality, 'personality', 15),
+        worldview: tail(old.worldview, 'worldview', 10),
+        family: tail(old.family, 'family', 10),
+        relationships: tail(old.relationships, 'relationships', 15),
+        memory: tail(old.memory, 'memory', 25)
       };
       const r = await WA.apiRouter.call('digest', [
         { role: 'system', content: PROFILE_SYS },

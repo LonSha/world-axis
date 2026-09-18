@@ -79,7 +79,10 @@
         startLayer: range.startLayer, endLayer: range.endLayer,
         content: clean(r.small_summary).slice(0, 220), at: Date.now(), used: false
       });
-      draft.memory.smallSummaries = draft.memory.smallSummaries.slice(-CAP_SMALL);
+      // v2.13.0: 纪要与总述此前是**登记表盲区**（全库唯一两条被 sizeAudit 报 unbounded 的容器），
+      //   而代码其实一直在静默 slice(-N)：既被误判为无界，裁剪也无人知晓。补登 + 接台账一并修。
+      if (WA.evict) WA.evict.array(draft.memory.smallSummaries, 'memory.smallSummary');
+      else draft.memory.smallSummaries = draft.memory.smallSummaries.slice(-CAP_SMALL);
     });
     WA.log('info', '纪要入账');
     return r.small_summary;
@@ -107,7 +110,8 @@
       const lo = Math.min(...batch.map(b => b.startLayer));
       const hi = Math.max(...batch.map(b => b.endLayer));
       draft.memory.bigSummaries.push({ startLayer: lo, endLayer: hi, content: clean(r.big_summary), at: Date.now() });
-      draft.memory.bigSummaries = draft.memory.bigSummaries.slice(-CAP_BIG);
+      if (WA.evict) WA.evict.array(draft.memory.bigSummaries, 'memory.bigSummary');   // v2.13.0
+      else draft.memory.bigSummaries = draft.memory.bigSummaries.slice(-CAP_BIG);
       const ids = new Set(batch.map(b => b.at));
       draft.memory.smallSummaries.forEach(x => { if (ids.has(x.at)) x.used = true; });
     });

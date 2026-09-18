@@ -49,6 +49,8 @@
         const totalExcess = active.length - MAX_ACTIVE;
         active.sort((a, b) => (a.createdRound || 0) - (b.createdRound || 0));
         const toDrop = new Set(active.slice(0, totalExcess).map(e => e.id));
+        // v2.13.0: 挤出侧单一出口记账（业务规则筛选型——按 createdRound 最旧优先）
+        if (WA.evict) WA.evict.note('evolution.enemies', active.slice(0, totalExcess));
         draft.evolution.enemies = enArr.filter(e => !e || !toDrop.has(e.id));
         WA.log('info', '活跃仇敌容量治理：挤出最早创建的 ' + totalExcess + ' 个（保留 ' + MAX_ACTIVE + ' 个活跃上限）');
       }
@@ -57,6 +59,8 @@
       if (term.length > TERMINATED_MAX) {
         term.sort((a, b) => (a.terminatedRound || 0) - (b.terminatedRound || 0));
         const dropT = new Set(term.slice(0, term.length - TERMINATED_MAX).map(e => e.id));
+        // v2.13.0: 终结态兜底挤出同样记账（业务规则筛选型）
+        if (WA.evict) WA.evict.note('evolution.enemies', term.slice(0, term.length - TERMINATED_MAX));
         draft.evolution.enemies = (draft.evolution.enemies || []).filter(e => !e || !dropT.has(e.id));
         WA.log('info', '终结仇敌数量治理：挤出最早的 ' + (term.length - TERMINATED_MAX) + ' 个（保留 ' + TERMINATED_MAX + ' 个终结记录）');
       }
@@ -70,7 +74,8 @@
         if (!a || !a.action) return;
         box.secretActions.push({ action: String(a.action).slice(0, 80), witnesses: String(a.witnesses || '无').slice(0, 40), at: Date.now() });
       });
-      box.secretActions = box.secretActions.slice(-15);
+      if (WA.evict) WA.evict.array(box.secretActions, 'evolution.blackboxActions');
+      else box.secretActions = box.secretActions.slice(-15);
       (bb.secretAssets || []).slice(0, 8).forEach(a => {
         if (!a || !a.name) return;
         const old = box.secretAssets.find(x => x.name === a.name);
@@ -79,7 +84,8 @@
         if (old) { old.exposure = exposure; old.status = status; }
         else box.secretAssets.push({ name: String(a.name).slice(0, 40), exposure, status });
       });
-      box.secretAssets = box.secretAssets.slice(-15);
+      if (WA.evict) WA.evict.array(box.secretAssets, 'evolution.blackboxAssets');
+      else box.secretAssets = box.secretAssets.slice(-15);
     },
 
     /** 天下大势入账 */
