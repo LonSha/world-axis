@@ -89,7 +89,8 @@
   const CHRONICLE_CAP = 200;     // v2.13.0: 仅作降级兜底；真源为 core/evict.js 站点表 backstage.chronicle
 
   // ── 工具 ──────────────────────────────────────────────
-  function roll01() { return Math.random(); }
+  // v2.14.0: 决策流（远景通道是否开火）——此前裸调 Math.random，同种子无法复现「本轮开没开火」。
+  function roll01() { return WA.rand.next('horizon.roll'); }
 
   function defaultLane() {
     return {

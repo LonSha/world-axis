@@ -294,11 +294,11 @@
     try {
       let w = mainWin.localStorage.getItem('worldaxis_writer_id');
       if (!w) {
-        w = 'w' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+        w = WA.rand.id('w', 6, 'writer');
         mainWin.localStorage.setItem('worldaxis_writer_id', w);
       }
       __writerId = w;
-    } catch (e) { noteStoreReadFail('writerId', 'worldaxis_writer_id', e); __writerId = 'w-mem-' + Math.random().toString(36).slice(2, 8); }
+    } catch (e) { noteStoreReadFail('writerId', 'worldaxis_writer_id', e); __writerId = WA.rand.id('w-mem-', 6, 'writer'); }
     return __writerId;
   }
   /**
@@ -1646,6 +1646,7 @@
       let orphanKeys = [], quarantineRestores = 0, quarantineDrops = 0;
       let sbIncoherent = 0, sbDormant = 0;
       let evictsN = 0, evictFailedN = 0, evictSitesN = 0;   // v2.13.0: 挤出侧三计量
+      let randDrawsN = 0, randFailedN = 0, randReproducible = false;   // v2.14.0: 随机源三计量
       try {
         if (typeof this.orphanSettingsKeys === 'function') orphanKeys = this.orphanSettingsKeys() || [];
         // v2.3.0: 登记表自洽性与休眠登记——只采集不产议题（同 orphan 口径：
@@ -1694,6 +1695,24 @@
           }
         }
       } catch (eEv) { markDegraded('evict', eEv); }
+      // ── 9.6 随机源（v2.14.0）──
+      //   为什么健康分要看随机源：它本身不是「世界坏了」，但它决定**其余所有体检结论能不能被复核**。
+      //   v2.13.0 让「长局里丢的是谁」可见，而丢的那个「谁」正是随机采样挑中的——
+      //   同一存档重放一次被挤出的就是另一批人，于是「我修好了吗」在原理上无法回答。
+      //   分级：参数非法（非法种子被静默接受会让复现结论本身不可信）＝缺陷，报 error；
+      //   未显式播种＝正常默认态，只报 info（它是「结果不可复核」的**根因说明**，不是故障）。
+      try {
+        const rs = (WA.rand && typeof WA.rand.randStat === 'function') ? WA.rand.randStat() : null;
+        if (rs) {
+          randDrawsN = rs.draws; randFailedN = rs.failed; randReproducible = !!rs.reproducible;
+          if (rs.failed > 0) {
+            score -= 6;
+            issues.push({ level: 'error', key: 'rand.failed', detail: '随机源有 ' + rs.failed + ' 次参数非法（' + JSON.stringify(rs.failedBy) + '）：非法种子/区间未被静默接受（已归因并退回默认），但调用点是缺陷——若非法的是种子，「已复现」的结论不可信' });
+          } else if (rs.draws > 0 && !rs.reproducible) {
+            issues.push({ level: 'info', key: 'rand', detail: '本会话 ' + rs.draws + ' 次决策抽取来自**自动种子**（' + rs.channels + ' 个通道，最近：' + (rs.lastChannel || '?') + '）——「同样操作两次结果不同」是随机源头没定，不是引擎不稳定；要复现执行 `WA.rand.seed(<数字>)`' });
+          }
+        }
+      } catch (eRd) { markDegraded('rand', eRd); }
       // ── 10. 巡视自身完整性（v2.0.0）──
       //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
       let degradedN = 0;
@@ -1783,6 +1802,9 @@
           sbIncoherent: sbIncoherent, sbDormant: sbDormant,  // v2.3.0
            // v2.13.0: 挤出侧（七面治理最后一面）——evicts>0 是设计内行为，evictFailed>0 是代码缺陷
            evicts: evictsN, evictFailed: evictFailedN, evictSites: evictSitesN,
+           // v2.14.0: 随机源——randDraws>0 且 randReproducible=false 说明「本轮结论不可复核」（设计内默认态），
+           //   randFailed>0 才是缺陷（非法种子被静默接受会让「已复现」的结论本身不可信）。
+           randDraws: randDrawsN, randFailed: randFailedN, randReproducible: randReproducible,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }

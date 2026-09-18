@@ -71,7 +71,7 @@
 
   function weightedPick(items) {
     const total = items.reduce((s, i) => s + i.weight, 0);
-    let roll = Math.random() * total;
+    let roll = WA.rand.next('regional.pick') * total;
     for (const item of items) { roll -= item.weight; if (roll <= 0) return item; }
     return items[items.length - 1];
   }
@@ -124,7 +124,9 @@
       }
       // 掷骰
       const chance = st.chancePercent / 100;
-      if (Math.random() >= chance) return null;
+      // 概率判定走 chance 语义（p<=0 恒假 / p>=1 恒真，且不抽数）——
+      //   `Math.random() >= chance` 在 chance=0 时仍需抽一次数，会平移随机序列。
+      if (!WA.rand.chance(chance, 'regional.roll')) return null;
       const picked = weightedPick(INCIDENT_TYPES);
       return {
         ongoing: false,

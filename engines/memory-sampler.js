@@ -49,7 +49,9 @@
     if (source.length <= take) return source.slice();
     const sides = clamp(parseInt(diceSides) || DEFAULT_DICE_SIDES, MIN_SIDES, MAX_SIDES);
     const scale = Math.max(1, take);
-    const rnd = (typeof randomFn === 'function') ? randomFn : Math.random;
+    // v2.14.0: 默认兜底从裸 Math.random 改为决策流 channel（调用方不注入时同样可复现）。
+    //   注入 randomFn 的能力保留——测试与确定性场景仍可完全接管随机源。
+    const rnd = (typeof randomFn === 'function') ? randomFn : function () { return WA.rand.next('memory.sampler'); };
     return source.map(function (item, index) {
       const age = source.length - 1 - index;
       const weight = Math.max(1 / sides, Math.exp(-age / scale));

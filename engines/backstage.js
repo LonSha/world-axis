@@ -393,11 +393,11 @@
         const old = draft.worldFacts.find(x => x.key === f.key);
         if (old) {
           if (old.value !== f.value) {
-            draft.chronicle.push({ id: 'chg' + now + Math.random().toString(36).slice(2, 5), kind: 'fact', title: f.key, summary: old.value + ' → ' + f.value, at: now });
+            draft.chronicle.push({ id: WA.rand.id('chg', 3, 'id'), kind: 'fact', title: f.key, summary: old.value + ' → ' + f.value, at: now });
             old.value = f.value; old.at = now;
           }
         } else {
-          draft.worldFacts.push({ id: 'wf' + now + Math.random().toString(36).slice(2, 6), key: f.key, value: f.value, scope: f.scope || 'world', source: 'engine', at: now, branchId: anchorBranchId(anchor) });
+          draft.worldFacts.push({ id: WA.rand.id('wf', 4, 'id'), key: f.key, value: f.value, scope: f.scope || 'world', source: 'engine', at: now, branchId: anchorBranchId(anchor) });
         }
       });
 
@@ -456,7 +456,7 @@
         } else if (created < LIMITS.currents_new) {
           created++;
           draft.currents.push({
-            id: 'cu' + now + Math.random().toString(36).slice(2, 6),
+            id: WA.rand.id('cu', 4, 'id'),
             title: c.title, summary: c.summary || '',
             visibility: c.visibility || 'hidden',
             publicity: c.publicity || 'private',
@@ -475,7 +475,7 @@
         // v0.9.0: 软引用生产方——记录入账时目标暗流是否在场（danglingAtWrite），
         // 区分「AI幻觉/数据损坏（入账即悬空，可检出）」与「暗流正常生命周期消失（入账后裁剪/终局，不告警）」。
         const ecDangling = ecTitle ? !(Array.isArray(draft.currents) ? draft.currents : []).some(c => c && c.title === ecTitle) : false;
-        draft.echoes.push({ id: 'ec' + now + Math.random().toString(36).slice(2, 6), refCurrent: ecTitle, result: e.result, exposure: e.exposure || 'subtle', danglingAtWrite: ecDangling, at: now });
+        draft.echoes.push({ id: WA.rand.id('ec', 4, 'id'), refCurrent: ecTitle, result: e.result, exposure: e.exposure || 'subtle', danglingAtWrite: ecDangling, at: now });
       });
       (r.chronicle || []).slice(0, LIMITS.chronicle).forEach(c => {
         if (!c || !c.title) return;
@@ -483,7 +483,7 @@
         const cRefs = (Array.isArray(c.refs) && c.refs.length)
           ? c.refs
           : ((WA.timeline && WA.timeline.captureRange) ? WA.timeline.captureRange(Math.max(0, (anchor && anchor.idx) || 0), (anchor && anchor.idx) || 0) : []);
-        draft.chronicle.push({ id: 'ch' + now + Math.random().toString(36).slice(2, 6), kind: c.kind || 'event', title: c.title, summary: c.summary || '', at: now, refs: cRefs });
+        draft.chronicle.push({ id: WA.rand.id('ch', 4, 'id'), kind: c.kind || 'event', title: c.title, summary: c.summary || '', at: now, refs: cRefs });
       });
 
       // 伏笔生命周期
@@ -528,7 +528,7 @@
           const useStages = stages || fallback;
           const stage = (e.stage && useStages.indexOf(e.stage) >= 0) ? e.stage : useStages[0];
           evArr.push({
-            id: 'ev' + now + Math.random().toString(36).slice(2, 6),
+            id: WA.rand.id('ev', 4, 'id'),
             // title 与 name 双写：limits.locateStable 按 title 匹配（「改名不换链」契约），
             // 而编辑器/推演读的是 name —— 只写其一会让 events_update 永远匹配不上（静默失效）。
             title: name, type: type, name: name, level: Math.max(1, Math.min(4, Number(e.level) || 1)),
@@ -576,7 +576,7 @@
           draft.evolution.winds = draft.evolution.winds || [];
           const old = draft.evolution.winds.find(x => x.topic === w.topic);
           if (old) { old.content = w.content || old.content; old.level = Math.max(old.level || 1, w.level || 1); old.scope = w.scope || old.scope; old.quietRounds = 0; }
-          else draft.evolution.winds.push({ id: 'w' + now + Math.random().toString(36).slice(2, 5), topic: w.topic, type: w.type || 'rumor', level: w.level || 1, content: w.content || '', scope: w.scope || '', source: w.source || '', quietRounds: 0 });
+          else draft.evolution.winds.push({ id: WA.rand.id('w', 3, 'id'), topic: w.topic, type: w.type || 'rumor', level: w.level || 1, content: w.content || '', scope: w.scope || '', source: w.source || '', quietRounds: 0 });
         });
       }
       // 仇敌/黑盒/天下大势入账

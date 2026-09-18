@@ -181,7 +181,16 @@ function install(WA) {
   installMiniDom(WA);
   WA.__parseInto = parseInto;
   WA.__qsa = qsa;
-  var uiWin = {};
+  // v2.14.0: 壳窗口必须以**真宿主**为原型。此前是 `var uiWin = {}` —— 一个没有任何
+  //   能力的空对象，连 localStorage 都没有。后果不是「UI 测试少覆盖一块」，而是**污染后续所有块**：
+  //   产品模块在求值期缓存 mainWin（`const mainWin = WA.mainWin || window`），而本函数把
+  //   WA.mainWin 换成了这个壳（且全库没有对称的还原动作）→ 自第二个用例起，凡落盘路径都撞
+  //   `mainWin.localStorage` 为 undefined，setItem 抛错又被各自的 try/catch 吞掉，
+  //   于是「设置拨了没生效」而全库零告警。实测：v2.14.0 的 regional 设置断言即因此失败
+  //   （setSettings({enabled:true}) 之后 effectiveSettings() 仍读回默认值）。
+  //   以真宿主为原型后，localStorage / URL / Blob / navigator / fetch 等宿主能力自动可达；
+  //   下面显式赋值的项仍刻意遮蔽（document 换成 mini-DOM、事件接口留空以免 UI 监听外溢）。
+  var uiWin = (typeof global !== 'undefined' && global) ? Object.create(global) : {};
   var doc = { nodeType: 9, location: { href: 'http://localhost/' } };
   doc.createElement = function (t) { return WA.__makeNode(doc, t); };
   doc.head = WA.__makeNode(doc, 'head');

@@ -64,7 +64,7 @@ function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
         if (!r || typeof r.find !== 'string' || !r.find) { rejected++; if (reasons.length < 3) reasons.push('missing-find'); continue; }
         try { new RegExp(r.find, r.flags || 'g'); }
         catch (e) { rejected++; if (reasons.length < 3) reasons.push('bad-regex:' + ((e && e.message) || '').slice(0, 30)); continue; }
-        accepted.push({ id: 'vr_' + (r.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 5))),
+        accepted.push({ id: 'vr_' + (r.id || WA.rand.id('', 3, 'id')),
           name: r.name || r.find.slice(0, 20), find: r.find, replace: r.replace || '', flags: r.flags || 'g', enabled: r.enabled !== false });
       }
       if (!accepted.length) { __purifyStat.importFailed++; __purifyStat.lastImport = 'all-rejected'; return { ok: false, reason: 'all-rejected', added: 0, rejected: rejected, reasons: reasons }; }

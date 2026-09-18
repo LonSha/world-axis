@@ -31,7 +31,7 @@
   let editingId = null;              // 当前处于编辑态的势力 id（UI 用，不落盘）
 
   function clean(v) { return String(v == null ? '' : v).trim(); }
-  function uid() { return 'fa_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function uid() { return WA.rand.id('fa_', 4, 'id'); }
   function list(state) { return (state || WA.store.get()).evolution?.factions || []; }
 
   /** 五要件准入校验：World 规则「势力五要件」——名称/范围/关系/目标/支柱至少一 */

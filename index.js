@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.13.0';
+  const VERSION = '2.14.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -200,6 +200,7 @@
   WA.loadScript = loadScript;
 
   const LOAD_ORDER = [
+    'core/rand.js',            // v2.14.0: 随机源单一出口（决策流可复现 / 标识流不混流）
     'core/settings-bus.js',
     'core/store.js',
     'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）

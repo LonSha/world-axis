@@ -85,7 +85,7 @@ const memory = WA.memory = {
         if (WA.evict) WA.evict.array(draft.memory.l1, 'memory.l1'); else draft.memory.l1 = draft.memory.l1.slice(-CAP.l1);
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'digest'); });
         if (r.foreshadow && r.foreshadow.content) {
-          (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: 'fs' + Date.now() + Math.random().toString(36).slice(2, 5), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: inheritRefs(batch), at: Date.now() });
+          (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: WA.rand.id('fs', 3, 'id'), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: inheritRefs(batch), at: Date.now() });
           // v1.2.0: 终态回收先于截断（单一实现 pruneForeshadows，与 backstage 容量控制段同口径）
           pruneForeshadows(draft.memory.foreshadows);
         }

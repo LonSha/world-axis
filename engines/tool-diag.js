@@ -73,7 +73,7 @@
 
   // ── 3. 模块装载完整性（文件 ↔ 导出对象） ─
   const MODULE_EXPORTS = {
-    'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
+    'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     'core/api-router.js': 'apiRouter',
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',
     'engines/regional.js': 'regional', 'engines/horizon.js': 'horizon', 'engines/digest.js': 'digest',
@@ -261,6 +261,23 @@
           sites: s.sites, activeSites: Object.keys(s.bySite || {}).length,
           bySite: s.bySite, lastEvict: s.lastEvict, lastFail: s.lastFail,
           lastDropped: s.lastDropped
+        };
+      }, {}),
+      // v2.14.0: 随机源（第八面）——在此之前「本轮为什么是这个结果」不可复现：
+      //   16 个产品文件裸调 Math.random，其中 5 处是**行为性决策**（进化骰决定成功/受挫/保持、
+      //   风声消散骰、区域事件是否触发与抽中哪种、远景通道是否开火、记忆采样决定谁被挤出）。
+      //   v2.13.0 刚让「丢的是谁」可见，但被丢的那个「谁」恰是随机挑中的——
+      //   于是报表在两次运行间不可比，「我修好了吗」在原理上无法回答。
+      //   这里透出种子来源（explicit 才算可复现）、逐通道抽数与非法参数归因。
+      rand: safe(function () {
+        if (!WA.rand || typeof WA.rand.randStat !== 'function') return { error: 'core/rand.js 未加载（随机源无台账，同种子不可复现）' };
+        const s = WA.rand.randStat();
+        return {
+          seedSource: s.seedSource, reproducible: s.reproducible,
+          draws: s.draws, ids: s.ids, reseeds: s.reseeds,
+          failed: s.failed, failedBy: s.failedBy,
+          channels: s.channels, byChannel: s.byChannel, channelNames: s.channelNames,
+          lastChannel: s.lastChannel, lastAt: s.lastAt
         };
       }, {}),
       chatcache: safe(function () {
@@ -678,6 +695,20 @@
         issues.push({ level: 'info', key: 'horizon', detail: '随机事件本会话掷骰 ' + hz.rolls + ' 次但零触发（最近：' + (hz.lastReason || '?') + '）' });
       }
     } catch (eHz) {}
+    // v2.14.0: 随机源分级——分两件不同的事，级也不同：
+    //   ① 参数非法（种子为 NaN/对象、区间反向、骰面数<1）⇒ **代码缺陷**，error。
+    //      特别是「非法种子被静默接受」会让「我以为复现了，其实没有」——复现结论本身不可信。
+    //   ② 未显式播种 ⇒ 当前会话不可复现。这**不是故障**（auto 是默认行为），
+    //      但它解释了一件用户会觉得怪的事：「同样的操作两次结果不同」不是引擎坏了，
+    //      而是随机源头没定。故 info，并明确告知怎么定住。
+    try {
+      const rd = (diag.runtime || {}).rand || {};
+      if (rd.failed > 0) {
+        issues.push({ level: 'error', key: 'rand', detail: '随机源有 ' + rd.failed + ' 次参数非法（' + JSON.stringify(rd.failedBy || {}) + '）：非法种子/区间不被静默接受，已归因并退回默认；但调用点是缺陷（须改代码）' });
+      } else if (rd.draws > 0 && rd.reproducible === false) {
+        issues.push({ level: 'info', key: 'rand', detail: '随机源未显式播种（本会话 ' + rd.draws + ' 次决策抽取，涉及 ' + rd.channels + ' 个通道，最近：' + (rd.lastChannel || '?') + '）——「同样操作两次结果不同」属正常；要复现运行 `WA.rand.seed(<数字>)`（决策流同种子同序列，标识流不受影响）' });
+      }
+    } catch (eRd) {}
     if (h && h.sillyTavern === false) issues.push({ level: 'warn', key: 'host', detail: '未检测到 SillyTavern 宿主（无事件源，仅拦截器函数可用）' });
     else if (h && h.eventSource === false) issues.push({ level: 'warn', key: 'host', detail: '宿主无事件源：after 链与切聊天重载将不生效' });
     if (h && h.extensionPrompt === false) issues.push({ level: 'error', key: 'host', detail: '宿主无 setExtensionPrompt：注入通道完全不可用' });

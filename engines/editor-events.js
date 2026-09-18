@@ -28,7 +28,7 @@
   let editingId = null;
 
   function clean(v) { return String(v == null ? '' : v).trim(); }
-  function uid() { return 'ev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function uid() { return WA.rand.id('ev_', 4, 'id'); }
   function list(state) { return (state || WA.store.get()).evolution?.events || []; }
   function stagesOf(type) { return TYPE_STAGES[type] || TYPE_STAGES.conflict; }
 

@@ -48,7 +48,7 @@
   // v2.6.0: 走 saveOrThrow 以便回传失败原因（save() 的布尔不足以说明「为什么没落盘」）
   function saveSettings(s) { return WA.settingsBus.saveOrThrow(__REG, s); }
 
-  function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function uid(prefix) { return WA.rand.id(prefix, 4, 'id'); }
 
   const MAX_WINDS = 12;   // v0.6.0: 风声环形容量（衰减引擎是常态收敛，入账点兜底）
   const evolution = WA.evolution = {
@@ -137,7 +137,7 @@
           const mod = this._num(st.diceModifier, __REG.def.diceModifier);
           const setback = this._num(st.setbackRatio, __REG.def.setbackRatio);
           const threshold = Math.round(base - 200 * r * (1 - r) + levelAdjust - mod);
-          const dice = Math.floor(Math.random() * 100) + 1;
+          const dice = WA.rand.dice(100, 'evolution.advance');
           if (dice > threshold) {
             this.advanceStageRound(ev); ev.consecutiveFails = 0; ev.evolveResult = '成功';
             results.push({ name: ev.name || ev.title, result: '成功', stage: ev.stage, dice, threshold });
@@ -184,7 +184,7 @@
           if (w.quietRounds <= params.grace) { survivors.push(w); continue; }
           const n = w.quietRounds - params.grace - 1;
           const chance = Math.min(95, Math.max(5, params.base + params.linear * n + params.quadratic * n * n - (level - 1) * 10));
-          const dice = Math.floor(Math.random() * 100) + 1;
+          const dice = WA.rand.dice(100, 'evolution.windDecay');
           if (dice <= chance) decayed.push(w.topic); else survivors.push(w);
         }
         draft.evolution.winds = survivors;

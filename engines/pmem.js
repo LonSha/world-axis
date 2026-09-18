@@ -113,7 +113,7 @@
         }
       }
       pmem.push({
-        id: 'pm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+        id: WA.rand.id('pm_', 4, 'id'),
         holders, known_by: allKnowers,
         text: text.slice(0, 60),
         time: clean(raw.time).slice(0, 40),

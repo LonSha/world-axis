@@ -22,7 +22,7 @@
   const mainWin = WA.mainWin || window;
 
   const SOURCE_ID_KEY = 'worldaxis_source_id';
-  let idCounter = 0;
+  // v2.14.0: idCounter 已随消息 id 迁移到 WA.rand.id（时间戳+递变计数在其内部）
   let saveTimer = null;
 
   const clean = v => String(v == null ? '' : v).trim();
@@ -73,7 +73,7 @@
     if (!message.extra || typeof message.extra !== 'object' || Array.isArray(message.extra)) message.extra = {};
     let id = clean(message.extra[SOURCE_ID_KEY]);
     if (!id) {
-      id = `wax_${Date.now().toString(36)}_${(++idCounter).toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      id = WA.rand.id('wax_', 6, 'id');   // v2.14.0: 标识流（时间戳+递变计数+噪声，唯一且可读）
       message.extra[SOURCE_ID_KEY] = id;
       scheduleSave();
     }

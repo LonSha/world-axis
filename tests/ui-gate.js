@@ -30,6 +30,14 @@ function fresh(opts) {
   opts = opts || {};
   const LOAD = loadOrder();
   const ctx = vm.createContext(global);
+  // v2.14.0: 重装 LOAD **之前**把宿主窗口复位成真宿主。
+  //   本函数与 run.js 复用同一个 vm 上下文 / global，故上一用例 install 出来的壳此刻仍挂在
+  //   WA.mainWin 上，而产品模块在求值期就会把它缓存进闭包
+  //   （`const mainWin = WA.mainWin || window`）——壳缺 localStorage，于是本用例的落盘能力
+  //   从出生起就是断的（setItem 抛错被 try/catch 吞成静默失败）。
+  //   顺序不能颠倒：先复位 → 再重装产品模块（绑真宿主）→ 最后 install（把 WA.mainWin 换成
+  //   mini-DOM 壳，只供随后求值的 ui/* 使用）。
+  try { global.WorldAxis.mainWin = global; global.WorldAxis.mainDoc = global.document; } catch (e) {}
   for (const rel of LOAD) vm.runInContext(fs.readFileSync(path.join(BASE, rel), 'utf8'), ctx, { filename: rel });
   const WA = global.WorldAxis;
   // 前提：代表「有聊天」。run.js 里靠前的块会把 mockCtx.chat 换成空数组/别的形状且不还原，

@@ -24,6 +24,7 @@ function section(t) { console.log('\n■ ' + t); }
 // 按依赖顺序加载扩展JS到同一vm上下文（跳过index.js与UI）
 const ctx = vm.createContext(global);
 const LOAD = [
+  'core/rand.js',            // v2.14.0: 随机源单一出口（核心原语，须最先装载）
   'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
@@ -1320,7 +1321,10 @@ WA.loadScript = _ls.loadScript;
   // 数量超过 limit 时严格截断且结果为子集
   const msBig = [];
   for (let i = 0; i < 30; i++) msBig.push({ id: i, text: '记忆' + i });
-  const msPicked = WA.memorySampler.exponentialSample(msBig, 8, Math.random, 10000);
+  // v2.14.0: 注入的随机源改为**确定性 LCG**——此前注入 Math.random 名义上「确定性」，
+  //   实际上每次运行值都不同，断言只在「长度/子集」这类不变式上成立。
+  const _detSrc = (function () { let _x = 1; return function () { _x = (_x * 1103515245 + 12345) % 2147483648; return _x / 2147483648; }; })();
+  const msPicked = WA.memorySampler.exponentialSample(msBig, 8, _detSrc, 10000);
   assert(msPicked.length === 8, '超限采样严格截断至 8 条: ' + msPicked.length);
   assert(msPicked.every(e => msBig.indexOf(e) >= 0), '采样结果必为原数组子集（引用保持）');
   // 结果按原序返回（截取后重排）
@@ -1342,9 +1346,9 @@ WA.loadScript = _ls.loadScript;
   );
   assert(msBias.length === 5, '混合随机源下仍稳定截断 5 条');
   // 骰子面数夹取
-  const msWide = WA.memorySampler.exponentialSample(msBig, 4, Math.random, 99999);
+  const msWide = WA.memorySampler.exponentialSample(msBig, 4, _detSrc, 99999);
   assert(msWide.length === 4, '超范围 diceSides 被夹取至 MAX 后仍正常工作');
-  const msNarrow = WA.memorySampler.exponentialSample(msBig, 4, Math.random, 5);
+  const msNarrow = WA.memorySampler.exponentialSample(msBig, 4, _detSrc, 5);
   assert(msNarrow.length === 4, '极小 diceSides 被夹取至 MIN 后仍正常工作');
   // ── 上下文相关性过滤 ──
   const msEntries = [
@@ -8647,13 +8651,15 @@ WA.loadScript = _ls.loadScript;
       d.evolution.horizon.near = { ledger: 0, cooldown: 0, pending: null, lastFired: 0 };
     });
     //   随机数计数只包住 rollLane（store 内部实现细节不应干扰「零掷骰」这一断言）
-    const _mr2300 = Math.random; let rndCalls2300 = 0;
-    Math.random = function () { rndCalls2300++; return 0.5; };
-    let offRoll2300 = null;
-    try { offRoll2300 = WA.horizon.rollLane('distant'); } finally { Math.random = _mr2300; }
+    //   v2.14.0: 口径从「patch Math.random 计数」改为**决策流抽数计数**——裸调已被治理，
+    //   patch 再也拦不到任何抽数（恒 0 ＝ 假通过，它已不再能证明「零掷骰」）。
+    //   WA.rand.randStat().draws 才是真实取数入口，负向能力反而更强（能分别看通道）。
+    const _draws2300a = WA.rand.randStat().draws;
+    const offRoll2300 = WA.horizon.rollLane('distant');
+    const rndCalls2300 = WA.rand.randStat().draws - _draws2300a;
     const offBlock2300 = WA.horizon.buildPromptBlock();
     assert(offRoll2300.fired === false && offRoll2300.skipped === true && offRoll2300.reason === 'disabled', '关闭通道：rollLane 明确回报 disabled（而非伪装成「没掷中」）');
-    assert(rndCalls2300 === 0, '关闭通道：连随机数都不取（真正零成本，非「取了不用」）');
+    assert(rndCalls2300 === 0, '关闭通道：连随机数都不取（决策流 draws 零增长，真正零成本）');
     assert(WA.horizon.stat().skipped >= 1, '跳过次数进留痕（「关了」与「掷了没中」可区分）');
     assert(WA.store.get().evolution.horizon.distant.ledger === 0, '关闭通道不消耗保底计数（改设置不产生副作用）');
     assert(offBlock2300 === null, '双通道关闭时 buildPromptBlock 不产出任何指令块');
@@ -9156,23 +9162,29 @@ WA.loadScript = _ls.loadScript;
     //   v2.4.0: 注入**确定性随机源**而非依赖真 Math.random —— 不确定性断言等于不确定的回归。
     //   阈值口径（conflict/level1/stageRound5/萌芽）：threshold = round(85 - 200*(5/9)*(4/9)) = 36；
     //   序列 [0.01, 0.20, 0.99] ⇒ dice=2/21/100 ⇒ 受挫 / 保持 / 成功 三分支**必然**各命中一次。
-    const dist2400 = {};
-    const _mr2400 = Math.random;
-    const _seq2400 = [0.01, 0.20, 0.99];
-    let _k2400 = 0;
-    Math.random = function () { return _seq2400[(_k2400++) % _seq2400.length]; };
-    try {
+    //   v2.14.0: 改走 `WA.rand.seed()` 显式播种（不再 patch Math.random——裸调已治理，patch 无效）。
+    //   顺带把断言从「各命中 100 次」升级为两条**更强的性质**：
+    //     ① 三分支全部可达，且都不占绝对多数（防「静默坍塌成单分支」，比定值更难糊弄）；
+    //     ② 同种子重放 300 次掷骰，分布**逐项相同**——这正是本版要立的能力本身。
+    const runDist2400 = function () {
+      WA.rand.seed(20240240);
+      const dist = {};
       for (let i = 0; i < 300; i++) {
         WA.store.transact(function (d) { d.evolution.events = [{ id: 'e1', type: 'conflict', name: 'T', level: 1, stage: '萌芽', stageRound: 5, consecutiveFails: 0 }]; });
         const res2400 = WA.evolution.rollEvents();
         const k2400 = (res2400[0] && res2400[0].result) || '?';
-        dist2400[k2400] = (dist2400[k2400] || 0) + 1;
+        dist[k2400] = (dist[k2400] || 0) + 1;
       }
-    } finally { Math.random = _mr2400; }
-    assert(dist2400['受挫'] === 100 && dist2400['保持'] === 100 && dist2400['成功'] === 100,
-      '确定性随机源下三分支各命中 100 次（实 ' + JSON.stringify(dist2400) + '）——受挫/保持/成功全部可达');
+      return dist;
+    };
+    const dist2400 = runDist2400();
+    const dist2400b = runDist2400();
+    assert(dist2400['受挫'] > 0 && dist2400['保持'] > 0 && dist2400['成功'] > 0 && dist2400['受挫'] < 250,
+      '三分支全部可达且都不占绝对多数（实 ' + JSON.stringify(dist2400) + '）——受挫/保持/成功均非零');
+    assert(JSON.stringify(dist2400) === JSON.stringify(dist2400b),
+      '（可复现）同种子重放 300 次掷骰，分布逐项相同（实 ' + JSON.stringify(dist2400) + '）');
     assert(Object.keys(dist2400).length >= 2, '缺子键下掷骰结果不再单一（实分布 ' + JSON.stringify(dist2400) + '）');
-    assert((dist2400['成功'] || 0) > 0 && (dist2400['保持'] || 0) > 0, '「成功」分支可达（此前 NaN 比较恒假，成功永不发生）');
+    assert((dist2400['成功'] || 0) > 0 && (dist2400['保持'] || 0) > 0, '「成功」分支可达（此前 NaN 比较恒真/恒假，成功永不发生）');
     // 负向：数值子键被写成脏值时同样不产生 NaN
     LS2400.setItem(evoKey2400, JSON.stringify({ diceModifier: 'abc', setbackRatio: null, progressFailBase: {}, conflictFailBase: [] }));
     const mfDirty2400 = WA.evolution.getMaxFails({ type: 'progress', level: 2 });
@@ -9796,7 +9808,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10340,7 +10352,7 @@ assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.13.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.14.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10631,7 +10643,7 @@ assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.13.0', '入口版本为 2.13.0（实 ' + ver + '）');
+    assert(ver === '2.14.0', '入口版本为 2.14.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11037,7 +11049,7 @@ assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11154,7 +11166,7 @@ assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.13.0', '入口版本为 2.13.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.14.0', '入口版本为 2.14.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11542,7 +11554,7 @@ assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.13.0', '入口版本为 2.13.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.14.0', '入口版本为 2.14.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11912,7 +11924,7 @@ assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.13.0', '入口版本为 2.13.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.14.0', '入口版本为 2.14.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12277,7 +12289,7 @@ assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.13.0', '入口版本为 2.13.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.14.0', '入口版本为 2.14.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -12463,6 +12475,359 @@ assert(verF2500 === '2.13.0' && mfF2500.version === verF2500, '入口与清单�
     pass += __uiGateRes.pass;
     fail += __uiGateRes.fail;
   }
+  // ══════════════════════════════════════════════════════════════════
+  // v2.14.0 块：随机源治理（第八面：可复现性）
+  //
+  // 命题：前七版把写侧/删侧/读侧/活性面/UI 渲染路径/挤出侧逐一收口，观测面已经完备。
+  //   但**被观测的那个过程本身不可复现**——全库 16 个产品文件裸调 Math.random，
+  //   其中 5 处是行为性决策（进化骰决定成功/受挫/保持、风声消散骰、区域事件是否触发与
+  //   抽中哪种、远景通道是否开火、记忆采样决定谁被挤出）。
+  //   于是 v2.13.0 刚立起来的「挤出侧丢了谁」在两次运行间不可比：
+  //   丢的那个「谁」正是随机采样挑中的，「我修好了吗」在原理上无法回答。
+  //
+  // 本块立的四件事：① 裸调归零（单一出口）② 同种子同序列（真可复现）
+  //   ③ 通道隔离（改 A 模块的抽数不动 B 模块）④ 非法参数不静默（否则「已复现」不可信）
+  // ══════════════════════════════════════════════════════════════════
+  {
+    console.log('\n■ G19 随机源治理（第八面：可复现性）');
+    const fsM19 = require('fs');
+    const pathM19 = require('path');
+    const PROD_DIRS19 = ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'];
+    const prodFiles19 = [];
+    // 命名函数表达式（`(function scan19(){...})()`）的名字**只在该函数体内可见**，
+    //   体外 by-name 调用会 ReferenceError —— 故此处用具名函数声明（可被 forEach 引用）。
+    function scan19(d) {
+      let ents = [];
+      try { ents = fsM19.readdirSync(pathM19.join(__dirname, '..', d)); } catch (e) { return; }
+      ents.forEach(function (e) {
+        const rel = d + '/' + e;
+        let st = null;
+        try { st = fsM19.statSync(pathM19.join(__dirname, '..', rel)); } catch (e2) { return; }
+        if (st.isDirectory()) { if (e !== 'node_modules') scan19(rel); }
+        else if (e.endsWith('.js')) prodFiles19.push(rel);
+      });
+    }
+    PROD_DIRS19.forEach(scan19);
+
+    // ── ① 裸调归零：全库唯一允许出现 Math.random 的产品文件是 core/rand.js，且恰好 1 处 ──
+    //   口径（关键）：先**剥掉注释与字符串字面量**再扫。
+    //   本文件与各模块的说明性注释里大量出现「Math.random」这个词（讲的正是本版治理），
+    //   裸正则会把文档债当漏改抓出来 —— 判据的输入面与结论面必须是同一件事。
+    const stripComments19 = function (src) {
+      return src.replace(/\/\*[\s\S]*?\*\//g, '')      // 块注释
+        .split('\n').map(function (l) { return l.replace(/(^|[^:'"\\])\/\/.*$/, '$1'); }).join('\n');   // 行注释（避开 http:// 与字符串里）
+    };
+    const RAW_RE19 = /Math\.random/;
+    const offenders19 = prodFiles19.filter(function (f) { return RAW_RE19.test(stripComments19(fsM19.readFileSync(pathM19.join(__dirname, '..', f), 'utf8'))); });
+    assert(offenders19.length === 1 && offenders19[0] === 'core/rand.js',
+      '裸调 Math.random 的产品文件只剩 core/rand.js（实 ' + offenders19.join('、') + '）——其余全部改走决策流/标识流');
+    const randSrc19 = fsM19.readFileSync(pathM19.join(__dirname, '..', 'core/rand.js'), 'utf8');
+    const randCode19 = stripComments19(randSrc19);
+    const rawHits19 = (randCode19.match(/Math\.random/g) || []).length;
+    assert(rawHits19 === 1, 'core/rand.js 内 Math.random 恰好 1 处（自动种子），实 ' + rawHits19 + ' 处——多出来的必然是漏改');
+    // 该处必须是自动种子（不是决策抽数）
+    const seedLine19 = randCode19.split('\n').filter(function (l) { return /Math\.random/.test(l); })[0];
+    assert(/__seed|seed/i.test(seedLine19), '仅存的那处 Math.random 必须是**自动种子**，实：' + seedLine19.trim().slice(0, 80));
+    // 决策抽数必须是确定性 PRNG（mulberry32），否则「同种子同序列」无从成立
+    assert(/function mulberry32/.test(randSrc19) && /hash32/.test(randSrc19), '决策流由确定性 PRNG（mulberry32）+ 通道哈希派生');
+
+    // ── ② 真可复现：同种子同序列（这是本版存在的全部理由）──
+    const R19 = WA.rand;
+    R19.seed(12345);
+    const seqA19 = []; for (let i = 0; i < 20; i++) seqA19.push(R19.next('t'));
+    R19.seed(12345);
+    const seqB19 = []; for (let i = 0; i < 20; i++) seqB19.push(R19.next('t'));
+    assert(seqA19.length === 20 && seqA19.join(',') === seqB19.join(','), '（可复现）同种子同通道 20 次抽取逐项相同');
+    // 不同种子必须给出不同序列（否则「种子」形同虚设）
+    R19.seed(12346);
+    const seqC19 = []; for (let i = 0; i < 20; i++) seqC19.push(R19.next('t'));
+    assert(seqC19.join(',') !== seqA19.join(','), '不同种子给出不同序列（种子确实起作用）');
+    // 跨「自动种子」边界也必须可复现：显式播种后即使中间发生过自动种子态，重播仍同序列
+    R19.reseed();
+    R19.seed(777);
+    const seqD19 = []; for (let i = 0; i < 8; i++) seqD19.push(R19.next('t'));
+    R19.reseed();
+    R19.seed(777);
+    const seqE19 = []; for (let i = 0; i < 8; i++) seqE19.push(R19.next('t'));
+    assert(seqD19.join(',') === seqE19.join(','), '中间插入 reseed（换自动种子）后重播同种子仍同序列');
+
+    // ── ③ 通道隔离：改一个模块的抽数**不得**平移另一个模块的序列 ──
+    //   这条是本版相对「单一全局流」的关键增量：单一流下 evolution 多掷一次骰，
+    //   horizon 的开火判定与采样结果会跟着变，且无任何痕迹（改 A 静默改 B）。
+    R19.seed(999);
+    const isoA19 = [R19.next('iso.A'), R19.next('iso.A'), R19.next('iso.A')];
+    R19.seed(999);
+    R19.next('iso.B'); R19.next('iso.B'); R19.next('iso.B'); R19.next('iso.B'); R19.next('iso.B');
+    const isoB19 = [R19.next('iso.A'), R19.next('iso.A'), R19.next('iso.A')];
+    assert(isoA19.join(',') === isoB19.join(','),
+      '（通道隔离）B 通道多抽 5 次，A 通道序列逐项不变——改 A 模块不会静默改掉 B 模块的行为');
+    //   补一条（v2.14.0 逆向审计自纠）：上面只证明了「互不消费」，**没有**证明「互不相关」。
+    //   若派生种子改成 `mulberry32(hash32(String(__seed)))`（把通道名丢掉），各通道仍是独立实例，
+    //   上面那条照样绿——但所有通道的序列逐项完全相同，两次「独立」掷骰实际是一次，
+    //   骰子退化成常量函数（不同的模块会同时成功、同时受挫、同时开火）。
+    //   实测：该破坏在第一轮审计里使全量回归 3814/0 **全绿**——即本条立之前的漏网。
+    //   隔离要成立，两条缺一不可：抽数上互不消费（上一条）× 序列上互不相同（本条）。
+    R19.seed(777);
+    const corrA19 = [R19.next('corr.A'), R19.next('corr.A'), R19.next('corr.A')];
+    R19.seed(777);
+    const corrB19 = [R19.next('corr.B'), R19.next('corr.B'), R19.next('corr.B')];
+    assert(corrA19.join(',') !== corrB19.join(','),
+      '（通道隔离）不同通道的序列不得逐项相同（实 ' + corrA19.join(',') + ' vs ' + corrB19.join(',') + '）——否则「两次独立掷骰」是一次，骰子退化成常量函数');
+
+    // ── ④ 标识流不占决策序列：生成 id 不平移任何决策 ──
+    //   这是「最难查的一类不可复现」的来源：若 id 也从决策流抽数，
+    //   多生成一个 id 就会把后续所有掷骰结果整体挪一位。
+    R19.seed(4242);
+    const idFreeA19 = [R19.next('free'), R19.next('free'), R19.next('free')];
+    R19.seed(4242);
+    const gid1_19 = R19.id('t', 6), gid2_19 = R19.id('t', 6), gid3_19 = R19.id('t', 6);
+    const idFreeB19 = [R19.next('free'), R19.next('free'), R19.next('free')];
+    assert(idFreeA19.join(',') === idFreeB19.join(','),
+      '（通道隔离）生成 3 个 id 不消耗决策流，后续抽取逐项不变');
+    assert(gid1_19 !== gid2_19 && gid2_19 !== gid3_19 && gid1_19 !== gid3_19, 'id 保持唯一（同毫秒内靠递变计数，不靠运气）');
+    assert(/^t/.test(gid1_19), 'id 保留可读前缀（标识流语义未变）: ' + gid1_19);
+
+    // ── ⑤ 记账口径：draws 只计决策，ids 只计标识（混在一起会让两个数都不可信）──
+    R19.resetRandStat();
+    R19.next('m'); R19.next('m'); R19.next('m');
+    R19.id('m', 4); R19.id('m', 4);
+    const stM19 = R19.randStat();
+    assert(stM19.draws === 3, 'draws 只计决策抽取（实 ' + stM19.draws + '）——id 噪声走独立通道，不计进决策数');
+    assert(stM19.ids === 2, 'ids 单独计量（实 ' + stM19.ids + '）');
+    assert(stM19.byChannel['m'] === 3, '逐通道计量按通道归集（实 ' + JSON.stringify(stM19.byChannel) + '）');
+
+    // ── ⑥ 非法参数不静默：归因 + 退回默认，且绝不产 NaN ──
+    R19.resetRandStat();
+    assert(R19.seed('这不是数字') === false, '「非法种子被拒绝」并返回 false（不静默接受）');
+    assert(R19.seed(NaN) === false && R19.seed(Infinity) === false && R19.seed({}) === false, 'NaN/Infinity/对象种子一律拒绝');
+    R19.seed(31337);
+    const keptSeed19 = R19.getSeed();
+    assert(R19.seed('abc') === false && R19.getSeed() === keptSeed19,
+      '（关键）非法播种**不改变**当前种子——否则「我以为复现了，其实没有」，复现结论本身不可信');
+    // 反向区间：归因 + 换序，不产 NaN、不抛
+    const rev19 = R19.int(10, 1);
+    assert(isFinite(rev19) && rev19 >= 1 && rev19 <= 10, '反向区间换序后仍在区间内（实 ' + rev19 + '），不产 NaN');
+    // 骰面数非法 → 退回 1..100
+    let diceFallback19 = null; try { diceFallback19 = R19.dice(0); } catch (e) { diceFallback19 = 'threw'; }
+    assert(diceFallback19 !== 'threw' && isFinite(diceFallback19) && diceFallback19 >= 1 && diceFallback19 <= 100, 'dice(0) 退回 1..100（实 ' + diceFallback19 + '），不抛不产 NaN');
+    // 概率边界：p<=0 恒假 / p>=1 恒真，且**都不抽数**
+    //   （原实现 `Math.random() >= chance` 在 chance=0 时仍需抽一次数，
+    //    「概率设 0」这个动作本身就会平移随机序列——正是本版要消灭的那类副作用）
+    const beforeBound19 = R19.randStat().draws;
+    assert(R19.chance(0) === false && R19.chance(-1) === false, 'p<=0 恒假');
+    assert(R19.chance(1) === true && R19.chance(2) === true, 'p>=1 恒真');
+    assert(R19.randStat().draws === beforeBound19, '（关键）概率为 0/1 时**不抽数**（实增量 ' + (R19.randStat().draws - beforeBound19) + '）——不产生「设了概率却动了随机序列」的副作用');
+    assert(R19.chance('x') === false, 'p 非数值恒假并归因（不静默当 0 或当 1）');
+    // 空集 / 权重异常
+    assert(R19.pick([]) === null && R19.pick(null) === null, '空集返回 null（不返回假元素）');
+    assert(R19.pickWeighted([], null) === null, '空权重表返回 null');
+    const wZero19 = R19.pickWeighted([{ w: 0 }, { w: 0 }], function (x) { return x.w; });
+    assert(wZero19 !== null, '权重全 0 时退回等概率（实 ' + JSON.stringify(wZero19) + '）而非恒选第一个');
+    const stBad19 = R19.randStat();
+    assert(stBad19.failed > 0, '非法参数进了 failed 台账（实 ' + stBad19.failed + '）');
+    ['bad-seed', 'reversed-range', 'bad-sides', 'bad-chance', 'bad-weights'].forEach(function (k) {
+      assert(Object.keys(stBad19.failedBy).some(function (x) { return x.indexOf(k) === 0; }),
+        '归因分桶含 ' + k + '（实 ' + JSON.stringify(stBad19.failedBy) + '）');
+    });
+    assert(isFinite(R19.next('after-bad')) && R19.next('after-bad') >= 0, '非法参数后随机源仍可用（不进入坏死态）');
+
+    // ── ⑦ 声明即执行：WA.rand 的每个导出都被真实调用过一次（防「声明面空转」）──
+    //   本仓库已多轮吃过「导出了但全库零调用」的亏，此处对新出口同样设卡。
+    const exportNames19 = Object.keys(R19);
+    const calledOk19 = [];
+    const callMap19 = {
+      next: function () { return R19.next('probe'); },
+      int: function () { return R19.int(1, 5, 'probe'); },
+      dice: function () { return R19.dice(6, 'probe'); },
+      chance: function () { return R19.chance(0.5, 'probe'); },
+      pick: function () { return R19.pick([1, 2], 'probe'); },
+      pickWeighted: function () { return R19.pickWeighted([{ w: 1 }], null, 'probe'); },
+      id: function () { return R19.id('p', 4); },
+      seed: function () { return R19.seed(5); },
+      reseed: function () { return R19.reseed(); },
+      getSeed: function () { return R19.getSeed(); },
+      seeded: function () { return R19.seeded(); },
+      randStat: function () { return R19.randStat(); },
+      resetRandStat: function () { return R19.resetRandStat(); },
+      channels: function () { return R19.channels(); }
+    };
+    exportNames19.forEach(function (k) {
+      assert(typeof callMap19[k] === 'function', '新导出 ' + k + ' 缺调用样例（新增能力必须同时给出执行方式，否则门禁看不见它）');
+      const r = callMap19[k]();
+      assert(r !== undefined || k === 'resetRandStat', k + ' 可真实调用并返回结果');
+      calledOk19.push(k);
+    });
+    assert(calledOk19.length === exportNames19.length, 'WA.rand 全部 ' + exportNames19.length + ' 个导出均通过真实调用（实 ' + calledOk19.length + '）');
+
+    // ── ⑧ 行为接线：五个随机决策点**确实**在各自的通道上抽数（不是只改了 import）──
+    //   这一条是本块最重的证据：正则能证明「Math.random 不见了」，
+    //   却证明不了「掷骰真的走了决策流」。故逐个驱动真模块后检查通道计数。
+    R19.resetRandStat();
+    R19.seed(2024140);
+    //   ① 进化推进骰
+    WA.store.transact(function (d) { d.evolution.events = [{ id: 'g19e', type: 'conflict', name: 'G19', level: 1, stage: '萌芽', stageRound: 5, consecutiveFails: 0 }]; });
+    WA.evolution.rollEvents();
+    assert((R19.randStat().byChannel['evolution.advance'] || 0) >= 1,
+      '进化推进骰走 evolution.advance 通道（实 ' + JSON.stringify(R19.randStat().byChannel) + '）');
+    //   ② 风声消散骰
+    R19.seed(2024141);
+    WA.store.transact(function (d) { d.evolution.winds = [{ id: 'g19w', topic: 'G19风声', type: 'rumor', level: 1, content: 'x', scope: '', source: '', quietRounds: 9 }]; });
+    WA.evolution.decayWinds();
+    assert((R19.randStat().byChannel['evolution.windDecay'] || 0) >= 1, '风声消散骰走 evolution.windDecay 通道');
+    //   ③ 区域事件（触发判定 + 类型抽取）
+    //   两条前置，缺一条下面就会因为**无关原因**失败（本块首次运行两条都踩到了）：
+    //     a) 前序块可能留下活跃区域事件 —— 此时 roll() 走「持续中」分支，根本不掷骰；
+    //     b) 设置必须真的写得进去 —— 写侧被截断时 effectiveSettings() 仍是默认 disabled，
+    //        roll() 直接 return null。b 暴露的是一条**基座缺陷**（见 ⑫），不是本块的问题。
+    const regBefore19 = WA.regional.getSettings();
+    R19.seed(2024142);
+    WA.store.transact(function (d) { d.evolution.regionalIncident = null; });
+    const setReg19 = WA.regional.setSettings({ enabled: true, chancePercent: 100 });
+    assert(setReg19 && setReg19.ok === true, '区域设置写入返回 ok（实 ' + JSON.stringify(setReg19) + '）——写失败必须可见，不能只有静默');
+    const regRoll19 = WA.regional.roll();
+    assert((R19.randStat().byChannel['regional.pick'] || 0) >= 1, '区域事件类型抽取走 regional.pick 通道');
+    assert(!!regRoll19 && regRoll19.ongoing === false, '几率 100% 时确实触发（chance(1) 恒真且不抽数）');
+    //   ④ 远景通道开火
+    R19.seed(2024143);
+    try {
+      WA.horizon.setSettings({ distantEnabled: true });
+      WA.store.transact(function (d) { d.evolution.horizon.distant = { ledger: 99, cooldown: 0, pending: null, lastFired: 0 }; });
+      WA.horizon.rollLane('distant');
+    } catch (eH19) {}
+    assert((R19.randStat().byChannel['horizon.roll'] || 0) >= 1, '远景通道开火走 horizon.roll 通道');
+    //   ⑤ 记忆采样（默认兜底也走决策流）
+    R19.seed(2024144);
+    try {
+      const big19 = []; for (let i = 0; i < 40; i++) big19.push({ text: 'm' + i });
+      WA.memorySampler.exponentialSample(big19, 5);
+    } catch (eM19) {}
+    assert((R19.randStat().byChannel['memory.sampler'] || 0) >= 1, '记忆采样默认兜底走 memory.sampler 通道（不注入 randomFn 时同样可复现）');
+    WA.regional.setSettings(regBefore19);
+
+    // ── ⑨ 五处决策点同种子重放 ⇒ 结果逐项相同（端到端可复现，而非仅函数级）──
+    const replay19 = function () {
+      R19.seed(555);
+      const out = [];
+      WA.store.transact(function (d) { d.evolution.events = [{ id: 'g19r', type: 'conflict', name: 'R', level: 1, stage: '萌芽', stageRound: 5, consecutiveFails: 0 }]; });
+      out.push((WA.evolution.rollEvents()[0] || {}).result);
+      WA.store.transact(function (d) { d.evolution.winds = [{ id: 'g19rw', topic: 'R风声', type: 'rumor', level: 1, content: 'x', scope: '', source: '', quietRounds: 9 }]; });
+      out.push(WA.evolution.decayWinds().length);
+      WA.store.transact(function (d) { d.evolution.regionalIncident = null; });
+      const rOne19 = WA.regional.roll() || {};
+      out.push(rOne19.ongoing === false ? ((rOne19.picked || {}).type || '?') : 'ongoing');
+      return out.join('|');
+    };
+    const repA19 = replay19(), repB19 = replay19();
+    assert(repA19 === repB19, '（端到端可复现）同种子重放真实引擎链（推进骰/消散骰/区域抽取）结果逐项相同：' + repA19);
+
+    // ── ⑩ 双消费端：诊断 + 面板 + 健康分（新台账无消费端 = 空转）──
+    const diag19 = WA.toolDiag.collect();
+    assert(diag19.runtime && diag19.runtime.rand && typeof diag19.runtime.rand.seedSource === 'string',
+      '诊断包透出 runtime.rand（种子来源/抽数/通道/归因）');
+    assert(typeof diag19.runtime.rand.draws === 'number' && diag19.runtime.rand.byChannel,
+      '诊断包含决策抽数与逐通道分布');
+    const panelSrc19 = fsM19.readFileSync(pathM19.join(__dirname, '..', 'ui', 'panel.js'), 'utf8');
+    assert(/function randBlock\(/.test(panelSrc19), '面板存在随机源展示块 randBlock()');
+    assert(/\$\{randBlock\(\)\}/.test(panelSrc19), '概览页真实调用了 randBlock()（导出但没人调 = 空转）');
+    assert(/随机源（决策可复现性）/.test(panelSrc19), '面板文案明确说明「决策可复现性」而非只堆数字');
+    //   健康分：三计量必须进 signals，且「未显式播种」如实报 info（诚实：不把默认态谎报成可复现）
+    R19.resetRandStat();
+    R19.seed(8888);
+    R19.next('sig'); R19.next('sig');
+    const mt19 = WA.store.maintain();
+    assert(mt19.signals.randDraws >= 2, '健康分 signals 含 randDraws（实 ' + mt19.signals.randDraws + '）');
+    assert(mt19.signals.randFailed === 0 && mt19.signals.randReproducible === true,
+      '显式播种下 randReproducible=true（实 ' + mt19.signals.randReproducible + '）——不虚报也不漏报');
+    const evOK19 = (mt19.issues || []).filter(function (i) { return i.key === 'rand' || i.key === 'rand.failed'; });
+    assert(evOK19.length === 0, '已显式播种 ⇒ 不产「未播种」议题（议题只在真的不可复现时出现）');
+    //   未播种态：info 且诚实（不报 error —— auto 是默认行为，不是故障）
+    R19.reseed();
+    R19.next('sig');
+    const mt19b = WA.store.maintain();
+    assert(mt19b.signals.randReproducible === false, '未显式播种时 signals.randReproducible=false（诚实）');
+    const evNoSeed19 = (mt19b.issues || []).filter(function (i) { return i.key === 'rand'; })[0];
+    assert(evNoSeed19 && evNoSeed19.level === 'info', '未播种报 info 级（实 ' + (evNoSeed19 && evNoSeed19.level) + '）——它是「结论不可复核」的根因说明，不是故障');
+    assert(/seed/.test(evNoSeed19.detail), '议题给出可执行解法（怎么把随机定住）');
+    //   参数非法 ⇒ error（缺陷级）
+    R19.seed('坏种子');
+    const mt19c = WA.store.maintain();
+    const evFail19 = (mt19c.issues || []).filter(function (i) { return i.key === 'rand.failed'; })[0];
+    assert(evFail19 && evFail19.level === 'error', '随机源参数非法在健康巡视里报 error（须改代码，不是清存储）');
+    assert(mt19c.score < mt19b.score, '缺陷级随机源问题真实扣分（' + mt19b.score + ' → ' + mt19c.score + '）');
+    //   诊断分级同步
+    const dgFail19 = WA.toolDiag.collect();
+    const vFail19 = (WA.toolDiag.verdict ? WA.toolDiag.verdict(dgFail19) : { issues: [] });
+    assert((vFail19.issues || []).some(function (i) { return i.key === 'rand' && i.level === 'error'; }),
+      '诊断 verdict 对参数非法报 error（与健康分同口径）');
+    //   复原：避免污染后续
+    R19.seed(1); R19.resetRandStat();
+
+    // ── ⑪ 负向自证：门禁的判据本身必须能被破坏检出（否则计数只是「恰好成立」）──
+    //   ① 裸调用探针：临时落一个含 Math.random 的产品文件 → ① 的扫描必须抓到
+    const probeDir19 = pathM19.join(__dirname, '..', 'core');
+    const probeFile19 = pathM19.join(probeDir19, '__g19_probe.js');
+    let caughtByProbe19 = false;
+    try {
+      fsM19.writeFileSync(probeFile19, "// 探针\n(function(){ var x = Math.random(); return x; })();\n");
+      const hitProbe19 = prodFiles19.concat(['core/__g19_probe.js']).filter(function (f) { return RAW_RE19.test(stripComments19(fsM19.readFileSync(pathM19.join(__dirname, '..', f), 'utf8'))); });
+      caughtByProbe19 = hitProbe19.length === 2;
+    } finally { try { fsM19.unlinkSync(probeFile19); } catch (e) {} }
+    assert(caughtByProbe19, '（负向自证）落一个裸调 Math.random 的产品文件，① 的扫描把它抓出来（探针有效）');
+    //   ② 通道隔离探针：把两个通道名指成同一个 → 隔离断言必须失败（证明隔离断言不是恒真）
+    R19.seed(321);
+    const isoX19 = [R19.next('same'), R19.next('same')];
+    R19.seed(321);
+    R19.next('same');                     // 同通道多抽一次
+    const isoY19 = [R19.next('same'), R19.next('same')];
+    assert(isoX19.join(',') !== isoY19.join(','), '（负向自证）同通道多抽一次必然改变后续——隔离断言不是恒真');
+    //   ③ 可复现探针：不播种（换自动种子）→ 序列必须不同
+    //      （证明「同种子同序列」来自种子，而不是「随机源恒定不变」这种平凡情况）
+    //      注意：**不能**写成 `a !== b || typeof a === 'number'`——那第二项恒真，
+    //      整条断言永远是绿的（本仓库已多次吃过「判据自己把结论删了」的亏）。
+    //      取 4 个抽数比对元组，把「恰好撞上同一个数」的概率压到可忽略。
+    const sample4 = function () { R19.reseed(); const o = []; for (let i = 0; i < 4; i++) o.push(R19.next('neg')); return o.join(','); };
+    const nA19 = sample4(), nB19 = sample4();
+    assert(nA19 !== nB19, '（负向自证）换自动种子后抽数序列确实变化（实 ' + nA19 + ' vs ' + nB19 + '）——可复现来自种子，而非随机源恒定');
+    //   ④ 种子有效性探针：同种子必须收敛（负向：不同种子不得收敛）
+    R19.seed(4242); const s1 = R19.next('v');
+    R19.seed(4242); const s2 = R19.next('v');
+    R19.seed(4243); const s3 = R19.next('v');
+    assert(s1 === s2 && s1 !== s3, '（自证）同种子收敛、异种子发散——②的判据在这两个方向上都成立');
+    // ── ⑫ 基座保真：宿主能力不得被测试壳截断（本版实测踩到的真缺陷）──
+    //   背景：tests/ui-dom.js 的 install() 把 WA.mainWin 换成 mini-DOM 壳窗口，而产品模块在
+    //   **求值期**就把 mainWin 缓存进闭包（`const mainWin = WA.mainWin || window`）。
+    //   此前那个壳是 `var uiWin = {}` —— 连 localStorage 都没有，且全库没有对称的还原动作：
+    //   自第二个 UI 用例起，所有落盘路径都撞 `mainWin.localStorage` 为 undefined，setItem 抛错
+    //   又被各自的 try/catch 吞掉 → 呈现为「设置拨了没生效」而全库零告警。
+    //   这类缺陷的可怕之处在于**它污染的是别的块**：UI 门禁全绿、错误信息全无，
+    //   失败却出现在毫不相干的后续用例里（本例：区域事件的随机通道断言）。
+    //   故此处立判据盯住「设置必须真的落盘、真的读回」，并做负向自证。
+    const hostBack19 = WA.regional.getSettings().chancePercent;
+    const hpSet19 = WA.regional.setSettings({ chancePercent: 37 });
+    assert(hpSet19 && hpSet19.ok === true, '（基座保真）产品路径的设置写入返回 ok（实 ' + JSON.stringify(hpSet19) + '）');
+    assert(WA.regional.getSettings().chancePercent === 37,
+      '（基座保真）写入后读回同一值（实 ' + WA.regional.getSettings().chancePercent + '）——「拨了没生效」必须响亮');
+    assert(String((WA.mainWin || {}).localStorage) !== 'undefined' && !!(WA.mainWin || {}).localStorage,
+      '（基座保真）宿主窗口可达 localStorage（壳须以真宿主为原型，否则落盘能力从出生起就是断的）');
+    //   负向自证：把宿主换成无 localStorage 的裸对象（复刻修复前的缺陷形态）→ 同一写入必须真的失败。
+    //   否则上面两条「ok:true」可能只是恒真，抓不到任何东西。
+    const savedWin19 = WA.mainWin;
+    let broken19 = false;
+    try {
+      WA.mainWin = {};
+      try { const r19 = WA.regional.setSettings({ chancePercent: 41 }); broken19 = !!(r19 && r19.ok === true); }
+      catch (eB19) { broken19 = false; }
+    } finally { WA.mainWin = savedWin19; }
+    assert(broken19 === false, '（负向自证）宿主缺 localStorage 时同一写入必然失败——上面的 ok:true 不是恒真判据');
+    //   复原：既让 ⑫ 不污染后续，也让「写回读」这条链本身再走一遍
+    WA.regional.setSettings({ chancePercent: (hostBack19 || 15) });
+    assert(WA.regional.effectiveSettings().chancePercent === (hostBack19 || 15),
+      '（基座保真）复原写入同样落盘并读回（实 ' + WA.regional.effectiveSettings().chancePercent + '）');
+    R19.seed(2); R19.resetRandStat();
+    console.log('  ✓ 裸调归零（唯一剩余＝自动种子 1 处）｜同种子同序列｜通道隔离｜非法参数不静默');
+    console.log('  ✓ 五处决策点行为接线实测｜端到端同种子重放逐项相同｜双消费端齐备｜负向自证 4 项');
+    console.log('  ✓ 基座保真（宿主能力不被测试壳截断：设置真写盘、真读回，含负向自证）');
+  } // end v2.14.0 block
   } // end v2.11.0 block
   } // end v2.10.0 block
   } // end v2.9.0 block

@@ -259,6 +259,18 @@
       sources: {
         contract: ['bandit', 'plague', 'market', 'faction_clash', 'official', 'sect', 'infrastructure', 'ominous'],
         // v2.10.0: 读侧完整性契约的留痕点——本文件是跨模块契约审计的唯一消费端。
+        // v2.14.0: 随机源治理契约留痕（第八面：可复现性）。
+        //   跨模块契约点：随机是唯一「同一存档重放会得出不同结论」的来源，而在本版之前
+        //   它散在 16 个产品文件里裸调（30 余处），其中 5 处是行为性决策。core/rand.js 是
+        //   单一出口：决策流（next/int/dice/chance/pick/pickWeighted）可复现、标识流（id）
+        //   唯一性优先且不占决策序列、通道按名派生互不相关也不互消费。
+        //   诊断经 toolDiag.runtime.rand 透出，健康分经 maintain().signals.randDraws/randFailed/
+        //   randReproducible 计量，面板概览经 ui/panel.js 的「随机源（决策可复现性）」块展示。
+        //   **消费端契约**：本文件与 tests/run.js v2.14.0 块共同冻结「同种子同序列 ↔ 通道隔离
+        //   ↔ 标识流不占决策序列 ↔ 非法参数不静默」四项性质（含负向自证，且每一项都经
+        //   逆向审计做过假设性破坏验证）。
+        //   本版同时修掉一条测试基座真缺陷（ui-dom 壳窗口截断宿主能力 + LOAD 重装顺序），
+        //   并据逆向审计结果补强了通道隔离判据（原判据只证「互不消费」、未证「互不相关」）。
         // v2.13.0: 挤出侧完整性契约留痕——七面治理的最后一面。
         //   跨模块契约点：挤出是本仓库唯一「按设计丢数据」的路径，而在本版之前它**零出口**：
         //   core/evict.js 的站点表 SITES 是 cap 的可执行真源，业务侧 14 个文件（backstage/

@@ -14,7 +14,7 @@
   const TERMINATED_MAX = 20; // v1.0.0: 终结态数量兜底（20轮窗口内海量终结时仍不超量）
   const MAX_ACTIVE = 24;     // v1.0.0: 活跃仇敌环形容量（与 __BOUNDED_CAPS['evolution.enemies'] 登记同源）
 
-  function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function uid(p) { return WA.rand.id(p, 4, 'id'); }
 
   WA.enemies = {
     ENEMY_STATUS: ENEMY_STATUS, ENEMY_TYPE: ENEMY_TYPE, ASSET_STATUS: ASSET_STATUS,

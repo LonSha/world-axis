@@ -78,6 +78,25 @@
         + '</div>';
     } catch (e) { return ''; }
   }
+  // ── v2.14.0: 随机源（第八面：可复现性）──────────────────────
+  // 为什么放这里：本页已有「容量收纳」（挤出侧）告诉用户「丢了谁」，
+  //   而「谁会被丢」是随机采样挑的——不把随机源状态摆出来，
+  //   用户看到两次不同的挤出结果会以为是引擎不稳定。
+  // 纯展示，不引入任何控件（因此不触碰 UI 绑定守卫 G17）。
+  function randBlock() {
+    let st = null;
+    try { st = WA.rand && WA.rand.randStat ? WA.rand.randStat() : null; } catch (e) { st = null; }
+    if (!st) return '';
+    const src = st.seedSource === 'explicit' ? '已显式播种（可复现）' : (st.seedSource === 'auto' ? '自动种子（本会话不可复现）' : '尚未使用');
+    const chans = (st.channelNames || []).map(function (c) { return c + '(' + ((st.byChannel || {})[c] || 0) + ')'; }).join('、');
+    const bad = st.failed > 0 ? '<span class="wa-bad">｜参数非法 ' + st.failed + ' 次（' + escapeHtml(JSON.stringify(st.failedBy || {})) + '）</span>' : '';
+    return '<div class="wa-card"><div class="wa-card-h">随机源（决策可复现性）</div>' +
+      '<div class="wa-kv">种子：<b>' + src + '</b>' + bad + '</div>' +
+      '<div class="wa-kv">决策抽取：' + st.draws + ' 次｜生成 id：' + st.ids + ' 个（id 走独立通道，不占用决策序列）</div>' +
+      '<div class="wa-kv">通道：' + (chans || '（本会话尚未抽取）') + '</div>' +
+      '<div class="wa-hint">要复现某次运行：控制台执行 <code>WorldAxis.rand.seed(数字)</code>，之后决策流同种子同序列。<br>' +
+      '「同样操作两次结果不同」不是引擎不稳定——是随机源没有定住。</div></div>';
+  }
   function renderOverview() {
     const s = WA.store.get();
     const nodes = WA.workflow.list();
@@ -91,7 +110,7 @@
         <div class="wa-stat"><div class="wa-stat-v">${s.evolution.round}</div><div class="wa-stat-k">演化回合</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${beforeN}+${afterN}</div><div class="wa-stat-k">工作流节点</div></div>
       </div>
-      ${evictBlock()}
+      ${evictBlock()}${randBlock()}
       <div class="wa-sec">工作流节点开关</div>
       <div class="wa-node-list">${nodes.map(n => `
         <label class="wa-node">

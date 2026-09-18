@@ -102,7 +102,7 @@
       return 'updated';
     }
     // 新建
-    const newId = `${type[0]}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const newId = WA.rand.id(type[0] + '_', 4, 'id');
     em[type].push({
       id: newId, name,
       aliases,
@@ -178,7 +178,7 @@
         if (desc) ent.desc = desc.slice(0, 200);
       } else {
         ent = {
-          id: `${raw.type[0]}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+          id: WA.rand.id(raw.type[0] + '_', 4, 'id'),
           name, aliases: strArr(raw.aliases).filter(a => normalized(a) !== normalized(name)).slice(0, 6),
           desc: clean(raw.description).slice(0, 200),
           events: [], updatedAt: Date.now()
