@@ -263,9 +263,12 @@
             ? (WA.settingsBus.selfCheck().lifecycle || null) : null;
           const mig = WA.settingsBus.migrationStat ? WA.settingsBus.migrationStat() : null;
           const ghosts = WA.settingsBus.ghostScan ? WA.settingsBus.ghostScan() : null;
+          // v2.6.0: 写入侧台账——此前「保存了却没生效」在诊断包里与「功能没实现」不可区分：
+          //   save() 返回 false 却零记录、零日志，调用方零检查。写失败必须与读侧计量同等可见。
+          const writes = WA.settingsBus.writeStat ? WA.settingsBus.writeStat() : null;
           return { registry: st, orphans: orphans, stats: WA.settingsBus.stats,
             coherent: coherent, defaultDrift: drift, dormant: dormant, subkeys: subkeys,
-            lifecycle: lifecycle, migrations: mig, ghosts: ghosts };
+            lifecycle: lifecycle, migrations: mig, ghosts: ghosts, writes: writes };
         }, {}),
         // v2.4.0: 可见性配置健康度——「源在 SOURCES 里却没有默认值声明」是子键级死配置
         visibility: safe(function () {
@@ -741,6 +744,34 @@
     const ghD = sbDiag.ghosts || null;
     if (ghD && ghD.total > 0) {
       issues.push({ level: 'warn', key: 'settingsBus.ghosts', detail: ghD.total + ' 个未登记设置键滞留磁盘（共 ' + Math.round(ghD.bytes / 1024 * 10) / 10 + 'KB，登记表与清理规则都不覆盖）：' + ghD.keys.slice(0, 3).map(function (x) { return x.key.replace(/^worldaxis_/, '') + '(' + x.bytes + 'B)'; }).join('、') + '——如需清理，用「存储键体检」并显式开启幽灵设置项' });
+    }
+    // v2.6.0: 写入失败——用户点了保存却没落盘，是「配置丢失」里最难取证的一类。
+    //   分级：writeFailed>0 即 warn（可能是历史失败后已恢复），最近一次失败仍未被后续成功写入
+    //   覆盖（lastError 非空）则 error（当下正在丢配置）。两者必须分开：只看累计数无法判断
+    //   「还在坏」还是「曾经坏过一次」，而这正是用户要的结论。
+    const wD = sbDiag.writes || null;
+    if (wD && wD.writeFailed > 0) {
+      // v2.6.0（收口）: 归因必须区分「环境问题」与「代码缺陷」。首版只说「配额已满」，会把
+      //   登记项未声明 key / 值不可序列化这类**实现缺陷**也引导用户去清存储——照着提示修永远修不好。
+      //   来源分类 bySource 由写出口统一记账（本版收口后覆盖全部写路径，见 settings-bus 的 lsWrite）。
+      const WRITE_SRC_LABEL = { missingKey: '登记项缺key(实现缺陷)', stringify: '值不可序列化(实现缺陷)',
+        setItem: '写盘被拒(配额/隐私模式)', writeback: '迁移回写', rawRevive: '格式复活',
+        quarantine: '损坏隔离副本', legacy: '旧键迁移', stamp: '结构指纹' };
+      const wBy = wD.bySource || {};
+      const srcTxt = Object.keys(wBy).filter(function (k) { return wBy[k] > 0; })
+        .map(function (k) { return (WRITE_SRC_LABEL[k] || k) + '×' + wBy[k]; }).join('、');
+      const codeBug = (wBy.missingKey || 0) + (wBy.stringify || 0) > 0;
+      const errNow = wD.lastError ? '，最近一次失败原因为 ' + String(wD.lastError).slice(0, 80) + '（此后尚无成功写入覆盖）' : '';
+      issues.push({ level: wD.lastError ? 'error' : 'warn', key: 'settingsBus.write',
+        detail: '设置写盘失败 ' + wD.writeFailed + ' 次（成功 ' + wD.writes + ' 次）'
+          + (srcTxt ? '，来源：' + srcTxt : '') + errNow
+          + (codeBug ? '：其中含**实现缺陷**（登记项未声明 key / 值不可序列化），须改调用方，清存储无效'
+                     : '：配额已满/隐私模式/键被拒绝时，用户改动不会落盘且界面无提示') });
+    }
+    if (wD && wD.subkeyDrift && wD.subkeyDrift.count > 0) {
+      const lp = wD.subkeyDrift.last || {};
+      issues.push({ level: 'warn', key: 'settingsBus.subkeyDrift',
+        detail: '写入侧出现 ' + wD.subkeyDrift.count + ' 个登记 def 之外的子键' + (lp.key ? '（最近 ' + lp.key + '：' + (lp.keys || []).slice(0, 4).join('/') + '）' : '') + '：迁移只治存量（老存档），这些是调用方新写入的存量之外死键，需在调用点收口' });
     }
     // v2.4.0: 可见性声明完整性——SOURCES 声明了但 def 未给默认值的源，无法归一化
     const visD = ((diag.runtime || {}).visibility) || null;

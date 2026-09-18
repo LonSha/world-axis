@@ -84,8 +84,9 @@
     getSettings: loadSettings,
     setSettings(obj) {
       const s = Object.assign(loadSettings(), obj || {});
-      saveSettings(s);
-      return s;
+      // v2.6.0: 此前返回的是「将要保存的值」（恒为真值），调用方无法据此判断写没写进去。
+      //   改为返回写入结果（{ok, reason}）——与 backstage/opinion/horizon/evolution 口径一致。
+      return saveSettings(s);
     }
   };
   // v2.1.0: 自动推进观测对象
@@ -98,11 +99,21 @@
   // v2.1.0: 设置（auto 默认开——世界钟自动推进是「世界模拟引擎」的应有行为）
   const __REG = { key: 'worldaxis_calendar_settings_v1', def: { auto: true }, module: 'calendar' };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  // v2.6.0: 内联的第二份默认值已删除。`read()` 自 v2.3.0 起已按键回落 `__REG.def`，
+  //   此处再 `Object.assign({ auto: true }, ...)` 是同一条默认值的**第二份声明**——
+  //   与 v2.4.0 修的「模块内联默认值」同型：def 一旦改动，这里不会跟着变，且
+  //   read 的返回不再严格等于登记声明（v2.3.0 的「单源不变量」断言对 calendar 会失效）。
   function loadSettings() {
-    try { if (WA.settingsBus) return Object.assign({ auto: true }, WA.settingsBus.read(__REG) || {}); } catch (e) {}
-    return { auto: true };
+    try { if (WA.settingsBus) return WA.settingsBus.read(__REG); } catch (e) {}
+    return { auto: true };   // 仅 settingsBus 尚未装载（加载早期）时的降级，非第二份真源
   }
-  function saveSettings(v) { try { if (WA.settingsBus) WA.settingsBus.save(__REG, v); } catch (e) {} }
+  function saveSettings(v) {
+    // v2.6.0: 写入侧审计修正——本模块此前是**唯一**给 settingsBus.save 包 try/catch 的调用方，
+    //   却也把写失败吞成了静默成功（面板无论如何都报「✓ 已保存」）。改为回传结果，
+    //   供调用方（面板）据此回显「未落盘」——写失败不得再被当成成功。
+    try { if (WA.settingsBus) return WA.settingsBus.saveOrThrow(__REG, v); } catch (e) { return { ok: false, reason: String((e && e.message) || e) }; }
+    return { ok: false, reason: 'settingsBus 未装载' };
+  }
   // v2.1.0: after 链节点——order 12，先于演化/记忆（时间推进影响后续所有引擎的「今天」）
   if (WA.workflow && WA.workflow.register) {
     WA.workflow.register({

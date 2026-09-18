@@ -792,7 +792,35 @@
         const life = (WA.settingsBus && WA.settingsBus.selfCheck) ? (WA.settingsBus.selfCheck().lifecycle || null) : null;
         const migSt = (WA.settingsBus && WA.settingsBus.migrationStat) ? WA.settingsBus.migrationStat() : null;
         const ghostN = (WA.settingsBus && WA.settingsBus.ghostScan) ? WA.settingsBus.ghostScan() : null;
+        // v2.6.0: 写入侧台账——读侧早有计量，写侧此前在面板上完全不可见。
+        //   用户「点了保存却没生效」时，这里是唯一能当场区分「写失败」与「没调用」的地方。
+        const wSt = (WA.settingsBus && WA.settingsBus.writeStat) ? WA.settingsBus.writeStat() : null;
         let html = '<div class="wa-item"><b>设置键登记表</b>：' + (regStat ? regStat.total : '?') + ' 项（带 legacy 旧键 ' + (regStat ? regStat.legacy : 0) + ' · 孤儿 ' + orphans.length + '）</div>';
+        if (wSt) {
+          // v2.6.0（收口）: 措辞必须与判定的**依据面**一致。本计量在收口后覆盖全部写路径
+          //   （保存 / 迁移回写 / 结构指纹 / 旧键迁移 / 格式复活 / 损坏隔离副本），故不再只说
+          //   「保存未落盘」——那会让「迁移回写失败」这类故障被读成「你没点保存」。
+          const WS_LABEL = { missingKey: '登记项缺key(实现缺陷)', stringify: '值不可序列化(实现缺陷)',
+            setItem: '写盘被拒', writeback: '迁移回写', rawRevive: '格式复活',
+            quarantine: '隔离副本', legacy: '旧键迁移', stamp: '结构指纹' };
+          const wBy2 = wSt.bySource || {};
+          const wSrcTxt = Object.keys(wBy2).filter(function (k) { return wBy2[k] > 0; })
+            .map(function (k) { return (WS_LABEL[k] || k) + '×' + wBy2[k]; }).join('、');
+          const wCodeBug = (wBy2.missingKey || 0) + (wBy2.stringify || 0) > 0;
+          if (wSt.writeFailed > 0) {
+            html += '<div class="wa-log wa-log-' + (wSt.lastError ? 'err' : 'warn') + '">写入侧：' + wSt.writeFailed + ' 次写盘失败、' + wSt.writes + ' 次成功'
+              + (wSrcTxt ? '（来源：' + esc(wSrcTxt) + '）' : '')
+              + (wSt.lastError ? '——最近原因 ' + esc(wSt.lastError) : '（此后已有成功写入覆盖）')
+              + (wCodeBug ? '。含实现缺陷项（登记项缺 key / 值不可序列化），清存储无效，须改调用方。</div>'
+                          : '。配额已满/隐私模式/键被拒绝时写盘会失败，用户改动可能静默丢失，请先导出诊断包留证。</div>') ;
+          } else {
+            html += '<div class="wa-dim">写入侧：' + wSt.writes + ' 次写盘全部落盘' + (wSt.last ? '（最近 ' + esc(wSt.last.key) + ' ' + wSt.last.bytes + 'B）' : '') + '。</div>';
+          }
+          if (wSt.subkeyDrift && wSt.subkeyDrift.count > 0) {
+            const lp = wSt.subkeyDrift.last || {};
+            html += '<div class="wa-log wa-log-warn">写入侧出现 ' + wSt.subkeyDrift.count + ' 个声明之外的子键' + (lp.key ? '（最近 ' + esc(lp.key) + '）' : '') + '：属调用点未收口，非老存档遗留。</div>';
+          }
+        }
         html += '<div class="wa-dim">登记表＝扩展认识的 worldaxis_* 设置键清单（含旧键迁移规则）。孤儿＝模块已声明废弃（orphan）且键已不在磁盘上的幽灵登记，注销只影响登记表，不动任何在用配置。</div>';
         if (life) {
           html += '<div class="wa-dim">生命周期声明：结构迁移 ' + life.migrate + ' 个键 · 原始格式复活 ' + life.rawRevive + ' 个键 · legacy 旧键 ' + life.legacy + ' 个。'

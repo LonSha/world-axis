@@ -13,7 +13,8 @@
   //   为默认（无隔离留痕），legacy 旧键迁移规则也完全不生效。
   function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  function saveSettings(s) { WA.settingsBus.save(__REG, s); }
+  // v2.6.0: 走 saveOrThrow 以便回传失败原因（save() 的布尔不足以说明「为什么没落盘」）
+  function saveSettings(s) { return WA.settingsBus.saveOrThrow(__REG, s); }
 
   const OPINION_SYS = `你是「舆情观察器」，只读世界状态与暗流，产出公众舆论层内容。规则：
 1. 你不改变世界事实，只描述公众能看到/传言的部分。
@@ -29,7 +30,8 @@
 
   const opinion = WA.opinion = {
     getSettings: loadSettings,
-    setSettings(o) { saveSettings(Object.assign(loadSettings(), o || {})); },
+    // v2.6.0: 回传写入结果（见 backstage.setSettings 注释）
+    setSettings(o) { return saveSettings(Object.assign(loadSettings(), o || {})); },
 
     /** 生成canon舆情（新闻+论坛），写入store.opinion */
     async generate() {

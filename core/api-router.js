@@ -72,7 +72,18 @@
     setChannel(name, obj) {
       const cfg = loadCfg();
       const prev = cfg[name] || null;
-      cfg[name] = Object.assign({}, cfg[name] || {}, obj || {});
+      // v2.6.0: 写入白名单——此前 `Object.assign({}, cfg[name] || {}, obj || {})` 原样接受任意额外字段，
+      //   于是「通道配置」里会长出 getChannel() 根本不读的子键（实测：getChannel 只消费
+      //   baseUrl / apiKey / model / temperature / maxTokens / useTavernProxy 六项）。
+      //   这类死子键与 v2.5.0 修的老存档死键是同一现象的两个来源——迁移只治**存量**，
+      //   每次保存都会把新塞进来的字段写回磁盘并永远留下。收敛口径：只保留被读取的字段，
+      //   被丢弃的字段名进日志（不静默：用户/调用方若真需要新字段，应同步改 getChannel）。
+      const ALLOWED = ['baseUrl', 'apiKey', 'model', 'temperature', 'maxTokens', 'useTavernProxy'];
+      const picked = {};
+      const dropped = [];
+      Object.keys(obj || {}).forEach(function (k) { if (ALLOWED.indexOf(k) >= 0) picked[k] = obj[k]; else dropped.push(k); });
+      if (dropped.length && WA.log) WA.log('warn', 'apiRouter: 通道[' + name + '] 丢弃未消费字段 ' + dropped.join('/') + '（getChannel 不读这些键）');
+      cfg[name] = Object.assign({}, cfg[name] || {}, picked);
       saveCfg(cfg);
       // v0.1.41: 配置变更计量 + 总线广播（热切换可观测；payload 不含 apiKey）
       __cfgStat.changes++; __cfgStat.lastAt = Date.now(); __cfgStat.lastChannel = name;

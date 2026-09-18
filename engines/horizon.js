@@ -32,7 +32,8 @@
   }, module: 'horizon' };
   function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  function saveSettings(s) { WA.settingsBus.save(__REG, s); }
+  // v2.6.0: 走 saveOrThrow 以便回传失败原因（save() 的布尔不足以说明「为什么没落盘」）
+  function saveSettings(s) { return WA.settingsBus.saveOrThrow(__REG, s); }
 
   /** 区间夹取：历史存档/手改值越界（如概率写成 500）会让判定永久为真——读入即夹取 */
   function clampInt(v, def, min, max) {
@@ -308,7 +309,8 @@
   WA.horizon = {
     rollLane, acceptResult, buildPromptBlock, snapshot, stat, laneCfg,
     getSettings: loadSettings,
-    setSettings(o) { saveSettings(Object.assign(loadSettings(), o || {})); },
+    // v2.6.0: 回传写入结果（见 backstage.setSettings 注释）
+    setSettings(o) { return saveSettings(Object.assign(loadSettings(), o || {})); },
     LEDGER_THRESHOLD, COOLDOWN_ROUNDS, BASE_CHANCE,
     MIN_CHANCE_PCT, MAX_CHANCE_PCT, MIN_COOLDOWN, MAX_COOLDOWN, MIN_LEDGER, MAX_LEDGER
   };

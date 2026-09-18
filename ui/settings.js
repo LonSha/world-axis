@@ -151,9 +151,26 @@
       if (msl) msl.oninput = () => { const v = $('#wa-set-mslimitv'); if (v) v.textContent = msl.value; };
       const msd = $('#wa-set-msdice');
       if (msd) msd.oninput = () => { const v = $('#wa-set-msdicev'); if (v) v.textContent = msd.value; };
+      // v2.6.0（收口）: 写失败归因话术——**单一实现，提升到共同作用域**。
+      //   为什么要提升（两处都踩过，留证防回退）：
+      //     · 首版把 whyTxt 定义在 `saveBtn.onclick` 的**函数体内**，而 `#wa-hz-save`（远方/近端）
+      //       在同一作用域的另一处引用它 ⇒ ReferenceError：主保存能用、另一个保存按钮一点就抛。
+      //       能提前的作用域不要后置——定义在使用点之后、或在别的兄弟闭包里面，都是定时炸弹。
+      //     · 反过来「在每个保存出口各写一份措辞」会立刻分叉成第二份真源（改一处忘一处）。
+      //   本函数内共有三处用户可见的写入出口（主保存 / 远方近端 / 未来新增），故此处只留一份。
+      const whyTxt = function (raw) {
+        // 归因必须区分「环境问题」与「实现缺陷」：把 missing-key / stringify 这类编程错误显示成原始
+        //   前缀，用户只会去清存储（或反复重试），永远修不好；反过来把配额问题说成「未知原因」也
+        //   无从下手。两者给不同的下一步动作。
+        const t = String(raw || '未知原因');
+        if (/^missing-key/.test(t)) return '登记项未声明 key（实现缺陷，与存储空间无关）';
+        if (/^stringify/.test(t)) return '设置值不可序列化（实现缺陷，与存储空间无关）';
+        if (/^setItem/.test(t)) return t.replace(/^setItem:\s*/, '') + '（存储写入被拒：配额已满/隐私模式等）';
+        return t;
+      };
       const saveBtn = $('#wa-set-save');
       if (saveBtn) saveBtn.onclick = () => {
-        WA.backstage.setSettings({
+        const wMain = WA.backstage.setSettings({
           simulationMode: $('#wa-set-mode').value,
           timePolicy: $('#wa-set-time').value,
           pulseActivity: $('#wa-set-pulse').value,
@@ -166,8 +183,17 @@
           memSamplerRelevance: $('#wa-set-msrel') && $('#wa-set-msrel').checked ? 'on' : 'off',
           customInstruction: $('#wa-set-custom').value.trim()
         });
-        WA.opinion.setSettings({ enabled: $('#wa-op-enable').checked, sandboxEnabled: $('#wa-op-sandbox').checked, everyNRounds: +$('#wa-op-n').value || 3 });
-        out().textContent = '✓ 设置已保存';
+        const wOp = WA.opinion.setSettings({ enabled: $('#wa-op-enable').checked, sandboxEnabled: $('#wa-op-sandbox').checked, everyNRounds: +$('#wa-op-n').value || 3 });
+        // v2.6.0: 保存结果必须回显——此前这里恒报「✓ 设置已保存」，而底层 save() 失败时
+        //   用户看到的是成功提示、磁盘上却什么都没变（配额满/隐私模式），下次打开发现配置回退
+        //   且完全无从判断是自己没保存还是被环境吞了。改为按 writeStat 的真实结果给话术。
+        const ws2 = (WA.settingsBus && WA.settingsBus.writeStat) ? WA.settingsBus.writeStat() : null;
+        //   两条判据都要看：① 本次调用的回传结果（最精确）；② 写入台账最近失败（兜住
+        //   「回传被吞」的路径）。两者任一为失败即报失败，绝不无条件报成功。
+        const badW = [wMain, wOp].filter(function (x) { return x && x.ok === false; })[0];
+        if (badW) out().textContent = '✗ 保存失败：' + whyTxt(badW.reason) + '（改动未落盘）';
+        else if (ws2 && ws2.lastError) out().textContent = '✗ 保存失败：' + whyTxt(ws2.lastError) + '（改动未落盘）';
+        else out().textContent = '✓ 设置已保存';
       };
       const opNow = $('#wa-op-now');
       if (opNow) opNow.onclick = async () => { out().textContent = '舆情生成中…'; const r = await WA.opinion.generate(); out().textContent = r.ok ? `✓ 新闻${r.news}条 论坛${r.forums}主题` : ('失败：' + r.reason); };
@@ -195,12 +221,16 @@
       });
       const hzSave = $('#wa-hz-save');
       if (hzSave) hzSave.onclick = () => {
-        WA.horizon.setSettings({
+        const wHz = WA.horizon.setSettings({
           distantEnabled: $('#wa-hz-d-en').checked, distantChance: +$('#wa-hz-d-chance').value, distantCooldown: +$('#wa-hz-d-cd').value, distantLedger: +$('#wa-hz-d-ledger').value,
           nearEnabled: $('#wa-hz-n-en').checked, nearChance: +$('#wa-hz-n-chance').value, nearCooldown: +$('#wa-hz-n-cd').value, nearLedger: +$('#wa-hz-n-ledger').value
         });
         const o = $('#wa-hz-out');
-        if (o) o.textContent = '✓ 已保存（生效值经区间夹取：概率 1-100%、冷却 0-20 轮、保底 3-30 轮）';
+        // v2.6.0: 与主保存同规格——写失败不得再报「✓ 已保存」；归因话术也复用同一处
+        //   （whyTxt 与主保存定义在同一作用域内，避免「两条保存路径两套措辞」的第二份真源）。
+        if (o) o.textContent = (wHz && wHz.ok === false)
+          ? ('✗ 保存失败：' + whyTxt(wHz.reason) + '（改动未落盘）')
+          : '✓ 已保存（生效值经区间夹取：概率 1-100%、冷却 0-20 轮、保底 3-30 轮）';
       };
       const evRoll = $('#wa-ev-roll');
       if (evRoll) evRoll.onclick = () => {

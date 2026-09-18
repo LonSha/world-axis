@@ -106,7 +106,8 @@
           }, module: 'backstage' };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_B]);
   function loadSettings() { return WA.settingsBus.read(__REG_B); }
-  function saveSettings(s) { WA.settingsBus.save(__REG_B, s); }
+  // v2.6.0: 走 saveOrThrow 以便回传失败原因（save() 的布尔不足以说明「为什么没落盘」）
+  function saveSettings(s) { return WA.settingsBus.saveOrThrow(__REG_B, s); }
 
   function getCtx() {
     try { return WA.mainWin.SillyTavern && WA.mainWin.SillyTavern.getContext ? WA.mainWin.SillyTavern.getContext() : null; }
@@ -171,7 +172,8 @@
   const __applyStat = { eventsCreated: 0, eventsUpdated: 0, eventsLoose: 0, lastAt: 0 };
   const backstage = WA.backstage = {
     getSettings: loadSettings,
-    setSettings(obj) { const s = Object.assign(loadSettings(), obj || {}); saveSettings(s); WA.emit('backstage:settings', s); },
+    // v2.6.0: 回传写入结果——面板据此区分「真保存」与「被环境吞掉」，不再无条件报成功。
+    setSettings(obj) { const s = Object.assign(loadSettings(), obj || {}); const w = saveSettings(s); WA.emit('backstage:settings', s); return w; },
     isRunning: () => !!currentTask,
     pending: () => pendingAnchor,
 

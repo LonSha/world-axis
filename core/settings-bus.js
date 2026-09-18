@@ -37,7 +37,28 @@
     //   原始格式复活（rawRevives）/ 结构指纹写入（schemaStamps）/ 幽灵键清理（ghostRemoved）。
     //   此前「迁移了几个键」「迁移失败了吗」只能靠翻日志，退出即散。
     migrations: 0, migrationFailed: 0, lastMigration: null,
-    rawRevives: 0, schemaStamps: 0, ghostRemoved: 0, ghostBytes: 0 };
+    rawRevives: 0, schemaStamps: 0, ghostRemoved: 0, ghostBytes: 0,
+    // v2.6.0: 写入侧计量——此前读有 `reads`、迁移有 `migrations`、盖章有 `schemaStamps`，
+    //   唯独 **save 的成败完全不可观测**：`save()` 返回 false 却不写 stats，而 12 个模块调用方
+    //   里只有 calendar 一处包了 try/catch、**没有一处检查返回值** ⇒ 配额满/隐私模式/键被策略性
+    //   拒绝时，用户点了「保存」、界面无任何提示、下次打开发现配置回到旧值，且诊断包里零线索
+    //   （最需要证据的场景恰恰是「什么都没写进去」）。本版补齐：writes = 真正写盘尝试次数、
+    //   writeFailed = 写盘失败次数（含未声明 key、JSON 序列化抛错、setItem 抛错三个来源）、
+    //   lastWrite = 最近一次成功写入的键与字节量（字节量取序列化后长度，可发现「越存越大」）、
+    //   lastWriteError = 最近一次失败原因（写失败必须能回答「为什么」）。
+    writes: 0, writeFailed: 0, lastWrite: null, lastWriteError: null,
+    // v2.6.0（收口）: 写失败**来源分类**——「配额已满」（环境问题，提示用户清理）与「登记项未声明
+    //   key」「值不可序列化」（代码缺陷，须改实现）是两类完全不同的故障；只留一个 lastError 字符串
+    //   会让诊断把编程错误报成环境问题，用户照着提示修永远修不好。
+    writeFailedBy: { missingKey: 0, stringify: 0, setItem: 0, writeback: 0, rawRevive: 0, quarantine: 0, legacy: 0, stamp: 0 },
+    // v2.6.0: 写入侧死键计量——`save()` 收到「不在登记 def 里的子键」的次数与最近键名。
+    //   v2.5.0 的缩减型迁移只解决了**存量**（老存档里已有的死子键），**增量**仍在继续：
+    //   `Object.assign(read(), patch)` 把运行时算出的旧字段一并写回、`setChannel` 无白名单地
+    //   接受任意额外字段，都会新造出 def 之外的子键，而迁移只在「读路径」触发、且对同形态只试一次。
+    //   本计量让「谁在往设置里塞 def 之外的东西」第一次可观测（**只计数，一个字节都不改**）。
+    //   命名口径：叫 extraSubkeys 而非 prunedSubkeys——本版**没有任何剪除动作**（写路径如实落盘），
+    //   用「已剪除」命名会让读诊断的人以为死键已经被清掉了，是计量里最危险的那种不实。
+    extraSubkeys: 0, lastExtra: null };
   // v2.4.0: 补齐告警去重——补齐发生在**返回值副本**上，磁盘未回写前每次读取都会再补一次。
   //   若每次补齐都打日志，热路径（loadSettings 每轮每事件调用）会刷屏：实测 300 轮掷骰产生
   //   900+ 条同内容 warn。故按「键」去重，本会话每个键只提示一次，计数不受影响。
@@ -171,13 +192,17 @@
     let value = raw;
     try { value = JSON.parse(JSON.stringify(raw)); } catch (e) { return { revived: false, reason: 'stringify-failed' }; }
     if (!probe) {
-      let ok = false;
-      try { ls.setItem(r.key, JSON.stringify(value)); ok = true; } catch (e2) { ok = false; }
+      // v2.6.0（收口）: 复活同样是写盘，经统一出口记账（含失败）。此前失败路径只返回
+      //   {revived:false}，**一个字节的记录都没有**——用户的旧格式配置没救回来，诊断里查不到原因。
+      const wRev = ls_set(r.key, value, 'rawRevive');
+      const ok = wRev.ok;
       if (ok) {
         stats.rawRevives++;
         if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 检测到历史原始格式（非 JSON 原文），已复活为 JSON 契约值——旧版本写入的裸值不再被判为损坏而丢弃');
+      } else if (WA.log) {
+        WA.log('error', 'settingsBus: ' + r.key + ' 原始格式已识别但复活写盘失败（本次未落盘，键仍是旧格式）', wRev.error);
       }
-      return { revived: ok, raw: raw, value: value, reason: ok ? 'revived' : 'write-failed' };
+      return { revived: ok, raw: raw, value: value, reason: ok ? 'revived' : ('write-failed: ' + String(stats.lastWriteError || 'unknown')) };
     }
     return { revived: true, raw: raw, value: value, reason: 'revivable' };
   }
@@ -240,11 +265,29 @@
       const res = r.migrate({ value: val, key: r.key, def: r.def });
       if (res && res.changed === true) {
         out = res.value;
-        status = 'ok'; reason = res.reason || null;
-        stats.migrations++;
-        stats.lastMigration = { key: r.key, at: now(), reason: reason, from: shapeOf(val), to: shapeOf(out) };
-        try { ls_set(r.key, out); } catch (eW) {}
-        if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 结构迁移 ' + shapeOf(val) + ' → ' + shapeOf(out) + (reason ? '（' + reason + '）' : ''));
+        // v2.6.0: 回写结果必须并入迁移结论——此前回写包在裸 try 里、失败静默，
+        //   于是 stats.migrations++ 已经记了「成功」，磁盘上却还是旧结构（下次启动再迁一遍），
+        //   诊断里显示的「已成功迁移 N 个」是假的。迁移的成败定义应是「新结构真的落盘」。
+        // v2.6.0（收口）: 回写经统一出口记账——ls_set 契约是「永不抛」，序列化失败也在内部记账
+        //   并返回 ok:false，故「迁移成没成」的判据只有一条：**新结构真的落盘了**。
+        //   此前回写失败**只**计 migrationFailed，`settingsBus.write` 议题不报、面板「写入侧」行
+        //   仍显示「全部落盘」，而用户磁盘上的结构其实没变（下次启动再迁一遍）。
+        const wbRes = ls_set(r.key, out, 'writeback');
+        const wErr = wbRes.ok ? null : (wbRes.error || { message: String(stats.lastWriteError || 'write-failed') });
+        const wroteBack = wbRes.ok;
+        if (wroteBack) {
+          status = 'ok'; reason = res.reason || null;
+          stats.migrations++;
+          stats.lastMigration = { key: r.key, at: now(), reason: reason, from: shapeOf(val), to: shapeOf(out) };
+          if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 结构迁移 ' + shapeOf(val) + ' → ' + shapeOf(out) + (reason ? '（' + reason + '）' : ''));
+        } else {
+          status = 'fail';
+          reason = 'writeback-failed: ' + String((wErr && (wErr.message || wErr)) || wErr).slice(0, 120);
+          stats.migrationFailed++;
+          stats.lastMigration = { key: r.key, at: now(), reason: reason, failed: true };
+          try { __migFailed[r.key] = reason; } catch (e0) {}
+          if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 结构迁移算完但回写失败（' + reason + '）——磁盘仍是旧结构，下次读取会再次尝试');
+        }
       } else {
         status = 'skip'; reason = (res && res.reason) || 'no-change';
       }
@@ -284,10 +327,72 @@
       return { changed: true, value: keep, reason: 'dropped-stale-subkeys:' + dropped.join(',') };
     };
   }
-  /** 内部：写盘（迁移回写专用，避免在本段依赖 save 的登记项形状） */
-  function ls_set(key, value) {
+  /**
+   * v2.6.0（收口）: 写失败归类记账——单一实现。
+   *   为什么需要：本版首轮把归因串直接写在各失败点（save 内三处），结果是**同一类故障的记账
+   *   要在每个点各写一遍**，而没人记得去补的地方就断档——正向审计抓到的正是这个：
+   *   迁移回写 / 结构盖章 / legacy 迁移三条路径的写失败压根没有记账。
+   * @param {string} tag 分类标签（决定 writeFailedBy 的桶，同时作为默认前缀）
+   * @param {*} err 原始错误或原因串
+   * @param {string} [prefix] 覆盖默认前缀（用于 missing-key / stringify 这类可读前缀）
+   */
+  function noteFail(tag, err, prefix) {
+    stats.writeFailed++;
+    try {
+      const t = tag || 'setItem';
+      if (stats.writeFailedBy && stats.writeFailedBy[t] !== undefined) stats.writeFailedBy[t]++;
+      else if (stats.writeFailedBy) stats.writeFailedBy.setItem++;
+    } catch (eC) { /* 分类计量失败不影响主计量 */ }
+    const msg = String((err && (err.message || err)) || err);
+    stats.lastWriteError = (prefix || ((tag || 'setItem') + ': ')) + msg.slice(0, 160);
+  }
+  /**
+   * v2.6.0（收口）: **唯一写盘出口**——设置家族键的每一次真实写入都必须经过这里。
+   *
+   * 为什么必须统一（本轮正向审计抓出的自身缺陷）：本版命题是「写失败可见」，但首轮只为
+   *   `save()` 与 `rawRevive` 两条路径接了计量，另有四条真实写路径仍在静默失败：
+   *     · 迁移回写——失败只记 migrationFailed，`settingsBus.write` 议题不报，面板照样显示「全部落盘」；
+   *     · 结构盖章——失败时 `catch { return false }`，**一个字节的记录都没有**；
+   *     · legacy 旧键迁移写盘——`catch (e4) {}` 完全静默；
+   *     · 损坏隔离副本写盘——失败被吞掉后**照样删原键**（「隔离」变成「直接销毁用户数据」）。
+   *   后果不是命名不实，而是**结论不实**：面板给出了「全部落盘」的判定，而判定的依据面并不
+   *   覆盖全部写路径。统一出口后，`writes / writeFailed` 对所有写路径成立，判定的依据面与
+   *   判定的措辞才一致。
+   *
+   * 语义：**永不抛**（返回 {ok, error}）——调用点多在 read 热路径上，把「写不进去」升级成
+   *   「读不出来」是把小故障放大成大故障。失败一律记账 + 归因，由调用方决定是否改变自己的结论。
+   *   写盘统计计「成功」（自增在 setItem 之后）：若放在之前，失败时 writes 与 writeFailed 同增，
+   *   诊断里「成功 N 次」立刻虚高，读的人会以为写进去了。
+   * @param {string} key
+   * @param {string} payload 已序列化字符串
+   * @param {string} [from] 来源标签（走 writeFailedBy 分类）
+   * @returns {{ok:boolean, error?:*, bytes:number}}
+   */
+  function lsWrite(key, payload, from) {
     const ls = (WA.mainWin || window).localStorage;
-    ls.setItem(key, JSON.stringify(value === undefined ? null : value));
+    const bytes = payload ? payload.length : 0;
+    try {
+      ls.setItem(key, payload);
+      stats.writes++;
+      stats.lastWrite = { key: key, bytes: bytes, at: now() };
+      stats.lastWriteError = null;
+      return { ok: true, bytes: bytes };
+    } catch (e) {
+      noteFail(from || 'setItem', e, (from && from !== 'setItem') ? (from + ': ') : 'setItem: ');
+      return { ok: false, error: e, bytes: bytes };
+    }
+  }
+  /**
+   * 内部：写盘（迁移回写 / 结构盖章 / legacy 迁移 / 原始格式复活共用）。
+   *   v2.6.0 收口后一律经统一出口 lsWrite 记账；序列化失败也在内部记账（它与写盘失败原因不同：
+   *   循环引用 vs 配额，但同样意味着「这次写入没有发生」）。
+   *   **契约：永不抛**——故调用方无需再包 try，也不会出现「漏包 try 就漏记账」的断档。
+   */
+  function ls_set(key, value, from) {
+    let payload = null;
+    try { payload = JSON.stringify(value === undefined ? null : value); }
+    catch (eS) { noteFail(from || 'writeback', eS, 'stringify: '); return { ok: false, error: eS }; }
+    return lsWrite(key, payload, from || 'writeback');
   }
   function ls_keys() {
     const ls = (WA.mainWin || window).localStorage;
@@ -391,7 +496,14 @@
     //   后续每次 read 都会在第一个条件处直接返回，天然零写入（不需要时间维度的记忆）。
     try {
       val._schema = { fp: fp, d: fingerprintDigest(fp), at: now() };
-      ls_set(r.key, val);
+      // v2.6.0（收口）: 盖章写盘此前是**完全静默**的失败路径（catch 后直接 return false，
+      //   一个字节的记录都没有）。盖章失败意味着「结构不符」每次读取都要重算、指纹永远缺失，
+      //   而它与配置写入失败同因（配额/隐私模式）——不进写入台账，「全部落盘」这个判定就是假的。
+      const stRes = ls_set(r.key, val, 'stamp');
+      if (!stRes.ok) {
+        if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 结构指纹写入失败（本次未落盘）：下次读取会重算并再试', stRes.error);
+        return false;
+      }
       stats.schemaStamps++;
       return true;
     } catch (e) { return false; }
@@ -501,8 +613,12 @@
               // 当前键损坏：留痕 + 隔离（sweep 可归置）
               stats.quarantines++;
               const qk = r.key + '_corrupt_' + now();
-              try { ls.setItem(qk, raw); } catch (e2) {}
-              try { ls.removeItem(r.key); } catch (e3) {}
+              // v2.6.0（收口）: 隔离副本写盘失败此前被 `catch(e2){}` 吞掉，而下一行**照样**删掉
+              //   原键——于是「隔离」变成「直接销毁用户数据」，且零痕迹。改为：副本没写成功就不动
+              //   原键（保命优先），并记账；原键保留 → 下次读取会再次尝试隔离，直到副本真的写下。
+              const wQ = lsWrite(qk, raw, 'quarantine');
+              if (wQ.ok) { try { ls.removeItem(r.key); } catch (e3) {} }
+              else if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 损坏但隔离副本写盘失败，已保留原键不做删除（避免直接销毁用户数据）', wQ.error);
               if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 损坏已隔离 → ' + qk + '（重置默认）', String(raw).slice(0, 200));
               val = null;
             }
@@ -520,14 +636,19 @@
               val = JSON.parse(lraw);
               stats.upgrades++;
               if (WA.log) WA.log('warn', 'settingsBus: ' + lk + ' 迁移 → ' + r.key, null);
-              try { ls.setItem(r.key, JSON.stringify(val)); } catch (e4) {}
+              // v2.6.0（收口）: 此前 `catch(e4){}` 完全静默——旧键已解析出值、本次仍可用，
+              //   但迁移写盘失败时用户每次启动都要重迁一遍，而台账里查不到任何痕迹。
+              const wLg = ls_set(r.key, val, 'legacy');
+              if (!wLg.ok && WA.log) WA.log('error', 'settingsBus: ' + lk + ' 迁移 → ' + r.key + ' 写盘失败（本次未落盘，下次读取会重试）', wLg.error);
               if (r.legacyRemove !== false) { try { ls.removeItem(lk); } catch (e5) {} }
             } catch (e) {
               // legacy 键也损坏：隔离留痕（防 v2 发布后误读老损坏格式）
               stats.quarantines++;
               const qk = lk + '_corrupt_' + now();
-              try { ls.setItem(qk, lraw); } catch (e6) {}
-              try { ls.removeItem(lk); } catch (e7) {}
+              // v2.6.0（收口）: 与设置键隔离同规格——副本没写成功就不删旧键（保命优先）。
+              const wQL = lsWrite(qk, lraw, 'quarantine');
+              if (wQL.ok) { try { ls.removeItem(lk); } catch (e7) {} }
+              else if (WA.log) WA.log('error', 'settingsBus: ' + lk + '（legacy）损坏但隔离副本写盘失败，已保留旧键不做删除', wQL.error);
               if (WA.log) WA.log('error', 'settingsBus: ' + lk + '（legacy）损坏已隔离 → ' + qk, String(lraw).slice(0, 200));
             }
             break;
@@ -565,6 +686,61 @@
     /** v2.5.0: 未登记设置键（幽灵设置）只读盘点——登记表与清理规则都管不到的键 */
     ghostScan() { return ghostScan(); },
     /**
+     * v2.6.0: 写入侧只读台账。
+     *
+     * **适用范围（v2.6.0 收口时实证确认，非估计）**：本台账覆盖**设置家族键**
+     *   （`worldaxis_*_settings_v1` / `worldaxis_*_v1` 等经注册表声明的键）的全部写路径。
+     *   全库另有 14 处直写 localStorage 的**旁路点**，实测**全部**落在非 settings 家族：
+     *     · `state`（store.js 主状态、chatcache installPack）——自带「写后读回校验」
+     *       （`__integrityStat` / writeVerified），且另有 store.integrity 议题出口；
+     *     · `state*_corrupt_*`（store.js 损坏隔离）——**保留原键不删**，无销毁语义；
+     *     · `recovery`（恢复点环形列表）；`conflict`（冲突现场键）；`writerId`（多实例标识）；
+     *     · `diagnostic`（event_log / error_log / wf_history / uninject_ledger）；
+     *     · `wb`（世界书选择）。
+     *   它们各有完整性或修订号机制，且不是「用户点保存」的路径——**不需要**并入本台账。
+     *   判据来自 `WA.store.classifyKey`（v2.5.0 起为单一真源），并由测试块 G13 逐点固化为
+     *   机器可校验的清单：**任何新增的 settings 家族旁路写点会让该断言失败**。
+     *   这条边界的意义在于诚实：台账说「全部落盘」时，它指的是**设置键**全部落盘；
+     *   把口径模糊成整个扩展的所有写盘，就是另一种计量不实。
+     *
+     * 已知残留缺口（本版未修，登记备查）：`engines/chatcache.js:96` 的 `installPack` 写 state
+     *   未做写后读回校验（其余 store 主路径均经 writeVerified / 校验出口），跨设备对账时
+     *   「安装成功」与「安装失败」不可区分 —— 属 state 家族，归下一轮。
+     *
+     * 为什么需要（本轮命题）：读侧已有 reads / subkeyFills / migrations / rawRevives / schemaStamps
+     *   五组计量，**写侧一个都没有**。而「保存了却没生效」是用户唯一会当场察觉、却最难取证的一类故障——
+     *   `save()` 早就在返回 false，但调用方零检查、stats 零记录、日志零输出，于是「配额写满」与
+     *   「功能没实现」在诊断包里长得一模一样。本视图把三个失败来源（缺 key / 序列化 / setItem）
+     *   与最近成功写入一起摊开，使「写不进去」第一次可判定。
+     * @returns {{writes:number, writeFailed:number, ok:boolean, last:object|null, lastError:string|null,
+     *   subkeyDrift:{count:number, last:object|null}}}
+     */
+    writeStat() {
+      // v2.6.0（收口）: ok 的语义只有在本计量**覆盖全部写路径**时才成立——这也是本版收口的原因
+      //   （首版只覆盖两条路径，ok 会在「迁移回写刚失败」时报 true）。bySource 让「环境问题」
+      //   与「代码缺陷」可分辨，否则用户拿到的结论是「清理存储再试」而实际是实现的 bug。
+      const bySource = {};
+      try { const src = stats.writeFailedBy || {}; Object.keys(src).forEach(function (k) { bySource[k] = src[k]; }); } catch (e) {}
+      return { writes: stats.writes, writeFailed: stats.writeFailed,
+        ok: stats.writeFailed === 0, last: stats.lastWrite, lastError: stats.lastWriteError,
+        bySource: bySource,
+        subkeyDrift: { count: stats.extraSubkeys, last: stats.lastExtra } };
+    },
+    /**
+     * v2.6.0: 严格写入——失败即返回原因，供「必须知道自己有没有存进去」的调用点使用。
+     *
+     * 与 save() 的关系：save() 的契约是「尽力写、返回布尔」，适合热路径与尽力而为的保存；
+     *   但**用户主动点击保存**的路径不该满足于此——那里失败必须能回显给用户。
+     *   本函数不改变 save() 的任何行为（不新增分支、不缓存状态），只是把它已经算出来的
+     *   失败原因结构化地交还给调用方（save 内部已把 lastWriteError 写进 stats）。
+     * @returns {{ok:boolean, reason?:string}}
+     */
+    saveOrThrow(reg, value) {
+      const ok = this.save(reg, value);
+      if (ok) return { ok: true };
+      return { ok: false, reason: stats.lastWriteError || 'write-failed（原因未记录）' };
+    },
+    /**
      * v2.5.0: 缩减型演化迁移器（单一实现，供各模块在登记项上引用）。
      *
      * 用法：`const __REG = { key, def: DEF, migrateObjects: true, migrate: WA.settingsBus.subkeyPruner(DEF) }`
@@ -583,7 +759,12 @@
     },
     save(reg, value) {
       const r = Object.assign({ key: null, orphan: false }, reg || {});
-      if (!r.key) return false;
+      // v2.6.0: 三个失败来源必须都可见——「静默写不进去」是配置丢失里最难查的一类。
+      if (!r.key) {
+        noteFail('missingKey', '（登记项未声明 key）', 'missing-key');
+        if (WA.log) WA.log('error', 'settingsBus: save 被调用但登记项缺 key —— 写入被丢弃（调用方传值无效）');
+        return false;
+      }
       const ls = (WA.mainWin || window).localStorage;
       let out = (value === undefined ? null : value);
       // v2.5.0: 回写时继承磁盘上的结构指纹——消费端拿到的 read() 结果里**没有** _schema
@@ -611,7 +792,43 @@
           out = copy;
         }
       }
-      try { ls.setItem(r.key, JSON.stringify(out)); return true; } catch (e) { return false; }
+      // v2.6.0: 序列化与写盘分两步、各自可归因。
+      //   此前 `JSON.stringify(out)` 就在 try 里与 setItem 同段——两者失败原因完全不同
+      //   （前者是值不可序列化/循环引用，后者是配额/隐私模式），混在一起无法诊断。
+      let payload = null;
+      try { payload = JSON.stringify(out); }
+      catch (eS) {
+        noteFail('stringify', eS, 'stringify: ');
+        if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 值无法序列化，写入被丢弃', eS);
+        return false;
+      }
+      if (payload === undefined) {   // 例如 value 是函数/undefined 且未走上面的 null 归一
+        noteFail('stringify', 'undefined（值不可表示）', 'stringify: ');
+        return false;
+      }
+      //   v2.6.0（收口）: 写盘一律经统一出口 lsWrite——记账、字节量、清空 lastWriteError、失败分类
+      //   全在那一处实现。此处不再自持一份写盘逻辑：**一份实现 + 一个计量**是台账能对账的前提。
+      const wMain = lsWrite(r.key, payload, 'setItem');
+      if (!wMain.ok) {
+        if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 写入失败（配额/隐私模式/键被拒绝），用户改动未落盘', wMain.error);
+        return false;
+      }
+      // v2.6.0: 顺带计量「写进来的 def 之外子键」——只计数，绝不剔除（写路径绝不改用户数据）。
+      //   为什么不在 save 里剔：save 的语义是「把调用方给的东西存下去」，在此静默丢字段会让
+      //   「我只改了一个开关」变成「我顺手删了你没见过的字段」，且会掩盖真正的缺陷源。
+      //   正确分工——save 负责**如实记录与计量**，收口负责**未来源**（各模块收口 + 未来按键显式声明）。
+      try {
+        const def = r.def;   // 各模块的 __REG 均自带 def（与 __settingsRegs 里那份是同一对象引用）
+        // 只对「有静态子键声明」的登记项判定：def 为空对象的容器型键（api_channels / workflow /
+        //   registry）其子键是**动态的**（通道名、工作流节点 id、NPC 名），没有「声明之外」这个概念，
+        //   否则每一次正常保存都会把全部动态子键报成漂移（本版首轮实测即踩到，属自造的误报）。
+        if (def && typeof def === 'object' && !Array.isArray(def) && Object.keys(def).length > 0
+            && out && typeof out === 'object' && !Array.isArray(out)) {
+          const extra = Object.keys(out).filter(function (k) { return k !== '_schema' && !Object.prototype.hasOwnProperty.call(def, k); });
+          if (extra.length) { stats.extraSubkeys += extra.length; stats.lastExtra = { key: r.key, keys: extra.slice(0, 8), at: now() }; }
+        }
+      } catch (eM) { /* 计量失败不影响写入 */ }
+      return true;
     },
     /** 注册表（只读拷贝）：{ key, legacy, legacyRemove, optional, orphan, def, module } */
     registry() {

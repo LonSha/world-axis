@@ -40,7 +40,8 @@
     migrate: WA.settingsBus.subkeyPruner(EVO_DEF) };
   function loadSettings() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  function saveSettings(s) { WA.settingsBus.save(__REG, s); }
+  // v2.6.0: 走 saveOrThrow 以便回传失败原因（save() 的布尔不足以说明「为什么没落盘」）
+  function saveSettings(s) { return WA.settingsBus.saveOrThrow(__REG, s); }
 
   function uid(prefix) { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -48,7 +49,8 @@
   const evolution = WA.evolution = {
     STAGE_MAP, TERMINAL, REPUTATION_LEVELS, FACTION_STATUS, FACTION_RELATION, ECONOMY_CLIMATE,
     getSettings: loadSettings,
-    setSettings(o) { saveSettings(Object.assign(loadSettings(), o || {})); },
+    // v2.6.0: 回传写入结果（见 backstage.setSettings 注释）
+    setSettings(o) { return saveSettings(Object.assign(loadSettings(), o || {})); },
 
     // ════════════════════════════════════════════════════
     // 事件链 CRUD + 骰子推进（移植 forceTriggerEvents）
