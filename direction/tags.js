@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   // 快捷导演指令：玩家消息中以 [[wa:xxx]] 形式触发
   const TAGS = {
@@ -10,11 +13,11 @@
       return '世界时间推进半天';
     }},
     'wa:storm': { desc: '提升世界脉搏到2', apply(ctx) {
-      WA.store.transact(d => { d.worldPulse = { pressure: 2, trend: 'rising', note: '用户手动加压', at: Date.now() }; });
+      WA.store.transact(d => { d.worldPulse = { pressure: 2, trend: 'rising', note: '用户手动加压', at: clockNow('tags') }; });
       return '世界脉搏已加压';
     }},
     'wa:calm': { desc: '降低世界脉搏到0', apply(ctx) {
-      WA.store.transact(d => { d.worldPulse = { pressure: 0, trend: 'falling', note: '用户手动平息', at: Date.now() }; });
+      WA.store.transact(d => { d.worldPulse = { pressure: 0, trend: 'falling', note: '用户手动平息', at: clockNow('tags') }; });
       return '世界脉搏已平息';
     }},
     'wa:sim': { desc: '立即触发一次世界推演', apply(ctx) {

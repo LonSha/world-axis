@@ -14,6 +14,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const mainWin = WA.mainWin || window;
 
   const NS = 'worldaxis';
@@ -120,7 +123,7 @@
           //   存储可读性，不是写入毒化）。方向仍保守（一律判失败），但归因必须诚实。
           try { back = mainWin.localStorage.getItem(key); } catch (eR) { back = null; backErr = eR; }
           if (backErr) { noteRead('chatcacheInstallBack', key, backErr); __installStat.readBackFailed = (__installStat.readBackFailed || 0) + 1; }
-          __installStat.attempts++; __installStat.lastAt = Date.now();
+          __installStat.attempts++; __installStat.lastAt = clockWall();
           __installStat.lastKey = key; __installStat.lastBytes = data.state.length;
           if (back === data.state) {
             __installStat.ok++;
@@ -132,7 +135,7 @@
           }
         } catch (e) {
           __installStat.attempts++; __installStat.failed++;
-          __installStat.lastAt = Date.now(); __installStat.lastKey = key;
+          __installStat.lastAt = clockWall(); __installStat.lastKey = key;
           __installStat.lastReason = 'write:' + String((e && e.message) || e).slice(0, 80);
           if (WA.log) WA.log('error', 'chatcache: 存档安装写盘失败（配额/隐私模式）——本次恢复未生效', e);
         }
@@ -208,7 +211,7 @@
       return nsArg ? curRev : true;
     }
     const rev = Math.max(localRev(id), (ns.live && ns.live.rev) || 0) + 1;
-    ns.live = { rev, updatedAt: Date.now(), chatId: id, data };
+    ns.live = { rev, updatedAt: clockNow('chatcache'), chatId: id, data };
     if (nsArg) return rev;
     if (writeNamespace(ns)) { setLocalRev(id, rev); return true; }
     return false;
@@ -237,7 +240,7 @@
         const same = ns.live && ns.live.chatId === id && sameData(ns.live.data, data);
         if (!same && (!ns.live || (ns.live.rev || 0) <= localRev(id))) {
           const rev = Math.max(localRev(id), (ns.live && ns.live.rev) || 0) + 1;
-          ns.live = { rev, updatedAt: Date.now(), chatId: id, data };
+          ns.live = { rev, updatedAt: clockNow('chatcache'), chatId: id, data };
           setLocalRev(id, rev);
           changed = true;
         } else if (ns.live && ns.live.chatId === id && (ns.live.rev || 0) > localRev(id)) {
@@ -258,8 +261,8 @@
           const lastAuto = autos[autos.length - 1];
           if (!lastAuto || !sameData(lastAuto.data, packChat(id))) {
             ns.snapshots.push({
-              id: 'auto_' + Date.now().toString(36), name: `自动备份 第${round}轮`,
-              auto: true, at: Date.now(), data: packChat(id)
+              id: 'auto_' + clockNow('chatcache').toString(36), name: `自动备份 第${round}轮`,
+              auto: true, at: clockNow('chatcache'), data: packChat(id)
             });
             pruneSnapshots(ns);
             changed = true;
@@ -295,7 +298,7 @@
     const data = packChat(id);
     if (!Object.keys(data).length) return { ok: false, reason: 'empty' };
     const ns = ensureNamespace();
-    ns.snapshots.push({ id: 'snap_' + Date.now().toString(36), name: String(name || '存档').slice(0, 30), auto: false, at: Date.now(), data });
+    ns.snapshots.push({ id: 'snap_' + clockNow('chatcache').toString(36), name: String(name || '存档').slice(0, 30), auto: false, at: clockNow('chatcache'), data });
     pruneSnapshots(ns);
     return { ok: writeNamespace(ns) };
   }

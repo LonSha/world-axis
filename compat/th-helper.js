@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   // v2.0.0: 激活状态观测（init 探测并暴露只读快照接口）
   const __thState = { active: false, exposedAt: 0, lastReason: 'not-initialized' };
@@ -12,7 +15,7 @@
     init() {
       try {
         this.expose();
-        __thState.active = true; __thState.exposedAt = Date.now(); __thState.lastReason = 'exposed';
+        __thState.active = true; __thState.exposedAt = clockWall(); __thState.lastReason = 'exposed';
         return true;
       } catch (e) { __thState.active = false; __thState.lastReason = 'error:' + (e && e.message); WA.log('warn', 'TH 桥接暴露失败', e); return false; }
     },

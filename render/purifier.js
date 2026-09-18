@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_purifier_rules_v1';
   // v2.1.0: 净化运行观测（此前 apply 零调用 = 功能失效，接入后必须能回答「到底净化了没有」）
   const __purifyStat = { runs: 0, changed: 0, charsSaved: 0, blocked: 0, lastAt: 0, ruleErrors: 0, lastRules: [],
@@ -89,7 +92,7 @@ function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
       if (typeof r.find !== 'string' || !r.find) return { ok: false, reason: 'missing-find' };
       try { new RegExp(r.find, r.flags || 'g'); }
       catch (e) { return { ok: false, reason: 'bad-regex:' + ((e && e.message) || '').slice(0, 40) }; }
-      const id = r.id || ('r' + Date.now().toString(36));
+      const id = r.id || ('r' + clockNow('purifier').toString(36));
       this.rules.push({ id: id, name: r.name || r.find.slice(0, 20), find: r.find, replace: r.replace || '', flags: r.flags || 'g', enabled: r.enabled !== false });
       saveRules(this.rules);
       return { ok: true, id: id, total: this.rules.length };
@@ -117,7 +120,7 @@ function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
         if (next !== out) hit.push(r.id);
         out = next;
       }
-      __purifyStat.lastAt = Date.now();
+      __purifyStat.lastAt = clockWall();
       if (out !== src && !out.trim() && src.trim()) {
         // 守卫：净化后为空但原文非空——规则过宽，回退原文（否则整条回复消失且无从察觉）
         __purifyStat.blocked++;

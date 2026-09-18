@@ -14,6 +14,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const SEVERITY_ORDER = { error: 0, warn: 1, info: 2 };
 
@@ -310,7 +313,7 @@
       clean: errors === 0 && warns === 0,
       counts: { error: errors, warn: warns, info: infos, total: errors + warns + infos },
       sections,
-      checkedAt: Date.now()
+      checkedAt: clockNow('inspectorState')
     };
   }
 

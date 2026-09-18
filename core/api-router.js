@@ -7,6 +7,9 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const mainWin = WA.mainWin || window;
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const LS_KEY = 'worldaxis_api_channels_v1';
 
@@ -44,7 +47,7 @@
     try {
       const key = channel || 'default';
       const st = callLedger.get(key) || { count: 0, ok: 0, errors: 0, byKind: {}, lastAt: 0, lastMs: 0, totalMs: 0, lastError: null };
-      st.count++; st.totalMs += ms; st.lastMs = ms; st.lastAt = Date.now();
+      st.count++; st.totalMs += ms; st.lastMs = ms; st.lastAt = clockWall();
       if (err) {
         st.errors++;
         const kind = (err && err.kind) || (String((err && err.message) || err).match(/timeout|abort/i) ? 'timeout' : 'unknown');
@@ -86,7 +89,7 @@
       cfg[name] = Object.assign({}, cfg[name] || {}, picked);
       saveCfg(cfg);
       // v0.1.41: 配置变更计量 + 总线广播（热切换可观测；payload 不含 apiKey）
-      __cfgStat.changes++; __cfgStat.lastAt = Date.now(); __cfgStat.lastChannel = name;
+      __cfgStat.changes++; __cfgStat.lastAt = clockWall(); __cfgStat.lastChannel = name;
       if (!prev || !prev.baseUrl || prev.baseUrl !== cfg[name].baseUrl) __cfgStat.baseUrlChanges++;
       if (WA.emit) try { WA.emit('api:channel-changed', { channel: name, fields: Object.keys(obj || {}), hadPrevious: !!prev }); } catch (e) {}
     },
@@ -105,12 +108,12 @@
      */
     async call(channel, messages, opts) {
       opts = opts || {};
-      const t0 = Date.now();
+      const t0 = clockWall();
       try {
         return await this._callInner(channel, messages, opts, t0);
       } catch (e) {
         // v0.1.27: 配置类失败（未配置 BaseURL/模型）也要入账
-        if (!e || !e.__ledgered) recCall(channel, Date.now() - t0, e);
+        if (!e || !e.__ledgered) recCall(channel, clockWall() - t0, e);
         throw e;
       }
     },
@@ -128,7 +131,7 @@
       }
       const timeoutMs = opts.timeoutMs || 120000;
       const timer = setTimeout(() => ac.abort(new Error('timeout')), timeoutMs);
-      const t0 = Date.now();
+      const t0 = clockWall();
       let callErr = null;
       try {
         const url = cfg.baseUrl + '/chat/completions';
@@ -170,7 +173,7 @@
       } finally {
         clearTimeout(timer);
         release();
-        recCall(channel, Date.now() - t0, callErr);
+        recCall(channel, clockWall() - t0, callErr);
       }
     },
     /** v0.1.27: 通道调用台账只读视图（tool-diag 消费） */

@@ -21,6 +21,9 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const mainWin = WA.mainWin || window;
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   function getCtx() {
     try { return mainWin.SillyTavern && mainWin.SillyTavern.getContext ? mainWin.SillyTavern.getContext() : null; }
@@ -63,7 +66,7 @@
       const info = floorInfo();
       const rec = lastRecord();
       const cid = chatId();
-      if (!info.ok) { __stat.nochat++; __stat.lastReason = 'no-chat'; __stat.lastAt = Date.now();
+      if (!info.ok) { __stat.nochat++; __stat.lastReason = 'no-chat'; __stat.lastAt = clockWall();
         return { settle: false, reason: 'no-chat', rec: null }; }
       let settle = false, reason = null;
       if (__force) { settle = true; reason = 'forced'; __force = false; __stat.forced++; }
@@ -72,7 +75,7 @@
       else if (info.floor === rec.floor) {
         settle = false; reason = (rec.sig === info.sig) ? 'dup' : 'reroll';
       } else { settle = false; reason = 'rewind'; }   // info.floor < rec.floor
-      if (!settle) { __stat[reason] = (__stat[reason] || 0) + 1; __stat.lastReason = reason; __stat.lastAt = Date.now(); __stat.lastSkippedFloor = info.floor; }
+      if (!settle) { __stat[reason] = (__stat[reason] || 0) + 1; __stat.lastReason = reason; __stat.lastAt = clockWall(); __stat.lastSkippedFloor = info.floor; }
       return { settle: settle, reason: reason, rec: { chatId: cid, floor: info.floor, swipe: info.swipe, mesLen: info.mesLen, hash: info.hash, sig: info.sig } };
     },
     /** 结算完成：记录最后已结算楼层（在批内调用，随批落盘） */
@@ -83,16 +86,16 @@
           d.meta = d.meta || {};
           d.meta.lastSettle = {
             chatId: rec.chatId, floor: rec.floor, swipe: rec.swipe, sig: rec.sig,
-            round: (d.evolution && d.evolution.round) || 0, at: Date.now()
+            round: (d.evolution && d.evolution.round) || 0, at: clockNow('settleGuard.commit')
           };
         });
-        if (tx && tx.ok) { __stat.settles++; __stat.lastReason = 'settled'; __stat.lastAt = Date.now(); return true; }
+        if (tx && tx.ok) { __stat.settles++; __stat.lastReason = 'settled'; __stat.lastAt = clockWall(); return true; }
       } catch (e) { WA.log('warn', 'settleGuard.commit 失败（不阻断）', e); }
       return false;
     },
     /** 跳过留痕（interceptor 在 gate 拒绝后调用） */
     markSkip(reason) {
-      __stat.lastReason = reason; __stat.lastAt = Date.now();
+      __stat.lastReason = reason; __stat.lastAt = clockWall();
     },
     /** 手动旁路一次：下一次 begin 强制结算（用户删改消息后的 escape hatch） */
     forceNext() { __force = true; return true; },

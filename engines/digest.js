@@ -12,6 +12,9 @@
  */
 (function () {
   const WA = (window.WorldAxis = window.WorldAxis || {});
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const DIGEST_MIN = 150;
   const DIGEST_MAX = 200;
@@ -115,7 +118,7 @@
       tx.evolution.worldDigest = {
         text:    digest,
         round:   (tx.meta && tx.meta.round) || 0,
-        at:      Date.now()
+        at:      clockNow('digest')
       };
     });
     // v0.1.33: 移除裸 save——transact 已落盘（嵌套时延迟到最外层统一提交）

@@ -24,6 +24,7 @@ function section(t) { console.log('\n■ ' + t); }
 // 按依赖顺序加载扩展JS到同一vm上下文（跳过index.js与UI）
 const ctx = vm.createContext(global);
 const LOAD = [
+  'core/clock.js',           // v2.15.0: 时间源单一出口（核心原语，须最先装载）
   'core/rand.js',            // v2.14.0: 随机源单一出口（核心原语，须最先装载）
   'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
@@ -5876,9 +5877,9 @@ WA.loadScript = _ls.loadScript;
   // ── 2. 记忆层 refs 生产方（L0/L1/L2/L3 入账写 refs）──
   const memSrc800 = fs.readFileSync(path.join(BASE, 'engines/memory.js'), 'utf8');
   assert(memSrc800.indexOf('refs: recentRefs(3)') >= 0, 'L0 入账写 refs（recentRefs 溯源）');
-  assert(memSrc800.indexOf("l1.push({ t: Date.now(), s: String(r.recap).slice(0, 200), refs: inheritRefs(batch) });") >= 0, 'L1 合并继承 refs');
-  assert(memSrc800.indexOf("l2.push({ t: Date.now(), s: String(r.chapter).slice(0, 350), refs: inheritRefs(batch) });") >= 0, 'L2 合并继承 refs');
-  assert(memSrc800.indexOf("l3.push({ t: Date.now(), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200), refs: inheritRefs(batch) });") >= 0, 'L3 合并继承 refs');
+  assert(memSrc800.indexOf("l1.push({ t: clockNow('memory'), s: String(r.recap).slice(0, 200), refs: inheritRefs(batch) });") >= 0, 'L1 合并继承 refs（入账时间戳走决策时间）');
+  assert(memSrc800.indexOf("l2.push({ t: clockNow('memory'), s: String(r.chapter).slice(0, 350), refs: inheritRefs(batch) });") >= 0, 'L2 合并继承 refs（入账时间戳走决策时间）');
+  assert(memSrc800.indexOf("l3.push({ t: clockNow('memory'), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200), refs: inheritRefs(batch) });") >= 0, 'L3 合并继承 refs（入账时间戳走决策时间）');
   // 运行时验证：直接模拟入账后条目带 refs（recentRefs 走 timeline.captureRange）
   const memChat800 = chat800;
   const refsProbe800 = WA.timeline.captureRange(0, memChat800.length - 1);
@@ -9808,7 +9809,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10352,7 +10353,7 @@ assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.14.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.15.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10643,7 +10644,7 @@ assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.14.0', '入口版本为 2.14.0（实 ' + ver + '）');
+    assert(ver === '2.15.0', '入口版本为 2.15.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11049,7 +11050,7 @@ assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11166,7 +11167,7 @@ assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.14.0', '入口版本为 2.14.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.15.0', '入口版本为 2.15.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11554,7 +11555,7 @@ assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.14.0', '入口版本为 2.14.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.15.0', '入口版本为 2.15.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11924,7 +11925,7 @@ assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.14.0', '入口版本为 2.14.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.15.0', '入口版本为 2.15.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12289,7 +12290,7 @@ assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.14.0', '入口版本为 2.14.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.15.0', '入口版本为 2.15.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -12828,6 +12829,421 @@ assert(verF2500 === '2.14.0' && mfF2500.version === verF2500, '入口与清单�
     console.log('  ✓ 五处决策点行为接线实测｜端到端同种子重放逐项相同｜双消费端齐备｜负向自证 4 项');
     console.log('  ✓ 基座保真（宿主能力不被测试壳截断：设置真写盘、真读回，含负向自证）');
   } // end v2.14.0 block
+  // ══════════════════════════════════════════════════════════════════
+  // v2.15.0 块：时间源治理（第九面：可复现性的另一半）
+  //
+  // 命题：v2.14.0 把**随机源**收成了单一出口，于是「掷骰」这一半可复现了。
+  //   但可复现性要**两个输入同时确定**，而第二个输入一格都没管：**时间**。
+  //   全库 40 个产品文件共 165 处裸调 `Date.now()`，其中相当一部分根本不是
+  //   「记个时间戳好看」，而是真的在判定与写入——store 的 `idleMs > maxIdleMs`
+  //   过期判定（决定**哪些键被当成过期数据回收掉**）、`meta.createdAt/updatedAt/lastSettle`、
+  //   恢复点 `at`、memory 每一条摘要的 `t` 与 facts 的 `at`、`'superseded@'+时间戳` 的
+  //   reason 串、chatcache 的快照 id 与 `at`、workflow 链历史 `at`……全部直接落盘。
+  //   于是 v2.14.0 的复现结论是**半张**的：同样的种子，只要跑的时刻不同（哪怕只差一毫秒），
+  //   存档就不再逐字节相同——上一轮自己在 README 里点出的下一个缺口
+  //   （「没有任何 API 能把一份存档 + 一个种子跑成确定性回放」）根因就在这里。
+  //
+  // 本块立的四件事：① 裸调归零（唯一墙钟读取点 + 守卫 fallback 逐个可解释）
+  //   ② 冻结即确定（决策时间恒为虚拟时刻、可步进）③ 两类时间不得混流
+  //   （测量时间不受冻结影响——否则「这一轮跑了多久」变成假话）
+  //   ④ 非法参数不静默（否则「已冻结」这个结论本身不可信）
+  // ══════════════════════════════════════════════════════════════════
+  {
+    console.log('\n■ G20 时间源治理（第九面：可复现性的另一半）');
+    const fsM20 = require('fs');
+    const pathM20 = require('path');
+    const vmM20 = require('vm');
+    const PROD_DIRS20 = ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'];
+    const prodFiles20 = [];
+    function scan20(d) {
+      let ents = [];
+      try { ents = fsM20.readdirSync(pathM20.join(BASE, d)); } catch (e) { return; }
+      ents.forEach(function (e) {
+        const rel = d + '/' + e;
+        let st = null;
+        try { st = fsM20.statSync(pathM20.join(BASE, rel)); } catch (e2) { return; }
+        if (st.isDirectory()) { if (e !== 'node_modules') scan20(rel); }
+        else if (e.endsWith('.js')) prodFiles20.push(rel);
+      });
+    }
+    PROD_DIRS20.forEach(scan20);
+    prodFiles20.push('index.js');
+    // 口径：先**剥掉注释与字符串外的行注释**再扫。本文件与各模块的说明性注释里
+    //   大量出现「Date.now」这个词（讲的正是本版治理），裸正则会把文档债当漏改抓出来。
+    const stripComments20 = function (src) {
+      return src.replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n').map(function (l) { return l.replace(/(^|[^:'"\\])\/\/.*$/, '$1'); }).join('\n');
+    };
+    const rd20 = function (f) { return stripComments20(fsM20.readFileSync(pathM20.join(BASE, f), 'utf8')); };
+    // ── ① 裸调归零：每一次 `Date.now()` 都必须落在四种**可解释形态**之一 ──
+    //   R 唯一墙钟读取点（clock.raw，恰 1 处）
+    //   G 守卫自身的 fallback（与守卫声明**同行共现**——守卫是「时钟不可用时别炸」，
+    //     它与「绕过时钟直接读时间」的区别正在于「同行有 WA.clock.」这件事本身）
+    //   T 内联三目（index.js/rand.js 专用：`WA.clock ? ... : Date.now()`）
+    //   P 能力探测（`typeof Date !== 'undefined' && Date.now`，**不调用**）
+    //   B 裸调 —— 必须为 0。剩下的第 5 类会让回放对不上时无从定位。
+    const K20 = { raw: [], guard: [], ternary: [], probe: [], bare: [] };
+    let guardDecl20 = 0;
+    prodFiles20.forEach(function (f) {
+      rd20(f).split('\n').forEach(function (l, i) {
+        const at = f + ':' + (i + 1);
+        if (/const clock(Now|Wall) = function|function (now|wallNow)\(\) \{ try \{ return WA\.clock\./.test(l)) guardDecl20++;
+        if (/Date\.now\(\)/.test(l)) {
+          if (f === 'core/clock.js' && /function raw\(\) \{ return Date\.now\(\); \}/.test(l)) K20.raw.push(at);
+          else if (/catch \(e\) \{ return Date\.now\(\); \}/.test(l)) K20.guard.push({ at: at, ok: /WA\.clock\./.test(l) });
+          else if (/WA\.clock \?/.test(l)) K20.ternary.push({ at: at, ok: /WA\.clock \? [^:]*: Date\.now\(\)/.test(l) });
+          else K20.bare.push(at + ' | ' + l.trim().slice(0, 96));
+        } else if (/Date\.now\b/.test(l)) {
+          K20.probe.push({ at: at, ok: /typeof Date !== 'undefined' && Date\.now/.test(l) });
+        }
+      });
+    });
+    assert(K20.raw.length === 1 && K20.raw[0].indexOf('core/clock.js:') === 0,
+      '全库唯一墙钟读取点是 core/clock.js 的 raw()（实 ' + (K20.raw.join('、') || '无') + '）——其余全部改走决策时钟/测量时钟');
+    assert(K20.bare.length === 0,
+      '产品代码零裸调 Date.now()（去注释后，残留 ' + (K20.bare.join('、') || '无') + '）——裸调绕过冻结，回放对不上时只能全库通读');
+    const guardBad20 = K20.guard.filter(function (g) { return !g.ok; });
+    assert(guardBad20.length === 0 && K20.guard.length === guardDecl20 && guardDecl20 > 0,
+      '每个守卫 fallback 都与守卫声明同行共现（声明 ' + guardDecl20 + ' / fallback ' + K20.guard.length + ' / 未共现 ' + guardBad20.length + '）——兜底可留，但必须与 `WA.clock.` 同行；分家的那些就是漏改的裸调');
+    const ternaryBad20 = K20.ternary.filter(function (t) { return !t.ok; });
+    assert(ternaryBad20.length === 0 && K20.ternary.length > 0,
+      '内联三目全部形如 `WA.clock ? WA.clock.xxx() : Date.now()`（' + K20.ternary.length + ' 处，异常 ' + ternaryBad20.length + '）——index.js 走三目是因为 loadScriptOnce 会被测试壳切片重编译，不能用闭包守卫');
+    assert(K20.probe.length === 1 && K20.probe[0].ok,
+      '仅存的能力探测（' + (K20.probe[0] && K20.probe[0].at) + '）不调用 Date.now——探测「宿主有没有 Date」与「读时间」是两件事');
+    const clockCode20 = rd20('core/clock.js');
+    const clockRawHits20 = (clockCode20.match(/Date\.now\(\)/g) || []).length;
+    assert(clockRawHits20 === 1, 'core/clock.js 内 Date.now() 恰好 1 处（实 ' + clockRawHits20 + '）——多出来的必然是绕过 raw() 的第二条出口');
+    // ── ② 冻结即确定（本版存在的全部理由）──
+    const C20 = WA.clock;
+    const TS20 = 1757000000000;
+    assert(!!C20 && typeof C20.now === 'function', 'core/clock.js 已装载且决策时钟可用');
+    C20.unfreeze(); C20.resetClockStat();
+    {
+      const a20 = Date.now(), v20 = C20.now('g20.a'), b20 = Date.now();
+      assert(v20 >= a20 && v20 <= b20,
+        '未冻结时 now() 返回真墙钟（' + v20 + ' ∈ [' + a20 + ',' + b20 + ']）——**迁移行为中立**：不回放时与迁移前逐位一致');
+      assert(C20.clockStat().reproducible === false, '未冻结时 reproducible=false——「跟墙钟走」的会话谈不上可复现');
+    }
+    {
+      assert(C20.freeze(TS20) === TS20, 'freeze(时刻) 返回冻结后的虚拟时刻');
+      assert(C20.now('g20.b') === TS20 && C20.now('g20.b') === TS20,
+        '冻结后 now() 恒为虚拟时刻（两次连读同值）——「同一 tape 重放两次，写进存档的每个时间戳都相同」的前提');
+      assert(C20.clockStat().reproducible === true, '冻结后 reproducible=true');
+      const vBefore20 = C20.virtualAt();
+      C20.advance(5000);
+      assert(C20.virtualAt() === vBefore20 + 5000 && C20.now('g20.b') === vBefore20 + 5000,
+        'advance(5000) 推进虚拟轴且 now() 立刻跟随（' + vBefore20 + ' → ' + C20.virtualAt() + '）');
+      const vB20 = C20.virtualAt();
+      C20.advance();
+      assert(C20.virtualAt() === vB20 + 1000, 'advance() 省略步长时按默认 1000ms 推进');
+    }
+    // ── ③ 两类时间不得混流（与 rand 的决策流/标识流对偶）──
+    {
+      const a20 = Date.now(), w20 = C20.wallNow(), b20 = Date.now();
+      assert(w20 >= a20 && w20 <= b20 && w20 !== TS20,
+        '冻结下 wallNow() 仍读真墙钟（' + w20 + '）——耗时台账与渲染展示不受冻结影响，否则「这一轮跑了多久」变成假话');
+      C20.freeze(0);
+      assert(C20.now('g20.c') === 0 && C20.wallNow() > 1e12,
+        '把虚拟时刻设成 0：决策时间读 0（' + C20.now('g20.c') + '），测量时间仍读真实墙钟（' + C20.wallNow() + '）——同一个冻结状态下两类时间给出不同来源，这就是「不混流」的可执行证据');
+      C20.freeze(TS20);
+    }
+    // ── ④ 行为性落盘：逐个驱动真模块，查**落盘字段**是否等于虚拟时刻 ──
+    //   正则只能证明「Date.now 不见了」，证明不了「落盘的时间戳真的跟着冻结走」。
+    const stateKey20 = 'worldaxis_state_' + WA.store.chatId();
+    {
+      WA.store.transact(function (d) { d.g20 = { label: 'g20' }; });
+      const raw20 = JSON.parse(global.localStorage.getItem(stateKey20));
+      assert(raw20.meta.updatedAt === C20.virtualAt(),
+        'store 落盘的 meta.updatedAt === 虚拟时刻（实 ' + raw20.meta.updatedAt + '）——写进磁盘的那一个时间戳第一次可被指定');
+      WA.store.transact(function (d) { WA.memory.upsertFact(d, 'g20k', 'g20v', 'g20test'); });
+      const f20 = WA.store.get().memory.facts.filter(function (x) { return x.key === 'g20k'; })[0];
+      assert(f20 && f20.at === C20.virtualAt(), 'memory.upsertFact 的 at === 虚拟时刻（实 ' + (f20 && f20.at) + '）——记忆条目的时标是存档内容的一部分');
+      WA.store.transact(function (d) { WA.memory.upsertFact(d, 'g20k', 'g20v2', 'g20test'); });
+      const old20 = WA.store.get().memory.facts.filter(function (x) { return x.key === 'g20k' && !x.active; })[0];
+      assert(old20 && String(old20.reason).indexOf('superseded@' + C20.virtualAt()) === 0,
+        '覆盖事实时 reason 串含虚拟时刻（实 ' + (old20 && old20.reason) + '）——连「何时被谁取代」都在存档里，冻结必须覆盖到这里');
+      const id20 = WA.rand.id('g20_', 2, 'id');
+      const tsId20 = parseInt(id20.split('_')[1], 36);
+      assert(tsId20 === C20.virtualAt(),
+        'rand.id 的时间戳 === 虚拟时刻（' + id20 + '）——**本版第一处归因修正**：id 产物会落盘（伏笔 fs_*、消息 wax_*、writer_id），属决策时间；用测量时间会让「种子与时刻都指定了、存档仍不同」');
+      assert(WA.rand.randStat().ids > 0,
+        '标识流仍独立记账（ids=' + WA.rand.randStat().ids + '）——归因修正不改变 v2.14.0 的「标识流不占决策序列」，两条约束正交');
+      const snapRes20 = WA.chatcache.addSnapshot('g20 探针');
+      const snaps20 = WA.chatcache.listSnapshots() || [];
+      const snap20 = snaps20[snaps20.length - 1];
+      assert(snapRes20 && snapRes20.ok === true && snap20 && snap20.at === C20.virtualAt(),
+        'chatcache 快照 at === 虚拟时刻（实 ' + (snap20 && snap20.at) + '）');
+      assert(snap20 && parseInt(String(snap20.id).split('_')[1], 36) === C20.virtualAt(),
+        '快照 id 内的时间戳 === 虚拟时刻（id=' + (snap20 && snap20.id) + '）——「同一操作两次跑出来 id 天生不同」的根因就在这里');
+      WA.store.createRecoveryPoint(WA.store.chatId());
+      const rp20 = (WA.store.listRecoveryPoints(WA.store.chatId()) || [])[0];
+      assert(rp20 && rp20.at === C20.virtualAt(),
+        '恢复点 at === 虚拟时刻（实 ' + (rp20 && rp20.at) + '）——注意 createRecoveryPoint **无返回值**，成败只能看落盘结果，不能看 return');
+    }
+    {
+      // ④g 工作流链历史（本版**第二处归因修正**；async 真驱动）
+      C20.freeze(TS20);
+      WA.workflow.resetHistory(WA.store.chatId());
+      WA.workflow.register({ id: 'g20.wfnode', chain: 'g20wf', order: 1, label: 'G20 节点', async run() {} });
+      await WA.workflow.run('g20wf', {});
+      const wfHistKey20 = 'worldaxis_wf_history_' + WA.store.chatId();
+      const wfRaw20 = global.localStorage.getItem(wfHistKey20);
+      const wfHist20 = wfRaw20 ? JSON.parse(wfRaw20) : [];
+      assert(wfHist20.length > 0 && wfHist20[wfHist20.length - 1].at === TS20,
+        '工作流链历史**落盘**的 at === 虚拟时刻（实 ' + (wfHist20.length ? wfHist20[wfHist20.length - 1].at : null) + '）——`__chainHistory` 经 persistWorkflowHistory 落进 ' + wfHistKey20 + '，属决策时间');
+      const wfRun20 = WA.workflow.history(1).runs[0];
+      assert(wfRun20 && wfRun20.at === TS20, 'workflow.history() 只读视图同值——落盘与视图同源');
+      assert(wfRun20 && typeof wfRun20.ms === 'number',
+        '同一条记录里的 ms（耗时）仍为测量值（实 ' + (wfRun20 && wfRun20.ms) + '）——同一个函数里两类时间并存、各归各的口径');
+      const lc20 = WA.workflow.stats().lastChains.g20wf;
+      assert(lc20 && lc20.at !== TS20,
+        'lastChains.at（只进内存台账、不落盘）仍为墙钟值（实 ' + (lc20 && lc20.at) + '）——反向归因同样要修：进内存的别走决策时钟');
+      WA.workflow.resetHistory(WA.store.chatId());
+      WA.workflow.unregister('g20.wfnode');
+    }
+    // ── ⑤ 端到端重放：随机源 + 时间源**双双定住** ──
+    {
+      const runReplay20 = function () {
+        WA.rand.reseed(); WA.rand.seed(777);
+        C20.freeze(TS20);
+        WA.store.transact(function (d) { WA.memory.upsertFact(d, 'g20rk', 'g20rv', 'replay'); });
+        const raw = JSON.parse(global.localStorage.getItem(stateKey20));
+        return raw.meta.updatedAt + '|' + raw.memory.facts.filter(function (f) { return f.key === 'g20rk'; })
+          .map(function (f) { return f.at + '/' + f.reason; }).join(',');
+      };
+      const a20 = runReplay20(), b20 = runReplay20();
+      assert(a20 === b20 && a20.length > 4,
+        '两次重放落盘的时间戳**逐项相同**（' + a20 + '）——这正是「存档 + 种子 → 确定性回放」此前缺失的那一半');
+      C20.freeze(TS20); C20.advance(1000);
+      assert(runReplay20() === a20, '重放的确定性不依赖「外部没动过时钟」：每次重放自带 freeze，结果仍逐项相同');
+      //   反证：未冻结时同样两次重放**不同**——否则上一条可能只是恒真
+      const runWall20 = function () {
+        C20.unfreeze();
+        WA.store.transact(function (d) { d.g20wall = 1; });
+        return JSON.parse(global.localStorage.getItem(stateKey20)).meta.updatedAt;
+      };
+      const w1_20 = runWall20();
+      const spin20 = Date.now(); while (Date.now() === spin20) { /* 至少跨 1ms */ }
+      const w2_20 = runWall20();
+      assert(w1_20 !== w2_20,
+        '未冻结时同样两次重放落盘时间戳**不同**（' + w1_20 + ' vs ' + w2_20 + '）——证明上一条不是恒真：时间源没定住时，种子定住也没用');
+    }
+    // ── ⑥ 非法参数不静默（与 rand.seed 同口径）──
+    {
+      C20.freeze(TS20);
+      const vB20 = C20.virtualAt();
+      assert(C20.freeze(NaN) === null && C20.virtualAt() === vB20 && C20.frozen() === true,
+        'freeze(NaN) 被拒且**不改当前状态**（虚拟轴仍在 ' + C20.virtualAt() + '）——静默接受一个 NaN 时刻会让「我以为冻结了，其实没有」');
+      const out20 = [C20.freeze(Infinity), C20.freeze({}), C20.freeze('不是时刻')];
+      assert(out20.every(function (x) { return x === null; }),
+        'freeze(Infinity/对象/字符串) 一律拒绝（返回 ' + JSON.stringify(out20) + '）');
+      const st20 = C20.clockStat();
+      assert(st20.failed >= 4 && st20.failedBy['bad-freeze'] >= 4,
+        '非法冻结全部**归因入账**（failed=' + st20.failed + '，桶 ' + JSON.stringify(st20.failedBy) + '）——桶名答「哪一类非法」，调用点靠 site/日志定位');
+      const vD20 = C20.virtualAt();
+      C20.advance(NaN);
+      assert(C20.virtualAt() === vD20 + 1000 && C20.clockStat().failedBy['bad-advance'] >= 1,
+        'advance(非法) 归因后退回默认步长（' + vD20 + ' → ' + C20.virtualAt() + '）——回放台看到的是「时间在走」，看不出走错了');
+      assert(C20.now('g20.d') === C20.virtualAt(), '非法入参后时钟仍完全可用');
+    }
+    // ── ⑦ 声明即执行 + 零消费出口（「声明了」必须能推出「被调用过」）──
+    {
+      const names20 = Object.keys(C20);
+      const callMap20 = {
+        now: function () { return C20.now('g20.declare'); },
+        wallNow: function () { return C20.wallNow(); },
+        freeze: function () { return C20.freeze(TS20); },
+        unfreeze: function () { return C20.unfreeze(); },
+        frozen: function () { return C20.frozen(); },
+        virtualAt: function () { return C20.virtualAt(); },
+        advance: function () { return C20.advance(); },
+        drift: function () { return C20.drift(); },
+        clockStat: function () { return C20.clockStat(); },
+        resetClockStat: function () { return C20.resetClockStat(); },
+        sites: function () { return C20.sites(); }
+      };
+      const missing20 = names20.filter(function (k) { return typeof callMap20[k] !== 'function'; });
+      assert(missing20.length === 0 && names20.length >= 11,
+        'WA.clock 的每个导出都有调用样例（' + names20.length + ' 个：' + names20.join('/') + '）' + (missing20.length ? '，缺 ' + missing20.join(',') : ''));
+      names20.forEach(function (k) { callMap20[k](); });
+      //   本轮首版导出过 DEFAULT_SITE / DEFAULT_STEP_MS，探针实测全库零消费 ⇒ 摘除。
+      //   按 v2.11.0 已确立的裁决：留着零消费出口的风险不是「多一个 API」，而是下一个调用者会挑错的那个。
+      assert(!/DEFAULT_SITE:\s*DEFAULT_SITE|DEFAULT_STEP_MS:\s*DEFAULT_STEP_MS/.test(clockCode20),
+        '零消费常量不挂在出口面上——兜底站点名 `unspecified` 本来就自解释地写在 bySite 的键里，不需要一个符号常量去指代一个可见字符串');
+      const consumers20 = prodFiles20.filter(function (f) { return f !== 'core/clock.js'; })
+        .filter(function (f) { return /DEFAULT_SITE|DEFAULT_STEP_MS/.test(rd20(f)); });
+      assert(consumers20.length === 0,
+        '全库产品代码零消费这两个常量（' + (consumers20.join('、') || '无') + '）——摘除的判据是**实测零消费**，不是「看起来没用」');
+      C20.freeze(TS20); C20.resetClockStat();
+      C20.now('g20.s1'); C20.now('g20.s1'); C20.now('g20.s2'); C20.wallNow();
+      const sit20 = C20.sites();
+      assert(sit20.indexOf('g20.s1') >= 0 && sit20.indexOf('g20.s2') >= 0,
+        'sites() 可枚举真实消费面（' + sit20.join('/') + '）——「谁在读时间」第一次可定位到具体调用点，与 rand.channels()/evict.SITES 同型');
+      C20.unfreeze();
+    }
+    // ── ⑧ 记账口径：决策读取与测量读取分列 ──
+    {
+      C20.unfreeze(); C20.resetClockStat();
+      C20.freeze(TS20);
+      C20.now('g20.acc.a'); C20.now('g20.acc.a'); C20.now('g20.acc.b');
+      C20.wallNow(); C20.wallNow();
+      const st20 = C20.clockStat();
+      assert(st20.nowCalls === 3 && st20.wallCalls === 2,
+        '决策读取与测量读取分列记账（now=' + st20.nowCalls + ' / wall=' + st20.wallCalls + '）——混在一起会让「耗时统计还在不在」不可判');
+      assert(st20.bySite['g20.acc.a'] === 2 && st20.bySite['g20.acc.b'] === 1,
+        '逐站点计数（' + JSON.stringify(st20.bySite) + '）');
+      assert(st20.lastSite === 'g20.acc.b' && st20.lastAt === TS20 && st20.lastWallAt > 0,
+        'lastSite/lastAt/lastWallAt 定位最近一次读取（' + st20.lastSite + '/' + st20.lastAt + '）');
+      assert(st20.frozen === true && st20.reproducible === true && st20.drift !== 0,
+        '冻结态可查（frozen=' + st20.frozen + ' / reproducible=' + st20.reproducible + ' / drift=' + st20.drift + '）');
+      assert(st20.freezes === 1 && st20.unfreezes === 0,
+        '冻结/解除分别留痕（freezes=' + st20.freezes + ' / unfreezes=' + st20.unfreezes + '）');
+      C20.unfreeze();
+      assert(C20.clockStat().unfreezes === 1, 'unfreeze 留痕（unfreezes=' + C20.clockStat().unfreezes + '）');
+      //   R7 逆向审计补判据：上面三处 reproducible 断言恰好都落在 freeze 之后（freezes ≥ 1），
+      //   分辨不出「取当下冻结状态」与「取历史冻结次数」——把 reproducible 写成 `stat.freezes > 0`
+      //   在旧判据下全绿。这里制造「冻过、但此刻没冻」的分裂态来锁死语义。
+      const st20u = C20.clockStat();
+      assert(st20u.reproducible === false && st20u.freezes >= 1,
+        '解冻后 reproducible **立刻**回 false（此刻未冻结），而 freezes 仍记着 ' + st20u.freezes + ' 次历史冻结——reproducible 答的是「此刻能不能确定性重放」而非「曾经冻过」，写成 freezes > 0 会让「冻过一次就解冻继续跑」的会话谎报可复现');
+      //   R7 同型外溢：rand 的 reproducible 存在**同一歧义面**，而此前没有任何判据钉住它的取值
+      //   （只断言过类型与 seedSource 存在）。两个源的可复现语义必须同型，
+      //   否则「种子定了」与「时刻定了」的判定会在同一件事上分叉。
+      {
+        WA.rand.seed(4242);
+        const rExpl20 = WA.rand.randStat();
+        assert(rExpl20.reproducible === true && rExpl20.seedSource === 'explicit',
+          'rand.reproducible 在显式播种后为 true（seedSource=' + rExpl20.seedSource + '）');
+        WA.rand.reseed();
+        const rNone20 = WA.rand.randStat();
+        assert(rNone20.reproducible === false && rNone20.seedSource !== 'explicit' && rNone20.reseeds > rExpl20.reseeds,
+          'rand.reproducible 同样取「**当下**是否显式播种」（reseed 后 ' + rNone20.reproducible + '，seedSource=' + rNone20.seedSource + '，历史 reseeds=' + rNone20.reseeds + '）——两个源同型：都答「此刻能不能确定性重放」，不答「曾经播过种吗」。注意 reseed 后 lazy 播种把 seedSource 变成 auto：**有种子 ≠ 可复现**，这也正是 v2.14.0 立 `reproducible` 这个字段而非直接看 seed 的原因');
+        WA.rand.seed(777);
+      }
+      C20.resetClockStat();
+      assert(C20.clockStat().nowCalls === 0 && C20.clockStat().failed === 0,
+        'resetClockStat 把计量与失败台账**一并**归零——语义是「从此刻重新计量」，留一半旧账会污染「本轮有没有非法参数」');
+    }
+    // ── ⑨ 双消费端（诊断 / 面板 / 健康分 / verdict）──
+    {
+      C20.unfreeze(); C20.resetClockStat(); C20.freeze(NaN); C20.now('g20.diag');
+      const dg20 = WA.toolDiag.collect();
+      const ck20 = dg20.runtime && dg20.runtime.clock;
+      assert(ck20 && typeof ck20.nowCalls === 'number' && typeof ck20.reproducible === 'boolean'
+        && typeof ck20.failed === 'number' && typeof ck20.failedBy === 'object',
+        '诊断包透出 runtime.clock（含 failed/failedBy）——**本版首版漏透出这两个字段**时，非法冻结在诊断包里恒不可见，verdict 只会落到 info 分支说「未冻结」，正是「声明面空转」的变体：台账记了、出口没接上');
+      assert(ck20.failed >= 1 && ck20.failedBy['bad-freeze'] >= 1,
+        '诊断包里的失败台账是真的（failed=' + ck20.failed + '，' + JSON.stringify(ck20.failedBy) + '）');
+      assert(typeof ck20.wallCalls === 'number' && typeof ck20.sites === 'number',
+        '诊断包里两类读取与站点面并列透出（wall=' + ck20.wallCalls + ' / sites=' + ck20.sites + '）');
+      const panelSrc20 = fsM20.readFileSync(pathM20.join(BASE, 'ui/panel.js'), 'utf8');
+      assert(/function clockBlock\(/.test(panelSrc20) && /\$\{clockBlock\(\)\}/.test(panelSrc20),
+        '面板概览新增「时间源」块且被真实渲染进 renderOverview（纯展示、不引入控件，故不触碰 UI 绑定守卫）');
+      const m20bad = WA.store.maintain();
+      assert(typeof m20bad.signals.clockNowCalls === 'number' && typeof m20bad.signals.clockFailed === 'number'
+        && typeof m20bad.signals.clockReproducible === 'boolean',
+        'maintain() 透出三计量（now=' + m20bad.signals.clockNowCalls + ' / failed=' + m20bad.signals.clockFailed + ' / reproducible=' + m20bad.signals.clockReproducible + '）');
+      const badIssue20 = (m20bad.issues || []).filter(function (i) { return i.key === 'clock.failed'; })[0];
+      assert(badIssue20 && badIssue20.level === 'error',
+        '非法参数在健康巡视里报 error 并点名（' + ((badIssue20 && badIssue20.detail) || '').slice(0, 52) + '…）');
+      C20.resetClockStat(); C20.freeze(TS20);
+      const m20ok = WA.store.maintain();
+      assert(m20ok.score > m20bad.score,
+        '非法参数确实扣分（bad=' + m20bad.score + ' → ok=' + m20ok.score + '）——只看议题不看分会让「体检结论」与「分数」互相矛盾');
+      const frozenIssues20 = (m20ok.issues || []).filter(function (i) { return i.key === 'clock' || i.key === 'clock.failed'; });
+      assert(frozenIssues20.length === 0,
+        '冻结态下不产时钟议题（' + frozenIssues20.length + ' 条）——冻结是**正确姿势**，不该被当成问题报出来');
+      C20.resetClockStat(); C20.unfreeze(); C20.now('g20.diag2');
+      const m20info = WA.store.maintain();
+      const infoIssue20 = (m20info.issues || []).filter(function (i) { return i.key === 'clock' && i.level === 'info'; })[0];
+      assert(infoIssue20 && /freeze/.test(infoIssue20.detail),
+        '未冻结时报 info 并给出解法（' + ((infoIssue20 && infoIssue20.detail) || '').slice(0, 56) + '…）——「明明播了种两次跑出来的存档还是不一样」需要有人告诉用户根因与动作');
+      C20.resetClockStat(); C20.unfreeze(); C20.now('g20.diag3');
+      const vInfo20 = (WA.toolDiag.verdict(WA.toolDiag.collect()).issues || []).filter(function (i) { return i.key === 'clock'; })[0];
+      assert(vInfo20 && vInfo20.level === 'info', 'verdict 在未冻结时给 info（实 ' + (vInfo20 && vInfo20.level) + '）');
+      C20.resetClockStat(); C20.freeze(NaN);
+      const vErr20 = (WA.toolDiag.verdict(WA.toolDiag.collect()).issues || []).filter(function (i) { return i.key === 'clock'; })[0];
+      assert(vErr20 && vErr20.level === 'error',
+        'verdict 在参数非法时升级为 error（实 ' + (vErr20 && vErr20.level) + '）——失败台账透不进 verdict 时，这条恒为 info，非法冻结永不可见');
+      C20.resetClockStat(); C20.freeze(TS20);
+    }
+    // ── ⑩ 基座保真：时钟不新增持久键、不接管持久层 ──
+    {
+      const keysBefore20 = Object.keys(global.localStorage._dump()).sort().join(',');
+      C20.freeze(TS20); C20.advance(1000); C20.now('g20.key'); C20.wallNow(); C20.unfreeze();
+      const keysAfter20 = Object.keys(global.localStorage._dump()).sort().join(',');
+      assert(keysBefore20 === keysAfter20,
+        '冻结/推进不新增任何持久键（键数 ' + Object.keys(global.localStorage._dump()).length + '）——时钟没有资格占地，键预算由 store 登记表管着');
+      assert(!/localStorage/.test(clockCode20),
+        'core/clock.js（去注释后）零 localStorage 引用——刷新即解除冻结是**有意的代价**：要跨会话复现就带着 tape 走，那是回放台的责任');
+    }
+    // ── ⑪ 负向自证 4 项：真源码破坏 → 加载破坏副本 → 在副本上重跑**同一条真判据** ──
+    //   判据本身也是「工具」，须两向自证：锚点不存在/不唯一必须抛（否则破坏不可控或被静默跳过）。
+    const mkBroken20 = function (rel, from, to, extraRels) {
+      const c = vmM20.createContext({});
+      vmM20.runInContext('var window = this; window.WorldAxis = { log: function(){} };', c);
+      vmM20.runInContext('window.localStorage = (function(){ var s={}; return { setItem:function(k,v){s[k]=String(v);}, getItem:function(k){return (k in s)?s[k]:null;}, removeItem:function(k){delete s[k];}, clear:function(){s={};}, key:function(i){return Object.keys(s)[i]||null;}, get length(){return Object.keys(s).length;}, _dump:function(){return Object.assign({},s);} }; })();', c);
+      (extraRels || []).forEach(function (r) {
+        vmM20.runInContext(fsM20.readFileSync(pathM20.join(BASE, r), 'utf8'), c, { filename: r });
+      });
+      const src = fsM20.readFileSync(pathM20.join(BASE, rel), 'utf8');
+      const hits = src.split(from).length - 1;
+      if (hits !== 1) throw new Error('锚点在 ' + rel + ' 中命中 ' + hits + ' 次（须恰为 1，否则破坏不可控）');
+      vmM20.runInContext(src.replace(from, to), c, { filename: rel + '.broken' });
+      return c;
+    };
+    const judgeWall20 = function (CK) { const a = Date.now(), v = CK.now('probe.a'), b = Date.now(); return v >= a && v <= b; };
+    try {
+      const C11a = vmM20.runInContext('window.WorldAxis.clock',
+        mkBroken20('core/clock.js', 'function raw() { return Date.now(); }', 'function raw() { return 12345; }', []));
+      C11a.unfreeze();
+      C20.unfreeze();
+      assert(judgeWall20(C20) === true, '（负向自证·原版对照）「未冻结时 now() 落在墙钟区间内」在真源码上为真——否则下面的「破坏后为假」可能只是判据恒假');
+      assert(judgeWall20(C11a) === false, '（负向自证）把 raw() 改成返回常量后，同一条判据必须变假——不变假说明它抓不到「唯一墙钟读取点被替换」');
+      C20.freeze(TS20);
+    } catch (e11a) { assert(false, '（负向自证）raw() 破坏副本构建失败：' + (e11a && e11a.message)); }
+    const judgeFrozen20 = function (CK) { CK.freeze(TS20); return CK.now('probe.b') === TS20; };
+    try {
+      const C11b = vmM20.runInContext('window.WorldAxis.clock',
+        mkBroken20('core/clock.js', 'const v = __frozen ? __virtualAt : raw();', 'const v = raw();', []));
+      assert(judgeFrozen20(C20) === true, '（负向自证·原版对照）「冻结后 now() 恒为虚拟时刻」在真源码上为真');
+      assert(judgeFrozen20(C11b) === false, '（负向自证）摘掉 now() 的冻结分支后，同一条判据必须变假——否则「冻结生效」这件事本身无从证明');
+    } catch (e11b) { assert(false, '（负向自证）now 冻结分支破坏副本构建失败：' + (e11b && e11b.message)); }
+    const judgeIdTs20 = function (CK, RK) { const id = RK.id('x_', 0, 'id'); return parseInt(id.split('_')[1], 36) === CK.virtualAt(); };
+    try {
+      const W11c = vmM20.runInContext('window.WorldAxis', mkBroken20('core/rand.js', "WA.clock.now('rand.id')", 'WA.clock.wallNow()', ['core/clock.js']));
+      W11c.clock.freeze(TS20);
+      C20.freeze(TS20);
+      assert(judgeIdTs20(C20, WA.rand) === true, '（负向自证·原版对照）「id 时间戳 === 虚拟时刻」在真源码上为真');
+      assert(judgeIdTs20(W11c.clock, W11c.rand) === false,
+        '（负向自证）把 rand.id 的时间戳从决策时钟退回测量时钟后，同一条判据必须变假——否则本版最关键的一处归因修正没有任何判据钉住');
+    } catch (e11c) { assert(false, '（负向自证）rand.id 破坏副本构建失败：' + (e11c && e11c.message)); }
+    try {
+      const W11d = vmM20.runInContext('window.WorldAxis',
+        mkBroken20('core/workflow.js', "at: clockNow('workflow')", 'at: clockWall()', ['core/clock.js', 'core/settings-bus.js', 'core/store.js']));
+      W11d.store.init();
+      W11d.clock.freeze(TS20);
+      W11d.workflow.register({ id: 'g20.bn', chain: 'g20b', order: 1, label: 'n', async run() {} });
+      await W11d.workflow.run('g20b', {});
+      C20.freeze(TS20);
+      WA.workflow.resetHistory(WA.store.chatId());
+      WA.workflow.register({ id: 'g20.wf2', chain: 'g20wf2', order: 1, label: 'n', async run() {} });
+      await WA.workflow.run('g20wf2', {});
+      assert(WA.workflow.history(1).runs[0].at === C20.virtualAt(), '（负向自证·原版对照）「链历史 at === 虚拟时刻」在真源码上为真');
+      assert(W11d.workflow.history(1).runs[0].at !== TS20,
+        '（负向自证）把链历史 at 退回测量时钟后，同一条判据必须变假——否则第二处归因修正同样没有判据钉住');
+      WA.workflow.resetHistory(WA.store.chatId());
+      WA.workflow.unregister('g20.wf2');
+    } catch (e11d) { assert(false, '（负向自证）workflow at 破坏副本构建失败：' + (e11d && e11d.message)); }
+    // ── 收尾：清理本块写入的探针数据、复位时钟，避免污染后续块 ──
+    C20.freeze(TS20); C20.resetClockStat();
+    try { WA.store.transact(function (d) { delete d.g20; delete d.g20wall; }); } catch (eClr) {}
+    try { WA.workflow.resetHistory(WA.store.chatId()); } catch (eClr2) {}
+    C20.unfreeze();
+    console.log('  ✓ 裸调归零（唯一墙钟读取点＝clock.raw，守卫 fallback 逐个可解释）｜冻结即确定｜测量时间不受冻结');
+    console.log('  ✓ 六处决策点落盘实测（store/memory/rand.id/chatcache/恢复点/工作流链历史）｜端到端重放逐项相同');
+    console.log('  ✓ 非法参数不静默｜声明即执行｜双消费端（诊断/面板/健康分/verdict）｜负向自证 4 项');
+  } // end v2.15.0 block
   } // end v2.11.0 block
   } // end v2.10.0 block
   } // end v2.9.0 block

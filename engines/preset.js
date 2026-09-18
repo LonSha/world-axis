@@ -13,6 +13,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const mainWin = WA.mainWin || window;
 
   const KEY_ACTIVE = 'worldaxis_active_preset';
@@ -28,7 +31,7 @@
   };
 
   function genId() {
-    const ts = (typeof Date !== 'undefined' && Date.now) ? Date.now() : 0;
+    const ts = (typeof Date !== 'undefined' && Date.now) ? clockNow('preset') : 0;
     // v2.14.0: 标识流（预设 id 只需唯一；不再从决策流取数）。
     //   保留局部 id 生成而不用 WA.rand.id —— 本函数有 Date 缺失时的兜底（ts=0），
     //   而 WA.rand.id 内部无条件用 Date.now()，会在同一退化环境里炸。
@@ -121,7 +124,7 @@
     if (!p.id || p.id === DEFAULT_ID) p.id = genId();
     const customs = loadCustomPresets();
     const idx = customs.findIndex(x => x.id === p.id);
-    const now = Date.now();
+    const now = clockNow('preset');
     p.updatedAt = now;
     if (p.createdAt === 0) p.createdAt = now;
     if (idx >= 0) customs[idx] = p; else customs.push(p);
@@ -133,7 +136,7 @@
     const p = normalizePreset(preset);
     p.id = genId();
     if (newName && String(newName).trim()) p.name = String(newName).trim();
-    p.createdAt = Date.now(); p.updatedAt = p.createdAt;
+    p.createdAt = clockNow('preset'); p.updatedAt = p.createdAt;
     const customs = loadCustomPresets();
     customs.push(p);
     saveCustomPresetsArray(customs);

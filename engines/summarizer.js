@@ -18,6 +18,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const SMALL_BATCH = 4;      // 攒4条纪要→1条总述
   const CAP_SMALL = 24;
@@ -77,7 +80,7 @@
       ensureState(draft);
       draft.memory.smallSummaries.push({
         startLayer: range.startLayer, endLayer: range.endLayer,
-        content: clean(r.small_summary).slice(0, 220), at: Date.now(), used: false
+        content: clean(r.small_summary).slice(0, 220), at: clockNow('summarizer'), used: false
       });
       // v2.13.0: 纪要与总述此前是**登记表盲区**（全库唯一两条被 sizeAudit 报 unbounded 的容器），
       //   而代码其实一直在静默 slice(-N)：既被误判为无界，裁剪也无人知晓。补登 + 接台账一并修。
@@ -109,7 +112,7 @@
       ensureState(draft);
       const lo = Math.min(...batch.map(b => b.startLayer));
       const hi = Math.max(...batch.map(b => b.endLayer));
-      draft.memory.bigSummaries.push({ startLayer: lo, endLayer: hi, content: clean(r.big_summary), at: Date.now() });
+      draft.memory.bigSummaries.push({ startLayer: lo, endLayer: hi, content: clean(r.big_summary), at: clockNow('summarizer') });
       if (WA.evict) WA.evict.array(draft.memory.bigSummaries, 'memory.bigSummary');   // v2.13.0
       else draft.memory.bigSummaries = draft.memory.bigSummaries.slice(-CAP_BIG);
       const ids = new Set(batch.map(b => b.at));

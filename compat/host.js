@@ -4,6 +4,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const w = WA.mainWin || window;
   function context() { try { return w.SillyTavern && w.SillyTavern.getContext ? w.SillyTavern.getContext() : null; } catch (e) { return null; } }
   function detect() {
@@ -26,7 +29,7 @@
   compat.context = context;
   compat.detect = detect;
   compat.events = function () { const c = context(); const e = c && c.eventTypes || {}; return { ready: e.APP_READY || e.APP_READY_EVENT, generation: e.GENERATION_STARTED || e.GENERATION_AFTER_COMMANDS || e.MESSAGE_RECEIVED || e.GENERATION_ENDED, chatChanged: e.CHAT_CHANGED || e.CHAT_CHANGED_EVENT }; };
-  compat.snapshot = function () { const s = detect(); s.at = Date.now(); return s; };
+  compat.snapshot = function () { const s = detect(); s.at = clockNow('compat'); return s; };
   compat.diagnose = function () { const s = compat.snapshot(); if (WA.log) WA.log('info', '宿主能力探测完成', s); return s; };
   if (WA.log) WA.log('info', '宿主兼容层已加载');
 })();

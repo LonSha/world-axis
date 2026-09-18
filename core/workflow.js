@@ -7,6 +7,9 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const mainWin = WA.mainWin || window;
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_workflow_v1';
 
   // 节点：{id, chain:'before'|'after', label, order, enabled, run(ctx)->Promise|void, rollback?(ctx)}
@@ -34,7 +37,12 @@
   function recChain(chain, nodes, tStart) {
     try {
       __chainHistory.push({
-        chain: chain, at: Date.now(), ms: Date.now() - tStart,
+        // v2.15.0: 本条走**决策时间**——`__chainHistory` 由 `persistWorkflowHistory()` 落进
+        //   `worldaxis_wf_history_<chatId>`，是**进存档**的字段（归因修正）。
+        //   下面的 `ms`（耗时）与 `recFail`/`recStat`/`lastChains` 仍走测量时间：
+        //   它们只进内存台账与面板展示，把它们冻住会让「这一轮跑了多久」变成假话。
+        //   同一个函数里两类时间并存、各归各的口径——这正是本模块头注释①要防的混流。
+        chain: chain, at: clockNow('workflow'), ms: clockWall() - tStart,
         nodes: nodes.map(function (n) { return { id: n.id, ms: n.ms, status: n.status }; })
       });
       while (__chainHistory.length > HISTORY_MAX) __chainHistory.shift();
@@ -49,14 +57,14 @@
   let __wfSeq = 0;
   function recFail(id, label, chain, msg) {
     try {
-      __wfFails.push({ seq: ++__wfSeq, id: id, label: label || id, chain: chain, at: Date.now(), msg: String(msg == null ? '' : msg).slice(0, 160) });
+      __wfFails.push({ seq: ++__wfSeq, id: id, label: label || id, chain: chain, at: clockWall(), msg: String(msg == null ? '' : msg).slice(0, 160) });
       while (__wfFails.length > FAIL_MAX) __wfFails.shift();
     } catch (e) { /* 台账自身失败不影响链执行 */ }
   }
   function recStat(id, ms, status) {
     try {
       const st = stats.get(id) || { count: 0, errors: 0, lastMs: 0, totalMs: 0, lastAt: 0, lastStatus: null };
-      st.count++; st.totalMs += ms; st.lastMs = ms; st.lastAt = Date.now(); st.lastStatus = status;
+      st.count++; st.totalMs += ms; st.lastMs = ms; st.lastAt = clockWall(); st.lastStatus = status;
       if (status === 'error') st.errors++;
       stats.set(id, st);
     } catch (e) { /* 画像失败不影响链执行 */ }
@@ -84,23 +92,23 @@
 
     /** 顺序执行一条链；单节点失败不中断后续（除非 node.critical） */
     async run(chain, ctx) {
-      const tChain = Date.now();
+      const tChain = clockWall();
       const executed = [];
       const trace142 = [];
       const list = this.list(chain).filter(n => n.enabled);
       WA.log('info', `工作流[${chain}] 执行 ${list.length} 个节点`);
       for (const node of list) {
-        const t0 = Date.now();
+        const t0 = clockWall();
         try {
           await node.run(ctx);
           executed.push(node);
-          recStat(node.id, Date.now() - t0, 'ok');
-          trace142.push({ id: node.id, ms: Date.now() - t0, status: 'ok' });
-          WA.log('info', `  ✓ ${node.label || node.id} (${Date.now() - t0}ms)`);
+          recStat(node.id, clockWall() - t0, 'ok');
+          trace142.push({ id: node.id, ms: clockWall() - t0, status: 'ok' });
+          WA.log('info', `  ✓ ${node.label || node.id} (${clockWall() - t0}ms)`);
         } catch (e) {
-          recStat(node.id, Date.now() - t0, 'error');
+          recStat(node.id, clockWall() - t0, 'error');
           recFail(node.id, node.label, chain, (e && e.message) || e);   // v2.1.0: 失败原因入台账
-          trace142.push({ id: node.id, ms: Date.now() - t0, status: 'error' });
+          trace142.push({ id: node.id, ms: clockWall() - t0, status: 'error' });
           WA.log('error', `  ✗ ${node.label || node.id}: ` + (e && e.message || e));
           if (node.critical) {
             // 关键节点失败：逆序回滚已执行节点
@@ -112,7 +120,7 @@
         }
       }
       try {
-        lastChains[chain] = { at: Date.now(), nodeCount: list.length, executedCount: executed.length, ms: Date.now() - tChain };
+        lastChains[chain] = { at: clockWall(), nodeCount: list.length, executedCount: executed.length, ms: clockWall() - tChain };
         recChain(chain, trace142, tChain);
       } catch (e) {}
       return executed;

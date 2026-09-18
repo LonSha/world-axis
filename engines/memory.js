@@ -5,6 +5,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const CAP = { l0: 20, l1: 30, l2: 40, l3: 60, facts: 100, foreshadows: 30 };
   const L1_EVERY = 5;   // L0攒5条→L1
@@ -62,7 +65,7 @@ const memory = WA.memory = {
       ], { json: true, maxTokens: 300, temperature: 0.3 }).catch(() => null);
       if (!r || !r.summary) return null;
       WA.store.transact(draft => {
-        draft.memory.l0.push({ t: Date.now(), s: String(r.summary).slice(0, 120), refs: recentRefs(3) });
+        draft.memory.l0.push({ t: clockNow('memory'), s: String(r.summary).slice(0, 120), refs: recentRefs(3) });
         if (WA.evict) WA.evict.array(draft.memory.l0, 'memory.l0'); else draft.memory.l0 = draft.memory.l0.slice(-CAP.l0);
       });
       return r.summary;
@@ -81,11 +84,11 @@ const memory = WA.memory = {
       ], { json: true, maxTokens: 600, temperature: 0.3 }).catch(() => null);
       if (!r || !r.recap) return false;
       WA.store.transact(draft => {
-        draft.memory.l1.push({ t: Date.now(), s: String(r.recap).slice(0, 200), refs: inheritRefs(batch) });
+        draft.memory.l1.push({ t: clockNow('memory'), s: String(r.recap).slice(0, 200), refs: inheritRefs(batch) });
         if (WA.evict) WA.evict.array(draft.memory.l1, 'memory.l1'); else draft.memory.l1 = draft.memory.l1.slice(-CAP.l1);
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'digest'); });
         if (r.foreshadow && r.foreshadow.content) {
-          (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: WA.rand.id('fs', 3, 'id'), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: inheritRefs(batch), at: Date.now() });
+          (draft.memory.foreshadows = draft.memory.foreshadows || []).push({ id: WA.rand.id('fs', 3, 'id'), content: String(r.foreshadow.content).slice(0, 150), status: 'waiting', links: inheritRefs(batch), at: clockNow('memory') });
           // v1.2.0: 终态回收先于截断（单一实现 pruneForeshadows，与 backstage 容量控制段同口径）
           pruneForeshadows(draft.memory.foreshadows);
         }
@@ -108,7 +111,7 @@ const memory = WA.memory = {
       ], { json: true, maxTokens: 800, temperature: 0.3 }).catch(() => null);
       if (!r || !r.chapter) return false;
       WA.store.transact(draft => {
-        draft.memory.l2.push({ t: Date.now(), s: String(r.chapter).slice(0, 350), refs: inheritRefs(batch) });
+        draft.memory.l2.push({ t: clockNow('memory'), s: String(r.chapter).slice(0, 350), refs: inheritRefs(batch) });
         if (WA.evict) WA.evict.array(draft.memory.l2, 'memory.l2'); else draft.memory.l2 = draft.memory.l2.slice(-CAP.l2);
         (r.facts || []).slice(0, 3).forEach(f => { if (f && f.key) memory.upsertFact(draft, f.key, f.value, 'l2'); });
         draft.memory.l1 = draft.memory.l1.slice(0, draft.memory.l1.length - L2_EVERY);
@@ -131,7 +134,7 @@ const memory = WA.memory = {
       ], { json: true, maxTokens: 600, temperature: 0.3 }).catch(() => null);
       if (!r || !r.theme) return false;
       WA.store.transact(draft => {
-        draft.memory.l3.push({ t: Date.now(), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200), refs: inheritRefs(batch) });
+        draft.memory.l3.push({ t: clockNow('memory'), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200), refs: inheritRefs(batch) });
         if (WA.evict) WA.evict.array(draft.memory.l3, 'memory.l3'); else draft.memory.l3 = draft.memory.l3.slice(-CAP.l3);
         draft.memory.l2 = draft.memory.l2.slice(0, draft.memory.l2.length - L3_EVERY);
       });
@@ -144,10 +147,10 @@ const memory = WA.memory = {
       const old = facts.find(f => f.key === key && f.active);
       if (old) {
         if (old.value === value) return false;
-        old.active = false; old.reason = 'superseded@' + Date.now();
-        facts.push({ key, value, version: (old.version || 1) + 1, active: true, reason: source || '', at: Date.now() });
+        old.active = false; old.reason = 'superseded@' + clockNow('memory');
+        facts.push({ key, value, version: (old.version || 1) + 1, active: true, reason: source || '', at: clockNow('memory') });
       } else {
-        facts.push({ key, value, version: 1, active: true, reason: source || '', at: Date.now() });
+        facts.push({ key, value, version: 1, active: true, reason: source || '', at: clockNow('memory') });
       }
       if (WA.evict) { WA.evict.array(facts, 'memory.facts'); draft.memory.facts = facts; }
       else draft.memory.facts = facts.slice(-CAP.facts);
@@ -175,16 +178,16 @@ const memory = WA.memory = {
     id: 'memory.digest', chain: 'after', order: 40, label: '记忆L0→L1→L2→L3分层巩固',
     async run() {
       // v0.1.40: 分层计时——每层耗时入 __memStat，供诊断观察巩固链路开销
-      const t0 = Date.now();
+      const t0 = clockWall();
       let l1r = false, l2r = false, l3r = false;
       try { await WA.memory.digestRound(); } catch (e) { WA.log('warn', 'digestRound 异常（巩固链继续）', e); }
       try { l1r = await WA.memory.consolidateL1() !== false; } catch (e) { WA.log('warn', 'consolidateL1 异常（巩固链继续）', e); }
-      const t1 = Date.now(); __memStat.layers.l1 = { ms: t1 - t0, ran: l1r };
+      const t1 = clockWall(); __memStat.layers.l1 = { ms: t1 - t0, ran: l1r };
       try { l2r = await WA.memory.consolidateL2() !== false; } catch (e) { WA.log('warn', 'consolidateL2 异常（巩固链继续）', e); }
-      const t2 = Date.now(); __memStat.layers.l2 = { ms: t2 - t1, ran: l2r };
+      const t2 = clockWall(); __memStat.layers.l2 = { ms: t2 - t1, ran: l2r };
       try { l3r = await WA.memory.consolidateL3() !== false; } catch (e) { WA.log('warn', 'consolidateL3 异常（巩固链继续）', e); }
-      __memStat.layers.l3 = { ms: Date.now() - t2, ran: l3r };
-      __memStat.rounds++; __memStat.lastMs = Date.now() - t0; __memStat.totalMs += __memStat.lastMs; __memStat.lastAt = Date.now();
+      __memStat.layers.l3 = { ms: clockWall() - t2, ran: l3r };
+      __memStat.rounds++; __memStat.lastMs = clockWall() - t0; __memStat.totalMs += __memStat.lastMs; __memStat.lastAt = clockWall();
     }
   });
 })();

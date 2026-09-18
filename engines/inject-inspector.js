@@ -16,6 +16,9 @@
   'use strict';
   const G = (typeof window !== 'undefined') ? window : global;
   const WA = G.WorldAxis = G.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const mainWin = WA.mainWin || G;
 
   const SENTINEL = 'world_axis_state';
@@ -62,7 +65,7 @@
 
   /** inject.js 落地成功后打点：用于区分「没注册」与「注册了却丢了」 */
   function markRegistered(len) {
-    _registered = { len: len | 0, at: safe(function () { return Date.now(); }, 0) };
+    _registered = { len: len | 0, at: safe(function () { return clockNow('injectInspector'); }, 0) };
   }
 
   function snapEnv(ctx, meta) {
@@ -117,7 +120,7 @@
       }
       const landed = ourIndex >= 0;
       return {
-        apiType: 'chat', ts: safe(function () { return Date.now(); }, 0),
+        apiType: 'chat', ts: safe(function () { return clockNow('injectInspector'); }, 0),
         status: classify(env, landed), landed: landed,
         messageCount: chat.length, roleChain: chain,
         ourIndex: ourIndex, ourContent: ourContent.slice(0, MAX_EXCERPT), ourContentLen: ourContent.length,
@@ -136,7 +139,7 @@
       const landed = idx >= 0;
       const excerpt = landed ? prompt.slice(Math.max(0, idx - 40), idx + MAX_EXCERPT) : '';
       return {
-        apiType: 'text', ts: safe(function () { return Date.now(); }, 0),
+        apiType: 'text', ts: safe(function () { return clockNow('injectInspector'); }, 0),
         status: classify(env, landed), landed: landed,
         promptLength: prompt.length, ourIndex: idx,
         ourExcerpt: excerpt, ourExcerptLen: excerpt.length,

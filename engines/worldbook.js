@@ -13,6 +13,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const mainWin = WA.mainWin || window;
   const LS_PREFIX = 'worldaxis_wb_selection_';
 
@@ -73,7 +76,7 @@
     const ov = sanitizeOverrides(overrides);
     const trimmed = {};
     for (const k in ov) if (idSet.has(k)) trimmed[k] = ov[k];
-    mainWin.localStorage.setItem(getSelectionKey(), JSON.stringify({ ids: uniqueIds, t: Date.now(), overrides: trimmed }));
+    mainWin.localStorage.setItem(getSelectionKey(), JSON.stringify({ ids: uniqueIds, t: clockNow('worldbook'), overrides: trimmed }));
   }
   function saveSelectedIds(ids) { persistSelection(ids, readStored().overrides); }
   function saveSelection(ids, overrides) { persistSelection(ids, overrides); }

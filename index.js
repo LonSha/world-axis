@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.14.0';
+  const VERSION = '2.15.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -33,13 +33,18 @@
   WA.version = VERSION;
   WA.mainWin = mainWin;
   WA.mainDoc = mainDoc;
+  // v2.15.0: 时间源单一出口（决策时间进存档/参与判定，测量时间只进内存台账与日志）。
+  //   注意：本文件里一律用**内联三目**而非局部 helper——run.js 会把 loadScriptOnce 这
+  //   段源码切片出来在独立沙箱里重编译，helper 不在切片内，用 helper 会在 CDN 回退路径上炸。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   // v2.0.0: 模块注册表契约已下沉至 core/store.js（注册表必须在所有加载路径下存在，
   // 而非仅在入口文件）——此处保留转发兜底，防旧加载顺序下未定义。
   if (typeof WA.registerModule !== 'function') {
     WA.modules = WA.modules || {};
     WA.registerModule = function (name, meta) {
       if (!name) return null;
-      const rec = { name: name, at: Date.now(), ver: (meta && meta.ver) || VERSION, kind: (meta && meta.kind) || 'engine' };
+      const rec = { name: name, at: (WA.clock ? WA.clock.now('index.module') : Date.now()), ver: (meta && meta.ver) || VERSION, kind: (meta && meta.kind) || 'engine' };
       WA.modules[name] = rec;
       return rec;
     };
@@ -108,21 +113,21 @@
     }, LOG_SAVE_DEBOUNCE_MS);
   }
   WA.log = function (level, msg, data) {
-    const entry = { t: Date.now(), level, msg, data: data === undefined ? null : String(data).slice(0, 500) };
+    const entry = { t: clockNow('index.log'), level, msg, data: data === undefined ? null : String(data).slice(0, 500) };
     WA.eventLog.push(entry);
     // v0.4.0: 按存储水位动态裁剪（常规 300 / 紧张 120 / 危急 60）
     const caps = logCaps();   // 函数声明提升：加载期调用也安全
     if (WA.eventLog.length > caps.event) {
       const drop = WA.eventLog.length - caps.event;
       WA.eventLog.splice(0, drop);
-      __logTrimStat.eventTrims += drop; __logTrimStat.lastAt = Date.now();
+      __logTrimStat.eventTrims += drop; __logTrimStat.lastAt = clockWall();
     }
     if (level === 'error') {
       WA.errorLog.push(entry);
       if (WA.errorLog.length > caps.error) {
         const dropE = WA.errorLog.length - caps.error;
         WA.errorLog.splice(0, dropE);
-        __logTrimStat.errorTrims += dropE; __logTrimStat.lastAt = Date.now();
+        __logTrimStat.errorTrims += dropE; __logTrimStat.lastAt = clockWall();
       }
     }
     scheduleLogSave(level === 'error');   // v0.2.1: error 立即落盘；info/warn 走防抖窗口
@@ -200,6 +205,7 @@
   WA.loadScript = loadScript;
 
   const LOAD_ORDER = [
+    'core/clock.js',           // v2.15.0: 时间源单一出口（决策时间可冻结 / 测量时间不受影响）——须最先装载
     'core/rand.js',            // v2.14.0: 随机源单一出口（决策流可复现 / 标识流不混流）
     'core/settings-bus.js',
     'core/store.js',
@@ -304,7 +310,7 @@
       for (let i = 0; i < CDN_BASES.length; i++) {
         const base = CDN_BASES[i];
         const lastFail = state.failedCdnAt.get(base) || 0;
-        if (Date.now() - lastFail < cooldownMs) continue;
+        if ((WA.clock ? WA.clock.now('index.cdnCooldown') : Date.now()) - lastFail < cooldownMs) continue;
         const cdnSrc = base + '/' + rel + tag;
         const r = await loadScriptOnce(cdnSrc);
         if (r.ok) {
@@ -314,10 +320,10 @@
           WA.log('warn', '模块走 CDN 容灾加载成功: ' + rel + ' <- ' + base);
           return result;
         }
-        state.failedCdnAt.set(base, Date.now());
+        state.failedCdnAt.set(base, (WA.clock ? WA.clock.now('index.cdnCooldown') : Date.now()));
       }
       WA.log('error', '模块全部源加载失败: ' + rel);
-      try { state.failed.set(rel, { at: Date.now(), sourcesTried: 1 + CDN_BASES.length }); } catch (e) {}
+      try { state.failed.set(rel, { at: (WA.clock ? WA.clock.now('index.cdnFail') : Date.now()), sourcesTried: 1 + CDN_BASES.length }); } catch (e) {}
       return { rel: rel, ok: false, failed: true };
     })();
   }

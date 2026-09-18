@@ -6,6 +6,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_SETTINGS = 'worldaxis_backstage_settings_v1';
   // v1.0.0: 人物容器容量（与 __BOUNDED_CAPS['people'] 登记同源）
   const PEOPLE_CAP = 48;
@@ -368,7 +371,7 @@
     // 结算器（全量入账）
     // ════════════════════════════════════════════════════
     applyResult(draft, r, anchor) {
-      const now = Date.now();
+      const now = clockNow('backstage');
       const LIMITS = { people: 12, currents_new: 6, knowledge: 20, chronicle: 8, foreshadows: 5 };
 
       // 时钟

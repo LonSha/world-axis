@@ -16,6 +16,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   // 六路权重（World ui 面板同源）：每路先归一到 [-1,1]，再乘权重
   const WEIGHTS = { event: 12, wind: 6, trend: 9, faction: 8, econ: 5, region: 7 };
@@ -198,7 +201,7 @@
     return {
       pressure, momentum, load, risks,
       verdict: risks.some(r => r.level === 'warn') ? 'warn' : (pressure.total >= OVERHEAT ? 'hot' : 'ok'),
-      analyzedAt: Date.now()
+      analyzedAt: clockNow('toolAnalyzer')
     };
   }
 

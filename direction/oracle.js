@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_PLAN = 'worldaxis_oracle_plan_v1';
 
   // v2.3.0: optional——用户尚未规划弧线时该键本就缺席，属正常而非废弃。
@@ -54,7 +57,7 @@
     async generatePlanSafe(goal, beatCount) {
       const g = String(goal == null ? '' : goal).trim();
       __orStat.runs++;
-      __orStat.lastAt = Date.now();
+      __orStat.lastAt = clockWall();
       if (!g) { __orStat.failed++; __orStat.lastReason = 'empty-goal'; return { ok: false, reason: 'empty-goal' }; }
       const cfg = WA.apiRouter.getChannel('judge');
       if (!cfg.baseUrl || !cfg.model) { __orStat.failed++; __orStat.lastReason = 'judge-not-configured'; return { ok: false, reason: 'judge-not-configured' }; }
@@ -91,7 +94,7 @@
         return null;
       });
       if (!r || !r.beats || !r.beats.length) return { ok: false, reason: 'api-fail' };
-      this.setPlan({ kind: 'sequence', goal, beats: r.beats.slice(0, n), current: 0, createdAt: Date.now() });
+      this.setPlan({ kind: 'sequence', goal, beats: r.beats.slice(0, n), current: 0, createdAt: clockNow('oracle') });
       return { ok: true, count: this.plan.beats.length };
     }
   };

@@ -14,6 +14,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const ENTITY_TYPES = ['organization', 'object', 'ability', 'location'];
   const TYPE_LABELS = { organization: '组织', object: '物品', ability: '能力', location: '地点' };
@@ -97,7 +100,7 @@
       if (WA.timeline && WA.timeline.unionRefs && Array.isArray(data.refs)) {
         entity.refs = WA.timeline.unionRefs([entity.refs || [], data.refs]);
       }
-      entity.updatedAt = Date.now();
+      entity.updatedAt = clockNow('entities');
       rebuildIndex(em);
       return 'updated';
     }
@@ -108,7 +111,7 @@
       aliases,
       desc: String((data && data.desc) || '').slice(0, 150),
       refs: (WA.timeline && WA.timeline.unionRefs && Array.isArray(data.refs)) ? WA.timeline.unionRefs([data.refs]) : [],
-      updatedAt: Date.now()
+      updatedAt: clockNow('entities')
     });
     // 容量裁剪（保留最新的）
     // v2.13.0: 改走挤出侧单一出口。此前这里是**主路径**裸 slice——同一容器在
@@ -181,7 +184,7 @@
           id: WA.rand.id(raw.type[0] + '_', 4, 'id'),
           name, aliases: strArr(raw.aliases).filter(a => normalized(a) !== normalized(name)).slice(0, 6),
           desc: clean(raw.description).slice(0, 200),
-          events: [], updatedAt: Date.now()
+          events: [], updatedAt: clockNow('entities')
         };
         em[raw.type].push(ent);
         // v2.13.0: 实体库挤出走单一出口（cap 与 __BOUNDED_CAPS 同源）
@@ -195,12 +198,12 @@
       if (ev) {
         ent.events = ent.events || [];
         if (!ent.events.some(x => normalized(x.e) === normalized(ev))) {
-          ent.events.push({ e: ev.slice(0, 60), t: clean(raw.time).slice(0, 40), at: Date.now() });
+          ent.events.push({ e: ev.slice(0, 60), t: clean(raw.time).slice(0, 40), at: clockNow('entities') });
           if (WA.evict) WA.evict.array(ent.events, 'evolution.entityEvents');
           else if (ent.events.length > 8) ent.events.splice(0, ent.events.length - 8);
         }
       }
-      ent.updatedAt = Date.now();
+      ent.updatedAt = clockNow('entities');
       count++;
     }
     return count;

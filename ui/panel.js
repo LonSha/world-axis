@@ -5,6 +5,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const mainDoc = WA.mainDoc || document;
   const mainWin = WA.mainWin || window;
 
@@ -97,6 +100,26 @@
       '<div class="wa-hint">要复现某次运行：控制台执行 <code>WorldAxis.rand.seed(数字)</code>，之后决策流同种子同序列。<br>' +
       '「同样操作两次结果不同」不是引擎不稳定——是随机源没有定住。</div></div>';
   }
+  // v2.15.0: 时间源（第九面：可复现性的另一半）——纯展示、不引入控件。
+  //   与随机源块并列的理由：可复现性要两个输入同时确定，而用户在面板上只看得见「种子」那一半，
+  //   看不见「时刻」那一半，于是「我明明播种了，怎么还是对不上」会变成一个没有出口的问题。
+  function clockBlock() {
+    let st = null;
+    try { st = WA.clock && WA.clock.clockStat ? WA.clock.clockStat() : null; } catch (e) { st = null; }
+    if (!st) return '';
+    const mode = st.frozen
+      ? '已冻结在 <b>' + new Date(st.virtualAt).toLocaleString() + '</b>（存档时间戳可复现）'
+      : '跟墙钟走（本会话存档时间戳不可复现）';
+    const sites = (st.siteNames || []).map(function (c) { return c + '(' + ((st.bySite || {})[c] || 0) + ')'; }).join('、');
+    const bad = st.failed > 0 ? '<span class="wa-bad">｜参数非法 ' + st.failed + ' 次（' + escapeHtml(JSON.stringify(st.failedBy || {})) + '）</span>' : '';
+    const dft = st.frozen && st.drift > 60000 ? '｜与真实时刻已偏差 ' + Math.round(st.drift / 60000) + ' 分钟（冻结期间的正常现象）' : '';
+    return '<div class="wa-card"><div class="wa-card-h">时间源（存档可复现性）</div>' +
+      '<div class="wa-kv">决策时钟：' + mode + bad + '</div>' +
+      '<div class="wa-kv">决策读取：' + st.nowCalls + ' 次｜测量读取：' + st.wallCalls + ' 次（耗时台账与展示，不受冻结影响）</div>' +
+      '<div class="wa-kv">站点：' + (sites || '（本会话尚未读取）') + dft + '</div>' +
+      '<div class="wa-hint">要复现某次运行：控制台执行 <code>WorldAxis.clock.freeze(时刻戳)</code>，之后所有进存档的时间戳都取这个虚拟时刻<br>' +
+      '（每轮用 <code>WorldAxis.clock.advance()</code> 推进；<code>unfreeze()</code> 回到墙钟）。刷新页面即解除——冻结是会话内的显式动作。</div></div>';
+  }
   function renderOverview() {
     const s = WA.store.get();
     const nodes = WA.workflow.list();
@@ -110,7 +133,7 @@
         <div class="wa-stat"><div class="wa-stat-v">${s.evolution.round}</div><div class="wa-stat-k">演化回合</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${beforeN}+${afterN}</div><div class="wa-stat-k">工作流节点</div></div>
       </div>
-      ${evictBlock()}${randBlock()}
+      ${evictBlock()}${randBlock()}${clockBlock()}
       <div class="wa-sec">工作流节点开关</div>
       <div class="wa-node-list">${nodes.map(n => `
         <label class="wa-node">
@@ -451,7 +474,7 @@
       };
     });
     const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
-    on('#wa-save-bg', () => { WA.store.patch('background', { text: $('#wa-bg').value, updatedAt: Date.now() }); WA.log('info', '世界背景已保存'); });
+    on('#wa-save-bg', () => { WA.store.patch('background', { text: $('#wa-bg').value, updatedAt: clockNow('ui.panel') }); WA.log('info', '世界背景已保存'); });
     on('#wa-set-clock', () => { const v = prompt('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null) { WA.calendar.setClock(v); renderBody(); } });
     on('#wa-cal-auto', () => {});
     { const cb = $('#wa-cal-auto');
@@ -668,7 +691,7 @@
         const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'worldaxis-recovery-' + Date.now() + '.json';
+        a.href = url; a.download = 'worldaxis-recovery-' + clockWall() + '.json';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         out.innerHTML = '<div class="wa-log wa-log-info">✓ 已导出 ' + pack.count + ' 个恢复点（' + Math.round(pack.bytes / 1024) + 'KB）</div>';
@@ -726,7 +749,7 @@
           const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json;charset=utf-8' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
-          a.href = url; a.download = 'worldaxis-conflict-' + Date.now() + '.json';
+          a.href = url; a.download = 'worldaxis-conflict-' + clockWall() + '.json';
           document.body.appendChild(a); a.click(); document.body.removeChild(a);
           setTimeout(() => URL.revokeObjectURL(url), 1000);
           out.innerHTML = '<div class="wa-log wa-log-info">✓ 已提取冲突快照（' + Math.round(pack.bytes / 1024) + 'KB）——含另一实例的完整世界状态，可离线核对</div>';

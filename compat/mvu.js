@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   // v2.0.0: 激活状态观测——init 探测宿主是否启用 MVU，未启用则保持 inactive（不虚报）
   const __mvuState = { active: false, lastSyncAt: 0, syncCount: 0, lastReason: 'not-initialized' };
@@ -39,7 +42,7 @@
         meta.stat_data.world_clock = s.clock.label;
         meta.stat_data.world_pulse = s.worldPulse ? s.worldPulse.pressure : 0;
         meta.stat_data.world_people = Object.values(s.people).map(p => ({ name: p.name, loc: p.location }));
-        __mvuState.syncCount++; __mvuState.lastSyncAt = Date.now();
+        __mvuState.syncCount++; __mvuState.lastSyncAt = clockWall();
         return true;
       } catch (e) { WA.log('warn', 'MVU 同步异常', e); return false; }
     }

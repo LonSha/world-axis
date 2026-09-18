@@ -259,6 +259,24 @@
       sources: {
         contract: ['bandit', 'plague', 'market', 'faction_clash', 'official', 'sect', 'infrastructure', 'ominous'],
         // v2.10.0: 读侧完整性契约的留痕点——本文件是跨模块契约审计的唯一消费端。
+        // v2.15.0: 时间源治理契约留痕（第九面：可复现性的另一半）。
+        //   跨模块契约点：v2.14.0 把随机源收成单一出口之后，可复现性只完成了**一半**——
+        //   第二个输入（时间）一格未管，而时间戳**大量落盘并参与判定**：store 的过期判定
+        //   （决定哪些键被当过期数据回收）、meta.createdAt/updatedAt/lastSettle、恢复点 at、
+        //   memory 的摘要 t / facts.at / 'superseded@'+时间戳、chatcache 快照 id 与 at、
+        //   workflow 链历史 at。core/clock.js 因此是时间的单一出口，两条口径：
+        //   决策时间 now(site)（未冻结==墙钟，故迁移行为中立；冻结==可指定常量 + advance 步进）
+        //   与测量时间 wallNow()（耗时台账/渲染展示，**不受冻结影响**——冻住它会让「跑了多久」
+        //   变假话）。站点名是已消费面（与 rand.channels()/evict.SITES 同型）。
+        //   诊断经 toolDiag.runtime.clock 透出（含 failed/failedBy——首版漏透出这两个字段时，
+        //   非法冻结在诊断包里恒不可见、verdict 只会落 info 分支说「未冻结」，属「声明面空转」），
+        //   健康分经 maintain().signals.clockNowCalls/clockFailed/clockReproducible 计量，
+        //   面板概览经 ui/panel.js 的「时间源（存档可复现性）」块展示。
+        //   **消费端契约**：本文件与 tests/run.js v2.15.0 块共同冻结「唯一墙钟读取点 ↔ 冻结即确定
+        //   ↔ 两类时间不混流 ↔ 落盘时间戳确实跟随冻结 ↔ 非法参数不静默」五项性质
+        //   （含负向自证 4 项与「原版对照」断言，且每一项都经假设性破坏验证）。
+        //   本版同时修掉三处**真实归因错误**（rand.id 与 workflow 链历史 at 属决策时间却走了
+        //   测量时钟；settings-bus 两处内存台账时间戳属测量时间却走了决策时钟）。
         // v2.14.0: 随机源治理契约留痕（第八面：可复现性）。
         //   跨模块契约点：随机是唯一「同一存档重放会得出不同结论」的来源，而在本版之前
         //   它散在 16 个产品文件里裸调（30 余处），其中 5 处是行为性决策。core/rand.js 是

@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   // v0.1.43: 章节史有界化——仅保留最近 MAX_HISTORY 章；编号改由 seq 计数器驱动，
   // 与 history 长度解耦，裁剪后不会出现重复章号（旧数据无 seq 时从现存最大 no 续起）。
@@ -28,10 +31,10 @@
       opts = opts || {};
       WA.store.transact(d => {
         if (d.chapters.current) { // 自动结束旧章
-          d.chapters.history.push(Object.assign({}, d.chapters.current, { endedAt: Date.now() }));
+          d.chapters.history.push(Object.assign({}, d.chapters.current, { endedAt: clockNow('chapters') }));
         }
         const no = nextNo(d);
-        d.chapters.current = { no: no, title: title || ('第' + no + '章'), script: opts.script || '', notes: opts.notes || '', startedAt: Date.now() };
+        d.chapters.current = { no: no, title: title || ('第' + no + '章'), script: opts.script || '', notes: opts.notes || '', startedAt: clockNow('chapters') };
         d.chapters.active = true;
         d.chapters.history = pruneHistory(d.chapters.history);   // v0.1.43
       });
@@ -40,7 +43,7 @@
     end(note) {
       WA.store.transact(d => {
         if (!d.chapters.current) return false;
-        d.chapters.current.endedAt = Date.now();
+        d.chapters.current.endedAt = clockNow('chapters');
         d.chapters.current.endNote = note || '';
         d.chapters.history.push(d.chapters.current);
         d.chapters.history = pruneHistory(d.chapters.history);   // v0.1.43

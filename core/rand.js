@@ -110,8 +110,8 @@
       // 全库唯一一处 Math.random 消费点——只用来产生**自动种子**。
       // 门禁 G19 断言：除本文件这一行外，产品代码零裸调。
       __seed = (Math.floor(Math.random() * 0xFFFFFFFF) >>> 0) || 1;
+      __seedAt = (WA.clock ? WA.clock.wallNow() : Date.now());
       __seedSource = 'auto';
-      __seedAt = Date.now();
       __stats.lastSeedAt = __seedAt;
     }
   }
@@ -119,7 +119,7 @@
     __stats.draws++;
     __stats.byChannel[name] = (__stats.byChannel[name] || 0) + 1;
     __stats.lastChannel = name;
-    __stats.lastAt = Date.now();
+    __stats.lastAt = (WA.clock ? WA.clock.wallNow() : Date.now());
   }
 
   // ── 决策流 ──────────────────────────────────────────────
@@ -199,7 +199,16 @@
     }
     __uidCounter = (__uidCounter + 1) % 0xFFFFFF;
     __stats.ids++;
-    return String(prefix || '') + Date.now().toString(36) + '_' + __uidCounter.toString(36) + (noise ? '_' + noise : '');
+    // v2.15.0: 时间戳走**决策时间**（clock.now）而非墙钟——归因修正。
+    //   理由：id 是**进存档的产物**（伏笔 id `fs_*` 进 draft.memory.foreshadows、
+    //   消息 id `wax_*` 进 entries、`worldaxis_writer_id` 与 meta.writer 一并落盘），
+    //   而冻结时钟的**全部意义**就是「同一份存档重放两次，写进磁盘的每一个可复现字段都相同」。
+    //   若这里取墙钟，则即便种子与冻结时刻都指定了，两次重放生成的 id 仍必然不同
+    //   ⇒「逐字节相同的存档」在原理上仍然做不到，本版命题只做到一半。
+    //   这与 v2.14.0 立的「标识流不占决策序列」并不冲突：那条约束说的是**抽数**不从决策流取，
+    //   本条说的是**时间戳**必须可复现——两者正交，各自服务于不同的性质。
+    //   唯一性不受影响：冻结时时间戳是常量，但递变计数器 __uidCounter 仍在同会话内单调递增。
+    return String(prefix || '') + (WA.clock ? WA.clock.now('rand.id') : Date.now()).toString(36) + '_' + __uidCounter.toString(36) + (noise ? '_' + noise : '');
   }
 
   // ── 种子管理 ────────────────────────────────────────────
@@ -218,7 +227,7 @@
     if (n === null || !isFinite(n)) { noteFail('bad-seed:' + (typeof v)); return false; }
     __seed = (Math.floor(Math.abs(n)) % 0xFFFFFFFF) >>> 0 || 1;
     __seedSource = 'explicit';
-    __seedAt = Date.now();
+    __seedAt = (WA.clock ? WA.clock.wallNow() : Date.now());
     __stats.lastSeedAt = __seedAt;
     // 清空派生流：旧通道的生成器状态属于旧种子，留着会让「播种后继续抽」串到旧序列
     Object.keys(__streams).forEach(function (k) { delete __streams[k]; });

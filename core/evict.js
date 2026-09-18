@@ -117,7 +117,8 @@
     lastFail: null      // { site, reason, at }
   };
 
-  function now() { try { return Date.now(); } catch (e) { return 0; } }
+  // v2.15.0: 挤出记录只活在内存台账（bySite.lastAt / lastDropped.at），不落盘 → 测量时间。
+  function now() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
 
   /** 元素摘要：优先取语义名，让「丢的是谁」可读（只记数量等于什么都没记） */
   function summarize(x) {

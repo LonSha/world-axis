@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   // v2.2.0: 剧场产出观测——此前 generate 的产物只能留在面板里，
   //   wrap() 定义了却零调用，产物到不了正文（功能在输出边界断掉）。
   const __thStat = { generated: 0, failed: 0, wrapped: 0, sent: 0, sendFailed: 0, lastReason: null, lastAt: 0 };
@@ -18,16 +21,16 @@
         const sys = '你是小剧场编剧。基于指令与世界状态，写一段独立番外（' + (opts.length || '中篇500-800字') + '）。不影响正文正史，轻松/日常/幕后风格均可。可直接输出文本。';
         const user = '【剧场指令】' + (instruction || '生成一段日常番外') + (people ? '\n【可用人物】' + people : '') + (s.clock.label ? '\n【世界时间】' + s.clock.label : '');
         const text = await WA.apiRouter.call('inference', [{ role: 'system', content: sys }, { role: 'user', content: user }], { maxTokens: opts.maxTokens || 2500, temperature: 0.9 });
-        __thStat.generated++; __thStat.lastAt = Date.now();
+        __thStat.generated++; __thStat.lastAt = clockWall();
         return { ok: true, text: String(text || '').trim() };
       } catch (e) {
-        __thStat.failed++; __thStat.lastReason = 'generate-fail:' + ((e && e.message) || e); __thStat.lastAt = Date.now();
+        __thStat.failed++; __thStat.lastReason = 'generate-fail:' + ((e && e.message) || e); __thStat.lastAt = clockWall();
         return { ok: false, error: e };
       }
     },
     /** 把剧场文本渲染为可插入正文的块（作为番外折叠） */
     wrap(title, text) {
-      __thStat.wrapped++; __thStat.lastAt = Date.now();
+      __thStat.wrapped++; __thStat.lastAt = clockWall();
       return '<details class="wa-theater"><summary>🎭 ' + (title || '番外小剧场') + '</summary>\n\n' + text + '\n\n</details>';
     },
     /**
@@ -44,7 +47,7 @@
       let el = null;
       try { el = doc && doc.getElementById ? doc.getElementById('send_textarea') : null; } catch (e) { el = null; }
       if (!el) {
-        __thStat.sendFailed++; __thStat.lastReason = 'no-input-el'; __thStat.lastAt = Date.now();
+        __thStat.sendFailed++; __thStat.lastReason = 'no-input-el'; __thStat.lastAt = clockWall();
         return { ok: false, reason: 'no-input-el', text: block };
       }
       try {
@@ -55,10 +58,10 @@
           if (Win && typeof Win.Event === 'function') el.dispatchEvent(new Win.Event('input', { bubbles: true }));
           else if (typeof Event === 'function') el.dispatchEvent(new Event('input', { bubbles: true }));
         } catch (e2) {}
-        __thStat.sent++; __thStat.lastAt = Date.now();
+        __thStat.sent++; __thStat.lastAt = clockWall();
         return { ok: true, text: block, length: block.length };
       } catch (e) {
-        __thStat.sendFailed++; __thStat.lastReason = 'write-fail:' + ((e && e.message) || e); __thStat.lastAt = Date.now();
+        __thStat.sendFailed++; __thStat.lastReason = 'write-fail:' + ((e && e.message) || e); __thStat.lastAt = clockWall();
         return { ok: false, reason: 'write-fail', text: block };
       }
     },

@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const BOX_SYS = `你是「突发事件暗箱」生成器。生成一个分轮解封的突发事件。规则：
 1. 事件共N轮，每轮揭示一层（真相逐层剥开）；
@@ -52,10 +55,10 @@
         // 同时只允许一个活跃突发事件
         (d.directEvents || []).forEach(e => { if (e.status === 'active') e.status = 'aborted'; });
         d.directEvents.push({
-          id: 'de' + Date.now(), title: r.title || '突发事件',
+          id: 'de' + clockNow('directEvent'), title: r.title || '突发事件',
           totalTurns: Math.min(turns, r.notes.length), currentTurn: 0,
           status: 'active', opponent: r.opponent || '', box: r.box || '',
-          notes: r.notes.map(n => String(n).slice(0, 500)), createdAt: Date.now()
+          notes: r.notes.map(n => String(n).slice(0, 500)), createdAt: clockNow('directEvent')
         });
         d.directEvents = pruneDirect(d.directEvents || []);   // v0.1.43
       });

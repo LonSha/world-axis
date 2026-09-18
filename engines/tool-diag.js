@@ -73,6 +73,7 @@
 
   // ── 3. 模块装载完整性（文件 ↔ 导出对象） ─
   const MODULE_EXPORTS = {
+    'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     'core/api-router.js': 'apiRouter',
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',
@@ -278,6 +279,33 @@
           failed: s.failed, failedBy: s.failedBy,
           channels: s.channels, byChannel: s.byChannel, channelNames: s.channelNames,
           lastChannel: s.lastChannel, lastAt: s.lastAt
+        };
+      }, {}),
+      // v2.15.0: 时间源（第九面）——随机源收口之后，可复现性只完成了**一半**：
+      //   第二个输入（时间）在此前一格未管，全库 165 处裸调 `Date.now()`（40 个产品文件），
+      //   其中好几处不是「记个时间戳好看」而是在**判定与写入**——`idleMs > maxIdleMs` 决定
+      //   哪些键被当过数据清理掉、`meta.updatedAt`/记忆摘要的 `t`/伏笔的 `at`/快照 id 与 `at`
+      //   全部直接落盘。于是 v2.14.0 的复现结论是半张的：同样的种子，只要跑的时刻不同
+      //   （甚至只差一毫秒），存档就不再逐字节相同。
+      //   这里透出「两个数」而不是一个：决策读取（进存档/参与判定）与测量读取
+      //   （耗时台账/渲染展示，不受冻结影响）必须分列——混在一起会让「耗时统计还在不在」不可判。
+      clock: safe(function () {
+        if (!WA.clock || typeof WA.clock.clockStat !== 'function') return { error: 'core/clock.js 未加载（时间源无台账，存档时间戳不可复现）' };
+        const s = WA.clock.clockStat();
+        return {
+          frozen: s.frozen, reproducible: s.reproducible,
+          virtualAt: s.virtualAt, drift: s.drift,
+          nowCalls: s.nowCalls, wallCalls: s.wallCalls,
+          freezes: s.freezes, unfreezes: s.unfreezes, advances: s.advances,
+          // v2.15.0（探针自纠）: failed/failedBy 必须一并透出——首版漏了这两个字段，
+          //   而 verdict 的 error 分支判据正是 `ck.failed > 0`。漏透出的后果不是「少一行显示」：
+          //   非法冻结时刻在诊断包里**恒不可见**，verdict 只会落到 info 分支说「未冻结」，
+          //   于是「我以为冻结了，其实没有」这件事永远不会被报出来——正是本版要消灭的那类失败。
+          //   这正是「声明面空转」的变体：台账记了，但出口没接上，消费端看不见。
+          failed: s.failed, failedBy: s.failedBy,
+          sites: s.sites, bySite: s.bySite, siteNames: s.siteNames,
+          lastSite: s.lastSite, lastAt: s.lastAt, lastWallAt: s.lastWallAt,
+          frozenFrom: s.frozenFrom
         };
       }, {}),
       chatcache: safe(function () {
@@ -709,6 +737,20 @@
         issues.push({ level: 'info', key: 'rand', detail: '随机源未显式播种（本会话 ' + rd.draws + ' 次决策抽取，涉及 ' + rd.channels + ' 个通道，最近：' + (rd.lastChannel || '?') + '）——「同样操作两次结果不同」属正常；要复现运行 `WA.rand.seed(<数字>)`（决策流同种子同序列，标识流不受影响）' });
       }
     } catch (eRd) {}
+    // v2.15.0: 时间源分级——与随机源**完全同型**，因为它们是同一个命题的两半：
+    //   ① 参数非法（freeze(NaN/Infinity/对象)、advance 步长非法）⇒ **代码缺陷**，error。
+    //      尤其是「非法冻结时刻被静默接受」会让「我以为冻结了，其实没有」——复现结论本身不可信。
+    //   ② 未冻结 ⇒ 本会话写进存档的时间戳不可复现。这**不是故障**（跟墙钟走是默认行为），
+    //      但它解释了另一件用户会觉得怪的事：明明播了种，两次跑出来的存档还是不一样。
+    //      故 info，并明确告知怎么把时刻定住。
+    try {
+      const ck = (diag.runtime || {}).clock || {};
+      if (ck.failed > 0) {
+        issues.push({ level: 'error', key: 'clock', detail: '时间源有 ' + ck.failed + ' 次参数非法（' + JSON.stringify(ck.failedBy || {}) + '）：非法冻结时刻/步长不被静默接受，已归因并退回默认；但调用点是缺陷（须改代码）——若非法的是冻结时刻，「已冻结」的结论不可信' });
+      } else if (ck.nowCalls > 0 && ck.reproducible === false) {
+        issues.push({ level: 'info', key: 'clock', detail: '决策时钟未冻结（本会话 ' + ck.nowCalls + ' 次决策时间读取，涉及 ' + ck.sites + ' 个站点，最近：' + (ck.lastSite || '?') + '；另有 ' + ck.wallCalls + ' 次测量读取不受影响）——「同样的种子两次跑出来的存档还是不一样」根因在此：随机源定了，时刻没定；要复现运行 `WA.clock.freeze(<时刻戳>)`（此后所有进存档的时间戳都取该虚拟时刻，每轮用 advance() 推进）' });
+      }
+    } catch (eCk) {}
     if (h && h.sillyTavern === false) issues.push({ level: 'warn', key: 'host', detail: '未检测到 SillyTavern 宿主（无事件源，仅拦截器函数可用）' });
     else if (h && h.eventSource === false) issues.push({ level: 'warn', key: 'host', detail: '宿主无事件源：after 链与切聊天重载将不生效' });
     if (h && h.extensionPrompt === false) issues.push({ level: 'error', key: 'host', detail: '宿主无 setExtensionPrompt：注入通道完全不可用' });

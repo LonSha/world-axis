@@ -6,6 +6,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_regional_settings_v1';
 
   // 区域突发事件类型权重（移植）
@@ -156,7 +159,7 @@
         inc.duration = Math.max(0, (inc.duration || 0) - 1);
         if (inc.duration === 0) {
           inc.active = false;
-          draft.chronicle.push({ id: 'ri' + Date.now(), kind: 'regional', title: '区域事件平息', summary: inc.title + ' 已平息', at: Date.now() });
+          draft.chronicle.push({ id: 'ri' + clockNow('regional'), kind: 'regional', title: '区域事件平息', summary: inc.title + ' 已平息', at: clockNow('regional') });
           WA.log('info', '区域突发事件平息：' + inc.title);
         }
       });

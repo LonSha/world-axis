@@ -6,6 +6,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_opinion_settings_v1';
 
   // v2.7.0（收口）: 区间声明上收到登记表——此前「每N轮」的合法范围只写在设置页的
@@ -52,7 +55,7 @@
         { role: 'user', content: '【候选公开事件】' + JSON.stringify(candidates) + '\n【上轮舆情快照】' + JSON.stringify(prev) }
       ], { json: true, maxTokens: 3000, temperature: 0.8 }).catch(e => { WA.log('warn', '舆情生成失败', e.message); return null; });
       if (!r) return { ok: false, reason: 'api-fail' };
-      const now = Date.now();
+      const now = clockNow('opinion');
       const validTitles = new Set(candidates.map(c => c.t));
       const news = (r.news || []).slice(0, 3).filter(n => n && n.title && validTitles.has(n.related_event_id))
         .map(n => ({ title: String(n.title).slice(0, 80), body: String(n.body || '').slice(0, 300), related_event_id: n.related_event_id, claim_status: ['fact', 'mixed', 'rumor'].includes(n.claim_status) ? n.claim_status : 'rumor', scope: n.scope || 'local', at: now, kind: 'news' }));
@@ -84,7 +87,7 @@
         { role: 'user', content: '生成一批世界碎片（纯氛围，NON-CANON）。' }
       ], { json: true, maxTokens: 1500, temperature: 1.0 }).catch(() => null);
       if (!r || !r.fragments) return { ok: false, reason: 'api-fail' };
-      const now = Date.now();
+      const now = clockNow('opinion');
       WA.store.transact(draft => {
         draft.opinion.sandbox = (r.fragments || []).slice(0, 4).map(f => ({ kind: f.kind || 'street', text: String(f.text || '').slice(0, 200), mood: f.mood || '', at: now }));
       });

@@ -5,6 +5,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const mainWin = WA.mainWin || window;
   const LS_KEY = 'worldaxis_inject_visibility_v1';
 
@@ -33,7 +36,7 @@
       }
       if (v[k] === undefined) { v[k] = def[k]; filled++; }
     });
-    if (filled) { __visStat.filled += filled; __visStat.lastAt = Date.now(); }
+    if (filled) { __visStat.filled += filled; __visStat.lastAt = clockWall(); }
     return v;
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
@@ -53,7 +56,7 @@
   }
   function recordUninject(trigger, result) {
     try {
-      __uninjectLedger.push({ at: Date.now(), chat: ledgerChatId(), trigger: trigger || 'unknown', ok: !!result.ok, reason: result.reason || null, cleared: result.cleared || [] });
+      __uninjectLedger.push({ at: clockNow('render.inject'), chat: ledgerChatId(), trigger: trigger || 'unknown', ok: !!result.ok, reason: result.reason || null, cleared: result.cleared || [] });
       if (__uninjectLedger.length > 20) __uninjectLedger.splice(0, __uninjectLedger.length - 20);
       persistUninjectLedger();
     } catch (e) {}
@@ -277,7 +280,7 @@
           const slotSnap = (WA.injectSlotAudit && lastSlots)
             ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: Date.now(), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
@@ -304,7 +307,7 @@
         // 诊断读到这里不应再把上一轮注入当作「仍在生效」的活证据
         try {
           if (WA.store && cleared.length) WA.store.transact(function (d) {
-            if (d.lastInjection) { d.lastInjection.injected = false; d.lastInjection.clearedAt = Date.now(); d.lastInjection.clearedBy = trigger || 'manual'; }
+            if (d.lastInjection) { d.lastInjection.injected = false; d.lastInjection.clearedAt = clockNow('render.inject'); d.lastInjection.clearedBy = trigger || 'manual'; }
           });
         } catch (e) {}
         if (WA.log) WA.log('info', 'uninject 清空 ' + cleared.length + ' 个槽位（trigger=' + (trigger || 'manual') + '）');

@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   WA.calendar = {
     /** 设定世界时间（自由标签或ISO） */
@@ -69,7 +72,7 @@
       const o = opts || {};
       const t = String(text == null ? '' : text);
       __calStat.runs++;
-      __calStat.lastAt = Date.now();
+      __calStat.lastAt = clockWall();
       if (o.force !== true && loadSettings().auto === false) { __calStat.skipped++; return { ok: false, reason: 'disabled' }; }
       const kind = this.suggestAdvance(t);
       if (!kind) { __calStat.noSignal++; return { ok: false, reason: 'no-time-word' }; }

@@ -6,6 +6,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const ENEMY_STATUS = ['追踪中', '策划中', '执行中', '已终结'];
   const ENEMY_TYPE = ['blood', 'grudge'];
@@ -72,7 +75,7 @@
       const box = draft.evolution.blackbox = draft.evolution.blackbox || { secretActions: [], secretAssets: [] };
       (bb.secretActions || []).slice(0, 6).forEach(a => {
         if (!a || !a.action) return;
-        box.secretActions.push({ action: String(a.action).slice(0, 80), witnesses: String(a.witnesses || '无').slice(0, 40), at: Date.now() });
+        box.secretActions.push({ action: String(a.action).slice(0, 80), witnesses: String(a.witnesses || '无').slice(0, 40), at: clockNow('enemies') });
       });
       if (WA.evict) WA.evict.array(box.secretActions, 'evolution.blackboxActions');
       else box.secretActions = box.secretActions.slice(-15);

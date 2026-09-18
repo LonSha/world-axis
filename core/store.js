@@ -7,6 +7,9 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const mainWin = WA.mainWin || window;
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const SCHEMA_VERSION = 1;
   // v0.1.36: draft 克隆 feature-detect——structuredClone 优先（原生实现快 1.5-2x 且保留类型），
@@ -24,7 +27,7 @@
   if (typeof WA.registerModule !== 'function') {
     WA.registerModule = function (name, meta) {
       if (!name) return null;
-      const rec = { name: name, at: Date.now(), ver: (meta && meta.ver) || WA.version || 'unknown', kind: (meta && meta.kind) || 'engine' };
+      const rec = { name: name, at: clockNow('store.module'), ver: (meta && meta.ver) || WA.version || 'unknown', kind: (meta && meta.kind) || 'engine' };
       WA.modules[name] = rec;
       return rec;
     };
@@ -95,7 +98,7 @@
       // 下轮注入三列引用（after链产出，before链一次性消费）
       nextTurnInjection: null,  // {required:[], conditional:[], suppress:[], at, anchor}
       // 元信息
-      meta: { createdAt: Date.now(), updatedAt: Date.now(), lastSettle: null }
+      meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null }
     };
   }
 
@@ -121,7 +124,7 @@
   const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, batched: 0, deferred: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
   function recTx(ms, status) {
     try {
-      __txStat.count++; __txStat.totalMs += ms; __txStat.lastMs = ms; __txStat.lastAt = Date.now(); __txStat.lastStatus = status;
+      __txStat.count++; __txStat.totalMs += ms; __txStat.lastMs = ms; __txStat.lastAt = clockWall(); __txStat.lastStatus = status;
       if (status === 'ok') __txStat.ok++;
       else if (status === 'error') __txStat.errors++;
       else if (status === 'aborted') __txStat.aborted++;
@@ -165,7 +168,7 @@
       const src = source || 'bytes';
       __readStat.readFailed++;
       __readStat.bySource[src] = (__readStat.bySource[src] || 0) + 1;
-      __readStat.lastReadFail = { key: key, source: src, at: Date.now(), error: String((err && err.message) || err).slice(0, 120) };
+      __readStat.lastReadFail = { key: key, source: src, at: clockWall(), error: String((err && err.message) || err).slice(0, 120) };
     } catch (e) { /* 记账失败不影响读取 */ }
   }
   // ── v2.9.0: 删除侧完整性计量 ─────────────────────────────────
@@ -188,7 +191,7 @@
   function removeVerified(key) {
     __removeStat.attempts++;
     __removeStat.lastKey = key;
-    __removeStat.lastAt = Date.now();
+    __removeStat.lastAt = clockWall();
     // v2.9.0（当前态口径）: 与 settings-bus 的 rmRemove 同规格——每次调用先清「最近一次结果」，
     //   使维持健康分的判据是当前态而非历史累计（见 v0.4.0 的 lastOk/lastFailAt 裁决）。
     __removeStat.lastReason = null;
@@ -268,11 +271,11 @@
           // 自己的写入不会产生 storage 事件；若 writer 与本实例相同则视为误触发（mock/兼容场景）
           if (writer && writer === __writerId) return;
           __externalWrite.count++;
-          __externalWrite.lastAt = Date.now();
+          __externalWrite.lastAt = clockWall();
           __externalWrite.lastKey = e.key;
           __externalWrite.lastRev = rev;
           __externalWrite.lastWriter = writer;
-          __externalWrite.staleSince = __externalWrite.staleSince || Date.now();
+          __externalWrite.staleSince = __externalWrite.staleSince || clockWall();
           WA.log('warn', '检测到另一实例更新了当前聊天的世界状态（序号 ' + rev + '）：'
             + '本窗口内存态可能已落后——继续推进会覆盖对方进度。建议刷新页面以载入最新状态'
             + '（若已覆盖，诊断面板「冲突现场」保留了对方快照）');
@@ -323,7 +326,7 @@
   }
   /** 保全他实例 payload 为冲突现场（不覆盖已有同名键） */
   function quarantineConflict(chatId, disc, mine) {
-    const ts = Date.now();
+    const ts = clockNow('store.conflict');
     const key = conflictKey(chatId, ts);
     let bytes = 0;
     try {
@@ -378,9 +381,9 @@
   /** v2.0.0: 标记巡视采集节降级（失败节不静默——否则 signals 归零伪装成健康） */
   function markDegraded(section, err) {
     try {
-      __maintainDegraded.sections.push({ section: section, at: Date.now(), msg: String(err && (err.message || err)).slice(0, 120) });
+      __maintainDegraded.sections.push({ section: section, at: clockWall(), msg: String(err && (err.message || err)).slice(0, 120) });
       if (__maintainDegraded.sections.length > 12) __maintainDegraded.sections.splice(0, __maintainDegraded.sections.length - 12);
-      __maintainDegraded.lastAt = Date.now(); __maintainDegraded.total++;
+      __maintainDegraded.lastAt = clockWall(); __maintainDegraded.total++;
     } catch (e) { /* 台账自身失败不得影响巡视 */ }
   }
   // v1.9.0: 引擎故障观测快照（errorLog 巡视间增量 + 逻辑瑕疵计量），经 maintainStat() 透出
@@ -514,7 +517,7 @@
     __integrityStat.writes++;
     for (let attempt = 0; attempt < 2; attempt++) {
       try { mainWin.localStorage.setItem(key, payload); }
-      catch (e) { __integrityStat.lastOk = false; __integrityStat.lastFailAt = Date.now(); return { ok: false, verified: false, retried: attempt > 0, reason: 'write', error: e }; }
+      catch (e) { __integrityStat.lastOk = false; __integrityStat.lastFailAt = clockWall(); return { ok: false, verified: false, retried: attempt > 0, reason: 'write', error: e }; }
       let back = null, backReadErr = null;
       try { back = mainWin.localStorage.getItem(key); } catch (e) { back = null; backReadErr = e; }
       // v2.10.0: 写后读回校验的「读」本身也会失败——此前与「读回内容不匹配」混成一个形态
@@ -522,18 +525,18 @@
       if (backReadErr) noteStoreReadFail('verify', key, backReadErr);
       if (back === payload) {
         if (attempt > 0) { __integrityStat.retried++; __integrityStat.recoveredByRetry++; }
-        __integrityStat.verified++; __integrityStat.lastAt = Date.now();
+        __integrityStat.verified++; __integrityStat.lastAt = clockWall();
         __integrityStat.lastOk = true;   // 当前态：最近一次写入校验通过（含重试自愈）
         return { ok: true, verified: true, retried: attempt > 0, reason: null };
       }
       // 读回不一致：磁盘上的副本不是我们写的东西
-      __integrityStat.mismatches++; __integrityStat.lastAt = Date.now();
+      __integrityStat.mismatches++; __integrityStat.lastAt = clockWall();
       __integrityStat.lastReason = backReadErr ? 'readback-failed'
         : back === null ? 'missing-after-write'
           : (typeof back === 'string' && typeof payload === 'string' && back.length !== payload.length) ? 'length-mismatch' : 'content-mismatch';
       if (attempt === 0) continue;   // 重试一次（瞬时写入毒化/回收常可自愈）
     }
-    __integrityStat.lastOk = false; __integrityStat.lastFailAt = Date.now();   // 当前态：最近一次写入校验失败
+    __integrityStat.lastOk = false; __integrityStat.lastFailAt = clockWall();   // 当前态：最近一次写入校验失败
     return { ok: false, verified: false, retried: true, reason: 'verify' };
   }
   function byteLen(s) {
@@ -812,7 +815,7 @@
       const shapeFix = ensureShape(memCache, defaultWorldState());
       // v0.1.45: lastFix 记录本次载入结果（议题据此报，避免状态恢复后永久挂红）；
       // healed/shapeConflicts 为历史累计，供回溯「是否曾发生过」
-      __loadStat.lastFix = { filled: shapeFix.filled, conflicts: shapeFix.conflicts, at: Date.now() };
+      __loadStat.lastFix = { filled: shapeFix.filled, conflicts: shapeFix.conflicts, at: clockWall() };
       if (shapeFix.filled > 0) {
         __loadStat.healed += shapeFix.filled;
         WA.log('warn', '载入状态缺失 ' + shapeFix.filled + ' 个字段，已按默认值补齐（旧存档兼容）');
@@ -863,7 +866,7 @@
       out.schemaVersion = SCHEMA_VERSION;
       // v0.1.47: 迁移结果不再落到 state（曾以 _migratedFrom 永久留在持久 payload 里，
       // 无人消费且每次载入都自我延续），改为写观测层并显式剥离历史残留
-      __migrateReport = { from: fromV, to: SCHEMA_VERSION, path: steps, steps: steps.length, failed: failed, at: Date.now() };
+      __migrateReport = { from: fromV, to: SCHEMA_VERSION, path: steps, steps: steps.length, failed: failed, at: clockWall() };
       delete out._migratedFrom;
       return out;
     },
@@ -871,7 +874,7 @@
     load(chatId) {
       // v0.1.38: 解析失败不再静默——原始 payload 存入 *_corrupt_<ts> 隔离键，
       // 避免默认状态在下次 save 时覆盖可恢复现场（部分写入/扩展冲突等导致的状态键损坏）
-      __loadStat.loads++; __loadStat.lastAt = Date.now();
+      __loadStat.loads++; __loadStat.lastAt = clockWall();
       let raw = null;
       try { raw = mainWin.localStorage.getItem(storageKey(chatId)); }
       catch (e) {
@@ -889,7 +892,7 @@
         return st;
       } catch (pe) {
         __loadStat.errors++; __loadStat.lastError = String((pe && pe.message) || pe);
-        try { mainWin.localStorage.setItem(storageKey(chatId) + '_corrupt_' + Date.now(), raw); } catch (e2) {}
+        try { mainWin.localStorage.setItem(storageKey(chatId) + '_corrupt_' + clockNow('store.corrupt'), raw); } catch (e2) {}
         WA.log('error', 'store.load解析失败：状态键已隔离（*_corrupt_*），下次保存不会覆盖原始现场', pe);
         return null;
       }
@@ -899,7 +902,7 @@
       try {
         const s = state || memCache;
         s.meta = s.meta || {};
-        s.meta.updatedAt = Date.now();
+        s.meta.updatedAt = clockNow('store.meta');
         // v0.5.0: 写入者标识与全局单调序号（多实例并发防护的可观测基础）
         const cidW = chatId || getChatId();
         let conflict = null;
@@ -921,13 +924,13 @@
             try { rawDisc = mainWin.localStorage.getItem(storageKey(cidW)); } catch (e) { rawDisc = null; rawDiscErr = e; }
             if (rawDiscErr) {
               noteStoreReadFail('saveConflict', storageKey(cidW), rawDiscErr);
-              try { __conflictStat.unpreserved = (__conflictStat.unpreserved || 0) + 1; __conflictStat.lastUnpreservedAt = Date.now(); } catch (eU) {}
+              try { __conflictStat.unpreserved = (__conflictStat.unpreserved || 0) + 1; __conflictStat.lastUnpreservedAt = clockWall(); } catch (eU) {}
               WA.log('error', '检测到并发写入（对方序号 ' + dRev + ' > 本实例所见 ' + __seenRev
                 + '）但对方 payload **读取失败**，本次覆盖**未能保全**其改动（键：' + storageKey(cidW) + '）', rawDiscErr);
             }
             if (rawDisc) {
               const kept = quarantineConflict(cidW, rawDisc, s);
-              __conflictStat.detected++; __conflictStat.lastAt = Date.now(); __conflictStat.lastChat = cidW;
+              __conflictStat.detected++; __conflictStat.lastAt = clockWall(); __conflictStat.lastChat = cidW;
               conflict = { detected: true, otherRev: dRev, myRev: __seenRev, kept: kept };
               if (kept) {
                 WA.log('warn', '检测到并发写入：另一实例已写入该聊天（序号 ' + dRev + ' > 本实例所见 ' + __seenRev
@@ -947,18 +950,18 @@
         // v0.4.0: 写后读回校验（含一次重试）——替换裸 setItem，静默截断不再被当成成功
         const w = writeVerified(storageKey(chatId), payload);
         if (!w.ok && w.reason === 'verify') {
-          __saveStat.at = Date.now(); __saveStat.ok = false; __saveStat.reason = 'verify'; __saveStat.failCount++;
+          __saveStat.at = clockWall(); __saveStat.ok = false; __saveStat.reason = 'verify'; __saveStat.failCount++;
           memCache = s;
           WA.log('error', 'store.save 写后读回校验失败（' + __integrityStat.lastReason + '）：磁盘副本与内存不一致，重试一次仍失败——数据可能未真正落盘');
           return false;
         }
         if (!w.ok) throw (w.error || new Error('write failed'));
         memCache = s;
-        __saveStat.at = Date.now(); __saveStat.ok = true; __saveStat.bytes = byteLen(payload); __saveStat.reason = null;
+        __saveStat.at = clockWall(); __saveStat.ok = true; __saveStat.bytes = byteLen(payload); __saveStat.reason = null;
         return true;
       } catch (e) {
         // v0.1.22: save 失败归因 + 计数；内存副本仍推进，避免本轮结算在半份状态里丢失
-        __saveStat.at = Date.now(); __saveStat.ok = false; __saveStat.reason = classifySaveError(e); __saveStat.failCount++;
+        __saveStat.at = clockWall(); __saveStat.ok = false; __saveStat.reason = classifySaveError(e); __saveStat.failCount++;
         const s = state || memCache; if (s) memCache = s;
         // v0.3.0: 配额耗尽不再只记日志——先尝试安全回收（过期诊断/孤儿恢复点/隔离溢出），成功则立刻重试落盘。
         // 救援只动「可安全回收」的键（当前聊天/settings/wb/state 本体永不参与），失败则保持可见错误。
@@ -998,7 +1001,7 @@
             WA.log('warn', '写合并批跨聊天纪元退出：未落盘改动已丢弃');
           } else if (__batch.dirty) {
             __batch.dirty = false;
-            try { this.save(); __batch.flushes++; __batch.lastFlushAt = Date.now(); } catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
+            try { this.save(); __batch.flushes++; __batch.lastFlushAt = clockWall(); } catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
           }
         }
       }
@@ -1013,29 +1016,29 @@
      * 返回 true 表示重试成功。
      */
     __rescueQuota(state, chatId) {
-      __rescueStat.attempts++; __rescueStat.lastAt = Date.now();
+      __rescueStat.attempts++; __rescueStat.lastAt = clockWall();
       let removed = 0, freed = 0;
       try {
         const plan = this.sweepStaleKeys({ apply: true });   // 只回收过期诊断/孤儿恢复点/隔离溢出
         removed = plan.remove.length; freed = plan.freedBytes;
       } catch (e) { removed = 0; freed = 0; }
       __rescueStat.lastRemoved = removed; __rescueStat.lastFreedBytes = freed;
-      if (!removed) { __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = Date.now(); return false; }
+      if (!removed) { __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = clockWall(); return false; }
       // 重试落盘
       try {
         const s = state || memCache;
         s.meta = s.meta || {};
-        s.meta.updatedAt = Date.now();
+        s.meta.updatedAt = clockNow('store.meta');
         const payload = JSON.stringify(s);
         const w2 = writeVerified(storageKey(chatId), payload);
-        if (!w2.ok) { __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = Date.now(); return false; }
+        if (!w2.ok) { __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = clockWall(); return false; }
         memCache = s;
         __saveStat.bytes = byteLen(payload);
         __rescueStat.recovered++;
         __rescueStat.lastOk = true;   // 当前态：最近一次救援成功
         return true;
       } catch (e2) {
-        __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = Date.now();
+        __rescueStat.failed++; __rescueStat.lastOk = false; __rescueStat.lastFailAt = clockWall();
         return false;
       }
     },
@@ -1054,7 +1057,7 @@
     maintain(opts) {
       const o = opts || {};
       const apply = o.apply === true;
-      __maintainStat.scans++; __maintainStat.lastAt = Date.now();
+      __maintainStat.scans++; __maintainStat.lastAt = clockWall();
       __maintainDegraded.sections.length = 0;   // v2.0.0: 巡视降级台账按轮计，不跨轮粘留
       const issues = [];
       const actions = [];
@@ -1414,7 +1417,7 @@
         let recent = el;
         if (!__faultWatch.primed) {
           recent = [];                                          // 从未巡视过：只建基线，不追溯载入期历史
-          __faultWatch.primedAt = Date.now();
+          __faultWatch.primedAt = clockWall();
         } else {
           const ix = el.indexOf(__faultWatch.cursor);
           // 游标可用 → 精确切片；失位（上次环空/环被重建）→ 退到「基线时刻之后产生」的时间口径，
@@ -1647,6 +1650,8 @@
       let sbIncoherent = 0, sbDormant = 0;
       let evictsN = 0, evictFailedN = 0, evictSitesN = 0;   // v2.13.0: 挤出侧三计量
       let randDrawsN = 0, randFailedN = 0, randReproducible = false;   // v2.14.0: 随机源三计量
+      // v2.15.0: 时间源三计量（与上面完全并列——可复现性的两个输入各占一组）
+      let clockNowCallsN = 0, clockFailedN = 0, clockReproducible = false;
       try {
         if (typeof this.orphanSettingsKeys === 'function') orphanKeys = this.orphanSettingsKeys() || [];
         // v2.3.0: 登记表自洽性与休眠登记——只采集不产议题（同 orphan 口径：
@@ -1713,6 +1718,25 @@
           }
         }
       } catch (eRd) { markDegraded('rand', eRd); }
+      // ── 9.7 时间源（v2.15.0）──
+      //   为什么健康分要看时间源：v2.14.0 把随机源收成单一出口，于是「掷骰」这一半可复现了，
+      //   而可复现性要两个输入同时确定——第二个输入（时间）在此前一格未管。
+      //   后果不是「世界坏了」，而是**其余所有体检结论都不能被复核**：
+      //   同一份存档 + 同一个种子重放，写进磁盘的每一个时间戳仍然不同。
+      //   分级与随机源同口径：参数非法（非法冻结时刻被静默接受）＝缺陷，报 error；
+      //   未冻结＝正常默认态（跟墙钟走），只报 info——它是「明明播了种还是对不上」的根因说明。
+      try {
+        const ck = (WA.clock && typeof WA.clock.clockStat === 'function') ? WA.clock.clockStat() : null;
+        if (ck) {
+          clockNowCallsN = ck.nowCalls; clockFailedN = ck.failed; clockReproducible = !!ck.reproducible;
+          if (ck.failed > 0) {
+            score -= 6;
+            issues.push({ level: 'error', key: 'clock.failed', detail: '时间源有 ' + ck.failed + ' 次参数非法（' + JSON.stringify(ck.failedBy) + '）：非法冻结时刻/步长未被静默接受（已归因并退回默认），但调用点是缺陷——若非法的是冻结时刻，「已冻结」的结论不可信，本轮复现结论同样不可信' });
+          } else if (ck.nowCalls > 0 && !ck.reproducible) {
+            issues.push({ level: 'info', key: 'clock', detail: '本会话 ' + ck.nowCalls + ' 次决策时间读取来自**墙钟**（' + ck.sites + ' 个站点，最近：' + (ck.lastSite || '?') + '）——「同样的种子两次跑出来的存档还是不一样」根因在此：随机源定了，时刻没定；要复现执行 `WA.clock.freeze(<时刻戳>)`' });
+          }
+        }
+      } catch (eCk) { markDegraded('clock', eCk); }
       // ── 10. 巡视自身完整性（v2.0.0）──
       //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
       let degradedN = 0;
@@ -1805,6 +1829,9 @@
            // v2.14.0: 随机源——randDraws>0 且 randReproducible=false 说明「本轮结论不可复核」（设计内默认态），
            //   randFailed>0 才是缺陷（非法种子被静默接受会让「已复现」的结论本身不可信）。
            randDraws: randDrawsN, randFailed: randFailedN, randReproducible: randReproducible,
+            // v2.15.0: 时间源——与上面并列的两半。clockNowCalls>0 且 clockReproducible=false
+            //   说明「本轮存档时间戳不可复核」（设计内默认态）；clockFailed>0 才是缺陷。
+            clockNowCalls: clockNowCallsN, clockFailed: clockFailedN, clockReproducible: clockReproducible,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }
@@ -2182,7 +2209,7 @@
     // 事务式更新：传入修改函数，成功才持久化（失败不留半份状态）
     transact(mutator, opts) {
       // v0.1.30: 事务计量——每轮生成触发多少次 transact、耗时多少（排查链式落盘）
-      const t0 = Date.now();
+      const t0 = clockWall();
       // v0.1.33: 嵌套事务——内层 mutator 直接在最外层 draft 上修改，提交延迟到最外层统一 save。
       // 修复：外层 save(draft) 用外层开始时的旧快照整体覆盖内层已提交改动
       // （backstage.applyResult → horizon.acceptResult/digest.generate 链路的静默丢失）
@@ -2190,32 +2217,32 @@
         const outer = __tx[__tx.length - 1];
         let result;
         try { result = mutator(outer); }
-        catch (e) { recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact嵌套修改异常（外层事务继续）', e); return { ok: false, error: e }; }
-        if (result === false) { recTx(Date.now() - t0, 'aborted'); return { ok: false, aborted: true, deferred: true }; }
+        catch (e) { recTx(clockWall() - t0, 'error'); WA.log('error', 'store.transact嵌套修改异常（外层事务继续）', e); return { ok: false, error: e }; }
+        if (result === false) { recTx(clockWall() - t0, 'aborted'); return { ok: false, aborted: true, deferred: true }; }
         // v0.1.34: 嵌套事务纳入计量（deferred=随外层提交的内层数）
-        recTx(Date.now() - t0, 'ok-deferred');
+        recTx(clockWall() - t0, 'ok-deferred');
         return { ok: true, deferred: true, state: outer, result };
       }
       const draft = cloneDraft(memCache);
       __tx.push(draft);
       let result, ret;
       try { result = mutator(draft); }
-      catch (e) { __tx.pop(); recTx(Date.now() - t0, 'error'); WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
-      if (result === false) { __tx.pop(); recTx(Date.now() - t0, 'aborted'); return { ok: false, aborted: true }; }
+      catch (e) { __tx.pop(); recTx(clockWall() - t0, 'error'); WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
+      if (result === false) { __tx.pop(); recTx(clockWall() - t0, 'aborted'); return { ok: false, aborted: true }; }
       // v0.1.31: 批作用域内只推进内存，落盘延迟到批退出（写合并）
       if (__batch.depth > 0 && __batch.orphaned) {
         // v0.1.35: 跨纪元僵尸批——不执行 mutator（防旧轮逻辑改写新聊天状态）
         __tx.pop();
-        recTx(Date.now() - t0, 'aborted');
+        recTx(clockWall() - t0, 'aborted');
         return { ok: false, aborted: true, stale: true };
       }
       if (__batch.depth > 0) {
         memCache = draft; __batch.dirty = true;
-        recTx(Date.now() - t0, 'ok-batched');
+        recTx(clockWall() - t0, 'ok-batched');
         ret = { ok: true, persisted: null, batched: true, state: draft, result };
       } else {
         const saved = this.save(draft);
-        recTx(Date.now() - t0, saved ? 'ok' : 'save-failed');
+        recTx(clockWall() - t0, saved ? 'ok' : 'save-failed');
         // ok=内存事务语义（v0.1.22 契约：落盘失败不回滚内存）；persisted=v0.1.30 新增落盘结果
         ret = { ok: true, persisted: saved, state: draft, result };
       }
@@ -2248,7 +2275,7 @@
         }
         // v0.5.0: 记录来源实例与当时序号——多窗口并存时可辨认「这份点谁建的」
         list.unshift({
-          at: Date.now(),
+          at: clockNow('store.recovery'),
           by: (function () { try { return writerId(); } catch (e) { return null; } })(),
           rev: (function () { const g = memCache; return (g && g.meta && typeof g.meta.stateRev === 'number') ? g.meta.stateRev : 0; })(),
           state: JSON.parse(JSON.stringify(memCache || defaultWorldState()))
@@ -2321,7 +2348,7 @@
       let conflictKeys = 0, conflictBytes = 0;
       let keysReadFailed = 0;           // v2.10.0: 本次盘点中读失败的键数（体积表可信度判据）
       const staleDiagCandidates = [];   // 仅超期项（与 sweepStaleKeys 同阈值）：{ key, chat, kind, idleMs }
-      const now = Date.now();
+      const now = clockNow('store.stale');
       keys.forEach(function (k) {
         const cls = classifyKey(k);
         const b = keyBytes(k);
@@ -2402,7 +2429,7 @@
       const keepCorrupt = typeof o.keepCorrupt === 'number' && o.keepCorrupt >= 0 ? o.keepCorrupt : 5;
       const cur = getChatId();
       const keys = listWorldAxisKeys();
-      const now = Date.now();
+      const now = clockNow('store.stale');
       const plan = { remove: [], keep: [], byFamily: { diagnostic: 0, corrupt: 0, orphanRecovery: 0 }, freedBytes: 0, apply: apply };
       // ── corrupt：state 隔离键与 settings 隔离键（settingsBus 损坏隔离产出）统一按键名时间戳排序，留最近 keepCorrupt 个 ──
       const corruptKeysSorted = keys.filter(function (k) { return classifyKey(k).family === 'corrupt'; })
@@ -2632,7 +2659,7 @@
       } catch (e) {
         return { ok: false, reason: '恢复写入失败：' + ((e && e.message) || e) };
       }
-      __quarantineStat.restores++; __quarantineStat.lastRestoreAt = Date.now(); __quarantineStat.lastKey = key;
+      __quarantineStat.restores++; __quarantineStat.lastRestoreAt = clockWall(); __quarantineStat.lastKey = key;
       WA.log('warn', '已从隔离现场恢复 state（' + key + '，聊天 ' + target + '）——原隔离键保留作为审计证据');
       return { ok: true, chat: target, bytes: byteLen(raw) };
     },
@@ -2654,7 +2681,7 @@
       //   隔离现场的丢弃是**不可逆**操作（原键已不在），报「已丢弃」而实际没删是双重误导。
       const r = removeVerified(key);
       if (!r.ok) return { ok: false, reason: '删除失败：' + r.reason };
-      __quarantineStat.drops++; __quarantineStat.lastDropAt = Date.now();
+      __quarantineStat.drops++; __quarantineStat.lastDropAt = clockWall();
       WA.log('info', '已丢弃隔离现场（用户确认）: ' + key);
       return { ok: true, key: key, quarantine: c.quarantine };
     },

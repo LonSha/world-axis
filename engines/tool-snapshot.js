@@ -17,6 +17,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const FORMAT = 2;
   const ACCEPTED = [1, 2];
@@ -109,7 +112,7 @@
       Object.assign(draft, incoming);
       if (draft.schemaVersion === undefined) draft.schemaVersion = WA.store.SCHEMA_VERSION || 1;
       if (!draft.meta || typeof draft.meta !== 'object') draft.meta = {};
-      draft.meta.updatedAt = Date.now();
+      draft.meta.updatedAt = clockNow('toolSnapshot');
     });
     if (!tx.ok) return { ok: false, reason: '写入失败：' + ((tx.error && tx.error.message) || (tx.aborted ? '已中止' : '未知')), recoveryCreated };
     return { ok: true, recoveryCreated, counts: counts(WA.store.get()), format: v.format };

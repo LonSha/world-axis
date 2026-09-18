@@ -21,7 +21,10 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
-  function now() { try { return Date.now(); } catch (e) { return 0; } }
+  // v2.15.0: 原单一 now() 拆两类——决策时间（写进设置值 _schema.at / 隔离键名）走 clockNow，
+  //   测量时间（stats.last* 内存台账）走 clockWall。此前同一个函数同时承担两种语义。
+  function now() { try { return WA.clock.now('settingsBus'); } catch (e) { return Date.now(); } }
+  function wallNow() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
   /** v2.3.0: 值形状摘要（脱敏）——诊断只比对/展示形状，不回显内容，避免密钥随诊断包外泄 */
   function shapeOf(v) {
     if (v === null) return 'null';
@@ -329,7 +332,7 @@
     if (isObj && r.migrateObjects !== true) return val;   // 正常结构 → 迁移函数一律不碰（除非显式声明缩减型演化）
     const mk = r.key + '|' + migShapeKey(val);
     if (__migTried[mk]) return val;            // 同一份值形态本会话已尝试过（含失败）→ 不重试
-    if (val === null || val === undefined) { __migTried[mk] = { status: 'skip', at: now(), reason: 'absent' }; return val; }
+    if (val === null || val === undefined) { __migTried[mk] = { status: 'skip', at: wallNow(), reason: 'absent' }; return val; }
     let out = val, status = 'skip', reason = null;
     try {
       const res = r.migrate({ value: val, key: r.key, def: r.def });
@@ -348,13 +351,13 @@
         if (wroteBack) {
           status = 'ok'; reason = res.reason || null;
           stats.migrations++;
-          stats.lastMigration = { key: r.key, at: now(), reason: reason, from: shapeOf(val), to: shapeOf(out) };
+          stats.lastMigration = { key: r.key, at: wallNow(), reason: reason, from: shapeOf(val), to: shapeOf(out) };
           if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 结构迁移 ' + shapeOf(val) + ' → ' + shapeOf(out) + (reason ? '（' + reason + '）' : ''));
         } else {
           status = 'fail';
           reason = 'writeback-failed: ' + String((wErr && (wErr.message || wErr)) || wErr).slice(0, 120);
           stats.migrationFailed++;
-          stats.lastMigration = { key: r.key, at: now(), reason: reason, failed: true };
+          stats.lastMigration = { key: r.key, at: wallNow(), reason: reason, failed: true };
           try { __migFailed[r.key] = reason; } catch (e0) {}
           if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 结构迁移算完但回写失败（' + reason + '）——磁盘仍是旧结构，下次读取会再次尝试');
         }
@@ -364,12 +367,12 @@
     } catch (eM) {
       status = 'fail'; reason = String((eM && (eM.message || eM)) || eM).slice(0, 160);
       stats.migrationFailed++;
-      stats.lastMigration = { key: r.key, at: now(), reason: reason, failed: true };
+      stats.lastMigration = { key: r.key, at: wallNow(), reason: reason, failed: true };
       // 失败必须可见：迁移没跑成 = 旧结构继续被当作「畸形值」消费，属需要人处理的状况
       try { __migFailed[r.key] = reason; } catch (e0) {}
       if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 结构迁移失败（' + reason + '）——本键按原值继续，诊断会持续报出');
     }
-    __migTried[mk] = { status: status, at: now(), reason: reason };
+    __migTried[mk] = { status: status, at: wallNow(), reason: reason };
     return out;
   }
   const __migFailed = Object.create(null);
@@ -460,7 +463,7 @@
     } catch (eC) { /* 分类计量失败不影响主计量 */ }
     const msg = String((err && (err.message || err)) || err);
     stats.lastReadError = (prefix || ((tag || 'read') + ': ')) + msg.slice(0, 160);
-    stats.lastReadFail = { tag: tag || 'read', at: now(), message: msg.slice(0, 160) };
+    stats.lastReadFail = { tag: tag || 'read', at: wallNow(), message: msg.slice(0, 160) };
   }
   /**
    * v2.9.0: **唯一删除出口**——设置家族键的每一次真实删除都必须经过这里。
@@ -494,7 +497,7 @@
     catch (e0) { existed = false; existReadErr = e0; }
     if (existReadErr) {
       noteReadFail('rmExisted', existReadErr, 'rmRemove-existed: ');
-      stats.lastRemove = { key: key, at: now(), readFailed: true };
+      stats.lastRemove = { key: key, at: wallNow(), readFailed: true };
       stats.lastRemoveError = 'read-failed: ' + String((existReadErr && existReadErr.message) || existReadErr).slice(0, 120);
       return { ok: false, error: existReadErr, existed: false, reason: 'read-failed' };
     }
@@ -510,7 +513,7 @@
     //   否则一句「N 次受控删除全部复核通过（键确已移除）」可能来自 N 次空操作。
     if (!existed) {
       stats.removeAbsent++;
-      stats.lastRemove = { key: key, at: now(), absent: true };
+      stats.lastRemove = { key: key, at: wallNow(), absent: true };
       return { ok: true, existed: false, absent: true };
     }
     try {
@@ -529,14 +532,14 @@
         }
         if (back !== null && back !== undefined) {
           stats.removeStaged++;
-          stats.lastRemoveStaged = { key: key, at: now(), bytes: (typeof back === 'string' ? back.length : 0) };
+          stats.lastRemoveStaged = { key: key, at: wallNow(), bytes: (typeof back === 'string' ? back.length : 0) };
           noteRemoveFail('guarded', 'still-present-after-remove', 'guarded: ');
           return { ok: false, error: { message: 'still-present-after-remove' }, existed: existed, staged: true };
         }
       }
       stats.removes++;
       stats.removeVerified++;
-      stats.lastRemove = { key: key, at: now() };
+      stats.lastRemove = { key: key, at: wallNow() };
       stats.lastRemoveError = null;
       return { ok: true, existed: existed };
     } catch (e) {
@@ -591,7 +594,7 @@
         if (backReadErr) {
           noteReadFail('verifyBack', backReadErr, 'lsWrite-verify: ');
           stats.verifyFailed++;
-          stats.lastStaged = { key: key, at: now(), reason: 'read-back-failed', bytes: bytes };
+          stats.lastStaged = { key: key, at: wallNow(), reason: 'read-back-failed', bytes: bytes };
           noteFail('verify', 'read-back-failed', 'verify: ');
           return { ok: false, error: backReadErr, bytes: bytes, staged: true, reason: 'read-back-failed' };
         }
@@ -600,13 +603,13 @@
             : (typeof back === 'string' && typeof payload === 'string' && back.length !== payload.length)
               ? 'length-mismatch:' + back.length + '≠' + payload.length : 'content-mismatch';
           stats.verifyFailed++;
-          stats.lastStaged = { key: key, at: now(), reason: why, bytes: bytes };
+          stats.lastStaged = { key: key, at: wallNow(), reason: why, bytes: bytes };
           noteFail('verify', why, 'verify: ');
           return { ok: false, error: { message: why }, bytes: bytes, staged: true, reason: why };
         }
       }
       stats.writes++;
-      stats.lastWrite = { key: key, bytes: bytes, at: now() };
+      stats.lastWrite = { key: key, bytes: bytes, at: wallNow() };
       stats.lastWriteError = null;
       return { ok: true, bytes: bytes };
     } catch (e) {
@@ -1107,10 +1110,10 @@
         // 损坏时 fp 记 null：此刻 `__sr.fp` 是 **def 的**指纹（schemaStamp 早期就从 reg.def
         //   算出来），而 lastStamp 这个字段的语义是「磁盘上那份结构的指纹」——把声明结构的
         //   指纹填进去，等于又一次用「看起来合理」的值替换了「实际为未知」的真相。
-        stats.lastStamp = { key: r.key, at: now(), status: __sk,
+        stats.lastStamp = { key: r.key, at: wallNow(), status: __sk,
           fp: __corruptVal ? null : (__sr.fp || null), prevAt: __sr.prevAt || null };
         if (__sk === 'stale') {
-          stats.lastStale = { key: r.key, at: now(), prevFp: __sr.prevFp || null,
+          stats.lastStale = { key: r.key, at: wallNow(), prevFp: __sr.prevFp || null,
             prevDigest: __sr.prevDigest || null, prevAt: __sr.prevAt || null };
           if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 磁盘结构指纹与当前声明不符（旧指纹 ' + String(__sr.prevFp).slice(0, 40)
             + (__sr.prevAt ? '，于 ' + new Date(__sr.prevAt).toLocaleString() + ' 写入' : '') + '）——已按当前结构重盖；'
@@ -1126,14 +1129,14 @@
       const __finalSrc = __why ? 'default-after-failure' : __src;
       const __bucket = (__finalSrc === 'default-after-failure') ? 'defaultAfterFailure' : __finalSrc;
       try { stats.readSources[__bucket] = (stats.readSources[__bucket] || 0) + 1; } catch (eB) { /* 计量失败不影响读取 */ }
-      stats.lastRead = { key: r.key, source: __finalSrc, reason: __why || __note || null, at: now() };
+      stats.lastRead = { key: r.key, source: __finalSrc, reason: __why || __note || null, at: wallNow() };
       try { return JSON.parse(JSON.stringify(stripStamp(val))); }
       catch (e) {
         // v2.10.0: 深拷贝往返失败**不得静默降级**为「返回内部对象引用」。
         //   静默返回引用会让消费端改返回值即改总线内部状态（而磁盘无变化），是典型静默失效；
         //   这里如实记账 + 打日志，返回值语义保持不变（不破坏既有调用方），但故障**可见**。
         stats.readonlyCopyFallback++;
-        stats.lastCopyFallback = { key: r.key, at: now(), error: String((e && e.message) || e).slice(0, 120) };
+        stats.lastCopyFallback = { key: r.key, at: wallNow(), error: String((e && e.message) || e).slice(0, 120) };
         noteReadFail('copy', e, 'copy: ');
         if (WA.log) WA.log('warn', 'settingsBus: ' + r.key + ' 返回值深拷贝往返失败——本次返回内部引用（消费端改动会影响后续读取，但磁盘不变）', e);
         return stripStamp(val);
@@ -1370,7 +1373,7 @@
         if (def && typeof def === 'object' && !Array.isArray(def) && Object.keys(def).length > 0
             && out && typeof out === 'object' && !Array.isArray(out)) {
           const extra = Object.keys(out).filter(function (k) { return k !== '_schema' && !Object.prototype.hasOwnProperty.call(def, k); });
-          if (extra.length) { stats.extraSubkeys += extra.length; stats.lastExtra = { key: r.key, keys: extra.slice(0, 8), at: now() }; }
+          if (extra.length) { stats.extraSubkeys += extra.length; stats.lastExtra = { key: r.key, keys: extra.slice(0, 8), at: wallNow() }; }
         }
       } catch (eM) { /* 计量失败不影响写入 */ }
       return true;

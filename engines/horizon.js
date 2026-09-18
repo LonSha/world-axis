@@ -13,6 +13,9 @@
  */
 (function () {
   const WA = (window.WorldAxis = window.WorldAxis || {});
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   // v2.3.0 块3: 以下四项此前是**模块常量**——用户完全不可配（随机事件关不掉、
   //   触发率改不了、冷却与保底轮数均无法调整）。现降级为「默认值」语义，
   //   真实生效值由 worldaxis_horizon_settings_v1 提供，默认与常量一致（行为不变）。
@@ -124,7 +127,7 @@
     const o = opts || {};
     const cf = laneCfg(kind, o.cfg);
     __hzStat.rolls++;
-    __hzStat.lastAt = Date.now();
+    __hzStat.lastAt = clockWall();
     // v2.3.0 块3: 通道关闭时**完全不掷骰**——此前用户无法拒绝随机事件，
     //   即便把触发率调到 0，ledger 保底仍会在第 10 轮强制触发（关不掉）。
     if (!cf.enabled && o.force !== true) {
@@ -226,7 +229,7 @@
             // v0.1.33: evolution 模块缺失时的兜底入账（原先此分支无任何写路径）
             WA.store.transact(tx => {
               tx.chronicle = tx.chronicle || [];
-              tx.chronicle.push({ kind: 'horizon_distant', title: String(result.topic || result.title || '').slice(0, 30), desc: String(result.content || '').slice(0, 50), at: Date.now(), round: (tx.meta && tx.meta.round) || 0, horizon: true });
+              tx.chronicle.push({ kind: 'horizon_distant', title: String(result.topic || result.title || '').slice(0, 30), desc: String(result.content || '').slice(0, 50), at: clockNow('horizon'), round: (tx.meta && tx.meta.round) || 0, horizon: true });
               // v2.13.0: 第二写入方同样走单一出口（同一容器 = 同一站点 backstage.chronicle）。
           if (WA.evict) WA.evict.array(tx.chronicle, 'backstage.chronicle');
           else if (tx.chronicle.length > CHRONICLE_CAP) tx.chronicle = tx.chronicle.slice(-CHRONICLE_CAP);
@@ -240,7 +243,7 @@
             kind:  'horizon_distant',
             title: String(result.title || '').slice(0, 30),
             desc:  String(result.desc || result.description || '').slice(0, 50),
-            at:    Date.now(),
+            at:    clockNow('horizon'),
             round: (tx.meta && tx.meta.round) || 0,
             horizon: true
           });
@@ -263,7 +266,7 @@
           kind:  'horizon_near',
           title: String(result.title || '').slice(0, 30),
           desc:  String(result.desc || result.description || '').slice(0, 50),
-          at:    Date.now(),
+          at:    clockNow('horizon'),
           round: (tx.meta && tx.meta.round) || 0,
           horizon: true
         });

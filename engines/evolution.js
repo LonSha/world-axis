@@ -6,6 +6,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_evolution_settings_v1';
 
   // ── 阶段定义 ──
@@ -241,7 +244,7 @@
         draft.evolution.trends = draft.evolution.trends || [];
         const old = draft.evolution.trends.find(x => x.trigger === c.trigger);
         if (old) { old.impact = c.impact || old.impact; old.fallout = c.fallout || old.fallout; }
-        else draft.evolution.trends.push({ id: uid('ic'), trigger: String(c.trigger).slice(0, 60), impact: String(c.impact || '').slice(0, 80), fallout: String(c.fallout || '').slice(0, 80), at: Date.now() });
+        else draft.evolution.trends.push({ id: uid('ic'), trigger: String(c.trigger).slice(0, 60), impact: String(c.impact || '').slice(0, 80), fallout: String(c.fallout || '').slice(0, 80), at: clockNow('evolution') });
         if (WA.evict) WA.evict.array(draft.evolution.trends, 'evolution.trends');
         else draft.evolution.trends = draft.evolution.trends.slice(-20);
       });

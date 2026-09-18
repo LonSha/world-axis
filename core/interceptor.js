@@ -7,6 +7,9 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const mainWin = WA.mainWin || window;
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   let installed = false;
   let lastRoundSig = '';           // 去重：同一轮生成只跑一次before链
@@ -195,7 +198,7 @@
     arr.slice().forEach(fn => {   // 快照：监听器内部 on/off 不影响本轮派发
       try { fn(data); called++; }
       catch (e) {
-        st.errors++; st.lastAt = Date.now();
+        st.errors++; st.lastAt = clockWall();
         st.lastError = String((e && (e.message || e)) || e).slice(0, 180);
         WA.log('warn', '事件监听异常 ' + evt, e);
       }
