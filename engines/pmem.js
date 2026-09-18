@@ -238,6 +238,12 @@
   WA.pmem = {
     SYSTEM_PROMPT, buildUserPrompt,
     applyPersonalMemory, recall, knows, buildBlock, extractRound, holderSet,
+    // v2.8.0: `recentText` 此前是**内部函数**（extractRound 自用），未导出。
+    //   而 render/inject.js 自 v0.9.8 起就在写 `WA.pmem.recentText(4)`，用三元守卫兜底——
+    //   于是「取近期正文当召回 haystack 分量」这件事**从未真正发生**：haystack 里
+    //   永远没有当前对话正文，memorySampler 的『上下文相关召回』实际只按世界状态匹配。
+    //   属纯漏导出（实现一直在用），非功能缺失；但静态看是悬空引用、行为上看是静默降级。
+    recentText,
     knownPeopleNames, peopleList,   // v1.1.0: 导出人物清单（别名可达性 + 测试/调试）
     CAP_TOTAL, CAP_PER_PERSON, BATCH_MAX
   };

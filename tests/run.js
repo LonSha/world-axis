@@ -9567,7 +9567,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.7.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.8.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10111,7 +10111,7 @@ assert(verF2500 === '2.7.0' && mfF2500.version === verF2500, '入口与清单同
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.7.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.8.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10402,9 +10402,210 @@ assert(verF2500 === '2.7.0' && mfF2500.version === verF2500, '入口与清单同
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.7.0', '入口版本为 2.7.0（实 ' + ver + '）');
+    assert(ver === '2.8.0', '入口版本为 2.8.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
+  }
+  // ══════════ v2.8.0 ══════════
+  v2800: {
+  // ════════════════════════════════════════════════════════════════════
+  // v2.8.0：出口面契约（模块导出面 ↔ 跨文件引用面的双向绑定）
+  //
+  // 命题：v2.7.0 收口「设置键的写入侧」，本版转向**模块接口面本身**。
+  //   此前全库只有 tool-diag.MODULE_EXPORTS 一张表，它回答的是「每个文件应当导出哪个
+  //   命名空间、且该命名空间是否存在」——**命名空间级**。于是「WA.pmem.recentText(4)」
+  //   这种**成员级**引用即便根本不存在，也没有任何检查会发现：静态看不出来，运行到
+  //   那一行才短路（三元守卫把它变成空串，静默降级，连一条日志都没有）。
+  //   本块把「跨文件依赖的导出成员」冻结成清单，实现双向绑定：
+  //     ① 引用面——产品代码跨文件引用的成员，运行时必须真的存在（不存在 = 潜在 TypeError）；
+  //     ② 定义面——依赖面发生任何增删都必须显式更新冻结串，不允许静默漂移。
+  //   基建在 tests/inventory.js（可独立运行：node tests/inventory.js [--dead] [--json]）。
+  // ════════════════════════════════════════════════════════════════════
+  section('v2.8.0 块1：出口面契约（悬空引用必须为零）');
+  {
+    // 依赖宿主的只有 UI 层三个模块；compat（compat/host.js）无头可装载，属真契约面。
+    const UI_NS2800 = ['ui', 'uiSettings', 'assistant'];
+    const diagSrc2800 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const mi2800 = diagSrc2800.indexOf('const MODULE_EXPORTS = {');
+    const mj2800 = diagSrc2800.indexOf('\n  };', mi2800);
+    const MODEX2800 = vm.runInNewContext('(' + diagSrc2800.slice(diagSrc2800.indexOf('{', mi2800), mj2800 + 4) + ')');
+    const OWNER2800 = {};
+    Object.keys(MODEX2800).forEach(function (f) { OWNER2800[MODEX2800[f]] = f; });
+
+    // 定义面：运行时真实导出（与 tests/inventory.js 同一口径——下划线前缀 = 私有，不属承诺面）
+    const SURF2800 = {};
+    Object.keys(OWNER2800).forEach(function (ns) {
+      const v = WA[ns];
+      if (v === null || typeof v !== 'object') return;
+      const set = new Set();
+      Object.keys(v).forEach(function (k) { if (k.charAt(0) !== '_') set.add(k); });
+      SURF2800[ns] = set;
+    });
+    function hasMember2800(ns, mem) { return !!(SURF2800[ns] && SURF2800[ns].has(mem)); }
+
+    const PROD2800 = [];
+    (function walk2800(dir) {
+      fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
+        if (e.name === '.git' || e.name === 'node_modules') return;
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) return walk2800(p);
+        if (e.name.endsWith('.js') && dir !== path.join(BASE, 'tests')) PROD2800.push(path.relative(BASE, p));
+      });
+    })(BASE);
+    PROD2800.sort();
+
+    const RE2800 = /WA\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g;
+    const phantom2800 = [];
+    const depMap2800 = {};
+    PROD2800.forEach(function (rel) {
+      fs.readFileSync(path.join(BASE, rel), 'utf8').split('\n').forEach(function (line, idx) {
+        if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;          // 注释里的名字同样是文档债，但不入契约
+        RE2800.lastIndex = 0; let m;
+        while ((m = RE2800.exec(line))) {
+          const ns = m[1], mem = m[2];
+          if (!OWNER2800[ns]) continue;                            // 宿主级导出（log/store 以外的顶层键）
+          if (mem.charAt(0) === '_') continue;                     // 私有成员
+          // UI 层**无条件**排除：它的可用性取决于宿主（真 ST 里 ui/panel.js 全套在场；
+          //   测试环境里只有 loadScript 桩暴露的少量导出），纳入冻结契约只会让清单随环境漂移。
+          //   UI 命名空间本身的存在性由 tool-diag.MODULE_EXPORTS 校验，控件 id 由 UI_BINDINGS 校验。
+          if (UI_NS2800.indexOf(ns) >= 0) continue;
+          if (!hasMember2800(ns, mem)) { phantom2800.push(ns + '.' + mem + ' @' + rel + ':' + (idx + 1)); continue; }
+          if (OWNER2800[ns] === rel) continue;                     // 同文件自用不算跨文件依赖
+          (depMap2800[ns] = depMap2800[ns] || new Set()).add(mem);
+        }
+      });
+    });
+
+    assert(phantom2800.length === 0,
+      '出口面契约：悬空引用为零（引用运行时不存在的东西＝运行到那行才炸）'
+      + (phantom2800.length ? ' — 实 ' + phantom2800.length + ' 处：' + phantom2800.slice(0, 8).join('、') : ''));
+
+    const actual2800 = Object.keys(depMap2800).sort().map(function (ns) {
+      return ns + ':' + Array.from(depMap2800[ns]).sort().join(' ');
+    }).join('|');
+    const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
+
+    // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:applyResult applyStat buildPrompt forceSimulate getSettings setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add list remove shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy list remove reputationPressure update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read registryStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read recoveryStat rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+
+    if (actual2800 === FROZEN2800) {
+      assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
+    } else {
+      function parse2800(str) {
+        const out = {};
+        String(str).split('|').forEach(function (part) {
+          const i = part.indexOf(':');
+          if (i < 0) return;
+          out[part.slice(0, i)] = new Set(part.slice(i + 1).split(' ').filter(Boolean));
+        });
+        return out;
+      }
+      const A = parse2800(actual2800), F = parse2800(FROZEN2800);
+      const added = [], removed = [];
+      Object.keys(A).forEach(function (ns) {
+        A[ns].forEach(function (m) { if (!F[ns] || !F[ns].has(m)) added.push(ns + '.' + m); });
+      });
+      Object.keys(F).forEach(function (ns) {
+        F[ns].forEach(function (m) { if (!A[ns] || !A[ns].has(m)) removed.push(ns + '.' + m); });
+      });
+      assert(false, '出口面契约：依赖面发生漂移——新增 [' + added.slice(0, 12).join('、') + '] 减少 ['
+        + removed.slice(0, 12).join('、') + ']（这是**有意的**门禁：接口面变动必须显式落进冻结串，'
+        + '防「成员被悄悄改名/删掉，调用方静默降级」；确认无误后按 tests/_gen_contract.js 重新生成）');
+    }
+
+    // 负向：错名不该被当成「存在」——这正是 regional.INCIDENT_TYPES 长期悬空的原因
+    assert(hasMember2800('regional', 'incidentTypes') === true, '（正向）regional.incidentTypes 已在出口面上');
+    assert(hasMember2800('regional', 'INCIDENT_TYPES') === false, '（负向）regional.INCIDENT_TYPES 不在出口面（内部常量名不是对外承诺）');
+    assert(hasMember2800('pmem', 'recentText') === true, '（正向）pmem.recentText 已在出口面上');
+
+    // 覆盖度：MODULE_EXPORTS 声明的命名空间必须全部在接口面里（无头环境允许 UI 层缺席）
+    const nsMissing2800 = Object.keys(OWNER2800)
+      .filter(function (ns) { return !SURF2800[ns] && UI_NS2800.indexOf(ns) < 0; });
+    assert(nsMissing2800.length === 0, '出口面契约：声明表登记的非可选命名空间全部可解析（缺 ' + nsMissing2800.join('、') + '）');
+  }
+  } // end v2.8.0 block
+  section('v2.8.0 块2：本轮修掉的三处悬空引用（含各自的现场证据）');
+  {
+    // ① pmem.recentText —— render/inject.js 自 v0.9.8 起就在调，函数却从未导出
+    assert(typeof WA.pmem.recentText === 'function', '① pmem.recentText 已导出（此前是内部函数，render/inject 的三元守卫静默取空串）');
+    assert(typeof WA.pmem.recentText(4) === 'string', '① pmem.recentText(4) 返回字符串（可安全喂给 memorySampler.buildBlock）');
+    const injectSrc2800 = fs.readFileSync(path.join(BASE, 'render/inject.js'), 'utf8');
+    assert(injectSrc2800.indexOf('WA.pmem.recentText') >= 0 && injectSrc2800.indexOf('memorySampler.buildBlock({ recentText: recent })') >= 0,
+      '① 消费端与出口对齐：render/inject 取到的 recent 真的会进 buildBlock（此前恒为空串）');
+
+    // ② regional.incidentTypes —— contract-audit 读了两个名字都没读到
+    assert(Array.isArray(WA.regional.incidentTypes), '② regional.incidentTypes 已导出为数组');
+    assert(WA.regional.incidentTypes.length === 8 && WA.regional.incidentTypes.every(function (t) { return typeof t === 'string'; }),
+      '② 形状为类型 id 的扁平数组（富对象表会让集合比对每个元素都不相等 → 8 条假漂移）');
+    assert(WA.regional.incidentTypes.join(',') === 'bandit,plague,market,faction_clash,official,sect,infrastructure,ominous',
+      '② 与契约枚举同序同值');
+
+    // ③ contract-audit 的跨模块检查：源缺失必须报 error（正是它漏报了 ②）
+    const rep2800 = WA.contractAudit.audit({ applyFn: function (d, r, a) { WA.backstage.applyResult(d, r, a); } });
+    const miss2800 = rep2800.crossModule.filter(function (c) { return (c.missingSources || []).length; });
+    assert(miss2800.length === 0, '③ 6 组跨模块检查的源全部取到了值（缺 ' + miss2800.map(function (c) { return c.name + ':' + c.missingSources.join('/'); }).join('；') + '）');
+    assert(rep2800.crossModule.every(function (c) { return c.compared >= 1; }),
+      '③ 每组至少比对了 1 个非契约源（compared 此前不存在——「比了几组」从来不可见）');
+    assert(rep2800.crossModule.filter(function (c) { return c.name === 'regional.incidentTypes'; })[0].compared === 1,
+      '③ regional.incidentTypes 这组真的执行了比对（此前源恒为 null 被跳过，报告上却与其它组长得一样）');
+
+    // 灵敏度：把源打掉必须立刻报 error，恢复后必须消失（规则无副作用）
+    const econ2800 = WA.contractAudit.CROSS_MODULE.filter(function (c) { return c.name === 'economy.climate'; })[0];
+    const keep2800 = econ2800.sources.evolution;
+    econ2800.sources.evolution = function () { return undefined; };
+    const repBad2800 = WA.contractAudit.audit({ applyFn: function (d, r, a) { WA.backstage.applyResult(d, r, a); } });
+    const badIssue2800 = repBad2800.issues.filter(function (i) { return i.code === 'cross_module_source_missing'; })[0];
+    assert(!!badIssue2800 && badIssue2800.level === 'error',
+      '（正向）源取不到时报 error——不再像此前那样「非空才比」把空源静默跳过');
+    assert(/未执行/.test(badIssue2800 ? badIssue2800.detail : ''), '（正向）判语点明「该组比对未执行，无漂移不成立」');
+    econ2800.sources.evolution = keep2800;
+    const repOk2800 = WA.contractAudit.audit({ applyFn: function (d, r, a) { WA.backstage.applyResult(d, r, a); } });
+    assert(repOk2800.issues.filter(function (i) { return i.code === 'cross_module_source_missing'; }).length === 0,
+      '恢复源后不再报（规则无副作用）');
+  }
+  section('v2.8.0 块3：体检出口（基建可独立运行 + 数据可被诊断消费）');
+  {
+    const invSrc2800 = fs.readFileSync(path.join(BASE, 'tests/inventory.js'), 'utf8');
+    assert(invSrc2800.indexOf('MODULE_EXPORTS') > 0, '体检脚本从 tool-diag 取声明表（不复制，避免两处漂移）');
+    assert(invSrc2800.indexOf("const LOAD = [") > 0 && invSrc2800.indexOf('tests/run.js') > 0,
+      '装载清单从 tests/run.js 提取（单一真源，新增模块自动纳入）');
+    assert(invSrc2800.indexOf('ui/panel.js') > 0, '体检脚本会尝试装载 UI 层——把「UI 未装载」这类假悬空与真悬空分开');
+    assert(invSrc2800.indexOf('已激活包') < 0 && invSrc2800.indexOf('process.exit(phantom.length ? 1 : 0)') > 0,
+      '体检脚本以退出码表达结论（可供 CI/工作流直接判定）');
+    const genSrc2800 = fs.readFileSync(path.join(BASE, 'tests/export-contract.js'), 'utf8');
+    assert(genSrc2800.indexOf("const OPTIONAL = ['ui', 'uiSettings', 'assistant'];") > 0,
+      '生成器的排除名单与测试块同口径（仅 UI 层依赖宿主；compat 无头可装载）');
+    assert(genSrc2800.indexOf('export_contract.txt') > 0, '生成器把冻结串落盘到固定路径，便于人工核对与回填');
+  }
+  section('v2.8.0 块5：端到端——源缺失会被「健康巡视」捕获（不止是单元断言）');
+  {
+    // 命题：新规则的价值在于**运行时真的能被看见**。若只加一条 issue 而没有任何消费端
+    //   读它，那就是又一次「声明面空转」（v2.7.0 刚治理过同型问题）。
+    //   store.maintain({deep:true}) 是产品侧唯一的引擎自检消费点（面板「健康巡视」按钮）。
+    const m0 = WA.store.maintain({ deep: true });
+    const keep2800 = WA.regional.incidentTypes;
+    delete WA.regional.incidentTypes;
+    const m1 = WA.store.maintain({ deep: true });
+    const iss1 = m1.issues.filter(function (i) { return i.key === 'engine.contract'; });
+    assert(iss1.length === 1 && iss1[0].level === 'error',
+      '源缺失时健康巡视报 error（不依赖任何测试专用入口）');
+    assert(/cross_module_source_missing/.test(iss1[0].detail), '判语点出具体代码（可检索、可归因）');
+    assert(m1.score < m0.score, '健康分随之下调（' + m0.score + ' → ' + m1.score + '，错误要能拉低评分而不是静默通过）');
+    WA.regional.incidentTypes = keep2800;
+    const m2 = WA.store.maintain({ deep: true });
+    assert(m2.score === m0.score, '恢复后健康分复原（规则无副作用：' + m2.score + '）');
+    assert(m2.issues.filter(function (i) { return i.key === 'engine.contract' && i.level === 'error'; }).length === 0,
+      '恢复后不再报 error');
+  }
+  section('v2.8.0 块4：版本三方对齐');
+  {
+    const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+    const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
+    const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
+    assert(ver2800 === '2.8.0', '入口版本为 2.8.0（实 ' + ver2800 + '）');
+    assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
+    assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
+      '出口面契约留痕（可回溯）');
   }
   } // end v2.7.0 block
   } // end v2.2.0 block

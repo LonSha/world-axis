@@ -258,7 +258,10 @@
       name: 'regional.incidentTypes',
       sources: {
         contract: ['bandit', 'plague', 'market', 'faction_clash', 'official', 'sect', 'infrastructure', 'ominous'],
-        regional: function () { return (WA.regional && WA.regional.incidentTypes) || (WA.regional && WA.regional.INCIDENT_TYPES) || null; }
+        // v2.8.0: 此前写 `incidentTypes || INCIDENT_TYPES`——两个名字都取不到（见 regional.js 注记），
+        //   故此处改为只读唯一出口 `incidentTypes`；取不到时由下面的「源缺失」规则报 error，
+        //   不再像以前那样静默跳过比对。
+        regional: function () { return WA.regional && WA.regional.incidentTypes; }
       },
       severity: 'warn'
     }
@@ -307,6 +310,16 @@
         const v = c.sources[k];
         sets[k] = typeof v === 'function' ? safe(v, null) : v;
       });
+      // v2.8.0: 「源取不到」必须先于「有没有差异」判定。
+      //   此前口径是「逐个**非空**源比对」——源为 null 就跳过，于是导出名写错（或压根没导出）
+      //   的检查会永远报 0 差异，看上去是「各处一致」，实际是**一次都没比过**。
+      //   这正是 regional.incidentTypes 的真实经历：两个名字都取不到，6 组里这一组
+      //   自建立起从未执行，而报告上它和其它 5 组长得一模一样。属「结论不实」的最小形态。
+      //   凡源缺失即报 error（模块未加载 / 导出名不符 / 实现未导出），绝不静默。
+      const missingSources = Object.keys(sets).filter(function (k) {
+        if (k === 'contract') return false;
+        return sets[k] === null || sets[k] === undefined;
+      });
       // 以 contract 集合为基准，逐个非空源比对
       const baseSet = sets.contract || [];
       const diffs = {};
@@ -315,7 +328,9 @@
         const d = sets[k].filter(function (v) { return baseSet.indexOf(v) < 0; });
         if (d.length) diffs[k] = d;
       });
-      return { name: c.name, severity: c.severity, sets: sets, diffs: diffs, hint: c.hint || null };
+      return { name: c.name, severity: c.severity, sets: sets, diffs: diffs,
+        missingSources: missingSources, compared: Object.keys(sets).length - 1 - missingSources.length,
+        hint: c.hint || null };
     });
 
     const issues = [];
@@ -325,6 +340,10 @@
       if (e.status === 'mismatch') issues.push({ level: 'warn', code: 'enum_drift', detail: e.field + ' 枚举漂移：契约缺 [' + e.missing.join(',') + '] 契约多 [' + e.extra.join(',') + ']' });
     });
     crossModule.forEach(function (c) {
+      if (c.missingSources.length) {
+        issues.push({ level: 'error', code: 'cross_module_source_missing',
+          detail: c.name + ' 源缺失：' + c.missingSources.join('、') + '（导出名不符或未导出）——该组比对未执行，『无漂移』不成立' });
+      }
       const dk = Object.keys(c.diffs);
       if (dk.length) issues.push({ level: c.severity, code: 'cross_module_drift', detail: c.name + ' 跨模块漂移：' + dk.map(function (k) { return k + ' 多 [' + c.diffs[k].join(',') + ']'; }).join('；') + (c.hint ? '——' + c.hint : '') });
     });

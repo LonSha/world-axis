@@ -80,6 +80,16 @@
     getSettings: loadSettings,
     // v2.3.0 块3: 只读生效视图（夹取后）——面板/诊断据此显示真实生效值
     effectiveSettings: effSettings,
+    // v2.8.0: 导出突发事件类型表。此前**完全没导出**，而 engines/contract-audit.js 的
+    //   跨模块漂移检查一直在读 `regional.incidentTypes || regional.INCIDENT_TYPES`——
+    //   前者是错名（内部常量叫 INCIDENT_TYPES）、后者因未导出也不存在，两个都取不到，
+    //   于是那组比对源恒为 null 被跳过：**该检查自建立起从未真正执行过一次**。
+    //   为什么值得修：这组检查防的正是「契约枚举与引擎实现漂移」（模型产出 bandit，
+    //   引擎侧却认不出、静默落到默认分支），是 6 组里唯一没有任何测试覆盖的一组。
+    //   形状须为**类型 id 的扁平数组**（契约里写的正是 bandit/plague/… 这 8 个 id）——
+    //   直接导出 INCIDENT_TYPES 会带上 label/weight/guide 三个字段，与契约做集合比对时
+    //   每个元素都不相等 → 反而制造 8 条假漂移。ids 才是对外的枚举面，富表是内部实现。
+    incidentTypes: INCIDENT_TYPES.map(function (t) { return t.type; }),
     MIN_CHANCE_PCT, MAX_CHANCE_PCT, MIN_DURATION, MAX_DURATION,
     /**
      * v2.7.0: 写入即归一——此前**落盘的是原值**（越界值原样存），而引擎一律用 effSettings()
