@@ -77,8 +77,9 @@
     __uninjectLedger.length = 0;
     remain.forEach(function (x) { __uninjectLedger.push(x); });
     try {
-      const mainWin = (typeof window !== 'undefined' ? window : global);
-      mainWin.localStorage.removeItem('worldaxis_uninject_ledger_' + cid);
+      // v2.9.0: 走 store 的受控删除出口（此前裸调 removeItem）——删不掉时台账会在下次装载时
+      //   复活，导致「已卸载的注入」被误判为仍在生效。
+      if (WA.store && typeof WA.store.removeVerified === 'function') WA.store.removeVerified('worldaxis_uninject_ledger_' + cid);
     } catch (e) {}
   }
   /** 取当前聊天域的台账条目（无域标识的历史条目视为同域，向后兼容） */

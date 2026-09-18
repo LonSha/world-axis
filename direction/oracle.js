@@ -11,7 +11,16 @@
   //   原先标 orphan:true 属误声明，会被面板「孤儿键注销」当成幽灵登记清掉。
   function loadPlan() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  function savePlan(p) { if (p) WA.settingsBus.save(__REG, p); else WA.mainWin.localStorage.removeItem(LS_PLAN); }
+  // v2.9.0: 清除走设置总线的删除出口（此前直调 localStorage.removeItem）。
+  //   本键是 **settings 家族且已登记**（classifyKey → {family:'settings'}），删它却绕过了总线：
+  //   ⇒ 删成功不进任何台账、删失败**抛错穿透到 oracle.clear() 调用方**（实测：内存 plan 已清空、
+  //      磁盘键仍在，UI 显示「已清除」而重启后计划复活）。
+  //   总线出口契约「永不抛」，失败返回 {ok:false} 并分桶归因。
+  function savePlan(p) {
+    if (p) { WA.settingsBus.save(__REG, p); return; }
+    const r = WA.settingsBus.remove(__REG);
+    if (r && r.ok === false && WA.log) WA.log('error', '剧情参谋：清除存档计划失败（' + String((r.error && (r.error.message || r.error)) || r.error) + '）——磁盘上的计划仍在，重启后会复活', null);
+  }
 
   // v2.1.0: 参谋运行观测
   const __orStat = { runs: 0, generated: 0, failed: 0, advanced: 0, lastReason: null, lastCount: 0, lastAt: 0, lastApiError: null };

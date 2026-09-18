@@ -162,8 +162,9 @@
       __wfFails.length = 0;   // v2.1.0: 台账随历史一并重置（语义：清空运行痕迹）
       try {
         const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
-        const mainWin = (typeof window !== 'undefined' ? window : global);
-        mainWin.localStorage.removeItem('worldaxis_wf_history_' + cid);
+        // v2.9.0: 走 store 的受控删除出口（此前裸调 removeItem）——删不掉时没有任何痕迹，
+        //   而 resetHistory 的语义是「清空运行痕迹」：删失败会让旧台账在下次 loadHistory 时复活。
+        if (WA.store && typeof WA.store.removeVerified === 'function') WA.store.removeVerified('worldaxis_wf_history_' + cid);
       } catch (e) {}
     },
     loadHistory(chatId) {

@@ -258,6 +258,9 @@
       name: 'regional.incidentTypes',
       sources: {
         contract: ['bandit', 'plague', 'market', 'faction_clash', 'official', 'sect', 'infrastructure', 'ominous'],
+        // v2.9.0: 删除侧完整性契约的留痕点——本文件是跨模块契约审计的唯一消费端，
+        //   删除侧空白面（全库裸 removeItem 零计量/零复核/零归因）正是靠它这类跨模块
+        //   一致性审计才能被发现：写入侧有 lsWrite 单出口与 verifyFailed，删除侧什么都没有。
         // v2.8.0: 此前写 `incidentTypes || INCIDENT_TYPES`——两个名字都取不到（见 regional.js 注记），
         //   故此处改为只读唯一出口 `incidentTypes`；取不到时由下面的「源缺失」规则报 error，
         //   不再像以前那样静默跳过比对。

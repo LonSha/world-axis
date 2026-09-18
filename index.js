@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.8.0';
+  const VERSION = '2.9.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -164,8 +164,13 @@
     __logSaveChat = null;
     try {
       const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
-      mainWin.localStorage.removeItem('worldaxis_event_log_' + cid);
-      mainWin.localStorage.removeItem('worldaxis_error_log_' + cid);
+      // v2.9.0: 走 store 的受控删除出口（此前裸调 removeItem）。清除日志的语义是「清空」——
+      //   删失败时防抖写入已取消、内存也清了，而磁盘上的旧日志会在下次 loadEventLog 时
+      //   整段复活：用户看到「已清空」，重启后又回来了，且没有任何线索。
+      if (WA.store && typeof WA.store.removeVerified === 'function') {
+        WA.store.removeVerified('worldaxis_event_log_' + cid);
+        WA.store.removeVerified('worldaxis_error_log_' + cid);
+      }
     } catch (e) {}
   };
 

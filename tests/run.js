@@ -9567,7 +9567,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.8.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.9.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10111,7 +10111,7 @@ assert(verF2500 === '2.8.0' && mfF2500.version === verF2500, '入口与清单同
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.8.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.9.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10402,7 +10402,7 @@ assert(verF2500 === '2.8.0' && mfF2500.version === verF2500, '入口与清单同
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.8.0', '入口版本为 2.8.0（实 ' + ver + '）');
+    assert(ver === '2.9.0', '入口版本为 2.9.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -10425,6 +10425,88 @@ assert(verF2500 === '2.8.0' && mfF2500.version === verF2500, '入口与清单同
   {
     // 依赖宿主的只有 UI 层三个模块；compat（compat/host.js）无头可装载，属真契约面。
     const UI_NS2800 = ['ui', 'uiSettings', 'assistant'];
+    // ── G14（v2.9.0）：删除侧适用范围契约——产品代码里的裸 removeItem 只能有一处 ──
+    //   为什么值得一条断言：本台账声称「删除可观测」时，指的是**所有删除都经受控出口**。
+    //   若日后有人再加一个裸 removeItem（绕过复核与计量），「删除可观测」会重新变成假结论。
+    //   与 G13（写入侧旁路清单）完全对称：G13 钉「裸 setItem 只剩白名单内的非 settings 旁路」，
+    //   G14 钉「裸 removeItem 只剩受控出口内部那一处」。
+    {
+      const dirsG14 = ['core', 'engines', 'render', 'ui', 'actors', 'direction', 'compat'];
+      const filesG14 = [];
+      const walkG14 = function (rel) {
+        const abs = path.join(BASE, rel);
+        let stG = null;
+        try { stG = fs.statSync(abs); } catch (e) { return; }
+        if (stG.isFile()) { if (/\.js$/.test(rel)) filesG14.push(rel); return; }
+        let namesG = [];
+        try { namesG = fs.readdirSync(abs); } catch (e) { return; }
+        namesG.forEach(function (n) { walkG14(rel + '/' + n); });
+      };
+      dirsG14.forEach(function (d) { walkG14(d); });
+      walkG14('index.js');
+      const bareG14 = [];
+      filesG14.forEach(function (rel) {
+        fs.readFileSync(path.join(BASE, rel), 'utf8').split('\n').forEach(function (ln, i) {
+          if (ln.indexOf('localStorage.removeItem(') < 0) return;
+          bareG14.push({ rel: rel, line: i + 1 });
+        });
+      });
+      // 冻结清单：受控删除出口的内部实现（store 内 removeVerified 的那一处裸调）。
+      const INVENTORY_G14 = { 'core/store.js': 1, 'core/settings-bus.js': 0 };
+      const cntG14 = {};
+      bareG14.forEach(function (st) { cntG14[st.rel] = (cntG14[st.rel] || 0) + 1; });
+      Object.keys(INVENTORY_G14).forEach(function (rel) {
+        assert((cntG14[rel] || 0) === INVENTORY_G14[rel],
+          'G14 删除侧出口唯一性：' + rel + '（实 ' + (cntG14[rel] || 0) + '，冻结 ' + INVENTORY_G14[rel] + '）');
+      });
+      const extraG14 = Object.keys(cntG14).filter(function (rel) { return INVENTORY_G14[rel] === undefined; });
+      assert(extraG14.length === 0, '（负向）没有新增裸删除文件（实 ' + (extraG14.join(',') || '无') + '）');
+      assert(bareG14.length === 1,
+        '（正向）全库裸 removeItem 恰为 1 处（受控出口内部；实 ' + bareG14.length + ' 处：' + bareG14.map(function (x) { return x.rel + ':' + x.line; }).join('、') + '）');
+      // 全库业务删除点必须走受控出口（正向可核验清单，防「日后又加一处裸删」被计数断言放过）
+      const mustUseG14 = ['core/workflow.js', 'render/inject.js', 'direction/oracle.js', 'index.js', 'tests/mock.js'];
+      const notUsingG14 = mustUseG14.filter(function (rel) {
+        const txtG = fs.readFileSync(path.join(BASE, rel), 'utf8');
+        if (rel === 'tests/mock.js') return txtG.indexOf('removeVerified') < 0;
+        return txtG.indexOf('removeVerified') < 0 && txtG.indexOf('settingsBus.remove') < 0 && txtG.indexOf('rmRemove') < 0;
+      });
+      assert(notUsingG14.length === 0,
+        '（正向）全部涉及删除的模块都已接入受控出口（未接入：' + (notUsingG14.join('、') || '无') + '）');
+      // settings-bus 自身：删除点必须走 rmRemove，且 rmRemove 内恰有一处裸删除、记账各一处
+      const busG14 = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+      assert((busG14.match(/ls\.removeItem\(/g) || []).length === 1,
+        '（结构性）settings-bus 内除统一删除出口外无裸 ls.removeItem（实 ' + (busG14.match(/ls\.removeItem\(/g) || []).length + ' 处）');
+      assert((busG14.match(/stats\.removeFailed\+\+/g) || []).length === 1,
+        '删除失败记账收敛为单一实现（noteRemoveFail 内一处）');
+      assert((busG14.match(/stats\.removes\+\+/g) || []).length === 1, '删除成功记账收敛为单一实现（rmRemove 内一处）');
+      // （负向）探针必须能抓到「新加的裸删」——否则上面那条计数断言只是「碰巧成立」。
+      //   做法：临时在 compat 下放一个含裸 removeItem 的文件，重跑同一套扫描逻辑，断言它被检出；
+      //   无论成败都必须删掉探针文件（否则下一个版本会被这道门禁本身绊住）。
+      const probeRel = 'compat/__g14_probe.js';
+      const probeAbs = path.join(BASE, probeRel);
+      let caughtG14 = -1;
+      try {
+        fs.writeFileSync(probeAbs, 'window.WorldAxis.__g14Probe = function (k) { window.localStorage.removeItem(k); };\n', 'utf8');
+        const filesG = [];
+        (function walkProbe(rel) {
+          const abs = path.join(BASE, rel);
+          let stP = null;
+          try { stP = fs.statSync(abs); } catch (e) { return; }
+          if (stP.isFile()) { if (/\.js$/.test(rel)) filesG.push(rel); return; }
+          let namesP = [];
+          try { namesP = fs.readdirSync(abs); } catch (e) { return; }
+          namesP.forEach(function (n) { walkProbe(rel + '/' + n); });
+        })('compat');
+        caughtG14 = filesG.filter(function (rel) {
+          return fs.readFileSync(path.join(BASE, rel), 'utf8').indexOf('localStorage.removeItem(') >= 0;
+        }).length;
+      } finally {
+        try { fs.unlinkSync(probeAbs); } catch (eU) {}
+      }
+      assert(caughtG14 === 1,
+        '（负向）G14 探针：新加一个裸删文件会被检出（实检出 ' + caughtG14 + ' 个，期望 1）');
+      assert(fs.existsSync(probeAbs) === false, '（环境）探针文件已清理，不残留');
+    }
     const diagSrc2800 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
     const mi2800 = diagSrc2800.indexOf('const MODULE_EXPORTS = {');
     const mj2800 = diagSrc2800.indexOf('\n  };', mi2800);
@@ -10486,7 +10568,7 @@ assert(verF2500 === '2.8.0' && mfF2500.version === verF2500, '入口与清单同
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:applyResult applyStat buildPrompt forceSimulate getSettings setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add list remove shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy list remove reputationPressure update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read registryStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read recoveryStat rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:applyResult applyStat buildPrompt forceSimulate getSettings setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add list remove shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy list remove reputationPressure update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read recoveryStat removeStat removeVerified rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -10602,11 +10684,404 @@ assert(verF2500 === '2.8.0' && mfF2500.version === verF2500, '入口与清单同
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.8.0', '入口版本为 2.8.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.9.0', '入口版本为 2.9.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
   }
+  // ══════════ v2.9.0 ══════════
+  v2900: {
+  // ════════════════════════════════════════════════════════════════════
+  // v2.9.0：删除侧完整性（模块删除点的受控出口 + 删后复核 + 计量归因）
+  //
+  // 命题：v2.6.0 / v2.7.0 / v2.8.0 三轮把**写入侧**收口成了 `lsWrite` 单一出口
+  //   （成功计量 / 失败分桶 / 写后读回校验三层），而**删除侧是它的精确对偶空白面**——
+  //   全库 13 处 `localStorage.removeItem` 直调，删成功没计数、删失败没归因、删完没复核。
+  //   删除是**破坏性**操作（删错 = 用户数据没了），它不可观测比写入不可观测更危险：
+  //   「已清理 N 项」可能是假的，而用户会据此认为空间已腾出。
+  // ════════════════════════════════════════════════════════════════════
+  const LS2900 = global.localStorage;
+  const ctx2900 = global.SillyTavern.getContext();
+  const PROD2900 = ['core/store.js', 'core/settings-bus.js', 'engines/tool-diag.js',
+    'core/workflow.js', 'render/inject.js', 'direction/oracle.js', 'index.js', 'ui/panel.js'];
+  const SRC2900 = PROD2900.map(function (rel) { return { rel: rel, text: fs.readFileSync(path.join(BASE, rel), 'utf8') }; });
+  function src2900(rel) { const h = SRC2900.filter(function (x) { return x.rel === rel; })[0]; return h ? h.text : ''; }
+  function rstat2900() { return WA.settingsBus.removeStat(); }
+  function fr2900() { LS2900.clear(); ctx2900.chatId = 'v2900_chat'; global.__mockChat.length = 0; WA.store.init(); }
+
+  // ── 块1：删除出口（唯一实现 + 三层对称 + 永不抛） ──
+  fr2900();
+  section('v2.9.0 块1：删除出口（唯一实现 + 三层对称 + 永不抛）');
+  {
+    const bus2900 = src2900('core/settings-bus.js');
+    assert((bus2900.match(/ls\.removeItem\(/g) || []).length === 1,
+      '（结构性）settings-bus 内除统一删除出口外无裸 ls.removeItem（实 ' + (bus2900.match(/ls\.removeItem\(/g) || []).length + ' 处）');
+    assert(bus2900.indexOf('function rmRemove(') > 0 && bus2900.indexOf('function noteRemoveFail(') > 0,
+      '存在唯一删除出口 rmRemove 与归类记账 noteRemoveFail（lsWrite/noteFail 的删除侧对偶）');
+    assert((bus2900.match(/stats\.removeFailed\+\+/g) || []).length === 1, '删除失败记账收敛为单一实现（noteRemoveFail 内一处）');
+    assert((bus2900.match(/stats\.removes\+\+/g) || []).length === 1, '删除成功记账收敛为单一实现（rmRemove 内一处）');
+    assert(bus2900.indexOf('if (o.verify !== false)') > 0 && bus2900.indexOf('still-present-after-remove') > 0,
+      '删除后读回复核在位（默认开启，与写入侧 verify 同规格）');
+    const iRm = bus2900.indexOf('ls.removeItem(key);');
+    const iOk = bus2900.indexOf('stats.removes++;');
+    const iStage = bus2900.indexOf('still-present-after-remove');
+    assert(iRm > 0 && iOk > iRm && iStage > iRm, '锚点齐全（removeItem / removes / staged）');
+    assert(iOk > iStage, 'removes 自增在复核分支之后（顺序即口径：只有复核通过才算删除成功）');
+    // （负向）结构性探针：把裸删塞进兼容层文件，扫描逻辑必须检出（否则上面的计数断言只是碰巧成立）
+    const probeB = path.join(BASE, 'compat/__v2900_probe.js');
+    let caughtB = -1;
+    try {
+      fs.writeFileSync(probeB, 'window.WorldAxis.__v2900 = function (k) { window.localStorage.removeItem(k); };\n', 'utf8');
+      caughtB = (fs.readFileSync(probeB, 'utf8').match(/localStorage\.removeItem\(/g) || []).length;
+    } finally { try { fs.unlinkSync(probeB); } catch (eU) {} }
+    assert(caughtB === 1, '（负向）裸删扫描能检出新加站点（实 ' + caughtB + '）');
+    assert(fs.existsSync(probeB) === false, '（环境）探针文件已清理，不残留');
+
+    // A. 正向：真删掉了
+    const kOk = 'worldaxis_v2900_ok_v1';
+    LS2900.setItem(kOk, JSON.stringify({ a: 1 }));
+    const r0 = rstat2900();
+    const rOk = WA.settingsBus.remove({ key: kOk, def: null, module: 'test' });
+    assert(rOk.ok === true && rOk.existed === true, '（正向）键存在时删除返回 ok');
+    assert(LS2900.getItem(kOk) === null, '（正向）键确已从磁盘移除（计量不是唯一证据）');
+    assert(rstat2900().removes === r0.removes + 1 && rstat2900().removeVerified === r0.removeVerified + 1,
+      '（正向）真删掉计入 removes / removeVerified');
+    assert(rstat2900().removeAbsent === r0.removeAbsent, '（正向）真删掉不计 removeAbsent');
+
+    // B. 负向：静默无效（removeItem 没抛错但键仍在）——删除侧最危险的形态
+    const kStaged = 'worldaxis_v2900_staged_v1';
+    LS2900.setItem(kStaged, JSON.stringify({ a: 2 }));
+    const rawRm = LS2900.removeItem;
+    let threw = null;
+    try {
+      LS2900.removeItem = function (k) { if (k === kStaged) return; return rawRm.call(LS2900, k); };
+      const s0 = rstat2900();
+      let rS = null;
+      try { rS = WA.settingsBus.remove({ key: kStaged, def: null, module: 'test' }); } catch (e) { threw = e; }
+      assert(threw === null, '（负向）静默无效路径不抛异常（出口契约：永不抛）');
+      assert(rS && rS.ok === false && rS.staged === true, '（负向）删完读回仍在 ⇒ 判失败（不再假装删成功）');
+      assert(rstat2900().removeStaged === s0.removeStaged + 1, '删完读回仍在计入 removeStaged');
+      assert(rstat2900().removes === s0.removes, '（关键）静默无效**不得**计入 removes——否则「N 次全部复核通过」虚高');
+      assert(rstat2900().lastRemoveStaged && rstat2900().lastRemoveStaged.key === kStaged,
+        'lastRemoveStaged 点名具体键与字节量（可归因）');
+      assert(LS2900.getItem(kStaged) !== null, '（环境）键确实还在磁盘上（模拟的就是这种失败）');
+      assert(rstat2900().lastRemoveError && rstat2900().lastRemoveError.indexOf('guarded:') === 0,
+        '归因桶区分「删不掉」与「删除被拒」（实 ' + rstat2900().lastRemoveError + '）');
+      assert((rstat2900().removeFailedBy || {}).guarded >= 1, 'guarded 独立成桶（不与 setItem 桶混同，两者处置不同）');
+    } finally { LS2900.removeItem = rawRm; }
+    const rAfter = WA.settingsBus.remove({ key: kStaged, def: null, module: 'test' });
+    assert(rAfter.ok === true && rstat2900().lastRemoveStaged === null,
+      '（可逆性）随后一次删除复核通过 ⇒ lastRemoveStaged 清零（判据是当前态而非历史累计）');
+
+    // C. 负向：删除被拒（抛错）
+    const kThrow = 'worldaxis_v2900_throw_v1';
+    LS2900.setItem(kThrow, JSON.stringify({ a: 3 }));
+    const byBefore = Object.assign({}, rstat2900().removeFailedBy);
+    threw = null;
+    try {
+      LS2900.removeItem = function (k) { if (k === kThrow) throw new Error('QuotaExceededError'); return rawRm.call(LS2900, k); };
+      let rT = null;
+      try { rT = WA.settingsBus.remove({ key: kThrow, def: null, module: 'test' }); } catch (e) { threw = e; }
+      assert(threw === null, '（负向）删除被拒不抛异常穿透调用方（此前裸 removeItem 会抛到调用点）');
+      assert(rT && rT.ok === false, '删除被拒 ⇒ 判失败');
+      assert(rstat2900().lastRemoveError && rstat2900().lastRemoveError.indexOf('settings') === 0,
+        '归因写出调用来路（实 ' + rstat2900().lastRemoveError + '）');
+      const byNow = rstat2900().removeFailedBy;
+      assert((byNow.settings || 0) === (byBefore.settings || 0) + 1,
+        '（归因不实已纠正）设置键出口的删除失败落在 settings 桶，而不是兜底 setItem 桶');
+      assert((byNow.setItem || 0) === (byBefore.setItem || 0),
+        '（负向）setItem 桶未被误增——归因不实会让用户照着「删除被拒」去查权限');
+      assert(LS2900.getItem(kThrow) !== null, '（环境）删除被拒后键仍在磁盘上');
+    } finally { LS2900.removeItem = rawRm; }
+
+    // D. 正向：键本就不存在 ⇒ 幂等无操作，不算删除成功
+    const a0 = rstat2900();
+    const rA = WA.settingsBus.remove({ key: 'worldaxis_v2900_absent_v1', def: null, module: 'test' });
+    assert(rA.ok === true && rA.absent === true, '（正向）删除一个本就不存在的键返回 ok（幂等无操作）');
+    assert(rstat2900().removeAbsent === a0.removeAbsent + 1, '「键本就不存在」计入 removeAbsent');
+    assert(rstat2900().removes === a0.removes,
+      '（关键）幂等无操作**不得**计入 removes——否则「N 次全部复核通过」可能来自 N 次空操作');
+    assert(rstat2900().lastRemove && rstat2900().lastRemove.absent === true,
+      'lastRemove 标出这是一次无操作（读的人不会被「最近删除」误导）');
+
+    // E. 登记项缺 key：必须走删除侧记账，不污染写入侧台账
+    const mf0 = Object.assign({}, rstat2900().removeFailedBy);
+    const wf0 = WA.settingsBus.writeStat();
+    const rMk = WA.settingsBus.remove({ def: {} });
+    assert(rMk.ok === false, '（负向）登记项没声明 key ⇒ 拒绝删除');
+    assert((rstat2900().removeFailedBy.missing || 0) === (mf0.missing || 0) + 1,
+      '登记项缺 key 落在删除侧 missing 桶（首版错走写入侧 noteFail，使 removeFailedBy.missing 声明了却零消费）');
+    assert(WA.settingsBus.writeStat().writeFailed === wf0.writeFailed,
+      '（修掉的首版缺陷）它**不得**污染写入侧台账——否则读的人会去查写盘环境');
+
+    // F. 总线内部三处删除点走出口（静态）
+    assert(bus2900.indexOf("rmRemove(r.key, 'quarantine')") > 0,
+      '隔离路径删除走出口（此前裸调 + 空 catch 静默吞错）');
+    assert(bus2900.indexOf("rmRemove(lk, 'legacy')") > 0,
+      'legacy 旧键迁移删除走出口（此前删不掉时「每次启动重迁一遍」完全不可见）');
+    assert((bus2900.match(/rmRemove\(/g) || []).length >= 5,
+      '全部内部删除点走出口（实 ' + (bus2900.match(/rmRemove\(/g) || []).length + ' 处：定义 1 + 对外 1 + 内部 3）');
+  }
+
+  // ── 块2：oracle 现场——设置家族的键删除却绕过总线 ──
+  section('v2.9.0 块2：oracle 现场（删除失败抛错穿透 + 删成功零台账）');
+  {
+    const orcS = src2900('direction/oracle.js');
+    assert((orcS.match(/localStorage\.removeItem\s*\(/g) || []).length === 0,
+      '（结构性）oracle 内已无裸删**调用**（实 ' + (orcS.match(/localStorage\.removeItem\s*\(/g) || []).length
+        + ' 处；注释里的字样是留证，不算调用——断言过宽会把留证文字当成缺陷）');
+    assert(orcS.indexOf('WA.settingsBus.remove(__REG)') > 0, '清除存档计划走设置总线删除出口');
+    const cO = WA.store.classifyKey('worldaxis_oracle_plan_v1');
+    assert(cO.family === 'settings',
+      '（现场）oracle 计划键属 settings 家族（实 ' + JSON.stringify(cO.family) + '）——治理面本应覆盖它');
+    const regsO = (WA.__settingsRegs || []).filter(function (r) { return r.key === 'worldaxis_oracle_plan_v1'; });
+    assert(regsO.length === 1, '（现场）该键已在设置登记表内（regHit=1）——删它却绕过总线，属治理空白面');
+    fr2900();
+    WA.oracle.setPlan({ beats: [{ goal: 'g1' }], current: 0 });
+    assert(LS2900.getItem('worldaxis_oracle_plan_v1') !== null, '（正向）setPlan 后计划落盘');
+    const ro0 = rstat2900();
+    WA.oracle.clear();
+    assert(LS2900.getItem('worldaxis_oracle_plan_v1') === null, '（正向）clear 后计划键确已移除');
+    assert(WA.oracle.plan === null, '（正向）clear 后内存态清空');
+    assert(rstat2900().removes === ro0.removes + 1, '（正向）clear 的删除计入总线台账（此前删成功零记录）');
+    // 负向：删除被拒时**不得抛错穿透**，且内存/磁盘不一致必须留下可检索线索
+    WA.oracle.setPlan({ beats: [{ goal: 'g2' }], current: 0 });
+    const errN0 = WA.errorLog.length;
+    let threwO = null;
+    const rawRmO = LS2900.removeItem;
+    try {
+      LS2900.removeItem = function (k) { if (k === 'worldaxis_oracle_plan_v1') throw new Error('blocked'); return rawRmO.call(LS2900, k); };
+      try { WA.oracle.clear(); } catch (e) { threwO = e; }
+    } finally { LS2900.removeItem = rawRmO; }
+    assert(threwO === null,
+      '（关键·本版修掉的真实缺陷）删除被拒时 clear() 不抛异常——首版实测：内存已清、磁盘键仍在、异常穿透到调用方');
+    assert(WA.oracle.plan === null, '（现场）内存态已清（用户的观感是「已清除」）');
+    assert(LS2900.getItem('worldaxis_oracle_plan_v1') !== null, '（现场）磁盘键仍在——UI 说清了，重启后计划复活');
+    const lastErr = WA.errorLog[WA.errorLog.length - 1] || {};
+    assert(WA.errorLog.length > errN0 && /重启后会复活/.test(String(lastErr.msg || '')),
+      '不一致必须留下可检索的告警（否则用户无从知道计划没真清掉）');
+    WA.oracle.setPlan(null);
+  }
+
+  // ── 块3：store 受控删除（计数必须计「真的删掉了」） ──
+  section('v2.9.0 块3：store 受控删除（计数必须计「真的删掉了」）');
+  {
+    const stS = src2900('core/store.js');
+    assert((stS.match(/localStorage\.removeItem\(/g) || []).length === 1,
+      '（结构性）store 内裸 removeItem 只剩受控出口内部那一处（实 ' + (stS.match(/localStorage\.removeItem\(/g) || []).length + ' 处）');
+    assert(stS.indexOf('function removeVerified(') > 0, '受控删除单一实现 removeVerified（与 writeVerified 对偶）');
+    assert((stS.match(/__removeStat\.removed\+\+/g) || []).length === 1, '「真删掉」的计数收敛为单一实现');
+    assert(stS.indexOf('__removeStat.lastReason = null;') > 0,
+      '当前态信号每次调用先清零（与 integrityStat.lastOk 同规格：判据是当前态不是历史累计）');
+    fr2900();
+    // A. 正向
+    const kS = 'worldaxis_v2900_store_probe_v1';
+    LS2900.setItem(kS, 'x');
+    const z0 = WA.store.removeStat();
+    const rSv = WA.store.removeVerified(kS);
+    assert(rSv.ok === true && rSv.removed === true && rSv.reason === null, '（正向）存在且删成功 ⇒ ok/removed');
+    assert(WA.store.removeStat().removed === z0.removed + 1, '（正向）真删掉计入 removed');
+    assert(LS2900.getItem(kS) === null, '（正向）键确已移除');
+    const rawRmS = LS2900.removeItem;
+    // B. 负向：静默无效
+    const kS2 = 'worldaxis_v2900_store_staged_v1';
+    LS2900.setItem(kS2, 'y');
+    try {
+      LS2900.removeItem = function (k) { if (k === kS2) return; return rawRmS.call(LS2900, k); };
+      const z1 = WA.store.removeStat();
+      const rS2 = WA.store.removeVerified(kS2);
+      assert(rS2.ok === false && rS2.reason === 'staged-still-present', '（负向）删完读回仍在 ⇒ 判失败并给出原因');
+      assert(WA.store.removeStat().staged === z1.staged + 1, '静默无效计入 staged');
+      assert(WA.store.removeStat().removed === z1.removed, '（关键）静默无效**不得**计入 removed');
+      assert(WA.store.removeStat().lastReason === 'staged-still-present',
+        '当前态信号标出「最近一次是静默无效」（消费端据此报 error）');
+      assert(LS2900.getItem(kS2) !== null, '（环境）键确实还在');
+    } finally { LS2900.removeItem = rawRmS; }
+    // C. 负向：抛错
+    const kS3 = 'worldaxis_v2900_store_throw_v1';
+    LS2900.setItem(kS3, 'z');
+    try {
+      LS2900.removeItem = function (k) { if (k === kS3) throw new Error('nope'); return rawRmS.call(LS2900, k); };
+      const rS3 = WA.store.removeVerified(kS3);
+      assert(rS3.ok === false && rS3.reason === 'remove-threw', '（负向）删除被拒 ⇒ 判失败（不抛）');
+      assert(WA.store.removeStat().lastReason === 'remove-threw', '当前态信号标出「被拒」');
+    } finally { LS2900.removeItem = rawRmS; }
+    // D. 正向：缺席（幂等）
+    const z2 = WA.store.removeStat();
+    const rS4 = WA.store.removeVerified('worldaxis_v2900_never_existed_v1');
+    assert(rS4.ok === true && rS4.removed === false && rS4.reason === 'absent',
+      '（正向）键不存在 ⇒ ok 但 removed=false（幂等无操作，不算删掉）');
+    assert(WA.store.removeStat().removed === z2.removed, '（关键）幂等无操作不计 removed');
+    assert(WA.store.removeStat().lastReason === null, '当前态信号标出「最近一次正常」');
+
+    // E. 【本版修掉的真实缺陷】清理计数虚高：removed++ 曾在裸调用后无条件执行
+    const iLoop = stS.indexOf('const rr = removeVerified(r.key);');
+    assert(iLoop > 0, '收口锚点：回收循环改为以返回值驱动计数');
+    assert(stS.indexOf('if (rr.ok && rr.removed) { removed++; freed += (r.bytes || 0); }') > 0,
+      '（现场证据）计数只对**真的删掉**的键发生（此前 removed++ 无条件执行 ⇒ 删除失败也计入「已释放」）');
+    const otherChat = 'v2900_other_chat';
+    LS2900.setItem('worldaxis_state_' + otherChat, JSON.stringify({ schemaVersion: 1, meta: { updatedAt: 1 } }));
+    LS2900.setItem('worldaxis_event_log_' + otherChat, '[]');
+    LS2900.setItem('worldaxis_error_log_' + otherChat, '[]');
+    LS2900.setItem('worldaxis_wf_history_' + otherChat, '[]');
+    const planDry = WA.store.sweepStaleKeys({});
+    const planLen = planDry.remove.length;
+    assert(planLen > 0, '（夹具）存在可回收键（实 ' + planLen + ' 个：该聊天 updatedAt=1970 ⇒ 判为久未活跃）');
+    try {
+      LS2900.removeItem = function () { return; };   // 全部静默丢弃
+      const planFail = WA.store.sweepStaleKeys({ apply: true });
+      assert(planFail.applied && planFail.applied.removed === 0,
+        '（关键·本版修掉的缺陷）删除被静默丢弃时 applied.removed 必须为 0（此前无条件 removed++ ⇒ 虚报「已释放 N KB」）');
+      assert(planFail.applied.failed === planLen, '失败条数如实记账（实 ' + planFail.applied.failed + ' / 计划 ' + planLen + '）');
+      assert(planFail.applied.freedBytes === 0, '未真正释放时 freedBytes 必须为 0（用户按「已清理」的提示继续清才不至于白清）');
+      assert(planFail.remove.length === planLen, 'plan.remove 保持「计划」语义不变（它列的是候选，不是执行结果）');
+    } finally { LS2900.removeItem = rawRmS; }
+    const planOk = WA.store.sweepStaleKeys({ apply: true });
+    assert(planOk.applied.removed === planLen && planOk.applied.failed === 0,
+      '（可逆性）恢复后真删掉 ⇒ removed 如实计数（实 ' + planOk.applied.removed + '）');
+    assert(planOk.applied.freedBytes > 0, '真释放后 freedBytes 有值（与「未释放时必须为 0」成对照）');
+    assert(LS2900.getItem('worldaxis_event_log_' + otherChat) === null, '（正向）键确已移除');
+
+    // F. 丢弃类动作：删不掉必须报失败而不是静默 ok（界面会报「已丢弃」而键仍在）
+    const ck = 'worldaxis_conflict_v2900_1_1';
+    LS2900.setItem(ck, '{}');
+    try {
+      LS2900.removeItem = function (k) { if (k === ck) return; return rawRmS.call(LS2900, k); };
+      const dC = WA.store.dropConflict(ck);
+      assert(dC.ok === false && /删除失败/.test(String(dC.reason)),
+        '（负向）冲突现场删不掉 ⇒ 报失败（此前静默 ok:true ⇒ 界面报「已丢弃」而键仍在、现场永不消失）');
+      assert(LS2900.getItem(ck) !== null, '（环境）现场仍在磁盘上');
+    } finally { LS2900.removeItem = rawRmS; }
+    const dC2 = WA.store.dropConflict(ck);
+    assert(dC2.ok === true && dC2.removed === true, '（正向）删除可用时丢弃成功且如实回报 removed');
+    // 复位当前态，避免把本块的失败信号带进下一块
+    LS2900.setItem('worldaxis_v2900_reset0_v1', '1');
+    WA.store.removeVerified('worldaxis_v2900_reset0_v1');
+  }
+
+  // ── 块4：双消费端（健康巡视 + 诊断包）——防「声明面空转」 ──
+  section('v2.9.0 块4：双消费端（健康巡视 + 诊断包）——防「声明面空转」');
+  {
+    // 关键：新计量若只有一条 issue 定义而没有任何消费端读它，就是又一次「声明面空转」
+    //   （v2.7.0 刚治理过同型问题）。store.maintain()（面板「健康巡视」）与 tool-diag 是两个消费端。
+    fr2900();
+    LS2900.setItem('worldaxis_v2900_base_v1', '1');
+    WA.store.removeVerified('worldaxis_v2900_base_v1');
+    // 首次巡视会消化前序块留下的可回收诊断键（一次性扣分），故取「第二、三次」作稳定基线；
+    //   这条自证是下面分差断言的前提：若基线本身不稳定，分差断言就没有意义。
+    WA.store.maintain({ deep: true });
+    const m0 = WA.store.maintain({ deep: true });
+    const mB = WA.store.maintain({ deep: true });
+    assert(m0.score === mB.score,
+      '（环境自证）稳定态下连续两次巡视健康分一致（' + m0.score + ' = ' + mB.score + '）——下面分差断言的前提');
+    const mBase = mB;
+    assert(m0.issues.filter(function (i) { return i.key === 'storage.removeStaged'; }).length === 0,
+      '（基线）最近一次删除正常 ⇒ 不报删除议题');
+    const rawRmD = LS2900.removeItem;
+    const kDiag = 'worldaxis_v2900_diag_v1';
+    LS2900.setItem(kDiag, 'q');
+    try {
+      LS2900.removeItem = function (k) { if (k === kDiag) return; return rawRmD.call(LS2900, k); };
+      WA.store.removeVerified(kDiag);
+    } finally { LS2900.removeItem = rawRmD; }
+    const m1 = WA.store.maintain({ deep: true });
+    const iss1 = m1.issues.filter(function (i) { return i.key === 'storage.removeStaged'; });
+    assert(iss1.length === 1 && iss1[0].level === 'error',
+      '删除静默无效时健康巡视报 error（不依赖任何测试专用入口）');
+    assert(/静默无效/.test(iss1[0].detail), '判语点出失败形态（可检索、可归因）');
+    assert(m1.score === mBase.score - 12,
+      '健康分恰下调 12（' + mBase.score + ' → ' + m1.score + '；error 级扣分是确定项，其余议题集合在两次巡视间不变）');
+    assert(m1.actions.some(function (a) { return a.id === 'review-storage'; }), '给出可执行的下一步（导出诊断包留证）');
+    LS2900.setItem('worldaxis_v2900_fix_v1', 'r');
+    WA.store.removeVerified('worldaxis_v2900_fix_v1');
+    const m2 = WA.store.maintain({ deep: true });
+    assert(m2.issues.filter(function (i) { return i.key === 'storage.removeStaged'; }).length === 0,
+      '（可逆性）最近一次删除正常后 error 消失——判据是当前态而非历史累计');
+    assert(m2.score === mBase.score, '健康分复原（规则无副作用：' + m2.score + '）——判据是当前态，故历史失败不会把分数永久压低');
+    // 诊断包：两个域各自报
+    LS2900.setItem(kDiag, 'q2');
+    try {
+      LS2900.removeItem = function (k) { if (k === kDiag) return; return rawRmD.call(LS2900, k); };
+      WA.store.removeVerified(kDiag);
+    } finally { LS2900.removeItem = rawRmD; }
+    const dgS = WA.toolDiag.collect();
+    assert(dgS.worldState.storage.remove && typeof dgS.worldState.storage.remove.staged === 'number',
+      '诊断包采集 store 删除侧台账（此前 removeStat 导出却零产品消费＝纯声明面）——挂在 worldState.storage 下');
+    const vSt = WA.toolDiag.verdict(dgS).issues.filter(function (i) { return i.key === 'store.removeStaged'; });
+    assert(vSt.length === 1 && vSt[0].level === 'error', '诊断包对 store 域静默无效报 error');
+    assert(/删完读回仍在/.test(vSt[0].detail), '判语点出失败形态（可检索）');
+    const kBus = 'worldaxis_v2900_busdiag_v1';
+    LS2900.setItem(kBus, 's');
+    try {
+      LS2900.removeItem = function (k) { if (k === kBus) return; return rawRmD.call(LS2900, k); };
+      WA.settingsBus.remove({ key: kBus, def: null, module: 'test' });
+    } finally { LS2900.removeItem = rawRmD; }
+    const dgB = WA.toolDiag.collect();
+    assert(dgB.runtime.settingsBus.removes && typeof dgB.runtime.settingsBus.removes.removeStaged === 'number',
+      '诊断包采集 settingsBus 删除侧台账（与写入侧 writeStat 并列）');
+    const vBus = WA.toolDiag.verdict(dgB).issues.filter(function (i) { return i.key === 'settingsBus.removeStaged'; });
+    assert(vBus.length === 1 && vBus[0].level === 'error', '诊断包对设置键域静默无效报 error');
+    // 覆盖度（防「新增 API 却零调用」）
+    let useRemoveStat = 0, useBusRemove = 0;
+    PROD2900.forEach(function (rel) {
+      const t = src2900(rel);
+      useRemoveStat += (t.match(/removeStat\(/g) || []).length;
+      useBusRemove += (t.match(/settingsBus\.remove\(/g) || []).length;
+    });
+    assert(useRemoveStat >= 4, 'removeStat 被多个消费端读（实 ' + useRemoveStat + ' 处；防「导出却零产品消费」）');
+    assert(useBusRemove >= 1, 'settingsBus.remove 有产品消费点（oracle 存档计划清除）');
+    // 清理
+    LS2900.setItem('worldaxis_v2900_reset1_v1', '1');
+    WA.settingsBus.remove({ key: 'worldaxis_v2900_reset1_v1', def: null, module: 'test' });
+    WA.store.removeVerified('worldaxis_v2900_reset1_v1');
+  }
+
+  // ── 块5：适用范围 + 版本三方对齐 ──
+  section('v2.9.0 块5：删除侧适用范围（G14）与版本三方对齐');
+  {
+    const runS = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
+    assert(runS.indexOf('G14 删除侧出口唯一性') > 0,
+      'G14 门禁在位（钉「产品代码裸 removeItem 只剩受控出口内部那一处」——与 G13 对偶）');
+    assert(runS.indexOf('INVENTORY_G14') > 0, 'G14 冻结清单在位（新增裸删站点即断言失败）');
+    assert(runS.indexOf('（负向）G14 探针：新加一个裸删文件会被检出') > 0,
+      'G14 有负向探针（否则上面的计数断言只是「碰巧成立」）');
+    // 最终口径核验：全库产品代码裸删除点
+    const bareAll = [];
+    ['core', 'engines', 'render', 'ui', 'actors', 'direction', 'compat'].forEach(function (d) {
+      (function walkF(rel) {
+        let names = [];
+        try { names = fs.readdirSync(path.join(BASE, rel)); } catch (e) { return; }
+        names.forEach(function (n) {
+          const r2 = rel + '/' + n;
+          let st2 = null;
+          try { st2 = fs.statSync(path.join(BASE, r2)); } catch (e2) { return; }
+          if (st2.isDirectory()) return walkF(r2);
+          if (!/\.js$/.test(n)) return;
+          fs.readFileSync(path.join(BASE, r2), 'utf8').split('\n').forEach(function (ln, i) {
+            if (ln.indexOf('localStorage.removeItem(') < 0) return;
+            bareAll.push(r2 + ':' + (i + 1));
+          });
+        });
+      })(d);
+    });
+    bareAll.push.apply(bareAll, fs.readFileSync(path.join(BASE, 'index.js'), 'utf8').split('\n')
+      .map(function (ln, i) { return ln.indexOf('localStorage.removeItem(') >= 0 ? 'index.js:' + (i + 1) : null; })
+      .filter(Boolean));
+    assert(bareAll.length === 1 && /^core\/store\.js:/.test(bareAll[0]),
+      '产品代码裸 removeItem 收敛至 1 处且在受控出口内部（实 ' + (bareAll.join('、') || '无') + '）——与写入侧「唯一写出口」对称');
+    const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+    const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
+    const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
+    assert(ver2900 === '2.9.0', '入口版本为 2.9.0（实 ' + ver2900 + '）');
+    assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
+    assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
+      '删除侧完整性契约留痕（可回溯）');
+    assert(src2900('core/settings-bus.js').indexOf('v2.9.0') > 0 && src2900('core/store.js').indexOf('v2.9.0') > 0,
+      '两域基线均留痕（settings-bus 删除出口 / store 受控删除）');
+    assert(src2900('ui/panel.js').indexOf('删除侧') > 0, '面板透出删除侧结论（用户可见出口）');
+  }
+  } // end v2.9.0 block
+
   } // end v2.7.0 block
   } // end v2.2.0 block
   } // end v2.1.0 block

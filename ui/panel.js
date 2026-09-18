@@ -829,6 +829,46 @@
             html += '<div class="wa-log wa-log-warn">写入侧出现 ' + wSt.subkeyDrift.count + ' 个声明之外的子键' + (lp.key ? '（最近 ' + esc(lp.key) + '）' : '') + '：属调用点未收口，非老存档遗留。</div>';
           }
         }
+        // v2.9.0: 删除侧——写入侧自 v2.6.0/v2.7.0 起有三行口径（落盘/写回不一致/子键漂移），
+        //   删除侧此前**一行都没有**。删除是破坏性操作，它不可观测比写入不可观测更危险：
+        //   「已清理 N 项」可能是假的，而用户会据此认为空间已腾出。
+        const rmSt = (WA.settingsBus && typeof WA.settingsBus.removeStat === 'function') ? WA.settingsBus.removeStat() : null;
+        if (rmSt) {
+          // v2.9.0（当前态口径）: 判据取自「最近一次删除的结果」（rmRemove 每次调用先清零），
+          //   与 maintain / tool-diag 同裁决；累计数只作括注展示。
+          //   否则用户把存储修好后，面板仍会永久置红——面板的作用是描述**现在**。
+          if (rmSt.lastRemoveStaged) {
+            const stgR = rmSt.lastRemoveStaged || {};
+            html += '<div class="wa-log wa-log-err">删除侧：最近一次删除**删完读回仍在**'
+              + (stgR.key ? '（' + esc(stgR.key) + '）' : '')
+              + '：removeItem 没报错但键还在磁盘上——清理报出的「已释放」与实际不符，请勿据此判断空间已腾出。此类失败重试无效，请先导出诊断包留证。'
+              + (rmSt.removeStaged > 1 ? '（本会话累计 ' + rmSt.removeStaged + ' 次）' : '') + '</div>';
+          } else if (rmSt.lastRemoveError) {
+            const byR = rmSt.removeFailedBy || {};
+            const rSrcTxt = Object.keys(byR).filter(function (k) { return byR[k] > 0; })
+              .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口' }[k] || k) + '×' + byR[k]; }).join('、');
+            html += '<div class="wa-log wa-log-warn">删除侧：最近一次删除未成功（' + esc(String(rmSt.lastRemoveError)) + '）'
+              + '；本会话累计 ' + rmSt.removeFailed + ' 次未成功、' + rmSt.removes + ' 次成功'
+              + (rSrcTxt ? '（来源：' + esc(rSrcTxt) + '）' : '')
+              + '。删除失败时相关键仍占据磁盘空间。</div>';
+          } else if (rmSt.removes > 0) {
+            html += '<div class="wa-dim">删除侧：' + rmSt.removes + ' 次受控删除全部复核通过（键确已移除）' + (rmSt.lastRemove ? '（最近 ' + esc(rmSt.lastRemove.key) + '）' : '') + '。</div>';
+          }
+        }
+        // v2.9.0: store 侧受控删除台账——此前 store.removeStat() 零产品消费（纯声明面）。
+        //   两个域各有独立的裸删点（settings-bus 管设置键、store 管冲突现场/隔离/诊断键），
+        //   只展示一处会让另一半的「清理了却没清掉」继续对用户不可见。
+        const rmStore = (WA.store && typeof WA.store.removeStat === 'function') ? (function () { try { return WA.store.removeStat(); } catch (e) { return null; } })() : null;
+        if (rmStore && rmStore.lastReason === 'staged-still-present') {
+          html += '<div class="wa-log wa-log-err">删除侧（存储域）：最近一次删除**删完读回仍在**'
+            + (rmStore.lastKey ? '（' + esc(String(rmStore.lastKey)) + '）' : '')
+            + '：键没被真正移除（本会话累计 ' + rmStore.staged + ' 次）。清理类操作报出的「已释放」不可信。</div>';
+        } else if (rmStore && rmStore.lastReason) {
+          html += '<div class="wa-log wa-log-warn">删除侧（存储域）：最近一次删除未成功（' + esc(String(rmStore.lastReason)) + '）'
+            + '；本会话累计 ' + rmStore.failed + ' 次未成功、' + rmStore.removed + ' 次成功。</div>';
+        } else if (rmStore && rmStore.removed > 0) {
+          html += '<div class="wa-dim">删除侧（存储域）：' + rmStore.removed + ' 次受控删除均复核通过（键确已移除）。</div>';
+        }
         html += '<div class="wa-dim">登记表＝扩展认识的 worldaxis_* 设置键清单（含旧键迁移规则）。孤儿＝模块已声明废弃（orphan）且键已不在磁盘上的幽灵登记，注销只影响登记表，不动任何在用配置。</div>';
         if (life) {
           html += '<div class="wa-dim">生命周期声明：结构迁移 ' + life.migrate + ' 个键 · 原始格式复活 ' + life.rawRevive + ' 个键 · legacy 旧键 ' + life.legacy + ' 个。'

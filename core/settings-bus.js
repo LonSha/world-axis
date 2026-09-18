@@ -66,7 +66,30 @@
     //   本计量让「谁在往设置里塞 def 之外的东西」第一次可观测（**只计数，一个字节都不改**）。
     //   命名口径：叫 extraSubkeys 而非 prunedSubkeys——本版**没有任何剪除动作**（写路径如实落盘），
     //   用「已剪除」命名会让读诊断的人以为死键已经被清掉了，是计量里最危险的那种不实。
-    extraSubkeys: 0, lastExtra: null };
+    extraSubkeys: 0, lastExtra: null,
+    // v2.9.0: 删除侧计量——写入侧自 v2.6.0 起有 writes/writeFailed/writeFailedBy/lastWriteError，
+    //   **删除侧一个字段都没有**，而删除同样是写盘家族的破坏性操作（删错 = 用户数据没了）。
+    //   实测三处现场：oracle 计划键（settings 家族、已登记）由裸 removeItem 删且删除失败时
+    //   **抛错穿透**调用方（内存已清、磁盘键还在）；总线自己三处删除点包在 `catch(e3){}` 里
+    //   **静默吞掉**；store 清理路径删除失败照样 removed++ 使计数虚高。
+    //   命名口径：removes = 真正删除成功的次数；removeFailed = 删除未成功的次数；
+    //   removeFailedBy 按来源分桶（guarded=删完复核仍在，missing=**登记项缺 key**，setItem=底层拒，
+    //   quarantine/legacy/settings=各自调用点）。注意 missing 指的是「登记项没声明 key」这个**实现缺陷**，
+    //   不是「键不存在」——后者是幂等无操作，走 removeAbsent 计量（v2.9.0 建成后纠正的首版误标）。
+    removes: 0, removeFailed: 0, lastRemove: null, lastRemoveError: null,
+    // v2.9.0: 失败按**来源**分桶。首版只声明 {guarded, missing, setItem}，而真实删除调用点是
+    //   remove（设置键）/ quarantine（损坏隔离）/ legacy（旧键迁移）三种——三种都不在桶里，
+    //   于是全部落进兜底桶 `setItem`，诊断里被报成「删除被拒」，而实际是隔离或迁移路径的删除
+    //   失败。归因**不实**比缺失归因更坏：用户会照着「删除被拒（权限/策略）」去查权限。
+    //   故改为：已知来源显式声明 + 未知来源动态建桶（新增调用点时归因不丢，不必改这张表）。
+    removeFailedBy: { guarded: 0, missing: 0, setItem: 0, quarantine: 0, legacy: 0, settings: 0 },
+    // v2.9.0: 「键本就不存在」单独计量——它不是删除成功。
+    //   删除一个缺席的键是**幂等的无操作**，把它计进 removes 会让「N 次删除全部复核通过」
+    //   这类结论虚高（与 v2.6.0 修掉的「writes 计尝试而非成功」同型）。
+    removeAbsent: 0,
+    // v2.9.0: 删除后复核——removeItem 不抛错不等于键真的没了（与写入侧 verifyFailed 同规格）。
+    //   复核判据：删完立刻读回，仍能读到即视为**这次删除没有发生**。
+    removeVerified: 0, removeStaged: 0, lastRemoveStaged: null };
   // v2.4.0: 补齐告警去重——补齐发生在**返回值副本**上，磁盘未回写前每次读取都会再补一次。
   //   若每次补齐都打日志，热路径（loadSettings 每轮每事件调用）会刷屏：实测 300 轮掷骰产生
   //   900+ 条同内容 warn。故按「键」去重，本会话每个键只提示一次，计数不受影响。
@@ -353,6 +376,92 @@
     } catch (eC) { /* 分类计量失败不影响主计量 */ }
     const msg = String((err && (err.message || err)) || err);
     stats.lastWriteError = (prefix || ((tag || 'setItem') + ': ')) + msg.slice(0, 160);
+  }
+  /**
+   * v2.9.0: 删除失败归类记账——`noteFail` 的删除侧对偶，单一实现。
+   *   为什么需要：写入侧自 v2.6.0 收口后「同一类故障的记账在多个点各写一遍 ⇒ 没人记得
+   *   去补的地方就断档」这个坑已经踩过一次；删除侧若各处各写，必然重演。
+   * @param {string} tag 分类标签（guarded / missing / setItem）
+   * @param {*} err 原始错误或原因串
+   * @param {string} [prefix] 覆盖默认前缀
+   */
+  function noteRemoveFail(tag, err, prefix) {
+    stats.removeFailed++;
+    try {
+      const t = tag || 'setItem';
+      const by = stats.removeFailedBy;
+      if (by) {
+        // v2.9.0: 未知来源**动态建桶**而不是塞进兜底桶。理由见 stats 处注释：
+        //   归因错误会让用户去修一个不存在的问题（「删除被拒」提示去查权限，
+        //   而实际是隔离副本路径的删除失败）。桶名归一：settingsBus.remove → settings。
+        const key = (t === 'settingsBus.remove') ? 'settings' : t;
+        by[key] = (by[key] || 0) + 1;
+      }
+    } catch (eC) { /* 分类计量失败不影响主计量 */ }
+    const msg = String((err && (err.message || err)) || err);
+    stats.lastRemoveError = (prefix || ((tag || 'setItem') + ': ')) + msg.slice(0, 160);
+  }
+  /**
+   * v2.9.0: **唯一删除出口**——设置家族键的每一次真实删除都必须经过这里。
+   *
+   * 为什么必须统一（本版命题）：v2.6.0/v2.7.0 把「写入侧」收口成 `lsWrite` 单一出口（写盘成功
+   *   计量、写失败分桶归因、写后读回校验三层），**删除侧完全没有对偶物**——全库 13 处
+   *   `localStorage.removeItem` 直调，其中总线自己 3 处（损坏隔离 / legacy 迁移 / legacy 隔离）
+   *   包在 `catch {}` 里静默吞错。结果是「删除」在台账上不存在：删成功没计数、删失败没归因、
+   *   删完没复核。
+   *
+   * 与 `lsWrite` 对称的三层：成功计量（`removes`）/ 失败分桶（`removeFailedBy`）/ 删除后复核
+   *   （`removeVerified`，读回仍存在即视为删除未发生）。
+   *
+   * 语义：**永不抛**（返回 {ok, error}）——理由与 lsWrite 相同：删除点多在清理策略与热路径上，
+   *   把「删不掉」升级成「调用方崩溃」是把小故障放大成大故障（oracle.clear 实测就是这个形态）。
+   * @param {string} key
+   * @param {string} [from] 来源标签（走 removeFailedBy 分桶）
+   * @param {object} [opts] {verify:false} 关闭复核（测试/极端场景）
+   * @returns {{ok:boolean, error?:*, existed?:boolean}}
+   */
+  function rmRemove(key, from, opts) {
+    const ls = (WA.mainWin || window).localStorage;
+    const o = opts || {};
+    let existed = false;
+    try { existed = ls.getItem(key) !== null && ls.getItem(key) !== undefined; } catch (e0) { existed = false; }
+    // v2.9.0（当前态口径）: 每次删除先把「最近一次结果」清零。
+    //   为什么必须清零：消费端（maintain / tool-diag）的分级判据必须是**当前态**信号——
+    //   v0.4.0 已就此立过裁决（`lastOk`/`lastFailAt` 与历史计数分离：「健康分只看当前态，
+    //   否则历史一次配额失败会把健康分永久压低」）。首版把删除侧判据写成累计 `staged > 0`，
+    //   既与该裁决相悖，也让「恢复后分数复原」这条可逆性断言根本无法成立
+    //   （累计数只增不减，一旦发生过就永久报 error）。
+    stats.lastRemoveStaged = null;
+    stats.lastRemoveError = null;
+    // v2.9.0: 键本不存在 ⇒ 这是幂等无操作，**不计** removes / removeVerified。
+    //   否则一句「N 次受控删除全部复核通过（键确已移除）」可能来自 N 次空操作。
+    if (!existed) {
+      stats.removeAbsent++;
+      stats.lastRemove = { key: key, at: now(), absent: true };
+      return { ok: true, existed: false, absent: true };
+    }
+    try {
+      ls.removeItem(key);
+      // 删除后复核：与写入侧 verifyFailed 同规格——删完读回还在 = 这次删除没有发生。
+      if (o.verify !== false) {
+        let back = null;
+        try { back = ls.getItem(key); } catch (eR) { back = null; }
+        if (back !== null && back !== undefined) {
+          stats.removeStaged++;
+          stats.lastRemoveStaged = { key: key, at: now(), bytes: (typeof back === 'string' ? back.length : 0) };
+          noteRemoveFail('guarded', 'still-present-after-remove', 'guarded: ');
+          return { ok: false, error: { message: 'still-present-after-remove' }, existed: existed, staged: true };
+        }
+      }
+      stats.removes++;
+      stats.removeVerified++;
+      stats.lastRemove = { key: key, at: now() };
+      stats.lastRemoveError = null;
+      return { ok: true, existed: existed };
+    } catch (e) {
+      noteRemoveFail(from || 'setItem', e, (from && from !== 'setItem') ? (from + ': ') : 'setItem: ');
+      return { ok: false, error: e, existed: existed };
+    }
   }
   /**
    * v2.6.0（收口）: **唯一写盘出口**——设置家族键的每一次真实写入都必须经过这里。
@@ -685,6 +794,31 @@
   }
   WA.settingsBus = {
     stats: stats,
+    /**
+     * v2.9.0: 设置家族键的删除出口（对外）——与 save() 对称。
+     *   此前模块要删自己的设置键只能直调 `localStorage.removeItem`，于是「删除」完全在
+     *   台账之外、失败也没有任何记录。`p` 为空时按「清除本键」语义处理。
+     * @param {object} reg 登记项
+     * @param {object} [opts] 透传 rmRemove 的 {verify}
+     * @returns {{ok:boolean, error?:*}}
+     */
+    remove(reg, opts) {
+      const r = reg || {};
+      // v2.9.0: 必须走**删除侧**记账。首版此处误用写入侧 noteFail（写失败分桶 missingKey），
+      //   后果有二：① 删除失败污染写入侧台账（「写失败 N 次」里混进删除失败，读的人会去查
+      //   写盘环境）；② removeFailedBy.missing 声明了却零消费——正是「声明面空转」的最小形态。
+      if (!r.key) { noteRemoveFail('missing', 'register-entry-has-no-key', 'missing-key: '); return { ok: false, error: { message: 'no-key' } }; }
+      return rmRemove(r.key, 'settingsBus.remove', opts);
+    },
+    /**
+     * v2.9.0: 删除侧观测视图（只读）——与 writeStat 对称。
+     */
+    removeStat() {
+      return { removes: stats.removes, removeAbsent: stats.removeAbsent, removeFailed: stats.removeFailed,
+        removeFailedBy: Object.assign({}, stats.removeFailedBy),
+        removeVerified: stats.removeVerified, removeStaged: stats.removeStaged, lastRemove: stats.lastRemove,
+        lastRemoveError: stats.lastRemoveError, lastRemoveStaged: stats.lastRemoveStaged };
+    },
     toBool: toBool,
     clampNum: clampNum,
     normalize: normalize,
@@ -717,7 +851,13 @@
               //   原键——于是「隔离」变成「直接销毁用户数据」，且零痕迹。改为：副本没写成功就不动
               //   原键（保命优先），并记账；原键保留 → 下次读取会再次尝试隔离，直到副本真的写下。
               const wQ = lsWrite(qk, raw, 'quarantine');
-              if (wQ.ok) { try { ls.removeItem(r.key); } catch (e3) {} }
+              // v2.9.0: 走唯一删除出口（此前裸调 + `catch(e3){}` 静默吞错）。
+              //   副本已写成功才删原键；删不掉时原键保留 → 下次读会再次隔离（幂等），
+              //   与「保命优先」的既有语义一致，但现在这一次失败**会被记账**。
+              if (wQ.ok) {
+                const dQ = rmRemove(r.key, 'quarantine');
+                if (!dQ.ok && WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 隔离副本已写但原键删除失败——原键仍在，下次读取会重复隔离（隔离副本不会丢，但会累积）', dQ.error);
+              }
               else if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 损坏但隔离副本写盘失败，已保留原键不做删除（避免直接销毁用户数据）', wQ.error);
               if (WA.log) WA.log('error', 'settingsBus: ' + r.key + ' 损坏已隔离 → ' + qk + '（重置默认）', String(raw).slice(0, 200));
               val = null;
@@ -740,14 +880,17 @@
               //   但迁移写盘失败时用户每次启动都要重迁一遍，而台账里查不到任何痕迹。
               const wLg = ls_set(r.key, val, 'legacy');
               if (!wLg.ok && WA.log) WA.log('error', 'settingsBus: ' + lk + ' 迁移 → ' + r.key + ' 写盘失败（本次未落盘，下次读取会重试）', wLg.error);
-              if (r.legacyRemove !== false) { try { ls.removeItem(lk); } catch (e5) {} }
+              // v2.9.0: 走唯一删除出口。legacy 键删不掉不是致命（值已迁到新键），
+              //   但「每次启动都重迁一遍」这件事必须可观测，否则台账显示迁移完成而磁盘上旧键还在。
+              if (r.legacyRemove !== false) rmRemove(lk, 'legacy');
             } catch (e) {
               // legacy 键也损坏：隔离留痕（防 v2 发布后误读老损坏格式）
               stats.quarantines++;
               const qk = lk + '_corrupt_' + now();
               // v2.6.0（收口）: 与设置键隔离同规格——副本没写成功就不删旧键（保命优先）。
               const wQL = lsWrite(qk, lraw, 'quarantine');
-              if (wQL.ok) { try { ls.removeItem(lk); } catch (e7) {} }
+              // v2.9.0: 与设置键隔离同规格——副本没写成功就不删旧键（保命优先），删失败记账。
+              if (wQL.ok) rmRemove(lk, 'quarantine');
               else if (WA.log) WA.log('error', 'settingsBus: ' + lk + '（legacy）损坏但隔离副本写盘失败，已保留旧键不做删除', wQL.error);
               if (WA.log) WA.log('error', 'settingsBus: ' + lk + '（legacy）损坏已隔离 → ' + qk, String(lraw).slice(0, 200));
             }

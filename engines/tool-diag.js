@@ -201,6 +201,10 @@
             maintain: WA.store.maintain ? (function () { try { return WA.store.maintain({ deep: false }); } catch (e) { return null; } })() : null,
             maintainStat: WA.store.maintainStat ? WA.store.maintainStat() : null,
             integrity: WA.store.integrityStat ? WA.store.integrityStat() : null,
+            // v2.9.0: 删除侧台账（store 域）——与 integrity（写入侧）对偶。
+            //   此前 store.removeStat() 是纯声明面：导出了却零产品消费（本版逆向审计抓出），
+            //   接入此处后「清理类操作到底删掉没有」第一次能被诊断包回答。
+            remove: WA.store.removeStat ? WA.store.removeStat() : null,
             // v0.7.0: 楼层结算守卫观测（settles/skips 归因 / 最后结算楼层）
             settleGuard: WA.settleGuard ? (function () { try { return WA.settleGuard.stat(); } catch (e) { return null; } })() : null,
             // v0.5.0: 多实例并发观测（写入者标识 / 冲突检出 / 现场 / 外部写入）
@@ -270,9 +274,13 @@
           // v2.6.0: 写入侧台账——此前「保存了却没生效」在诊断包里与「功能没实现」不可区分：
           //   save() 返回 false 却零记录、零日志，调用方零检查。写失败必须与读侧计量同等可见。
           const writes = WA.settingsBus.writeStat ? WA.settingsBus.writeStat() : null;
+          // v2.9.0: 删除侧台账——写入侧自 v2.6.0/v2.7.0 收口后已有 writes/verifyFailed 两条口径，
+          //   而**删除侧零计量**：删成功没计数、删失败没归因、删完没复核（全库 13 处裸 removeItem）。
+          //   删除是破坏性操作，它不可观测比写入不可观测更危险——「已清理 N 项」可能是假的。
+          const removes = WA.settingsBus.removeStat ? WA.settingsBus.removeStat() : null;
           return { registry: st, orphans: orphans, stats: WA.settingsBus.stats,
             coherent: coherent, defaultDrift: drift, dormant: dormant, subkeys: subkeys,
-            lifecycle: lifecycle, migrations: mig, ghosts: ghosts, writes: writes };
+            lifecycle: lifecycle, migrations: mig, ghosts: ghosts, writes: writes, removes: removes };
         }, {}),
         // v2.4.0: 可见性配置健康度——「源在 SOURCES 里却没有默认值声明」是子键级死配置
         visibility: safe(function () {
@@ -789,6 +797,46 @@
       issues.push({ level: 'warn', key: 'settingsBus.subkeyDrift',
         detail: '写入侧出现 ' + wD.subkeyDrift.count + ' 个登记 def 之外的子键' + (lp.key ? '（最近 ' + lp.key + '：' + (lp.keys || []).slice(0, 4).join('/') + '）' : '') + '：迁移只治存量（老存档），这些是调用方新写入的存量之外死键，需在调用点收口' });
     }
+    // v2.9.0: 删除侧失败——「清理了却没清掉」是「空间清不出来」里最难取证的一类。
+    //   与写入侧同一裁决口径：静默无效（removeItem 没抛错但键仍在）→ error（当下正在骗人）；
+    //   删除抛错 → warn（可恢复，但相关键仍在磁盘上）。
+    const rmD = sbDiag.removes || null;
+    // v2.9.0（当前态口径）: 用 lastRemoveStaged / lastRemoveError（rmRemove 每次调用先清零）
+    //   而非累计数——与 store.integrityStat 的 lastOk 同裁决，且保证「恢复后不再报」可成立。
+    if (rmD && rmD.lastRemoveStaged) {
+      const stgR = rmD.lastRemoveStaged || {};
+      issues.push({ level: 'error', key: 'settingsBus.removeStaged',
+        detail: '设置键删除 ' + rmD.removeStaged + ' 次**删完读回仍在**（最近 ' + String(stgR.key || '?').slice(0, 60) + '）'
+          + '——removeItem 没报错但键还在磁盘上：清理报出的「已释放」与实际不符，别依赖计数判断空间是否腾出。'
+          + '此类失败重试同一动作通常无效，请先导出诊断包留证' });
+    }
+    else if (rmD && rmD.lastRemoveError) {
+      const byR = rmD.removeFailedBy || {};
+      const srcRTxt = Object.keys(byR).filter(function (k) { return byR[k] > 0; })
+        .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口' }[k] || k) + '×' + byR[k]; }).join('、');
+      issues.push({ level: 'warn', key: 'settingsBus.remove',
+        detail: '设置键删除失败 ' + rmD.removeFailed + ' 次（成功 ' + rmD.removes + ' 次）'
+          + (srcRTxt ? '，来源：' + srcRTxt : '')
+          + (rmD.lastRemoveError ? '，最近原因 ' + String(rmD.lastRemoveError).slice(0, 80) : '')
+          + '：删除失败时相关键仍在磁盘上占据空间，而清理策略已把它计入「已释放」' });
+    }
+    // v2.9.0: store 侧受控删除结论——与 settingsBus 侧同判据、同分级。
+    //   为什么两处都要报：两个域各自有独立的裸删点（settings-bus 管设置键、store 管
+    //   冲突现场/隔离/诊断键），只报一处会让另一半的「删了却没删掉」继续不可见。
+    // 读路径必须与采集路径同源。探针实测：store 域的持久化子节挂在 **worldState.storage**
+    //   下（secRuntime 只含 chatcache/settingsBus/... 而没有 store），首版读 runtime.storage
+    //   在无头环境恒为 undefined ⇒ 这条判据悄悄永不成立（正是本版要治的「结论不实」）。
+    const stRm = ((diag.worldState || {}).storage || {}).remove || null;
+    if (stRm && stRm.lastReason === 'staged-still-present') {
+      issues.push({ level: 'error', key: 'store.removeStaged',
+        detail: '受控删除 ' + stRm.staged + ' 次**删完读回仍在**（最近 ' + String(stRm.lastKey || '?').slice(0, 60)
+          + '）——removeItem 没报错但键仍在磁盘上：清理报出的「已释放」与实际不符。此类失败重试同一动作'
+          + '通常无效（问题在存储层而非时序），请先导出诊断包留证' });
+    } else if (stRm && stRm.lastReason) {
+      issues.push({ level: 'warn', key: 'store.remove',
+        detail: '受控删除失败 ' + stRm.failed + ' 次（成功 ' + stRm.removed + ' 次，最近原因 ' + (stRm.lastReason || 'unknown') + '）'
+          + (stRm.lastReason === 'remove-threw' ? '：删除被拒（权限/策略），相关键仍在磁盘上' : '：删除未生效，相关键仍在磁盘上') });
+    }
     // v2.4.0: 可见性声明完整性——SOURCES 声明了但 def 未给默认值的源，无法归一化
     const visD = ((diag.runtime || {}).visibility) || null;
     if (visD && visD.undeclared && visD.undeclared.length) {
@@ -934,6 +982,10 @@
     try {
       const ig = WA.store.integrityStat ? WA.store.integrityStat() : null;
       if (ig) lines.push('- 写入完整性: 校验 ' + ig.verified + '/' + ig.writes + ' 次 · 不一致 ' + ig.mismatches + ' · 重试自愈 ' + ig.recoveredByRetry + ' · 当前态 ' + (ig.lastOk === null ? '未采样' : ig.lastOk ? '正常' : '失败(' + (ig.lastReason || '?') + ')'));
+    } catch (e) {}
+    try {
+      const rv = WA.store.removeStat ? WA.store.removeStat() : null;
+      if (rv) lines.push('- 删除完整性: 尝试 ' + rv.attempts + ' · 真删掉 ' + rv.removed + ' · 删完仍在 ' + rv.staged + ' · 失败 ' + rv.failed + (rv.lastKey ? ' · 最近 ' + String(rv.lastKey).slice(0, 60) : ''));
     } catch (e) {}
     // ── v0.5.0: 多实例并发一致性 ──
     lines.push('');

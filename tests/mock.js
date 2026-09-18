@@ -234,8 +234,11 @@ WA.clearEventLog = function (chatId) {
   __mockLogChat = null;
   try {
     const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
-    global.localStorage.removeItem('worldaxis_event_log_' + cid);
-    global.localStorage.removeItem('worldaxis_error_log_' + cid);
+    // v2.9.0: 与 index.js 保持一致——走受控删除出口
+    if (WA.store && typeof WA.store.removeVerified === 'function') {
+      WA.store.removeVerified('worldaxis_event_log_' + cid);
+      WA.store.removeVerified('worldaxis_error_log_' + cid);
+    }
   } catch (e) {}
 };
 const __listeners = {};

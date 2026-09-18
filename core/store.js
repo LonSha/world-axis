@@ -139,6 +139,46 @@
   // 与 writes/verified/mismatches 等「历史经历」计数分离——
   // 健康分只看当前态，否则一次瞬时毒化会把健康分永久压低（误报警）。
   const __integrityStat = { writes: 0, verified: 0, mismatches: 0, retried: 0, recoveredByRetry: 0, lastAt: 0, lastReason: null, lastOk: null, lastFailAt: 0 };
+  // ── v2.9.0: 删除侧完整性计量 ─────────────────────────────────
+  // 背景（本版命题）：写入侧自 v0.4.0 就有 writeVerified（写后读回逐字符比对 + 一次重试），
+  //   而**删除侧完全没有对应物**——全库 13 处 localStorage.removeItem 直调，清完之后谁也不复核
+  //   「键是不是真的没了」。而删除与写入在失败模式上并不对称：写入失败通常至少能抛配额错，
+  //   删除失败则可能**静默无效**（键仍在、无异常），此时清理策略会报「已释放 N 字节」而磁盘
+  //   一个字节都没释放，用户按提示继续清理却永远清不出空间。
+  //   判据与 writeVerified 同规格：删完立刻读回，仍能读到即视为**这次删除没有发生**。
+  const __removeStat = { attempts: 0, removed: 0, failed: 0, verified: 0, staged: 0, lastKey: null, lastAt: 0, lastReason: null };
+  /**
+   * v2.9.0: 受控删除（唯一实现）——删除后读回复核，失败分类留痕。
+   *
+   * 语义：与 writeVerified 对齐但不重试。理由：写入毒化常可被「立刻重写一遍」自愈，
+   *   而删除失败（键仍在）重试同一动作通常无效——问题在存储层而非时序。故只如实报告。
+   * @param {string} key
+   * @returns {{ok:boolean, removed:boolean, reason:string|null}}
+   *   removed=true 表示「本次调用确实把键删掉了」；键本来就不存在时 ok=true 但 removed=false。
+   */
+  function removeVerified(key) {
+    __removeStat.attempts++;
+    __removeStat.lastKey = key;
+    __removeStat.lastAt = Date.now();
+    // v2.9.0（当前态口径）: 与 settings-bus 的 rmRemove 同规格——每次调用先清「最近一次结果」，
+    //   使维持健康分的判据是当前态而非历史累计（见 v0.4.0 的 lastOk/lastFailAt 裁决）。
+    __removeStat.lastReason = null;
+    let existed = false;
+    try { const cur = mainWin.localStorage.getItem(key); existed = (cur !== null && cur !== undefined); }
+    catch (e) { __removeStat.failed++; __removeStat.lastReason = 'read-failed'; return { ok: false, removed: false, reason: 'read-failed' }; }
+    if (!existed) { __removeStat.verified++; return { ok: true, removed: false, reason: 'absent' }; }
+    try { mainWin.localStorage.removeItem(key); }
+    catch (e) { __removeStat.failed++; __removeStat.lastReason = 'remove-threw'; return { ok: false, removed: false, reason: 'remove-threw' }; }
+    let back = null;
+    try { back = mainWin.localStorage.getItem(key); } catch (e) { back = null; }
+    if (back !== null && back !== undefined) {
+      // 静默无效：removeItem 没抛错，但键还在。这是删除侧最危险的形态——调用方会以为清掉了。
+      __removeStat.staged++; __removeStat.failed++; __removeStat.lastReason = 'staged-still-present';
+      return { ok: false, removed: false, reason: 'staged-still-present' };
+    }
+    __removeStat.removed++; __removeStat.verified++; __removeStat.lastReason = null;
+    return { ok: true, removed: true, reason: null };
+  }
   // ── v0.5.0: 多实例并发防护 ──────────────────────────────────
   // 背景：localStorage 为多标签页共享；两个窗口同时推进同一聊天时，后写会静默覆盖前写，
   // 且 save 返回 true、无任何告警——用户数轮进度永久丢失却无从察觉。
@@ -252,7 +292,10 @@
         return (parseInt(pa[pa.length - 1], 10) || 0) - (parseInt(pb[pb.length - 1], 10) || 0);
       });
       while (all.length > CONFLICT_KEEP) {
-        try { mainWin.localStorage.removeItem(all.shift()); } catch (e) {}
+        // v2.9.0: 走受控删除并复核——此前裸调 + `catch(e){}`，删不掉时轮转静默失效
+        //   （冲突现场会无限累积直到配额耗尽，而日志里什么都没有）。
+        const r0 = removeVerified(all.shift());
+        if (!r0.ok && WA.log) WA.log('warn', '并发冲突现场轮转：删除失败（' + r0.reason + '）——现场可能持续累积', null);
       }
     } catch (e) {
       // 保全失败绝不能阻断写入（否则一撞配额就写不进去）——如实留痕
@@ -966,6 +1009,24 @@
         issues.push({ level: 'info', key: 'integrity.ok', detail: '写入完整性校验 ' + is.verified + ' 次全部通过' });
       }
 
+      // ── 5.5 v2.9.0 删除侧完整性 ──
+      //   与写入侧对称的裁决：删除静默无效（removeItem 没抛错但键仍在）会让清理策略报出
+      //   「已释放 N 字节」而磁盘一个字节没释放——用户按提示继续清理，永远清不出空间。
+      //   属**当前态缺陷**（本会话内真实发生过），扣分并把处置写进 actions。
+      const rmS = (function () { try { return __removeStat; } catch (e) { return null; } })();
+      // v2.9.0（当前态口径）: 判据取自 lastReason（最近一次删除的结果），累计数只作展示。
+      //   与写入侧 integrityStat 的 lastOk 同规格——历史经历过一次删除失败不应把健康分永久压低，
+      //   而一旦**最近一次**删除静默无效，就必须当场是 error（当下正在骗人）。
+      if (rmS && rmS.lastReason === 'staged-still-present') {
+        score -= 12;
+        issues.push({ level: 'error', key: 'storage.removeStaged', detail: '最近一次删除**静默无效**（removeItem 没报错但键仍在，键：' + String(rmS.lastKey || '').slice(0, 60) + '；本会话累计 ' + rmS.staged + ' 次）——清理报出的「已释放」与实际不符，释放空间请勿依赖计数' });
+        actions.push({ id: 'review-storage', safe: true, detail: '存储写入/删除被环境静默丢弃，先导出诊断包留证，再考虑清理其他聊天' });
+      } else if (rmS && rmS.lastReason) {
+        score -= 9;
+        issues.push({ level: 'warn', key: 'storage.removeFailed', detail: '最近一次受控删除未成功（原因：' + rmS.lastReason + '；本会话累计失败 ' + rmS.failed + ' 次，成功 ' + rmS.removed + ' 次）——' + (rmS.lastReason === 'remove-threw' ? '删除被拒（权限/策略）' : '删除未生效，相关键仍在磁盘上') });
+      } else if (rmS && rmS.removed > 0) {
+        issues.push({ level: 'info', key: 'storage.removeOk', detail: '受控删除 ' + rmS.removed + ' 次全部复核通过（键确已移除）' });
+      }
       // ── 6. 多实例并发一致性 ──
       //   ① 存在未处置的冲突现场 → 当前态缺陷（有他实例数据等待用户决策）→ 扣分 warn
       //   ② 本实例内存态已落后他实例（收到过 storage 事件）→ 提示刷新 → 扣分 warn
@@ -1438,8 +1499,11 @@
       if (eligible.length) {
         let removed = 0, freed = 0;
         eligible.forEach(function (r) {
-          try { mainWin.localStorage.removeItem(r.key); removed++; freed += (r.bytes || 0); }
-          catch (e) {}
+          // v2.9.0: 受控删除 + 只对**真的删掉**的键计数。此前 `removed++` 在裸调用之后无条件执行，
+          //   删除失败也计入 removed / freedBytes → 巡视报「已自动释放 N KB」而实际一个字节没释放，
+          //   用户按提示继续清理却永远清不出空间（与 v2.6.0 修掉的「writes 计尝试而非成功」同型）。
+          const rr = removeVerified(r.key);
+          if (rr.ok && rr.removed) { removed++; freed += (r.bytes || 0); }
         });
         applied = { removed: removed, freedBytes: freed };
         __maintainStat.autoApplies++; __maintainStat.lastAutoFreedKeys = removed; __maintainStat.lastAutoFreedBytes = freed;
@@ -1529,8 +1593,11 @@
       try {
         if (typeof key !== 'string' || key.indexOf('worldaxis_conflict_') !== 0) return { ok: false, reason: '非冲突现场键，拒绝删除' };
         if (mainWin.localStorage.getItem(key) === null) return { ok: false, reason: '键不存在' };
-        mainWin.localStorage.removeItem(key);
-        return { ok: true };
+        // v2.9.0: 受控删除 + 复核。此前删除若静默无效会返回 ok:true（界面报「已丢弃」而键仍在，
+        //   用户以为处理完了、实际冲突现场永远不会消失）。
+        const r = removeVerified(key);
+        if (!r.ok) return { ok: false, reason: '删除失败：' + r.reason };
+        return { ok: true, removed: r.removed };
       } catch (e) { return { ok: false, reason: String((e && e.message) || e) }; }
     },
     /** v0.5.0: 提取冲突现场全文（离机备份用） */
@@ -1553,6 +1620,21 @@
       const i = __integrityStat;
       return { writes: i.writes, verified: i.verified, mismatches: i.mismatches, retried: i.retried, recoveredByRetry: i.recoveredByRetry, lastAt: i.lastAt, lastReason: i.lastReason, lastOk: i.lastOk, lastFailAt: i.lastFailAt };
     },
+    /**
+     * v2.9.0: 删除侧完整性视图（只读）——integrityStat 的删除侧对偶。
+     *   attempts 为受控删除调用次数；removed 为**真的删掉了**的次数；staged 为
+     *   「removeItem 没抛错但键仍在」的静默无效次数（删除侧最危险形态）。
+     */
+    removeStat() {
+      const r = __removeStat;
+      return { attempts: r.attempts, removed: r.removed, failed: r.failed, verified: r.verified, staged: r.staged, lastKey: r.lastKey, lastAt: r.lastAt, lastReason: r.lastReason };
+    },
+    /**
+     * v2.9.0: 受控删除（对外）——清理类调用方应走这里而非裸 removeItem。
+     * @param {string} key
+     * @returns {{ok:boolean, removed:boolean, reason:string|null}}
+     */
+    removeVerified(key) { return removeVerified(key); },
     /**
      * v0.4.0: 单聊天状态体检（只读）——解析可用性 + 结构完整度 + 体积。
      * deep:true 时额外按默认结构比对缺失字段（不修改任何数据）。
@@ -2011,7 +2093,17 @@
         plan.keep.push(k);   // state（其他聊天的存档本体，默认保留——清理属用户决策）与未过期 recovery
       });
       plan.remove.forEach(function (r) { plan.freedBytes += r.bytes; plan.byFamily[r.reason] = (plan.byFamily[r.reason] || 0) + 1; });
-      if (apply) plan.remove.forEach(function (r) { try { mainWin.localStorage.removeItem(r.key); } catch (e) {} });
+      // v2.9.0: apply 阶段走受控删除，并**逐条记录实际结果**。
+      //   此前裸删 + 空 catch：删除失败既无返回也无计量，而调用方（面板「体检」）会照着
+      //   plan.remove 的长度向用户报「已清理 N 项」——计划长度被当成了执行结果。
+      //   现在 plan.applied 承载真实结果，plan.remove 保持「计划」语义不变（兼容既有断言）。
+      let sweptRemoved = 0, sweptFailed = 0, sweptBytes = 0;
+      if (apply) plan.remove.forEach(function (r) {
+        const rr = removeVerified(r.key);
+        if (rr.ok && rr.removed) { sweptRemoved++; sweptBytes += (r.bytes || 0); }
+        else if (!rr.ok) sweptFailed++;
+      });
+      if (apply) plan.applied = { removed: sweptRemoved, failed: sweptFailed, freedBytes: sweptBytes };
       return plan;
     },
     /**
@@ -2184,8 +2276,10 @@
       let existed = null;
       try { existed = mainWin.localStorage.getItem(key); } catch (e) {}
       if (existed === null) return { ok: false, reason: '隔离现场不存在（可能已被清理或键名有误）' };
-      try { mainWin.localStorage.removeItem(key); }
-      catch (e) { return { ok: false, reason: '删除失败：' + ((e && e.message) || e) }; }
+      // v2.9.0: 受控删除 + 复核（此前只包住「抛错」，静默无效会被当成成功丢弃）。
+      //   隔离现场的丢弃是**不可逆**操作（原键已不在），报「已丢弃」而实际没删是双重误导。
+      const r = removeVerified(key);
+      if (!r.ok) return { ok: false, reason: '删除失败：' + r.reason };
       __quarantineStat.drops++; __quarantineStat.lastDropAt = Date.now();
       WA.log('info', '已丢弃隔离现场（用户确认）: ' + key);
       return { ok: true, key: key, quarantine: c.quarantine };
