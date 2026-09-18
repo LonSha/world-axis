@@ -784,8 +784,13 @@
     } else if (ev && ev.evicts > 0) {
       const _topSites = Object.keys(ev.bySite || {}).sort(function (a, b) { return ev.bySite[b].dropped - ev.bySite[a].dropped; }).slice(0, 3)
         .map(function (s) { return s + '(' + ev.bySite[s].dropped + ')'; });
-      const _what = (ev.lastDropped || []).slice(-3).map(function (x) { return x.what; }).join('、');
-      issues.push({ level: 'info', key: 'evict', detail: '容量挤出 ' + ev.evicts + ' 次 / 丢弃 ' + ev.evicted + ' 项（涉及 ' + Object.keys(ev.bySite || {}).length + ' 个站点，最频繁：' + (_topSites.join('、') || '—') + '）；最近被挤出的是：' + (_what || '—') + '——有界收纳属设计内，但「丢的是谁」应可见' });
+      // v2.13.0（端到端审计自纠）：点名**最频繁站点各自丢了谁**，而不是只给全局最近几条。
+      //   现场：长局里 people 丢 32 人、chronicle 丢 60 条，而全局环形只留最近 12 条摘要，
+      //   于是议题只能说「最近被挤出的是：伏笔17、伏笔18」——「丢了哪 32 个角色」看不见。
+      const _topSite = Object.keys(ev.bySite || {}).sort(function (a, b) { return ev.bySite[b].dropped - ev.bySite[a].dropped; })[0];
+      const _topWhat = ((ev.bySite || {})[_topSite] || {}).lastWhat || [];
+      const _what = _topWhat.slice(-3).join('、') || (ev.lastDropped || []).slice(-3).map(function (x) { return x.what; }).join('、');
+      issues.push({ level: 'info', key: 'evict', detail: '容量挤出 ' + ev.evicts + ' 次 / 丢弃 ' + ev.evicted + ' 项（涉及 ' + Object.keys(ev.bySite || {}).length + ' 个站点，最频繁：' + (_topSites.join('、') || '—') + '）；' + _topSite + ' 最近被挤出的是：' + (_what || '—') + '——有界收纳属设计内，但「丢的是谁」应可见' });
     }
     const ldr = (diag.runtime || {}).loader || {};
     // v0.1.25: 加载失败的模块点名（对照装载清单升级为 error）

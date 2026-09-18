@@ -232,8 +232,17 @@
     stats.evicts++;
     stats.evicted += dropped;
     stats.lastEvict = { site: site, cap: cap, before: before, after: after, dropped: dropped, at: at };
-    const b = stats.bySite[site] = stats.bySite[site] || { evicts: 0, dropped: 0, lastAt: 0, lastDropped: 0 };
+    const b = stats.bySite[site] = stats.bySite[site] || { evicts: 0, dropped: 0, lastAt: 0, lastDropped: 0, lastWhat: [] };
     b.evicts++; b.dropped += dropped; b.lastAt = at; b.lastDropped = dropped;
+    // v2.13.0（端到端审计自纠）：**逐站点**保留「丢的是谁」。
+    //   缺陷现场：全局 lastDropped 只留最近 12 条，一次长局里多站点同时挤出时，
+    //   先挤出的站点（如 people 丢 32 人）明细会被随后的站点（如伏笔）立刻冲掉——
+    //   诊断议题于是只能说「最近被挤出的是：伏笔17、伏笔18」，而「丢了哪 32 个角色」
+    //   永远看不到。这与模块头注释「只记条数等于什么都没说」自相矛盾：单站点成立、
+    //   多站点失效。改为每个站点各自保留最近 6 条摘要，互不冲刷。
+    if (!Array.isArray(b.lastWhat)) b.lastWhat = [];
+    (tail || []).forEach(function (s) { b.lastWhat.push(s); });
+    if (b.lastWhat.length > 6) b.lastWhat.splice(0, b.lastWhat.length - 6);
     (tail || []).forEach(function (s) { stats.lastDropped.push({ site: site, what: s, at: at }); });
     if (stats.lastDropped.length > 12) stats.lastDropped.splice(0, stats.lastDropped.length - 12);
     try { WA.log('info', '挤出: ' + site + ' ' + before + '\u2192' + after + '（丢弃 ' + dropped + '）：' + (tail || []).slice(0, 3).join('、')); } catch (e) {}
@@ -244,7 +253,7 @@
     const byS = {};
     Object.keys(stats.bySite).forEach(function (k) {
       const b = stats.bySite[k];
-      byS[k] = { evicts: b.evicts, dropped: b.dropped, lastAt: b.lastAt, lastDropped: b.lastDropped };
+      byS[k] = { evicts: b.evicts, dropped: b.dropped, lastAt: b.lastAt, lastDropped: b.lastDropped, lastWhat: (b.lastWhat || []).slice() };
     });
     return {
       evicts: stats.evicts,

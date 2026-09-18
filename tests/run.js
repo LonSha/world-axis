@@ -3801,6 +3801,34 @@ WA.loadScript = _ls.loadScript;
   const mtFail = WA.store.maintain();
   const mtEvErr = (mtFail.issues || []).filter(function (x) { return x.key === 'evict.failed'; })[0];
   assert(mtEvErr && mtEvErr.level === 'error', '（消费端③·负向）挤出失败在健康巡视里报 error（须改代码，不是清存储）');
+  // ④b 多站点互不冲刷（**放在 ⑤⑥ 之后**：它需要构建自己的台账，
+  //   若插在 ④ 与 ⑤ 之间会把 ⑤⑥ 依赖的「memory.l0 挤出一次」状态清掉——
+  //   本门禁首版正是这么写的，实测导致 4 条断言失败）。
+  //   缺陷来源：端到端审计自纠——全局 lastDropped 只留 12 条，长局里先挤出的站点
+  //   （people 丢 32 人）明细会被后挤出的站点（伏笔）立刻冲掉，「丢了哪 32 个角色」永远看不见。
+  WA.evict.resetEvictStat();
+  const mk = function (n, tag) { const a = []; for (let i = 0; i < n; i++) a.push({ name: tag + i }); return a; };
+  WA.evict.array(mk(45, '甲'), 'memory.l0');              // 丢 25 个「甲」
+  WA.evict.array(mk(45, '乙'), 'memory.l1');              // 丢 15 个「乙」（l1 cap 30）
+  WA.evict.array(mk(50, '丙'), 'chapters.history');       // 丢 30 个「丙」
+  const ms1300 = WA.evict.evictStat();
+  assert((ms1300.bySite['memory.l0'].lastWhat || []).some(function (w) { return w.indexOf('甲') === 0; }),
+    '（负向回归）多站点连挤后，先挤出的站点仍保留自己的「丢了谁」（全局环形会冲掉它）');
+  assert((ms1300.bySite['chapters.history'].lastWhat || []).some(function (w) { return w.indexOf('丙') === 0; }),
+    '（正向）后挤出的站点同样有自己的明细');
+  assert(ms1300.evicts === 3 && ms1300.bySite['memory.l0'].dropped === 25 && ms1300.bySite['chapters.history'].dropped === 30,
+    '（正向）三站点各自独立计数（不合并、不串扰）');
+  const dgMulti = WA.toolDiag.collect();
+  const evMulti = ((dgMulti.verdict || {}).issues || []).filter(function (x) { return x.key === 'evict'; })[0];
+  assert(evMulti && /chapters\.history 最近被挤出的是：丙/.test(evMulti.detail),
+    '（消费端①）诊断议题点名**最频繁站点自己的**丢弃物（而非全局最近）');
+  const stMulti = WA.evict.evictStat();
+  assert(JSON.stringify(stMulti.bySite['memory.l0'].lastWhat) !== JSON.stringify(stMulti.bySite['chapters.history'].lastWhat),
+    '（负向）不同站点的明细互不相同（防「看着有明细、其实都指向同一批」的假通过）');
+  WA.evict.resetEvictStat();
+  if (typeof WA.flushLog === 'function') WA.flushLog();
+  if (Array.isArray(WA.eventLog)) WA.eventLog.length = 0;
+  if (Array.isArray(WA.errorLog)) WA.errorLog.length = 0;
   // 探针自清：台账归零 + 清掉探针自己产生的日志，避免污染后续「干净态」断言
   WA.evict.resetEvictStat();
   if (typeof WA.flushLog === 'function') WA.flushLog();

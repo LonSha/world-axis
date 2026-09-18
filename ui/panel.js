@@ -65,7 +65,11 @@
       const rows = Object.keys(st.bySite || {}).sort(function (a, b) { return st.bySite[b].dropped - st.bySite[a].dropped; }).slice(0, 6)
         .map(function (k) {
           const b = st.bySite[k];
-          return '<div class="wa-item"><span class="wa-dim">' + esc(k) + '</span> 丢弃 ' + b.dropped + ' 项 / ' + b.evicts + ' 次</div>';
+          // v2.13.0（端到端审计自纠）：逐站点显示「丢的是谁」——全局最近 12 条在多站点场景下
+          //   会被后发生的站点冲掉，等于最需要看的那个站点反而看不到明细。
+          const w = (b.lastWhat || []).slice(-2).join('、');
+          return '<div class="wa-item"><span class="wa-dim">' + esc(k) + '</span> 丢弃 ' + b.dropped + ' 项 / ' + b.evicts + ' 次'
+            + (w ? '：' + esc(w) : '') + '</div>';
         }).join('');
       const what = (st.lastDropped || []).slice(-3).map(function (x) { return esc(x.site + '→' + x.what); }).join('、');
       return '<div class="wa-sec">容量收纳（共挤出 ' + st.evicts + ' 次 / 丢弃 ' + st.evicted + ' 项）</div>'

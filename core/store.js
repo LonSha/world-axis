@@ -1685,8 +1685,12 @@
             actions.push({ id: 'review-evict-fail', safe: false, detail: '面板「诊断」查看挤出失败明细（须改代码或补站点登记，不是清存储能解决的）' });
           } else if (es.evicts > 0) {
             const top = Object.keys(es.bySite).sort(function (a, b) { return es.bySite[b].dropped - es.bySite[a].dropped; })[0];
-            const what = (es.lastDropped || []).slice(-2).map(function (x) { return x.what; }).join('、');
-            issues.push({ level: 'info', key: 'evict', detail: '本轮已发生 ' + es.evicts + ' 次容量挤出，共丢弃 ' + es.evicted + ' 项（最频繁：' + (top || '?') + '，最近丢弃：' + (what || '—') + '）——这是设计内的有界收纳，但「丢了什么」应当可见' });
+            // v2.13.0（端到端审计自纠）：取**该站点自己的**丢弃物摘要，而不是全局最近几条。
+            //   全局环形 12 条在多站点场景下会被后发生的站点冲掉，于是「最频繁的那个站点
+            //   到底丢了谁」反而看不到（实测：people 丢 32 人，报表里只剩「伏笔18、伏笔19」）。
+            const topWhat = ((es.bySite || {})[top] || {}).lastWhat || [];
+            const what = topWhat.slice(-2).join('、') || (es.lastDropped || []).slice(-2).map(function (x) { return x.what; }).join('、');
+            issues.push({ level: 'info', key: 'evict', detail: '本轮已发生 ' + es.evicts + ' 次容量挤出，共丢弃 ' + es.evicted + ' 项（最频繁：' + (top || '?') + '，其最近丢弃：' + (what || '—') + '）——这是设计内的有界收纳，但「丢了什么」应当可见' });
           }
         }
       } catch (eEv) { markDegraded('evict', eEv); }
