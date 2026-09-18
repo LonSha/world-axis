@@ -88,6 +88,7 @@
     'engines/tool-analyzer.js': 'toolAnalyzer', 'engines/tool-import.js': 'toolImport',
     'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag', 'engines/contract-audit.js': 'contractAudit', 'engines/memory-sampler.js': 'memorySampler', 'engines/sampler-check.js': 'samplerCheck', 'engines/inject-channel.js': 'injectChannel', 'engines/inject-slot-audit.js': 'injectSlotAudit', 'engines/proactive.js': 'proactive', 'engines/wb-inject.js': 'wbInject',
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
+    'engines/bridge.js': 'bridge',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -679,6 +680,35 @@
       };
     }, {});
   }
+  // ── 14. v2.16.0: 对外只读互操作桥（worldaxis_bridge_v1）──
+  //   为什么诊断要看它：本仓库此前**没有任何对外接口**，「世界状态有没有被外部读走」既不可见
+  //   也不可归因——外部问得太早（store 未就绪）、宿主没挂上、ctx 下挂载点被删，四种处境在
+  //   外部侧看过去完全一样（都是「读不到」）。本块把「拉了没有 / 被谁拉 / 拉不到为什么」摆出来。
+  //   分级：桥未装载＝warn（外部集成整条断链，须查装载）；开闸但零发布＝warn（开着的开关没在干活）；
+  //   发布失败/被拒＞0＝error（外部拿到 null 却不知道原因）；最近一次失效标签进 info 供排障。
+  function secBridge() {
+    return safe(function () {
+      if (!WA.bridge || typeof WA.bridge.stat !== 'function') {
+        return { error: 'engines/bridge.js 未加载（外部无法读取世界状态：另两个插件各说各话）' };
+      }
+      const s = WA.bridge.stat();
+      const cfg = safe(function () { return WA.bridge.settings(); }, {});
+      return {
+        id: WA.bridge.id, version: WA.bridge.version, floorGap: WA.bridge.FLOOR_GAP,
+        enabled: cfg ? cfg.enabled : null,
+        includeHidden: cfg ? cfg.includeHidden : null,
+        presumeUnknown: cfg ? cfg.presumeUnknown : null,
+        mounted: s.mounted, published: s.published, publishedFloor: s.publishedFloor,
+        invalidated: s.invalidated, subscribed: s.subscribed,
+        ageMs: s.ageMs, snapshotBytes: s.snapshotBytes,
+        refreshes: s.refreshes, publishes: s.publishes, invalidations: s.invalidations,
+        debounced: s.debounced, refused: s.refused,
+        externalReads: s.externalReads, failures: s.failures,
+        lastReason: s.lastReason, lastInvalidateReason: s.lastInvalidateReason, byInvalidate: s.byInvalidate,
+        lastRefusal: s.lastRefusal, lastFailure: s.lastFailure, floor: s.floor
+      };
+    }, {});
+  }
   // ── 汇总 ──
   function collect() {
     const diag = {
@@ -686,6 +716,7 @@
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
+      bridge: secBridge(),
       compat: secCompat()
     };
     diag.verdict = verdict(diag);
@@ -751,6 +782,35 @@
         issues.push({ level: 'info', key: 'clock', detail: '决策时钟未冻结（本会话 ' + ck.nowCalls + ' 次决策时间读取，涉及 ' + ck.sites + ' 个站点，最近：' + (ck.lastSite || '?') + '；另有 ' + ck.wallCalls + ' 次测量读取不受影响）——「同样的种子两次跑出来的存档还是不一样」根因在此：随机源定了，时刻没定；要复现运行 `WA.clock.freeze(<时刻戳>)`（此后所有进存档的时间戳都取该虚拟时刻，每轮用 advance() 推进）' });
       }
     } catch (eCk) {}
+    // v2.16.0: 对外只读互操作桥分级——分四件不同的事，级也不同：
+    //   ① 桥不可用（模块没装载/stat 缺失）⇒ **外部集成整条断链**，warn：本扩展仍能独立运行，
+    //      但另两个插件读不到世界（它们各自回落成「自己猜」，用户看到的是「两个世界对不上」）。
+    //   ② 开闸却零发布 ⇒ warn：开关开着、也有刷新请求，却没有一次成功——须查 store 是否就绪。
+    //   ③ 发布失败 > 0 ⇒ error：外部拿到 null 又不知道原因，正是本仓库反复治理的「静默降级」形态。
+    //   ④ 闸关着但外面在读 ⇒ warn：**外部拿到的永远是 null，而它看起来像「这个世界是空的」**。
+    //      这是本版最隐蔽的一种失配（与 lonsha 侧「未开启快照桥」同一形状），故显式点出。
+    try {
+      const bd = diag.bridge || {};
+      if (bd.error) {
+        issues.push({ level: 'warn', key: 'bridge', detail: '对外桥不可用：' + bd.error });
+      } else {
+        if (bd.failures > 0) {
+          issues.push({ level: 'error', key: 'bridge', detail: '对外桥发布失败 ' + bd.failures + ' 次（最近：' + ((bd.lastFailure || {}).reason || '?') + '）——外部侧拿到的是 null，且它分不清「世界是空的」与「投影坏了」，须改代码或查 store 状态' });
+        }
+        if (bd.enabled === true && bd.publishes === 0) {
+          issues.push({ level: 'warn', key: 'bridge', detail: '对外桥已开闸且有 ' + bd.refreshes + ' 次刷新请求，但一次也没成功发布（最近理由：' + (bd.lastReason || '?') + '）——开关开着却没在干活' });
+        }
+        if (bd.enabled === false && bd.externalReads > 0) {
+          issues.push({ level: 'warn', key: 'bridge', detail: '对外桥当前**休眠**（设置键 worldaxis_bridge_settings_v1 的 enabled=false），但外部已尝试读取 ' + bd.externalReads + ' 次——对方拿到的永远是 null，看起来像「这个世界没有任何世界状态」' });
+        }
+        if (bd.enabled === false) {
+          issues.push({ level: 'info', key: 'bridge', detail: '对外桥休眠中（默认）：另两个插件（RubyPhone 世界脉搏 / TimeManager、LonSha 世界推进）此刻各自用自己的办法描述世界；要共享真值开 `WorldAxis.bridge.setSettings({ enabled: true })`' });
+        }
+        if (bd.enabled !== false && bd.lastInvalidateReason) {
+          issues.push({ level: 'info', key: 'bridge.invalidated', detail: '快照最近一次作废理由：' + bd.lastInvalidateReason + '（分布 ' + JSON.stringify(bd.byInvalidate || {}) + '）——推演结算/换聊天后外部读到的必须是新世界' });
+        }
+      }
+    } catch (eBd) {}
     if (h && h.sillyTavern === false) issues.push({ level: 'warn', key: 'host', detail: '未检测到 SillyTavern 宿主（无事件源，仅拦截器函数可用）' });
     else if (h && h.eventSource === false) issues.push({ level: 'warn', key: 'host', detail: '宿主无事件源：after 链与切聊天重载将不生效' });
     if (h && h.extensionPrompt === false) issues.push({ level: 'error', key: 'host', detail: '宿主无 setExtensionPrompt：注入通道完全不可用' });
@@ -1210,6 +1270,22 @@
       out.push({ level: (mv.failed || th.failed) ? 'error' : 'info', key: 'compat',
         detail: 'MVU ' + (mv.active ? '已激活(同步 ' + mv.syncCount + ')' : '未激活(' + (mv.reason || '?') + ')')
           + ' · TH ' + (th.active ? '已暴露' : '未激活(' + (th.reason || '?') + ')') });
+    }
+    // v2.16.0: 对外桥摘要行——否则 flatten 出来的清单里「另两个插件能不能读到世界」完全缺席。
+    const bdF = d.bridge || {};
+    if (bdF.error) {
+      out.push({ level: 'warn', key: 'bridge', detail: '对外桥不可用：' + bdF.error });
+    } else if (bdF.enabled === false) {
+      out.push({ level: 'info', key: 'bridge', detail: '对外桥休眠（外部读取 ' + (bdF.externalReads || 0) + ' 次）——另两个插件各自描述世界' });
+    } else {
+      out.push({
+        level: (bdF.failures > 0) ? 'error' : 'info', key: 'bridge',
+        detail: '对外桥' + (bdF.mounted ? '已挂载' : '未挂载') + '：发布 ' + (bdF.publishes || 0)
+          + ' 次（floor=' + (bdF.publishedFloor === undefined ? '?' : bdF.publishedFloor) + '，'
+          + (bdF.snapshotBytes || 0) + ' 字节）｜外部读取 ' + (bdF.externalReads || 0) + ' 次｜作废 '
+          + (bdF.invalidations || 0) + ' 次（最近：' + (bdF.lastInvalidateReason || '—') + '）'
+          + (bdF.failures > 0 ? '｜失败 ' + bdF.failures + ' 次' : '')
+      });
     }
     // v0.1.6: 槽位落地摘要
     const inj = d.inject || {};

@@ -29,7 +29,7 @@ const LOAD = [
   'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -7385,7 +7385,15 @@ WA.loadScript = _ls.loadScript;
     //   它们此前只被**悬浮球呼吸动画**订阅，面板自身不重绘，于是本版新上线的「世界推演运行态」
     //   行会停留在渲染那一刻的值（点了中止也不会变回「空闲」，运行中也不会变成「运行中」）。
     //   本块的语义（挂载前全是死信号 → 挂载后 dead 零增长）逐字不变，只更新清单长度。
-    assert(Array.isArray(EV2100) && EV2100.length === 11, '状态事件清单为 11 个（v2.11.0：+backstage:started/settled）');
+    assert(Array.isArray(EV2100) && EV2100.length === 11,
+      '面板状态事件清单为 11 个（v2.11.0 起 9 → 11）——v2.16.0 的对外桥**不改这份清单**：'
+      + '它把自己挂作废订阅的 `backstage:settled` / `chat:changed` 本来就是面板已订阅的事件，不是第 12、13 项');
+    // v2.16.0（本仓库口径，显式留痕）: 对外桥的作废订阅是**惰性**的（真发布过快照才挂监听），
+    //   故它**不该**在装载期占住 `backstage:settled` / `chat:changed` 两个监听位——
+    //   本仓库总线上「有发出无监听」是刻意可见的健康信号，一个默认休眠的模块常驻监听位
+    //   等于把这条真实告警抹平。此刻（面板未挂载 + 桥未发布）这两个事件必须**仍**是死信号。
+    assert(WA.bridge && typeof WA.bridge.stat === 'function' && WA.bridge.stat().subscribed === false,
+      '桥此刻未订阅（本块尚未发布过快照 ⇒ 惰性订阅没生效）');
     assert(WA.ui.mounted === false, '挂载前 mounted=false');
 
     // D1. 断链现场 → 挂载后全部被接收
@@ -7393,14 +7401,14 @@ WA.loadScript = _ls.loadScript;
     const bsA2100 = WA.busStats(999), mapA2100 = {};
     (bsA2100.events || []).forEach(function (r) { mapA2100[r.event] = r.dead || 0; });
     const deadBefore2100 = EV2100.filter(function (e) { return (mapA2100[e] || 0) > 0; });
-    assert(deadBefore2100.length === 11, '挂载前 11 个事件全是死信号（断链现场）');
+    assert(deadBefore2100.length === EV2100.length, '挂载前 ' + EV2100.length + ' 个状态事件全是死信号（断链现场）');
     WA.store.init();
     WA.ui.mount();
     assert(WA.ui.mounted === true, '挂载后 mounted=true');
     EV2100.forEach(function (e) { WA.emit(e); });
     const bsB2100 = WA.busStats(999), mapB2100 = {};
     (bsB2100.events || []).forEach(function (r) { mapB2100[r.event] = r.dead || 0; });
-    assert(EV2100.every(function (e) { return (mapB2100[e] || 0) === (mapA2100[e] || 0); }), '全部 ' + EV2100.length + ' 个事件挂载后 dead 零增长（死信号已治理）');
+    assert(EV2100.every(function (e) { return (mapB2100[e] || 0) === (mapA2100[e] || 0); }), '全部 ' + EV2100.length + ' 个事件挂载后 dead 零增长（死信号已治理；含桥的两个作废订阅点，它们这段里既没被桥订阅、也没被面板漏掉）');
 
     // D2. 重绘语义：隐藏不重绘 / 节流 / 输入中不重绘
     const rsA2100 = WA.ui.rerenderStat();
@@ -9809,7 +9817,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.16.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10353,7 +10361,7 @@ assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.15.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.16.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10644,7 +10652,7 @@ assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.15.0', '入口版本为 2.15.0（实 ' + ver + '）');
+    assert(ver === '2.16.0', '入口版本为 2.16.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11050,7 +11058,7 @@ assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11167,7 +11175,7 @@ assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.15.0', '入口版本为 2.15.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.16.0', '入口版本为 2.16.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11555,7 +11563,7 @@ assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.15.0', '入口版本为 2.15.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.16.0', '入口版本为 2.16.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11925,7 +11933,7 @@ assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.15.0', '入口版本为 2.15.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.16.0', '入口版本为 2.16.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12290,7 +12298,7 @@ assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.15.0', '入口版本为 2.15.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.16.0', '入口版本为 2.16.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -13244,6 +13252,324 @@ assert(verF2500 === '2.15.0' && mfF2500.version === verF2500, '入口与清单�
     console.log('  ✓ 六处决策点落盘实测（store/memory/rand.id/chatcache/恢复点/工作流链历史）｜端到端重放逐项相同');
     console.log('  ✓ 非法参数不静默｜声明即执行｜双消费端（诊断/面板/健康分/verdict）｜负向自证 4 项');
   } // end v2.15.0 block
+// ══════════════════════════════════════════════════════════════════
+  // v2.16.0 块：对外只读互操作桥（第十面：世界状态的可外供性）
+  //
+  // 命题：本扩展是全套三插件（WorldAxis / RubyPhone / LonSha 记忆引擎）里**唯一没有对外接口**的一个。
+  //   实测：产品代码零 `VirtualPhone`、零 `LonSha` 引用，对外只有内部的 `window.WorldAxis.*`。
+  //   于是同一个剧情里，另外两个插件对「世界」各有各的看法，而且都是**猜的**：
+  //     · RubyPhone「世界脉搏」App：自己再调一次 LLM 现编平行事件
+  //     · RubyPhone TimeManager：从正文/世界书里**猜**当前时间
+  //     · LonSha：世界推进另记一本账
+  //   真正的世界状态（本扩展 store）三者都读不到——「两个世界对不上」的根因在此，且此前无法从外部观测。
+  //
+  // 本块立六件事：① 契约同规格（与 lonsha_memory_bridge_v1 同型：只读投影／纯读不抛／深拷贝／拉取面）
+  //   ② 过滤不静默（visibility 三态各自的去向可归因，宽松口径须显式选择）
+  //   ③ 不刷屏（楼层间隔 + 时间去抖），但**作废必须优先于去抖**——否则换会话/推演结算后的第一问
+  //      拿回来的还是旧世界，正是本仓库反复治理的「静默串味」
+  //   ④ 休眠要可归因（默认关闭时外部读到 null 必须能问出原因，而不是看起来像「世界是空的」）
+  //   ⑤ 出口面只留被消费的成员（零消费出口按 v2.11.0 裁决摘除，本块把这条口径钉住）
+  //   ⑥ **休眠不得拿观测性换便利**：总线订阅是惰性的（真发布过才挂），否则默认关闭的模块
+  //      会常驻两个监听位，把「有发出无监听」这条真实健康信号抹平
+  // ══════════════════════════════════════════════════════════════════
+  {
+    console.log('\n■ G21 对外只读互操作桥（第十面：世界状态的可外供性）');
+    const B = WA.bridge;
+    assert(!!B && B.id === 'worldaxis_bridge_v1' && B.version === 1,
+      '桥已装载且版本自洽（id=' + (B && B.id) + ' version=' + (B && B.version) + '）');
+    assert(typeof B.buildSnapshot === 'function' && typeof B.splitCurrents === 'function'
+      && typeof B.refresh === 'function' && typeof B.snapshot === 'function'
+      && typeof B.invalidate === 'function' && typeof B.settings === 'function'
+      && typeof B.setSettings === 'function' && typeof B.stat === 'function',
+      '八个出口成员齐备（buildSnapshot/splitCurrents/refresh/snapshot/invalidate/settings/setSettings/stat）');
+    // ── ① 只读投影：本桥**不得**提供任何写世界状态的办法 ──
+    const writerNames = Object.keys(B).filter(function (k) {
+      return /^(set|patch|apply|write|save|update|mutate|rollback|reset)([A-Z_]|$)/.test(k);
+    });
+    assert(writerNames.length === 1 && writerNames[0] === 'setSettings',
+      '桥上唯一的「set*」是 setSettings（改的是本桥开闸配置，不是世界状态），实 ' + JSON.stringify(writerNames));
+    const cfgBeforeRO = B.settings();
+    assert(cfgBeforeRO && cfgBeforeRO.enabled === false && cfgBeforeRO.presumeUnknown === 'hidden'
+      && cfgBeforeRO.maxCurrents === 20 && cfgBeforeRO.maxEchoes === 12 && cfgBeforeRO.maxOpinion === 8
+      && cfgBeforeRO.debounceMs === 400 && cfgBeforeRO.includeHidden === false,
+      '默认设置＝休眠（enabled=false）＋保守过滤（presumeUnknown=hidden）——快照要 clone 世界状态，无事时不该付出这份开销');
+    // 声明即执行：本模块的设置登记表真的挂在总线上（否则面板/诊断读到的是镜像值）
+    //   注：case 20 会替换整个 WA.__settingsRegs 数组（实测 90 项 → 15 项），故这里按**内容**查找
+    //   而不是断言「恰好一条」——登记表的唯一性由 case 21 的自洽校验负责，本处只问本键在不在。
+    // 口径：取**首个**匹配项（仓库既有写法，见 regOf2400 / reg2500 / backstage 段）。
+    //   本测试进程把模块文件多次装载进同一全局对象（`concat` 追加、无去重），故每个模块的
+    //   登记项都会累积成多份——实测 15 个模块一律各 5 份，**与 bridge 无关**；
+    //   「恰好一份」不是本仓库的契约，断言它只会把装置产物误报成产品缺陷。
+    //   （登记表可因宿主重复装载而膨胀：本条只钉「在册且归因正确」，
+    //     要不要给登记加去重属 settingsBus 的跨模块口径，另案处理，不在本版偷偷改。）
+    const regB = (WA.__settingsRegs || []).filter(function (r) { return r && r.key === 'worldaxis_bridge_settings_v1'; })[0];
+    assert(regB && regB.module === 'bridge' && regB.def.enabled === false
+      && regB.enums && Array.isArray(regB.enums.presumeUnknown)
+      && regB.enums.presumeUnknown.indexOf('hidden') >= 0 && regB.enums.presumeUnknown.indexOf('public') >= 0,
+      '设置登记表在场且模块归因正确，含枚举白名单声明（settingsBus 的读路径/归一化/边界声明都靠它）');
+    assert(WA.settingsBus.registry().some(function (r) { return r.key === 'worldaxis_bridge_settings_v1'; }),
+      '登记表经 settingsBus.registry() 读得到（面板/诊断为读这条路径，而非直接摸 __settingsRegs）');
+    // ── ④ 休眠可归因：默认关闭时外部拿 null，但**必须问得出原因** ──
+    const statA = WA.bridge.stat();
+    const snapOff = B.snapshot();
+    const statB = WA.bridge.stat();
+    assert(snapOff === null, '休眠时外部读取返回 null（不抛、不返回「空世界」的假快照）');
+    assert(statB.refused === statA.refused + 1 && statB.lastRefusal && statB.lastRefusal.reason === 'disabled',
+      '休眠拒绝被记账且可归因（refused ' + statA.refused + '→' + statB.refused + '，最近理由 ' + (statB.lastRefusal || {}).reason + '）');
+    assert(statB.externalReads === statA.externalReads + 1, '外部读取次数记账（externalReads ' + statA.externalReads + '→' + statB.externalReads + '）');
+    assert(statB.publishes === statA.publishes, '休眠时不会偷偷发布快照（publishes 不变）');
+    assert(statB.subscribed === false,
+      '休眠的桥不占总线监听位（subscribed=false）——本仓库总线上「有发出无监听」是刻意可见的健康信号，'
+      + '一个从不工作的模块常驻在 backstage:settled/chat:changed 上等于把这条真实告警抹平');
+    const busPreB = WA.busStats(999).events.filter(function (r) { return r.event === 'backstage:settled' || r.event === 'chat:changed'; });
+    assert(busPreB.every(function (r) { return r.listeners === 0; }),
+      '（读侧实证）休眠期这两个事件在总线上确实无人监听（实测 ' + JSON.stringify(busPreB.map(function (r) { return r.event + ':' + r.listeners; })) + '）');
+    // ── ② 过滤不静默：三态各自的去向可归因（纯函数独立驱动）──
+    const FX = [
+      { id: 'c_pub', title: '公开', visibility: 'public' },
+      { id: 'c_trace', title: '半公开', visibility: 'public_trace' },
+      { id: 'c_hid', title: '隐藏', visibility: 'hidden' },
+      { id: 'c_none', title: '未标记' }
+    ];
+    const sp = B.splitCurrents(FX, 'hidden');
+    assert(sp.out.length === 2 && sp.out[0].id === 'c_pub' && sp.out[1].id === 'c_trace',
+      '保守口径：只有显式 public/public_trace 外供（实 ' + sp.out.map(function (c) { return c.id; }).join(',') + '）');
+    assert(sp.notMarked.length === 1 && sp.notMarked[0].id === 'c_none',
+      '未标记的进「未标记清单」而不是被静默丢掉——「一条都没进来」与「进来的都不该进」从此可区分');
+    assert(B.splitCurrents(FX, 'public').out.length === 3 && B.splitCurrents(FX, 'public').notMarked.length === 0,
+      '宽松口径（presumeUnknown=public）须显式选择：未标记并入外供');
+    assert(B.splitCurrents(null, 'hidden').out.length === 0 && B.splitCurrents([null, 1, 'x'], 'hidden').notMarked.length === 0,
+      '非数组/非对象元素全部吞掉，不进清单（外部数据脏不得连坐整张快照）');
+    // ── 开闸：快照结构与两份真值 ──
+    B.setSettings({ enabled: true });
+    assert(B.settings().enabled === true, 'setSettings 即时生效并落盘读回');
+    WA.store.transact(function (d) {
+      d.clock.label = 'G21·开闸前'; d.clock.iso = '2026-01-01T00:00:00.000Z'; d.clock.dayIndex = 7; d.clock.source = 'user';
+      d.currents.push({ id: 'g21_hid', title: '隐藏暗流', visibility: 'hidden', participants: ['甲'], stage: 'spread' });
+      d.currents.push({ id: 'g21_pub', title: '公开暗流', visibility: 'public', participants: ['乙'], stage: 'seed' });
+      d.opinion.canon.push({ title: '已核实', body: '权威通报', claim_status: 'fact', scope: 'global', related_event_id: 'g21_evt' });
+      d.opinion.forum.push({ board: '茶馆', topic: '传闻', claim_status: 'rumor', related_event_id: 'g21_evt', replies: [{ author: '张三', text: '听说了吗' }] });
+      d.opinion.sandbox.push({ kind: 'murmur', text: '路人闲聊', mood: 'calm' });
+    });
+    B.invalidate('g21-setup');
+    const sn1 = B.refresh({ reason: 'g21-open' });
+    assert(!!sn1 && sn1.version === 1 && sn1.bridge === 'worldaxis_bridge_v1' && sn1.reason === 'g21-open',
+      '快照头部自洽（version/bridge/reason）——宿主侧可据此判定「读到的是这个桥」');
+    assert(WA.bridge.stat().subscribed === true && WA.busStats(999).events.filter(function (r) {
+      return (r.event === 'backstage:settled' || r.event === 'chat:changed') && r.listeners === 1;
+    }).length === 2, '首次成功发布后两个作废订阅点才挂上（惰性订阅的反向：真在跑就必须占位）');
+    assert(sn1.worldClock.label === 'G21·开闸前' && sn1.worldClock.dayIndex === 7 && sn1.worldClock.source === 'user',
+      '世界钟为直读真值（label/dayIndex/source）——RubyPhone TimeManager 的「猜时间」可由「读时间」替代');
+    assert(sn1.currents.length === 1 && sn1.currents[0].id === 'g21_pub',
+      '保守口径下隐藏暗流不外供（含 includeHidden=false 时的真实投影）');
+    assert(sn1.filter.presumeUnknown === 'hidden' && sn1.filter.includeHidden === false
+      && sn1.filter.notMarkedCount === 0 && sn1.filter.hiddenCount === 1,
+      '过滤归因字段完整（presumeUnknown/includeHidden/notMarkedCount/hiddenCount）');
+    assert(sn1.counts.currents === 2 && sn1.counts.opinionCanon === 1 && sn1.counts.opinionForum === 1,
+      'counts 报的是**世界真值**（currents=2）而 currents 报的是**外供投影**（1 条）——总量与外供量必须分开可读');
+    assert(sn1.opinion.canon.length === 1 && sn1.opinion.canon[0].claim === 'fact' && sn1.opinion.canon[0].relatedEvent === 'g21_evt',
+      '已核实新闻带 claim_status 与来源事件（「已核实」与「纯传闻」在外部侧是两种事实强度）');
+    assert(sn1.opinion.forum.length === 1 && sn1.opinion.forum[0].claim === 'rumor' && sn1.opinion.forum[0].replies.length === 1,
+      '论坛传闻带 claim_status=rumor 与首条回复（外部侧据此决定「敢不敢当成事实引用」）');
+    assert(sn1.opinion.sandbox.length === 1 && sn1.opinion.sandbox[0].kind === 'murmur',
+      'NON-CANON 闲逛单列（sandbox）——不与 canon 混流');
+    assert(sn1.exportedAt > 0 && sn1.exportedAtWall > 0 && sn1.reason === 'g21-open',
+      '决策时间与测量时间分别落账（exportedAt/exportedAtWall）——冻结时钟时前者可复现、后者仍是真墙钟');
+    // ③ 深拷贝：改返回值不得改到引擎内存态
+    const sn1b = B.snapshot();
+    sn1b.worldClock.label = '被外部改坏了';
+    sn1b.currents.push({ id: '外部硬塞' });
+    const rawAfter = WA.store.read('clock.label');
+    assert(rawAfter === 'G21·开闸前', '外部改快照不回写世界（store 仍是原值，实 ' + rawAfter + '）');
+    assert(B.snapshot().currents.length === 1, '外部往快照里塞条目不影响下一次读取（深拷贝边界成立）');
+    assert(B.snapshot() !== B.snapshot(), '每次 snapshot() 返回新对象（不是同一引用）');
+    // ── ③ 不刷屏：楼层间隔 + 时间去抖 ──
+    const stG = WA.bridge.stat();
+    assert(stG.floorGap === 5 && typeof stG.subscribed === 'boolean' && typeof stG.invalidated === 'boolean',
+      'stat 报出 floorGap/subscribed/invalidated（面板此前引用的 floorGap 本来不存在，会渲染成 undefined）');
+    const beforeDeb = WA.bridge.stat();
+    const snDeb = B.snapshot();
+    const afterDeb = WA.bridge.stat();
+    assert(afterDeb.debounced > beforeDeb.debounced && snDeb !== null,
+      '同一时刻重复读取被时间去抖挡下（不重建、直接回上一份）——外部轮询不会变成 clone 风暴');
+    assert(afterDeb.publishes === beforeDeb.publishes, '去抖命中时 publishes 不增（没有白干活）');
+    // 楼层间隔：同一 floor 上强制重建之后，普通 refresh 仍被间隔挡住
+    const beforeForced = WA.bridge.stat();
+    const snForced = B.refresh({ reason: 'g21-forced', force: true });
+    const afterForced = WA.bridge.stat();
+    assert(snForced && afterForced.publishes === beforeForced.publishes + 1,
+      'force 可越过间隔（外部「我知道世界变了」的显式通道）');
+    const snBlocked = B.refresh({ reason: 'g21-same-floor' });
+    const afterBlocked = WA.bridge.stat();
+    assert(afterBlocked.debounced === afterForced.debounced + 1 && afterBlocked.publishes === afterForced.publishes,
+      '未 force 且楼层未前进时被楼层间隔挡下（世界推演是本仓库最慢的链路，快照 clone 不该更贵）');
+    assert(snBlocked !== null, '被挡下时返回上一份快照而不是 null（外部不会因去抖而「读不到世界」）');
+    // ── ③′ 作废优先于去抖（本块最要害的一条：跨会话串味）──
+    const beforeInv = WA.bridge.stat();
+    B.invalidate('g21-chat');
+    const afterInv = WA.bridge.stat();
+    assert(afterInv.invalidations === beforeInv.invalidations + 1
+      && afterInv.byInvalidate['g21-chat'] === 1
+      && afterInv.lastInvalidateReason === 'g21-chat',
+      'invalidate 按理由归因入账（byInvalidate 分桶）——「谁把快照作废的」不靠日志猜');
+    assert(afterInv.invalidated === true, 'stat 透出 invalidated 状态位（作废不是隐式内部态）');
+    const snRe = B.refresh({ reason: 'g21-after-inv' });
+    const afterRe = WA.bridge.stat();
+    assert(afterRe.publishes === afterInv.publishes + 1 && afterRe.invalidated === false,
+      '作废后的第一次 refresh **必然**重建（而不是被楼层间隔/时间去抖吃掉旧世界）——这是跨会话串味的回归钉');
+    // ── ④ 归一：非法口径值退回保守档，不静默放宽 ──
+    B.setSettings({ presumeUnknown: 'wild', maxCurrents: 9999, debounceMs: -5, includeHidden: 'yes' });
+    const cfgN = B.settings();
+    assert(cfgN.presumeUnknown === 'hidden', '非法 presumeUnknown 退回保守档（实 ' + cfgN.presumeUnknown + '）——放宽过滤这件事不该由拼错的值替用户决定');
+    assert(cfgN.maxCurrents === 80, '越界上限夹回声明区间上界（实 ' + cfgN.maxCurrents + '）');
+    assert(cfgN.debounceMs === 0, '越界去抖夹回下界（实 ' + cfgN.debounceMs + '）');
+    assert(cfgN.includeHidden === true, '布尔域经 toBool 归一（字符串 yes ⇒ true）');
+    B.setSettings({ maxCurrents: 20, debounceMs: 400, includeHidden: false, presumeUnknown: 'hidden' });
+    // ── 只读投影的硬证：跑完整条 after 链，世界状态逐字段不变 ──
+    const snapBeforeRun = B.snapshot();
+    const worldBefore = JSON.stringify(WA.store.get());
+    await WA.workflow.run('after', {});
+    assert(typeof WA.workflow.list('after').find(function (n) { return n.id === 'bridge.publish'; }) === 'object',
+      '本桥已挂进 after 链（id=bridge.publish）——对外投影的时机就是「世界刚推完」');
+    const pubNode = WA.workflow.list('after').filter(function (n) { return n.id === 'bridge.publish'; })[0];
+    assert(pubNode.order > 60 && pubNode.critical === false && typeof pubNode.run === 'function',
+      '排在 actors.profileMaintain(60) 之后、且**非关键节点**（对外投影失败绝不能拖住或回滚世界推演主链）');
+    assert(WA.store.read('clock.label') === 'G21·开闸前' && snapBeforeRun !== null
+      && JSON.parse(worldBefore).clock.label === WA.store.read('clock.label'),
+      '跑完整条 after 链后世界状态不变（桥全程只读，零写世界）');
+    // ── 消费侧：诊断节 / 健康分 / 面板 —— 声明即执行 ──
+    const dg21 = WA.toolDiag.collect();
+    assert(dg21.bridge && dg21.bridge.id === 'worldaxis_bridge_v1' && dg21.bridge.enabled === true
+      && dg21.bridge.subscribed === true,
+      '诊断节 secBridge 采到桥的真实状态（id/enabled/subscribed）');
+    assert(dg21.bridge.publishes > 0 && dg21.bridge.floor === WA.bridge.stat().floor
+      && typeof dg21.bridge.snapshotBytes === 'number' && dg21.bridge.invalidated === false,
+      '诊断节带出发布次数/楼层/快照字节/作废态（外部集成是否真在跑，一眼可见）');
+    const fl21 = WA.toolDiag.flatten(dg21);
+    assert(fl21.filter(function (r) { return r.key === 'bridge'; }).length >= 1,
+      'flatten 清单里有对外桥摘要行——否则「另两个插件能不能读到这个世界」在总览里完全缺席');
+    assert(WA.toolDiag.MODULE_EXPORTS['engines/bridge.js'] === 'bridge',
+      'MODULE_EXPORTS 已登记（装载缺失会被 secModules 报出来，而不是静默少一个模块）');
+    const mt21 = WA.store.maintain({});
+    assert(mt21.signals && mt21.signals.bridgePublishes === WA.bridge.stat().publishes
+      && mt21.signals.bridgeEnabled === true,
+      '健康分 signals 透出 bridgePublishes/bridgeEnabled（实 publishes=' + mt21.signals.bridgePublishes + '）');
+    assert(typeof mt21.signals.bridgeExternalReads === 'number' && typeof mt21.signals.bridgeFailures === 'number',
+      'signals 四字段齐备（publishes/failures/externalReads/enabled）');
+    const panelSrc21 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    assert(panelSrc21.indexOf('function bridgeBlock()') >= 0 && panelSrc21.indexOf('${bridgeBlock()}') >= 0,
+      '面板概览已挂 bridgeBlock()（UI 层在无头测试里不装载，故只做源码级钉——实机表现须另行核验）');
+    // ── 零消费出口检查（本块把「导出面必须被消费」口径钉成回归）──
+    //   本桥最初多写了 onAfterReply / resetStat 两个出口，产品代码零消费（实测扫全库：唯一调用点就在本文件内）。
+    //   按 v2.11.0 裁决摘除。判据落在**读侧**（有谁会去调它），而不是写在 bridge.js 里的自述。
+    const bridgeSrc21 = fs.readFileSync(path.join(BASE, 'engines/bridge.js'), 'utf8');
+    const consumerSelf21 = /WA\s*\.\s*bridge\s*(?:\?\.|\.)\s*(onAfterReply|resetStat)\b/;
+    assert(!consumerSelf21.test(bridgeSrc21),
+      '零消费出口不留：桥自己也不在别处引用 onAfterReply/resetStat（摘除彻底）');
+    const exportKeys21 = bridgeSrc21.slice(bridgeSrc21.indexOf('const bridge = WA.bridge = {'));
+    assert(exportKeys21.indexOf('resetStat:') < 0 && exportKeys21.indexOf('onAfterReply:') < 0,
+      '两个零消费出口已从导出面移除——留着零消费出口的风险不是「多一个 API」，而是「下一个调用者会挑错的那个」');
+    // ── 负向自证：拆掉两重判定中的任一重，串味必须立刻现形 ──
+    //   闭环：真源码上跑同一条判据（必须干净）→ 在**真源码**上做单点破坏（锚点恰中 1 次）→
+    //   加载破坏副本 → 重跑同一条判据（必须现形）。判据自身引用锚点串会被本仓库门禁点名，故
+    //   锚点只在这里声明一次，判据只看快照内容。
+    // 注：**只装载一次**。此前版本先建上下文、再补跑一遍 load21 兜底，那会把破坏副本
+    //   整体覆盖回原版——于是三条判据在三个副本上读数完全一致（破坏根本没生效）。
+    const LOAD21 = ['core/clock.js', 'core/rand.js', 'core/settings-bus.js', 'core/store.js', 'core/evict.js',
+      'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
+      'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js',
+      'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js', 'engines/worldbook.js',
+      'engines/ledger.js', 'engines/inspector.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js',
+      'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js', 'engines/chapters.js',
+      'engines/opinion.js', 'engines/bridge.js', 'compat/host.js'];
+    const ANCH21 = /if \(!__invalidated && !opts\.force && f >= 0 && __snapshot && f >= __publishedFloor && \(f - __publishedFloor\) < FLOOR_GAP\) \{/;
+    const mkBroken21 = function (fromRe, to, noReplace) {
+      const c = vm.createContext({});
+      vm.runInContext('var window = this; window.WorldAxis = { log: function(){} };', c);
+      vm.runInContext('window.localStorage = (function(){ var s={}; return { setItem:function(k,v){s[k]=String(v);}, getItem:function(k){return (k in s)?s[k]:null;}, removeItem:function(k){delete s[k];}, clear:function(){s={};}, key:function(i){return Object.keys(s)[i]||null;}, get length(){return Object.keys(s).length;} }; })();', c);
+      // 一次造一份**持久**上下文：桥的 floor() 从它读楼层。若每次 getContext 返回新对象，
+      //   判据里对楼层的改写就永远不被 floor() 看见（判据会静默恒真）。
+      vm.runInContext('window.SillyTavern = (function(){ var _st = { chat: { length: 3 }, chatId: "g21_broken" }; return { getContext: function(){ return _st; } }; })();', c);
+      const src = fs.readFileSync(path.join(BASE, 'engines/bridge.js'), 'utf8');
+      let out = src;
+      if (!noReplace) {
+        // 非全局匹配数锚点（含捕获组时 split 口径会把命中数算重，正是本块自纠掉的那个假象）
+        const hits = (src.match(new RegExp(fromRe.source, 'g')) || []).length;
+        if (hits !== 1) throw new Error('锚点在 engines/bridge.js 中命中 ' + hits + ' 次（须恰为 1，否则破坏不可控）');
+        out = src.replace(fromRe, to);
+        if (out === src) throw new Error('破坏锚点命中但替换后源码未变（判据会被静默绕过）');
+      }
+      LOAD21.forEach(function (r) {
+        const isT = (r === 'engines/bridge.js');
+        const code = isT ? out : fs.readFileSync(path.join(BASE, r), 'utf8');
+        vm.runInContext(code, c, { filename: r + ((isT && !noReplace) ? '.broken' : '') });
+      });
+      const copy = { ctx: c, bridge: vm.runInContext('window.WorldAxis.bridge', c),
+        store: vm.runInContext('window.WorldAxis.store', c), st: vm.runInContext('window.SillyTavern', c) };
+      if (!copy.bridge || !copy.store) throw new Error('副本装载不全（bridge/store 缺失）');
+      return copy;
+    };
+    // 判据只看快照内容，不看实现细节：世界已变之后，**下一问**必须拿到最新世界。
+    const judge21 = function (copy) {
+      const WB = copy.bridge, WS = copy.store, ST = copy.st;
+      const out = { invStale: false, shortStale: false };
+      WS.init();
+      // 关掉**时间**去抖，让判据只考**楼层**这一维：两维耦合时（出版间隔 400ms 内）
+      //   干净版也会被时间去抖挡下、把旧快照当「作废/回退」返回——判据会分不清是
+      //   哪个维度在起作用（此前探针二在真源码上就因此恒真）。
+      WB.setSettings({ enabled: true, debounceMs: 0 });
+      // 探针一：世界已变 + 显式作废（换会话 / 推演结算）→ 下一问必须是最新世界。
+      ST.getContext().chat.length = 3;
+      WS.transact(function (d) { d.clock.label = 'A1'; });
+      WB.refresh({ reason: 'a1', force: true });
+      WS.transact(function (d) { d.clock.label = 'A2'; });
+      WB.invalidate('chat:changed');
+      out.invStale = (WB.snapshot() || { worldClock: {} }).worldClock.label === 'A1';
+      // 探针二：世界已变 + 楼层不比上一份大（会话被截短 / 换到更短的会话）→ 下一问必须是最新世界。
+      //   走到这里时 __publishedFloor = 5（上面那一问在 chat.length=6 时发布），再把会话截回 5 楼
+      //   问一次：若只剩「间隔够不够」这一维（上界 `f >= __publishedFloor` 被拆掉），
+      //   f - publishedFloor = -1 依旧小于 FLOOR_GAP ⇒ 照样把上一份快照当成「间隔不够」返回。
+      ST.getContext().chat.length = 6;
+      WS.transact(function (d) { d.clock.label = 'B1'; });
+      WB.refresh({ reason: 'b1', force: true });
+      WS.transact(function (d) { d.clock.label = 'B2'; });
+      ST.getContext().chat.length = 5;
+      out.shortStale = (WB.snapshot() || { worldClock: {} }).worldClock.label === 'B1';
+      return out;
+    };
+    try {
+      const jReal = judge21(mkBroken21(/$^/, '', true));
+      assert(jReal.invStale === false && jReal.shortStale === false,
+        '（负向自证·原版对照）真源码上两条判据都是干净的（作废后拿到最新 / 楼层不比上一份大时拿到最新）——'
+        + '否则下面的「破坏后现形」可能只是判据恒真。实 ' + JSON.stringify(jReal));
+      const jA21 = judge21(mkBroken21(ANCH21,
+        'if (!opts.force && f >= 0 && __snapshot && f >= __publishedFloor && (f - __publishedFloor) < FLOOR_GAP) {'));
+      assert(jA21.invStale === true,
+        '（负向自证）把「作废优先」拆掉后，作废后的第一问拿回来的必然是旧世界——这正是换会话/推演结算的串味');
+      const jB21 = judge21(mkBroken21(ANCH21,
+        'if (!__invalidated && !opts.force && f >= 0 && __snapshot && (f - __publishedFloor) < FLOOR_GAP) {'));
+      assert(jB21.shortStale === true,
+        '（负向自证）把楼层上界 `f >= __publishedFloor` 单独拆掉后，楼层回退那一问同样拿到旧世界——两重判定缺一不可');
+    } catch (e21) {
+      assert(false, '（负向自证）作废语义的破坏副本构建失败：' + (e21 && e21.message));
+    }
+    // ── 收尾：复位本块的世界状态与桥设置，避免污染后续块 ──
+    WA.store.transact(function (d) {
+      d.clock.label = ''; d.clock.iso = ''; d.clock.dayIndex = 0; d.clock.source = 'unset';
+      d.currents = d.currents.filter(function (c) { return !/^g21_/.test(c.id); });
+      d.opinion.canon = d.opinion.canon.filter(function (o) { return o.title !== '已核实'; });
+      d.opinion.forum = d.opinion.forum.filter(function (o) { return o.topic !== '传闻'; });
+      d.opinion.sandbox = d.opinion.sandbox.filter(function (o) { return o.text !== '路人闲聊'; });
+    });
+    B.setSettings({ enabled: false, includeHidden: false, presumeUnknown: 'hidden', maxCurrents: 20, maxEchoes: 12, maxOpinion: 8, debounceMs: 400 });
+    B.invalidate('g21-teardown');
+    console.log('  ✓ 只读投影（零写世界出口）｜纯读不抛（休眠返 null 且 refused 可归因）｜深拷贝边界成立');
+    console.log('  ✓ 过滤不静默（三态去向 + 宽松口径须显式选择）｜归一（非法口径退回保守档）｜默认休眠不偷跑');
+    console.log('  ✓ 不刷屏（楼层间隔 + 时间去抖）但作废优先于去抖｜failures/debounced/invalidations 全部可观测');
+    console.log('  ✓ 休眠不占总线监听位（惰性订阅）——不拿观测性换便利');
+    console.log('  ✓ 消费侧齐备（after 链节点/诊断节/flatten/健康分 signals/面板块）｜零消费出口摘除');
+    console.log('  ✓ 负向自证 3 项（原版对照 + 拆任一条判定都必然现形）');
+  } // end v2.16.0 block
   } // end v2.11.0 block
   } // end v2.10.0 block
   } // end v2.9.0 block

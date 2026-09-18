@@ -1700,6 +1700,7 @@
           }
         }
       } catch (eEv) { markDegraded('evict', eEv); }
+      let bridgePublishesN = 0, bridgeFailuresN = 0, bridgeExternalReadsN = 0, bridgeEnabledN = false; // v2.16.0: 对外桥
       // ── 9.6 随机源（v2.14.0）──
       //   为什么健康分要看随机源：它本身不是「世界坏了」，但它决定**其余所有体检结论能不能被复核**。
       //   v2.13.0 让「长局里丢的是谁」可见，而丢的那个「谁」正是随机采样挑中的——
@@ -1737,6 +1738,34 @@
           }
         }
       } catch (eCk) { markDegraded('clock', eCk); }
+      // ── 9.8 对外只读互操作桥（v2.16.0）──
+      //   为什么健康分要看对外桥：本扩展此前全库零对外引用，是这套三插件里**唯一没有出口**的一个。
+      //   于是「另两个插件看到的世界」与「真正的世界状态」是不是同一份，没有任何地方答得上来。
+      //   分级与随机源/时间源同型——「休眠」是设计内默认态（info），「开闸却发不出去」才是缺陷：
+      //     · 发布失败 > 0 ⇒ error（外部拿到 null 且不知道原因＝静默降级）；
+      //     · 开闸但零发布 ⇒ warn（开关在，活儿没干）；
+      //     · 闸关着外面却在一遍遍读 ⇒ warn（对方拿到的永远是 null，看起来像「世界是空的」）。
+      try {
+        const bd = (WA.bridge && typeof WA.bridge.stat === 'function') ? WA.bridge.stat() : null;
+        if (bd) {
+          bridgePublishesN = bd.publishes; bridgeFailuresN = bd.failures;
+          bridgeExternalReadsN = bd.externalReads; bridgeEnabledN = (WA.bridge.settings() || {}).enabled === true;
+          if (bd.failures > 0) {
+            score -= 5;
+            issues.push({ level: 'error', key: 'bridge.failed', detail: '对外桥有 ' + bd.failures + ' 次发布失败（最近：' + ((bd.lastFailure || {}).reason || '?') + '）：外部侧拿到的是 null 且分不清「世界是空的」与「投影坏了」——占位失败会静默持续' });
+          } else if (bridgeEnabledN && bd.publishes === 0) {
+            score -= 3;
+            issues.push({ level: 'warn', key: 'bridge', detail: '对外桥已开闸（' + bd.refreshes + ' 次刷新请求）却一次也没发布——开关开着没在干活' });
+          } else if (!bridgeEnabledN && bd.externalReads > 0) {
+            score -= 3;
+            issues.push({ level: 'warn', key: 'bridge', detail: '对外桥休眠但已被外部读取 ' + bd.externalReads + ' 次：对方拿到的永远是 null，看起来像「这个世界没有任何世界状态」（开闸：WA.bridge.setSettings({ enabled: true })）' });
+          } else if (!bridgeEnabledN) {
+            issues.push({ level: 'info', key: 'bridge', detail: '对外桥休眠（默认）：RubyPhone 世界脉搏/TimeManager 与 LonSha 世界推进此刻各自描述世界——不是故障，但「两边对不上」的根因在此' });
+          } else if (bd.publishes > 0) {
+            issues.push({ level: 'info', key: 'bridge', detail: '对外桥已发布 ' + bd.publishes + ' 次快照（' + (bd.snapshotBytes || 0) + ' 字节，floor=' + bd.publishedFloor + '，外部读取 ' + bd.externalReads + ' 次，作废 ' + bd.invalidations + ' 次）' });
+          }
+        }
+      } catch (eBd) { markDegraded('bridge', eBd); }
       // ── 10. 巡视自身完整性（v2.0.0）──
       //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
       let degradedN = 0;
@@ -1832,6 +1861,11 @@
             // v2.15.0: 时间源——与上面并列的两半。clockNowCalls>0 且 clockReproducible=false
             //   说明「本轮存档时间戳不可复核」（设计内默认态）；clockFailed>0 才是缺陷。
             clockNowCalls: clockNowCallsN, clockFailed: clockFailedN, clockReproducible: clockReproducible,
+            // v2.16.0: 对外桥——「另两个插件看到的那个世界」是不是这一份，第一次有信号。
+            //   bridgePublishes>0 = 外部集成在真跑；bridgeExternalReads>0 而 bridgeEnabled=false 是**失配**
+            //   （对方拿到的永远是 null），bridgeFailures>0 才是缺陷。
+            bridgePublishes: bridgePublishesN, bridgeFailures: bridgeFailuresN,
+            bridgeExternalReads: bridgeExternalReadsN, bridgeEnabled: bridgeEnabledN,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }
