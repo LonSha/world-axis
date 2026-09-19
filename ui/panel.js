@@ -171,6 +171,40 @@
       unparsable: '日期串读不出'
     };
     const bad = (d.verdict === 'world-ahead' || d.verdict === 'world-behind');
+    // [v2.18.0] 反向消费面扩到九本账：账本画像 + 对读面（环）。
+    //   环必须**在面板上被点名**——它是对方读本扩展所得的投影，不是外部事实。
+    const lsum = WA.lonshaReader.ledgerSummary(read.snapshot);
+    const lb = WA.lonshaReader.ledgerBridges(read.snapshot);
+    const secs = lsum.sections || {};
+    const cmpB = (lb.items || []).filter(x => x.comparable);
+    const driftB = cmpB.reduce((a, x) => a + (x.worldOnlyTotal || 0) + (x.localOnlyTotal || 0), 0);
+    const confB = (lb.items || []).reduce((a, x) => a + (x.conflicts || 0), 0);
+    const ledLine = '对方账本 ' + lsum.total + ' 本：有值 ' + (secs.value || 0) + '｜显式为空 ' + (secs.nullish || 0)
+      + '｜未外供 ' + (secs.absent || 0) + (lsum.absentList.length ? '（' + lsum.absentList.join('、') + '）' : '');
+    // 逐本看图（只报「叫什么、多大」，不搬运内容）——用户要的是「对方给了几本、各多厚」。
+    const ledChips = WA.lonshaReader.ledgerSection(read.snapshot)
+      .map(x => x.field + (x.present ? (x.kind === 'null' ? '·空' : '×' + x.size) : '·未外供'))
+      .join('　');
+    // 三处对读面逐处念：缺口四态 / 差集 / 位置冲突。**不可比的那处不报「差集 0」**——
+    //   那会被读成「两边一致」，而它其实是「无从对读」。
+    const bridgeChips = (lb.items || []).map(x => {
+      if (!x.comparable) return x.id + '·不可比';
+      const d = (x.worldOnlyTotal || 0) + (x.localOnlyTotal || 0);
+      return x.id + '·' + (d ? '差 ' + d : '一致') + (x.conflicts ? '·冲突' + x.conflicts : '')
+        + (x.id === 'currents' && x.verdict ? '·' + x.verdict : '');
+    }).join('　');
+    const bridgeLine = '对读面 ' + cmpB.length + '/3 可比'
+      + (driftB ? '｜差集 ' + driftB + ' 项' : '') + (confB ? '｜位置冲突 ' + confB + ' 处' : '')
+      + '（明细见诊断 JSON）';
+    // 上游键集自证：本侧读的键上游是不是真有。缺口**不可知**（no-filter）与**明确无缺口**（complete）
+    //   必须在屏幕上分得开——这两件事的处置相反。
+    const esh = lb.echoShape || {};
+    const keyLine = esh.present
+      ? '对读读数键集：本侧认 ' + (esh.readKeys || []).length + ' 键｜上游实给 '
+        + ((esh.readKeys || []).length - (esh.missing || []).length) + ' 键'
+        + ((esh.missing || []).length ? '｜⚠️ 本侧读了上游没有的 ' + esh.missing.join('、') : '')
+        + ((esh.unknown || []).length ? '｜上游另有未消费 ' + esh.unknown.join('、') : '')
+      : '';
     return '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
       '<div class="wa-kv">对账：' + (bad ? '<span class="wa-bad">' : '') + esc(VD[d.verdict] || d.verdict) + (bad ? '</span>' : '') + '</div>' +
       '<div class="wa-kv">本扩展 ' + esc(d.worldDate || '（无公历钟）') + ' ｜LonSha ' + esc(d.lonshaDate || '（未记录）') + '</div>' +
@@ -179,9 +213,19 @@
       (sum.absent.length || sum.nullish.length
         ? '<div class="wa-kv">未外供 ' + esc(sum.absent.join('、') || '—') + '｜显式为空 ' + esc(sum.nullish.join('、') || '—') + '</div>'
         : '') +
+      '<div class="wa-kv">' + esc(ledLine) + '</div>' +
+      '<div class="wa-kv">' + esc(bridgeLine) + '</div>' +
+      '<div class="wa-kv">对读面逐处：' + esc(bridgeChips) + '</div>' +
+      '<div class="wa-kv">逐本：' + esc(ledChips) + '</div>' +
+      (keyLine ? '<div class="wa-kv' + ((esh.missing || []).length ? ' wa-bad' : '') + '">' + esc(keyLine) + '</div>' : '') +
+      (lsum.echoPresent
+        ? '<div class="wa-kv"><span class="wa-bad">对读读数是环</span>（' + esc(WA.lonshaReader.ECHO_SECTION)
+          + '）：它反映的是<b>对方眼里的本扩展</b>，不是「对方的世界」——引用前须认得 kind=echo</div>'
+        : '') +
       '<div class="wa-hint">这是本扩展对 LonSha 记忆桥的**唯一**消费点（此前全库零消费，引用只在注释里）。<br>' +
       '只读：不写对方的账本、不改本扩展的世界钟——两个钟对不上只报不管，<b>谁拍板由用户决定</b>。<br>' +
-      '「未外供」与「显式为空」是两件事（本扩展尊重对方 v3.174 的三态自述），故分别列出。</div></div>';
+      '「未外供」与「显式为空」是两件事（本扩展尊重对方 v3.174 的三态自述），故分别列出。<br>' +
+      'v2.18.0 起读的**不只是 `clock` 一个字段**：对方八本账 + 一本对读读数逐本看图，并对三本账报差集。</div></div>';
   }
   function renderOverview() {
     const s = WA.store.get();

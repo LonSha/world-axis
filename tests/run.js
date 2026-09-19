@@ -9817,7 +9817,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10361,7 +10361,7 @@ assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.17.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.18.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10652,7 +10652,7 @@ assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.17.0', '入口版本为 2.17.0（实 ' + ver + '）');
+    assert(ver === '2.18.0', '入口版本为 2.18.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11058,7 +11058,7 @@ assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:LONSHA_BRIDGE_ID describeLonsha diffWithLonsha lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11175,7 +11175,7 @@ assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.17.0', '入口版本为 2.17.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.18.0', '入口版本为 2.18.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11563,7 @@ assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.17.0', '入口版本为 2.17.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.18.0', '入口版本为 2.18.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11933,7 @@ assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.17.0', '入口版本为 2.17.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.18.0', '入口版本为 2.18.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12298,7 @@ assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.17.0', '入口版本为 2.17.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.18.0', '入口版本为 2.18.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -13780,6 +13780,323 @@ assert(verF2500 === '2.17.0' && mfF2500.version === verF2500, '入口与清单�
     console.log('  ✓ 三态尊重（未外供/显式为空/有值互不相同）｜对账不硬比（自由标签≠坏掉；对方未记≠读不出）');
     console.log('  ✓ 消费侧齐备（诊断节/flatten/健康分 signals/面板块）｜负向自证 4 项（原版对照 + 拆任一条判定都现形）');
   } // end v2.17.0 block
+  // ═══════════════════════════════════════════════════════════════════
+  // v2.18.0 块：反向消费面扩到**九本账**（通路不是没通，是只通了一根线）
+  //
+  // 命题：v2.17.0 把「本扩展读 LonSha」这条边接通了，但**只读了 `clock` 一个字段**，
+  //   而对方快照外供的是**八个顶层账本 + 一本对读读数**。同一型缺陷（通路通、只通一根线）
+  //   在反向边上重演了一次——与 lonsha v3.176 修掉的是同一型。
+  //
+  // 更要紧的是：lonsha v3.176 新增的 `worldLedgerRead` **是对方读本扩展所得**（一个环）。
+  //   本扩展若把它当「对方的世界」读进来，就会拿**自己的投影**冒充外部事实：
+  //   一处单侧计算、两处消费，两边永远一致（因为同源）。故本块立的第一件事就是：
+  //   **环必须被认出来**（kind='echo'），「对方的世界」与「对方眼里的我」不得同形。
+  //
+  // ★ 本块在写作中还挖出了一处**更严重的真实联调断线**：
+  //   原设计照直觉去取 `worldLedgerRead.currents / facts / people` 三支**数组**——
+  //   但上游 `GameClock.readWorldLedger` 的**三处构造点都并不外供**那三支，
+  //   只外供 `counts` 与 `peopleDiff` / `factsDiff` 的对读结论（外加 `gap`）。
+  //   于是真实联调下三处对读面会**静默全退化为 absent**；而只要手工夹具顺手带上
+  //   那三支数组，门禁就照样全绿——正是本项目最忌的「测试绿而生产不工作」。
+  //   裁决：**只透传对方已算好的结论，本侧不自算差集**（拿自己的投影跟自己对账，
+  //   差集恒为 0 却看着像「两边一致」），并把上游键集钉成 `ECHO_KEYS` 常量，
+  //   新增一条静态判据——三处取数键**逐一必须在上游键集里**。
+  //
+  // 本块立七件事：① 九本账逐本**在场三态**（未外供 ≠ 显式为空，尊重对方 fieldTypes）
+  //   ② 形状画像（各本多大 / 有哪些键；absent 只数「压根没外供」）③ 三处对读面 + 环归因
+  //   ④ **对方缺面 ≠ 空集**（不可比时不得报「差集为 0」被误读成「两边一致」）
+  //   ⑤ 明细有界（12 条 + 总数取对方自述口径）⑥ 消费侧齐备（诊断节新增两行 / flatten /
+  //   健康分 signals / 面板块）⑦ **上游键集自证**（我读的键上游是不是真有）
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    console.log('\n■ G23 反向消费面（九本账逐本看图 + 三处对读面 + 环归因 + 上游键集自证）');
+    const LR2 = WA.lonshaReader;
+    assert(typeof LR2.ledgerSection === 'function' && typeof LR2.ledgerSummary === 'function'
+      && typeof LR2.ledgerBridges === 'function' && typeof LR2.echoShape === 'function'
+      && typeof LR2.echoNotice === 'function',
+      '五个新判定入口齐备（ledgerSection/ledgerSummary/ledgerBridges/echoShape/echoNotice）');
+    assert(Array.isArray(LR2.LEDGER_SECTIONS) && LR2.LEDGER_SECTIONS.length === 9
+      && LR2.LEDGER_SECTIONS.indexOf('clock') >= 0 && LR2.ECHO_SECTION === 'worldLedgerRead'
+      && Array.isArray(LR2.ECHO_KEYS) && LR2.ECHO_KEYS.length === 10,
+      '账本面登记表：八本账 + 一本对读读数 = 9 项；对读读数名=' + LR2.ECHO_SECTION
+      + '，本侧认的键 ' + LR2.ECHO_KEYS.length + ' 个');
+    // ★★ 本块最要紧的一条静态判据：三处对读面取的键**必须逐一在上游键集里**。
+    //   上游 v3.176.0 的 worldLedgerRead **并不外供** currents/facts/people 三支数组
+    //   （只外供 gap + peopleDiff/factsDiff 的对读结论 + counts）。若照直觉取那三支，
+    //   手工夹具能把门禁喂绿，而**真实联调时三处对读面恒为 absent**——
+    //   那正是本仓库最忌的「测试绿而生产不工作」。
+    assert(LR2.BRIDGE_PAIRS.length === 3 && LR2.BRIDGE_PAIRS.every(function (p) {
+        return LR2.ECHO_KEYS.indexOf(p.sub) >= 0;
+      }),
+      '三处对读面取的键（' + LR2.BRIDGE_PAIRS.map(function (p) { return p.sub; }).join('/')
+      + '）**逐一都在上游键集里**——取上游没有的键会「测试绿而生产恒为空」');
+
+    // ── 构造一份「对方快照」：八本账三态齐全 + 一本对读读数（**严格按上游 v3.176.0 的键集**）──
+    //   刻意做成：有值 6 本 / 显式为空 1 本（moneyLedger）/ 未外供 2 本（lifeDetails、recallAudit）
+    //   ＋ worldLedgerRead（环，键集与 lonsha GameClock.readWorldLedger 的构造点逐一对齐）
+    const FULL = {
+      version: 1, bridge: 'lonsha_memory_bridge_v1', pluginVersion: '3.176.0', floor: 99,
+      protagonist: { name: '林砚' },
+      characters: { 崔莺莺: { name: '崔莺莺' } },
+      moneyLedger: null,
+      outline: { beats: [{ title: '初遇' }] },
+      worldProg: { events: { 城门封锁: {} } },
+      clock: { date: '2026-09-13', label: '第三日' },
+      worldLedgerRead: {
+        ok: true, reason: 'ok', describe: '就绪（暗流 2 / 事实 1 / 人物 2）',
+        shape: { currents: { present: true, kind: 'value', count: 2 } },
+        gap: { known: true, exported: 2, notMarkedCount: 3, notMarked: ['cur_a', 'cur_b', 'cur_c'],
+          truncated: false, presumeUnknown: '', includeHidden: false, gapRatio: 0.6,
+          hiddenTotal: 1, verdict: 'gapped' },
+        opinion: { present: true, canon: 1, forum: 0, sandbox: 0, verified: 1, rumor: 0, unknown: 0 },
+        counts: { currents: 2, echoes: 0, facts: 1, people: 2, opinionCanon: 1, opinionForum: 0 },
+        peopleDiff: { hasWorld: true, hasLocal: true, matched: 1,
+          mismatched: [{ name: '林砚', world: '邮局', local: '城南车站', kind: 'conflict' }],
+          mismatchedTotal: 1, conflicts: [{ name: '林砚', world: '邮局', local: '城南车站', kind: 'conflict' }],
+          worldOnly: ['柳明熙'], worldOnlyTotal: 1, localOnly: ['崔莺莺'], localOnlyTotal: 1 },
+        factsDiff: { hasWorld: true, hasLocal: true, shared: 1, worldOnly: ['城门封锁'], worldOnlyTotal: 1,
+          localOnly: [], localOnlyTotal: 0 },
+        at: 1710000000000
+      },
+      meta: { contract: 'v3.176', selfBytes: 4321, strictJsonOk: true, fieldTypes: {
+        protagonist: { present: true, kind: 'object' },
+        lifeDetails: { present: false, kind: 'undefined' },
+        characters: { present: true, kind: 'object' },
+        moneyLedger: { present: true, kind: 'null' },
+        outline: { present: true, kind: 'object' },
+        worldProg: { present: true, kind: 'object' },
+        clock: { present: true, kind: 'object' },
+        recallAudit: { present: false, kind: 'undefined' },
+        worldLedgerRead: { present: true, kind: 'object' }
+      } }
+    };
+
+    // ── ① 逐本在场三态 ──
+    const sec = LR2.ledgerSection(FULL);
+    assert(sec.length === 9, '逐本读数覆盖全部 9 本（实 ' + sec.length + '）');
+    const byField = {};
+    sec.forEach(function (x) { byField[x.field] = x; });
+    assert(byField.lifeDetails.present === false && byField.lifeDetails.kind === 'absent',
+      '未外供的账本如实标 present=false（对方压根没这项 ⇒ 本侧应降级，而不是「这本是空的」）');
+    assert(byField.moneyLedger.present === true && byField.moneyLedger.kind === 'null',
+      '显式为空的账本如实标 present=true + kind=null（照常推演，不降级）');
+    assert(JSON.stringify(byField.lifeDetails) !== JSON.stringify(byField.moneyLedger),
+      '★ 「未外供」与「显式为空」**不得同形**——两者处置相反（降级 vs 照常）');
+    assert(byField.characters.size === 1 && byField.worldLedgerRead.size === LR2.ECHO_KEYS.length,
+      '各有值账本带 size（characters 1 键 / 对读读数 ' + byField.worldLedgerRead.size
+      + ' 键 = 上游外供的键数），供「对方给了几本、各多厚」');
+    assert(byField.worldLedgerRead.isEcho === true && byField.characters.isEcho === false,
+      '★ 对读读数被标 isEcho=true（环），其余账本是 false——「对方眼里的我」与「对方的世界」不同形');
+
+    // ── ② 形状画像：absent 只数「压根没外供」，不把「显式为空」算进去 ──
+    const lsum = LR2.ledgerSummary(FULL);
+    assert(lsum.total === 9 && lsum.sections.value === 6 && lsum.sections.nullish === 1 && lsum.sections.absent === 2,
+      '形状画像三态分开计（有值 ' + lsum.sections.value + ' / 显式为空 ' + lsum.sections.nullish
+      + ' / 未外供 ' + lsum.sections.absent + '）');
+    assert(lsum.absentList.length === 2 && lsum.absentList.indexOf('moneyLedger') < 0,
+      '★ absentList 只列「压根没外供」的两本，**不把显式为空的 moneyLedger 混进去**'
+      + '（否则「对方明确说没有」会被报成「对方缺了这本账」）');
+    assert(lsum.echoPresent === true && lsum.echoExported === true,
+      '画像点出对方**已经在读本扩展**了（echoPresent=true）——此前这件事在本扩展侧完全不可见');
+    assert(lsum.entries.filter(function (e) { return e.keys.length; }).length >= 2,
+      '有值账本另带 key 前若干项（供面板念出「这本里有什么」，不搬运内容）');
+
+    // ── ③ 三处对读面 + 环归因（**透传对方已算好的结论，本侧不自算差集**）──
+    //   本侧 store 备齐三本账（否则「不可比」——那是另一件事，见 ④）。
+    const bkPpl2 = JSON.parse(JSON.stringify(WA.store.get().people));
+    const bkCur2 = JSON.parse(JSON.stringify(WA.store.get().currents));
+    const bkFct2 = JSON.parse(JSON.stringify(WA.store.get().worldFacts));
+    WA.store.transact(function (d) {
+      d.currents = [{ id: 'cur_local', title: '盐价' }];
+      d.worldFacts = [{ id: 'f1', key: '城门封锁', value: '已定' }];
+      d.people = { 崔莺莺: { id: 'p_崔莺莺', name: '崔莺莺', location: '城南车站' } };
+    });
+    const lb2 = LR2.ledgerBridges(FULL);
+    assert(lb2.items.length === 3 && lb2.echoKind === 'echo' && lb2.echoOk === true,
+      '对读面 3 处（' + lb2.items.map(function (x) { return x.id; }).join('/')
+      + '），且 kind 一律 echo（那三支源自在下的投影）；上游自述 ok 一并透出');
+    assert(lb2.echoNotice.indexOf('对方眼里的我') >= 0 || lb2.echoNotice.indexOf('环') >= 0
+      || lb2.echoNotice.indexOf('读本扩展') >= 0,
+      '归因话术说清「这是对方读我所得」——不认得环就会拿自己的投影当外部事实：' + lb2.echoNotice.slice(0, 40) + '…');
+    const items2 = {};
+    lb2.items.forEach(function (x) { items2[x.id] = x; });
+    assert(items2.currents.sub === 'gap' && items2.currents.verdict === 'gapped'
+      && items2.currents.worldOnlyTotal === 3 && items2.currents.worldOnly[0] === 'cur_a',
+      '缺口支（gap）：**缺口四态原样透传**（实 ' + items2.currents.verdict + '），'
+      + '未外供的 ' + items2.currents.worldOnlyTotal + ' 条带名（' + items2.currents.worldOnly.join('、') + '）'
+      + '——修前「有多少东西没给我」根本读不到');
+    assert(items2.facts.sub === 'factsDiff' && items2.facts.shared === 1
+      && items2.facts.worldOnlyTotal === 1 && items2.facts.worldOnly.indexOf('城门封锁') >= 0
+      && items2.facts.totalFromPeer === true,
+      '权威事实支（factsDiff）：透传对方已算好的差集（shared=' + items2.facts.shared
+      + '，worldOnly=' + items2.facts.worldOnly.join('、') + '），总数取对方自述口径');
+    assert(items2.people.shared === 1 && items2.people.worldOnlyTotal === 1
+      && items2.people.worldOnly[0] === '柳明熙' && items2.people.localOnlyTotal === 1
+      && items2.people.localOnly[0] === '崔莺莺',
+      '人物支（peopleDiff）：两侧差集原样透出（对方独有 ' + items2.people.worldOnly.join('、')
+      + '｜本侧独有 ' + items2.people.localOnly.join('、') + '），只报差集、不合并');
+    assert(items2.people.mismatched === 1 && items2.people.conflicts === 1,
+      '★ 位置冲突**单独计数**（' + items2.people.conflicts + ' 处）——「两侧都记了但不一样」'
+      + '与「一边没记」处置相反，不得混成一堆');
+    assert(lb2.echoShape.present === true && lb2.echoShape.missing.length === 0
+      && lb2.echoShape.unknown.length === 0 && lb2.echoShape.keys.length === LR2.ECHO_KEYS.length,
+      '★ **上游键集自证**：本侧认的 ' + LR2.ECHO_KEYS.length + ' 键上游全给（missing 为空）'
+      + '——若有 missing，说明本侧读了上游并不外供的键（真实联调恒为空）');
+    // 复位本块改动的三本账
+    WA.store.transact(function (d) { d.people = bkPpl2; d.currents = bkCur2; d.worldFacts = bkFct2; });
+
+    // 对象形态的条目也要认得（不同上游版本可能给对象而非裸串）——只做形状兼容，不改口径
+    const lbObj = LR2.ledgerBridges({ worldLedgerRead: { ok: true,
+      peopleDiff: { shared: 0, worldOnly: [{ name: '甲' }, { id: '乙' }], worldOnlyTotal: 2 } } });
+    assert(lbObj.items.filter(function (x) { return x.id === 'people'; })[0].worldOnly.join('/') === '甲/乙',
+      '对象形态条目（{name}/{id}）一样取得到名字（上游不同版本给的形态不同，本侧不因形态而漏）');
+
+    // ── ④ ★ 对方缺面 ≠ 空集（本块最要紧的一条判据）──
+    //   上游快照里**没有对读读数**（或对读读数里没有那一支）时，三处一律不可比。
+    //   此时若把它当成「对方的账本是空的」，就会报出「我这边多出来 N 项」——
+    //   那是**我自己没外供**，不是对方少记；而它看起来却像一次真正的对账。
+    const NOECHO = { version: 1, bridge: 'lonsha_memory_bridge_v1', clock: { date: '2026-09-13' },
+      characters: { A: {} }, meta: { fieldTypes: {} } };
+    const lb3 = LR2.ledgerBridges(NOECHO);
+    assert(lb3.echoKind === 'absent'
+      && lb3.items.every(function (x) { return x.theirsAvailable === false && x.comparable === false; }),
+      '对方未外供对读读数 ⇒ 三处一律 absent 且 comparable=false（**不得**当成「对方的账本是空的」）');
+    assert(lb3.items.every(function (x) { return x.worldOnlyTotal === 0 && x.localOnlyTotal === 0; }),
+      '★ 不可比时两侧差集**一律为 0**——绝不出一个假的「我这边多出来 N 项」（那是自指噪声，不是对账）');
+    assert(lb3.items.filter(function (x) { return x.id === 'facts'; })[0].kind === 'absent',
+      'facts 这一支同样标 absent（对方快照里没有对读读数 ⇒ 无从对读）');
+    const lsum3 = LR2.ledgerSummary(NOECHO);
+    assert(lsum3.echoPresent === false && lsum3.echoExported === false,
+      '画像如实报「对方还没在读本扩展」——无环，但这件事本身也要可见');
+    // 「键在、值是 null」与「键压根不在」也必须不同形：前者是「对方给了个空的」，后者是「对方没这一支」。
+    const lbNull = LR2.ledgerBridges({ worldLedgerRead: { ok: true, reason: 'ok', gap: null } });
+    const gapNull = lbNull.items.filter(function (x) { return x.id === 'currents'; })[0];
+    assert(gapNull.theirsAvailable === true && gapNull.theirsHasValue === false && gapNull.comparable === false,
+      '★ 「上游这一支值为 null」（available=true/hasValue=false）与「上游没这一支」（available=false）'
+      + '**不同形**——前者是「对方给了、内容是空」，后者是「对方这版压根没这一支」');
+
+    // ── ⑤ 明细有界（读数会进诊断 JSON / 面板，不能随剧情无界膨胀）──
+    const bigEcho = { version: 1, bridge: 'lonsha_memory_bridge_v1',
+      worldLedgerRead: { ok: true, peopleDiff: { shared: 0, worldOnlyTotal: 40,
+        worldOnly: (function () {
+          const a = []; for (let i = 0; i < 40; i++) a.push('路人' + i); return a;
+        })() } } };
+    const lbBig = LR2.ledgerBridges(bigEcho);
+    const pBig = lbBig.items.filter(function (x) { return x.id === 'people'; })[0];
+    assert(pBig.worldOnly.length === 12 && pBig.worldOnlyTotal === 40,
+      '★ 明细有界（12 条）+ **总数不失真**（40，取对方自述口径）——读数进快照不能让存档无界膨胀');
+    assert(pBig.worldOnly.length !== pBig.worldOnlyTotal,
+      '（负向自证）切片与总数确实不同值——否则「切掉了」与「本来就这么少」会塌成一态');
+
+    // ── ⑥ 消费侧齐备 ──
+    const mt18 = WA.store.maintain({});
+    assert('lonshaLedgers' in mt18.signals && 'lonshaEchoPresent' in mt18.signals
+      && 'lonshaBridgesComparable' in mt18.signals && 'lonshaBridgeDrift' in mt18.signals
+      && 'lonshaBridgeConflict' in mt18.signals,
+      '健康分 signals 透出九本账面（账本数 / 环 / 可比处数 / 差集 / 位置冲突）');
+    assert(mt18.signals.lonshaEchoPresent === false && mt18.signals.lonshaLedgers === 0
+      && mt18.signals.lonshaBridgeConflict === 0,
+      '无 LonSha 环境下如实报 0/false（不是无名 null，也不是扣分项）');
+    const dSrc18 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    assert(dSrc18.indexOf('lonshaLedgers') >= 0 && dSrc18.indexOf('lonshaBridges') >= 0
+      && dSrc18.indexOf('lonshaEchoKeys') >= 0,
+      '诊断 flatten 清单新增三行（账本画像 / 对读面 / **上游键集自证**）'
+      + '——否则「对方给了几本账」与「我读的键上游是不是真有」在总览里缺席');
+    const pSrc18 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    assert(pSrc18.indexOf('ledgerSection') >= 0 && pSrc18.indexOf('ledgerSummary') >= 0
+      && pSrc18.indexOf('ledgerBridges') >= 0 && pSrc18.indexOf('bridgeChips') >= 0
+      && pSrc18.indexOf('echoShape') >= 0,
+      '面板记忆桥块已挂新读数（逐本看图 / 逐处对读 / 键集自证；UI 层无头不装载，故只做源码级钉）');
+
+    // ── 负向自证：真源码破坏 → 破坏副本 → 同款真判据（原版对照 + 逐项现形 + 互不连坐）──
+    //   纪律（与 lonsha 侧同规格）：
+    //     ① 锚点必须**恰中一次**（不符即抛——防锚点漂移后把「没破坏成功」误读成「判据无反应」）；
+    //     ② 破坏点必须与**判据所读的代码位置匹配**（否则会写出一个恒绿的假负控制）；
+    //     ③ 破坏后语法仍须合法（非零退出必须来自判据，不能来自解析崩溃）；
+    //     ④ 破坏副本要能读到**同一个 store**，否则依赖 store 的判据会因「本侧无账本」而恒真。
+    const modSrc23 = fs.readFileSync(path.join(BASE, 'engines/lonsha-reader.js'), 'utf8');
+    const ANCH23 = {
+      // 破坏一：把环的 kind 塌成与外部账本同形（本版要治的那一处）
+      echoKind: "        id: pair.id, kind: pick.available ? 'echo' : 'absent',",
+      // 破坏二：把「对方缺面」当成空集——用本侧账本顶替对方差集（自指噪声）
+      noPhantom: "        ? { shared: 0, worldOnly: [], worldOnlyTotal: 0, localOnly: [], localOnlyTotal: 0,",
+      // 破坏三：把「显式为空」也算进未外供
+      absentOnly: "      if (!e.present) { sections.absent++; absentList.push(e.field); }",
+      // 破坏四：去掉切片（明细随剧情无界膨胀）
+      bounded: "      worldOnly: worldOnly.slice(0, lim),",
+      // 破坏五：把键集自证做成恒真（missing 恒为空）——「负控制是假的」的典型形态
+      keysHonest: "        missing: ECHO_KEYS.filter(function (k) { return keys.indexOf(k) < 0; })"
+    };
+    const mkBroken23 = function (anchor, to) {
+      const hits = modSrc23.split(anchor).length - 1;
+      if (hits !== 1) { throw new Error('锚点命中 ' + hits + ' 次（期望恰 1 次）——负控制作废'); }
+      let sB = modSrc23.replace(anchor, to);
+      if (sB === modSrc23) { throw new Error('替换未改变源码（负控制是假的）'); }
+      // 破坏后必须**语法仍合法**——否则非零退出不能归因于判据
+      const g = { WorldAxis: { store: WA.store } };   // 让破坏副本读到同一个 store
+      new Function('window', 'global', sB)(g, g);
+      if (!g.WorldAxis || !g.WorldAxis.lonshaReader) { throw new Error('破坏副本装载失败'); }
+      return g.WorldAxis.lonshaReader;
+    };
+    // 判据与破坏点**一一对应**（每条判据只读它那条破坏所改的那份输出）
+    const judge23 = function (api) {
+      const out = {};
+      // 判据一（对 echoKind）：三处对读面必须都标 echo——环与外部账本不同形
+      out.echoDistinct = api.ledgerBridges(FULL).items.every(function (x) { return x.kind === 'echo'; });
+      // 判据二（对 noPhantom）：**上游没给的那一支**不得产出任何非零差集，即便本侧账本很满
+      const bkP = JSON.parse(JSON.stringify(WA.store.get().people));
+      const bkF = JSON.parse(JSON.stringify(WA.store.get().worldFacts));
+      WA.store.transact(function (d) { d.people['柳明熙'] = { name: '柳明熙' }; d.worldFacts = [{ key: '城门封锁' }]; });
+      const b2 = api.ledgerBridges({ worldLedgerRead: { ok: true, reason: 'reader-unavailable' } });
+      out.noPhantom = b2.items.filter(function (x) { return !x.theirsHasValue; })
+        .every(function (x) { return x.worldOnlyTotal === 0 && x.worldOnly.length === 0 && x.localOnlyTotal === 0; });
+      WA.store.transact(function (d) { d.people = bkP; d.worldFacts = bkF; });
+      // 判据三（对 absentOnly）：absent 只数「压根没外供」
+      out.absentOnly = api.ledgerSummary(FULL).sections.absent === 2;
+      // 判据四（对 bounded）：明细有界且总数不失真
+      const bb = api.ledgerBridges(bigEcho).items.filter(function (x) { return x.id === 'people'; })[0];
+      out.bounded = bb.worldOnly.length === 12 && bb.worldOnlyTotal === 40;
+      // 判据五（对 keysHonest）：键集自证必须**两向都真**——全给时报空，缺键时报出缺的那几个
+      const FULLMISS = api.echoShape(FULL).missing.length === 0;
+      const BADMISS = api.echoShape({ worldLedgerRead: { ok: true, reason: 'ok', gap: null, counts: {} } })
+        .missing.length === 6;   // 10 keys, upstream gave ok/reason/gap/counts = 4, so 6 missing
+      out.keysHonest = FULLMISS && BADMISS;
+      return out;
+    };
+    try {
+      const jReal23 = judge23(LR2);
+      assert(jReal23.echoDistinct === true && jReal23.noPhantom === true && jReal23.absentOnly === true
+        && jReal23.bounded === true && jReal23.keysHonest === true,
+        '（负向自证·原版对照）真源码上五条判据全部干净——否则下面的「破坏后现形」可能只是判据恒真');
+      const jA23 = judge23(mkBroken23(ANCH23.echoKind, "        id: pair.id, kind: 'absent',"));
+      assert(jA23.echoDistinct === false,
+        '（负向自证）把环的 kind 塌成与外部账本同形后，「对方眼里的我」不再可分辨——正是本版要治的那一处');
+      assert(jA23.bounded === true && jA23.absentOnly === true, '（负向自证）破坏一不连坐有界性与三态');
+      const jB23 = judge23(mkBroken23(ANCH23.noPhantom,
+        "        ? { shared: 0, worldOnly: mineArr.map(nameOf).filter(Boolean), worldOnlyTotal: mineArr.length, localOnly: [], localOnlyTotal: 0,"));
+      assert(jB23.noPhantom === false,
+        '（负向自证）把「对方缺面」当成空集后，本侧会拿**自己的账本**顶替对方差集，'
+        + '报出一个假的「我这边多出来 N 项」——正是要治的自指噪声');
+      assert(jB23.echoDistinct === true, '（负向自证）破坏二只动缺面处置，不连坐环归因');
+      const jC23 = judge23(mkBroken23(ANCH23.absentOnly,
+        "      if (!e.present || e.kind === 'null') { sections.absent++; absentList.push(e.field); }"));
+      assert(jC23.absentOnly === false,
+        '（负向自证）把「显式为空」也算进未外供后，absent 变成 3——「对方明确说没有」被报成「对方缺了这本账」');
+      const jD23 = judge23(mkBroken23(ANCH23.bounded, "      worldOnly: worldOnly,"));
+      assert(jD23.bounded === false, '（负向自证）去掉切片后明细变 40 条——读数进快照会让存档无界膨胀');
+      assert(jD23.echoDistinct === true, '（负向自证）破坏四只动有界性，不连坐环归因');
+      const jE23 = judge23(mkBroken23(ANCH23.keysHonest, "        missing: []"));
+      assert(jE23.keysHonest === false,
+        '（负向自证）把键集自证做成恒真（missing 恒为空）后，判据现形——'
+        + '否则「本侧读了上游没有的键」这类「测试绿而生产恒为空」的缺陷永不被抓');
+    } catch (e23) {
+      assert(false, '（负向自证）破坏副本构建失败：' + (e23 && e23.message));
+    }
+    console.log('  ✓ 八本账逐本三态（未外供/显式为空/有值互不相同）｜画像 absent 只数「压根没外供」');
+    console.log('  ✓ 三处对读面（透传对方已算好的差集，本侧不自算）｜缺口四态原样透传｜环归因 kind=echo');
+    console.log('  ✓ ★ 上游键集自证（取数键必须上游真有）｜对方缺面 ≠ 空集｜明细有界 + 总数取对方口径');
+    console.log('  ✓ 负向自证 5 项（原版对照 + 逐项现形 + 互不连坐）');
+  } // end v2.18.0 block
   } // end v2.11.0 block
   } // end v2.10.0 block
   } // end v2.9.0 block

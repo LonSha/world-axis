@@ -741,6 +741,23 @@
         out.absent = sum.absent; out.nullish = sum.nullish;
         out.verdict = diff.verdict; out.days = diff.days;
         out.worldDate = diff.worldDate; out.lonshaDate = diff.lonshaDate;
+        // [v2.18.0] 反向消费面扩到**九本账**：此前本侧只读对方快照的 `clock` 一个字段，
+        //   而对方外供的是八本账 + 一本对读读数。这里把账本画像、**上游键集自证**与三处对读面一并采出。
+        //   全部只读、可归因；任何一处缺位都如实标 absent，不当成「空」。
+        const lsum = WA.lonshaReader.ledgerSummary(read.snapshot);
+        out.ledgers = { total: lsum.total, sections: lsum.sections, absent: lsum.absentList,
+          echoPresent: lsum.echoPresent, echoExported: lsum.echoExported, entries: lsum.entries };
+        const lb = WA.lonshaReader.ledgerBridges(read.snapshot);
+        out.bridges = { echoKind: lb.echoKind, echoOk: lb.echoOk, echoReason: lb.echoReason,
+          shape: lb.echoShape, notice: lb.echoNotice, items: lb.items };
+        out.echoPresent = lsum.echoPresent;
+        // 上游键集自证：`readKeys` 是本侧认的键，`missing` 是上游其实没给的（真缺陷），
+        //   `unknown` 是上游给了、本侧还没消费的（漏读）。两者都上诊断面，不靠人肉核对。
+        out.echoKeys = (function () {
+          const sh = lb.echoShape || {};
+          return { readKeys: sh.readKeys || [], present: !!sh.present,
+            missing: sh.missing || [], unknown: sh.unknown || [] };
+        })();
       }
       return out;
     }, {});
@@ -1358,6 +1375,46 @@
           + (lsF.pluginVersion ? '，对方 ' + lsF.pluginVersion : '') + '）｜对账：' + vdTxt
           + (lsF.absent && lsF.absent.length ? '｜对方未外供 ' + lsF.absent.join('/') : '')
           + (lsF.nullish && lsF.nullish.length ? '｜对方显式为空 ' + lsF.nullish.join('/') : '') });
+      // [v2.18.0] 反向消费面扩到九本账后的**新增两行**：
+      //   ① 账本画像——对方给了几本、哪几本压根没给（未外供 ≠ 显式为空，两者处置相反）。
+      //   ② 对读面——对方的对读读数是**环**（反映的是「对方眼里的我」），必须单独念出来，
+      //      否则它会以「对方的世界」的形态混进剧情引用。
+      const lgs = lsF.ledgers || {};
+      if (lgs.total) {
+        const secs = lgs.sections || {};
+        out.push({ level: 'info', key: 'lonshaLedgers',
+          detail: '对方账本 ' + lgs.total + ' 本：有值 ' + (secs.value || 0) + '｜显式为空 ' + (secs.nullish || 0)
+            + '｜未外供 ' + (secs.absent || 0)
+            + ((lgs.absent && lgs.absent.length) ? '（' + lgs.absent.join('/') + '）' : '')
+            + '｜含对读读数 ' + (lgs.echoPresent ? '是' : '否') });
+      }
+      // 上游键集自证行：读的键上游是不是真有。**「上游没给」与「上游给了个空的」不同形**，
+      //   而「本侧读了上游没有的键」是真缺陷（真实联调恒为空、手工夹具却能喂绿）。
+      const eks = lsF.echoKeys || {};
+      if (eks.present) {
+        const missK = eks.missing || [], unkK = eks.unknown || [];
+        out.push({ level: missK.length ? 'warn' : 'info', key: 'lonshaEchoKeys',
+          detail: '对读读数键集：本侧认 ' + (eks.readKeys || []).length + ' 键，上游实给 '
+            + ((eks.readKeys || []).length - missK.length) + ' 键'
+            + (missK.length ? '｜⚠️ 本侧读了上游没有的 ' + missK.join('/') + '（那些读数在真实联调里恒为空）' : '')
+            + (unkK.length ? '｜上游另有本侧未消费的 ' + unkK.join('/') : '') });
+      }
+      const lbs = lsF.bridges;
+      if (lbs && lbs.items && lbs.items.length) {
+        const cmp = lbs.items.filter(function (x) { return x.comparable; });
+        const drift = cmp.reduce(function (a, x) { return a + (x.worldOnlyTotal || 0) + (x.localOnlyTotal || 0); }, 0);
+        const conf = lbs.items.reduce(function (a, x) { return a + (x.conflicts || 0); }, 0);
+        // 缺口支：缺口四态（full/complete/gapped/no-filter）必须念出来——尤其 `no-filter`
+        //   （上游没告诉我有没有缺口）与 `complete`（上游明确说没有缺口）不是一回事。
+        const gapIt = lbs.items.filter(function (x) { return x.id === 'currents'; })[0] || {};
+        const gv = gapIt.verdict || '';
+        out.push({ level: lgs.echoPresent ? 'warn' : 'info', key: 'lonshaBridges',
+          detail: '对读面 3 处（' + (lbs.echoKind === 'echo' ? 'kind=echo：对方读本扩展所得，非外部事实' : '对方未外供对读读数')
+            + '）｜可比 ' + cmp.length + '/3'
+            + (gv ? '｜缺口 ' + gv : '')
+            + (drift ? '｜差集 ' + drift + ' 项（两本账对不上，明细见诊断 JSON）' : '')
+            + (conf ? '｜位置冲突 ' + conf + ' 处' : '') });
+      }
     }
     // v0.1.6: 槽位落地摘要
     const inj = d.inject || {};

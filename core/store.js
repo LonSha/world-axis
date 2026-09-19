@@ -1705,6 +1705,9 @@
       //   两者是同一套互操作的两条边：只有发文没有读入，说明这个扩展只把世界摆在门口，
       //   却不看另一个插件记的那本账，「两个钟对不上」就永远没人发现。
       let lonshaAvailableN = false, lonshaVerdictN = '', lonshaDaysN = null;
+      // [v2.18.0] 反向消费面扩到九本账：账本画像 + 对读面（环有没有被认出来 / 三本账可比几处 / 差集多大）
+      let lonshaLedgersN = 0, lonshaAbsentLedgersN = 0, lonshaEchoPresentN = false;
+      let lonshaBridgesComparableN = 0, lonshaBridgeDriftN = 0, lonshaBridgeConflictN = 0;
       // ── 9.6 随机源（v2.14.0）──
       //   为什么健康分要看随机源：它本身不是「世界坏了」，但它决定**其余所有体检结论能不能被复核**。
       //   v2.13.0 让「长局里丢的是谁」可见，而丢的那个「谁」正是随机采样挑中的——
@@ -1770,7 +1773,7 @@
           }
         }
       } catch (eBd) { markDegraded('bridge', eBd); }
-      // ── 9.9 记忆桥消费面（v2.17.0）──
+      // ── 9.9 记忆桥消费面（v2.17.0 → v2.18.0 扩到九本账）──
       //   与 9.8 是同一套互操作的两条边。分级：读不到＝info（对方未装是常见合法配置，
       //   且 reason 已可归因，不必扣分）；两钟不一致＝info（不是故障——正文校准的钟与
       //   推演钟本来就各自演化，但它必须可见，否则「两边对不上」永远只是用户的感觉）。
@@ -1786,6 +1789,60 @@
             } else if (ldf.verdict === 'lonsha-empty') {
               issues.push({ level: 'info', key: 'lonsha', detail: '记忆桥已就绪，但对方尚未记录时间（等它即可，与本扩展的无公历钟是两件事）' });
             }
+            // [v2.18.0] 反向消费面扩到九本账 + **环归因**：本侧真正吃进来的是三类读数——
+            //   ① 对方给了几本账：`ledgers` 三态画像 + **上游键集自证**（`echoShape.missing` 非空
+            //      即说明本侧读了一个上游并不外供的键；那种缺陷在真实联调下恒为 absent，
+            //      却能靠手工夹具喂绿——正是「测试绿而生产不工作」）；
+            //   ② 环：`worldLedgerRead` 是对方**读本扩展**所得的投影，`kind='echo'`，
+            //      不是「对方的世界」——必须可见，否则会被当外部事实引用；
+            //   ③ 三处对读面：**透传**对方已算好的差集结论（本侧不自算，自算等于拿投影跟自己对账），
+            //      不可比时一律 0，绝不出现假的「我这边多出来 N 项」。
+            try {
+              const lsum = WA.lonshaReader.ledgerSummary(lrd.snapshot);
+              lonshaLedgersN = lsum.total; lonshaAbsentLedgersN = lsum.absentList.length;
+              lonshaEchoPresentN = !!lsum.echoPresent;
+              if (lsum.absentList.length) {
+                issues.push({ level: 'info', key: 'lonsha.ledgers',
+                  detail: '记忆桥：对方未外供 ' + lsum.absentList.length + ' 本账（' + lsum.absentList.join('/') + '）——'
+                    + '「没外供」与「显式为空」是两件事：前者本侧应降级，后者照常推演' });
+              }
+              const lb = WA.lonshaReader.ledgerBridges(lrd.snapshot);
+              if (lsum.echoPresent) {
+                issues.push({ level: 'info', key: 'lonsha.echo',
+                  detail: '对方外供了对读读数（' + WA.lonshaReader.ECHO_SECTION + '）——它反映的是**对方眼里的本扩展**，'
+                    + '不是「对方的世界」；引用前须认得这是环（kind=echo），别拿自己的投影当外部事实' });
+                // 上游键集自证：本侧**认**的键里，哪些上游其实没给（真缺陷）；上游给了哪些本侧还没读（漏读）。
+                const esh = lb.echoShape || {};
+                if (esh.missing && esh.missing.length) {
+                  issues.push({ level: 'warn', key: 'lonsha.echoKeys',
+                    detail: '对读读数：本侧读了上游并不外供的键 ' + esh.missing.join('/')
+                      + '——真实联调下这几处读数恒为空（测试夹具喂绿也改不了这一点）' });
+                }
+                if (esh.unknown && esh.unknown.length) {
+                  issues.push({ level: 'info', key: 'lonsha.echoNew',
+                    detail: '对读读数：上游多给了 ' + esh.unknown.length + ' 个本侧尚未消费的键（' + esh.unknown.join('/') + '）' });
+                }
+              }
+              const cmpB = lb.items.filter(function (x) { return x.comparable; });
+              lonshaBridgesComparableN = cmpB.length;
+              lonshaBridgeDriftN = cmpB.reduce(function (a, x) { return a + (x.worldOnlyTotal || 0) + (x.localOnlyTotal || 0); }, 0);
+              lonshaBridgeConflictN = lb.items.reduce(function (a, x) { return a + (x.conflicts || 0); }, 0);
+              if (lonshaBridgeDriftN > 0) {
+                issues.push({ level: 'info', key: 'lonsha.bridgeDrift',
+                  detail: '两本账对不上：对读面 ' + cmpB.length + '/3 可比，差集共 ' + lonshaBridgeDriftN
+                    + ' 项（明细由**对方**算出，本侧透传不重算）——只报差集，不合并、不覆盖' });
+              }
+              if (lonshaBridgeConflictN > 0) {
+                issues.push({ level: 'info', key: 'lonsha.bridgeConflict',
+                  detail: '对读面检出 ' + lonshaBridgeConflictN + ' 处**位置冲突**（两侧都记了、记的不一样）——'
+                    + '「一边没记」（one-sided）不算冲突，本侧不把两者混报' });
+              }
+              if (cmpB.length === 0 && lb.items.length) {
+                issues.push({ level: 'info', key: 'lonsha.bridgeUncomparable',
+                  detail: '对读面 3 处**全部不可比**——对方未外供对读读数，或本侧 store 尚无对应账本；'
+                    + '此时不得报「差集为 0」（那会被误读成「两边一致」）' });
+              }
+            } catch (eLb) { markDegraded('lonsha.ledgers', eLb); }
           } else {
             lonshaVerdictN = lrd.reason;
           }
@@ -1895,6 +1952,12 @@
             //   说明「读不到」这件事本身是**可归因**的（未装/未就绪/契约不匹配各有其名），
             //   而不是一个无名的 null。lonshaDays 为真不一致时的天数。
             lonshaAvailable: lonshaAvailableN, lonshaVerdict: lonshaVerdictN, lonshaDays: lonshaDaysN,
+            // [v2.18.0] 九本账面：对方给了几本 / 哪几本没给 / 对读面是不是环 / 三本账可比几处、差集多大、冲突几处。
+            //   lonshaEchoPresent=true **不是缺陷**（对方在读我是设计如此），但必须可见——
+            //   否则「对方眼里的我」会被当成「对方的世界」引用。
+            lonshaLedgers: lonshaLedgersN, lonshaAbsentLedgers: lonshaAbsentLedgersN, lonshaEchoPresent: lonshaEchoPresentN,
+            lonshaBridgesComparable: lonshaBridgesComparableN, lonshaBridgeDrift: lonshaBridgeDriftN,
+            lonshaBridgeConflict: lonshaBridgeConflictN,
           rescueRecovered: rs ? rs.recovered : 0,
           integrityMismatches: is ? is.mismatches : 0, integrityOk: is ? is.lastOk !== false : true
         }
