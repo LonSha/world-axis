@@ -94,12 +94,15 @@ function hasMember(ns, mem) {
 // ── 5. 引用面：静态扫描产品代码 ──
 function productFiles() {
   const out = [];
+  // v2.22.0: `tools/` 是零依赖诊断脚本（scan_drift 等），不导出命名空间、不属产品模块面；
+  //   与 tests/ 同例排除，否则每个诊断脚本都会以「未登记模块」形式挂在清册上（假阳性）。
+  const SKIP_DIRS = ['tests', 'tools'];
   (function walk(dir) {
     fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
       if (e.name === '.git' || e.name === 'node_modules') return;
       const p = path.join(dir, e.name);
       if (e.isDirectory()) return walk(p);
-      if (e.name.endsWith('.js') && dir !== path.join(BASE, 'tests')) out.push(path.relative(BASE, p));
+      if (e.name.endsWith('.js') && SKIP_DIRS.indexOf(path.relative(BASE, dir)) < 0) out.push(path.relative(BASE, p));
     });
   })(BASE);
   return out.sort();

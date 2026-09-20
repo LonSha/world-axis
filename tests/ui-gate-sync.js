@@ -149,4 +149,87 @@ async function checkClickable(env, opts) {
   out.rejections = seen;
   return out;
 }
-module.exports = { fresh: fresh, checkPages: checkPages, checkClickable: checkClickable, BASE: BASE, UI_FILES: UI_FILES };
+// v2.22.0: 展示映射漂移探针（第十面）。UI 层另有一类**静态**缺陷，运行期探针抓不到：
+//   ui/panel.js 里的枚举→徽章/配色映射、桶→中文标签映射，都是「第二份真源」，与引擎侧
+//   枚举/桶集各写一遍。引擎新增一个枚举值或一个失败桶时，UI 侧若不同步，映射就**静默回退**
+//   （`|| '⚪'` / `|| k`）——用户看到的是错误的徽章色、或裸露的英文桶名。这类缺陷运行期
+//   「不抛不报」，G17/G18 全绿也照不出，只能靠「UI 映射键集 ⊇ 引擎真源键集」的源码级比对。
+//   同族先例：tool-analyzer v0.9.6 曾因气候枚举未对齐 evolution.ECONOMY_CLIMATE 自纠。
+// 口径：引擎真源从源码提取（枚举常量 / 记账桶声明 ∪ 调用点字面量标签）；UI 键集从映射对象
+//   字面量提取（纯文本正则，不用 eval——值里可能有模板串/简写属性）。
+//   opts.srcOverride 可替换某文件源码，供负向自证（注入一处漂移，判据必须现形）。
+function _wdRead(rel, override) {
+  if (override && override[rel] !== undefined) return override[rel];
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
+function _wdObjAt(src, anchor) {
+  const t0 = src.indexOf(anchor);
+  if (t0 < 0) throw new Error('drift: anchor not found: ' + anchor);
+  const s = anchor.indexOf('{') >= 0 ? src.indexOf('{', t0) : src.lastIndexOf('{', t0);
+  if (s < 0) throw new Error('drift: no brace for: ' + anchor);
+  let d = 0;
+  for (let i = s; i < src.length; i++) {
+    if (src[i] === '{') d++;
+    else if (src[i] === '}') { d--; if (d === 0) return src.slice(s, i + 1); }
+  }
+  throw new Error('drift: unbalanced: ' + anchor);
+}
+function _wdKeysOf(lit) {
+  const body = lit.slice(1, -1), keys = [];
+  const RE = /(?:^|[,{])\s*(?:'([^']*)'|"([^"]*)"|([A-Za-z_$][\w$]*))\s*:/g;
+  let m; while ((m = RE.exec(body))) keys.push(m[1] !== undefined ? m[1] : (m[2] !== undefined ? m[2] : m[3]));
+  return keys;
+}
+function _wdArr(txt, name) {
+  const m = txt.match(new RegExp(name + ' = (\\[[^\\]]*\\])'));
+  if (!m) throw new Error('drift: cannot find ' + name);
+  return vm.runInNewContext('(' + m[1] + ')');
+}
+// 返回 {groups:[{name, missing, ghost, ok}], failures:[...]}
+function checkSrcMaps(opts) {
+  opts = opts || {};
+  const ov = opts.srcOverride || {};
+  const panel = _wdRead('ui/panel.js', ov);
+  const evo = _wdRead('engines/evolution.js', ov);
+  const inj = _wdRead('render/inject.js', ov);
+  const sb = _wdRead('core/settings-bus.js', ov);
+  const st = _wdRead('core/store.js', ov);
+
+  const groups = [];
+  function check(name, uiKeys, engKeys) {
+    const missing = engKeys.filter(function (k) { return uiKeys.indexOf(k) < 0; });
+    const ghost = uiKeys.filter(function (k) { return engKeys.indexOf(k) < 0; });
+    groups.push({ name: name, missing: missing, ghost: ghost, ui: uiKeys.length, eng: engKeys.length, ok: !missing.length && !ghost.length });
+  }
+  // 枚举映射（引擎常量 ↔ UI 键集）
+  check('factionBadge', _wdKeysOf(_wdObjAt(panel, "'鼎盛':'")), _wdArr(evo, 'FACTION_STATUS'));
+  check('relBadge', _wdKeysOf(_wdObjAt(panel, "'血盟':'")), _wdArr(evo, 'FACTION_RELATION'));
+  check('repColor', _wdKeysOf(_wdObjAt(panel, "'万众敬仰':'")), _wdArr(evo, 'REPUTATION_LEVELS'));
+  check('ecoColor', _wdKeysOf(_wdObjAt(panel, "'繁荣':'")), _wdArr(evo, 'ECONOMY_CLIMATE'));
+  check('renderDirector', _wdKeysOf(_wdObjAt(panel, "clock:'世界时间'")), _wdArr(inj, 'SOURCES'));
+  // 记账桶标签映射（声明桶 ∪ 调用点字面量标签 ↔ UI 键集）
+  function declKeys(anchor) { return _wdKeysOf(_wdObjAt(sb, anchor)); }
+  function callTags(fn) { const s = []; const RX = new RegExp(fn + "\\(\\s*'([^']+)'", 'g'); let mm; while ((mm = RX.exec(sb))) if (s.indexOf(mm[1]) < 0) s.push(mm[1]); return s; }
+  function uni(a, b) { return Array.from(new Set(a.concat(b))).sort(); }
+  check('WS_LABEL', _wdKeysOf(_wdObjAt(panel, 'missingKey: ')), uni(declKeys('missingKey: 0, stringify: 0'), callTags('noteFail')));
+  check('rSrcTxt', _wdKeysOf(_wdObjAt(panel, "guarded: '删完仍在'")), uni(declKeys('guarded: 0, missing: 0'), callTags('noteRemoveFail')));
+  check('rdSrcTxt', _wdKeysOf(_wdObjAt(panel, "read: '存储层读取'")), uni(declKeys('read: 0, parse: 0, migrate: 0, copy: 0'), callTags('noteReadFail')));
+  // store 读侧：noteStoreReadFail 字面量 ∪ 各模块 store.reportReadFail 投递点
+  const stTags = [];
+  { const RX = /noteStoreReadFail\(\s*'([^']+)'/g; let mm; while ((mm = RX.exec(st))) if (stTags.indexOf(mm[1]) < 0) stTags.push(mm[1]); }
+  ['index.js', 'core/workflow.js', 'engines/worldbook.js', 'engines/chatcache.js', 'engines/tool-diag.js', 'render/inject.js'].forEach(function (f) {
+    const t = _wdRead(f, ov);
+    const RX = /report(?:Host)?ReadFail\(\s*'([^']+)'/g; let mm;
+    while ((mm = RX.exec(t))) if (stTags.indexOf(mm[1]) < 0) stTags.push(mm[1]);
+    const RX3 = /noteRead\(\s*'([^']+)'/g; let m3;
+    while ((m3 = RX3.exec(t))) if (stTags.indexOf(m3[1]) < 0) stTags.push(m3[1]);
+  });
+  check('LAB_P', _wdKeysOf(_wdObjAt(panel, "bytes: '按字节'")), stTags.sort());
+
+  const failures = [];
+  groups.forEach(function (g) {
+    if (!g.ok) failures.push(g.name + (g.missing.length ? ' 缺键[' + g.missing.join('、') + ']' : '') + (g.ghost.length ? ' 幽灵键[' + g.ghost.join('、') + ']' : ''));
+  });
+  return { groups: groups, failures: failures };
+}
+module.exports = { fresh: fresh, checkPages: checkPages, checkClickable: checkClickable, checkSrcMaps: checkSrcMaps, BASE: BASE, UI_FILES: UI_FILES };

@@ -7,6 +7,9 @@ const __uiGateFresh = __uiGate.fresh, __uiGateCheckPages = __uiGate.checkPages;
 // v2.21.0: 控件可点性探针（第九面）。与 checkPages 互补：checkPages 管「控件成树」，
 //   checkClickable 管「控件被点会不会抛」——同步抛出 + 未处理 Promise 拒绝两面合一。
 const __uiGateCheckClickable = __uiGate.checkClickable;
+// v2.22.0: 展示映射漂移探针（第十面）。源码级比对「UI 映射键集 ⊇ 引擎枚举/桶集」，
+//   抓运行期不抛不报、G17/G18 照不出的静态漂移（错误的徽章色 / 裸露桶名）。
+const __uiGateCheckSrcMaps = __uiGate.checkSrcMaps;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -9808,7 +9811,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.22.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10352,7 +10355,7 @@ assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.21.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.22.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10643,7 +10646,7 @@ assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.21.0', '入口版本为 2.21.0（实 ' + ver + '）');
+    assert(ver === '2.22.0', '入口版本为 2.21.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11166,7 +11169,7 @@ assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.21.0', '入口版本为 2.21.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.22.0', '入口版本为 2.21.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11554,7 +11557,7 @@ assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.21.0', '入口版本为 2.21.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.22.0', '入口版本为 2.21.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11924,7 +11927,7 @@ assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.21.0', '入口版本为 2.21.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.22.0', '入口版本为 2.21.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12289,7 +12292,7 @@ assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.21.0', '入口版本为 2.21.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.22.0', '入口版本为 2.21.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -12508,6 +12511,60 @@ assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单�
     assert(__uiGateRes.fail === 0, '（正向）UI 渲染路径门禁全绿（渲染器/绑定/条件渲染均真实执行）', __uiGateRes.failures.join('；'));
     pass += __uiGateRes.pass;
     fail += __uiGateRes.fail;
+  }
+  // ══════════════════════════════════════════════════════════════════
+  // v2.22.0 块：展示映射漂移（第十面：UI 展示层与引擎真源的键集契约）
+  //
+  // 命题：前九面把写侧/删侧/读侧/活性面/渲染路径/控件可点性逐一收口，观测面完备。
+  //   但 UI 展示层还藏着一类**静态**缺陷——「第二份真源」：
+  //     · 枚举 → 徽章/配色映射（factionBadge/relBadge/repColor/ecoColor）
+  //     · 可见性源 → 中文标签（renderDirector）
+  //     · 失败桶/读来源 → 中文标签（WS_LABEL/rSrcTxt/rdSrcTxt/LAB_P）
+  //   这些映射在 ui/panel.js 里各写一遍，与引擎侧枚举常量、记账桶集并存。引擎一方
+  //   新增枚举值或桶时，UI 一方若不同步，映射**静默回退**（`|| '⚪'` / `|| k`）——
+  //   用户看到错误的徽章色、或裸露的英文桶名。此类缺陷运行期不抛不报，G17/G18 全绿
+  //   也照不出（这正是本版实测到 6 组漂移却无一条自动化报警的原因）。
+  //   同族先例：tool-analyzer v0.9.6 曾因气候枚举未对齐 evolution.ECONOMY_CLIMATE 自纠。
+  // 判据：UI 映射键集 == 引擎真源键集（缺键=静默回退；幽灵键=永不命中）。真源一律从源码
+  //   提取：枚举取常量数组；记账桶取「声明桶 ∪ 调用点字面量标签」（三者均动态建桶）。
+  section('v2.22.0 块：展示映射漂移（UI 键集 == 引擎真源键集，含负向自证）');
+  {
+    const SM_FILES = ['ui/panel.js', 'engines/evolution.js', 'render/inject.js', 'core/settings-bus.js', 'core/store.js'];
+    const smSrcs = {};
+    SM_FILES.forEach(function (f) { smSrcs[f] = fs.readFileSync(path.join(BASE, f), 'utf8'); });
+    const smBase = __uiGateCheckSrcMaps();
+    smBase.groups.forEach(function (g) {
+      assert(g.ok, '（正向）' + g.name + ' 键集与引擎真源一致（ui ' + g.ui + ' / eng ' + g.eng + '）',
+        g.missing.length || g.ghost.length ? ('缺键[' + g.missing.join('、') + '] 幽灵键[' + g.ghost.join('、') + ']') : '');
+    });
+    assert(smBase.failures.length === 0, '（正向）六组枚举/标签映射零漂移', smBase.failures.join('；'));
+    // 负向自证：判据必须抓得住「引擎加了值但 UI 没跟」与「UI 自造了引擎没有的键」两类漂移。
+    //   ① 枚举漂移：把 ecoColor 的引擎真值「衰退」改写成幽灵键「萧条」⇒ 缺键 + 幽灵键双向现形。
+    const Q = String.fromCharCode(39);
+    const smDoc1 = smSrcs['ui/panel.js'].replace(
+      Q + '平稳' + Q + ':' + Q + '#2196f3' + Q + ',' + Q + '衰退' + Q,
+      Q + '平稳' + Q + ':' + Q + '#2196f3' + Q + ',' + Q + '萧条' + Q);
+    assert(smDoc1 !== smSrcs['ui/panel.js'], '（负向自证）枚举漂移注入点命中（ecoColor 衰退→萧条）');
+    const smNeg1 = __uiGateCheckSrcMaps({ srcOverride: { 'ui/panel.js': smDoc1 } });
+    assert(smNeg1.failures.length > 0, '（负向）枚举漂移被判据抓到（实 ' + smNeg1.failures.length + ' 组）');
+    assert(smNeg1.failures.join('').indexOf('衰退') > 0 && smNeg1.failures.join('').indexOf('萧条') > 0,
+      '（负向）缺键与幽灵键双向现形');
+    //   ② 桶标签漂移：删掉 WS_LABEL 的 verify 键 ⇒ 与 settings-bus.writeFailedBy 失配。
+    const smDoc2 = smSrcs['ui/panel.js'].replace(
+      ',' + '\n' + '            verify: ' + Q + '写后读回不一致' + Q,
+      '');
+    assert(smDoc2 !== smSrcs['ui/panel.js'], '（负向自证）桶标签漂移注入点命中（WS_LABEL 删 verify）');
+    const smNeg2 = __uiGateCheckSrcMaps({ srcOverride: { 'ui/panel.js': smDoc2 } });
+    assert(smNeg2.failures.length > 0 && smNeg2.failures.join('').indexOf('verify') > 0,
+      '（负向）桶标签漂移被判据抓到（WS_LABEL 缺 verify）');
+    //   ③ 真源漂移：引擎侧新增一个枚举值 ⇒ UI 缺键必须现形（扫的是引擎源码，不是 UI 副本）。
+    const smDoc3 = smSrcs['engines/evolution.js'].replace('FACTION_STATUS = [', 'FACTION_STATUS = [' + Q + '新兴' + Q + ',');
+    assert(smDoc3 !== smSrcs['engines/evolution.js'], '（负向自证）引擎真源漂移注入点命中');
+    const smNeg3 = __uiGateCheckSrcMaps({ srcOverride: { 'engines/evolution.js': smDoc3 } });
+    assert(smNeg3.failures.length > 0 && smNeg3.failures.join('').indexOf('新兴') > 0,
+      '（负向）引擎新增枚举值而 UI 未跟 ⇒ 缺键现形');
+    console.log('  ✓ 十面门禁：UI 展示映射键集 == 引擎真源键集（' + smBase.groups.length + ' 组）');
+    console.log('  ✓ 负向自证：枚举漂移 / 桶标签漂移 / 真源漂移均被源码级判据抓到');
   }
   // ══════════════════════════════════════════════════════════════════
   // v2.14.0 块：随机源治理（第八面：可复现性）

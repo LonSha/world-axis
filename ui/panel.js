@@ -307,10 +307,13 @@
     const esc = t => String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
     // 势力徽章色
-    const factionBadge = st => ({'鼎盛':'🟡','强盛':'🟢','平稳':'⚪','衰退':'🟠','动荡':'🔴','瓦解':'⚫'}[st]||'⚪');
+    // v2.22.0: 键集必须等于 evolution.FACTION_STATUS（鼎盛|稳固|倾轧|困顿|衰落|瓦解）。
+    //   此前写的是另一套自造枚举（强盛/平稳/衰退/动荡）⇒ 引擎真值 4/6 回退默认 ⚪，
+    //   徽章色与势力状态**无关**（用户可见的错误呈现）。同族先例见 tool-analyzer v0.9.6。
+    const factionBadge = st => ({'鼎盛':'🟡','稳固':'🟢','倾轧':'🔵','困顿':'🟠','衰落':'🔴','瓦解':'⚫'}[st]||'⚪');
     const relBadge = r => ({'血盟':'💞','盟友':'🤝','友好':'😊','中立':'😐','冷淡':'😒','敌对':'⚔️','世仇':'💀'}[r]||'😐');
-    const repColor = l => ({'万众敬仰':'#4caf50','受人敬重':'#8bc34a','小有名气':'#ffc107','默默无闻':'#9e9e9e','声名狼藉':'#ff5722','天怒人怨':'#f44336'}[l]||'#9e9e9e');
-    const ecoColor = c => ({'繁荣':'#4caf50','平稳':'#2196f3','萧条':'#ff9800','危机':'#f44336'}[c]||'#2196f3');
+    const repColor = l => ({'万众敬仰':'#4caf50','受人尊敬':'#8bc34a','默默无闻':'#9e9e9e','声名狼藉':'#ff5722','天怒人怨':'#f44336'}[l]||'#9e9e9e');
+    const ecoColor = c => ({'繁荣':'#4caf50','平稳':'#2196f3','衰退':'#ff9800','动荡':'#f44336'}[c]||'#2196f3');
 
     // v2.11.0: 编辑态接线——`editorFaction.getEditingId` / `editorEvents.getEditingId` 此前
     //   全库零调用（真功能断链）：编辑器把「我在改哪一项」存在模块级变量里，但那个变量
@@ -428,7 +431,7 @@
     const plan = WA.oracle.plan;
     return `
       <div class="wa-sec">注入可见性（哪些世界信息递给正文）</div>
-      ${WA.render.SOURCES.map(k => `<label class="wa-node"><input type="checkbox" data-vis="${k}" ${vis[k] ? 'checked' : ''}/><span class="wa-node-label">${({clock:'世界时间',background:'世界背景',people:'人物',currents:'暗流',echoes:'回声',memory:'记忆',opinion:'舆情'})[k] || k}</span></label>`).join('')}
+      ${WA.render.SOURCES.map(k => `<label class="wa-node"><input type="checkbox" data-vis="${k}" ${vis[k] ? 'checked' : ''}/><span class="wa-node-label">${({clock:'世界时间',background:'世界背景',people:'人物',currents:'暗流',echoes:'回声',memory:'记忆',opinion:'舆情',pulse:'世界脉搏',ledger:'重大事件账本',digest:'世界推演'})[k] || k}</span></label>`).join('')}
       <div class="wa-sec">剧情引导（弧线/序列）</div>
       ${plan ? `<div class="wa-item"><b>${esc(plan.kind === 'arc' ? '弧线' : '序列')}</b> 第${plan.current + 1}/${plan.beats.length}拍<div class="wa-dim">${esc((WA.oracle.currentBeat() || {}).goal || '')}</div><button class="wa-btn wa-mini" id="wa-beat-next">完成本拍</button><button class="wa-btn wa-mini" id="wa-plan-clear">放弃</button></div>`
         : `<textarea id="wa-plan-beats" class="wa-ta" placeholder="每行一拍的目标/指令…"></textarea><button class="wa-btn" id="wa-plan-start">开始序列引导</button>`}
@@ -1036,7 +1039,8 @@
           //   「保存未落盘」——那会让「迁移回写失败」这类故障被读成「你没点保存」。
           const WS_LABEL = { missingKey: '登记项缺key(实现缺陷)', stringify: '值不可序列化(实现缺陷)',
             setItem: '写盘被拒', writeback: '迁移回写', rawRevive: '格式复活',
-            quarantine: '隔离副本', legacy: '旧键迁移', stamp: '结构指纹' };
+            quarantine: '隔离副本', legacy: '旧键迁移', stamp: '结构指纹',
+            verify: '写后读回不一致' };
           const wBy2 = wSt.bySource || {};
           const wSrcTxt = Object.keys(wBy2).filter(function (k) { return wBy2[k] > 0; })
             .map(function (k) { return (WS_LABEL[k] || k) + '×' + wBy2[k]; }).join('、');
@@ -1080,7 +1084,7 @@
           } else if (rmSt.lastRemoveError) {
             const byR = rmSt.removeFailedBy || {};
             const rSrcTxt = Object.keys(byR).filter(function (k) { return byR[k] > 0; })
-              .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口' }[k] || k) + '×' + byR[k]; }).join('、');
+              .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口', verifyBack: '写后/删后复核读回' }[k] || k) + '×' + byR[k]; }).join('、');
             html += '<div class="wa-log wa-log-warn">删除侧：最近一次删除未成功（' + esc(String(rmSt.lastRemoveError)) + '）'
               + '；本会话累计 ' + rmSt.removeFailed + ' 次未成功、' + rmSt.removes + ' 次成功'
               + (rSrcTxt ? '（来源：' + esc(rSrcTxt) + '）' : '')
@@ -1102,7 +1106,10 @@
           } else if (rdSt.readFailed > 0) {
             const byRd = rdSt.bySource || {};
             const rdSrcTxt = Object.keys(byRd).filter(function (k) { return byRd[k] > 0; })
-              .map(function (k) { return ({ read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝' }[k] || k) + '×' + byRd[k]; }).join('、');
+              .map(function (k) { return ({ read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝',
+              rmExisted: '受控删除的存在性探测', verifyBack: '写后/删后复核读回', legacyRead: 'legacy 旧键读取',
+              saveInherit: '保存时继承结构指纹', subkeyAudit: '子键缺口盘点', pendingOrphan: '幽灵键盘点',
+              verifyDefaults: '默认值声明校验', lsRaw: '幽灵设置盘点原文' }[k] || k) + '×' + byRd[k]; }).join('、');
             html += '<div class="wa-log wa-log-warn">读取侧：' + rdSt.readFailed + ' 次读取未命中用户配置'
               + (rdSrcTxt ? '（来源：' + esc(rdSrcTxt) + '）' : '')
               + (rdSt.lastError ? '，最近：' + esc(String(rdSt.lastError).slice(0, 80)) : '') + '。</div>';
@@ -1172,9 +1179,7 @@
             verify: '写后/删后复核读回', recovery: '恢复点清单', conflict: '冲突现场',
             quarantine: '隔离现场', writerId: '写入者标识',
             load: '存档载入', saveConflict: '并发覆盖前保全', verifyState: '存档巡检',
-            rmExisted: '删除前探测', verifyBack: '复核读回', legacyRead: '旧键读取',
-            saveInherit: '指纹继承', subkeyAudit: '子键盘点', pendingOrphan: '幽灵盘点',
-            verifyDefaults: '默认值校验', lsRaw: '幽灵原文', chatcacheState: '聊天快照',
+            readSpotCheck: '诊断抽查列目录', chatcacheState: '聊天快照',
             chatcacheRev: '同步序号', chatcacheInstallBack: '安装回读',
             worldbookSelection: '世界书选择', workflowHistory: '工作流历史',
             uninjectLedger: '撤销账本', eventLog: '事件日志', errorLog: '错误日志' };
