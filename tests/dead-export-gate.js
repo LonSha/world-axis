@@ -68,59 +68,34 @@ function nsToFile() {
   Object.keys(inv).forEach(function (f) { out[inv[f]] = f; });
   return out;
 }
-// v2.28.0：读侧与判定侧必须共用同一份剥离口径（单源）。
-//   · 产品侧 referenceCounts 用 stripNonCode 过滤注释/字符串 —— 与 inventory.js 的 inComment 口径同向；
-//   · selfUsed 也用同一份剥离，而不是裸正则。
-//   若两处各写一份剥离实现，就会出现「门禁说 self-only、证据说 refs>0」这类自相矛盾。
-function stripNonCode(src) {
-  let out = '';
-  let i = 0;
-  let state = 'code';
-  const n = src.length;
-  while (i < n) {
-    const c = src[i];
-    const d = src[i + 1];
-    if (state === 'code') {
-      if (c === '/' && d === '/') { state = 'line'; i += 2; out += '  '; continue; }
-      if (c === '/' && d === '*') { state = 'block'; i += 2; out += '  '; continue; }
-      if (c === "'" || c === '"' || c === '`') {
-        state = (c === "'" ? 'sq' : c === '"' ? 'dq' : 'tpl');
-        i += 1; out += ' '; continue;
-      }
-      out += c; i += 1; continue;
-    }
-    if (state === 'line') {
-      if (c === '\n') { state = 'code'; out += '\n'; } else { out += ' '; }
-      i += 1; continue;
-    }
-    if (state === 'block') {
-      if (c === '*' && d === '/') { state = 'code'; i += 2; out += '  '; }
-      else { out += (c === '\n' ? '\n' : ' '); i += 1; }
-      continue;
-    }
-    const q = state === 'sq' ? "'" : state === 'dq' ? '"' : '`';
-    if (c === '\\') { out += '  '; i += 2; continue; }
-    if (c === q) { state = 'code'; i += 1; out += ' '; continue; }
-    out += (c === '\n' ? '\n' : ' ');
-    i += 1; continue;
-  }
-  return out;
-}
-// 计数：word-boundary 匹配，剔除注释与字符串（**仅**用于 own —— 判断「算不算自用」）
+// v2.29.0：剥离口径**只有一个来源**——tests/inventory.js 的 codeFace（真代码面）。
+//   本文件不再自写剥离器：旧 stripNonCode 不识别正则字面量，遇字符类正则会跨行失步、
+//   把其后整段真代码剥成空格（实测 ui/settings.js 39 处真引用只留 1 处），
+//   于是「门禁说 refs=0、其实那行代码真在跑」——探测器坏了比缺陷更危险。
+
+// 计数：word-boundary 匹配，**只在真代码面上**（仅用于 own —— 判断「算不算自用」）
+// v2.29.0：剥离器从自写的 stripNonCode 换成清册同源的 inventory.codeFace。
+//   旧 stripNonCode 不识别正则字面量，遇到 `/[&<>"]/` 这类会进字符串态且**跨行失步**，
+//   把其后整段真代码剥成空格：实测 ui/settings.js 保留 39 处真引用中的 1 处（丢 38），
+//   ui/panel.js 丢 58，engines/tool-snapshot.js 丢 1 —— 即「证据少算」。
 function countRefs(src, mem) {
   const re = new RegExp('(?<![\\w$])' + escapeRe(mem) + '(?![\\w$])', 'g');
   let n = 0;
   let m;
-  const clean = stripNonCode(src);
+  const clean = inventory.codeFace(src);
   while ((m = re.exec(clean))) n += 1;
   return n;
 }
-// 产品侧引用数（清册 REF_RE 口径：`WA` 取成员，注释里提到也计——须与冻结判据同宽，独立实现避免漂移）
+// 产品侧引用数（清册 REF_RE × 清册 codeFace —— 与冻结判据同宽，独立实现避免漂移）
+// v2.29.0：**只在真代码面**上计数。此前直接扫原文，把注释与字符串文本里的 `WA.ns.mem`
+//   也算成引用，于是「加一行注释」就能把冻结项伪装成「已被消费」，而同一条目在账本里
+//   的 refs 仍是 0 ⇒ evidenceDrift 报「证据失实」⇒ 门禁反而逼人跑 --update 抹掉它。
 function refCountIn(src) {
   const out = Object.create(null);
   const re = new RegExp(inventory.REF_RE.source, 'g');
   let m;
-  while ((m = re.exec(src))) {
+  const code = inventory.codeFace(src);
+  while ((m = re.exec(code))) {
     const ns = m[1];
     const mem = m[2];
     const k = ns + '.' + mem;
@@ -148,7 +123,7 @@ function testRefCount(rec) {
   try { src = fs.readFileSync(path.join(__dirname, 'run.js'), 'utf8'); } catch (e) { return 0; }
   return (refCountIn(src)[keyOf(rec)] || 0);
 }
-// 定义文件内部对该成员名的**真代码**自用数（剥注释/字符串：注释里提到名字不算使用）
+// 定义文件内部对该成员名的**真代码**自用数（真代码面：注释里提到名字不算使用）
 function ownRefCount(rec) {
   const rel = nsToFile()[rec.ns];
   if (!rel) return 0;
@@ -271,7 +246,17 @@ function evidenceDrift(result, ledger) {
       });
       const rec = now[k];
       if (!rec) return;
-      const ev = evidenceOf(rec);
+      // v2.28.0：逐条**异常隔离**。证据复算会读盘（定义文件、产品文件、tests/run.js），
+      //   单个文件读失败/不可解析不能让整个门禁抛栈中断（那会让「读不到证据」退化成
+      //   「门禁挂了」，其余条目的失实全部无人过问）。失败即**记一条失实**——不许静默跳过：
+      //   「算不出来」与「算出来不符」在红灯面上一视同仁。
+      let ev;
+      try {
+        ev = evidenceOf(rec);
+      } catch (e) {
+        out.push({ kind: kind, key: k, field: '（复算）', detail: '证据复算失败（' + (e && e.message ? e.message : e) + '）——算不出来不得当作算过' });
+        return;
+      }
       EVIDENCE_KEYS.forEach(function (f) {
         if (item[f] === undefined) return;
         if (item[f] !== ev[f]) {
@@ -394,4 +379,4 @@ module.exports = { LEDGER_PATH: LEDGER_PATH, FROZEN_KINDS: FROZEN_KINDS, ADVISOR
   judge: judge, classify: classify, detailOf: detailOf, selfUsed: selfUsed, nsToFile: nsToFile, keyOf: keyOf,
   versionOf: versionOf, versionNotes: versionNotes, metadataProblems: metadataProblems, evidenceDrift: evidenceDrift,
   evidenceOf: evidenceOf, countRefs: countRefs, ownRefCount: ownRefCount, refCountIn: refCountIn,
-  referenceCounts: referenceCounts, testRefCount: testRefCount, stripNonCode: stripNonCode, report: report };
+  referenceCounts: referenceCounts, testRefCount: testRefCount, report: report };

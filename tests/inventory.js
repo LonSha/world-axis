@@ -11,7 +11,8 @@
 //
 // 口径说明（避免假阳性）：
 //   · 定义面取**运行时对象**（vm 装载后 Object.keys），不解析源码对象字面量——不会因换行/注释误判；
-//   · 引用面取**静态正则**（含注释：注释里写错的名字同样是文档债，一并列出但单独标记）；
+//   · 引用面取**静态正则**（v2.29.0 起只在**真代码面**上跑：注释与字符串文本里的
+//     `WA.ns.mem` 不算引用——否则「加一行注释」即可把死子面静默改小，见 codeFace 注释）；
 //   · 「零引用」只在**产品代码**内判定；测试引用单独统计（仅测试调用 ≠ 产品调用，但也不等于死）。
 
 'use strict';
@@ -62,6 +63,85 @@ const PROD = productFiles();
 // 引用面正则：`WA.x.y` 与可选链 `WA.x?.y` 都算真引用；私有成员（`_` 前缀）与
 // 非接口命名空间（宿主级导出、数组下标）在下面两道 guard 里挡掉。
 const REF_RE = /WA\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g;
+
+// v2.29.0 — 真代码面提取器（codeFace）。
+// 为什么需要它：引用面的**输入**必须是「真会被执行的代码」，不能是「文件里出现过的字符」。
+//   · 注释里写 `WA.bridge.snapshot` 只是文档债，不是消费方；
+//   · 字符串字面量里的 `WA.ns.mem`（诊断提示文本、模板 HTML、规则说明）同理。
+//   旧口径只按「行首是不是 // * /*」判注释，于是三处漏判：
+//     ① 行尾注释（`wa.x.y(); // WA.a.b 已接通`）——行首不是注释标记，整行计入引用；
+//     ② 字符串字面量——写成文本的成员名被当成调用；
+//     ③ 模板字符串里**嵌在 ${} 中的真代码**——这才是真引用，但朴素剥离会把它一起剥掉。
+//   实测：在任一产品文件末尾加一行 `// 外部可调 WA.bridge.snapshot` ⇒ 冻结面 208→207，
+//   门禁照样输出 ✓（「已登记的死导出消失 1 项」只提示、不红灯），跑一次 --update 就把
+//   该条目从账本删除——**死子面被一行注释永久掏空**，比 v2.27.0 治的「新增无人提示」更隐蔽。
+// 做法：单遍状态机（长度与行号守恒，原位空格替换，行号仍可与原文对照）。
+//   状态：code / line / block / sq / dq / tpl；
+//   · 模板字符串的**文本**不是代码，但 `${ ... }` 内的表达式**是代码**（用 brace 计数配对）；
+//   · 单双引号串遇换行即终止（JS 语义：未闭合的单双引号是语法错误）；
+//   · `/` 是正则字面量还是除法：看前一个非空白代码字符（`( , = : [ ! & | ? { } ; + - * % < > ~ ^` 之后为正则）。
+//   保真性靠「长度守恒 + 行数守恒」自检（tests/run.js 的 v2.29.0 块钉住）。
+function codeFace(src) {
+  let out = '';
+  const n = src.length;
+  const stack = [{ kind: 'code', brace: -1 }];   // brace>=0 表示这一层由 ${ 进入
+  const CONT = '(),=:[!&|?{};+-*%<>~^/\n \t';
+  let i = 0;
+  while (i < n) {
+    const c = src[i], d = src[i + 1];
+    const st = stack[stack.length - 1];
+    if (st.kind === 'code') {
+      if (c === '/' && d === '/') { stack.push({ kind: 'line', brace: st.brace }); out += '  '; i += 2; continue; }
+      if (c === '/' && d === '*') { stack.push({ kind: 'block', brace: st.brace }); out += '  '; i += 2; continue; }
+      if (c === '/') {
+        let j = out.length - 1;
+        while (j >= 0 && (out[j] === ' ' || out[j] === '\t' || out[j] === '\n')) j -= 1;
+        const prev = j >= 0 ? out[j] : '';
+        if (prev === '' || CONT.indexOf(prev) >= 0) {
+          let k = i + 1, inClass = false, ok = false;
+          while (k < n) {
+            const e = src[k];
+            if (e === '\\') { k += 2; continue; }
+            if (e === '[') inClass = true;
+            else if (e === ']') inClass = false;
+            else if (e === '/' && !inClass) { ok = true; break; }
+            else if (e === '\n') break;
+            k += 1;
+          }
+          if (ok) { while (i <= k) { out += (src[i] === '\n' ? '\n' : ' '); i += 1; } continue; }
+        }
+        out += c; i += 1; continue;
+      }
+      if (c === "'") { stack.push({ kind: 'sq', brace: -1 }); out += ' '; i += 1; continue; }
+      if (c === '"') { stack.push({ kind: 'dq', brace: -1 }); out += ' '; i += 1; continue; }
+      if (c === '`') { stack.push({ kind: 'tpl', brace: -1 }); out += ' '; i += 1; continue; }
+      if (c === '{' && st.brace >= 0) { st.brace += 1; out += c; i += 1; continue; }
+      if (c === '}' && st.brace >= 0) {
+        if (st.brace === 0) { stack.pop(); out += ' '; i += 1; continue; }   // 插值结束，回模板
+        st.brace -= 1; out += c; i += 1; continue;
+      }
+      out += c; i += 1; continue;
+    }
+    if (st.kind === 'line') { if (c === '\n') { stack.pop(); out += '\n'; } else out += ' '; i += 1; continue; }
+    if (st.kind === 'block') {
+      if (c === '*' && d === '/') { stack.pop(); out += '  '; i += 2; }
+      else { out += (c === '\n' ? '\n' : ' '); i += 1; }
+      continue;
+    }
+    if (st.kind === 'tpl') {
+      if (c === '\\') { out += '  '; i += 2; continue; }
+      if (c === '`') { stack.pop(); out += ' '; i += 1; continue; }
+      if (c === '$' && d === '{') { stack.push({ kind: 'code', brace: 0 }); out += '  '; i += 2; continue; }
+      out += (c === '\n' ? '\n' : ' '); i += 1; continue;
+    }
+    const q = st.kind === 'sq' ? "'" : '"';
+    if (c === '\\') { out += '  '; i += 2; continue; }
+    if (c === q) { stack.pop(); out += ' '; i += 1; continue; }
+    if (c === '\n') { stack.pop(); out += '\n'; i += 1; continue; }
+    out += ' '; i += 1; continue;
+  }
+  return out;
+}
 
 // ── 4. 装载（与 tests/run.js 同一上下文语义）──
 // v2.27.0: 抽成 collect() 后可被门禁（tests/dead-export-gate.js）复用同一份口径，
@@ -134,9 +214,11 @@ function hasMember(ns, mem) {
 }
 
 // ── 5. 引用面：静态扫描产品代码（面与正则见 §3 模块顶层，此处只消费）──
-const refs = [];              // { ns, mem, file, line, inComment }
+// v2.29.0: 逐文件先过 codeFace() 剥出**真代码面**，再跑 REF_RE。注释与字符串文本里的
+//   `WA.ns.mem` 不再计入引用面——「提及」不等于「引用」。
+const refs = [];              // { ns, mem, file, line }
 for (const rel of PROD) {
-  const src = fs.readFileSync(path.join(BASE, rel), 'utf8');
+  const src = codeFace(fs.readFileSync(path.join(BASE, rel), 'utf8'));
   const lines = src.split('\n');
   lines.forEach(function (line, idx) {
     REF_RE.lastIndex = 0;
@@ -145,8 +227,7 @@ for (const rel of PROD) {
       const ns = m[1], mem = m[2];
       if (!MODULE_NS.has(ns)) continue;                        // 只审模块接口面
       if (mem.charAt(0) === '_') continue;                     // 私有成员不属承诺面
-      const inComment = /^\s*(\/\/|\*|\/\*)/.test(line);
-      refs.push({ ns: ns, mem: mem, file: rel, line: idx + 1, inComment: inComment });
+      refs.push({ ns: ns, mem: mem, file: rel, line: idx + 1 });
     }
   });
 }
@@ -155,7 +236,8 @@ const testSrc = fs.readFileSync(path.join(__dirname, 'run.js'), 'utf8');
 const testRefSet = new Set();
 (function () {
   let m; REF_RE.lastIndex = 0;
-  while ((m = REF_RE.exec(testSrc))) testRefSet.add(m[1] + '.' + m[2]);
+  const testCode = codeFace(testSrc);              // v2.29.0：测试侧同样只认真代码
+  while ((m = REF_RE.exec(testCode))) testRefSet.add(m[1] + '.' + m[2]);
 })();
 
 // ── 6. 求差 ──
@@ -229,7 +311,7 @@ if (require.main === module) {
     phantom.forEach(function (p) { const k = p.ns + '.' + p.mem + ' [' + p.reason + ']'; (pGroup[k] = pGroup[k] || []).push(p); });
     Object.keys(pGroup).sort().forEach(function (k) {
       const sites = pGroup[k];
-      console.log('  ✗ ' + k + ' ×' + sites.length + '  ' + sites[0].file + ':' + sites[0].line + (sites[0].inComment ? '（在注释中）' : ''));
+      console.log('  ✗ ' + k + ' ×' + sites.length + '  ' + sites[0].file + ':' + sites[0].line);
     });
     if (!phantom.length) console.log('  （无）');
     console.log('');
@@ -266,4 +348,4 @@ if (require.main === module) {
 //   供 tests/dead-export-gate.js 复算「归因证据」时使用。证据的扫描面与正则必须与清册**同源**——
 //   若门禁自己再 walk 一遍目录、或另写一条引用正则，就会出现「证据说 refs>0、判据说该成员是死导出」
 //   这种自相矛盾（判据的输入面与结论面必须是同一件事）。
-module.exports = { collect: collect, MODULE_EXPORTS: MODULE_EXPORTS, PRODUCT_FILES: PROD, REF_RE: REF_RE };
+module.exports = { collect: collect, MODULE_EXPORTS: MODULE_EXPORTS, PRODUCT_FILES: PROD, REF_RE: REF_RE, codeFace: codeFace };
