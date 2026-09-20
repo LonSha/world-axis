@@ -175,7 +175,15 @@ function _wdObjAt(src, anchor) {
   throw new Error('drift: unbalanced: ' + anchor);
 }
 function _wdKeysOf(lit) {
-  const body = lit.slice(1, -1), keys = [];
+  // v2.26.0: 先剥注释再取键。此前是本函数的一个**静默盲点**——键的匹配要求它紧跟在
+  //   `,` 或 `{` 之后，而「逗号 + 若干注释行 + 键」这种写法（本仓 SRC_LABEL 的
+  //   `readSpotCheck` 正是如此）会让该键**从键集里消失**：门禁不报「缺键」也不报「幽灵键」，
+  //   而是把它当作不存在。于是「给一行键补注释」就能让键悄悄退出判据面。
+  //   注释剥离只可能让隐藏的键**重新可见**（不可能凭空造键），与判据方向一致。
+  const body = lit.slice(1, -1)
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ');
+  const keys = [];
   const RE = /(?:^|[,{])\s*(?:'([^']*)'|"([^"]*)"|([A-Za-z_$][\w$]*))\s*:/g;
   let m; while ((m = RE.exec(body))) keys.push(m[1] !== undefined ? m[1] : (m[2] !== undefined ? m[2] : m[3]));
   return keys;
@@ -245,6 +253,14 @@ function checkSrcMaps(opts) {
   check('toolDiag.WRITE_SRC_LABEL', _wdKeysOf(_wdObjAt(td, 'const WRITE_SRC_LABEL = {')), WB);
   check('toolDiag.removeLabel', _wdKeysOf(_wdObjAt(td, "guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒'")), RB);
   check('toolDiag.readLabel', _wdKeysOf(_wdObjAt(td, "read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝'")), sbTags);
+  // v2.26.0（第十四面）: 同一条「跨域错放」线索的**第三处现场**，此前完全无门禁保护。
+  //   engines/tool-diag.js 的 `SRC_LABEL` 是 store 读侧标签的第三份真源（另两份是
+  //   core/store.js 的 LAB 与 ui/panel.js 的 LAB_P，均已由本文件覆盖）。它此前同时犯了
+  //   两处错放：漏掉 store 域自己的 `readSpotCheck`（诊断包退回裸桶名），又混入 8 个
+  //   **settings-bus 域**键（rmExisted/verifyBack/legacyRead/saveInherit/subkeyAudit/
+  //   pendingOrphan/verifyDefaults/lsRaw——归 toolDiag.readLabel 管，在这张表里永不被消费）。
+  //   注：这三份表的**文案**可以各异（诊断包要比 UI 更详细地说明后果），门禁只钉**键集**。
+  check('toolDiag.SRC_LABEL(store 读侧标签)', _wdKeysOf(_wdObjAt(td, 'const SRC_LABEL = {')), stTags);
   // v2.22.0: 事件阶段序列（有序列表）在全库有 4 份副本——`editorEvents.TYPE_STAGES` 是 de-facto
   //   真源（`stagesOf` 是 backstage / inspectorState 都优先调用的公共访问器），但 evolution 的
   //   `STAGE_MAP`、backstage 的「紧急兜底」、inspector-state 的「无 editorEvents 兜底」各写一份。

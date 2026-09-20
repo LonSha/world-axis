@@ -1208,11 +1208,19 @@
       //   三个已知来源，而 noteStoreReadFail 支持动态建桶 ⇒ 本版新增的读点（diskRev / verify /
       //   recovery / conflict / quarantine / writerId）会「有归因但在诊断里看不见」。
       //   每个来源的后果不同（有的只是容量数字失真，有的是静默覆盖/丢恢复点），必须逐项可读。
-      // v2.11.0: 标签表必须覆盖**全部**归因点。本版新增的来源包括 core 侧的
-      //   load / saveConflict / verifyState / rmExisted / verifyBack / legacyRead /
-      //   saveInherit / subkeyAudit / pendingOrphan / verifyDefaults / lsRaw，
-      //   以及引擎侧 chatcache* / worldbookSelection / workflowHistory / uninjectLedger /
-      //   eventLog / errorLog。缺标签 ⇒ 消费端退回裸桶名 ⇒ 「有归因但看不懂」。
+      // v2.11.0: 标签表必须覆盖**全部**归因点。store 域来源包括 core 侧的
+      //   load / saveConflict / verifyState / verify / recovery / conflict / quarantine /
+      //   writerId / diskRev，以及引擎侧 chatcache* / worldbookSelection / workflowHistory /
+      //   uninjectLedger / eventLog / errorLog / readSpotCheck。缺标签 ⇒ 消费端退回裸桶名
+      //   ⇒ 「有归因但看不懂」。（v2.26.0 修正：rmExisted/verifyBack/legacyRead/saveInherit/
+      //   subkeyAudit/pendingOrphan/verifyDefaults/lsRaw 属 settings-bus 域，已移出本表。）
+      // v2.26.0（第十四面）：本表是 store 读侧标签的**第三份真源**（另两份：core/store.js 的 LAB、
+      //   ui/panel.js 的 LAB_P）。此前它同时犯了两处「跨域错放」——漏了 store 域自己的
+      //   `readSpotCheck`，又混入 8 个 **settings-bus 域**键（rmExisted / verifyBack / legacyRead /
+      //   saveInherit / subkeyAudit / pendingOrphan / verifyDefaults / lsRaw）：这 8 个投递的是
+      //   settings-bus 的 readFailedBy，由 toolDiag.readLabel 管。后果与 v2.22.0/v2.23.0 同型——
+      //   诊断包里 store 读失败明细「缺标签退回裸桶名 + 幽灵标签永不被消费」，而这份表**此前无门禁**。
+      //   判据已补：tests/ui-gate-sync.js 的 toolDiag.SRC_LABEL 组（= store 读侧真源键集）。
       const SRC_LABEL = {
         bytes: '容量计量', activity: '活跃时间', enumerate: '键枚举',
         diskRev: '磁盘序号（读失败 ⇒ 并发覆盖检测失效）',
@@ -1220,11 +1228,7 @@
         conflict: '冲突现场', quarantine: '隔离现场', writerId: '写入者标识',
         load: '存档载入（读失败 ⇒ 整份存档不可见）',
         saveConflict: '并发覆盖前的保全读回（读失败 ⇒ 对方进度未被保全）',
-        verifyState: '存档巡检', rmExisted: '受控删除的存在性探测',
-        verifyBack: '写后/删后复核读回', legacyRead: 'legacy 旧键读取',
-        saveInherit: '保存时继承结构指纹', subkeyAudit: '子键缺口盘点',
-        pendingOrphan: '幽灵键盘点', verifyDefaults: '默认值声明校验',
-        lsRaw: '幽灵设置盘点原文',
+        verifyState: '存档巡检',
         // v2.11.0（逆向审计自纠）: `readSpotCheck` 是本版新增的 store 域归因来源
         //   （tool-diag 自己的抽查列目录读失败），首版漏进本表 ⇒ 消费端退回裸桶名，
         //   读者只看到 `readSpotCheck×1` 而不知其后果。归因**不可读**等于归因不实

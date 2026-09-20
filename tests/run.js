@@ -9811,7 +9811,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.25.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10355,7 +10355,7 @@ assert(verF2500 === '2.25.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.25.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.26.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10646,7 +10646,7 @@ assert(verF2500 === '2.25.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.25.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.26.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11169,7 +11169,7 @@ assert(verF2500 === '2.25.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.25.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.26.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11557,7 +11557,7 @@ assert(verF2500 === '2.25.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.25.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.26.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11927,7 +11927,7 @@ assert(verF2500 === '2.25.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.25.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.26.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12292,7 +12292,7 @@ assert(verF2500 === '2.25.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.25.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.26.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -12677,6 +12677,46 @@ assert(verF2500 === '2.25.0' && mfF2500.version === verF2500, '入口与清单�
       assert(!/Object\.keys\(by\)\.forEach\(function \(k\) \{[\s\S]*?DEGRADE_SRC/.test(sbDoc25),
         '（负向）退化后的分类被动态遍历判据判否');
       console.log('  ✓ v2.25.0：readStat 硬失败/降级分类遍历动态桶且完备（防「硬编码子集」，含负向自证）');
+    }
+    //   v2.26.0（第十四面）：诊断包 store 读侧标签表必须与 store 域真源键集一致。
+    //   命题：store 读侧标签表在全库有**三份消费端**——core/store.js 的 `LAB`（标注
+    //   readFailedDetail）、ui/panel.js 的 `LAB_P`、engines/tool-diag.js 的 `SRC_LABEL`
+    //   （诊断包）。前两份已由 v2.22.0/v2.23.0 收口，**第三份此前完全没有门禁**：它同时犯了
+    //   两处「跨域错放」——漏掉 store 域自己的 `readSpotCheck`（诊断包退回裸桶名，「有归因但
+    //   看不懂」），又混入 8 个 **settings-bus 域**键（rmExisted/verifyBack/legacyRead/
+    //   saveInherit/subkeyAudit/pendingOrphan/verifyDefaults/lsRaw——这 8 个投递的是
+    //   settings-bus 的 readFailedBy，归 toolDiag.readLabel 管，在本表里永不被消费）。
+    //   判据（源码级）：① 表内含 store 域真源键 readSpotCheck；② 不再含 settings-bus 域键。
+    {
+      const tdD = smSrcs['engines/tool-diag.js'];
+      assert(/readSpotCheck\s*:\s*'/.test(tdD),
+        '（正向）诊断包标签表含 store 域真源键 readSpotCheck（此前漏标签 ⇒ 退回裸桶名）');
+      // 口径（关键，勿退化为全文件裸配）：必须**只在本表字面量内**判幽灵键。
+      //   `rmExisted` 等 8 个键在 toolDiag.readLabel（settings-bus 域标签，合法）里同样出现，
+      //   裸配全文件会把那处合法用法误判成「本表残留幽灵键」——判据的输入面与结论面必须是同一件事。
+      const tdLabelLit26 = (tdD.match(/const SRC_LABEL = \{[\s\S]*?\n\s*\};/) || [''])[0];
+      assert(tdLabelLit26.length > 0, '（自洽）诊断包 store 标签表字面量可定位');
+      const ghostKeys26 = ['rmExisted', 'verifyBack', 'legacyRead', 'saveInherit',
+        'subkeyAudit', 'pendingOrphan', 'verifyDefaults', 'lsRaw'];
+      const leftGhost = ghostKeys26.filter(function (k) {
+        return new RegExp('(^|[,{\\s])' + k + '\\s*:\\s*[\'\"]').test(tdLabelLit26);
+      });
+      assert(leftGhost.length === 0,
+        '（正向）诊断包 store 标签表不含 settings-bus 域幽灵键（实残留 ' + (leftGhost.join('、') || '无') + '）');
+      // 负向自证 ①：删掉 readSpotCheck 标签 ⇒ 新门禁组必须现形
+      const tdDoc26a = tdD.replace("readSpotCheck: '诊断抽查列目录',\n", '');
+      assert(tdDoc26a !== tdD, '（负向自证）诊断包标签漂移注入点命中（删 readSpotCheck）');
+      const smNeg26a = __uiGateCheckSrcMaps({ srcOverride: { 'engines/tool-diag.js': tdDoc26a } });
+      assert(smNeg26a.failures.length > 0 && smNeg26a.failures.join('').indexOf('readSpotCheck') > 0,
+        '（负向）诊断包漏 store 域标签被判据抓到');
+      // 负向自证 ②：把 settings-bus 域键塞回该表 ⇒ 幽灵键现形
+      const tdDoc26b = tdD.replace("verifyState: '存档巡检',",
+        "verifyState: '存档巡检',\n        verifyBack: '写后/删后复核读回',");
+      assert(tdDoc26b !== tdD, '（负向自证）幽灵键注入点命中（塞回 verifyBack）');
+      const smNeg26b = __uiGateCheckSrcMaps({ srcOverride: { 'engines/tool-diag.js': tdDoc26b } });
+      assert(smNeg26b.failures.length > 0 && smNeg26b.failures.join('').indexOf('verifyBack') > 0,
+        '（负向）诊断包混入 settings-bus 域键被判据抓到');
+      console.log('  ✓ v2.26.0：诊断包 store 读侧标签表 == store 域真源键集（防「跨域错放」，含负向自证）');
     }
   }
   // ══════════════════════════════════════════════════════════════════
