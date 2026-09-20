@@ -79,7 +79,7 @@
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',
     'engines/regional.js': 'regional', 'engines/horizon.js': 'horizon', 'engines/digest.js': 'digest',
     'engines/limits.js': 'limits', 'engines/worldbook.js': 'worldbook', 'engines/ledger.js': 'ledger',
-    'engines/inspector.js': 'inspector', 'engines/timeline.js': 'timeline', 'engines/entities.js': 'entities',
+    'engines/timeline.js': 'timeline', 'engines/entities.js': 'entities',
     'engines/preset.js': 'preset', 'engines/chatcache.js': 'chatcache', 'engines/pmem.js': 'pmem',
     'engines/rules.js': 'rules', 'engines/summarizer.js': 'summarizer', 'engines/chapters.js': 'chapters',
     'engines/direct-event.js': 'directEvent',
