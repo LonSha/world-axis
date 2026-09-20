@@ -1163,14 +1163,18 @@
         //   legacyRead / saveInherit / subkeyAudit / pendingOrphan / verifyDefaults / load /
         //   saveConflict / verifyState）。标签缺失会让这些来源在消费端退回裸桶名——
         //   与 v2.10.0 修掉的「有归因但看不见」是同一个坑。
+        // v2.23.0: 本表标注的是 `readFailedDetail`（store 域 bySource），来源集合 = 21 个。
+        //   此前它保留了 8 个 **settings-bus 域**的键（rmExisted/verifyBack/legacyRead/saveInherit/
+        //   subkeyAudit/pendingOrphan/verifyDefaults/lsRaw）——这 8 个投递的是 settings-bus 自己的
+        //   `noteReadFail`（进 stats.readFailedBy），**永不流入 store 的 bySource**（settings-bus 不向
+        //   store 转发读失败），故在此表里是永不命中的幽灵键；同时又漏了 `readSpotCheck`。
+        //   与 ui/panel.js 的 LAB_P（v2.22.0 已修）是同一条「跨域错放」线索的第二处现场。
         const LAB = { bytes: '按字节', activity: '活跃时间', enumerate: '枚举', diskRev: '磁盘序号',
           verify: '写后校验/删后复核读回', recovery: '恢复点清单', conflict: '冲突现场',
           quarantine: '隔离现场', writerId: '写入者标识',
           load: '存档载入（整份存档不可见）', saveConflict: '并发覆盖前的保全读回',
-          verifyState: '存档巡检', rmExisted: '受控删除的存在性探测', verifyBack: '写后/删后复核读回',
-          legacyRead: 'legacy 旧键读取', saveInherit: '保存时继承结构指纹',
-          subkeyAudit: '子键缺口盘点', pendingOrphan: '幽灵键盘点', verifyDefaults: '默认值声明校验',
-          lsRaw: '幽灵设置盘点原文', chatcacheState: '聊天快照', chatcacheRev: '同步修订号',
+          verifyState: '存档巡检', readSpotCheck: '诊断抽查列目录',
+          chatcacheState: '聊天快照', chatcacheRev: '同步修订号',
           chatcacheInstallBack: '快照安装回读', worldbookSelection: '世界书条目选择',
           workflowHistory: '工作流历史', uninjectLedger: '撤销注入账本',
           eventLog: '事件日志载入', errorLog: '错误日志载入' };
@@ -2466,7 +2470,15 @@
       //   面板却照样报出一份「存储很干净」的结论；消费端拿到的 `readFailedKeys` 也不含它。
       //   口径不一致（主计数与分桶明细不同源）是本版第三次踩到的同型坑，故当版修掉并加断言钉住。
       const __rfBefore = __readStat.readFailed;
-      const __byBefore = { bytes: __readStat.bySource.bytes, activity: __readStat.bySource.activity, enumerate: __readStat.bySource.enumerate };
+      // v2.23.0: 基线快照改为**全来源**。bySource 是动态建桶（noteStoreReadFail / reportReadFail
+      //   支持未知来源），此前这里与下面两处明细都硬编码成 3 键（bytes/activity/enumerate），
+      //   于是本会话新增的 12+ 个来源（diskRev/verify/load/saveConflict/verifyState/recovery/
+      //   quarantine/conflict/writerId/chatcache*/worldbookSelection/workflowHistory/uninjectLedger/
+      //   eventLog/errorLog/readSpotCheck）在明细里**根本没有键**——消费端读它们恒得 undefined。
+      //   现场：store.js:1200 读 `readFailedCumulative.recovery || 1` ⇒ 无论真实发生几十次，
+      //   诊断永远报「本会话累计 1 次」（结论不实，正是本仓库反复治的那一类）。
+      const __byBefore = {};
+      Object.keys(__readStat.bySource).forEach(function (k) { __byBefore[k] = __readStat.bySource[k]; });
       const keys = listWorldAxisKeys();
       const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, other: 0 };
       const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, other: 0 };
@@ -2525,12 +2537,18 @@
         //   warn，而用户把存储问题修好后分数不会复原。这正是 v0.4.0 立下的裁决
         //   （「健康分只看当前态，否则历史一次失败会把分数永久压低」）所要禁止的形态，
         //   本版删除侧（P9）刚修过一次，store 读侧这里又踩了一遍，故当版修掉。
-        readFailedDetail: {
-          bytes: __readStat.bySource.bytes - __byBefore.bytes,
-          activity: __readStat.bySource.activity - __byBefore.activity,
-          enumerate: __readStat.bySource.enumerate - __byBefore.enumerate
-        },
-        readFailedCumulative: { bytes: __readStat.bySource.bytes, activity: __readStat.bySource.activity, enumerate: __readStat.bySource.enumerate },
+        // v2.23.0: 全来源动态枚举（此前硬编码 3 键 ⇒ 新增来源在明细里查无此键）。
+        //   口径不变：detail = 本次盘点差值，cumulative = 本会话累计，二者同源同键集。
+        readFailedDetail: (function () {
+          const d = {};
+          Object.keys(__readStat.bySource).forEach(function (k) { d[k] = __readStat.bySource[k] - (__byBefore[k] || 0); });
+          return d;
+        })(),
+        readFailedCumulative: (function () {
+          const c = {};
+          Object.keys(__readStat.bySource).forEach(function (k) { c[k] = __readStat.bySource[k]; });
+          return c;
+        })(),
         staleDiagCandidates: staleDiagCandidates.sort(function (a, b2) { return a.idleMs - b2.idleMs; }),
         enumerable: typeof mainWin.localStorage.length === 'number' && mainWin.localStorage.length >= 0
       };

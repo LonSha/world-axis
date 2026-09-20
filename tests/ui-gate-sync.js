@@ -228,6 +228,10 @@ function checkSrcMaps(opts) {
     while ((m3 = RX3.exec(t))) if (stTags.indexOf(m3[1]) < 0) stTags.push(m3[1]);
   });
   check('LAB_P', _wdKeysOf(_wdObjAt(panel, "bytes: '按字节'")), stTags.sort());
+  // v2.23.0: core/store.js 内**自己**也有一张 store 读侧标签表 `LAB`（标注 readFailedDetail），
+  //   与 ui/panel.js 的 `LAB_P` 是同一份真源的两个消费端。此前它保留了 8 个 settings-bus 域
+  //   的幽灵键、又漏了 readSpotCheck——同一条「跨域错放」线索的第二处现场。
+  check('store.LAB(读取侧标签)', _wdKeysOf(_wdObjAt(st, 'const LAB = {')), stTags);
   // v2.22.0: 引擎↔引擎的重复真源（同样是「第二份真源」，当前一致但无门禁保护）：
   //   engines/editor-faction.js 的 STATUSES/RELATIONS 与 evolution 的 FACTION_STATUS/
   //   FACTION_RELATION 各写一遍——编辑器接受的状态集与引擎合法状态集必须同源同值，
