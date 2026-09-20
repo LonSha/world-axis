@@ -1228,10 +1228,24 @@
       //     · 降级（migrate / copy）＝值本身是对的，只是结构迁移没落盘 / 返回值与内部对象共享引用。
       //   把两者合成一个 ok，会让「迁移回写失败」被报成「读不到配置」——用户会去查存储，
       //   而实际要查的是迁移钩子。归因**不实**比缺失归因更坏（本版 P7/P9 两次踩到同型）。
-      const hardFail = (by.read || 0) + (by.parse || 0);
-      const degraded = (by.migrate || 0) + (by.copy || 0);
+      // v2.25.0: 分类必须**完备**。此前硬失败只取 `read+parse`、降级只取 `migrate+copy`（固定 2+2
+      //   子集），而 `by` 是 readFailedBy 的**动态桶**（noteReadFail 支持任意来源）。本会话新增的
+      //   核查读回类来源（verifyBack/rmExisted/legacyRead/saveInherit/subkeyAudit/pendingOrphan/
+      //   verifyDefaults/lsRaw）全落在两个口径之外：readFailed 涨了、`ok` 却仍报 true（「存储读取
+      //   一切正常」），且「硬失败+降级=读失败总数」这条完备性会在运行期被静默破坏——与 v2.23.0
+      //   「硬编码子集」同族。修法：口径改为「已知降级白名单 + 其余全部计硬失败」——任何未登记
+      //   来源都按「没读到可用配置」保守判定（它们是核查读回，失败即该结论不可信），并单列
+      //   `unclassified` 使落桶外来源仍可追溯（不丢归因）。
+      const DEGRADE_SRC = { migrate: 1, copy: 1 };
+      let hardFail = 0, degraded = 0, unclassified = 0;
+      Object.keys(by).forEach(function (k) {
+        const v = by[k] || 0;
+        if (DEGRADE_SRC[k] === 1) { degraded += v; return; }
+        hardFail += v;
+        if (k !== 'read' && k !== 'parse') unclassified += v;
+      });
       return { reads: stats.reads, readFailed: stats.readFailed, ok: hardFail === 0,
-        hardFailed: hardFail, degraded: degraded,
+        hardFailed: hardFail, degraded: degraded, unclassified: unclassified,
         bySource: by, sources: sources,
         // v2.10.0: 「有数据但没读到」单列——它与 reads 的比值就是数据丢失率，必须一眼可见。
         defaultAfterFailure: sources.defaultAfterFailure || 0,
