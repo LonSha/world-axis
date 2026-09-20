@@ -119,7 +119,18 @@
             proactive: true,
             wbInject: true,
             wbWorldbookName: '',
-            wbAutoEnsure: false
+            wbAutoEnsure: false,
+            // [v2.19.0] 酒馆缓存同步（engines/chatcache.js）的两把开关——**声明缺失修复**：
+            //   该引擎读 `settings().syncToChat` / `settings().autoBackup` 决定「是否把存档镜像进
+            //   聊天文件」「是否轮次推进时滚动备份」，但这两个键既不在 def、也从未在设置页出现。
+            //   后果三重：① 子键补齐/`verifyDefaults`/声明完备性检查全都看不见它们；②
+            //   `settingsBus.normalize` 把「未声明」的布尔键**原样透传**，引擎侧却写死 `=== true`，
+            //   于是任何非 `true` 的存量值都等于「关」——一个「开关摆了却没有开关」的静默失效；
+            //   ③ 消费端（engines/chatcache.js）成为全库唯一读它们的文件，产品侧零写入口。
+            //   默认 false：这两个功能会写聊天文件 / 增内存快照，属**有副作用的能力**，
+            //   默认关、由用户显式开启，与「自动推演」这类开箱即用项区分。
+            syncToChat: false,           // 把本扩展存档镜像进 chat_metadata（随聊天文件跨设备同步）
+            autoBackup: false            // 轮次推进时滚动自动备份（保留最近 3 份，可恢复）
           },
           // v2.7.0（收口）: 区间与枚举声明上收到登记表——此前这些合法范围**只存在于设置页的
           //   `<input min max>` 与 `<select>` 选项里**，引擎一侧承认的只有少数几个（且分散）：

@@ -30,6 +30,8 @@
         <div class="wa-set-row"><span>NPC预算 <b id="wa-set-npcv">${bs.npcBudget}</b></span><input type="range" min="${rng(bB.npcBudget, [1, 16])[0]}" max="${rng(bB.npcBudget, [1, 16])[1]}" value="${bs.npcBudget}" id="wa-set-npc" class="wa-range"/></div>
         <label class="wa-node"><input type="checkbox" id="wa-set-auto" ${bs.autoSimulate ? 'checked' : ''}/><span class="wa-node-label">每轮自动推演（关闭则仅手动）</span></label>
         <label class="wa-node"><input type="checkbox" id="wa-set-fullrules" ${bs.fullRules ? 'checked' : ''}/><span class="wa-node-label">注入世界规则全文（12模块铁律；关闭则仅精简守则，省token）</span></label>
+        <label class="wa-node"><input type="checkbox" id="wa-set-sync" ${bs.syncToChat ? 'checked' : ''}/><span class="wa-node-label">镜像存档进聊天文件（随聊天跨设备同步；关闭则仅存本机）</span></label>
+        <label class="wa-node"><input type="checkbox" id="wa-set-autobak" ${bs.autoBackup ? 'checked' : ''}/><span class="wa-node-label">轮次推进时自动备份（滚动保留最近 3 份，可恢复）</span></label>
         <div class="wa-set-row"><span>注入预算</span><select id="wa-set-budget-mode" class="wa-input">
           <option value="auto" ${bs.injectBudget == null || bs.injectBudget < 0 ? 'selected' : ''}>自动（按上下文窗口 6%）</option>
           <option value="unlimited" ${bs.injectBudget === 0 ? 'selected' : ''}>不限（全量注入）</option>
@@ -208,6 +210,8 @@
           npcBudget: +npc.value,
           autoSimulate: $('#wa-set-auto').checked,
           fullRules: $('#wa-set-fullrules').checked,
+          syncToChat: $('#wa-set-sync') ? $('#wa-set-sync').checked : false,
+          autoBackup: $('#wa-set-autobak') ? $('#wa-set-autobak').checked : false,
           injectBudget: (() => { const m = $('#wa-set-budget-mode'); const v = m ? m.value : 'auto'; if (v === 'unlimited') return 0; if (v === 'manual') return Math.max(200, +($('#wa-set-budget') ? $('#wa-set-budget').value : 2400) || 2400); return -1; })(),
           memSamplerLimit: +($('#wa-set-mslimit') ? $('#wa-set-mslimit').value : 8) || 8,
           memSamplerDice: +($('#wa-set-msdice') ? $('#wa-set-msdice').value : 10000) || 10000,

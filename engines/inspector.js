@@ -109,17 +109,22 @@
   }
 
   function init() {
-    if (_subscribed) return;
+    // [v2.19.0] 回传布尔：true=本次订阅成功 / false=已订阅或前提不足。
+    //   index.js 的启动接线按返回值把「本次真正激活了哪些引擎」记进 WA.__inited，
+    //   没有明确回传就无法区分「已就位」与「恰好调用成功」。
+    if (_subscribed) return false;
     try {
       const ctx = getCtx();
-      if (!ctx || !ctx.eventSource || typeof ctx.eventSource.on !== 'function') return;
+      if (!ctx || !ctx.eventSource || typeof ctx.eventSource.on !== 'function') return false;
       const et = ctx.event_types || {};
       ctx.eventSource.on(et.CHAT_COMPLETION_PROMPT_READY || EV_CHAT, onChatPromptReady);
       ctx.eventSource.on(et.GENERATE_AFTER_COMBINE_PROMPTS || EV_TEXT, onTextPromptReady);
       _subscribed = true;
       WA.log('info', '注入自检查看器就绪（只读订阅prompt-ready事件）');
+      return true;
     } catch (e) {
       WA.log('warn', '注入自检订阅失败（非致命）: ' + (e && e.message));
+      return false;
     }
   }
 

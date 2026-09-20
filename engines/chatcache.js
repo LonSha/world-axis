@@ -31,8 +31,22 @@
   function chatId() { const ctx = getCtx(); return ctx && ctx.chatId ? ctx.chatId : 'default'; }
 
   function settings() {
-    try { return WA.backstage && WA.backstage.getSettings ? WA.backstage.getSettings() : {}; }
-    catch (e) { return {}; }
+    try {
+      if (WA.backstage && WA.backstage.getSettings) return WA.backstage.getSettings();
+    } catch (e) {}
+    // [v2.19.0] 兜底：backstage 未就位时直读**同一登记项**（不新造第二份真源）。
+    //   此前本引擎只认 `WA.backstage.getSettings`，而后者本身就是 `settingsBus.read(__REG_B)`；
+    //   故按 key 找到那条登记再读，取到的是同一份数据。
+    try {
+      const regs = WA.__settingsRegs || [];
+      for (let i = 0; i < regs.length; i++) {
+        const r = regs[i];
+        if (r && r.key === 'worldaxis_backstage_settings_v1' && WA.settingsBus && WA.settingsBus.read) {
+          return WA.settingsBus.read(r);
+        }
+      }
+    } catch (e) {}
+    return {};
   }
   function syncEnabled() { return settings().syncToChat === true; }
   function autoBackupEnabled() { return settings().autoBackup === true; }
@@ -330,17 +344,29 @@
   }
 
   // ── 初始化：监听store保存后调度同步 ────────────────────
+  let _inited = false;
   function init() {
+    // [v2.19.0] 幂等守卫：本函数**包裹** WA.store.save。若被调用两次，第二层包裹会把
+    //   第一层再包一层——每次 save 触发两次 scheduleTick，且原函数链无界累积。
+    //   返回 true=本次挂载成功 / false=已挂载或前提不足，供启动侧归因。
+    if (_inited) return false;
     try {
+      if (!WA.store || typeof WA.store.save !== 'function') {
+        WA.log('warn', 'chatcache挂载跳过：store.save 未就位');
+        return false;
+      }
       const origSave = WA.store.save.bind(WA.store);
       WA.store.save = function (state, chatIdArg) {
         const r = origSave(state, chatIdArg);
         if (!_suspend) scheduleTick();
         return r;
       };
+      _inited = true;
       WA.log('info', '酒馆缓存同步已挂载（chat_metadata镜像）');
+      return true;
     } catch (e) {
       WA.log('warn', 'chatcache挂载失败（非致命）', e);
+      return false;
     }
   }
 

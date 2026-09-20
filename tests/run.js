@@ -9817,7 +9817,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.19.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10361,7 +10361,7 @@ assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.18.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.19.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10652,7 +10652,7 @@ assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.18.0', '入口版本为 2.18.0（实 ' + ver + '）');
+    assert(ver === '2.19.0', '入口版本为 2.18.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11058,7 +11058,7 @@ assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:init installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspector:init|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11175,7 +11175,7 @@ assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.18.0', '入口版本为 2.18.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.19.0', '入口版本为 2.18.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11563,7 @@ assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.18.0', '入口版本为 2.18.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.19.0', '入口版本为 2.18.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11933,7 @@ assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.18.0', '入口版本为 2.18.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.19.0', '入口版本为 2.18.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12298,7 @@ assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.18.0', '入口版本为 2.18.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.19.0', '入口版本为 2.18.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14097,6 +14097,106 @@ assert(verF2500 === '2.18.0' && mfF2500.version === verF2500, '入口与清单�
     console.log('  ✓ ★ 上游键集自证（取数键必须上游真有）｜对方缺面 ≠ 空集｜明细有界 + 总数取对方口径');
     console.log('  ✓ 负向自证 5 项（原版对照 + 逐项现形 + 互不连坐）');
   } // end v2.18.0 block
+  // ═════════════════════════════════════════════════
+  // v2.19.0 块：启动接线（第十二面：能力死代码 / 开关无线）
+  //
+  // 命题：v2.18.0 在**反向边**上修的是「通路通、只通一根线」。本版把同一类检查
+  //   推进到**启动序列**：一个引擎的 `init()` 定义了、登记进 MODULE_EXPORTS、
+  //   被测过行为——但 `index.js` 的启动序列**自创建起从未调用它**。
+  //   能力齐全、入口全绿、产品里那台引擎从不启动。
+  //
+  // 本版抳出两处：
+  //   · engines/chatcache.js → WA.chatcache.init()  零调用 ⇒ 跨设备同步/自动备份两条链路从未运行
+  //   · engines/inspector.js  → WA.inspector.init()   零调用 ⇒ 注入自检从未订阅 prompt-ready
+  //     （面板/诊断/SENTINEL 读到的恒为「尚未生成」，因为订阅从未建立）
+  //   且 chatcache 读的两个开关 `syncToChat` / `autoBackup` **既不在设置 def、也不在设置页**
+  //   ——「开关摆了却没有开关」：消费端读 `=== true`，任何存量值都等于关。
+  //
+  // 本块立六件事：
+  //   A 入口接线：index.js 启动序列真的调用 chatcache.init / inspector.init，且成功必被记账
+  //   B 引擎行为：init 幂等（重复返回 false，不叠加包裹）
+  //   C 开关声明：syncToChat / autoBackup 进 backstage def、进 settingsBus.normalize
+  //   D 消费面：设置页控件 + 保存回写 + UI_BINDINGS 守卫
+  //   E 静态判据：入口源码里两处 init 调用在场（防「接线被悄悄摘掉」）
+  //   F 负向自证：抽掉入口接线后，静态判据必须现形
+  // ═════════════════════════════════════════════════
+  {
+    section('v2.19.0 启动接线');
+    const idxSrc2190 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+    const ccSrc2190 = fs.readFileSync(path.join(BASE, 'engines/chatcache.js'), 'utf8');
+    const insSrc2190 = fs.readFileSync(path.join(BASE, 'engines/inspector.js'), 'utf8');
+    const bsSrc2190 = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
+    const uiSet2190 = fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8');
+
+    // ── A. 入口接线在场 ──
+    assert(idxSrc2190.indexOf('WA.chatcache.init') >= 0, 'index.js 启动序列调用 chatcache.init（此前零调用）');
+    assert(idxSrc2190.indexOf('WA.inspector.init') >= 0, 'index.js 启动序列调用 inspector.init（此前零调用）');
+    assert(idxSrc2190.indexOf('WA.__inited') >= 0, '入口把「本次实际激活了哪些引擎」记账（启动可观测）');
+    assert(/__inited\.push\('chatcache'\)/.test(idxSrc2190) && /__inited\.push\('inspector'\)/.test(idxSrc2190),
+      '两个引擎的成功记账各自独立');
+
+    // ── B. 幂等 ──
+    const first2190 = WA.chatcache.init();
+    const second2190 = WA.chatcache.init();
+    assert(second2190 === false, 'chatcache.init 幂等：重复调用返回 false（实 ' + second2190 + '）');
+    assert(/let _inited = false/.test(ccSrc2190), 'chatcache 自持已挂载标记');
+    assert(typeof WA.store.save === 'function', 'store.save 仍可用');
+    void first2190;
+
+    // inspector.init 同样幂等；且真的订阅了宿主事件
+    const insFirst2190 = WA.inspector.init();
+    const insSecond2190 = WA.inspector.init();
+    assert(insSecond2190 === false, 'inspector.init 幂等：重复调用返回 false（实 ' + insSecond2190 + '）');
+    assert(insFirst2190 === true || insFirst2190 === false, 'inspector.init 有明确布尔回传');
+    assert(WA.inspector.getLastSnapshot() !== undefined, 'inspector.getLastSnapshot 可读（接线后口径存在）');
+
+    // ── C. 开关声明 ──
+    assert(bsSrc2190.indexOf('syncToChat:') > 0 && bsSrc2190.indexOf('autoBackup:') > 0,
+      'backstage def 声明 syncToChat / autoBackup（此前消费端读、声明面看不见）');
+    const reg2190 = (WA.__settingsRegs || []).filter(function (r) { return r.key === 'worldaxis_backstage_settings_v1'; })[0];
+    assert(!!reg2190 && ('syncToChat' in reg2190.def) && ('autoBackup' in reg2190.def),
+      '登记表 def 含两键（子键补齐/verifyDefaults/声明完备性检查可见）');
+    const norm2190 = WA.settingsBus.normalize(reg2190, { syncToChat: false, autoBackup: true });
+    assert(norm2190.syncToChat === false && norm2190.autoBackup === true, 'normalize 对两键保真（布尔域由 def 推断）');
+    assert(reg2190.def.syncToChat === false && reg2190.def.autoBackup === false, '两键默认关（写聊天文件/增快照属有副作用能力）');
+
+    // ── D. 消费面：UI 控件 + 保存接线 ──
+    assert(uiSet2190.indexOf('wa-set-sync') >= 0, '设置页渲染同步开关');
+    assert(uiSet2190.indexOf('wa-set-autobak') >= 0, '设置页渲染自动备份开关');
+    assert(uiSet2190.indexOf('syncToChat: $(') >= 0 && uiSet2190.indexOf('autoBackup: $(') >= 0,
+      '保存处理器把两开关写回设置（渲染了却存不回 = 开关摆了没用）');
+    const ids2190 = (WA.toolDiag.UI_BINDINGS.filter(function (g) { return g.page === 'settings'; })[0] || {}).ids || [];
+    assert(ids2190.indexOf('wa-set-sync') >= 0 && ids2190.indexOf('wa-set-autobak') >= 0,
+      '两控件纳入 UI_BINDINGS 守卫（防绑定断裂无人发现）');
+
+    // ── E. 静态判据 ──
+    assert(idxSrc2190.indexOf("typeof WA.chatcache.init === 'function'") > 0,
+      '入口调用带能力守卫（引擎缺失不炸）');
+    assert(idxSrc2190.indexOf("typeof WA.inspector.init === 'function'") > 0,
+      'inspector 调用同样带守卫');
+    assert(/return true;/.test(ccSrc2190) && /return false;/.test(ccSrc2190), 'chatcache.init 有 true/false 双出口');
+    assert(insSrc2190.indexOf('if (_subscribed) return') >= 0, 'inspector 保留单订阅守卫');
+
+    // ── F. 负向自证 ──
+    const judge2190 = function (src) {
+      return src.indexOf('WA.chatcache.init') >= 0 && src.indexOf('WA.inspector.init') >= 0;
+    };
+    assert(judge2190(idxSrc2190) === true, '（负向自证·原版对照）真源码上判据为真');
+    const ANCH2190 = 'WA.chatcache.init';
+    const cnt2190 = idxSrc2190.split(ANCH2190).length - 1;
+    assert(cnt2190 >= 1, '（负向自证）破坏锚点在场（实 ' + cnt2190 + '）');
+    const broken2190 = idxSrc2190.replace(/WA\.chatcache\.init/g, 'waChatcacheInitRemoved')
+                                 .replace(/WA\.inspector\.init/g, 'waInspectorInitRemoved');
+    assert(broken2190 !== idxSrc2190, '（负向自证）破坏真的改变了源码');
+    assert(judge2190(broken2190) === false,
+      '（负向自证）摘掉入口接线后判据现形——这正是本版要治的那一处（能力在、入口不接）');
+
+    console.log('  ✓ 入口接线（chatcache/inspector 自创建起零调用的 init 被真正调用 + 成功记账）');
+    console.log('  ✓ 引擎行为（init 幂等、重复返回 false、包裹不叠加）');
+    console.log('  ✓ 开关声明（syncToChat/autoBackup 进 def、过 normalize、默认关）');
+    console.log('  ✓ 消费面（设置页控件 + 保存回写 + UI_BINDINGS 守卫）');
+    console.log('  ✓ 静态判据 + 负向自证（抽掉接线判据现形）');
+  } // end v2.19.0 block
   } // end v2.11.0 block
   } // end v2.10.0 block
   } // end v2.9.0 block

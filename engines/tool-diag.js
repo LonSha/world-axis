@@ -532,7 +532,7 @@
     //   净化规则区在 purifier 未加载时整段不渲染 → 归入 cond（依赖态，缺失不判失败）。
     { page: 'settings', ids: [
       'wa-set-mode', 'wa-set-time', 'wa-set-pulse', 'wa-set-npc',
-      'wa-set-auto', 'wa-set-fullrules', 'wa-set-budget-mode', 'wa-set-budget',
+      'wa-set-auto', 'wa-set-fullrules', 'wa-set-sync', 'wa-set-autobak', 'wa-set-budget-mode', 'wa-set-budget',
       'wa-set-mslimit', 'wa-set-msdice', 'wa-set-msrel', 'wa-set-custom', 'wa-set-save',
       'wa-op-enable', 'wa-op-sandbox', 'wa-op-n', 'wa-op-now', 'wa-sim-now',
       'wa-ev-dice', 'wa-ev-mod', 'wa-ev-roll', 'wa-ev-out',

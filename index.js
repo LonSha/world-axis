@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.18.0';
+  const VERSION = '2.19.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -357,6 +357,17 @@
     try { WA.store && WA.store.init && WA.store.init(); } catch (e) { WA.log('error', 'store初始化失败', e); }
     try { WA.interceptor && WA.interceptor.install && WA.interceptor.install(); } catch (e) { WA.log('error', '拦截器安装失败', e); }
     try { WA.injectInspector && WA.injectInspector.init && WA.injectInspector.init(); } catch (e) { WA.log('warn', '注入自检初始化失败', e); }
+    // [v2.19.0] 两个引擎的 init 自创建起**零调用**（能力死代码）——本版按兼容层激活同规格接线：
+    //   · chatcache.init  ：包裹 store.save → 驱动「跨设备同步」与「自动备份」两条链路；
+    //     与同步/备份开关（def.syncToChat / def.autoBackup，本版补声明）配合生效。
+    //   · inspector.init  ：订阅 prompt-ready 事件 → 让「注入自检」真的会抓取最终 prompt 快照；
+    //     此前 UI 面板/诊断读到的恒为「尚未生成」（订阅从未建立）。
+    //   两者均为**幂等**（自持已挂载标记，重复调用返回 false），故即便宿主再次执行启动序列
+    //   也不会叠加副作用。
+    const __inited = [];
+    try { if (WA.chatcache && typeof WA.chatcache.init === 'function' && WA.chatcache.init() === true) __inited.push('chatcache'); } catch (e) { WA.log('warn', '酒馆缓存同步初始化失败', e); }
+    try { if (WA.inspector && typeof WA.inspector.init === 'function' && WA.inspector.init() === true) __inited.push('inspector'); } catch (e) { WA.log('warn', '注入自检查看器初始化失败', e); }
+    WA.__inited = __inited;
     try { WA.ui && WA.ui.mount && WA.ui.mount(); } catch (e) { WA.log('error', 'UI挂载失败', e); }
     // v2.0.0: 装载审计——「已加载 / 已注册 / 清单声明」三方对齐，注册表不再空转
     try {
