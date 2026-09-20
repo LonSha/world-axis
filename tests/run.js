@@ -12529,7 +12529,7 @@ assert(verF2500 === '2.22.0' && mfF2500.version === verF2500, '入口与清单�
   //   提取：枚举取常量数组；记账桶取「声明桶 ∪ 调用点字面量标签」（三者均动态建桶）。
   section('v2.22.0 块：展示映射漂移（UI 键集 == 引擎真源键集，含负向自证）');
   {
-    const SM_FILES = ['ui/panel.js', 'engines/evolution.js', 'engines/editor-faction.js', 'render/inject.js', 'core/settings-bus.js', 'core/store.js'];
+    const SM_FILES = ['ui/panel.js', 'engines/evolution.js', 'engines/editor-faction.js', 'engines/tool-diag.js', 'render/inject.js', 'core/settings-bus.js', 'core/store.js'];
     const smSrcs = {};
     SM_FILES.forEach(function (f) { smSrcs[f] = fs.readFileSync(path.join(BASE, f), 'utf8'); });
     const smBase = __uiGateCheckSrcMaps();
@@ -12570,8 +12570,16 @@ assert(verF2500 === '2.22.0' && mfF2500.version === verF2500, '入口与清单�
     const smNeg4 = __uiGateCheckSrcMaps({ srcOverride: { 'engines/editor-faction.js': smDoc4 } });
     assert(smNeg4.failures.length > 0 && smNeg4.failures.join('').indexOf('鼎盛') > 0,
       '（负向）编辑器状态集与引擎真源漂移被判据抓到');
-    console.log('  ✓ 十面门禁：UI 展示映射键集 == 引擎真源键集（' + smBase.groups.length + ' 组）');
-    console.log('  ✓ 负向自证：枚举漂移 / 桶标签漂移 / 真源漂移 / 引擎↔引擎漂移均被源码级判据抓到');
+    //   ⑤ 诊断包消费端漂移：tool-diag 的写侧标签表删掉 verify ⇒ 与 writeFailedBy 失配。
+    const smDoc5 = smSrcs['engines/tool-diag.js'].replace(
+      ',' + '\n' + '        verify: ' + Q + '写后读回不一致' + Q,
+      '');
+    assert(smDoc5 !== smSrcs['engines/tool-diag.js'], '（负向自证）诊断包标签漂移注入点命中（tool-diag 删 verify）');
+    const smNeg5 = __uiGateCheckSrcMaps({ srcOverride: { 'engines/tool-diag.js': smDoc5 } });
+    assert(smNeg5.failures.length > 0 && smNeg5.failures.join('').indexOf('verify') > 0,
+      '（负向）诊断包标签表漂移被判据抓到');
+    console.log('  ✓ 十面门禁：UI/诊断/编辑器展示映射键集 == 引擎真源键集（' + smBase.groups.length + ' 组）');
+    console.log('  ✓ 负向自证：枚举漂移 / 桶标签漂移 / 真源漂移 / 引擎↔引擎 / 诊断包漂移均被源码级判据抓到');
   }
   // ══════════════════════════════════════════════════════════════════
   // v2.14.0 块：随机源治理（第八面：可复现性）

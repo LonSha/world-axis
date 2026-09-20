@@ -211,9 +211,12 @@ function checkSrcMaps(opts) {
   function declKeys(anchor) { return _wdKeysOf(_wdObjAt(sb, anchor)); }
   function callTags(fn) { const s = []; const RX = new RegExp(fn + "\\(\\s*'([^']+)'", 'g'); let mm; while ((mm = RX.exec(sb))) if (s.indexOf(mm[1]) < 0) s.push(mm[1]); return s; }
   function uni(a, b) { return Array.from(new Set(a.concat(b))).sort(); }
-  check('WS_LABEL', _wdKeysOf(_wdObjAt(panel, 'missingKey: ')), uni(declKeys('missingKey: 0, stringify: 0'), callTags('noteFail')));
-  check('rSrcTxt', _wdKeysOf(_wdObjAt(panel, "guarded: '删完仍在'")), uni(declKeys('guarded: 0, missing: 0'), callTags('noteRemoveFail')));
-  check('rdSrcTxt', _wdKeysOf(_wdObjAt(panel, "read: '存储层读取'")), uni(declKeys('read: 0, parse: 0, migrate: 0, copy: 0'), callTags('noteReadFail')));
+  const WB = uni(declKeys('missingKey: 0, stringify: 0'), callTags('noteFail'));
+  const RB = uni(declKeys('guarded: 0, missing: 0'), callTags('noteRemoveFail'));
+  const sbTags = uni(declKeys('read: 0, parse: 0, migrate: 0, copy: 0'), callTags('noteReadFail'));
+  check('WS_LABEL', _wdKeysOf(_wdObjAt(panel, 'missingKey: ')), WB);
+  check('rSrcTxt', _wdKeysOf(_wdObjAt(panel, "guarded: '删完仍在'")), RB);
+  check('rdSrcTxt', _wdKeysOf(_wdObjAt(panel, "read: '存储层读取'")), sbTags);
   // store 读侧：noteStoreReadFail 字面量 ∪ 各模块 store.reportReadFail 投递点
   const stTags = [];
   { const RX = /noteStoreReadFail\(\s*'([^']+)'/g; let mm; while ((mm = RX.exec(st))) if (stTags.indexOf(mm[1]) < 0) stTags.push(mm[1]); }
@@ -232,6 +235,12 @@ function checkSrcMaps(opts) {
   const ef = _wdRead('engines/editor-faction.js', ov);
   check('editorFaction.STATUSES↔FACTION_STATUS', _wdArr(ef, 'STATUSES'), _wdArr(evo, 'FACTION_STATUS'));
   check('editorFaction.RELATIONS↔FACTION_RELATION', _wdArr(ef, 'RELATIONS'), _wdArr(evo, 'FACTION_RELATION'));
+  // v2.22.0: 诊断包消费端 engines/tool-diag.js 亦自带标签表（第三/四份真源）——诊断是同族
+  //   缺陷的**第二处高发区**：用户导出诊断包排查故障时，桶名若对不上，看到的又是裸桶名。
+  const td = _wdRead('engines/tool-diag.js', ov);
+  check('toolDiag.WRITE_SRC_LABEL', _wdKeysOf(_wdObjAt(td, 'const WRITE_SRC_LABEL = {')), WB);
+  check('toolDiag.removeLabel', _wdKeysOf(_wdObjAt(td, "guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒'")), RB);
+  check('toolDiag.readLabel', _wdKeysOf(_wdObjAt(td, "read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝'")), sbTags);
 
   const failures = [];
   groups.forEach(function (g) {

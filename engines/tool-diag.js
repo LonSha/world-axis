@@ -1068,7 +1068,8 @@
       //   来源分类 bySource 由写出口统一记账（本版收口后覆盖全部写路径，见 settings-bus 的 lsWrite）。
       const WRITE_SRC_LABEL = { missingKey: '登记项缺key(实现缺陷)', stringify: '值不可序列化(实现缺陷)',
         setItem: '写盘被拒(配额/隐私模式)', writeback: '迁移回写', rawRevive: '格式复活',
-        quarantine: '损坏隔离副本', legacy: '旧键迁移', stamp: '结构指纹' };
+        quarantine: '损坏隔离副本', legacy: '旧键迁移', stamp: '结构指纹',
+        verify: '写后读回不一致' };
       const wBy = wD.bySource || {};
       const srcTxt = Object.keys(wBy).filter(function (k) { return wBy[k] > 0; })
         .map(function (k) { return (WRITE_SRC_LABEL[k] || k) + '×' + wBy[k]; }).join('、');
@@ -1110,7 +1111,7 @@
     else if (rmD && rmD.lastRemoveError) {
       const byR = rmD.removeFailedBy || {};
       const srcRTxt = Object.keys(byR).filter(function (k) { return byR[k] > 0; })
-        .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口' }[k] || k) + '×' + byR[k]; }).join('、');
+        .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口', verifyBack: '写后/删后复核读回' }[k] || k) + '×' + byR[k]; }).join('、');
       issues.push({ level: 'warn', key: 'settingsBus.remove',
         detail: '设置键删除失败 ' + rmD.removeFailed + ' 次（成功 ' + rmD.removes + ' 次）'
           + (srcRTxt ? '，来源：' + srcRTxt : '')
@@ -1131,7 +1132,10 @@
     } else if (rdD && rdD.readFailed > 0) {
       const byRd = rdD.bySource || {};
       const srcTxt = Object.keys(byRd).filter(function (k) { return byRd[k] > 0; })
-        .map(function (k) { return ({ read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝' }[k] || k) + '×' + byRd[k]; }).join('、');
+        .map(function (k) { return ({ read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝',
+          rmExisted: '受控删除的存在性探测', verifyBack: '写后/删后复核读回', legacyRead: 'legacy 旧键读取',
+          saveInherit: '保存时继承结构指纹', subkeyAudit: '子键缺口盘点', pendingOrphan: '幽灵键盘点',
+          verifyDefaults: '默认值声明校验', lsRaw: '幽灵设置盘点原文' }[k] || k) + '×' + byRd[k]; }).join('、');
       issues.push({ level: 'warn', key: 'settingsBus.readFailed',
         detail: '设置读取失败 ' + rdD.readFailed + ' 次' + (srcTxt ? '（来源：' + srcTxt + '）' : '')
           + (rdD.lastError ? '，最近原因 ' + String(rdD.lastError).slice(0, 80) : '')
