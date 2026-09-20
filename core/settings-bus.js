@@ -413,8 +413,15 @@
     stats.writeFailed++;
     try {
       const t = tag || 'setItem';
-      if (stats.writeFailedBy && stats.writeFailedBy[t] !== undefined) stats.writeFailedBy[t]++;
-      else if (stats.writeFailedBy) stats.writeFailedBy.setItem++;
+      if (stats.writeFailedBy) {
+        // v2.24.0: 与 noteRemoveFail / noteReadFail 统一为**未知来源动态建桶**。此前本函数
+        //   用白名单判定（`writeFailedBy[t] !== undefined`）+ 兜底塞进 setItem：一旦新增写
+        //   路径忘了登记桶，失败就被**静默误归因成「写盘被拒」**——用户会去查配额/隐私模式，
+        //   而实际问题在别处。三面记账对「未知来源」的策略必须一致（读/删侧自 v2.9.0/v2.10.0
+        //   起已是动态建桶，写侧是唯一会误导归因的一面）。桶名归一：settingsBus.write → settings。
+        const wKey = (t === 'settingsBus.write') ? 'settings' : t;
+        stats.writeFailedBy[wKey] = (stats.writeFailedBy[wKey] || 0) + 1;
+      }
     } catch (eC) { /* 分类计量失败不影响主计量 */ }
     const msg = String((err && (err.message || err)) || err);
     stats.lastWriteError = (prefix || ((tag || 'setItem') + ': ')) + msg.slice(0, 160);

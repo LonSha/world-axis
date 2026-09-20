@@ -9811,7 +9811,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.23.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.24.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10355,7 +10355,7 @@ assert(verF2500 === '2.23.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.23.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.24.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10646,7 +10646,7 @@ assert(verF2500 === '2.23.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.23.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.24.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11169,7 +11169,7 @@ assert(verF2500 === '2.23.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.23.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.24.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11557,7 +11557,7 @@ assert(verF2500 === '2.23.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.23.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.24.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11927,7 +11927,7 @@ assert(verF2500 === '2.23.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.23.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.24.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12292,7 +12292,7 @@ assert(verF2500 === '2.23.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.23.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.24.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -12617,6 +12617,37 @@ assert(verF2500 === '2.23.0' && mfF2500.version === verF2500, '入口与清单�
       assert(!/readFailedDetail:\s*\(function\s*\(\s*\)\s*\{[\s\S]*?Object\.keys\(__readStat\.bySource\)/.test(smDoc7),
         '（负向）退化后的明细被动态枚举判据判否');
       console.log('  ✓ v2.23.0：动态桶明细表为全来源枚举（防「硬编码子集」，含负向自证）');
+    }
+    //   v2.24.0：三面记账对「未知来源」的策略必须一致（禁白名单+静默兜底）。
+    //   命题：settings-bus 的写/删/读三面各有归类记账函数（noteFail / noteRemoveFail / noteReadFail）。
+    //   读/删侧自 v2.9.0/v2.10.0 起对未知来源**动态建桶**；写侧 noteFail 却用白名单判定
+    //   （`writeFailedBy[t] !== undefined`）+ 把未知 tag 静默塞进兜底桶 `setItem`。新写路径一旦
+    //   漏登记桶，其失败就被**误归因成「写盘被拒」**——用户去查配额/隐私模式，而真正的问题在别处。
+    //   这与本仓库反复治的「归因不实」同型，也是三面记账唯一不一致的一面。
+    //   判据（源码级）：三个记账函数对未知来源都必须走「有则自增、无则建桶」，且写侧须做桶名归一。
+    {
+      const sbD = smSrcs['core/settings-bus.js'];
+      // 写侧（v2.24.0 修）：未知来源动态建桶 + 桶名归一
+      assert(sbD.indexOf('writeFailedBy[wKey] = (stats.writeFailedBy[wKey] || 0) + 1') > 0,
+        '（正向）noteFail 未知来源动态建桶（不得白名单+静默兜底）');
+      assert(sbD.indexOf("(t === 'settingsBus.write') ? 'settings' : t") > 0,
+        '（正向）写侧桶名归一 settingsBus.write → settings');
+      // 删侧（v2.9.0 既有）：未知来源动态建桶
+      assert(sbD.indexOf('by[key] = (by[key] || 0) + 1') > 0,
+        '（正向）noteRemoveFail 未知来源动态建桶');
+      // 读侧（v2.10.0 既有）：未知来源动态建桶——三面策略一致
+      assert(sbD.indexOf('by[t] = (by[t] || 0) + 1') > 0,
+        '（正向）noteReadFail 未知来源动态建桶（与写/删侧一致）');
+      // 自洽：写侧声明表在场（缺则整条台账空转）
+      assert(/writeFailedBy:\s*\{[^}]*setItem:\s*0[^}]*\}/.test(sbD), '（自洽）writeFailedBy 声明表在场');
+      // 负向自证：把写侧改回「白名单+静默兜底」⇒ 判据必须现形
+      const sbDoc24 = sbD.replace(
+        "        const wKey = (t === 'settingsBus.write') ? 'settings' : t;\n        stats.writeFailedBy[wKey] = (stats.writeFailedBy[wKey] || 0) + 1;",
+        "        if (stats.writeFailedBy[t] !== undefined) stats.writeFailedBy[t]++;\n        else stats.writeFailedBy.setItem++;");
+      assert(sbDoc24 !== sbD, '（负向自证）写侧兜底退化注入点命中（改回白名单+静默兜底）');
+      assert(sbDoc24.indexOf('writeFailedBy[wKey] = (stats.writeFailedBy[wKey] || 0) + 1') < 0,
+        '（负向）退化后的 noteFail 被动态建桶判据判否');
+      console.log('  ✓ v2.24.0：写/删/读三面记账未知来源一律动态建桶（防「白名单+静默兜底」，含负向自证）');
     }
   }
   // ══════════════════════════════════════════════════════════════════
