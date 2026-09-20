@@ -241,6 +241,32 @@ function checkSrcMaps(opts) {
   check('toolDiag.WRITE_SRC_LABEL', _wdKeysOf(_wdObjAt(td, 'const WRITE_SRC_LABEL = {')), WB);
   check('toolDiag.removeLabel', _wdKeysOf(_wdObjAt(td, "guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒'")), RB);
   check('toolDiag.readLabel', _wdKeysOf(_wdObjAt(td, "read: '存储层读取', parse: '值解析', migrate: '迁移', copy: '返回值拷贝'")), sbTags);
+  // v2.22.0: 事件阶段序列（有序列表）在全库有 4 份副本——`editorEvents.TYPE_STAGES` 是 de-facto
+  //   真源（`stagesOf` 是 backstage / inspectorState 都优先调用的公共访问器），但 evolution 的
+  //   `STAGE_MAP`、backstage 的「紧急兜底」、inspector-state 的「无 editorEvents 兜底」各写一份。
+  //   兜底/副本一旦与规范阶段集脱钩，同一条事件会被写成规范集之外的 stage——它不在任何枚举里，
+  //   isTerminal/推进逻辑全都认不出（写进去读出来不一样，还不报错）。
+  //   注：`TERMINAL` 各文件语义不一（evolution 视「已爆发」为终态、editorEvents 只认「已消散」、
+  //   ledger 取两者并集），属**设计分歧**而非复制漂移，故本判据只收「有序阶段序列」。
+  const ee = _wdRead('engines/editor-events.js', ov);
+  const bs = _wdRead('engines/backstage.js', ov);
+  const evo2 = _wdRead('engines/evolution.js', ov);
+  const ins = _wdRead('engines/inspector-state.js', ov);
+  function _wdArrLit(lit) { return vm.runInNewContext('(' + lit + ')'); }
+  const eeConflict = _wdArrLit(ee.match(/conflict:\s*(\[[^\]]*\])/)[1]);
+  const eeProgress = _wdArrLit(ee.match(/progress:\s*(\[[^\]]*\])/)[1]);
+  const mbs = bs.match(/type === 'progress' \? (\[[^\]]*\]) : (\[[^\]]*\])/);
+  if (!mbs) throw new Error('drift: cannot find backstage event-stage fallback');
+  check('backstage.fallback.progress', _wdArrLit(mbs[1]), eeProgress);
+  check('backstage.fallback.conflict', _wdArrLit(mbs[2]), eeConflict);
+  const msm = evo2.match(/STAGE_MAP = \{ conflict:\s*(\[[^\]]*\]),\s*progress:\s*(\[[^\]]*\])/);
+  if (!msm) throw new Error('drift: cannot find evolution.STAGE_MAP');
+  check('evolution.STAGE_MAP.conflict', _wdArrLit(msm[1]), eeConflict);
+  check('evolution.STAGE_MAP.progress', _wdArrLit(msm[2]), eeProgress);
+  const mins = ins.match(/=== 'progress'\s*\?\s*(\[[^\]]*\])\s*:\s*(\[[^\]]*\])/);
+  if (!mins) throw new Error('drift: cannot find inspector-state stage fallback');
+  check('inspectorState.fallback.progress', _wdArrLit(mins[1]), eeProgress);
+  check('inspectorState.fallback.conflict', _wdArrLit(mins[2]), eeConflict);
 
   const failures = [];
   groups.forEach(function (g) {
