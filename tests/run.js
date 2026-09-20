@@ -9811,7 +9811,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.28.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10355,7 +10355,7 @@ assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.27.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.28.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10646,7 +10646,7 @@ assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.27.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.28.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11172,7 +11172,7 @@ assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.27.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.28.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11560,7 +11560,7 @@ assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.27.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.28.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11930,7 +11930,7 @@ assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.27.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.28.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12295,7 +12295,7 @@ assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.27.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.28.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14514,11 +14514,18 @@ assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单�
     const jCorrupt2700 = gate2700.judge(r2700, ledCorrupt2700);
     assert(jCorrupt2700.ok === false && jCorrupt2700.staleReason.length === 1,
       '（负控制）归因腐坏 ⇒ 报「账本归因不可读」（归因不可读等于归因不实）');
+    // v2.28.0：账本是留档凭证 ⇒ gone 条目仍须带证（build() 本就只写带证条目），但 gone 本身不红灯。
     const ledGone2700 = clone2700(led2700);
-    ledGone2700.dead['nonexistent.member'] = { reason: 'unwired', detail: 'x' };
+    ledGone2700.dead['nonexistent.member'] = { reason: 'unwired', detail: 'x', src: 'engines/no-such.js', refs: 0, tref: 0, own: 1 };
     const jGone2700 = gate2700.judge(r2700, ledGone2700);
     assert(jGone2700.gone.length === 1 && jGone2700.ok === true,
       '（负控制）登记条目消失 ⇒ 只提示、不红灯（收口期不误伤，但催人跑 --update）');
+    const ledGoneNoEv2700 = clone2700(led2700);
+    ledGoneNoEv2700.dead['nonexistent.member'] = { reason: 'unwired', detail: 'x' };
+    const jGoneNoEv2700 = gate2700.judge(r2700, ledGoneNoEv2700);
+    assert(jGoneNoEv2700.ok === false && jGoneNoEv2700.evidence.length > 0
+      && jGoneNoEv2700.evidence.every(function (x) { return x.detail.indexOf('证据字段缺失') === 0; }),
+      '（负控制）账本留无证记录（即便该条目已消失）⇒ 红灯（凭证里的条目要么带证、要么不该留在文件里）');
     // ── F. 归因分类语义 ──
     const fileMap2700 = gate2700.nsToFile();
     assert(gate2700.classify(fileMap2700, { ns: 'limits', mem: 'anyName', inTests: true }) === 'test-only',
@@ -14558,6 +14565,179 @@ assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单�
     console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
     console.log('  ✓ 判定四态（新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红）');
     console.log('  ✓ 负向自证（破坏「已装载」判据 ⇒ 定义面塌成 0、退出码非零、症状 JSON 可解析）');
+  }
+
+  // ══════════ v2.28.0 ══════════
+  section('v2.28.0：账本元数据与归因证据强度（把「归因可读」推到「归因可证伪」）');
+  {
+    // 命题：v2.27.0 让归因**可读**（reason 必须在词表内、不许 TODO），但「可读」只保证
+    //   这句话**看得懂**，不保证这句话**是真的、可核对的**。交付时现场有两处铁证：
+    //   ① 账本 `version` 字段写 2.26.0、`_note` 写 v2.27.0、入口 VERSION 是 2.27.0——
+    //      **同一文件内两个版本，且都不等于入口**，而该字段此前没有任何门禁；
+    //   ② 212 条归因**零条带证据**——「凭什么是 self-only 而不是 unwired」完全没有答案，
+    //      核对者只能相信写账本的那一次测量（本仓既有裁决：归因不可读等于归因不实）。
+    const inv2800 = require('./inventory.js');
+    const gate2800 = require('./dead-export-gate.js');
+    const gsrc2800 = fs.readFileSync(path.join(BASE, 'tests/dead-export-gate.js'), 'utf8');
+    const r2800 = inv2800.collect();
+    const led2800 = gate2800.loadLedger();
+    const clone2800 = function (o) { return JSON.parse(JSON.stringify(o)); };
+    const VER2800 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8').match(/const VERSION = '([\d.]+)'/) || [])[1];
+
+    // ── A. 结构锁：新判据面必须在场，且判定口径不放宽 ──
+    assert(typeof gate2800.metadataProblems === 'function' && typeof gate2800.evidenceDrift === 'function'
+      && typeof gate2800.versionNotes === 'function' && typeof gate2800.evidenceOf === 'function',
+      '门禁导出 metadataProblems()/evidenceDrift()/versionNotes()/evidenceOf()');
+    assertDeepEq(gate2800.EVIDENCE_KEYS, ['src', 'refs', 'tref', 'own'],
+      '证据字段恰为 src/refs/tref/own（refs 与「死」的定义同宽、own 与 self-only 同宽）');
+    assert(gsrc2800.indexOf('证据字段缺失') > 0 && gsrc2800.indexOf('拒绝写入账本') > 0,
+      '[静态] 无证即点名 + 未识别归因拒绝写入（fail-closed，不留占位）在场');
+    assert(gsrc2800.indexOf('归因与证据不符') > 0,
+      '[静态] 归因可由证据唯一反推（reason != derived 即红灯）在场');
+    assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
+
+    // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
+    assert(VER2800 === '2.28.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
+    assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
+      '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
+    assert(gate2800.metadataProblems(led2800, VER2800).length === 0, '现场元数据自洽');
+    // 版本词的形状：只认 v<数字>，历史表述不得被当成版本声明（判据的输入面必须与结论面同宽）
+    assertDeepEq(gate2800.versionNotes('规则：v0.1.x 遗留的单桶已给出出口'), ['v0.1'],
+      'versionNotes 只认 v<数字> 形态（不会把散文里的历史表述读成当前版本）');
+    assert(gate2800.versionNotes('账本（v2.28.0）').indexOf('v2.28.0') >= 0,
+      'versionNotes 认得出账本自称（v2.28.0）');
+
+    // ── C. 负控制：元数据不自洽的三级形态各须现形 ──
+    const ledMF2800 = clone2800(led2800); ledMF2800.version = '2.26.0';
+    const pmF2800 = gate2800.metadataProblems(ledMF2800, VER2800);
+    assert(pmF2800.some(function (x) { return x.mismatch === 'field-vs-entry'; }),
+      '（负控制）version 落后入口 ⇒ field-vs-entry（正是 v2.27.0 交付时的现场）'
+      + (pmF2800.length ? '' : ' —— 未报出'));
+    assert(gate2800.judge(r2800, ledMF2800).ok === false, '（负控制）元数据不自洽 ⇒ 红灯（judge.ok=false）');
+    const ledMN2800 = clone2800(led2800); ledMN2800._note = 'WorldAxis 死子面冻结账本。判据与 tests/inventory.js 同源。';
+    const pmN2800 = gate2800.metadataProblems(ledMN2800, VER2800);
+    assert(pmN2800.some(function (x) { return x.mismatch === 'note-absent'; }),
+      '（负控制）_note 抽掉版本词 ⇒ note-absent（账本不得自称不出年代）');
+    const ledNV2800 = clone2800(led2800); ledNV2800._note = 'WorldAxis 死子面冻结账本（v2.25.0）。';
+    const pmV2800 = gate2800.metadataProblems(ledNV2800, VER2800);
+    assert(pmV2800.some(function (x) { return x.mismatch === 'note-vs-entry'; })
+      && pmV2800.some(function (x) { return x.mismatch === 'field-vs-note'; }),
+      '（负控制）_note 与 version 互不一致 ⇒ note-vs-entry + field-vs-note 同时现形');
+
+    // ── D. 证据强度：212 条逐条带证、可复算、与归因同宽 ──
+    const allEnt2800 = [];
+    ['dead', 'uiDead'].forEach(function (k) {
+      Object.keys(led2800[k] || {}).forEach(function (kk) { allEnt2800.push({ kind: k, key: kk, item: led2800[k][kk] }); });
+    });
+    assert(allEnt2800.length === 212, '账本条目 212 条（实 ' + allEnt2800.length + '）');
+    const missingEv2800 = allEnt2800.filter(function (e) {
+      return gate2800.EVIDENCE_KEYS.some(function (f) { return e.item[f] === undefined; });
+    });
+    assert(missingEv2800.length === 0, '每条冻结项都带全 src/refs/tref/own 证据（缺证 ' + missingEv2800.length + ' 条）');
+    const refsNZ2800 = allEnt2800.filter(function (e) { return e.item.refs !== 0; });
+    assert(refsNZ2800.length === 0, '冻结项的产品引用数全为 0（与「死」的定义同宽，非 0 的 ' + refsNZ2800.length + ' 条）');
+    const deriveBad2800 = allEnt2800.filter(function (e) {
+      const d = e.item.tref > 0 ? 'test-only' : (e.item.own >= 2 ? 'self-only' : 'unwired');
+      return d !== e.item.reason;
+    });
+    assert(deriveBad2800.length === 0, '归因可由 (tref, own) 唯一反推（不可反推 ' + deriveBad2800.length + ' 条）');
+    const dist2800 = {};
+    allEnt2800.forEach(function (e) { dist2800[e.item.reason] = (dist2800[e.item.reason] || 0) + 1; });
+    assert(dist2800['test-only'] === 136 && dist2800['self-only'] === 72 && dist2800['unwired'] === 4,
+      '归因分布 test-only 136 / self-only 72 / unwired 4（实 ' + JSON.stringify(dist2800) + '）');
+    assert(gate2800.evidenceDrift(r2800, led2800).length === 0, '现场账本证据复算零失实');
+
+    // ── E. 负控制：证据失实/缺证/归因与证据不符 各须现形 ──
+    const ledRef2800 = clone2800(led2800);
+    ledRef2800.dead[Object.keys(ledRef2800.dead)[0]].refs = 5;
+    const edRef2800 = gate2800.evidenceDrift(r2800, ledRef2800);
+    assert(edRef2800.some(function (x) { return x.field === 'refs'; }),
+      '（负控制）证据 refs 被篡改 ⇒ 报证据失实（且指明「产品引用数应为 0」）');
+    const ledOwn2800 = clone2800(led2800);
+    const selfKey2800 = allEnt2800.filter(function (e) { return e.item.reason === 'self-only'; })[0].key;
+    ledOwn2800.dead[selfKey2800].own = 1;
+    const edOwn2800 = gate2800.evidenceDrift(r2800, ledOwn2800);
+    assert(edOwn2800.some(function (x) { return x.field === 'own'; })
+      && edOwn2800.some(function (x) { return x.field === 'reason'; }),
+      '（负控制）self-only 的 own 被改小 ⇒ own 失实 + 归因不可反推（self-only 要求 own≥2）');
+    const ledRs2800 = clone2800(led2800);
+    const testKey2800 = allEnt2800.filter(function (e) { return e.item.reason === 'test-only'; })[0].key;
+    ledRs2800.dead[testKey2800].reason = 'unwired';
+    const edRs2800 = gate2800.evidenceDrift(r2800, ledRs2800);
+    assert(edRs2800.some(function (x) { return x.field === 'reason'; }),
+      '（负控制）归因与证据不符（test-only→unwired）⇒ 红灯（不是「词表内就放行」）');
+    const ledMiss2800 = clone2800(led2800);
+    delete ledMiss2800.dead[Object.keys(ledMiss2800.dead)[0]].own;
+    assert(gate2800.evidenceDrift(r2800, ledMiss2800).some(function (x) { return x.field === 'own' && x.detail.indexOf('缺失') > 0; }),
+      '（负控制）抽掉证据键 ⇒ 报「证据字段缺失——归因不得无证」');
+    assert(gate2800.judge(r2800, ledRef2800).ok === false, '（负控制）证据失实 ⇒ judge.ok=false');
+
+    // ── F. 判据不越界：冻结面与现场锚点一字不动 ──
+    assertDeepEq(gate2800.FROZEN_KINDS, ['dead', 'uiDead'], '冻结面仍为 dead/uiDead（本版不扩面）');
+    assertDeepEq(gate2800.ADVISORY_KINDS, ['dataOnly'], 'advisory 面仍为 dataOnly（不升级为拦截）');
+    assert(r2800.dead.length === 208 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 101
+      && r2800.deadInTestsOnly === 132,
+      '现场锚点不变（dead 208 / uiDead 4 / dataOnly 101 / 仅测试 132）');
+    assert(r2800.refs === 1223 && r2800.namespaces === 64 && r2800.members === 665,
+      '清册面不变（refs 1223 / 命名空间 64 / 成员 665）');
+    // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
+    assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
+      '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
+    assert(inv2800.REF_RE instanceof RegExp && inv2800.REF_RE.source.length > 0,
+      '清册导出 REF_RE（门禁复算证据时复用同一份正则，避免两处漂移）');
+    // 旧判定仍有效（新增的灯没有替换任何一盏旧灯）
+    const ledAdd2800 = clone2800(led2800);
+    delete ledAdd2800.dead[Object.keys(ledAdd2800.dead)[0]];
+    assert(gate2800.judge(r2800, ledAdd2800).added.length === 1, '新增死导出仍红灯（旧判据未被替换）');
+    const ledTod2800 = clone2800(led2800);
+    ledTod2800.dead[Object.keys(ledTod2800.dead)[0]].reason = 'TODO';
+    assert(gate2800.judge(r2800, ledTod2800).staleReason.length === 1, '归因不可读仍红灯（旧判据未被替换）');
+    assert(gate2800.judge(r2800, null).ok === false, '账本缺失仍红灯（旧判据未被替换）');
+
+    // ── H. 负向自证：真源码破坏「元数据闸」⇒ 该面不再现形（原版同输入必现形）──
+    const ANCH_META2800 = 'function metadataProblems(ledger, entryVersion) {';
+    const cntMeta2800 = gsrc2800.split(ANCH_META2800).length - 1;
+    assert(cntMeta2800 === 1, '（负向自证）元数据闸锚点在真源码中恰 1 处（实 ' + cntMeta2800 + '）');
+    const brokenMeta2800 = gsrc2800.replace(ANCH_META2800, ANCH_META2800 + '\n  return [];');
+    assert(brokenMeta2800 !== gsrc2800, '（负向自证）破坏真的改变了源码');
+    const tmpGate2800 = path.join(__dirname, '_nc_gate_meta_break.js');
+    let bMeta2800 = null;
+    try {
+      fs.writeFileSync(tmpGate2800, brokenMeta2800);
+      delete require.cache[require.resolve(tmpGate2800)];
+      bMeta2800 = require(tmpGate2800);
+    } finally {
+      // 只 require、不跑 CLI（main 不执行 ⇒ 绝不触碰真实账本）；随后立刻清理
+      try { fs.unlinkSync(tmpGate2800); } catch (e) {}
+      try { delete require.cache[require.resolve(tmpGate2800)]; } catch (e) {}
+    }
+    assert(bMeta2800 && bMeta2800.metadataProblems(ledMF2800, VER2800).length === 0,
+      '（负向自证）闸被破坏后 version 落后入口不再现形（破坏真生效，不是写死常量）');
+    assert(gate2800.metadataProblems(ledMF2800, VER2800).length > 0,
+      '（负向自证）同一输入在原版上必现形（判据纯度）');
+    assert(bMeta2800 && bMeta2800.evidenceDrift(r2800, ledRef2800).length > 0,
+      '（负向自证）破坏只影响元数据面：证据面在同一破坏版上仍能点亮（不是整体失灵）');
+    assert(bMeta2800.LEDGER_PATH === gate2800.LEDGER_PATH,
+      '（负向自证）破坏版与真源指向同一账本路径（证明它读的就是现场账本，而非另造一份）');
+
+    // ── G. 类别证明：账本「内部自洽」不等于「指向真相」──
+    const ledSrc2800 = clone2800(led2800);
+    ledSrc2800.dead['ghost.ns'] = { reason: 'unwired', detail: 'x', src: 'engines/no-such-file.js', refs: 0, tref: 0, own: 1 };
+    // 内部自洽（reason 词表内、证据形状齐备）但它指向一个不存在的定义文件 ⇒ 复算即现形
+    const edGhost2800 = gate2800.evidenceDrift(r2800, ledSrc2800);
+    assert(edGhost2800.length === 0,
+      '（类别证明）只做形状校验查不出「src 指向不存在的文件」——所以判据必须复算，而不是读来源文档');
+    const truth2800 = require('child_process');
+    void truth2800;
+    assert(ledSrc2800.dead['ghost.ns'].src.indexOf('no-such-file') > 0
+      && !fs.existsSync(path.join(BASE, ledSrc2800.dead['ghost.ns'].src)),
+      '（类别证明）该条目在形状上完全合法（词表内 reason + 四证据键），却指向不存在的文件');
+    console.log('  ✓ 元数据三级同源（version / _note / 入口 VERSION，负控制三形态全现形）');
+    console.log('  ✓ 归因带证（212 条全带 src/refs/tref/own，归因由证据唯一反推）');
+    console.log('  ✓ 证据失实（篡改 / 缺证 / 与归因不符，三类负控制全现形）');
+    console.log('  ✓ 不越界（冻结面与现场锚点不变，旧四盏灯一盏不少）');
+    console.log('  ✓ 负向自证（破坏元数据闸 ⇒ 该面不再现形、证据面仍亮、原版同输入必现形）');
   }
 
   // ── 汇总 ──

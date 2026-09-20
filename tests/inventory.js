@@ -42,7 +42,28 @@ const oi = diagSrc.indexOf('const OPTIONAL_EXPORTS = [');
 const oj = diagSrc.indexOf('];', oi);
 const OPTIONAL_EXPORTS = vm.runInNewContext('(' + diagSrc.slice(diagSrc.indexOf('[', oi), oj + 1) + ')');
 
-// ── 3. 装载（与 tests/run.js 同一上下文语义）──
+// ── 3. 引用面：静态扫描产品代码（v2.28.0 提到模块顶层，供门禁复用同一份扫描面与正则）──
+function productFiles() {
+  const out = [];
+  // v2.22.0: `tools/` 是零依赖诊断脚本（scan_drift 等），不导出命名空间、不属产品模块面；
+  //   与 tests/ 同例排除，否则每个诊断脚本都会以「未登记模块」形式挂在清册上（假阳性）。
+  const SKIP_DIRS = ['tests', 'tools'];
+  (function walk(dir) {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
+      if (e.name === '.git' || e.name === 'node_modules') return;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) return walk(p);
+      if (e.name.endsWith('.js') && SKIP_DIRS.indexOf(path.relative(BASE, dir)) < 0) out.push(path.relative(BASE, p));
+    });
+  })(BASE);
+  return out.sort();
+}
+const PROD = productFiles();
+// 引用面正则：`WA.x.y` 与可选链 `WA.x?.y` 都算真引用；私有成员（`_` 前缀）与
+// 非接口命名空间（宿主级导出、数组下标）在下面两道 guard 里挡掉。
+const REF_RE = /WA\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g;
+
+// ── 4. 装载（与 tests/run.js 同一上下文语义）──
 // v2.27.0: 抽成 collect() 后可被门禁（tests/dead-export-gate.js）复用同一份口径，
 //   不再有第二份「表面求差」实现 —— 单源是判据诚实的前提。
 function collect() {
@@ -112,26 +133,7 @@ function hasMember(ns, mem) {
   return !!(s && (s.api.has(mem) || s.data.has(mem)));
 }
 
-// ── 5. 引用面：静态扫描产品代码 ──
-function productFiles() {
-  const out = [];
-  // v2.22.0: `tools/` 是零依赖诊断脚本（scan_drift 等），不导出命名空间、不属产品模块面；
-  //   与 tests/ 同例排除，否则每个诊断脚本都会以「未登记模块」形式挂在清册上（假阳性）。
-  const SKIP_DIRS = ['tests', 'tools'];
-  (function walk(dir) {
-    fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
-      if (e.name === '.git' || e.name === 'node_modules') return;
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) return walk(p);
-      if (e.name.endsWith('.js') && SKIP_DIRS.indexOf(path.relative(BASE, dir)) < 0) out.push(path.relative(BASE, p));
-    });
-  })(BASE);
-  return out.sort();
-}
-const PROD = productFiles();
-// 引用面正则：`WA.x.y` 与可选链 `WA.x?.y` 都算真引用；私有成员（`_` 前缀）与
-// 非接口命名空间（宿主级导出、数组下标）在下面两道 guard 里挡掉。
-const REF_RE = /WA\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g;
+// ── 5. 引用面：静态扫描产品代码（面与正则见 §3 模块顶层，此处只消费）──
 const refs = [];              // { ns, mem, file, line, inComment }
 for (const rel of PROD) {
   const src = fs.readFileSync(path.join(BASE, rel), 'utf8');
@@ -260,4 +262,8 @@ if (require.main === module) {
   //   exitCode 只设码不强制退出，Node 在 stdout 排空后以该码结束，语义完全一致。
   process.exitCode = result.phantom.length ? 1 : 0;
 }
-module.exports = { collect: collect, MODULE_EXPORTS: MODULE_EXPORTS };
+// v2.28.0：向外导出 PRODUCT_FILES（产品文件扫描面）与 REF_RE（引用面正则），
+//   供 tests/dead-export-gate.js 复算「归因证据」时使用。证据的扫描面与正则必须与清册**同源**——
+//   若门禁自己再 walk 一遍目录、或另写一条引用正则，就会出现「证据说 refs>0、判据说该成员是死导出」
+//   这种自相矛盾（判据的输入面与结论面必须是同一件事）。
+module.exports = { collect: collect, MODULE_EXPORTS: MODULE_EXPORTS, PRODUCT_FILES: PROD, REF_RE: REF_RE };
