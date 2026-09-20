@@ -78,6 +78,12 @@ let m; while ((m = RE.exec(stTxt))) stTags.add(m[1]);
 });
 check('panel:LAB_P(store读侧)', keysOf(objAt(panel, "bytes: '按字节'")), Array.from(stTags).sort());
 
+// 引擎↔引擎重复真源：editor-faction 的 STATUSES/RELATIONS 必须等于 evolution 的 FACTION_STATUS/FACTION_RELATION
+const efTxt = rd('engines/editor-faction.js');
+const arrOf = (txt, name) => (new Function('return (' + txt.match(new RegExp(name + ' = (\\[[^\\]]*\\])'))[1] + ')'))();
+check('editorFaction.STATUSES↔FACTION_STATUS', arrOf(efTxt, 'STATUSES'), FACTION_STATUS);
+check('editorFaction.RELATIONS↔FACTION_RELATION', arrOf(efTxt, 'RELATIONS'), FACTION_RELATION);
+
 console.log('\n== 漂移扫描 ==');
 let bad = 0;
 report.forEach(r => {

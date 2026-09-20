@@ -225,6 +225,13 @@ function checkSrcMaps(opts) {
     while ((m3 = RX3.exec(t))) if (stTags.indexOf(m3[1]) < 0) stTags.push(m3[1]);
   });
   check('LAB_P', _wdKeysOf(_wdObjAt(panel, "bytes: '按字节'")), stTags.sort());
+  // v2.22.0: 引擎↔引擎的重复真源（同样是「第二份真源」，当前一致但无门禁保护）：
+  //   engines/editor-faction.js 的 STATUSES/RELATIONS 与 evolution 的 FACTION_STATUS/
+  //   FACTION_RELATION 各写一遍——编辑器接受的状态集与引擎合法状态集必须同源同值，
+  //   否则编辑出的势力状态会被引擎当成非法值回退（写进去读出来不一样，且无任何报错）。
+  const ef = _wdRead('engines/editor-faction.js', ov);
+  check('editorFaction.STATUSES↔FACTION_STATUS', _wdArr(ef, 'STATUSES'), _wdArr(evo, 'FACTION_STATUS'));
+  check('editorFaction.RELATIONS↔FACTION_RELATION', _wdArr(ef, 'RELATIONS'), _wdArr(evo, 'FACTION_RELATION'));
 
   const failures = [];
   groups.forEach(function (g) {

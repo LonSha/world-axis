@@ -12529,7 +12529,7 @@ assert(verF2500 === '2.22.0' && mfF2500.version === verF2500, '入口与清单�
   //   提取：枚举取常量数组；记账桶取「声明桶 ∪ 调用点字面量标签」（三者均动态建桶）。
   section('v2.22.0 块：展示映射漂移（UI 键集 == 引擎真源键集，含负向自证）');
   {
-    const SM_FILES = ['ui/panel.js', 'engines/evolution.js', 'render/inject.js', 'core/settings-bus.js', 'core/store.js'];
+    const SM_FILES = ['ui/panel.js', 'engines/evolution.js', 'engines/editor-faction.js', 'render/inject.js', 'core/settings-bus.js', 'core/store.js'];
     const smSrcs = {};
     SM_FILES.forEach(function (f) { smSrcs[f] = fs.readFileSync(path.join(BASE, f), 'utf8'); });
     const smBase = __uiGateCheckSrcMaps();
@@ -12537,7 +12537,7 @@ assert(verF2500 === '2.22.0' && mfF2500.version === verF2500, '入口与清单�
       assert(g.ok, '（正向）' + g.name + ' 键集与引擎真源一致（ui ' + g.ui + ' / eng ' + g.eng + '）',
         g.missing.length || g.ghost.length ? ('缺键[' + g.missing.join('、') + '] 幽灵键[' + g.ghost.join('、') + ']') : '');
     });
-    assert(smBase.failures.length === 0, '（正向）六组枚举/标签映射零漂移', smBase.failures.join('；'));
+    assert(smBase.failures.length === 0, '（正向）枚举/标签/引擎↔引擎映射零漂移', smBase.failures.join('；'));
     // 负向自证：判据必须抓得住「引擎加了值但 UI 没跟」与「UI 自造了引擎没有的键」两类漂移。
     //   ① 枚举漂移：把 ecoColor 的引擎真值「衰退」改写成幽灵键「萧条」⇒ 缺键 + 幽灵键双向现形。
     const Q = String.fromCharCode(39);
@@ -12563,8 +12563,15 @@ assert(verF2500 === '2.22.0' && mfF2500.version === verF2500, '入口与清单�
     const smNeg3 = __uiGateCheckSrcMaps({ srcOverride: { 'engines/evolution.js': smDoc3 } });
     assert(smNeg3.failures.length > 0 && smNeg3.failures.join('').indexOf('新兴') > 0,
       '（负向）引擎新增枚举值而 UI 未跟 ⇒ 缺键现形');
+    //   ④ 引擎↔引擎漂移：编辑器的势力状态集与引擎真源各写一份 ⇒ 改一份即须现形。
+    const smDoc4 = smSrcs['engines/editor-faction.js'].replace(
+      'STATUSES = [' + Q + '鼎盛' + Q, 'STATUSES = [' + Q + '强盛' + Q);
+    assert(smDoc4 !== smSrcs['engines/editor-faction.js'], '（负向自证）引擎↔引擎漂移注入点命中（STATUSES 鼎盛→强盛）');
+    const smNeg4 = __uiGateCheckSrcMaps({ srcOverride: { 'engines/editor-faction.js': smDoc4 } });
+    assert(smNeg4.failures.length > 0 && smNeg4.failures.join('').indexOf('鼎盛') > 0,
+      '（负向）编辑器状态集与引擎真源漂移被判据抓到');
     console.log('  ✓ 十面门禁：UI 展示映射键集 == 引擎真源键集（' + smBase.groups.length + ' 组）');
-    console.log('  ✓ 负向自证：枚举漂移 / 桶标签漂移 / 真源漂移均被源码级判据抓到');
+    console.log('  ✓ 负向自证：枚举漂移 / 桶标签漂移 / 真源漂移 / 引擎↔引擎漂移均被源码级判据抓到');
   }
   // ══════════════════════════════════════════════════════════════════
   // v2.14.0 块：随机源治理（第八面：可复现性）
