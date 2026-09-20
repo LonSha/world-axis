@@ -4,6 +4,9 @@ require('./mock.js');
 // v2.12.0: UI render-path gate host environment (mini-DOM + isolated UI load). fresh()/checkPages() are reused verbatim by the v2.12.0 block below.
 const __uiGate = require('./ui-gate-sync.js');
 const __uiGateFresh = __uiGate.fresh, __uiGateCheckPages = __uiGate.checkPages;
+// v2.21.0: 控件可点性探针（第九面）。与 checkPages 互补：checkPages 管「控件成树」，
+//   checkClickable 管「控件被点会不会抛」——同步抛出 + 未处理 Promise 拒绝两面合一。
+const __uiGateCheckClickable = __uiGate.checkClickable;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -9805,7 +9808,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.21.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10349,7 +10352,7 @@ assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.20.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.21.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10640,7 +10643,7 @@ assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.20.0', '入口版本为 2.20.0（实 ' + ver + '）');
+    assert(ver === '2.21.0', '入口版本为 2.21.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11163,7 +11166,7 @@ assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.20.0', '入口版本为 2.20.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.21.0', '入口版本为 2.21.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11551,7 +11554,7 @@ assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.20.0', '入口版本为 2.20.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.21.0', '入口版本为 2.21.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11921,7 +11924,7 @@ assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.20.0', '入口版本为 2.20.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.21.0', '入口版本为 2.21.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12286,7 +12289,7 @@ assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.20.0', '入口版本为 2.20.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.21.0', '入口版本为 2.21.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -12459,6 +12462,40 @@ assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单�
       assert(envShell.dom.getElementById('wa-panel') === null,
         '（负向）未装载 UI 时面板不存在（探针判据来自真实渲染，不是常量）');
     }
+    section('G18 控件可点性（v2.21.0 第九面：点了会不会抛）');
+    {
+      // G17 只验证「控件**成树**」，不验证「控件**可点**」。真缺陷恰在后者：
+      //   设置页 async 出口在 await **之后**才写 out().textContent，而 out() 每次重查，
+      //   其间面板重绘使节点离树 ⇒ TypeError；面板三处裸 prompt 在无 prompt 宿主里
+      //   ReferenceError，而它们是唯一入口。探针口径见 ui-gate-sync.checkClickable。
+      const envC = __uiGateFresh();
+      const rc = await __uiGateCheckClickable(envC);
+      assert(rc.controls >= 100, '（正向）逐页控件被真实点到（实 ' + rc.controls + ' 个）');
+      assert(rc.thrown.length === 0, '（正向）全部控件点击零同步抛出', rc.thrown.join('；'));
+      assert(rc.rejections.length === 0, '（正向）点击后无未处理 Promise 拒绝', rc.rejections.join('；'));
+      const srcP18 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+      const bA18 = srcP18.replace(
+        "const v = askText('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)",
+        "const v = prompt('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)");
+      assert(bA18 !== srcP18, '（自证）负向注入点 A 命中（世界钟裸 prompt）');
+      const rcA = await __uiGateCheckClickable(__uiGateFresh({ srcOverride: { 'ui/panel.js': bA18 } }));
+      assert(rcA.thrown.length > 0, '（负向）裸 prompt 的 ReferenceError 被同步抛出抓到（实 ' + rcA.thrown.length + ' 项）');
+      const srcS18 = fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8');
+      const bB18 = srcS18.replace(
+        'const setOut = function (text) { const o = out(); if (o) o.textContent = text; };',
+        'const setOut = function (text) { out().textContent = text; };');
+      assert(bB18 !== srcS18, '（自证）负向注入点 B 命中（settings 判空出口）');
+      const rcB = await __uiGateCheckClickable(__uiGateFresh({ srcOverride: { 'ui/settings.js': bB18 } }));
+      assert(rcB.rejections.length > 0, '（负向）异步出口写回失败的未处理拒绝被拿到（实 ' + rcB.rejections.length + ' 项）');
+    }
+    // v2.21.0: 总线复位。本进程把模块反复装载进**同一个** global.WorldAxis，而总线监听登记
+    //   在每次装载 core 时被重建——于是「最后一个 fresh() 决定总线残留监听器数」。
+    //   G17-G 以 fresh({files:[]})（不装 ui/*）收尾，故此后总线是裸的；G18 会多次装
+    //   带面板的 UI（面板在 buildPanel 时按 STATE_EVENTS 订阅 backstage:settled /
+    //   chat:changed），若不收尾，末尾留下的那份订阅会污染后续 G21 的
+    //   「休眠期这两个事件无人监听」判定——那是装置耦合，不是产品缺陷。
+    //   故显式以不装 UI 的一份环境收尾（与 G17-G 同一惯例），把总线复位成裸态。
+    __uiGateFresh({ files: [] });
 
     console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
     console.log('UI 渲染路径门禁：通过 ' + pass.length + ' / 失败 ' + fail.length);
@@ -12467,7 +12504,7 @@ assert(verF2500 === '2.20.0' && mfF2500.version === verF2500, '入口与清单�
     return { pass: pass.length, fail: fail.length, failures: fail.slice() };
   }
     const __uiGateRes = await __uiGateBlocks();
-    assert(__uiGateRes.pass >= 40, '（正向）G17 断言数 ≥ 40（实 ' + __uiGateRes.pass + '）');
+    assert(__uiGateRes.pass >= 46, '（正向）G17+G18 断言数 ≥ 46（实 ' + __uiGateRes.pass + '）');
     assert(__uiGateRes.fail === 0, '（正向）UI 渲染路径门禁全绿（渲染器/绑定/条件渲染均真实执行）', __uiGateRes.failures.join('；'));
     pass += __uiGateRes.pass;
     fail += __uiGateRes.fail;

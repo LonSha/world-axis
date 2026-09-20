@@ -93,4 +93,60 @@ function checkPages(env, countFn) {
   }
   return out;
 }
-module.exports = { fresh: fresh, checkPages: checkPages, BASE: BASE, UI_FILES: UI_FILES };
+// v2.21.0: 控件可点击探针（逐页渲染后真实点击每个 button/input/select/textarea）
+//   为什么需要它：checkPages 只验证「控件**成树**」（HTML 里的 <button> 在树里找得到），
+//   不验证「控件**可点**」。而真实缺陷恰好落在这一层：设置页「立即生成舆情」是 async 出口，
+//   它在 `await` **之后**才写 `out().textContent`；而 `out()` 每次都重新查询 —— 其间任意状态
+//   事件都会触发面板自动重绘，`#wa-set-out` 从树中消失，重查得 null，写 textContent 抛
+//   `TypeError: Cannot set properties of null`（用户视角「点了没反应」，日志里一条与页面无关的
+//   DOM 报错）。同类还有面板的观测切片 / 选项目 / 弧线生成 / 助手问答 / 剧场生成 / 快照导入，
+//   以及三处裸 `prompt(...)`（宿主无 prompt 时 ReferenceError，而它们是**唯一入口**）。
+//   本探针把「点一下会不会抛」变成可复现的门禁。
+// 口径：同步抛出在点击循环里直接捕获；`await` 之后的写回失败表现为**未处理的 Promise 拒绝**
+//   （它不会阻塞点击循环），故本探针自带进程级 unhandledRejection 收集器，点击完等一拍收网。
+//   两者合起来才是完整判据——只测同步会漏掉异步那一半（本轮真缺陷恰在异步那一半）。
+async function checkClickable(env, opts) {
+  opts = opts || {};
+  const settleTicks = opts.settleTicks || 3;
+  const WA = env.WA, dom = env.dom;
+  const out = { tested: 0, controls: 0, thrown: [], rejections: [] };
+  const panel = dom.getElementById('wa-panel');
+  if (!panel) { out.thrown.push('面板未注入（无法点击控件）'); return out; }
+  const seen = [];
+  const onRej = function (r) { seen.push(String((r && r.message) || r).slice(0, 200)); };
+  process.on('unhandledRejection', onRej);
+  try {
+    const pages = (WA.ui && typeof WA.ui.pages === 'function') ? WA.ui.pages() : [];
+    for (const page of pages) {
+      out.tested++;
+      const tab = panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === page; })[0];
+      if (!tab) continue;
+      try { tab.click(); } catch (e) { out.thrown.push(page + ' 页签点击抛出：' + (e && e.message)); continue; }
+      const body = panel.querySelector('.wa-body');
+      if (!body) continue;
+      const ctrls = body.querySelectorAll('button,input,select,textarea');
+      for (const c of ctrls) {
+        out.controls++;
+        const tag = '<' + String(c.tagName || '').toLowerCase() + (c.id ? ' id=' + c.id : '') + '>';
+        // 前提补齐：真浏览器里 `<input type=file>` 的 `.files` **恒**为 FileList（未选文件时
+        //   是空列表），mini-DOM 不提供该属性。不补这一层的话，快照/导入两处 `files[0]`
+        //   读的是 `undefined`，探针会把它记成产品缺陷——那是探针前提失真，不是缺陷
+        //   （真实用户不选文件时 `files[0]` 是 undefined，被 `if (!f) return;` 正常短路）。
+        try { if (String(c.type || '').toLowerCase() === 'file' && !c.files) c.files = []; } catch (e) {}
+        try {
+          if (typeof c.click === 'function') c.click();
+          if (typeof c.oninput === 'function') c.oninput({ target: c });
+          if (typeof c.onchange === 'function') c.onchange({ target: c });
+        } catch (e) {
+          out.thrown.push(page + ' | ' + tag + ' -> ' + (e && e.message));
+        }
+      }
+    }
+    for (let i = 0; i < settleTicks; i++) await new Promise(function (r) { setTimeout(r, 20); });
+  } finally {
+    process.removeListener('unhandledRejection', onRej);
+  }
+  out.rejections = seen;
+  return out;
+}
+module.exports = { fresh: fresh, checkPages: checkPages, checkClickable: checkClickable, BASE: BASE, UI_FILES: UI_FILES };

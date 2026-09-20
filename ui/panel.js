@@ -550,10 +550,31 @@
 
   function bindBody() {
     const $ = sel => panelEl.querySelector(sel);
+    // v2.21.0: 结果出口的**判空写**（与设置页同规格，同一处约定不再各写一份）。
+    //   `$('#x')` 每次调用都重新查询；异步出口（观测/档案/弧线/选项目/快照导入）在 `await`
+    //   之后才写回，其间任意状态事件都会触发面板重绘、目标节点从树中消失 ⇒ 重查得 null ⇒
+    //   写 `textContent` 抛 TypeError（用户视角「点了没反应」）。统一出口 + 判空 = 静默降级为
+    //   「本轮结果无处可显」，而不是把 DOM 异常抛进事件循环。
+    const setOut = function (sel, text) { const el = $(sel); if (el) el.textContent = text; };
+    const setHtml = function (sel, html) { const el = $(sel); if (el) el.innerHTML = html; };
+    // v2.21.0: 宿主取文本的**能力守卫**。为什么是缺陷而不是洁癖：
+    //   面板在「无头/iframe/被沙箱化」的宿主里可能根本没有 `prompt` 全局（本仓库的 UI 门禁
+    //   就是这种环境——tests/ui-gate.js 的 mini-DOM 不注入 prompt）。此前三处直接裸调
+    //   `prompt(...)`，点下去就是 `ReferenceError: prompt is not defined`，而这恰恰是**唯一
+    //   的入口**（势力编辑器没有别的编辑途径、世界钟没有别的设定途径），能力等于不存在。
+    //   守卫把「宿主不支持」变成用户看得见、可归因的一句话。
+    const askText = function (msg, dft) {
+      try {
+        if (typeof mainWin.prompt === 'function') return mainWin.prompt(msg, dft);
+        if (typeof prompt === 'function') return prompt(msg, dft);
+      } catch (e) { if (WA.log) WA.log('warn', '宿主取文本失败', e); }
+      setOut('#wa-diag-out', '宿主不支持输入框（prompt 不可用）—— 该入口在本环境不可用，非配置问题');
+      return null;
+    };
     panelEl.querySelectorAll('[data-node]').forEach(cb => cb.onchange = () => WA.workflow.setEnabled(cb.dataset.node, cb.checked));
     panelEl.querySelectorAll('[data-vis]').forEach(cb => cb.onchange = () => { WA.render.setVisibility(cb.dataset.vis, cb.checked); });
     panelEl.querySelectorAll('[data-unreg]').forEach(x => x.onclick = () => { WA.registry.unregister(x.dataset.unreg); renderBody(); });
-    panelEl.querySelectorAll('[data-observe]').forEach(b => b.onclick = async () => { const out = $('#wa-observe-out'); out.textContent = '观测中…'; const r = await WA.observe.slice(b.dataset.observe); out.textContent = r.ok ? r.text : ('失败：' + (r.error && r.error.message || r.reason)); });
+    panelEl.querySelectorAll('[data-observe]').forEach(b => b.onclick = async () => { setOut('#wa-observe-out', '观测中…'); const r = await WA.observe.slice(b.dataset.observe); setOut('#wa-observe-out', r.ok ? r.text : ('失败：' + (r.error && r.error.message || r.reason))); });
     // v2.2.0: 档案入口——此前 setProfile 零调用，用户没有任何建档途径（推演的性格锚点永远未建立）
     let profEditing = null;
     panelEl.querySelectorAll('[data-prof]').forEach(b => b.onclick = () => {
@@ -582,12 +603,12 @@
     });
     const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
     on('#wa-save-bg', () => { WA.store.patch('background', { text: $('#wa-bg').value, updatedAt: clockNow('ui.panel') }); WA.log('info', '世界背景已保存'); });
-    on('#wa-set-clock', () => { const v = prompt('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null) { WA.calendar.setClock(v); renderBody(); } });
+    on('#wa-set-clock', () => { const v = askText('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null) { WA.calendar.setClock(v); renderBody(); } });
     on('#wa-cal-auto', () => {});
     { const cb = $('#wa-cal-auto');
       if (cb) cb.onchange = () => { WA.calendar.setSettings({ auto: cb.checked }); WA.log('info', '世界钟自动推进已' + (cb.checked ? '开启' : '关闭')); renderBody(); }; }
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
-    on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); btn.textContent = '生成中…'; await WA.directEvent.create({ prompt: p, turns: t }); renderBody(); });
+    on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); if (btn) { btn.textContent = '生成中…'; btn.disabled = true; } try { await WA.directEvent.create({ prompt: p, turns: t }); } finally { renderBody(); } });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });
     // v2.11.0: 推演中止——引擎侧 `abort()` 已实现却无人调用（用户只能刷页面打断）
     on('#wa-bs-abort', () => { WA.backstage.abort(); WA.log('warn', '世界推演已请求中止'); renderBody(); });
@@ -611,9 +632,9 @@
         if (typeof WA.editorFaction.setEditingId === 'function') WA.editorFaction.setEditingId(+b.dataset.efEdit);
         const arr = WA.editorFaction.list();
         const cur = arr[+b.dataset.efEdit];
-        const next = prompt('运势（' + WA.editorFaction.STATUSES.join('/') + '）：', cur && cur.status);
+        const next = askText('运势（' + WA.editorFaction.STATUSES.join('/') + '）：', cur && cur.status);
         if (next != null) {
-          const rel = prompt('关系（' + WA.editorFaction.RELATIONS.join('/') + '）：', cur && cur.relation);
+          const rel = askText('关系（' + WA.editorFaction.RELATIONS.join('/') + '）：', cur && cur.relation);
           WA.store.transact(d => WA.editorFaction.update(d, +b.dataset.efEdit, { status: next, relation: rel == null ? undefined : rel }));
           renderBody();
         }
@@ -661,9 +682,9 @@
           const f = upFile.files[0]; if (!f) return;
           const txt = await f.text();
           const r = WA.toolSnapshot.restore(txt);
-          $('#wa-snap-out').textContent = r.ok
+          setOut('#wa-snap-out', r.ok
             ? ('恢复成功（恢复点' + (r.recoveryCreated ? '已留' : '未留') + '）：' + JSON.stringify(r.counts))
-            : ('校验/写入失败：' + r.reason);
+            : ('校验/写入失败：' + r.reason));
           if (r.ok) renderBody();
           upFile.value = '';
         };
@@ -719,7 +740,7 @@
       else if (out) out.textContent = '生成失败：' + r.reason + (r.reason === 'judge-not-configured' ? '（面板「连接」页配置 judge 通道）' : '');
     });
     on('#wa-plan-clear', () => { WA.oracle.clear(); renderBody(); });
-    on('#wa-gen-choices', async () => { const out = $('#wa-choices-out'); out.textContent = '生成中…'; const cs = await WA.choices.generate(4); out.innerHTML = cs.length ? cs.map((c, i) => `<div class="wa-item">${i + 1}. ${esc(c)}</div>`).join('') : '（未配置choices通道或生成失败）'; });
+    on('#wa-gen-choices', async () => { setOut('#wa-choices-out', '生成中…'); const cs = await WA.choices.generate(4); setHtml('#wa-choices-out', cs.length ? cs.map((c, i) => `<div class="wa-item">${i + 1}. ${esc(c)}</div>`).join('') : '（未配置choices通道或生成失败）'); });
     on('#wa-log-copy', () => { navigator.clipboard && navigator.clipboard.writeText(WA.eventLog.map(l => `[${new Date(l.t).toLocaleTimeString()}][${l.level}] ${l.msg} ${l.data || ''}`).join('\n')); });
     on('#wa-log-err', () => { __logErrOnly = !__logErrOnly; renderBody(); });
     on('#wa-err-report', () => { if (navigator.clipboard && WA.toolDiag && WA.toolDiag.buildErrorReport) { navigator.clipboard.writeText(WA.toolDiag.buildErrorReport()); const tip = $('#wa-err-report'); if (tip) { tip.textContent = '已复制✓'; setTimeout(() => { tip.textContent = '复制错误报告'; renderBody(); }, 1500); } } });
@@ -1221,14 +1242,14 @@
     if (currentPage === 'settings' && WA.uiSettings) WA.uiSettings.bind(panelEl);
     // 助手页绑定
     const askBtn = $('#wa-ask-btn');
-    if (askBtn) askBtn.onclick = async () => { const q = $('#wa-ask-input').value.trim(); if (!q) return; const out = $('#wa-ask-out'); out.textContent = '思考中…'; const r = await WA.assistant.ask(q); out.textContent = r.ok ? r.text : ('失败：' + r.reason); };
+    if (askBtn) askBtn.onclick = async () => { const q = $('#wa-ask-input').value.trim(); if (!q) return; setOut('#wa-ask-out', '思考中…'); const r = await WA.assistant.ask(q); setOut('#wa-ask-out', r.ok ? r.text : ('失败：' + r.reason)); };
     let thLast = null;   // v2.2.0: 最近一次剧场产物（供「插入输入框」使用）
     const thBtn = $('#wa-theater-btn');
     if (thBtn) thBtn.onclick = async () => {
-      const out = $('#wa-theater-out'); out.textContent = '剧场编排中…';
+      setOut('#wa-theater-out', '剧场编排中…');
       const r = await WA.theater.generate($('#wa-theater-input').value.trim());
       thLast = r.ok ? r.text : null;
-      out.textContent = r.ok ? r.text : ('失败：' + (r.reason || (r.error && r.error.message)));
+      setOut('#wa-theater-out', r.ok ? r.text : ('失败：' + (r.reason || (r.error && r.error.message))));
       const ib = $('#wa-theater-insert'); if (ib) ib.disabled = !r.ok;
     };
     // v2.2.0: 把产物送进输入框（此前 wrap 零调用，产物只能停在面板里 → 功能死路）

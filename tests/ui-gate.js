@@ -11,88 +11,12 @@
 'use strict';
 const path = require('path');
 const fs = require('fs');
-const vm = require('vm');
-require('./mock.js');                 // 宿主基础桩（localStorage / SillyTavern / WA.log）
-const uiDom = require('./ui-dom.js');
-const BASE = path.join(__dirname, '..');
-const UI_FILES = ['ui/panel.js', 'ui/settings.js', 'ui/assistant.js'];
-
-function loadOrder() {
-  const src = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
-  const li = src.indexOf('const LOAD = [');
-  const lj = src.indexOf('];', li);
-  if (li < 0 || lj < 0) throw new Error('ui-gate: 无法从 tests/run.js 提取 LOAD 清单');
-  return vm.runInNewContext('(' + src.slice(src.indexOf('[', li), lj + 1) + ')');
-}
-
-// 装一个「已启动」的 UI 环境：产品模块 + mini-DOM + 启动序列 + 面板/设置/助手三件套
-function fresh(opts) {
-  opts = opts || {};
-  const LOAD = loadOrder();
-  const ctx = vm.createContext(global);
-  // v2.14.0: 重装 LOAD **之前**把宿主窗口复位成真宿主。
-  //   本函数与 run.js 复用同一个 vm 上下文 / global，故上一用例 install 出来的壳此刻仍挂在
-  //   WA.mainWin 上，而产品模块在求值期就会把它缓存进闭包
-  //   （`const mainWin = WA.mainWin || window`）——壳缺 localStorage，于是本用例的落盘能力
-  //   从出生起就是断的（setItem 抛错被 try/catch 吞成静默失败）。
-  //   顺序不能颠倒：先复位 → 再重装产品模块（绑真宿主）→ 最后 install（把 WA.mainWin 换成
-  //   mini-DOM 壳，只供随后求值的 ui/* 使用）。
-  try { global.WorldAxis.mainWin = global; global.WorldAxis.mainDoc = global.document; } catch (e) {}
-  for (const rel of LOAD) vm.runInContext(fs.readFileSync(path.join(BASE, rel), 'utf8'), ctx, { filename: rel });
-  const WA = global.WorldAxis;
-  // 前提：代表「有聊天」。run.js 里靠前的块会把 mockCtx.chat 换成空数组/别的形状且不还原，
-  //   而本门禁的推演链路需要一条末楼作为锚点——所以不能假设它恰好还在，
-  //   显式复位（否则门禁会因“别的块此刻的环境”而不可复现地失败）。
-  try {
-    const __st = WA.mainWin && WA.mainWin.SillyTavern;
-    const __c = __st && __st.getContext && __st.getContext();
-    if (__c && (!__c.chat || !__c.chat.length)) __c.chat = [{ is_user: true, mes: 'ui-gate anchor', swipe_id: 0 }];
-  } catch (e) {}
-  uiDom.install(WA);                    // 必须在 ui/* 求值前：panel.js 求值时缓存 mainDoc/mainWin
-  try { WA.store.init(); } catch (e) {}
-  if (WA.interceptor && WA.interceptor.install) WA.interceptor.install();
-  if (WA.injectInspector && WA.injectInspector.init) WA.injectInspector.init();
-  const files = opts.files || UI_FILES;
-  const srcOverride = opts.srcOverride || {};
-  for (const rel of files) {
-    const src = srcOverride[rel] !== undefined ? srcOverride[rel] : fs.readFileSync(path.join(BASE, rel), 'utf8');
-    vm.runInContext(src, ctx, { filename: rel });
-  }
-  // 复刻 index.js 启动序列的最后一步（否则面板只装载不挂载，等于没渲染过）
-  if (WA.ui && typeof WA.ui.mount === 'function') WA.ui.mount();
-  return { ctx: ctx, WA: WA, dom: WA.__uiDoc };
-}
-
-// 逐页渲染探针（可被主门禁与负向自证复用）：返回 {tested, failures}
-// 覆盖面：点 tab 走 buildPanel 真实绑定 → renderBody → RENDERERS[page]() → innerHTML 真实解析 → bindBody
-function checkPages(env, countFn) {
-  const WA = env.WA, dom = env.dom;
-  const out = { tested: 0, failures: [], details: [] };
-  const pages = (WA.ui && typeof WA.ui.pages === 'function') ? WA.ui.pages() : [];
-  const panel = dom.getElementById('wa-panel');
-  if (!panel) { out.failures.push('面板未注入（无法逐页渲染）'); return out; }
-  for (const page of pages) {
-    out.tested++;
-    const tab = panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === page; })[0];
-    if (!tab) { out.failures.push('找不到 ' + page + ' 的 tab（buildPanel 未渲染该页入口）'); continue; }
-    let err = null;
-    try { tab.click(); } catch (e) { err = e; }
-    if (err) { out.failures.push(page + ' 页切换抛异常：' + (err && err.message)); continue; }
-    if (WA.ui.currentPage() !== page) { out.failures.push(page + ' 页切换后 currentPage 未跟随（实 ' + WA.ui.currentPage() + '）'); continue; }
-    const body = panel.querySelector('.wa-body');
-    const html = body ? body.innerHTML : '';
-    if (!html || !html.trim()) { out.failures.push(page + ' 页渲染产物为空'); continue; }
-    // 「渲染出来的控件能在树里被找到」——这是纯壳 stub 永远测不到的一段：
-    //   innerHTML 里的 button/input 若因未闭合/空容器而没成树，绑定就是空转。
-    const inHtml = countFn(html);
-    const inTree = body.querySelectorAll('button,input,select,textarea').length;
-    out.details.push(page + ':' + html.length + 'B/' + inTree + '控件');
-    if (inHtml > inTree) {
-      out.failures.push(page + ' 页有 ' + inHtml + ' 个控件写进 HTML、但树里只找得到 ' + inTree + ' 个（渲染产物未成树，绑定会空转）');
-    }
-  }
-  return out;
-}
+// v2.21.0: 单一真源收口。此前本文件**自带一份** fresh()/checkPages() 副本，而
+//   tests/ui-gate-sync.js 的模块头明写「装载顺序按 run.js 的 LOAD 取（不复制、不漂移）」——
+//   两份实现靠人工同步，本轮新增 checkClickable 与 `<input type=file>.files` 前提修复时
+//   立刻暴露：sync 改了、本文件的副本没跟。现改为直接从 sync 取（唯一实现），
+//   本文件只保留用例与断言。
+const { fresh, checkPages, checkClickable, BASE } = require('./ui-gate-sync.js');
 
 async function main() {
   const pass = [], fail = [];
@@ -245,6 +169,44 @@ async function main() {
     const envShell = fresh({ files: [] });
     assert(envShell.dom.getElementById('wa-panel') === null,
       '（负向）未装载 UI 时面板不存在（探针判据来自真实渲染，不是常量）');
+  }
+
+  // v2.21.0: 控件可点性门禁（G18）。第九面：**控件被点可不可点**。
+  //   G17 管「控件成树」（HTML 里的 <button> 在树里找得到），G18 管「控件可点」——
+  //   点下去会不会抛。两轮真缺陷都落在这一层：
+  //     ① 设置页「立即生成舆情」是 async 出口，`await` **之后**才写 `out().textContent`，
+  //        而 `out()` 每次重查 —— 其间任意状态事件触发面板重绘，`#wa-set-out` 离树，
+  //        重查得 null ⇒ TypeError（用户视角「点了没反应」）。
+  //     ② 面板三处裸 `prompt(...)`（世界钟 / 势力编辑器）——宿主无 prompt 时
+  //        ReferenceError，而它们是**唯一入口**。
+  //   探针口径见 ui-gate-sync.js checkClickable：同步抛出 + 未处理 Promise 拒绝，两者合
+  //   起来才是完整判据（只测同步会漏掉异步那一半，而本轮真缺陷恰在异步那一半）。
+  section('G18 控件可点性（逐页真实点击每个 button/input/select/textarea）');
+  {
+    const env18 = fresh();
+    const r = await checkClickable(env18);
+    assert(r.controls >= 100, '逐页渲染出的可交互控件被真实点到（实 ' + r.controls + ' 个）');
+    assert(r.thrown.length === 0, '（正向）全部控件点击零同步抛出', r.thrown.join('；'));
+    assert(r.rejections.length === 0, '（正向）点击后无未处理 Promise 拒绝（异步出口写回不炸）', r.rejections.join('；'));
+    const srcP = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    // 负向 A：调用点裸 prompt（真实反映「有人写了裸 prompt()」；不能回退 askText 内部——
+    //   它自带 try/catch，ReferenceError 会被吞掉而无法现形）
+    const bA = srcP.replace(
+      "const v = askText('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)",
+      "const v = prompt('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)");
+    assert(bA !== srcP, '（自证）负向注入点 A 命中（世界钟裸 prompt）');
+    const envA = fresh({ srcOverride: { 'ui/panel.js': bA } });
+    const rA = await checkClickable(envA);
+    assert(rA.thrown.length > 0, '（负向）裸 prompt → ReferenceError 被同步抛出抓到（实 ' + rA.thrown.length + ' 项）');
+    const srcS = fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8');
+    // 负向 B：settings 的判空出口退回裸写（异步那一半）
+    const bB = srcS.replace(
+      'const setOut = function (text) { const o = out(); if (o) o.textContent = text; };',
+      'const setOut = function (text) { out().textContent = text; };');
+    assert(bB !== srcS, '（自证）负向注入点 B 命中（settings 判空出口）');
+    const envB = fresh({ srcOverride: { 'ui/settings.js': bB } });
+    const rB = await checkClickable(envB);
+    assert(rB.rejections.length > 0, '（负向）异步出口写回失败 → 未处理拒绝被拿到（实 ' + rB.rejections.length + ' 项）');
   }
 
   console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');

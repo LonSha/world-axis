@@ -129,6 +129,14 @@
     bind(panelEl) {
       const $ = sel => panelEl.querySelector(sel);
       const out = () => $('#wa-set-out');
+      // v2.21.0: 设置页结果出口的**判空写**。为什么必须收成单一出口：
+      //   `out()` 每次调用都重新查询 —— 而本页有异步出口（舆情生成）在 `await` **之后**才写结果，
+      //   其间任何一个状态事件（clock:changed / backstage:settled / 任意 STATE_EVENTS）都会让面板
+      //   自动重绘、`#wa-set-out` 从树中消失 ⇒ 重查得 null ⇒ 写 `textContent` 抛
+      //   `TypeError: Cannot set properties of null`。用户看到的是「点了没反应」，日志里是一条
+      //   与页面无关的 DOM 报错（本仓库既有约定是「先取节点、判空再写」，见下方 pOut 的用法，
+      //   但设置页主出口此前是唯一的例外）。此处把同一约定收成一个出口，杜绝再次分化。
+      const setOut = function (text) { const o = out(); if (o) o.textContent = text; };
       // v2.2.0: 净化规则治理绑定（此前这些能力零调用 = 治理无入口）
       if (WA.purifier) {
         const pOut = () => { const o = $('#wa-prm-out'); return o; };
@@ -226,14 +234,14 @@
         //   两条判据都要看：① 本次调用的回传结果（最精确）；② 写入台账最近失败（兜住
         //   「回传被吞」的路径）。两者任一为失败即报失败，绝不无条件报成功。
         const badW = [wMain, wOp].filter(function (x) { return x && x.ok === false; })[0];
-        if (badW) out().textContent = '✗ 保存失败：' + whyTxt(badW.reason) + '（改动未落盘）';
-        else if (ws2 && ws2.lastError) out().textContent = '✗ 保存失败：' + whyTxt(ws2.lastError) + '（改动未落盘）';
-        else out().textContent = '✓ 设置已保存';
+        if (badW) setOut('✗ 保存失败：' + whyTxt(badW.reason) + '（改动未落盘）');
+        else if (ws2 && ws2.lastError) setOut('✗ 保存失败：' + whyTxt(ws2.lastError) + '（改动未落盘）');
+        else setOut('✓ 设置已保存');
       };
       const opNow = $('#wa-op-now');
-      if (opNow) opNow.onclick = async () => { out().textContent = '舆情生成中…'; const r = await WA.opinion.generate(); out().textContent = r.ok ? `✓ 新闻${r.news}条 论坛${r.forums}主题` : ('失败：' + r.reason); };
+      if (opNow) opNow.onclick = async () => { setOut('舆情生成中…'); const r = await WA.opinion.generate(); setOut(r.ok ? `✓ 新闻${r.news}条 论坛${r.forums}主题` : ('失败：' + r.reason)); };
       const simNow = $('#wa-sim-now');
-      if (simNow) simNow.onclick = () => { WA.backstage.forceSimulate(); out().textContent = '已触发世界推演（见日志）'; };
+      if (simNow) simNow.onclick = () => { WA.backstage.forceSimulate(); setOut('已触发世界推演（见日志）'); };
       // 演化设置
       const evMod = $('#wa-ev-mod');
       if (evMod) evMod.oninput = () => { $('#wa-ev-modv').textContent = evMod.value; };
