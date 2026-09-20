@@ -6,8 +6,8 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.26.0 |
-| 全量回归 | `node tests/run.js` → 4121 断言全绿 |
+| 版本 | v2.27.0 |
+| 全量回归 | `node tests/run.js` → 4149 断言全绿 |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
 | UI 门禁 | `node tests/ui-gate.js` → 49/0（v2.22.0 未涉及运行时 UI 探针） |
 | 出口面契约 | 58 命名空间 / 321 成员 / 4094 字符 |
@@ -107,3 +107,18 @@
   - ① **门禁静默盲点**：取键器 `_wdKeysOf` 的朴素正则要求键紧跟 `,`/`{`，而 `readSpotCheck` 前夹着整段注释 ⇒ 键**从键集消失**，既不报缺键也不报幽灵键。修法：取键前先剥注释（方向安全：只能让隐藏键重新可见）。
   - ② **判据越界**：新测试块的幽灵键判据首版裸配全文件，把 `toolDiag.readLabel`（合法）里同名键误判成「本表残留」——已收窄到只在本表字面量内判。
 - **验证**：`node tests/run.js` 4121/0（+8）；`node tools/scan_drift.js` → 漂移组数 0 / 22；`node tests/ui-gate.js` 49/0；`node tests/inventory.js` 四类悬空 0；出口面 58/321/4094 不变。
+
+### R10 · 2026-09-20 · v2.27.0 死子面冻结账本 + 门禁（第十五面）
+- **做了什么**：把 `tests/inventory.js` 重构成可复用单源，新建死子面冻结账本与门禁并接进主回归门。
+  - **现场（缺口）**：出口面契约钉「整个 interface 面」的增删，**不区分成员有无消费方**——新增死导出回填冻结串即可静默通过；`dead` 子面 208 项（仅测试引用 132）此前既无账本也无门禁。
+  - **重构**：`inventory.js` 抽出 `function collect()`（含复用保护）+ `module.exports = { collect, MODULE_EXPORTS }`；尾部 `if (require.main === module)` 保留 CLI 与人类可读打印。门禁直接 require 它，杜绝第二份「表面求差」实现。
+  - **新建**：`tests/dead-export-ledger.json`（dead 208 / uiDead 4 逐条 reason + detail，归类 test-only / self-only / unwired，advisory 只记 dataOnly 计数）；`tests/dead-export-gate.js`（判四态：新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红；支持 `--update`、`--json`）。
+  - **测试锁**：`tests/run.js` 新增 v2.27.0 节（A 口径单源、B 复用判据、C 现场锚点、D 账本健全、E 判定四态、F 归因语义、G 负向自证）。
+- **为什么**：本轮主线仍是「门禁/清册自身的诚实度」。判据的输入面与结论面必须是同一件事——所以清册必须单源、复用判据必须真能区分「已装载」。
+- **影响范围**：`tests/inventory.js`（重构 + 两处判据修正）、新增 `tests/dead-export-gate.js` 与 `tests/dead-export-ledger.json`、`tests/run.js`（+1 节、版本 7 处）、`index.js`、`manifest.json`、`README.md`、本日志。产品代码零改动（出口面不变）。
+- **附带自纠（新版自身两处不确定性，均为真实踩到）**：
+  - ① 复用判据 `!!global.WorldAxis` **恒真**（`tests/mock.js` 预置宿主壳）⇒ CLI 首跑跳过装载，定义面塌成命名空间 0 项、1223 处真引用反被判为 1209 处悬空、退出码 1。修为「LOAD 里的模块命名空间是否已有实例」。
+  - ② UI 层装载写在 `if (!ALREADY)` 内 ⇒ 复用路径（门禁在 run.js 进程内取值）少 3 命名空间、uiPhantom 14 ↔ uiDead 0 互换，与 CLI 的 64/0/4 不一致——**定义面随调用时机漂移＝判据不确定**。改为幂等确保装载。
+  - ③ 清册 CLI 的 `process.exit()` 在**输出大且 stdout 是管道**时截断尚未刷出的 stdout：破坏态 `--json` 有 137,750 字符，管道消费者拿到的是断在半个对象上的 JSON（exit 1 + 垃圾），手动重定向到文件则完整——即「结论体只在重定向时完整」。改为 `process.exitCode`（只设码不强制退出，Node 在 stdout 排空后以该码结束）。这是本版第三次踩到「探测器自身的输出不可信」，与 ①② 同型。
+  - ④ 首次重构还漏收口 `if (!ALREADY)` 的闭合花括号（`node --check` 报 Unexpected end of input，花括号 61/59）——已补齐并使两条路径逐项一致。
+- **验证**：重构前后 `--json` 逐项一致（命名空间 64 / 成员 665 / 引用 1223 / dead 208 · uiDead 4 · dataOnly 101 / deadInTestsOnly 132）；CLI 与复用路径一致；负控制两向（真新增死导出被点名拦截、归因腐坏被报不可读、撤销复原）；`node tests/run.js` → **4149/0**（+28）；`node tests/dead-export-gate.js` 绿灯；`node tests/inventory.js` 四类悬空 0；出口面 58/321/4094 不变。

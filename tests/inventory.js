@@ -43,21 +43,42 @@ const oj = diagSrc.indexOf('];', oi);
 const OPTIONAL_EXPORTS = vm.runInNewContext('(' + diagSrc.slice(diagSrc.indexOf('[', oi), oj + 1) + ')');
 
 // ── 3. 装载（与 tests/run.js 同一上下文语义）──
+// v2.27.0: 抽成 collect() 后可被门禁（tests/dead-export-gate.js）复用同一份口径，
+//   不再有第二份「表面求差」实现 —— 单源是判据诚实的前提。
+function collect() {
+// v2.27.0: 「已装载」判据不能用 `!!global.WorldAxis` —— tests/mock.js 会预置**宿主级空壳**
+//   （version / log / eventLog / on / emit …），于是该表达式恒真，CLI 首跑即误判「已装载」，
+//   整体跳过装载 ⇒ 定义面塌成命名空间 0 项、全部引用反被判为悬空（实测 1209 悬空）。
+//   判据改为「装载清单里的模块命名空间是否已有实例」：mock 的宿主壳里不含任何一个。
+//   用 some() 而非 every()：宁可认为「已装载」（复用现有实例，不重复求值引擎），
+//   也不要在 run.js 进程内因个别模块缺登记而重复装载（会重复订阅总线、污染计量）。
+const ALREADY = LOAD.some(function (rel) {
+  const ns = MODULE_EXPORTS[rel];
+  return !!(ns && global.WorldAxis && global.WorldAxis[ns]);
+});
 const ctx = vm.createContext(global);
+if (!ALREADY) {
 for (const rel of LOAD) {
   vm.runInContext(fs.readFileSync(path.join(BASE, rel), 'utf8'), ctx, { filename: rel });
 }
-// v2.8.0: UI 层同样尝试装载。tests/run.js 的 LOAD 刻意不含 ui/*（无头环境不需要真实 DOM），
+}  // end if (!ALREADY)：已装载时复用现有 global.WorldAxis，跳过重复求值
+// v2.8.0 / v2.27.0: UI 层**幂等确保**装载。tests/run.js 的 LOAD 刻意不含 ui/*（无头环境不需要真实 DOM），
 //   但 mock 提供的 document 足以让三个 UI 模块走完顶层求值——装载成功即「UI 导出面可验证」，
 //   于是「ui.mount / uiSettings.render 查不到」这类**假悬空**不再需要人工判断。
-//   装载失败（真缺 DOM 能力）时 UI_LOADED 为空，这些引用退回 uiPhantom 单列。
+//   装载失败（真缺 DOM 能力）时该模块缺席，其引用退回 uiPhantom 单列。
+//   v2.27.0 修正：此前 UI 装载写在 `if (!ALREADY)` 内，于是**复用路径**（门禁在 tests/run.js
+//   进程内调用 collect()，此时 UI 层尚未装载）会得到另一幅面：命名空间 61 / uiPhantom 14 / uiDead 0，
+//   与 CLI 的 64 / 0 / 4 不一致。定义面随**调用时机**漂移 = 判据不确定，门禁与账本都不可能与它对齐。
+//   现改为无条件按需装载（只补缺席的，已装载的不重复求值）：两条路径结果逐项一致。
 const UI_LOAD = ['ui/panel.js', 'ui/settings.js', 'ui/assistant.js'];
-const UI_LOADED = [];
 for (const rel of UI_LOAD) {
-  try { vm.runInContext(fs.readFileSync(path.join(BASE, rel), 'utf8'), ctx, { filename: rel }); UI_LOADED.push(rel); }
+  const ns = MODULE_EXPORTS[rel];
+  if (ns && WA_peek(ns)) continue;   // 已在册：复用，不重复求值
+  try { vm.runInContext(fs.readFileSync(path.join(BASE, rel), 'utf8'), ctx, { filename: rel }); }
   catch (e) { /* 环境不足以装载 UI：不视作缺陷，后续单列 */ }
 }
 const WA = global.WorldAxis;
+function WA_peek(ns) { return !!(global.WorldAxis && global.WorldAxis[ns]); }
 
 // ── 4. 定义面：运行时真实导出 ──
 // 只把 MODULE_EXPORTS 声明的命名空间当作「模块接口面」。
@@ -186,44 +207,57 @@ const result = {
   dataOnly: dataOnly,
   uiDead: uiDead
 };
-
-if (AS_JSON) {
-  console.log(JSON.stringify(result, null, 2));
-} else {
-  console.log('■ 出口面清册（WorldAxis）');
-  console.log('  产品文件 ' + result.files.product + ' · 声明表登记 ' + result.files.declared + ' · 命名空间 ' + nsList.length + ' · 成员 ' + result.members);
-  console.log('  静态引用 ' + refs.length + ' 处');
-  console.log('');
-  console.log('■ 悬空引用（模块接口面上引用了不存在的东西）: ' + phantom.length);
-  const pGroup = Object.create(null);
-  phantom.forEach(function (p) { const k = p.ns + '.' + p.mem + ' [' + p.reason + ']'; (pGroup[k] = pGroup[k] || []).push(p); });
-  Object.keys(pGroup).sort().forEach(function (k) {
-    const sites = pGroup[k];
-    console.log('  ✗ ' + k + ' ×' + sites.length + '  ' + sites[0].file + ':' + sites[0].line + (sites[0].inComment ? '（在注释中）' : ''));
-  });
-  if (!phantom.length) console.log('  （无）');
-  console.log('');
-  console.log('■ UI 层悬空（无头环境不装载，需浏览器复核）: ' + uiPhantom.length);
-  uiPhantom.forEach(function (p) { console.log('  ~ ' + p.ns + '.' + p.mem + '  ' + p.file + ':' + p.line); });
-  if (!uiPhantom.length) console.log('  （无）');
-  console.log('');
-  console.log('■ 未登记模块（磁盘有、MODULE_EXPORTS 无）: ' + undeclared.length);
-  undeclared.forEach(function (f) { console.log('  ! ' + f); });
-  if (!undeclared.length) console.log('  （无）');
-  console.log('■ 登记表悬空（声明了、磁盘无）: ' + declaredMissing.length);
-  declaredMissing.forEach(function (f) { console.log('  ! ' + f); });
-  if (!declaredMissing.length) console.log('  （无）');
-  if (SHOW_DEAD) {
-    console.log('');
-    console.log('■ 死导出（产品零引用）: ' + dead.length + '（其中仅测试引用 ' + result.deadInTestsOnly + '）');
-    dead.sort(function (a, b) { return (a.ns + a.mem) < (b.ns + b.mem) ? -1 : 1; }).forEach(function (d) {
-      console.log('  · ' + d.ns + '.' + d.mem + (d.inTests ? '  ← 仅测试引用' : ''));
-    });
-    console.log('');
-    console.log('■ 常量/数据成员产品零引用（备查，非死导出）: ' + dataOnly.length);
-    dataOnly.sort(function (a, b) { return (a.ns + a.mem) < (b.ns + b.mem) ? -1 : 1; }).forEach(function (d) {
-      console.log('  · ' + d.ns + '.' + d.mem + (d.inTests ? '  ← 仅测试引用' : ''));
-    });
-  }
+return result;
 }
-process.exit(phantom.length ? 1 : 0);
+
+if (require.main === module) {
+  const result = collect();
+  const phantom = result.phantom, uiPhantom = result.uiPhantom;
+  const dead = result.dead, dataOnly = result.dataOnly;
+  const undeclared = result.files.undeclared, declaredMissing = result.files.declaredMissing;
+  if (AS_JSON) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log('■ 出口面清册（WorldAxis）');
+    console.log('  产品文件 ' + result.files.product + ' · 声明表登记 ' + result.files.declared + ' · 命名空间 ' + result.namespaces + ' · 成员 ' + result.members);
+    console.log('  静态引用 ' + result.refs + ' 处');
+    console.log('');
+    console.log('■ 悬空引用（模块接口面上引用了不存在的东西）: ' + phantom.length);
+    const pGroup = Object.create(null);
+    phantom.forEach(function (p) { const k = p.ns + '.' + p.mem + ' [' + p.reason + ']'; (pGroup[k] = pGroup[k] || []).push(p); });
+    Object.keys(pGroup).sort().forEach(function (k) {
+      const sites = pGroup[k];
+      console.log('  ✗ ' + k + ' ×' + sites.length + '  ' + sites[0].file + ':' + sites[0].line + (sites[0].inComment ? '（在注释中）' : ''));
+    });
+    if (!phantom.length) console.log('  （无）');
+    console.log('');
+    console.log('■ UI 层悬空（无头环境不装载，需浏览器复核）: ' + uiPhantom.length);
+    uiPhantom.forEach(function (p) { console.log('  ~ ' + p.ns + '.' + p.mem + '  ' + p.file + ':' + p.line); });
+    if (!uiPhantom.length) console.log('  （无）');
+    console.log('');
+    console.log('■ 未登记模块（磁盘有、MODULE_EXPORTS 无）: ' + undeclared.length);
+    undeclared.forEach(function (f) { console.log('  ! ' + f); });
+    if (!undeclared.length) console.log('  （无）');
+    console.log('■ 登记表悬空（声明了、磁盘无）: ' + declaredMissing.length);
+    declaredMissing.forEach(function (f) { console.log('  ! ' + f); });
+    if (!declaredMissing.length) console.log('  （无）');
+    if (SHOW_DEAD) {
+      console.log('');
+      console.log('■ 死导出（产品零引用）: ' + dead.length + '（其中仅测试引用 ' + result.deadInTestsOnly + '）');
+      dead.slice().sort(function (a, b) { return (a.ns + a.mem) < (b.ns + b.mem) ? -1 : 1; }).forEach(function (d) {
+        console.log('  · ' + d.ns + '.' + d.mem + (d.inTests ? '  ← 仅测试引用' : ''));
+      });
+      console.log('');
+      console.log('■ 常量/数据成员产品零引用（备查，非死导出）: ' + dataOnly.length);
+      dataOnly.slice().sort(function (a, b) { return (a.ns + a.mem) < (b.ns + b.mem) ? -1 : 1; }).forEach(function (d) {
+        console.log('  · ' + d.ns + '.' + d.mem + (d.inTests ? '  ← 仅测试引用' : ''));
+      });
+    }
+  }
+  // v2.27.0: 用 exitCode 而非 process.exit()。实测在**输出很大且 stdout 是管道**时（破坏态下 --json 有
+  //   137,750 字符），process.exit() 会截断尚未刷出的 stdout —— JSON 断在半个对象上，管道消费者拿到
+  //   「exit 1 + 无法解析的垃圾」，既丢结论又误导（本仓裁决：探测器坏了比缺陷更危险）。
+  //   exitCode 只设码不强制退出，Node 在 stdout 排空后以该码结束，语义完全一致。
+  process.exitCode = result.phantom.length ? 1 : 0;
+}
+module.exports = { collect: collect, MODULE_EXPORTS: MODULE_EXPORTS };

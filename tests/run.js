@@ -9811,7 +9811,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.27.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10355,7 +10355,7 @@ assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.26.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.27.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10646,7 +10646,7 @@ assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.26.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.27.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11137,7 +11137,10 @@ assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单�
     assert(invSrc2800.indexOf("const LOAD = [") > 0 && invSrc2800.indexOf('tests/run.js') > 0,
       '装载清单从 tests/run.js 提取（单一真源，新增模块自动纳入）');
     assert(invSrc2800.indexOf('ui/panel.js') > 0, '体检脚本会尝试装载 UI 层——把「UI 未装载」这类假悬空与真悬空分开');
-    assert(invSrc2800.indexOf('已激活包') < 0 && invSrc2800.indexOf('process.exit(phantom.length ? 1 : 0)') > 0,
+    // v2.27.0: 清册抽成 collect() 后 CLI 收口改为 `process.exitCode = result.phantom.length ? 1 : 0`。
+    //   意图不变、强度更高（① 结论直接取自本次 collect 的返回值，不再依赖外层作用域变量；
+    //   ② 行成 exitCode 而非 process.exit()，避免大输出经管道时被截断）。
+    assert(invSrc2800.indexOf('已激活包') < 0 && invSrc2800.indexOf('process.exitCode = result.phantom.length ? 1 : 0') > 0,
       '体检脚本以退出码表达结论（可供 CI/工作流直接判定）');
     const genSrc2800 = fs.readFileSync(path.join(BASE, 'tests/export-contract.js'), 'utf8');
     assert(genSrc2800.indexOf("const OPTIONAL = ['ui', 'uiSettings', 'assistant'];") > 0,
@@ -11169,7 +11172,7 @@ assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.26.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.27.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11557,7 +11560,7 @@ assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.26.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.27.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11927,7 +11930,7 @@ assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.26.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.27.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12292,7 +12295,7 @@ assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.26.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.27.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14447,6 +14450,116 @@ assert(verF2500 === '2.26.0' && mfF2500.version === verF2500, '入口与清单�
   } // end v0.8.0 block
   } // end v0.7.0 block
   } // end v0.2.2 block
+  // ══════════ v2.27.0 ══════════
+  section('v2.27.0：死子面冻结账本（dead/uiDead 不再是一条静默增长的面）');
+  {
+    // 命题：出口面契约（export-contract 冻结串 + FROZEN2800）钉住的是**整个 interface 面**——
+    //   命名空间 × 成员的集合有无增删。它不区分「这个成员有没有消费方」：新增一个产品代码
+    //   永不引用的导出，只要把冻结串一并回填，契约照样通过。于是 dead 这一子面长期
+    //   无账本、无门禁（v2.11.0 分级治过一次，之后新增无人提示）——静默增长的面。
+    const inv2700 = require('./inventory.js');
+    const gate2700 = require('./dead-export-gate.js');
+    // ── A. 口径单源（门禁与清册共用同一份求差，不出现第二实现）──
+    assert(typeof inv2700.collect === 'function' && typeof inv2700.MODULE_EXPORTS === 'object',
+      '清册导出 collect() 与 MODULE_EXPORTS（门禁与 CLI 共用同一份口径）');
+    assert(typeof gate2700.judge === 'function' && typeof gate2700.build === 'function'
+      && typeof gate2700.classify === 'function', '门禁导出 judge()/build()/classify() 供测试与工具复用');
+    const invSrc2700 = fs.readFileSync(path.join(BASE, 'tests/inventory.js'), 'utf8');
+    assert(invSrc2700.indexOf("require('./dead-export-gate.js')") < 0 && invSrc2700.indexOf("require('./inventory.js')") < 0,
+      '清册不反向依赖门禁（依赖方向单向，无环）');
+    // 大输出经管道不被截断（本版实测：破坏态 --json 137,750 字符，process.exit() 把 JSON 断成半句）
+    assert(invSrc2700.indexOf('process.exit(result.phantom') < 0
+      && invSrc2700.indexOf('process.exitCode = result.phantom.length ? 1 : 0') > 0,
+      '清册 CLI 以 exitCode 收口（管道消费者拿到的结论体完整，不是半句垃圾）');
+    // ── B. 「已装载」判据：本次真实踩到的坑（mock 预置宿主壳使 !!global.WorldAxis 恒真）──
+    assert(invSrc2700.indexOf('const ALREADY = !!global.WorldAxis') < 0,
+      '复用判据不是 !!global.WorldAxis（mock 的宿主壳会让它恒真 ⇒ CLI 首跑即跳过装载）');
+    assert(invSrc2700.indexOf('LOAD.some(function (rel)') > 0,
+      '复用判据改为「装载清单里的模块命名空间是否已有实例」');
+    const iUi2700 = invSrc2700.indexOf('const UI_LOAD =');
+    const iEndIf2700 = invSrc2700.indexOf('end if (!ALREADY)');
+    assert(iUi2700 > 0 && iEndIf2700 > 0 && iUi2700 > iEndIf2700,
+      'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
+    // ── C. 现场锚点（口径不许漂移）──
+    const r2700 = inv2700.collect();
+    assert(r2700.refs === 1223, '现场静态引用 1223 处（实 ' + r2700.refs + '）');
+    assert(r2700.namespaces === 64 && r2700.members === 665,
+      '定义面 64 命名空间 / 665 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.dead.length === 208 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 101,
+      '死子面 dead 208 / uiDead 4 / dataOnly 101（实 ' + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
+    assert(r2700.deadInTestsOnly === 132, '其中仅测试引用 132（实 ' + r2700.deadInTestsOnly + '）');
+    // ── D. 账本健全：条目数一致、归因在词表内、无占位 ──
+    const led2700 = gate2700.loadLedger();
+    assert(!!led2700 && typeof led2700 === 'object', '账本可加载（tests/dead-export-ledger.json）');
+    assert(Object.keys(led2700.dead).length === 208 && Object.keys(led2700.uiDead).length === 4,
+      '账本条目数与现场一致（dead 208 / uiDead 4）');
+    const reasons2700 = Array.from(new Set(Object.keys(led2700.dead).concat(Object.keys(led2700.uiDead))
+      .map(function (k) { return (led2700.dead[k] || led2700.uiDead[k] || {}).reason; })));
+    assert(reasons2700.every(function (x) { return gate2700.REASON_CODES.indexOf(x) >= 0; }),
+      '归因全在词表内（' + reasons2700.join(',') + '）');
+    assert(JSON.stringify(led2700).indexOf('TODO') < 0, '账本无占位归因（归因由测量得出，不留 TODO）');
+    assert(led2700.advisory && led2700.advisory.dataOnly === 101, 'advisory 面只记计数不拦截（dataOnly=101）');
+    // ── E. 判定四态（纯判定面，用现场结果驱动）──
+    const clone2700 = function (o) { return JSON.parse(JSON.stringify(o)); };
+    assert(gate2700.judge(r2700, led2700).ok === true, '（基线）现场与账本一致 ⇒ ok');
+    assert(gate2700.judge(r2700, null).ok === false,
+      '（负控制）账本缺失 ⇒ 红灯（不能因账本不在就静默放行）');
+    const ledAdd2700 = clone2700(led2700);
+    delete ledAdd2700.dead[Object.keys(ledAdd2700.dead)[0]];
+    const jAdd2700 = gate2700.judge(r2700, ledAdd2700);
+    assert(jAdd2700.ok === false && jAdd2700.added.length === 1,
+      '（负控制）账本少登记一条 ⇒ 报「新增死导出」并点名');
+    const ledCorrupt2700 = clone2700(led2700);
+    ledCorrupt2700.dead[Object.keys(ledCorrupt2700.dead)[0]].reason = 'TODO';
+    const jCorrupt2700 = gate2700.judge(r2700, ledCorrupt2700);
+    assert(jCorrupt2700.ok === false && jCorrupt2700.staleReason.length === 1,
+      '（负控制）归因腐坏 ⇒ 报「账本归因不可读」（归因不可读等于归因不实）');
+    const ledGone2700 = clone2700(led2700);
+    ledGone2700.dead['nonexistent.member'] = { reason: 'unwired', detail: 'x' };
+    const jGone2700 = gate2700.judge(r2700, ledGone2700);
+    assert(jGone2700.gone.length === 1 && jGone2700.ok === true,
+      '（负控制）登记条目消失 ⇒ 只提示、不红灯（收口期不误伤，但催人跑 --update）');
+    // ── F. 归因分类语义 ──
+    const fileMap2700 = gate2700.nsToFile();
+    assert(gate2700.classify(fileMap2700, { ns: 'limits', mem: 'anyName', inTests: true }) === 'test-only',
+      '仅测试引用 ⇒ test-only');
+    assert(gate2700.classify(fileMap2700, { ns: 'limits', mem: 'clamp', inTests: false }) === 'self-only',
+      '定义文件内部自用、外部零引用 ⇒ self-only（过度导出）');
+    assert(gate2700.classify(fileMap2700, { ns: 'limits', mem: 'noSuchName4272', inTests: false }) === 'unwired',
+      '产品与测试均零引用 ⇒ unwired（能力未接线）');
+    // ── G. 负向自证：真源码破坏「已装载」判据 ⇒ 清册面塌、不再正常出结论 ──
+    const ANCH2700 = 'const ALREADY = LOAD.some(function (rel) {';
+    const cnt2700 = invSrc2700.split(ANCH2700).length - 1;
+    assert(cnt2700 === 1, '（负向自证）判据锚点在真源码中恰 1 处（实 ' + cnt2700 + '）');
+    const broken2700 = invSrc2700.replace(ANCH2700, 'const ALREADY = true || (function (rel) {');
+    assert(broken2700 !== invSrc2700, '（负向自证）破坏真的改变了源码');
+    // 判据纯度：破坏后 `ALREADY` 恒真 ⇒ 跳过 LOAD 装载 ⇒ 只剩无条件装载的 UI 面、全部引用反被判悬空
+    const tmp2700 = path.join(__dirname, '_nc_inv_break.js');
+    let rc2700 = -1, cout2700 = '';
+    try {
+      fs.writeFileSync(tmp2700, broken2700);
+      // spawnSync 不抛：无论退出码如何都能拿到 stdout。maxBuffer 给足（破坏后 phantom 1209 条，
+      //   JSON 约 0.3MB；1MB 默认值余量太小，超限会得到空 stdout 而让判据假红）。
+      const r2700 = require('child_process').spawnSync(process.execPath, [tmp2700, '--json'],
+        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+      rc2700 = (r2700.status === null ? -1 : r2700.status);
+      cout2700 = String(r2700.stdout || '');
+    } finally { try { fs.unlinkSync(tmp2700); } catch (e) {} }
+    assert(rc2700 !== 0, '（负向自证）判据被破坏后清册以非零码退出（exit ' + rc2700 + '）');
+    let boom2700 = null;
+    try { boom2700 = JSON.parse(cout2700); } catch (e) { boom2700 = null; }
+    // 破坏后 ALREADY 恒真 ⇒ 跳过 LOAD 装载，只剩无条件装载的 UI 3 个命名空间；
+    // 1223 处引用全判为悬空、dead 归零。实测 3 / 1209 / 0（原版对照 64 / 0 / 208）。
+    assert(boom2700 && boom2700.namespaces < 10 && boom2700.phantom.length > 1000 && boom2700.dead.length === 0,
+      '（负向自证）症状可读：命名空间 ' + (boom2700 ? boom2700.namespaces : '?')
+      + ' / 悬空 ' + (boom2700 ? boom2700.phantom.length : '?') + '（正是 CLI 首跑踩到的塌面）');
+    console.log('  ✓ 口径单源（collect 复用、依赖单向无环、复用判据不退回宿主壳）');
+    console.log('  ✓ 现场锚点（refs 1223 / 命名空间 64 / 成员 665 / dead 208 · uiDead 4 · dataOnly 101）');
+    console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
+    console.log('  ✓ 判定四态（新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红）');
+    console.log('  ✓ 负向自证（破坏「已装载」判据 ⇒ 定义面塌成 0、退出码非零、症状 JSON 可解析）');
+  }
+
   // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
