@@ -17,6 +17,9 @@
   const MAX_LEN = 12;       // 但太长肯定不是敷衍——上限
   const COOLDOWN_ROUNDS = 3; // 同一 NPC 连续拉动的冷却轮数，避免每轮都拽
   const MODULE = 'proactive';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  // v2.30.0（P2-1）：行为台账——此前触发/跳过全部静默，排查「怎么没拉动」时无据可查
+  const __stat = { pulls: 0, skippedCooldown: 0, skippedDisabled: 0, skippedNotDrained: 0, lastPullAt: 0, lastReason: null };
 
   function settings() {
     try { return WA.backstage && WA.backstage.getSettings ? WA.backstage.getSettings() : {}; }
@@ -59,6 +62,17 @@
     isDrained: isDrained,
     /** 供设置页/诊断调用 */
     isEnabled: enabled,
+    /** v2.30.0（P2-1）：行为台账——触发/冷却跳过/关闭/空输入不再静默，全数记账 */
+    stat() {
+      return {
+        pulls: __stat.pulls,
+        skippedCooldown: __stat.skippedCooldown,
+        skippedDisabled: __stat.skippedDisabled,
+        skippedNotDrained: __stat.skippedNotDrained,
+        lastPullAt: __stat.lastPullAt,
+        lastReason: __stat.lastReason
+      };
+    },
     /** 手动标记一次拉动（重置冷却计时） */
     markPulled() {
       try {
@@ -73,14 +87,15 @@
   WA.workflow.register({
     id: 'proactive.pull', chain: 'before', order: 25, label: '主动拉动（语义枯竭时）',
     async run(ctx) {
-      if (!enabled()) return;
-      if (!ctx || !Array.isArray(ctx.chat) || !ctx.chat.length) return;
+      if (!enabled()) { __stat.skippedDisabled++; __stat.lastReason = 'disabled'; return; }
+      if (!ctx || !Array.isArray(ctx.chat) || !ctx.chat.length) { __stat.skippedNotDrained++; __stat.lastReason = 'no-chat'; return; }
       const st = ctx.store || (WA.store ? WA.store.get() : null) || {};
-      if (!cooldownOk(st)) return;                  // 冷却中不重复拉
+      if (!cooldownOk(st)) { __stat.skippedCooldown++; __stat.lastReason = 'cooldown'; return; }   // 冷却中不重复拉
       const text = lastUserText(ctx.chat);
-      if (!isDrained(text)) return;                 // 回复有实质内容，不需要拉
+      if (!isDrained(text)) { __stat.skippedNotDrained++; __stat.lastReason = 'not-drained'; return; }  // 回复有实质内容，不需要拉
       // 记冷却
       try { WA.proactive.markPulled(); } catch (e) {}
+      __stat.pulls++; __stat.lastPullAt = clockNow('proactive.pull'); __stat.lastReason = 'pulled';
       ctx.injections.push({
         source: '主动拉动',
         position: 'after_last_user', depth: 0,

@@ -90,7 +90,7 @@
         if (id) break;
       }
     }
-    if (id) entity = em[type].find(e => e.id === id);
+    if (id) entity = em[type].find(e => WA.store.sameId(e.id, id)); // v2.30.0 P1-1 收口
 
     if (entity) {
       // 更新：合并别名、刷新描述，并合并来源引用（v0.8.0：修复 refs 生产方缺失）
@@ -170,7 +170,7 @@
             if (id) break;
           }
         }
-        if (id) ent = em[raw.type].find(e => e.id === id) || null;
+        if (id) ent = em[raw.type].find(e => WA.store.sameId(e.id, id)) || null; // v2.30.0 P1-1 收口
       }
       if (ent) {
         // 合并别名

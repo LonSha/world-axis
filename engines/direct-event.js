@@ -89,7 +89,7 @@
       _advanceBusy = true;
       try {
         WA.store.transact(d => {
-          const e = (d.directEvents || []).find(x => x.id === ev.id);
+          const e = (d.directEvents || []).find(x => WA.store.sameId(x.id, ev.id)); // v2.30.0 P1-1 收口
           if (!e) return;
           e.currentTurn++;
           if (e.currentTurn >= e.totalTurns) { e.status = 'done'; WA.emit('directEvent:ended'); d.directEvents = pruneDirect(d.directEvents || []); }  // v0.1.43

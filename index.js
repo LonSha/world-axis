@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.29.0';
+  const VERSION = '2.34.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -211,6 +211,7 @@
     'core/store.js',
     'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）
     'core/api-router.js',
+    'core/undo.js',           // v2.30.0: 参数编辑撤销栈（P0-2；须在 store 之后、UI 之前装载）
     'core/workflow.js',
     'core/settle-guard.js',
     'core/interceptor.js',
@@ -218,6 +219,7 @@
     'engines/evolution.js',
     'engines/enemies.js',
     'engines/regional.js',
+    'engines/parallel-world.js', // v2.34.0: 平行世界（主线之外独立推演，缝合自狐神抚 V19.5）
      'engines/horizon.js',
      'engines/digest.js',
      'engines/limits.js',

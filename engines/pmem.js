@@ -171,7 +171,7 @@
   /** 信息不对称检查：某条记忆该人物是否知情 */
   function knows(person, memoryId) {
     const st = WA.store.get();
-    const e = ((st.memory && st.memory.pmem) || []).find(x => x.id === memoryId);
+    const e = ((st.memory && st.memory.pmem) || []).find(x => WA.store.sameId(x.id, memoryId)); // v2.30.0 P1-1 收口
     if (!e) return false;
     const set = holderSet(person);
     return (e.known_by || []).some(k => set.has(k));

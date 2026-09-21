@@ -41,12 +41,12 @@ async function main() {
   assert(!!panel && !!panel.querySelector('.wa-body'), '内容容器成树（renderBody 的挂载点）');
   assert(!!panel && panel.classList.contains('wa-hidden') === true, '初始为隐藏态（未点开时不占屏）');
 
-  section('G17-B 十个渲染器逐页真实执行（点击 → renderBody → innerHTML 解析 → bindBody）');
+  section('G17-B 十二个渲染器逐页真实执行（点击 → renderBody → innerHTML 解析 → bindBody）');
   WA.ui.open();
   assert(panel.classList.contains('wa-hidden') === false, 'open() 后翻为可见');
   const pages = checkPages(env, countControls);
-  assert(pages.tested === 10, 'RENDERERS 覆盖的页面数为 10（实 ' + pages.tested + '）');
-  assert(pages.failures.length === 0, '十个页面全部渲染成树且控件可在树中找到', pages.failures.join('；'));
+  assert(pages.tested === 12, 'RENDERERS 覆盖的页面数为 12（实 ' + pages.tested + '）');
+  assert(pages.failures.length === 0, '十二个页面全部渲染成树且控件可在树中找到', pages.failures.join('；'));
   console.log('    ' + pages.details.join('  '));
   assert(WA.ui.currentPage() === (WA.ui.pages() || []).slice(-1)[0],
     '切换按 pages() 原始顺序推进（末页实 ' + WA.ui.currentPage() + '）');

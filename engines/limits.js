@@ -110,7 +110,7 @@
 
     // 按id精确匹配
     if (update.id) {
-      const idx = existing.findIndex(e => e && e.id === update.id);
+      const idx = existing.findIndex(e => e && WA.store.sameId(e.id, update.id)); // v2.30.0 P1-1 收口
       if (idx >= 0) return { idx, stable: true };
     }
 

@@ -78,13 +78,88 @@ function nsToFile() {
 //   旧 stripNonCode 不识别正则字面量，遇到 `/[&<>"]/` 这类会进字符串态且**跨行失步**，
 //   把其后整段真代码剥成空格：实测 ui/settings.js 保留 39 处真引用中的 1 处（丢 38），
 //   ui/panel.js 丢 58，engines/tool-snapshot.js 丢 1 —— 即「证据少算」。
-function countRefs(src, mem) {
+// v2.32.0：文件级读盘缓存（性能）。
+//   病：referenceCounts() 对每个产品文件独立 readFileSync + refCountIn()，而它被 evidenceOf()
+//   逐条（冻结项 ~211 条）调用 => 同一文件被 codeFace 解析 211 次（实测单次 evidenceDrift
+//   82.7~87.3 秒；完整回归 11 次调用约占 15 分钟的大头）。refCountIn() 返回的本来就是
+//   **完整 key->count map**，每个文件其实只需解析一次。
+//   药：按绝对路径缓存 {stamp, src, code, map}，stamp = mtimeMs + ':' + size。
+//   安全（为什么不假绿）：缓存键含 mtime+size，任何写盘（含 v2.29 负控的「注入注释 ->
+//   注入真调用 -> 还原备份」）都会改变 stamp => 必然 miss => 重读重算。**绝不**用
+//   「内容哈希」当键（那要先读盘，等于没省），也**绝不**用无键缓存（那会让端到端注入负控假绿）。
+const __srcCache = Object.create(null);
+function stampOf(abs) {
+  const st = fs.statSync(abs);
+  return String(st.mtimeMs) + ':' + String(st.size);
+}
+// 读文件 + 真代码面 + REF_RE 计数，一次算齐；同 stamp 内命中缓存
+function readCached(abs) {
+  let stamp;
+  try { stamp = stampOf(abs); } catch (e) { return null; }
+  const hit = __srcCache[abs];
+  if (hit && hit.stamp === stamp) return hit;
+  let srcText;
+  try { srcText = fs.readFileSync(abs, 'utf8'); } catch (e) { return null; }
+  const code = inventory.codeFace(srcText);
+  const map = Object.create(null);
+  const re = new RegExp(inventory.REF_RE.source, 'g');
+  let m;
+  while ((m = re.exec(code))) {
+    const k = m[1] + '.' + m[2];
+    map[k] = (map[k] || 0) + 1;
+  }
+  const entry = { stamp: stamp, src: srcText, code: code, map: map };
+  __srcCache[abs] = entry;
+  return entry;
+}
+// v2.32.0（第二层）：整趟快照。上一层缓存把「读盘 + codeFace」降到每文件一次，但
+//   referenceCounts() 仍被 211 条冻结项各调一次 => 每趟仍要 211 x 66 = 13926 次 statSync。
+//   本层再把「产品文件面」整体做成一份快照，每趟只 stat / codeFace 各 67 次。
+//   安全：sig 由全部产品文件 + run.js 的 mtimeMs:size 拼成；任一文件被写（含负控注入与还原）
+//   => sig 变化 => 整份快照重建。evidenceDrift 内部是同步执行，单线程下不存在「趟中被改写」。
+const __snap = { sig: null, byFile: null, run: null };
+// v2.32.0（第三层）：趟内复用。sig 核验本身要 67 次 statSync，若 211 条冻结项各核一次，
+//   光 stat 就又是 14k 次。而 evidenceDrift 是**同步**执行：一趟之内没有任何写盘机会，
+//   因此「趟首核一次 sig」与「每条都核」在同步语义下等价。趟外调用（evidenceOf 直调）
+//   仍走全量核验，缓存安全性一分不减。
+let __passDepth = 0;
+let __passResolved = false;
+function beginPass() { if (__passDepth === 0) __passResolved = false; __passDepth += 1; }
+function endPass() { __passDepth -= 1; if (__passDepth <= 0) { __passDepth = 0; __passResolved = false; } }
+function productSnapshot() {
+  if (__passDepth > 0 && __passResolved && __snap.byFile) return __snap;
+  const rels = inventory.PRODUCT_FILES || [];
+  const runAbs = path.join(__dirname, 'run.js');
+  let sig = '';
+  for (let i = 0; i < rels.length; i++) {
+    const abs = path.join(BASE, rels[i]);
+    try { const st = fs.statSync(abs); sig += String(st.mtimeMs) + ':' + String(st.size) + '|'; }
+    catch (e) { sig += '-|'; }
+  }
+  try { const st = fs.statSync(runAbs); sig += String(st.mtimeMs) + ':' + String(st.size); }
+  catch (e) { sig += '-'; }
+  if (__snap.sig === sig && __snap.byFile) { if (__passDepth > 0) __passResolved = true; return __snap; }
+  const byFile = Object.create(null);
+  for (let i = 0; i < rels.length; i++) {
+    const e = readCached(path.join(BASE, rels[i]));
+    if (e) byFile[rels[i]] = e;
+  }
+  __snap.sig = sig;
+  __snap.byFile = byFile;
+  __snap.run = readCached(runAbs);
+  if (__passDepth > 0) __passResolved = true;
+  return __snap;
+}
+// 在**已剥离的真代码面**上按 word-boundary 计数（countRefs 的纯核）
+function countRefsOnCode(code, mem) {
   const re = new RegExp('(?<![\\w$])' + escapeRe(mem) + '(?![\\w$])', 'g');
   let n = 0;
   let m;
-  const clean = inventory.codeFace(src);
-  while ((m = re.exec(clean))) n += 1;
+  while ((m = re.exec(code))) n += 1;
   return n;
+}
+function countRefs(src, mem) {
+  return countRefsOnCode(inventory.codeFace(src), mem);
 }
 // 产品侧引用数（清册 REF_RE × 清册 codeFace —— 与冻结判据同宽，独立实现避免漂移）
 // v2.29.0：**只在真代码面**上计数。此前直接扫原文，把注释与字符串文本里的 `WA.ns.mem`
@@ -109,27 +184,31 @@ function referenceCounts(rec) {
   const own = fileMap[rec.ns];
   const k = keyOf(rec);
   let refs = 0;
-  (inventory.PRODUCT_FILES || []).forEach(function (rel) {
-    if (rel === own) return;
-    let src;
-    try { src = fs.readFileSync(path.join(BASE, rel), 'utf8'); } catch (e) { return; }
-    refs += (refCountIn(src)[k] || 0);
-  });
+  const snap = productSnapshot();
+  const rels = inventory.PRODUCT_FILES || [];
+  for (let i = 0; i < rels.length; i++) {
+    const rel = rels[i];
+    if (rel === own) continue;
+    const hit = snap.byFile[rel];
+    if (!hit) continue;
+    refs += (hit.map[k] || 0);
+  }
   return refs;
 }
 // 测试侧引用数（与清册同口径：只读 tests/run.js）
 function testRefCount(rec) {
-  let src;
-  try { src = fs.readFileSync(path.join(__dirname, 'run.js'), 'utf8'); } catch (e) { return 0; }
-  return (refCountIn(src)[keyOf(rec)] || 0);
+  const hit = productSnapshot().run;
+  if (!hit) return 0;
+  return (hit.map[keyOf(rec)] || 0);
 }
 // 定义文件内部对该成员名的**真代码**自用数（真代码面：注释里提到名字不算使用）
 function ownRefCount(rec) {
   const rel = nsToFile()[rec.ns];
   if (!rel) return 0;
-  let src;
-  try { src = fs.readFileSync(path.join(BASE, rel), 'utf8'); } catch (e) { return 0; }
-  return countRefs(src, rec.mem);
+  const snap = productSnapshot();
+  const hit = snap.byFile[rel] || readCached(path.join(BASE, rel));
+  if (!hit) return 0;
+  return countRefsOnCode(hit.code, rec.mem);
 }
 // 证据组（写入与复算共用同一份实现——两侧不同源就会「写进去的对不上复算的」）
 function evidenceOf(rec) {
@@ -233,6 +312,8 @@ function metadataProblems(ledger, entryVersion) {
 function evidenceDrift(result, ledger) {
   const out = [];
   if (!ledger || typeof ledger !== 'object') return out;
+  beginPass();
+  try {
   FROZEN_KINDS.forEach(function (kind) {
     const now = {};
     (result[kind] || []).forEach(function (rec) { now[keyOf(rec)] = rec; });
@@ -279,6 +360,7 @@ function evidenceDrift(result, ledger) {
     });
   });
   return out;
+  } finally { endPass(); }
 }
 // 判定：added / staleReason / metadata / evidence 是红灯；gone 只提示
 function judge(result, ledger, opts) {

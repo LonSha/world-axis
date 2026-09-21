@@ -503,7 +503,7 @@
       // 伏笔生命周期
       (r.foreshadows || []).slice(0, LIMITS.foreshadows).forEach(f => {
         if (!f || !f.id) return;
-        const old = (draft.memory.foreshadows || []).find(x => x.id === f.id);
+        const old = (draft.memory.foreshadows || []).find(x => WA.store.sameId(x.id, f.id)); // v2.30.0 P1-1 收口
         // v0.8.0: 伏笔 links 生产方补齐——推演结果未给 links 时捕获当前楼层溯源
         const links = (Array.isArray(f.links) && f.links.length)
           ? f.links

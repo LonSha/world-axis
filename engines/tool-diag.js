@@ -75,9 +75,10 @@
   const MODULE_EXPORTS = {
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
+    'core/undo.js': 'undo',
     'core/api-router.js': 'apiRouter',
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',
-    'engines/regional.js': 'regional', 'engines/horizon.js': 'horizon', 'engines/digest.js': 'digest',
+    'engines/regional.js': 'regional', 'engines/parallel-world.js': 'parallelWorld', 'engines/horizon.js': 'horizon', 'engines/digest.js': 'digest',
     'engines/limits.js': 'limits', 'engines/worldbook.js': 'worldbook', 'engines/ledger.js': 'ledger',
     'engines/timeline.js': 'timeline', 'engines/entities.js': 'entities',
     'engines/preset.js': 'preset', 'engines/chatcache.js': 'chatcache', 'engines/pmem.js': 'pmem',
@@ -228,7 +229,12 @@
             })() : null,
             sizeProfile: prof,
             // v0.1.47: 诊断走自动续扫编排（消费方不必手写 cursor 循环）
-            sizeAudit: WA.store.sizeAuditFull ? WA.store.sizeAuditFull({ minBytes: 512, chunkNodes: 800 }) : (WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null)
+            sizeAudit: WA.store.sizeAuditFull ? WA.store.sizeAuditFull({ minBytes: 512, chunkNodes: 800 }) : (WA.store.sizeAudit ? WA.store.sizeAudit({ minBytes: 512 }) : null),
+      // v2.30.0: 韧性面自检——镜像回落/撤销栈/主动拉动三台账并入诊断包（消费方=诊断视图）
+      mirrorStat: WA.store.mirrorStat ? WA.store.mirrorStat() : null,
+      undoStat: WA.undo && WA.undo.stat ? WA.undo.stat() : null,
+      mirrorOwner: WA.chatcache && WA.chatcache.mirrorOwner ? WA.chatcache.mirrorOwner() : null,
+      proactiveStat: WA.proactive && WA.proactive.stat ? WA.proactive.stat() : null
           };
         }, null)
       };
@@ -507,11 +513,13 @@
       // v2.2.0: 诊断出口收口——三个新增控件同样纳入「渲染 ↔ 绑定」一致性校验
       'wa-stat-reset', 'wa-compat-view', 'wa-wf-reset',
       // v2.2.0 块5：存档恢复点 / 设置键卫生
-      'wa-recovery-view', 'wa-orphan-view',
+      'wa-recovery-view', 'wa-orphan-view', 'wa-undo-btn', 'wa-mirror-view',
       // v2.2.0 块8：工具页既有控件（此前全在守卫之外 → 绑定断裂无人发现）
-      'wa-audit-copy', 'wa-key-check', 'wa-quar-view', 'wa-recovery-dl', 'wa-maintain', 'wa-conf-view', 'wa-settle-view'],
+      'wa-audit-copy', 'wa-key-check', 'wa-quar-view', 'wa-recovery-dl', 'wa-maintain', 'wa-conf-view', 'wa-settle-view',
+      // v2.34.0: 记忆采样预览三件
+      'wa-samp-preview', 'wa-samp-copy', 'wa-samp-out'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
-      dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel'] },
+      dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg'], dynamic: ['wa-conc-v'] },
     { page: 'people', ids: ['wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
@@ -550,7 +558,16 @@
       'wa-rg-enable', 'wa-rg-chance', 'wa-rg-dur', 'wa-rg-save', 'wa-rg-out',
       'wa-rg-chancev', 'wa-rg-durv',
       'wa-set-out'],
-      cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] }
+      cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
+    // v2.33.0: 记忆页 / 注入页——本版把「能力面」第一次接到「呈现面」：memory（92 方法，
+    //   全库最大单体）与 timeline（记忆溯源）此前产品 UI 零入口。两页控件一并纳管，
+    //   否则「渲染了但绑定写错 id」这类断裂在新增出口上无人发现（同 v2.2.0 设置页教训）。
+    { page: 'memory', ids: ['wa-mem-q', 'wa-mem-q-go', 'wa-mem-fact-k', 'wa-mem-fact-v', 'wa-mem-fact-add', 'wa-mem-facts-clear', 'wa-mem-out'] },
+    { page: 'enemies', ids: ['wa-en-out'] },
+    // v2.34.0: 平行世界页（静态控件；data-pwnrm/data-pwmod 为数据驱动动态按钮，随渲染数量变化，不入静态守卫）
+    { page: 'parallel', ids: ['wa-pw-enable', 'wa-pw-mode', 'wa-pw-int', 'wa-pw-dice', 'wa-pw-detail', 'wa-pw-save', 'wa-pw-advance', 'wa-pw-prompt', 'wa-pw-block', 'wa-pw-npc-name', 'wa-pw-npc-goal', 'wa-pw-npc-add', 'wa-pw-out'],
+      cond: [] },
+    { page: 'inject', ids: ['wa-inj-refresh', 'wa-inj-diag', 'wa-inj-out'] }
   ];
   function secUi() {
     return safe(function () {

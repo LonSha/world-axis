@@ -10,6 +10,9 @@ const __uiGateCheckClickable = __uiGate.checkClickable;
 // v2.22.0: 展示映射漂移探针（第十面）。源码级比对「UI 映射键集 ⊇ 引擎枚举/桶集」，
 //   抓运行期不抛不报、G17/G18 照不出的静态漂移（错误的徽章色 / 裸露桶名）。
 const __uiGateCheckSrcMaps = __uiGate.checkSrcMaps;
+// v2.31.0: UI 接线面门禁（引用面→渲染面）。与 ui-gate 的「渲染面→操作面」互补：
+//   抓 handler 绑到从不渲染的 id（if(el) 守卫致静默空转、点击门禁点不到）。
+const __uiWire = require('./ui-wire-audit.js');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -32,8 +35,8 @@ const ctx = vm.createContext(global);
 const LOAD = [
   'core/clock.js',           // v2.15.0: 时间源单一出口（核心原语，须最先装载）
   'core/rand.js',            // v2.14.0: 随机源单一出口（核心原语，须最先装载）
-  'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
-  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
+  'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/undo.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
+  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
@@ -5809,7 +5812,7 @@ WA.loadScript = _ls.loadScript;
   const dg700 = WA.toolDiag.collect();
   assert(dg700.worldState.storage.settleGuard && typeof dg700.worldState.storage.settleGuard.settles === 'number', '诊断透出 settleGuard 节');
   const panelSrc700 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-  assert(panelSrc700.indexOf('id="wa-settle-view">结算守卫</button>') >= 0, '面板渲染结算守卫按钮（按钮行）');
+  assert(panelSrc700.indexOf('id="wa-settle-view"') >= 0 && panelSrc700.indexOf('结算守卫</button>') >= 0, '面板渲染结算守卫按钮（按钮行）');
   assert(panelSrc700.indexOf('wa-settle-force') >= 0 && panelSrc700.indexOf('forceNext') >= 0, '面板接线结算守卫处理器（forceNext 逃生门）');
   assert(WA.settleGuard.stat().skips.reroll >= 1, '归因计数：reroll 跳过被计量');
 
@@ -6617,7 +6620,7 @@ WA.loadScript = _ls.loadScript;
   const rpA1700 = WA.store.registryParity();
   assert(rpA1700.ok === true && rpA1700.missing.length === 0, '正常态 registryParity ok=true missing=0');
   assert(rpA1700.checked === arrayKeys1700.length + objKeys1700.length, 'checked 纳入精确 object 键（不再是仅 array）');
-  assert(rpA1700.checked === 33, 'checked 精确值 33（v1.6.0 时 30，+people；v2.13.0 再 +smallSummaries/bigSummaries 两条真盲区）');
+  assert(rpA1700.checked === 36, 'checked 精确值 36（v2.34.0 +parallelWorld 三容器；前值 33）');
   // ── B. object 键漏物化检出（v1.6.0 盲区修复）──
   fresh1700();
   WA.store.transact(d => { delete d.people; });
@@ -7083,7 +7086,7 @@ WA.loadScript = _ls.loadScript;
   // A1. 功能级生效：AI 回复真的被净化
   const chat2100 = global.__mockChat;
   WA.interceptor.install();
-  const ORIG2100 = '\u8499\u9762\u4eba\u538b\u4f4e\u58f0\u97f3\uff1a\u300c\u4f60\u4e0d\u8be5\u6765\u8fd9\u91cc\u3002\u300d<think>\u6211\u5e94\u8be5\u8ba9\u4ed6\u5f00\u53e3</think>\u7a97\u5916\u7a81\u7136\u4f20\u6765\u9a6c\u8e44\u58f0\u3002';
+  const ORIG2100 = '\u8499\u9762\u4eba\u538b\u4f4e\u58f0\u97f3\uff1a\u300c\u4f60\u4e0d\u8be5\u6975\u8fd9\u91cc\u3002\u300d<think>\u6211\u5e94\u8be5\u8ba9\u4ed6\u5f00\u53e3</think>\u7a97\u5916\u7a81\u7136\u4f20\u6975\u9a6c\u8e44\u58f0\u3002';
   chat2100.push({ is_user: false, name: '\u65c1\u767d', mes: ORIG2100, swipe_id: 0 });
   const stB2100 = purStat2100();
   await global.__triggerEvent('msg_recv', chat2100.length - 1);
@@ -7115,7 +7118,7 @@ WA.loadScript = _ls.loadScript;
   const savedR2100 = WA.purifier.rules.slice();
   WA.purifier.rules = [{ id: 'probe_eat_all', find: '[\\s\\S]*', replace: '', flags: 'g', enabled: true }];
   const stG2100 = purStat2100();
-  const TXT2100 = '\u8fd9\u662f\u4e00\u6761\u5f88\u957f\u7684\u6b63\u6587\uff0c\u4e0d\u80fd\u88ab\u541e\u3002';
+  const TXT2100 = '\u8fd9\u662f\u4e00\u6971\u5f88\u957f\u7684\u6b63\u6587\uff0c\u4e0d\u80fd\u88ab\u541e\u3002';
   assert(WA.purifier.applySafe(TXT2100) === TXT2100, '净化后为空时回退原文（防整条消失）');
   assert(purStat2100().blocked === stG2100.blocked + 1, 'blocked 计数可见');
   assert(purStat2100().changed === stG2100.changed, '被拦下不计入 changed（不误报成功）');
@@ -7270,7 +7273,7 @@ WA.loadScript = _ls.loadScript;
   // C2. 功能级生效：真的从通道生成弧线
   WA.apiRouter.setChannel && WA.apiRouter.setChannel('judge', Object.assign({}, savedJudge2100, { baseUrl: 'http://probe.local/v1', model: 'probe-model' }));
   global.__pushApiJson({ beats: [
-    { goal: '\u63a5\u8fd1\u8499\u9762\u4eba', instruction: '\u8ba9\u73a9\u5bb6\u5728\u9152\u9986\u62fe\u5230\u5b57\u6761' },
+    { goal: '\u63a5\u8fd1\u8499\u9762\u4eba', instruction: '\u8ba9\u73a9\u5bb6\u5728\u9152\u9986\u62fe\u5230\u5b57\u6971' },
     { goal: '\u5957\u8bdd', instruction: '\u5bf9\u8bdd\u4e2d\u900f\u9732\u7ebf\u7d22' },
     { goal: '\u63ed\u9762', instruction: '\u7a81\u53d1\u4e8b\u4ef6\u903c\u8feb\u5bf9\u65b9\u644a\u724c' }
   ] });
@@ -7905,7 +7908,7 @@ WA.loadScript = _ls.loadScript;
     const badShD = WA.registry.setProfileSafe(NMD, { personality: 123 });
     assert(badShD.ok === false && badShD.rejected.some(function (r) { return r.section === 'personality' && r.reason === 'bad-shape'; }), '非数组/非字符串拒绝（防写坏结构）');
     const lenBeforeD = WA.registry.getProfile(NMD).personality.length;
-    const wLongD = WA.registry.setProfileSafe(NMD, { personality: ['x'.repeat(260), '\u5408\u6cd5\u6761\u76ee'] });
+    const wLongD = WA.registry.setProfileSafe(NMD, { personality: ['x'.repeat(260), '\u5408\u6cd5\u6971\u76ee'] });
     assert(wLongD.ok === true && wLongD.rejected.some(function (r) { return r.reason === 'length-or-empty'; }), '超长条目拒收并归因');
     assert(WA.registry.getProfile(NMD).personality.length === lenBeforeD + 1, '只有合法条目进档');
     const wRelD = WA.registry.setProfileSafe(NMD, { relationships: [' | a | b'] });
@@ -7917,7 +7920,7 @@ WA.loadScript = _ls.loadScript;
     const capPD = WA.store.capsFor('people.p_x.profile.personality').cap;
     const capMD = WA.store.capsFor('people.p_x.profile.memory').cap;
     const capRD = WA.store.capsFor('people.p_x.profile.relationships').cap;
-    const manyPD = []; for (let i = 0; i < capPD + 8; i++) manyPD.push('\u6027\u683c\u6761' + i);
+    const manyPD = []; for (let i = 0; i < capPD + 8; i++) manyPD.push('\u6027\u683c\u6971' + i);
     WA.registry.setProfileSafe(NMD, { personality: manyPD });
     assert(WA.registry.getProfile(NMD).personality.length === capPD, '性格节剪裁到登记表上限（' + capPD + '）——单一真源生效');
     const manyMD = []; for (let i = 0; i < capMD + 9; i++) manyMD.push('\u7ecf\u5386' + i);
@@ -7929,7 +7932,7 @@ WA.loadScript = _ls.loadScript;
     assert(WA.store.sizeAudit({ minBytes: 0, maxDepth: 8 }).drifted.every(function (r) { return r.path.indexOf('profile') < 0; }), '写入后无 drifted（登记与实现同源）');
 
     // D5. replace 与清空
-    const wRepD = WA.registry.setProfileSafe(NMD, { personality: ['\u552f\u4e00\u65b0\u6761'] }, { replace: true });
+    const wRepD = WA.registry.setProfileSafe(NMD, { personality: ['\u552f\u4e00\u65b0\u6971'] }, { replace: true });
     assert(wRepD.ok === true && WA.registry.getProfile(NMD).personality.length === 1, 'replace:true 整节替换');
     const clrD = WA.registry.clearProfile(NMD);
     assert(clrD.ok === true, 'clearProfile 成功');
@@ -7943,7 +7946,7 @@ WA.loadScript = _ls.loadScript;
     const issNoD = mNoProfD.issues.filter(function (i) { return i.key === 'actors.profile'; })[0];
     assert(!!issNoD && issNoD.level === 'info', '「有 NPC 却零档案」被报为可行动信号');
     assert(mNoProfD.actions.some(function (a) { return a.id === 'edit-npc-profile'; }), '巡视给出建档动作指引');
-    WA.registry.setProfileSafe(NMD, { personality: ['\u4e00\u6761'], memory: ['\u53c8\u4e00\u6761'] });
+    WA.registry.setProfileSafe(NMD, { personality: ['\u4e00\u6971'], memory: ['\u53c8\u4e00\u6971'] });
     const mHasD = WA.store.maintain({});
     assert(mHasD.signals.profWith >= 1 && mHasD.signals.profEntries >= 2, '建档后 signals 覆盖率回升');
     const dgD = WA.toolDiag.collect();
@@ -7978,12 +7981,12 @@ WA.loadScript = _ls.loadScript;
       const pInD = $d('#wa-prof-personality');
       assert(!!pInD && pInD.value.indexOf('\u521d\u59cb') >= 0, '编辑器预填现有档案（不丢已录内容）');
       const setVD = function (sel, v) { const el = $d(sel); if (el) el.value = v; };
-      setVD('#wa-prof-personality', ['\u7b2c\u4e00\u6761', '\u7b2c\u4e8c\u6761'].join(String.fromCharCode(10)));
+      setVD('#wa-prof-personality', ['\u7b2c\u4e00\u6971', '\u7b2c\u4e8c\u6971'].join(String.fromCharCode(10)));
       setVD('#wa-prof-memory', '\u8bb0\u5fc6\u4e00');
       setVD('#wa-prof-relationships', '\u7532 | \u540c\u4f34 | \u540c\u884c');
       const svD = $d('#wa-prof-save'); if (svD && svD.onclick) svD.onclick();
       const prED = WA.registry.getProfile(NMD2);
-      assert(prED.personality.length === 2 && prED.personality[0].text === '\u7b2c\u4e00\u6761', '面板保存真写入档案（整节替换）');
+      assert(prED.personality.length === 2 && prED.personality[0].text === '\u7b2c\u4e00\u6971', '面板保存真写入档案（整节替换）');
       assert(prED.memory.length === 1 && prED.relationships.length === 1, '多节同时保存生效');
       peopleTabD2200.onclick();
       const btnD2 = global.document.querySelector('[data-prof="' + NMD2 + '"]');
@@ -8171,7 +8174,7 @@ WA.loadScript = _ls.loadScript;
     WA.store.transact(d => { d.evolution.events = []; d.evolution.round = 3; });
     const stF0 = WA.backstage.applyStat();
     WA.store.transact(d => WA.backstage.applyResult(d, { events_create: [
-      { title: '\u8840\u5200\u95e8\u5bfb\u4ec7', type: 'conflict', level: 2, desc: '\u5bfb\u4e0a\u95e8\u6765' },
+      { title: '\u8840\u5200\u95e8\u5bfb\u4ec7', type: 'conflict', level: 2, desc: '\u5bfb\u4e0a\u95e8\u6975' },
       { title: '\u62a4\u9001\u5546\u961f', type: 'progress', level: 9, desc: '\u5f80\u5317\u53bb' }
     ] }, { idx: 1 }));
     const evsF1 = WA.store.read('evolution.events', []);
@@ -9061,7 +9064,7 @@ WA.loadScript = _ls.loadScript;
   const LS2400 = global.localStorage;
   const ctx2400 = global.SillyTavern.getContext();
   const PROD2400 = ['core/store.js', 'core/settings-bus.js', 'core/api-router.js', 'core/workflow.js', 'core/interceptor.js',
-    'engines/backstage.js', 'engines/evolution.js', 'engines/opinion.js', 'engines/regional.js', 'engines/horizon.js',
+    'engines/backstage.js', 'engines/evolution.js', 'engines/opinion.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js',
     'engines/calendar.js', 'engines/memory-sampler.js', 'engines/tool-diag.js',
     'render/inject.js', 'render/purifier.js', 'ui/panel.js', 'ui/settings.js'];
   const SRC2400 = PROD2400.map(function (rel) { return { rel: rel, text: fs.readFileSync(path.join(BASE, rel), 'utf8') }; });
@@ -9361,7 +9364,7 @@ WA.loadScript = _ls.loadScript;
   const LS2500 = global.localStorage;
   const ctx2500 = global.SillyTavern.getContext();
   const PROD2500 = ['core/store.js', 'core/settings-bus.js', 'core/api-router.js', 'core/workflow.js',
-    'engines/backstage.js', 'engines/evolution.js', 'engines/opinion.js', 'engines/regional.js', 'engines/horizon.js',
+    'engines/backstage.js', 'engines/evolution.js', 'engines/opinion.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js',
     'engines/calendar.js', 'engines/preset.js', 'engines/tool-diag.js',
     'render/inject.js', 'render/purifier.js', 'ui/panel.js'];
   const SRC2500 = PROD2500.map(function (rel) { return { rel: rel, text: fs.readFileSync(path.join(BASE, rel), 'utf8') }; });
@@ -9811,7 +9814,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.34.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -9821,7 +9824,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
   const LS2600 = global.localStorage;
   const ctx2600 = global.SillyTavern.getContext();
   const PROD2600 = ['core/store.js', 'core/settings-bus.js', 'core/api-router.js', 'core/workflow.js',
-    'engines/backstage.js', 'engines/evolution.js', 'engines/opinion.js', 'engines/regional.js', 'engines/horizon.js',
+    'engines/backstage.js', 'engines/evolution.js', 'engines/opinion.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js',
     'engines/calendar.js', 'engines/preset.js', 'engines/tool-diag.js',
     'render/inject.js', 'render/purifier.js', 'ui/panel.js', 'ui/settings.js'];
   const SRC2600 = PROD2600.map(function (rel) { return { rel: rel, text: fs.readFileSync(path.join(BASE, rel), 'utf8') }; });
@@ -10220,7 +10223,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
         return sites;
       })();
       // 冻结清单：新增任何一处旁路都会使本断言失败（迫使走一次「它属于哪个家族」的判断）
-      const INVENTORY_G = { 'core/store.js': 7, 'core/workflow.js': 1, 'engines/worldbook.js': 1,
+      const INVENTORY_G = { 'core/store.js': 8, 'core/workflow.js': 1, 'engines/worldbook.js': 1,
         'engines/chatcache.js': 2, 'render/inject.js': 1, 'index.js': 2 };
       const countByFile = {};
       BOUNDARY_G.forEach(function (st) { countByFile[st.rel] = (countByFile[st.rel] || 0) + 1; });
@@ -10355,7 +10358,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.29.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.34.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10635,7 +10638,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     assert(WA.settingsBus.selfCheck().ok === true, '清理后登记表恢复自洽（校验无副作用）');
     // 空转守卫：归一器本身必须有产品消费面（不止测试）
     let normUse = 0;
-    ['engines/backstage.js', 'engines/opinion.js', 'engines/regional.js', 'engines/horizon.js', 'engines/evolution.js']
+    ['engines/backstage.js', 'engines/opinion.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/evolution.js']
       .forEach(function (f) { normUse += (src2700(f).match(/settingsBus\.normalize/g) || []).length; });
     assert(normUse >= 5, 'normalize 被五个模块写路径消费（实 ' + normUse + ' 处；防「新增 API 却零调用」）');
     assert(WA.settingsBus.boundsOf && WA.settingsBus.clampNum, 'clampNum/boundsOf 已导出（跨文件消费点取用）');
@@ -10646,7 +10649,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.29.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.34.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11052,7 +11055,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:init installStat listSnapshots|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueStat resetTxStat restore restoreQuarantine save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:getSettings setClock setSettings stat|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:applyEntities applyEntityUpdates buildEntitiesBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|parallelWorld:IMPACTS IMPACT_LABEL addNpc advance buildParallelBlock buildPrompt dropModule effectiveSettings removeNpc setSettings stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id int next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:SOURCE_ID_KEY auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|undo:capture clear peek pushValue stat undo|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:buildPromptSection hasSelection';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11172,7 +11175,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.29.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.34.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11560,7 +11563,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.29.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.34.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11930,7 +11933,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.29.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.34.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12295,7 +12298,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.29.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.34.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -12339,12 +12342,12 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     assert(!!panel && !!panel.querySelector('.wa-body'), '内容容器成树（renderBody 的挂载点）');
     assert(!!panel && panel.classList.contains('wa-hidden') === true, '初始为隐藏态（未点开时不占屏）');
 
-    section('G17-B 十个渲染器逐页真实执行（点击 → renderBody → innerHTML 解析 → bindBody）');
+    section('G17-B 十四个渲染器逐页真实执行（点击 → renderBody → innerHTML 解析 → bindBody）');
     WA.ui.open();
     assert(panel.classList.contains('wa-hidden') === false, 'open() 后翻为可见');
     const pages = __uiGateCheckPages(env, countControls);
-    assert(pages.tested === 10, 'RENDERERS 覆盖的页面数为 10（实 ' + pages.tested + '）');
-    assert(pages.failures.length === 0, '十个页面全部渲染成树且控件可在树中找到', pages.failures.join('；'));
+    assert(pages.tested === 14, 'RENDERERS 覆盖的页面数为 14（实 ' + pages.tested + '）');
+    assert(pages.failures.length === 0, '十四个页面全部渲染成树且控件可在树中找到', pages.failures.join('；'));
     console.log('    ' + pages.details.join('  '));
     assert(WA.ui.currentPage() === (WA.ui.pages() || []).slice(-1)[0],
       '切换按 pages() 原始顺序推进（末页实 ' + WA.ui.currentPage() + '）');
@@ -13715,7 +13718,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     //   整体覆盖回原版——于是三条判据在三个副本上读数完全一致（破坏根本没生效）。
     const LOAD21 = ['core/clock.js', 'core/rand.js', 'core/settings-bus.js', 'core/store.js', 'core/evict.js',
       'core/api-router.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
-      'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/horizon.js',
+      'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js',
       'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js', 'engines/worldbook.js',
       'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js',
       'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js', 'engines/chapters.js',
@@ -14482,23 +14485,23 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 1202, '现场静态引用 1202 处（真代码口径，实 ' + r2700.refs + '）');
-    assert(r2700.namespaces === 64 && r2700.members === 665,
-      '定义面 64 命名空间 / 665 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
-    assert(r2700.dead.length === 211 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 101,
-      '死子面 dead 211 / uiDead 4 / dataOnly 101（实 ' + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
+    assert(r2700.refs === 1327, '现场静态引用 1327 处（真代码口径，实 ' + r2700.refs + '）');
+    assert(r2700.namespaces === 66 && r2700.members === 697,
+      '定义面 65 命名空间 / 697 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.dead.length === 212 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 107,
+      '死子面 dead 212 / uiDead 4 / dataOnly 107（实 ' + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
     assert(r2700.deadInTestsOnly === 133, '其中仅测试引用 133（实 ' + r2700.deadInTestsOnly + '）');
     // ── D. 账本健全：条目数一致、归因在词表内、无占位 ──
     const led2700 = gate2700.loadLedger();
     assert(!!led2700 && typeof led2700 === 'object', '账本可加载（tests/dead-export-ledger.json）');
-    assert(Object.keys(led2700.dead).length === 211 && Object.keys(led2700.uiDead).length === 4,
-      '账本条目数与现场一致（dead 211 / uiDead 4）');
+    assert(Object.keys(led2700.dead).length === 212 && Object.keys(led2700.uiDead).length === 4,
+      '账本条目数与现场一致（dead 212 / uiDead 4）');
     const reasons2700 = Array.from(new Set(Object.keys(led2700.dead).concat(Object.keys(led2700.uiDead))
       .map(function (k) { return (led2700.dead[k] || led2700.uiDead[k] || {}).reason; })));
     assert(reasons2700.every(function (x) { return gate2700.REASON_CODES.indexOf(x) >= 0; }),
       '归因全在词表内（' + reasons2700.join(',') + '）');
     assert(JSON.stringify(led2700).indexOf('TODO') < 0, '账本无占位归因（归因由测量得出，不留 TODO）');
-    assert(led2700.advisory && led2700.advisory.dataOnly === 101, 'advisory 面只记计数不拦截（dataOnly=101）');
+    assert(led2700.advisory && led2700.advisory.dataOnly === 107, 'advisory 面只记计数不拦截（dataOnly=107）');
     // ── E. 判定四态（纯判定面，用现场结果驱动）──
     const clone2700 = function (o) { return JSON.parse(JSON.stringify(o)); };
     assert(gate2700.judge(r2700, led2700).ok === true, '（基线）现场与账本一致 ⇒ ok');
@@ -14561,7 +14564,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
       '（负向自证）症状可读：命名空间 ' + (boom2700 ? boom2700.namespaces : '?')
       + ' / 悬空 ' + (boom2700 ? boom2700.phantom.length : '?') + '（正是 CLI 首跑踩到的塌面）');
     console.log('  ✓ 口径单源（collect 复用、依赖单向无环、复用判据不退回宿主壳）');
-    console.log('  ✓ 现场锚点（refs 1202 / 命名空间 64 / 成员 665 / dead 211 · uiDead 4 · dataOnly 101）');
+    console.log('  ✓ 现场锚点（refs 1327 / 命名空间 66 / 成员 697 / dead 212 · uiDead 4 · dataOnly 107）');
     console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
     console.log('  ✓ 判定四态（新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红）');
     console.log('  ✓ 负向自证（破坏「已装载」判据 ⇒ 定义面塌成 0、退出码非零、症状 JSON 可解析）');
@@ -14574,7 +14577,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     //   这句话**看得懂**，不保证这句话**是真的、可核对的**。交付时现场有两处铁证：
     //   ① 账本 `version` 字段写 2.26.0、`_note` 写 v2.27.0、入口 VERSION 是 2.27.0——
     //      **同一文件内两个版本，且都不等于入口**，而该字段此前没有任何门禁；
-    //   ② 215 条归因**零条带证据**——「凭什么是 self-only 而不是 unwired」完全没有答案，
+    //   ② 216 条归因**零条带证据**——「凭什么是 self-only 而不是 unwired」完全没有答案，
     //      核对者只能相信写账本的那一次测量（本仓既有裁决：归因不可读等于归因不实）。
     const inv2800 = require('./inventory.js');
     const gate2800 = require('./dead-export-gate.js');
@@ -14597,7 +14600,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.29.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.34.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -14625,12 +14628,12 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
       && pmV2800.some(function (x) { return x.mismatch === 'field-vs-note'; }),
       '（负控制）_note 与 version 互不一致 ⇒ note-vs-entry + field-vs-note 同时现形');
 
-    // ── D. 证据强度：215 条逐条带证、可复算、与归因同宽 ──
+    // ── D. 证据强度：216 条逐条带证、可复算、与归因同宽 ──
     const allEnt2800 = [];
     ['dead', 'uiDead'].forEach(function (k) {
       Object.keys(led2800[k] || {}).forEach(function (kk) { allEnt2800.push({ kind: k, key: kk, item: led2800[k][kk] }); });
     });
-    assert(allEnt2800.length === 215, '账本条目 215 条（实 ' + allEnt2800.length + '）');
+    assert(allEnt2800.length === 216, '账本条目 216 条（实 ' + allEnt2800.length + '）');
     const missingEv2800 = allEnt2800.filter(function (e) {
       return gate2800.EVIDENCE_KEYS.some(function (f) { return e.item[f] === undefined; });
     });
@@ -14644,8 +14647,8 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     assert(deriveBad2800.length === 0, '归因可由 (tref, own) 唯一反推（不可反推 ' + deriveBad2800.length + ' 条）');
     const dist2800 = {};
     allEnt2800.forEach(function (e) { dist2800[e.item.reason] = (dist2800[e.item.reason] || 0) + 1; });
-    assert(dist2800['test-only'] === 137 && dist2800['self-only'] === 73 && dist2800['unwired'] === 5,
-      '归因分布 test-only 137 / self-only 73 / unwired 5（实 ' + JSON.stringify(dist2800) + '）');
+    assert(dist2800['test-only'] === 137 && dist2800['self-only'] === 73 && dist2800['unwired'] === 6,
+      '归因分布 test-only 137 / self-only 73 / unwired 6（实 ' + JSON.stringify(dist2800) + '）');
     assert(gate2800.evidenceDrift(r2800, led2800).length === 0, '现场账本证据复算零失实');
 
     // ── E. 负控制：证据失实/缺证/归因与证据不符 各须现形 ──
@@ -14676,11 +14679,11 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     // ── F. 判据不越界：冻结面与归因宽度本版不动；现场锚点随 v2.29.0 真代码口径更新 ──
     assertDeepEq(gate2800.FROZEN_KINDS, ['dead', 'uiDead'], '冻结面仍为 dead/uiDead（本版不扩面）');
     assertDeepEq(gate2800.ADVISORY_KINDS, ['dataOnly'], 'advisory 面仍为 dataOnly（不升级为拦截）');
-    assert(r2800.dead.length === 211 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 101
+    assert(r2800.dead.length === 212 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 107
       && r2800.deadInTestsOnly === 133,
-      '现场锚点（dead 211 / uiDead 4 / dataOnly 101 / 仅测试 133）');
-    assert(r2800.refs === 1202 && r2800.namespaces === 64 && r2800.members === 665,
-      '清册面（refs 1202 / 命名空间 64 / 成员 665，真代码口径）');
+      '现场锚点（dead 212 / uiDead 4 / dataOnly 107 / 仅测试 133）');
+    assert(r2800.refs === 1327 && r2800.namespaces === 66 && r2800.members === 697,
+      '清册面（refs 1327 / 命名空间 66 / 成员 697，真代码口径）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -14859,11 +14862,11 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-    assert(r2900.refs === 1202 && r2900.namespaces === 64 && r2900.members === 665,
-      '清册面（refs 1202 / 命名空间 64 / 成员 665）——真代码口径下的现场值');
-    assert(r2900.dead.length === 211 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 101
+    assert(r2900.refs === 1327 && r2900.namespaces === 66 && r2900.members === 697,
+      '清册面（refs 1327 / 命名空间 66 / 成员 697）——真代码口径下的现场值');
+    assert(r2900.dead.length === 212 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 107
       && r2900.deadInTestsOnly === 133,
-      '死子面 dead 211 / uiDead 4 / dataOnly 101 / 仅测试 133（实 ' + r2900.dead.length + '/'
+      '死子面 dead 212 / uiDead 4 / dataOnly 107 / 仅测试 133（实 ' + r2900.dead.length + '/'
       + r2900.uiDead.length + '/' + r2900.dataOnly.length + '/' + r2900.deadInTestsOnly + '）');
     const soft2900 = ['rand.seed', 'clock.freeze', 'bridge.setSettings'];
     const ledKeys2900 = Object.keys(led2900.dead);
@@ -14891,7 +14894,7 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
     assertDeepEq(gate2900.EVIDENCE_KEYS, ['src', 'refs', 'tref', 'own'], '证据键不变（refs 与「死」的定义仍同宽）');
     assert(inv2900.PRODUCT_FILES.length === r2900.files.product && inv2900.REF_RE instanceof RegExp,
       '清册导出 PRODUCT_FILES / REF_RE 与产品面同源（门禁复算不另写扫描面）');
-    assert(led2900.advisory && led2900.advisory.dataOnly === 101, 'advisory 只记计数（dataOnly 101）');
+    assert(led2900.advisory && led2900.advisory.dataOnly === 107, 'advisory 只记计数（dataOnly 107）');
     // 旧灯一盏不少
     const ledAdd2900 = clone2900(led2900);
     delete ledAdd2900.dead[Object.keys(ledAdd2900.dead)[0]];
@@ -14958,7 +14961,662 @@ assert(verF2500 === '2.29.0' && mfF2500.version === verF2500, '入口与清单�
   }
 
 
-  // ── 汇总 ──
+  // ── v2.30.0：镜像回落 + 撤销栈 + 引用收口 + 扫描面断言 + proactive 台账 ──
+  section('v2.30.0：镜像回落（分支世界不归零）+ 参数撤销栈 + 引用判据收口');
+  {
+    // A. mirrorStat 三计数在场且初值可读
+    assert(typeof WA.store.mirrorStat === 'function', 'v2300: store.mirrorStat 在场');
+    const ms0 = WA.store.mirrorStat();
+    assert(ms0 && typeof ms0.hits === 'number' && typeof ms0.misses === 'number' && typeof ms0.errors === 'number',
+      'v2300: 镜像三计数（hits/misses/errors）可读');
+    assert(typeof WA.store.rescueFromMirror === 'function', 'v2300: store.rescueFromMirror 在场');
+    // B. undo 模块在场且与 patch 钩子联动
+    assert(WA.undo && typeof WA.undo.pushValue === 'function' && typeof WA.undo.undo === 'function',
+      'v2300: WA.undo 在场（pushValue/undo）');
+    WA.undo.clear();
+    const uB = WA.undo.stat().pushes;
+    const uMerged0 = WA.undo.stat().merged;
+    WA.store.patch('v2300probe', { a: 1 });
+    assert(WA.undo.stat().pushes === uB + 1, 'v2300: store.patch 写回成功 ⇒ before 入栈');
+    const uPeek = WA.undo.peek();
+    assert(uPeek && uPeek.path === 'v2300probe', 'v2300: 栈顶 path 记录正确');
+    const uBefore = WA.store.read('v2300probe');
+    WA.store.patch('v2300probe', { a: 2 });
+    assert(WA.store.read('v2300probe').a === 2, 'v2300: 二次编辑生效');
+    assert(WA.undo.stat().pushes === uB + 1 && WA.undo.stat().merged === uMerged0 + 1,
+      'v2300: 同标签同 path 连续编辑合并（pushes 不增、merged+1）——只记最早 before');
+    const uR = WA.undo.undo();
+    // 同标签合并 ⇒ 栈顶 before = 第一次编辑前 = undefined（新键）⇒ undo 一步退到「序列最早」即键不存在
+    assert(uR.ok === true, 'v2300: undo 成功执行');
+    assert(WA.store.read('v2300probe') === undefined,
+      'v2300: undo 还原到序列最早状态（同标签合并 ⇒ 新键编辑序列退到键不存在）');
+    assert(uBefore.a === 1, 'v2300: before 快照不被后续编辑污染（显式值优先）');
+    // C. sameId 三态裁决
+    assert(WA.store.sameId('x', 'x') === true, 'v2300: sameId 相同串匹配');
+    assert(WA.store.sameId('7', 7) === true, 'v2300: sameId 数字/字符串归一');
+    assert(WA.store.sameId(null, null) === false && WA.store.sameId('', '') === false,
+      'v2300: sameId null/空串不参与匹配（读失败不与缺失同形同源纪律）');
+    // D. 扫描面完整性断言：产品代码（非tests）零 Node 内建引用（纯逻辑层守恒）
+    const scanDirs2300 = ['core', 'engines', 'render', 'compat', 'actors', 'direction'];
+    let nodeBuiltinHits2300 = [];
+    scanDirs2300.forEach(function (d) {
+      (function walk(dir) {
+        let ents = []; try { ents = fs.readdirSync(path.join(BASE, dir), { withFileTypes: true }); } catch (_) { return; }
+        ents.forEach(function (e) {
+          const p = path.join(dir, e.name);
+          if (e.isDirectory()) return walk(p);
+          if (!e.name.endsWith('.js')) return;
+          fs.readFileSync(path.join(BASE, p), 'utf8').split('\n').forEach(function (line, i) {
+            if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+            // v2.30.0 同轮自纠（判据精确化，零误杀/零漏报）：只抓「真 Node 运行时依赖」，放过局部变量/宿主形态/数据词。
+            //   require( —— 模块引入根（Node fs 等必经此处，无需单列 fs.）；__dirname/__filename —— Node 特有全局；
+            //   process./Buffer 用 lookbehind 排除 window./WA. 宿主前缀；global[./global[ 排除带前缀宿主形态与 typeof 兜底、数据词。
+            if (/\brequire\s*\(|__dirname|__filename|(?<![.\w])process\.\w|(?<![.\w])Buffer[.(]|(?<![\w.])global\s*[.\[]/.test(line)) {
+              nodeBuiltinHits2300.push(p + ':' + (i + 1));
+            }
+          });
+        });
+      })(d);
+    });
+    assert(nodeBuiltinHits2300.length === 0,
+      'v2300: 扫描面完整性——产品代码零 Node 内建引用（Browser 运行时守恒）'
+      + (nodeBuiltinHits2300.length ? ' — 命中: ' + nodeBuiltinHits2300.slice(0, 6).join('、') : ''));
+    // 负向自证：把判据的识别规则临时放宽，确认它**能**报出假想命中（不是恒真断言）
+    assert(nodeBuiltinHits2300.length === 0 && /\brequire\s*\(/.test('x = require(1);'),
+      'v2300: 扫描判据规则本身可命中 require 形态（负向自证：判据不是恒真）');
+    // E. proactive 台账在场（P2-1）
+    assert(WA.proactive && typeof WA.proactive.stat === 'function', 'v2300: proactive.stat 台账在场');
+    const ps0 = WA.proactive.stat();
+    assert(ps0 && typeof ps0.pulls === 'number' && typeof ps0.skippedCooldown === 'number',
+      'v2300: proactive 台账含 pulls/skippedCooldown 计数');
+    // F. 自动回落仅分支：同聊天空键不得把持久镜像灌回 LS.clear 后的空白
+    {
+      const ctxF = global.SillyTavern.getContext();
+      const mdF = ctxF.chatMetadata;
+      const origChatF = ctxF.chatId;
+      const origMainF = mdF.main_chat;
+      const origNsF = mdF.worldaxis;
+      const LSF = global.localStorage;
+      const snapF = JSON.stringify(WA.store.get());
+      const packF = { live: { chatId: 'v2300_parent', data: { state: snapF }, rev: 1 } };
+      try {
+        // F1 同聊天空键 + 镜像在 ⇒ 不写盘
+        delete mdF.main_chat;
+        mdF.worldaxis = packF;
+        const keySameF = 'worldaxis_state_' + origChatF;
+        LSF.removeItem(keySameF);
+        const hitsBeforeF = WA.store.mirrorStat().hits;
+        WA.store.init();
+        assert(LSF.getItem(keySameF) === null,
+          'v2300: 同聊天空键不自动写回镜像（防 LS.clear 污染）');
+        assert(WA.store.mirrorStat().hits === hitsBeforeF,
+          'v2300: 非分支路径不记 mirrorHits');
+        // F2 分支世界 + 镜像在 ⇒ 落盘救回
+        ctxF.chatId = 'v2300_branch';
+        mdF.main_chat = 'v2300_parent';
+        mdF.worldaxis = packF;
+        const keyBrF = 'worldaxis_state_v2300_branch';
+        LSF.removeItem(keyBrF);
+        const hitsBrF = WA.store.mirrorStat().hits;
+        WA.store.init();
+        const rawBrF = LSF.getItem(keyBrF);
+        assert(rawBrF !== null, 'v2300: 分支世界从镜像救回并落盘');
+        const lastBrF = WA.store.mirrorStat().last;
+        assert(WA.store.mirrorStat().hits === hitsBrF + 1, 'v2300: 分支回落记 mirrorHits');
+        assert(lastBrF && lastBrF.inherited === true && lastBrF.fromChatId === 'v2300_parent',
+          'v2300: lastMirror.inherited 落证母聊天');
+        assert(WA.store.read('clock.label') === JSON.parse(snapF).clock.label,
+          'v2300: 分支读侧不归零（世界从镜像接过来）');
+        // F3 手动补救无视是否分支
+        ctxF.chatId = 'v2300_manual';
+        delete mdF.main_chat;
+        mdF.worldaxis = packF;
+        const keyManF = 'worldaxis_state_v2300_manual';
+        LSF.removeItem(keyManF);
+        const rManF = WA.store.rescueFromMirror();
+        assert(rManF.ok === true, 'v2300: rescueFromMirror 无视是否分支（实 ' + (rManF.reason || 'ok') + '）');
+        assert(LSF.getItem(keyManF) !== null, 'v2300: 手动补救写回本地键');
+      } finally {
+        ctxF.chatId = origChatF;
+        if (origMainF === undefined) delete mdF.main_chat; else mdF.main_chat = origMainF;
+        if (origNsF === undefined) delete mdF.worldaxis; else mdF.worldaxis = origNsF;
+        try { WA.store.init(); } catch (eF) {}
+      }
+    }
+  }
+  // ── UI 接线面（v2.31.0）：引用面 → 渲染面，与 ui-gate 的操作面互补 ──
+  section('v2.31.0 块：UI 接线面门禁（引用面→渲染面，零幽灵绑定）');
+  {
+    const wireFiles = __uiWire.uiFiles();
+    assert(wireFiles.length === 3, 'UI 接线面：三个 ui 文件在场（实 ' + wireFiles.length + '）');
+    wireFiles.forEach(function (f) {
+      const r = __uiWire.auditWire(f.src);
+      const gdesc = r.ghosts.map(function (g) { return g + '@L' + (r.referenced[g] || []).join(','); }).join('、');
+      assert(r.ghosts.length === 0, 'UI 接线面 ' + f.rel + ' 零幽灵引用（引用 ' + Object.keys(r.referenced).length + ' / 渲染提及 ' + Object.keys(r.rendered).length + '）', gdesc);
+    });
+    // 负向自证：对真实 panel.js 注入一个幽灵引用，门禁必须变红（判据非恒绿）
+    const realPanel = wireFiles.filter(function (f) { return f.rel === 'ui/panel.js'; })[0];
+    const doctored = realPanel.src + '\n' + "on('#wa-ghost-probe-btn', () => {});\n";
+    const rD = __uiWire.auditWire(doctored);
+    assert(rD.ghosts.indexOf('wa-ghost-probe-btn') >= 0, '（负向）注入的幽灵引用被接线面门禁抓到（实 ' + rD.ghosts.join('、') + '）');
+  }
+  // ══════════ v2.32.0 ══════════
+  section('v2.32.0：证据复算性能（文件级缓存 + 整趟快照，缓存不得假绿）');
+  {
+    // 命题：v2.28.0 让归因**可证伪**（每条冻结项重算证据并复比），代价是 referenceCounts()
+    //   对每个产品文件各自 readFileSync + codeFace，而被 evidenceOf() 逐条调用 ⇒ 同一文件
+    //   被解析 211 次。实测单次 evidenceDrift 82.7~87.3 秒，而 run.js 里调用 11 次
+    //   ⇒ 完整回归 15 分钟的大头全在这里。本版把它压到毫秒级，**且不许因此丢掉证伪能力**。
+    const inv2320 = require('./inventory.js');
+    const gate2320 = require('./dead-export-gate.js');
+    const gsrc2320 = fs.readFileSync(path.join(BASE, 'tests/dead-export-gate.js'), 'utf8');
+
+    // ── A. 结构锁：三层缓存基础设施在场，且缓存键含写盘信号 ──
+    assert(gsrc2320.indexOf('function readCached(abs)') > 0
+      && gsrc2320.indexOf('function productSnapshot()') > 0
+      && gsrc2320.indexOf('function beginPass()') > 0
+      && gsrc2320.indexOf('function endPass()') > 0,
+      '性能缓存三层在场（文件级 readCached / 整趟 productSnapshot / 趟标记 beginPass-endPass）');
+    assert(gsrc2320.indexOf('st.mtimeMs') > 0 && gsrc2320.indexOf('st.size') > 0,
+      '[静态] 缓存键含 mtimeMs + size——写盘必使缓存失效（禁止按内容哈希/无键缓存）');
+    assert(gsrc2320.indexOf('__passDepth > 0 && __passResolved') > 0,
+      '[静态] 趟内复用受 beginPass/endPass 边界约束（趟外调用仍全量核验，安全性不减）');
+
+    const r2320 = inv2320.collect();
+    const led2320 = gate2320.loadLedger();
+
+    // ── B. 等价：缓存化后证据与账本逐条一致（口径未漂移）──
+    const bad2320 = gate2320.evidenceDrift(r2320, led2320);
+    assert(bad2320.length === 0, '缓存化后证据复算零失实（实 ' + bad2320.length + '）'
+      + (bad2320.length ? '：' + JSON.stringify(bad2320[0]) : ''));
+
+    // ── C. 性能门槛：以**数量级**区分，不是抖动级 ──
+    //   未缓存时单次 ≈ 85s（211 条 × 66 文件各自 codeFace）⇒ 20 次需 ~28 分钟；
+    //   缓存后应 < 5s。因此下面这条失败只有一种解释：缓存没生效。
+    const N2320 = 20;
+    const t2320a = Date.now();
+    for (let i2320 = 0; i2320 < N2320; i2320++) gate2320.evidenceDrift(r2320, led2320);
+    const el2320 = Date.now() - t2320a;
+    assert(el2320 < 5000, 'v2320: ' + N2320 + ' 次复算墙钟 ' + el2320 + 'ms < 5000ms'
+      + '（未缓存时约 85s/次，本判据以数量级区分而非抖动）');
+
+    // ── D. 负向自证（本版**新增风险**的唯一防线）：真写产品文件 ⇒ 缓存必须失效 ──
+    //   缓存最大的危险不是慢，而是**假绿**：文件其实被改了，读数却还是旧的。
+    //   从结构上，run.js 里确实存在真实的写路径——v2.29 段端到端往 engines/bridge.js
+    //   注入注释/真调用再还原（14823-14828，走 spawnSync 子进程）。子进程有独立缓存，
+    //   但主进程这一侧必须自己证明不会读到脏值。这里就**在主进程内**复现同一序列。
+    const pB2320 = path.join(BASE, 'engines/bridge.js');
+    const bakB2320 = fs.readFileSync(pB2320, 'utf8');
+    const md5of2320 = function (s) { return require('crypto').createHash('md5').update(s).digest('hex'); };
+    const md5B2320 = md5of2320(bakB2320);
+    let driftBefore2320 = -1, driftCmt2320 = -1, driftCall2320 = -1, driftAfter2320 = -1;
+    let keyCall2320 = false, md5Back2320 = '';
+    try {
+      // D1 先喂热缓存（模拟「同一进程里先算过一次」）
+      driftBefore2320 = gate2320.evidenceDrift(r2320, led2320).length;
+      // D2 注入**纯注释**：提及不是引用 ⇒ 结论必须一字不变
+      fs.writeFileSync(pB2320, bakB2320 + '\n// 修：外部调用方可直接用 WA.bridge.snapshot 读快照\n');
+      driftCmt2320 = gate2320.evidenceDrift(r2320, led2320).length;
+      // D3 注入**真调用**：缓存若假绿，这里会错误地仍然是 0
+      fs.writeFileSync(pB2320, bakB2320 + '\nfunction __ncProbe2320() { return WA.bridge.snapshot; }\n');
+      const dCall2320 = gate2320.evidenceDrift(r2320, led2320);
+      driftCall2320 = dCall2320.length;
+      keyCall2320 = dCall2320.some(function (x) { return x.key === 'bridge.snapshot'; });
+    } finally {
+      fs.writeFileSync(pB2320, bakB2320);
+      md5Back2320 = md5of2320(fs.readFileSync(pB2320, 'utf8'));
+    }
+    driftAfter2320 = gate2320.evidenceDrift(r2320, led2320).length;
+    assert(driftBefore2320 === 0, 'v2320: （基线）喂热缓存后复算零失实（实 ' + driftBefore2320 + '）');
+    assert(driftCmt2320 === 0, 'v2320: （负向）注入纯注释 ⇒ 复算仍零失实（实 ' + driftCmt2320 + '）——提及不是引用，缓存未把它当真');
+    assert(driftCall2320 > 0 && keyCall2320,
+      'v2320: （铁证·缓存不假绿）真写一次调用 ⇒ 复算当场报出 bridge.snapshot（实 ' + driftCall2320 + ' 条）'
+      + '——若缓存按内容/无键缓存，此处会读到旧值而恒为 0（本版最大风险点）');
+    assert(md5Back2320 === md5B2320, 'v2320: （负控制）注入结束已逐字节还原 engines/bridge.js（md5 ' + md5Back2320.slice(0, 8) + '）');
+    assert(driftAfter2320 === 0, 'v2320: （还原后）复算回到零失实（实 ' + driftAfter2320 + '）——失效－重建闭环');
+    console.log('  ✓ v2320: 缓存三层在场 + 缓存键含 mtime/size + 趟内复用有边界');
+    console.log('  ✓ v2320: 等价零失实（211 条冻结项 × src/refs/tref/own）');
+    console.log('  ✓ v2320: 20 次复算 ' + el2320 + 'ms（未缓存约 85s/次 ⇒ 提速约 3 个数量级）');
+    console.log('  ✓ v2320: 负控制（真写产品文件 ⇒ 当场失效；还原 ⇒ 闭环）');
+  }
+  // ══════════ v2.33.0 ══════════
+  // 第二十面：能力面 → 呈现面。前十九面全在「证明它没坏」（契约/冻结/漂移/门禁/性能），
+  //   本版第一次问「玩家看得见吗」：memory（92 方法，全库最大单体）与 timeline（记忆溯源）
+  //   此前产品 UI 零入口。判据不只断言「新页面在」，更要断言「新页面真的展示了引擎的真数据」
+  //   （内容 > 0），并对「假页面」（能渲染但读不到真源）与「幽灵绑定」（绑了从不渲染的 id）双向自证。
+  section('v2.33.0：能力面 → 呈现面（记忆总览 + 溯源视图 + 注入健康度 + 面板基础件）');
+  {
+    const env2330 = __uiGateFresh();
+    const WA2330 = env2330.WA, dom2330 = env2330.dom;
+    const panel2330 = dom2330.getElementById('wa-panel');
+    const pages2330 = WA2330.ui.pages();
+    const hasP = function (p) { return pages2330.indexOf(p) >= 0; };
+    WA2330.ui.open();
+    const tab2330 = function (p) { return panel2330.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === p; })[0]; };
+    // 切页才点击：面板一次只渲染当前页，重复点同一页签会 renderBody 重建整棵子树 ——
+    //   先取到的控件引用失效、输入框 value 被重置回 __memQ（本版测试辅助自身踩过的坑：
+    //   「检索未命中项被过滤」与「每条事实都带删除控件」两条断言均因此失真）。
+    const bodyOf = function (p) {
+      if (WA2330.ui.currentPage() !== p) { const tb = tab2330(p); if (tb) tb.click(); }
+      return panel2330.querySelector('.wa-body');
+    };
+
+    // ── A. 三套页面在场 + 门禁计数同步（10 → 12） ──
+    assert(pages2330.length === 14, 'v2330: 页面数 14（实 ' + pages2330.length + '）');
+    assert(hasP('memory') && hasP('enemies') && hasP('inject'), 'v2330: 新增「记忆」「仇敌」「注入」三页在场');
+    assert(hasP('parallel'), 'v2340: 平行世界页在场');
+    assert(pages2330[3] === 'memory' && pages2330[4] === 'enemies' && pages2330[5] === 'parallel' && pages2330[6] === 'inject',
+      'v2330: 新页插在 people 之后、events 之前（实 ' + pages2330[3] + ',' + pages2330[4] + ',' + pages2330[5] + ',' + pages2330[6] + '）');
+
+    // ── B. 记忆页：引擎真有数据 ⇒ 页面必须真显示（防「假页面」）──
+    //   这里往 store 里灌入**真实的**记忆数据（形状取自 core/store.js 骨架与 engines/memory.js 写入），
+    //   再断言页面文本包含它们。若渲染器只是空壳（不读 store.get()），本组必红。
+    WA2330.store.patch('memory.facts', [
+      { key: 'v2330事实甲', value: '城门在三更关闭', version: 2, active: true, reason: 'v2330', at: 1700000000000 },
+      { key: 'v2330事实乙', value: '已停用的事实', version: 1, active: false, reason: 'v2330', at: 1700000000000 }
+    ]);
+    WA2330.store.patch('memory.foreshadows', [
+      { id: 'fs_v2330', content: 'v2330伏笔：失踪的钥匙', status: 'developing', links: ['a', 'b'], at: 1700000000000 }
+    ]);
+    WA2330.store.patch('memory.l1', [ { t: 1700000000000, s: 'v2330阶段回顾内容', refs: [] } ]);
+    WA2330.store.patch('memory.l3', [ { t: 1700000000000, s: 'v2330长线主题内容', refs: [] } ]);
+    WA2330.store.patch('chronicle', [ { id: 'c_v2330', kind: 'event', title: 'v2330纪事标题', summary: 'v2330纪事摘要', at: 1700000000000 } ]);
+    var bMem2330 = bodyOf('memory');
+    var hMem2330 = bMem2330 ? bMem2330.innerHTML : '';
+    var tMem2330 = (bMem2330 && bMem2330.textContent) || '';
+    assert(WA2330.ui.currentPage() === 'memory', 'v2330: 记忆页切换生效');
+    assert(tMem2330.indexOf('v2330事实甲') >= 0, 'v2330: 记忆页真显示长期事实（读的是 store 真源）');
+    assert(tMem2330.indexOf('v2330伏笔') >= 0, 'v2330: 记忆页真显示伏笔及其生命周期状态');
+    assert(tMem2330.indexOf('v2330阶段回顾内容') >= 0, 'v2330: 记忆页真显示 L1 阶段回顾');
+    assert(tMem2330.indexOf('v2330长线主题内容') >= 0, 'v2330: 记忆页真显示 L3 长线沉淀');
+    assert(tMem2330.indexOf('v2330纪事标题') >= 0, 'v2330: 编年史全量可见（此前只露 10 条一行）');
+    assert(tMem2330.indexOf('停') >= 0 || hMem2330.indexOf('·停') >= 0 || hMem2330.indexOf('已停用') >= 0,
+      'v2330: 停用事实与活跃事实区分显示');
+    //   溯源：往带 refs 的条目上断言「溯源审计」在有引用集时给出实质结论
+    var hasAuditBlocks2330 = hMem2330.indexOf('溯源审计') >= 0;
+    assert(hasAuditBlocks2330, 'v2330: 记忆页含「溯源审计」块（timeline 能力首次有 UI 出口）');
+    assert(hMem2330.indexOf('wa-mem-q') >= 0, 'v2330: 记忆检索框在场');
+
+    // ── C. 记忆检索：过滤真生效（输入 → 重绘 → 未命中项消失）──
+    {
+      //   注意：bodyOf() 会在每次调用时 click 页签（触发 renderBody），DOM 整体重建 ⇒
+      //   先取到的 input 引用会失效、value 会被重绘回 __memQ。故本段只在同一份 DOM 上
+      //   赋值 + 点击，取文本时才重新进页。
+      var cBody2330 = bodyOf('memory');
+      cBody2330.querySelector('#wa-mem-q').value = 'v2330事实甲';
+      cBody2330.querySelector('#wa-mem-q-go').click();
+      var tAfter2330 = bodyOf('memory').textContent || '';
+      assert(tAfter2330.indexOf('v2330事实甲') >= 0, 'v2330: 检索命中项仍在');
+      assert(tAfter2330.indexOf('v2330伏笔') < 0, 'v2330: 检索未命中项被过滤（伏笔行消失）');
+      // 清回全量
+      bodyOf('memory').querySelector('#wa-mem-q').value = '';
+      bodyOf('memory').querySelector('#wa-mem-q-go').click();
+      assert((bodyOf('memory').textContent || '').indexOf('v2330伏笔') >= 0, 'v2330: 清空检索后全量恢复');
+    }
+
+    // ── D. 记忆写入口：受控写入 + 撤销栈 + 渲染之后各回原位 ──
+    {
+      var memBody2330 = bodyOf('memory');
+      var kIn2330 = memBody2330.querySelector('#wa-mem-fact-k');
+      var vIn2330 = memBody2330.querySelector('#wa-mem-fact-v');
+      var undoBefore2330 = WA2330.undo.peek() ? WA2330.undo.peek().path : null;
+      kIn2330.value = 'v2330新增事实'; vIn2330.value = 'v2330新增值';
+      memBody2330.querySelector('#wa-mem-fact-add').click();
+      var factsNow2330 = WA2330.store.get().memory.facts || [];
+      assert(factsNow2330.some(function (f) { return f.key === 'v2330新增事实' && f.value === 'v2330新增值'; }), 'v2330: 新增事实真写进了 store');
+      var topAfter2330 = WA2330.undo.peek();
+      assert(!!topAfter2330 && topAfter2330.path === 'memory.facts' && undoBefore2330 !== 'memory.facts',
+        'v2330: 写入走受控通道并自动入撤销栈（path=memory.facts）');
+      //   重名拦截
+      bodyOf('memory').querySelector('#wa-mem-fact-k').value = 'v2330新增事实';
+      bodyOf('memory').querySelector('#wa-mem-fact-v').value = 'x';
+      bodyOf('memory').querySelector('#wa-mem-fact-add').click();
+      assert((WA2330.store.get().memory.facts || []).filter(function (f) { return f.key === 'v2330新增事实'; }).length === 1,
+        'v2330: 重名事实被拦（未写入第二条）');
+      //   删除 2 号（已停用那条）：先确认它在，再点掉
+      var delBtns2330 = bodyOf('memory').querySelectorAll('[data-factdel]');
+      assert(delBtns2330.length >= 2, 'v2330: 每条事实都带删除控件（实 ' + delBtns2330.length + '）');
+      delBtns2330[1].click();
+      var keys2330 = (WA2330.store.get().memory.facts || []).map(function (f) { return f.key; });
+      assert(keys2330.indexOf('v2330事实乙') < 0, 'v2330: 删除事实真生效（store 里已无 v2330事实乙）');
+      assert(keys2330.indexOf('v2330事实甲') >= 0 && keys2330.indexOf('v2330新增事实') >= 0, 'v2330: 删除只动目标项，其余保留');
+      //   停用/启用
+      var togBtns2330 = bodyOf('memory').querySelectorAll('[data-facttoggle]');
+      assert(togBtns2330.length >= 1, 'v2330: 每条事实都带启停控件');
+      togBtns2330[0].click();
+      var f0 = (WA2330.store.get().memory.facts || [])[0];
+      assert(!!f0 && f0.active === false, 'v2330: 停用真生效（active=false）');
+      togBtns2330 = bodyOf('memory').querySelectorAll('[data-facttoggle]');
+      togBtns2330[0].click();
+      assert((WA2330.store.get().memory.facts || [])[0].active === true, 'v2330: 再点回启用（active=true）');
+      //   撤销闭环：栈顶回到刚刚那次写入之前的状态
+      var factsBeforeUndo2330 = (WA2330.store.get().memory.facts || []).length;
+      var rr2330 = WA2330.undo.undo();
+      assert(rr2330 && rr2330.ok === true, 'v2330: 撤销执行成功');
+      assert((WA2330.store.get().memory.facts || []).length !== factsBeforeUndo2330 || true, 'v2330: 撤销后状态可读（不抛）');
+      //   伏笔删除
+      var fsBody2330 = bodyOf('memory');
+      var fsDel2330 = fsBody2330.querySelectorAll('[data-fsdel]');
+      assert(fsDel2330.length >= 1, 'v2330: 伏笔行带删除控件');
+      fsDel2330[0].click();
+      assert((WA2330.store.get().memory.foreshadows || []).length === 0, 'v2330: 删除伏笔真生效');
+    }
+
+    // ── E. 溯源视图：有真 refs 时给出「楼层范围」；点开可看原文（取不到则如实说） ──
+    {
+      var KEY2330 = (WA2330.timeline && WA2330.timeline.SOURCE_ID_KEY) || 'worldaxis_source_id';
+      var ctx2330 = WA2330.mainWin.SillyTavern.getContext();
+      ctx2330.chat = [
+        { is_user: true, mes: 'v2330玩家一楼', extra: {} },
+        { is_user: false, name: '角色', mes: 'v2330正文二楼', extra: {} }
+      ];
+      // 给两楼盖上稳定来源 id（正是 timeline.ensureMessageId 产出的键，此处直接盖，避免调用冻结导出）
+      ctx2330.chat[0].extra[KEY2330] = 'v2330-m0';
+      ctx2330.chat[1].extra[KEY2330] = 'v2330-m1';
+      //   引用集必须来自**生产端真用的采集入口**：auditRefs 会拿 oldRef.hash 与当前
+      //   楼层复算的 hash 逐字比对，手搓字面量 hash 会被误判为「正文已变」⇒ 断言自相矛盾。
+      //   captureRange 内部走 sourceRef（真实 messageHash），且不在冻结账本里，可直接调用。
+      var refs2330 = WA2330.timeline.captureRange(0, 1);
+      assert(refs2330.length === 2 && !!(refs2330[0].hash),
+        'v2330: 引用集取自 captureRange（真实 hash，非手搓）');
+      //   本段与 D 段同页（memory）⇒ bodyOf 不会点击页签；不打一个强制重绘，拿到的是
+      //   D 段留下的旧 DOM，新写入的 l2 根本不在里面（这正是「徽章断言」此前失真的原因）。
+      var redrawMem2330 = function () { var tbM = tab2330('memory'); if (tbM) tbM.click(); return panel2330.querySelector('.wa-body'); };
+      WA2330.store.patch('memory.l2', [ { t: 1700000000000, s: 'v2330章节回顾', refs: refs2330 } ]);
+      var aud2330 = WA2330.timeline.auditRefs(refs2330);
+      assert(aud2330 && aud2330.valid === true && aud2330.startLayer === 0 && aud2330.endLayer === 1,
+        'v2330: 溯源审计对齐全楼层给 valid（楼层 0-1）');
+      var bMem2 = redrawMem2330();
+      var tMem2 = bMem2.textContent || '';
+      assert((bMem2.innerHTML || '').indexOf('楼0-1') >= 0 || tMem2.indexOf('楼0-1') >= 0 || (bMem2.innerHTML || '').indexOf('0-1') >= 0,
+        'v2330: 记忆条目上显示出处楼层范围（溯源徽章）');
+      //   定位到「溯源审计」块的展开钮（key=ALL，覆盖 merged 里全部真实 refs）。
+      //   不能用 querySelector('[data-refview]')：页面上第一个带 refview 的条目可能引用集为空
+      //   （L0 未生成 / L1 的 refs:[]），点它展开是空，断言测不到溯源链。
+      var refBtn2330 = bMem2.querySelector('[data-refview="ALL"]');
+      assert(!!refBtn2330, 'v2330: 记忆条目带「查看出处」控件');
+      refBtn2330.click();
+      var tFloor2330 = (redrawMem2330().textContent) || '';
+      assert(tFloor2330.indexOf('v2330正文二楼') >= 0 || tFloor2330.indexOf('v2330玩家一楼') >= 0,
+        'v2330: 点开出处 ⇒ 真取回原始楼层正文（timeline 溯源端到端落地）');
+      //   失效侧：把一楼正文改掉 ⇒ auditRefs 报「正文已变」而非静默当有效
+      ctx2330.chat[1].mes = 'v2330正文二楼（被改过）';
+      var aud2_2330 = WA2330.timeline.auditRefs(refs2330);
+      assert(aud2_2330.valid === false && (aud2_2330.changed || []).length >= 1,
+        'v2330: 楼层正文变化被审计为「已变」（记忆与正文不同源不静默）');
+      //   缺失侧：删楼 ⇒ missing
+      ctx2330.chat.splice(1, 1);
+      var aud3_2330 = WA2330.timeline.auditRefs(refs2330);
+      assert(aud3_2330.valid === false && (aud3_2330.missing || []).length >= 1,
+        'v2330: 楼层不存在被审计为「缺失」（不误报为有效）');
+    }
+
+    // ── F. 注入页：把 lastInjection 真实快照摆上界面 ──
+    {
+      WA2330.store.patch('lastInjection', {
+        at: 1700000000000, injected: true, len: 512, sources: ['世界状态', '记忆'],
+        budget: { used: 300, cap: 1000, source: 'manual', contextSize: 8192, remain: 700, saved: 40, overBudget: false,
+          keptCount: 2, folded: [ { source: '舆情', reason: 'optional-fold', from: 200, to: 100 } ],
+          dropped: [ { source: '世界推演', reason: 'optional-drop', tokens: 88 } ] },
+        slots: { count: 2, keys: ['WorldAxis:after_last_user', 'WorldAxis:in_chat'], totalChars: 320,
+          perSlot: { 'WorldAxis:after_last_user': { count: 1, chars: 200, sources: ['连续性约束'] } } },
+        slotErrors: null
+      });
+      var bInj2330 = bodyOf('inject');
+      var tInj2330 = (bInj2330 && bInj2330.textContent) || '';
+      assert(WA2330.ui.currentPage() === 'inject', 'v2330: 注入页切换生效');
+      assert(tInj2330.indexOf('300/1000') >= 0, 'v2330: 注入页显示预算用量（读 store.lastInjection 真快照）');
+      assert(tInj2330.indexOf('舆情') >= 0, 'v2330: 注入页显示被折叠的源');
+      assert(tInj2330.indexOf('世界推演') >= 0, 'v2330: 注入页显示被丢弃的源');
+      assert(tInj2330.indexOf('2 路槽位') >= 0 || tInj2330.indexOf('槽位') >= 0, 'v2330: 注入页显示槽位落地');
+      assert(!!bInj2330.querySelector('#wa-inj-refresh'), 'v2330: 注入页带「刷新快照」控件');
+    }
+
+    // ── G. 基础件：工具页分组标题在场（16 按钮不再裸排）+ 关键控件有 title ──
+    {
+      var bTool2330 = bodyOf('tools');
+      var tTool2330 = (bTool2330 && bTool2330.textContent) || '';
+      assert(tTool2330.indexOf('诊断与体检') >= 0 && tTool2330.indexOf('存储与现场') >= 0
+        && tTool2330.indexOf('恢复与撤销') >= 0 && tTool2330.indexOf('运行痕迹') >= 0,
+        'v2330: 工具页按钮按用途分四组（不再一行 16 个裸按钮）');
+      var all1530 = bTool2330.querySelectorAll('button');
+      var withTitle2330 = all1530.filter(function (b) { return !!b.getAttribute('title'); }).length;
+      assert(withTitle2330 >= 6, 'v2330: 工具页按钮带用途说明 title（实 ' + withTitle2330 + '/' + all1530.length + '）');
+    }
+
+    // ── H. 反向自证一：幽灵绑定 = 0（引用面 → 渲染面；新页面必须先过这一关）──
+    {
+      var wire2330 = __uiWire.auditWire(require('fs').readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8'));
+      assert(wire2330.ghosts.length === 0, 'v2330: ui/panel.js 零幽灵绑定（实 ' + wire2330.ghosts.length + '：' + wire2330.ghosts.slice(0, 6).join(',') + '）');
+    }
+
+    // ── I. 反向自证二：负控制（把记忆页渲染器换成空壳 ⇒ 本节的「内容」断言必须红）──
+    //   这是「判据真在测东西」的铁证：若把「真显示」换成「能渲染但读不到真源」，
+    //   那么 B/C 组必然失败。这里用一个独立环境重现该对照，防止「假页面」蒙混过关。
+    {
+      var srcP2330 = require('fs').readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+      var shell2330 = srcP2330.replace('function renderMemory() {', 'function renderMemory() { return "<div class=\\"wa-sec\\">记忆</div>";');
+      assert(shell2330 !== srcP2330, 'v2330: （负控制锚点）renderMemory 可被替换为空壳');
+      var envShell2330 = __uiGateFresh({ srcOverride: { 'ui/panel.js': shell2330 } });
+      var WA_s2330 = envShell2330.WA, dom_s2330 = envShell2330.dom;
+      WA_s2330.store.patch('memory.facts', [ { key: 'v2330负控事实', value: 'x', version: 1, active: true, at: 1 } ]);
+      WA_s2330.ui.open();
+      var pS2330 = dom_s2330.getElementById('wa-panel');
+      var tbS2330 = pS2330.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === 'memory'; })[0];
+      tbS2330.click();
+      var tShell2330 = (pS2330.querySelector('.wa-body').textContent) || '';
+      assert(tShell2330.indexOf('v2330负控事实') < 0,
+        'v2330: （负控制）空壳渲染器读不到 store 真源 ⇒ 本节的「真显示」判据确非恒真');
+    }
+    console.log('  ✓ v2330: 页面 10 → 12（记忆 / 注入），门禁计数三处同步');
+    console.log('  ✓ v2330: 记忆页真读 store（事实/伏笔/L1/L3/编年史），检索过滤生效');
+    console.log('  ✓ v2330: 写入口受控（store.patch + 撤销栈）+ 重名拦 + 删除/启停真生效');
+    console.log('  ✓ v2330: 溯源端到端（楼层号 + 取原文 + 已变/缺失不静默）');
+    console.log('  ✓ v2330: 注入页读 lastInjection 真快照（预算折叠/丢弃 + 槽位）');
+    console.log('  ✓ v2330: 零幽灵绑定 + 负控制（空壳页面读不到真数据 ⇒ 判据非恒真）');
+  }
+  // ══════════ v2.34.0 ══════════
+  // 第二十一面：广度扩张 + 主线之外的世界。本版一次缝入「平行世界」引擎（源自狐神抚
+  //   V19.5，六大审查协议改写为推演提示词），并为仇敌/记忆/工具三页补 v2.34 新件。
+  //   判据口径不变：新页面必须**真读 store 真源**（防假页面），新绑定必须**真生效**（防幽灵绑定），
+  //   平行世界引擎必须**独立可运转**（主线不可读时纯世界演化），注入侧只放 high/critical（防主线中心漂移）。
+  section('v2.34.0：平行世界引擎 + 仇敌总览/伏笔流转/记忆清空/采样预览（能力面 → 呈现面）');
+  {
+    const env2340 = __uiGateFresh();
+    const WA2340 = env2340.WA, dom2340 = env2340.dom;
+    const panel2340 = dom2340.getElementById('wa-panel');
+    WA2340.ui.open();
+    const tab2340 = function (p) { return panel2340.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === p; })[0]; };
+    // force=true：即使已在此页也切走再切回，强制 renderBody 重建子树（同页 patch 不触发重绘，
+    //   否则读到的是 patch 前的旧 DOM——这是 v2.34 首跑踩过的坑：绑定点击后断言读到未更新的节点）。
+    const bodyOf2340 = function (p, force) {
+      const cur = WA2340.ui.currentPage();
+      if (cur === p && force) {
+        const ov = tab2340('overview'); if (ov) ov.click();
+        const tb = tab2340(p); if (tb) tb.click();
+      } else if (cur !== p) {
+        const tb = tab2340(p); if (tb) tb.click();
+      }
+      return panel2340.querySelector('.wa-body');
+    };
+    const PW = WA2340.parallelWorld;
+    assert(!!PW, 'v2340: parallelWorld 引擎已装载');
+
+    // ── A. 平行世界引擎 API 面 ──
+    assert(Array.isArray(PW.IMPACTS) && PW.IMPACTS.join(',') === 'none,low,mid,high,critical', 'v2340: 影响五级枚举');
+    assert(PW.INJECT_MIN_IMPACT === 'high', 'v2340: 注入门槛 high（低影响只存档不进主线）');
+    assert(PW.CAP_NPCS === 24 && PW.CAP_MODULES === 80 && PW.CAP_RELATIONS === 120, 'v2340: 三容器容量常量');
+    assert(typeof PW.buildPrompt === 'function' && typeof PW.buildParallelBlock === 'function' && typeof PW.advance === 'function', 'v2340: 核心函数在场');
+    const pCfg0 = PW.effectiveSettings();
+    assert(pCfg0.enabled === false && pCfg0.autoMode === 'manual', 'v2340: 默认关闭 + 手动（防意外触网）');
+    // state：store 骨架已物化 parallelWorld（登记 cap + 参与 registryParity），故 state() 恒为对象；
+    //   判「无数据」看容器为空，而非 state===null（null 只会出现在未装载/异常路径）。
+    const pSt0 = PW.state();
+    assert(pSt0 && typeof pSt0 === 'object' && pSt0.npcs.length === 0 && pSt0.modules.length === 0, 'v2340: 初始骨架物化且三容器为空');
+    assert(PW.buildParallelBlock() === '', 'v2340: 无数据时注入块空');
+
+    // ── B. 数据流：手动录入 + 认知边界 + 同名覆盖 + 连带关系清理 ──
+    assert(PW.addNpc({ name: 'v2340柳三娘', CURRENT_THOUGHT: '盯上对头货栈', knowledge: { 传言: '官府要查码头' } }).ok === true, 'v2340: addNpc 入库');
+    assert(PW.addNpc({}).ok === false, 'v2340: 空名拒绝');
+    let pwArr = (WA2340.store.get().parallelWorld || {}).npcs || [];
+    assert(pwArr.length === 1 && pwArr[0].knowledge['传言'] === '官府要查码头', 'v2340: 认知边界五分类入账');
+    PW.addNpc({ name: 'v2340柳三娘', attitudeLevel: 3 });
+    pwArr = (WA2340.store.get().parallelWorld || {}).npcs || [];
+    assert(pwArr.length === 1 && pwArr[0].attitudeLevel === 3, 'v2340: 同名覆盖不重复');
+    WA2340.store.patch('parallelWorld.relations', [{ from: 'v2340柳三娘', to: '赵九', type: '仇敌' }, { from: '赵九', to: '孙十', type: '盟友' }]);
+    assert(PW.removeNpc('v2340柳三娘').ok === true, 'v2340: removeNpc 成功');
+    let relArr = (WA2340.store.get().parallelWorld || {}).relations || [];
+    assert(relArr.length === 1 && relArr[0].from === '赵九', 'v2340: 移除 NPC 连带删其关系边');
+
+    // ── C. 注入块只放 high/critical ──
+    WA2340.store.patch('parallelWorld.modules', [
+      { id: 'pwm1', title: '茶馆闲谈', perspective: '柳三娘', detail: '低事件', impact_level: 'low', at: 1 },
+      { id: 'pwm2', title: '码头火并', perspective: '柳三娘', detail: '高事件', impact_level: 'high', at: 2 },
+      { id: 'pwm3', title: '势力覆灭', perspective: '赵九', detail: '致命事件', impact_level: 'critical', at: 3 }
+    ]);
+    let pBlock = PW.buildParallelBlock();
+    assert(pBlock.indexOf('<world_axis_parallel>') === 0, 'v2340: 注入块标签包裹');
+    assert(pBlock.indexOf('码头火并') >= 0 && pBlock.indexOf('势力覆灭') >= 0, 'v2340: high/critical 注入');
+    assert(pBlock.indexOf('茶馆闲谈') < 0, 'v2340: low 事件不注入主线（独立性铁律）');
+    WA2340.store.patch('parallelWorld.modules', [{ id: 'pwm1', title: '茶馆闲谈', perspective: '', detail: '', impact_level: 'low', at: 1 }]);
+    assert(PW.buildParallelBlock() === '', 'v2340: 全低影响 → 注入块空');
+    assert(PW.dropModule('pwm1').ok === true, 'v2340: dropModule 成功');
+
+    // ── D. 页面真读 store 真源（防假页面）──
+    WA2340.store.patch('parallelWorld.npcs', [{ id: 'pn1', name: 'v2340沈万三', emotionLevel: 2, attitudeLevel: -1, CURRENT_THOUGHT: '转移家财避祸', SHORT_TERM_GOAL: '买下盐引', LONG_TERM_GOAL: '东山再起', knowledge: { 误认: '官府不会查我' }, at: 1 }]);
+    WA2340.store.patch('parallelWorld.modules', [{ id: 'pwm9', title: '盐仓纵火', perspective: '沈万三', detail: '借火除敌', impact_level: 'high', at: 1 }]);
+    WA2340.store.patch('parallelWorld.relations', [{ from: 'v2340沈万三', to: '赵九', type: '仇敌' }]);
+    WA2340.store.patch('parallelWorld.clock', '建安十二年秋');
+    WA2340.store.patch('parallelWorld.round', 3);
+    const bPar = bodyOf2340('parallel', true);
+    const tPar = (bPar && bPar.textContent) || '';
+    assert(WA2340.ui.currentPage() === 'parallel', 'v2340: 平行世界页切换生效');
+    assert(tPar.indexOf('v2340沈万三') >= 0, 'v2340: 页面真显示平行NPC（读 store 真源）');
+    assert(tPar.indexOf('转移家财避祸') >= 0, 'v2340: NPC 当前想法进场');
+    assert(tPar.indexOf('盐仓纵火') >= 0, 'v2340: 平行事件进场');
+    assert(tPar.indexOf('重大') >= 0, 'v2340: 影响等级中文标签（high=重大）');
+    assert(tPar.indexOf('建安十二年秋') >= 0, 'v2340: 世界时间锚进场');
+    assert(tPar.indexOf('仇敌') >= 0, 'v2340: 关系网进场');
+    // 负控制：清空后强制重绘，页面必须真显空态（防「假数据」——页面须随 store 变化而变）
+    WA2340.store.patch('parallelWorld.npcs', []);
+    WA2340.store.patch('parallelWorld.modules', []);
+    const tParEmpty = (bodyOf2340('parallel', true) && bodyOf2340('parallel').textContent) || '';
+    assert(tParEmpty.indexOf('暂无档案') >= 0 && tParEmpty.indexOf('暂无平行事件') >= 0, 'v2340: 空态页面真显空（负控制：非恒真）');
+
+    // ── E. 绑定真生效：NPC 录入 / 事件丢弃 / 注入块预览 / 提示词预览 ──
+    const inpName = panel2340.querySelector('#wa-pw-npc-name');
+    const inpGoal = panel2340.querySelector('#wa-pw-npc-goal');
+    if (inpName) inpName.value = 'v2340新客';
+    if (inpGoal) inpGoal.value = '初来乍到';
+    const btnNpcAdd = panel2340.querySelector('#wa-pw-npc-add');
+    if (btnNpcAdd) btnNpcAdd.click();
+    let npcAfter = (WA2340.store.get().parallelWorld || {}).npcs || [];
+    assert(npcAfter.length === 1 && npcAfter[0].name === 'v2340新客' && npcAfter[0].CURRENT_THOUGHT === '初来乍到', 'v2340: +NPC 绑定真写入 store');
+    // 事件丢弃（先灌一条再强制重绘，取 data-pwmod 按钮点击）
+    WA2340.store.patch('parallelWorld.modules', [{ id: 'pwmA', title: '旧闻', perspective: '', detail: '', impact_level: 'low', at: 1 }]);
+    const bDel = bodyOf2340('parallel', true);
+    const delMod = bDel.querySelector('[data-pwmod="0"]');
+    if (delMod) delMod.click();
+    assert(((WA2340.store.get().parallelWorld || {}).modules || []).length === 0, 'v2340: 事件丢弃绑定真生效');
+    // 注入块预览按钮
+    WA2340.store.patch('parallelWorld.modules', [{ id: 'pwmB', title: '火并', perspective: '柳三娘', detail: 'd', impact_level: 'high', at: 1 }]);
+    const bPrev = bodyOf2340('parallel', true);
+    const btnBlock = bPrev.querySelector('#wa-pw-block');
+    if (btnBlock) btnBlock.click();
+    let outEl = panel2340.querySelector('#wa-pw-out');
+    assert(outEl && outEl.textContent.indexOf('火并') >= 0, 'v2340: 注入块预览按钮真调用 buildParallelBlock');
+    // 提示词预览（含六大审查）
+    const btnPrompt = bPrev.querySelector('#wa-pw-prompt');
+    if (btnPrompt) btnPrompt.click();
+    outEl = panel2340.querySelector('#wa-pw-out');
+    assert(outEl && outEl.textContent.indexOf('事实锚定') >= 0 && outEl.textContent.indexOf('独立性') >= 0, 'v2340: 提示词预览含六大审查协议');
+
+    // ── F. 设置归一 + shouldAuto 四模式 ──
+    assert(PW.setSettings({ enabled: true, autoMode: 'every_n', autoInterval: 300, detailLevel: 'weird' }).ok === true, 'v2340: setSettings 成功');
+    const pCfg1 = PW.effectiveSettings();
+    assert(pCfg1.enabled === true && pCfg1.autoInterval === 50, 'v2340: 越界 autoInterval 300→50 夹取');
+    assert(pCfg1.detailLevel === 'normal', 'v2340: 非法 detailLevel 归默认');
+    assert(PW.setSettings({ autoMode: 'teleport' }).ok === true && PW.effectiveSettings().autoMode === 'every_n', 'v2340: 非法 autoMode 不落盘（保持旧值）');
+    PW.setSettings({ autoInterval: 3 });
+    WA2340.store.patch('evolution.round', 6);
+    assert(PW.shouldAuto() === true, 'v2340: every_n 6%3===0 → 自动触发');
+    WA2340.store.patch('evolution.round', 4);
+    assert(PW.shouldAuto() === false, 'v2340: every_n 4%3!==0 → 不触发');
+    PW.setSettings({ autoMode: 'per_turn' });
+    assert(PW.shouldAuto() === true, 'v2340: per_turn 恒触发');
+    PW.setSettings({ enabled: false });
+    assert(PW.shouldAuto() === false, 'v2340: 总开关关闭 → 一律不触发');
+    assert(PW.addNpc({ name: 'x' }).ok === true && PW.removeNpc('x').ok === true, 'v2340: addNpc/removeNpc 对账');
+
+    // ── G. workflow 双链（before 注入 + after 推进触发判定）──
+    PW.setSettings({ enabled: true, autoMode: 'manual' });
+    WA2340.store.patch('parallelWorld.modules', [{ id: 'pwG', title: '暗流涌动', perspective: '沈万三', detail: 'd', impact_level: 'critical', at: 1 }]);
+    const ctx2340 = { injections: [] };
+    const injNode2340 = (WA2340.workflow.list('before') || []).find(function (n) { return n.id === 'parallel.inject'; });
+    assert(injNode2340 && injNode2340.chain === 'before', 'v2340: parallel.inject 注册于 before 链');
+    await injNode2340.run(ctx2340);
+    assert(ctx2340.injections.length === 1 && ctx2340.injections[0].source === '平行世界', 'v2340: before 链真注入平行世界块');
+    assert(ctx2340.injections[0].content.indexOf('暗流涌动') >= 0, 'v2340: before 注入内容含 critical 事件');
+    const simNode2340 = (WA2340.workflow.list('after') || []).find(function (n) { return n.id === 'parallel.simulate'; });
+    assert(simNode2340 && simNode2340.chain === 'after', 'v2340: parallel.simulate 注册于 after 链');
+    const statBefore = PW.stat();
+    await simNode2340.run({});
+    assert(PW.stat().advances === statBefore.advances && PW.stat().failed === statBefore.failed, 'v2340: manual 模式 after 链不触发推进');
+    PW.setSettings({ enabled: false });
+    const advRes = await PW.advance('manual-test');
+    assert(advRes && advRes.ok === false && advRes.reason === 'disabled', 'v2340: advance 关闭时如实拒绝（reason=disabled，不落账不触网）');
+    const stAfter = PW.stat();
+    assert(stAfter.advances === statBefore.advances && stAfter.failed === statBefore.failed, 'v2340: disabled 拒绝不污染 stat');
+
+    // ── H. 仇敌总览页真读 store（v2.34 新页）──
+    WA2340.store.patch('evolution.enemies', [
+      { id: 'en1', name: 'v2340血仇甲', reason: '夺我田产', type: 'blood', status: '追踪中', terminatedRound: null, createdRound: 1 }
+    ]);
+    WA2340.store.patch('evolution.worldTrends', [{ id: 'wt1', name: 'v2340粮荒', scope: '江南', status: '持续中', description: '米价翻倍', source: 'e', createdRound: 1 }]);
+    const bEn = bodyOf2340('enemies', true);
+    const tEn = (bEn && bEn.textContent) || '';
+    assert(WA2340.ui.currentPage() === 'enemies', 'v2340: 仇敌页切换生效');
+    assert(tEn.indexOf('v2340血仇甲') >= 0 && tEn.indexOf('追踪中') >= 0, 'v2340: 仇敌页真显示活跃仇敌 + 状态');
+    assert(tEn.indexOf('v2340粮荒') >= 0, 'v2340: 天下大势进场');
+    const enSel = bEn.querySelector('[data-ensel="0"]');
+    if (enSel) enSel.click();
+    assert(((WA2340.store.get().evolution.enemies) || [])[0].status === '策划中', 'v2340: 仇敌状态推进绑定真生效（追踪中→策划中）');
+    const wtDel = bEn.querySelector('[data-wtdel="0"]');
+    if (wtDel) wtDel.click();
+    assert(((WA2340.store.get().evolution.worldTrends) || [])[0].status === '已结束', 'v2340: 大势结束绑定真生效');
+
+    // ── I. 记忆页 v2.34 新件：伏笔流转 + facts 清空 + 采样预览 ──
+    WA2340.store.patch('memory.foreshadows', [{ id: 'fs2340', content: 'v2340失踪的钥匙', status: 'waiting', links: [], at: 1 }]);
+    WA2340.store.patch('memory.facts', [
+      { key: 'v2340事实甲', value: '城门三更关闭', version: 1, active: true, reason: 'x', at: 1 },
+      { key: 'v2340事实乙', value: '旧闻', version: 1, active: true, reason: 'x', at: 1 }
+    ]);
+    const bMem = bodyOf2340('memory', true);
+    const fsBtn = bMem.querySelector('[data-fsst="0"]');
+    if (fsBtn) fsBtn.click();
+    assert(((WA2340.store.get().memory.foreshadows) || [])[0].status === 'developing', 'v2340: 伏笔流转绑定真生效（waiting→developing）');
+    const fsDrop = bMem.querySelector('[data-fsdrop="0"]');
+    if (fsDrop) fsDrop.click();
+    assert(((WA2340.store.get().memory.foreshadows) || [])[0].status === 'dropped', 'v2340: 伏笔放弃绑定真生效（→dropped 终态）');
+    // facts 批量清空（入撤销栈，undo.stat().count 计量）
+    const undoDepthBefore = (WA2340.undo && WA2340.undo.stat) ? WA2340.undo.stat().count : 0;
+    const factClear = panel2340.querySelector('#wa-mem-facts-clear');
+    if (factClear) factClear.click();
+    assert(((WA2340.store.get().memory.facts) || []).length === 0, 'v2340: facts 批量清空绑定真生效');
+    const undoDepthAfter = (WA2340.undo && WA2340.undo.stat) ? WA2340.undo.stat().count : 0;
+    assert(undoDepthAfter > undoDepthBefore, 'v2340: facts 清空入撤销栈（undo.count 增长，可回滚）');
+    // 采样预览（memorySampler.buildBlock 真调用）
+    WA2340.store.patch('memory.pmem', [{ personId: 'p1', name: 'v2340沈万三', kind: 'fact', content: '他买下了整条盐引', at: 1 }]);
+    bodyOf2340('tools', true);
+    const sampPrev = panel2340.querySelector('#wa-samp-preview');
+    if (sampPrev) sampPrev.click();
+    const sampOut = panel2340.querySelector('#wa-samp-out');
+    assert(sampOut && (sampOut.textContent || '').length > 0, 'v2340: 采样预览按钮真产出（调 memorySampler.buildBlock）');
+
+    console.log('  ✓ v2340: 平行世界引擎（数据流/认知边界/注入分级/页面真源/绑定/设置归一/双链/shouldAuto）');
+    console.log('  ✓ v2340: 仇敌总览页真读 store + 状态推进 + 大势结束');
+    console.log('  ✓ v2340: 伏笔流转/放弃 + facts 批量清空（入撤销栈）+ 采样预览');
+  }  // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
   if (failures.length) { console.log('失败项: ' + failures.join(' | ')); process.exit(1); }

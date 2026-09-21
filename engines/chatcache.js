@@ -224,6 +224,10 @@
       const curRev = (ns.live && ns.live.rev) || localRev(id);
       return nsArg ? curRev : true;
     }
+    // v2.30.0: 外来镜像（另一个聊天的）+ 本地有存档 ⇒ 本聊天接管（与 runTick 同一判据，单一实现见彼处注释）
+    if (ns.live && ns.live.chatId && ns.live.chatId !== id && !hasAnyLocal(id)) {
+      return nsArg ? null : false;   // 本地没存档就不接管：不拿空内容去顶别人的镜像
+    }
     const rev = Math.max(localRev(id), (ns.live && ns.live.rev) || 0) + 1;
     ns.live = { rev, updatedAt: clockNow('chatcache'), chatId: id, data };
     if (nsArg) return rev;
@@ -252,7 +256,15 @@
       const data = packChat(id);
       if (Object.keys(data).length) {
         const same = ns.live && ns.live.chatId === id && sameData(ns.live.data, data);
-        if (!same && (!ns.live || (ns.live.rev || 0) <= localRev(id))) {
+        // v2.30.0: **分支接管**——镜像属于**另一个聊天**（ns.live.chatId !== id）而本地键已存在时，
+        //   说明本聊天刚从镜像继承了一份世界（见 core/store.js loadFromMirror）。若仍按原条件
+        //   （rev 比较）判定，分支的 localRev 是 0、镜像 rev 是母聊天的 7 ⇒ 7 <= 0 不成立 ⇒
+        //   **既不推送也不安装**：分支里世界照跑，镜像却永远停在母聊天那一份。下一次刷新时读侧
+        //   回落到旧镜像 ⇒ 用户看到「进度凭空回退」（比归零更难查的故障）。
+        //   故此处显式允许「本地有存档的外来镜像」被本聊天接管（rev 基线续在 max 上）。
+        const foreign = !!(ns.live && ns.live.chatId && ns.live.chatId !== id);
+        const canTake = !ns.live || (ns.live.rev || 0) <= localRev(id) || (foreign && hasAnyLocal(id));
+        if (!same && canTake) {
           const rev = Math.max(localRev(id), (ns.live && ns.live.rev) || 0) + 1;
           ns.live = { rev, updatedAt: clockNow('chatcache'), chatId: id, data };
           setLocalRev(id, rev);
@@ -325,7 +337,7 @@
   function restoreSnapshot(id) {
     const ns = readNamespace();
     if (!ns || !Array.isArray(ns.snapshots)) return { ok: false, reason: 'not-found' };
-    const snap = ns.snapshots.find(s => s.id === id);
+    const snap = ns.snapshots.find(s => WA.store.sameId(s.id, id)); // v2.30.0 P1-1 收口
     if (!snap) return { ok: false, reason: 'not-found' };
     const cid = chatId();
     installPack(snap.data, cid);
@@ -372,6 +384,14 @@
 
   WA.chatcache = {
     NS, init, scheduleTick, runTick, pushLiveNow,
+    /** v2.30.0: 镜像归属视图——镜像属于哪个聊天、本地是否有档（诊断/UI 说清「这份世界从哪来」） */
+    mirrorOwner(id) {
+      const ns = readNamespace();
+      const cid = id || chatId();
+      const owner = (ns && ns.live && ns.live.chatId) || null;
+      return { owner: owner, current: cid, foreign: !!(owner && owner !== cid), hasLocal: hasAnyLocal(cid),
+        rev: (ns && ns.live && typeof ns.live.rev === 'number') ? ns.live.rev : null };
+    },
     stripHeavy, packChat, installPack, pruneSnapshots, writeNamespace,
     addSnapshot, listSnapshots, restoreSnapshot, deleteSnapshot,
     readNamespace, ensureNamespace,

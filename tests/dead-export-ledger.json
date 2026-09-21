@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.29.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.29.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.34.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.34.0",
   "dead": {
     "apiRouter.extractJson": {
       "reason": "self-only",
@@ -168,7 +168,7 @@
       "src": "engines/chatcache.js",
       "refs": 0,
       "tref": 3,
-      "own": 6
+      "own": 7
     },
     "chatcache.restoreSnapshot": {
       "reason": "test-only",
@@ -866,6 +866,22 @@
       "tref": 0,
       "own": 2
     },
+    "parallelWorld.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/parallel-world.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "parallelWorld.state": {
+      "reason": "self-only",
+      "detail": "engines/parallel-world.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/parallel-world.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "pmem.buildUserPrompt": {
       "reason": "self-only",
       "detail": "engines/pmem.js 内部自用、外部零引用（过度导出）",
@@ -1033,14 +1049,6 @@
       "refs": 0,
       "tref": 0,
       "own": 1
-    },
-    "rand.int": {
-      "reason": "self-only",
-      "detail": "core/rand.js 内部自用、外部零引用（过度导出）",
-      "src": "core/rand.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 6
     },
     "rand.pick": {
       "reason": "self-only",
@@ -1726,6 +1734,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 101
+    "dataOnly": 107
   }
 }

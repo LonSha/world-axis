@@ -31,6 +31,10 @@
     { id: 'overview', icon: '◈', label: '概览' },
     { id: 'world', icon: '🌐', label: '世界' },
     { id: 'people', icon: '👤', label: '人物' },
+    { id: 'memory', icon: '🧠', label: '记忆' },
+    { id: 'enemies', icon: '⚔️', label: '仇敌' },
+    { id: 'parallel', icon: '🌀', label: '平行世界' },
+    { id: 'inject', icon: '💉', label: '注入' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -265,7 +269,7 @@
       })()}
       <div class="wa-sec">世界背景设定</div>
       <textarea id="wa-bg" class="wa-ta" placeholder="填写世界背景/基调/规则（纯框架，不预设内容）…">${esc(s.background.text)}</textarea>
-      <button class="wa-btn" id="wa-save-bg">保存背景</button>
+      <button class="wa-btn" id="wa-save-bg" title="保存世界背景/基调/规则（纯框架，不预设内容）">保存背景</button>
       <div class="wa-sec">权威世界事实（${s.worldFacts.length}）</div>
       <div class="wa-list">${s.worldFacts.slice(-15).reverse().map(f => `<div class="wa-item"><b>${esc(f.key)}</b> = ${esc(f.value)}</div>`).join('') || '<div class="wa-empty">尚无已结算事实</div>'}</div>
       <div class="wa-sec">暗流（${s.currents.length}）</div>
@@ -280,7 +284,7 @@
     const people = Object.values(s.people);
     return `
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
-      <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add">注册</button></div>
+      <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
       <div class="wa-sec">世界人物状态（${people.length}）</div>
       <div class="wa-list">${people.map(p => `
@@ -332,8 +336,8 @@
 
     return `
       <div class="wa-sec">突发事件（一轮生成·多轮解封）</div>
-      ${active ? `<div class="wa-item"><b>${esc(active.title)}</b> <span class="wa-badge">第${active.currentTurn}/${active.totalTurns}轮</span><div class="wa-dim">对手：${esc(active.opponent || '未通报')}</div><button class="wa-btn wa-mini" id="wa-de-abort">中止事件</button></div>`
-        : `<div class="wa-row"><input id="wa-de-prompt" class="wa-input" placeholder="事件要求（可空）…"/><input id="wa-de-turns" class="wa-input wa-w60" type="number" value="6" min="1" max="30"/><button class="wa-btn" id="wa-de-create">生成事件</button></div>`}
+      ${active ? `<div class="wa-item"><b>${esc(active.title)}</b> <span class="wa-badge">第${active.currentTurn}/${active.totalTurns}轮</span><div class="wa-dim">对手：${esc(active.opponent || '未通报')}</div><button class="wa-btn wa-mini" id="wa-de-abort" title="立即终止当前突发事件">中止事件</button></div>`
+        : `<div class="wa-row"><input id="wa-de-prompt" class="wa-input" placeholder="事件要求（可空）…"/><input id="wa-de-turns" class="wa-input wa-w60" type="number" value="6" min="1" max="30"/><button class="wa-btn" id="wa-de-create" title="生成一场分轮次的突发事件（每轮推进一个阶段）">生成事件</button></div>`}
 
       ${digest && digest.text ? `<div class="wa-sec">世界推演叙事</div><div class="wa-item wa-digest">${esc(digest.text)}</div>` : ''}
 
@@ -423,7 +427,369 @@
 
       <div class="wa-sec">章节</div>
       ${s.chapters.current ? `<div class="wa-item"><b>${esc(s.chapters.current.title)}</b><div class="wa-dim">${esc((s.chapters.current.script || '').slice(0, 150))}</div><button class="wa-btn wa-mini" id="wa-ch-end">结束本章</button></div>`
-        : `<div class="wa-row"><input id="wa-ch-title" class="wa-input" placeholder="章节标题…"/><button class="wa-btn" id="wa-ch-start">开始章节</button></div>`}`;
+        : `<div class="wa-row"><input id="wa-ch-title" class="wa-input" placeholder="章节标题…"/><button class="wa-btn" id="wa-ch-start" title="开启新章节，章节回顾会归入它">开始章节</button></div>`}`;
+  }
+
+// ===== v2.33.0（第二十面：能力面 -> 呈现面）=====
+  // 设计动机：本仓 66 个产品文件里 30 个零 UI 入口，其中 memory.js（92 方法，全库最大单体）
+  //   承载 L0->L1->L2->L3 分层回顾 / facts 更迭 / 伏笔生命周期——世界引擎喂给模型的全部记忆原料，
+  //   面板此前只有一个「长期事实 N」数字；engines/timeline.js 整套记忆溯源（来源楼层 + 有效性
+  //   审计 valid/changed/missing）生产端真用、UI 零出口；注入链（inspector/budget/slotAudit）
+  //   回答的恰是最致命的「这轮注进去没」，同样零出口。本版把三者摆上界面。
+  // 数据源铁律：只读 store.get() 与**非冻结**导出（timeline.auditRefs/captureRange/unionRefs/SOURCE_ID_KEY、
+  //   injectInspector.getLastSnapshot/statusText、injectBudget.summaryText、evict.siteDecls、memory.stats）。
+  //   绝不调用 dead 账本冻结的导出（timeline.sourceRef、injectInspector.flatten 等）——否则证据复算当场报失实。
+  let __memQ = '';
+  let __memRefKey = null;
+  let __injQ = '';
+
+  function _msTs(t) { if (!t) return ''; try { return new Date(t).toLocaleString(); } catch (e) { return String(t); } }
+  function _msAudit(refs) { try { return (WA.timeline && WA.timeline.auditRefs) ? WA.timeline.auditRefs(refs || []) : null; } catch (e) { return null; } }
+  function _msRefBadge(refs) {
+    try {
+      const a = _msAudit(refs);
+      if (!a) return '';
+      const n = (a.refs || []).length;
+      if (!n) return '<span class="wa-badge wa-vis-hidden">无溯源</span>';
+      const hasChanged = !!(a.changed && a.changed.length);
+      const cls = a.valid ? 'wa-vis-public' : (hasChanged ? 'wa-vis-trace' : 'wa-vis-hidden');
+      const st = a.valid ? '有效' : (hasChanged ? '正文已变' : '楼层缺失');
+      const tip = '出处楼层 ' + a.startLayer + '-' + a.endLayer + '\uff5c引用 ' + n + ' 处\uff5c' + st + (a.missing && a.missing.length ? '\uff5c缺失 ' + a.missing.length : '');
+      return '<span class="wa-badge ' + cls + '" title="' + esc(tip) + '">' + esc(st) + '楼' + esc(String(a.startLayer)) + '-' + esc(String(a.endLayer)) + '</span>';
+    } catch (e) { return ''; }
+  }
+  function _msFloorText(refs) {
+    try {
+      const ctx = (mainWin.SillyTavern && mainWin.SillyTavern.getContext) ? mainWin.SillyTavern.getContext() : null;
+      const chat = (ctx && ctx.chat) || [];
+      const KEY = (WA.timeline && WA.timeline.SOURCE_ID_KEY) || 'worldaxis_source_id';
+      const parts = [];
+      (refs || []).forEach(function (rf) {
+        const mid = String(rf.messageId == null ? '' : rf.messageId);
+        let m = null, idx = -1;
+        for (let i = 0; i < chat.length; i++) {
+          const e = chat[i] && chat[i].extra;
+          if (e && String(e[KEY]) === mid) { m = chat[i]; idx = i; break; }
+        }
+        if (!m && rf.layer != null && chat[rf.layer]) { m = chat[rf.layer]; idx = rf.layer; }
+        if (!m) return;
+        parts.push('[楼' + (rf.layer != null ? rf.layer : idx) + '|' + String(rf.role || (m.is_user ? 'user' : 'char')) + '] ' + String(m.mes || '').slice(0, 400));
+      });
+      return parts.join('\n\n');
+    } catch (e) { return ''; }
+  }
+  function _msRefToggle(key, refs) {
+    const isOpen = __memRefKey === key;
+    const txt = isOpen ? _msFloorText(refs) : '';
+    return '<button class="wa-btn wa-mini" data-refview="' + esc(key) + '" title="展开该条目引用的原始楼层正文">' + (isOpen ? '收起出处' : '查看出处') + '</button>' + (isOpen ? '<div class="wa-out">' + (txt ? esc(txt) : '（该条目引用的楼层在当前聊天中已找不到）') + '</div>' : '');
+  }
+
+  function renderMemory() {
+    const s = WA.store.get();
+    const mem = s.memory || {};
+    const L0 = mem.l0 || [], L1 = mem.l1 || [], L2 = mem.l2 || [], L3 = mem.l3 || [];
+    const facts = mem.facts || [];
+    const fsArr = mem.foreshadows || [];
+    const pf = mem.pmem || [];
+    const chron = s.chronicle || [];
+    const q = __memQ.trim();
+    const hit = function (t) { return !q || String(t == null ? '' : t).indexOf(q) >= 0; };
+    let st = null; try { st = (WA.memory && WA.memory.stats) ? WA.memory.stats() : null; } catch (e) {}
+    const factsOn = facts.filter(function (f) { return f && f.active !== false; }).length;
+    let out = '';
+    out += '<div class="wa-stat-grid">'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + L0.length + '</div><div class="wa-stat-k">L0 单轮</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + L1.length + '</div><div class="wa-stat-k">L1 阶段</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + L2.length + '</div><div class="wa-stat-k">L2 章节</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + L3.length + '</div><div class="wa-stat-k">L3 长线</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + factsOn + '/' + facts.length + '</div><div class="wa-stat-k">事实 活跃/总</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + fsArr.length + '</div><div class="wa-stat-k">伏笔</div></div>'
+      + '</div>';
+    out += '<div class="wa-sec">检索<span class="wa-dim">（过滤下方全部记忆条目）</span></div>'
+      + '<div class="wa-row"><input id="wa-mem-q" class="wa-input" placeholder="搜记忆/facts/伏笔/编年…" value="' + esc(__memQ) + '"/>'
+      + '<button class="wa-btn" id="wa-mem-q-go" title="按关键词过滤下方记忆条目（空则显示全部）">搜</button></div>';
+    if (st) out += '<div class="wa-dim">巩固链：' + st.rounds + ' 轮，最近 ' + st.lastMs + 'ms／均 ' + st.avgMs + 'ms</div>';
+    const LAYER_DEF = [['L0 单轮摘要', L0], ['L1 阶段回顾', L1], ['L2 章节回顾', L2], ['L3 长线沉淀', L3]];
+    LAYER_DEF.forEach(function (pair, li) {
+      const name = pair[0], arr = pair[1];
+      const rows = [];
+      arr.forEach(function (x, i) {
+        const txt = (x && (x.s != null ? x.s : x.text)) || '';
+        if (!hit(txt)) return;
+        const key = 'L' + li + '#' + i;
+        rows.push('<div class="wa-item">' + esc(String(txt)) + ' <span class="wa-dim">' + esc(_msTs(x && x.t)) + '</span> ' + _msRefBadge(x && x.refs)
+          + ' ' + _msRefToggle(key, (x && x.refs) || []) + '</div>');
+      });
+      out += '<div class="wa-sec">' + esc(name) + '（' + arr.length + '）</div>'
+        + '<div class="wa-list">' + (rows.join('') || '<div class="wa-empty">' + (arr.length ? '无匹配' : '尚未生成（随推演自动巩固）') + '</div>') + '</div>';
+    });
+    const fRows = [];
+    facts.forEach(function (f, i) {
+      if (!f) return;
+      if (!hit(f.key) && !hit(f.value)) return;
+      fRows.push('<div class="wa-item"><b>' + esc(f.key) + '</b> = ' + esc(f.value)
+        + ' <span class="wa-badge' + (f.active === false ? '' : ' wa-on') + '">v' + esc(String(f.version || 1)) + (f.active === false ? '停' : '') + '</span>'
+        + ' <span class="wa-dim">' + esc(_msTs(f.at)) + (f.reason ? '｜' + esc(String(f.reason).slice(0, 40)) : '') + '</span>'
+        + ' <button class="wa-btn wa-mini" data-facttoggle="' + i + '" title="启/停用该事实（停用后不再注入正文）">' + (f.active === false ? '启用' : '停用') + '</button>'
+        + '<button class="wa-btn wa-mini" data-factdel="' + i + '" title="删除该事实（可经撤销编辑回滚）">删除</button></div>');
+    });
+    out += '<div class="wa-sec">长期事实（' + factsOn + ' 活跃 / ' + facts.length + ' 总）</div>'
+      + '<div class="wa-list">' + (fRows.join('') || '<div class="wa-empty">' + (facts.length ? '无匹配' : '尚无长期事实') + '</div>') + '</div>'
+      + '<div class="wa-row"><input id="wa-mem-fact-k" class="wa-input" placeholder="事实名（如 王都守卫人数）"/>'
+      + '<input id="wa-mem-fact-v" class="wa-input" placeholder="内容"/></div>'
+      + '<button class="wa-btn" id="wa-mem-fact-add" title="新增一条长期事实（走受控写入，可撤销）">新增事实</button>'
+      + '<button class="wa-btn wa-mini" id="wa-mem-facts-clear" title="清空全部长期事实（入撤销栈，可回滚）" ' + (facts.length ? '' : 'disabled') + '>清空</button>';
+    const FS_ST = { waiting: ['等待', 'wa-vis-hidden'], developing: ['发展中', 'wa-vis-trace'], triggered: ['已触发', 'wa-vis-public'], recycled: ['已回收', 'wa-vis-public'], dropped: ['已放弃', ''] };
+    const sRows = [];
+    fsArr.forEach(function (f, i) {
+      if (!f) return;
+      if (!hit(f.content)) return;
+      const meta = FS_ST[f.status] || [f.status || '?', ''];
+      sRows.push('<div class="wa-item">' + esc(f.content) + ' <span class="wa-badge ' + meta[1] + '">' + esc(meta[0]) + '</span>'
+        + ' <span class="wa-dim">链' + ((f.links || []).length) + '｜' + esc(_msTs(f.at)) + '</span> ' + _msRefBadge(f.refs)
+        + ' <button class="wa-btn wa-mini" data-fsst="' + i + '" title="推进伏笔状态：等待→发展中→已触发→已回收">⏩' + esc(meta[0]) + '</button>'
+        + ' <button class="wa-btn wa-mini" data-fsdrop="' + i + '" title="放弃该伏笔（标记为已放弃，不再参与注入）">弃</button>'
+        + ' <button class="wa-btn wa-mini" data-fsdel="' + i + '" title="删除该伏笔（可经撤销编辑回滚）">删除</button></div>');
+    });
+    out += '<div class="wa-sec">伏笔生命周期（' + fsArr.length + '）</div>'
+      + '<div class="wa-list">' + (sRows.join('') || '<div class="wa-empty">' + (fsArr.length ? '无匹配' : '尚无伏笔') + '</div>') + '</div>';
+    if (pf.length) {
+      const pRows = pf.filter(function (x) { return hit(x && (x.memory || x.text)); }).slice(-20).map(function (x) {
+        return '<div class="wa-item"><b>' + esc((x && x.name) || '?') + '</b> <span class="wa-dim">' + esc(_msTs(x && x.at)) + '</span><div class="wa-dim">' + esc(String((x && (x.memory || x.text)) || '').slice(0, 160)) + '</div></div>';
+      });
+      out += '<div class="wa-sec">个人主观记忆（' + pf.length + '）</div><div class="wa-list">' + (pRows.join('') || '<div class="wa-empty">无匹配</div>') + '</div>';
+    }
+    const cRows = chron.filter(function (c) { return hit(c && c.title) || hit(c && c.summary); }).slice(-40).reverse().map(function (c) {
+      return '<div class="wa-item wa-dim">' + esc(c.title || '') + ' — ' + esc(String(c.summary || '').slice(0, 100))
+        + ' <span class="wa-dim">' + esc(_msTs(c.at)) + '</span> ' + _msRefBadge(c.refs) + '</div>';
+    });
+    out += '<div class="wa-sec">编年史（' + chron.length + '，示最近 40）</div><div class="wa-list">' + (cRows.join('') || '<div class="wa-empty">' + (chron.length ? '无匹配' : '暂无纪事') + '</div>') + '</div>';
+    out += '<div class="wa-sec">溯源审计<span class="wa-dim">（记忆条目 <-> 原始楼层，现算现验）</span></div>';
+    out += (function () {
+      try {
+        if (!WA.timeline || !WA.timeline.unionRefs || !WA.timeline.auditRefs) return '<div class="wa-empty">溯源引擎未加载</div>';
+        const groups = [];
+        L0.concat(L1, L2, L3).forEach(function (x) { if (x && x.refs) groups.push(x.refs); });
+        fsArr.forEach(function (x) { if (x && x.refs) groups.push(x.refs); });
+        pf.forEach(function (x) { if (x && x.refs) groups.push(x.refs); });
+        chron.forEach(function (x) { if (x && x.refs) groups.push(x.refs); });
+        const merged = WA.timeline.unionRefs(groups);
+        const a = WA.timeline.auditRefs(merged);
+        const n = (a.refs || []).length;
+        if (!n) return '<div class="wa-item wa-dim">全部记忆条目均无溯源引用（尚未记录来源楼层）</div>';
+        return '<div class="wa-item"><b>' + (a.valid ? '全部有效' : '存在失效引用') + '</b>'
+          + '<div class="wa-dim">覆盖楼层 ' + a.startLayer + '-' + a.endLayer + '｜引用 ' + n + ' 处'
+          + (a.changed && a.changed.length ? '｜<span class="wa-log-warn">正文已变 ' + a.changed.length + '</span>' : '')
+          + (a.missing && a.missing.length ? '｜<span class="wa-log-error">楼层缺失 ' + a.missing.length + '</span>' : '') + '</div>'
+          + '<div class="wa-dim">「正文已变」= 记忆入库后该楼层被编辑/重掷，记忆已与正文不同源；「楼层缺失」= 引用指向的楼层已不存在。</div>'
+          + _msRefToggle('ALL', merged) + '</div>';
+      } catch (e) { return '<div class="wa-empty">溯源审计失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    out += '<div id="wa-mem-out" class="wa-out"></div>';
+    return out;
+  }
+
+  function renderEnemies() {
+    const s = WA.store.get();
+    const ev = s.evolution || {};
+    const enemies = ev.enemies || [];
+    const trends = ev.worldTrends || [];
+    const bb = ev.blackbox || {};
+    const actions = bb.secretActions || [];
+    const assets = bb.secretAssets || [];
+    const active = enemies.filter(function (e) { return e && e.status !== '已终结'; });
+    const terminated = enemies.filter(function (e) { return e && e.status === '已终结'; });
+    const activeTrends = trends.filter(function (t) { return t && t.status !== '已结束'; });
+    const ES_BADGE = { '追踪中': 'wa-vis-trace', '策划中': 'wa-vis-public', '执行中': 'wa-on', '已终结': '' };
+    const AT_BADGE = { '有效': 'wa-on', '过期': 'wa-vis-hidden', '暴露': 'wa-vis-trace', '失效': '' };
+    let out = '';
+    out += '<div class="wa-stat-grid">'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + active.length + '</div><div class="wa-stat-k">活跃仇敌</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + terminated.length + '</div><div class="wa-stat-k">已终结</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + activeTrends.length + '</div><div class="wa-stat-k">天下大势</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + assets.length + '</div><div class="wa-stat-k">隐秘资产</div></div>'
+      + '</div>';
+    const aRows = active.map(function (e, i) {
+      const gi = enemies.indexOf(e);
+      return '<div class="wa-item"><b>' + esc(e.name) + '</b> <span class="wa-badge ' + (ES_BADGE[e.status] || '') + '">' + esc(e.status || '?') + '</span>'
+        + ' <span class="wa-dim">' + esc(e.type || 'grudge') + '｜R' + esc(String(e.createdRound || '?')) + '</span>'
+        + (e.reason ? '<div class="wa-dim">' + esc(String(e.reason).slice(0, 120)) + '</div>' : '')
+        + ' <button class="wa-btn wa-mini" data-ensel="' + gi + '" title="推进状态：追踪中→策划中→执行中→已终结">⏩</button></div>';
+    });
+    out += '<div class="wa-sec">活跃仇敌（' + active.length + '）</div>'
+      + '<div class="wa-list">' + (aRows.join('') || '<div class="wa-empty">暂无活跃仇敌（随推演自动产生）</div>') + '</div>';
+    if (terminated.length) {
+      const tRows = terminated.slice(-10).map(function (e) {
+        return '<div class="wa-item wa-dim"><b>' + esc(e.name) + '</b> <span class="wa-badge">已终结</span> R' + esc(String(e.terminatedRound || '?')) + '</div>';
+      });
+      out += '<div class="wa-sec">已终结（' + terminated.length + '，示最近 10）</div><div class="wa-list">' + tRows.join('') + '</div>';
+    }
+    if (activeTrends.length) {
+      const wRows = activeTrends.map(function (t) {
+        return '<div class="wa-item"><b>' + esc(t.name) + '</b> <span class="wa-badge">' + esc(t.status || '持续中') + '</span>'
+          + (t.scope ? ' <span class="wa-dim">' + esc(t.scope) + '</span>' : '')
+          + (t.description ? '<div class="wa-dim">' + esc(String(t.description).slice(0, 100)) + '</div>' : '')
+          + ' <button class="wa-btn wa-mini" data-wtdel="' + trends.indexOf(t) + '" title="结束该大势">止</button></div>';
+      });
+      out += '<div class="wa-sec">天下大势（' + activeTrends.length + '）</div><div class="wa-list">' + wRows.join('') + '</div>';
+    }
+    if (assets.length) {
+      const sRows = assets.map(function (a) {
+        return '<div class="wa-item"><b>' + esc(a.name) + '</b> <span class="wa-badge ' + (AT_BADGE[a.status] || '') + '">' + esc(a.status || '?') + '</span>'
+          + ' <span class="wa-dim">暴露度 ' + esc(String(a.exposure || 0)) + '%</span></div>';
+      });
+      out += '<div class="wa-sec">隐秘资产（' + assets.length + '）</div><div class="wa-list">' + sRows.join('') + '</div>';
+    }
+    if (actions.length) {
+      const xRows = actions.slice(-8).map(function (a) {
+        return '<div class="wa-item wa-dim">' + esc(String(a.action).slice(0, 80)) + ' <span class="wa-dim">' + esc(String(a.witnesses || '').slice(0, 30)) + '｜' + esc(_msTs(a.at)) + '</span></div>';
+      });
+      out += '<div class="wa-sec">隐秘行动（' + actions.length + '，示最近 8）</div><div class="wa-list">' + xRows.join('') + '</div>';
+    }
+    out += '<div id="wa-en-out" class="wa-out"></div>';
+    return out;
+}
+  // v2.34.0: 平行世界页（主线之外的独立推演：NPC档案/关系网/事件模块 + 推进控制）
+  function renderParallelWorld() {
+    const s = WA.store.get();
+    const pw = s.parallelWorld || { clock: '', npcs: [], relations: [], modules: [], round: 0 };
+    const cfg = (WA.parallelWorld && typeof WA.parallelWorld.effectiveSettings === 'function') ? WA.parallelWorld.effectiveSettings() : { enabled: false, autoMode: 'manual', autoInterval: 5, diceEnabled: false, detailLevel: 'normal' };
+    const st = (WA.parallelWorld && typeof WA.parallelWorld.stat === 'function') ? WA.parallelWorld.stat() : { advances: 0, failed: 0 };
+    const npcs = pw.npcs || [];
+    const rels = pw.relations || [];
+    const mods = pw.modules || [];
+    const IMPACTS = (WA.parallelWorld && WA.parallelWorld.IMPACTS) || ['none', 'low', 'mid', 'high', 'critical'];
+    const IL = (WA.parallelWorld && WA.parallelWorld.IMPACT_LABEL) || {};
+    const hot = mods.filter(function (m) { return IMPACTS.indexOf(m.impact_level) >= IMPACTS.indexOf('high'); });
+    let out = '';
+    out += '<div class="wa-stat-grid">'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + npcs.length + '</div><div class="wa-stat-k">平行NPC</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + mods.length + '</div><div class="wa-stat-k">平行事件</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + hot.length + '</div><div class="wa-stat-k">高影响（将注入）</div></div>'
+      + '<div class="wa-stat"><div class="wa-stat-v">' + (pw.round || 0) + '</div><div class="wa-stat-k">推进轮次</div></div>'
+      + '</div>';
+    // 控制区
+    out += '<div class="wa-sec">推演控制</div>'
+      + '<div class="wa-row"><label class="wa-node"><input type="checkbox" id="wa-pw-enable" ' + (cfg.enabled ? 'checked' : '') + '><span class="wa-node-label">启用平行世界</span></label>'
+      + ' <select id="wa-pw-mode" class="wa-input wa-w60"><option value="manual"' + (cfg.autoMode === 'manual' ? ' selected' : '') + '>手动</option><option value="per_turn"' + (cfg.autoMode === 'per_turn' ? ' selected' : '') + '>每轮推进</option><option value="every_n"' + (cfg.autoMode === 'every_n' ? ' selected' : '') + '>每N轮</option><option value="dice"' + (cfg.autoMode === 'dice' ? ' selected' : '') + '>骰子（1/6）</option></select>'
+      + ' <input type="number" id="wa-pw-int" class="wa-input wa-w60" min="1" max="50" value="' + cfg.autoInterval + '" title="每N轮推进的N" disabled>'
+      + ' <label class="wa-node"><input type="checkbox" id="wa-pw-dice" ' + (cfg.diceEnabled ? 'checked' : '') + '><span class="wa-node-label">骰子</span></label>'
+      + ' <select id="wa-pw-detail" class="wa-input wa-w60"><option value="brief"' + (cfg.detailLevel === 'brief' ? ' selected' : '') + '>简</option><option value="normal"' + (cfg.detailLevel === 'normal' ? ' selected' : '') + '>中</option><option value="rich"' + (cfg.detailLevel === 'rich' ? ' selected' : '') + '>丰</option></select>'
+      + ' <button class="wa-btn wa-mini" id="wa-pw-save">存</button></div>'
+      + '<div class="wa-row"><button class="wa-btn" id="wa-pw-advance" ' + (cfg.enabled ? '' : 'disabled') + ' title="调用推演器跑一轮（走 inference 通道）">▶ 手动推进一轮</button>'
+      + ' <button class="wa-btn wa-mini" id="wa-pw-prompt" title="预览推进提示词（含六大审查协议）">提示词</button>'
+      + ' <button class="wa-btn wa-mini" id="wa-pw-block" title="预览当前会注入主线的平行世界块">注入块</button></div>'
+      + '<div class="wa-dim">推进 ' + st.advances + ' 次 / 失败 ' + st.failed + ' 次' + (st.lastErr ? ' · 最近失败：' + esc(String(st.lastErr).slice(0, 80)) : '') + '</div>';
+    if (pw.clock) out += '<div class="wa-kv"><span>世界时间锚</span><b>' + esc(pw.clock) + '</b></div>';
+    // NPC 档案
+    const nRows = npcs.slice(-12).reverse().map(function (n) {
+      const gi = npcs.indexOf(n);
+      const kb = Object.keys(n.knowledge || {}).filter(function (k) { return n.knowledge[k]; }).map(function (k) { return k + ':' + String(n.knowledge[k]).slice(0, 30); });
+      return '<div class="wa-item"><b>' + esc(n.name) + '</b> <span class="wa-dim">情绪' + esc(String(n.emotionLevel != null ? n.emotionLevel : '?')) + '/态度' + esc(String(n.attitudeLevel != null ? n.attitudeLevel : '?')) + '</span>'
+        + (n.CURRENT_THOUGHT ? '<div class="wa-dim">想法：' + esc(String(n.CURRENT_THOUGHT).slice(0, 80)) + '</div>' : '')
+        + ((n.SHORT_TERM_GOAL || n.LONG_TERM_GOAL) ? '<div class="wa-dim">目标：' + esc(String(n.SHORT_TERM_GOAL || '').slice(0, 30)) + (n.LONG_TERM_GOAL ? ' → ' + esc(String(n.LONG_TERM_GOAL).slice(0, 30)) : '') + '</div>' : '')
+        + (kb.length ? '<div class="wa-dim">认知：' + esc(kb.join('；').slice(0, 120)) + '</div>' : '')
+        + ' <button class="wa-btn wa-mini" data-pwnrm="' + gi + '" title="移除该NPC档案（连带关系边）">✕</button></div>';
+    });
+    out += '<div class="wa-sec">平行NPC档案（' + npcs.length + '，示最近 12）</div>'
+      + '<div class="wa-list">' + (nRows.join('') || '<div class="wa-empty">暂无档案——手动录入或推进一轮自动生成</div>') + '</div>'
+      + '<div class="wa-row"><input type="text" id="wa-pw-npc-name" class="wa-input" placeholder="NPC姓名" maxlength="24">'
+      + ' <input type="text" id="wa-pw-npc-goal" class="wa-input" placeholder="当前想法/目标（可选）" maxlength="120">'
+      + ' <button class="wa-btn wa-mini" id="wa-pw-npc-add">+ NPC</button></div>';
+    // 关系网
+    if (rels.length) {
+      const rRows = rels.slice(-20).reverse().map(function (r) {
+        return '<div class="wa-item wa-dim">' + esc(r.from) + ' → ' + esc(r.to) + ' <span class="wa-badge">' + esc(r.type || '无') + '</span></div>';
+      });
+      out += '<div class="wa-sec">关系网（' + rels.length + '，示最近 20）</div><div class="wa-list">' + rRows.join('') + '</div>';
+    }
+    // 事件模块
+    const mRows = mods.slice(-10).reverse().map(function (m) {
+      const gi = mods.indexOf(m);
+      const hotNow = IMPACTS.indexOf(m.impact_level) >= IMPACTS.indexOf('high');
+      return '<div class="wa-item"><b>' + esc(m.title) + '</b> <span class="wa-badge ' + (hotNow ? 'wa-on' : '') + '">' + esc(IL[m.impact_level] || m.impact_level) + (hotNow ? '·注入' : '') + '</span>'
+        + (m.perspective ? ' <span class="wa-dim">[' + esc(m.perspective) + ']</span>' : '')
+        + (m.detail ? '<div class="wa-dim">' + esc(String(m.detail).slice(0, 100)) + '</div>' : '')
+        + ' <button class="wa-btn wa-mini" data-pwmod="' + gi + '" title="丢弃该平行事件">✕</button></div>';
+    });
+    out += '<div class="wa-sec">平行事件（' + mods.length + '，示最近 10）</div>'
+      + '<div class="wa-list">' + (mRows.join('') || '<div class="wa-empty">暂无平行事件（推进一轮生成）</div>') + '</div>';
+    out += '<div id="wa-pw-out" class="wa-out"></div>';
+    return out;
+  }
+  function renderInject() {
+    const vis = (function () { try { return WA.render.getVisibility(); } catch (e) { return {}; } })();
+    const SOURCES = (WA.render && WA.render.SOURCES) || [];
+    const NAMES = { clock: '世界时间', background: '世界背景', people: '人物', currents: '暗流', echoes: '回声', memory: '记忆', opinion: '舆情', pulse: '世界脉搏', ledger: '重大事件账本', digest: '世界推演' };
+    let out = '';
+    out += '<div class="wa-sec">本轮注入落地<span class="wa-dim">（世界状态到底进没进最终 prompt）</span></div>';
+    out += (function () {
+      try {
+        if (!WA.injectInspector || !WA.injectInspector.getLastSnapshot) return '<div class="wa-empty">注入自检引擎未加载</div>';
+        const snap = WA.injectInspector.getLastSnapshot();
+        if (!snap) return '<div class="wa-item wa-dim">尚无可讲的注入记录——先推演一轮，再回来看。</div>';
+        const txt = WA.injectInspector.statusText(snap.status, snap.scope);
+        const lv = snap.landed ? 'wa-on' : '';
+        const rows = [];
+        rows.push('<div class="wa-kv"><span>判定</span><b class="wa-badge ' + lv + '">' + esc(txt) + '</b></div>');
+        if (snap.apiType) rows.push('<div class="wa-kv"><span>通道</span><b>' + esc(snap.apiType) + '</b></div>');
+        if (snap.ourIndex != null) rows.push('<div class="wa-kv"><span>命中位置</span><b>' + esc(String(snap.ourIndex)) + '</b></div>');
+        if (snap.ourContentLen != null) rows.push('<div class="wa-kv"><span>注入长度</span><b>' + esc(String(snap.ourContentLen)) + ' 字符</b></div>');
+        if (snap.messageCount != null) rows.push('<div class="wa-kv"><span>消息数</span><b>' + esc(String(snap.messageCount)) + '</b></div>');
+        if (snap.promptLength != null) rows.push('<div class="wa-kv"><span>prompt 长度</span><b>' + esc(String(snap.promptLength)) + '</b></div>');
+        rows.push('<div class="wa-kv"><span>时间</span><b>' + esc(_msTs(snap.at)) + '</b></div>');
+        return '<div class="wa-item">' + rows.join('') + '</div>';
+      } catch (e) { return '<div class="wa-empty">读取注入快照失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    out += '<div class="wa-sec">注入预算裁决</div>';
+    out += (function () {
+      try {
+        const li = (WA.store.get().lastInjection) || null;
+        if (!li) return '<div class="wa-item wa-dim">尚未发生注入；推演一轮后此处显示预算用量与折叠/丢弃明细。</div>';
+        if (!li.budget) return '<div class="wa-item wa-dim">上次注入未受预算约束（预算=0 不限，或无可裁项）。</div>';
+        const b = li.budget;
+        let h = '<div class="wa-item"><b>' + esc(b.used + '/' + b.cap + 't') + '</b>'
+          + '<div class="wa-kv"><span>预算来源</span><b>' + esc(b.source || '?') + (b.contextSize ? '（上下文 ' + esc(String(b.contextSize)) + '）' : '') + '</b></div>'
+          + '<div class="wa-kv"><span>保留项</span><b>' + esc(String(b.keptCount == null ? '?' : b.keptCount)) + '</b></div>'
+          + (b.overBudget ? '<div class="wa-dim wa-log-warn">超出预算（pinned 保底项不可裁）</div>' : '');
+        if ((b.folded || []).length) h += '<div class="wa-dim">折叠 ' + (b.folded || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')'; }).join('、') + '</div>';
+        if ((b.dropped || []).length) h += '<div class="wa-dim wa-log-warn">丢弃 ' + (b.dropped || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')' + (f.tokens ? ' ' + esc(String(f.tokens)) + 't' : ''); }).join('、') + '</div>';
+        h += '</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取预算快照失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    out += '<div class="wa-sec">槽位落地<span class="wa-dim">（剧情约束类注入的独立分槽）</span></div>';
+    out += (function () {
+      try {
+        const li = (WA.store.get().lastInjection) || null;
+        const slots = li && li.slots;
+        const errs = li && li.slotErrors;
+        let h = '';
+        if (!slots || !slots.count) h += '<div class="wa-item wa-dim">上次注入无独立槽位（全部并入主块）</div>';
+        else {
+          h += '<div class="wa-item"><b>' + esc(String(slots.count)) + ' 路槽位</b>｜合计 ' + esc(String(slots.totalChars || 0)) + ' 字符'
+            + '<div class="wa-dim">' + ((slots.keys || []).map(function (k) { return esc(k); }).join('、') || '—') + '</div>';
+          const ps = slots.perSlot || {};
+          Object.keys(ps).forEach(function (k) {
+            const v = ps[k] || {};
+            h += '<div class="wa-dim">' + esc(k) + '：' + esc(String(v.count || 0)) + ' 项｜' + esc(String(v.chars || 0)) + ' 字符'
+              + (v.sources && v.sources.length ? '｜' + v.sources.map(function (x) { return esc(x); }).join('/') : '') + '</div>';
+          });
+          h += '</div>';
+        }
+        if (errs && errs.length) h += '<div class="wa-dim wa-log-error">槽位落地报错 ' + errs.length + ' 处</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取槽位快照失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    const onCount = SOURCES.filter(function (k) { return vis[k]; }).length;
+    out += '<div class="wa-sec">注入可见性（' + onCount + '/' + SOURCES.length + ' 开）</div>'
+      + '<div class="wa-item">' + SOURCES.map(function (k) { return '<span class="wa-tag">' + esc(NAMES[k] || k) + (vis[k] ? '' : '关') + '</span>'; }).join('')
+      + '<div class="wa-dim">开关在「导演」页调整。</div></div>';
+    out += '<div class="wa-sec">注入自检</div>'
+      + '<div class="wa-row"><button class="wa-btn" id="wa-inj-refresh" title="重新读取当前注入快照（只读，不改变任何状态）">刷新快照</button>'
+      + '<button class="wa-btn" id="wa-inj-diag" title="跳转工具页运行完整自检">去自检</button></div>'
+      + '<div id="wa-inj-out" class="wa-out"></div>';
+    return out;
   }
 
   function renderDirector() {
@@ -433,11 +799,11 @@
       <div class="wa-sec">注入可见性（哪些世界信息递给正文）</div>
       ${WA.render.SOURCES.map(k => `<label class="wa-node"><input type="checkbox" data-vis="${k}" ${vis[k] ? 'checked' : ''}/><span class="wa-node-label">${({clock:'世界时间',background:'世界背景',people:'人物',currents:'暗流',echoes:'回声',memory:'记忆',opinion:'舆情',pulse:'世界脉搏',ledger:'重大事件账本',digest:'世界推演'})[k] || k}</span></label>`).join('')}
       <div class="wa-sec">剧情引导（弧线/序列）</div>
-      ${plan ? `<div class="wa-item"><b>${esc(plan.kind === 'arc' ? '弧线' : '序列')}</b> 第${plan.current + 1}/${plan.beats.length}拍<div class="wa-dim">${esc((WA.oracle.currentBeat() || {}).goal || '')}</div><button class="wa-btn wa-mini" id="wa-beat-next">完成本拍</button><button class="wa-btn wa-mini" id="wa-plan-clear">放弃</button></div>`
+      ${plan ? `<div class="wa-item"><b>${esc(plan.kind === 'arc' ? '弧线' : '序列')}</b> 第${plan.current + 1}/${plan.beats.length}拍<div class="wa-dim">${esc((WA.oracle.currentBeat() || {}).goal || '')}</div><button class="wa-btn wa-mini" id="wa-beat-next" title="推进到剧情弧线的下一拍">完成本拍</button><button class="wa-btn wa-mini" id="wa-plan-clear">放弃</button></div>`
         : `<textarea id="wa-plan-beats" class="wa-ta" placeholder="每行一拍的目标/指令…"></textarea><button class="wa-btn" id="wa-plan-start">开始序列引导</button>`}
       <div class="wa-sec">AI 剧情参谋（judge 通道）</div>
       <div class="wa-row"><input id="wa-or-goal" class="wa-input" placeholder="剧情目标（如「揭开蒙面人身份」）…"/><input id="wa-or-beats" class="wa-input wa-num" type="number" min="1" max="12" value="5"/></div>
-      <button class="wa-btn" id="wa-or-gen">AI 生成弧线</button>
+      <button class="wa-btn" id="wa-or-gen" title="用 judge 通道把剧情目标展开成多拍弧线">AI 生成弧线</button>
       <div id="wa-or-out" class="wa-out">${(() => {
         // v2.1.0: 参谋留痕（此前 generatePlan 零调用，AI 弧线能力形同虚设）
         if (!WA.oracle || typeof WA.oracle.stat !== 'function') return '';
@@ -447,7 +813,7 @@
         return '<span class="wa-dim">' + base + tail + '</span>';
       })()}</div>
       <div class="wa-sec">行动选项</div>
-      <button class="wa-btn" id="wa-gen-choices">生成4个行动选项</button>
+      <button class="wa-btn" id="wa-gen-choices" title="基于当前世界状态生成玩家的 4 个可选行动">生成4个行动选项</button>
       <div id="wa-choices-out" class="wa-out"></div>`;
   }
 
@@ -464,7 +830,7 @@
           <button class="wa-btn wa-mini wa-ch-save">保存</button>
         </div>`).join('')}
       <div class="wa-sec">并发上限：<b id="wa-conc-v">${WA.apiRouter.getConcurrency()}</b>（队列 ${WA.apiRouter.queueLength()}）</div>
-      <input type="range" min="1" max="10" value="${WA.apiRouter.getConcurrency()}" id="wa-conc" class="wa-range"/>`;
+      <input type="range" min="1" max="10" value="${WA.apiRouter.getConcurrency()}" id="wa-conc" class="wa-range" title="同时进行的 AI 请求上限（调高会更快，但可能触发供应商限流）"/>`;
   }
 
   function renderTools() {
@@ -473,17 +839,47 @@
       <button class="wa-btn" id="wa-an-run">立即分析</button>
       <div id="wa-an-out" class="wa-out"></div>
       <div class="wa-sec">状态快照导出 / 恢复</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-snap-dl">导出 JSON</button><button class="wa-btn" id="wa-snap-up">导入 JSON</button><input type="file" id="wa-snap-file" accept=".json" style="display:none"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-snap-dl" title="导全量快照（剔除运行期脏字段，可归档/传给别人/跨聊天移植）">导出 JSON</button><button class="wa-btn" id="wa-snap-up" title="从快照文件恢复（先校验格式/schema/字段完整性，通过才写入）">导入 JSON</button><input type="file" id="wa-snap-file" accept=".json" style="display:none"/></div>
       <div class="wa-dim">导出剔除运行时脏字段；导入先校验（格式/schema/字段完整性），通过才写入并自动留恢复点。</div>
       <div id="wa-snap-out" class="wa-out"></div>
       <div class="wa-sec">外部数据导入（自动识别类型）</div>
       <div class="wa-row"><button class="wa-btn" id="wa-imp-pick">选择 JSON 文件</button><input type="file" id="wa-imp-file" accept=".json" style="display:none"/></div>
       <div class="wa-dim">支持：全量存档 / 区域事件 / 势力清单 / 事件链清单 / 人物主观记忆 / 世界书条目组（自动判别）</div>
       <textarea id="wa-imp-text" class="wa-ta" placeholder="或直接粘贴 JSON 内容…"></textarea>
-      <button class="wa-btn" id="wa-imp-run">预检并导入</button>
+      <button class="wa-btn" id="wa-imp-run" title="自动识别粘贴/文件内容的类型（存档/区域事件/势力/事件链/主观记忆），校验失败零写入">预检并导入</button>
       <div id="wa-imp-out" class="wa-out"></div>
       <div class="wa-sec">扩展自检（模块/注入/UI/运行环境）</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-diag-run">立即自检</button><button class="wa-btn" id="wa-diag-dl">导出诊断包</button><button class="wa-btn" id="wa-audit-copy">复制内存审计</button><button class="wa-btn" id="wa-key-check">存储键体检</button><button class="wa-btn" id="wa-quar-view">隔离现场</button><button class="wa-btn" id="wa-recovery-dl">导出恢复点</button><button class="wa-btn" id="wa-maintain">健康巡视</button><button class="wa-btn" id="wa-conf-view">冲突现场</button><button class="wa-btn" id="wa-settle-view">结算守卫</button><button class="wa-btn" id="wa-stat-reset">清零计量</button><button class="wa-btn" id="wa-compat-view">宿主兼容层</button><button class="wa-btn" id="wa-wf-reset">清空运行痕迹</button><button class="wa-btn" id="wa-recovery-view">存档恢复点</button><button class="wa-btn" id="wa-orphan-view">设置键</button></div>
+      <div class="wa-sec">诊断与体检<span class="wa-dim">（只读，不改世界状态）</span></div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-diag-run" title="立即体检：模块装载/上轮注入/UI 绑定/视图开关/API 通道">立即自检</button>
+        <button class="wa-btn" id="wa-diag-dl" title="把体检结果导出为 JSON 诊断包（不含聊天正文与密钥）">导出诊断包</button>
+        <button class="wa-btn" id="wa-audit-copy" title="复制内存/持久化用量审计报告">复制内存审计</button>
+        <button class="wa-btn" id="wa-maintain" title="健康巡视：逐站点扫描容量、陈旧、孤立数据">健康巡视</button>
+      </div>
+      <div class="wa-sec">存储与现场<span class="wa-dim">（看磁盘上真实存了什么）</span></div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-key-check" title="存储键体检：列出本扩展写过的所有键与占用">存储键体检</button>
+        <button class="wa-btn" id="wa-quar-view" title="隔离现场：读取损坏而被隔离的原始数据">隔离现场</button>
+        <button class="wa-btn" id="wa-conf-view" title="冲突现场：多标签页并发写导致的冲突快照">冲突现场</button>
+        <button class="wa-btn" id="wa-mirror-view" title="镜像视图：聊天 metadata 镜像与 localStorage 的回落台账">镜像视图</button>
+        <button class="wa-btn" id="wa-orphan-view" title="设置键：未登记却已落盘的幽灵设置">设置键</button>
+        <button class="wa-btn" id="wa-settle-view" title="结算守卫：同一楼层是否被重复结算">结算守卫</button>
+        <button class="wa-btn" id="wa-compat-view" title="宿主兼容层：当前宿主提供了哪些能力、缺哪些">宿主兼容层</button>
+      </div>
+      <div class="wa-sec">恢复与撤销<span class="wa-dim">（改错了能退回去）</span></div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-recovery-dl" title="导出当前状态的恢复点文件">导出恢复点</button>
+        <button class="wa-btn" id="wa-recovery-view" title="列出已留存的恢复点">存档恢复点</button>
+        <button class="wa-btn" id="wa-undo-btn" title="回退最近一次面板编辑（参数/背景/事实/伏笔等）">撤销编辑</button>
+      </div>
+      <div class="wa-sec">记忆采样预览<span class="wa-dim">（buildBlock 实时输出）</span></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-samp-preview" title="调用 memorySampler.buildBlock 查看当前会注入的记忆采样文本">预览采样</button><button class="wa-btn wa-mini" id="wa-samp-copy" disabled>复制</button></div>
+      <div id="wa-samp-out" class="wa-out"></div>
+      <div class="wa-sec">运行痕迹<span class="wa-dim">（只清计量，不动世界状态）</span></div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-stat-reset" title="仅重置各种计数器，世界状态与存档不受影响">清零计量</button>
+        <button class="wa-btn" id="wa-wf-reset" title="清空工作流运行历史与失败台账">清空运行痕迹</button>
+      </div>
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
@@ -517,22 +913,22 @@
     const label = __logErrOnly ? `错误日志（最近${errCount}条，子环保留≤50）` : `运行日志（最近${WA.eventLog.length}条）`;
     return `<div class="wa-sec">${label}</div>
       <button class="wa-btn wa-mini" id="wa-log-err">${__logErrOnly ? '显示全部' : `仅看错误${errCount ? '(' + errCount + ')' : ''}`}</button>
-      <button class="wa-btn wa-mini" id="wa-log-copy">复制</button>
+      <button class="wa-btn wa-mini" id="wa-log-copy" title="复制当前日志到剪贴板">复制</button>
       <button class="wa-btn wa-mini" id="wa-err-report">复制错误报告</button>
       <div class="wa-logbox">${src.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
   function renderAssistant() {
     return `
       <div class="wa-sec">世界助手（就世界状态问答，上帝视角）</div>
-      <div class="wa-row"><input id="wa-ask-input" class="wa-input" placeholder="问世界/人物/暗流/舆情…"/><button class="wa-btn" id="wa-ask-btn">问</button></div>
+      <div class="wa-row"><input id="wa-ask-input" class="wa-input" placeholder="问世界/人物/暗流/舆情…"/><button class="wa-btn" id="wa-ask-btn" title="就当前世界状态向助手提问（上帝视角，会提示哪些内容正文角色不该知道）">问</button></div>
       <div id="wa-ask-out" class="wa-out"></div>
       <div class="wa-sec">番外小剧场</div>
-      <div class="wa-row"><input id="wa-theater-input" class="wa-input" placeholder="剧场指令（可空）…"/><button class="wa-btn" id="wa-theater-btn">生成番外</button></div>
+      <div class="wa-row"><input id="wa-theater-input" class="wa-input" placeholder="剧场指令（可空）…"/><button class="wa-btn" id="wa-theater-btn" title="生成与主线无关的番外/小剧场文本（不写入世界状态）">生成番外</button></div>
       <div class="wa-row"><button class="wa-btn wa-mini" id="wa-theater-insert" disabled>插入输入框</button><button class="wa-btn wa-mini" id="wa-theater-copy">复制</button></div>
       <div id="wa-theater-out" class="wa-out">${(() => {
         // v2.2.0: 剧场产出留痕（此前 wrap 零调用，产物送不出去也无人知情）
@@ -606,6 +1002,35 @@
     });
     const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
     on('#wa-save-bg', () => { WA.store.patch('background', { text: $('#wa-bg').value, updatedAt: clockNow('ui.panel') }); WA.log('info', '世界背景已保存'); });
+    // v2.30.0（P0-2）：撤销编辑——弹撤销栈顶、按 path 写回；镜像视图——读侧回落台账。
+    on('#wa-undo-btn', () => {
+      const r = WA.undo.undo();
+      const top = WA.undo.peek();
+      const out = $('#wa-diag-out');
+      if (out) out.innerHTML = '<div class="wa-log ' + (r.ok ? 'wa-log-info' : 'wa-log-warn') + '">'
+        + (r.ok ? '✓ 已撤销：' + r.label + '（' + r.path + '）'
+        : '撤销未执行：' + r.reason + (top ? '（下一候补：' + top.label + '）' : '（栈已空）')) + '</div>';
+      if (r.ok) { WA.log('info', '已撤销编辑：' + r.label); renderBody(); }
+    });
+    on('#wa-mirror-view', () => {
+      const out = $('#wa-diag-out');
+      try {
+        const m = WA.store.mirrorStat();
+        let html = '<div class="wa-item"><b>镜像回落台账</b>：命中 ' + m.hits + ' / 未命中 ' + m.misses
+          + ' / 读失败 ' + m.errors
+          + '　最近：' + (m.last ? esc(JSON.stringify(m.last)) : '无')
+          + '　分支父聊天：' + (m.branchParent || '（非分支）') + '</div>';
+        html += '<button class="wa-btn" id="wa-mirror-rescue">从镜像恢复本聊天</button>';
+        if (out) out.innerHTML = html;
+        const rb = $('#wa-mirror-rescue');
+        if (rb) rb.onclick = () => {
+          const res = WA.store.rescueFromMirror();
+          out.innerHTML = '<div class="wa-log ' + (res.ok ? 'wa-log-info' : 'wa-log-warn') + '">'
+            + (res.ok ? '✓ 已从镜像恢复（' + res.bytes + 'B）' : '未恢复：' + esc(res.reason)) + '</div>';
+          if (res.ok) renderBody();
+        };
+      } catch (e) { if (out) out.textContent = '镜像视图失败：' + (e && e.message); }
+    });
     on('#wa-set-clock', () => { const v = askText('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null) { WA.calendar.setClock(v); renderBody(); } });
     on('#wa-cal-auto', () => {});
     { const cb = $('#wa-cal-auto');
@@ -628,7 +1053,15 @@
         if (!r.ok) WA.log('warn', '势力新增失败：' + r.reason);
         renderBody();
       };
-      panelEl.querySelectorAll('[data-ef-del]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorFaction.remove(d, +b.dataset.efDel)); if (typeof WA.editorFaction.setEditingId === 'function') WA.editorFaction.setEditingId(null); renderBody(); });
+      panelEl.querySelectorAll('[data-ef-del]').forEach(b => b.onclick = () => {
+          // v2.30.0（P0-2）：破坏性删除入撤销栈——before 必须在 transact 改内存前取好（显式值优先）
+          const arr = WA.store.read('evolution.factions', []);
+          const idx = +b.dataset.efDel;
+          if (arr[idx]) WA.undo.pushValue('删除势力「' + (arr[idx].name || idx) + '」', 'evolution.factions', arr.slice());
+          WA.store.transact(d => WA.editorFaction.remove(d, idx));
+          if (typeof WA.editorFaction.setEditingId === 'function') WA.editorFaction.setEditingId(null);
+          renderBody();
+        });
       panelEl.querySelectorAll('[data-ef-copy]').forEach(b => b.onclick = () => { WA.store.transact(d => WA.editorFaction.copy(d, +b.dataset.efCopy)); renderBody(); });
       panelEl.querySelectorAll('[data-ef-edit]').forEach(b => b.onclick = () => {
         // v2.11.0: 编辑态唯一的写入口（此前 setEditingId 零调用 ⇒ 阅读态永远无标记可显示）
@@ -966,6 +1399,7 @@
         const before = (WA.workflow && WA.workflow.stats) ? WA.workflow.stats(999).tracked : 0;
         if (WA.workflow && WA.workflow.resetStats) WA.workflow.resetStats();
         if (WA.workflow && WA.workflow.resetHistory) WA.workflow.resetHistory();
+        if (WA.undo && WA.undo.clear) WA.undo.clear(); // v2.30.0: 撤销栈同属运行痕迹，一并清空
         out.innerHTML = '<div class="wa-log wa-log-info">✓ 已清空工作流节点画像与运行历史（此前跟踪 ' + before + ' 个节点）：下一轮运行将重新取样，失败台账同时清零</div>';
       } catch (e) { out.textContent = '清空失败：' + (e && e.message); }
     };
@@ -1275,6 +1709,229 @@
         else out.textContent = block;
       } catch (e) { out.textContent = block; }
     };
+    // ── v2.33.0：记忆页 ──
+    //   删除/停用均走 store.patch（受控写入 → 自动入撤销栈），失败不静默；
+    //   任一修改后重绘本页，保证「界面上的 = 磁盘上的」。
+    const memOut = function (msg, bad) { const o = $('#wa-mem-out'); if (o) o.innerHTML = '<div class="wa-log ' + (bad ? 'wa-log-warn' : 'wa-log-info') + '">' + esc(msg) + '</div>'; };
+    on('#wa-mem-q-go', () => { __memQ = ($('#wa-mem-q') && $('#wa-mem-q').value) || ''; __memRefKey = null; renderBody(); });
+    on('#wa-mem-fact-add', () => {
+      const k = ($('#wa-mem-fact-k') && $('#wa-mem-fact-k').value || '').trim();
+      const v = ($('#wa-mem-fact-v') && $('#wa-mem-fact-v').value || '').trim();
+      if (!k) { memOut('请先填事实名', true); return; }
+      const s = WA.store.get();
+      const facts = (s.memory && s.memory.facts) || [];
+      const i = facts.findIndex(f => f && f.key === k);
+      if (i >= 0) { memOut('事实名「' + k + '」已存在（v' + (facts[i].version || 1) + '）——请改名，或点该条「停用」', true); return; }
+      const next = facts.slice();
+      next.push({ key: k, value: v, version: 1, active: true, reason: '面板手动新增', at: clockNow('ui.panel') });
+      const r = WA.store.patch('memory.facts', next);
+      memOut(r && r.ok ? ('已新增事实「' + k + '」') : ('写入失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      if (r && r.ok) renderBody();
+    });
+    panelEl.querySelectorAll('[data-factdel]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.factdel); const s = WA.store.get();
+      const cur = (s.memory && s.memory.facts) || []; if (!cur[i]) return;
+      const label = String(cur[i].key || '');
+      const next = cur.slice(); next.splice(i, 1);
+      const r = WA.store.patch('memory.facts', next);
+      memOut(r && r.ok ? ('已删除事实「' + label + '」（可经工具页「撤销编辑」回滚）') : ('删除失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      if (r && r.ok) renderBody();
+    });
+    panelEl.querySelectorAll('[data-facttoggle]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.facttoggle); const s = WA.store.get();
+      const cur = (s.memory && s.memory.facts) || []; if (!cur[i]) return;
+      const next = cur.slice(); next[i] = Object.assign({}, next[i], { active: !(next[i].active !== false) });
+      const r = WA.store.patch('memory.facts', next);
+      memOut(r && r.ok ? (next[i].key + ' 已' + (next[i].active ? '启用' : '停用')) : ('写入失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      if (r && r.ok) renderBody();
+    });
+    panelEl.querySelectorAll('[data-fsdel]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.fsdel); const s = WA.store.get();
+      const cur = (s.memory && s.memory.foreshadows) || []; if (!cur[i]) return;
+      const next = cur.slice(); next.splice(i, 1);
+      const r = WA.store.patch('memory.foreshadows', next);
+      memOut(r && r.ok ? '已删除伏笔（可经工具页「撤销编辑」回滚）' : ('删除失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      if (r && r.ok) renderBody();
+    });
+    // v2.34.0: 伏笔状态流转（waiting→developing→triggered→recycled）
+    panelEl.querySelectorAll('[data-fsst]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.fsst); const s = WA.store.get();
+      const cur = (s.memory && s.memory.foreshadows) || []; if (!cur[i]) return;
+      const CYCLE = ['waiting', 'developing', 'triggered', 'recycled'];
+      const idx = CYCLE.indexOf(cur[i].status);
+      const nxt = CYCLE[(idx + 1) % CYCLE.length];
+      const next = cur.slice(); next[i] = Object.assign({}, next[i], { status: nxt });
+      const r = WA.store.patch('memory.foreshadows', next);
+      const LABELS = { waiting: '等待', developing: '发展中', triggered: '已触发', recycled: '已回收' };
+      memOut(r && r.ok ? ('伏笔已推进至「' + (LABELS[nxt] || nxt) + '」（可经撤销回滚）') : ('写入失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      if (r && r.ok) renderBody();
+    });
+    // v2.34.0: 伏笔放弃
+    panelEl.querySelectorAll('[data-fsdrop]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.fsdrop); const s = WA.store.get();
+      const cur = (s.memory && s.memory.foreshadows) || []; if (!cur[i]) return;
+      const next = cur.slice(); next[i] = Object.assign({}, next[i], { status: 'dropped' });
+      const r = WA.store.patch('memory.foreshadows', next);
+      memOut(r && r.ok ? '伏笔已标记为「已放弃」' : ('写入失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      if (r && r.ok) renderBody();
+    });
+    panelEl.querySelectorAll('[data-refview]').forEach(b => b.onclick = () => {
+      const k = b.dataset.refview;
+      __memRefKey = (__memRefKey === k) ? null : k;
+      renderBody();
+    });
+    // ── v2.33.0：注入页 ──
+    on('#wa-inj-refresh', () => {
+      const snap = (WA.injectInspector && WA.injectInspector.getLastSnapshot) ? WA.injectInspector.getLastSnapshot() : null;
+      const o = $('#wa-inj-out');
+      if (o) o.textContent = snap ? ('最新快照：' + WA.injectInspector.statusText(snap.status, snap.scope) + '（' + _msTs(snap.at) + '）') : '尚无快照——先推演一轮。';
+    });
+    on('#wa-inj-diag', () => {
+      const toolTab = panelEl.querySelectorAll('.wa-tab').filter(t => t.dataset.page === 'tools')[0];
+      if (toolTab) toolTab.click();
+      const btn = $('#wa-diag-run'); if (btn) btn.click();
+    });
+    // v2.34.0: 长期事实清空
+    on('#wa-mem-facts-clear', () => {
+      const s = WA.store.get();
+      const cur = (s.memory && s.memory.facts) || [];
+      if (!cur.length) return;
+      const r = WA.store.patch('memory.facts', []);
+      memOut(r && r.ok ? ('已清空 ' + cur.length + ' 条长期事实（可经撤销回滚）') : ('清空失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      if (r && r.ok) renderBody();
+    });
+    // v2.34.0: 仇敌状态推进
+    panelEl.querySelectorAll('[data-ensel]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.ensel); const s = WA.store.get();
+      const arr = (s.evolution && s.evolution.enemies) || []; if (!arr[i]) return;
+      const CYC = ['追踪中', '策划中', '执行中', '已终结'];
+      const idx = CYC.indexOf(arr[i].status);
+      const nxt = CYC[(idx + 1) % CYC.length];
+      const next = arr.slice(); next[i] = Object.assign({}, next[i], { status: nxt });
+      if (nxt === '已终结' && next[i].terminatedRound == null) next[i].terminatedRound = (s.evolution && s.evolution.round) || 0;
+      const r = WA.store.patch('evolution.enemies', next);
+      const o = $('#wa-en-out');
+      if (o) o.textContent = r && r.ok ? ('仇敌「' + next[i].name + '」已推进至「' + nxt + '」（可经撤销回滚）') : ('写入失败：' + ((r && r.reason) || '?'));
+      if (r && r.ok) renderBody();
+    });
+    // v2.34.0: 大势结束
+    panelEl.querySelectorAll('[data-wtdel]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.wtdel); const s = WA.store.get();
+      const arr = (s.evolution && s.evolution.worldTrends) || []; if (!arr[i]) return;
+      const next = arr.slice(); next[i] = Object.assign({}, next[i], { status: '已结束' });
+      const r = WA.store.patch('evolution.worldTrends', next);
+      const o = $('#wa-en-out');
+      if (o) o.textContent = r && r.ok ? ('大势「' + next[i].name + '」已结束') : ('写入失败：' + ((r && r.reason) || '?'));
+      if (r && r.ok) renderBody();
+    });
+    // v2.34.0: 平行世界 —— 设置存 / 手动推进 / 提示词与注入块预览 / NPC录入删除 / 事件丢弃
+    on('#wa-pw-save', () => {
+      const o = $('#wa-pw-out');
+      try {
+        if (!WA.parallelWorld) { if (o) o.textContent = 'parallelWorld 模块未加载'; return; }
+        const r = WA.parallelWorld.setSettings({
+          enabled: !!(($('#wa-pw-enable') || {}).checked),
+          autoMode: (($('#wa-pw-mode') || {}).value) || 'manual',
+          autoInterval: Number((($('#wa-pw-int') || {}).value) || 5),
+          diceEnabled: !!(($('#wa-pw-dice') || {}).checked),
+          detailLevel: (($('#wa-pw-detail') || {}).value) || 'normal'
+        });
+        if (o) o.textContent = r && r.ok ? ('平行世界设置已保存（生效值：' + JSON.stringify(WA.parallelWorld.effectiveSettings()) + '）') : ('保存失败：' + ((r && r.reason) || '?'));
+        if (r && r.ok) renderBody();
+      } catch (e) { if (o) o.textContent = '保存失败：' + (e && e.message); }
+    });
+    on('#wa-pw-advance', () => {
+      const o = $('#wa-pw-out');
+      const btn = $('#wa-pw-advance');
+      if (!WA.parallelWorld) { if (o) o.textContent = 'parallelWorld 模块未加载'; return; }
+      if (btn) btn.disabled = true;
+      if (o) o.textContent = '推进中…（调用 inference 通道）';
+      WA.parallelWorld.advance('manual').then(res => {
+        if (o) o.textContent = res && res.ok
+          ? ('推进成功：新事件 ' + res.modules + ' 条 / NPC 更新 ' + res.npcs + ' 个（第 ' + (((WA.store.get().parallelWorld || {}).round) || 0) + ' 轮）')
+          : ('推进失败：' + ((res && res.reason) || '?') + '（通道未配置时属预期——先连接页配 inference）');
+        renderBody();
+      }).catch(e => {
+        if (o) o.textContent = '推进异常：' + (e && e.message);
+        if (btn) btn.disabled = false;
+      });
+    });
+    on('#wa-pw-prompt', () => {
+      const o = $('#wa-pw-out');
+      try {
+        if (!WA.parallelWorld || typeof WA.parallelWorld.buildPrompt !== 'function') { if (o) o.textContent = 'parallelWorld 模块未加载'; return; }
+        if (o) o.textContent = WA.parallelWorld.buildPrompt();
+      } catch (e) { if (o) o.textContent = '预览失败：' + (e && e.message); }
+    });
+    on('#wa-pw-block', () => {
+      const o = $('#wa-pw-out');
+      try {
+        if (!WA.parallelWorld || typeof WA.parallelWorld.buildParallelBlock !== 'function') { if (o) o.textContent = 'parallelWorld 模块未加载'; return; }
+        const b = WA.parallelWorld.buildParallelBlock();
+        if (o) o.textContent = b || '当前无 high/critical 平行事件——注入块为空（低影响事件只存档不进主线）';
+      } catch (e) { if (o) o.textContent = '预览失败：' + (e && e.message); }
+    });
+    on('#wa-pw-npc-add', () => {
+      const o = $('#wa-pw-out');
+      const name = ((($('#wa-pw-npc-name') || {}).value) || '').trim();
+      if (!name) { if (o) o.textContent = '请先填 NPC 姓名'; return; }
+      if (!WA.parallelWorld) { if (o) o.textContent = 'parallelWorld 模块未加载'; return; }
+      const r = WA.parallelWorld.addNpc({ name: name, CURRENT_THOUGHT: ((($('#wa-pw-npc-goal') || {}).value) || '').slice(0, 120) });
+      if (o) o.textContent = r && r.ok ? ('NPC「' + name + '」已录入平行世界（可撤销）') : ('录入失败：' + ((r && r.reason) || '?'));
+      if (r && r.ok) renderBody();
+    });
+    panelEl.querySelectorAll('[data-pwnrm]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.pwnrm); const s = WA.store.get();
+      const arr = (s.parallelWorld && s.parallelWorld.npcs) || []; if (!arr[i]) return;
+      const name = arr[i].name;
+      const r = WA.parallelWorld.removeNpc(name);
+      const o = $('#wa-pw-out');
+      if (o) o.textContent = r && r.ok ? ('NPC「' + name + '」档案已移除（连带关系边，可撤销）') : ('移除失败：' + ((r && r.reason) || '?'));
+      if (r && r.ok) renderBody();
+    });
+    panelEl.querySelectorAll('[data-pwmod]').forEach(b => b.onclick = () => {
+      const i = Number(b.dataset.pwmod); const s = WA.store.get();
+      const arr = (s.parallelWorld && s.parallelWorld.modules) || []; if (!arr[i]) return;
+      const r = WA.parallelWorld.dropModule(arr[i].id);
+      const o = $('#wa-pw-out');
+      if (o) o.textContent = r && r.ok ? ('平行事件「' + arr[i].title + '」已丢弃（可撤销）') : ('丢弃失败：' + ((r && r.reason) || '?'));
+      if (r && r.ok) renderBody();
+    });
+    (function () {
+      const sel = $('#wa-pw-mode'), inp = $('#wa-pw-int');
+      if (sel && inp) sel.onchange = () => { inp.disabled = sel.value !== 'every_n'; renderBody(); };
+    })();
+    // v2.34.0: 记忆采样预览
+    on('#wa-samp-preview', () => {
+      const o = $('#wa-samp-out');
+      try {
+        if (!WA.memorySampler || typeof WA.memorySampler.buildBlock !== 'function') { setOut('#wa-samp-out', 'memorySampler 模块未加载'); return; }
+        const s = WA.store.get();
+        const recent = (WA.mainWin && WA.mainWin.SillyTavern && WA.mainWin.SillyTavern.getContext) || null;
+        let recentText = '';
+        if (recent) {
+          try {
+            const ctx = recent();
+            const msgs = (ctx && ctx.chat) || [];
+            recentText = msgs.slice(-4).map(m => String(m.mes || m.content || '')).join('\n').slice(-2000);
+          } catch (e) {}
+        }
+        const block = WA.memorySampler.buildBlock({ recentText: recentText, state: s });
+        if (!block) { setOut('#wa-samp-out', '采样为空——尚无人物主观记忆或采样配置为空'); return; }
+        if (o) o.textContent = block;
+        const cp = $('#wa-samp-copy'); if (cp) cp.disabled = false;
+      } catch (e) { setOut('#wa-samp-out', '预览失败：' + (e && e.message)); }
+    });
+    on('#wa-samp-copy', () => {
+      const o = $('#wa-samp-out');
+      if (o && o.textContent) {
+        try {
+          if (typeof mainWin.navigator !== 'undefined' && mainWin.navigator.clipboard) mainWin.navigator.clipboard.writeText(o.textContent);
+          else if (typeof mainWin.prompt === 'function') mainWin.prompt('复制以下内容：', o.textContent);
+        } catch (e) {}
+        setOut('#wa-samp-out', '已复制到剪贴板 ' + o.textContent);
+      }
+    });
     panelEl.querySelectorAll('.wa-chan').forEach(box => {
       box.querySelector('.wa-ch-save').onclick = () => {
         WA.apiRouter.setChannel(box.dataset.chan, { baseUrl: box.querySelector('.wa-ch-base').value.trim(), apiKey: box.querySelector('.wa-ch-key').value.trim(), model: box.querySelector('.wa-ch-model').value.trim() });

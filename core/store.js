@@ -91,6 +91,8 @@
       },
       // 突发事件（direct-event：一轮生成多轮解封的小纸条）
       directEvents: [],         // {id,title,totalTurns,currentTurn,status:active|done|aborted,opponent,box,notes:[],createdAt}
+      // v2.34.0 平行世界（parallel-world.js：主线之外的独立推演 —— NPC档案/关系网/事件模块）
+      parallelWorld: { clock: '', npcs: [], relations: [], modules: [], round: 0 },
       // 一致性记录（冲突诊断，不静默覆盖）
       consistency: [],          // {kind, detail, at}
       // 世界脉搏（backstage结算）
@@ -112,6 +114,112 @@
     return (ctx && (ctx.chatId || ctx.chatMetadata?.file_name)) || 'wa_default';
   }
   function storageKey(chatId) { return 'worldaxis_state_' + (chatId || getChatId()); }
+  // ── v2.30.0（分支世界不归零）: 聊天镜像回落 ──────────────────────
+  // 病：ST 建分支（`mes_create_branch`）会**整份复制 chat_metadata**，而按聊天隔离的
+  //   `worldaxis_state_<chatId>` 是新键、必然为空 ⇒ 分支里活世界**立刻归零**（人物/事件/记忆/
+  //   纪事全没），而 chat_metadata 镜像里明明躺着一份完整存档，**没有任何代码去读它**——
+  //   写入侧 engines/chatcache.js 一直在推镜像（live.data.state），读侧此前只认 localStorage。
+  // 口径（保守五条）：
+  //   ① **只在 miss 时回落**：本地键存在（哪怕解析失败）一律不走镜像——绝不覆盖本地真源；
+  //   ② **命中即落盘**：把镜像那份用 writeVerified 写回本聊天键，后续所有路径统一走 localStorage
+  //      （不新造第二条读路径）；写回失败如实记账，不假装继承成功；
+  //   ③ **读不出来 ≠ 没有**：镜像在但读失败/解析失败 ⇒ mirrorErrors++，与「镜像也没有」
+  //      （mirrorMisses++）分开报（本仓既有裁决：读失败掩盖缺失是重罪）；
+  //   ④ **损坏现场要隔离**：镜像存在但解析不了时，原文另存隔离键再记账——否则用户的下一次
+  //      保存会把这份唯一的可恢复现场冲掉（与 load() 本地解析失败同规格）；
+  //   ⑤ **继承关系显式记账**：live.chatId !== 当前 chatId ⇒ 这份世界是**继承来的**（分支现场），
+  //      台账 lastMirror.inherited=true + fromChatId 落证，用户能看见「世界是从哪个聊天接过来的」。
+  //   ⑥ **自动回落仅分支**：branchParentId() 为空（同聊天空键）一律不写回 ——
+  //      跨设备同聊天安装走 chatcache.installPack；用户主动补救走 rescueFromMirror。
+  //      若此处无条件写回，LS.clear()+init() 会被持久 chatMetadata 镜像凭空重建 state 键。
+  const MIRROR_NS = 'worldaxis';
+  /**
+   * 读聊天镜像。**三种结果必须可分**（本仓裁决：读失败掩盖缺失是重罪）：
+   *   { raw }        镜像里有存档原文
+   *   { absent:true } 镜像里确实没有（或没挂载镜像）
+   *   { err }        镜像在/可能在上，但读不出来 —— **不等于没有**
+   */
+  function readChatMirror() {
+    let md = null;
+    try {
+      const ctx = getCtx();
+      md = ctx && ctx.chatMetadata;
+    } catch (e) { return { err: e }; }
+    if (!md || typeof md !== 'object') return { absent: true };
+    let ns = null;
+    try { ns = md[MIRROR_NS]; } catch (e) { return { err: e }; }
+    if (!ns || typeof ns !== 'object') return { absent: true };
+    const live = ns.live;
+    if (!live || typeof live !== 'object') return { absent: true };
+    const d = live.data;
+    if (!d || typeof d !== 'object' || d.state == null) return { absent: true, live: live };
+    const raw = d.state;
+    if (typeof raw !== 'string' || !raw) return { absent: true, live: live };
+    return { raw: raw, live: live };
+  }
+  /** 当前聊天是否是**分支**（ST 把母聊天 id 记在 chat_metadata.main_chat） */
+  function branchParentId() {
+    try {
+      const ctx = getCtx();
+      const md = ctx && ctx.chatMetadata;
+      const p = md && md.main_chat;
+      return (typeof p === 'string' && p) ? p : null;
+    } catch (e) { return null; }
+  }
+  /** 镜像解析失败时的现场隔离（与本地 load 解析失败同规格，防下次保存冲掉唯一证据） */
+  function quarantineMirror(cid, raw) {
+    try {
+      const key = storageKey(cid) + '_corrupt_' + clockNow('store.mirrorCorrupt');
+      mainWin.localStorage.setItem(key, raw);
+      return key;
+    } catch (e) { return null; }
+  }
+  /** miss 回落：把镜像那份救回本地。仅分支才落盘（writeVerified），并记完整归因。 */
+  function loadFromMirror(chatId) {
+    const cid = chatId || getChatId();
+    // 自动回落只对分支世界动手（ST 把母聊天记在 chat_metadata.main_chat）。
+    // 同聊天空键由 chatcache.installPack / 用户显式 rescueFromMirror 负责，本函数不写盘。
+    if (!branchParentId()) return null;
+    const m = readChatMirror();
+    if (m.err) {
+      __loadStat.mirrorErrors++;
+      __loadStat.lastError = 'mirror:' + String((m.err && m.err.message) || m.err);
+      WA.log('error', 'store.load：本地键为空且聊天镜像**读取失败**——无法判定这个世界是「空白新分支」还是「有一份存档没读出来」（本地键：' + storageKey(cid) + '）', m.err);
+      return null;
+    }
+    if (m.absent) { __loadStat.mirrorMisses++; return null; }
+    let st = null;
+    try { st = JSON.parse(m.raw); }
+    catch (pe) {
+      __loadStat.mirrorErrors++;
+      const qk = quarantineMirror(cid, m.raw);
+      __loadStat.lastError = 'mirror-parse:' + String((pe && pe.message) || pe);
+      WA.log('error', 'store.load：聊天镜像存在但**解析失败**（本次未采用；原文已隔离到 ' + (qk || '（隔离失败）')
+        + '，本地键仍为空）', pe);
+      return null;
+    }
+    const live = m.live || {};
+    const from = live.chatId || null;
+    const inherited = !!(from && from !== cid);
+    // 命中即落盘：后续读取路径统一走 localStorage（不新造第二条真源）
+    const w = writeVerified(storageKey(cid), m.raw);
+    __loadStat.mirrorHits++;
+    __lastMirror = {
+      at: clockWall(), chatId: cid, fromChatId: from, inherited: inherited,
+      branchParent: branchParentId(), rev: (typeof live.rev === 'number') ? live.rev : null,
+      bytes: byteLen(m.raw), writtenBack: !!(w && w.ok), writeReason: (w && w.ok) ? null : ((w && w.reason) || 'unknown'),
+      manual: false
+    };
+    __loadStat.lastMirror = __lastMirror;
+    if (w && w.ok) {
+      WA.log('warn', 'store.load：本地键为空，已从聊天镜像救回世界状态（' + Math.round(__lastMirror.bytes / 1024) + 'KB'
+        + (inherited ? '，继承自聊天 ' + from : '') + '）——若这是新分支，世界不该归零，本份即其起点');
+    } else {
+      WA.log('error', 'store.load：聊天镜像已读到（' + Math.round(__lastMirror.bytes / 1024) + 'KB）但**写回本地失败**（'
+        + __lastMirror.writeReason + '）——本次仍以镜像内容工作，刷新后会再次回落到镜像');
+    }
+    return st;
+  }
   function recoveryKey(chatId) { return 'worldaxis_recovery_' + (chatId || getChatId()); }
 
   let memCache = {}; // 内存态（当前聊天的权威副本）
@@ -391,7 +499,17 @@
   // v2.0.0: 巡视自身降级台账——采集节抛错即记录（此前裸 catch 使「巡视半瞎」与「一切正常」不可区分）
   const __maintainDegraded = { sections: [], lastAt: 0, total: 0 };
   // v0.1.38: 加载观测——状态键损坏时隔离原始 payload 而非静默丢弃
-  const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0 };
+  const __loadStat = { loads: 0, hits: 0, misses: 0, errors: 0, healed: 0, shapeConflicts: 0, lastFix: { filled: 0, conflicts: 0, at: 0 }, lastError: null, lastAt: 0,
+    // v2.30.0（分支世界不归零）: 镜像回落计量——「本地键空、但聊天镜像里躺着一份完整存档」此前
+    //   完全不可观测：load() 只读 localStorage，miss 即返回 null，调用方拿到 defaultWorldState()。
+    //   ST 建分支会**整份复制 chat_metadata**（镜像随分支走），而 `worldaxis_state_<新chatId>` 是新键、
+    //   必然为空 ⇒ 新分支＝活世界当场归零，而镜像里那份存档无人读取。三个计数回答三件事：
+    //     mirrorHits   = 本次确实从镜像救回了世界（带 from/rev/bytes 证据）
+    //     mirrorMisses = 镜像里也没有（真·空白分支，归零是正确行为）
+    //     mirrorErrors = 镜像在/可能在上，但**读不出来或解析不了**（绝不与「没有」同形）
+    mirrorHits: 0, mirrorMisses: 0, mirrorErrors: 0, lastMirror: null };
+  // v2.30.0: 镜像命中台账（最近一次回落的完整归因，UI/诊断据此说「这份世界从哪来」）
+  let __lastMirror = null;
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
   const __migrations = {};
   let __keyHygieneScanSig = null;    // v0.1.54: 上次 dry-run 扫描的清理计划指纹（纯指纹幂等：变化才告警，同指纹静默）
@@ -615,6 +733,10 @@
     'evolution.events': { cap: 16, site: 'editor-events.js MAX_EVENTS=16' },
     'evolution.factions': { cap: 16, site: 'editor-faction.js MAX_FACTIONS=16' },
     'directEvents': { cap: 4, site: 'direct-event.js pruneDirect(KEEP_DONE=3 + 1 活跃)' },
+    // v2.34.0 平行世界三容器（parallel-world.js 入账器环形剪枝，上限与引擎常量同源）
+    'parallelWorld.npcs': { cap: 24, site: 'parallel-world.js CAP_NPCS=24' },
+    'parallelWorld.relations': { cap: 120, site: 'parallel-world.js CAP_RELATIONS=120' },
+    'parallelWorld.modules': { cap: 80, site: 'parallel-world.js CAP_MODULES=80' },
     'chapters.history': { cap: 20, site: 'chapters.js pruneHistory(MAX_HISTORY=20)' },
     // v1.4.0 补登：entityMemory 四类实体库（entities.js CAP_PER_TYPE=30 双处裁剪）——此前漏登致 sizeAudit 误报 unbounded、maintain 盲区
     'evolution.entityMemory.organization': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
@@ -885,7 +1007,15 @@
         __loadStat.errors++; __loadStat.lastError = String((e && e.message) || e);
         WA.log('error', 'store.load读取失败', e); return null;
       }
-      if (!raw) { __loadStat.misses++; return null; }
+      if (!raw) {
+        __loadStat.misses++;
+        // v2.30.0: 自动回落**只对分支世界**动手（母聊天 id 在 chat_metadata.main_chat）。
+        //   同聊天空键由 chatcache 跨设备安装负责；若此处无条件写回，LS.clear()+init()
+        //   会被持久 chatMetadata 镜像凭空重建 state 键（破坏「拒绝恢复未凭空创建」契约）。
+        //   用户主动补救走 rescueFromMirror（无视本地键，必须显式调用）。
+        if (branchParentId()) return loadFromMirror(chatId);
+        return null;
+      }
       try {
         const st = JSON.parse(raw);
         __loadStat.hits++;
@@ -2129,7 +2259,45 @@
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
     /** v0.1.38: 加载观测只读视图（tool-diag 消费）——errors>0 意味着发生过状态键损坏 */
-    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, at: __migrateReport.at } : null, lastError: __loadStat.lastError, lastAt: __loadStat.lastAt }; },
+    /** v2.30.0: 镜像回落视图（本次世界从哪来 / 是否分支继承 / 写回是否成功） */
+    mirrorStat() {
+      return { hits: __loadStat.mirrorHits, misses: __loadStat.mirrorMisses, errors: __loadStat.mirrorErrors,
+        last: __lastMirror ? JSON.parse(JSON.stringify(__lastMirror)) : null,
+        branchParent: branchParentId() };
+    },
+    /**
+     * v2.30.0: 手动补救入口（对齐 ref_app branch-rescue-tool 的产品意图：用户主动把镜像里的世界装回来）。
+     * 与自动回落的分工：自动回落**只在本地键为空时**动手（绝不覆盖活世界）；本入口**无视本地键存在与否**
+     * 作出裁决，故必须由用户显式调用。返回体如实区分「没有镜像」「读不出来」「解析不了」「写不回」。
+     * @param {string} [chatId]
+     * @returns {{ok:boolean, reason?:string, bytes?:number, fromChatId?:string|null, inherited?:boolean}}
+     */
+    rescueFromMirror(chatId) {
+      const cid = chatId || getChatId();
+      const m = readChatMirror();
+      if (m.err) return { ok: false, reason: '镜像读取失败（无法判定有没有）：' + String((m.err && m.err.message) || m.err) };
+      if (m.absent) return { ok: false, reason: '聊天镜像里没有可恢复的存档' };
+      let st = null;
+      try { st = JSON.parse(m.raw); }
+      catch (pe) {
+        const qk = quarantineMirror(cid, m.raw);
+        return { ok: false, reason: '镜像内容解析失败（原文已隔离到 ' + (qk || '（隔离失败）') + '）：' + String((pe && pe.message) || pe) };
+      }
+      const w = writeVerified(storageKey(cid), m.raw);
+      if (!w || !w.ok) return { ok: false, reason: '写回失败：' + ((w && w.reason) || 'unknown') };
+      const live = m.live || {};
+      const from = live.chatId || null;
+      __lastMirror = { at: clockWall(), chatId: cid, fromChatId: from, inherited: !!(from && from !== cid),
+        branchParent: branchParentId(), rev: (typeof live.rev === 'number') ? live.rev : null,
+        bytes: byteLen(m.raw), writtenBack: true, writeReason: null, manual: true };
+      __loadStat.lastMirror = __lastMirror;
+      memCache = st;
+      return { ok: true, bytes: byteLen(m.raw), fromChatId: from, inherited: !!(from && from !== cid) };
+    },
+    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, at: __migrateReport.at } : null,
+      // v2.30.0: 镜像回落三计数同域可见——「本地 miss 但镜像救回」此前在诊断上全无痕迹
+      mirrorHits: __loadStat.mirrorHits, mirrorMisses: __loadStat.mirrorMisses, mirrorErrors: __loadStat.mirrorErrors,
+      lastError: __loadStat.lastError, lastAt: __loadStat.lastAt }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
     sizeProfile(topN) {
       const rows = [];
@@ -2841,13 +3009,42 @@
     },
 
     // ── 便捷读写 ──
+    // ── 引用判据收口（v2.30.0，P1-1）──
+    // why：全库 15 处 `x.id === y.id` 形态的实体匹配，此前各写各的——null 与 null 相等、
+    // 数字 id 与字符串 id 不等、空串能匹配空串。judge 只住一处（ref_sw2 ref-rules 的
+    // 核心纪律：判据住一处，调用方只消费）：所有 id/键身份判定都从这里走。
+    // 三条裁决（都有判据钉住）：
+    //   ① null/undefined 不参与匹配（两边都没有 ≠ 是同一个；实体查找语境下误配比漏配危险）
+    //   ② 数字与字符串按字符串形态归一（id 类型漂移不该让匹配静默失效）
+    //   ③ 空串不是 id（与 ① 同理）
+    sameId(a, b) {
+      if (a == null || b == null) return false;
+      const sa = typeof a === 'string' ? a : String(a);
+      const sb = typeof b === 'string' ? b : String(b);
+      if (sa === '' || sb === '') return false;
+      return sa === sb;
+    },
+    // v2.30.0（P0-2）：patch 是手动参数编辑的受控入口——写回成功后把「变更前」交给撤销栈。
+    // 钩子只挂 patch 不挂 transact：transact 是引擎高频链路（每轮几十次），入栈会让
+    // 撤销栈被自动演进淹没；patch 是面板/用户语义的编辑动作，才配得上「可撤销」。
+    // 显式值优先：before 在改内存之前取好，写回成功后才 capture（写失败不入栈）。
     patch(path, value) {
-      return this.transact(draft => {
+      // before 的读取也必须包住：坏 path 时 read 会抛，不能让它在 transact 之外炸栈
+      // （旧契约：patch 对坏输入如实返回 ok:false，绝不由钩子引入新的抛出路径）
+      let before;
+      try { before = this.read(path, undefined); }
+      catch (_e) { before = undefined; }
+      const r = this.transact(draft => {
         const segs = path.split('.');
         let node = draft;
         for (let i = 0; i < segs.length - 1; i++) { node[segs[i]] = node[segs[i]] || {}; node = node[segs[i]]; }
         node[segs[segs.length - 1]] = value;
       });
+      if (r && r.ok === true && WA.undo && typeof WA.undo.capture === 'function') {
+        try { WA.undo.capture('参数编辑', path, before); }
+        catch (_e) { WA.log('warn', 'undo.capture 失败（编辑已生效，仅撤销栈未记）', _e); }
+      }
+      return r;
     },
     read(path, fallback) {
       let node = memCache;

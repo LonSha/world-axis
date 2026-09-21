@@ -38,7 +38,7 @@ function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
      *   收回理由与 setProfile 同型：留着裸入口，下一个调用者挑错的那个就会绕过准入。
      *   注意：`rules` 数据成员本身**保留**（读取面：规则清单/统计都读它，不是死面）。
      */
-    setEnabled(id, on) { const r = this.rules.find(x => x.id === id); if (r) { r.enabled = !!on; saveRules(this.rules); } },
+    setEnabled(id, on) { const r = this.rules.find(x => WA.store.sameId(x.id, id)); if (r) { r.enabled = !!on; saveRules(this.rules); } }, // v2.30.0 P1-1 收口
     /**
      * v2.11.0（面C · 死面治理）: 此处原有 `loadPreset(preset)`——只认 Veridis 预设且
      *   入参形态判断极窄（`preset.type === 'veridis-rewrite-preset'`），不满足即**静默返回 0**

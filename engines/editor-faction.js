@@ -58,7 +58,7 @@
   function findIndex(state, key) {
     const arr = list(state);
     if (typeof key === 'number') return key >= 0 && key < arr.length ? key : -1;
-    return arr.findIndex(f => f.id === key || f.name === key);
+    return arr.findIndex(f => WA.store.sameId(f.id, key) || f.name === key); // v2.30.0 P1-1 收口
   }
 
   /** 新增：重名拒绝（World 推演按 name 匹配，重名会导致归并串味） */

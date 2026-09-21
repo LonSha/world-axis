@@ -102,7 +102,7 @@
     const id = WA.settingsBus.read(__REG_ACTIVE);
     if (!id || typeof id !== 'string') return DEFAULT_ID;
     if (id !== DEFAULT_ID) {
-      const found = loadCustomPresets().some(p => p.id === id);
+      const found = loadCustomPresets().some(p => WA.store.sameId(p.id, id)); // v2.30.0 P1-1 收口
       if (!found) { setActivePresetId(DEFAULT_ID); return DEFAULT_ID; }
     }
     return id;
@@ -114,7 +114,7 @@
 
   function getPresetById(id) {
     if (!id || id === DEFAULT_ID) return buildDefaultPreset();
-    return loadCustomPresets().find(p => p.id === id) || null;
+    return loadCustomPresets().find(p => WA.store.sameId(p.id, id)) || null; // v2.30.0 P1-1 收口
   }
 
   function getActivePreset() { return getPresetById(getActivePresetId()) || buildDefaultPreset(); }
@@ -123,7 +123,7 @@
     const p = normalizePreset(preset);
     if (!p.id || p.id === DEFAULT_ID) p.id = genId();
     const customs = loadCustomPresets();
-    const idx = customs.findIndex(x => x.id === p.id);
+    const idx = customs.findIndex(x => WA.store.sameId(x.id, p.id)); // v2.30.0 P1-1 收口
     const now = clockNow('preset');
     p.updatedAt = now;
     if (p.createdAt === 0) p.createdAt = now;

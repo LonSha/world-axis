@@ -35,7 +35,7 @@
   function findIndex(state, key) {
     const arr = list(state);
     if (typeof key === 'number') return key >= 0 && key < arr.length ? key : -1;
-    return arr.findIndex(e => e.id === key || e.name === key);
+    return arr.findIndex(e => WA.store.sameId(e.id, key) || e.name === key); // v2.30.0 P1-1 收口
   }
 
   /** 新增：类型必填且必须合法；名称去重（推演侧按名归并，重名会串链） */
