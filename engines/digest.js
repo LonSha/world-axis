@@ -14,6 +14,12 @@
   const WA = (window.WorldAxis = window.WorldAxis || {});
   // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  /** v2.36.0: 轮次读口——唯一真源 WA.evolution.roundOf（未加载时兜底 evolution.round）。 */
+  function roundOfSafe(state) {
+    try { if (WA.evolution && typeof WA.evolution.roundOf === 'function') return WA.evolution.roundOf(state); } catch (e) {}
+    try { const s = state || WA.store.get(); if (s && s.evolution && typeof s.evolution.round === 'number') return s.evolution.round; } catch (e) {}
+    return 0;
+  }
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const DIGEST_MIN = 150;
@@ -117,7 +123,7 @@
       if (!tx.evolution) tx.evolution = {};
       tx.evolution.worldDigest = {
         text:    digest,
-        round:   (tx.meta && tx.meta.round) || 0,
+        round:   roundOfSafe(tx),  // v2.36.0: 轮次单一真源（此前 `meta.round` 零写入方）
         at:      clockNow('digest')
       };
     });

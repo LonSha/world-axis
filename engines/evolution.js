@@ -54,8 +54,32 @@
   function uid(prefix) { return WA.rand.id(prefix, 4, 'id'); }
 
   const MAX_WINDS = 12;   // v0.6.0: 风声环形容量（衰减引擎是常态收敛，入账点兜底）
+  /**
+   * v2.36.0: 轮次单一真源。
+   *
+   * 现场（铁证，v2.35.0 收口时抓到）：全库有 5 处读 `meta.round`
+   *   （ledger.recordChanges / horizon 掷骰与两处 chronicle 入账 / digest 入账），
+   *   而 `meta.round` **全库零写入方**——真源是 `evolution.round`（`tick()` 里唯一 ++）。
+   *   后果：账本永远写「第0轮」、同轮重 roll 覆盖判据（filter(m => m.round !== round)）
+   *   恒真 ⇒ 每轮都新压一条、「保留最近 20 轮」在 21 轮后开始静默吃掉真实轮次；
+   *   纪事 / world_digest 的 round 字段同样是死的（前端看不到轮次推进）。
+   *
+   * 本函数是**唯一**读轮次的出口：调用方一律走它，不许再摸 `meta.round`。
+   * 兜底顺序：`evolution.round` → 存档点兼容读 `meta.round`（历史数据若是别处写的也认）→ 0。
+   * @param {object} [state] 可选状态对象（事务 draft）；缺省读 live store
+   * @returns {number}
+   */
+  function roundOf(state) {
+    try {
+      const s = state || WA.store.get();
+      if (s && s.evolution && typeof s.evolution.round === 'number') return s.evolution.round;
+      if (s && s.meta && typeof s.meta.round === 'number') return s.meta.round;
+    } catch (e) { /* 读失败按 0——与旧行为一致，不抛 */ }
+    return 0;
+  }
   const evolution = WA.evolution = {
     STAGE_MAP, TERMINAL, REPUTATION_LEVELS, FACTION_STATUS, FACTION_RELATION, ECONOMY_CLIMATE,
+    roundOf,
     getSettings: loadSettings,
     // v2.6.0: 回传写入结果（见 backstage.setSettings 注释）
     // v2.7.0（收口）: 幂等归一——与其余四模块同规格（区间声明在 __REG.bounds 上）。

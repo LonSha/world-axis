@@ -17,6 +17,12 @@
   const EVENT_TYPE_NAMES = { conflict: '冲突型', progress: '推进型' };
   const TERMINAL_STAGES = new Set(['已完成', '已失败', '已消散', '已爆发']);
 
+  /** v2.36.0: 轮次读口——唯一真源 WA.evolution.roundOf（evolution 未加载时兜底）。 */
+  function roundOfSafe(state) {
+    try { if (WA.evolution && typeof WA.evolution.roundOf === 'function') return WA.evolution.roundOf(state); } catch (e) {}
+    try { const s = state || WA.store.get(); if (s && s.evolution && typeof s.evolution.round === 'number') return s.evolution.round; } catch (e) {}
+    return 0;
+  }
   // ── 存档点 ─────────────────────────────────────────────
   /**
    * 推演前调用：保存当前演化状态快照
@@ -41,7 +47,9 @@
     const cp = ev._ledgerCheckpoint;
     if (!cp) { clearCheckpoint(); return; }
 
-    const round = (st.meta && st.meta.round) || 0;
+    // v2.36.0: 轮次单一真源——此前读 `meta.round`（全库零写入方），账本永远记「第0轮」，
+    //   连带「同轮重 roll 覆盖」判据恒真（每轮都新压一条，20 轮环形在 21 轮后开始吃真账）。
+    const round = roundOfSafe(st);
     const changes = [];
 
     // —— 事件链：Lv3+变化或任何终局都记录 ——
