@@ -81,6 +81,7 @@
     'parallelWorld.npcs':     { path: 'parallelWorld.npcs', cap: 24, why: '平行世界NPC档案环形' },
     'parallelWorld.relations':{ path: 'parallelWorld.relations', cap: 120, why: '平行世界关系网环形（同向边去重后）' },
     'parallelWorld.modules':  { path: 'parallelWorld.modules', cap: 80, why: '平行世界事件模块环形' },
+    'parallelWorld.snapshots':{ path: 'parallelWorld.snapshots', cap: 12, why: '平行世界子树快照环形（v2.35.0）' },
     // 对象型：每人认知边界（键 = 「谁知道什么」），按 at 最旧优先挤出
     'people.knowledge':   { path: 'people.*.knowledge', cap: 30, kind: 'object', why: '人物认知边界（每键一桩知情）' },
     // ── v2.13.0 补漏（本轮广谱侦察发现的真缺陷）──

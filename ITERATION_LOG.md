@@ -238,3 +238,18 @@
   - ⑤ **同页 patch 不触发重绘**：v2.34 测试初版 `bodyOf()` 同页连访拿到旧 DOM，绑定点击后断言读到未更新节点（事件丢弃 / 空态负控 / state 判 null 三处假失败）。修法：`bodyOf(p, force=true)` 切走再切回强制 renderBody 重建子树。教训：面板测试里「写 store → 读页面」之间必须保证渲染器重跑。
   - ⑥ **骨架物化后 `state()` 不再返回 null**：store 骨架已物化 `parallelWorld`，判「无数据」应看容器为空而非 `state===null`（null 只出现在未装载/异常路径）。教训：断言「空态」要看真数据容器，不看句柄。
 - **验证**：全量回归 → **4381 / 失败 0**（v2.34.0 section +73 断言），「全部测试通过 ✓」；`node tests/dead-export-gate.js` → ✓（dataOnly 107 与账本一致，dead 212）；独立冒烟 pw_smoke.js 45/0。出口面 inventory：66 命名空间 / 697 成员 / 0 悬空 / 0 未登记。版本推进后残留 `2.33.0` 为 0、三处版本源全 2.34.0。
+
+### R18 · 2026-09-21 · v2.35.0 交付（能力面 → 呈现面·第二十二面：世界书蓝绿灯 / 实体库 / 账本 / 下一日 / 平行快照）
+- **做了什么**：一次「大更新」把孤神抚源卡对照后仍剩的五个「玩家看得见」正交缺口补进既有 14 页，不新增第 15 页。
+  - **世界书蓝绿灯**：`engines/worldbook.js` 新增 `seedEntries/peekEntries/previewActivation/OVERRIDE_VALUES`；无头测试用 seed mock，不走 `import('/scripts/world-info.js')`。`backstage.__REG_B.def.worldbookTrigger: false`（有副作用能力默认关），世界页 `wa-wb-trigger` 走 `setSettings` merge。触发关闭时已选全量「触发关闭·全量注入」。
+  - **世界钟下一日**：`wa-next-day` 调 `calendar.advanceDay({source:'user'})`，`advanceDay` 从 test-only 变成活出口。
+  - **实体库**：事件页按 `TYPE_LABELS` 四类各示最近 8 条，手工录入走 `store.transact` + `entities.upsert`。
+  - **重大事件账本**：事件页真读 `WA.ledger.buildLedgerText()`，空态仍保 `#wa-ledger-text`。
+  - **平行世界快照**：`saveSnapshot/listSnapshots/restoreSnapshot/dropSnapshot`，只序列化 clock/npcs/relations/modules/round，不含 settings 与 snapshots 自身；恢复保留快照列表；cap 12 走 `evict.array`。
+  - **双登记**：`store` 骨架补 `evolution.ledger: []` 与 `parallelWorld.snapshots: []`；`__BOUNDED_CAPS` + `evict.SITES` 加 snapshots(12) + ledger(20)；`registryParity.checked` 36→38。
+  - **面板**：世界页 `wa-wb-*` + `wa-next-day`；事件页 `wa-ent-*` + `wa-ledger-text`；平行页 `wa-pw-snap-*`。`UI_BINDINGS` 静态组已加新 id；动态 `data-wb-sel/ov` 与 `data-pwsnap-*` 不入静态守卫。
+  - **门禁**：FROZEN2800 实跑回填；dead-export-ledger `--update`（dead 212→208 / dataOnly 107→106 / 仅测试 133→130）；现场锚点 refs 1327→1362 / members 697→706。
+  - **新增 v2.35.0 回归段**（约 41 条 `v2350:`）：世界书 seed/preview/选择/触发、下一日跨日、实体库呈现/手工录入、账本真读、registryParity 38、快照保存/列出/恢复/删除/容量环形。
+- **为什么**：引擎能力在、面板零入口。世界书触发开关之前因 def 缺键恒为 false；`advanceDay` 之前 test-only；账本在 evict.SITES 但骨架缺字段。
+- **影响范围**：`engines/worldbook.js` / `engines/parallel-world.js` / `engines/backstage.js` / `core/store.js` / `core/evict.js` / `ui/panel.js` / `engines/tool-diag.js` / `index.js` / `manifest.json` / `tests/run.js` / `tests/dead-export-ledger.json` / README / ITERATION_LOG。不新增页面、不新增产品文件。
+- **验证**：全量回归 4419/0；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106 / 仅测试 130）；ui-wire-audit 8/0。出口面 66 ns / 706 members / refs 1362。版本三源 2.35.0。

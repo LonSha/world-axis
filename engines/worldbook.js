@@ -20,6 +20,8 @@
   const LS_PREFIX = 'worldaxis_wb_selection_';
 
   let worldInfoModulePromise = null;
+  // v2.35.0: 条目缓存——面板同步渲染 / 无头测试 seedEntries mock，不必真 import 酒馆模块。
+  let cachedEntries = [];
 
   const LOGIC = { AND_ANY: 0, NOT_ALL: 1, NOT_ANY: 2, AND_ALL: 3 };
   const OVERRIDE_VALUES = ['const', 'key', 'off'];
@@ -107,7 +109,7 @@
       throw new Error('当前 SillyTavern 版本不支持读取世界书条目');
     }
     const entries = await module.getSortedEntries();
-    return (Array.isArray(entries) ? entries : [])
+    const mapped = (Array.isArray(entries) ? entries : [])
       .filter(entry => entry && entry.uid !== undefined && String(entry.content || '').trim())
       .filter(entry => !getEntryTitle(entry).startsWith('TavernDB-ACU'))
       .map(entry => ({
@@ -126,6 +128,42 @@
         caseSensitive: entry.caseSensitive === true,
         matchWholeWords: entry.matchWholeWords === true
       }));
+    seedEntries(mapped);
+    return mapped;
+  }
+
+  /** v2.35.0: 无头/面板写入条目缓存（loadCurrentEntries 成功路径也会走这里） */
+  function seedEntries(list) {
+    cachedEntries = Array.isArray(list) ? list.slice() : [];
+    return cachedEntries.length;
+  }
+  function peekEntries() { return cachedEntries.slice(); }
+
+  /**
+   * v2.35.0: 蓝绿灯触发预览（同步，读缓存 + 当前选择/覆写）。
+   * 触发关闭时已选条目视为全量注入；未选/禁用单独标原因。
+   */
+  function previewActivation(scanText) {
+    const stored = readStored();
+    const selectedIds = new Set(stored.ids || []);
+    const overrides = stored.overrides || {};
+    const triggerOn = triggerEnabled();
+    const text = String(scanText || '');
+    return peekEntries().map(function (entry) {
+      const selected = selectedIds.has(entry.id);
+      const mode = overrides[entry.id] || 'auto';
+      let act;
+      if (!selected) act = { active: false, reason: '未选' };
+      else if (entry.disabled) act = { active: false, reason: '条目禁用' };
+      else if (!triggerOn) act = { active: true, reason: '触发关闭·全量注入' };
+      else act = activationOf(entry, text, mode);
+      return {
+        id: entry.id, title: entry.title, world: entry.world,
+        selected: selected, override: mode,
+        keys: entry.keys || [], constant: !!entry.constant, disabled: !!entry.disabled,
+        active: !!act.active, reason: act.reason
+      };
+    });
   }
 
   // ── 蓝绿灯触发引擎 ─────────────────────────────────────
@@ -230,6 +268,7 @@ ${content}`;
   WA.worldbook = {
     hasSelection, getSelectedIds, getOverrides, saveSelectedIds, saveSelection,
     loadCurrentEntries, buildPromptSection, triggerEnabled,
-    isEntryActive, activationOf, matchKey
+    isEntryActive, activationOf, matchKey,
+    seedEntries, peekEntries, previewActivation, OVERRIDE_VALUES
   };
 })();

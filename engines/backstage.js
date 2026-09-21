@@ -130,7 +130,10 @@
             //   默认 false：这两个功能会写聊天文件 / 增内存快照，属**有副作用的能力**，
             //   默认关、由用户显式开启，与「自动推演」这类开箱即用项区分。
             syncToChat: false,           // 把本扩展存档镜像进 chat_metadata（随聊天文件跨设备同步）
-            autoBackup: false            // 轮次推进时滚动自动备份（保留最近 3 份，可恢复）
+            autoBackup: false,           // 轮次推进时滚动自动备份（保留最近 3 份，可恢复）
+            // v2.35.0: 世界书蓝绿灯触发总开关。engines/worldbook.js 读 `s.worldbookTrigger === true`，
+            //   此前键不在 def → 永远读不到 true（触发引擎恒关）。默认关：有副作用的注入筛选须用户显式打开。
+            worldbookTrigger: false
           },
           // v2.7.0（收口）: 区间与枚举声明上收到登记表——此前这些合法范围**只存在于设置页的
           //   `<input min max>` 与 `<select>` 选项里**，引擎一侧承认的只有少数几个（且分散）：

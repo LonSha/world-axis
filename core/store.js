@@ -72,6 +72,8 @@
         blackbox: { secretActions: [], secretAssets: [] }, worldTrends: [], regionalIncident: null,
         // v1.6.0 物化：实体记忆库（登记四键 cap 30 此前未在骨架声明——冷启动审计不可见、直写即炸事务）
         entityMemory: { organization: [], object: [], ability: [], location: [] },
+        // v2.35.0 物化：重大事件账本（ledger.js KEEP_ROUNDS=20；此前只在 evict.SITES 登记，骨架缺字段）
+        ledger: [],
         reputation: { authority: '默默无闻', common: '默默无闻', shadow: '默默无闻', circuit: '默默无闻', lastChange: '' },
         economy: { climate: '平稳', signals: [] },
         round: 0, digest: '',
@@ -92,7 +94,7 @@
       // 突发事件（direct-event：一轮生成多轮解封的小纸条）
       directEvents: [],         // {id,title,totalTurns,currentTurn,status:active|done|aborted,opponent,box,notes:[],createdAt}
       // v2.34.0 平行世界（parallel-world.js：主线之外的独立推演 —— NPC档案/关系网/事件模块）
-      parallelWorld: { clock: '', npcs: [], relations: [], modules: [], round: 0 },
+      parallelWorld: { clock: '', npcs: [], relations: [], modules: [], round: 0, snapshots: [] },
       // 一致性记录（冲突诊断，不静默覆盖）
       consistency: [],          // {kind, detail, at}
       // 世界脉搏（backstage结算）
@@ -737,6 +739,8 @@
     'parallelWorld.npcs': { cap: 24, site: 'parallel-world.js CAP_NPCS=24' },
     'parallelWorld.relations': { cap: 120, site: 'parallel-world.js CAP_RELATIONS=120' },
     'parallelWorld.modules': { cap: 80, site: 'parallel-world.js CAP_MODULES=80' },
+    'parallelWorld.snapshots': { cap: 12, site: 'parallel-world.js CAP_SNAPSHOTS=12（v2.35.0）' },
+    'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },
     'chapters.history': { cap: 20, site: 'chapters.js pruneHistory(MAX_HISTORY=20)' },
     // v1.4.0 补登：entityMemory 四类实体库（entities.js CAP_PER_TYPE=30 双处裁剪）——此前漏登致 sizeAudit 误报 unbounded、maintain 盲区
     'evolution.entityMemory.organization': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },

@@ -17,6 +17,7 @@
   const CAP_NPCS = 24;      // 平行世界 NPC 档案环形容量
   const CAP_RELATIONS = 120;
   const CAP_MODULES = 80;   // 事件模块总量（注入只取最新 slice）
+  const CAP_SNAPSHOTS = 12; // v2.35.0: 平行世界子树快照环形（不含设置）
   const INJECT_MODULE_SHOW = 5;  // 注入块事件条数上限
   const AUTO_MODES = ['manual', 'per_turn', 'every_n', 'dice'];
   const LS_KEY = 'worldaxis_parallel_settings_v1';
@@ -64,6 +65,68 @@
     const pw = s.parallelWorld;
     if (!pw) return null;
     return { clock: pw.clock || '', npcs: pw.npcs || [], relations: pw.relations || [], modules: pw.modules || [], round: pw.round || 0 };
+  }
+
+  // v2.35.0: 只快照平行世界子树（clock/npcs/relations/modules/round），不含 settings、不含 snapshots 自身。
+  function clonePwCore(pw) {
+    const src = pw || {};
+    try {
+      return JSON.parse(JSON.stringify({
+        clock: src.clock || '',
+        npcs: Array.isArray(src.npcs) ? src.npcs : [],
+        relations: Array.isArray(src.relations) ? src.relations : [],
+        modules: Array.isArray(src.modules) ? src.modules : [],
+        round: src.round || 0
+      }));
+    } catch (e) {
+      return { clock: '', npcs: [], relations: [], modules: [], round: 0 };
+    }
+  }
+  function saveSnapshot(label) {
+    const st = pwState() || { round: 0 };
+    const name = String(label == null ? '' : label).trim().slice(0, 40) || ('快照 第' + (st.round || 0) + '轮');
+    const r = WA.store.transact(function (draft) {
+      draft.parallelWorld = draft.parallelWorld || { clock: '', npcs: [], relations: [], modules: [], round: 0, snapshots: [] };
+      if (!Array.isArray(draft.parallelWorld.snapshots)) draft.parallelWorld.snapshots = [];
+      const core = clonePwCore(draft.parallelWorld);
+      draft.parallelWorld.snapshots.push({
+        id: uid('pwsp'), label: name, at: clockNow('parallel'),
+        round: core.round, clock: core.clock,
+        npcs: core.npcs, relations: core.relations, modules: core.modules
+      });
+      if (WA.evict) WA.evict.array(draft.parallelWorld.snapshots, 'parallelWorld.snapshots');
+      else if (draft.parallelWorld.snapshots.length > CAP_SNAPSHOTS) {
+        draft.parallelWorld.snapshots = draft.parallelWorld.snapshots.slice(-CAP_SNAPSHOTS);
+      }
+    });
+    return (r && r.ok) ? { ok: true } : { ok: false, reason: String((r && r.error) || 'store-fail') };
+  }
+  function listSnapshots() {
+    const s = WA.store.get();
+    return ((s && s.parallelWorld && s.parallelWorld.snapshots) || []).slice();
+  }
+  function restoreSnapshot(id) {
+    const snap = listSnapshots().find(function (x) { return x && x.id === id; });
+    if (!snap) return { ok: false, reason: 'not-found' };
+    const r = WA.store.transact(function (draft) {
+      draft.parallelWorld = draft.parallelWorld || { clock: '', npcs: [], relations: [], modules: [], round: 0, snapshots: [] };
+      const keep = (draft.parallelWorld.snapshots || []).slice();
+      const core = clonePwCore(snap);
+      draft.parallelWorld.clock = core.clock;
+      draft.parallelWorld.npcs = core.npcs;
+      draft.parallelWorld.relations = core.relations;
+      draft.parallelWorld.modules = core.modules;
+      draft.parallelWorld.round = core.round;
+      draft.parallelWorld.snapshots = keep;
+    });
+    return (r && r.ok) ? { ok: true } : { ok: false, reason: 'store-fail' };
+  }
+  function dropSnapshot(id) {
+    const r = WA.store.transact(function (draft) {
+      if (!draft.parallelWorld) return false;
+      draft.parallelWorld.snapshots = (draft.parallelWorld.snapshots || []).filter(function (x) { return x.id !== id; });
+    });
+    return (r && r.ok) ? { ok: true } : { ok: false, reason: 'none' };
   }
 
   // ── 推进提示词（六大审查协议：事实锚定 / NPC延续 / 独立性 / 自然互动 / 因果分级 / 输出合规）──
@@ -276,7 +339,7 @@
 
   const pw = WA.parallelWorld = {
     IMPACTS: IMPACTS, IMPACT_LABEL: IMPACT_LABEL, INJECT_MIN_IMPACT: INJECT_MIN_IMPACT,
-    CAP_NPCS: CAP_NPCS, CAP_RELATIONS: CAP_RELATIONS, CAP_MODULES: CAP_MODULES,
+    CAP_NPCS: CAP_NPCS, CAP_RELATIONS: CAP_RELATIONS, CAP_MODULES: CAP_MODULES, CAP_SNAPSHOTS: CAP_SNAPSHOTS,
     AUTO_MODES: AUTO_MODES, LS_KEY: LS_KEY, KB_KEYS: KB_KEYS,
     getSettings: loadSettings, effectiveSettings: effSettings,
     setSettings(o) {
@@ -292,6 +355,7 @@
     },
     buildPrompt: buildPrompt, buildParallelBlock: buildParallelBlock,
     advance: advance, addNpc: addNpc, removeNpc: removeNpc, dropModule: dropModule,
+    saveSnapshot: saveSnapshot, listSnapshots: listSnapshots, restoreSnapshot: restoreSnapshot, dropSnapshot: dropSnapshot,
     shouldAuto: shouldAuto, state: pwState,
     stat() { return { running: running, advances: __stat.advances, failed: __stat.failed, notConfigured: __stat.notConfigured, lastAt: __stat.lastAt, lastErr: __stat.lastErr }; }
   };

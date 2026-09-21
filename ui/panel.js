@@ -258,7 +258,7 @@
   function renderWorld() {
     const s = WA.store.get();
     return `
-      <div class="wa-sec">世界钟 <button class="wa-btn wa-mini" id="wa-set-clock">设定</button></div>
+      <div class="wa-sec">世界钟 <button class="wa-btn wa-mini" id="wa-set-clock">设定</button> <button class="wa-btn wa-mini" id="wa-next-day" title="推进一天（保留时段由引擎单一实现决定）">下一日</button></div>
       <div class="wa-kv"><span>当前</span><b>${esc(s.clock.label || '未设定')}</b></div>
       ${(() => {
         // v2.1.0: 自动推进可见（此前 suggestAdvance 零消费，时间只能手动设）
@@ -275,7 +275,31 @@
       <div class="wa-sec">暗流（${s.currents.length}）</div>
       <div class="wa-list">${s.currents.slice(-10).reverse().map(c => `<div class="wa-item"><span class="wa-badge wa-vis-${c.visibility}">${c.visibility}</span> <b>${esc(c.title)}</b> <span class="wa-dim">${esc(c.stage)}</span><div class="wa-dim">${esc(c.summary || '').slice(0, 120)}</div></div>`).join('') || '<div class="wa-empty">暂无暗流</div>'}</div>
       <div class="wa-sec">纪事（${s.chronicle.length}）</div>
-      <div class="wa-list">${s.chronicle.slice(-10).reverse().map(c => `<div class="wa-item wa-dim">${esc(c.title)} — ${esc((c.summary || '').slice(0, 80))}</div>`).join('') || '<div class="wa-empty">暂无纪事</div>'}</div>`;
+      <div class="wa-list">${s.chronicle.slice(-10).reverse().map(c => `<div class="wa-item wa-dim">${esc(c.title)} — ${esc((c.summary || '').slice(0, 80))}</div>`).join('') || '<div class="wa-empty">暂无纪事</div>'}</div>
+      ${(() => {
+        // v2.35.0: 世界书蓝绿灯选择/覆写/触发预览（此前引擎有、面板零入口）
+        if (!WA.worldbook) return '<div class="wa-sec">世界书</div><div class="wa-dim">世界书模块未加载</div>';
+        const trig = (typeof WA.worldbook.triggerEnabled === 'function') ? WA.worldbook.triggerEnabled() : false;
+        if (typeof WA.worldbook.peekEntries === 'function') WA.worldbook.peekEntries();
+        const rows = (typeof WA.worldbook.previewActivation === 'function') ? WA.worldbook.previewActivation(__wbScan) : [];
+        const ovOpts = (WA.worldbook.OVERRIDE_VALUES || ['const', 'key', 'off']);
+        const list = rows.length ? rows.map(function (r) {
+          const ov = r.override || 'auto';
+          const sel = ovOpts.map(function (v) { return '<option value="' + v + '"' + (ov === v ? ' selected' : '') + '>' + (v === 'const' ? '常驻' : v === 'key' ? '关键词' : '关闭') + '</option>'; }).join('');
+          return '<div class="wa-item"><label class="wa-node"><input type="checkbox" data-wb-sel="' + esc(r.id) + '" ' + (r.selected ? 'checked' : '') + '/><span class="wa-node-label"><b>' + esc(r.title) + '</b></span></label>'
+            + ' <select class="wa-input wa-w60" data-wb-ov="' + esc(r.id) + '"><option value="auto"' + (ov === 'auto' ? ' selected' : '') + '>自动</option>' + sel + '</select>'
+            + ' <span class="wa-badge' + (r.active ? ' wa-on' : '') + '">' + (r.active ? '注入' : '跳过') + '</span>'
+            + '<div class="wa-dim">' + esc(r.world || '') + ' · ' + esc(r.reason || '') + ((r.keys && r.keys.length) ? ' · 键 ' + esc(r.keys.slice(0, 4).join('/')) : '') + '</div></div>';
+        }).join('') : '<div class="wa-empty">尚无条目缓存——点「刷新条目」从当前世界书载入，无头环境可用 seedEntries mock</div>';
+        return '<div class="wa-sec">世界书蓝绿灯（' + rows.length + '）</div>'
+          + '<label class="wa-node"><input type="checkbox" id="wa-wb-trigger" ' + (trig ? 'checked' : '') + '/><span class="wa-node-label">关键词触发（关=已选全量注入）</span></label>'
+          + '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-wb-refresh" title="从酒馆当前世界书载入条目（失败则保留缓存）">刷新条目</button>'
+          + '<button class="wa-btn wa-mini" id="wa-wb-preview" title="用扫描文本预览蓝绿灯命中">预览触发</button></div>'
+          + '<textarea id="wa-wb-scan" class="wa-ta" placeholder="扫描文本（预览关键词命中，可空）">' + esc(__wbScan) + '</textarea>'
+          + '<div class="wa-list" id="wa-wb-list">' + list + '</div>'
+          + '<div id="wa-wb-out" class="wa-out"></div>';
+      })()}`;
+
   }
 
   function renderPeople() {
@@ -425,6 +449,34 @@
       <button class="wa-btn" id="wa-inspect-run">立即体检（纯只读）</button>
       <div id="wa-inspect-out" class="wa-out"></div>
 
+      ${(() => {
+        // v2.35.0: 实体库四类呈现 + 手工 upsert（此前引擎有、面板零入口）
+        const types = (WA.entities && WA.entities.ENTITY_TYPES) || ['organization', 'object', 'ability', 'location'];
+        const labels = (WA.entities && WA.entities.TYPE_LABELS) || { organization: '组织', object: '物品', ability: '能力', location: '地点' };
+        const em = (s.evolution && s.evolution.entityMemory) || {};
+        const blocks = types.map(function (t) {
+          const arr = em[t] || [];
+          const items = arr.slice(-8).reverse().map(function (e) {
+            return '<div class="wa-item"><b>' + esc(e.name) + '</b>' + ((e.aliases && e.aliases.length) ? ' <span class="wa-dim">' + esc(e.aliases.join('/')) + '</span>' : '') + (e.desc ? '<div class="wa-dim">' + esc(String(e.desc).slice(0, 80)) + '</div>' : '') + '</div>';
+          }).join('') || '<div class="wa-empty">暂无</div>';
+          return '<div class="wa-sec">' + esc(labels[t] || t) + '（' + arr.length + '）</div><div class="wa-list">' + items + '</div>';
+        }).join('');
+        const opts = types.map(function (t) { return '<option value="' + t + '">' + esc(labels[t] || t) + '</option>'; }).join('');
+        return '<div class="wa-sec">实体库</div>'
+          + '<div class="wa-row"><select id="wa-ent-type" class="wa-input wa-w60">' + opts + '</select>'
+          + '<input id="wa-ent-name" class="wa-input" placeholder="名称" maxlength="40"/>'
+          + '<input id="wa-ent-desc" class="wa-input" placeholder="描述（可选）" maxlength="150"/>'
+          + '<button class="wa-btn wa-mini" id="wa-ent-add" title="手工写入实体库（走 entities.upsert）">录入</button></div>'
+          + blocks
+          + '<div id="wa-ent-out" class="wa-out"></div>';
+      })()}
+      ${(() => {
+        // v2.35.0: 重大事件账本呈现（读 ledger.buildLedgerText / evolution.ledger）
+        const txt = (WA.ledger && typeof WA.ledger.buildLedgerText === 'function') ? WA.ledger.buildLedgerText() : '';
+        const n = ((s.evolution && s.evolution.ledger) || []).length;
+        return '<div class="wa-sec">重大事件账本（' + n + ' 轮）</div>'
+          + (txt ? '<div class="wa-item"><pre class="wa-dim" id="wa-ledger-text">' + esc(txt) + '</pre></div>' : '<div class="wa-empty" id="wa-ledger-text">尚无账本——推演一轮后对比存档点才会写入</div>');
+      })()}
       <div class="wa-sec">章节</div>
       ${s.chapters.current ? `<div class="wa-item"><b>${esc(s.chapters.current.title)}</b><div class="wa-dim">${esc((s.chapters.current.script || '').slice(0, 150))}</div><button class="wa-btn wa-mini" id="wa-ch-end">结束本章</button></div>`
         : `<div class="wa-row"><input id="wa-ch-title" class="wa-input" placeholder="章节标题…"/><button class="wa-btn" id="wa-ch-start" title="开启新章节，章节回顾会归入它">开始章节</button></div>`}`;
@@ -442,6 +494,7 @@
   let __memQ = '';
   let __memRefKey = null;
   let __injQ = '';
+  let __wbScan = '';  // v2.35.0: 世界书预览扫描文本（切页不丢）
 
   function _msTs(t) { if (!t) return ''; try { return new Date(t).toLocaleString(); } catch (e) { return String(t); } }
   function _msAudit(refs) { try { return (WA.timeline && WA.timeline.auditRefs) ? WA.timeline.auditRefs(refs || []) : null; } catch (e) { return null; } }
@@ -714,6 +767,17 @@
     });
     out += '<div class="wa-sec">平行事件（' + mods.length + '，示最近 10）</div>'
       + '<div class="wa-list">' + (mRows.join('') || '<div class="wa-empty">暂无平行事件（推进一轮生成）</div>') + '</div>';
+    // v2.35.0: 平行世界子树快照（与工具页全量 toolSnapshot 区分：只序列化 parallelWorld 核心，不含 settings）
+    const snaps = (WA.parallelWorld && typeof WA.parallelWorld.listSnapshots === 'function') ? WA.parallelWorld.listSnapshots() : (pw.snapshots || []);
+    const sRows = (snaps || []).slice().reverse().map(function (sp) {
+      return '<div class="wa-item"><b>' + esc(sp.label || sp.id) + '</b> <span class="wa-dim">第' + esc(String(sp.round || 0)) + '轮' + (sp.clock ? ' · ' + esc(sp.clock) : '') + '</span>'
+        + ' <button class="wa-btn wa-mini" data-pwsnap-restore="' + esc(sp.id) + '">恢复</button>'
+        + ' <button class="wa-btn wa-mini" data-pwsnap-drop="' + esc(sp.id) + '">✕</button></div>';
+    }).join('');
+    out += '<div class="wa-sec">平行世界快照（' + (snaps || []).length + '）</div>'
+      + '<div class="wa-row"><input type="text" id="wa-pw-snap-label" class="wa-input" placeholder="快照名（可空=按轮次）" maxlength="40">'
+      + ' <button class="wa-btn wa-mini" id="wa-pw-snap-save" title="保存当前平行世界子树（NPC/关系/事件/时间锚/轮次）">保存快照</button></div>'
+      + '<div class="wa-list">' + (sRows || '<div class="wa-empty">暂无快照</div>') + '</div>';
     out += '<div id="wa-pw-out" class="wa-out"></div>';
     return out;
   }
@@ -1032,9 +1096,63 @@
       } catch (e) { if (out) out.textContent = '镜像视图失败：' + (e && e.message); }
     });
     on('#wa-set-clock', () => { const v = askText('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null) { WA.calendar.setClock(v); renderBody(); } });
+    on('#wa-next-day', () => {
+      if (!WA.calendar || typeof WA.calendar.advanceDay !== 'function') { WA.log('warn', '世界钟模块未加载'); return; }
+      const day = WA.calendar.advanceDay({ source: 'user' });
+      WA.log('info', day < 0 ? '世界钟缺失，未推进' : ('世界钟已推进至第' + day + '日'));
+      renderBody();
+    });
     on('#wa-cal-auto', () => {});
     { const cb = $('#wa-cal-auto');
       if (cb) cb.onchange = () => { WA.calendar.setSettings({ auto: cb.checked }); WA.log('info', '世界钟自动推进已' + (cb.checked ? '开启' : '关闭')); renderBody(); }; }
+    (function () {
+      // v2.35.0: 世界书选择/覆写/触发/刷新/预览
+      const saveWb = function () {
+        if (!WA.worldbook || typeof WA.worldbook.saveSelection !== 'function') return;
+        const ids = [];
+        const ov = {};
+        panelEl.querySelectorAll('[data-wb-sel]').forEach(function (cb) { if (cb.checked) ids.push(cb.dataset.wbSel); });
+        panelEl.querySelectorAll('[data-wb-ov]').forEach(function (sel) {
+          const v = sel.value; if (v && v !== 'auto') ov[sel.dataset.wbOv] = v;
+        });
+        WA.worldbook.saveSelection(ids, ov);
+      };
+      panelEl.querySelectorAll('[data-wb-sel]').forEach(function (cb) { cb.onchange = function () { saveWb(); renderBody(); }; });
+      panelEl.querySelectorAll('[data-wb-ov]').forEach(function (sel) { sel.onchange = function () { saveWb(); renderBody(); }; });
+      const trig = $('#wa-wb-trigger');
+      if (trig) trig.onchange = function () {
+        if (WA.backstage && typeof WA.backstage.setSettings === 'function') WA.backstage.setSettings({ worldbookTrigger: !!trig.checked });
+        renderBody();
+      };
+      on('#wa-wb-refresh', async function () {
+        setOut('#wa-wb-out', '载入中…');
+        try {
+          if (!WA.worldbook || typeof WA.worldbook.loadCurrentEntries !== 'function') { setOut('#wa-wb-out', '世界书模块未加载'); return; }
+          const list = await WA.worldbook.loadCurrentEntries();
+          setOut('#wa-wb-out', '已载入 ' + ((list && list.length) || 0) + ' 条');
+          renderBody();
+        } catch (e) { setOut('#wa-wb-out', '载入失败：' + ((e && e.message) || e)); }
+      });
+      on('#wa-wb-preview', function () {
+        __wbScan = ((($('#wa-wb-scan') || {}).value) || '');
+        if (!WA.worldbook || typeof WA.worldbook.previewActivation !== 'function') { setOut('#wa-wb-out', '世界书模块未加载'); return; }
+        const rows = WA.worldbook.previewActivation(__wbScan);
+        const n = rows.filter(function (r) { return r.active; }).length;
+        renderBody();
+        setOut('#wa-wb-out', '预览：注入 ' + n + '/' + rows.length + (__wbScan ? '（扫描 ' + __wbScan.length + ' 字）' : '（无扫描文本）'));
+      });
+    })();
+    on('#wa-ent-add', function () {
+      const type = ((($('#wa-ent-type') || {}).value) || 'organization');
+      const name = (((($('#wa-ent-name') || {}).value) || '')).trim();
+      const desc = (((($('#wa-ent-desc') || {}).value) || '')).trim();
+      if (!name) { setOut('#wa-ent-out', '请先填名称'); return; }
+      if (!WA.entities || typeof WA.entities.upsert !== 'function') { setOut('#wa-ent-out', '实体库模块未加载'); return; }
+      const r = WA.store.transact(function (d) { return WA.entities.upsert(d, type, { name: name, desc: desc }); });
+      const act = r && r.result;
+      setOut('#wa-ent-out', act === 'created' ? ('已新建「' + name + '」') : act === 'updated' ? ('已更新「' + name + '」') : ('未写入：' + act));
+      if (act === 'created' || act === 'updated') renderBody();
+    });
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
     on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); if (btn) { btn.textContent = '生成中…'; btn.disabled = true; } try { await WA.directEvent.create({ prompt: p, turns: t }); } finally { renderBody(); } });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });
@@ -1870,6 +1988,28 @@
         const b = WA.parallelWorld.buildParallelBlock();
         if (o) o.textContent = b || '当前无 high/critical 平行事件——注入块为空（低影响事件只存档不进主线）';
       } catch (e) { if (o) o.textContent = '预览失败：' + (e && e.message); }
+    });
+    on('#wa-pw-snap-save', () => {
+      const o = $('#wa-pw-out');
+      if (!WA.parallelWorld || typeof WA.parallelWorld.saveSnapshot !== 'function') { if (o) o.textContent = 'parallelWorld 模块未加载'; return; }
+      const label = (((($('#wa-pw-snap-label') || {}).value) || '')).trim();
+      const r = WA.parallelWorld.saveSnapshot(label);
+      if (o) o.textContent = r && r.ok ? ('快照已保存' + (label ? '「' + label + '」' : '')) : ('保存失败：' + ((r && r.reason) || '?'));
+      if (r && r.ok) renderBody();
+    });
+    panelEl.querySelectorAll('[data-pwsnap-restore]').forEach(b => b.onclick = () => {
+      const o = $('#wa-pw-out');
+      if (!WA.parallelWorld) { if (o) o.textContent = 'parallelWorld 模块未加载'; return; }
+      const r = WA.parallelWorld.restoreSnapshot(b.dataset.pwsnapRestore);
+      if (o) o.textContent = r && r.ok ? '快照已恢复（设置不变）' : ('恢复失败：' + ((r && r.reason) || '?'));
+      if (r && r.ok) renderBody();
+    });
+    panelEl.querySelectorAll('[data-pwsnap-drop]').forEach(b => b.onclick = () => {
+      const o = $('#wa-pw-out');
+      if (!WA.parallelWorld) { if (o) o.textContent = 'parallelWorld 模块未加载'; return; }
+      const r = WA.parallelWorld.dropSnapshot(b.dataset.pwsnapDrop);
+      if (o) o.textContent = r && r.ok ? '快照已删除' : ('删除失败：' + ((r && r.reason) || '?'));
+      if (r && r.ok) renderBody();
     });
     on('#wa-pw-npc-add', () => {
       const o = $('#wa-pw-out');

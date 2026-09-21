@@ -520,10 +520,10 @@
       'wa-samp-preview', 'wa-samp-copy', 'wa-samp-out'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
       dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue'] },
-    { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg'], dynamic: ['wa-conc-v'] },
+    { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg', 'wa-next-day', 'wa-wb-trigger', 'wa-wb-refresh', 'wa-wb-preview', 'wa-wb-scan', 'wa-wb-list', 'wa-wb-out'], dynamic: ['wa-conc-v'] },
     { page: 'people', ids: ['wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
-    { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out'],
+    { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
       //   与 wa-de-abort（有活跃突发事件才渲染）同一语义。纳入守卫表后，「按钮渲染了但
       //   绑定代码引用了别的 id」这类断裂会被发现（本版新增的绑定正需要这道守）。
@@ -565,7 +565,7 @@
     { page: 'memory', ids: ['wa-mem-q', 'wa-mem-q-go', 'wa-mem-fact-k', 'wa-mem-fact-v', 'wa-mem-fact-add', 'wa-mem-facts-clear', 'wa-mem-out'] },
     { page: 'enemies', ids: ['wa-en-out'] },
     // v2.34.0: 平行世界页（静态控件；data-pwnrm/data-pwmod 为数据驱动动态按钮，随渲染数量变化，不入静态守卫）
-    { page: 'parallel', ids: ['wa-pw-enable', 'wa-pw-mode', 'wa-pw-int', 'wa-pw-dice', 'wa-pw-detail', 'wa-pw-save', 'wa-pw-advance', 'wa-pw-prompt', 'wa-pw-block', 'wa-pw-npc-name', 'wa-pw-npc-goal', 'wa-pw-npc-add', 'wa-pw-out'],
+    { page: 'parallel', ids: ['wa-pw-enable', 'wa-pw-mode', 'wa-pw-int', 'wa-pw-dice', 'wa-pw-detail', 'wa-pw-save', 'wa-pw-advance', 'wa-pw-prompt', 'wa-pw-block', 'wa-pw-npc-name', 'wa-pw-npc-goal', 'wa-pw-npc-add', 'wa-pw-out', 'wa-pw-snap-label', 'wa-pw-snap-save'],
       cond: [] },
     { page: 'inject', ids: ['wa-inj-refresh', 'wa-inj-diag', 'wa-inj-out'] }
   ];
