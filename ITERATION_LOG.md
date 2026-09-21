@@ -239,6 +239,15 @@
   - ⑥ **骨架物化后 `state()` 不再返回 null**：store 骨架已物化 `parallelWorld`，判「无数据」应看容器为空而非 `state===null`（null 只出现在未装载/异常路径）。教训：断言「空态」要看真数据容器，不看句柄。
 - **验证**：全量回归 → **4381 / 失败 0**（v2.34.0 section +73 断言），「全部测试通过 ✓」；`node tests/dead-export-gate.js` → ✓（dataOnly 107 与账本一致，dead 212）；独立冒烟 pw_smoke.js 45/0。出口面 inventory：66 命名空间 / 697 成员 / 0 悬空 / 0 未登记。版本推进后残留 `2.33.0` 为 0、三处版本源全 2.34.0。
 
+### R21 · 2026-09-22 · v2.38.0 交付（开关无幽灵·第二十五面：回声分支缺失）
+- **做了什么**：继续沿「有产出、无消费 / 有开关、无实现」的静默失效链扫，抓到第三个。侦察法：把 render/inject.js 的 SOURCES 十项与 buildWorldSnapshot 分支逐个对齐。
+- **缺陷链（静默型）**：echoes 在 SOURCES 十项里、面板注入页有真复选框、backstage applyResult 真写入（cap 40，evict.SITES 已登记），但 buildWorldSnapshot() 从无 echoes 分支。复现脚本 /tmp/wa_scan/repro_echo.js：写一条 obvious 回声（盐船案→盐帮首领伏诛）+ 一条 subtle 回声，setVisibility 置 true/false 各取一次快照 —— 两次产物**逐字节相同**（identical: true），回声结果在快照里 indexOf = -1。
+- **修法**：render/inject.js 的 buildWorldSnapshot 补 echoes 分支，口径与 currents 对齐（obvious 给「案件→结果」；subtle 只给「（余波未明）」迹象，不剧透未结算内幕）；取最近 4 条；空回声返空 ⇒ 不产空头段。
+- **新增 v2.38.0 回归段（+11 断言）**：开/关产物必须不同（旧实现逐字节相同）+ 开启含回声段 + 关闭不含；obvious 给结果、subtle 不剧透结果但给「余波未明」；空回声不产空头段；**通用门禁**——SOURCES 每一项都必须在快照/注入路径有真读（缺项直接列名报红）；SOURCES 仍为 10 项；负向自证（把 echoes 判断抹成 false ⇒ 真代码面确不含该读点，证明门禁能抓）。
+- **同轮自纠（真实踩到）**：门禁首版把切片范围写成 buildWorldSnapshot → applyInjections 之间，而 memory/opinion/ledger/digest 四项的真读在 applyInjections 内部 ⇒ 误报「缺 4 项」。改为从快照构建起至文件末尾，因为可见性真读本就分布在两处。首版即被自己的断言抓红，说明门禁形态有效。
+- **为什么**：与 v2.36/v2.37 同型，属静默失效——不抛不报、门禁全绿、面板正常，但开关是装饰。优先级高于新功能。
+- **影响范围**：render/inject.js（buildWorldSnapshot 一处 + 注释）/ tests/run.js（v2.38.0 段 +11 断言 + 8 处版本号）/ tests/dead-export-ledger.json（version 2.38.0）/ index.js / manifest.json / README.md / ITERATION_LOG.md。
+- **门禁与验证**：全量回归 **4458 / 失败 0**（v2.37 基线 4447，+11 断言）；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106，无需 --update）；export-contract 不变（60 ns / 360 members / 4546 chars）；版本三源同源 2.38.0。
 ### R20 · 2026-09-22 · v2.37.0 交付（闭环缺口·第二十四面：实体库只进不出）
 - **做了什么**：沿 v2.36.0 的方法论继续扫「机制自述有用途、生产侧零消费」的静默失效，抓到第二个。复现脚本 /tmp/wa_scan/repro_ent.js：① 走真实 LOAD 清单装载全部产品模块；② store.transact + entities.upsert 写入「v2370盐帮（淮北盐帮）」与「v2370盐码头」；③ 调 entities.buildEntitiesBlock() —— 正确产出「【既有实体库】推演必须复用以下实体…【组织】v2370盐帮（淮北盐帮）」；④ 调 backstage.buildPrompt() 取 user 段 —— **查无此名**（indexOf = -1）。
 - **缺陷链（静默型）**：entities.buildEntitiesBlock() 是活导出（有 tool-analyzer 与测试消费，故死导出账本看不见它），但它的**语义用途**（让推演模型复用既有实体、不重复造同义实体）在生产侧从未生效：backstage 只在结算侧 applyEntities 写入实体库，buildPrompt 的 user 段只有 世界快照 / 世界书 / regional / horizon / 近期正文 五块，且 compactState() 也不含 entityMemory ⇒ 实体库只进不出。后果：模型每轮推演都看不到既有实体，容易为同一事物反复造新名（「淮北盐帮」→「盐帮」→「运河盐会」），实体库膨胀且别名索引失效。

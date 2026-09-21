@@ -153,6 +153,16 @@
         const cs = s.currents.filter(c => c.visibility !== 'hidden').slice(0, 6);
         if (cs.length) parts.push('【可感知暗流】' + cs.map(c => c.visibility === 'trace' ? (c.public_trace || c.title + '（异常迹象）') : c.title).join('；'));
       }
+      // v2.38.0: 回声分支此前**完全缺失**——`echoes` 在 SOURCES 与面板开关里都有，
+      //   但 buildWorldSnapshot 从无对应分支 ⇒ 复选框点了零效果（开/关产物逐字节相同），
+      //   写进 state.echoes 的「已结算结果的正文触面」从不进正文（实测：回声「盐帮首领伏诛」查无）。
+      //   口径与 currents 一致：obvious 给结果，subtle 只给「余波未明」的迹象，不剧透未结算内幕。
+      if (vis.echoes) {
+        const es = (s.echoes || []).slice(-4);
+        if (es.length) parts.push('【已结算回声】' + es.map(e => e.exposure === 'obvious'
+          ? ((e.refCurrent || '?') + '→' + (e.result || ''))
+          : ((e.refCurrent || '?') + '（余波未明）')).join('；'));
+      }
       // v0.1.29: 呈现铁律只在真有状态内容时追加——此前无条件 push 导致
       // parts.length 恒真、可见性全关仍注入 221 字空壳（开关对世界状态失效）
       if (parts.length) {

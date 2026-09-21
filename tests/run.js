@@ -9814,7 +9814,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.38.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10358,7 +10358,7 @@ assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.37.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.38.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10649,7 +10649,7 @@ assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.37.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.38.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11175,7 +11175,7 @@ assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.37.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.38.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11563,7 @@ assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.37.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.38.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11933,7 @@ assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.37.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.38.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12298,7 @@ assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.37.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.38.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14600,7 +14600,7 @@ assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.37.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.38.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -15865,6 +15865,64 @@ assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单�
     const faceBs2370 = require("./inventory.js").codeFace(srcBs2370);
     assert(faceBs2370.indexOf("WA.entities.buildEntitiesBlock") >= 0, "v2370: backstage 真代码面含 buildEntitiesBlock 调用（静态锁）");
     console.log("  ✓ v2370: 实体库闭环（写入侧 upsert + 读取侧进推演提示词 + 空库不产垃圾段）");
+  }
+
+  // ══════════ v2.38.0 ══════════
+  // 第二十五面：可见性开关无幽灵（echoes 分支缺失）。SOURCES 里 10 项都有面板复选框，
+  //   但 buildWorldSnapshot 从无 echoes 分支 ⇒ 开关点了零效果、回声数据从不进正文。
+  //   本段锁三件事：开关真生效（开/关产物必须不同）、subtle 不剧透、通用门禁（每项必有真读）。
+  section('v2.38.0：回声分支补全 + 可见性开关无幽灵（通用门禁）');
+  {
+    const W = WA;
+    const snapWith = function (on) {
+      W.render.setVisibility("echoes", on);
+      const s = W.render.buildWorldSnapshot();
+      W.render.setVisibility("echoes", false);
+      return s;
+    };
+    W.store.transact(function (d) {
+      d.echoes = [
+        { id: "ecv2380a", refCurrent: "v2380盐船案", result: "盐帮首领伏诛", exposure: "obvious", at: 1 },
+        { id: "ecv2380b", refCurrent: "v2380边关密议", result: "密约签署", exposure: "subtle", at: 2 },
+      ];
+      d.clock.label = "第9日";
+      d.worldPulse = { pressure: 2, trend: "rising", note: "风声鹤唳" };
+    });
+    // A. 开关真生效：开 / 关产物必须不同（旧实现逐字节相同）
+    const onSnap = snapWith(true);
+    const offSnap = snapWith(false);
+    assert(onSnap !== offSnap, "v2380: echoes 开/关产物必须不同（旧实现逐字节相同）");
+    assert(onSnap.indexOf("已结算回声") >= 0, "v2380: 开启后快照含回声段");
+    assert(offSnap.indexOf("已结算回声") < 0, "v2380: 关闭后快照不含回声段（开关真关）");
+    // B. obvious 给结果，subtle 不剧透
+    assert(onSnap.indexOf("盐帮首领伏诛") >= 0, "v2380: obvious 回声给结果");
+    assert(onSnap.indexOf("密约签署") < 0, "v2380: subtle 回声不剧透结果（只给余波迹象）");
+    assert(onSnap.indexOf("余波未明") >= 0, "v2380: subtle 回声给「余波未明」迹象");
+    // C. 空回声不产空头段
+    W.store.transact(function (d) { d.echoes = []; });
+    const emptySnap = snapWith(true);
+    assert(emptySnap.indexOf("已结算回声") < 0, "v2380: 空回声不产空头段");
+    // D. 通用门禁：SOURCES 每一项都必须在 buildWorldSnapshot 里有真读（防新的幽灵开关）
+    const srcIj2380 = fs.readFileSync(path.join(BASE, "render/inject.js"), "utf8");
+    const faceIj2380 = require("./inventory.js").codeFace(srcIj2380);
+    const bi = faceIj2380.indexOf("buildWorldSnapshot()");
+    // 范围 = 从快照构建起直到文件末尾：可见性真读分布在 buildWorldSnapshot（clock/…/echoes）
+    //   与 applyInjections（memory/opinion/ledger/digest）两处，只看前者会把后者误报为「缺」。
+    const bodySnap = faceIj2380.slice(bi);
+    const missingVis = (W.render.SOURCES || []).filter(function (k) {
+      return bodySnap.indexOf("vis." + k) < 0;
+    });
+    assert(missingVis.length === 0, "v2380: 门禁——SOURCES 每项都在快照里有真读（缺: " + missingVis.join(",") + "）");
+    assert((W.render.SOURCES || []).length === 10, "v2380: SOURCES 仍为 10 项（实 " + (W.render.SOURCES || []).length + "）");
+    // E. 负向自证：把 echoes 分支从源码里抹掉 ⇒ 门禁必须现形
+    const broken2380 = srcIj2380.split("if (vis.echoes)").join("if (false)");
+    assert(broken2380 !== srcIj2380, "v2380: （负向自证）破坏锚点在真源码中恰命中（可观测改行为）");
+    const faceBroken = require("./inventory.js").codeFace(broken2380);
+    const mb = faceBroken.indexOf("buildWorldSnapshot()");
+    const bodyBroken = faceBroken.slice(mb);
+    assert(bodyBroken.indexOf("vis.echoes") < 0, "v2380: （负向自证）破坏后真代码面确不含 vis.echoes");
+    console.log("  ✓ v2380: 回声分支补全（开关真生效 + subtle 不剧透 + 空库不产垃圾段）");
+    console.log("  ✓ v2380: 通用门禁（SOURCES 每项必有真读）+ 负向自证");
   }
   }  // ── 汇总 ──
   console.log('\n══════════════════════');
