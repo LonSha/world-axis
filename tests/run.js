@@ -9814,7 +9814,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.37.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10358,7 +10358,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.36.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.37.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10649,7 +10649,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.36.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.37.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11175,7 +11175,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.36.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.37.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11563,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.36.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.37.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11933,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.36.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.37.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12298,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.36.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.37.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14485,7 +14485,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 1372, '现场静态引用 1372 处（真代码口径，实 ' + r2700.refs + '）');
+    assert(r2700.refs === 1374, '现场静态引用 1374 处（真代码口径，实 ' + r2700.refs + '）');
     assert(r2700.namespaces === 66 && r2700.members === 707,
       '定义面 66 命名空间 / 707 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
     assert(r2700.dead.length === 208 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 106,
@@ -14564,7 +14564,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
       '（负向自证）症状可读：命名空间 ' + (boom2700 ? boom2700.namespaces : '?')
       + ' / 悬空 ' + (boom2700 ? boom2700.phantom.length : '?') + '（正是 CLI 首跑踩到的塌面）');
     console.log('  ✓ 口径单源（collect 复用、依赖单向无环、复用判据不退回宿主壳）');
-    console.log('  ✓ 现场锚点（refs 1372 / 命名空间 66 / 成员 707 / dead 208 · uiDead 4 · dataOnly 106）');
+    console.log('  ✓ 现场锚点（refs 1374 / 命名空间 66 / 成员 707 / dead 208 · uiDead 4 · dataOnly 106）');
     console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
     console.log('  ✓ 判定四态（新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红）');
     console.log('  ✓ 负向自证（破坏「已装载」判据 ⇒ 定义面塌成 0、退出码非零、症状 JSON 可解析）');
@@ -14600,7 +14600,7 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.36.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.37.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -14682,8 +14682,8 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     assert(r2800.dead.length === 208 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 106
       && r2800.deadInTestsOnly === 130,
       '现场锚点（dead 208 / uiDead 4 / dataOnly 106 / 仅测试 130）');
-    assert(r2800.refs === 1372 && r2800.namespaces === 66 && r2800.members === 707,
-      '清册面（refs 1372 / 命名空间 66 / 成员 707，真代码口径）');
+    assert(r2800.refs === 1374 && r2800.namespaces === 66 && r2800.members === 707,
+      '清册面（refs 1374 / 命名空间 66 / 成员 707，真代码口径）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -14862,8 +14862,8 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-    assert(r2900.refs === 1372 && r2900.namespaces === 66 && r2900.members === 707,
-      '清册面（refs 1372 / 命名空间 66 / 成员 707）——真代码口径下的现场值');
+    assert(r2900.refs === 1374 && r2900.namespaces === 66 && r2900.members === 707,
+      '清册面（refs 1374 / 命名空间 66 / 成员 707）——真代码口径下的现场值');
     assert(r2900.dead.length === 208 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 106
       && r2900.deadInTestsOnly === 130,
       '死子面 dead 208 / uiDead 4 / dataOnly 106 / 仅测试 130（实 ' + r2900.dead.length + '/'
@@ -15827,6 +15827,44 @@ assert(verF2500 === '2.36.0' && mfF2500.version === verF2500, '入口与清单�
       'v2360: 全库 meta.round 真代码引用只剩 evolution.js 兼容读 2 处（实 ' + mrHits2360 + ' @ ' + mrFiles2360.join(',') + '）');
     console.log('  ✓ v2360: 轮次真源优先级 + 兼容兜底 + 不抛');
     console.log('  ✓ v2360: 账本/纪事/摘要三处入账轮次同源 + 同轮覆盖恢复 + 静态口径收口');
+  }
+
+  // ══════════ v2.37.0 ══════════
+  // 第二十四面：实体库闭环。buildEntitiesBlock 自述「推演必须复用、不得重复造同义实体」，
+  //   但全库唯一调用方是 tool-analyzer（诊断）与测试——backstage 只写不读，机制是死的。
+  //   本段锁三件事：提示词真含既有实体、空库不产垃圾段、结算侧写得进（写读成对）。
+  section('v2.37.0：既有实体清单进推演提示词（实体库闭环）');
+  {
+    const W = WA;
+    const userOf = function () {
+      const msgs = W.backstage.buildPrompt({ idx: 1, text: "x" }, "");
+      const u = msgs.filter(function (m) { return m.role === "user"; })[0];
+      return u ? u.content : "";
+    };
+    // 空库：不得注入空头段（宁缺毋滥，与全库口径一致）
+    W.store.transact(function (d) { d.evolution.entityMemory = { organization: [], object: [], ability: [], location: [] }; });
+    assert(W.entities.buildEntitiesBlock() === "", "v2370: 空实体库 buildEntitiesBlock 返回空串");
+    assert(userOf().indexOf("既有实体库") < 0, "v2370: 空库时推演提示词不出现空头段");
+    // 写入：结算侧 upsert 真进 state
+    const ru = W.store.transact(function (d) { return W.entities.upsert(d, "organization", { name: "v2370盐帮", aliases: ["淮北盐帮"], desc: "运河漕运巨擘" }); });
+    assert(ru.ok && ru.result === "created", "v2370: entities.upsert 真写入新建");
+    const ru2 = W.store.transact(function (d) { return W.entities.upsert(d, "location", { name: "v2370盐码头", desc: "夜半起火处" }); });
+    assert(ru2.ok && ru2.result === "created", "v2370: 第二类实体写入");
+    // 读取：提示词真含实体（本轮修复的判据）
+    const blk = W.entities.buildEntitiesBlock();
+    assert(blk.indexOf("既有实体库") >= 0 && blk.indexOf("v2370盐帮") >= 0 && blk.indexOf("淮北盐帮") >= 0, "v2370: buildEntitiesBlock 含名与别名");
+    const u = userOf();
+    assert(u.indexOf("v2370盐帮") >= 0, "v2370: 推演提示词真含既有实体（旧实现查无此名）");
+    assert(u.indexOf("既有实体库") >= 0, "v2370: 推演提示词含实体段头（防重复造实体的指令真到位）");
+    assert(u.indexOf("v2370盐码头") >= 0, "v2370: 第二类实体同样进提示词");
+    // 负向：清空后再看——不得留残影
+    W.store.transact(function (d) { d.evolution.entityMemory = { organization: [], object: [], ability: [], location: [] }; });
+    assert(userOf().indexOf("v2370盐帮") < 0, "v2370: （负向）实体清空后提示词不得再含其名");
+    // 静态口径：backstage 必须真调 buildEntitiesBlock（防日后回退）
+    const srcBs2370 = fs.readFileSync(path.join(BASE, "engines/backstage.js"), "utf8");
+    const faceBs2370 = require("./inventory.js").codeFace(srcBs2370);
+    assert(faceBs2370.indexOf("WA.entities.buildEntitiesBlock") >= 0, "v2370: backstage 真代码面含 buildEntitiesBlock 调用（静态锁）");
+    console.log("  ✓ v2370: 实体库闭环（写入侧 upsert + 读取侧进推演提示词 + 空库不产垃圾段）");
   }
   }  // ── 汇总 ──
   console.log('\n══════════════════════');

@@ -239,6 +239,14 @@
   - ⑥ **骨架物化后 `state()` 不再返回 null**：store 骨架已物化 `parallelWorld`，判「无数据」应看容器为空而非 `state===null`（null 只出现在未装载/异常路径）。教训：断言「空态」要看真数据容器，不看句柄。
 - **验证**：全量回归 → **4381 / 失败 0**（v2.34.0 section +73 断言），「全部测试通过 ✓」；`node tests/dead-export-gate.js` → ✓（dataOnly 107 与账本一致，dead 212）；独立冒烟 pw_smoke.js 45/0。出口面 inventory：66 命名空间 / 697 成员 / 0 悬空 / 0 未登记。版本推进后残留 `2.33.0` 为 0、三处版本源全 2.34.0。
 
+### R20 · 2026-09-22 · v2.37.0 交付（闭环缺口·第二十四面：实体库只进不出）
+- **做了什么**：沿 v2.36.0 的方法论继续扫「机制自述有用途、生产侧零消费」的静默失效，抓到第二个。复现脚本 /tmp/wa_scan/repro_ent.js：① 走真实 LOAD 清单装载全部产品模块；② store.transact + entities.upsert 写入「v2370盐帮（淮北盐帮）」与「v2370盐码头」；③ 调 entities.buildEntitiesBlock() —— 正确产出「【既有实体库】推演必须复用以下实体…【组织】v2370盐帮（淮北盐帮）」；④ 调 backstage.buildPrompt() 取 user 段 —— **查无此名**（indexOf = -1）。
+- **缺陷链（静默型）**：entities.buildEntitiesBlock() 是活导出（有 tool-analyzer 与测试消费，故死导出账本看不见它），但它的**语义用途**（让推演模型复用既有实体、不重复造同义实体）在生产侧从未生效：backstage 只在结算侧 applyEntities 写入实体库，buildPrompt 的 user 段只有 世界快照 / 世界书 / regional / horizon / 近期正文 五块，且 compactState() 也不含 entityMemory ⇒ 实体库只进不出。后果：模型每轮推演都看不到既有实体，容易为同一事物反复造新名（「淮北盐帮」→「盐帮」→「运河盐会」），实体库膨胀且别名索引失效。
+- **修法**：engines/backstage.js 的 buildPrompt user 段在 horizon 块之后插入 (WA.entities && WA.entities.buildEntitiesBlock ? WA.entities.buildEntitiesBlock() : '')。空库时该函数返空串 ⇒ 不产空头段（与全库「宁缺毋滥」口径一致）。不新增导出、不新增页面、不改结算侧。
+- **新增 v2.37.0 回归段（+11 断言）**：空库 buildEntitiesBlock 返空串 + 空库时提示词不出现空头段；结算侧 upsert 真写入（组织 + 地点两类，返回 created）；buildEntitiesBlock 含实体名与别名；**提示词真含既有实体**（旧实现查无此名）+ 含实体段头 + 第二类实体同样进提示词；负向（清空 entityMemory 后提示词不得再含其名，防残影）；静态锁（backstage 真代码面经 inventory.codeFace 必须含 WA.entities.buildEntitiesBlock，防日后回退）。
+- **为什么**：与 v2.36.0 同型，属「静默失效」——不抛不报、门禁全绿、UI 正常，但机制白写。用户规则要求先修严重问题/明显缺陷，这类缺陷比新功能优先。
+- **影响范围**：engines/backstage.js（buildPrompt 一处 + 注释）/ tests/run.js（v2.37.0 段 +11 断言 + 清册面锚点 1372→1374 + 8 处版本号）/ tests/dead-export-ledger.json（version 2.37.0）/ index.js / manifest.json / README.md / ITERATION_LOG.md。
+- **门禁与验证**：全量回归 **4447 / 失败 0**（v2.36 基线 4437，+10 断言）；node tests/dead-export-gate.js 绿（dead 208 / uiDead 4 / dataOnly 106，无需 --update）；export-contract 不变（60 ns / 360 members / 4546 chars —— 本轮不新增导出）；货册面 refs 1372→1374（entities.buildEntitiesBlock 获得真实产品消费方，逐文件归因确认）。版本三源同源 2.37.0。
 ### R19 · 2026-09-22 · v2.36.0 交付（单一真源·第二十三面：轮次真源收口）
 - **做了什么**：进入持续自主迭代模式后的第一轮。侦察方式：先核实现场（HEAD cd56187 干净、已推送、VERSION 2.35.0、全库 TODO/FIXME 产品代码零命中），再跑命名空间覆盖矩阵（64 个命名空间 / 15 个面板零引用），逐个核实后确认多数「零 UI」命名空间有内域消费（interceptor 被 index.js 用、contractAudit 被 store 用、limits 被 backstage 用、purifier 被 settings 用 10 次），monologue / profile / tags 走 WA.workflow.register 注册（before/after 链节点），不是死代码——面收窄后转向真正的缺陷线索。
 - **抓到并坐实的缺陷链（静默型，全绿也照不出）**：全库 meta.round 有读者、零写者。读者 6 处：engines/ledger.js recordChanges 1 处、engines/horizon.js 掷骰与纪事入账 4 处、engines/digest.js world_digest 入账 1 处；写者 0 处（唯一写 d.meta.* 的是 core/settle-guard.js 写 lastSettle、core/interceptor.js 写 contextSize）。真源是 evolution.round（engines/evolution.js 的 tick() 内唯一 draft.evolution.round++）。

@@ -360,6 +360,11 @@
         (worldbookSection || ''),
         (WA.regional ? (() => { const roll = WA.regional.roll(); return roll ? '\n' + roll.prompt : ''; })() : ''),
         (WA.horizon ? (() => { const block = WA.horizon.buildPromptBlock(); return block ? '\n' + block : ''; })() : ''),
+        // v2.37.0: 既有实体清单此前**从未进过推演提示词**——entities.buildEntitiesBlock 自述用途
+        //   是「推演必须复用以下实体，不得重复创建同义实体」，但全库唯一调用方是 tool-analyzer（诊断）
+        //   与测试；backstage 只在结算侧 applyEntities 写入，提示词侧从不读 ⇒ 实体库只进不出，
+        //   防重复机制形同虚设（实测：库里有「淮北盐帮」，提示词里查无此名）。
+        (WA.entities && WA.entities.buildEntitiesBlock ? WA.entities.buildEntitiesBlock() : ''),
         '【近期正文（最新锚点=m' + anchor.idx + '）】',
         recentText(8)
       ].join('\n');
