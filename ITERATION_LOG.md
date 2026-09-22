@@ -664,4 +664,25 @@
 - **本版坐实的第三处问题（方法面）**：v2.56.0 那类**静态源码锁**照不到本缺陷——intel 的控件 id 与其分区是两件事，前者存在、后者缺失。这类「结构声明缺失」必须**在渲染产物上判**，而 <code>tests/ui-gate-sync.js</code> 的 <code>fresh()</code> 已提供真机 mini-DOM 环境（装载顺序从 <code>tests/run.js</code> 的 LOAD 提取，不复制不漂移），本锁直接复用它，不另造壳。<b>顺带收窄一条长期论断：此前「UI 层悬空、需浏览器复核」——真机渲染路径在无头环境其实是可判定的。</b>
 - **验证**：<code>tests/ui-module-section-v2570.js</code> → <code>pass</code>（9 项）；先跑成**红**（<code>[B] 「资源与组织」下有 资源与组织 + 因果与情报</code>）再修产品端转绿，负控制确认删除该标题后 A/B 同时现形；全量回归 <b>4977 / 失败 0</b>（v2.56.0 为 4968，+9 即本版新锁）；死导出门禁绿 dead 223 / uiDead 4 / dataOnly 122；ui-wire-audit 9 / 0；出口面契约逐字一致 ns 70 / members 466 / chars 5742。
 - **提交**：<code>（见本版提交）</code>。
+### R41 · 2026-09-22 · v2.58.0 交付（可见性「无死开关」行为锁·第四十三面：把「开关点了零效果」从逐例治改成成类判）
+- **做了什么**：
+  · 新建 <code>tests/inject-vis-v2580.js</code>：对 <code>SOURCES</code> **全部 15 个源逐个**验证「开关动一下、产物跟着动」，含面板复选框集合对齐与真实点击落盘；已接进门禁。
+  · 本版**未改产品代码**——这是本仓第一次「先证明整条链已是好的，再把它锁死」的版本。理由是 v2.56.0 刚修完同类缺陷，正需要一条能**证明修复在行为面成立**的判据（静态锁只证明源码形状，证明不了产物）。
+- **为什么（成类问题）**：同一型病在本仓已出现**三次**，且三次都是「逐例治」——
+  · v2.38.0 <code>echoes</code>：SOURCES 与面板里都有，但快照构建从无对应分支 ⇒ 开关开/关产物逐字节相同；
+  · v2.38.0 账本/世界推演：**不在 SOURCES 内** ⇒ 关掉所有源仍注入；
+  · v2.56.0 <code>life/intel/org/longline</code>：只判模块在不在、不读开关，且根本没登记进源表 ⇒ 面板上连开关都没有。
+  三次修完后，**没有任何判据回答成类问题**：SOURCES 里每一项，开关是否真的管用？于是下一次加源仍会重演。此锁把它变成对全量源的可执行判据。
+- **判据（四层，全部在行为面上判）**：
+  · A 面板 <code>data-vis</code> 复选框集合 <b>==</b> SOURCES（源表新增而面板不渲染 ⇒ 用户点不到）。
+  · B 真实点击复选框 → <code>getVisibility()</code> 跟随（UI 绑定真接通，不是只画了个框）。
+  · C 逐源「关 → 产物不含 / 开 → 产物含」。快照类（clock/pulse/background/people/currents/echoes）读 <code>buildWorldSnapshot()</code>，独立注入项读 <code>applyInjections</code> 落进宿主的扩展提示词。
+  · D 覆盖度前提：必须判到 15 个源（防在子集上恒真）。
+- **判据设计上的两个关键决定**：
+  · ① 用**哨兵文本**（<code>&lt;&lt;SENT-xxx&gt;&gt;</code>）替换模块真实产出，使「产物含不含」与业务语义完全解耦——判的是**注入链的开关**，不是某个模块的文案。这样更换某模块的文案风格不会假报红。
+  · ② 消费的方法名**由探测得出**（模块现有哪个取数口：<code>buildBlock</code> / <code>buildMemoryBlock</code> / ……），**不写死清单**——写死清单就是「新增源时锁不知道」，与本锁要治的病同型。
+- **实测覆盖**：15 / 15 源全部判到、**零跳过**（含 memory 经 memorySampler 路径、opinion/ledger 走各自的 <code>buildXxxBlock</code>、style 与四条新模块走 <code>buildBlock</code>），逐源 <code>on=true / off=false</code>。
+- **负控制（真源码破坏 → 破坏副本上重跑同款判据）**：把 <code>vis.life &amp;&amp; WA.life</code> 还原成 <code>WA.life</code>（正是 v2.56.0 之前的真实缺陷形态），用 <code>gate.fresh({files, srcOverride})</code> 装载破坏副本，要求 C 面在 life 上报红；原版上同款判据仍为绿。**这条负控制同时回报了一件事：本仓长期标注的「UI 层悬空需浏览器复核」并不完全成立——真机渲染与注入路径在无头环境是可判定、可破坏自证的。**
+- **验证**：<code>tests/inject-vis-v2580.js</code> → <code>pass</code>（10 项）；全量回归 <b>4987 / 失败 0</b>（v2.57.0 为 4977，+10 即本版新锁）；死导出门禁绿 dead 223 / uiDead 4 / dataOnly 122；ui-wire-audit 9 / 0；出口面契约逐字一致 ns 70 / members 466 / chars 5742。
+- **提交**：<code>（见本版提交）</code>。
 
