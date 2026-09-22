@@ -49,13 +49,15 @@ function auditWire(src) {
   return { referenced: referenced, rendered: rendered, ghosts: ghosts, pure: pure };
 }
 
-function uiFiles() {
-  const out = [];
-  ['ui/panel.js', 'ui/settings.js', 'ui/assistant.js'].forEach(function (rel) {
-    const fp = path.join(BASE, rel);
-    if (fs.existsSync(fp)) out.push({ rel: rel, src: fs.readFileSync(fp, 'utf8') });
-  });
-  return out;
+// v2.42.0：UI 文件面**动态发现**（原为硬编码三文件清单）。
+//   硬编码 = 「新增一个 ui 模块，对两道 ui 门禁（本审计 + ui-gate 的真实点击）**同时隐身**」，
+//   即 UI 层唯一自动化覆盖整体失效。与 v2.40.0 的「页面写死 12」同一家族（把会长的集合写成常量）。
+function uiFiles(dir) {
+  const d = dir || path.join(BASE, 'ui');
+  return fs.readdirSync(d)
+    .filter(function (n) { return /\.js$/.test(n); })
+    .sort()
+    .map(function (n) { return { rel: 'ui/' + n, src: fs.readFileSync(path.join(d, n), 'utf8') }; });
 }
 
 async function main() {
@@ -67,7 +69,19 @@ async function main() {
 
   console.log('\n\u25a0 UI 接线面门禁（引用面 → 渲染面）');
   const files = uiFiles();
-  assert(files.length === 3, '三个 ui 文件全部在场（实 ' + files.length + '）');
+  // v2.42.0：不再写死「三个 ui 文件」。原断言 `files.length === 3` 只能证明「模块数量没变」，
+  //   证明不了「发现面与另一道 ui 门禁（ui-gate-sync 的真实装载/点击面）一致」——
+  //   而两道门禁用的是**各自独立的**清单，天然会漂移。改为与 ui-gate-sync 的 UI_FILES 交叉核对：
+  //   既自维护（加模块自动跟随），又把「两道 ui 门禁看同一批文件」变成硬约束。
+  const syncUI = require('./ui-gate-sync.js').UI_FILES || [];
+  const mine = files.map(function (f) { return f.rel; });
+  const missInSync = mine.filter(function (r) { return syncUI.indexOf(r) < 0; });
+  const missInMine = syncUI.filter(function (r) { return mine.indexOf(r) < 0; });
+  assert(files.length > 0 && mine.indexOf('ui/panel.js') >= 0,
+    'UI 文件面非空且含 ui/panel.js（实 ' + files.length + ' 个：' + mine.join('、') + '）');
+  assert(missInSync.length === 0 && missInMine.length === 0,
+    '本门禁发现面与 ui-gate-sync 的 UI_FILES **同一批文件**（漏 ' + (missInSync.join('、') || '无')
+    + ' / 多 ' + (missInMine.join('、') || '无') + '）');
   files.forEach(function (f) {
     const r = auditWire(f.src);
     const gdesc = r.ghosts.map(function (g) { return g + '@L' + (r.referenced[g] || []).join(','); }).join('、');

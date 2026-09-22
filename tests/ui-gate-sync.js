@@ -15,7 +15,20 @@ const vm = require('vm');
 require('./mock.js');                 // 宿主基础桩（localStorage / SillyTavern / WA.log）
 const uiDom = require('./ui-dom.js');
 const BASE = path.join(__dirname, '..');
-const UI_FILES = ['ui/panel.js', 'ui/settings.js', 'ui/assistant.js'];
+// v2.42.0：UI 装载面改为**动态发现**（原为硬编码三文件清单）。
+//   为什么：硬编码清单 = 「新增一个 ui 模块，对两道 ui 门禁**同时隐身**」——
+//   ui-wire-audit 的「引用面 → 渲染面」接线审计与本文件的真实点击门禁都不会看它，
+//   而它们正是 UI 层唯一的自动化覆盖。这与 v2.40.0 修掉的「页面写死 12」是**同一家族**：
+//   把一个会长的集合写成常量，于是集合长大了门禁却不知道。
+//   discoverUIFiles 参数化导出：回归可在临时目录上做**行为级**负向自证，
+//   证明它真的读文件系统，而不是又一个换了写法的常量。
+function discoverUIFiles(dir) {
+  return fs.readdirSync(dir)
+    .filter(function (n) { return /\.js$/.test(n); })
+    .sort()
+    .map(function (n) { return 'ui/' + n; });
+}
+const UI_FILES = discoverUIFiles(path.join(__dirname, '..', 'ui'));
 
 function loadOrder() {
   const src = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
@@ -294,4 +307,4 @@ function checkSrcMaps(opts) {
   });
   return { groups: groups, failures: failures };
 }
-module.exports = { fresh: fresh, checkPages: checkPages, checkClickable: checkClickable, checkSrcMaps: checkSrcMaps, BASE: BASE, UI_FILES: UI_FILES };
+module.exports = { fresh: fresh, checkPages: checkPages, checkClickable: checkClickable, checkSrcMaps: checkSrcMaps, BASE: BASE, UI_FILES: UI_FILES, discoverUIFiles: discoverUIFiles };

@@ -9814,7 +9814,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10358,7 +10358,7 @@ assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.41.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.42.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10649,7 +10649,7 @@ assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.41.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.42.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11175,7 +11175,7 @@ assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.41.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.42.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11563,7 @@ assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.41.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.42.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11933,7 @@ assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.41.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.42.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12298,7 @@ assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.41.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.42.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14600,7 +14600,7 @@ assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.41.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.42.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -16043,6 +16043,72 @@ assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单�
   }
 
 
+  // ══════════ v2.42.0 ══════════
+  // 第二十九面：UI 文件面自维护。v2.40.0 治的是「门禁断言写死页面数 12」，本轮抓到**同一家族的第二例**：
+  //   两道 ui 门禁（ui-wire-audit 的「引用面 → 渲染面」接线审计、ui-gate-sync 的真实装载/点击面）
+  //   各自持有一份**硬编码三文件清单** `['ui/panel.js','ui/settings.js','ui/assistant.js']`。
+  //   后果：新增一个 `ui/*.js` 模块，对这两道门禁**同时隐身**——而它们是 UI 层唯一的自动化覆盖。
+  //   与 v2.40.0 同一病根：把一个会长的集合写成常量，于是集合长大了门禁却不知道。
+  section('v2.42.0：UI 文件面自维护（两道 ui 门禁硬编码清单 → 动态发现 + 交叉核对）');
+  {
+    const fs4200 = require('fs');
+    const os4200 = require('os');
+    const path4200 = require('path');
+    const sync4200 = require('./ui-gate-sync.js');
+    const wire4200 = require('./ui-wire-audit.js');
+
+    // ── A. 两道门禁的 UI 文件面都来自**动态发现**，且与磁盘实际一致 ──
+    const actual4200 = fs4200.readdirSync(path4200.join(BASE, 'ui'))
+      .filter(function (n) { return /\.js$/.test(n); }).sort().map(function (n) { return 'ui/' + n; });
+    assert(Array.isArray(sync4200.UI_FILES) && sync4200.UI_FILES.length === actual4200.length
+      && sync4200.UI_FILES.join(',') === actual4200.join(','),
+      'v2420: ui-gate-sync 的 UI_FILES 与 ui/ 磁盘实际一致（实 ' + sync4200.UI_FILES.join('、') + '）');
+    assert(typeof wire4200.uiFiles === 'function',
+      'v2420: ui-wire-audit 导出 uiFiles（供交叉核对与负向自证）');
+    const mine4200 = wire4200.uiFiles().map(function (f) { return f.rel; });
+    assert(mine4200.join(',') === sync4200.UI_FILES.join(','),
+      'v2420: 两道 ui 门禁的发现面**同一批文件**（实 ' + mine4200.join('、') + '）');
+
+    // ── B. 静态面：旧的硬编码清单已不存在（防回退写法原地复活）──
+    const syncSrc4200 = fs4200.readFileSync(path4200.join(BASE, 'tests/ui-gate-sync.js'), 'utf8');
+    const wireSrc4200 = fs4200.readFileSync(path4200.join(BASE, 'tests/ui-wire-audit.js'), 'utf8');
+    const OLD_LIST4200 = "['ui/panel.js', 'ui/settings.js', 'ui/assistant.js']";
+    assert(syncSrc4200.indexOf(OLD_LIST4200) < 0 && wireSrc4200.indexOf(OLD_LIST4200) < 0,
+      'v2420: 两道门禁源码里已无硬编码三文件清单');
+    assert(syncSrc4200.indexOf('discoverUIFiles') > 0 && wireSrc4200.indexOf('readdirSync') > 0,
+      'v2420: 两处发现面均落在 readdirSync（动态，跟磁盘走）');
+
+    // ── C. 行为级负向自证：发现逻辑真的读文件系统，不是换了写法的常量 ──
+    //   做法：在临时目录里造一个「比仓库多一个模块」的 ui/，发现器必须跟着变。
+    //   这条能证伪「discoverUIFiles 其实是个常量数组」这一类假修。
+    const tmpUi4200 = fs4200.mkdtempSync(path4200.join(os4200.tmpdir(), 'wa_ui_4200_'));
+    ['panel.js', 'settings.js', 'assistant.js', 'zz_extra_4200.js'].forEach(function (n) {
+      fs4200.writeFileSync(path4200.join(tmpUi4200, n), '// probe\n', 'utf8');
+    });
+    fs4200.writeFileSync(path4200.join(tmpUi4200, 'note.txt'), 'not js\n', 'utf8');
+    const discTmp4200 = sync4200.discoverUIFiles(tmpUi4200);
+    assert(discTmp4200.length === 4 && discTmp4200.indexOf('ui/zz_extra_4200.js') >= 0,
+      'v2420: （负向自证）临时目录多一个模块 ⇒ 发现器跟随（实 ' + discTmp4200.join('、') + '）');
+    assert(discTmp4200.indexOf('ui/note.txt') < 0, 'v2420: （负向自证）非 .js 文件被排除');
+    const wireTmp4200 = wire4200.uiFiles(tmpUi4200);
+    assert(wireTmp4200.length === 4 && wireTmp4200.some(function (f) { return f.rel === 'ui/zz_extra_4200.js'; }),
+      'v2420: （负向自证）ui-wire-audit 的发现器同样跟随临时目录（实 ' + wireTmp4200.length + ' 个）');
+    assert(actual4200.length === 3 && discTmp4200.length === 4,
+      'v2420: （负向自证）仓库 3 个 vs 临时 4 个——发现面确实取决于目录内容（非恒值）');
+    fs4200.rmSync(tmpUi4200, { recursive: true, force: true });
+
+    // ── D. 接线审计在**完整文件面**上仍零幽灵（不是「少扫了文件所以干净」）──
+    let ghostTotal4200 = 0;
+    mine4200.forEach(function (rel) {
+      const r = wire4200.auditWire(fs4200.readFileSync(path4200.join(BASE, rel), 'utf8'));
+      ghostTotal4200 += r.ghosts.length;
+    });
+    assert(ghostTotal4200 === 0,
+      'v2420: 全部 ' + mine4200.length + ' 个 ui 文件的接线审计零幽灵引用（实 ' + ghostTotal4200 + '）');
+
+    console.log('  ✓ v2420: 两道 ui 门禁的 UI 文件面改动态发现（原硬编码三文件清单），与磁盘一致');
+    console.log('  ✓ v2420: 行为级负向自证——临时目录多一模块即跟随，证明发现器非恒值');
+  }
   // ══════════ v2.41.0 ══════════
   // 第二十八面：工具可移植性。v2.40.0 刚抓完「门禁写死一种形态」的陈旧常量，
   //   本轮沿同一根线扫「工具写死一种环境」——tests/export-contract.js 的 BASE /

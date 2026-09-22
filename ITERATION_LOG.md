@@ -362,3 +362,21 @@
 - **为什么**：三次「写死」缺陷（v2.40 门禁期望值写死页面数 12 → v2.41 工具写死工作区路径 /tmp/wa_git）同一病根：**把一个会变的值当成常量**。v2.40 治的是断言侧，本轮治的是工具侧，并各自补了成类静态锁，此后「写死形态/环境」进不了提交。
 - **影响范围**：`tests/export-contract.js`（BASE/mock/产物三处可移植化 + 打印路径）/ `tests/run.js`（块1 路径断言同步 + v2.41.0 段 +15 断言 + 8 处版本锚点）/ `.gitignore`（新）/ `index.js` / `manifest.json` / `tests/dead-export-ledger.json`（version + `_note`）/ README / ITERATION_LOG。**不新增导出、不新增产品文件。**
 - **门禁与验证**：全量回归 **4511 / 失败 0**（v2.40.0 基线 4496，**+15 净增**）；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106，**无需 `--update`**）；export-contract 不变（60 ns / 360 members / 4546 chars）；ui-gate 53/0；ui-wire-audit 8/0；field-liveness-gate 绿；版本三源同源 **2.41.0**。
+### R25 · 2026-09-22 · v2.42.0 交付（UI 文件面自维护·第二十九面：两道 ui 门禁硬编码清单 → 动态发现）
+- **做了什么**：续接 v2.40.0「门禁写死一种形态」这条线，把「**会长的集合被写成常量**」当作一类来扫，从 UI 侧再抓一例同族缺陷。
+- **缺陷（实测坐实）**：两道 ui 门禁各自硬编码同一份三文件清单：
+  1) `tests/ui-gate-sync.js:18` `const UI_FILES = ['ui/panel.js', 'ui/settings.js', 'ui/assistant.js']`    —— 真实装载 + 逐页点击/可点性门禁的装载面；
+  2) `tests/ui-wire-audit.js` 的 `uiFiles()` —— 接线审计（引用面 → 渲染面）的扫描面；
+  另有 `assert(files.length === 3, ...)` 把「三个」写进断言（与 v2.40.0 写死 12 完全同形）。
+  后果：新增 `ui/xxx.js` ⇒ 两道门禁**同时不看它**，而它们是 UI 层唯一的自动化覆盖。
+  （对照：`tests/inventory.js` 的 `productFiles()` 是**动态遍历**，所以死导出/字段门禁的主扫描面无此问题——同一个仓库里已经存在正确写法，UI 侧是没有跟上。）
+- **为什么算缺陷**：`uiFiles()` 只在列表内取文件、不存在也不报；`files.length === 3` 只能证明「数量没变」，证明不了「发现面是对的」。两者叠加的净效果是：**新增 UI 模块 0 覆盖、0 提示**，恰是本仓一直在治的静默失效形态。
+- **修法**：两处改为动态发现（`readdirSync` + `.js` 过滤 + 排序）；`ui-gate-sync` 导出参数化的 `discoverUIFiles(dir)`，`ui-wire-audit` 导出带 `dir` 参数的 `uiFiles(dir)`；`ui-wire-audit` 的计数断言换成与 `ui-gate-sync.UI_FILES` 的**交叉核对**（把「两道门禁看同一批文件」变成硬约束，而非各自维护一份注释同步的清单）。
+- **判据（新增 v2.42.0 回归段，+10 断言）**：
+  · A 两道门禁的发现面与 `ui/` 磁盘实际**逐项一致**，且彼此同一批文件；
+  · B 静态度：两文件源码里已无旧硬编码清单，发现面均落在 `readdirSync`；
+  · C **行为级负向自证**：临时目录造 3+1 个 `.js` 与 1 个 `.txt` ⇒ 两个发现器都返回 4 项、    含 `ui/zz_extra_4200.js`、排除 `note.txt`；且仓库(3) vs 临时(4) 不同，    **证明发现面取决于目录内容而非恒值**（可证伪「换了写法的常量」这类假修）；
+  · D 在**完整文件面**上复核接线审计零幽灵引用（防「少扫了文件所以干净」的假结论）。
+- **为什么**：同族的两次「写死」（v2.40 页面数 12 / v2.42 UI 文件清单三文件）都属同一个病根：**把一个会长的集合当成常量**，于是集合长大了门禁却不知道。v2.40 治断言、v2.42 治扫描面，并在本次把负向自证升级为**行为级**（临时目录驱动），比「源码字符串断言」更能证伪假修。
+- **影响范围**：`tests/ui-gate-sync.js`（UI_FILES 动态发现 + 导出 discoverUIFiles）/ `tests/ui-wire-audit.js`（uiFiles 动态发现 + 交叉核对断言 + 导出）/ `tests/run.js`（v2.42.0 段 +10 断言 + 8 处版本锚点）/ `index.js` / `manifest.json` / `tests/dead-export-ledger.json`（version + `_note`）/ README / ITERATION_LOG。**不新增导出成员、不新增产品文件。**
+- **门禁与验证**：全量回归 **4521 / 失败 0**（v2.41.0 基线 4511，**+10 净增**）；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106，**无需 `--update`**）；export-contract 不变（60 ns / 360 members / 4546 chars）；ui-gate 53/0；ui-wire-audit **8 → 9/0**；field-liveness-gate 绿；版本三源同源 **2.42.0**。
