@@ -138,26 +138,39 @@
     return safe(function () {
       if (!WA.injectInspector) return { error: 'injectInspector 模块不可用' };
       const snap = WA.injectInspector.getLastSnapshot('world');
-      if (!snap) return { hasSnapshot: false, status: 'NOT_YET', statusText: WA.injectInspector.statusText('NOT_YET') };
-      const out = {
-        hasSnapshot: true, status: snap.status,
-        statusText: WA.injectInspector.statusText ? WA.injectInspector.statusText(snap.status) : null,
-        apiType: snap.apiType, round: snap.round, ts: snap.ts, landed: snap.landed,
-        injectEnabled: snap.injectEnabled, registeredAtSend: snap.registeredAtSend
-      };
-      if (snap.apiType === 'chat') { out.messageCount = snap.messageCount; out.ourIndex = snap.ourIndex; out.ourContentLen = snap.ourContentLen; }
+      // v2.48.0: 无快照**不再提前退出**。注入器快照（snapEnv/classify/snapshotChat）与槽位证据
+      //   （store.lastInjection 的 slots / slotErrors / budget）是**两套独立子系统**：前者要等到
+      //   一次真实发送才生成，后者上一轮注入完就已经在场。此前 `if (!snap) return ...` 把后者
+      //   一起挡在门外——于是「槽位部分失败（现场缺失）」「预算超支折叠」这些最该被看见的现场，
+      //   在快照尚未生成时**完全不可见**（用户只会看到一句「尚未生成，暂无注入记录」）。
+      //   探针 L 实测：造好 slotErrors 与 slots 后调 secInject，返回里连 slotConsistent 都没有。
+      const out = snap
+        ? {
+            hasSnapshot: true, status: snap.status,
+            statusText: WA.injectInspector.statusText ? WA.injectInspector.statusText(snap.status) : null,
+            apiType: snap.apiType, round: snap.round, ts: snap.ts, landed: snap.landed,
+            injectEnabled: snap.injectEnabled, registeredAtSend: snap.registeredAtSend
+          }
+        : { hasSnapshot: false, status: 'NOT_YET', statusText: WA.injectInspector.statusText('NOT_YET') };
+      if (snap && snap.apiType === 'chat') { out.messageCount = snap.messageCount; out.ourIndex = snap.ourIndex; out.ourContentLen = snap.ourContentLen; }
       // v0.1.6: 补槽位落地信息（来自 injectSlotAudit 对 lastInjection 的对账结果）
       const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
       // v0.1.29: 快照已撤销时标注——槽位证据保留但注入已不在场
       if (li && li.injected === false) { out.injected = false; out.clearedAt = li.clearedAt || null; out.clearedBy = li.clearedBy || null; }
       // v0.1.41: 撤销-槽位关联审计
       if (WA.render && WA.render.uninjectAudit) { const ua = WA.render.uninjectAudit(); if (ua.issues.length) out.uninjectIssues = ua.issues; }
-      if (li && li.slots) {
-        out.slots = li.slots;
+      // v2.48.0: 前置条件从 li.slots 放宽到「有快照 或 有槽位失败」。
+      //   此前只要 slots 为 null 就整段跳过——而部分失败轮在旧版根本不写快照，
+      //   恰好是最需要结论的那一轮，诊断包却什么都不说（新错误码也永远到不了这里）。
+      if (li && (li.slots || li.slotErrors)) {
+        if (li.slots) out.slots = li.slots;
         const slotAudit = WA.injectSlotAudit ? WA.injectSlotAudit.audit(li) : null;
         if (slotAudit) {
           out.slotConsistent = slotAudit.consistent;
           if (slotAudit.issues.length) out.slotIssues = slotAudit.issues;
+          // v2.48.0: 结论本身也要能带走——note 写的是「现场缺失」还是「未启用路由」，
+          //   是两种截然不同的处置方向，不能只留一个 consistent 布尔。
+          if (slotAudit.note) out.slotAuditNote = slotAudit.note;
         }
       }
       // v0.1.24: 上轮注入预算账单（超支/折叠/丢弃明细）
@@ -169,7 +182,7 @@
       }
       // v0.1.9: 槽位路由错误快照（部分失败时存在）
       if (li && li.slotErrors) out.slotErrors = li.slotErrors;
-      else { out.promptLength = snap.promptLength; out.ourExcerptLen = snap.ourExcerptLen; }
+      else if (snap) { out.promptLength = snap.promptLength; out.ourExcerptLen = snap.ourExcerptLen; }
       return out;
     }, {});
   }

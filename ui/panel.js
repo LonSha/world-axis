@@ -829,10 +829,36 @@
         const slots = li && li.slots;
         const errs = li && li.slotErrors;
         let h = '';
-        if (!slots || !slots.count) h += '<div class="wa-item wa-dim">上次注入无独立槽位（全部并入主块）</div>';
+        // v2.48.0: 「没有槽位快照」不再等同于「全部并入主块」。部分失败轮（旧版写不出快照，
+        //   新版才修）与「压根没启用路由」是两回事：前者有失败、有回退、有幽灵注入风险，
+        //   面板却照旧宣称「全部并入主块」——用户据此以为一切正常。有失败就必须明说现场缺失。
+        if (!slots || !slots.count) {
+          if (errs && errs.length) {
+            h += '<div class="wa-item wa-log-error"><b>槽位路由部分失败且未留快照</b>'
+              + '<div class="wa-dim">失败的 ' + esc(String(errs.length)) + ' 路已回退主块；'
+              + '本轮哪些真落地、哪些未落地无法回答（旧版「计划=落地才写快照」导致的证据缺失）。'
+              + '受影响：' + errs.map(function (e) { return esc((e && e.slot) || '?'); }).join('、') + '</div></div>';
+          } else {
+            h += '<div class="wa-item wa-dim">上次注入无独立槽位（全部并入主块）</div>';
+          }
+        }
         else {
-          h += '<div class="wa-item"><b>' + esc(String(slots.count)) + ' 路槽位</b>｜合计 ' + esc(String(slots.totalChars || 0)) + ' 字符'
-            + '<div class="wa-dim">' + ((slots.keys || []).map(function (k) { return esc(k); }).join('、') || '—') + '</div>';
+          // v2.48.0: 三数必须同时在场——「计划 N / 落地 M / 失败 N-M」。
+          //   此前只显示计划数，用户无法判断这一轮到底有没有槽位被回退（部分成功被当成整体成功）。
+          const landedN = Array.isArray(slots.landed) ? slots.landed.length : null;
+          const failedN = Array.isArray(slots.failed) ? slots.failed.length : null;
+          h += '<div class="wa-item"><b>' + esc(String(slots.count)) + ' 路槽位</b>｜合计 ' + esc(String(slots.totalChars || 0)) + ' 字符';
+          if (landedN !== null || failedN !== null) {
+            h += '｜<span class="' + ((failedN && failedN > 0) ? 'wa-log-warn' : 'wa-dim') + '">落地 '
+              + esc(String(landedN === null ? (slots.applied || 0) : landedN)) + ' / 失败 '
+              + esc(String(failedN === null ? Math.max(0, slots.count - (slots.applied || 0)) : failedN)) + '</span>';
+          }
+          h += '<div class="wa-dim">' + ((slots.keys || []).map(function (k) { return esc(k); }).join('、') || '—') + '</div>';
+          if (Array.isArray(slots.landed) && slots.landed.length && slots.landed.length !== (slots.keys || []).length) {
+            h += '<div class="wa-dim">真落地：' + slots.landed.map(function (k) { return esc(k); }).join('、') + '</div>';
+            const fellBack = (slots.keys || []).filter(function (k) { return slots.landed.indexOf(k) < 0; });
+            if (fellBack.length) h += '<div class="wa-dim wa-log-warn">已回退主块（不重复注入）：' + fellBack.map(function (k) { return esc(k); }).join('、') + '</div>';
+          }
           // v2.47.0: perSlot 的真实形状是**数组**（injectSlotAudit.snapshotSlots 产出），
           //   而这里此前按对象 map 遍历（Object.keys 拿到 "0"/"1"），于是每个槽位都渲染成
           //   「0：0 项｜0 字符」——用户看到的是「槽位一个项都没有」，与快照事实相反。

@@ -260,15 +260,27 @@
           }, slots);
           slotResOut = slotRes;
           const applied = slotRes.applied;
-          // 原子语义：只有 applySlots 全部成功后才标记接管，避免「注入了但没标记」的丢失
-          if (applied === slots.length) {
+          // v2.48.0（第三十三面）：**部分成功也是一次真实的落地**，必须逐项区分处理。
+          //   此前这里是「全成功才标记接管，否则只记错误」的二分——于是 applied>0 且 <total 时：
+          //     · routedKeys 与 lastSlots 都不设 ⇒ 已经**成功落地**的槽位内容仍被并进主块
+          //       ⇒ 同一段约束在 prompt 里出现两次（独立槽位 + 主块），白烧 token、模型看到重复指令；
+          //     · 快照 slots=null ⇒ 「计划了哪些 / 哪些真落地」的证据被整段抹掉；
+          //     · uninject 依据 slots.keys 清理，为 null ⇒ 真落地的槽位**永不被清**，
+          //       内容残留在宿主里持续注入后续每一轮（幽灵注入，实测可复现）；
+          //     · audit 对 null 快照反而判「一致」并谎称「未启用路由」。
+          //   修法：真落地的键位（landed）按实际情况登记，接管判定按**逐项落地**而不是整体成功。
+          const landedKeys = Array.isArray(slotRes.landed) ? slotRes.landed.slice() : [];
+          if (applied > 0) {
             slotCount = applied;
-            routedKeys = slots.map(function (sl) { return sl.slot; });
+            // 只把**真落地**的键位算作「已接管」——失败的项回退主块（值保住），成功的项不重复进主块
+            routedKeys = landedKeys.length ? landedKeys : slots.map(function (sl) { return sl.slot; });
             lastSlots = slots;
-          } else {
+          }
+          if (applied !== slots.length) {
             // v0.1.9: 部分失败时收集错误快照，供 tool-diag 排障
+            // v2.48.0: 与 landed 一起落快照——「计划 N / 落地 M / 失败 N-M」三数必须都在场
             slotErrors = (slotRes.errors || []).slice();
-            WA.log('warn', '槽位路由部分失败（' + applied + '/' + slots.length + '），约束注入并入主块');
+            WA.log('warn', '槽位路由部分失败（' + applied + '/' + slots.length + '），失败的 规则注入回退主块，已落地的 ' + applied + ' 路不重复注入');
           }
         }
       } catch (e) { WA.log('warn', '槽位路由失败，约束注入并入主块', e); }
@@ -343,7 +355,13 @@
         const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
         if (!li) { const r = { ok: false, reason: 'no-snapshot' }; recordUninject(trigger, r); return r; }
         const cleared = [];
-        const slotKeys = (li.slots && Array.isArray(li.slots.keys)) ? li.slots.keys.slice() : [];
+        // v2.48.0: 清理依据改为「**真落地**的键位」优先。只清计划里的键位会在两种情况下出错：
+        //   · 部分失败轮：快照此前根本不存（slots=null）⇒ 真落地的槽位被漏清，残值持续注入；
+        //   · 旧快照（无 landed 字段）：退回 keys（宁多清不可漏清——清一个未落地的键位是空操作）。
+        const landedKeys = (li.slots && Array.isArray(li.slots.landed)) ? li.slots.landed.slice() : null;
+        const plannedKeys = (li.slots && Array.isArray(li.slots.keys)) ? li.slots.keys.slice() : [];
+        const slotKeys = [];
+        (landedKeys || plannedKeys).forEach(function (k) { if (slotKeys.indexOf(k) < 0) slotKeys.push(k); });
         slotKeys.forEach(function (k) { try { c.setExtensionPrompt(k, '', 1, 0, false); cleared.push(k); } catch (e) {} });
         try { c.setExtensionPrompt('WorldAxis', '', 1, 0, false); cleared.push('WorldAxis'); } catch (e) {}
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(0);

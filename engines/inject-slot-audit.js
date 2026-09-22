@@ -35,6 +35,10 @@
     const apObj = (applied && typeof applied === 'object') ? applied : null;
     const landedArr = apObj && Array.isArray(apObj.landed) ? apObj.landed : null;
     const apNum = (typeof applied === 'number') ? applied : ((apObj && typeof apObj.applied === 'number') ? apObj.applied : 0);
+    // v2.48.0: failed 从 errors 反推（失败槽位名）——「计划 N / 落地 M / 失败 N-M」三数必须都在场。
+    //   只记 landed 仍留一个洞：读快照的人要看不出「哪些是压根没试过」。
+    const errArr = apObj && Array.isArray(apObj.errors) ? apObj.errors : [];
+    const failedArr = errArr.map(function (e) { return (e && e.slot) ? e.slot : null; }).filter(Boolean);
     const perSlot = list.map(function (s) {
       const items = Array.isArray(s.items) ? s.items : [];
       return {
@@ -49,6 +53,9 @@
       count: perSlot.length,
       applied: apNum,
       landed: landedArr ? landedArr.slice() : null,
+      // v2.48.0: 计划 / 失败两侧也记下来（旧字段 keys 即 planned，保留以免破坏既有读侧）
+      planned: perSlot.map(function (x) { return x.slot; }),
+      failed: failedArr.slice(),
       keys: perSlot.map(function (x) { return x.slot; }),
       totalChars: perSlot.reduce(function (sum, x) { return sum + x.chars; }, 0),
       perSlot: perSlot
@@ -65,6 +72,18 @@
     const li = lastInjection || {};
     const slots = li.slots;
     if (!slots || !Array.isArray(slots.perSlot)) {
+      // v2.48.0: 无快照**不再一律判「未启用路由」**。此前 partial 失败轮写不出快照（slots=null），
+      //   这里照样返回 consistent:true + 「未启用路由」——把「路由跑了但部分失败」说成「没启用」，
+      //   **结论不实**且掩盖了真正的现场（错误快照就在同一个 li 里）。
+      const errs = (li && Array.isArray(li.slotErrors)) ? li.slotErrors : [];
+      if (errs.length) {
+        issues.push({
+          level: 'error', code: 'slot.snapshotMissing',
+          detail: '本轮槽位路由有 ' + errs.length + ' 处失败（' + errs.map(function (e) { return (e && e.slot) || '?'; }).join('/')
+            + '），但未留槽位快照——哪些真落地、哪些回退主块无法回答（旧版：计划=落地才写快照）'
+        });
+        return { consistent: false, issues: issues, note: '有槽位失败但无快照（现场缺失）' };
+      }
       return { consistent: true, issues: issues, note: '无槽位快照（v0.1.1 前的旧记录或未启用路由）' };
     }
     // 已声明路由成功但槽位落地数与计划数不一致
@@ -74,6 +93,29 @@
         code: 'slot.appliedMismatch',
         detail: '计划 ' + slots.count + ' 个槽位，实际落地 ' + slots.applied + ' 个'
       });
+    }
+    // v2.48.0: 三数自洽——「每个计划槽位必须恰好出现在成功一侧或失败一侧」。
+    //   这是本版面的根因级不变式：部分成功被整体当成失败，正是因为它从未被要求自证这一点。
+    if (Array.isArray(slots.perSlot)) {
+      const plannedSet = slots.perSlot.map(function (p) { return p.slot; });
+      const landedSet = Array.isArray(slots.landed) ? slots.landed : null;
+      const failedSet = Array.isArray(slots.failed) ? slots.failed : [];
+      if (landedSet && landedSet.length) {
+        const unaccounted = plannedSet.filter(function (k) { return landedSet.indexOf(k) < 0 && failedSet.indexOf(k) < 0; });
+        if (unaccounted.length) {
+          issues.push({
+            level: 'warn', code: 'slot.unaccounted',
+            detail: '有 ' + unaccounted.length + ' 个计划槽位既不在成功名单也不在失败名单里：' + unaccounted.join('/') + '（记账不完整）'
+          });
+        }
+        const bothSides = landedSet.filter(function (k) { return failedSet.indexOf(k) >= 0; });
+        if (bothSides.length) {
+          issues.push({
+            level: 'error', code: 'slot.bothSides',
+            detail: '有槽位同时出现在成功与失败名单里：' + bothSides.join('/') + '（记账自相矛盾）'
+          });
+        }
+      }
     }
     // 孤儿槽位：计划了但没落地
     //   v2.47.0: 归因**不得靠猜**。旧实现假定「前 applied 个成功、其余失败」，于是把
