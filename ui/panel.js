@@ -318,7 +318,12 @@
     const reg = WA.registry.list();
     const people = Object.values(s.people);
     return `
-      <div class="wa-sec">因果与情报</div>
+      <div class="wa-sec">资源与组织</div>
+      <label class="wa-row"><input id="wa-org-enabled" type="checkbox" ${WA.org && WA.org.getSettings().enabled ? 'checked' : ''}/> 启用资源与组织</label>
+      <div class="wa-row"><input id="wa-org-kind" class="wa-input" placeholder="faction 或 person"/><input id="wa-org-name" class="wa-input" placeholder="持有者"/><input id="wa-org-item" class="wa-input" placeholder="资源"/><input id="wa-org-qty" class="wa-input" placeholder="数量"/></div>
+      <div class="wa-row"><input id="wa-org-to-kind" class="wa-input" placeholder="接收类型"/><input id="wa-org-to-name" class="wa-input" placeholder="接收者"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-org-grant">入库</button><button class="wa-btn" id="wa-org-transfer">转移</button><button class="wa-btn" id="wa-org-check">检查余额</button></div>
+      <div id="wa-org-out" class="wa-out"></div>
       <label class="wa-row"><input id="wa-intel-enabled" type="checkbox" ${WA.intel && WA.intel.getSettings().enabled ? 'checked' : ''}/> 启用因果与情报</label>
       <div class="wa-row"><input id="wa-intel-cause" class="wa-input" placeholder="已有前因"/><input id="wa-intel-effect" class="wa-input" placeholder="结果"/></div>
       <div class="wa-row"><input id="wa-intel-person" class="wa-input" placeholder="知情人物"/><input id="wa-intel-claim" class="wa-input" placeholder="情报"/><input id="wa-intel-source" class="wa-input" placeholder="来源"/></div>
@@ -1439,7 +1444,23 @@
       if (act === 'created' || act === 'updated') renderBody();
     });
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
-    // v2.53.0：因果必须指向已有依据；情报必须带来源，低置信保持怀疑。
+    // v2.54.0：只操作已有势力或人物；余额不足时拒绝转移。
+    const orgVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const orgOut = function (r, keep) {
+      const text = r && r.ok ? ('已记录 ' + (r.id || r.reason || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
+      if (keep) panelEl.dataset.orgOut = text;
+      const o = $('#wa-org-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.orgOut) { const saved = $('#wa-org-out'); if (saved) saved.textContent = panelEl.dataset.orgOut; }
+    { const el = $('#wa-org-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true);
+        WA.org.setSettings({ enabled: !!el.checked });
+        orgOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' }, true);
+      }; }
+    on('#wa-org-grant', () => { if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true); const r = WA.org.grant(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), orgVal('#wa-org-item'), orgVal('#wa-org-qty')); const stock = r.ok ? WA.org.stockOf((WA.store.get()||{}).evolution && (WA.store.get().evolution.factions||[]).filter(function(f){return f.name===orgVal('#wa-org-name');})[0] || (((WA.store.get()||{}).people||{})['p_'+orgVal('#wa-org-name')])) : null; orgOut(Object.assign({}, r, { id: r.ok ? (r.id + ':' + r.amount + ':' + ((stock && stock[r.id]) || 0)) : r.id }), true); renderBody(); });
+    on('#wa-org-transfer', () => { if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true); const item = orgVal('#wa-org-item'); const affordable = WA.org.canAfford(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), item, orgVal('#wa-org-qty')); const r = WA.org.transfer(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), orgVal('#wa-org-to-kind'), orgVal('#wa-org-to-name'), item, orgVal('#wa-org-qty')); orgOut(Object.assign({}, r, { id: r.ok ? (item + ':' + r.amount + ':' + (affordable ? 'affordable' : 'blocked')) : r.id }), true); renderBody(); });
+    on('#wa-org-check', () => { if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true); const ok = WA.org.canAfford(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), orgVal('#wa-org-item'), orgVal('#wa-org-qty')); const st = WA.org.stat(); orgOut({ ok: ok, id: (ok ? 'affordable' : 'insufficient') + ':' + st.blocked, reason: ok ? '' : 'insufficient' }, true); });
     const intelVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
     const intelOut = function (r, keep) {
       const text = r && r.ok ? ('已记录 ' + (r.id || r.status || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
