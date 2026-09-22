@@ -135,10 +135,37 @@
         issues.push({ level: 'error', code: 'slot.orphanUnknown', detail: '有 ' + (slots.count - slots.applied) + ' 个槽位未落地，但快照未记录成功名单，无法定位是哪几个（applySlots 未交回 landed）' });
       }
     }
-    // 主块声称的来源数与槽位接管项冲突时给出提示（信息级）
-    if (Array.isArray(li.sources) && li.sources.length && slots.count) {
-      // 主块来源里不应出现已被槽位接管的 source（内容指纹双保险下不精确，仅信息级）
+    // v2.49.0（第三十四面）：把这段**空分支**落实成真正的检查。
+    //   它自 v0.1.42 起就在读 li.sources，注释写着「给出提示」，函数体里却一行都没有——
+    //   「声明了却从未存在」的审计：读点存在（活字段扫描看不见它）、结论为零，
+    //   于是「同一来源既走独立槽位、又并进主块」这种重复注入**永远无人过问**。
+    //   口径：只有**真落地**的槽位才算重复（部分失败时失败的一路回退主块，是正确行为，不报）。
+    //   ── 已知精度边界（不追求消灭，如实记在错误文案里）──
+    //   本检查按**源名**比对，而源名是**用户可见名、不保证唯一**（v2.47.0 修过同族的
+    //   「同名串味」：真实注入面里「连续性约束」「演化状态」都是固定名，同轮可多项）。
+    //   因此两个同名项一个走槽位、一个并主块时，这条会报出来——而**报出来是对的**：
+    //   那正是「同一段文本在 prompt 里出现两次」的真实现场，只是归因粒度到「源名」为止。
+    if (Array.isArray(li.sources) && li.sources.length && slots.count && Array.isArray(slots.perSlot)) {
+      const landedSet = Array.isArray(slots.landed) ? slots.landed : null;
+      if (landedSet && landedSet.length) {
+        const dup = [];
+        slots.perSlot.forEach(function (p) {
+          if (landedSet.indexOf(p.slot) < 0) return;                    // 只查真落地的槽位
+          (Array.isArray(p.sources) ? p.sources : []).forEach(function (src) {
+            if (li.sources.indexOf(src) >= 0 && dup.indexOf(src) < 0) dup.push(src);
+          });
+        });
+        if (dup.length) {
+          issues.push({
+            level: 'error', code: 'slot.mainDuplicate',
+            detail: '这 ' + dup.length + ' 个来源既已独立落地槽位、又并进了主块：' + dup.join('/')
+              + '（同一段约束在 prompt 里出现两次——白烧 token 且模型看到重复指令；'
+              + '检查 routedKeys 是否漏收真落地键位。归因粒度到源名，同名不同项时请对照去向账逐项核）'
+          });
+        }
+      }
     }
+
     return { consistent: issues.length === 0, issues: issues };
   }
 

@@ -879,6 +879,45 @@
         return h;
       } catch (e) { return '<div class="wa-empty">读取槽位快照失败（' + esc(e && e.message) + '）</div>'; }
     })();
+    // v2.49.0（第三十四面）：**主块自身的账**。
+    //   为什么面板必须有它：此前主块是整条注入链上**唯一没有独立账的一环**——
+    //   预算账单记「折叠/丢弃」、槽位快照记「哪几路落地」、去向账记「每一项去哪」，
+    //   而主块本身（上一轮 prompt 里我们实际拼了多少字、由哪些源拼成）无人可答。
+    //   store.lastInjection 里的 len / sources 自 v0.2.1 起就每轮写入，却**全库零读点**。
+    //   后果不是崩溃，而是「主块 0 字」这句结论**无法区分两种局面**：
+    //     · 本轮全部经独立槽位落地（约束已生效，正常）；
+    //     · 本轮确实没有可注入内容（什么都没进 prompt）。
+    out += '<div class="wa-sec">主块账<span class="wa-dim">（上一轮 prompt 里我们实际拼了多少字、由哪些源拼成）</span></div>';
+    out += (function () {
+      try {
+        const li = (WA.store.get().lastInjection) || null;
+        if (!li) return '<div class="wa-item wa-dim">尚未发生注入；推演一轮后此处显示主块字数与来源。</div>';
+        const len = li.len | 0;
+        const srcs = Array.isArray(li.sources) ? li.sources : [];
+        const slotLanded = !!(li.slots && li.slots.applied > 0);
+        let h = '<div class="wa-item"><b>' + esc(String(len)) + ' 字符</b>｜'
+          + esc(String(srcs.length)) + ' 个来源';
+        if (!srcs.length) {
+          h += '<div class="wa-dim">' + (len ? '来源未登记（有内容却无来源名——记账断裂）' : '无来源（主块为空）') + '</div>';
+        } else {
+          h += '<div class="wa-dim">' + srcs.map(function (x) { return esc(x); }).join('、') + '</div>';
+        }
+        // 「主块 0 字」必须当场说清是哪种局面（这是本区块存在的核心理由）
+        if (len === 0) {
+          h += slotLanded
+            ? '<div class="wa-dim">本轮全部经独立槽位落地——约束类注入已生效，不是「没注入」</div>'
+            : '<div class="wa-dim wa-log-warn">本轮确实没有可注入内容（主块与槽位都没有产出）</div>';
+        }
+        // 重复注入：同一来源既进槽位又进主块（v2.49.0 落实了 audit 里那个空分支）
+        try {
+          const a = (WA.injectSlotAudit && WA.injectSlotAudit.audit) ? WA.injectSlotAudit.audit(li) : null;
+          const dups = (a && a.issues ? a.issues : []).filter(function (x) { return x.code === 'slot.mainDuplicate'; });
+          if (dups.length) h += '<div class="wa-dim wa-log-error">' + dups.map(function (x) { return esc(x.detail); }).join('；') + '</div>';
+        } catch (e2) {}
+        h += '</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取主块账失败（' + esc(e && e.message) + '）</div>'; }
+    })();
     // v2.47.0: 注入项去向（第三十二面）——每个候选项最后去了哪里，逐项可答。
     //   为什么面板必须看它：此前能显示的只有三张互不相通的账（预算账单按 source 名、
     //   槽位快照只有 slot 与字数、主块是一个拼好的字符串），于是「正文里少了那条约束」

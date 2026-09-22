@@ -157,6 +157,18 @@
       const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
       // v0.1.29: 快照已撤销时标注——槽位证据保留但注入已不在场
       if (li && li.injected === false) { out.injected = false; out.clearedAt = li.clearedAt || null; out.clearedBy = li.clearedBy || null; }
+      // v2.49.0（第三十四面）：**主块自身的账**。len / sources 由 render/inject.js 每轮写入，
+      //   但自 v0.2.1 起全库零读点——「上一轮主块多少字、由哪些源拼成」在诊断包与面板里
+      //   都查不到。缺了它，「主块 0 字」这句结论无法区分两种截然不同的局面：
+      //     · 全部走独立槽位（约束已生效）——正常；
+      //     · 本轮确实没有可注入内容（什么都没进 prompt）——可能有问题。
+      //   两者在旧账上完全同形（len=0 / sources=[] / injected=true）。
+      if (li) {
+        out.main = { len: li.len | 0, sources: Array.isArray(li.sources) ? li.sources.slice() : [], count: (typeof li.mainCount === 'number') ? li.mainCount : null };
+        out.main.dupWithSlots = (WA.injectSlotAudit && WA.injectSlotAudit.audit) ? (function () {
+          try { const a = WA.injectSlotAudit.audit(li); return (a.issues || []).filter(function (x) { return x.code === 'slot.mainDuplicate'; }).map(function (x) { return x.detail; }); } catch (e) { return []; }
+        })() : [];
+      }
       // v0.1.41: 撤销-槽位关联审计
       if (WA.render && WA.render.uninjectAudit) { const ua = WA.render.uninjectAudit(); if (ua.issues.length) out.uninjectIssues = ua.issues; }
       // v2.48.0: 前置条件从 li.slots 放宽到「有快照 或 有槽位失败」。
@@ -1475,6 +1487,25 @@
     const inj = d.inject || {};
     if (inj.slots) {
       out.push({ level: inj.slotConsistent === false ? 'warn' : 'info', key: 'injectSlots', detail: '槽位 ' + inj.slots.applied + '/' + inj.slots.count + ' 落地' + (inj.slotConsistent === false ? '（不一致）' : '') });
+    }
+    // v2.49.0: 主块账摘要——「主块 0 字但槽位有落地」必须是**一句能读懂的话**，
+    //   而不是让读者自己从两个数字里去猜到底是哪种局面。
+    const mAccounts = (d.inject || {}).main;
+    if (mAccounts) {
+      const srcN = (mAccounts.sources || []).length;
+      if (mAccounts.dupWithSlots && mAccounts.dupWithSlots.length) {
+        out.push({ level: 'error', key: 'injectMainDuplicate', detail: mAccounts.dupWithSlots.join('；') });
+      }
+      if (mAccounts.len === 0) {
+        const slotLanded = !!(inj.slots && inj.slots.applied > 0);
+        out.push({ level: 'info', key: 'injectMain', detail: slotLanded
+          ? '主块 0 字（本轮全部经独立槽位落地——约束类注入已生效，不是「没注入」）'
+          : '主块 0 字且无独立槽位落地（本轮确实没有可注入内容）' });
+      } else {
+        out.push({ level: srcN ? 'info' : 'warn', key: 'injectMain',
+          detail: '主块 ' + mAccounts.len + ' 字符｜' + srcN + ' 个来源'
+            + (srcN ? '（' + (mAccounts.sources || []).join('、') + '）' : '（来源未登记——记账断裂，请报此现场）') });
+      }
     }
     // v0.1.9: 槽位路由错误快照（部分失败时升级为 warn）
     if (inj.slotErrors && inj.slotErrors.length) {
