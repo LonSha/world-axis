@@ -953,6 +953,80 @@
       } catch (e) { return '<div class="wa-empty">读取去向账失败（' + esc(e && e.message) + '）</div>'; }
     })();
     const onCount = SOURCES.filter(function (k) { return vis[k]; }).length;
+    // v2.50.0（第三十五面）：宿主世界书激活账。
+    //   为什么面板必须有它：宿主自己那次世界书扫描注入了哪几条，在本扩展侧此前
+    //   **一个字都答不出**（engines/worldbook.js 读的是条目定义，不是「本轮实际注入」）。
+    //   用户改不动条目时能拿到的只有「感觉没生效」。此处把三态如实摆出来——
+    //   unsupported 说的是「宿主没给这个事件」，**不是**「本轮没有条目激活」。
+    out += '<div class="wa-sec">宿主世界书激活账<span class="wa-dim">（宿主自己扫描并注入的条目——本扩展此前完全看不到的那一半）</span></div>';
+    out += (function () {
+      try {
+        if (!WA.hostWbTrace || typeof WA.hostWbTrace.stat !== 'function') return '<div class="wa-empty">宿主世界书激活账未加载</div>';
+        const st = WA.hostWbTrace.stat();
+        const tone = st.state === 'ok' ? 'wa-log-info' : (st.state === 'shape-unknown' ? 'wa-log-warn' : 'wa-dim');
+        let h = '<div class="wa-item"><b>' + esc(String(st.state)) + '</b>'
+          + '<div class="' + tone + '">' + esc(WA.hostWbTrace.stateText ? WA.hostWbTrace.stateText() : '') + '</div>';
+        if (st.state === 'ok') {
+          h += '<div class="wa-dim">本轮 ' + esc(String(st.lastCount | 0)) + ' 条：'
+            + esc((st.lastNames || []).slice(0, 8).join('、') || '—') + '</div>';
+          if (st.sysExcluded) h += '<div class="wa-dim">另有 ' + esc(String(st.sysExcluded)) + ' 条系统条目按宿主口径排除（显式报出，不静默丢弃）</div>';
+        } else if (st.state === 'shape-unknown') {
+          h += '<div class="wa-dim">载荷键名：' + esc((st.shapeUnknownKeys || []).join('、') || '?') + '——已拒绝猜字段名</div>';
+        }
+        if (st.rounds) h += '<div class="wa-dim">跨轮窗口 ' + esc(String(st.rounds)) + ' 轮</div>';
+        h += '</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取宿主世界书激活账失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    // v2.50.0（第三十五面）：楼层变更联动账。
+    //   「有判据、无处置」是这一块此前的全部形态：timeline.auditRefs 早就算得出 missing，
+    //   面板却只多两条 warn，没人回收。此处把「哪一条引用着已删楼层」摊开，并出**处置计划**
+    //   （只读，不执行——回收会不可逆地删掉用户的世界）；同时把与 settleGuard 的对账结论摆出来，
+    //   因为两套口径不一致时，用户必须知道「谁说的才算数」得由他自己判断。
+    out += '<div class="wa-sec">楼层变更联动账<span class="wa-dim">（删楼/改楼后，哪些派生数据还指着旧楼层）</span></div>';
+    out += (function () {
+      try {
+        if (!WA.floorChanges || typeof WA.floorChanges.plan !== 'function') return '<div class="wa-empty">楼层变更联动账未加载</div>';
+        const p = WA.floorChanges.plan();
+        const gv = (p.guard || {}).verdict;
+        const warn = (p.missing || []).length > 0 || gv === 'divergent' || gv === 'guard-blind';
+        let h = '<div class="wa-item"><b>' + esc(WA.floorChanges.stateText ? WA.floorChanges.stateText() : p.state) + '</b>';
+        h += '<div class="wa-dim">盘点 ' + esc(String((p.scanned || {}).sites | 0)) + ' 处引用面 · 有效引用 '
+          + esc(String((p.scanned || {}).refs | 0)) + ' 个 · 继承跳过 ' + esc(String((p.scanned || {}).inherited | 0)) + '</div>';
+        if ((p.missing || []).length) {
+          h += '<div class="wa-log-warn">' + (p.missing || []).map(function (m) {
+            return esc(m.where) + (m.label ? '「' + esc(m.label) + '」' : '') + ' → ' + esc(String(m.count)) + ' 个引用指向已删楼层'
+              + ((m.floors || []).length ? '（楼层 ' + esc((m.floors || []).join('/')) + '）' : '');
+          }).join('<br>') + '</div>';
+        }
+        if ((p.changed || []).length) {
+          h += '<div class="wa-dim">另 ' + esc(String((p.changed || []).length)) + ' 处所依据内容被编辑/重roll（摘要/事实可能已过时）</div>';
+        }
+        h += '<div class="wa-dim' + (warn ? ' wa-log-warn' : '') + '">与结算守卫对账：' + esc(String(gv || '?')) + ' — ' + esc(String((p.guard || {}).note || '')) + '</div>';
+        h += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-fc-plan">出处置计划</button>'
+          + '<button class="wa-btn wa-mini" id="wa-fc-reset">清空变更窗口</button></div>';
+        h += '<div class="wa-dim">本面板**不提供自动回收**：回收会不可逆地删掉用户的世界，故只出计划（needConfirm）留给人工判断。</div>';
+        h += '</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取楼层变更联动账失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    // v2.50.0（第三十五面）：台账时间轴。
+    //   单值 lastAt 的结构性盲区：「每轮都在失败」与「刚失败一次」在面板上完全同形。
+    //   本区块给出「本窗口内是否新增失败」（failing）与「连续同态几次」（stalled，中性）。
+    out += '<div class="wa-sec">台账时间轴<span class="wa-dim">（把「最近一次」变成「最近 N 次」——区分持续故障与偶发一次）</span></div>';
+    out += (function () {
+      try {
+        if (!WA.ledgerTimeline || typeof WA.ledgerTimeline.stat !== 'function') return '<div class="wa-empty">台账时间轴未加载</div>';
+        const st = WA.ledgerTimeline.stat();
+        let h = '<div class="wa-item"><b>' + esc(String(st.sites || 0)) + '</b> 个站点在被观测'
+          + '<div class="wa-dim">' + esc(WA.ledgerTimeline.summaryText ? WA.ledgerTimeline.summaryText() : '') + '</div>';
+        if ((st.failing || []).length) h += '<div class="wa-log-warn">本窗口内新增失败：' + esc((st.failing || []).join('、')) + '</div>';
+        if ((st.stalled || []).length) h += '<div class="wa-dim">连续同态 ' + esc(String((st.stalled || []).length)) + ' 站（中性结论：可能是稳定，也可能是停摆）</div>';
+        h += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-lt-refresh">立即采样</button>'
+          + '<button class="wa-btn wa-mini" id="wa-lt-reset">清空窗口</button></div></div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取台账时间轴失败（' + esc(e && e.message) + '）</div>'; }
+    })();
     out += '<div class="wa-sec">注入可见性（' + onCount + '/' + SOURCES.length + ' 开）</div>'
       + '<div class="wa-item">' + SOURCES.map(function (k) { return '<span class="wa-tag">' + esc(NAMES[k] || k) + (vis[k] ? '' : '关') + '</span>'; }).join('')
       + '<div class="wa-dim">开关在「导演」页调整。</div></div>';
@@ -1662,6 +1736,53 @@
           out.innerHTML = '<div class="wa-log wa-log-info">✓ 已取消强制标记：下一次回复恢复常规楼层守卫判定（重复/重掷/回退仍会被跳过）</div>';
         };
       } catch (e) { out.textContent = '结算守卫读取失败：' + (e && e.message); }
+    };
+    // v2.50.0（第三十五面）：三账的两个只读出口。
+    //   「出处置计划」把 floorChanges.plan() 的全部动作摊开（**不做**任何回收）；
+    //   「立即采样」手动喂一次台账时间轴（面板打开时也可取一份，不必等下一轮注入）。
+    //   两者都只读：本版刻意不提供任何自动回收按钮（回收不可逆）。
+    const fcBtn = $('#wa-fc-plan');
+    if (fcBtn) fcBtn.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.floorChanges) return;
+      try {
+        const p = WA.floorChanges.plan();
+        let html = '<div class="wa-log wa-log-' + ((p.actions || []).length ? 'warn' : 'info') + '">处置计划（本版**不自动执行**：executable=' + esc(String(p.executable)) + '）</div>';
+        html += '<div class="wa-item">盘点 ' + esc(String((p.scanned || {}).sites | 0)) + ' 处引用面 · 缺失 '
+          + esc(String((p.missing || []).length)) + ' 处 · 内容变更 ' + esc(String((p.changed || []).length)) + ' 处</div>';
+        html += '<div class="wa-item">与结算守卫对账：<b>' + esc(String((p.guard || {}).verdict || '?')) + '</b>'
+          + '<div class="wa-dim">' + esc(String((p.guard || {}).note || '')) + '</div></div>';
+        html += (p.actions || []).map(function (a) {
+          return '<div class="wa-item"><span class="wa-tag">' + esc(a.act) + '</span>'
+            + (a.needConfirm ? '<span class="wa-dim">需确认</span>' : '')
+            + '<div class="wa-dim">' + esc(a.detail) + '</div></div>';
+        }).join('') || '<div class="wa-empty">无待处置项</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '处置计划读取失败：' + (e && e.message); }
+    };
+    const fcReset = $('#wa-fc-reset');
+    if (fcReset) fcReset.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.floorChanges) return;
+      try { WA.floorChanges.reset(); out.innerHTML = '<div class="wa-log wa-log-info">✓ 已清空楼层变更窗口（只清观测记录，世界状态与派生数据未动）</div>'; }
+      catch (e) { out.textContent = '清空失败：' + (e && e.message); }
+    };
+    const ltBtn = $('#wa-lt-refresh');
+    if (ltBtn) ltBtn.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.ledgerTimeline) return;
+      try {
+        const n = WA.ledgerTimeline.probeDefault();
+        const st = WA.ledgerTimeline.stat();
+        let html = '<div class="wa-log wa-log-info">✓ 已采样 ' + esc(String(n)) + ' 个站点（读数成功数；首轮只见基线不判涨跌）</div>';
+        html += '<div class="wa-item">' + esc(WA.ledgerTimeline.summaryText()) + '</div>';
+        if ((st.failing || []).length) html += '<div class="wa-log wa-log-warn">本窗口内新增失败：' + esc((st.failing || []).join('、')) + '</div>';
+        if ((st.stalled || []).length) html += '<div class="wa-dim">连续同态：' + esc((st.stalled || []).join('、')) + '（中性：可能是稳定也可能是停摆）</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '采样失败：' + (e && e.message); }
+    };
+    const ltReset = $('#wa-lt-reset');
+    if (ltReset) ltReset.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.ledgerTimeline) return;
+      try { WA.ledgerTimeline.reset(); out.innerHTML = '<div class="wa-log wa-log-info">✓ 已清空台账时间轴窗口（只清观测窗口，各引擎台账未动）</div>'; }
+      catch (e) { out.textContent = '清空失败：' + (e && e.message); }
     };
     // v2.2.0: 计量清零出口——resetTxStat / resetCallStats 此前定义了却没有入口（计数只增不减，
     // 长会话里 avgMs 与错误率被历史样本稀释，用户无从重新取样）。

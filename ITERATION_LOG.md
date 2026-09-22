@@ -482,3 +482,42 @@
 - **判据 +27**（v2.48.0 基线 4803 → <b>4830</b>）：A 组写侧 2 项（mainCount 落地、len/sources 写点未被破坏）；B 组空分支落实 3 项（错误码在位、死注释已摘、精度边界进文案）；C 组真跑 audit 6 项（真落地+同源必报 / 级别 error / 指明来源 / 失败回退不报 / 名单缺席不报 / 源名不重合不报）；D 组负控制 3 项（锚点唯一 / 破坏发生 / 破坏后误报）；E 组接线 7 项（诊断包 main / injectMain / injectMainDuplicate / 两种局面分说、面板主块账 / 真读 len+sources / 来源未登记告警）；F 组诊断包真跑 6 项（main 在场 / 空来源如实给空数组 / 分说两种局面 / 负向不得混淆）。
 - **影响范围**：改 <code>render/inject.js</code>（+mainCount）/ <code>engines/inject-slot-audit.js</code>（空分支落实 +41 行）/ <code>engines/tool-diag.js</code>（main 账 + 摘要条目）/ <code>ui/panel.js</code>（主块账区块）/ <code>tests/run.js</code>（新增 v2.49.0 段 +142 行、四处 refs 锚点 1435→1440）；<code>index.js</code>（VERSION）/ <code>manifest.json</code> / <code>tests/dead-export-ledger.json</code>（version + <code>_note</code>）三源同步。**未新增/删除任何导出成员** ⇒ 出口面契约与死子面不变（dead 205 / uiDead 4 / dataOnly 109 逐字未变）。
 - **门禁与验证（已实跑）**：全量回归 <b>4830 / 失败 0</b>（v2.48.0 基线 4803，+27 净增）；dead-export-gate 绿（dead 205 / uiDead 4 / 归因分布 test-only 129 / 其余 76，<code>--update</code> 已复核 209 条证据）；ui-gate <b>53/0</b>；ui-wire-audit <b>9/0</b>；field-liveness-gate 绿（规则① denylist 命中与基线逐字一致：<code>meta.round-read</code> 1 文件 / <code>state.round-read</code> 3 文件；规则② 写侧越界 1 处 <code>ui/panel.js::innerHTML</code> 为长期白名单；规则③ 读侧越界 0）；inventory 四类悬空 0（<b>refs 1440</b> / 命名空间 68 / 成员 737，refs 由 1435 增至 1440 是本版新增 5 处静态引用所致，四处锚点已按实测回填）；export-contract <b>62 ns / 390 members / 4908 chars</b>（逐字未变，<code>FROZEN2800</code> 与 <code>EC2430</code> 无需回填）。
+
+### R33 · 2026-09-22 · v2.50.0 交付（宿主两侧 + 台账时间轴·第三十五面：把「无从得知」与「确实没有」分开）
+- **做了什么**：落三笔只读账并接上消费端。
+  · ① <code>engines/host-wb-trace.js</code>（265 行）宿主世界书激活账：四态 <code>unsupported/awaiting/ok/shape-unknown</code>，
+    <code>normalizePayload</code> <b>不猜载荷形状</b>（保留键名清单），<code>crossCheck</code> 报 <code>same-text</code>/<code>same-name</code> 重叠。
+  · ② <code>engines/ledger-timeline.js</code>（228 行）台账时间轴：环形窗口 <code>MAX_STEPS=12</code>，段机制区分持续失败与偶发一次。
+  · ③ <code>engines/floor-changes.js</code>（246 行）楼层变更联动账：<code>sweep</code> 扫描 L0~L3/smallSummaries/foreshadows/entityMemory/chronicle，
+    <code>guardReconcile</code> 与 <code>settleGuard</code> 三态对账，<code>plan</code> 只出 <code>needConfirm</code> 且 <code>executable=false</code>。
+- **为什么**：两件事此前<b>完全不可观测</b>——宿主自己扫描注入了哪几条（<code>WORLD_INFO_ACTIVATED</code> 全库零订阅；
+  <code>worldbook.js</code> 读的是条目定义不是本轮实际注入），以及删楼/改楼后派生数据的引用一致性
+  （<code>timeline.auditRefs</code> 早就算得出 <code>missing</code>/<code>changed</code>、消费端也有两条 warn——差的是触发点）。
+  口径：<b>「无从得知」不等于「确实没有」</b>（<code>unsupported</code> 是环境事实，面板必须说「不可观测」）。
+- **本版坐实的真缺陷（五处）**：
+  · ① <code>ledger-timeline.note</code> 首版同态直接 <code>return</code> ⇒ <code>streak</code> 恒为 1、<code>stalled</code> 永不成立，与设计目标正相反（改为末段 <code>reps++</code>）。
+  · ② <code>host-wb-trace.crossCheck</code> 首版逐项判「宿主无正文」⇒ 把「宿主机给了正文但这一条未匹配」误报为<b>不可比</b>（改为判宿主整批）。
+  · ③ <code>floor-changes.sweep</code> 缺失项标签只兜 <code>title || summary</code>，漏了摘要条目实际正文键 <code>s</code>（用户只能看到 <code>l2#0</code> 这类下标）。
+  · ④ <code>reset</code> 首版把 <code>unsupported</code> 降级回 <code>awaiting</code> ⇒ 清一次窗口就抹掉「宿主根本不给这个事件」的<b>会话级结论</b>。
+  · ⑤ <b>两处同源</b> <code>markSubscribed</code> 写作 <code>else if (!__subscribed)</code> ⇒「<b>曾经订阅成功过</b>」永久豁免后续 <code>unsupported</code>：
+    宿主旧版本/重装后不再派发事件时，面板显示「已订阅，本轮尚未派发」，<b>把能力缺失伪装成还没轮到</b>（host-wb-trace / floor-changes 各一份，两处都修，G3/G4 各打真源码破坏自证）。
+- **顺路坐实 v2.43.0 家族的最后一只漏网**：<code>tests/run.js</code> 出口面契约块<b>自带遍历器</b>（只排 <code>tests/</code>），
+  而生成器委托 <code>productFiles()</code>（排 <code>tests/+tools/</code>）——两套「产品面」定义。后果不是「多几个名字」：
+  本版新增块文件对三新节的引用被算成产品跨文件依赖，门禁报「接口面漂移」，<b>实为判据扫错文件面</b>。
+  已委托单一真源；新增 <b>H 组成类锁</b>（H1/H2 字面锁 + H3 旧遍历器负控制 + H4/H5 现扫描面自证）。
+- **接上消费端（否则「记了没人看」，v2.49.0 同一种病）**：<code>interceptor</code> 真订阅三事件并在缺席时显式回报；
+  <code>render/inject</code> 每轮真调 <code>crossCheck</code> / <code>probeDefault</code> 写入 <code>lastInjection.hostWb</code>；
+  诊断包三节 + 三条 <code>flatten</code> 摘要行 + 四个 <code>UI_BINDINGS</code> 控件；面板三区块。
+- **自纠一项（真实踩到）**：H 组首版只写进块文件、<b>没同步进 <code>tests/run.js</code></b>（且块内用了未声明的 <code>srcRun2500</code>），
+  首跑即 <code>ReferenceError</code> 暴露——补声明后同款判据才真跑起来（<b>「脚本里写了」不等于「跑起来了」</b>）。
+- **负控制（本版最核心的自证）**：四组全部打在<b>真源码副本</b>上——G1 摘掉系统条目排除（<code>sysExcluded=0/count=2</code>）、
+  G2 摘掉段机制（<code>streak=1/段数=3/stalled=false</code>）、G3/G4 把 <code>markSubscribed</code> 改回旧写法（<code>state</code> 停在 <code>awaiting</code>），
+  每组同时断言<b>原版上同款判据仍成立</b>（双向自证，非恒真）；H3 证明旧遍历器确实射中 <code>tools/</code>。
+- **判据 +93**（v2.49.0 基线 4830 → <b>4923</b>，失败 0）：A 装载链 3 / B 宿主四态 6 / C 时间轴段 6 / D 守卫对账 9 / 
+  E 消费端 12 / F 诊断包真跑 8 / G 真源码破坏 16 / H 文件面成类锁 5，另含 30 项门禁与既有套件重算。
+- **影响范围**：新增三引擎（共 739 行）；改 <code>core/interceptor.js</code> / <code>render/inject.js</code> / <code>engines/tool-diag.js</code> /
+  <code>ui/panel.js</code> / <code>index.js</code> / <code>manifest.json</code> / <code>tests/run.js</code>（+396 行，起始第 17640 行附近）；
+  <code>tests/dead-export-ledger.json</code> 重生成（dead 205→218、<code>version=2.50.0</code>、test-only 131）。
+- **门禁与验证（已实跑）**：全量回归 <b>4923 / 失败 0</b>（v2.49.0 基线 4830，<b>+93 净增</b>）；
+  <code>dead-export-gate</code> 绿（dead 218 / uiDead 4 / dataOnly 116→116 / 仅测试 131）；
+  <code>export-contract</code> 逐字一致（ns 65 / members 406 / chars 5100）。

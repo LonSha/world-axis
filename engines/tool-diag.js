@@ -77,7 +77,54 @@
     }, {});
   }
 
-  // ── 3. 模块装载完整性（文件 ↔ 导出对象） ─
+// ── v2.50.0: 宿主两侧 + 时间轴三节（消费面）────────────────────────────
+  // 为什么单独出节：这三笔账此前**不存在**（宿主世界书激活、楼层变更处置、台账时间维），
+  //   如果不进诊断包，它们就只是「引擎里有、用户永远看不到」——与 v2.49.0 修掉的主块账同病。
+  // 三态如实：宿主不给事件 ⇒ state='unsupported' 并原样带出文案，绝不落成「一切正常」。
+  function secHostWb() {
+    return safe(function () {
+      if (!WA.hostWbTrace) return { error: 'hostWbTrace 模块不可用' };
+      const st = WA.hostWbTrace.stat();
+      return {
+        state: st.state, subscribed: st.subscribed, attempts: st.attempts,
+        lastCount: st.lastCount, lastNames: st.lastNames, at: st.lastAt,
+        sysExcluded: st.sysExcluded,
+        shapeUnknownKeys: st.shapeUnknownKeys,
+        rounds: st.rounds,
+        text: WA.hostWbTrace.stateText ? WA.hostWbTrace.stateText() : null
+      };
+    });
+  }
+  function secFloorChanges() {
+    return safe(function () {
+      if (!WA.floorChanges) return { error: 'floorChanges 模块不可用' };
+      const p = WA.floorChanges.plan();     // 只读：出计划、不执行
+      return {
+        state: p.state, subscribedAt: WA.floorChanges.stat().subscribed,
+        events: (p.events || []).length,
+        scanned: p.scanned,
+        missing: p.missing, changed: p.changed,
+        guardVerdict: p.guard ? p.guard.verdict : null,
+        guardNote: p.guard ? p.guard.note : null,
+        actions: (p.actions || []).map(function (a) { return { act: a.act, needConfirm: a.needConfirm, detail: a.detail }; }),
+        executable: p.executable,
+        text: WA.floorChanges.stateText ? WA.floorChanges.stateText() : null
+      };
+    });
+  }
+  function secLedgerTimeline() {
+    return safe(function () {
+      if (!WA.ledgerTimeline) return { error: 'ledgerTimeline 模块不可用' };
+      const st = WA.ledgerTimeline.stat();
+      return {
+        sites: st.sites, failing: st.failing, stalled: st.stalled,
+        stallThreshold: st.stallThreshold,
+        detail: st.detail,
+        text: WA.ledgerTimeline.summaryText ? WA.ledgerTimeline.summaryText() : null
+      };
+    });
+  }
+  // ── 3. 模块装载完整性（文件 ↔ 导出对象） ──
   const MODULE_EXPORTS = {
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
@@ -97,6 +144,10 @@
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
     'engines/bridge.js': 'bridge',
     'engines/lonsha-reader.js': 'lonshaReader',
+    // v2.50.0（第三十五面）：宿主两侧 + 时间轴三账
+    'engines/host-wb-trace.js': 'hostWbTrace',
+    'engines/ledger-timeline.js': 'ledgerTimeline',
+    'engines/floor-changes.js': 'floorChanges',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -168,6 +219,16 @@
         out.main.dupWithSlots = (WA.injectSlotAudit && WA.injectSlotAudit.audit) ? (function () {
           try { const a = WA.injectSlotAudit.audit(li); return (a.issues || []).filter(function (x) { return x.code === 'slot.mainDuplicate'; }).map(function (x) { return x.detail; }); } catch (e) { return []; }
         })() : [];
+      }
+      // v2.50.0（第三十五面）：本轮**宿主世界书激活**与我这批注入的交叉核对结果。
+      //   由 render/inject.js 在落地时写入（引擎侧算，快照侧存），这里只是把结果读出来——
+      //   缺了这一步，hostWbTrace 就又变成「记了没人看」（与 v2.49.0 主块账同病）。
+      if (li && li.hostWb) {
+        out.hostWb = {
+          available: !!li.hostWb.available, state: li.hostWb.state || null,
+          checked: li.hostWb.checked | 0, uncomparable: li.hostWb.uncomparable | 0,
+          overlaps: (li.hostWb.overlaps || []).slice(0, 5), note: li.hostWb.note || ''
+        };
       }
       // v0.1.41: 撤销-槽位关联审计
       if (WA.render && WA.render.uninjectAudit) { const ua = WA.render.uninjectAudit(); if (ua.issues.length) out.uninjectIssues = ua.issues; }
@@ -607,7 +668,11 @@
       //   在新增出口上无人发现。
       'wa-ka-id', 'wa-ka-path', 'wa-ka-op', 'wa-ka-add',
       'wa-ka-rule-id', 'wa-ka-rule-when', 'wa-ka-rule-text', 'wa-ka-rule-add',
-      'wa-ka-eval', 'wa-ka-clear', 'wa-ka-out'] }
+      'wa-ka-eval', 'wa-ka-clear', 'wa-ka-out',
+      // v2.50.0（第三十五面）：三账出口控件——渲染在**注入页**（renderInject），
+      //   故必须登记到本组而不是工具页（登记到错页等于守卫永远查不到它们，
+      //   而「登记了却在别页」比不登记更坏：它看起来已被覆盖）。
+      'wa-fc-plan', 'wa-fc-reset', 'wa-lt-refresh', 'wa-lt-reset'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。
@@ -656,7 +721,11 @@
       { key: 'toolImport', api: ['detect', 'preview', 'importData'], label: '外部导入器' },
       { key: 'injectInspector', api: ['init', 'getLastSnapshot', 'statusText'], label: '注入自检' },
       { key: 'pmem', api: ['applyPersonalMemory', 'recall', 'knows', 'buildBlock'], label: '人物主观记忆' },
-{ key: 'injectBudget', api: ['plan', 'apply', 'trim', 'summaryText'], label: '注入预算裁判' },
+      { key: 'injectBudget', api: ['plan', 'apply', 'trim', 'summaryText'], label: '注入预算裁判' },
+      // v2.50.0（第三十五面）：三账能力面——缺任一项即为断裂（能力清单是「装上了没」的证据）
+      { key: 'hostWbTrace', api: ['stat', 'crossCheck', 'stateText'], label: '宿主世界书激活账' },
+      { key: 'floorChanges', api: ['plan', 'sweep', 'guardReconcile', 'stateText'], label: '楼层变更联动账' },
+      { key: 'ledgerTimeline', api: ['note', 'siteStat', 'stat', 'probeDefault'], label: '台账时间轴' },
       { key: 'toolDiag', api: ['collect', 'verdict', 'toJSON', 'summaryText', 'flatten'], label: '自检诊断包' }
     ];
     return caps.map(function (c) {
@@ -830,7 +899,9 @@
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
       bridge: secBridge(),
       lonsha: secLonsha(),
-      compat: secCompat()
+      compat: secCompat(),
+      // v2.50.0（第三十五面）：宿主两侧 + 时间轴三节
+      hostWb: secHostWb(), floorChanges: secFloorChanges(), ledgerTimeline: secLedgerTimeline()
     };
     diag.verdict = verdict(diag);
     return diag;
@@ -1377,6 +1448,62 @@
     }
     const qaD = ((diag.runtime || {}).quarantineAudit) || null;
     if (qaD && (qaD.restores > 0 || qaD.drops > 0)) issues.push({ level: 'info', key: 'quarantine.history', detail: '隔离现场处置史：恢复 ' + qaD.restores + ' 次 / 丢弃 ' + qaD.drops + ' 次' + (qaD.lastKey ? '（最近 ' + qaD.lastKey + '）' : '') });
+    // ── v2.50.0（第三十五面）：宿主两侧 + 时间轴三账的议题规则 ─────────────
+    // 分级口径照仓库既有规格：
+    //   · 「环境没给这个能力」= info（不是故障，但必须可见，否则用户以为已覆盖）；
+    //   · 「真有该处理而没处理的事」= warn；
+    //   · 「观测本身坏了（载荷形状未知）」= warn（读不出结论 ≠ 没问题）。
+    try {
+      const hw = diag.hostWb || {};
+      if (hw.error) {
+        issues.push({ level: 'warn', key: 'hostWb', detail: '宿主世界书激活账不可用：' + hw.error });
+      } else if (hw.state === 'unsupported') {
+        issues.push({ level: 'info', key: 'hostWb', detail: '宿主未提供世界书激活事件：宿主那一半注入（它自己扫描出的条目）本会话不可观测——这不是「没有激活」，是「无从得知」' });
+      } else if (hw.state === 'shape-unknown') {
+        issues.push({ level: 'warn', key: 'hostWb', detail: '宿主世界书激活事件的载荷形状未知（保留键：' + ((hw.shapeUnknownKeys || []).join('、') || '?') + '）：已拒绝猜测字段名，本次未做交叉核对' });
+      } else if (hw.state === 'awaiting') {
+        issues.push({ level: 'info', key: 'hostWb', detail: '已订阅世界书激活事件，本会话尚未派发（宿主只在真实发送时派发）' });
+      } else if (hw.state === 'ok' && typeof hw.lastCount === 'number') {
+        issues.push({ level: 'info', key: 'hostWb', detail: '宿主世界书本轮激活 ' + hw.lastCount + ' 条' + (hw.sysExcluded ? '（另排除系统条目 ' + hw.sysExcluded + ' 条）' : '') + '：' + (hw.lastNames || []).slice(0, 4).join('、') });
+      }
+    } catch (eHw) {}
+    try {
+      const fc = diag.floorChanges || {};
+      if (fc.error) {
+        issues.push({ level: 'warn', key: 'floorChanges', detail: '楼层变更联动账不可用：' + fc.error });
+      } else if (fc.state === 'found') {
+        issues.push({ level: 'warn', key: 'floorChanges',
+          detail: '有 ' + (fc.missing || []).length + ' 处派生数据引用了**已删除楼层**（' + ((fc.scanned || {}).refs || 0) + ' 个有效引用中）'
+            + '｜与结算守卫对账：' + (fc.guardVerdict || '?') + '（' + String(fc.guardNote || '') + '）'
+            + '｜本版**不自动回收**（回收不可逆）：' + ((fc.actions || []).map(function (a) { return a.act; }).join('、') || '无') });
+      } else if (fc.state === 'changed') {
+        issues.push({ level: 'info', key: 'floorChanges', detail: '无楼层缺失，但 ' + (fc.changed || []).length + ' 处派生数据所依据的楼层内容被编辑/重roll：摘要与事实可能已过时（按设计不自动改写）' });
+      } else if (fc.state === 'quiet' && fc.subscribedAt === false) {
+        issues.push({ level: 'info', key: 'floorChanges', detail: '宿主未提供楼层删除/编辑事件：楼层变更面不可观测（盘点仍可在诊断包手动触发）' });
+      }
+      const gv = fc.guardVerdict;
+      if (gv === 'guard-blind' || gv === 'divergent') {
+        issues.push({ level: 'warn', key: 'floorChanges.guard',
+          detail: '楼层变更账与结算守卫口径不一致（' + gv + '）：' + String(fc.guardNote || '') + '——两套结论都可能是对的，处置前必须人工判断谁是当前真相' });
+      } else if (gv === 'no-guard' || gv === 'unreadable') {
+        issues.push({ level: 'info', key: 'floorChanges.guard', detail: '结算守卫不可对账（' + gv + '）：楼层变更账不据此推断一致性' });
+      }
+    } catch (eFc) {}
+    try {
+      const lt = diag.ledgerTimeline || {};
+      if (lt.error) {
+        issues.push({ level: 'warn', key: 'ledgerTimeline', detail: '台账时间轴不可用：' + lt.error });
+      } else if (!lt.sites) {
+        issues.push({ level: 'info', key: 'ledgerTimeline', detail: '台账时间轴尚未观测到站点（采样点随注入链，本轮尚未写入）' });
+      } else {
+        if ((lt.failing || []).length) {
+          issues.push({ level: 'warn', key: 'ledgerTimeline.failing', detail: (lt.failing || []).length + ' 个台账站点**本窗口内新增失败**：' + (lt.failing || []).slice(0, 4).join('、') + '（单值 lastAt 无法区分「每轮都在失败」与「刚失败一次」，这一面补的正是它）' });
+        }
+        if ((lt.stalled || []).length) {
+          issues.push({ level: 'info', key: 'ledgerTimeline.stalled', detail: (lt.stalled || []).length + ' 个台账站点连续 ' + (lt.stallThreshold || 3) + ' 次以上同态：' + (lt.stalled || []).slice(0, 4).join('、') + '——中性结论，可能是稳定也可能是停摆，需人工核对' });
+        }
+      }
+    } catch (eLt) {}
     const errs = issues.filter(function (i) { return i.level === 'error'; }).length;
     return { ok: errs === 0, errorCount: errs, warnCount: issues.length - errs, issues: issues };
   }
@@ -1403,6 +1530,42 @@
       out.push({ level: (mv.failed || th.failed) ? 'error' : 'info', key: 'compat',
         detail: 'MVU ' + (mv.active ? '已激活(同步 ' + mv.syncCount + ')' : '未激活(' + (mv.reason || '?') + ')')
           + ' · TH ' + (th.active ? '已暴露' : '未激活(' + (th.reason || '?') + ')') });
+    }
+    // v2.50.0（第三十五面）：三账各占一行——本节的所有「三态」结论都要在这里落地。
+    //   教训来自 v2.49.0 的 F3/F4：`summaryText()` 只回一行汇总，**逐条 issue 在 flatten()**
+    //   里；只写 section 不写 flatten，用户仍然看不到「宿主那一半到底观测到了没有」。
+    const hwF = d.hostWb || {};
+    if (hwF.error) {
+      out.push({ level: 'warn', key: 'hostWb', detail: '宿主世界书激活账不可用：' + hwF.error });
+    } else if (hwF.state === 'unsupported') {
+      out.push({ level: 'info', key: 'hostWb', detail: '宿主世界书激活面**不可观测**（宿主无此事件）：宿主自己扫描注入了哪几条无从得知——这不是「没有激活」' });
+    } else if (hwF.state === 'shape-unknown') {
+      out.push({ level: 'warn', key: 'hostWb', detail: '宿主世界书激活事件载荷形状未知（保留键 ' + ((hwF.shapeUnknownKeys || []).join('、') || '?') + '），已拒绝猜字段名' });
+    } else if (hwF.state === 'ok') {
+      out.push({ level: 'info', key: 'hostWb', detail: '宿主世界书本轮激活 ' + (hwF.lastCount | 0) + ' 条：' + (hwF.lastNames || []).slice(0, 5).join('、') + (hwF.sysExcluded ? '（另排除系统条目 ' + hwF.sysExcluded + '）' : '') });
+    } else {
+      out.push({ level: 'info', key: 'hostWb', detail: '已订阅世界书激活事件，本轮尚未派发（宿主只在真实发送时派发）' });
+    }
+    const fcF = d.floorChanges || {};
+    if (fcF.error) {
+      out.push({ level: 'warn', key: 'floorChanges', detail: '楼层变更联动账不可用：' + fcF.error });
+    } else {
+      out.push({
+        level: ((fcF.missing || []).length || fcF.guardVerdict === 'divergent' || fcF.guardVerdict === 'guard-blind') ? 'warn' : 'info', key: 'floorChanges',
+        detail: '楼层变更：盘点 ' + ((fcF.scanned || {}).sites | 0) + ' 处引用面 · 缺失 ' + ((fcF.missing || []).length) + ' 处 · 内容变更 ' + ((fcF.changed || []).length) + ' 处'
+          + '｜守卫对账 ' + (fcF.guardVerdict || '?') + '｜待处置 ' + ((fcF.actions || []).length) + ' 项（executable=' + fcF.executable + '，回收不可逆故本版不自动执行）'
+      });
+    }
+    const ltF = d.ledgerTimeline || {};
+    if (ltF.error) {
+      out.push({ level: 'warn', key: 'ledgerTimeline', detail: '台账时间轴不可用：' + ltF.error });
+    } else {
+      out.push({
+        level: (ltF.failing || []).length ? 'warn' : 'info', key: 'ledgerTimeline',
+        detail: (ltF.sites | 0) ? ('台账时间轴 ' + ltF.sites + ' 站：本窗口新增失败 ' + (ltF.failing || []).length + ' 站'
+          + '，连续同态 ' + (ltF.stalled || []).length + ' 站（阈值 ' + (ltF.stallThreshold || 3) + '）')
+          : '台账时间轴尚未观测到站点'
+      });
     }
     // v2.16.0: 对外桥摘要行——否则 flatten 出来的清单里「另两个插件能不能读到世界」完全缺席。
     const bdF = d.bridge || {};
@@ -1636,6 +1799,7 @@
     collect, verdict, toJSON, summaryText, flatten, download, buildErrorReport,
     OPTIONAL_EXPORTS,
     secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities, secCompat,
+    secHostWb, secFloorChanges, secLedgerTimeline,   // v2.50.0（第三十五面）
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');

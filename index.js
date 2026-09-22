@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.49.0';
+  const VERSION = '2.50.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -259,6 +259,13 @@
     //   ——它读 store.clock 做对账；与 bridge.js（对外的**供货**面）互为镜像：桥发得出去、
     //   也读得进来，这套互操作才算通了整条。
     'engines/lonsha-reader.js',
+    // v2.50.0（第三十五面）: 宿主两侧 + 时间轴三账。
+    //   须在 engines/timeline.js（hashText / auditRefs 的提供方）之后，且**必须早于**
+    //   render/inject.js —— 注入落地时会读 hostWbTrace.crossCheck 与 ledgerTimeline.probeDefault，
+    //   而 core/interceptor.js 的订阅回调也要在 install() 时找到这三个命名空间。
+    'engines/host-wb-trace.js',
+    'engines/ledger-timeline.js',
+    'engines/floor-changes.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

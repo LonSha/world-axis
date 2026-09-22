@@ -154,9 +154,57 @@
             WA.emit && WA.emit('chat:changed');
           });
         }
+        // ── v2.50.0（第三十五面）块1：宿主两侧事件面 ──────────────────────────
+        // 缝合来源：Luker 的 World Info Activation Trace + Nocturne 的 change-rollback。
+        // 为什么必须挂在**这里**：全库 eventSource.on 此前只有 5 处，且零订阅
+        // WORLD_INFO_ACTIVATED / MESSAGE_DELETED / MESSAGE_EDITED——于是两件事不可观测：
+        //   · 宿主自己那次世界书扫描注入了哪几条（engines/worldbook.js 读的是**条目定义**，
+        //     不是「本轮实际注入」）；用户改不动条目时只能拿到一句「感觉没生效」。
+        //   · 楼层被删/被编辑后，记忆 L0~L3、facts、伏笔、entityMemory、chronicle 全都还
+        //     指着不存在的楼层（判据早就有——timeline.auditRefs 会算 missing/changed——
+        //     但没有触发点，没人回收）。
+        // 口径：事件名可能缺席（宿主版本差异）⇒ **显式**回报 unsupported，绝不静默当成
+        //   「本轮没有条目激活」/「没人删楼」（那是把环境差异伪装成事实）。
+        const wiEvt = et.WORLD_INFO_ACTIVATED;
+        if (WA.hostWbTrace) {
+          if (wiEvt) {
+            ctx.eventSource.on(wiEvt, function (payload) {
+              try { WA.hostWbTrace.onActivated(payload); }
+              catch (e) { WA.log('warn', '宿主世界书激活记账失败（不影响生成）', e); }
+            });
+            WA.hostWbTrace.markSubscribed('subscribed');
+            WA.log('info', '已订阅宿主世界书激活事件（' + String(wiEvt) + '）');
+          } else {
+            WA.hostWbTrace.markSubscribed('unsupported');
+            WA.log('warn', '宿主未提供 WORLD_INFO_ACTIVATED：世界书激活面标为「不可观测」（不等于本轮无激活）');
+          }
+        }
+        if (WA.floorChanges) {
+          const delEvt = et.MESSAGE_DELETED, edEvt = et.MESSAGE_EDITED;
+          let hooked = 0;
+          if (delEvt) {
+            ctx.eventSource.on(delEvt, function () {
+              try { WA.floorChanges.onFloorEvent('deleted', { args: Array.prototype.slice.call(arguments) }); }
+              catch (e) { WA.log('warn', '楼层删除记账失败', e); }
+            });
+            hooked++;
+          }
+          if (edEvt) {
+            ctx.eventSource.on(edEvt, function () {
+              try { WA.floorChanges.onFloorEvent('edited', { args: Array.prototype.slice.call(arguments) }); }
+              catch (e) { WA.log('warn', '楼层编辑记账失败', e); }
+            });
+            hooked++;
+          }
+          WA.floorChanges.markSubscribed(hooked ? 'subscribed' : 'unsupported');
+          if (!hooked) WA.log('warn', '宿主未提供 MESSAGE_DELETED / MESSAGE_EDITED：楼层变更面标为「不可观测」');
+        }
         WA.log('info', '拦截器安装完成（事件源已挂接）');
       } else {
         WA.log('warn', '未检测到SillyTavern事件源，仅拦截器函数可用');
+        // v2.50.0 块1：无宿主事件源 ⇒ 两个新面**如实**标为不可观测（不是「一切正常」）
+        try { if (WA.hostWbTrace) WA.hostWbTrace.markSubscribed('unsupported'); } catch (e) {}
+        try { if (WA.floorChanges) WA.floorChanges.markSubscribed('unsupported'); } catch (e) {}
       }
     }
   };

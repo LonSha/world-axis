@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.49.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.49.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.50.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.50.0",
   "dead": {
     "apiRouter.fetchModels": {
       "reason": "unwired",
@@ -506,6 +506,22 @@
       "tref": 4,
       "own": 2
     },
+    "floorChanges.guardReconcile": {
+      "reason": "self-only",
+      "detail": "engines/floor-changes.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/floor-changes.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "floorChanges.sweep": {
+      "reason": "self-only",
+      "detail": "engines/floor-changes.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/floor-changes.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "horizon.laneCfg": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -528,6 +544,54 @@
       "src": "engines/horizon.js",
       "refs": 0,
       "tref": 1,
+      "own": 2
+    },
+    "hostWbTrace.capture": {
+      "reason": "self-only",
+      "detail": "engines/host-wb-trace.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/host-wb-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hostWbTrace.fingerprint": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/host-wb-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "hostWbTrace.isSystemEntry": {
+      "reason": "self-only",
+      "detail": "engines/host-wb-trace.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/host-wb-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hostWbTrace.normalizePayload": {
+      "reason": "self-only",
+      "detail": "engines/host-wb-trace.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/host-wb-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hostWbTrace.reset": {
+      "reason": "self-only",
+      "detail": "engines/host-wb-trace.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/host-wb-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "hostWbTrace.safe": {
+      "reason": "self-only",
+      "detail": "engines/host-wb-trace.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/host-wb-trace.js",
+      "refs": 0,
+      "tref": 0,
       "own": 2
     },
     "injectBudget.autoBudget": {
@@ -737,6 +801,30 @@
       "refs": 0,
       "tref": 4,
       "own": 4
+    },
+    "ledgerTimeline.note": {
+      "reason": "self-only",
+      "detail": "engines/ledger-timeline.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ledger-timeline.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "ledgerTimeline.probe": {
+      "reason": "self-only",
+      "detail": "engines/ledger-timeline.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ledger-timeline.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "ledgerTimeline.siteStat": {
+      "reason": "self-only",
+      "detail": "engines/ledger-timeline.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ledger-timeline.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "limits.clamp": {
       "reason": "test-only",
@@ -1306,14 +1394,6 @@
       "tref": 2,
       "own": 4
     },
-    "timeline.hashText": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/timeline.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 4
-    },
     "timeline.messageHash": {
       "reason": "self-only",
       "detail": "engines/timeline.js 内部自用、外部零引用（过度导出）",
@@ -1384,7 +1464,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 42
+      "own": 45
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -1410,12 +1490,36 @@
       "tref": 0,
       "own": 3
     },
+    "toolDiag.secFloorChanges": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "toolDiag.secHostWb": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
     "toolDiag.secInject": {
       "reason": "test-only",
       "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
       "src": "engines/tool-diag.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 4,
+      "own": 3
+    },
+    "toolDiag.secLedgerTimeline": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 1,
       "own": 3
     },
     "toolDiag.secMeta": {
@@ -1480,7 +1584,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 19,
-      "own": 13
+      "own": 14
     },
     "toolImport.detect": {
       "reason": "test-only",
@@ -1678,6 +1782,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 109
+    "dataOnly": 116
   }
 }

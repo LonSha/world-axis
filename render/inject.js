@@ -332,14 +332,31 @@
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(combined.length);
         try {
+          // v2.50.0（第三十五面）：宿主世界书激活账的**真消费点**。
+          //   引擎自己被订阅、自己落账，但若没人问它，那就只是「记了没人看」——
+          //   与 v2.49.0 修掉的「主块账零读点」是同一种病。这里把交叉核对结果随
+          //   lastInjection 一并落盘：宿主那一半（它自己扫描注入的条目）从本轮起可查。
+          //   三态如实：宿主不给事件 ⇒ available=false 且 note 说明「无从得知」，
+          //   **不写成「无重复」**（那是把不可观测伪装成好结论）。
+          let hostCk = null;
+          try {
+            if (WA.hostWbTrace && WA.hostWbTrace.crossCheck) {
+              hostCk = WA.hostWbTrace.crossCheck(finalItems.map(function (i) { return { source: (i && i.source) || '未命名', content: (i && i.content) || '' }; }));
+            }
+          } catch (eH) { hostCk = { available: false, state: 'error', note: '宿主世界书核对异常：' + String(eH && (eH.message || eH)) }; }
           // v0.1.3: 快照补 slots 字段——排查「约束注入丢了」时可区分路由失败与槽位被覆盖
           const slotSnap = (WA.injectSlotAudit && lastSlots)
             ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotResOut || slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, hostWb: hostCk, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
+      // v2.50.0（第三十五面）：台账时间轴每轮采样一次（只读）。
+      //   放在这里而不是事件回调里，是因为它要与「本轮注入是否真的落地」同频：注入链
+      //   是台账产生的主要来源，采样点跟着它走，时间轴才会随世界推进自然生长。
+      //   与注入成败**无关**（上面 catch 之后仍执行）——失败轮同样要被记进窗口。
+      try { if (WA.ledgerTimeline && WA.ledgerTimeline.probeDefault) WA.ledgerTimeline.probeDefault(); } catch (eLT) { /* 观测失败不影响注入 */ }
     },
     /**
      * v0.1.15: 真撤销。按上一轮落地记录清空全部已注入槽位。
