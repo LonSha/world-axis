@@ -593,3 +593,51 @@
   · 附带：<code>node --check</code> 按<b>扩展名</b>判定模块格式，临时文件必须带 <code>.js</code> 后缀，否则
     <code>ERR_UNKNOWN_FILE_EXTENSION</code> 会伪装成「被检文件有语法错」——<b>报错指向的对象不是真正的出错对象</b>。
 
+### R35 · 2026-09-22 · v2.52.0 交付（人物生活·第三十七面：把「持续目标」从人设描述变成可结算的承诺）
+- **做了什么**：新建 <code>engines/life.js</code>——人物生活面：持续目标（goal）、五类关系承诺（promise / debt / secret / cooperation / boundary）、基础日程（schedule）与条件式行动决策。
+  · 状态落 <code>people.&lt;id&gt;.life</code>，<b>绑定稳定人物 ID</b>（不按名字重查，防同名人串味）。
+  · <code>decide()</code> 决策顺序固定：危机 → 资源缺失 → 高警戒 → 信任求助 → 条件推进 → 等待；<b>明确履约证据优先</b>于普通目标。
+  · 日程冲突返回 <code>time-conflict</code>，不静默改期。
+- **为什么**：全库此前只有「人物当前状态」（location/action/intent），<b>没有「人物欠着什么、打算什么时候做」</b>。于是 NPC 一旦离开正文镜头就静止——长局里人物退化成布景。
+- **接上消费端**：<code>render/inject.js</code> 独立注入项；<code>ui/panel.js</code> 人物页四控件（加目标/加承诺/加日程/结算）；<code>engines/tool-diag.js</code> <code>secLife()</code>。
+- **本版坐实的两处真缺陷**：
+  · ① <b>开关误用点击时的旧状态</b>：控件用 <code>onclick</code> 读自身 checked，<code>renderBody()</code> 重绘后结果被清掉——改为 <code>onchange</code>，结果存 <code>panelEl.dataset.lifeOut</code> 跨重绘。
+  · ② <b>时间走裸墙钟</b>：日程与结算直接用 <code>Date.now()</code>，绕过 <code>core/clock.js</code> 单一时间出口；统一改 <code>clockNow('ui.life')</code>。
+- **验证**：<code>tests/life-v2520.js</code> 通过；全量回归 <b>4933 / 失败 0</b>；dead 223 / uiDead 4 / dataOnly 122；出口面 ns 67 / members 437 / chars 5460；清册面 refs 1572 / 命名空间 73 / 成员 815。
+- **提交**：<code>8a0d632</code>（已推送 <code>origin/main</code>）。
+
+### R36 · 2026-09-22 · v2.53.0 交付（因果与情报·第三十八面：可追溯事件链 + 带来源的人物认知）
+- **做了什么**：新建 <code>engines/intel.js</code>——<b>不新建顶层世界状态</b>，复用既有容器：因果写 <code>currents.causes</code>，情报写 <code>people.&lt;id&gt;.knowledge.intel</code>。
+  · <b>前因必须已存在</b>：须命中世界事实 / 记忆事实 / 演化事件 / 已有暗流之一，否则返回 <code>unknown-cause</code>——<b>禁止凭空生成原因</b>（这是「AI 编一个前因」最常见的入口）。
+  · 情报四级 <code>rumor / report / witness / record</code>，置信度 25 / 55 / 75 / 90；<b>低于 75 保持 <code>suspected</code>，达到 75 才标 <code>believed</code></b>——传闻永不自动升格为事实。
+  · <code>visibleTo(person, topic)</code> 只返回<strong>该人物自己</strong>持有的情报（信息不对称不被全知视角抹平）。
+- **为什么**：<code>evolution</code> 早就有事件与影响链，但那是<b>上帝视角的结果账</b>；「谁因为什么知道了什么」这层从未分开记。缺了它，NPC 会说出他不该知道的事。
+- **接上消费端**：注入项、人物页控件、<code>secIntel()</code>；面板实际消费 <code>knownCause</code> / <code>explain</code> / <code>visibleTo</code> / <code>CONFIDENCE</code>。
+- **验证**：<code>tests/intel-v2530.js</code> → <code>INTEL-V2530: pass</code>；全量回归 <b>4938 / 失败 0</b>；出口面 ns 68 / members 448 / chars 5570；清册面 refs 1595 / 命名空间 74 / 成员 826。
+- **提交**：<code>93692f3</code>（已推送）。
+
+### R37 · 2026-09-22 · v2.54.0 交付（资源与组织·第三十九面：可执行库存与余额不足阻断）
+- **做了什么**：新建 <code>engines/org.js</code>——势力与人物资源账本：<code>grant</code>（入库）/ <code>transfer</code>（转移）/ <code>canAfford</code>（余额）/ <code>stockOf</code> / <code>buildBlock</code>。
+  · 只操作<b>已存在</b>的势力或人物（<code>missing-holder</code>），不凭空创建组织。
+  · 转移前先校验余额，不足返回 <code>insufficient</code> 且<b>库存一字不改</b>（不把负数伪装成成功）。
+  · 人物定位收成单一出口 <code>holder(kind, name, root)</code>：查询与入账走同一条路径，不再两处各写一套 ID 拼装。
+- **为什么**：<code>people.resources</code> 在 <code>core/store.js</code> 的人物字段说明里<b>躺了很久</b>，势力也只存目标/核心/支柱——「资源」在 schema 上是事实，在运行时是空话。这是本仓典型病：<b>声明了容器，没有生产方</b>。
+- **接上消费端**：<code>render/inject.js</code> 注入项（含「不足不得完成转移、不得凭空加库存」的硬口径）；人物页三按钮（入库/转移/检查余额）；<code>secOrg()</code>。
+- **验证**：<code>tests/org-v2540.js</code> → <code>ORG-V2540: pass</code>；全量回归 <b>4943 / 失败 0</b>；dead 223 / uiDead 4 / dataOnly 122；出口面 ns 69 / members 457 / chars 5653；清册面 refs 1621 / 命名空间 75 / 成员 835。
+- **提交**：<code>93bf00e</code>（已推送）。
+
+### R38 · 2026-09-22 · v2.55.0 交付（长线伏笔·第四十面：把「埋了没收」变成可度量的欠账）
+- **做了什么**：新建 <code>engines/longline.js</code>——长线伏笔的<b>承诺回收时刻</b>与<b>逾期欠账</b>。
+  · <code>promise(id, dueAt)</code> 只给<b>已存在的伏笔</b>写 <code>dueAt</code>：不存在 → <code>missing-foreshadow</code>，已终态（recycled/dropped/triggered）→ <code>already-terminal</code>，非法时刻 → <code>bad-due</code>。<b>不创建伏笔、不改写状态</b>。
+  · <code>overdue(now)</code> / <code>sweep(now)</code> / <code>pressure(now)</code>：超过 <code>graceMs</code> 才算逾期，按逾期时长降序，<b>只报不改</b>。
+  · <code>buildBlock()</code> 注入欠账清单，并显式写明「<b>逾期只提示，不自动回收；收束与否由剧情决定</b>」。
+- **为什么**：<code>memory.foreshadows</code> 早有状态枚举与终态回收（<code>pruneForeshadows</code>），但<b>没有任何「承诺何时回收」的字段</b>——于是「埋了没收」在全库不可观测：伏笔可以无限期 <code>waiting</code>，既不被回收、也不被报出，长线全靠人记。这是「长线」这一面最真实的缺口。
+- **边界（写进模块头，防后续误用）**：① 总开关默认关闭；② 只度量、不回收——<b>回收是叙事决定，不是容量决定</b>（与 <code>pruneForeshadows</code> 的容量治理职责严格分开）。
+- **接上消费端**：<code>render/inject.js</code> 注入项；人物页三控件（设定承诺 / 扫描欠账 / 总开关）；<code>secLongline()</code>（含 pressure 与 worstMs）。
+- **本版坐实的真缺陷（我自己的）**：
+  · ① <code>bad-due</code> 这条拒绝<b>没有计入 <code>blocked</code></b>——计量账漏一笔。由行为测试第 12 项当场红灯暴露（<b>「模块能跑」不等于「账记得对」</b>）。
+  · ② <code>overdue</code> 起初<b>没有产品消费端</b>（只有测试调它）⇒ 死导出账本当场 dead 223→224。门禁点出后接进面板扫描按钮，dead 回到 223——<b>本项目「新导出必须立刻有真消费方」这条铁律，是靠门禁自动拦住我的</b>。
+- **验证**：<code>tests/longline-v2550.js</code> → <code>LONGLINE-V2550: pass</code>（12 组）；全量回归 <b>4948 / 失败 0</b>；dead 223 / uiDead 4 / dataOnly 122 / 仅测试 131；出口面 ns 70 / members 466 / chars 5742；清册面 refs 1644 / 命名空间 76 / 成员 844。
+- **工程教训（重要，已固化进流程）**：<b>用 heredoc 向终端传中文脚本会偶发讹变</b>（实测 <code>拒绝转移</code> 被写成 <code>拒绍转移</code>、<code>资源与组织</code> 被写成 <code>资 源与组织</code>），导致字面锚点匹配失败而补丁静默不生效。<b>含中文的改动一律走 <code>edit_file</code> 或 <code>create_file</code> 落盘后再执行</b>；终端内只做纯 ASCII 替换。
+- **提交**：<code>（见本版提交）</code>。
+

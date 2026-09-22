@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.54.0';
+  const VERSION = '2.55.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -284,6 +284,8 @@
     'engines/intel.js',
     // v2.54.0：资源与组织。须早于 render/inject.js，注入时读取 org.buildBlock()。
     'engines/org.js',
+    // v2.55.0：长线伏笔。须早于 render/inject.js，注入时读取 longline.buildBlock()。
+    'engines/longline.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

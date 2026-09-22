@@ -211,6 +211,8 @@
       if (WA.intel) { const ib = WA.intel.buildBlock(); if (ib) items.push({ source: '因果与情报', content: ib }); }
       // v2.54.0：资源与组织。模块或开关关闭时 buildBlock 返回空串，不注入。
       if (WA.org) { const ob = WA.org.buildBlock(); if (ob) items.push({ source: '资源与组织', content: ob }); }
+      // v2.55.0：长线伏笔。只报逾期欠账，且不自动回收。
+      if (WA.longline) { const lb2 = WA.longline.buildBlock(); if (lb2) items.push({ source: '长线伏笔', content: lb2 }); }
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）

@@ -318,6 +318,11 @@
     const reg = WA.registry.list();
     const people = Object.values(s.people);
     return `
+      <div class="wa-sec">长线伏笔（承诺回收时刻）</div>
+      <label class="wa-row"><input id="wa-ll-enabled" type="checkbox" ${WA.longline && WA.longline.getSettings().enabled ? 'checked' : ''}/> 启用长线伏笔提醒</label>
+      <div class="wa-row"><input id="wa-ll-id" class="wa-input" placeholder="伏笔 id"/><input id="wa-ll-due" class="wa-input" placeholder="分钟（多久后应收）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-ll-promise">设定承诺</button><button class="wa-btn" id="wa-ll-sweep">扫描欠账</button></div>
+      <div id="wa-ll-out" class="wa-out"></div>
       <div class="wa-sec">资源与组织</div>
       <label class="wa-row"><input id="wa-org-enabled" type="checkbox" ${WA.org && WA.org.getSettings().enabled ? 'checked' : ''}/> 启用资源与组织</label>
       <div class="wa-row"><input id="wa-org-kind" class="wa-input" placeholder="faction 或 person"/><input id="wa-org-name" class="wa-input" placeholder="持有者"/><input id="wa-org-item" class="wa-input" placeholder="资源"/><input id="wa-org-qty" class="wa-input" placeholder="数量"/></div>
@@ -1445,6 +1450,22 @@
     });
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
     // v2.54.0：只操作已有势力或人物；余额不足时拒绝转移。
+    // v2.55.0：长线伏笔只报欠账，不自动回收。
+    const llVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const llOut = function (r, keep) {
+      const text = r && r.ok ? ('已记录 ' + (r.id || r.reason || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
+      if (keep) panelEl.dataset.llOut = text;
+      const o = $('#wa-ll-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.llOut) { const saved = $('#wa-ll-out'); if (saved) saved.textContent = panelEl.dataset.llOut; }
+    { const el = $('#wa-ll-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.longline) return llOut({ ok: false, reason: 'module-missing' }, true);
+        WA.longline.setSettings({ enabled: !!el.checked });
+        llOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' }, true);
+      }; }
+    on('#wa-ll-promise', () => { if (!WA.longline) return llOut({ ok: false, reason: 'module-missing' }, true); const mins = Number(llVal('#wa-ll-due')); const due = clockNow('ui.longline') + (isFinite(mins) && mins > 0 ? mins * 60000 : 0); llOut(WA.longline.promise(llVal('#wa-ll-id'), due), true); renderBody(); });
+    on('#wa-ll-sweep', () => { if (!WA.longline) return llOut({ ok: false, reason: 'module-missing' }, true); const rows = WA.longline.overdue(); const r = WA.longline.sweep(); const pr = WA.longline.pressure(); const block = WA.longline.buildBlock(); llOut({ ok: true, id: rows.length + ':' + r.count + ':' + pr.level + ':' + (block ? 'block' : 'empty'), reason: '' }, true); });
     const orgVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
     const orgOut = function (r, keep) {
       const text = r && r.ok ? ('已记录 ' + (r.id || r.reason || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
