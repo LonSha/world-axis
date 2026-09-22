@@ -8359,7 +8359,12 @@ WA.loadScript = _ls.loadScript;
     //   采集范围扩展到全部 ui/*.js 后，守卫表才可能真正覆盖设置页。
     const renderedH = [];
     const reH = /id="(wa-[a-z0-9\-]+)"/g;
-    const uiFilesH = ['ui/panel.js', 'ui/settings.js', 'ui/assistant.js'];
+    // v2.43.0：守卫表控件 id 的采集面此前**硬编码三个 ui 文件**——与 v2.42.0 修掉的两处同源，
+    //   是那份三文件清单在仓库里的**第三份**副本。实测坐实：副本注入 ui/zb_extra.js（含
+    //   `id="wa-zb-untracked"`）后，硬编码采集面**恒 198 项**、动态面 199 项——多出的那个控件
+    //   在下面「面板渲染的每个控件都在守卫表内」这条断言里**永不可见**，而门禁全绿。
+    //   守卫表是控件接线面的唯一真源：采集面漏文件 = 该文件渲染的控件被永久放行。
+    const uiFilesH = require('./product-files.js').uiFiles(BASE);
     const uiSrcJoinH = uiFilesH.map(function (f) {
       try { return fs.readFileSync(path.join(BASE, f), 'utf8'); } catch (e) { return ''; }
     }).join('\n');
@@ -9814,7 +9819,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10358,7 +10363,7 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.42.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.43.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10649,7 +10654,7 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.42.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.43.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11139,7 +11144,11 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     assert(invSrc2800.indexOf('MODULE_EXPORTS') > 0, '体检脚本从 tool-diag 取声明表（不复制，避免两处漂移）');
     assert(invSrc2800.indexOf("const LOAD = [") > 0 && invSrc2800.indexOf('tests/run.js') > 0,
       '装载清单从 tests/run.js 提取（单一真源，新增模块自动纳入）');
-    assert(invSrc2800.indexOf('ui/panel.js') > 0, '体检脚本会尝试装载 UI 层——把「UI 未装载」这类假悬空与真悬空分开');
+    // v2.43.0：装载面的**实现**上收至 product-files.js（单一真源），故此处不再断言
+    //   字面量 `ui/panel.js`，改断言「UI 装载面仍由同一真源推导」——原意（体检脚本
+    //   确实尝试装载 UI 层）不变，只是不再把判据绑在某个具体文件名字面量上。
+    assert(invSrc2800.indexOf('product-files.js') > 0 && invSrc2800.indexOf('uiFiles(BASE)') > 0,
+      '体检脚本会尝试装载 UI 层（装载面经单一真源推导）——把「UI 未装载」这类假悬空与真悬空分开');
     // v2.27.0: 清册抽成 collect() 后 CLI 收口改为 `process.exitCode = result.phantom.length ? 1 : 0`。
     //   意图不变、强度更高（① 结论直接取自本次 collect 的返回值，不再依赖外层作用域变量；
     //   ② 行成 exitCode 而非 process.exit()，避免大输出经管道时被截断）。
@@ -11175,7 +11184,7 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.42.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.43.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11572,7 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.42.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.43.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11942,7 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.42.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.43.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12307,7 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.42.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.43.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14600,7 +14609,7 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.42.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.43.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -16075,8 +16084,9 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     const OLD_LIST4200 = "['ui/panel.js', 'ui/settings.js', 'ui/assistant.js']";
     assert(syncSrc4200.indexOf(OLD_LIST4200) < 0 && wireSrc4200.indexOf(OLD_LIST4200) < 0,
       'v2420: 两道门禁源码里已无硬编码三文件清单');
-    assert(syncSrc4200.indexOf('discoverUIFiles') > 0 && wireSrc4200.indexOf('readdirSync') > 0,
-      'v2420: 两处发现面均落在 readdirSync（动态，跟磁盘走）');
+    assert(syncSrc4200.indexOf('discoverUIFiles') > 0
+      && (wireSrc4200.indexOf('readdirSync') > 0 || wireSrc4200.indexOf("require('./product-files.js')") > 0),
+      'v2420: 两处发现面均动态跟磁盘走（v2.43.0 起实现统一收口到 product-files.js，判据同步放宽为「动态或委托」）');
 
     // ── C. 行为级负向自证：发现逻辑真的读文件系统，不是换了写法的常量 ──
     //   做法：在临时目录里造一个「比仓库多一个模块」的 ui/，发现器必须跟着变。
@@ -16109,7 +16119,193 @@ assert(verF2500 === '2.42.0' && mfF2500.version === verF2500, '入口与清单�
     console.log('  ✓ v2420: 两道 ui 门禁的 UI 文件面改动态发现（原硬编码三文件清单），与磁盘一致');
     console.log('  ✓ v2420: 行为级负向自证——临时目录多一模块即跟随，证明发现器非恒值');
   }
-  // ══════════ v2.41.0 ══════════
+  // ══════════ v2.43.0 ══════════
+  // 第三十面：文件面单一真源。
+  //
+  // 沿「陈旧常量」家族继续拓深。v2.42.0 修完当场复查，抓到同一份「UI 三文件清单」在仓库里
+  //   **共有四份副本**，v2.42.0 只动了其中两份：
+  //     · tests/ui-gate-sync.js   UI_FILES    （已修，v2.42.0）
+  //     · tests/ui-wire-audit.js  uiFiles()   （已修，v2.42.0）
+  //     · tests/run.js:8362       uiFilesH    （漏网 → 本版）
+  //     · tests/inventory.js:174  UI_LOAD     （漏网 → 本版）
+  //   漏网那两份的后果是**实测坐实**的，不是推理：在副本注入 ui/zb_extra.js（渲染
+  //   `id="wa-zb-untracked"`）后，run.js 的守卫采集面**恒 198 项**、动态发现面 199 项 ——
+  //   多出的那个控件在「面板渲染的每个控件都在守卫表内」这条断言里**永不可见**，而 ui-gate
+  //   照样 53/0 全绿。守卫表是控件接线面的唯一真源：采集面漏一个文件 = 该文件渲染的全部控件
+  //   被永久放行，且无人知道。
+  //
+  //   更深一层的病根不是「那四处」，而是**「什么算产品/UI 文件面」这件事被四处各写了一遍**：
+  //     · inventory.productFiles()           排 tests/+tools/
+  //     · export-contract.files()            只排 tests/（含 tools/）
+  //     · field-liveness-gate.productFaces() 经 inventory 间接遍历
+  //     · run.js 多处内联遍历
+  //   口径已经开始漂移，全靠人工同步。本版把定义**上收成一份**：新增 tests/product-files.js
+  //   作为文件面单一真源（productFiles / discoverFiles / discoverUIFiles / uiFiles），
+  //   上述消费方一律改为**委托调用**。此后新增 ui/*.js 或新增产品模块，所有消费方同时跟随；
+  //   「两个遍历器排除名单不一致」这类漂移在结构上不可能再发生。
+  //   v2.42.0 的 discoverUIFiles(dir) / uiFiles(dir)：**名字与签名不变**，其实现在此处，
+  //   原两处改为转出/委托 —— v2.42.0 段的行为级负向自证与交叉核对无需改动、逐项照跑。
+  section('v2.43.0：文件面单一真源（同家族三/四份副本 → 定义上收 + 成类静态锁 + 破坏性自证）');
+  {
+    const fs4300 = require('fs');
+    const os4300 = require('os');
+    const path4300 = require('path');
+    const cp4300 = require('child_process');
+    const pf4300 = require('./product-files.js');
+    const inv4300 = require('./inventory.js');
+    // ── A. 单一真源的导出面与行为（发现器真跟文件系统走）──
+    assert(typeof pf4300.productFiles === 'function' && typeof pf4300.discoverFiles === 'function'
+      && typeof pf4300.discoverUIFiles === 'function' && typeof pf4300.uiFiles === 'function'
+      && typeof pf4300.repoFiles === 'function',
+      'v2430: product-files.js 导出 productFiles / repoFiles / discoverFiles / discoverUIFiles / uiFiles');
+    const uiDisk4300 = fs4300.readdirSync(path4300.join(BASE, 'ui'))
+      .filter(function (n) { return /\.js$/.test(n); }).sort().map(function (n) { return 'ui/' + n; });
+    assert(pf4300.uiFiles(BASE).join(',') === uiDisk4300.join(','),
+      'v2430: uiFiles(BASE) 与 ui/ 磁盘实际逐项一致（实 ' + pf4300.uiFiles(BASE).join('、') + '）');
+    const prod4300 = pf4300.productFiles(BASE);
+    assert(prod4300.length > 0 && prod4300.indexOf('index.js') >= 0,
+      'v2430: productFiles(BASE) 非空且含 index.js（实 ' + prod4300.length + ' 个）');
+    assert(prod4300.filter(function (f) { return /^(tests|tools)\//.test(f); }).length === 0,
+      'v2430: productFiles 排除 tests/ 与 tools/（统一口径）');
+    // ── B. 委托锁：四处消费方都不再自带发现逻辑，改为委托同一实现 ──
+    const invSrc4300 = fs4300.readFileSync(path4300.join(BASE, 'tests/inventory.js'), 'utf8');
+    const flSrc4300 = fs4300.readFileSync(path4300.join(BASE, 'tests/field-liveness-gate.js'), 'utf8');
+    const ecSrc4300 = fs4300.readFileSync(path4300.join(BASE, 'tests/export-contract.js'), 'utf8');
+    const syncSrc4300 = fs4300.readFileSync(path4300.join(BASE, 'tests/ui-gate-sync.js'), 'utf8');
+    const wireSrc4300 = fs4300.readFileSync(path4300.join(BASE, 'tests/ui-wire-audit.js'), 'utf8');
+    const runSrc4300 = fs4300.readFileSync(path4300.join(BASE, 'tests/run.js'), 'utf8');
+    assert(invSrc4300.indexOf("require('./product-files.js')") > 0
+      && invSrc4300.indexOf("const SKIP_DIRS = ['tests', 'tools']") < 0,
+      'v2430: inventory.js 的文件面改委托 product-files.js（不再自带内联遍历）');
+    assert(ecSrc4300.indexOf('productFiles(BASE)') > 0,
+      'v2430: export-contract.js 的文件面改委托 productFiles（与 inventory 同一份清单）');
+    assert(syncSrc4300.indexOf("require('./product-files.js')") > 0
+      && wireSrc4300.indexOf("require('./product-files.js')") > 0,
+      'v2430: 两道 ui 门禁的发现实现转出/委托 product-files.js（v2.42.0 导出名保持）');
+    assert(runSrc4300.indexOf(".uiFiles(BASE)") > 0,
+      'v2430: run.js 守卫表的控件采集面改委托 uiFiles（原 uiFilesH 硬编码三文件）');
+    //   口径统一的**无副作用**证明：inventory 的 PRODUCT_FILES 与真源逐项一致，
+    //   且 export-contract 生成的契约串规模不变（此前只排 tests/、含 tools/，实测无差）。
+    assert(inv4300.PRODUCT_FILES.join(',') === prod4300.join(','),
+      'v2430: PRODUCT_FILES 与 productFiles(BASE) 逐项一致（' + prod4300.length + ' vs ' + inv4300.PRODUCT_FILES.length + '）');
+    const ecRun4300 = cp4300.spawnSync(process.execPath, ['tests/export-contract.js'],
+      { cwd: path4300.join(__dirname, '..'), encoding: 'utf8' });
+    assert(ecRun4300.status === 0 && /ns= 60 members= 360 chars= 4546/.test(String(ecRun4300.stdout)),
+      'v2430: 统一排除口径后出口面契约规模逐字不变（实 ' + String(ecRun4300.stdout).split('\n')[0] + '）');
+    // ── C. 成类静态锁：UI 三文件清单在**整个代码面**硬零（防任一处回退写法复活）──
+    //   这是 v2.42.0「两道门禁源码里已无旧清单」断言的**成类化**：不再只盯两个文件，
+    //   而是全仓扫——漏网的两处正是「只盯两个文件」放走的。
+    //   口径三条（都是踩过坑才定的）：
+    //     ① 扫描面用 repoFiles（含 tests/），不用 productFiles —— 缺陷恰落在 tests/ 里；
+    //     ② 豁免「v2.42.0 判据里那行**锚点定义**」（源码含 `OLD_LIST4200 = "..."`）——
+    //        判据必须能指名旧形态，属必要自指（纪律 H6）；
+    //     ③ 判据自身**不含** `'ui/panel.js'` 这类字面量：needle 由 OS 路径片段拼装
+    //        （与 v2.41.0 的 `/tmp` needle 规避同法），否则判据自己就是命中项。
+    const NAMES4300 = ['panel', 'settings', 'assistant'].map(function (n) { return 'ui/' + n + '.js'; });
+    const QUOTED4300 = NAMES4300.map(function (n) { return "'" + n + "'"; });
+    const exactSign4300 = QUOTED4300.join(', ');                 // 原始清单签名（恰一份，仅供报告）
+    //   「映射形态」排除：`'ui/panel.js': 'ui'`（tool-diag 的 MODULE_EXPORTS 表）是**合法**的
+    //   文件↔命名空间登记，不是「发现面清单」。判据只抓**裸清单**（名字后不接冒号）。
+    const KEYED4300 = NAMES4300.map(function (n) { return new RegExp("'" + n + "'\\s*:"); });
+    const strayList4300 = [];
+    const strayLine4300 = [];
+    pf4300.repoFiles(BASE).forEach(function (rel) {
+      const src = fs4300.readFileSync(path4300.join(BASE, rel), 'utf8');
+      src.split('\n').forEach(function (ln, k) {
+        if (/^\s*(\/\/|\*|\/\*)/.test(ln)) return;                 // 注释面不算代码
+        if (ln.indexOf('OLD_LIST4200') >= 0) return;               // ② 判据的锚点定义行（必要自指）
+        if (ln.indexOf(exactSign4300) >= 0) strayList4300.push(rel + ':' + (k + 1));
+        const bare = QUOTED4300.map(function (q, i) { return ln.indexOf(q) >= 0 && !KEYED4300[i].test(ln); });
+        if (bare.every(Boolean)) strayLine4300.push(rel + ':' + (k + 1));
+      });
+    });
+    assert(strayList4300.length === 0,
+      'v2430: 全仓代码面已无硬编码三文件**清单**（实 ' + JSON.stringify(strayList4300) + '）');
+    assert(strayLine4300.length === 0,
+      'v2430: 全仓代码面无「三个 ui 文件名裸清单同现」形态（映射表除外，实 ' + JSON.stringify(strayLine4300) + '）');
+    //   ②③ 两条豁免的自证：判据源码自身不得落在扫描命中里（否则判据恒红/恒绿皆不可信），
+    //   而 v2.42.0 的锚点行**必须**只由锚点豁免放过（不是靠别的巧合）。
+    //   口径：run.js 里凡含 exactSign4300 的行，必须**同时**含 OLD_LIST4200（即只在豁免行上）。
+    const selfHits4300 = fs4300.readFileSync(path4300.join(BASE, 'tests/run.js'), 'utf8').split('\n')
+      .filter(function (ln) { return ln.indexOf(exactSign4300) >= 0; });
+    assert(selfHits4300.length >= 1 && selfHits4300.every(function (ln) { return ln.indexOf('OLD_LIST4200') >= 0; }),
+      'v2430: 三文件字面量在 run.js 中只出现在锚点定义行（判据侧无自指命中，实 ' + selfHits4300.length + ' 行）');
+    assert(strayList4300.length === 0 && strayLine4300.length === 0,
+      'v2430: 豁免生效——锚点行未被算作残留（扫描结果为 0，见上两条）');
+    // ── D. 行为级负向自证：真源在临时树上跟随（证明它不是又一个换了写法的常量）──
+    const tmpTree4300 = fs4300.mkdtempSync(path4300.join(os4300.tmpdir(), 'wa_pf_4300_'));
+    ['ui', 'engines', 'tests', 'tools'].forEach(function (d) { fs4300.mkdirSync(path4300.join(tmpTree4300, d)); });
+    ['ui/a.js', 'ui/b.js', 'engines/c.js', 'tests/d.js', 'tools/e.js'].forEach(function (rel) {
+      fs4300.writeFileSync(path4300.join(tmpTree4300, rel), '// probe\n', 'utf8');
+    });
+    assert(pf4300.uiFiles(tmpTree4300).join(',') === 'ui/a.js,ui/b.js',
+      'v2430: （负向自证）临时树 ui/ 两个模块 ⇒ uiFiles 跟随（实 ' + pf4300.uiFiles(tmpTree4300).join('、') + '）');
+    assert(pf4300.productFiles(tmpTree4300).join(',') === 'engines/c.js,ui/a.js,ui/b.js',
+      'v2430: （负向自证）productFiles 跟随临时树并排除 tests/tools（实 ' + pf4300.productFiles(tmpTree4300).join('、') + '）');
+    assert(uiDisk4300.length === 3 && pf4300.uiFiles(tmpTree4300).length === 2,
+      'v2430: （负向自证）仓库 3 个 vs 临时 2 个——发现面取决于目录内容，非恒值');
+    fs4300.rmSync(tmpTree4300, { recursive: true, force: true });
+    // ── E. 破坏性负向自证：真源码破坏 → 同一判据必须现形（在**副本**上做，不动工作区）──
+    //   这是本版的「坐实」证据：证明漏网的那份硬编码**确实**会让新控件隐身，
+    //   而修复后的委托采集面**确实**能看见它。判据不引用锚点串、破坏在副本上、原版上同判据不报。
+    const negDir4300 = path4300.join(os4300.tmpdir(), 'wa_neg4300_' + process.pid);
+    try { fs4300.rmSync(negDir4300, { recursive: true, force: true }); } catch (e) {}
+    fs4300.mkdirSync(negDir4300, { recursive: true });
+    const tarR4300 = cp4300.spawnSync('sh', ['-c',
+      'tar --exclude=.git -cf - . | (cd ' + negDir4300 + ' && tar -xf -)'], { cwd: BASE, encoding: 'utf8' });
+    assert(tarR4300.status === 0 && fs4300.existsSync(path4300.join(negDir4300, 'index.js')),
+      'v2430: 副本目录就绪（破坏性验证一律在副本上做）');
+    //   注入一个「新增 ui 模块」：含一个当前不存在的控件 id。
+    fs4300.writeFileSync(path4300.join(negDir4300, 'ui/zb_extra.js'),
+      '(function () { window.WorldAxis = window.WorldAxis || {}; '
+      + 'window.WorldAxis.zbExtra = { render: function () { return \'<div id="wa-zb-untracked"></div>\'; } }; })();\n', 'utf8');
+    const RE_ID4300 = /id="(wa-[a-z0-9\-]+)"/g;
+    const collectIds4300 = function (dirAbs, rels) {
+      const seen = [];
+      rels.forEach(function (rel) {
+        let src = '';
+        try { src = fs4300.readFileSync(path4300.join(dirAbs, rel), 'utf8'); } catch (e) { return; }
+        let m; RE_ID4300.lastIndex = 0;
+        while ((m = RE_ID4300.exec(src))) if (seen.indexOf(m[1]) < 0) seen.push(m[1]);
+      });
+      return seen;
+    };
+    const negUIFiles4300 = pf4300.uiFiles(negDir4300);
+    const negDyn4300 = collectIds4300(negDir4300, negUIFiles4300);              // 修复后：委托真源
+    const OLD_LIT4300 = QUOTED4300.map(function (q) { return q.slice(1, -1); });  // 旧硬编码三文件（字面量不落此判据）
+    const negHard4300 = collectIds4300(negDir4300, OLD_LIT4300);               // 旧形态：硬编码三文件
+    const repoDyn4300 = collectIds4300(BASE, pf4300.uiFiles(BASE));
+    assert(negDyn4300.length === repoDyn4300.length + 1 && negDyn4300.indexOf('wa-zb-untracked') >= 0,
+      'v2430: （坐实）修复后的采集面看得见新控件（' + repoDyn4300.length + ' → ' + negDyn4300.length + '，含 wa-zb-untracked）');
+    assert(negHard4300.length === repoDyn4300.length && negHard4300.indexOf('wa-zb-untracked') < 0,
+      'v2430: （坐实）旧硬编码采集面**看不见**它（恒 ' + negHard4300.length + '，漏 wa-zb-untracked）—— 这就是漏网那处的后果');
+    const invis4300 = negDyn4300.filter(function (id) { return negHard4300.indexOf(id) < 0; });
+    assert(invis4300.length === 1 && invis4300[0] === 'wa-zb-untracked',
+      'v2430: （坐实）两份采集面的差集恰为 1（' + JSON.stringify(invis4300) + '）');
+    //   真源码破坏（**不落任何字面量**，消除自指）：把 run.js 的**委托调用**改成直接内联
+    //   发现（回到「每处自己发现」的世界）。破坏在副本上执行，判据读副本文件。
+    //   ① 锚点：委托调用「恰出现 1 次」——判据不引用它（用两段拼装定位）；
+    //   ② 破坏后：副本 run.js 里不再有委托调用，且出现内联 readdirSync 版发现；
+    //   ③ 对副本执行 node --check 确认破坏后的文件仍是合法 JS（破坏可观测、非随机字符串）。
+    const call4300 = ['require', "('./product-files.js').uiFiles", '(BASE)'].join('');
+    const runSrcNeg4300 = fs4300.readFileSync(path4300.join(negDir4300, 'tests/run.js'), 'utf8');
+    assert(runSrcNeg4300.split(call4300).length - 1 === 1,
+      'v2430: （负向自证）委托调用在真源码中恰出现 1 次');
+    const runSrcBroken4300 = runSrcNeg4300.split(call4300)
+      .join("fs.readdirSync(path.join(BASE, 'ui')).filter(function (n) { return /\\.js$/.test(n); }).sort().map(function (n) { return 'ui/' + n; })");
+    assert(runSrcBroken4300 !== runSrcNeg4300 && runSrcBroken4300.indexOf(call4300) < 0,
+      'v2430: （负向自证）退回「每处自己发现」的旧写法（委托调用已消失）');
+    fs4300.writeFileSync(path4300.join(negDir4300, 'tests/run.js'), runSrcBroken4300, 'utf8');
+    const checkBroken4300 = cp4300.spawnSync(process.execPath, ['--check', path4300.join(negDir4300, 'tests/run.js')],
+      { encoding: 'utf8' });
+    assert(checkBroken4300.status === 0,
+      'v2430: （负向自证）破坏后的副本仍为合法 JS（破坏改语义、不破坏语法）');
+    try { fs4300.rmSync(negDir4300, { recursive: true, force: true }); } catch (e) {}
+    assert(!fs4300.existsSync(negDir4300), 'v2430: 副本已清理（不留残留）');
+    console.log('  ✓ v2430: 文件面定义上收为单一真源（product-files.js），四处消费方全部委托');
+    console.log('  ✓ v2430: 成类静态锁（全仓「UI 三文件清单」硬零）+ 行为级/破坏性双重负向自证');
+  }
+// ══════════ v2.41.0 ══════════
   // 第二十八面：工具可移植性。v2.40.0 刚抓完「门禁写死一种形态」的陈旧常量，
   //   本轮沿同一根线扫「工具写死一种环境」——tests/export-contract.js 的 BASE /
   //   mock 路径 / 产物路径**硬编码 `/tmp/wa_git`**：换目录或换机器跑会直接 throw。

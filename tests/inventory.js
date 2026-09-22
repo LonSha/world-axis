@@ -44,21 +44,12 @@ const oj = diagSrc.indexOf('];', oi);
 const OPTIONAL_EXPORTS = vm.runInNewContext('(' + diagSrc.slice(diagSrc.indexOf('[', oi), oj + 1) + ')');
 
 // ── 3. 引用面：静态扫描产品代码（v2.28.0 提到模块顶层，供门禁复用同一份扫描面与正则）──
-function productFiles() {
-  const out = [];
-  // v2.22.0: `tools/` 是零依赖诊断脚本（scan_drift 等），不导出命名空间、不属产品模块面；
-  //   与 tests/ 同例排除，否则每个诊断脚本都会以「未登记模块」形式挂在清册上（假阳性）。
-  const SKIP_DIRS = ['tests', 'tools'];
-  (function walk(dir) {
-    fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
-      if (e.name === '.git' || e.name === 'node_modules') return;
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) return walk(p);
-      if (e.name.endsWith('.js') && SKIP_DIRS.indexOf(path.relative(BASE, dir)) < 0) out.push(path.relative(BASE, p));
-    });
-  })(BASE);
-  return out.sort();
-}
+// v2.43.0：产品文件面的**定义**上收至 tests/product-files.js（单一真源）。
+//   此前「什么算产品文件面」在四处各写了一遍遍历器（本文件 / field-liveness-gate /
+//   export-contract / run.js 内联），口径已经开始漂移：export-contract 只排 tests/、
+//   本文件排 tests/+tools/。统一到一处后，差集的来源只可能是真实的文件增删，
+//   不可能再是「两个遍历器的排除名单不一致」。PRODUCT_FILES 的对外语义与取值逐项不变。
+const { productFiles } = require('./product-files.js');
 const PROD = productFiles();
 // 引用面正则：`WA.x.y` 与可选链 `WA.x?.y` 都算真引用；私有成员（`_` 前缀）与
 // 非接口命名空间（宿主级导出、数组下标）在下面两道 guard 里挡掉。
@@ -171,7 +162,7 @@ for (const rel of LOAD) {
 //   进程内调用 collect()，此时 UI 层尚未装载）会得到另一幅面：命名空间 61 / uiPhantom 14 / uiDead 0，
 //   与 CLI 的 64 / 0 / 4 不一致。定义面随**调用时机**漂移 = 判据不确定，门禁与账本都不可能与它对齐。
 //   现改为无条件按需装载（只补缺席的，已装载的不重复求值）：两条路径结果逐项一致。
-const UI_LOAD = ['ui/panel.js', 'ui/settings.js', 'ui/assistant.js'];
+const UI_LOAD = require('./product-files.js').uiFiles(BASE);
 for (const rel of UI_LOAD) {
   const ns = MODULE_EXPORTS[rel];
   if (ns && WA_peek(ns)) continue;   // 已在册：复用，不重复求值

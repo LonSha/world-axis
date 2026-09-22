@@ -22,12 +22,14 @@ const BASE = path.join(__dirname, '..');
 //   把一个会长的集合写成常量，于是集合长大了门禁却不知道。
 //   discoverUIFiles 参数化导出：回归可在临时目录上做**行为级**负向自证，
 //   证明它真的读文件系统，而不是又一个换了写法的常量。
-function discoverUIFiles(dir) {
-  return fs.readdirSync(dir)
-    .filter(function (n) { return /\.js$/.test(n); })
-    .sort()
-    .map(function (n) { return 'ui/' + n; });
-}
+// v2.43.0：实现**收进 tests/product-files.js**（文件面单一真源），此处改为转出（re-export）。
+//   为什么还要动一次：v2.42.0 只把这条链上的两份副本改成动态发现，而**同一份三文件清单
+//   在仓库里共有四处**（本文件、ui-wire-audit、tests/run.js 的守卫采集面、tests/inventory.js
+//   的装载面）。剩下两处的后果是实测过的：副本注入 ui/zb_extra.js 后，run.js 的守卫采集面
+//   恒 198 项、动态面 199 项，那个控件在守卫门禁里**永不可见而门禁全绿**。
+//   只修「这一处」是治症状；把定义收成一份、其余全部委托，才是断根。
+//   导出名与签名保持不变（discoverUIFiles(dir)），v2.42.0 的回归断言与负向自证无需改动。
+const { discoverUIFiles } = require('./product-files.js');
 const UI_FILES = discoverUIFiles(path.join(__dirname, '..', 'ui'));
 
 function loadOrder() {

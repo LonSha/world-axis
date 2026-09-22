@@ -31,16 +31,11 @@ const OPTIONAL = ['ui', 'uiSettings', 'assistant'];   // 仅 UI 层依赖宿主�
 const WA = global.WorldAxis;
 
 function files() {
-  const out = [];
-  (function walk(dir) {
-    fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
-      if (e.name === '.git' || e.name === 'node_modules') return;
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) return walk(p);
-      if (e.name.endsWith('.js') && dir !== path.join(BASE, 'tests')) out.push(path.relative(BASE, p));
-    });
-  })(BASE);
-  return out.sort();
+  // v2.43.0：口径统一——改用 tests/product-files.js 的 productFiles()（排 tests/ + tools/）。
+  //   此前本文件自带一份遍历器、只排 tests/，于是 tools/ 下的诊断脚本被算进出口面扫描面。
+  //   实测 tools/scan_drift.js 对 `WA.` 零引用，故统一后契约串逐字不变（回归段有逐字锁）。
+  //   统一的意义：文件面的定义只剩一处，「两个遍历器排除名单不一致」这类漂移不可能再发生。
+  return require('./product-files.js').productFiles(BASE);
 }
 const RE = /WA\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g;
 const map = {};

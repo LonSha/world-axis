@@ -100,6 +100,7 @@ function schemaTopKeys(WA) {
 }
 
 function productFaces() {
+  // v2.43.0：文件面定义上收至 tests/product-files.js（单一真源），此处不再自带发现逻辑。
   const inv = require('./inventory.js');
   return (inv.PRODUCT_FILES || []).map(function (rel) {
     return { rel: rel, face: inv.codeFace(fs.readFileSync(path.join(BASE, rel), 'utf8')) };

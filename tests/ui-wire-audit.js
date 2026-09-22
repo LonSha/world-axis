@@ -52,12 +52,15 @@ function auditWire(src) {
 // v2.42.0：UI 文件面**动态发现**（原为硬编码三文件清单）。
 //   硬编码 = 「新增一个 ui 模块，对两道 ui 门禁（本审计 + ui-gate 的真实点击）**同时隐身**」，
 //   即 UI 层唯一自动化覆盖整体失效。与 v2.40.0 的「页面写死 12」同一家族（把会长的集合写成常量）。
+// v2.43.0：发现的**定义**上收至 tests/product-files.js（文件面单一真源），此处不再自带过滤逻辑。
+//   本函数保留原签名 uiFiles(dir) 与返回体形态（{rel, src}[]），既有调用方与 v2.42.0 的
+//   行为级负向自证（临时目录多一模块即跟随）逐项不变——只是背后换了唯一的实现。
+const { discoverUIFiles } = require('./product-files.js');
 function uiFiles(dir) {
   const d = dir || path.join(BASE, 'ui');
-  return fs.readdirSync(d)
-    .filter(function (n) { return /\.js$/.test(n); })
-    .sort()
-    .map(function (n) { return { rel: 'ui/' + n, src: fs.readFileSync(path.join(d, n), 'utf8') }; });
+  return discoverUIFiles(d).map(function (rel) {
+    return { rel: rel, src: fs.readFileSync(path.join(d, path.basename(rel)), 'utf8') };
+  });
 }
 
 async function main() {
