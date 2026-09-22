@@ -21,14 +21,34 @@
    * @param {number} applied  applySlots 实际成功数
    * @returns {Object} { count, keys, totalChars, perSlot }
    */
+  /**
+   * 采集槽位落地快照
+   * @param {Array} slots     planSlots 的输出 [{slot, position, depth, text, items?}]
+   * @param {number|Object} applied  applySlots 的实际结果：
+   *   兼容两种入参——数字（旧：只给计数）或 applySlots 返回值（新：含 landed 成功名单）。
+   *   v2.47.0: 只给计数时 `landed` 置 null（**不猜**）；给了名单就逐项核对。
+   *   见 audit() 里「归因不得靠猜」的说明。
+   * @returns {Object} { count, applied, landed, keys, totalChars, perSlot }
+   */
   function snapshotSlots(slots, applied) {
     const list = Array.isArray(slots) ? slots : [];
+    const apObj = (applied && typeof applied === 'object') ? applied : null;
+    const landedArr = apObj && Array.isArray(apObj.landed) ? apObj.landed : null;
+    const apNum = (typeof applied === 'number') ? applied : ((apObj && typeof apObj.applied === 'number') ? apObj.applied : 0);
     const perSlot = list.map(function (s) {
-      return { slot: s.slot, position: s.position, depth: s.depth, chars: (s.text || '').length };
+      const items = Array.isArray(s.items) ? s.items : [];
+      return {
+        slot: s.slot, position: s.position, depth: s.depth, chars: (s.text || '').length,
+        // v2.47.0: 记「这一槽位由哪些源拼成」——快照此前只留 key 与字数，
+        //   「某项约束到底进没进正文」在快照里无迹可查
+        sources: items.map(function (x) { return (x && x.source) || '?'; }),
+        itemCount: items.length
+      };
     });
     return {
       count: perSlot.length,
-      applied: (typeof applied === 'number') ? applied : 0,
+      applied: apNum,
+      landed: landedArr ? landedArr.slice() : null,
       keys: perSlot.map(function (x) { return x.slot; }),
       totalChars: perSlot.reduce(function (sum, x) { return sum + x.chars; }, 0),
       perSlot: perSlot
@@ -56,13 +76,22 @@
       });
     }
     // 孤儿槽位：计划了但没落地
+    //   v2.47.0: 归因**不得靠猜**。旧实现假定「前 applied 个成功、其余失败」，于是把
+    //   实际失败了的那一项记成成功、把成功的记成「计划了但未落地」——用户照着这条去查
+    //   一个根本没出错的槽位（实测：第 1 槽抛异常、第 2 槽正常时，报的是第 2 槽）。
+    //   现在优先按 applySlots 交回的成功名单逐项核对；名单缺席（旧入参）时**不猜**，
+    //   改为如实报「有几个不确定、且不知道是哪几个」，宁可少报也不误导。
     if (slots.applied < slots.count) {
-      const landed = slots.perSlot.slice(0, slots.applied).map(function (x) { return x.slot; });
-      slots.perSlot.forEach(function (p) {
-        if (landed.indexOf(p.slot) < 0) {
-          issues.push({ level: 'error', code: 'slot.orphan', detail: '槽位 ' + p.slot + ' 计划了但未落地（可能被宿主覆盖或 setExt 抛异常）' });
-        }
-      });
+      const landedList = Array.isArray(slots.landed) ? slots.landed : null;
+      if (landedList) {
+        slots.perSlot.forEach(function (p) {
+          if (landedList.indexOf(p.slot) < 0) {
+            issues.push({ level: 'error', code: 'slot.orphan', detail: '槽位 ' + p.slot + ' 计划了但未落地（可能被宿主覆盖或 setExt 抛异常）' });
+          }
+        });
+      } else {
+        issues.push({ level: 'error', code: 'slot.orphanUnknown', detail: '有 ' + (slots.count - slots.applied) + ' 个槽位未落地，但快照未记录成功名单，无法定位是哪几个（applySlots 未交回 landed）' });
+      }
     }
     // 主块声称的来源数与槽位接管项冲突时给出提示（信息级）
     if (Array.isArray(li.sources) && li.sources.length && slots.count) {

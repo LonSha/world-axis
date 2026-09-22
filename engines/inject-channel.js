@@ -66,6 +66,9 @@
         slot: b.slot,
         position: b.position,
         depth: b.items[0].depth,
+        // v2.47.0: 带上桶内成员——落地快照靠它回答「这条约束最后进了哪个槽位」，
+        //   此前只留 slot 与 text，源身份在快照里无迹可查。
+        items: b.items.map(function (i) { return { source: i.source, depth: i.depth, chars: String(i.content || '').length }; }),
         text: b.items.map(function (i) { return i.content; }).join('\n')
       };
     });
@@ -85,18 +88,23 @@
    */
   function applySlots(setExt, slots) {
     const list = slots || [];
-    if (typeof setExt !== 'function') return { applied: 0, total: list.length, errors: [{ slot: '(all)', detail: 'setExt 不是函数' }] };
+    if (typeof setExt !== 'function') return { applied: 0, total: list.length, landed: [], errors: [{ slot: '(all)', detail: 'setExt 不是函数' }] };
     let applied = 0;
     const errors = [];
+    // v2.47.0: 记**成功名单**。此前只回 applied 计数，失败名单无出口 ⇒ 下游只能按
+    //   「前 N 个成功」猜——而失败可能发生在任意位置（实测：第 1 个抛异常、第 2 个成功时，
+    //   快照把成功的那个记成「未落地」，把真出错的漏掉，排查方向被彻底带偏）。
+    const landed = [];
     list.forEach(function (s) {
       try {
         setExt(s.slot, s.text, POS[s.position], s.depth, false);
         applied++;
+        landed.push(s.slot);
       } catch (e) {
         errors.push({ slot: s.slot, position: s.position, depth: s.depth, detail: String(e && (e.message || e)) });
       }
     });
-    return { applied: applied, total: list.length, errors: errors };
+    return { applied: applied, total: list.length, landed: landed, errors: errors };
   }
 
   WA.injectChannel = {

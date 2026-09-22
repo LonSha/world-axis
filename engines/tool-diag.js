@@ -584,6 +584,8 @@
       'wa-ka-rule-id', 'wa-ka-rule-when', 'wa-ka-rule-text', 'wa-ka-rule-add',
       'wa-ka-eval', 'wa-ka-clear', 'wa-ka-out'] }
   ];
+  // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
+  //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。
   function secUi() {
     return safe(function () {
       const doc = (WA.mainDoc || (mainWin && mainWin.document)) || null;

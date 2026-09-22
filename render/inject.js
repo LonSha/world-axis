@@ -239,6 +239,9 @@
       let routedKeys = [];
       let lastSlots = null;
       let slotErrors = [];   // v0.1.9: 槽位路由错误快照
+      // v2.47.0: 留住 applySlots 的完整结果（含 landed 成功名单）——快照有了名单才能对账
+      //   「哪个槽位真没落地」，而不是按「前 N 个成功」猜。
+      let slotResOut = null;
       try {
         const routable = ctxInj.filter(function (i) { return !!(i && i.position); });
         // v0.1.42: 路由覆盖审计——同 position 多源 depth 不一致时显式告警（不改变路由行为）
@@ -255,6 +258,7 @@
           const slotRes = WA.injectChannel.applySlots(function (slotName, text, pos, depth, scan) {
             c.setExtensionPrompt(slotName, text, pos, depth, scan);
           }, slots);
+          slotResOut = slotRes;
           const applied = slotRes.applied;
           // 原子语义：只有 applySlots 全部成功后才标记接管，避免「注入了但没标记」的丢失
           if (applied === slots.length) {
@@ -269,18 +273,48 @@
         }
       } catch (e) { WA.log('warn', '槽位路由失败，约束注入并入主块', e); }
       // 未被槽位路由接管的项（含路由失败时回退的 routable 项）才并入主块
-      // v0.1.2: 预算裁决已透传原始字段，优先用 position 过滤；内容指纹作双保险
-      const routedSet = routedKeys.length ? WA.injectChannel.planSlots(ctxInj) : [];
-      const routedContents = routedSet.length
-        ? routedSet.reduce(function (acc, sl) { return acc.concat(sl.text.split('\n')); }, [])
-        : [];
+      // v2.47.0: **删掉「内容指纹」这条判定**。它本意是「双保险」，实际是一条误伤通道：
+      //   槽位只收带 position 的项（planSlots 吃的是 routable），而指纹按**内容相等**判定——
+      //   于是任何**不带 position** 的项，只要正文恰好与某个槽位文本的一行相同（例如两条
+      //   一模一样的提醒，一条走槽位、一条并主块），就会被当成「已被接管」从主块里剔掉：
+      //   注入静默少一条，而槽位快照与预算账单里都查不到它——「谁把这条吃了」无迹可查。
+      //   真正的判定只有一条：该项声明的 position 对应的槽位**确实被接管了**。
       const mainItems = routedKeys.length
         ? finalItems.filter(function (i) {
             if (i.position && routedKeys.indexOf(WA.injectChannel.SLOT_PREFIX + ':' + WA.injectChannel.normPos(i.position)) >= 0) return false;
-            return routedContents.indexOf(i.content) < 0;
+            return true;
           })
         : finalItems;
       const combined = mainItems.map(i => i.content).join('\n');
+      // v2.47.0: 去向账——「这条注入最后去哪了」必须逐项可答。
+      //   此前只有三张互不相通的账：预算账单（折叠/丢弃，只按 source 名）、槽位快照
+      //   （只有 slot 与字数）、主块（一个拼好的大字符串）。三者之间没有一条能把
+      //   「第 i 个候选项」与「它的落点」连起来的线，于是「正文里少了那条约束」只能靠猜。
+      //   这里按**输入位置**逐项记账，去向五态：slot / main / folded / dropped / empty。
+      const trace = [];
+      const __foldById = {}, __dropById = {};
+      if (planInfo && typeof planInfo.inputCount === 'number' && planInfo.inputCount === items.length) {
+        (planInfo.folded || []).forEach(function (f) { if (typeof f.id === 'number') __foldById[f.id] = f; });
+        (planInfo.dropped || []).forEach(function (f) { if (typeof f.id === 'number') __dropById[f.id] = f; });
+      }
+      items.forEach(function (it, idx) {
+        const src = (it && it.source) || '未命名';
+        if (!it || !it.content) { trace.push({ i: idx, source: src, to: 'empty' }); return; }
+        if (__dropById[idx]) { trace.push({ i: idx, source: src, to: 'dropped', reason: __dropById[idx].reason || null, tokens: __dropById[idx].tokens || 0 }); return; }
+        if (__foldById[idx]) { trace.push({ i: idx, source: src, to: 'folded', reason: __foldById[idx].reason || null, foldedFrom: __foldById[idx].from, foldedTo: __foldById[idx].to }); return; }
+        // v2.47.0 自纠：降级路径（injectChannel 缺席 / setExt 失败回退）下 routedKeys 为空，
+        //   但 trace 仍会逐项走一遍 —— 此处必须自己判通道在不在，不能硬引用
+        //   （实测：测试删掉 WA.injectChannel 后 applyInjections 直接 TypeError）。
+        const slotKey = (it.position && WA.injectChannel && WA.injectChannel.SLOT_PREFIX && WA.injectChannel.normPos)
+          ? (WA.injectChannel.SLOT_PREFIX + ':' + WA.injectChannel.normPos(it.position)) : null;
+        if (slotKey && routedKeys.indexOf(slotKey) >= 0) {
+          trace.push({ i: idx, source: src, to: 'slot', slot: slotKey });
+          return;
+        }
+        trace.push({ i: idx, source: src, to: 'main' });
+      });
+      const traceSummary = { main: 0, slot: 0, folded: 0, dropped: 0, empty: 0 };
+      trace.forEach(function (t) { if (traceSummary[t.to] !== undefined) traceSummary[t.to]++; });
       try {
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
@@ -288,9 +322,9 @@
         try {
           // v0.1.3: 快照补 slots 字段——排查「约束注入丢了」时可区分路由失败与槽位被覆盖
           const slotSnap = (WA.injectSlotAudit && lastSlots)
-            ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotCount)
+            ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotResOut || slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }

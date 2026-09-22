@@ -81,10 +81,14 @@
     const o = opts || {};
     const rb = resolveBudget(o.budget);
     const budget = Math.max(0, rb.budget);
-    const list = (Array.isArray(items) ? items : []).map(function (it) {
+    // v2.47.0: 每一项带唯一 id（= 输入位置）——此前 kept/folded/dropped 三张表只按 source
+    //   记名，而 source 是**用户可见名、不保证唯一**（「连续性约束」等名在同轮里可能多项）。
+    //   按名索引会让两条同名项共用同一份折叠文本：一条被折叠 ⇒ 另一条也被替换成同一段，
+    //   一条 retained 一条 dropped ⇒ 两条都按 retained 出。id 只用于内部对账，不改变账单语义。
+    const list = (Array.isArray(items) ? items : []).map(function (it, idx) {
       const source = (it && it.source) || '未命名';
       const content = String((it && it.content) || '');
-      return { source: source, content: content, rank: rankOf(source), fold: foldable(source), tokens: tokensOf(content) };
+      return { id: idx, source: source, content: content, rank: rankOf(source), fold: foldable(source), tokens: tokensOf(content) };
     });
 
     const pinned = list.filter(function (x) { return x.rank <= 2; });
@@ -99,8 +103,8 @@
       const floorTokens = Math.min(x.tokens, Math.max(FOLD_FLOOR_TOKENS, Math.floor(x.tokens * 0.25)));
       const t = trim(x.content, Math.min(floorTokens, x.tokens));
       const nt = tokensOf(t);
-      folded.push({ source: x.source, reason: 'pinned_over_budget', from: x.tokens, to: nt, content: t });
-      kept.push({ source: x.source, tokens: nt });
+      folded.push({ id: x.id, source: x.source, reason: 'pinned_over_budget', from: x.tokens, to: nt, content: t });
+      kept.push({ id: x.id, source: x.source, tokens: nt });
       used += nt;
     });
 
@@ -109,18 +113,21 @@
       const remain = budget - used;
       if (x.tokens <= remain) { kept.push(x); used += x.tokens; return; }
       if (!x.fold || remain < MIN_KEEP_TOKENS) {
-        dropped.push({ source: x.source, reason: x.fold ? 'no_budget' : 'not_foldable', tokens: x.tokens });
+        dropped.push({ id: x.id, source: x.source, reason: x.fold ? 'no_budget' : 'not_foldable', tokens: x.tokens });
         return;
       }
       const t = trim(x.content, remain);
       const nt = tokensOf(t);
-      if (nt < MIN_KEEP_TOKENS) { dropped.push({ source: x.source, reason: 'folded_too_small', tokens: x.tokens }); return; }
-      folded.push({ source: x.source, reason: 'over_budget', from: x.tokens, to: nt, content: t });
-      kept.push({ source: x.source, tokens: nt });
+      if (nt < MIN_KEEP_TOKENS) { dropped.push({ id: x.id, source: x.source, reason: 'folded_too_small', tokens: x.tokens }); return; }
+      folded.push({ id: x.id, source: x.source, reason: 'over_budget', from: x.tokens, to: nt, content: t });
+      kept.push({ id: x.id, source: x.source, tokens: nt });
       used += nt;
     });
 
     return {
+      // v2.47.0: inputCount 让 apply 能判「这份计划是不是这份输入算出来的」——长度不符时
+      //   退回按 source 名匹配（旧语义），避免把位置对账用在错的计划上。
+      inputCount: list.length,
       budget: budget, budgetSource: rb.source, contextSize: rb.contextSize, used: used, remain: Math.max(0, budget - used),
       overBudget: used > budget,
       kept: kept, folded: folded, dropped: dropped,
@@ -129,20 +136,42 @@
     };
   }
 
-  /** 按计划重组注入文本（保序：原始 items 顺序，折叠项用折叠文本） */
+  /**
+   * 按计划重组注入文本（保序：原始 items 顺序，折叠项用折叠文本）
+   *
+   * v2.47.0: 改为**按位置对账**。旧实现用 `bySource[source]` / `keepSet[source]` 两张
+   *   以 source 名为键的表回填，而 source 是用户可见名、不保证唯一——同轮里出现两条同名项时：
+   *     · 一条被折叠、一条被丢弃 ⇒ 两条都命中 `bySource` ⇒ 被丢弃的那条**又回来了**（变成折叠文本）
+   *     · 两条都超预算被折叠 ⇒ 两条拿到**同一段**折叠文本（内容串味：第二条的正文被第一条覆盖）
+   *   这不是理论问题：真实注入面里「连续性约束」「演化状态」都是固定 source 名，同轮可以出现多项。
+   *   计划里每项带 id（= 输入位置），apply 按 id 回填；长度不符（计划不是这份输入算出来的）时
+   *   退回旧的按名匹配语义，保持向后兼容。
+   * 输出项额外带 `orig`（输入位置）——落地侧靠它回答「这一项最后去哪了」。
+   */
   function apply(items, planResult) {
     const p = planResult || plan(items);
-    const bySource = {};
-    p.folded.forEach(function (f) { bySource[f.source] = f.content; });
-    const keepSet = {};
-    p.kept.forEach(function (k) { keepSet[k.source] = true; });
+    const arr = (Array.isArray(items) ? items : []);
+    const byId = (typeof p.inputCount === 'number') && p.inputCount === arr.length;
+    const foldById = {}, keepById = {};
+    if (byId) {
+      p.folded.forEach(function (f) { if (typeof f.id === 'number') foldById[f.id] = f.content; });
+      p.kept.forEach(function (k) { if (typeof k.id === 'number') keepById[k.id] = true; });
+    }
+    const bySource = {}, keepSet = {};
+    if (!byId) {
+      p.folded.forEach(function (f) { bySource[f.source] = f.content; });
+      p.kept.forEach(function (k) { keepSet[k.source] = true; });
+    }
     let seq = 0;
     // v0.1.2: 透传原始项的全部字段（position/depth 等），槽位路由依赖这些字段
-    return (Array.isArray(items) ? items : []).map(function (it) {
+    return arr.map(function (it, idx) {
       const source = (it && it.source) || '未命名';
       const base = (it && typeof it === 'object') ? it : {};
-      if (bySource[source] !== undefined) return Object.assign({}, base, { source: source, content: bySource[source], folded: true, seq: seq++ });
-      if (keepSet[source]) return Object.assign({}, base, { source: source, content: String((it && it.content) || ''), folded: false, seq: seq++ });
+      const foldedHere = byId ? (foldById[idx] !== undefined) : (bySource[source] !== undefined);
+      const keptHere = byId ? !!keepById[idx] : !!keepSet[source];
+      // v2.47.0: orig = 输入位置，落地侧按它对账「这一项最后进了哪里」
+      if (foldedHere) return Object.assign({}, base, { orig: idx, source: source, content: byId ? foldById[idx] : bySource[source], folded: true, seq: seq++ });
+      if (keptHere) return Object.assign({}, base, { orig: idx, source: source, content: String((it && it.content) || ''), folded: false, seq: seq++ });
       return null;
     }).filter(Boolean);
   }

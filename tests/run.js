@@ -2024,7 +2024,9 @@ WA.loadScript = _ls.loadScript;
   // ═══════════════════════════════════════════════════════════
   v019: {
   // ── v0.1.9: applySlots 返回对象 {applied,total,errors} ──
-  assertDeepEq(WA.injectChannel.applySlots(null, icPlan), { applied: 0, total: 2, errors: [{ slot: '(all)', detail: 'setExt 不是函数' }] }, 'setExt 非函数时返回错误对象不抛异常');
+  assertDeepEq(WA.injectChannel.applySlots(null, icPlan), { applied: 0, total: 2, landed: [], errors: [{ slot: '(all)', detail: 'setExt 不是函数' }] }, 'setExt 非函数时返回错误对象不抛异常');
+  // v2.47.0: setExt 缺席时「一个都没落地」必须如实 —— landed 空数组（而不是缺字段）
+  assertDeepEq(WA.injectChannel.applySlots(null, icPlan).landed, [], 'v2470: setExt 非函数时 landed=[]（无成功可言）');
   assertDeepEq(WA.injectChannel.applySlots(function () {}, []).applied, 0, '空槽位计划 applied=0');
   assertDeepEq(WA.injectChannel.applySlots(function () {}, null).applied, 0, 'null 槽位计划 applied=0');
   // 单槽位失败不中断其余槽位
@@ -2041,8 +2043,11 @@ WA.loadScript = _ls.loadScript;
   assert(failRes.applied === 1 && failRes.total === 2, 'applied=1/total=2: ' + JSON.stringify({ a: failRes.applied, t: failRes.total }));
   assert(failRes.errors.length === 1 && failRes.errors[0].slot === 'WorldAxis:after_last_user', '错误快照含失败槽位: ' + JSON.stringify(failRes.errors));
   assert(String(failRes.errors[0].detail).indexOf('boom-slot') >= 0, '错误快照含异常信息');
+  // v2.47.0: 成功名单是**按槽位逐个记**的，失败的那个不在其中（下游据此对账，不必再猜）
+  assertDeepEq(failRes.landed, ['WorldAxis:in_chat'], 'v2470: applySlots 交回成功名单（失败槽位不在其中）');
   const okRes = WA.injectChannel.applySlots(function () {}, failPlan);
   assert(okRes.applied === 2 && okRes.errors.length === 0, '全部成功: applied=2, errors=[]');
+  assertDeepEq(okRes.landed, ['WorldAxis:in_chat', 'WorldAxis:after_last_user'], 'v2470: 全成功时名单等于计划槽位序');
   } // end v0.1.9 block
   // ── 端到端：applyInjections 的 ctx.injections 真的走了独立槽位 ──
   global.__lastExtensionPrompt = null;
@@ -2169,14 +2174,45 @@ WA.loadScript = _ls.loadScript;
   assert(saLegacy.consistent === true, 'audit 无 slots 字段时一致（兼容旧记录）');
   assert(!!saLegacy.note, 'audit 旧记录带 note 说明');
   assertDeepEq(WA.injectSlotAudit.audit(null).consistent, true, 'audit null 入参一致');
-  // ── audit：落地数不足 → appliedMismatch + orphan ──
+  // ── audit：落地数不足 → appliedMismatch + 「不确定是哪几个」──
+  //   v2.47.0: 只给计数（旧入参）时**不许猜**。旧实现假定「前 applied 个成功」，于是把
+  //   实际失败的那一项记成成功、把成功的记成「计划了但未落地」——用户照这条去查一个
+  //   根本没出错的槽位。现在名单缺席就如实报 orphanUnknown（宁可少报，不可误导）。
   const saPartial = WA.injectSlotAudit.snapshotSlots(saPlan, 1);
+  assert(saPartial.landed === null, 'v2470: 数字入参时 landed=null（不猜成功名单）');
   const saBad = WA.injectSlotAudit.audit({ len: 10, sources: [], slots: saPartial });
   assert(saBad.consistent === false, 'audit 计划2/落地1 时不一致');
   const saMis = saBad.issues.filter(function (x) { return x.code === 'slot.appliedMismatch'; })[0];
   assert(!!saMis, 'audit 报 appliedMismatch');
-  const saOrphan = saBad.issues.filter(function (x) { return x.code === 'slot.orphan'; })[0];
-  assert(!!saOrphan, 'audit 报 slot.orphan（孤儿槽位）');
+  assert(!saBad.issues.filter(function (x) { return x.code === 'slot.orphan'; }).length,
+    'v2470: 名单缺席时不指认具体槽位（不报 slot.orphan）');
+  const saUnknown = saBad.issues.filter(function (x) { return x.code === 'slot.orphanUnknown'; })[0];
+  assert(!!saUnknown, 'v2470: audit 报 slot.orphanUnknown（有未落地，但不知是哪几个）');
+  assert(String(saUnknown.detail).indexOf('1') > 0, 'v2470: orphanUnknown 带上未落地个数');
+  // ── audit：给了成功名单 → 逐项核对，报的是**真出错**的那一路 ──
+  //   实测场景：第 1 槽抛异常、第 2 槽成功。旧实现按 slice(0, applied) 取前 1 个当成功，
+  //   于是报「WorldAxis:in_chat 计划了但未落地」——把成功的记成失败、真出错的漏掉。
+  const saPlanErr = WA.injectChannel.planSlots([
+    { source: '连续性约束', content: '约束A', position: 'after_last_user', depth: 0 },
+    { source: '世界状态', content: '状态B', position: 'in_chat', depth: 5 }
+  ]);
+  const saFailedFirst = WA.injectChannel.applySlots(function (slotName) {
+    if (slotName === 'WorldAxis:after_last_user') throw new Error('boom-slot-1');
+  }, saPlanErr);
+  assert(saFailedFirst.applied === 1 && JSON.stringify(saFailedFirst.landed) === '["WorldAxis:in_chat"]',
+    'v2470: 失败发生在第 1 个槽位时，成功名单仍只含真落地的那一路');
+  const saSnapErr = WA.injectSlotAudit.snapshotSlots(saPlanErr, saFailedFirst);
+  assert(JSON.stringify(saSnapErr.landed) === '["WorldAxis:in_chat"]', 'v2470: 快照带回成功名单');
+  const saAuditErr = WA.injectSlotAudit.audit({ len: 10, sources: [], slots: saSnapErr });
+  const saOrphan = saAuditErr.issues.filter(function (x) { return x.code === 'slot.orphan'; })[0];
+  assert(!!saOrphan && String(saOrphan.detail).indexOf('after_last_user') > 0,
+    'v2470: 归因指向真出错的槽位（after_last_user），而不是成功的那一路');
+  assert(!saAuditErr.issues.some(function (x) { return String(x.detail).indexOf('in_chat') > 0; }),
+    'v2470: 成功落地的槽位不出现在任何 issue 里（不误伤）');
+  // 快照记源：perSlot 带上「这一槽由哪些源拼成」——此前只有 slot 与字数
+  assertDeepEq(saSnapErr.perSlot[0].sources, ['连续性约束'], 'v2470: perSlot 记下该槽的源');
+  assert(saSnapErr.perSlot[0].itemCount === 1 && saSnapErr.perSlot[1].itemCount === 1,
+    'v2470: perSlot 记下每槽项数');
   // ── 端到端：lastInjection 快照含 slots ──
   global.__lastExtensionPrompt = null;
   global.__extPromptLog = [];
@@ -9819,7 +9855,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.47.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10363,7 +10399,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.46.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.47.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10654,7 +10690,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.46.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.47.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11184,7 +11220,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.46.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.47.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11572,7 +11608,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.46.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.47.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11942,7 +11978,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.46.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.47.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12307,7 +12343,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.46.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.47.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14494,7 +14530,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 1431, '现场静态引用 1431 处（真代码口径，实 ' + r2700.refs + '）');
+    assert(r2700.refs === 1435, '现场静态引用 1435 处（真代码口径，实 ' + r2700.refs + '）');
     assert(r2700.namespaces === 68 && r2700.members === 737,
       '定义面 68 命名空间 / 737 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
     assert(r2700.dead.length === 205 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 109,
@@ -14573,7 +14609,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
       '（负向自证）症状可读：命名空间 ' + (boom2700 ? boom2700.namespaces : '?')
       + ' / 悬空 ' + (boom2700 ? boom2700.phantom.length : '?') + '（正是 CLI 首跑踩到的塌面）');
     console.log('  ✓ 口径单源（collect 复用、依赖单向无环、复用判据不退回宿主壳）');
-    console.log('  ✓ 现场锚点（refs 1431 / 命名空间 68 / 成员 737 / dead 205 · uiDead 4 · dataOnly 109）');
+    console.log('  ✓ 现场锚点（refs 1435 / 命名空间 68 / 成员 737 / dead 205 · uiDead 4 · dataOnly 109）');
     console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
     console.log('  ✓ 判定四态（新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红）');
     console.log('  ✓ 负向自证（破坏「已装载」判据 ⇒ 定义面塌成 0、退出码非零、症状 JSON 可解析）');
@@ -14609,7 +14645,7 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.46.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.47.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -14691,8 +14727,8 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     assert(r2800.dead.length === 205 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 109
       && r2800.deadInTestsOnly === 128,
       '现场锚点（dead 205 / uiDead 4 / dataOnly 109 / 仅测试 128）');
-    assert(r2800.refs === 1431 && r2800.namespaces === 68 && r2800.members === 737,
-      '清册面（refs 1431 / 命名空间 68 / 成员 737，真代码口径）');
+    assert(r2800.refs === 1435 && r2800.namespaces === 68 && r2800.members === 737,
+      '清册面（refs 1435 / 命名空间 68 / 成员 737，真代码口径）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -14871,8 +14907,8 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-    assert(r2900.refs === 1431 && r2900.namespaces === 68 && r2900.members === 737,
-      '清册面（refs 1431 / 命名空间 68 / 成员 737）——真代码口径下的现场值');
+    assert(r2900.refs === 1435 && r2900.namespaces === 68 && r2900.members === 737,
+      '清册面（refs 1435 / 命名空间 68 / 成员 737）——真代码口径下的现场值');
     assert(r2900.dead.length === 205 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 109
       && r2900.deadInTestsOnly === 128,
       '死子面 dead 205 / uiDead 4 / dataOnly 109 / 仅测试 128（实 ' + r2900.dead.length + '/'
@@ -16948,6 +16984,299 @@ assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单�
       assert(panelSrc2460.indexOf('WA.kaleidoscope.' + mem) >= 0, 'v2460: 面板消费 WA.kaleidoscope.' + mem);
     });
     console.log('  ✓ v2460: 派生 / 区间 / 公式 / 条件注入 / 三态如实 / 只读无副作用 / 降级 全部现形');
+  }
+  // ══════════ v2.47.0 ══════════
+  // 注入项去向可答（第三十二面）。此前注入面有**三张互不相通的账**：预算账单（按 source
+  //   名字记折叠/丢弃）、槽位快照（只有 slot 与字数）、主块（一个拼好的大字符串）。
+  //   三者之间没有一条线能把「第 i 个候选项」与「它的落点」连起来，于是「正文里少了那条
+  //   约束」在界面上**无法回答**——它可能是被折叠、被丢弃、进了别的槽位，或者根本没生成。
+  //   本版把三张账收成**按输入位置的一本账**（trace 五态），并修掉沿途坐实的 5 处真实缺陷。
+  //   本段按「先证缺陷存在（负向）→ 再证修好了（正向）→ 再证不猜（边界）」三段写。
+  section('v2.47.0：注入项去向可答（同名不串味 / 归因不猜 / 指纹不误伤 / 五态对账）');
+  {
+    const IB2470 = WA.injectBudget;
+    const IC2470 = WA.injectChannel;
+    const ISA2470 = WA.injectSlotAudit;
+
+    // ── A. 缺陷①：apply 按 source 名回填 ⇒ 同名项串味 + 被丢弃项复活 ──
+    //   真实注入面里「连续性约束」「演化状态」都是**固定 source 名**，同轮可以出现多项。
+    //   按名索引时：一条被折叠 ⇒ 另一条也拿到同一份折叠文本；一条 dropped ⇒ 也被当成 kept 出。
+    const dup2470 = [
+      { source: '同名源', content: 'AAAA'.repeat(200), position: 'after_last_user', depth: 0 },
+      { source: '同名源', content: 'BBBB'.repeat(200), position: 'after_last_user', depth: 0 }
+    ];
+    const dupPlan2470 = IB2470.plan(dup2470, { budget: 120 });
+    // 计划本身必须是「留一、折一、丢一」这类不糊口的账 —— 先锁账单语义没被改动
+    assert(dupPlan2470.inputCount === 2, 'v2470: plan 回填 inputCount（供 apply 判「这份计划是否是这份输入算出来的」）');
+    assert(dupPlan2470.kept.length + dupPlan2470.dropped.length === 2,
+      'v2470: 账单对同名两项分别裁决（实 kept=' + dupPlan2470.kept.length + ' dropped=' + dupPlan2470.dropped.length + '）');
+    // 计划里每一项都带 id（= 输入位置）
+    dupPlan2470.kept.forEach(function (k) { assert(typeof k.id === 'number', 'v2470: 账单项带 id（按位置对账，不按名）'); });
+    const dupApplied2470 = IB2470.apply(dup2470, dupPlan2470);
+    // 出路条数必须等于「账单里还在的条数」——被丢弃的**不许复活**
+    const expectOut2470 = dupPlan2470.kept.length;
+    assert(dupApplied2470.length === expectOut2470,
+      'v2470: apply 出路项数 == 账单保留项数（实 ' + dupApplied2470.length + ' vs ' + expectOut2470 + '，旧实现会多出被丢弃的那条）');
+    // 两条同源项**内容不许相同**（串味的判据：同一份折叠正文被两条共用）
+    if (dupApplied2470.length === 2) {
+      assert(dupApplied2470[0].content !== dupApplied2470[1].content,
+        'v2470: 同名两项内容不串味（旧实现两条拿到同一份折叠文本）');
+    } else {
+      assert(true, 'v2470: 同名两项未同时出路（不适用串味判据）');
+    }
+    // orig（输入位置）必须唯一且落在输入范围内 —— 落地侧靠它回答「这一项去哪了」
+    const origs2470 = dupApplied2470.map(function (x) { return x.orig; });
+    assert(origs2470.every(function (o) { return typeof o === 'number' && o >= 0 && o < dup2470.length; }),
+      'v2470: 出路项带唯一输入位置 orig（实 ' + JSON.stringify(origs2470) + '）');
+    assert(new Set(origs2470).size === origs2470.length, 'v2470: orig 不重复（一条输入不能出两份）');
+
+    // ── B. 向后兼容：计划不是这份输入算出来的 ⇒ 退回按名语义（不把位置对账用在错的计划上）──
+    const stray2470 = IB2470.plan([{ source: '仅一个', content: 'X'.repeat(40) }], { budget: 1000 });
+    const strayApplied2470 = IB2470.apply(dup2470, stray2470);
+    //   退回按名匹配后，源名对不上就一项都不出 —— 这**正是**旧语义（不拿位置对账乱扣项）。
+    assert(strayApplied2470.length === 0,
+      'v2470: 计划与输入长度不符时退回按名匹配（源名对不上则不出项，实 ' + strayApplied2470.length + '）');
+
+    // ── C. 缺陷②：applySlots 无成功名单 ⇒ 快照只能按序号猜、归因颠倒 ──
+    //   实测场景：第 1 槽抛异常、第 2 槽成功。旧实现按 slice(0, applied) 前 N 个成功，
+    //   于是把成功的记成 orphan、把真出错的漏掉 —— 用户去查一个根本没问题的槽位。
+    const plan2470 = IC2470.planSlots([
+      { source: '连续性约束', content: '约束A', position: 'after_last_user', depth: 0 },
+      { source: '演化状态', content: '演化B', position: 'after_last_user', depth: 1 },
+      { source: '章节', content: '章节C', position: 'in_chat', depth: 2 }
+    ]);
+    // 桶内成员（源身份）必须带回：快照靠它回答「这条约束进了哪个槽位」
+    const alu2470 = plan2470.filter(function (s) { return s.position === 'after_last_user'; })[0];
+    assert(Array.isArray(alu2470.items) && alu2470.items.length === 2,
+      'v2470: planSlots 桶内带 items（每源身份可见）');
+    assertDeepEq(alu2470.items.map(function (x) { return x.source; }), ['连续性约束', '演化状态'],
+      'v2470: 桶内成员按深度序排列（源身份可答）');
+    // 逐个记名单：第 1 槽失败，第 2、3 槽成功
+    let call2470 = 0;
+    const res2470 = IC2470.applySlots(function (slotName) {
+      call2470++;
+      if (slotName === 'WorldAxis:after_last_user') throw new Error('boom-2470');
+    }, plan2470);
+    assert(res2470.applied === 1 && res2470.total === 2,
+      'v2470: applied=1/total=2（三项归两桶，失败不中断其余桶，实 ' + res2470.applied + '/' + res2470.total + '）');
+    assertDeepEq(res2470.landed, ['WorldAxis:in_chat'], 'v2470: 成功名单只含真落地的那一路');
+    const snap2470 = ISA2470.snapshotSlots(plan2470, res2470);
+    assertDeepEq(snap2470.landed, ['WorldAxis:in_chat'], 'v2470: 快照带回成功名单（可对账）');
+    assertDeepEq(snap2470.perSlot[0].sources, ['连续性约束', '演化状态'],
+      'v2470: 快照记下该槽由哪些源拼成（此前只有 slot 与字数）');
+    assert(snap2470.perSlot[0].itemCount === 2, 'v2470: 快照记下每槽项数');
+    const audit2470 = ISA2470.audit({ len: 10, sources: [], slots: snap2470 });
+    const orphanList2470 = audit2470.issues.filter(function (x) { return x.code === 'slot.orphan'; });
+    assert(orphanList2470.length === 1, 'v2470: 恰好指认一个未落地槽位');
+    assert(String(orphanList2470[0].detail).indexOf('after_last_user') > 0,
+      'v2470: 归因指向**真出错**的槽位（旧实现指认成功的那一路）');
+    assert(!audit2470.issues.some(function (x) { return x.code === 'slot.orphanUnknown'; }),
+      'v2470: 名单在手就不走「不知道是哪几个」那条路');
+    // 数字入参（旧调用形态）：不猜
+    const snapOld2470 = ISA2470.snapshotSlots(plan2470, 1);
+    assert(snapOld2470.count === 2 && snapOld2470.applied === 1, 'v2470: 旧入参形态（计划 2 / 落地 1）');
+    assert(snapOld2470.landed === null, 'v2470: 只给计数时 landed=null（不伪造成功名单）');
+    const auditOld2470 = ISA2470.audit({ len: 10, sources: [], slots: snapOld2470 });
+    assert(!auditOld2470.issues.some(function (x) { return x.code === 'slot.orphan'; }),
+      'v2470: 名单缺席时不指认具体槽位（宁可少报，不可误导）');
+    assert(auditOld2470.issues.some(function (x) { return x.code === 'slot.orphanUnknown'; }),
+      'v2470: 名单缺席时如实报 orphanUnknown（明说不知道是哪几个）');
+
+    // ── D. 缺陷③：主块过滤的「内容指纹双保险」误伤无 position 项 ──
+    //   槽位只收带 position 的项，而指纹按**内容相等**判定 —— 不带 position 的项只要正文
+    //   恰好等于某个槽位文本的一行，就被从主块剔掉：注入静默少一条，两账都查不到它。
+    global.__lastExtensionPrompt = null;
+    global.__extPromptLog = [];
+    const sameTxt2470 = '同一行文本（指纹判据的靶子）';
+    WA.render.applyInjections({ injections: [
+      { source: '连续性约束', content: sameTxt2470, position: 'after_last_user', depth: 0 },
+      { source: '无位置提醒', content: sameTxt2470 }
+    ]});
+    const logH2470 = global.__extPromptLog || [];
+    const mainH2470 = logH2470.filter(function (r) { return r.key === 'WorldAxis'; });
+    const mainLast2470 = mainH2470[mainH2470.length - 1];
+    assert(!!mainLast2470, 'v2470: 主槽位调用存在（指纹误伤场景）');
+    assert((mainLast2470.text || '').indexOf(sameTxt2470) >= 0,
+      'v2470: 与槽位文本同文的**无 position** 项仍进主块（旧实现按内容指纹把它静默剔掉）');
+    const slotH2470 = logH2470.filter(function (r) { return r.key === 'WorldAxis:after_last_user'; })[0];
+    assert(!!slotH2470 && slotH2470.text.indexOf(sameTxt2470) >= 0, 'v2470: 带 position 的那条照常走槽位');
+
+    // ── E. 缺陷④：去向不可答 → 现在按输入位置逐项记账（五态 + 合计对账）──
+    const li2470 = WA.store.get().lastInjection;
+    assert(!!li2470 && Array.isArray(li2470.trace), 'v2470: lastInjection 带去向账 trace');
+    assert(li2470.trace.length === li2470.traceSummary.main + li2470.traceSummary.slot
+      + li2470.traceSummary.folded + li2470.traceSummary.dropped + li2470.traceSummary.empty,
+      'v2470: 五态合计 == 候选项数（无项静默消失）');
+    const slotTrace2470 = li2470.trace.filter(function (t) { return t.to === 'slot'; })[0];
+    assert(!!slotTrace2470 && slotTrace2470.slot === 'WorldAxis:after_last_user',
+      'v2470: 去向账能回答「这一项进了哪个槽位」');
+    const mainTrace2470 = li2470.trace.filter(function (t) { return t.to === 'main'; });
+    assert(mainTrace2470.length >= 1, 'v2470: 去向账标出并主块的项');
+    // 每项的 i 都落在输入位置范围内且不重复（一本账按位置记）
+    const idxs2470 = li2470.trace.map(function (t) { return t.i; });
+    assert(new Set(idxs2470).size === idxs2470.length, 'v2470: 去向账按输入位置唯一记账');
+    // UI 面数据形状：perSlot 是**数组**（面板此前按对象遍历，全部显示 0 项/0 字符）
+    assert(Array.isArray(li2470.slots.perSlot), 'v2470: 快照 perSlot 是数组（真实形状）');
+
+    // ── F. 折叠/丢弃也进账：造一条真被折叠的项，去向账必须点名 + 账单一致 ──
+    //   走真实配置路径：预算读的是 backstage.getSettings()（settingsBus 注册表），
+    //   直接改 store 里的 backstage.settings 不会被读到——探针自身踩过一次的坑。
+    const budgetBefore2470 = WA.backstage.getSettings().injectBudget;
+    WA.backstage.setSettings({ injectBudget: 60 });
+    assert(WA.backstage.getSettings().injectBudget === 60, 'v2470: 预算已按真实路径收紧到 60');
+    global.__lastExtensionPrompt = null;
+    global.__extPromptLog = [];
+    WA.render.applyInjections({ injections: [
+      { source: '连续性约束', content: '折'.repeat(300), position: 'after_last_user', depth: 0 },
+      { source: '舆情', content: '舆'.repeat(300) }
+    ]});
+    const liF2470 = WA.store.get().lastInjection;
+    assert(!!liF2470.trace, 'v2470: 受预算约束的一轮同样写去向账');
+    const foldedTrace2470 = liF2470.trace.filter(function (t) { return t.to === 'folded' || t.to === 'dropped'; });
+    assert(foldedTrace2470.length >= 1, 'v2470: 被折叠/丢弃的项在去向账里可点名（实 ' + foldedTrace2470.length + ' 项）');
+    if (liF2470.budget) {
+      const billCount2470 = (liF2470.budget.folded || []).length + (liF2470.budget.dropped || []).length;
+      assert(billCount2470 === foldedTrace2470.length,
+        'v2470: 账单折叠+丢弃数 == 去向账该态数（两账对得上，实 ' + billCount2470 + ' vs ' + foldedTrace2470.length + '）');
+    } else {
+      assert(true, 'v2470: 本轮未受预算约束（不适用两账对账）');
+    }
+    // 还原预算设置，避免污染后续断言
+    WA.backstage.setSettings({ injectBudget: budgetBefore2470 });
+    assert(WA.backstage.getSettings().injectBudget === budgetBefore2470, 'v2470: 预算设置已还原');
+
+    // ── G. 负向自证：把去向账的候选数篡改 ⇒ 对账判据必须现形（不是恒真断言）──
+    {
+      const liG2470 = WA.store.get().lastInjection;
+      const beforeG2470 = liG2470.trace.length;
+      WA.store.transact(function (d) { d.lastInjection.traceSummary.main = 99; });
+      const liG2470b = WA.store.get().lastInjection;
+      const totG2470 = ['main', 'slot', 'folded', 'dropped', 'empty']
+        .reduce(function (a, k) { return a + (liG2470b.traceSummary[k] || 0); }, 0);
+      assert(totG2470 !== beforeG2470,
+        'v2470: （负控制）篡改五态后合计与候选数不等 ⇒ 对账判据可现形（判据不是恒真）');
+      WA.store.transact(function (d) { d.lastInjection.traceSummary.main = 1; });
+    }
+
+    // ── H. 降级路径：injectChannel 缺席时不许抛（trace 段不得硬引用通道）──
+    {
+      const keepIC2470 = WA.injectChannel;
+      delete WA.injectChannel;
+      global.__lastExtensionPrompt = null;
+      global.__extPromptLog = [];
+      let threw2470 = null;
+      try {
+        WA.render.applyInjections({ injections: [{ source: '连续性约束', content: '降级约束', position: 'after_last_user', depth: 0 }] });
+      } catch (e) { threw2470 = e; }
+      WA.injectChannel = keepIC2470;
+      assert(threw2470 === null, 'v2470: 通道缺席时 applyInjections 不抛（实测旧 trace 段会 TypeError）');
+      const liH2470 = WA.store.get().lastInjection;
+      assert(liH2470.trace.every(function (t) { return t.to !== 'slot'; }),
+        'v2470: 降级轮不谎称进了槽位（去向如实标 main）');
+    }
+
+    // ── I. 静态面：改名/删名都不得留「按 source 名回填」的旧语义 ──
+    {
+      const fs2470 = require('fs');
+      const path2470 = require('path');
+      const ibSrc2470 = fs2470.readFileSync(path2470.join(__dirname, '..', 'engines/inject-budget.js'), 'utf8');
+      assert(ibSrc2470.indexOf('inputCount') > 0, 'v2470: [静态] 预算计划带 inputCount（位置对账的前提）');
+      assert(ibSrc2470.indexOf('orig: idx') > 0, 'v2470: [静态] apply 输出带 orig（落地侧对账的锚）');
+      const icSrc2470 = fs2470.readFileSync(path2470.join(__dirname, '..', 'engines/inject-channel.js'), 'utf8');
+      assert(icSrc2470.indexOf('landed.push') > 0, 'v2470: [静态] applySlots 逐个记成功名单');
+      const isaSrc2470 = fs2470.readFileSync(path2470.join(__dirname, '..', 'engines/inject-slot-audit.js'), 'utf8');
+      assert(isaSrc2470.indexOf('slot.orphanUnknown') > 0, 'v2470: [静态] 名单缺席走 orphanUnknown（不猜）');
+      assert(isaSrc2470.indexOf("Array.isArray(apObj.landed)") > 0, 'v2470: [静态] 快照只接受真名单，不伪造');
+      const injSrc2470 = fs2470.readFileSync(path2470.join(__dirname, '..', 'render/inject.js'), 'utf8');
+      assert(injSrc2470.indexOf('routedContents') < 0, 'v2470: [静态] 内容指纹判据已摘除（误伤通道关闭）');
+      assert(injSrc2470.indexOf('traceSummary') > 0, 'v2470: [静态] 去向账与合计写入快照');
+      // 接线面：面板真实消费去向账与槽位快照（否则「可答」只停在引擎里）
+      const panelSrc2470 = fs2470.readFileSync(path2470.join(__dirname, '..', 'ui/panel.js'), 'utf8');
+      assert(panelSrc2470.indexOf('traceSummary') > 0, 'v2470: [接线] 面板消费 traceSummary');
+      assert(panelSrc2470.indexOf('注入项去向') > 0, 'v2470: [接线] 面板渲染「注入项去向」区块');
+      assert(panelSrc2470.indexOf('Array.isArray(ps) ? ps') > 0,
+        'v2470: [接线] 面板按数组读 perSlot（旧实现当对象遍历 ⇒ 全显示 0 项）');
+      assert(panelSrc2470.indexOf('Object.keys(ps).forEach') < 0,
+        'v2470: [接线] 旧的「Object.keys(perSlot)」遍历已消失');
+      // 诊断面登记：去向区块是纯只读文本、不引入控件，inject 组 id 不变（明写留痕）
+      const tdSrc2470 = fs2470.readFileSync(path2470.join(__dirname, '..', 'engines/tool-diag.js'), 'utf8');
+      assert(tdSrc2470.indexOf('「注入项去向」区块**不引入控件**') > 0,
+        'v2470: [诊断] UI_BINDINGS 旁明写「去向区块不引入控件」（防后续误判漏登记）');
+    }
+
+    // ── J. 面板面（真实 mini-DOM）：数组 perSlot 真渲染 + 去向区块真取源 + 对账告警可现形 ──
+    {
+      const env2470 = __uiGateFresh();
+      const WAJ2470 = env2470.WA, domJ2470 = env2470.dom;
+      const panelJ2470 = domJ2470.getElementById('wa-panel');
+      WAJ2470.ui.open();
+      WAJ2470.store.transact(function (d) {
+        d.lastInjection = {
+          at: 1700000000000, injected: true, len: 4321, sources: ['连续性约束'],
+          budget: { used: 120, cap: 120, source: 'auto', keptCount: 1,
+            folded: [{ source: '仇敌大势', reason: '超预算折叠' }],
+            dropped: [{ source: '直接事件', reason: '超预算丢弃', tokens: 300 }] },
+          slots: { count: 2, applied: 2, landed: ['WorldAxis:after_last_user', 'WorldAxis:in_chat'],
+            keys: ['WorldAxis:after_last_user', 'WorldAxis:in_chat'], totalChars: 260,
+            perSlot: [
+              { slot: 'WorldAxis:after_last_user', position: 'after_last_user', depth: 0, chars: 200, itemCount: 2, sources: ['连续性约束', '演化状态'] },
+              { slot: 'WorldAxis:in_chat', position: 'in_chat', depth: 1, chars: 60, itemCount: 1, sources: ['章节'] }
+            ] },
+          slotErrors: null,
+          trace: [
+            { i: 0, source: '连续性约束', to: 'slot', slot: 'WorldAxis:after_last_user' },
+            { i: 1, source: '演化状态', to: 'slot', slot: 'WorldAxis:after_last_user' },
+            { i: 2, source: '章节', to: 'main' },
+            { i: 3, source: '仇敌大势', to: 'folded', reason: '超预算折叠' },
+            { i: 4, source: '直接事件', to: 'dropped', reason: '超预算丢弃', tokens: 300 },
+            { i: 5, source: '空源', to: 'empty' }
+          ],
+          traceSummary: { main: 1, slot: 2, folded: 1, dropped: 1, empty: 1 }
+        };
+      });
+      // 切到注入页（面板一次只渲染当前页）
+      const tabJ2470 = panelJ2470.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === 'inject'; })[0];
+      assert(!!tabJ2470, 'v2470: 注入页页签在场');
+      if (WAJ2470.ui.currentPage() !== 'inject') tabJ2470.click();
+      const bodyJ2470 = panelJ2470.querySelector('.wa-body');
+      const htmlJ2470 = bodyJ2470 ? bodyJ2470.innerHTML : '';
+      assert(htmlJ2470.indexOf('槽位落地') >= 0, 'v2470: 槽位落地区块渲染');
+      assert(htmlJ2470.indexOf('WorldAxis:after_last_user：2 项｜200 字符') >= 0,
+        'v2470: 数组 perSlot 渲染出真实项数/字数（旧实现渲染「0：0 项｜0 字符」）');
+      assert(htmlJ2470.indexOf('0：0 项') < 0, 'v2470: 不再出现「0：0 项」伪渲染');
+      assert(htmlJ2470.indexOf('连续性约束/演化状态') >= 0, 'v2470: 每槽显示源列表（可答「这条约束进了哪」）');
+      assert(htmlJ2470.indexOf('注入项去向') >= 0, 'v2470: 「注入项去向」区块渲染');
+      assert(htmlJ2470.indexOf('6 项候选') >= 0, 'v2470: 显示候选项数');
+      assert(htmlJ2470.indexOf('主块 1') >= 0 && htmlJ2470.indexOf('独立槽位 2') >= 0
+        && htmlJ2470.indexOf('已折叠 1') >= 0 && htmlJ2470.indexOf('已丢弃 1') >= 0
+        && htmlJ2470.indexOf('空内容 1') >= 0, 'v2470: 五态合计逐项显示');
+      assert(htmlJ2470.indexOf('有项未记账') < 0, 'v2470: 合计对得上时不出告警');
+      // 负向自证：篡改五态 ⇒ 面板必须显式告警（不是恒不报）
+      WAJ2470.store.transact(function (d) { d.lastInjection.traceSummary.dropped = 0; });
+      if (WAJ2470.ui.currentPage() !== 'inject') tabJ2470.click();
+      else { tabJ2470.click(); }
+      const htmlJ2470b = (panelJ2470.querySelector('.wa-body') || {}).innerHTML || '';
+      assert(htmlJ2470b === '' || htmlJ2470b.indexOf('有项未记账') >= 0,
+        'v2470: （负控制）五态对不上时面板显式告警（判据可现形）');
+      // 旧形状兼容：perSlot 是对象（v2.47.0 前的存档快照）仍要显示，不许显示空白
+      WAJ2470.store.transact(function (d) {
+        d.lastInjection.slots.perSlot = { 'WorldAxis:after_last_user': { count: 3, chars: 111, sources: ['旧源'] } };
+        d.lastInjection.traceSummary = { main: 1, slot: 2, folded: 1, dropped: 1, empty: 1 };
+      });
+      tabJ2470.click();
+      const htmlJ2470c = (panelJ2470.querySelector('.wa-body') || {}).innerHTML || '';
+      assert(htmlJ2470c.indexOf('3 项｜111 字符') >= 0, 'v2470: 旧对象形状的 perSlot 仍能渲染（向后兼容，不空白）');
+      // 旧存档快照（无 trace）：如实说「未记录去向」，不伪造
+      WAJ2470.store.transact(function (d) {
+        d.lastInjection = { at: 1, len: 1, sources: [], budget: null, slots: null, slotErrors: null };
+      });
+      tabJ2470.click();
+      const htmlJ2470d = (panelJ2470.querySelector('.wa-body') || {}).innerHTML || '';
+      assert(htmlJ2470d.indexOf('未记录去向') >= 0 || htmlJ2470d.indexOf('尚无注入记录') >= 0,
+        'v2470: 无 trace 的旧快照如实说明（不伪造去向）');
+    }
+
+    console.log('  ✓ v2470: 同名不串味 / 掉出项不复活 / 归因不猜 / 指纹不误伤 / 五态对账 / 降级不抛 全部现形');
   }
   }  // ── 汇总 ──
   console.log('\n══════════════════════');

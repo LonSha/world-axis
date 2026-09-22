@@ -833,17 +833,59 @@
         else {
           h += '<div class="wa-item"><b>' + esc(String(slots.count)) + ' 路槽位</b>｜合计 ' + esc(String(slots.totalChars || 0)) + ' 字符'
             + '<div class="wa-dim">' + ((slots.keys || []).map(function (k) { return esc(k); }).join('、') || '—') + '</div>';
-          const ps = slots.perSlot || {};
-          Object.keys(ps).forEach(function (k) {
-            const v = ps[k] || {};
-            h += '<div class="wa-dim">' + esc(k) + '：' + esc(String(v.count || 0)) + ' 项｜' + esc(String(v.chars || 0)) + ' 字符'
-              + (v.sources && v.sources.length ? '｜' + v.sources.map(function (x) { return esc(x); }).join('/') : '') + '</div>';
+          // v2.47.0: perSlot 的真实形状是**数组**（injectSlotAudit.snapshotSlots 产出），
+          //   而这里此前按对象 map 遍历（Object.keys 拿到 "0"/"1"），于是每个槽位都渲染成
+          //   「0：0 项｜0 字符」——用户看到的是「槽位一个项都没有」，与快照事实相反。
+          //   现在两种形状都吃（数组优先，对象为旧存档兼容），并显示每槽的源与项数。
+          const ps = slots.perSlot;
+          const psList = Array.isArray(ps) ? ps
+            : (ps && typeof ps === 'object' ? Object.keys(ps).map(function (k) {
+                const v = ps[k] || {};
+                return { slot: k, chars: v.chars, itemCount: v.count, sources: v.sources };
+              }) : []);
+          psList.forEach(function (s) {
+            h += '<div class="wa-dim">' + esc(s.slot) + '：' + esc(String(s.itemCount || 0)) + ' 项｜' + esc(String(s.chars || 0)) + ' 字符'
+              + (s.sources && s.sources.length ? '｜' + s.sources.map(function (x) { return esc(x); }).join('/') : '') + '</div>';
           });
           h += '</div>';
         }
         if (errs && errs.length) h += '<div class="wa-dim wa-log-error">槽位落地报错 ' + errs.length + ' 处</div>';
         return h;
       } catch (e) { return '<div class="wa-empty">读取槽位快照失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    // v2.47.0: 注入项去向（第三十二面）——每个候选项最后去了哪里，逐项可答。
+    //   为什么面板必须看它：此前能显示的只有三张互不相通的账（预算账单按 source 名、
+    //   槽位快照只有 slot 与字数、主块是一个拼好的字符串），于是「正文里少了那条约束」
+    //   在界面上**无法回答**：它可能是被折叠、被丢弃、进了别的槽位，或者根本没生成。
+    //   这里按输入位置列出每一项的去向，并用合计与候选项数对账（数不上就是有项静默消失）。
+    out += '<div class="wa-sec">注入项去向<span class="wa-dim">（每个候选项最后落在哪）</span></div>';
+    out += (function () {
+      try {
+        const li = (WA.store.get().lastInjection) || null;
+        if (!li) return '<div class="wa-item wa-dim">尚无注入记录。</div>';
+        const tr = Array.isArray(li.trace) ? li.trace : null;
+        if (!tr) return '<div class="wa-item wa-dim">上次注入未记录去向（旧存档快照）。</div>';
+        const TO_LABEL = { main: '主块', slot: '独立槽位', folded: '已折叠', dropped: '已丢弃', empty: '空内容' };
+        const sum = li.traceSummary || {};
+        let h = '<div class="wa-item"><b>' + esc(String(tr.length)) + ' 项候选</b>';
+        h += '<div class="wa-kv"><span>去向</span><b>'
+          + ['main', 'slot', 'folded', 'dropped', 'empty'].map(function (k) {
+              const n = sum[k] || 0;
+              return (n ? '<span class="wa-tag">' + esc(TO_LABEL[k]) + ' ' + esc(String(n)) + '</span>' : '');
+            }).join('') + '</b></div>';
+        h += '<div class="wa-dim">' + tr.map(function (t) {
+          const tail = t.to === 'slot' ? '→' + esc(String(t.slot)) 
+            : (t.to === 'folded' ? '(' + esc(String(t.reason || '')) + ')'
+            : (t.to === 'dropped' ? '(' + esc(String(t.reason || '')) + (t.tokens ? ' ' + esc(String(t.tokens)) + 't' : '') + ')'
+            : ''));
+          return esc(String(t.i)) + '.' + esc(t.source) + '→' + esc(TO_LABEL[t.to] || t.to) + tail;
+        }).join('　') + '</div>';
+        // 对账：折叠+丢弃+进槽+并主块+空 应当恰好等于候选项数
+        const tot = ['main', 'slot', 'folded', 'dropped', 'empty'].reduce(function (a, k) { return a + (sum[k] || 0); }, 0);
+        if (tot !== tr.length) h += '<div class="wa-dim wa-log-warn">去向合计 ' + esc(String(tot)) + ' 与候选项数 ' + esc(String(tr.length)) + ' 不符（有项未记账）</div>';
+        h += '</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取去向账失败（' + esc(e && e.message) + '）</div>'; }
     })();
     const onCount = SOURCES.filter(function (k) { return vis[k]; }).length;
     out += '<div class="wa-sec">注入可见性（' + onCount + '/' + SOURCES.length + ' 开）</div>'
