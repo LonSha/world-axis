@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.52.0';
+  const VERSION = '2.53.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -280,6 +280,8 @@
     'engines/style.js',
     // v2.52.0：人物生活。须早于 render/inject.js，注入时读取 life.buildBlock()。
     'engines/life.js',
+    // v2.53.0：因果与情报。须早于 render/inject.js，注入时读取 intel.buildBlock()。
+    'engines/intel.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

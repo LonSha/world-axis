@@ -318,6 +318,12 @@
     const reg = WA.registry.list();
     const people = Object.values(s.people);
     return `
+      <div class="wa-sec">因果与情报</div>
+      <label class="wa-row"><input id="wa-intel-enabled" type="checkbox" ${WA.intel && WA.intel.getSettings().enabled ? 'checked' : ''}/> 启用因果与情报</label>
+      <div class="wa-row"><input id="wa-intel-cause" class="wa-input" placeholder="已有前因"/><input id="wa-intel-effect" class="wa-input" placeholder="结果"/></div>
+      <div class="wa-row"><input id="wa-intel-person" class="wa-input" placeholder="知情人物"/><input id="wa-intel-claim" class="wa-input" placeholder="情报"/><input id="wa-intel-source" class="wa-input" placeholder="来源"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-intel-link">加因果</button><button class="wa-btn" id="wa-intel-add">加情报</button></div>
+      <div id="wa-intel-out" class="wa-out"></div>
       <div class="wa-sec">人物生活（目标、承诺、日程）</div>
       <label class="wa-row"><input id="wa-life-enabled" type="checkbox" ${WA.life && WA.life.getSettings().enabled ? 'checked' : ''}/> 启用人物生活</label>
       <div class="wa-row"><input id="wa-life-person" class="wa-input" placeholder="人物"/><input id="wa-life-text" class="wa-input" placeholder="目标、承诺或日程"/></div>
@@ -1433,6 +1439,22 @@
       if (act === 'created' || act === 'updated') renderBody();
     });
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
+    // v2.53.0：因果必须指向已有依据；情报必须带来源，低置信保持怀疑。
+    const intelVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const intelOut = function (r, keep) {
+      const text = r && r.ok ? ('已记录 ' + (r.id || r.status || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
+      if (keep) panelEl.dataset.intelOut = text;
+      const o = $('#wa-intel-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.intelOut) { const saved = $('#wa-intel-out'); if (saved) saved.textContent = panelEl.dataset.intelOut; }
+    { const el = $('#wa-intel-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.intel) return intelOut({ ok: false, reason: 'module-missing' }, true);
+        WA.intel.setSettings({ enabled: !!el.checked });
+        intelOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' }, true);
+      }; }
+    on('#wa-intel-link', () => { if (!WA.intel) return intelOut({ ok: false, reason: 'module-missing' }, true); const effect = intelVal('#wa-intel-effect'); const known = WA.intel.knownCause(intelVal('#wa-intel-cause')); const r = WA.intel.addLink({ cause: intelVal('#wa-intel-cause'), effect: effect }); const ex = r.ok ? WA.intel.explain(effect) : null; intelOut(Object.assign({}, r, { id: r.ok ? (effect + ':' + (known ? 'known' : 'unknown') + ':' + ((ex && ex.causes || []).length)) : r.id }), true); renderBody(); });
+    on('#wa-intel-add', () => { if (!WA.intel) return intelOut({ ok: false, reason: 'module-missing' }, true); const person = intelVal('#wa-intel-person'); const r = WA.intel.addIntel(person, { claim: intelVal('#wa-intel-claim'), source: intelVal('#wa-intel-source'), level: 'report', about: intelVal('#wa-intel-effect') }); const seen = r.ok ? WA.intel.visibleTo(person, intelVal('#wa-intel-effect')) : []; intelOut(Object.assign({}, r, { id: r.ok ? (r.status + ':' + seen.length + ':' + ((seen[0] && WA.intel.CONFIDENCE[seen[0].level]) || '')) : r.id }), true); renderBody(); });
     // v2.52.0：人物生活只写用户明确提交的内容；关闭开关后停止结算与注入。
     const lifeText = function () {
       const person = ($('#wa-life-person') || {}).value || '';

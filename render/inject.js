@@ -207,6 +207,8 @@
       if (vis.style) { const stb = this.buildStyleBlock(); if (stb) items.push({ source: '叙事工艺', content: stb }); }
       // v2.52.0：人物生活。模块或开关关闭时 buildBlock 返回空串，不注入。
       if (WA.life) { const lb = WA.life.buildBlock(); if (lb) items.push({ source: '人物生活', content: lb }); }
+      // v2.53.0：因果与情报。模块或开关关闭时 buildBlock 返回空串，不注入。
+      if (WA.intel) { const ib = WA.intel.buildBlock(); if (ib) items.push({ source: '因果与情报', content: ib }); }
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）
