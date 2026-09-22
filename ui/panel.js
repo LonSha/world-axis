@@ -882,6 +882,55 @@
       + '<div class="wa-row"><input id="wa-er-input" class="wa-input" placeholder="试跑输入（模拟玩家这一句）…"/><button class="wa-btn" id="wa-er-dry" title="只算不写：看这一句会让哪些条目被隐藏，不改任何状态">试跑</button>'
       + '<button class="wa-btn" id="wa-er-apply" title="把最近一轮试跑结果落到 WorldAxis 自己的 off 覆写表（只改覆写、不动用户开关，下一轮自动重写）">应用本轮</button></div>'
       + '<div id="wa-er-out" class="wa-out"></div>';
+    // v2.46.0: 变量驱动条款（万花筒）
+    //   为什么面板必须看它：派生量与规则全在引擎内存里，且「键没有」与「真值就是 null」
+    //   在这里被刻意分成两态——界面上不显示，用户会把「路径写错」看成「世界还没走到」。
+    //   本区块是这组导出的**真实产品消费者**（读派生 / 读规则 / 读三态求值 / 读降级留痕 /
+    //   增删派生与规则 / 试算），不是仅供测试引用的摆设（v2.45.0 踩过：只由测试引用 ⇒
+    //   整组导出被判「功能级失效」）。
+    out += '<div class="wa-sec">变量驱动条款<span class="wa-dim">（数值过阈值就换一段正文，不必再手写世界书关键词）</span></div>';
+    out += (function () {
+      try {
+        if (!WA.kaleidoscope || typeof WA.kaleidoscope.evaluate !== 'function') return '<div class="wa-empty">万花筒引擎未加载</div>';
+        const ev = WA.kaleidoscope.evaluate();
+        const der = WA.kaleidoscope.listDerives();
+        const rls = WA.kaleidoscope.listRules();
+        const fail = WA.kaleidoscope.lastFailure();
+        let h = '<div class="wa-item"><b>' + der.length + ' 个派生量 / ' + rls.length + ' 条规则</b>'
+          + '<div class="wa-dim">上限 ' + esc(String(WA.kaleidoscope.MAX_DERIVES)) + ' / ' + esc(String(WA.kaleidoscope.MAX_RULES))
+          + '；算子 ' + esc(WA.kaleidoscope.OPS.join(' / ')) + '</div>';
+        if (!der.length && !rls.length) h += '<div class="wa-dim">尚未配置——本回合不注入（0 token）。</div>';
+        if (der.length) h += '<div class="wa-dim">' + der.map(function (d) {
+          return esc(d.id) + '(' + esc(d.op) + ')<button class="wa-mini" data-ka-del="' + esc(d.id) + '" title="删除该派生量">删</button>';
+        }).join('、') + '</div>';
+        if (rls.length) h += '<div class="wa-dim">' + rls.map(function (r) {
+          return esc(r.id) + '<button class="wa-mini" data-ka-rdel="' + esc(r.id) + '" title="删除该规则">删</button>';
+        }).join('、') + '</div>';
+        // 三态分开显示：ok / missing（路径不存在）/ invalid（规则或取值非法）——绝不同形。
+        h += '<div class="wa-kv"><span>命中</span><b>' + ev.hits.length + ' 条</b></div>'
+          + '<div class="wa-kv"><span>缺路径</span><b>' + ev.missing.length + ' 个'
+          + (ev.missing.length ? '：' + esc(ev.missing.map(function (x) { return x.id; }).join('、')) : '') + '</b></div>'
+          + '<div class="wa-kv"><span>非法</span><b>' + ev.invalid.length + ' 个'
+          + (ev.invalid.length ? '：' + esc(ev.invalid.map(function (x) { return x.id + '(' + x.reason + ')'; }).join('、')) : '') + '</b></div>';
+        if (ev.skipped.length) h += '<div class="wa-dim">条件为假 ' + ev.skipped.length + ' 条：'
+          + esc(ev.skipped.map(function (x) { return x.id + '(' + x.reason + ')'; }).join('、')) + '</div>';
+        if (ev.unresolved.length) h += '<div class="wa-dim wa-log-warn">占位符未解析（原样保留，不是静默清空）：' + esc(ev.unresolved.join('、')) + '</div>';
+        if (fail) h += '<div class="wa-dim wa-log-warn">上次降级：' + esc(fail.kind + ' — ' + fail.message) + '（本回合不注入）</div>';
+        h += '</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取变量驱动状态失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    out += '<div class="wa-row"><input id="wa-ka-id" class="wa-input" placeholder="派生量 id（如 声望档）…"/>'
+      + '<input id="wa-ka-path" class="wa-input" placeholder="世界状态路径（如 evolution.reputation.common）…"/>'
+      + '<input id="wa-ka-op" class="wa-input wa-num" placeholder="算子 map / range / formula…" value="map"/>'
+      + '<button class="wa-btn" id="wa-ka-add" title="新增或覆盖一个派生量；formula 请把表达式填在路径框（如 $a * 2 + 10）">写入派生量</button></div>'
+      + '<div class="wa-row"><input id="wa-ka-rule-id" class="wa-input" placeholder="规则 id…"/>'
+      + '<input id="wa-ka-rule-when" class="wa-input" placeholder="条件（如 $声望值 &lt; 30 且 $敌意 &gt;= 80，空=恒真）…"/>'
+      + '<input id="wa-ka-rule-text" class="wa-input" placeholder="命中后注入的正文（可用占位符引用派生量）…"/>'
+      + '<button class="wa-btn" id="wa-ka-rule-add" title="条件命中时把这段正文拼进「变量驱动条款」块">写入规则</button>'
+      + '<button class="wa-btn" id="wa-ka-eval" title="只算不写：立刻重算三态并打印本回合会注入的块">试算</button>'
+      + '<button class="wa-btn" id="wa-ka-clear" title="清空全部派生量与规则（不改世界状态）">清空</button></div>'
+      + '<div id="wa-ka-out" class="wa-out"></div>';
     out += '<div class="wa-sec">注入自检</div>'
       + '<div class="wa-row"><button class="wa-btn" id="wa-inj-refresh" title="重新读取当前注入快照（只读，不改变任何状态）">刷新快照</button>'
       + '<button class="wa-btn" id="wa-inj-diag" title="跳转工具页运行完整自检">去自检</button></div>'
@@ -1980,6 +2029,60 @@
       const toolTab = panelEl.querySelectorAll('.wa-tab').filter(t => t.dataset.page === 'tools')[0];
       if (toolTab) toolTab.click();
       const btn = $('#wa-diag-run'); if (btn) btn.click();
+    });
+    // ── v2.46.0：变量驱动条款（万花筒）──
+    // 三态在界面上必须分开呈现（命中 / 缺路径 / 非法）：只报「0 条命中」会让用户
+    // 把「路径写错」读成「条件没满足」，两者的处置方向相反。
+    function _kaShow() {
+      if (!WA.kaleidoscope || typeof WA.kaleidoscope.evaluate !== 'function') { setOut('#wa-ka-out', '万花筒引擎未加载。'); return; }
+      const block = WA.kaleidoscope.buildBlock();
+      const snap = WA.kaleidoscope.snapshot();
+      const last = WA.kaleidoscope.lastEval();
+      const parts = ['派生 ' + snap.derives + ' 成功 / ' + snap.missing + ' 缺路径 / ' + snap.invalid + ' 非法',
+        '规则命中 ' + snap.hit + ' / 跳过 ' + snap.skipped];
+      if (snap.unresolved.length) parts.push('未解析占位符（原样保留）：' + snap.unresolved.join('、'));
+      parts.push('求值时间：' + _msTs(last ? last.at : snap.at));
+      setOut('#wa-ka-out', parts.join('\n') + (block ? '\n\n本回合将注入：\n' + block : '\n\n本回合不注入（0 token）。'));
+    }
+    on('#wa-ka-add', () => {
+      const id = ($('#wa-ka-id') || {}).value ? $('#wa-ka-id').value.trim() : '';
+      const path = ($('#wa-ka-path') || {}).value ? $('#wa-ka-path').value.trim() : '';
+      const op = ($('#wa-ka-op') || {}).value ? $('#wa-ka-op').value.trim() : 'map';
+      if (!id) { setOut('#wa-ka-out', '请填写派生量 id。'); return; }
+      const rec = { id: id, op: op };
+      if (op === 'formula') rec.args = { expr: path }; else rec.path = path;
+      const r = WA.kaleidoscope.setDerive(rec);
+      if (!r.ok) { setOut('#wa-ka-out', '未写入：' + r.reason + ' — ' + (r.detail || '')); return; }
+      // 先重绘再回话：重绘会换掉整段 body，回话写在重绘之前会被自己擦掉。
+      renderBody();
+      _kaShow();
+    });
+    on('#wa-ka-rule-add', () => {
+      const id = ($('#wa-ka-rule-id') || {}).value ? $('#wa-ka-rule-id').value.trim() : '';
+      const when = ($('#wa-ka-rule-when') || {}).value ? $('#wa-ka-rule-when').value.trim() : '';
+      const text = ($('#wa-ka-rule-text') || {}).value ? $('#wa-ka-rule-text').value : '';
+      if (!id) { setOut('#wa-ka-out', '请填写规则 id。'); return; }
+      const r = WA.kaleidoscope.setRule({ id: id, when: when, text: text });
+      if (!r.ok) { setOut('#wa-ka-out', '未写入：' + r.reason + ' — ' + (r.detail || '')); return; }
+      renderBody();
+      _kaShow();
+    });
+    on('#wa-ka-eval', () => { _kaShow(); });
+    on('#wa-ka-clear', () => {
+      WA.kaleidoscope.clearDerives();
+      WA.kaleidoscope.clearRules();
+      renderBody();
+      setOut('#wa-ka-out', '派生量与规则已清空（世界状态未改动）。');
+    });
+    panelEl.querySelectorAll('[data-ka-del]').forEach(b => b.onclick = () => {
+      const ok = WA.kaleidoscope.removeDerive(b.dataset.kaDel);
+      if (ok) renderBody();
+      setOut('#wa-ka-out', ok ? ('已删除派生量：' + b.dataset.kaDel) : '未删除：没有这个派生量。');
+    });
+    panelEl.querySelectorAll('[data-ka-rdel]').forEach(b => b.onclick = () => {
+      const ok = WA.kaleidoscope.removeRule(b.dataset.kaRdel);
+      if (ok) renderBody();
+      setOut('#wa-ka-out', ok ? ('已删除规则：' + b.dataset.kaRdel) : '未删除：没有这条规则。');
     });
     // v2.34.0: 长期事实清空
     on('#wa-mem-facts-clear', () => {

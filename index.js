@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.45.0';
+  const VERSION = '2.46.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -245,6 +245,10 @@
     // v2.45.0: 世界书条目按需路由。必须在 worldbook.js 之后装载——它读 worldbook 的
     //   按聊天覆写表（getOverrides/getSelectedIds/saveSelection）落「本回合隐藏」。
     'engines/entry-router.js',
+    // v2.46.0: 变量驱动条款（世界状态 → 派生量 → 按变量值确定性注入正文）。
+    //   须在 core/store 之后（它只读 store 快照），与本模块的 before 节点位置无关
+    //   （节点顺序由 workflow 的 order 决定，不由装载顺序决定）。
+    'engines/kaleidoscope.js',
     'engines/calendar.js',
     'engines/memory.js',
     'engines/opinion.js',

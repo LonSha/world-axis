@@ -93,7 +93,7 @@
     'engines/editor-faction.js': 'editorFaction', 'engines/editor-events.js': 'editorEvents',
     'engines/inspector-state.js': 'inspectorState', 'engines/tool-snapshot.js': 'toolSnapshot',
     'engines/tool-analyzer.js': 'toolAnalyzer', 'engines/tool-import.js': 'toolImport',
-    'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag', 'engines/contract-audit.js': 'contractAudit', 'engines/memory-sampler.js': 'memorySampler', 'engines/sampler-check.js': 'samplerCheck', 'engines/inject-channel.js': 'injectChannel', 'engines/inject-slot-audit.js': 'injectSlotAudit', 'engines/proactive.js': 'proactive', 'engines/wb-inject.js': 'wbInject', 'engines/entry-router.js': 'entryRouter',
+    'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag', 'engines/contract-audit.js': 'contractAudit', 'engines/memory-sampler.js': 'memorySampler', 'engines/sampler-check.js': 'samplerCheck', 'engines/inject-channel.js': 'injectChannel', 'engines/inject-slot-audit.js': 'injectSlotAudit', 'engines/proactive.js': 'proactive', 'engines/wb-inject.js': 'wbInject', 'engines/entry-router.js': 'entryRouter', 'engines/kaleidoscope.js': 'kaleidoscope',
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
     'engines/bridge.js': 'bridge',
     'engines/lonsha-reader.js': 'lonshaReader',
@@ -576,7 +576,13 @@
     // v2.45.0: 条目路由控件纳入守卫（否则新控件游离在「渲染↔绑定」一致性校验之外）
     { page: 'inject', ids: ['wa-inj-refresh', 'wa-inj-diag', 'wa-inj-out',
       'wa-er-id', 'wa-er-cond', 'wa-er-add', 'wa-er-clear', 'wa-er-out',
-      'wa-er-input', 'wa-er-dry', 'wa-er-apply'] }
+      'wa-er-input', 'wa-er-dry', 'wa-er-apply',
+      // v2.46.0: 变量驱动条款（万花筒）控件——同 v2.45.0 的理由：新控件必须同时
+      //   在位（渲染 + 绑定 + 守卫登记），否则「按钮渲染了但绑定写错 id」这类断裂
+      //   在新增出口上无人发现。
+      'wa-ka-id', 'wa-ka-path', 'wa-ka-op', 'wa-ka-add',
+      'wa-ka-rule-id', 'wa-ka-rule-when', 'wa-ka-rule-text', 'wa-ka-rule-add',
+      'wa-ka-eval', 'wa-ka-clear', 'wa-ka-out'] }
   ];
   function secUi() {
     return safe(function () {

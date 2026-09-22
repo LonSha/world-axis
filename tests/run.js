@@ -38,7 +38,7 @@ const LOAD = [
   'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/undo.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -9819,7 +9819,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.46.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10363,7 +10363,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.45.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.46.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10654,7 +10654,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.45.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.46.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11060,7 +11060,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings roundOf setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|parallelWorld:IMPACTS IMPACT_LABEL addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id int next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:SOURCE_ID_KEY auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|undo:capture clear peek pushValue stat undo|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries peekEntries previewActivation saveSelection triggerEnabled';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings roundOf setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|parallelWorld:IMPACTS IMPACT_LABEL addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id int next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:SOURCE_ID_KEY auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|undo:capture clear peek pushValue stat undo|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries peekEntries previewActivation saveSelection triggerEnabled';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11184,7 +11184,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.45.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.46.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11572,7 +11572,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.45.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.46.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11942,7 +11942,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.45.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.46.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12307,7 +12307,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.45.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.46.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14494,9 +14494,9 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 1409, '现场静态引用 1409 处（真代码口径，实 ' + r2700.refs + '）');
-    assert(r2700.namespaces === 67 && r2700.members === 721,
-      '定义面 67 命名空间 / 721 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.refs === 1431, '现场静态引用 1431 处（真代码口径，实 ' + r2700.refs + '）');
+    assert(r2700.namespaces === 68 && r2700.members === 737,
+      '定义面 68 命名空间 / 737 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
     assert(r2700.dead.length === 205 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 109,
       '死子面 dead 205 / uiDead 4 / dataOnly 109（实 ' + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
     assert(r2700.deadInTestsOnly === 128, '其中仅测试引用 128（实 ' + r2700.deadInTestsOnly + '）');
@@ -14573,7 +14573,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
       '（负向自证）症状可读：命名空间 ' + (boom2700 ? boom2700.namespaces : '?')
       + ' / 悬空 ' + (boom2700 ? boom2700.phantom.length : '?') + '（正是 CLI 首跑踩到的塌面）');
     console.log('  ✓ 口径单源（collect 复用、依赖单向无环、复用判据不退回宿主壳）');
-    console.log('  ✓ 现场锚点（refs 1409 / 命名空间 67 / 成员 721 / dead 205 · uiDead 4 · dataOnly 109）');
+    console.log('  ✓ 现场锚点（refs 1431 / 命名空间 68 / 成员 737 / dead 205 · uiDead 4 · dataOnly 109）');
     console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
     console.log('  ✓ 判定四态（新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红）');
     console.log('  ✓ 负向自证（破坏「已装载」判据 ⇒ 定义面塌成 0、退出码非零、症状 JSON 可解析）');
@@ -14609,7 +14609,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.45.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.46.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -14691,8 +14691,8 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     assert(r2800.dead.length === 205 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 109
       && r2800.deadInTestsOnly === 128,
       '现场锚点（dead 205 / uiDead 4 / dataOnly 109 / 仅测试 128）');
-    assert(r2800.refs === 1409 && r2800.namespaces === 67 && r2800.members === 721,
-      '清册面（refs 1409 / 命名空间 67 / 成员 721，真代码口径）');
+    assert(r2800.refs === 1431 && r2800.namespaces === 68 && r2800.members === 737,
+      '清册面（refs 1431 / 命名空间 68 / 成员 737，真代码口径）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -14871,8 +14871,8 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-    assert(r2900.refs === 1409 && r2900.namespaces === 67 && r2900.members === 721,
-      '清册面（refs 1409 / 命名空间 67 / 成员 721）——真代码口径下的现场值');
+    assert(r2900.refs === 1431 && r2900.namespaces === 68 && r2900.members === 737,
+      '清册面（refs 1431 / 命名空间 68 / 成员 737）——真代码口径下的现场值');
     assert(r2900.dead.length === 205 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 109
       && r2900.deadInTestsOnly === 128,
       '死子面 dead 205 / uiDead 4 / dataOnly 109 / 仅测试 128（实 ' + r2900.dead.length + '/'
@@ -16194,7 +16194,7 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
     //   apiRouter.extractJson（解析纯文本独白），该成员由「死导出」转为「活导出」，出口面随之
     //   +1 成员 / +12 字符。故此处改为与当前真值比对；口径本身（统一排除名单后规模不漂移）
     //   由「本次运行产物 == FROZEN2800」这条更强的断言承担，不再用硬编码旧数字。
-    const EC2430 = 'ns= 61 members= 374 chars= 4731';
+    const EC2430 = 'ns= 62 members= 390 chars= 4908';
     assert(ecRun4300.status === 0 && String(ecRun4300.stdout).indexOf(EC2430) >= 0,
       'v2430: 统一排除口径后出口面契约规模稳定（实 ' + String(ecRun4300.stdout).split('\n')[0] + '，期望 ' + EC2430 + '）');
     // ── C. 成类静态锁：UI 三文件清单在**整个代码面**硬零（防任一处回退写法复活）──
@@ -16725,7 +16725,230 @@ assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单�
 
     console.log('  ✓ v2450: 条目路由 / 缓存 / 被动条目 / 归一化 / 降级不中止 全部现形');
   }
+  // ══════════ v2.46.0 ══════════
+  // 万花筒：世界状态 → 派生量 → 按变量值确定性注入正文。
+  // 引用口径与前几版一致：一律**直写** `WA.kaleidoscope.xxx`，不用别名——
+  //   死子面账本按 `WA.ns.mem` 正则计引用，别名调用在产品侧与测试侧都数不到。
+  section('v2.46.0：变量驱动条款（派生量 / 条件注入 / 三态如实）');
+  {
+    const fs2460 = require('fs');
+    const path2460 = require('path');
+    const src2460 = fs2460.readFileSync(path2460.join(__dirname, '..', 'engines/kaleidoscope.js'), 'utf8');
+    // ── 静态面：硬约束写进断言，不是注释里的愿望 ──
+    assert(src2460.indexOf('无 eval / 无 new Function') > 0, 'v2460: 硬约束写成注释并留痕');
+    // 判据只看**真代码面**（注释里那句「无 eval / 无 new Function」是本模块的设计声明，
+    //   不是动态执行面）。用清册同源的 codeFace 剥离，避免把文档债误判成缺陷。
+    const codeFace2460 = require('./inventory.js').codeFace(src2460);
+    assert(codeFace2460.indexOf('new Function') < 0, 'v2460: 代码面无 new Function（用户可写文本不得接上动态执行）');
+    assert((codeFace2460.match(/eval\s*\(/g) || []).length === 0, 'v2460: 代码面无 eval(');
+    assert(src2460.indexOf("OPS = ['map', 'range', 'formula']") > 0, 'v2460: 三算子枚举在位');
+    assert(src2460.indexOf('MAX_DERIVES = 40') > 0, 'v2460: 派生量上限 40');
+    assert(src2460.indexOf('MAX_RULES = 40') > 0, 'v2460: 规则上限 40');
+    assert(src2460.indexOf('MAX_EXPR_LEN = 400') > 0, 'v2460: 表达式长度闸 400');
+    assert(src2460.indexOf('throw') < 0, 'v2460: 引擎内无 throw（失败降级，不向上中止）');
+    const idxSrc2460 = fs2460.readFileSync(path2460.join(__dirname, '..', 'index.js'), 'utf8');
+    assert(idxSrc2460.indexOf("'engines/kaleidoscope.js'") > 0, 'v2460: 装载链已挂');
+    const stAt2460 = idxSrc2460.indexOf("'core/store.js'");
+    const kaAt2460 = idxSrc2460.indexOf("'engines/kaleidoscope.js'");
+    assert(stAt2460 > 0 && kaAt2460 > stAt2460, 'v2460: 万花筒在 store 之后装载（只读快照）');
+    // ── 三态分离：ok / missing / invalid 绝不同形 ──
+    WA.kaleidoscope.clearDerives();
+    WA.kaleidoscope.clearRules();
+    assert(WA.kaleidoscope.listDerives().length === 0 && WA.kaleidoscope.listRules().length === 0, 'v2460: 起始无派生无规则');
+    assert(WA.kaleidoscope.buildBlock() === '', 'v2460: 空配置注入空串（0 token，不进 ctx.injections）');
+    // map：区间 → 标签
+    // 路径不存在 ⇒ missing（不是「值就是 null」）
+    WA.kaleidoscope.setDerive({ id: '幽灵量', path: 'evolution.noSuchKey', op: 'range', args: { min: 0, max: 10 } });
+    let ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.missing.length === 1 && ev2460.missing[0].id === '幽灵量', 'v2460: 路径不存在落 missing 态');
+    assert(ev2460.ok.length === 0 && ev2460.invalid.length === 0, 'v2460: missing 不混进 ok/invalid');
+    assert(ev2460.missing[0].reason === 'missing', 'v2460: missing 具名原因');
+    // map：数值 → 标签（用真实数值字段 evolution.round，非幽灵键）
+    WA.store.patch('evolution.round', 3);
+    const r2 = WA.kaleidoscope.setDerive({ id: '声望档', path: 'evolution.round', op: 'map',
+      args: { segments: [{ max: 20, label: '默默无闻' }, { max: 60, label: '小有名气' }, { max: 90, label: '声名远播' }], overflow: '万众敬仰' } });
+    assert(r2.ok === true, 'v2460: map 派生量写入成功');
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.missing.length === 1 && ev2460.missing[0].id === '幽灵量', 'v2460: 有值路径不再落 missing（仅幽灵量缺路径）');
+    const map2460 = ev2460.ok.filter(function (x) { return x.id === '声望档'; })[0];
+    assert(map2460 && map2460.value === '默默无闻' && map2460.raw === 3, 'v2460: map 命中返回标签（raw 保留原始数值）');
+    assert(map2460.kind === 'label', 'v2460: map 产物标为 label 型');
+    // 键存在但值不可算 ⇒ invalid（不是 missing）——两态必须分得开
+    WA.kaleidoscope.setDerive({ id: '档位', path: 'evolution.reputation.common', op: 'map',
+      args: { segments: [{ max: 10, label: 'x' }] } });
+    ev2460 = WA.kaleidoscope.evaluate();
+    const nv2460 = ev2460.invalid.filter(function (x) { return x.id === '档位'; })[0];
+    const mv2460 = ev2460.missing.filter(function (x) { return x.id === '档位'; })[0];
+    assert(!mv2460 && nv2460 && nv2460.reason === 'not-a-number',
+      'v2460: 键存在但值不是数值 ⇒ invalid（不是 missing）——两态不同形');
+    WA.kaleidoscope.removeDerive('档位');
+    WA.kaleidoscope.removeDerive('幽灵量');
+    // range：归一化到 0..100，越界钳制
+    WA.kaleidoscope.setDerive({ id: '轮次百分比', path: 'evolution.round', op: 'range', args: { min: 0, max: 10 } });
+    ev2460 = WA.kaleidoscope.evaluate();
+    const rg2460 = ev2460.ok.filter(function (x) { return x.id === '轮次百分比'; })[0];
+    assert(rg2460 && rg2460.value === 30, 'v2460: range 归一化（3/10 → 30）');
+    WA.store.patch('evolution.round', 99);
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.ok.filter(function (x) { return x.id === '轮次百分比'; })[0].value === 100, 'v2460: range 上越界钳到 100');
 
+    // formula：受限算术 + 引用其它派生量（可链式）
+    const rf2460 = WA.kaleidoscope.setDerive({ id: '双倍', op: 'formula', args: { expr: '$轮次百分比 * 2' } });
+    assert(rf2460.ok === true, 'v2460: formula 派生量可写入（无 path 要求）');
+    ev2460 = WA.kaleidoscope.evaluate();
+    // 注意：这里引用的 `$轮次百分比` 的 **raw 是 99**（range 的 value 是 100）。
+    //   formula 走 raw —— 「标签/归一值用于成文、raw 用于继续算」这条分工的直接后果，
+    //   不是 bug：若按 value 算，链式派生会把「已钳到 100」这个显示口径当成数学真值。
+    assert(ev2460.ok.filter(function (x) { return x.id === '双倍'; })[0].value === 198,
+      'v2460: formula 引用其它派生量（链式求值，走 raw）');
+    // formula 的错误面：具名失败码，不是「算出来是 NaN」
+    //   先备一个「取值本身不是数值」的派生量（路径存在、值是真值 '默默无闻'）——
+    //   它的 raw 是字符串，被 formula 引用时必须给出 not-a-number，而不是静默取 0。
+    WA.kaleidoscope.setDerive({ id: '文本量', path: 'evolution.reputation.common', op: 'range', args: { min: 0, max: 10 } });
+    function tryFormula(expr) {
+      WA.kaleidoscope.setDerive({ id: '__tmp2460', op: 'formula', args: { expr: expr } });
+      const e = WA.kaleidoscope.evaluate();
+      const bad = e.invalid.filter(function (x) { return x.id === '__tmp2460'; })[0];
+      WA.kaleidoscope.removeDerive('__tmp2460');
+      return bad ? bad.reason : null;
+    }
+    assert(tryFormula('1 / 0') === 'div-zero', 'v2460: 除零 ⇒ div-zero');
+    assert(tryFormula('$不存在的量 + 1') === 'unknown-derive', 'v2460: 引用不存在的派生量 ⇒ unknown-derive');
+    assert(tryFormula('1 2') === 'trailing-token', 'v2460: 尾部多余内容 ⇒ trailing-token');
+    assert(tryFormula('(1 + 2') === 'unbalanced-paren', 'v2460: 括号不配对 ⇒ unbalanced-paren');
+    assert(tryFormula('hello') === 'bad-word', 'v2460: 裸词 ⇒ bad-word（变量引用必须写 $）');
+    assert(tryFormula('1 @ 2') === 'bad-char', 'v2460: 非法字符 ⇒ bad-char');
+    assert(tryFormula('1.2.3') === 'bad-number', 'v2460: 多点数字 ⇒ bad-number');
+    assert(tryFormula('$文本量 * 2') === 'not-a-number', 'v2460: 取值非数值的派生量参与算术 ⇒ not-a-number（不静默取 0）');
+    // map 的 raw 保留原始**数值**，故 `$声望档`（raw=99）参与算术是**合法**的——
+    //   这正是「标签用于成文、raw 用于继续算」这条分工的意义。锁住它，防止后人把 raw 也换成标签。
+    assert(tryFormula('$声望档 * 2') === null && WA.kaleidoscope.listDerives().length >= 1,
+      'v2460: map 派生量的 raw 仍是数值 ⇒ 可继续参与算术（标签只用于成文）');
+    // 而 rule 条件里引用「取值非数值」的派生量 ⇒ 该条跳过并具名留痕（不是整块失败）
+    WA.kaleidoscope.setRule({ id: '__tmpw__', when: '$文本量 > 5', text: '不该出现。' });
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.skipped.filter(function (x) { return x.id === '__tmpw__'; })[0].reason.indexOf('not-a-number') >= 0,
+      'v2460: 条件里引用非数值派生量 ⇒ 该条具名跳过（not-a-number）');
+    WA.kaleidoscope.removeRule('__tmpw__');
+    WA.kaleidoscope.removeDerive('文本量');
+    assert(WA.kaleidoscope.OPS.length === 3 && WA.kaleidoscope.MAX_DERIVES === 40 && WA.kaleidoscope.MAX_RULES === 40,
+      'v2460: 常量面可读（OPS / 上限）');
+    // 成环 ⇒ 具名 cycle，不是栈溢出
+    WA.kaleidoscope.setDerive({ id: '环A', op: 'formula', args: { expr: '$环B + 1' } });
+    WA.kaleidoscope.setDerive({ id: '环B', op: 'formula', args: { expr: '$环A + 1' } });
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.invalid.filter(function (x) { return x.reason === 'cycle'; }).length >= 1, 'v2460: 派生量成环 ⇒ 具名 cycle');
+    WA.kaleidoscope.removeDerive('环A'); WA.kaleidoscope.removeDerive('环B');
+    // ── 引用名的字符集（v2.46.0 自纠）：中文 id 必须能引用得到 ──
+    //   现场缺陷：首版 tokenizer 把引用名限定为 `[A-Za-z0-9_\-.]+`，而派生量 id 是**用户起的名字**
+    //   （面板示例就写着「声望档」）。于是中文 id 能写进列表、却永远取不到，规则的报错是
+    //   `unknown-derive` ——用户看到的是「明明在列表里却说它不存在」。判据下沉到「中文可引用」。
+    WA.kaleidoscope.setDerive({ id: '沪上', op: 'formula', args: { expr: '3 + 4' } });
+    assert(tryFormula('$沪上 * 2') === null, 'v2460: 中文 id 可被 $引用（首版限定 ASCII，属现场缺陷）');
+    WA.kaleidoscope.setDerive({ id: '沪上双', op: 'formula', args: { expr: '$沪上 + 1' } });
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.ok.filter(function (x) { return x.id === '沪上双'; })[0].value === 8, 'v2460: 中文 id 之间可链式引用');
+    // 引用名与算符之间的界限由 REF_STOP 钉住：`-` 是终止字符（属算符），故 `$a-1` 是减法。
+    //   这条断言的作用是**把界限写死**：谁要是把 `-` 从 REF_STOP 里拿掉（为了让 id 能带横杠），
+    //   这里立刻红灯——否则「$a-1」会静默变成「引用 a-1」并报 unknown-derive，用户看不懂。
+    assert(tryFormula('$沪上-1') === null, 'v2460: `$a-1` 是减法（`-` 属终止字符，不是 id 的一部分）');
+    assert(tryFormula('$沪上 - 1') === null, 'v2460: `$a - 1`（带空格）同样是减法');
+    assert(tryFormula('($沪上)+1') === null, 'v2460: `($a)+1`（括号分隔）也是减法');
+    WA.kaleidoscope.removeDerive('沪上'); WA.kaleidoscope.removeDerive('沪上双');
+    // id 是双向契约（$引用 与 {占位符} 都要匹配得上），含空格的 id 写入即拒收
+    assert(WA.kaleidoscope.setDerive({ id: '带 空格', op: 'range', path: 'evolution.round', args: { min: 0, max: 1 } }).reason === 'bad-id',
+      'v2460: 含空格的派生量 id 写入即拒收（写进去取不出来 = 缺陷）');
+    assert(WA.kaleidoscope.setRule({ id: '带 空格', text: 'x' }).reason === 'bad-id',
+      'v2460: 含空格的规则 id 同样拒收（同一份 idProblem 判据）');
+    // 中文 id 的占位符插值（`{沪上}` 形态；首版占位符正则同样只认 ASCII）
+    WA.kaleidoscope.setDerive({ id: '沪上', op: 'formula', args: { expr: '7' } });
+    WA.kaleidoscope.setRule({ id: '__tmpz__', text: '沪上值={沪上}', order: 90 });
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.hits.filter(function (x) { return x.id === '__tmpz__'; })[0].text === '沪上值=7',
+      'v2460: 中文 id 的 {} 占位符可插值（首版正则只认 ASCII）');
+    WA.kaleidoscope.removeRule('__tmpz__'); WA.kaleidoscope.removeDerive('沪上');
+    // ── 条件注入：when 命中拼块、{占位符} 插值、order 排序、空 when 恒真 ──
+    WA.kaleidoscope.setRule({ id: 'r低', when: '$轮次百分比 < 50', text: '世界仍在序章。', order: 20 });
+    WA.kaleidoscope.setRule({ id: 'r高', when: '$轮次百分比 >= 50', text: '轮次已达 {轮次百分比}，声望档：{声望档}。', order: 10 });
+    WA.kaleidoscope.setRule({ id: 'r恒', text: '无条件条款。', order: 30 });
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.hits.length === 2, 'v2460: 条件命中 2 条（低阈假、高阈真、无条件真）');
+    assert(ev2460.hits[0].id === 'r高', 'v2460: 命中按 order 升序（高 10 < 低 20）');
+    assert(ev2460.hits[1].id === 'r恒', 'v2460: 同轮无条件条款在位');
+    assert(ev2460.hits[0].text === '轮次已达 100，声望档：万众敬仰。', 'v2460: {占位符} 按派生量显示值插值（map 给标签、range 给数值）');
+    assert(ev2460.skipped.length === 1 && ev2460.skipped[0].id === 'r低', 'v2460: 条件为假进 skipped 并留原因');
+    const block2460 = WA.kaleidoscope.buildBlock();
+    assert(block2460.indexOf('<world_axis_kaleidoscope>') === 0 && block2460.indexOf('</world_axis_kaleidoscope>') > 0,
+      'v2460: 注入块带具名标签（便于溯源）');
+    assert(block2460.indexOf('[变量驱动条款]') > 0, 'v2460: 注入块含分段标题');
+    assert(block2460.indexOf('- 轮次已达 100') > 0, 'v2460: 命中条款以列表项成文');
+    // 未解析占位符：原样保留 + 记账（不得静默清空）
+    WA.kaleidoscope.setRule({ id: 'r坏', when: '', text: '引用 {查无此量} 的条款。', order: 40 });
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.unresolved.indexOf('查无此量') >= 0, 'v2460: 未解析占位符记账');
+    assert(ev2460.hits.filter(function (x) { return x.id === 'r坏'; })[0].text.indexOf('{查无此量}') >= 0,
+      'v2460: 未解析占位符原样保留（不静默替换成空串）');
+    WA.kaleidoscope.removeRule('r坏');
+    // 规则条件语法错误 ⇒ 跳过该条并留原因（不是整块失败）
+    WA.kaleidoscope.setRule({ id: 'r语法', when: '1 @@ 2', text: '不该出现。' });
+    ev2460 = WA.kaleidoscope.evaluate();
+    assert(ev2460.hits.filter(function (x) { return x.id === 'r语法'; }).length === 0, 'v2460: 条件语法错误不命中');
+    assert(ev2460.skipped.filter(function (x) { return x.id === 'r语法'; })[0].reason.indexOf('bad-char') >= 0,
+      'v2460: 条件语法错误具名留痕（bad-char）');
+    WA.kaleidoscope.removeRule('r语法');
+    // 无条件（空 when 且非空 text）恒真、空 text 拒收
+    assert(WA.kaleidoscope.setRule({ id: 'r空', when: '', text: '   ' }).ok === false, 'v2460: 空文本规则拒收（白占 token）');
+    assert(WA.kaleidoscope.setRule({ id: '', text: 'x' }).ok === false, 'v2460: 规则 id 不能为空');
+    assert(WA.kaleidoscope.setDerive({ id: 'x', op: 'nope' }).ok === false, 'v2460: 未知算子拒收');
+    assert(WA.kaleidoscope.setDerive({ id: 'y', op: 'map' }).ok === false, 'v2460: map 缺 path 拒收');
+    // ── 无副作用：求值前后世界状态深比较相等 ──
+    const before2460 = JSON.stringify(WA.store.get());
+    WA.kaleidoscope.evaluate();
+    WA.kaleidoscope.buildBlock();
+    WA.kaleidoscope.snapshot();
+    assert(JSON.stringify(WA.store.get()) === before2460, 'v2460: 求值/成块/快照全部只读（世界状态逐字未变）');
+    // ── 确定性：同输入同输出（无随机无时钟参与决策） ──
+    const b1 = WA.kaleidoscope.buildBlock();
+    const b2 = WA.kaleidoscope.buildBlock();
+    assert(b1 === b2, 'v2460: 同状态同规则 ⇒ 逐字同块（可复现）');
+    // ── 上限面 ──
+    for (let i = 0; i < 60; i++) WA.kaleidoscope.setRule({ id: 'rf' + i, when: '', text: 't' + i });
+    assert(WA.kaleidoscope.listRules().length === WA.kaleidoscope.MAX_RULES, 'v2460: 规则数被上限截在 ' + WA.kaleidoscope.MAX_RULES);
+    for (let i = 0; i < 60; i++) WA.kaleidoscope.removeRule('rf' + i);
+    assert(WA.kaleidoscope.listRules().length === 3, 'v2460: 清理后仅剩原三条');
+    // ── snapshot / lastEval / lastFailure 三个诊断出口 ──
+    const snap2460 = WA.kaleidoscope.snapshot();
+    assert(snap2460.derives >= 1 && typeof snap2460.at === 'number', 'v2460: snapshot 汇总可读（含求值时间）');
+    assert(WA.kaleidoscope.lastEval() !== null && Array.isArray(WA.kaleidoscope.lastEval().hits), 'v2460: lastEval 留痕最近一次求值');
+    assert(WA.kaleidoscope.lastFailure() === null, 'v2460: 正常路径无失败留痕（不留痕 = 没出事）');
+    // ── 工作流节点面 ──
+    const wf2460 = WA.workflow.list('before').find(n => n.id === 'kaleidoscope.inject');
+    assert(wf2460 && wf2460.order === 22, 'v2460: 节点已注册 before 链 order 22');
+    const er2460 = WA.workflow.list('before').find(n => n.id === 'engines.entryRouter');
+    assert(er2460 && er2460.order === 60 && 22 < 60, 'v2460: 落在 enemies(19) 之后、proactive(25) 与路由(60) 之前');
+    // 端到端：跑一次 before 链，块真的进了注入面；清空后不再进（0 token）
+    const injBefore2460 = [];
+    const bctx2460 = { injections: injBefore2460, vars: {}, flags: {} };
+    await WA.workflow.run('before', bctx2460);
+    const ka2460 = injBefore2460.filter(function (i) { return i.source === '变量驱动'; });
+    assert(ka2460.length === 1, 'v2460: before 链真实产出「变量驱动」注入项');
+    assert(ka2460[0].content.indexOf('<world_axis_kaleidoscope>') === 0, 'v2460: 注入内容即万花筒块');
+    assert(ka2460[0].position === 'after_last_user' && ka2460[0].depth === 3, 'v2460: 注入位置与深度如声明');
+    WA.kaleidoscope.clearDerives();
+    WA.kaleidoscope.clearRules();
+    const injAfter2460 = [];
+    await WA.workflow.run('before', { injections: injAfter2460, vars: {}, flags: {} });
+    assert(injAfter2460.filter(function (i) { return i.source === '变量驱动'; }).length === 0,
+      'v2460: 清空后本回合不注入（空块不进 ctx.injections）');
+    // ── 接线面：面板真实消费这组导出（否则整组会被判「功能级死导出」） ──
+    const panelSrc2460 = fs2460.readFileSync(path2460.join(__dirname, '..', 'ui/panel.js'), 'utf8');
+    ['listDerives', 'listRules', 'evaluate', 'buildBlock', 'snapshot', 'lastEval', 'lastFailure',
+      'setDerive', 'removeDerive', 'clearDerives', 'setRule', 'removeRule', 'clearRules',
+      'OPS', 'MAX_DERIVES', 'MAX_RULES'].forEach(function (mem) {
+      assert(panelSrc2460.indexOf('WA.kaleidoscope.' + mem) >= 0, 'v2460: 面板消费 WA.kaleidoscope.' + mem);
+    });
+    console.log('  ✓ v2460: 派生 / 区间 / 公式 / 条件注入 / 三态如实 / 只读无副作用 / 降级 全部现形');
+  }
   }  // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
