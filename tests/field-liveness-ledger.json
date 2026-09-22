@@ -1,0 +1,42 @@
+{
+  "_note": "WorldAxis 骨架归属冻结账本（v2.40.0）。规则①记录幽灵读点的豁免残留；规则②③记录「写入/读取了骨架未声明的顶层键」的现状（每条须有 OWNED_TOP_KEYS 理由，否则须先把字段补进 core/store.js 的 defaultWorldState）。出现新条目即红灯：须显式 --update 登记并补理由，或修掉它。",
+  "version": "2.40.0",
+  "schemaTopKeys": [
+    "background",
+    "chapters",
+    "chronicle",
+    "clock",
+    "consistency",
+    "currents",
+    "directEvents",
+    "echoes",
+    "evolution",
+    "lastInjection",
+    "memory",
+    "meta",
+    "nextTurnInjection",
+    "opinion",
+    "parallelWorld",
+    "people",
+    "proactiveLastRound",
+    "schemaVersion",
+    "worldFacts",
+    "worldPulse"
+  ],
+  "deny": {
+    "meta.round-read": {
+      "engines/evolution.js": 2
+    },
+    "state.round-read": {
+      "engines/inject-inspector.js": 2,
+      "engines/parallel-world.js": 1,
+      "engines/tool-diag.js": 1
+    }
+  },
+  "write": {
+    "ui/panel.js": {
+      "innerHTML": 1
+    }
+  },
+  "read": {}
+}

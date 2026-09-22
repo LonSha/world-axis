@@ -9814,7 +9814,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10358,7 +10358,7 @@ assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.39.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.40.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10649,7 +10649,7 @@ assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.39.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.40.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11175,7 +11175,7 @@ assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.39.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.40.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11563,7 @@ assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.39.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.40.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11933,7 @@ assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.39.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.40.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12298,7 @@ assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.39.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.40.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14600,7 +14600,7 @@ assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.39.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.40.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -16042,6 +16042,124 @@ assert(verF2500 === '2.39.0' && mfF2500.version === verF2500, '入口与清单�
     console.log("  ✓ v2390: 静态口径（顶层 .round 幽灵读点清零）+ 负向自证");
   }
 
+
+  // ══════════ v2.40.0 ══════════
+  // 第二十七面：骨架归属。三次同型缺陷（v2.36「meta.round 有读者零写者」→
+  // v2.39「顶层 state.round 有读者、骨架无字段」→ v2.40 侦察到同型另一半：
+  // **写侧** lastInjection / proactiveLastRound 有写入方、有读者、骨架却没声明）
+  // 的共同教训是「静态锁写死一种拼法，等于给其它拼法发通行证」。故本段不再枚举拼法，
+  // 而以运行时骨架为唯一字段真源，落三条正交门禁并冻结账本：
+  //   ① ghost-read（幽灵读点 denylist）
+  //   ② schema-write（transact draft / patch 的顶层键必须在骨架一级键里）
+  //   ③ schema-read（裸 store.get().FIELD 必须在骨架一级键里）
+  section('v2.40.0：骨架归属门禁（写侧幽灵物化 + 三规则冻结 + 负向自证）');
+  {
+    const gate2400 = require('./field-liveness-gate.js');
+    const inv2400 = require('./inventory.js');
+    const fs2400 = require('fs');
+    const path2400 = require('path');
+    const W2400 = gate2400.loadWA();
+    const keys2400 = gate2400.schemaTopKeys(W2400);
+    const faces2400 = gate2400.productFaces();
+    const storeSrc2400 = fs2400.readFileSync(path2400.join(__dirname, '..', 'core/store.js'), 'utf8');
+
+    // ── A. v2.40.0 修的两处「写侧幽灵」已物化进骨架 ──
+    assert(keys2400.indexOf('lastInjection') >= 0,
+      'v2400: 骨架物化 lastInjection（此前 render/inject.js 写入 + 7 处读，骨架零声明）');
+    assert(keys2400.indexOf('proactiveLastRound') >= 0,
+      'v2400: 骨架物化 proactiveLastRound（proactive.js 写入，骨架零声明）');
+    const st2400 = W2400.store.get();
+    // 注意：loadWA() 复用同进程 global，前序段（v1817 等）已往 lastInjection 注入过快照，
+    //   所以这里不能断言「初值为 null」——初值由**骨架声明字面量**证明，运行时只验类型在册。
+    assert(storeSrc2400.indexOf('lastInjection: null,') >= 0 && storeSrc2400.indexOf('proactiveLastRound: 0,') >= 0,
+      'v2400: 骨架声明字面量成对在位（lastInjection: null / proactiveLastRound: 0）');
+    assert(st2400.lastInjection === null || typeof st2400.lastInjection === 'object',
+      'v2400: lastInjection 骨架在册且类型正确（实 ' + (st2400.lastInjection === null ? 'null' : typeof st2400.lastInjection) + '）');
+    assert(typeof st2400.proactiveLastRound === 'number',
+      'v2400: proactiveLastRound 骨架在册且为数字（实 ' + st2400.proactiveLastRound + '）');
+    assert(storeSrc2400.indexOf('（lastInjection/worldPulse 等）') >= 0,
+      'v2400: ensureShape 注释早就把它俩并列写成「默认为 null 的字段」——注释认、骨架不认，即本次补的是这个缺口');
+    assert(W2400.store.registryParity().ok === true,
+      'v2400: 骨架物化未破坏 registryParity 登记一致性');
+
+    // ── B. 规则① denylist：命中只许落在显式豁免面 ──
+    const deny2400 = gate2400.scanDeny(faces2400);
+    let denyBad2400 = [];
+    gate2400.DENY_RULES.forEach(function (rule) {
+      const got = deny2400[rule.id] || {};
+      Object.keys(got).forEach(function (rel) {
+        const cap = (rule.allow && rule.allow[rel]) || 0;
+        if (got[rel] > cap) denyBad2400.push(rule.id + '@' + rel + '=' + got[rel] + '>' + cap);
+      });
+    });
+    assert(denyBad2400.length === 0,
+      'v2400: 规则① 幽灵读点不超豁免上限（实 ' + (denyBad2400.join(' ') || JSON.stringify(deny2400)) + '）');
+
+    // ── C. 规则②③ 骨架归属：现场零越界（仅 OWNED_TOP_KEYS 登记的本地对象撞名）──
+    const own2400 = gate2400.scanOwnership(faces2400, keys2400);
+    let ownBad2400 = [];
+    Object.keys(own2400.write).forEach(function (rel) {
+      Object.keys(own2400.write[rel]).forEach(function (k) {
+        if (own2400.write[rel][k] > (gate2400.OWNED_TOP_KEYS[rel + '::' + k] || 0)) ownBad2400.push('写 ' + rel + '::' + k + '×' + own2400.write[rel][k]);
+      });
+    });
+    Object.keys(own2400.read).forEach(function (rel) {
+      Object.keys(own2400.read[rel]).forEach(function (k) { ownBad2400.push('读 ' + rel + '::' + k + '×' + own2400.read[rel][k]); });
+    });
+    assert(ownBad2400.length === 0,
+      'v2400: 写侧/读侧零骨架外键（实 ' + (ownBad2400.join(' ') || '无') + '）');
+    assert(Object.keys(own2400.read).length === 0,
+      'v2400: 裸形态 store.get().FIELD 全部命中骨架一级键（v2.39 的 st.round 属绑定变量形态，见规则①）');
+
+    // ── D. 门禁模块端到端（比对冻结账本）为绿：防止门禁「另开一趟没人跑」──
+    const cp2400 = require('child_process');
+    const rG2400 = cp2400.spawnSync(process.execPath, ['tests/field-liveness-gate.js'],
+      { cwd: path2400.join(__dirname, '..'), encoding: 'utf8' });
+    assert(rG2400.status === 0,
+      'v2400: 门禁模块端到端 exit 0（实 ' + rG2400.status + '）'
+      + (rG2400.status === 0 ? '' : ' :: ' + String(rG2400.stdout || '') + String(rG2400.stderr || '')));
+
+    // ── E. 负向自证：**真源码破坏 → 同一判据必须现形**（不是模拟常量、不是对原文件断言）──
+    //   E1 规则①：把 chatcache 的真写法退回「顶层 st.round」幽灵读形态
+    const ccSrc2400 = fs2400.readFileSync(path2400.join(__dirname, '..', 'engines/chatcache.js'), 'utf8');
+    const ccBroken2400 = ccSrc2400.split("const round = roundOfSafe(JSON.parse(getState(id) || '{}'));")
+      .join("const round = (st.round, roundOfSafe(JSON.parse(getState(id) || '{}')));");
+    assert(ccBroken2400 !== ccSrc2400, 'v2400: （负向自证）E1 破坏锚点恰命中');
+    const denyBroken2400 = gate2400.scanDeny([{ rel: 'engines/chatcache.js', face: inv2400.codeFace(ccBroken2400) }]);
+    assert(denyBroken2400['state.round-read'] && denyBroken2400['state.round-read']['engines/chatcache.js'] === 1,
+      'v2400: （负向自证）E1 退回 st.round 幽灵后规则① 真报 1 处（实 '
+      + JSON.stringify((denyBroken2400['state.round-read'] || {})) + '）');
+
+    //   E2 规则③：把真源码里的裸读改成骨架外键（同时验证它在原版不报、破坏后必报）
+    const tdSrc2400 = fs2400.readFileSync(path2400.join(__dirname, '..', 'engines/tool-diag.js'), 'utf8');
+    const tdBroken2400 = tdSrc2400.split('WA.store.get().lastInjection')
+      .join('WA.store.get().ghostProbe2400');
+    assert(tdBroken2400 !== tdSrc2400, 'v2400: （负向自证）E2 破坏锚点恰命中');
+    const ownBroken2400 = gate2400.scanOwnership([{ rel: 'engines/tool-diag.js', face: inv2400.codeFace(tdBroken2400) }], keys2400);
+    assert(ownBroken2400.read['engines/tool-diag.js']
+      && ownBroken2400.read['engines/tool-diag.js']['ghostProbe2400'] >= 1,
+      'v2400: （负向自证）E2 改成骨架外键后规则③ 真报（实 '
+      + JSON.stringify(ownBroken2400.read) + '）');
+    const ownOrig2400 = gate2400.scanOwnership([{ rel: 'engines/tool-diag.js', face: inv2400.codeFace(tdSrc2400) }], keys2400);
+    assert(!ownOrig2400.read['engines/tool-diag.js'],
+      'v2400: （负向自证）E2 同一判据在原版上不报（证明 E2 不是恒真）');
+
+    //   E3 规则②：把骨架声明抽掉 ⇒ 现有真写点立刻越界（证明规则② 与骨架声明强耦合）
+    const keysNo2400 = keys2400.filter(function (k) { return k !== 'lastInjection'; });
+    const riSrc2400 = fs2400.readFileSync(path2400.join(__dirname, '..', 'render/inject.js'), 'utf8');
+    const ownE3_2400 = gate2400.scanOwnership([{ rel: 'render/inject.js', face: inv2400.codeFace(riSrc2400) }], keysNo2400);
+    assert(ownE3_2400.write['render/inject.js'] && ownE3_2400.write['render/inject.js']['lastInjection'] === 1,
+      'v2400: （负向自证）E3 抽掉骨架声明后规则② 真报 lastInjection 越界 1 处（实 '
+      + JSON.stringify(ownE3_2400.write) + '）');
+    assert(storeSrc2400.indexOf('lastInjection: null,') >= 0, 'v2400: 骨架声明确在现场（E3 的删除是判据侧模拟白名单，未改真文件）');
+
+    //   E4 规则② 的假阳性面：panel.js 的本地元素 `d.innerHTML` 撞名 → 由 OWNED_TOP_KEYS 显式登记兜住
+    assert(gate2400.OWNED_TOP_KEYS['ui/panel.js::innerHTML'] === 1,
+      'v2400: 本地对象撞名（transact 回调参数 d 与元素变量 d）走显式登记，不靠静默豁免');
+
+    console.log('  ✓ v2400: 骨架归属门禁三规则 + 冻结账本，写侧幽灵（lastInjection/proactiveLastRound）已物化');
+    console.log('  ✓ v2400: 四条负向自证（E1 denylist / E2 读侧 / E3 写侧 / E4 撞名登记）全部现形');
+  }
   }  // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

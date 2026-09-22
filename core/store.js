@@ -99,6 +99,17 @@
       consistency: [],          // {kind, detail, at}
       // 世界脉搏（backstage结算）
       worldPulse: null,         // {pressure:0-3, trend:rising|falling|steady, note, at}
+      // v2.40.0 物化：上轮注入打点快照（render/inject.js:293 写入方，诊断/撤销读）
+      //   why：它与 worldPulse/nextTurnInjection 同族（默认 null、运行时变对象），
+      //   store.js 下方 ensureShape 的注释也把它俩并列写成「默认为 null 的字段
+      //   （lastInjection/worldPulse 等）」——但 worldPulse 在骨架里声明了、它没有。
+      //   后果不是崩溃（读侧有 `|| null` 守卫），而是**骨架清单失真**：任何按骨架
+      //   白名单裁剪/体检的路径都不认识它，ensureShape 也补齐不到（v2.39.0 同型的
+      //   另一半：那轮修的是「读了骨架里没有的字段」，这里是「写了骨架里没有的字段」）。
+      lastInjection: null,      // {at, injected, len, sources, budget, slots, slotErrors, clearedAt, clearedBy}
+      // v2.40.0 物化：主动拉动的冷却轮次（engines/proactive.js:86 写入方）
+      //   真源是 evolution.round（v2.39.0 收口），此字段只是「上次拉动时的轮次」留痕。
+      proactiveLastRound: 0,    // 与 parallelWorld.round 同类：0 表示「从未拉动」
       // 下轮注入三列引用（after链产出，before链一次性消费）
       nextTurnInjection: null,  // {required:[], conditional:[], suppress:[], at, anchor}
       // 元信息

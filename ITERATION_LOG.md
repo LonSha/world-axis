@@ -314,3 +314,30 @@
   `tests/run.js`（v2.39.0 段 +26 断言 + 8 处版本锚点 + 4 处清册面锚点）/ `tests/dead-export-ledger.json`（version）/ `index.js` / `manifest.json` / `README.md` / `ITERATION_LOG.md`。
 - **门禁与验证**：全量回归 **4477 / 失败 0**（v2.38.0 基线 4458，+19 净增）；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106，**无需 `--update`**）；
   export-contract 不变（60 ns / 360 members / 4546 chars，本轮不新增导出）；清册面 refs 1374→1386（+12 = 四处 `roundOfSafe` 各 3 个真代码引用，逐文件归因一致）；版本三源同源 2.39.0。
+### R23 · 2026-09-22 · v2.40.0 交付（骨架归属门禁·第二十七面：写侧幽灵物化 + 三规则冻结，并修 ui-gate 陈旧常量红灯）
+- **做了什么**：延续「静默失效」猎取线（第二十七面）。前两轮修的都是**读侧**幽灵（v2.36 `meta.round` 有读者零写者；v2.39 顶层 `state.round` 有读者、骨架无字段），本轮把同一条线拉到底，抓到**写侧**那一半，并把它固化成永久门禁。
+- **缺陷（实测坐实）**：
+  1) `lastInjection` —— `render/inject.js:293` 真实写入（含 budget/slots/slotErrors 快照），`inject-inspector` / `tool-diag` / `render/inject` / `panel.js` 共 7 处读，**骨架 `defaultWorldState()` 零声明**。
+  2) `proactiveLastRound` —— `engines/proactive.js:86` 写入（v2.39.0 刚改成写真源轮次），冷却判据 `cooldownOk` 读，骨架同样零声明。
+  3) 佐证链最刺眼的一环：`core/store.js` 的 `ensureShape` 注释**自己**写着「仅当默认期望容器（对象/数组）而实测不是，才算污染；默认为 null 的字段（**lastInjection**/worldPulse 等）运行时变对象属正常演进」——`worldPulse` 在骨架里，它俩不在。**注释认、骨架不认**，正是「骨架清单失真」的直接证据。
+- **为什么算缺陷（而不是「只是注释没写」）**：骨架是**字段权威清单**（`registryParity` 以它判「未在骨架物化」，`ensureShape` 以它做结构自愈，体检/白名单裁剪以它为集合）。写进去却不在清单里 ⇒ 形状自愈补不到、按清单白名单裁剪的路径不认识它。它不抛不报、门禁全绿、UI 正常，属典型的静默失效面。
+- **修法（两层）**：
+  · **治标**：`core/store.js` 的 `defaultWorldState()` 物化 `lastInjection: null` 与 `proactiveLastRound: 0`（与 `worldPulse` 同族），各带 why 注释指向写入方与本次缺口。
+  · **治本**：新增 `tests/field-liveness-gate.js` + 冻结账本 `tests/field-liveness-ledger.json`。**不再枚举拼法**（v2.36 的教训：静态锁只认字面 `meta.round`，`(JSON.parse(...).meta || {}).round` 嵌套写法直接漏网），改为以运行时骨架（`store.get()` 真实导出）为唯一字段真源，三条正交规则：
+    ① `ghost-read`：已知幽灵读形态 denylist（`meta.round` / 顶层 `state.round`），命中只许落在**逐条附理由**的豁免面；
+    ② `schema-write`：`transact` 回调 draft 与 `patch(key)` 写入的**顶层键**必须在骨架一级键内；
+    ③ `schema-read`：裸形态 `store.get().FIELD` 读取的顶层键同上。
+- **门禁规则的两轮自纠（本仓纪律：门禁不能成为维护负担）**：
+  · 首版规则② 用「骨架字段存活性」（写点/读点计数）⇒ 实测 **200+ 噪声**（`background.text` 这类叶名与页名撞词、`ensureShape` 的 `leaf:` 声明被误当写点）。判定为**门禁本身不合格**（不可审查的门禁只会变成维护负担），删掉重写。
+  · 二版收敛为「写侧越界 + 读侧越界」两口径（更锐、贴着 v2.39/v2.40 缺陷形态），现场输出 **5 行、逐条可审查**：规则② 1 处（`ui/panel.js::innerHTML`，transact 回调参数 `d` 与 `const d = mainDoc.createElement(...)` 撞名，显式登记）、规则③ 0 处。
+- **同轮修掉的既有红灯（严重问题优先）**：`tests/ui-gate.js` 在 v2.39.0 干净基线上**本就是红的**（`git stash` 对照实测确认）：「RENDERERS 覆盖的页面数为 12（实 14）」。根因是**陈旧常量**——`checkPages.tested` 恒等于 `ui.pages().length`（循环内自增），页面在 v2.30~v2.34 段从 12 增至 14 时期望值没跟，写死数字只会在加页时误报，而真正的漏渲染早被同一段的 `failures` 兜住。修法：期望值改为自维护（`tested === pages().length && > 0`），并把「**RENDERERS ↔ PAGES 逐页同名同数**」提升为静态不变式（漏一个渲染器时点到该页必抛，此前无静态覆盖）。**这条红灯与本次主题完全同构**：只认一种形态（写死的 12）就等于给其它形态发通行证。
+- **判据（新增 v2.40.0 回归段，+19 断言）**：
+  · A 骨架物化两字段 + 声明字面量成对在位 + `registryParity().ok === true` + `ensureShape` 注释佐证；
+  · B 规则① denylist 命中不超显式豁免上限；
+  · C 规则②③ 现场零越界（读侧要求**恰好为 0**）；
+  · D 门禁模块端到端 `spawnSync` exit 0（防止「门禁另开一趟没人跑」）；
+  · E **四条负向自证**：E1 把 chatcache 真写法退回 `st.round` 幽灵 ⇒ 规则① 报 1 处；E2 把 tool-diag 的裸读改成 `ghostProbe2400` ⇒ 规则③ 报，且**同一判据在原版上不报**（证明非恒真）；E3 从白名单抽掉 `lastInjection` ⇒ 规则② 立刻报 `render/inject.js` 越界 1 处；E4 撞名走 `OWNED_TOP_KEYS` 显式登记（不是静默豁免）。
+- **同轮自纠（1 次，被自己新写的断言抓红）**：首版断言写「两字段初值为 null/0」，但 `loadWA()` 复用同进程 `global`，前序段（v1817 等）已往 `lastInjection` 注入过快照 ⇒ 前提不成立。改为「初值由**骨架声明字面量**证明 + 运行时只验类型/在册」，并把坑写进注释。
+- **为什么**：三次同型缺陷（读侧零写者 → 读侧无字段 → 写侧无字段）都由「骨架与代码各说各话」引起，而两次漏网都源于「静态锁写死一种拼法」。本轮把判据的作用点从「代码里的拼法」搬到「运行时骨架本身」，这类缺陷此后无法静默进入。
+- **影响范围**：`core/store.js`（物化两字段）/ `tests/field-liveness-gate.js`（新）/ `tests/field-liveness-ledger.json`（新）/ `tests/ui-gate.js`（陈旧常量 → 自维护 + 新增静态不变式 + 段名）/ `tests/run.js`（v2.40.0 段 +19 断言 + 8 处版本锚点）/ `index.js` / `manifest.json` / `tests/dead-export-ledger.json`（version + `_note`）/ README / ITERATION_LOG。**不新增导出、不新增产品文件。**
+- **门禁与验证**：全量回归 **4496 / 失败 0**（v2.39.0 基线 4477，**+19 净增**）；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106，**无需 `--update`**）；export-contract 不变（60 ns / 360 members / 4546 chars）；ui-gate **48/1 → 53/0**（修复既有红灯 + 净 +5 断言）；ui-wire-audit 8/0；field-liveness-gate 绿；版本三源同源 **2.40.0**。

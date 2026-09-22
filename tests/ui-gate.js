@@ -41,12 +41,33 @@ async function main() {
   assert(!!panel && !!panel.querySelector('.wa-body'), '内容容器成树（renderBody 的挂载点）');
   assert(!!panel && panel.classList.contains('wa-hidden') === true, '初始为隐藏态（未点开时不占屏）');
 
-  section('G17-B 十二个渲染器逐页真实执行（点击 → renderBody → innerHTML 解析 → bindBody）');
+  section('G17-B 全部渲染器逐页真实执行（点击 → renderBody → innerHTML 解析 → bindBody）');
   WA.ui.open();
   assert(panel.classList.contains('wa-hidden') === false, 'open() 后翻为可见');
   const pages = checkPages(env, countControls);
-  assert(pages.tested === 12, 'RENDERERS 覆盖的页面数为 12（实 ' + pages.tested + '）');
-  assert(pages.failures.length === 0, '十二个页面全部渲染成树且控件可在树中找到', pages.failures.join('；'));
+  // v2.40.0：期望值不再写死数字。此前写 `=== 12`，而页面已增至 14 —— 该断言成为
+  //   本门禁唯一红灯来源（`checkPages.tested` 恒等于 `pages().length`，写死数字只在
+  //   加页时误报；真正的漏渲染早被下面的 failures 兜住）。这正是「写死一种形态 =
+  //   给其它形态发通行证」的老毛病：**陈旧常量**。改为三条自维护判据，并把
+  //   「RENDERERS ↔ PAGES 逐页同名同数」这一根因层不变式补上（漏一个渲染器时
+  //   点到该页必抛，属 G17 要管的真缺陷，此前无静态覆盖）。
+  const pageIds = (WA.ui && typeof WA.ui.pages === 'function') ? WA.ui.pages() : [];
+  assert(pages.tested === pageIds.length && pages.tested > 0,
+    '逐页探针覆盖全部 ' + pageIds.length + ' 个页面（实 ' + pages.tested + '）');
+  assert(pages.failures.length === 0, '全部页面渲染成树且控件可在树中找到', pages.failures.join('；'));
+  {
+    const psrc = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    const reg = psrc.match(/const RENDERERS = \{([\s\S]*?)\};/);
+    assert(!!reg, 'RENDERERS 字面量可定位（静态不变式的锚点）');
+    const rk = reg ? Array.from(new Set((reg[1].match(/([A-Za-z_$][\w$]*)\s*:/g) || [])
+      .map(function (s) { return s.replace(/\s*:$/, ''); }))) : [];
+    const missR = pageIds.filter(function (p) { return rk.indexOf(p) < 0; });
+    const missP = rk.filter(function (k) { return pageIds.indexOf(k) < 0; });
+    assert(rk.length === pageIds.length,
+      'RENDERERS 键数与 PAGES 页数一致（' + rk.length + ' vs ' + pageIds.length + '）');
+    assert(missR.length === 0, 'PAGES 里每页都有对应 RENDERERS 条目（缺 ' + (missR.join(',') || '无') + '）');
+    assert(missP.length === 0, 'RENDERERS 里每个键都在 PAGES 中（多 ' + (missP.join(',') || '无') + '）');
+  }
   console.log('    ' + pages.details.join('  '));
   assert(WA.ui.currentPage() === (WA.ui.pages() || []).slice(-1)[0],
     '切换按 pages() 原始顺序推进（末页实 ' + WA.ui.currentPage() + '）');
