@@ -229,7 +229,12 @@ function checkSrcMaps(opts) {
   check('relBadge', _wdKeysOf(_wdObjAt(panel, "'血盟':'")), _wdArr(evo, 'FACTION_RELATION'));
   check('repColor', _wdKeysOf(_wdObjAt(panel, "'万众敬仰':'")), _wdArr(evo, 'REPUTATION_LEVELS'));
   check('ecoColor', _wdKeysOf(_wdObjAt(panel, "'繁荣':'")), _wdArr(evo, 'ECONOMY_CLIMATE'));
-  check('renderDirector', _wdKeysOf(_wdObjAt(panel, "clock:'世界时间'")), _wdArr(inj, 'SOURCES'));
+  // v2.51.0（第三十六面）: 锚点从「导演页里内联的那份手写表」改为「模块级单一真源 VIS_NAMES」。
+  //   本版把同一张中文名表在 panel.js 里被写了两遍的那份（renderInject 的局部 NAMES +
+  //   renderDirector 的内联字面量）提升成了一个 VIS_NAMES 常量——两处引用同一份。
+  //   若仍按旧锚点取，_wdObjAt 会抛「anchor not found」把整轮回归打断（已实测），
+  //   而判据本身并没有失效：它要的正是「UI 侧这份映射的键集 == render.SOURCES」。
+  check('renderDirector', _wdKeysOf(_wdObjAt(panel, "clock: '世界时间'")), _wdArr(inj, 'SOURCES'));
   // 记账桶标签映射（声明桶 ∪ 调用点字面量标签 ↔ UI 键集）
   function declKeys(anchor) { return _wdKeysOf(_wdObjAt(sb, anchor)); }
   function callTags(fn) { const s = []; const RX = new RegExp(fn + "\\(\\s*'([^']+)'", 'g'); let mm; while ((mm = RX.exec(sb))) if (s.indexOf(mm[1]) < 0) s.push(mm[1]); return s; }

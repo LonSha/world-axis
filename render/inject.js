@@ -11,9 +11,15 @@
   const mainWin = WA.mainWin || window;
   const LS_KEY = 'worldaxis_inject_visibility_v1';
 
-  const SOURCES = ['clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse', 'ledger', 'digest'];
+  // v2.51.0（第三十六面）: 追加 'style'（叙事工艺约束）。它在 applyInjections 里有真实
+  //   分支——SOURCES 的每项都必须在 def 里有默认值、且**真被读**，否则就是「声明了源
+  //   却没人消费」（v2.38.0 的 echoes 正是踩过这个坑：开关点了零效果）。
+  const SOURCES = ['clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse', 'ledger', 'digest', 'style'];
 
-  const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true }, module: 'inject' };
+  const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
+        // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
+        //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
+        style: false }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -172,6 +178,19 @@
       return '';
     },
 
+    /**
+     * v2.51.0（第三十六面）：叙事工艺块（render 侧的取数口）。
+     *   单独成方法而不是内联在 applyInjections 里，是为了让它可被单独测量——
+     *   「设置面开了、产物却是空串」这类现场，只有直接调它才分得清是哪一层的空
+     *   （可见性关 / style 模块缺席 / 五轴全 off / buildBlock 抛错）。
+     *   任何一层缺失都返回空串（零 token 占用），不产出半截文本。
+     */
+    buildStyleBlock() {
+      if (!WA.style || typeof WA.style.buildBlock !== 'function') return '';
+      try { return WA.style.buildBlock() || ''; }
+      catch (e) { if (WA.log) WA.log('warn', '叙事工艺块构建失败', e); return ''; }
+    },
+
     applyInjections(ctx) {
       const c = (() => { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } })();
       if (!c || !c.setExtensionPrompt) { if (ctx.injections.length) WA.log('warn', '宿主无setExtensionPrompt，注入丢弃'); return; }
@@ -179,6 +198,13 @@
       const items = [];
       const snap = this.buildWorldSnapshot();
       if (snap) items.push({ source: '世界状态', content: snap });
+      // v2.51.0（第三十六面）：叙事工艺约束作为**独立注入项**（不进世界状态块）。
+      //   并入的代价是它从治理面消失：预算裁决、去向账、快照 sources 三项都只认独立项，
+      //   并进去之后「工艺约束为什么没进 prompt」在 trace 里会显示成「世界状态」。
+      //   另外它套进 <world_axis_state> 会与那段「呈现铁律·绝不使用系统旁白」互相矛盾
+      //   （工艺约束本身就是系统口径的写作要求）。
+      //   三态如实：style 模块缺席（旧加载顺序/加载失败）⇒ 不注入，不假装注入了空段。
+      if (vis.style) { const stb = this.buildStyleBlock(); if (stb) items.push({ source: '叙事工艺', content: stb }); }
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）

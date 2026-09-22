@@ -46,7 +46,10 @@
       // 权威世界事实（已结算，正文连续性约束）
       worldFacts: [],           // {id, key, value, scope, source, at, branchId}
       // 人物（NPC）状态：位置/行动/意图/身体/资源/认知边界
-      people: {},               // id -> {id,name,avatar,location,action,intent,body,resources,knowledge:{},personalityAnchor,speakingStyle,behaviorBoundaries,innerVoice,lastSeenAt,updatedAt}
+      // v2.51.0 新增（位于 people.<id>.profile 内部）：persona 人格机制（slot/locked/d1-d5/at/note）、
+      //   relations 单向关系量值数组（target/intimacy/trust/hostility/vigilance/attachment/boundary_status/at）。
+      //   与 profile 既有五节分开：五节是叙述性人设文本条，relations/persona 是带钳制的量值与机制面。
+      people: {},               // id -> {id,name,avatar,location,action,intent,body,resources,knowledge:{},personalityAnchor,speakingStyle,behaviorBoundaries,innerVoice,lastSeenAt,updatedAt,profile:{...}}
       // 暗流（未结算事件链）
       currents: [],             // {id,title,summary,visibility:hidden|trace|public,public_trace,causes:[],participants:[],stage,createdAt,updatedAt,branchId}
       // 回声（已结算结果与正文的接触面）
@@ -766,6 +769,10 @@
     'people.*.profile.family': { cap: 10, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
     'people.*.profile.memory': { cap: 25, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
     'people.*.profile.relationships': { cap: 15, wildcard: true, site: 'actors/registry.js 档案节写入（上限取自本登记表，v2.2.0 单一真源）' },
+    // v2.51.0 补登：单向关系量值（缝合万相锚典亲密度语义区间，压缩口径）。
+    //   未登记会让 sizeAudit 把 people.<id>.profile.relations 报成 unbounded。
+    //   persona 是对象且非顶层，不计入 maintain 的 rows7 盘点，故无需登记 cap。
+    'people.*.profile.relations': { cap: 40, wildcard: true, site: 'actors/registry.js 关系量值写入（上限取自本登记表；单次变化±20 硬边界）' },
     // v1.5.0 补登：people.<id>.knowledge 对象键容器（backstage 按 at 排序逐出，保留 30 键）
     'people.*.knowledge': { cap: 30, kind: 'object', wildcard: true, site: 'backstage.js knowledge 容量30逐出' },
     // v2.13.0 补登（挤出侧广谱侦察发现的**真盲区**）：阶段纪要 / 大总述环形。

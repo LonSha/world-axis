@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.50.0';
+  const VERSION = '2.51.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -273,6 +273,11 @@
     'direction/oracle.js',
     'direction/tags.js',
     'direction/choices.js',
+    // v2.51.0（第三十六面）：叙事工艺设置面。须早于其唯一消费方 render/inject.js
+    //   —— 注入落地时 applyInjections 要读 style.buildBlock()。
+    //   它是 engines/rules.js 的 craft 模块（「叙事工艺按设置面口径执行」）所指向的
+    //   那个**设置面本身**：此前只有口径声明、没有产生方。
+    'engines/style.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

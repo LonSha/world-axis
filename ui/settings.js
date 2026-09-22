@@ -5,6 +5,41 @@
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '"' }[c])); }
 
+  /**
+   * v2.51.0（第三十六面）叙事工艺设置面（五轴）。
+   *   渲染成独立函数而不是内联在模板里：本块有六处需要从引擎档位表取数，内联会让
+   *   render() 变成第二个档位真源（枚举改了这里不改就是静默漂移）。
+   *   档位下拉一律由 WA.style.CHOICES × CHOICE_LABELS 生成 —— 单一真源。
+   */
+  function styleBlockHtml() {
+    if (!WA.style || typeof WA.style.getSettings !== 'function') {
+      return '<div class="wa-sec">叙事工艺设置面</div><div class="wa-dim">叙事工艺模块未加载（engines/style.js）</div>';
+    }
+    const st = WA.style.getSettings();
+    const opt = (axis) => WA.style.CHOICES[axis]
+      .map(v => `<option value="${v}" ${st[axis] === v ? 'selected' : ''}>${esc(WA.style.CHOICE_LABELS[v] || v)}</option>`).join('');
+    // 五行的控件 id 一律**字面量写在模板里**，不走 `id="${变量}"`。原因不是风格：
+    //   v2.2.0 块8 的守卫不变量（tests/run.js H2）用 `/id="(wa-[a-z0-9\-]+)"/` 从
+    //   ui/*.js 源码里采集「渲染出的控件」，再与 UI_BINDINGS 对账「无僵尸条目」。
+    //   若 id 由变量拼出来（`id="${id}"`），采集面**看不到这五个控件**，而它们又已写进
+    //   守卫表 ⇒ 门禁立刻报僵尸条目（本版实测正是这五个）。参数化那个 row() 在这里
+    //   省不了几行，换来的却是「门禁看不见这五个控件」——恰是本门禁要消灭的那类盲区。
+    //   档位选项仍由 CHOICES × CHOICE_LABELS 生成（单一真源），只有标签/id/title 是字面量。
+    return `
+      <div class="wa-sec">叙事工艺设置面<span class="wa-dim">（正文怎么写；全部默认「不设定」= 零 token 占用）</span></div>
+      <label class="wa-node"><input type="checkbox" id="wa-st-block" ${st.block === 'on' ? 'checked' : ''}/><span class="wa-node-label">启用叙事工艺约束（关闭则整块不注入）</span></label>
+      <div class="wa-set-row"><span>段落节奏</span><select id="wa-st-para" class="wa-input" title="单段字数的目标区间与换行密度">${opt('paragraphStyle')}</select></div>
+      <div class="wa-set-row"><span>叙事视角</span><select id="wa-st-persp" class="wa-input" title="以谁的眼睛看这个场景">${opt('perspective')}</select></div>
+      <div class="wa-set-row"><span>玩家角色人称</span><select id="wa-st-pron" class="wa-input" title="正文里指代玩家角色用第几人称">${opt('userPronoun')}</select></div>
+      <div class="wa-set-row"><span>演绎授权</span><select id="wa-st-takeover" class="wa-input" title="是否代写玩家角色的言行（越靠右授权越大）">${opt('takeover')}</select></div>
+      <div class="wa-set-row"><span>转述授权</span><select id="wa-st-narrate" class="wa-input" title="是否复述/融入玩家的上一句输入">${opt('narrate')}</select></div>
+      <textarea id="wa-st-custom" class="wa-ta" placeholder="附加的写作要求（≤500 字，例如：少用比喻、对白不加引号…）">${esc(st.custom || '')}</textarea>
+      <button class="wa-btn" id="wa-st-save">保存叙事工艺</button>
+      <div id="wa-st-out" class="wa-out"></div>
+      <div class="wa-dim">当前：${esc(WA.style.summaryText())}</div>
+      <div class="wa-dim">保存后还需在「导演」页的注入可见性里开启「叙事工艺」源，否则不注入正文。</div>`;
+  }
+
   WA.uiSettings = {
     render() {
       const bs = WA.backstage.getSettings();
@@ -124,7 +159,8 @@
             <div class="wa-row"><button class="wa-btn" id="wa-hz-save">保存随机事件设置</button></div><div id="wa-hz-out" class="wa-out"></div>`
             + tail;
         })()}
-        <div id="wa-set-out" class="wa-out"></div>`;
+        <div id="wa-set-out" class="wa-out"></div>
+        ${styleBlockHtml()}`;
     },
     bind(panelEl) {
       const $ = sel => panelEl.querySelector(sel);
@@ -300,6 +336,42 @@
         WA.evolution.setSettings({ diceEnabled: $('#wa-ev-dice').checked, diceModifier: +evMod.value });
         const results = WA.evolution.tick();
         $('#wa-ev-out').innerHTML = results.length ? results.map(r => `<div class="wa-item">${esc(r.name)}：<b>${esc(r.result)}</b> ${r.stage ? '→ ' + esc(r.stage) : ''} ${r.dice ? '(骰' + r.dice + '/阈' + r.threshold + ')' : ''}</div>`).join('') : '<div class="wa-dim">（无活跃事件链，可在backstage推演中生成）</div>';
+      };
+      // v2.51.0（第三十六面）: 叙事工艺保存出口。三点与既有保存出口同规格，一点为本块独有：
+      //   同规格 → ① 写失败不得报成功（`ok === false` 才走失败分支）；② 归因话术复用
+      //     同一处 `whyTxt`（不新增第二份措辞真源）；③ 失败时明说「改动未落盘」。
+      //   独有 → ④ **必须回显注入可见性**。本块在 render SOURCES 里的默认值是 false
+      //      （老用户凭空多约束 = 静默行为变更，故默认关），因此「保存成功了但正文没变」
+      //      是这个面最可能被问的问题。不回显这一句，用户只会得到与 v2.38.0 `echoes`
+      //      复选框「点了零效果」完全同形的体验——本版新增出口不得再犯该型病。
+      const stSave = byId('wa-st-save');
+      if (stSave) stSave.onclick = function () {
+        const o = byId('wa-st-out');
+        if (!WA.style || typeof WA.style.setSettings !== 'function') { if (o) o.textContent = '✗ 保存失败：叙事工艺模块未加载（engines/style.js）'; return; }
+        const wSt = WA.style.setSettings({
+          block: byId('wa-st-block').checked ? 'on' : 'off',
+          paragraphStyle: byId('wa-st-para').value,
+          perspective: byId('wa-st-persp').value,
+          userPronoun: byId('wa-st-pron').value,
+          takeover: byId('wa-st-takeover').value,
+          narrate: byId('wa-st-narrate').value,
+          custom: byId('wa-st-custom').value.trim()
+        });
+        if (!o) return;
+        if (wSt && wSt.ok === false) {
+          // 非法档位是「整笔拒收」语义（磁盘上不留一半新一半旧的中间态），故这里必须把
+          //   被拒的轴原样带出来——否则用户看到「保存失败」却不知道哪一轴不合法。
+          const bad = (wSt.bad || []).map(function (b) { return (b.axis || '?') + '=' + b.got; }).join('、');
+          o.textContent = '✗ 保存失败：' + whyTxt(wSt.reason) + (bad ? '（非法档位：' + bad + '）' : '') + '（改动未落盘）';
+          return;
+        }
+        const eff = (typeof WA.style.effectiveSettings === 'function') ? WA.style.effectiveSettings() : {};
+        const axN = Object.keys(eff).filter(function (k) { return k !== 'enabled'; }).length;
+        const vis = (WA.render && typeof WA.render.getVisibility === 'function') ? WA.render.getVisibility() : {};
+        const visOn = !!vis.style;
+        o.textContent = '✓ 已保存（' + (typeof WA.style.summaryText === 'function' ? WA.style.summaryText() : '') + '）'
+          + '｜生效轴 ' + axN + ' 项'
+          + (visOn ? '｜注入可见性：已开启（下轮注入生效）' : '｜注入可见性：**未开启** —— 需到「导演」页开启「叙事工艺」源，否则不进正文');
       };
     }
   };

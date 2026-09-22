@@ -124,6 +124,51 @@
       };
     });
   }
+  // ── v2.51.0（第三十六面）: 叙事工艺设置面 ────────────────────────────
+  // 为什么单独出节：rules.craft 的正文自 v2.x 起就写着「叙事工艺按设置面口径执行
+  //   （字数/段落/视角/人称/转述/演绎）」——而那个设置面**不存在**，即「声明了消费口径
+  //   却没有产生方」的招牌缺陷形态。本版补上产生方（engines/style.js）之后，若诊断包里
+  //   看不到它，就只是把同一型病从「无产生方」换成「有产生方但没人能看见它为什么不出话」。
+  // 本节的判据设计（三态如实，不落「一切正常」）：`enabled` 只说明「轴选得对不对」，
+  //   真正决定「正文有没有被约束」的是**第二道闸**——render 侧的可见性源。两者必须并列，
+  //   否则「我明明设了却没生效」与「我根本没设」在诊断包里同形。
+  function secStyle() {
+    return safe(function () {
+      if (!WA.style || typeof WA.style.styleStat !== 'function') return { error: 'style 模块不可用' };
+      const st = WA.style.styleStat();
+      const vis = (WA.render && WA.render.getVisibility) ? WA.render.getVisibility() : {};
+      // 覆盖度交叉校验：档位表（CHOICES）↔ 正文表（PARA_TEXT 等）是两处手写。
+      //   漂移的症状是静默的（档位可选、写入合法、正文零约束），故这里直接把「有档位但正文为空」
+      //   的轴列出来——空数组 = 两张表一致，非空 = 存在「看起来生效其实不出话」的档位。
+      const uncovered = [];
+      try {
+        const cov = WA.style.textCoverage ? WA.style.textCoverage() : {};
+        Object.keys(cov).forEach(function (axis) {
+          Object.keys(cov[axis]).forEach(function (c) {
+            if (c !== 'off' && !(cov[axis][c] > 0)) uncovered.push(axis + '=' + c);
+          });
+        });
+      } catch (e) { /* 覆盖度取不到不影响其余诊断 */ }
+      return {
+        key: st.key, axes: st.axes,
+        values: st.values, labels: st.labels,
+        enabled: st.enabled,
+        summary: st.summary,
+        // 二道闸：可见性源关着 ⇒ 「设置生效但正文不注入」——这是本面最容易被误判成
+        //   「新功能坏掉了」的局面，必须与 enabled 分开报。
+        injectSource: 'style',
+        injectReady: !!vis.style,
+        customLen: st.customLen, customMax: st.customMax,
+        reads: st.reads, writes: st.writes, rejects: st.rejects,
+        fallbacks: st.fallbacks, lastFallback: st.lastFallback,
+        lastReject: st.lastReject,
+        builds: st.builds, emptyBuilds: st.emptyBuilds,
+        lastLen: st.lastLen, lastAt: st.lastAt,
+        uncovered: uncovered,
+        text: WA.style.summaryText ? WA.style.summaryText() : null
+      };
+    });
+  }
   // ── 3. 模块装载完整性（文件 ↔ 导出对象） ──
   const MODULE_EXPORTS = {
     'core/clock.js': 'clock',
@@ -148,6 +193,8 @@
     'engines/host-wb-trace.js': 'hostWbTrace',
     'engines/ledger-timeline.js': 'ledgerTimeline',
     'engines/floor-changes.js': 'floorChanges',
+    // v2.51.0（第三十六面）：叙事工艺设置面（rules.craft 所指的设置面本体）
+    'engines/style.js': 'style',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -649,6 +696,13 @@
       // v2.7.0: 区域突发事件配置（生效值视图接入界面后的新增出口）
       'wa-rg-enable', 'wa-rg-chance', 'wa-rg-dur', 'wa-rg-save', 'wa-rg-out',
       'wa-rg-chancev', 'wa-rg-durv',
+      // v2.51.0（第三十六面）: 叙事工艺设置面控件（同 v2.45.0/v2.46.0 的理由：新控件
+      //   必须同时「渲染 + 绑定 + 守卫登记」，否则「渲染了但绑定的 id 写错」在新增出口上无人发现）。
+      //   注：`wa-st-block` 等一律无条件渲染（模块缺席时整段降级成一句提示、控件不在场 ⇒
+      //   本组会在 style.js 未加载时报 missing——这是**有意的**：style.js 是产品文件，
+      //   它缺席本身就是断裂，不该被 cond 层「依赖态、缺失不判失败」掩盖）。
+      'wa-st-block', 'wa-st-para', 'wa-st-persp', 'wa-st-pron', 'wa-st-takeover', 'wa-st-narrate',
+      'wa-st-custom', 'wa-st-save', 'wa-st-out',
       'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
     // v2.33.0: 记忆页 / 注入页——本版把「能力面」第一次接到「呈现面」：memory（92 方法，
@@ -893,7 +947,7 @@
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),

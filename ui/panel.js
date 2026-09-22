@@ -10,6 +10,17 @@
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const mainDoc = WA.mainDoc || document;
   const mainWin = WA.mainWin || window;
+  /**
+   * v2.51.0（第三十六面）: 注入源的中文名——**单一真源，提升到模块级**。
+   *   此前同一张表在文件里被手写了两遍：`renderInject()` 里的 `NAMES` 与
+   *   `renderDirector()` 里注入可见性那段的内联字面量。两遍的后果不是「多写几行」，
+   *   而是**新增源时只改一处，另一处静默露出裸键名**：本版新增 `style`（叙事工艺）时，
+   *   若只补 renderInject，导演页的可见性复选框就会显示 `style` 而不是「叙事工艺」，
+   *   而后者恰恰是用户唯一能打开它的地方——两个页面各说各的名字，没人会去比对。
+   *   提升后两处引用同一份，新增源只需在此表加一行（`SOURCES` 仍是枚举真源，
+   *   本表只是它的显示名；缺名时下游已有 `|| k` 兜底，不会渲染成 undefined）。
+   */
+  const VIS_NAMES = { clock: '世界时间', background: '世界背景', people: '人物', currents: '暗流', echoes: '回声', memory: '记忆', opinion: '舆情', pulse: '世界脉搏', ledger: '重大事件账本', digest: '世界推演', style: '叙事工艺' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
@@ -784,7 +795,7 @@
   function renderInject() {
     const vis = (function () { try { return WA.render.getVisibility(); } catch (e) { return {}; } })();
     const SOURCES = (WA.render && WA.render.SOURCES) || [];
-    const NAMES = { clock: '世界时间', background: '世界背景', people: '人物', currents: '暗流', echoes: '回声', memory: '记忆', opinion: '舆情', pulse: '世界脉搏', ledger: '重大事件账本', digest: '世界推演' };
+    const NAMES = VIS_NAMES;   // v2.51.0: 单一真源（此前是本函数内的局部手写表，与导演页各一份）
     let out = '';
     out += '<div class="wa-sec">本轮注入落地<span class="wa-dim">（世界状态到底进没进最终 prompt）</span></div>';
     out += (function () {
@@ -1124,7 +1135,7 @@
     const plan = WA.oracle.plan;
     return `
       <div class="wa-sec">注入可见性（哪些世界信息递给正文）</div>
-      ${WA.render.SOURCES.map(k => `<label class="wa-node"><input type="checkbox" data-vis="${k}" ${vis[k] ? 'checked' : ''}/><span class="wa-node-label">${({clock:'世界时间',background:'世界背景',people:'人物',currents:'暗流',echoes:'回声',memory:'记忆',opinion:'舆情',pulse:'世界脉搏',ledger:'重大事件账本',digest:'世界推演'})[k] || k}</span></label>`).join('')}
+      ${WA.render.SOURCES.map(k => `<label class="wa-node"><input type="checkbox" data-vis="${k}" ${vis[k] ? 'checked' : ''}/><span class="wa-node-label">${VIS_NAMES[k] || k}</span></label>`).join('')}
       <div class="wa-sec">剧情引导（弧线/序列）</div>
       ${plan ? `<div class="wa-item"><b>${esc(plan.kind === 'arc' ? '弧线' : '序列')}</b> 第${plan.current + 1}/${plan.beats.length}拍<div class="wa-dim">${esc((WA.oracle.currentBeat() || {}).goal || '')}</div><button class="wa-btn wa-mini" id="wa-beat-next" title="推进到剧情弧线的下一拍">完成本拍</button><button class="wa-btn wa-mini" id="wa-plan-clear">放弃</button></div>`
         : `<textarea id="wa-plan-beats" class="wa-ta" placeholder="每行一拍的目标/指令…"></textarea><button class="wa-btn" id="wa-plan-start">开始序列引导</button>`}

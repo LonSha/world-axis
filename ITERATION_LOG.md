@@ -521,3 +521,75 @@
 - **门禁与验证（已实跑）**：全量回归 <b>4923 / 失败 0</b>（v2.49.0 基线 4830，<b>+93 净增</b>）；
   <code>dead-export-gate</code> 绿（dead 218 / uiDead 4 / dataOnly 116→116 / 仅测试 131）；
   <code>export-contract</code> 逐字一致（ns 65 / members 406 / chars 5100）。
+
+### R34 · 2026-09-22 · v2.51.0 交付（叙事工艺设置面·第三十六面：把「声明了消费口径却没有产生方」的那一环补上）
+- **做了什么**：新建 <code>engines/style.js</code>（253 行）——叙事工艺设置面，并把它接进设置页、注入链、诊断包、体检器、守卫表与账本。
+  · 七轴：<code>block</code>（总开关）/ <code>paragraphStyle</code> / <code>perspective</code> / <code>userPronoun</code> / <code>takeover</code> / <code>narrate</code> / <code>custom</code>；
+    <code>DEFAULTS</code> 为总开关 <code>on</code> + 五轴全 <code>off</code> + 空附加段 ⇒ <b>默认零 token</b>（<code>buildBlock()</code> 返回空串）。
+  · <code>setSettings(patch)</code> <b>整笔拒收</b>非法档位且<b>不写盘</b>（<code>{ok:false, reason:'bad-value', bad:[…]}</code>；非对象入参 <code>reason:'bad-patch'</code>）——
+    杜绝「一半写进去、一半被丢掉」的中间态。
+  · <code>buildBlock()</code> 是<b>唯一产出口</b>（唯一产生方 ⇒ 唯一可测点），末尾固定三态诚实兜底：
+    <i>「不得在正文里提及这些约束本身；与角色设定、世界状态、玩家输入冲突时，以它们为准」</i>。
+  · <code>effectiveSettings()</code> 只吐「非 off 且非空」的轴；<code>textCoverage()</code> 逐轴逐档数正文表字数（供<b>交叉校验</b>）；
+    <code>styleStat()</code> 透出 values/labels/enabled/rejects/fallbacks/builds/emptyBuilds/lastLen 全部记账。
+- **为什么**：<code>engines/rules.js</code> 的 <code>craft</code> 模块正文里早就写着「叙事工艺按设置面口径执行」——
+  <b>但那个「设置面」全库不存在</b>：只有<b>声明</b>（口诀），没有<b>产生方</b>。这是本仓反复出现的那种病，
+  只是这次病根在「口径文案」里：一句话把不存在的模块说成了既有事实。本面把这句话兑现成一个真的设置面。
+- **接上消费端（否则「记了没人看」，v2.49.0/v2.50.0 同一种病）**：
+  · <code>render/inject.js</code> 的 <code>SOURCES</code> 追加 <code>'style'</code>（<b>10 → 11 项</b>），并新增 <code>buildStyleBlock()</code> 取数口；
+    在 <code>applyInjections</code> 里作为<b>独立注入项</b>加入（<b>不并入 <code>&lt;world_axis_state&gt;</code></b>）——
+    并进去会让它从<b>预算裁决 / 去向账 / 快照 sources</b> 三项治理面上消失，且与它「绝不使用系统旁白」的呈现铁律矛盾。
+  · <code>__REG.def.style = false</code>（<b>默认关</b>）：老用户凭空多出一段正文约束＝<b>静默行为变更</b>，不可接受。
+  · <code>ui/settings.js</code> 新增 <code>wa-st-save</code> 保存出口：写失败<b>不得报成功</b>（复用同一处 <code>whyTxt</code>、明说「改动未落盘」），
+    并<b>独有地回显注入可见性</b>——因为 style 源默认 false，「保存成功但正文没变」是本面最可能被问的问题。
+  · <code>engines/tool-diag.js</code> 新增 <code>secStyle()</code>（判据含 <code>injectReady</code> 二道闸与 <code>uncovered</code> 覆盖度交叉校验）并入 <code>collect()</code>；
+    <code>UI_BINDINGS</code> settings 组登记 <b>9 个</b> <code>wa-st-*</code> 控件（全部放 <code>ids</code> 层、<b>不放 <code>cond</code> 层</b>：
+    style.js 是产品文件，它缺席本身就是断裂，不该被 cond 的「依赖态、缺失不判失败」掩盖）。
+  · <code>engines/inspector-state.js</code> 新增 checker 12 <code>checkStyleCraft</code>（覆盖 <code>blocked/notInjected/rejects/fallbacks/emptyBuild/uncovered</code> 六类）。
+  · <code>ui/panel.js</code> 把注入源中文名收口为<b>模块级单一真源 <code>VIS_NAMES</code></b>（<code>renderInject</code> 的局部表与 <code>renderDirector</code> 的内联字面量各一份 ⇒ 两处会各自漂移）。
+- **本版坐实的两处真缺陷（都是「判据自己在骗人」，不是产品 bug）**：
+  · ① <b>包装器缺 <code>return</code> ⇒ 证据蒸发，报告却写「确实没读」</b>。<code>contract-audit</code> 的委托字段判据（<code>persona_update</code>/<code>relation_update</code>）
+    完全依赖 <code>applyFn</code> 的返回值，而测试基座传的是 <code>function (d, r, a) { WA.backstage.applyResult(d, r, a); }</code>——<b>没有 return</b>。
+    于是这两个字段<b>恒判「未消费」</b>：先把「无法判定」说成「确实没读」，再据此报假警。
+    双向修复：判据侧记 <code>retMissing</code> 并在 <code>audit</code> 里升级为 <code>delegated_evidence_missing</code> <b>error</b>（防下次静默复发），
+    消费侧补 <code>return</code>；并实测确认<b>产品路径本来就是好的</b>（默认直取 <code>WA.backstage.applyResult</code>，<code>ret={"persona":1,"relation":1}</code>）。
+    教训一句话：<b>判据拿不到证据时，必须报「判不了」，不能报「没有」</b>。
+  · ② <b>参数化 id 让门禁失明</b>。<code>tests/run.js</code> H2 用源码正则 <code>/id="(wa-[a-z0-9\-]+)"/</code> 采集「渲染出的控件」，
+    首版五个档位控件由 <code>row()</code> 变量拼 id（<code>id="${id}"</code>）⇒ 采集面看不见，而它们已写进守卫表 ⇒ 一登记就必报<b>僵尸条目</b>。
+    反过来说，参数化会让这五个控件<b>永久游离在守卫之外</b>——恰是这道门禁要消灭的盲区。
+    改为五行<b>字面量直写</b>（档位选项仍由 <code>CHOICES × CHOICE_LABELS</code> 生成），<code>row()</code> 删除。
+- **负控制（本面最核心的自证）**：把 <code>const PERSP_TEXT = {</code> 改成空对象加载<b>破坏副本</b>——
+  同款判据报警 <b>4 处</b>、<code>buildBlock</code> 对选中轴<b>不出话</b>（副本产物 0 字），而<b>原版上判据仍为真</b>（<code>uncovered=0</code>）。
+  双向自证：判据不是恒真、也不是写死的。
+- **行为验证**：新增 <code>tools/smoke_v2510_p4.js</code>，8 节 <b>54 项</b>断言全绿（<code>SMOKE-P4: pass=54 fail=0</code>）：
+  默认态零 token（<code>buildBlock() === ''</code>）、五轴分别生效（142/214/262/362/420 字）、总开关与附加段（超长截到 <code>CUSTOM_MAX=500</code>）、
+  非法档位整笔拒收且磁盘零变化（<code>rejects=3</code>）、读路径非法值回落（<code>fallbacks=6</code>、JSON 损坏不抛）、
+  二道闸（<code>SOURCES</code> 11 项、<code>undeclared.length===0</code>）、覆盖度交叉校验与 checker 12 导出、负控制一组。
+- **顺路修掉两处「旧口径」**：
+  · <code>summaryText</code> 原先把 <code>total</code> 含 <code>info</code> ⇒ 干净存档（仅一条 <code>rules.newModules</code> 提示）被报成
+    「⚠️ 发现 0 错误 / 0 警告 / 1 提示」——<b>先说自洽</b>才对（无 error/warn 一律先说自洽）。
+  · <code>tests/ui-gate-sync.js</code> 的锚点指向了已删除的内联表；改为 <code>"clock: '世界时间'"</code>（带空格，逐字匹配真源码），
+    否则回归会以 <code>drift: anchor not found</code> 直接中断——<b>门禁先崩，后面的判据一条都跑不到</b>。
+- **判据数**：v2.50.0 基线 <b>4920</b> → <b>4928</b>（+8 净增；其中本面新增 54 项行为验证在 <code>smoke_v2510_p4</code> 独立脚本内，不并入 <code>run.js</code> 计数）。
+- **影响范围（+5 行/-1 行量级）**：新增 <code>engines/style.js</code>（253 行）；改
+  <code>ui/settings.js</code>（+73-1，保存出口与字面量 id）/ <code>engines/inspector-state.js</code>（+193-3，checker 12 + <code>summaryText</code> 修）/
+  <code>engines/contract-audit.js</code>（+39-4，委托字段证据判据）/<code>engines/tool-diag.js</code>（+55-1，<code>secStyle</code> + 9 控件）/
+  <code>render/inject.js</code>（+28-2，<code>SOURCES</code> + <code>buildStyleBlock</code> + 独立注入项）/ <code>ui/panel.js</code>（+13-2，<code>VIS_NAMES</code>）/
+  <code>index.js</code>（+6-1，LOAD_ORDER 挂载 <code>engines/style.js</code>）/ <code>manifest.json</code>（version 2.50.0 → 2.51.0）/
+  <code>tests/ui-gate-sync.js</code>（+6-1）/ <code>tests/run.js</code>（+42-39，含 11 处基线回填 + 冻结串逐字回填）；
+  <code>tests/dead-export-ledger.json</code> 重生成（dead 218→<b>223</b>、<code>version=2.51.0</code>、<code>dataOnly</code> 116→122）。
+- **门禁与验证（已实跑）**：全量回归 <b>4928 / 失败 0</b>；<code>dead-export-gate</code> 绿
+  （dead 223 / uiDead 4 / dataOnly 122 / 仅测试 131，归因 <code>{unwired:7, self-only:85, test-only:135}</code>）；
+  <code>export-contract</code> 逐字一致（ns 66 / members 426 / chars 5349，FROZEN2800 同步回填）；
+  <code>node --check</code> 对 8 个改动文件全部 OK。
+- **收口过程中踩到的两个坑（都属「判据自身的问题」，记下来防复发）**：
+  · ① <b>裸锚点撞上「作为字符串的正则源码」</b>。<code>const FROZEN2800 = '…';</code> 在 <code>tests/run.js</code> 里命中 <b>2 处</b>——
+    真声明，以及 v2410 块用来抽取它的正则字面量 <code>/const FROZEN2800 = '([\s\S]*?)';/</code>。
+    解法：锚点加<b>行首缩进 + 行尾分号</b>（<code>^    …$</code> + <code>re.M</code>）⇒ 恰中 1 处。
+    一般化：<b>本仓的测试文件里存着产品文件的源码文本</b>，任何锚点都可能同时命中「真代码」与「描述真代码的字符串」。
+  · ② <b>「全部改完才写盘」结构下的一次失败会吞掉前面所有成功</b>。上一批补丁逐条 <code>replace</code> 但只在最后写盘，
+    末条 <code>exit(2)</code> ⇒ 前面 5 条已 <code>ok</code> 的编辑<b>一条都没落进文件</b>（输出却显示 ok，极具迷惑性）。
+    本批改为「逐条校验 → 全通过才 <code>os.replace</code>」，并加了<b>旧值残留复核</b>（写盘前扫一遍旧字面量）。
+  · 附带：<code>node --check</code> 按<b>扩展名</b>判定模块格式，临时文件必须带 <code>.js</code> 后缀，否则
+    <code>ERR_UNKNOWN_FILE_EXTENSION</code> 会伪装成「被检文件有语法错」——<b>报错指向的对象不是真正的出错对象</b>。
+

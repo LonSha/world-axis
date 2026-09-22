@@ -11,7 +11,7 @@
 1. 只补充剧情中新显露的信息；不臆造未表现的性格/关系。
 2. 每节输出增量条目（不是全量重写）；无变化给空数组。
 3. 分节：personality(性格)/worldview(观念)/family(家庭)/relationships(关系动态)/memory(关键经历)。
-4. relationships 条目格式 {"target":"对象名","relation":"关系","dynamic":"最新动态"}。
+4. relationships 条目格式 {"target":"对象名","relation":"关系","dynamic":"最新动态"}。\n4b. 因果解释只写**已发生的行为**，不写推测的心理成因。若确需给成因，优先级为：自然成长/家庭文化/教育/职业/人际 ＞ 重大事件 ＞ 创伤（创伤最后且必须有明确剧情依据）。\n4c. 现实性格（长久倾向）与人格机制（本轮情境下的行为选择）分开写，不得用本轮行为反推性格，也不得用性格标签代替行为。
 只输出JSON：{"personality":["..."],"worldview":["..."],"family":["..."],"relationships":[{"target":"...","relation":"...","dynamic":"..."}],"memory":["..."]}`;
 
   function getCtx() { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } }

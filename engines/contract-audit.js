@@ -31,6 +31,10 @@
     world_pulse: { pressure: 3, trend: 'rising', note: PROBE_TAG + 'pulse' },
     worldFacts: [{ key: PROBE_TAG + 'fact', value: '1', scope: 'world' }],
     people: [{ name: PROBE_TAG + 'person', location: 'L', action: 'A' }],
+    // v2.51.0：人格/关系两通道。写库在事务外（registry 自带事务），state 差分看不到，
+    //   故消费判据走「返回值接收计数」（见下 RET_DELEGATED 分支）。
+    persona_update: [{ name: PROBE_TAG + 'person', slot: 'A', d1: 1, d2: 2, d3: 3, d4: 4, d5: 5 }],
+    relation_update: [{ name: PROBE_TAG + 'person', target: PROBE_TAG + 'target', intimacy: 30 }],
     knowledge_updates: [{ person: PROBE_TAG + 'person', about: PROBE_TAG + 'know', status: 'fact', route: 'witnessed' }],
     currents: [{ title: PROBE_TAG + 'current', summary: 's', visibility: 'trace', stage: '发展' }],
     echoes: [{ refCurrent: PROBE_TAG + 'current', result: PROBE_TAG + 'echo', exposure: 'subtle' }],
@@ -57,6 +61,8 @@
     events_update: [{ id: PROBE_TAG + 'seedEv', title: PROBE_TAG + 'seedEv', stage: '酽酿', desc: PROBE_TAG + 'upd' }]
   };
   const FIELDS = Object.keys(PROBES);
+  // v2.51.0：写库在事务外（state 差分不可见）的字段，消费判据改看 applyResult 返回的接收计数
+  const RET_DELEGATED = { persona_update: 'persona', relation_update: 'relation' };
   // ── 更新类探针的基线种子 ──
   // 更新探针必须能命中已存在事件，否则 applyResult 找不到目标（只计入 eventsLoose），
   // 状态无变化 → 会被误判成「消费端不读」（假阴性）。故种一条与探针 id 同名的事件，
@@ -154,8 +160,8 @@
           ls.chronicle = ls.chronicle || [];
           ls.nextTurnInjection = ls.nextTurnInjection || null;
         });
-        let ok = true, err = null;
-        try { applyFn(draft, probe, { idx: 999 }); }
+        let ok = true, err = null, retRaw = null;
+        try { retRaw = applyFn(draft, probe, { idx: 999 }); }
         catch (e) { ok = false; err = String((e && e.message) || e); }
         const changed = ok && diffState(before, draft);
         const liveAfter = safe(function () { return WA.store.get(); }, {});
@@ -166,11 +172,28 @@
         // live 兜底：仅限委托字段，且必须是「本轮前后 live 真发生差异」（字段特异，抗前轮残留）
         const liveIterChanged = liveBefore ? diffState(liveBefore, liveAfter) : false;
         const liveOk = LIVE_DELEGATED.indexOf(f) >= 0 && liveIterChanged && marked;
+        // v2.51.0：委托字段判据 = 返回值报告接收数 > 0（负数表示未提供该节）。
+        //   这同时覆盖「形状非法被静默丢弃」的回归（接收数会变 0）。
+        const retKey = RET_DELEGATED[f];
+        const retOk = ok && !!retKey && !!retRaw && typeof retRaw[retKey] === 'number' && retRaw[retKey] > 0;
+        // v2.51.0（自纠）: 委托字段的判据完全建立在「applyFn 的返回值」上，而测试基座
+        //   历来传的是包装器 `function (d, r, a) { WA.backstage.applyResult(d, r, a); }`
+        //   ——**没有 return**。于是 retRaw 恒为 undefined ⇒ retOk 恒假 ⇒ 这两个字段
+        //   在整条回归链路里被判成「未消费」，而产品路径（applyFn 默认直取
+        //   WA.backstage.applyResult）里判据是好的。这是「判据没被真调用」的典型形态：
+        //   结论看着是判据给的，其实是包装器把证据吃掉了。
+        //   两件事一起做：① 包装器补 return（消费端修）；② 此处把「证据缺失」显式记进
+        //   逐字段结果并在 audit 里升级为 error（判据侧修）——否则下次再有人包一层，
+        //   同样的假阴性会**静默复发**，而报告上只会写「契约声明但消费端不读」。
+        const retMissing = ok && !!retKey && retRaw === undefined;
         result[f] = {
-          consumed: !!((changed && marked) || liveOk),
+          consumed: !!((changed && marked) || liveOk || retOk),
           changed: !!changed,
           marked: marked,
-          error: err
+          error: err,
+          // 委托字段专用：判据证据本身在不在场（consumed=false 时区分「真没消费」与「无法判」）
+          retMissing: retMissing || undefined,
+          ret: retKey ? (retRaw === undefined ? undefined : retRaw) : undefined
         };
       });
     } finally {
@@ -415,6 +438,18 @@
     const issues = [];
     if (declaredNotConsumed.length) issues.push({ level: 'warn', code: 'declared_not_consumed', detail: '契约声明但消费端不读：' + declaredNotConsumed.join('、') + '（模型白产出，静默丢弃）' });
     if (probeNotDeclared.length) issues.push({ level: 'error', code: 'probe_not_declared', detail: '消费端有处理但契约未声明：' + probeNotDeclared.join('、') + '（模型永远不会发）' });
+    // v2.51.0（自纠）: 「判据证据不在场」必须单独成条、且必须是 error。
+    //   委托字段（persona_update/relation_update）的消费判据**只能**来自 applyFn 的返回值
+    //   （写库在事务外，state 差分看不到）。若调用方把 applyFn 包一层却没 return，
+    //   证据就整段蒸发——此时 consumed 恒 false，报告只会在 declared_not_consumed 里
+    //   写一句「消费端不读」，把「无法判」说成「确实没读」。这正是本仓库反复出现的
+    //   「结论不实」最小形态（同 v2.8.0 的跨模块源缺失：源取不到 ≠ 无差异）。
+    //   故凡委托字段的 retMissing 非空 ⇒ 直接 error，并点名是哪几个字段。
+    const retEvidenceMissing = Object.keys(consumed).filter(function (f) { return consumed[f] && consumed[f].retMissing; });
+    if (retEvidenceMissing.length) {
+      issues.push({ level: 'error', code: 'delegated_evidence_missing',
+        detail: '委托字段消费判据的证据缺失：' + retEvidenceMissing.join('、') + '（applyFn 未回传返回值 ⇒ 无法判「消费了没有」，不得据此判成未消费）' });
+    }
     enums.forEach(function (e) {
       if (e.status === 'mismatch') issues.push({ level: 'warn', code: 'enum_drift', detail: e.field + ' 枚举漂移：契约缺 [' + e.missing.join(',') + '] 契约多 [' + e.extra.join(',') + ']' });
     });

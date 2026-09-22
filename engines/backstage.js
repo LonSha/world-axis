@@ -199,10 +199,31 @@
       background: s.background.text ? s.background.text.slice(0, 500) : '',
       pulse: s.worldPulse || null,
       facts: (s.worldFacts || []).slice(-20).map(f => ({ k: f.key, v: f.value })),
-      people: sorted.slice(0, budget || 8).map(p => ({
-        id: p.id, n: p.name, loc: p.location || '', act: p.action || '', intent: p.intent || '',
-        knows: p.knowledge ? Object.keys(p.knowledge).slice(0, 10) : []
-      })),
+      people: sorted.slice(0, budget || 8).map(p => {
+        // v2.51.0：人格快照与关系量值摘要——不注入的话模型看不到「已锁定」，
+        //   每轮都可能重新发明一套人格（重骰的真实成因）。
+        const row = {
+          id: p.id, n: p.name, loc: p.location || '', act: p.action || '', intent: p.intent || '',
+          knows: p.knowledge ? Object.keys(p.knowledge).slice(0, 10) : []
+        };
+        const pr = p.profile || {};
+        const ps = pr.persona;
+        if (ps && ps.locked === true) {
+          // v2.51.0 修正：骰面在 registry 侧以 persona.d1..d5 **打平**存储；两形状兼容读取，
+          //   使快照不因存放形状变化而静默丢失 pe（pe 缺失 = 模型看不到已锁定 = 重骰成因）。
+          const dd = (ps.dice && typeof ps.dice === 'object') ? ps.dice : ps;
+          row.pe = (ps.slot || '?') + '|' + ['d1', 'd2', 'd3', 'd4', 'd5'].map(function (k) { return dd[k] === undefined ? '?' : dd[k]; }).join(',');
+        }
+        const paText = pr.personalityAnchor || p.personalityAnchor || '';
+        if (paText) row.pa = String(paText).slice(0, 40);
+        const rels = Array.isArray(pr.relations) ? pr.relations.slice(-6) : [];
+        if (rels.length) row.rel = rels.map(function (x) {
+          return x.target + ':' + (x.intimacy === undefined ? '?' : x.intimacy)
+            + (x.trust === undefined ? '' : '/T' + x.trust)
+            + (x.vigilance === undefined ? '' : '/V' + x.vigilance);
+        }).join(' ');
+        return row;
+      }),
       currents: (s.currents || []).filter(c => !['已结束', 'closed'].includes(c.stage)).slice(0, 10).map(c => ({
         id: c.id, t: c.title, v: c.visibility, pub: c.publicity || 'private', st: c.stage, s: (c.summary || '').slice(0, 120)
       })),
@@ -225,7 +246,16 @@
 
   // v2.2.0: 事件链入账计量——「推演说要发生的事件」是否真进了 state，此前完全不可观测
   //   （applyResult 对 events_create/events_update 零消费，整条链静默丢弃）
-  const __applyStat = { eventsCreated: 0, eventsUpdated: 0, eventsLoose: 0, lastAt: 0 };
+  // v2.51.0: chanPersona/chanRelation = 本轮**接收**的两节条目数。
+  //   这两节写库发生在事务外（registry 自带事务，不可嵌套），state 差分看不到它们；
+  //   契约对账器需用「接收计数」判定「声明↔消费」，否则误报「声明但未消费」。
+  const __applyStat = { eventsCreated: 0, eventsUpdated: 0, eventsLoose: 0, lastAt: 0, chanPersona: 0, chanRelation: 0 };
+  // v2.51.0：推演侧人格/关系通道。store.transact 回调是**同步**的，而 registry 的写入
+  //   自己也要开事务 -> 不能在事务内嵌套调用。故 applyResult 只把已校验的写法收进缓冲，
+  //   待事务提交后由 _start 落库（写失败只降级为日志，不回滚已结算的世界状态）。
+  const __personaWrites = [];
+  const __relationWrites = [];
+
   const backstage = WA.backstage = {
     getSettings: loadSettings,
     // v2.6.0: 回传写入结果——面板据此区分「真保存」与「被环境吞掉」，不再无条件报成功。
@@ -235,6 +265,44 @@
       const s = WA.settingsBus.normalize(__REG_B, Object.assign(loadSettings(), obj || {}));
       const w = saveSettings(s); WA.emit('backstage:settings', s); return w;
     },
+    /**
+     * v2.51.0：把本轮收集到的人格/关系写入 registry。
+     *   ① 骰面已锁定者一律拒收（already-locked），不重骰；演化必须走 setPersonaDice 的显式单维入口；
+     *   ② 关系行落在**持有者**名下（单向），与对侧各自独立；
+     *   ③ 写失败只记账并降级为日志——已结算的世界状态不因人格通道失败而回滚。
+     */
+    flushPersonaChannels() {
+      const stat = { personaTry: __personaWrites.length, personaOk: 0, personaRej: 0, relTry: __relationWrites.length, relOk: 0, relRej: 0, reasons: {} };
+      const bucket = function (rsn) { stat.reasons[rsn] = (stat.reasons[rsn] || 0) + 1; };
+      if (WA.registry) {
+        __personaWrites.forEach(function (w) {
+          if (!w.name) { stat.personaRej++; bucket('missing-name'); return; }
+          let res = null;
+          try { res = WA.registry.setPersonaDice(w.name, w.dice, { slot: w.slot, note: w.note || '' }); }
+          catch (e) { res = { ok: false, reason: 'throw' }; }
+          if (res && res.ok) { stat.personaOk++; try { WA.registry.register(w.name); } catch (e) {} }
+          else { stat.personaRej++; const rr = (res && res.reason) || 'unknown'; bucket(rr); if (rr !== 'already-locked' && rr !== 'no-change') WA.log('warn', '人格写入被拒: ' + w.name + ' -> ' + rr); }
+        });
+        __relationWrites.forEach(function (w) {
+          let res = null;
+          try { res = WA.registry.setRelations(w.name, [w.row]); }
+          catch (e) { res = { ok: false, reason: 'throw' }; }
+          if (res && res.ok) { stat.relOk++; try { WA.registry.register(w.name); } catch (e) {} }
+          else { stat.relRej++; bucket((res && res.reason) || 'unknown'); }
+        });
+      } else { stat.personaRej = stat.personaTry; stat.relRej = stat.relTry; bucket('no-registry'); }
+      __personaWrites.length = 0; __relationWrites.length = 0;
+      __applyStat.lastChannels = stat; __applyStat.lastAtChannels = clockWall();
+      return stat;
+    },
+    /**
+     * v2.51.0：人格/关系通道的最近一次落库结果。
+     *   外部消费方：inspector-state.checkPersonaRelation（落库被拒时给 warn）。
+     *   为何要暴露：拒收是**静默**的（AI 每轮重发人格都会被 already-locked 挡掉），
+     *   而「模型没给」与「给了但被拒」在日志里长得一样，没有这个视图就无法区分。
+     */
+    channelStat() { return { last: __applyStat.lastChannels || null, at: __applyStat.lastAtChannels || 0, pending: __personaWrites.length + __relationWrites.length }; },
+
     isRunning: () => !!currentTask,
     pending: () => pendingAnchor,
 
@@ -275,6 +343,17 @@
           const tx = WA.store.transact(draft => { this.applyResult(draft, clamped, anchor); });
           if (tx.ok) {
             WA.log('info', '世界推演结算完成 anchor=m' + anchor.idx);
+            // v2.51.0：事务提交后落人格/关系（registry 自带事务，故必须在 tx 之外）
+            try {
+              const chStat = this.flushPersonaChannels();
+              // v2.51.0：落库结果进日志（真实业务消费点）——此前成败不可见，
+              //   「推演产出了人格但没落库」与「模型根本没给」在日志里长得一样。
+              if (chStat && (chStat.personaTry || chStat.relTry)) {
+                WA.log('info', '人格/关系落库 persona ' + chStat.personaOk + '/' + chStat.personaTry
+                  + ' relation ' + chStat.relOk + '/' + chStat.relTry
+                  + (Object.keys(chStat.reasons || {}).length ? ' 拒因:' + JSON.stringify(chStat.reasons) : ''));
+              }
+            } catch (e) { WA.log('warn', '人格/关系落库异常', e && e.message); }
             // v0.8 账本差分记录
             if (WA.ledger) WA.ledger.recordChanges();
           }
@@ -331,7 +410,10 @@
         ' "clock": "新的世界时间标签(可空字符串表示不变)",',
         ' "world_pulse": {"pressure": 0-3, "trend": "rising|falling|steady", "note": "一句话"},',
         ' "worldFacts": [{"key":"...","value":"...","scope":"world|region|personal"}],',
-        ' "people": [{"name":"...","location":"...","action":"...","intent":"...","body":"..."}],',
+        ' "people": [{"name":"...","location":"...","action":"...","intent":"...","body":"...","personalityAnchor":"现实性格长句","speakingStyle":"说话方式","behaviorBoundaries":"行为边界","innerVoice":"内心口吻"}],',
+        // v2.51.0：只对**本轮首次出场**且尚无锁定骰面的角色给以下两节；已有锁定的人格严禁重发。
+        ' "persona_update": [{"name":"...","slot":"A-L","d1":1-12,"d2":1-12,"d3":1-12,"d4":1-12,"d5":1-12,"note":"骰面解释，≤60字"}]（无新角色则留空数组；**已有锁定骰面的人格严禁重发**，重发一律被引擎拒收）,',
+        ' "relation_update": [{"name":"持有者","target":"对象","intimacy":0-100,"trust":0-100,"hostility":0-100,"vigilance":0-100,"boundary_status":"..."}]（只写本轮确实发生变化的关系；数值为**变化后**的新值，本引擎按单次±20硬边界截断，请勿为保证生效而反复加码）,',
         ' "currents": [{"title":"...","summary":"...","visibility":"hidden|trace|known|direct","publicity":"private|trace|public","public_trace":"...","stage":"...","causes":[],"participants":[]}],',
         ' "knowledge_updates": [{"person":"...","about":"...","status":"fact|suspected","route":"witnessed|told|investigated|message|public_channel|inferred"}],',
         ' "echoes": [{"refCurrent":"事件标题","result":"...","exposure":"subtle|obvious"}],',
@@ -390,6 +472,8 @@
     // 结算器（全量入账）
     // ════════════════════════════════════════════════════
     applyResult(draft, r, anchor) {
+      __personaWrites.length = 0; __relationWrites.length = 0;   // v2.51.0：每次结算从零开始收
+      __applyStat.chanPersona = 0; __applyStat.chanRelation = 0;
       const now = clockNow('backstage');
       const LIMITS = { people: 12, currents_new: 6, knowledge: 20, chronicle: 8, foreshadows: 5 };
 
@@ -445,7 +529,22 @@
         });
         if (mergedAliases.length) draft.people[id].aliases = mergedAliases;
       });
+      // v2.51.0：人格/关系通道收集（骰面完整性与合法性在 registry 侧再度校验）
+      (r.persona_update || []).slice(0, 6).forEach(function (pu) {
+        if (!pu || !pu.name) return;
+        __personaWrites.push({ name: String(pu.name), slot: pu.slot, note: pu.note,
+          dice: { d1: pu.d1, d2: pu.d2, d3: pu.d3, d4: pu.d4, d5: pu.d5 } });
+      });
+      (r.relation_update || []).slice(0, 12).forEach(function (ru) {
+        if (!ru || !ru.name || !ru.target) return;
+        __relationWrites.push({ name: String(ru.name), row: { target: String(ru.target),
+          intimacy: ru.intimacy, trust: ru.trust, hostility: ru.hostility, vigilance: ru.vigilance,
+          attachment: ru.attachment, boundary_status: ru.boundary_status, relationship_aftereffect: ru.relationship_aftereffect } });
+      });
 
+      // v2.51.0：通道接收计量（已过形状校验的那部分，非原始载荷长度）
+      __applyStat.chanPersona += __personaWrites.length;
+      __applyStat.chanRelation += __relationWrites.length;
       // 认知边界入账（knowledge_updates，inferred只能suspected）
       (r.knowledge_updates || []).slice(0, LIMITS.knowledge).forEach(k => {
         if (!k || !k.person || !k.about) return;
@@ -708,6 +807,11 @@
           }
         }
       }
+      // v2.51.0：返回本轮通道接收计数（-1 = 两节均未提供，与「给了空数组」区分）
+      return {
+        persona: ('persona_update' in (r || {})) ? __applyStat.chanPersona : -1,
+        relation: ('relation_update' in (r || {})) ? __applyStat.chanRelation : -1
+      };
     },
 
     /** before链：消费 next_turn_injection，生成连续性约束注入 */
@@ -725,7 +829,8 @@
 
     /** v2.2.0: 推演入账计量只读视图（诊断/面板消费）——入账链是否真的在跑，此前不可观测 */
     applyStat() {
-      return { eventsCreated: __applyStat.eventsCreated, eventsUpdated: __applyStat.eventsUpdated, eventsLoose: __applyStat.eventsLoose, lastAt: __applyStat.lastAt };
+      return { eventsCreated: __applyStat.eventsCreated, eventsUpdated: __applyStat.eventsUpdated, eventsLoose: __applyStat.eventsLoose, lastAt: __applyStat.lastAt,
+        chanPersona: __applyStat.chanPersona, chanRelation: __applyStat.chanRelation };   // v2.51.0
     },
 
     /** 清空已消费的注入（生成后调用，避免重复注入） */
