@@ -849,6 +849,39 @@
     out += '<div class="wa-sec">注入可见性（' + onCount + '/' + SOURCES.length + ' 开）</div>'
       + '<div class="wa-item">' + SOURCES.map(function (k) { return '<span class="wa-tag">' + esc(NAMES[k] || k) + (vis[k] ? '' : '关') + '</span>'; }).join('')
       + '<div class="wa-dim">开关在「导演」页调整。</div></div>';
+    // v2.45.0: 条目按需路由（缝合 cultivation-rule-router）
+    //   为什么面板必须看它：候选集和「本回合哪些条目被隐藏」全在引擎内存里，
+    //   界面上一片空白时用户无从判断是「路由没跑」还是「跑了一致没隐藏」。
+    //   测试用 `R.` 别名引用引擎，产品侧零消费者会让这组导出被判「功能级失效」——
+    //   本区块就是它的真实消费方（读候选 / 读最近一轮结果 / 读降级留痕 / 增删候选）。
+    out += '<div class="wa-sec">条目按需路由<span class="wa-dim">（本回合哪些常驻条目该上场）</span></div>';
+    out += (function () {
+      try {
+        if (!WA.entryRouter || typeof WA.entryRouter.lastRoute !== 'function') return '<div class="wa-empty">条目路由引擎未加载</div>';
+        const cands = WA.entryRouter.listCandidates();
+        const rt = WA.entryRouter.lastRoute();
+        const fail = WA.entryRouter.lastFailure();
+        let h = '<div class="wa-item"><b>' + cands.length + ' 条候选</b>';
+        if (!cands.length) h += '<div class="wa-dim">尚无候选——路由不介入（发送前扫描按宿主原样）。在下面加入条目 id 与启用条件。</div>';
+        else h += '<div class="wa-dim">' + cands.map(function (c) {
+          return esc(c.title || c.id) + (WA.entryRouter.isPassive(c.id) ? '(被动)' : '')
+            + ' <button class="wa-mini" data-er-del="' + esc(c.id) + '" title="从候选集移除（不改世界书条目本身）">移除</button>';
+        }).join('、') + '</div>';
+        if (rt) {
+          h += '<div class="wa-kv"><span>最近一轮</span><b>' + esc(String(rt.enabled.length)) + ' 条激活 / ' + esc(String(cands.length - rt.enabled.length)) + ' 条隐藏</b></div>'
+            + '<div class="wa-kv"><span>判定时间</span><b>' + esc(_msTs(rt.at)) + '</b></div>';
+        } else h += '<div class="wa-dim">尚无路由记录。</div>';
+        if (fail) h += '<div class="wa-dim wa-log-warn">上次降级：' + esc(fail.kind + ' — ' + fail.message) + '（本回合不隐藏任何条目）</div>';
+        h += '<div class="wa-dim">判据取最近剧情 ' + esc(String(WA.entryRouter.recentMessages(4).length)) + ' 字符</div>';
+        h += '</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取路由状态失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    out += '<div class="wa-row"><input id="wa-er-id" class="wa-input" placeholder="条目 id…"/><input id="wa-er-cond" class="wa-input" placeholder="启用条件（空=不参与路由）…"/><button class="wa-btn" id="wa-er-add" title="把世界书条目加入「按需激活」候选集；条件为空则不参与路由">加入路由</button>'
+      + '<button class="wa-btn" id="wa-er-clear" title="清空候选集与结果缓存（不改世界书条目本身）">重置</button></div>'
+      + '<div class="wa-row"><input id="wa-er-input" class="wa-input" placeholder="试跑输入（模拟玩家这一句）…"/><button class="wa-btn" id="wa-er-dry" title="只算不写：看这一句会让哪些条目被隐藏，不改任何状态">试跑</button>'
+      + '<button class="wa-btn" id="wa-er-apply" title="把最近一轮试跑结果落到 WorldAxis 自己的 off 覆写表（只改覆写、不动用户开关，下一轮自动重写）">应用本轮</button></div>'
+      + '<div id="wa-er-out" class="wa-out"></div>';
     out += '<div class="wa-sec">注入自检</div>'
       + '<div class="wa-row"><button class="wa-btn" id="wa-inj-refresh" title="重新读取当前注入快照（只读，不改变任何状态）">刷新快照</button>'
       + '<button class="wa-btn" id="wa-inj-diag" title="跳转工具页运行完整自检">去自检</button></div>'
@@ -1903,6 +1936,45 @@
       const snap = (WA.injectInspector && WA.injectInspector.getLastSnapshot) ? WA.injectInspector.getLastSnapshot() : null;
       const o = $('#wa-inj-out');
       if (o) o.textContent = snap ? ('最新快照：' + WA.injectInspector.statusText(snap.status, snap.scope) + '（' + _msTs(snap.at) + '）') : '尚无快照——先推演一轮。';
+    });
+    // v2.45.0: 条目路由控件（读写引擎公共面，非别名引用）
+    on('#wa-er-add', () => {
+      const id = ($('#wa-er-id') || {}).value ? $('#wa-er-id').value.trim() : '';
+      const cond = ($('#wa-er-cond') || {}).value ? $('#wa-er-cond').value.trim() : '';
+      if (!id) { setOut('#wa-er-out', '请填写条目 id。'); return; }
+      const ok = WA.entryRouter.setCandidate({ id: id, title: id, condition: cond });
+      setOut('#wa-er-out', ok ? ('已加入候选：' + id + '（' + cond + '）') : '未加入：启用条件为空时条目不参与路由。');
+      if (ok) renderBody();
+    });
+    on('#wa-er-clear', () => {
+      WA.entryRouter.clearCandidates();
+      WA.entryRouter.clearCache();
+      setOut('#wa-er-out', '候选集与缓存已清空。');
+      renderBody();
+    });
+    panelEl.querySelectorAll('[data-er-del]').forEach(b => b.onclick = () => {
+      const ok = WA.entryRouter.removeCandidate(b.dataset.erDel);
+      setOut('#wa-er-out', ok ? ('已移除候选：' + b.dataset.erDel) : '未移除：候选集里没有这个 id。');
+      if (ok) renderBody();
+    });
+    on('#wa-er-dry', async () => {
+      const el = $('#wa-er-input');
+      const q = el && el.value ? el.value.trim() : '';
+      setOut('#wa-er-out', '试跑中…');
+      try {
+        const p = await WA.entryRouter.plan(q);
+        const hid = (p.hidden || []).join('、') || '（无）';
+        setOut('#wa-er-out', (p.degraded ? '降级（不隐藏任何条目）：' : (p.fromCache ? '命中缓存：' : '判定完成：'))
+          + '激活 ' + (p.enabled || []).length + ' 条｜隐藏 ' + hid);
+      } catch (e) { setOut('#wa-er-out', '试跑失败：' + ((e && e.message) || e)); }
+    });
+    on('#wa-er-apply', () => {
+      const p = WA.entryRouter.lastRoute();
+      const all = WA.entryRouter.listCandidates();
+      const on = (p && p.enabled) || [];
+      const r = WA.entryRouter.applyPlan({ hidden: all.filter(c => on.indexOf(c.id) < 0).map(c => c.id), degraded: !p });
+      setOut('#wa-er-out', r.applied ? ('已落覆写：隐藏 ' + r.hidden + ' 条') : ('未落覆写：' + (r.reason || '无可用轮次')));
+      if (r.applied) renderBody();
     });
     on('#wa-inj-diag', () => {
       const toolTab = panelEl.querySelectorAll('.wa-tab').filter(t => t.dataset.page === 'tools')[0];

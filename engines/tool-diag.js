@@ -93,7 +93,7 @@
     'engines/editor-faction.js': 'editorFaction', 'engines/editor-events.js': 'editorEvents',
     'engines/inspector-state.js': 'inspectorState', 'engines/tool-snapshot.js': 'toolSnapshot',
     'engines/tool-analyzer.js': 'toolAnalyzer', 'engines/tool-import.js': 'toolImport',
-    'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag', 'engines/contract-audit.js': 'contractAudit', 'engines/memory-sampler.js': 'memorySampler', 'engines/sampler-check.js': 'samplerCheck', 'engines/inject-channel.js': 'injectChannel', 'engines/inject-slot-audit.js': 'injectSlotAudit', 'engines/proactive.js': 'proactive', 'engines/wb-inject.js': 'wbInject',
+    'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag', 'engines/contract-audit.js': 'contractAudit', 'engines/memory-sampler.js': 'memorySampler', 'engines/sampler-check.js': 'samplerCheck', 'engines/inject-channel.js': 'injectChannel', 'engines/inject-slot-audit.js': 'injectSlotAudit', 'engines/proactive.js': 'proactive', 'engines/wb-inject.js': 'wbInject', 'engines/entry-router.js': 'entryRouter',
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
     'engines/bridge.js': 'bridge',
     'engines/lonsha-reader.js': 'lonshaReader',
@@ -573,7 +573,10 @@
     // v2.34.0: 平行世界页（静态控件；data-pwnrm/data-pwmod 为数据驱动动态按钮，随渲染数量变化，不入静态守卫）
     { page: 'parallel', ids: ['wa-pw-enable', 'wa-pw-mode', 'wa-pw-int', 'wa-pw-dice', 'wa-pw-detail', 'wa-pw-save', 'wa-pw-advance', 'wa-pw-prompt', 'wa-pw-block', 'wa-pw-npc-name', 'wa-pw-npc-goal', 'wa-pw-npc-add', 'wa-pw-out', 'wa-pw-snap-label', 'wa-pw-snap-save'],
       cond: [] },
-    { page: 'inject', ids: ['wa-inj-refresh', 'wa-inj-diag', 'wa-inj-out'] }
+    // v2.45.0: 条目路由控件纳入守卫（否则新控件游离在「渲染↔绑定」一致性校验之外）
+    { page: 'inject', ids: ['wa-inj-refresh', 'wa-inj-diag', 'wa-inj-out',
+      'wa-er-id', 'wa-er-cond', 'wa-er-add', 'wa-er-clear', 'wa-er-out',
+      'wa-er-input', 'wa-er-dry', 'wa-er-apply'] }
   ];
   function secUi() {
     return safe(function () {

@@ -38,7 +38,7 @@ const LOAD = [
   'core/settings-bus.js', 'core/store.js', 'core/evict.js', 'core/api-router.js', 'core/undo.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
@@ -9819,7 +9819,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.45.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10363,7 +10363,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.43.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.45.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10654,7 +10654,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.43.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.45.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11060,7 +11060,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'apiRouter:call callStats cfgStat getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings roundOf setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|parallelWorld:IMPACTS IMPACT_LABEL addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id int next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:SOURCE_ID_KEY auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|undo:capture clear peek pushValue stat undo|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:OVERRIDE_VALUES buildPromptSection hasSelection loadCurrentEntries peekEntries previewActivation saveSelection triggerEnabled';
+    const FROZEN2800 = 'apiRouter:call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|backstage:abort applyResult applyStat buildPrompt forceSimulate getSettings isRunning pending setSettings|bridge:FLOOR_GAP id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|choices:generate|clock:clockStat freeze now wallNow|compat:context snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ENEMY_STATUS apply applyBlackbox applyWorldTrends|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings roundOf setSettings tick|horizon:acceptResult bounds buildPromptBlock getSettings setSettings stat|injectBudget:apply plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inspectorState:flatten inspect summaryText|interceptor:install|ledger:buildLedgerText recordChanges saveCheckpoint|limits:applyStableUpdate clampBackstageResult locateStable|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|parallelWorld:IMPACTS IMPACT_LABEL addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|rand:chance dice id int next randStat seed|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile getProfile list profileStat register setProfileSafe unregister|render:SOURCES applyInjections buildWorldSnapshot getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rules:coreSummary getAll|samplerCheck:runChecks|settingsBus:boundsOf clampNum deregisterOrphan dormantGhosts ghostScan migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|summarizer:buildBlock|theater:generate send stat wrap|timeline:SOURCE_ID_KEY auditRefs captureRange unionRefs|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview|toolSnapshot:download restore|undo:capture clear peek pushValue stat undo|wbInject:activeOrders findCompanionName getConfig isEnabled|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries peekEntries previewActivation saveSelection triggerEnabled';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -11184,7 +11184,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.43.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.45.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11572,7 +11572,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.43.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.45.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11942,7 +11942,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.43.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.45.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12307,7 +12307,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.43.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.45.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14494,23 +14494,23 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 1386, '现场静态引用 1386 处（真代码口径，实 ' + r2700.refs + '）');
-    assert(r2700.namespaces === 66 && r2700.members === 707,
-      '定义面 66 命名空间 / 707 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
-    assert(r2700.dead.length === 208 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 106,
-      '死子面 dead 208 / uiDead 4 / dataOnly 106（实 ' + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
-    assert(r2700.deadInTestsOnly === 130, '其中仅测试引用 130（实 ' + r2700.deadInTestsOnly + '）');
+    assert(r2700.refs === 1409, '现场静态引用 1409 处（真代码口径，实 ' + r2700.refs + '）');
+    assert(r2700.namespaces === 67 && r2700.members === 721,
+      '定义面 67 命名空间 / 721 成员（实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.dead.length === 205 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 109,
+      '死子面 dead 205 / uiDead 4 / dataOnly 109（实 ' + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
+    assert(r2700.deadInTestsOnly === 128, '其中仅测试引用 128（实 ' + r2700.deadInTestsOnly + '）');
     // ── D. 账本健全：条目数一致、归因在词表内、无占位 ──
     const led2700 = gate2700.loadLedger();
     assert(!!led2700 && typeof led2700 === 'object', '账本可加载（tests/dead-export-ledger.json）');
-    assert(Object.keys(led2700.dead).length === 208 && Object.keys(led2700.uiDead).length === 4,
-      '账本条目数与现场一致（dead 208 / uiDead 4）');
+    assert(Object.keys(led2700.dead).length === 205 && Object.keys(led2700.uiDead).length === 4,
+      '账本条目数与现场一致（dead 205 / uiDead 4）');
     const reasons2700 = Array.from(new Set(Object.keys(led2700.dead).concat(Object.keys(led2700.uiDead))
       .map(function (k) { return (led2700.dead[k] || led2700.uiDead[k] || {}).reason; })));
     assert(reasons2700.every(function (x) { return gate2700.REASON_CODES.indexOf(x) >= 0; }),
       '归因全在词表内（' + reasons2700.join(',') + '）');
     assert(JSON.stringify(led2700).indexOf('TODO') < 0, '账本无占位归因（归因由测量得出，不留 TODO）');
-    assert(led2700.advisory && led2700.advisory.dataOnly === 106, 'advisory 面只记计数不拦截（dataOnly=106）');
+    assert(led2700.advisory && led2700.advisory.dataOnly === 109, 'advisory 面只记计数不拦截（dataOnly=109）');
     // ── E. 判定四态（纯判定面，用现场结果驱动）──
     const clone2700 = function (o) { return JSON.parse(JSON.stringify(o)); };
     assert(gate2700.judge(r2700, led2700).ok === true, '（基线）现场与账本一致 ⇒ ok');
@@ -14573,7 +14573,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
       '（负向自证）症状可读：命名空间 ' + (boom2700 ? boom2700.namespaces : '?')
       + ' / 悬空 ' + (boom2700 ? boom2700.phantom.length : '?') + '（正是 CLI 首跑踩到的塌面）');
     console.log('  ✓ 口径单源（collect 复用、依赖单向无环、复用判据不退回宿主壳）');
-    console.log('  ✓ 现场锚点（refs 1386 / 命名空间 66 / 成员 707 / dead 208 · uiDead 4 · dataOnly 106）');
+    console.log('  ✓ 现场锚点（refs 1409 / 命名空间 67 / 成员 721 / dead 205 · uiDead 4 · dataOnly 109）');
     console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
     console.log('  ✓ 判定四态（新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红）');
     console.log('  ✓ 负向自证（破坏「已装载」判据 ⇒ 定义面塌成 0、退出码非零、症状 JSON 可解析）');
@@ -14609,7 +14609,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.43.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.45.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -14642,7 +14642,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     ['dead', 'uiDead'].forEach(function (k) {
       Object.keys(led2800[k] || {}).forEach(function (kk) { allEnt2800.push({ kind: k, key: kk, item: led2800[k][kk] }); });
     });
-    assert(allEnt2800.length === 212, '账本条目 212 条（实 ' + allEnt2800.length + '）');
+    assert(allEnt2800.length === 209, '账本条目 209 条（实 ' + allEnt2800.length + '）');
     const missingEv2800 = allEnt2800.filter(function (e) {
       return gate2800.EVIDENCE_KEYS.some(function (f) { return e.item[f] === undefined; });
     });
@@ -14656,8 +14656,8 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     assert(deriveBad2800.length === 0, '归因可由 (tref, own) 唯一反推（不可反推 ' + deriveBad2800.length + ' 条）');
     const dist2800 = {};
     allEnt2800.forEach(function (e) { dist2800[e.item.reason] = (dist2800[e.item.reason] || 0) + 1; });
-    assert(dist2800['test-only'] === 134 && dist2800['self-only'] === 72 && dist2800['unwired'] === 6,
-      '归因分布 test-only 134 / self-only 72 / unwired 6（实 ' + JSON.stringify(dist2800) + '）');
+    assert(dist2800['test-only'] === 132 && dist2800['self-only'] === 71 && dist2800['unwired'] === 6,
+      '归因分布 test-only 132 / self-only 71 / unwired 6（实 ' + JSON.stringify(dist2800) + '）');
     assert(gate2800.evidenceDrift(r2800, led2800).length === 0, '现场账本证据复算零失实');
 
     // ── E. 负控制：证据失实/缺证/归因与证据不符 各须现形 ──
@@ -14688,11 +14688,11 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     // ── F. 判据不越界：冻结面与归因宽度本版不动；现场锚点随 v2.29.0 真代码口径更新 ──
     assertDeepEq(gate2800.FROZEN_KINDS, ['dead', 'uiDead'], '冻结面仍为 dead/uiDead（本版不扩面）');
     assertDeepEq(gate2800.ADVISORY_KINDS, ['dataOnly'], 'advisory 面仍为 dataOnly（不升级为拦截）');
-    assert(r2800.dead.length === 208 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 106
-      && r2800.deadInTestsOnly === 130,
-      '现场锚点（dead 208 / uiDead 4 / dataOnly 106 / 仅测试 130）');
-    assert(r2800.refs === 1386 && r2800.namespaces === 66 && r2800.members === 707,
-      '清册面（refs 1386 / 命名空间 66 / 成员 707，真代码口径）');
+    assert(r2800.dead.length === 205 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 109
+      && r2800.deadInTestsOnly === 128,
+      '现场锚点（dead 205 / uiDead 4 / dataOnly 109 / 仅测试 128）');
+    assert(r2800.refs === 1409 && r2800.namespaces === 67 && r2800.members === 721,
+      '清册面（refs 1409 / 命名空间 67 / 成员 721，真代码口径）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -14871,11 +14871,11 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-    assert(r2900.refs === 1386 && r2900.namespaces === 66 && r2900.members === 707,
-      '清册面（refs 1386 / 命名空间 66 / 成员 707）——真代码口径下的现场值');
-    assert(r2900.dead.length === 208 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 106
-      && r2900.deadInTestsOnly === 130,
-      '死子面 dead 208 / uiDead 4 / dataOnly 106 / 仅测试 130（实 ' + r2900.dead.length + '/'
+    assert(r2900.refs === 1409 && r2900.namespaces === 67 && r2900.members === 721,
+      '清册面（refs 1409 / 命名空间 67 / 成员 721）——真代码口径下的现场值');
+    assert(r2900.dead.length === 205 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 109
+      && r2900.deadInTestsOnly === 128,
+      '死子面 dead 205 / uiDead 4 / dataOnly 109 / 仅测试 128（实 ' + r2900.dead.length + '/'
       + r2900.uiDead.length + '/' + r2900.dataOnly.length + '/' + r2900.deadInTestsOnly + '）');
     const soft2900 = ['rand.seed', 'clock.freeze', 'bridge.setSettings'];
     const ledKeys2900 = Object.keys(led2900.dead);
@@ -14903,7 +14903,7 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     assertDeepEq(gate2900.EVIDENCE_KEYS, ['src', 'refs', 'tref', 'own'], '证据键不变（refs 与「死」的定义仍同宽）');
     assert(inv2900.PRODUCT_FILES.length === r2900.files.product && inv2900.REF_RE instanceof RegExp,
       '清册导出 PRODUCT_FILES / REF_RE 与产品面同源（门禁复算不另写扫描面）');
-    assert(led2900.advisory && led2900.advisory.dataOnly === 106, 'advisory 只记计数（dataOnly 106）');
+    assert(led2900.advisory && led2900.advisory.dataOnly === 109, 'advisory 只记计数（dataOnly 109）');
     // 旧灯一盏不少
     const ledAdd2900 = clone2900(led2900);
     delete ledAdd2900.dead[Object.keys(ledAdd2900.dead)[0]];
@@ -16190,8 +16190,13 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
       'v2430: PRODUCT_FILES 与 productFiles(BASE) 逐项一致（' + prod4300.length + ' vs ' + inv4300.PRODUCT_FILES.length + '）');
     const ecRun4300 = cp4300.spawnSync(process.execPath, ['tests/export-contract.js'],
       { cwd: path4300.join(__dirname, '..'), encoding: 'utf8' });
-    assert(ecRun4300.status === 0 && /ns= 60 members= 360 chars= 4546/.test(String(ecRun4300.stdout)),
-      'v2430: 统一排除口径后出口面契约规模逐字不变（实 ' + String(ecRun4300.stdout).split('\n')[0] + '）');
+    // v2.44.0：本段原钉「members= 360 chars= 4546」。v2.44.0 起 actors/monologue.js 开始调用
+    //   apiRouter.extractJson（解析纯文本独白），该成员由「死导出」转为「活导出」，出口面随之
+    //   +1 成员 / +12 字符。故此处改为与当前真值比对；口径本身（统一排除名单后规模不漂移）
+    //   由「本次运行产物 == FROZEN2800」这条更强的断言承担，不再用硬编码旧数字。
+    const EC2430 = 'ns= 61 members= 374 chars= 4731';
+    assert(ecRun4300.status === 0 && String(ecRun4300.stdout).indexOf(EC2430) >= 0,
+      'v2430: 统一排除口径后出口面契约规模稳定（实 ' + String(ecRun4300.stdout).split('\n')[0] + '，期望 ' + EC2430 + '）');
     // ── C. 成类静态锁：UI 三文件清单在**整个代码面**硬零（防任一处回退写法复活）──
     //   这是 v2.42.0「两道门禁源码里已无旧清单」断言的**成类化**：不再只盯两个文件，
     //   而是全仓扫——漏网的两处正是「只盯两个文件」放走的。
@@ -16547,6 +16552,180 @@ assert(verF2500 === '2.43.0' && mfF2500.version === verF2500, '入口与清单�
     console.log('  ✓ v2400: 骨架归属门禁三规则 + 冻结账本，写侧幽灵（lastInjection/proactiveLastRound）已物化');
     console.log('  ✓ v2400: 四条负向自证（E1 denylist / E2 读侧 / E3 写侧 / E4 撞名登记）全部现形');
   }
+
+  // ══════════ v2.44.0 ══════════
+  // 对齐 SoulLink v1.7.1：角色扮演独白从「必须 JSON」改为纯文本内心独白，并兼容旧 JSON。
+  // 预筛 Gate 仍要求 JSON。不引入上游全局 max_tokens，也不搬特殊场景写法。
+  section('v2.44.0：独白纯文本（SoulLink v1.7.1 口径，兼容旧 JSON）');
+  {
+    const fs4400 = require('fs');
+    const path4400 = require('path');
+    const src4400 = fs4400.readFileSync(path4400.join(BASE, 'actors/monologue.js'), 'utf8');
+    assert(src4400.split('json: true').length - 1 === 1, 'v2440: 全文件只剩预筛一处 json:true');
+    assert(src4400.indexOf('json: true, signal, maxTokens: 500') > 0, 'v2440: 预筛仍走 JSON');
+    assert(src4400.indexOf('maxTokens: 800') > 0 && src4400.indexOf('json: true, signal, maxTokens: 800') < 0,
+      'v2440: 独白调用不再要求 JSON');
+    assert(src4400.indexOf('只输出一段纯文本内心独白') > 0 && src4400.indexOf('400字以内') > 0,
+      'v2440: 提示词改为 400 字纯文本');
+    assert(src4400.indexOf('只输出JSON：{"character"') < 0, 'v2440: 独白提示词不再要求 JSON');
+    const pres4400 = src4400.slice(src4400.indexOf('PRESCREEN_SYS'), src4400.indexOf('ROLEPLAY_SYS'));
+    assert(pres4400.indexOf('只输出JSON') > 0, 'v2440: 预筛提示词仍要求 JSON');
+    WA.apiRouter.setChannel('inference', { baseUrl: 'http://mock', model: 'm', apiKey: 'k' });
+    WA.registry.register('蒙面人');
+    async function one4400(content) {
+      global.__pushApiJson(content);
+      return WA.monologue.roleplayOne('蒙面人', new AbortController().signal);
+    }
+    const plain4400 = await one4400('这人不能留，得警告他离开。');
+    assert(plain4400 && plain4400.monologue === '这人不能留，得警告他离开。', 'v2440: 纯文本原样注入');
+    const pref4400 = await one4400('[蒙面人]的内心独白: 这人不能留，得警告他离开。');
+    assert(pref4400 && pref4400.monologue === '这人不能留，得警告他离开。', 'v2440: 剥掉姓名前缀');
+    const fence4400 = await one4400('```text\n这人不能留，得警告他离开。\n```');
+    assert(fence4400 && fence4400.monologue === '这人不能留，得警告他离开。', 'v2440: 剥掉代码围栏');
+    const json4400 = await one4400(JSON.stringify({ character: '蒙面人', monologue: '这人不能留，得警告他离开。' }));
+    assert(json4400 && json4400.monologue.indexOf('警告') > 0, 'v2440: 旧 JSON 的 monologue 字段仍可注入');
+    const empty4400 = await one4400('   ');
+    assert(empty4400 === null, 'v2440: 空返回不注入');
+    const long4400 = await one4400('长'.repeat(500));
+    assert(long4400 && long4400.monologue.length === 400, 'v2440: 超长截到 400（实 ' + (long4400 && long4400.monologue.length) + '）');
+    const prose4400 = await one4400('我觉得 {"monologue":"不该被抽走"} 只是想法');
+    assert(prose4400 && prose4400.monologue.indexOf('不该被抽走') > 0 && prose4400.monologue.indexOf('我觉得') === 0,
+      'v2440: 正文里的 JSON 片段不被抽走');
+    console.log('  ✓ v2440: 独白纯文本 + 旧 JSON 兼容，预筛仍是 JSON');
+  }
+
+  // ══════════ v2.45.0 ══════════
+  // 条目按需激活路由（缝合自 Awene cultivation-rule-router）。
+  // 取舍：只取「条目路由 + 结果缓存」；失败一律降级为「本回合不隐藏」，
+  // 不采用上游「最终超时中止整个生成任务」那一档（世界引擎无权卡住一次生成）。
+  section('v2.45.0：世界书条目按需路由（降级不中止）');
+  {
+    const fs2450 = require('fs');
+    const path2450 = require('path');
+    const src2450 = fs2450.readFileSync(path2450.join(__dirname, '..', 'engines/entry-router.js'), 'utf8');
+    assert(src2450.indexOf('本回合不隐藏') > 0, 'v2450: 失败策略写死为降级');
+    assert(src2450.indexOf('throw') < 0, 'v2450: 引擎内无 throw（不向上中止）');
+    assert(src2450.indexOf("ROUTE_TIMEOUT_MS = 30000") > 0, 'v2450: 默认 30s 闸刀');
+    assert(src2450.indexOf('CACHE_MAX = 20') > 0, 'v2450: 结果缓存上限 20');
+    assert(src2450.indexOf('MAX_CANDIDATES = 60') > 0, 'v2450: 单轮候选上限 60');
+
+    // 装载链：必须在 worldbook.js 之后
+    const idxSrc2450 = fs2450.readFileSync(path2450.join(__dirname, '..', 'index.js'), 'utf8');
+    assert(idxSrc2450.indexOf("'engines/entry-router.js'") > 0, 'v2450: 装载链已挂');
+    const wbAt = idxSrc2450.indexOf("'engines/worldbook.js'");
+    const erAt = idxSrc2450.indexOf("'engines/entry-router.js'");
+    assert(wbAt > 0 && erAt > wbAt, 'v2450: 路由引擎在 worldbook 之后装载');
+
+    // 行为面：候选集 / 被动条目 / 归一化 / 关联展开 / 降级
+    // 引用口径：一律**直写** `WA.entryRouter.xxx`，不用 `const R = WA.entryRouter` 别名。
+    //   为什么：死子面账本按 `WA.ns.mem` 正则计引用，别名调用在产品侧与测试侧都数不到 0 ——
+    //   整组导出会被判「零消费者」，而它们其实正是本段在消费。（v2.45.0 实测踩到这个坑）
+    WA.entryRouter.clearCandidates();
+    WA.entryRouter.clearCache();
+    // mock 基建：apiRouter 响应队列是全局共享的，上一段未消费的响应会污染本段（实测踩到：
+    //   缓存命中时 __pushApiJson 的那条根本不被消费，留给下一个 plan 当成功响应）。
+    //   本段每处网络调用前都清干净，只留本次要用的那一条。
+    global.__fetchResponses.length = 0;
+    WA.worldbook.saveSelection(['a', 'b', 'c', 'd'], {});
+    assert(WA.entryRouter.listCandidates().length === 0, 'v2450: 清空后无候选');
+    assert(WA.entryRouter.setCandidate({ id: 'a' }) === false, 'v2450: 无启用条件不参与路由');
+    assert(WA.entryRouter.setCandidate({ id: 'a', condition: '有战斗', links: ['c'] }) === true, 'v2450: 有启用条件才入候选');
+    WA.entryRouter.setCandidate({ id: 'b', condition: '有铁匠' });
+    WA.entryRouter.setCandidate({ id: 'c', condition: '被 a 关联' });
+    assert(WA.entryRouter.isPassive('c') === true, 'v2450: 被 links 指向即被动条目');
+    assert(WA.entryRouter.isPassive('a') === false, 'v2450: 发起关联者本身不是被动条目');
+    WA.entryRouter.setCandidate({ id: 'd', condition: '无关条目' });
+    assert(WA.entryRouter.listCandidates().length === 4, 'v2450: 候选入表');
+
+    // 归一化与关联展开不经导出面验证（它们是 plan 内部步骤，已从导出面摘除）；
+    //   改由下方「成功路径」的三形态端到端断言覆盖，真源仍是同一份实现。
+    //   links 语义（发起关联者带 links）：a 带 ['c'] ⇒ 命中 a 必带 c。
+
+    // 通道未配置 = 不介入（不是失败）
+    WA.apiRouter.setChannel('inference', { baseUrl: '', model: '', apiKey: '' });
+    const p2450a = await WA.entryRouter.plan('去铁匠铺');
+    assert(p2450a.ok && !p2450a.degraded && p2450a.reason.indexOf('未配置') >= 0,
+      'v2450: 通道未配置本回合不介入');
+    assert(p2450a.hidden.length === 0, 'v2450: 未配置时不隐藏任何条目');
+
+    // 副模型失败 = 降级不隐藏（本版核心纪律）
+    WA.apiRouter.setChannel('inference', { baseUrl: 'http://mock', model: 'm', apiKey: 'k' });
+    global.__fetchResponses.length = 0;
+    global.__fetchResponses.push({ ok: false, status: 500, body: { error: 'network down' } });
+    const p2450b = await WA.entryRouter.plan('去铁匠铺');
+    assert(p2450b.degraded === true && p2450b.hidden.length === 0,
+      'v2450: 副模型失败降级为不隐藏');
+    assert(p2450b.enabled.length === 4, 'v2450: 降级时全部条目照常（4 条候选全开）');
+    assert(WA.entryRouter.lastFailure() && String(WA.entryRouter.lastFailure().message).length > 0,
+      'v2450: 降级留痕（lastFailure 可查）');
+    const applied2450 = WA.entryRouter.applyPlan(p2450b);
+    assert(applied2450.applied === false, 'v2450: 降级计划不落覆写');
+
+    // 成功路径：命中 + 关联展开 + 缓存
+    WA.entryRouter.clearCache();
+    global.__fetchResponses.length = 0;
+    global.__pushApiJson({ enabled: ['a', 'b'] });
+    const p2450c = await WA.entryRouter.plan('去铁匠铺');
+    assert(p2450c.ok && !p2450c.degraded, 'v2450: 副模型返回正常');
+    assert(JSON.stringify(p2450c.enabled) === '["a","b","c"]', 'v2450: 命中集取副模型结果并展开关联');
+    assert(JSON.stringify(p2450c.hidden) === '["d"]', 'v2450: 未命中即本回合隐藏（被展开的 c 不隐藏）');
+    assert(p2450c.fromCache === false, 'v2450: 首次不算缓存');
+    const p2450d = await WA.entryRouter.plan('去铁匠铺');
+    assert(p2450d.fromCache === true, 'v2450: 同一输入复用缓存（不重复调用副模型）');
+    assert(JSON.stringify(p2450d.enabled) === '["a","b","c"]', 'v2450: 缓存不重复调用副模型');
+
+    // applyPlan：只写 off 覆写，不动用户 const/auto
+    const ovBefore2450 = WA.worldbook.getOverrides();
+    assert(!ovBefore2450['d'], 'v2450: 落覆写前 d 无 off 标记');
+    WA.entryRouter.applyPlan(p2450c);
+    const ovAfter2450 = WA.worldbook.getOverrides();
+    assert(ovAfter2450['d'] === 'off', 'v2450: 隐藏条目写 off 覆写');
+    const sel2450 = WA.worldbook.getSelectedIds();
+    assert(sel2450.indexOf('a') >= 0 && sel2450.indexOf('b') >= 0 && sel2450.indexOf('c') >= 0,
+      'v2450: 选择集不变（只改覆写不改勾选）');
+
+    // 下一轮：清掉上一轮 off 再写新的
+    WA.entryRouter.clearCache();
+    global.__fetchResponses.length = 0;
+    global.__pushApiJson({ enabled: ['a'] });
+    const p2450e = await WA.entryRouter.plan('去别处');
+    WA.entryRouter.applyPlan(p2450e);
+    assert(JSON.stringify(p2450e.hidden) === '["b","d"]', 'v2450: 只命中 a 时 a 与关联 c 之外全部隐藏');
+    const ovFinal2450 = WA.worldbook.getOverrides();
+    assert(ovFinal2450['d'] === 'off' && ovFinal2450['b'] === 'off', 'v2450: 新一轮 off 覆写生效');
+
+    // 候选移除：被动集随之重建
+    assert(WA.entryRouter.removeCandidate('a') === true, 'v2450: 候选可移除');
+    assert(WA.entryRouter.isPassive('c') === false, 'v2450: 移除发起者后被动集重建');
+    assert(WA.entryRouter.removeCandidate('a') === false, 'v2450: 重复移除返回 false（无候选可删）');
+    WA.entryRouter.setCandidate({ id: 'a', condition: '有战斗', links: ['c'] });
+
+    // workflow 注册面
+    const wf2450 = WA.workflow.list('before').find(n => n.id === 'engines.entryRouter');
+    assert(wf2450 && wf2450.order === 60, 'v2450: 路由节点已注册 before 链 order 60');
+
+    // 路由只影响 WorldAxis 自己的扫描，不动宿主原生世界书扫描——如实锁住边界
+    const wbSrc2450 = fs2450.readFileSync(path2450.join(__dirname, '..', 'engines/worldbook.js'), 'utf8');
+    assert(wbSrc2450.indexOf('buildPromptSection') > 0 && wbSrc2450.indexOf('getOverrides()') >= 0,
+      'v2450: 覆写表只作用于 buildPromptSection');
+
+    // 失败不记忆：同一输入再请求时若副模型恢复正常，必须拿到正常结果（不被上轮失败钉住）
+    WA.entryRouter.clearCache();
+    global.__fetchResponses.length = 0;
+    global.__fetchResponses.push({ ok: false, status: 500, body: { error: 'boom' } });
+    const p2450f = await WA.entryRouter.plan('另一个输入');
+    assert(p2450f.degraded === true, 'v2450: 新输入失败仍降级');
+    assert(WA.entryRouter.recentMessages(2) !== null, 'v2450: 最近剧情读取通道可用');
+    global.__pushApiJson({ enabled: ['a', 'b'] });
+    const p2450g = await WA.entryRouter.plan('另一个输入');
+    assert(p2450g.degraded === false && p2450g.fromCache === false && JSON.stringify(p2450g.enabled) === '["a","b","c"]',
+      'v2450: 失败不记忆——恢复后同一输入重新判定');
+    WA.entryRouter.clearCache();
+    WA.entryRouter.clearCandidates();
+
+    console.log('  ✓ v2450: 条目路由 / 缓存 / 被动条目 / 归一化 / 降级不中止 全部现形');
+  }
+
   }  // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);

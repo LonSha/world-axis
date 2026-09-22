@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.43.0';
+  const VERSION = '2.45.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -242,6 +242,9 @@
     'engines/inject-slot-audit.js',
     'engines/proactive.js',
     'engines/wb-inject.js',
+    // v2.45.0: 世界书条目按需路由。必须在 worldbook.js 之后装载——它读 worldbook 的
+    //   按聊天覆写表（getOverrides/getSelectedIds/saveSelection）落「本回合隐藏」。
+    'engines/entry-router.js',
     'engines/calendar.js',
     'engines/memory.js',
     'engines/opinion.js',
