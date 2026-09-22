@@ -14,12 +14,26 @@
   // v2.51.0（第三十六面）: 追加 'style'（叙事工艺约束）。它在 applyInjections 里有真实
   //   分支——SOURCES 的每项都必须在 def 里有默认值、且**真被读**，否则就是「声明了源
   //   却没人消费」（v2.38.0 的 echoes 正是踩过这个坑：开关点了零效果）。
-  const SOURCES = ['clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse', 'ledger', 'digest', 'style'];
-
+  // v2.56.0: 追加 'life' / 'intel' / 'org' / 'longline'（v2.52.0~v2.55.0 新增的四条注入分支）。
+  //   **这是一次真缺陷的修复**：那四条分支加进 applyInjections 时漏登记 SOURCES —— 于是它们
+  //   ① 没有可见性开关（用户关不掉单个源）、② 不进 def ⇒ 逃出「声明完整性 / 子键自愈 /
+  //   undeclared 记账」三重校验、③ 反向的守卫（SOURCES 有而 def 无）也照不到（两边都没有）。
+  //   这恰是 SOURCES 存在的理由：源表与注入分支必须**同时**增长，任何单边增长都是静默缺口。
+  //   本版同时加了一条成类锁（tests/inject-sources-v2560.js）：用正则从 applyInjections 里抽出
+  //   所有 `WA.<ns>.buildBlock()` 调用点，断言其命名空间**逐一**在 SOURCES 里 —— 此后
+  //   「加了注入分支忘了登记源表」在回归当场红灯。该锁同时覆盖**反向**：SOURCES 里声明了
+  //   却在注入链中无任何消费点的源（v2.4.0 的 undeclared 只查 def 面，查不到这一面）。
+  //   默认值取 **true**（与 style 的 false 不同）：这四面的总开关各自默认为关闭，注入本来就
+  //   不会发生 —— 故这里默认 true 不会给老用户凭空多出任何约束，却避免了「开了模块却发现
+  //   也要再开开关」的双闸困惑。style 之所以要 false，是因为它自己的总开关 `block` 默认为 on。
+  const SOURCES = ['clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse', 'ledger', 'digest', 'style',
+    'life', 'intel', 'org', 'longline'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
-        style: false }, module: 'inject' };
+style: false,
+        // v2.56.0：四面注入源默认 true（理由见 SOURCES 上方注释——它们的模块总开关默认为关）。
+        life: true, intel: true, org: true, longline: true }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -206,13 +220,16 @@
       //   三态如实：style 模块缺席（旧加载顺序/加载失败）⇒ 不注入，不假装注入了空段。
       if (vis.style) { const stb = this.buildStyleBlock(); if (stb) items.push({ source: '叙事工艺', content: stb }); }
       // v2.52.0：人物生活。模块或开关关闭时 buildBlock 返回空串，不注入。
-      if (WA.life) { const lb = WA.life.buildBlock(); if (lb) items.push({ source: '人物生活', content: lb }); }
+      // v2.56.0: 补 `vis.life` —— 本分支只有模块总开关、没读可见性（见 SOURCES 上方注释），
+      //   于是面板上这个源关掉后仍照常注入，是 v2.38.0「开关点了零效果」的原样复刻。
+      //   口径与既有各源一致：**可见性关**与**模块缺席**都返回空串，两者都如实不注入。
+      if (vis.life && WA.life) { const lb = WA.life.buildBlock(); if (lb) items.push({ source: '人物生活', content: lb }); }
       // v2.53.0：因果与情报。模块或开关关闭时 buildBlock 返回空串，不注入。
-      if (WA.intel) { const ib = WA.intel.buildBlock(); if (ib) items.push({ source: '因果与情报', content: ib }); }
+      if (vis.intel && WA.intel) { const ib = WA.intel.buildBlock(); if (ib) items.push({ source: '因果与情报', content: ib }); }
       // v2.54.0：资源与组织。模块或开关关闭时 buildBlock 返回空串，不注入。
-      if (WA.org) { const ob = WA.org.buildBlock(); if (ob) items.push({ source: '资源与组织', content: ob }); }
+      if (vis.org && WA.org) { const ob = WA.org.buildBlock(); if (ob) items.push({ source: '资源与组织', content: ob }); }
       // v2.55.0：长线伏笔。只报逾期欠账，且不自动回收。
-      if (WA.longline) { const lb2 = WA.longline.buildBlock(); if (lb2) items.push({ source: '长线伏笔', content: lb2 }); }
+      if (vis.longline && WA.longline) { const lb2 = WA.longline.buildBlock(); if (lb2) items.push({ source: '长线伏笔', content: lb2 }); }
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）

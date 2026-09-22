@@ -20,7 +20,10 @@
    *   提升后两处引用同一份，新增源只需在此表加一行（`SOURCES` 仍是枚举真源，
    *   本表只是它的显示名；缺名时下游已有 `|| k` 兜底，不会渲染成 undefined）。
    */
-  const VIS_NAMES = { clock: '世界时间', background: '世界背景', people: '人物', currents: '暗流', echoes: '回声', memory: '记忆', opinion: '舆情', pulse: '世界脉搏', ledger: '重大事件账本', digest: '世界推演', style: '叙事工艺' };
+  const VIS_NAMES = { clock: '世界时间', background: '世界背景', people: '人物', currents: '暗流', echoes: '回声', memory: '记忆', opinion: '舆情', pulse: '世界脉搏', ledger: '重大事件账本', digest: '世界推演', style: '叙事工艺',
+    // v2.56.0: v2.52.0~v2.55.0 新增的四条注入分支此前未登记源表，也**没在这里登记显示名**
+    //   —— 面板会裸露英文键名（life/intel/org/longline）。补名与补源表是同一件事的两面。
+    life: '人物生活', intel: '因果与情报', org: '资源与组织', longline: '长线伏笔' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {

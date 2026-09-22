@@ -640,4 +640,16 @@
 - **验证**：<code>tests/longline-v2550.js</code> → <code>LONGLINE-V2550: pass</code>（12 组）；全量回归 <b>4948 / 失败 0</b>；dead 223 / uiDead 4 / dataOnly 122 / 仅测试 131；出口面 ns 70 / members 466 / chars 5742；清册面 refs 1644 / 命名空间 76 / 成员 844。
 - **工程教训（重要，已固化进流程）**：<b>用 heredoc 向终端传中文脚本会偶发讹变</b>（实测 <code>拒绝转移</code> 被写成 <code>拒绍转移</code>、<code>资源与组织</code> 被写成 <code>资 源与组织</code>），导致字面锚点匹配失败而补丁静默不生效。<b>含中文的改动一律走 <code>edit_file</code> 或 <code>create_file</code> 落盘后再执行</b>；终端内只做纯 ASCII 替换。
 - **提交**：<code>（见本版提交）</code>。
+### R39 · 2026-09-22 · v2.56.0 交付（注入源表 × 注入分支 双向成类锁·第四十一面：把「加了消费点忘了登记源」变成当场红灯）
+- **做了什么**：
+  · 修一处**真缺陷**：<code>SOURCES</code> 与 <code>__REG.def</code> 补登记 <code>life</code> / <code>intel</code> / <code>org</code> / <code>longline</code> 四源。
+  · 给那四条注入分支补上可见性守卫（<code>vis.life && WA.life</code> …）——此前只判模块在不在。
+  · <code>ui/panel.js</code> 的 <code>VIS_NAMES</code> 补四条显示名（否则面板裸露英文键）。
+  · 新建 <code>tests/inject-sources-v2560.js</code>：双向成类锁（A / A2 / B / C / D 五面 + N1~N4 负控制），并**接进 <code>tests/run.js</code> 门禁**（+20 项）。
+- **为什么**：v2.52.0~v2.55.0 连续四版往 <code>applyInjections</code> 里加注入分支，**四次全部漏登记**。后果三重，而**既有守卫一条都照不到**：① 面板上没有这四项的可见性开关；② 不在 <code>def</code> ⇒ 逃出「声明完整性 / 子键自愈 / undeclared 记账」三重校验；③ 反向守卫（SOURCES 有而 def 无、def 有而 SOURCES 无）两边都没有它。更隐蔽的是这四条分支**只判模块在不在、不读可见性**——即便事后补登记源表，面板开关依然**点了零效果**，与 v2.38.0 的 <code>echoes</code> 复选框是同一种病。
+- **判据设计（防止再犯同类）**：A 注入分支 → 源表（<code>WA.&lt;ns&gt;.buildBlock</code> 的 ns 必须 ∈ SOURCES，子源须显式登记统管源）；A2 源守卫必须走可见性通道（不得存在「只判 <code>WA.&lt;ns&gt;</code> 在不在」的形态）；B 源表 → 消费点（防幽灵开关）；C 源表 ⇄ def **互为子集**；D 源表 → 面板显示名（两向）。判据只吃真代码面（<code>codeFace</code> 剥注释与字符串），故**注释里写出开关名不算消费点**；负控制以「真源码破坏 → 在破坏副本上重跑同款判据」自证，锚点须恰中 1 次否则抛。
+- **本版坐实的第二处问题（流程面，比缺陷本身更值得记）**：<code>SOURCES</code> 上方的注释曾写「本版同时加了一条成类锁（<code>tests/longline-v2560.js</code>）」——**该文件当时根本不存在**。也就是说注释把「打算做」写成了「已经做了」。这与本仓反复出现的病同型：<b>声明与落地必须是两件事的核对，不能靠同一段文字自证</b>。声称「加了锁」就去 <code>ls</code> 那个文件；声称「修了缺陷」就去读那行代码。
+- **顺手修掉的陈旧断言**：<code>tests/run.js</code> 里 v2380 段把 <code>SOURCES</code> 长度钉死为 <code>11</code>（v2.51.0 时代的数字）。源表增长后它会红灯——已改为 15。**这是「能拦住我」的那类断言**（记错了就得来说明），故保留其形态而非改成动态比较。
+- **验证**：<code>tests/inject-sources-v2560.js</code> → <code>INJECT-SOURCES-V2560: pass</code>（20 项）；全量回归 <b>4968 / 失败 0</b>（v2.55.0 为 4948，+20 即本版新锁）；死导出门禁绿 <b>dead 223 / uiDead 4 / dataOnly 122 / 仅测试 131</b>，元数据同源、证据可复算。
+- **提交**：<code>（见本版提交）</code>。
 
