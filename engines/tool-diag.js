@@ -169,6 +169,20 @@
       };
     });
   }
+  function secLife() {
+    return safe(function () {
+      if (!WA.life || typeof WA.life.stat !== 'function') return { error: 'life 模块不可用' };
+      const st = WA.life.stat();
+      const cfg = WA.life.getSettings ? WA.life.getSettings() : {};
+      return {
+        enabled: !!cfg.enabled, maxPeople: cfg.maxPeople, maxItems: cfg.maxItems,
+        ticks: st.ticks || 0, changed: st.changed || 0, blocked: st.blocked || 0,
+        lastReason: st.lastReason || '', lastAt: st.lastAt || 0,
+        actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
+      };
+    });
+  }
+
   // ── 3. 模块装载完整性（文件 ↔ 导出对象） ──
   const MODULE_EXPORTS = {
     'core/clock.js': 'clock',
@@ -195,6 +209,7 @@
     'engines/floor-changes.js': 'floorChanges',
     // v2.51.0（第三十六面）：叙事工艺设置面（rules.craft 所指的设置面本体）
     'engines/style.js': 'style',
+    'engines/life.js': 'life',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -660,7 +675,7 @@
       cond: ['wa-orph-all', 'wa-settle-unforce'],
       dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg', 'wa-next-day', 'wa-wb-trigger', 'wa-wb-refresh', 'wa-wb-preview', 'wa-wb-scan', 'wa-wb-list', 'wa-wb-out'], dynamic: ['wa-conc-v'] },
-    { page: 'people', ids: ['wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out'],
+    { page: 'people', ids: ['wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
@@ -947,7 +962,7 @@
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
@@ -1621,6 +1636,9 @@
           : '台账时间轴尚未观测到站点'
       });
     }
+    const lfF = d.life || {};
+    if (lfF.error) out.push({ level: 'info', key: 'life', detail: '人物生活不可用：' + lfF.error });
+    else out.push({ level: 'info', key: 'life', detail: '人物生活' + (lfF.enabled ? '已启用' : '未启用') + '：结算 ' + (lfF.ticks || 0) + ' 次 / 改变 ' + (lfF.changed || 0) + ' / 无变化 ' + (lfF.blocked || 0) + (lfF.lastReason ? '（最近：' + lfF.lastReason + '）' : '') });
     // v2.16.0: 对外桥摘要行——否则 flatten 出来的清单里「另两个插件能不能读到世界」完全缺席。
     const bdF = d.bridge || {};
     if (bdF.error) {

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.51.0';
+  const VERSION = '2.52.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -278,6 +278,8 @@
     //   它是 engines/rules.js 的 craft 模块（「叙事工艺按设置面口径执行」）所指向的
     //   那个**设置面本身**：此前只有口径声明、没有产生方。
     'engines/style.js',
+    // v2.52.0：人物生活。须早于 render/inject.js，注入时读取 life.buildBlock()。
+    'engines/life.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

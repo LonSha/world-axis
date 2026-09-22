@@ -318,6 +318,11 @@
     const reg = WA.registry.list();
     const people = Object.values(s.people);
     return `
+      <div class="wa-sec">人物生活（目标、承诺、日程）</div>
+      <label class="wa-row"><input id="wa-life-enabled" type="checkbox" ${WA.life && WA.life.getSettings().enabled ? 'checked' : ''}/> 启用人物生活</label>
+      <div class="wa-row"><input id="wa-life-person" class="wa-input" placeholder="人物"/><input id="wa-life-text" class="wa-input" placeholder="目标、承诺或日程"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-life-goal">加目标</button><button class="wa-btn" id="wa-life-promise">加承诺</button><button class="wa-btn" id="wa-life-schedule">加日程</button><button class="wa-btn" id="wa-life-tick">结算</button></div>
+      <div id="wa-life-out" class="wa-out"></div>
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
@@ -1428,6 +1433,28 @@
       if (act === 'created' || act === 'updated') renderBody();
     });
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
+    // v2.52.0：人物生活只写用户明确提交的内容；关闭开关后停止结算与注入。
+    const lifeText = function () {
+      const person = ($('#wa-life-person') || {}).value || '';
+      const text = ($('#wa-life-text') || {}).value || '';
+      return { person: person.trim(), text: text.trim() };
+    };
+    const lifeOut = function (r, keep) {
+      const text = r && r.ok ? ('已记录 ' + (r.id || r.reason || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
+      if (keep) panelEl.dataset.lifeOut = text;
+      const o = $('#wa-life-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.lifeOut) { const saved = $('#wa-life-out'); if (saved) saved.textContent = panelEl.dataset.lifeOut; }
+    { const el = $('#wa-life-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.life) { lifeOut({ ok: false, reason: 'module-missing' }, true); return; }
+        WA.life.setSettings({ enabled: !!el.checked });
+        lifeOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' }, true);
+      }; }
+    on('#wa-life-goal', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addGoal(x.person, { text: x.text }), true); renderBody(); });
+    on('#wa-life-promise', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addCommitment(x.person, { kind: 'promise', target: '玩家', text: x.text }), true); renderBody(); });
+    on('#wa-life-schedule', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); lifeOut(WA.life.addSchedule(x.person, { activity: x.text, start: now, end: now + 3600000 }), true); renderBody(); });
+    on('#wa-life-tick', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); const person = WA.store && x.person ? ((WA.store.get()||{}).people||{})['p_'+x.person] : null; const goal = person && person.life && (person.life.goals||[]).filter(g=>g.status==='active')[0]; const decision = person && goal && WA.life.decide ? WA.life.decide(goal, person, { now: now, with: '玩家' }) : null; const r = WA.life.tick({ now: now, with: '玩家', decision: decision }); const why = decision ? (decision.action + '/' + decision.reason) : (r.reason || ''); lifeOut({ ok: !!r.ok, id: (r.changed || 0) + ':' + why, reason: r.reason }, true); renderBody(); });
     on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); if (btn) { btn.textContent = '生成中…'; btn.disabled = true; } try { await WA.directEvent.create({ prompt: p, turns: t }); } finally { renderBody(); } });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });
     // v2.11.0: 推演中止——引擎侧 `abort()` 已实现却无人调用（用户只能刷页面打断）
