@@ -1,0 +1,4 @@
+# v2.41.0：出口面契约生成器的产物（由 tests/export-contract.js 写入，供人工核对与回填
+#   tests/run.js 的 FROZEN2800）。它是**派生产物**，不是真源——真源是运行中的仓库本身。
+tests/export_contract.txt
+node_modules/

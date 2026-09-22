@@ -341,3 +341,24 @@
 - **为什么**：三次同型缺陷（读侧零写者 → 读侧无字段 → 写侧无字段）都由「骨架与代码各说各话」引起，而两次漏网都源于「静态锁写死一种拼法」。本轮把判据的作用点从「代码里的拼法」搬到「运行时骨架本身」，这类缺陷此后无法静默进入。
 - **影响范围**：`core/store.js`（物化两字段）/ `tests/field-liveness-gate.js`（新）/ `tests/field-liveness-ledger.json`（新）/ `tests/ui-gate.js`（陈旧常量 → 自维护 + 新增静态不变式 + 段名）/ `tests/run.js`（v2.40.0 段 +19 断言 + 8 处版本锚点）/ `index.js` / `manifest.json` / `tests/dead-export-ledger.json`（version + `_note`）/ README / ITERATION_LOG。**不新增导出、不新增产品文件。**
 - **门禁与验证**：全量回归 **4496 / 失败 0**（v2.39.0 基线 4477，**+19 净增**）；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106，**无需 `--update`**）；export-contract 不变（60 ns / 360 members / 4546 chars）；ui-gate **48/1 → 53/0**（修复既有红灯 + 净 +5 断言）；ui-wire-audit 8/0；field-liveness-gate 绿；版本三源同源 **2.40.0**。
+### R24 · 2026-09-22 · v2.41.0 交付（工具可移植性·第二十八面：生成器硬编码 /tmp → __dirname 推导 + 成类静态锁）
+- **做了什么**：延续「静默失效」猎取线（第二十八面）。v2.40.0 治的是「门禁断言写死一种形态」（ui-gate 的陈旧常量 12），本轮沿同一根线把范围推到「**工具写死一种环境**」——扫描全仓 `/tmp` 硬编码绝对路径。
+- **缺陷（实测坐实）**：`tests/export-contract.js` 三处硬编码 `/tmp/wa_git`：
+  1) `require('/tmp/wa_git/tests/mock.js')` —— 换目录即 MODULE_NOT_FOUND；
+  2) `const BASE = '/tmp/wa_git'` —— 被测真源被**写死成某个特定工作区**；
+  3) 产物 `fs.writeFileSync('/tmp/export_contract.txt')` —— 共享临时目录，多副本并行互相覆盖。
+  全仓扫描确认**产品面上只有这一处**（core/engines/render/ui/actors/direction/compat/index.js 全零命中），它是唯一的坏点。
+- **为什么算缺陷（而不是「本机跑得好好的」）**：它是出口面契约门禁在漂移时**唯一指定的回填工具**（`tests/run.js` 块1 失败文案写死「运行 `node tests/export-contract.js` 并回填」），属「防线所依赖的工具本身不可移植」。换目录/换机器/换 CI 工作区时，门禁红了却**修不了**——这正是「门禁自己白写」的最内层形态。
+- **修法**：`BASE` 改由 `path.join(__dirname, '..')` 推导；mock 走 `path.join(BASE, 'tests/mock.js')`；产物落到**仓库内** `tests/export_contract.txt`（真源永远是「运行中的仓库本身」，不再依赖共享 /tmp）；新增 `.gitignore` 忽略该派生产物；生成器打印写入路径；同步更新块1 里写死 `/tmp/export_contract.txt` 的失败文案。
+- **判据（新增 v2.41.0 回归段，+15 断言）**：
+  · A **静态面**：生成器含 `path.join(__dirname, '..')` 且零 /tmp 字面量；
+  · B **行为面**：在**仓库之外的 cwd**（`tests/` 目录）里运行生成器，仍 exit 0、仍打印 `ns/members/chars`、    产物仍落回真源仓库；
+  · C **链路面**：产物与 `FROZEN2800` **逐字一致**（重生成 → 回填 → 门禁比对这条链路未断）；
+  · D **成类静态锁**：全仓 `.js` 扫描，**产品面硬零** `/tmp` 死路径；测试面只允许「**守卫式本地安装回退**」    `/tmp/node_modules/<pkg>` 一类（先 `require('<pkg>')` 可移植路径，失败才回退本地临时安装，    且整段在 try/catch 内、缺失降级为 null 而非崩——run.js 的 9 处 jsdom 回退正是此形），其余仍报；
+  · E **两条负向自证**：E1 把 `BASE` 退回硬编码 ⇒ 静态锁报出，且**原版同判据不报**（非恒真）；    E2 把 `BASE` 指向不存在目录 ⇒ 运行**非零退出**，反证 B 的 exit 0 不是常量。
+- **同轮自纠（2 次，均由自己新写的门禁抓红）**：
+  · ① 首版规则 D 把 `tests/` 与产品面混在一起扫描 ⇒ 一次性报出 **16 处**（9 处 jsdom 本地回退 + 6 处**判据自身字面量**）。    逐条辨明后按「**产品面硬零 / 测试面按可归类豁免**」收口——9 处属正当回退，判据自指属伪命中。
+  · ② 消除自指的更干净做法：把 needle 改成**字符串拼接构造**（`const TMP4100 = '/' + 'tmp'`），    于是本段源码自身不再含 /tmp 字面量，**根本不需要「自指豁免」**（判据不得引用锚点串，v2.40.0 判据纯度纪律的延伸）。
+- **为什么**：三次「写死」缺陷（v2.40 门禁期望值写死页面数 12 → v2.41 工具写死工作区路径 /tmp/wa_git）同一病根：**把一个会变的值当成常量**。v2.40 治的是断言侧，本轮治的是工具侧，并各自补了成类静态锁，此后「写死形态/环境」进不了提交。
+- **影响范围**：`tests/export-contract.js`（BASE/mock/产物三处可移植化 + 打印路径）/ `tests/run.js`（块1 路径断言同步 + v2.41.0 段 +15 断言 + 8 处版本锚点）/ `.gitignore`（新）/ `index.js` / `manifest.json` / `tests/dead-export-ledger.json`（version + `_note`）/ README / ITERATION_LOG。**不新增导出、不新增产品文件。**
+- **门禁与验证**：全量回归 **4511 / 失败 0**（v2.40.0 基线 4496，**+15 净增**）；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106，**无需 `--update`**）；export-contract 不变（60 ns / 360 members / 4546 chars）；ui-gate 53/0；ui-wire-audit 8/0；field-liveness-gate 绿；版本三源同源 **2.41.0**。

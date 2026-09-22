@@ -9814,7 +9814,7 @@ WA.loadScript = _ls.loadScript;
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.41.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10358,7 +10358,7 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.40.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.41.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10649,7 +10649,7 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.40.0', '入口版本为 2.23.0（实 ' + ver + '）');
+    assert(ver === '2.41.0', '入口版本为 2.23.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11080,7 +11080,7 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
       assert(false, '出口面契约：依赖面发生漂移——新增 [' + added.slice(0, 12).join('、') + '] 减少 ['
         + removed.slice(0, 12).join('、') + ']（这是**有意的**门禁：接口面变动必须显式落进冻结串，'
         + '防「成员被悄悄改名/删掉，调用方静默降级」；确认无误后运行 `node tests/export-contract.js`，'
-        + '把它写出的 /tmp/export_contract.txt 逐字回填到本块的 FROZEN2800）');
+        + '把它写出的 tests/export_contract.txt 逐字回填到本块的 FROZEN2800）');
     }
 
     // 负向：错名不该被当成「存在」——这正是 regional.INCIDENT_TYPES 长期悬空的原因
@@ -11175,7 +11175,7 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.40.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.41.0', '入口版本为 2.23.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11563,7 +11563,7 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.40.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.41.0', '入口版本为 2.23.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -11933,7 +11933,7 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.40.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.41.0', '入口版本为 2.23.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12298,7 +12298,7 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.40.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.41.0', '入口版本为 2.23.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14600,7 +14600,7 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.40.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.41.0', '入口 VERSION = 2.28.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -16043,6 +16043,131 @@ assert(verF2500 === '2.40.0' && mfF2500.version === verF2500, '入口与清单�
   }
 
 
+  // ══════════ v2.41.0 ══════════
+  // 第二十八面：工具可移植性。v2.40.0 刚抓完「门禁写死一种形态」的陈旧常量，
+  //   本轮沿同一根线扫「工具写死一种环境」——tests/export-contract.js 的 BASE /
+  //   mock 路径 / 产物路径**硬编码 `/tmp/wa_git`**：换目录或换机器跑会直接 throw。
+  //   而它是出口面契约门禁在漂移时**唯一指定的回填工具**（块1 的失败文案直接指向它），
+  //   属「防线所依赖的工具本身不可移植」——与「门禁自己白写」同源，是静默失效的最内层。
+  section('v2.41.0：工具可移植性（生成器硬编码 /tmp → __dirname 推导 + 成类静态锁）');
+  {
+    const fs4100 = require('fs');
+    const os4100 = require('os');
+    const path4100 = require('path');
+    const cp4100 = require('child_process');
+    const genSrc4100 = fs4100.readFileSync(path4100.join(BASE, 'tests/export-contract.js'), 'utf8');
+
+    // 判据纯度（v2.40.0 纪律的延伸）：needle 由**字符串拼接**构造（'/' + 'tmp'），
+    //   故本段源码自身不含任何 /tmp 字面量 —— 扫描面不必再对自己开豁免。
+    const TMP4100 = '/' + 'tmp';
+    const NQ4100 = "'" + TMP4100;     // 单引号形态
+    const ND4100 = '"' + TMP4100;     // 双引号形态
+
+    // ── A. 生成器已可移植（静态面）──
+    assert(genSrc4100.indexOf("path.join(__dirname, '..')") > 0,
+      'v2410: BASE 从 __dirname 推导（原硬编码 /tmp/wa_git）');
+    assert(genSrc4100.indexOf(NQ4100) < 0 && genSrc4100.indexOf(ND4100) < 0,
+      'v2410: 生成器零 /tmp 硬编码绝对路径');
+
+    // ── B. 在**仓库之外的 cwd** 里跑生成器，产物仍落回真源仓库（行为面）──
+    const r4100 = cp4100.spawnSync(process.execPath, [path4100.join(BASE, 'tests/export-contract.js')],
+      { cwd: path4100.join(BASE, 'tests'), encoding: 'utf8' });
+    assert(r4100.status === 0, 'v2410: 非仓库根 cwd 下可运行（实 exit ' + r4100.status + '）'
+      + (r4100.status === 0 ? '' : ' :: ' + String(r4100.stderr || '').slice(0, 300)));
+    assert(/\bns= \d+ members= \d+ chars= \d+/.test(String(r4100.stdout || '')),
+      'v2410: 生成器自证打印规模（ns/members/chars）');
+    const out4100 = path4100.join(BASE, 'tests', 'export_contract.txt');
+    assert(fs4100.existsSync(out4100), 'v2410: 产物落在真源仓库内 tests/export_contract.txt');
+
+    // ── C. 产物与冻结串**逐字**一致：重生成 → 回填 → 门禁比对这条链路仍是活的 ──
+    const baked4100 = fs4100.readFileSync(out4100, 'utf8');
+    const runSrc4100 = fs4100.readFileSync(path4100.join(BASE, 'tests/run.js'), 'utf8');
+    const fm4100 = runSrc4100.match(/const FROZEN2800 = '([\s\S]*?)';/);
+    assert(!!fm4100, 'v2410: FROZEN2800 可定位（出口面契约冻结串）');
+    assert(fm4100 && baked4100.trim() === fm4100[1],
+      'v2410: 生成器产物与 FROZEN2800 逐字一致（链路未断）'
+      + (fm4100 && baked4100.trim() !== fm4100[1]
+        ? '（产物 ' + baked4100.trim().length + ' 字符 vs 冻结 ' + fm4100[1].length + ' 字符）' : ''));
+
+    // ── D. 成类静态锁：产品代码面禁用 `/tmp` 死路径 ──
+    //   本轮的缺陷不是「一处写错」，而是「没人会发现的写错」（只在换目录时才炸）。
+    //   这条锁让「死路径写回产品代码」在未来任何一次提交上直接红灯。
+    function walkJs4100(rel, acc) {
+      const abs = path4100.join(BASE, rel);
+      let st = null;
+      try { st = fs4100.statSync(abs); } catch (e) { return acc; }
+      if (st.isFile()) { if (/\.js$/.test(rel)) acc.push(rel); return acc; }
+      fs4100.readdirSync(abs).forEach(function (n) { walkJs4100(rel + '/' + n, acc); });
+      return acc;
+    }
+    const files4100 = [];
+    // 产品面（会被分发到用户环境）与测试面分开：产品面一旦写死 /tmp 就是真缺陷；
+    //   测试面允许两类**可归类**的 /tmp（见下方 filter），其余仍为缺陷。
+    const PROD4100 = ['core', 'engines', 'render', 'ui', 'actors', 'direction', 'compat'];
+    PROD4100.forEach(function (d) { walkJs4100(d, files4100); });
+    files4100.push('index.js');
+    const TESTFILES4100 = [];
+    walkJs4100('tests', TESTFILES4100);
+
+    // ① 产品面：硬零（换目录/换机器即失效的死路径）
+    const tmpProd4100 = [];
+    files4100.forEach(function (rel) {
+      fs4100.readFileSync(path4100.join(BASE, rel), 'utf8').split('\n').forEach(function (ln, i) {
+        if (ln.indexOf(NQ4100) >= 0 || ln.indexOf(ND4100) >= 0) tmpProd4100.push(rel + ':' + (i + 1));
+      });
+    });
+    assert(tmpProd4100.length === 0,
+      'v2410: **产品面**零 `/tmp` 硬编码绝对路径（原 export-contract.js 的 BASE 即此类，换 cwd 直接 throw）'
+      + (tmpProd4100.length ? ' 命中 ' + tmpProd4100.join('、') : ''));
+
+    // ② 测试面：允许**一类可归类**残留（守卫式本地安装回退），其余仍报。
+    //   它不属「换环境就静默失效」的死路径：先 require('<pkg>') 走可移植路径，
+    //   失败才回退 `/tmp/node_modules/<pkg>`（本地临时安装），且整段在 try/catch 内——
+    //   包缺失时降级为 null 而非崩。run.js 的 9 处 jsdom 回退属此类。
+    //   判据自身不含字面量（needle 由拼接构造），故无需自指豁免。
+    const nqMod4100 = "'" + TMP4100 + '/node_modules/';
+    const ndMod4100 = '"' + TMP4100 + '/node_modules/';
+    const isOptionalLocalInstall = function (ln) {
+      return ln.indexOf(nqMod4100) >= 0 || ln.indexOf(ndMod4100) >= 0;
+    };
+    const tmpTest4100 = [];
+    TESTFILES4100.forEach(function (rel) {
+      fs4100.readFileSync(path4100.join(BASE, rel), 'utf8').split('\n').forEach(function (ln, i) {
+        if (ln.indexOf(NQ4100) < 0 && ln.indexOf(ND4100) < 0) return;
+        if (isOptionalLocalInstall(ln)) return;
+        tmpTest4100.push(rel + ':' + (i + 1));
+      });
+    });
+    assert(tmpTest4100.length === 0,
+      'v2410: 测试面 `/tmp` 仅限「守卫式本地安装回退」一类，其余为缺陷'
+      + (tmpTest4100.length ? ' 命中 ' + tmpTest4100.join('、') : ''));
+    assert(files4100.length > 0 && TESTFILES4100.length > 0,
+      'v2410: 产品面/测试面文件清单均非空（扫描面本身可达，判据不是空跑）');
+
+    // ── E. 负向自证（真源码破坏 → 同款判据必须现形）──
+    //   E1 静态锁：把 BASE 退回硬编码 ⇒ 扫描面必须报出（破坏串同样由拼接构造，保持判据纯度）
+    const hardCoded4100 = "'" + TMP4100 + '/wa_git' + "'";
+    const brokenGen4100 = genSrc4100.replace("const BASE = path.join(__dirname, '..');",
+      'const BASE = ' + hardCoded4100 + ';');
+    assert(brokenGen4100 !== genSrc4100, 'v2410: （负向自证）E1 破坏锚点恰命中');
+    assert(brokenGen4100.indexOf(NQ4100) >= 0,
+      'v2410: （负向自证）E1 破坏版含 /tmp 字面量（D 的判据输入确实变了）');
+    assert(genSrc4100.indexOf(NQ4100) < 0, 'v2410: （负向自证）E1 原版同判据不报（非恒真）');
+    //   E2 行为门禁：把 BASE 指向不存在的目录 ⇒ 运行必须非零退出（证明 B 的 exit 0 非常量）
+    const brokenFile4100 = path4100.join(os4100.tmpdir(), 'wa_gen_broken_4100.js');
+    const nonexit4100 = "'" + TMP4100 + '/wa_git_nonexistent_4100' + "'";
+    fs4100.writeFileSync(brokenFile4100,
+      genSrc4100.replace("const BASE = path.join(__dirname, '..');",
+        'const BASE = ' + nonexit4100 + ';'), 'utf8');
+    const rBad4100 = cp4100.spawnSync(process.execPath, [brokenFile4100], { cwd: BASE, encoding: 'utf8' });
+    assert(rBad4100.status !== 0,
+      'v2410: （负向自证）E2 BASE 指向不存在目录 ⇒ 非零退出（实 exit ' + rBad4100.status + '）');
+    assert(r4100.status === 0, 'v2410: （负向自证）E2 对照——__dirname 版同 cwd 下 exit 0');
+    try { fs4100.unlinkSync(brokenFile4100); } catch (e) {}
+
+    console.log('  ✓ v2410: 生成器 BASE/产物路径改由 __dirname 推导（原硬编码 /tmp/wa_git）');
+    console.log('  ✓ v2410: 产物与 FROZEN2800 逐字一致 + 全仓零 /tmp 死路径 + 两条负向自证');
+  }
   // ══════════ v2.40.0 ══════════
   // 第二十七面：骨架归属。三次同型缺陷（v2.36「meta.round 有读者零写者」→
   // v2.39「顶层 state.round 有读者、骨架无字段」→ v2.40 侦察到同型另一半：
