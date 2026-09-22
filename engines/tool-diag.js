@@ -26,6 +26,12 @@
     catch (e) { return { error: String((e && e.message) || e) }; }
     return fallback === undefined ? null : fallback;
   }
+  /** v2.39.0: 轮次读口——唯一真源 WA.evolution.roundOf（未加载时兜底 evolution.round）。 */
+  function roundOfSafe(state) {
+    try { if (WA.evolution && typeof WA.evolution.roundOf === 'function') return WA.evolution.roundOf(state); } catch (e) {}
+    try { const s = state || WA.store.get(); if (s && s.evolution && typeof s.evolution.round === 'number') return s.evolution.round; } catch (e) {}
+    return 0;
+  }
   function len(a) { return Array.isArray(a) ? a.length : 0; }
   function redact(v) {
     if (v == null) return v;
@@ -176,7 +182,7 @@
       const ev = st.evolution || {};
       return {
         schemaVersion: st.schemaVersion,
-        round: st.round,
+        round: roundOfSafe(st),   // v2.39.0: 顶层 state.round 幽灵 ⇒ 诊断包 round 缺失
         clock: (st.clock && st.clock.label) || null,
         counts: {
           events: len(ev.events), factions: len(ev.factions),

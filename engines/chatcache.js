@@ -48,6 +48,12 @@
     } catch (e) {}
     return {};
   }
+  /** v2.39.0: 轮次读口——唯一真源 WA.evolution.roundOf（未加载时兜底 evolution.round）。 */
+  function roundOfSafe(state) {
+    try { if (WA.evolution && typeof WA.evolution.roundOf === 'function') return WA.evolution.roundOf(state); } catch (e) {}
+    try { const s = state || WA.store.get(); if (s && s.evolution && typeof s.evolution.round === 'number') return s.evolution.round; } catch (e) {}
+    return 0;
+  }
   function syncEnabled() { return settings().syncToChat === true; }
   function autoBackupEnabled() { return settings().autoBackup === true; }
 
@@ -279,7 +285,10 @@
     // 自动备份：轮次推进时滚动备份
     if (autoBackupEnabled()) {
       try {
-        const round = (JSON.parse(getState(id) || '{}').meta || {}).round || 0;
+        // v2.39.0: 此处读 meta.round（全库零写入方）⇒ round 恒 0 ⇒ `round > _lastAutoRound` 恒假，
+        //   「轮次推进时滚动自动备份」开关形同虚设（永远不会产生任何自动快照）。
+        //   v2.36.0 收口时漏网：当时的静态锁正则只认字面 `meta.round`，这种 `).meta || {}).round` 嵌套写法不命中。
+        const round = roundOfSafe(JSON.parse(getState(id) || '{}'));
         if (_lastAutoRound === null) _lastAutoRound = round;
         else if (round > _lastAutoRound) {
           _lastAutoRound = round;

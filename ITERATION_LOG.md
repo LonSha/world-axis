@@ -280,3 +280,37 @@
 - **为什么**：引擎能力在、面板零入口。世界书触发开关之前因 def 缺键恒为 false；`advanceDay` 之前 test-only；账本在 evict.SITES 但骨架缺字段。
 - **影响范围**：`engines/worldbook.js` / `engines/parallel-world.js` / `engines/backstage.js` / `core/store.js` / `core/evict.js` / `ui/panel.js` / `engines/tool-diag.js` / `index.js` / `manifest.json` / `tests/run.js` / `tests/dead-export-ledger.json` / README / ITERATION_LOG。不新增页面、不新增产品文件。
 - **验证**：全量回归 4419/0；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106 / 仅测试 130）；ui-wire-audit 8/0。出口面 66 ns / 706 members / refs 1362。版本三源 2.35.0。
+
+### R22 · 2026-09-22 · v2.39.0 交付（幽灵轮次收口·第二十六面：顶层 round 读点 + v2.36.0 漏网修正）
+
+- **做了什么**：延续「静默失效」猎取线（第二十六面），沿 v2.36.0 的轮次真源线索再挖一层，把当时**没收干净的另一半**收口。
+- **缺陷链（实测坐实）**：全库 5 处读「顶层 `state.round`」——该字段在 `core/store.js` 的 `defaultWorldState()` 骨架里**根本不存在**，
+  真源只有 `evolution.round`（`tick()` 内唯一 `++`）。三处受害：
+  1) **`engines/proactive.js`（最严重）**：`cooldownOk` 读 `st.round`（恒 undefined ⇒ 0），`markPulled` 写 `d.round`（恒 0）
+     ⇒ `(0 - 0) >= COOLDOWN_ROUNDS(3)` **恒假** ⇒ 主动拉动拉过一次后**永久冷却**——整条「语义枯竭 → 强制拉动互动」链路退化为一次性功能。
+     复现（`/tmp/wa_scan/repro_proactive.js`）：`evolution.round` 从 5 推到 12、再到 40，`proactive.pull` 均**不再注入**，`stat.skippedCooldown` 一路 +
+     （修复后：`proactiveLastRound` 写 5、推进到 20 时正常拉动、诊断 round=40）。
+  2) **`engines/chatcache.js`**：自动备份读 `(JSON.parse(getState(id)||'{}').meta||{}).round` —— `meta.round` 全库零写入方 ⇒ 恒 0
+     ⇒ `round > _lastAutoRound` 恒假 ⇒ 「轮次推进时滚动自动备份」开关**永不产出任何自动快照**（用户以为有兜底，实际没有）。
+  3) **`engines/inject-inspector.js` / `engines/tool-diag.js`**：注入自检快照与诊断包的世界轮次恒 `null` / `undefined`，排障时看不到轮次。
+- **漏网原因**：v2.36.0 的静态锁 `(face.match(/meta *[.] *round/g))` **只认字面 `meta.round`**，
+  `).meta || {}).round` 这种嵌套写法不命中 —— 静态锁的形态盲区本身就是缺陷的一部分。
+- **修法**：给四个模块各加本地 `roundOfSafe(state)`（优先 `WA.evolution.roundOf`，兜底直读 `evolution.round`，不硬依赖加载顺序），
+  五处读点全部改向；写入口 `markPulled` 同样写真源（写进去的是别人要读的东西，必须同源）。
+- **判据（新增 v2.39.0 回归段，+26 断言）**：
+  · A 写入口写 `evolution.round` 真值（旧实现恒 0）；
+  · B 冷却真生效——未推进（6-5=1 < 3）不放行 / 推进到期（20-5=15 ≥ 3）真拉动 / 拉动后计数同步真源；
+  · C 诊断包 `worldState.round` 取真源（旧实现 `undefined`）；
+  · D 注入自检 `snapEnv().round` 取真源（旧实现 `null`）；
+  · E **静态口径**——全库顶层 `.round` 幽灵读点清零，只余三处**本地构造对象**的合法读（`inject-inspector` 的 `env`、`tool-diag` 的 `snap`、`parallel-world` 的 `pwState().st`，三者自带 `round` 字段）；
+  · F/G/H **负向自证**——真源码破坏 → 副本上重跑同款判据（proactive 退回旧写法报 4 处、chatcache 退回嵌套写法报 1 处）；
+  · G 另含 chatcache 行为门禁（开 `autoBackup` 驱 `runTick`，断言真产出自动快照且名字含真源轮次）。
+- **为什么**：一个字段在读者侧被引用了 5 次、在骨架里却从未存在 —— 不抛不报、门禁全绿、UI 正常，但机制实际白写。
+  这类「幽灵字段」与 v2.36.0「有读者零写者」同源，属同一根藤上的第二个瓜。
+- **同轮自纠（3 次，全部由自己新写的门禁抓红）**：① 首版 `ghostScan` 标识符集过宽，把诊断快照对象 `snap`/`env` 误报为幽灵（改为白名单三处合法残留）；
+  ② 负向自证期望值算错（4 误写 6 —— 该断言只扫 `proactive.js` 一份文件面，`st.round`/`d.round` 各出现两次）；
+  ③ 自动备份判据用「份数增长」，被 `MAX_AUTO_BACKUPS=3` 环形裁剪掩盖（改为「存在性 + 名含真源轮次」）。
+- **影响范围**：`engines/proactive.js` / `engines/inject-inspector.js` / `engines/tool-diag.js` / `engines/chatcache.js`（四处各加 `roundOfSafe` + 五处读点改向）/
+  `tests/run.js`（v2.39.0 段 +26 断言 + 8 处版本锚点 + 4 处清册面锚点）/ `tests/dead-export-ledger.json`（version）/ `index.js` / `manifest.json` / `README.md` / `ITERATION_LOG.md`。
+- **门禁与验证**：全量回归 **4477 / 失败 0**（v2.38.0 基线 4458，+19 净增）；dead-export-gate 绿（dead 208 / uiDead 4 / dataOnly 106，**无需 `--update`**）；
+  export-contract 不变（60 ns / 360 members / 4546 chars，本轮不新增导出）；清册面 refs 1374→1386（+12 = 四处 `roundOfSafe` 各 3 个真代码引用，逐文件归因一致）；版本三源同源 2.39.0。

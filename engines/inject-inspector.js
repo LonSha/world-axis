@@ -68,6 +68,12 @@
     _registered = { len: len | 0, at: safe(function () { return clockNow('injectInspector'); }, 0) };
   }
 
+  /** v2.39.0: 轮次读口——唯一真源 WA.evolution.roundOf（未加载时兜底 evolution.round）。 */
+  function roundOfSafe(state) {
+    try { if (WA.evolution && typeof WA.evolution.roundOf === 'function') return WA.evolution.roundOf(state); } catch (e) {}
+    try { const s = state || WA.store.get(); if (s && s.evolution && typeof s.evolution.round === 'number') return s.evolution.round; } catch (e) {}
+    return 0;
+  }
   function snapEnv(ctx, meta) {
     const vis = safe(function () { return WA.render && WA.render.getVisibility(); }, null) || {};
     const anyOn = Object.keys(vis).some(function (k) { return vis[k] === true; });
@@ -75,7 +81,7 @@
     const snap = safe(function () { return WA.render && WA.render.buildWorldSnapshot && WA.render.buildWorldSnapshot(); }, '') || '';
     return {
       injectEnabled: anyOn,
-      round: st && st.round != null ? st.round : null,
+      round: roundOfSafe(st),   // v2.39.0: 顶层 state.round 幽灵 ⇒ 快照轮次恒 null
       hasState: !!st,
       snapshotChars: snap.length,
       registeredAtSend: !!_registered,

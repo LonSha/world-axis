@@ -49,11 +49,17 @@
     return false;
   }
 
+  /** v2.39.0: 轮次读口——唯一真源 WA.evolution.roundOf（未加载时兜底 evolution.round）。 */
+  function roundOfSafe(state) {
+    try { if (WA.evolution && typeof WA.evolution.roundOf === 'function') return WA.evolution.roundOf(state); } catch (e) {}
+    try { const s = state || WA.store.get(); if (s && s.evolution && typeof s.evolution.round === 'number') return s.evolution.round; } catch (e) {}
+    return 0;
+  }
   /** 冷却检查：距上次拉动不足 COOLDOWN_ROUNDS 轮则跳过 */
   function cooldownOk(state) {
     const st = state || {};
     const last = st.proactiveLastRound;
-    const round = st.round != null ? st.round : 0;
+    const round = roundOfSafe(state);   // v2.39.0: 顶层 state.round 幽灵（骨架无此字段）⇒ 该判据恒真，拉一次后永久冷却
     return last == null || (round - last) >= COOLDOWN_ROUNDS;
   }
 
@@ -77,7 +83,7 @@
     markPulled() {
       try {
         WA.store.transact(d => {
-          d.proactiveLastRound = d.round != null ? d.round : 0;
+          d.proactiveLastRound = roundOfSafe(d);   // v2.39.0: 同上（写进去的也是幽灵 0）
         });
       } catch (e) { /* 非致命 */ }
     }
