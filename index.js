@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.62.0';
+  const VERSION = '2.63.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -289,6 +289,16 @@
     // v2.62.0：因果结算。须早于 render/inject.js，注入时读取 causal.buildBlock()；
     //   且须**晚于** intel.js —— knownCause 单一真源指向 intel.knownCause。
     'engines/causal.js',
+    // v2.63.0：世界织体（社会生活 / 共同日程 / 地点与路途）。
+    //   须早于 render/inject.js，注入时读取 world.buildBlock()；
+    //   且须**晚于** life.js —— 在场者名单的唯一证据是「人物自己的日程安排」（life.schedule）。
+    'engines/world.js',
+    // v2.63.0：社交漩涡（关系经历与承诺深化）。
+    //   须早于 render/inject.js，注入时读取 shadow.buildBlock()。
+    'engines/shadow.js',
+    // v2.63.0：悬案（调查与情报玩法面）。
+    //   须早于 render/inject.js，注入时读取 threads.buildBlock()。
+    'engines/threads.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

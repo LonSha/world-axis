@@ -85,6 +85,15 @@
     // ── v2.62.0 因果结算（causal.js）──
     'causal.chains':  { path: 'causal.chains',  cap: 24, why: '因果链环形（含终态：已结算/已取消/已失效都留痕，答「为什么没发生」）' },
     'causal.settled': { path: 'causal.settled', cap: 40, why: '因果结算台账环形（结算过什么，与 echoes 正文触面分开）' },
+    // ── v2.63.0 世界织体（world.js）──
+    'world.places': { path: 'world.places', cap: 24, why: '已登记地点环形（没登记的地方不存在，故这张表就是世界的全部可达面）' },
+    'world.roads':  { path: 'world.roads',  cap: 40, why: '已登记道路环形（没登记的路走不通，故这张表决定谁能到哪）' },
+    'world.events': { path: 'world.events', cap: 12, why: '共同日程环形（集市/节庆/庭审/仪式/聚会）' },
+    // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
+    'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
+    'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },
+    'threads.cases':      { path: 'threads',            cap: 6,  why: '悬案环形（结案可回收，但「悬置」不算结案）' },
+    'threads.leads':      { path: 'threads.*.leads',    cap: 8,  why: '每案线索环（每案各自有界，故按案剪枝）' },
     // 对象型：每人认知边界（键 = 「谁知道什么」），按 at 最旧优先挤出
     'people.knowledge':   { path: 'people.*.knowledge', cap: 30, kind: 'object', why: '人物认知边界（每键一桩知情）' },
     // ── v2.13.0 补漏（本轮广谱侦察发现的真缺陷）──

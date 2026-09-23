@@ -120,6 +120,23 @@
       //            删了就答不出「为什么后来没发生」）
       //   settled：已结算后果的流水（与 echoes 分开：echoes 是正文触面，这里是结算台账）
       causal: { chains: [], settled: [] },
+      // v2.63.0 世界织体（world.js：社会生活 / 共同日程 / 地点与路途）
+      //   places：已登记的地点（没登记的地方**不存在**，不是「大概很近」）
+      //   roads ：已登记的道路（无向，带耗时分钟；没登记的路**走不通**）
+      //   events：共同日程（集市/节庆/庭审/仪式/聚会），带 status planned→ongoing→done
+      //   为什么三张表都要有界：它们都是「会被 AI 源源不断写进来」的容器，
+      //   无界 = 存档体积被单机长跑拖垮；而**在场者名单不落盘**（由日程+地点现算，
+      //   落盘就成了一份会过期的第二真源——「谁在场」必须永远能从证据重新推出来）。
+      world: { places: [], roads: [], events: [] },
+      // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
+      //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
+      //   experiences：关系经历流水（open/kept/broken 分开归因）
+      //   为什么与 registry 的 relations 分开：量值可逆、经历不可逆。并表会让
+      //   「你替他顶过一次罪」被几次数值变动抹平——那是这个世界最不该丢的东西。
+      shadow: { rows: [], experiences: [] },
+      // v2.63.0 悬案（threads.js：调查与情报玩法面）。数组根，每案自带 leads 环。
+      //   为什么与 intel 分开：intel 是「某人以为」（可以错），本模块是「查到了哪」（必须有据）。
+      threads: [],
       // 元信息
       meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null }
     };
@@ -767,6 +784,21 @@
     //   settled 与 echoes 分开：echoes 是正文触面（世界里的响动），settled 是结算台账。
     'causal.chains': { cap: 24, site: 'causal.js WA.evict.array(causal.chains)' },
     'causal.settled': { cap: 40, site: 'causal.js WA.evict.array(causal.settled)' },
+    // v2.63.0 世界织体三容器（world.js 走 WA.evict.array 单一出口，cap 与 evict.SITES 同源）。
+    //   注意「在场者名单」**不在此表**：它由日程 + 地点现算，不落盘，
+    //   落盘就会变成一份会过期的第二真源——「谁在场」必须永远能从证据重新推出来。
+    'world.places': { cap: 24, site: 'world.js WA.evict.array(world.places)' },
+    'world.roads': { cap: 40, site: 'world.js WA.evict.array(world.roads)' },
+    'world.events': { cap: 12, site: 'world.js WA.evict.array(world.events)' },
+    // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
+    'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
+    'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },
+    // 悬案是**数组根**（每案自带 leads 环），故登记键就是 'threads' 本身，
+    //   与 evict.SITES 的 path:'threads' 逐字同名——G18 会拿站点 path 反查登记键，
+    //   写成 'threads.cases' 会两边对不上（站点 path 不含通配段时只能全等）。
+    'threads': { cap: 6, site: 'threads.js WA.evict.array(threads)' },
+    // 通配登记：每案的线索环（精确键无法枚举；'*' 段吃 1 段）
+    'threads.*.leads': { cap: 8, wildcard: true, site: 'threads.js WA.evict.array(thread.leads)' },
     // v1.4.0 补登：entityMemory 四类实体库（entities.js CAP_PER_TYPE=30 双处裁剪）——此前漏登致 sizeAudit 误报 unbounded、maintain 盲区
     'evolution.entityMemory.organization': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
     'evolution.entityMemory.object': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },

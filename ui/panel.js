@@ -25,7 +25,9 @@
     //   —— 面板会裸露英文键名（life/intel/org/longline）。补名与补源表是同一件事的两面。
     life: '人物生活', intel: '因果与情报', org: '资源与组织', longline: '长线伏笔',
     // v2.62.0: 因果结算。与 SOURCES 同批登记（只加源表不加显示名 ⇒ 面板裸露英文键名）。
-    causal: '因果结算' };
+    causal: '因果结算',
+    // v2.63.0: 世界织体 / 社交漩涡 / 悬案。同上——只加源表不加显示名会让面板裸露英文键名。
+    world: '世界织体', shadow: '社交漩涡', threads: '悬案' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
@@ -370,6 +372,26 @@
       <div class="wa-row"><input id="wa-id-name" class="wa-input" placeholder="人物姓名"/><button class="wa-btn" id="wa-id-lookup">查身份</button><button class="wa-btn" id="wa-id-bindall" title="为当前聊天里已经注册、但还没有持久编号的人物补上编号（不改动任何状态）">补全已注册</button><button class="wa-btn" id="wa-id-clear" title="只解除身份绑定，不删除该人物的任何状态">解除绑定</button></div>
       <div id="wa-id-out" class="wa-out"></div>
       <div class="wa-list">${idRows}</div>
+      <div class="wa-sec">世界织体（地点、道路、共同日程）</div>
+      <label class="wa-row"><input id="wa-world-enabled" type="checkbox" ${WA.world && WA.world.getSettings().enabled ? 'checked' : ''}/> 启用世界织体</label>
+      <div class="wa-row"><input id="wa-world-place" class="wa-input" placeholder="地点名"/><button class="wa-btn" id="wa-world-addplace" title="登记一个地点：没登记的地方不可达（不猜「大概很近」）">登记地点</button><button class="wa-btn" id="wa-world-reach">查可到</button></div>
+      <div class="wa-row"><input id="wa-world-rd-a" class="wa-input" placeholder="从"/><input id="wa-world-rd-b" class="wa-input" placeholder="到"/><input id="wa-world-rd-min" class="wa-input" placeholder="分钟"/><button class="wa-btn" id="wa-world-addroad" title="登记一条道路：没登记的路走不通">登记道路</button></div>
+      <div class="wa-row"><input id="wa-world-ev-title" class="wa-input" placeholder="共同日程名"/><input id="wa-world-ev-place" class="wa-input" placeholder="地点"/><button class="wa-btn" id="wa-world-addevent">登记日程</button><button class="wa-btn" id="wa-world-tick">推进日程</button><button class="wa-btn" id="wa-world-who" title="到场者只认日程证据——没依据的人不会出现在名单里">查到会人</button></div>
+      <div class="wa-row"><input id="wa-world-mv-who" class="wa-input" placeholder="人物"/><input id="wa-world-mv-from" class="wa-input" placeholder="从"/><input id="wa-world-mv-to" class="wa-input" placeholder="到"/><button class="wa-btn" id="wa-world-move" title="先问路通不通，再问此人这一刻在不在别处">移动</button><button class="wa-btn" id="wa-world-canbe">能否在场</button></div>
+      <div id="wa-world-out" class="wa-out"></div>
+      <div class="wa-sec">社交漩涡（共同隐瞒、关系经历）</div>
+      <label class="wa-row"><input id="wa-shadow-enabled" type="checkbox" ${WA.shadow && WA.shadow.getSettings().enabled ? 'checked' : ''}/> 启用社交漩涡</label>
+      <div class="wa-row"><input id="wa-shadow-a" class="wa-input" placeholder="甲"/><input id="wa-shadow-b" class="wa-input" placeholder="乙"/><input id="wa-shadow-secret" class="wa-input" placeholder="共同隐瞒的事"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-shadow-add" title="共同隐瞒必须双方各持一行——单方面持有的不是共同秘密">记隐瞒</button><button class="wa-btn" id="wa-shadow-deepen" title="只在已有秘密且仍在生效时才允许加深">加深</button><button class="wa-btn" id="wa-shadow-brighten" title="只降胁迫感，不删「秘密存在过」这一事实">变淡</button><button class="wa-btn" id="wa-shadow-lookup">查此对</button><button class="wa-btn" id="wa-shadow-visible" title="此人「持有」的秘密（而不是「关于此人」的秘密）——两件事极易混">查持有</button></div>
+      <div class="wa-row"><input id="wa-shadow-what" class="wa-input" placeholder="关系经历（发生过什么）"/><button class="wa-btn" id="wa-shadow-exp-kept" title="履行：守了。与背弃分开留痕">记履行</button><button class="wa-btn" id="wa-shadow-exp-broken" title="背弃：赖了。不得写成「关系结束」而隐去他赖了">记背弃</button></div>
+      <div id="wa-shadow-out" class="wa-out"></div>
+      <div class="wa-sec">悬案（线索、矛盾、结案依据）</div>
+      <label class="wa-row"><input id="wa-threads-enabled" type="checkbox" ${WA.threads && WA.threads.getSettings().enabled ? 'checked' : ''}/> 启用悬案</label>
+      <div class="wa-row"><input id="wa-threads-q" class="wa-input" placeholder="待查的问题"/><button class="wa-btn" id="wa-threads-open">立案</button></div>
+      <div class="wa-row"><input id="wa-threads-id" class="wa-input" placeholder="案 id"/><input id="wa-threads-claim" class="wa-input" placeholder="线索主张"/><input id="wa-threads-src" class="wa-input" placeholder="来源"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-threads-lead" title="没来源的线索不是线索：可靠性由来源类型决定，不由「我觉得可信」决定">加线索</button><button class="wa-btn" id="wa-threads-refute" title="反证：与支撑线索打脸的必须各自保留，不得取平均">加反证</button><button class="wa-btn" id="wa-threads-converge">汇聚</button><button class="wa-btn" id="wa-threads-stall" title="查不下去但仍在查——记录不删，这不是结案">悬置</button></div>
+      <div class="wa-row"><input id="wa-threads-answer" class="wa-input" placeholder="结案结论（须有依据）"/><button class="wa-btn" id="wa-threads-resolve" title="结案必须有依据：无线索支撑、或矛盾未解时一律拒收">结案</button><button class="wa-btn" id="wa-threads-abandon" title="主动放下并写明理由——与「悬置」是两种事实">放弃</button><button class="wa-btn" id="wa-threads-why">查依据</button></div>
+      <div id="wa-threads-out" class="wa-out"></div>
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
@@ -1656,6 +1678,220 @@
       const r = WA.registry.idClear(idVal());
       idOut(r.ok ? { id: r.name + ':' + r.id + ':unbound' } : { reason: r.reason }, true);
       renderBody();
+    });
+    // v2.63.0：世界织体 / 社交漩涡 / 悬案三面的面板绑定。
+    //   三面各自的关键**拒绝理由**都必须看得见——它们在世界状态里都长得像「什么都没发生」：
+    //     · world   —— unknown-place（地点没登记，不猜）/ unreachable（路没登记，不抄近路）
+    //                  / scheduled-elsewhere（此时人在别处，不重叠）；
+    //     · shadow  —— no-shadow / shadow-closed（没有可加深的秘密，不凭空升级）；
+    //     · threads —— no-basis（不得凭空结案）/ conflicts-unresolved（矛盾不得被平均）。
+    const wv = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    // v2.63.0: 面板出口用到的两个只读小工具。
+    //   两者都只**读**当前状态、取不到就返回空，由引擎按「缺字段/缺依据」如实归因——
+    //   面板不得为了让按钮「看起来能按」而替用户补一个默认值。
+    const lastEventId = function () {
+      try {
+        const d = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+        const ev = (d.world && Array.isArray(d.world.events)) ? d.world.events : [];
+        const tail = ev[ev.length - 1];
+        return (tail && tail.id) ? tail.id : '';
+      } catch (e) { return ''; }
+    };
+    const basisOf = function (threadId) {
+      try {
+        const d = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+        const arr = Array.isArray(d.threads) ? d.threads : [];
+        const id = String(threadId == null ? '' : threadId).trim();
+        const t = arr.filter(function (x) { return x && x.id === id; })[0];
+        const leads = (t && Array.isArray(t.leads)) ? t.leads : [];
+        return leads.map(function (l) { return l && l.id; }).filter(Boolean);
+      } catch (e) { return []; }
+    };
+    const plainOut = function (outId, dataKey, r) {
+      const bits = [];
+      if (r && r.ok) {
+        if (r.id) bits.push(r.id);
+        if (r.status) bits.push(r.status);
+        if (r.pair) bits.push(r.pair);
+        if (r.minutes != null) bits.push(r.minutes + '分钟');
+        if (r.hops != null) bits.push(r.hops + '跳');
+        if (r.who) bits.push('到场 ' + (r.who.length ? r.who.join('、') : '无'));
+        if (r.reachable === false) bits.push('走不通');
+        if (r.conflicted === true) bits.push('有矛盾未解');
+        if (r.conflicts && r.conflicts.length) bits.push('矛盾 ' + r.conflicts.length);
+        if (r.basis) bits.push('依据 ' + r.basis + ' 条');
+      }
+      const text = (r && r.ok) ? ('已记录 ' + (bits.join(':') || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
+      if (dataKey) panelEl.dataset[dataKey] = text;
+      const o = $('#' + outId); if (o) o.textContent = text;
+    };
+    const worldOut = function (r) { return plainOut('wa-world-out', 'worldOut', r); };
+    const shadowOut = function (r) { return plainOut('wa-shadow-out', 'shadowOut', r); };
+    const threadsOut = function (r) { return plainOut('wa-threads-out', 'threadsOut', r); };
+    if (panelEl.dataset.worldOut) { const o = $('#wa-world-out'); if (o) o.textContent = panelEl.dataset.worldOut; }
+    if (panelEl.dataset.shadowOut) { const o = $('#wa-shadow-out'); if (o) o.textContent = panelEl.dataset.shadowOut; }
+    if (panelEl.dataset.threadsOut) { const o = $('#wa-threads-out'); if (o) o.textContent = panelEl.dataset.threadsOut; }
+    { const el = $('#wa-world-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+        WA.world.setSettings({ enabled: !!el.checked });
+        worldOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-world-addplace', () => {
+      if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+      const r = WA.world.addPlace({ name: wv('#wa-world-place') });
+      worldOut(Object.assign({}, r, { id: r.ok ? (r.name + (r.existed ? ':已有' : ':新登记')) : r.reason }));
+      renderBody();
+    });
+    on('#wa-world-addroad', () => {
+      if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+      const r = WA.world.addRoad(wv('#wa-world-rd-a'), wv('#wa-world-rd-b'), Number(wv('#wa-world-rd-min')));
+      worldOut(Object.assign({}, r, { id: r.ok ? (r.minutes + '分钟') : r.reason }));
+      renderBody();
+    });
+    on('#wa-world-reach', () => {
+      if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+      // 没有登记的路 ⇒ 走不过去。这里如实报「不达」，**不**按直线距离兜底。
+      const r = WA.world.reach(wv('#wa-world-rd-a'), wv('#wa-world-rd-b'));
+      worldOut(r.ok ? Object.assign({}, r, { id: r.reachable ? (r.path.join('→') + ':' + r.minutes + '分钟') : '不达（未登记道路）' }) : r);
+    });
+    on('#wa-world-addevent', () => {
+      if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+      const now = clockNow('ui.world');
+      const r = WA.world.addEvent({ title: wv('#wa-world-ev-title'), place: wv('#wa-world-ev-place'), start: now, end: now + 3600000 });
+      worldOut(Object.assign({}, r, { id: r.ok ? (r.kind + ':' + r.id) : r.reason }));
+      renderBody();
+    });
+    on('#wa-world-tick', () => {
+      if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+      const r = WA.world.tick({ now: clockNow('ui.world') });
+      worldOut({ ok: !!r.ok, id: '变更 ' + (r.changed || 0) + ':' + r.reason });
+      renderBody();
+    });
+    on('#wa-world-who', () => {
+      if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+      // 到场者只认日程证据——没有依据的人**一个都不会**出现在名单里。
+      const evId = wv('#wa-world-ev-title') || lastEventId();
+      const r = WA.world.attendees(evId);
+      if (!r.ok) return worldOut(r);
+      // 「同期还有几场」——同一时段彼此争人的其它日程也要摆出来：
+      //   只报「这场谁到了」，用户会以为这些人整个下午都闲着。
+      const ev = ((WA.store.get().world || {}).events || []).filter(function (x) { return x && x.id === evId; })[0] || null;
+      const same = ev ? WA.world.eventsBetween(ev.start, ev.end).filter(function (x) { return x && x.id !== evId; }).length : 0;
+      worldOut(Object.assign({}, r, { id: '到场者（' + r.evidence + '）同期还有 ' + same + ' 场' }));
+    });
+    on('#wa-world-move', () => {
+      if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+      const r = WA.world.move(wv('#wa-world-mv-who'), wv('#wa-world-mv-from'), wv('#wa-world-mv-to'), clockNow('ui.world'));
+      worldOut(r.ok ? Object.assign({}, r, { id: r.path.join('→') }) : r);
+    });
+    on('#wa-world-canbe', () => {
+      if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
+      const r = WA.world.canBeAt(wv('#wa-world-mv-who'), wv('#wa-world-mv-to'), clockNow('ui.world'));
+      worldOut(r.ok ? Object.assign({}, r, { id: '在场许可' }) : r);
+    });
+    { const el = $('#wa-shadow-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.shadow) return shadowOut({ ok: false, reason: 'module-missing' });
+        WA.shadow.setSettings({ enabled: !!el.checked });
+        shadowOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-shadow-add', () => {
+      if (!WA.shadow) return shadowOut({ ok: false, reason: 'module-missing' });
+      const r = WA.shadow.addShadow(wv('#wa-shadow-a'), wv('#wa-shadow-b'), { secret: wv('#wa-shadow-secret') });
+      shadowOut(Object.assign({}, r, { id: r.ok ? (r.pair + (r.existed ? ':已有' : (r.reopened ? ':重开' : ':新记'))) : r.reason }));
+      renderBody();
+    });
+    on('#wa-shadow-deepen', () => {
+      if (!WA.shadow) return shadowOut({ ok: false, reason: 'module-missing' });
+      // 没有可加深的秘密时**明确归因**——不得把「刚认识」直接写成「生死之交」。
+      const r = WA.shadow.deepen(wv('#wa-shadow-a'), wv('#wa-shadow-b'), 1);
+      shadowOut(r.ok ? Object.assign({}, r, { id: r.before + '→' + r.after }) : r);
+    });
+    on('#wa-shadow-brighten', () => {
+      if (!WA.shadow) return shadowOut({ ok: false, reason: 'module-missing' });
+      const r = WA.shadow.brighten(wv('#wa-shadow-a'), wv('#wa-shadow-b'), 1);
+      shadowOut(r.ok ? Object.assign({}, r, { id: r.before + '→' + r.after + ':' + r.status }) : r);
+      renderBody();
+    });
+    on('#wa-shadow-lookup', () => {
+      if (!WA.shadow) return shadowOut({ ok: false, reason: 'module-missing' });
+      const r = WA.shadow.getShadow(wv('#wa-shadow-a'), wv('#wa-shadow-b'));
+      shadowOut(r.ok ? Object.assign({}, r, { id: (r.exists ? (r.status + ':胁迫' + r.severity) : '无共同隐瞒') + ':经历' + r.exp.length }) : r);
+    });
+    on('#wa-shadow-visible', () => {
+      if (!WA.shadow) return shadowOut({ ok: false, reason: 'module-missing' });
+      // 此人**持有**的秘密（而不是「关于此人的秘密」）——这两件事在其它任何查询里都会混。
+      //   同时列出与该人相关的经历条数：秘密是两人共有的，经历也是。
+      const who = wv('#wa-shadow-a');
+      const held = WA.shadow.visibleTo(who);
+      const exp = WA.shadow.experiencesOf(who, wv('#wa-shadow-b'));
+      shadowOut({ ok: true, id: '持有 ' + held.length + ' 桩（' + held.map(function (x) { return x.other; }).join('、') + '）:经历 ' + exp.length });
+    });
+    on('#wa-shadow-exp-kept', () => {
+      if (!WA.shadow) return shadowOut({ ok: false, reason: 'module-missing' });
+      shadowOut(WA.shadow.addExperience(wv('#wa-shadow-a'), wv('#wa-shadow-b'), { what: wv('#wa-shadow-what'), outcome: 'kept' }));
+      renderBody();
+    });
+    on('#wa-shadow-exp-broken', () => {
+      if (!WA.shadow) return shadowOut({ ok: false, reason: 'module-missing' });
+      shadowOut(WA.shadow.addExperience(wv('#wa-shadow-a'), wv('#wa-shadow-b'), { what: wv('#wa-shadow-what'), outcome: 'broken' }));
+      renderBody();
+    });
+    { const el = $('#wa-threads-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+        WA.threads.setSettings({ enabled: !!el.checked });
+        threadsOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-threads-open', () => {
+      if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+      threadsOut(WA.threads.open({ question: wv('#wa-threads-q') }));
+      renderBody();
+    });
+    on('#wa-threads-lead', () => {
+      if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+      const r = WA.threads.addLead(wv('#wa-threads-id'), { claim: wv('#wa-threads-claim'), source: wv('#wa-threads-src'), reliability: 'trace' });
+      threadsOut(Object.assign({}, r, { id: r.ok ? ('权重 ' + r.weight + ':' + r.status) : r.reason }));
+      renderBody();
+    });
+    on('#wa-threads-refute', () => {
+      if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+      const r = WA.threads.addLead(wv('#wa-threads-id'), { claim: wv('#wa-threads-claim'), source: wv('#wa-threads-src'), reliability: 'trace', polarity: 'refutes' });
+      threadsOut(Object.assign({}, r, { id: r.ok ? ('反证 权重 ' + r.weight) : r.reason }));
+      renderBody();
+    });
+    on('#wa-threads-converge', () => {
+      if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+      // 矛盾原样列出，**不取平均**——平均掉等于真线索与假线索同归于尽。
+      const r = WA.threads.converge(wv('#wa-threads-id'));
+      threadsOut(r.ok ? Object.assign({}, r, { id: '支撑' + r.supports + ':反证' + r.refutes + (r.conflicted ? ':矛盾未解' : '') }) : r);
+    });
+    on('#wa-threads-stall', () => {
+      if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+      // 悬置**不是**结案：记录不删，案子仍在查。
+      threadsOut(WA.threads.stall(wv('#wa-threads-id'), '线索断了'));
+      renderBody();
+    });
+    on('#wa-threads-resolve', () => {
+      if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+      // 结案依据 = 本案**已存在的全部线索 id**（面板只列事实，不替引擎编依据）。
+      //   有矛盾未解时由 `resolve()` 自己拒收并归因 `conflicts-unresolved`——
+      //   面板不预先「净化」矛盾，否则用户看不到他为什么结不了案。
+      const basis = basisOf(wv('#wa-threads-id'));
+      const r = WA.threads.resolve(wv('#wa-threads-id'), { answer: wv('#wa-threads-answer'), basis: basis });
+      threadsOut(Object.assign({}, r, { id: r.ok ? ('依据 ' + r.basis + ' 条') : r.reason }));
+      renderBody();
+    });
+    on('#wa-threads-abandon', () => {
+      if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+      threadsOut(WA.threads.abandon(wv('#wa-threads-id'), wv('#wa-threads-answer') || '不再追查'));
+      renderBody();
+    });
+    on('#wa-threads-why', () => {
+      if (!WA.threads) return threadsOut({ ok: false, reason: 'module-missing' });
+      const r = WA.threads.explain(wv('#wa-threads-id'));
+      threadsOut(r.ok ? Object.assign({}, r, { id: r.answer + ':依据 ' + r.basis.length + ' 条' }) : r);
     });
     on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); if (btn) { btn.textContent = '生成中…'; btn.disabled = true; } try { await WA.directEvent.create({ prompt: p, turns: t }); } finally { renderBody(); } });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });

@@ -240,6 +240,77 @@
     });
   }
 
+  /**
+   * v2.63.0：世界织体采集节。
+   *   报出的重点不是「登记了几个地点」，而是**时空面拒了什么**（按原因分列）：
+   *     · unknown-place  —— 用了没登记的地点（世界不猜「大概很近」）；
+   *     · unreachable    —— 两地之间没有登记的道路（不按直线距离兜底）；
+   *     · scheduled-elsewhere / closed —— 人在别处、或地点此刻不开放。
+   *   这几类此前在状态里长得一模一样（都表现为「什么也没发生」），本节的全部意义
+   *   就是让它们**分得开**——「悄悄不存在的地点」是本仓库最贵的一类静默失败。
+   */
+  function secWorld() {
+    return safe(function () {
+      if (!WA.world || typeof WA.world.stat !== 'function') return { error: 'world 模块不可用' };
+      const st = WA.world.stat();
+      const cfg = WA.world.getSettings ? WA.world.getSettings() : {};
+      const ws = (WA.world.whereStat ? WA.world.whereStat() : {});
+      return { enabled: !!cfg.enabled, maxPlaces: cfg.maxPlaces, maxEvents: cfg.maxEvents,
+        places: ws.places || 0, roads: ws.roads || 0, events: ws.events || 0, upcoming: ws.upcoming || 0,
+        moves: st.moves || 0, checks: st.checks || 0, blocked: st.blocked || 0,
+        faults: st.faults || {}, faultKinds: Object.keys(st.faults || {}).sort(),
+        lastReason: st.lastReason || '', placeKinds: WA.world.PLACE_KINDS || [],
+        eventKinds: WA.world.EVENT_KINDS || [] };
+    });
+  }
+  /**
+   * v2.63.0：社交漩涡采集节。
+   *   重点报**履行与背弃各有多少**（kept / broken 分开），以及「想加深却没有秘密可加深」
+   *   被拒了几次（no-shadow / shadow-closed，按原因分列）。
+   *   合成一个「关系结束」就再也答不出「他到底守没守」——本节不让它被合掉。
+   */
+  function secShadow() {
+    return safe(function () {
+      if (!WA.shadow || typeof WA.shadow.stat !== 'function') return { error: 'shadow 模块不可用' };
+      const st = WA.shadow.stat();
+      const cfg = WA.shadow.getSettings ? WA.shadow.getSettings() : {};
+      const ss = (WA.shadow.shadowStat ? WA.shadow.shadowStat() : {});
+      return { enabled: !!cfg.enabled, maxRows: cfg.maxRows, maxExp: cfg.maxExp,
+        rows: ss.rows || 0, active: ss.active || 0, faded: ss.faded || 0,
+        experiences: ss.experiences || 0, kept: ss.kept || 0, broken: ss.broken || 0,
+        deepened: st.deepened || 0, brightened: st.brightened || 0, blocked: st.blocked || 0,
+        faults: st.faults || {}, faultKinds: Object.keys(st.faults || {}).sort(),
+        lastReason: st.lastReason || '',
+        kinds: WA.shadow.SHADOW_KINDS || [], stakes: WA.shadow.STAKES || [] };
+    });
+  }
+  /**
+   * v2.63.0：悬案采集节。
+   *   重点报**查到了哪一步**：open（在查）/ stalled（悬置，仍在查）/ resolved（结案）
+   *   / abandoned（放下并写明理由）四态分开；外加 overruled —— 矛盾未解却强行结案的案数。
+   *   「悬着」与「破了」在状态里曾经长得一样，而那是推理玩法唯一重要的区分。
+   */
+  function secThreads() {
+    return safe(function () {
+      if (!WA.threads || typeof WA.threads.stat !== 'function') return { error: 'threads 模块不可用' };
+      const st = WA.threads.stat();
+      const cfg = WA.threads.getSettings ? WA.threads.getSettings() : {};
+      const ts = (WA.threads.threadStat ? WA.threads.threadStat() : {});
+      const overruled = (function () {
+        try {
+          const arr = Array.isArray(WA.store.get().threads) ? WA.store.get().threads : [];
+          return arr.reduce(function (a, x) { return a + (x && x.overruled ? 1 : 0); }, 0);
+        } catch (e) { return 0; }
+      })();
+      return { enabled: !!cfg.enabled, maxThreads: cfg.maxThreads, maxLeads: cfg.maxLeads,
+        cases: ts.cases || 0, open: ts.open || 0, stalled: ts.stalled || 0,
+        resolved: ts.resolved || 0, abandoned: ts.abandoned || 0, leads: ts.leads || 0,
+        opened: st.opened || 0, blocked: st.blocked || 0, overruled: overruled,
+        faults: st.faults || {}, faultKinds: Object.keys(st.faults || {}).sort(),
+        lastReason: st.lastReason || '', reliability: WA.threads.RELIABILITY || [],
+        terminal: WA.threads.TERMINAL || [] };
+    });
+  }
   const MODULE_EXPORTS = {
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
@@ -271,6 +342,10 @@
     'engines/longline.js': 'longline',
     // v2.62.0：因果结算
     'engines/causal.js': 'causal',
+    // v2.63.0：世界织体 / 社交漩涡 / 悬案（与 index.js LOAD_ORDER 同批登记）
+    'engines/world.js': 'world',
+    'engines/shadow.js': 'shadow',
+    'engines/threads.js': 'threads',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -759,7 +834,26 @@
        // v2.62.0: 因果结算控件（渲染在人物页）+ 稳定人物 ID 控件。
        //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
        //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
-       'wa-causal-enabled', 'wa-causal-cause', 'wa-causal-condition', 'wa-causal-action', 'wa-causal-immediate', 'wa-causal-delayed', 'wa-causal-delayed-min', 'wa-causal-add', 'wa-causal-tick', 'wa-causal-due', 'wa-causal-classify', 'wa-causal-id', 'wa-causal-by', 'wa-causal-defer', 'wa-causal-cancel', 'wa-causal-settle', 'wa-causal-out', 'wa-id-name', 'wa-id-lookup', 'wa-id-bindall', 'wa-id-clear', 'wa-id-out'],
+       'wa-causal-enabled', 'wa-causal-cause', 'wa-causal-condition', 'wa-causal-action', 'wa-causal-immediate', 'wa-causal-delayed', 'wa-causal-delayed-min', 'wa-causal-add', 'wa-causal-tick', 'wa-causal-due', 'wa-causal-classify', 'wa-causal-id', 'wa-causal-by', 'wa-causal-defer', 'wa-causal-cancel', 'wa-causal-settle', 'wa-causal-out', 'wa-id-name', 'wa-id-lookup', 'wa-id-bindall', 'wa-id-clear', 'wa-id-out',
+      // v2.63.0: 世界织体 / 社交漩涡 / 悬案控件（同样渲染在人物页）。
+      //   三条理由与 v2.51.0 / v2.62.0 一致：新控件必须同时「渲染 + 绑定 + 守卫登记」，
+      //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+      //   三者一律**无条件渲染**（模块缺席时整段降级成提示、控件不在场 ⇒ 本组会报 missing）；
+      //   与 style/causal 同一取舍：world/shadow/threads 是产品文件，缺席本身就是断裂。
+      //   注：world 组的 `wa-world-ev-title` 既是日程标题输入、又是「查到会人」的取案入口
+      //   （空值时回落到最近一次日程），故一个控件同时挂在两个出口上——绑定不重复登记。
+      'wa-world-enabled', 'wa-world-place', 'wa-world-addplace', 'wa-world-reach',
+      'wa-world-rd-a', 'wa-world-rd-b', 'wa-world-rd-min', 'wa-world-addroad',
+      'wa-world-ev-title', 'wa-world-ev-place', 'wa-world-addevent', 'wa-world-tick', 'wa-world-who',
+      'wa-world-mv-who', 'wa-world-mv-from', 'wa-world-mv-to', 'wa-world-move', 'wa-world-canbe',
+      'wa-world-out',
+      'wa-shadow-enabled', 'wa-shadow-a', 'wa-shadow-b', 'wa-shadow-secret', 'wa-shadow-add',
+      'wa-shadow-deepen', 'wa-shadow-brighten', 'wa-shadow-lookup', 'wa-shadow-what',
+      'wa-shadow-exp-kept', 'wa-shadow-exp-broken', 'wa-shadow-visible', 'wa-shadow-out',
+      'wa-threads-enabled', 'wa-threads-q', 'wa-threads-open', 'wa-threads-id', 'wa-threads-claim',
+      'wa-threads-src', 'wa-threads-lead', 'wa-threads-refute', 'wa-threads-converge',
+      'wa-threads-stall', 'wa-threads-answer', 'wa-threads-resolve', 'wa-threads-abandon',
+      'wa-threads-why', 'wa-threads-out'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
@@ -1047,6 +1141,7 @@
   function collect() {
     const diag = {
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), causal: secCausal(),
+      world: secWorld(), shadow: secShadow(), threads: secThreads(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
