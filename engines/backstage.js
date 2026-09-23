@@ -413,7 +413,13 @@
         ' "people": [{"name":"...","location":"...","action":"...","intent":"...","body":"...","personalityAnchor":"现实性格长句","speakingStyle":"说话方式","behaviorBoundaries":"行为边界","innerVoice":"内心口吻"}],',
         // v2.51.0：只对**本轮首次出场**且尚无锁定骰面的角色给以下两节；已有锁定的人格严禁重发。
         ' "persona_update": [{"name":"...","slot":"A-L","d1":1-12,"d2":1-12,"d3":1-12,"d4":1-12,"d5":1-12,"note":"骰面解释，≤60字"}]（无新角色则留空数组；**已有锁定骰面的人格严禁重发**，重发一律被引擎拒收）,',
-        ' "relation_update": [{"name":"持有者","target":"对象","intimacy":0-100,"trust":0-100,"hostility":0-100,"vigilance":0-100,"boundary_status":"..."}]（只写本轮确实发生变化的关系；数值为**变化后**的新值，本引擎按单次±20硬边界截断，请勿为保证生效而反复加码）,',
+        // v2.59.0：补 attachment / relationship_aftereffect 两轴。二者此前**只在引擎侧存在**——
+        //   registry 的 REL_NUM_FIELDS/REL_STR_FIELDS 收它们、rules.relation「[字段分离]」明文
+        //   「亲密度≠信任度≠敌对度≠警戒度≠依恋」、「[修复]」明文「是否留下长期后遗症……」，
+        //   入账点 applyResult 也确实接收——但输出契约从没要求模型给它们。
+        //   后果：模型按契约必然不给 ⇒ 两轴**由构造即死**（恒 undefined），而引擎侧一切正常，
+        //   静态锁全绿。这是「声明面承认、契约面缺席」的同型病（对照 v2.37.0 实体清单只进不出）。
+        ' "relation_update": [{"name":"持有者","target":"对象","intimacy":0-100,"trust":0-100,"hostility":0-100,"vigilance":0-100,"attachment":0-100,"boundary_status":"...","relationship_aftereffect":"..."}]（只写本轮确实发生变化的关系；数值为**变化后**的新值，本引擎按单次±20硬边界截断，请勿为保证生效而反复加码。attachment 是独立于亲密度的「依恋」，boundary_status/relationship_aftereffect 描述关系边界状态与后遗症，均非必填）,',
         ' "currents": [{"title":"...","summary":"...","visibility":"hidden|trace|known|direct","publicity":"private|trace|public","public_trace":"...","stage":"...","causes":[],"participants":[]}],',
         ' "knowledge_updates": [{"person":"...","about":"...","status":"fact|suspected","route":"witnessed|told|investigated|message|public_channel|inferred"}],',
         ' "echoes": [{"refCurrent":"事件标题","result":"...","exposure":"subtle|obvious"}],',
