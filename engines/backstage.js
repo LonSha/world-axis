@@ -410,7 +410,17 @@
         ' "clock": "新的世界时间标签(可空字符串表示不变)",',
         ' "world_pulse": {"pressure": 0-3, "trend": "rising|falling|steady", "note": "一句话"},',
         ' "worldFacts": [{"key":"...","value":"...","scope":"world|region|personal"}],',
-        ' "people": [{"name":"...","location":"...","action":"...","intent":"...","body":"...","personalityAnchor":"现实性格长句","speakingStyle":"说话方式","behaviorBoundaries":"行为边界","innerVoice":"内心口吻"}],',
+                // v2.60.0：本节内字段对账补声明——引擎**真实读取**、契约却从未要求的字段，
+        //   模型按契约必然不给 ⇒ 该能力**由构造即死**（v2.59.0 的 relation_update 两轴是同型单例）。
+        //   本轮以行为探针（Proxy 追踪 applyResult 的真实读取）扫遍全部 26 节，抓出四处同型：
+        //   · people.aliases —— `pmem.holderSet` 用它把别名归到本体记忆；不声明 ⇒ **别名召回恒空**；
+        //   · chronicle.refs / foreshadows.links —— 不声明 ⇒ 模型永不主动给，
+        //     **溯源引用永远退回引擎兜底锚定**，生产方形同废弃；
+        //   · events_create.stage —— 引擎校验合法性并采用（非法才回落首阶段）；不声明 ⇒
+        //     **新事件永远从首阶段开始**，推演无法宣告「已推进到某阶段」。
+        //   avatar/resources 一并列出：引擎收得下、保留不丢（属可给字段；avatar 常由载体方写入）。
+        //   配套锁：tests/rel-contract-v2600.js（**节内字段**粒度双向对账 + 行为面 + 豁免自证）。
+        ' "people": [{"name":"...","aliases":[],"avatar":"...","resources":{},"location":"...","action":"...","intent":"...","body":"...","personalityAnchor":"现实性格长句","speakingStyle":"说话方式","behaviorBoundaries":"行为边界","innerVoice":"内心口吻"}],',
         // v2.51.0：只对**本轮首次出场**且尚无锁定骰面的角色给以下两节；已有锁定的人格严禁重发。
         ' "persona_update": [{"name":"...","slot":"A-L","d1":1-12,"d2":1-12,"d3":1-12,"d4":1-12,"d5":1-12,"note":"骰面解释，≤60字"}]（无新角色则留空数组；**已有锁定骰面的人格严禁重发**，重发一律被引擎拒收）,',
         // v2.59.0：补 attachment / relationship_aftereffect 两轴。二者此前**只在引擎侧存在**——
@@ -423,8 +433,8 @@
         ' "currents": [{"title":"...","summary":"...","visibility":"hidden|trace|known|direct","publicity":"private|trace|public","public_trace":"...","stage":"...","causes":[],"participants":[]}],',
         ' "knowledge_updates": [{"person":"...","about":"...","status":"fact|suspected","route":"witnessed|told|investigated|message|public_channel|inferred"}],',
         ' "echoes": [{"refCurrent":"事件标题","result":"...","exposure":"subtle|obvious"}],',
-        ' "chronicle": [{"kind":"event|fact|pulse","title":"...","summary":"..."}],',
-        ' "foreshadows": [{"id":"...","content":"...","status":"waiting|developing|triggered|recycled|dropped"}],',
+        ' "chronicle": [{"kind":"event|fact|pulse","title":"...","summary":"...","refs":[]}]（refs：可选的楼层引用数组，元素形如 m77；不给则引擎按本次结算楼层自动锚定）',
+        ' "foreshadows": [{"id":"...","content":"...","status":"waiting|developing|triggered|recycled|dropped","links":[]}]（links：可选的楼层引用数组，元素形如 m99；不给则引擎按当前楼层兜底捕获）',
         ' "factions": [{"name":"...","scope":"...","status":"鼎盛|稳固|倾轧|困顿|衰落|瓦解","relation":"血盟|盟友|友好|中立|冷淡|敌对|世仇","currentGoal":"...","core_person":"...","powerPillars":["..."]}],',
         ' "reputation": {"authority":"天怒人怨|声名狼藉|默默无闻|受人尊敬|万众敬仰","common":"...","shadow":"...","circuit":"...","lastChange":"..."},',
         ' "economy": {"climate":"繁荣|平稳|衰退|动荡","signals":[{"summary":"...","scope":"..."}]},',
@@ -437,7 +447,7 @@
          ' "distantEvent": {"type":"event|wind","title":"...","desc":"...","topic":"...","content":"...","level":1-5}或null,',
          ' "nearEvent": {"title":"...","desc":"...","urgent":true|false}或null,',
          ' "entities": {"organization":[{"name":"...","aliases":[],"desc":"..."}],"object":[],"ability":[],"location":[]}或省略,',
-        ' "events_create": [{"title":"事件名≤30字","type":"conflict|progress","level":1-4,"desc":"≤50字"}],',
+        ' "events_create": [{"title":"事件名≤30字","type":"conflict|progress","level":1-4,"desc":"≤50字","stage":"该类型合法阶段(可空,缺省为首阶段)"}],',
         ' "events_update": [{"title":"要更新的已有事件名（改名不换链）","name":"改名后的新名（可选）","stage":"该类型合法阶段","desc":"≤50字","stall":true|false,"stallReason":"停滞原因"}],',
         ' "next_turn_injection": {"required":[],"conditional":[],"suppress":[]}',
         '}',
