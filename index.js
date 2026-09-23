@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.68.0';
+  const VERSION = '2.69.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -317,6 +317,9 @@
     'engines/survival.js',
     'engines/warrant.js',
     'engines/beast-bond.js',
+    // v2.69.0: 外貌分级契约 / 原型阶梯。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/appearance.js',
+    'engines/ladder.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

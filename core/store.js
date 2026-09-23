@@ -146,6 +146,9 @@
       survival: { rows: [] },
       warrant: { rows: [] },
       beastBond: { rows: [] },
+      // v2.69.0 外貌分级契约 / 原型阶梯。登记了容量却不在骨架里，冷启动直写会炸事务。
+      appearance: { rows: [] },
+      ladder: { rows: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -827,6 +830,9 @@
     'survival.rows': { cap: 12, site: 'survival.js WA.evict.array(survival.rows)' },
     'warrant.rows': { cap: 16, site: 'warrant.js WA.evict.array(warrant.rows)' },
     'beastBond.rows': { cap: 10, site: 'beast-bond.js WA.evict.array(beastBond.rows)' },
+    // v2.69.0 外貌分级契约 / 原型阶梯。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
+    'appearance.rows': { cap: 24, site: 'appearance.js WA.evict.array(appearance.rows)' },
+    'ladder.rows': { cap: 16, site: 'ladder.js WA.evict.array(ladder.rows)' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

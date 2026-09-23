@@ -460,6 +460,9 @@
     'engines/survival.js': 'survival',
     'engines/warrant.js': 'warrant',
     'engines/beast-bond.js': 'beastBond',
+    // v2.69.0：外貌分级契约 / 原型阶梯（与 index.js LOAD_ORDER 同批登记）
+    'engines/appearance.js': 'appearance',
+    'engines/ladder.js': 'ladder',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.68.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.68.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.69.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.69.0",
   "dead": {
     "affect.channel": {
       "reason": "self-only",
@@ -57,6 +57,54 @@
       "refs": 0,
       "tref": 0,
       "own": 1
+    },
+    "appearance.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/appearance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "appearance.read": {
+      "reason": "self-only",
+      "detail": "engines/appearance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/appearance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "appearance.register": {
+      "reason": "self-only",
+      "detail": "engines/appearance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/appearance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "appearance.sceneAssert": {
+      "reason": "self-only",
+      "detail": "engines/appearance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/appearance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "appearance.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/appearance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "appearance.stat": {
+      "reason": "self-only",
+      "detail": "engines/appearance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/appearance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
     },
     "backstage.flushPersonaChannels": {
       "reason": "self-only",
@@ -1137,6 +1185,70 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "ladder.deescalate": {
+      "reason": "self-only",
+      "detail": "engines/ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ladder.define": {
+      "reason": "self-only",
+      "detail": "engines/ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ladder.drop": {
+      "reason": "self-only",
+      "detail": "engines/ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ladder.escalate": {
+      "reason": "self-only",
+      "detail": "engines/ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ladder.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "ladder.read": {
+      "reason": "self-only",
+      "detail": "engines/ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "ladder.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "ladder.stat": {
+      "reason": "self-only",
+      "detail": "engines/ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
     },
     "ledgerTimeline.note": {
       "reason": "self-only",
@@ -2502,6 +2614,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 138
+    "dataOnly": 146
   }
 }

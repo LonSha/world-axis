@@ -110,6 +110,9 @@
     'survival.rows': { path: 'survival.rows', cap: 12, why: '生存三轴环形（饱食/精力/负重分段，归零惩罚如实报出）' },
     'warrant.rows': { path: 'warrant.rows', cap: 16, why: '通缉环形（罪度三档，不随死亡消除，惯犯升级）' },
     'beastBond.rows': { path: 'beastBond.rows', cap: 10, why: '驯兽环形（驯服满百清零转化，红线状态机）' },
+    // ── v2.69.0 外貌分级契约 / 原型阶梯（appearance.js / ladder.js）──
+    'appearance.rows': { path: 'appearance.rows', cap: 24, why: '外貌契约环形（分级/覆盖/异化档位/场景排他，每人一行）' },
+    'ladder.rows': { path: 'ladder.rows', cap: 16, why: '原型阶梯环形（档位表 + 当前档，升级必须带事件）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },

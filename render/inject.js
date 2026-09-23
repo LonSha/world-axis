@@ -38,7 +38,9 @@
     // v2.66.0: 'affect' / 'bonds' / 'masks'。与注入分支同批登记，否则开关点了零效果。
     'weather', 'difficulty', 'affect', 'bonds', 'masks', 'temporalLock', 'temperament', 'fondness', 'parallelEvents',
     // v2.68.0: 'eraCycle' / 'survival' / 'warrant' / 'beastBond'。与注入分支同批登记（键名 = 命名空间名）。
-    'eraCycle', 'survival', 'warrant', 'beastBond'];
+    'eraCycle', 'survival', 'warrant', 'beastBond',
+    // v2.69.0: 'appearance' / 'ladder'。与注入分支同批登记（键名 = 命名空间名）。
+    'appearance', 'ladder'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -47,7 +49,7 @@ style: false,
         life: true, intel: true, org: true, longline: true,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
-        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true }, module: 'inject' };
+        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -274,6 +276,9 @@ style: false,
       if (vis.survival && WA.survival) { const sv = WA.survival.buildBlock(); if (sv) items.push({ source: '生存三轴', content: sv }); }
       if (vis.warrant && WA.warrant) { const wr = WA.warrant.buildBlock(); if (wr) items.push({ source: '通缉', content: wr }); }
       if (vis.beastBond && WA.beastBond) { const bb = WA.beastBond.buildBlock(); if (bb) items.push({ source: '驯兽', content: bb }); }
+      // v2.69.0 外貌分级契约 / 原型阶梯。总开关关闭时 buildBlock 返回空串，零 token。
+      if (vis.appearance && WA.appearance) { const ap = WA.appearance.buildBlock(); if (ap) items.push({ source: '外貌契约', content: ap }); }
+      if (vis.ladder && WA.ladder) { const ld = WA.ladder.buildBlock(); if (ld) items.push({ source: '原型阶梯', content: ld }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块
       //   （它仍留在存档里，因为「秘密存在过」是事实，不是态度）。
