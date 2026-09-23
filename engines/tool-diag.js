@@ -211,6 +211,35 @@
   }
 
   // ── 3. 模块装载完整性（文件 ↔ 导出对象） ──
+  /**
+   * v2.62.0：因果结算采集节。
+   *   报出的重点不是「有几条链」，而是**「为什么没发生」的三个出口各有多少**：
+   *     · cancelled  —— 有人主动叫停；
+   *     · expired    —— 前提消失导致自动失效；
+   *     · blocked    —— 被拒（原因不存在 / 参数不全 / 已终态）。
+   *   这三者此前在世界状态里长得一模一样（都表现为「链没了」），本节的全部意义
+   *   就是让它们**分得开**——「悄悄消失的旧计划」是本仓库最贵的一类静默失败。
+   */
+  function secCausal() {
+    return safe(function () {
+      if (!WA.causal || typeof WA.causal.stat !== 'function') return { error: 'causal 模块不可用' };
+      const st = WA.causal.stat();
+      const cfg = WA.causal.getSettings ? WA.causal.getSettings() : {};
+      const chains = (function () {
+        try { const c = (WA.store.get().causal || {}).chains || []; return c.length; } catch (e) { return 0; }
+      })();
+      const settledRows = (function () {
+        try { const c = (WA.store.get().causal || {}).settled || []; return c.length; } catch (e) { return 0; }
+      })();
+      const due = (WA.causal.due ? WA.causal.due().length : 0);
+      return { enabled: !!cfg.enabled, maxChains: cfg.maxChains, maxItems: cfg.maxItems,
+        chains: chains, settledRows: settledRows, adds: st.chains || 0, acts: st.acts || 0,
+        deferred: st.deferred || 0, cancelled: st.cancelled || 0, expired: st.expired || 0,
+        blocked: st.blocked || 0, dueNow: due, lastReason: st.lastReason || '',
+        stages: WA.causal.STAGES || [], terminal: WA.causal.TERMINAL || [] };
+    });
+  }
+
   const MODULE_EXPORTS = {
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
@@ -240,6 +269,8 @@
     'engines/intel.js': 'intel',
     'engines/org.js': 'org',
     'engines/longline.js': 'longline',
+    // v2.62.0：因果结算
+    'engines/causal.js': 'causal',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -627,6 +658,25 @@
           if (!WA.registry || !WA.registry.profileStat) return { error: 'registry 不可用' };
           return WA.registry.profileStat();
         }, {}),
+        // v2.62.0：人物身份的持久面（路线图前置收口①）。
+        //   与上面的 actors（档案覆盖率）互补：actor 说的是「写进去多少」，
+        //   本节说的是「这些人**是谁**、长期状态挂在哪个键上」。
+        //   关键读数是 stateWithoutId —— 「有履历却没有身份」的人，此前无从发现。
+        identity: safe(function () {
+          if (!WA.registry || typeof WA.registry.idStat !== 'function') return { error: 'registry 身份面不可用' };
+          const st = WA.registry.idStat();
+          const withoutId = st.stateWithoutId || [];
+          return {
+            chatId: st.chatId, bound: st.bound, persisted: st.persisted,
+            slotCapacity: st.slotCapacity, slotUsed: st.slotUsed, beyondSlots: st.beyondSlots,
+            slotsExhausted: st.slotsExhausted,
+            // 身份 ↔ 存档键（people 容器）：由 registry 单一入口生成，不在此重拼
+            worldKeys: st.worldKeys || {},
+            stateWithoutId: withoutId, idWithoutState: st.idWithoutState || [],
+            drifted: !!st.drifted,
+            slotPurpose: (WA.registry.slotStat ? WA.registry.slotStat().purpose : '')
+          };
+        }, {}),
         // v0.1.40: 记忆巩固链路计时（L0→L1→L2→L3）
         memory: safe(function () {
           if (!WA.memory || !WA.memory.stats) return null;
@@ -705,7 +755,11 @@
       cond: ['wa-orph-all', 'wa-settle-unforce'],
       dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg', 'wa-next-day', 'wa-wb-trigger', 'wa-wb-refresh', 'wa-wb-preview', 'wa-wb-scan', 'wa-wb-list', 'wa-wb-out'], dynamic: ['wa-conc-v'] },
-    { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-out', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out'],
+    { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-out', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
+       // v2.62.0: 因果结算控件（渲染在人物页）+ 稳定人物 ID 控件。
+       //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
+       //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+       'wa-causal-enabled', 'wa-causal-cause', 'wa-causal-condition', 'wa-causal-action', 'wa-causal-immediate', 'wa-causal-delayed', 'wa-causal-delayed-min', 'wa-causal-add', 'wa-causal-tick', 'wa-causal-due', 'wa-causal-classify', 'wa-causal-id', 'wa-causal-by', 'wa-causal-defer', 'wa-causal-cancel', 'wa-causal-settle', 'wa-causal-out', 'wa-id-name', 'wa-id-lookup', 'wa-id-bindall', 'wa-id-clear', 'wa-id-out'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
@@ -992,7 +1046,7 @@
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), causal: secCausal(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),

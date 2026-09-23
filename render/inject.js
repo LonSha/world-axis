@@ -27,13 +27,19 @@
   //   不会发生 —— 故这里默认 true 不会给老用户凭空多出任何约束，却避免了「开了模块却发现
   //   也要再开开关」的双闸困惑。style 之所以要 false，是因为它自己的总开关 `block` 默认为 on。
   const SOURCES = ['clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse', 'ledger', 'digest', 'style',
-    'life', 'intel', 'org', 'longline'];
+    'life', 'intel', 'org', 'longline',
+    // v2.62.0: 'causal'（因果结算）。它**必须**与注入分支同时增长（v2.56.0 立的规矩）：
+    //   只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻），
+    //   只加源表不加分支 = 声明了却没人消费。tests/inject-sources-v2560.js 两面都锁。
+    'causal'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
 style: false,
         // v2.56.0：四面注入源默认 true（理由见 SOURCES 上方注释——它们的模块总开关默认为关）。
-        life: true, intel: true, org: true, longline: true }, module: 'inject' };
+        life: true, intel: true, org: true, longline: true,
+        // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
+        causal: true }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -230,6 +236,12 @@ style: false,
       if (vis.org && WA.org) { const ob = WA.org.buildBlock(); if (ob) items.push({ source: '资源与组织', content: ob }); }
       // v2.55.0：长线伏笔。只报逾期欠账，且不自动回收。
       if (vis.longline && WA.longline) { const lb2 = WA.longline.buildBlock(); if (lb2) items.push({ source: '长线伏笔', content: lb2 }); }
+      // v2.62.0：因果结算。只报**在推进中**的因果链与其待发生后果。
+      //   口径与其它源一致：可见性关 / 模块缺席 / 无在途链 → 返回空串，零 token 占用。
+      //   特别注意这不与「世界状态·已结算回声」重复：回声是**已经发生**的响动（正文触面），
+      //   本块讲的是**尚未发生**的推进中链条——若二者同形，「预测」就会被读成「既成事实」，
+      //   而那正是路线图列为最有价值的那条区分。
+      if (vis.causal && WA.causal) { const cb = WA.causal.buildBlock(); if (cb) items.push({ source: '因果结算', content: cb }); }
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）

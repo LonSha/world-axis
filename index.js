@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.61.0';
+  const VERSION = '2.62.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -286,6 +286,9 @@
     'engines/org.js',
     // v2.55.0：长线伏笔。须早于 render/inject.js，注入时读取 longline.buildBlock()。
     'engines/longline.js',
+    // v2.62.0：因果结算。须早于 render/inject.js，注入时读取 causal.buildBlock()；
+    //   且须**晚于** intel.js —— knownCause 单一真源指向 intel.knownCause。
+    'engines/causal.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

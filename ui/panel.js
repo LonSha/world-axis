@@ -23,7 +23,9 @@
   const VIS_NAMES = { clock: '世界时间', background: '世界背景', people: '人物', currents: '暗流', echoes: '回声', memory: '记忆', opinion: '舆情', pulse: '世界脉搏', ledger: '重大事件账本', digest: '世界推演', style: '叙事工艺',
     // v2.56.0: v2.52.0~v2.55.0 新增的四条注入分支此前未登记源表，也**没在这里登记显示名**
     //   —— 面板会裸露英文键名（life/intel/org/longline）。补名与补源表是同一件事的两面。
-    life: '人物生活', intel: '因果与情报', org: '资源与组织', longline: '长线伏笔' };
+    life: '人物生活', intel: '因果与情报', org: '资源与组织', longline: '长线伏笔',
+    // v2.62.0: 因果结算。与 SOURCES 同批登记（只加源表不加显示名 ⇒ 面板裸露英文键名）。
+    causal: '因果结算' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
@@ -320,6 +322,20 @@
     const s = WA.store.get();
     const reg = WA.registry.list();
     const people = Object.values(s.people);
+    // v2.62.0：身份 ↔ 存档键对照表。`idStat()` 的 drifted 非空即说明
+    //   「有人带着长期状态，却从未被登记过身份」——这在此前**完全不可观测**。
+    const idRows = (function () {
+      if (!WA.registry || typeof WA.registry.idStat !== 'function') return '<div class="wa-item wa-dim">身份模块不可用</div>';
+      const st = WA.registry.idStat();
+      const ks = Object.keys(st.worldKeys || {});
+      const head = '<div class="wa-item wa-dim">已绑定 ' + st.bound + ' 人 · 活动槽 ' + st.slotUsed + '/' + st.slotCapacity
+        + ' · 有身份但未占本轮槽 ' + st.beyondSlots + ' 人'
+        + (st.drifted ? ' · <b>身份缺失 ' + st.stateWithoutId.length + ' 人</b>（有状态无编号）' : '') + '</div>';
+      if (!ks.length) return head;
+      return head + ks.map(function (k) {
+        return '<div class="wa-item">' + esc(k) + ' → ' + (st.worldKeys[k] || '<b>未绑定</b>') + '</div>';
+      }).join('');
+    })();
     return `
       <div class="wa-sec">长线伏笔（承诺回收时刻）</div>
       <label class="wa-row"><input id="wa-ll-enabled" type="checkbox" ${WA.longline && WA.longline.getSettings().enabled ? 'checked' : ''}/> 启用长线伏笔提醒</label>
@@ -343,6 +359,17 @@
       <div class="wa-row"><input id="wa-life-person" class="wa-input" placeholder="人物"/><input id="wa-life-text" class="wa-input" placeholder="目标、承诺或日程"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-life-goal">加目标</button><button class="wa-btn" id="wa-life-promise">加承诺</button><button class="wa-btn" id="wa-life-schedule">加日程</button><button class="wa-btn" id="wa-life-tick">结算</button></div>
       <div id="wa-life-out" class="wa-out"></div>
+      <div class="wa-sec">因果结算（原因→条件→行动→后果）</div>
+      <label class="wa-row"><input id="wa-causal-enabled" type="checkbox" ${WA.causal && WA.causal.getSettings().enabled ? 'checked' : ''}/> 启用因果结算</label>
+      <div class="wa-row"><input id="wa-causal-cause" class="wa-input" placeholder="已有前因（须已存在）"/><input id="wa-causal-condition" class="wa-input" placeholder="条件（可空）"/><input id="wa-causal-action" class="wa-input" placeholder="行动"/></div>
+      <div class="wa-row"><input id="wa-causal-immediate" class="wa-input" placeholder="直接后果（落进世界事实）"/><input id="wa-causal-delayed" class="wa-input" placeholder="延迟后果（只排期，不到期不算发生）"/><input id="wa-causal-delayed-min" class="wa-input" placeholder="多久后(分钟)"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-causal-add">建链</button><button class="wa-btn" id="wa-causal-tick">推进一轮</button><button class="wa-btn" id="wa-causal-due">查到期</button><button class="wa-btn" id="wa-causal-classify">查状态</button></div>
+      <div class="wa-row"><input id="wa-causal-id" class="wa-input" placeholder="链 id"/><input id="wa-causal-by" class="wa-input" placeholder="延期毫秒(可负)"/><button class="wa-btn" id="wa-causal-defer">延期</button><button class="wa-btn" id="wa-causal-cancel">取消</button><button class="wa-btn" id="wa-causal-settle">结算到期</button></div>
+      <div id="wa-causal-out" class="wa-out"></div>
+      <div class="wa-sec">人物身份（持久 ID ↔ 存档键）</div>
+      <div class="wa-row"><input id="wa-id-name" class="wa-input" placeholder="人物姓名"/><button class="wa-btn" id="wa-id-lookup">查身份</button><button class="wa-btn" id="wa-id-bindall" title="为当前聊天里已经注册、但还没有持久编号的人物补上编号（不改动任何状态）">补全已注册</button><button class="wa-btn" id="wa-id-clear" title="只解除身份绑定，不删除该人物的任何状态">解除绑定</button></div>
+      <div id="wa-id-out" class="wa-out"></div>
+      <div class="wa-list">${idRows}</div>
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
@@ -1523,6 +1550,113 @@
     on('#wa-life-promise', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addCommitment(x.person, { kind: 'promise', target: '玩家', text: x.text }), true); renderBody(); });
     on('#wa-life-schedule', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); lifeOut(WA.life.addSchedule(x.person, { activity: x.text, start: now, end: now + 3600000 }), true); renderBody(); });
     on('#wa-life-tick', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); const person = WA.store && x.person ? ((WA.store.get()||{}).people||{})['p_'+x.person] : null; const goal = person && person.life && (person.life.goals||[]).filter(g=>g.status==='active')[0]; const decision = person && goal && WA.life.decide ? WA.life.decide(goal, person, { now: now, with: '玩家' }) : null; const r = WA.life.tick({ now: now, with: '玩家', decision: decision }); const why = decision ? (decision.action + '/' + decision.reason) : (r.reason || ''); lifeOut({ ok: !!r.ok, id: (r.changed || 0) + ':' + why, reason: r.reason }, true); renderBody(); });
+    // v2.62.0：因果结算——原因必须已存在（knownCause 单一真源），延迟后果到点**只报告**，
+    //   由用户显式结算；「取消」与「前提消失的失效」分开归因（两者都不得静默删记录）。
+    const causalVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const causalOut = function (r, keep) {
+      const text = r && r.ok ? ('已记录 ' + (r.id || r.reason || r.status || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
+      if (keep) panelEl.dataset.causalOut = text;
+      const o = $('#wa-causal-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.causalOut) { const saved = $('#wa-causal-out'); if (saved) saved.textContent = panelEl.dataset.causalOut; }
+    { const el = $('#wa-causal-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.causal) { causalOut({ ok: false, reason: 'module-missing' }, true); return; }
+        WA.causal.setSettings({ enabled: !!el.checked });
+        causalOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' }, true);
+      }; }
+    on('#wa-causal-add', () => {
+      if (!WA.causal) return causalOut({ ok: false, reason: 'module-missing' }, true);
+      const cause = causalVal('#wa-causal-cause');
+      const known = WA.causal.knownCause(cause);
+      const dlTxt = causalVal('#wa-causal-delayed');
+      const dlMins = Number(causalVal('#wa-causal-delayed-min'));
+      const r = WA.causal.addChain({ cause: cause, condition: causalVal('#wa-causal-condition'), action: causalVal('#wa-causal-action'),
+        immediate: causalVal('#wa-causal-immediate'),
+        delayed: dlTxt ? [{ text: dlTxt, after: (isFinite(dlMins) && dlMins > 0 ? dlMins * 60000 : 0) }] : [] });
+      causalOut(Object.assign({}, r, { id: r.ok ? (r.id + ':cause-' + (known ? 'known' : 'unknown') + ':d' + (r.delayed || 0)) : ('cause-' + (known ? 'known' : 'unknown') + ':' + r.reason) }), true);
+      renderBody();
+    });
+    on('#wa-causal-tick', () => {
+      if (!WA.causal) return causalOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.causal.tick({ now: clockNow('ui.causal') });
+      const st = WA.causal.stat();
+      causalOut({ ok: !!r.ok, id: (r.changed || 0) + ':exp-' + (r.expired || 0) + ':blk-' + st.blocked, reason: r.reason }, true);
+      renderBody();
+    });
+    on('#wa-causal-due', () => {
+      if (!WA.causal) return causalOut({ ok: false, reason: 'module-missing' }, true);
+      const rows = WA.causal.due();
+      // 到期 ≠ 已发生：这里只报「哪些延迟后果到点了」，结算必须显式再做一次。
+      causalOut({ ok: true, id: 'due-' + rows.length + ':' + (rows[0] ? rows[0].chain : 'none') }, true);
+    });
+    on('#wa-causal-classify', () => {
+      if (!WA.causal) return causalOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.causal.classify(causalVal('#wa-causal-id'));
+      causalOut(Object.assign({}, r, { id: r.ok ? (r.status + ':happened-' + (r.happened ? 'y' : 'n') + ':pending-' + r.pending) : r.reason }), true);
+    });
+    on('#wa-causal-defer', () => {
+      if (!WA.causal) return causalOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.causal.defer(causalVal('#wa-causal-id'), Number(causalVal('#wa-causal-by')));
+      causalOut(Object.assign({}, r, { id: r.ok ? ('shifted-' + r.shifted) : r.reason }), true);
+      renderBody();
+    });
+    on('#wa-causal-cancel', () => {
+      if (!WA.causal) return causalOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.causal.cancel(causalVal('#wa-causal-id'), '面板取消');
+      causalOut(Object.assign({}, r, { id: r.ok ? r.status : r.reason }), true);
+      renderBody();
+    });
+    on('#wa-causal-settle', () => {
+      if (!WA.causal) return causalOut({ ok: false, reason: 'module-missing' }, true);
+      const rows = WA.causal.due();
+      if (!rows.length) return causalOut({ ok: true, id: 'due-0' }, true);
+      const r = WA.causal.settle(rows[0].chain, rows[0].id, '');
+      const st = WA.causal.stat();
+      causalOut(Object.assign({}, r, { id: r.ok ? (r.id + ':chain-' + r.chainStatus + ':left-' + Math.max(0, rows.length - 1) + ':blk-' + st.blocked) : r.reason }), true);
+      renderBody();
+    });
+    // v2.62.0：稳定人物 ID 面板面（路线图前置收口① 的可见出口）。
+    //   过去人物的「身份」只是 A-L 活动槽（模块内存态，刷新即丢、只容 12 人）。
+    //   现在三层分开显示：**id**（持久编号）/ **存档键**（长期状态落点）/ **活动槽**（本轮计算）。
+    //   把三者摆在一起，看的人才能一眼分辨「槽耗尽」不是「人物丢了」。
+    const idVal = function () { return ((($('#wa-id-name') || {}).value) || '').trim(); };
+    const idOut = function (r, keep) {
+      const text = r && r.id ? ('已记录 ' + r.id) : ('未记录：' + ((r && r.reason) || '未知原因'));
+      if (keep) panelEl.dataset.idOut = text;
+      const o = $('#wa-id-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.idOut) { const saved = $('#wa-id-out'); if (saved) saved.textContent = panelEl.dataset.idOut; }
+    on('#wa-id-lookup', () => {
+      if (!WA.registry || typeof WA.registry.identityOf !== 'function') return idOut({ reason: 'registry-missing' }, true);
+      const nm = idVal();
+      if (!nm) return idOut({ reason: 'missing-name' }, true);
+      const idn = WA.registry.identityOf(nm);          // 消费 identityOf（三位一体唯一入口）
+      const slotOfName = (WA.registry.slotStat ? (WA.registry.slotStat().owners.filter(function (o) { return o.name === nm; })[0] || {}).slot : '') || '-';
+      idOut({ id: idn.personId + ':' + idn.worldKey + ':slot-' + slotOfName }, true);
+      renderBody();
+    });
+    on('#wa-id-bindall', () => {
+      if (!WA.registry || typeof WA.registry.identityOf !== 'function') return idOut({ reason: 'registry-missing' }, true);
+      // 为什么必须走注册表而不是 people 容器：注册表是「系统认为在场的人物」的既有真源，
+      //   而 people 容器里的键是**状态落点**。补号的目的是让两者对上，不是新造人物。
+      const names = WA.registry.list() || [];
+      let n = 0, skip = 0;
+      names.forEach(function (nm) {
+        const before = WA.registry.idStat ? (WA.registry.idStat().ids[nm] || '') : '';
+        if (before) { skip++; return; }
+        if (WA.registry.identityOf(nm)) n++;
+      });
+      const st = WA.registry.idStat ? WA.registry.idStat() : {};
+      idOut({ id: 'bound-' + n + ':skip-' + skip + ':total-' + st.bound + ':drift-' + ((st.stateWithoutId || []).length) }, true);
+      renderBody();
+    });
+    on('#wa-id-clear', () => {
+      if (!WA.registry || typeof WA.registry.idClear !== 'function') return idOut({ reason: 'registry-missing' }, true);
+      const r = WA.registry.idClear(idVal());
+      idOut(r.ok ? { id: r.name + ':' + r.id + ':unbound' } : { reason: r.reason }, true);
+      renderBody();
+    });
     on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); if (btn) { btn.textContent = '生成中…'; btn.disabled = true; } try { await WA.directEvent.create({ prompt: p, turns: t }); } finally { renderBody(); } });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });
     // v2.11.0: 推演中止——引擎侧 `abort()` 已实现却无人调用（用户只能刷页面打断）

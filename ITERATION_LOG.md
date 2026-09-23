@@ -756,3 +756,37 @@
 - **一条可直接复用的口径**：**有界容器的「排序键」是一条跨模块契约，必须有生产者供给面的判据**。只钉「淘汰按什么排」（站点声明 + 调用点存在）会让整族缺陷长期隐身——因为**声明与消费都对，错的是生产者**。判据必须**行为级**（灌满 → 写入 → 真淘汰 → 看存活），静态扫描只能做补充（C2/D）。
 - **本轮猎取路径（方法论，供后人复用）**：本版连续排除了三个候选面后才收敛——① 持久化往返（`run.js:8913` 早有 C13 断言、`run.js:968` 早有 toolSnapshot 往返用例，**不重复建设**）；② settingsBus 设置面（写三个探针实测：21 个注册项幻影声明 0、未约束 number 0；11 个有 `bounds/enums/sentinels` 的登记项从各自 `setSettings` 写越界值**全部正确夹取**；再用 Proxy 追踪 `settingsBus.read()` 的 83 个静态子键真实读取，唯一未命中的 `bridge` 4 键经核实是**探针调用链未触达 `buildSnapshot`** 的假阳性，源码侧确实消费）⇒ **该面健全**；③ clock/rand 单一出口（`core/clock.js:76` 自陈已被门禁 G20 覆盖）。转向正交信号——**`grep -rn 'draft.people' 清点容器的全部写入方**，与「淘汰消费的排序键」对照，一眼看出供给面缺口。
 - **提交**：`（见本版提交）`。
+
+### R45 · 2026-09-23 · v2.62.0 交付（因果结算：阶段格 × 终态归因 锁·第四十七面：把「世界从记录变化到结算因果」钉上）
+- **做了什么**：
+  · 新建 `engines/causal.js`（284 行）：**因果结算**——原因成立 → 条件满足 → 行动发生 → 直接后果 → 延迟后果。单独成模块而不并进 `intel`，因为两者**真源不同**：`intel` 管「谁知道什么、凭什么相信」（认知面，可以错——怀疑/谣言），本模块管「事情怎么发生、后果什么时候到」（结算面，不可错——已发生的事实就是事实）。并成一个模块，最直接的后果是「人物以为会发生」与「真的发生了」在状态里长得一样，而路线图把这条列为**最有价值的区分**。
+  · 四个**否定式**能力（本面最有价值的部分）：
+    ① **条件未足 ⇒ 停在 pending**：`stage='pending'` 而 `status` 仍为 `open`——把「还没做」与「已经做了」在状态上分开。这就是「延期」的自然形态，不需要额外的 defer 调用；连推多次恒定（`changed=0`），且**不得把即时后果写进权威世界事实**。
+    ② **前提消失 ⇒ 自动 expired**：`tick` 检测到 `!knownCause(x.cause)` 即置终态并写明归因「前提消失（原因已不在世界事实中）」。这是「旧计划不得照常执行」的落地。
+    ③ **延迟后果到点只报告**：`due()` **只报告、不结算**——预测不得自己变成既成事实；结算走 `settle()`，后果落进 `echoes`（已结算结果与正文的接触面）而非 `worldFacts`。
+    ④ **取消与失效分开归因**：`TERMINAL = ['settled','cancelled','expired']` 三态显式，且**终态记录不删**——删了就再也答不出「为什么没发生」。
+  · 状态落 `store.causal.{chains, settled}`；两容器容量登记 `causal.chains` cap 24 / `causal.settled` cap 40，**剪枝走 `WA.evict.array` 单一出口**（cap 的真源在 `core/evict.js` 的 `SITES`，与 `store.__BOUNDED_CAPS` 同源）。
+  · **前置收口① `actors/registry.js` 稳定人物 ID**：`ID_KEY` 按 `chatId()` 分域持久化；序号取「本域已有 id 最大值 + 1」（不读全局计数 ⇒ 切聊天时序号不漂移，同域内删人再增不复用旧号）；形如 `pid_<n>`，**不设 12 上限**。
+    · 新增 `identityOf(name)` = `{name, personId, worldKey}` 三位一体（**下游只认这一个口**）；`idStat()` 报出 `beyondSlots`（有身份但未占本轮槽——>0 是**正常**的，而此前这种局面在界面上不存在，只能被读成「人物丢了」）；`idClear(name)` 解绑；`slotStat().purpose` 明写「活动槽只为本轮计算服务；人物身份见 identityOf()（持久、不设 12 上限）」。
+    · **修掉一处同名不同义的真实风险**：`engines/life.js` 内部也有一个叫 `personId` 的函数，返回 `'p_' + name`（即 store 里 people 容器的键），而本模块的 `personId()` 返回 `'pid_' + n`——**同名不同义必然误导下一个调用者**。故给 `worldKey(name)`（存档容器键 = 长期状态实际落点）与 `identityOf()` 做唯一桥接，并让 `idStat()` 增加**对账字段** `worldKeys`（容器键 → 已登记编号的映射）/ `stateWithoutId` / `idWithoutState` / `drifted`，使「长期状态绑的到底是哪个键」可被机器核对。
+    · 出口收敛：三个有真实消费方的口（`identityOf` / `idStat` / `idClear`）留在出口上，`personId` / `worldKey` / `idOf` **退回实现内部**（拿到 id 请走 `identityOf().personId`）——「导出即有承诺」是本仓库的纪律。
+  · **前置收口② 54 项叙事工艺验证固化进版本库**：原 `tools/smoke_v2510_p4.js` 是**临时诊断脚本**（硬编码 `/tmp/wa_git`、`process.exit`、不进任何门禁）⇒ 临时脚本的判据等于不存在。改建 `tests/style-craft-v2510.js`（55 项）：路径改相对仓库根、沙箱改走 `ui-gate-sync.fresh()`（与全部 UI/引擎门禁同一份装载链）、判定交宿主 `assert` 收口（不再自己 `process.exit`，否则带崩整个回归进程），并保留真源码破坏负控制。
+  · 接线四面（导出即在用，新增死导出归零）：注入面 `render/inject.js`（`SOURCES` + `def` + `applyInjections` 分支；块内明写「待发生 ≠ 已发生」——回声是**已发生**、本块是**尚未发生**，同形会让「预测」被读成「既成事实」）；面板面 `ui/panel.js`（因果结算分区 21 控件 + 人物身份分区「持久 ID ↔ 存档键」+ 补全已注册）；诊断面 `engines/tool-diag.js`（`MODULE_EXPORTS` + `secCausal()`，重点报 `cancelled` / `expired` / `blocked` **三个「为什么没发生」的出口** + `actors.identity` 子节）；有界容器面（`core/store.js` 两条容量登记 + `core/evict.js` 两个站点）。
+  · 加载链同序插入：`index.js` 的 `LOAD_ORDER` 与 `tests/run.js` 的 `LOAD` 都插在 `longline` 之后、`render/inject` 之前（须晚于 `intel` —— `knownCause` 单一真源指向 `intel.knownCause`；须早于 `render/inject` —— 注入时读 `causal.buildBlock()`）。
+- **为什么既有 46 个面全都照不到（本版最关键的定位）**：
+  · `tests/run.js` 的 G18 门禁钉「站点声明 ⇄ 调用点存在」，**不问语义、不问阶段顺序**；
+  · v2.61.0（evict-meta）钉「淘汰元字段由谁提供」，是**生产者供给面**，与因果语义不同轴；
+  · rel-contract v2.59.0 / v2.60.0 钉「节内字段 ⇄ 引擎读取面」，管字段畅通、**不管阶段按什么条件推进**；
+  · field-liveness / dead-export 是**静态面**（读写归属、导出承诺），看不出「这个口返回的东西跨刷新会不会变」。
+  · 一句话：**既有锁把「因果链的字段存在」钉住了，没人钉「阶段按什么条件、以什么顺序推进」**。而 `pending`→`acted`→`immediate`→`delayed` 这条阶梯上，最有价值的四个能力全是否定式的——一个把 `pending` 直接当 `acted` 推进、把 `due` 当 `settle`、把 `cancelled` 写成 `expired` 的实现，**同样拥全套函数名、全套常量**，存在面判据对它一无所知。
+- **判据设计上的自纠（三处，均由实跑暴露）**：
+  · ① **把阶段当状态**：初版判据写 `statusOf(id) === 'pending'`，而实现里 `pending` 是**阶段格**（`stage`）、`status` 保持 `open` 表示「尚未行动」。这比单一字段更严格（两个字段并存 = 「还没做」与「已经做了」可分），故改判据而非改实现——**停在 pending 必须同时钉 `stage` 与 `status`**，只钉一个的话，把 `status` 直接当 `acted` 写的实现照样能过。
+  · ② **推进格数假设错**：`tick` 一次只推进**一格**（`open`→`acted`→`immediate`→`delayed`），这是真实契约（把「行动发生」与「后果落地」压进同一次调用，会让调用方失去在中间插入判断的机会）。初版负控制探针只推一次就断言 `immediate`，实跑报 `acted` ⇒ 改为推两次并逐格断言。
+  · ③ **把「正常推进」误判成「终态被改写」**：初版终态快照对**全部链**取，而未终态的链本就该被 tick 推进 ⇒ 快照必然不等。改为只对已是终态的链取快照（`id:status:updatedAt` 三字段），并加「快照非空」前提防在空集上恒真。
+- **两向自证（先跑成红是纪律）**：
+  · `tests/causal-v2620.js` 三组真源码破坏（`srcOverride` 内存副本，仓库文件零改写）：`A_EXPIRE`（prune 条件）/ `A_DUE`（due 比较）/ `A_TERMINAL`（终态字面量），N0 校验各恰中 1 次，破坏后对应判据**现形**（`immediate` / 报出 1 项 / 三态全缺），原版上同款判据**全绿**，且 N3 逐锚敏感（域破坏不牵连编号面）。
+  · `tests/registry-identity-v2620.js` 三段破坏：`chatId` 退化成单一域 ⇒ 跨聊天隔离判据现形（本域可见 `["甲","乙"]`）；编号前缀被改坏 ⇒ 「不同姓名不同 id」现形（`x=y=p_1`）；对账被摘除 ⇒ 「有状态无编号」现形（`stateWithoutId=[] / drifted=false`）。原版上三者全部通过（`pid_1` / `pid_2` / 报出漂移键）。
+  · `tests/style-craft-v2510.js`：清空 `PERSP_TEXT` 正文表 ⇒ 覆盖度判据现形（captured 4 处）且行为真的改变（选了而正文表为空 ⇒ 该轴不出话、产物 0 字）；原版上 `uncovered=0`。
+- **验证**：`tests/causal-v2620.js` → `pass`（72 项）；`tests/registry-identity-v2620.js` → `pass`（45 项）；`tests/style-craft-v2510.js` → `pass`（55 项）；全量回归 **5232 / 失败 0**（v2.61.0 为 5060，+172 即本版三项新锁）；死导出门禁绿 **dead 223 / uiDead 4 / dataOnly 122 / 仅测试 131**；field-liveness-gate 绿（骨架一级键 21 个、写侧越界仅 `ui/panel.js::innerHTML` 1 处既有、读侧 0 处）；出口面契约 **ns 71 / members 483 / chars 5889**；中间一轮的 `refs 1701 → 1708` 显式冻结项**已确证增量全部来自新模块 `engines/causal.js` 的 7 处 `WA.` 引用**（`ns` / `members` / `dead` / `uiDead` / `dataOnly` / `deadInTestsOnly` 逐项未变 ⇒ 产品侧零漂移），按仓库既有口径回填（`refs` 采集面是**产品文件面**，不含 `tests/`）。
+- **一条可直接复用的口径**：**否定式能力必须用「不得发生什么」来钉**。因果结算最有价值的四件事（停住 / 失效 / 只报告 / 分开归因）在实现里都表现为「某个字段**没有**变成另一个值」，因此判据必须问「此刻它**不是**什么」——`stage` 仍是 `pending`、权威事实里**没有**该键、回声里**没有**该 id、终态**没有**被后续 tick 改写。存在面判据（有 `addChain` 吗 / 有 `TERMINAL` 吗）对这种实现与对「全都会做错」的实现**给出同样的结论**。
+- **提交**：`（见本版提交）`。

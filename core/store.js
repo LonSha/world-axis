@@ -115,6 +115,11 @@
       proactiveLastRound: 0,    // 与 parallelWorld.round 同类：0 表示「从未拉动」
       // 下轮注入三列引用（after链产出，before链一次性消费）
       nextTurnInjection: null,  // {required:[], conditional:[], suppress:[], at, anchor}
+      // v2.62.0 因果结算（causal.js：原因→条件→行动→直接后果→延迟后果）
+      //   chains ：在推进的因果链（含终态 settled/cancelled/expired —— **不删记录**，
+      //            删了就答不出「为什么后来没发生」）
+      //   settled：已结算后果的流水（与 echoes 分开：echoes 是正文触面，这里是结算台账）
+      causal: { chains: [], settled: [] },
       // 元信息
       meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null }
     };
@@ -756,6 +761,12 @@
     'parallelWorld.snapshots': { cap: 12, site: 'parallel-world.js CAP_SNAPSHOTS=12（v2.35.0）' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },
     'chapters.history': { cap: 20, site: 'chapters.js pruneHistory(MAX_HISTORY=20)' },
+    // v2.62.0 因果结算两容器（causal.js 走 WA.evict.array 单一出口，cap 与 evict.SITES 同源）。
+    //   chains 是**含终态**的环形：settled/cancelled/expired 三种终态都保留记录，
+    //   「记录被删掉」正是本仓库最贵的一类默认值——删了就再也答不出「这件事为什么没发生」。
+    //   settled 与 echoes 分开：echoes 是正文触面（世界里的响动），settled 是结算台账。
+    'causal.chains': { cap: 24, site: 'causal.js WA.evict.array(causal.chains)' },
+    'causal.settled': { cap: 40, site: 'causal.js WA.evict.array(causal.settled)' },
     // v1.4.0 补登：entityMemory 四类实体库（entities.js CAP_PER_TYPE=30 双处裁剪）——此前漏登致 sizeAudit 误报 unbounded、maintain 盲区
     'evolution.entityMemory.organization': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },
     'evolution.entityMemory.object': { cap: 30, site: 'entities.js CAP_PER_TYPE=30' },

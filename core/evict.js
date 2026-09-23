@@ -82,6 +82,9 @@
     'parallelWorld.relations':{ path: 'parallelWorld.relations', cap: 120, why: '平行世界关系网环形（同向边去重后）' },
     'parallelWorld.modules':  { path: 'parallelWorld.modules', cap: 80, why: '平行世界事件模块环形' },
     'parallelWorld.snapshots':{ path: 'parallelWorld.snapshots', cap: 12, why: '平行世界子树快照环形（v2.35.0）' },
+    // ── v2.62.0 因果结算（causal.js）──
+    'causal.chains':  { path: 'causal.chains',  cap: 24, why: '因果链环形（含终态：已结算/已取消/已失效都留痕，答「为什么没发生」）' },
+    'causal.settled': { path: 'causal.settled', cap: 40, why: '因果结算台账环形（结算过什么，与 echoes 正文触面分开）' },
     // 对象型：每人认知边界（键 = 「谁知道什么」），按 at 最旧优先挤出
     'people.knowledge':   { path: 'people.*.knowledge', cap: 30, kind: 'object', why: '人物认知边界（每键一桩知情）' },
     // ── v2.13.0 补漏（本轮广谱侦察发现的真缺陷）──

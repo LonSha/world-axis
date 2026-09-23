@@ -41,6 +41,118 @@
     SLOT_ORDER.forEach(function (x) { if (__slots[x] === nm) { delete __slots[x]; freed = x; } });
     return freed ? { ok: true, slot: freed } : { ok: false, reason: 'not-assigned' };
   }
+  // -- v2.62.0：稳定人物 ID（路线图前置收口①）-------------------------------
+  // 缺陷：A–L 槽表此前既当「身份」又当「容量」用——它是**模块内存态**（刷新即丢）、
+  //   按姓名分配，且只容 12 人。于是长期状态（目标/承诺/日程/认知/资源）若绑在槽位上：
+  //     · 刷新一次全部认不出人（槽是内存态，存档里的状态却还在）；
+  //     · 第 13 个角色**根本没有位置**，而「没有槽位」被当成「无法身份化」。
+  //   本次把两件事彻底分开：
+  //     · **人物 ID**（本区）：按**聊天分域持久化**，跨刷新/跨切页稳定；人数不设 12 上限。
+  //     · **活动槽**（上一区）：只承担「本轮计算 / 提示组织」用途——12 是它的合法边界，
+  //       不是人物的数量边界。slotStat().purpose 明写这一点，免得下游再把两者混用。
+  //   迁移口径：只为**已经出现过的姓名**登记 id，不凭空生成履历或关系
+  //   （登记的是身份，不是经历）。
+  const ID_KEY = 'worldaxis_registry_ids_v1';
+  const __REG_IDS = { key: ID_KEY, def: {}, module: 'registryIds' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_IDS]);
+  function idTable() { try { return WA.settingsBus.read(__REG_IDS) || {}; } catch (e) { return {}; } }
+  function idScope() {
+    const all = idTable();
+    const cid = chatId();
+    if (!all[cid] || typeof all[cid] !== 'object' || Array.isArray(all[cid])) all[cid] = {};
+    return { all: all, cid: cid, mine: all[cid] };
+  }
+  /**
+   * 稳定人物 ID：同一姓名在同一聊天内**始终**同一 id（刷新、切页、重载都不变），
+   *   且人数不受活动槽 12 个上限约束。
+   *   序号取「本域已有 id 的最大值 + 1」（不读全局计数）——这样切聊天时序号不会漂移，
+   *   同一聊天内删掉某人再新增也不会把旧 id 复用给别人。
+   */
+  function personId(name) {
+    const nm = String(name || '').trim();
+    if (!nm) return '';
+    const sc = idScope();
+    if (sc.mine[nm]) return sc.mine[nm];
+    let max = 0;
+    Object.keys(sc.mine).forEach(function (k) {
+      const n = parseInt(String(sc.mine[k]).replace(/^pid_/, ''), 10);
+      if (isFinite(n) && n > max) max = n;
+    });
+    const id = 'pid_' + (max + 1);
+    sc.mine[nm] = id;
+    try { WA.settingsBus.save(__REG_IDS, sc.all); } catch (e) { /* 落盘失败不影响本次分配 */ }
+    return id;
+  }
+  /** 稳定 ID 视图（诊断/面板消费）——**同时**报出槽位占用，使「槽耗尽 ≠ ID 耗尽」一眼可分 */
+  function idStat() {
+    const sc = idScope();
+    const names = Object.keys(sc.mine);
+    const slots = (function () {
+      const owners = SLOT_ORDER.map(function (x) { return __slots[x] || ''; }).filter(Boolean);
+      return { capacity: SLOT_ORDER.length, used: owners.length };
+    })();
+    // 状态侧对账：people 容器里有状态、但从未登记稳定 id 的人数（以及反向）。
+    //   这正是「长期状态与身份脱节」的可观测出口——>0 说明有人有履历却没有编号。
+    let worldKeys = {}, driftState = [], driftId = [];
+    try {
+      const s = WA.store && WA.store.get ? (WA.store.get() || {}) : {};
+      const withState = Object.keys(s.people || {}).filter(function (k) {
+        const p = s.people[k];
+        return p && (p.life || p.knowledge || (p.profile && (p.profile.relations || p.profile.personality)));
+      });
+      worldKeys = withState.reduce(function (acc, k) {
+        const nm = String(k).replace(/^p_/, '');
+        acc[k] = sc.mine[nm] || '';
+        if (!sc.mine[nm]) driftState.push(k);
+        return acc;
+      }, {});
+      driftId = names.filter(function (nm) { return !s.people || !s.people[worldKey(nm)]; });
+    } catch (e) {}
+    return {
+      chatId: sc.cid, bound: names.length, ids: Object.assign({}, sc.mine),
+      slotCapacity: slots.capacity, slotUsed: slots.used,
+      slotsExhausted: slots.used >= slots.capacity,
+      // 「有身份但没分到本轮活动槽」的人数——>0 是**正常**的（活动槽只为本轮服务），
+      //   而此前这种局面在界面上不存在，只能被读成「人物丢了」。
+      beyondSlots: Math.max(0, names.length - slots.used),
+      // v2.62.0: 身份 ↔ 长期状态落点（people 容器键）的对账
+      worldKeys: worldKeys,
+      stateWithoutId: driftState,   // 有状态、无稳定 id
+      idWithoutState: driftId,      // 有稳定 id、无状态容器
+      drifted: driftState.length > 0,
+      persisted: true
+    };
+  }
+  function idClear(name) {
+    const nm = String(name || '').trim();
+    if (!nm) return { ok: false, reason: 'missing-name' };
+    const sc = idScope();
+    if (!sc.mine[nm]) return { ok: false, reason: 'not-bound' };
+    const old = sc.mine[nm];
+    delete sc.mine[nm];
+    try { WA.settingsBus.save(__REG_IDS, sc.all); } catch (e) {}
+    return { ok: true, name: nm, id: old };
+  }
+  /**
+   * 世界状态键：long-term 状态（目标/承诺/日程/认知）在 store 里的**实际落点**是
+   *   `people['p_' + 姓名]`。它与 personId() 是**两件事**，必须显式桥接而不是各自为政：
+   *     · worldKey  = 存档里的容器键（人一旦被存档就固定，是本引擎的持久身份）；
+   *     · personId  = 稳定编号（跨重命名/跨引用统一的短 id，供外部引用与诊断）。
+   *   历史上二者同名不同义（life.js 内部也有一个叫 personId 的函数，返回的正是 worldKey）
+   *   是**真实风险**：下一个调用者会以为它们可以互换。故此处提供唯一桥接口，
+   *   并让 idStat() 报出两侧对应关系，使「长期状态绑的到底是哪个键」可被机器核对。
+   */
+  function worldKey(name) {
+    const nm = String(name || '').trim();
+    return nm ? ('p_' + nm) : '';
+  }
+  /** 姓名 → { name, personId, worldKey } 三位一体（下游只认这一个口，不再各拼各的） */
+  function identityOf(name) {
+    const nm = String(name || '').trim();
+    if (!nm) return null;
+    return { name: nm, personId: personId(nm), worldKey: worldKey(nm) };
+  }
+
   const REL_NUM_FIELDS = ['intimacy', 'hostility', 'trust', 'vigilance', 'attachment'];
   const REL_STR_FIELDS = ['boundary_status', 'relationship_aftereffect'];
   const REL_DELTA_CAP = 20;   // 单次事件最终变化绝对不超过 20（硬边界）
@@ -393,9 +505,24 @@
     slotStat() {
       const owners = SLOT_ORDER.map(function (x) { return { slot: x, name: __slots[x] || '' }; });
       const used = owners.filter(function (o) { return !!o.name; }).length;
+      // v2.62.0: 明写**用途**。此前「槽耗尽」与「人物装不下」被读成同一件事，
+      //   而它们是两件事：槽只为本轮计算/提示组织服务，人物身份另有一套持久 id。
       return { capacity: SLOT_ORDER.length, used: used, free: SLOT_ORDER.length - used, owners: owners,
-        exhausted: used >= SLOT_ORDER.length };
+        exhausted: used >= SLOT_ORDER.length,
+        purpose: '本轮计算与提示组织的活动槽；人物身份见 personId()/idStat()（持久、不设 12 上限）' };
     },
+    // -- v2.62.0：稳定人物 ID 出口（路线图前置收口①）-------------------------
+    //   身份与活动槽分离后，长期状态（目标/承诺/日程/认知/资源）一律绑 id 而非槽位。
+    //   口径：**对外只留三个口，且每个都有真实消费方**（本仓库纪律：导出即有承诺）。
+    //     · identityOf() —— 姓名 → {personId, worldKey} 的唯一入口（面板「查身份」消费）；
+    //     · idStat()     —— 身份/槽位/存档键三方对账（面板人物页 + 诊断 actors.identity 消费）；
+    //     · idClear()    —— 解除绑定（面板「解除绑定」消费）。
+    //   内部的 personId() / worldKey() / idOf() 曾经也挂在出口上，但它们**零外部消费**
+    //   （只有本文件自用）⇒ 被 dead-export-gate 判 self-only/unwired「过度导出」。
+    //   现在它们退回实现内部：拿到 id 请走 identityOf().personId，不要再单挂一个口。
+    identityOf: identityOf,
+    idStat: idStat,
+    idClear: idClear,
     /** 关系量值阶梯（只读，供面板/诊断取语义区间） */
     relationBands() { return REL_BANDS.map(function (b) { return { min: b[0], max: b[1], band: b[2] }; }); },
 
