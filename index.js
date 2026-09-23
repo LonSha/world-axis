@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.64.0';
+  const VERSION = '2.65.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -293,6 +293,9 @@
     //   须早于 render/inject.js，注入时读取 world.buildBlock()；
     //   且须**晚于** life.js —— 在场者名单的唯一证据是「人物自己的日程安排」（life.schedule）。
     'engines/world.js',
+    // v2.65.0 天气与难度。天气必须晚于 world.js：setWeather 用 world.reach 确认地点已登记。
+    'engines/weather.js',
+    'engines/difficulty.js',
     // v2.63.0：社交漩涡（关系经历与承诺深化）。
     //   须早于 render/inject.js，注入时读取 shadow.buildBlock()。
     'engines/shadow.js',

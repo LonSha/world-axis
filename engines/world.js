@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/world.js (v2.63.0)
+ * WorldAxis engines/world.js (v2.65.0)
  * 世界织体：社会生活（共同日程 / 聚散）与时空约束（地点、路途、「同一时刻只能在一处」）。
  *
  * 为什么单独成模块，而不并进 life.js / calendar.js：
@@ -24,7 +24,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_world_settings_v1';
-  const DEF = { enabled: false, maxPlaces: 8, maxEvents: 4, maxItems: 3 };
+  const DEF = { enabled: false, maxPlaces: 8, maxEvents: 4, maxItems: 3, maxJourneys: 4 };
   const __REG = { key: LS_KEY, def: DEF, module: 'world',
     bounds: { maxPlaces: [1, 24], maxEvents: [1, 12], maxItems: [1, 6] } };
   const PLACE_KINDS = ['home', 'work', 'market', 'public', 'wild', 'sacred'];
@@ -38,7 +38,8 @@
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  const stat = { places: 0, roads: 0, events: 0, moves: 0, checks: 0, blocked: 0, lastReason: '', faults: {} };
+  const stat = { places: 0, roads: 0, events: 0, moves: 0, checks: 0, blocked: 0, lastReason: '', faults: {},
+    departed: 0, arrived: 0, advanced: 0 };
 
   function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -46,6 +47,7 @@
   function places() { return Array.isArray(node().places) ? node().places : []; }
   function roads() { return Array.isArray(node().roads) ? node().roads : []; }
   function events() { return Array.isArray(node().events) ? node().events : []; }
+  function journeys() { return Array.isArray(node().journeys) ? node().journeys : []; }
   function placeByName(nm) { const k = clean(nm, 40); return places().filter(function (x) { return x && x.name === k; })[0] || null; }
   function personLife(name) {
     const p = (state().people || {})['p_' + clean(name, 60)];
@@ -225,6 +227,77 @@
     return { ok: true, person: who, from: f, to: t, minutes: r.minutes, departAt: at2, arriveAt: arrive, path: r.path };
   }
 
+  /**
+   * v2.65.0 行程表。move() 只回答「能不能到」；depart() 才把「人已经在路上」写进状态。
+   * 在途的人既不在起点也不在终点——where() 对在途者返回 inTransit:true。
+   * 同一人同时只能有一条行程：第二条会被拒（already-in-transit），不得静默覆盖。
+   */
+  function activeJourney(who) {
+    const k = clean(who, 60);
+    return journeys().filter(function (j) { return j && j.person === k && j.status === 'in-transit'; })[0] || null;
+  }
+  function depart(person, from, to, at) {
+    const who = clean(person, 60);
+    if (!who) return { ok: false, reason: 'missing-fields' };
+    // 总开关关闭时不得改变任何人的位置。move() 只回答可达性、不落盘，
+    // 所以闸必须放在写行程之前：关闭时连「能不能到」都不问，直接拒绝。
+    if (!settings().enabled) { stat.blocked++; return { ok: false, reason: 'disabled', person: who }; }
+    if (activeJourney(who)) { stat.blocked++; return { ok: false, reason: 'already-in-transit', person: who }; }
+    const m = move(who, from, to, at);
+    if (!m.ok) return m;
+    if (m.minutes === 0) return { ok: false, reason: 'already-there', person: who, place: m.to };
+    let out = null;
+    WA.store.transact(function (draft) {
+      draft.world = draft.world && typeof draft.world === 'object' && !Array.isArray(draft.world) ? draft.world : {};
+      draft.world.journeys = Array.isArray(draft.world.journeys) ? draft.world.journeys : [];
+      const row = { id: 'jn_' + who + '_' + draft.world.journeys.length,
+        person: who, from: m.from, to: m.to, path: m.path.slice(),
+        total: m.minutes, left: m.minutes, departAt: m.departAt, arriveAt: m.arriveAt,
+        status: 'in-transit', at: clockNow('world') };
+      draft.world.journeys.push(row);
+      WA.evict.array(draft.world.journeys, 'world.journeys');
+      out = { ok: true, id: row.id, person: who, from: row.from, to: row.to, left: row.left, status: row.status };
+    }, 'world:depart');
+    if (out && out.ok) { stat.departed++; stat.lastReason = 'departed'; } else stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 推进在途行程。minutes 必须为正：0 或负不是「原地不动」，是非法输入（bad-minutes）。
+   * 耗尽才算到达（status: arrived）；没耗尽就只减少 left，人仍在途中。
+   */
+  function advance(minutes) {
+    const step = Number(minutes);
+    if (!isFinite(step) || step <= 0) return { ok: false, reason: 'bad-minutes' };
+    // 关闭时不推进在途者。把 left 减掉等于改了位置，和「关闭不改变任何人的位置」冲突。
+    if (!settings().enabled) { stat.blocked++; return { ok: false, reason: 'disabled' }; }
+    const arrived = [], still = [];
+    WA.store.transact(function (draft) {
+      const list = (draft.world && Array.isArray(draft.world.journeys)) ? draft.world.journeys : [];
+      list.forEach(function (j) {
+        if (!j || j.status !== 'in-transit') return;
+        j.left = Math.max(0, j.left - step);
+        if (j.left === 0) { j.status = 'arrived'; arrived.push(j.person + '→' + j.to); }
+        else still.push(j.person);
+      });
+    }, 'world:advance');
+    stat.advanced++;
+    stat.arrived += arrived.length;
+    stat.lastReason = arrived.length ? 'arrived' : (still.length ? 'in-transit' : 'nothing-to-do');
+    return { ok: true, arrived: arrived, still: still, reason: stat.lastReason };
+  }
+
+  /** 人此刻在哪。在途优先于「日程落点」：在路上的人不得被写成已在目的地。 */
+  function where(person) {
+    const who = clean(person, 60);
+    if (!who) return { ok: false, reason: 'missing-fields' };
+    const j = activeJourney(who);
+    if (j) return { ok: true, person: who, inTransit: true, from: j.from, to: j.to, left: j.left, place: null };
+    const done = journeys().filter(function (x) { return x && x.person === who && x.status === 'arrived'; });
+    if (done.length) { const last = done[done.length - 1]; return { ok: true, person: who, inTransit: false, place: last.to, arrived: true }; }
+    return { ok: true, person: who, inTransit: false, place: null, reason: 'no-journey' };
+  }
+
   /** 推进：把共同日程按当前时间落成 planned → ongoing → done。只改状态，不凭空给人安排去处。 */
   function tick(facts) {
     const cfg = settings(); const f = facts || {};
@@ -261,6 +334,9 @@
     });
     lines.push('时空约束：未登记的地点不存在、未登记的道路走不通——不得据此推断「大概很近」。');
     lines.push('同一人物同一时刻只能在一处；不在名单上的人不得被写成在场（在场者只认日程证据）。');
+    const js = journeys().filter(function (j) { return j && j.status === 'in-transit'; }).slice(0, Math.max(1, cfg.maxJourneys || 4));
+    if (js.length) lines.push('在途：' + js.map(function (j) { return j.person + '（' + j.from + '→' + j.to + '，剩余 ' + j.left + '分钟）'; }).join('；'));
+    if (js.length) lines.push('在途者既不在起点也不在终点：剩余分钟未耗尽前，不得写成已到达。');
     return '[世界织体]\n' + lines.join('\n') + '\n';
   }
 
@@ -269,7 +345,7 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     addPlace: addPlace, addRoad: addRoad, reach: reach,
     addEvent: addEvent, eventsBetween: eventsBetween, attendees: attendees,
-    canBeAt: canBeAt, move: move, tick: tick, buildBlock: buildBlock,
+    canBeAt: canBeAt, move: move, depart: depart, advance: advance, where: where, tick: tick, buildBlock: buildBlock,
     whereStat: function () {
       return { places: places().length, roads: roads().length, events: events().length,
         upcoming: events().filter(function (e) { return e && e.status !== 'done'; }).length };

@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.64.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.64.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.65.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.65.0",
   "dead": {
     "apiRouter.fetchModels": {
       "reason": "unwired",
@@ -345,6 +345,54 @@
       "refs": 0,
       "tref": 3,
       "own": 2
+    },
+    "difficulty.actionCost": {
+      "reason": "self-only",
+      "detail": "engines/difficulty.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/difficulty.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "difficulty.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/difficulty.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "difficulty.setProfile": {
+      "reason": "self-only",
+      "detail": "engines/difficulty.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/difficulty.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "difficulty.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/difficulty.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "difficulty.spanMinutes": {
+      "reason": "self-only",
+      "detail": "engines/difficulty.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/difficulty.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "difficulty.stat": {
+      "reason": "self-only",
+      "detail": "engines/difficulty.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/difficulty.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
     },
     "editorEvents.buildBlock": {
       "reason": "test-only",
@@ -833,6 +881,14 @@
       "refs": 0,
       "tref": 4,
       "own": 19
+    },
+    "intel.releaseDue": {
+      "reason": "self-only",
+      "detail": "engines/intel.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/intel.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "ledgerTimeline.note": {
       "reason": "self-only",
@@ -1754,6 +1810,70 @@
       "tref": 1,
       "own": 4
     },
+    "weather.effect": {
+      "reason": "self-only",
+      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "weather.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "weather.season": {
+      "reason": "self-only",
+      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
+    "weather.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "weather.setWeather": {
+      "reason": "self-only",
+      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "weather.stat": {
+      "reason": "self-only",
+      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
+    },
+    "weather.travelMinutes": {
+      "reason": "self-only",
+      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "weather.weatherOf": {
+      "reason": "self-only",
+      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
     "workflow.unregister": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -1761,6 +1881,30 @@
       "refs": 0,
       "tref": 17,
       "own": 1
+    },
+    "world.advance": {
+      "reason": "self-only",
+      "detail": "engines/world.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "world.depart": {
+      "reason": "self-only",
+      "detail": "engines/world.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "world.where": {
+      "reason": "self-only",
+      "detail": "engines/world.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "worldbook.activationOf": {
       "reason": "test-only",
@@ -1838,6 +1982,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 117
+    "dataOnly": 125
   }
 }

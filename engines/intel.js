@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/intel.js (v2.53.0)
+ * WorldAxis engines/intel.js (v2.65.0)
  * 因果与情报：可追溯事件链、带来源的人物认知。
  *
  * 边界：
@@ -7,6 +7,8 @@
  *   2 因果必须指向已存在的事实、事件或上一环，不凭空生成原因。
  *   3 情报必须有来源与置信度；低置信只能标为怀疑，不能升格为事实。
  *   4 人物只能使用自己持有的情报，不把全知伪装成推理。
+ *   5 情报不得瞬移。给了 from/to 且路途有耗时时，接收者在到期前看不到它；
+ *     路途未登记则报 unreachable，不回落成「马上知道」。没给路途的情报仍是即时入账。
  */
 (function () {
   'use strict';
@@ -27,7 +29,7 @@
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  const stat = { links: 0, intel: 0, blocked: 0, lastReason: '' };
+  const stat = { links: 0, intel: 0, delayed: 0, released: 0, blocked: 0, lastReason: '' };
   function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function knownCause(id) {
@@ -60,12 +62,76 @@
     if (out && out.ok) { stat.links++; stat.lastReason = 'linked'; } else stat.blocked++;
     return out || { ok: false, reason: 'store-unavailable' };
   }
+  function queue() {
+    const q = state().intelQueue;
+    return Array.isArray(q) ? q : [];
+  }
+  /** \u8def\u9014\u8017\u65f6\u53ea\u95ee world.reach\u3002world \u672a\u88c5\u8f7d\u6216\u8def\u4e0d\u901a\u90fd\u4e0d\u5f97\u731c\u4e00\u4e2a\u5206\u949f\u6570\u3002 */
+  function travelOf(from, to) {
+    if (!WA.world || typeof WA.world.reach !== 'function') return { ok: false, reason: 'world-missing' };
+    const r = WA.world.reach(from, to);
+    if (!r || r.ok === false) return { ok: false, reason: (r && r.reason) || 'unreachable' };
+    if (!r.reachable) return { ok: false, reason: 'unreachable' };
+    return { ok: true, minutes: r.minutes };
+  }
+  /** \u5230\u671f\u624d\u5165\u8d26\u3002due \u7528\u4e16\u754c\u949f\u6beb\u79d2\uff1b\u6ca1\u7ed9 now \u5c31\u7528\u5f53\u524d\u949f\u3002\u672a\u5230\u671f\u7684\u4e00\u6761\u90fd\u4e0d\u52a8\u3002 */
+  function releaseDue(now) {
+    const t = isFinite(Number(now)) ? Number(now) : clockNow('intel');
+    const due = queue().filter(function (x) { return x && isFinite(x.due) && x.due <= t; });
+    if (!due.length) return { ok: true, released: 0, pending: queue().length };
+    let n = 0;
+    WA.store.transact(function (draft) {
+      draft.intelQueue = Array.isArray(draft.intelQueue) ? draft.intelQueue : [];
+      const keep = [];
+      draft.intelQueue.forEach(function (x) {
+        if (x && isFinite(x.due) && x.due <= t) {
+          const id = 'p_' + x.person;
+          const p = draft.people[id] || (draft.people[id] = { id: id, name: x.person, knowledge: {} });
+          p.lastSeenAt = clockNow('intel');
+          p.updatedAt = p.lastSeenAt;
+          p.knowledge = p.knowledge && typeof p.knowledge === 'object' ? p.knowledge : {};
+          p.knowledge.intel = Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
+          p.knowledge.intel = p.knowledge.intel.concat([{
+            id: x.id, claim: x.claim, source: x.source, level: x.level, confidence: x.confidence,
+            about: x.about, status: x.status, at: x.due, from: x.from, to: x.to
+          }]).slice(-12);
+          n++;
+        } else keep.push(x);
+      });
+      draft.intelQueue = keep;
+    }, 'intel:release');
+    stat.released += n; stat.intel += n; stat.lastReason = n ? 'released' : 'nothing-due';
+    return { ok: true, released: n, pending: queue().length };
+  }
   function addIntel(person, item) {
     const who = clean(person, 60), claim = clean(item && item.claim, 100), source = clean(item && item.source, 60);
     const level = LEVELS.indexOf(item && item.level) >= 0 ? item.level : '';
     if (!who || !claim || !source || !level) return { ok: false, reason: 'missing-fields' };
     const about = clean(item.about, 80);
     if (about && !knownCause(about)) return { ok: false, reason: 'unknown-subject' };
+    const from = clean(item && item.from, 40), to = clean(item && item.to, 40);
+    if (from || to) {
+      if (!from || !to) return { ok: false, reason: 'missing-route' };
+      const tv = travelOf(from, to);
+      if (!tv.ok) { stat.blocked++; return { ok: false, reason: tv.reason, from: from, to: to }; }
+      if (tv.minutes > 0) {
+        const due = clockNow('intel') + tv.minutes * 60000;
+        let queued = null;
+        WA.store.transact(function (draft) {
+          draft.intelQueue = Array.isArray(draft.intelQueue) ? draft.intelQueue : [];
+          const row = { id: 'intel_' + clockNow('intel') + '_' + draft.intelQueue.length,
+            person: who, claim: claim, source: source, level: level, confidence: CONF[level],
+            about: about, status: CONF[level] >= 75 ? 'believed' : 'suspected',
+            from: from, to: to, due: due, at: clockNow('intel') };
+          draft.intelQueue.push(row);
+          WA.evict.array(draft.intelQueue, 'intel.queue');
+          queued = { ok: true, id: row.id, status: 'in-transit', due: due, minutes: tv.minutes };
+        }, 'intel:delay');
+        if (queued && queued.ok) { stat.delayed++; stat.lastReason = 'delayed'; return queued; }
+        stat.blocked++;
+        return { ok: false, reason: 'store-unavailable' };
+      }
+    }
     let out = null;
     WA.store.transact(function (draft) {
       const id = 'p_' + who;
@@ -110,7 +176,7 @@
   WA.intel = {
     LEVELS: LEVELS, CONFIDENCE: CONF,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    addLink: addLink, addIntel: addIntel, visibleTo: visibleTo, explain: explain, knownCause: knownCause, buildBlock: buildBlock,
+    addLink: addLink, addIntel: addIntel, releaseDue: releaseDue, visibleTo: visibleTo, explain: explain, knownCause: knownCause, buildBlock: buildBlock,
     stat: function () { return Object.assign({}, stat); }
   };
 })();

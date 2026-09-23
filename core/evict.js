@@ -1,5 +1,5 @@
 /**
- * WorldAxis core/evict.js (v2.13.0) — 挤出侧完整性（七面治理的最后一面）
+ * WorldAxis core/evict.js (v2.65.0) — 挤出侧完整性（七面治理的最后一面）
  *
  * 为什么需要它：
  *   本仓库已把写侧（v2.6.0/v2.7.0）、删侧（v2.9.0）、读侧（v2.10.0）、活性面（v2.11.0）
@@ -89,6 +89,12 @@
     'world.places': { path: 'world.places', cap: 24, why: '已登记地点环形（没登记的地方不存在，故这张表就是世界的全部可达面）' },
     'world.roads':  { path: 'world.roads',  cap: 40, why: '已登记道路环形（没登记的路走不通，故这张表决定谁能到哪）' },
     'world.events': { path: 'world.events', cap: 12, why: '共同日程环形（集市/节庆/庭审/仪式/聚会）' },
+    // v2.65.0 行程表：在途与已到达都留痕（「他走过这条路」是事实，不得到达即删）
+    'world.journeys': { path: 'world.journeys', cap: 24, why: '行程表环形（在途 + 已到达；出发≠到达，故这张表就是「谁在路上」的全部证据）' },
+    // v2.65.0 天气：同地覆盖，表本身有界。未登记站点会 unknown-site 且不截断。
+    'weather.rows': { path: 'weather.rows', cap: 24, why: '已登记天气环形（没登记的地点不是晴天，故这张表就是天气的全部证据）' },
+    // v2.65.0 情报延迟：未到期的不入账。到期后从队列移走，队列本身仍有界。
+    'intel.queue': { path: 'intelQueue', cap: 24, why: '在途情报环形（未到期前接收者不可见；路不通则不入队）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },

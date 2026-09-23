@@ -127,7 +127,10 @@
       //   为什么三张表都要有界：它们都是「会被 AI 源源不断写进来」的容器，
       //   无界 = 存档体积被单机长跑拖垮；而**在场者名单不落盘**（由日程+地点现算，
       //   落盘就成了一份会过期的第二真源——「谁在场」必须永远能从证据重新推出来）。
-      world: { places: [], roads: [], events: [] },
+      world: { places: [], roads: [], events: [], journeys: [] },
+      // v2.65.0 天气与在途情报。登记了容量却不在骨架里，冷启动直写会炸事务。
+      weather: { rows: [] },
+      intelQueue: [],
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -790,6 +793,10 @@
     'world.places': { cap: 24, site: 'world.js WA.evict.array(world.places)' },
     'world.roads': { cap: 40, site: 'world.js WA.evict.array(world.roads)' },
     'world.events': { cap: 12, site: 'world.js WA.evict.array(world.events)' },
+    // v2.65.0 行程表与天气。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
+    'world.journeys': { cap: 24, site: 'world.js WA.evict.array(world.journeys)' },
+    'weather.rows': { cap: 24, site: 'weather.js WA.evict.array(weather.rows)' },
+    'intelQueue': { cap: 24, site: 'intel.js WA.evict.array(intel.queue)' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

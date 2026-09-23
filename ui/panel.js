@@ -27,7 +27,8 @@
     // v2.62.0: 因果结算。与 SOURCES 同批登记（只加源表不加显示名 ⇒ 面板裸露英文键名）。
     causal: '因果结算',
     // v2.63.0: 世界织体 / 社交漩涡 / 悬案。同上——只加源表不加显示名会让面板裸露英文键名。
-    world: '世界织体', shadow: '社交漩涡', threads: '悬案' };
+    world: '世界织体', shadow: '社交漩涡', threads: '悬案',
+    weather: '天气与物候', difficulty: '世界难度' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
@@ -326,6 +327,23 @@
     const people = Object.values(s.people);
     // v2.62.0：身份 ↔ 存档键对照表。`idStat()` 的 drifted 非空即说明
     //   「有人带着长期状态，却从未被登记过身份」——这在此前**完全不可观测**。
+    const settleRows = (function () {
+      const w = (s.world && typeof s.world === 'object') ? s.world : {};
+      const js = (Array.isArray(w.journeys) ? w.journeys : []).filter(function (j) { return j && j.status === 'in-transit'; });
+      const wx = (s.weather && Array.isArray(s.weather.rows)) ? s.weather.rows : [];
+      const df = (WA.difficulty && typeof WA.difficulty.effective === 'function') ? WA.difficulty.effective() : null;
+      const jLine = js.length
+        ? js.slice(0, 4).map(function (j) { return esc(j.person) + ' ' + esc(j.from) + '→' + esc(j.to) + ' 剩' + j.left + '分'; }).join('；')
+        : '无';
+      const wLine = wx.length
+        ? wx.slice(0, 4).map(function (x) { return esc(x.place) + ' ' + esc(x.kind); }).join('；')
+        : '未登记';
+      const dLine = !df ? '模块未装载'
+        : (df.enabled ? (esc(df.resistance) + ' / ' + esc(df.stance) + ' / ' + esc(df.pace)) : '关闭（中性值，不改结算）');
+      return '<div class="wa-item wa-dim">在途：' + jLine + '</div>'
+        + '<div class="wa-item wa-dim">天气：' + wLine + '</div>'
+        + '<div class="wa-item wa-dim">难度：' + dLine + '</div>';
+    })();
     const idRows = (function () {
       if (!WA.registry || typeof WA.registry.idStat !== 'function') return '<div class="wa-item wa-dim">身份模块不可用</div>';
       const st = WA.registry.idStat();
@@ -373,6 +391,7 @@
       <div id="wa-id-out" class="wa-out"></div>
       <div class="wa-list">${idRows}</div>
       <div class="wa-sec">世界织体（地点、道路、共同日程）</div>
+      <div class="wa-list">${settleRows}</div>
       <label class="wa-row"><input id="wa-world-enabled" type="checkbox" ${WA.world && WA.world.getSettings().enabled ? 'checked' : ''}/> 启用世界织体</label>
       <div class="wa-row"><input id="wa-world-place" class="wa-input" placeholder="地点名"/><button class="wa-btn" id="wa-world-addplace" title="登记一个地点：没登记的地方不可达（不猜「大概很近」）">登记地点</button><button class="wa-btn" id="wa-world-reach">查可到</button></div>
       <div class="wa-row"><input id="wa-world-rd-a" class="wa-input" placeholder="从"/><input id="wa-world-rd-b" class="wa-input" placeholder="到"/><input id="wa-world-rd-min" class="wa-input" placeholder="分钟"/><button class="wa-btn" id="wa-world-addroad" title="登记一条道路：没登记的路走不通">登记道路</button></div>

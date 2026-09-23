@@ -442,6 +442,8 @@
     'engines/causal.js': 'causal',
     // v2.63.0：世界织体 / 社交漩涡 / 悬案（与 index.js LOAD_ORDER 同批登记）
     'engines/world.js': 'world',
+    'engines/weather.js': 'weather',
+    'engines/difficulty.js': 'difficulty',
     'engines/shadow.js': 'shadow',
     'engines/threads.js': 'threads',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
