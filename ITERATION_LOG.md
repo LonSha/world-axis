@@ -639,7 +639,7 @@
   · ② <code>overdue</code> 起初<b>没有产品消费端</b>（只有测试调它）⇒ 死导出账本当场 dead 223→224。门禁点出后接进面板扫描按钮，dead 回到 223——<b>本项目「新导出必须立刻有真消费方」这条铁律，是靠门禁自动拦住我的</b>。
 - **验证**：<code>tests/longline-v2550.js</code> → <code>LONGLINE-V2550: pass</code>（12 组）；全量回归 <b>4948 / 失败 0</b>；dead 223 / uiDead 4 / dataOnly 122 / 仅测试 131；出口面 ns 70 / members 466 / chars 5742；清册面 refs 1644 / 命名空间 76 / 成员 844。
 - **工程教训（重要，已固化进流程）**：<b>用 heredoc 向终端传中文脚本会偶发讹变</b>（实测 <code>拒绝转移</code> 被写成 <code>拒绍转移</code>、<code>资源与组织</code> 被写成 <code>资 源与组织</code>），导致字面锚点匹配失败而补丁静默不生效。<b>含中文的改动一律走 <code>edit_file</code> 或 <code>create_file</code> 落盘后再执行</b>；终端内只做纯 ASCII 替换。
-- **提交**：<code>（见本版提交）</code>。
+- **提交**：<code>4143407</code>。
 ### R39 · 2026-09-22 · v2.56.0 交付（注入源表 × 注入分支 双向成类锁·第四十一面：把「加了消费点忘了登记源」变成当场红灯）
 - **做了什么**：
   · 修一处**真缺陷**：<code>SOURCES</code> 与 <code>__REG.def</code> 补登记 <code>life</code> / <code>intel</code> / <code>org</code> / <code>longline</code> 四源。
@@ -651,7 +651,7 @@
 - **本版坐实的第二处问题（流程面，比缺陷本身更值得记）**：<code>SOURCES</code> 上方的注释曾写「本版同时加了一条成类锁（<code>tests/longline-v2560.js</code>）」——**该文件当时根本不存在**。也就是说注释把「打算做」写成了「已经做了」。这与本仓反复出现的病同型：<b>声明与落地必须是两件事的核对，不能靠同一段文字自证</b>。声称「加了锁」就去 <code>ls</code> 那个文件；声称「修了缺陷」就去读那行代码。
 - **顺手修掉的陈旧断言**：<code>tests/run.js</code> 里 v2380 段把 <code>SOURCES</code> 长度钉死为 <code>11</code>（v2.51.0 时代的数字）。源表增长后它会红灯——已改为 15。**这是「能拦住我」的那类断言**（记错了就得来说明），故保留其形态而非改成动态比较。
 - **验证**：<code>tests/inject-sources-v2560.js</code> → <code>INJECT-SOURCES-V2560: pass</code>（20 项）；全量回归 <b>4968 / 失败 0</b>（v2.55.0 为 4948，+20 即本版新锁）；死导出门禁绿 <b>dead 223 / uiDead 4 / dataOnly 122 / 仅测试 131</b>，元数据同源、证据可复算。
-- **提交**：<code>（见本版提交）</code>。
+- **提交**：<code>6f4d1ac</code>。
 ### R40 · 2026-09-22 · v2.57.0 交付（模块分区分组锁·第四十二面：把「控件加进了面板、分区标题没写」变成当场红灯）
 - **做了什么**：
   · 修一处**真缺陷**：人物页的「因果与情报」**漏写了分区标题**，9 个 <code>wa-intel-*</code> 控件全部落在前一个「资源与组织」分区里——用户看到的是「资源与组织」标题下同时挂着两套功能（入库/转移/检查余额 与 加因果/加情报），两套 placeholder 混排，只能靠猜。补回 <code>&lt;div class="wa-sec"&gt;因果与情报&lt;/div&gt;</code>。
@@ -663,7 +663,7 @@
   · ② 首版 <code>moduleKeyword</code> 忘了先 <code>trim()</code>：渲染产物里 label 文本带换行缩进（<code>\n        启用人物生活</code>），<code>^启用</code> 永不匹配 ⇒ 4 个开关全部假报违规。**判据自己被谓词形状骗了**（与 v2.51.0 踩过的「参数化 id 让门禁失明」同型）。
 - **本版坐实的第三处问题（方法面）**：v2.56.0 那类**静态源码锁**照不到本缺陷——intel 的控件 id 与其分区是两件事，前者存在、后者缺失。这类「结构声明缺失」必须**在渲染产物上判**，而 <code>tests/ui-gate-sync.js</code> 的 <code>fresh()</code> 已提供真机 mini-DOM 环境（装载顺序从 <code>tests/run.js</code> 的 LOAD 提取，不复制不漂移），本锁直接复用它，不另造壳。<b>顺带收窄一条长期论断：此前「UI 层悬空、需浏览器复核」——真机渲染路径在无头环境其实是可判定的。</b>
 - **验证**：<code>tests/ui-module-section-v2570.js</code> → <code>pass</code>（9 项）；先跑成**红**（<code>[B] 「资源与组织」下有 资源与组织 + 因果与情报</code>）再修产品端转绿，负控制确认删除该标题后 A/B 同时现形；全量回归 <b>4977 / 失败 0</b>（v2.56.0 为 4968，+9 即本版新锁）；死导出门禁绿 dead 223 / uiDead 4 / dataOnly 122；ui-wire-audit 9 / 0；出口面契约逐字一致 ns 70 / members 466 / chars 5742。
-- **提交**：<code>（见本版提交）</code>。
+- **提交**：<code>2c311e4</code>。
 ### R41 · 2026-09-22 · v2.58.0 交付（可见性「无死开关」行为锁·第四十三面：把「开关点了零效果」从逐例治改成成类判）
 - **做了什么**：
   · 新建 <code>tests/inject-vis-v2580.js</code>：对 <code>SOURCES</code> **全部 15 个源逐个**验证「开关动一下、产物跟着动」，含面板复选框集合对齐与真实点击落盘；已接进门禁。
@@ -684,7 +684,7 @@
 - **实测覆盖**：15 / 15 源全部判到、**零跳过**（含 memory 经 memorySampler 路径、opinion/ledger 走各自的 <code>buildXxxBlock</code>、style 与四条新模块走 <code>buildBlock</code>），逐源 <code>on=true / off=false</code>。
 - **负控制（真源码破坏 → 破坏副本上重跑同款判据）**：把 <code>vis.life &amp;&amp; WA.life</code> 还原成 <code>WA.life</code>（正是 v2.56.0 之前的真实缺陷形态），用 <code>gate.fresh({files, srcOverride})</code> 装载破坏副本，要求 C 面在 life 上报红；原版上同款判据仍为绿。**这条负控制同时回报了一件事：本仓长期标注的「UI 层悬空需浏览器复核」并不完全成立——真机渲染与注入路径在无头环境是可判定、可破坏自证的。**
 - **验证**：<code>tests/inject-vis-v2580.js</code> → <code>pass</code>（10 项）；全量回归 <b>4987 / 失败 0</b>（v2.57.0 为 4977，+10 即本版新锁）；死导出门禁绿 dead 223 / uiDead 4 / dataOnly 122；ui-wire-audit 9 / 0；出口面契约逐字一致 ns 70 / members 466 / chars 5742。
-- **提交**：<code>（见本版提交）</code>。
+- **提交**：<code>ee6790b</code>。
 
 
 ### R42 · 2026-09-23 · v2.59.0 交付（推演输出契约 ⇄ 引擎字段表双向锁·第四十四面：把「声明面承认、契约面缺席」变成当场红灯）
@@ -700,7 +700,7 @@
 - **两向自证（先跑成红）**：把契约行临时还原成修复前形态（逐字 `"vigilance":0-100,"boundary_status":"..."`）→ 锁立刻报 `[A] 缺 attachment,relationship_aftereffect`；恢复后 md5 逐字节一致并转绿。**这条是本版最重要的证据：它证明锁对这两个字段真敏感，而不是事后补一句「已验证」。**
 - **验证**：`tests/rel-contract-v2590.js` → `pass`（16 项）；全量回归 **5003 / 失败 0**（v2.58.0 为 4987，+16 即本版新锁）；死导出门禁绿 **dead 223 / uiDead 4 / dataOnly 122**；ui-wire-audit 9 / 0；出口面契约逐字一致 **ns 70 / members 466 / chars 5742**；field-liveness-gate 绿（无幽灵读点、写/读侧零越界）；提示词实测 5478 → 5613 字符，两轴归位。
 - **本轮猎取路径（方法论，供后人复用）**：本版之前的三个版本都是「读代码猜缺口」。本版换了正交信号——用 **Node 内置 V8 覆盖率**（`NODE_V8_COVERAGE`）跑一遍全量回归，聚合出**产品文件中顶层零执行的具名函数**（90 项），再与「全库零调用点」（33 项）与「导出面契约」交叉。这条链**照出了静态锁照不到的一面**：例如 `engines/style.buildBlock` 在覆盖率上零执行——因为 v2.58.0 的 C 面把模块取数口**整体替换成哨兵函数**，真实产出自然不跑。一路收敛到「relation_update 契约字段」这个真缺陷。**记一条口径**：`NODE_V8_COVERAGE` 产物的 `url` 是**相对路径**（如 `engines/evolution.js`）而非 `file://` 绝对路径，且含 `.broken` / `broken/` 负控制副本，聚合时必须显式排除。
-- **提交**：`（见本版提交）`。
+- **提交**：<code>ce467bc</code>。
 ### R43 · 2026-09-23 · v2.60.0 交付（输出契约「节内字段」⇄ 引擎读取面全节锁·第四十五面：把 v2.59.0 的「一处的病」升级为「一族的体检」）
 - **做了什么**：
   · 修**四处真缺陷**（全部行为级实证：引擎真实读取、契约从未要求 ⇒ 模型按契约必然不给 ⇒ 能力由构造即死）：
@@ -725,4 +725,34 @@
 - **验证**：`tests/rel-contract-v2600.js` → `pass`（23 项）；全量回归 **5026 / 失败 0**（v2.59.0 为 5003，+23 即本版新锁）；死导出门禁绿 **dead 223 / uiDead 4 / dataOnly 122**；ui-wire-audit 9 / 0；出口面契约逐字一致 **ns 70 / members 466 / chars 5742**；field-liveness-gate 绿（无幽灵读点、写/读侧零越界）；提示词实测 58678 → 60188 字节。
 - **一条可直接复用的口径**：**探针读键的默认值必须与真值同型**。给「truthy 哨兵」看着更省事（能顺带捕获 `x.f && …` 型受保护读取），但会破坏引擎的类型守卫、让探测在半途静默截断——**漏检比误报危险得多**，因为它伪装成「这一节没有问题」。
 - **本轮猎取路径（方法论，供后人复用）**：v2.59.0 用 V8 覆盖率找「零执行面」；本版换了**正交信号**——**Proxy 追踪真实读取**。它照出的是既有全部锁（含 `contract-audit` 这个专治同类病的对账器）都照不到的一维：**同一条契约行内部的字段级增删**。收敛路径：先按节读 `applyResult` 的消费点（grep 出 10 个消费区块）→ 用 `probe_region.js` 做精确分区扫描（判据自纠过一次：`[a-zA-Z_]+` 会排除含数字字段如 `d1`，改为 `[a-zA-Z_][a-zA-Z0-9_]*`）→ 逐项**定性**（补声明 / 明确归为引擎内部字段）→ 建锁。
+- **提交**：<code>7070e19</code>。
+### R44 · 2026-09-23 · v2.61.0 交付（有界容器「淘汰元字段」的生产者供给面锁·第四十六面：把「淘汰读什么」之外没人钉的「写什么」钉上）
+
+- **做了什么**：
+  · 修 **6 处真缺陷**（同一缺陷族，全部行为级实证）——`people` 是有界容器（cap 48），淘汰**唯一**按 `updatedAt` 最旧优先，但有 4 条创建/更新条目的路径**从不写它**。缺字段 ⇒ 排序键恒 0 ⇒ 该条目**恒定被视为「最旧」** ⇒ 刚写入即被优先挤出，与「保留近期活跃者」的设计口径**方向完全相反**：
+    ① `engines/backstage.js` people 主通道补 `lastSeenAt: now`（此前 `lastSeenAt` **全库零写入方**，而 `core/store.js` 的 schema 声明了它、`engines/bridge.js:165` 的对外投影也真的读它 ⇒ 另一侧插件永远读到 0）；
+    ② `engines/backstage.js` `knowledge_updates` 路径补 `person.lastSeenAt/updatedAt`；
+    ③ `engines/intel.js` `addIntel` 补 `p.lastSeenAt/updatedAt`；
+    ④ `engines/life.js` `addCommitment` 补 `p.updatedAt`（**同文件内自相矛盾**：`addGoal` 写了、本条漏了）；
+    ⑤ `engines/life.js` `addSchedule` 补 `p.updatedAt`（日程自带未来 `start/end`，恰是**最该留在场上**的那类人物）；
+    ⑥ `engines/life.js` `tick` 补 `p.updatedAt`（它改写了 `p.intent`——观测面 `observe.slice` 的输入，却不算「人物被更新」）。
+  · 新建 `tests/evict-meta-v2610.js`（**26 项**）：A 站点声明⇄淘汰消费者（全仓源码面，经 `tests/product-files.js` 单一真源推导）/ B 消费者⇄排序键（从 sort 表达式解析，且与站点 `why` 自陈一致）/ C 生产者供给面（**行为级主判据**：灌满同样老的 48 条 → 各路径写一个**全新**条目 → 触发真实淘汰 → 必须存活）/ C2 生产者清单⇄源码面 / D 声明⇄写入方（防幽灵字段）/ E 哨兵不泄漏，外加 N0~N8 负控制。
+  · 给 `tests/ui-gate-sync.js` 的 `fresh()` 加**产品模块源码覆盖**能力（`opts.srcOverride`）：与既有 `ui/*` 覆盖同一口径，用途是让「修复前形态」在**内存副本**上装载并重跑同款判据（真源码零改写）。默认路径逐字不变，既有 ui-gate 53/0 不受影响。
+- **为什么既有 45 个面全都照不到（本版最关键的定位）**：
+  · `tests/run.js` 的 people 容量治理用例（v1.0.0）种下 60 个 **都带 `updatedAt`** 的条目，只验证「排序生效、挤出 48」——它把排序键**当既有事实**，从不问生产者给不给；
+  · `tests/run.js` 的 G18 门禁（v2.13.0）钉的是「站点声明 ⇄ 调用点存在」，**不看调用点排的是哪个键**；
+  · `core/evict.js` 的 `SITES` 只声明「cap 几、怎么排」，不声明「排序键由谁维护」；
+  · field-liveness-gate 管的是「骨架一级键的读写归属」，`people` 内部的 `updatedAt` 在其粒度之下；
+  · v2.60.0 的锁管「输出契约节内字段 ⇄ 引擎读取面」，与「持久化元字段的生产者供给面」不同轴。
+  · 一句话：**既有锁把淘汰「读什么」钉住了，没人钉「写什么」**。
+- **判据设计上的自纠（两处，均由实跑暴露）**：
+  · ① **排序键解析空集**：`siteCallIn` 初版正则只认 `\[x\]\s*&&\s*ident\[x\]\.F`，而真实形态是 `draft.people[a] && draft.people[a].updatedAt`（**带点路径**）⇒ 解析结果空集、B 面假红。改为接收者允许 `(?:.prop)*`。
+  · ② **幽灵字段假阳性**：`writersOf` 初版只认 `{`/`,` 前缀的对象字面量属性，而多行字面量里属性**各占一行、位于行首** ⇒ backstage 的 `avatar` 被误报成幽灵字段。改为 `(?:^|[\{,])\s*field\s*:`。
+  · ③ **E 面从「全字节比对」改判**：探测经 `store.transact` 会**真落盘**（批外 `store.save`），故探测窗口改为「快照 → 跑 → 还原」自隔离；而 mock 的日志是**防抖异步落盘**、`store.init()` 自身在 `loadEventLog` 时会 `flushLog()` 落一次盘——那是**基建行为**，拿它当判据会把「基建时序」误判成「锁有副作用」。E 面最终钉的是本锁自己的契约：**哨兵不得泄漏进真实存档**（另把 `WA.log` 在探测窗口静音，静音的是诊断出口、不改任何被测行为）。
+- **两向自证（先跑成红是纪律，两种口径都做了）**：
+  · **内存副本口径**（N1/N3）：把六处修复点逐字还原成修复前形态 → 同款判据现形**恰 4 处**（`knowledge_updates` / `addIntel` / `addCommitment` / `addSchedule`），与修复前实测集合逐项一致；只还原一路时恰好报那一路。
+  · **真源码破坏口径**（独立取证）：真删 `backstage.js` / `intel.js` 两处修复语句（锚点各恰中 1 次）→ 锁立刻报 `[C] 缺 backstage.applyResult.knowledge_updates(updatedAt=undefined), intel.addIntel(updatedAt=undefined)`；从备份还原后 `cmp` **逐字节一致**、锁转绿 26/26。
+- **验证**：`tests/evict-meta-v2610.js` → `pass`（26 项，连跑两遍可重复）；全量回归 **5052 / 失败 0**（v2.60.0 为 5026，+26 即本版新锁）；死导出门禁绿 **dead 223 / uiDead 4 / dataOnly 122**；ui-wire-audit 9 / 0；出口面契约逐字一致 **ns 70 / members 466 / chars 5742**；field-liveness-gate 绿（无幽灵读点、写侧越界 1 处既有、读侧 0）。
+- **一条可直接复用的口径**：**有界容器的「排序键」是一条跨模块契约，必须有生产者供给面的判据**。只钉「淘汰按什么排」（站点声明 + 调用点存在）会让整族缺陷长期隐身——因为**声明与消费都对，错的是生产者**。判据必须**行为级**（灌满 → 写入 → 真淘汰 → 看存活），静态扫描只能做补充（C2/D）。
+- **本轮猎取路径（方法论，供后人复用）**：本版连续排除了三个候选面后才收敛——① 持久化往返（`run.js:8913` 早有 C13 断言、`run.js:968` 早有 toolSnapshot 往返用例，**不重复建设**）；② settingsBus 设置面（写三个探针实测：21 个注册项幻影声明 0、未约束 number 0；11 个有 `bounds/enums/sentinels` 的登记项从各自 `setSettings` 写越界值**全部正确夹取**；再用 Proxy 追踪 `settingsBus.read()` 的 83 个静态子键真实读取，唯一未命中的 `bridge` 4 键经核实是**探针调用链未触达 `buildSnapshot`** 的假阳性，源码侧确实消费）⇒ **该面健全**；③ clock/rand 单一出口（`core/clock.js:76` 自陈已被门禁 G20 覆盖）。转向正交信号——**`grep -rn 'draft.people' 清点容器的全部写入方**，与「淘汰消费的排序键」对照，一眼看出供给面缺口。
 - **提交**：`（见本版提交）`。

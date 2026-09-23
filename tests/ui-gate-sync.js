@@ -53,7 +53,14 @@ function fresh(opts) {
   //   顺序不能颠倒：先复位 → 再重装产品模块（绑真宿主）→ 最后 install（把 WA.mainWin 换成
   //   mini-DOM 壳，只供随后求值的 ui/* 使用）。
   try { global.WorldAxis.mainWin = global; global.WorldAxis.mainDoc = global.document; } catch (e) {}
-  for (const rel of LOAD) vm.runInContext(fs.readFileSync(path.join(BASE, rel), 'utf8'), ctx, { filename: rel });
+  // v2.61.0: 产品模块同样支持源码覆盖（与下方 ui/* 的 opts.srcOverride 同一口径）。
+  //   用途：让「修复前形态」在**内存副本**上装载并重跑同款判据（真源码破坏，零文件改写）；
+  //   默认路径逐字不变——未传 override 时仍直接读盘。
+  const __srcOv = opts.srcOverride || {};
+  for (const rel of LOAD) {
+    const __src = __srcOv[rel] !== undefined ? __srcOv[rel] : fs.readFileSync(path.join(BASE, rel), 'utf8');
+    vm.runInContext(__src, ctx, { filename: rel });
+  }
   const WA = global.WorldAxis;
   // 前提：代表「有聊天」。run.js 里靠前的块会把 mockCtx.chat 换成空数组/别的形状且不还原，
   //   而本门禁的推演链路需要一条末楼作为锚点——所以不能假设它恰好还在，

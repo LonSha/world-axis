@@ -541,7 +541,9 @@
           speakingStyle: p.speakingStyle || old.speakingStyle,
           behaviorBoundaries: p.behaviorBoundaries || old.behaviorBoundaries,
           innerVoice: p.innerVoice || old.innerVoice,
-          updatedAt: now
+          // v2.61.0: `lastSeenAt` 此前**零写入方**（schema 声明了、bridge 投影读了，
+          //   却从没人写 ⇒ 外部永远读到 0）。此处是「人物被结算看见」的时刻，正是它的语义。
+          lastSeenAt: now, updatedAt: now
         });
         if (mergedAliases.length) draft.people[id].aliases = mergedAliases;
       });
@@ -566,6 +568,9 @@
         if (!k || !k.person || !k.about) return;
         const id = 'p_' + String(k.person);
         const person = draft.people[id] = draft.people[id] || { id, name: k.person, knowledge: {} };
+        // v2.61.0: 认知边界写入也是「人物被结算看见」——淘汰唯一按 updatedAt 排序，
+        //   不写它则本条目的排序键恒 0 ⇒ 刚记下知情的人物反而优先被挤出。
+        person.lastSeenAt = now; person.updatedAt = now;
         person.knowledge = person.knowledge || {};
         const status = (k.route === 'inferred') ? 'suspected' : (k.status === 'fact' ? 'fact' : 'suspected');
         person.knowledge[String(k.about).slice(0, 80)] = { status, route: k.route || 'told', at: now };

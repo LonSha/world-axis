@@ -70,6 +70,9 @@
     WA.store.transact(function (draft) {
       const id = 'p_' + who;
       const p = draft.people[id] || (draft.people[id] = { id: id, name: who, knowledge: {} });
+      // v2.61.0: 本条创建/更新人物条目，必须一并维护有界容器 `people` 淘汰所依赖的排序键
+      //   （cap 48 按 `updatedAt` 最旧优先挤出）——否则该条目排序键恒 0，刚写入即被优先挤出。
+      p.lastSeenAt = clockNow('intel'); p.updatedAt = p.lastSeenAt;
       p.knowledge = p.knowledge && typeof p.knowledge === 'object' ? p.knowledge : {};
       p.knowledge.intel = Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
       const row = { id: 'intel_' + clockNow('intel') + '_' + p.knowledge.intel.length, claim: claim, source: source, level: level, confidence: CONF[level], about: about, status: CONF[level] >= 75 ? 'believed' : 'suspected', at: clockNow('intel') };

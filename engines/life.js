@@ -82,7 +82,9 @@
     WA.store.transact(function (draft) {
       const p = person(draft, name), life = ensureLife(p);
       const row = { id: 'cmt_' + clockNow('life') + '_' + life.commitments.length, kind: item.kind, target: target, text: text, due: isFinite(Number(item.due)) ? Number(item.due) : 0, status: 'active', at: clockNow('life') };
-      life.commitments = life.commitments.concat([row]).slice(-12); out = { ok: true, id: row.id };
+      // v2.61.0: 与 addGoal 同规格——本文件写了 updatedAt 的只有 addGoal，本条漏掉，
+      //   于是同一个人「有承诺」反而比「有目标」更早被淘汰（同一文件内自相矛盾）。
+      life.commitments = life.commitments.concat([row]).slice(-12); p.updatedAt = row.at; out = { ok: true, id: row.id };
     }, 'life:add-commitment');
     return out || { ok: false, reason: 'store-unavailable' };
   }
@@ -95,7 +97,9 @@
       const p = person(draft, name), life = ensureLife(p);
       if (life.schedule.some(function (x) { return x.status === 'active' && start < x.end && end > x.start; })) { out = { ok: false, reason: 'time-conflict' }; return; }
       const row = { id: 'sch_' + clockNow('life') + '_' + life.schedule.length, activity: activity, location: clean(item.location, 40), start: start, end: end, status: 'active' };
-      life.schedule = life.schedule.concat([row]).slice(-12); out = { ok: true, id: row.id };
+      // v2.61.0: 同 addCommitment——日程是「人物在做什么」，且日程自带 start/end（未来时刻），
+      //   恰是**最该留在场上**的那类人物；缺 updatedAt 会让它最先被挤出。
+      life.schedule = life.schedule.concat([row]).slice(-12); p.updatedAt = clockNow('life'); out = { ok: true, id: row.id };
     }, 'life:add-schedule');
     return out || { ok: false, reason: 'store-unavailable' };
   }
@@ -118,7 +122,9 @@
         if (fulfilled) commitment.status = 'kept';
         life.lastDecision = { action: decision.action, reason: decision.reason, goal: goal ? goal.id : '', at: f.now || stat.lastAt };
         if (decision.action === 'advance' && goal && !goal.next) goal.next = '推进中';
-        p.intent = decision.action === 'wait' ? '等待条件' : decision.reason; changed++;
+        // v2.61.0: tick 改写了当前意图（观测面 `observe.slice` 的输入），却不算「人物被更新」——
+        //   于是本轮真正在行动的人物，在淘汰排序上仍是「最旧」。
+        p.intent = decision.action === 'wait' ? '等待条件' : decision.reason; p.updatedAt = f.now || stat.lastAt; changed++;
       });
     }, 'life:tick');
     stat.ticks++; stat.changed += changed; if (!changed) stat.blocked++; stat.lastReason = changed ? 'updated' : 'nothing-to-do';
