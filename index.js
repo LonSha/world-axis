@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.67.0';
+  const VERSION = '2.68.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -312,6 +312,11 @@
     'engines/temperament.js',
     'engines/fondness.js',
     'engines/parallel-events.js',
+    // v2.68.0: 资料片周期 / 生存三轴 / 通缉 / 驯兽。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/era-cycle.js',
+    'engines/survival.js',
+    'engines/warrant.js',
+    'engines/beast-bond.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

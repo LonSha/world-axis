@@ -36,7 +36,9 @@
     'causal', 'world', 'shadow', 'threads',
     // v2.65.0: 'weather' / 'difficulty'。与注入分支同批登记，否则开关点了零效果。
     // v2.66.0: 'affect' / 'bonds' / 'masks'。与注入分支同批登记，否则开关点了零效果。
-    'weather', 'difficulty', 'affect', 'bonds', 'masks', 'temporalLock', 'temperament', 'fondness', 'parallelEvents'];
+    'weather', 'difficulty', 'affect', 'bonds', 'masks', 'temporalLock', 'temperament', 'fondness', 'parallelEvents',
+    // v2.68.0: 'eraCycle' / 'survival' / 'warrant' / 'beastBond'。与注入分支同批登记（键名 = 命名空间名）。
+    'eraCycle', 'survival', 'warrant', 'beastBond'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -45,7 +47,7 @@ style: false,
         life: true, intel: true, org: true, longline: true,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
-        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true }, module: 'inject' };
+        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -268,6 +270,10 @@ style: false,
       if (vis.temperament && WA.temperament) { const tm = WA.temperament.buildBlock(); if (tm) items.push({ source: '双层性格', content: tm }); }
       if (vis.fondness && WA.fondness) { const fb = WA.fondness.buildBlock(); if (fb) items.push({ source: '好感审计', content: fb }); }
       if (vis.parallelEvents && WA.parallelEvents) { const pb = WA.parallelEvents.buildBlock(); if (pb) items.push({ source: '场外事件', content: pb }); }
+      if (vis.eraCycle && WA.eraCycle) { const ec = WA.eraCycle.buildBlock(); if (ec) items.push({ source: '资料片周期', content: ec }); }
+      if (vis.survival && WA.survival) { const sv = WA.survival.buildBlock(); if (sv) items.push({ source: '生存三轴', content: sv }); }
+      if (vis.warrant && WA.warrant) { const wr = WA.warrant.buildBlock(); if (wr) items.push({ source: '通缉', content: wr }); }
+      if (vis.beastBond && WA.beastBond) { const bb = WA.beastBond.buildBlock(); if (bb) items.push({ source: '驯兽', content: bb }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块
       //   （它仍留在存档里，因为「秘密存在过」是事实，不是态度）。

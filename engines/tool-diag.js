@@ -455,6 +455,11 @@
     'engines/temperament.js': 'temperament',
     'engines/fondness.js': 'fondness',
     'engines/parallel-events.js': 'parallelEvents',
+    // v2.68.0：资料片周期 / 生存三轴 / 通缉 / 驯兽（与 index.js LOAD_ORDER 同批登记）
+    'engines/era-cycle.js': 'eraCycle',
+    'engines/survival.js': 'survival',
+    'engines/warrant.js': 'warrant',
+    'engines/beast-bond.js': 'beastBond',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

@@ -141,6 +141,11 @@
       temperament: { rows: [] },
       fondness: { rows: [] },
       parallelEvents: { rows: [] },
+      // v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽。登记了容量却不在骨架里，冷启动直写会炸事务。
+      eraCycle: { rows: [] },
+      survival: { rows: [] },
+      warrant: { rows: [] },
+      beastBond: { rows: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -817,6 +822,11 @@
     'temperament.rows': { cap: 12, site: 'temperament.js WA.evict.array(temperament.rows)' },
     'fondness.rows': { cap: 16, site: 'fondness.js WA.evict.array(fondness.rows)' },
     'parallelEvents.rows': { cap: 15, site: 'parallel-events.js WA.evict.array(parallelEvents.rows)' },
+    // v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
+    'eraCycle.rows': { cap: 8, site: 'era-cycle.js WA.evict.array(eraCycle.rows)' },
+    'survival.rows': { cap: 12, site: 'survival.js WA.evict.array(survival.rows)' },
+    'warrant.rows': { cap: 16, site: 'warrant.js WA.evict.array(warrant.rows)' },
+    'beastBond.rows': { cap: 10, site: 'beast-bond.js WA.evict.array(beastBond.rows)' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

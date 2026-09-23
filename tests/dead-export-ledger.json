@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.67.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.67.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.68.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.68.0",
   "dead": {
     "affect.channel": {
       "reason": "self-only",
@@ -65,6 +65,62 @@
       "refs": 0,
       "tref": 0,
       "own": 2
+    },
+    "beastBond.bond": {
+      "reason": "self-only",
+      "detail": "engines/beast-bond.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beast-bond.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "beastBond.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/beast-bond.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "beastBond.read": {
+      "reason": "self-only",
+      "detail": "engines/beast-bond.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beast-bond.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "beastBond.register": {
+      "reason": "self-only",
+      "detail": "engines/beast-bond.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beast-bond.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "beastBond.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/beast-bond.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "beastBond.stat": {
+      "reason": "self-only",
+      "detail": "engines/beast-bond.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beast-bond.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "beastBond.train": {
+      "reason": "self-only",
+      "detail": "engines/beast-bond.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beast-bond.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "bonds.getSettings": {
       "reason": "unwired",
@@ -593,6 +649,54 @@
       "refs": 0,
       "tref": 0,
       "own": 7
+    },
+    "eraCycle.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/era-cycle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "eraCycle.init": {
+      "reason": "self-only",
+      "detail": "engines/era-cycle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/era-cycle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "eraCycle.read": {
+      "reason": "self-only",
+      "detail": "engines/era-cycle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/era-cycle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "eraCycle.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/era-cycle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "eraCycle.stat": {
+      "reason": "self-only",
+      "detail": "engines/era-cycle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/era-cycle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
+    "eraCycle.tick": {
+      "reason": "self-only",
+      "detail": "engines/era-cycle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/era-cycle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "evict.nonEvictDecls": {
       "reason": "test-only",
@@ -1698,6 +1802,46 @@
       "tref": 0,
       "own": 6
     },
+    "survival.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/survival.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "survival.read": {
+      "reason": "self-only",
+      "detail": "engines/survival.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survival.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "survival.set": {
+      "reason": "self-only",
+      "detail": "engines/survival.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survival.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survival.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/survival.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "survival.stat": {
+      "reason": "self-only",
+      "detail": "engines/survival.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survival.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
+    },
     "temperament.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -2074,6 +2218,54 @@
       "tref": 5,
       "own": 3
     },
+    "warrant.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/warrant.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "warrant.pardon": {
+      "reason": "self-only",
+      "detail": "engines/warrant.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/warrant.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "warrant.read": {
+      "reason": "self-only",
+      "detail": "engines/warrant.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/warrant.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "warrant.report": {
+      "reason": "self-only",
+      "detail": "engines/warrant.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/warrant.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "warrant.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/warrant.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "warrant.stat": {
+      "reason": "self-only",
+      "detail": "engines/warrant.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/warrant.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
     "wbInject.clearOrder": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -2310,6 +2502,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 131
+    "dataOnly": 138
   }
 }

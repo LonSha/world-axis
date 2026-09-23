@@ -105,6 +105,11 @@
     'temperament.rows': { path: 'temperament.rows', cap: 12, why: '双层性格环形（底色/习惯/触发词，每行一人）' },
     'fondness.rows': { path: 'fondness.rows', cap: 16, why: '好感审计环形（步进白名单 + 信任对冲，不降准则）' },
     'parallelEvents.rows': { path: 'parallelEvents.rows', cap: 15, why: '场外事件环形（三要素 + 主时钟同步，活跃容量 3）' },
+    // ── v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽（era-cycle.js / survival.js / warrant.js / beast-bond.js）──
+    'eraCycle.rows': { path: 'eraCycle.rows', cap: 8, why: '资料片周期环形（四档状态机 + 倒计时，结算转长草强制换事件）' },
+    'survival.rows': { path: 'survival.rows', cap: 12, why: '生存三轴环形（饱食/精力/负重分段，归零惩罚如实报出）' },
+    'warrant.rows': { path: 'warrant.rows', cap: 16, why: '通缉环形（罪度三档，不随死亡消除，惯犯升级）' },
+    'beastBond.rows': { path: 'beastBond.rows', cap: 10, why: '驯兽环形（驯服满百清零转化，红线状态机）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },
