@@ -95,6 +95,11 @@
     'weather.rows': { path: 'weather.rows', cap: 24, why: '已登记天气环形（没登记的地点不是晴天，故这张表就是天气的全部证据）' },
     // v2.65.0 情报延迟：未到期的不入账。到期后从队列移走，队列本身仍有界。
     'intel.queue': { path: 'intelQueue', cap: 24, why: '在途情报环形（未到期前接收者不可见；路不通则不入队）' },
+    // ── v2.66.0 情绪通道 / 关系六型 / 假面（affect.js / bonds.js / masks.js）──
+    'affect.channels': { path: 'affect.channels', cap: 12, why: '情绪通道环形（每人一行：开放动作/硬关闭动作/过载回退，不含情绪词）' },
+    'affect.loads': { path: 'affect.loads', cap: 24, kind: 'object', why: '调制量（疲惫/饥饿/疼痛/社交消耗，每键一人）' },
+    'bonds.rows': { path: 'bonds.rows', cap: 24, why: '关系六型环形（与 enemies 血仇正交：血仇记事件，六型记结构）' },
+    'masks.rows': { path: 'masks.rows', cap: 20, why: '假面环形（口径与露馅同时在场且不一致才算假面）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },

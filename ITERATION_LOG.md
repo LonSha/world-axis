@@ -854,6 +854,14 @@
 - **一条可直接复用的口径**：**否定式能力的判据必须落在「不发生活动的那一侧也说得清」上**。三面最贵的边界分别是「没掷的那次别算成掷过」「没开的时候别写」「没进去的那些要说去哪了」——它们共同的特征是：**在状态里长得像「什么都没发生」**。凡是这种边界，都必须先在引擎里造一个**只在拒绝/跳过路径上增长**的计数器，再把判据钉在那个计数器与「真做了什么」的**互斥关系**上；只有计数、没有互斥关系，判据就退化成「计数存在」。（同型先例：v2.63.0 三面的 `stat.faults`。）
 - **提交**：`（见本版提交）`。
 
+### R49 · 2026-09-23 · v2.66.0 交付（字段面四件套 · 第五十五面：情绪通道 / 关系六型 / 假面 / 摘要三列 + 选项梯度）
+- **做了什么**：`engines/affect.js`（新，情绪通道：情绪词不进任何出口、开放×硬关闭不相交、过载回退必须是已登记开放动作、四项调制量之和 ≥6 时开放通道收成回退）、`engines/bonds.js`（新，关系六型：类型表白名单、自对拒收、配对键无向、与血仇正交分账）、`engines/masks.js`（新，假面：口径与露馅同时在场且不一致才成立、撤销显式）、`engines/digest.js`（摘要三列：关系方向/物品状态/新旧伏笔，全部从已有证据现算）、`direction/choices.js`（`generateGraded` 选项梯度：两易一中一难、配额引擎核验、`WA.rand` 洗位，`generate` 保持旧行为）。来源材料评估（四份新上传）：两份《自动续杯 BottomsUp 2.6.0》是宿主层错误重试/截断续写脚本，属容错与流式解包，不进引擎；可借的「拒绝必须可观测 + 报错特征分类账」思路与本仓库 `stat.faults` 口径一致，等价实现已存在；《【日月西】Gemini & Claude v0.41》是叙事预设，其五条日月律作字段设计的语义依据（人物立体→假面、物体连续→物品状态列），破限头部/NSFW 条款/混淆长文/伪闭合标签一律不进引擎。
+- **为什么**：R48 留下的字段面（情绪通道、关系六型、假面、摘要方向、选项梯度）都出自 4.4 与《日月西》。本版的纪律是「预设给的是描写指令，引擎收的是结算含义」：情绪词→动作、人设锚→可归类结构账、摘要模板→从证据现算的片段、选项要求→引擎侧配额。全部模块总开关默认关，关闭时 `reason:'disabled'` 与「用户选了空」可区分。
+- **影响范围**：`engines/affect.js`、`engines/bonds.js`、`engines/masks.js`（均新）、`engines/digest.js`、`direction/choices.js`、`core/evict.js`、`core/store.js`、`index.js`、`manifest.json`、`render/inject.js`、`ui/panel.js`、`engines/tool-diag.js`、`tests/run.js`、`tests/settle-v2660.js`（新）、`tests/export_contract.txt`、`tests/dead-export-ledger.json`。`tools/w266_*.py` 不入库。
+- **门禁结果**：`node tests/run.js` → **5741 / 失败 0**（v2.65.0 为 5657）。专锁单独 69/0（首跑 64/5，3 项暴露真缺陷：`affect.setLoad` 的 `missing-fields` 检查先于 `bad-load`，纯非法字段走不到 `bad-load` 分支，检查顺序对调修复；另 2 项为判据自身的开关时序错误）。出口面 ns 79 / members 545 / chars 6584（生成器产物逐字回填 `FROZEN2800`）。清册 refs 1907 / ns 85 / members 968，死子面 dead 262 / uiDead 4 / dataOnly 129，仅测试 131；账本由 `node tests/dead-export-gate.js --update` 写出，version 2.66.0，条目 266，归因 test-only 135 / self-only 115 / unwired 16。`checked` 49→53，`SOURCES` 21→24。
+- **可复用的判据**：① 对象型站点的登记必须三处同批：evict.SITES（带 `kind:'object'`）、store `__BOUNDED_CAPS`（带 `kind:'object'`）、`evict.object` 调用点带排序键第三参——本轮漏了登记表的 `kind`，registryParity 判「类型错配（应为数组）」，健康分 95、11 项红灯；probe 先于全量回归抓到。② 拒绝分支的检查顺序是语义的一部分：`missing-fields` 放在 `bad-load` 之前会让后者对「只给了非法字段」的写入不可达，专锁的 [N2] 判据（原版必须报 bad-load）当场现形。③ 缝合预设材料的取舍口径：**能落成「登记→核验→拒收」的才进引擎；只能落成「给模型的一句话要求」的留在预设里**。
+- **提交**：`（见本版提交）`。
+
 ### R48 · 2026-09-23 · v2.65.0 交付（结算缺口四件套 · 第五十四面：行程表 / 天气物候 / 难度三档 / 情报延迟）
 - **做了什么**：
   · 行程表补上总开关。`engines/world.js` 的 `move()` 继续只回答可达性；`depart()` 在 `missing-fields` 之后、`already-in-transit` 之前检查 `settings().enabled`，关闭返回 `{ ok:false, reason:'disabled' }` 且不调用 `move()`；`advance()` 在 `bad-minutes` 之后同样拒绝，不减 `left`。同一人同时只能一条 `in-transit`，`left` 减到 0 才改 `arrived`，`where` 对在途者给 `inTransit:true` 且 `place:`。`DEF.maxJourneys` 为 4，evict 站点 `world.journeys` cap 24。

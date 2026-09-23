@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.65.0';
+  const VERSION = '2.66.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -302,6 +302,11 @@
     // v2.63.0：悬案（调查与情报玩法面）。
     //   须早于 render/inject.js，注入时读取 threads.buildBlock()。
     'engines/threads.js',
+    // v2.66.0：情绪通道 / 关系六型 / 假面。须早于 render/inject.js，注入时读取各自 buildBlock()；
+    //   且须晚于 threads.js —— affect 的过载口径参考 difficulty 的枚举纪律，无硬依赖但保持装载序。
+    'engines/affect.js',
+    'engines/bonds.js',
+    'engines/masks.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

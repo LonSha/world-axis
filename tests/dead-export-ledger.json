@@ -1,7 +1,55 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.65.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.65.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.66.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.66.0",
   "dead": {
+    "affect.channel": {
+      "reason": "self-only",
+      "detail": "engines/affect.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/affect.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "affect.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/affect.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "affect.setChannel": {
+      "reason": "self-only",
+      "detail": "engines/affect.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/affect.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "affect.setLoad": {
+      "reason": "self-only",
+      "detail": "engines/affect.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/affect.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "affect.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/affect.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "affect.stat": {
+      "reason": "self-only",
+      "detail": "engines/affect.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/affect.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
     "apiRouter.fetchModels": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -17,6 +65,46 @@
       "refs": 0,
       "tref": 0,
       "own": 2
+    },
+    "bonds.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/bonds.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "bonds.read": {
+      "reason": "self-only",
+      "detail": "engines/bonds.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/bonds.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "bonds.setBond": {
+      "reason": "self-only",
+      "detail": "engines/bonds.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/bonds.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "bonds.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/bonds.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "bonds.stat": {
+      "reason": "self-only",
+      "detail": "engines/bonds.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/bonds.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
     },
     "bridge.buildSnapshot": {
       "reason": "self-only",
@@ -201,6 +289,22 @@
       "refs": 0,
       "tref": 1,
       "own": 6
+    },
+    "choices.generateGraded": {
+      "reason": "self-only",
+      "detail": "direction/choices.js 内部自用、外部零引用（过度导出）",
+      "src": "direction/choices.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "choices.stat": {
+      "reason": "self-only",
+      "detail": "direction/choices.js 内部自用、外部零引用（过度导出）",
+      "src": "direction/choices.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
     },
     "clock.advance": {
       "reason": "self-only",
@@ -977,6 +1081,54 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "masks.dropMask": {
+      "reason": "self-only",
+      "detail": "engines/masks.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/masks.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "masks.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/masks.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "masks.read": {
+      "reason": "self-only",
+      "detail": "engines/masks.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/masks.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "masks.setMask": {
+      "reason": "self-only",
+      "detail": "engines/masks.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/masks.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "masks.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/masks.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "masks.stat": {
+      "reason": "self-only",
+      "detail": "engines/masks.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/masks.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
     },
     "memory.upsertFact": {
       "reason": "test-only",
@@ -1982,6 +2134,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 125
+    "dataOnly": 129
   }
 }

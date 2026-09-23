@@ -131,6 +131,10 @@
       // v2.65.0 天气与在途情报。登记了容量却不在骨架里，冷启动直写会炸事务。
       weather: { rows: [] },
       intelQueue: [],
+      // v2.66.0 情绪通道 / 关系六型 / 假面。登记了容量却不在骨架里，冷启动直写会炸事务。
+      affect: { channels: [], loads: {} },
+      bonds: { rows: [] },
+      masks: { rows: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -797,6 +801,11 @@
     'world.journeys': { cap: 24, site: 'world.js WA.evict.array(world.journeys)' },
     'weather.rows': { cap: 24, site: 'weather.js WA.evict.array(weather.rows)' },
     'intelQueue': { cap: 24, site: 'intel.js WA.evict.array(intel.queue)' },
+    // v2.66.0 情绪通道 / 关系六型 / 假面。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
+    'affect.channels': { cap: 12, site: 'affect.js WA.evict.array(affect.channels)' },
+    'affect.loads': { cap: 24, kind: 'object', site: 'affect.js WA.evict.object(affect.loads)' },
+    'bonds.rows': { cap: 24, site: 'bonds.js WA.evict.array(bonds.rows)' },
+    'masks.rows': { cap: 20, site: 'masks.js WA.evict.array(masks.rows)' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

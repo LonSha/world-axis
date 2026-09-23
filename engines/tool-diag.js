@@ -446,6 +446,10 @@
     'engines/difficulty.js': 'difficulty',
     'engines/shadow.js': 'shadow',
     'engines/threads.js': 'threads',
+    // v2.66.0：情绪通道 / 关系六型 / 假面（与 index.js LOAD_ORDER 同批登记）
+    'engines/affect.js': 'affect',
+    'engines/bonds.js': 'bonds',
+    'engines/masks.js': 'masks',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

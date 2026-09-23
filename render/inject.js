@@ -35,7 +35,8 @@
     //   与 SOURCES 同批登记（只加分支不加源表 = 开关点了零效果）。
     'causal', 'world', 'shadow', 'threads',
     // v2.65.0: 'weather' / 'difficulty'。与注入分支同批登记，否则开关点了零效果。
-    'weather', 'difficulty'];
+    // v2.66.0: 'affect' / 'bonds' / 'masks'。与注入分支同批登记，否则开关点了零效果。
+    'weather', 'difficulty', 'affect', 'bonds', 'masks'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -44,7 +45,7 @@ style: false,
         life: true, intel: true, org: true, longline: true,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
-        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true }, module: 'inject' };
+        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -257,6 +258,11 @@ style: false,
       // v2.65.0 天气与难度。总开关关闭时 buildBlock 返回空串，零 token。
       if (vis.weather && WA.weather) { const wx = WA.weather.buildBlock(); if (wx) items.push({ source: '天气与物候', content: wx }); }
       if (vis.difficulty && WA.difficulty) { const df = WA.difficulty.buildBlock(); if (df) items.push({ source: '世界难度', content: df }); }
+      // v2.66.0 情绪通道 / 关系六型 / 假面。总开关关闭时 buildBlock 返回空串，零 token。
+      //   三块各自只讲结构（能做什么/是什么关系/演与露馅），不与「人物生活」「社交漩涡」重复。
+      if (vis.affect && WA.affect) { const ab = WA.affect.buildBlock(); if (ab) items.push({ source: '情绪通道', content: ab }); }
+      if (vis.bonds && WA.bonds) { const bb = WA.bonds.buildBlock(); if (bb) items.push({ source: '关系六型', content: bb }); }
+      if (vis.masks && WA.masks) { const mb2 = WA.masks.buildBlock(); if (mb2) items.push({ source: '假面', content: mb2 }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块
       //   （它仍留在存档里，因为「秘密存在过」是事实，不是态度）。

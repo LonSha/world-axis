@@ -87,6 +87,47 @@
     return map[economy.climate] || '';
   }
 
+  // ── v2.66.0 摘要三列：关系方向 / 物品状态 / 新旧伏笔 ─────────────────
+  // 缝合来源：4.4「Summary」格式中的 Relation/KeyItems/Hooks 三列。预设里那是
+  // 摘要模板的字段；本模块把它们改成**从已有证据现算**的片段——不新增任何数据源：
+  //   关系方向读 people.*.relations（已有量值），物品状态读 entityMemory.object，
+  //   新旧伏笔读 memory.foreshadows 的生命周期。三列都是「有据才说」，不空转。
+  function relationFragment(people) {
+    const dirs = [];
+    Object.keys(people || {}).forEach(function (k) {
+      const p = people[k]; if (!p || !Array.isArray(p.relations)) return;
+      p.relations.slice(-3).forEach(function (r) {
+        if (!r || !r.target) return;
+        const a = Number(r.intimacy), b = Number(r.trust);
+        if (!isFinite(a) && !isFinite(b)) return;
+        const v = isFinite(a) ? a : b;
+        const v2 = isFinite(b) ? b : a;
+        const dir = (v >= 70 && v2 >= 70) ? '愈近' : (v <= 25 && v2 <= 25) ? '愈远' : '徘徊';
+        dirs.push(p.name + '对' + r.target + dir);
+      });
+    });
+    if (!dirs.length) return '';
+    return '人与人的走向：' + dirs.slice(0, 3).join('，') + '。';
+  }
+  function itemFragment(em) {
+    const objs = (em && Array.isArray(em.object)) ? em.object : [];
+    if (!objs.length) return '';
+    const names = objs.slice(-3).map(function (o) { return String(o && o.name || '').slice(0, 12); }).filter(Boolean);
+    if (!names.length) return '';
+    return '世人关注的物件：' + names.join('、') + '。';
+  }
+  function foreshadowFragment(fs) {
+    const list = Array.isArray(fs) ? fs : [];
+    if (!list.length) return '';
+    const dev = list.filter(f => f && f.status === 'developing').length;
+    const trig = list.filter(f => f && (f.status === 'triggered' || f.status === 'recycled')).length;
+    const wait = list.filter(f => f && f.status === 'waiting').length;
+    const parts = [];
+    if (wait) parts.push(wait + '条伏线尚在蛰伏');
+    if (dev) parts.push(dev + '条正在发酵');
+    if (trig) parts.push(trig + '条已经回收');
+    return parts.length ? '命运的暗线：' + parts.join('，') + '。' : '';
+  }
   // ── 主生成函数 ─────────────────────────────────────────
   /**
    * 基于当前世界状态生成本轮world_digest
@@ -102,7 +143,11 @@
       eventFragment(ev.events),
       windFragment(ev.winds),
       factionFragment(ev.factions),
-      economyFragment(ev.economy)
+      economyFragment(ev.economy),
+      // v2.66.0 摘要三列：有据才说，三列全空不占字数。
+      relationFragment(st.people),
+      itemFragment(ev.entityMemory),
+      foreshadowFragment(st.memory && st.memory.foreshadows)
     ].filter(Boolean);
 
     let digest = fragments.join('');
