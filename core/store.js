@@ -149,6 +149,9 @@
       // v2.69.0 外貌分级契约 / 原型阶梯。登记了容量却不在骨架里，冷启动直写会炸事务。
       appearance: { rows: [] },
       ladder: { rows: [] },
+      sceneSlice: { rows: [] },
+      gauge: { rows: [] },
+      rivalry: { rows: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -833,6 +836,10 @@
     // v2.69.0 外貌分级契约 / 原型阶梯。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
     'appearance.rows': { cap: 24, site: 'appearance.js WA.evict.array(appearance.rows)' },
     'ladder.rows': { cap: 16, site: 'ladder.js WA.evict.array(ladder.rows)' },
+    // v2.70.0 情境切片 / 阻尼量规 / 竞争焦点
+    'sceneSlice.rows': { cap: 20, site: 'scene-slice.js WA.evict.array(sceneSlice.rows)' },
+    'gauge.rows': { cap: 16, site: 'gauge.js WA.evict.array(gauge.rows)' },
+    'rivalry.rows': { cap: 16, site: 'rivalry.js WA.evict.array(rivalry.rows)' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

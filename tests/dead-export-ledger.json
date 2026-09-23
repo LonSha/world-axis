@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.69.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.69.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.70.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.70.0",
   "dead": {
     "affect.channel": {
       "reason": "self-only",
@@ -874,6 +874,46 @@
       "tref": 0,
       "own": 9
     },
+    "gauge.create": {
+      "reason": "self-only",
+      "detail": "engines/gauge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gauge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "gauge.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/gauge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "gauge.read": {
+      "reason": "self-only",
+      "detail": "engines/gauge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gauge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "gauge.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/gauge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "gauge.step": {
+      "reason": "self-only",
+      "detail": "engines/gauge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gauge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "horizon.laneCfg": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -1722,6 +1762,54 @@
       "tref": 4,
       "own": 3
     },
+    "rivalry.declare": {
+      "reason": "self-only",
+      "detail": "engines/rivalry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/rivalry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "rivalry.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/rivalry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "rivalry.modulate": {
+      "reason": "self-only",
+      "detail": "engines/rivalry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/rivalry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "rivalry.read": {
+      "reason": "self-only",
+      "detail": "engines/rivalry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/rivalry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "rivalry.retire": {
+      "reason": "self-only",
+      "detail": "engines/rivalry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/rivalry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "rivalry.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/rivalry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
     "rules.getRuleCount": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -1753,6 +1841,46 @@
       "refs": 0,
       "tref": 2,
       "own": 4
+    },
+    "sceneSlice.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/scene-slice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "sceneSlice.read": {
+      "reason": "self-only",
+      "detail": "engines/scene-slice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-slice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "sceneSlice.resolveSegment": {
+      "reason": "self-only",
+      "detail": "engines/scene-slice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-slice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "sceneSlice.set": {
+      "reason": "self-only",
+      "detail": "engines/scene-slice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-slice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sceneSlice.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/scene-slice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
     },
     "settingsBus.applyDefaults": {
       "reason": "self-only",
@@ -2614,6 +2742,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 146
+    "dataOnly": 149
   }
 }

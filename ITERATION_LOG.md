@@ -854,6 +854,28 @@
 - **一条可直接复用的口径**：**否定式能力的判据必须落在「不发生活动的那一侧也说得清」上**。三面最贵的边界分别是「没掷的那次别算成掷过」「没开的时候别写」「没进去的那些要说去哪了」——它们共同的特征是：**在状态里长得像「什么都没发生」**。凡是这种边界，都必须先在引擎里造一个**只在拒绝/跳过路径上增长**的计数器，再把判据钉在那个计数器与「真做了什么」的**互斥关系**上；只有计数、没有互斥关系，判据就退化成「计数存在」。（同型先例：v2.63.0 三面的 `stat.faults`。）
 - **提交**：`（见本版提交）`。
 
+### R53 · 2026-09-23 · v2.70.0 交付（情境切片 × 阻尼量规 × 竞争焦点 · 第五十九面）
+- **做了什么**：`engines/scene-slice.js`（新，情境切片：空间属性白名单 + 七档时间段解析 + 室内天气抑制）、`engines/gauge.js`（新，阻尼量规：0..100 值域 + 单步限幅 + 里程碑事件强制 + 到顶拦截）、`engines/rivalry.js`（新，竞争焦点：三元键 + 权重反弹惩罚 + 显式注销）。三引擎接入容量骨架（evict/store 各 cap 20/16/16）、装载序、注入源（SOURCES 34→37）、UI 友好名、测试清单，版本号升至 2.70.0。专锁 `tests/settle-v2700.js` 覆盖 11 处破坏锚点与 N0–N5 负控制。
+- **为什么**：用户提供 12 份酒馆预设（约 10MB，105–320 个 prompt 块）要求评估可缝入内容。扫描确认 100% 为预设而非世界书，95% 以上是文风/破限/文学腔调（不可证伪，不收）。三件可证伪状态机值得进引擎：Phantasm 的日期/时间段/室内外资讯框要求、进度 0–100% 节点突变逻辑、打工喵与 MoM 的竞争关系与注意力均衡需求。
+- **影响范围**：`engines/scene-slice.js`、`engines/gauge.js`、`engines/rivalry.js`（均新）、`core/evict.js`、`core/store.js`、`engines/tool-diag.js`、`index.js`、`manifest.json`、`render/inject.js`、`ui/panel.js`、`tests/run.js`、`tests/settle-v2700.js`、`tests/dead-export-ledger.json`、`tests/export_contract.txt`。
+- **门禁结果**：`node tests/run.js` → **6179 / 失败 0**（v2.69.0 为 6094；净增 70 项专锁 + 冻结面转正）。专锁单独 70/0。出口面 ns 92 / members 558 / chars 6855；清册面 refs 2052 / ns 98 / members 1077；死子面 dead 338 / uiDead 4 / dataOnly 149 / 仅测试 131；账本 342 条（self-only 165 / test-only 135 / unwired 42）；checked 66；SOURCES 37。
+- **真缺陷与判据演进**：
+  · 缺陷①（引擎侧）：三引擎初版用 CommonJS `module.exports`，`ui-gate-sync` 沙盒是纯浏览器 VM 语义、只认 `window.WorldAxis`，装载失败。修正为标准 IIFE 闭包（`tools/fix_engines_iife.py`）。
+  · 缺陷②（引擎侧）：挤出调用写成 `WA.evict.array(list, 20)`——第二参数是容量数字而非站点名字符串，站点表反查判「声明悬空站点」（sceneSlice.rows/gauge.rows/rivalry.rows 零调用）。修正为 `WA.evict.array(list, 'sceneSlice.rows')` 等具名站点调用，与 appearance/ladder 同形；gauge 的 history 子数组挤出保留数字容量但补 `if (WA.evict)` 守卫。
+  · 判据演进：冻结面回填 25 处（checked 63→66、版本常量 8 处、清册面三处、死子面四处、账本条目与归因分布、advisory、SOURCES、EC2430、settle 挂载），比较值与消息文本同批改。
+- **可复用的判据**：① 新引擎必须 IIFE 挂 `window.WorldAxis`，`module.exports` 在 ui-gate 沙盒不可见；② `WA.evict.array` 的第二参数是站点名字符串（与 evict.js 站点表键逐字一致），传数字容量会被站点反查判悬空；③ 12 份预设类材料的缝入口径：先全量结构扫描分离文风与状态机，只收能落成「登记→核验→拒收码」的机制。
+- **提交**：`（见本版提交）`。
+### R53 · 2026-09-23 · v2.70.0 交付（情境切片 × 阻尼量规 × 竞争焦点 · 第五十九面）
+- **做了什么**：`engines/scene-slice.js`（新，情境切片：空间属性白名单 + 七档时间段解析 + 室内天气抑制）、`engines/gauge.js`（新，阻尼量规：0..100 值域 + 单步限幅 + 里程碑事件强制 + 到顶拦截）、`engines/rivalry.js`（新，竞争焦点：三元键 + 权重反弹惩罚 + 显式注销）。三引擎接入容量骨架（evict/store 各 cap 20/16/16）、装载序、注入源（SOURCES 34→37）、UI 友好名、测试清单，版本号升至 2.70.0。专锁 `tests/settle-v2700.js` 覆盖 11 处破坏锚点与 N0–N5 负控制。
+- **为什么**：用户提供 12 份酒馆预设（约 10MB，105–320 个 prompt 块）要求评估可缝入内容。扫描确认 100% 为预设而非世界书，95% 以上是文风/破限/文学腔调（不可证伪，不收）。三件可证伪状态机值得进引擎：Phantasm 的日期/时间段/室内外资讯框要求、进度 0–100% 节点突变逻辑、打工喵与 MoM 的竞争关系与注意力均衡需求。
+- **影响范围**：`engines/scene-slice.js`、`engines/gauge.js`、`engines/rivalry.js`（均新）、`core/evict.js`、`core/store.js`、`engines/tool-diag.js`、`index.js`、`manifest.json`、`render/inject.js`、`ui/panel.js`、`tests/run.js`、`tests/settle-v2700.js`、`tests/dead-export-ledger.json`、`tests/export_contract.txt`。
+- **门禁结果**：`node tests/run.js` → **6179 / 失败 0**（v2.69.0 为 6094；净增 70 项专锁 + 冻结面转正）。专锁单独 70/0。出口面 ns 92 / members 558 / chars 6855；清册面 refs 2052 / ns 98 / members 1077；死子面 dead 338 / uiDead 4 / dataOnly 149 / 仅测试 131；账本 342 条（self-only 165 / test-only 135 / unwired 42）；checked 66；SOURCES 37。
+- **真缺陷与判据演进**：
+  · 缺陷①（引擎侧）：三引擎初版用 CommonJS `module.exports`，`ui-gate-sync` 沙盒是纯浏览器 VM 语义、只认 `window.WorldAxis`，装载失败。修正为标准 IIFE 闭包（`tools/fix_engines_iife.py`）。
+  · 缺陷②（引擎侧）：挤出调用写成 `WA.evict.array(list, 20)`——第二参数是容量数字而非站点名字符串，站点表反查判「声明悬空站点」（sceneSlice.rows/gauge.rows/rivalry.rows 零调用）。修正为 `WA.evict.array(list, 'sceneSlice.rows')` 等具名站点调用，与 appearance/ladder 同形；gauge 的 history 子数组挤出保留数字容量但补 `if (WA.evict)` 守卫。
+  · 判据演进：冻结面回填 25 处（checked 63→66、版本常量 8 处、清册面三处、死子面四处、账本条目与归因分布、advisory、SOURCES、EC2430、settle 挂载），比较值与消息文本同批改。
+- **可复用的判据**：① 新引擎必须 IIFE 挂 `window.WorldAxis`，`module.exports` 在 ui-gate 沙盒不可见；② `WA.evict.array` 的第二参数是站点名字符串（与 evict.js 站点表键逐字一致），传数字容量会被站点反查判悬空；③ 12 份预设类材料的缝入口径：先全量结构扫描分离文风与状态机，只收能落成「登记→核验→拒收码」的机制。
+- **提交**：`（见本版提交）`。
 ### R52 · 2026-09-23 · v2.69.0 交付（角色呈现契约 · 第五十八面：外貌分级 / 原型阶梯）
 - **做了什么**：`engines/appearance.js`（新，199 行，外貌分级契约：S/A/B/C 分级 + COVERAGE_REQ 覆盖率核验 + 关系加权单向升一级 + 异化三档 humanoid/half/true + 场景排他眼型脸型/服装风格同场唯一）、`engines/ladder.js`（新，149 行，原型阶梯：档位表 ≥2 且去重 + 升级必须登记事件 + 逐级推进禁跳档 + 到顶/到底拒收 + drop 重置）。来源材料评估：两份新世界书——ref7《外貌构建》（种族判定/分级扫描/Layer1-4 覆盖/比喻/行文顺序）与 ref8《ACG 角色心理模型 3.0.0》（94 条 = 2 元信息 + 92 条 ACG 心理原型，傲娇/病娇/三无/地雷系……）。**取舍口径**（沿 R50/R51）：能落成「登记→核验→拒收」的进引擎；文风块不收。ref7 只收分级覆盖契约、关系加权、异化档位与场景排他，几千词外貌要素库与比喻/光影规则留在预设层；ref8 铁板模板（【本质】92/92、【关系光谱】91/92、【破防】86/92）本质是给 LLM 的扮演词库，99% 不收，唯一可机制化的是病娇等条目的「禁止跳级、升级必须有事件推进」骨架，落成 ladder 引擎。
 - **为什么**：文风层预设要求写「S 级描写完整四层、C 级只抓单一特征」，但模型通常凭感觉堆词；心理模型要求「禁止一上来就暴走、必须有事件推进」，但缺乏状态追踪。本版把两份材料的结构性约束收编为引擎级契约，通过注入块把「当前状态 + 铁律」显式传递。

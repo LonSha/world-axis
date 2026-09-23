@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.69.0';
+  const VERSION = '2.70.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -320,6 +320,10 @@
     // v2.69.0: 外貌分级契约 / 原型阶梯。位置与 tool-diag MODULE_EXPORTS 同批登记。
     'engines/appearance.js',
     'engines/ladder.js',
+    // v2.70.0: 情境切片 / 阻尼量规 / 竞争焦点。
+    'engines/scene-slice.js',
+    'engines/gauge.js',
+    'engines/rivalry.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

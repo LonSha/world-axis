@@ -113,6 +113,10 @@
     // ── v2.69.0 外貌分级契约 / 原型阶梯（appearance.js / ladder.js）──
     'appearance.rows': { path: 'appearance.rows', cap: 24, why: '外貌契约环形（分级/覆盖/异化档位/场景排他，每人一行）' },
     'ladder.rows': { path: 'ladder.rows', cap: 16, why: '原型阶梯环形（档位表 + 当前档，升级必须带事件）' },
+    // ── v2.70.0 情境切片 / 阻尼量规 / 竞争焦点（scene-slice.js / gauge.js / rivalry.js）──
+    'sceneSlice.rows': { path: 'sceneSlice.rows', cap: 20, why: '情境切片环形（地点空间属性/恶劣天气挂起/七档自然时间段）' },
+    'gauge.rows': { path: 'gauge.rows', cap: 16, why: '阻尼量规环形（0..100百分比/单步阻尼限幅/四大里程碑事件）' },
+    'rivalry.rows': { path: 'rivalry.rows', cap: 16, why: '竞争焦点环形（三元焦点对立/反向偏向调制/嫉妒反馈）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },
