@@ -450,6 +450,11 @@
     'engines/affect.js': 'affect',
     'engines/bonds.js': 'bonds',
     'engines/masks.js': 'masks',
+    // v2.67.0：时间锁 / 双层性格 / 好感审计 / 场外事件（与 index.js LOAD_ORDER 同批登记）
+    'engines/temporal-lock.js': 'temporalLock',
+    'engines/temperament.js': 'temperament',
+    'engines/fondness.js': 'fondness',
+    'engines/parallel-events.js': 'parallelEvents',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

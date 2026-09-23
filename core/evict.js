@@ -100,6 +100,11 @@
     'affect.loads': { path: 'affect.loads', cap: 24, kind: 'object', why: '调制量（疲惫/饥饿/疼痛/社交消耗，每键一人）' },
     'bonds.rows': { path: 'bonds.rows', cap: 24, why: '关系六型环形（与 enemies 血仇正交：血仇记事件，六型记结构）' },
     'masks.rows': { path: 'masks.rows', cap: 20, why: '假面环形（口径与露馅同时在场且不一致才算假面）' },
+    // ── v2.67.0 时间锁 / 双层性格 / 好感审计 / 场外事件（temporal-lock.js / temperament.js / fondness.js / parallel-events.js）──
+    'temporal.lock': { path: 'temporal.lock', cap: 2, kind: 'object', why: '时间锁锁定态（单行对象：label + at 两键；空对象 = 未锁定）' },
+    'temperament.rows': { path: 'temperament.rows', cap: 12, why: '双层性格环形（底色/习惯/触发词，每行一人）' },
+    'fondness.rows': { path: 'fondness.rows', cap: 16, why: '好感审计环形（步进白名单 + 信任对冲，不降准则）' },
+    'parallelEvents.rows': { path: 'parallelEvents.rows', cap: 15, why: '场外事件环形（三要素 + 主时钟同步，活跃容量 3）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },

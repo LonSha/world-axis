@@ -30,7 +30,7 @@
     world: '世界织体', shadow: '社交漩涡', threads: '悬案',
     weather: '天气与物候', difficulty: '世界难度',
     // v2.66.0: 情绪通道 / 关系六型 / 假面。与 SOURCES 同批登记（不加显示名 ⇒ 面板裸露英文键名）。
-    affect: '情绪通道', bonds: '关系六型', masks: '假面' };
+    affect: '情绪通道', bonds: '关系六型', masks: '假面', temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', parallelEvents: '场外事件' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {

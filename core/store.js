@@ -135,6 +135,12 @@
       affect: { channels: [], loads: {} },
       bonds: { rows: [] },
       masks: { rows: [] },
+      // v2.67.0 时间锁 / 双层性格 / 好感审计 / 场外事件。登记了容量却不在骨架里，冷启动直写会炸事务。
+      //   temporal.lock 用空对象表示未锁定（registryParity 对 kind:'object' 不认 null）。
+      temporal: { lock: {} },
+      temperament: { rows: [] },
+      fondness: { rows: [] },
+      parallelEvents: { rows: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -806,6 +812,11 @@
     'affect.loads': { cap: 24, kind: 'object', site: 'affect.js WA.evict.object(affect.loads)' },
     'bonds.rows': { cap: 24, site: 'bonds.js WA.evict.array(bonds.rows)' },
     'masks.rows': { cap: 20, site: 'masks.js WA.evict.array(masks.rows)' },
+    // v2.67.0 时间锁 / 双层性格 / 好感审计 / 场外事件。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
+    'temporal.lock': { cap: 2, kind: 'object', site: 'temporal-lock.js WA.evict.object(temporal.lock)' },
+    'temperament.rows': { cap: 12, site: 'temperament.js WA.evict.array(temperament.rows)' },
+    'fondness.rows': { cap: 16, site: 'fondness.js WA.evict.array(fondness.rows)' },
+    'parallelEvents.rows': { cap: 15, site: 'parallel-events.js WA.evict.array(parallelEvents.rows)' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

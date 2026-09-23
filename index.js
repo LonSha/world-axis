@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.66.0';
+  const VERSION = '2.67.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -307,6 +307,11 @@
     'engines/affect.js',
     'engines/bonds.js',
     'engines/masks.js',
+    // v2.67.0: 时间锁 / 双层性格 / 好感审计 / 场外事件。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/temporal-lock.js',
+    'engines/temperament.js',
+    'engines/fondness.js',
+    'engines/parallel-events.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

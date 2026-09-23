@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.66.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.66.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.67.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.67.0",
   "dead": {
     "affect.channel": {
       "reason": "self-only",
@@ -682,6 +682,46 @@
       "tref": 0,
       "own": 3
     },
+    "fondness.apply": {
+      "reason": "self-only",
+      "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/fondness.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "fondness.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/fondness.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "fondness.read": {
+      "reason": "self-only",
+      "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/fondness.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "fondness.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/fondness.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "fondness.stat": {
+      "reason": "self-only",
+      "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/fondness.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
+    },
     "horizon.laneCfg": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -1170,6 +1210,54 @@
       "tref": 0,
       "own": 2
     },
+    "parallelEvents.active": {
+      "reason": "self-only",
+      "detail": "engines/parallel-events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/parallel-events.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
+    "parallelEvents.add": {
+      "reason": "self-only",
+      "detail": "engines/parallel-events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/parallel-events.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "parallelEvents.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/parallel-events.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "parallelEvents.resolve": {
+      "reason": "self-only",
+      "detail": "engines/parallel-events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/parallel-events.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "parallelEvents.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/parallel-events.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "parallelEvents.stat": {
+      "reason": "self-only",
+      "detail": "engines/parallel-events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/parallel-events.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
     "parallelWorld.state": {
       "reason": "self-only",
       "detail": "engines/parallel-world.js 内部自用、外部零引用（过度导出）",
@@ -1609,6 +1697,94 @@
       "refs": 0,
       "tref": 0,
       "own": 6
+    },
+    "temperament.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/temperament.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "temperament.read": {
+      "reason": "self-only",
+      "detail": "engines/temperament.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/temperament.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "temperament.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/temperament.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "temperament.setTemperament": {
+      "reason": "self-only",
+      "detail": "engines/temperament.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/temperament.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "temperament.stat": {
+      "reason": "self-only",
+      "detail": "engines/temperament.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/temperament.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "temporalLock.check": {
+      "reason": "self-only",
+      "detail": "engines/temporal-lock.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/temporal-lock.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "temporalLock.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/temporal-lock.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "temporalLock.lock": {
+      "reason": "self-only",
+      "detail": "engines/temporal-lock.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/temporal-lock.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 26
+    },
+    "temporalLock.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/temporal-lock.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "temporalLock.stat": {
+      "reason": "self-only",
+      "detail": "engines/temporal-lock.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/temporal-lock.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "temporalLock.unlock": {
+      "reason": "self-only",
+      "detail": "engines/temporal-lock.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/temporal-lock.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "timeline.chatId": {
       "reason": "test-only",
@@ -2134,6 +2310,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 129
+    "dataOnly": 131
   }
 }
