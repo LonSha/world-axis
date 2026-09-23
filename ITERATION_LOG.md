@@ -823,3 +823,33 @@
 - **验证**：`tests/world-v2630.js` → `pass`（63 项）；`tests/shadow-v2630.js` → `pass`（65 项）；`tests/threads-v2630.js` → `pass`（78 项）；全量回归 **5453 / 失败 0**（v2.62.0 为 5232；+206 即本版三把新锁，另有 15 项为上一版冻结值按实跑产物回填后由红转绿）；死导出门禁绿 **dead 223 / uiDead 4 / dataOnly 123 / 仅测试 131**；field-liveness-gate 绿（骨架一级键 **24** 个、写侧越界仅 `ui/panel.js::innerHTML` 1 处既有、读侧 0 处）；ui-wire-audit **9 / 0**（零幽灵引用）；ui-gate **53 / 0**（逐页真实点击 331 个控件）；出口面契约 **ns 74 / members 527 / chars 6327**（较 v2.62.0 的 ns 71 / members 483 / chars 5889 净增 world 16 + shadow 14 + threads 14 成员）；清册面 refs 1814 / 命名空间 80 / 成员 906。索引与清单同源 **2.63.0**，死子面账本 `version` 与 `_note` 版本词三级同源。
 - **一条可直接复用的口径**：**当「最有价值的边界」是否定式且否定来源不同时，锁必须按来源拆开，且必须在判据最前验空白态**。三面各自最贵的失败都是「世界自己造了一个证据」（编一条街、编一条路、编一份名单、无秘密也照样升级、把矛盾平均成结论），它们在实现里都表现为「某个字段**没有**变成另一个值」或「某张表里**没有**多出一行」，因此判据必须问「此刻它**不是**什么」，并且不能在任何会重置共享状态的操作**之后**才问。
 - **提交**：`（见本版提交）`。
+
+### R47 · 2026-09-23 · v2.64.0 交付（随机性 / 独立性 / 敌意 三面专锁 · 第五十一 / 五十二 / 五十三面：把「没触发的那次到底算不算掷过」「推进时到底谁说了算」「没记下来的那些去哪了」各自钉上）
+- **做了什么**：
+  · 锁定三面主攻：`engines/horizon.js`（374 行，**随机性面**：远方/近端随机事件泳道）、`engines/parallel-world.js`（385 行，**独立性面**：主线之外此刻正在发生什么）、`engines/enemies.js`（135 行，**敌意面**：血仇/恩怨 + 黑盒 + 天下大势）。选它们的硬依据是**三面均零专锁**：`grep -rln` 证实 `horizon` / `parallelWorld` 在 `tests/` 下没有任何专锁文件，`enemies` 只在 `rel-contract-v2600.js` 里被顺带提及。
+  · **修掉三处真缺陷**（全部由探针与锁的实跑暴露）：
+    · ① `horizon` 的 `__hzStat.rolls++` 与 `lastAt` 位于**通道检查之前** ⇒ 用户主动关闭随机事件时，面板那句「掷骰 N 次但零触发」是**假话**（一次都没掷）。修法：两行移到关闭分支**之后**，并在关闭分支记 `reasons['disabled']++`；`rolls` 与 `skipped` 从此**互斥**。
+    · ② `parallelWorld.getSettings` 零引用（`unwired`）：`after` 链节点裸调内部闭包 `effSettings()` ⇒ **导出面与真正生效的口可各自漂移**。修法：节点改为经 `getSettings()` 读原始设置 + `effectiveSettings()` 归一 + `shouldAuto()` 判闸门，三条导出同时成为真实生效路径。
+    · ③ `enemies.apply` 的**首次入账即已终结**条目写成 `terminatedRound: null`，而清理判据是 `!= null && delta > 20` ⇒ 这类仇敌的「终结保留 20 轮后清除」**永久失效**。修法：入账时若已是终结态就把终结轮次记为当轮。
+  · **三处观测面**（同 v2.63.0 `stat.faults` 口径：拒绝必须可观测）：`horizon.stat()` 增 `reasons` / `reasonKinds`（理由归到有限几类，防键集无限增长）；`enemies.dropStat()` 透出**按原因分开**的丢弃计数 + `applied` 四数（与之**成对**）+ `lastDropped`；`tool-diag` 增 `secHorizon` / `secEnemies` / `secParallelWorld` 三采集节（后者透出 `settingsRaw` vs `settingsEffective` 与 `settingsDrift`——**导出读口与生效读口是否已漂移**）。
+  · 面板只读可见化（**不加控件**，避免控件计数与幽灵绑定漂移）：泳道行并排显示「掷骰 / 跳过（关）/ 理由分类」；仇敌页显示「丢弃归因 + 入账四数 + 最近丢弃」。
+  · 版本与账本：`index.js` / `manifest.json` / `tests/dead-export-ledger.json` / `tests/run.js` 八处断言字面量（升版脚本逐点核对命中数，失配即退出）。
+- **为什么既有 50 个面全都照不到（本版最关键的定位）**：
+  · `tests/run.js` 的 `engines/horizon v0.5` 与 `engines/enemies v0.3` 两节钉的是**功能在场**（掷得出来、入账成功、临时标记剥离、冷却不触发），判据全在 `fired === true` 一侧；
+  · `v2.34.0` 节钉的是平行世界的**呈现面与数据流**（页面真读 store、高影响注入、同名覆盖、连带清理）——它证明了「能跑」，没证明「只有那一条口能跑」；
+  · `field-liveness` / `dead-export` 是**静态面**：它们**能**发现 `getSettings` 零引用，但只能把它记进账本（`test-only` / `unwired`），钉不住「它必须是真路径」；
+  · `v2.33.0` / `v1.0.0` 节钉的是**容量数字同源**（24+20=44）——钉的是「声明」不是「治理真的发生」。
+  · 一句话：**既有锁把「能触发」「能推进」「仇敌能记下来」钉住了，没人钉「没触发的那次算不算掷过」「推进时谁说了算」「没记下来的那些去哪了」**。
+- **判据设计上的自纠（四条，均由实跑暴露，可直接复用）**：
+  · ① **`settingsBus` 的落盘真源是 localStorage，不是 `store`**：`store.read('worldaxis_parallel_settings_v1')` 返回 `null`，而 `localStorage[key]` 有值。按 `store` 读会永远拿到 `undefined`，于是「非法枚举不落盘」这条判据**在原版上也假绿**（`undefined !== 'bogus-mode'` 恒成立）。**写否定式判据必须先确认真正的落盘面**。
+  · ② **`after` 链上有多个推演消费者竞争同一 fetch 队列**（`backstage.simulate` 排在 `parallel.simulate` 之前），单条 `__pushApiJson` 不保证轮到被测节点。诊断实测：`advance('manual')` 单独调用可成功（`{ok:true, reason:'manual', modules:1, npcs:1}`）、`shouldAuto()` 为真、12 个 `after` 节点全 enabled——说明链与闸门本身正常，问题在判据的响应投喂方式。修法是**多喂 8 条 + 用 `workflow.run()` 返回的 `executed` 单独钉住「节点确实被链调度」**，否则「库一格不动」这条判据在「节点压根没跑」时也成立（**假绿**）。
+  · ③ **破坏锚点必须覆盖完整的破坏面**：关闭态「不写」由节点闸门**和** `advance()` 内部守卫**两条**联合保证，只拆闸门时 `advance` 仍会拦下，N1 不现形（实测 `delta` 恒为 0 即此因）。修法：把 `BROKEN[0]` 扩展为**多锚点**（`parts`），同时拆闸门与 `advance` 内部守卫。
+  · ④ **破坏锚点若覆盖真源码里的两处同型行，破坏后会产生双计数**（horizon 的 `A_ROLLS` 实测 `delta=4` 而非 2）：此时应改**方向性断言**（`delta > 0`）并由**原版侧的精确断言**（`delta === 0`）承担另一半——两向合起来才叫自证。
+  · 另：`[N5] 无副作用` 出现真泄漏（哨兵进了 `worldaxis_state_test_chat_001`），根因是 **store 的落盘是异步的**——`restoreLS` 摘掉磁盘上的哨兵后，队列里还压着一次落盘会把含哨兵的内存态写回。修法：断言前先 `await tick()` 两拍（那不是泄漏，是**时序**）。
+- **两向自证（先跑成红是纪律）**：三把锁各携带真源码破坏锚点（`srcOverride` 内存副本，仓库文件零改写），N0 校验各恰中 1 次，破坏后对应判据**逐条现形**；N2 侧原版全绿；N3 逐锚敏感（一枚破坏不牵连别面）；N4 非恒真（分类表/闸门/原因表确实随状态变化）；N5 无副作用。
+  · `tests/horizon-v2640.js`（41 项）：`A_ROLLS`（通道检查块整体）⇒「关闭时 rolls 不涨、skipped 恰 +2」现形；`A_COOLDOWN` ⇒ 冷却递减现形；`A_FORCED` ⇒ 保底无条件触发现形；`A_REASON` ⇒ 分类归因现形。**判据必须自证可复现**：三类局面（disabled / cooldown / pending-dropped）全部用**确定性**手段制造，不用概率（`distantChance: 1` 在收窄口径下是 **1%** 而非 100%，靠概率的判据会给回归带来随机红点）。
+  · `tests/parallel-world-v2640.js`（50 项）：`A_READ`（整条闸门六行）+ `A_ADVGUARD` ⇒「关掉开关就一格不动」现形；`A_MODE` ⇒「非法枚举不落盘」现形；`A_MIN` ⇒「低影响不进主线」现形；`A_NAME` ⇒「空名拒收」现形。
+  · `tests/enemies-v2640.js`（49 项）：`A_DROPSHAPE`（两类合流）⇒「分开计数」现形；`A_DROPNAME`（静默吞掉）⇒「丢弃必须可观测」现形；`A_MAXACTIVE` ⇒「超容量即挤出」现形；`A_SHOW` ⇒「有界展开」现形；`A_APPLIED` ⇒「入账与丢弃成对」现形；`A_TERMROUND`（终结戳写回 null）⇒「终结窗口起算」现形。
+- **验证**：`tests/horizon-v2640.js` → `pass`（41 项）；`tests/parallel-world-v2640.js` → `pass`（50 项）；`tests/enemies-v2640.js` → `pass`（49 项）；全量回归 **5572 / 失败 0**（v2.63.0 为 5453；+140 即本版三把新锁，另 +21 为三处缺陷修复带出的断言）。冻结值按**实跑产物**回填：`export_contract` **ns 74 / members 539 / chars 6481**（前值 527 / 6327）；`inventory.collect()` refs **1845** / ns 80 / members **913**（前值 1814 / 906）/ dead **225** / uiDead 4 / dataOnly **117**（前值 223 / 4 / 123）/ 仅测试 131；`dead-export-gate` 绿（`dead 225 · uiDead 4`，归因分布 `test-only 131 / self-only 88 / unwired 6`——`unwired` 由 7 降到 6 即本版修掉的 `parallelWorld.getSettings` 转为**活导出**的实证）；`field-liveness-gate` 绿（骨架一级键 24、写侧越界 1 处既有 `ui/panel.js::innerHTML`、读侧 0）；`ui-wire-audit` 9 / 0；`ui-gate` 53 / 0（逐页真实点击控件 331 个，**未变**——本版面板只加只读行、不加控件）。
+- **一条可直接复用的口径**：**否定式能力的判据必须落在「不发生活动的那一侧也说得清」上**。三面最贵的边界分别是「没掷的那次别算成掷过」「没开的时候别写」「没进去的那些要说去哪了」——它们共同的特征是：**在状态里长得像「什么都没发生」**。凡是这种边界，都必须先在引擎里造一个**只在拒绝/跳过路径上增长**的计数器，再把判据钉在那个计数器与「真做了什么」的**互斥关系**上；只有计数、没有互斥关系，判据就退化成「计数存在」。（同型先例：v2.63.0 三面的 `stat.faults`。）
+- **提交**：`（见本版提交）`。

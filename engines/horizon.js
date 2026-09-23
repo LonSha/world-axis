@@ -92,7 +92,10 @@
     };
   }
   /** 掷骰留痕（面板/诊断消费）：关闭通道导致「什么都没发生」与「掷了没中」必须可区分 */
-  const __hzStat = { rolls: 0, distantFired: 0, nearFired: 0, skipped: 0, lastReason: '', lastAt: 0 };
+  // v2.64.0: reasons 是「为什么没触发」的分类计数表。否定式边界在状态里看不见
+  //   （没触发当然不落盘），而「掷了没中」「冷却中」「保底还没到」三种局面在面板上
+  //   必须分得开——否则用户只会看到「事件老不来」，查不出是哪一种。
+  const __hzStat = { rolls: 0, distantFired: 0, nearFired: 0, skipped: 0, reasons: {}, lastReason: '', lastAt: 0 };
   // v1.3.0: chronicle 容量同源化——此前 3 处内联 cap=80 与登记表/backstage 的 200 冲突，
   // horizon 入账一次即把满载 200 条纪事砍到 80（静默丢失 120 条，且按位置丢最旧的带溯源条目）。
   const CHRONICLE_CAP = 200;     // v2.13.0: 仅作降级兜底；真源为 core/evict.js 站点表 backstage.chronicle
@@ -100,6 +103,23 @@
   // ── 工具 ──────────────────────────────────────────────
   // v2.14.0: 决策流（远景通道是否开火）——此前裸调 Math.random，同种子无法复现「本轮开没开火」。
   function roll01() { return WA.rand.next('horizon.roll'); }
+
+  /**
+   * v2.64.0: 把 reason 字符串归到**有限几类**。
+   *   为什么必须归类而不是直接拿 reason 当键：reason 里带着运行时数字
+   *   （`ledger=7` / `cooldown(3→2)` / `pending_retry(2/3)`），直接入表会得到一个
+   *   无限增长的键集——面板读不完、诊断包也会被撑爆。分类是把「可读」变成「可数」。
+   */
+  function hzReasonKind(out) {
+    if (!out) return 'unknown';
+    if (out.fired) return out.forced ? 'fired-forced' : 'fired-chance';
+    const r = String(out.reason || '');
+    if (r === 'disabled') return 'disabled';
+    if (r.indexOf('cooldown') === 0) return 'cooldown';
+    if (r.indexOf('pending_dropped') === 0) return 'pending-dropped';
+    if (r.indexOf('ledger=') === 0) return 'ledger-below';
+    return 'other';
+  }
 
   function defaultLane() {
     return {
@@ -132,15 +152,21 @@
   function rollLane(kind, opts) {
     const o = opts || {};
     const cf = laneCfg(kind, o.cfg);
-    __hzStat.rolls++;
-    __hzStat.lastAt = clockWall();
     // v2.3.0 块3: 通道关闭时**完全不掷骰**——此前用户无法拒绝随机事件，
     //   即便把触发率调到 0，ledger 保底仍会在第 10 轮强制触发（关不掉）。
     if (!cf.enabled && o.force !== true) {
       __hzStat.skipped++;
+      __hzStat.reasons['disabled'] = (__hzStat.reasons['disabled'] || 0) + 1;
       __hzStat.lastReason = kind + ':disabled';
       return { fired: false, forced: false, skipped: true, reason: 'disabled' };
     }
+    // v2.64.0 修复：`rolls` 只统计**真的掷了**的次数。
+    //   此前这两行在通道检查之前，于是「通道关闭 ⇒ 根本没掷」也被计成一次掷骰。
+    //   后果不是崩溃，而是**读数误导**：面板与诊断那句「本会话掷骰 N 次但零触发」
+    //   在最常见的情形下（用户主动关了随机事件）是假的——它一次都没掷。
+    //   `skipped` 早已单独记账，两者必须分得开：「没掷」与「掷了没中」是两种事实。
+    __hzStat.rolls++;
+    __hzStat.lastAt = clockWall();
     // v0.1.33: 整体单事务——掷骰各分支只改 draft，由 transact 统一落盘
     // （原先「直改 live store + 裸 save」绕过事务计量与批作用域，批内会提前打破写合并）
     let out = null;
@@ -183,6 +209,9 @@
     });
     if (out) {
       if (out.fired) { if (kind === 'distant') __hzStat.distantFired++; else __hzStat.nearFired++; }
+      // v2.64.0 观测面：按原因归类计数（「为什么没开火」必须可数，见 hzReasonKind 注释）
+      const rk = hzReasonKind(out);
+      __hzStat.reasons[rk] = (__hzStat.reasons[rk] || 0) + 1;
       __hzStat.lastReason = kind + ':' + out.reason;
     }
     return out;
@@ -338,7 +367,11 @@
       config: { distant: laneCfg('distant', c), near: laneCfg('near', c) },
       enabled: { distant: laneCfg('distant', c).enabled, near: laneCfg('near', c).enabled },
       rolls: __hzStat.rolls, distantFired: __hzStat.distantFired, nearFired: __hzStat.nearFired,
-      skipped: __hzStat.skipped, lastReason: __hzStat.lastReason, lastAt: __hzStat.lastAt
+      // v2.64.0: skipped 与 rolls 从此互斥——「没掷」不再被算进「掷了」。
+      //   reasons 按原因分类（键集有限），reasonKinds 是它的排序键集（面板/诊断直接读）。
+      skipped: __hzStat.skipped, reasons: Object.assign({}, __hzStat.reasons),
+      reasonKinds: Object.keys(__hzStat.reasons).sort(),
+      lastReason: __hzStat.lastReason, lastAt: __hzStat.lastAt
     };
   }
 

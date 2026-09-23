@@ -311,6 +311,104 @@
         terminal: WA.threads.TERMINAL || [] };
     });
   }
+  /**
+   * v2.64.0：随机性面采集节（远方/近端事件泳道）。
+   *   报出的重点不是「触发了几次」，而是**「为什么没触发」各有多少**。
+   *   `rolls` 与 `skipped` 必须互斥：前者只数真的掷了的、后者数「通道关着根本没掷」。
+   *   本版此前这两行在通道检查**之前**，于是用户主动关掉随机事件时，
+   *   面板那句「掷骰 N 次但零触发」是假的——它一次都没掷。
+   */
+  function secHorizon() {
+    return safe(function () {
+      if (!WA.horizon || typeof WA.horizon.stat !== 'function') return { error: 'horizon 模块不可用' };
+      const st = WA.horizon.stat();
+      return {
+        enabled: st.enabled, config: st.config,
+        rolls: st.rolls || 0, skipped: st.skipped || 0,
+        distantFired: st.distantFired || 0, nearFired: st.nearFired || 0,
+        reasons: st.reasons || {}, reasonKinds: st.reasonKinds || [],
+        lastReason: st.lastReason || null,
+        ledgers: (function () {
+          try {
+            const h = (WA.store.get().evolution || {}).horizon || {};
+            return { distant: h.distant || null, near: h.near || null };
+          } catch (e) { return null; }
+        })(),
+        defaults: { ledgerThreshold: WA.horizon.LEDGER_THRESHOLD, cooldown: WA.horizon.COOLDOWN_ROUNDS,
+          baseChance: WA.horizon.BASE_CHANCE }
+      };
+    });
+  }
+  /**
+   * v2.64.0：敌意面采集节（仇敌 / 黑盒 / 天下大势）。
+   *   报出的重点不是「有几个仇敌」，而是**被丢弃的入账条目**（按原因分列）。
+   *   本模块的否定式边界一律写作 `if (!e || !e.name) return;` —— 被丢的当然不落盘，
+   *   于是「上游输出不合规」这件事在状态里此前**没有任何读法**。
+   *   `applied` 四数与之成对：只报丢弃不报入账，读者会以为入账也坏了。
+   */
+  function secEnemies() {
+    return safe(function () {
+      if (!WA.enemies || typeof WA.enemies.dropStat !== 'function') return { error: 'enemies 模块不可用' };
+      const ds = WA.enemies.dropStat();
+      const cnt = (function () {
+        try {
+          const ev = WA.store.get().evolution || {};
+          const all = ev.enemies || [];
+          const bb = ev.blackbox || {};
+          return { active: all.filter(function (e) { return e && e.status !== '已终结'; }).length,
+            terminated: all.filter(function (e) { return e && e.status === '已终结'; }).length,
+            trends: (ev.worldTrends || []).length,
+            actions: (bb.secretActions || []).length, assets: (bb.secretAssets || []).length };
+        } catch (e) { return {}; }
+      })();
+      return {
+        dropped: ds.dropped || {}, dropKinds: ds.dropKinds || [],
+        applied: ds.applied || {}, lastDropped: ds.lastDropped || '',
+        statuses: WA.enemies.ENEMY_STATUS || [], types: WA.enemies.ENEMY_TYPE || [],
+        assetStatuses: WA.enemies.ASSET_STATUS || [], counts: cnt
+      };
+    });
+  }
+  /**
+   * v2.64.0：独立性面采集节（平行世界）。
+   *   报出的重点有两项：
+   *     ① `shouldAutoNow` —— after 链的唯一闸门此刻判成什么。此前它只在引擎内部被调用，
+   *        「自动推进没发生」与「根本没开」在诊断包里长得完全一样；
+   *     ② `settingsRaw` vs `settingsEffective` 与 `settingsDrift` —— 磁盘原值与归一后
+   *        生效值的对照，是 v2.7.0「写入即归一」的唯一现场证据。
+   */
+  function secParallelWorld() {
+    return safe(function () {
+      if (!WA.parallelWorld || typeof WA.parallelWorld.stat !== 'function') return { error: 'parallelWorld 模块不可用' };
+      const st = WA.parallelWorld.stat();
+      const cfg = (WA.parallelWorld.effectiveSettings ? WA.parallelWorld.effectiveSettings() : {});
+      const raw = (WA.parallelWorld.getSettings ? WA.parallelWorld.getSettings() : {});
+      const auto = (typeof WA.parallelWorld.shouldAuto === 'function') ? WA.parallelWorld.shouldAuto() : null;
+      const drift = (function () {
+        try {
+          const ks = ['enabled', 'autoMode', 'autoInterval', 'diceEnabled', 'detailLevel'];
+          return ks.filter(function (k) { return String((raw || {})[k]) !== String((cfg || {})[k]); });
+        } catch (e) { return null; }
+      })();
+      const cnt = (function () {
+        try {
+          const pw = WA.store.get().parallelWorld || {};
+          return { npcs: (pw.npcs || []).length, relations: (pw.relations || []).length,
+            modules: (pw.modules || []).length, snapshots: (pw.snapshots || []).length, round: pw.round || 0 };
+        } catch (e) { return {}; }
+      })();
+      const round = (function () { try { return WA.store.read('evolution.round', 0) || 0; } catch (e) { return 0; } })();
+      return { enabled: !!cfg.enabled, autoMode: cfg.autoMode, autoInterval: cfg.autoInterval,
+        diceEnabled: !!cfg.diceEnabled, detailLevel: cfg.detailLevel,
+        settingsRaw: raw, settingsEffective: cfg, settingsDrift: drift,
+        running: st.running === true, advances: st.advances || 0, failed: st.failed || 0,
+        notConfigured: st.notConfigured || 0, lastErr: st.lastErr || '',
+        shouldAutoNow: auto, evolutionRound: round,
+        impacts: WA.parallelWorld.IMPACTS || [], injectMinImpact: WA.parallelWorld.INJECT_MIN_IMPACT || null,
+        caps: { npcs: WA.parallelWorld.CAP_NPCS, relations: WA.parallelWorld.CAP_RELATIONS, modules: WA.parallelWorld.CAP_MODULES },
+        counts: cnt };
+    });
+  }
   const MODULE_EXPORTS = {
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
@@ -697,8 +795,10 @@
         horizon: safe(function () {
           if (!WA.horizon || typeof WA.horizon.stat !== 'function') return { error: 'horizon 不可用' };
           const st = WA.horizon.stat();
+          // v2.64.0: rolls 与 skipped 从此互斥（前者只数真掷），并透出「为什么没触发」的分类。
           return { enabled: st.enabled, config: st.config, rolls: st.rolls,
             distantFired: st.distantFired, nearFired: st.nearFired, skipped: st.skipped,
+            reasons: st.reasons || {}, reasonKinds: st.reasonKinds || [],
             lastReason: st.lastReason || null };
         }, {}),
         // v2.2.0: 隔离处置史与存档迁移报告（此前 quarantineAudit/migrateReport 零消费）
@@ -1142,6 +1242,8 @@
     const diag = {
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), causal: secCausal(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(),
+      // v2.64.0（第五十一 / 五十二 / 五十三面）：随机性面 / 敌意面 / 独立性面
+      horizon: secHorizon(), enemies: secEnemies(), parallelWorld: secParallelWorld(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
@@ -2054,6 +2156,7 @@
     OPTIONAL_EXPORTS,
     secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities, secCompat,
     secHostWb, secFloorChanges, secLedgerTimeline,   // v2.50.0（第三十五面）
+    secHorizon, secEnemies, secParallelWorld,        // v2.64.0（第五十一 / 五十二 / 五十三面）
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');

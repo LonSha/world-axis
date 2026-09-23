@@ -374,7 +374,16 @@
   WA.workflow.register({
     id: 'parallel.simulate', chain: 'after', order: 22, label: '平行世界推进（后台）',
     async run(ctx) {
-      const cfg = effSettings();
+      // v2.64.0 缺陷修复：此前此处裸调内部闭包 `effSettings()`，而导出的
+      //   `WA.parallelWorld.getSettings` 是同一个只读设置口的对外名字 —— 引擎内部
+      //   一律不走它，于是它成了死导出（unwired：产品与测试均零引用）。
+      //   后果不是崩溃，而是**导出面与真实生效的口可以各自漂移**：门禁只钉得住
+      //   「导出还在场」，钉不住「它就是真正被读的那只口」。
+      //   现在本处（after 链唯一入口）经导出面读原始设置，再经 effectiveSettings
+      //   归一 —— 两条口都成为真实生效路径，缺一即本模块整体不推进（回归可证）。
+      const raw = WA.parallelWorld.getSettings();
+      if (!raw) return;
+      const cfg = WA.parallelWorld.effectiveSettings();
       if (!cfg.enabled) return;
       if (running) return;
       // 触发判定走导出面（WA.parallelWorld.shouldAuto）——shouldAuto 的真实消费方；

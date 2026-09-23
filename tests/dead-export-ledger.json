@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.63.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.63.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.64.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.64.0",
   "dead": {
     "apiRouter.fetchModels": {
       "reason": "unwired",
@@ -962,14 +962,6 @@
       "tref": 0,
       "own": 2
     },
-    "parallelWorld.getSettings": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/parallel-world.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
-    },
     "parallelWorld.state": {
       "reason": "self-only",
       "detail": "engines/parallel-world.js 内部自用、外部零引用（过度导出）",
@@ -1504,7 +1496,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 55
+      "own": 58
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -1522,6 +1514,14 @@
       "tref": 3,
       "own": 3
     },
+    "toolDiag.secEnemies": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "toolDiag.secEnv": {
       "reason": "self-only",
       "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
@@ -1536,6 +1536,14 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 1,
+      "own": 3
+    },
+    "toolDiag.secHorizon": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "toolDiag.secHostWb": {
@@ -1571,6 +1579,14 @@
       "own": 3
     },
     "toolDiag.secModules": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "toolDiag.secParallelWorld": {
       "reason": "self-only",
       "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
       "src": "engines/tool-diag.js",
@@ -1822,6 +1838,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 123
+    "dataOnly": 117
   }
 }

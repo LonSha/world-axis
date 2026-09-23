@@ -483,7 +483,12 @@
           if (!l) return label + ' —';
           return label + badge(k) + ` ledger=${l.ledger} cd=${l.cooldown}${l.pending ? ' ⏳' : ''}`;
         };
-        const tail = hzEn ? `<div class="wa-dim">掷骰 ${hzEn.rolls} 次 · 触发 远${hzEn.distantFired}/近${hzEn.nearFired} · 跳过（关） ${hzEn.skipped}${hzEn.lastReason ? ' · 最近：' + esc(hzEn.lastReason) : ''}</div>` : '';
+        // v2.64.0: 掷骰与跳过必须**互斥**显示——此前 rolls 把「通道关闭而跳过」也算成掷过，
+        //   于是用户主动关掉随机事件时，面板那句「掷骰 N 次但零触发」是一句**假话**（它一次都没掷）。
+        //   修好后此处并排显示：掷了几次 / 跳过几次（含关通道），理由按有限分类聚合。
+        const __rk = hzEn && hzEn.reasonKinds && hzEn.reasonKinds.length
+          ? ' · 理由 ' + hzEn.reasonKinds.map(function (k) { return k + '×' + (hzEn.reasons[k] || 0); }).join('/') : '';
+        const tail = hzEn ? `<div class="wa-dim">掷骰 ${hzEn.rolls} 次 · 触发 远${hzEn.distantFired}/近${hzEn.nearFired} · 跳过（关） ${hzEn.skipped}${__rk}${hzEn.lastReason ? ' · 最近：' + esc(hzEn.lastReason) : ''}</div>` : '';
         return `<div class="wa-item wa-dim">${lane('distant', '远方')}<br>${lane('near', '近端')}${tail}</div>`;
       })()}
 
@@ -785,6 +790,18 @@
       out += '<div class="wa-sec">隐秘行动（' + actions.length + '，示最近 8）</div><div class="wa-list">' + xRows.join('') + '</div>';
     }
     out += '<div id="wa-en-out" class="wa-out"></div>';
+    // v2.64.0: 丢弃归因行——本模块的否定式边界全在**丢弃**上，被丢掉的条目当然不落盘，
+    //   于是「上游推了一条没有名字的仇敌 / 一条没有名称的资产」此前在面板上完全不可见
+    //   （只能看到仇敌少了一个，答不出为什么少）。此处只**读** dropStat，如实显示：
+    //   丢弃原因分布 + 实际入账量。两者必须并排——只报丢弃不报入账，用户会以为入账也坏了。
+    if (WA.enemies && typeof WA.enemies.dropStat === 'function') {
+      const __ds = WA.enemies.dropStat();
+      const __dk = (__ds.dropKinds || []).map(function (k) { return k + '×' + __ds.dropped[k]; }).join(' · ');
+      const __ap = __ds.applied || {};
+      out += '<div class="wa-dim">丢弃归因：' + (__dk ? esc(__dk) : '无') + '；入账 仇敌' + (__ap.enemies || 0)
+        + '/行动' + (__ap.actions || 0) + '/资产' + (__ap.assets || 0) + '/大势' + (__ap.trends || 0)
+        + (__ds.lastDropped ? ' · 最近丢弃：' + esc(__ds.lastDropped) : '') + '</div>';
+    }
     return out;
 }
   // v2.34.0: 平行世界页（主线之外的独立推演：NPC档案/关系网/事件模块 + 推进控制）
