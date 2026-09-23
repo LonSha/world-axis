@@ -152,6 +152,11 @@
       sceneSlice: { rows: [] },
       gauge: { rows: [] },
       rivalry: { rows: [] },
+      // v2.71.0 叙事纪律四件套。登记了容量却不在骨架里，冷启动直写会炸事务。
+      enigma: { rows: [] },
+      tempo: { gear: 'andante', shifts: [] },
+      quota: { rows: [] },
+      spotlight: { rows: [], pending: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -840,6 +845,13 @@
     'sceneSlice.rows': { cap: 20, site: 'scene-slice.js WA.evict.array(sceneSlice.rows)' },
     'gauge.rows': { cap: 16, site: 'gauge.js WA.evict.array(gauge.rows)' },
     'rivalry.rows': { cap: 16, site: 'rivalry.js WA.evict.array(rivalry.rows)' },
+    // v2.71.0 叙事纪律四件套。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
+    'enigma.rows': { cap: 24, site: 'enigma.js WA.evict.array(enigma.rows)' },
+    'tempo.shifts': { cap: 32, site: 'tempo.js WA.evict.array(tempo.shifts, maxShifts)（per-call，取设置上界）' },
+    'quota.rows': { cap: 24, site: 'quota.js WA.evict.array(quota.rows)' },
+    'spotlight.rows': { cap: 32, site: 'spotlight.js WA.evict.array(spotlight.rows)' },
+    'spotlight.pending': { cap: 32, site: 'spotlight.js WA.evict.array(spotlight.pending)（per-call，取设置上界）' },
+    'gauge.rows.*.history': { cap: 8, kind: 'array', wildcard: true, site: 'gauge.js WA.evict.array(hit.history)（每行各自有界）' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

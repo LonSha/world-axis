@@ -88,7 +88,7 @@
       hit.val = nextVal;
       if (!Array.isArray(hit.history)) hit.history = [];
       hit.history.push({ at: clockNow('gauge'), from: prev, to: nextVal, ev: event || 'step' });
-      if (WA.evict) WA.evict.array(hit.history, 8);
+      if (WA.evict) WA.evict.array(hit.history, 'gauge.history');
       out = { ok: true, key: key, from: prev, to: nextVal, crossed: crossedMilestone };
     }, 'gauge.step');
     return out;

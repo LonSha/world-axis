@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.70.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.70.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.71.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.71.0",
   "dead": {
     "affect.channel": {
       "reason": "self-only",
@@ -672,6 +672,70 @@
       "src": "engines/editor-faction.js",
       "refs": 0,
       "tref": 1,
+      "own": 3
+    },
+    "enigma.drop": {
+      "reason": "self-only",
+      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/enigma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "enigma.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/enigma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "enigma.mark": {
+      "reason": "self-only",
+      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/enigma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "enigma.outsiders": {
+      "reason": "self-only",
+      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/enigma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "enigma.read": {
+      "reason": "self-only",
+      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/enigma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "enigma.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/enigma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "enigma.stat": {
+      "reason": "self-only",
+      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/enigma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 14
+    },
+    "enigma.unmark": {
+      "reason": "self-only",
+      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/enigma.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "entities.ensureState": {
@@ -1674,6 +1738,70 @@
       "tref": 1,
       "own": 1
     },
+    "quota.add": {
+      "reason": "self-only",
+      "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/quota.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "quota.drop": {
+      "reason": "self-only",
+      "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/quota.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "quota.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/quota.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "quota.list": {
+      "reason": "self-only",
+      "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/quota.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "quota.resolve": {
+      "reason": "self-only",
+      "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/quota.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "quota.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/quota.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "quota.stat": {
+      "reason": "self-only",
+      "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/quota.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 16
+    },
+    "quota.tick": {
+      "reason": "self-only",
+      "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/quota.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "rand.channels": {
       "reason": "self-only",
       "detail": "core/rand.js 内部自用、外部零引用（过度导出）",
@@ -1946,6 +2074,62 @@
       "tref": 5,
       "own": 5
     },
+    "spotlight.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/spotlight.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "spotlight.idle": {
+      "reason": "self-only",
+      "detail": "engines/spotlight.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spotlight.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spotlight.note": {
+      "reason": "self-only",
+      "detail": "engines/spotlight.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spotlight.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spotlight.report": {
+      "reason": "self-only",
+      "detail": "engines/spotlight.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spotlight.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spotlight.seal": {
+      "reason": "self-only",
+      "detail": "engines/spotlight.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spotlight.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spotlight.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/spotlight.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "spotlight.stat": {
+      "reason": "self-only",
+      "detail": "engines/spotlight.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spotlight.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 12
+    },
     "store.batchDepth": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -2121,6 +2305,54 @@
       "refs": 0,
       "tref": 0,
       "own": 10
+    },
+    "tempo.check": {
+      "reason": "self-only",
+      "detail": "engines/tempo.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tempo.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "tempo.current": {
+      "reason": "self-only",
+      "detail": "engines/tempo.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tempo.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "tempo.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/tempo.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "tempo.setGear": {
+      "reason": "self-only",
+      "detail": "engines/tempo.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tempo.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "tempo.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/tempo.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "tempo.stat": {
+      "reason": "self-only",
+      "detail": "engines/tempo.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tempo.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 12
     },
     "temporalLock.check": {
       "reason": "self-only",
@@ -2742,6 +2974,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 149
+    "dataOnly": 151
   }
 }

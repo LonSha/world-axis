@@ -117,6 +117,13 @@
     'sceneSlice.rows': { path: 'sceneSlice.rows', cap: 20, why: '情境切片环形（地点空间属性/恶劣天气挂起/七档自然时间段）' },
     'gauge.rows': { path: 'gauge.rows', cap: 16, why: '阻尼量规环形（0..100百分比/单步阻尼限幅/四大里程碑事件）' },
     'rivalry.rows': { path: 'rivalry.rows', cap: 16, why: '竞争焦点环形（三元焦点对立/反向偏向调制/嫉妒反馈）' },
+    // ── v2.71.0 叙事纪律四件套（enigma.js / tempo.js / quota.js / spotlight.js）──
+    'enigma.rows': { path: 'enigma.rows', cap: 24, why: '信息暗礁环形（秘密知情名单，每秘密一行）' },
+    'tempo.shifts': { path: 'tempo.shifts', cap: 'per-call', kind: 'array', why: '节奏挡位变更留痕（上限 = maxShifts 设置，写入时传入）' },
+    'quota.rows': { path: 'quota.rows', cap: 24, why: '伏笔配给种子环形（短/长双池，过期仍占位）' },
+    'spotlight.rows': { path: 'spotlight.rows', cap: 32, why: '焦点分配登场账（seen/missed/streak 每行一人）' },
+    'spotlight.pending': { path: 'spotlight.pending', cap: 'per-call', kind: 'array', why: '焦点点名单轮内实名（上限 = maxRows 设置，结算即清空）' },
+    'gauge.history': { path: 'gauge.rows.*.history', cap: 8, why: '阻尼量规步进史（v2.70.0 遗留：第二参数误传数字导致挤出静默失败的修复）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },

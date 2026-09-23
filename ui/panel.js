@@ -32,7 +32,7 @@
     // v2.66.0: 情绪通道 / 关系六型 / 假面。与 SOURCES 同批登记（不加显示名 ⇒ 面板裸露英文键名）。
     affect: '情绪通道', bonds: '关系六型', masks: '假面', temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', parallelEvents: '场外事件',
     eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉', beastBond: '驯兽',
-    appearance: '外貌契约', ladder: '原型阶梯', sceneSlice: '情境切片', gauge: '阻尼量规', rivalry: '竞争焦点' };
+    appearance: '外貌契约', ladder: '原型阶梯', sceneSlice: '情境切片', gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮', quota: '伏笔配给', spotlight: '焦点分配' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {

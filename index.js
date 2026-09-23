@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.70.0';
+  const VERSION = '2.71.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -324,6 +324,11 @@
     'engines/scene-slice.js',
     'engines/gauge.js',
     'engines/rivalry.js',
+    // v2.71.0: 叙事纪律四件套（信息暗礁 / 节奏齿轮 / 伏笔配给 / 焦点分配）。
+    'engines/enigma.js',
+    'engines/tempo.js',
+    'engines/quota.js',
+    'engines/spotlight.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

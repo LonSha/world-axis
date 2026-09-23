@@ -854,16 +854,17 @@
 - **一条可直接复用的口径**：**否定式能力的判据必须落在「不发生活动的那一侧也说得清」上**。三面最贵的边界分别是「没掷的那次别算成掷过」「没开的时候别写」「没进去的那些要说去哪了」——它们共同的特征是：**在状态里长得像「什么都没发生」**。凡是这种边界，都必须先在引擎里造一个**只在拒绝/跳过路径上增长**的计数器，再把判据钉在那个计数器与「真做了什么」的**互斥关系**上；只有计数、没有互斥关系，判据就退化成「计数存在」。（同型先例：v2.63.0 三面的 `stat.faults`。）
 - **提交**：`（见本版提交）`。
 
-### R53 · 2026-09-23 · v2.70.0 交付（情境切片 × 阻尼量规 × 竞争焦点 · 第五十九面）
-- **做了什么**：`engines/scene-slice.js`（新，情境切片：空间属性白名单 + 七档时间段解析 + 室内天气抑制）、`engines/gauge.js`（新，阻尼量规：0..100 值域 + 单步限幅 + 里程碑事件强制 + 到顶拦截）、`engines/rivalry.js`（新，竞争焦点：三元键 + 权重反弹惩罚 + 显式注销）。三引擎接入容量骨架（evict/store 各 cap 20/16/16）、装载序、注入源（SOURCES 34→37）、UI 友好名、测试清单，版本号升至 2.70.0。专锁 `tests/settle-v2700.js` 覆盖 11 处破坏锚点与 N0–N5 负控制。
-- **为什么**：用户提供 12 份酒馆预设（约 10MB，105–320 个 prompt 块）要求评估可缝入内容。扫描确认 100% 为预设而非世界书，95% 以上是文风/破限/文学腔调（不可证伪，不收）。三件可证伪状态机值得进引擎：Phantasm 的日期/时间段/室内外资讯框要求、进度 0–100% 节点突变逻辑、打工喵与 MoM 的竞争关系与注意力均衡需求。
-- **影响范围**：`engines/scene-slice.js`、`engines/gauge.js`、`engines/rivalry.js`（均新）、`core/evict.js`、`core/store.js`、`engines/tool-diag.js`、`index.js`、`manifest.json`、`render/inject.js`、`ui/panel.js`、`tests/run.js`、`tests/settle-v2700.js`、`tests/dead-export-ledger.json`、`tests/export_contract.txt`。
-- **门禁结果**：`node tests/run.js` → **6179 / 失败 0**（v2.69.0 为 6094；净增 70 项专锁 + 冻结面转正）。专锁单独 70/0。出口面 ns 92 / members 558 / chars 6855；清册面 refs 2052 / ns 98 / members 1077；死子面 dead 338 / uiDead 4 / dataOnly 149 / 仅测试 131；账本 342 条（self-only 165 / test-only 135 / unwired 42）；checked 66；SOURCES 37。
+### R54 · 2026-09-24 · v2.71.0 交付（信息暗礁 × 节奏齿轮 × 伏笔配给 × 聚光灯 · 第六十面）
+- **做了什么**：`engines/enigma.js`（新，信息暗礁：秘密知情名单边界账，双容量上限 + outsiders 反查）、`engines/tempo.js`（新，节奏齿轮：四挡速率 + 跨度核验 + 切挡留痕）、`engines/quota.js`（新，伏笔配给：短/长双池 + 过期只标不删 + 终态收口）、`engines/spotlight.js`（新，聚光灯：轮次结算 + 久缺名单 + 不阻断剧情的均衡读数）。四引擎接入容量骨架（evict 6 站点 / store 5 容器 / checked 66→71）、装载序、注入源（SOURCES 37→41）、UI 友好名、测试清单，版本号升至 2.71.0。专锁 `tests/settle-v2710.js`（347 行）覆盖 20 处破坏锚点与 N0–N5 负控制。
+- **为什么**：对 12 份酒馆预设做第二轮「叙事纪律」机制专项复扫。四件可证伪状态机值得进引擎：MoM 蛾摩拉的「信息差」管理（谁知道什么、谁不知道什么、谁不该表现出知道）、Phantasm 的叙事速率挡位、可待的「短期 3 条/30 次输出、长期 3 条/50 次输出」伏笔配额、MoM 果实与打工喵的「角色登场均衡」需求。
+- **影响范围**：`engines/enigma.js`、`engines/tempo.js`、`engines/quota.js`、`engines/spotlight.js`（均新）、`core/evict.js`、`core/store.js`、`engines/tool-diag.js`、`index.js`、`manifest.json`、`render/inject.js`、`ui/panel.js`、`tests/run.js`、`tests/settle-v2710.js`、`tests/dead-export-ledger.json`、`README.md`、`ITERATION_LOG.md`。
+- **门禁结果**：`node tests/run.js` → **6329 / 失败 0**（v2.70.0 为 6179；净增 130 项专锁 + 冻结面转正）。专锁单独 130/0。出口面 ns 96 / members 562 / chars 6928；清册面 refs 2102 / ns 102 / members 1112；死子面 dead 367 / uiDead 4 / dataOnly 151 / 仅测试 131；账本 371 条（self-only 186 / test-only 135 / unwired 50）；checked 71；SOURCES 41。
 - **真缺陷与判据演进**：
-  · 缺陷①（引擎侧）：三引擎初版用 CommonJS `module.exports`，`ui-gate-sync` 沙盒是纯浏览器 VM 语义、只认 `window.WorldAxis`，装载失败。修正为标准 IIFE 闭包（`tools/fix_engines_iife.py`）。
-  · 缺陷②（引擎侧）：挤出调用写成 `WA.evict.array(list, 20)`——第二参数是容量数字而非站点名字符串，站点表反查判「声明悬空站点」（sceneSlice.rows/gauge.rows/rivalry.rows 零调用）。修正为 `WA.evict.array(list, 'sceneSlice.rows')` 等具名站点调用，与 appearance/ladder 同形；gauge 的 history 子数组挤出保留数字容量但补 `if (WA.evict)` 守卫。
-  · 判据演进：冻结面回填 25 处（checked 63→66、版本常量 8 处、清册面三处、死子面四处、账本条目与归因分布、advisory、SOURCES、EC2430、settle 挂载），比较值与消息文本同批改。
-- **可复用的判据**：① 新引擎必须 IIFE 挂 `window.WorldAxis`，`module.exports` 在 ui-gate 沙盒不可见；② `WA.evict.array` 的第二参数是站点名字符串（与 evict.js 站点表键逐字一致），传数字容量会被站点反查判悬空；③ 12 份预设类材料的缝入口径：先全量结构扫描分离文风与状态机，只收能落成「登记→核验→拒收码」的机制。
+  · 缺陷①（v2.70.0 遗留·引擎侧）：`engines/gauge.js` 的 `WA.evict.array(hit.history, 8)` 第二参数传数字而非站点名 → 每次 `unknown-site` 静默失败，探针实测 20 次 step 后 historyCount=21 > 声明 cap 8。修复为站点名 `'gauge.history'` 并在 evict/store 双侧登记（`gauge.rows.*.history` 通配键）。
+  · 缺陷②（v2.70.0 遗留·文档侧）：`README.md` 与 `ITERATION_LOG.md` 各有一处逐字节重复条目，根因是 `tools/w270_docs.js` 的 `s.replace(anchor, entry + anchor)` 前置插入只在插入前校验 count(anchor)===1（插入后锚点计数不变），重复执行不报错。本版清重并在新脚本中内置「新条目已存在则跳过」的幂等保护。
+  · 缺陷③（v2.71.0 新发现·引擎侧）：`engines/quota.js` 的 `('seed_' + Date.now())` 为 G20 判定的 B 裸调（绕过冻结时钟）。修复为 `clockNow('quota')`。
+  · 判据演进：专锁首跑 FAIL 6——测试设值 `maxRows: 1`（enigma bounds [4,64]）与 `maxRows: 2`（spotlight bounds [8,64]）被 settingsBus.normalize 的 clampNum 夹回最小值。修正为 bounds 内合法值（4 / 8）并重排填满逻辑。**教训：专锁设值必须先过 bounds 再断言容量行为。**
+- **可复用的判据**：① 专锁设值必须落在 settingsBus bounds 内（越界值会被静默夹取，导致容量测试失效）；② 冻结面回填的批量脚本必须内置幂等保护（锚点0次但新串已存在 ⇒ 跳过而非重插）；③ 叙事纪律类引擎的共同形态：只在拒绝/边界路径上增长的计数器 + 「未发生的那侧也说得清」的互斥断言。
 - **提交**：`（见本版提交）`。
 ### R53 · 2026-09-23 · v2.70.0 交付（情境切片 × 阻尼量规 × 竞争焦点 · 第五十九面）
 - **做了什么**：`engines/scene-slice.js`（新，情境切片：空间属性白名单 + 七档时间段解析 + 室内天气抑制）、`engines/gauge.js`（新，阻尼量规：0..100 值域 + 单步限幅 + 里程碑事件强制 + 到顶拦截）、`engines/rivalry.js`（新，竞争焦点：三元键 + 权重反弹惩罚 + 显式注销）。三引擎接入容量骨架（evict/store 各 cap 20/16/16）、装载序、注入源（SOURCES 34→37）、UI 友好名、测试清单，版本号升至 2.70.0。专锁 `tests/settle-v2700.js` 覆盖 11 处破坏锚点与 N0–N5 负控制。
