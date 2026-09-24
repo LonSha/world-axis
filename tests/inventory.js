@@ -223,12 +223,18 @@ for (const rel of PROD) {
   });
 }
 // 测试侧引用（只统计，不参与死导出判定）
-const testSrc = fs.readFileSync(path.join(__dirname, 'run.js'), 'utf8');
+// v2.73.0：测试面从「只读 tests/run.js 文本」改为「tests/ 下全部 .js」。
+//   此前口径漏掉了 run.js 通过 require 聚合执行的 settle-* 专锁与专项套件——
+//   那些文件里的真引用对归因完全不可见，实测 122 项被误标 unwired/self-only。
+//   文件面由 tests/product-files.js 单一真源给出（不在此处再写一份遍历器）。
+const { testFiles } = require('./product-files.js');
 const testRefSet = new Set();
 (function () {
-  let m; REF_RE.lastIndex = 0;
-  const testCode = codeFace(testSrc);              // v2.29.0：测试侧同样只认真代码
-  while ((m = REF_RE.exec(testCode))) testRefSet.add(m[1] + '.' + m[2]);
+  testFiles().forEach(function (rel) {
+    const testCode = codeFace(fs.readFileSync(path.join(BASE, rel), 'utf8')); // 只认真代码
+    let m; REF_RE.lastIndex = 0;
+    while ((m = REF_RE.exec(testCode))) testRefSet.add(m[1] + '.' + m[2]);
+  });
 })();
 
 // ── 6. 求差 ──

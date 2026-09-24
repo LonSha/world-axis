@@ -45,6 +45,7 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const LEDGER_PATH = path.join(__dirname, 'dead-export-ledger.json');
 const inventory = require('./inventory.js');
+const { testFiles } = require('./product-files.js');
 // 被冻结的两个死面：模块接口面的函数成员 + UI 层函数成员（无头环境不装载，但成员名是静态可判的）
 const FROZEN_KINDS = ['dead', 'uiDead'];
 // 只记录计数、不拦截的面（常量/数据成员零引用）
@@ -117,7 +118,7 @@ function readCached(abs) {
 //   本层再把「产品文件面」整体做成一份快照，每趟只 stat / codeFace 各 67 次。
 //   安全：sig 由全部产品文件 + run.js 的 mtimeMs:size 拼成；任一文件被写（含负控注入与还原）
 //   => sig 变化 => 整份快照重建。evidenceDrift 内部是同步执行，单线程下不存在「趟中被改写」。
-const __snap = { sig: null, byFile: null, run: null };
+const __snap = { sig: null, byFile: null, tests: null };
 // v2.32.0（第三层）：趟内复用。sig 核验本身要 67 次 statSync，若 211 条冻结项各核一次，
 //   光 stat 就又是 14k 次。而 evidenceDrift 是**同步**执行：一趟之内没有任何写盘机会，
 //   因此「趟首核一次 sig」与「每条都核」在同步语义下等价。趟外调用（evidenceOf 直调）
@@ -129,24 +130,36 @@ function endPass() { __passDepth -= 1; if (__passDepth <= 0) { __passDepth = 0; 
 function productSnapshot() {
   if (__passDepth > 0 && __passResolved && __snap.byFile) return __snap;
   const rels = inventory.PRODUCT_FILES || [];
-  const runAbs = path.join(__dirname, 'run.js');
+  // v2.73.0：测试面 = tests/ 下全部 .js（单一真源 tests/product-files.js）。
+  //   此前只读 run.js 文本，漏掉它 require 聚合的 settle-* 专锁——那些文件里的真引用
+  //   对 tref 不可见，122 项被误标 unwired/self-only。签名必须覆盖全部测试文件，
+  //   否则改了专锁而缓存不失效，复算仍拿旧面。
+  const testRels = testFiles();
   let sig = '';
   for (let i = 0; i < rels.length; i++) {
     const abs = path.join(BASE, rels[i]);
     try { const st = fs.statSync(abs); sig += String(st.mtimeMs) + ':' + String(st.size) + '|'; }
     catch (e) { sig += '-|'; }
   }
-  try { const st = fs.statSync(runAbs); sig += String(st.mtimeMs) + ':' + String(st.size); }
-  catch (e) { sig += '-'; }
+  for (let i = 0; i < testRels.length; i++) {
+    const abs = path.join(BASE, testRels[i]);
+    try { const st = fs.statSync(abs); sig += String(st.mtimeMs) + ':' + String(st.size) + '#'; }
+    catch (e) { sig += '-#'; }
+  }
   if (__snap.sig === sig && __snap.byFile) { if (__passDepth > 0) __passResolved = true; return __snap; }
   const byFile = Object.create(null);
   for (let i = 0; i < rels.length; i++) {
     const e = readCached(path.join(BASE, rels[i]));
     if (e) byFile[rels[i]] = e;
   }
+  const tests = Object.create(null);
+  for (let i = 0; i < testRels.length; i++) {
+    const e = readCached(path.join(BASE, testRels[i]));
+    if (e) tests[testRels[i]] = e;
+  }
   __snap.sig = sig;
   __snap.byFile = byFile;
-  __snap.run = readCached(runAbs);
+  __snap.tests = tests;
   if (__passDepth > 0) __passResolved = true;
   return __snap;
 }
@@ -195,11 +208,15 @@ function referenceCounts(rec) {
   }
   return refs;
 }
-// 测试侧引用数（与清册同口径：只读 tests/run.js）
+// 测试侧引用数（与清册同口径：tests/ 下全部 .js，v2.73.0 起不再只读 run.js）
 function testRefCount(rec) {
-  const hit = productSnapshot().run;
-  if (!hit) return 0;
-  return (hit.map[keyOf(rec)] || 0);
+  const snap = productSnapshot();
+  const tests = snap.tests;
+  if (!tests) return 0;
+  const k = keyOf(rec);
+  let n = 0;
+  Object.keys(tests).forEach(function (rel) { n += (tests[rel].map[k] || 0); });
+  return n;
 }
 // 定义文件内部对该成员名的**真代码**自用数（真代码面：注释里提到名字不算使用）
 function ownRefCount(rec) {
