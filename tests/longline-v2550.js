@@ -88,6 +88,6 @@ function runAll(a) {
   assert.strictEqual(L.TERMINAL.join(','), 'recycled,dropped,triggered', 'terminal set (cross-realm safe)');
 }
 
-module.exports = { runAll: runAll };
+module.exports = { runAll: require('./lock-assert.js').restoring(runAll) };
 
 if (require.main === module) runAll(require('assert'));

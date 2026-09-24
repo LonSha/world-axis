@@ -75,6 +75,8 @@ function runAll(a) {
     const lastLine = src.trim().split('\n').pop();
     assert.ok(lastLine.indexOf("runAll(require('assert'))") > 0,
       'v2750: [A] ' + t.rel + ' 直跑入口在最后一行（require.main 守卫）');
+    assert.ok(src.indexOf("require('./lock-assert.js').restoring(runAll)") > 0,
+      'v2750: [A] ' + t.rel + ' 的导出经 restoring 包裹（宿主全局还原，不靠顺序活着）');
     const mod = require(path.join(BASE, t.rel));
     assert.strictEqual(typeof mod.runAll, 'function', 'v2750: [A] ' + t.rel + ' 导出 runAll');
     assert.strictEqual(typeof mod.runNegative, 'undefined', 'v2750: [A] ' + t.rel + ' 未凭空添导出面');
@@ -102,6 +104,10 @@ function runAll(a) {
   });
   assert.ok(rep.locks.indexOf(GATE_REL) >= 0 && rep.locks.indexOf(SELF_REL) >= 0,
     'v2750: [B] 门禁与专锁自身也在可达面里');
+  assert.strictEqual(rep.globalResidue, 0,
+    'v2750: [B] 锁在宿主全局上零残骸（实 ' + rep.globalResidue + ' 处）');
+  assert.ok(rep.problems.some(function (p) { return p.kind === 'global-residue'; }) === false,
+    'v2750: [B] 无 global-residue 告警');
 }
 
 function runNegative(a) {
@@ -178,6 +184,31 @@ function runNegative(a) {
   const repE = gate.scan({ vfs: {} });
   assert.ok(repE.problems.length >= 2 && repE.problems.some(function (p) { return p.kind === 'vacuous'; }),
     'v2750: [D4] 空图上不恒真（零告警必须被反空转下限拦住，实 ' + repE.problems.length + ' 项）');
+  //   D7 宿主全局探针两侧自证（干净零告警 / 污染必现形）—— 污点在子进程里造，测试完删除
+  const probeTmp = path.join(BASE, 'tests', '__tmp_polluter.js');
+  fs.writeFileSync(probeTmp, 'module.exports = { runAll: function () { global.window = { WorldAxis: {} }; } };\n');
+  try {
+    const polluted = gate.globalResidueProbe(['__tmp_polluter.js']);
+    assert.ok(polluted.ok && polluted.dirty.length > 0,
+      'v2750: [D7] 污染锁必被探针逮住（实 ' + JSON.stringify(polluted.dirty) + '）');
+    const clean = gate.globalResidueProbe();
+    assert.ok(clean.ok && clean.dirty.length === 0,
+      'v2750: [D7] 干净面零告警（实 ' + JSON.stringify(clean.dirty) + '）');
+  } finally { try { fs.unlinkSync(probeTmp); } catch (e) {} }
+  assert.ok(!fs.existsSync(probeTmp), 'v2750: [D7] 污点测试文件已删除（无副作用）');
+  //   D8 restoring 是包装而不是常量：撤掉它，同一个锁必须立刻变成被逮住的
+  const rawOrg = fs.readFileSync(path.join(BASE, 'tests/org-v2540.js'), 'utf8');
+  const wrappedExport = "module.exports = { runAll: require('./lock-assert.js').restoring(runAll) };";
+  assert.strictEqual(rawOrg.split(wrappedExport).length - 1, 1, 'v2750: [D8][前置] 还原包装可定位且唯一');
+  const unwrapped = rawOrg.replace(wrappedExport, 'module.exports = { runAll: runAll };');
+  const tmpLock = path.join(BASE, 'tests', '__tmp_unwrapped.js');
+  fs.writeFileSync(tmpLock, unwrapped);
+  try {
+    const r = gate.globalResidueProbe(['__tmp_unwrapped.js']);
+    assert.ok(r.ok && r.dirty.length > 0,
+      'v2750: [D8] 撤掉 restoring 包装后必被逮住（实 ' + JSON.stringify(r.dirty) + '）');
+  } finally { try { fs.unlinkSync(tmpLock); } catch (e) {} }
+  assert.ok(!fs.existsSync(tmpLock), 'v2750: [D8] 撤包装测试文件已删除（无副作用）');
   //   D6 适配器不得吞失败
   const adapter = require('./lock-assert.js').from;
   const rec = [];

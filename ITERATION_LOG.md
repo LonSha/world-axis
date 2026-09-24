@@ -854,6 +854,20 @@
 - **一条可直接复用的口径**：**否定式能力的判据必须落在「不发生活动的那一侧也说得清」上**。三面最贵的边界分别是「没掷的那次别算成掷过」「没开的时候别写」「没进去的那些要说去哪了」——它们共同的特征是：**在状态里长得像「什么都没发生」**。凡是这种边界，都必须先在引擎里造一个**只在拒绝/跳过路径上增长**的计数器，再把判据钉在那个计数器与「真做了什么」的**互斥关系**上；只有计数、没有互斥关系，判据就退化成「计数存在」。（同型先例：v2.63.0 三面的 `stat.faults`。）
 - **提交**：`（见本版提交）`。
 
+### R59 · 2026-09-24 · v2.76.0 挂载后遗风（锁不得给宿主全局留残骸；把「靠顺序活着」判据化）
+- **做了什么**：① <code>tests/lock-assert.js</code> 增 <code>restoring(fn)</code>（<b>单一真源</b>），四个锁导出改为 <code>restoring(runAll)</code>；② <code>tests/test-surface-gate.js</code> 新增判据 D「宿主不变量」与 <code>globalResidueProbe()</code>（子进程探针，抳 <code>global.window</code> / <code>global.document</code> 整换或抹键）；③ <code>tests/orphan-lock-v2750.js</code> 新增四条自证（A 段断还原包装 / B 段断现场零残骸 / D7 探针两侧自证 / D8 撤掉包装后必被逮住）。版本号升至 2.76.0（<code>index.js</code> / <code>manifest.json</code> / <code>tests/run.js</code> 八处版本断言）；账本 <code>--update</code>（<code>version=2.76.0</code>）。
+- **为什么**：v2.75.0 交付后立即倒查自己的挂载动作 —— 「把一个从不执行的测试文件接进回归」除了「它自己通不通过」，还改变了什么？扫「谁写 <code>global.</code> 而不清理」时发现四个锁开头是 <code>global.window = { WorldAxis: WA }</code>（<b>整体替换</b>）且从不还原。裸脚本时期无害（只影响自己进程），挂载后<b>第一次变成活的</b>：实测跑完四个锁，<code>global.window !== mock 的 window</code>、<code>'document' in global.window === false</code>（33 个键消失）。没炸只因它们恰好排在回归末尾 —— <b>「靠顺序活着」</b>。
+- **影响范围**：改 <code>tests/lock-assert.js</code>、<code>tests/intel-v2530.js</code> / <code>tests/life-v2520.js</code> / <code>tests/longline-v2550.js</code> / <code>tests/org-v2540.js</code>、<code>tests/test-surface-gate.js</code>、<code>tests/orphan-lock-v2750.js</code>、<code>tests/run.js</code>、<code>index.js</code>、<code>manifest.json</code>、<code>tests/dead-export-ledger.json</code>、<code>README.md</code>、<code>ITERATION_LOG.md</code>。
+- **门禁结果**：<code>node tests/run.js</code> → **6706 / 失败 0**（v2.75.0 为 6694，+12 即本版新增断言）。<code>node tests/test-surface-gate.js</code> → **文件面 43 · 锁 40 · 可达 43 · 孤儿 0 · 宿主残骸 0 · EXIT=0</code>。<code>node tests/orphan-lock-v2750.js</code> → <code>ORPHAN-V2750: pass</code>（150 断言 / 0 失败）。死子面门禁绿（dead 407 / uiDead 4，账本 411 条）。
+- **真缺陷与判据演进**：
+  · 教训一：<b>挂载一个此前不执行的测试文件，等于把它所有的进程级副作用第一次接进共享进程。</b> 挂载前要审的不只是「它能不能通过」，还有「它给共享全局留下了什么」。
+  · 教训二：<b>「靠顺序活着」的绿灯必须判据化</b> —— 顺序不是契约。本版就是因为「新 section 恰好在最后」而首次全量回归全绿，实际已埋了一个只等下一个挂载者踩的雷。
+  · 教训三：<b>探针本身要被判据保护</b>（跑不起来报 <code>probe-broken</code>）——探针静默失败会让整条判据变成恒真。
+  · 教训四：<b>负控制要在临时文件上做并清理</b>，且要断「已删」；本版 D7/D8 两条都用临时文件，跑完断 <code>!fs.existsSync</code>。<b>测完不清理的负控制，本身就是下一个缺陷源。</b>
+  · 实现坑（已进注释）：探针子进程里 <code>require('./tests/x.js')</code> 按<b>脚本自身目录</b>解析，即使 cwd 是仓库根也找不到模块。
+- **可复用的判据**：① 挂载前审进程级副作用（共享全局是否被整换/抹键）；② 进程级污染必须在子进程里探（不可在测试进程内自证）；③ 探针要有 <code>probe-broken</code> 自护；④ 负控制只碰临时/内存副本且断「已删」；⑤ 子进程相对路径按脚本目录解析。
+- **提交**：`（见本版提交）`。
+
 ### R58 · 2026-09-24 · v2.75.0 判据补面（测试文件面可达性：把「从不执行的测试文件」变成红灯）
 - **做了什么**：做两件事。① 把四个**从未进过全量回归**的专锁接上：<code>tests/intel-v2530.js</code> / <code>life-v2520.js</code> / <code>longline-v2550.js</code> / <code>org-v2540.js</code> 由「裸脚本 + 末尾 <code>console.log('XXX: pass')</code>」改造为 <code>runAll(a)</code> 锁（<b>断言实现逐字保留</b>，assert 改为注入），挂进 <code>tests/run.js</code> 新增 section <code>v2.75.0 test-file reachability x orphan-lock mount</code>。② 新增常驻门禁 <code>tests/test-surface-gate.js</code> 与专锁 <code>tests/orphan-lock-v2750.js</code>（138 项），并新增 <code>tests/lock-assert.js</code>（断言适配器，单一真源）。版本号升至 2.75.0（<code>index.js</code> / <code>manifest.json</code> / <code>tests/run.js</code> 八处版本断言）；账本跑 <code>--update</code>（<code>version=2.75.0</code>，411 条证据重算）。
 - **为什么**：v2.74.0 交付后立即侦察，沿「静态面盲区」族往下审 —— 这次审的是<b>孤儿测试文件</b>（存在于 <code>tests/</code> 却没人挂载 ⇒ 从不执行）。用 <code>require('./x.js')</code> 从全仓 <code>repoFiles()</code> 建依赖图、以 <code>tests/run.js</code> 为根做 BFS，得到<b>34 可达 / 6 不可达</b>。6 个不可达里两个属正常（<code>export-contract.js</code> 被 run.js 以 <code>spawnSync</code> 调用、<code>ui-gate.js</code> 的案例被内联进 run.js），<b>另外 4 个是真孤儿</b>。逐一实测：四个文件<b>独立 <code>node</code> 跑通</b>（输出 <code>INTEL-V2530: pass</code> 等），但<b>均无 <code>module.exports</code></b>、不在 spawn 清单、也不被内联 ⇒ <b>全量回归从未执行过它们</b>。危害链：v2.73.0 起账本归因覆盖全部 <code>tests/*.js</code>，于是这 4 个「从不执行的文件」的引用成了归因依据 —— <b>「归因建立在不执行的文件上」</b>。

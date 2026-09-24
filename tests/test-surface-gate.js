@@ -13,6 +13,10 @@
 //   B 豁免不得腐烂：EXEMPT 项必须真在 orphans 里（豁免生效）或被判为 spawned/inline（真有执行入口）；
 //     被判为 lock 说明它已被 require —— 豁免与说明该删，红灯。
 //   C 反空转下限：文件面 ≥30、锁 ≥20、可达 ≥30、直接 spawn 行 ≥6 —— 零告警在空集上恒真。
+//   D 宿主不变量：能**到达**的锁不得给宿主全局留下残骸（`global.window` / `global.document`
+//     不能被整体替换后不还原）。挂载会让「裸脚本时期无害的全局替换」第一次变成活的 ——
+//     而它炸的是别的锁；哪一个先炸取决于 run.js 里的**顺序**，靠顺序活着的东西必须判据化。
+//     判据在子进程里跑（污染是进程级的，必须隔离；且能拿到两个方向：污点被逮住 + 干净时零告警）。
 //
 // 判据的两条纪律（本仓在 v2.74.0 踩过同族坑，故写进自证）：
 //   ① 引用面必须在**去注释但保留字符串**的面上取：`require('./x.js')` 的路径是字符串字面量，
@@ -34,6 +38,10 @@ const MIN_FILES = 30;
 const MIN_LOCKS = 20;
 const MIN_REACH = 30;
 const MIN_SPAWN_LINES = 6;
+const GLOBAL_PROBE = [
+  { g: 'global.window', mark: 'WorldAxis (mock 建立的宿主全局)' },
+  { g: 'global.document', mark: 'mock DOM' }
+];
 const INLINE_MARK = /内联|inline|embeds/i;
 const SPAWN_CALL = /\b(spawnSync|spawn|execSync|exec)\s*\(/;
 const RE_REQUIRE = /require\s*\(\s*'(\.\/[\w.-]+\.js)'/g;
@@ -167,6 +175,48 @@ function buildReach(vfs) {
 }
 
 /** 扫描：vfs 省略时扫真仓库（现场面）；给出时用虚拟面（负控制：真源码副本 + 定点破坏）。 */
+/**
+ * 宿主全局还原探针：按 run.js 的执行方式一个个跑锁，看哪个不还原宿主全局。
+ * 在子进程里跑（污染是进程级的，必须隔离；子进程也可单跑，不靠聚合器）。
+ */
+function globalResidueProbe(files) {
+  const list = (files || ['intel-v2530.js', 'life-v2520.js', 'longline-v2550.js', 'org-v2540.js']);
+  const grader = [
+    "require('./mock.js');",
+    "const PROBES = " + JSON.stringify(GLOBAL_PROBE.map(function (p) { return p.g; })) + ";",
+    "const read = function (g) { return (0, eval)(g); };",
+    "const snap = function () { const o = {}; PROBES.forEach(function (g) { o[g] = read(g); }); return o; };",
+    "const before = snap();",
+    "const dirty = [];",
+    "const list = " + JSON.stringify(list) + ";",
+    "list.forEach(function (f) {",
+    "  const marks = snap();",
+    "  try { require('./' + f).runAll(function () {}); } catch (e) { dirty.push(f + ' THREW ' + e.message); return; }",
+    "  PROBES.forEach(function (g) {",
+    "    const now = read(g), was = before[g];",
+    "    if (now !== was) dirty.push(f + ' 整换 ' + g);",
+    "    else if (now && typeof now === 'object') {",
+    "      const lost = Object.keys(marks[g] || {}).filter(function (k) { return !(k in now); });",
+    "      if (lost.length) dirty.push(f + ' 抹键 ' + g + ':' + lost.slice(0, 5).join(',') + '+' + lost.length);",
+    "    }",
+    "  });",
+    "});",
+    "process.stdout.write(JSON.stringify(dirty));"
+  ].join('\n');
+  const file = path.join(BASE, 'tests', '__tmp_global_probe.js');
+  fs.writeFileSync(file, grader);
+  try {
+    const r = require('child_process').spawnSync(process.execPath, [file], { cwd: BASE, encoding: 'utf8' });
+    if (r.status !== 0) return { ok: false, dirty: [], why: 'probe 退出 ' + r.status + ' :: ' + String(r.stderr || '').slice(0, 200) };
+    const out = JSON.parse(String(r.stdout || '[]'));
+    return { ok: true, dirty: out, why: '' };
+  } catch (e) {
+    return { ok: false, dirty: [], why: 'probe 异常 ' + e.message };
+  } finally {
+    try { fs.unlinkSync(file); } catch (e) {}
+  }
+}
+
 function scan(opts) {
   opts = opts || {};
   let vfs = opts.vfs || null;
@@ -192,6 +242,9 @@ function scan(opts) {
   if (base.locks.length < MIN_LOCKS) problems.push({ kind: 'vacuous', msg: '锁 ' + base.locks.length + ' < 下限 ' + MIN_LOCKS });
   if (base.reach.length < MIN_REACH) problems.push({ kind: 'vacuous', msg: '可达 ' + base.reach.length + ' < 下限 ' + MIN_REACH });
   if (base.spawnLines < MIN_SPAWN_LINES) problems.push({ kind: 'vacuous', msg: '直接 spawn 行 ' + base.spawnLines + ' < 下限 ' + MIN_SPAWN_LINES });
+  const residue = opts.vfs ? { ok: true, dirty: [], why: '' } : globalResidueProbe();
+  if (!residue.ok) problems.push({ kind: 'probe-broken', msg: '宿主全局探针跑不起来：' + residue.why });
+  residue.dirty.forEach(function (d) { problems.push({ kind: 'global-residue', msg: '锁在宿主全局上留残骸：' + d }); });
   return {
     files: base.files.length,
     aggregator: base.aggregator,
@@ -201,6 +254,7 @@ function scan(opts) {
     inline: base.inline,
     orphans: base.orphans,
     spawnLines: base.spawnLines,
+    globalResidue: residue.ok ? residue.dirty.length : -1,
     exempt: exempt.slice(),
     problems: problems
   };
@@ -212,6 +266,7 @@ function summary(report) {
   return '测试文件面 ' + report.files + ' · 锁 ' + report.locks.length + ' · 可达 ' + report.reach.length
     + ' · spawn ' + report.spawned.length + ' · 内联 ' + report.inline.length
     + ' · 孤儿 ' + report.orphans.length + ' · spawn 行 ' + report.spawnLines;
+    + ' · 宿主残骸 ' + report.globalResidue;
 }
 
 function main() {
@@ -242,6 +297,8 @@ module.exports = {
   entriesOf: entriesOf,
   buildReach: buildReach,
   scan: scan,
+  globalResidueProbe: globalResidueProbe,
+  GLOBAL_PROBE: GLOBAL_PROBE,
   judge: judge,
   summary: summary
 };

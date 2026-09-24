@@ -40,6 +40,6 @@ function runAll(a) {
   assert.ok(block.includes('离开家族') && block.includes('当前选择=keep'));
 }
 
-module.exports = { runAll: runAll };
+module.exports = { runAll: require('./lock-assert.js').restoring(runAll) };
 
 if (require.main === module) runAll(require('assert'));

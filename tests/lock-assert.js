@@ -21,4 +21,23 @@ function from(a) {
   };
 }
 
-module.exports = { from: from };
+
+/**
+ * 包一层宿主全局还原。
+ *
+ * 为什么需要：v2.52–v2.55 的四个锁原本是裸脚本，开头 �write 的写法是
+ *   `global.window = { WorldAxis: WA }` —— **整体替换**而不是打补丁，且从不还原。
+ *   裸脚本时它只影响自己的进程；v2.75.0 把它们挂进 run.js 后，注入同一个进程，
+ *   宿主全局就被换成只剩 WorldAxis 一个键的裸对象（`document` 等全没了）。
+ *   当时没�…没炸只是因为它们恰好排在回归末尾 —— 典型的「靠顺序活着」。
+ *
+ * 用法：`module.exports = { runAll: restoring(runAll) };`
+ */
+function restoring(fn) {
+  return function (a) {
+    const win = global.window;
+    try { return fn(a); } finally { global.window = win; }
+  };
+}
+
+module.exports = { from: from, restoring: restoring };

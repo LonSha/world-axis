@@ -32,6 +32,6 @@ function runAll(a) {
   assert.ok(block.includes('fact_fee') && block.includes('\u6000\u7591') && block.includes('\u94f6\u884c\u8d26\u518c'));
 }
 
-module.exports = { runAll: runAll };
+module.exports = { runAll: require('./lock-assert.js').restoring(runAll) };
 
 if (require.main === module) runAll(require('assert'));

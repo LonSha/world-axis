@@ -54,6 +54,6 @@ function runAll(a) {
   assert.ok(st.blocked >= 1);
 }
 
-module.exports = { runAll: runAll };
+module.exports = { runAll: require('./lock-assert.js').restoring(runAll) };
 
 if (require.main === module) runAll(require('assert'));
