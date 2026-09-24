@@ -519,6 +519,7 @@
     'engines/hazard.js': 'hazard',
     'engines/marginal.js': 'marginal',
     'engines/tolerance.js': 'tolerance',
+    'engines/events.js': 'events',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

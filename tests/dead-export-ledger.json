@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.80.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.80.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.81.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.81.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -810,6 +810,94 @@
       "tref": 11,
       "own": 3
     },
+    "events.active": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "events.cancel": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 4
+    },
+    "events.claim": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 11,
+      "own": 3
+    },
+    "events.complete": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 3
+    },
+    "events.due": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 5,
+      "own": 3
+    },
+    "events.fails": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "events.getSettings": {
+      "reason": "test-only",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 1
+    },
+    "events.replace": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 4
+    },
+    "events.schedule": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 35,
+      "own": 4
+    },
+    "events.setSettings": {
+      "reason": "test-only",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "events.stat": {
+      "reason": "test-only",
+      "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/events.js",
+      "refs": 0,
+      "tref": 8,
+      "own": 22
+    },
     "evict.nonEvictDecls": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -831,7 +919,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/evict.js",
       "refs": 0,
-      "tref": 12,
+      "tref": 13,
       "own": 3
     },
     "evict.summarize": {
@@ -2471,7 +2559,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 14,
+      "tref": 15,
       "own": 4
     },
     "store.sizeCaps": {
@@ -2479,7 +2567,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 15,
+      "tref": 16,
       "own": 1
     },
     "store.staleSinceExternal": {
@@ -3350,6 +3438,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 154
+    "dataOnly": 157
   }
 }

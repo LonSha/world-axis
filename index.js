@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.80.0';
+  const VERSION = '2.81.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -334,6 +334,7 @@
     'engines/hazard.js',
     'engines/marginal.js',
     'engines/tolerance.js',
+    'engines/events.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

@@ -28,6 +28,7 @@ const DEAD = {
 function runWitness(WA) {
   const K = WA.kaleidoscope, Rg = WA.registry, I = WA.intel, Lf = WA.life,
         C = WA.causal, O = WA.org, Wd = WA.world, Wt = WA.weather;
+  const Ev = WA.events;
   const seen = {};
   const expect = {};
   function want(code, desc) { expect[code] = desc; }
@@ -207,6 +208,43 @@ function runWitness(WA) {
   trip('bad-weight', function () { const R2 = WA.rivalry; const keep = R2.getSettings(); R2.setSettings({ enabled: true });
     const r = R2.declare('w甲', 'w乙', 'w丙', NaN); R2.setSettings(keep);
     return [r.reason]; });
+  // ── engines/events.js（v2.81.0 第十五面：排期 ≠ 触发）──
+  //   为什么必须补这 6 条：它们随 v2.81.0 新引入，此前既无见证也不在基线台账里，
+  //   门禁会如实报「未分类」。按第十二面口径，正解不是把码删掉而是把它真跑出来。
+  //   每条见证都走**产品真 API**，且刻意经过 schedule() 的写闸（先 enabled=true），
+  //   不是绕过闸门直造状态——见证的意义正是「这条拒收路径真的在现网可达」。
+  //   EF 在每条之后复位事件容器：见证之间共享同一个 WA，不复位会让
+  //   「同 id 仍在活动态 ⇒ duplicate」之类的串扰变成假见证（v2.81.0 专锁踩过同款坑）。
+  function EF() { if (!WA.store || !WA.store.transact) return;
+    WA.store.transact(function (d) { d.events = { rows: [], failQueue: [] }; }, 'reject-witness:events-reset'); }
+  function ES() { const keep = (Ev && Ev.getSettings) ? Ev.getSettings() : null;
+    if (Ev && Ev.setSettings) Ev.setSettings({ enabled: true }); return keep; }
+  function EK(keep) { if (Ev && Ev.setSettings && keep) Ev.setSettings(keep); EF(); }
+  want('bad-priority', 'events.schedule 传越界优先级 99（合法域 0..9）');
+  trip('bad-priority', function () { const keep = ES();
+    try { return [Ev.schedule({ id: 'z1', title: 't', priority: 99 }).reason]; } finally { EK(keep); } });
+  want('bad-trigger', 'events.schedule 排期参数不成形（repeat 缺正 intervalMs / delayed 缺 at|inMs / conditional 缺 condition）');
+  trip('bad-trigger', function () { const keep = ES();
+    try { return [
+      Ev.schedule({ id: 'z2', title: 't', kind: 'repeat' }).reason,
+      Ev.schedule({ id: 'z3', title: 't', kind: 'delayed' }).reason,
+      Ev.schedule({ id: 'z4', title: 't', kind: 'conditional' }).reason]; } finally { EK(keep); } });
+  want('condition-unmet', 'events.claim 时不传 metConditions（世界条件未足 ⇒ 状态零变化）');
+  trip('condition-unmet', function () { const keep = ES();
+    try { Ev.schedule({ id: 'z5', title: 't', kind: 'conditional', condition: '城门开' });
+      return Ev.claim().blocked.map(function (b) { return b.reason; }); } finally { EK(keep); } });
+  want('duplicate', 'events.schedule 同 id 且仍在活动态（不静默覆盖既有排期）');
+  trip('duplicate', function () { const keep = ES();
+    try { Ev.schedule({ id: 'z6', title: 't' });
+      return [Ev.schedule({ id: 'z6', title: 't' }).reason]; } finally { EK(keep); } });
+  want('not-active', 'events.cancel/replace 打在终态行上（已结束的排期不可再动）');
+  trip('not-active', function () { const keep = ES();
+    try { Ev.schedule({ id: 'z7', title: 't' }); Ev.cancel('z7', '见证');
+      return [Ev.cancel('z7', 'again').reason, Ev.replace('z7', {}).reason]; } finally { EK(keep); } });
+  want('not-claimed', 'events.complete 对未认领的行回报（没认领不许宣称做完）');
+  trip('not-claimed', function () { const keep = ES();
+    try { Ev.schedule({ id: 'z8', title: 't' });
+      return [Ev.complete('z8', { ok: true }).reason]; } finally { EK(keep); } });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

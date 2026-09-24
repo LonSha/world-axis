@@ -162,6 +162,8 @@
       hazard: { rows: [] },
       marginal: { rows: [] },
       tolerance: { round: 0, rows: [] },
+      // v2.81.0 事件调度（events.js）。登记了容量却不在骨架里，冷启动直写会炸事务。
+      events: { rows: [], failQueue: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -873,6 +875,10 @@
     'hazard.rows': { cap: 16, site: 'hazard.js WA.evict.array(hazard.rows)' },
     'marginal.rows': { cap: 16, site: 'marginal.js WA.evict.array(marginal.rows)' },
     'tolerance.rows': { cap: 24, site: 'tolerance.js WA.evict.array(tolerance.rows)' },
+    // v2.81.0 事件调度（events.js）。两容器 per-call：上限 = 设置上界（maxRows/maxFails，
+    //   与 evict.SITES 同源；运行时由 events.js 显式传当前设置值，改设置不漂移）。
+    'events.rows':      { cap: 24, site: 'events.js WA.evict.array(events.rows, maxRows)（per-call，取设置上界）' },
+    'events.failQueue': { cap: 24, site: 'events.js WA.evict.array(events.failQueue, maxFails)（per-call，取设置上界）' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

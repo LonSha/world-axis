@@ -157,7 +157,12 @@
     //   （actors/registry.js）在运行时才知道（它从 store 容量登记表逐节取）。
     //   因此本项 cap 为 'per-call'：调用方必须显式传入该节上限，传漏即 bad-cap 归因——
     //   「随手给个默认值」正是本仓库发生过的漂移（registry 曾写死常量，被 sizeAudit 判 drifted）。
-    'people.profile':     { path: 'people.*.profile.*', cap: 'per-call', kind: 'array', why: '人物档案各节（上限取自 store 登记表，写入时传入）' }
+    'people.profile':     { path: 'people.*.profile.*', cap: 'per-call', kind: 'array', why: '人物档案各节（上限取自 store 登记表，写入时传入）' },
+    // v2.81.0 事件调度（events.js：排期 ≠ 触发）。两容器都 per-call：
+    //   rows 上限 = maxRows 设置（与 schedule 容量拒收同源，改设置不漂移），
+    //   failQueue 上限 = maxFails 设置（complete 失败分支消费，答「上次为什么没成」）。
+    'events.rows':        { path: 'events.rows',        cap: 'per-call', kind: 'array', why: '事件队列（上限 = maxRows 设置，写入时传入）' },
+    'events.failQueue':   { path: 'events.failQueue',   cap: 'per-call', kind: 'array', why: '事件失败队列（上限 = maxFails 设置，写入时传入）' }
   };
 
   // ── 非挤出站点（显式声明，防「假阴性」与「计数虚高」两头都错）──────────
