@@ -350,7 +350,7 @@
       return { places: places().length, roads: roads().length, events: events().length,
         upcoming: events().filter(function (e) { return e && e.status !== 'done'; }).length };
     },
-    stat: function () { return Object.assign({}, stat); }
+    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
   // v2.63.0 观测面：把「被拒了什么」按原因计入 stat.faults。
   //   为什么必须另立一面：拒绝是**不落盘**的——被拒的东西当然写不进存档，

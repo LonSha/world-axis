@@ -409,6 +409,51 @@
         counts: cnt };
     });
   }
+  /**
+   * v2.80.0（第十四面）：故障台账总目。
+   *   背景：v2.63.0 起，world / shadow / threads 各自把「被拒了什么」按原因计入 stat.faults，
+   *   并由本模块的 secWorld / secShadow / secThreads 三节分别报出。此后陆续又有二十余个模块
+   *   照同一口径建了台账（choices / affect / bonds / masks / temporal-lock / temperament /
+   *   fondness / parallel-events / era-cycle / survival / warrant / beast-bond / appearance /
+   *   ladder / enigma / tempo / quota / spotlight / karma / hazard / marginal / tolerance /
+   *   weather / difficulty），却一个都没被念出来——台账建了，读侧没长。
+   *   后果是分级的：那三个老模块的拒收分得开（unknown-place / unreachable / no-shadow /
+   *   missing-question …），其余二十四个模块的拒收在**本面板上**与「什么也没发生」不可分，
+   *   而这恰是 v2.63.0 立那三面时要根除的那类静默失败。
+   *   本节的判据只有一条：**凡以 stat().faults 记账的模块，必须出现在同一张总目里**。
+   *   逐模块单列采集节在结构上兜不住这条——漏一个模块，它的采集节与它一起缺席，面板照绿；
+   *   一张会自己长大的总目才兜得住（新增台账模块自动进表，无需有人记得来加一节）。
+   *   实现纪律：只读观测。不改判定、不改返回结构、不新增模块导出成员。模块缺席、
+   *   stat() 抛错、或无 faults 容器的一律跳过（那是「没台账」，不是「台账坏了」）。
+   *   读数一律**快照拷贝**：本节的立场是「观测不该成为可被观测者改写的东西」，
+   *   故它不能把 stat() 交回来的 faults 原样转手（structural 模块曾整份交回内部引用）。
+   */
+  function secFaultLedger() {
+    return safe(function () {
+      const rows = [];
+      let owners = 0, accounted = 0;
+      Object.keys(WA).forEach(function (k) {
+        const m = WA[k];
+        if (!m || typeof m !== 'object' || typeof m.stat !== 'function') return;
+        let st = null;
+        try { st = m.stat(); } catch (e) { return; }
+        if (!st || typeof st !== 'object') return;
+        const f = st.faults;
+        if (!f || typeof f !== 'object') return;
+        owners++;
+        const kinds = Object.keys(f).sort();
+        const sum = kinds.reduce(function (a, r) { return a + (typeof f[r] === 'number' ? f[r] : 0); }, 0);
+        accounted += sum;
+        if (!kinds.length) return;                 // 空台账不进总目（否则总目被几十行零填满）
+        const counts = {};
+        kinds.forEach(function (r) { counts[r] = f[r]; });
+        rows.push({ module: k, kinds: kinds, total: sum, counts: counts });
+      });
+      rows.sort(function (a, b) { return b.total - a.total || (a.module < b.module ? -1 : 1); });
+      return { owners: owners, modules: rows.length, accounted: accounted, rows: rows };
+    }, { owners: 0, modules: 0, accounted: 0, rows: [], error: 'fault-ledger collect failed' });
+  }
+
   const MODULE_EXPORTS = {
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
@@ -1281,7 +1326,9 @@
       lonsha: secLonsha(),
       compat: secCompat(),
       // v2.50.0（第三十五面）：宿主两侧 + 时间轴三节
-      hostWb: secHostWb(), floorChanges: secFloorChanges(), ledgerTimeline: secLedgerTimeline()
+      hostWb: secHostWb(), floorChanges: secFloorChanges(), ledgerTimeline: secLedgerTimeline(),
+      // v2.80.0（第十四面）：故障台账总目（凡以 stat().faults 记账的模块必须出现在这里）
+      faultLedger: secFaultLedger()
     };
     diag.verdict = verdict(diag);
     return diag;
@@ -2186,6 +2233,7 @@
     OPTIONAL_EXPORTS,
     secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities, secCompat,
     secHostWb, secFloorChanges, secLedgerTimeline,   // v2.50.0（第三十五面）
+    secFaultLedger, // v2.80.0（第十四面）
     secHorizon, secEnemies, secParallelWorld,        // v2.64.0（第五十一 / 五十二 / 五十三面）
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
