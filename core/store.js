@@ -838,6 +838,9 @@
     'temperament.rows': { cap: 12, site: 'temperament.js WA.evict.array(temperament.rows)' },
     'fondness.rows': { cap: 16, site: 'fondness.js WA.evict.array(fondness.rows)' },
     'parallelEvents.rows': { cap: 15, site: 'parallel-events.js WA.evict.array(parallelEvents.rows)' },
+    // v2.77.0 好感行内两环（与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded）。
+    'fondness.rows.*.history': { cap: 8, kind: 'array', wildcard: true, site: 'fondness.js WA.evict.array(hit.history)（每行各自有界）' },
+    'fondness.rows.*.corrections': { cap: 8, kind: 'array', wildcard: true, site: 'fondness.js WA.evict.array(hit.corrections)（每行各自有界）' },
     // v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
     'eraCycle.rows': { cap: 8, site: 'era-cycle.js WA.evict.array(eraCycle.rows)' },
     'survival.rows': { cap: 12, site: 'survival.js WA.evict.array(survival.rows)' },

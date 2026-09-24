@@ -105,6 +105,11 @@
     'temperament.rows': { path: 'temperament.rows', cap: 12, why: '双层性格环形（底色/习惯/触发词，每行一人）' },
     'fondness.rows': { path: 'fondness.rows', cap: 16, why: '好感审计环形（步进白名单 + 信任对冲，不降准则）' },
     'parallelEvents.rows': { path: 'parallelEvents.rows', cap: 15, why: '场外事件环形（三要素 + 主时钟同步，活跃容量 3）' },
+    // v2.77.0 阶段授权/提案过期/行级撤销/纠错依据：好感行内两环。
+    //   与 karma.notes / gauge.history 同型——未登记站点会走 unknown-site 静默失败，
+    //   行内数组就会退化成无界（这正是 v2.70.0 / v2.72.0 已裁决过的同型病）。
+    'fondness.history': { path: 'fondness.rows.*.history', cap: 8, why: '好感变更史环（自动/采纳/判定不变/撤销/纠错/授权，每行各自有界；undo 需回看最近一项）' },
+    'fondness.corrections': { path: 'fondness.rows.*.corrections', cap: 8, why: '好感纠错依据环（每行各自有界；只增不删地约束模型不得再依据同一事件）' },
     // ── v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽（era-cycle.js / survival.js / warrant.js / beast-bond.js）──
     'eraCycle.rows': { path: 'eraCycle.rows', cap: 8, why: '资料片周期环形（四档状态机 + 倒计时，结算转长草强制换事件）' },
     'survival.rows': { path: 'survival.rows', cap: 12, why: '生存三轴环形（饱食/精力/负重分段，归零惩罚如实报出）' },
