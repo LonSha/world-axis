@@ -18,6 +18,16 @@ const DEAD = {
       + '故 else 永不取。穷举验证：6174 个长度≤3 的词法组合全跑一遍，该码零见证。'
       + '不删：若未来新增比较符，它是第一道防线（本面门禁会在那时通过 deadLeak 提醒「该码可能复活」）。'
   },
+  'backup-corrupt': {
+    anchor: "catch (e) { return { ok: false, reason: 'backup-corrupt', reverted: 0 }; }",
+    why: 'v2.83.0（B6）cfgRollback 的备份解析出口，在当前设计下**结构上不可达**：'
+      + 'cfgRollback 只在「写盘阶段中途失败」时被调用，而进入写盘阶段的前提是**导入前备份已成功写入**'
+      + '（备份失败会在写盘前以 backup-failed 拒收整次导入，见 settings-bus 的写盘前置条件）。'
+      + '而备份成功必然把同一个备份键覆写成合法 JSON ⇒ cfgRollback 读到的必是合法 JSON。'
+      + '故要走这条分支，得先有一个「存在但不是 JSON」的备份键，同时备份写入又失败——与前置条件互斥。'
+      + '不删：第三方脚本或外部工具若直接调用回滚入口（或未来备份环引入多源写入），它是第一道防线；'
+      + '届时本门禁会以 deadLeak 提醒「该码可能复活」。'
+  },
   'migration-loop': {
     anchor: "if (++guard > 64) return { ok: false, reason: 'migration-loop' };",
     why: 'checkpoints.migrate 的自旋防护在 FORMAT=1 期**结构上不可达**：循环条件 f < FORMAT 要求 f<1，'

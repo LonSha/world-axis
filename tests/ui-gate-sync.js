@@ -53,6 +53,16 @@ function fresh(opts) {
   //   顺序不能颠倒：先复位 → 再重装产品模块（绑真宿主）→ 最后 install（把 WA.mainWin 换成
   //   mini-DOM 壳，只供随后求值的 ui/* 使用）。
   try { global.WorldAxis.mainWin = global; global.WorldAxis.mainDoc = global.document; } catch (e) {}
+  // v2.83.0: 重装 LOAD **之前**清空设置登记表。
+  //   本函数重装产品模块，而每个模块的注册都是无条件追加
+  //   （`WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG])`）——表只增不减，
+  //   实测每次 fresh() 让登记项翻倍（54 → 109 → 163，54 个键各重复 2/3 次）。
+  //   两个后果都是真的：① 「重复登记」在 settingsBus.selfCheck() 里是 error 级阻断项，
+  //   于是任何在 fresh() 之后跑自洽判据的块都会读到一个人造的红灯；② 以登记表为真源的
+  //   判据（如「设置键归属」）会读到累计的脏数据 —— run.js 各块注入的 `module:'test'`
+  //   夹具会一路活到别的块、把「键归属对不上真实命名空间」变成非确定性失败。
+  //   清空是安全的：产品模块全部无条件 concat，重装即完整重建（实测回到 54 条）。
+  try { if (global.WorldAxis) global.WorldAxis.__settingsRegs = []; } catch (e) {}
   // v2.61.0: 产品模块同样支持源码覆盖（与下方 ui/* 的 opts.srcOverride 同一口径）。
   //   用途：让「修复前形态」在**内存副本**上装载并重跑同款判据（真源码破坏，零文件改写）；
   //   默认路径逐字不变——未传 override 时仍直接读盘。

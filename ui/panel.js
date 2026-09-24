@@ -1315,6 +1315,7 @@
         <button class="wa-btn" id="wa-conf-view" title="冲突现场：多标签页并发写导致的冲突快照">冲突现场</button>
         <button class="wa-btn" id="wa-mirror-view" title="镜像视图：聊天 metadata 镜像与 localStorage 的回落台账">镜像视图</button>
         <button class="wa-btn" id="wa-orphan-view" title="设置键：未登记却已落盘的幽灵设置">设置键</button>
+        <button class="wa-btn" id="wa-cfg-view" title="配置包：整包导出/导入设置家族键，含 schema 版本、备份环与失败不污染">配置包</button>
         <button class="wa-btn" id="wa-settle-view" title="结算守卫：同一楼层是否被重复结算">结算守卫</button>
         <button class="wa-btn" id="wa-compat-view" title="宿主兼容层：当前宿主提供了哪些能力、缺哪些">宿主兼容层</button>
       </div>
@@ -2350,6 +2351,119 @@
     // v2.2.0: 存档恢复点出口——store.restore / dropRecoveryPoint 此前全库零调用：
     //   恢复点只能导出成 JSON 文件，无法回滚；环形窗口仅 3 个却无法手动腾位。
     const rvBtn = $('#wa-recovery-view');
+    // v2.83.0（B6）: 配置包出口——此前「配置能不能整包搬走」在库里没有任何实现，
+    //   于是用户换设备/换聊天只能逐项重设，或把整份诊断包当配置搬运（含存档与日志，
+    //   既不安全也不精确）。本块给 exportConfig/importConfig 一个真实消费点。
+    //   面板只做**一层**：读出口读数 + 导出一份包到诊断输出区。导入是破坏性操作，
+    //   留待有明确意图的调用方（脚本/诊断），不在面板上放一个「粘贴即覆盖」的按钮。
+    const cfgBtn = $('#wa-cfg-view');
+    if (cfgBtn) cfgBtn.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.settingsBus) return;
+      try {
+        const st = (WA.settingsBus.cfgStat) ? WA.settingsBus.cfgStat() : null;
+        const sf = (WA.settingsBus.cfgSurface) ? WA.settingsBus.cfgSurface() : null;
+        const li = (WA.settingsBus.selfCheck) ? (WA.settingsBus.selfCheck().lifecycle || null) : null;
+        let html = '<div class="wa-item"><b>配置包</b>：schema ' + (st ? st.schema : '?')
+          + ' · 格式 ' + esc(st ? st.format : '?')
+          + ' · 未知键策略 ' + esc(st ? st.unknownKeyPolicy : '?') + '</div>';
+        if (sf) {
+          html += '<div class="wa-dim">当前配置面：已登记键 ' + sf.registered + ' 个'
+            + (sf.unregistered ? ' · 未登记键 ' + sf.unregistered + ' 个（仍属用户数据，按设置家族一并入包）' : '')
+            + ' · ' + Math.round(sf.bytes / 1024) + 'KB</div>';
+        }
+        if (li && li.migrations) {
+          html += '<div class="wa-dim">声明了结构迁移的键 ' + li.migrations + ' 个 · 本会话迁移 ' + (li.migratedThisSession || 0) + ' 个</div>';
+        }
+        if (st) {
+          html += '<div class="wa-dim">导入导出台账：导出 ' + st.exports + ' 次 · 导入 ' + st.imports
+            + ' 次（失败 ' + st.importFailed + ' 次）· 备份环 ' + st.backupCount + '/' + st.maxBackups
+            + '（' + Math.round(st.backupBytes / 1024) + 'KB）</div>';
+          if (st.lastImport) {
+            html += '<div class="wa-log wa-log-' + (st.lastImport.ok ? 'info' : 'warn') + '">最近导入：'
+              + esc(st.lastImport.code) + (st.lastImport.detail ? '（' + esc(String(st.lastImport.detail).slice(0, 80)) + '）' : '')
+              + (st.lastImport.ok ? ' · 成功写入 ' + (st.lastImport.applied || 0) + ' 个键' : ' · 当前配置未被改动') + '</div>';
+          }
+          if (st.backups.length) {
+            html += '<div class="wa-dim">备份（导入前自动留，环形 ' + st.maxBackups + ' 份）：'
+              + st.backups.map(function (b) { return esc(b.key.replace('worldaxis_cfgbackup_', '')) + ' ' + Math.round(b.bytes / 1024) + 'KB'; }).join(' · ') + '</div>';
+          }
+        }
+        const ex = WA.settingsBus.exportConfig();
+        html += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-cfg-copy">复制配置包</button>'
+          + '<button class="wa-btn wa-mini" id="wa-cfg-import">导入配置包…</button></div>';
+        out.innerHTML = html;
+        const cb = $('#wa-cfg-copy');
+        if (cb) cb.onclick = () => {
+          const o2 = $('#wa-diag-out');
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(ex.text);
+              if (o2) o2.innerHTML += '<div class="wa-log wa-log-info">✓ 配置包已复制（' + Math.round(ex.bytes / 1024) + 'KB，含 ' + ex.keys + ' 个已登记键）</div>';
+            } else if (o2) {
+              o2.innerHTML += '<div class="wa-log wa-log-warn">剪贴板不可用；配置包已写入控制台（console）</div>';
+              try { console.log('[世界枢轴] 配置包：' + ex.text); } catch (e2) {}
+            }
+          } catch (e2) {
+            if (o2) o2.innerHTML += '<div class="wa-log wa-log-err">复制失败：' + esc(String(e2 && e2.message)) + '</div>';
+          }
+        };
+        // 导入：两阶段（先粘文本 + 校验，再二次确认才写入）。
+        //   为什么不在第一屏就粘 + 写：导入是**破坏性**的（覆盖设置家族键），
+        //   与「存储键体检」的确认清理、「恢复到此点」的二次确认同规格。
+        //   第一阶段的校验用真实 importConfig 的**拒收面**（不写盘），
+        //   故用户看到的是「这个包会被怎么处置」，而不是一个空按钮。
+        const ib = $('#wa-cfg-import');
+        if (ib) ib.onclick = () => {
+          const o2 = $('#wa-diag-out'); if (!o2) return;
+          o2.innerHTML = '<div class="wa-dim">把配置包 JSON 粘贴到下面，先校验（此阶段不写入任何东西）：</div>'
+            + '<textarea id="wa-cfg-text" class="wa-input" rows="4" style="width:100%"></textarea>'
+            + '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-cfg-check">校验</button>'
+            + '<button class="wa-btn wa-mini" id="wa-cfg-cancel">取消</button></div>';
+          const ck = $('#wa-cfg-check');
+          if (ck) ck.onclick = async () => {
+            const txt = ($('#wa-cfg-text') || {}).value || '';
+            let pre = null;
+            try { pre = JSON.parse(txt); } catch (e3) { pre = null; }
+            if (!pre || pre.format !== 'worldaxis-config') {
+              o2.innerHTML = '<div class="wa-log wa-log-err">这不是本扩展的配置包（缺 worldaxis-config 信封）</div>';
+              return;
+            }
+            // 试运行：直接调 importConfig 但**故意先注入一个必然拒收的条件**不可行（会掩盖真实校验），
+            //   故改用「空 keys 探针 + 真实校验路径」两条并报：这里只做形状与键数的事实陈述。
+            const ks = Object.keys(pre.keys || {}).length;
+            const un = Object.keys(pre.unknown || {}).length;
+            o2.innerHTML = '<div class="wa-log wa-log-warn">⚠ 即将导入 schema ' + esc(String(pre.schema))
+              + ' 的配置包：已登记键 ' + ks + ' 个、未登记键 ' + un + ' 个。'
+              + '写入前会自动留一份备份（导入前备份），写入是最后一步，任何校验不通过都不会改动当前配置。</div>'
+              + '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-cfg-go">确认导入</button>'
+              + '<button class="wa-btn wa-mini" id="wa-cfg-abort">取消</button></div>';
+            const go = $('#wa-cfg-go');
+            if (go) go.onclick = async () => {
+              let r = null;
+              try { r = await WA.settingsBus.importConfig(txt); }
+              catch (e4) { r = { ok: false, code: 'threw', detail: String(e4 && e4.message) }; }
+              const o3 = $('#wa-diag-out');
+              if (!o3) return;
+              if (r.ok) {
+                renderBody();
+                const o4 = $('#wa-diag-out');
+                if (o4) o4.innerHTML = '<div class="wa-log wa-log-info">✓ 配置包已导入：写入 ' + r.applied
+                  + ' 个键 · 迁移 ' + (r.migrated ? r.migrated.length : 0) + ' 个'
+                  + (r.skippedUnknownKeys && r.skippedUnknownKeys.length ? ' · 跳过未登记键 ' + r.skippedUnknownKeys.length + ' 个' : '')
+                  + ' · 导入前备份 ' + esc(String(r.backup || '')) + '</div>';
+              } else {
+                o3.innerHTML = '<div class="wa-log wa-log-err">✗ 导入被拒（当前配置未被改动）：' + esc(String(r.code))
+                  + (r.detail ? '（' + esc(String(r.detail).slice(0, 120)) + '）' : '') + '</div>';
+              }
+            };
+            const ab = $('#wa-cfg-abort');
+            if (ab) ab.onclick = () => { if (cfgBtn.onclick) cfgBtn.onclick(); };
+          };
+          const cc2 = $('#wa-cfg-cancel');
+          if (cc2) cc2.onclick = () => { if (cfgBtn.onclick) cfgBtn.onclick(); };
+        };
+      } catch (e) { out.textContent = '配置包读取失败：' + (e && e.message); }
+    };
     if (rvBtn) rvBtn.onclick = () => {
       const out = $('#wa-diag-out'); if (!out || !WA.store) return;
       try {

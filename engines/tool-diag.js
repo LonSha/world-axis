@@ -1000,12 +1000,22 @@
       'wa-stat-reset', 'wa-compat-view', 'wa-wf-reset',
       // v2.2.0 块5：存档恢复点 / 设置键卫生
       'wa-recovery-view', 'wa-orphan-view', 'wa-undo-btn', 'wa-mirror-view',
+      // v2.83.0（B6）：配置包出口。与 v2.2.0/v2.34.0 新增控件同规格——
+      //   必须同时「渲染 + 绑定 + 守卫登记」，否则「控件渲染了但绑定 id 写错」
+      //   在新出口上无人发现（本块是「渲染↔绑定」两面里唯一会互相校验的地方）。
+      //   注意 wa-cfg-copy 属 **dynamic**：它只在点开配置包面板后才渲染 ——
+      //   放进 ids 会被「逐页无缺失」判成静态渲染缺失（本版实测踩到并纠正）。
+      'wa-cfg-view',
       // v2.2.0 块8：工具页既有控件（此前全在守卫之外 → 绑定断裂无人发现）
       'wa-audit-copy', 'wa-key-check', 'wa-quar-view', 'wa-recovery-dl', 'wa-maintain', 'wa-conf-view', 'wa-settle-view',
       // v2.34.0: 记忆采样预览三件
       'wa-samp-preview', 'wa-samp-copy', 'wa-samp-out'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
-      dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue'] },
+      dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue',
+      // v2.83.0（B6）：配置包面板里的动态控件（点开才渲染）。
+      //   wa-cfg-copy / wa-cfg-import 在第一屏；wa-cfg-text / wa-cfg-check / wa-cfg-go /
+      //   wa-cfg-abort / wa-cfg-cancel 在「粘贴 → 校验 → 二次确认」两步流程里逐步出现。
+      'wa-cfg-copy', 'wa-cfg-import', 'wa-cfg-text', 'wa-cfg-check', 'wa-cfg-cancel', 'wa-cfg-go', 'wa-cfg-abort'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg', 'wa-next-day', 'wa-wb-trigger', 'wa-wb-refresh', 'wa-wb-preview', 'wa-wb-scan', 'wa-wb-list', 'wa-wb-out'], dynamic: ['wa-conc-v'] },
     { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-out', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
        // v2.62.0: 因果结算控件（渲染在人物页）+ 稳定人物 ID 控件。

@@ -53,7 +53,7 @@
   //   迁移口径：只为**已经出现过的姓名**登记 id，不凭空生成履历或关系
   //   （登记的是身份，不是经历）。
   const ID_KEY = 'worldaxis_registry_ids_v1';
-  const __REG_IDS = { key: ID_KEY, def: {}, module: 'registryIds' };
+  const __REG_IDS = { key: ID_KEY, def: {}, module: 'registry' };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_IDS]);
   function idTable() { try { return WA.settingsBus.read(__REG_IDS) || {}; } catch (e) { return {}; } }
   function idScope() {

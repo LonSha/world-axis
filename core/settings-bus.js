@@ -62,6 +62,11 @@
     //   本字段记录「setItem 未抛错但读回不一致」的次数（独立于 setItem 桶：前者是写被拒，
     //   后者是写被接受却没留住，两者的处置完全不同——前者清空间，后者只能重试/换键）。
     verifyFailed: 0, lastStaged: null,
+    // v2.83.0（B6）：配置导入导出侧计量。此前「配置能不能整包搬走」在库里**没有实现**，
+    //   故也没有计量；本版补齐后，成败、迁移键数、备份环规模都必须可读（与 read/write/remove
+    //   三侧台账同规格：失败必须能回答「为什么」与「当前配置有没有被改动」）。
+    cfgExports: 0, cfgImports: 0, cfgImportFailed: 0, cfgMigrations: 0,
+    lastCfgImport: null, lastCfgBackupKey: null,
     // v2.6.0: 写入侧死键计量——`save()` 收到「不在登记 def 里的子键」的次数与最近键名。
     //   v2.5.0 的缩减型迁移只解决了**存量**（老存档里已有的死子键），**增量**仍在继续：
     //   `Object.assign(read(), patch)` 把运行时算出的旧字段一并写回、`setChannel` 无白名单地
@@ -798,6 +803,12 @@
    *   （那是隔离副本，另有一条清理规则）。真删除一律走 sweepStaleKeys({ apply:true })。
    * @returns {{keys:Array<{key:string,bytes:number,shape:string}>, total:number, bytes:number}}
    */
+  /**
+   * v2.83.0（B6）: 配置备份键前缀。声明在这里（ghostScan 之前）而不是 B6 实现块里 ——
+   *   它有两个消费点：本函数下方的豁免、以及 B6 的备份环读写。放在后面的块里会让
+   *   本处成为跨 TDZ 使用（同文件内更晚声明的 const 在装载期不可见）。
+   */
+  const CFG_BACKUP_PREFIX = 'worldaxis_cfgbackup_';
   function ghostScan() {
     const regs = WA.__settingsRegs || [];
     const known = Object.create(null);
@@ -805,6 +816,10 @@
     const rows = [], seen = [];
     ls_keys().forEach(function (k) {
       if (known[k]) return;
+      // v2.83.0（B6）: 本模块自己的配置备份环不是「幽灵设置」——它是本版刻意写下的
+      //   退路（每个设置家族键都登记在册，唯独备份键是**带数据**的工具键）。
+      //   不加这一行，用户会在「设置键」面板看到一串自己的备份并被建议清理。
+      if (k.indexOf(CFG_BACKUP_PREFIX) === 0) return;
       if (KNOWN_SUFFIX_RE.test(k)) return;
       // v2.5.0: 优先问 store 家族分类（单一真源）；不可用时退回本地前缀清单（见 familyOf 注释）
       const fam = familyOf(k);
@@ -927,8 +942,351 @@
     }
     return {};
   }
+  // ══════════════════════════════════════════════════════════════════════════
+  // v2.83.0（第三十七面 B6）：配置 schema 版本 / 迁移 / 导入导出 / 失败不污染
+  //
+  // 为什么落在**本文件**而不是新开一个模块（三条实测理由，不是偏好）：
+  //   ① 设置键的单一真源就在这里（`WA.__settingsRegs`）。另开模块就只能隔着总线读，
+  //      等于把「谁拥有这个键」这件事抄第二份 —— 本仓库已经删过两份这种副本
+  //      （store.js 的 settingsSettings 白名单、ghostScan 的前缀清单），都漂移过。
+  //   ② 结构指纹（`_schema`）与迁移器契约（`migrateIfNeeded`）是**存储层**概念，
+  //      只在本文件的 read/save 路径上闭环。配置包若在别处校验结构，就是两份判据。
+  //   ③ 新增**存储家族键**会踩既有卫生规则：实测（本版自己踩到）——备份键
+  //      `worldaxis_cfgbackup_*` 会被 `ghostScan()` 报成「幽灵设置」，因为 `_v1` 这类后缀
+  //      **没有任何正则豁免**（`corruptSettings` 只豁免 `_corrupt_<ts>`，与新鲜度无关）。
+  //      故本版**不新造家族**（备份落在 settings 家族内），并且必须显式在 ghostScan 里
+  //      排除自己的备份键 —— 否则用户会在「键卫生」面板看到一串自己的备份、并被建议清理。
+  //
+  // 「导入失败不污染」的实现口径（本版核心）：
+  //   写盘是最后一步，且写盘前**必然**先落一份导入前备份；任何一步拒绝都发生在写盘之前；
+  //   写盘阶段中途失败则按备份逐键回滚（新建的键删除、原有的键还原）。
+  //   —— 「拒绝」与「回滚」是两种收尾，但对外都叫「当前配置没被改动」。
+  // ══════════════════════════════════════════════════════════════════════════
+  const CFG_FORMAT = 'worldaxis-config';
+  const CFG_SCHEMA = 1;
+  const CFG_MAX_BACKUPS = 3;
+  const CFG_MIGRATE_TIMEOUT_MS = 800;
+  // 未知「键」策略（包里有、现场登记表没有的键）。未知「子键」不在此列 ——
+  //   子键的保留由既有 normalize 契约保证（未声明子键原样保留，见 normalize 末分支），
+  //   本版只**声明并实测**该策略，不重复实现一份。
+  const CFG_UNKNOWN_KEY_POLICY = 'skip';   // skip：只报告不写入（default）；adopt：一并写入
+
+  function cfgRegisteredKey(key) {
+    const rows = WA.__settingsRegs || [];
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].key === key) return rows[i];
+    }
+    return null;
+  }
+  function cfgOwnerModule(key) {
+    const r = cfgRegisteredKey(key);
+    return r ? (r.module || '(未声明)') : '(未登记)';
+  }
+  /** 该键是否属「配置」面——非配置家族（存档/恢复点/诊断/隔离/冲突/写者标识/世界书选择）不进配置包。 */
+  function cfgIsConfigKey(key) {
+    if (typeof key !== 'string' || key.indexOf('worldaxis_') !== 0) return false;
+    if (key.indexOf(CFG_BACKUP_PREFIX) === 0) return false;   // 备份键自身不入包（防自指递归）
+    let fam = null;
+    try {
+      const c = (WA.store && typeof WA.store.classifyKey === 'function') ? WA.store.classifyKey(key) : null;
+      fam = c && c.family;
+    } catch (e) { fam = null; }
+    if (fam === null) {
+      // store 不可用（本文件先于 store 装载的窗口）→ 退回保守判据：只认登记表内的键。
+      return !!cfgRegisteredKey(key);
+    }
+    return fam === 'settings' || fam === 'settingsUnregistered';
+  }
+  function cfgBackupKeys() {
+    return ls_keys().filter(function (k) { return k.indexOf(CFG_BACKUP_PREFIX) === 0; }).sort();
+  }
+  /**
+   * 复用**已审计的写路径**（`settingsBus.saveOrThrow` 内含写后读回校验、失败分桶、
+   * 子键漂移计量）。刻意不直接调 `ls_set`：那会绕过上述四层记账，让一次配置导入
+   * 在诊断里变成「没有发生过」。
+   *   注意：本函数在源文件里的位置早于 `WA.settingsBus` 赋值 —— 故取用时必须**晚绑定**
+   *   （调用期查 `WA.settingsBus`），不能在装载期捕获。这正是本版门禁实测出的
+   *   「调用期引用不构成装载顺序约束」那条口径的直接应用。
+   */
+  function cfgWrite(reg, val) {
+    try {
+      const sb = WA.settingsBus;
+      if (sb && typeof sb.saveOrThrow === 'function') return sb.saveOrThrow(reg, val);
+      if (sb && typeof sb.save === 'function') {
+        // 复用既有码 'write-failed'（同语义，见 settingsBus.save 的失败归因）——
+        //   刻意不另造 'save-failed'：本仓库拒收码台账要求每个码都落在
+        //   『有见证 / 已证不可达 / 存量基线』三类之一，而这一分支只在 saveOrThrow
+        //   缺失时才可能取到（正常装载不可达），另造新码等于给台账添一笔不可达死债。
+        return sb.save(reg, val) ? { ok: true } : { ok: false, reason: 'write-failed' };
+      }
+    } catch (e) {
+      return { ok: false, reason: 'save-threw: ' + String((e && e.message) || e).slice(0, 80) };
+    }
+    const w = ls_set(reg && reg.key, val, 'import');
+    return w && w.ok ? { ok: true } : { ok: false, reason: (w && w.error) ? String(w.error.message || w.error) : 'write-failed' };
+  }
+  /**
+   * 导出配置包。`o.backup === true` 时不返回包内容，而是**落到一个备份键**并返回 {ok, key}。
+   * 备份落地用同一个打包函数 —— 「导出给用户」与「写前留退路」共用一份序列化，
+   * 避免两条路径各写一遍、日后分叉（本仓库在 store 的 recovery 上正是靠单一实现保持自洽）。
+   */
+  function cfgPack(o) {
+    const op = o || {};
+    const keys = {}, unknown = {}, modules = {};
+    ls_keys().forEach(function (k) {
+      if (!cfgIsConfigKey(k)) return;
+      const raw = ls_raw(k);
+      let parsed = null, parsedOk = true;
+      try { parsed = (raw === null || raw === undefined) ? null : JSON.parse(raw); }
+      catch (e) { parsedOk = false; }
+      const rec = parsedOk ? { v: parsed } : { raw: raw === null ? null : String(raw) };
+      if (cfgRegisteredKey(k)) { keys[k] = rec; modules[k] = cfgOwnerModule(k); }
+      else unknown[k] = rec;
+    });
+    const out = {
+      format: CFG_FORMAT, schema: CFG_SCHEMA, at: wallNow(),
+      app: (WA.version || null),
+      chat: (function () { try { return (WA.store && WA.store.chatId) ? WA.store.chatId() : null; } catch (e) { return null; } })(),
+      registered: Object.keys(keys).length,
+      unknownCount: Object.keys(unknown).length,
+      keys: keys, unknown: unknown, modules: modules
+    };
+    if (op.includeUnknown === false) { out.unknown = {}; out.unknownCount = 0; }
+    out.bytes = JSON.stringify(out).length;
+    return out;
+  }
+  function cfgExport(opts) {
+    const b = cfgPack(opts);
+    stats.cfgExports++;
+    return { ok: true, bundle: b, text: JSON.stringify(b), bytes: b.bytes,
+      keys: b.registered, unknown: b.unknownCount };
+  }
+  /** 导入前自动备份：写第 1 步就是它，返回 null 即「无法留退路」→ 调用方必须拒绝整次导入。 */
+  function cfgBackup(tag) {
+    const b = cfgPack();
+    const key = CFG_BACKUP_PREFIX + (tag || 'auto');
+    let ring = cfgBackupKeys();
+    const w = ls_set(key, b, 'writeback');
+    if (!w.ok) {
+      WA.log('error', 'settingsBus: 配置备份写入失败（' + key + '）——无退路，调用方须放弃后续写入');
+      return null;
+    }
+    // 环形：只留最近 CFG_MAX_BACKUPS 份（与 store 的恢复点环形同规格）
+    ring = cfgBackupKeys();
+    while (ring.length > CFG_MAX_BACKUPS) {
+      const oldest = ring.shift();
+      if (oldest === key) ring.push(oldest);
+      else { try { rmRemove(oldest, 'settingsBus.cfgBackup', { verify: false }); } catch (e) {} }
+    }
+    stats.lastCfgBackupKey = key;
+    return { ok: true, key: key, keys: Object.keys(b.keys).length, bytes: b.bytes };
+  }
+  /**
+   * 迁移器调用护栏：迁移函数若挂死会连带卡死 UI 线程。
+   * 诚实的边界：JS 单线程，超时**打断不了**一个同步死循环（只能打断 await 边界上的等待）。
+   * 故本护栏的语义是「不无限期等 + 失败可见」，不是「一定能中断」。
+   */
+  function cfgInvokeGuarded(fn, ctxObj) {
+    let timer = null;
+    return Promise.race([
+      Promise.resolve().then(function () { return fn(ctxObj); }),
+      new Promise(function (_, rej) {
+        timer = setTimeout(function () { rej(new Error('migrate-timeout')); }, CFG_MIGRATE_TIMEOUT_MS);
+      })
+    ]).then(function (v) { if (timer) clearTimeout(timer); return v; },
+      function (e) { if (timer) clearTimeout(timer); throw e; });
+  }
+
+  /**
+   * 导入配置包。异步（迁移器可能是 async），但**所有拒绝都发生在写盘之前**。
+   * 返回：{ ok, code, ... }。任何 !ok 都保证「当前配置未被改动」。
+   */
+  async function cfgImport(text, opts) {
+    const o = opts || {};
+    stats.cfgImports++;
+    function refuse(code, detail, extra) {
+      stats.cfgImportFailed++;
+      stats.lastCfgImport = { at: wallNow(), ok: false, code: code, detail: detail || null };
+      const out = { ok: false, code: code, detail: (detail === undefined ? null : detail) };
+      if (extra && typeof extra === 'object') Object.keys(extra).forEach(function (k) { out[k] = extra[k]; });
+      return out;
+    }
+    // ① 输入边界：必须是字符串且非空（空输入是最常见的粘贴失败）
+    if (typeof text !== 'string' || !text.trim()) return refuse('empty-input');
+    // ② 解析边界
+    let b = null;
+    try { b = JSON.parse(text); }
+    catch (e) { return refuse('bad-json', String((e && e.message) || e).slice(0, 120)); }
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return refuse('bad-envelope');
+    // ③ 信封识别：`format` 是唯一来源（v2.82.0 在 checkpoints 上踩过「导出字段与导入校验字段不一致」
+    //    的坑：导出写 worldaxisCheckpoint、迁移校验读 format —— 自己导出的包自己拒收）
+    if (b.format !== CFG_FORMAT) return refuse('bad-format', String(b.format));
+    // ④ 版本门：更高 schema 一律不接 —— 理解不了的字段写进去就是静默破坏
+    if (typeof b.schema !== 'number') return refuse('no-schema');
+    if (b.schema > CFG_SCHEMA) return refuse('schema-too-new', 'bundle=' + b.schema + ' supported=' + CFG_SCHEMA);
+    const srcKeys = (b.keys && typeof b.keys === 'object' && !Array.isArray(b.keys)) ? b.keys : {};
+    const srcUnknown = (b.unknown && typeof b.unknown === 'object' && !Array.isArray(b.unknown)) ? b.unknown : {};
+    if (!Object.keys(srcKeys).length && !Object.keys(srcUnknown).length) return refuse('empty-bundle');
+
+    // ⑤ 导入前校验：逐键定性，全部判定完成后才允许进入写盘阶段
+    const cand = [], issues = [], unknownKeys = [];
+    Object.keys(srcKeys).sort().forEach(function (k) {
+      const rec = srcKeys[k];
+      const reg = cfgRegisteredKey(k);
+      if (!reg) { unknownKeys.push(k); return; }
+      if (!rec || typeof rec !== 'object') { issues.push({ key: k, code: 'bad-record' }); return; }
+      let val;
+      if (Object.prototype.hasOwnProperty.call(rec, 'raw')) {
+        // 原始字符串形态：导入前必须证明它是合法 JSON —— 否则写进去就是下一个损坏键
+        try { val = JSON.parse(rec.raw); }
+        catch (e) { issues.push({ key: k, code: 'bad-raw' }); return; }
+      } else {
+        val = rec.v;
+      }
+      if (val === undefined) { issues.push({ key: k, code: 'undefined-value' }); return; }
+      // 归一化预演：只报告不阻断（越界值被夹回是既有 normalize 契约，用户需要知道发生了）
+      let normNote = null;
+      try {
+        const norm = normalize(reg, val);
+        if (JSON.stringify(norm) !== JSON.stringify(val)) normNote = 'normalized';
+      } catch (eN) { normNote = 'normalize-threw'; }
+      // 已删除字段兼容提示：磁盘上有、当前 def 里没有的子键 → 保留但点名
+      let droppedFields = [];
+      try {
+        const def = (reg.def && typeof reg.def === 'object' && !Array.isArray(reg.def)) ? reg.def : null;
+        if (def && val && typeof val === 'object' && !Array.isArray(val)) {
+          droppedFields = Object.keys(val).filter(function (kk) {
+            return kk !== '_schema' && !Object.prototype.hasOwnProperty.call(def, kk);
+          });
+        }
+      } catch (eD) {}
+      cand.push({ key: k, reg: reg, val: val, normNote: normNote, droppedFields: droppedFields });
+      if (normNote) issues.push({ key: k, code: normNote });
+      if (droppedFields.length) issues.push({ key: k, code: 'fields-not-in-schema', fields: droppedFields });
+    });
+    // 未知键：源包 `unknown` 桶 + `keys` 里登记表没有的键，**都要报告**。
+    //   本版首轮实现只看了 `keys`，把源包的 `unknown` 桶整桶丢掉（既不采纳也不报告）——
+    //   实测由冒烟抓出：那正是本仓库反复在治的「声明面空转」形态（一个字段存在、
+    //   无人消费、且失效时无声）。
+    Object.keys(srcUnknown).sort().forEach(function (k) {
+      if (unknownKeys.indexOf(k) < 0) unknownKeys.push(k);
+    });
+    unknownKeys.forEach(function (k) {
+      issues.push({ key: k, code: 'unknown-key', policy: CFG_UNKNOWN_KEY_POLICY });
+    });
+    // 「全部不可用」必须带上**逐键原因** —— 否则一个 bad-record 会以 all-rejected 的
+    //   面貌出现，用户只看到「全被拒了」，看不到「第 3 个键的记录格式不对」。
+    if (!cand.length) return refuse('all-rejected',
+      '候选键 ' + Object.keys(srcKeys).length + ' 个，全部不可用；未知键 ' + unknownKeys.length + ' 个',
+      { issues: issues, unknownKeys: unknownKeys });
+
+    // ⑥ 迁移阶段（写盘之前）：包 schema < 当前 schema 时逐键调用模块自持的迁移器
+    const migrated = [];
+    if (b.schema < CFG_SCHEMA) {
+      for (let i = 0; i < cand.length; i++) {
+        const c = cand[i];
+        if (typeof c.reg.migrate !== 'function') continue;   // 无迁移器 = 无结构变化，按原值导入
+        let res;
+        try { res = await cfgInvokeGuarded(c.reg.migrate, { value: c.val, key: c.key, def: c.reg.def }); }
+        catch (eM) { return refuse('migrate-failed', c.key + ': ' + String((eM && eM.message) || eM).slice(0, 120)); }
+        // 迁移器返回值必须显式声明「改了什么」——不猜、不把 undefined 当值写
+        if (res && res.changed === true && Object.prototype.hasOwnProperty.call(res, 'value')) {
+          if (res.value === undefined) return refuse('migrate-no-value', c.key);
+          c.val = res.value;
+          migrated.push(c.key);
+        } else if (res === undefined || res === null) {
+          return refuse('migrate-no-result', c.key);
+        }
+      }
+      stats.cfgMigrations += migrated.length;
+    }
+
+    // ⑦ 唯一写盘点：前面所有拒绝都发生在这里之前
+    const bk = cfgBackup('pre-import');
+    if (!bk || !bk.ok) return refuse('backup-failed', '导入前备份未能落盘，为保住当前配置而放弃导入');
+    const applied = [];
+    for (let i = 0; i < cand.length; i++) {
+      const c = cand[i];
+      const w = cfgWrite(c.reg, c.val);
+      if (w.ok) { applied.push(c.key); continue; }
+      // 写盘中途失败 → 按备份回滚**本次已写入的键**（原有的还原、本次新建的删除）
+      cfgRollback(bk.key, applied);
+      stats.cfgImportFailed++;
+      stats.lastCfgImport = { at: wallNow(), ok: false, code: 'write-failed', detail: c.key, rolledBack: true };
+      return { ok: false, code: 'write-failed', detail: c.key, reason: w.reason, rolledBack: true, applied: applied.slice() };
+    }
+    stats.lastCfgImport = { at: wallNow(), ok: true, code: 'import-ok', applied: applied.length,
+      migrated: migrated.length, backup: bk.key };
+    return { ok: true, code: 'import-ok', applied: applied.length, appliedKeys: applied,
+      migrated: migrated, backup: bk.key, skippedUnknownKeys: unknownKeys,
+      issues: issues, droppedFields: issues.filter(function (x) { return x.code === 'fields-not-in-schema'; }) };
+  }
+  /**
+   * 回滚：只撤销**本次导入已写入的那些键**（不扫全库、不碰本次未涉及的键）。
+   *   · 键在备份内 → 还原为备份值；键不在备份内（本次新建）→ 删除。
+   *   为什么限定范围：全库扫描式回滚会把「备份之后、由其它模块正常写入的键」一并按缺省处置，
+   *   把一次失败的导入放大成一次配置重置 —— 回滚的边界必须与导入的边界完全重合。
+   */
+  function cfgRollback(backupKey, appliedKeys) {
+    const list = Array.isArray(appliedKeys) ? appliedKeys : [];
+    const raw = ls_raw(backupKey);
+    let b = null;
+    try { b = JSON.parse(raw === null || raw === undefined ? 'null' : raw); }
+    catch (e) { return { ok: false, reason: 'backup-corrupt', reverted: 0 }; }
+    const keys = (b && b.keys) || {};   // 备份缺失/损坏 → 退化为「删除本次写入」（宁可删掉刚写的半份，也不留下混合态）
+    const out = { ok: true, restored: 0, removed: 0, reverted: 0 };
+    list.forEach(function (k) {
+      const reg = cfgRegisteredKey(k);
+      if (!reg) return;
+      const rec = keys[k];
+      if (rec && typeof rec === 'object') {
+        let val;
+        if (Object.prototype.hasOwnProperty.call(rec, 'raw')) { try { val = JSON.parse(rec.raw); } catch (e) { val = undefined; } }
+        else val = rec.v;
+        if (val !== undefined) {
+          const w = cfgWrite(reg, val);
+          if (w.ok) { out.restored++; out.reverted++; }
+          return;
+        }
+      }
+      const r = rmRemove(k, 'settingsBus.cfgRollback', { verify: false });
+      if (r && r.ok) { out.removed++; out.reverted++; }
+    });
+    return out;
+  }
+  /** 导出面：配置包大小 / 备份环 / 导入台账 —— 供面板与诊断读取。 */
+  function cfgStat() {
+    const bks = cfgBackupKeys();
+    let bytes = 0;
+    bks.forEach(function (k) { const r = ls_raw(k); bytes += (r ? r.length : 0); });
+    return {
+      format: CFG_FORMAT, schema: CFG_SCHEMA, unknownKeyPolicy: CFG_UNKNOWN_KEY_POLICY,
+      exports: stats.cfgExports, imports: stats.cfgImports, importFailed: stats.cfgImportFailed,
+      migrations: stats.cfgMigrations, lastImport: stats.lastCfgImport,
+      lastBackupKey: stats.lastCfgBackupKey,
+      backups: bks.map(function (k) { return { key: k, bytes: (ls_raw(k) || '').length }; }),
+      backupCount: bks.length, maxBackups: CFG_MAX_BACKUPS, backupBytes: bytes
+    };
+  }
+  /** 当前配置面规模（面板/诊断一行读数）：已登记键数、未登记键数、总字节。 */
+  function cfgSurface() {
+    let reg = 0, unreg = 0, bytes = 0;
+    ls_keys().forEach(function (k) {
+      if (!cfgIsConfigKey(k)) return;
+      const raw = ls_raw(k);
+      bytes += (raw ? raw.length : 0);
+      if (cfgRegisteredKey(k)) reg++; else unreg++;
+    });
+    return { registered: reg, unregistered: unreg, bytes: bytes, keys: reg + unreg };
+  }
+
   WA.settingsBus = {
     stats: stats,
+    // v2.83.0（第三十七面 B6）：配置 schema / 导入导出 / 迁移 / 失败不污染。
+    //   实现与本导出面同在本文件 —— 理由见实现块头部（设置键真源在这里、结构指纹与迁移器
+    //   契约是存储层概念、新造存储家族会踩 ghostScan 的假警报）。
+    cfgStat: cfgStat, cfgSurface: cfgSurface, exportConfig: cfgExport, importConfig: cfgImport,
+
     /**
      * v2.9.0: 设置家族键的删除出口（对外）——与 save() 对称。
      *   此前模块要删自己的设置键只能直调 `localStorage.removeItem`，于是「删除」完全在

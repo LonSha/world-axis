@@ -1095,3 +1095,32 @@
 - **门禁结果**：`node tests/run.js` → **5657 / 失败 0**（v2.64.0 为 5572）。专锁单独 75/0。出口面 ns 76 / members 542 / chars 6532（生成器产物逐字回填 `FROZEN2800`）。清册 refs 1872 / ns 82 / members 942，死子面 dead 243 / uiDead 4 / dataOnly 125，仅测试 131；账本由 `node tests/dead-export-gate.js --update` 写出，version 2.65.0，条目 247，归因 test-only 135 / self-only 102 / unwired 10。`checked` 46→49，`SOURCES` 19→21。回填前全量是 5631/26，26 项全部是冻结计数，没有结算逻辑失败。
 - **可复用的判据**：否定式能力要钉在互斥计数上。关闭行程不是「返回了 disabled 字符串」就够了，必须同时证明没有调用 `move()`、没有减 `left`；关闭难度回落中性值时，`reason` 必须是 `disabled`，否则「用户选了中性」和「模块没开」在读面上不可区分。依赖面冻结串只收录被别的模块调用的成员：`depart` / `advance` / `releaseDue` 本版没有进串，因为还没有产品代码调用它们，这是口径而不是遗漏。
 - **提交**：`（见本版提交）`。
+
+### R66 · v2.83.0 — 模块契约与配置迁移（第三十七面：引用多 ≠ 必须先装载）
+
+- **版本**：v2.83.0（父 v2.82.0）。路线图 B4（模块能力注册表 + 依赖检查 + 命名空间隔离）+ B6（配置 schema + 旧版本迁移 + 未知字段保留 + 导入前校验 + 失败不污染 + 迁移前自动备份）。
+- **目的**：把「模块依赖」从静态印象变成运行期事实；把「配置」从逐项重设变成可整包搬迁且失败不污染的东西。
+- **做了什么**：
+  - `tests/module-registry-gate.js`（新，273 行）：模块契约实测门禁（真装载 + Proxy 拦 `WA` 访问 + 调用栈定案归属），`--update` 写 `tests/module-registry-ledger.json`；`EDGE_DROP=<rel> --probe` 做可证伪探针；`require` 时只导出量测面。
+  - `core/settings-bus.js`（+354 行）：B6 全套——`exportConfig` / `importConfig` / `cfgStat` / `cfgSurface`，配置包信封 `{format:'worldaxis-config', schema}`，写盘前置备份环（3 份，`worldaxis_cfgbackup_*`），导入前校验、版本门、迁移器调用、未知键策略、回滚。
+  - `tests/settle-v2830.js`（新，54 项）：B4/B6 双向专锁（10 条破坏锚点 + 1 条不可达防御锚点）。
+  - 接线修正：`actors/registry.js` / `engines/temporal-lock.js` / `render/inject.js` 的 `module` 字段改成真实命名空间；`engines/tool-diag.js` 登记 8 个新控件（1 静态 + 7 动态）；`ui/panel.js` 新增「配置包」出口（复制 + 两步确认导入）。
+- **为什么**：
+  - B4 的「依赖」在静态面上测不准。v1 朴素 DFS 判环按路径展开、指数爆炸（超时 180s）；v2 用括号配平猜「函数体掩码」，而本仓库文件一律 `(function () { … })()` 形态，装载期语句天然在 IIFE 函数体内，掩码必然反向——实测输出 `装载期 558 / 调用期 0`，真相是 `装载期 23 / 调用期引用 44`。**结论：静态图上的「核心四件套互相成环」全是幻影。**
+  - 「0 条」必须是可证伪的：`EDGE_DROP=core/workflow.js` ⇒ 18 个消费方当场抛 `Cannot read properties of undefined (reading 'register')`；`EDGE_DROP=core/store.js` / `core/clock.js`（全仓引用最多）⇒ **零个**消费方失败。**引用多 ≠ 必须先装载。**
+  - B6 的落点不新开模块：设置键真源在 `settings-bus.js`（另开就得抄第二份，本仓库已删过两份这种副本）；结构指纹与迁移器契约是存储层概念；而且**新造存储家族会踩既有卫生规则**——备份键 `worldaxis_cfgbackup_*` 会被 `ghostScan()` 报成「幽灵设置」（`_v1` 后缀没有任何正则豁免）。
+- **影响范围**：`core/settings-bus.js`、`actors/registry.js`、`engines/temporal-lock.js`、`render/inject.js`、`engines/tool-diag.js`、`ui/panel.js`、`index.js`、`manifest.json`、`tests/run.js`、`tests/ui-gate-sync.js`（`fresh()` 清空注册表）、`tests/module-registry-gate.js`（新）、`tests/module-registry-ledger.json`（新）、`tests/settle-v2830.js`（新）、`tests/dead-export-ledger.json`、`README.md`、`ITERATION_LOG.md`。`tools/*.py` 不入库。
+- **门禁结果**：`node tests/run.js` → **7341 / 失败 0**（v2.82.0 为 7283）。专锁 `tests/settle-v2830.js` 单独 55/0（连跑稳定）。`tests/module-registry-gate.js`：文件 105 / 命名空间 113 / 装载期边 23 / 硬边 0 / 调用期引用 44 / 结构问题 0。`tests/inventory.js`：refs 2219 / 产品文件 109 / 命名空间 108 / 成员 1209。`tests/export-contract.js`：ns 102 / members 573 / chars 7108（生成器产物逐字回填 `FROZEN2800`）。`tests/dead-export-gate.js`：dead 444 / uiDead 4 / dataOnly 160 / 仅测试 291，账本 version 2.83.0。`tests/test-surface-gate.js`：文件面 57 / 锁 53 / 孤儿 0 / spawn 3。**净增导出 4 个且全部接线（dead 面未增长）。**
+- **可复用的判据**（本轮新增，编号续 R65）：
+  - ⑪ **「必须先装载」只能由运行期事实回答**：静态面能回答的只有「提到了谁」（refs），回答不了装载顺序。判据的归属必须由调用栈定案（栈里第一个「位于本仓库文件内且无函数名」的帧 = 装载期顶层语句）；`at file.js:864:6` 这种顶层表达式语句**同样带行号**，故「有行号 = 函数体内」是错的。
+  - ⑫ **「零告警」必须配一个能证伪的负控制**：本版用「摘掉提供方重跑」证明判据真的能失败（workflow 摘掉 ⇒ 18 处抛错；store/clock 摘掉 ⇒ 0 处）——否则「硬边 0」与「判据是瞎的」不可分。
+  - ⑬ **可复用门禁必须能被 require**：首版 `module-registry-gate.js` 被 require 时照跑 CLI 核对分支并 `process.exit(1)`，直接把引入它的测试进程打死（7 项假红）。CLI 分支一律先判 `require.main === module`；且 Node CJS 模块顶层**不准 `return`**。
+  - ⑭ **新写的存储键要先问既有卫生规则会不会报它**：备份键被 `ghostScan()` 判成幽灵设置，因为豁免只有 `_corrupt_<ts>` 一类后缀，**与新鲜度无关**。新键必须先跑一遍盘点面（幽灵/越界/家族），再决定要不要在规则里显式豁免。
+  - ⑮ **声明面必须被消费**：导出包带 `unknown` 桶、导入侧只读 `keys` ⇒ 整桶静默丢弃（本版自己踩到，冒烟抓出）。核一个「新字段」时先问「谁读它、它失效时谁会响」。
+  - ⑯ **回滚的边界必须与导入的边界重合**：全库扫描式回滚会把「备份之后由其它模块正常写入的键」一并按缺省处置，把一次失败的导入放大成一次配置重置。
+  - ⑰ **负面判据（拒收不污染）与写路径破坏是两面**：把写路径换成恒 `ok` 后，「拒收不污染」仍成立（拒收都在写盘前），只有「值到底有没有落地」那一面才现形——**负控制必须挂在能看见它的那个面上**。
+  - ⑱ **冻结读数的比较值与消息文本同批改（R65⑧ 复现）+ 全文残留自检**：本轮 `refs 2207→2219 / members 1205→1209` 共 5 处，补丁自检抓出漏改的 1 处（`r2800`），全量回归又抓出口面契约的 `569/7063 → 573/7108` 一处。**冻结计数必须做全文残留扫描，不能只改写过的锚点。**
+  - ⑲ **交付物「在场」不等于「被执行」（v2.75.0 孤儿病的复发形态）**：`settle-v2830.js` 只对门禁做 `fs.existsSync`，于是 289 行、能独立跑出「装载期边 23 / 硬边 0」的 `module-registry-gate.js` 在测试文件面上被判 **orphan**——整套回归从未跑过它，而它恰是「依赖检查」的唯一判据面，漂移无人可见。修法按 v2400 惯例在 run.js 里 `spawnSync` 端到端跑一遍，并断言读数含关键值（防「空壳退出 0」）。**新写门禁必须同时接进执行面。**
+  - ⑳ **`fresh()` 重装模块时，只增不减的注册表必须显式清空**：产品模块一律无条件 `concat`，故每次 `fresh()` 让 `__settingsRegs` 翻倍（54 → 109 → 163，54 键各重复 2/3 次）。两个后果都真实：① 重复登记在 `selfCheck()` 里是 error 级阻断项 ⇒ 任何在 `fresh()` 之后跑自洽判据的块都读到人造红灯；② 以登记表为真源的判据会读到累计脏数据 —— run.js 各块注入的 `module:'test'` 夹具一路活到别的块，把「键归属对不上真实命名空间」变成非确定性失败（本轮 `unmapped:test` 的唯一根因）。**重装即重建 ⇒ 重装前须清空（实测回到稳定 54 条、零重复）。**
+  - ㉑ **`kill -9` 打断注入窗口会留下未还原的产品文件（v2.80.0 事故的再现）**：本轮回归被系统资源枯竭反复打断，其中一次恰停在 `bridge.js` 注入窗口内，残留一行 `function __ncProbeBridgeSnapshot() {…}`。症状不是报错而是**口径整体错位**：`refs 2219→2220`、`dead 444→443`，且 `bridge.snapshot` 引用数实测 1（期望 0）——多个「冻结读数」判据同时 ✗。定位手段：`git status` 列出不该改的文件 + mtime 晚于版本升档时刻。修法：`git checkout -- engines/bridge.js`（**不要手改**，尾部换行差异会让 diff 不干净）。**回归被外部中断后，先核 git 工作区再重跑。**
+- **提交**：`（见本版提交）`。
