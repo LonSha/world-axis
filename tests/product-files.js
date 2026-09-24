@@ -104,24 +104,6 @@ function repoFiles(root) {
 function testFiles(root) {
   return discoverFiles(path.join(root || BASE, 'tests'), 'tests');
 }
-/**
- * 测试面：`tests/` 下全部 .js（**含 run.js 本身**），按 posix 相对路径升序。
- *
- * v2.73.0 —— 为什么要有它：
- *   「测试引用面」此前在两处各写了一遍，且都只读 `tests/run.js` **一个文件的文本**：
- *     · tests/inventory.js 的 testRefSet（只跑 run.js 的 codeFace）；
- *     · tests/dead-export-gate.js 的 testRefCount（只读 run.js 的缓存快照）。
- *   而 run.js 是**聚合器**：它用 `require('./settle-v2650.js').runAll(assert)` 把
- *   8 个 settle-* 专锁与若干专项套件拉进同一个进程执行。于是那些文件里的真引用
- *   （`WA.karma.setSettings(...)` 之类）**对测试面完全不可见** ——
- *   实测 122 项被冻结账本误标为 unwired/self-only（「产品与测试均零引用」），
- *   而它们其实每轮回归都在被调用。归因失真与 v2.29.0 治的「一行注释掏空死子面」同族：
- *   **判据的输入面比事实窄**，结论就会稳定地错。
- *   收敛到本文件后，「什么算测试面」只有一处定义，消费方一律委托。
- */
-function testFiles(root) {
-  return discoverFiles(path.join(root || BASE, 'tests'), 'tests');
-}
 module.exports = {
   BASE: BASE,
   SKIP_DIRS: SKIP_DIRS,
