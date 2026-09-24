@@ -124,6 +124,16 @@
     'spotlight.rows': { path: 'spotlight.rows', cap: 32, why: '焦点分配登场账（seen/missed/streak 每行一人）' },
     'spotlight.pending': { path: 'spotlight.pending', cap: 'per-call', kind: 'array', why: '焦点点名单轮内实名（上限 = maxRows 设置，结算即清空）' },
     'gauge.history': { path: 'gauge.rows.*.history', cap: 8, why: '阻尼量规步进史（v2.70.0 遗留：第二参数误传数字导致挤出静默失败的修复）' },
+    // ── v2.72.0 叙事动力四件套（karma.js / hazard.js / marginal.js / tolerance.js）──
+    'karma.rows': { path: 'karma.rows', cap: 16, why: '业力双轴账（功德/债各一行，不净额化）' },
+    // v2.72.0 首个真缺陷：karma.js 原先写 `WA.evict.array(row.notes, 'karma.notes', 8)`，
+    //   而 'karma.notes' **未登记在 SITES** ⇒ 每次记账都走 unknown-site 静默失败 ⇒
+    //   每行的 notes 实际无界（与 v2.70.0 gauge.history 同型缺陷）。
+    //   修为具名通配站点（每行各自有界 8 条），引擎侧同步去掉误导性的第三参数。
+    'karma.notes': { path: 'karma.rows.*.notes', cap: 8, why: '业力行备注环（每行各自有界）' },
+    'hazard.rows': { path: 'hazard.rows', cap: 16, why: '累积风险账（每风险一行，含暗账 pending）' },
+    'marginal.rows': { path: 'marginal.rows', cap: 16, why: '边际折旧账（每对象一行，含重复计数与冷却）' },
+    'tolerance.rows': { path: 'tolerance.rows', cap: 24, why: '手段耐受账（每手段一行，触达轮号滑窗）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },

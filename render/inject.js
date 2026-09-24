@@ -44,7 +44,9 @@
     // v2.70.0: 'sceneSlice', 'gauge', 'rivalry'
     'sceneSlice', 'gauge', 'rivalry',
     // v2.71.0: 'enigma', 'tempo', 'quota', 'spotlight'
-    'enigma', 'tempo', 'quota', 'spotlight'];
+    'enigma', 'tempo', 'quota', 'spotlight',
+    // v2.72.0: 'karma', 'hazard', 'marginal', 'tolerance'
+    'karma', 'hazard', 'marginal', 'tolerance'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -53,7 +55,7 @@ style: false,
         life: true, intel: true, org: true, longline: true,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
-        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true }, module: 'inject' };
+        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -291,6 +293,11 @@ style: false,
       if (vis.tempo && WA.tempo) { const tp = WA.tempo.buildBlock(); if (tp) items.push({ source: '节奏齿轮', content: tp }); }
       if (vis.quota && WA.quota) { const qt = WA.quota.buildBlock(); if (qt) items.push({ source: '伏笔配给', content: qt }); }
       if (vis.spotlight && WA.spotlight) { const sl = WA.spotlight.buildBlock(); if (sl) items.push({ source: '焦点分配', content: sl }); }
+      // v2.72.0 叙事动力四件套。总开关关闭时 buildBlock 返回空串，零 token。
+      if (vis.karma && WA.karma) { const km = WA.karma.buildBlock(); if (km) items.push({ source: '业力账', content: km }); }
+      if (vis.hazard && WA.hazard) { const hz = WA.hazard.buildBlock(); if (hz) items.push({ source: '风险账', content: hz }); }
+      if (vis.marginal && WA.marginal) { const mg = WA.marginal.buildBlock(); if (mg) items.push({ source: '边际折旧', content: mg }); }
+      if (vis.tolerance && WA.tolerance) { const tl = WA.tolerance.buildBlock(); if (tl) items.push({ source: '手段耐受', content: tl }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块
       //   （它仍留在存档里，因为「秘密存在过」是事实，不是态度）。

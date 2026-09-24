@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.71.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.71.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.72.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.72.0",
   "dead": {
     "affect.channel": {
       "reason": "self-only",
@@ -978,6 +978,94 @@
       "tref": 0,
       "own": 3
     },
+    "hazard.bump": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hazard.confirm": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hazard.drop": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hazard.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "hazard.open": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hazard.read": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "hazard.roll": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hazard.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "hazard.stat": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 18
+    },
+    "hazard.targetFor": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "hazard.tick": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "horizon.laneCfg": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -1290,6 +1378,70 @@
       "tref": 0,
       "own": 3
     },
+    "karma.balance": {
+      "reason": "self-only",
+      "detail": "engines/karma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/karma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "karma.drop": {
+      "reason": "self-only",
+      "detail": "engines/karma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/karma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "karma.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/karma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "karma.intervene": {
+      "reason": "self-only",
+      "detail": "engines/karma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/karma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "karma.offset": {
+      "reason": "self-only",
+      "detail": "engines/karma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/karma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "karma.record": {
+      "reason": "self-only",
+      "detail": "engines/karma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/karma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "karma.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/karma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "karma.stat": {
+      "reason": "self-only",
+      "detail": "engines/karma.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/karma.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
     "ladder.deescalate": {
       "reason": "self-only",
       "detail": "engines/ladder.js 内部自用、外部零引用（过度导出）",
@@ -1438,6 +1590,94 @@
       "reason": "self-only",
       "detail": "engines/lonsha-reader.js 内部自用、外部零引用（过度导出）",
       "src": "engines/lonsha-reader.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "marginal.cool": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 23
+    },
+    "marginal.drop": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "marginal.factorFor": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "marginal.gain": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "marginal.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "marginal.open": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "marginal.read": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "marginal.reset": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "marginal.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "marginal.stat": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 17
+    },
+    "marginal.tick": {
+      "reason": "self-only",
+      "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/marginal.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -2450,6 +2690,86 @@
       "tref": 3,
       "own": 4
     },
+    "tolerance.check": {
+      "reason": "self-only",
+      "detail": "engines/tolerance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "tolerance.clear": {
+      "reason": "self-only",
+      "detail": "engines/tolerance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "tolerance.drop": {
+      "reason": "self-only",
+      "detail": "engines/tolerance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "tolerance.factorFor": {
+      "reason": "self-only",
+      "detail": "engines/tolerance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "tolerance.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "tolerance.round": {
+      "reason": "self-only",
+      "detail": "engines/tolerance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 20
+    },
+    "tolerance.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "tolerance.stat": {
+      "reason": "self-only",
+      "detail": "engines/tolerance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
+    },
+    "tolerance.tick": {
+      "reason": "self-only",
+      "detail": "engines/tolerance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "tolerance.use": {
+      "reason": "self-only",
+      "detail": "engines/tolerance.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tolerance.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "toolAnalyzer.estimateTokens": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -2974,6 +3294,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 151
+    "dataOnly": 154
   }
 }

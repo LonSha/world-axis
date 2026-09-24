@@ -157,6 +157,11 @@
       tempo: { gear: 'andante', shifts: [] },
       quota: { rows: [] },
       spotlight: { rows: [], pending: [] },
+      // v2.72.0 叙事动力四件套。登记了容量却不在骨架里，冷启动直写会炸事务。
+      karma: { rows: [] },
+      hazard: { rows: [] },
+      marginal: { rows: [] },
+      tolerance: { round: 0, rows: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -852,6 +857,12 @@
     'spotlight.rows': { cap: 32, site: 'spotlight.js WA.evict.array(spotlight.rows)' },
     'spotlight.pending': { cap: 32, site: 'spotlight.js WA.evict.array(spotlight.pending)（per-call，取设置上界）' },
     'gauge.rows.*.history': { cap: 8, kind: 'array', wildcard: true, site: 'gauge.js WA.evict.array(hit.history)（每行各自有界）' },
+    // v2.72.0 叙事动力四件套。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
+    'karma.rows': { cap: 16, site: 'karma.js WA.evict.array(karma.rows)' },
+    'karma.rows.*.notes': { cap: 8, kind: 'array', wildcard: true, site: 'karma.js WA.evict.array(row.notes)（每行各自有界）' },
+    'hazard.rows': { cap: 16, site: 'hazard.js WA.evict.array(hazard.rows)' },
+    'marginal.rows': { cap: 16, site: 'marginal.js WA.evict.array(marginal.rows)' },
+    'tolerance.rows': { cap: 24, site: 'tolerance.js WA.evict.array(tolerance.rows)' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

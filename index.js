@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.71.0';
+  const VERSION = '2.72.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -329,6 +329,11 @@
     'engines/tempo.js',
     'engines/quota.js',
     'engines/spotlight.js',
+    // v2.72.0: 叙事动力四件套（业力双轴 / 累积风险 / 边际折旧 / 手段耐受）。
+    'engines/karma.js',
+    'engines/hazard.js',
+    'engines/marginal.js',
+    'engines/tolerance.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',
