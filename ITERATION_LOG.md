@@ -14,6 +14,18 @@
 
 ## 迭代记录
 
+### R61 · 2026-09-24 · v2.78.0 拒收码可达性（第十二面）+ 缺陷猎捕（非法数守卫 / 读面活引用 / 不可达码）
+- **做了什么**：本版主题是「专门找 bug 和优化」，故先广度侦察再逐模块证伪，最后把新学到的口径工业化为常驻门禁。
+  - **面**：产品源码 <b>264 个</b>内联 <code>reason: '&lt;code&gt;'</code>，此前<b>零判据</b>——码写在源码里 vs 码真跑得出来，在读数上不可分。新增第十二面：每个码必须属于 <code>witnessed</code>（有可执行见证）/ <code>dead</code>（已证不可达 + 钉住锚点）/ <code>base</code>（存量未分类，冻结台账）三者之一。<b>两向判据</b>：新增未分类码 ⇒ 红灯；台账里的码被接上见证或从源码消失 ⇒ <code>baseStale</code> 红灯（防台账永久比现实胖）。
+  - **真缺陷 ①（本版最要紧）**：<code>typeof x === 'number'</code> 对 <code>NaN</code>/<code>±Infinity</code> <b>恒真</b> ⇒「是不是数」这道守卫拦不住非法值。实测：<code>gauge.step('g', NaN)</code> 整次 <code>ok:true</code>，<code>NaN</code> 落盘（<code>history.to=NaN</code>）并进注入段（<code>· g（g）: NaN%</code>）——<b>同一事实 JSON 面显示 <code>null</code>、注入面显示 <code>NaN</code>，两面互相矛盾</b>（违反本模块自己的「三态如实」）；<code>rivalry.declare(..., NaN)</code> 存下 <code>NaN</code> 烈度（注入 <code>烈度: NaN</code>）；<code>quota</code> 存龄 <code>NaN</code> ⇒ <code>age &gt;= limit</code> 恒假 ⇒ 记录<b>永不过期</b>（污染存档把池永久占满且读数无异常）。修法：逐处补 <code>isFinite</code>，且<b>只在已确认为 number 之后判有限性</b>（纯收紧、零语义漂移）。探针列表：<code>nan_probe</code> 全 API 扫（14 处命中，落盘的 5 处即上列）。
+  - **真缺陷 ②**：读面回传 store 内部<b>活引用</b>。实测 <code>WA.editorEvents.list() === WA.store.get().evolution.events</code> 为 <code>true</code> ⇒ <code>list().push(x)</code> 绕过 <code>add</code> 的全部校验（容量/查重/字段）直接入账；<code>editorFaction.list()</code> 同款。修法：<b>读面（无参）浅拷贝 / 写面（带 draft）原数组</b>——写路径逐字不变。
+  - **真缺陷 ③**：不可达码与不可分码。<code>bad-operator</code>（<code>parseCmp</code> 的 <code>else</code>）词法层永不可达（穷举 6174 个长度 ≤3 的组合零命中）；<code>gauge.step</code> 把「delta 不是数」并进 <code>missing-fields</code>（两根因不可分）⇒ 拆出 <code>bad-delta</code>；<code>rivalry.declare</code> 对非数 weight <b>静默降级 50</b> ⇒ <code>bad-weight</code> 只在 0..100 外可达。
+- **为什么**：上一版（v2.77.0）学到「码存在 ≠ 码可达」，但那条口径当时只活在 R60 的散记里。本版把它变成<b>可执行且两向的</b>常驻判据，并顺着这条判据往下扫，扫出上列三类真缺陷——「先立判据、判据再倒逼出缺陷」这个次序是有效的。
+- **四条可复用口径（本版固化）**：其一，<b>不可达码的正确处置是登记 + 钉锚点，不是删除</b>——删了就没第三个人知道这里原本有一道防线，且它可能在别处复活；<code>deadLeak</code>（锚点消失）与 <code>deadMissing</code>（码消失）两向都要红。其二，<b>未被观察过的码必须显式归类</b>，否则下一次被改成别的意思也无人知晓。其三，<b>判据的输入面必须与「真会被执行的代码」同宽</b>：初版门禁按原文扫，把 <code>bridge.js</code> 文档注释里的调用示例（<code>reason: 'pull'</code>）算成了真码（265 里 1 条是注释）；改用去注释剥离器后 264。这是 v2.75.0 [D2]「提及不是引用」的同族。其四，<b>探针要在全 API 面上扫，而不是在「已知嫌疑点」上扫</b>：本轮最有价值的缺陷（NaN 守卫族）是广度扫出来的，不是猜出来的。
+- **影响范围**：产品侧 8 文件 13 处（<code>engines/gauge.js</code>、<code>engines/rivalry.js</code>、<code>engines/quota.js</code>、<code>engines/ledger-timeline.js</code>、<code>engines/floor-changes.js</code>、<code>engines/editor-events.js</code>、<code>engines/editor-faction.js</code>、<code>core/store.js</code>）；测试侧新增 <code>tests/reject-v2780.js</code>（见证表）、<code>tests/reject-code-gate.js</code>（门禁）、<code>tests/reject-code-ledger.json</code>（基线台账）、<code>tests/reject-lock-v2780.js</code>（专锁）；改 <code>tests/settle-v2700.js</code>（<code>rv-weight</code> 锚点随修法前移 + 两条非数 weight 断言——门禁在首跑时正是这样逮住我的改动的）、<code>tests/run.js</code>（八处版本断言 + 挂载新锁）、<code>tests/dead-export-ledger.json</code>（<code>--update</code>，<code>version=2.78.0</code>；本版新增测试引用只影响 9 条 <code>tref</code> 证据，dead/uiDead 规模不变）、<code>index.js</code>、<code>manifest.json</code>、<code>README.md</code>、<code>ITERATION_LOG.md</code>。
+- **门禁结果**：<code>node tests/run.js</code> → <b>6840 / 失败 0</b>（v2.77.0 为 6788；+52 = 新专锁 50 + v2.70.0 锁新增 2）；<code>node tests/reject-code-gate.js</code> → <b>产品文件 107 / 内联码 264（见证 52 / 死表 1 / 基线 211）</b>，三集合穷尽互斥；<code>node tests/reject-lock-v2780.js</code> → <b>50 / 失败 0</b>；<code>node tests/dead-export-gate.js</code> → 绿（<code>dead 413 · uiDead 4</code> 不变）；<code>node tests/test-surface-gate.js</code> → 真仓库零孤儿（新锁挂在可达面里）。
+- **提交**：`（见本版提交）`。
+
 ### R1 · 2026-09-20 · 建立迭代日志
 - **做了什么**：新建本文件，固化基线指标与迭代节奏。
 - **为什么**：无人值守模式需要一个可追溯的变更台账。

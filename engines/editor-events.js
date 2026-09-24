@@ -29,7 +29,10 @@
 
   function clean(v) { return String(v == null ? '' : v).trim(); }
   function uid() { return WA.rand.id('ev_', 4, 'id'); }
-  function list(state) { return (state || WA.store.get()).evolution?.events || []; }
+  // v2.78.0: 读面（无 state）返回**浅拷贝**——修前返回的就是 store 里那个数组，
+  //   调用方 `list().push(x)` 等于绕过 add 的全部校验（上限/查重/字段）直接入账。
+  //   写面（带 state，即 transact 的 draft）必须拿原数组，否则 splice/赋值落不到 draft 上。
+  function list(state) { const m = (state || WA.store.get()).evolution; const arr = (m && m.events) || []; return state ? arr : arr.slice(); }
   function stagesOf(type) { return TYPE_STAGES[type] || TYPE_STAGES.conflict; }
 
   function findIndex(state, key) {

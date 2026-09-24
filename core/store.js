@@ -2464,9 +2464,11 @@
      */
     sizeAudit(opts) {
       const o = opts || {};
-      const minBytes = typeof o.minBytes === 'number' ? o.minBytes : 256;
-      const maxDepth = typeof o.maxDepth === 'number' ? o.maxDepth : 3;
-      const maxNodes = typeof o.maxNodes === 'number' && o.maxNodes > 0 ? o.maxNodes : 800;
+      // v2.78.0: 选项面同样不得放过 NaN——修前 sizeAudit({minBytes:NaN}) 会把 suspects 滤成空集，
+      //   于是「体检通过」与「体检没跑」在读数上不可分（两者都返回空 unbounded/suspects）。
+      const minBytes = (typeof o.minBytes === 'number' && isFinite(o.minBytes)) ? o.minBytes : 256;
+      const maxDepth = (typeof o.maxDepth === 'number' && isFinite(o.maxDepth)) ? o.maxDepth : 3;
+      const maxNodes = (typeof o.maxNodes === 'number' && isFinite(o.maxNodes) && o.maxNodes > 0) ? o.maxNodes : 800;
       // path -> { cap: 裁剪后长度硬上限, site: 裁剪点出处 }
       const BOUNDED = __BOUNDED_CAPS;
       const arrays = [];
@@ -2595,16 +2597,16 @@
     },
     sizeAuditFull(opts) {
       const o = opts || {};
-      const chunkNodes = typeof o.chunkNodes === 'number' && o.chunkNodes > 0 ? o.chunkNodes : 800;
-      const maxChunks = typeof o.maxChunks === 'number' && o.maxChunks > 0 ? o.maxChunks : 64;
-      const minBytes = typeof o.minBytes === 'number' ? o.minBytes : 256;
+      const chunkNodes = (typeof o.chunkNodes === 'number' && isFinite(o.chunkNodes) && o.chunkNodes > 0) ? o.chunkNodes : 800;
+      const maxChunks = (typeof o.maxChunks === 'number' && isFinite(o.maxChunks) && o.maxChunks > 0) ? o.maxChunks : 64;
+      const minBytes = (typeof o.minBytes === 'number' && isFinite(o.minBytes)) ? o.minBytes : 256;
       const merged = {};   // path -> row（同路径取较大体积，保守上报）
       let cursor = null, chunks = 0, visitedSum = 0, truncated = false, stalled = false;
       let depthCap = null;
       for (;;) {
         const pass = WA.store.sizeAudit({
           minBytes: minBytes, maxNodes: chunkNodes,
-          maxDepth: typeof o.maxDepth === 'number' ? o.maxDepth : 3,
+          maxDepth: (typeof o.maxDepth === 'number' && isFinite(o.maxDepth)) ? o.maxDepth : 3,
           topN: 1000000, resumeCursor: cursor
         });
         if (pass && pass.error) return { error: pass.error };
@@ -3010,7 +3012,7 @@
     dropRecoveryPoint(chatId, index) {
       const cid = chatId || getChatId();
       const list = this.listRecoveryPoints(cid);
-      const i = typeof index === 'number' ? index : -1;
+      const i = (typeof index === 'number' && isFinite(index)) ? index : -1;
       if (i < 0 || i >= list.length) return { ok: false, reason: '索引越界（当前 ' + list.length + ' 个恢复点）' };
       const dropped = list.splice(i, 1)[0];
       try { mainWin.localStorage.setItem(recoveryKey(cid), JSON.stringify(list)); }

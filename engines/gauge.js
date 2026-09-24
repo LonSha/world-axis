@@ -31,7 +31,7 @@
     if (!settings().enabled) return { ok: true, reason: 'disabled' };
     if (!key || typeof key !== 'string') return { ok: false, reason: 'missing-fields' };
     const o = opts || {};
-    const initVal = typeof o.initial === 'number' ? Math.max(0, Math.min(100, o.initial)) : 0;
+    const initVal = (typeof o.initial === 'number' && isFinite(o.initial)) ? Math.max(0, Math.min(100, o.initial)) : 0;
     let out = null;
     WA.store.transact(function (draft) {
       if (!draft.gauge) draft.gauge = { rows: [] };
@@ -57,7 +57,12 @@
 
   function step(key, delta, event) {
     if (!settings().enabled) return { ok: true, reason: 'disabled' };
-    if (!key || typeof delta !== 'number') return { ok: false, reason: 'missing-fields' };
+    if (!key) return { ok: false, reason: 'missing-fields' };
+    if (typeof delta !== 'number') return { ok: false, reason: 'missing-fields' };
+    // v2.78.0: NaN / ±Infinity 也属于「不是合法步长」——与 missing-fields 分开，两个根因在诊断面可分。
+    //   修前：typeof NaN === 'number' 恒真 ⇒ 缺 delta 与 NaN 合并，且 NaN 直接落盘（history.to=NaN），
+    //   buildBlock 把它当百分数注进 prompt（实测 `· g（g）: NaN%`）——注入面与 JSON 面互相矛盾。
+    if (!isFinite(delta)) return { ok: false, reason: 'bad-delta', got: delta };
     const lim = (settings().maxStep > 0) ? settings().maxStep : DEFAULT_MAX_STEP;
     if (Math.abs(delta) > lim) return { ok: false, reason: 'step-too-large', delta: delta, limit: lim };
 

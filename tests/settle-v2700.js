@@ -29,7 +29,9 @@ const A_GG_EVENT = "if (crossedMilestone !== null && (!event || typeof event !==
 const A_GG_TOP = "if (hit.val >= 100 && delta > 0) { out = { ok: false, reason: 'top', key: key, val: hit.val }; return; }";
 const A_RV_GATE = "if (!settings().enabled) return { ok: true, reason: 'disabled' };";
 const A_RV_ACTORS = "if (charA === charB || charA === target || charB === target) return { ok: false, reason: 'invalid-actors' };";
-const A_RV_WEIGHT = "if (w < 0 || w > 100) return { ok: false, reason: 'bad-weight', got: weight };";
+// v2.78.0: 锚点随修法前移——非数 weight 此前被静默降级 50，bad-weight 只在 0..100 外可达
+//   （码存在但一半不可达）。v2.78.0 起先判「是不是有限数」再判域，故锚点取整条守卫。
+const A_RV_WEIGHT = "if (typeof w !== 'number' || !isFinite(w) || w < 0 || w > 100) return { ok: false, reason: 'bad-weight', got: weight };";
 const A_RV_MOD_MISS = "if (!list.length) return { ok: false, reason: 'missing', favoured: favouredChar, target: target };";
 
 function fresh(opts) { return require('./ui-gate-sync.js').fresh(opts).WA; }
@@ -122,6 +124,8 @@ function judge(a) {
   a(WA.rivalry.declare('甲', '甲', '目标').reason === 'invalid-actors', 'v2700: [3] self vs self refused');
   a(WA.rivalry.declare('甲', '乙', '甲').reason === 'invalid-actors', 'v2700: [3] actor collision with target refused');
   a(WA.rivalry.declare('甲', '乙', '目标', 150).reason === 'bad-weight', 'v2700: [3] weight > 100 refused');
+  a(WA.rivalry.declare('甲', '乙', '目标', NaN).reason === 'bad-weight', 'v2700: [3] NaN weight refused (v2.78.0: 此前被静默降级 50)');
+  a(WA.rivalry.declare('甲丙', '乙丙', '目标丙', 'x').reason === 'bad-weight', 'v2700: [3] non-number weight refused (v2.78.0)');
   const rvOk = WA.rivalry.declare('师姐', '师妹', '主角', 80);
   a(rvOk.ok === true && rvOk.weight === 80, 'v2700: [3] rivalry declared');
   a(WA.rivalry.modulate('路人', '主角', 20).reason === 'missing', 'v2700: [3] unrecorded rivalry modulate says missing');

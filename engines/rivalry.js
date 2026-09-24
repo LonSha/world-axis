@@ -34,8 +34,10 @@
     if (!charA || !charB || !target) return { ok: false, reason: 'missing-fields' };
     if (charA === charB || charA === target || charB === target) return { ok: false, reason: 'invalid-actors' };
 
-    const w = typeof weight === 'number' ? weight : 50;
-    if (w < 0 || w > 100) return { ok: false, reason: 'bad-weight', got: weight };
+    // v2.78.0: 修前非数 weight 静默降级 50（bad-weight 存而在但只在 0..100 外可达，即「码不可达」）。
+    //   现在：缺省仍为 50；但一旦给了值，就必须是有限数且落在域内，否则如实报 bad-weight。
+    const w = (weight === undefined || weight === null) ? 50 : weight;
+    if (typeof w !== 'number' || !isFinite(w) || w < 0 || w > 100) return { ok: false, reason: 'bad-weight', got: weight };
 
     const key = makeKey(charA, charB, target);
     let out = null;
@@ -63,7 +65,7 @@
   function modulate(favouredChar, target, favourScore) {
     if (!settings().enabled) return { ok: true, reason: 'disabled' };
     if (!favouredChar || !target) return { ok: false, reason: 'missing-fields' };
-    const score = typeof favourScore === 'number' ? favourScore : 10;
+    const score = (typeof favourScore === 'number' && isFinite(favourScore)) ? favourScore : 10;
 
     const list = rows().filter(function (r) {
       return r && r.target === target && (r.charA === favouredChar || r.charB === favouredChar);

@@ -317,6 +317,15 @@
       if (!tk.ok) return { ok: false, reason: tk.reason, detail: tk.detail };
       const pr = makeParser(tk.tokens, refValue).arith();
       if (!pr.ok) return { ok: false, reason: pr.reason, detail: pr.detail };
+      //三态如实：溢出得到的 Infinity / NaN 不是「一个数」。
+      //   算术链上每一处都用 isFinite 定义「是数值」（参考量 parseFactor/parseOperand、
+      //   applyRange/applyMap 的入口），只有这里漏了一步——于是 「999...9 * 999...9」算出
+      //   Infinity 后被归进 ok：snapshot 报 invalid=0，而 buildBlock 把字面量
+      //   `Infinity` 直接写进注入段（模型看到的是一个不是数的数）。
+      //   同一份结论在 JSON 里显示为 null、在注入面显示为 Infinity，两面互相矛盾。
+      //   命名依据：与 div-zero 同族——「运算结果不合法」是独立根因，不应并进 not-a-number
+      //   （后者专指「引用到的量不是数值」），否则两个根因在诊断面不可分。
+      if (!isFinite(pr.v)) return { ok: false, reason: 'overflow', detail: 'formula 结果不是有限数（' + pr.v + '）' };
       return { ok: true, raw: pr.v, value: pr.v, kind: 'number' };
     }
     const snap = snapshotState();

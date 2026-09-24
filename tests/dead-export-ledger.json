@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.77.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.77.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.78.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.78.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -991,7 +991,7 @@
       "detail": "engines/gauge.js 内部自用、外部零引用（过度导出）",
       "src": "engines/gauge.js",
       "refs": 0,
-      "tref": 12,
+      "tref": 13,
       "own": 3
     },
     "gauge.getSettings": {
@@ -1007,7 +1007,7 @@
       "detail": "engines/gauge.js 内部自用、外部零引用（过度导出）",
       "src": "engines/gauge.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 4,
       "own": 4
     },
     "gauge.setSettings": {
@@ -1015,7 +1015,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/gauge.js",
       "refs": 0,
-      "tref": 7,
+      "tref": 8,
       "own": 1
     },
     "gauge.step": {
@@ -1023,7 +1023,7 @@
       "detail": "engines/gauge.js 内部自用、外部零引用（过度导出）",
       "src": "engines/gauge.js",
       "refs": 0,
-      "tref": 13,
+      "tref": 14,
       "own": 3
     },
     "hazard.bump": {
@@ -2031,7 +2031,7 @@
       "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
       "src": "engines/quota.js",
       "refs": 0,
-      "tref": 17,
+      "tref": 18,
       "own": 3
     },
     "quota.drop": {
@@ -2071,7 +2071,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/quota.js",
       "refs": 0,
-      "tref": 9,
+      "tref": 10,
       "own": 1
     },
     "quota.stat": {
@@ -2087,7 +2087,7 @@
       "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
       "src": "engines/quota.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 3,
       "own": 3
     },
     "rand.channels": {
@@ -2183,7 +2183,7 @@
       "detail": "engines/rivalry.js 内部自用、外部零引用（过度导出）",
       "src": "engines/rivalry.js",
       "refs": 0,
-      "tref": 9,
+      "tref": 12,
       "own": 3
     },
     "rivalry.getSettings": {
@@ -2223,7 +2223,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/rivalry.js",
       "refs": 0,
-      "tref": 4,
+      "tref": 5,
       "own": 1
     },
     "rules.getRuleCount": {

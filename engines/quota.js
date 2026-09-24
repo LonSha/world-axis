@@ -90,7 +90,9 @@
       let aged = 0, expired = 0;
       draft.quota.rows.forEach(function (r) {
         if (!r || r.status !== 'active') return;
-        r.age = (typeof r.age === 'number' ? r.age : 0) + 1;
+        // v2.78.0: 修前存量 age 若是 NaN，`typeof NaN === 'number'` 让它**永不过期**（age >= limit 恒假）——
+        //   一条被污染的存档会把该池永久占满，而且任何读数都看不出异常。
+        r.age = ((typeof r.age === 'number' && isFinite(r.age)) ? r.age : 0) + 1;
         aged++;
         const limit = r.pool === 'short' ? settings().shortAge : settings().longAge;
         if (r.age >= limit) { r.status = 'expired'; r.expiredAt = clockNow('quota'); expired++; }

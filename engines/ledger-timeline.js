@@ -81,7 +81,8 @@
       }
       rec.lastSig = s2;
       rec.lastOk = ok2;
-      rec.steps.push({ at: rec.lastAt, ok: ok2, sig: s2, reps: 1, key: (typeof key === 'number' ? key : null) });
+      // v2.78.0: key 是楼层号；NaN 会让「同一段」的指纹失去可比性（NaN !== NaN 恒真）。
+      rec.steps.push({ at: rec.lastAt, ok: ok2, sig: s2, reps: 1, key: ((typeof key === 'number' && isFinite(key)) ? key : null) });
       while (rec.steps.length > MAX_STEPS) rec.steps.shift();
       return rec;
     } catch (e) { return null; }

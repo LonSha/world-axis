@@ -32,7 +32,9 @@
 
   function clean(v) { return String(v == null ? '' : v).trim(); }
   function uid() { return WA.rand.id('fa_', 4, 'id'); }
-  function list(state) { return (state || WA.store.get()).evolution?.factions || []; }
+  // v2.78.0: 与 editorEvents.list 同款修法（读面浅拷贝 / 写面原数组）——
+  //   修前 `WA.editorFaction.list() === WA.store.get().evolution.factions` 为真，改返回值即改持久态。
+  function list(state) { const m = (state || WA.store.get()).evolution; const arr = (m && m.factions) || []; return state ? arr : arr.slice(); }
 
   /** 五要件准入校验：World 规则「势力五要件」——名称/范围/关系/目标/支柱至少一 */
   function validate(input) {

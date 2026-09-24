@@ -78,7 +78,8 @@
       const mes = (p.message && typeof p.message.mes === 'string') ? p.message.mes : (typeof p.mes === 'string' ? p.mes : '');
       __events.push({
         at: clockWall(), kind: k,
-        floor: (typeof p.index === 'number') ? p.index : (typeof p.floor === 'number' ? p.floor : null),
+        // v2.78.0: 楼层号 NaN 会被当成「一个正常楼层」记进变更账（下游按号比对全部失配）。
+        floor: (typeof p.index === 'number' && isFinite(p.index)) ? p.index : ((typeof p.floor === 'number' && isFinite(p.floor)) ? p.floor : null),
         mesLen: mes.length,
         hash: mes ? safe(function () { return WA.timeline.hashText(mes); }, '') : ''
       });
