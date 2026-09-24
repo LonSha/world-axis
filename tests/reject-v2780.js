@@ -17,6 +17,15 @@ const DEAD = {
       + '而 tokenize 产 op 的分支只输出 >=/<=/==/!=/>/<，该集合恰是下面 if/else 链的全部分支，'
       + '故 else 永不取。穷举验证：6174 个长度≤3 的词法组合全跑一遍，该码零见证。'
       + '不删：若未来新增比较符，它是第一道防线（本面门禁会在那时通过 deadLeak 提醒「该码可能复活」）。'
+  },
+  'migration-loop': {
+    anchor: "if (++guard > 64) return { ok: false, reason: 'migration-loop' };",
+    why: 'checkpoints.migrate 的自旋防护在 FORMAT=1 期**结构上不可达**：循环条件 f < FORMAT 要求 f<1，'
+      + '而唯一的迁移登记入口 registerMigration 收窄为 f<1 ⇒ missing-fields，0/-1/-2 全被拒。'
+      + '故循环体内永远拿不到 step，至多转 1 圈即走 no-migration 出口，guard 永不越 64。'
+      + '穷举验证（/tmp/diag7.js）：registerMigration(-2..0) 全返回 missing-fields；'
+      + 'migrate({worldaxisCheckpoint:0}) 返回 no-migration。不删：将来若新增 format 2 与相应迁移，'
+      + '它是第一道防线（届时本门禁会以 deadLeak 提醒「该码可能复活」）。'
   }
 };
 
@@ -26,6 +35,7 @@ const DEAD = {
  *   unexpected：见证中冒出来的、不在预期集合里的码（防再命名）。
  */
 function runWitness(WA) {
+  const LS = global.localStorage;
   const K = WA.kaleidoscope, Rg = WA.registry, I = WA.intel, Lf = WA.life,
         C = WA.causal, O = WA.org, Wd = WA.world, Wt = WA.weather;
   const Ev = WA.events;
@@ -245,6 +255,51 @@ function runWitness(WA) {
   trip('not-claimed', function () { const keep = ES();
     try { Ev.schedule({ id: 'z8', title: 't' });
       return [Ev.complete('z8', { ok: true }).reason]; } finally { EK(keep); } });
+  // ── engines/checkpoints.js（v2.82.0 第十六面：快照与分支）──
+  //   这 11 个码全部**可达**，故逐条补真见证（不是声称可达）。
+  const Cp = WA.checkpoints;
+  function cpReset(patch) {
+    LS.clear(); try { WA.store.init(); } catch (e) {}
+    Cp.setSettings(Object.assign({ enabled: true, maxSlots: 6, autoEvery: 0, autoSlots: 2 }, patch || {}));
+  }
+  want('bad-scope', 'checkpoints.resolveScope 传不在白名单里的范围');
+  trip('bad-scope', function () { cpReset(); return [Cp.resolveScope('nope', []).reason]; });
+  want('missing-keys', 'checkpoints 取 module/scene 范围却不给键');
+  trip('missing-keys', function () { cpReset(); return [Cp.resolveScope('module', []).reason]; });
+  want('unknown-keys', 'checkpoints 点名了骨架里没有的顶层键');
+  trip('unknown-keys', function () { cpReset(); return [Cp.resolveScope('scene', ['__nope__']).reason]; });
+  want('guarded-key', 'checkpoints 显式点名守卫键（schemaVersion）存快照');
+  trip('guarded-key', function () { cpReset(); return [Cp.resolveScope('module', ['schemaVersion']).reason]; });
+  want('lib-unreadable', '快照库读不出时 save/read 一律拒收（绝不覆盖写）');
+  trip('lib-unreadable', function () {
+    cpReset(); Cp.save('甲', { scope: 'global' });
+    LS.setItem(Cp.stat().key, '{broken');
+    return [Cp.save('乙', { scope: 'global' }).reason, Cp.read('c1').reason];
+  });
+  want('bad-format', '信封格式号非有限值 / 不是 JSON / 没有 worldaxisCheckpoint 标记');
+  trip('bad-format', function () {
+    cpReset();
+    return [Cp.migrate({ worldaxisCheckpoint: 'x' }).reason,
+      Cp.importOne('{not json').reason, Cp.importOne({ nope: 1 }).reason];
+  });
+  want('too-new', '信封格式号高于本引擎支持的 FORMAT');
+  trip('too-new', function () { cpReset(); return [Cp.migrate({ worldaxisCheckpoint: 99 }).reason]; });
+  want('no-migration', '信封版本更旧但没有登记对应迁移步骤（不猜）');
+  trip('no-migration', function () { cpReset(); return [Cp.migrate({ worldaxisCheckpoint: 0 }).reason]; });
+  want('checksum-mismatch', '信封校验和与正文对不上（搬运途中被改写）');
+  trip('checksum-mismatch', function () {
+    cpReset();
+    const a = Cp.save('甲', { scope: 'global' });
+    const ex = Cp.exportOne(a.id);
+    const tampered = JSON.parse(ex.text);
+    tampered.checksum = 'kdeadbeef';
+    return [Cp.importOne(tampered).reason];
+  });
+  want('not-due', '自动快照开了但这一轮还没轮到（与 disabled 各自成词）');
+  trip('not-due', function () {
+    cpReset({ autoEvery: 3 });
+    return [Cp.tick().reason];
+  });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

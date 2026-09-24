@@ -48,7 +48,8 @@
     // v2.72.0: 'karma', 'hazard', 'marginal', 'tolerance'
     'karma', 'hazard', 'marginal', 'tolerance',
     // v2.81.0: 'events'（事件调度）。与注入分支同批登记（键名 = 命名空间名）。
-    'events'];
+    // v2.82.0: 'checkpoints'（快照与分支）。同批登记——只加分支不加源表 = 开关点了零效果。
+    'events', 'checkpoints'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -57,7 +58,7 @@ style: false,
         life: true, intel: true, org: true, longline: true,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
-        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true }, module: 'inject' };
+        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true }, module: 'inject' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -302,6 +303,9 @@ style: false,
       if (vis.tolerance && WA.tolerance) { const tl = WA.tolerance.buildBlock(); if (tl) items.push({ source: '手段耐受', content: tl }); }
       // v2.81.0 事件调度。总开关关闭时 buildBlock 返回空串，零 token。
       if (vis.events && WA.events) { const ev = WA.events.buildBlock(); if (ev) items.push({ source: '事件调度', content: ev }); }
+      // v2.82.0 快照与分支。本块只报「存在哪些存档」，**不报当前世界是否已保存**——
+      //   列表非空 ≠ 当前进度有档，若不说清，模型会把「有存档」读成「随时能回来」。
+      if (vis.checkpoints && WA.checkpoints) { const cp = WA.checkpoints.buildBlock(); if (cp) items.push({ source: '快照与分支', content: cp }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块
       //   （它仍留在存档里，因为「秘密存在过」是事实，不是态度）。

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.81.0';
+  const VERSION = '2.82.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -335,6 +335,9 @@
     'engines/marginal.js',
     'engines/tolerance.js',
     'engines/events.js',
+    // v2.82.0: 快照与分支（B3）。**无核心依赖**（只读 store.get / store.transact），
+    //   位置只需早于 render/inject.js 的消费点（注入块与事件调度同批）。
+    'engines/checkpoints.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

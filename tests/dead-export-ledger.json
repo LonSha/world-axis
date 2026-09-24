@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.81.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.81.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.82.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.82.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -393,6 +393,166 @@
       "refs": 0,
       "tref": 1,
       "own": 6
+    },
+    "checkpoints.branch": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 6,
+      "own": 3
+    },
+    "checkpoints.checksum": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 9
+    },
+    "checkpoints.compare": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 3
+    },
+    "checkpoints.exportOne": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 3
+    },
+    "checkpoints.getSettings": {
+      "reason": "test-only",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "checkpoints.importOne": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 3
+    },
+    "checkpoints.lineage": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "checkpoints.list": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 20,
+      "own": 39
+    },
+    "checkpoints.migrate": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 4
+    },
+    "checkpoints.migrations": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "checkpoints.read": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 5,
+      "own": 8
+    },
+    "checkpoints.registerMigration": {
+      "reason": "self-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "checkpoints.remove": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "checkpoints.resolveScope": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 4
+    },
+    "checkpoints.restore": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 4
+    },
+    "checkpoints.save": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 34,
+      "own": 5
+    },
+    "checkpoints.setSettings": {
+      "reason": "test-only",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "checkpoints.stat": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 12,
+      "own": 25
+    },
+    "checkpoints.tick": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 5
+    },
+    "checkpoints.topKeys": {
+      "reason": "test-only",
+      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/checkpoints.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 4
     },
     "choices.generateGraded": {
       "reason": "self-only",
@@ -2514,14 +2674,6 @@
       "tref": 9,
       "own": 1
     },
-    "store.defaultWorldState": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "core/store.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 8
-    },
     "store.load": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -2567,7 +2719,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 16,
+      "tref": 17,
       "own": 1
     },
     "store.staleSinceExternal": {
@@ -3438,6 +3590,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 157
+    "dataOnly": 160
   }
 }
