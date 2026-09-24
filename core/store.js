@@ -613,6 +613,13 @@
     //      而不是维护第十三条清单。
   };
   function classifyKey(key) {
+    // v2.79.0（第十三面续 · 输入边界）：键必须先真的是字符串。
+    //   此前 key=null/undefined/数字/对象/日期全会抛 TypeError（key.match is not a function）——
+    //   实测 23 种坏输入里 19 种抛出。抛出的后果不止「报错」：调用方大多是扫描
+    //   localStorage 的巡检路径（sweep 垃圾回收、体积审计、孤儿盘点），一个抛会把
+    //   **整轮巡检**打断，于是「巡检没查出问题」与「巡检没跑完」在读数上不可分。
+    //   非法键不属「未知家族」，而是「根本不可能是本扩展的键」：单列 invalid，一眼可辨。
+    if (typeof key !== 'string' || !key) return { family: 'invalid', chat: null };
     let m;
     // v0.2.3: 隔离键必须保留 chat 归属——否则「当前聊天的键永不被清理」不变量对隔离副本失效
     // （当前聊天唯一幸存的可恢复现场被 sweep 当溢出删除），且隔离聊天的 recovery 快照被判孤儿删除
@@ -3190,6 +3197,9 @@
       return r;
     },
     read(path, fallback) {
+      // v2.79.0（第十三面续 · 输入边界）：同 classifyKey —— 此前非字符串 path 在 split 上抛。
+      //   读接口对坏入参的正确语义是「没有这个节点」（即 fallback），而不是抛。
+      if (typeof path !== 'string' || !path) return fallback;
       let node = memCache;
       for (const seg of path.split('.')) { if (node == null) return fallback; node = node[seg]; }
       return node === undefined ? fallback : node;

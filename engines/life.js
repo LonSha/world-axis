@@ -95,7 +95,7 @@
     let out = null;
     WA.store.transact(function (draft) {
       const p = person(draft, name), life = ensureLife(p);
-      if (life.schedule.some(function (x) { return x.status === 'active' && start < x.end && end > x.start; })) { out = { ok: false, reason: 'time-conflict' }; return; }
+      if (life.schedule.some(function (x) { return x.status === 'active' && start < x.end && end > x.start; })) { out = { ok: false, reason: 'time-conflict' }; return false; }
       const row = { id: 'sch_' + clockNow('life') + '_' + life.schedule.length, activity: activity, location: clean(item.location, 40), start: start, end: end, status: 'active' };
       // v2.61.0: 同 addCommitment——日程是「人物在做什么」，且日程自带 start/end（未来时刻），
       //   恰是**最该留在场上**的那类人物；缺 updatedAt 会让它最先被挤出。

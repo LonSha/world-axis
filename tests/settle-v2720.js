@@ -35,32 +35,32 @@ const TAG = '__st2720_';
 const A_KM_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
 const A_KM_KIND = "if (KINDS.indexOf(k) < 0) { noteFault('bad-kind'); return { ok: false, reason: 'bad-kind', got: kind }; }";
 const A_KM_AMOUNT = "if (!isFinite(amt) || amt <= 0) { noteFault('bad-amount'); return { ok: false, reason: 'bad-amount', got: amount }; }";
-const A_KM_ROWS = "if (draft.karma.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', who: w }; return; }";
+const A_KM_ROWS = "if (draft.karma.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', who: w }; return false; }";
 const A_KM_ADDAXIS = "row[k] = (Number(row[k]) || 0) + amt;";
-const A_KM_NODEBT = "if (debt <= 0) { out = { ok: false, reason: 'nothing-to-offset', who: w }; return; }";
-const A_KM_NOMERIT = "if (merit <= 0) { out = { ok: false, reason: 'no-merit', who: w }; return; }";
+const A_KM_NODEBT = "if (debt <= 0) { out = { ok: false, reason: 'nothing-to-offset', who: w }; return false; }";
+const A_KM_NOMERIT = "if (merit <= 0) { out = { ok: false, reason: 'no-merit', who: w }; return false; }";
 const A_KM_ESCALATE = "if (escalated) { row.stage = next; stat.escalations++; }";
 const A_KM_NOTES = "if (WA.evict) WA.evict.array(row.notes, 'karma.notes');";
 // hazard
 const A_HZ_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
-const A_HZ_DUP = "if (draft.hazard.rows.filter(function (r) { return r && r.key === k; })[0]) { out = { ok: false, reason: 'exists', key: k }; return; }";
-const A_HZ_ROWS = "if (draft.hazard.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', key: k }; return; }";
-const A_HZ_PENDING = "if (row.pending) { out = { ok: false, reason: 'already-pending', key: k }; return; }";
-const A_HZ_RAND = "if (!WA.rand || typeof WA.rand.dice !== 'function') { out = { ok: false, reason: 'rand-unavailable', key: k }; return; }";
-const A_HZ_NOTPEND = "if (!row.pending) { out = { ok: false, reason: 'not-pending', key: k }; return; }";
-const A_HZ_TOOSOON = "if ((Number(row.waiting) || 0) < need) { out = { ok: false, reason: 'too-soon', key: k, waiting: Number(row.waiting) || 0, need: need }; return; }";
+const A_HZ_DUP = "if (draft.hazard.rows.filter(function (r) { return r && r.key === k; })[0]) { out = { ok: false, reason: 'exists', key: k }; return false; }";
+const A_HZ_ROWS = "if (draft.hazard.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', key: k }; return false; }";
+const A_HZ_PENDING = "if (row.pending) { out = { ok: false, reason: 'already-pending', key: k }; return false; }";
+const A_HZ_RAND = "if (!WA.rand || typeof WA.rand.dice !== 'function') { out = { ok: false, reason: 'rand-unavailable', key: k }; return false; }";
+const A_HZ_NOTPEND = "if (!row.pending) { out = { ok: false, reason: 'not-pending', key: k }; return false; }";
+const A_HZ_TOOSOON = "if ((Number(row.waiting) || 0) < need) { out = { ok: false, reason: 'too-soon', key: k, waiting: Number(row.waiting) || 0, need: need }; return false; }";
 // marginal
 const A_MG_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
 const A_MG_AMOUNT = "if (!isFinite(amt) || amt <= 0) { noteFault('bad-amount'); return { ok: false, reason: 'bad-amount', got: raw }; }";
-const A_MG_MISSING = "if (!row) { out = { ok: false, reason: 'missing', who: w }; return; }";
+const A_MG_MISSING = "if (!row) { out = { ok: false, reason: 'missing', who: w }; return false; }";
 const A_MG_COOLNOSUM = "row.cool = n;                                     // 冷却**不叠加**，取指定值";
 const A_MG_TICKDEC = "if ((Number(r.cool) || 0) > 0) { r.cool = Math.max(0, (Number(r.cool) || 0) - 1); cooled++; }";
 // tolerance
 const A_TL_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
 const A_TL_KIND = "if (KINDS.indexOf(kd) < 0) { noteFault('bad-kind'); return { ok: false, reason: 'bad-kind', got: kind }; }";
-const A_TL_BURST = "if (hits.indexOf(r) >= 0) { out = { ok: false, reason: 'burst', key: k, round: r }; return; }";
-const A_TL_STALE = "if (before >= maxR) { out = { ok: false, reason: 'stale', key: k, hits: before, round: r, maxRepeat: maxR }; return; }";
-const A_TL_ROWS = "if (b.rows.length >= cfg.maxRows) { out = { ok: false, reason: 'rows-full', key: k }; return; }";
+const A_TL_BURST = "if (hits.indexOf(r) >= 0) { out = { ok: false, reason: 'burst', key: k, round: r }; return false; }";
+const A_TL_STALE = "if (before >= maxR) { out = { ok: false, reason: 'stale', key: k, hits: before, round: r, maxRepeat: maxR }; return false; }";
+const A_TL_ROWS = "if (b.rows.length >= cfg.maxRows) { out = { ok: false, reason: 'rows-full', key: k }; return false; }";
 
 function fresh(opts) { return require('./ui-gate-sync.js').fresh(opts).WA; }
 function st(WA) { return WA.store.get() || {}; }

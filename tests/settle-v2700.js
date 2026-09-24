@@ -26,7 +26,7 @@ const A_SS_TIME = "if (mins < 0) return { ok: false, reason: 'bad-time', got: ti
 const A_GG_GATE = "if (!settings().enabled) return { ok: true, reason: 'disabled' };";
 const A_GG_STEP_LIM = "if (Math.abs(delta) > lim) return { ok: false, reason: 'step-too-large', delta: delta, limit: lim };";
 const A_GG_EVENT = "if (crossedMilestone !== null && (!event || typeof event !== 'string')) {";
-const A_GG_TOP = "if (hit.val >= 100 && delta > 0) { out = { ok: false, reason: 'top', key: key, val: hit.val }; return; }";
+const A_GG_TOP = "if (hit.val >= 100 && delta > 0) { out = { ok: false, reason: 'top', key: key, val: hit.val }; return false; }";
 const A_RV_GATE = "if (!settings().enabled) return { ok: true, reason: 'disabled' };";
 const A_RV_ACTORS = "if (charA === charB || charA === target || charB === target) return { ok: false, reason: 'invalid-actors' };";
 // v2.78.0: 锚点随修法前移——非数 weight 此前被静默降级 50，bad-weight 只在 0..100 外可达

@@ -69,7 +69,7 @@
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
       draft.tempo = draft.tempo && typeof draft.tempo === 'object' && !Array.isArray(draft.tempo) ? draft.tempo : {};
       const from = draft.tempo.gear && GEAR_MAP[draft.tempo.gear] ? draft.tempo.gear : settings().gear;
-      if (from === gid) { out = { ok: false, reason: 'same-gear', gear: gid }; return; }
+      if (from === gid) { out = { ok: false, reason: 'same-gear', gear: gid }; return false; }
       draft.tempo.gear = gid;
       draft.tempo.shifts = Array.isArray(draft.tempo.shifts) ? draft.tempo.shifts : [];
       draft.tempo.shifts.push({ at: clockNow('tempo'), from: from, to: gid });

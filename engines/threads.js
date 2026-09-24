@@ -48,6 +48,10 @@
 
   /** 立一桩悬案（待查的问题）。问题必须具体：空问题不是悬案。 */
   function open(item) {
+    // v2.79.0（第十三面续 · 输入边界）：入参必须是对象。
+    //   此前 `item && item.question` 对 NaN 求值为 NaN（falsy 短路不生效，因为 NaN 直接
+    //   参与 &&），clean(NaN) → 'NaN' 非空 → **立出一桩问题叫「NaN」的悬案**并报 ok。
+    if (item == null || typeof item !== 'object' || Array.isArray(item)) return { ok: false, reason: 'missing-question' };
     const q = clean(item && item.question, 80);
     if (!q) return { ok: false, reason: 'missing-question' };
     const subject = clean(item && item.subject, 60);
@@ -86,7 +90,7 @@
     WA.store.transact(function (draft) {
       const arr = Array.isArray(draft.threads) ? draft.threads : [];
       const t = arr.filter(function (x) { return x && x.id === id; })[0];
-      if (!t) { out = { ok: false, reason: 'missing-thread' }; return; }
+      if (!t) { out = { ok: false, reason: 'missing-thread' }; return false; }
       t.leads = Array.isArray(t.leads) ? t.leads : [];
       const lead = { id: 'ld_' + clockNow('threads') + '_' + t.leads.length,
         claim: claim, source: src, reliability: rel, weight: REL_W[rel], polarity: polarity,
@@ -164,7 +168,7 @@
     WA.store.transact(function (draft) {
       const arr = Array.isArray(draft.threads) ? draft.threads : [];
       const row = arr.filter(function (x) { return x && x.id === id; })[0];
-      if (!row) { out = { ok: false, reason: 'missing-thread' }; return; }
+      if (!row) { out = { ok: false, reason: 'missing-thread' }; return false; }
       row.status = 'resolved'; row.answer = answer; row.basis = basis.slice();
       row.resolvedAt = clockNow('threads'); row.updatedAt = row.resolvedAt;
       if (cv.conflicted && o.overruleConflicts === true) {
@@ -188,7 +192,7 @@
     WA.store.transact(function (draft) {
       const arr = Array.isArray(draft.threads) ? draft.threads : [];
       const row = arr.filter(function (x) { return x && x.id === id; })[0];
-      if (!row) { out = { ok: false, reason: 'missing-thread' }; return; }
+      if (!row) { out = { ok: false, reason: 'missing-thread' }; return false; }
       row.status = 'stalled'; row.stallReason = reason; row.stalledAt = clockNow('threads');
       row.updatedAt = row.stalledAt;
       out = { ok: true, id: id, status: 'stalled' };
@@ -210,7 +214,7 @@
     WA.store.transact(function (draft) {
       const arr = Array.isArray(draft.threads) ? draft.threads : [];
       const row = arr.filter(function (x) { return x && x.id === id; })[0];
-      if (!row) { out = { ok: false, reason: 'missing-thread' }; return; }
+      if (!row) { out = { ok: false, reason: 'missing-thread' }; return false; }
       row.status = 'abandoned'; row.abandonReason = reason; row.abandonedAt = clockNow('threads');
       row.updatedAt = row.abandonedAt;
       out = { ok: true, id: id, status: 'abandoned' };

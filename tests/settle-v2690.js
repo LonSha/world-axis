@@ -22,16 +22,16 @@ const TAG = '__st2690_';
 
 const A_AP_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
 const A_AP_TIER = "if (TIERS.indexOf(tier) < 0) { noteFault('bad-tier'); return { ok: false, reason: 'bad-tier', got: tier }; }";
-const A_AP_C = "if (effTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return; }";
-const A_AP_EXISTS = "if (prev && o.mode !== 'rescan') { out = { ok: false, reason: 'exists', who: w }; return; }";
-const A_AP_FORM = "if (o.form != null && FORMS.indexOf(o.form) < 0) { out = { ok: false, reason: 'bad-form', got: o.form }; return; }";
-const A_AP_EYEFACE = "if (clashEyeFace) { out = { ok: false, reason: 'eye-face-clash', who: w, scene: scene }; return; }";
-const A_AP_OUTFIT = "if (clashOutfit) { out = { ok: false, reason: 'outfit-clash', who: w, scene: scene }; return; }";
+const A_AP_C = "if (effTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return false; }";
+const A_AP_EXISTS = "if (prev && o.mode !== 'rescan') { out = { ok: false, reason: 'exists', who: w }; return false; }";
+const A_AP_FORM = "if (o.form != null && FORMS.indexOf(o.form) < 0) { out = { ok: false, reason: 'bad-form', got: o.form }; return false; }";
+const A_AP_EYEFACE = "if (clashEyeFace) { out = { ok: false, reason: 'eye-face-clash', who: w, scene: scene }; return false; }";
+const A_AP_OUTFIT = "if (clashOutfit) { out = { ok: false, reason: 'outfit-clash', who: w, scene: scene }; return false; }";
 const A_LD_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
 const A_LD_RUNGS = "if (list.length < 2) { noteFault('bad-rungs'); return { ok: false, reason: 'bad-rungs', got: list.length }; }";
-const A_LD_DUP = "if (draft.ladder.rows.filter(function (r) { return r && r.key === key; })[0]) { out = { ok: false, reason: 'exists', who: w, kind: k }; return; }";
-const A_LD_EVENT = "if (!ev) { out = { ok: false, reason: 'missing-event', who: w, kind: k }; return; }";
-const A_LD_TOP = "if (hit.idx >= hit.rungs.length - 1) { out = { ok: false, reason: 'top', who: w, kind: k, rung: hit.rungs[hit.idx] }; return; }";
+const A_LD_DUP = "if (draft.ladder.rows.filter(function (r) { return r && r.key === key; })[0]) { out = { ok: false, reason: 'exists', who: w, kind: k }; return false; }";
+const A_LD_EVENT = "if (!ev) { out = { ok: false, reason: 'missing-event', who: w, kind: k }; return false; }";
+const A_LD_TOP = "if (hit.idx >= hit.rungs.length - 1) { out = { ok: false, reason: 'top', who: w, kind: k, rung: hit.rungs[hit.idx] }; return false; }";
 
 function fresh(opts) { return require('./ui-gate-sync.js').fresh(opts).WA; }
 function st(WA) { return WA.store.get() || {}; }

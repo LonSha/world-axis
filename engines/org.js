@@ -45,7 +45,7 @@
     let out = null;
     WA.store.transact(function (draft) {
       const row = holder(kind, name, draft);
-      if (!row) { out = { ok: false, reason: 'missing-holder' }; return; }
+      if (!row) { out = { ok: false, reason: 'missing-holder' }; return false; }
       row.resources = stockOf(row);
       row.resources[resource] = (qty(row.resources[resource]) || 0) + n;
       row.updatedAt = clockNow('org');
@@ -63,9 +63,9 @@
     let out = null;
     WA.store.transact(function (draft) {
       const a = holder(fromKind, fromName, draft), b = holder(toKind, toName, draft);
-      if (!a || !b) { out = { ok: false, reason: 'missing-holder' }; return; }
+      if (!a || !b) { out = { ok: false, reason: 'missing-holder' }; return false; }
       a.resources = stockOf(a); b.resources = stockOf(b);
-      if ((a.resources[resource] || 0) < n) { out = { ok: false, reason: 'insufficient' }; return; }
+      if ((a.resources[resource] || 0) < n) { out = { ok: false, reason: 'insufficient' }; return false; }
       a.resources[resource] -= n; b.resources[resource] = (b.resources[resource] || 0) + n;
       if (!a.resources[resource]) delete a.resources[resource];
       out = { ok: true, id: resource, amount: n };

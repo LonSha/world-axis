@@ -63,15 +63,21 @@
    * 登记或更新某人三轴读数。satiety/stamina 0..100；load 为负重读数，capacity 为上限。
    */
   function set(who, axes) {
+    // v2.79.0（第十三面续 · 输入边界）：who 必须是非空字符串、axes 必须是对象。
+    //   此前 set('甲', NaN) 会让 `axes || {}` 落到 {}，于是三轴一个都没校验、一路走到
+    //   末尾**建出一条全 null 的空记录并报 ok** —— 一次「参数传错」被记成了「这个人
+    //   登记了三轴读数」。
+    if (typeof who !== 'string' || !who.trim()) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    if (axes != null && (typeof axes !== 'object' || Array.isArray(axes))) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     const w = clean(who, 40);
     const p = axes || {};
     if (!w) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
-      if (p.satiety != null && (typeof p.satiety !== 'number' || !isFinite(p.satiety) || p.satiety < 0 || p.satiety > 100)) { out = { ok: false, reason: 'bad-axis', axis: 'satiety' }; return; }
-      if (p.stamina != null && (typeof p.stamina !== 'number' || !isFinite(p.stamina) || p.stamina < 0 || p.stamina > 100)) { out = { ok: false, reason: 'bad-axis', axis: 'stamina' }; return; }
-      if (p.load != null && (typeof p.load !== 'number' || !isFinite(p.load) || p.load < 0)) { out = { ok: false, reason: 'bad-load' }; return; }
+      if (p.satiety != null && (typeof p.satiety !== 'number' || !isFinite(p.satiety) || p.satiety < 0 || p.satiety > 100)) { out = { ok: false, reason: 'bad-axis', axis: 'satiety' }; return false; }
+      if (p.stamina != null && (typeof p.stamina !== 'number' || !isFinite(p.stamina) || p.stamina < 0 || p.stamina > 100)) { out = { ok: false, reason: 'bad-axis', axis: 'stamina' }; return false; }
+      if (p.load != null && (typeof p.load !== 'number' || !isFinite(p.load) || p.load < 0)) { out = { ok: false, reason: 'bad-load' }; return false; }
       draft.survival = draft.survival && typeof draft.survival === 'object' && !Array.isArray(draft.survival) ? draft.survival : { rows: [] };
       draft.survival.rows = Array.isArray(draft.survival.rows) ? draft.survival.rows : [];
       let hit = draft.survival.rows.filter(function (r) { return r && r.who === w; })[0];
@@ -80,12 +86,12 @@
       if (p.stamina != null) hit.stamina = p.stamina;
       if (p.load != null) hit.load = p.load;
       if (p.capacity != null) {
-        if (typeof p.capacity !== 'number' || !isFinite(p.capacity) || p.capacity <= 0) { out = { ok: false, reason: 'bad-load' }; return; }
+        if (typeof p.capacity !== 'number' || !isFinite(p.capacity) || p.capacity <= 0) { out = { ok: false, reason: 'bad-load' }; return false; }
         hit.capacity = p.capacity;
       }
       // no-capacity 只在**本次给了 load** 且未同时给 capacity 且行内也无存量 capacity 时报：
       //   合法字段的其他更新（只改饱食/精力）不得被历史半成品行连带拒绝。
-      if (p.load != null && p.capacity == null && hit.capacity == null) { out = { ok: false, reason: 'no-capacity', who: w }; return; }
+      if (p.load != null && p.capacity == null && hit.capacity == null) { out = { ok: false, reason: 'no-capacity', who: w }; return false; }
       hit.at = clockNow('survival');
       if (WA.evict) WA.evict.array(draft.survival.rows, 'survival.rows');
       out = { ok: true, who: w };

@@ -46,8 +46,8 @@
     let out = null;
     WA.store.transact(function (draft) {
       const f = find(id, draft);
-      if (!f) { out = { ok: false, reason: 'missing-foreshadow' }; return; }
-      if (!isOpen(f)) { out = { ok: false, reason: 'already-terminal' }; return; }
+      if (!f) { out = { ok: false, reason: 'missing-foreshadow' }; return false; }
+      if (!isOpen(f)) { out = { ok: false, reason: 'already-terminal' }; return false; }
       f.dueAt = at;
       f.promisedAt = clockNow('longline');
       out = { ok: true, id: clean(id, 40), dueAt: at };

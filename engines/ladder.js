@@ -69,7 +69,7 @@
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
       draft.ladder = draft.ladder && typeof draft.ladder === 'object' && !Array.isArray(draft.ladder) ? draft.ladder : { rows: [] };
       draft.ladder.rows = Array.isArray(draft.ladder.rows) ? draft.ladder.rows : [];
-      if (draft.ladder.rows.filter(function (r) { return r && r.key === key; })[0]) { out = { ok: false, reason: 'exists', who: w, kind: k }; return; }
+      if (draft.ladder.rows.filter(function (r) { return r && r.key === key; })[0]) { out = { ok: false, reason: 'exists', who: w, kind: k }; return false; }
       draft.ladder.rows.push({ key: key, who: w, kind: k, rungs: list.slice(), idx: 0, at: clockNow('ladder') });
       if (WA.evict) WA.evict.array(draft.ladder.rows, 'ladder.rows');
       out = { ok: true, who: w, kind: k, rungs: list.slice(), rung: list[0], idx: 0 };
@@ -86,14 +86,14 @@
     let out = null;
     WA.store.transact(function (draft) {
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
-      if (!w || !k) { out = { ok: false, reason: 'missing-fields' }; return; }
-      if (!ev) { out = { ok: false, reason: 'missing-event', who: w, kind: k }; return; }
+      if (!w || !k) { out = { ok: false, reason: 'missing-fields' }; return false; }
+      if (!ev) { out = { ok: false, reason: 'missing-event', who: w, kind: k }; return false; }
       draft.ladder = draft.ladder && typeof draft.ladder === 'object' && !Array.isArray(draft.ladder) ? draft.ladder : { rows: [] };
       draft.ladder.rows = Array.isArray(draft.ladder.rows) ? draft.ladder.rows : [];
       const key = keyOf(w, k);
       const hit = draft.ladder.rows.filter(function (r) { return r && r.key === key; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing', who: w, kind: k }; return; }
-      if (hit.idx >= hit.rungs.length - 1) { out = { ok: false, reason: 'top', who: w, kind: k, rung: hit.rungs[hit.idx] }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', who: w, kind: k }; return false; }
+      if (hit.idx >= hit.rungs.length - 1) { out = { ok: false, reason: 'top', who: w, kind: k, rung: hit.rungs[hit.idx] }; return false; }
       hit.idx = hit.idx + 1;
       hit.at = clockNow('ladder');
       out = { ok: true, who: w, kind: k, from: hit.rungs[hit.idx - 1], to: hit.rungs[hit.idx], idx: hit.idx, event: ev };
@@ -107,13 +107,13 @@
     let out = null;
     WA.store.transact(function (draft) {
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
-      if (!w || !k) { out = { ok: false, reason: 'missing-fields' }; return; }
+      if (!w || !k) { out = { ok: false, reason: 'missing-fields' }; return false; }
       draft.ladder = draft.ladder && typeof draft.ladder === 'object' && !Array.isArray(draft.ladder) ? draft.ladder : { rows: [] };
       draft.ladder.rows = Array.isArray(draft.ladder.rows) ? draft.ladder.rows : [];
       const key = keyOf(w, k);
       const hit = draft.ladder.rows.filter(function (r) { return r && r.key === key; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing', who: w, kind: k }; return; }
-      if (hit.idx <= 0) { out = { ok: false, reason: 'bottom', who: w, kind: k, rung: hit.rungs[0] }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', who: w, kind: k }; return false; }
+      if (hit.idx <= 0) { out = { ok: false, reason: 'bottom', who: w, kind: k, rung: hit.rungs[0] }; return false; }
       hit.idx = hit.idx - 1;
       hit.at = clockNow('ladder');
       out = { ok: true, who: w, kind: k, from: hit.rungs[hit.idx + 1], to: hit.rungs[hit.idx], idx: hit.idx };
@@ -130,12 +130,12 @@
     let out = null;
     WA.store.transact(function (draft) {
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
-      if (!w || !k) { out = { ok: false, reason: 'missing-fields' }; return; }
+      if (!w || !k) { out = { ok: false, reason: 'missing-fields' }; return false; }
       draft.ladder = draft.ladder && typeof draft.ladder === 'object' && !Array.isArray(draft.ladder) ? draft.ladder : { rows: [] };
       draft.ladder.rows = Array.isArray(draft.ladder.rows) ? draft.ladder.rows : [];
       const key = keyOf(w, k);
       const idx = draft.ladder.rows.map(function (r) { return r && r.key; }).indexOf(key);
-      if (idx < 0) { out = { ok: false, reason: 'missing', who: w, kind: k }; return; }
+      if (idx < 0) { out = { ok: false, reason: 'missing', who: w, kind: k }; return false; }
       draft.ladder.rows.splice(idx, 1);
       out = { ok: true, who: w, kind: k };
     }, 'ladder:drop');

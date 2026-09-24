@@ -34,7 +34,23 @@
   function uid() { return WA.rand.id('fa_', 4, 'id'); }
   // v2.78.0: 与 editorEvents.list 同款修法（读面浅拷贝 / 写面原数组）——
   //   修前 `WA.editorFaction.list() === WA.store.get().evolution.factions` 为真，改返回值即改持久态。
-  function list(state) { const m = (state || WA.store.get()).evolution; const arr = (m && m.factions) || []; return state ? arr : arr.slice(); }
+  // v2.79.0（读面元素级活引用修复）: 与 editorEvents.list 同族同修 —— 浅拷贝只防住改数组结构，
+  //   `list()[0].name = 'x'` 改的仍是 store 里那个对象，绕过 update 的全部准入
+  //   （五要件 / status-relation 枚举 / 支柱上限与长度 / 名称去重）。
+  //   读面改为逐元素浅拷贝，且 `powerPillars` 再拷一层 ——
+  //   否则 `list()[0].powerPillars.push('x')` 同样穿透（它绕过 MAX_PILLARS 与 PILLAR_MAXLEN）。
+  function list(state) {
+    const m = (state || WA.store.get()).evolution;
+    const arr = (m && m.factions) || [];
+    return state ? arr : arr.map(function (f) {
+      if (!f || typeof f !== 'object') return f;
+      const c = {};
+      Object.keys(f).forEach(function (k) {
+        c[k] = (k === 'powerPillars' && Array.isArray(f[k])) ? f[k].slice() : f[k];
+      });
+      return c;
+    });
+  }
 
   /** 五要件准入校验：World 规则「势力五要件」——名称/范围/关系/目标/支柱至少一 */
   function validate(input) {

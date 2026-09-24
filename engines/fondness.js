@@ -139,17 +139,17 @@
       let hit = draft.fondness.rows.filter(function (r) { return r && r.person === who; })[0];
       if (!hit) { hit = { person: who, value: 0, trust: null, note: '', at: 0 }; draft.fondness.rows.push(hit); }
       const next = +(hit.value + delta).toFixed(1);
-      if (next > CAP) { out = { ok: false, reason: 'over-cap', value: hit.value }; return; }
+      if (next > CAP) { out = { ok: false, reason: 'over-cap', value: hit.value }; return false; }
       // v2.77.0: 阶段封顶——staged 开启时单次步进不得跳越本行已授权段的段顶。
       //   不截断、不静默夹取（截断等于替玩家做了「进段」这个决定）。
       if (cfg.staged && next > capOfRow(hit)) {
         out = { ok: false, reason: 'band-cap', value: hit.value, cap: capOfRow(hit), hint: '跳越段顶需 advance() 显式授权进段' };
-        return;
+        return false;
       }
-      if (cfg.locked && cfg.mode === 'manual') { out = { ok: false, reason: 'locked', value: hit.value }; return; }
+      if (cfg.locked && cfg.mode === 'manual') { out = { ok: false, reason: 'locked', value: hit.value }; return false; }
       // v2.77.0: confirm 模式只入账待确认，不直接改值（建议过期在 accept 侧核验）。
       if (cfg.mode === 'confirm') {
-        if (hit.pending) { out = { ok: false, reason: 'already-pending', value: hit.value }; return; }
+        if (hit.pending) { out = { ok: false, reason: 'already-pending', value: hit.value }; return false; }
         hit.pending = { from: hit.value, to: next, delta: delta, reason: clean(p.reason || p.note || '', 80), at: clockNow('fondness') };
         stat.pending++;
         out = { ok: true, person: who, value: hit.value, pending: true, to: next, band: bandOf(hit.value).name };
@@ -181,10 +181,10 @@
     let out = null;
     WA.store.transact(function (draft) {
       const hit = findRow(draft, who);
-      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return; }
-      if (cfg.locked) { out = { ok: false, reason: 'locked', person: who }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return false; }
+      if (cfg.locked) { out = { ok: false, reason: 'locked', person: who }; return false; }
       const pd = hit.pending;
-      if (!pd) { out = { ok: false, reason: 'no-pending', person: who }; return; }
+      if (!pd) { out = { ok: false, reason: 'no-pending', person: who }; return false; }
       // 建议过期：以「提交它时的读数」为准——读数已变，该建议不再指向同一现场。
       if (pd.from !== hit.value) {
         hit.pending = null;
@@ -193,7 +193,7 @@
         out = { ok: false, reason: 'stale-proposal', person: who, from: pd.from, value: hit.value };
         return;
       }
-      if (pd.to > CAP) { out = { ok: false, reason: 'over-cap', value: hit.value }; return; }
+      if (pd.to > CAP) { out = { ok: false, reason: 'over-cap', value: hit.value }; return false; }
       hit.value = pd.to;
       hit.pending = null;
       hit.at = clockNow('fondness');
@@ -213,9 +213,9 @@
     let out = null;
     WA.store.transact(function (draft) {
       const hit = findRow(draft, who);
-      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return false; }
       const pd = hit.pending;
-      if (!pd) { out = { ok: false, reason: 'no-pending', person: who }; return; }
+      if (!pd) { out = { ok: false, reason: 'no-pending', person: who }; return false; }
       hit.pending = null;
       pushHist(hit, { kind: '判定不变', from: pd.from, to: pd.from, requested: pd.delta, reason: pd.reason || '玩家拒绝' });
       out = { ok: true, person: who, value: hit.value, rejected: true };
@@ -236,7 +236,7 @@
     let out = null;
     WA.store.transact(function (draft) {
       const hit = findRow(draft, who);
-      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return false; }
       const hist = Array.isArray(hit.history) ? hit.history : [];
       let last = null;
       for (let i = hist.length - 1; i >= 0; i--) {
@@ -245,11 +245,11 @@
       }
       if (!last || (last.kind !== '自动' && last.kind !== '玩家采纳')) {
         out = { ok: false, reason: 'not-undoable', person: who, hint: '最近一项不是可撤销的自动变化，请用 correct() 手动纠错' };
-        return;
+        return false;
       }
       if (last.to !== hit.value) {
         out = { ok: false, reason: 'not-undoable', person: who, to: last.to, value: hit.value };
-        return;
+        return false;
       }
       hit.value = last.from;
       // v2.77.0: 不在此清空待确认建议——旧建议指向旧读数，留着让 accept() 如实报 stale-proposal，
@@ -274,10 +274,10 @@
     let out = null;
     WA.store.transact(function (draft) {
       const hit = findRow(draft, who);
-      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return false; }
       if (value < hit.value) {
         out = { ok: false, reason: 'non-positive-delta', value: hit.value, hint: '纠错不得降值：要回退刚发生的那次加值请走 undo()' };
-        return;
+        return false;
       }
       const from = hit.value;
       hit.value = +value.toFixed(1);
@@ -305,13 +305,13 @@
     let out = null;
     WA.store.transact(function (draft) {
       const hit = findRow(draft, who);
-      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return; }
-      if (cfg.locked) { out = { ok: false, reason: 'locked', person: who }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return false; }
+      if (cfg.locked) { out = { ok: false, reason: 'locked', person: who }; return false; }
       const idx = Math.min(BANDS.length - 1, Math.max(bandIdxOf(hit.value), (typeof hit.auth === 'number' && hit.auth >= 0) ? hit.auth : 0));
-      if (idx >= BANDS.length - 1) { out = { ok: false, reason: 'top-stage', person: who, stage: BANDS[idx].name }; return; }
+      if (idx >= BANDS.length - 1) { out = { ok: false, reason: 'top-stage', person: who, stage: BANDS[idx].name }; return false; }
       if (hit.value !== segTop(idx)) {
         out = { ok: false, reason: 'not-at-cap', person: who, value: hit.value, need: segTop(idx) };
-        return;
+        return false;
       }
       hit.auth = idx + 1;
       pushHist(hit, { kind: '玩家授权', from: hit.value, to: hit.value, reason: '玩家明确许可进入 ' + BANDS[idx + 1].name });

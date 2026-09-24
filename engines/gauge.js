@@ -29,7 +29,9 @@
 
   function create(key, opts) {
     if (!settings().enabled) return { ok: true, reason: 'disabled' };
-    if (!key || typeof key !== 'string') return { ok: false, reason: 'missing-fields' };
+    // v2.79.0（第十三面续 · 输入边界）：纯空白键不是键。此前 `!key` 对 '   ' 为假 →
+    //   建出一张**无名量表**（面板上是一行空标题，且此后无法按名找到它去删除）。
+    if (typeof key !== 'string' || !key.trim()) return { ok: false, reason: 'missing-fields' };
     const o = opts || {};
     const initVal = (typeof o.initial === 'number' && isFinite(o.initial)) ? Math.max(0, Math.min(100, o.initial)) : 0;
     let out = null;
@@ -39,7 +41,7 @@
       const existing = list.filter(function (r) { return r && r.key === key; })[0];
       if (existing && !o.force) {
         out = { ok: false, reason: 'exists', key: key };
-        return;
+        return false;
       }
       const record = {
         key: key,
@@ -71,8 +73,8 @@
       if (!draft.gauge) draft.gauge = { rows: [] };
       const list = draft.gauge.rows || [];
       const hit = list.filter(function (r) { return r && r.key === key; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing', key: key }; return; }
-      if (hit.val >= 100 && delta > 0) { out = { ok: false, reason: 'top', key: key, val: hit.val }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', key: key }; return false; }
+      if (hit.val >= 100 && delta > 0) { out = { ok: false, reason: 'top', key: key, val: hit.val }; return false; }
 
       const nextVal = Math.max(0, Math.min(100, hit.val + delta));
       let crossedMilestone = null;
@@ -86,7 +88,7 @@
 
       if (crossedMilestone !== null && (!event || typeof event !== 'string')) {
         out = { ok: false, reason: 'missing-event', key: key, milestone: crossedMilestone };
-        return;
+        return false;
       }
 
       const prev = hit.val;

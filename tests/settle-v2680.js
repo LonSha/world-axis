@@ -24,24 +24,24 @@ const TAG = '__st2680_';
 // 这类锚点声明其预期命中数（hits），N0 判据核验"实际命中 == 声明命中"，
 // 而不是强求唯一 —— 精确的定义是"命中数被显式声明并被验证"，不是"必须为 1"。
 const A_ERA_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
-const A_ERA_CNT = "if (days != null && (typeof days !== 'number' || !isFinite(days) || days <= 0 || (days | 0) !== days)) { out = { ok: false, reason: 'bad-countdown' }; return; }";
-const A_ERA_EXISTS = "if (draft.eraCycle.rows.filter(function (r) { return r && r.name === who; })[0]) { out = { ok: false, reason: 'exists', name: who }; return; }";
-const A_ERA_DELTA = "if (dayDelta == null || typeof dayDelta !== 'number' || !isFinite(dayDelta) || dayDelta < 0 || (dayDelta | 0) !== dayDelta) { out = { ok: false, reason: 'bad-delta' }; return; }";
-const A_ERA_MISSING = "if (!hit) { out = { ok: false, reason: 'missing', name: who }; return; }";
-const A_ERA_STALE = "if (ev === prevEvent) { out = { ok: false, reason: 'stale-event', stage: hit.stage }; return; }";
+const A_ERA_CNT = "if (days != null && (typeof days !== 'number' || !isFinite(days) || days <= 0 || (days | 0) !== days)) { out = { ok: false, reason: 'bad-countdown' }; return false; }";
+const A_ERA_EXISTS = "if (draft.eraCycle.rows.filter(function (r) { return r && r.name === who; })[0]) { out = { ok: false, reason: 'exists', name: who }; return false; }";
+const A_ERA_DELTA = "if (dayDelta == null || typeof dayDelta !== 'number' || !isFinite(dayDelta) || dayDelta < 0 || (dayDelta | 0) !== dayDelta) { out = { ok: false, reason: 'bad-delta' }; return false; }";
+const A_ERA_MISSING = "if (!hit) { out = { ok: false, reason: 'missing', name: who }; return false; }";
+const A_ERA_STALE = "if (ev === prevEvent) { out = { ok: false, reason: 'stale-event', stage: hit.stage }; return false; }";
 const A_SV_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
-const A_SV_SAT = "if (p.satiety != null && (typeof p.satiety !== 'number' || !isFinite(p.satiety) || p.satiety < 0 || p.satiety > 100)) { out = { ok: false, reason: 'bad-axis', axis: 'satiety' }; return; }";
-const A_SV_STA = "if (p.stamina != null && (typeof p.stamina !== 'number' || !isFinite(p.stamina) || p.stamina < 0 || p.stamina > 100)) { out = { ok: false, reason: 'bad-axis', axis: 'stamina' }; return; }";
-const A_SV_CAP = "if (p.load != null && p.capacity == null && hit.capacity == null) { out = { ok: false, reason: 'no-capacity', who: w }; return; }";
+const A_SV_SAT = "if (p.satiety != null && (typeof p.satiety !== 'number' || !isFinite(p.satiety) || p.satiety < 0 || p.satiety > 100)) { out = { ok: false, reason: 'bad-axis', axis: 'satiety' }; return false; }";
+const A_SV_STA = "if (p.stamina != null && (typeof p.stamina !== 'number' || !isFinite(p.stamina) || p.stamina < 0 || p.stamina > 100)) { out = { ok: false, reason: 'bad-axis', axis: 'stamina' }; return false; }";
+const A_SV_CAP = "if (p.load != null && p.capacity == null && hit.capacity == null) { out = { ok: false, reason: 'no-capacity', who: w }; return false; }";
 const A_WR_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
-const A_WR_LEVEL = "if (LEVELS.indexOf(level) < 0) { out = { ok: false, reason: 'bad-level', got: level }; return; }";
-const A_WR_FIELDS = "if (!w || !ch || !pl) { out = { ok: false, reason: 'missing-fields' }; return; }";
-const A_WR_MAJOR = "if (level === 'major' && !why) { out = { ok: false, reason: 'major-gate' }; return; }";
+const A_WR_LEVEL = "if (LEVELS.indexOf(level) < 0) { out = { ok: false, reason: 'bad-level', got: level }; return false; }";
+const A_WR_FIELDS = "if (!w || !ch || !pl) { out = { ok: false, reason: 'missing-fields' }; return false; }";
+const A_WR_MAJOR = "if (level === 'major' && !why) { out = { ok: false, reason: 'major-gate' }; return false; }";
 const A_BB_VAL = "if (typeof tame !== 'number' || !isFinite(tame) || tame < 0 || tame > 100) { noteFault('bad-value'); return { ok: false, reason: 'bad-value', axis: 'tame' }; }";
-const A_BB_METHOD = "if (METHODS.indexOf(m) < 0) { out = { ok: false, reason: 'bad-method', got: m }; return; }";
-const A_BB_DELTA = "if (typeof delta !== 'number' || !isFinite(delta) || delta === 0) { out = { ok: false, reason: 'bad-delta' }; return; }";
-const A_BB_CAUSE = "if (delta < 0 && !p.cause) { out = { ok: false, reason: 'missing-cause' }; return; }";
-const A_BB_DUP = "if (draft.beastBond.rows.filter(function (r) { return r && r.beast === b; })[0]) { out = { ok: false, reason: 'exists', beast: b }; return; }";
+const A_BB_METHOD = "if (METHODS.indexOf(m) < 0) { out = { ok: false, reason: 'bad-method', got: m }; return false; }";
+const A_BB_DELTA = "if (typeof delta !== 'number' || !isFinite(delta) || delta === 0) { out = { ok: false, reason: 'bad-delta' }; return false; }";
+const A_BB_CAUSE = "if (delta < 0 && !p.cause) { out = { ok: false, reason: 'missing-cause' }; return false; }";
+const A_BB_DUP = "if (draft.beastBond.rows.filter(function (r) { return r && r.beast === b; })[0]) { out = { ok: false, reason: 'exists', beast: b }; return false; }";
 function fresh(opts) { return require('./ui-gate-sync.js').fresh(opts).WA; }
 function st(WA) { return WA.store.get() || {}; }
 function resetWorld(WA) {

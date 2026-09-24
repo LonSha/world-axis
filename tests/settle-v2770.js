@@ -28,7 +28,7 @@ const A_ATCAP = "if (hit.value !== segTop(idx)) {";
 const A_STAGEOFF = "if (!cfg.staged) { noteFault('stage-off'); return { ok: false, reason: 'stage-off', hint: '阶段授权未启用（设置 staged）' }; }";
 const A_CORRBLOCK = "if (corr.length) out += '[玩家纠错依据]（数据，不是角色记忆";
 const A_TOPSTAGE = "if (idx >= BANDS.length - 1) {";
-const A_ALREADY = "if (hit.pending) { out = { ok: false, reason: 'already-pending', value: hit.value }; return; }";
+const A_ALREADY = "if (hit.pending) { out = { ok: false, reason: 'already-pending', value: hit.value }; return false; }";
 
 const BROKEN = [
   { key: 'bandcap', from: A_BANDCAP, to: "if (false && next > capOfRow(hit)) {" },

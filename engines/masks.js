@@ -65,7 +65,7 @@
       if (!draft.masks || !Array.isArray(draft.masks.rows)) return;
       const before = draft.masks.rows.length;
       draft.masks.rows = draft.masks.rows.filter(function (r) { return r && r.person !== who; });
-      if (draft.masks.rows.length === before) { out = { ok: false, reason: 'missing', person: who }; return; }
+      if (draft.masks.rows.length === before) { out = { ok: false, reason: 'missing', person: who }; return false; }
       out = { ok: true, person: who };
     }, 'masks:drop');
     if (out && out.ok) { stat.sets++; stat.lastReason = 'dropped'; } else if (out && !out.ok) noteFault(out.reason);

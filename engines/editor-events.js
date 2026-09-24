@@ -32,7 +32,23 @@
   // v2.78.0: 读面（无 state）返回**浅拷贝**——修前返回的就是 store 里那个数组，
   //   调用方 `list().push(x)` 等于绕过 add 的全部校验（上限/查重/字段）直接入账。
   //   写面（带 state，即 transact 的 draft）必须拿原数组，否则 splice/赋值落不到 draft 上。
-  function list(state) { const m = (state || WA.store.get()).evolution; const arr = (m && m.events) || []; return state ? arr : arr.slice(); }
+  // v2.79.0（读面元素级活引用修复）: v2.78.0 的浅拷贝只防住「改数组结构」，
+  //   **元素对象仍是 store 里那一个** —— 实测 `list()[0] === store.evolution.events[0]` 为真，
+  //   于是 `list()[0].name = 'x'` 直接改写持久态，绕过 update 的全部校验
+  //   （type 禁改 / 阶段合法性 / 等级 1-4 / 名字非空 / stageRound 边界）。
+  //   读面改为**逐元素浅拷贝**（外层与顶层字段都不共享），写面仍是原数组。
+  //   为什么不再深一层：数据形状是「扁平记录 + 少量字符串数组/对象」，
+  //   元素级拷贝已切断「改返回值即改持久态」这条通路；再往下拷会让读面成本随嵌套膨胀。
+  function list(state) {
+    const m = (state || WA.store.get()).evolution;
+    const arr = (m && m.events) || [];
+    return state ? arr : arr.map(function (e) {
+      if (!e || typeof e !== 'object') return e;
+      const c = {};
+      Object.keys(e).forEach(function (k) { c[k] = e[k]; });
+      return c;
+    });
+  }
   function stagesOf(type) { return TYPE_STAGES[type] || TYPE_STAGES.conflict; }
 
   function findIndex(state, key) {

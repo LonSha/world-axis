@@ -66,8 +66,8 @@
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
       draft.marginal = draft.marginal && typeof draft.marginal === 'object' && !Array.isArray(draft.marginal) ? draft.marginal : { rows: [] };
       draft.marginal.rows = Array.isArray(draft.marginal.rows) ? draft.marginal.rows : [];
-      if (draft.marginal.rows.filter(function (r) { return r && r.who === w; })[0]) { out = { ok: false, reason: 'exists', who: w }; return; }
-      if (draft.marginal.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', who: w }; return; }
+      if (draft.marginal.rows.filter(function (r) { return r && r.who === w; })[0]) { out = { ok: false, reason: 'exists', who: w }; return false; }
+      if (draft.marginal.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', who: w }; return false; }
       draft.marginal.rows.push({ who: w, count: 0, idle: 0, cool: 0, at: clockNow('marginal') });
       if (WA.evict) WA.evict.array(draft.marginal.rows, 'marginal.rows');
       out = { ok: true, who: w, count: 0, factor: factorFor(0) };
@@ -91,7 +91,7 @@
       draft.marginal = draft.marginal && typeof draft.marginal === 'object' && !Array.isArray(draft.marginal) ? draft.marginal : { rows: [] };
       draft.marginal.rows = Array.isArray(draft.marginal.rows) ? draft.marginal.rows : [];
       const row = draft.marginal.rows.filter(function (r) { return r && r.who === w; })[0];
-      if (!row) { out = { ok: false, reason: 'missing', who: w }; return; }
+      if (!row) { out = { ok: false, reason: 'missing', who: w }; return false; }
       const count = Math.max(0, Math.floor(Number(row.count) || 0));
       const cool = Math.max(0, Math.floor(Number(row.cool) || 0));
       const f = factorFor(count);
@@ -117,7 +117,7 @@
       draft.marginal = draft.marginal && typeof draft.marginal === 'object' && !Array.isArray(draft.marginal) ? draft.marginal : { rows: [] };
       draft.marginal.rows = Array.isArray(draft.marginal.rows) ? draft.marginal.rows : [];
       const row = draft.marginal.rows.filter(function (r) { return r && r.who === w; })[0];
-      if (!row) { out = { ok: false, reason: 'missing', who: w }; return; }
+      if (!row) { out = { ok: false, reason: 'missing', who: w }; return false; }
       const had = Math.max(0, Math.floor(Number(row.count) || 0));
       row.count = 0; row.idle = 0; row.cool = 0;
       row.at = clockNow('marginal');
@@ -137,9 +137,9 @@
       draft.marginal = draft.marginal && typeof draft.marginal === 'object' && !Array.isArray(draft.marginal) ? draft.marginal : { rows: [] };
       draft.marginal.rows = Array.isArray(draft.marginal.rows) ? draft.marginal.rows : [];
       const row = draft.marginal.rows.filter(function (r) { return r && r.who === w; })[0];
-      if (!row) { out = { ok: false, reason: 'missing', who: w }; return; }
+      if (!row) { out = { ok: false, reason: 'missing', who: w }; return false; }
       const n = (rounds === undefined || rounds === null) ? settings().coolRounds : Math.floor(Number(rounds));
-      if (!isFinite(n) || n <= 0) { out = { ok: false, reason: 'bad-amount', got: rounds }; return; }
+      if (!isFinite(n) || n <= 0) { out = { ok: false, reason: 'bad-amount', got: rounds }; return false; }
       row.cool = n;                                     // 冷却**不叠加**，取指定值
       row.at = clockNow('marginal');
       out = { ok: true, who: w, cool: row.cool };
@@ -192,7 +192,7 @@
       draft.marginal = draft.marginal && typeof draft.marginal === 'object' && !Array.isArray(draft.marginal) ? draft.marginal : { rows: [] };
       draft.marginal.rows = Array.isArray(draft.marginal.rows) ? draft.marginal.rows : [];
       const idx = draft.marginal.rows.map(function (r) { return r && r.who; }).indexOf(w);
-      if (idx < 0) { out = { ok: false, reason: 'missing', who: w }; return; }
+      if (idx < 0) { out = { ok: false, reason: 'missing', who: w }; return false; }
       draft.marginal.rows.splice(idx, 1);
       out = { ok: true, who: w };
     }, 'marginal:drop');

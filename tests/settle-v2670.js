@@ -32,7 +32,7 @@ const A_FTRUST = "if (trust != null && (typeof trust !== 'number' || !isFinite(t
 const A_FNEG = "if (delta <= 0) {";
 const A_PE_GATE = "if (!settings().enabled) return { ok: true, reason: 'disabled' };";
 const A_PFUTURE = "if (typeof p.startedAt === 'number' && isFinite(p.startedAt) && p.startedAt > now) {";
-const A_PCAP = "if (active.length >= Math.max(1, settings().maxActive)) { out = { ok: false, reason: 'capacity', active: active.length }; return; }";
+const A_PCAP = "if (active.length >= Math.max(1, settings().maxActive)) { out = { ok: false, reason: 'capacity', active: active.length }; return false; }";
 const A_PCROWD = "if (cast.length > MAX_PERSONS) { noteFault('crowd'); return { ok: false, reason: 'crowd', max: MAX_PERSONS }; }";
 function fresh(opts) { return require('./ui-gate-sync.js').fresh(opts).WA; }
 function st(WA) { return WA.store.get() || {}; }

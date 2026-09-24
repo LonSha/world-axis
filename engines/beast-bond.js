@@ -66,7 +66,7 @@
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
       draft.beastBond = draft.beastBond && typeof draft.beastBond === 'object' && !Array.isArray(draft.beastBond) ? draft.beastBond : { rows: [] };
       draft.beastBond.rows = Array.isArray(draft.beastBond.rows) ? draft.beastBond.rows : [];
-      if (draft.beastBond.rows.filter(function (r) { return r && r.beast === b; })[0]) { out = { ok: false, reason: 'exists', beast: b }; return; }
+      if (draft.beastBond.rows.filter(function (r) { return r && r.beast === b; })[0]) { out = { ok: false, reason: 'exists', beast: b }; return false; }
       const row = { beast: b, owner: w, tame: tame, loyalty: 0, hunger: false, at: clockNow('beastBond') };
       draft.beastBond.rows.push(row);
       if (WA.evict) WA.evict.array(draft.beastBond.rows, 'beastBond.rows');
@@ -88,9 +88,9 @@
       draft.beastBond = draft.beastBond && typeof draft.beastBond === 'object' && !Array.isArray(draft.beastBond) ? draft.beastBond : { rows: [] };
       draft.beastBond.rows = Array.isArray(draft.beastBond.rows) ? draft.beastBond.rows : [];
       const hit = draft.beastBond.rows.filter(function (r) { return r && r.beast === b; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing', beast: b }; return; }
-      if (typeof delta !== 'number' || !isFinite(delta) || delta <= 0) { out = { ok: false, reason: 'bad-delta' }; return; }
-      if (METHODS.indexOf(m) < 0) { out = { ok: false, reason: 'bad-method', got: m }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', beast: b }; return false; }
+      if (typeof delta !== 'number' || !isFinite(delta) || delta <= 0) { out = { ok: false, reason: 'bad-delta' }; return false; }
+      if (METHODS.indexOf(m) < 0) { out = { ok: false, reason: 'bad-method', got: m }; return false; }
       let t = hit.tame + delta;
       let clamped = false, converted = null;
       if (t >= 100) {
@@ -120,9 +120,9 @@
       draft.beastBond = draft.beastBond && typeof draft.beastBond === 'object' && !Array.isArray(draft.beastBond) ? draft.beastBond : { rows: [] };
       draft.beastBond.rows = Array.isArray(draft.beastBond.rows) ? draft.beastBond.rows : [];
       const hit = draft.beastBond.rows.filter(function (r) { return r && r.beast === b; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing', beast: b }; return; }
-      if (typeof delta !== 'number' || !isFinite(delta) || delta === 0) { out = { ok: false, reason: 'bad-delta' }; return; }
-      if (delta < 0 && !p.cause) { out = { ok: false, reason: 'missing-cause' }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', beast: b }; return false; }
+      if (typeof delta !== 'number' || !isFinite(delta) || delta === 0) { out = { ok: false, reason: 'bad-delta' }; return false; }
+      if (delta < 0 && !p.cause) { out = { ok: false, reason: 'missing-cause' }; return false; }
       let v = hit.loyalty + delta;
       let clamped = false;
       if (v > 100) { v = 100; clamped = true; }

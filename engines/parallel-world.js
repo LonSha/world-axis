@@ -60,11 +60,24 @@
     }).join('\n---\n');
   }
 
+  /**
+   * v2.79.0（第十三面 · 读面隔离）：此处此前把 store 里的 npcs/relations/modules 三个数组
+   *   **原样**放进返回值 —— 消费方（面板列表、注入块拼装）改一下元素就等于直接改持久态。
+   *   现在逐元素浅拷（口径与 editor-events / editor-faction / rivalry.read / registry 一致）。
+   */
   function pwState() {
     const s = WA.store.get();
     const pw = s.parallelWorld;
     if (!pw) return null;
-    return { clock: pw.clock || '', npcs: pw.npcs || [], relations: pw.relations || [], modules: pw.modules || [], round: pw.round || 0 };
+    const copyArr = function (a) {
+      return (Array.isArray(a) ? a : []).map(function (x) {
+        if (!x || typeof x !== 'object') return x;
+        const c = {};
+        Object.keys(x).forEach(function (k) { c[k] = x[k]; });
+        return c;
+      });
+    };
+    return { clock: pw.clock || '', npcs: copyArr(pw.npcs), relations: copyArr(pw.relations), modules: copyArr(pw.modules), round: pw.round || 0 };
   }
 
   // v2.35.0: 只快照平行世界子树（clock/npcs/relations/modules/round），不含 settings、不含 snapshots 自身。

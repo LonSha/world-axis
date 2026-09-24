@@ -65,8 +65,8 @@
     let out = null;
     WA.store.transact(function (draft) {
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
-      if (!w || !ch || !pl) { out = { ok: false, reason: 'missing-fields' }; return; }
-      if (LEVELS.indexOf(level) < 0) { out = { ok: false, reason: 'bad-level', got: level }; return; }
+      if (!w || !ch || !pl) { out = { ok: false, reason: 'missing-fields' }; return false; }
+      if (LEVELS.indexOf(level) < 0) { out = { ok: false, reason: 'bad-level', got: level }; return false; }
       draft.warrant = draft.warrant && typeof draft.warrant === 'object' && !Array.isArray(draft.warrant) ? draft.warrant : { rows: [] };
       draft.warrant.rows = Array.isArray(draft.warrant.rows) ? draft.warrant.rows : [];
       const row = { who: w, level: level, charge: ch, place: pl, status: 'active', at: clockNow('warrant') };
@@ -94,13 +94,13 @@
     let out = null;
     WA.store.transact(function (draft) {
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
-      if (!w) { out = { ok: false, reason: 'missing-fields' }; return; }
-      if (LEVELS.indexOf(level) < 0) { out = { ok: false, reason: 'bad-level', got: level }; return; }
-      if (level === 'major' && !why) { out = { ok: false, reason: 'major-gate' }; return; }
+      if (!w) { out = { ok: false, reason: 'missing-fields' }; return false; }
+      if (LEVELS.indexOf(level) < 0) { out = { ok: false, reason: 'bad-level', got: level }; return false; }
+      if (level === 'major' && !why) { out = { ok: false, reason: 'major-gate' }; return false; }
       draft.warrant = draft.warrant && typeof draft.warrant === 'object' && !Array.isArray(draft.warrant) ? draft.warrant : { rows: [] };
       draft.warrant.rows = Array.isArray(draft.warrant.rows) ? draft.warrant.rows : [];
       const hit = draft.warrant.rows.filter(function (r) { return r && r.who === w && r.level === level && r.status !== 'pardoned'; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing', who: w }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', who: w }; return false; }
       hit.status = 'pardoned'; hit.pardonReason = why || ''; hit.pardonedAt = clockNow('warrant');
       if (WA.evict) WA.evict.array(draft.warrant.rows, 'warrant.rows');
       out = { ok: true, who: w, level: level };

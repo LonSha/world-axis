@@ -60,15 +60,18 @@ const BROKEN = [
     from: "r.age = ((typeof r.age === 'number' && isFinite(r.age)) ? r.age : 0) + 1;",
     to: "r.age = (typeof r.age === 'number' ? r.age : 0) + 1;",
     why: '退回修前形态：存量 age 是 NaN 时 age>=limit 恒假 ⇒ 该记录**永不过期**' },
-  // ② 读面活引用族：把浅拷贝摘掉 = 读面重新返回 store 内部数组
+  // ② 读面活引用族：把拷贝摘掉 = 读面重新返回 store 内部**元素对象**
+  //   v2.79.0 口径升级：v2.78.0 锚的是 `return state ? arr : arr.slice(); }`（防的是改数组结构），
+  //   本版读面已改为逐元素浅拷贝，那条锚点自然消失。新锚点锚「拷贝动作本身」——
+  //   摘掉它，元素级别名通道重新打开（`list()[0].name = 'x'` 即改持久态）。
   { key: 'ee-alias', rel: 'engines/editor-events.js',
-    from: "return state ? arr : arr.slice(); }",
-    to: "return arr; }",
-    why: 'editorEvents.list() 重新回传 store 内部数组 ⇒ 调用方 push 即入账' },
+    from: "      const c = {};",
+    to: "      const c = e;",
+    why: 'editorEvents.list() 逐元素拷贝被摘成引用直传 ⇒ 元素级活引用重新打开（改返回值即改持久态）' },
   { key: 'ef-alias', rel: 'engines/editor-faction.js',
-    from: "return state ? arr : arr.slice(); }",
-    to: "return arr; }",
-    why: 'editorFaction.list() 同款：读面泄露内部数组' },
+    from: "      const c = {};",
+    to: "      const c = f;",
+    why: 'editorFaction.list() 同款：元素级拷贝被摘，且 powerPillars 的再拷一层随之失效' },
   // ③ 死表锚点：不可达码的「为何不可达」被改掉 ⇒ 它可能在别处复活而无人知
   { key: 'dead-anchor', rel: 'engines/kaleidoscope.js',
     from: "else return { ok: false, reason: 'bad-operator', detail: v };",
@@ -113,17 +116,41 @@ function probeQuotaNaN(WA) {
   const row = (WA.store.get().quota.rows || []).filter(function (r) { return r.text === '存龄探针'; })[0];
   return { expired: expired, status: row ? String(row.status) : 'gone', age: row ? String(row.age) : 'none' };
 }
-// 症状 D：读面是否回传 store 内部活引用（改返回值 = 改持久态）
+// 症状 D：读面是否回传 store 内部**元素对象**（改返回值 = 改持久态）
+//   v2.79.0 口径升级：v2.78.0 只探「回传的是不是同一个数组」（改数组结构即入账），
+//   本版探**元素级**——`list()[0] === store.evolution.events[0]`。
+//   为什么必须升级探针：只探数组身份的探针，在「独立数组 + 共享元素」的实现上恒绿（假绿），
+//   而那条通路恰恰绕过 update 的全部准入（枚举/上限/长度/非空）。
 function probeAlias(WA, which) {
+  // 元素级判据要求容器里**至少有一条**——空容器上「元素级泄露」恒为 undefined，
+  // 那是判据的输入面太窄（假绿），不是产品没问题。故先播种一条再探。
+  const seedEvent = { id: 'al_seed', type: 'conflict', name: '播种事件', level: 1, stage: '筹备', stageRound: 1, desc: '' };
+  const seedFaction = { id: 'al_seed', name: '播种势力', scope: '城', status: '稳固', relation: '中立', currentGoal: '摸底', core_person: '某人', powerPillars: ['军'] };
+  WA.store.transact(function (d) {
+    if (!d.evolution) d.evolution = {};
+    if (!Array.isArray(d.evolution.events)) d.evolution.events = [];
+    if (!Array.isArray(d.evolution.factions)) d.evolution.factions = [];
+    if (which === 'events' && !d.evolution.events.some(function (x) { return x && x.id === 'al_seed'; })) d.evolution.events.push(Object.assign({}, seedEvent));
+    if (which === 'factions' && !d.evolution.factions.some(function (x) { return x && x.id === 'al_seed'; })) d.evolution.factions.push(Object.assign({}, seedFaction));
+  }, 'lock:alias-seed');
   const st = WA.store.get();
   const arr = which === 'events' ? (st.evolution && st.evolution.events) : (st.evolution && st.evolution.factions);
   const got = which === 'events' ? WA.editorEvents.list() : WA.editorFaction.list();
-  if (!arr) return { aliased: null, why: 'store 里没有容器' };
-  const aliased = got === arr;
-  const before = arr.length;
+  if (!arr || !arr.length) return { aliased: null, why: '播种后仍无容器' };
+  if (!got || !got.length) return { aliased: null, why: '读面为空' };
+  const sameArray = got === arr;
+  // 元素级别名：改返回值里的条目，看持久态是否跟着变
+  const target = which === 'events' ? 'name' : 'currentGoal';
+  const before = arr[0][target];
+  const probe = '__alias__' + target;
+  try { got[0][target] = probe; } catch (e) {}
+  const leakedField = arr[0][target] === probe;
+  if (leakedField) arr[0][target] = before;   // 还原，别把探针的写入留在 store 里
+  // 结构级别名：push 会不会进 store 容器
+  const lenBefore = arr.length;
   try { got.push({ __alias__: true }); } catch (e) {}
-  const grew = arr.length !== before;
-  return { aliased: aliased, storeGrew: grew };
+  const grew = arr.length !== lenBefore;
+  return { aliased: leakedField || grew, elementLeak: leakedField, storeGrew: grew, sameArray: sameArray };
 }
 // 症状 E：死表锚点在场性（不可达码的「为何不可达」是否还在）
 function probeDeadAnchor(read) {
@@ -209,11 +236,9 @@ function runNegative(a) {
   a(qtBad.expired === 0 && qtBad.status === 'active',
     'v2780: [C1] 退回修前形态 ⇒ 存龄 NaN 使记录永不过期（expired ' + qtBad.expired + ' / status ' + qtBad.status + '）');
   const eBad = isolated(function () { return probeAlias(freshOver(eeB.rel, eeB.from, eeB.to), 'events'); });
-  a(eBad.aliased === true && eBad.storeGrew === true,
-    'v2780: [C1] 摘掉浅拷贝 ⇒ editorEvents 读面重新回传内部数组（alias ' + eBad.aliased + ' / 入账 ' + eBad.storeGrew + '）');
+  a(eBad.elementLeak === true, 'v2780: [C1] 摘掉逐元素拷贝 ⇒ editorEvents 读面回传内部元素（元素级泄露 ' + eBad.elementLeak + ' / 数组同身份 ' + eBad.sameArray + '）');
   const fBad = isolated(function () { return probeAlias(freshOver(efB.rel, efB.from, efB.to), 'factions'); });
-  a(fBad.aliased === true && fBad.storeGrew === true,
-    'v2780: [C1] editorFaction 同款（alias ' + fBad.aliased + ' / 入账 ' + fBad.storeGrew + '）');
+  a(fBad.elementLeak === true, 'v2780: [C1] editorFaction 同款（元素级泄露 ' + fBad.elementLeak + ' / 数组同身份 ' + fBad.sameArray + '）');
 
   // C2 死表锚点漂移 ⇒ 判据必须点名（用内存覆盖读跑同一份 audit）
   const readOv = withOver(daB.rel, daB.from, daB.to);

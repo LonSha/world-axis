@@ -49,6 +49,10 @@
    * 登记锁定态。label 是给读面的一个可辨认名（如「对峙第三分钟」）。
    */
   function lock(label) {
+    // v2.79.0（第十三面续 · 输入边界）：标签必须真的是字符串。
+    //   此前 `String(label)` 把 NaN 变成 'NaN'、把对象变成 '[object Object]' —— 上锁
+    //   成功，读面上是一把名字荒唐的锁，而调用方拿到的 ok=true 让它无从察觉。
+    if (typeof label !== 'string') { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     const who = String(label == null ? '' : label).replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
@@ -66,7 +70,7 @@
   function unlock() {
     let out = null;
     WA.store.transact(function (draft) {
-      if (!draft.temporal || !draft.temporal.lock || !draft.temporal.lock.label) { out = { ok: false, reason: 'missing' }; return; }
+      if (!draft.temporal || !draft.temporal.lock || !draft.temporal.lock.label) { out = { ok: false, reason: 'missing' }; return false; }
       draft.temporal.lock = {};
       if (WA.evict) WA.evict.object(draft.temporal.lock, 'temporal.lock', ['label', 'at']);
       out = { ok: true };

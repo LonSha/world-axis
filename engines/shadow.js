@@ -103,7 +103,7 @@
     WA.store.transact(function (draft) {
       const list = (draft.shadow && Array.isArray(draft.shadow.rows)) ? draft.shadow.rows : [];
       const row = findRow(list, k);
-      if (!row) { out = { ok: false, reason: 'no-shadow' }; return; }
+      if (!row) { out = { ok: false, reason: 'no-shadow' }; return false; }
       const before = clampSev(row.severity, 0);
       const after = clampSev(before + add, before);
       row.severity = after; row.deepened = (Number(row.deepened) || 0) + 1;
@@ -131,7 +131,7 @@
     WA.store.transact(function (draft) {
       const list = (draft.shadow && Array.isArray(draft.shadow.rows)) ? draft.shadow.rows : [];
       const row = findRow(list, k);
-      if (!row) { out = { ok: false, reason: 'no-shadow' }; return; }
+      if (!row) { out = { ok: false, reason: 'no-shadow' }; return false; }
       const before = clampSev(row.severity, 0);
       const after = clampSev(before - cut, before);
       row.severity = after; row.updatedAt = clockNow('shadow');

@@ -100,17 +100,17 @@
       draft.appearance = draft.appearance && typeof draft.appearance === 'object' && !Array.isArray(draft.appearance) ? draft.appearance : { rows: [] };
       draft.appearance.rows = Array.isArray(draft.appearance.rows) ? draft.appearance.rows : [];
       const prev = draft.appearance.rows.filter(function (r) { return r && r.who === w; })[0];
-      if (prev && o.mode !== 'rescan') { out = { ok: false, reason: 'exists', who: w }; return; }
+      if (prev && o.mode !== 'rescan') { out = { ok: false, reason: 'exists', who: w }; return false; }
       const form = FORMS.indexOf(o.form) >= 0 ? o.form : 'humanoid';
-      if (o.form != null && FORMS.indexOf(o.form) < 0) { out = { ok: false, reason: 'bad-form', got: o.form }; return; }
+      if (o.form != null && FORMS.indexOf(o.form) < 0) { out = { ok: false, reason: 'bad-form', got: o.form }; return false; }
       const weighted = weight(tier, o.weighted);
       const effTier = weighted.tier;
       // C 级只允许 1 个覆盖子项（「至少 1 个可识别特征」的上限）
       const cov = o.cover || {};
       const total = LAYERS.reduce(function (n, L) { return n + (typeof cov[L] === 'number' ? cov[L] : 0); }, 0);
-      if (effTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return; }
+      if (effTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return false; }
       const covChk = checkCoverage(effTier, cov);
-      if (!covChk.ok) { out = { ok: false, reason: covChk.reason, missing: covChk.missing, who: w }; return; }
+      if (!covChk.ok) { out = { ok: false, reason: covChk.reason, missing: covChk.missing, who: w }; return false; }
       // 场景排他断言：同场景已有人占用了 眼型+脸型 组合或同色系服装 → 拒收
       const scene = clean(o.scene, 40);
       const eye = clean(o.eye, 16), face = clean(o.face, 16), outfit = clean(o.outfit, 24), style = clean(o.style, 12);
@@ -118,13 +118,13 @@
         const clashEyeFace = draft.appearance.rows.some(function (r) {
           return r && r.scene === scene && r.eye === eye && r.face === face;
         });
-        if (clashEyeFace) { out = { ok: false, reason: 'eye-face-clash', who: w, scene: scene }; return; }
+        if (clashEyeFace) { out = { ok: false, reason: 'eye-face-clash', who: w, scene: scene }; return false; }
       }
       if (scene && outfit && style) {
         const clashOutfit = draft.appearance.rows.some(function (r) {
           return r && r.scene === scene && r.outfit === outfit && r.style === style;
         });
-        if (clashOutfit) { out = { ok: false, reason: 'outfit-clash', who: w, scene: scene }; return; }
+        if (clashOutfit) { out = { ok: false, reason: 'outfit-clash', who: w, scene: scene }; return false; }
       }
       const row = { who: w, tier: tier, effTier: effTier, weighted: weighted.weighted, weightedBy: weighted.by || '',
         cover: { L1: cov.L1 || 0, L2: cov.L2 || 0, L3: cov.L3 || 0, L4: cov.L4 || 0 },

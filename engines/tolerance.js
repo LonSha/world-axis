@@ -88,16 +88,16 @@
       const lo = lowBound(r, win);
       let row = b.rows.filter(function (x) { return x && x.key === k; })[0];
       if (!row) {
-        if (b.rows.length >= cfg.maxRows) { out = { ok: false, reason: 'rows-full', key: k }; return; }
+        if (b.rows.length >= cfg.maxRows) { out = { ok: false, reason: 'rows-full', key: k }; return false; }
         row = { key: k, kind: kd, hits: [], tier: 0, at: clockNow('tolerance') };
         b.rows.push(row);
       }
       row.kind = kd;
       const hits = (Array.isArray(row.hits) ? row.hits : []).filter(function (n) { return Number(n) >= lo; });
       row.hits = hits;
-      if (hits.indexOf(r) >= 0) { out = { ok: false, reason: 'burst', key: k, round: r }; return; }
+      if (hits.indexOf(r) >= 0) { out = { ok: false, reason: 'burst', key: k, round: r }; return false; }
       const before = hits.length;
-      if (before >= maxR) { out = { ok: false, reason: 'stale', key: k, hits: before, round: r, maxRepeat: maxR }; return; }
+      if (before >= maxR) { out = { ok: false, reason: 'stale', key: k, hits: before, round: r, maxRepeat: maxR }; return false; }
       hits.push(r);
       const n = before + 1;
       row.tier = n;
@@ -168,7 +168,7 @@
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
       const b = bucket(draft);
       const idx = b.rows.map(function (r) { return r && r.key; }).indexOf(k);
-      if (idx < 0) { out = { ok: false, reason: 'missing', key: k }; return; }
+      if (idx < 0) { out = { ok: false, reason: 'missing', key: k }; return false; }
       b.rows.splice(idx, 1);
       out = { ok: true, key: k };
     }, 'tolerance:drop');

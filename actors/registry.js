@@ -212,10 +212,47 @@
       WA.emit('registry:changed');
     },
     /** 档案存取（SoulLink结构：fields + personality/worldview/family/relationships/memory分节） */
+    /**
+     * v2.79.0（第十三面 · 读面隔离）：此处此前**直接返回** `store.people['p_'+name].profile` ——
+     *   返回值与持久态是同一个对象。消费方（独白取性格锚点、观测切片、关系面只读视图、
+     *   面板档案编辑器、巡视统计）只要顺手写一下返回值（`p.personality.push(x)`、
+     *   `p.persona.locked = true`），就绕过了 setProfileSafe 的全部准入：分节剪裁、
+     *   20 条关系硬边界、0-100 截断、容量登记表。症状是「写路径的校验只对走写路径的人有效」。
+     *   现在按元素浅拷一层（口径与 editor-events / editor-faction / rivalry.read 一致）：
+     *   切断「改返回值即改持久态」；不再往下拷 —— 读面成本不该随嵌套膨胀（深层请走写路径）。
+     */
     getProfile(name) {
+      // v2.79.0（第十三面续 · 输入边界）：名字必须先真的是字符串。
+      //   此前非字符串名走 `'p_' + name` 的隐式字符串化 —— 要么在 ToPrimitive 上抛
+      //   （对象 / 带敌意 toString），要么查出一个**根本不存在的键**（null → 'p_null'）
+      //   并返回一份看着正常的空档案，把「调用方传错了」伪装成「这个人没档案」。
+      if (typeof name !== 'string' || !name.trim()) {
+        return { fields: { name: '' }, personality: [], worldview: [], family: [], relationships: [], memory: [], relations: [], persona: null };
+      }
       const s = WA.store.get();
       const p = s.people['p_' + name];
-      return (p && p.profile) || { fields: { name }, personality: [], worldview: [], family: [], relationships: [], memory: [], relations: [], persona: null };
+      const src = (p && p.profile) || { fields: { name }, personality: [], worldview: [], family: [], relationships: [], memory: [], relations: [], persona: null };
+      const out = {};
+      Object.keys(src).forEach(function (k) {
+        const v = src[k];
+        if (Array.isArray(v)) {
+          out[k] = v.map(function (x) {
+            if (!x || typeof x !== 'object') return x;
+            const c = {};
+            Object.keys(x).forEach(function (f) { c[f] = x[f]; });
+            return c;
+          });
+          return;
+        }
+        if (v && typeof v === 'object') {
+          const c = {};
+          Object.keys(v).forEach(function (f) { c[f] = v[f]; });
+          out[k] = c;
+          return;
+        }
+        out[k] = v;
+      });
+      return out;
     },
     /**
      * v2.11.0（面C · 死面治理）: 此处原有 `setProfile(name, profile)` ——**裸整份覆盖、无准入**。

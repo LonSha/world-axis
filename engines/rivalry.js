@@ -31,7 +31,12 @@
 
   function declare(charA, charB, target, weight, opts) {
     if (!settings().enabled) return { ok: true, reason: 'disabled' };
-    if (!charA || !charB || !target) return { ok: false, reason: 'missing-fields' };
+    // v2.79.0（第十三面续 · 输入边界）：三方都必须是真字符串。
+    //   此前 `!charA` 只挡 falsy —— 数字/对象/数组照进，然后 makeKey 的 sort().join() 与
+    //   clean() 把它们字符串化成 'NaN'/'[object Object]'（对象带敌意 toString 时直接抛穿）。
+    //   于是「传错了参数」被记成一条以 'NaN' 为竞对的真实竞争焦点。
+    if (typeof charA !== 'string' || typeof charB !== 'string' || typeof target !== 'string'
+        || !charA.trim() || !charB.trim() || !target.trim()) return { ok: false, reason: 'missing-fields' };
     if (charA === charB || charA === target || charB === target) return { ok: false, reason: 'invalid-actors' };
 
     // v2.78.0: 修前非数 weight 静默降级 50（bad-weight 存而在但只在 0..100 外可达，即「码不可达」）。
@@ -90,23 +95,40 @@
   }
 
   function retire(charA, charB, target) {
-    if (!charA || !charB || !target) return { ok: false, reason: 'missing-fields' };
+    // v2.79.0（第十三面续 · 输入边界）：与 declare 同款守卫。
+    //   此前这里只挡 falsy，而紧随其后的 makeKey 走 `[a, b].sort().join()` —— 会调用
+    //   入参的 ToPrimitive：带敌意 toString 的对象直接抛穿（实测 'Error: boom'），
+    //   无原型对象抛 'Cannot convert object to primitive value'。
+    //   同一文件的 declare 与本处消费同一组参数，守卫强度必须一致。
+    if (typeof charA !== 'string' || typeof charB !== 'string' || typeof target !== 'string'
+        || !charA.trim() || !charB.trim() || !target.trim()) return { ok: false, reason: 'missing-fields' };
     const key = makeKey(charA, charB, target);
     let out = null;
     WA.store.transact(function (draft) {
       if (!draft.rivalry) draft.rivalry = { rows: [] };
       const list = draft.rivalry.rows || [];
       const idx = list.findIndex(function (r) { return r && r.key === key; });
-      if (idx < 0) { out = { ok: false, reason: 'missing', key: key }; return; }
+      if (idx < 0) { out = { ok: false, reason: 'missing', key: key }; return false; }
       list.splice(idx, 1);
       out = { ok: true, retired: key };
     }, 'rivalry.retire');
     return out;
   }
 
+  /**
+   * v2.79.0（第十三面 · 读面隔离）：此前返回值里的 `rivalries` 是 `rows()` 的直接产物 ——
+   *   即 store 内部那些元素本身（`read(t).rivalries[0] === rows()[0]` 为真）。
+   *   消费方改一下 `weight` 就等于直接改持久态，绕过 declare 的 bad-weight 准入与 retire 的
+   *   存在性判定。现在逐元素浅拷（口径与 editor-events / editor-faction / registry 一致）。
+   */
   function read(target) {
     if (!target) return { ok: false, reason: 'missing-fields' };
-    const hits = rows().filter(function (r) { return r && r.target === target; });
+    const hits = rows().filter(function (r) { return r && r.target === target; }).map(function (r) {
+      if (!r || typeof r !== 'object') return r;
+      const c = {};
+      Object.keys(r).forEach(function (k) { c[k] = r[k]; });
+      return c;
+    });
     return { ok: true, target: target, count: hits.length, rivalries: hits };
   }
 

@@ -63,7 +63,7 @@
       draft.spotlight.pending = Array.isArray(draft.spotlight.pending) ? draft.spotlight.pending : [];
       if (draft.spotlight.pending.indexOf(w) >= 0) { out = { ok: true, who: w, already: true, pending: draft.spotlight.pending.length }; return; }
       const pendCap = settings().maxRows;
-      if (draft.spotlight.pending.length >= pendCap) { out = { ok: false, reason: 'pending-full', who: w, cap: pendCap }; return; }
+      if (draft.spotlight.pending.length >= pendCap) { out = { ok: false, reason: 'pending-full', who: w, cap: pendCap }; return false; }
       draft.spotlight.pending.push(w);
       if (WA.evict) WA.evict.array(draft.spotlight.pending, 'spotlight.pending', pendCap);
       out = { ok: true, who: w, already: false, pending: draft.spotlight.pending.length };
@@ -85,7 +85,7 @@
       draft.spotlight.pending = Array.isArray(draft.spotlight.pending) ? draft.spotlight.pending : [];
       if (WA.evict) WA.evict.array(draft.spotlight.pending, 'spotlight.pending', settings().maxRows);
       const pend = draft.spotlight.pending.slice();
-      if (!pend.length) { out = { ok: false, reason: 'empty-round' }; return; }
+      if (!pend.length) { out = { ok: false, reason: 'empty-round' }; return false; }
       const known = {};
       draft.spotlight.rows.forEach(function (r) { if (r && r.who) known[r.who] = r; });
       pend.forEach(function (w) {

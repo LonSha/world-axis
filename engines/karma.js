@@ -89,7 +89,7 @@
       draft.karma.rows = Array.isArray(draft.karma.rows) ? draft.karma.rows : [];
       let row = draft.karma.rows.filter(function (r) { return r && r.who === w; })[0];
       if (!row) {
-        if (draft.karma.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', who: w }; return; }
+        if (draft.karma.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', who: w }; return false; }
         row = { who: w, merit: 0, debt: 0, stage: 0, at: clockNow('karma') };
         draft.karma.rows.push(row);
       }
@@ -125,11 +125,11 @@
       draft.karma = draft.karma && typeof draft.karma === 'object' && !Array.isArray(draft.karma) ? draft.karma : { rows: [] };
       draft.karma.rows = Array.isArray(draft.karma.rows) ? draft.karma.rows : [];
       const row = draft.karma.rows.filter(function (r) { return r && r.who === w; })[0];
-      if (!row) { out = { ok: false, reason: 'missing', who: w }; return; }
+      if (!row) { out = { ok: false, reason: 'missing', who: w }; return false; }
       const debt = Number(row.debt) || 0;
       const merit = Number(row.merit) || 0;
-      if (debt <= 0) { out = { ok: false, reason: 'nothing-to-offset', who: w }; return; }
-      if (merit <= 0) { out = { ok: false, reason: 'no-merit', who: w }; return; }
+      if (debt <= 0) { out = { ok: false, reason: 'nothing-to-offset', who: w }; return false; }
+      if (merit <= 0) { out = { ok: false, reason: 'no-merit', who: w }; return false; }
       const use = Math.min(debt, merit, amt);
       row.debt = debt - use; row.merit = merit - use;
       row.stage = stageFor(netOf(row));
@@ -172,7 +172,7 @@
       draft.karma = draft.karma && typeof draft.karma === 'object' && !Array.isArray(draft.karma) ? draft.karma : { rows: [] };
       draft.karma.rows = Array.isArray(draft.karma.rows) ? draft.karma.rows : [];
       const idx = draft.karma.rows.map(function (r) { return r && r.who; }).indexOf(w);
-      if (idx < 0) { out = { ok: false, reason: 'missing', who: w }; return; }
+      if (idx < 0) { out = { ok: false, reason: 'missing', who: w }; return false; }
       draft.karma.rows.splice(idx, 1);
       out = { ok: true, who: w };
     }, 'karma:drop');

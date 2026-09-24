@@ -66,8 +66,8 @@
     WA.store.transact(function (draft) {
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
       skeleton(draft);
-      if (draft.eraCycle.rows.filter(function (r) { return r && r.name === who; })[0]) { out = { ok: false, reason: 'exists', name: who }; return; }
-      if (days != null && (typeof days !== 'number' || !isFinite(days) || days <= 0 || (days | 0) !== days)) { out = { ok: false, reason: 'bad-countdown' }; return; }
+      if (draft.eraCycle.rows.filter(function (r) { return r && r.name === who; })[0]) { out = { ok: false, reason: 'exists', name: who }; return false; }
+      if (days != null && (typeof days !== 'number' || !isFinite(days) || days <= 0 || (days | 0) !== days)) { out = { ok: false, reason: 'bad-countdown' }; return false; }
       const row = { name: who, event: ev, stage: 'fallow', countdown: (days | 0) || suggestedT('fallow'), at: clockNow('eraCycle') };
       draft.eraCycle.rows.push(row);
       if (WA.evict) WA.evict.array(draft.eraCycle.rows, 'eraCycle.rows');
@@ -87,8 +87,8 @@
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
       skeleton(draft);
       const hit = draft.eraCycle.rows.filter(function (r) { return r && r.name === who; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing', name: who }; return; }
-      if (dayDelta == null || typeof dayDelta !== 'number' || !isFinite(dayDelta) || dayDelta < 0 || (dayDelta | 0) !== dayDelta) { out = { ok: false, reason: 'bad-delta' }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', name: who }; return false; }
+      if (dayDelta == null || typeof dayDelta !== 'number' || !isFinite(dayDelta) || dayDelta < 0 || (dayDelta | 0) !== dayDelta) { out = { ok: false, reason: 'bad-delta' }; return false; }
       if (dayDelta === 0) { out = { ok: true, reason: 'same-day', stage: hit.stage, countdown: hit.countdown }; return; }
       let t = hit.countdown - dayDelta;
       let crossed = [];
@@ -102,8 +102,8 @@
         t += suggestedT(nextStage);
         if (nextStage === 'fallow' && !eventSet) {
           // 只在跨入 fallow 的**第一次**核验事件：跨档多圈时同一事件名不得被误判 stale
-          if (!ev) { out = { ok: false, reason: 'missing-event', stage: hit.stage, crossed: crossed.slice() }; return; }
-          if (ev === prevEvent) { out = { ok: false, reason: 'stale-event', stage: hit.stage }; return; }
+          if (!ev) { out = { ok: false, reason: 'missing-event', stage: hit.stage, crossed: crossed.slice() }; return false; }
+          if (ev === prevEvent) { out = { ok: false, reason: 'stale-event', stage: hit.stage }; return false; }
           hit.event = ev;
           eventSet = true;
         }

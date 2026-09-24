@@ -54,13 +54,13 @@
       draft.enigma.rows = Array.isArray(draft.enigma.rows) ? draft.enigma.rows : [];
       let row = draft.enigma.rows.filter(function (r) { return r && r.key === key; })[0];
       if (!row) {
-        if (draft.enigma.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', key: key }; return; }
+        if (draft.enigma.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', key: key }; return false; }
         row = { key: key, knowers: [], at: clockNow('enigma') };
         draft.enigma.rows.push(row);
       }
       const list = knowersOf(row);
-      if (list.filter(function (k) { return k && k.who === who; })[0]) { out = { ok: false, reason: 'exists', key: key, who: who }; return; }
-      if (list.length >= settings().maxKnowers) { out = { ok: false, reason: 'knowers-full', key: key, who: who, cap: settings().maxKnowers }; return; }
+      if (list.filter(function (k) { return k && k.who === who; })[0]) { out = { ok: false, reason: 'exists', key: key, who: who }; return false; }
+      if (list.length >= settings().maxKnowers) { out = { ok: false, reason: 'knowers-full', key: key, who: who, cap: settings().maxKnowers }; return false; }
       list.push({ who: who, at: clockNow('enigma') });
       row.knowers = list;
       if (WA.evict) WA.evict.array(draft.enigma.rows, 'enigma.rows');
@@ -80,10 +80,10 @@
       draft.enigma = draft.enigma && typeof draft.enigma === 'object' && !Array.isArray(draft.enigma) ? draft.enigma : { rows: [] };
       draft.enigma.rows = Array.isArray(draft.enigma.rows) ? draft.enigma.rows : [];
       const row = draft.enigma.rows.filter(function (r) { return r && r.key === key; })[0];
-      if (!row) { out = { ok: false, reason: 'missing', key: key }; return; }
+      if (!row) { out = { ok: false, reason: 'missing', key: key }; return false; }
       const list = knowersOf(row);
       const idx = list.map(function (k) { return k && k.who; }).indexOf(who);
-      if (idx < 0) { out = { ok: false, reason: 'missing', key: key, who: who }; return; }
+      if (idx < 0) { out = { ok: false, reason: 'missing', key: key, who: who }; return false; }
       list.splice(idx, 1);
       row.knowers = list;
       out = { ok: true, key: key, who: who, count: list.length };
@@ -102,7 +102,7 @@
       draft.enigma = draft.enigma && typeof draft.enigma === 'object' && !Array.isArray(draft.enigma) ? draft.enigma : { rows: [] };
       draft.enigma.rows = Array.isArray(draft.enigma.rows) ? draft.enigma.rows : [];
       const idx = draft.enigma.rows.map(function (r) { return r && r.key; }).indexOf(key);
-      if (idx < 0) { out = { ok: false, reason: 'missing', key: key }; return; }
+      if (idx < 0) { out = { ok: false, reason: 'missing', key: key }; return false; }
       draft.enigma.rows.splice(idx, 1);
       out = { ok: true, key: key };
     }, 'enigma:drop');

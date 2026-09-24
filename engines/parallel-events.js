@@ -58,10 +58,10 @@
       const now = clockNow('parallelEvents');
       const startedAt = (typeof p.startedAt === 'number' && isFinite(p.startedAt) && p.startedAt <= now) ? p.startedAt : now;
       if (typeof p.startedAt === 'number' && isFinite(p.startedAt) && p.startedAt > now) {
-        out = { ok: false, reason: 'future-event' }; return;
+        out = { ok: false, reason: 'future-event' }; return false;
       }
       const active = draft.parallelEvents.rows.filter(function (r) { return r && r.status === 'active'; });
-      if (active.length >= Math.max(1, settings().maxActive)) { out = { ok: false, reason: 'capacity', active: active.length }; return; }
+      if (active.length >= Math.max(1, settings().maxActive)) { out = { ok: false, reason: 'capacity', active: active.length }; return false; }
       const row = { id: 'pev_' + now + '_' + draft.parallelEvents.rows.length, title: t, location: loc, persons: cast, status: 'active', startedAt: startedAt, endedAt: null };
       draft.parallelEvents.rows.push(row);
       if (WA.evict) WA.evict.array(draft.parallelEvents.rows, 'parallelEvents.rows');
@@ -74,9 +74,9 @@
   function resolve(id) {
     let out = null;
     WA.store.transact(function (draft) {
-      if (!draft.parallelEvents || !Array.isArray(draft.parallelEvents.rows)) { out = { ok: false, reason: 'missing' }; return; }
+      if (!draft.parallelEvents || !Array.isArray(draft.parallelEvents.rows)) { out = { ok: false, reason: 'missing' }; return false; }
       const hit = draft.parallelEvents.rows.filter(function (r) { return r && r.id === id && r.status === 'active'; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing' }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing' }; return false; }
       hit.status = 'resolved'; hit.endedAt = clockNow('parallelEvents');
       out = { ok: true, id: id };
     }, 'parallelEvents:resolve');

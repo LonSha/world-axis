@@ -189,11 +189,11 @@
     WA.store.transact(function (draft) {
       const c = ensureCausal(draft);
       const x = c.chains.filter(function (y) { return y && y.id === cid; })[0];
-      if (!x) { out = { ok: false, reason: 'missing-chain' }; return; }
-      if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return; }
+      if (!x) { out = { ok: false, reason: 'missing-chain' }; return false; }
+      if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return false; }
       const d = (x.delayed || []).filter(function (y) { return y && y.id === did; })[0];
-      if (!d) { out = { ok: false, reason: 'missing-delayed' }; return; }
-      if (d.status !== 'scheduled') { out = { ok: false, reason: 'already-' + d.status }; return; }
+      if (!d) { out = { ok: false, reason: 'missing-delayed' }; return false; }
+      if (d.status !== 'scheduled') { out = { ok: false, reason: 'already-' + d.status }; return false; }
       const now = clockNow('causal');
       d.status = 'settled'; d.settledAt = now;
       // 后果落成回声（已结算结果与正文的接触面），不是「预测」
@@ -220,8 +220,8 @@
     let out = null;
     WA.store.transact(function (draft) {
       const x = ensureCausal(draft).chains.filter(function (y) { return y && y.id === cid; })[0];
-      if (!x) { out = { ok: false, reason: 'missing-chain' }; return; }
-      if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return; }
+      if (!x) { out = { ok: false, reason: 'missing-chain' }; return false; }
+      if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return false; }
       x.status = 'cancelled'; x.cancelReason = clean(reason, 80) || '调用方取消'; x.updatedAt = clockNow('causal');
       out = { ok: true, id: x.id, status: x.status };
     }, 'causal:cancel');
@@ -236,8 +236,8 @@
     let out = null;
     WA.store.transact(function (draft) {
       const x = ensureCausal(draft).chains.filter(function (y) { return y && y.id === cid; })[0];
-      if (!x) { out = { ok: false, reason: 'missing-chain' }; return; }
-      if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return; }
+      if (!x) { out = { ok: false, reason: 'missing-chain' }; return false; }
+      if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return false; }
       let n = 0;
       (x.delayed || []).forEach(function (d) {
         if (d && d.status === 'scheduled') { d.dueAt = Math.max(0, Number(d.dueAt || 0) + by); n++; }

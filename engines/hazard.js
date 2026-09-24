@@ -65,8 +65,8 @@
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }
       draft.hazard = draft.hazard && typeof draft.hazard === 'object' && !Array.isArray(draft.hazard) ? draft.hazard : { rows: [] };
       draft.hazard.rows = Array.isArray(draft.hazard.rows) ? draft.hazard.rows : [];
-      if (draft.hazard.rows.filter(function (r) { return r && r.key === k; })[0]) { out = { ok: false, reason: 'exists', key: k }; return; }
-      if (draft.hazard.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', key: k }; return; }
+      if (draft.hazard.rows.filter(function (r) { return r && r.key === k; })[0]) { out = { ok: false, reason: 'exists', key: k }; return false; }
+      if (draft.hazard.rows.length >= settings().maxRows) { out = { ok: false, reason: 'rows-full', key: k }; return false; }
       draft.hazard.rows.push({ key: k, note: memo, count: 0, hits: 0, pending: false, waiting: 0, at: clockNow('hazard') });
       if (WA.evict) WA.evict.array(draft.hazard.rows, 'hazard.rows');
       out = { ok: true, key: k, count: 0, target: targetFor(0) };
@@ -85,7 +85,7 @@
       draft.hazard = draft.hazard && typeof draft.hazard === 'object' && !Array.isArray(draft.hazard) ? draft.hazard : { rows: [] };
       draft.hazard.rows = Array.isArray(draft.hazard.rows) ? draft.hazard.rows : [];
       const row = draft.hazard.rows.filter(function (r) { return r && r.key === k; })[0];
-      if (!row) { out = { ok: false, reason: 'missing', key: k }; return; }
+      if (!row) { out = { ok: false, reason: 'missing', key: k }; return false; }
       row.count = Math.max(0, Math.floor(Number(row.count) || 0)) + 1;
       row.at = clockNow('hazard');
       out = { ok: true, key: k, count: row.count, target: targetFor(row.count) };
@@ -107,11 +107,11 @@
       draft.hazard = draft.hazard && typeof draft.hazard === 'object' && !Array.isArray(draft.hazard) ? draft.hazard : { rows: [] };
       draft.hazard.rows = Array.isArray(draft.hazard.rows) ? draft.hazard.rows : [];
       const row = draft.hazard.rows.filter(function (r) { return r && r.key === k; })[0];
-      if (!row) { out = { ok: false, reason: 'missing', key: k }; return; }
-      if (row.pending) { out = { ok: false, reason: 'already-pending', key: k }; return; }
+      if (!row) { out = { ok: false, reason: 'missing', key: k }; return false; }
+      if (row.pending) { out = { ok: false, reason: 'already-pending', key: k }; return false; }
       // 掷骰必须走决策流：不可用时**显式拒收**，绝不用裸调 Math.random 兜底
       //（裸调绕过冻结种子 ⇒ 同一剧本复现不出同一结果，v2.14.0 起的全库纪律）。
-      if (!WA.rand || typeof WA.rand.dice !== 'function') { out = { ok: false, reason: 'rand-unavailable', key: k }; return; }
+      if (!WA.rand || typeof WA.rand.dice !== 'function') { out = { ok: false, reason: 'rand-unavailable', key: k }; return false; }
       const sides = Math.max(2, settings().baseTarget);
       const face = WA.rand.dice(sides, 'hazard');
       const tg = targetFor(row.count);
@@ -151,10 +151,10 @@
       draft.hazard = draft.hazard && typeof draft.hazard === 'object' && !Array.isArray(draft.hazard) ? draft.hazard : { rows: [] };
       draft.hazard.rows = Array.isArray(draft.hazard.rows) ? draft.hazard.rows : [];
       const row = draft.hazard.rows.filter(function (r) { return r && r.key === k; })[0];
-      if (!row) { out = { ok: false, reason: 'missing', key: k }; return; }
-      if (!row.pending) { out = { ok: false, reason: 'not-pending', key: k }; return; }
+      if (!row) { out = { ok: false, reason: 'missing', key: k }; return false; }
+      if (!row.pending) { out = { ok: false, reason: 'not-pending', key: k }; return false; }
       const need = Math.max(1, settings().revealDelay);
-      if ((Number(row.waiting) || 0) < need) { out = { ok: false, reason: 'too-soon', key: k, waiting: Number(row.waiting) || 0, need: need }; return; }
+      if ((Number(row.waiting) || 0) < need) { out = { ok: false, reason: 'too-soon', key: k, waiting: Number(row.waiting) || 0, need: need }; return false; }
       row.pending = false; row.waiting = 0; row.hits = Math.floor(Number(row.hits) || 0) + 1; row.count = 0;
       row.lastHitAt = clockNow('hazard');
       out = { ok: true, key: k, hits: row.hits, count: row.count };
@@ -181,7 +181,7 @@
       draft.hazard = draft.hazard && typeof draft.hazard === 'object' && !Array.isArray(draft.hazard) ? draft.hazard : { rows: [] };
       draft.hazard.rows = Array.isArray(draft.hazard.rows) ? draft.hazard.rows : [];
       const idx = draft.hazard.rows.map(function (r) { return r && r.key; }).indexOf(k);
-      if (idx < 0) { out = { ok: false, reason: 'missing', key: k }; return; }
+      if (idx < 0) { out = { ok: false, reason: 'missing', key: k }; return false; }
       draft.hazard.rows.splice(idx, 1);
       out = { ok: true, key: k };
     }, 'hazard:drop');

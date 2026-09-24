@@ -56,6 +56,11 @@
   function live(pool) { return rows().filter(function (r) { return r && r.pool === pool && ACTIVE.indexOf(r.status) >= 0; }); }
   /** 登记一颗种子（status 从 active 起算，age=0）。 */
   function add(pool, text) {
+    // v2.79.0（第十三面续 · 输入边界）：pool/text 都必须是真字符串。
+    //   此前 `String(pool)` 与 `clean(text)` 会调入参的 ToPrimitive —— 带敌意 toString
+    //   的对象直接抛穿（实测 'Error: boom'），无原型对象抛 'Cannot convert ...'。
+    //   与 declare/retire 同款：坏入参一律以既有拒收码如实拒绝，不落成字符串。
+    if (typeof pool !== 'string' || typeof text !== 'string') { noteFault('bad-pool'); return { ok: false, reason: 'bad-pool', got: pool }; }
     const p = String(pool == null ? '' : pool).trim().toLowerCase();
     const t = clean(text, 80);
     if (POOLS.indexOf(p) < 0) { noteFault('bad-pool'); return { ok: false, reason: 'bad-pool', got: pool }; }
@@ -66,11 +71,11 @@
       draft.quota = draft.quota && typeof draft.quota === 'object' && !Array.isArray(draft.quota) ? draft.quota : { rows: [] };
       draft.quota.rows = Array.isArray(draft.quota.rows) ? draft.quota.rows : [];
       if (draft.quota.rows.filter(function (r) { return r && (r.status === 'active' || r.status === 'expired') && r.pool === p && r.text === t; })[0]) {
-        out = { ok: false, reason: 'dup-text', pool: p, text: t }; return;
+        out = { ok: false, reason: 'dup-text', pool: p, text: t }; return false;
       }
       const liveCount = draft.quota.rows.filter(function (r) { return r && r.pool === p && (r.status === 'active' || r.status === 'expired'); }).length;
       const cap = p === 'short' ? settings().shortCap : settings().longCap;
-      if (liveCount >= cap) { out = { ok: false, reason: 'pool-full', pool: p, cap: cap }; return; }
+      if (liveCount >= cap) { out = { ok: false, reason: 'pool-full', pool: p, cap: cap }; return false; }
       const row = { id: WA.rand && WA.rand.id ? WA.rand.id('seed', 3, 'id') : ('seed_' + clockNow('quota')), pool: p, text: t, status: 'active', age: 0, at: clockNow('quota') };
       draft.quota.rows.push(row);
       if (WA.evict) WA.evict.array(draft.quota.rows, 'quota.rows');
@@ -120,8 +125,8 @@
       draft.quota = draft.quota && typeof draft.quota === 'object' && !Array.isArray(draft.quota) ? draft.quota : { rows: [] };
       draft.quota.rows = Array.isArray(draft.quota.rows) ? draft.quota.rows : [];
       const hit = draft.quota.rows.filter(function (r) { return r && r.id === key; })[0];
-      if (!hit) { out = { ok: false, reason: 'missing', id: key }; return; }
-      if (hit.status === 'resolved' || hit.status === 'dropped') { out = { ok: false, reason: 'already-terminal', id: key, status: hit.status }; return; }
+      if (!hit) { out = { ok: false, reason: 'missing', id: key }; return false; }
+      if (hit.status === 'resolved' || hit.status === 'dropped') { out = { ok: false, reason: 'already-terminal', id: key, status: hit.status }; return false; }
       hit.status = status;
       hit.closedAt = clockNow('quota');
       out = { ok: true, id: key, pool: hit.pool, status: status };
