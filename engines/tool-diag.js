@@ -298,7 +298,12 @@
         moves: st.moves || 0, checks: st.checks || 0, blocked: st.blocked || 0,
         faults: st.faults || {}, faultKinds: Object.keys(st.faults || {}).sort(),
         lastReason: st.lastReason || '', placeKinds: WA.world.PLACE_KINDS || [],
-        eventKinds: WA.world.EVENT_KINDS || [] };
+        eventKinds: WA.world.EVENT_KINDS || [],
+        // v2.93.0（X4）：通行三层的读数。**本节不调 transit**——它会增 stat 计数，
+        //   而观测不得改变被观测对象；这里的数是面板按钮真跑出来的产物。
+        channels: WA.world.CHANNELS || [],
+        transits: (st.transits || { person: 0, goods: 0, message: 0 }),
+        transitBlocks: (st.blocks || { person: 0, goods: 0, message: 0 }) };
     });
   }
   /**
@@ -1140,6 +1145,7 @@
       'wa-world-rd-a', 'wa-world-rd-b', 'wa-world-rd-min', 'wa-world-addroad',
       'wa-world-ev-title', 'wa-world-ev-place', 'wa-world-addevent', 'wa-world-tick', 'wa-world-who',
       'wa-world-mv-who', 'wa-world-mv-from', 'wa-world-mv-to', 'wa-world-move', 'wa-world-canbe',
+      'wa-world-tr-ch', 'wa-world-transit',
       'wa-world-out',
       'wa-shadow-enabled', 'wa-shadow-a', 'wa-shadow-b', 'wa-shadow-secret', 'wa-shadow-add',
       'wa-shadow-deepen', 'wa-shadow-brighten', 'wa-shadow-lookup', 'wa-shadow-what',

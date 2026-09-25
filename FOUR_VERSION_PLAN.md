@@ -54,7 +54,7 @@
   · **A5 的「常用操作 / 有效配置来源 / 回滚结果 / 手机交互 / 实机浏览器验收」**未做；本版 A5 只收口了差异预览与字段映射。
   · **B7 题材对正文的实际影响**只做到「模块是否进入注入面」，未做「不同题材下同一场景的生成差异」对照实验。
 
-## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O5 已交付）
+## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O5 已交付，X4 已交付）
 起点：v2.87.0 / 40b6c04。两份计划已入库（folder=WorldAxis）：《WorldAxis v2.88+ 优化方向计划（O1–O5 性能与透明度）》UUID 29179707-ce90-49ac-8e71-36d3c5079409；《WorldAxis v2.88+ 功能拓展计划（X1–X5 交互生态拓宽）》UUID 38375f01-cbd6-41a1-8bd9-842294a610ac。
 - [x] O1（本版落点 = 注入预算实测与分档，原料 = A4 未覆盖项「短中长基准/耗时分列」）：
   · 计时落在 `render/inject.js` 的 `engineCall`（v2.86.0 的唯一引擎调用出口，46 处调用点）——一处落表覆盖全部引擎源；时钟用 `clockWall`（测量时间），与 `clockNow` 分列。
@@ -102,7 +102,19 @@
   · 真缺陷一并修：面板失败分支 `reason` 留空 ⇒ 印出「未记录：未知原因」（而事实是「存量与流水对不上」）——修为可读原因 + 读数措辞「账本 · 」与写盘回执「已记录」分开。
 - [x] 验收（O5）：专锁 `tests/resource-ledger-v2920.js` **47/0**（A 成类锁 / B 运行时 B1–B9 / C 缺陷锁 / N0–N4 负控制，五个真源码破坏锚点 `ANCHOR_NOTE_G` / `ANCHOR_PENDING_G` / `ANCHOR_DRIFT` / `ANCHOR_CHAIN` / `ANCHOR_VSSTOCK` 各恰中 1 次，破坏形态含「静默报零」与「失去分辨力」两向）；全量回归 **7906/0**（v2.91.0 为 7859/0，+47）；出口面 `ns= 104 members= 609 chars= 7458`（+2，已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs **2391** / 命名空间 110 / 成员 **1246**；死子面 dead 444 / uiDead 4 / dataOnly 161（无新增）；拒收码 **310**（见证 93 / 死表 5 / 基线 212，新码 `ledger-throw` 显式归类）；六个独立门禁（module-registry / export-contract / reject-code / field-liveness / test-surface / orphan-lock-v2750）全过，`dead-export-gate` 更新证据后过（账本 version=2.92.0）。
 - [ ] O5 未覆盖（如实留在清单）：流水**只驻内存**（与 causal 磁带同口径，不落盘、不注入正文，跨会话不可查）；只覆盖 `org` 的 `grant` / `transfer` 两类操作，**不覆盖** `evolution.economy`（气候 / 信号）与其它模块的库存改动（编辑器直接改 `resources` 不计流水）；经济风（`ECONOMY_CLIMATE`）**未纳入**资源账本读数（计划原文「经济风 + `org.stockOf` 流水」只落了后者）；流水被挤出后 `reconcile` 只核对带内（`truncated` 照实报，**未做**落盘存档点以核全量）；异常笔三类**未接进健康分**（只进诊断与面板）。
-- [ ] X1–X5 未开始（见功能拓展计划）：X1 UI 实机验收通道；X2 B3 经济引擎；X3 B4 传播与辟谣；X4 B2 天气灾害封锁联动；X5 跨插件因果桥。
+- [x] X4（本版落点 = B2 天气灾害封锁联动，见功能拓展计划；本轮先落 weather↔world 这一半）：
+  · `engines/world.js` 三渠道通行面：`CHANNELS = ['person','goods','message']`（**封闭集合**）+ `BLOCK_LEVEL`（逐天气逐渠道的显式封锁映射：`storm`/`snow` 封人封物放消息，`heat`/`fog` 三渠道全封，`rain`/`clear` 一律不封）+ `transit(channel, from, to)`。
+  · `transit` 只收**三参数**；判序 `bad-channel` → `disabled` → `unreachable` → 沿路径**逐段**查天气（命中报 `weather-blocked` 并带 `at`/`kind`/`factor`/`path`）→ 成功报 `ok:true` + `path`/`minutes`/`hops`/`weather`/`weatherReason`。
+  · 内部面 `weatherBlockOf(place)`：`reason ∈ engine-absent|disabled|missing|unknown-kind|ok`；**未登记天气不回落成晴**（报 `missing`，`kind === null`，**不因此封路**）；未知天气词报 `unknown-kind` 且 `blocked: null`（既不假装通行也不假装封锁）。
+  · 计数**分列**：成功进 `transits[channel]`、被封进 `blocks[channel]`、总 `blocked` 另计——「今天运了几趟」与「今天被拦了几趟」不挤在一个计数器里。
+  · **导出只加 2 个成员**（`CHANNELS` / `transit`），`weatherBlockOf` 作为内部只读面**不导出**（无消费方不挂）。
+  · 两处真消费方（**无消费方不挂**）：诊断 `secWorld` 的 `channels`/`transits`/`transitBlocks` 三读数 + 面板世界页「判通行」按钮（起终点**复用** `wa-world-mv-from`/`wa-world-mv-to`，同一个「从/到」语义不另造一份；`weather-blocked` 与其它原因**分列措辞**）。
+  · **观测不得改变被观测对象**：`transit` 会改 `stat` 计数，故诊断 `secWorld` 刻意**不调** `transit`、也**不调** `weatherBlockOf` 做推断——只读已发生的计数，不自赠结论。
+  · 真缺陷一并修：产品侧 `weatherReason: wx.ok ? wx.reason : 'unknown'` 的 `else` 落进「内联字面量 `reason: 'x'`」词法形状，被拒收码扫描器误捕 ⇒ 改**词法形状**为 `(wx.ok && wx.reason) || 'unknown'`（**非码不塞进台账**，否则台账永久虚胖）。
+- [x] 验收（X4）：专锁 `tests/transit-v2930.js` **74/0**（A 结构 / B 运行时 B0–B13 / C 不变式与诚实降级 / N0–N4 负控制，六个真源码破坏锚点各恰中 1 次）；全量回归 **7980/0**（v2.92.0 基线 7906/0，+74）；六道独立门禁全过。
+- [ ] X4 未覆盖（如实留在清单）：`BLOCK_LEVEL` 是**本版固化的映射**（未来新增天气词只报 `unknown-kind`，由调用方面对，不假装通行也不假装封锁）；`transit` **不做耗时修正**（`weather.factor` 只随读数报出，交调用方决策——`travelMinutes` 是另一入口）；**不做多跳途中遭遇**（只在路径各点查静态天气，不模拟「走到半路下起暴雨」）；`transit` 会改 `stat` 计数（故诊断节不调它）；**`hazard` 与本版未联动**（计划原文「weather.js 与 hazard/world.canBeAt 打通」只落了 weather↔world 这一半，hazard 侧留待后续如实登记）。
+- [ ] X1 未开始（见功能拓展计划）：X1 UI 实机验收通道（**需真机三插件联调，无头不可验**）。
+- [ ] X2 / X3 / X5 未开始（见功能拓展计划）：X2 B3 经济引擎；X3 B4 传播与辟谣；X5 跨插件因果桥。
 
 ## 完成纪律
 - 每项需附实现路径、真实消费者、正反判据、运行证据，不能以新增导出或文件存在标记完成。

@@ -411,6 +411,7 @@
       <div class="wa-row"><input id="wa-world-rd-a" class="wa-input" placeholder="从"/><input id="wa-world-rd-b" class="wa-input" placeholder="到"/><input id="wa-world-rd-min" class="wa-input" placeholder="分钟"/><button class="wa-btn" id="wa-world-addroad" title="登记一条道路：没登记的路走不通">登记道路</button></div>
       <div class="wa-row"><input id="wa-world-ev-title" class="wa-input" placeholder="共同日程名"/><input id="wa-world-ev-place" class="wa-input" placeholder="地点"/><button class="wa-btn" id="wa-world-addevent">登记日程</button><button class="wa-btn" id="wa-world-tick">推进日程</button><button class="wa-btn" id="wa-world-who" title="到场者只认日程证据——没依据的人不会出现在名单里">查到会人</button></div>
       <div class="wa-row"><input id="wa-world-mv-who" class="wa-input" placeholder="人物"/><input id="wa-world-mv-from" class="wa-input" placeholder="从"/><input id="wa-world-mv-to" class="wa-input" placeholder="到"/><button class="wa-btn" id="wa-world-move" title="先问路通不通，再问此人这一刻在不在别处">移动</button><button class="wa-btn" id="wa-world-canbe">能否在场</button></div>
+      <div class="wa-row"><input id="wa-world-tr-ch" class="wa-input" placeholder="person / goods / message"/><button class="wa-btn" id="wa-world-transit" title="按通道判通行：人可到 / 物可到 / 消息可到分开作答；恶劣天气封锁路线（人/物不可，消息可）">判通行</button></div>
       <div id="wa-world-out" class="wa-out"></div>
       <div class="wa-sec">社交漩涡（共同隐瞒、关系经历）</div>
       <label class="wa-row"><input id="wa-shadow-enabled" type="checkbox" ${WA.shadow && WA.shadow.getSettings().enabled ? 'checked' : ''}/> 启用社交漩涡</label>
@@ -2052,6 +2053,23 @@
       if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
       const r = WA.world.move(wv('#wa-world-mv-who'), wv('#wa-world-mv-from'), wv('#wa-world-mv-to'), clockNow('ui.world'));
       worldOut(r.ok ? Object.assign({}, r, { id: r.path.join('→') }) : r);
+    });
+    on('#wa-world-transit', () => {
+      if (!WA.world || !WA.world.transit) return worldOut({ ok: false, reason: 'module-missing' });
+      const ch = wv('#wa-world-tr-ch');
+      const r = WA.world.transit(ch, wv('#wa-world-mv-from'), wv('#wa-world-mv-to'));
+      if (!r.ok) {
+        // 「被封住」与「本来就不达」是两件事，**不得合成一句「不行」**。
+        const txt = r.reason === 'weather-blocked'
+          ? ('通行 · 被封 · ' + r.channel + ' ' + r.from + '→' + r.to + '：' + r.kind + ' 封住 ' + r.at
+            + '（人/物不可，消息可）')
+          : ('通行 · ' + (r.reason || 'unknown'));
+        panelEl.dataset.worldOut = txt;
+        const o = $('#wa-world-out'); if (o) o.textContent = txt;
+        return;
+      }
+      const wx = r.weather ? (r.path.join('→') + ' · ' + r.weather.kind + ' ×' + r.weather.factor) : '未登记天气';
+      worldOut(Object.assign({}, r, { id: '通行 · ' + r.channel + ' ' + r.path.join('→') + '（' + wx + '）' }));
     });
     on('#wa-world-canbe', () => {
       if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });

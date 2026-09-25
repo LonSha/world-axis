@@ -34,6 +34,19 @@
     bounds: { maxPlaces: [1, 24], maxEvents: [1, 12], maxItems: [1, 6] } };
   const PLACE_KINDS = ['home', 'work', 'market', 'public', 'wild', 'sacred'];
   const EVENT_KINDS = ['market', 'festival', 'court', 'rite', 'meeting'];
+  // v2.93.0（X4）：通行三层。"人可到"与"物可到"与"消息可到"是三件事——
+  //   合并成一个 reachable 就再也答不出「人过不去但信能过去」。
+  //   通道语义：person 需道路（weather 封锁即不可）；goods 需承运（比 person 怕封路）；
+  //   message 走消息面（不受封路影响，但受「完全静默」级别的封锁影响）。
+  const CHANNELS = ['person', 'goods', 'message'];
+  // 封锁等级：天气 → 该地通道是否尚可通行。**只由已登记的天气决定，不猜**。
+  //   storm/snow 封路（person/goods 不可，message 可）；heat/fog 不封路（只减速）。
+  const BLOCK_LEVEL = { storm: { person: false, goods: false, message: true },
+    snow: { person: false, goods: false, message: true },
+    heat: { person: true, goods: true, message: true },
+    fog: { person: true, goods: true, message: true },
+    rain: { person: true, goods: true, message: true },
+    clear: { person: true, goods: true, message: true } };
 
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
@@ -44,7 +57,11 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { places: 0, roads: 0, events: 0, moves: 0, checks: 0, blocked: 0, lastReason: '', faults: {},
-    departed: 0, arrived: 0, advanced: 0 };
+    departed: 0, arrived: 0, advanced: 0,
+    // v2.93.0（X4）：三层通行的成功计数，逐层分列（合并就答不出哪层在用）。
+    transits: { person: 0, goods: 0, message: 0 },
+    // 被天气封住的次数（逐层分列）——「没过去」与「过去了」是两件事。 
+    blocks: { person: 0, goods: 0, message: 0 } };
 
   function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -152,6 +169,60 @@
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
+  /**
+   * v2.93.0（X4）：某地此刻的天气封锁面。**只读**，不改存档、不掷骰。
+   *   三态照实：模块缺席 → available:false；开关关闭 → disabled；未登记天气 → missing。
+   *   「没登记天气」**不回落成晴**——那是本仓库最贵的一类默认值（weather.js 同条纪律）。
+   */
+  function weatherBlockOf(place) {
+    const pl = clean(place, 40);
+    if (!pl) return { ok: false, reason: 'missing-fields' };
+    const wx = WA.weather;
+    if (!wx || typeof wx.effect !== 'function') return { ok: true, available: false, place: pl, kind: '', blocked: { person: true, goods: true, message: true }, reason: 'engine-absent' };
+    const cfg = (typeof wx.getSettings === 'function') ? wx.getSettings() : {};
+    if (!cfg || cfg.enabled !== true) return { ok: true, available: false, place: pl, kind: '', blocked: { person: true, goods: true, message: true }, reason: 'disabled' };
+    const e = wx.effect(pl);
+    if (!e || !e.ok) return { ok: true, available: false, place: pl, kind: '', blocked: { person: true, goods: true, message: true }, reason: (e && e.reason) || 'missing' };
+    const lv = BLOCK_LEVEL[e.kind] || null;
+    // 未登记进封锁表的天气（未来新增词）**不假装通行、也不假装封锁**——报 unknown-kind 由调用方面对。
+    if (!lv) return { ok: true, available: true, place: pl, kind: e.kind, blocked: null, reason: 'unknown-kind' };
+    return { ok: true, available: true, place: pl, kind: e.kind, factor: e.factor, blocked: Object.assign({}, lv), reason: 'ok' };
+  }
+  /**
+   * v2.93.0（X4）：三层通行判定。
+   *   "人可到"与"物可到"与"消息可到"分别作答——三个判定各自有否定的理由，
+   *   且**不得合成一个「不行」**（warrant/move 同条纪律：合成就答不出是哪一层断的）。
+   *   天气封锁归因报 `weather-blocked` 并带上天气名；路本身不存在报 `unreachable`。
+   *   签名只收三个参数：**封锁按地点当前天气判，不看时刻**——收一个用不上的 at
+   *   就是给调用方一个不存在的承诺。
+   */
+  function transit(channel, from, to) {
+    const ch = clean(channel, 20), f = clean(from, 40), t = clean(to, 40);
+    if (!ch || !f || !t) return { ok: false, reason: 'missing-fields' };
+    if (CHANNELS.indexOf(ch) < 0) return { ok: false, reason: 'bad-channel', channels: CHANNELS.slice() };
+    if (!settings().enabled) { stat.blocked++; stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const road = reach(f, t);
+    if (!road.ok) return road;
+    if (!road.reachable) { stat.blocked++; stat.lastReason = 'unreachable'; return { ok: false, reason: 'unreachable', channel: ch, from: f, to: t }; }
+    // 天气按**目的地**判（货与人都要落到对面）：途中每一段都看，逐段报第一处封锁。
+    const path = road.path.slice();
+    for (let i = 1; i < path.length; i++) {
+      const b = weatherBlockOf(path[i]);
+      if (!b.ok) return b;
+      if (b.blocked && b.blocked[ch] === false) {
+        stat.blocked++; stat.lastReason = 'weather-blocked';
+        stat.blocks[ch] = (stat.blocks[ch] || 0) + 1;
+        return { ok: false, reason: 'weather-blocked', channel: ch, at: path[i], kind: b.kind,
+          factor: b.factor, from: f, to: t, path: path };
+      }
+    }
+    stat.transits[ch] = (stat.transits[ch] || 0) + 1;
+    stat.lastReason = 'transit-ok';
+    const wx = weatherBlockOf(t);
+    return { ok: true, channel: ch, from: f, to: t, path: path, minutes: road.minutes, hops: road.hops,
+      weather: (wx.ok && wx.available) ? { place: wx.place, kind: wx.kind, factor: wx.factor } : null,
+      weatherReason: (wx.ok && wx.reason) || 'unknown' };
+  }
   /**
    * 可达性：按「登记的道路」求最短耗时路径（Dijkstra 的朴素版，图很小）。
    * **没有路径就是走不过去**——不按坐标/直线距离兜底（本仓库最贵的一类默认值）。
@@ -421,6 +492,8 @@
 
   WA.world = {
     PLACE_KINDS: PLACE_KINDS, EVENT_KINDS: EVENT_KINDS,
+    // v2.93.0（X4）：通行三层 + 判定入口。transit 的消费方：诊断 secWorld + 面板世界页按钮。
+    CHANNELS: CHANNELS, transit: transit,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     addPlace: addPlace, addRoad: addRoad, reach: reach,
     addEvent: addEvent, eventsBetween: eventsBetween, attendees: attendees,
@@ -429,7 +502,7 @@
       return { places: places().length, roads: roads().length, events: events().length,
         upcoming: events().filter(function (e) { return e && e.status !== 'done'; }).length };
     },
-    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
+    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults), transits: Object.assign({}, stat.transits), blocks: Object.assign({}, stat.blocks) }); }
   };
   // v2.63.0 观测面：把「被拒了什么」按原因计入 stat.faults。
   //   为什么必须另立一面：拒绝是**不落盘**的——被拒的东西当然写不进存档，

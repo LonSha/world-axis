@@ -39,11 +39,22 @@ function broke(rel, from, to) {
 }
 
 const OLD_FORM = '    stat: function () { return Object.assign({}, stat); }';
+// v2.93.0：world 的 stat() 因 X4 多了一个快照面（transits/blocks），故「新形态」不再唯一。
+//   判据按模块分别给锚点：同一纪律（快照而非浅拷贝）在字面上允许不同形状。
 const NEW_FORM = '    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }';
+const NEW_FORM_BY = { 'engines/world.js':
+  'stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults), transits: Object.assign({}, stat.transits), blocks: Object.assign({}, stat.blocks) }); }' };
+function newFormOf(rel) { return NEW_FORM_BY[rel] || NEW_FORM; }
+// 「退回浅拷贝」在 world 上的形态：整条快照面被去掉（faults 不再是副本）——
+//   若把它只写成「少快照 transits/blocks 而 faults 仍快照」，那破坏后并不泄露，
+//   判据会以为自己证明了「破坏必现形」，实际证明的是一个不构成泄露的形态。
+const OLD_FORM_BY = { 'engines/world.js':
+  'stat: function () { return Object.assign({}, stat); }' };
+function oldFormOf(rel) { return OLD_FORM_BY[rel] || OLD_FORM; }
 
 // ── 破坏表：把该模块退回「浅拷贝」形态（各恰 1 次）──
 const BROKEN = TARGETS.map(function (rel) {
-  return { key: rel.split('/')[1].replace('.js', ''), rel: rel, from: NEW_FORM, to: OLD_FORM,
+  return { key: rel.split('/')[1].replace('.js', ''), rel: rel, from: newFormOf(rel), to: oldFormOf(rel),
     why: '退回浅拷贝形态 ⇒ 改 stat() 返回值即改模块内部台账（观测记录可被伪造/抹除）' };
 });
 
@@ -88,8 +99,8 @@ function runAll(a) {
   // A 结构：三个模块的 stat() 采用与其余模块逐字一致的快照写法
   TARGETS.forEach(function (rel) {
     const src = srcOf(rel);
-    a(src.indexOf(NEW_FORM) >= 0, 'A1 采用快照写法 [' + rel + ']（与仓库既有先例逐字一致）');
-    a(src.indexOf(OLD_FORM) < 0, 'A2 已无浅拷贝形态 [' + rel + ']');
+    a(src.indexOf(newFormOf(rel)) >= 0, 'A1 采用快照写法 [' + rel + ']（与仓库既有先例同一纪律）');
+    a(src.indexOf(oldFormOf(rel)) < 0, 'A2 已无浅拷贝形态 [' + rel + ']');
   });
 
   // B 现场：全仓扫描，零泄露
@@ -138,7 +149,7 @@ function runNegative(a) {
   // D2 非空转：破坏确实可观测地改变了行为（紧接各自 fresh 取值）
   const WAg = fresh({});
   const goodLeak = leaks(WAg, 'world');
-  const WAb = fresh({ srcOverride: (function () { const o = {}; o['engines/world.js'] = broke('engines/world.js', NEW_FORM, OLD_FORM); return o; })() });
+  const WAb = fresh({ srcOverride: (function () { const o = {}; o['engines/world.js'] = broke('engines/world.js', newFormOf('engines/world.js'), oldFormOf('engines/world.js')); return o; })() });
   const badLeak = leaks(WAb, 'world');
   a(goodLeak === false && badLeak === true,
     'D2 破坏可观测地改变了行为（原版泄露=' + goodLeak + ' / 破坏后泄露=' + badLeak + '）');
