@@ -380,7 +380,7 @@
       <label class="wa-row"><input id="wa-org-enabled" type="checkbox" ${WA.org && WA.org.getSettings().enabled ? 'checked' : ''}/> 启用资源与组织</label>
       <div class="wa-row"><input id="wa-org-kind" class="wa-input" placeholder="faction 或 person"/><input id="wa-org-name" class="wa-input" placeholder="持有者"/><input id="wa-org-item" class="wa-input" placeholder="资源"/><input id="wa-org-qty" class="wa-input" placeholder="数量"/></div>
       <div class="wa-row"><input id="wa-org-to-kind" class="wa-input" placeholder="接收类型"/><input id="wa-org-to-name" class="wa-input" placeholder="接收者"/></div>
-      <div class="wa-row"><button class="wa-btn" id="wa-org-grant">入库</button><button class="wa-btn" id="wa-org-transfer">转移</button><button class="wa-btn" id="wa-org-check">检查余额</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-org-grant">入库</button><button class="wa-btn" id="wa-org-transfer">转移</button><button class="wa-btn" id="wa-org-check">检查余额</button><button class="wa-btn" id="wa-org-ledger">资源账本</button></div>
       <div id="wa-org-out" class="wa-out"></div>
       <div class="wa-sec">因果与情报</div>
       <label class="wa-row"><input id="wa-intel-enabled" type="checkbox" ${WA.intel && WA.intel.getSettings().enabled ? 'checked' : ''}/> 启用因果与情报</label>
@@ -1754,7 +1754,10 @@
     on('#wa-ll-sweep', () => { if (!WA.longline) return llOut({ ok: false, reason: 'module-missing' }, true); const rows = WA.longline.overdue(); const r = WA.longline.sweep(); const pr = WA.longline.pressure(); const block = WA.longline.buildBlock(); llOut({ ok: true, id: rows.length + ':' + r.count + ':' + pr.level + ':' + (block ? 'block' : 'empty'), reason: '' }, true); });
     const orgVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
     const orgOut = function (r, keep) {
-      const text = r && r.ok ? ('已记录 ' + (r.id || r.reason || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
+      // v2.92.0：读数类出口（带 summary）不再是「回执」措辞——把核对结论说成「已记录」
+      //   会让对账断裂读起来像一次成功写盘。
+      const okText = (r && r.summary) ? ('账本 · ' + r.summary) : ('已记录 ' + ((r && (r.id || r.reason)) || 'ok'));
+      const text = r && r.ok ? okText : ('未记录：' + ((r && r.reason) || '未知原因'));
       if (keep) panelEl.dataset.orgOut = text;
       const o = $('#wa-org-out'); if (o) o.textContent = text;
     };
@@ -1767,6 +1770,24 @@
       }; }
     on('#wa-org-grant', () => { if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true); const r = WA.org.grant(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), orgVal('#wa-org-item'), orgVal('#wa-org-qty')); const stock = r.ok ? WA.org.stockOf((WA.store.get()||{}).evolution && (WA.store.get().evolution.factions||[]).filter(function(f){return f.name===orgVal('#wa-org-name');})[0] || (((WA.store.get()||{}).people||{})['p_'+orgVal('#wa-org-name')])) : null; orgOut(Object.assign({}, r, { id: r.ok ? (r.id + ':' + r.amount + ':' + ((stock && stock[r.id]) || 0)) : r.id }), true); renderBody(); });
     on('#wa-org-transfer', () => { if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true); const item = orgVal('#wa-org-item'); const affordable = WA.org.canAfford(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), item, orgVal('#wa-org-qty')); const r = WA.org.transfer(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), orgVal('#wa-org-to-kind'), orgVal('#wa-org-to-name'), item, orgVal('#wa-org-qty')); orgOut(Object.assign({}, r, { id: r.ok ? (item + ':' + r.amount + ':' + (affordable ? 'affordable' : 'blocked')) : r.id }), true); renderBody(); });
+    on('#wa-org-ledger', () => {
+      if (!WA.org || !WA.org.ledgerView) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      let v = null; try { v = WA.org.ledgerView(); } catch (e) { return orgOut({ ok: false, reason: 'ledger-throw' }, true); }
+      const ab = v.anomalies || { count: 0, stockDrift: [], negativeStock: [], overpay: [] };
+      const rc = v.reconciled || {};
+      // v2.92.0：失败分支必须给出**可读原因**。首版在断裂时留空 reason，面板于是印出
+      //   「未记录：未知原因」——而事实是「存量与流水对不上」，两句话南辕北辙。
+      const why = ab.count && rc.ok === false ? 'anomaly+reconcile-break' : (ab.count ? 'anomaly' : (rc.ok === false ? 'reconcile-break' : ''));
+      const summary = '持有者 ' + v.holderCount + ' · 流水 ' + v.entries + ' 笔（挤出 ' + v.dropped + '）· 流入 ' + v.flow.in + ' / 流出 ' + v.flow.out + ' · 异常笔 ' + ab.count
+        + (ab.count ? '（负库存 ' + ab.negativeStock.length + ' / 前后值漂移 ' + ab.stockDrift.length + ' / 超额支付 ' + ab.overpay.length + '）' : '')
+        + ' · 对账 ' + (rc.ok ? '自洽' : (rc.breakCount || 0) + ' 处断裂' + (rc.truncated ? '（流水已截断，仅核对带内）' : ''));
+      // 读数与「写盘回执」分开措辞：账本按钮报的是**核对结论**，不是「刚才那笔记下来了」。
+      if (why) return orgOut({ ok: false, reason: why, summary: summary }, true);
+      const o = $('#wa-org-out');
+      const text = '账本 · ' + summary;
+      panelEl.dataset.orgOut = text;
+      if (o) o.textContent = text;
+    });
     on('#wa-org-check', () => { if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true); const ok = WA.org.canAfford(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), orgVal('#wa-org-item'), orgVal('#wa-org-qty')); const st = WA.org.stat(); orgOut({ ok: ok, id: (ok ? 'affordable' : 'insufficient') + ':' + st.blocked, reason: ok ? '' : 'insufficient' }, true); });
     const intelVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
     const intelOut = function (r, keep) {

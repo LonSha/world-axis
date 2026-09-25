@@ -181,7 +181,19 @@
     return safe(function () {
       if (!WA.org || typeof WA.org.stat !== 'function') return { error: 'org 模块不可用' };
       const st = WA.org.stat(); const cfg = WA.org.getSettings ? WA.org.getSettings() : {};
-      return { enabled: !!cfg.enabled, grants: st.grants || 0, transfers: st.transfers || 0, blocked: st.blocked || 0, lastReason: st.lastReason || '', kinds: WA.org.KINDS || [] };
+      // v2.92.0（O5）：资源账本读数——存量 / 流量 / 笔数 / 异常笔 / 对账结论。
+      //   ledgerView 与 reconcile 的真消费方各在此一处（「导出即有承诺」）。
+      const led = (WA.org.ledgerView ? safe(function () { return WA.org.ledgerView(); }, null) : null);
+      const rc = (WA.org.reconcile ? safe(function () { return WA.org.reconcile(); }, null) : null);
+      return { enabled: !!cfg.enabled, grants: st.grants || 0, transfers: st.transfers || 0, blocked: st.blocked || 0,
+        lastReason: st.lastReason || '', kinds: WA.org.KINDS || [],
+        ledger: led ? {
+          entries: led.entries, recorded: led.recorded, dropped: led.dropped, holderCount: led.holderCount,
+          flowIn: led.flow.in, flowOut: led.flow.out,
+          abnormal: led.anomalies.count, abnormalDetail: led.anomalies,
+          reconciled: rc ? rc.ok : led.reconciled.ok, reconcileBreaks: rc ? rc.breakCount : led.reconciled.breakCount,
+          truncated: led.reconciled.truncated
+        } : { error: 'ledgerView 不可用' } };
     });
   }
 
@@ -1112,7 +1124,7 @@
       //   wa-cfg-abort / wa-cfg-cancel 在「粘贴 → 校验 → 二次确认」两步流程里逐步出现。
       'wa-cfg-copy', 'wa-cfg-import', 'wa-cfg-text', 'wa-cfg-check', 'wa-cfg-cancel', 'wa-cfg-go', 'wa-cfg-abort'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg', 'wa-next-day', 'wa-wb-trigger', 'wa-wb-refresh', 'wa-wb-preview', 'wa-wb-scan', 'wa-wb-list', 'wa-wb-out'], dynamic: ['wa-conc-v'] },
-    { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-out', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
+    { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-ledger', 'wa-org-out', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
        // v2.62.0: 因果结算控件（渲染在人物页）+ 稳定人物 ID 控件。
        //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
        //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。

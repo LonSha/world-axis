@@ -43,8 +43,8 @@ const REPAIRED = [
     anchor: 'return isOpen(f) && f.dueAt && t > (f.dueAt + cfg.graceMs);',
     replacement: 'return false;' },
   { rel: 'tests/org-v2540.js', engine: 'engines/org.js', tag: '划转必须双向记账（转入方入库）',
-    anchor: 'a.resources[resource] -= n; b.resources[resource] = (b.resources[resource] || 0) + n;',
-    replacement: 'a.resources[resource] -= n;' }
+    anchor: 'a.resources[resource] = fromBefore - n; b.resources[resource] = toBefore + n;',
+    replacement: 'a.resources[resource] = fromBefore - n;' }
 ];
 const SELF_REL = 'tests/orphan-lock-v2750.js';
 const GATE_REL = 'tests/test-surface-gate.js';

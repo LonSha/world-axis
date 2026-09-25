@@ -89,6 +89,7 @@
     "invalid-actors",
     "judge-not-configured",
     "knowers-full",
+    "ledger-throw",
     "length-or-empty",
     "locked",
     "major-gate",

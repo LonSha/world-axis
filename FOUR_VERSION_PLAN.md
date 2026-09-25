@@ -54,7 +54,7 @@
   · **A5 的「常用操作 / 有效配置来源 / 回滚结果 / 手机交互 / 实机浏览器验收」**未做；本版 A5 只收口了差异预览与字段映射。
   · **B7 题材对正文的实际影响**只做到「模块是否进入注入面」，未做「不同题材下同一场景的生成差异」对照实验。
 
-## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O4 已交付）
+## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O5 已交付）
 起点：v2.87.0 / 40b6c04。两份计划已入库（folder=WorldAxis）：《WorldAxis v2.88+ 优化方向计划（O1–O5 性能与透明度）》UUID 29179707-ce90-49ac-8e71-36d3c5079409；《WorldAxis v2.88+ 功能拓展计划（X1–X5 交互生态拓宽）》UUID 38375f01-cbd6-41a1-8bd9-842294a610ac。
 - [x] O1（本版落点 = 注入预算实测与分档，原料 = A4 未覆盖项「短中长基准/耗时分列」）：
   · 计时落在 `render/inject.js` 的 `engineCall`（v2.86.0 的唯一引擎调用出口，46 处调用点）——一处落表覆盖全部引擎源；时钟用 `clockWall`（测量时间），与 `clockNow` 分列。
@@ -93,7 +93,15 @@
   · 同步 O3 锁的**陈旧常量**：归因码是封闭集合，新增一档而不更新 `tests/explain-v2900.js` 的六态表，那份表就会把正确的新实现判成「越界」（实测一次报 32 项越界）；B4 的 `org` 正例因总开关被前序用例关过而失效（**对照吃环境**）⇒ 修法是「判据改七态 + seeds 把模块总开关也显式置定」，**不是放宽断言**。
 - [x] 验收（O4）：专锁 `tests/switch-matrix-v2910.js` **72/0**（A 成类锁 / B 运行时 / C 缺陷锁 / N 负控制，四个真源码破坏锚点 `ANCHOR_OFF` / `ANCHOR_FACE` / `ANCHOR_DANG` / `ANCHOR_DANG2` 各恰中 1 次，破坏形态含「静默报零」与「失去分辨力」两向）；全量回归 **7859/0**（v2.90.0 为 7787/0，+72 = 专锁 72 项）；出口面 `ns=104 members=607 chars=7437`（+1 = `registry.danglingRefs`，已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs **2385** / 命名空间 110 / 成员 **1244**；死子面 dead 444 / uiDead 4 / dataOnly 161（无新增）；拒收码 309（见证 93 / 死表 5 / 基线 211）；五个独立门禁（module-registry / export-contract / reject-code / field-liveness / test-surface）全过，`dead-export-gate` 更新证据后过（账本 version=2.91.0）。
 - [ ] O4 未覆盖（如实留在清单）：`danglingRefs` 只扫三类引用行（`relationships` / `relations` / `commitments`），`warrant` / `hazard` / `world` 等其它可能带名字引用的面未纳入；`faceAudit` 是**当次快照**，不做历史曲线；「id 重命名后旧引用可追溯」只做到「报出悬空」，**未做**别名表 / 追溯链；开关**全组合**（三源以上同时关闭的相互踩踏）仍只有 v2.84.1 的两方关闭覆盖，本版未扩到三三 / 多多组合。
-- [ ] O5 未开始：资源账本健康面（B3 经济侧先观测）。
+- [x] O5（本版落点 = 资源账本健康面，原料 = B3 经济侧先观测「把 `org.stockOf` 流水分列为资源账本读数（存量/流量/笔数/异常笔）」）：
+  · **侦察结论：计划判据原样不可判定**——`engines/org.js` 自 v2.54.0 起只有累计计数 `stat = {grants,transfers,blocked,lastReason}`，没有任何逐笔流水 ⇒「某笔交易后存量 = 存量 ± 流量」缺输入面。本版先补观测面。
+  · `engines/org.js`：`JOURNAL_CAP = 200` + `journal[]` + `journalStat{recorded,dropped}` + `noteJournal(row)`（try 包裹；环形挤出 `dropped++`——**静默丢弃不是可接受的默认值**）；`grant` 记 `toBefore/toAfter`、`transfer` 记双向 `fromBefore/fromAfter/toBefore/toAfter`；**只记成功的交易**（被拒的转移不是流量）。
+  · 读数口：`qtyOf`（无持有者 `null`，不拿 0 冒充）/ `anomalies()`（`stockDrift` / `negativeStock` / `overpay`，逐笔算术判，**不猜**）/ `reconcile()`（链检 + 与当前存量比对，`breaks ≤ 20` / `truncated` / `holderGone` 照实报）/ `ledgerView()`（存量 + 流量 + 笔数 + 异常 + 对账结论）。
+  · **导出只加 2 个成员**（`ledgerView` / `reconcile`），两处真消费方（**无消费方不挂**）：诊断 `secOrg.ledger` 段 + 面板人物页「资源账本」按钮。
+  · **观测不得改变被观测对象**：`ledgerView` / `reconcile` 纯读（不跑引擎、不改存档、不注入），`grant` / `transfer` 返回值与 `stat` 语义一字不变。
+  · 真缺陷一并修：面板失败分支 `reason` 留空 ⇒ 印出「未记录：未知原因」（而事实是「存量与流水对不上」）——修为可读原因 + 读数措辞「账本 · 」与写盘回执「已记录」分开。
+- [x] 验收（O5）：专锁 `tests/resource-ledger-v2920.js` **47/0**（A 成类锁 / B 运行时 B1–B9 / C 缺陷锁 / N0–N4 负控制，五个真源码破坏锚点 `ANCHOR_NOTE_G` / `ANCHOR_PENDING_G` / `ANCHOR_DRIFT` / `ANCHOR_CHAIN` / `ANCHOR_VSSTOCK` 各恰中 1 次，破坏形态含「静默报零」与「失去分辨力」两向）；全量回归 **7906/0**（v2.91.0 为 7859/0，+47）；出口面 `ns= 104 members= 609 chars= 7458`（+2，已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs **2391** / 命名空间 110 / 成员 **1246**；死子面 dead 444 / uiDead 4 / dataOnly 161（无新增）；拒收码 **310**（见证 93 / 死表 5 / 基线 212，新码 `ledger-throw` 显式归类）；六个独立门禁（module-registry / export-contract / reject-code / field-liveness / test-surface / orphan-lock-v2750）全过，`dead-export-gate` 更新证据后过（账本 version=2.92.0）。
+- [ ] O5 未覆盖（如实留在清单）：流水**只驻内存**（与 causal 磁带同口径，不落盘、不注入正文，跨会话不可查）；只覆盖 `org` 的 `grant` / `transfer` 两类操作，**不覆盖** `evolution.economy`（气候 / 信号）与其它模块的库存改动（编辑器直接改 `resources` 不计流水）；经济风（`ECONOMY_CLIMATE`）**未纳入**资源账本读数（计划原文「经济风 + `org.stockOf` 流水」只落了后者）；流水被挤出后 `reconcile` 只核对带内（`truncated` 照实报，**未做**落盘存档点以核全量）；异常笔三类**未接进健康分**（只进诊断与面板）。
 - [ ] X1–X5 未开始（见功能拓展计划）：X1 UI 实机验收通道；X2 B3 经济引擎；X3 B4 传播与辟谣；X4 B2 天气灾害封锁联动；X5 跨插件因果桥。
 
 ## 完成纪律
