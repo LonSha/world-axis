@@ -33,7 +33,7 @@
   // 本仓照抄该口径并**显式报出**排除了多少条——排除而不报，等于把「有条目没出现」的锅推给上游。
   const SYS_MARK = /^\s*\{\s*(systemPrompt)?\s*\}\s*$/i;
 
-  const clean = function (v) { return String(v == null ? '' : v).trim(); };
+  const clean = function (v) { return WA.inputGuard.text(v, 80); };
   function safe(fn, fb) { try { const v = fn(); if (v !== undefined) return v; } catch (e) {} return fb === undefined ? null : fb; }
 
   // ── 状态 ──────────────────────────────────────────────

@@ -47,7 +47,7 @@
   const STAGE_LABEL = ['无干预', '警示', '干扰', '压制', '惩戒', '终极措施'];
   const stat = { records: 0, offsets: 0, escalations: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().karma; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function find(who) { return rows().filter(function (r) { return r && r.who === who; })[0]; }
@@ -75,9 +75,10 @@
    *   净业 netOf() 仍是两轴之差，干预阶梯照旧由净业映射——只是现在它真的会随核销回退。
    */
   function record(who, kind, amount, note) {
-    const w = clean(who, 40);
-    const k = String(kind == null ? '' : kind).trim().toLowerCase();
-    const amt = Number(amount);
+    const w = WA.inputGuard.text(who, 40);
+    // 枚举归一走边界层：非法 kind 不再经 String() 升格（对象会抛、NaN 会变 'nan'）
+    const k = WA.inputGuard.oneOf(kind, KINDS, '');
+    const amt = WA.inputGuard.num(amount, NaN);
     if (!w) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     if (KINDS.indexOf(k) < 0) { noteFault('bad-kind'); return { ok: false, reason: 'bad-kind', got: kind }; }
     if (!isFinite(amt) || amt <= 0) { noteFault('bad-amount'); return { ok: false, reason: 'bad-amount', got: amount }; }
@@ -164,7 +165,7 @@
   }
   /** 删除一人的账（转世/退场）。 */
   function drop(who) {
-    const w = clean(who, 40);
+    const w = WA.inputGuard.text(who, 40);
     if (!w) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {

@@ -25,7 +25,7 @@
   // v2.14.0: idCounter 已随消息 id 迁移到 WA.rand.id（时间戳+递变计数在其内部）
   let saveTimer = null;
 
-  const clean = v => String(v == null ? '' : v).trim();
+  const clean = v => WA.inputGuard.text(v, 80);
   const clone = v => v == null ? v : JSON.parse(JSON.stringify(v));
 
   function getCtx() { try { return mainWin.SillyTavern.getContext(); } catch (e) { return null; } }

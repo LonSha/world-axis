@@ -63,13 +63,20 @@ const GUARDED = [
     anchor: "    if (typeof key !== 'string' || !key.trim()) return { ok: false, reason: 'missing-fields' };" },
   { name: 'survival.set', rel: 'engines/survival.js',
     call: function (WA, v) { return WA.survival.set(v); },
-    anchor: "    if (typeof who !== 'string' || !who.trim()) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }" },
+    anchor: "    if (typeof who !== 'string' || !who.trim()) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }",
+    // v2.84.0：A2 之后本入口的第二层防线是 inputGuard（`clean(NaN)` → ''，再被 `if (!w)` 拒收）。
+    //   单摘守卫时缺陷不复现，故这里的破坏必须把兜底一并退回旧 String 形态。
+    secondBreak: { from: "  function clean(v, max) { return WA.inputGuard.text(v, max || 40); }",
+      to: "  function clean(v, max) { return String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max || 40); }" } },
   { name: 'temporalLock.lock', rel: 'engines/temporal-lock.js',
     call: function (WA, v) { return WA.temporalLock.lock(v); },
     anchor: "    if (typeof label !== 'string') { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }" },
   { name: 'threads.open', rel: 'engines/threads.js',
     call: function (WA, v) { return WA.threads.open(v); },
-    anchor: "    if (item == null || typeof item !== 'object' || Array.isArray(item)) return { ok: false, reason: 'missing-question' };" },
+    anchor: "    if (item == null || typeof item !== 'object' || Array.isArray(item)) return { ok: false, reason: 'missing-question' };",
+    // 同上：A2 之后 `clean(NaN)` 由 inputGuard 挡下，两层一起拆才能重现「立一桩叫 NaN 的悬案」。
+    secondBreak: { from: "  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }",
+      to: "  function clean(v, max) { return String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max || 60); }" } },
   { name: 'rivalry.declare', rel: 'engines/rivalry.js',
     call: function (WA, v) { return WA.rivalry.declare(v, 'B', 'T', 50); },
     // 锚点必须含**完整守卫**（含第一行）——只含续行会把 `if (` 留下 → 悬空 if → 语法错。
@@ -214,8 +221,21 @@ function runNegative(a) {
     //   （保留后续代码，防连带删掉变量定义让异常在事务里被吞）＞ 整行删。
     const broken = g.weaken ? g.weaken(src) : (g.breakInto ? src.split(g.anchor).join(g.breakInto) : src.split(g.anchor).join(''));
     a(broken !== src, 'v2790: [C1] ' + g.name + ' 的破坏副本与原不同（锚点真命中）');
+    // v2.84.0：A2 统一输入边界之后，若干入口的防线**分成两层**（入口参数守卫 + inputGuard
+    //   形态兜底）。单摘第一层时，NaN 已被 inputGuard 挡下（`text(NaN)` → ''），
+    //   缺陷不复现 —— 这不是判据坏了，是防线更深了。这类入口必须**两层一起拆**，
+    //   否则负控制打不到靶，「C1 无异常」就成了假绿。
+    //   反之，仍能单层复现的入口保持单层破坏（不动），避免把判据改成「必须两层」的过度约束。
+    let brokenFinal = broken;
+    if (g.secondBreak) {
+      const hits2 = brokenFinal.split(g.secondBreak.from).length - 1;
+      a(hits2 === 1, 'v2790: [C1] ' + g.name + ' 的第二层防线锚点恰 1 次（实 ' + hits2 + '）');
+      const b2 = brokenFinal.split(g.secondBreak.from).join(g.secondBreak.to);
+      a(b2 !== brokenFinal, 'v2790: [C1] ' + g.name + ' 的第二层破坏确实发生（inputGuard 兜底已退回旧 String 形态）');
+      brokenFinal = b2;
+    }
     const WA2 = isolated(function () {
-      const ov = {}; ov[g.rel] = broken;
+      const ov = {}; ov[g.rel] = brokenFinal;
       return fresh({ srcOverride: ov });
     });
     const m2 = isolated(function () { enable(WA2); return matrix(WA2)[g.name]; });

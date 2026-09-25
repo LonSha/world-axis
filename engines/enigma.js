@@ -39,13 +39,13 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { marks: 0, unmarks: 0, drops: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().enigma; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function knowersOf(row) { return (row && Array.isArray(row.knowers)) ? row.knowers : []; }
   /** 登记：who 知道 secret（幂等登记 → 重复报 exists）。 */
   function mark(secret, knower) {
-    const key = clean(secret, 60), who = clean(knower, 40);
+    const key = WA.inputGuard.text(secret, 60), who = WA.inputGuard.text(knower, 40);
     if (!key || !who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {
@@ -94,7 +94,7 @@
   }
   /** 注销整个秘密（秘密不再保密，或叙事上已公开）。 */
   function drop(secret) {
-    const key = clean(secret, 60);
+    const key = WA.inputGuard.text(secret, 60);
     if (!key) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {

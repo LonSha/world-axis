@@ -43,7 +43,7 @@
   const METHOD_INIT = { subdue: [10, 30], feed: [40, 60], rescue: [60, 90] };
   const stat = { acts: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 40); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().beastBond; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function rowOf(name) { return rows().filter(function (r) { return r && r.beast === name; })[0] || null; }

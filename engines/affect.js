@@ -31,7 +31,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { sets: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 40); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const a = state().affect; return (a && Array.isArray(a.channels)) ? a.channels : []; }
   function loadsOf(root) { const a = (root || state()).affect; return (a && a.loads && typeof a.loads === 'object') ? a.loads : {}; }

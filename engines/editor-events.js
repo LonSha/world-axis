@@ -27,7 +27,7 @@
   const DESC_MAXLEN = 50;
   let editingId = null;
 
-  function clean(v) { return String(v == null ? '' : v).trim(); }
+  function clean(v) { return WA.inputGuard.text(v, 80); }
   function uid() { return WA.rand.id('ev_', 4, 'id'); }
   // v2.78.0: 读面（无 state）返回**浅拷贝**——修前返回的就是 store 里那个数组，
   //   调用方 `list().push(x)` 等于绕过 add 的全部校验（上限/查重/字段）直接入账。

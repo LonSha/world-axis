@@ -29,6 +29,8 @@ function runAll(a) {
     },
     store: { get() { return store; }, transact(fn) { fn(store); } }
   };
+  // v2.84.0: 桩由 tests/synth-host.js 统一补齐核心模块
+  require('./synth-host.js').hostStub(WA);
   global.window = { WorldAxis: WA };
   vm.runInNewContext(src, { window: global.window, Date, Number, String, Array, Object, isFinite }, { filename: 'engines/org.js' });
   const org = WA.org;

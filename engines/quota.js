@@ -48,7 +48,7 @@
   const ACTIVE = ['active', 'expired'];   // expired 仍占位（显式回收/放弃才释放）
   const stat = { adds: 0, ticks: 0, resolved: 0, expired: 0, drops: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 80); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const q = state().quota; return (q && Array.isArray(q.rows)) ? q.rows : []; }
   function capOf(pool) { const cfg = settings(); return pool === 'short' ? cfg.shortCap : cfg.longCap; }

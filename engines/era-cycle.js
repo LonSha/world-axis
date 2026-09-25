@@ -43,7 +43,7 @@
   const NEXT_T = { fallow: [5, 10], buildup: [3, 7], eruption: [2, 4], settle: [10, 20] };
   const stat = { ticks: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().eraCycle; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function rowOf(name) { return rows().filter(function (r) { return r && r.name === name; })[0] || null; }

@@ -44,7 +44,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { notes: 0, seals: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 40); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().spotlight; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function pendingRound() { const m = state().spotlight; return (m && Array.isArray(m.pending)) ? m.pending : []; }

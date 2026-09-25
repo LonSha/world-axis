@@ -29,7 +29,7 @@
   // 终态：已收/已弃/已引爆——都不再算「欠账」（与 memory.FS_TERMINAL / backstage 同口径）
   const TERMINAL = ['recycled', 'dropped', 'triggered'];
   const stat = { promises: 0, sweeps: 0, overdue: 0, blocked: 0, lastReason: '' };
-  function clean(v, max) { return String(v == null ? '' : v).split(/\s+/).join(' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function ts(v) { const n = Number(v); return isFinite(n) && n > 0 ? Math.floor(n) : 0; }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function list(root) { return (((root || state()).memory || {}).foreshadows) || []; }

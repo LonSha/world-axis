@@ -29,7 +29,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { ticks: 0, changed: 0, blocked: 0, lastAt: 0, lastReason: '' };
 
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 80); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function personId(name) { const n = clean(name, 60); return n ? 'p_' + n : ''; }
   function ensureLife(person) {
     if (!person.life || typeof person.life !== 'object' || Array.isArray(person.life)) person.life = { goals: [], commitments: [], schedule: [], lastDecision: null };

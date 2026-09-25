@@ -30,7 +30,7 @@
 
   let editingId = null;              // 当前处于编辑态的势力 id（UI 用，不落盘）
 
-  function clean(v) { return String(v == null ? '' : v).trim(); }
+  function clean(v) { return WA.inputGuard.text(v, 80); }
   function uid() { return WA.rand.id('fa_', 4, 'id'); }
   // v2.78.0: 与 editorEvents.list 同款修法（读面浅拷贝 / 写面原数组）——
   //   修前 `WA.editorFaction.list() === WA.store.get().evolution.factions` 为真，改返回值即改持久态。

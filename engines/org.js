@@ -21,7 +21,7 @@
   function saveSettings(next) { return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {}))); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { grants: 0, transfers: 0, blocked: 0, lastReason: '' };
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 40); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function qty(v) { const n = Number(v); return isFinite(n) && n > 0 ? Math.min(9999, Math.floor(n)) : 0; }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function holder(kind, name, root) {

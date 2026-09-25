@@ -38,7 +38,7 @@
   const MAX_STEPS = 12;       // 每个观测点的环形窗口长度
   const MAX_TEXT = 120;
 
-  const clean = function (v) { return String(v == null ? '' : v).trim(); };
+  const clean = function (v) { return WA.inputGuard.text(v, 80); };
   function safe(fn, fb) { try { const v = fn(); if (v !== undefined) return v; } catch (e) {} return fb === undefined ? null : fb; }
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 

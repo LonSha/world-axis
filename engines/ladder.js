@@ -46,7 +46,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { defines: 0, escalations: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().ladder; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function keyOf(who, kind) { return clean(who, 40) + '::' + clean(kind, 24); }
@@ -126,7 +126,7 @@
    * 未登记如实报 missing，不静默成功。
    */
   function drop(who, kind) {
-    const w = clean(who, 40), k = clean(kind, 24);
+    const w = WA.inputGuard.text(who, 40), k = WA.inputGuard.text(kind, 24);
     let out = null;
     WA.store.transact(function (draft) {
       if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }

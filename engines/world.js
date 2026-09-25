@@ -41,7 +41,7 @@
   const stat = { places: 0, roads: 0, events: 0, moves: 0, checks: 0, blocked: 0, lastReason: '', faults: {},
     departed: 0, arrived: 0, advanced: 0 };
 
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 40); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function node() { const w = state().world; return (w && typeof w === 'object' && !Array.isArray(w)) ? w : {}; }
   function places() { return Array.isArray(node().places) ? node().places : []; }

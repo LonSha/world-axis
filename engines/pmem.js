@@ -25,7 +25,7 @@
   const CAP_PER_PERSON = 6;
   const BATCH_MAX = 8;
 
-  const clean = v => String(v == null ? '' : v).trim();
+  const clean = v => WA.inputGuard.text(v, 80);
   const normalized = v => clean(v).toLocaleLowerCase();
   const strArray = v => (Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]))
     .map(clean).filter(Boolean);

@@ -70,6 +70,23 @@ function runWitness(WA) {
     };
   }, 'reject-witness:seed');
 
+  // ── core/input-guard.js（v2.84.0：统一输入边界）──
+  //   这三个码是**新增**的，故必须带可执行见证（否则门禁报「未分类」）。
+  //   见证走产品真 API，且每条都用**同一入口的不同坏输入**触发不同归因——
+  //   这正是本模块存在的意义：把「参数传错」与「合法但空」区分开，
+  //   而不是像那 28 份自备兜底一样把它们一起塌成 'NaN' / '[object Object]' / 抛出。
+  {
+    const Ig = WA.inputGuard;
+    if (Ig && typeof Ig.check === 'function') {
+      want('non-finite', '输入边界：NaN/±Infinity 不得被升格成字面量（v2.84.0 新增）');
+      trip('non-finite', function () { return [Ig.check(NaN).reason, Ig.check(Infinity).reason]; });
+      want('blank', '输入边界：纯空白串不是有效文本（v2.84.0 新增）');
+      trip('blank', function () { return [Ig.check('   ').reason, Ig.check('').reason]; });
+      want('not-a-string', '输入边界：对象/数组/函数不得被隐式字符串化（v2.84.0 新增）');
+      trip('not-a-string', function () { return [Ig.check({}).reason, Ig.check([]).reason, Ig.check(function () {}).reason]; });
+    }
+  }
+
   // ── engines/kaleidoscope.js ──
   function kinv(rec) { K.clearDerives(); K.setDerive(rec); const ev = K.evaluate();
     return ev.invalid.map(function (x) { return x.reason; })
@@ -191,6 +208,16 @@ function runWitness(WA) {
   trip('missing-chain', function () { return [C.settle('无此链', 'x').reason]; });
   want('bad-args', 'defer 传 0 或非数');
   trip('bad-args', function () { return [C.defer('无此链', 0).reason]; });
+  // v2.84.0（B5）：`not-acted` **不进见证表**，这是门禁自己的词法契约决定的，不是省事：
+  //   本门禁只认**内联字面量** `reason: 'x'`（见 tests/reject-code-gate.js 的 CODE_RE 注释：
+  //   拼接写法 `reason: 'already-' + st` 代码不定，故不归一，其稳定性由**各引擎专锁**负责）。
+  //   而 `not-acted` 是 `settleBlockReason()` 的返回值，经变量进 `reason: block` —— 属拼接码。
+  //   实测（v2.84.0 全量 r6）：把它放进 want() 之后，扫描面 282 里根本没有这个码，
+  //   于是 `witnessed(69) + dead(3) + base(211) = 283 > total 282`，划分立刻胀出 1 项。
+  //   ——「台账里的码必须真在现场」这条纪律是对的：账本不能比现实胖。
+  //   它的**可达性证明**因此落在引擎专锁上（两处，都要跑）：
+  //     · tests/causal-v2620.js [15]：还没发生不得结算，且行动发生后同项必须放开；
+  //     · tests/reject-lock-v2780.js 的 probeNotActed：走真 API 建链 → tick(条件未足) → settle 被拒。
 
   // ── engines/org.js ──
   if (O && O.setSettings) O.setSettings({ enabled: true });

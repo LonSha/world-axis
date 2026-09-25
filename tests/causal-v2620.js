@@ -56,6 +56,9 @@ const TAG = '__cs2620_';                  // 哨兵前缀
 const A_EXPIRE = 'if (!knownCause(x.cause) && (f.pruneInvalid !== false)) {';
 const A_DUE = "if (d && d.status === 'scheduled' && isFinite(d.dueAt) && t >= d.dueAt) out.push({";
 const A_TERMINAL = "const TERMINAL = ['settled', 'cancelled', 'expired'];";
+// v2.84.0（B5）两个新锚点：结算前置条件 / 已结算后果的因果传播
+const A_NOTACTED = "if (!hasActed(x)) return 'not-acted';";
+const A_PROPAGATE = "if (settledCause(key, st)) return true;";
 
 function fresh(opts) { return require('./ui-gate-sync.js').fresh(opts).WA; }
 function causalOf(WA) {
@@ -301,6 +304,64 @@ function judge(a) {
   a(String(blk).indexOf('不等于已发生') >= 0,
     'v2620: [13] 注入块明写「待发生 ≠ 已发生」（语义约束随块注入，不指望模型自己记得）');
 
+  // ── 15 「还没发生」不得结算（v2.84.0 B5）──
+  //   为什么单列：本模块把「已发生」与「待发生」分得很清，但**漏了一条绕行路径**——
+  //   settle 此前只挡终态，不挡阶段。条件未足（pending）或从未 tick（open）的链，
+  //   照样能把延迟后果写进回声并跳到 settled，等于让预测跨过行动直接成为事实。
+  //   实测（探针）：open + pending 的链调用 settle 返回 ok，回声落盘、链变 settled。
+  const J = TAG + 'na';
+  seedFact(WA, J, '还没发生的原因');
+  const mNA = c.addChain({ cause: J, condition: TAG + 'nacond', action: '赴约', delayed: [{ text: '对方失望', after: 0 }] });
+  c.tick({ metConditions: [] });
+  const rowNA = chainById(WA, mNA.id);
+  const didNA = rowNA.delayed[0].id;
+  const echoesNA0 = echoRefs(WA).length;
+  a(rowNA.stage === 'pending' && rowNA.status === 'open',
+    'v2620: [15] 前置：该链停在 pending 阶段（stage=' + rowNA.stage + ' status=' + rowNA.status + '）');
+  const sNA = c.settle(mNA.id, didNA, '提前结算');
+  a(sNA.ok === false && sNA.reason === 'not-acted',
+    'v2620: [15] 条件未足的链不得结算延迟后果（实 ' + JSON.stringify(sNA) + '）');
+  a(echoRefs(WA).length === echoesNA0,
+    'v2620: [15] 被拒的结算不得留下回声（预测不得跳过行动成为既成事实）');
+  a(statusOf(WA, mNA.id) === 'open',
+    'v2620: [15] 被拒的结算不得把链推成 settled（实 ' + statusOf(WA, mNA.id) + '）');
+  const mNA2 = c.addChain({ cause: J, action: '从未 tick 的链', delayed: [{ text: '不该现在发生', after: 0 }] });
+  const rowNA2 = chainById(WA, mNA2.id);
+  const sNA2 = c.settle(mNA2.id, rowNA2.delayed[0].id, 'x');
+  a(rowNA2.status === 'open' && sNA2.ok === false && sNA2.reason === 'not-acted',
+    'v2620: [15] 从未 tick（open）的链同样不得结算（实 ' + JSON.stringify(sNA2) + '）');
+  a(c.settleBlockReason(rowNA) === 'not-acted' && c.settleBlockReason({ status: 'delayed', stage: 'delayed' }) === '',
+    'v2620: [15] 结算前置条件可**只读**查询（供调用方先问再调，而不是撞了才知道）');
+  //   行动真发生之后，同一条路径必须放开（否则不是守卫而是恒拒）
+  c.tick({ metConditions: [TAG + 'nacond'] });
+  const sNAok = c.settle(mNA.id, didNA, '这次可以了');
+  a(sNAok.ok === true,
+    'v2620: [15] 条件满足、行动发生之后同一项可正常结算（守卫不是恒拒，实 ' + JSON.stringify(sNAok) + '）');
+
+  // ── 16 已结算的后果必须能当后续链的原因（v2.84.0 B5：传播环）──
+  //   为什么单列：后果写进 echoes 之后就与模块外绝缘——knownCause 不认回声/结算记录，
+  //   于是「A 引起 B」这条最核心的传播环在模块内部自我封闭，链条永远接不起来。
+  //   实测（探针）：结算完的链 id / 回声 id，knownCause 都是 false。
+  a(c.knownCause(mNA.id) === true,
+    'v2620: [16] 已结算链的 id 可作原因（实 ' + c.knownCause(mNA.id) + '）');
+  const echoIdNA = 'ec_' + didNA;
+  a(echoRefs(WA).indexOf(echoIdNA) >= 0, 'v2620: [16] 前置：该结算确实落了回声（' + echoIdNA + '）');
+  a(c.knownCause(echoIdNA) === true,
+    'v2620: [16] 回声 id 可作原因（实 ' + c.knownCause(echoIdNA) + '）');
+  const mNext = c.addChain({ cause: mNA.id, action: '因为上一次的后果而行动' });
+  a(mNext.ok === true,
+    'v2620: [16] 以已结算后果为原因可建立后续链（实 ' + JSON.stringify(mNext) + '）');
+  const mNext2 = c.addChain({ cause: echoIdNA, action: '以回声为原因' });
+  a(mNext2.ok === true, 'v2620: [16] 以回声 id 为原因亦可建立后续链（实 ' + JSON.stringify(mNext2) + '）');
+  //   反向：**在途**（未结算）的预测不得充当原因 —— 否则「打算做」被当成「已经做了」
+  const K2 = TAG + 'pending2';
+  seedFact(WA, K2, 'k');
+  const mPend = c.addChain({ cause: K2, action: '在途的事', delayed: [{ text: '还没到', after: 3600000 }] });
+  c.tick({}); c.tick({}); c.tick({});
+  const rowPend = chainById(WA, mPend.id);
+  a(rowPend.status === 'delayed' && c.knownCause(mPend.id) === false,
+    'v2620: [16] 在途（delayed）的链不得充当原因（实 status=' + rowPend.status + ' known=' + c.knownCause(mPend.id) + '）');
+
   // ── 12 容量与挤出（cap 单一真源在 evict.SITES） ──
   WA.evict.resetEvictStat();
   for (let i = 0; i < CAP + 5; i++) c.addChain({ cause: F, action: TAG + 'bulk' + i });
@@ -341,10 +402,41 @@ function probeTerminal(WA) {
   const TERM = causalOf(WA).TERMINAL || [];
   return { settled: TERM.indexOf('settled') >= 0, cancelled: TERM.indexOf('cancelled') >= 0, expired: TERM.indexOf('expired') >= 0 };
 }
+/** v2.84.0 B5：条件未足的链调用 settle 的结果。原版应被拒（not-acted）；守卫被摘掉时应返回 ok */
+function probeNotActed(WA) {
+  const c = causalOf(WA); c.setSettings({ enabled: true });
+  const F = TAG + 'pn';
+  seedFact(WA, F, 'v');
+  const m = c.addChain({ cause: F, condition: TAG + 'pnc', action: 'a', delayed: [{ text: 'd', after: 0 }] });
+  c.tick({ metConditions: [] });
+  const row = chainById(WA, m.id);
+  // v2.84.0：判据必须量「这一次调用**新增**了几个回声」，不是「库里现在有几个」。
+  //   实测（r6 全量）：原写法 `echoRefs(WA).length` 读的是**整库**回声数，于是同一份源码
+  //   在独立跑里 0、在全量跑里 1（前面的 section 早已往同一个 chat 的 state 里写过回声）——
+  //   判据的输入面比它声称的结论面宽，就会随「前面谁跑过」变红。改为增量后，
+  //   它测的才是「预测绕过行动写进正文」这件事本身。
+  const before = echoRefs(WA).length;
+  const r = c.settle(m.id, row.delayed[0].id, 'x');
+  return { ok: r.ok, reason: r.reason, echoes: echoRefs(WA).length - before };
+}
+/** v2.84.0 B5：已结算后果能否充当原因。原版应能（true）；传播分支被摘掉时应为 false */
+function probePropagate(WA) {
+  const c = causalOf(WA); c.setSettings({ enabled: true });
+  const F = TAG + 'pp';
+  seedFact(WA, F, 'v');
+  const m = c.addChain({ cause: F, action: 'a', delayed: [{ text: 'd', after: 0 }] });
+  c.tick({}); c.tick({});
+  const row = chainById(WA, m.id);
+  c.settle(m.id, row.delayed[0].id, 'x');
+  return { byChain: c.knownCause(m.id), byEcho: c.knownCause('ec_' + row.delayed[0].id), chainStatus: statusOf(WA, m.id) };
+}
 const BROKEN = [
   { key: 'prune', rel: 'engines/causal.js', from: A_EXPIRE, to: "if (!knownCause(x.cause) && (f.pruneInvalid === 'never')) {" },
   { key: 'due', rel: 'engines/causal.js', from: A_DUE, to: "if (d && d.status === 'scheduled' && isFinite(d.dueAt) && t < d.dueAt) out.push({" },
-  { key: 'terminal', rel: 'engines/causal.js', from: A_TERMINAL, to: "const TERMINAL = ['closed'];" }
+  { key: 'terminal', rel: 'engines/causal.js', from: A_TERMINAL, to: "const TERMINAL = ['closed'];" },
+  // v2.84.0 B5 两处：摘掉结算前置条件 / 摘掉已结算后果的传播分支
+  { key: 'notacted', rel: 'engines/causal.js', from: A_NOTACTED, to: "if (false) return 'not-acted';" },
+  { key: 'propagate', rel: 'engines/causal.js', from: A_PROPAGATE, to: 'if (false) return true;' }
 ];
 function brokenOverride(spec) {
   const src = fs.readFileSync(path.join(BASE, spec.rel), 'utf8');
@@ -388,6 +480,13 @@ function runNegative(a) {
   const tBad = probeWith(BROKEN[2], probeTerminal);
   a(!(tBad.settled && tBad.cancelled && tBad.expired),
     'v2620: [N1] 终态字面量被改坏 ⇒ 「三态齐备」判据现形（实 ' + JSON.stringify(tBad) + '）');
+  // v2.84.0 B5：两处新锚点各自现形（摘掉守卫 ⇒ 行为判据变红），且不得牵连同锚点之外的判据
+  const naBad = probeWith(BROKEN[3], probeNotActed);
+  a(naBad.ok === true || naBad.echoes > 0,
+    'v2620: [N1] 摘掉结算前置条件 ⇒ 「还没发生不得结算」判据现形（实 ' + JSON.stringify(naBad) + '）');
+  const ppBad = probeWith(BROKEN[4], probePropagate);
+  a(ppBad.byChain === false && ppBad.byEcho === false,
+    'v2620: [N1] 摘掉已结算后果的传播分支 ⇒ 「后果可作原因」判据现形（实 ' + JSON.stringify(ppBad) + '）');
 
   // N2 两向自证：原版源码上同款探针全部通过
   const eOk = probeClean(probeExpire);
@@ -396,6 +495,13 @@ function runNegative(a) {
   a(dOk === 0, 'v2620: [N2] 原版源码上「未到点不报告」（实 ' + dOk + '）');
   const tOk = probeClean(probeTerminal);
   a(tOk.settled && tOk.cancelled && tOk.expired, 'v2620: [N2] 原版源码上终态三态齐备（实 ' + JSON.stringify(tOk) + '）');
+  // v2.84.0 B5：原版上两处新判据的两向自证（不是恒红）
+  const naOk = probeClean(probeNotActed);
+  a(naOk.ok === false && naOk.reason === 'not-acted' && naOk.echoes === 0,
+    'v2620: [N2] 原版源码上「还没发生不得结算」（实 ' + JSON.stringify(naOk) + '）');
+  const ppOk = probeClean(probePropagate);
+  a(ppOk.byChain === true && ppOk.byEcho === true && ppOk.chainStatus === 'settled',
+    'v2620: [N2] 原版源码上「已结算后果可作原因」（实 ' + JSON.stringify(ppOk) + '）');
 
   // N3 逐锚敏感：三种破坏各自只触发对应判据（互不串扰）
   a(probeWith(BROKEN[0], probeDue) === 0 || probeWith(BROKEN[0], probeDue) > 0,
@@ -446,5 +552,6 @@ if (require.main === module) {
 module.exports = {
   runAll: runAll, runNegative: runNegative,
   probeExpire: probeExpire, probeDue: probeDue, probeTerminal: probeTerminal,
+  probeNotActed: probeNotActed, probePropagate: probePropagate,
   brokenOverride: brokenOverride
 };

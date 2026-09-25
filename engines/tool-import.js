@@ -21,13 +21,18 @@
 
   function isArr(v) { return Array.isArray(v); }
   function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }
-  function clean(v) { return String(v == null ? '' : v).trim(); }
+  function clean(v) { return WA.inputGuard.text(v, 80); }
 
   /** 类型判别：返回 {kind, payload, confidence} */
   function detect(raw) {
     let data = raw;
     if (typeof raw === 'string') {
-      try { data = JSON.parse(raw); }
+      // v2.84.0：入界文本先过统一输入边界。敌意/异常形态在这里就被归因，
+      //   而不是让 JSON.parse 抛出一条与「这不是 JSON」无关的运行时错误
+      //   （原实现把任意异常都写成「不是合法 JSON」）。
+      const chk = WA.inputGuard.check(raw, 4 * 1024 * 1024);
+      if (!chk.ok) return { kind: 'invalid', reason: '入界文本不可读（' + chk.reason + '）' };
+      try { data = JSON.parse(chk.value); }
       catch (e) { return { kind: 'invalid', reason: '不是合法 JSON：' + e.message }; }
     }
     if (!isObj(data) && !isArr(data)) return { kind: 'invalid', reason: '顶层不是对象或数组' };

@@ -41,7 +41,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { opened: 0, leads: 0, resolved: 0, stalled: 0, abandoned: 0, blocked: 0, lastReason: '', faults: {} };
 
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function list() { const t = state().threads; return Array.isArray(t) ? t : []; }
   function byId(id) { const k = clean(id, 60); return list().filter(function (x) { return x && x.id === k; })[0] || null; }

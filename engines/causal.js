@@ -41,20 +41,46 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { chains: 0, acts: 0, deferred: 0, cancelled: 0, expired: 0, blocked: 0, lastReason: '' };
 
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 80); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   /** 原因是否已存在——单一真源指向 intel.knownCause；intel 缺席时按同一口径兜底 */
   function knownCause(id) {
     const key = clean(id, 80);
     if (!key) return false;
-    try { if (WA.intel && typeof WA.intel.knownCause === 'function') return WA.intel.knownCause(key); } catch (e) {}
+    // intel 认出即成立；**认不出不能就此返回** —— intel 的口径里没有「因果结算记录」这一面，
+    //   早期写法在这里直接 return，于是下面那段传播判定永远走不到（实测：加了分支仍全 false）。
+    try { if (WA.intel && typeof WA.intel.knownCause === 'function' && WA.intel.knownCause(key)) return true; } catch (e) {}
     const st = state();
     const facts = [].concat(st.worldFacts || [], (st.memory || {}).facts || []);
     const events = ((st.evolution || {}).events || []);
     const currents = st.currents || [];
+    // v2.84.0：已结算的因果后果同样是**已发生的事**，必须能当后续因果链的原因——
+    //   否则「A 发生 → 引起 B」这条最核心的传播环在模块内自我封闭：
+    //   后果写进 echoes 之后，除了正文谁也读不到，链条永远接不起来。
+    //   实测（v2.84.0 探针）：结算完的链 id / 回声 id，knownCause 都是 false。
+    if (settledCause(key, st)) return true;
     return facts.some(function (x) { return x && (x.id === key || x.key === key); })
       || events.some(function (x) { return x && x.id === key; })
       || currents.some(function (x) { return x && (x.id === key || (x.causes || []).indexOf(key) >= 0); });
+  }
+  /**
+   * 已结算的因果后果是否可作原因（v2.84.0 B5：传播环的入口）。
+   *   只认**已结算**（status='settled' / delayed 项 status='settled'）：
+   *   在途链的 delayed 仍是预测，不得充当原因——否则「打算做」被当成「已经做了」。
+   *   回声 id 与链 id 都要认：前者是正文可读的触面，后者是结算台账的主键。
+   */
+  function settledCause(key, st) {
+    const settled = ((st.causal || {}).settled || []);
+    if (settled.some(function (x) { return x && (x.id === key || x.echo === key || (x.echo && x.echo === 'ec_' + key)); })) return true;
+    return ((st.causal || {}).chains || []).some(function (x) {
+      if (!x || x.status !== 'settled') return false;
+      if (x.id === key) return true;
+      // 回声 id 的构造在 settle 里是 'ec_' + <延迟项 id>：调用方拿到的是回声 id，
+      //   故这里必须同时认「延迟项 id」与「回声 id」两种写法，否则正文可见的那一面接不上。
+      return (x.delayed || []).some(function (d) {
+        return d && d.status === 'settled' && (d.id === key || 'ec_' + d.id === key);
+      });
+    });
   }
   function ensureCausal(draft) {
     if (!draft.causal || typeof draft.causal !== 'object' || Array.isArray(draft.causal)) draft.causal = { chains: [], settled: [] };
@@ -181,6 +207,25 @@
     return out;
   }
 
+  // 阶段是否已越过「行动发生」——**settle 的前置条件**。
+  //   为什么必须判：条件未足（pending）或从未 tick（open）时，这件事**还没发生**。
+  //   此时允许结算它的延迟后果，等于把「预测」直接写成「已发生」——正是本模块
+  //   第 3 条边界（取消/失效显式留痕）想守住的同一件事，只是漏了这条路径。
+  //   实测（v2.84.0 探针）：open + 条件未足的链调用 settle 返回 ok，回声落盘、链变 settled。
+  //   'acted' 也要算「已行动」：tick 一次只推进一格（open→acted→immediate），
+  //   行动发生的**那一刻**就是 acted；把结算门槛设成 immediate 会让「行动刚发生、
+  //   后果正要落地」这一格变成死区（实测：条件满足后同一项仍被拒，守卫成了恒拒）。
+  const SETTLE_READY = ['acted', 'immediate', 'delayed'];
+  function hasActed(x) { return !!x && SETTLE_READY.indexOf(x.stage) >= 0; }
+
+  /** 该因果链是否已具备结算延迟后果的前置条件。未具备时返回原因码（供调用方如实拒收）。 */
+  function settleBlockReason(x) {
+    if (!x) return 'missing-chain';
+    if (isTerminal(x)) return 'chain-terminal';
+    if (!hasActed(x)) return 'not-acted';
+    return '';
+  }
+
   /** 结算一条延迟后果（写进回声，可被正文触到） */
   function settle(chainId, delayedId, note) {
     const cid = clean(chainId, 80), did = clean(delayedId, 80);
@@ -189,8 +234,13 @@
     WA.store.transact(function (draft) {
       const c = ensureCausal(draft);
       const x = c.chains.filter(function (y) { return y && y.id === cid; })[0];
-      if (!x) { out = { ok: false, reason: 'missing-chain' }; return false; }
-      if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return false; }
+      // 「还没发生」不得结算（见 settleBlockReason）：预测不得跳过行动直接变成既成事实
+      const block = settleBlockReason(x);
+      if (block) {
+        out = { ok: false, reason: block };
+        if (x) { out.stage = x.stage; out.status = x.status; }
+        return false;
+      }
       const d = (x.delayed || []).filter(function (y) { return y && y.id === did; })[0];
       if (!d) { out = { ok: false, reason: 'missing-delayed' }; return false; }
       if (d.status !== 'scheduled') { out = { ok: false, reason: 'already-' + d.status }; return false; }
@@ -204,7 +254,9 @@
       const left = (x.delayed || []).filter(function (y) { return y && y.status === 'scheduled'; }).length;
       if (!left) { x.status = 'settled'; x.settledAt = now; }
       x.updatedAt = now;
-      c.settled.push({ id: x.id, at: now, result: d.text });
+      // echo 字段记的是**回声 id**：settledCause 靠它把「正文可见的回声」映射回链，
+      //   只记链 id 会让正文侧拿到的回声 id 问不出「这是谁引起的」。
+      c.settled.push({ id: x.id, at: now, result: d.text, echo: 'ec_' + d.id });
       if (WA.evict) WA.evict.array(c.settled, 'causal.settled');
       else if (c.settled.length > 40) c.settled.splice(0, c.settled.length - 40);
       out = { ok: true, id: did, chainStatus: x.status };
@@ -289,6 +341,9 @@
     //   外部零消费 ⇒ dead-export-gate 判 self-only（过度导出）。终态判定已由 classify().terminal
     //   对外表达，不必再挂一个没有消费方的口——「导出即有承诺」是本仓库的纪律。
     classify: classify, knownCause: knownCause, buildBlock: buildBlock,
+    // v2.84.0 B5：结算前置条件对外可查——调用方（UI/正文/其他引擎）能先问「这条链
+    //   现在允许结算吗」，而不是撞上 not-acted 才知道。与 classify 一样是**只读**口。
+    settleBlockReason: settleBlockReason,
     stat: function () { return Object.assign({}, stat); }
   };
 })();

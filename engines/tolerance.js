@@ -44,7 +44,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { uses: 0, bursts: 0, stales: 0, drops: 0, ticks: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function bucket(draft) {
     if (!draft.tolerance || typeof draft.tolerance !== 'object' || Array.isArray(draft.tolerance)) draft.tolerance = { round: 0, rows: [] };
@@ -161,7 +161,7 @@
   }
   /** 显式清账（换场景/换对手/翻篇）。未登记报 missing。 */
   function drop(key) {
-    const k = clean(key, 48);
+    const k = WA.inputGuard.text(key, 48);
     if (!k) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {

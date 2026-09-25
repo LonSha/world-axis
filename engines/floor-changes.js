@@ -45,7 +45,7 @@
   const MAX_EVENTS = 20;      // 变更事件环形
   const MAX_LIST = 40;        // 单次清单上限（面板/摘要不刷屏）
 
-  const clean = function (v) { return String(v == null ? '' : v).trim(); };
+  const clean = function (v) { return WA.inputGuard.text(v, 80); };
   function safe(fn, fb) { try { const v = fn(); if (v !== undefined) return v; } catch (e) {} return fb === undefined ? null : fb; }
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };

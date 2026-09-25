@@ -27,7 +27,7 @@
   const CAP_BIG = 8;
   const SMALL_ROUNDS = 3;     // 每次纪要压缩最近3条已定稿对话
 
-  const clean = v => String(v == null ? '' : v).trim();
+  const clean = v => WA.inputGuard.text(v, 80);
 
   const SMALL_SYSTEM = `你是世界进程的纪要记录员。你的工作不是评价剧情，而是留下以后可以据此还原现场的事件记录。
 阅读给定的连续对话，只记录这一阶段实际发生、被明确说出、被确认或发生变化的内容。

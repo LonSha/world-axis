@@ -30,7 +30,7 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { links: 0, intel: 0, delayed: 0, released: 0, blocked: 0, lastReason: '' };
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 80); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function knownCause(id) {
     const key = clean(id, 80); if (!key) return false;

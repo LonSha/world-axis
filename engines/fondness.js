@@ -76,7 +76,7 @@
   const stat = { applies: 0, blocked: 0, lastReason: '', faults: {},
     pending: 0, accepts: 0, rejects: 0, undos: 0, advances: 0, corrections: 0 };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 40); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().fondness; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function bandOf(v) { return BANDS.filter(function (b) { return v >= b.lo && v < b.hi; })[0] || BANDS[4]; }
@@ -116,7 +116,7 @@
    * v2.77.0: mode='confirm' 时只写 pending（不改值）；staged 开启时跳越段顶拒收 band-cap。
    */
   function apply(person, opts) {
-    const who = clean(person, 40);
+    const who = WA.inputGuard.text(person, 40);
     const p = opts || {};
     if (!who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     if (!settings().enabled) return { ok: true, reason: 'disabled' };

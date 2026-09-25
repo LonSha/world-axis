@@ -16,6 +16,8 @@ function runAll(a) {
   const src=fs.readFileSync(path.join(__dirname,'..','engines/intel.js'),'utf8');
   const store={worldFacts:[{id:'fact_fee',key:'fact_fee'}],currents:[],people:{},memory:{facts:[]},evolution:{events:[]}};
   const WA={settingsBus:{read(){return {enabled:false,maxLinks:4,maxItems:2};},normalize(r,v){return v;},saveOrThrow(r,v){this.read=()=>v;return {ok:true};}},store:{get(){return store;},transact(fn){fn(store);}}};
+  // v2.84.0: 桩由 tests/synth-host.js 统一补齐核心模块（手写桩与引擎依赖面之间此前无门禁）
+  require('./synth-host.js').hostStub(WA);
   global.window={WorldAxis:WA}; vm.runInNewContext(src,{window:global.window,Date,Number,String,Array,Object,isFinite}, {filename:'engines/intel.js'});
   const intel=WA.intel;
   assert.strictEqual(intel.buildBlock(),'','disabled empty');

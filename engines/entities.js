@@ -22,7 +22,7 @@
   const TYPE_LABELS = { organization: '组织', object: '物品', ability: '能力', location: '地点' };
   const CAP_PER_TYPE = 30;
 
-  const clean = v => String(v == null ? '' : v).trim();
+  const clean = v => WA.inputGuard.text(v, 80);
   const normalized = v => clean(v).toLocaleLowerCase();
   const unique = values => Array.from(new Set((Array.isArray(values) ? values : [values]).map(clean).filter(Boolean)));
 

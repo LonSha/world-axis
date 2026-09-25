@@ -44,7 +44,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { gains: 0, resets: 0, cools: 0, idles: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().marginal; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function find(who) { return rows().filter(function (r) { return r && r.who === who; })[0]; }
@@ -184,7 +184,7 @@
       factor: factorFor(count), nextFactor: factorFor(count + 1) };
   }
   function drop(who) {
-    const w = clean(who, 40);
+    const w = WA.inputGuard.text(who, 40);
     if (!w) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {

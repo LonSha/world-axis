@@ -45,7 +45,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { bumps: 0, rolls: 0, hits: 0, reveals: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().hazard; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function find(key) { return rows().filter(function (r) { return r && r.key === key; })[0]; }
@@ -77,7 +77,8 @@
   }
   /** 累加一次（一次「无防护的风险事件」）：count+1，目标值随之滑落。 */
   function bump(key) {
-    const k = clean(key, 60);
+    // v2.84.0：走统一输入边界（NaN/对象不再被升格成 'NaN'/'[object Object]'）
+    const k = WA.inputGuard.text(key, 60);
     if (!k) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {
@@ -86,7 +87,7 @@
       draft.hazard.rows = Array.isArray(draft.hazard.rows) ? draft.hazard.rows : [];
       const row = draft.hazard.rows.filter(function (r) { return r && r.key === k; })[0];
       if (!row) { out = { ok: false, reason: 'missing', key: k }; return false; }
-      row.count = Math.max(0, Math.floor(Number(row.count) || 0)) + 1;
+      row.count = WA.inputGuard.count(row.count) + 1;
       row.at = clockNow('hazard');
       out = { ok: true, key: k, count: row.count, target: targetFor(row.count) };
     }, 'hazard:bump');
@@ -173,7 +174,7 @@
       hits: Number(row.hits) || 0, pending: !!row.pending, waiting: Number(row.waiting) || 0 };
   }
   function drop(key) {
-    const k = clean(key, 60);
+    const k = WA.inputGuard.text(key, 60);
     if (!k) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {

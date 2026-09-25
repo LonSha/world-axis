@@ -1674,7 +1674,21 @@
       if (!WA.causal) return causalOut({ ok: false, reason: 'module-missing' }, true);
       const rows = WA.causal.due();
       if (!rows.length) return causalOut({ ok: true, id: 'due-0' }, true);
-      const r = WA.causal.settle(rows[0].chain, rows[0].id, '');
+      // v2.84.0：结算前**先问这条链现在允许结算吗**（settleBlockReason）。
+      //   过去这里直接调 settle：链的行动还没发生（open／条件未足）时 settle 会静默成功，
+      //   把「预测」写成既成事实——面板上看不出任何异常。现在被挡就如实输出原因码与阶段，
+      //   使「不该结」和「结失败」在界面上可分辨。
+      const chains = ((WA.store && WA.store.get ? WA.store.get() : {}) || {}).causal || {};
+      const rowOfChain = function (id) {
+        return (chains.chains || []).filter(function (y) { return y && y.id === id; })[0];
+      };
+      const ready = rows.filter(function (r) { return !WA.causal.settleBlockReason(rowOfChain(r.chain)); })[0];
+      if (!ready) {
+        const x = rowOfChain(rows[0].chain);
+        return causalOut({ ok: false, reason: WA.causal.settleBlockReason(x) || 'missing-chain',
+          id: 'due-' + rows.length + ':stage-' + ((x && x.stage) || '-') }, true);
+      }
+      const r = WA.causal.settle(ready.chain, ready.id, '');
       const st = WA.causal.stat();
       causalOut(Object.assign({}, r, { id: r.ok ? (r.id + ':chain-' + r.chainStatus + ':left-' + Math.max(0, rows.length - 1) + ':blk-' + st.blocked) : r.reason }), true);
       renderBody();

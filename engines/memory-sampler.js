@@ -31,7 +31,7 @@
   const MIN_LIMIT = 1, MAX_LIMIT = 30;
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-  function clean(v) { return String(v == null ? '' : v).trim(); }
+  function clean(v) { return WA.inputGuard.text(v, 80); }
   function normalized(v) { return clean(v).toLocaleLowerCase(); }
 
   /**

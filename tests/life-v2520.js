@@ -16,6 +16,8 @@ function runAll(a) {
   const src=fs.readFileSync(path.join(__dirname,'..','engines/life.js'),'utf8');
   const store={people:{}};
   const WA={settingsBus:{read(){return {enabled:false,maxPeople:4,maxItems:2};},normalize(r,v){return v;},saveOrThrow(r,v){this.value=v; this.read=()=>v; return {ok:true};}},store:{get(){return store;},transact(fn){fn(store);}}};
+  // v2.84.0: 同上——桩缺核心模块时该引擎从出生起就是残的
+  require('./synth-host.js').hostStub(WA);
   global.window={WorldAxis:WA}; vm.runInNewContext(src,{window:global.window,Date,Number,String,Array,Object,isFinite,Math}, {filename:'engines/life.js'});
   const life=WA.life;
   assert.strictEqual(life.buildBlock(),'','disabled injection empty');

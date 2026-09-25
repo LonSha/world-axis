@@ -41,7 +41,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { shadows: 0, deepened: 0, brightened: 0, experiences: 0, blocked: 0, lastReason: '', faults: {} };
 
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function node() { const s = state().shadow; return (s && typeof s === 'object' && !Array.isArray(s)) ? s : {}; }
   function rows() { return Array.isArray(node().rows) ? node().rows : []; }

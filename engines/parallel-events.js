@@ -35,7 +35,7 @@
   const MAX_PERSONS = 4;
   const stat = { adds: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
-  function clean(v, max) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max || 60); }
+  function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function rows() { const m = state().parallelEvents; return (m && Array.isArray(m.rows)) ? m.rows : []; }
   function activeCount(rows_) { return rows_.filter(function (r) { return r && r.status === 'active'; }).length; }
@@ -43,12 +43,12 @@
    * 登记一场场外事件。三要素 + 开始时刻（默认主时钟现在）。
    */
   function add(title, location, persons, opts) {
-    const t = clean(title, 40), loc = clean(location, 40);
+    const t = WA.inputGuard.text(title, 40), loc = WA.inputGuard.text(location, 40);
     const p = opts || {};
     if (!t || !loc) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     if (!settings().enabled) return { ok: true, reason: 'disabled' };
     if (!Array.isArray(persons) || !persons.length) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
-    const cast = persons.map(function (x) { return clean(x, 24); }).filter(Boolean);
+    const cast = WA.inputGuard.list(persons, MAX_PERSONS + 1, 24);
     if (!cast.length) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     if (cast.length > MAX_PERSONS) { noteFault('crowd'); return { ok: false, reason: 'crowd', max: MAX_PERSONS }; }
     let out = null;

@@ -1,9 +1,9 @@
 {
- "version": "2.83.0",
- "loadOrderCount": 108,
- "loadedCount": 105,
+ "version": "2.84.0",
+ "loadOrderCount": 109,
+ "loadedCount": 106,
  "uiCount": 3,
- "nsCount": 113,
+ "nsCount": 114,
  "totals": {
   "loadEdges": 23,
   "hardEdges": 0,
@@ -52,6 +52,18 @@
   "core/rand.js": {
    "ns": [
     "rand"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/input-guard.js": {
+   "ns": [
+    "inputGuard"
    ],
    "requires": [],
    "requiresFiles": [],
