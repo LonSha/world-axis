@@ -538,9 +538,14 @@
       else if (OPTIONAL_EXPORTS.indexOf(key) >= 0) optionalMissing.push({ file: file, key: key });
       else missing.push({ file: file, key: key });
     });
+    // v2.86.0 A3：把「人物条目是谁建出来的」接进模块节。
+    //   它是 registry.personOriginStat 的真消费方——观测出口没人读就是死导出，
+    //   而这条读数正是「有没有人又绕开唯一写者」的唯一现场证据。
+    const personOrigin = safe(function () { return WA.registry && WA.registry.personOriginStat ? WA.registry.personOriginStat() : null; }, null);
     return {
       loadedCount: loaded.length,
       missingCount: missing.length,
+      personOrigin: personOrigin,
       missing: missing,
       optionalMissingList: optionalMissing,
       optionalMissing: optionalMissing.map(function (x) { return x.key; }),

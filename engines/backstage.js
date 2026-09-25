@@ -527,7 +527,11 @@
       (r.people || []).slice(0, LIMITS.people).forEach(p => {
         if (!p || !p.name) return;
         const id = 'p_' + String(p.name);
-        const old = draft.people[id] || { id, name: p.name, knowledge: {} };
+        // v2.86.0 A3：空基座也走唯一写者（本处原本只是一行兜底，
+        //   但它是「条目从哪来」这条链上的第二个入口，一并收敛）。
+        const old = draft.people[id] || (WA.registry && WA.registry.ensurePerson
+          ? (WA.registry.ensurePerson(draft, id, p.name, 'backstage').row || { id, name: p.name, knowledge: {} })
+          : (draft.people[id] = { id, name: p.name, knowledge: {}, createdVia: 'backstage:fallback', createdAt: now }));
         // v1.1.0: 人设载体贯通——补齐 schema 声明但此前未入账的字段（AI 未给则保留旧值）
         const mergedAliases = unionAliases(old.aliases, p.aliases);
         draft.people[id] = Object.assign(old, {
@@ -567,7 +571,10 @@
       (r.knowledge_updates || []).slice(0, LIMITS.knowledge).forEach(k => {
         if (!k || !k.person || !k.about) return;
         const id = 'p_' + String(k.person);
-        const person = draft.people[id] = draft.people[id] || { id, name: k.person, knowledge: {} };
+        // v2.86.0 A3：创建走唯一写者。
+        const person = draft.people[id] || ((WA.registry && WA.registry.ensurePerson)
+          ? (WA.registry.ensurePerson(draft, id, k.person, 'backstage').row || draft.people[id])
+          : (draft.people[id] = { id, name: k.person, knowledge: {}, createdVia: 'backstage:fallback', createdAt: now }));
         // v2.61.0: 认知边界写入也是「人物被结算看见」——淘汰唯一按 updatedAt 排序，
         //   不写它则本条目的排序键恒 0 ⇒ 刚记下知情的人物反而优先被挤出。
         person.lastSeenAt = now; person.updatedAt = now;

@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.85.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.85.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.86.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.86.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -1671,7 +1671,7 @@
       "detail": "engines/intel.js 内部自用、外部零引用（过度导出）",
       "src": "engines/intel.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 3
     },
     "karma.balance": {
@@ -3104,7 +3104,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 59
+      "own": 60
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -3195,11 +3195,11 @@
       "own": 3
     },
     "toolDiag.secModules": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
       "src": "engines/tool-diag.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "toolDiag.secParallelWorld": {

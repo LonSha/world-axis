@@ -123,6 +123,62 @@
       persisted: true
     };
   }
+  /** 本轮进程内「按来源计的新建次数」（内存态：诊断「这条链真的在用唯一写者吗」） */
+  const __created = {};
+  /**
+   * v2.86.0 A3（事实唯一写者）：**people 条目的唯一创建点**。
+   *
+   * 修前：五个模块各自内联 `draft.people[id] = draft.people[id] || { id, name, knowledge: {} }`
+   *   （life/intel 各若干处、backstage 两处、本文件一处）。五种写法、四处分散，
+   *   于是「这个人是怎么出现的」在状态里**没有任何痕迹**——写一条承诺就凭空多一个人，
+   *   还占掉 cap 48 的名额。
+   *
+   * 现口径：创建只此一处，每次**新建**都打来源标签（createdVia / createdAt）。
+   *   已存在的条目原样返回，**绝不覆盖**既有字段——本函数只解决「有没有」，
+   *   不解决「内容是什么」（那是 setProfileSafe 的事）。
+   */
+  function ensurePerson(draft, id, name, via) {
+    if (!draft || typeof draft !== 'object') return { ok: false, reason: 'bad-draft' };
+    const key = String(id == null ? '' : id);
+    if (!key || key === 'p_') return { ok: false, reason: 'missing-name' };
+    if (!draft.people || typeof draft.people !== 'object') draft.people = {};
+    const row = draft.people[key];
+    if (row && typeof row === 'object') return { ok: true, isNew: false, row: row };
+    const nm = String(name == null ? key.replace(/^p_/, '') : name).trim().slice(0, 60);
+    const p = { id: key, name: nm, knowledge: {} };
+    p.createdVia = String(via || 'unknown').slice(0, 40);
+    p.createdAt = clockNow('registry');
+    draft.people[key] = p;
+    __created[p.createdVia] = (__created[p.createdVia] || 0) + 1;
+    // v2.86.0 A3：返回值用 isNew、不写 reason: 'created' —— 拒收码门禁按字面量扫
+    //   `reason: 'x'`（不辨语义），在返回值里带上一个叫 created 的 reason 会被当成新拒收码。
+    //   返回值本就是内部契约，键名改动零外部影响。
+    return { ok: true, isNew: true, row: p };
+  }
+  /**
+   * v2.86.0 A3 观测出口：人物条目来源分布 + **未标注行**。
+   *   unlabeledCount > 0 只有两种可能：旧存档（本版之前建的条目），
+   *   或有人又绕过了唯一写者。两种都需要被看见——这就是本出口存在的理由。
+   */
+  function personOriginStat() {
+    let s = {};
+    try { s = (WA.store && WA.store.get ? (WA.store.get() || {}) : {}); } catch (e) { s = {}; }
+    const rows = Object.keys(s.people || {}).filter(function (k) {
+      const p = s.people[k];
+      return p && typeof p === 'object';
+    });
+    const unlabeled = rows.filter(function (k) { return !s.people[k].createdVia; });
+    const byVia = {};
+    rows.forEach(function (k) {
+      const v = s.people[k].createdVia || '(未标注)';
+      byVia[v] = (byVia[v] || 0) + 1;
+    });
+    return {
+      rows: rows.length, byVia: byVia,
+      unlabeledCount: unlabeled.length, unlabeled: unlabeled.slice(0, 12),
+      createdThisRun: Object.assign({}, __created)
+    };
+  }
   function idClear(name) {
     const nm = String(name || '').trim();
     if (!nm) return { ok: false, reason: 'missing-name' };
@@ -428,7 +484,9 @@
       };
       WA.store.transact(function (draft) {
         const id = 'p_' + nm;
-        const p = draft.people[id] = draft.people[id] || { id: id, name: nm, knowledge: {} };
+        // v2.86.0 A3：创建走唯一写者（本文件自己也是调用方之一，不搞双重标准）。
+        ensurePerson(draft, id, nm, 'registry');
+        const p = draft.people[id];
         p.profile = merged;
         p.updatedAt = now;
       });
@@ -560,6 +618,9 @@
     identityOf: identityOf,
     idStat: idStat,
     idClear: idClear,
+    // v2.86.0 A3：people 条目的唯一写者 + 来源观测口（消费方：life/intel/backstage + 诊断）
+    ensurePerson: ensurePerson,
+    personOriginStat: personOriginStat,
     /** 关系量值阶梯（只读，供面板/诊断取语义区间） */
     relationBands() { return REL_BANDS.map(function (b) { return { min: b[0], max: b[1], band: b[2] }; }); },
 

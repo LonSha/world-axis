@@ -176,28 +176,100 @@ style: false,
       issues: issues
     };
   }
+  // ══════════════════ v2.86.0 A5：注入链韧性 ══════════════════
+  /**
+   * 源显示名表（与 SOURCES / VIS_NAMES 同批，仅供失败台账报「用户看得懂的名字」）。
+   *   内部常量，不进接口面——避免为观测面付接口冻结的代价。
+   */
+  const SRC_NAME = {
+    clock: '世界时间', pulse: '世界脉搏', background: '世界背景', people: '人物此刻',
+    currents: '可感知暗流', echoes: '回声',
+    style: '叙事工艺', life: '人物生活', intel: '因果与情报', org: '资源与组织',
+    longline: '长线伏笔', causal: '因果结算', world: '世界织体', weather: '天气与物候',
+    difficulty: '世界难度', affect: '情绪通道', bonds: '关系六型', masks: '假面',
+    temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计',
+    parallelEvents: '场外事件', eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉',
+    beastBond: '驯兽', appearance: '外貌契约', ladder: '原型阶梯', sceneSlice: '情境切片',
+    gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮',
+    quota: '伏笔配给', spotlight: '焦点分配', karma: '业力账', hazard: '风险账',
+    marginal: '边际折旧', tolerance: '手段耐受', events: '事件调度', checkpoints: '快照与分支',
+    shadow: '社交漩涡', threads: '悬案',
+    memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
+    opinion: '舆情', ledger: '重大事件账本', digest: '世界推演', nearEvent: '近端事件'
+  };
+  /**
+   * 失败台账：源显示名 -> { count, lastMsg, lastAt }。
+   *   与「源产出空串」分开记 —— 空串是「这一轮没什么可说」（正常），
+   *   抛异常是「这一块的数据坏了」（要看）。两者混记就再也答不出
+   *   「世界状态为什么没进正文」到底是没内容还是坏了。
+   */
+  const engineFailures = {};
+  function noteEngineFailure(ns, err) {
+    const name = SRC_NAME[ns] || ns;
+    const rec = engineFailures[name] || (engineFailures[name] = { count: 0, lastMsg: '', lastAt: 0 });
+    rec.count++;
+    rec.lastMsg = String((err && err.message) || err || '').slice(0, 160);
+    rec.lastAt = clockWall();
+    try { if (WA.log) WA.log('warn', '注入源构建失败（只丢该源）: ' + name + ' :: ' + rec.lastMsg); } catch (e) {}
+    return rec;
+  }
+  function engineFailuresView() {
+    const out = {};
+    Object.keys(engineFailures).forEach(function (k) {
+      out[k] = { count: engineFailures[k].count, lastMsg: engineFailures[k].lastMsg, lastAt: engineFailures[k].lastAt };
+    });
+    return out;
+  }
+  function engineFailureCount() {
+    return Object.keys(engineFailures).reduce(function (a, k) { return a + engineFailures[k].count; }, 0);
+  }
+  /**
+   * 注入链的**唯一**引擎调用出口。
+   *   修前：43 个调用点里 42 个裸调用 ⇒ 任一可选源抛一次就把整条链打断（实测 0/47）。
+   *   现在：异常在这里被收住 ⇒ 只丢该源、其余照常注入、异常不外泄、台账留痕。
+   *   返回值一律为字符串（空串表示「本块无内容或本块失败」），调用点的 `if (xx)` 照旧可用。
+   */
+  function engineCall(ns, fn) {
+    if (!WA[ns]) return '';
+    try { return fn() || ''; }
+    catch (e) { noteEngineFailure(ns, e); return ''; }
+  }
   WA.render = {
     /** v0.1.41: 撤销-槽位关联审计只读视图（tool-diag 消费） */
     uninjectAudit: uninjectAudit,
     SOURCES,
     /** v2.4.0: 可见性配置健康度只读视图（诊断消费）——undeclared 非空即「源存在但无默认值声明」 */
-    visibilityStat() { return { sources: SOURCES.length, declared: Object.keys(__REG.def).length, filled: __visStat.filled, undeclared: __visStat.undeclared.slice(), lastAt: __visStat.lastAt, key: LS_KEY }; },
+    visibilityStat() { return { sources: SOURCES.length, declared: Object.keys(__REG.def).length, filled: __visStat.filled, undeclared: __visStat.undeclared.slice(), lastAt: __visStat.lastAt, key: LS_KEY,
+      // v2.86.0 A5：注入链失败读数（按源显示名）——与「源产出空串」分开记，
+      //   否则「世界状态为什么没进正文」永远答不出是没内容还是坏了。
+      engineFaults: engineFailuresView(), engineFaultTotal: engineFailureCount() }; },
     getVisibility() { return loadVis(); },
     setVisibility(k, on) { const v = loadVis(); v[k] = !!on; WA.settingsBus.save(__REG, v); },
 
     buildWorldSnapshot() {
-      const vis = loadVis(); const s = WA.store.get(); const parts = [];
-      if (vis.clock && s.clock.label) parts.push('【世界时间】' + s.clock.label);
-      if (vis.pulse && s.worldPulse) parts.push('【世界脉搏】压力' + s.worldPulse.pressure + '/3（' + s.worldPulse.trend + '）' + (s.worldPulse.note || ''));
-      if (vis.background && s.background.text) parts.push('【世界背景】' + s.background.text.slice(0, 500));
-      if (vis.people) {
-        const ps = Object.values(s.people).filter(p => p.location || p.action).slice(0, 8);
-        if (ps.length) parts.push('【人物此刻】' + ps.map(p => p.name + '：' + (p.location || '?') + '，' + (p.action || '')).join('；'));
-      }
-      if (vis.currents) {
-        const cs = s.currents.filter(c => c.visibility !== 'hidden').slice(0, 6);
-        if (cs.length) parts.push('【可感知暗流】' + cs.map(c => c.visibility === 'trace' ? (c.public_trace || c.title + '（异常迹象）') : c.title).join('；'));
-      }
+      const vis = loadVis(); const s = WA.store.get() || {}; const parts = [];
+      // v2.86.0 A5：**每一段各自守卫**。修前六段全是裸读取，任何一段的脏行都会把
+      //   整个世界状态块打成空（而这一段是注入的根：它没了，模型看到的时间/背景/人物/
+      //   暗流/回声一起消失，现场只是一条英文 TypeError）。口径：坏的那段不进文本并留痕，
+      //   其余段照常产出——「少一块」远好过「全没有」。
+      try { if (vis.clock && s.clock && s.clock.label) parts.push('【世界时间】' + s.clock.label); }
+      catch (e) { noteEngineFailure('clock', e); }
+      try { if (vis.pulse && s.worldPulse) parts.push('【世界脉搏】压力' + s.worldPulse.pressure + '/3（' + s.worldPulse.trend + '）' + (s.worldPulse.note || '')); }
+      catch (e) { noteEngineFailure('pulse', e); }
+      try { if (vis.background && s.background.text) parts.push('【世界背景】' + s.background.text.slice(0, 500)); }
+      catch (e) { noteEngineFailure('background', e); }
+      try {
+        if (vis.people) {
+          const ps = Object.values(s.people || {}).filter(p => p && (p.location || p.action)).slice(0, 8);
+          if (ps.length) parts.push('【人物此刻】' + ps.map(p => p.name + '：' + (p.location || '?') + '，' + (p.action || '')).join('；'));
+        }
+      } catch (e) { noteEngineFailure('people', e); }
+      try {
+        if (vis.currents) {
+          const cs = (s.currents || []).filter(c => c && c.visibility !== 'hidden').slice(0, 6);
+          if (cs.length) parts.push('【可感知暗流】' + cs.map(c => c.visibility === 'trace' ? (c.public_trace || c.title + '（异常迹象）') : c.title).join('；'));
+        }
+      } catch (e) { noteEngineFailure('currents', e); }
       // v2.38.0: 回声分支此前**完全缺失**——`echoes` 在 SOURCES 与面板开关里都有，
       //   但 buildWorldSnapshot 从无对应分支 ⇒ 复选框点了零效果（开/关产物逐字节相同），
       //   写进 state.echoes 的「已结算结果的正文触面」从不进正文（实测：回声「盐帮首领伏诛」查无）。
@@ -248,92 +320,97 @@ style: false,
       // v2.56.0: 补 `vis.life` —— 本分支只有模块总开关、没读可见性（见 SOURCES 上方注释），
       //   于是面板上这个源关掉后仍照常注入，是 v2.38.0「开关点了零效果」的原样复刻。
       //   口径与既有各源一致：**可见性关**与**模块缺席**都返回空串，两者都如实不注入。
-      if (vis.life && WA.life) { const lb = WA.life.buildBlock(); if (lb) items.push({ source: '人物生活', content: lb }); }
+      if (vis.life && WA.life) { const lb = engineCall('life', function () { return WA.life.buildBlock(); }); if (lb) items.push({ source: '人物生活', content: lb }); }
       // v2.53.0：因果与情报。模块或开关关闭时 buildBlock 返回空串，不注入。
-      if (vis.intel && WA.intel) { const ib = WA.intel.buildBlock(); if (ib) items.push({ source: '因果与情报', content: ib }); }
+      if (vis.intel && WA.intel) { const ib = engineCall('intel', function () { return WA.intel.buildBlock(); }); if (ib) items.push({ source: '因果与情报', content: ib }); }
       // v2.54.0：资源与组织。模块或开关关闭时 buildBlock 返回空串，不注入。
-      if (vis.org && WA.org) { const ob = WA.org.buildBlock(); if (ob) items.push({ source: '资源与组织', content: ob }); }
+      if (vis.org && WA.org) { const ob = engineCall('org', function () { return WA.org.buildBlock(); }); if (ob) items.push({ source: '资源与组织', content: ob }); }
       // v2.55.0：长线伏笔。只报逾期欠账，且不自动回收。
-      if (vis.longline && WA.longline) { const lb2 = WA.longline.buildBlock(); if (lb2) items.push({ source: '长线伏笔', content: lb2 }); }
+      if (vis.longline && WA.longline) { const lb2 = engineCall('longline', function () { return WA.longline.buildBlock(); }); if (lb2) items.push({ source: '长线伏笔', content: lb2 }); }
       // v2.62.0：因果结算。只报**在推进中**的因果链与其待发生后果。
       //   口径与其它源一致：可见性关 / 模块缺席 / 无在途链 → 返回空串，零 token 占用。
       //   特别注意这不与「世界状态·已结算回声」重复：回声是**已经发生**的响动（正文触面），
       //   本块讲的是**尚未发生**的推进中链条——若二者同形，「预测」就会被读成「既成事实」，
       //   而那正是路线图列为最有价值的那条区分。
-      if (vis.causal && WA.causal) { const cb = WA.causal.buildBlock(); if (cb) items.push({ source: '因果结算', content: cb }); }
+      if (vis.causal && WA.causal) { const cb = engineCall('causal', function () { return WA.causal.buildBlock(); }); if (cb) items.push({ source: '因果结算', content: cb }); }
       // v2.63.0：世界织体（社会生活 / 时空约束）。只报**已登记的地点、已登记的道路、
       //   未结束的共同日程**，以及**有日程证据的到场者**。
       //   口径与其它源一致：可见性关 / 模块缺席 / 三张表皆空 → 返回空串，零 token 占用。
       //   特别注意它**不与「人物生活」重复**：那块讲的是「某人打算做什么」（个体动机），
       //   本块讲的是「谁和谁真的在同一个地方」（共同在场的证据）——若二者同形，
       //   「他有事要做」就会被读成「他到了场」。
-      if (vis.world && WA.world) { const wb = WA.world.buildBlock(); if (wb) items.push({ source: '世界织体', content: wb }); }
+      if (vis.world && WA.world) { const wb = engineCall('world', function () { return WA.world.buildBlock(); }); if (wb) items.push({ source: '世界织体', content: wb }); }
       // v2.65.0 天气与难度。总开关关闭时 buildBlock 返回空串，零 token。
-      if (vis.weather && WA.weather) { const wx = WA.weather.buildBlock(); if (wx) items.push({ source: '天气与物候', content: wx }); }
-      if (vis.difficulty && WA.difficulty) { const df = WA.difficulty.buildBlock(); if (df) items.push({ source: '世界难度', content: df }); }
+      if (vis.weather && WA.weather) { const wx = engineCall('weather', function () { return WA.weather.buildBlock(); }); if (wx) items.push({ source: '天气与物候', content: wx }); }
+      if (vis.difficulty && WA.difficulty) { const df = engineCall('difficulty', function () { return WA.difficulty.buildBlock(); }); if (df) items.push({ source: '世界难度', content: df }); }
       // v2.66.0 情绪通道 / 关系六型 / 假面。总开关关闭时 buildBlock 返回空串，零 token。
       //   三块各自只讲结构（能做什么/是什么关系/演与露馅），不与「人物生活」「社交漩涡」重复。
-      if (vis.affect && WA.affect) { const ab = WA.affect.buildBlock(); if (ab) items.push({ source: '情绪通道', content: ab }); }
-      if (vis.bonds && WA.bonds) { const bb = WA.bonds.buildBlock(); if (bb) items.push({ source: '关系六型', content: bb }); }
-      if (vis.masks && WA.masks) { const mb2 = WA.masks.buildBlock(); if (mb2) items.push({ source: '假面', content: mb2 }); }
+      if (vis.affect && WA.affect) { const ab = engineCall('affect', function () { return WA.affect.buildBlock(); }); if (ab) items.push({ source: '情绪通道', content: ab }); }
+      if (vis.bonds && WA.bonds) { const bb = engineCall('bonds', function () { return WA.bonds.buildBlock(); }); if (bb) items.push({ source: '关系六型', content: bb }); }
+      if (vis.masks && WA.masks) { const mb2 = engineCall('masks', function () { return WA.masks.buildBlock(); }); if (mb2) items.push({ source: '假面', content: mb2 }); }
       // v2.67.0 时间锁 / 双层性格 / 好感审计 / 场外事件。总开关关闭时 buildBlock 返回空串，零 token。
-      if (vis.temporalLock && WA.temporalLock) { const tb = WA.temporalLock.buildBlock(); if (tb) items.push({ source: '时间锁', content: tb }); }
-      if (vis.temperament && WA.temperament) { const tm = WA.temperament.buildBlock(); if (tm) items.push({ source: '双层性格', content: tm }); }
-      if (vis.fondness && WA.fondness) { const fb = WA.fondness.buildBlock(); if (fb) items.push({ source: '好感审计', content: fb }); }
-      if (vis.parallelEvents && WA.parallelEvents) { const pb = WA.parallelEvents.buildBlock(); if (pb) items.push({ source: '场外事件', content: pb }); }
-      if (vis.eraCycle && WA.eraCycle) { const ec = WA.eraCycle.buildBlock(); if (ec) items.push({ source: '资料片周期', content: ec }); }
-      if (vis.survival && WA.survival) { const sv = WA.survival.buildBlock(); if (sv) items.push({ source: '生存三轴', content: sv }); }
-      if (vis.warrant && WA.warrant) { const wr = WA.warrant.buildBlock(); if (wr) items.push({ source: '通缉', content: wr }); }
-      if (vis.beastBond && WA.beastBond) { const bb = WA.beastBond.buildBlock(); if (bb) items.push({ source: '驯兽', content: bb }); }
+      if (vis.temporalLock && WA.temporalLock) { const tb = engineCall('temporalLock', function () { return WA.temporalLock.buildBlock(); }); if (tb) items.push({ source: '时间锁', content: tb }); }
+      if (vis.temperament && WA.temperament) { const tm = engineCall('temperament', function () { return WA.temperament.buildBlock(); }); if (tm) items.push({ source: '双层性格', content: tm }); }
+      if (vis.fondness && WA.fondness) { const fb = engineCall('fondness', function () { return WA.fondness.buildBlock(); }); if (fb) items.push({ source: '好感审计', content: fb }); }
+      if (vis.parallelEvents && WA.parallelEvents) { const pb = engineCall('parallelEvents', function () { return WA.parallelEvents.buildBlock(); }); if (pb) items.push({ source: '场外事件', content: pb }); }
+      if (vis.eraCycle && WA.eraCycle) { const ec = engineCall('eraCycle', function () { return WA.eraCycle.buildBlock(); }); if (ec) items.push({ source: '资料片周期', content: ec }); }
+      if (vis.survival && WA.survival) { const sv = engineCall('survival', function () { return WA.survival.buildBlock(); }); if (sv) items.push({ source: '生存三轴', content: sv }); }
+      if (vis.warrant && WA.warrant) { const wr = engineCall('warrant', function () { return WA.warrant.buildBlock(); }); if (wr) items.push({ source: '通缉', content: wr }); }
+      if (vis.beastBond && WA.beastBond) { const bb = engineCall('beastBond', function () { return WA.beastBond.buildBlock(); }); if (bb) items.push({ source: '驯兽', content: bb }); }
       // v2.69.0 外貌分级契约 / 原型阶梯。总开关关闭时 buildBlock 返回空串，零 token。
-      if (vis.appearance && WA.appearance) { const ap = WA.appearance.buildBlock(); if (ap) items.push({ source: '外貌契约', content: ap }); }
-      if (vis.ladder && WA.ladder) { const ld = WA.ladder.buildBlock(); if (ld) items.push({ source: '原型阶梯', content: ld }); }
-      if (vis.sceneSlice && WA.sceneSlice) { const ss = WA.sceneSlice.buildBlock(); if (ss) items.push({ source: '情境切片', content: ss }); }
-      if (vis.gauge && WA.gauge) { const gg = WA.gauge.buildBlock(); if (gg) items.push({ source: '阻尼量规', content: gg }); }
-      if (vis.rivalry && WA.rivalry) { const rv = WA.rivalry.buildBlock(); if (rv) items.push({ source: '竞争焦点', content: rv }); }
+      if (vis.appearance && WA.appearance) { const ap = engineCall('appearance', function () { return WA.appearance.buildBlock(); }); if (ap) items.push({ source: '外貌契约', content: ap }); }
+      if (vis.ladder && WA.ladder) { const ld = engineCall('ladder', function () { return WA.ladder.buildBlock(); }); if (ld) items.push({ source: '原型阶梯', content: ld }); }
+      if (vis.sceneSlice && WA.sceneSlice) { const ss = engineCall('sceneSlice', function () { return WA.sceneSlice.buildBlock(); }); if (ss) items.push({ source: '情境切片', content: ss }); }
+      if (vis.gauge && WA.gauge) { const gg = engineCall('gauge', function () { return WA.gauge.buildBlock(); }); if (gg) items.push({ source: '阻尼量规', content: gg }); }
+      if (vis.rivalry && WA.rivalry) { const rv = engineCall('rivalry', function () { return WA.rivalry.buildBlock(); }); if (rv) items.push({ source: '竞争焦点', content: rv }); }
       // v2.71.0 叙事纪律四件套。总开关关闭时 buildBlock 返回空串，零 token。
-      if (vis.enigma && WA.enigma) { const eg = WA.enigma.buildBlock(); if (eg) items.push({ source: '信息暗礁', content: eg }); }
-      if (vis.tempo && WA.tempo) { const tp = WA.tempo.buildBlock(); if (tp) items.push({ source: '节奏齿轮', content: tp }); }
-      if (vis.quota && WA.quota) { const qt = WA.quota.buildBlock(); if (qt) items.push({ source: '伏笔配给', content: qt }); }
-      if (vis.spotlight && WA.spotlight) { const sl = WA.spotlight.buildBlock(); if (sl) items.push({ source: '焦点分配', content: sl }); }
+      if (vis.enigma && WA.enigma) { const eg = engineCall('enigma', function () { return WA.enigma.buildBlock(); }); if (eg) items.push({ source: '信息暗礁', content: eg }); }
+      if (vis.tempo && WA.tempo) { const tp = engineCall('tempo', function () { return WA.tempo.buildBlock(); }); if (tp) items.push({ source: '节奏齿轮', content: tp }); }
+      if (vis.quota && WA.quota) { const qt = engineCall('quota', function () { return WA.quota.buildBlock(); }); if (qt) items.push({ source: '伏笔配给', content: qt }); }
+      if (vis.spotlight && WA.spotlight) { const sl = engineCall('spotlight', function () { return WA.spotlight.buildBlock(); }); if (sl) items.push({ source: '焦点分配', content: sl }); }
       // v2.72.0 叙事动力四件套。总开关关闭时 buildBlock 返回空串，零 token。
-      if (vis.karma && WA.karma) { const km = WA.karma.buildBlock(); if (km) items.push({ source: '业力账', content: km }); }
-      if (vis.hazard && WA.hazard) { const hz = WA.hazard.buildBlock(); if (hz) items.push({ source: '风险账', content: hz }); }
-      if (vis.marginal && WA.marginal) { const mg = WA.marginal.buildBlock(); if (mg) items.push({ source: '边际折旧', content: mg }); }
-      if (vis.tolerance && WA.tolerance) { const tl = WA.tolerance.buildBlock(); if (tl) items.push({ source: '手段耐受', content: tl }); }
+      if (vis.karma && WA.karma) { const km = engineCall('karma', function () { return WA.karma.buildBlock(); }); if (km) items.push({ source: '业力账', content: km }); }
+      if (vis.hazard && WA.hazard) { const hz = engineCall('hazard', function () { return WA.hazard.buildBlock(); }); if (hz) items.push({ source: '风险账', content: hz }); }
+      if (vis.marginal && WA.marginal) { const mg = engineCall('marginal', function () { return WA.marginal.buildBlock(); }); if (mg) items.push({ source: '边际折旧', content: mg }); }
+      if (vis.tolerance && WA.tolerance) { const tl = engineCall('tolerance', function () { return WA.tolerance.buildBlock(); }); if (tl) items.push({ source: '手段耐受', content: tl }); }
       // v2.81.0 事件调度。总开关关闭时 buildBlock 返回空串，零 token。
-      if (vis.events && WA.events) { const ev = WA.events.buildBlock(); if (ev) items.push({ source: '事件调度', content: ev }); }
+      if (vis.events && WA.events) { const ev = engineCall('events', function () { return WA.events.buildBlock(); }); if (ev) items.push({ source: '事件调度', content: ev }); }
       // v2.82.0 快照与分支。本块只报「存在哪些存档」，**不报当前世界是否已保存**——
       //   列表非空 ≠ 当前进度有档，若不说清，模型会把「有存档」读成「随时能回来」。
-      if (vis.checkpoints && WA.checkpoints) { const cp = WA.checkpoints.buildBlock(); if (cp) items.push({ source: '快照与分支', content: cp }); }
+      if (vis.checkpoints && WA.checkpoints) { const cp = engineCall('checkpoints', function () { return WA.checkpoints.buildBlock(); }); if (cp) items.push({ source: '快照与分支', content: cp }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块
       //   （它仍留在存档里，因为「秘密存在过」是事实，不是态度）。
-      if (vis.shadow && WA.shadow) { const sb = WA.shadow.buildBlock(); if (sb) items.push({ source: '社交漩涡', content: sb }); }
+      if (vis.shadow && WA.shadow) { const sb = engineCall('shadow', function () { return WA.shadow.buildBlock(); }); if (sb) items.push({ source: '社交漩涡', content: sb }); }
       // v2.63.0：悬案。只报**未结案**（open/stalled）的案与它的线索。
       //   特别注意它**不与「因果与情报」重复**：那块讲「某人以为」（可错），
       //   本块讲「查到了哪」（必须有据）——若二者同形，「有人怀疑是他」就会被读成「查实是他」。
-      if (vis.threads && WA.threads) { const tb = WA.threads.buildBlock(); if (tb) items.push({ source: '悬案', content: tb }); }
+      if (vis.threads && WA.threads) { const tb = engineCall('threads', function () { return WA.threads.buildBlock(); }); if (tb) items.push({ source: '悬案', content: tb }); }
       // 记忆块（visibility控制）
-      if (vis.memory && WA.memory) { const mb = WA.memory.buildMemoryBlock(); if (mb) items.push({ source: '记忆', content: mb }); }
+      if (vis.memory && WA.memory) { const mb = engineCall('memory', function () { return WA.memory.buildMemoryBlock(); }); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）
       // v0.9.8: 采样器接管——指数衰减采样 + 上下文相关召回，替代 slice(-8) 无差别截取
       if (vis.memory && WA.memorySampler) {
-        const recent = WA.pmem && WA.pmem.recentText ? WA.pmem.recentText(4) : '';
-        const pb = WA.memorySampler.buildBlock({ recentText: recent });
+        const recent = engineCall('pmem', function () { return WA.pmem.recentText(4); }) || '';
+        const pb = engineCall('memorySampler', function () { return WA.memorySampler.buildBlock({ recentText: recent }); });
         if (pb) items.push({ source: '主观记忆', content: pb });
-      } else if (vis.memory && WA.pmem) { const pb = WA.pmem.buildBlock(); if (pb) items.push({ source: '主观记忆', content: pb }); }
+        else { const pb2 = engineCall('pmem', function () { return WA.pmem.buildBlock(); }); if (pb2) items.push({ source: '主观记忆', content: pb2 }); }
+      } else if (vis.memory && WA.pmem) { const pb = engineCall('pmem', function () { return WA.pmem.buildBlock(); }); if (pb) items.push({ source: '主观记忆', content: pb }); }
       // v0.8.3: 双层叙事摘要块（优先总述回退纪要）
-      if (vis.memory && WA.summarizer) { const sb = WA.summarizer.buildBlock(); if (sb) items.push({ source: '叙事摘要', content: sb }); }
+      if (vis.memory && WA.summarizer) { const sb = engineCall('summarizer', function () { return WA.summarizer.buildBlock(); }); if (sb) items.push({ source: '叙事摘要', content: sb }); }
       // 舆情块
-      if (vis.opinion && WA.opinion) { const ob = WA.opinion.buildOpinionBlock(); if (ob) items.push({ source: '舆情', content: ob }); }
+      if (vis.opinion && WA.opinion) { const ob = engineCall('opinion', function () { return WA.opinion.buildOpinionBlock(); }); if (ob) items.push({ source: '舆情', content: ob }); }
       // v0.8: 重大事件账本块
       // v0.1.29: 账本/世界推演此前不受可见性控制（不在 SOURCES 内），
       // 关掉所有注入源仍会注入账本与推演块——补齐开关覆盖，默认开保持旧行为
-      if (vis.ledger && WA.ledger) { const lb = WA.ledger.buildLedgerText(); if (lb) items.push({ source: '账本', content: '[重大事件账本]\n' + lb }); }
+      if (vis.ledger && WA.ledger) { const lb = engineCall('ledger', function () { return WA.ledger.buildLedgerText(); }); if (lb) items.push({ source: '账本', content: '[重大事件账本]\n' + lb }); }
       // v0.7: world_digest块
-      if (vis.digest && WA.digest) { const db = WA.digest.buildBlock(); if (db) items.push({ source: '世界推演', content: db }); }
+      if (vis.digest && WA.digest) { const db = engineCall('digest', function () { return WA.digest.buildBlock(); }); if (db) items.push({ source: '世界推演', content: db }); }
       // v0.7: 近端事件一次性消费
+      // v2.86.0 A5：本块既是读也是**写**（一次性消费要清 nearEvent），故整体守卫。
+      //   它抛错的代价与别的源不同：消费没完成 ⇒ 同一条突发事件会**每轮重复注入**，
+      //   而其它源抛错只是少一块。
+      try {
       const st = WA.store.get();
       if (st && st.nextTurnInjection && st.nextTurnInjection.nearEvent) {
         const ne = st.nextTurnInjection.nearEvent;
@@ -347,6 +424,7 @@ style: false,
           if (empty) d.nextTurnInjection = null;
         });
       }
+      } catch (e) { noteEngineFailure('nearEvent', e); }
       // v0.1.1: 剧情约束类注入由槽位路由独立落地，不并入主块（避免重复注入）
       const ctxInj = (ctx.injections || []);
       // 无 position 的项保持旧行为（并入主块）；带 position 的项默认也并入主块，

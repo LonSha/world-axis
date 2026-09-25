@@ -77,9 +77,26 @@
     if (item.kind === 'boundary') return 'hide';
     return item.due && facts && facts.now && facts.now > item.due ? 'pause' : 'keep';
   }
+  /**
+   * v2.86.0 A3（事实唯一写者）：本函数**不再自己造人**，改为委托 registry.ensurePerson。
+   *
+   * 修前 `draft.people[id] || (draft.people[id] = {...})` 是一个「方便」的取值器，
+   *   顺手把自己变成了创建者：写一条目标/承诺/日程就凭空多出一个人（占 cap 48 名额、
+   *   把真在场上的人物挤出去），且条目上没有留下任何痕迹。
+   *
+   * 现口径：创建统一走 registry（唯一写者 + createdVia 标签）。
+   *   合成宿主桩里没有 registry，此时保留**等价兜底**并打 `life:fallback` ——
+   *   于是「产品运行时到底走没走唯一写者」可以由专锁断言，而不是靠读代码相信。
+   */
   function person(draft, name) {
     const id = personId(name);
-    return draft.people[id] || (draft.people[id] = { id: id, name: clean(name, 60), knowledge: {} });
+    if (!id) return null;
+    const reg = WA.registry;
+    if (reg && typeof reg.ensurePerson === 'function') {
+      const r = reg.ensurePerson(draft, id, clean(name, 60), 'life');
+      return r && r.row ? r.row : null;
+    }
+    return draft.people[id] || (draft.people[id] = { id: id, name: clean(name, 60), knowledge: {}, createdVia: 'life:fallback', createdAt: clockNow('life') });
   }
 
   function addGoal(name, goal) {

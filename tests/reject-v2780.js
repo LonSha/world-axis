@@ -28,6 +28,13 @@ const DEAD = {
       + '不删：第三方脚本或外部工具若直接调用回滚入口（或未来备份环引入多源写入），它是第一道防线；'
       + '届时本门禁会以 deadLeak 提醒「该码可能复活」。'
   },
+  'bad-draft': {
+    anchor: "if (!draft || typeof draft !== 'object') return { ok: false, reason: 'bad-draft' };",
+    why: 'registry.ensurePerson（v2.86.0 A3，people 条目的唯一写者）的入参守卫，在现有调用面上'
+      + '结构不可达：它的调用点（life.person / intel.personRow / backstage 两处 / registry.setProfileSafe）'
+      + '全部位于 store.transact(function (draft) {...}) 回调内，而 transact 保证传入骨架草稿对象。'
+      + '不删：唯一写者是对外导出，越界调用时它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。'
+  },
   'migration-loop': {
     anchor: "if (++guard > 64) return { ok: false, reason: 'migration-loop' };",
     why: 'checkpoints.migrate 的自旋防护在 FORMAT=1 期**结构上不可达**：循环条件 f < FORMAT 要求 f<1，'
