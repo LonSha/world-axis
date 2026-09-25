@@ -618,6 +618,52 @@
     identityOf: identityOf,
     idStat: idStat,
     idClear: idClear,
+    /**
+     * v2.91.0 O4：**跨模块身份引用的悬空对账**（只读，不改任何状态）。
+     *   它治的病：关系 / 量值 / 承诺三类行里的 `target` 都是**名字引用**，
+     *   而名字引用的生死从来没人核对——某人被改了名、被解除绑定、或从来没登记过，
+     *   指向他的行仍然原样留着，且在任何出口上都看不见（idStat 只对账
+     *   `people` 容器键 ↔ 持久 id，看不见「行内 target」这一层）。
+     *   口径：**只报不删**。悬空引用不是错误，是待确认的旧账——
+     *   自动清掉等于替作者做了「这个关系不算数」的决定。
+     */
+    danglingRefs() {
+      const sc = idScope();
+      const bound = {}, known = {};
+      Object.keys(sc.mine).forEach(function (n) { bound[n] = true; known[n] = true; });
+      let s = {};
+      try { s = (WA.store && WA.store.get ? (WA.store.get() || {}) : {}); } catch (e) { s = {}; }
+      const people = s.people || {};
+      Object.keys(people).forEach(function (k) { known[String(k).replace(/^p_/, '')] = true; });
+      // 名字的两套来源（等价）：持久绑定表 + 存档容器键。任一命中即不算悬空。
+      const rows = [], byKind = { relationships: 0, relations: 0, commitment: 0 };
+      Object.keys(people).forEach(function (k) {
+        const nm = String(k).replace(/^p_/, '');
+        const p = people[k];
+        if (!p || typeof p !== 'object') return;
+        const pr = (p.profile || {});
+        ['relationships', 'relations'].forEach(function (sec) {
+          const arr = Array.isArray(pr[sec]) ? pr[sec] : [];
+          arr.forEach(function (x) {
+            const t = String((x && x.target) || '').trim();
+            if (!t || known[t]) return;
+            byKind[sec]++;
+            rows.push({ from: nm, kind: sec, target: t });
+          });
+        });
+        const lf = p.life;
+        if (lf && Array.isArray(lf.commitments)) {
+          lf.commitments.forEach(function (x) {
+            const t = String((x && x.target) || '').trim();
+            if (!t || known[t]) return;
+            byKind.commitment++;
+            rows.push({ from: nm, kind: 'commitment', target: t });
+          });
+        }
+      });
+      return { rows: rows.length, byKind: byKind, items: rows.slice(0, 20),
+        knownCount: Object.keys(known).length, persisted: true };
+    },
     // v2.86.0 A3：people 条目的唯一写者 + 来源观测口（消费方：life/intel/backstage + 诊断）
     ensurePerson: ensurePerson,
     personOriginStat: personOriginStat,

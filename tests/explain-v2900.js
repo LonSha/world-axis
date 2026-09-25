@@ -21,6 +21,7 @@
 //   B1 快照类源归 landed-in-state、非快照源真落地归 landed、玩家面落下「世界状态」。
 //   B2 关掉**原本会落地**的源 ⇒ 该源归 visibility-off，且玩家面「未进项」+1（不谎报进了正文）。
 //   B3 模块缺席 ⇒ 该源归 module-absent（与 visibility-off 分开）。
+//      v2.91.0 起另有一档 module-off（模块装载了、但总开关关着）——缺席与被关是两件事。
 //   B4 引擎抛异常 ⇒ 该源归 failed（与 no-content 分开：坏 ≠ 没内容）。
 //   B5 无内容 ⇒ no-content（正常态，不等于坏）。
 //   B6 未注入过 ⇒ ok:false / no-rotation（照实拒答，不编一份空解释）。
@@ -54,6 +55,17 @@ const INJECT = path.join(BASE, 'render/inject.js');
 const DIAG = path.join(BASE, 'engines/tool-diag.js');
 const PANEL = path.join(BASE, 'ui/panel.js');
 function src(p) { return fs.readFileSync(p, 'utf8'); }
+/** v2.91.0：源键 → 模块 settings 键（与产品源码**同源**解析——抄一份副本
+ *   就是「第二份实现」，产品改了表名它不再同步） */
+const SRC_MOD_SETTING_OF = (function () {
+  const t = fs.readFileSync(INJECT, 'utf8');
+  const a = t.indexOf('const SRC_MOD_SETTING = {');
+  if (a < 0) return {};
+  const b = t.indexOf('};', a);
+  const seg = t.slice(a, b), out = {}, re = /([A-Za-z_$][\w$]*)\s*:\s*'([^']+)'/g;
+  let m; while ((m = re.exec(seg)) !== null) out[m[1]] = m[2];
+  return out;
+})();
 // ── 三个真源码破坏锚点（各恰中 1 次才动刀）──
 const ANCHOR_VIS = "else if (vis && vis[k] === false) st = 'visibility-off';";
 const ANCHOR_FAIL = "else if (fails[name]) st = 'failed';";
@@ -63,7 +75,9 @@ const BREAK_VIS = "else if (false && vis && vis[k] === false) st = 'visibility-o
 const BREAK_FAIL = "else if (false && fails[name]) st = 'failed';";
 const BREAK_LAND = "if (false && !isSnap && landedSet.indexOf(name) >= 0) st = 'landed';";
 // 归因码封闭集合（新增态必须在源码与本表同批增长）
-const STATES = ['landed', 'landed-in-state', 'visibility-off', 'module-absent', 'failed', 'no-content'];
+// v2.91.0（O4）：新增 module-off（可见性勾着、模块级总开关关着）——封闭集合必须在
+//   源码与判据**同批**增长，否则这份表就是一份陈旧常量：它会把正确的新实现判成「越界」。
+const STATES = ['landed', 'landed-in-state', 'visibility-off', 'module-absent', 'module-off', 'failed', 'no-content'];
 // 让一个**非快照**源真落地的哨兵：否则「落地/未落地」判据只在子集上恒真
 const PAT = { longline: '<<TOK-LONGLINE>>' };
 function hits(s, anchor) {
@@ -84,11 +98,23 @@ function seed(WA) {
     d.evolution = d.evolution || {};
     d.evolution.round = 3;
     d.lastInjection = null;
+    // v2.91.0：模块级总开关也**显式置定**。先前这里只设可见性，而本版起
+    //   `module-off` 进归因链 ⇒ 前序用例关过哪个模块，本锁的读数就跟着变
+    //   （首跑实测：org 因为被别处显式关掉，不再报 no-content）。
+    WA.render.SOURCES.forEach(function (key) {
+      const sk = SRC_MOD_SETTING_OF[key];
+      if (!sk) return;
+      const rg = (WA.__settingsRegs || []).filter(function (x) { return x && x.key === sk; })[0];
+      if (!rg) return;
+      const cur = WA.settingsBus.read(rg) || {};
+      cur.enabled = true;                 // 全开：本锁治的是可见性与失败归因，不是模块开关
+      WA.settingsBus.save(rg, cur);
+    });
     // 长线伏笔：已过承诺时刻 ⇒ buildBlock 出内容 ⇒ longline 真落地（非快照源的正样本）
     d.memory = d.memory || {};
     d.memory.foreshadows = [{ id: 'f-' + PAT.longline, content: PAT.longline, status: 'waiting', dueAt: 1 }];
   }, 'explain-v2900:seed');
-  WA.longline.setSettings({ enabled: true, graceMs: 0 });
+  WA.longline.setSettings({ enabled: true, graceMs: 0 });   // 与上面显式置定同向（冗余但不冲突）
   WA.render.SOURCES.forEach(function (k) { WA.render.setVisibility(k, true); });
 }
 function inject(WA) { WA.render.applyInjections({ injections: [] }); return WA.store.get().lastInjection; }
@@ -109,7 +135,7 @@ function runAll(a) {
   a(ex.ok === true && ex.round === 3, 'v2900: [A1] 轮次取自 evolution.roundOf（实 ' + ex.round + '）');
   const injSrc = src(INJECT);
   const set = STATES.filter(function (s) { return injSrc.indexOf("'" + s + "'") < 0; });
-  a(set.length === 0, 'v2900: [A2] 六个归因码全部落在源码里（缺: ' + (set.join(',') || '无') + '）');
+  a(set.length === 0, 'v2900: [A2] 七个归因码全部落在源码里（缺: ' + (set.join(',') || '无') + '）——v2.91.0 起含 module-off');
   const decKeys = ex.omniscient.decisions.map(function (x) { return x.key; });
   a(decKeys.length === sources.length && sources.every(function (k) { return decKeys.indexOf(k) >= 0; }),
     'v2900: [A2] sourceDecisions 逐项覆盖 SOURCES（' + decKeys.length + '/' + sources.length + '，不多不少）');

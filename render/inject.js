@@ -204,6 +204,53 @@ style: false,
     ledger: '账本',
     digest: '世界推演', nearEvent: '近端事件'
   };
+  // ── v2.91.0 O4：开关两面对账 ──────────────────────────────────────────
+  /**
+   * 源键 -> 该模块 settings 里的键，**显式映射**。
+   *   为什么用表而不是猜：源键与模块 settings 键并非总同名（`temporalLock` ->
+   *   `worldaxis_temporal_settings_v1`、`parallelEvents` -> `worldaxis_pevents_settings_v1`）。
+   *   猜错的后果分两种，都不能接受：报成「模块没装载」（明明是关着的），或反过来。
+   *   表里**没有**的源一律读成「不可判定」（null），不当作「已关」——
+   *   六个快照源与 memory/ledger/digest 本来就没有模块级总开关（它们由 store 直供）。
+   */
+  const SRC_MOD_SETTING = { opinion: 'worldaxis_opinion_settings_v1', life: 'worldaxis_life_settings_v1',
+    intel: 'worldaxis_intel_settings_v1', org: 'worldaxis_org_settings_v1', longline: 'worldaxis_longline_settings_v1',
+    causal: 'worldaxis_causal_settings_v1', world: 'worldaxis_world_settings_v1', weather: 'worldaxis_weather_settings_v1',
+    difficulty: 'worldaxis_difficulty_settings_v1', shadow: 'worldaxis_shadow_settings_v1', threads: 'worldaxis_threads_settings_v1',
+    affect: 'worldaxis_affect_settings_v1', bonds: 'worldaxis_bonds_settings_v1', masks: 'worldaxis_masks_settings_v1',
+    temporalLock: 'worldaxis_temporal_settings_v1', temperament: 'worldaxis_temperament_settings_v1',
+    fondness: 'worldaxis_fondness_settings_v1', parallelEvents: 'worldaxis_pevents_settings_v1',
+    eraCycle: 'worldaxis_era_settings_v1', survival: 'worldaxis_survival_settings_v1', warrant: 'worldaxis_warrant_settings_v1',
+    beastBond: 'worldaxis_beast_settings_v1', appearance: 'worldaxis_appearance_settings_v1', ladder: 'worldaxis_ladder_settings_v1',
+    sceneSlice: 'worldaxis_scene_slice_settings_v1', gauge: 'worldaxis_gauge_settings_v1', rivalry: 'worldaxis_rivalry_settings_v1',
+    enigma: 'worldaxis_enigma_settings_v1', tempo: 'worldaxis_tempo_settings_v1', quota: 'worldaxis_quota_settings_v1',
+    spotlight: 'worldaxis_spotlight_settings_v1', karma: 'worldaxis_karma_settings_v1', hazard: 'worldaxis_hazard_settings_v1',
+    marginal: 'worldaxis_marginal_settings_v1', tolerance: 'worldaxis_tolerance_settings_v1',
+    events: 'worldaxis_events_settings_v1', checkpoints: 'worldaxis_ckpt_settings_v1' };
+  /**
+   * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
+   *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
+   *   那样用户会把「我明明勾了」看成 bug，而实际只是这里没有模块级开关。
+   */
+  function moduleEnabled(k) {
+    const key = SRC_MOD_SETTING[k];
+    if (!key) return null;
+    // 登记项的真源是 `__settingsRegs`（模块装载时自己登记的，含它**声明的** def）。
+    //   首版曾用 `{ key: key, def: {} }` 临时造一个登记项去读——那是错的：
+    //   settingsBus 按传入的 def 补子键，def 里没有 enabled 就补不出来，
+    //   于是「默认关闭」的模块被答成「不可判定」。实测同一环境下 life/intel 读成
+    //   unavailable 而 longline 读成 false，正是这个错法留下的三种答案。
+    let reg = null;
+    try {
+      const list = WA.__settingsRegs || [];
+      for (let i = 0; i < list.length; i++) { if (list[i] && list[i].key === key) { reg = list[i]; break; } }
+    } catch (e) { reg = null; }
+    if (!reg) return null;   // 该键没登记 ⇒ 老实说不知道，不猜
+    try {
+      const all = WA.settingsBus.read(reg) || {};
+      return (typeof all.enabled === 'boolean') ? all.enabled : null;
+    } catch (e) { return null; }
+  }
   // ── v2.90.0 O3：每轮执行解释 ──────────────────────────────────────────
   /**
    * 源决策归因（v2.90.0 O3）。
@@ -231,6 +278,7 @@ style: false,
       else if (isSnap && stateSnap && !(vis && vis[k] === false)) st = 'landed-in-state';
       else if (vis && vis[k] === false) st = 'visibility-off';
       else if (!WA[k]) st = 'module-absent';
+      else if (moduleEnabled(k) === false) st = 'module-off';
       else if (fails[name]) st = 'failed';
       else st = 'no-content';
       return { key: k, name: name, state: st };
@@ -358,7 +406,25 @@ style: false,
       //   否则「世界状态为什么没进正文」永远答不出是没内容还是坏了。
       engineFaults: engineFailuresView(), engineFaultTotal: engineFailureCount(),
       // v2.88.0 O1：本轮引擎源耗时（零新成员——与 engineFaults 同一条口子出，理由同 A3）。
-      injectCost: costStat(), injectCostTotal: Object.keys(engineCost).reduce(function (a, k) { return a + engineCost[k].ms; }, 0) }; },
+      injectCost: costStat(), injectCostTotal: Object.keys(engineCost).reduce(function (a, k) { return a + engineCost[k].ms; }, 0),
+      // v2.91.0 O4：**开关两面对账**——「可见性勾着」与「模块开着」是两套真值，
+      //   此前没有任何地方把它们摆在一起。逐源三态：on（两面都通）/ vis-off（用户关的）/
+      //   mod-off（勾了也无效：模块被关）/ unavailable（该源没有模块级开关，不假装知道）。
+      //   代价实测：勾着 longline 却关掉模块，产物里一个字都没有，而报账说「本轮无内容」——
+      //   用户会去改世界内容，改不动，因为**根本没调用**它。
+      faceAudit: (function () {
+        const vis = loadVis();   // 走**唯一**读入口：再读一遍配置就等于第二份实现
+        return SOURCES.map(function (k) {
+        const mod = moduleEnabled(k);
+        const visOn = vis[k] !== false;
+        let face = 'on';
+        if (!visOn) face = 'vis-off';
+        else if (mod === false) face = 'mod-off';
+        else if (mod === null) face = 'unavailable';
+        return { key: k, name: SRC_NAME[k] || k, face: face, visibility: visOn, moduleEnabled: mod,
+          note: face === 'mod-off' ? '可见性勾着也无效：模块总开关关着' : (face === 'unavailable' ? '该源无模块级总开关（由 store 直供）' : '') };
+        });
+      })() }; },
     getVisibility() { return loadVis(); },
     setVisibility(k, on) { const v = loadVis(); v[k] = !!on; WA.settingsBus.save(__REG, v); },
 

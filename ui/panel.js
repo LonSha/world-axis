@@ -355,8 +355,18 @@
       const head = '<div class="wa-item wa-dim">已绑定 ' + st.bound + ' 人 · 活动槽 ' + st.slotUsed + '/' + st.slotCapacity
         + ' · 有身份但未占本轮槽 ' + st.beyondSlots + ' 人'
         + (st.drifted ? ' · <b>身份缺失 ' + st.stateWithoutId.length + ' 人</b>（有状态无编号）' : '') + '</div>';
-      if (!ks.length) return head;
-      return head + ks.map(function (k) {
+      // v2.91.0 O4：跨模块身份引用的悬空——**只报不删**。
+      //   关系 / 量值 / 承诺三类行里的 target 是名字引用：被改名、被解除绑定、或从来
+      //   没登记过时，行仍原样留着，而此前任何出口都看不见这一层。
+      //   这里只给「几条 + 前几条」：给太多等于把这条读数淹掉，逐条明细走诊断页。
+      const dang = (typeof WA.registry.danglingRefs === 'function') ? WA.registry.danglingRefs() : null;
+      const dangRow = (dang && dang.rows)
+        ? '<div class="wa-item wa-dim"><b>悬空引用 ' + dang.rows + ' 条</b>（指向未登记的名字：'
+          + dang.items.slice(0, 4).map(function (x) { return esc(x.from) + '→' + esc(x.target) + '（' + esc(x.kind) + '）'; }).join('；')
+          + (dang.rows > 4 ? ' 等' : '') + ' · 只报不删，确认后再改）</div>'
+        : '';
+      if (!ks.length) return head + dangRow;
+      return head + dangRow + ks.map(function (k) {
         return '<div class="wa-item">' + esc(k) + ' → ' + (st.worldKeys[k] || '<b>未绑定</b>') + '</div>';
       }).join('');
     })();
@@ -1262,6 +1272,7 @@
       + '<div class="wa-row"><button class="wa-btn" id="wa-inj-refresh" title="重新读取当前注入快照（只读，不改变任何状态）">刷新快照</button>'
       + '<button class="wa-btn" id="wa-inj-explain" title="本轮为何这样：只报“进了什么”与“还有几项没进”（玩家视图）；逐项原因属制作者视图">本轮解释</button>'
       + '<button class="wa-btn" id="wa-inj-explain-all" title="逐源列名 + 归因码（可见性关 / 模块缺席 / 构建失败 / 本轮无内容），供制作者定位">全知面明细</button>'
+      + '<button class="wa-btn" id="wa-inj-face" title="开关两面真值：只报「可见性勾着、模块总开关却关着」的源——那些源本轮一个字节都进不来">开关两面</button>'
       + '<button class="wa-btn" id="wa-inj-diag" title="跳转工具页运行完整自检">去自检</button></div>'
       + '<div id="wa-inj-out" class="wa-out"></div>';
     return out;
@@ -3070,6 +3081,24 @@
     };
     on('#wa-inj-explain', () => { explainOut(false); });
     on('#wa-inj-explain-all', () => { explainOut(true); });
+    // v2.91.0 O4：**开关两面真值**单独一个入口。
+    //   为什么不能只放在诊断里：`mod-off` 是「用户勾着却完全无效」——它必须发生在
+    //   用户自己点得到的地方，否则他会一路去改世界内容，而那个源根本没被调用过。
+    //   只列 mod-off：on / unavailable 是常态，全列出来等于把这条读数淹掉。
+    on('#wa-inj-face', () => {
+      const stat = (WA.render && typeof WA.render.visibilityStat === 'function') ? WA.render.visibilityStat() : null;
+      const audit = (stat && Array.isArray(stat.faceAudit)) ? stat.faceAudit : [];
+      const off = audit.filter((r) => r.face === 'mod-off');
+      const un = audit.filter((r) => r.face === 'unavailable');
+      if (!off.length) {
+        setOut('#wa-inj-out', '开关两面一致：没有任何源处于「勾着却无效」。'
+          + '（' + audit.length + ' 个源中，' + un.length + ' 个没有模块级总开关，由世界数据直供）');
+        return;
+      }
+      setOut('#wa-inj-out', '勾着却无效（模块总开关关着，共 ' + off.length + ' 个）：\n'
+        + off.map((r) => '  · ' + r.name + '（' + r.key + '）—— ' + r.note).join('\n')
+        + '\n这些源本轮一个字节都不会进正文；要让它们生效请开对应模块。');
+    });
     // v2.45.0: 条目路由控件（读写引擎公共面，非别名引用）
     on('#wa-er-add', () => {
       const id = ($('#wa-er-id') || {}).value ? $('#wa-er-id').value.trim() : '';

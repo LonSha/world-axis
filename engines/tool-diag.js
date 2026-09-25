@@ -576,6 +576,11 @@
       missingCount: missing.length,
       personOrigin: personOrigin,
       theme: theme,
+      // v2.91.0 O4：跨模块身份引用的**悬空对账**（只报不删）。
+      //   它是 registry.danglingRefs 的真消费方——关系 / 量值 / 承诺三类行里的 target
+      //   都是名字引用，而「名字的生死」此前没有任何出口可见（idStat 只对账
+      //   people 容器键 ↔ 持久 id，看不见**行内 target** 这一层）。
+      danglingRefs: safe(function () { return WA.registry && WA.registry.danglingRefs ? WA.registry.danglingRefs() : null; }, null),
       missing: missing,
       optionalMissingList: optionalMissing,
       optionalMissing: optionalMissing.map(function (x) { return x.key; }),
@@ -704,6 +709,17 @@
           };
           if (!out.explain.missed.length) delete out.explain.missed;
         } else out.explain = { error: (ex && ex.reason) || 'unavailable' };
+      }
+      // v2.91.0 O4：开关两面真值的诊断读数。
+      //   只报**异常面**（mod-off 是「勾了却无效」，必须点出来）；on / unavailable 是常态，
+      //   逐条撞进诊断只是噪声。零新增导出：走既有 visibilityStat 口。
+      if (WA.render && typeof WA.render.visibilityStat === 'function') {
+        try {
+          const fa = (WA.render.visibilityStat() || {}).faceAudit || [];
+          const offRows = fa.filter(function (r) { return r.face === 'mod-off'; });
+          if (offRows.length) out.faceOff = offRows.map(function (r) { return r.name + '(' + r.key + ')'; });
+          out.faceUnavailable = fa.filter(function (r) { return r.face === 'unavailable'; }).length;
+        } catch (e) { out.faceAuditError = String((e && e.message) || e).slice(0, 120); }
       }
       // v0.1.9: 槽位路由错误快照（部分失败时存在）
       if (li && li.slotErrors) out.slotErrors = li.slotErrors;
@@ -1201,7 +1217,9 @@
       // v2.90.0（O3）：每轮执行解释两枚按钮——渲染在**注入页**（renderInject），故登记到本组。
       //   同 v2.50.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
       //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
-      'wa-inj-explain', 'wa-inj-explain-all'] }
+      'wa-inj-explain', 'wa-inj-explain-all',
+      // v2.91.0（O4）：开关两面真值按钮——同 v2.90.0 的理由，渲染在注入页故登记到本组。
+      'wa-inj-face'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。

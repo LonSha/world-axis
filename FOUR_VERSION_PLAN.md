@@ -54,7 +54,7 @@
   · **A5 的「常用操作 / 有效配置来源 / 回滚结果 / 手机交互 / 实机浏览器验收」**未做；本版 A5 只收口了差异预览与字段映射。
   · **B7 题材对正文的实际影响**只做到「模块是否进入注入面」，未做「不同题材下同一场景的生成差异」对照实验。
 
-## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O3 已交付）
+## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O4 已交付）
 起点：v2.87.0 / 40b6c04。两份计划已入库（folder=WorldAxis）：《WorldAxis v2.88+ 优化方向计划（O1–O5 性能与透明度）》UUID 29179707-ce90-49ac-8e71-36d3c5079409；《WorldAxis v2.88+ 功能拓展计划（X1–X5 交互生态拓宽）》UUID 38375f01-cbd6-41a1-8bd9-842294a610ac。
 - [x] O1（本版落点 = 注入预算实测与分档，原料 = A4 未覆盖项「短中长基准/耗时分列」）：
   · 计时落在 `render/inject.js` 的 `engineCall`（v2.86.0 的唯一引擎调用出口，46 处调用点）——一处落表覆盖全部引擎源；时钟用 `clockWall`（测量时间），与 `clockNow` 分列。
@@ -86,7 +86,14 @@
   · 两条本版最该记住的（都在「判据的输入面」上）：① **判「玩家面是否剧透」不能拿整段 JSON 去判**——`player` 有个键就叫 `landed`，序列化后必然命中状态码 `'landed'`，输入面选错会把正确实现判成缺陷；该判「键集封闭 + 每个字符串值不含状态码」。② **负控制的破坏形态不能是「删行」**——链首 `if` 删掉会留下悬空 `else`，破坏副本 `SyntaxError`，「装不起来」证明不了判据敏感；统一改**条件置假**（`if (false && …)`）。另钉一条命名约束：面板里那个全知面局部变量若叫 `o`，会被 v2.39.0 的顶层 `.round` 幽灵扫描命中（标识符集含 `o`）——**变量名也进了门禁的口径**，专锁正面钉住它。
 - [x] 验收（O3）：专锁 `tests/explain-v2900.js` **53/0**（A 成类锁 / B 运行时 / C 缺陷锁 / N 负控制，三个真源码破坏锚点 `ANCHOR_VIS` / `ANCHOR_FAIL` / `ANCHOR_LAND` 各恰中 1 次，破坏形态统一为条件置假）；全量回归 **7787/0**（v2.89.0 为 7734/0，+53 = 专锁 53 项）；出口面 `ns=104 members=606 chars=7424`（+1 = `render.explain`，已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs **2374** / 命名空间 110 / 成员 **1243**；死子面 dead 444 / uiDead 4 / dataOnly 161；拒收码 309（见证 **93** / 死表 5 / 基线 211，两个新码 `no-rotation` / `round-not-recorded` 用产品真 API 跑出见证，**不靠声称**）。
 - [ ] O3 未覆盖（如实留在清单）：`explain` 只解释「本轮注入链」的**源级**去向，不解释预算折叠/丢弃的逐项理由（那些在 `trace` 里，本版只透传不归纳）；快照块内逐段**不细分**（拿不到的粒度不假装拿到）；跨设备 / 跨会话的解释面（`lastInjection` 只驻当前存档）未验证；玩家面与全知面的分列只做到「结构上分开」，未做面向终端用户的多语言文案。
-- [ ] O4–O5 未开始：O4 因果与状态批量治理（A3 的开关全组合）；O5 资源账本健康面（B3 经济侧先观测）。
+- [x] O4（本版落点 = 因果与状态批量治理：开关全组合 + 身份引用稳定，原料 = v2.86.0 未覆盖项「A3 的开关全组合」）：
+  · `render/inject.js` 三处：① `SRC_MOD_SETTING`（源键 → 模块设置键，**37 项显式列出**，不同名的一一列出，如 `temporalLock → worldaxis_temporal_settings_v1`）；② `moduleEnabled(k)` **三态读**（键没登记 / 读抛错 ⇒ `null`，**不造 `def: {}` 壳**——不在读不到时冒充「开着」）；③ 归因链新增 `module-off`（插在 `module-absent` 之后、`failed` 之前 ⇒ **七态封闭集合**），`visibilityStat()` 增 `faceAudit`（逐源 `{key,name,face,visibility,moduleEnabled,note}`，`face` 取 `on` / `vis-off` / `mod-off` / `unavailable`）。实测默认态 47 源：`mod-off 36` / `unavailable 8` / `vis-off 3`。
+  · `actors/registry.js` 新增 `danglingRefs()`（本版**唯一**新增导出成员）：两套名字真源（持久绑定表 `idScope().mine` + 人物容器键去 `p_` 前缀）× 三类引用行（`relationships` / `relations` / `life.commitments` 的 `target`）；**只报不删**（悬空引用不是错误，是待确认的旧账；自动清掉等于替作者做了决定），**只读不改状态**；返回 `{rows, byKind, items ≤ 20, knownCount, persisted}`。
+  · 两处真消费方（**无消费方不挂**）：诊断 `secModules.danglingRefs` + `secInject.faceOff / faceUnavailable / faceAuditError`；面板注入页 `wa-inj-face`（只列 `mod-off`，全一致时才说「开关两面一致」——**两枚按钮不合并到一个输出框**）+ 人物页悬空行（几条 + 前 4 条 + 「只报不删，确认后再改」）。守卫表同步登记。
+  · 同步 O3 锁的**陈旧常量**：归因码是封闭集合，新增一档而不更新 `tests/explain-v2900.js` 的六态表，那份表就会把正确的新实现判成「越界」（实测一次报 32 项越界）；B4 的 `org` 正例因总开关被前序用例关过而失效（**对照吃环境**）⇒ 修法是「判据改七态 + seeds 把模块总开关也显式置定」，**不是放宽断言**。
+- [x] 验收（O4）：专锁 `tests/switch-matrix-v2910.js` **72/0**（A 成类锁 / B 运行时 / C 缺陷锁 / N 负控制，四个真源码破坏锚点 `ANCHOR_OFF` / `ANCHOR_FACE` / `ANCHOR_DANG` / `ANCHOR_DANG2` 各恰中 1 次，破坏形态含「静默报零」与「失去分辨力」两向）；全量回归 **7859/0**（v2.90.0 为 7787/0，+72 = 专锁 72 项）；出口面 `ns=104 members=607 chars=7437`（+1 = `registry.danglingRefs`，已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs **2385** / 命名空间 110 / 成员 **1244**；死子面 dead 444 / uiDead 4 / dataOnly 161（无新增）；拒收码 309（见证 93 / 死表 5 / 基线 211）；五个独立门禁（module-registry / export-contract / reject-code / field-liveness / test-surface）全过，`dead-export-gate` 更新证据后过（账本 version=2.91.0）。
+- [ ] O4 未覆盖（如实留在清单）：`danglingRefs` 只扫三类引用行（`relationships` / `relations` / `commitments`），`warrant` / `hazard` / `world` 等其它可能带名字引用的面未纳入；`faceAudit` 是**当次快照**，不做历史曲线；「id 重命名后旧引用可追溯」只做到「报出悬空」，**未做**别名表 / 追溯链；开关**全组合**（三源以上同时关闭的相互踩踏）仍只有 v2.84.1 的两方关闭覆盖，本版未扩到三三 / 多多组合。
+- [ ] O5 未开始：资源账本健康面（B3 经济侧先观测）。
 - [ ] X1–X5 未开始（见功能拓展计划）：X1 UI 实机验收通道；X2 B3 经济引擎；X3 B4 传播与辟谣；X4 B2 天气灾害封锁联动；X5 跨插件因果桥。
 
 ## 完成纪律
