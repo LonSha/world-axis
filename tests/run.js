@@ -18351,6 +18351,16 @@ assert(r2900.dead.length === 444 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   见该门禁头部留档的两次失败）。
   await require('./settle-v2830.js').runAll(assert);
   await require('./settle-v2830.js').runNegative(assert);
+  // v2.84.0 A3 收口：**开关组合面**与**存档兼容**。
+  //   为什么还要一把新锁：tests/inject-vis-v2580.js 已逐源证明「单开关真生效」，但它的
+  //   probeAll 在每个源上只翻「该源自己」那一个开关、其余全开 —— 于是三类组合至今无判据：
+  //   两两关闭、全关、以及「关了 A 不许误伤 B」。第二项尤其重要：v2.58.0 的锁对
+  //   「A 的关闭连累 B」这种缺陷是**瞎的**。
+  //   另一半是存档兼容：本版 A2 收紧了输入边界（约 28 份 clean() 委托到 inputGuard），
+  //   而没有任何判据回答「收紧之后旧存档还读不读得进」——「更严格」不得以误伤存档为代价。
+  require('./settle-v2841.js').runAll(assert);
+  require('./settle-v2841.js').runCompat(assert);
+  require('./settle-v2841.js').runNegative(assert);
   // ── v2.83.0 门禁端到端：B4 的交付物必须**真被执行**，不能只是「文件在场」 ──
   //   本段治的正是 v2.75.0 点名的孤儿病：交付物写完却没有任何入口跑它。
   //   实测踩到（本版）：settle-v2830.js 只做 fs.existsSync 检查，于是

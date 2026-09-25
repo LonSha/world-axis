@@ -2687,7 +2687,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 7,
+      "tref": 8,
       "own": 2
     },
     "store.migrations": {
