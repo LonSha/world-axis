@@ -1247,9 +1247,20 @@
   function renderDirector() {
     const vis = WA.render.getVisibility();
     const plan = WA.oracle.plan;
+    const activeThemes = (WA.theme && typeof WA.theme.statView === 'function') ? (WA.theme.statView().themes || []) : [];
     return `
       <div class="wa-sec">注入可见性（哪些世界信息递给正文）</div>
       ${WA.render.SOURCES.map(k => `<label class="wa-node"><input type="checkbox" data-vis="${k}" ${vis[k] ? 'checked' : ''}/><span class="wa-node-label">${VIS_NAMES[k] || k}</span></label>`).join('')}
+      <div class="wa-sec">题材规则组合（B7）</div>
+      <div class="wa-dim">题材是对规则模块的显式组合：多选取并集并按原序；核心模块（世界/事件/知情边界/声誉）永在场。预览不落设置，应用是唯一写入口。</div>
+      <div class="wa-row">${(WA.theme ? WA.theme.list() : []).map(x => `<label class="wa-node"><input type="checkbox" class="wa-theme-opt" value="${x.key}" ${activeThemes.indexOf(x.key) >= 0 ? 'checked' : ''}/><span class="wa-node-label">${esc(x.label)}</span></label>`).join('') || '<span class="wa-dim">题材模块未加载</span>'}</div>
+      <div class="wa-row"><button class="wa-btn" id="wa-theme-preview">预览差异</button><button class="wa-btn" id="wa-theme-apply" title="唯一写入口：未知题材一律拒收且不改设置">应用题材</button><button class="wa-btn" id="wa-theme-clear" title="清空题材：回到全量注入（旧行为）">清空（回全量）</button></div>
+      <div id="wa-theme-out" class="wa-out">${(() => {
+        const ts = (WA.theme && typeof WA.theme.statView === 'function') ? WA.theme.statView() : null;
+        if (!ts) return '';
+        return '<span class="wa-dim">当前启用：' + (ts.themes.length ? esc(ts.themes.join('+')) : '无（全量 ' + (((WA.rules && WA.rules.ORDER) || []).length) + ' 模块）')
+          + ' · 应用 ' + ts.applies + ' 次 / 预览 ' + ts.previews + ' 次 / 拒收 ' + ts.rejects + ' 次</span>';
+      })()}</div>
       <div class="wa-sec">剧情引导（弧线/序列）</div>
       ${plan ? `<div class="wa-item"><b>${esc(plan.kind === 'arc' ? '弧线' : '序列')}</b> 第${plan.current + 1}/${plan.beats.length}拍<div class="wa-dim">${esc((WA.oracle.currentBeat() || {}).goal || '')}</div><button class="wa-btn wa-mini" id="wa-beat-next" title="推进到剧情弧线的下一拍">完成本拍</button><button class="wa-btn wa-mini" id="wa-plan-clear">放弃</button></div>`
         : `<textarea id="wa-plan-beats" class="wa-ta" placeholder="每行一拍的目标/指令…"></textarea><button class="wa-btn" id="wa-plan-start">开始序列引导</button>`}
@@ -1266,6 +1277,10 @@
       })()}</div>
       <div class="wa-sec">行动选项</div>
       <button class="wa-btn" id="wa-gen-choices" title="基于当前世界状态生成玩家的 4 个可选行动">生成4个行动选项</button>
+      <div class="wa-sec">因果工作台（B6）</div>
+      <div class="wa-row"><button class="wa-btn" id="wa-cw-view" title="当前存档与本次进程累计分列——一个答「现在是怎样」，一个答「这一轮发生了几次」">当前/累计</button><button class="wa-btn" id="wa-cw-rehearse" title="在深拷贝上跑一整轮推进：看会发生什么，但不改存档、不留痕迹">分支试演</button><button class="wa-btn" id="wa-cw-conflicts" title="报出同因同果的重复链——只报不消解，消解由你显式选择">查冲突</button><button class="wa-btn" id="wa-cw-evidence" title="这一轮推进凭什么：随机源读数与推进绑定，不可复现时必须照实说">回放证据</button></div>
+      <div class="wa-row"><input id="wa-cw-id" class="wa-input" placeholder="链 id"/><input id="wa-cw-act" class="wa-input" placeholder="动作 advance/cancel/settle"/><button class="wa-btn" id="wa-cw-intervene" title="先预览「做这个动作会变成什么」，允许与否都给原因码，零副作用">干预预览</button></div>
+      <div id="wa-cw-out" class="wa-out"></div>
       <div id="wa-choices-out" class="wa-out"></div>`;
   }
 
@@ -1454,6 +1469,106 @@
       };
     });
     const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
+    // v2.87.0 B7：题材组合（预览不落设置 / 应用是唯一写入口 / 清空回全量）
+    const themeOut = function (text) { setOut('#wa-theme-out', text); };
+    const themePicked = function () {
+      const els = panelEl.querySelectorAll('.wa-theme-opt');
+      const out = [];
+      for (let i = 0; i < els.length; i++) { if (els[i].checked) out.push(els[i].value); }
+      return out;
+    };
+    on('#wa-theme-preview', () => {
+      if (!WA.theme) { themeOut('题材模块未加载'); return; }
+      const p = WA.theme.preview(themePicked());
+      themeOut('预览：' + p.moduleCount + ' 模块 / ' + p.chars + ' 字（当前 ' + p.currentChars + ' 字，差异 ' + (p.deltaChars >= 0 ? '+' : '') + p.deltaChars + '）'
+        + '｜新增 ' + p.added.length + '：' + (p.added.join('、') || '无') + '｜移除 ' + p.removed.length + '：' + (p.removed.join('、') || '无') + '（预览未落设置）');
+    });
+    on('#wa-theme-apply', () => {
+      if (!WA.theme) { themeOut('题材模块未加载'); return; }
+      const r = WA.theme.apply(themePicked());
+      themeOut(r.ok ? ('已应用：' + (r.themes.join('+') || '全量') + '（' + ((r.modules || []).length) + ' 模块）') : ('拒收：' + r.reason + '（未知 ' + ((r.unknown || []).join('、')) + '）'));
+      if (r.ok) renderBody();
+    });
+    on('#wa-theme-clear', () => {
+      if (!WA.theme) return;
+      WA.theme.apply([]);
+      themeOut('已清空题材：回到全量注入');
+      renderBody();
+    });
+    // v2.87.0 B6：因果工作台——当前/累计分列、干预预览、分支试演、冲突显式选择、回放证据。
+    //   这四口此前只有测试引用（test-only ⇒ 死导出）。本仓库纪律：导出即有承诺，
+    //   承诺的消费方是**面板**而不是测试。
+    const cwOut = function (html) { setHtml('#wa-cw-out', html); };
+    const cwFmt = function (o) { const ks = Object.keys(o || {}); return ks.length ? ks.map(function (k) { return k + '×' + o[k]; }).join('、') : '无'; };
+    const cwDraw = function () {
+      if (!WA.causal) { cwOut('<div class="wa-dim">因果模块未加载</div>'); return; }
+      const v = (typeof WA.causal.stateView === 'function') ? WA.causal.stateView() : null;
+      const st = WA.causal.stat();
+      if (!v) { cwOut('<div class="wa-dim">状态视图不可用</div>'); return; }
+      cwOut('<div class="wa-item"><b>当前存档</b>（现存 ' + v.chains + ' 链）' + '<div class="wa-dim">在途 ' + v.live + ' / 终态 ' + v.terminal
+        + '｜按状态 ' + cwFmt(v.byStatus) + '｜按阶段 ' + cwFmt(v.byStage) + (v.pending ? '（条件未足 ' + v.pending + ' 条）' : '')
+        + '｜待发生 ' + v.scheduledDelayed + ' 项｜已结算 ' + v.settledRows + ' 行</div>'
+        + '<div class="wa-dim">本次进程累计：行动 ' + st.acts + ' / 过期 ' + st.expired + ' / 被挡 ' + st.blocked + '</div></div>');
+    };
+    on('#wa-cw-view', () => { cwDraw(); });
+    on('#wa-cw-rehearse', () => {
+      if (!WA.causal) return;
+      const f = { now: clockNow('ui.causal'), pruneInvalid: false };
+      const r = WA.causal.rehearse(f);
+      if (!r.ok) { cwOut('<div class="wa-dim">试演未执行：' + esc(r.reason) + '</div>'); return; }
+      const v = WA.causal.stateView();
+      cwOut('<div class="wa-item"><b>试演（零副作用）</b>：会动 ' + r.counts.changed + ' 条（行动 ' + r.counts.acted + ' / 过期 ' + r.counts.expired + '）'
+        + '｜存档实际仍为 ' + v.live + ' 在途<div class="wa-dim">'
+        + (r.changes.length ? r.changes.map(function (c) { return esc(c.id) + ' ' + esc(c.from) + ' → ' + esc(c.to); }).join('；') : '无状态变化') + '</div></div>');
+    });
+    const cwKeep = function (id) {
+      if (!WA.causal) return;
+      // 「都留」= 显式选择不消解（动作上一次**选择**，而不是默认放任）。
+      if (id === 'both') { cwOut('<div class="wa-dim">已选择「都留」：两条链均保留。这是选择，不是默认。</div>'); return; }
+      const hit = WA.causal.conflicts().filter(function (c) { return c.ids.indexOf(id) >= 0; })[0];
+      // v2.87.0 自纠：不新造拒收码。other 取不到时直接把空串交给 cancel——
+      //   它自己的 missing-fields 就是对的归因（面板多一个语义相同的码，
+      //   只会让「未分类」在 reject-code-gate 上多一份要维护的账）。
+      const other = hit ? hit.ids.filter(function (x) { return x !== id; })[0] : '';
+      const r = WA.causal.cancel(other, '冲突消解：保留 ' + id);
+      cwOut('<div class="wa-item">保留 <b>' + esc(id) + '</b>，取消 <b>' + esc(other) + '</b>：' + (r.ok ? '已取消' : esc(r.reason)) + '</div>');
+      renderBody();
+    };
+    on('#wa-cw-conflicts', () => {
+      if (!WA.causal) return;
+      const cs = WA.causal.conflicts();
+      if (!cs.length) { cwOut('<div class="wa-dim">无同因同果的在途重复链</div>'); return; }
+      cwOut(cs.map(function (c) {
+        return '<div class="wa-item"><b>冲突</b> ' + esc(c.cause) + ' → ' + esc(c.action)
+          + '<div class="wa-dim">' + esc(c.note) + '</div>'
+          + '<div class="wa-row"><button class="wa-btn wa-mini" data-cw-keep="' + esc(c.ids[0]) + '">留 ' + esc(c.ids[0]) + '</button>'
+          + '<button class="wa-btn wa-mini" data-cw-keep="' + esc(c.ids[1]) + '">留 ' + esc(c.ids[1]) + '</button>'
+          + '<button class="wa-btn wa-mini" data-cw-keep="both">都留</button></div></div>';
+      }).join(''));
+      // 动态渲染的按钮在绑定期还不存在，故在这里就地接线（不是委派——mini-DOM 无冒泡支持）。
+      const bs = panelEl.querySelectorAll('[data-cw-keep]');
+      for (let i = 0; i < bs.length; i++) { bs[i].onclick = function () { cwKeep(this.dataset.cwKeep); }; }
+    });
+    on('#wa-cw-evidence', () => {
+      if (!WA.causal) return;
+      const e = WA.causal.evidence();
+      cwOut('<div class="wa-item"><b>回放证据</b>：seed ' + esc(String(e.seed)) + '（来源 ' + esc(e.seedSource) + '）'
+        + '｜可复现：' + (e.reproducible ? '<b>是</b>（显式播种）' : '<b>否</b>——自动种子刷新即换，不得据此声称本轮可重放')
+        + '｜抽取 ' + e.draws + ' 次｜通道 ' + esc((e.channels || []).join('、') || '无')
+        + '<div class="wa-dim">与推进绑定的读数：链 ' + e.chains + ' · 行动 ' + e.acts + ' · 过期 ' + e.expired + ' · 被挡 ' + e.blocked + '</div></div>');
+    });
+    on('#wa-cw-intervene', () => {
+      if (!WA.causal) return;
+      const id = causalVal('#wa-cw-id');
+      const act = causalVal('#wa-cw-act') || 'advance';
+      if (!id) { cwOut('<div class="wa-dim">请先填链 id</div>'); return; }
+      const p = WA.causal.previewIntervention(id, act, { now: clockNow('ui.causal'), pruneInvalid: false, reason: '面板预览', delayedId: causalVal('#wa-cw-act') === 'settle' ? id : '' });
+      if (!p.ok) { cwOut('<div class="wa-dim">预览失败：' + esc(p.reason) + '</div>'); return; }
+      const to = p.after ? (p.after.status + '/' + p.after.stage) : '-';
+      cwOut('<div class="wa-item"><b>干预预览（零副作用）</b> ' + esc(p.chain) + ' · ' + esc(p.action) + '：'
+        + (p.allowed ? ('允许 · ' + esc(p.before.status + '/' + p.before.stage) + ' → ' + esc(to)) : ('<b>不允许</b>：' + esc(p.reason)))
+        + ((p.willWrite && p.willWrite.length) ? '<div class="wa-dim">将写事实：' + esc(p.willWrite.join('、')) + '</div>' : '') + '</div>');
+    });
     on('#wa-save-bg', () => { WA.store.patch('background', { text: $('#wa-bg').value, updatedAt: clockNow('ui.panel') }); WA.log('info', '世界背景已保存'); });
     // v2.30.0（P0-2）：撤销编辑——弹撤销栈顶、按 path 写回；镜像视图——读侧回落台账。
     on('#wa-undo-btn', () => {
@@ -2065,8 +2180,12 @@
         const raw = ($('#wa-imp-text').value || '').trim();
         if (!raw) { out.textContent = '请先选择文件或粘贴 JSON'; return; }
         const pv = WA.toolImport.preview(raw);
+        // v2.87.0 A5 收口：导入差异预览（与真跑同一批准入函数，零副作用）
+        const pl = (typeof WA.toolImport.previewPlan === 'function') ? WA.toolImport.previewPlan(raw) : null;
+        const planPv = (pl && pl.ok) ? ('｜将新增 ' + (pl.willAdd || 0) + ' / 跳过 ' + (pl.willSkip || 0) + (pl.note ? '（' + pl.note + '）' : '')) : (pl ? ('｜预览不可用：' + pl.reason) : '');
         const r = WA.toolImport.importData(raw);
         out.textContent = (r.ok ? '✓ [' + pv.kind + '] ' : '✗ [' + pv.kind + '] ')
+          + planPv
           + (r.reason || ('新增 ' + (r.added || 0) + ' 条' + (r.skipped ? '，跳过 ' + r.skipped + ' 条' : '') + (r.reasons && r.reasons.length ? '（' + r.reasons.join('；') + '）' : '')));
         if (r.ok && r.added) renderBody();
       };

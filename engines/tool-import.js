@@ -22,6 +22,7 @@
   function isArr(v) { return Array.isArray(v); }
   function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }
   function clean(v) { return WA.inputGuard.text(v, 80); }
+  function txt(v) { return (v === undefined || v === null) ? '' : String(v); }
 
   /** 类型判别：返回 {kind, payload, confidence} */
   function detect(raw) {
@@ -70,6 +71,53 @@
     return { kind: 'unknown', reason: '无法识别的结构（不是存档/区域事件/势力/事件链/主观记忆/世界书条目）' };
   }
 
+  /** v2.87.0 A5 收口：字段映射抽成共用函数——差异预览与真跑用**同一份**映射。
+   *   若预览自己再写一遍字段名，它会与真跑漂移：预览说「会新增」，真跑却因缺字段拒收。
+   */
+  function toFaction(item) {
+    return { name: item.name, scope: item.scope, status: item.status, relation: item.relation,
+      currentGoal: item.currentGoal || item.goal, core_person: item.core_person || item.core,
+      powerPillars: item.powerPillars || item.pillars };
+  }
+  function toEvent(item) {
+    return { type: item.type, name: item.name, level: item.level, stage: item.stage,
+      stageRound: item.stageRound, desc: item.desc || item.description };
+  }
+  function toPmem(x) {
+    return { name: x.name || x.names, known_by: x.known_by || x.knownBy,
+      memory: x.memory || x.content || x.text, time: x.time };
+  }
+  /** v2.87.0 A5 收口：导入差异预览——「这次导入会新增什么、跳过什么、为什么」。
+   *   在深拷贝上跑**同一批准入函数**（editorFaction.add 等），零副作用（不落盘、不改 store）。
+   *   与 B6 的 rehearse 同一思想：预览与真跑不同源就毫无意义。
+   */
+  function previewPlan(raw) {
+    const d = detect(raw);
+    if (d.kind === 'invalid' || d.kind === 'unknown') return { ok: false, kind: d.kind, reason: d.reason, dryRun: true };
+    let draft = {};
+    try { draft = JSON.parse(JSON.stringify(WA.store.get() || {})); } catch (e) { draft = {}; }
+    const rows = [];
+    const push = function (label, r) {
+      rows.push({ item: txt(label), ok: !!(r && r.ok), reason: txt(r && r.reason) });
+    };
+    if (d.kind === 'factions') {
+      if (!WA.editorFaction || typeof WA.editorFaction.add !== 'function') return { ok: false, kind: d.kind, reason: 'editor-faction 未加载', dryRun: true };
+      d.payload.forEach(function (item) { push(item.name, WA.editorFaction.add(draft, toFaction(item))); });
+    } else if (d.kind === 'events') {
+      if (!WA.editorEvents || typeof WA.editorEvents.add !== 'function') return { ok: false, kind: d.kind, reason: 'editor-events 未加载', dryRun: true };
+      d.payload.forEach(function (item) { push(item.name, WA.editorEvents.add(draft, toEvent(item))); });
+    } else if (d.kind === 'pmem') {
+      if (!WA.pmem || typeof WA.pmem.applyPersonalMemory !== 'function') return { ok: false, kind: d.kind, reason: 'pmem 未加载', dryRun: true };
+      const r = WA.pmem.applyPersonalMemory(draft, d.payload.map(toPmem)) || {};
+      rows.push({ item: '(批量)', ok: true, reason: 'added=' + (r.added || 0) + ' skipped=' + (r.skipped || 0) });
+    } else {
+      return { ok: true, kind: d.kind, total: 1, willAdd: 1, willSkip: 0, rows: [],
+        note: '该类型按整件替换或由其他模块管理，不做逐条差异预览', dryRun: true };
+    }
+    const willAdd = rows.filter(function (x) { return x.ok; }).length;
+    return { ok: true, kind: d.kind, total: rows.length, willAdd: willAdd, willSkip: rows.length - willAdd,
+      rows: rows.slice(0, 20), dryRun: true };
+  }
   /** 各类型导入执行器（都走 transact；返回 {ok, added, skipped, reason}） */
   const IMPORTERS = {
     snapshot(raw) {
@@ -101,11 +149,7 @@
       const reasons = [];
       const tx = WA.store.transact(d => {
         for (const item of list) {
-          const r = WA.editorFaction.add(d, {
-            name: item.name, scope: item.scope, status: item.status, relation: item.relation,
-            currentGoal: item.currentGoal || item.goal, core_person: item.core_person || item.core,
-            powerPillars: item.powerPillars || item.pillars
-          });
+          const r = WA.editorFaction.add(d, toFaction(item));   // v2.87.0：与差异预览同一映射
           if (r.ok) added++; else { skipped++; if (reasons.length < 3) reasons.push(r.reason); }
         }
       });
@@ -118,10 +162,7 @@
       const reasons = [];
       const tx = WA.store.transact(d => {
         for (const item of list) {
-          const r = WA.editorEvents.add(d, {
-            type: item.type, name: item.name, level: item.level, stage: item.stage,
-            stageRound: item.stageRound, desc: item.desc || item.description
-          });
+          const r = WA.editorEvents.add(d, toEvent(item));   // v2.87.0：与差异预览同一映射
           if (r.ok) added++; else { skipped++; if (reasons.length < 3) reasons.push(r.reason); }
         }
       });
@@ -132,10 +173,7 @@
       if (!WA.pmem) return { ok: false, reason: 'pmem 未加载' };
       let added = 0, skipped = 0;
       const tx = WA.store.transact(d => {
-        const r = WA.pmem.applyPersonalMemory(d, list.map(x => ({
-          name: x.name || x.names, known_by: x.known_by || x.knownBy,
-          memory: x.memory || x.content || x.text, time: x.time
-        })));
+        const r = WA.pmem.applyPersonalMemory(d, list.map(toPmem));   // v2.87.0：与差异预览同一映射
         added = r.added; skipped = r.skipped;
       });
       return tx.ok ? { ok: true, added, skipped } : { ok: false, reason: '事务失败' };
@@ -180,8 +218,11 @@
     return { kind: d.kind, reason: d.reason, confidence: d.confidence, size, count: isArr(d.payload) ? d.payload.length : (d.payload ? 1 : 0) };
   }
 
+  // v2.87.0 A5 收口：toFaction/toEvent/toPmem 是 previewPlan 与 IMPORTERS 共用的**内部**映射
+  //   （外部零引用 = self-only 过度导出），故不进导出面。与真跑同源这件事由
+  //   previewPlan（对外口）承担：它在深拷贝上跑同一批准入函数。
   WA.toolImport = {
-    detect, preview, importData, IMPORTERS
+    detect, preview, previewPlan, importData, IMPORTERS
   };
   if (WA.log) WA.log('info', '外部数据导入工具已加载');
 })();

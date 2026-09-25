@@ -167,8 +167,14 @@
   const NEW_MODULES = ['persona', 'relation', 'craft', 'protocol'];
   function isNewModule(k) { return NEW_MODULES.indexOf(k) >= 0; }
 
+  // v2.87.0 B7：按题材组合过滤（零启用题材时 = 全量，既有行为逐字不变）。
+  function activeOrder() {
+    const a = (WA.theme && typeof WA.theme.activeModules === 'function') ? WA.theme.activeModules() : null;
+    return Array.isArray(a) ? ORDER.filter(function (k) { return a.indexOf(k) >= 0; }) : ORDER;
+  }
   function getAll() {
-    return '## 世界推演规则（' + ORDER.length + '模块）\n\n' + ORDER.map(k => `========== 模块·${LABELS[k]} ==========\n${RULES[k]}`).join('\n\n');
+    const ord = activeOrder();
+    return '## 世界推演规则（' + ord.length + '模块）\n\n' + ord.map(k => `========== 模块·${LABELS[k]} ==========\n${RULES[k]}`).join('\n\n');
   }
 
   // 精简行为守则（默认常驻注入，控制token）
@@ -190,7 +196,11 @@
 - 叙事工艺按设置面口径执行（字数/段落/视角/人称/转述/演绎）；未开启时不额外约束。任何档位下都不得代写玩家言行超出授权范围。`;
   }
 
+  // v2.87.0 B7：activeOrder() 是 getAll() 的内部自用口（外部零引用 = 过度导出），
+  //   故不进导出面。按题材过滤这件事对外由 getAll() 的模块头数与
+  //   theme.statView().active 表达——“导出即有承诺”，没有消费方的口不挂。
   WA.rules = { RULES, ORDER, LABELS, NEW_MODULES, isNewModule, getAll, coreSummary,
+
     getRuleCount: () => ORDER.length,
     // v2.51.0: 分组读取（面板与诊断按组取文本，不必自己拼 ORDER）
     getModule: (k) => RULES[k] || '',

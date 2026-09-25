@@ -232,8 +232,11 @@
         try { const c = (WA.store.get().causal || {}).settled || []; return c.length; } catch (e) { return 0; }
       })();
       const due = (WA.causal.due ? WA.causal.due().length : 0);
+      // v2.87.0 B6：当前状态与累计分列。stateView 只读存档（现在怎么样），
+      //   st 是本次进程累计（发生过几次）—— 两份读数都报，但**不混在同一个键里**。
+      const now = (WA.causal.stateView ? WA.causal.stateView() : null);
       return { enabled: !!cfg.enabled, maxChains: cfg.maxChains, maxItems: cfg.maxItems,
-        chains: chains, settledRows: settledRows, adds: st.chains || 0, acts: st.acts || 0,
+        chains: chains, settledRows: settledRows, now: now, adds: st.chains || 0, acts: st.acts || 0,
         deferred: st.deferred || 0, cancelled: st.cancelled || 0, expired: st.expired || 0,
         blocked: st.blocked || 0, dueNow: due, lastReason: st.lastReason || '',
         stages: WA.causal.STAGES || [], terminal: WA.causal.TERMINAL || [] };
@@ -464,7 +467,7 @@
     'engines/limits.js': 'limits', 'engines/worldbook.js': 'worldbook', 'engines/ledger.js': 'ledger',
     'engines/timeline.js': 'timeline', 'engines/entities.js': 'entities',
     'engines/preset.js': 'preset', 'engines/chatcache.js': 'chatcache', 'engines/pmem.js': 'pmem',
-    'engines/rules.js': 'rules', 'engines/summarizer.js': 'summarizer', 'engines/chapters.js': 'chapters',
+    'engines/rules.js': 'rules', 'engines/theme.js': 'theme', 'engines/summarizer.js': 'summarizer', 'engines/chapters.js': 'chapters',
     'engines/direct-event.js': 'directEvent',
     'engines/editor-faction.js': 'editorFaction', 'engines/editor-events.js': 'editorEvents',
     'engines/inspector-state.js': 'inspectorState', 'engines/tool-snapshot.js': 'toolSnapshot',
@@ -542,10 +545,14 @@
     //   它是 registry.personOriginStat 的真消费方——观测出口没人读就是死导出，
     //   而这条读数正是「有没有人又绕开唯一写者」的唯一现场证据。
     const personOrigin = safe(function () { return WA.registry && WA.registry.personOriginStat ? WA.registry.personOriginStat() : null; }, null);
+    // v2.87.0 B7：题材规则组合的现场读数（启用哪些题材 / 生效模块 / 拒收次数）。
+    //   它是 WA.theme.statView 的真消费方——「题材装上了没」在诊断面必须可答。
+    const theme = safe(function () { return WA.theme && WA.theme.statView ? WA.theme.statView() : null; }, null);
     return {
       loadedCount: loaded.length,
       missingCount: missing.length,
       personOrigin: personOrigin,
+      theme: theme,
       missing: missing,
       optionalMissingList: optionalMissing,
       optionalMissing: optionalMissing.map(function (x) { return x.key; }),
@@ -1052,8 +1059,16 @@
       //   与 wa-de-abort（有活跃突发事件才渲染）同一语义。纳入守卫表后，「按钮渲染了但
       //   绑定代码引用了别的 id」这类断裂会被发现（本版新增的绑定正需要这道守）。
       cond: ['wa-de-abort', 'wa-ch-end', 'wa-ch-title', 'wa-ch-start', 'wa-bs-abort'] },
-    { page: 'director', ids: ['wa-plan-beats', 'wa-plan-start', 'wa-or-goal', 'wa-or-beats', 'wa-or-gen', 'wa-or-out', 'wa-gen-choices', 'wa-choices-out'],
+    { page: 'director', ids: ['wa-plan-beats', 'wa-plan-start', 'wa-or-goal', 'wa-or-beats', 'wa-or-gen', 'wa-or-out', 'wa-gen-choices', 'wa-choices-out',
+      // v2.87.0 B7：题材规则组合区。题材模块未加载时整段不渲染（空占位），故同样归入 cond层：
+      //   存在时必须渲染且必须有绑定（否则「控件在、点了没反应」在新出口上无人发现）。
+      'wa-theme-preview', 'wa-theme-apply', 'wa-theme-clear', 'wa-theme-out'],
       cond: ['wa-beat-next', 'wa-plan-clear'] },
+    // v2.87.0 B6：因果工作台区（事件页因果区末）。四个只读口 + 干预预览：
+    //   stateView / rehearse / conflicts / evidence / previewIntervention 均由本区真消费，
+    //   这是它们不是死导出的唯一理由。
+    { page: 'events', ids: ['wa-cw-view', 'wa-cw-rehearse', 'wa-cw-conflicts', 'wa-cw-evidence',
+      'wa-cw-id', 'wa-cw-act', 'wa-cw-intervene', 'wa-cw-out'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
@@ -1292,10 +1307,14 @@
       }
       // 诊断是**旁观**：不强制对方重建快照（refresh:false），只看它此刻持有什么。
       //   强制重建会把「我这轮体检」变成「我顺手命令另一个插件干活」——诊断不该有副作用。
+      // v2.87.0 B7：三插件职责分离（事实结算 / 证据读取 / 交互执行）。
+      //   谁的活谁干：本扩展只做事实结算面，缺席方如实标注而非写死「已接入」。
+      const separation = safe(function () { return WA.theme && WA.theme.separation ? WA.theme.separation() : null; }, null);
       const read = WA.lonshaReader.readLonshaSnapshot({ refresh: false });
       const src = read.source || safe(function () { return WA.lonshaReader.lonshaSource(WA.lonshaReader.LONSHA_BRIDGE_ID); }, {});
       const out = {
         mounted: !!src.mounted, ok: !!read.ok, reason: read.reason,
+        separation: separation,
         sourceState: src.sourceState || null, lastError: src.lastError || null,
         describe: WA.lonshaReader.describeLonsha(read)
       };

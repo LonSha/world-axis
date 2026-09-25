@@ -39,10 +39,16 @@
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  // v2.87.0 B6：两份读数从不混用。
+  //   stat      —— **本次进程的累计**（自模块装载起发生过几次），刷新即零。
+  //   stateView —— **存档里的当前状态**（现在有几条、各处于什么状态），只读存档、不随进程复位。
+  //   两者之前混在同一个计数器里：「这条链现在怎么了」永远答不出，
+  //   因为读到的是「这一轮开着过程中发生过几次」。
   const stat = { chains: 0, acts: 0, deferred: 0, cancelled: 0, expired: 0, blocked: 0, lastReason: '' };
 
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
+  function txt(v) { return (v === undefined || v === null) ? '' : String(v); }
   /** 原因是否已存在——单一真源指向 intel.knownCause；intel 缺席时按同一口径兜底 */
   function knownCause(id) {
     const key = clean(id, 80);
@@ -148,47 +154,15 @@
     const cfg = settings();
     if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: true, changed: 0, reason: 'disabled' }; }
     const f = facts || {};
-    let changed = 0, expired = 0;
+    let n = null;
     WA.store.transact(function (draft) {
-      const c = ensureCausal(draft);
-      const now = isFinite(Number(f.now)) ? Number(f.now) : clockNow('causal');
-      c.chains.slice(-cfg.maxChains).forEach(function (x) {
-        if (!x || isTerminal(x)) return;
-        // 前提消失 ⇒ 失效（最有价值的能力之一：旧计划不能照常执行）
-        if (!knownCause(x.cause) && (f.pruneInvalid !== false)) {
-          x.status = 'expired'; x.stage = 'open';
-          x.cancelReason = '前提消失（原因已不在世界事实中）'; x.updatedAt = now;
-          expired++; changed++; stat.expired++;
-          return;
-        }
-        if (x.status === 'open') {
-          const ready = !x.condition || (Array.isArray(f.metConditions) && f.metConditions.indexOf(x.condition) >= 0);
-          if (!ready) {
-            if (x.stage !== 'pending') { x.stage = 'pending'; x.updatedAt = now; changed++; }
-            stat.lastReason = 'condition-open';
-            return;
-          }
-          x.status = 'acted'; x.stage = 'acted'; x.updatedAt = now;
-          x.actedAt = now; changed++; stat.acts++;
-          return;
-        }
-        if (x.status === 'acted') {
-          if (x.immediate) {
-            // 直接后果落进权威世界事实——这是「已发生」，与 delayed 的「待发生」严格分开
-            draft.worldFacts = Array.isArray(draft.worldFacts) ? draft.worldFacts : [];
-            if (!draft.worldFacts.some(function (w) { return w && w.key === ('causal:' + x.id); })) {
-              draft.worldFacts.push({ id: 'wf_' + x.id, key: 'causal:' + x.id, value: x.immediate, scope: 'world', source: 'causal', at: now });
-              if (draft.worldFacts.length > 100) draft.worldFacts.splice(0, draft.worldFacts.length - 100);
-            }
-          }
-          x.status = 'immediate'; x.stage = 'immediate'; x.updatedAt = now; changed++;
-          return;
-        }
-        if (x.status === 'immediate') {
-          x.status = 'delayed'; x.stage = 'delayed'; x.updatedAt = now; changed++;
-        }
-      });
+      // v2.87.0 B6：推进语义只有一份（advanceChains），真跑与试演共用。
+      n = advanceChains(draft, f, cfg);
+      stat.expired += n.expired;
+      stat.acts += n.acted;
     }, 'causal:tick');
+    const changed = n ? n.changed : 0, expired = n ? n.expired : 0;
+    if (n && n.pending) stat.lastReason = 'condition-open';
     stat.lastReason = expired ? 'expired' : (changed ? 'advanced' : (stat.lastReason || 'nothing-to-do'));
     return { ok: true, changed: changed, expired: expired, reason: stat.lastReason };
   }
@@ -303,6 +277,206 @@
   }
 
   /** 已发生 vs 待发生 vs 有条件：三态查询口（这三件事不得同形） */
+  /**
+   * v2.87.0 B6：当前状态视图（**只读存档**，零副作用）。
+   *   与 stat()（本次进程累计）的分别：
+   *     · stat()     答「自模块装载起发生过几次」—— 刷新页面即归零；
+   *     · stateView() 答「存档里现在有几条、各处于什么状态」—— 只跟存档走。
+   *   两者之前混在同一个计数器：读 stat() 的人以为自己看到了「当前状态」，
+   *   实际看到的是「这一轮开着过程中的累计」—— 「这条链现在怎么了」永远答不出。
+   *   byStatus 按真实状态分组（含三个终态），于是「取消 / 失效 / 结算」分得开，
+   *   而不是都表现为「链没了」。
+   */
+  /**
+   * v2.87.0 B6：一轮推进的**唯一实现**——真跑（tick）与分支试演（rehearse）共用同一份。
+   *
+   * 抽出来的理由不是「少写代码」，而是**两份实现必然漂移**：试演若另写一通推进规则，
+   * 它给出的预览会在某个分支上与真跑不一致——而那种不一致恰好最难发现：
+   * 用户据预览做决定，真跑却走了另一条路。
+   *
+   * 约定：只改传入的 draft（试演传深拷贝），**不碰 store、不碰 stat、不写台账**。
+   * only 非空时只推进指定链（供单点干预预览）；真跑不传。
+   */
+  function advanceChains(draft, f, cfg, only) {
+    const c = ensureCausal(draft);
+    const now = isFinite(Number(f.now)) ? Number(f.now) : clockNow('causal');
+    const n = { changed: 0, expired: 0, acted: 0, immediate: 0, delayed: 0, pending: 0, untouched: 0,
+      skipped: Math.max(0, c.chains.length - cfg.maxChains), facts: [] };
+    const rows = c.chains.slice(-cfg.maxChains).filter(function (x) { return !only || (x && x.id === only); });
+    rows.forEach(function (x) {
+      if (!x || isTerminal(x)) { n.untouched++; return; }
+      if (!knownCause(x.cause) && (f.pruneInvalid !== false)) {
+        x.status = 'expired'; x.stage = 'open';
+        x.cancelReason = '前提消失（原因已不在世界事实中）'; x.updatedAt = now;
+        n.expired++; n.changed++;
+        return;
+      }
+      if (x.status === 'open') {
+        const ready = !x.condition || (Array.isArray(f.metConditions) && f.metConditions.indexOf(x.condition) >= 0);
+        if (!ready) {
+          if (x.stage !== 'pending') { x.stage = 'pending'; x.updatedAt = now; n.changed++; }
+          n.pending++;
+          return;
+        }
+        x.status = 'acted'; x.stage = 'acted'; x.updatedAt = now;
+        x.actedAt = now; n.changed++; n.acted++;
+        return;
+      }
+      if (x.status === 'acted') {
+        if (x.immediate) {
+          draft.worldFacts = Array.isArray(draft.worldFacts) ? draft.worldFacts : [];
+          if (!draft.worldFacts.some(function (w) { return w && w.key === ('causal:' + x.id); })) {
+            draft.worldFacts.push({ id: 'wf_' + x.id, key: 'causal:' + x.id, value: x.immediate, scope: 'world', source: 'causal', at: now });
+            if (draft.worldFacts.length > 100) draft.worldFacts.splice(0, draft.worldFacts.length - 100);
+            n.facts.push('causal:' + x.id);
+          }
+        }
+        x.status = 'immediate'; x.stage = 'immediate'; x.updatedAt = now; n.changed++; n.immediate++;
+        return;
+      }
+      if (x.status === 'immediate') {
+        x.status = 'delayed'; x.stage = 'delayed'; x.updatedAt = now; n.changed++; n.delayed++;
+      }
+    });
+    return n;
+  }
+  /** 当前状态的摘要（单一实现：stateView 与试演后的读数同源） */
+  function summarize(st) {
+    const rows = (((st || {}).causal || {}).chains || []).filter(function (x) { return x && typeof x === 'object'; });
+    const byStatus = {}, byStage = {};
+    let live = 0, terminal = 0, scheduled = 0, pending = 0;
+    rows.forEach(function (x) {
+      const k = String(x.status || '(未标注)');
+      byStatus[k] = (byStatus[k] || 0) + 1;
+      const g = String(x.stage || '(未标注)');
+      byStage[g] = (byStage[g] || 0) + 1;
+      if (g === 'pending') pending++;
+      if (isTerminal(x)) terminal++; else live++;
+      (x.delayed || []).forEach(function (d) { if (d && d.status === 'scheduled') scheduled++; });
+    });
+    return {
+      chains: rows.length, live: live, terminal: terminal,
+      byStatus: byStatus, byStage: byStage, pending: pending,
+      scheduledDelayed: scheduled,
+      settledRows: (((st || {}).causal || {}).settled || []).length
+    };
+  }
+  function stateView() { return summarize(state()); }
+  /**
+   * v2.87.0 B6：分支试演——「如果这一轮这么推进，会发生什么」。
+   *
+   * 与 rehearse 的分工：本函数跑**一整轮**（全部在推进窗口内的链），
+   * previewIntervention 跑**单个动作**（定点）。
+   *
+   * 三条硬约束（清单：分支零污染）：
+   *   ① 在深拷贝上跑，不调 store.transact；
+   *   ② 不碰 stat、不写任何台账 —— 试演不得在任何面上留下痕迹；
+   *   ③ 与真跑共用 advanceChains —— 预览与真跑不同源就毫无意义。
+   */
+  function rehearse(facts) {
+    const cfg = settings();
+    if (!cfg.enabled) return { ok: false, reason: 'disabled' };
+    const f = facts || {};
+    const draft = JSON.parse(JSON.stringify(state() || {}));
+    const snap = function (d) {
+      const m = {};
+      (((d.causal || {}).chains) || []).forEach(function (x) {
+        if (x && x.id) m[x.id] = { status: x.status, stage: x.stage };
+      });
+      return m;
+    };
+    const b = snap(draft);
+    const n = advanceChains(draft, f, cfg);
+    const a = snap(draft);
+    const changes = [];
+    Object.keys(a).forEach(function (id) {
+      const x = b[id], y = a[id];
+      if (!x || x.status !== y.status || x.stage !== y.stage) {
+        changes.push({ id: id, from: x ? (x.status + '/' + x.stage) : '(新)', to: y.status + '/' + y.stage });
+      }
+    });
+    return { ok: true, counts: n, changes: changes, facts: n.facts.slice(), after: summarize(draft), dryRun: true };
+  }
+  /**
+   * v2.87.0 B6：干预预览——「现在对这条链做这个动作，会变成什么」（只读，零副作用）。
+   *   导演面所有误操作都源于「先执行再看结果」；预览不留痕，才谈得上
+   *   「干预预览留痕」——留痕的是**选择**，不是预览本身。
+   *   action ∈ {advance, cancel, settle}。allowed=false 时给出原因码（与真跑同一套）。
+   */
+  function previewIntervention(chainId, action, args) {
+    const cfg = settings();
+    const cid = clean(chainId, 80), act = clean(action, 40);
+    if (!cid || !act) return { ok: false, reason: 'missing-fields' };
+    const x0 = row(cid);
+    if (!x0) return { ok: false, reason: 'missing-chain' };
+    const a = args || {};
+    const before = { status: x0.status, stage: x0.stage };
+    if (act === 'advance') {
+      if (!cfg.enabled) return { ok: true, chain: cid, action: act, allowed: false, reason: 'disabled', before: before };
+      const draft = JSON.parse(JSON.stringify(state() || {}));
+      const n = advanceChains(draft, a, cfg, cid);
+      const x = (((draft.causal || {}).chains) || []).filter(function (y) { return y && y.id === cid; })[0] || {};
+      return { ok: true, chain: cid, action: act, allowed: true, before: before,
+        after: { status: x.status, stage: x.stage }, counts: n,
+        willWrite: n.facts.slice(), wouldChange: n.changed > 0, dryRun: true };
+    }
+    if (act === 'cancel') {
+      if (isTerminal(x0)) return { ok: true, chain: cid, action: act, allowed: false, reason: 'chain-terminal', before: before };
+      return { ok: true, chain: cid, action: act, allowed: true, before: before,
+        after: { status: 'cancelled', stage: x0.stage }, reason: clean(a.reason, 80) || '调用方取消', dryRun: true };
+    }
+    if (act === 'settle') {
+      const block = settleBlockReason(x0);
+      if (block) return { ok: true, chain: cid, action: act, allowed: false, reason: block, before: before };
+      const did = clean(a.delayedId, 80);
+      const d = ((x0.delayed || []).filter(function (y) { return y && y.id === did; })[0]) || null;
+      if (!d && did) return { ok: true, chain: cid, action: act, allowed: false, reason: 'missing-delayed', before: before };
+      if (d && d.status !== 'scheduled') return { ok: true, chain: cid, action: act, allowed: false, reason: 'already-' + d.status, before: before };
+      return { ok: true, chain: cid, action: act, allowed: true, before: before,
+        after: { status: x0.status, stage: x0.stage, delayedId: d ? d.id : '', echo: d ? ('ec_' + d.id) : '' },
+        willWrite: d ? ['ec_' + d.id] : [], dryRun: true };
+    }
+    return { ok: false, reason: 'unknown-action', action: act };
+  }
+  /**
+   * v2.87.0 B6：冲突显式选择——同因同果的重复链。
+   *   实测缺口：对同一 cause 连续两次同 action 建链，得到两条独立链，各自 tick、
+   *   各自落事实 ⇒ 世界状态里出现两个「带伞」，调用方无从知道该用哪条。
+   *   本函数只**报出**冲突（只读，不改任何状态）；消解由调用方显式选择
+   *   （cancel 其一 / 都留）——「静默取一」才是真缺陷。
+   */
+  function conflicts() {
+    const rows = (((state().causal || {}).chains) || []).filter(function (x) { return x && !isTerminal(x); });
+    const seen = {}, out = [];
+    rows.forEach(function (x) {
+      const k = txt(x.cause) + ' :: ' + txt(x.action);
+      if (seen[k]) {
+        out.push({ cause: x.cause, action: x.action, ids: [seen[k].id, x.id],
+          options: [seen[k].id, x.id, 'both'], note: '两条在途链同因同果，须显式选择保留哪条' });
+      } else seen[k] = x;
+    });
+    return out;
+  }
+  /**
+   * v2.87.0 B6：回放证据——「这一轮的推进凭什么？能不能重放同一个结果？」
+   *   随机源已由 core/rand 治理（种子/通道/draws 可分列），但**没有任何一处把它与
+   *   因果推进绑在一起**：事后想说「这一轮是可复现的」只能自己拼读数。
+   *   reproducible=false 时**不得声称可回放**（自动种子刷新即换）。
+   */
+  function evidence() {
+    const cfg = settings();
+    const rnd = (WA.rand && typeof WA.rand.randStat === 'function') ? WA.rand.randStat() : null;
+    const view = stateView();
+    return {
+      enabled: !!cfg.enabled, maxChains: cfg.maxChains,
+      seed: rnd ? rnd.seed : null, seedSource: rnd ? rnd.seedSource : 'rand-absent',
+      reproducible: !!(rnd && rnd.reproducible),
+      draws: rnd ? rnd.draws : 0,
+      channels: rnd && rnd.byChannel ? Object.keys(rnd.byChannel).sort() : [],
+      chains: view.chains, byStatus: view.byStatus,
+      acts: stat.acts, expired: stat.expired, blocked: stat.blocked
+    };
+  }
   function classify(chainId) {
     const x = row(chainId);
     if (!x) return { ok: false, reason: 'missing-chain' };
@@ -344,6 +518,15 @@
     // v2.84.0 B5：结算前置条件对外可查——调用方（UI/正文/其他引擎）能先问「这条链
     //   现在允许结算吗」，而不是撞上 not-acted 才知道。与 classify 一样是**只读**口。
     settleBlockReason: settleBlockReason,
-    stat: function () { return Object.assign({}, stat); }
+    stat: function () { return Object.assign({}, stat); },
+    // v2.87.0 B6：当前状态（只读存档）。与 stat()（本次进程累计）分列：
+    //   累计答「这一轮发生过几次」，当前状态答「现在是怎么样」。混成一个数，两个问题都答不出。
+    stateView: stateView,
+    // v2.87.0 B6：导演面四个只读口（干预预览 / 分支试演 / 冲突报出 / 回放证据）。
+    //   全部零副作用：预览与试演不改任何状态，冲突只报不消解，证据只读。
+    previewIntervention: previewIntervention,
+    rehearse: rehearse,
+    conflicts: conflicts,
+    evidence: evidence
   };
 })();

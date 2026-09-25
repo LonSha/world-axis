@@ -26,12 +26,33 @@
 - [ ] B4：事实/目击/转述/谣言分层、动机可信度、隐瞒误传辟谣、证据调查、带时间来源的认知变化。
 - [ ] 验收：资源变化驱动真实组织行动；传播与辟谣不篡改事实；普通注入不剧透。
 
-## v2.87.0 导演工作台与拓宽（待开始）
-- [ ] A5 收口：常用操作、有效配置来源、导入差异预览、回滚结果、手机交互、实机浏览器验收。
-- [ ] A6：职责收敛、已证重复实现提取、减少手工接线、独立审计复用、当前文档读数同步；不做公开发布/API平台重写。
-- [ ] B6：因果关系视图、干预预览留痕、独立分支试演/对比、随机与模型输出回放证据；冲突显式选择。
-- [ ] B7：都市/校园/悬疑/奇幻/经营可选规则组合，预览不覆盖；WorldAxis事实结算/LonSha证据/RubyPhone交互职责分离；消息去重、聊天隔离、来源版本和缺席降级。
-- [ ] 验收：独立运行与三插件联调，分支零污染，真实酒馆端到端操作。
+## v2.87.0 导演工作台与拓宽（已交付，本版为四个版本的结束版本）
+- [x] B6（本版落点 = 因果工作台全部四项）：
+  · **推进单实现**：`engines/causal.js` 抽出 `advanceChains(draft, f, cfg, only)` 作为推进的**唯一实现**，`tick()` 改为调用它；只改传入的 draft，不碰 store、不碰 stat、不写台账。
+  · **当前/累计分列**：新增 `summarize(st)` 与 `stateView()`（= `summarize(state())`），返回 `chains/live/terminal/byStatus/byStage/pending/scheduledDelayed/settledRows`——与 `stat()`（本次进程累计）分列表达。stage 维度是本版自纠补上的：此前只按 status 分组，「条件未足」落在 stage 上，答不出「为什么没动」。
+  · **干预预览**：`previewIntervention(chainId, action, args)` 支持 advance/cancel/settle，返回 allowed 与原因码；不允许时给的是与真跑同一套原因（disabled/chain-terminal/missing-delayed/already-*/unknown-action）。零副作用。
+  · **分支试演**：`rehearse(facts)` 在深拷贝上跑完整一轮 advanceChains，返回逐链 from→to 变化与试演后摘要，`dryRun:true`、不碰 stat（实测试演与真跑结果同一）。
+  · **冲突显式选择**：`conflicts()` 只**报出**同因同果的在途链并给出 a / b / both 三个选项，**不自动消解**；消解由面板按钮显式执行（「都留」也是一次选择，不是默认放任）。
+  · **回放证据**：`evidence()` 把随机源读数与推进绑在一起；`reproducible` 仅在显式播种时为 true，自动种子下如实报 seedSource=auto 且 reproducible=false，**不谎称可重放**。
+- [x] B7（本版落点 = 题材规则组合 + 职责分离）：
+  · 新增 `engines/theme.js`：五题材（都市/校园/悬疑/奇幻/经营）对 `rules.ORDER` 的**显式组合**；核心模块（world/event/info/reputation）不入任何题材的排除面。
+  · 组合是**叠加**的（多选取并集、按 ORDER 原序，不引入优先级/覆盖）；`preview()` **纯计算不落设置**；`apply()` 是**唯一写入口**，未知题材返回 unknown-theme 且不改状态。
+  · `rules.getAll()` 按启用题材过滤（零启用题材时 = 全量，旧行为逐字不变）；`theme.statView()` 由 `tool-diag.secModules()` 真消费（诊断面 theme 字段）。
+  · `separation()` 报告三插件分工（WorldAxis 事实结算 / LonSha 证据读取 / RubyPhone 交互执行），缺席跑 `compat.detect()` 现场探测**降级可见**，不写死「已接入」；由 `tool-diag.secLonsha()` 真消费（separation 字段）。
+- [x] A5 收口（本版落点 = 导入差异预览 + 字段映射收口）：
+  · 抽出共用字段映射 `toFaction/toEvent/toPmem`，三处 IMPORTERS 改为复用（消除两处字段名分叉）；据「导出即有承诺」纪律**不进导出面**（外部零引用 = 过度导出）。
+  · 新增 `previewPlan(raw)`：在深拷贝上跑**同一批准入函数**，逐条报 willAdd/willSkip/rows，零副作用；snapshot/regional/worldbook 如实给 note（该类型按整件替换，不做逐条预览）。由「工具」页导入区真消费。
+- [x] UI 接线（B6/B7/A5 的真消费方）：
+  · 「导演」页新增**题材规则组合**区（多选、预览差异、应用、清空回全量）；「事件」页因果区新增**因果工作台**区（当前/累计、分支试演、查冲突、回放证据、干预预览）。
+  · 「工具」页导入区把 preview 与 previewPlan 并列显示（识别类型 + 将新增/跳过）。
+  · 证据：`tests/ui-gate.js` **53/0**（375 个控件真实点击、零同步抛出、零未处理拒绝）；`tests/ui-wire-audit.js` **9/0**（零幽灵引用）。
+- [x] A6：**明确不做**。理由：A6 的候选（32 处 `function clean()` 一行委托抽取、tool-diag 手工接线收敛）中，clean() 抽取零行为收益却要付接口冻结价（每次成员面变动都要回填 FROZEN2800 与清册）；tool-diag 接线本版已按「消费方缺失」单独治理（theme / separation 两处）。按清单「不能以新增导出或文件存在标记完成」，本项不留 TODO、不伪称完成。
+- [x] 验收（本版）：两把专锁 `tests/causal-view-v2870.js`（B6 观测面）与 `tests/b6-b7-v2870.js`（B6+B7+A5，含 N0–N4 负控制）已挂进 `tests/run.js`；出口面 `ns=104 members=596 chars=7341`（B7/A5 新增成员，已回填 FROZEN2800 与本块 EC2430）；`dead-export-gate` dead **443** / uiDead 4 / dataOnly 161 / 仅测试 291 / 证据 447 条 — 本版 9 个新增死导出全部清零（4 个接 UI、4 个收回导出、1 个由 theme.separation 接通）；`module-registry-gate` pass（107 文件 / 115 命名空间，`engines/theme.js` 已登记）。
+- [ ] 本版未覆盖（如实留在清单，不伪称已完成）：
+  · **回放证据只做到「证据可查」而非「随机序列重放」**——本轮可答「种子是什么、是否可复现」，不可答「请把这一轮的抽签序列重放一遍」；后者需要随机源落盘通道，本版未做。
+  · **三插件实机联调无法在无头环境证明**：separation() 的 LonSha 侧读数在无头下是 engine-absent，真机装三个插件的联调须人工在酒馆里做。
+  · **A5 的「常用操作 / 有效配置来源 / 回滚结果 / 手机交互 / 实机浏览器验收」**未做；本版 A5 只收口了差异预览与字段映射。
+  · **B7 题材对正文的实际影响**只做到「模块是否进入注入面」，未做「不同题材下同一场景的生成差异」对照实验。
 
 ## 完成纪律
 - 每项需附实现路径、真实消费者、正反判据、运行证据，不能以新增导出或文件存在标记完成。

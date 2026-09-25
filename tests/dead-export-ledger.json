@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.86.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.86.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.87.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.87.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -632,14 +632,6 @@
       "src": "core/clock.js",
       "refs": 0,
       "tref": 0,
-      "own": 4
-    },
-    "compat.detect": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "compat/host.js",
-      "refs": 0,
-      "tref": 3,
       "own": 4
     },
     "compat.diagnose": {
@@ -2391,7 +2383,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/rand.js",
       "refs": 0,
-      "tref": 7,
+      "tref": 8,
       "own": 4
     },
     "rand.seeded": {
@@ -3104,7 +3096,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 60
+      "own": 62
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -3264,7 +3256,7 @@
       "src": "engines/tool-import.js",
       "refs": 0,
       "tref": 8,
-      "own": 4
+      "own": 5
     },
     "toolSnapshot.buildPayload": {
       "reason": "test-only",
@@ -3590,6 +3582,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 160
+    "dataOnly": 161
   }
 }

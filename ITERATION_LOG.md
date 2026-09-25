@@ -13,16 +13,18 @@
 | 出口面契约 | 58 命名空间 / 321 成员 / 4094 字符 |
 
 ## 迭代记录
-### R66 · 2026-09-25 · v2.86.0 注入链韧性 + 事实唯一写者（第四十面：一个源的数据瑕疵能把整块世界状态吃掉；一条事实有五个写者，谁写的看不出来）
 
-- **做了什么**：两处落点，两把专锁。
-  **A5（`render/inject.js`）**：43 个源调用点里只有 `style` 一处在 try/catch 内。实测让 `bonds` 抛一次异常 ⇒ **47 个源全部丢失**（连世界状态的时间/背景/人物一起消失），异常还冒泡出扩展。新增 `engineCall(ns, fn)` 作为唯一引擎调用出口：缺席 / 空串 / **抛异常**三态分开，只有抛异常进故障台账，并按**用户看得见的名字**记（「关系六型」而不是 `bonds`）。42 个裸调用点全部收敛；世界快照六段逐段守卫；`nearEvent`（既读又写）整块守卫。故障台账经**既有** `visibilityStat()` 暴露——**零新增导出成员**。专锁 `tests/settle-v2860.js`（22 项，N0–N4 负控制）。
-  **A3（`actors/registry.js`）**：人物条目此前有五个创建点（life / intel 两处 / backstage 两处 / registry），各写各的 `draft.people[id] = {...}` ⇒ 「这个条目是谁建出来的」完全不可见。新增 `ensurePerson(draft, id, name, via)` 作为**唯一写者**，每次新建打 `createdVia` / `createdAt` 来源标签；五个调用点全部改为委托（自动建人的行为一个字都没收紧）；无 registry 的合成宿主桩仍能自建，但标签带 `:fallback` 后缀——于是「产品运行时到底走没走唯一写者」这件事本身可被断言。观测出口 `personOriginStat()` 由 `tool-diag.secModules()` 真消费。专锁 `tests/identity-v2860.js`（36 项，五个真源码破坏锚点各恰中 1 次）。
-- **为什么**：两处都是「承诺写在源码里，但没有任何判据问过它」的同型病。A5 修前，模型输出少一个字段（`bonds` 缺 `types`、`ladder` 缺 `rungs`、`shadow` 缺 `holders`）正文就整块空白，而「世界状态为什么没进正文」永远答不出是没内容还是坏了。A3 曾试过更硬的一版（未知 id 直接拒收），实测撞 24 条既有契约（life-v2520 / settle-v2650 / evict-meta-v2610 / registry-identity-v2620）已回滚——**把「创建」判成病是错的，把「看不见谁创建的」判成病才对**。
-- **踩过的坑**：① 首版把 `vis.<k>` 挪进 `engineCall` 首参，破坏了 v2560/v2580/v2841 三条负控制的锚点 `vis.life && WA.life` ⇒ 负控制假绿，改为 `engineCall(ns, fn)` 形态、守卫原样保留；② `gate.fresh()` 复用同一个 `global.WorldAxis`，负控制里「先取原版、后建破坏副本」会让原版引用被覆盖 ⇒ 原版侧读数必须在建破坏副本**之前**算完；③ 新增导出成员要付接口冻结串的价（members 580→582 / chars 7169→7199），且专锁的真代码面引用会改写 dead-export 账本的 tref（test-only 291→292）。
-- **影响范围**：`render/inject.js`、`actors/registry.js`、`engines/life.js`、`engines/intel.js`、`engines/backstage.js`、`engines/tool-diag.js`、`tests/run.js`、`tests/settle-v2860.js`（新）、`tests/identity-v2860.js`（新）、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、`tests/field-liveness-ledger.json`、`tests/module-registry-ledger.json`、`index.js`、`manifest.json`、`README.md`、`ITERATION_LOG.md`。
-- **门禁结果**：`node tests/run.js` → **通过 7541 / 失败 0**（v2.85.0 基线 **7483 / 0**，净增 58 = A5 专锁 22 + A3 专锁 36）；`tests/settle-v2860.js` → **22 / 0**；`tests/identity-v2860.js` → **36 / 0**；`tests/reject-code-gate.js` → 每个码都有归属；`tests/dead-export-gate.js` → dead 444 / uiDead 4 / dataOnly 160 / 仅测试 292 / 证据 448 条；出口面 `ns= 103 members= 582 chars= 7199`。
+### R69 · 2026-09-25 · v2.87.0 导演工作台与拓宽（第四十一面：能力已经实现，但没有任何人读得到——探针只在测试里活着）
 
+- **做了什么**：三处落点，两把专锁，四个版本计划的收官版本。
+  **B6（`engines/causal.js`）**：抽出 `advanceChains(draft, f, cfg, only)` 作为推进的**唯一实现**（`tick()` 改为调它，只改传入 draft，不碰 store/stat/台账），在其上新增四个只读口：`stateView()`（活链/终局/按状态/按阶段/待定/延迟/已结算分列，与 `stat()` 的进程累计分列）、`previewIntervention(chainId, action, args)`（advance/cancel/settle 三动作给 allowed 与原因码，零副作用）、`rehearse(facts)`（深拷贝上跑完整一轮，dryRun:true）、`conflicts()`（只报同因同果在途链，给 a/b/both 选项，不自动消解）、`evidence()`（随机源读数与推进绑定，reproducible 仅在显式播种时为 true）。
+  **B7（`engines/theme.js`，新）**：五题材（都市/校园/悬疑/奇幻/经营）对 `rules.ORDER` 的**显式组合**。核心四模块（world/event/info/reputation）不入任何排除面；多题材取并集按 ORDER 原序（不引入优先级/覆盖）；`preview()` 纯计算不落设置；`apply()` 是唯一写入口，未知题材返回 `unknown-theme` 且不改状态；`rules.getAll()` 按启用题材过滤（零启用 = 全量，旧行为逐字不变）；`separation()` 报告三插件分工，缺席由 `compat.detect()` 现场探测**降级可见**。
+  **A5 收口（`engines/tool-import.js`）**：抽出共用字段映射 `toFaction/toEvent/toPmem`（消除两处字段名分叉）；新增 `previewPlan(raw)` 在深拷贝上跑**同一批准入函数**逐条报 willAdd/willSkip/rows；snapshot/regional/worldbook 如实给 note。
+  **UI 接线**：导演页新增题材规则组合区（多选/预览差异/应用/清空回全量）；事件页因果区新增因果工作台区（当前/累计/分支试演/查冲突/回放证据/干预预览）；工具页导入区 preview 与 previewPlan 并列显示。
+- **为什么**：B6/B7/A5 三处都是同型病——能力已经实现，但没有任何人读得到：causal 只能整体跑、不能定点，更不能先看后做；rules 只有全量/精简两档，题材无处装卸；toolImport.preview 只报 kind/size/count，而导入有副作用。
+- **踩过的坑**：① `theme.preview` 的「当前面」基线误用 `compose([])`（只得到 CORE 4 个模块），campus 的 deltaChars 报出 +5408 的虚假增量——**差异预览撒谎比没有预览更糟**，改为「未启用题材时当前面 = 全量 ORDER」后报 -1107；② B6-E 判据首版写错期望（rand 未播种时 seedSource 初始为 none 而非 auto），改为锚 `!== explicit && reproducible === false`；③ 首跑 `dead-export-gate` 一次报出 9 个新增死导出（B6 四个口 + A5 的 previewPlan 只有测试引用、4 个 self-only 过度导出）——处置不是刷账本，而是分两类治：四个只读口接面板、四个收回导出、一个由 `theme.separation` 接通；④ `missing-pair` 是自造的多余码，改为把空串交给 `causal.cancel` 复用其 `missing-fields` 归因。
+- **影响范围**：`engines/causal.js`、`engines/rules.js`、`engines/tool-import.js`、`engines/tool-diag.js`、`engines/theme.js`（新）、`ui/panel.js`、`tests/run.js`、`tests/b6-b7-v2870.js`（新）、`tests/causal-view-v2870.js`（新）、`tests/reject-v2780.js`、`tests/settle-v2830.js`、`tests/dead-export-ledger.json`、`tests/module-registry-ledger.json`、`index.js`、`manifest.json`、`README.md`、`FOUR_VERSION_PLAN.md`。
+- **门禁结果**：`node tests/run.js` → **通过 7596 / 失败 0**（v2.86.0 基线 **7541 / 0**，+55 = 两把专锁）；`tests/ui-gate.js` → **53 / 0**（375 控件真实点击）；`tests/ui-wire-audit.js` → **9 / 0**；出口面 `ns= 104 members= 596 chars= 7341`（已回填 FROZEN2800 与 EC2430）；`tests/dead-export-gate.js` → dead **443** / uiDead 4 / dataOnly 161 / 仅测试 291 / 证据 447；`tests/module-registry-gate.js` → pass（107 文件 / 115 命名空间）；`tests/reject-code-gate.js` → 见证 **79** / 死表 4 / 基线 211；`tests/settle-v2830.js` → **55 / 0**；`tests/inventory.js` → 四类悬空均 0（静态引用 2339 处）。
 ### R66 · 2026-09-25 · v2.86.0 注入链韧性 + 事实唯一写者（第四十面：一个源的数据瑕疵能把整块世界状态吃掉；一条事实有五个写者，谁写的看不出来）
 
 - **做了什么**：两处落点，两把专锁。

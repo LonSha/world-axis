@@ -387,6 +387,23 @@ function runWitness(WA) {
   trip('road-crowded', function () { return [codes2850()['road-crowded']]; });
   want('unreciprocated', '单向宣布的合作不得被当作已建立的协作（v2.85.0 B1）');
   trip('unreciprocated', function () { return [codes2850()['unreciprocated']]; });
+  // v2.87.0：B6/B7 暴露的码——一律用产品真 API 跑出来，不靠声称。
+  //   unknown-action：previewIntervention 的 action 不在 advance/cancel/settle 内时的出口。
+  //   注意行校验在动作分发**之前**：得先有一条真链，否则先撞 missing-chain。
+  want('unknown-action', '干预预览的未知动作被显式拒收（v2.87.0 B6，不静默当作 advance）');
+  trip('unknown-action', function () {
+    // 先让前因真实存在（addChain 只认已存在的世界事实，否则未知前因先拦）
+    WA.store.transact(function (d) {
+      d.worldFacts = [{ id: 'wf_v2870', key: '下雨', value: '是' }];
+      d.causal = { chains: [], settled: [] };
+    }, 'reject-witness:v2870-seed');
+    const chain = C.addChain({ cause: '下雨', action: '带伞' });
+    return [C.previewIntervention(chain.id, 'nope').reason];
+  });
+  //   unknown-theme：theme.apply 对未登记题材**拒收且不改状态**
+  //     （v2.87.0 B7；承诺面是「未知题材不静默当空集」，故必须真跑 apply 而不是只问 known）。
+  want('unknown-theme', '未知题材拒收且不改设置（v2.87.0 B7：不静默当空集）');
+  trip('unknown-theme', function () { return [WA.theme.apply(['no-such-theme']).reason]; });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

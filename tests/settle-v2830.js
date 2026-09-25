@@ -312,9 +312,10 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 114 && led.loadedCount === 106,
-    'v2830/mr: 命名空间 114 / 装载文件 106（与 LOAD_ORDER 的 109 差 3 个 ui/*）'
-    + ' —— v2.84.0 A2 新增 core/input-guard.js（inputGuard 命名空间）');
+  a(led.nsCount === 115 && led.loadedCount === 107,
+    'v2830/mr: 命名空间 115 / 装载文件 107（与 LOAD_ORDER 的 110 差 3 个 ui/*）'
+    + ' —— v2.84.0 A2 新增 core/input-guard.js（inputGuard 命名空间）；'
+    + ' v2.87.0 B7 新增 engines/theme.js（theme 命名空间）');
   const providers = Object.keys(led.modules).reduce(function (acc, rel) {
     led.modules[rel].requires.forEach(function (ns) { acc[ns] = true; });
     return acc;
