@@ -113,8 +113,22 @@
   · 真缺陷一并修：产品侧 `weatherReason: wx.ok ? wx.reason : 'unknown'` 的 `else` 落进「内联字面量 `reason: 'x'`」词法形状，被拒收码扫描器误捕 ⇒ 改**词法形状**为 `(wx.ok && wx.reason) || 'unknown'`（**非码不塞进台账**，否则台账永久虚胖）。
 - [x] 验收（X4）：专锁 `tests/transit-v2930.js` **74/0**（A 结构 / B 运行时 B0–B13 / C 不变式与诚实降级 / N0–N4 负控制，六个真源码破坏锚点各恰中 1 次）；全量回归 **7980/0**（v2.92.0 基线 7906/0，+74）；六道独立门禁全过。
 - [ ] X4 未覆盖（如实留在清单）：`BLOCK_LEVEL` 是**本版固化的映射**（未来新增天气词只报 `unknown-kind`，由调用方面对，不假装通行也不假装封锁）；`transit` **不做耗时修正**（`weather.factor` 只随读数报出，交调用方决策——`travelMinutes` 是另一入口）；**不做多跳途中遭遇**（只在路径各点查静态天气，不模拟「走到半路下起暴雨」）；`transit` 会改 `stat` 计数（故诊断节不调它）；**`hazard` 与本版未联动**（计划原文「weather.js 与 hazard/world.canBeAt 打通」只落了 weather↔world 这一半，hazard 侧留待后续如实登记）。
+- [x] O6（本版落点 = 流水落盘与跨会话可查，原料 = O5 未覆盖项「流水只驻内存」+ O2 未覆盖项「磁带只驻内存」）：
+  · `engines/org.js`：`JOURNAL_FORMAT` / `JOURNAL_FORMAT_VERSION` 两常量 + `exportJournal()`（**纯读**：不挤出、不清空、不改 stat、不改 journalStat；`truncated = dropped > 0` 照实带出）+ `inspectJournal(vol)`（四态校验，**内部面不导出**）+ `reconcileWith(vol)`（**带外对账**：链比对 `why:'chain'` + 存量比对 `why:'vs-stock'`，**不改本侧 journal**）。
+  · **不自动落盘**：落盘由用户显式调用 `exportJournal()` 触发（自动落盘会把观测面变成隐式写盘面，且每笔交易写一次 `localStorage` 是性能陷阱）。
+  · **没核与核过一致是两件事**：面板无卷时报 `no-volume` 并提示「先点『导出流水』得到一卷，再核」。
+  · 导出面**只加 2 个成员**（`exportJournal` → 面板 + 诊断 `secOrg`；`reconcileWith` → 面板）；`inspectJournal` / `climateOf` 一律**不导出**（无独立消费方不挂）。
+- [x] O7（本版落点 = 异常笔接进健康分，原料 = O5 未覆盖项「异常笔三类未接进健康分」）：
+  · `core/store.js` 新增 5 变量 + **9.10 资源账本异常笔**采集节：`anomalies.count > 0 ⇒ error`（扣 `min(18, n*6)`，`key:'org.anomalies'`，附处置入口）；否则 `dropped > 0 ⇒ info`（`key:'org.journal'`，明说「对账只核到**带内**，跨会话全量须显式导出流水卷」）。
+  · 分级与随机源/时间源同型：「没交易」是设计内默认态（不报），「有异常笔」才是缺陷。
+  · **观测不得改变被观测对象**：只读 `ledgerView()` / `journalStat`，不调 `grant` / `transfer`；整节 try 包裹，抛错走 `markDegraded('org.ledger')`。
+- [x] O8（本版落点 = 经济风纳入账本读数，原料 = O5 未覆盖项「`ECONOMY_CLIMATE` 未纳入」）：
+  · `climateOf()` 五态（`engine-absent` / `missing` / `unknown-climate` / `ok` / `climate-throw`），前三者 `available:false` 且 `climate:null`——**引擎缺席与字段缺失一律不回落成「平稳」**；表外气候词报 `unknown-climate`。
+  · `ledgerView()` 返回体增 `climate` 段；**只读不写**（`evolution` 是气候唯一写入口）。
+- [x] 验收（O6–O8，本版）：专锁 `tests/journal-v2940.js` **40/0**（A 静态面 / B 运行时面 / C 不变式 / N0–N4 负控制，六条真源码破坏锚点各恰中 1 次，负控制一律「真源码破坏 → 装载破坏副本 → 在副本上重跑同款真判据」+ 判据纯度前置检查 + H5 锚点字面量各只声明一次）；全量回归 **8013/0**（v2.93.0 基线 7980/0）；六道独立门禁全绿。
+- [ ] O6–O8 未覆盖（如实留在清单）：流水卷**须用户显式导出**（不自动落盘、不写 `localStorage`）；带外对账**只核卷内已记的键**（本侧新增持有者不在卷里故不报——这是「带外」的定义边界）；经济风**只报不判**；O7 **未做自动修复**（写坏是缺陷，缺陷不该被静默抹平）；`exportJournal` 的 `rows` 是元素同引用的浅拷贝（本版按「取证口不复制整卷」权衡保留）。
 - [ ] X1 未开始（见功能拓展计划）：X1 UI 实机验收通道（**需真机三插件联调，无头不可验**）。
-- [ ] X2 / X3 / X5 未开始（见功能拓展计划）：X2 B3 经济引擎；X3 B4 传播与辟谣；X5 跨插件因果桥。
+- [ ] X2 / X3 / X5 未开始（见功能拓展计划）：X2 B3 经济引擎（下一版 v2.95.0 落点）；X3 B4 传播与辟谣 + X6 hazard↔weather（v2.96.0）；X5 跨插件因果桥（v2.97.0）。
 
 ## 完成纪律
 - 每项需附实现路径、真实消费者、正反判据、运行证据，不能以新增导出或文件存在标记完成。

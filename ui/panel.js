@@ -381,6 +381,7 @@
       <div class="wa-row"><input id="wa-org-kind" class="wa-input" placeholder="faction 或 person"/><input id="wa-org-name" class="wa-input" placeholder="持有者"/><input id="wa-org-item" class="wa-input" placeholder="资源"/><input id="wa-org-qty" class="wa-input" placeholder="数量"/></div>
       <div class="wa-row"><input id="wa-org-to-kind" class="wa-input" placeholder="接收类型"/><input id="wa-org-to-name" class="wa-input" placeholder="接收者"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-org-grant">入库</button><button class="wa-btn" id="wa-org-transfer">转移</button><button class="wa-btn" id="wa-org-check">检查余额</button><button class="wa-btn" id="wa-org-ledger">资源账本</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-org-export" title="导出一卷流水（纯读：不挤出、不清空、不改计数）——跨会话全量对账靠它">导出流水</button><button class="wa-btn" id="wa-org-reconcile" title="把上一次导出的流水卷与本侧当前存量比对（带外 = 本侧环形已挤出、只有外来卷才核得到）">带外对账</button><button class="wa-btn" id="wa-org-climate" title="读数：当前经济气候（繁荣/平稳/衰退/动荡）与最近信号；只读 evolution.economy，不回落成「平稳」">经济风</button></div>
       <div id="wa-org-out" class="wa-out"></div>
       <div class="wa-sec">因果与情报</div>
       <label class="wa-row"><input id="wa-intel-enabled" type="checkbox" ${WA.intel && WA.intel.getSettings().enabled ? 'checked' : ''}/> 启用因果与情报</label>
@@ -1784,6 +1785,46 @@
         + ' · 对账 ' + (rc.ok ? '自洽' : (rc.breakCount || 0) + ' 处断裂' + (rc.truncated ? '（流水已截断，仅核对带内）' : ''));
       // 读数与「写盘回执」分开措辞：账本按钮报的是**核对结论**，不是「刚才那笔记下来了」。
       if (why) return orgOut({ ok: false, reason: why, summary: summary }, true);
+      const o = $('#wa-org-out');
+      const text = '账本 · ' + summary;
+      panelEl.dataset.orgOut = text;
+      if (o) o.textContent = text;
+    });
+    // ── v2.94.0（O6）：流水导出 / 带外对账。**显式触发**——落盘由用户按下这一刻决定，
+    //   不由每次交易隐式发生（自动落盘会把观测面变成隐式写盘面 + 性能陷阱）。
+    on('#wa-org-export', () => {
+      if (!WA.org || !WA.org.exportJournal) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      let v = null; try { v = WA.org.exportJournal(); } catch (e) { return orgOut({ ok: false, reason: 'export-throw' }, true); }
+      if (!v || !v.ok) return orgOut({ ok: false, reason: (v && v.reason) || 'export-unavailable' }, true);
+      // 导出即存档点：把这一卷留在面板 dataset 里，供「带外对账」当场核对（不写 localStorage）。
+      try { panelEl.__orgVol = v; } catch (e) {}
+      const summary = '流水卷 · ' + v.format + ' v' + v.formatVersion + ' · 带内 ' + v.entries + ' 笔（上限 ' + v.cap + '，累计 ' + v.recorded + '，挤出 ' + v.dropped + '）'
+        + (v.truncated ? ' · **已截断**：链首无上游可核，只含带内' : ' · 完整卷');
+      const o = $('#wa-org-out');
+      const text = '账本 · ' + summary;
+      panelEl.dataset.orgOut = text;
+      if (o) o.textContent = text;
+    });
+    on('#wa-org-reconcile', () => {
+      if (!WA.org || !WA.org.reconcileWith) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const vol = panelEl.__orgVol;
+      // 没有卷时不假装核对过：如实说「先导出一卷」——「没核」与「核过一致」是两件事。
+      if (!vol) return orgOut({ ok: false, reason: 'no-volume', summary: '先点「导出流水」得到一卷，再核' }, true);
+      let rc = null; try { rc = WA.org.reconcileWith(vol); } catch (e) { return orgOut({ ok: false, reason: 'reconcile-throw' }, true); }
+      if (!rc || rc.ok === undefined) return orgOut({ ok: false, reason: (rc && rc.reason) || 'bad-volume', summary: '流水卷不合规，未核对' }, true);
+      const summary = '带外对账 · 核 ' + rc.checked + ' 笔 · ' + (rc.ok ? '自洽' : (rc.breakCount || 0) + ' 处断裂') + (rc.truncated ? '（卷已截断）' : '');
+      const o = $('#wa-org-out');
+      const text = '账本 · ' + summary;
+      panelEl.dataset.orgOut = text;
+      if (o) o.textContent = text;
+    });
+    // 经济风读数：**只读**——不回落成「平稳」（引擎缺席 / 字段缺失各有其名）。
+    on('#wa-org-climate', () => {
+      if (!WA.org || !WA.org.ledgerView) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      let v = null; try { v = WA.org.ledgerView(); } catch (e) { return orgOut({ ok: false, reason: 'ledger-throw' }, true); }
+      const c = v.climate || {};
+      if (!c.available) return orgOut({ ok: false, reason: c.reason || 'climate-unavailable', summary: '经济风不可读（' + (c.reason || '?') + '）——不回落成「平稳」' }, true);
+      const summary = '经济风 · ' + c.climate + (c.reason === 'unknown-climate' ? '（**表外气候词**，由调用方面对）' : '') + ' · 信号 ' + (c.signals || []).length + ' 条';
       const o = $('#wa-org-out');
       const text = '账本 · ' + summary;
       panelEl.dataset.orgOut = text;

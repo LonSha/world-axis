@@ -32,6 +32,62 @@
   //   ③ 记录**不得影响判定**：noteJournal 全程 try 包裹，grant / transfer 的
   //      返回值与既有 stat 语义一字不变（观测不得改变被观测行为）。
   const JOURNAL_CAP = 200;
+  // ── v2.94.0（O6）：流水导出 / 存档点（跨会话可查，**显式触发不自动落盘**）──
+  // 为什么需要它：v2.92.0 的流水只驻内存（与 causal 磁带同口径），于是「上一节会话里
+  //   那笔之后存量对不对」跨会话不可判定；reconcile 在环形挤出后只能核对**带内**。
+  // 三条口径：
+  //   ① **不自动落盘**：落盘由用户显式调用 exportJournal() 触发——自动落盘会把
+  //      观测面变成隐式写盘面（且每次交易都写一次 localStorage 是性能陷阱）。
+  //   ② 导出带 **format / version / cap** 三元头：读的人能判「这是哪一版的流水」
+  //      与「这一卷是不是被截断过」（dropped 照实带出，不假装完整）。
+  //   ③ 导出是**纯读**：不挤出、不清空、不改 stat、不改 journalStat（观测不得
+  //      改变被观测对象）；导入是**显式**动作，且只接受同 format 的卷。
+  const JOURNAL_FORMAT = 'worldaxis.org.journal';
+  const JOURNAL_FORMAT_VERSION = 1;
+  function exportJournal() {
+    try {
+      return {
+        ok: true, format: JOURNAL_FORMAT, formatVersion: JOURNAL_FORMAT_VERSION,
+        cap: JOURNAL_CAP, entries: journal.length,
+        recorded: journalStat.recorded, dropped: journalStat.dropped,
+        // dropped > 0 ⇒ 本卷只含**带内**流水，链首无上游可核——照实带出不假装完整。
+        truncated: journalStat.dropped > 0,
+        savedAt: clockNow('org'), rows: journal.slice()
+      };
+    } catch (e) { return { ok: false, reason: 'export-throw' }; }
+  }
+  /** 校验一卷外来的流水（不导入、不写盘）——读的人先知道这卷能不能用。 */
+  function inspectJournal(vol) {
+    if (!vol || typeof vol !== 'object') return { ok: false, reason: 'bad-volume' };
+    if (vol.format !== JOURNAL_FORMAT) return { ok: false, reason: 'bad-format', want: JOURNAL_FORMAT, got: vol.format };
+    if (vol.formatVersion !== JOURNAL_FORMAT_VERSION) return { ok: false, reason: 'bad-version', want: JOURNAL_FORMAT_VERSION, got: vol.formatVersion };
+    if (!Array.isArray(vol.rows)) return { ok: false, reason: 'bad-rows' };
+    return { ok: true, format: JOURNAL_FORMAT, formatVersion: JOURNAL_FORMAT_VERSION,
+      entries: vol.rows.length, truncated: !!vol.truncated, savedAt: vol.savedAt || 0 };
+  }
+  /** 带外对账：把一卷外来流水与本侧当前存量比对（**不改本侧 journal**）。
+   *  「带外」= 本侧环形已挤出的那些笔，只有外来卷才核得到——这正是跨会话可查的意义。 */
+  function reconcileWith(vol) {
+    const ins = inspectJournal(vol);
+    if (!ins.ok) return ins;
+    const last = {}; const kOf = function (kind, name, resource) { return kind + '|' + name + '|' + resource; };
+    const breaks = [];
+    vol.rows.forEach(function (r, i) {
+      if (!r || typeof r !== 'object') return;
+      const sides = [['to', r.toKind, r.toName, r.toBefore, r.toAfter]];
+      if (r.op === 'transfer') sides.push(['from', r.fromKind, r.fromName, r.fromBefore, r.fromAfter]);
+      sides.forEach(function (side) {
+        const k = kOf(side[1], side[2], r.resource), before = side[3], after = side[4];
+        if (Object.prototype.hasOwnProperty.call(last, k) && typeof before === 'number' && before !== last[k]) {
+          breaks.push({ i: i, why: 'chain', key: k, expect: last[k], got: before });
+        }
+        last[k] = after;
+      });
+    });
+    stockBreakOf(last, breaks, null);
+    return { ok: breaks.length === 0, checked: vol.rows.length, breakCount: breaks.length,
+      breaks: breaks.slice(0, 20), truncated: !!vol.truncated, savedAt: vol.savedAt || 0 };
+  }
   const journal = [];
   const journalStat = { recorded: 0, dropped: 0 };
   function noteJournal(row) {
@@ -147,6 +203,19 @@
     out.count = out.stockDrift.length + out.negativeStock.length + out.overpay.length;
     return out;
   }
+  /** 存量比对：把「流水末值」与「当前存量」逐键对齐，对不上即记一笔 vs-stock 断裂。
+   *  抽成函数是**实质需要**不是洁癖：v2.94.0 的带外对账（reconcileWith）与带内对账
+   *  （reconcile）必须给同一份账同一个答案——复制一份循环的那天，改一处漏一处就分叉了。
+   *  `onGone` 是两面对「持有者已消失」的既有分歧：带内记进 holderGone（持有人没了），
+   *  带外只报断裂（外来卷说的持有者本侧根本不认识，这本身就是一种对不上）。 */
+  function stockBreakOf(last, breaks, onGone) {
+    Object.keys(last).forEach(function (k) {
+      const parts = k.split('|');
+      const cur = qtyOf(parts[0], parts[1], parts[2]);
+      if (cur === null) { if (onGone) onGone(k); return; }
+      if (cur !== last[k]) breaks.push({ i: -1, why: 'vs-stock', key: k, expect: last[k], got: cur });
+    });
+  }
   /** 对账：把流水逐笔串起来，核对「这笔的 before == 上一笔的 after」，再与当前存量比对。
    *  基线照实：链首那笔的 before 没有上游可核（环形挤出后更无从核起）——如实报 truncated。 */
   function reconcile() {
@@ -166,12 +235,7 @@
       });
     });
     const gone = [];
-    Object.keys(last).forEach(function (k) {
-      const parts = k.split('|');
-      const cur = qtyOf(parts[0], parts[1], parts[2]);
-      if (cur === null) { gone.push(k); return; }
-      if (cur !== last[k]) breaks.push({ i: -1, why: 'vs-stock', key: k, expect: last[k], got: cur });
-    });
+    stockBreakOf(last, breaks, function (k) { gone.push(k); });
     return {
       ok: breaks.length === 0, checked: journal.length, breaks: breaks.slice(0, 20), breakCount: breaks.length,
       baseline: journalStat.dropped > 0 ? 'truncated' : 'journal-head', truncated: journalStat.dropped > 0,
@@ -179,6 +243,30 @@
     };
   }
   /** 只读账本视图：存量（逐持有者逐资源）+ 流量（流入 / 流出 / 净）+ 笔数 + 异常笔 + 对账。 */
+  // ── v2.94.0（O8）：经济风纳入账本读数（**只读 evolution.economy**）──
+  // 为什么：O5 的计划原文是「经济风（ECONOMY_CLIMATE）+ org.stockOf 流水」，v2.92.0 只落了
+  //   后者——于是「存量在动、经济风是繁荣还是衰退」这张账答不上来，读者看完库存仍不知道
+  //   这些物资是在盛世囤的还是乱世抢的。
+  // 口径：**只读不写**——`evolution` 是经济气候的唯一写入口（本模块不越界改它）；
+  //   引擎缺席或字段缺失时如实报 `available:false` 与 `reason`，**不回落成「平稳」**
+  //   （「不知道」与「平稳」是两件事，拿后者冒充前者就是静默撒谎）。
+  function climateOf() {
+    try {
+      if (!WA.evolution || typeof WA.evolution !== 'object') return { available: false, reason: 'engine-absent', climate: null, signals: [] };
+      const st = state();
+      const eco = (st.evolution || {}).economy;
+      if (!eco || typeof eco !== 'object') return { available: false, reason: 'missing', climate: null, signals: [] };
+      const known = (WA.evolution.ECONOMY_CLIMATE || []);
+      const climate = eco.climate;
+      // 表外气候词不装作认识：照实报出来，由调用方面对。
+      const recognized = known.length ? known.indexOf(climate) >= 0 : !!climate;
+      const sigs = Array.isArray(eco.signals) ? eco.signals : [];
+      return { available: true, reason: recognized ? 'ok' : 'unknown-climate', climate: climate || null,
+        recognized: recognized, known: known.slice(), signals: sigs.map(function (x) {
+          return { summary: (x && x.summary) || '', at: (x && x.at) || 0 };
+        }).slice(0, 6) };
+    } catch (e) { return { available: false, reason: 'climate-throw', climate: null, signals: [] }; }
+  }
   function ledgerView() {
     const st = state();
     const holders = [];
@@ -193,6 +281,7 @@
     journal.forEach(function (r) { inflow += qty(r.amount); if (r.op === 'transfer') outflow += qty(r.amount); });
     return {
       enabled: !!settings().enabled,
+      climate: climateOf(),
       holderCount: holders.length, holders: holders.slice(0, 20),
       entries: journal.length, recorded: journalStat.recorded, dropped: journalStat.dropped, cap: JOURNAL_CAP,
       flow: { in: inflow, out: outflow, net: inflow - outflow },
@@ -208,6 +297,10 @@
     // v2.92.0（O5）：账本读数两口。ledgerView → 诊断 secOrg + 面板「资源账本」按钮；
     //   reconcile → 诊断 secOrg（跨文件消费方）。**纯读**：不跑引擎、不改存档、不注入。
     ledgerView: ledgerView, reconcile: reconcile,
+    // v2.94.0（O6）：流水导出/存档点三面。exportJournal → 面板「导出流水」按钮 + 诊断 secOrg；
+    //   reconcileWith → 面板「带外对账」按钮（带外 = 本侧环形已挤出、只有外来卷才核得到）。
+    //   inspectJournal 被 reconcileWith 消费（不单独导出——无独立消费方不挂）。
+    exportJournal: exportJournal, reconcileWith: reconcileWith,
     stat: function () { return Object.assign({}, stat); }
   };
 })();

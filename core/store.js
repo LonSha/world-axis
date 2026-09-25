@@ -1989,6 +1989,9 @@
         }
       } catch (eEv) { markDegraded('evict', eEv); }
       let bridgePublishesN = 0, bridgeFailuresN = 0, bridgeExternalReadsN = 0, bridgeEnabledN = false; // v2.16.0: 对外桥
+      // v2.94.0（O7）：资源账本异常笔——健康分此前对「库存被写坏」完全无感（O5 只把异常笔
+      //   送进诊断与面板，体检结论仍可能报 ok）。计数与归因分开：只读，不调 grant/transfer。
+      let orgAnomaliesN = 0, orgDriftN = 0, orgNegativeN = 0, orgOverpayN = 0, orgJournalDroppedN = 0;
       // v2.17.0: 记忆桥消费面——上面那组信号答的是「我发得出去吗」，这组答「我读得进来吗」。
       //   两者是同一套互操作的两条边：只有发文没有读入，说明这个扩展只把世界摆在门口，
       //   却不看另一个插件记的那本账，「两个钟对不上」就永远没人发现。
@@ -2136,6 +2139,34 @@
           }
         }
       } catch (eLs2) { markDegraded('lonsha', eLs2); }
+      // ── 9.10 资源账本异常笔（v2.94.0 / O7）──
+      //   为什么健康分要看它：v2.92.0 把逐笔流水与异常笔三类（前后值漂移 / 负库存 / 超额支付）
+      //   算出来了，但只送进诊断与面板——**体检结论照样能报 ok**。于是「库存被写坏、账上一切正常」
+      //   这件事在健康分层面仍然是不可见的：面板要用户主动点「资源账本」才看得到。
+      //   分级与随机源/时间源同型——「没交易」是设计内默认态（不报），「有异常笔」才是缺陷：
+      //     · 异常笔 > 0 ⇒ error（库存与流水对不上：这是账本自证「我被写坏了」）；
+      //     · 流水挤出 > 0 ⇒ info（环形上限的设计内行为，但要说清「对账只核到带内」）。
+      //   **观测不得改变被观测对象**：只读 anomalies() / journalStat，不调 grant / transfer。
+      try {
+        if (WA.org && typeof WA.org.ledgerView === 'function') {
+          const ov = WA.org.ledgerView();
+          const oa = (ov && ov.anomalies) || null;
+          if (oa) {
+            orgAnomaliesN = oa.count || 0;
+            orgDriftN = (oa.stockDrift || []).length;
+            orgNegativeN = (oa.negativeStock || []).length;
+            orgOverpayN = (oa.overpay || []).length;
+            orgJournalDroppedN = ov.dropped || 0;
+            if (orgAnomaliesN > 0) {
+              score -= Math.min(18, orgAnomaliesN * 6);
+              issues.push({ level: 'error', key: 'org.anomalies', detail: '资源账本检出 ' + orgAnomaliesN + ' 笔异常（前后值漂移 ' + orgDriftN + ' / 负库存 ' + orgNegativeN + ' / 超额支付 ' + orgOverpayN + '）——库存与流水对不上，账本自证被写坏；面板「资源账本」看明细' });
+              actions.push({ id: 'review-org-anomalies', safe: true, detail: '面板人物页「资源账本」查看逐笔异常明细' });
+            } else if (orgJournalDroppedN > 0) {
+              issues.push({ level: 'info', key: 'org.journal', detail: '资源流水已挤出 ' + orgJournalDroppedN + ' 笔（环形上限的设计内行为）——对账只核到**带内**，跨会话全量须显式导出流水卷（WA.org.exportJournal）' });
+            }
+          }
+        }
+      } catch (eOrg) { markDegraded('org.ledger', eOrg); }
       // ── 10. 巡视自身完整性（v2.0.0）──
       //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
       let degradedN = 0;
@@ -2236,6 +2267,10 @@
             //   （对方拿到的永远是 null），bridgeFailures>0 才是缺陷。
             bridgePublishes: bridgePublishesN, bridgeFailures: bridgeFailuresN,
             bridgeExternalReads: bridgeExternalReadsN, bridgeEnabled: bridgeEnabledN,
+            // v2.94.0（O7）：资源账本异常笔——orgAnomalies>0 是缺陷（库存与流水对不上），
+            //   orgJournalDropped>0 是设计内行为但要说清「对账只核到带内」。
+            orgAnomalies: orgAnomaliesN, orgDrift: orgDriftN, orgNegative: orgNegativeN,
+            orgOverpay: orgOverpayN, orgJournalDropped: orgJournalDroppedN,
             // v2.17.0: 记忆桥消费面——lonshaAvailable=false 且 lonshaVerdict 为归因字符串时，
             //   说明「读不到」这件事本身是**可归因**的（未装/未就绪/契约不匹配各有其名），
             //   而不是一个无名的 null。lonshaDays 为真不一致时的天数。
