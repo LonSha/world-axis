@@ -44,6 +44,33 @@
  * 不做什么：**不写 localStorage**。种子只活在内存里，不新增任何持久键——
  *   持久键预算已由 store 的登记表管着，随机源没有资格占地。
  *   代价：刷新页面即换种子（自动种子）。要复现就显式 `seed(n)`，这是调用方的责任。
+ *
+ * v2.89.0 O2（第四十三面：回放不了的那一步）——**抽取磁带与回放模式**。
+ *   到这里为止，「可复现」只做到**声明层**：`randStat().reproducible` 说「这一轮是显式
+ *   播种的」，却**没有任何地方能证明这句话**。种子相同的两次运行之间，还有一个东西在动：
+ *   **调用顺序**。同一种子只在「谁在第几步取数、取了几次、走的哪条通道」逐字相同时才给出
+ *   同一序列；而推进逻辑一旦分支（条件满足 / 未满足、链被取消 / 到期），两侧的抽取序列
+ *   就错位，此后每个数都不同——而错位**不会报错**，它只是安静地给出另一套数。
+ *   于是「这一轮可复现吗」永远只能靠人去比对两份世界状态，而两份状态本来就不该相同。
+ *
+ *   两条口径（与「决策流 / 标识流」的既有切分正交）：
+ *     · **磁带记的是「答案 + 位置」**：每次决策取数（与 `id()` 的噪声取数）按顺序记
+ *       `{c: 通道名, v: 取到的值, k: 'd'|'i'}`。种子不记「推导过程」而记「取出的数」——
+ *       这样即使调用顺序变了，**位置对不上会被当场报出来**，而不是静默换一套数。
+ *     · **回放模式不碰派生流**：回放时 `next()` / `id()` 的取数全部来自磁带，`streamFor`
+ *       连派生都不发生——于是回放**不消耗、也不重置**当前会话的随机序列。若为了回放去
+ *       `seed()` 一次，退出回放后整个会话的后续序列就换了，而调用方无从知道。
+ *       这是「取证动作不得改变被取证对象」的最低要求。
+ *
+ *   三条**绝不静默**（对齐本模块的 `failed` / `failedBy` 口径）：
+ *     ① 通道名对不上 ⇒ 记 `miss` 并给出 `lastMiss{want,got,why}`，**不猜、不顺延**；
+ *     ② 位置越界（磁带枯竭）⇒ 记 `miss`，值退 `0`（回放不得抛，也不得假装成功）；
+ *     ③ 值非法（NaN/Infinity）⇒ 记 `miss`，不让它顺着算术传播成「恒假比较」（v2.4.0 的坑）。
+ *   回放期间 `next()` 照常 `tick()`：`byChannel` 于是反映**回放侧真的问了什么**，
+ *   与磁带通道构成不一致本身就是一条可断言的证据。
+ *
+ *   不做什么：**不落盘**。磁带只活在内存里，由调用方（causal.evidence）交给持有者；
+ *     与种子同规格——持久键预算不因取证功能扩张。
  */
 (function () {
   'use strict';
@@ -86,6 +113,17 @@
     lastAt: 0, lastChannel: null, lastSeedAt: 0
   };
   let __uidCounter = 0;
+
+  // ── v2.89.0 O2：抽取磁带与回放模式 ──────────────────────
+  //   __mode === 'live'   → 取数走派生流；若磁带开着则顺手记账（录制）
+  //   __mode === 'replay' → 取数全部来自磁带；派生流不派生、不消耗
+  let __mode = 'live';
+  let __tape = null;          // {seed, entries:[{c,v,k}], open, idx, used, miss, lastMiss}
+  // v2.89.0 O2 自纠：最近**收卷**的一卷磁带。为什么还要单独存一份：
+  //   回放结束时 `__tape` 会被清掉（那只是走位用的索引卷）。此前没有这份留存，
+  //   于是「刚复核完一轮」之后 `tape()` 报 entries=0 —— 一个**只读的取证动作**
+  //   （replayWith）把 `evidence().replayable` 从 true 翻成了 false：取证擦掉了证据。
+  let __lastTape = null;
 
   function noteFail(why) {
     __stats.failed++;
@@ -131,13 +169,73 @@
    */
   function draw(name) {
     ensureSeed();
-    return streamFor(name)();
+    // v2.89.0 O2：回放模式下标识流的**噪声抽取**也从磁带取。
+    //   边界如实（本版自纠，实测得出的，不是推演）：复现的是「抽到的随机噪声」，
+    //   **时间戳与递变计数器不参与回放**——`cs_<时间戳>_<计数器>_<噪声>` 里只有噪声逐字相同
+    //   （实测 a=`..._1_3d4c` / b=`..._2_3d4c`：噪声同、计数器不同）。
+    //   理由不是偷懒：计数器与时间戳的职责是**唯一性**（同毫秒不撞、跨会话不撞）。
+    //   把它们也复现，两次回放会产出同一个 id，而世界里的那份还在——用唯一性换可复现性是净亏。
+    if (__mode === 'replay') {
+      const r = take(name, 'i');
+      return r.ok ? r.v : 0;
+    }
+    const v = streamFor(name)();
+    noteTape(name, v, 'i');
+    return v;
   }
-  /** 取一个 [0,1) 实数（决策流，计入 draws）。**唯一**的决策取数入口，其余都是它的规约。 */
+
+  // ── v2.89.0 O2：磁带读取（回放侧唯一取数通道）────────────
+  /**
+   * 按**位置**取一格磁带。三条绝不静默（见文件头注）。
+   * 位置**无论命中与否都前进一格**——这是错位可被检出的前提：
+   *   若只在命中时前进，错位会退化成「同一个值反复取」，反而更像「一切正常」。
+   */
+  function take(name, kind) {
+    const t = __tape;
+    if (!t) return { ok: false, why: 'no-tape' };
+    const e = (t.idx < t.entries.length) ? t.entries[t.idx] : null;
+    t.idx++;
+    if (!e) {
+      t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: '(磁带枯竭)', why: 'exhausted' };
+      return { ok: false, why: 'exhausted' };
+    }
+    t.used++;
+    if (String(e.c) !== name) {
+      t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: String(e.c), why: 'channel' };
+      return { ok: false, why: 'channel' };
+    }
+    if (String(e.k) !== kind) {
+      t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: String(e.c), why: 'kind:' + String(e.k) };
+      return { ok: false, why: 'kind' };
+    }
+    const v = Number(e.v);
+    if (!isFinite(v)) {
+      t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: String(e.c), why: 'bad-value' };
+      return { ok: false, why: 'bad-value' };
+    }
+    return { ok: true, v: v };
+  }
+  /** 录制：只记**答案**，不记推导过程（调用顺序错位才会被位置检出来） */
+  function noteTape(name, v, kind) {
+    if (!__tape || !__tape.open) return;
+    __tape.entries.push({ c: name, v: v, k: kind });
+  }
+
+  /**
+   * 取一个 [0,1) 实数（决策流，计入 draws）。**唯一**的决策取数入口，其余都是它的规约。
+   * v2.89.0 O2：`tick()` 在两种模式下都照跑——回放侧的 `byChannel` 于是是「它真的问了什么」，
+   *   与磁带构成比对即可暴露调用顺序漂移（若回放里少问一次，那个通道的计数当场偏低）。
+   */
   function next(ch) {
     const name = channelOf(ch);
     tick(name);
-    return draw(name);
+    if (__mode === 'replay') {
+      const r = take(name, 'd');
+      return r.ok ? r.v : 0;
+    }
+    const v = streamFor(name)();
+    noteTape(name, v, 'd');
+    return v;
   }
   /**
    * 区间整数 [min, max]（含两端）。
@@ -243,6 +341,127 @@
   }
 
   // ── 只读视图（供诊断 / 面板 / 健康分消费）──────────────
+  // ── v2.89.0 O2：磁带公开面（五个口，全部有真实消费方：causal.evidence /
+  //   面板「回放」按钮 / 诊断 secCausal）────────────────────
+  /** 只读视图：任何模式下都可读（未录制时为 live 空卷） */
+  function tapeInfo() {
+    // 无在卷时回落到最近收卷的一卷（v2.89.0 O2 自纠）：复核只该丢掉走位用的索引卷，
+    //   不该让「上一轮录了什么」变得不可见。
+    const t = __tape || __lastTape;
+    const chans = {};
+    if (t) t.entries.forEach(function (e) { chans[e.c] = 1; });
+    return {
+      mode: __mode,
+      open: !!(t && t.open),
+      seed: t ? t.seed : (__seedSource === 'none' ? null : __seed),
+      entries: t ? t.entries.length : 0,
+      values: t ? t.entries.filter(function (e) { return e.k === 'd'; }).length : 0,
+      idx: t ? t.idx : 0,
+      used: t ? t.used : 0,
+      miss: t ? t.miss : 0,
+      lastMiss: t ? (t.lastMiss || null) : null,
+      channels: Object.keys(chans).sort(),
+      // 磁带种子与当前会话种子是否一致：不一致时，这次回放**不构成对当前会话的复现依据**
+      //   （它只复现了磁带自己的那一轮）。三者含义不同：true / false / null（当前无种子）。
+      seedMatched: (t && __seedSource !== 'none') ? (Number(t.seed) === __seed) : null
+    };
+  }
+  /** 开一卷磁带开始录制。withValues=false 只记位置与通道（省内存，用于只看漂移） */
+  function beginTape(withValues) {
+    if (__mode === 'replay') return { ok: false, reason: 'in-replay' };
+    if (__tape && __tape.open) return { ok: false, reason: 'already-recording' };
+    __tape = { seed: (__seedSource === 'none' ? null : __seed), entries: [], open: true,
+      idx: 0, used: 0, miss: 0, lastMiss: null, withValues: withValues !== false };
+    return { ok: true, seed: __tape.seed, mode: __mode };
+  }
+  /** 收卷。返回这卷磁带（值取自入参 `into` 或返回值，本模块不持有历史卷） */
+  function endTape() {
+    if (!__tape || !__tape.open) return { ok: false, reason: 'not-recording' };
+    __tape.open = false;
+    const out = {
+      seed: __tape.seed, open: false, entries: __tape.entries.slice(),
+      recordedAt: (WA.clock ? WA.clock.wallNow() : Date.now())
+    };
+    if (__tape.withValues === false) {
+      out.entries = out.entries.map(function (e) { return { c: e.c, k: e.k }; });
+      out.noValues = true;
+    }
+    // 留存一份：收卷之后这卷磁带就是「上一轮可复核的证据」，要活过随后的任何复核动作
+    __lastTape = out;
+    return { ok: true, tape: out, count: out.entries.length, seed: out.seed };
+  }
+  /**
+   * 进入回放。**不重播种子、不重置派生流**——回放期间一切取数走磁带，
+   *   于是退出后会话的随机序列与进入前**逐位相同**（取证不改被取证对象）。
+   * @param {object} t 由 endTape 产出的磁带（未 open）
+   * @returns {{ok:boolean, reason?:string}}
+   */
+  function replay(t) {
+    if (!t || !Array.isArray(t.entries)) return { ok: false, reason: 'bad-tape' };
+    if (t.open) return { ok: false, reason: 'tape-open' };
+    if (__tape && __tape.open) return { ok: false, reason: 'recording' };
+    if (t.noValues) return { ok: false, reason: 'tape-without-values' };
+    __tape = { seed: (t.seed === undefined ? null : t.seed), entries: [], open: false,
+      idx: 0, used: 0, miss: 0, lastMiss: null };
+    // 只索引、不拷贝值：磁带是调用方的东西，本模块不持有第二份真源
+    __tape.entries = t.entries;
+    __mode = 'replay';
+    return { ok: true, entries: __tape.entries.length,
+      seed: __tape.seed, seedMatched: (__seedSource === 'none') ? null : (Number(__tape.seed) === __seed) };
+  }
+  /**
+   * v2.89.0 O2：**从种子重算磁带**——纯函数，零副作用，不跑任何产品代码。
+   *
+   * 与 `replay()` 分工（两条证据答两个不同问题，缺一留缝）：
+   *   · `replay()`   —— 同一段代码按磁带再走一遍，证「抽取序列对得上」；要重跑代码，
+   *                     故**不能**用于会写世界的轮次；
+   *   · `verifyTape()` —— 只做算术，证「这卷磁带确实出自这个种子」；对任何轮次都能用。
+   *
+   * 算法与录制路径逐字同构：逐通道 `hash32(种子 + ':' + 通道名)` 派生 mulberry32 流，
+   *   按 entries 的**顺序**从各自通道取数——这正是录制时发生的事，故能逐值对齐。
+   * 不一致只报**第一处**（第几格、哪个通道、期望值、实际值）：一处分歧之后所有值都会错位，
+   *   把 200 处错位列出来反而藏住了「从哪儿开始错的」。
+   */
+  function verifyTape(t) {
+    if (!t || !Array.isArray(t.entries)) return { ok: false, reason: 'bad-tape' };
+    if (t.seed === null || t.seed === undefined) return { ok: false, reason: 'no-seed' };
+    const n = Number(t.seed);
+    if (!isFinite(n)) return { ok: false, reason: 'bad-seed' };
+    const seedNum = (Math.floor(Math.abs(n)) % 0xFFFFFFFF) >>> 0 || 1;
+    const streams = {};
+    let checked = 0, mism = 0, first = null;
+    t.entries.forEach(function (e, i) {
+      const name = (e && e.c !== undefined && e.c !== null && e.c !== '') ? String(e.c) : 'default';
+      if (!streams[name]) streams[name] = mulberry32(hash32(seedNum + ':' + name));
+      const want = streams[name]();
+      const got = Number(e && e.v);
+      checked++;
+      if (!(got === want)) {
+        mism++;
+        if (!first) first = { at: i, channel: name, want: want, got: (e ? e.v : null) };
+      }
+    });
+    return {
+      ok: mism === 0, reason: mism === 0 ? '' : 'value-mismatch',
+      seed: seedNum, checked: checked, mismatches: mism, firstMismatch: first,
+      channels: Object.keys(streams).sort(),
+      // 位置面：磁带里 `k` 不是 'd'/'i' 的格（手改/旧版磁带）单独报，不混进值比对
+      oddKinds: t.entries.filter(function (e) { return e && e.k !== 'd' && e.k !== 'i'; }).length
+    };
+  }
+  /** 退出回放。返回本次回放的走位读数（used / miss / 未走完多少格） */
+  function stopReplay() {
+    if (__mode !== 'replay') return { ok: false, reason: 'not-replaying' };
+    const t = __tape || { idx: 0, used: 0, miss: 0, entries: [] };
+    const out = { ok: true, used: t.used, miss: t.miss, consumed: t.idx,
+      left: Math.max(0, t.entries.length - t.idx), lastMiss: t.lastMiss || null };
+    __mode = 'live';
+    // 只丢走位用的索引卷；最近收卷的磁带留在 __lastTape（取证不得擦掉证据）
+    __tape = null;
+    return out;
+  }
+
+  // 观测
   function randStat() {
     const byCh = {};
     Object.keys(__stats.byChannel).forEach(function (k) { byCh[k] = __stats.byChannel[k]; });
@@ -290,6 +509,17 @@
     // 观测
     randStat: randStat,
     resetRandStat: resetRandStat,
-    channels: channels
+    channels: channels,
+    // v2.89.0 O2：抽取磁带（录制 / 收卷 / 只读视图 / 进入回放 / 退出回放）。
+    //   回放侧读的是**答案与位置**，因此「调用顺序漂移」第一次可以被打出来，
+    //   而不是安静地换一套数——本仓库此前对这种情况只有「不可判定」。
+    beginTape: beginTape,
+    endTape: endTape,
+    tape: tapeInfo,
+    replay: replay,
+    stopReplay: stopReplay,
+    // v2.89.0 O2：从种子重算磁带（纯）。消费方：面板「复核磁带」与 tool-diag 的 secCausal
+    //   —— 诊断侧只能调它，不能调 replay（replay 要重跑代码，而诊断必须零副作用）。
+    verifyTape: verifyTape
   };
 })();

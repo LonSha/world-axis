@@ -35,6 +35,15 @@ const DEAD = {
       + '全部位于 store.transact(function (draft) {...}) 回调内，而 transact 保证传入骨架草稿对象。'
       + '不删：唯一写者是对外导出，越界调用时它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。'
   },
+  'end-failed': {
+    anchor: "if (!tape || !tape.ok) return { ok: false, reason: 'end-failed', result: result };",
+    why: 'causal.record（v2.89.0 O2）的收卷失败出口，在现有设计下**结构不可达**：'
+      + '进入该分支的前提是 beginTape 成功，而 beginTape 成功必然把磁带置于 open=true；'
+      + 'endTape 的拒收条件恰是“磁带不存在或已收卷”，两者互斥。唯一能造出'
+      + '“begin 成功但 end 拒绝”的路径是自己先把磁带收掉，而收卷发生在 finally 里、fn 体拿不到句柄。'
+      + '不删：将来若磁带面被改成可重入（外部可提前收卷），它是第一道防线；'
+      + '届时本门禁会以 deadLeak 提醒它可能复活。'
+  },
   'migration-loop': {
     anchor: "if (++guard > 64) return { ok: false, reason: 'migration-loop' };",
     why: 'checkpoints.migrate 的自旋防护在 FORMAT=1 期**结构上不可达**：循环条件 f < FORMAT 要求 f<1，'
@@ -404,6 +413,80 @@ function runWitness(WA) {
   //     （v2.87.0 B7；承诺面是「未知题材不静默当空集」，故必须真跑 apply 而不是只问 known）。
   want('unknown-theme', '未知题材拒收且不改设置（v2.87.0 B7：不静默当空集）');
   trip('unknown-theme', function () { return [WA.theme.apply(['no-such-theme']).reason]; });
+  // v2.89.0 O2：磁带面（rand 六口 + causal 两口）暴露的码。
+  //   这一段本身就是本版「取证不得靠声称」的同一把尺子用在自家新口上：
+  //   12 个码逐个用真 API 跑出来，唯一跑不到的（end-failed）进死表并附可复算前提。
+  const Rn = WA.rand;
+  want('in-replay', '回放中拒绝开新卷（v2.89.0 O2：取证期间不得改被取证对象）');
+  trip('in-replay', function () {
+    Rn.seed(4242);
+    // 先自纠一处写法：beginTape 返回的是**回执**（{ok, seed, mode}），磁带只能从
+    //   endTape().tape 取。写成 `replay(beginTape(...).tape)` 会因入参 undefined 走 bad-tape，
+    //   根本没进入回放态，于是这条见证看着「没跑出 in-replay」。
+    Rn.beginTape(true);
+    const e = Rn.endTape();
+    const rr = Rn.replay(e.tape);
+    const r = rr.ok ? Rn.beginTape(true) : { reason: 'replay-not-armed' };
+    Rn.stopReplay();
+    return [r.reason];
+  });
+  want('already-recording', '录制中拒绝再开一卷（防一卷覆盖一卷、前一卷静默丢失）');
+  trip('already-recording', function () {
+    Rn.beginTape(true);
+    const r = Rn.beginTape(true);
+    Rn.endTape();
+    return [r.reason];
+  });
+  want('not-recording', '无在卷时收卷被如实拒收（不伪造一卷空磁带）');
+  trip('not-recording', function () {
+    Rn.stopReplay();
+    const t = Rn.tape();
+    if (t && t.open) Rn.endTape();
+    return [Rn.endTape().reason];
+  });
+  want('bad-tape', 'replay 收到不是磁带的入参时如实拒收（不按空卷假装走一遍）');
+  trip('bad-tape', function () { return [Rn.replay(null).reason, Rn.replay({}).reason]; });
+  want('tape-open', '未收卷的磁带拒绝回放（它还在录，值不完整）');
+  trip('tape-open', function () {
+    Rn.beginTape(true);
+    const t0 = Rn.tape();
+    const r = Rn.replay({ seed: t0.seed, entries: [], open: true });
+    Rn.endTape();
+    return [r.reason];
+  });
+  want('recording', '录制中拒绝进入回放（否则这一次推进既录又放、两边都不是）');
+  trip('recording', function () {
+    Rn.beginTape(true);
+    const r = Rn.replay({ seed: 1, entries: [], open: false });
+    Rn.endTape();
+    return [r.reason];
+  });
+  want('tape-without-values', '只记位置的磁带拒绝回放（无处取值就别假装能重放）');
+  trip('tape-without-values', function () {
+    return [Rn.replay({ seed: 1, entries: [{ c: 'x', k: 'd' }], noValues: true }).reason];
+  });
+  want('not-replaying', '未在回放时退出被如实拒收（不谎报「刚结束了一次回放」）');
+  trip('not-replaying', function () {
+    Rn.stopReplay();
+    return [Rn.stopReplay().reason];
+  });
+  want('no-seed', '无种子的磁带如实拒收复核（不假装复核过）');
+  trip('no-seed', function () { return [Rn.verifyTape({ seed: null, entries: [] }).reason]; });
+  want('bad-seed', '非有限种子如实拒收复核（NaN/Infinity 不得被当成某个种子）');
+  trip('bad-seed', function () { return [Rn.verifyTape({ seed: 'x', entries: [] }).reason]; });
+  want('bad-fn', 'causal.record / replayWith 收到非函数时如实拒收');
+  trip('bad-fn', function () {
+    return [WA.causal.record(null).reason, WA.causal.replayWith({ seed: 1, entries: [] }, null).reason];
+  });
+  want('rand-absent', '随机源缺席时如实拒收（不静默降级成「录了一卷空的」）');
+  trip('rand-absent', function () {
+    const keep = WA.rand;
+    try {
+      WA.rand = undefined;
+      return [WA.causal.record(function () { return 1; }).reason,
+        WA.causal.replayWith({ seed: 1, entries: [] }, function () { return 1; }).reason];
+    } finally { WA.rand = keep; }
+  });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

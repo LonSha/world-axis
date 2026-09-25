@@ -44,7 +44,10 @@
   //   stateView —— **存档里的当前状态**（现在有几条、各处于什么状态），只读存档、不随进程复位。
   //   两者之前混在同一个计数器里：「这条链现在怎么了」永远答不出，
   //   因为读到的是「这一轮开着过程中发生过几次」。
-  const stat = { chains: 0, acts: 0, deferred: 0, cancelled: 0, expired: 0, blocked: 0, lastReason: '' };
+  //   v2.89.0 O2：records / replays / recordFails 与最近一卷磁带、最近一次回放读数。
+  //     与既有计数同规格——只增不减，供诊断与面板读；**不落盘**（磁带是内存物）。
+  const stat = { chains: 0, acts: 0, deferred: 0, cancelled: 0, expired: 0, blocked: 0, lastReason: '',
+    records: 0, replays: 0, recordFails: 0, lastTape: null, lastReplay: null };
 
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -463,10 +466,114 @@
    *   因果推进绑在一起**：事后想说「这一轮是可复现的」只能自己拼读数。
    *   reproducible=false 时**不得声称可回放**（自动种子刷新即换）。
    */
+  /**
+   * v2.89.0 O2：**录制一次推进**——把「这一轮」从名词变成一段有起止的东西。
+   *
+   * 为什么必须有这一段：`replay` 要有个窗口，而「一轮」此前没有任何边界物。
+   *   若由调用方自己 `beginTape` / `endTape`，任何一条 early return（推进被禁、
+   *   链不存在、store 不可用）都会把磁带**留在录制态**，此后整局都在悄悄录——
+   *   于是「录制」变成一种不可见的状态改变。故这里 `finally` 无条件收卷。
+   *
+   * @param {function} fn 本轮要做的事（通常是 tick；任何取随机的函数都行）
+   * @returns {{ok, result, tape, count, reason?}} fn 抛异常时如实体现在 reason 里，
+   *   磁带**仍然交出**（已录到的部分就是证据），绝不吞掉异常。
+   */
+  function record(fn) {
+    if (typeof fn !== 'function') return { ok: false, reason: 'bad-fn' };
+    const tz = (WA.rand && typeof WA.rand.beginTape === 'function') ? WA.rand : null;
+    if (!tz) return { ok: false, reason: 'rand-absent' };
+    const b = tz.beginTape(true);
+    if (!b || !b.ok) return { ok: false, reason: (b && b.reason) || 'begin-failed' };
+    let result = null, err = null;
+    try {
+      result = fn();
+    } catch (e) {
+      err = (e && e.message) ? e.message : String(e);
+    } finally {
+      // 无条件收卷：录制态漏出去 = 整局被静默记录，这比丢一卷磁带严重得多
+      // v2.89.0 O2：直呼产品导出（不绕别名 `tz`）——别名让**引用面门禁看不见这次调用**，
+      //   于是 endTape 被判成「导出即无消费方」的死子面（实测：dead 443→446 里的一条）。
+      //   守卫已过（tz 非空）之后没有理由再绕一层：配对出口的开门与关门都该被看得见。
+      try { if (WA.rand && WA.rand.endTape) stat.lastTape = WA.rand.endTape(); } catch (e2) {}
+    }
+    const tape = stat.lastTape;
+    stat.records++;
+    // v2.89.0 O2 自纠：这里原先把 `endTape()` 的**回执**（{ok, tape, count, seed}）当成磁带交回，
+    //   于是 `rec.tape.entries` 是 undefined —— 调用方按「磁带」用它（把这段部分录制退回去复核）
+    //   会当场炸，而「推进中途抛了」恰恰是最该把已录部分留成证据的一条路径。
+    //   实测证据：bad.tape = {ok:true, tape:{...}, count:1, seed:99}，bad.tape.entries === undefined。
+    if (err) { stat.recordFails++; return { ok: false, reason: 'fn-threw: ' + err, result: result, tape: (tape && tape.ok ? tape.tape : null), error: err }; }
+    if (!tape || !tape.ok) return { ok: false, reason: 'end-failed', result: result };
+    return { ok: true, result: result, tape: tape.tape, count: tape.count, seed: tape.seed };
+  }
+
+  //   出口契约：失败路径（fn 抛）同样把**已录到的部分磁带**交回（`tape` 是磁带本体，
+  //   不是 `endTape()` 的回执）——部分录制也是证据，只是不构成一次完整的复现依据。
+  /**
+   * v2.89.0 O2：**按磁带重放本轮**——同一个 `fn`，随机取数全部来自磁带。
+   *
+   * 与 `rehearse` 的分工（两者都零副作用，但证的不是同一件事）：
+   *   · `rehearse(facts)` 答「如果按当前世界状态再推进一轮，会变成什么」（前瞻）；
+   *   · `replayWith(tape, fn)` 答「上一轮是怎么走出来的」（回溯，且可逐字复核）。
+   *
+   * 三条口径：
+   *   ① 回放期间**不重播种子、不重置派生流**（由 core/rand 保证），故退出后会话序列不变；
+   *   ② `identical` 只在给了 `expect` 时计算——没给基准就说「一致」是假话；
+   *   ③ 走位读数（used / miss / left / lastMiss）**无论如何都返回**：miss > 0 时
+   *      「这次回放不构成复现依据」，调用方必须自己决定怎么用，而不是由这里悄悄降级。
+   */
+  function replayWith(tape, fn, expect) {
+    if (typeof fn !== 'function') return { ok: false, reason: 'bad-fn' };
+    const tz = (WA.rand && typeof WA.rand.replay === 'function') ? WA.rand : null;
+    if (!tz) return { ok: false, reason: 'rand-absent' };
+    const r = tz.replay(tape);
+    if (!r || !r.ok) return { ok: false, reason: (r && r.reason) || 'replay-refused' };
+    let result = null, err = null;
+    try {
+      result = fn();
+    } catch (e) {
+      err = (e && e.message) ? e.message : String(e);
+    } finally {
+      // 同上：stopReplay 是 replay 的配对出口，同样直呼，理由一致。
+      try { if (WA.rand && WA.rand.stopReplay) stat.lastReplay = WA.rand.stopReplay(); } catch (e2) {}
+    }
+    const rp = stat.lastReplay || {};
+    stat.replays++;
+    const out = {
+      ok: !err, result: result, error: err || undefined,
+      used: rp.used || 0, miss: rp.miss || 0, consumed: rp.consumed || 0,
+      left: (rp.left === undefined ? 0 : rp.left), lastMiss: rp.lastMiss || null,
+      seed: (tape && tape.seed !== undefined) ? tape.seed : null,
+      seedMatched: r.seedMatched, dryRun: true,
+      // 有未命中 ⇒ 这次回放**不是**一次成立的复现（位置对不上，值已经不等同）
+      verdict: (rp.miss ? 'positions-mismatch' : ((rp.left || 0) > 0 ? 'tape-underrun' : 'clean'))
+    };
+    if (expect !== undefined) {
+      // 自纠（本版首跑现场）：`JSON.stringify(undefined)` **返回 undefined 而不是字符串**
+      //   —— 于是「回放一个无返回值的推进函数」（最常用的一种传法）会让 `a.length` 抛 TypeError。
+      //   取证口自己抛异常等于「想复核却把复核者打死」，比没有复核更坏。故这里统一规约成字符串。
+      const strOf = function (v) {
+        let s = '';
+        try { s = JSON.stringify(v); } catch (e3) { return '(unserializable)'; }
+        return (typeof s === 'string') ? s : String(s);
+      };
+      const a = strOf(result), b = strOf(expect);
+      out.identical = (a === b);
+      out.diffLen = (a === b) ? 0 : Math.abs(a.length - b.length);
+    }
+    return out;
+  }
   function evidence() {
     const cfg = settings();
     const rnd = (WA.rand && typeof WA.rand.randStat === 'function') ? WA.rand.randStat() : null;
     const view = stateView();
+    const tp = (WA.rand && typeof WA.rand.tape === 'function') ? WA.rand.tape() : null;
+    // v2.89.0 O2：`reproducible` 只说明「现在是显式播种的」，**它不等于「这一轮能被重放」**。
+    //   能重放至少还要有「一卷录下来的磁带」且没有未命中；两句话不能合成一句——
+    //   把前者当后者正是本版要消灭的那类失实（「我以为可复现，其实没有」）。
+    const hasTape = !!(tp && tp.mode === 'live' && tp.entries > 0 && !tp.open);
+    const miss = tp ? (tp.miss || 0) : 0;
+    const canReplay = hasTape && miss === 0;
     return {
       enabled: !!cfg.enabled, maxChains: cfg.maxChains,
       seed: rnd ? rnd.seed : null, seedSource: rnd ? rnd.seedSource : 'rand-absent',
@@ -474,7 +581,19 @@
       draws: rnd ? rnd.draws : 0,
       channels: rnd && rnd.byChannel ? Object.keys(rnd.byChannel).sort() : [],
       chains: view.chains, byStatus: view.byStatus,
-      acts: stat.acts, expired: stat.expired, blocked: stat.blocked
+      acts: stat.acts, expired: stat.expired, blocked: stat.blocked,
+      // v2.89.0 O2：回放证据（第四十三面）。`replayable` 与 `reproducible` **分列**：
+      //   前者答「这一轮有没有一卷能重放的磁带」，后者答「种子是不是自己定的」。
+      //   未播种时前者为 false 并给出原因——**不谎称可回放**（本计划写死的判据）。
+      tape: tp ? {
+        mode: tp.mode, entries: tp.entries, values: tp.values,
+        seed: tp.seed, seedMatched: tp.seedMatched, miss: miss,
+        lastMiss: tp.lastMiss || null, channels: tp.channels, open: tp.open
+      } : { mode: 'rand-absent', entries: 0, miss: 0, channels: [], open: false },
+      replayable: canReplay,
+      replayBlockedBy: canReplay ? '' : (!rnd ? 'rand-absent'
+        : (!rnd.reproducible ? 'auto-seed' : (!hasTape ? 'no-tape' : 'tape-mismatch'))),
+      records: stat.records, replays: stat.replays, recordFails: stat.recordFails
     };
   }
   function classify(chainId) {
@@ -527,6 +646,10 @@
     previewIntervention: previewIntervention,
     rehearse: rehearse,
     conflicts: conflicts,
-    evidence: evidence
+    evidence: evidence,
+    // v2.89.0 O2：录制一次推进 / 按磁带重放（两个口，都有真实消费方：
+    //   面板「导演 · 回放」按钮与 tool-diag 的 secCausal 回放段）。
+    record: record,
+    replayWith: replayWith
   };
 })();

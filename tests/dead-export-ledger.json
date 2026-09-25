@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.88.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.88.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.89.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.89.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -281,6 +281,14 @@
       "refs": 0,
       "tref": 4,
       "own": 2
+    },
+    "causal.replayWith": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/causal.js",
+      "refs": 0,
+      "tref": 9,
+      "own": 3
     },
     "chapters.current": {
       "reason": "self-only",
@@ -2336,7 +2344,7 @@
       "src": "core/rand.js",
       "refs": 0,
       "tref": 0,
-      "own": 4
+      "own": 6
     },
     "rand.getSeed": {
       "reason": "unwired",
@@ -2367,7 +2375,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/rand.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 3,
       "own": 3
     },
     "rand.resetRandStat": {
@@ -2383,8 +2391,8 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/rand.js",
       "refs": 0,
-      "tref": 8,
-      "own": 4
+      "tref": 15,
+      "own": 24
     },
     "rand.seeded": {
       "reason": "unwired",

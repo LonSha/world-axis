@@ -235,7 +235,30 @@
       // v2.87.0 B6：当前状态与累计分列。stateView 只读存档（现在怎么样），
       //   st 是本次进程累计（发生过几次）—— 两份读数都报，但**不混在同一个键里**。
       const now = (WA.causal.stateView ? WA.causal.stateView() : null);
+      // v2.89.0 O2：回放证据段。诊断侧只能读、不能回放（replay 要重跑代码，而诊断必须零副作用），
+      //   故这里报的是两件只读的事实：① 磁带在不在、有多少格、有没有未命中；
+      //   ② 用 verifyTape 从种子重算的逐值复核结论（纯算术，不跑产品代码）。
+      //   `ev.replayable` 与 `ev.reproducible` 分列，理由见 causal.evidence 注释：
+      //   把「种子是显式定的」当成「这一轮能重放」是本版要消灭的那类失实。
+      const ev = (WA.causal.evidence ? WA.causal.evidence() : null);
+      const tape = (function () {
+        try {
+          const t = WA.rand && WA.rand.tape ? WA.rand.tape() : null;
+          if (!t) return null;
+          const last = (st.lastTape && st.lastTape.ok) ? st.lastTape.tape : null;
+          const vf = (last && WA.rand.verifyTape) ? WA.rand.verifyTape(last) : null;
+          return { mode: t.mode, open: t.open, entries: t.entries, values: t.values,
+            seed: t.seed, seedMatched: t.seedMatched, miss: t.miss, lastMiss: t.lastMiss,
+            channels: t.channels, verify: vf };
+        } catch (e) { return { error: String((e && e.message) || e) }; }
+      })();
+      const replay = ev ? {
+        replayable: ev.replayable, blockedBy: ev.replayBlockedBy,
+        records: ev.records, replays: ev.replays, recordFails: ev.recordFails,
+        tapeMode: ev.tape ? ev.tape.mode : null
+      } : null;
       return { enabled: !!cfg.enabled, maxChains: cfg.maxChains, maxItems: cfg.maxItems,
+        replay: replay, tape: tape,
         chains: chains, settledRows: settledRows, now: now, adds: st.chains || 0, acts: st.acts || 0,
         deferred: st.deferred || 0, cancelled: st.cancelled || 0, expired: st.expired || 0,
         blocked: st.blocked || 0, dueNow: due, lastReason: st.lastReason || '',
@@ -1092,7 +1115,11 @@
     // v2.87.0 B6：因果工作台区（事件页因果区末）。四个只读口 + 干预预览：
     //   stateView / rehearse / conflicts / evidence / previewIntervention 均由本区真消费，
     //   这是它们不是死导出的唯一理由。
+    // v2.89.0 O2：本区新增两枚按钮——「录制一轮」（causal.record）与「复核磁带」
+    //   （rand.verifyTape）。**必须同时登记进守卫表**：否则它们渲染出来却没有绑定，
+    //   而「控件在、点了没反应」在守卫表之外是无人发现的（守卫表是接线面的唯一真源）。
     { page: 'events', ids: ['wa-cw-view', 'wa-cw-rehearse', 'wa-cw-conflicts', 'wa-cw-evidence',
+      'wa-cw-record', 'wa-cw-verify',
       'wa-cw-id', 'wa-cw-act', 'wa-cw-intervene', 'wa-cw-out'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },

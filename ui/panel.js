@@ -1299,7 +1299,7 @@
       <div class="wa-sec">行动选项</div>
       <button class="wa-btn" id="wa-gen-choices" title="基于当前世界状态生成玩家的 4 个可选行动">生成4个行动选项</button>
       <div class="wa-sec">因果工作台（B6）</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-cw-view" title="当前存档与本次进程累计分列——一个答「现在是怎样」，一个答「这一轮发生了几次」">当前/累计</button><button class="wa-btn" id="wa-cw-rehearse" title="在深拷贝上跑一整轮推进：看会发生什么，但不改存档、不留痕迹">分支试演</button><button class="wa-btn" id="wa-cw-conflicts" title="报出同因同果的重复链——只报不消解，消解由你显式选择">查冲突</button><button class="wa-btn" id="wa-cw-evidence" title="这一轮推进凭什么：随机源读数与推进绑定，不可复现时必须照实说">回放证据</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-cw-view" title="当前存档与本次进程累计分列——一个答「现在是怎样」，一个答「这一轮发生了几次」">当前/累计</button><button class="wa-btn" id="wa-cw-rehearse" title="在深拷贝上跑一整轮推进：看会发生什么，但不改存档、不留痕迹">分支试演</button><button class="wa-btn" id="wa-cw-conflicts" title="报出同因同果的重复链——只报不消解，消解由你显式选择">查冲突</button><button class="wa-btn" id="wa-cw-evidence" title="这一轮推进凭什么：随机源读数与推进绑定，不可复现时必须照实说">回放证据</button><button class="wa-btn" id="wa-cw-record" title="录制一轮推进：把这一轮抽取到的随机答案按顺序记成一卷磁带——录制之后的「复核磁带」与「回放」才有东西可查">录制一轮</button><button class="wa-btn" id="wa-cw-verify" title="从种子重算最近一卷磁带（纯算术、零副作用）：证「这卷磁带确实出自这个种子」；与「回放」是两条不同的证据">复核磁带</button></div>
       <div class="wa-row"><input id="wa-cw-id" class="wa-input" placeholder="链 id"/><input id="wa-cw-act" class="wa-input" placeholder="动作 advance/cancel/settle"/><button class="wa-btn" id="wa-cw-intervene" title="先预览「做这个动作会变成什么」，允许与否都给原因码，零副作用">干预预览</button></div>
       <div id="wa-cw-out" class="wa-out"></div>
       <div id="wa-choices-out" class="wa-out"></div>`;
@@ -1573,10 +1573,53 @@
     on('#wa-cw-evidence', () => {
       if (!WA.causal) return;
       const e = WA.causal.evidence();
+      // v2.89.0 O2：两句结论**分开念**。「种子是显式定的」（reproducible）与
+      //   「这一轮有一卷能重放的磁带」（replayable）不是同一件事——合成一句就是失实。
+      const tp = e.tape || {};
+      const why = { 'auto-seed': '自动种子刷新即换', 'no-tape': '本会话尚未录到磁带', 'rand-absent': '随机源未加载', 'tape-mismatch': '磁带与当前不符' };
       cwOut('<div class="wa-item"><b>回放证据</b>：seed ' + esc(String(e.seed)) + '（来源 ' + esc(e.seedSource) + '）'
         + '｜可复现：' + (e.reproducible ? '<b>是</b>（显式播种）' : '<b>否</b>——自动种子刷新即换，不得据此声称本轮可重放')
         + '｜抽取 ' + e.draws + ' 次｜通道 ' + esc((e.channels || []).join('、') || '无')
+        + '<div class="wa-dim">磁带：' + esc(String(tp.mode || '?')) + '｜' + (tp.entries | 0) + ' 格（决策 ' + (tp.values | 0) + '）'
+        + '｜未命中 ' + (tp.miss | 0) + (tp.lastMiss ? '（' + esc(tp.lastMiss.why) + '：' + esc(tp.lastMiss.want) + ' ← ' + esc(tp.lastMiss.got) + '）' : '')
+        + '｜种子相符 ' + (tp.seedMatched === true ? '是' : tp.seedMatched === false ? '<b>否</b>' : '未知') + '</div>'
+        + '<div class="wa-dim">可重放：' + (e.replayable ? '<b>是</b>' : '<b>否</b>（' + esc(why[e.replayBlockedBy] || e.replayBlockedBy || '—') + '）')
+        + '｜录制 ' + (e.records | 0) + ' 次 / 回放 ' + (e.replays | 0) + ' 次 / 录制失败 ' + (e.recordFails | 0) + '</div>'
         + '<div class="wa-dim">与推进绑定的读数：链 ' + e.chains + ' · 行动 ' + e.acts + ' · 过期 ' + e.expired + ' · 被挡 ' + e.blocked + '</div></div>');
+    });
+    on('#wa-cw-record', () => {
+      if (!WA.causal || typeof WA.causal.record !== 'function') { cwOut('<div class="wa-dim">因果模块未加载</div>'); return; }
+      // 录制的是**真跑一轮**（tick 会写世界）——这与「试演」刻意相反：
+      //   试演证「如果这么走会怎样」（零副作用、前瞻）；录制证「这一轮实际是怎么走的」（留痕、回溯）。
+      //   两者都必须存在：只有前者则无从复核已经发生的事，只有后者则动手前先瞎一次。
+      const r = WA.causal.record(function () { return WA.causal.tick({ now: clockNow('ui.causal') }); });
+      if (!r.ok) {
+        cwOut('<div class="wa-item"><b>录制失败</b>：' + esc(String(r.reason || '?'))
+          + (r.tape ? '' : '')
+          + '<div class="wa-dim">失败也把磁带交回（部分录制是证据）——只是不构成一次完整的复现依据。</div></div>');
+        return;
+      }
+      const t = r.tape || {};
+      cwOut('<div class="wa-item"><b>已录制一轮</b>：seed ' + esc(String(r.seed)) + '｜磁带 ' + (r.count | 0) + ' 格'
+        + '｜推进结果 ' + esc(JSON.stringify(r.result || {}))
+        + '<div class="wa-dim">接着点「复核磁带」可验证它出自这个种子；点「回放证据」可看可重放与否（未显式播种时照实报否）。</div></div>');
+    });
+    on('#wa-cw-verify', () => {
+      if (!WA.rand || typeof WA.rand.verifyTape !== 'function') { cwOut('<div class="wa-dim">随机源未加载</div>'); return; }
+      const st = WA.causal && WA.causal.stat ? WA.causal.stat() : null;
+      const last = (st && st.lastTape && st.lastTape.ok) ? st.lastTape.tape : null;
+      if (!last) {
+        cwOut('<div class="wa-dim">本会话尚未录到磁带——先做一次「录制一轮」（<code>WorldAxis.causal.record(fn)</code>）再复核。<br>'
+          + '注意：复核的是<b>已录下来的那一轮</b>，不是「现在再跑一次」。</div>');
+        return;
+      }
+      const v = WA.rand.verifyTape(last);
+      const fm = v.firstMismatch;
+      cwOut('<div class="wa-item"><b>磁带复核（纯算术，零副作用）</b>：seed ' + esc(String(v.seed))
+        + '｜比对 ' + v.checked + ' 格｜一致：' + (v.ok ? '<b>是</b>' : '<b>否</b>（错 ' + v.mismatches + ' 格）')
+        + (fm ? '<div class="wa-dim">第一处分歧：第 ' + fm.at + ' 格 · 通道 ' + esc(fm.channel) + ' · 应为 ' + esc(String(fm.want)) + ' 实为 ' + esc(String(fm.got)) + '</div>' : '')
+        + '<div class="wa-dim">通道 ' + esc((v.channels || []).join('、') || '无') + '｜异常格 ' + v.oddKinds
+        + '<br>它证的是「这卷磁带确实出自这个种子」；「同一段代码按磁带再走一遍」由 <code>causal.replayWith</code> 负责——后者要重跑代码，故对会写世界的轮次不适用。</div></div>');
     });
     on('#wa-cw-intervene', () => {
       if (!WA.causal) return;

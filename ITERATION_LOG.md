@@ -13,6 +13,17 @@
 | 出口面契约 | 58 命名空间 / 321 成员 / 4094 字符 |
 
 ## 迭代记录
+### R71 · 2026-09-26 · v2.89.0 因果回放证据升级
+- **做了什么**：O2 一处落点（第四十三面），一把专锁（`tests/replay-v2890.js`，含 N0–N4 负控制）。
+  **`core/rand.js` 新增抽取磁带**：录制每格 `{c: 通道名, v: 取到的值, k: 'd'|'i'}`，**按位置**记录（不记推导过程），故调用顺序漂移会被位置检出而非静默换数。新增 `beginTape` / `endTape` / `tape` / `replay` / `stopReplay` / `verifyTape` 六口。
+  **回放不碰派生流**：回放时 `next()` / `draw()` 全走磁带，`streamFor` 不派生 ⇒ 退出后会话序列与进入前逐位相同。`evidence()` 新增 `tape` / `replayable` / `replayBlockedBy`，与既有的 `reproducible` **分列**。
+  **`engines/causal.js` 新增 `record(fn)` / `replayWith(tape, fn, expect)`**：前者 `finally` 无条件收卷（否则任何 early return 都把磁带留在录制态 = 整局被静默记录）；后者走位读数无论 miss 与否都返回，`verdict ∈ clean / positions-mismatch / tape-underrun`。
+  **面板与诊断接线**：`ui/panel.js` 加「录制一轮」「复核磁带」两枚按钮并升级「回放证据」段为两句结论分列；`engines/tool-diag.js` 的 `secCausal` 加只读回放/磁带段（只呼 `verifyTape`，不呼 `replay`——诊断必须零副作用）。
+- **为什么**：本仓库从 v2.14.0 起就报 `reproducible`，却没有任何地方能证明「这一轮真能重放」。种子相同而调用顺序漂移时，随机源会安静地换一整套数，此后所有基于它推出的结论都不可复核。这是「可复现」这句话长期只有声明、没有证据的缺口。
+- **踩过的坑**：① **`JSON.stringify(undefined)` 返回 undefined 而不是字符串**（首跑现场）：`a.length` 抛 TypeError —— 而「回放一个无返回值的推进函数」恰是最常用形态，取证口自己炸掉比没有复核更坏。② **注释里「id 逐字一致」是假话**（实测自纠）：噪声逐字相同（`3d4c`）而递变计数器不同（`1` vs `2`）；把计数器也复现会让两次回放产出同一个 id，用唯一性换可复现性是净亏 ⇒ 边界修正为「复现的是随机抽取，时间戳与计数器不参与回放」。③ **取证擦掉了证据**（真缺陷）：`stopReplay` 把最近一卷磁带一并清掉，实测「录制 2 格 → replayable=true」在「调一次 replayWith」之后变成 false；修法是另存最近收卷的磁带、`tape()` 无在卷时回落。④ **失败路径交出的是回执不是磁带**（真缺陷）：`record` 里 fn 抛异常时把 `endTape()` 的返回对象 `{ok, tape, count, seed}` 当磁带交回，`rec.tape.entries` 是 undefined。⑤ **别名让门禁看不见调用**：`causal` 里经 `tz.endTape()` 调用的配对出口被判成死导出（dead 443→446），直呼后回落。⑥ **本表缺失会带崩运行器**：run.js 的 `callMap19` 覆盖 rand 每个导出，新口没进表时 forEach 以 `callMap19[k] is not a function` 中断整套回归——比一条红灯危险得多（后面的用例静默不跑）。⑦ **判据自己写错了两处**，都靠实测纠正：N1b 原断言「破坏位置前进后 miss 变 0」根本做不到（`take` 无论如何都查通道），改用两通道对照；`used===1` 与实测 `used=2` 不符（`used++` 在通道检查之前）。
+- **影响范围**：`core/rand.js`、`engines/causal.js`、`engines/tool-diag.js`、`ui/panel.js`、`tests/run.js`、`tests/replay-v2890.js`（新）、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、`tests/module-registry-ledger.json`、`index.js`、`manifest.json`、`README.md`、`ITERATION_LOG.md`、`FOUR_VERSION_PLAN.md`。
+- **门禁结果**：`node tests/run.js` 通过 **7734 / 失败 0**（v2.88.0 基线 7654 / 0，+80 = 专锁 68 + 拒收码见证 12）；`tests/replay-v2890.js` 68 / 0；出口面 `ns= 104 members= 605 chars= 7416`（已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs 2367 / 命名空间 110 / 成员 1242；死子面 dead 444 / uiDead 4 / dataOnly 161（新增 `causal.replayWith` 如实登记）；拒收码 307 个（见证 91 / 死表 5 / 基线 211），无新增静默码。
+
 ### R70 · 2026-09-26 · v2.88.0 注入成本实测与分档
 - **做了什么**：O1 一处落点（第四十二面），一把专锁（`tests/cost-v2880.js`，58 项，N0–N4 负控制）。
   **计时落在唯一引擎调用出口**（`render/inject.js` 的 `engineCall`）：v2.86.0 已把它收敛成 46 处调用点共用的唯一出口，于是「每源构建花了多少 ms」在一处落表就天然覆盖全部引擎源；若换到 46 个调用点各写一遭，迟早早漏一个，而漏掉的那个会以「0ms」的样子出现在账上（看不出是漏的）。时钟用既有的 `clockWall`（测量时间），与参与判定的 `clockNow` 分列 —— v2.15.0 的时间源纪律。
