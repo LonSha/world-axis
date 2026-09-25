@@ -1260,6 +1260,8 @@
       + '<div id="wa-ka-out" class="wa-out"></div>';
     out += '<div class="wa-sec">注入自检</div>'
       + '<div class="wa-row"><button class="wa-btn" id="wa-inj-refresh" title="重新读取当前注入快照（只读，不改变任何状态）">刷新快照</button>'
+      + '<button class="wa-btn" id="wa-inj-explain" title="本轮为何这样：只报“进了什么”与“还有几项没进”（玩家视图）；逐项原因属制作者视图">本轮解释</button>'
+      + '<button class="wa-btn" id="wa-inj-explain-all" title="逐源列名 + 归因码（可见性关 / 模块缺席 / 构建失败 / 本轮无内容），供制作者定位">全知面明细</button>'
       + '<button class="wa-btn" id="wa-inj-diag" title="跳转工具页运行完整自检">去自检</button></div>'
       + '<div id="wa-inj-out" class="wa-out"></div>';
     return out;
@@ -3041,6 +3043,33 @@
       const o = $('#wa-inj-out');
       if (o) o.textContent = snap ? ('最新快照：' + WA.injectInspector.statusText(snap.status, snap.scope) + '（' + _msTs(snap.at) + '）') : '尚无快照——先推演一轮。';
     });
+    // v2.90.0 O3：本轮执行解释。两枚按钮各自报一面——
+    //   玩家面只有“进了什么 + 还有几项没进”；全知面才有逐源名与归因码。
+    //   两者不合并到一个输出框：合并就等于把制作者视图泄给玩家。
+    const explainOut = (all) => {
+      if (!WA.render || typeof WA.render.explain !== 'function') { setOut('#wa-inj-out', '本轮解释不可用（render.explain 未加载）。'); return; }
+      const ex = WA.render.explain();
+      if (!ex || !ex.ok) {
+        const why = (ex && ex.reason) || 'unavailable';
+        const hint = why === 'no-rotation' ? '尚无轮次记录——先推演一轮。'
+          : (why === 'round-not-recorded' ? ('该轮次无记录（要 ' + ex.want + ' / 有 ' + ex.have + '）——不拿上一轮的当这一轮。') : '解释未可用。');
+        setOut('#wa-inj-out', hint + '（' + why + '）');
+        return;
+      }
+      if (!all) {
+        const p = ex.player;
+        setOut('#wa-inj-out', '第 ' + ex.round + ' 轮：' + p.summary + '。' + p.note);
+        return;
+      }
+      const om = ex.omniscient;
+      const lines = ['第 ' + om.round + ' 轮（' + _msTs(om.at) + '）：候选 ' + om.candidates + ' / 落地 ' + om.landedCount + ' / 未落地 ' + om.missedCount];
+      om.decisions.forEach((d) => { lines.push('  · ' + d.name + '：' + d.state); });
+      if (om.budget) lines.push('预算 ' + om.budget.used + '/' + om.budget.cap + 't' + (om.budget.overBudget ? '（超）' : '') + '｜折叠 ' + om.budget.folded + ' / 丢弃 ' + om.budget.dropped);
+      if (om.cost) lines.push('耗时 ' + om.cost.totalMs + 'ms｜' + om.cost.measured + ' 源可计' + (om.cost.slowest ? '｜最慢 ' + om.cost.slowest.source + ' ' + om.cost.slowest.ms + 'ms' : ''));
+      setOut('#wa-inj-out', lines.join('\n'));
+    };
+    on('#wa-inj-explain', () => { explainOut(false); });
+    on('#wa-inj-explain-all', () => { explainOut(true); });
     // v2.45.0: 条目路由控件（读写引擎公共面，非别名引用）
     on('#wa-er-add', () => {
       const id = ($('#wa-er-id') || {}).value ? $('#wa-er-id').value.trim() : '';

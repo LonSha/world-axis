@@ -13,6 +13,23 @@
 | 出口面契约 | 58 命名空间 / 321 成员 / 4094 字符 |
 
 ## 迭代记录
+### R72 · 2026-09-26 · v2.90.0 每轮执行解释（玩家面 / 全知面分列）
+- **做了什么**：O3 一处落点（第四十四面），一把专锁（`tests/explain-v2900.js`，53 项，含 N0–N4 负控制）。
+  **`render/inject.js` 新增事后归因**：`SNAP_SOURCES`（六源合记「世界状态」块）+ `sourceDecisions(vis, landedNames, failNames)`，六态封闭集合（`landed` / `landed-in-state` / `visibility-off` / `module-absent` / `failed` / `no-content`），**不改 47 条注入分支**——记账点长在分支上，加分支的人必忘（v2.56.0 教训）。
+  **`explain(round)` 两面分列**：`player` 只给 `{landed, missedCount, summary, note}`（不报未落地项名与归因码，避免机制层剧透）；`omniscient` 给逐源 `{key,name,state}` + `trace` + `budget` + `cost`。轮次三态：`no-rotation` / `round-not-recorded{want,have}` / 正常。`lastInjection` 补 `round` 与 `decisions` 两字段；`applyInjections` 的 `roundNow` 跟 `evolution.roundOf()` 走（缺席为 null）。
+  **两处真消费方**：`engines/tool-diag.js` 的 `secInject` 加 `out.explain`（round/candidates/landedCount/missedCount/playerSummary/missed 逐项）；`ui/panel.js` 注入页加 `wa-inj-explain`（玩家面摘要）与 `wa-inj-explain-all`（逐源列名）两枚按钮 + `explainOut(all)` 绑定，两者不合并到一个输出框。
+- **为什么**：`if (vis.xx && WA.xx)` 的跳过式注入让四种截然不同的局面在存档上长得一模一样（都是「这个源没进正文」）：用户关的 / 模块没加载 / 本轮没内容 / 构建抛异常。缺了分列，「世界状态为什么没进正文」只能靠人肉比对可见性配置——这是 v2.86.0 把「坏 ≠ 没内容」分开之后仍缺的那一层：**分开记了，但没有面向人的解释面**。
+- **踩过的坑**（五处首跑失败全是判据自己写错，一处是环境残留）：
+  ① **判「玩家面是否剧透」的输入面选错**：拿整段 `JSON.stringify(ex.player)` 去判状态码，而 `player` 有个键就叫 `landed`，序列化后必然命中 ⇒ 正确实现被判成剧透。改判「键集封闭 + 每个字符串值不含状态码」。
+  ② **口径错：关掉 no-content 的源不改计数**：断言「关掉 intel 后未进项 +1」，实测 41→41——intel 本来就是 no-content，关掉只换归因码。改为关**原本会落地**的源（longline）并断言 +1。
+  ③ **复用旧环境变量**：`fresh()` 重装模块后旧变量看到的是新 store（WA 是同一个对象），拿 `W4.render.explain()` 与 `ex5` 比会读到新环境；「未注入过」也不能赌环境干净（共享 localStorage 有前例落盘），须显式置 `lastInjection = null`。轮次三态另起局部环境（`W8`）。
+  ④ **守恒式挑错层级**：`player.landed` 是**块级**（6 个快照源合记 1 项），拿它与源数对账必然对不上；源级守恒属全知面，块级守恒写「世界状态 1 块 + 真落地源数」。
+  ⑤ **负控制破坏形态无效**：`ANCHOR_VIS` 首版用「删行」，链首 `if` 删掉留悬空 `else` ⇒ 破坏副本 `SyntaxError: Unexpected token 'else'`，`runNegative` 直接 THROW——**装不起来就证明不了判据敏感**。统一改**条件置假**。
+  ⑥ **环境残留导致单点红灯**：负控制 N3 硬编码「未进 40」，而全量回归里前序 section 留下的世界内容让额外 3 个源真出内容（实测 37）。**硬编码容易漂的读数＝陈旧常量**，改为相对判据（落地源真落地 + 计数与候选数守恒）。另抓出一处：面板里全知面局部变量原名 `o`，撞上 v2.39.0 顶层 `.round` 幽灵扫描（标识符集含 `o`）⇒ 改名 `om` 并在专锁正面钉住该命名约束。
+  ⑦ **补丁脚本不可重复执行**（本版第二次踩）：`o3_wire.py` 跑两遍导致 `tool-diag.js` 诊断块重复插入（`out.explain` 4 处）；用 `git checkout -- engines/tool-diag.js` 回滚后只重跑诊断那一刀。⚠️ 回滚的最小单位是文件、不是目录。
+  ⑧ **文档里的门禁读数必须在终局回归之后回填**：本版先按修 N3 前的读数写文档（7785 / +51），修完 N3 后的干净回归是 **7787 / 0**（7734 + 53 = 专锁 53 项，与直跑 53 / 0 自洽）。数字写早了同样落进「**陈旧常量**」这一类——终局回归是唯一权威读数，文档一律等它。
+- **影响范围**：`render/inject.js`、`engines/tool-diag.js`、`ui/panel.js`、`tests/run.js`、`tests/explain-v2900.js`（新）、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、`tests/module-registry-ledger.json`、`tests/export_contract.txt`、`index.js`、`manifest.json`、`README.md`、`ITERATION_LOG.md`、`FOUR_VERSION_PLAN.md`。
+- **门禁结果**：`node tests/run.js` 通过 **7787 / 失败 0**（v2.89.0 基线 7734 / 0，+53 = 专锁）；`tests/explain-v2900.js` 53 / 0（直跑 53 / 0）；出口面 `ns= 104 members= 606 chars= 7424`（已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs 2374 / 命名空间 110 / 成员 1243；死子面 dead 444 / uiDead 4 / dataOnly 161 / 仅测试 292；拒收码 309（见证 93 / 死表 5 / 基线 211）；`tests/module-registry-gate.js` → pass（文件 107 / 命名空间 115 / 装载期边 23 / 硬边 0 / 调用期引用 44 / 结构问题 0）；`tests/field-liveness-gate.js` → 无幽灵读点、无写/读侧越界。
 ### R71 · 2026-09-26 · v2.89.0 因果回放证据升级
 - **做了什么**：O2 一处落点（第四十三面），一把专锁（`tests/replay-v2890.js`，含 N0–N4 负控制）。
   **`core/rand.js` 新增抽取磁带**：录制每格 `{c: 通道名, v: 取到的值, k: 'd'|'i'}`，**按位置**记录（不记推导过程），故调用顺序漂移会被位置检出而非静默换数。新增 `beginTape` / `endTape` / `tape` / `replay` / `stopReplay` / `verifyTape` 六口。

@@ -487,6 +487,34 @@ function runWitness(WA) {
         WA.causal.replayWith({ seed: 1, entries: [] }, function () { return 1; }).reason];
     } finally { WA.rand = keep; }
   });
+  // v2.90.0 O3：每轮执行解释（render.explain）暴露的两个码。
+  //   与 O2 那一段同尺子——新出口的拒收必须**用真 API 跑出来**，不能只在源码里「存在」。
+  //   两个码是同一入口的两种不同局面：「从没注入过」与「问的不是这一轮」，
+  //   分列的意义正在于此（前者是空，后者是错坐标——不能混成一种「查不到」）。
+  want('no-rotation', '未注入过时照实拒答（不编一份空解释当答案，v2.90.0 O3）');
+  trip('no-rotation', function () {
+    const store = WA.store;
+    const keep = store.get().lastInjection;
+    try {
+      store.transact(function (d) { d.lastInjection = null; }, 'reject-witness:o3-clear');
+      return [WA.render.explain().reason];
+    } finally {
+      store.transact(function (d) { d.lastInjection = keep; }, 'reject-witness:o3-restore');
+    }
+  });
+  want('round-not-recorded', '轮次坐标不符时照实拒答（不拿上一轮的当这一轮，v2.90.0 O3）');
+  trip('round-not-recorded', function () {
+    const store = WA.store;
+    const keep = store.get().lastInjection;
+    try {
+      store.transact(function (d) {
+        d.lastInjection = Object.assign({}, keep || {}, { round: 3, decisions: [] });
+      }, 'reject-witness:o3-round');
+      return [WA.render.explain(99).reason];
+    } finally {
+      store.transact(function (d) { d.lastInjection = keep; }, 'reject-witness:o3-restore2');
+    }
+  });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

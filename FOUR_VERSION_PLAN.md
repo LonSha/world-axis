@@ -54,7 +54,7 @@
   · **A5 的「常用操作 / 有效配置来源 / 回滚结果 / 手机交互 / 实机浏览器验收」**未做；本版 A5 只收口了差异预览与字段映射。
   · **B7 题材对正文的实际影响**只做到「模块是否进入注入面」，未做「不同题材下同一场景的生成差异」对照实验。
 
-## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1 / O2 已交付）
+## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O3 已交付）
 起点：v2.87.0 / 40b6c04。两份计划已入库（folder=WorldAxis）：《WorldAxis v2.88+ 优化方向计划（O1–O5 性能与透明度）》UUID 29179707-ce90-49ac-8e71-36d3c5079409；《WorldAxis v2.88+ 功能拓展计划（X1–X5 交互生态拓宽）》UUID 38375f01-cbd6-41a1-8bd9-842294a610ac。
 - [x] O1（本版落点 = 注入预算实测与分档，原料 = A4 未覆盖项「短中长基准/耗时分列」）：
   · 计时落在 `render/inject.js` 的 `engineCall`（v2.86.0 的唯一引擎调用出口，46 处调用点）——一处落表覆盖全部引擎源；时钟用 `clockWall`（测量时间），与 `clockNow` 分列。
@@ -76,7 +76,17 @@
   · 真缺陷一并修：① `stopReplay` 把最近一卷磁带随 `__tape` 一起清掉 ⇒「录制 2 格、replayable=true」在调过一次 `replayWith` 之后翻成 false（**取证擦掉了证据**），修法是新增 `__lastTape` 留存、`tape()` 无在卷时回落；② `causal.record` 在 fn 抛异常时把 `endTape()` 的**回执** `{ok,tape,count,seed}` 当磁带交回（`rec.tape.entries` 是 undefined），而「推进中途抛了」恰是最该留下部分录制的路径，修法是交回磁带本体；③ `causal` 里经局部别名 `tz.endTape()` 调用，配对出口在门禁眼里不可见、被判死导出，改为直呼 `WA.rand.*`（**别名让门禁看不见调用**）；④ 注释声称「id 逐字一致」是假话（噪声逐字相同而递变计数器不同），改为「复现的是随机抽取，时间戳与计数器不参与回放」——把它们也复现会让两次回放产出同一 id，用唯一性换可复现性是净亏。
 - [x] 验收（O2）：专锁 `tests/replay-v2890.js` **68/0**（A 结构 / B 运行时 / C 缺陷锁 / N 负控制，三个真源码破坏锚点各恰中 1 次）；全量回归 **7734/0**（v2.88.0 为 7654/0，+80 = 专锁 68 + 拒收码见证 12）；出口面 `ns=104 members=605 chars=7416`（已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs 2367 / 命名空间 110 / 成员 1242；死子面 dead 444 / uiDead 4 / dataOnly 161；拒收码见证 91 / 死表 5 / 基线 211。
 - [ ] O2 未覆盖（如实留在清单）：磁带**只驻内存不落盘**（跨会话重放不可用）；`replayWith` 在产品内**无安全调用点**（会写世界的轮次不能用它），如实登记为 test-only 死导出；定位只做到「通道 + 序号」，**未做**「第几轮第几步」的语义坐标；跨设备 / 跨版本磁带兼容性未验证。
-- [ ] O3–O5 未开始：O3 每轮执行解释（A5 的玩家/全知诊断分离）；O4 因果与状态批量治理（A3 的开关全组合）；O5 资源账本健康面（B3 经济侧先观测）。
+- [x] O3（本版落点 = 每轮执行解释 + 玩家/全知诊断分离，原料 = v2.86.0 未覆盖项「A5 的每轮执行解释 / 当前状态与累计分列 / 玩家与全知诊断分离」）：
+  · `render/inject.js` 新增 `SNAP_SOURCES`（clock/pulse/background/people/currents/echoes 六源合记一个「世界状态」块）与 `sourceDecisions(vis, landedNames, failNames)`：**事后**按源表逐项给状态码，**不改 47 条注入分支**。为什么不长在分支上：v2.56.0 的教训——记账点长在分支上，加分支的人必忘；后置归因只认源表，新增源不需要谁记得补一行。
+  · 六态封闭集合：`landed`（非快照源真落地）／`landed-in-state`（快照源进了 `<world_axis_state>` 块）／`visibility-off`（用户关的，正常）／`module-absent`（模块没加载或被禁用，装配问题）／`failed`（本轮构建抛异常，**坏**）／`no-content`（本轮无内容，正常态）。**坏 ≠ 没内容**：把 `failed` 混进 `no-content`，就再也答不出「这一块是坏了还是本来就没事」（v2.86.0 的台账是本版之上的一层，本版把它变成可读的解释面）。
+  · 归因优先级（自纠后）：`!isSnap && landedSet 含该源` → landed；`isSnap && stateSnap && vis 未被关` → landed-in-state；`vis[k] === false` → visibility-off；`!WA[k]` → module-absent；`fails[name]` → failed；兜底 no-content。**先认「真落地」再认「被关」**——顺序反了会把「用户关了但源本来就落地」错归成用户关的。
+  · `explain(round)` 两面分列，**不是同一份数据的两种排版**：`player` 只给 `{landed, missedCount, summary, note}`，**不报未落地项的名字与归因码**（源名会暗示尚未揭示的剧情线，属机制层剧透）；`omniscient` 给逐源 `{key,name,state}` + `trace` / `traceSummary` / `main` / `injected` / `candidates` / `landedCount` / `missedCount` / `budget` / `cost`。`lastInjection` 补 `round` 与 `decisions` 两字段；`applyInjections` 的 `roundNow` 跟 `evolution.roundOf()` 走（缺席为 `null`，**不拿 0 冒充第 0 轮**）。
+  · 轮次坐标三态照实：从没注入过 ⇒ `{ok:false, reason:'no-rotation'}`；传入轮次与现场不符 ⇒ `{ok:false, reason:'round-not-recorded', want, have}`（**不拿上一轮的当这一轮**）；相符才作答。`explain` 纯读：只读 `store.lastInjection`，不跑引擎、不改存档、不向上文注入——**取证不得改变被取证对象**（O2 同一条纪律）。
+  · 接线两处真消费方（**无消费方不挂**）：`engines/tool-diag.js` 的 `secInject` 增 `out.explain`（round / candidates / landedCount / missedCount / playerSummary / missed 逐项）；`ui/panel.js` 注入页增 `wa-inj-explain`（「本轮为何这样」：只报进了什么、还有几项没进）与 `wa-inj-explain-all`（逐源列名 + 归因码）两枚控件并登进守卫表，**两者不合并到一个输出框**——合并等于把制作者视图泄给玩家。
+  · 两条本版最该记住的（都在「判据的输入面」上）：① **判「玩家面是否剧透」不能拿整段 JSON 去判**——`player` 有个键就叫 `landed`，序列化后必然命中状态码 `'landed'`，输入面选错会把正确实现判成缺陷；该判「键集封闭 + 每个字符串值不含状态码」。② **负控制的破坏形态不能是「删行」**——链首 `if` 删掉会留下悬空 `else`，破坏副本 `SyntaxError`，「装不起来」证明不了判据敏感；统一改**条件置假**（`if (false && …)`）。另钉一条命名约束：面板里那个全知面局部变量若叫 `o`，会被 v2.39.0 的顶层 `.round` 幽灵扫描命中（标识符集含 `o`）——**变量名也进了门禁的口径**，专锁正面钉住它。
+- [x] 验收（O3）：专锁 `tests/explain-v2900.js` **53/0**（A 成类锁 / B 运行时 / C 缺陷锁 / N 负控制，三个真源码破坏锚点 `ANCHOR_VIS` / `ANCHOR_FAIL` / `ANCHOR_LAND` 各恰中 1 次，破坏形态统一为条件置假）；全量回归 **7787/0**（v2.89.0 为 7734/0，+53 = 专锁 53 项）；出口面 `ns=104 members=606 chars=7424`（+1 = `render.explain`，已回填 `FROZEN2800` 与 `EC2430`）；清册面 refs **2374** / 命名空间 110 / 成员 **1243**；死子面 dead 444 / uiDead 4 / dataOnly 161；拒收码 309（见证 **93** / 死表 5 / 基线 211，两个新码 `no-rotation` / `round-not-recorded` 用产品真 API 跑出见证，**不靠声称**）。
+- [ ] O3 未覆盖（如实留在清单）：`explain` 只解释「本轮注入链」的**源级**去向，不解释预算折叠/丢弃的逐项理由（那些在 `trace` 里，本版只透传不归纳）；快照块内逐段**不细分**（拿不到的粒度不假装拿到）；跨设备 / 跨会话的解释面（`lastInjection` 只驻当前存档）未验证；玩家面与全知面的分列只做到「结构上分开」，未做面向终端用户的多语言文案。
+- [ ] O4–O5 未开始：O4 因果与状态批量治理（A3 的开关全组合）；O5 资源账本健康面（B3 经济侧先观测）。
 - [ ] X1–X5 未开始（见功能拓展计划）：X1 UI 实机验收通道；X2 B3 经济引擎；X3 B4 传播与辟谣；X4 B2 天气灾害封锁联动；X5 跨插件因果桥。
 
 ## 完成纪律

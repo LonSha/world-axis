@@ -686,6 +686,25 @@
           out.budget.injectCostTop = keys.sort(function (a, c) { return icost.injectCost[c].ms - icost.injectCost[a].ms; }).slice(0, 5)
             .map(function (k) { const ms = icost.injectCost[k].ms; return { source: k, ms: ms, n: icost.injectCost[k].n, band: bandOf ? bandOf(ms).band : null }; });
         }      }
+      // v2.90.0 O3：本轮执行解释的**真消费点**。
+      //   修前：一个轮里「哪些源进了、哪些没进、为什么」只能靠人手比对
+      //   main.sources 与可见性配置——而「模块未加载」与「本轮无内容」在旧读数上同形。
+      //   这里只报全知面的计数与未落地项（玩家面的叙事句子属面板）——
+      //   诊断包不该把 47 条逐源明细撞进去（那是另一个已有的账）。
+      if (WA.render && typeof WA.render.explain === 'function') {
+        const ex = WA.render.explain();
+        if (ex && ex.ok) {
+          out.explain = {
+            round: ex.round, candidates: ex.omniscient.candidates,
+            landedCount: ex.omniscient.landedCount, missedCount: ex.omniscient.missedCount,
+            playerSummary: ex.player.summary,
+            missed: ex.omniscient.decisions.filter(function (x) {
+              return x.state !== 'landed' && x.state !== 'landed-in-state';
+            }).map(function (x) { return x.name + '(' + x.state + ')'; })
+          };
+          if (!out.explain.missed.length) delete out.explain.missed;
+        } else out.explain = { error: (ex && ex.reason) || 'unavailable' };
+      }
       // v0.1.9: 槽位路由错误快照（部分失败时存在）
       if (li && li.slotErrors) out.slotErrors = li.slotErrors;
       else if (snap) { out.promptLength = snap.promptLength; out.ourExcerptLen = snap.ourExcerptLen; }
@@ -1178,7 +1197,11 @@
       // v2.50.0（第三十五面）：三账出口控件——渲染在**注入页**（renderInject），
       //   故必须登记到本组而不是工具页（登记到错页等于守卫永远查不到它们，
       //   而「登记了却在别页」比不登记更坏：它看起来已被覆盖）。
-      'wa-fc-plan', 'wa-fc-reset', 'wa-lt-refresh', 'wa-lt-reset'] }
+      'wa-fc-plan', 'wa-fc-reset', 'wa-lt-refresh', 'wa-lt-reset',
+      // v2.90.0（O3）：每轮执行解释两枚按钮——渲染在**注入页**（renderInject），故登记到本组。
+      //   同 v2.50.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
+      //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
+      'wa-inj-explain', 'wa-inj-explain-all'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。

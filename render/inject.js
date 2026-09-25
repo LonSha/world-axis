@@ -204,6 +204,86 @@ style: false,
     ledger: '账本',
     digest: '世界推演', nearEvent: '近端事件'
   };
+  // ── v2.90.0 O3：每轮执行解释 ──────────────────────────────────────────
+  /**
+   * 源决策归因（v2.90.0 O3）。
+   *   它治的病：**“这个源为什么没进正文”在旧账上答不出**。
+   *   逐段守卫写的是 `if (vis.xx && WA.xx)`，判不过就直接跳过——
+   *   于是“可见性关了”“模块没启用”“本轮真没内容”“构建出错了”四种
+   *   截然不同的局面，在存档上长得一模一样（都是“没出现在正文里”）。
+   *   为何**事后**归因而不逐条记账：v2.56.0 的真缺陷正是“加了分支忘了登记”——
+   *   记账点长在分支上，加分支的人必忘；后置归因只认源表，新增源不需要谁记得去补一行。
+   *   四态不合并：landed / visibility-off / module-absent / failed / no-content。
+   *   快照类源（clock/pulse/background/people/currents/echoes）合成一个
+   *   `世界状态` 块，**块内逐段不细分**——这是如实标注，
+   *   不是隐瞒：拿不到的粒度不假装拿到（诊断面同口径）。
+   */
+  const SNAP_SOURCES = ['clock', 'pulse', 'background', 'people', 'currents', 'echoes'];
+  function sourceDecisions(vis, landedNames, failNames) {
+    const landedSet = landedNames || [];
+    const fails = failNames || {};
+    const stateSnap = landedSet.indexOf('世界状态') >= 0;
+    return SOURCES.map(function (k) {
+      const name = SRC_NAME[k] || k;
+      const isSnap = SNAP_SOURCES.indexOf(k) >= 0;
+      let st;
+      if (!isSnap && landedSet.indexOf(name) >= 0) st = 'landed';
+      else if (isSnap && stateSnap && !(vis && vis[k] === false)) st = 'landed-in-state';
+      else if (vis && vis[k] === false) st = 'visibility-off';
+      else if (!WA[k]) st = 'module-absent';
+      else if (fails[name]) st = 'failed';
+      else st = 'no-content';
+      return { key: k, name: name, state: st };
+    });
+  }
+  /**
+   * 每轮执行解释（v2.90.0 O3，原料 = A5 未覆盖项“每轮执行解释 / 玩家与全知诊断分离”）。
+   *   两面**分列**，不是同一份数据的两种排版：
+   *     · player      ：只报“进了什么”与“还有几项没进”——**不报未落地项的名字与归因码**。
+   *                      名字会暗示尚未揭示的剧情线（机制层剧透），故留给全知面。
+   *     · omniscient ：逐源列名 + 归因码 + 候选项去向账（trace）与预算/成本读数，供制作者定位。
+   *   纯读：只读 `store.lastInjection`，不跑引擎、不改存档、不向上下文注入（A5 约束）。
+   *   轮次坐标：传入的 round 与现场不符时**照实拒答**，不把上一轮的当成这一轮。
+   */
+  function explain(round) {
+    const li = (function () { try { return WA.store.get().lastInjection || null; } catch (e) { return null; } })();
+    if (!li) return { ok: false, reason: 'no-rotation' };
+    const have = (typeof li.round === 'number') ? li.round : null;
+    const want = (typeof round === 'number' && isFinite(round)) ? round : null;
+    if (want !== null && want !== have) return { ok: false, reason: 'round-not-recorded', want: want, have: have };
+    const dec = Array.isArray(li.decisions) ? li.decisions : [];
+    const hit = dec.filter(function (x) { return x.state === 'landed'; });
+    const inState = dec.filter(function (x) { return x.state === 'landed-in-state'; });
+    const missed = dec.filter(function (x) { return x.state !== 'landed' && x.state !== 'landed-in-state'; });
+    const names = hit.map(function (x) { return x.name; });
+    if (inState.length) names.unshift('世界状态');
+    const b = li.budget || null, cst = (b && b.cost) || null;
+    return {
+      ok: true, round: have, recordedAt: li.at || 0,
+      player: {
+        landed: names,
+        missedCount: missed.length,
+        summary: names.length
+          ? ('本轮进正文 ' + names.join('、') + '（共 ' + names.length + ' 项）')
+          : '本轮没有任何源进入正文',
+        note: missed.length
+          ? ('另有 ' + missed.length + ' 项本轮未进入正文；逐项原因属制作者视图（全知面）')
+          : '本轮候选项全部进入正文'
+      },
+      omniscient: {
+        round: have, at: li.at || 0, injected: !!li.injected,
+        candidates: dec.length, landedCount: hit.length + inState.length, missedCount: missed.length,
+        decisions: dec.slice(),
+        trace: Array.isArray(li.trace) ? li.trace.slice() : null,
+        traceSummary: li.traceSummary || null,
+        main: { len: li.len | 0, count: (typeof li.mainCount === 'number') ? li.mainCount : null,
+          sources: Array.isArray(li.sources) ? li.sources.slice() : [] },
+        budget: b ? { used: b.used, cap: b.cap, overBudget: !!b.overBudget,
+          folded: (b.folded || []).length, dropped: (b.dropped || []).length } : null,
+        cost: cst ? { totalMs: cst.totalMs, measured: cst.measured, subTick: cst.subTick, slowest: cst.slowest } : null
+      }
+    };
+  }
   /**
    * 失败台账：源显示名 -> { count, lastMsg, lastAt }。
    *   与「源产出空串」分开记 —— 空串是「这一轮没什么可说」（正常），
@@ -270,6 +350,8 @@ style: false,
     /** v0.1.41: 撤销-槽位关联审计只读视图（tool-diag 消费） */
     uninjectAudit: uninjectAudit,
     SOURCES,
+    /** v2.90.0 O3：每轮执行解释（玩家面 / 全知面分列）——面板与诊断各有真消费方 */
+    explain: explain,
     /** v2.4.0: 可见性配置健康度只读视图（诊断消费）——undeclared 非空即「源存在但无默认值声明」 */
     visibilityStat() { return { sources: SOURCES.length, declared: Object.keys(__REG.def).length, filled: __visStat.filled, undeclared: __visStat.undeclared.slice(), lastAt: __visStat.lastAt, key: LS_KEY,
       // v2.86.0 A5：注入链失败读数（按源显示名）——与「源产出空串」分开记，
@@ -343,6 +425,13 @@ style: false,
       // v2.88.0 O1：成本账按轮清零——它记的是**本轮**注入链的引擎耗时，不是从开机累到现在。
       //   每轮清零后，注入构建花了多少时间才能与「这一轮 token 用了多少」同轴比较。
       resetCost();
+      // v2.90.0 O3：本轮的**轮次坐标**。此前 lastInjection 一个轮次都没记，
+      //   于是「这一轮为什么这样」连问的是哪一轮都无从确认；轮次真源只有一个（evolution.roundOf），
+      //   本处跟它走，不自己数。模块缺席时为 null（如实报缺，不拿 0 冲当“第 0 轮”）。
+      const roundNow = (function () {
+        try { return (WA.evolution && typeof WA.evolution.roundOf === 'function') ? WA.evolution.roundOf() : null; }
+        catch (e) { return null; }
+      })();
       const items = [];
       const snap = this.buildWorldSnapshot();
       if (snap) items.push({ source: '世界状态', content: snap });
@@ -577,6 +666,9 @@ style: false,
       });
       const traceSummary = { main: 0, slot: 0, folded: 0, dropped: 0, empty: 0 };
       trace.forEach(function (t) { if (traceSummary[t.to] !== undefined) traceSummary[t.to]++; });
+      // v2.90.0 O3：本轮源决策台账。口径 = 源表 + 真落地名集合 + 故障台账，三者都是现场已有的事实。
+      const landedNames = finalItems.map(function (i) { return (i && i.source) || '未命名'; });
+      const decisions = sourceDecisions(vis, landedNames, engineFailuresView());
       try {
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
@@ -598,7 +690,7 @@ style: false,
           const slotSnap = (WA.injectSlotAudit && lastSlots)
             ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotResOut || slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, hostWb: hostCk, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
