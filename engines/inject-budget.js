@@ -89,6 +89,76 @@
   };
   const DEFAULT_RANK = 6;
 
+  // ══════════════════ v2.88.0 O1：注入成本实测与分档 ══════════════════
+  /**
+   * 成本分档：短 / 中 / 长 三档（按单源构建耗时归类）。
+   *   为什么必须分档而不只报一个总数：本模块早已报「用了多少 token」，而耗时这一维
+   *   从未被测量过——「注入慢在哪、慢在谁身上」在治理面上完全不可答。
+   *   分档按人机交互尺度切：≤2ms 无感、≤16ms 一帧内、再往上用户能感知。分档纯属解释面，不参与任何判定（不因慢而丢源）。
+   */
+  const COST_BANDS = [
+    { band: 'short', maxMs: 2, note: '无感' },
+    { band: 'medium', maxMs: 16, note: '一帧内' },
+    { band: 'long', maxMs: Infinity, note: '引人注意' }
+  ];
+  /** 单次耗时归类（纯函数；非法/负值一律归 short，不抛、不返 undefined）。 */
+  function costOf(ms) {
+    const v = (typeof ms === 'number' && isFinite(ms) && ms > 0) ? ms : 0;
+    const r = Math.round(v * 100) / 100;
+    for (let i = 0; i < COST_BANDS.length; i++) {
+      if (v <= COST_BANDS[i].maxMs) return { band: COST_BANDS[i].band, ms: r, note: COST_BANDS[i].note };
+    }
+    return { band: 'short', ms: r, note: COST_BANDS[0].note };
+  }
+  /**
+   * 科目表：源显示名 → { account, role }。
+   *   分档回答「慢不慢」，科目回答「这笔时间花在哪一类事上」——同样是 30ms，花在
+   *   「世界骨架」与花在「账目与观测」上的处置方向完全不同（前者动不得，后者可降级）。
+   *   名称以注入项的 source 字面量为准（与 render/inject.js 一致）；表外源归「未归类」
+   *   并由 costView().unclassified 当场报出——它是成类锁：源面新增而此处漏登记会红灯。
+   */
+  const ACCOUNTS = {};
+  //   v2.88.0 O1：**逐个登记全部 45 源**（与 PRIORITY 同一名单）。为什么必须全覆盖：
+  //   只登记少数几个会让绝大多数源落在「未归类」上，那这个科目表就只是装饰；
+  //   全覆盖之后 `costView().unclassified` 才恢复到它真正的含义——**源面长了而表没跟上**。
+  //   本表由 tests/cost-v2880.js 的 C1 成类锁盯着：PRIORITY 的键集必须被 ACCOUNTS 逐字盖住。
+  [
+    // 世界骨架：注入的根（世界是什么样）——缺了它不是「少一块」而是「舞台没了」
+    ['世界状态', '世界骨架', '承载'], ['世界织体', '世界骨架', '承载'],
+    ['世界推演', '世界骨架', '推进'], ['时间锁', '世界骨架', '承载'],
+    // 人物与关系：在场的人是谁、与玩家什么关系、记忆里有什么
+    //   注：「人物此刻」不作为独立注入项存在（它并进『世界状态』文本），故不入表。
+    ['人物生活', '人物与关系', '承载'],
+    ['关系六型', '人物与关系', '承载'], ['情绪通道', '人物与关系', '承载'],
+    ['双层性格', '人物与关系', '承载'], ['假面', '人物与关系', '承载'],
+    ['记忆', '人物与关系', '承载'], ['主观记忆', '人物与关系', '承载'],
+    ['好感审计', '人物与关系', '计量'], ['社交漩涡', '人物与关系', '推进'],
+    ['原型阶梯', '人物与关系', '计量'], ['驯兽', '人物与关系', '计量'],
+    ['外貌契约', '人物与关系', '呈现'],
+    // 叙事推进：剧情往前走的那些线（因果 / 事件 / 伏笔 / 节奏）
+    ['因果结算', '叙事推进', '承载'], ['因果与情报', '叙事推进', '承载'],
+    ['叙事摘要', '叙事推进', '承载'], ['事件调度', '叙事推进', '推进'],
+    ['场外事件', '叙事推进', '推进'], ['长线伏笔', '叙事推进', '推进'],
+    ['悬案', '叙事推进', '推进'], ['资源与组织', '叙事推进', '推进'],
+    ['情境切片', '叙事推进', '推进'], ['竞争焦点', '叙事推进', '推进'],
+    ['信息暗礁', '叙事推进', '推进'], ['伏笔配给', '叙事推进', '计量'],
+    ['节奏齿轮', '叙事推进', '计量'], ['焦点分配', '叙事推进', '计量'],
+    ['阻尼量规', '叙事推进', '计量'],
+    // 环境与氛围：可被上下文替代的那一层
+    ['天气与物候', '环境与氛围', '氛围'], ['资料片周期', '环境与氛围', '氛围'],
+    ['生存三轴', '环境与氛围', '承载'], ['世界难度', '环境与氛围', '计量'],
+    ['通缉', '环境与氛围', '计量'], ['风险账', '环境与氛围', '计量'],
+    ['业力账', '环境与氛围', '计量'], ['边际折旧', '环境与氛围', '计量'],
+    ['手段耐受', '环境与氛围', '计量'],
+    // 账目与观测：账本与呈现面（时间花在这里，多半是为了「让人看见」）
+    ['账本', '账目与观测', '计量'], ['舆情', '账目与观测', '计量'],
+    ['快照与分支', '账目与观测', '计量'], ['叙事工艺', '账目与观测', '呈现'],
+    // 一次性：本轮消费即清（不进长期账）
+    ['近端事件', '账目与观测', '一次性']
+  ].forEach(function (r) { ACCOUNTS[r[0]] = { account: r[1], role: r[2] }; });
+  const UNCLASSIFIED = '未归类';
+
+
   function tokensOf(text) {
     const s = String(text == null ? '' : text);
     if (!s) return 0;
@@ -146,7 +216,10 @@
       const source = (it && it.source) || '未命名';
       const content = String((it && it.content) || '');
       if (!Object.prototype.hasOwnProperty.call(PRIORITY, source) && unranked.indexOf(source) < 0) unranked.push(source);
-      return { id: idx, source: source, content: content, rank: rankOf(source), fold: foldable(source), tokens: tokensOf(content) };
+      // v2.88.0 O1：项带科目（account/role）——成本账要能按「这笔时间花在哪类事上」分组。
+      const acc = ACCOUNTS[source];
+      return { id: idx, source: source, content: content, rank: rankOf(source), fold: foldable(source), tokens: tokensOf(content),
+        account: (acc && acc.account) || UNCLASSIFIED, role: (acc && acc.role) || null };
     });
 
     const pinned = list.filter(function (x) { return x.rank <= 2; });
@@ -191,6 +264,14 @@
       budget: budget, budgetSource: rb.source, contextSize: rb.contextSize, used: used, remain: Math.max(0, budget - used),
       overBudget: used > budget,
       kept: kept, folded: folded, dropped: dropped,
+      // v2.88.0 O1：**成本账**。调用方（render/inject.js）在唯一引擎调用出口上实测
+      //   每一源构建花了多少 ms，按 source 名经 opts.costs 交进来；本模块只归类不测量
+      //   （纯函数承诺不变：不读 store、不写配置、不落地注入）。三态如实：
+      //   有耗时的进分档（其中 0ms 另计 subTick）；非计量项如实进 unmeasured。
+      //   两种都不按 0ms 冒充「很快」。
+      //   账本主键是**引擎真调用过的源**（见 costSummary ①）：产出空串的源照样进账，
+      //   不能因为「它这轮没内容」就把它当成不花时间。
+      cost: costSummary(list, o.costs),
       inputTokens: list.reduce(function (s, x) { return s + x.tokens; }, 0),
       saved: list.reduce(function (s, x) { return s + x.tokens; }, 0) - used
     };
@@ -263,19 +344,116 @@
     return { budget: budget | 0, source: 'manual', contextSize: null };
   }
 
+  /**
+   * v2.88.0 O1：成本账汇总（纯函数）。
+   *   `costs` 形如 { '关系六型': 3.2, '人际此刻': 0.4, ... }（毫秒，按源显示名）。
+   *   为什么分档 + 科目两层都要：分档答「慢不慢」，科目答「这笔时间值不值得花」——
+   *   同为 30ms，花在「世界骨架」与花在「账目与观测」上的处置方向完全不同。
+   *   `unmeasured` 不是「忘了测」，而是**不在本账口径内**：进 list 的项并不全是引擎源——
+   *   `世界状态`（快照）、`叙事工艺`（自带 try/catch）、`近端事件`（内联 try）、以及外部经
+   *   ctx.injections 交来的项都不过 engineCall，也就没有耗时可交。**如实列出它们，不按 0ms 记账**：
+   *   把非计量项当 0ms 入账，账上会凭空多出「零成本源」，总耗时看着就比真实的小。
+   *   `unclassified` 则是一面镜子：非空 ⇒ 源面长了而科目表没跟上（新增源当场报出，不静默归其它）。
+   *   `costs` 每项可为数字（毫秒）或 `{ ms, n }`（毫秒 + 构建次数）。为什么要次数：墙体时钟精到
+   *   1ms，快引擎构建一次很可能量到 **0**；此时「0ms」是**低于计时精度**，不是「不花时间」。
+   *   拿 0 当读数就是拿精度下限冒充结论，故按 `subTick` 单独计数并如实报出。
+   */
+  function costSummary(list, costs) {
+    const cs = (costs && typeof costs === 'object') ? costs : null;
+    const byList = {};
+    (Array.isArray(list) ? list : []).forEach(function (x) { if (!byList[x.source]) byList[x.source] = x; });
+    const bands = { short: 0, medium: 0, long: 0 };
+    const accounts = {};
+    const unclassified = [];
+    const unmeasured = [];
+    const rows = [];
+    let measured = 0, totalMs = 0, slowest = null, subTick = 0;
+    function bucket(name, account, role) {
+      return accounts[account] || (accounts[account] = { count: 0, measured: 0, unmeasured: 0, ms: 0, bands: { short: 0, medium: 0, long: 0 } });
+    }
+    // ① 主循环以**引擎真调用过的源**为账本主键，而不是以 list 为账本。
+    //   这个分别很关键：引擎源构筑后返回空串是常事（世界没这块数据），
+    //   但「产出空」≠「不花时间」——它可能算了一大圈才发现没什么可说。
+    //   旧形只从 list 出发，于是 42 个引擎源里只有那几个碰巧有内容的进账，
+    //   实测（tools/diag_o1 口径）：空世界下 42 源有耗时、账上只见 0 源。
+    Object.keys(cs || {}).forEach(function (name) {
+      const ent = cs[name];
+      const obj = !!(ent && typeof ent === 'object');
+      const raw = obj ? ent.ms : ent;
+      if (typeof raw !== 'number' || !isFinite(raw)) return;   // 台账里的坏行不入账，也不静默当 0
+      const runs = obj ? (ent.n | 0) : 1;
+      const ms = Math.round(raw * 100) / 100;
+      const band = costOf(raw).band;
+      const sub = (raw === 0 && runs > 0);
+      if (sub) subTick++;
+      const x = byList[name] || null;
+      const meta = ACCOUNTS[name] || null;
+      const account = (x && x.account) || (meta && meta.account) || UNCLASSIFIED;
+      const role = (x && x.role) || (meta && meta.role) || null;
+      if (account === UNCLASSIFIED && unclassified.indexOf(name) < 0) unclassified.push(name);
+      bands[band]++; measured++; totalMs += raw;
+      if (!slowest || raw > slowest.ms) slowest = { source: name, ms: ms, band: band, runs: runs };
+      const a = bucket(name, account, role);
+      a.count++; a.measured++; a.ms = Math.round((a.ms + raw) * 100) / 100; a.bands[band]++;
+      rows.push({ source: name, account: account, role: role, ms: ms, band: band, runs: runs, sub: sub, measured: true, injected: !!x });
+    });
+    // ② list 里而台账里没有的项 = 非计量项（快照 / 工艺 / 内联 / 外部注入）。
+    //   它们也算进科目分布（count 计入），但**不计入 measured 与 totalMs**——
+    //   把非计量项当 0ms 入账，账上会凭空多出「零成本源」，总耗时看着就比真实的小。
+    (Array.isArray(list) ? list : []).forEach(function (x) {
+      if (cs && Object.prototype.hasOwnProperty.call(cs, x.source)) return;
+      if (unmeasured.indexOf(x.source) < 0) unmeasured.push(x.source);
+      const a = bucket(x.source, x.account, x.role);
+      a.count++; a.unmeasured++;
+    });
+    return {
+      measured: measured, unmeasured: unmeasured, unmeasuredCount: unmeasured.length, subTick: subTick, totalMs: Math.round(totalMs * 100) / 100,
+      bands: bands, accounts: accounts, unclassified: unclassified, slowest: slowest, rows: rows
+    };
+  }
+  /**
+   * v2.88.0 O1：成本只读视图（面板/诊断消费）。
+   *   传计划对象直接取其 cost；传 null 时返回一份「未规划」结构的**零值**，
+   *   而不是 null —— 调用方就不得不写 `(v||{}).bands` 这种防御代码。
+   */
+  function costView(planResult) {
+    // 两种入参都收：`plan()` 的返回值（有 .cost），或**裸的成本账**本身。
+    //   为什么后者必要：UI 是从存档快照（lastInjection.budget.cost）拿的，那一份不是 plan 结果；
+    //   若只收前者，消费方就得自己拼一个 { cost: x } 的空壳——多一层没必要的东西。
+    const src = planResult || null;
+    const c = (src && src.cost) ? src.cost : ((src && typeof src.measured === 'number') ? src : null);
+    if (!c) return { planned: false, measured: 0, totalMs: 0, subTick: 0, bands: { short: 0, medium: 0, long: 0 }, accounts: {}, unclassified: [], unmeasured: [], unmeasuredCount: 0, slowest: null, rows: [] };
+    return { planned: true, measured: c.measured, totalMs: c.totalMs, subTick: c.subTick, bands: c.bands, accounts: c.accounts, unclassified: c.unclassified, unmeasured: c.unmeasured, unmeasuredCount: c.unmeasuredCount, slowest: c.slowest, rows: c.rows };
+  }
   function summaryText(p) {
     if (!p) return '未规划';
     const tail = p.folded.length ? '｜折叠 ' + p.folded.length : '';
     const drop = p.dropped.length ? '｜丢弃 ' + p.dropped.length : '';
     // v2.85.0 A4：未声明源在摘要里也要看得见（调用方传的是精简对象时容错）。
-    const un = (p.unranked && p.unranked.length) ? '｜未声明 ' + p.unranked.length + ' 源' : '';
-    return '注入 ' + p.used + '/' + p.budget + 't' + tail + drop + un + (p.saved > 0 ? '｜省 ' + p.saved + 't' : '');
+    // v2.88.0 O1：未声明源**指名报出**（旧形只报个数）。为什么必须指名：只给「未声明 3 源」时，读者
+    //   无从判断那三个是谁，也就无从去补表——它把一条可行动的缺陷读数变成了一个纯计数。
+    const un = (p.unranked && p.unranked.length) ? '｜未声明 ' + p.unranked.length + ' 源[' + p.unranked.slice(0, 4).join('/') + ']' : '';
+    // v2.88.0 O1：成本一句——仅当有**实测**耗时时追加。未测量时如实不提，不拿 0ms 冒充「很快」。
+    const cst = (p.cost && p.cost.measured) ? '｜耗时 ' + p.cost.totalMs + 'ms'
+      + (p.cost.slowest ? '(' + p.cost.slowest.source + ' 最慢 ' + p.cost.slowest.ms + 'ms)' : '')
+      + (p.cost.subTick ? '(' + p.cost.subTick + ' 源低于 1ms)' : '') : '';
+    // v2.88.0 O1：**一个引擎源都没量到**要看得见（说明成本面根本没工作，而不是「很快」）。
+    //   除此之外不报 unmeasured：快照总是非计量项，每轮都报就成了噪音，读的人会开始不看它。
+    const abs = (p.cost && p.cost.measured === 0 && p.cost.unmeasuredCount) ? '｜本轮无引擎调用（' + p.cost.unmeasuredCount + ' 项非计量）' : '';
+    return '注入 ' + p.used + '/' + p.budget + 't' + tail + drop + un + cst + abs + (p.saved > 0 ? '｜省 ' + p.saved + 't' : '');
   }
 
   WA.injectBudget = {
     DEFAULT_BUDGET, MIN_KEEP_TOKENS, FOLD_FLOOR_TOKENS, PRIORITY, AUTO_RATIO, AUTO_MIN, AUTO_MAX,
     autoBudget, resolveBudget, resolveContextSize,
-    tokensOf, rankOf, foldable, trim, plan, apply, summaryText
+    tokensOf, rankOf, foldable, trim, plan, apply, summaryText,
+    // v2.88.0 O1：成本面**只导出两个**，且两个都有真消费方：
+    //   · costOf —— tool-diag 的 secInject 用它给「最慢 5 源」贴档位（分档只有贴到读数上才有人看）；
+    //   · costView —— ui/panel.js 的「本轮注入」段用它渲染上轮耗时与科目分布。
+    //   COST_BANDS / ACCOUNTS / UNCLASSIFIED 是**实现细节而非承诺**，不导出：
+    //   导出一个没人读的常量就是给自己加一份要维护的接口面（还要为它付冻结串的价）。
+    //   需要它俩的地方在本模块内（costOf / costSummary），屏外一律走 plan + costView。
+    costOf, costView
   };
   if (WA.log) WA.log('info', '注入预算裁判已加载');
 })();

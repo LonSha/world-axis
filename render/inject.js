@@ -195,7 +195,14 @@ style: false,
     marginal: '边际折旧', tolerance: '手段耐受', events: '事件调度', checkpoints: '快照与分支',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
-    opinion: '舆情', ledger: '重大事件账本', digest: '世界推演', nearEvent: '近端事件'
+    opinion: '舆情',
+    // v2.88.0 O1：此处原名是「重大事件账本」，而**注入项**的 source 是「账本」（见
+    //   下方 `items.push({ source: '账本'`）。同一个源两套名字，代价是它同时出现在两本账上：
+    //   故障台账按 SRC_NAME 记「重大事件账本」，而 token 账/科目表/优先级表按注入项名记「账本」
+    //   ——同一源在两张表里对不上同（O1 实测：科目表把「重大事件账本」报成未归类）。
+    //   统一到注入项名（用户也在注入日志里看到的就是它）。面板开关的显示名属于 VIS_NAMES，不受此处影响。
+    ledger: '账本',
+    digest: '世界推演', nearEvent: '近端事件'
   };
   /**
    * 失败台账：源显示名 -> { count, lastMsg, lastAt }。
@@ -204,6 +211,26 @@ style: false,
    *   「世界状态为什么没进正文」到底是没内容还是坏了。
    */
   const engineFailures = {};
+  /**
+   * v2.88.0 O1：引擎源耗时台账（显示名 -> { ms, n }，**只记本轮**，每轮注入链开头清零）。
+   *   为什么要 n（调用次数）：墙体时钟只精到 1ms，单次构建常常量到 0；此时 0ms 是
+   *   **低于计时精度**，不是「不花时间」。只报 ms 的话，「一次都没量到」与「量到了但很快」
+   *   在账上长得一模一样。
+   */
+  const engineCost = {};
+  function noteCost(ns, ms) {
+    const name = SRC_NAME[ns] || ns;
+    const rec = engineCost[name] || (engineCost[name] = { ms: 0, n: 0 });
+    rec.n++;
+    rec.ms = Math.round((rec.ms + ((typeof ms === 'number' && isFinite(ms) && ms > 0) ? ms : 0)) * 100) / 100;
+  }
+  function resetCost() { Object.keys(engineCost).forEach(function (k) { delete engineCost[k]; }); }
+  /** 耗时台账只读副本（plan 与 visibilityStat 两处共用同一份实现） */
+  function costStat() {
+    const out = {};
+    Object.keys(engineCost).forEach(function (k) { out[k] = { ms: engineCost[k].ms, n: engineCost[k].n }; });
+    return out;
+  }
   function noteEngineFailure(ns, err) {
     const name = SRC_NAME[ns] || ns;
     const rec = engineFailures[name] || (engineFailures[name] = { count: 0, lastMsg: '', lastAt: 0 });
@@ -231,8 +258,13 @@ style: false,
    */
   function engineCall(ns, fn) {
     if (!WA[ns]) return '';
+    // v2.88.0 O1：**唯一的引擎调用出口也是唯一该计时的地方**——46 处调用点全在这里过，
+    //   在一处落表就天然覆盖全部引擎源；换到 46 个调用点各写一遭，迟早漏一个（而漏掉的那个
+    //   会以「0ms」的样子出现在账上，看不出是漏的）。
+    const t0 = clockWall();
     try { return fn() || ''; }
     catch (e) { noteEngineFailure(ns, e); return ''; }
+    finally { noteCost(ns, clockWall() - t0); }
   }
   WA.render = {
     /** v0.1.41: 撤销-槽位关联审计只读视图（tool-diag 消费） */
@@ -242,7 +274,9 @@ style: false,
     visibilityStat() { return { sources: SOURCES.length, declared: Object.keys(__REG.def).length, filled: __visStat.filled, undeclared: __visStat.undeclared.slice(), lastAt: __visStat.lastAt, key: LS_KEY,
       // v2.86.0 A5：注入链失败读数（按源显示名）——与「源产出空串」分开记，
       //   否则「世界状态为什么没进正文」永远答不出是没内容还是坏了。
-      engineFaults: engineFailuresView(), engineFaultTotal: engineFailureCount() }; },
+      engineFaults: engineFailuresView(), engineFaultTotal: engineFailureCount(),
+      // v2.88.0 O1：本轮引擎源耗时（零新成员——与 engineFaults 同一条口子出，理由同 A3）。
+      injectCost: costStat(), injectCostTotal: Object.keys(engineCost).reduce(function (a, k) { return a + engineCost[k].ms; }, 0) }; },
     getVisibility() { return loadVis(); },
     setVisibility(k, on) { const v = loadVis(); v[k] = !!on; WA.settingsBus.save(__REG, v); },
 
@@ -306,6 +340,9 @@ style: false,
       const c = (() => { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } })();
       if (!c || !c.setExtensionPrompt) { if (ctx.injections.length) WA.log('warn', '宿主无setExtensionPrompt，注入丢弃'); return; }
       const vis = loadVis();
+      // v2.88.0 O1：成本账按轮清零——它记的是**本轮**注入链的引擎耗时，不是从开机累到现在。
+      //   每轮清零后，注入构建花了多少时间才能与「这一轮 token 用了多少」同轴比较。
+      resetCost();
       const items = [];
       const snap = this.buildWorldSnapshot();
       if (snap) items.push({ source: '世界状态', content: snap });
@@ -436,7 +473,7 @@ style: false,
       try {
         const budget = (WA.backstage && WA.backstage.getSettings) ? WA.backstage.getSettings().injectBudget : null;
         if (WA.injectBudget && budget !== 0 && items.length) {
-          planInfo = WA.injectBudget.plan(items, { budget: (budget == null ? -1 : budget) });
+          planInfo = WA.injectBudget.plan(items, { budget: (budget == null ? -1 : budget), costs: costStat() });
           finalItems = WA.injectBudget.apply(items, planInfo);
           if (planInfo.folded.length || planInfo.dropped.length) {
             WA.log('info', '注入预算裁决：' + WA.injectBudget.summaryText(planInfo)
@@ -561,7 +598,7 @@ style: false,
           const slotSnap = (WA.injectSlotAudit && lastSlots)
             ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotResOut || slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, hostWb: hostCk, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, hostWb: hostCk, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }

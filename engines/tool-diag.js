@@ -636,8 +636,33 @@
         const b = li.budget;
         out.budget = { used: b.used, cap: b.cap, source: b.source, contextSize: b.contextSize || null, remain: b.remain, inputTokens: b.inputTokens, saved: b.saved, overBudget: !!b.overBudget, keptCount: b.keptCount || 0, foldedCount: (b.folded || []).length, droppedCount: (b.dropped || []).length };
         if ((b.dropped || []).length) out.budget.dropped = b.dropped;
-        out.budget.summary = WA.injectBudget && WA.injectBudget.summaryText ? WA.injectBudget.summaryText({ used: b.used, budget: b.cap, folded: b.folded || [], dropped: b.dropped || [], saved: b.saved }) : null;
-      }
+        out.budget.summary = WA.injectBudget && WA.injectBudget.summaryText ? WA.injectBudget.summaryText({ used: b.used, budget: b.cap, folded: b.folded || [], dropped: b.dropped || [], saved: b.saved, cost: b.cost || null }) : null;
+        // v2.88.0 O1：成本账的**真消费点**。快照里写了 cost 而无人读，就只是「记了没人看」
+        //   （与 v2.49.0 的主块账、v2.50.0 的宿主账同病）。这里把分档/科目/最慢源提到诊断面上：
+        //   「注入慢在哪、慢在谁身上」从本版起在诊断包里可答。
+        if (b.cost) {
+          out.budget.cost = {
+            measured: b.cost.measured | 0, unmeasuredCount: b.cost.unmeasuredCount | 0,
+            subTick: b.cost.subTick | 0, totalMs: b.cost.totalMs, bands: b.cost.bands,
+            slowest: b.cost.slowest, unclassified: (b.cost.unclassified || []).slice(0, 6),
+            accounts: b.cost.accounts
+          };
+          // 「未归类非空」是一面镜子：源面长了而科目表没跟上（含新增源名）
+          if ((b.cost.unclassified || []).length) out.budget.cost.note = '科目表缺登记：' + b.cost.unclassified.slice(0, 4).join('/');
+        }
+        // 本轮引擎耗时的实时读数（与快照里的成本账互为佐证：一个记「本地刚跑过的」，一个记「上一轮存下的」）
+        const icost = (WA.render && WA.render.visibilityStat) ? WA.render.visibilityStat() : null;
+        if (icost && icost.injectCost) {
+          const keys = Object.keys(icost.injectCost);
+          out.budget.injectCostTotal = icost.injectCostTotal || 0;
+          out.budget.injectCostSources = keys.length;
+          // 只报最慢的 5 个——全量列表会把诊断包撑大，而「哪几个慢」才是要看的
+          // v2.88.0 O1：每行贴上档位（injectBudget.costOf 的真消费方）。只报一个裸 ms
+          //   要读者自己换算「1ms 算快吗」；贴了档位才是可行动的读数。
+          const bandOf = (WA.injectBudget && WA.injectBudget.costOf) ? WA.injectBudget.costOf : null;
+          out.budget.injectCostTop = keys.sort(function (a, c) { return icost.injectCost[c].ms - icost.injectCost[a].ms; }).slice(0, 5)
+            .map(function (k) { const ms = icost.injectCost[k].ms; return { source: k, ms: ms, n: icost.injectCost[k].n, band: bandOf ? bandOf(ms).band : null }; });
+        }      }
       // v0.1.9: 槽位路由错误快照（部分失败时存在）
       if (li && li.slotErrors) out.slotErrors = li.slotErrors;
       else if (snap) { out.promptLength = snap.promptLength; out.ourExcerptLen = snap.ourExcerptLen; }

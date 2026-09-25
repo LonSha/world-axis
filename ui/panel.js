@@ -944,6 +944,27 @@
         if ((b.folded || []).length) h += '<div class="wa-dim">折叠 ' + (b.folded || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')'; }).join('、') + '</div>';
         if ((b.dropped || []).length) h += '<div class="wa-dim wa-log-warn">丢弃 ' + (b.dropped || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')' + (f.tokens ? ' ' + esc(String(f.tokens)) + 't' : ''); }).join('、') + '</div>';
         h += '</div>';
+        // v2.88.0 O1：成本账（`injectBudget.costView` 的真消费方）。
+        //   本轮之前「注入花了多少毫秒」在面板上无处可见——用户只看得见 token 花在谁身上，
+        //   看不见时间花在谁身上。两笔账必须并排才叫透明。
+        //   「一个引擎源都没量到」不写成「很快」：那说明成本面根本没工作。
+        const cv = (WA.injectBudget && WA.injectBudget.costView) ? WA.injectBudget.costView(b.cost) : null;
+        if (cv && cv.planned && cv.measured) {
+          const bits = ['耗时 ' + cv.totalMs + 'ms', cv.measured + ' 源'];
+          if (cv.subTick) bits.push(cv.subTick + ' 源低于 1ms');
+          if (cv.slowest) bits.push('最慢 ' + cv.slowest.source + ' ' + cv.slowest.ms + 'ms');
+          h += '<div class="wa-dim">' + esc(bits.join('｜')) + '</div>';
+          const accs = Object.keys(cv.accounts || {}).map(function (k) { return { k: k, v: cv.accounts[k] }; })
+            .filter(function (x) { return x.v.measured; }).sort(function (a, c) { return c.v.ms - a.v.ms; });
+          if (accs.length) {
+            h += '<div class="wa-dim">科目 ' + accs.map(function (x) { return esc(x.k + ' ' + x.v.ms + 'ms/' + x.v.measured); }).join('｜') + '</div>';
+          }
+          if ((cv.unclassified || []).length) {
+            h += '<div class="wa-dim wa-log-warn">科目表缺登记：' + cv.unclassified.map(function (x) { return esc(x); }).join('、') + '</div>';
+          }
+        } else if (cv && cv.planned) {
+          h += '<div class="wa-dim">本轮无引擎源可计（' + cv.unmeasuredCount + ' 项非计量）</div>';
+        }
         return h;
       } catch (e) { return '<div class="wa-empty">读取预算快照失败（' + esc(e && e.message) + '）</div>'; }
     })();
