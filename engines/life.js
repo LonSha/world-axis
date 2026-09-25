@@ -27,7 +27,11 @@
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  const stat = { ticks: 0, changed: 0, blocked: 0, lastAt: 0, lastReason: '' };
+  const stat = { ticks: 0, changed: 0, blocked: 0, lastAt: 0, lastReason: '',
+    // v2.85.0 B1：两个「本可以推演却没推演」的原因必须分开计数——
+    //   名额不足（skipped）与协作未被回应（unreciprocated）是两件事：
+    //   前者是资源约束，后者是**依据不足**。合成一个数就再也答不出该加名额还是该等对方。
+    skipped: 0, unreciprocated: 0 };
 
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function personId(name) { const n = clean(name, 60); return n ? 'p_' + n : ''; }
@@ -51,6 +55,22 @@
     if (trust !== null && trust >= 55 && f.with) return { action: 'ask', reason: 'trusted-person' };
     if (!goal.prerequisite || f.ready === true) return { action: 'advance', reason: 'ready' };
     return { action: 'wait', reason: 'prerequisite-open' };
+  }
+  /**
+   * v2.85.0 B1：协作必须**对称持有**。
+   *   kind='cooperation' 的承诺只有在对方也持有一行指向此人的同事项合作时才成立。
+   *   单方面宣布的合作不是合作——否则「我说了我们要一起做」就等价于「我们一起做」。
+   *   注意：本函数**只读**，不修改任何一方（拒收/降级不得顺手删掉事实）。
+   */
+  function reciprocated(draft, person, cmt) {
+    const other = (draft.people || {})[personId(cmt.target)];
+    const lf = other && other.life;
+    if (!lf || !Array.isArray(lf.commitments)) return false;
+    const me = clean(person.name, 60) || String(person.id || '').replace(/^p_/, '');
+    return lf.commitments.some(function (x) {
+      return x && x.status === 'active' && x.kind === 'cooperation'
+        && clean(x.target, 60) === me && clean(x.text, 80) === clean(cmt.text, 80);
+    });
   }
   function commitmentAction(item, facts) {
     if (facts && Array.isArray(facts.fulfilledIds) && facts.fulfilledIds.indexOf(item.id) >= 0) return 'keep';
@@ -107,9 +127,28 @@
   function tick(facts) {
     const cfg = settings(); stat.lastAt = clockNow('life');
     if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: true, changed: 0, reason: 'disabled' }; }
-    const f = facts || {}; let changed = 0;
+    const f = facts || {}; let changed = 0, skipped = 0, unrecip = 0;
     WA.store.transact(function (draft) {
-      Object.keys(draft.people || {}).slice(0, cfg.maxPeople).forEach(function (id) {
+      // v2.85.0 B1：名单不再按插入序截断。旧口径 `Object.keys(...).slice(0, maxPeople)`
+      //   让「谁被推演」取决于谁先进场——有依据的人插在第 5 位之后就永远轮不到。
+      //   现口径：**有依据者优先**（依据条数多者先，同依据按下标稳定），无依据者不占名额。
+      const basisOf = function (id) {
+        const p0 = draft.people[id], lf = p0 && p0.life;
+        if (!lf || typeof lf !== 'object') return 0;
+        let n = 0;
+        if (Array.isArray(lf.goals) && lf.goals.some(function (x) { return x && x.status === 'active'; })) n++;
+        if (Array.isArray(lf.commitments) && lf.commitments.some(function (x) { return x && x.status === 'active'; })) n++;
+        if (Array.isArray(lf.schedule) && lf.schedule.some(function (x) { return x && x.status === 'active'; })) n++;
+        return n;
+      };
+      const ranked = Object.keys(draft.people || {}).map(function (id, i) {
+        return { id: id, n: basisOf(id), i: i };
+      }).filter(function (r) { return r.n > 0; })
+        .sort(function (a, b) { return (b.n - a.n) || (a.i - b.i); });
+      // 名额不足时**必须留痕**：静默少推演一个人，与「他本来没事可做」在读数上长得一样。
+      skipped = Math.max(0, ranked.length - cfg.maxPeople);
+      ranked.slice(0, cfg.maxPeople).forEach(function (row) {
+        const id = row.id;
         const p = draft.people[id]; if (!p || !p.life) return;
         const life = ensureLife(p);
         const active = life.schedule.filter(function (x) { return x.status === 'active' && f.now >= x.start && f.now < x.end; })[0];
@@ -117,7 +156,17 @@
         const commitment = life.commitments.filter(function (x) { return x.status === 'active'; })[0];
         const fulfilled = commitment && Array.isArray(f.fulfilledIds) && f.fulfilledIds.indexOf(commitment.id) >= 0;
         const supplied = f.decision && f.decision.action ? f.decision : null;
-        let decision = fulfilled ? { action: 'keep', reason: 'commitment-fulfilled' } : (supplied ? supplied : (goal ? decide(goal, p, f) : (commitment ? { action: commitmentAction(commitment, f), reason: 'commitment' } : (active ? { action: 'keep', reason: 'schedule' } : null))));
+        // v2.85.0 B1：单向协作**不得**被当作可依承诺。
+        //   位置刻意放在「有目标的人走目标路径」之后：协作被回应与否，不该拦下一个本来
+        //   就有自己目标的人；它只影响「除了这条协作之外别无依据」的那种人。
+        const lone = !!(commitment && commitment.kind === 'cooperation' && !reciprocated(draft, p, commitment));
+        if (lone) unrecip++;
+        let decision = fulfilled ? { action: 'keep', reason: 'commitment-fulfilled' }
+          : (supplied ? supplied
+            : (goal ? decide(goal, p, f)
+              : (lone ? { action: 'wait', reason: 'unreciprocated' }
+                : (commitment ? { action: commitmentAction(commitment, f), reason: 'commitment' }
+                  : (active ? { action: 'keep', reason: 'schedule' } : null)))));
         if (!decision) return;
         if (fulfilled) commitment.status = 'kept';
         life.lastDecision = { action: decision.action, reason: decision.reason, goal: goal ? goal.id : '', at: f.now || stat.lastAt };
@@ -127,8 +176,12 @@
         p.intent = decision.action === 'wait' ? '等待条件' : decision.reason; p.updatedAt = f.now || stat.lastAt; changed++;
       });
     }, 'life:tick');
-    stat.ticks++; stat.changed += changed; if (!changed) stat.blocked++; stat.lastReason = changed ? 'updated' : 'nothing-to-do';
-    return { ok: true, changed: changed, reason: stat.lastReason };
+    stat.ticks++; stat.changed += changed; if (!changed) stat.blocked++;
+    stat.skipped += skipped; stat.unreciprocated += unrecip;
+    stat.lastReason = changed ? 'updated' : 'nothing-to-do';
+    // skipped 与 unreciprocated 进返回值：调用方要能当场看见「没被推演」的原因，
+    //   而不是只能事后从 stat 里猜。
+    return { ok: true, changed: changed, reason: stat.lastReason, skipped: skipped, unreciprocated: unrecip };
   }
 
   function buildBlock() {

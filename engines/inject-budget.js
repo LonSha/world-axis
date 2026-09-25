@@ -23,16 +23,69 @@
   const FOLD_FLOOR_TOKENS = 30;     // 折叠下限
   const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 
-  /** 源优先级：rank 越小越重要；fold=true 允许超预算时折叠 */
+  /**
+   * 源优先级：rank 越小越重要；fold=true 允许超预算时折叠。
+   *
+   * v2.85.0 A4：本表此前只有 v0.9.3 的 8 个源名，而注入面已长到 46 个 push 点 ——
+   *   于是 38 个源**全部静默落 DEFAULT_RANK**，「pinned 优先保障、绝不静默丢弃」
+   *   这条承诺只对 2 个源成立，且「有源没被声明」在运行时不可见。
+   *   现按**可替代性**补满：越靠前＝越不可替代（丢一条，模型就再也看不到那件事）。
+   *   判据由 tests/settle-v2851.js 承担：真代码面里每个 `source: 'X'` 都必须在本表内，
+   *   且未声明者会经 plan().unranked / summaryText 当场报出（成类锁，防再次漂移）。
+   */
   const PRIORITY = {
+    // rank 1-2：pinned，绝不静默丢弃
     '近端事件': { rank: 1, fold: false },
     '世界状态': { rank: 2, fold: false },
+    // rank 3：丢了就断因果/记忆主链
     '主观记忆': { rank: 3, fold: true },
+    '因果结算': { rank: 3, fold: true },
+    // rank 4：长期记忆本体
     '记忆': { rank: 4, fold: true },
+    // rank 5：世界骨架与叙事摘要
     '叙事摘要': { rank: 5, fold: true },
+    '世界织体': { rank: 5, fold: true },
+    '人物生活': { rank: 5, fold: true },
+    '因果与情报': { rank: 5, fold: true },
+    '事件调度': { rank: 5, fold: true },
+    // rank 6：推演与结构性面
     '世界推演': { rank: 6, fold: true },
+    '资源与组织': { rank: 6, fold: true },
+    '长线伏笔': { rank: 6, fold: true },
+    '悬案': { rank: 6, fold: true },
+    '社交漩涡': { rank: 6, fold: true },
+    '场外事件': { rank: 6, fold: true },
+    '情绪通道': { rank: 6, fold: true },
+    '关系六型': { rank: 6, fold: true },
+    '时间锁': { rank: 6, fold: true },
+    '双层性格': { rank: 6, fold: true },
+    '资料片周期': { rank: 6, fold: true },
+    '生存三轴': { rank: 6, fold: true },
+    '情境切片': { rank: 6, fold: true },
+    '竞争焦点': { rank: 6, fold: true },
+    '信息暗礁': { rank: 6, fold: true },
+    '风险账': { rank: 6, fold: true },
+    // rank 7：物候/环境/氛围类（可被上下文替代）
     '账本': { rank: 7, fold: true },
-    '舆情': { rank: 8, fold: true }
+    '天气与物候': { rank: 7, fold: true },
+    '世界难度': { rank: 7, fold: true },
+    '假面': { rank: 7, fold: true },
+    '好感审计': { rank: 7, fold: true },
+    '通缉': { rank: 7, fold: true },
+    '阻尼量规': { rank: 7, fold: true },
+    '节奏齿轮': { rank: 7, fold: true },
+    '伏笔配给': { rank: 7, fold: true },
+    '焦点分配': { rank: 7, fold: true },
+    '业力账': { rank: 7, fold: true },
+    '叙事工艺': { rank: 7, fold: true },
+    // rank 8：最可替代（统计/库存/外观/账目类）
+    '舆情': { rank: 8, fold: true },
+    '驯兽': { rank: 8, fold: true },
+    '外貌契约': { rank: 8, fold: true },
+    '原型阶梯': { rank: 8, fold: true },
+    '边际折旧': { rank: 8, fold: true },
+    '手段耐受': { rank: 8, fold: true },
+    '快照与分支': { rank: 8, fold: true }
   };
   const DEFAULT_RANK = 6;
 
@@ -85,9 +138,14 @@
     //   记名，而 source 是**用户可见名、不保证唯一**（「连续性约束」等名在同轮里可能多项）。
     //   按名索引会让两条同名项共用同一份折叠文本：一条被折叠 ⇒ 另一条也被替换成同一段，
     //   一条 retained 一条 dropped ⇒ 两条都按 retained 出。id 只用于内部对账，不改变账单语义。
+    // v2.85.0 A4：未声明源必须**可观测**。旧实现在这里静默套 DEFAULT_RANK，
+    //   于是「优先级表没跟着源面长」这件事在任何读数里都看不见——补表之后，
+    //   再加新源却忘了登记，plan().unranked 与 summaryText 会当场报出来。
+    const unranked = [];
     const list = (Array.isArray(items) ? items : []).map(function (it, idx) {
       const source = (it && it.source) || '未命名';
       const content = String((it && it.content) || '');
+      if (!Object.prototype.hasOwnProperty.call(PRIORITY, source) && unranked.indexOf(source) < 0) unranked.push(source);
       return { id: idx, source: source, content: content, rank: rankOf(source), fold: foldable(source), tokens: tokensOf(content) };
     });
 
@@ -128,6 +186,8 @@
       // v2.47.0: inputCount 让 apply 能判「这份计划是不是这份输入算出来的」——长度不符时
       //   退回按 source 名匹配（旧语义），避免把位置对账用在错的计划上。
       inputCount: list.length,
+      // 本次输入里没有任何优先级声明的源（去重）。空数组 = 源面已全部被声明覆盖。
+      unranked: unranked,
       budget: budget, budgetSource: rb.source, contextSize: rb.contextSize, used: used, remain: Math.max(0, budget - used),
       overBudget: used > budget,
       kept: kept, folded: folded, dropped: dropped,
@@ -207,7 +267,9 @@
     if (!p) return '未规划';
     const tail = p.folded.length ? '｜折叠 ' + p.folded.length : '';
     const drop = p.dropped.length ? '｜丢弃 ' + p.dropped.length : '';
-    return '注入 ' + p.used + '/' + p.budget + 't' + tail + drop + (p.saved > 0 ? '｜省 ' + p.saved + 't' : '');
+    // v2.85.0 A4：未声明源在摘要里也要看得见（调用方传的是精简对象时容错）。
+    const un = (p.unranked && p.unranked.length) ? '｜未声明 ' + p.unranked.length + ' 源' : '';
+    return '注入 ' + p.used + '/' + p.budget + 't' + tail + drop + un + (p.saved > 0 ? '｜省 ' + p.saved + 't' : '');
   }
 
   WA.injectBudget = {

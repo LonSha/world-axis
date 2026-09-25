@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.84.0';
+  const VERSION = '2.85.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -207,7 +207,7 @@
   const LOAD_ORDER = [
     'core/clock.js',           // v2.15.0: 时间源单一出口（决策时间可冻结 / 测量时间不受影响）——须最先装载
     'core/rand.js',            // v2.14.0: 随机源单一出口（决策流可复现 / 标识流不混流）
-    'core/input-guard.js',     // v2.84.0: 统一输入边界（须早于一切消费外部值的模块）
+    'core/input-guard.js',     // v2.85.0: 统一输入边界（须早于一切消费外部值的模块）
     'core/settings-bus.js',
     'core/store.js',
     'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）

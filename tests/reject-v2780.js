@@ -337,6 +337,49 @@ function runWitness(WA) {
     cpReset({ autoEvery: 3 });
     return [Cp.tick().reason];
   });
+  // ── v2.85.0（B2 地域与交通 + B1 人物生活）六个新码 ──
+  //   场景**必须记忆化**：这批探针会登记地点（甲/乙/丙）与人物（独1/独2），
+  //   重复跑第二次时「甲已登记」「独1 已有承诺」都会改变结论——首跑才对得上，二跑就成了另一个场景。
+  //   （实测：不记忆化时 trip 里第二次跑 parent-locked 会拿到 admitted，因为归属已被第一次补全。）
+  let MEMO2850 = null;
+  function codes2850() {
+    if (MEMO2850) return MEMO2850;
+    const out = {};
+    const T = '__w2850_';
+    // 世界织体面：层级（归属）/ 通行量（走得动）
+    Wd.setSettings({ enabled: true });
+    out['unknown-parent'] = Wd.addPlace({ name: T + '丁', parent: T + '不存在' }).reason;
+    out['self-parent'] = Wd.addPlace({ name: T + '戊', parent: T + '戊' }).reason;
+    Wd.addPlace({ name: T + '甲' });
+    Wd.addPlace({ name: T + '乙', parent: T + '甲' });
+    out['parent-cycle'] = Wd.addPlace({ name: T + '甲', parent: T + '乙' }).reason;
+    Wd.addPlace({ name: T + '丙', parent: T + '甲' });
+    out['parent-locked'] = Wd.addPlace({ name: T + '丙', parent: T + '乙' }).reason;
+    Wd.addRoad(T + '甲', T + '乙', 10, 1);
+    Wd.depart(T + '行甲', T + '甲', T + '乙', 0);
+    out['road-crowded'] = Wd.depart(T + '行乙', T + '甲', T + '乙', 0).reason;
+    // 人物生活面：单向宣布的合作 ≠ 已建立的协作
+    Lf.setSettings({ enabled: true, maxPeople: 4 });
+    Lf.addCommitment(T + '独1', { kind: 'cooperation', target: T + '独2', text: '合办义仓' });
+    Lf.tick({ now: 20 });
+    const p = (WA.store.get() || {}).people['p_' + T + '独1'];
+    const d = p && p.life && p.life.lastDecision;
+    out['unreciprocated'] = d ? d.reason : '';
+    MEMO2850 = out;
+    return out;
+  }
+  want('unknown-parent', '登记的父级必须已登记（v2.85.0 B2：不猜「大概同城」）');
+  trip('unknown-parent', function () { return [codes2850()['unknown-parent']]; });
+  want('self-parent', '地点不得以自己为父级（v2.85.0 B2）');
+  trip('self-parent', function () { return [codes2850()['self-parent']]; });
+  want('parent-cycle', '补全归属会让父子互相归属 ⇒ 拒收（v2.85.0 B2）');
+  trip('parent-cycle', function () { return [codes2850()['parent-cycle']]; });
+  want('parent-locked', '已有归属不得被冲突改写（v2.85.0 B2：无→有是补全、x→y 才是改写）');
+  trip('parent-locked', function () { return [codes2850()['parent-locked']]; });
+  want('road-crowded', '路段容量满 ⇒ 拒收且不落盘（v2.85.0 B2：走得通 ≠ 现在走得动）');
+  trip('road-crowded', function () { return [codes2850()['road-crowded']]; });
+  want('unreciprocated', '单向宣布的合作不得被当作已建立的协作（v2.85.0 B1）');
+  trip('unreciprocated', function () { return [codes2850()['unreciprocated']]; });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

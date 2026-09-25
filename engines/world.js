@@ -18,6 +18,11 @@
  *      「后来的悄悄赢过先前的」会让用户永远不知道自己的安排被改掉了。
  *   5 共同日程不得被读成「所有人都在场」：在场者只来自**证据**（人物自己的日程安排），
  *      不得由「办了一场集市」推出「全城人都到了」。
+ *   ── v2.85.0 追加（B2 地域与交通深化，全是否定式）──
+ *   6 地域层级只说明**归属**，不说明可达：A∈B 不得被读成「A 走得到 B」（第 3 条的复发）。
+ *     父级须先登记（unknown-parent）、不得自指（self-parent）、不得成环（parent-cycle）；
+ *     已有归属不得被冲突改写（parent-locked），补全缺失归属则只许一次。
+ *   7 路走得通 ≠ 现在走得动：路段容量满时**拒收并归因**（road-crowded），且拒收发生在落盘之前。
  */
 (function () {
   'use strict';
@@ -61,13 +66,44 @@
     if (!name) return { ok: false, reason: 'missing-name' };
     const kind = clean(item && item.kind, 12);
     if (kind && PLACE_KINDS.indexOf(kind) < 0) return { ok: false, reason: 'bad-kind', kinds: PLACE_KINDS.slice() };
+    // v2.85.0 地域层级（B2）。父级**必须先登记**：没登记的「属于某地」不是「大概同城」，而是拒收。
+    //   全部分支都判在写事务**之前**（只读）——拒收分支不进事务，
+    //   「拒收却推进 rev / 半条记录落盘」就没有立足点（v2.79.0 立的规矩）。
+    const parent = clean(item && item.parent, 40);
+    if (parent) {
+      if (parent === name) return { ok: false, reason: 'self-parent', name: name };
+      if (!placeByName(parent)) return { ok: false, reason: 'unknown-parent', parent: parent };
+      // 已有归属不得被**冲突改写**（x→y 拒收并写明现有归属）。
+      //   「无 → 有」是补全缺失事实，不是改写已登记事实 —— 允许，且只允许一次（补后即锁）。
+      //   若把补全也拒掉，一次误登记就永久锁死；本仓库禁的是「静默改写」，不是「不得改写」。
+      const ex0 = placeByName(name);
+      const cur0 = ex0 ? clean(ex0.parent, 40) : '';
+      if (cur0 && parent !== cur0) return { ok: false, reason: 'parent-locked', name: name, parent: cur0 };
+    }
     let out = null;
     WA.store.transact(function (draft) {
       draft.world = draft.world && typeof draft.world === 'object' && !Array.isArray(draft.world) ? draft.world : {};
       draft.world.places = Array.isArray(draft.world.places) ? draft.world.places : [];
       const hit = draft.world.places.filter(function (x) { return x && x.name === name; })[0];
-      if (hit) { out = { ok: true, id: hit.id, name: name, existed: true }; return; }
-      const row = { id: 'pl_' + name, name: name, kind: kind || 'public',
+      if (hit) {
+        const cur = clean(hit.parent, 40);
+        // 复核（正常路径已在事务外挡下）：不一致即**透明中止**，不留半条记录。
+        if (parent && cur && parent !== cur) return false;
+        if (parent && !cur) {
+          // 环检测必须落在这里：只有**补全**这一瞬才可能出现 A∈B、B∈A
+          //   （事务前读的是补全前的旧图，判它等于写一段永不触发的代码）。
+          let c = parent, guard = 0, loop = false;
+          while (c && guard++ < 64) {
+            if (c === name) { loop = true; break; }
+            const u = placeByName(c);
+            c = u ? clean(u.parent, 40) : '';
+          }
+          if (loop) { out = { ok: false, reason: 'parent-cycle', name: name, parent: parent }; return false; }
+          hit.parent = parent;
+        }
+        out = { ok: true, id: hit.id, name: name, existed: true, parent: clean(hit.parent, 40) }; return;
+      }
+      const row = { id: 'pl_' + name, name: name, kind: kind || 'public', parent: parent,
         open: isFinite(Number(item && item.open)) ? Number(item.open) : 0,
         close: isFinite(Number(item && item.close)) ? Number(item.close) : 0,
         at: clockNow('world') };
@@ -81,11 +117,16 @@
   }
 
   /** 登记道路（无向）。两端都必须是已登记地点；分钟数必须为正。 */
-  function addRoad(a, b, minutes) {
+  function addRoad(a, b, minutes, cap) {
     const x = clean(a, 40), y = clean(b, 40), mins = Number(minutes);
     if (!x || !y) return { ok: false, reason: 'missing-fields' };
     if (x === y) return { ok: false, reason: 'self-road' };
     if (!isFinite(mins) || mins <= 0) return { ok: false, reason: 'bad-minutes' };
+    // v2.85.0 通行量（交通网络的一面）：缺省/0 = 不限；正整数 = 同一时刻这段路最多几个在途者。
+    //   为什么落在路段行而不是另开一张表：容量是**路段自己的属性**；
+    //   另立并行表就要回答「谁是真源、改了甲忘了乙怎么办」——那是双真源，本仓库零容忍。
+    const lim = (cap === undefined || cap === null || cap === '') ? 0 : Number(cap);
+    if (!isFinite(lim) || lim < 0 || Math.floor(lim) !== lim) return { ok: false, reason: 'bad-cap' };
     if (!placeByName(x) || !placeByName(y)) return { ok: false, reason: 'unknown-place' };
     let out = null;
     WA.store.transact(function (draft) {
@@ -93,8 +134,16 @@
       draft.world.roads = Array.isArray(draft.world.roads) ? draft.world.roads : [];
       const same = function (r, p, q) { return r && ((r.a === p && r.b === q) || (r.a === q && r.b === p)); };
       const hit = draft.world.roads.filter(function (r) { return same(r, x, y); })[0];
-      if (hit) { hit.minutes = Math.round(mins); out = { ok: true, id: hit.id, existed: true, minutes: hit.minutes }; return; }
-      const row = { id: 'rd_' + x + '_' + y, a: x, b: y, minutes: Math.round(mins), at: clockNow('world') };
+      if (hit) {
+        // 耗时是这条路的既定属性，重登记即更新；容量则**只在显式给出时才改**——
+        //   缺省参数不是「把容量改成不限」，那会让一次「改个耗时」顺带抹掉通行量。
+        const explicitCap = !(cap === undefined || cap === null || cap === '');
+        hit.minutes = Math.round(mins);
+        if (explicitCap) hit.cap = lim; else if (!isFinite(hit.cap)) hit.cap = 0;
+        out = { ok: true, id: hit.id, existed: true, minutes: hit.minutes, cap: hit.cap };
+        return;
+      }
+      const row = { id: 'rd_' + x + '_' + y, a: x, b: y, minutes: Math.round(mins), cap: lim, at: clockNow('world') };
       draft.world.roads.push(row);
       WA.evict.array(draft.world.roads, 'world.roads');
       out = { ok: true, id: row.id, existed: false, minutes: row.minutes };
@@ -232,6 +281,22 @@
    * 在途的人既不在起点也不在终点——where() 对在途者返回 inTransit:true。
    * 同一人同时只能有一条行程：第二条会被拒（already-in-transit），不得静默覆盖。
    */
+  /** 某段路登记的容量 + 当前在途人数。容量按**段**算：
+   *  「甲乙都要过同一座桥」才是拥挤，各走各的相邻路段不是。 */
+  function roadCapOf(a, b) {
+    const hit = roads().filter(function (r) { return r && ((r.a === a && r.b === b) || (r.a === b && r.b === a)); })[0];
+    return (hit && isFinite(hit.cap)) ? Number(hit.cap) : 0;
+  }
+  function roadUsage(a, b) {
+    let n = 0;
+    journeys().forEach(function (j) {
+      if (!j || j.status !== 'in-transit' || !Array.isArray(j.path)) return;
+      for (let i = 0; i + 1 < j.path.length; i++) {
+        if ((j.path[i] === a && j.path[i + 1] === b) || (j.path[i] === b && j.path[i + 1] === a)) { n++; break; }
+      }
+    });
+    return n;
+  }
   function activeJourney(who) {
     const k = clean(who, 60);
     return journeys().filter(function (j) { return j && j.person === k && j.status === 'in-transit'; })[0] || null;
@@ -246,6 +311,16 @@
     const m = move(who, from, to, at);
     if (!m.ok) return m;
     if (m.minutes === 0) return { ok: false, reason: 'already-there', person: who, place: m.to };
+    // v2.85.0：路走得通 ≠ 现在走得动。占用检查必须在**写行程之前**——
+    //   先落一条行程再回头删，等于「被拒的也留下了痕迹」，而拒绝本应不落盘。
+    for (let i = 0; i + 1 < m.path.length; i++) {
+      const sa = m.path[i], sb = m.path[i + 1];
+      const lim2 = roadCapOf(sa, sb);
+      if (lim2 > 0 && roadUsage(sa, sb) >= lim2) {
+        stat.blocked++;
+        return { ok: false, reason: 'road-crowded', person: who, from: sa, to: sb, cap: lim2, on: roadUsage(sa, sb) };
+      }
+    }
     let out = null;
     WA.store.transact(function (draft) {
       draft.world = draft.world && typeof draft.world === 'object' && !Array.isArray(draft.world) ? draft.world : {};
@@ -323,7 +398,10 @@
     if (!ps.length && !es.length) return '';
     const lines = [];
     if (ps.length) {
-      lines.push('地点：' + ps.map(function (p) { return p.name + '（' + p.kind + '）'; }).join('｜'));
+      lines.push('地点：' + ps.map(function (p) {
+        const pa = clean(p.parent, 40);
+        return p.name + '（' + p.kind + '）' + (pa ? '∈' + pa : '');
+      }).join('｜'));
       const rs = roads().slice(0, 6);
       if (rs.length) lines.push('道路：' + rs.map(function (r) { return r.a + '↔' + r.b + ' ' + r.minutes + '分钟'; }).join('；'));
     }
@@ -333,6 +411,7 @@
         + (at.ok && at.who.length ? '；到场者：' + at.who.join('、') : '；到场者：无日程依据'));
     });
     lines.push('时空约束：未登记的地点不存在、未登记的道路走不通——不得据此推断「大概很近」。');
+    lines.push('地点层级（A∈B 表示 A 属于 B）只说明归属，**不说明可达**：父子之间没有登记道路时同样走不通。');
     lines.push('同一人物同一时刻只能在一处；不在名单上的人不得被写成在场（在场者只认日程证据）。');
     const js = journeys().filter(function (j) { return j && j.status === 'in-transit'; }).slice(0, Math.max(1, cfg.maxJourneys || 4));
     if (js.length) lines.push('在途：' + js.map(function (j) { return j.person + '（' + j.from + '→' + j.to + '，剩余 ' + j.left + '分钟）'; }).join('；'));

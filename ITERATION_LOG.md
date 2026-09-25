@@ -1125,6 +1125,32 @@
   - ㉑ **`kill -9` 打断注入窗口会留下未还原的产品文件（v2.80.0 事故的再现）**：本轮回归被系统资源枯竭反复打断，其中一次恰停在 `bridge.js` 注入窗口内，残留一行 `function __ncProbeBridgeSnapshot() {…}`。症状不是报错而是**口径整体错位**：`refs 2219→2220`、`dead 444→443`，且 `bridge.snapshot` 引用数实测 1（期望 0）——多个「冻结读数」判据同时 ✗。定位手段：`git status` 列出不该改的文件 + mtime 晚于版本升档时刻。修法：`git checkout -- engines/bridge.js`（**不要手改**，尾部换行差异会让 diff 不干净）。**回归被外部中断后，先核 git 工作区再重跑。**
 - **提交**：`（见本版提交）`。
 
+### R68 · 2026-09-25 · v2.85.0 注入效率 · 人物自主生活 · 地域与交通（第三十九面：承诺写在源码里，但没有判据问过它）
+- **做了什么**（四处落点，全部零新增导出 / 零新增容器 / 零新增设置键）：
+  - `engines/inject-budget.js`（A4，11608 → 15067 字节）：`PRIORITY` 由 **8 源补到 45 源**（分 7 档）；`plan()` 收集并返回 `unranked`；`summaryText` 报未声明源计数。**不改成员名** ⇒ `FROZEN2800` 的 `injectBudget:` 段逐字不变。
+  - `engines/life.js`（B1，10426 → 13877 字节）：名单口径由**插入序截断**改为 `basisOf()` 计分（goals/commitments/schedule 各计 1）+ `.filter(r.n>0).sort((b.n-a.n)||(a.i-b.i))`；新增 `reciprocated()` 对偶只读检查，单向协作降级为 `wait / unreciprocated`；`skipped` 与 `unreciprocated` 进 `stat` 与返回值。
+  - `engines/world.js`（B2，22462 → 27596 字节，9 处）：地点行加 `parent`（层级落在**place 行**而不是另开一张表 —— 双真源零容忍）；道路行加 `cap`（容量是**路段自己的属性**，`explicitCap` 判定保证「只改耗时」不抹容量）；`roadCapOf`/`roadUsage` 段级查询；`depart` 逐段占用校验。
+  - `tests/settle-v2850.js`（新，422 行，60 项）：A/B/C 三面 + N0–N4 负控制；C 面用 `/source:\s*'([^']+)'/g` 从 `render/inject.js` **真源码抽源名**（成类锁，防再漂移）。
+  - `tests/reject-v2780.js`：6 个新码接**可执行见证**（`unknown-parent` / `self-parent` / `parent-locked` / `parent-cycle` / `road-crowded` / `unreciprocated`），见证驱动走**记忆化 `codes2850()`**。
+- **为什么**：本版三处落点治的是同一类病——**承诺写在源码里，但没有任何判据问过它**。
+  - A4 是真缺陷，且是本版最贵的一处：`PRIORITY` 只有 v0.9.3 时代的 8 个源名（近端事件/世界状态/主观记忆/记忆/叙事摘要/世界推演/账本/舆情），而注入面已长到 **45 个 distinct source 名**。逐个取证：8 个旧名全部命中，其余 **37 个零命中** ⇒「pinned（rank≤2）优先保障、绝不静默丢弃」这条承诺对那 37 个源**从未生效**；且「有源没被声明」在运行时完全不可见（`rankOf` 静默给 `DEFAULT_RANK = 6`）。这是 v2.56.0 立过的规矩（源面与声明面必须同时增长）在别处的复发。补法**按可替代性分档**：rank1-2 pinned / rank3 因果与记忆主链 / rank4 长期记忆 / rank5 世界骨架 / rank6 推演结构性面 / rank7 物候氛围 / rank8 统计库存。
+  - B1 是两个真缺陷：① 名单按插入序截断 ⇒「谁被推演」取决于谁先进场，有依据的人插在第 5 位之后**永远轮不到**；② 单方面宣布的合作被当作已建立的协作（`kind === 'cooperation'` 只看自己那一行，不看对方回没回应）。
+  - B2 新增的两条边界**全是否定式**：层级只说明归属、**不说明可达**（父子之间没登记道路时 `reach` 必须 `reachable:false`）；路走得通 ≠ 现在走得动（段容量满时拒收且**拒收不落盘**）。存在面判据（有 `parent` 字段吗 / 有 `cap` 字段吗）对这两条一无所知——**「有字段」与「字段被当成什么读」是两件事**。
+- **两处由本仓库既有成类锁当场抓出的问题（都不是纸面推演）**：
+  - ① **6 个新码未归类** ⇒ `reject-lock-v2780` 红灯。正解不是删码而是补**可执行见证**（用产品真 API 真跑出来）。
+  - ② **拒收后裸 `return;`** ⇒ `side-effect-lock-v2790` 报「站点数 2 vs 白名单 1」。取证确认：`parent-locked` 当时写在**事务内**、用裸 `return;`，而在 `transact` 里裸 return 会**照样提交（推进 rev、整份落盘）**——正是 v2.79.0 那类缺陷。修法是**结构性的**：把全部层级校验移到**事务之前**（只读，拒收分支根本不进事务），缝隙从根上消失；环检测留在事务内但改为 `return false` **透明中止**。
+- **三个环检测位置的教训（本版最该记住的一条）**：首版把环检测写在**补全前**的只读校验里。那是错的：`A∈B`、`B∈A` **只在补全那一瞬**才可能成立，事务前读的是补全前的旧图 —— 判它等于**写一段永不触发的死代码冒充把关**。正确位置是「事务前只读判定全部层级校验（self-parent / unknown-parent / parent-locked）+ 事务内补全前判环（parent-cycle）」。**破坏锚点必须落在热路径上。**
+- **两处「两态不可分」的补全语义**：已登记地点「无 → 有」是**补全缺失事实**（允许，且只许一次——补后即锁），「x → y」才是**冲突改写**（拒收并写明现有归属）。若把补全也拒掉，**一次误登记就永久锁死**；本仓库禁的是「静默改写」，不是「不得改写」。
+- **影响范围**：`engines/world.js`、`engines/life.js`、`engines/inject-budget.js`、`tests/settle-v2850.js`（新）、`tests/reject-v2780.js`、`tests/run.js`、`index.js`、`manifest.json`、`tests/dead-export-ledger.json`、`tests/module-registry-ledger.json`、`README.md`、`ITERATION_LOG.md`。`tools/*.py` 不入库。
+- **门禁结果**：`node tests/run.js` → **通过 7483 / 失败 0**（v2.84.0 收口为 **7423 / 0**；+60 = 本版专锁）；`tests/settle-v2850.js` → **60 / 0**；`tests/reject-lock-v2780.js` → **50 / 0**（见证 71 → **77**）；`tests/side-effect-lock-v2790.js` → **23 / 0**；`tests/inventory.js` → 四类悬空均 0；`tests/export-contract.js` → `ns= 103 members= 580 chars= 7169`（**逐字未变**，零新增导出）；`tests/dead-export-gate.js` → dead 444 / uiDead 4 / dataOnly 160 / 仅测试 291（未增长）；`tests/test-surface-gate.js` → 全部通过、孤儿 0。
+- **可复用的判据**（本轮新增，编号续 R67）：
+  - (29) **零新增导出优先** —— 能用既有面的参数与证据面承载的，不新增 promise。`world.places` 行的 `parent`、`world.roads` 行的 `cap`、`injectBudget.plan()` 返回的 `unranked` 全部落在既有面里，`FROZEN2800` 三处段逐字不变。**新开一张表就要回答「谁是真源、改了甲忘了乙怎么办」——那是双真源。**
+  - (30) **锚点命中数 != 期望即整体放弃，绝不部分改写**：A4 首跑因 `summaryText` 结尾缩进（实为 2 空格 `  }`，脚本里写了 `}`）锚点 4 命中 0 次 ⇒ 脚本**整体放弃、一字节未写入**，改对后重跑才落盘。
+  - (31) **归属守卫是双层的，负控制必须打到「没有守卫的实现」**：本版专锁首跑 2 处红，全在负控制层。实测只摘事务前那层，事务内的 `return false` 仍兜住（`reason` 变成 `store-unavailable`、归属没被改）⇒ 症状不现形；必须**两层一起**改成「没有守卫的实现」，症状才是这条判据要抓的「已有归属被静默改写」。**多锚点破坏需要基础设支持**（`also` 字段 + 逐锚 N0 判定），否则「破坏没打到靶」会被误读成「判据坏」。
+  - (32) **`git checkout -- <目录>` 是收口期最危险的一条命令**：本轮误用 `git checkout -- tests/` 想回滚升档脚本的越界改写，**连带回滚了同一目录下两个已完成的交付物**（`reject-v2780.js` 的 6 个新码见证、`run.js` 的本版接线），而当时它们与「被误改的历史注释」混在同一目录里。**回滚的最小单位是文件、不是目录；回滚前先 `git status --short` 看清这个目录里还有哪些未提交的成果。**
+  - (33) **升档属「多处字面量」任务，但历史注释不得跟着升**：`v2.84.0（B5）` 这类注释说的是「这个锚点由哪个版本引入」，升档时**逐字不动**；只有承载「当前版本」的断言值、冻结读数消息、账本元数据与自己写的注释要改。判据是查既有提交的惯例（`git show <上版提交> -- tests/run.js`），不是自己觉得该不该改。
+- **提交**：`（见本版提交）`。
+
 ### R67 · 2026-09-25 · v2.84.0 测试上下文隔离 · 统一输入边界（第三十八面：共享的宿主面 / 「字符串化兜底」把非法值静默升格）
 - **做了什么**：
   - `tests/isolated-runner.js`（新，238 行）＋ `tests/isolated-runner-lock.js`（新，211 行）：全量回归放进独立候选树（`/tmp/worldaxis-regression-XXXXXX`），锁身份取「pid + starttime」，陈旧锁绝不自动回收（须锁主人 stale **且** worker 已死两道条件同时成立）。
