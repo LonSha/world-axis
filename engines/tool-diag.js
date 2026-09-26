@@ -189,6 +189,9 @@
       const cli = led && led.climate ? led.climate : null;
       const vol = (WA.org.exportJournal ? safe(function () { const v = WA.org.exportJournal(); return v && v.ok ? { format: v.format, formatVersion: v.formatVersion, cap: v.cap, entries: v.entries, recorded: v.recorded, dropped: v.dropped, truncated: v.truncated, savedAt: v.savedAt } : { error: (v && v.reason) || 'export-unavailable' }; }, null) : null);
       const rc = (WA.org.reconcile ? safe(function () { return WA.org.reconcile(); }, null) : null);
+      // v2.95.0（X2）：组织面读数——名册规模 / 欠薪总量 / 经济风两档（词与倍率同源）。
+      //   只读：organizationSummary 不调 grant / transfer（观测不得改变被观测对象）。
+      const orgz = led && led.organization ? led.organization : null;
       return { enabled: !!cfg.enabled, grants: st.grants || 0, transfers: st.transfers || 0, blocked: st.blocked || 0,
         lastReason: st.lastReason || '', kinds: WA.org.KINDS || [],
         ledger: led ? {
@@ -199,6 +202,12 @@
           truncated: led.reconciled.truncated
         } : { error: 'ledgerView 不可用' },
         // v2.94.0（O8）：经济风——引擎缺席 / 字段缺失 / 表外气候词三态照实带出，不回落成「平稳」。
+        // v2.95.0（X2）：名册与欠薪——「组织面有没有人、欠着谁」在诊断里可读。
+        organization: orgz ? { rosterCount: orgz.rosterCount, owedTotal: orgz.owedTotal,
+          factions: (orgz.factions || []).length,
+          tide: orgz.tide ? { known: !!orgz.tide.known, reason: orgz.tide.reason,
+            climate: orgz.tide.climate, mul: orgz.tide.mul, word: orgz.tide.word } : null }
+          : { error: 'organizationSummary 不可用' },
         climate: cli ? { available: cli.available, reason: cli.reason, climate: cli.climate,
           recognized: !!cli.recognized, signals: (cli.signals || []).length } : { error: 'climate 不可用' },
         // v2.94.0（O6）：流水卷头（能否跨会话可查，看它是不是空卷 + 有没有被截断）。
@@ -1144,7 +1153,11 @@
     { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-ledger', 'wa-org-out',
        // v2.94.0（O6）：流水导出 / 带外对账 / 经济风三控件。同 v2.51.0 的理由——新控件必须
        //   同时「渲染 + 绑定 + 守卫登记」，否则「按钮渲染了但绑定的 id 写错」无人发现。
-       'wa-org-export', 'wa-org-reconcile', 'wa-org-climate', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
+       'wa-org-export', 'wa-org-reconcile', 'wa-org-climate',
+       // v2.95.0（X2）：经济引擎——职册 / 功簿 / 薪俸 / 欠薪 / 罚没九控件。
+       //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
+       //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+       'wa-org-person', 'wa-org-role', 'wa-org-assign', 'wa-org-credit', 'wa-org-promote', 'wa-org-roster', 'wa-org-pay', 'wa-org-settle', 'wa-org-penalize', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
        // v2.62.0: 因果结算控件（渲染在人物页）+ 稳定人物 ID 控件。
        //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
        //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。

@@ -382,6 +382,9 @@
       <div class="wa-row"><input id="wa-org-to-kind" class="wa-input" placeholder="接收类型"/><input id="wa-org-to-name" class="wa-input" placeholder="接收者"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-org-grant">入库</button><button class="wa-btn" id="wa-org-transfer">转移</button><button class="wa-btn" id="wa-org-check">检查余额</button><button class="wa-btn" id="wa-org-ledger">资源账本</button></div>
       <div class="wa-row"><button class="wa-btn" id="wa-org-export" title="导出一卷流水（纯读：不挤出、不清空、不改计数）——跨会话全量对账靠它">导出流水</button><button class="wa-btn" id="wa-org-reconcile" title="把上一次导出的流水卷与本侧当前存量比对（带外 = 本侧环形已挤出、只有外来卷才核得到）">带外对账</button><button class="wa-btn" id="wa-org-climate" title="读数：当前经济气候（繁荣/平稳/衰退/动荡）与最近信号；只读 evolution.economy，不回落成「平稳」">经济风</button></div>
+      <div class="wa-row"><input id="wa-org-person" class="wa-input" placeholder="成员姓名"/><input id="wa-org-role" class="wa-input" placeholder="职阶 novice/member/steward/chief 或 帮闲/管事/主事/当家"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-org-assign" title="编入名册或改任（同一人重复编入 = 改职，不叠加——「本来就是他」与「刚收进来」必须可区分）">编入</button><button class="wa-btn" id="wa-org-credit" title="记功：只记在册者，单次上限 99；够门槛只报 ready，不自动晋升（晋升是显式决策，不是记账的副作用）">记功</button><button class="wa-btn" id="wa-org-promote" title="晋升：贡献够门槛才升一阶；不够就照实报差多少——不四舍五入、不「看表现」">晋升</button><button class="wa-btn" id="wa-org-roster" title="名册：逐人职阶 / 贡献 / 欠薪 / 下一阶门槛 / 本期应付 + 当前经济风（两档同账不同词）">名册</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-org-pay" title="发薪：逐人把本期应付从势力转给本人（走 transfer——同一支笔，自动进流水与带外对账）；发不出就记欠薪，不静默减半">发薪</button><button class="wa-btn" id="wa-org-settle" title="补发欠薪：只补得起的量，余额照实留着（不把「还欠着」抹成「清了」）">补发欠薪</button><button class="wa-btn" id="wa-org-penalize" title="罚没：本人 → 势力一次 transfer 走完（不是「先 grant 再扣」两步——两步之间没有原子性，中途失败会凭空多出资源）">罚没</button></div>
       <div id="wa-org-out" class="wa-out"></div>
       <div class="wa-sec">因果与情报</div>
       <label class="wa-row"><input id="wa-intel-enabled" type="checkbox" ${WA.intel && WA.intel.getSettings().enabled ? 'checked' : ''}/> 启用因果与情报</label>
@@ -1829,6 +1832,71 @@
       const text = '账本 · ' + summary;
       panelEl.dataset.orgOut = text;
       if (o) o.textContent = text;
+    });
+    // ── v2.95.0（X2 · B3）：经济引擎——职册 / 功簿 / 薪俸 / 欠薪 / 罚没。
+    //   每个口一个**真消费方**（本处即消费方），且全部走既有 transfer 通道——
+    //   于是这些按钮产生的每一笔都自动进 O5 流水、可被 O6 带外对账核、异常时进 O7 健康分。
+    on('#wa-org-assign', () => {
+      if (!WA.org || !WA.org.assignRole) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.assignRole(orgVal('#wa-org-kind'), orgVal('#wa-org-person') || orgVal('#wa-org-name'), orgVal('#wa-org-role'));
+      // 「刚收进来」与「本来就是他」必须可区分：改任读起来不能像一次招聘。
+      orgOut(Object.assign({}, r, { id: r.ok ? (r.role + (r.changed ? ':changed' : ':new') + ':' + r.count) : r.id }), true);
+      renderBody();
+    });
+    on('#wa-org-credit', () => {
+      if (!WA.org || !WA.org.creditWork) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.creditWork(orgVal('#wa-org-kind'), orgVal('#wa-org-person') || orgVal('#wa-org-name'), orgVal('#wa-org-qty'));
+      // 够格只报 ready，不自动晋升——晋升是显式决策，不是记账的副作用。
+      orgOut(Object.assign({}, r, { id: r.ok ? ('contrib:' + r.contrib + (r.ready ? ':ready' : ':need-' + r.need)) : r.id }), true);
+      renderBody();
+    });
+    on('#wa-org-promote', () => {
+      if (!WA.org || !WA.org.promote) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.promote(orgVal('#wa-org-kind'), orgVal('#wa-org-person') || orgVal('#wa-org-name'));
+      // 门槛不达标时照实报差多少（need/have），不四舍五入、不「看表现」。
+      orgOut(Object.assign({}, r, { id: r.ok ? (r.from + '→' + r.to) : (r.reason === 'insufficient-contrib' ? ('contrib ' + r.have + '/' + r.need) : r.id) }), true);
+      renderBody();
+    });
+    on('#wa-org-roster', () => {
+      if (!WA.org || !WA.org.rosterView) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      let v = null; try { v = WA.org.rosterView(orgVal('#wa-org-kind')); } catch (e) { return orgOut({ ok: false, reason: 'roster-throw' }, true); }
+      if (!v || !v.ok) return orgOut({ ok: false, reason: (v && v.reason) || 'roster-unavailable' }, true);
+      const t = v.tide || {};
+      // 两档同账不同词：精确档给倍率、叙事档给词；经济风不可读时词为 null（不借用「如常」）。
+      const summary = '名册 · ' + v.faction + ' · ' + v.count + ' 人 · 欠薪 ' + v.owed
+        + ' · 经济风 ' + (t.known ? (t.word + '（×' + t.mul + '）') : ('不可读（' + (t.reason || '?') + '）——不回落成「如常」'));
+      const o = $('#wa-org-out');
+      const text = '账本 · ' + summary;
+      panelEl.dataset.orgOut = text;
+      if (o) o.textContent = text;
+    });
+    on('#wa-org-pay', () => {
+      if (!WA.org || !WA.org.payroll) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      let r = null; try { r = WA.org.payroll(orgVal('#wa-org-kind'), { item: orgVal('#wa-org-item') }); } catch (e) { return orgOut({ ok: false, reason: 'payroll-throw' }, true); }
+      if (!r || !r.ok) return orgOut({ ok: false, reason: (r && r.reason) || 'payroll-unavailable' }, true);
+      // `ok` 答「流程跑完了没有」，`settled` 答「从此不欠谁了吗」——两者分开印。
+      //   流程跑完而全员欠薪，是最坏也最容易被读成成功的一种结局。
+      const summary = '发薪 · ' + r.faction + ' · ' + r.count + ' 人 · 已发 ' + r.paid + ' · 欠 ' + r.leftOwed
+        + (r.settled ? ' · 发清了' : ' · **未发清**（' + (r.reason || 'partial') + '，欠薪记在名册上）');
+      const o = $('#wa-org-out');
+      const text = '账本 · ' + summary;
+      panelEl.dataset.orgOut = text;
+      if (o) o.textContent = text;
+      renderBody();
+    });
+    on('#wa-org-settle', () => {
+      if (!WA.org || !WA.org.settleOwed) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      let r = null; try { r = WA.org.settleOwed(orgVal('#wa-org-kind'), orgVal('#wa-org-person') || orgVal('#wa-org-name'), { item: orgVal('#wa-org-item') }); } catch (e) { return orgOut({ ok: false, reason: 'settle-throw' }, true); }
+      if (!r || !r.ok) return orgOut(Object.assign({}, r || {}, { ok: false, reason: (r && r.reason) || 'settle-unavailable' }), true);
+      // 只补得起的量：余额照实留着，不把「还欠着」抹成「清了」。
+      orgOut(Object.assign({}, r, { id: (r.settled ? 'cleared:' : 'partial:') + r.paid + ':' + r.left }), true);
+      renderBody();
+    });
+    on('#wa-org-penalize', () => {
+      if (!WA.org || !WA.org.penalize) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.penalize(orgVal('#wa-org-kind'), orgVal('#wa-org-person') || orgVal('#wa-org-name'), orgVal('#wa-org-item'), orgVal('#wa-org-qty'));
+      orgOut(Object.assign({}, r, { id: r.ok ? (r.item + ':' + r.amount + '→' + r.to) : r.id }), true);
+      renderBody();
     });
     on('#wa-org-check', () => { if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true); const ok = WA.org.canAfford(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), orgVal('#wa-org-item'), orgVal('#wa-org-qty')); const st = WA.org.stat(); orgOut({ ok: ok, id: (ok ? 'affordable' : 'insufficient') + ':' + st.blocked, reason: ok ? '' : 'insufficient' }, true); });
     const intelVal = function (id) { return ((($(id) || {}).value) || '').trim(); };

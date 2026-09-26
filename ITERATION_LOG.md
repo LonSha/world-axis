@@ -13,6 +13,25 @@
 | 出口面契约 | 58 命名空间 / 321 成员 / 4094 字符 |
 
 ## 迭代记录
+### R77 · 2026-09-26 · v2.95.0 经济引擎（X2 · B3 职册 / 功簿 / 薪俸 / 欠薪 / 罚没）
+- **做了什么**：一处落点 + 两处消费侧 + 一把专锁（`tests/org-econ-v2950.js`，421 行，**59 项**，含 N0–N4 负控制）：
+  **`engines/org.js`（九处锚点全部命中）**：① 常量块 `ROLES`（四阶：`novice` 帮闲 pay 2 need 0 / `member` 管事 5 need 12 / `steward` 主事 12 need 40 / `chief` 当家 30 need 120）+ `ROLE_IDS` + `TIDE` + `TIDE_WORD`；② 内部助手 `roleOf` / `tideOf`（返回 `{known, reason, climate, mul, word, recognized}`）/ `rosterOf` / `dueOf` / `membersOf`（**全量不截断**——发薪靠它逐人发，截断会让超出显示上限的人静默失业）/ `writeOwed`（`value` 是**绝对值**）；③ `assignRole`（重复编入 = 改职，返回 `changed` + `count`）；④ `creditWork`（只记在册者 / 单次上限 99 / 不自动晋升）；⑤ `promote`（逐阶门槛，`insufficient-contrib` 带 `need`/`have`，到顶 `top-role`）；⑥ `rosterView`（纯读）；⑦ `payroll`（逐人走 `transfer`，`ok` 与 `settled` **分开**，`reason ∈ '' | partial | insufficient`）；⑧ `settleOwed`（只补得起的量，余额照实留）；⑨ `penalize`（**一次 transfer** 走完）+ `organizationSummary`（内部面，被 `ledgerView` 消费）。`stat` 扩到五类新动作计数（`assigns` / `credits` / `promotions` / `payrolls` / `penalties`）。
+  **`ui/panel.js`**：人物页增两输入框（`wa-org-person` / `wa-org-role`）+ 七按钮（`wa-org-assign` / `credit` / `promote` / `roster` / `pay` / `settle` / `penalize`）+ 66 行绑定（每个按钮出 `orgOut` 时把业务可读的 summary 拼进 `panelEl.dataset.orgOut`）。
+  **`engines/tool-diag.js`**：`secOrg` 新增 `orgz` 读数（`{rosterCount, owedTotal, factions, tide:{known, reason, climate, mul, word}}`）；九个新控件登进守卫表。
+- **为什么**：四句话在 v2.94.0 都答不上来——① 「这个组织里有谁、各任什么职」（`org` 从 v2.54.0 起只有库存与累计计数，没有名册）；② 「这一期该发多少、按什么行情发」（经济风只是个读数，不影响任何人拿到什么）；③ 「发薪发出去了吗、欠着谁的」（没有欠薪概念——「发过」与「没发」长得一样）；④ 「谁做得好、谁该升、谁受过罚」（没有功簿与处分）。
+- **踩过的坑**（产品侧首跑即现形 1 处设计缺陷 + 专锁三轮 47/9 → 52/6 → 59/0 + 全量首跑 16 红）：
+  ① **换算系数把倍率摊薄到说不出话**（产品侧实质缺陷，冒烟当场现形）：`fine = pay/PAY_CYCLE × 倍率` 让低职阶在四档气候下应付恒为 `Math.max(1, ...)` 的最小 1——口径②「两档同账不同词，倍率真进账」形同虚设。**修法**：删掉换算层，`pay` 直接就是「每期发多少单位资源」（当家繁荣 38 / 衰退 23）。**教训**：「倍率真进账」这句话在代码里不允许夹中间换算层。
+  ② **发薪顺序不规定就等于不可解释**（产品侧主动追加）：钱不够时「谁被欠」若由名字典序决定，账面照样可复现但业务不可解释。**修法**：显式按时职阶从低到高发放（`ROLE_IDS.indexOf(a.role) - ROLE_IDS.indexOf(b.role)`），并写下注释点明理由。
+  ③ **离散量与连续量的差异要写成注释并用两条独立断言锁住**：`payroll`（一份就是一份）与 `settleOwed`（债可以分次还）的差异是**有意**的，不是不一致。
+  ④ **H5 判据的输入面必须与结论面同宽**（专锁 H5 永久为假）：多行锚点在源文件里是转义 `\\n`，运行时 `ANCHORS[k].txt` 已被解析成真换行——拿真换行搜原文恒 0 命中。**修法**：把真换行还原成转义形态再比对。
+  ⑤ **「输入框」不能按「按钮」判**（A2 九项全 false）：`wa-org-person` / `wa-org-role` 走 `orgVal('#X')` 读值，本来就没有也不该有 `on()` 绑定。**修法**：分成两组判据（七按钮「渲染 + 绑定」/ 两输入框「渲染 + 被读值」）。
+  ⑥ **锚点撞车 = 判据会改错地方**（`CREDIT_ROSTERED_ONLY` self=2）：单看 `rec.contrib = Math.min(...)` 与 `assignRole` 里同型行撞车。**修法**：锚点扩成含那三行守卫本身。
+  ⑦ **手拼 JSON 写坏台账后立刻回滚**：`v2950_code.py` 对元素做 `strip('"')` 丢掉了行尾裸引号形态，写出坏 JSON。**修法**：`git checkout -- tests/reject-code-ledger.json` 回滚，改用 `json.dumps(..., ensure_ascii=False, indent=2)` 序列化重做——**人只决定集合内容，格式正确性交给序列化器**。
+  ⑧ **挂锁步骤会随脚本改写丢失**：`p2 → code → mount` 之间挂 `run.js` 那一步被悄悄丢掉，`test-surface-gate` 随即报孤儿。**修法**：改写驱动脚本后复跑门禁（这条门禁会当场抓出孤儿），不盲信「我刚写过挂载」。
+  ⑨ **共享宿主 localStorage 下夹具必须整体重写数组**（全量首跑 16 红中的 10 项）：夹具按名字找势力并读数组首元素，而前面几十个锁在同一宿主上跑过、往 `factions` 里塞过别的势力（断言里出现「实 999」）。**修法**：`seed()` 把 `d.evolution.factions` **整体重写**为恰好一个「会」+ 抽出 `facOf(W)` 按名字取读数（不依赖下标）；顺带一个反向坑：`setFac` **不能**像 `seed` 那样整换势力对象（会把已编好的名册一起抹掉），只能按名字改 `resources`（N4 实测 so=0 / sb=0，破坏与否都观测不到差异）。
+- **影响范围**：`engines/org.js`（+9 锚点，导出 +7）、`ui/panel.js`（九控件 + 66 行绑定）、`engines/tool-diag.js`（`secOrg` + 守卫表）、`tests/run.js`（第四十九面 + 常量回填）、新增 `tests/org-econ-v2950.js`、`tests/reject-code-ledger.json`（base 223→233）、`tests/export_contract.txt` 与 `FROZEN2800`、三本台账 version=2.95.0。
+- **门禁结果**：全量回归 `node tests/run.js` → **8079 / 0**（v2.94.0 基线 8020/0，+59）；专锁 **59 / 0**；六道独立门禁全绿（死子面 444/4/161 **无新增**、拒收码 331 见证 93 死表 5 基线 233、测试文件面 76 锁 71 孤儿 0、UI 接线 9/0、骨架归属无幽灵读点、重复定义 1950 声明 0 重复、模块注册 107 文件 115 命名空间 硬边 0）。
+- **未覆盖（如实留清单）**：不跨势力调动；倍率只影响应付；无排期 / 周期概念；功簿与罚没均为累计量（不衰减、不追溯退还）；经济风表由 `evolution` 维护，本模块只读不写。
 ### R76 · 2026-09-26 · v2.94.0 账本三面收口（O6 流水卷与带外对账 + O7 异常笔进健康分 + O8 经济风纳入账本）
 - **做了什么**：三处落点 + 一把专锁（`tests/journal-v2940.js`，336 行，**40 项**，含 N0–N4 负控制），产品侧改动：
   **`engines/org.js`（O6 + O8）**：① `JOURNAL_FORMAT = 'worldaxis.org.journal'` / `JOURNAL_FORMAT_VERSION = 1` 两常量与 `exportJournal()`（纯读：不挤出、不清空、不改 stat、不改 journalStat；`truncated = dropped > 0` 照实带出）；② `inspectJournal(vol)` 校验四态（`bad-volume` / `bad-format` / `bad-version` / `bad-rows`）——**内部面不导出**，只被 `reconcileWith` 消费；③ `reconcileWith(vol)` 做**带外对账**：链比对（`why:'chain'`）+ 与当前存量比对（`why:'vs-stock'`），**不改本侧 journal**；④ `climateOf()` 五态（`engine-absent` / `missing` / `unknown-climate` / `ok` / `climate-throw`），前三者 `available:false` 且 `climate:null`；⑤ `ledgerView()` 返回体增 `climate` 段；⑥ 存量比对抽成共用 `stockBreakOf(last, breaks, onGone)`（消除双真源，见坑②）。
