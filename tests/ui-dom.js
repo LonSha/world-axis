@@ -223,4 +223,67 @@ function install(WA) {
   return uiWin;
 }
 
-module.exports = { installMiniDom: installMiniDom, install: install, dataKey: dataKey, VOID_TAGS: VOID_TAGS, qsa: qsa };
+// v2.103.0（A3 = O16）：与 jsdom **同形**的端到端替身。
+//   它治的病在 run.js：10 处端到端块的写法是
+//     `try { JSDOM = require('jsdom').JSDOM } catch { JSDOM = null }`
+//     → `if (!JSDOM) { console.log('⚠ jsdom 不可用，跳过端到端断言'); } else { ... }`
+//   即「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」。而替身（本文件）一直在仓库里：ui-gate-sync.fresh()
+//   自 v2.12.0 起就用它真装载 ui/panel.js、真点击、真查询。
+//   故这里不新增依赖、不要求 jsdom 变成必需，而是补一个 **形状相同** 的 `new JSDOM(html, opts)`：
+//   返回 { window: { document, Node } }，能力面覆盖这 10 处块实际用到的子集
+//   （createElement / innerHTML 解析 / querySelector(All) / getElementById / dataset /
+//     onclick / classList / appendChild / textContent）。
+//   于是那些块只需改「构造器从哪来」一行，**块体逐字不动** —— 最小侵入、可逐块对照。
+function ensureHook(WA) {
+  CUR = WA;
+  installMiniDom(WA);
+  WA.__parseInto = parseInto;
+  WA.__qsa = qsa;
+  return WA;
+}
+
+function makeDoc(WA, url) {
+  ensureHook(WA);
+  var doc = { nodeType: 9, location: { href: url || 'http://localhost/' } };
+  doc.createElement = function (t) { return WA.__makeNode(doc, t); };
+  doc.head = WA.__makeNode(doc, 'head');
+  doc.documentElement = WA.__makeNode(doc, 'html');
+  doc.body = WA.__makeNode(doc, 'body');
+  doc.documentElement.appendChild(doc.head);
+  doc.documentElement.appendChild(doc.body);
+  doc.getElementById = function (id) { return qsa(doc.documentElement, '#' + id)[0] || null; };
+  doc.getElementsByTagName = function (t) { return qsa(doc.documentElement, t); };
+  doc.querySelectorAll = function (s) { return qsa(doc.documentElement, s); };
+  doc.querySelector = function (s) { return qsa(doc.documentElement, s)[0] || null; };
+  doc.addEventListener = function () {};
+  doc.removeEventListener = function () {};
+  doc.activeElement = null;
+  doc.readyState = 'complete';
+  return doc;
+}
+
+/** jsdom 同形构造器：`new JSDOMShim(html, { url })` → { window: { document, Node } } */
+function JSDOMShim(html, opts) {
+  // 宿主取法：优先 global.WorldAxis（run.js 的 10 处块在装载产品模块之后才构造）；
+  //   裸机（无产品模块）退到自建挂点 —— 替身只用到 __makeNode / __parseInto / __qsa 三个
+  //   内部钩子，它们不需要任何产品能力。若硬要求 global.WorldAxis，「替身自身」也会
+  //   变成「依赖宿主就绪」的隐式前置，专锁在隔离环境里直接跑不起来。
+  var g = (typeof global !== 'undefined') ? global : null;
+  var WA = (g && g.WorldAxis) ? g.WorldAxis : (g ? (g.__WA_SHIM_HOST__ = g.__WA_SHIM_HOST__ || {}) : {});
+  var doc = makeDoc(WA, (opts && opts.url) || 'http://localhost/');
+  var s = String(html == null ? '' : html);
+  var mb = s.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  var inner = mb ? mb[1] : s.replace(/^[\s\S]*?<html[^>]*>/i, '').replace(/<\/html>[\s\S]*$/i, '');
+  if (inner) doc.body.innerHTML = inner;
+  // Node：mini-DOM 无真实节点类；10 处块对该值只做 `try { global.Node = ... } catch {}`，
+  //   给一个可辨识的占位（不写 undefined，避免下游 `typeof Node` 判据误判成「浏览器环境缺失」）。
+  this.window = { document: doc, Node: function MiniNode() {}, location: doc.location };
+  this.window.self = this.window;
+  this.window.window = this.window;
+  this._hostNs = WA;
+}
+
+module.exports = {
+  installMiniDom: installMiniDom, install: install, dataKey: dataKey,
+  VOID_TAGS: VOID_TAGS, qsa: qsa, ensureHook: ensureHook, makeDoc: makeDoc, JSDOMShim: JSDOMShim
+};

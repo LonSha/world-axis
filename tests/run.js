@@ -7270,6 +7270,22 @@ const __ctxGuard = require('./context-guard.js').boundary();
   WA.purifier.rules = savedR2_2100;
 
   // A5. 巡视消费净化统计（engine.purifier 扩展）
+  // v2.103.0（A3 = O16）：本段曾是**靠顺序活着**的判据。
+  //   原判据「异常后分数 < 异常前分数」比较的是**两次独立巡视**的绝对分。
+  //   但两次巡视之间另有动态扣分项在变（可回收键 hygiene.reclaimable、
+  //   诊断占比 diag.budget、冲突现场 concurrent.*），它们的增减与被测的净化异常无关。
+  //   实测（同源同一 errBefore=2 / expDelta=2）：
+  //     第一次回归 m1 = base + 6（动态项回落 8 分），第二次回归 m1 = base − 2（恰合公式）——
+  //   同一判据在同样输入下给出两种结论，即为 flaky 的定义。另 __purifyStat.ruleErrors 是
+  //   模块级**单调计数器**（全库无 reset 出口），配合扣分封顶 6，饱和后边际为 0，
+  //   「分数必须更低」在饱和路径上本就恒假。
+  //   处置：不比较跨巡视绝对分，改用**等价判据**——
+  //   core/store.js 中「扣分」与「议题」写在同一 if 分支内且无提前 return：
+  //       if (purifyRuleErrors > 0) { score -= Math.min(6, purifyRuleErrors * 2);
+  //                                   issues.push({ key: 'engine.purifier', ... }); }
+  //   故「engine.purifier 议题按异常笔出现在 m1」⇔「扣分已按封顶公式真计入分数」。
+  //   另配静态守卫（同分支内两条语句必须并存），使「把扣分行删掉而留下议题」也报红。
+  const errBefore2100 = purStat2100().ruleErrors;
   const m0_2100 = WA.store.maintain({ deep: true });
   assert(m0_2100.signals.purifyRuns > 0, 'deep 巡视透出净化运行数（此前无任何消费）');
   assert(m0_2100.signals.purifyChanged > 0, 'deep 巡视透出命中数');
@@ -7282,7 +7298,29 @@ const __ctxGuard = require('./context-guard.js').boundary();
   assert(m1_2100.signals.purifierBadRules === 0, '静态非法规则为 0（排除旧通道掩盖）');
   assert(!!(m1_2100.issues || []).find(function (i) { return i.key === 'engine.purifier'; }), '规则异常产 engine.purifier 议题');
   assert(m1_2100.signals.purifyRuleErrors > 0, 'signals.purifyRuleErrors 可见');
-  assert(m1_2100.score < base2100, '健康分不假绿（低于基线）');
+  const errNow2100 = m1_2100.signals.purifyRuleErrors;
+  assert(errNow2100 === errBefore2100 + 1,
+    '异常笔真推进了净化异常计数（' + errBefore2100 + ' → ' + errNow2100 + '）——判据落在被测事实上');
+  assert(base2100 >= 0 && base2100 <= 100, '基线分在合法区间（0..100）');
+  // ★ 等价判据：议题与扣分同分支 ⇒ 议题在位即扣分在位（不再比较跨巡视绝对分，理由见上注）。
+  const purIssue2100 = (m1_2100.issues || []).filter(function (i) { return i.key === 'engine.purifier'; })[0];
+  assert(!!purIssue2100 && String(purIssue2100.detail).indexOf(errNow2100 + ' 次净化规则执行异常') === 0,
+    'engine.purifier 议题按异常笔计入（同一分支 ⇒ 分数真被扣；封顶 6 饱和时边际为 0 是设计内行为）');
+  // 静态守卫：扣分行与议题行必须在**同一 if 分支**内并存——删掉扣分行而留下议题即报红。
+  assert(sSrc2100.indexOf('score -= Math.min(6, purifyRuleErrors * 2);') > 0
+    && sSrc2100.indexOf("key: 'engine.purifier', detail: purifyRuleErrors") > 0,
+    '净化异常「扣分公式」与「议题可见性」同分支成对（缺一即缺陷）');
+  // 负控制（自证）：真源码破坏——删掉扣分行而保留议题，同款判据必须现形（非恒真）。
+  {
+    const needle2100 = 'score -= Math.min(6, purifyRuleErrors * 2);';
+    const broken2100 = sSrc2100.replace(needle2100, '');
+    assert(broken2100.length === sSrc2100.length - needle2100.length,
+      '负控制锚点恰中 1 次（破坏真发生）');
+    assert(broken2100.indexOf(needle2100) < 0
+      && broken2100.indexOf("key: 'engine.purifier', detail: purifyRuleErrors") > 0,
+      '负控制：删掉扣分行而留下议题 ⇒ 同款判据报红（议题在 ≠ 扣分在）');
+    assert(sSrc2100.indexOf(needle2100) > 0, '对照：原版同判据为真（判据不是恒假）');
+  }
   assert(m1_2100.score >= 0, '分数不为负');
   assert(sSrc2100.indexOf('Math.min(6, purifyRuleErrors * 2)') > 0, '净化异常扣分公式在位（封顶 6）');
 
@@ -7922,8 +7960,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // C3. 端到端（真 DOM）：出口真能点通
     let JSDOMC2200 = null;
     try { JSDOMC2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMC2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMC2200 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSDOMC2200) JSDOMC2200 = require('./ui-dom.js').JSDOMShim;
     if (!JSDOMC2200) {
-      console.log('  \u26a0 jsdom 不可用，跳过端到端断言（源码锚点已覆盖接线）');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       const dom2200 = new JSDOMC2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
       const savedDoc2200 = global.document;
@@ -8083,8 +8125,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // D7. 端到端（真 DOM）：面板入口真能建档
     let JSDOMD2200 = null;
     try { JSDOMD2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMD2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMD2200 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSDOMD2200) JSDOMD2200 = require('./ui-dom.js').JSDOMShim;
     if (!JSDOMD2200) {
-      console.log('  \u26a0 jsdom 不可用，跳过块4 端到端断言（源码锚点已覆盖接线）');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       const domD2200 = new JSDOMD2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
       const savedDocD2200 = global.document;
@@ -8234,8 +8280,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // E7. 端到端（真 DOM）：出口真能点通，且反馈不被重绘冲掉
     let JSDOME2200 = null;
     try { JSDOME2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOME2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOME2200 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSDOME2200) JSDOME2200 = require('./ui-dom.js').JSDOMShim;
     if (!JSDOME2200) {
-      console.log('  \u26a0 jsdom 不可用，跳过块5 端到端断言（源码锚点已覆盖接线）');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       const domE2200 = new JSDOME2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
       const savedDocE2200 = global.document;
@@ -8368,8 +8418,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // F7. 端到端（真 DOM）：事件页留痕
     let JSDOMF2200 = null;
     try { JSDOMF2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMF2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMF2200 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSDOMF2200) JSDOMF2200 = require('./ui-dom.js').JSDOMShim;
     if (!JSDOMF2200) {
-      console.log('  \u26a0 jsdom 不可用，跳过块6 端到端断言（源码锚点已覆盖接线）');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       const domF2200 = new JSDOMF2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
       const savedDocF2200 = global.document;
@@ -8516,8 +8570,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // H4. 真 DOM：轮转全部带守卫的页，逐页无缺失
     let JSDOMH2200 = null;
     try { JSDOMH2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMH2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMH2200 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSDOMH2200) JSDOMH2200 = require('./ui-dom.js').JSDOMShim;
     if (!JSDOMH2200) {
-      console.log('  \u26a0 jsdom 不可用，跳过块8 端到端断言（静态锚点已覆盖）');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       const domH2200 = new JSDOMH2200('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
       const savedDocH2200 = global.document;
@@ -8909,8 +8967,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
     //    源码照常含 id，静态断言全绿，而用户拖滑块毫无反应。）
     let JSDOMB2300 = null;
     try { JSDOMB2300 = require('jsdom').JSDOM; } catch (e) { try { JSDOMB2300 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMB2300 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSDOMB2300) JSDOMB2300 = require('./ui-dom.js').JSDOMShim;
     if (!JSDOMB2300) {
-      console.log('  \u26a0 jsdom 不可用，跳过随机事件控件绑定断言');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       const domB2300 = new JSDOMB2300('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
       const savedDocB2300 = global.document;
@@ -9144,8 +9206,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
   {
     let JSDoM2300 = null;
     try { JSDoM2300 = require('jsdom').JSDOM; } catch (e) { try { JSDoM2300 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDoM2300 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSDoM2300) JSDoM2300 = require('./ui-dom.js').JSDOMShim;
     if (!JSDoM2300) {
-      console.log('  \u26a0 jsdom 不可用，跳过泳道区端到端断言（静态锚点已覆盖接线）');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       const domE2300 = new JSDoM2300('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
       const savedDocE2300 = global.document;
@@ -9886,8 +9952,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
     assert(dynIds2500.indexOf('wa-key-sweep-ghost') >= 0, '新控件 wa-key-sweep-ghost 纳入 UI_BINDINGS.dynamic');
     let JSD2500 = null;
     try { JSD2500 = require('jsdom').JSDOM; } catch (e) { try { JSD2500 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSD2500 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSD2500) JSD2500 = require('./ui-dom.js').JSDOMShim;
     if (!JSD2500) {
-      console.log('  \\u26a0 jsdom 不可用，跳过面板端到端（静态锚点已覆盖接线）');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       fresh2500();   // 面板端到端从干净磁盘起（上方 E3 为验 verdict 议题写过幽灵键，不清会污染「无幽灵」负向断言）
       const domE2500 = new JSD2500('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
@@ -9947,7 +10017,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.103.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10161,8 +10231,12 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     // jsdom 端到端：真渲染设置键页 + 设置页保存的失败回显
     let JSDE2600 = null;
     try { JSDE2600 = require('jsdom').JSDOM; } catch (e) { try { JSDE2600 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDE2600 = null; } }
+    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+    //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+    //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+    if (!JSDE2600) JSDE2600 = require('./ui-dom.js').JSDOMShim;
     if (!JSDE2600) {
-      console.log('  \u26a0 jsdom 不可用，跳过设置键页/设置页端到端（静态锚点已覆盖接线）');
+        assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
     } else {
       fresh2600();
       const domE = new JSDE2600('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
@@ -10413,8 +10487,12 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     {
       let JSDH = null;
       try { JSDH = require('jsdom').JSDOM; } catch (e) { try { JSDH = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDH = null; } }
+      // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
+      //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
+      //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
+      if (!JSDH) JSDH = require('./ui-dom.js').JSDOMShim;
       if (!JSDH) {
-        console.log('  \u26a0 jsdom 不可用，跳过远方/近端保存端到端（H1 静态作用域断言已覆盖）');
+          assert(false, '端到端依赖与替身同时不可用 ⇒ 必须报红（不许静默跳过）');
       } else {
         fresh2600();
         const domH = new JSDH('<!doctype html><html><head></head><body></body></html>', { url: 'http://localhost/' });
@@ -10491,7 +10569,7 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.102.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.103.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10782,7 +10860,7 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.102.0', '入口版本为 2.102.0（实 ' + ver + '）');
+    assert(ver === '2.103.0', '入口版本为 2.103.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11313,7 +11391,7 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.102.0', '入口版本为 2.102.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.103.0', '入口版本为 2.103.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11701,7 +11779,7 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.102.0', '入口版本为 2.102.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.103.0', '入口版本为 2.103.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12071,7 +12149,7 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.102.0', '入口版本为 2.102.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.103.0', '入口版本为 2.103.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12436,7 +12514,7 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.102.0', '入口版本为 2.102.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.103.0', '入口版本为 2.103.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14759,7 +14837,7 @@ assert(verF2500 === '2.102.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.102.0', '入口 VERSION = 2.102.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.103.0', '入口 VERSION = 2.103.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -18798,7 +18876,39 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
        && cg2840b.hardSignals({ waAddedNs: ['ui'], uiAddedNs: ['ui'], waAddedMembers: [], waGoneNs: [], lsAdded: [], lsGone: [] }) === 1,
        'v2840/ctx: hardSignals 对「非 UI 面」与「UI 面」给出 0 / 1 的不同判定（判据可单测）');
    }
-   }  // ── 汇总 ──
+   // ══════════ v2.103.0（A3 = O16）══════════
+  // 第五十九面（O16 首刀）：可选依赖可见性治理。
+  //   治的病：「缺依赖 ⇒ 静默 skip ⇒ 门禁全绿」。本仓曾有 10 处
+  //     `try{require('jsdom')}catch{null}` + `if(!JSDOM){console.log('⚠ 跳过')}`，
+  //   缺依赖时端到端一条不跑、回归照绿，且 pass 计数**更低** —— 没有任何一处会告诉你
+  //   「本次绿灯比上次少跑了 N 条断言」。判据的绿，建立在自己没跑这件事上。
+  //   处置：替身（tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形）顶上；依赖从可选且静默
+  //   变成可选且可见（三档 full/fallback/missing）。
+  section('v2.103.0（A3 = O16）：可选依赖可见性（三档 + 零依赖替身）');
+  {
+    const dg2103 = require('./dependency-guard.js');
+    const p2103 = dg2103.probe();
+    // 三档可见性：**必须打出来** —— 这正是「静默」与「可见」的分界。
+    p2103.deps.forEach(function (d) {
+      const tag = d.tier === dg2103.TIERS.FULL ? '✓ 全覆盖'
+        : d.tier === dg2103.TIERS.FALLBACK ? '⚠ 降级通过（走零依赖替身）' : '✗ 关键依赖缺失';
+      console.log('  ' + tag + '：' + d.name + '（how=' + d.how + '）');
+      if (d.tier === dg2103.TIERS.FALLBACK) console.log('      替身：' + d.fallback);
+      if (d.tier === dg2103.TIERS.MISSING) console.log('      ⇒ 受影响面必须报红，不许静默放行：' + d.affects.join('、'));
+    });
+    assert(p2103.summary.missing === 0,
+      'v2103: 零「关键依赖缺失」（既无依赖也无替身 ⇒ 该块必须报红）');
+    assert(p2103.deps.every(function (d) { return d.tier === dg2103.TIERS.FULL || d.tier === dg2103.TIERS.FALLBACK; }),
+      'v2103: 每项依赖都落在 full / fallback 两档之一（不存在第三态）');
+    assert(typeof dg2103.registry === 'function' && dg2103.registry().length >= 1,
+      'v2103: 登记表非空（空表上的三档结论恒真）');
+
+    // 专锁（A 静态 / B 运行时 / C 不变式 / N 负控制）
+    const lock2103 = require('./dependency-guard-v2103.js');
+    lock2103.runAll(assert);
+  }
+
+  }  // ── 汇总 ──
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
   if (failures.length) { console.log('失败项: ' + failures.join(' | ')); process.exit(1); }
