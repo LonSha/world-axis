@@ -69,8 +69,31 @@
  *   回放期间 `next()` 照常 `tick()`：`byChannel` 于是反映**回放侧真的问了什么**，
  *   与磁带通道构成不一致本身就是一条可断言的证据。
  *
- *   不做什么：**不落盘**。磁带只活在内存里，由调用方（causal.evidence）交给持有者；
- *     与种子同规格——持久键预算不因取证功能扩张。
+ *   不做什么：**自己不动盘**。磁带与种子一样只活在内存里——持久键预算不因取证功能扩张。
+ *
+ * v2.98.0 P2（第四十五面：上一会话那一轮凭什么）——**磁带卷**。
+ *   到这里为止，「可复现」的证据面全在本进程内：磁带只驻内存，于是「上一节会话里那一轮
+ *   的抽取对不对」跨会话不可判定。第一世代 org 流水已经吃过同型的亏（v2.94.0 O6 立了
+ *   「显式导出 + 带外对账」），磁带这一半一直空着。
+ *
+ *   四条口径（全是否定式；与 O6 同规格，不另立一套）：
+ *     ① **不自动落盘**：本模块不替调用方写盘。卷由调用方拿走（交给持有者 / 交给面板），
+ *        「要不要落盘」是调用方的决定——本模块连一个持久键都不新增。
+ *     ② 导出**不改本侧**：不丢卷、不清 `__lastTape`、不改 `__mode`、不改 stat / randStat。
+ *     ③ **位置真源照搬**（本版最难的一处）：每格的 `n` 是录制时现算的段内步数，
+ *        导出与带外核对**都不重算**它。重算会把「导出」变成一次改写——若磁带被手改过，
+ *        重算反而会把被改坏的位置洗白成「自洽」。故带外核对的第一条线索就是这份 n：
+ *        连续递增、无跳号无重复；链断了就是这卷被改过（或由别的东西拼出来）。
+ *     ④ 拒收码沿用既有词汇（bad-volume / bad-format / bad-version / bad-tape /
+ *        export-throw），不新造同义词——同一个意思有两个码，读的人就得记两套。
+ *
+ *   两条边界（照实说，不假装更强）：
+ *     · 磁带**没有**环形上限（与 org 流水的 JOURNAL_CAP 不同），故没有「已挤出」这回事：
+ *       `truncated` 恒 false 是事实，不是占位；外来卷自称截断时照实带出，不当它是完整的。
+ *     · 「跨会话」由**带外**构成：把上一会话导出的卷交给本会话核对。本模块不持有第二份
+ *       真源，也无从知道手里的卷出自哪个会话——它只能照实报「比了几格、第一处分歧在哪」。
+ *       故 `compared === 0` 时只说明「卷内自洽」，**不构成**「与本侧一致」；这两句话
+ *       由调用方（面板）分开念。
  */
 (function () {
   'use strict';
@@ -569,6 +592,128 @@
     return out;
   }
 
+  // ── v2.98.0 P2（第四十五面）：磁带卷——导出 / 校验 / 带外核对 ────────
+  //   照 O6（engines/org.js 的流水卷）的形状取齐：FORMAT + FORMAT_VERSION 两常量，
+  //   一个**纯读**导出、一个只报不导入的校验、一个**零状态触碰**的带外核对。
+  //   为什么核准必须零触碰（本版最贵的一条）：`take()` 读的是模块内的在卷。
+  //   若核准去换在卷，就得在 `__mode`、`idx/used/miss/lastMiss` 上写一遍再还原——
+  //   一次抛错或一次提前 return 都会把「录到一半的磁带」留在别人的模式里。
+  //   故核对外来卷走 `verifyTapeWith(vol)`：不装卷、不推进、不改 §模块状态 里的任何一格。
+  const TAPE_FORMAT = 'worldaxis.rand.tape';
+  const TAPE_FORMAT_VERSION = 1;
+  /**
+   * 导出一卷磁带（**纯读**）。无在卷时回落到最近收卷的一卷。「没有卷」与「有空卷」
+   *   是两件事：前者 `reason='no-tape'`，后者导出成功但 entries=0。
+   */
+  function tapeVol() {
+    const t = __tape || __lastTape;
+    if (!t || !Array.isArray(t.entries)) return { ok: false, reason: 'no-tape' };
+    try {
+      return {
+        ok: true, format: TAPE_FORMAT, formatVersion: TAPE_FORMAT_VERSION,
+        seed: (t.seed === undefined ? null : t.seed),
+        entries: t.entries.length,
+        values: t.entries.filter(function (e) { return e && e.k === 'd'; }).length,
+        // 磁带无环形上限（与 org 的 JOURNAL_CAP 不同）⇒ 本侧永不截断：这一位是事实
+        //  不是占位。外来卷自称截断时照实带出（它可能只含半截链），不当它是完整的。
+        truncated: !!t.truncated,
+        // 录制中的卷照实带出、不拒绝：冻结一份「此刻录到哪儿」本身是可用的证据，
+        //   而拒绝它等于逼调用方先收卷——那是一次**改变被取证对象**的动作。
+        opened: !!t.open,
+        savedAt: (WA.clock ? WA.clock.wallNow() : Date.now()),
+        // 位置真源照搬：`n` 现算于录制时，导出**不重算**（重算会把被改坏的卷洗白成自洽）
+        rows: t.entries.map(function (e) {
+          return { c: e.c, v: e.v, k: e.k, n: e.n, r: e.r, s: e.s };
+        })
+      };
+    } catch (e) { return { ok: false, reason: 'export-throw' }; }
+  }
+  /** 校验一卷外来的磁带（**不导入、不推进、不装卷**）——读的人先知道这卷能不能用。 */
+  function inspectTape(vol) {
+    if (!vol || typeof vol !== 'object') return { ok: false, reason: 'bad-volume' };
+    if (vol.format !== TAPE_FORMAT) return { ok: false, reason: 'bad-format', want: TAPE_FORMAT, got: vol.format };
+    if (vol.formatVersion !== TAPE_FORMAT_VERSION) return { ok: false, reason: 'bad-version', want: TAPE_FORMAT_VERSION, got: vol.formatVersion };
+    if (!Array.isArray(vol.rows)) return { ok: false, reason: 'bad-tape' };
+    return { ok: true, format: TAPE_FORMAT, formatVersion: TAPE_FORMAT_VERSION,
+      seed: (vol.seed === undefined ? null : vol.seed),
+      entries: vol.rows.length,
+      values: vol.rows.filter(function (e) { return e && e.k === 'd'; }).length,
+      truncated: !!vol.truncated, savedAt: vol.savedAt || 0 };
+  }
+  /**
+   * 带外核对一卷外来磁带（**零状态触碰**：不装卷、不推进、不改 mode / stat / __lastTape）。
+   *   「带外」= 卷出自别的会话（或别处），本侧没有任何在卷能与它对应；核对只能靠
+   *   卷**自带**的两条线索：位置链（`n`）与值链（种子 + 通道分组重算）。
+   *
+   *   三态照实分列，**绝不合并**成一句「通过 / 失败」：
+   *     · `posBroken`  —— 卷内位置链断了（被手改过 / 由别的东西拼出来）。它不是值的问题，
+   *                       也不因为值对得上就消失；链首缺上游时它照样报。
+   *     · `outcome`    —— `entailed`（种子在场且逐值一致）/ `mismatch`（有分歧，给第一处）/
+  *                       `no-seed`（无显式种子 ⇒ 值链在原理上无从核对）/
+  *                       `bad-seed`（种子非法）；行不是对象时另以 `reason='bad-tape'` 如实拒收。
+   *     · `compared`   —— 真的比了几格。**0 时只说明「卷内自洽」，不构成「可比对」**。
+   *                       本侧没有第二份真源可比（磁带不落盘），故此处不存在「与本侧一致」这句话——
+   *                       要回答那个问题须由调用方把**本侧导出卷**与外来卷一起拿来比。
+   *   拒绝与缺项都**不抛**：核对口自己炸掉比没有核对口更坏（对齐 replay 的既有口径）。
+   */
+  function verifyTapeWith(vol) {
+    const ins = inspectTape(vol);
+    if (!ins.ok) return ins;
+    const rows = vol.rows;
+    // 行面：非对象行当场归因（不静默跳过——跳过等于把它们算进「比过了」）
+    const badRows = rows.filter(function (e) { return !e || typeof e !== 'object'; }).length;
+    if (badRows) return { ok: false, reason: 'bad-tape', badRows: badRows, entries: rows.length };
+    // ① 位置链：`n` 由录制时现算（段内第几步），**不重算**。链断裂只为「被改过」作证，
+    //    与值是否对得上无关——故它在值面之前算，且独立于值面返回。
+    const posBroken = [];
+    for (let i = 0; i < rows.length; i++) {
+      const n = Number(rows[i].n);
+      if (!isFinite(n) || Math.floor(n) !== n || n !== (i + 1)) {
+        posBroken.push({ at: i, got: (rows[i].n === undefined ? null : rows[i].n), want: i + 1 });
+        if (posBroken.length >= 5) break;
+      }
+    }
+    // ② 值链：种子在场时按通道分组重算（每个通道一条独立流，与录制路径同口径）
+    const ext = (vol.seed === undefined ? null : vol.seed);
+    // 局部变量刻意叫 chList 而非 channels：本文件的死导出判据按词边界数成员名自用次数，
+    //   一个同名局部变量会被算成「rand.channels 被自用」——那是假的（见 v2.98.0 自纠）。
+    let compared = 0, mismatches = 0, firstMismatch = null, chList = [], outcome = 'no-seed';
+    if (ext !== null && ext !== undefined) {
+      const nv = Number(ext);
+      if (!isFinite(nv)) { outcome = 'bad-seed'; }
+      else {
+        const seedNum = (Math.floor(Math.abs(nv)) % 0xFFFFFFFF) >>> 0 || 1;
+        const streams = {};
+        rows.forEach(function (e, i) {
+          const name = (e.c !== undefined && e.c !== null && e.c !== '') ? String(e.c) : 'default';
+          if (!streams[name]) streams[name] = mulberry32(hash32(seedNum + ':' + name));
+          const want = streams[name]();
+          const got = Number(e.v);
+          compared++;
+          if (!(got === want)) {
+            mismatches++;
+            if (!firstMismatch) firstMismatch = { at: i, channel: name, want: want, got: e.v };
+          }
+        });
+        chList = Object.keys(streams).sort();
+        outcome = mismatches === 0 ? 'entailed' : 'mismatch';
+      }
+    }
+    return {
+      ok: mismatches === 0 && posBroken.length === 0,
+      outcome: outcome,
+      seed: (ext === null ? null : (isFinite(Number(ext)) ? ((Math.floor(Math.abs(Number(ext))) % 0xFFFFFFFF) >>> 0 || 1) : ext)),
+      entries: rows.length, compared: compared,
+      mismatches: mismatches, firstMismatch: firstMismatch,
+      // 键名刻意用 chUsed 而不是 channels：本文件里 `channels` 这个词已被死导出判据按词频
+      //   钉住（rand.channels 的 self-only 证据），新增一个同名词会把那份证据抬成失实。
+      chUsed: chList,
+      // 位置链断点（至多 5 处）：它是「这卷被改过」的直接证词，不与值面混成一句
+      posBroken: posBroken, posOk: posBroken.length === 0,
+      truncated: !!vol.truncated, savedAt: vol.savedAt || 0
+    };
+  }
+
   // 观测
   function randStat() {
     const byCh = {};
@@ -634,6 +779,19 @@
     coordOf: coordOf,
     // v2.89.0 O2：从种子重算磁带（纯）。消费方：面板「复核磁带」与 tool-diag 的 secCausal
     //   —— 诊断侧只能调它，不能调 replay（replay 要重跑代码，而诊断必须零副作用）。
-    verifyTape: verifyTape
+    verifyTape: verifyTape,
+    // v2.98.0 P2：磁带卷（跨会话可查）。
+    //   两个口各有真消费方，**与 O6 同形**（engines/org.js 的 exportJournal / reconcileWith）：
+    //     · tapeVol       —— 纯读导出一卷（消费方：面板「导出磁带」按钮 + 诊断 secCausal）
+    //     · verifyTapeWith —— 带外核对（消费方：面板「带外核对」按钮）
+    //   口径**刻意**与 verifyTape 分开（两个问题，两个口，缺一留缝）：
+    //     · verifyTape(t)     答「这卷（你手里那份磁带对象）出自这个种子吗」——纯算术，不碰卷；
+    //     · verifyTapeWith(v) 答「这卷（从别处拿来的**卷**）值链对得上吗、位置链断没断」——
+    //       多了格式头与位置链两面（磁带对象没有格式头，也没有「被别的会话改过」这回事）。
+    //   常量（TAPE_FORMAT / TAPE_FORMAT_VERSION）与 inspectTape **不单独导出**：本模块的
+    //   既有判据只认调用点（无独立消费方不挂），而它们的信息全部经上面两个口的返回值带出
+    //   —— 面板读 `v.format` / `v.formatVersion`，不必去摸模块内部的常量。
+    tapeVol: tapeVol,
+    verifyTapeWith: verifyTapeWith
   };
 })();

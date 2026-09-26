@@ -1354,6 +1354,8 @@
       <div class="wa-sec">因果工作台（B6）</div>
       <div class="wa-row"><button class="wa-btn" id="wa-cw-view" title="当前存档与本次进程累计分列——一个答「现在是怎样」，一个答「这一轮发生了几次」">当前/累计</button><button class="wa-btn" id="wa-cw-rehearse" title="在深拷贝上跑一整轮推进：看会发生什么，但不改存档、不留痕迹">分支试演</button><button class="wa-btn" id="wa-cw-conflicts" title="报出同因同果的重复链——只报不消解，消解由你显式选择">查冲突</button><button class="wa-btn" id="wa-cw-evidence" title="这一轮推进凭什么：随机源读数与推进绑定，不可复现时必须照实说">回放证据</button><button class="wa-btn" id="wa-cw-record" title="录制一轮推进：把这一轮抽取到的随机答案按顺序记成一卷磁带——录制之后的「复核磁带」与「回放」才有东西可查">录制一轮</button><button class="wa-btn" id="wa-cw-verify" title="从种子重算最近一卷磁带（纯算术、零副作用）：证「这卷磁带确实出自这个种子」；与「回放」是两条不同的证据">复核磁带</button></div>
       <div class="wa-row"><input id="wa-cw-id" class="wa-input" placeholder="链 id"/><input id="wa-cw-act" class="wa-input" placeholder="动作 advance/cancel/settle"/><button class="wa-btn" id="wa-cw-intervene" title="先预览「做这个动作会变成什么」，允许与否都给原因码，零副作用">干预预览</button></div>
+      <div class="wa-row">      <button class="wa-btn" id="wa-cw-vol" title="导出最近一卷磁带（纯读：不丢卷、不清留存、不改计数）——上一节会话那一轮凭什么，只有把它带出去才答得上">导出磁带</button><button class="wa-btn" id="wa-cw-vol-check" title="核对一卷从别处拿来的磁带（值链 + 位置链），零状态触碰：不装卷、不推进、不改当前模式">带外核对</button></div>
+      <textarea id="wa-cw-vol-text" class="wa-ta" placeholder="把一卷磁带（JSON）粘在这里再点「带外核对」——上一节会话导出的那种。本侧无卷时照实说「先导出一卷」，不假装核对过"></textarea>
       <div id="wa-cw-out" class="wa-out"></div>
       <div id="wa-choices-out" class="wa-out"></div>`;
   }
@@ -1680,6 +1682,61 @@
         + esc((v.rounds || []).join('、') || '无') + '（无坐标格 >0 时，上面那句「第几格」是真话，「第几轮第几步」这次说不出口）</div>'
         + '<div class="wa-dim">通道 ' + esc((v.channels || []).join('、') || '无') + '｜异常格 ' + v.oddKinds
         + '<br>它证的是「这卷磁带确实出自这个种子」；「同一段代码按磁带再走一遍」由 <code>causal.replayWith</code> 负责——后者要重跑代码，故对会写世界的轮次不适用。</div></div>');
+    });
+    // ── v2.98.0 P2：磁带卷（跨会话可查）。**显式触发**——本模块不自动落盘，
+    //   与 O6 的「导出流水 / 带外对账」同规格：要不要把这一卷带出会话，是按下这一刻的决定。
+    on('#wa-cw-vol', () => {
+      if (!WA.rand || typeof WA.rand.tapeVol !== 'function') { cwOut('<div class="wa-dim">随机源未加载</div>'); return; }
+      let v = null; try { v = WA.rand.tapeVol(); } catch (e) { return cwOut('<div class="wa-dim">导出磁带失败：导出抛错（export-throw）</div>'); }
+      // 「没有卷」与「有空卷」是两件事：前者照实说没得导，后者导出成功但 0 格。
+      if (!v || !v.ok) { cwOut('<div class="wa-dim">导出磁带：' + esc((v && v.reason) || 'no-tape') + '（' + ((v && v.reason) === 'no-tape' ? '本会话尚未录到磁带——先点「录制一轮」' : '卷不可导出') + '）</div>'); return; }
+      const t = $('#wa-cw-vol-text');
+      const json = JSON.stringify(v);
+      if (t) t.value = json;
+      const summary = '磁带卷 · ' + esc(v.format) + ' v' + v.formatVersion + ' · ' + v.entries + ' 格（决策 ' + v.values + '）'
+        + '｜种子 ' + esc(String(v.seed)) + '｜' + (v.opened ? (v.entries ? '<b>录制中</b>：这是此刻录到哪儿的快照，不是收卷后的完整卷' : '<b>录制中</b>（尚未录到任何一格）') : '已收卷')
+        + (v.truncated ? ' · <b>已截断</b>：链首无上游可核，只含带内' : ' · 完整卷（磁带无环形挤出，故本侧永不截断）');
+      cwOut('<div class="wa-item"><b>已导出一卷磁带</b>：' + summary
+        + '<div class="wa-dim">卷已填进下面的粘贴框（' + json.length + ' 字符）——把它带到别处（或下一节会话），再用「带外核对」核。'
+        + '注意本模块<b>没有</b>替你写盘：要不要留下这一卷由你决定。</div></div>');
+    });
+    on('#wa-cw-vol-check', () => {
+      if (!WA.rand || typeof WA.rand.verifyTapeWith !== 'function') { cwOut('<div class="wa-dim">随机源未加载</div>'); return; }
+      const raw = ($('#wa-cw-vol-text') ? ($('#wa-cw-vol-text').value || '') : '').trim();
+      // 没有卷时不假装核对过：「没核」与「核过一致」是两件事（与 O6 的 no-volume 同口径）。
+      if (!raw) { cwOut('<div class="wa-dim">带外核对：no-volume —— 先把一卷磁带粘进上面的框里再核。'
+        + '<br>（本侧不会替你从存档里找一个卷出来：磁带在本模块里不落盘，那样做等于假装有第二份真源。）</div>'); return; }
+      let vol = null;
+      try { vol = JSON.parse(raw); } catch (e) { cwOut('<div class="wa-dim">带外核对：bad-volume —— 粘进来的不是合法 JSON（' + esc(String(e && e.message || e)) + '）</div>'); return; }
+      let r = null; try { r = WA.rand.verifyTapeWith(vol); } catch (e) { cwOut('<div class="wa-dim">带外核对：核对抛错（本口承诺不抛——这是一个缺陷，不是配置问题）</div>'); return; }
+      if (!r) { cwOut('<div class="wa-dim">带外核对：无结论</div>'); return; }
+      // 拒收（格式头/行面）照原码带出，不与「核对过了但不一致」混成一句
+      if (r.ok === false && r.reason) {
+        const want = r.want !== undefined ? ('（期望 ' + esc(String(r.want)) + '，实为 ' + esc(String(r.got)) + '）') : '';
+        cwOut('<div class="wa-item"><b>带外核对：卷不合规，未核对</b> ' + esc(String(r.reason)) + want
+          + (r.reason === 'bad-tape' ? '<div class="wa-dim">行面读不了——卷里的格不是对象。连读都读不了的卷不该说成「核对不一致」，两者是两件事。</div>' : '')
+          + '</div>');
+        return;
+      }
+      const fm = r.firstMismatch;
+      // 位置链与值链**分开念**：位置断了不代表值错，值对上了也不代表位置没断
+      const posLine = r.posOk ? '位置链完整（' + r.entries + ' 格逐格递增，无跳号无重复）'
+        : '<b>位置链断了</b> ' + (r.posBroken || []).length + ' 处（首处第 ' + ((r.posBroken || [{}])[0].at | 0) + ' 格：期望 n=' + ((r.posBroken || [{}])[0].want) + '，实为 ' + esc(String((r.posBroken || [{}])[0].got)) + '）'
+          + '——这卷被改过，或由别的东西拼出来；它与值对得上对不上是两回事';
+      const valLine = r.outcome === 'no-seed' ? '<b>值链无从核对</b>（卷里没有种子：seed=null）——「能不能核对」与「核对结果」是两句不同的话'
+        : r.outcome === 'bad-seed' ? '<b>值链无从核对</b>（种子非法：' + esc(String(r.seed)) + '）'
+          : r.outcome === 'entailed' ? '值链一致（比对 ' + r.compared + ' 格，逐值相同）'
+            : '<b>值链有分歧</b> ' + r.mismatches + ' 格'
+              + (fm ? '（首处第 ' + fm.at + ' 格 · 通道 ' + esc(fm.channel) + ' · 应为 ' + esc(String(fm.want)) + '，实为 ' + esc(String(fm.got)) + '）' : '');
+      // 「卷内自洽」与「与本侧一致」必须与 O6 同款分开念：本侧没有第二份真源可比。
+      const scopeLine = r.compared === 0
+        ? '比了 0 格：本口只答「卷内自洽 / 位置链完整」，<b>不答</b>「与本侧一致」——本侧磁带不落盘，没有第二份真源可比。'
+        : '比了 ' + r.compared + ' 格（通道 ' + esc((r.chUsed || []).join('、') || '无') + '）——一律是<b>卷内</b>核对。';
+      cwOut('<div class="wa-item"><b>带外核对（零状态触碰：不装卷、不推进、不改当前模式）</b>'
+        + '<div class="wa-dim">' + posLine + '</div>'
+        + '<div class="wa-dim">' + valLine + '</div>'
+        + '<div class="wa-dim">' + scopeLine + '</div>'
+        + '</div>');
     });
     on('#wa-cw-intervene', () => {
       if (!WA.causal) return;

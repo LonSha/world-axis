@@ -1264,6 +1264,12 @@
     //   而「控件在、点了没反应」在守卫表之外是无人发现的（守卫表是接线面的唯一真源）。
     { page: 'events', ids: ['wa-cw-view', 'wa-cw-rehearse', 'wa-cw-conflicts', 'wa-cw-evidence',
       'wa-cw-record', 'wa-cw-verify',
+      // v2.98.0 P2：磁带卷跨会话可查的两枚按钮 + 一枚粘贴框（渲染在事件页因果工作台区）。
+      //   同 v2.51.0 / v2.62.0 / v2.63.0 / v2.89.0 / v2.95.0 / v2.96.0 / v2.97.0 的理由——
+      //   tapeVol / verifyTapeWith 是本版新增的两个导出，它们**必须有真消费方**（无消费方不挂），
+      //   UI_BINDINGS 就是那两个消费方的接线真源。不登记时，下面这条门禁会如实报「未覆盖」：
+      //   `panel 渲染的每个控件都在守卫表内（未覆盖：[...]）`——本版实测正是被它抓出来的。
+      'wa-cw-vol', 'wa-cw-vol-check', 'wa-cw-vol-text',
       'wa-cw-id', 'wa-cw-act', 'wa-cw-intervene', 'wa-cw-out'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
