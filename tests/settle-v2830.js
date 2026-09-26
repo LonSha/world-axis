@@ -312,15 +312,17 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 118 && led.loadedCount === 110,
-    'v2830/mr: 命名空间 118 / 装载文件 110（与 LOAD_ORDER 的 113 差 3 个 ui/*——'
-    + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：113 - 3 = 110；'
-    + 'v2.98.0 时为 112 - 3 = 109，v2.99.0 新增 engines/canon.js 后两边各 +1）'
+  a(led.nsCount === 119 && led.loadedCount === 111,
+    'v2830/mr: 命名空间 119 / 装载文件 111（与 LOAD_ORDER 的 114 差 3 个 ui/*——'
+    + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：114 - 3 = 111；'
+    + 'v2.98.0 时为 112 - 3 = 109，v2.99.0 新增 engines/canon.js 后两边各 +1；'
+    + 'v2.101.0 新增 engines/interop.js 后两边各 +1）'
     + ' —— v2.84.0 A2 新增 core/input-guard.js（inputGuard 命名空间）；'
     + ' v2.87.0 B7 新增 engines/theme.js（theme 命名空间）；'
     + ' v2.96.0 X3 新增 engines/rumor.js（rumor 命名空间）；'
     + ' v2.97.0 X5 新增 engines/phone-bridge.js（phoneBridge 命名空间）；'
-    + ' v2.99.0 新增 engines/canon.js（canon 命名空间）');
+    + ' v2.99.0 新增 engines/canon.js（canon 命名空间）；'
+    + ' v2.101.0 新增 engines/interop.js（interop 命名空间）');
   const providers = Object.keys(led.modules).reduce(function (acc, rel) {
     led.modules[rel].requires.forEach(function (ns) { acc[ns] = true; });
     return acc;

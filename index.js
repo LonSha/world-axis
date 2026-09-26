@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.100.0';
+  const VERSION = '2.101.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -361,6 +361,11 @@
     'compat/host.js',
     'compat/mvu.js',
     'compat/th-helper.js',
+    // v2.101.0（O11）：跨插件互操作验收面（纯读）。
+    //   为什么必须**最后**：它读的是三处现场读数——compat.detect()（宿主能力）、
+    //   lonshaReader.lonshaSource()（上游桥）、phoneBridge.phaseOf()（下游入站桥），
+    //   不是自己另探一遍；先于它们装载只会让三态一律落到 unknown。
+    'engines/interop.js',
     'ui/panel.js',
     'ui/settings.js',
     'ui/assistant.js',

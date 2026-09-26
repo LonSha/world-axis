@@ -13,6 +13,28 @@
 | 出口面契约 | 58 命名空间 / 321 成员 / 4094 字符 |
 
 ## 迭代记录
+### R84 · 2026-09-26 · v2.101.0 跨插件互操作验收面（第五十八面：装了没 ≠ 装对了没）
+- **做了什么**：一处新模块 + 三处消费侧 + 一把专锁：
+  **`engines/interop.js`（新增，229 行 / 11 口导出，纯读）**：封闭集合 `PARTNERS=['host','lonsha','rubyphone']`、`STATES=['ready','partial','absent','incompatible','unknown']`、`HOST_NEED` / `HOST_NICE`；三探针分别**委托既有真源**（`compat.detect()` / `lonshaReader.lonshaSource()` + `readLonshaSnapshot({refresh:false})` / `phoneBridge.phaseOf()`）；`probePartner(key)`（错名不回落）、`probeAll()`（`rows` / `matrix` / `ready` / `degraded` / `allReady`）、`freeze()`（三桥 id/version/direction/duty + 诊断节键 + 两表拒收码 + 两封闭集合）、`compatGaps()`（旧存档 / 旧配置 / 缺席插件三种老环境，每条带判据落点）、`summaryText()`、`stat()`（只读计量，不进存档）。
+  **`engines/theme.js`（两处失真修复）**：`separation()` 的 LonSha 行原读 `lonshaSource().state`——而该函数**从来没有 `state` 字段**（真字段是 `reason`）⇒ **恒报 unknown**；RubyPhone 行写死 `present:false`。改为查 `mounted` / `reason` 与 `phoneBridge.phaseOf()`，并把「用户关掉」（`disabled`）与「对方不在」（`absent`）分开，`owns` 补 `['phoneBridge']`。
+  **消费侧**：`ui/panel.js` 两枚入口（跨插件面 / 协议冻结面，高亮**它是只读的**）；`engines/tool-diag.js` 的 `secInterop` 采集节 + `MODULE_EXPORTS` 登记；`index.js` LOAD_ORDER 与 `tests/run.js` LOAD 插位（须晚于其读取的 compat / lonsha-reader / phone-bridge）。
+  **专锁 `tests/interop-v2101.js`（新增 481 行 / 51 项）**：A 静态面 A1–A6（必载登记 / 诊断节读 `probeAll` / 面板两枚真消费方 / 守卫表登记 / 装载位 / 零 npm 依赖）、B 运行时 J1–J11（宿主六形态 / 上游六形态 / 下游六形态含 `phase-unknown:` / 错名不回落且与 host 不同形 / 五态分列 + degraded 构成 / 挂带 `refresh` 的桥并要求它一次都没被调、且 `readLonshaSnapshot` 收到的 `opts.refresh === false` / 只读（前后存档逐字相同）/ `summaryText` 两向 / `freeze` 三桥逐字 + **`diagSections` 每键必须真是 `toolDiag.collect()` 的键** / `compatGaps` 三规则键集恰为 `oldSave,oldConfig,absentPlugin` 且 `oldConfig.evidence` 匹配 `/^-?\d+ 个幽灵键$/`——专门钉住本轮修掉的那个病 / `separation` 两行 `present` 真值）、C1–C2 不变式（探测不落盘 / 两封闭集合恰为声明值）、N0–N15 负控制（14 个真源码破坏锚点各恰中 1 次 + 判据纯度前置检查）。
+- **为什么**：本扩展的运行前提是**三个外部件**（SillyTavern+TavernHelper 宿主 / LonSha 记忆插件 / RubyPhone），而此前它们只有一个「挂没挂」的二值读数、散在各引擎里。于是「对方在、但契约版本不兼容」「对方在、但引擎是空的」这两种**最需要说出口**的状态，在面板上与「不在」长得一模一样；更贵的是 `theme.separation()` 连二值都是错的（见上）。本版把三伙伴拆成**封闭五态并分列不合并**，同时交出「协议冻结面」（三桥 id/version/direction + 两表拒收码 + 诊断节键），使「装了没」与「装对了没」成为两件可分别回答的事。
+- **踩过的坑（本版四条，全部留痕）**：
+  ① **静默降级：把一句真话说成假的（本轮最值钱的一条）**：`compatGaps.oldConfig.evidence` 读 `WA.settingsBus.orphanSettingsKeys()`，而真源在 `WA.store`（`settingsBus` 上无此口）⇒ `ReferenceError` 被自己的 `try/catch` 吞成 `-1`，面板**恒报「-1 个幽灵键」**而不报错。修后实测 `0 个幽灵键`。**发现路径**：全量回归的「出口面契约：悬空引用为零」把 `settingsBus.orphanSettingsKeys @engines/interop.js:199` 连文件带行号点了出来——这条门禁此前是清册面的边角料，本版证明它才是「恒假读数」的头号捕手。**教训：`try/catch` 的兜底值不得是一个合法读数**（`-1` 看起来就像个数字），否则失败永远说不出口。
+  ② **探针挂错面 ⇒ 五条判据差点全是恒过**：`engines/lonsha-reader.js` 解析上游桥走的是**真全局**（`const G = (typeof window!=='undefined')?window:global`），**不是** `WA.mainWin`。第一版探针把桥挂在 `WA.mainWin` 上，五种情形（含「桥在且就绪」「契约版本不匹配」）**全部返回 absent**——差一点据此写出五条「原版上就绿、破坏后也绿」的判据。**教训：写判据前先侦察「真源在哪」；`absent` 大面积出现时第一反应应是「我挂对地方了吗」。**
+  ③ **穷举数组不含「返回值」（`phaseOf` 的 `disabled`）**：`phoneBridge.PHASES = ['pushing','quiet','unknown']`，而 `disabled` 是 `phaseOf()` 在 `enabled:false` 时的返回。**枚举与「函数的返回域」是两层**，先读产品源码确认返回域再写断言。
+  ④ **清册口径的「自己算不算消费方」**：`interop.probePartner` 被本模块自己的分发逻辑调用，按清册口径（产品代码内真引用）判为 **`self-only` 死导出**并如实登记进账本（`refs 0 / tref 0 / own 4`）——**没有为了让数字好看而去挂一个假消费方**。
+- **可复用的判据**（本轮新增，编号续 R83）：
+  - (43) **兜底值不得是合法读数**：`catch → -1` 与 `catch → null + state:'thrown'` 是两件事——前者的失败在面板上长得跟成功一样。（本版实测：修前 `-1 个幽灵键`，修后 `0 个幽灵键`。）
+  - (44) **不为数字好看挂假消费方**：新口若只有本模块内部与测试引用，**如实登记为死导出**（`self-only` / `test-only`）比挂一个「点了什么也不做」的按钮诚实得多。
+  - (45) **`absent` 大面积出现先怀疑探针**：五态分列的收益，前提是探针真的接到了真源；接错了会得到一整套**恒过**的判据（比没有判据更坏）。
+  - (46) **封闭集合要与「函数的返回域」核对**：`PHASES` 与 `phaseOf()` 的返回域不是一回事；`STATES` 与 `probePartner()` 的返回域必须逐字一致（本版以 C2 不变式钉住）。
+- **影响范围**：`engines/interop.js`（新增）；`engines/theme.js`（`separation()` 两处失真修复）；`ui/panel.js`（两枚入口 + 两段绑定）；`engines/tool-diag.js`（`MODULE_EXPORTS` + `secInterop` + `collect` 挂节 + `UI_BINDINGS` 登记）；`index.js`（LOAD_ORDER 插位 + 版本 2.101.0）；`tests/run.js`（专锁挂载 + `FROZEN2800` 整串回填 + `EC2430` + 清册/死子面读数 + 八处版本断言 + 模块注册 e2e 读数 + 新增 v2.101.0 核验块）；`manifest.json`（2.101.0）；`tests/interop-v2101.js`（新增）；`tests/reject-lock-v2780.js`（台账 version 断言）；`tests/reject-code-ledger.json` / `tests/dead-export-ledger.json` / `tests/module-registry-ledger.json`；`README.md` / `ITERATION_LOG.md` / `FOUR_VERSION_PLAN.md`。`tools/*.py` 不入库。
+- **门禁结果**：全量回归 `node tests/run.js` → **8627 / 0**；专锁 `tests/interop-v2101.js` **51 / 0**；出口面契约 `ns= 108 members= 678 chars= 8147`；清册面 refs **2587** / 命名空间 114 / 成员 **1322**；死子面 dead 445 / uiDead 4 / dataOnly 167；拒收码 **356**（不变）；模块注册 文件 111 / 命名空间 119 / 装载期边 23 / 硬边 0 / 调用期引用 44；测试文件面 85 文件 / 80 锁 / 孤儿 0；九道独立门禁全绿（dead-export / module-registry / field-liveness / reject-code / test-surface / dup-decl / export-contract 等）。
+- **未覆盖（如实留清单）**：**UI 层未做实机验证（如实登记）**——两枚入口住在 `ui/panel.js`，而它**在无头回归里不装载**；三插件缺席 / 部分接入 / 版本不兼容三态的**实机联调**由 C5（X13）承担；`freeze()` 只做冻结读数，**不做**协议协商与版本迁移器；`unknown` 的**重试策略**不在本版（只保证它与 `absent` 长得不一样）。
+- **提交**：`（见本版提交）`。
+
 ### R83 · 2026-09-26 · v2.100.0 原著对位（第五十七面：基准有了，但没人拿它去比）
 - **做了什么**：一处模块增量 + 两处消费侧 + 一把专锁，**架构一个字没动**：
   **`engines/canon.js`（+4 口导出，全部是读面）**：① `signal(text, opts)`——拿一段文本撞幕目**题名**，返回 `hits`（命中幕号 / 题名 / 重叠证据 / 分数）与 `bigram` 证据；② `position(opts)`——拿**世界侧四个真源**（`chronicle` / `currents` / `echoes` / `chapters.history`）逐行撞题名，返回 `rows`（撞上的行 + 归属幕）、`acts` / `acts0`、`truncated`、`lastReason`；③ `gap(actNo)`——某幕「还剩多少、被截掉多少」（**总幕数取自 `acts0`**）；④ `alignView()`——诊断/面板用的一次性读数（`signals` / `aligns` / `gaps` 与 `builds` / `adopted` 分列）。

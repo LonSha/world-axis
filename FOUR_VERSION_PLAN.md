@@ -161,6 +161,13 @@
 - **本版两条自纠（记录以免后人「修回去」）**：① `evidence` 是**重叠**二字窗，`join('')` ≠ 原短语 —— 最初的 `evidence.join('') === 短语` 从出生起就是**恒假判据**；② `coordOf` 的界是 `LIMITS.MAX_ACTS`（号本身的合法域）**不是幕数**，`coordOf(99)` 合法返回 `A99`。
 - **收口期实测抓到的跨版本污染一处**：v2.100.0 新增的拒收码见证段在 `finally` 里漏还原 `canon`（它开场自己写过）⇒ 残留的 `canon.outline.acts` 被 `store.sizeAudit` 判为 `unbounded`，连带 v2.82.0 的 [N3] 与一条健康分基线判据变红。修法：见证段还原清单**对着写入清单**核对（`keepCanon` 快照 + `finally` 无条件还原）。
 
+## v2.101.0 跨插件互操作验收面（第五十八面 · 版本 A 的 A1 = O11）
+- [x] 验收（interop，v2.101.0）：专锁 `tests/interop-v2101.js` **51/0**（A 静态面 A1–A6 / B 运行时 J1–J11 / C 不变式 C1–C2 / N0–N15 负控制，14 个真源码破坏锚点各恰中 1 次，负控制一律「真源码破坏 → 装载破坏副本 → 在副本上重跑同款真判据」+ 判据纯度前置检查）；全量回归 `node tests/run.js` → **8627 / 0**（v2.100.0 基线 8576/0）；出口面契约 `ns= 108 members= 678 chars= 8147`（+1 命名空间 / +6 成员，`FROZEN2800` 与 `EC2430` 已逐字回填）；清册面 refs **2587** / 命名空间 114 / 成员 **1322**；死子面 dead 445 / uiDead 4 / dataOnly 167（新增 `interop.probePartner` 一处，`self-only` 如实登记）；拒收码 **356**（本版零新增）；模块注册 文件 111 / 命名空间 119 / 装载期边 23 / 硬边 0 / 调用期引用 44；测试文件面 85 文件 / 80 锁 / 孤儿 0；九道独立门禁全绿；四本台账 version=2.101.0。
+- [x] 内容：① `engines/interop.js`（新模块，纯读）——三伙伴（宿主 / LonSha / RubyPhone）**封闭五态**（`ready` / `partial` / `absent` / `incompatible` / `unknown`）分列，`probePartner` / `probeAll` / `freeze` / `compatGaps` / `summaryText` / `stat`，探测一律**委托既有真源**、**不新增第二套真源**；② `theme.separation()` 两处失真修复（LonSha 恒 `unknown`、RubyPhone 写死 `present:false`）；③ 消费侧两枚面板入口 + `secInterop` 采集节；④ 协议冻结面（三桥 id/version/direction/duty + 两表拒收码 + 诊断节键；`diagSections` 每键必须真是 `toolDiag.collect()` 的键）。
+- [x] 产品侧真缺陷一处（收口期全量回归抓到）：`compatGaps.oldConfig` 读 `WA.settingsBus.orphanSettingsKeys()`（真源在 `WA.store`）⇒ `ReferenceError` 被 `try/catch` 吞成 `-1`，**恒报「-1 个幽灵键」**。发现路径是「出口面契约：悬空引用为零」把文件与行号点了出来；修后实测 `0 个幽灵键`。
+- [ ] 未覆盖（如实留在清单）：**UI 层未做实机验证**（`ui/panel.js` 在无头回归里不装载，两枚入口只由静态门禁与专锁静态面覆盖，须实机复核）；**三插件缺席 / 部分接入 / 版本不兼容三态的实机联调**本轮只到「可判定的读数与冻结面」，真机联调记录由 C5（X13）承担；`freeze()` **不做**协议协商与版本迁移器；`unknown` 的**重试策略**不在本版。
+- [ ] A2（O12 性能基线与增量计算）/ A3（O16 维护工具与 UI 运行质量）待做。
+
 ## 完成纪律
 - 每项需附实现路径、真实消费者、正反判据、运行证据，不能以新增导出或文件存在标记完成。
 - node tests/run.js 是全量入口；无头通过不替代实机。

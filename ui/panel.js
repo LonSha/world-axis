@@ -1428,6 +1428,8 @@
         <button class="wa-btn" id="wa-cfg-view" title="配置包：整包导出/导入设置家族键，含 schema 版本、备份环与失败不污染">配置包</button>
         <button class="wa-btn" id="wa-settle-view" title="结算守卫：同一楼层是否被重复结算">结算守卫</button>
         <button class="wa-btn" id="wa-compat-view" title="宿主兼容层：当前宿主提供了哪些能力、缺哪些">宿主兼容层</button>
+        <button class="wa-btn" id="wa-net-view" title="跨插件互操作：宿主能力 / 上游证据读取 / 手机侧交互执行，三伙伴五态分列（只读，不驱动对方重建快照）">跨插件面</button>
+        <button class="wa-btn" id="wa-net-freeze" title="协议冻结面：三座桥的 id 与契约版本、诊断节键、拒收码词表——外部读者认的就是这些字符串">协议冻结面</button>
       </div>
       <div class="wa-sec">恢复与撤销<span class="wa-dim">（改错了能退回去）</span></div>
       <div class="wa-row">
@@ -3112,6 +3114,43 @@
         html += '<div class="wa-dim">未激活不等于故障：MVU 需宿主开启变量框架，TH 桥仅在脚本沙箱内暴露。真正的异常（reason 以 error: 开头）会被健康巡视记为 engine.compat。</div>';
         out.innerHTML = html;
       } catch (e) { out.textContent = '兼容层读取失败：' + (e && e.message); }
+    };
+    // v2.101.0（O11）：跨插件互操作验收面出口——interop.probeAll / summaryText / freeze
+    //   此前零消费（新模块只有测试在活，而「只在测试里活的导出不算交付」）。
+    //   两枚按钮与宿主兼容层同规格：只写 #wa-diag-out、只读、不驱动对方重建快照。
+    const netView = $('#wa-net-view');
+    if (netView) netView.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out) return;
+      try {
+        const r = WA.interop.probeAll();
+        let html = '<div class="wa-sec">跨插件互操作（三伙伴五态分列）</div>';
+        html += r.rows.map(function (x) {
+          const on = x.state === 'ready';
+          return '<div class="wa-item"><b>' + esc(x.label) + '</b> '
+            + (on ? '<span class="wa-badge wa-on">ready</span>' : '<span class="wa-badge">' + esc(x.state) + '</span>')
+            + '<br><span class="wa-dim">' + esc(x.duty) + ' · ' + esc(x.detail) + '（凭 ' + esc(x.evidence) + '）</span></div>';
+        }).join('');
+        html += '<div class="wa-dim">' + esc(WA.interop.summaryText())
+          + ' —— 「探不出」（unknown）与「它不在」（absent）处置相反，故分列不合并。</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '互操作面读取失败：' + (e && e.message); }
+    };
+    const netFreeze = $('#wa-net-freeze');
+    if (netFreeze) netFreeze.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out) return;
+      try {
+        const f = WA.interop.freeze();
+        let html = '<div class="wa-sec">协议冻结面（外部读者认的字符串）</div>';
+        html += f.bridges.map(function (b) {
+          return '<div class="wa-item"><b>' + esc(String(b.id)) + '</b> v' + esc(String(b.version))
+            + ' · ' + esc(b.direction) + '<br><span class="wa-dim">' + esc(b.duty) + '</span></div>';
+        }).join('');
+        html += '<div class="wa-item">拒收码：入站 ' + f.rejectCodes.inbound.length + ' 枚 / 读面 '
+          + f.rejectCodes.readFace.length + ' 枚<br><span class="wa-dim">'
+          + esc(f.rejectCodes.inbound.concat(f.rejectCodes.readFace).join(' / ')) + '</span></div>';
+        html += '<div class="wa-dim">诊断节键：' + esc(f.diagSections.join(' / ')) + '</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '冻结面读取失败：' + (e && e.message); }
     };
     // v2.2.0: 运行痕迹清空出口——resetStats / resetHistory 此前无面板入口（画像只能越积越旧）
     const wfrBtn = $('#wa-wf-reset');

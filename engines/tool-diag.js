@@ -683,6 +683,8 @@
     'engines/tolerance.js': 'tolerance',
     'engines/events.js': 'events',
     'engines/checkpoints.js': 'checkpoints',
+    // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
+    'engines/interop.js': 'interop',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -1239,6 +1241,9 @@
       'wa-cfg-view',
       // v2.2.0 块8：工具页既有控件（此前全在守卫之外 → 绑定断裂无人发现）
       'wa-audit-copy', 'wa-key-check', 'wa-quar-view', 'wa-recovery-dl', 'wa-maintain', 'wa-conf-view', 'wa-settle-view',
+      // v2.101.0（O11）：跨插件互操作两枚出口。同 v2.2.0 块8 的理由——
+      //   「渲染了但绑定写错 id」这类断裂只有在守卫登记过的控件上才会被发现。
+      'wa-net-view', 'wa-net-freeze',
       // v2.34.0: 记忆采样预览三件
       'wa-samp-preview', 'wa-samp-copy', 'wa-samp-out'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
@@ -1673,6 +1678,28 @@
       return out;
     }, {});
   }
+  // ── v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列；纯读，不驱动对方重建） ──
+  function secInterop() {
+    return safe(function () {
+      if (!WA.interop || typeof WA.interop.probeAll !== 'function') {
+        return { error: 'engines/interop.js 未加载（跨插件面读数缺席）' };
+      }
+      // 诊断是**旁观**：probeAll 内部一律 refresh:false，不命令对方插件干活。
+      const r = WA.interop.probeAll();
+      return {
+        partners: r.rows.map(function (x) {
+          return { key: x.key, label: x.label, duty: x.duty, state: x.state, evidence: x.evidence, detail: x.detail };
+        }),
+        matrix: r.matrix, ready: r.ready, degraded: r.degraded, allReady: r.allReady,
+        summary: WA.interop.summaryText(),
+        // 协议冻结面与兼容矩阵：只报当前值，不做冻结动作
+        bridges: WA.interop.freeze().bridges,
+        compat: WA.interop.compatGaps(),
+        stat: WA.interop.stat()
+      };
+    }, {});
+  }
+
   // ── 汇总 ──
   function collect() {
     const diag = {
@@ -1690,6 +1717,9 @@
       bridge: secBridge(),
       phoneBridge: secPhoneBridge(),
       lonsha: secLonsha(),
+      // v2.101.0（O11）：跨插件互操作验收面。与 bridge / phoneBridge / lonsha 三节
+      //   互补——那三节各报**一个方向**的现场，这一节把三伙伴归一成一张可核对的矩阵。
+      interop: secInterop(),
       compat: secCompat(),
       // v2.50.0（第三十五面）：宿主两侧 + 时间轴三节
       hostWb: secHostWb(), floorChanges: secFloorChanges(), ledgerTimeline: secLedgerTimeline(),

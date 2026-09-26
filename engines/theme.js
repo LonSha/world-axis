@@ -115,15 +115,36 @@
   function separation() {
     const d = (WA.compat && typeof WA.compat.detect === 'function') ? (function () { try { return WA.compat.detect(); } catch (e) { return null; } })() : null;
     const lr = WA.lonshaReader;
+    // ★ v2.101.0（O11）修正：此处原读 `s.state`，而 lonshaSource() 从不返回该字段
+    //   （它回的是 mounted / sourceState / lastError / hasSnapshot / reason）⇒
+    //   无论上游在不在、版本对不对，读数一律 `unknown`。改为读**真源字段**，
+    //   并把「不在」与「探不出」分开：不在报 not-mounted，探针抛错报 thrown。
     const lonState = (function () {
-      if (!lr || typeof lr.lonshaSource !== 'function') return 'engine-absent';
-      try { const s = lr.lonshaSource(lr.LONSHA_BRIDGE_ID); return (s && s.state) || 'unknown'; } catch (e) { return 'thrown'; }
+      if (!lr || typeof lr.lonshaSource !== 'function') return 'consumer-missing';
+      try {
+        const s = lr.lonshaSource(lr.LONSHA_BRIDGE_ID);
+        if (!s || s.mounted !== true) return (s && s.reason) || 'not-mounted';
+        return s.reason || 'unknown';
+      } catch (e) { return 'thrown'; }
+    })();
+    // ★ v2.101.0（O11）修正：`present` 原为**写死 false**（RubyPhone 那一行永远说「未接入」）。
+    //   改为看**入站桥现场**：桥在且相位不是 disabled ⇒ 这条边是通的。
+    //   缺席与「已关闭」分开：disabled 由用户在面板关的，不是对方不在。
+    const phone = (function () {
+      const pb = WA.phoneBridge;
+      if (!pb || typeof pb.phaseOf !== 'function') return { present: false, state: 'absent', note: '入站桥未加载；缺席不降级事实结算面' };
+      try {
+        const ph = pb.phaseOf();
+        const phase = String((ph && ph.phase) || 'unknown');
+        if (phase === 'disabled') return { present: false, state: 'disabled', note: '入站桥已关闭（用户关闭 ≠ 对方不在）：手机侧操作不会进世界台账' };
+        return { present: true, state: phase, note: (ph && ph.note) || '' };
+      } catch (e) { return { present: false, state: 'thrown', note: '入站桥探针抛错' }; }
     })();
     return {
       roles: [
         { owner: 'WorldAxis', duty: '事实结算', owns: ['causal', 'world', 'evolution', 'intel'], present: true },
         { owner: 'LonSha', duty: '证据读取', owns: ['lonshaReader'], present: !!d && d.tavernHelper === true, state: lonState },
-        { owner: 'RubyPhone', duty: '交互执行', owns: [], present: false, note: '不属于本扩展；缺席不降级事实结算面' }
+        { owner: 'RubyPhone', duty: '交互执行', owns: ['phoneBridge'], present: phone.present, state: phone.state, note: phone.note }
       ],
       host: d ? { sillyTavern: d.sillyTavern, tavernHelper: d.tavernHelper, variables: d.variables, worldbook: d.worldbook } : null,
       // 去重/隔离/来源版本的现状：如实报告，不宣称「已实现」
