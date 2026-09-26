@@ -68,9 +68,13 @@ function must1(s, x, tag) { const n = hits(s, x); if (n !== 1) throw new Error('
 // ══════════════ 真源码破坏锚点（各自恰中 1 次）══════════════
 const ANCHORS = {
   // 口径⑧ locate 的前置：没有基准就照实说没有（**不编一份出来**）
-  NO_FAKE_OUTLINE: { rel: CANON, txt: "    const o = outline();\n    if (!o) { stat.blocked++; stat.lastReason = 'no-outline'; return { ok: false, reason: 'no-outline' }; }\n    const raw = clean(coord, 20);" },
+  // v2.100.0 收口：`gap()` 的头部与本函数**逐字同构**（同为「没有基准就照实说没有」），
+  //   故锚点扩到函数头一行——口径没变，只是把两个函数区分开（撞车的是锚点粒度，不是判据）。
+  NO_FAKE_OUTLINE: { rel: CANON, txt: "  function locate(coord) {\n    const o = outline();\n    if (!o) { stat.blocked++; stat.lastReason = 'no-outline'; return { ok: false, reason: 'no-outline' }; }" },
   // 口径⑧ 语法不对 ⇒ bad-coord（且把原始串带出来）
-  BAD_COORD_REJECT: { rel: CANON, txt: "    const m = raw.match(COORD_RE);\n    if (!m) { stat.blocked++; stat.lastReason = 'bad-coord'; return { ok: false, reason: 'bad-coord', got: raw }; }" },
+  // 同理：`gap()` 的坐标语法拒收段与 locate 逐字同构；尾缀行 `const a = Number(m[1]), p = ...`
+  //   是 locate 独有的（gap 只解幕号、没有点号），用它把两者区分开。
+  BAD_COORD_REJECT: { rel: CANON, txt: "    const m = raw.match(COORD_RE);\n    if (!m) { stat.blocked++; stat.lastReason = 'bad-coord'; return { ok: false, reason: 'bad-coord', got: raw }; }\n    const a = Number(m[1]), p = m[2] ? Number(m[2]) : null;" },
   // 口径⑧ 号越界 ⇒ out-of-range（**不夹到边界**：夹了就说不出「你指的这段不存在」）
   OUT_OF_RANGE_NO_CLAMP: { rel: CANON, txt: "    const act = (o.acts || []).filter(function (x) { return x && x.no === a; })[0] || null;\n    if (!act) {\n      stat.blocked++; stat.lastReason = 'out-of-range';" },
   // 口径⑦ 点数截断如实报出（截了就得说截了，还要说截前多少）
@@ -96,9 +100,9 @@ const ANCHORS = {
 };
 const BREAK = {
   // 破坏：没有基准时**编一份出来**（返回 ok:true 的空壳）——这正是口径⑧要根除的那类谎
-  NO_FAKE_OUTLINE: "    const o = outline();\n    if (!o) { return { ok: true, coord: raw0() }; }\n    const raw = clean(coord, 20);",
+  NO_FAKE_OUTLINE: "  function locate(coord) {\n    const o = outline();\n    if (!o) { return { ok: true, coord: raw0() }; }",
   // 破坏：语法不对也放行（把「人写的坐标往往不是坐标」这件事实抹掉）
-  BAD_COORD_REJECT: "    const m = raw.match(COORD_RE) || ['A1', '1'];\n    if (!m) { stat.blocked++; stat.lastReason = 'bad-coord'; return { ok: false, reason: 'bad-coord', got: raw }; }",
+  BAD_COORD_REJECT: "    const m = raw.match(COORD_RE) || ['A1', '1'];\n    if (!m) { stat.blocked++; stat.lastReason = 'bad-coord'; return { ok: false, reason: 'bad-coord', got: raw }; }\n    const a = Number(m[1]), p = m[2] ? Number(m[2]) : null;",
   // 破坏：越界就**夹到边界**（说成「你指的是最后一幕」——这句话是假的）
   OUT_OF_RANGE_NO_CLAMP: "    const act = (o.acts || []).filter(function (x) { return x && x.no === a; })[0] || (o.acts || [])[0] || null;\n    if (!act) {\n      stat.blocked++; stat.lastReason = 'out-of-range';",
   // 破坏：恒报「没截」（截断这件事这次就永远说不出口）
@@ -311,8 +315,12 @@ function probeTitleTrim(W) {
 function probeExactKey(W) {
   try {
     const keys = Object.keys(W.canon);
-    return keys.length === 13 && keys.indexOf('coordOf') >= 0 && keys.indexOf('actText') >= 0
-      && keys.indexOf('LIMITS') >= 0 && keys.indexOf('stat') >= 0;
+    // v2.100.0：出口面 13 → 17。新增四口**必须**在场（只改数字、不验成员名，
+    //   会让「删掉 signal 又加一个无关成员」照样绿——那是把判据放宽，不是收口）。
+    return keys.length === 17 && keys.indexOf('coordOf') >= 0 && keys.indexOf('actText') >= 0
+      && keys.indexOf('LIMITS') >= 0 && keys.indexOf('stat') >= 0
+      && keys.indexOf('signal') >= 0 && keys.indexOf('position') >= 0
+      && keys.indexOf('gap') >= 0 && keys.indexOf('alignView') >= 0;
   } catch (e) { return false; }
 }
 /** B14 观测不得改变被观测对象：诊断节只读（collect 不改计数）。 */
@@ -336,10 +344,12 @@ function runAll(a) {
     'v2990: [A1] 不调模型（口径③：canon.js 零提及 WA.apiRouter——分幕是纯算术，模型分幕不可复现）；'
     + '判据刻意认 `WA.apiRouter` 而不是裸字串 `apiRouter`：后者在头部说明里本来就出现一次（自纠，'
     + '原判据把「注释里说了这件事」误判成「代码里做了这件事」）');
-  a(panSrc.indexOf('WA.canon') >= 0 && hits(panSrc, "on('#wa-cn-") === 7,
-    'v2990: [A2] 面板真接线（7 条 canon 绑定：build / adopt / locate / view / clear / go / act）');
-  a(hits(diagSrc, "'wa-cn-") === 15,
-    'v2990: [A2] 诊断节的 UI_BINDINGS 登记 15 个 canon 控件 id（渲染 + 绑定 + 守卫登记三件齐做）');
+  a(panSrc.indexOf('WA.canon') >= 0 && hits(panSrc, "on('#wa-cn-") === 10,
+    'v2990: [A2] 面板真接线（v2.100.0 起 10 条 canon 绑定：build / adopt / locate / view / clear / go / act'
+    + ' + 对位三枚 signal / position / gap——新增导出各有一个**真消费方**，无消费方不挂导出）');
+  a(hits(diagSrc, "'wa-cn-") === 19,
+    'v2990: [A2] 诊断节的 UI_BINDINGS 登记 19 个 canon 控件 id（渲染 + 绑定 + 守卫登记三件齐做；'
+    + 'v2.100.0 新增 wa-cn-check / wa-cn-signal / wa-cn-position / wa-cn-gap 四枚）');
   a(diagSrc.indexOf("'engines/canon.js': 'canon',") >= 0
     && diagSrc.indexOf("const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat'];") >= 0,
     'v2990: [A3] canon 登记为**必载**模块（不在 OPTIONAL_EXPORTS 里——缺席即断裂，不该被静默兜住）');
@@ -371,7 +381,7 @@ function runAll(a) {
   a(probeTitleTrim(env().WA),
     'v2990: [B12] 门面文字收尾：题名末尾句号剥掉（不出现「。。」；多幕用分号分隔）');
   a(probeExactKey(env().WA),
-    'v2990: [B13] 出口面恰为 13 个成员（加成员就得来改本锁——「新增导出必付代价」）');
+    'v2990: [B13] 出口面恰为 17 个成员（v2.100.0 起；加成员就得来改本锁——「新增导出必付代价」）');
   a(probeDiagPureRead(env().WA),
     'v2990: [B14] 观测不得改变被观测对象：诊断节只读（collect() 不改 buildOutline 的计数）');
   // ── C 不变式 ──

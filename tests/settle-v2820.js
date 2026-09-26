@@ -417,7 +417,11 @@ function probeWiring(WA) {
 }
 function probeSizeAudit(WA) {
   const a = WA.store.sizeAudit ? WA.store.sizeAudit() : null;
-  return (a && a.unbounded && a.unbounded.length) ? ('unbounded:' + a.unbounded.length) : 'clean';
+  const ub = (a && a.unbounded) || [];
+  // 失败时把**路径**带出来：只说 'unbounded:1' 无法归因（哪条容器、谁写进去的都不知道）
+  return ub.length
+    ? ('unbounded:' + ub.length + '[' + ub.map(function (x) { return typeof x === 'string' ? x : (x && x.path) || '?'; }).join(',') + ']')
+    : 'clean';
 }
 /** 库键与世界载荷分离：世界那一侧的持久化字节里不得出现存档痕迹。 */
 function probeSeparateKeys(WA) {
@@ -637,7 +641,9 @@ function runNegative(a) {
   // N3 隔离性：破坏的可见面恰好是本判据——接线与骨架不受影响
   a(probeWith(BROKEN[B.refuse], probeWiring) === 'owner/order/load/vis/outside/uncapped',
     'v2820/cp: [N3] 库拒收破坏不影响四处接线声明');
-  a(probeWith(BROKEN[B.guard], probeSizeAudit) === 'clean', 'v2820/cp: [N3] 守卫键破坏不影响容量审计');
+  const saGuard2820 = probeWith(BROKEN[B.guard], probeSizeAudit);
+  a(saGuard2820 === 'clean', 'v2820/cp: [N3] 守卫键破坏不影响容量审计'
+    + (saGuard2820 === 'clean' ? '' : '（实 ' + saGuard2820 + '）'));
   a(probeWith(BROKEN[B.fmt], probeLibOutside) === 'outside', 'v2820/cp: [N3] 信封格式号破坏不影响「库在世界之外」');
   // N4 真状态改变（判据非恒真）
   const chg = isolated(function () {

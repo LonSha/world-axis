@@ -69,8 +69,13 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
-  const LIMITS = { MAX_TEXT: 4000000, MAX_ACTS: 200, MAX_POINTS: 5000, TITLE: 60, BRIEF: 12, ACTS_KEEP: 60 };
+  const LIMITS = { MAX_TEXT: 4000000, MAX_ACTS: 200, MAX_POINTS: 5000, TITLE: 60, BRIEF: 12, ACTS_KEEP: 60,
+    // v2.100.0（第五十七面）：对位面三个上界。单次对位文本上限 / 每源取最近多少行 / 报出的共有片段数。
+    MAX_ALIGN_TEXT: 20000, ALIGN_ROWS: 24, ALIGN_KEEP: 8 };
   const stat = { builds: 0, adopted: 0, cleared: 0, blocked: 0, truncated: 0, faults: {},
+    // v2.100.0：对位面三个计数。**与 builds / adopted / cleared 分列**——
+    //   「我看了几眼对位」与「我整理了几次原著」是两件事，挤进同一个计数器就再也分不出。
+    signals: 0, aligns: 0, gaps: 0,
     lastReason: '', lastActs: 0, lastPoints: 0, lastChars: 0, lastAt: 0 };
   function noteFault(kind, e) {
     try { stat.faults[kind] = (stat.faults[kind] || 0) + 1; } catch (x) {}
@@ -351,6 +356,226 @@
       + (o.truncated && o.truncated.acts ? '（已整理 ' + o.acts.length + ' 幕，其余未分）' : '')
       + '。开篇：' + head + '。推进请与幕目对齐，不要提前演出后续幕的事件。';
   }
+  // ── 对位（v2.100.0 第五十七面）：拿世界侧历史去撞原著幕目 ────────────
+  // 治的病：v2.99.0 只给了**基准**（幕目骨架），把「现在演到原著哪一段了」留在
+  //   「只能靠人记」。本版把**可观测的那一半**做出来：把世界侧已经发生的事
+  //   （chronicle / currents / echoes / 章节历史）与幕目题名做**字面重叠对位**。
+  //
+  // **本版不做「偏离判定」**——那是本次刻意不越的线：
+  //   同一段剧情，有人要逐句照演、有人只要骨架对上就算没偏。**判定标准是作者的**，
+  //   不是引擎的；引擎替作者定标准，等于把「我觉得你写偏了」包装成客观读数。
+  //   本版只交两样东西：读数（最接近第几幕）与证据（凭什么）。
+  //
+  // 边界（全是否定式）：
+  //   ① **对的是题名，不是正文**：原著正文不入存档（v2.99.0 口径 5），故粒度是
+  //      **题名级**，如实写进返回（`scope`），不假装做过逐句比对。
+  //   ② **不调模型**：纯算术（二字窗口交集计数）。
+  //   ③ **证据与推断分列**：`evidence`（共有片段）与 `score` 一起交出——
+  //      说不出「它说在第 3 幕，凭什么」的读数，等于让人替引擎背书。
+  //   ④ **没信号就说没信号**：证据为空一律 `no-signal`，**不给「最接近」的坐标**。
+  //      「随便挑一个最像的」与「没对上」在面板上必须长得不一样。
+  //   ⑤ **观测不得改变被观测对象**：三个入口全是纯读（不写 store、不改已落盘骨架）；
+  //      诊断面 `alignView` 连 stat 都不写。
+  //   ⑥ **不替用户回写坐标**：对位结果**不自动** markCoord。O10 立的规矩是
+  //      「坐标是标出来的、不是猜的」——对位是猜，猜的输出要人看一眼后**手动**标。
+  //   ⑦ 题名归一化后不足 4 字（窗口数 < ALIGN_MIN_NEED）的幕不参与对位（标 `thin`）：
+  //      两字撞上不是信号，是噪声。这条是**噪声下限**，不是精度调优。
+  const ALIGN_TITLE = '题名级';
+  const ALIGN_GRAM = 2;
+  // 噪声下限（题名归一化后窗口数 < 此值 ⇒ 不参与对位）。
+  //   **不另设 ALIGN_KEEP**：报出几条共有片段只认 LIMITS.ALIGN_KEEP 一处——
+  //   同一语义两处真源，日后必然各改一处，于是同一个问题有了两个答案。
+  const ALIGN_MIN_NEED = 3;
+  const ALIGN_SOURCES = ['chronicle', 'currents', 'echoes', 'chapters'];
+  // 只留汉字/字母/数字：标点与空白一律不参与匹配（否则「。」会变成所有题名的共同窗口）
+  const NOISE_RE = /[^0-9A-Za-z\u4e00-\u9fa5]/g;
+  function flatText(x) { return String(x == null ? '' : x).replace(NOISE_RE, ''); }
+  function gramSet(x) {
+    const t = flatText(x), out = {};
+    for (let i = 0; i + ALIGN_GRAM <= t.length; i++) out[t.slice(i, i + ALIGN_GRAM)] = 1;
+    return out;
+  }
+  /**
+   * 一处实现：一个幕题名被这段文本覆盖了多少。
+   *   分母取**题名的窗口数**，不是文本的窗口数：世界侧的历史行远长于幕题名，
+   *   用 Jaccard 会被长度压死；要问的是「这一幕的题名有多少真的出现在这段历史里」。
+   */
+  function coverOf(textGrams, title) {
+    const keys = Object.keys(gramSet(title));
+    if (keys.length < ALIGN_MIN_NEED) return { score: 0, hit: 0, need: keys.length, thin: true, evidence: [] };
+    let hit = 0; const ev = [];
+    for (let i = 0; i < keys.length; i++) {
+      if (textGrams[keys[i]]) { hit++; if (ev.length < LIMITS.ALIGN_KEEP) ev.push(keys[i]); }
+    }
+    return { score: hit / keys.length, hit: hit, need: keys.length, thin: false, evidence: ev };
+  }
+  // 一段文本最像哪一幕（平手取幕号小的那一个——顺序稳定才可复现）
+  function bestAct(textGrams, acts) {
+    let cand = null;
+    for (let i = 0; i < acts.length; i++) {
+      const act = acts[i];
+      if (!act) continue;
+      const c = coverOf(textGrams, act.title);
+      if (c.hit > 0 && (!cand || c.score > cand.score)) {
+        cand = { actNo: act.no, coord: 'A' + act.no, title: act.title,
+          score: c.score, hit: c.hit, need: c.need, thin: c.thin, evidence: c.evidence };
+      }
+    }
+    return cand;
+  }
+  /**
+   * 世界侧历史行（只读）。每源取最近 LIMITS.ALIGN_ROWS 行，总数另设上限。
+   *   label 是给证据用的「这一行是谁」；没有题名的行照实写 `(无题名)`，不留空串。
+   */
+  function historyRows(scope) {
+    const s = state();
+    const want = ALIGN_SOURCES.indexOf(scope) >= 0 ? [scope] : ALIGN_SOURCES;
+    const out = [];
+    function add(src, label, text) {
+      if (out.length >= LIMITS.ALIGN_ROWS * 2) return;
+      const t = clean(text, 160);
+      if (t) out.push({ src: src, label: clean(label, 40) || '(无题名)', text: t });
+    }
+    if (want.indexOf('chronicle') >= 0) (s.chronicle || []).slice(-LIMITS.ALIGN_ROWS).forEach(function (c) {
+      if (c) add('chronicle', c.title, (c.title || '') + ' ' + (c.summary || ''));
+    });
+    if (want.indexOf('currents') >= 0) (s.currents || []).slice(-LIMITS.ALIGN_ROWS).forEach(function (c) {
+      if (c) add('currents', c.title, (c.title || '') + ' ' + (c.summary || ''));
+    });
+    if (want.indexOf('echoes') >= 0) (s.echoes || []).slice(-LIMITS.ALIGN_ROWS).forEach(function (c) {
+      if (c) add('echoes', c.id, String(c.result || ''));
+    });
+    if (want.indexOf('chapters') >= 0) {
+      const hist = (s.chapters && s.chapters.history) || [];
+      const cur = s.chapters && s.chapters.current;
+      (cur ? hist.concat([cur]) : hist).slice(-LIMITS.ALIGN_ROWS).forEach(function (c) {
+        if (c) add('chapters', c.title, (c.title || '') + ' ' + (c.notes || ''));
+      });
+    }
+    return out;
+  }
+  /**
+   * signal：纯计算。给一段文本，答「它最像哪一幕」并交出证据。**不读 store 之外的任何东西、不落盘。**
+   *   拒收三态与 locate / actText 同规格（no-outline / empty-text / too-long），
+   *   且都进 stat.blocked —— 「你给的东西不对」是我们这边看得见的账。
+   */
+  function signal(text, topN) {
+    const o = outline();
+    if (!o) { stat.blocked++; stat.lastReason = 'no-outline'; return { ok: false, reason: 'no-outline' }; }
+    const raw = String(text == null ? '' : text);
+    if (!raw.trim()) { stat.blocked++; stat.lastReason = 'empty-text'; return { ok: false, reason: 'empty-text' }; }
+    if (raw.length > LIMITS.MAX_ALIGN_TEXT) {
+      stat.blocked++; stat.lastReason = 'too-long';
+      return { ok: false, reason: 'too-long', chars: raw.length, max: LIMITS.MAX_ALIGN_TEXT };
+    }
+    const tg = gramSet(raw);
+    const n = pick(topN, 1, LIMITS.ALIGN_ROWS, LIMITS.ALIGN_KEEP);
+    const rows = (o.acts || []).map(function (act) {
+      if (!act) return null;
+      const c = coverOf(tg, act.title);
+      return { actNo: act.no, coord: 'A' + act.no, title: act.title,
+        score: c.score, hit: c.hit, need: c.need, thin: c.thin, evidence: c.evidence };
+    }).filter(function (r) { return r && r.hit > 0; })
+      .sort(function (x, y) { return (y.score - x.score) || (x.actNo - y.actNo); });
+    stat.signals++;
+    stat.lastReason = rows.length ? 'signal' : 'no-signal';
+    if (!rows.length) {
+      return { ok: false, reason: 'no-signal', scope: ALIGN_TITLE,
+        grams: Object.keys(tg).length, acts: (o.acts || []).length };
+    }
+    return { ok: true, scope: ALIGN_TITLE, grams: Object.keys(tg).length,
+      best: rows[0], rows: rows.slice(0, n), hitActs: rows.length, acts: (o.acts || []).length };
+  }
+  /**
+   * 对位的纯算核心（**零 stat 写入**）——用户面与诊断面共用这一处实现。
+   *   为什么单拎出来：诊断面调它时不能涨任何计数（「看一眼」不该改账），
+   *   而用户面拒收时该记账。口径分叉点只允许在**外层包一层**，不允许两处各写一套算法。
+   */
+  function alignCalc(scope) {
+    const o = outline();
+    if (!o || !o.acts || !o.acts.length) return { ok: false, reason: 'no-outline' };
+    const rows = historyRows(scope);
+    const sources = {};
+    rows.forEach(function (r) { sources[r.src] = (sources[r.src] || 0) + 1; });
+    if (!rows.length) return { ok: false, reason: 'no-history', sources: sources };
+    const scored = rows.map(function (r) {
+      return { src: r.src, label: r.label, cand: bestAct(gramSet(r.text), o.acts) };
+    });
+    const hit = scored.filter(function (x) { return !!x.cand; });
+    // 一行都没撞上 ⇒ 照实说没信号，**不给坐标**（口径④）
+    if (!hit.length) return { ok: false, reason: 'no-signal', rows: rows.length, sources: sources, scope: ALIGN_TITLE };
+    const byAct = {};
+    hit.forEach(function (x) {
+      const k = x.cand.actNo;
+      if (!byAct[k]) byAct[k] = { actNo: k, coord: x.cand.coord, title: x.cand.title, votes: 0, score: 0, evidence: [], rows: [] };
+      byAct[k].votes++;
+      // 分取该幕的**最高分**（票数答「几行指向它」，分答「指得多准」，两个都要）
+      if (x.cand.score > byAct[k].score) { byAct[k].score = x.cand.score; byAct[k].evidence = x.cand.evidence; }
+      if (byAct[k].rows.length < 3) byAct[k].rows.push(x.label);
+    });
+    const rank = Object.keys(byAct).map(function (k) { return byAct[k]; })
+      .sort(function (a, b) { return (b.votes - a.votes) || (b.score - a.score) || (a.actNo - b.actNo); });
+    const arch = o.acts.length;
+    const total = o.acts0 || arch;
+    const top = rank[0];
+    return { ok: true, scope: ALIGN_TITLE, rows: rows.length, hitRows: hit.length, sources: sources,
+      best: top, runners: rank.slice(1, 3), hitActs: rank.length, acts: arch, total: total,
+      passed: top.actNo, remain: Math.max(0, total - top.actNo),
+      truncated: { acts: !!(o.truncated && o.truncated.acts), points: !!(o.truncated && o.truncated.points) } };
+  }
+  /**
+   * position：用世界侧历史对位（用户面）。拒收写 stat.blocked，成功记 stat.aligns。
+   *   `opts.scope` 只能是 ALIGN_SOURCES 里的一个；给别的（含空）一律**四源全扫**，
+   *   不报错——因为「不指定」是正常用法，而拼错的 scope 名回落成「全扫」也不会给出错答案。
+   */
+  function position(opts) {
+    const r = alignCalc(clean((opts && opts.scope) || '', 20));
+    if (!r.ok) { stat.blocked++; stat.lastReason = r.reason; return r; }
+    stat.aligns++; stat.lastReason = 'aligned';
+    return r;
+  }
+  /**
+   * gap：幕目推进度。**只报数，不判偏离**——「还剩 4 幕」是事实，「所以你不该在这里」是判定。
+   *   坐标语法/越界沿用既有词汇（bad-coord / out-of-range），不另造词。
+   */
+  function gap(coord) {
+    const o = outline();
+    if (!o) { stat.blocked++; stat.lastReason = 'no-outline'; return { ok: false, reason: 'no-outline' }; }
+    const raw = clean(coord, 20);
+    const m = raw.match(COORD_RE);
+    if (!m) { stat.blocked++; stat.lastReason = 'bad-coord'; return { ok: false, reason: 'bad-coord', got: raw }; }
+    const a = Number(m[1]);
+    const arch = (o.acts || []).length;
+    if (!(a >= 1 && a <= arch)) {
+      stat.blocked++; stat.lastReason = 'out-of-range';
+      return { ok: false, reason: 'out-of-range', coord: raw, acts: arch, total: o.acts0 || arch };
+    }
+    const total = o.acts0 || arch;
+    stat.gaps++; stat.lastReason = 'gap';
+    return { ok: true, coord: 'A' + a, act: a, total: total, archived: arch,
+      passed: a, remain: Math.max(0, total - a), truncated: !!(o.truncated && o.truncated.acts) };
+  }
+  /**
+   * alignView：诊断面的只读对位视图（**零 stat 写入**，口径⑤）。
+   *   未采纳原著、世界侧还没历史、一行都没撞上——三种都**不是故障**，
+   *   故一律 `ok:true` + `hasSignal:false` + 到底哪一步没戏（reason）。
+   *   报成 error 会让「刚装上还没用」看起来像坏了（与 actsBrief 同一取舍）。
+   */
+  function alignView() {
+    const o = outline();
+    if (!o || !o.acts || !o.acts.length) return { ok: true, adopted: false, hasSignal: false };
+    const r = alignCalc('');
+    if (!r.ok) {
+      return { ok: true, adopted: true, hasSignal: false, reason: r.reason,
+        rows: r.rows || 0, sources: r.sources || {} };
+    }
+    return { ok: true, adopted: true, hasSignal: true, coord: r.best.coord, actNo: r.best.actNo,
+      title: r.best.title, score: r.best.score, votes: r.best.votes, evidence: r.best.evidence,
+      runners: r.runners.map(function (x) { return x.coord + '(' + x.votes + '/' + x.score.toFixed(2) + ')'; }),
+      rows: r.rows, hitRows: r.hitRows, hitActs: r.hitActs, sources: r.sources,
+      acts: r.acts, total: r.total, passed: r.passed, remain: r.remain,
+      cutActs: !!(r.truncated && r.truncated.acts), cutPoints: !!(r.truncated && r.truncated.points) };
+  }
   // ── 只读视图 ─────────────────────────────────────────────
   function outlineView() {
     const o = outline();
@@ -375,6 +600,13 @@
     actText: actText,
     buildBlock: buildBlock,
     outlineView: outlineView,
+    // v2.100.0（第五十七面）：对位面四口，**每口一个真消费方**——
+    //   signal / position / gap 三枚面板按钮（贴文本试算 / 用世界侧历史对位 / 看推进度），
+    //   alignView 由诊断 secCanon.align 消费。四口全是纯读，不替用户回写坐标。
+    signal: signal,
+    position: position,
+    gap: gap,
+    alignView: alignView,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

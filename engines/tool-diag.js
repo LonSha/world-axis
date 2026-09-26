@@ -387,6 +387,11 @@
       // 幕目简报只在**已采纳**且开关打开时取。未采纳时 actsBrief 会返回 no-outline——
       //   那是合法态（还没喂原著），不是故障；把它当异常报会让「刚装上还没用」看起来像坏了。
       const brief = (cfg.enabled && view && view.adopted) ? safe(function () { return WA.canon.actsBrief(6); }, null) : null;
+      // v2.100.0（第五十七面）：对位只读视图。**它连 stat 都不写**（alignView 内部走 alignCalc
+      //   纯算核心，不碰任何计数）——诊断面上每一次「看一眼」都不该改账。
+      //   未采纳原著 / 世界侧还没历史 / 一行都没撞上，三种都照实报 hasSignal:false + reason，
+      //   不当异常报（与 brief 同一取舍：刚装上还没用不是坏了）。
+      const align = (typeof WA.canon.alignView === 'function') ? safe(function () { return WA.canon.alignView(); }, null) : null;
       return { enabled: !!cfg.enabled, perAct: cfg.perAct, segChars: cfg.segChars,
         maxActs: cfg.maxActs, maxPoints: cfg.maxPoints, minPointChars: cfg.minPointChars,
         adopted: !!(view && view.adopted),
@@ -399,6 +404,15 @@
         blocked: st.blocked || 0, truncated: st.truncated || 0, lastReason: st.lastReason || '',
         lastActs: st.lastActs || 0, lastPoints: st.lastPoints || 0, lastChars: st.lastChars || 0,
         brief: (brief && brief.ok) ? brief.rows.map(function (a) { return 'A' + a.no + ' ' + a.title; }) : [],
+        // v2.100.0 对位段：读数 + 证据 + 三态分母一起报（说不出证据的读数不报）。
+        align: align ? { adopted: !!align.adopted, hasSignal: !!align.hasSignal, reason: align.reason || '',
+          coord: align.coord || '', title: align.title || '', score: align.score || 0, votes: align.votes || 0,
+          evidence: align.evidence || [], runners: align.runners || [],
+          rows: align.rows || 0, hitRows: align.hitRows || 0, hitActs: align.hitActs || 0,
+          sources: align.sources || {}, passed: align.passed || 0, remain: align.remain || 0,
+          cutActs: !!align.cutActs, cutPoints: !!align.cutPoints } : null,
+        // 对位面三计数与整理面分列（signals/aligns/gaps —— 「看了几眼」不是「整理了几次」）
+        signals: st.signals || 0, aligns: st.aligns || 0, gaps: st.gaps || 0,
         faults: st.faults || {}, faultKinds: Object.keys(st.faults || {}).sort() };
     });
   }
@@ -1298,7 +1312,14 @@
        'wa-cn-src', 'wa-cn-coord', 'wa-cn-locate', 'wa-cn-view', 'wa-cn-clear', 'wa-cn-out',
        // v2.99.0 追加：两枚「按号」入口（coordOf / actText 的真消费方）。
        //   它们与上面那组同规格：渲染 + 绑定 + 守卫登记三件齐做。
-       'wa-cn-actno', 'wa-cn-ptno', 'wa-cn-go', 'wa-cn-act'],
+       'wa-cn-actno', 'wa-cn-ptno', 'wa-cn-go', 'wa-cn-act',
+       // v2.100.0（第五十七面）：原著对位四控件（同渲染在人物页）。
+       //   三条理由与前六批完全一致：新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，
+       //   否则「按钮渲染了但绑定的 id 写错」这一类断裂在新增出口上无人发现。
+       //   一律**无条件渲染**（模块缺席时整段降级成提示、控件不在场 ⇒ 本组报 missing）；
+       //   canon.js 是产品文件，缺席本身就是断裂。
+       //   `wa-cn-check` 是 input（手贴一段正文用）——它不是**状态**，故不进 dynamic。
+       'wa-cn-check', 'wa-cn-signal', 'wa-cn-position', 'wa-cn-gap'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——

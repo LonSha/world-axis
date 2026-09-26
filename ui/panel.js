@@ -461,6 +461,7 @@
       <div class="wa-row"><input id="wa-cn-peract" class="wa-input wa-num" type="number" min="1" max="40" value="${WA.canon ? WA.canon.getSettings().perAct : 6}" title="每幕合并多少节（节 = 该点数的剧情点）。架构源 ADR-0009 的「幕数 ≈ 节数/6」即此值取 6。调小 ⇒ 幕更密"/><button class="wa-btn" id="wa-cn-build" title="纯计算：按字符/段落边界切分成「幕 → 剧情点」，只切分不改写，**不采纳**（不写存档）。要落盘请再点「采纳」">切分试算</button><button class="wa-btn" id="wa-cn-adopt" title="唯一写入口：把上一次试算的大纲落盘（原著全文**不入存档**，只落可定位的骨架）。已采纳过则覆盖并留下 replacedAt">采纳大纲</button></div>
       <textarea id="wa-cn-text" class="wa-ta" placeholder="把原著正文粘在这里（只用于本次切分，不会进存档）——超上限一律拒收，不静默截断"></textarea>
       <div class="wa-row"><input id="wa-cn-src" class="wa-input" placeholder="来源备注（第几卷/哪个译本，可空）"/><input id="wa-cn-coord" class="wa-input" placeholder="定位坐标（如 A3.5）"/><button class="wa-btn" id="wa-cn-locate" title="按幕/点坐标定位回原文骨架——坐标是标出来的，越界一律照实说「不成立」，不夹到边界">定位</button><button class="wa-btn" id="wa-cn-view" title="只读：已采纳哪一份大纲、多少幕多少点、有没有被截断（截断必须报出，不然你会以为全整理完了）">当前大纲</button><button class="wa-btn" id="wa-cn-clear" title="清掉已采纳的大纲（只清大纲，不动世界状态）">清空</button></div>
+       <div class="wa-row"><input id="wa-cn-check" class="wa-input" placeholder="贴当前这一段正文，看它最像原著哪一幕（对的是题名，不是正文）"/><button class="wa-btn" id="wa-cn-signal" title="拿你贴的这段文本去撞幕目题名，报「最像第几幕」**并给证据**（共有的二字片段是哪几个）。说不出证据的读数只能让人替引擎背书。粒度是题名级——原著正文不入存档，故引擎手里只有题名">对位试算</button><button class="wa-btn" id="wa-cn-position" title="拿**世界侧已经发生的事**（纪事 / 暗流 / 回声 / 章节）去撞幕目题名，答「现在最接近原著第几幕」。它是猜测、不是判定——「有没有偏离」由你看着这些证据自己说">用世界侧历史对位</button><button class="wa-btn" id="wa-cn-gap" title="按上面的幕号，答「还剩几幕」= 总数 − 这个幕号。**只报数，不判偏离**：「还剩 4 幕」是事实，「所以你不该在这里」是判定，判定不是引擎的活">看推进度</button></div>
        <div id="wa-cn-out" class="wa-out"></div>
        <div class="wa-row"><input id="wa-cn-actno" class="wa-input wa-num" type="number" min="1" placeholder="幕号"/><input id="wa-cn-ptno" class="wa-input wa-num" type="number" min="1" placeholder="点号（可空 = 整幕）"/><button class="wa-btn" id="wa-cn-go" title="按幕/点号拼出坐标再定位。拼坐标这一步**只有 coordOf 一处实现**——面板不自己拼 'A'+a+'.'+p：手拼的写法会绕开边界判定，于是 A0 / A999 这类号先被拼出来再撞进 locate，报错理由从「号不对」（bad-coord）变成「越界」（out-of-range），两句话的处置完全不同">按号定位</button><button class="wa-btn" id="wa-cn-act" title="取某一幕的剧情点题名（作者面，不进正文）。与「当前大纲」分列：那个答「整理到哪了」，这个答「这一幕里有哪些点」">看这一幕的点</button></div>
       <div class="wa-sec">传播与辟谣（一条事实在人际间怎么传、传到最后还是不是原来那条）</div>
@@ -2596,6 +2597,46 @@
       if (!r.ok) return canonOut(r);
       canonOut({ ok: true, id: r.coord + ' ' + r.title + '（' + r.rows.length + ' 点）：'
         + r.rows.map(function (p) { return p.coord + ' ' + p.title; }).join('；') });
+    });
+    // v2.100.0（第五十七面）：原著对位的面板绑定。
+    //   三枚按钮各接一个导出（无消费方不挂），且**三个出口不合并到一个输出框**：
+    //     · 对位试算（signal）——论：「这段文本最像哪一幕，凭哪几个片段」；
+    //     · 用世界侧历史对位（position）——论：「按世界已经发生的事，现在到哪一幕了」；
+    //     · 看推进度（gap）——论：「还剩多少幕」。
+    //   前两个都是「最接近哪一幕」，但**输入面完全不同**（一段手贴的文本 vs 全库历史），
+    //   合并成一个按钮就等于逼用户在一句话里回答两个不同的问题。
+    //   幕号复用 `wa-cn-actno`（同一个「第几幕」语义不另造一份输入框，与 world 页 transit
+    //   复用 mv-from/mv-to 同一取舍）。
+    on('#wa-cn-signal', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      const r = WA.canon.signal($('#wa-cn-check') ? ($('#wa-cn-check').value || '') : '');
+      if (!r.ok) return canonOut(r);
+      const b = r.best;
+      return canonOut({ ok: true, id: '最像 ' + b.coord + '「' + b.title + '」（覆盖 ' + Math.round(b.score * 100)
+        + '% · ' + b.hit + '/' + b.need + ' 片段）' + (b.evidence.length ? ' · 共有片段：' + b.evidence.join('、') : '')
+        + (r.rows.length > 1 ? ' · 另有 ' + (r.rows.length - 1) + ' 幕也有重叠' : '')
+        + '（题名级对位，仅供参考——偏没偏由你定）' });
+    });
+    on('#wa-cn-position', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      const r = WA.canon.position({});
+      if (!r.ok) return canonOut(r);
+      const srcs = Object.keys(r.sources).map(function (k) { return k + ' ' + r.sources[k]; }).join('/');
+      return canonOut({ ok: true, id: '世界侧最接近 ' + r.best.coord + '「' + r.best.title + '」（' + r.best.votes
+        + ' 行指向它 · 峰值 ' + Math.round(r.best.score * 100) + '% · ' + r.hitRows + '/' + r.rows + ' 行有重叠 · 源：' + srcs + '）'
+        + ' → 已过 ' + r.passed + ' / ' + r.total + ' 幕，还剩 ' + r.remain + ' 幕。'
+        + (r.runners.length ? '次选：' + r.runners.map(function (x) { return x.coord + '(' + x.votes + ')'; }).join('、') + '。' : '')
+        + '仅报读数与证据，不判偏离' });
+    });
+    on('#wa-cn-gap', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      const an = Number(($('#wa-cn-actno') || {}).value);
+      const c = WA.canon.coordOf(an, null);
+      if (!c) return canonOut({ ok: false, reason: 'bad-coord', got: String(an) });
+      const r = WA.canon.gap(c.text);
+      if (!r.ok) return canonOut(r);
+      return canonOut({ ok: true, id: r.coord + ' 之后还剩 ' + r.remain + ' 幕（共 ' + r.total + ' 幕'
+        + (r.archived < r.total ? '，已整理 ' + r.archived + ' 幕' : '') + '）· 只报数，不判偏离' });
     });
     // v2.96.0（X3）：传播与辟谣的面板绑定。
     //   五类拒绝理由都必须看得见——它们在世界状态里都长得像「什么都没发生」：

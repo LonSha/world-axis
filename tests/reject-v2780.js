@@ -796,6 +796,59 @@ function runWitness(WA) {
       WA.store.transact(function (d) { d.canon = keepCnOutline; }, 'reject-witness:v2990-restore');
     }
   }
+  // ── v2.100.0（第五十七面：原著对位）：两个新码，同样走**可执行见证** ──
+  //   为什么它们必须见证而不是进死表：两条都是**外部输入就能触发的现实局面**——
+  //     · no-history —— 大纲已采纳，但世界侧还没攒下任何历史（刚采纳、还没演过一轮）；
+  //     · no-signal  —— 世界侧有历史，但一行都没撞上幕目题名（对位最常见的诚实结局）。
+  //   它们也是最容易被顺手改掉的两个：把「没对上」改成「挑一个最像的」，
+  //   在面板上看起来像功能增强，实则是把「不知道」包装成「知道」。
+  //   见证要**造世界侧历史**（chronicle 是真源之一），故必须原样收回：写完不收回，
+  //   同一进程里后续的锁会读到别人的手指印（本段开头先快照、finally 无条件还原）。
+  if (WA.canon && typeof WA.canon.position === 'function') {
+    const Cn2 = WA.canon;
+    const keepSnap = WA.store.transact ? WA.store.get() : null;
+    const keepChron = keepSnap ? keepSnap.chronicle : null;
+    const keepCur = keepSnap ? keepSnap.currents : null;
+    const keepEch = keepSnap ? keepSnap.echoes : null;
+    const keepChap = keepSnap ? keepSnap.chapters : null;
+    // ★ canon 也必须一起收回：本段开场会 `d.canon.outline = null` 并 adopt 一份新大纲，
+    //   finally 若不还原，残留的 `canon.outline.acts` 会被后续的 sizeAudit 判成
+    //   **未登记容量的世界侧数组**（v2820 [N3] 与健康分基线两处判据当场变红）。
+    //   深拷贝而非活引用：transact 里的写入不得反过来污染这份基线。
+    const keepCanon = (keepSnap && keepSnap.canon !== undefined && keepSnap.canon !== null)
+      ? JSON.parse(JSON.stringify(keepSnap.canon)) : undefined;
+    const keepCfg2 = Cn2.getSettings();
+    const keepTx2 = WA.store.transact;
+    const sample2 = '推开门，屋里没有人。窗外的雨下了一整夜。桌上放着一封没有署名的信。\n'
+      + '灯还亮着。他把信拿起来，又放下了。走廊尽头传来脚步声，很轻。';
+    try {
+      Cn2.setSettings({ enabled: true });
+      WA.store.transact(function (d) { if (d.canon) d.canon.outline = null; }, 'reject-witness:v2100-reset');
+      const b2 = Cn2.buildOutline(sample2, {});
+      if (b2.ok && Cn2.adopt(b2, '见证').ok) {
+        // no-history：采纳了基准，但世界侧一片空白
+        WA.store.transact(function (d) {
+          d.chronicle = []; d.currents = []; d.echoes = [];
+          d.chapters = { active: false, current: null, history: [], seq: 0 };
+        }, 'reject-witness:v2100-empty');
+        want('no-history', 'canon.position：大纲已采纳但世界侧还没历史 ⇒ 照实说「还没得对」（不编读数，v2.100.0）');
+        trip('no-history', function () { return [Cn2.position({}).reason]; });
+        // no-signal：有历史，但一行都没撞上幕目题名（只用无汉字填充，避免假命中）
+        WA.store.transact(function (d) {
+          d.chronicle = [{ id: 'w1', kind: 'event', title: 'ZZZ', summary: 'xxxx', at: 1, refs: [] }];
+        }, 'reject-witness:v2100-miss');
+        want('no-signal', 'canon.position：有历史但一行都没撞上幕目题名 ⇒ 照实说没信号而**不给「最接近」的坐标**（v2.100.0）');
+        trip('no-signal', function () { return [Cn2.position({}).reason, Cn2.signal('完全没有交集的另一段文字').reason]; });
+      }
+    } finally {
+      WA.store.transact = keepTx2;
+      Cn2.setSettings(keepCfg2);
+      WA.store.transact(function (d) {
+        d.chronicle = keepChron; d.currents = keepCur; d.echoes = keepEch; d.chapters = keepChap;
+        if (keepCanon !== undefined) d.canon = keepCanon;
+      }, 'reject-witness:v2100-restore');
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };
