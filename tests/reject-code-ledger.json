@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 拒收码基线台账（v2.97.0）。第十二面：产品源码里的每一个内联拒收码，必须落入下三个集合之一——witnessed（有可执行见证）/ dead（已证不可达）/ base（本盘点的存量未分类）。前两者搬在 tests/reject-v2780.js 里，本文件只冻结第三类。判据是「两向」的：新增未分类码即红灯；存量码被接上见证或从源码消失，会以「基线冗余」提醒回收到 witnessed/dead（台账不得永久比现实胖）。\n扫描面：tests/test-surface-gate.js 的去注释剥离器（保留字符串字面量、长度与行号守恒）——注释里写的 reason 是文档不是码（初版按原文扫会多算 1 条：bridge.js 的调用示例）。\nv2.97.0：新增 9 个码**全部带可执行见证**（O9 四码：alias-cycle / name-taken / too-deep / unknown-name；X5 五码：unknown-chain / unknown-op / no-ops / already-linked / ops-full），见证 99→108；基线保持 233 条不变——基线只装「存量未分类」，新码一律走见证，不进基线。",
-  "version": "2.98.0",
+  "_note": "WorldAxis 拒收码基线台账（v2.97.0）。第十二面：产品源码里的每一个内联拒收码，必须落入下三个集合之一——witnessed（有可执行见证）/ dead（已证不可达）/ base（本盘点的存量未分类）。前两者搬在 tests/reject-v2780.js 里，本文件只冻结第三类。判据是「两向」的：新增未分类码即红灯；存量码被接上见证或从源码消失，会以「基线冗余」提醒回收到 witnessed/dead（台账不得永久比现实胖）。\n扫描面：tests/test-surface-gate.js 的去注释剥离器（保留字符串字面量、长度与行号守恒）——注释里写的 reason 是文档不是码（初版按原文扫会多算 1 条：bridge.js 的调用示例）。\nv2.97.0：新增 9 个码**全部带可执行见证**（O9 四码：alias-cycle / name-taken / too-deep / unknown-name；X5 五码：unknown-chain / unknown-op / no-ops / already-linked / ops-full），见证 99→108；基线保持 233 条不变——基线只装「存量未分类」，新码一律走见证，不进基线。\nv2.99.0：新增 7 个码全部带可执行见证（原著幕目 canon.js：bad-outline / bad-coord / out-of-range / no-outline / build-throw / adopt-throw / clear-throw），见证 108→116；基线仍保持 233 条不变。其中 build-throw 的见证形态改过一次：原用 buildOutline(sample, { perAct: Symbol }) 去撞内部异常，而 pick 加固成「非数一律回落默认值」之后该路返回 ok:true，见证静默落进 missing（有触发路径字样却跑不出码的**假见证**）；现与 adopt-throw / clear-throw 同规格，打桩设置层 / 存储层来造真异常——这条码的本义本来就是「侧边坏了」，不是「你给的东西不对」。",
+  "version": "2.99.0",
   "base": [
     "absent",
     "after-reply",

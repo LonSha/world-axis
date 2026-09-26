@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.98.0';
+  const VERSION = '2.99.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -314,6 +314,11 @@
     //     ② 须**晚于** engines/intel.js —— 层的置信度由 intel.CONFIDENCE 反查（不内联第二套数）；
     //     ③ 须**早于** render/inject.js —— 注入时读取 rumor.buildBlock()。
     'engines/rumor.js',
+    // v2.99.0（第五十六面）：原著幕目（canon.js：长文本 → 幕 → 剧情点）。
+    //   位置只需**早于 render/inject.js**（注入时读取 canon.buildBlock()）；
+    //   与 rumor 无依赖。它在 LOAD 里排在 rumor 之后、affect 之前——
+    //   与 `engines/*` 区的既有次序保持「新增追加在同类末尾」的惯例。
+    'engines/canon.js',
     // v2.66.0：情绪通道 / 关系六型 / 假面。须早于 render/inject.js，注入时读取各自 buildBlock()；
     //   且须晚于 threads.js —— affect 的过载口径参考 difficulty 的枚举纪律，无硬依赖但保持装载序。
     'engines/affect.js',

@@ -181,7 +181,15 @@
   const NON_EVICT = {
     'evolution.economy.signals': '替换式覆盖（取最新读数整体重写，非环形累积）',
     'opinion.sandbox': '替换式覆盖（沙盒碎片每次重生成，NON-CANON 不累积）',
-    'evolution.entityMemory.README': '同上：实体库替换由 evolution.entityMemory 站点计量，此处不重复计'
+    'evolution.entityMemory.README': '同上：实体库替换由 evolution.entityMemory 站点计量，此处不重复计',
+    // v2.99.0（第五十六面）：原著幕目（canon.js）。两条 cap 是**构造上界**而不是挤出上限——
+    //   `canon.outline` 的初值是 `null`（未采纳就是没有骨架），一旦写入就已经由 buildOutline
+    //   在**落盘之前**按 LIMITS 截断并如实报出（`truncated.acts` / `truncated.points`），
+    //   故本模块**不走 evict**：它没有「对持久容器的破坏性截断」这件事。
+    //   两条都登记为通配形态（与 store 的 `__BOUNDED_CAPS` 同形）：中间段 `acts` 在未采纳态
+    //   取不到，精确键会被 registryParity 报「未在骨架物化」——那不是缺陷，是诚实表示。
+    'canon.outline.*.acts': '构造上界（未采纳时无骨架；截断在 buildOutline 落盘前完成，不走 evict）',
+    'canon.outline.acts.*.points': '同上：每幕点数 = perAct²（perAct 上界 40 ⇒ 1600），构造上界而非挤出上限'
   };
 
   // ── 记账 ──────────────────────────────────────────────────

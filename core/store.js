@@ -121,6 +121,16 @@
       //   这里只记「这一跳把哪个值递了出去」。结构：
       //   { id, factKey, factValue, factSource, note, layer, intact, hops:[], suppressed:[], at, updatedAt }
       rumor: { chains: [] },
+      // v2.99.0（第五十六面）：原著幕目（canon.js：把长文本切成「幕 → 剧情点」骨架）
+      //   outline：已采纳的幕目骨架（null = 未采纳）。**原著全文不落盘**——
+      //   落盘的是可定位的骨架（逐幕题名 / 点数 / 字数 / 采纳时刻），体积与篇幅无关。
+      //   为什么要有它：本仓的叙事状态清一色是「这个世界自己长出来的历史」
+      //   （currents / echoes / chronicle / causal.chains），**没有一处记「原著本该长什么样」**，
+      //   于是「现在演到原著哪一段了」在本仓不可答、只能靠人记，
+      //   而「已偏离哪一段」「哪一段已不可能再发生」连输入面都没有（没有幕坐标就没有偏离基准）。
+      //   注意：本键名 `canon` 与 opinion.canon（已核实舆情环形）**同词不同物**——
+      //   前者是「原著骨架」，后者是「正史舆情」；层级不同（顶层 vs opinion 内），不构成占位冲突。
+      canon: { outline: null },
       // v2.62.0 因果结算（causal.js：原因→条件→行动→直接后果→延迟后果）
       //   chains ：在推进的因果链（含终态 settled/cancelled/expired —— **不删记录**，
       //            删了就答不出「为什么后来没发生」）
@@ -896,6 +906,17 @@
     //   不登记会被 sizeAudit 报 unbounded。**跳与隐瞒不在此登记**：它们是每链自带的
     //   有界数组（maxHops / maxSuppressed，满员即拒收、不挤出），不是全局环形容器。
     'rumor.chains': { cap: 8, site: 'rumor.js WA.evict.array(rumor.chains)' },
+    // v2.99.0（第五十六面）原著幕目。两处都要登记：幕数组与**幕内的点数组**——
+    //   只登记幕会漏掉后者（sizeAudit 的 DFS 走得到 `canon.outline.acts.<n>.points`）。
+    //   两条 cap 都不是「挤出上限」而是**构造上界**：截断发生在 buildOutline（还没落盘就已截），
+    //   故本模块**不走 evict**——没有「对持久容器的破坏性截断」，截断由 `truncated` 如实报出。
+    //   幕数组写成**通配形态**（`canon.outline.*.acts`）而不是直接写 `canon.outline.acts`：
+    //   实测直接写精确键会被 registryParity 报 `未在骨架物化`——`canon.outline` 的初值是
+    //   **null**（未采纳就是没有骨架，这是诚实表示，不该为了过自检而伪造一个空数组），
+    //   而精确键分支要求整条路径可物化到底。通配键的语义正是「按定义不在默认状态」，
+    //   与 people.*.profile.* 那批同一族。cap 语义一分不减：sizeAudit 的 DFS 照样走得到它。
+    'canon.outline.*.acts': { cap: 200, wildcard: true, site: 'canon.js buildOutline 幕数截断（LIMITS.MAX_ACTS=200，超出报 truncated.acts）' },
+    'canon.outline.acts.*.points': { cap: 1600, kind: 'array', wildcard: true, site: 'canon.js 每幕点数 = perAct²（perAct 上界 40 ⇒ 1600）' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

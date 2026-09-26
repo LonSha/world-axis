@@ -366,6 +366,43 @@
     });
   }
   /**
+   * v2.99.0：原著幕目采集节。
+   *   它要答的**不是**「切了几幕」——那是过程量。要答的是三件在存档里长得像
+   *   「什么都没发生」的事：
+   *     · 有没有基准（adopted）——没采纳过原著大纲，「已偏离原著哪一段」这类问题
+   *       连**输入面**都没有（没有幕坐标就没有偏离的基准）；
+   *     · 截断有没有被如实报出（cutActs / cutPoints **分两列**）——截断静默
+   *       等于用户以为全整理完了，而分点被砍与分幕被砍是两种不同的丢失；
+   *     · 定位被拒了几次、按什么理由（blocked + lastReason）——`out-of-range` /
+   *       `bad-coord` / `no-outline` 在界面上都长得像「点了没反应」。
+   *   全节**纯读**：只调 outlineView / actsBrief / stat，
+   *   不调 buildOutline / adopt / clearOutline——观测不得改变被观测对象。
+   *   （尤其 buildOutline：它会改 stat.builds，探一次就把「本轮构建过几次」污染了。）
+   */
+  function secCanon() {
+    return safe(function () {
+      if (!WA.canon || typeof WA.canon.stat !== 'function') return { error: 'canon 模块不可用' };
+      const st = WA.canon.stat(); const cfg = WA.canon.getSettings ? WA.canon.getSettings() : {};
+      const view = (typeof WA.canon.outlineView === 'function') ? safe(function () { return WA.canon.outlineView(); }, null) : null;
+      // 幕目简报只在**已采纳**且开关打开时取。未采纳时 actsBrief 会返回 no-outline——
+      //   那是合法态（还没喂原著），不是故障；把它当异常报会让「刚装上还没用」看起来像坏了。
+      const brief = (cfg.enabled && view && view.adopted) ? safe(function () { return WA.canon.actsBrief(6); }, null) : null;
+      return { enabled: !!cfg.enabled, perAct: cfg.perAct, segChars: cfg.segChars,
+        maxActs: cfg.maxActs, maxPoints: cfg.maxPoints, minPointChars: cfg.minPointChars,
+        adopted: !!(view && view.adopted),
+        acts: (view && view.acts) || 0, acts0: (view && view.acts0) || 0,
+        points: (view && view.points) || 0, chars: (view && view.chars) || 0, segs: (view && view.segs) || 0,
+        cutActs: !!(view && view.truncated && view.truncated.acts),
+        cutPoints: !!(view && view.truncated && view.truncated.points),
+        note: (view && view.note) || '',
+        builds: st.builds || 0, adoptedCount: st.adopted || 0, cleared: st.cleared || 0,
+        blocked: st.blocked || 0, truncated: st.truncated || 0, lastReason: st.lastReason || '',
+        lastActs: st.lastActs || 0, lastPoints: st.lastPoints || 0, lastChars: st.lastChars || 0,
+        brief: (brief && brief.ok) ? brief.rows.map(function (a) { return 'A' + a.no + ' ' + a.title; }) : [],
+        faults: st.faults || {}, faultKinds: Object.keys(st.faults || {}).sort() };
+    });
+  }
+  /**
    * v2.63.0：社交漩涡采集节。
    *   重点报**履行与背弃各有多少**（kept / broken 分开），以及「想加深却没有秘密可加深」
    *   被拒了几次（no-shadow / shadow-closed，按原因分列）。
@@ -597,6 +634,11 @@
     'engines/threads.js': 'threads',
     // v2.96.0（X3）：传播与辟谣（与 index.js LOAD_ORDER 同批登记）。
     'engines/rumor.js': 'rumor',
+    // v2.99.0：原著幕目（与 index.js LOAD_ORDER 同批登记）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——
+    //   canon.js 是产品文件，它缺席（LOAD 清单漏登记/文件被删）本身就是断裂，
+    //   不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/canon.js': 'canon',
     // v2.66.0：情绪通道 / 关系六型 / 假面（与 index.js LOAD_ORDER 同批登记）
     'engines/affect.js': 'affect',
     'engines/bonds.js': 'bonds',
@@ -1244,7 +1286,19 @@
        //   同 v2.51.0 / v2.62.0 / v2.63.0 / v2.95.0 / v2.96.0 的理由——aliasOf / bindAlias /
        //   aliasStat 是本版新增的三个导出，它们**必须有真消费方**（无消费方不挂），
        //   而这里就是那三个消费方；不同时登记进守卫表，「渲染了但绑定 id 写错」无人发现。
-       'wa-id-aliasname', 'wa-id-bindalias', 'wa-id-aliasof', 'wa-id-aliasstat'],
+       'wa-id-aliasname', 'wa-id-bindalias', 'wa-id-aliasof', 'wa-id-aliasstat',
+       // v2.99.0：原著幕目七控件（同样渲染在人物页）。
+       //   三条理由与 v2.51.0 / v2.62.0 / v2.63.0 / v2.95.0 / v2.96.0 / v2.97.0 一致：新控件
+       //   必须同时「渲染 + 绑定 + 守卫登记」，否则「按钮渲染了但绑定的 id 写错」无人发现。
+       //   一律**无条件渲染**（模块缺席时整段降级成提示、控件不在场 ⇒ 本组会报 missing）；
+       //   与 style/world/rumor 同一取舍：canon.js 是产品文件，缺席本身就是断裂。
+       //   `wa-cn-text` 是 textarea：它上方那一行只是**暂存**而不是状态，故不进 dynamic
+       //   （第一屏就渲染，缺失即真断裂）。
+       'wa-cn-enabled', 'wa-cn-peract', 'wa-cn-build', 'wa-cn-adopt', 'wa-cn-text',
+       'wa-cn-src', 'wa-cn-coord', 'wa-cn-locate', 'wa-cn-view', 'wa-cn-clear', 'wa-cn-out',
+       // v2.99.0 追加：两枚「按号」入口（coordOf / actText 的真消费方）。
+       //   它们与上面那组同规格：渲染 + 绑定 + 守卫登记三件齐做。
+       'wa-cn-actno', 'wa-cn-ptno', 'wa-cn-go', 'wa-cn-act'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
@@ -1603,6 +1657,10 @@
     const diag = {
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), causal: secCausal(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
+      // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
+      //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，
+      //   这一节记的是「原著里本该长什么样」——清一色世界侧状态里的唯一一处外部基准。
+      canon: secCanon(),
       // v2.64.0（第五十一 / 五十二 / 五十三面）：随机性面 / 敌意面 / 独立性面
       horizon: secHorizon(), enemies: secEnemies(), parallelWorld: secParallelWorld(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),

@@ -32,6 +32,11 @@
     // v2.96.0（X3）：传播与辟谣。与 SOURCES 同批登记——只加源表不加显示名 ⇒
     //   注入页/导演页会裸露英文键名 `rumor`，而那是用户唯一能开关它的地方。
     rumor: '传开的与亲眼见的',
+    // v2.99.0：原著幕目。与 SOURCES 同批登记——只加源表不加显示名 ⇒
+    //   注入页/导演页裸露英文键名 `canon`，而那是用户唯一能开关它的地方。
+    //   （另有同名风险：舆情面内部还有一个 `opinion.canon`，但那是**状态键**不是注入源，
+    //   不会出现在 SOURCES 里，两者不存在键集冲突。）
+    canon: '原著幕目',
     // v2.66.0: 情绪通道 / 关系六型 / 假面。与 SOURCES 同批登记（不加显示名 ⇒ 面板裸露英文键名）。
     affect: '情绪通道', bonds: '关系六型', masks: '假面', temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', parallelEvents: '场外事件',
     eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉', beastBond: '驯兽',
@@ -451,6 +456,13 @@
       <div class="wa-row"><button class="wa-btn" id="wa-threads-lead" title="没来源的线索不是线索：可靠性由来源类型决定，不由「我觉得可信」决定">加线索</button><button class="wa-btn" id="wa-threads-refute" title="反证：与支撑线索打脸的必须各自保留，不得取平均">加反证</button><button class="wa-btn" id="wa-threads-converge">汇聚</button><button class="wa-btn" id="wa-threads-stall" title="查不下去但仍在查——记录不删，这不是结案">悬置</button></div>
       <div class="wa-row"><input id="wa-threads-answer" class="wa-input" placeholder="结案结论（须有依据）"/><button class="wa-btn" id="wa-threads-resolve" title="结案必须有依据：无线索支撑、或矛盾未解时一律拒收">结案</button><button class="wa-btn" id="wa-threads-abandon" title="主动放下并写明理由——与「悬置」是两种事实">放弃</button><button class="wa-btn" id="wa-threads-why">查依据</button></div>
       <div id="wa-threads-out" class="wa-out"></div>
+      <div class="wa-sec">原著幕目（把原著长文本切成「幕 → 剧情点」，只切分不改写）</div>
+      <label class="wa-row"><input id="wa-cn-enabled" type="checkbox" ${WA.canon && WA.canon.getSettings().enabled ? 'checked' : ''}/> 启用原著幕目</label>
+      <div class="wa-row"><input id="wa-cn-peract" class="wa-input wa-num" type="number" min="1" max="40" value="${WA.canon ? WA.canon.getSettings().perAct : 6}" title="每幕合并多少节（节 = 该点数的剧情点）。架构源 ADR-0009 的「幕数 ≈ 节数/6」即此值取 6。调小 ⇒ 幕更密"/><button class="wa-btn" id="wa-cn-build" title="纯计算：按字符/段落边界切分成「幕 → 剧情点」，只切分不改写，**不采纳**（不写存档）。要落盘请再点「采纳」">切分试算</button><button class="wa-btn" id="wa-cn-adopt" title="唯一写入口：把上一次试算的大纲落盘（原著全文**不入存档**，只落可定位的骨架）。已采纳过则覆盖并留下 replacedAt">采纳大纲</button></div>
+      <textarea id="wa-cn-text" class="wa-ta" placeholder="把原著正文粘在这里（只用于本次切分，不会进存档）——超上限一律拒收，不静默截断"></textarea>
+      <div class="wa-row"><input id="wa-cn-src" class="wa-input" placeholder="来源备注（第几卷/哪个译本，可空）"/><input id="wa-cn-coord" class="wa-input" placeholder="定位坐标（如 A3.5）"/><button class="wa-btn" id="wa-cn-locate" title="按幕/点坐标定位回原文骨架——坐标是标出来的，越界一律照实说「不成立」，不夹到边界">定位</button><button class="wa-btn" id="wa-cn-view" title="只读：已采纳哪一份大纲、多少幕多少点、有没有被截断（截断必须报出，不然你会以为全整理完了）">当前大纲</button><button class="wa-btn" id="wa-cn-clear" title="清掉已采纳的大纲（只清大纲，不动世界状态）">清空</button></div>
+       <div id="wa-cn-out" class="wa-out"></div>
+       <div class="wa-row"><input id="wa-cn-actno" class="wa-input wa-num" type="number" min="1" placeholder="幕号"/><input id="wa-cn-ptno" class="wa-input wa-num" type="number" min="1" placeholder="点号（可空 = 整幕）"/><button class="wa-btn" id="wa-cn-go" title="按幕/点号拼出坐标再定位。拼坐标这一步**只有 coordOf 一处实现**——面板不自己拼 'A'+a+'.'+p：手拼的写法会绕开边界判定，于是 A0 / A999 这类号先被拼出来再撞进 locate，报错理由从「号不对」（bad-coord）变成「越界」（out-of-range），两句话的处置完全不同">按号定位</button><button class="wa-btn" id="wa-cn-act" title="取某一幕的剧情点题名（作者面，不进正文）。与「当前大纲」分列：那个答「整理到哪了」，这个答「这一幕里有哪些点」">看这一幕的点</button></div>
       <div class="wa-sec">传播与辟谣（一条事实在人际间怎么传、传到最后还是不是原来那条）</div>
       <label class="wa-row"><input id="wa-rm-enabled" type="checkbox" ${WA.rumor && WA.rumor.getSettings().enabled ? 'checked' : ''}/> 启用传播与辟谣</label>
       <div class="wa-row"><input id="wa-rm-fact" class="wa-input" placeholder="事实 key（须已在世界事实里）"/><button class="wa-btn" id="wa-rm-start" title="起一条传播链：一事实一链（同一件事不该有两条互不相干的链）——事实没登记一律拒收，不凭空造一条">起链</button><button class="wa-btn" id="wa-rm-investigate" title="证据调查：逐跳列出经手人，并回答那个唯一的问题——传到最后还是不是原来那条。纯读，不改任何状态">调查</button><button class="wa-btn" id="wa-rm-fullview" title="全知视图（四层全出）：给作者看底牌，含被隐瞒者与已被改写者；不进正文">全知视图</button></div>
@@ -658,6 +670,12 @@
   let __memRefKey = null;
   let __injQ = '';
   let __wbScan = '';  // v2.35.0: 世界书预览扫描文本（切页不丢）
+  // v2.99.0：原著幕目的「试算产物」暂存槽。**必须住在闭包变量**而不是 dataset：
+  //   它的体积随原著篇幅线性增长（上限 MAX_TEXT=4MB 级），塞进 DOM 属性等于把整份大纲
+  //   复制到属性树上；而 renderBody() 整块重建 DOM，属性本来也留不住。
+  //   注意「留得住」的只是它——用户可以切页回来看，但面板重绘后按钮仍要重按（这是有意的：
+  //   采纳是**写存档**动作，「上次试算」不该跨重绘静默生效）。
+  let __cnBuilt = null;
 
   function _msTs(t) { if (!t) return ''; try { return new Date(t).toLocaleString(); } catch (e) { return String(t); } }
   function _msAudit(refs) { try { return (WA.timeline && WA.timeline.auditRefs) ? WA.timeline.auditRefs(refs || []) : null; } catch (e) { return null; } }
@@ -2493,6 +2511,92 @@
       threadsOut(r.ok ? Object.assign({}, r, { id: r.answer + ':依据 ' + r.basis.length + ' 条' }) : r);
     });
     on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); if (btn) { btn.textContent = '生成中…'; btn.disabled = true; } try { await WA.directEvent.create({ prompt: p, turns: t }); } finally { renderBody(); } });
+    // v2.99.0：原著幕目的面板绑定。
+    //   四类拒绝理由都必须看得见——它们在世界状态里都长得像「什么都没发生」：
+    //     · empty-text / too-long（贴错内容 / 超上限——超上限一律拒收，不静默截断）；
+    //     · bad-coord / out-of-range（坐标写错 / 越界——**不夹到边界**，幕号是标出来的）；
+    //     · no-outline（还没采纳就定位 ⇒ 照实说没有基准，不编一份出来）；
+    //     · build-throw / adopt-throw / clear-throw（引擎内部异常，另记在 stat.faults）。
+    //   试算产物留在**闭包变量**而不落 dataset：它体积随篇幅线性增长，
+    //   往 dataset 里塞等于把整份大纲复制到 DOM 属性上（renderBody 重建 DOM，属性也跟着丢）。
+    const canonOut = function (r) { return plainOut('wa-cn-out', 'canonOut', r); };
+    if (panelEl.dataset.canonOut) { const o = $('#wa-cn-out'); if (o) o.textContent = panelEl.dataset.canonOut; }
+    { const el = $('#wa-cn-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+        WA.canon.setSettings({ enabled: !!el.checked });
+        canonOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-cn-build', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      // perAct 以**试算参数**递进去，不写设置面——与题材区的「预览不落设置，应用是唯一写入口」
+      //   同一取舍：调一个数字看看效果，不该顺手改掉用户存档里的配置。
+      const raw = $('#wa-cn-text') ? ($('#wa-cn-text').value || '') : '';
+      const pa = Number(($('#wa-cn-peract') || {}).value);
+      const r = WA.canon.buildOutline(raw, isFinite(pa) && pa >= 1 ? { perAct: pa } : null);
+      if (!r.ok) { __cnBuilt = null; return canonOut(r); }
+      __cnBuilt = r;
+      canonOut({ ok: true, id: '已切分 ' + r.acts.length + ' 幕 / ' + r.points + ' 点 / ' + r.segs + ' 段'
+        + (r.truncated.acts ? ' · 幕数已截断（共 ' + r.truncated.totalActs + ' 幕）' : '')
+        + (r.truncated.points ? ' · 点数已截断（共 ' + r.truncated.totalPoints + ' 点）' : '')
+        + ' —— 尚未采纳（点「采纳大纲」才落盘）' });
+    });
+    on('#wa-cn-adopt', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      if (!__cnBuilt) return canonOut({ ok: false, reason: 'bad-outline' });
+      const r = WA.canon.adopt(__cnBuilt, $('#wa-cn-src') ? $('#wa-cn-src').value : '');
+      if (!r.ok) return canonOut(r);
+      __cnBuilt = null;
+      canonOut({ ok: true, id: '已采纳 ' + r.acts + ' 幕 / ' + r.points + ' 点' + (r.replaced ? '（覆盖了上一份）' : '') });
+    });
+    on('#wa-cn-locate', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      const r = WA.canon.locate($('#wa-cn-coord') ? $('#wa-cn-coord').value : '');
+      if (!r.ok) return canonOut(r);
+      canonOut({ ok: true, id: r.coord + ' ' + r.title
+        + (r.point === null ? '（整幕 ' + r.points + ' 点）' : '（第 ' + r.point + ' 点 / ' + r.chars + ' 字）') });
+    });
+    on('#wa-cn-view', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      const v = WA.canon.outlineView();
+      if (!v.adopted) return canonOut({ ok: true, id: '未采纳任何大纲（还没喂原著）' });
+      const b = WA.canon.actsBrief(6);
+      canonOut({ ok: true, id: v.acts + '/' + v.acts0 + ' 幕 · ' + v.points + ' 点 · ' + v.chars + ' 字 · '
+        + v.segs + ' 段 · 每幕 ' + v.perAct + ' 节'
+        + (v.truncated.acts || v.truncated.points ? ' · 有截断（幕' + (v.truncated.acts ? '是' : '否') + '/点' + (v.truncated.points ? '是' : '否') + '）' : '')
+        + (v.note ? ' · ' + v.note : '')
+        + (b.ok && b.rows.length ? '：' + b.rows.map(function (a) { return 'A' + a.no + ' ' + a.title; }).join('；') : '') });
+    });
+    on('#wa-cn-clear', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      const r = WA.canon.clearOutline();
+      canonOut(r.ok ? { ok: true, id: '已清空原著大纲' } : r);
+    });
+    // 两个「按号」入口：它们存在的意义是让 coordOf / actText 有真消费方。
+    //   · 坐标**只由 coordOf 一处拼**（面板不自己拼 'A'+a）：手拼会绕开边界判定，
+    //     A0 / A999 会被拼出来再撞进 locate，于是「号不对」与「号越界」两句不同的话
+    //     在界面上塌成同一句。coordOf 对越界号返回 null ⇒ 这里照实报 `bad-coord`。
+    //   · actText 是作者面（列点题名）：与 actsBrief 分列——后者只出幕号题名（防剧透），
+    //     前者是「我要看这一幕里有哪些点」时才显式要的那一层。
+    on('#wa-cn-go', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      const an = Number(($('#wa-cn-actno') || {}).value);
+      const pn = wv('#wa-cn-ptno');
+      const c = WA.canon.coordOf(an, pn === '' ? null : Number(pn));
+      if (!c) return canonOut({ ok: false, reason: 'bad-coord', got: String(an) + (pn === '' ? '' : '.' + pn) });
+      const r = WA.canon.locate(c.text);
+      if (!r.ok) return canonOut(r);
+      canonOut({ ok: true, id: r.coord + ' ' + r.title
+        + (r.point === null ? '（整幕 ' + r.points + ' 点）' : '（第 ' + r.point + ' 点 / ' + r.chars + ' 字）') });
+    });
+    on('#wa-cn-act', () => {
+      if (!WA.canon) return canonOut({ ok: false, reason: 'module-missing' });
+      const an = Number(($('#wa-cn-actno') || {}).value);
+      const r = WA.canon.actText(an);
+      if (!r.ok) return canonOut(r);
+      canonOut({ ok: true, id: r.coord + ' ' + r.title + '（' + r.rows.length + ' 点）：'
+        + r.rows.map(function (p) { return p.coord + ' ' + p.title; }).join('；') });
+    });
     // v2.96.0（X3）：传播与辟谣的面板绑定。
     //   五类拒绝理由都必须看得见——它们在世界状态里都长得像「什么都没发生」：
     //     · unknown-fact（事实没登记，不凭空造一条）/ layer-ascend（不许升格成既成事实）；

@@ -714,6 +714,88 @@ function runWitness(WA) {
       WA.store.transact(function (d) { d.causal = keepCausal; }, 'reject-witness:v2970-restore-causal');
     }
   }
+  // ── v2.99.0（第五十六面：原著幕目）：七个新码，全部走**可执行见证** ──
+  //   为什么不进死表：这七条每一条都是**可被外部输入触发**的现实局面——
+  //     · bad-outline  —— 面板点了「采纳大纲」但从没试算过（`__cnBuilt` 为空）；
+  //     · bad-coord    —— 坐标栏随手敲了 `zz` / `A` / `从三段开始`（人写的坐标往往不是坐标）；
+  //     · out-of-range —— 坐标语法对但号越界（粘来的旧大纲换过一份 ⇒ A12 现在可能不存在了）；
+  //     · no-outline   —— 还没喂原著就点定位（照实说没基准，不编一份出来）；
+  //     · build-throw / adopt-throw / clear-throw —— 引擎内部异常（Store 事务被打桩/被第三方
+  //       插件替换是常态），它们与上面四条**分开报**：上面四条是「你给的东西不对」，
+  //       这三条是「侧边坏了」——混成一句，面板就只能用同一句话回答两件完全不同的事。
+  //   见证全部走产品真 API，且三处异常见证用 finally 无条件还原被打桩的 store.transact
+  //   （写完不收回，同一进程里后续的锁会读到别人的手指印）。
+  if (WA.canon && typeof WA.canon.buildOutline === 'function') {
+    const Cn = WA.canon;
+    const keepCn = Cn.getSettings();
+    const keepCnTransact = WA.store.transact;
+    const keepCnOutline = WA.store.get().canon;
+    // 见证用的原著样张：短句 + 换行，够切出多段多点（不依赖任何外部文件）。
+    const sample = '推开门，屋里没有人。窗外的雨下了一整夜。桌上放着一封没有署名的信。\n'
+      + '灯还亮着。他把信拿起来，又放下了。走廊尽头传来脚步声，很轻。\n'
+      + '那是谁。他没有回头，只是把那封信折起来收进内袋。';
+    try {
+      Cn.setSettings({ enabled: true });
+      // 收卷口径同 O9/X5 两段：先清掉上一次采纳的大纲，避免「已采纳」态影响 no-outline 的判据。
+      WA.store.transact(function (d) { if (d.canon) d.canon.outline = null; }, 'reject-witness:v2990-reset');
+      want('no-outline', 'canon.locate：还没采纳任何大纲就按坐标定位 ⇒ 照实说「没有基准」（不编一份出来，v2.99.0）');
+      trip('no-outline', function () { return [Cn.locate('A1').reason, Cn.actText(1).reason]; });
+      want('bad-coord', 'canon.locate：坐标语法不对（`zz` / `A` / 空串一律照实拒收——人写的坐标往往不是坐标，v2.99.0）');
+      trip('bad-coord', function () {
+        const b = Cn.buildOutline(sample, {});
+        if (!b.ok || !Cn.adopt(b, '见证').ok) return ['witness-setup-failed'];
+        return [Cn.locate('zz').reason, Cn.locate('A').reason, Cn.locate('A1.x').reason];
+      });
+      want('out-of-range', 'canon.locate：坐标语法对但号越界 ⇒ 照实说「不成立」而**不夹到边界**（幕号是标出来的，v2.99.0）');
+      trip('out-of-range', function () {
+        const b = Cn.buildOutline(sample, {});
+        if (!b.ok || !Cn.adopt(b, '见证').ok) return ['witness-setup-failed'];
+        const acts = Cn.outlineView().acts;
+        return [Cn.locate('A' + (acts + 5)).reason, Cn.locate('A1.9999').reason, Cn.actText(acts + 5).reason];
+      });
+      want('bad-outline', 'canon.adopt：收到不是大纲的东西（面板从没试算过就点采纳 / 外部传了空值，v2.99.0）');
+      trip('bad-outline', function () { return [Cn.adopt(null, '见证').reason, Cn.adopt({}, '见证').reason]; });
+      want('build-throw', 'canon.buildOutline：切分过程内部异常 ⇒ 与「你给的东西不对」分开报（引擎坏了是另一件事，v2.99.0）');
+      trip('build-throw', function () {
+        // 造法：把 settingsBus.normalize 换成会抛的桩 —— 它在 buildOutline 的 try 内被 settings() 调到。
+        //   ★ 这里曾用 `perAct: Symbol('bad')` 触发，**已失效**：pick 加固后是**全域总**的
+        //     （非数一律回落设置里的默认值，不再抛），于是那条路返回 ok:true，
+        //     见证静默落进 missing —— 一条**假见证**（有触发路径字样，却跑不出码）。
+        //     记录在此以免后人「修回去」：拿怪异输入去撞内部异常，本身就是把两类事混成一件。
+        //   ★ 为什么换成打桩而不是再找一个会抛的输入：这条码的本义就不是「你给的东西不对」
+        //     （那是上面四条 bad-* / no-outline / out-of-range 的活），而是「**侧边坏了**」——
+        //     设置层/存储层被第三方替换或本身就是坏的，是宿主上完全正常的局面。
+        //     adopt-throw / clear-throw 打桩 store.transact 是同一规格，此处打桩设置层与它们对齐。
+        const keepNorm = WA.settingsBus.normalize;
+        try {
+          WA.settingsBus.normalize = function () { throw new Error('witness:settings-boom'); };
+          return [Cn.buildOutline(sample, {}).reason];
+        } finally { WA.settingsBus.normalize = keepNorm; }
+      });
+      want('adopt-throw', 'canon.adopt：落盘事务抛异常 ⇒ 如实归因，且**不留半份大纲**（v2.99.0）');
+      trip('adopt-throw', function () {
+        const b = Cn.buildOutline(sample, {});
+        if (!b.ok) return ['witness-setup-failed'];
+        try {
+          WA.store.transact = function () { throw new Error('witness:adopt-boom'); };
+          return [Cn.adopt(b, '见证').reason];
+        } finally { WA.store.transact = keepCnTransact; }
+      });
+      want('clear-throw', 'canon.clearOutline：清空事务抛异常 ⇒ 如实归因（v2.99.0）');
+      trip('clear-throw', function () {
+        const b = Cn.buildOutline(sample, {});
+        if (!b.ok || !Cn.adopt(b, '见证').ok) return ['witness-setup-failed'];
+        try {
+          WA.store.transact = function () { throw new Error('witness:clear-boom'); };
+          return [Cn.clearOutline().reason];
+        } finally { WA.store.transact = keepCnTransact; }
+      });
+    } finally {
+      WA.store.transact = keepCnTransact;
+      Cn.setSettings(keepCn);
+      WA.store.transact(function (d) { d.canon = keepCnOutline; }, 'reject-witness:v2990-restore');
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

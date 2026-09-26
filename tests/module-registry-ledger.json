@@ -1,9 +1,9 @@
 {
- "version": "2.98.0",
- "loadOrderCount": 112,
- "loadedCount": 109,
+ "version": "2.99.0",
+ "loadOrderCount": 113,
+ "loadedCount": 110,
  "uiCount": 3,
- "nsCount": 117,
+ "nsCount": 118,
  "totals": {
   "loadEdges": 23,
   "hardEdges": 0,
@@ -1219,6 +1219,20 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_rumor_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/canon.js": {
+   "ns": [
+    "canon"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_canon_settings_v1"
    ],
    "consumedBy": []
   },
