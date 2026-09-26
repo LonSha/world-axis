@@ -161,9 +161,20 @@ function runAll(a) {
   const rd = siteReadings(runSrc);
   a(rd.every(function (r) { return r.found && r.ms === gt.GATE_TIMEOUTS.spawnMs; }),
     'A9 逐站点都能取到整段 options 与统一预算（取不到的：' + JSON.stringify(rd.filter(function (r) { return !r.found || r.ms !== 96000; })) + '）');
+  // v2.106.0 修：此处原写死行号区间 `>= 14790 && <= 18792` —— 只要在它**上方**插入任何代码
+  //   （本版接线就在 32 行处加了 require、在文末加了 v2.106.0 section），全部站点行号一起下移，
+  //   这条判据就红，而它读的东西其实毫无变化。**这正是一份「硬编码读数」的第二副本**：
+  //   判据要答的是「这是我找到的那个调用点、它的 options 就在它自己这一段里」，不是「它在第几行」。
+  //   故改为与 run.js 的 v2.105.0 section **同口径**：按 `gt.parseCallBlocks` 把每个站点的行号定位出来，
+  //   逐个断言「该行确实是一个调用点块」，且**行号严格递增**（顺序真实、无重复定位）。
+  const blocks = gt.parseCallBlocks(runSrc);
+  const blockLines = blocks.map(function (b) { return b.line; });
+  const anchored = rd.map(function (r) { return r.line; });
   a(rd.every(function (r) { return r.span >= 1; }) &&
-    rd.every(function (r) { return r.line >= 14790 && r.line <= 18792; }),
-    'A10 站点行号落在真实调用点范围内（' + rd.map(function (r) { return r.line; }).join(',') + '）');
+    anchored.every(function (l) { return blockLines.indexOf(l) >= 0; }) &&
+    anchored.every(function (l, i) { return i === 0 || l > anchored[i - 1]; }),
+    'A10 十个站点行号逐个落在真实调用点块上且严格递增（' + anchored.join(',')
+    + '；调用点块 ' + blockLines.length + ' 个）—— 不写死行号：写死一份，上方插一行就假红');
 
   // 判据纯度（H5：负控代码块内锚点字面量只准声明一次，判据不得引用锚点串）
   const self = selfSrc();
