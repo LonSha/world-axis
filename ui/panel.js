@@ -1430,6 +1430,9 @@
         <button class="wa-btn" id="wa-compat-view" title="宿主兼容层：当前宿主提供了哪些能力、缺哪些">宿主兼容层</button>
         <button class="wa-btn" id="wa-net-view" title="跨插件互操作：宿主能力 / 上游证据读取 / 手机侧交互执行，三伙伴五态分列（只读，不驱动对方重建快照）">跨插件面</button>
         <button class="wa-btn" id="wa-net-freeze" title="协议冻结面：三座桥的 id 与契约版本、诊断节键、拒收码词表——外部读者认的就是这些字符串">协议冻结面</button>
+        <button class="wa-btn" id="wa-perf-view" title="性能面：分层耗时 P50/P95、四个耗时分列、脏集与复用计数（只念已发生的读数，不触发基准）">性能面</button>
+        <button class="wa-btn" id="wa-perf-bench" title="基准面：真跑冷启（四面各一遍）与热启（按脏集复用），并复核复用值是否等于现算值">基准面</button>
+        <button class="wa-btn" id="wa-perf-partial" title="增量面：按每一面自己的输入（世界步进 stateRev）决定重算还是复用——同一世界步进下重复读取应为 0 重算；改过世界再点则如实重算">增量面</button>
       </div>
       <div class="wa-sec">恢复与撤销<span class="wa-dim">（改错了能退回去）</span></div>
       <div class="wa-row">
@@ -3151,6 +3154,112 @@
         html += '<div class="wa-dim">诊断节键：' + esc(f.diagSections.join(' / ')) + '</div>';
         out.innerHTML = html;
       } catch (e) { out.textContent = '冻结面读取失败：' + (e && e.message); }
+    };
+    // v2.102.0（A2/O12）：性能基线与分层增量两枚出口——WA.perfTrace 此前只活在测试里
+    //   （「只在测试里活的导出不算交付」）。两枚按钮同 v2.101.0 规格：只写 #wa-diag-out、
+    //   只读、不改设置、不落盘。区别在**代价**：读曲线不跑基准（看一眼体检 ≠ 跑一轮全量），
+    //   测本轮才真跑冷/热两趟，并把「复用值 == 现算值」的复核结论一并念出来。
+    //   两枚都足量消费真导出（summaryText / split / curve / LAYERS / coldStart / warmStart）。
+    const perfView = $('#wa-perf-view');
+    if (perfView) perfView.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out) return;
+      try {
+        const sp = WA.perfTrace.split(), stv = WA.perfTrace.stat();
+        let html = '<div class="wa-sec">性能面（已发生的读数；本按钮不触发基准）</div>';
+        html += '<div class="wa-item"><b>' + esc(WA.perfTrace.summaryText()) + '</b></div>';
+        html += '<div class="wa-kv"><span>本地 / 序列化 / 宿主 / 渲染</span><b>'
+          + esc(sp.localMs + 'ms / ' + sp.serializeMs + 'ms / '
+            + (sp.declared.host ? sp.hostMs + 'ms' : '未上报') + ' / '
+            + (sp.declared.render ? sp.renderMs + 'ms' : '未上报')) + '</b></div>';
+        if ((sp.undeclared || []).length) {
+          html += '<div class="wa-dim wa-log-warn">未上报分列：' + esc(sp.undeclared.join(' / '))
+            + ' —— 「没人报」不写成 0ms（无头回归里 ui/panel.js 根本不装载）</div>';
+        }
+        WA.perfTrace.LAYERS.forEach(function (L) {
+          const c = WA.perfTrace.curveAll()[L], b = WA.perfTrace.baseline(L);
+          html += '<div class="wa-item"><b>' + esc(L) + '</b> <span class="wa-dim">' + esc(WA.perfTrace.LAYER_LABEL[L] || '') + '</span>'
+            + '<div class="wa-kv"><span>P50 / P95 / 峰值</span><b>' + c.p50 + 'ms / ' + c.p95 + 'ms / ' + c.max + 'ms</b></div>'
+            + '<div class="wa-kv"><span>样本</span><b>' + c.n + ' 次（窗口 ' + c.window + '/' + WA.perfTrace.HISTORY_CAP
+            + '，挤出 ' + c.dropped + '；低于 1ms ' + c.subTick + ' 次）</b></div>'
+            + '<div class="wa-kv"><span>上次真算于</span><b>' + (b.lastAt ? new Date(b.lastAt).toISOString() : '从未') + '</b></div></div>';
+        });
+        const dirty = WA.perfTrace.dirtyAll();
+        const dk = WA.perfTrace.LAYERS.filter(function (L) { return (dirty[L] || []).length; });
+        html += '<div class="wa-dim">脏集：'
+          + (dk.length ? dk.map(function (L) { return esc(L + '(' + dirty[L].join(',') + ')'); }).join('、')
+            : '无（各层输入指纹自上次消费以来未变）')
+          + '；复用 ' + stv.reuse + ' / 重算 ' + stv.recompute + ' / 失败 ' + stv.miss + ' / 挤出 ' + stv.evicted + '</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '性能面读取失败：' + (e && e.message); }
+    };
+    const perfBench = $('#wa-perf-bench');
+    if (perfBench) perfBench.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out) return;
+      try {
+        const c = WA.perfTrace.coldStart();
+        const w = WA.perfTrace.warmStart();
+        let html = '<div class="wa-sec">冷启 / 热启（真跑四个面：注入 / 诊断 / 原著对位 / 世界状态）</div>';
+        html += '<div class="wa-item"><b>冷启 ' + c.totalMs + 'ms</b> · 就绪 ' + c.cold + ' 面 / 缺席 ' + c.absent
+          + '<br><span class="wa-dim">' + (c.rows.map(function (r) {
+            return esc(r.face + ' ' + (r.absent ? '缺席' : r.ms + 'ms'));
+          }).join('｜')) + '</span></div>';
+        html += '<div class="wa-item"><b>热启 ' + w.totalMs + 'ms</b> · 复用 ' + w.reused + ' / 重算 ' + w.recomputed
+          + '<br><span class="wa-dim">' + (w.rows.map(function (r) {
+            return esc(r.face + ' ' + (r.hit ? '复用' : r.ms + 'ms'));
+          }).join('｜')) + '</span></div>';
+        html += '<div class="wa-kv"><span>复用值与现算值指纹一致</span><b>'
+          + (w.consistent === null
+            ? '不可判（本次没有复用项——一致性判据不是「恒真」）'
+            : (w.consistent ? '是（' + w.checked + ' 面已复核）' : '否 —— ' + esc(w.consistentNote || '')))
+          + '</b></div>';
+        if ((w.stale || []).length || (w.volatile || []).length) {
+          html += '<div class="wa-dim' + ((w.stale || []).length ? ' wa-log-warn' : '') + '">'
+            + ((w.stale || []).length ? '缓存过期（本面缺陷）：' + esc(w.stale.join('/')) + '　' : '')
+            + ((w.volatile || []).length ? '被观测面自身不可复现（非缓存缺陷，该面本就不会命中）：' + esc(w.volatile.join('/')) : '')
+            + '</div>';
+        }
+        html += '<div class="wa-dim">' + esc(WA.perfTrace.summaryText()) + '；基准档位 '
+          + esc(WA.perfTrace.CLASSES.join(' / ')) + '（lowend 为同机放大估计，真机读数须实机）</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '基准失败：' + (e && e.message); }
+    };
+    // v2.102.0（A2/O12）：增量面出口——`partial()` 按**每一面自己的输入**（世界步进
+    //   `stateRev`）决定重算还是复用。与「基准面」的区别是**代价与判据**：这一枚
+    //   在无写入时应当一次活都不干（reused 4 / recomputed 0），而改过世界再点就如实重算。
+    //   只读、不落盘、不改设置；读数里带着「按哪个世界步进算的」以便复算。
+    const perfPartial = $('#wa-perf-partial');
+    if (perfPartial) perfPartial.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out) return;
+      try {
+        const p = WA.perfTrace.partial(), stv = WA.perfTrace.stat();
+        let html = '<div class="wa-sec">增量面（按每面自己的输入决定重算；本按钮不改世界）</div>';
+        html += '<div class="wa-kv"><span>世界步进</span><b>'
+          + (p.revOk ? 'stateRev ' + p.rev : '不可读（' + esc(p.revKind) + '）—— 输入判不出来的面一律重算')
+          + '</b></div>';
+        html += '<div class="wa-kv"><span>本轮复用 / 重算</span><b>' + p.reused + ' / ' + p.recomputed
+          + '　<span class="wa-dim">共 ' + p.rows.length + ' 面，缺席 ' + p.absent + '</span></b></div>';
+        html += WA.perfTrace.LAYERS.map(function (L) {
+          const r = p.rows.filter(function (x) { return x.layer === L; })[0];
+          if (!r) return '';
+          return '<div class="wa-item"><b>' + esc(L) + '</b> <span class="wa-dim">' + esc(WA.perfTrace.LAYER_LABEL[L] || '') + '</span>'
+            + '<div class="wa-kv"><span>处置</span><b>' + (r.absent ? '缺席' : (r.hit ? '复用（输入未变）' : '重算 ' + r.ms + 'ms'))
+            + '</b></div>'
+            + '<div class="wa-kv"><span>输入</span><b>' + esc(r.inputKind) + (r.inputOk ? '（rev ' + r.inputRev + '）' : '')
+            + '</b></div></div>';
+        }).join('');
+        html += WA.perfTrace.LAYERS.map(function (L) {
+          const sl = WA.perfTrace.slots(L);
+          if (!sl.length) return '';
+          return '<div class="wa-item"><b>' + esc(L) + '</b> <span class="wa-dim">' + sl.length + ' 个缓存槽</span>'
+            + sl.slice(0, 6).map(function (x) {
+              return '<div class="wa-kv"><span>' + esc(x.key) + '</span><b>命中 ' + x.hits + ' / 过期 ' + x.stale
+                + '　<span class="wa-dim">' + esc(String(x.vfp).slice(0, 8)) + '</span></b></div>';
+            }).join('') + '</div>';
+        }).join('');
+        html += '<div class="wa-dim">增量累计：调用 ' + stv.partialCalls + ' 次 / 复用 ' + stv.partialReused
+          + ' 面；已知边界：canonAlign 的幕表住在设置侧（不在 stateRev 里），单改幕表不会被判脏</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '增量面读取失败：' + (e && e.message); }
     };
     // v2.2.0: 运行痕迹清空出口——resetStats / resetHistory 此前无面板入口（画像只能越积越旧）
     const wfrBtn = $('#wa-wf-reset');

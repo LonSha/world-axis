@@ -849,6 +849,60 @@ function runWitness(WA) {
       }, 'reject-witness:v2100-restore');
     }
   }
+  // ── engines/perf-trace.js（v2.102.0 = A2/O12：性能基线与分层增量）──
+  //   六个新码全部来自本模块，**一条不留死表、全部带可执行见证**：
+  //   前四个是「参数给错」的入口守卫，后两个是「未知档/未知分列」的照实拒收。
+  //   理由与本仓既有口径一致：能拿真 API 跑出来的码就不该躺在死表里（死表是给
+  //   **结构上不可达**的防线准备的，不是给「懒得写见证」准备的）。
+  {
+    const Pt = WA.perfTrace;
+    if (Pt && typeof Pt.mark === 'function') {
+      // bad-layer-or-key：非封闭集合里的层 / 空键 —— 标记不成，如实拒收且不计数
+      want('bad-layer-or-key', 'perfTrace.mark：层不在封闭集合（或键为空）⇒ 如实拒收、不计数（v2.102.0）');
+      trip('bad-layer-or-key', function () {
+        return [Pt.mark('ghost-layer', 'k', 1).reason, Pt.mark('inject', '', 1).reason];
+      });
+      // unknown-class：四档之外的档位 —— 不许「默认当成 short」跑一遍再把数字报出去
+      want('unknown-class', 'perfTrace.bench：未知档位 ⇒ 拒收并报出可选档（不默认跑一档，v2.102.0）');
+      trip('unknown-class', function () { return [Pt.bench('nope').reason]; });
+      // unknown-span：四类耗时分列之外的名字 —— 不许静默丢进某个桶
+      want('unknown-span', 'perfTrace.noteSpan：未知分列名 ⇒ 拒收并报出可选项（不静默丢桶，v2.102.0）');
+      trip('unknown-span', function () { return [Pt.noteSpan('gpu', 3).reason]; });
+    }
+  }
+  //   另三个码的见证要造出「真的异常/缺失」，故各自打桩（打桩后无条件还原）：
+  //     · produce-failed：produce 抛错 ⇒ ok:false **且不写缓存**（旧值不许连坐）
+  //     · module-absent：面模块缺席 ⇒ 该面 absent（不是「跑了 0ms」）
+// reuse：这一条**不是缺陷也不是守卫**，是 `ensure` 命中路径上的**正常归因**
+  //       （reason:'reuse' 与 'stale'/'forced' 并列，答的是「这次为什么是它」）。
+  //       它出现在源码里是**正常**的，故用真 API 跑出一次命中共证（不是「拒收」）。
+  //       为什么走 `{stamp}` 而不走 `{dirty}`：dirty 模式要 `dirtyOf(L).length===0` 才命中，
+  //       而见证里刚 mark 过 ⇒ 脏集非空 ⇒ 永远落在 'stale' 上（首版就这么写的，门禁报「码跑不出」）。
+  //       stamp 模式只看「指纹可读且与槽位相同」，一步就能跑到命中路径。
+  {
+    const Pt2 = WA.perfTrace;
+    if (Pt2 && typeof Pt2.ensure === 'function') {
+      want('produce-failed', 'perfTrace.ensure：produce 抛错 ⇒ ok:false 且**不写缓存**（旧值不许连坐，v2.102.0）');
+      trip('produce-failed', function () {
+        Pt2.ensure('inject', 'witness-fail', function () { return { a: 1 }; }, { stamp: 's' });
+        return [Pt2.ensure('inject', 'witness-fail', function () { throw new Error('witness boom'); }, { stamp: 's', force: true }).reason];
+      });
+      want('reuse', 'perfTrace.ensure：命中路径的正常归因（与 stale/forced 并列答「为什么是它」，v2.102.0）');
+      trip('reuse', function () {
+        Pt2.ensure('inject', 'witness-reuse', function () { return { a: 1 }; }, { stamp: 'w1' });
+        return [Pt2.ensure('inject', 'witness-reuse', function () { return { a: 2 }; }, { stamp: 'w1' }).reason];
+      });
+      want('module-absent', 'perfTrace.runFace：面模块缺席 ⇒ 该面 absent（不是「跑了 0ms」也不编样本，v2.102.0）');
+      trip('module-absent', function () {
+        const keepDiag = WA.toolDiag;
+        try {
+          delete WA.toolDiag;
+          const c = Pt2.coldStart();
+          return c.rows.filter(function (r) { return r.absent; }).map(function (r) { return r.reason; });
+        } finally { WA.toolDiag = keepDiag; }
+      });
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

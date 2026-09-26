@@ -685,6 +685,9 @@
     'engines/checkpoints.js': 'checkpoints',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
+    // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
+    //   三处既有出口，缺席就是「性能面读数缺席」，那本身就是断裂，不该被静默兜住。
+    'engines/perf-trace.js': 'perfTrace',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -1244,6 +1247,9 @@
       // v2.101.0（O11）：跨插件互操作两枚出口。同 v2.2.0 块8 的理由——
       //   「渲染了但绑定写错 id」这类断裂只有在守卫登记过的控件上才会被发现。
       'wa-net-view', 'wa-net-freeze',
+      // v2.102.0（A2/O12）：性能面两枚出口。同 v2.101.0 的理由——「渲染了但绑定写错 id」
+      //   这类断裂只有在守卫登记过的控件上才会被发现。
+      'wa-perf-view', 'wa-perf-bench', 'wa-perf-partial',
       // v2.34.0: 记忆采样预览三件
       'wa-samp-preview', 'wa-samp-copy', 'wa-samp-out'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
@@ -1700,6 +1706,40 @@
     }, {});
   }
 
+  // ── v2.102.0（A2/O12）：性能基线与分层增量（纯内存观测；本节目**不触发基准**） ──
+  function secPerfTrace() {
+    return safe(function () {
+      if (!WA.perfTrace || typeof WA.perfTrace.stat !== 'function') {
+        return { error: 'engines/perf-trace.js 未加载（性能面读数缺席）' };
+      }
+      // 诊断是**旁观**：只念已经发生过的读数。
+      //   为什么不在这里跑 coldStart：跑一次会真调四个面的真源（注入/诊断/对位/快照）——
+      //   「看一眼体检」不该等于「跑一轮全量」，那会把无头诊断变成有负载的操作。
+      const st = WA.perfTrace.stat();
+      const sp = WA.perfTrace.split();
+      const cur = {};
+      WA.perfTrace.LAYERS.forEach(function (L) {
+        const c = WA.perfTrace.curve(L);
+        cur[L] = { n: c.n, window: c.window, p50: c.p50, p95: c.p95, max: c.max, subTick: c.subTick, dropped: c.dropped };
+      });
+      return {
+        stat: st, split: sp, layers: cur,
+        // v2.102.0：**增量的现场**——世界步进与「上一轮增量各面被怎么处置」。
+        //   注意这里**不调 partial()**：本节目是旁观（调一次会真跑四个面 = 把体检变成负载）。
+        //   故只念 `stat()` 里已累计的读数 + 当前世界步进；谁要看本轮逐面处置，走面板「增量面」。
+        incremental: { rev: st.rev, calls: st.partialCalls, reused: st.partialReused },
+        historyCap: st.historyCap, fingerprintCap: st.fingerprintCap,
+        classes: WA.perfTrace.CLASSES.map(function (c) {
+          const d = WA.perfTrace.CLASS_DEF[c] || {};
+          return { cls: c, repeats: d.repeats, budget: d.budget, approx: !!d.approx, note: d.note };
+        }),
+        dirty: WA.perfTrace.dirtyAll(),
+        summary: WA.perfTrace.summaryText(),
+        note: '只报已发生过的读数（本节目不触发基准）；host/render 未上报即 declared:false；lowend 档为同机放大估计（真机读数须实机）'
+      };
+    }, {});
+  }
+
   // ── 汇总 ──
   function collect() {
     const diag = {
@@ -1720,6 +1760,9 @@
       // v2.101.0（O11）：跨插件互操作验收面。与 bridge / phoneBridge / lonsha 三节
       //   互补——那三节各报**一个方向**的现场，这一节把三伙伴归一成一张可核对的矩阵。
       interop: secInterop(),
+      // v2.102.0（A2/O12）：性能基线与分层增量。与 interop 同一取舍：读数**只念现场**，
+      //   不替用户跑基准（跑基准是面板出口的事）。
+      perfTrace: secPerfTrace(),
       compat: secCompat(),
       // v2.50.0（第三十五面）：宿主两侧 + 时间轴三节
       hostWb: secHostWb(), floorChanges: secFloorChanges(), ledgerTimeline: secLedgerTimeline(),

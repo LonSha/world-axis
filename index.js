@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.101.0';
+  const VERSION = '2.102.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -366,6 +366,11 @@
     //   lonshaReader.lonshaSource()（上游桥）、phoneBridge.phaseOf()（下游入站桥），
     //   不是自己另探一遍；先于它们装载只会让三态一律落到 unknown。
     'engines/interop.js',
+    // v2.102.0（A2 = O12）：性能基线与分层增量（纯内存观测：不写存档、不落盘）。
+    //   为什么必须**最后**（与 interop 并列在 compat 之后、ui 之前）：它测的四个面全是既有出口——
+    //   render.visibilityStat / render.buildWorldSnapshot / toolDiag.collect / canon.alignView，
+    //   不是自己另探一遍；先于它们装载只会让基线一律落到「模块缺席」。
+    'engines/perf-trace.js',
     'ui/panel.js',
     'ui/settings.js',
     'ui/assistant.js',

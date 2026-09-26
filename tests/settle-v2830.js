@@ -312,11 +312,12 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 119 && led.loadedCount === 111,
-    'v2830/mr: 命名空间 119 / 装载文件 111（与 LOAD_ORDER 的 114 差 3 个 ui/*——'
-    + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：114 - 3 = 111；'
+  a(led.nsCount === 120 && led.loadedCount === 112,
+    'v2830/mr: 命名空间 120 / 装载文件 112（与 LOAD_ORDER 的 115 差 3 个 ui/*——'
+    + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：115 - 3 = 112；'
     + 'v2.98.0 时为 112 - 3 = 109，v2.99.0 新增 engines/canon.js 后两边各 +1；'
-    + 'v2.101.0 新增 engines/interop.js 后两边各 +1）'
+    + 'v2.101.0 新增 engines/interop.js 后两边各 +1；'
+    + 'v2.102.0 新增 engines/perf-trace.js（perfTrace 命名空间）后两边各 +1）'
     + ' —— v2.84.0 A2 新增 core/input-guard.js（inputGuard 命名空间）；'
     + ' v2.87.0 B7 新增 engines/theme.js（theme 命名空间）；'
     + ' v2.96.0 X3 新增 engines/rumor.js（rumor 命名空间）；'

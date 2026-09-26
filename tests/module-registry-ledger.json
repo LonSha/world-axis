@@ -1,9 +1,9 @@
 {
- "version": "2.101.0",
- "loadOrderCount": 114,
- "loadedCount": 111,
+ "version": "2.102.0",
+ "loadOrderCount": 115,
+ "loadedCount": 112,
  "uiCount": 3,
- "nsCount": 119,
+ "nsCount": 120,
  "totals": {
   "loadEdges": 23,
   "hardEdges": 0,
@@ -1682,6 +1682,18 @@
   "engines/interop.js": {
    "ns": [
     "interop"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/perf-trace.js": {
+   "ns": [
+    "perfTrace"
    ],
    "requires": [],
    "requiresFiles": [],
