@@ -13,6 +13,39 @@
 | 出口面契约 | 58 命名空间 / 321 成员 / 4094 字符 |
 
 ## 迭代记录
+### R88 · 2026-09-27 · v2.105.0 门禁超时熔断（计划一 #3：兜底存在≠风险被看见）
+
+- **做了什么**：
+  - `tests/gate-timeout.js`（新，约 460 行，24 导出）：门禁超时的**单一真源**。`GATE_TIMEOUTS{spawnMs:96000, shellMs:240}`、`RATIOS{spawn:8,inline:4,heavy:4}`、`ARMED_SITES`（10 条现场站点：key + **现场唯一锚点** + mode + kill + shellFuse + pipe）、`GATES`（11 条实测证据）、`coherence()`（三组规则：统一预算 vs 逐门禁建议上限、站点表 vs 武装表不许各说一套、**含管道必须有 shell 保险丝**的客观规则）、`spawnOptsFor` / `runTable` / `limitsOf` / `buildTable` / `withTimeout` / `tailLines` / `formatHangBlock` / `modeCounts` / `summary` / `discover`，以及解析器三件 `stripLiterals` / `parseCallBlocks`（括号平衡切块）/ `findSiteBlock` 与 `siteStats`。
+  - `tests/gate-timeout-v2105.js`（新，四段专锁 **53/0**）：A1–A16 静态 / B1–B13 运行时 / C1–C2 不变式 / N0–N10 负控制。
+  - `tests/run.js`：**10 个 spawnSync 调用点全部武装 `timeout: 96000`**（出口 5 处另给 `killSignal: 'SIGKILL'`；tar 改写为 `timeout -k 5 240 tar …`；`node --check` 处如实标注「只取证」），新增 section 打印现场读数并**逐站点**核对。
+  - `tools/patch_v2105_a/b/c/d.py`、`tools/fix2105_d.py`、`tools/sec2105.py`、`tools/bump_v2105.py`、`tools/bump_run_ver_v2105.py`、`tools/doc_v2105.py`、`tools/seal_check_v2105.py`（收尾核验）。
+- **附带自纠（收尾期实测抓到的）**：`tools/patch_v2105_d.py` / `tools/fix2105_d.py` / `tools/sec2105.py` 三个脚本执行完**实际落在 `/tmp`**，而本文档的「做了什么」把路径写成了 `tools/`——**文档指向了不存在的位置**。已把三者按 v2.104.0 对一次性脚本的入库口径（`a7dc0ab` 将 11 个 `tools/*.py` 全部纳入）归档进 `tools/`，并在 `seal_check_v2105.py` 里加了一条判据：**文档点名的一次性脚本必须实存**（文档不得指向不存在的位置，这一条与「读数不许照抄」同源）。
+- **为什么**：
+  - run.js 的 10 个调用点此前**无一**声明 timeout；唯一兜底是外层 `isolated-runner.js` 的 **10 分钟** SIGKILL，而全量回归实测 **6~8 分钟** ⇒ **余量不足一倍**。更糟的是被强杀时的**信息损失**：日志里只剩一行 `Status: runner-failed`——卡在哪一道门禁、卡死前最后说了什么，**全部丢失**。本版把这三件事变成可判定的读数。
+  - 阈值**不许照抄计划**：计划原文写「export-contract 3s / 全量 20s / 专锁各 5s」，而实测 export-contract **0.58s**（3s 只有 5 倍余量）、全量 **6~8 分钟**（与 20s 差一个量级）。故先实测再定：**唯一 10s 级门禁是 `dead-export-gate`（12.0~13.0s）**，预算取它的 8 倍 = 96000ms，全表统一。
+  - 为什么不逐道各算：门禁里有几道跨 git 版本会明显变重（P1 计划里就有「从 git 读上版快照比对」的判据），紧贴实测会在那些版本上变成**假红**。8 倍对 12s 是 96s，对 0.16s 是余量过剩——**过剩是安全的，紧贴不是**。
+- **本版自测期连撞的五类「自己身上的」缺陷（全部是它要治的那族病）**：
+  - **D1 定位口径**：专锁初版拿模块里的 key（`'negative-probe-broken'` 之类）去 run.js 定位站点，而那些 key **只活在模块里**、run.js 一个字都没有 ⇒ 十处全报 `site-missing`、判据从第一天起恒假。正解：用 run.js **现场唯一**的调用行行首片段作锚点，且**逐站点**判断；专锁用 **N1b** 专门证明「全局存在性口径会漏报」（别处仍有 timeout 时，被拆的那一处必须照样现形）。
+  - **D2 破坏不彻底**：`str.replace(a, b)` 在 JS 里只替换**第一处** ⇒「10 处预算全改 10ms」实际只改了 1 处，区间判据只现形 1 条，断言恒假。正解：`split/join`；并让「破坏是否真发生」也进断言。
+  - **D3 标签依赖**：`coherence()` 里「外部命令要另有 shell 保险丝」原先看的是 `mode === 'spawn+shell'` 这个**标签**——把标签抹平（`mode→'spawn'`）判断就**无声逃逸**，而模块头自己写着「口径是行为读数，不是字形比对」。正解：看**客观形态**（命令串含不含管道），并加 N4 在破坏副本上验证这条规则真会现形。
+  - **D4 观察位取窗口**：选项探测必须在**调用点之后的整个块**里取（本仓三个调用点带跨行注释，options 落在调用行之后第 11~12 行）。**取窗口的判据会在真源码上假红**——这是「负控制全绿而正控红」的典型形态。
+  - **D5 锚点包含被测值**：`negative-probe-v2410` 那一行初版把含 `timeout: 96000` 的整行当锚点 ⇒ 一旦预算被改动（**正是本锁要守的东西**）锚点先失效、报的是 `site-missing` 而非 `value-mismatch`——判据被它要抓的破坏顺手打掉了。正解：锚点截到 options 之前。
+- **工具级教训（补丁工程，两处）**：
+  - 补丁 D 用「全局 `str.replace` 还原占位符」把 `TIMEOUT` → `timeout: `，结果**把标识符当前缀一起换了**：`GATE_TIMEOUTS` → `GATE_timeout: S`、`TIMEOUT_ARMED` → `timeout: _ARMED`，并让正则里的 `\(` 变成裸 `(`（`node --check` 立刻报 Unterminated group）。**占位符必须带界符，或按行定点重建**。
+  - 修正时**手写的期望计数是错的**（写 11/9，真值 8/10）——补丁的守卫拦下了这次错误，`ABORT` 而不是静默改写。**期望计数一律实测取得，不写在纸上**。
+- **口径踩坑（正控红 vs 判据红）**：本轮 4 条红里有 3 条是**判据口径错**（B7 行号 off-by-one：79 行输入断言「首行不在」必然恒假；N7 双破坏叠加导致实际不是 99；N2 因锚点含被测值而报 `site-missing` 而非 `value-mismatch`），只有 1 条是 run.js section 里的**属性名写错**（`d.armedSites` 不存在，消息打印真值 10/10/10 而条件在比 `undefined`）。教训：**红的时候先问「这个数是我算的还是实现的」**——消息里打印的读数正确、条件却为假，几乎一定是判据写错。
+- **影响范围**：`tests/gate-timeout.js`、`tests/gate-timeout-v2105.js`、`tests/run.js`、`index.js`、`manifest.json`、`tests/reject-lock-v2780.js`、`tests/reject-code-ledger.json`、`tests/module-registry-ledger.json`、`tests/dead-export-ledger.json`、`tools/patch_v2105_a/b/c/d.py`、`tools/fix2105_d.py`、`tools/sec2105.py`、`tools/bump_v2105.py`、`tools/bump_run_ver_v2105.py`、`tools/doc_v2105.py`、`tools/seal_check_v2105.py`（收尾核验）、`FOUR_VERSION_PLAN.md`、`ITERATION_LOG.md`。**本版一次性 `tools/*.py` 按 v2.104.0 的入库先例（`a7dc0ab` 纳入 11 个）实际入库**——与旧条目里「`tools/*.py` 不入库」的写法不同，此处以实况为准。
+- **门禁结果**：`node tests/run.js` → **通过 8867 / 失败 0**（v2.104.0 基线 8806/0，**+61**）；专锁独立跑 **53/0**；`tests/export-contract.js` → `ns= 109 members= 694 chars= 8296`（**逐字未变**）；`tests/reject-code-gate.js` → 产品文件 116 / 内联拒收码 362（见证 124 / 死表 5 / 基线 233，**三者全不变**）；`tests/test-surface-gate.js` → 文件面 **92** / 锁 **87** / 可达 92 / spawn 4 / 内联 2 / 孤儿 **0**；`tests/module-registry-gate.js` → 文件 112 / 命名空间 120 / 装载期边 23 / 硬边 0 / 调用期引用 44 / 结构问题 0；`tests/dead-export-gate.js` → dead 454 / uiDead 4 / dataOnly 169 → 169；`tests/field-liveness-gate.js` → 写侧越界 1 处（`ui/panel.js innerHTML`）/ 读侧 0 处；`tests/dup-decl-gate.js` → 扫描 211 文件 / 顶层声明 2390 / JSDoc 495 / 重复 0；负控制审计读数 **锁 63（统一 12 / 非统一 51 / 装载不了 0 / 装载中 0）· 被审锚点 110 · 问题 0**；三本台账 version=2.105.0。
+- **可复用的判据**（编号续 R87）：
+  - (64) **阈值不许照抄计划里的数字**：上限必须 =「**最重那道**的实测 × 余量倍数」，且倍数（8）与被测对象（最重 12~13s）都要写成可读的读数；逐道紧贴实测会在门禁变重的版本上变成**假红**。
+  - (65) **不许有两套预算**：同一口径里若「逐门禁表算出 96s」而「现场武装值写 90s」，则现场真读 90s、任何「统一预算 = 96s」的陈述都是假的。须把它做成可调用判据（`coherence()`），并让负控制（N3）在破坏副本上验证它真会现形。
+  - (66) **形态受限的调用点用「形态自证」而非放弃**：`node --check` 与 `sh -c 'tar …'` 的主体是外部命令，spawnSync 的 timeout 只作用于直接子进程 ⇒ 两处照样武装（覆盖 `sh`/`node` 本身），tar 另加 shell 侧 `timeout -k <grace> <secs> tar`（**必须带 `-k`**：那句在管道里，缺了只杀写端、读端照挂），并把「不可中断段」如实记为 `mode:'spawn-only'`，**不假称已覆盖**。
+  - (67) **判据的定位口径必须是「现场唯一签名」**，不能用「模块内标签」；且必须**逐站点**判断——「别处还有 timeout」不构成该站点已武装（用一条负控制专门证明全局存在性口径会漏报）。
+  - (68) **「无 timeout 的调用点」必须被数出来**：`siteStats` 数「调用点数 / 带预算的调用点数 / 预算处数」，断言三者相等（10/10/10）；并用负控制证明「全删 timeout 后未武装计数 = 全部 10 处」。
+  - (69) **锚点不许包含它要守卫的那个值**：否则破坏该值时锚点先失效，报出来的是 `site-missing`（判据被打掉）而不是 `value-mismatch`（判据命中）——**判据的自我指涉不止「抄了锚点串」一种形态**。
+  - (70) **观察位要取「整段」而不是「固定窗口」**：调用点的选项可能落在调用行之后十几行（中间有跨行注释）。取窗口的判据会在**真源码上假红**，而负控制照样全绿——这是最难自查的一类口径错。
+
 ### R87 · 2026-09-27 · v2.104.0 负控制锚点的自动化审计（计划一 #2：每个锁都说自己查过了，但没人查过那些锁）
 
 - **做了什么**：

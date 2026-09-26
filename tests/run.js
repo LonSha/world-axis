@@ -10017,7 +10017,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.105.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10569,7 +10569,7 @@ assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.104.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.105.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10860,7 +10860,7 @@ assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.104.0', '入口版本为 2.104.0（实 ' + ver + '）');
+    assert(ver === '2.105.0', '入口版本为 2.105.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11391,7 +11391,7 @@ assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.104.0', '入口版本为 2.104.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.105.0', '入口版本为 2.105.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11779,7 +11779,7 @@ assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.104.0', '入口版本为 2.104.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.105.0', '入口版本为 2.105.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12149,7 +12149,7 @@ assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.104.0', '入口版本为 2.104.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.105.0', '入口版本为 2.105.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12514,7 +12514,7 @@ assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.104.0', '入口版本为 2.104.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.105.0', '入口版本为 2.105.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14788,7 +14788,7 @@ assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单�
       // spawnSync 不抛：无论退出码如何都能拿到 stdout。maxBuffer 给足（破坏后 phantom 1189 条，
       //   JSON 约 0.3MB；1MB 默认值余量太小，超限会得到空 stdout 而让判据假红）。
       const r2700 = require('child_process').spawnSync(process.execPath, [tmp2700, '--json'],
-        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 96000, killSignal: 'SIGKILL' });
       rc2700 = (r2700.status === null ? -1 : r2700.status);
       cout2700 = String(r2700.stdout || '');
     } finally { try { fs.unlinkSync(tmp2700); } catch (e) {} }
@@ -14837,7 +14837,7 @@ assert(verF2500 === '2.104.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.104.0', '入口 VERSION = 2.104.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.105.0', '入口 VERSION = 2.105.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -15055,7 +15055,7 @@ assert(r2800.refs === 2631 && r2800.namespaces === 115 && r2800.members === 1349
     const md5Bridge2900 = md5of2900(bakBridge2900);
     const runGate2900 = function () {
       const rr = require('child_process').spawnSync(process.execPath, [path.join(__dirname, 'dead-export-gate.js'), '--json'],
-        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 96000, killSignal: 'SIGKILL' });
       try { return JSON.parse(String(rr.stdout || '')); } catch (e) { return null; }
     };
     let vBase2900 = null, vCmt2900 = null, vCall2900 = null, md5After2900 = '';
@@ -16421,7 +16421,7 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(inv4300.PRODUCT_FILES.join(',') === prod4300.join(','),
       'v2430: PRODUCT_FILES 与 productFiles(BASE) 逐项一致（' + prod4300.length + ' vs ' + inv4300.PRODUCT_FILES.length + '）');
     const ecRun4300 = cp4300.spawnSync(process.execPath, ['tests/export-contract.js'],
-      { cwd: path4300.join(__dirname, '..'), encoding: 'utf8' });
+      { cwd: path4300.join(__dirname, '..'), encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
     // v2.44.0：本段原钉「members= 360 chars= 4546」。v2.44.0 起 actors/monologue.js 开始调用
     //   apiRouter.extractJson（解析纯文本独白），该成员由「死导出」转为「活导出」，出口面随之
     //   +1 成员 / +12 字符。故此处改为与当前真值比对；口径本身（统一排除名单后规模不漂移）
@@ -16500,7 +16500,7 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
     try { fs4300.rmSync(negDir4300, { recursive: true, force: true }); } catch (e) {}
     fs4300.mkdirSync(negDir4300, { recursive: true });
     const tarR4300 = cp4300.spawnSync('sh', ['-c',
-      'tar --exclude=.git -cf - . | (cd ' + negDir4300 + ' && tar -xf -)'], { cwd: BASE, encoding: 'utf8' });
+      'timeout -k 5 240 tar --exclude=.git -cf - . | (cd ' + negDir4300 + ' && tar -xf -)'], { cwd: BASE, encoding: 'utf8', timeout: 96000 });
     assert(tarR4300.status === 0 && fs4300.existsSync(path4300.join(negDir4300, 'index.js')),
       'v2430: 副本目录就绪（破坏性验证一律在副本上做）');
     //   注入一个「新增 ui 模块」：含一个当前不存在的控件 id。
@@ -16544,8 +16544,10 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(runSrcBroken4300 !== runSrcNeg4300 && runSrcBroken4300.indexOf(call4300) < 0,
       'v2430: （负向自证）退回「每处自己发现」的旧写法（委托调用已消失）');
     fs4300.writeFileSync(path4300.join(negDir4300, 'tests/run.js'), runSrcBroken4300, 'utf8');
+    // v2.105.0：node --check 不读 spawnSync 的 timeout 选项，此处是「只取证」形态
+    //   （上限由外层 isolated-runner 与 tests/gate-timeout.js 的取证面承担）。
     const checkBroken4300 = cp4300.spawnSync(process.execPath, ['--check', path4300.join(negDir4300, 'tests/run.js')],
-      { encoding: 'utf8' });
+      { encoding: 'utf8', timeout: 96000 });
     assert(checkBroken4300.status === 0,
       'v2430: （负向自证）破坏后的副本仍为合法 JS（破坏改语义、不破坏语法）');
     try { fs4300.rmSync(negDir4300, { recursive: true, force: true }); } catch (e) {}
@@ -16581,7 +16583,7 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
 
     // ── B. 在**仓库之外的 cwd** 里跑生成器，产物仍落回真源仓库（行为面）──
     const r4100 = cp4100.spawnSync(process.execPath, [path4100.join(BASE, 'tests/export-contract.js')],
-      { cwd: path4100.join(BASE, 'tests'), encoding: 'utf8' });
+      { cwd: path4100.join(BASE, 'tests'), encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
     assert(r4100.status === 0, 'v2410: 非仓库根 cwd 下可运行（实 exit ' + r4100.status + '）'
       + (r4100.status === 0 ? '' : ' :: ' + String(r4100.stderr || '').slice(0, 300)));
     assert(/\bns= \d+ members= \d+ chars= \d+/.test(String(r4100.stdout || '')),
@@ -16669,7 +16671,7 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
     fs4100.writeFileSync(brokenFile4100,
       genSrc4100.replace("const BASE = path.join(__dirname, '..');",
         'const BASE = ' + nonexit4100 + ';'), 'utf8');
-    const rBad4100 = cp4100.spawnSync(process.execPath, [brokenFile4100], { cwd: BASE, encoding: 'utf8' });
+    const rBad4100 = cp4100.spawnSync(process.execPath, [brokenFile4100], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
     assert(rBad4100.status !== 0,
       'v2410: （负向自证）E2 BASE 指向不存在目录 ⇒ 非零退出（实 exit ' + rBad4100.status + '）');
     assert(r4100.status === 0, 'v2410: （负向自证）E2 对照——__dirname 版同 cwd 下 exit 0');
@@ -16749,7 +16751,7 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
     // ── D. 门禁模块端到端（比对冻结账本）为绿：防止门禁「另开一趟没人跑」──
     const cp2400 = require('child_process');
     const rG2400 = cp2400.spawnSync(process.execPath, ['tests/field-liveness-gate.js'],
-      { cwd: path2400.join(__dirname, '..'), encoding: 'utf8' });
+      { cwd: path2400.join(__dirname, '..'), encoding: 'utf8', timeout: 96000 });
     assert(rG2400.status === 0,
       'v2400: 门禁模块端到端 exit 0（实 ' + rG2400.status + '）'
       + (rG2400.status === 0 ? '' : ' :: ' + String(rG2400.stdout || '') + String(rG2400.stderr || '')));
@@ -18764,7 +18766,7 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
   {
     const cp2830 = require('child_process');
     const rG2830 = cp2830.spawnSync(process.execPath, ['tests/module-registry-gate.js'],
-      { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+      { cwd: path.join(__dirname, '..'), encoding: 'utf8', timeout: 96000 });
     assert(rG2830.status === 0,
       'v2830/mr: 模块契约门禁端到端 exit 0（实 ' + rG2830.status + '）'
       + (rG2830.status === 0 ? '' : ' :: ' + String(rG2830.stdout || '') + String(rG2830.stderr || '').slice(0, 200)));
@@ -18788,7 +18790,7 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
   {
     const cp2840 = require('child_process');
     const rI2840 = cp2840.spawnSync(process.execPath, ['tests/isolated-runner-lock.js'],
-      { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+      { cwd: path.join(__dirname, '..'), encoding: 'utf8', timeout: 96000 });
     const outI2840 = String(rI2840.stdout || '');
     const mI2840 = outI2840.match(/isolation (\d+)\/(\d+)/);
     assert(rI2840.status === 0,
@@ -18937,6 +18939,59 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 负控制）
     require('./negative-control-audit-v2104.js').runAll(assert);
+  }
+
+  // ── v2.105.0（计划一 #3）：门禁超时熔断 —— 「门禁会不会卡死」不该是一条没有读数的命题 ──
+  //   治的病：run.js 的 10 个 spawnSync 调用点此前**无一**声明 timeout（唯一的兜底是外层
+  //   isolated-runner 的 10 分钟 SIGKILL，而全量回归实测 6~8 分钟 ⇒ 余量不足一倍）；
+  //   真被强杀时日志里只剩一行 "Status: runner-failed"，卡在哪一道门禁、卡死前最后说了
+  //   什么，全部丢失 —— 这三件事正是本版要变成**读数**的东西。
+  //   阈值口径：**不许照抄计划里的 3s / 20s / 5s** —— 实测最重门禁 12s、export-contract 0.58s，
+  //   故预算 =「最重那道门禁实测 × 8」= 96000ms，全表统一（多一档就多一处会漂移的地方；
+  //   本版第一次落盘正是「表算 96s、现场写 90s」两套预算并存，故把自洽钉成可调用判据）。
+  section('v2.105.0（计划一 #3）：门禁超时熔断（10 个调用点全部武装 + 卡死取证块 + 逐站点现场核对）');
+  {
+    const gt = require('./gate-timeout.js');
+    const d = gt.discover();
+    // 读数**必须打出来**：看不见的东西等于不存在
+    console.log('  ' + d.summary);
+    console.log('    · 现场读数（run.js 自身）：调用点 ' + d.siteStats.sites + ' / 武装点 '
+      + d.siteStats.armedSites + ' / 预算处 ' + d.siteStats.budget
+      + ' · 形态 ' + JSON.stringify(d.modeCounts)
+      + ' · 另有一道外部命令形态的 shell 侧保险丝 ' + d.limits.shellMs + 's');
+    assert(d.siteStats.sites === d.siteStats.armedSites && d.siteStats.armedSites === d.siteStats.budget,
+      'v2105: 现场三数相等（调用点 = 武装点 = 预算处，实 ' + d.siteStats.sites + '/'
+      + d.siteStats.armedSites + '/' + d.siteStats.budget + '）——留一个没声明的调用点就是留一条静默挂起的路径');
+    assert(d.armedCount === d.sites.length && d.sites.length >= 8,
+      'v2105: 武装表与现场站点清单同长（' + d.armedCount + ' vs ' + d.sites.length + '）——空表上的「全部有 timeout」恒真');
+    assert(d.limits.spawnMs >= 60000 && d.limits.spawnMs <= 300000 && d.limits.shellMs >= 60,
+      'v2105: 预算落在判据区间内（' + d.limits.spawnMs + 'ms / shell 保险丝 ' + d.limits.shellMs + 's）'
+      + ' —— 不许紧贴实测，也不许大到等于没有超时');
+    assert(d.coherence.length === 0, 'v2105: 自洽（' + d.coherenceSummary + '）——现场只读一个预算');
+    const mc = d.modeCounts;
+    assert(mc['spawn+shell'] === 1 && mc['spawn-only'] === 1,
+      'v2105: 三档形态齐备（' + JSON.stringify(mc) + '）——外部命令形态不许被静默抹平成普通 spawn，'
+      + '也不许假装 spawnSync 的 timeout 能中断外部命令本身（如实记为 spawn-only）');
+
+    // 现场逐站点核对：**逐站点**才算（「别处还有 timeout」不构成该站点已武装）
+    const runSrc = require('fs').readFileSync(__filename, 'utf8');
+    const located = gt.ARMED_SITES.filter(function (s) { return !!gt.findSiteBlock(runSrc, s.anchor); });
+    assert(located.length === gt.ARMED_SITES.length,
+      'v2105: 现场 ' + gt.ARMED_SITES.length + ' 个调用点全部可按锚点定位（实 ' + located.length + '）');
+    const unarmed = gt.ARMED_SITES.filter(function (s) {
+      const b = gt.findSiteBlock(runSrc, s.anchor);
+      return !b || !/(?:^|[^\w])timeout: \d+/.test(b.text);
+    });
+    assert(unarmed.length === 0,
+      'v2105: 每个调用点**自己的**整段 options 里都有 timeout（缺的：'
+      + ((unarmed.map(function (s) { return s.key; }).join(',')) || '无') + '）——病根是否复发就看这一条');
+    const fuse = gt.findSiteBlock(runSrc, gt.ARMED_SITES[3].anchor);
+    assert(!!fuse && fuse.text.indexOf(String(d.limits.shellMs) + ' tar') > 0 && fuse.text.indexOf('-k ') > 0,
+      'v2105: 管道形态的调用点另有 `timeout -k <grace> ' + d.limits.shellMs + ' tar` 保险丝'
+      + '（缺 -k 只杀写端、读端照挂）');
+
+    // 专锁（A 静态 / B 运行时 / C 不变式 / N 负控制）
+    require('./gate-timeout-v2105.js').runAll(assert);
   }
 
   }  // ── 汇总 ──
