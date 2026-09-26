@@ -1,9 +1,9 @@
 {
- "version": "2.96.0",
- "loadOrderCount": 111,
- "loadedCount": 108,
+ "version": "2.97.0",
+ "loadOrderCount": 112,
+ "loadedCount": 109,
  "uiCount": 3,
- "nsCount": 116,
+ "nsCount": 117,
  "totals": {
   "loadEdges": 23,
   "hardEdges": 0,
@@ -933,6 +933,7 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_npc_registry_v1",
+    "worldaxis_registry_alias_v1",
     "worldaxis_registry_ids_v1"
    ],
    "consumedBy": []
@@ -1120,6 +1121,20 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_causal_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/phone-bridge.js": {
+   "ns": [
+    "phoneBridge"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_phone_bridge_v1"
    ],
    "consumedBy": []
   },

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.96.0';
+  const VERSION = '2.97.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -290,6 +290,11 @@
     // v2.62.0：因果结算。须早于 render/inject.js，注入时读取 causal.buildBlock()；
     //   且须**晚于** intel.js —— knownCause 单一真源指向 intel.knownCause。
     'engines/causal.js',
+    // v2.97.0（X5）：跨插件因果桥（**入站边**，worldaxis_phone_ops_v1）。
+    //   为什么须**晚于** engines/causal.js：它把手机侧的操作登记进 `causal.phoneOps`
+    //   （与因果链同容器），并把「这条链的因是手机操作」这一层接回来——因果面先在场，
+    //   入站台账才有链可指。与 engines/bridge.js（只读**出站**投影）正交，两者互不调用。
+    'engines/phone-bridge.js',
     // v2.63.0：世界织体（社会生活 / 共同日程 / 地点与路途）。
     //   须早于 render/inject.js，注入时读取 world.buildBlock()；
     //   且须**晚于** life.js —— 在场者名单的唯一证据是「人物自己的日程安排」（life.schedule）。

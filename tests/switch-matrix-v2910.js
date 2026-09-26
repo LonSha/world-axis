@@ -60,15 +60,24 @@ function src(p) { return fs.readFileSync(p, 'utf8'); }
 // ── 真源码破坏锚点（各恰中 1 次才动刀）──
 const ANCHOR_OFF = "else if (moduleEnabled(k) === false) st = 'module-off';";
 const ANCHOR_FACE = "else if (mod === false) face = 'mod-off';";
-const ANCHOR_DANG = "            if (!t || known[t]) return;\n            byKind[sec]++;";
-const ANCHOR_DANG2 = "            if (!t || known[t]) return;\n            byKind.commitment++;";
+// v2.97.0（O9）重取：三类分类由两处内联循环收进单一 `mark()`（直认 / 靠别名认 / 谁也认不出
+//   三态**分列**），旧锚点 `byKind[sec]++` / `byKind.commitment++` 已随结构消失。
+//   新锚点取 mark() 的守卫 + 后续分支——语义与原锚点**同一件事**（「名字认不出来 ⇒ 记一笔」），
+//   且在全仓唯一（该守卫只此一处）。
+const ANCHOR_DANG = "        if (!t || known[t]) return;\n        if (rev[t]) {";
+// 第二条独立行为面（v2.97.0 新增）：**靠改名台账兜住**的那一支。它必须与上面那一支
+//   各自可证——两支若合一，「有人把名字改坏了」与「这里记着一个早没人认得的名字」
+//   会重新长得一模一样（那正是 O9 要消灭的那种混同）。
+const ANCHOR_ALIAS_BODY = "        if (rev[t]) {\n          const up = canonicalOf(t);";
 // 破坏形态：条件置假 / 条件置真（**不删行**——删条件会留下悬空 else ⇒ 破坏副本语法错，
 //   「装不起来」证明不了判据敏感；而「装不起来」与「判据失灵」是两件事）
 const BREAK_OFF = "else if (false && moduleEnabled(k) === false) st = 'module-off';";
 const BREAK_FACE = "else if (false && mod === false) face = 'mod-off';";
-const BREAK_DANG_NIL = "            if (true || !t || known[t]) return;\n            byKind[sec]++;";
-const BREAK_DANG2_NIL = "            if (true || !t || known[t]) return;\n            byKind.commitment++;";
-const BREAK_DANG_ALL = "            if (false && (!t || known[t])) return;\n            byKind[sec]++;";
+const BREAK_DANG_NIL = "        if (true || !t || known[t]) return;\n        if (rev[t]) {";
+// 第二支的破坏取**置假**（不是置真）：置真在「无别名登记」时不可观测 ⇒ 那是假敏感
+//   （本仓库点过名的一类坏负控制）；置假则无论有没有别名登记都改变行为面。
+const BREAK_ALIAS_OFF = "        if (false && rev[t]) {\n          const up = canonicalOf(t);";
+const BREAK_DANG_ALL = "        if (false && (!t || known[t])) return;\n        if (rev[t]) {";
 // 归因码封闭集合（v2.91.0 由六态扩到七态：新增 module-off）
 const STATES = ['landed', 'landed-in-state', 'visibility-off', 'module-absent', 'module-off', 'failed', 'no-content'];
 // 面码封闭集合（对账面四态）
@@ -136,6 +145,32 @@ function seedPeople(WA) {
     d.people.p_已登记 = { id: 'p_已登记', name: '已登记' };
     d.people.p_容器键 = { id: 'p_容器键', name: '容器键' };
   }, 'switch-matrix-v2910:people');
+}
+/**
+ * v2.97.0（O9）探针：**同一批函数**在原版与破坏副本上跑。
+ *   夹具：给「甲」挂一条旧名「阿甲」，再让一条关系行指向那个**旧名**。
+ *   原版上它应被改名台账兜住（进 aliasRows，真悬空仍是 3 条）；
+ *   别名支被拆掉之后它会掉回 rows（真悬空变 4 条）——「改名」重新等于「断链」。
+ */
+function probeAliasRow(WA) {
+  // 夹具自足（本段实测踩到）：别名表住在**设置面**（localStorage），同一进程里别的锁
+  //   若曾往它写过，本探针读到的就不是自己挂的那一条 —— 判据会呈现成「原版不干净」，
+  //   而真凶在别人身上。故先按产品的方式把这张表清空（与 alias-trace 的 seed 同习俗）。
+  (function () {
+    const reg = (WA.__settingsRegs || []).filter(function (r) {
+      return r && r.key === 'worldaxis_registry_alias_v1';
+    })[0];
+    if (reg && WA.settingsBus) { try { WA.settingsBus.save(reg, {}); } catch (e) {} }
+  })();
+  WA.store.transact(function (d) {
+    d.people.p_甲.profile.relationships.push({ target: '阿甲' });
+  }, 'switch-matrix-v2910:alias-target');
+  // 规范名须**在册**（本模块的口径：给一个不存在的人登记历史名等于凭空造一个身份）。
+  //   夹具走真 API 登记身份，而不是手工改设置表——那正是「唯一写者」这条口径要的用法。
+  WA.registry.identityOf('甲');
+  const r = WA.registry.bindAlias('甲', { was: '阿甲' });
+  const dg = WA.registry.danglingRefs();
+  return { bound: r.ok === true, rows: dg.rows, aliasRows: dg.aliasRows, aliasNames: dg.aliasNames };
 }
 function inject(WA) { WA.render.applyInjections({ injections: [] }); return WA.store.get().lastInjection; }
 function stateOf(ex, key) {
@@ -337,8 +372,8 @@ function runAll(a) {
     'v2910: [C2] 异常面每条带说明（不是一串光秃秃的名字——面板要直接把它印给用户看）');
   // ── N 面 ──
   a(hits(injSrc, ANCHOR_OFF) === 1 && hits(injSrc, ANCHOR_FACE) === 1
-    && hits(regSrc, ANCHOR_DANG) === 1 && hits(regSrc, ANCHOR_DANG2) === 1,
-    'v2910: [N0] 四个破坏锚点在真源码各恰中 1 次（inject×2 / registry×2）');
+    && hits(regSrc, ANCHOR_DANG) === 1 && hits(regSrc, ANCHOR_ALIAS_BODY) === 1,
+    'v2910: [N0] 四个破坏锚点在真源码各恰中 1 次（inject×2 / registry×2：悬空支 + 别名支）');
   let threw = 0;
   try { hits(injSrc, '锚点根本不在源码里__v2910'); } catch (e) { threw++; }
   try { hits(injSrc + ANCHOR_OFF, ANCHOR_OFF); } catch (e) { threw++; }
@@ -347,7 +382,7 @@ function runAll(a) {
 /** 负控制：真源码破坏 → **装上破坏副本** → 在副本上重跑与正面判据**同款**的断言 */
 function runNegative(a) {
   const s = src(INJECT), r = src(REGISTRY);
-  hits(s, ANCHOR_OFF); hits(s, ANCHOR_FACE); hits(r, ANCHOR_DANG); hits(r, ANCHOR_DANG2);
+  hits(s, ANCHOR_OFF); hits(s, ANCHOR_FACE); hits(r, ANCHOR_DANG); hits(r, ANCHOR_ALIAS_BODY);
   // N3：原版读数自洽，且**不硬编码绝对计数**（run.js 里各 section 共享宿主面，
   //   前序 section 的残留会让可判定源的个数漂移；本锁只钉相对事实）。
   const H0 = fresh();
@@ -404,20 +439,32 @@ function runNegative(a) {
   const A3 = fresh({ srcOverride: { 'actors/registry.js': b3 } });
   seed(A3.WA); seedPeople(A3.WA);
   const dgc = A3.WA.registry.danglingRefs();
-  a(dgc.rows === 1 && dgc.byKind.relationships === 0 && dgc.byKind.relations === 0 && dgc.byKind.commitment === 1,
-    'v2910: [N1c] 破坏后 B6 现形：前两类（关系 / 量值）**一条都不报**，只剩承诺那 1 条（实 ' + dgc.rows
+  // v2.97.0（O9）自纠：分类收进单一 mark() 之后，置真 ⇒ **三类同时归零**
+  //   （原结构里关系/量值走一个分支、承诺走另一个，故当时是「只剩承诺 1 条」）。
+  //   断言随结构更新，但被证明的那件事没变：**静默报零看起来像「一切正常」**。
+  a(dgc.rows === 0 && dgc.byKind.relationships === 0 && dgc.byKind.relations === 0 && dgc.byKind.commitment === 0,
+    'v2910: [N1c] 破坏后 B6 现形：三类悬空**一条都不报**（实 ' + dgc.rows
       + ' / ' + JSON.stringify(dgc.byKind) + '）——静默报零看起来像「一切正常」');
   a(dgc.knownCount > 0, 'v2910: [N1c] 破坏后仍报分母（knownCount=' + dgc.knownCount + '）——分子归零而分母健在，正是这句话的可信伪装');
-  // N1c-2：两个分支持有的守卫**各自独立**可证（共用一个锚点不等于共用一个行为面）
-  const b4 = r.replace(ANCHOR_DANG, BREAK_DANG_NIL).replace(ANCHOR_DANG2, BREAK_DANG2_NIL);
-  a(b4 !== r && b4.indexOf(BREAK_DANG_NIL) >= 0 && b4.indexOf(BREAK_DANG2_NIL) >= 0,
-    'v2910: [N1c] 两支同置真的可构造性成立（判据有现形空间）');
+  // N1c-2：第二条独立行为面 = **靠改名台账兜住的那一支**（v2.97.0 O9 新增）。
+  //   闭环口径：真源码上先跑同一条判据（必须干净）→ 单点破坏（锚点恰中 1 次）→
+  //   装破坏副本 → 在副本上重跑**同一批函数**（必须现形）。
+  const A4o = fresh();
+  seed(A4o.WA); seedPeople(A4o.WA);
+  const p4o = probeAliasRow(A4o.WA);
+  a(p4o.bound && p4o.aliasRows === 1 && p4o.rows === 3,
+    'v2910: [N1c] 原版上同一判据干净：旧名「阿甲」被改名台账兜住（aliasRows=' + p4o.aliasRows
+      + '）而真悬空仍是 ' + p4o.rows + ' 条——「改过名」不等于「断过链」');
+  const b4 = r.replace(ANCHOR_ALIAS_BODY, BREAK_ALIAS_OFF);
+  a(b4 !== r && b4.indexOf(BREAK_ALIAS_OFF) >= 0,
+    'v2910: [N1c] 别名支置假的可构造性成立（判据有现形空间）');
   const A4 = fresh({ srcOverride: { 'actors/registry.js': b4 } });
   seed(A4.WA); seedPeople(A4.WA);
-  const dgd = A4.WA.registry.danglingRefs();
-  a(dgd.rows === 0 && dgd.byKind.commitment === 0,
-    'v2910: [N1c] 两支同置真 ⇒ 三类悬空**全零**（实 ' + dgd.rows + '）——'
-      + '这条判据（原版 3 条）在破坏副本上必然现形');
+  const p4 = probeAliasRow(A4.WA);
+  a(p4.aliasNames === 1 && p4.aliasRows === 0 && p4.rows === 4,
+    'v2910: [N1c] 破坏后现形：台账里那条旧名仍在（aliasNames=' + p4.aliasNames
+      + '）却不再兜住任何引用（aliasRows=' + p4.aliasRows + '），真悬空涨到 ' + p4.rows
+      + ' 条——「有人把名字改坏了」重新长得像「没人认得这个名字」');
   // N1c-3：条件置**假**是另一个方向——**多报**（连正例都报），说明该判据对破坏双向敏感
   const b5 = r.replace(ANCHOR_DANG, BREAK_DANG_ALL);
   a(b5 !== r, 'v2910: [N1c] 另一个方向的破坏同样可构造（守卫置假 ⇒ 连正例都报）');

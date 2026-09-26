@@ -50,6 +50,20 @@
     records: 0, replays: 0, recordFails: 0, lastTape: null, lastReplay: null };
 
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
+  /**
+   * v2.97.0 O10：轮次读口——唯一真源 evolution.roundOf。
+   *   未装载时返回 **null** 而不是 0：`0` 是一个合法的轮次（第一轮），
+   *   拿它冒充「不知道第几轮」会让坐标面从第一格起就说假话（O3 已立同一条口径）。
+   */
+  function roundNow(s) {
+    try {
+      if (WA.evolution && typeof WA.evolution.roundOf === 'function') {
+        const n = WA.evolution.roundOf(s);
+        return (typeof n === 'number' && isFinite(n)) ? n : null;
+      }
+    } catch (e) {}
+    return null;
+  }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function txt(v) { return (v === undefined || v === null) ? '' : String(v); }
   /** 原因是否已存在——单一真源指向 intel.knownCause；intel 缺席时按同一口径兜底 */
@@ -484,6 +498,12 @@
     if (!tz) return { ok: false, reason: 'rand-absent' };
     const b = tz.beginTape(true);
     if (!b || !b.ok) return { ok: false, reason: (b && b.reason) || 'begin-failed' };
+    // v2.97.0 O10：录制期打**语义坐标**。轮次取自唯一真源 evolution.roundOf（缺席为 null，
+    //   **不拿 0 冒充第 0 轮**——与 O3 的 roundNow 同口径）；段名就是本函数的身份。
+    //   成对还原写在 finally 之前：无论 fn 抛不抛，标记都要回到进入前的样子，
+    //   否则一次失败录制会把后续整局的坐标都标成「record 段」。
+    const prevMark = (WA.rand && typeof WA.rand.markCoord === 'function')
+      ? WA.rand.markCoord(roundNow(), 'causal.record') : null;
     let result = null, err = null;
     try {
       result = fn();
@@ -495,6 +515,10 @@
       //   于是 endTape 被判成「导出即无消费方」的死子面（实测：dead 443→446 里的一条）。
       //   守卫已过（tz 非空）之后没有理由再绕一层：配对出口的开门与关门都该被看得见。
       try { if (WA.rand && WA.rand.endTape) stat.lastTape = WA.rand.endTape(); } catch (e2) {}
+      try {
+        if (prevMark && WA.rand && WA.rand.markCoord) WA.rand.markCoord(prevMark.round, prevMark.label, prevMark.at);
+        else if (WA.rand && WA.rand.markCoord) WA.rand.markCoord(null, '', 0);
+      } catch (e3) {}
     }
     const tape = stat.lastTape;
     stat.records++;
@@ -528,6 +552,10 @@
     if (!tz) return { ok: false, reason: 'rand-absent' };
     const r = tz.replay(tape);
     if (!r || !r.ok) return { ok: false, reason: (r && r.reason) || 'replay-refused' };
+    // v2.97.0 O10：回放期同样打坐标。回放**不写磁带**（take 只走位不落格），
+    //   故这里标记的意义是让 `lastMiss` 带上下文：断在哪一轮哪一段，一眼可读。
+    const prevMark = (WA.rand && typeof WA.rand.markCoord === 'function')
+      ? WA.rand.markCoord(roundNow(), 'causal.replay') : null;
     let result = null, err = null;
     try {
       result = fn();
@@ -536,6 +564,10 @@
     } finally {
       // 同上：stopReplay 是 replay 的配对出口，同样直呼，理由一致。
       try { if (WA.rand && WA.rand.stopReplay) stat.lastReplay = WA.rand.stopReplay(); } catch (e2) {}
+      try {
+        if (prevMark && WA.rand && WA.rand.markCoord) WA.rand.markCoord(prevMark.round, prevMark.label, prevMark.at);
+        else if (WA.rand && WA.rand.markCoord) WA.rand.markCoord(null, '', 0);
+      } catch (e3) {}
     }
     const rp = stat.lastReplay || {};
     stat.replays++;
@@ -563,6 +595,16 @@
     }
     return out;
   }
+  /** v2.97.0 O10：当前语义坐标（只读）。rand 缺席即照实报「没有坐标面」，不编一个。 */
+  function coordNow() {
+    try {
+      if (WA.rand && typeof WA.rand.coordOf === 'function') {
+        const c = WA.rand.coordOf();
+        return { marked: !!c.marked, round: (c.round === undefined ? null : c.round), label: String(c.label || '') };
+      }
+    } catch (e) {}
+    return { marked: false, round: null, label: '', randAbsent: true };
+  }
   function evidence() {
     const cfg = settings();
     const rnd = (WA.rand && typeof WA.rand.randStat === 'function') ? WA.rand.randStat() : null;
@@ -585,11 +627,25 @@
       // v2.89.0 O2：回放证据（第四十三面）。`replayable` 与 `reproducible` **分列**：
       //   前者答「这一轮有没有一卷能重放的磁带」，后者答「种子是不是自己定的」。
       //   未播种时前者为 false 并给出原因——**不谎称可回放**（本计划写死的判据）。
+      // v2.97.0 O10：语义坐标。`tape.coords` 是逐轮分组（这一卷横跨了世界的哪几轮），
+      //   `coord` 是当前标记；`coordGaps` 是无坐标的格数——它决定复核结论的定位粒度。
       tape: tp ? {
         mode: tp.mode, entries: tp.entries, values: tp.values,
         seed: tp.seed, seedMatched: tp.seedMatched, miss: miss,
-        lastMiss: tp.lastMiss || null, channels: tp.channels, open: tp.open
-      } : { mode: 'rand-absent', entries: 0, miss: 0, channels: [], open: false },
+        lastMiss: tp.lastMiss || null, channels: tp.channels, open: tp.open,
+        steps: tp.steps, coords: tp.coords || []
+      } : { mode: 'rand-absent', entries: 0, miss: 0, channels: [], open: false, steps: 0, coords: [] },
+      // 当前坐标（未标记时 marked:false —— 照实说不，不编一个轮次）
+      coord: coordNow(),
+      // 无坐标的格数：>0 说明「定位到第几轮第几步」这句话这次说不出口
+      coordGaps: (function () {
+        try {
+          const t = (stat.lastTape && stat.lastTape.ok) ? stat.lastTape.tape : null;
+          if (!t || !WA.rand || typeof WA.rand.verifyTape !== 'function') return null;
+          const v = WA.rand.verifyTape(t);
+          return { orphanSlots: v.orphanSlots, withCoord: v.withCoord, rounds: v.rounds, checked: v.checked };
+        } catch (e) { return null; }
+      })(),
       replayable: canReplay,
       replayBlockedBy: canReplay ? '' : (!rnd ? 'rand-absent'
         : (!rnd.reproducible ? 'auto-seed' : (!hasTape ? 'no-tape' : 'tape-mismatch'))),

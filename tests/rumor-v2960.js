@@ -289,8 +289,11 @@ function runAll(a) {
   a(missBind.length === 0, 'v2960: [A6] 每个控件都有绑定代码（缺 ' + (missBind.join('/') || '无') + '）');
   a(dSrc.indexOf("'wa-rm-enabled', 'wa-rm-fact', 'wa-rm-start'") > 0,
     'v2960: [A6] 守卫表登记（登记错页比不登记更坏——它看起来已被覆盖）');
+  // 自纠：判据原先钉在 `'wa-rm-out'],`（「本组登记到最后一个」）—— 而 v2.97.0 起
+  //   人物页同一组尾部又接了 X5 八控件与 O9 四控件，字面量当然不再命中。
+  //   判据要问的是「本组这 18 枚都在同一组登记里」，不是「本组排在文件末尾」。
   a(dSrc.indexOf("'wa-rm-relay', 'wa-rm-refute', 'wa-rm-conceal', 'wa-rm-person', 'wa-rm-why', 'wa-rm-visible',") > 0
-    && dSrc.indexOf("'wa-rm-out'],") > 0,
+    && dSrc.indexOf("'wa-rm-out',") > 0,
     'v2960: [A6] 守卫表登记覆盖面到最后一个控件（漏一个即静默幽灵绑定）');
   // 注入面三处同批
   a(src(INJECT).indexOf("'rumor'") > 0 && src(INJECT).indexOf('rumor: true') > 0

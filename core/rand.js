@@ -124,6 +124,19 @@
   //   于是「刚复核完一轮」之后 `tape()` 报 entries=0 —— 一个**只读的取证动作**
   //   （replayWith）把 `evidence().replayable` 从 true 翻成了 false：取证擦掉了证据。
   let __lastTape = null;
+  // ── v2.97.0 O10：抽取的**语义坐标** ─────────────────────
+  //   它治的病（v2.89.0 O2 未覆盖项坐实）：磁带记下了「哪一次抽象取了什么值、在第几格」，
+  //   但那一格**发生在世界的哪一步**没有出口。于是 `miss` 报出「第 7 格通道对不上」时，
+  //   复核的人只能回去数代码——而「第 7 格」这个位置量对作者毫无意义。
+  //   坐标把位置量翻译成**语义量**：第几轮、哪一段、段内第几步。
+  //
+  //   口径（三条，全是否定式）：
+  //     ① 坐标是**标记出来的**，不是猜出来的。没人标记时照实报 `round:null` / `label:''`
+  //        ——为无标记的磁带编一个轮次，比没有坐标更坏（它会让复核结论不可信）。
+  //     ② 坐标只在**录制时**落进磁带：回放期 `take()` 不写磁带，故回放不会把坐标改掉。
+  //     ③ `n`（段内第几步）由磁带长度现算，是**位置真源**；坐标是附加的语义层，
+  //        两者分列——坐标标错时，位置仍然对得上。
+  let __mark = { round: null, label: '', at: 0 };
 
   function noteFail(why) {
     __stats.failed++;
@@ -196,29 +209,42 @@
     const e = (t.idx < t.entries.length) ? t.entries[t.idx] : null;
     t.idx++;
     if (!e) {
-      t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: '(磁带枯竭)', why: 'exhausted' };
+      // v2.97.0 O10：未命中同时报**语义坐标**——「第 7 格对不上」在复核时是位置量，
+      //   而「第 2 轮 causal.tick 段第 3 步对不上」才是能回去查现场的量。
+      t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: '(磁带枯竭)', why: 'exhausted',
+        n: t.idx, r: __mark.round, s: __mark.label };
+      if (!t.firstMiss) t.firstMiss = t.lastMiss;
       return { ok: false, why: 'exhausted' };
     }
     t.used++;
     if (String(e.c) !== name) {
-      t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: String(e.c), why: 'channel' };
+      t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: String(e.c), why: 'channel',
+        n: t.idx, r: __mark.round, s: __mark.label, expectN: Number(e.n) || 0, expectR: e.r };
+      if (!t.firstMiss) t.firstMiss = t.lastMiss;
       return { ok: false, why: 'channel' };
     }
     if (String(e.k) !== kind) {
       t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: String(e.c), why: 'kind:' + String(e.k) };
+      if (!t.firstMiss) t.firstMiss = t.lastMiss;
       return { ok: false, why: 'kind' };
     }
     const v = Number(e.v);
     if (!isFinite(v)) {
       t.miss++; t.lastMiss = { at: t.idx - 1, want: name, got: String(e.c), why: 'bad-value' };
+      if (!t.firstMiss) t.firstMiss = t.lastMiss;
       return { ok: false, why: 'bad-value' };
     }
     return { ok: true, v: v };
   }
-  /** 录制：只记**答案**，不记推导过程（调用顺序错位才会被位置检出来） */
+  /**
+   * 录制：只记**答案**，不记推导过程（调用顺序错位才会被位置检出来）。
+   *   v2.97.0 O10：同时落**语义坐标**（`n` 段内第几步 / `r` 轮次 / `s` 段名）。
+   *   `n` 是位置真源（由磁带长度现算）；`r`/`s` 取自当前标记，未标记即 null / ''。
+   */
   function noteTape(name, v, kind) {
     if (!__tape || !__tape.open) return;
-    __tape.entries.push({ c: name, v: v, k: kind });
+    __tape.entries.push({ c: name, v: v, k: kind,
+      n: __tape.entries.length + 1, r: __mark.round, s: __mark.label });
   }
 
   /**
@@ -363,8 +389,48 @@
       channels: Object.keys(chans).sort(),
       // 磁带种子与当前会话种子是否一致：不一致时，这次回放**不构成对当前会话的复现依据**
       //   （它只复现了磁带自己的那一轮）。三者含义不同：true / false / null（当前无种子）。
-      seedMatched: (t && __seedSource !== 'none') ? (Number(t.seed) === __seed) : null
+      seedMatched: (t && __seedSource !== 'none') ? (Number(t.seed) === __seed) : null,
+      // v2.97.0 O10：语义坐标面。`steps` 是段内步数（位置真源），`coords` 是逐轮分组
+      //   （语义读法：这一卷磁带横跨了世界的哪几轮、每轮各取了几次数）。
+      //   未标记的格归入 `(未标记)` 一组并照实计数——丢掉它们等于把「没坐标」当「没发生过」。
+      steps: t ? t.entries.length : 0,
+      coord: coordOf(),
+      coords: (function () {
+        if (!t) return [];
+        const by = {}, order = [];
+        t.entries.forEach(function (e) {
+          const key = (e && e.r !== undefined && e.r !== null) ? String(e.r) : '(未标记)';
+          if (!by[key]) { by[key] = { round: (e && e.r !== undefined && e.r !== null) ? e.r : null, count: 0, first: 0, last: 0, labels: {} }; order.push(key); }
+          const g = by[key];
+          g.count++;
+          const n = Number(e && e.n) || 0;
+          if (!g.first || (n && n < g.first)) g.first = n;
+          if (n && n > g.last) g.last = n;
+          const lb = String((e && e.s) || '');
+          if (lb) g.labels[lb] = (g.labels[lb] || 0) + 1;
+        });
+        return order.map(function (k) { return by[k]; });
+      })()
     };
+  }
+  /**
+   * v2.97.0 O10：打一个语义坐标标记，返回**上一个**标记（供调用方成对还原）。
+   *   为什么返回旧值而不是内置栈：标记是**调用方的事**（调用方才知道这一轮是第几轮、
+   *   这一段叫什么），引擎替它维护一个栈只会让「谁负责还原」变得含糊。
+   *   嵌套调用用 `const prev = markCoord(a,b); try {...} finally { markCoord(prev.round, prev.label, prev.at); }`。
+   *   第三参 `at` 是**还原用**：不传则取当前时刻；传了就照传（还原到「未标记」时须传 0，
+   *   否则回到初始态却带着一个非零时刻——`coordOf()` 的三态自洽性当场被破坏）。
+   */
+  function markCoord(round, label, at) {
+    const prev = { round: __mark.round, label: __mark.label, at: __mark.at };
+    __mark = { round: (round === undefined ? null : round), label: String(label === undefined || label === null ? '' : label).slice(0, 40),
+      at: (at === undefined ? (WA.clock ? WA.clock.wallNow() : Date.now()) : at) };
+    return prev;
+  }
+  /** 当前语义坐标（只读）。未标记时 round 为 null、label 为空串——**不编一个默认轮次**。 */
+  function coordOf() {
+    return { round: __mark.round, label: __mark.label, at: __mark.at,
+      marked: __mark.round !== null || !!__mark.label };
   }
   /** 开一卷磁带开始录制。withValues=false 只记位置与通道（省内存，用于只看漂移） */
   function beginTape(withValues) {
@@ -423,10 +489,32 @@
    *   把 200 处错位列出来反而藏住了「从哪儿开始错的」。
    */
   function verifyTape(t) {
-    if (!t || !Array.isArray(t.entries)) return { ok: false, reason: 'bad-tape' };
-    if (t.seed === null || t.seed === undefined) return { ok: false, reason: 'no-seed' };
+    // v2.97.0 O10 自纠：坐标覆盖率面**先算**，四条早期返回全部把它带上。
+    //   为什么必须这样：`no-seed`（未显式播种）是**最常见**的一条返回，而它此前
+    //   连一个坐标字段都不带 ⇒ 调用方读 `orphanSlots` 得到 undefined，整条坐标读数静默失踪。
+    //   「这卷磁带能不能定位到轮」与「这卷磁带出不出自这个种子」是两个独立的问题：
+    //   后者答不了时，前者照样答得出来。
+    //   另一处自纠（同一段）：原实现把「无坐标」判成 `!e.n` —— 而 `n` 是**位置真源**，
+    //   每格必有 ⇒ `orphanSlots` 恒为 0，于是「这句话这次说不出口」永远说不出口。
+    //   真正的判据是**语义坐标**（r / s）在不在。
+    const coordHas = function (e) { return !!(e && ((e.r !== null && e.r !== undefined) || e.s)); };
+    const coordFace = function (tt) {
+      const es = (tt && Array.isArray(tt.entries)) ? tt.entries : [];
+      return {
+        withCoord: es.filter(coordHas).length,
+        orphanSlots: es.filter(function (e) { return !coordHas(e); }).length,
+        rounds: (function () {
+          const seen = {};
+          es.forEach(function (e) { if (e && e.r !== undefined && e.r !== null) seen[String(e.r)] = 1; });
+          return Object.keys(seen).map(function (k) { return Number(k); }).sort(function (a, b) { return a - b; });
+        })()
+      };
+    };
+    const cf = coordFace(t);
+    if (!t || !Array.isArray(t.entries)) return { ok: false, reason: 'bad-tape', withCoord: cf.withCoord, orphanSlots: cf.orphanSlots, rounds: cf.rounds };
+    if (t.seed === null || t.seed === undefined) return { ok: false, reason: 'no-seed', withCoord: cf.withCoord, orphanSlots: cf.orphanSlots, rounds: cf.rounds };
     const n = Number(t.seed);
-    if (!isFinite(n)) return { ok: false, reason: 'bad-seed' };
+    if (!isFinite(n)) return { ok: false, reason: 'bad-seed', withCoord: cf.withCoord, orphanSlots: cf.orphanSlots, rounds: cf.rounds };
     const seedNum = (Math.floor(Math.abs(n)) % 0xFFFFFFFF) >>> 0 || 1;
     const streams = {};
     let checked = 0, mism = 0, first = null;
@@ -446,15 +534,35 @@
       seed: seedNum, checked: checked, mismatches: mism, firstMismatch: first,
       channels: Object.keys(streams).sort(),
       // 位置面：磁带里 `k` 不是 'd'/'i' 的格（手改/旧版磁带）单独报，不混进值比对
-      oddKinds: t.entries.filter(function (e) { return e && e.k !== 'd' && e.k !== 'i'; }).length
+      oddKinds: t.entries.filter(function (e) { return e && e.k !== 'd' && e.k !== 'i'; }).length,
+      // v2.97.0 O10：坐标覆盖率（与早期返回**同一份**计算——两处各写一套迟早漂）。
+      //   `orphanSlots` > 0 说明这卷磁带有一部分格**没有语义坐标**（旧版磁带，或录制时没人标记）
+      //   ——它不是错误，但它决定「复核结论能定位到哪一层」：0 时可以指着「第几轮第几步」，
+      //   >0 时只能说「第几格」。两句话不能混成一句。
+      withCoord: cf.withCoord,
+      orphanSlots: cf.orphanSlots,
+      rounds: cf.rounds
     };
   }
   /** 退出回放。返回本次回放的走位读数（used / miss / 未走完多少格） */
   function stopReplay() {
     if (__mode !== 'replay') return { ok: false, reason: 'not-replaying' };
     const t = __tape || { idx: 0, used: 0, miss: 0, entries: [] };
+    // v2.97.0 O10：走位读数按**语义坐标**分组。`byRound` 让「这一轮重放走了几步、
+    //   在第几轮断掉」可读；`firstMissCoord` 是**未命中那一刻的坐标**
+    //   （`lastMiss` 是最后一次；两者分列——第一次断点才是要找的那一处）。
+    const byRound = {};
+    t.entries.slice(0, t.idx).forEach(function (e) {
+      const key = (e && e.r !== undefined && e.r !== null) ? String(e.r) : '(未标记)';
+      byRound[key] = (byRound[key] || 0) + 1;
+    });
     const out = { ok: true, used: t.used, miss: t.miss, consumed: t.idx,
-      left: Math.max(0, t.entries.length - t.idx), lastMiss: t.lastMiss || null };
+      left: Math.max(0, t.entries.length - t.idx), lastMiss: t.lastMiss || null,
+      byRound: byRound, rounds: Object.keys(byRound).length,
+      // 断点坐标取**未命中那一刻**记下的那一份（t.firstMiss，由 take 在首次未命中时落笔）。
+      //   自纠：本版首版这里写的是 `t.entries.filter(...)[0]` —— 无论断在哪都返回第 1 格，
+      //   于是「第一次断在哪一轮哪一段」答出来的是「磁带从哪一格开始」（本版专锁当场抓出）。
+      firstMissCoord: t.firstMiss || null };
     __mode = 'live';
     // 只丢走位用的索引卷；最近收卷的磁带留在 __lastTape（取证不得擦掉证据）
     __tape = null;
@@ -518,6 +626,12 @@
     tape: tapeInfo,
     replay: replay,
     stopReplay: stopReplay,
+    // v2.97.0 O10：语义坐标（两个口，都有真实消费方）：
+    //   · markCoord —— 打/还原坐标标记（消费方：causal.record / causal.replayWith
+    //     —— 它们才知道「这一轮是第几轮、这一段叫什么」）
+    //   · coordOf   —— 当前坐标只读（消费方：causal.evidence → 诊断 secCausal.coord 与面板）
+    markCoord: markCoord,
+    coordOf: coordOf,
     // v2.89.0 O2：从种子重算磁带（纯）。消费方：面板「复核磁带」与 tool-diag 的 secCausal
     //   —— 诊断侧只能调它，不能调 replay（replay 要重跑代码，而诊断必须零副作用）。
     verifyTape: verifyTape

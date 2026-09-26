@@ -125,7 +125,11 @@
       //   chains ：在推进的因果链（含终态 settled/cancelled/expired —— **不删记录**，
       //            删了就答不出「为什么后来没发生」）
       //   settled：已结算后果的流水（与 echoes 分开：echoes 是正文触面，这里是结算台账）
-      causal: { chains: [], settled: [] },
+      //   phoneOps（v2.97.0 X5）：手机侧交互动作的入站台账（**另立一张表**）。
+      //     为什么不能并进 chains：把「世界里发生的事」与「手机上按下的按钮」放进同一个数组，
+      //     状态里就再也分不出「这条链的因是世界里的一件事，还是外部插件的一笔上报」。
+      //     骨架里必须有这个键——冷启动直写不存在的键会炸事务（v2.65.0 天气与在途情报踩过的同型坑）。
+      causal: { chains: [], settled: [], phoneOps: [] },
       // v2.63.0 世界织体（world.js：社会生活 / 共同日程 / 地点与路途）
       //   places：已登记的地点（没登记的地方**不存在**，不是「大概很近」）
       //   roads ：已登记的道路（无向，带耗时分钟；没登记的路**走不通**）
@@ -833,6 +837,9 @@
     //   settled 与 echoes 分开：echoes 是正文触面（世界里的响动），settled 是结算台账。
     'causal.chains': { cap: 24, site: 'causal.js WA.evict.array(causal.chains)' },
     'causal.settled': { cap: 40, site: 'causal.js WA.evict.array(causal.settled)' },
+    // v2.97.0 X5：跨插件因果桥的入站台账（cap 与 evict.SITES 同源）。
+    //   满员走上游拒收（ops-full），这里的剪枝只是「有别的路径直写这张表」时的兜底。
+    'causal.phoneOps': { cap: 40, site: 'phone-bridge.js WA.evict.array(c.phoneOps)' },
     // v2.63.0 世界织体三容器（world.js 走 WA.evict.array 单一出口，cap 与 evict.SITES 同源）。
     //   注意「在场者名单」**不在此表**：它由日程 + 地点现算，不落盘，
     //   落盘就会变成一份会过期的第二真源——「谁在场」必须永远能从证据重新推出来。

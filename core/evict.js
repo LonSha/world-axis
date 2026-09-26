@@ -85,6 +85,10 @@
     // ── v2.62.0 因果结算（causal.js）──
     'causal.chains':  { path: 'causal.chains',  cap: 24, why: '因果链环形（含终态：已结算/已取消/已失效都留痕，答「为什么没发生」）' },
     'causal.settled': { path: 'causal.settled', cap: 40, why: '因果结算台账环形（结算过什么，与 echoes 正文触面分开）' },
+    // ── v2.97.0 跨插件因果桥（入站边，phone-bridge.js）──
+    //   台账记「手机侧按下过什么」：一笔操作带 opId（幂等认它）/ seq（递变序）/ chainId（事后接链）。
+    //   它是因果链的**入站因**，与 chains（世界里的因）必须分表——见 phone-bridge.js 的口径 ②。
+    'phoneBridge.ops': { path: 'causal.phoneOps', cap: 40, why: '手机侧操作台账环形（入站边：一笔手机动作就是一条链的因；满员走上游拒收，本表只兜底）' },
     // ── v2.63.0 世界织体（world.js）──
     'world.places': { path: 'world.places', cap: 24, why: '已登记地点环形（没登记的地方不存在，故这张表就是世界的全部可达面）' },
     'world.roads':  { path: 'world.roads',  cap: 40, why: '已登记道路环形（没登记的路走不通，故这张表决定谁能到哪）' },

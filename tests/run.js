@@ -88,11 +88,13 @@ const LOAD = [
   'engines/longline.js',
   // v2.62.0：因果结算。位置与 index.js LOAD_ORDER 同序（须晚于 intel，须早于 render/inject）。
   'engines/causal.js',
+  // v2.97.0（X5）：跨插件因果桥（入站边）。位置与 index.js LOAD_ORDER 同序（须晚于 causal.js）。
+  'engines/phone-bridge.js',
   // v2.63.0：世界织体 / 社交漩涡 / 悬案。位置与 index.js LOAD_ORDER 同序
   //   （world 须晚于 life.js —— 到场者名单的唯一证据是人物自己的 life.schedule；
   //    三者都须早于 render/inject.js 的消费点）。
   'engines/world.js', 'engines/weather.js', 'engines/difficulty.js', 'engines/shadow.js', 'engines/threads.js',
-  // v2.96.0（X3）：传播与辟谣。位置与 index.js LOAD_ORDER 同序
+  // v2.97.0（X3）：传播与辟谣。位置与 index.js LOAD_ORDER 同序
   //   （须晚于 memory.js/intel.js：事实真源与置信度反查都指向那两处；须早于 render/inject.js 消费点）。
   'engines/rumor.js',
   // v2.66.0：情绪通道 / 关系六型 / 假面。位置与 index.js LOAD_ORDER 同序（都早于 render/inject.js 消费点）。
@@ -6737,7 +6739,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   const rpA1700 = WA.store.registryParity();
   assert(rpA1700.ok === true && rpA1700.missing.length === 0, '正常态 registryParity ok=true missing=0');
   assert(rpA1700.checked === arrayKeys1700.length + objKeys1700.length, 'checked 纳入精确 object 键（不再是仅 array）');
-  assert(rpA1700.checked === 78, 'checked 精确值 78（v2.96.0：X3 新增 rumor.chains 一容器；v2.81.0 时为 77）');
+  assert(rpA1700.checked === 79, 'checked 精确值 79（v2.97.0：X5 新增 causal.phoneOps 一容器；v2.96.0 时为 78）');
   // ── B. object 键漏物化检出（v1.6.0 盲区修复）──
   fresh1700();
   WA.store.transact(d => { delete d.people; });
@@ -9936,7 +9938,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.97.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10480,7 +10482,7 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.96.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.97.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10771,7 +10773,7 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.96.0', '入口版本为 2.92.0（实 ' + ver + '）');
+    assert(ver === '2.97.0', '入口版本为 2.92.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11179,7 +11181,7 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'affect:buildBlock|apiRouter:call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|appearance:buildBlock|backstage:abort applyResult applyStat buildPrompt channelStat forceSimulate getSettings isRunning pending setSettings|beastBond:buildBlock|bonds:buildBlock|bridge:FLOOR_GAP id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|causal:STAGES TERMINAL addChain buildBlock cancel classify conflicts defer due evidence getSettings knownCause previewIntervention record rehearse setSettings settle settleBlockReason stat stateView tick|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|checkpoints:buildBlock|choices:generate|clock:clockStat freeze now wallNow|compat:context detect snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|difficulty:buildBlock effective|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ASSET_STATUS ENEMY_STATUS ENEMY_TYPE apply applyBlackbox applyWorldTrends dropStat|enigma:buildBlock|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|eraCycle:buildBlock|events:buildBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings roundOf setSettings tick|floorChanges:markSubscribed onFloorEvent plan reset stat stateText|fondness:buildBlock|gauge:buildBlock|hazard:buildBlock|horizon:BASE_CHANCE COOLDOWN_ROUNDS LEDGER_THRESHOLD acceptResult bounds buildPromptBlock getSettings setSettings stat|hostWbTrace:crossCheck markSubscribed onActivated stat stateText|injectBudget:apply costOf costView plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inputGuard:check count list num oneOf text|inspectorState:flatten inspect summaryText|intel:CONFIDENCE LEVELS addIntel addLink buildBlock explain getSettings knownCause setSettings stat visibleTo|interceptor:install|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|karma:buildBlock|ladder:buildBlock|ledger:buildLedgerText recordChanges saveCheckpoint|ledgerTimeline:probeDefault reset stat summaryText|life:ACTIONS COMMITMENTS addCommitment addGoal addSchedule buildBlock decide getSettings setSettings stat tick|limits:applyStableUpdate clampBackstageResult locateStable|longline:TERMINAL buildBlock getSettings overdue pressure promise setSettings stat sweep|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|marginal:buildBlock|masks:buildBlock|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|org:KINDS assignRole buildBlock canAfford creditWork exportJournal getSettings grant ledgerView payroll penalize promote reconcile reconcileWith rosterView setSettings settleOwed stat stockOf transfer|parallelEvents:buildBlock|parallelWorld:CAP_MODULES CAP_NPCS CAP_RELATIONS IMPACTS IMPACT_LABEL INJECT_MIN_IMPACT addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings getSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings shouldAuto stat|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|quota:buildBlock|rand:beginTape chance dice endTape id int next randStat replay seed stopReplay tape verifyTape|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:clearProfile danglingRefs ensurePerson getPersona getProfile getRelation idClear idStat identityOf list personOriginStat profileStat register relationBands relationStat setPersonaDice setProfileSafe setRelations slotStat unregister|render:SOURCES applyInjections buildWorldSnapshot explain getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rivalry:buildBlock|rules:ORDER coreSummary getAll getModule isNewModule listModules|rumor:LAYERS MOTIVES PUBLIC_LAYERS buildBlock conceal fullView getSettings investigate refute relay setSettings startChain stat visibleTo|samplerCheck:runChecks|sceneSlice:buildBlock|settingsBus:boundsOf cfgStat cfgSurface clampNum deregisterOrphan dormantGhosts exportConfig ghostScan importConfig migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|shadow:SHADOW_KINDS STAKES addExperience addShadow brighten buildBlock deepen experiencesOf getSettings getShadow setSettings shadowStat stat visibleTo|spotlight:buildBlock|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId defaultWorldState diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|style:CHOICES CHOICE_LABELS buildBlock effectiveSettings getSettings setSettings styleStat summaryText textCoverage|summarizer:buildBlock|survival:buildBlock|temperament:buildBlock|tempo:buildBlock|temporalLock:buildBlock|theater:generate send stat wrap|theme:activeModules apply list preview separation statView|threads:RELIABILITY TERMINAL abandon addLead buildBlock converge explain getSettings open resolve setSettings stall stat threadStat|timeline:SOURCE_ID_KEY auditRefs captureRange hashText unionRefs|tolerance:buildBlock|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview previewPlan|toolSnapshot:download restore|undo:capture clear peek pushValue stat undo|warrant:buildBlock|wbInject:activeOrders findCompanionName getConfig isEnabled|weather:buildBlock|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|world:CHANNELS EVENT_KINDS PLACE_KINDS addEvent addPlace addRoad attendees buildBlock canBeAt eventsBetween getSettings move reach setSettings stat tick transit whereStat|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries peekEntries previewActivation saveSelection triggerEnabled';
+    const FROZEN2800 = 'affect:buildBlock|apiRouter:call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|appearance:buildBlock|backstage:abort applyResult applyStat buildPrompt channelStat forceSimulate getSettings isRunning pending setSettings|beastBond:buildBlock|bonds:buildBlock|bridge:FLOOR_GAP id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|causal:STAGES TERMINAL addChain buildBlock cancel classify conflicts defer due evidence getSettings knownCause previewIntervention record rehearse setSettings settle settleBlockReason stat stateView tick|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|checkpoints:buildBlock|choices:generate|clock:clockStat freeze now wallNow|compat:context detect snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|difficulty:buildBlock effective|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ASSET_STATUS ENEMY_STATUS ENEMY_TYPE apply applyBlackbox applyWorldTrends dropStat|enigma:buildBlock|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|eraCycle:buildBlock|events:buildBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings roundOf setSettings tick|floorChanges:markSubscribed onFloorEvent plan reset stat stateText|fondness:buildBlock|gauge:buildBlock|hazard:buildBlock|horizon:BASE_CHANCE COOLDOWN_ROUNDS LEDGER_THRESHOLD acceptResult bounds buildPromptBlock getSettings setSettings stat|hostWbTrace:crossCheck markSubscribed onActivated stat stateText|injectBudget:apply costOf costView plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inputGuard:check count list num oneOf text|inspectorState:flatten inspect summaryText|intel:CONFIDENCE LEVELS addIntel addLink buildBlock explain getSettings knownCause setSettings stat visibleTo|interceptor:install|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|karma:buildBlock|ladder:buildBlock|ledger:buildLedgerText recordChanges saveCheckpoint|ledgerTimeline:probeDefault reset stat summaryText|life:ACTIONS COMMITMENTS addCommitment addGoal addSchedule buildBlock decide getSettings setSettings stat tick|limits:applyStableUpdate clampBackstageResult locateStable|longline:TERMINAL buildBlock getSettings overdue pressure promise setSettings stat sweep|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|marginal:buildBlock|masks:buildBlock|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|org:KINDS assignRole buildBlock canAfford creditWork exportJournal getSettings grant ledgerView payroll penalize promote reconcile reconcileWith rosterView setSettings settleOwed stat stockOf transfer|parallelEvents:buildBlock|parallelWorld:CAP_MODULES CAP_NPCS CAP_RELATIONS IMPACTS IMPACT_LABEL INJECT_MIN_IMPACT addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings getSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings shouldAuto stat|phoneBridge:ACT_LABEL PHASES PHONE_ACTS getSettings id linkChain noteAction opTrace opsView phaseOf setSettings stat traceOf version|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|quota:buildBlock|rand:beginTape chance coordOf dice endTape id int markCoord next randStat replay seed stopReplay tape verifyTape|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:aliasOf aliasStat bindAlias clearProfile danglingRefs ensurePerson getPersona getProfile getRelation idClear idStat identityOf list personOriginStat profileStat register relationBands relationStat setPersonaDice setProfileSafe setRelations slotStat traceOf unregister|render:SOURCES applyInjections buildWorldSnapshot explain getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rivalry:buildBlock|rules:ORDER coreSummary getAll getModule isNewModule listModules|rumor:LAYERS MOTIVES PUBLIC_LAYERS buildBlock conceal fullView getSettings investigate refute relay setSettings startChain stat visibleTo|samplerCheck:runChecks|sceneSlice:buildBlock|settingsBus:boundsOf cfgStat cfgSurface clampNum deregisterOrphan dormantGhosts exportConfig ghostScan importConfig migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|shadow:SHADOW_KINDS STAKES addExperience addShadow brighten buildBlock deepen experiencesOf getSettings getShadow setSettings shadowStat stat visibleTo|spotlight:buildBlock|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId defaultWorldState diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|style:CHOICES CHOICE_LABELS buildBlock effectiveSettings getSettings setSettings styleStat summaryText textCoverage|summarizer:buildBlock|survival:buildBlock|temperament:buildBlock|tempo:buildBlock|temporalLock:buildBlock|theater:generate send stat wrap|theme:activeModules apply list preview separation statView|threads:RELIABILITY TERMINAL abandon addLead buildBlock converge explain getSettings open resolve setSettings stall stat threadStat|timeline:SOURCE_ID_KEY auditRefs captureRange hashText unionRefs|tolerance:buildBlock|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview previewPlan|toolSnapshot:download restore|undo:capture clear peek pushValue stat undo|warrant:buildBlock|wbInject:activeOrders findCompanionName getConfig isEnabled|weather:buildBlock|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|world:CHANNELS EVENT_KINDS PLACE_KINDS addEvent addPlace addRoad attendees buildBlock canBeAt eventsBetween getSettings move reach setSettings stat tick transit whereStat|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries peekEntries previewActivation saveSelection triggerEnabled';
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
     } else {
@@ -11302,7 +11304,7 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.96.0', '入口版本为 2.92.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.97.0', '入口版本为 2.92.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11690,7 +11692,7 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.96.0', '入口版本为 2.92.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.97.0', '入口版本为 2.92.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12060,7 +12062,7 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.96.0', '入口版本为 2.92.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.97.0', '入口版本为 2.92.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12425,7 +12427,7 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.96.0', '入口版本为 2.92.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.97.0', '入口版本为 2.92.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -13035,7 +13037,12 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
       tape: function () { return R19.tape(); },
       replay: function () { R19.beginTape(true); const t = R19.endTape(); return R19.replay(t.tape); },
       stopReplay: function () { return R19.stopReplay(); },
-      verifyTape: function () { R19.beginTape(true); const t = R19.endTape(); return R19.verifyTape(t.tape); }
+      verifyTape: function () { R19.beginTape(true); const t = R19.endTape(); return R19.verifyTape(t.tape); },
+      // v2.97.0 O10：回放语义坐标两个新导出（markCoord / coordOf）。补进本表不是形式——
+      //   缺失时 forEach 会以 `callMap19[k] is not a function` **带崩整个运行器**（v2.97.0 已踩到）。
+      //   markCoord 的返回值是**上一个标记**（收卷/还原用的），故此处的样例循同一习俗成对还原。
+      markCoord: function () { const pv = R19.markCoord(1, 'probe'); R19.markCoord(pv.round, pv.label); return pv; },
+      coordOf: function () { return R19.coordOf(); }
     };
     exportNames19.forEach(function (k) {
       assert(typeof callMap19[k] === 'function', '新导出 ' + k + ' 缺调用样例（新增能力必须同时给出执行方式，否则门禁看不见它）');
@@ -14621,11 +14628,11 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 2461, '现场静态引用 2461 处（真代码口径，实 ' + r2700.refs + '）');
-    assert(r2700.namespaces === 111 && r2700.members === 1272,
-      '定义面 111 命名空间 / 1272 成员（v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身），实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.refs === 2523, '现场静态引用 2523 处（真代码口径，实 ' + r2700.refs + '）');
+    assert(r2700.namespaces === 112 && r2700.members === 1292,
+      '定义面 112 命名空间 / 1292 成员（v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
     assert(r2700.dead.length === 444 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 162,
-      '死子面 dead 444 / uiDead 4 / dataOnly 162（v2.88.0：O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方，'
+      '死子面 dead 444 / uiDead 4 / dataOnly 162（v2.88.0：O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
       + '只有 causal.replayWith 如实登记为 test-only（它重跑代码，而会写世界的轮次不能用它，产品内确无安全调用点），实 '
       + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
     assert(r2700.deadInTestsOnly === 293, '其中仅测试引用 293（v2.92.0：O5 的资源账本两口入此列，实 ' + r2700.deadInTestsOnly + '）');
@@ -14738,7 +14745,7 @@ assert(verF2500 === '2.96.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.96.0', '入口 VERSION = 2.92.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.97.0', '入口 VERSION = 2.92.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -14822,9 +14829,9 @@ assert(dist2800['test-only'] === 297 && dist2800['self-only'] === 119 && dist280
     assertDeepEq(gate2800.ADVISORY_KINDS, ['dataOnly'], 'advisory 面仍为 dataOnly（不升级为拦截）');
 assert(r2800.dead.length === 444 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 162
 && r2800.deadInTestsOnly === 293,
-'现场锚点（dead 444 / uiDead 4 / dataOnly 162 / 仅测试 293，v2.96.0：X3 传播与辟谣）');
-assert(r2800.refs === 2461 && r2800.namespaces === 111 && r2800.members === 1272,
-    '清册面（refs 2461 / 命名空间 111 / 成员 1272，v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出）');
+'现场锚点（dead 444 / uiDead 4 / dataOnly 162 / 仅测试 293，v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥）');
+assert(r2800.refs === 2523 && r2800.namespaces === 112 && r2800.members === 1292,
+    '清册面（refs 2523 / 命名空间 112 / 成员 1292，v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -15003,11 +15010,11 @@ assert(r2800.refs === 2461 && r2800.namespaces === 111 && r2800.members === 1272
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-assert(r2900.refs === 2461 && r2900.namespaces === 111 && r2900.members === 1272,
-'清册面（refs 2461 / 命名空间 111 / 成员 1272）——真代码口径下的现场值（v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出）');
+assert(r2900.refs === 2523 && r2900.namespaces === 112 && r2900.members === 1292,
+'清册面（refs 2523 / 命名空间 112 / 成员 1292）——真代码口径下的现场值（v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
 assert(r2900.dead.length === 444 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 162
 && r2900.deadInTestsOnly === 293,
-'死子面 dead 444 / uiDead 4 / dataOnly 162 / 仅测试 293（v2.96.0，实 ' + r2900.dead.length + '/'
+'死子面 dead 444 / uiDead 4 / dataOnly 162 / 仅测试 293（v2.97.0，实 ' + r2900.dead.length + '/'
       + r2900.uiDead.length + '/' + r2900.dataOnly.length + '/' + r2900.deadInTestsOnly + '）');
     const soft2900 = ['rand.seed', 'clock.freeze', 'bridge.setSettings'];
     const ledKeys2900 = Object.keys(led2900.dead);
@@ -15844,7 +15851,7 @@ assert(r2900.dead.length === 444 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(tLed.indexOf('v2350火并') >= 0 && tLed.indexOf('第7轮') >= 0, 'v2350: 账本文本真读 evolution.ledger');
     const rp = WA2350.store.registryParity();
     assert(rp.ok, 'v2350: registryParity 仍绿（snapshots/ledger 已物化）');
-    assert(rp.checked === 78, 'v2350: checked 精确值 78（v2.96.0 补登 rumor.chains 容器）');
+    assert(rp.checked === 79, 'v2350: checked 精确值 79（v2.97.0 补登 causal.phoneOps 容器）');
     assert((rp.checkedKeys || []).indexOf('parallelWorld.snapshots') >= 0, 'v2350: snapshots 进精确键');
     assert((rp.checkedKeys || []).indexOf('evolution.ledger') >= 0, 'v2350: ledger 进精确键');
 
@@ -16331,7 +16338,7 @@ assert(r2900.dead.length === 444 && r2900.uiDead.length === 4 && r2900.dataOnly.
     //   仍由「本次运行产物 == FROZEN2800」这条更强的断言承担。
     // v2.84.0：A2 统一输入边界新增 core/input-guard.js（inputGuard 命名空间 6 成员），
     //   B5 把 causal.settleBlockReason 接上真实消费者 ⇒ 出口面 574→580 成员、7126→7169 字符。
-    const EC2430 = 'ns= 105 members= 634 chars= 7710';
+    const EC2430 = 'ns= 106 members= 654 chars= 7897';
     assert(ecRun4300.status === 0 && String(ecRun4300.stdout).indexOf(EC2430) >= 0,
       'v2430: 统一排除口径后出口面契约规模稳定（实 ' + String(ecRun4300.stdout).split('\n')[0] + '，期望 ' + EC2430 + '）');
     // ── C. 成类静态锁：UI 三文件清单在**整个代码面**硬零（防任一处回退写法复活）──
@@ -18503,6 +18510,21 @@ assert(r2900.dead.length === 444 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   紧接着的转述/调查就当场变成 missing-fields。面板侧已改为「id 与输出同源缓存 + 起链不重建」。
   require('./rumor-v2960.js').runAll(assert);
   require('./rumor-v2960.js').runNegative(assert);
+  // ── v2.97.0（第五十面 / X5）：跨插件因果桥（入站边）—— 手机侧动作进世界台账 ──
+  //   入站是**显式动作**（不猜、不轮询）；绝不覆盖世界状态，只写 causal.phoneOps；
+  //   按 opId 幂等；不认识的动作拒收而不是吞掉；能力缺席如实降级；可追溯靠真源比对。
+  //   容量治理三件套：MAX_OPS 是**常量**（不做滑块——两套容量治理会互相打架）
+  //   + evict 站点同源 + 满员拒收 ops-full。
+  //   O9 别名与追溯链：只登记不改写 / 只增不删 / 一个旧名一个主人 / 链有边界 / 查不到就说查不到。
+  //   O10 回放语义坐标：坐标是**标记出来的**不是猜的（无人标记照实报 null，不编默认轮次）；
+  //   只在录制时落格（回放不写磁带）；`n` 是位置真源、坐标是附加语义层，两者分列——
+  //   「第 7 格对不上」与「第 2 轮 causal.tick 段第 3 步对不上」是两句不同的话。
+  require('./phone-bridge-v2970.js').runAll(assert);
+  require('./phone-bridge-v2970.js').runNegative(assert);
+  require('./alias-trace-v2970.js').runAll(assert);
+  require('./alias-trace-v2970.js').runNegative(assert);
+  require('./coord-v2970.js').runAll(assert);
+  require('./coord-v2970.js').runNegative(assert);
   // ── v2.83.0 门禁端到端：B4 的交付物必须**真被执行**，不能只是「文件在场」 ──
   //   本段治的正是 v2.75.0 点名的孤儿病：交付物写完却没有任何入口跑它。
   //   实测踩到（本版）：settle-v2830.js 只做 fs.existsSync 检查，于是

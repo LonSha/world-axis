@@ -426,6 +426,7 @@
       <div id="wa-causal-out" class="wa-out"></div>
       <div class="wa-sec">人物身份（持久 ID ↔ 存档键）</div>
       <div class="wa-row"><input id="wa-id-name" class="wa-input" placeholder="人物姓名"/><button class="wa-btn" id="wa-id-lookup">查身份</button><button class="wa-btn" id="wa-id-bindall" title="为当前聊天里已经注册、但还没有持久编号的人物补上编号（不改动任何状态）">补全已注册</button><button class="wa-btn" id="wa-id-clear" title="只解除身份绑定，不删除该人物的任何状态">解除绑定</button></div>
+      <div class="wa-row"><input id="wa-id-aliasname" class="wa-input" placeholder="旧名（改名之前的名字）"/><button class="wa-btn" id="wa-id-bindalias" title="登记一条改名台账：旧名永久可解析（只增不删），于是「改过名」不再等于「断过链」。规范名须已在册（给不存在的人登记历史名 = 凭空造一个身份）；一个旧名只有一个主人；链可以深但必须有边界（超过 8 跳当场拒收）">登记旧名</button><button class="wa-btn" id="wa-id-aliasof" title="查改名：对历史名也作答——它现在是谁、经过几跳、路径是什么。查不到就说查不到（unknown-name），不替它编一个规范名">查改名</button><button class="wa-btn" id="wa-id-aliasstat" title="改名台账：几对旧名 / 涉及几人 / 最深几跳（上限 8）">改名台账</button></div>
       <div id="wa-id-out" class="wa-out"></div>
       <div class="wa-list">${idRows}</div>
       <div class="wa-sec">世界织体（地点、道路、共同日程）</div>
@@ -458,6 +459,12 @@
       <div class="wa-row"><button class="wa-btn" id="wa-rm-relay" title="转述一跳：没声明要改就不许改值——随手动改值（未声明）一律拒收，那是账面上最危险的一种错">转述</button><button class="wa-btn" id="wa-rm-refute" title="辟谣：改的是「有人不再当它是一回事」，不是「这件事没发生过」——事实与层都不动">辟谣</button><button class="wa-btn" id="wa-rm-conceal" title="隐瞒：有人知道但没往外传。它不是一次传播，故另记「隐瞒」而不混进跳数（隐瞒者取『经手人（从）』，理由取右侧栏）">隐瞒</button></div>
       <div class="wa-row"><input id="wa-rm-person" class="wa-input" placeholder="人物（查某人可见）"/><input id="wa-rm-why" class="wa-input" placeholder="隐瞒理由"/><button class="wa-btn" id="wa-rm-visible" title="某人在本链上看得到什么——只出事实与亲历两层；转述与流言不过玩家面">查可见</button></div>
       <div id="wa-rm-out" class="wa-out"></div>
+      <div class="wa-sec">跨插件因果桥（入站：手机侧的动作怎么进世界）</div>
+      <label class="wa-row"><input id="wa-pb-enabled" type="checkbox" ${WA.phoneBridge && WA.phoneBridge.getSettings().enabled ? 'checked' : ''}/> 启用跨插件因果桥</label>
+      <div class="wa-row"><input id="wa-pb-opid" class="wa-input" placeholder="opId（手机侧那笔操作的唯一号）"/><input id="wa-pb-act" class="wa-input" placeholder="act message/pin/block/unblock"/><input id="wa-pb-to" class="wa-input" placeholder="对象（拉黑谁 / 回给谁）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-pb-note" title="登记一笔手机侧操作：按 opId 幂等（重复上报返回 reused 而不是第二条——手机侧重试是常态）；不认识的动作一律拒收 unknown-act，让外部替本扩展决定因果词汇表是更坏的选项">记一笔操作</button><button class="wa-btn" id="wa-pb-view" title="入站台账视图：最近几笔 + 未接链笔数 + 手机侧推送相位（相位三态，unknown 不等于 quiet）">看台账</button></div>
+      <div class="wa-row"><input id="wa-pb-chain" class="wa-input" placeholder="因果链 id（须已存在）"/><button class="wa-btn" id="wa-pb-link" title="把这笔操作接到一条因果链上：链必须已存在（接一条不存在的链 = 用桥给世界造一条因果）；已接过别的链不覆盖（静默改写会让「这条链的因」事后被换掉而没人知道）">接链</button><button class="wa-btn" id="wa-pb-trace" title="追溯：一笔操作 → 它接在哪条链上（反过来问「这条链的因是不是手机侧」由因果工作台的证据面答）">查追溯</button></div>
+      <div id="wa-pb-out" class="wa-out"></div>
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
@@ -1631,6 +1638,11 @@
         + '｜种子相符 ' + (tp.seedMatched === true ? '是' : tp.seedMatched === false ? '<b>否</b>' : '未知') + '</div>'
         + '<div class="wa-dim">可重放：' + (e.replayable ? '<b>是</b>' : '<b>否</b>（' + esc(why[e.replayBlockedBy] || e.replayBlockedBy || '—') + '）')
         + '｜录制 ' + (e.records | 0) + ' 次 / 回放 ' + (e.replays | 0) + ' 次 / 录制失败 ' + (e.recordFails | 0) + '</div>'
+        + '<div class="wa-dim">语义坐标：' + (e.coord && e.coord.marked
+          ? ('第 ' + esc(String(e.coord.round)) + ' 轮 · 段 ' + esc(e.coord.label || '（空段名）'))
+          : '未标记（无人打标记时照实说不——不编一个轮次）')
+        + '｜无坐标格 ' + ((e.coordGaps && typeof e.coordGaps.orphanSlots === 'number') ? e.coordGaps.orphanSlots : '未知')
+        + '：0 时可指着「第几轮第几步」，>0 时只能说「第几格」</div>'
         + '<div class="wa-dim">与推进绑定的读数：链 ' + e.chains + ' · 行动 ' + e.acts + ' · 过期 ' + e.expired + ' · 被挡 ' + e.blocked + '</div></div>');
     });
     on('#wa-cw-record', () => {
@@ -1664,6 +1676,8 @@
       cwOut('<div class="wa-item"><b>磁带复核（纯算术，零副作用）</b>：seed ' + esc(String(v.seed))
         + '｜比对 ' + v.checked + ' 格｜一致：' + (v.ok ? '<b>是</b>' : '<b>否</b>（错 ' + v.mismatches + ' 格）')
         + (fm ? '<div class="wa-dim">第一处分歧：第 ' + fm.at + ' 格 · 通道 ' + esc(fm.channel) + ' · 应为 ' + esc(String(fm.want)) + ' 实为 ' + esc(String(fm.got)) + '</div>' : '')
+        + '<div class="wa-dim">坐标覆盖：有坐标 ' + v.withCoord + ' 格 · 无坐标 ' + v.orphanSlots + ' 格 · 轮次 '
+        + esc((v.rounds || []).join('、') || '无') + '（无坐标格 >0 时，上面那句「第几格」是真话，「第几轮第几步」这次说不出口）</div>'
         + '<div class="wa-dim">通道 ' + esc((v.channels || []).join('、') || '无') + '｜异常格 ' + v.oddKinds
         + '<br>它证的是「这卷磁带确实出自这个种子」；「同一段代码按磁带再走一遍」由 <code>causal.replayWith</code> 负责——后者要重跑代码，故对会写世界的轮次不适用。</div></div>');
     });
@@ -2084,6 +2098,111 @@
       const r = WA.registry.idClear(idVal());
       idOut(r.ok ? { id: r.name + ':' + r.id + ':unbound' } : { reason: r.reason }, true);
       renderBody();
+    });
+    // v2.97.0（O9）：别名面（**名字可以有历史**）的面板绑定。
+    //   为什么必须在这一层有出口：aliasOf / bindAlias / traceOf / aliasStat 四个口答的正是
+    //   「改名之后旧引用还认不认得出」——四个口若没有真消费方，它们就是本仓库点名要摘的
+    //   「零消费死面」（本仓库的判据从不信自述，只认调用点）。
+    //   三类拒绝理由都必须看得见（它们在状态里都长得像「什么都没发生」）：
+    //     · not-bound（规范名不在册：给不存在的人登记历史名 = 凭空造一个身份）；
+    //     · name-taken（一个旧名只能有一个主人，否则同一行会解析出两种身份）；
+    //     · too-deep / alias-cycle（链可以有深度但必须有边界：8 跳上限、不许成环）；
+    //     · unknown-name（查不到就说查不到，不替它编一个规范名）。
+    const aliasVal = function () { return ((($('#wa-id-aliasname') || {}).value) || '').trim(); };
+    on('#wa-id-bindalias', () => {
+      if (!WA.registry || typeof WA.registry.bindAlias !== 'function') return idOut({ reason: 'registry-missing' }, true);
+      const was = aliasVal();
+      if (!was) return idOut({ reason: 'missing-name' }, true);
+      const r = WA.registry.bindAlias(idVal(), { was: was });
+      idOut(r.ok ? { id: (r.reused ? '已登记过' : '已登记') + ':' + was + '→' + r.canonical + ':共' + (r.aliases || []).length + '个旧名' }
+        : { reason: r.reason + (r.reason === 'name-taken' ? '(主人 ' + r.owner + ')' : '') + (r.reason === 'too-deep' ? '(已 ' + r.hops + ' 跳，上限 8)' : '') }, true);
+      renderBody();
+    });
+    on('#wa-id-aliasof', () => {
+      if (!WA.registry || typeof WA.registry.aliasOf !== 'function') return idOut({ reason: 'registry-missing' }, true);
+      // 两个输入框任一有值即可查：身份区既有「人物姓名」也有「旧名」，
+      //   而历史名恰恰是这两个框都可能填进去的那种名字。
+      const nm = idVal() || aliasVal();
+      if (!nm) return idOut({ reason: 'missing-name' }, true);
+      const r = WA.registry.aliasOf(nm);
+      if (!r.ok) return idOut({ reason: r.reason }, true);
+      // traceOf 是第二步：aliasOf 答「尽头是谁」，traceOf 答「它是怎么走到那里的」。
+      //   两句合一句就是失实——中间每一跳都得看得见。
+      const t = WA.registry.traceOf(nm);
+      const path = (t.ok && t.steps.length) ? t.steps.map(function (x) { return x.from + '→' + x.to; }).join('/', ) : '（一步到位）';
+      idOut({ id: (r.isAlias ? '历史名' : '现名') + ':' + r.canonical + ':跳' + r.hops + ':' + path
+        + ':名下旧名 ' + ((r.aliases || []).length) }, true);
+      renderBody();
+    });
+    on('#wa-id-aliasstat', () => {
+      if (!WA.registry || typeof WA.registry.aliasStat !== 'function') return idOut({ reason: 'registry-missing' }, true);
+      const s = WA.registry.aliasStat();
+      idOut({ id: '改名台账 ' + s.pairs + ' 对 / ' + s.owners + ' 人 / 旧名 ' + s.names
+        + ' / 最深 ' + s.maxDepth + '（上限 ' + s.maxHops + '）'
+        + (s.pairs ? '：' + s.rows.map(function (x) { return x.was + '→' + x.canonical; }).join('、') : '（尚无改名记录）') }, true);
+    });
+    // v2.97.0（X5）：跨插件因果桥（**入站边**）的面板绑定。
+    //   与上面的「传播与辟谣」同规格：三类拒绝理由都必须看得见——它们在世界状态里
+    //   同样长得像「什么都没发生」：
+    //     · unknown-act（不认识的动作，不照收）/ missing-op（没带 opNo，认不出是哪一笔）；
+    //     · disabled（桥关着 ⇒ 上报**不落盘也不排队**，那笔操作当场丢了，不是「以后会补上」）；
+    //     · unknown-chain（接一条不存在的链 = 用桥给世界造一条因果）/
+    //       already-linked（已接过别的链，不覆盖）/ link-off（接链开关关着）/ ops-full（台账满，不静默挤掉）。
+    const pbOut = function (r) { return plainOut('wa-pb-out', 'pbOut', r); };
+    if (panelEl.dataset.pbOut) { const o = $('#wa-pb-out'); if (o) o.textContent = panelEl.dataset.pbOut; }
+    { const el = $('#wa-pb-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.phoneBridge) return pbOut({ ok: false, reason: 'module-missing' });
+        WA.phoneBridge.setSettings({ enabled: !!el.checked });
+        // 开闸/关闸都要把相位念出来：关着的时候「手机侧还在推」这句话必须看得见，
+        //   否则用户会以为「关掉 = 暂存」，而实际是「那几笔已经丢了」。
+        const p = WA.phoneBridge.phaseOf();
+        pbOut({ ok: true, id: (el.checked ? 'enabled' : 'disabled') + ':phase-' + p.phase });
+      }; }
+    on('#wa-pb-note', () => {
+      if (!WA.phoneBridge) return pbOut({ ok: false, reason: 'module-missing' });
+      // opId 留空时**不替它编一个**：凭空的 opId 会让幂等失效（每次点击都成了「新的一笔」），
+      //   那是比 missing-op 更坏的默认值——缺就照实报缺。
+      const r = WA.phoneBridge.noteAction({ opId: wv('#wa-pb-opid'), act: wv('#wa-pb-act'), to: wv('#wa-pb-to'), from: '本机' });
+      pbOut(Object.assign({}, r, { id: r.ok ? ((r.reused ? '已收下过（幂等）' : '已记一笔') + ':' + r.act + ':' + r.id) : r.reason }));
+      if (r.ok && r.opId) panelEl.dataset.pbOpId = r.opId;
+      renderBody();
+    });
+    on('#wa-pb-view', () => {
+      if (!WA.phoneBridge) return pbOut({ ok: false, reason: 'module-missing' });
+      const st = WA.phoneBridge.stat();
+      const v = WA.phoneBridge.opsView(6);
+      const p = WA.phoneBridge.phaseOf();
+      const rows = v.items.map(function (x) { return x.actLabel + (x.to ? '→' + x.to : '') + (x.chainId ? '@' + x.chainId : '·未接链'); }).join('、');
+      // traceOf 是**反方向**的那一问（链 → 它背后那几笔手机操作），与 opTrace（操作 → 链）配对。
+      //   计划判据写的是「evidence() 可把链回放到手机操作记录」——那正是这个方向；
+      //   面板把它摆在台账旁边，是为了让「这条链的因是不是手机侧」一眼可答。
+      const chains = {};
+      v.items.forEach(function (x) { if (x.chainId) chains[x.chainId] = true; });
+      const traces = Object.keys(chains).slice(0, 3).map(function (cid) {
+        const tr = WA.phoneBridge.traceOf(cid);
+        return cid + '←' + (tr.items || []).map(function (y) { return y.actLabel; }).join('+') + '(' + tr.count + ')';
+      }).join('；');
+      pbOut({ ok: true, id: '台账 ' + v.rows + '/' + st.maxOps + '：未接链 ' + st.unlinked
+        + '｜相位 ' + p.phase + '｜最近：' + (rows || '无')
+        + (traces ? '｜链回放：' + traces : '') });
+    });
+    on('#wa-pb-link', () => {
+      if (!WA.phoneBridge) return pbOut({ ok: false, reason: 'module-missing' });
+      // 操作号沿用「记一笔」缓存的那一笔（与 rumor 的链 id 同规格：renderBody 会把输入框重建回空值，
+      //   不留缓存的话「先记一笔、再接链」这个最自然的顺序会在第二击时变成 missing-fields）。
+      const opId = wv('#wa-pb-opid') || panelEl.dataset.pbOpId || '';
+      const r = WA.phoneBridge.linkChain(opId, wv('#wa-pb-chain'));
+      pbOut(Object.assign({}, r, { id: r.ok ? (r.already ? '已接过同一条链' : '已接链') + ':' + r.opId + '@' + r.chainId
+        : (r.reason + (r.want ? '（现有 ' + r.chainId + '，想接 ' + r.want + '）' : '')) }));
+      renderBody();
+    });
+    on('#wa-pb-trace', () => {
+      if (!WA.phoneBridge) return pbOut({ ok: false, reason: 'module-missing' });
+      const opId = wv('#wa-pb-opid') || panelEl.dataset.pbOpId || '';
+      const r = WA.phoneBridge.opTrace(opId);
+      pbOut(r.ok ? { ok: true, id: r.actLabel + (r.linked ? '：已接链 ' + r.chainId : '：尚未接链（手机侧的那笔世界里的因还没被指认）') }
+        : { ok: false, reason: r.reason });
     });
     // v2.63.0：世界织体 / 社交漩涡 / 悬案三面的面板绑定。
     //   三面各自的关键**拒绝理由**都必须看得见——它们在世界状态里都长得像「什么都没发生」：

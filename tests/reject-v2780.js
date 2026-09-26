@@ -600,6 +600,107 @@ function runWitness(WA) {
       } finally { WA.rand = keep; }
     }
   }
+  // ── v2.97.0（O9）别名表与追溯链：五个新码，各自一条真 API 见证 ──
+  //   为何这些码值得有见证而不进死表：它们全都**可被外部输入触发**——
+  //   旧存档里的环、外部导入的深链、面板上填错的旧名，三样都会走到这里。
+  //   一个从未被观察过的码，下一次被改成别的意思也没人知道（本面存在的全部理由）。
+  if (Rg && typeof Rg.bindAlias === 'function') {
+    // 收卷契约（本段实测踩到）：本段往**设置面**写真实别名登记，而设置表住在 localStorage
+    //   —— 写完不收回，同一进程里后续的锁读到的就不是自己的夹具（switch-matrix 的 [N1c]
+    //   原版判据要求 aliasNames===1，实测读到 10，当场假失败）。
+    //   与 X5 段同规格：先留底，finally 无条件还原。
+    const keepAl = {};
+    const alRegs = (WA.__settingsRegs || []).filter(function (r) {
+      return r && (r.key === 'worldaxis_registry_alias_v1' || r.key === 'worldaxis_registry_ids_v1');
+    });
+    alRegs.forEach(function (r) {
+      try { keepAl[r.key] = WA.settingsBus ? WA.settingsBus.read(r) : null; } catch (e) { keepAl[r.key] = null; }
+    });
+    try {
+    want('not-bound', 'registry.bindAlias：规范名不在册（给不存在的人登记历史名 = 凭空造一个身份，v2.97.0 O9）');
+    trip('not-bound', function () { return [Rg.bindAlias('谁也不是', { was: '老名' }).reason]; });
+    want('alias-cycle', 'registry.bindAlias：自指登记（旧名就是现名 ⇒ 这条边没有意义，v2.97.0 O9）');
+    trip('alias-cycle', function () {
+      Rg.identityOf('甲');
+      return [Rg.bindAlias('甲', { was: '甲' }).reason];
+    });
+    want('unknown-name', 'registry.aliasOf：对完全不在册的名字**不编**一个规范名（v2.97.0 O9）');
+    trip('unknown-name', function () { return [Rg.aliasOf('查无此人').reason, Rg.traceOf('查无此人').reason]; });
+    want('name-taken', 'registry.bindAlias：一个旧名只能有一个主人（两个主人 ⇒ 同一行解析出两种身份，v2.97.0 O9）');
+    trip('name-taken', function () {
+      Rg.identityOf('甲'); Rg.identityOf('乙');
+      const a = Rg.bindAlias('乙', { was: '老李' });
+      const b = Rg.bindAlias('甲', { was: '老李' });
+      return [a.ok ? b.reason : a.reason];
+    });
+    want('too-deep', 'registry.bindAlias：链深超过 8 跳当场拒收（往表里放一条永远解析不出来的登记 = 在账上打个死结，v2.97.0 O9）');
+    trip('too-deep', function () {
+      // 造法：倒序登记 x1←x0, x2←x1 … x8←x7 ⇒ canonicalOf(x0) 恰 8 跳；
+      //   再给 x0 挂一个旧名 ⇒ newDepth = 8 + 1 = 9 > 8 ⇒ too-deep。
+      //   （顺序反了永远只有 1 跳：newDepth 取的是**规范名那一侧**的链长。）
+      for (let i = 0; i <= 8; i++) Rg.identityOf('深' + i);
+      for (let i = 0; i < 8; i++) Rg.bindAlias('深' + (i + 1), { was: '深' + i });
+      return [Rg.bindAlias('深0', { was: '更早的名' }).reason];
+    });
+    } finally {
+      // 无条件收回：两张表都要还原（只还原 alias 不还原 ids 会让「甲/乙/深0」留着）
+      alRegs.forEach(function (r) {
+        try { if (WA.settingsBus) WA.settingsBus.save(r, keepAl[r.key] || {}); } catch (e) {}
+      });
+    }
+  }
+  // ── v2.97.0（X5）跨插件因果桥（入站边）：五个新码 ──
+  //   入站面收的是**外部插件**递来的东西，故这些码每一条都是「对方发错/发乱」的现实形态。
+  if (WA.phoneBridge && typeof WA.phoneBridge.linkChain === 'function') {
+    const Pb = WA.phoneBridge;
+    const keepPb = Pb.getSettings();
+    const keepCausal = WA.store.get().causal;
+    try {
+      Pb.setSettings({ enabled: true, linkCausal: true });
+      const CID = 'c_reject_witness_v2970';
+      const CID2 = 'c_reject_witness_v2970b';
+      WA.store.transact(function (d) {
+        // 两条链：一条给正常接链用，另一条是 already-linked 的**目标**——
+        //   若目标链不存在，先撞的是 unknown-chain（门序：unknown-chain → no-ops → unknown-op → already-linked）。
+        d.causal = { chains: [
+          { id: CID, cause: '见证', action: '见证', status: 'active', stage: 'pending' },
+          { id: CID2, cause: '见证乙', action: '见证乙', status: 'active', stage: 'pending' }
+        ], settled: [], phoneOps: [] };
+      }, 'reject-witness:v2970-causal');
+      want('unknown-chain', 'phoneBridge.linkChain：链必须**已存在**（接一条不存在的链 = 用桥给世界造一条因果，v2.97.0 X5）');
+      trip('unknown-chain', function () { return [Pb.linkChain('po_x', 'c_根本不存在').reason]; });
+      want('unknown-op', 'phoneBridge.linkChain：台账里没有这笔操作（认不出是谁 ⇒ 不许凭空接上，v2.97.0 X5）');
+      trip('unknown-op', function () { return [Pb.linkChain('po_不存在', CID).reason]; });
+      want('no-ops', 'phoneBridge.linkChain：因果容器在但台账面不存在（旧存档 / 外部导入没带这一层，v2.97.0 X5）');
+      trip('no-ops', function () {
+        let keep = null;
+        WA.store.transact(function (d) { keep = d.causal.phoneOps; delete d.causal.phoneOps; }, 'reject-witness:v2970-drop-ops');
+        try { return [Pb.linkChain('po_x', CID).reason]; }
+        finally { WA.store.transact(function (d) { d.causal.phoneOps = keep || []; }, 'reject-witness:v2970-restore-ops'); }
+      });
+      want('already-linked', 'phoneBridge.linkChain：已接过别的链**不覆盖**（静默改写会让「这条链的因」事后被换掉而没人知道，v2.97.0 X5）');
+      trip('already-linked', function () {
+        const n = Pb.noteAction({ opId: 'po_rej_1', act: 'block', to: '乙', chainId: CID });
+        if (!n.ok) return ['note-failed:' + n.reason];
+        return [Pb.linkChain('po_rej_1', CID2).reason];
+      });
+      want('ops-full', 'phoneBridge.noteAction：台账满 ⇒ 拒收而非静默挤掉（挤掉一笔 = 让「这条链的因」事后消失，v2.97.0 X5）');
+      trip('ops-full', function () {
+        const cap = Pb.stat().maxOps;
+        WA.store.transact(function (d) {
+          d.causal.phoneOps = [];
+          for (let i = 0; i < cap; i++) {
+            d.causal.phoneOps.push({ id: 'po_fill_' + i, opId: 'po_fill_' + i, act: 'message', actLabel: '回消息',
+              from: '', to: '', text: '', at: 1, seq: i + 1, chainId: '' });
+          }
+        }, 'reject-witness:v2970-fill');
+        return [Pb.noteAction({ opId: 'po_over', act: 'pin' }).reason];
+      });
+    } finally {
+      Pb.setSettings(keepPb);
+      WA.store.transact(function (d) { d.causal = keepCausal; }, 'reject-witness:v2970-restore-causal');
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

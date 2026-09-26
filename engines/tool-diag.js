@@ -290,8 +290,18 @@
         records: ev.records, replays: ev.replays, recordFails: ev.recordFails,
         tapeMode: ev.tape ? ev.tape.mode : null
       } : null;
+      // v2.97.0 O10：语义坐标面（第四十四面）。两句必须**分开念**：
+      //   · coord     —— 当前标记（无人标记时 round 为 null，照实说不，不编一个轮次）；
+      //   · coordGaps —— 无坐标的格数。0 时可以指着「第几轮第几步」，>0 时只能说「第几格」。
+      //   两句合成一句（例如拿 0 冒充「没有坐标」）会让复核结论的定位粒度变成假话。
+      //   这里是**直读现场**（与上面直读 tape / verifyTape 同规格）：诊断的职责是自己去看，
+      //   而不是转发另一个模块的摘要——转发会让「诊断看到的」与「模块报的」之间多一层信任假设。
+      const coordFace = (function () {
+        try { return (WA.rand && WA.rand.coordOf) ? WA.rand.coordOf() : null; } catch (e) { return null; }
+      })();
+      const coordGaps = (ev && ev.coordGaps) ? ev.coordGaps : null;
       return { enabled: !!cfg.enabled, maxChains: cfg.maxChains, maxItems: cfg.maxItems,
-        replay: replay, tape: tape,
+        replay: replay, tape: tape, coord: coordFace, coordGaps: coordGaps,
         chains: chains, settledRows: settledRows, now: now, adds: st.chains || 0, acts: st.acts || 0,
         deferred: st.deferred || 0, cancelled: st.cancelled || 0, expired: st.expired || 0,
         blocked: st.blocked || 0, dueNow: due, lastReason: st.lastReason || '',
@@ -577,6 +587,8 @@
     'engines/longline.js': 'longline',
     // v2.62.0：因果结算
     'engines/causal.js': 'causal',
+    // v2.97.0（X5）：跨插件因果桥（入站边）
+    'engines/phone-bridge.js': 'phoneBridge',
     // v2.63.0：世界织体 / 社交漩涡 / 悬案（与 index.js LOAD_ORDER 同批登记）
     'engines/world.js': 'world',
     'engines/weather.js': 'weather',
@@ -1220,7 +1232,19 @@
        'wa-rm-enabled', 'wa-rm-fact', 'wa-rm-start', 'wa-rm-investigate', 'wa-rm-fullview',
        'wa-rm-id', 'wa-rm-from', 'wa-rm-to', 'wa-rm-motive', 'wa-rm-value', 'wa-rm-layer',
        'wa-rm-relay', 'wa-rm-refute', 'wa-rm-conceal', 'wa-rm-person', 'wa-rm-why', 'wa-rm-visible',
-       'wa-rm-out'],
+       'wa-rm-out',
+       // v2.97.0（X5）：跨插件因果桥（入站边）八控件（同样渲染在人物页）。
+       //   三条理由与 v2.51.0 / v2.62.0 / v2.63.0 / v2.95.0 / v2.96.0 一致：新控件必须同时
+       //   「渲染 + 绑定 + 守卫登记」，否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+       //   一律**无条件渲染**（模块缺席时整段降级成提示、控件不在场 ⇒ 本组会报 missing）；
+       //   与 style/causal/world/rumor 同一取舍：phone-bridge.js 是产品文件，缺席本身就是断裂。
+       'wa-pb-enabled', 'wa-pb-opid', 'wa-pb-act', 'wa-pb-to',
+       'wa-pb-note', 'wa-pb-view', 'wa-pb-chain', 'wa-pb-link', 'wa-pb-trace', 'wa-pb-out',
+       // v2.97.0（O9）：别名面三控件（渲染在人物页「人物身份」区）。
+       //   同 v2.51.0 / v2.62.0 / v2.63.0 / v2.95.0 / v2.96.0 的理由——aliasOf / bindAlias /
+       //   aliasStat 是本版新增的三个导出，它们**必须有真消费方**（无消费方不挂），
+       //   而这里就是那三个消费方；不同时登记进守卫表，「渲染了但绑定 id 写错」无人发现。
+       'wa-id-aliasname', 'wa-id-bindalias', 'wa-id-aliasof', 'wa-id-aliasstat'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
@@ -1470,6 +1494,48 @@
       };
     }, {});
   }
+  // v2.97.0（X5）: 跨插件因果桥（**入站边**）——手机侧的动作有没有进到世界里来。
+  //   为什么诊断要看它：v2.16.0 把**出站**边做出来了（本扩展的世界外供），本节管的是反向那条边。
+  //   入站整条断链的后果比出站更隐蔽：手机侧一次「拉黑」在世界里没有任何痕迹，
+  //   而 WorldAxis 侧的因果面照旧只有正文里冒出来的那些 cause —— 同一件事两边各说一遍，
+  //   从世界状态里看不出「少了一笔」。故本节把「收了几笔 / 卡在哪一步 / 有没有接上链」摆出来。
+  //   分级：模块未装载＝error（入站整条断链，手机侧的因永远进不来）；
+  //   休眠但有上报＝warn（**那几笔操作已经丢了**——桥没开闸时上报不落盘，不是「以后会补上」）；
+  //   有拒收（不认识的动作 / 缺 opId）＝warn（那正是「让外部决定本扩展因果词汇表」的前兆）；
+  //   台账满＝warn（后续上报被拒收，须知道）；其余＝info。
+  function secPhoneBridge() {
+    return safe(function () {
+      if (!WA.phoneBridge || typeof WA.phoneBridge.stat !== 'function') {
+        return { error: 'engines/phone-bridge.js 未加载（手机侧的因进不来：同一件事两边各说一遍）' };
+      }
+      const s = WA.phoneBridge.stat();
+      const cfg = safe(function () { return WA.phoneBridge.getSettings(); }, {});
+      const p = safe(function () { return WA.phoneBridge.phaseOf(); }, {});
+      return {
+        id: WA.phoneBridge.id, version: WA.phoneBridge.version,
+        acts: WA.phoneBridge.PHONE_ACTS, actLabels: WA.phoneBridge.ACT_LABEL, phases: WA.phoneBridge.PHASES,
+        enabled: cfg ? cfg.enabled : null, linkCausal: cfg ? cfg.linkCausal : null, maxOps: s.maxOps,
+        phase: p ? p.phase : null, phaseSinceMs: p ? p.sinceMs : null, phaseNote: p ? p.note : null,
+        noted: s.noted, reused: s.reused, blocked: s.blocked,
+        linked: s.linked, linkFails: s.linkFails,
+        rows: s.rows, unlinked: s.unlinked, linkedRows: s.linked_rows,
+        byAct: s.byAct, faults: s.faults,
+        // 链 → 操作（traceOf）的诊断消费：计划判据是「evidence() 可把链回放到手机操作记录」，
+        //   而「这条链的因在不在手机侧」必须在诊断面可答——否则一笔上报接上了链、
+        //   接了哪条链，只有写它的那一方知道。
+        traces: safe(function () {
+          const v = WA.phoneBridge.opsView(40);
+          const chains = [];
+          (v.items || []).forEach(function (x) { if (x.chainId && chains.indexOf(x.chainId) < 0) chains.push(x.chainId); });
+          return chains.slice(0, 5).map(function (cid) {
+            const tr = WA.phoneBridge.traceOf(cid);
+            return { chainId: cid, count: tr.count, acts: (tr.items || []).map(function (y) { return y.act; }) };
+          });
+        }, []),
+        lastReason: s.lastReason, lastAct: s.lastAct, lastOpId: s.lastOpId
+      };
+    }, {});
+  }
   // v2.17.0: 记忆桥消费面（另一个插件记的那本账，本扩展读不读得到）
   //   为什么要有这一节：v2.16.0 把本扩展的**出口**做出来了（外部能读到这个世界），
   //   但反向那条边一直是断的——全库 grep lonsha_memory_bridge_v1 的命中**全在注释与
@@ -1537,6 +1603,7 @@
       ui: secUi(), capabilities: secCapabilities(),
       host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
       bridge: secBridge(),
+      phoneBridge: secPhoneBridge(),
       lonsha: secLonsha(),
       compat: secCompat(),
       // v2.50.0（第三十五面）：宿主两侧 + 时间轴三节
@@ -1648,6 +1715,32 @@
         }
       }
     } catch (eBd) {}
+    // v2.97.0（X5）: 入站桥分级——与上面出站桥**对称**（一发一收，缺任一边这套互操作都是半条）。
+    //   ① 模块不可用 ⇒ error：手机侧的交互动作在世界里不留痕迹，而状态里看不出「少了一笔」。
+    //   ② 休眠却有上报 ⇒ warn：**那几笔已经丢了**。入站桥没开闸时上报不落盘、也不排队，
+    //      「以后会补上」是假的——手机侧看到的是「我报了」，本扩展看到的是「什么都没发生」。
+    //   ③ 有拒收 ⇒ warn：对方发来了本扩展不认识的动作（或没带 opId）——那正是
+    //      「让外部决定本扩展因果词汇表」的前兆。
+    //   ④ 台账满 ⇒ warn：后续上报被拒收（不静默挤掉，但须知道）。
+    try {
+      const pb = diag.phoneBridge || {};
+      if (pb.error) {
+        issues.push({ level: 'error', key: 'phoneBridge', detail: '入站桥不可用：' + pb.error });
+      } else {
+        if (pb.enabled === false && (pb.blocked > 0 || pb.noted > 0)) {
+          issues.push({ level: 'warn', key: 'phoneBridge', detail: '入站桥休眠，但手机侧已上报过 ' + (pb.blocked + pb.noted) + ' 笔——桥没开闸时上报**不落盘也不排队**，那几笔操作已经丢了（要收就开 `WorldAxis.phoneBridge.setSettings({ enabled: true })`）' });
+        }
+        if (pb.enabled === true && pb.blocked > 0) {
+          issues.push({ level: 'warn', key: 'phoneBridge', detail: '入站桥拒收 ' + pb.blocked + ' 笔（' + JSON.stringify(pb.faults || {}) + '）——拒收本身是对的（不认识的动作不许照收），但须看是「对方发错了」还是「本扩展的词汇表该扩了」' });
+        }
+        if (pb.enabled === true && pb.rows >= pb.maxOps) {
+          issues.push({ level: 'warn', key: 'phoneBridge', detail: '入站台账已满（' + pb.rows + '/' + pb.maxOps + '），后续上报会被拒收（ops-full）——不静默挤掉是对的，但满员本身要处理' });
+        }
+        if (pb.enabled === true && pb.rows > 0 && pb.unlinked === pb.rows) {
+          issues.push({ level: 'info', key: 'phoneBridge', detail: '入站台账 ' + pb.rows + ' 笔全部未接链——手机侧的操作已经进来了，但还没人把「它是哪条链的因」接上（`linkChain`）' });
+        }
+      }
+    } catch (ePb) {}
     if (h && h.sillyTavern === false) issues.push({ level: 'warn', key: 'host', detail: '未检测到 SillyTavern 宿主（无事件源，仅拦截器函数可用）' });
     else if (h && h.eventSource === false) issues.push({ level: 'warn', key: 'host', detail: '宿主无事件源：after 链与切聊天重载将不生效' });
     if (h && h.extensionPrompt === false) issues.push({ level: 'error', key: 'host', detail: '宿主无 setExtensionPrompt：注入通道完全不可用' });
@@ -2228,6 +2321,23 @@
           + (bdF.snapshotBytes || 0) + ' 字节）｜外部读取 ' + (bdF.externalReads || 0) + ' 次｜作废 '
           + (bdF.invalidations || 0) + ' 次（最近：' + (bdF.lastInvalidateReason || '—') + '）'
           + (bdF.failures > 0 ? '｜失败 ' + bdF.failures + ' 次' : '')
+      });
+    }
+    // v2.97.0（X5）: 入站桥摘要行——与上面 bridge 行**对称**（那一行答「我发得出去吗」，
+    //   这一行答「我收得进来吗」；缺这一行，「手机侧按下的按钮进没进世界」在总览里完全缺席）。
+    const pbF = d.phoneBridge || {};
+    if (pbF.error) {
+      out.push({ level: 'error', key: 'phoneBridge', detail: '入站桥不可用：' + pbF.error });
+    } else if (pbF.enabled === false) {
+      out.push({ level: 'info', key: 'phoneBridge', detail: '入站桥休眠（手机侧动作不进世界台账；已丢 ' + (pbF.blocked || 0) + ' 笔上报）' });
+    } else {
+      out.push({
+        level: (pbF.blocked > 0 || (pbF.rows >= pbF.maxOps)) ? 'warn' : 'info', key: 'phoneBridge',
+        detail: '入站桥开闸：台账 ' + (pbF.rows || 0) + '/' + (pbF.maxOps || 0) + ' 笔（未接链 ' + (pbF.unlinked || 0)
+          + '）｜收下 ' + (pbF.noted || 0) + ' 次（重复上报 ' + (pbF.reused || 0) + ' 次）｜接链 ' + (pbF.linked || 0)
+          + ' 次（失败 ' + (pbF.linkFails || 0) + '）｜拒收 ' + (pbF.blocked || 0) + ' 笔'
+          + (pbF.blocked > 0 ? '（' + JSON.stringify(pbF.faults || {}) + '）' : '')
+          + '｜手机侧推送相位 ' + (pbF.phase || '?')
       });
     }
     // v2.17.0: 记忆桥消费面摘要行——否则 flatten 出来的清单里「另一个插件记的那本账」

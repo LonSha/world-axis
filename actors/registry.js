@@ -189,6 +189,199 @@
     try { WA.settingsBus.save(__REG_IDS, sc.all); } catch (e) {}
     return { ok: true, name: nm, id: old };
   }
+  // -- v2.97.0 O9：别名表与追溯链（v2.91.0 O4 未覆盖项「id 重命名后旧引用可追溯」）------
+  //   它治的病：`danglingRefs` 只答「这个引用指向的名字已经不在册了」，答不出**它原来是谁**。
+  //   于是「张三改叫三哥」之后，所有指向「张三」的关系行 / 量值行 / 承诺行一律变成悬空——
+  //   调用方被迫在「清掉旧账」与「任其悬空」之间二选一，而两个选项都在替作者做决定。
+  //   别名表是第三个选项：**名字可以有历史**。
+  //
+  //   口径（全是否定式，这五条正是本段存在的全部理由）：
+  //     ① **只登记、不改写**：旧名不删、不重定向任何既有行——关系行照旧写着旧名，
+  //        「改过名」从此不再等于「断过链」。
+  //     ② **只增不删**：历史名一经登记永久可解析（与 rumor 的 intact 累积不可恢复同源）。
+  //     ③ **一个旧名只有一个主人**：旧名若已属于别人，报 name-taken。否则同一行会解析出
+  //        两种身份，追溯链当场失去意义。
+  //     ④ **链可有深度，但必须有边界**：登记时**当场**拒绝把链建过 ALIAS_MAX_HOPS
+  //        （too-deep）——往表里放一条永远解析不出来的登记，等于在账上打个死结；
+  //        解析侧另有一道同样的闸，管旧存档与外部导入的数据。
+  //     ⑤ **查不到就说查不到**：对完全不在册的名字报 unknown-name——
+  //        给它编一个规范名，等于用别名表替世界造了一个人。
+  const ALIAS_KEY = 'worldaxis_registry_alias_v1';
+  const __REG_ALIAS = { key: ALIAS_KEY, def: {}, module: 'registry' };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG_ALIAS]);
+  const ALIAS_MAX_HOPS = 8;
+  function aliasTable() { try { return WA.settingsBus.read(__REG_ALIAS) || {}; } catch (e) { return {}; } }
+  /** 按聊天分域（与身份表同规格：切聊天不串味） */
+  function aliasScope() {
+    const all = aliasTable();
+    const cid = chatId();
+    if (!all[cid] || typeof all[cid] !== 'object' || Array.isArray(all[cid])) all[cid] = {};
+    return { all: all, cid: cid, mine: all[cid] };
+  }
+  /**
+   * 反向索引：历史名 → 它的直接主人（规范名）。
+   *   **单一构造点**：追溯、结环检查、在册判定三处共用一份，免得三处各写一套配对逻辑
+   *   （「同一份真源、三种实现」是本仓库反复治理过的病）。
+   */
+  function aliasRev(sc) {
+    const s = sc || aliasScope();
+    const rev = {};
+    Object.keys(s.mine).forEach(function (canon) {
+      const arr = Array.isArray(s.mine[canon]) ? s.mine[canon] : [];
+      arr.forEach(function (row) {
+        const old = String((row && row.was) || '').trim();
+        if (old && !rev[old]) rev[old] = canon;
+      });
+    });
+    return rev;
+  }
+  /**
+   * 逐跳回溯到规范名。**不判在册**——它只回答「往上的链尽头是谁」（在册判定在 aliasOf 里）。
+   *   链走不通时报**停在哪一跳**，而不是返回一个半截答案。
+   */
+  function canonicalOf(name) {
+    const nm = String(name || '').trim();
+    if (!nm) return { ok: false, reason: 'missing-name' };
+    const rev = aliasRev();
+    let cur = nm, hops = 0;
+    const seen = {};
+    seen[nm] = true;
+    for (;;) {
+      const up = rev[cur];
+      if (!up) return { ok: true, canonical: cur, hops: hops };
+      if (seen[up]) return { ok: false, reason: 'alias-cycle', at: cur, next: up, hops: hops };
+      if (hops + 1 > ALIAS_MAX_HOPS) return { ok: false, reason: 'too-deep', at: cur, hops: hops, cap: ALIAS_MAX_HOPS };
+      seen[up] = true; cur = up; hops++;
+    }
+  }
+  /** 名字是否「在册」：有稳定 id / 自己名下有历史名 / 自己是别人的历史名，三者任一即算 */
+  function aliasKnown(nm, scI, scA, rev) {
+    const s1 = scI || idScope(), s2 = scA || aliasScope(), r = rev || aliasRev(s2);
+    if (s1.mine[nm]) return { known: true, how: 'id' };
+    if (Array.isArray(s2.mine[nm]) && s2.mine[nm].length > 0) return { known: true, how: 'aliases' };
+    if (r[nm]) return { known: true, how: 'alias-of:' + r[nm] };
+    return { known: false, how: '' };
+  }
+  /**
+   * 登记一条别名：`name` 是**现在的名字**，`opts.was` 是它的旧名。
+   *   幂等：同一对重复登记返回 reused:true（与 slotAssign 同规格），不报错也不重复追加。
+   *   规范名须**在册**（有 id、或本身就是某人的旧名）——给一个不存在的人登记历史名，
+   *   等于凭空造一个身份；而给「本身就是旧名」的名字再挂一个更早的名字，正是链式登记。
+   */
+  function bindAlias(name, opts) {
+    const o = opts || {};
+    const canon = String(name || '').trim();
+    const was = String(o.was === undefined || o.was === null ? '' : o.was).trim();
+    if (!canon || !was) return { ok: false, reason: 'missing-fields' };
+    if (canon === was) return { ok: false, reason: 'alias-cycle', at: canon, next: was, self: true };
+    const scI = idScope();
+    const scA = aliasScope();
+    const rev = aliasRev(scA);
+    const rec = aliasKnown(canon, scI, scA, rev);
+    if (!rec.known) return { ok: false, reason: 'not-bound', name: canon };
+    if (rev[was] && rev[was] !== canon) return { ok: false, reason: 'name-taken', was: was, owner: rev[was] };
+    const arr = Array.isArray(scA.mine[canon]) ? scA.mine[canon] : (scA.mine[canon] = []);
+    for (let i = 0; i < arr.length; i++) {
+      if (String((arr[i] && arr[i].was) || '') === was) {
+        return { ok: true, reused: true, canonical: canon, aliases: arr.map(function (x) { return x.was; }) };
+      }
+    }
+    // 结环检查：新边是 was → canon。若从 canon 沿既有边能走回 was，这条登记就把链焊成了环。
+    //   自指（canon === was）已在上面拦下；这里管的是「绕一圈回来」。
+    const seenC = {};
+    let probe = canon, guard = 0;
+    seenC[probe] = true;
+    for (;;) {
+      const nx = rev[probe];
+      if (!nx) break;
+      if (nx === was) return { ok: false, reason: 'alias-cycle', at: canon, next: was, via: probe };
+      if (seenC[nx] || guard++ > ALIAS_MAX_HOPS + 2) break;
+      seenC[nx] = true; probe = nx;
+    }
+    // 深度闸：加上这一边之后，was 的链长 = 1 + canon 的链长。超上限当场拒绝。
+    const upCanon = canonicalOf(canon);
+    if (!upCanon.ok) return upCanon;
+    const newDepth = upCanon.hops + 1;
+    if (newDepth > ALIAS_MAX_HOPS) return { ok: false, reason: 'too-deep', at: was, hops: newDepth - 1, cap: ALIAS_MAX_HOPS };
+    arr.push({ was: was, at: clockNow('registry.alias'),
+      note: String(o.note === undefined || o.note === null ? '' : o.note).slice(0, 60) });
+    try { WA.settingsBus.save(__REG_ALIAS, scA.all); } catch (e) { /* 落盘失败不影响本次登记的内存视图 */ }
+    return { ok: true, reused: false, canonical: canon,
+      aliases: arr.map(function (x) { return x.was; }), depth: newDepth };
+  }
+  /**
+   * 名字 → 身份（别名面，只读）。三位一体一律给**规范名**那一份，
+   *   并同时报出「这个名字是历史名吗、它的规范名是谁、它名下还有哪些历史名」。
+   *   与 identityOf 的分工：identityOf 按**当前名**给身份（写路径用），本口额外回答历史。
+   */
+  function aliasOf(name) {
+    const nm = String(name || '').trim();
+    if (!nm) return { ok: false, reason: 'missing-name' };
+    const scI = idScope(), scA = aliasScope(), rev = aliasRev(scA);
+    const rec = aliasKnown(nm, scI, scA, rev);
+    if (!rec.known) return { ok: false, reason: 'unknown-name', name: nm };
+    const up = canonicalOf(nm);
+    if (!up.ok) return { ok: false, reason: up.reason, at: up.at, next: up.next, hops: up.hops, cap: up.cap };
+    const canon = up.canonical;
+    const arr = Array.isArray(scA.mine[canon]) ? scA.mine[canon] : [];
+    return {
+      ok: true, name: nm, canonical: canon,
+      // 自己就是历史名，还是「当前名 + 一串历史名」——这一位决定调用方该认哪个身份
+      isAlias: canon !== nm,
+      hops: up.hops,
+      aliases: arr.map(function (x) { return x.was; }),
+      personId: scI.mine[canon] || '',
+      worldKey: worldKey(canon)
+    };
+  }
+  /**
+   * 追溯链（只读）：名字 → 规范名的**完整路径**，逐跳带时间与备注。
+   *   与 aliasOf 的分工：aliasOf 答「尽头是谁」，traceOf 答「它是怎么走到那里的」——
+   *   中间每一跳都是作者做过的一次决定，抹掉就等于把「为什么改过名」从账上删掉。
+   */
+  function traceOf(name) {
+    const nm = String(name || '').trim();
+    if (!nm) return { ok: false, reason: 'missing-name' };
+    const scI = idScope(), scA = aliasScope(), rev = aliasRev(scA);
+    const rec = aliasKnown(nm, scI, scA, rev);
+    if (!rec.known) return { ok: false, reason: 'unknown-name', name: nm };
+    const steps = [];
+    let cur = nm, hops = 0;
+    const seen = {};
+    seen[nm] = true;
+    for (;;) {
+      const up = rev[cur];
+      if (!up) break;
+      if (seen[up]) return { ok: false, reason: 'alias-cycle', at: cur, next: up, steps: steps, hops: hops };
+      if (hops + 1 > ALIAS_MAX_HOPS) return { ok: false, reason: 'too-deep', at: cur, hops: hops, cap: ALIAS_MAX_HOPS, steps: steps };
+      // 这一跳的登记行（时间与备注）：从**主人名下的表**里取，不从反向索引里猜
+      const rows = Array.isArray(scA.mine[up]) ? scA.mine[up] : [];
+      const row = rows.filter(function (x) { return String((x && x.was) || '') === cur; })[0] || {};
+      steps.push({ at: Number(row.at) || 0, from: cur, to: up, note: String(row.note || '') });
+      seen[up] = true; cur = up; hops++;
+    }
+    return { ok: true, name: nm, canonical: cur, hops: hops, steps: steps };
+  }
+  /**
+   * 别名表只读视图（诊断 / 面板消费）：成对总数、跳数上限、**最深链**。
+   *   maxDepth 是这张表最该被看见的数：它说明世界里的名字被改过几手。
+   */
+  function aliasStat() {
+    const s = aliasScope(), rev = aliasRev(s);
+    const rows = [];
+    Object.keys(s.mine).forEach(function (canon) {
+      const arr = Array.isArray(s.mine[canon]) ? s.mine[canon] : [];
+      arr.forEach(function (x) {
+        rows.push({ canonical: canon, was: String((x && x.was) || ''), at: Number(x && x.at) || 0 });
+      });
+    });
+    const depthOf = function (nm) { const u = canonicalOf(nm); return u.ok ? u.hops : -1; };
+    let maxDepth = 0;
+    rows.forEach(function (r) { const d = depthOf(r.was); if (d > maxDepth) maxDepth = d; });
+    return { chatId: s.cid, pairs: rows.length, owners: Object.keys(s.mine).length,
+      names: Object.keys(rev).length, maxDepth: maxDepth, maxHops: ALIAS_MAX_HOPS,
+      rows: rows.slice(0, 20), persisted: true };
+  }
   /**
    * 世界状态键：long-term 状态（目标/承诺/日程/认知）在 store 里的**实际落点**是
    *   `people['p_' + 姓名]`。它与 personId() 是**两件事**，必须显式桥接而不是各自为政：
@@ -618,6 +811,17 @@
     identityOf: identityOf,
     idStat: idStat,
     idClear: idClear,
+    // v2.97.0 O9：别名表与追溯链。四个口，每个都有真消费方（无消费方不挂）：
+    //   · aliasOf   —— 名字 → 规范名身份（面板「查身份」在历史名上也能作答）
+    //   · bindAlias —— 登记一次改名留痕（面板「登记曾用名」消费）
+    //   · traceOf   —— 逐步追溯路径（诊断 alias.trace 消费：中间每一跳都要看得见）
+    //   · aliasStat —— 表视图（诊断 + 面板空态提示两处消费）
+    //   不导出 canonicalOf / aliasRev / aliasKnown：三者只有本文件内的消费方
+    //   （danglingRefs / aliasOf / traceOf），挂出去就是本仓库点名的「零消费死面」。
+    aliasOf: aliasOf,
+    bindAlias: bindAlias,
+    traceOf: traceOf,
+    aliasStat: aliasStat,
     /**
      * v2.91.0 O4：**跨模块身份引用的悬空对账**（只读，不改任何状态）。
      *   它治的病：关系 / 量值 / 承诺三类行里的 `target` 都是**名字引用**，
@@ -629,6 +833,9 @@
      */
     danglingRefs() {
       const sc = idScope();
+      // v2.97.0 O9：别名面是名字的**第三套来源**。旧名不再等于悬空——
+      //   它只是「走到了别人名下」。两件事必须分列报出（见下方 aliasRows）。
+      const rev = aliasRev(aliasScope());
       const bound = {}, known = {};
       Object.keys(sc.mine).forEach(function (n) { bound[n] = true; known[n] = true; });
       let s = {};
@@ -636,7 +843,23 @@
       const people = s.people || {};
       Object.keys(people).forEach(function (k) { known[String(k).replace(/^p_/, '')] = true; });
       // 名字的两套来源（等价）：持久绑定表 + 存档容器键。任一命中即不算悬空。
-      const rows = [], byKind = { relationships: 0, relations: 0, commitment: 0 };
+      //   分类口径（v2.97.0 O9 立）：直认 / 靠别名认 / 谁也认不出，三态**分列**。
+      //   全塞进 rows 会让「有人把名字改坏了」与「这里记着一个早就没人认得的名字」
+      //   长得一模一样（都表现为一行悬空）——而它们要的处理完全不同。
+      const rows = [], aliasRows = [], byKind = { relationships: 0, relations: 0, commitment: 0 };
+      const aliasByKind = { relationships: 0, relations: 0, commitment: 0 };
+      const mark = function (from, kind, t) {
+        if (!t || known[t]) return;
+        if (rev[t]) {
+          const up = canonicalOf(t);
+          aliasByKind[kind]++;
+          aliasRows.push({ from: from, kind: kind, target: t,
+            canonical: up.ok ? up.canonical : '', hops: up.ok ? up.hops : -1, aliasBroken: !up.ok });
+          return;
+        }
+        byKind[kind]++;
+        rows.push({ from: from, kind: kind, target: t });
+      };
       Object.keys(people).forEach(function (k) {
         const nm = String(k).replace(/^p_/, '');
         const p = people[k];
@@ -644,25 +867,18 @@
         const pr = (p.profile || {});
         ['relationships', 'relations'].forEach(function (sec) {
           const arr = Array.isArray(pr[sec]) ? pr[sec] : [];
-          arr.forEach(function (x) {
-            const t = String((x && x.target) || '').trim();
-            if (!t || known[t]) return;
-            byKind[sec]++;
-            rows.push({ from: nm, kind: sec, target: t });
-          });
+          arr.forEach(function (x) { mark(nm, sec, String((x && x.target) || '').trim()); });
         });
         const lf = p.life;
         if (lf && Array.isArray(lf.commitments)) {
-          lf.commitments.forEach(function (x) {
-            const t = String((x && x.target) || '').trim();
-            if (!t || known[t]) return;
-            byKind.commitment++;
-            rows.push({ from: nm, kind: 'commitment', target: t });
-          });
+          lf.commitments.forEach(function (x) { mark(nm, 'commitment', String((x && x.target) || '').trim()); });
         }
       });
       return { rows: rows.length, byKind: byKind, items: rows.slice(0, 20),
-        knownCount: Object.keys(known).length, persisted: true };
+        // 靠改名台账兜住的那些引用：不是缺陷，但必须可见——一个引用面全靠别名兜住，
+        //   本身就是「这个世界的名字被改得很勤」这条实情。
+        aliasRows: aliasRows.length, aliasByKind: aliasByKind, aliasItems: aliasRows.slice(0, 20),
+        knownCount: Object.keys(known).length, aliasNames: Object.keys(rev).length, persisted: true };
     },
     // v2.86.0 A3：people 条目的唯一写者 + 来源观测口（消费方：life/intel/backstage + 诊断）
     ensurePerson: ensurePerson,

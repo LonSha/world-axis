@@ -54,7 +54,7 @@
   · **A5 的「常用操作 / 有效配置来源 / 回滚结果 / 手机交互 / 实机浏览器验收」**未做；本版 A5 只收口了差异预览与字段映射。
   · **B7 题材对正文的实际影响**只做到「模块是否进入注入面」，未做「不同题材下同一场景的生成差异」对照实验。
 
-## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O5 已交付，X4 已交付）
+## v2.89.0 优化线推进（O1–O5 / X1–X5 两份计划：O1–O5 已交付，X2 / X4 / X5 已交付）
 起点：v2.87.0 / 40b6c04。两份计划已入库（folder=WorldAxis）：《WorldAxis v2.88+ 优化方向计划（O1–O5 性能与透明度）》UUID 29179707-ce90-49ac-8e71-36d3c5079409；《WorldAxis v2.88+ 功能拓展计划（X1–X5 交互生态拓宽）》UUID 38375f01-cbd6-41a1-8bd9-842294a610ac。
 - [x] O1（本版落点 = 注入预算实测与分档，原料 = A4 未覆盖项「短中长基准/耗时分列」）：
   · 计时落在 `render/inject.js` 的 `engineCall`（v2.86.0 的唯一引擎调用出口，46 处调用点）——一处落表覆盖全部引擎源；时钟用 `clockWall`（测量时间），与 `clockNow` 分列。
@@ -146,7 +146,8 @@
 - [x] 验收（X3 + X6，v2.96.0）：**X3** 新增 `engines/rumor.js`（十五口导出）+ 专锁 `tests/rumor-v2960.js` **84/0**（A 静态面 / B 运行时 B0–B19 / C 不变式 / N0–N5 负控制，十锚点 `ASCEND_GUARD` / `TAMPER_LAYER` / `UNDECLARED_REWRITE` / `INTACT_CUMULATIVE` / `HOPS_NO_EVICT` / `CONF_NO_FALLBACK` / `PUBLIC_ONLY_BLOCK` / `FACT_NO_FABRICATE` / `CONCEAL_NOT_HOP` / `REFUTE_NO_REWRITE` 各恰中 1 次）；**X6** 判定面接线 `engines/hazard.js`（`weatherAt` / `targetWith` / `weatherGain` 三个内部面**不导出**，十二口导出逐字不变）+ 专锁 `tests/hazard-weather-v2960.js` **61/0**（八锚点 `READONLY_WEATHER` / `NO_FALLBACK_ABSENT` / `DISTINGUISH_BASE` / `HARD_FLOOR_ONE` / `SINGLE_SEVERITY` / `MISSING_HONEST` / `HAS_AT_DISCRIMINATION` / `DISABLED_NOT_SUNNY` 各恰中 1 次）。两锁均「真源码破坏 → 装载破坏副本 → 在副本上重跑同款真判据」+ 判据纯度前置检查 + H5 锚点字面量各只声明一次 + N5「破坏必须真的替换掉锚点」。消费侧：面板人物页十八控件 / `secRumor` 采读节 / 十八控件守卫表。出口面 `ns= 105 members= 634 chars= 7710`（`FROZEN2800` 已回填 `rumor:` 段）；清册面 refs **2461** / 命名空间 111 / 成员 1272；死子面 dead 444 / uiDead 4（**无新增**——`weatherAt` 等内部面不导出故不入死表）/ dataOnly 162；拒收码 **337**（见证 99 / 死表 5 / 基线 233，新增 8 码 `unknown-fact` / `chains-full` / `hops-full` / `suppressed-full` / `bad-motive` / `link-off` 等显式归类）。九道独立门禁全绿。
 - [ ] X3 / X6 未覆盖（如实留在清单）：`rumor` 不做跨链合并、不做自动层推断；`refute` 只改「有人不再当它是一回事」；`hazard` 的天气修正只作用于目标值，不改 `count`/`hits` 语义；天气面缺席一律如实降级不回落。
 - [ ] X1 未开始（见功能拓展计划）：X1 UI 实机验收通道（**需真机三插件联调，无头不可验**）。
-- [ ] X5 未开始（见功能拓展计划）：X5 跨插件因果桥（v2.97.0，与 O9 / O10 同版）。
+- [x] 验收（O9 + O10 + X5，本轮）：三把专锁 `tests/alias-trace-v2970.js` **58/0** / `tests/coord-v2970.js` **41/0** / `tests/phone-bridge-v2970.js` **47/0**（各含 A 静态面 / B 运行时 / C 不变式 / N0–N9 负控制，真源码破坏 → 装载破坏副本 → 在副本上重跑同款真判据）；全量回归 **8388/0**（v2.96.0 基线 8202/40）；出口面 `ns= 106 members= 654 chars= 7897`（+5 成员：`registry` 四口 `bindAlias` / `aliasOf` / `traceOf` / `aliasStat` + `phoneBridge.traceOf`，`FROZEN2800` 与 `EC2430` 已逐字回填）；清册面 refs **2523** / 命名空间 112 / 成员 1292；死子面 dead 444 / uiDead 4（**无新增**——三线新增导出全部接上真消费方）；拒收码 **346**（见证 108 / 死表 5 / 基线 233，新增九码全部带可执行见证）；九道独立门禁全绿。**产品侧三处真缺陷**（`orphanSlots` 恒为 0 / `firstMissCoord` 答错问题 / `markCoord` 还原带非零 `at`）全部由探针发现并修复；另修一处测试侧污染源（`tests/reject-v2780.js` 的 O9 见证段写真实登记却不复位，护栏与夹具自足一并补上）。
+- [ ] O9 / O10 / X5 未覆盖（如实留在清单）：别名表**只增不删**、**一个旧名只有一个主人**（旧名已属别人报 `name-taken`）、链深**硬上限 8**（登记侧当场拒绝，解析侧另有一道同样的闸管旧存档与外部导入）；`danglingRefs` **只报不删**；坐标是**标出来的、不是猜的**（无标记照实报 `round:null` / `label:`），且只在**录制时**落进磁带（回放期不写磁带故不改坐标）；桥**不挂事件监听 / 不轮询 / 不自动消费快照**、**不检查对方在场**（对方不在场时这笔操作仍然发生过，只由 `phase` 照实报出）、`block` 与 `unblock` **不合并**。
 
 ## 完成纪律
 - 每项需附实现路径、真实消费者、正反判据、运行证据，不能以新增导出或文件存在标记完成。
