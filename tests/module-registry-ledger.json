@@ -1,9 +1,9 @@
 {
- "version": "2.95.0",
- "loadOrderCount": 110,
- "loadedCount": 107,
+ "version": "2.96.0",
+ "loadOrderCount": 111,
+ "loadedCount": 108,
  "uiCount": 3,
- "nsCount": 115,
+ "nsCount": 116,
  "totals": {
   "loadEdges": 23,
   "hardEdges": 0,
@@ -1190,6 +1190,20 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_threads_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rumor.js": {
+   "ns": [
+    "rumor"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rumor_settings_v1"
    ],
    "consumedBy": []
   },

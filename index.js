@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.95.0';
+  const VERSION = '2.96.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -303,6 +303,12 @@
     // v2.63.0：悬案（调查与情报玩法面）。
     //   须早于 render/inject.js，注入时读取 threads.buildBlock()。
     'engines/threads.js',
+    // v2.96.0（X3）：传播与辟谣（事实 / 目击 / 转述 / 流言四层传播链）。
+    //   三条位置约束，全是硬依赖：
+    //     ① 须**晚于** engines/memory.js —— 事实真源是 memory.facts（事实唯一写者 upsertFact）；
+    //     ② 须**晚于** engines/intel.js —— 层的置信度由 intel.CONFIDENCE 反查（不内联第二套数）；
+    //     ③ 须**早于** render/inject.js —— 注入时读取 rumor.buildBlock()。
+    'engines/rumor.js',
     // v2.66.0：情绪通道 / 关系六型 / 假面。须早于 render/inject.js，注入时读取各自 buildBlock()；
     //   且须晚于 threads.js —— affect 的过载口径参考 difficulty 的枚举纪律，无硬依赖但保持装载序。
     'engines/affect.js',

@@ -115,6 +115,12 @@
       proactiveLastRound: 0,    // 与 parallelWorld.round 同类：0 表示「从未拉动」
       // 下轮注入三列引用（after链产出，before链一次性消费）
       nextTurnInjection: null,  // {required:[], conditional:[], suppress:[], at, anchor}
+      // v2.96.0（X3）传播与辟谣（rumor.js：事实 / 目击 / 转述 / 流言四层传播链）
+      //   chains：每条链记「同一个事实被谁用什么动机传给了谁、值有没有被改过」。
+      //   **本模块不改事实**——事实真源仍是 memory.facts（唯一写者 upsertFact）；
+      //   这里只记「这一跳把哪个值递了出去」。结构：
+      //   { id, factKey, factValue, factSource, note, layer, intact, hops:[], suppressed:[], at, updatedAt }
+      rumor: { chains: [] },
       // v2.62.0 因果结算（causal.js：原因→条件→行动→直接后果→延迟后果）
       //   chains ：在推进的因果链（含终态 settled/cancelled/expired —— **不删记录**，
       //            删了就答不出「为什么后来没发生」）
@@ -879,6 +885,10 @@
     //   与 evict.SITES 同源；运行时由 events.js 显式传当前设置值，改设置不漂移）。
     'events.rows':      { cap: 24, site: 'events.js WA.evict.array(events.rows, maxRows)（per-call，取设置上界）' },
     'events.failQueue': { cap: 24, site: 'events.js WA.evict.array(events.failQueue, maxFails)（per-call，取设置上界）' },
+    // v2.96.0 传播与辟谣一容器（rumor.js）。cap 与 evict.SITES / rumor.js 三处同源；
+    //   不登记会被 sizeAudit 报 unbounded。**跳与隐瞒不在此登记**：它们是每链自带的
+    //   有界数组（maxHops / maxSuppressed，满员即拒收、不挤出），不是全局环形容器。
+    'rumor.chains': { cap: 8, site: 'rumor.js WA.evict.array(rumor.chains)' },
     // v2.63.0 社交漩涡两容器（shadow.js）+ 悬案两容器（threads.js）
     'shadow.rows': { cap: 12, site: 'shadow.js WA.evict.array(shadow.rows)' },
     'shadow.experiences': { cap: 20, site: 'shadow.js WA.evict.array(shadow.experiences)' },

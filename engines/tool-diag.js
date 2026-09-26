@@ -328,6 +328,34 @@
     });
   }
   /**
+   * v2.96.0（X3）：传播与辟谣采集节。**四层分列**——把「多少还停在事实层」
+   *   与「多少已经烂成流言」分开数；合成一个总数就再也答不出这条链烂到哪一层。
+   * 全知面（fullView）只在此处被消费：它是「谣言层不进玩家面」的对照面，
+   *   没有它，「不剧透」这句话就无从复核（作者看不见底牌，就不知道玩家面是不是漏了）。
+   */
+  function secRumor() {
+    return safe(function () {
+      if (!WA.rumor || typeof WA.rumor.stat !== 'function') return { error: 'rumor 模块不可用' };
+      const st = WA.rumor.stat(); const cfg = WA.rumor.getSettings ? WA.rumor.getSettings() : {};
+      const fv = (cfg.enabled && WA.rumor.fullView) ? safe(function () { return WA.rumor.fullView(); }, null) : null;
+      const rows = (fv && fv.ok && Array.isArray(fv.chains)) ? fv.chains : [];
+      const byLayer = WA.rumor.LAYERS.reduce(function (a, L) {
+        a[L] = rows.filter(function (x) { return x && x.layer === L; }).length; return a; }, {});
+      // 两处纯读（fullView 与 LAYERS 归并），**不调** startChain / relay / refute / conceal：
+      //   观测不得改变被观测对象——本节的存在本身不该让任何一条链多经一手。
+      return { enabled: !!cfg.enabled, maxChains: cfg.maxChains, maxHops: cfg.maxHops, maxSuppressed: cfg.maxSuppressed,
+        layers: WA.rumor.LAYERS || [], motives: WA.rumor.MOTIVES || [],
+        publicLayers: WA.rumor.PUBLIC_LAYERS || [],
+        started: st.started || 0, relays: st.relays || 0, concealed: st.concealed || 0, refuted: st.refuted || 0,
+        blocked: st.blocked || 0, lastReason: st.lastReason || '',
+        chains: rows.length, tampered: rows.filter(function (x) { return x && !x.intact; }).length,
+        hops: rows.reduce(function (a, x) { return a + ((x && x.hopCount) || 0); }, 0),
+        suppressed: rows.reduce(function (a, x) { return a + ((x && x.suppressed) || 0); }, 0),
+        byLayer: byLayer,
+        faults: st.faults || {}, faultKinds: Object.keys(st.faults || {}).sort() };
+    });
+  }
+  /**
    * v2.63.0：社交漩涡采集节。
    *   重点报**履行与背弃各有多少**（kept / broken 分开），以及「想加深却没有秘密可加深」
    *   被拒了几次（no-shadow / shadow-closed，按原因分列）。
@@ -555,6 +583,8 @@
     'engines/difficulty.js': 'difficulty',
     'engines/shadow.js': 'shadow',
     'engines/threads.js': 'threads',
+    // v2.96.0（X3）：传播与辟谣（与 index.js LOAD_ORDER 同批登记）。
+    'engines/rumor.js': 'rumor',
     // v2.66.0：情绪通道 / 关系六型 / 假面（与 index.js LOAD_ORDER 同批登记）
     'engines/affect.js': 'affect',
     'engines/bonds.js': 'bonds',
@@ -1181,7 +1211,16 @@
       'wa-threads-enabled', 'wa-threads-q', 'wa-threads-open', 'wa-threads-id', 'wa-threads-claim',
       'wa-threads-src', 'wa-threads-lead', 'wa-threads-refute', 'wa-threads-converge',
       'wa-threads-stall', 'wa-threads-answer', 'wa-threads-resolve', 'wa-threads-abandon',
-      'wa-threads-why', 'wa-threads-out'],
+       'wa-threads-why', 'wa-threads-out',
+       // v2.96.0（X3）：传播与辟谣十四控件（同样渲染在人物页）。
+       //   三条理由与 v2.51.0 / v2.62.0 / v2.63.0 / v2.95.0 一致：新控件必须同时
+       //   「渲染 + 绑定 + 守卫登记」，否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+       //   一律**无条件渲染**（模块缺席时整段降级成提示、控件不在场 ⇒ 本组会报 missing）；
+       //   与 style/world/threads 同一取舍：rumor.js 是产品文件，缺席本身就是断裂。
+       'wa-rm-enabled', 'wa-rm-fact', 'wa-rm-start', 'wa-rm-investigate', 'wa-rm-fullview',
+       'wa-rm-id', 'wa-rm-from', 'wa-rm-to', 'wa-rm-motive', 'wa-rm-value', 'wa-rm-layer',
+       'wa-rm-relay', 'wa-rm-refute', 'wa-rm-conceal', 'wa-rm-person', 'wa-rm-why', 'wa-rm-visible',
+       'wa-rm-out'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
@@ -1491,7 +1530,7 @@
   function collect() {
     const diag = {
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), causal: secCausal(),
-      world: secWorld(), shadow: secShadow(), threads: secThreads(),
+      world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.64.0（第五十一 / 五十二 / 五十三面）：随机性面 / 敌意面 / 独立性面
       horizon: secHorizon(), enemies: secEnemies(), parallelWorld: secParallelWorld(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),

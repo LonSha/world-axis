@@ -29,6 +29,9 @@
     // v2.63.0: 世界织体 / 社交漩涡 / 悬案。同上——只加源表不加显示名会让面板裸露英文键名。
     world: '世界织体', shadow: '社交漩涡', threads: '悬案',
     weather: '天气与物候', difficulty: '世界难度',
+    // v2.96.0（X3）：传播与辟谣。与 SOURCES 同批登记——只加源表不加显示名 ⇒
+    //   注入页/导演页会裸露英文键名 `rumor`，而那是用户唯一能开关它的地方。
+    rumor: '传开的与亲眼见的',
     // v2.66.0: 情绪通道 / 关系六型 / 假面。与 SOURCES 同批登记（不加显示名 ⇒ 面板裸露英文键名）。
     affect: '情绪通道', bonds: '关系六型', masks: '假面', temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', parallelEvents: '场外事件',
     eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉', beastBond: '驯兽',
@@ -293,8 +296,25 @@
       <div class="wa-sec">世界背景设定</div>
       <textarea id="wa-bg" class="wa-ta" placeholder="填写世界背景/基调/规则（纯框架，不预设内容）…">${esc(s.background.text)}</textarea>
       <button class="wa-btn" id="wa-save-bg" title="保存世界背景/基调/规则（纯框架，不预设内容）">保存背景</button>
-      <div class="wa-sec">权威世界事实（${s.worldFacts.length}）</div>
-      <div class="wa-list">${s.worldFacts.slice(-15).reverse().map(f => `<div class="wa-item"><b>${esc(f.key)}</b> = ${esc(f.value)}</div>`).join('') || '<div class="wa-empty">尚无已结算事实</div>'}</div>
+       <div class="wa-sec">权威世界事实（${s.worldFacts.length}）</div>
+       <div class="wa-list">${s.worldFacts.slice(-15).reverse().map(f => `<div class="wa-item"><b>${esc(f.key)}</b> = ${esc(f.value)}</div>`).join('') || '<div class="wa-empty">尚无已结算事实</div>'}</div>
+       ${(() => {
+         // v2.96.0（X3）：传播链**只读**概览。放在事实列表正下方——因为「起一条链」的入参
+         //   就是这上面列出的 fact key，两者必须看得到彼此（否则用户得去人物页猜 key）。
+         //   这里不引入任何控件（纯文本）：控件一律登记在人物页那一组，避免同一出口两处渲染。
+         const cfg = (WA.rumor && WA.rumor.getSettings) ? WA.rumor.getSettings() : null;
+         if (!cfg) return '<div class="wa-sec">传播与辟谣</div><div class="wa-dim">模块未装载</div>';
+         if (!cfg.enabled) return '<div class="wa-sec">传播与辟谣</div><div class="wa-dim">关闭（未记录、未注入；在人物页打开）</div>';
+         const fv = (typeof WA.rumor.fullView === 'function') ? WA.rumor.fullView() : null;
+         const rows = (fv && fv.ok && Array.isArray(fv.chains)) ? fv.chains : [];
+         if (!rows.length) return '<div class="wa-sec">传播与辟谣</div><div class="wa-dim">尚无传播链（起链后此处显示每条链停在哪一层）</div>';
+         return '<div class="wa-sec">传播与辟谣（' + rows.length + '）</div>'
+           + '<div class="wa-list">' + rows.slice(-8).map(function (c) {
+               return '<div class="wa-item"><b>' + esc(c.factKey) + '</b> <span class="wa-dim">@' + esc(c.layer)
+                 + ' · ' + esc(String(c.hopCount)) + ' 跳 · 隐瞒 ' + esc(String(c.suppressed))
+                 + (c.intact ? '' : ' · <b>已被改写</b>') + '</span></div>';
+             }).join('') + '</div>';
+       })()}
       <div class="wa-sec">暗流（${s.currents.length}）</div>
       <div class="wa-list">${s.currents.slice(-10).reverse().map(c => `<div class="wa-item"><span class="wa-badge wa-vis-${c.visibility}">${c.visibility}</span> <b>${esc(c.title)}</b> <span class="wa-dim">${esc(c.stage)}</span><div class="wa-dim">${esc(c.summary || '').slice(0, 120)}</div></div>`).join('') || '<div class="wa-empty">暂无暗流</div>'}</div>
       <div class="wa-sec">纪事（${s.chronicle.length}）</div>
@@ -430,6 +450,14 @@
       <div class="wa-row"><button class="wa-btn" id="wa-threads-lead" title="没来源的线索不是线索：可靠性由来源类型决定，不由「我觉得可信」决定">加线索</button><button class="wa-btn" id="wa-threads-refute" title="反证：与支撑线索打脸的必须各自保留，不得取平均">加反证</button><button class="wa-btn" id="wa-threads-converge">汇聚</button><button class="wa-btn" id="wa-threads-stall" title="查不下去但仍在查——记录不删，这不是结案">悬置</button></div>
       <div class="wa-row"><input id="wa-threads-answer" class="wa-input" placeholder="结案结论（须有依据）"/><button class="wa-btn" id="wa-threads-resolve" title="结案必须有依据：无线索支撑、或矛盾未解时一律拒收">结案</button><button class="wa-btn" id="wa-threads-abandon" title="主动放下并写明理由——与「悬置」是两种事实">放弃</button><button class="wa-btn" id="wa-threads-why">查依据</button></div>
       <div id="wa-threads-out" class="wa-out"></div>
+      <div class="wa-sec">传播与辟谣（一条事实在人际间怎么传、传到最后还是不是原来那条）</div>
+      <label class="wa-row"><input id="wa-rm-enabled" type="checkbox" ${WA.rumor && WA.rumor.getSettings().enabled ? 'checked' : ''}/> 启用传播与辟谣</label>
+      <div class="wa-row"><input id="wa-rm-fact" class="wa-input" placeholder="事实 key（须已在世界事实里）"/><button class="wa-btn" id="wa-rm-start" title="起一条传播链：一事实一链（同一件事不该有两条互不相干的链）——事实没登记一律拒收，不凭空造一条">起链</button><button class="wa-btn" id="wa-rm-investigate" title="证据调查：逐跳列出经手人，并回答那个唯一的问题——传到最后还是不是原来那条。纯读，不改任何状态">调查</button><button class="wa-btn" id="wa-rm-fullview" title="全知视图（四层全出）：给作者看底牌，含被隐瞒者与已被改写者；不进正文">全知视图</button></div>
+      <div class="wa-row"><input id="wa-rm-id" class="wa-input" placeholder="链 id（rm_事实key）"/><input id="wa-rm-from" class="wa-input" placeholder="经手人（从）"/><input id="wa-rm-to" class="wa-input" placeholder="经手人（到）"/></div>
+      <div class="wa-row"><input id="wa-rm-motive" class="wa-input" placeholder="动机 honest/conceal/distort/refute"/><input id="wa-rm-value" class="wa-input" placeholder="值（只有歪曲能动）"/><input id="wa-rm-layer" class="wa-input" placeholder="层（留空即自动下一层；只能往更不真走）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-rm-relay" title="转述一跳：没声明要改就不许改值——随手动改值（未声明）一律拒收，那是账面上最危险的一种错">转述</button><button class="wa-btn" id="wa-rm-refute" title="辟谣：改的是「有人不再当它是一回事」，不是「这件事没发生过」——事实与层都不动">辟谣</button><button class="wa-btn" id="wa-rm-conceal" title="隐瞒：有人知道但没往外传。它不是一次传播，故另记「隐瞒」而不混进跳数（隐瞒者取『经手人（从）』，理由取右侧栏）">隐瞒</button></div>
+      <div class="wa-row"><input id="wa-rm-person" class="wa-input" placeholder="人物（查某人可见）"/><input id="wa-rm-why" class="wa-input" placeholder="隐瞒理由"/><button class="wa-btn" id="wa-rm-visible" title="某人在本链上看得到什么——只出事实与亲历两层；转述与流言不过玩家面">查可见</button></div>
+      <div id="wa-rm-out" class="wa-out"></div>
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
@@ -2289,6 +2317,76 @@
       threadsOut(r.ok ? Object.assign({}, r, { id: r.answer + ':依据 ' + r.basis.length + ' 条' }) : r);
     });
     on('#wa-de-create', async () => { const p = $('#wa-de-prompt').value.trim(); const t = +$('#wa-de-turns').value || 6; const btn = $('#wa-de-create'); if (btn) { btn.textContent = '生成中…'; btn.disabled = true; } try { await WA.directEvent.create({ prompt: p, turns: t }); } finally { renderBody(); } });
+    // v2.96.0（X3）：传播与辟谣的面板绑定。
+    //   五类拒绝理由都必须看得见——它们在世界状态里都长得像「什么都没发生」：
+    //     · unknown-fact（事实没登记，不凭空造一条）/ layer-ascend（不许升格成既成事实）；
+    //     · tamper-layer（歪曲不许落进事实层与目击层）/ undeclared-rewrite（没声明就不许改值）；
+    //     · hops-full / suppressed-full（满员拒收不挤出——中间跳丢了结论就再也算不出来）。
+    //   两条读出口（调查 / 全知视图）与一条可见出口同样登记：观测不得改变被观测对象。
+    const rumorOut = function (r) { return plainOut('wa-rm-out', 'rumorOut', r); };
+    if (panelEl.dataset.rumorOut) { const o = $('#wa-rm-out'); if (o) o.textContent = panelEl.dataset.rumorOut; }
+    // 链 id 必须与输出同源缓存：`renderBody()` 整块重建 DOM，输入框被重建回空值 ⇒
+    //   起链后回填的 id 在下一次点击时就丢了（紧接着的转述 / 调查会当场变成 missing-fields）。
+    //   输出留得住而 id 留不住，等于把「一事实一链」的便利在最需要它的那一步抹掉。
+    if (panelEl.dataset.rumorId && $('#wa-rm-id')) $('#wa-rm-id').value = panelEl.dataset.rumorId;
+    { const el = $('#wa-rm-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
+        WA.rumor.setSettings({ enabled: !!el.checked });
+        rumorOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-rm-start', () => {
+      if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
+      const r = WA.rumor.startChain(wv('#wa-rm-fact'), wv('#wa-rm-why'));
+      // 起链后把链 id 回填进输入框：一事实一链，id 由 factKey 派生，人手抄一遍必错。
+      //   这里**不** renderBody()——startChain 只写世界状态与统计，控件树里没有任何一格随它变；
+      //   整块重建只会把刚回填的 id 抹回空值，接着的转述 / 调查就当场变成 missing-fields。
+      //   （输出节点由 rumorOut 现写，不依赖重建。）
+      if (r.ok) panelEl.dataset.rumorId = r.id;
+      if (r.ok && $('#wa-rm-id')) $('#wa-rm-id').value = r.id;
+      rumorOut(Object.assign({}, r, { id: r.ok ? (r.id + ':conf-' + r.conf + ':hops-' + r.hops) : r.reason }));
+    });
+    on('#wa-rm-relay', () => {
+      if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
+      const motive = wv('#wa-rm-motive') || 'honest';
+      // 值一律递进去（含如实转述）：如实却递了别的值 = 「未声明的改写」，
+      //   由引擎当场拒收并在面板上如实显示——面板不替用户把值抹掉（那样就看不见这条门了）。
+      const r = WA.rumor.relay(wv('#wa-rm-id'), { from: wv('#wa-rm-from'), to: wv('#wa-rm-to'),
+        motive: motive, value: wv('#wa-rm-value'), layer: wv('#wa-rm-layer') });
+      rumorOut(Object.assign({}, r, { id: r.ok ? (r.layer + ':conf-' + r.conf + ':intact-' + (r.intact ? 'y' : 'n') + ':' + r.hops + '跳') : r.reason }));
+    });
+    on('#wa-rm-refute', () => {
+      if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
+      const r = WA.rumor.refute(wv('#wa-rm-id'), { from: wv('#wa-rm-from'), to: wv('#wa-rm-to'), layer: wv('#wa-rm-layer') });
+      rumorOut(Object.assign({}, r, { id: r.ok ? ('辟谣:' + r.layer + ':intact-' + (r.intact ? 'y' : 'n')) : r.reason }));
+    });
+    on('#wa-rm-conceal', () => {
+      if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
+      const r = WA.rumor.conceal(wv('#wa-rm-id'), { by: wv('#wa-rm-from'), why: wv('#wa-rm-why') });
+      rumorOut(Object.assign({}, r, { id: r.ok ? ('隐瞒 ' + r.by + ':共' + r.suppressed + '次') : r.reason }));
+    });
+    on('#wa-rm-investigate', () => {
+      if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
+      const r = WA.rumor.investigate(wv('#wa-rm-id'));
+      // 「传到最后还是不是原来那条」——只报事实：被改过就报 drift 的 from→to，没被改就报原样。
+      rumorOut(r.ok ? Object.assign({}, r, { id: '层 ' + r.layer + ':' + r.hopCount + '跳:'
+        + (r.tampered ? ('已改写 ' + (r.drift ? (r.drift.from + '→' + r.drift.to) : '')) : '未被改写')
+        + ':隐瞒 ' + r.suppressed }) : r);
+    });
+    on('#wa-rm-fullview', () => {
+      if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
+      const r = WA.rumor.fullView();
+      rumorOut(r.ok ? { ok: true, id: (r.chains.length ? r.chains.map(function (c) {
+        return c.factKey + '@' + c.layer + (c.intact ? '' : '✗');
+      }).join('；') : '暂无传播链') } : r);
+    });
+    on('#wa-rm-visible', () => {
+      if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
+      const r = WA.rumor.visibleTo(wv('#wa-rm-person'));
+      rumorOut(r.ok ? { ok: true, id: (r.count ? (r.count + ' 条：' + r.rows.map(function (x) {
+        return x.factKey + '@' + x.layer;
+      }).join('；')) : '无（只出事实与亲历两层）') } : r);
+    });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });
     // v2.11.0: 推演中止——引擎侧 `abort()` 已实现却无人调用（用户只能刷页面打断）
     on('#wa-bs-abort', () => { WA.backstage.abort(); WA.log('warn', '世界推演已请求中止'); renderBody(); });

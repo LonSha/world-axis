@@ -139,6 +139,10 @@
     'hazard.rows': { path: 'hazard.rows', cap: 16, why: '累积风险账（每风险一行，含暗账 pending）' },
     'marginal.rows': { path: 'marginal.rows', cap: 16, why: '边际折旧账（每对象一行，含重复计数与冷却）' },
     'tolerance.rows': { path: 'tolerance.rows', cap: 24, why: '手段耐受账（每手段一行，触达轮号滑窗）' },
+    // ── v2.96.0 传播与辟谣（rumor.js）──
+    //   一条传播链就是「一条事实的全部经手」。cap 8 而非 16：链一多，用户读不完整条；
+    //   并且**跳不挤出**（hops 满员即拒收）——中间跳被丢掉，这条链的结论就再也算不出来。
+    'rumor.chains': { path: 'rumor.chains', cap: 8, why: '传播链环形（每条链自带跳与隐瞒两个有界数组）' },
     // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
     'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
     'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },

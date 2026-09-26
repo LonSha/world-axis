@@ -515,6 +515,91 @@ function runWitness(WA) {
       store.transact(function (d) { d.lastInjection = keep; }, 'reject-witness:o3-restore2');
     }
   });
+  // ── v2.96.0（X3 传播与辟谣 / X6 判定面接天气）：八个新出口的拒收见证 ──
+  //   同一把尺子：见证**不是声称**，用真 API 把码跑出来。
+  //   X3 的四条「门」各自对应一句产品承诺，码就是承诺的可观测面：
+  //     · unknown-fact  —— 没登记的事实不许有传播链（「没发生的事不该传」）；
+  //     · chains-full   —— 容量满拒收不挤出（挤掉一条就等于改写了历史）；
+  //     · hops-full     —— 中间跳丢了，「传到最后还是不是原来那条」就再也答不出；
+  //     · suppressed-full —— 隐瞒与跳分列计数，各自有闸。
+  //   X6 的两条是「不可用不回落成无影响」的三种形态里的两种：
+  //     · link-off    —— 没给地点（不是「天气很好」，两者必须能分辨）；
+  //     · bad-motive  —— 动机不在四值内，不按 honest 静默放过。
+  //   （engine-absent 早已在 O2 段有见证：rand 缺席与 weather 缺席走的是同一条纪律。）
+  {
+    const Rm = WA.rumor, Hz = WA.hazard;
+    if (Rm && typeof Rm.startChain === 'function') {
+      const RK = '拒收见证事实';
+      const keep = Rm.getSettings().enabled;
+      try {
+        Rm.setSettings({ enabled: true });
+        WA.store.transact(function (d) {
+          d.worldFacts = (Array.isArray(d.worldFacts) ? d.worldFacts : []).concat([{ key: RK, value: '三日未归', active: true }]);
+        }, 'reject-witness:v2960-fact');
+        // 故意不打桩：这些码全部在前置门里返回，没一条走到随机源。
+        want('unknown-fact', 'rumor.startChain 点名一条没登记的事实 ⇒ 拒收（不凭空造一条链，v2.96.0 X3）');
+        trip('unknown-fact', function () { return [Rm.startChain('查无此事').reason]; });
+        want('bad-motive', 'rumor.relay 传四值以外的动机 ⇒ 拒收（不静默当 honest，v2.96.0 X3）');
+        trip('bad-motive', function () { return [Rm.relay('rm_x', { from: '甲', to: '乙', motive: 'nope' }).reason]; });
+        // 两条容量闸必须**先在链上堆到满**：空链上永远走不到满员那一支。
+        want('chains-full', 'rumor.startChain 超出 maxChains ⇒ 拒收（满员拒收不挤出，v2.96.0 X3）');
+        trip('chains-full', function () {
+          const st = Rm.getSettings();
+          const keepCap = st.maxChains;
+          // 必须换一个**不同的事实**：同一事实再起一次会先撞 exists（一事实一链），
+          //   那样测到的是「重复」而不是「满员」——两个码分列的意义正在于此。
+          //   （本轮实测踩到：初版用同一 factKey，门序里 exists 在 chains-full 之前。）
+          const RK2 = '拒收见证事实乙';
+          try {
+            WA.store.transact(function (d) {
+              d.worldFacts = (Array.isArray(d.worldFacts) ? d.worldFacts : []).concat([{ key: RK2, value: '两日未归', active: true }]);
+            }, 'reject-witness:v2960-fact2');
+            Rm.setSettings({ maxChains: 1 });
+            Rm.startChain(RK);
+            return [Rm.startChain(RK2).reason];
+          } finally { Rm.setSettings({ maxChains: keepCap }); }
+        });
+        want('hops-full', 'rumor.relay 超出 maxHops ⇒ 拒收（中间跳不许被挤掉，v2.96.0 X3）');
+        trip('hops-full', function () {
+          const st = Rm.getSettings();
+          const keepHops = st.maxHops;
+          try {
+            Rm.setSettings({ maxHops: 1 });
+            const id = 'rm_' + RK;
+            Rm.relay(id, { from: '甲', to: '乙' });
+            return [Rm.relay(id, { from: '乙', to: '丙' }).reason];
+          } finally { Rm.setSettings({ maxHops: keepHops }); }
+        });
+        want('suppressed-full', 'rumor.conceal 超出 maxSuppressed ⇒ 拒收（隐瞒与跳分列计数，v2.96.0 X3）');
+        trip('suppressed-full', function () {
+          const st = Rm.getSettings();
+          const keepSup = st.maxSuppressed;
+          try {
+            Rm.setSettings({ maxSuppressed: 1 });
+            const id = 'rm_' + RK;
+            Rm.conceal(id, { by: '甲' });
+            return [Rm.conceal(id, { by: '乙' }).reason];
+          } finally { Rm.setSettings({ maxSuppressed: keepSup }); }
+        });
+      } finally { Rm.setSettings({ enabled: keep }); }
+    }
+    if (Hz && typeof Hz.open === 'function' && Hz.roll) {
+      const HK = '拒收见证风险', Wd = WA.world;
+      const keep = WA.rand;
+      try {
+        Wd.addPlace('甲镇', '镇');
+        WA.store.transact(function (d) {
+          d.hazard = { rows: [{ key: HK, note: '', count: 0, hits: 0, pending: false, waiting: 0, at: '' }] };
+        }, 'reject-witness:v2960-hazard');
+        Rm && Rm.setSettings && Rm.setSettings({ enabled: true });
+        // 打桩是为了**越过**前置门走到天气面：本段要见证的是天气归因（link-off），
+        //   而不是随机源纪律（那一条在 O2 段已有见证，桩里也顺带把它钉住）。
+        WA.rand = { dice: function (s, site) { if (site !== 'hazard') throw new Error('site 走了别的入口：' + site); return s; } };
+        want('link-off', 'hazard.roll 显式给了空地点 ⇒ 天气面照实报 link-off（不给 at 时回执里连 weather 字段都没有，v2.96.0 X6）');
+        trip('link-off', function () { return [((Hz.roll(HK, { at: '' }).weather) || {}).reason]; });
+      } finally { WA.rand = keep; }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.95.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.95.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.96.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.96.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -1327,7 +1327,7 @@
       "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
       "src": "engines/hazard.js",
       "refs": 0,
-      "tref": 8,
+      "tref": 9,
       "own": 3
     },
     "hazard.setSettings": {
@@ -1335,7 +1335,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/hazard.js",
       "refs": 0,
-      "tref": 11,
+      "tref": 12,
       "own": 1
     },
     "hazard.stat": {
@@ -1352,7 +1352,7 @@
       "src": "engines/hazard.js",
       "refs": 0,
       "tref": 0,
-      "own": 7
+      "own": 8
     },
     "hazard.tick": {
       "reason": "test-only",
@@ -3104,7 +3104,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 66
+      "own": 68
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -3447,7 +3447,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/weather.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 1
     },
     "weather.setWeather": {
@@ -3455,7 +3455,7 @@
       "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
       "src": "engines/weather.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 4,
       "own": 3
     },
     "weather.stat": {
@@ -3590,6 +3590,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 161
+    "dataOnly": 162
   }
 }
