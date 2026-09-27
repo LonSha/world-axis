@@ -213,28 +213,38 @@ function runNegative(assert, ctx) {
     'N0 负控制所依赖的问题类别在归因表内');
 
   // N1 单站点漂移 ⇒ intra-drift（不是 stale-reading：另有站点仍正确）
-  const b1 = breakOnce(runSrc, 'r2700.refs === 2631', 'r2700.refs === 2632', 'N1');
+  //   四处锚点的读数一律**现场取**（同本文件 N6/N7 对版本词的处理）：写死就会在升版后
+  //   静默打空，而打空不会报「读数过期」—— 它让整把锁的负向段当场中断。v2.109.0 实测：
+  //   清册 refs 与 dead、dataOnly 三族都长过（见 tests/run.js 的现场断言），四处锚点全空，
+  //   N1 抛出后 N2 起全部未执行 —— 这正是「锚点漂移 = 覆盖消失」的又一次实证。
+  const refsAt = function (n) { return 'r' + n + '.refs === ' + LIVE.refs; };
+  const falseRefs = function (n) { return 'r' + n + '.refs === ' + (LIVE.refs - 1); };
+  const b1 = breakOnce(runSrc, refsAt(2700), 'r2700.refs === ' + (LIVE.refs + 1), 'N1');
   const p1 = R.coherence(b1, { live: LIVE });
   assert(p1.filter(function (p) { return p.kind === 'intra-drift' && p.field === 'refs'; }).length === 1,
     'N1 单站点漂移 ⇒ 报 intra-drift/refs（实 ' + kindsOf(p1).join(',') + '）');
 
   // N2 全族覆盖（三站同改）⇒ stale-reading（同值但与实测不符）
   const b2 = breakOnce(breakOnce(breakOnce(runSrc,
-    'r2700.refs === 2631', 'r2700.refs === 2630', 'N2a'),
-    'r2800.refs === 2631', 'r2800.refs === 2630', 'N2b'),
-    'r2900.refs === 2631', 'r2900.refs === 2630', 'N2c');
+    refsAt(2700), falseRefs(2700), 'N2a'),
+    refsAt(2800), falseRefs(2800), 'N2b'),
+    refsAt(2900), falseRefs(2900), 'N2c');
   const p2 = R.coherence(b2, { live: LIVE });
   assert(p2.filter(function (p) { return p.kind === 'stale-reading' && p.field === 'refs'; }).length === 1,
     'N2 全族同改 ⇒ 报 stale-reading/refs（实 ' + kindsOf(p2).join(',') + '）');
 
   // N3 比较值与消息脱钩（v2.81.0 的形态）：消息一字不动，判据也必须现形
-  const b3 = breakOnce(runSrc, 'r2700.dead.length === 454', 'r2700.dead.length === 455', 'N3');
+  const b3 = breakOnce(runSrc, 'r2700.dead.length === ' + LIVE.dead,
+    'r2700.dead.length === ' + (LIVE.dead + 1), 'N3');
   const p3 = R.coherence(b3, { live: LIVE });
   assert(p3.filter(function (p) { return p.kind === 'intra-drift' && p.field === 'dead'; }).length === 1,
     'N3 只改比较值（消息不动）⇒ 报 intra-drift/dead');
 
   // N4 只改消息静态头 ⇒ message-mismatch（证明「静态头」这个观察位真的在起作用）
-  const b4 = breakOnce(runSrc, '死子面 dead 454 / uiDead 4 / dataOnly 169（', '死子面 dead 455 / uiDead 4 / dataOnly 169（', 'N4');
+  const head4 = '死子面 dead ' + LIVE.dead + ' / uiDead ' + LIVE.uiDead
+    + ' / dataOnly ' + LIVE.dataOnly + '（';
+  const b4 = breakOnce(runSrc, head4,
+    head4.replace('dead ' + LIVE.dead, 'dead ' + (LIVE.dead + 1)), 'N4');
   const p4 = R.coherence(b4, { live: LIVE });
   assert(p4.filter(function (p) { return p.kind === 'message-mismatch' && p.field === 'dead'; }).length === 1,
     'N4 只改消息静态头 ⇒ 报 message-mismatch/dead');

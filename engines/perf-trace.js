@@ -67,6 +67,8 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  /** 本文件内拼多行输出的统一样式（避免脚本里混入真实换行）。 */
+  const NL_S = String.fromCharCode(10);
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   /** 层封闭集合。顺序写死：面板与诊断按此序念出，不随装载顺序漂。 */
@@ -91,11 +93,33 @@
   const HISTORY_CAP = 64;
   /** 每层指纹键上限（有界；挤出即 evicted++，不静默丢）。 */
   const FINGERPRINT_CAP = 256;
+  /**
+   * v2.109.0（#9）：每层**缓存槽**上限。此前 `_cache` **无上限** ——
+   *   指纹表有界（FINGERPRINT_CAP 挤出即计数），缓存表却随会话里出现过的
+   *   每一个 `layer:key` 组合线性增长，而它一个计数都没有（`slots()` 只报当前在场项）。
+   *   「有界的地方被数着、没界的地方没人看」是本仓反复出现的形态（见 004 号形态）。
+   */
+  const CACHE_CAP = 64;
+  /** 淘汰策略（#9）。`fifo` = 插入序最早先走（既有行为）；`lru` = 最久未访问先走。 */
+  const EVICT_POLICIES = ['fifo', 'lru'];
+  /** 火焰图帧数上限（#11，有界；挤出即 dropped++）。 */
+  const FLAME_CAP = 256;
+  /**
+   * 劣化告警阈值（#10）。**相对**读数（倍数），跨机可比——
+   *   绝对毫秒数跨机器不可比（本仓实测同一次全量回归在不同机器上差 3 倍以上），
+   *   拿绝对值当阈值就是「换台机器就假红」。故阈值只认比例：`factor`（倍数）
+   *   与 `minSamples`（样本下限，样本不够不判——防「第一个样本」抖动成告警）。
+   *   `minMs` 同理是**放大后的**门槛：小于它的差是噪声（本仓墙体时钟只精到 1ms）。
+   */
+  const PERF_THRESHOLD = { factor: 1.5, minSamples: 8, minMs: 4 };
 
   const _marks = {};      // layer -> { key -> fp }
   const _dirty = {};      // layer -> { key -> true }（自上次 consume 以来变过的键）
-  const _cache = {};      // layer -> { key -> { fp, vfp, value, at, hits, stale } }
+  const _cache = {};      // layer -> { key -> { fp, vfp, infp, value, at, lastAccessAt, hits, stale } }
   const _samples = {};    // layer -> { n, sum, min, max, lastMs, lastAt, dropped, ring:[] }
+  const _faceMs = {};     // layer -> { face -> { n, ms } }（#11 火焰图的唯一依据）
+  const _fpIndex = {};    // 输入指纹 -> { 产物指纹 -> n }（#8 冲突检测的唯一依据）
+  let _cachePolicy = 'fifo';   // #9：默认保持既有行为（lru 由调用方显式选择）
   const _span = {
     local: { ms: 0, n: 0, declared: true },
     host: { ms: 0, n: 0, declared: false },
@@ -103,7 +127,8 @@
     render: { ms: 0, n: 0, declared: false }
   };
   const _stat = { calls: 0, marks: 0, reuse: 0, recompute: 0, miss: 0, evicted: 0, forced: 0, dirtyHit: 0,
-    partialCalls: 0, partialReused: 0, lastAt: 0, lastErr: '' };
+    partialCalls: 0, partialReused: 0, lastAt: 0, lastErr: '',
+    fpCollisions: 0, evictedPolicy: 0, flameDropped: 0, alertCount: 0, lastAlert: '' };
 
   function clean(v, max) {
     try { return WA.inputGuard && WA.inputGuard.text ? WA.inputGuard.text(v, max || 80) : String(v === null || v === undefined ? '' : v).slice(0, max || 80); }
@@ -207,9 +232,23 @@
     else if (o.stamp !== undefined) { f = fingerprint(o.stamp); okStamp = (f !== 'na'); }
     _stat.calls++;
     if (cur && !o.force && okStamp && cur.fp === f) {
-      cur.hits++; _stat.reuse++;
-      if (o.dirty) _stat.dirtyHit++;
-      return { layer: L, key: K, ok: true, hit: true, recomputed: false, value: cur.value, fp: f, vfp: cur.vfp || '', reason: 'reuse' };
+      // v2.109.0（#8）：指纹只是**承诺**（同一份输入给同一份输出）。承诺可能破——
+      //   破了的后果是「拿旧值当新值」，而读数上完全看不出来（两边都"有值"）。
+      //   故调用方若给了**完整输入**（`o.full`），除指纹相等外还要真比一遍输入本身：
+      //   指纹相等而完整输入不等 ⇒ **指纹冲突** ⇒ 一律重算，不拿旧值冒充命中。
+      let conflict = false;
+      if (o.full !== undefined) {
+        const finfp = fingerprint(o.full);
+        if (finfp !== 'na' && cur.infp && cur.infp !== 'na' && cur.infp !== finfp) {
+          conflict = true; _stat.fpCollisions++;
+        }
+      }
+      if (!conflict) {
+        cur.hits++; cur.lastAccessAt = clockWall(); _stat.reuse++;
+        if (o.dirty) _stat.dirtyHit++;
+        return { layer: L, key: K, ok: true, hit: true, recomputed: false, value: cur.value, fp: f, vfp: cur.vfp || '', reason: 'reuse' };
+      }
+      _stat.lastErr = clean('fingerprint-collision:' + K, 120);
     }
     if (o.force) _stat.forced++;
     let v, err = '';
@@ -221,16 +260,85 @@
       return { layer: L, key: K, ok: false, hit: false, recomputed: true, error: err, fp: f, vfp: '', reason: 'produce-failed' };
     }
     const vfp = fingerprint(v);
-    slot[K] = { fp: f, vfp: vfp, value: v, at: clockWall(), hits: 0, stale: (cur ? (cur.stale || 0) : 0) };
+    const infp = (o.full !== undefined) ? fingerprint(o.full) : '';
+    noteFpIndex(f, vfp);
+    const nowAt = clockWall();
+    slot[K] = { fp: f, vfp: vfp, infp: infp, value: v, at: nowAt, lastAccessAt: nowAt, hits: 0, stale: (cur ? (cur.stale || 0) : 0) };
+    _enforceCap(L, slot);
     _stat.recompute++;
     return { layer: L, key: K, ok: true, hit: false, recomputed: true, value: v, fp: f, vfp: vfp, reason: o.force ? 'forced' : 'stale' };
   }
-  /** 该层缓存槽的读数（诊断用；不给值本体——不把整包塞进诊断）。 */
+  /**
+   * v2.109.0（#8）：把「输入指纹 → 产物指纹」记成可查索引。
+   *   同一份输入指纹映射出**第二个**不同产物指纹 ⇒ 承诺破了（`fpCollisions++`）。
+   *   过滤掉非指纹形态（`na` / `clean` / `dirty-N` 是状态标记，不是指纹）。
+   */
+  function noteFpIndex(fp, vfp) {
+    if (!fp || fp === 'na' || !vfp || vfp === 'na') return false;
+    if (fp === 'clean' || fp.indexOf('dirty-') === 0) return false;
+    const m = _fpIndex[fp] || (_fpIndex[fp] = {});
+    const had = Object.keys(m);
+    m[vfp] = (m[vfp] || 0) + 1;
+    // 索引自身有界（与指纹表同口径：挤出最旧登记的输入指纹，不静默无界增长）
+    const ks = Object.keys(_fpIndex);
+    if (ks.length > FINGERPRINT_CAP) delete _fpIndex[ks[0]];
+    if (had.length && had.indexOf(vfp) < 0) { _stat.fpCollisions++; return true; }
+    return false;
+  }
+  /** v2.109.0（#9）：缓存槽超上限即淘汰（策略见 `setCachePolicy`），挤出即计数。 */
+  function _enforceCap(L, slot) {
+    const ks = Object.keys(slot);
+    if (ks.length <= CACHE_CAP) return;
+    let victim = ks[0];
+    if (_cachePolicy === 'lru') {
+      ks.forEach(function (k) {
+        const a = slot[k].lastAccessAt || slot[k].at || 0;
+        const b = slot[victim].lastAccessAt || slot[victim].at || 0;
+        if (a < b) victim = k;
+      });
+    }
+    delete slot[victim];
+    _stat.evicted++; _stat.evictedPolicy++;
+  }
+  /**
+   * v2.109.0（#9）：换淘汰策略。默认 `fifo` 保持既有行为——
+   *   lru 需要每次命中都写 `lastAccessAt`（内存里的隐式状态写），
+   *   换默认前得先把「观测不得改变被观测对象」的口径复核一遍，故由调用方显式选择。
+   */
+  function setCachePolicy(p) {
+    const x = clean(p, 8);
+    if (EVICT_POLICIES.indexOf(x) < 0) return { ok: false, reason: 'unknown-policy', known: EVICT_POLICIES.slice(), policy: _cachePolicy };
+    _cachePolicy = x;
+    return { ok: true, policy: _cachePolicy };
+  }
+  /** v2.109.0（#9）：缓存槽的**热度**读数（含最近访问时刻与年龄）。 */
   function slots(layer) {
-    const s = _cache[clean(layer, 24)] || {};
+    const L = clean(layer, 24);
+    const s = _cache[L] || {};
+    const now = clockWall();
     return Object.keys(s).sort().map(function (k) {
-      return { key: k, fp: s[k].fp, vfp: s[k].vfp, hits: s[k].hits, stale: s[k].stale || 0, at: s[k].at };
+      const at = s[k].lastAccessAt || s[k].at || 0;
+      return { key: k, fingerprint: s[k].fp, fp: s[k].fp, vfp: s[k].vfp, hits: s[k].hits, stale: s[k].stale || 0,
+        at: s[k].at, lastAccessAt: at, ageMs: at ? Math.max(0, now - at) : 0 };
     });
+  }
+  /** v2.109.0（#9）：缓存面读数（策略 / 上限 / 逐层占用 / 挤出）。 */
+  function cacheStat() {
+    const per = {}; let total = 0;
+    LAYERS.forEach(function (L) { const n = Object.keys(_cache[L] || {}).length; per[L] = n; total += n; });
+    return { policy: _cachePolicy, policies: EVICT_POLICIES.slice(), cap: CACHE_CAP,
+      total: total, per: per, evicted: _stat.evicted, evictedPolicy: _stat.evictedPolicy };
+  }
+  /** v2.109.0（#9）：热度直方图（按 ageMs 分桶；纯读，不改任何槽）。 */
+  function heatHistogram(layer) {
+    const buckets = [{ label: '<1s', max: 1000 }, { label: '<1min', max: 60000 },
+      { label: '<10min', max: 600000 }, { label: '≥10min', max: Infinity }];
+    const rows = slots(layer);
+    const out = buckets.map(function (b) { return { label: b.label, n: 0 }; });
+    rows.forEach(function (r) {
+      for (let i = 0; i < buckets.length; i++) { if (r.ageMs < buckets[i].max) { out[i].n++; break; } }
+    });
+    return { layer: clean(layer, 24), total: rows.length, buckets: out, policy: _cachePolicy };
   }
 
   /* ── 分层计时与有限窗口历史曲线 ───────────────────────────────────── */
@@ -294,6 +402,207 @@
       return s + ' 无上报';
     }).join('；');
     return out;
+  }
+  /** v2.109.0（#11）：面级耗时账（火焰图的**唯一**依据；此前只有层级账）。 */
+  function faceNote(layer, face, ms) {
+    const L = clean(layer, 24), F = clean(face, 40);
+    if (!inLayers(L) || !F) return null;
+    const m = _faceMs[L] || (_faceMs[L] = {});
+    const r = m[F] || (m[F] = { n: 0, ms: 0 });
+    r.n++;
+    r.ms = Math.round((r.ms + ((typeof ms === 'number' && isFinite(ms) && ms > 0) ? ms : 0)) * 100) / 100;
+    return r;
+  }
+
+  /* ── v2.109.0 #7：真机性能基线持续追踪（导出 / 导入比对） ────────────── */
+
+  /**
+   * 导出当前性能基线为**可落盘对象**（#7）。
+   *   为什么需要它：`baseline()` 只活在内存里，会话一关就没了——
+   *   于是「这个版本比上个版本慢了吗」在任何时刻都只能靠**记忆**回答。
+   *   本出口把基线写成一份纯 JSON（`performance-snapshot-<ts>.json` 的**内容**，本面不落盘），
+   *   下一版读到它就能逐层比对。
+   * 口径（诚实边界）：**墙钟读数跨机器不可比**（同一次全量回归在不同机器上差 3 倍以上），
+   *   故快照里同时带 `bytes`（产物规模，**确定量**，跨机可比）与 `ms`（墙钟，只在同机自比时有意义）
+   *   两套读数，并各自标 `comparable` 标志——不把不可比的东西混成一个数。
+   */
+  function snapshot(label) {
+    const at = clockWall();
+    const layers = {};
+    LAYERS.forEach(function (L) {
+      const b = baseline(L);
+      const fm = _faceMs[L] || {};
+      layers[L] = { label: LAYER_LABEL[L] || '', n: b.n, window: b.window,
+        p50: b.p50, p95: b.p95, max: b.max, subTick: b.subTick, dropped: b.dropped,
+        faces: Object.keys(fm).sort().map(function (k) { return { face: k, n: fm[k].n, ms: fm[k].ms }; }) };
+    });
+    return { v: 1, at: at, label: clean(label, 60) || 'snapshot', version: (WA.VERSION || ''),
+      historyCap: HISTORY_CAP, fingerprintCap: FINGERPRINT_CAP, cacheCap: CACHE_CAP,
+      faces: FACE_KEYS.slice(), classes: CLASSES.slice(),
+      layers: layers, split: split(), cache: cacheStat(), stat: stat(),
+      comparable: { ms: false, bytes: true },
+      note: '墙钟 ms 跨机不可比（同机自比可用）；bytes/计数为确定量，跨机可比' };
+  }
+  /**
+   * 导入一份快照并与现场比对（#7）。返回逐层 delta 与判定。
+   *   判定只用**同机可比**的那一半：`p95` 只在 `sameHost`（调用方声明同机）时判，
+   *   否则只报**结构面**（层数 / 面数 / 缓存上限 / 策略）差异——那是跨机也能判的。
+   *   `ok`（问题数）为 0 才是「与基线一致」；结构面缺项如实报 `missing` 而不是静默跳过。
+   */
+  function importSnapshot(obj, opts) {
+    const o = opts || {};
+    const problems = [];
+    if (!obj || typeof obj !== 'object') return { ok: false, problems: ['not-an-object'], rows: [] };
+    if (obj.v !== 1) problems.push('unknown-snapshot-version:' + String(obj.v));
+    const rows = [];
+    LAYERS.forEach(function (L) {
+      const then = (obj.layers || {})[L];
+      const now = baseline(L);
+      if (!then) { problems.push('layer-missing:' + L); rows.push({ layer: L, then: null, now: { p50: now.p50, p95: now.p95, max: now.max }, verdict: 'missing' }); return; }
+      const d95 = (typeof then.p95 === 'number' && then.p95 > 0) ? (now.p95 / then.p95) : 0;
+      // 非同一台机 ⇒ 墙钟**不许**判，verdict 必须如实写成 `not-comparable`。
+      //   首版留在 `'ok'` 上，而 `'ok'` 的语义是「判过了，没问题」——「没判」与「判过没问题」
+      //   被压成同一个读数，正是本仓反复治的「结论不实」（由专锁 B2 当场抓出）。
+      const row = { layer: L, then: { p50: then.p50, p95: then.p95, max: then.max },
+        now: { p50: now.p50, p95: now.p95, max: now.max },
+        ratio: d95 ? Math.round(d95 * 1000) / 1000 : 0, msComparable: !!o.sameHost,
+        verdict: o.sameHost ? 'ok' : 'not-comparable' };
+      if (o.sameHost && typeof then.p95 === 'number' && then.p95 > 0) {
+        if (d95 >= PERF_THRESHOLD.factor && (now.p95 - then.p95) >= PERF_THRESHOLD.minMs) { row.verdict = 'regressed'; problems.push('regressed:' + L + ':' + row.ratio + 'x'); }
+        else if (d95 <= 1 / PERF_THRESHOLD.factor) row.verdict = 'improved';
+      }
+      rows.push(row);
+    });
+    const struct = [];
+    if (obj.cacheCap !== CACHE_CAP) struct.push('cacheCap ' + obj.cacheCap + ' -> ' + CACHE_CAP);
+    if ((obj.faces || []).length !== FACE_KEYS.length) struct.push('faces ' + (obj.faces || []).length + ' -> ' + FACE_KEYS.length);
+    return { ok: problems.length === 0, problems: problems, rows: rows, struct: struct,
+      label: clean(obj.label, 60), at: obj.at || 0, msComparable: !!o.sameHost,
+      note: o.sameHost ? '同机比对（含墙钟判定）' : '跨机比对：墙钟不可比，只判结构面（传 {sameHost:true} 才判墙钟）' };
+  }
+
+  /* ── v2.109.0 #10：劣化告警阈值 ─────────────────────────────────────── */
+
+  /** 阈值读数（#10，纯读）。 */
+  function thresholds() { return { factor: PERF_THRESHOLD.factor, minSamples: PERF_THRESHOLD.minSamples, minMs: PERF_THRESHOLD.minMs }; }
+  /** 设置阈值（有界：factor 必须 > 1，否则「劣化」与「改进」不可分辨）。 */
+  function setThresholds(o) {
+    const x = o || {};
+    const f = Number(x.factor);
+    if (!(isFinite(f) && f > 1)) return { ok: false, reason: 'bad-factor', got: x.factor, thresholds: thresholds() };
+    PERF_THRESHOLD.factor = f;
+    if (isFinite(Number(x.minSamples)) && Number(x.minSamples) >= 1) PERF_THRESHOLD.minSamples = Math.floor(Number(x.minSamples));
+    if (isFinite(Number(x.minMs)) && Number(x.minMs) >= 0) PERF_THRESHOLD.minMs = Number(x.minMs);
+    return { ok: true, thresholds: thresholds() };
+  }
+  /**
+   * 窗口内自比（#10）：`p95 / p50` 的倍数。
+   *   为什么自比是有意义的：它衡量「这一层稳不稳」——p95 远高于 p50 说明偶发长尾，
+   *   而那正是用户感知到的「卡」。样本不足（< minSamples）**不判**，如实报 `insufficient`。
+   *   `minMs` 门槛：p95 与 p50 都小于它时差值属噪声（时钟只精到 1ms），不判。
+   */
+  function spikeOf(layer) {
+    const b = baseline(layer);
+    if (b.window < PERF_THRESHOLD.minSamples) return { layer: b.layer, ok: false, kind: 'insufficient', window: b.window, need: PERF_THRESHOLD.minSamples, ratio: 0, spiking: false };
+    const ratio = b.p50 > 0 ? Math.round((b.p95 / b.p50) * 1000) / 1000 : 0;
+    const spiking = ratio >= PERF_THRESHOLD.factor && (b.p95 - b.p50) >= PERF_THRESHOLD.minMs;
+    return { layer: b.layer, ok: true, kind: spiking ? 'spike' : 'stable', window: b.window, p50: b.p50, p95: b.p95, ratio: ratio, spiking: spiking };
+  }
+  /**
+   * 劣化告警（#10）：逐层判「长尾劣化」。
+   *   传 `base`（一份快照）时另判**跨版本**劣化（且只在 `o.sameHost` 时判墙钟，见 `importSnapshot`）。
+   *   告警一律 `WA.log('warn', …)` 发出去（**不能只返回数组**——没人读的告警等于没有告警），
+   *   并累计 `alertCount` / `lastAlert` 供诊断念。
+   */
+  function alerts(base, opts) {
+    const o = opts || {};
+    const out = [];
+    LAYERS.forEach(function (L) {
+      const s = spikeOf(L);
+      if (s.spiking) out.push({ layer: L, kind: 'spike', detail: 'P95 ' + s.p95 + 'ms / P50 ' + s.p50 + 'ms（' + s.ratio + 'x ≥ ' + PERF_THRESHOLD.factor + 'x，窗口 ' + s.window + '）' });
+    });
+    if (base) {
+      const imp = importSnapshot(base, { sameHost: !!o.sameHost });
+      imp.rows.forEach(function (r) { if (r.verdict === 'regressed') out.push({ layer: r.layer, kind: 'regressed', detail: '跨版本 P95 ' + r.ratio + 'x（' + r.then.p95 + ' -> ' + r.now.p95 + 'ms）' }); });
+    }
+    if (out.length) {
+      _stat.alertCount += out.length;
+      _stat.lastAlert = clean(out[0].layer + '/' + out[0].kind, 120);
+      try { if (WA.log) WA.log('warn', '性能劣化告警：' + out.map(function (x) { return x.layer + '/' + x.kind; }).join(', ')); } catch (e) { /* 日志不可用不影响判据 */ }
+    }
+    return { at: clockWall(), alerts: out, n: out.length, thresholds: thresholds(), grade: out.length ? 'warn' : 'pass' };
+  }
+
+  /* ── v2.109.0 #11：火焰图（折叠栈 / JSON 树 / SVG） ─────────────────── */
+
+  /**
+   * 火焰图（#11）。三种形态：
+   *   `folded` —— Brendan Gregg 折叠栈 `a;b;c <值>`（本面**值单位是毫秒**，非标准微秒，已标注）；
+   *   `json`   —— `{name, value, children[]}` 树；
+   *   `svg`    —— 零依赖拼出的矩形图（不引任何渲染库）。
+   * **诚实边界（必须说清）**：本仓的「栈」**不是真调用栈**，而是「层 → 面」的分解
+   *   （真调用栈只有 V8 profiler 能给，无头回归里不可用）。故读数是**逻辑火焰图**，
+   *   带 `logical:true` 与一句明说，**不冒充**真调用栈火焰图。
+   */
+  function flameFrames() {
+    const frames = [];
+    LAYERS.forEach(function (L) {
+      const s = _samples[L];
+      const fm = _faceMs[L] || {};
+      const keys = Object.keys(fm).sort();
+      const faceSum = keys.reduce(function (a, k) { return a + (fm[k].ms || 0); }, 0);
+      const total = faceSum || (s ? s.sum : 0);
+      if (!total && !(s && s.n)) return;
+      frames.push({ stack: 'perf;' + L, ms: Math.round(total * 100) / 100, n: (s ? s.n : 0) });
+      keys.forEach(function (k) {
+        frames.push({ stack: 'perf;' + L + ';' + L + '.' + k, ms: fm[k].ms, n: fm[k].n, face: k });
+      });
+    });
+    if (frames.length > FLAME_CAP) { const d = frames.length - FLAME_CAP; frames.length = FLAME_CAP; _stat.flameDropped += d; }
+    return frames;
+  }
+  function flamegraph(opts) {
+    const o = opts || {};
+    const fmt = clean(o.format, 12) || 'folded';
+    const frames = flameFrames();
+    if (fmt === 'folded') {
+      const text = frames.map(function (f) { return f.stack + ' ' + f.ms; }).join(NL_S);
+      return { ok: true, format: 'folded', unit: 'ms', logical: true, frames: frames.length, text: text,
+        note: '逻辑火焰图（层/面分解，非真调用栈）；值单位为毫秒' };
+    }
+    if (fmt === 'json') {
+      const tree = { name: 'perf', value: 0, children: [] };
+      const byLayer = {};
+      frames.forEach(function (f) {
+        if (f.stack.split(';').length === 2) { const nd = { name: f.stack, value: f.ms, children: [] }; tree.children.push(nd); byLayer[f.stack] = nd; tree.value += f.ms; }
+      });
+      frames.forEach(function (f) {
+        const parts = f.stack.split(';');
+        if (parts.length !== 3) return;
+        const p = byLayer['perf;' + parts[1]];
+        if (p) p.children.push({ name: parts[2], value: f.ms, children: [] });
+      });
+      return { ok: true, format: 'json', logical: true, tree: tree, frames: frames.length };
+    }
+    if (fmt === 'svg') {
+      const W = 900, ROW = 22, PAD = 4;
+      const total = frames.filter(function (f) { return f.stack.split(';').length === 2; }).reduce(function (a, f) { return a + f.ms; }, 0) || 1;
+      const rows = [];
+      rows.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + (frames.length * ROW + ROW) + '">');
+      let y = 0;
+      frames.forEach(function (f) {
+        const w = Math.max(2, Math.round((f.ms / total) * (W - 2 * PAD)));
+        const depth = f.stack.split(';').length - 1;
+        const x = PAD + (depth > 1 ? 24 : 0);
+        const color = depth === 1 ? '#c94f4f' : '#e08a3c';
+        rows.push('<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + (ROW - 2) + '" fill="' + color + '"/>');
+        rows.push('<text x="' + (x + 4) + '" y="' + (y + 14) + '" font-size="11" fill="#fff">' + f.stack.replace(/[<>&]/g, '') + ' ' + f.ms + 'ms</text>');
+        y += ROW;
+      });
+      rows.push('</svg>');
+      return { ok: true, format: 'svg', logical: true, frames: frames.length, svg: rows.join(NL_S) };
+    }
+    return { ok: false, reason: 'unknown-format', known: ['folded', 'json', 'svg'] };
   }
 
   /* ── 四个观测面（全部委托既有真源，本面不另探一遍） ─────────────────── */
@@ -378,7 +687,7 @@
     let v, err = '';
     try { v = d.probe(); } catch (e) { err = String((e && e.message) || e); }
     const ms = clockWall() - t0;
-    note('local', ms); record(d.layer, ms);
+    note('local', ms); record(d.layer, ms); faceNote(d.layer, d.key, ms);
     if (err) { _stat.lastErr = clean(err, 120); return { face: d.key, layer: d.layer, ok: false, absent: false, reason: 'probe-threw', error: err, ms: ms, fp: '', bytes: 0 }; }
     const bytes = sizeOf(v);
     return { face: d.key, layer: d.layer, ok: true, absent: false, reason: '', ms: ms, fp: fingerprint(v), bytes: bytes };
@@ -558,6 +867,8 @@
       historyCap: HISTORY_CAP, fingerprintCap: FINGERPRINT_CAP,
       layers: LAYERS.length, faces: FACES.length, lastAt: _stat.lastAt, lastErr: _stat.lastErr,
       partialCalls: _stat.partialCalls, partialReused: _stat.partialReused,
+      fpCollisions: _stat.fpCollisions, evictedPolicy: _stat.evictedPolicy, flameDropped: _stat.flameDropped,
+      alertCount: _stat.alertCount, lastAlert: _stat.lastAlert, cachePolicy: _cachePolicy,
       rev: worldRev(),
       dirty: (function () { const d = dirtyAll(); return LAYERS.reduce(function (a, L) { return a + d[L].length; }, 0); })() };
   }
@@ -569,7 +880,9 @@
       return '性能面：注入面 P50 ' + b.p50 + 'ms / P95 ' + b.p95 + 'ms（窗口 ' + b.window + '/' + HISTORY_CAP + '）'
         + '；本地 ' + s.localMs + 'ms / 序列化 ' + s.serializeMs + 'ms / 宿主 ' + (s.declared.host ? s.hostMs + 'ms' : '未上报')
         + ' / 渲染 ' + (s.declared.render ? s.renderMs + 'ms' : '未上报')
-        + '；复用 ' + d.reuse + ' / 重算 ' + d.recompute + ' / 失败 ' + d.miss;
+        + '；复用 ' + d.reuse + ' / 重算 ' + d.recompute + ' / 失败 ' + d.miss
+        + (d.fpCollisions ? '；**指纹冲突 ' + d.fpCollisions + '**' : '')
+        + (d.alertCount ? '；劣化告警 ' + d.alertCount : '');
     } catch (e) { return '性能面读取失败'; }
   }
 
@@ -584,6 +897,11 @@
     bench: bench, benchAll: benchAll,
     baseline: baseline, curve: curve, curveAll: curveAll,
     noteSpan: noteSpan, split: split, partial: partial,
+    CACHE_CAP: CACHE_CAP, EVICT_POLICIES: EVICT_POLICIES, FLAME_CAP: FLAME_CAP,
+    snapshot: snapshot, importSnapshot: importSnapshot,
+    setCachePolicy: setCachePolicy, cacheStat: cacheStat, heatHistogram: heatHistogram,
+    thresholds: thresholds, setThresholds: setThresholds, spikeOf: spikeOf, alerts: alerts,
+    flamegraph: flamegraph,
     stat: stat, summaryText: summaryText
   };
   if (WA.log) WA.log('info', '性能基线与分层增量已加载（纯内存观测：不写存档、不落盘）');

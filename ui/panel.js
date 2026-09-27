@@ -75,8 +75,72 @@
     { id: 'logs', icon: '📋', label: '日志' }
   ];
 
-  let currentPage = 'overview';
+  // == v2.109.0（计划一 #15）：面板状态持久化走设置总线 ==
+  //   为什么必须有它（三条实测理由，不是偏好）：
+  //     ① 面板把「上一次停在哪一页 / 日志是否只看错误」这类**交互偏好**放在模块级闭包变量里——
+  //        页面一刷新、宿主一重载，用户的视图状态就回到出厂值；而这类状态**没有任何生命周期
+  //        理由**不持久化（它不是运行时引用，是用户选择）。
+  //     ② 但持久化**不能**各写各的 localStorage：本仓 v2.5.0 起，设置键的单一真源是
+  //        `WA.__settingsRegs`（各模块自持登记），写路径必须走 `settingsBus.saveOrThrow`——
+  //        那条路径内含写后读回校验、失败分桶、子键漂移计量、结构指纹与迁移引擎。绕开它直写
+  //        `localStorage.setItem` 会让「一次面板操作」在诊断里变成「没有发生过」。
+  //     ③ 它此前确实是「外部可见的可变状态」，只是**没有任何登记、计量与出口**。
+  //   刻意**不**持久化的：panelEl / orbEl（DOM 引用）、lastPerfSnap（时效性槽，跨会话比对无
+  //   意义）、__rerenderTimer（运行时定时器）、__cnBuilt / __memRefKey（缓存/展开键）。
+  const __PANEL_STATE_KEY = 'worldaxis_ui_panel_state_v1';
+  const __panelStateReg = {
+    key: __PANEL_STATE_KEY,
+    def: { page: 'overview', logErrOnly: false },
+    module: 'ui',
+    // 枚举白名单：页面 id 是**闭合集合**（PAGES）。不声明的话，旧版本删掉某页后，磁盘里会
+    //   留着一个永远切不过去的「当前页」，表现为「面板打开是空白页」且**零报错**（silent）。
+    enums: { page: PAGES.map(function (p) { return p.id; }) }
+  };
+  // 幂等登记（实测：tests/run.js 有 8 处直接求值本文件而**不清**登记表，无条件 concat 会让
+  //   同一个键在同一张表里出现 8 次——而「重复登记」在 settingsBus.selfCheck() 里是 error 级
+  //   阻断项，那会是一盏自造的红灯。filter+concat 仍是无条件重建，与其余模块同口径）。
+  WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) {
+    return !r || r.key !== __PANEL_STATE_KEY;
+  }).concat([__panelStateReg]);
+  /** 读侧快照（settingsBus 缺席时回落 def —— 与各引擎同口径）。 */
+  function __panelState() {
+    try {
+      if (WA.settingsBus && typeof WA.settingsBus.read === 'function') return WA.settingsBus.read(__panelStateReg);
+    } catch (e) {}
+    return { page: 'overview', logErrOnly: false };
+  }
+  /** 页 id 白名单校验（**读侧**）：`enums` 声明管的是**写**路径不落非法值；本函数管的是
+   *  **读**路径不因历史非法值炸渲染 —— `RENDERERS[非法 id]` 是 undefined，调用它必抛。 */
+  function __pageOr(fb) {
+    const p = (__panelState() || {}).page;
+    for (let i = 0; i < PAGES.length; i++) if (PAGES[i].id === p) return p;
+    return fb;
+  }
+  /** 面板状态落盘（**唯一写路径**：走 settingsBus.saveOrThrow）。
+   *  失败必须留下痕迹：静默失败会让用户看到「关了面板再打开又是老样子」，而日志里没有
+   *  任何解释——本仓对「写失败被当成成功」已有一次裁决（v2.6.0 calendar 的 ✓ 已保存）。 */
+  function __persistPanel() {
+    try {
+      if (!WA.settingsBus || typeof WA.settingsBus.saveOrThrow !== 'function') {
+        // 首版此处静默返回 —— 而本文件顶上刚写过「失败必须留下痕迹」。补齐。
+        // 另：首版给这一路与「无返回」那一路共用一个自造的原因串，被拒收码扫描面捕获；
+        //   两路失败各有真实原因，不需要自造的码来统一（见 v2.109.0 沿革）。
+        if (WA.log) WA.log('warn', 'ui.panel: 面板状态未落盘——设置总线未装载（本次会话内仍生效）', null);
+        return { ok: false };
+      }
+      const r = WA.settingsBus.saveOrThrow(__panelStateReg, { page: currentPage, logErrOnly: __logErrOnly });
+      if (r && r.ok === false && WA.log) WA.log('warn', 'ui.panel: 面板状态未落盘（' + (r.reason || '?') + '，本次会话内仍生效）', null);
+      return r || { ok: false };
+    } catch (e) {
+      if (WA.log) WA.log('warn', 'ui.panel: 面板状态写盘异常', e);
+      return { ok: false, reason: String((e && e.message) || e) };
+    }
+  }
+  let currentPage = __pageOr('overview');
   let panelEl = null, orbEl = null;
+  /** v2.109.0（#7）：上一次「基准面」按下时的性能快照。存在的意义就是**下次能比对**——
+   *   没有它，`importSnapshot` 只能与现场自比（恒等），那是看起来有值、其实没有意义的读数。 */
+  let lastPerfSnap = null;
 
   function h(html) { const d = mainDoc.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '"' }[c])); }
@@ -532,7 +596,7 @@
     return `
       <div class="wa-sec">突发事件（一轮生成·多轮解封）</div>
       ${active ? `<div class="wa-item"><b>${esc(active.title)}</b> <span class="wa-badge">第${active.currentTurn}/${active.totalTurns}轮</span><div class="wa-dim">对手：${esc(active.opponent || '未通报')}</div><button class="wa-btn wa-mini" id="wa-de-abort" title="立即终止当前突发事件">中止事件</button></div>`
-        : `<div class="wa-row"><input id="wa-de-prompt" class="wa-input" placeholder="事件要求（可空）…"/><input id="wa-de-turns" class="wa-input wa-w60" type="number" value="6" min="1" max="30"/><button class="wa-btn" id="wa-de-create" title="生成一场分轮次的突发事件（每轮推进一个阶段）">生成事件</button></div>`}
+        : `<div class="wa-row"><input id="wa-de-prompt" class="wa-input" placeholder="事件要求（可空）…"/><input id="wa-de-turns" aria-label="生成轮数" class="wa-input wa-w60" type="number" value="6" min="1" max="30"/><button class="wa-btn" id="wa-de-create" title="生成一场分轮次的突发事件（每轮推进一个阶段）">生成事件</button></div>`}
 
       ${digest && digest.text ? `<div class="wa-sec">世界推演叙事</div><div class="wa-item wa-digest">${esc(digest.text)}</div>` : ''}
 
@@ -618,7 +682,7 @@
         <div class="wa-dim">声誉总压：${WA.editorFaction.reputationPressure(s).pressure} / ±${WA.editorFaction.reputationPressure(s).cap}</div>` : '<div class="wa-empty">势力编辑器未加载</div>'}
       <div class="wa-sec">事件编辑器</div>
       ${WA.editorEvents ? `
-        <div class="wa-row"><input id="wa-ee-name" class="wa-input" placeholder="事件名"/><select id="wa-ee-type" class="wa-input wa-w60"><option value="conflict">冲突型</option><option value="progress">推进型</option></select><button class="wa-btn" id="wa-ee-add">新增事件</button></div>
+        <div class="wa-row"><input id="wa-ee-name" class="wa-input" placeholder="事件名"/><select id="wa-ee-type" aria-label="事件类型" class="wa-input wa-w60"><option value="conflict">冲突型</option><option value="progress">推进型</option></select><button class="wa-btn" id="wa-ee-add">新增事件</button></div>
         <div class="wa-list">${(WA.editorEvents.list(s) || []).map((e, i) => `<div class="wa-item${__eeCur === i ? ' wa-editing' : ''}"><b>${esc(e.name)}</b> <span class="wa-badge">${e.type === 'conflict' ? '冲突' : '进度'} Lv.${e.level}</span> <span class="wa-dim">${esc(e.stage)} ${e.stageRound||1}/9</span>${__eeCur === i ? ' <span class="wa-badge wa-on">编辑中</span>' : ''}
           <button class="wa-btn wa-mini" data-ee-prev="${i}">阶段</button><button class="wa-btn wa-mini" data-ee-next="${i}">阶段▶</button><button class="wa-btn wa-mini" data-ee-del="${i}">删除</button></div>`).join('') || '<div class="wa-empty">暂无事件</div>'}</div>` : '<div class="wa-empty">事件编辑器未加载</div>'}
       <div class="wa-sec">状态一致性体检</div>
@@ -639,7 +703,7 @@
         }).join('');
         const opts = types.map(function (t) { return '<option value="' + t + '">' + esc(labels[t] || t) + '</option>'; }).join('');
         return '<div class="wa-sec">实体库</div>'
-          + '<div class="wa-row"><select id="wa-ent-type" class="wa-input wa-w60">' + opts + '</select>'
+          + '<div class="wa-row"><select id="wa-ent-type" aria-label="实体类型" class="wa-input wa-w60">' + opts + '</select>'
           + '<input id="wa-ent-name" class="wa-input" placeholder="名称" maxlength="40"/>'
           + '<input id="wa-ent-desc" class="wa-input" placeholder="描述（可选）" maxlength="150"/>'
           + '<button class="wa-btn wa-mini" id="wa-ent-add" title="手工写入实体库（走 entities.upsert）">录入</button></div>'
@@ -918,10 +982,10 @@
     // 控制区
     out += '<div class="wa-sec">推演控制</div>'
       + '<div class="wa-row"><label class="wa-node"><input type="checkbox" id="wa-pw-enable" ' + (cfg.enabled ? 'checked' : '') + '><span class="wa-node-label">启用平行世界</span></label>'
-      + ' <select id="wa-pw-mode" class="wa-input wa-w60"><option value="manual"' + (cfg.autoMode === 'manual' ? ' selected' : '') + '>手动</option><option value="per_turn"' + (cfg.autoMode === 'per_turn' ? ' selected' : '') + '>每轮推进</option><option value="every_n"' + (cfg.autoMode === 'every_n' ? ' selected' : '') + '>每N轮</option><option value="dice"' + (cfg.autoMode === 'dice' ? ' selected' : '') + '>骰子（1/6）</option></select>'
+      + ' <select id="wa-pw-mode" aria-label="推进模式" class="wa-input wa-w60"><option value="manual"' + (cfg.autoMode === 'manual' ? ' selected' : '') + '>手动</option><option value="per_turn"' + (cfg.autoMode === 'per_turn' ? ' selected' : '') + '>每轮推进</option><option value="every_n"' + (cfg.autoMode === 'every_n' ? ' selected' : '') + '>每N轮</option><option value="dice"' + (cfg.autoMode === 'dice' ? ' selected' : '') + '>骰子（1/6）</option></select>'
       + ' <input type="number" id="wa-pw-int" class="wa-input wa-w60" min="1" max="50" value="' + cfg.autoInterval + '" title="每N轮推进的N" disabled>'
       + ' <label class="wa-node"><input type="checkbox" id="wa-pw-dice" ' + (cfg.diceEnabled ? 'checked' : '') + '><span class="wa-node-label">骰子</span></label>'
-      + ' <select id="wa-pw-detail" class="wa-input wa-w60"><option value="brief"' + (cfg.detailLevel === 'brief' ? ' selected' : '') + '>简</option><option value="normal"' + (cfg.detailLevel === 'normal' ? ' selected' : '') + '>中</option><option value="rich"' + (cfg.detailLevel === 'rich' ? ' selected' : '') + '>丰</option></select>'
+      + ' <select id="wa-pw-detail" aria-label="推进明细" class="wa-input wa-w60"><option value="brief"' + (cfg.detailLevel === 'brief' ? ' selected' : '') + '>简</option><option value="normal"' + (cfg.detailLevel === 'normal' ? ' selected' : '') + '>中</option><option value="rich"' + (cfg.detailLevel === 'rich' ? ' selected' : '') + '>丰</option></select>'
       + ' <button class="wa-btn wa-mini" id="wa-pw-save">存</button></div>'
       + '<div class="wa-row"><button class="wa-btn" id="wa-pw-advance" ' + (cfg.enabled ? '' : 'disabled') + ' title="调用推演器跑一轮（走 inference 通道）">▶ 手动推进一轮</button>'
       + ' <button class="wa-btn wa-mini" id="wa-pw-prompt" title="预览推进提示词（含六大审查协议）">提示词</button>'
@@ -1358,7 +1422,7 @@
       ${plan ? `<div class="wa-item"><b>${esc(plan.kind === 'arc' ? '弧线' : '序列')}</b> 第${plan.current + 1}/${plan.beats.length}拍<div class="wa-dim">${esc((WA.oracle.currentBeat() || {}).goal || '')}</div><button class="wa-btn wa-mini" id="wa-beat-next" title="推进到剧情弧线的下一拍">完成本拍</button><button class="wa-btn wa-mini" id="wa-plan-clear">放弃</button></div>`
         : `<textarea id="wa-plan-beats" class="wa-ta" placeholder="每行一拍的目标/指令…"></textarea><button class="wa-btn" id="wa-plan-start">开始序列引导</button>`}
       <div class="wa-sec">AI 剧情参谋（judge 通道）</div>
-      <div class="wa-row"><input id="wa-or-goal" class="wa-input" placeholder="剧情目标（如「揭开蒙面人身份」）…"/><input id="wa-or-beats" class="wa-input wa-num" type="number" min="1" max="12" value="5"/></div>
+      <div class="wa-row"><input id="wa-or-goal" class="wa-input" placeholder="剧情目标（如「揭开蒙面人身份」）…"/><input id="wa-or-beats" aria-label="节拍数" class="wa-input wa-num" type="number" min="1" max="12" value="5"/></div>
       <button class="wa-btn" id="wa-or-gen" title="用 judge 通道把剧情目标展开成多拍弧线">AI 生成弧线</button>
       <div id="wa-or-out" class="wa-out">${(() => {
         // v2.1.0: 参谋留痕（此前 generatePlan 零调用，AI 弧线能力形同虚设）
@@ -1401,11 +1465,11 @@
       <button class="wa-btn" id="wa-an-run">立即分析</button>
       <div id="wa-an-out" class="wa-out"></div>
       <div class="wa-sec">状态快照导出 / 恢复</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-snap-dl" title="导全量快照（剔除运行期脏字段，可归档/传给别人/跨聊天移植）">导出 JSON</button><button class="wa-btn" id="wa-snap-up" title="从快照文件恢复（先校验格式/schema/字段完整性，通过才写入）">导入 JSON</button><input type="file" id="wa-snap-file" accept=".json" style="display:none"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-snap-dl" title="导全量快照（剔除运行期脏字段，可归档/传给别人/跨聊天移植）">导出 JSON</button><button class="wa-btn" id="wa-snap-up" title="从快照文件恢复（先校验格式/schema/字段完整性，通过才写入）">导入 JSON</button><input type="file" id="wa-snap-file" aria-label="要导入的快照文件" accept=".json" style="display:none"/></div>
       <div class="wa-dim">导出剔除运行时脏字段；导入先校验（格式/schema/字段完整性），通过才写入并自动留恢复点。</div>
       <div id="wa-snap-out" class="wa-out"></div>
       <div class="wa-sec">外部数据导入（自动识别类型）</div>
-      <div class="wa-row"><button class="wa-btn" id="wa-imp-pick">选择 JSON 文件</button><input type="file" id="wa-imp-file" accept=".json" style="display:none"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-imp-pick">选择 JSON 文件</button><input type="file" id="wa-imp-file" aria-label="要导入的 JSON 文件" accept=".json" style="display:none"/></div>
       <div class="wa-dim">支持：全量存档 / 区域事件 / 势力清单 / 事件链清单 / 人物主观记忆 / 世界书条目组（自动判别）</div>
       <textarea id="wa-imp-text" class="wa-ta" placeholder="或直接粘贴 JSON 内容…"></textarea>
       <button class="wa-btn" id="wa-imp-run" title="自动识别粘贴/文件内容的类型（存档/区域事件/势力/事件链/主观记忆），校验失败零写入">预检并导入</button>
@@ -1474,7 +1538,10 @@
       + `<div id="wa-prof-msg" class="wa-dim"></div>`;
   }
 
-  let __logErrOnly = false;
+  // v2.109.0（#15）：初值改从持久化状态读（此前每次重载都回到「看全部」）——
+  //   `=== true` 是刻意的：登记 def 里它是布尔，但手改 localStorage / 旧版本写入会产出
+  //   字符串 'true'/'false'，而 read() 的 normalize 会按 def 类型把它归一回布尔。
+  let __logErrOnly = __panelState().logErrOnly === true;
   function renderLogs() {
     const errCount = (WA.errorLog || []).length;
     const src = __logErrOnly && WA.errorLog ? WA.errorLog : WA.eventLog;
@@ -2858,7 +2925,7 @@
     on('#wa-plan-clear', () => { WA.oracle.clear(); renderBody(); });
     on('#wa-gen-choices', async () => { setOut('#wa-choices-out', '生成中…'); const cs = await WA.choices.generate(4); setHtml('#wa-choices-out', cs.length ? cs.map((c, i) => `<div class="wa-item">${i + 1}. ${esc(c)}</div>`).join('') : '（未配置choices通道或生成失败）'); });
     on('#wa-log-copy', () => { navigator.clipboard && navigator.clipboard.writeText(WA.eventLog.map(l => `[${new Date(l.t).toLocaleTimeString()}][${l.level}] ${l.msg} ${l.data || ''}`).join('\n')); });
-    on('#wa-log-err', () => { __logErrOnly = !__logErrOnly; renderBody(); });
+    on('#wa-log-err', () => { __logErrOnly = !__logErrOnly; renderBody(); __persistPanel(); });   // v2.109.0（#15）：开关即落盘
     on('#wa-err-report', () => { if (navigator.clipboard && WA.toolDiag && WA.toolDiag.buildErrorReport) { navigator.clipboard.writeText(WA.toolDiag.buildErrorReport()); const tip = $('#wa-err-report'); if (tip) { tip.textContent = '已复制✓'; setTimeout(() => { tip.textContent = '复制错误报告'; renderBody(); }, 1500); } } });
     on('#wa-audit-copy', () => { if (navigator.clipboard && WA.store && WA.store.exportAuditReport) { navigator.clipboard.writeText(WA.store.exportAuditReport()); const out = $('#wa-diag-out'); if (out) out.textContent = '✓ 内存/持久化审计报告 (sizeAudit) 已复制到剪贴板！'; } });
     // v0.1.52: 存储键体检——dry-run 计划 + 确认执行（二次确认制，apply 权在用户）
@@ -3189,6 +3256,45 @@
           + (dk.length ? dk.map(function (L) { return esc(L + '(' + dirty[L].join(',') + ')'); }).join('、')
             : '无（各层输入指纹自上次消费以来未变）')
           + '；复用 ' + stv.reuse + ' / 重算 ' + stv.recompute + ' / 失败 ' + stv.miss + ' / 挤出 ' + stv.evicted + '</div>';
+        // v2.109.0（#9 缓存治理 / #10 劣化告警 / #11 火焰图）三面接真消费方。
+        //   这三块此前**只活在测试里**：dead-export-gate 把 cacheStat / heatHistogram /
+        //   thresholds / spikeOf / alerts / flamegraph 逐条记成 test-only 或 self-only。
+        //   接在这里的理由与 v2.102.0 同一条：写在源码里而无人消费的读数 = 不存在。
+        //   三块都**纯读**：不跑基准、不改设置、不落盘（看一眼体检不该有副作用）。
+        try {
+          const cs = WA.perfTrace.cacheStat();
+          html += '<div class="wa-item"><b>指纹缓存</b> <span class="wa-dim">策略 ' + esc(cs.policy)
+            + '（可选 ' + esc(cs.policies.join('/')) + '）· 上限 ' + cs.cap + ' 槽/层</span>'
+            + '<div class="wa-kv"><span>占用</span><b>' + cs.total + ' 槽（'
+            + WA.perfTrace.LAYERS.map(function (L) { return esc(L) + ' ' + cs.per[L]; }).join(' / ')
+            + '）</b></div>'
+            + '<div class="wa-kv"><span>挤出</span><b>' + cs.evicted + ' 次（其中按策略淘汰 ' + cs.evictedPolicy
+            + ' 次）</b></div></div>';
+          const heat = WA.perfTrace.heatHistogram();
+          html += '<div class="wa-dim">热度分布（按最近访问年龄）：' + esc(heat.buckets.map(function (b) {
+            return b.label + ' ' + b.n;
+          }).join('　')) + '（共 ' + heat.total + ' 槽）</div>';
+          const th = WA.perfTrace.thresholds();
+          html += '<div class="wa-dim">劣化阈值：' + th.factor + 'x（≥ ' + th.minSamples + ' 样本且差 ≥ '
+            + th.minMs + 'ms 才算）—— 阈值是**倍数**不是毫秒：墙钟跨机差 3 倍以上，绝对数当阈值会换台机就假红</div>';
+          html += WA.perfTrace.LAYERS.map(function (L) {
+            const sp = WA.perfTrace.spikeOf(L);
+            const kind = !sp.ok ? ('不判（' + esc(sp.kind) + '，窗口 ' + sp.window + '/' + sp.need + '）')
+              : (sp.spiking ? '长尾偏大 ' + sp.ratio + 'x' : '平稳 ' + sp.ratio + 'x');
+            return '<div class="wa-kv"><span>' + esc(L) + ' 稳定性</span><b>' + kind + '</b></div>';
+          }).join('');
+          const al = WA.perfTrace.alerts();
+          html += '<div class="wa-dim' + (al.n ? ' wa-log-warn' : '') + '">劣化告警：'
+            + (al.n ? esc(al.alerts.map(function (x) { return x.layer + '/' + x.kind + '（' + x.detail + '）'; }).join('；'))
+              : '无（各层 P95/P50 未越阈值，或样本不足未判）') + '</div>';
+          const fg = WA.perfTrace.flamegraph({ format: 'folded' });
+          if (fg.ok) {
+            const firstLines = String(fg.text).split(String.fromCharCode(10)).slice(0, 6);
+            html += '<div class="wa-item"><b>逻辑火焰图</b> <span class="wa-dim">' + esc(fg.note || '')
+              + '</span><div class="wa-dim">' + esc(firstLines.join(' ｜ '))
+              + (fg.frames > firstLines.length ? '　…（共 ' + fg.frames + ' 帧，完整文本用 flamegraph())' : '') + '</div></div>';
+          }
+        } catch (e) { html += '<div class="wa-dim wa-log-warn">缓存/告警/火焰图读数失败：' + esc(e && e.message) + '</div>'; }
         out.innerHTML = html;
       } catch (e) { out.textContent = '性能面读取失败：' + (e && e.message); }
     };
@@ -3218,6 +3324,29 @@
             + ((w.volatile || []).length ? '被观测面自身不可复现（非缓存缺陷，该面本就不会命中）：' + esc(w.volatile.join('/')) : '')
             + '</div>';
         }
+        // v2.109.0（#7）：与**上一次**按下的基线比对（同会话内自比，故 sameHost 成立）。
+        //   为什么不留「与当前比」：那是恒等比对（ratio 恒 1），读数看起来有值却没有意义。
+        //   真正的用法就是「先量一次、改点东西、再量一次」——故基线存在模块级变量里。
+        try {
+          const snap = WA.perfTrace.snapshot('panel-bench');
+          if (lastPerfSnap) {
+            const cmp = WA.perfTrace.importSnapshot(lastPerfSnap, { sameHost: true });
+            html += '<div class="wa-item"><b>与上次基准比对</b> <span class="wa-dim">'
+              + esc(cmp.note || '') + '</span>'
+              + '<div class="wa-kv"><span>结构面</span><b>'
+              + (cmp.struct.length ? esc(cmp.struct.join('；')) : '一致（缓存上限 / 面数未变）') + '</b></div>'
+              + cmp.rows.map(function (r) {
+                return '<div class="wa-kv"><span>' + esc(r.layer) + '</span><b>' + esc(r.verdict)
+                  + (r.ratio ? '　' + r.ratio + 'x（' + r.then.p95 + ' → ' + r.now.p95 + 'ms）' : '') + '</b></div>';
+              }).join('')
+              + (cmp.problems.length ? '<div class="wa-dim wa-log-warn">问题：' + esc(cmp.problems.join('；')) + '</div>' : '')
+              + '</div>';
+          } else {
+            html += '<div class="wa-dim">首次基准：已记为基线（再按一次即可与本次比对；'
+              + '快照带 comparable.ms=false —— 墙钟跨机不可比，跨机只判结构面）</div>';
+          }
+          lastPerfSnap = snap;
+        } catch (e) { html += '<div class="wa-dim wa-log-warn">基准比对失败：' + esc(e && e.message) + '</div>'; }
         html += '<div class="wa-dim">' + esc(WA.perfTrace.summaryText()) + '；基准档位 '
           + esc(WA.perfTrace.CLASSES.join(' / ')) + '（lowend 为同机放大估计，真机读数须实机）</div>';
         out.innerHTML = html;
@@ -4094,7 +4223,10 @@
     </div>`);
     mainDoc.body.appendChild(panelEl);
     panelEl.querySelector('.wa-close').onclick = () => toggle(false);
-    panelEl.querySelectorAll('.wa-tab').forEach(t => t.onclick = () => { currentPage = t.dataset.page; syncTabs(); renderBody(); });
+    // v2.109.0（#15）：切页即落盘（走 __persistPanel 的单一写路径）——点同一页也写一次：
+    //   saveOrThrow 内含写后读回校验，重复写同值不产生副作用，却能让「落盘能力断了」
+    //   这件事**在第一次点击时就暴露**，而不是等到用户下次重载才发现视图状态没了。
+    panelEl.querySelectorAll('.wa-tab').forEach(t => t.onclick = () => { currentPage = t.dataset.page; syncTabs(); renderBody(); __persistPanel(); });
     syncTabs();
   }
   function syncTabs() { panelEl.querySelectorAll('.wa-tab').forEach(t => t.classList.toggle('active', t.dataset.page === currentPage)); }

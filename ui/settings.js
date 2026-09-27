@@ -59,24 +59,24 @@
       const rng = (arr, fb) => Array.isArray(arr) ? arr : fb;
       return `
         <div class="wa-sec">世界推演设置</div>
-        <div class="wa-set-row"><span>推演尺度</span><select id="wa-set-mode" class="wa-input">${modes.map(m => `<option value="${m[0]}" ${bs.simulationMode === m[0] ? 'selected' : ''}>${m[1]}</option>`).join('')}</select></div>
-        <div class="wa-set-row"><span>时间策略</span><select id="wa-set-time" class="wa-input">${times.map(t => `<option value="${t[0]}" ${bs.timePolicy === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('')}</select></div>
-        <div class="wa-set-row"><span>世界脉搏活跃度</span><select id="wa-set-pulse" class="wa-input">${pulses.map(p => `<option value="${p[0]}" ${bs.pulseActivity === p[0] ? 'selected' : ''}>${p[1]}</option>`).join('')}</select></div>
-        <div class="wa-set-row"><span>NPC预算 <b id="wa-set-npcv">${bs.npcBudget}</b></span><input type="range" min="${rng(bB.npcBudget, [1, 16])[0]}" max="${rng(bB.npcBudget, [1, 16])[1]}" value="${bs.npcBudget}" id="wa-set-npc" class="wa-range"/></div>
+        <div class="wa-set-row"><span>推演尺度</span><select aria-label="推演尺度" id="wa-set-mode" class="wa-input">${modes.map(m => `<option value="${m[0]}" ${bs.simulationMode === m[0] ? 'selected' : ''}>${m[1]}</option>`).join('')}</select></div>
+        <div class="wa-set-row"><span>时间策略</span><select aria-label="时间策略" id="wa-set-time" class="wa-input">${times.map(t => `<option value="${t[0]}" ${bs.timePolicy === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('')}</select></div>
+        <div class="wa-set-row"><span>世界脉搏活跃度</span><select aria-label="世界脉搏活跃度" id="wa-set-pulse" class="wa-input">${pulses.map(p => `<option value="${p[0]}" ${bs.pulseActivity === p[0] ? 'selected' : ''}>${p[1]}</option>`).join('')}</select></div>
+        <div class="wa-set-row"><span>NPC预算 <b id="wa-set-npcv">${bs.npcBudget}</b></span><input type="range" min="${rng(bB.npcBudget, [1, 16])[0]}" max="${rng(bB.npcBudget, [1, 16])[1]}" value="${bs.npcBudget}" aria-label="NPC预算" id="wa-set-npc" class="wa-range"/></div>
         <label class="wa-node"><input type="checkbox" id="wa-set-auto" ${bs.autoSimulate ? 'checked' : ''}/><span class="wa-node-label">每轮自动推演（关闭则仅手动）</span></label>
         <label class="wa-node"><input type="checkbox" id="wa-set-fullrules" ${bs.fullRules ? 'checked' : ''}/><span class="wa-node-label">注入世界规则全文（12模块铁律；关闭则仅精简守则，省token）</span></label>
         <label class="wa-node"><input type="checkbox" id="wa-set-sync" ${bs.syncToChat ? 'checked' : ''}/><span class="wa-node-label">镜像存档进聊天文件（随聊天跨设备同步；关闭则仅存本机）</span></label>
         <label class="wa-node"><input type="checkbox" id="wa-set-autobak" ${bs.autoBackup ? 'checked' : ''}/><span class="wa-node-label">轮次推进时自动备份（滚动保留最近 3 份，可恢复）</span></label>
-        <div class="wa-set-row"><span>注入预算</span><select id="wa-set-budget-mode" class="wa-input">
+        <div class="wa-set-row"><span>注入预算</span><select aria-label="注入预算" id="wa-set-budget-mode" class="wa-input">
           <option value="auto" ${bs.injectBudget == null || bs.injectBudget < 0 ? 'selected' : ''}>自动（按上下文窗口 6%）</option>
           <option value="unlimited" ${bs.injectBudget === 0 ? 'selected' : ''}>不限（全量注入）</option>
           <option value="manual" ${bs.injectBudget > 0 ? 'selected' : ''}>手动上限</option>
         </select></div>
-        <div class="wa-set-row"><span>手动上限 <b id="wa-set-budgetv">${bs.injectBudget > 0 ? bs.injectBudget + 't' : '—'}</b></span><input type="range" min="200" max="6000" step="200" value="${bs.injectBudget > 0 ? bs.injectBudget : 2400}" id="wa-set-budget" class="wa-range"/></div>
+        <div class="wa-set-row"><span>手动上限 <b id="wa-set-budgetv">${bs.injectBudget > 0 ? bs.injectBudget + 't' : '—'}</b></span><input type="range" min="200" max="6000" step="200" value="${bs.injectBudget > 0 ? bs.injectBudget : 2400}" aria-label="手动上限" id="wa-set-budget" class="wa-range"/></div>
         <div class="wa-dim">预算裁决：核心块（世界状态/近端事件）优先保底；记忆/摘要/账本/舆情超预算时先折叠后丢弃。自动档从宿主上下文窗口推导，夹在 800–4000t。</div>
         <div class="wa-sec">主观记忆采样（v0.9.9）</div>
-        <div class="wa-set-row"><span>采样上限 <b id="wa-set-mslimitv">${bs.memSamplerLimit || 8}</b></span><input type="range" min="${rng(bB.memSamplerLimit, [1, 30])[0]}" max="${rng(bB.memSamplerLimit, [1, 30])[1]}" value="${bs.memSamplerLimit || 8}" id="wa-set-mslimit" class="wa-range"/></div>
-        <div class="wa-set-row"><span>骰子面数 <b id="wa-set-msdicev">${bs.memSamplerDice || 10000}</b></span><input type="range" min="${rng(bB.memSamplerDice, [1000, 10000])[0]}" max="${rng(bB.memSamplerDice, [1000, 10000])[1]}" step="500" value="${bs.memSamplerDice || 10000}" id="wa-set-msdice" class="wa-range"/></div>
+        <div class="wa-set-row"><span>采样上限 <b id="wa-set-mslimitv">${bs.memSamplerLimit || 8}</b></span><input type="range" min="${rng(bB.memSamplerLimit, [1, 30])[0]}" max="${rng(bB.memSamplerLimit, [1, 30])[1]}" value="${bs.memSamplerLimit || 8}" aria-label="采样上限" id="wa-set-mslimit" class="wa-range"/></div>
+        <div class="wa-set-row"><span>骰子面数 <b id="wa-set-msdicev">${bs.memSamplerDice || 10000}</b></span><input type="range" min="${rng(bB.memSamplerDice, [1000, 10000])[0]}" max="${rng(bB.memSamplerDice, [1000, 10000])[1]}" step="500" value="${bs.memSamplerDice || 10000}" aria-label="骰子面数" id="wa-set-msdice" class="wa-range"/></div>
         <label class="wa-node"><input type="checkbox" id="wa-set-msrel" ${bs.memSamplerRelevance !== 'off' ? 'checked' : ''}/><span class="wa-node-label">上下文相关召回（只注入当前剧情相关的人物记忆，关闭则全量采样）</span></label>
         <div class="wa-sec">自定义推演指令（追加到系统提示）</div>
         <textarea id="wa-set-custom" class="wa-ta" placeholder="例如：本世界魔法衰退，推演时注意时代背景…">${esc(bs.customInstruction)}</textarea>
@@ -110,8 +110,8 @@
           const rg = WA.regional.effectiveSettings();
           const bd = (typeof WA.regional.bounds === 'function') ? WA.regional.bounds() : { chancePercent: [1, 100], durationRounds: [1, 20] };
           return `<label class="wa-node"><input type="checkbox" id="wa-rg-enable" ${rg.enabled ? 'checked' : ''}/><span class="wa-node-label">启用区域突发事件（按轮掷骰）</span></label>
-            <div class="wa-set-row"><span>触发概率 <b id="wa-rg-chancev">${rg.chancePercent}%</b></span><input type="range" min="${bd.chancePercent[0]}" max="${bd.chancePercent[1]}" value="${rg.chancePercent}" id="wa-rg-chance" class="wa-range"/></div>
-            <div class="wa-set-row"><span>持续轮次 <b id="wa-rg-durv">${rg.durationRounds}</b></span><input type="range" min="${bd.durationRounds[0]}" max="${bd.durationRounds[1]}" value="${rg.durationRounds}" id="wa-rg-dur" class="wa-range"/></div>
+            <div class="wa-set-row"><span>触发概率 <b id="wa-rg-chancev">${rg.chancePercent}%</b></span><input type="range" min="${bd.chancePercent[0]}" max="${bd.chancePercent[1]}" value="${rg.chancePercent}" aria-label="触发概率" id="wa-rg-chance" class="wa-range"/></div>
+            <div class="wa-set-row"><span>持续轮次 <b id="wa-rg-durv">${rg.durationRounds}</b></span><input type="range" min="${bd.durationRounds[0]}" max="${bd.durationRounds[1]}" value="${rg.durationRounds}" aria-label="持续轮次" id="wa-rg-dur" class="wa-range"/></div>
             <button class="wa-btn" id="wa-rg-save">保存区域设置</button>
             <div id="wa-rg-out" class="wa-out"></div>
             <div class="wa-dim">此处显示的是<b>生效值</b>（越界存档已在保存时归一，落盘即引擎掷骰用的数）。</div>`;
@@ -119,14 +119,14 @@
         <div class="wa-sec">舆情引擎</div>
         <label class="wa-node"><input type="checkbox" id="wa-op-enable" ${op.enabled ? 'checked' : ''}/><span class="wa-node-label">启用舆情观察（新闻/论坛）</span></label>
         <label class="wa-node"><input type="checkbox" id="wa-op-sandbox" ${op.sandboxEnabled ? 'checked' : ''}/><span class="wa-node-label">启用闲逛沙盒（NON-CANON氛围碎片）</span></label>
-        <div class="wa-set-row"><span>每N轮生成</span><input type="number" min="${rng(bO.everyNRounds, [1, 10])[0]}" max="${rng(bO.everyNRounds, [1, 10])[1]}" value="${op.everyNRounds}" id="wa-op-n" class="wa-input wa-w60"/></div>
+        <div class="wa-set-row"><span>每N轮生成</span><input type="number" min="${rng(bO.everyNRounds, [1, 10])[0]}" max="${rng(bO.everyNRounds, [1, 10])[1]}" value="${op.everyNRounds}" aria-label="每N轮生成" id="wa-op-n" class="wa-input wa-w60"/></div>
         <div class="wa-row">
           <button class="wa-btn" id="wa-op-now">立即生成舆情</button>
           <button class="wa-btn" id="wa-sim-now">立即推演世界</button>
         </div>
         <div class="wa-sec">事件演化（本地骰子）</div>
         <label class="wa-node"><input type="checkbox" id="wa-ev-dice" ${WA.evolution.getSettings().diceEnabled ? 'checked' : ''}/><span class="wa-node-label">启用事件链本地骰子推进</span></label>
-        <div class="wa-set-row"><span>骰子修正 <b id="wa-ev-modv">${WA.evolution.getSettings().diceModifier}</b></span><input type="range" min="${rng(bE.diceModifier, [-30, 30])[0]}" max="${rng(bE.diceModifier, [-30, 30])[1]}" value="${WA.evolution.getSettings().diceModifier}" id="wa-ev-mod" class="wa-range"/></div>
+        <div class="wa-set-row"><span>骰子修正 <b id="wa-ev-modv">${WA.evolution.getSettings().diceModifier}</b></span><input type="range" min="${rng(bE.diceModifier, [-30, 30])[0]}" max="${rng(bE.diceModifier, [-30, 30])[1]}" value="${WA.evolution.getSettings().diceModifier}" aria-label="骰子修正" id="wa-ev-mod" class="wa-range"/></div>
         <div class="wa-row"><button class="wa-btn" id="wa-ev-roll">立即掷一轮演化骰</button></div>
         <div id="wa-ev-out" class="wa-out"></div>
         <div class="wa-sec">远方 / 近端随机事件（v2.3.0）</div>
@@ -148,13 +148,13 @@
           //   拼接出的 id 运行时存在、静态守卫里隐形（会被报成僵尸或漏覆盖）。
           return `
             <label class="wa-node"><input type="checkbox" id="wa-hz-d-en" ${dEn ? 'checked' : ''}/><span class="wa-node-label">远方通道</span></label>
-            <div class="wa-set-row"><span>触发率 <b id="wa-hz-d-chancev">${c.distantChance}</b>%</span><input type="range" min="${hb.chancePct[0]}" max="${hb.chancePct[1]}" value="${c.distantChance}" id="wa-hz-d-chance" class="wa-range" ${dis(c.distantEnabled)}/></div>
-            <div class="wa-set-row"><span>冷却 <b id="wa-hz-d-cdv">${c.distantCooldown}</b>轮</span><input type="range" min="${hb.cooldown[0]}" max="${hb.cooldown[1]}" value="${c.distantCooldown}" id="wa-hz-d-cd" class="wa-range" ${dis(c.distantEnabled)}/></div>
-            <div class="wa-set-row"><span>保底 <b id="wa-hz-d-ledgerv">${c.distantLedger}</b>轮</span><input type="range" min="${hb.ledger[0]}" max="${hb.ledger[1]}" value="${c.distantLedger}" id="wa-hz-d-ledger" class="wa-range" ${dis(c.distantEnabled)}/></div>
+            <div class="wa-set-row"><span>触发率 <b id="wa-hz-d-chancev">${c.distantChance}</b>%</span><input type="range" min="${hb.chancePct[0]}" max="${hb.chancePct[1]}" value="${c.distantChance}" aria-label="触发率" id="wa-hz-d-chance" class="wa-range" ${dis(c.distantEnabled)}/></div>
+            <div class="wa-set-row"><span>冷却 <b id="wa-hz-d-cdv">${c.distantCooldown}</b>轮</span><input type="range" min="${hb.cooldown[0]}" max="${hb.cooldown[1]}" value="${c.distantCooldown}" aria-label="冷却" id="wa-hz-d-cd" class="wa-range" ${dis(c.distantEnabled)}/></div>
+            <div class="wa-set-row"><span>保底 <b id="wa-hz-d-ledgerv">${c.distantLedger}</b>轮</span><input type="range" min="${hb.ledger[0]}" max="${hb.ledger[1]}" value="${c.distantLedger}" aria-label="保底" id="wa-hz-d-ledger" class="wa-range" ${dis(c.distantEnabled)}/></div>
             <label class="wa-node"><input type="checkbox" id="wa-hz-n-en" ${nEn ? 'checked' : ''}/><span class="wa-node-label">近端通道</span></label>
-            <div class="wa-set-row"><span>触发率 <b id="wa-hz-n-chancev">${c.nearChance}</b>%</span><input type="range" min="${hb.chancePct[0]}" max="${hb.chancePct[1]}" value="${c.nearChance}" id="wa-hz-n-chance" class="wa-range" ${dis(c.nearEnabled)}/></div>
-            <div class="wa-set-row"><span>冷却 <b id="wa-hz-n-cdv">${c.nearCooldown}</b>轮</span><input type="range" min="${hb.cooldown[0]}" max="${hb.cooldown[1]}" value="${c.nearCooldown}" id="wa-hz-n-cd" class="wa-range" ${dis(c.nearEnabled)}/></div>
-            <div class="wa-set-row"><span>保底 <b id="wa-hz-n-ledgerv">${c.nearLedger}</b>轮</span><input type="range" min="${hb.ledger[0]}" max="${hb.ledger[1]}" value="${c.nearLedger}" id="wa-hz-n-ledger" class="wa-range" ${dis(c.nearEnabled)}/></div>
+            <div class="wa-set-row"><span>触发率 <b id="wa-hz-n-chancev">${c.nearChance}</b>%</span><input type="range" min="${hb.chancePct[0]}" max="${hb.chancePct[1]}" value="${c.nearChance}" aria-label="触发率" id="wa-hz-n-chance" class="wa-range" ${dis(c.nearEnabled)}/></div>
+            <div class="wa-set-row"><span>冷却 <b id="wa-hz-n-cdv">${c.nearCooldown}</b>轮</span><input type="range" min="${hb.cooldown[0]}" max="${hb.cooldown[1]}" value="${c.nearCooldown}" aria-label="冷却" id="wa-hz-n-cd" class="wa-range" ${dis(c.nearEnabled)}/></div>
+            <div class="wa-set-row"><span>保底 <b id="wa-hz-n-ledgerv">${c.nearLedger}</b>轮</span><input type="range" min="${hb.ledger[0]}" max="${hb.ledger[1]}" value="${c.nearLedger}" aria-label="保底" id="wa-hz-n-ledger" class="wa-range" ${dis(c.nearEnabled)}/></div>
             <div class="wa-dim">保底：连续未触发达该轮数即强制触发一次；关闭通道后连掷骰都不进行（不消耗冷却与保底计数）。</div>
             <div class="wa-row"><button class="wa-btn" id="wa-hz-save">保存随机事件设置</button></div><div id="wa-hz-out" class="wa-out"></div>`
             + tail;

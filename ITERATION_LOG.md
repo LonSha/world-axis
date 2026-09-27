@@ -14,6 +14,77 @@
 
 ## 迭代记录
 
+### R96 · 2026-09-27 · v2.110.0 三个基元模块 + 开发体验工具链七件（计划一 #21-#30 收口 · 计划二 #39/#70 并入）
+
+- **做了什么**（新增 10 个文件、接线 4 个文件、台账 3 本同源）：
+  - `core/fault-context.js`（新，202 行；#21 异常上下文与恢复）：`wrap(op, fn, opts)` 默认把抛出**折成结果对象** `{ok:false, reason:'fault-handled', kind, operation, ctx}`；显式 `{rethrow:true}` 时**原样重抛同一个 error 对象**（identity 不变）；`classify()` 只认五档 `network/transient/type/range/other`（判据只落在 message+code 上，不读 stack 文本）；重试**默认关**且只对 `network`/`transient` 开放；`stateBrief()` 捕一切异常、取不到的字段**如实给 null**（不是 0、不是 ''）；60 条上下文环（`recent()` 返回副本）。
+  - `core/schema.js`（新，215 行；#22 结构级输入校验）：`validate(spec, input)` 恒返回 `{ok, reason:'invalid-input', errors:[{field, expected, actual}], checked}`；**类型不放宽**（`'3'` 不是 `3`、`[]` 不是 `{}`，放宽必须 `coerce:true`）；`errors` **恒为数组**；枚举 `expected` 渲染成 `a|b|c`；未知字段**默认保留**（`unknown:'keep'`，与产品「未知字段保留不执行」同口径）；未注册 schema 名 ⇒ `unknown-schema`（不静默放过）；校验器自己炸 ⇒ `validator-threw`（绝不假装通过）。
+  - `core/permissions.js`（新，177 行；**计划二 #39 与 #70 是同一处机制**）：「角色 → 权限位 → 判定」一处实现。五内置角色 / 十权限位；**未注册用户一律拒绝**（`allowed:false` + `unknown-user`）；**审计模式不改产品行为**（判定只回答允不允许，不阻断任何既有写路径）；通配只认 `*` 与 `前缀.*`，`*.*` **不支持**（不做正则、不猜）。
+  - `tools/`（新七件，全部零依赖、全部「只报不改」）：`gen-lock.js`（#23 专锁模板生成器，导出面取自真源码文本、生成物必过 JS 解析、手写锁拒绝覆盖）、`coverage-report.js`（#25 零依赖解析 `NODE_V8_COVERAGE`，**没有数据就报 no-data 并给出产出命令，绝不打印 0%/100% 伪读数**）、`doc-gate.js`（#26 只判三件可机械核对的事，**刻意不查 `@param` 名字**，不设阈值除非 `--strict`）、`impact-analysis.js`（#27 四层各自成词 direct/alias/indirect/locks+ui，**不合并成一个数字**，并自报 `unseen:true`）、`patch-idempotency.js`（#28 判定只有一条：锚点剩几次；0 ⇒ 已应用、≥2 ⇒ **拒绝**、不给锚点 ⇒ 拒绝）、`hooks.js`（#29 快门槛进 pre-commit、**pre-push 默认不阻断**、外来 hook 拒绝覆盖 + 备份）、`gen-changelog.js`（#30 只输出**事实清单**草稿到 stdout、**不写日志**、区间必须显式）。
+  - `tests/run.js`：`#24` 失败根因定位（`__ctxRing` + `__noteTick` + `reportFailure` 纯函数，失败行带上「哪个 section / 锚点 / 最近通过的三条」）+ 新 section 接线五把锁（+ #24 的七条内联判据）。
+  - `index.js` / `manifest.json` / `engines/tool-diag.js` / `tests/run.js` 的 `LOAD`：三个基元模块四处同批登记（`LOAD_ORDER` / `LOAD` / `MODULE_EXPORTS`）。
+  - `tests/fault-context-v2110.js`（62 项）· `tests/schema-v2110.js`（64 项）· `tests/permissions-v2110.js`（74 项）· `tests/tools-v2110.js`（155 项）：四把新专锁，各含 A 导出面 / B 运行时 / C 不变式 / N **真源码破坏**四段。
+  - 三本台账同源：`module-registry-ledger`（`--update`：文件 115 / 命名空间 123 / 装载期边 23 未变）、`dead-export-ledger`（`--update`：dead 456→482）、`reject-code-ledger`（定点替换：version 2.110.0 + `_note` 追加一段，**基线 233 不动**）。
+- **为什么**：
+  - #21/#22 补的是同一条边界上的两层。此前 `core/input-guard.js` 治的是**值级**（一个字段长什么样），而**结构级**没有任何统一入口：`store.save()` 收下 `{actors:'x'}`、`tool-import` 收下字段名拼错的 JSON，都会被下游当合法输入往里走，然后在**很深的地方**炸，或者更糟——安静地写进世界。拒收码体系要求「拒收要趁早、要带名字」，而「结构不对」此前每个引擎自己 `if (!Array.isArray(x))` 一遍、形态各不相同。
+  - 异常侧的病灶不是「报错难看」而是**错误没有归属**：同一个 `TypeError` 可能来自 40 个入口，回归与实机日志只能按**行号**区分它们。
+  - #39/#70 并版是因为**两处病灶同源**：本仓有「谁能改什么」的全部前提（`store.save` 的写入口、`undo` 的操作栈、`bridge` 的对外投影面）却**没有任何一处问过权限**。分成两个模块只会得到两份会漂移的判定。
+  - 工具链七件治的是**开发流程本身的静默增长**：`tools/` 不进出口面契约（`product-files` 的 `SKIP_DIRS` 排掉它），所以**没有任何既有门禁看得见它们**——而它们恰是「下次改动会不会踩坑」的判官。
+- **四个由工具自己当场抓出的问题（都不是纸面推演，全部是这轮写工具时实测出来的）**：
+  - ① **`coverage-report` 的首版折算法把「覆盖」算成了恒 100%**。V8 的 range 是**逐层细化**的：最外层区间覆盖整个脚本且 `count>0`，内层未执行的块是 `count=0` 的子区间。首版把「count>0 的区间」逐字节 OR 起来 ⇒ 外层那条覆盖全文件的区间让每一个字节都算覆盖。探针里那个 `neverRun()` 报出来的是 100%。改成「长的在前、短的后覆盖，每个字节留最内层的计数」才读出真实的部分覆盖。**这正是这份工具存在的理由，而它第一版自己就犯了这个错。**
+  - ② **`hooks.js` 的 `git rev-parse` 在非仓库目录下往 stderr 喷 fatal**，而「不是仓库 ⇒ 回退 `.git/hooks`」是它的**正常路径**。不吞 stderr 的话每次 install/status 都在回归输出里留一行假警报（实测 7 行）。
+  - ③ **`gen-changelog.js` 的区间守卫只判 `indexOf('..') < 0`**，于是裸 `'..'` 能走到 git 那里，归因从「你没给区间」变成「git 不可用」——**归因错了一档**，而调用方看到 `no-git` 会去查 git，实际问题在参数的形状上。改为「必须两端非空的 `A..B`」。
+  - ④ **`#28` 的负控制首版打不到靶**：摘掉 `hits >= 2` 那行之后判定**仍是** `refuse-ambiguous`，因为末行兜底 `命中 N 次 != 期望 w` 同样返回它。**同一结论有两条路径时，只破坏其中一条不会让判据现形。** 改打「恰 1 次 ⇒ can-apply」那行才让症状露出来。
+- **三处必须记住的收口教训**：
+  - (a) **JSON 台账的定点替换，锚点必须含结构字符**。首版把新增段拼在 `",` **之前**，于是字符串提前闭合、后面那串成了裸文本，整份台账立刻不可解析（`Expecting property name`）。`ast.parse` 查不出来（补丁自己语法是对的）——**「插在哪一侧」这件事，必须有引号与逗号替你保证。**
+  - (b) **拼接式字符串少一个字符的补丁，唯一的防线是跑完立刻语法检查**。给 `run.js` 补沿革注释的那次漏了结尾的 `'）；` 三个字符，`node --check` 立刻报 `14815` 行 SyntaxError。补丁脚本的 `ast.parse` 只证明**补丁**语法正确，不证明**产物**正确。
+  - (c) **vm 上下文的裸全局没有 `require`**。用 `vm.runInContext` 截取 `run.js` 的段来验接线时，第一版报 `require is not defined`；手工把 require 塞进 vm 全局也绕不过全局代理的限制。最终用「写一个**真 CommonJS 临时模块**到 `tests/` 下、内部用 `new Function` 在显式作用域求值」——**真 CommonJS 模块才是 `tests/run.js` 的真实处境**。
+- **影响范围**：`core/fault-context.js`（新）、`core/schema.js`（新）、`core/permissions.js`（新）、`tools/gen-lock.js` / `coverage-report.js` / `doc-gate.js` / `impact-analysis.js` / `patch-idempotency.js` / `hooks.js` / `gen-changelog.js`（新）、`tests/fault-context-v2110.js` / `schema-v2110.js` / `permissions-v2110.js` / `tools-v2110.js`（新）、`tests/run.js`、`tests/reject-v2780.js`（+9 个可执行见证）、`index.js`、`manifest.json`、`engines/tool-diag.js`、`tests/module-registry-ledger.json`、`tests/dead-export-ledger.json`、`tests/reject-code-ledger.json`、`ITERATION_LOG.md`。`tools/patch_v2110_*.py` 不入库。
+- **门禁结果**（逐道实跑）：
+  - `tests/module-registry-gate.js` → **pass**：文件 115 / 命名空间 123 / 装载期边 23 / 硬边 0 / 调用期引用 44 / 结构问题 0。
+  - `tests/dead-export-gate.js` → **pass**：dead 482 / uiDead 4 / dataOnly 178 / 仅测试 293；新增 26 个口**全部按实测归因登记**（三个基元模块的 26 个导出在 `--update` 前是 `self-only`、专锁接上后按现场重算）。
+  - `tests/reject-code-gate.js` → **pass**：产品文件 119 / 内联码 375 / 见证 **128 → 137** / 死表 5 / 基线 **233 不变**。9 个新码全部走可执行见证（**不进基线**——那条规矩就是「新码一律走见证」）。
+  - `tests/export-contract.js` → **`ns= 109 members= 702 chars= 8381`，逐字未变**。三个基元模块只调用既有的 `inputGuard.text` / `store.read` / `clock.wallNow`，`FROZEN2800` 与 `EC2430` 都零增量。
+  - `tests/test-surface-gate.js` → 通过：测试文件面 108 / 锁 103 / 可达 108 / **孤儿 0** / 豁免 0。
+  - `tests/inventory.js` → 产品文件 119 / 声明表登记 118 / 命名空间 118 / 成员 1394 / 静态引用 2653，四类悬空均 0。
+  - `tools/sync-hardcoded.js --write` → 5 族 16 站点回填（refs 2645→2653、namespaces 115→118、members 1362→1394、dead 456→482、dataOnly 172→178），写后复判「无需回填」。
+  - 四把新专锁真装载面探针 → **355 / 0**；`run.js` 段接线探针（真 CommonJS 模块）→ **364 / 0**；`tools-v2110.js` 独立运行 → **155 / 0**。
+  - `node tests/run.js` → **通过 9695 / 失败 0**（v2.109.0 起点；本版净增 355 项专锁 + #24 的 7 条内联判据）。整轮耗时已超 `run.js` 默认 600s 上限，故以 `isolated-runner` 的公开选项 `timeoutMs` 显式给足预算（**默认值不动** —— 那条 10 分钟上限本身是一条读数）。
+  - **收口期连带修正（整轮现场抓出，非纸面推演）**：· `v2830/mr: 命名空间 120 / 装载文件 112` —— 三个新 `core` 模块使 `LOAD_ORDER` 115→118、门禁现场复算 `nsCount/loadedCount` 120/112→123/115（沿革算式逐字保留、只追写本版一行）。· `module-cycle-gate-v2107` 五处读数随文件面 +3 与调用期边 +9 跟到真值：`116/872/895/115/145/120/8` ⇒ `119/881/904/118/148/123/11`；门禁文件头里「拿全部静态引用判次序会报 N 条噪声」的 N 也由 607 跟到本版实测的 281。· `tools-v2110` 的 `gen-changelog` 区间用例原先依赖**宿主树的 git 深度**，而整轮跑在 `git archive` 出来的**单提交候选树**里 ⇒ 消息参数读 `undefined.length`、**在 `run.js:19328` 打死整个 v2.110.0 段**（断言短路救不了消息）；改为自建 3 提交夹具仓（落在仓库外），判据自足。
+  - **环境实测记录（为什么整轮要重跑）**：另一并发会话留下的 `/tmp/regbg.sh` 首行是 `pkill -9 -f 测试入口字面量`，它按**整条命令行**匹配，会把隔离 worker 连同探针一起杀掉 —— 现象是 `run.log` 停在中途、`result.json` 仍写 `running`、**没有任何错误行与栈**（「静默消失」而不是「报错」）。`/tmp` 在本环境不是 tmpfs ⇒ 上一轮被杀留下的 `.wa-run-owner.json` 会让下一轮报 `Regression lock unavailable: stale`（陈旧锁必须显式清）。判定进程生死用**外部事实**（`who -b` / 候选树里是否有与 `isWorker` 匹配的 `.wa-run-owner.json`），**不用** `uptime`：proot 绑进来的 `/proc/uptime` 是静态快照，永远显示「up 2 min」。
+
+- **可复用的判据**（本轮新增，编号续 R95）：
+  - (34) **负控制要打「结论的唯一路径」，不是「结论的一条路径」**：同一结论有两条 return 路径时，摘掉一条不会改变结论，判据因此不现形，而「不现形」会被误读成「判据坏」。选锚点的判据是：**摘掉它之后，结论真的会变吗**。
+  - (35) **静态串判据 ≠ 语义判据**：`hooks` 的首版判据是「生成物里不含 `--no-verify`」，而生成物的**注释里**会说明「那会训练人 `--no-verify`」——判据把一句正当的告诫当成了缺陷。改为语义判据（`pre-commit` 必须真会 `exit 1`；`pre-push` 必须无 `exit 1`）。
+  - (36) **读数的口径错了，工具就会成为它要治的那个病**：`coverage-report` 首版报 100%，与它文档里写的「全绿才是可疑信号」正好相反。**新工具的第一版必须先在自己的输出上发现自己。**
+  - (37) **「导出面」的静态抽取要认准**：`gen-lock` 的 `render()` 里有 `L.push('module.exports = {…};')` 这样一行**模板文本**，用非贪婪匹配抽 `module.exports` 会先撞上它 ⇒ 判据从「工具导出了什么」变成「生成器想生成什么」。专锁要把「模板文本」与「真导出块」分开（实测本文件首轮 5 条假红全出自这一处）。
+  - (38) **工具链也要专锁**：`tools/` 不受任何既有门禁管辖，而它们决定下一次改动会不会踩坑。工具专锁的负控制还有一个便利：**工具零相对依赖 ⇒ 破坏副本可直接落进临时目录 require**，不必装配宿主。
+  - (39) **负控制不许把被测对象弄坏**：`coverage-report` 的一处破坏把 `catch` 整段删成空白，于是副本自己语法错、`loadBroken` 直接抛,判据根本没跑到。破坏必须**保留可运行性、只改行为**（改成 `catch (e) { throw e; }` 而不是删掉它）。
+  - (40) **`reset()` 的边界要写清楚**：`permissions.reset()` 清**用户表与计数**、**不清角色定义**。首版专锁判「reset 后角色表恰等于内置五条」因而报红；真判据该钉「内置角色一个不少 + 自定义角色跨 reset 保留」——**把边界当缺陷改掉，就会让「先 defineRole 再 grant」变成隐形契约**。
+- **提交**：`（见本版提交）`
+
+### R93 · 2026-09-27 · v2.109.0 性能观测深化 · UI 可测试性（计划一 #7-#16 合版）
+
+- **做了什么**（产品面两处落点 + 四份新测试件；零新增导出 / 零新增容器 / 零新增设置键）：
+  - `engines/perf-trace.js`（+340 行）：**#7** `snapshot(label)` / `importSnapshot()` 把基线写成**可落盘对象**（`performance-snapshot-<ts>.json` 的**内容**，本面不落盘），并**各自标可比性**——`comparable.ms === false`（墙钟跨机不可比）、`comparable.bytes === true`（产物规模是确定量）；**#8** `_fpIndex` + `stat().fpCollisions`（同一输入指纹映射出**第二个**产物指纹 ⇒ 承诺破了）；**#9** `CACHE_CAP = 64` + `setCachePolicy('fifo'|'lru')` + `cacheStat()` / `heatHistogram()`（此前 `_cache` **无上限且零计量**）；**#10** `PERF_THRESHOLD = { factor: 1.5, minSamples: 8, minMs: 4 }` + `alerts()` / `thresholds()` / `setThresholds()`；**#11** `faceNote` / `_faceMs` **面级**耗时账 + `flamegraph()` + `FLAME_CAP = 256` + `flameDropped`。
+  - `ui/panel.js`（#7 基线比对入口 + #9/#10/#11 三面接**真消费方** + #15 面板状态持久化）、`ui/settings.js`（26 处 `aria-label`）。
+  - `ui/panel.js` 的 `__PANEL_STATE_KEY = 'worldaxis_ui_panel_state_v1'` / `__panelStateReg` / `__panelState()`：`enums.page` = `PAGES` 的**闭合集合**（旧版本删页后磁盘里不会留一个永远切不过去的「当前页」）；登记**幂等**（`tests/run.js` 有 8 处直接求值本文件而**不清**登记表，无条件 `concat` 会让同一个键在同一张表里出现 8 次，而重复登记在 `settingsBus.selfCheck()` 里是 error 级）。刻意**不**持久化：`panelEl` / `orbEl`（DOM 引用）、`lastPerfSnap`（时效性槽）、`__rerenderTimer`（运行时定时器）、`__cnBuilt` / `__memRefKey`（缓存/展开键）。
+  - `tests/perf-observability-v2109.js`（新，**101 项**；A 静态契约 / B 运行时 / C 不变式 / N **真源码破坏**负控制，破坏走 `ui-gate-sync.fresh` 的 `srcOverride` **内存副本**、磁盘字节零改写）、`tests/perf-regression-gate.js`（新，#12）、`tests/ui-a11y-gate.js`（新，#14）、`tests/ui-components-v2109.js`（新，**27 项**，#16）。
+  - `tests/run.js` 新增 `section('v2.109.0（计划一 #7-#16）')`（62 条断言）。**本段的存在本身是一处判据**：三份新文件若不在这里被 `require`，就会被 `test-surface-gate` 判成「从不执行的孤儿」（v2.75.0 点名的那类交付物），而 `EXEMPT` 当前为空。
+- **为什么**：
+  - **#7-#11 治的是同一类病：读数看着有数，其实没有意义。** `baseline()` 只活在内存里（会话一关就没了 ⇒「这个版本比上个版本慢了吗」在任何时刻都只能靠**记忆**回答）；`_cache` 无上限且一个计数都没有（`slots()` 只报当前在场项）——**「有界的地方被数着、没界的地方没人看」是本仓反复出现的形态**；告警若拿绝对毫秒当阈值就是**换台机器就假红**（本仓实测同一次全量回归在不同机器上差 3 倍以上），而假红的门禁最后一定会被绕过；火焰图此前只有**层级**账、没有**面级**账。
+  - **#12 的病灶是零告警的劣化**：`perf-trace` 自 v2.102.0 起能答「这一轮慢在谁身上」、本版起能导出快照，但**没有一道门禁读快照** —— 性能劣化**从不报错**，它只是让用户觉得「这扩展有点卡」，然后在某一天被卸载。
+  - **#13-#16 治的是 UI 层的静默无效**：实测 **453 个控件里 130 个无可访问名**（覆盖率 71.3%，缺口集中在文本输入 104/104、下拉 8/13、滑块 13/14）——它们成树、可点、不抛任何异常，但屏幕阅读器只念「编辑框」。同族第二病：`<select>` 里零个 `<option>`、`<input type=range>` 没有 `min`/`max`，而 `ui-gate` 的 `checkPages` 对渲染产物**只断言总数**（`inHtml > inTree`）⇒ **控件成树 ≠ 控件可用**，这两者之间的缝此前没人守。
+- **三处本版自纠（全部由判据实跑抓出，非纸面推演）**：
+  - ① **口径错了，读数就与真缺陷同形**：a11y 首版判据读 `el.type`，而裸 `<input>` 上它是**空串** ⇒ 104 个带 `placeholder` 的控件被判成「非文本类、无名字」。**被压低的读数与真的缺名在输出上完全同形**（同一个「缺口 130」）。修法 `normType`：裸 input 按规范缺省为 `text`，大写透传为小写；并把这条例外写进 `BASIS` 口径自述（判据的依据面要**可核对**，不是暗规则）。
+  - ② **判据断言了一种不存在的补名方式**：首版写「`aria-labelledby` ≥18 / `aria-label` ≥8」，而本版 26 处**全部**走 `aria-label`、模板里 `aria-labelledby` **全仓 0 处** ⇒ 这条判据**从落地起必然红**。订正为两条**互相佐证**的判据：数 DOM（`ad.byHow['aria-label']`）与数源码文本（`a11y.srcLabelCount(BASE)`），不再对补名方式的分布做任何假设；且计数由**门禁自己**提供——判据侧不许再碰文件面（v2.43.0 的负向自证要求「委托 `product-files` 的调用在 `run.js` 中恰出现 **1** 次」，本轮实测正是被它抓到，而它抓得对：**单一真源的意思就是只有一处去发现文件面**，多一处就多一处会漂的地方）。
+  - ③ **「还没有可比对象」与「有对象但跨机不可比」是两件事**：`perf-regression-gate` 首版把两者都写成 `not-comparable`，等于用一个读数表达两种事实（本仓反复治的**结论不实**）。改为按基线存在性分别钉死：无基线 ⇒ `state: 'first-baseline'` + `walls: 'n/a'`（**不适用**），有基线 ⇒ `compared` + `not-comparable`，并让 `state` 与基线存在性**同向**（不许「无基线却报 compared」）。实测现场即 `first-baseline` / 墙钟 `n/a`。
+- **本版四条否定式口径**（写进门禁文件头，不是风格偏好）：① **墙钟跨机不可比 ⇒ 默认不判墙钟**，只判**结构面**（层 / 面 / 缓存上限——确定量），墙钟判定须调用方**显式声明同机**（`--same-host` / `{sameHost:true}`）；② **无上版可比不许静默 pass**（`first-baseline` 是合法终态，但「没有基线」与「比过了没问题」必须是两个不同状态）；③ **样本不足不判**（`MIN_SAMPLES = 8`；`REGRESS_FACTOR = 1.2`；窗口里没几个样本时报「稳定」等于说谎）；④ a11y 名源是 **HTML-AAM accname 的闭集子集**（`aria-labelledby` → `aria-label` → 宿主语言关联 → 文本类控件的 `placeholder` → 内容即名），且**明确写出不作为名字的东西**（`<select>` 的 option 文本是**选项**、不是控件名——把「有 option 文本」当可读名正是本仓反复治的「读数不实」）。
+- **影响范围**：`engines/perf-trace.js`、`ui/panel.js`、`ui/settings.js`、`tests/perf-observability-v2109.js`（新）、`tests/perf-regression-gate.js`（新）、`tests/ui-a11y-gate.js`（新）、`tests/ui-components-v2109.js`（新）、`tests/perf-trace-v2102.js`、`tests/run.js`、`tests/dead-export-ledger.json`、`tests/module-registry-ledger.json`、`README.md`、`ITERATION_LOG.md`。`tools/patch_v2109_*.py`、`tools/bump_v2109.py` 不入库。
+- **门禁结果**：`node tests/run.js` → **通过 9695 / 失败 0**（v2.108.0 基线 9186/0；本段净增 62 条断言 + 四份专锁经 `section` 真被执行）；`tests/perf-observability-v2109.js` → **101 / 0**；`tests/ui-components-v2109.js` → **27 / 0**；`tests/ui-a11y-gate.js` → 控件 **453 / 有名 453**（**100.0%**，下限 85%）· 缺口 **0** · 名源分布 `aria-label=26 content=65 placeholder=124 title=130 wrap-label=108`；`tests/perf-regression-gate.js` → `本版 ? / 基线 无（首版） · 状态 first-baseline · 结构差 0 · 墙钟 n/a`；出口面契约 `ns= 109 members= 702 chars= 8381`（**逐字未变**，本版零新增导出）；`tests/inventory.js` → 产品文件 119 / 命名空间 118 / 成员 1394 / 静态引用 2653（四类悬空均 0）；`tests/test-surface-gate.js` → 测试文件面 108 / 锁 103 / 可达 108 / **孤儿 0** / 豁免 0。
+- **未覆盖（如实留在清单）**：**UI 层仍未做实机验证**（`ui/panel.js` 在无头回归里不装载 ⇒ a11y 门禁与组件单元锁读的是无头 DOM，不代表浏览器里念得出声）；`lowend` 基准是**同机放大估计**（`approx: true`），真机读数须实机；`perf-regression-gate` 当前是**首版**（`first-baseline`，没有可比对象 ⇒ 它这一轮的绿**只证明判据在场**，不证明「没劣化」）；墙钟判定需要调用方显式声明同机，本仓目前**没有**自带的跨版本基线文件（快照由人拿走）。
+- **提交**：`（见本版提交）`。
+
 ### R92 · 2026-09-27 · v2.108.0 存档损坏三级自动修复 · 渲染层防御式边界（计划一 #18 + #19 合版）
 
 - **做了什么**（产品面两处落点，零新增导出 / 零新增容器 / 零新增设置键）：

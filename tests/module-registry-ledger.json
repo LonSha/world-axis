@@ -1,9 +1,9 @@
 {
- "version": "2.108.0",
- "loadOrderCount": 115,
- "loadedCount": 112,
+ "version": "2.110.0",
+ "loadOrderCount": 118,
+ "loadedCount": 115,
  "uiCount": 3,
- "nsCount": 120,
+ "nsCount": 123,
  "totals": {
   "loadEdges": 23,
   "hardEdges": 0,
@@ -64,6 +64,42 @@
   "core/input-guard.js": {
    "ns": [
     "inputGuard"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/fault-context.js": {
+   "ns": [
+    "faultContext"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/schema.js": {
+   "ns": [
+    "schema"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/permissions.js": {
+   "ns": [
+    "permissions"
    ],
    "requires": [],
    "requiresFiles": [],

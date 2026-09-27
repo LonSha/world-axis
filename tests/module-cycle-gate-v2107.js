@@ -149,22 +149,22 @@ function runAll(A) {
 
   // ── B 运行时（现场真跑） ──
   const a = M.audit();
-  A(a.files === 116 && a.aliasFiles === 116 && a.refFiles === 115,
+  A(a.files === 119 && a.aliasFiles === 119 && a.refFiles === 118,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
-  A(a.edgesLoad === 23 && a.edgesCall === 872 && a.edgesAll === 895 && a.identityOk,
+  A(a.edgesLoad === 23 && a.edgesCall === 881 && a.edgesAll === 904 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
-    + '（运行期定案 23 条装载期读；静态引用 895 条里 872 条是调用期，'
-    + '拿 895 判次序会报 607 条噪声）');
-  A(a.edgesLoad >= 20 && a.orderLen === 115,
+    + '（运行期定案 23 条装载期读；静态引用 904 条里 881 条是调用期，'
+    + '拿 904 判次序会报 281 条噪声；v2.110.0（计划一 #21/#22 + 计划二 #39/#70）新增 core/fault-context.js / core/schema.js / core/permissions.js 三文件后：装载期边 23 不变、调用期 +9（归因为提供方）、文件面 +3）');
+  A(a.edgesLoad >= 20 && a.orderLen === 118,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
-  A(a.nsProvided === 145 && a.nsLedger === 120 && a.nsRead === 137,
+  A(a.nsProvided === 148 && a.nsLedger === 123 && a.nsRead === 137,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
-  A(a.deadNs.length === 8, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 11, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
@@ -268,7 +268,7 @@ function runNegative(A) {
   const n1a = n1.audit();
   A(n1a.aliasFiles < n1a.files,
     done('N1b 装载破坏副本 ⇒ 别名面塌陷（' + n1a.aliasFiles + '/' + n1a.files
-      + ' < 116）—— 证明 B1 的下限判据真在测覆盖率，而不是恒真'));
+      + ' < 119）—— 证明 B1 的下限判据真在测覆盖率，而不是恒真'));
 
   // ── N2 真源码破坏：EXTERNAL 表填一个假外名 ⇒ 「过期登记」判据必须现形 ──
   const n2src = breakOnce(S, ANCHORS.aExternal.txt, "const EXTERNAL = { ghostExternal: '假外名' };", 'N2');

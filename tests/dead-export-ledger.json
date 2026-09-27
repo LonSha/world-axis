@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.108.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.108.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.110.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.110.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -1130,6 +1130,62 @@
       "tref": 4,
       "own": 2
     },
+    "faultContext.classify": {
+      "reason": "self-only",
+      "detail": "core/fault-context.js 内部自用、外部零引用（过度导出）",
+      "src": "core/fault-context.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "faultContext.isRetriable": {
+      "reason": "self-only",
+      "detail": "core/fault-context.js 内部自用、外部零引用（过度导出）",
+      "src": "core/fault-context.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "faultContext.recent": {
+      "reason": "self-only",
+      "detail": "core/fault-context.js 内部自用、外部零引用（过度导出）",
+      "src": "core/fault-context.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "faultContext.reset": {
+      "reason": "self-only",
+      "detail": "core/fault-context.js 内部自用、外部零引用（过度导出）",
+      "src": "core/fault-context.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "faultContext.stat": {
+      "reason": "self-only",
+      "detail": "core/fault-context.js 内部自用、外部零引用（过度导出）",
+      "src": "core/fault-context.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "faultContext.stateBrief": {
+      "reason": "self-only",
+      "detail": "core/fault-context.js 内部自用、外部零引用（过度导出）",
+      "src": "core/fault-context.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "faultContext.wrap": {
+      "reason": "self-only",
+      "detail": "core/fault-context.js 内部自用、外部零引用（过度导出）",
+      "src": "core/fault-context.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "floorChanges.guardReconcile": {
       "reason": "self-only",
       "detail": "engines/floor-changes.js 内部自用、外部零引用（过度导出）",
@@ -2184,7 +2240,7 @@
       "src": "engines/perf-trace.js",
       "refs": 0,
       "tref": 0,
-      "own": 8
+      "own": 11
     },
     "perfTrace.mark": {
       "reason": "self-only",
@@ -2198,6 +2254,110 @@
       "reason": "self-only",
       "detail": "engines/perf-trace.js 内部自用、外部零引用（过度导出）",
       "src": "engines/perf-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "perfTrace.setCachePolicy": {
+      "reason": "self-only",
+      "detail": "engines/perf-trace.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/perf-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "perfTrace.setThresholds": {
+      "reason": "self-only",
+      "detail": "engines/perf-trace.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/perf-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.can": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.check": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.defineRole": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.effective": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "permissions.grant": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.grantDirect": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.has": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "permissions.matrix": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.reset": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.revoke": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "permissions.stat": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -2625,6 +2785,70 @@
       "refs": 0,
       "tref": 3,
       "own": 1
+    },
+    "schema.attach": {
+      "reason": "self-only",
+      "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
+      "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "schema.define": {
+      "reason": "self-only",
+      "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
+      "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "schema.get": {
+      "reason": "self-only",
+      "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
+      "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "schema.list": {
+      "reason": "self-only",
+      "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
+      "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "schema.reset": {
+      "reason": "self-only",
+      "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
+      "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "schema.stat": {
+      "reason": "self-only",
+      "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
+      "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "schema.validate": {
+      "reason": "self-only",
+      "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
+      "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "schema.validateNamed": {
+      "reason": "self-only",
+      "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
+      "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "settingsBus.applyDefaults": {
       "reason": "self-only",
@@ -3649,7 +3873,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "ui/panel.js",
       "refs": 0,
-      "tref": 17,
+      "tref": 25,
       "own": 2
     },
     "ui.pages": {
@@ -3657,7 +3881,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "ui/panel.js",
       "refs": 0,
-      "tref": 16,
+      "tref": 17,
       "own": 1
     },
     "ui.rerenderStat": {
@@ -3670,6 +3894,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 169
+    "dataOnly": 178
   }
 }

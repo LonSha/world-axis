@@ -71,7 +71,7 @@ const ANCHORS = {
   // 口径② produce 失败 ⇒ ok:false 且不写缓存
   ENSURE_FAIL: { rel: PF, txt: "      return { layer: L, key: K, ok: false, hit: false, recomputed: true, error: err, fp: f, vfp: '', reason: 'produce-failed' };" },
   // 口径③ 写缓存时命中计数从 0 起算（不是编出来的数）
-  ENSURE_WRITE: { rel: PF, txt: '    slot[K] = { fp: f, vfp: vfp, value: v, at: clockWall(), hits: 0, stale: (cur ? (cur.stale || 0) : 0) };' },
+  ENSURE_WRITE: { rel: PF, txt: '    slot[K] = { fp: f, vfp: vfp, infp: infp, value: v, at: nowAt, lastAccessAt: nowAt, hits: 0, stale: (cur ? (cur.stale || 0) : 0) };' },
   // 口径① 历史曲线只留数字（环形有界：进样本）
   RING_PUSH: { rel: PF, txt: '    s.ring.push(x);' },
   // 口径① 挤出要计数（不许静默丢）
@@ -121,7 +121,7 @@ const BREAK = {
   FP_NA: "      return 'na';",
   ENSURE_HIT: '    if (false) {',
   ENSURE_FAIL: "      return { layer: L, key: K, ok: true, hit: false, recomputed: true, error: err, fp: f, vfp: 'x', reason: 'forced' };",
-  ENSURE_WRITE: '    slot[K] = { fp: f, vfp: vfp, value: v, at: clockWall(), hits: 99, stale: (cur ? (cur.stale || 0) : 0) };',
+  ENSURE_WRITE: '    slot[K] = { fp: f, vfp: vfp, infp: infp, value: v, at: nowAt, lastAccessAt: nowAt, hits: 99, stale: (cur ? (cur.stale || 0) : 0) };',
   RING_PUSH: '    if (false) s.ring.push(x);',
   RING_EVICT: '    if (false) { s.ring.shift(); s.dropped++; }',
   FACEAVAIL: '    try { return false; } catch (e) { return false; }',

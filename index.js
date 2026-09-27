@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.108.0'
+  const VERSION = '2.110.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -208,6 +208,13 @@
     'core/clock.js',           // v2.15.0: 时间源单一出口（决策时间可冻结 / 测量时间不受影响）——须最先装载
     'core/rand.js',            // v2.14.0: 随机源单一出口（决策流可复现 / 标识流不混流）
     'core/input-guard.js',     // v2.85.0: 统一输入边界（须早于一切消费外部值的模块）
+    // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个**基元**模块。位置与 tests/run.js 的 LOAD 同序
+    //   （紧随 input-guard）。三者在**调用期**读 WA.inputGuard / WA.store / WA.clock，不在装载期读，
+    //   故对次序无硬要求；放在这一批是刻意的 —— 它们与 input-guard 是同一条边界上的三层：
+    //   值级 → 结构级 → 归属级，而 fault-context 是三层共用的「一次失败怎么讲清楚」。
+    'core/fault-context.js',
+    'core/schema.js',
+    'core/permissions.js',
     'core/settings-bus.js',
     'core/store.js',
     'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）
