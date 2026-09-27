@@ -143,7 +143,24 @@
   let lastPerfSnap = null;
 
   function h(html) { const d = mainDoc.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '"' }[c])); }
+  // v2.111.0（计划二 #69）：转义走单一真源 core/sanitize.js；本处是兜底实现。
+  //   修掉两个真缺陷：① 原映射表把双引号映射成双引号自己（恒等），故属性上下文里等于不转义；
+  //   ② 另有 2 处调用了全仓不存在的 escapeHtml 函数（一碰就 ReferenceError）。
+  function esc(s) {
+    // 刻意**逐字写全** `WA.sanitize.html`（而不是先存进局部变量再调）：
+    //   死子面门禁的引用正则只看 `WA.<ns>.<mem>` 这种字面形态，存进局部变量后调用点
+    //   在静态面上就是「产品代码零引用」—— 于是账本会记下一条与事实相反的证据。
+    //   「证据与判据同宽」是本仓的硬规矩：真在用的东西不许看起来像死的。
+    if (WA && WA.sanitize && typeof WA.sanitize.html === 'function') return WA.sanitize.html(s);
+    var A = String.fromCharCode(38), LT = String.fromCharCode(60), GT = String.fromCharCode(62), DQ = String.fromCharCode(34), AP = String.fromCharCode(39);
+    return String(s == null ? '' : s).replace(new RegExp('[' + A + LT + GT + DQ + AP + ']', 'g'), function (c) {
+      if (c === LT) return A + 'lt;';
+      if (c === GT) return A + 'gt;';
+      if (c === DQ) return A + 'quot;';
+      if (c === AP) return A + '#39;';
+      return A + 'amp;';
+    });
+  }
 
   // ── 页面渲染 ──
   // v2.13.0: 挤出侧可见出口（概览页）。
@@ -191,7 +208,7 @@
     if (!st) return '';
     const src = st.seedSource === 'explicit' ? '已显式播种（可复现）' : (st.seedSource === 'auto' ? '自动种子（本会话不可复现）' : '尚未使用');
     const chans = (st.channelNames || []).map(function (c) { return c + '(' + ((st.byChannel || {})[c] || 0) + ')'; }).join('、');
-    const bad = st.failed > 0 ? '<span class="wa-bad">｜参数非法 ' + st.failed + ' 次（' + escapeHtml(JSON.stringify(st.failedBy || {})) + '）</span>' : '';
+    const bad = st.failed > 0 ? '<span class="wa-bad">｜参数非法 ' + st.failed + ' 次（' + esc(JSON.stringify(st.failedBy || {})) + '）</span>' : '';
     return '<div class="wa-card"><div class="wa-card-h">随机源（决策可复现性）</div>' +
       '<div class="wa-kv">种子：<b>' + src + '</b>' + bad + '</div>' +
       '<div class="wa-kv">决策抽取：' + st.draws + ' 次｜生成 id：' + st.ids + ' 个（id 走独立通道，不占用决策序列）</div>' +
@@ -210,7 +227,7 @@
       ? '已冻结在 <b>' + new Date(st.virtualAt).toLocaleString() + '</b>（存档时间戳可复现）'
       : '跟墙钟走（本会话存档时间戳不可复现）';
     const sites = (st.siteNames || []).map(function (c) { return c + '(' + ((st.bySite || {})[c] || 0) + ')'; }).join('、');
-    const bad = st.failed > 0 ? '<span class="wa-bad">｜参数非法 ' + st.failed + ' 次（' + escapeHtml(JSON.stringify(st.failedBy || {})) + '）</span>' : '';
+    const bad = st.failed > 0 ? '<span class="wa-bad">｜参数非法 ' + st.failed + ' 次（' + esc(JSON.stringify(st.failedBy || {})) + '）</span>' : '';
     const dft = st.frozen && st.drift > 60000 ? '｜与真实时刻已偏差 ' + Math.round(st.drift / 60000) + ' 分钟（冻结期间的正常现象）' : '';
     return '<div class="wa-card"><div class="wa-card-h">时间源（存档可复现性）</div>' +
       '<div class="wa-kv">决策时钟：' + mode + bad + '</div>' +

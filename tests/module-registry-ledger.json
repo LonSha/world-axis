@@ -1,9 +1,9 @@
 {
- "version": "2.110.0",
- "loadOrderCount": 118,
- "loadedCount": 115,
+ "version": "2.111.0",
+ "loadOrderCount": 120,
+ "loadedCount": 117,
  "uiCount": 3,
- "nsCount": 123,
+ "nsCount": 125,
  "totals": {
   "loadEdges": 23,
   "hardEdges": 0,
@@ -100,6 +100,30 @@
   "core/permissions.js": {
    "ns": [
     "permissions"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/audit-log.js": {
+   "ns": [
+    "auditLog"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/sanitize.js": {
+   "ns": [
+    "sanitize"
    ],
    "requires": [],
    "requiresFiles": [],

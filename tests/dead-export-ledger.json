@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.110.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.110.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.111.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.111.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -105,6 +105,46 @@
       "refs": 0,
       "tref": 0,
       "own": 9
+    },
+    "auditLog.byAction": {
+      "reason": "self-only",
+      "detail": "core/audit-log.js 内部自用、外部零引用（过度导出）",
+      "src": "core/audit-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "auditLog.count": {
+      "reason": "self-only",
+      "detail": "core/audit-log.js 内部自用、外部零引用（过度导出）",
+      "src": "core/audit-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "auditLog.recent": {
+      "reason": "self-only",
+      "detail": "core/audit-log.js 内部自用、外部零引用（过度导出）",
+      "src": "core/audit-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "auditLog.reset": {
+      "reason": "self-only",
+      "detail": "core/audit-log.js 内部自用、外部零引用（过度导出）",
+      "src": "core/audit-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "auditLog.stat": {
+      "reason": "self-only",
+      "detail": "core/audit-log.js 内部自用、外部零引用（过度导出）",
+      "src": "core/audit-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "backstage.flushPersonaChannels": {
       "reason": "test-only",
@@ -2746,6 +2786,38 @@
       "tref": 2,
       "own": 4
     },
+    "sanitize.attr": {
+      "reason": "self-only",
+      "detail": "core/sanitize.js 内部自用、外部零引用（过度导出）",
+      "src": "core/sanitize.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sanitize.needsEscape": {
+      "reason": "self-only",
+      "detail": "core/sanitize.js 内部自用、外部零引用（过度导出）",
+      "src": "core/sanitize.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sanitize.text": {
+      "reason": "self-only",
+      "detail": "core/sanitize.js 内部自用、外部零引用（过度导出）",
+      "src": "core/sanitize.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "sanitize.tpl": {
+      "reason": "self-only",
+      "detail": "core/sanitize.js 内部自用、外部零引用（过度导出）",
+      "src": "core/sanitize.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "sceneSlice.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -3894,6 +3966,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 178
+    "dataOnly": 184
   }
 }

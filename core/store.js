@@ -1474,6 +1474,15 @@
         if (!w.ok) throw (w.error || new Error('write failed'));
         memCache = s;
         __saveStat.at = clockWall(); __saveStat.ok = true; __saveStat.bytes = byteLen(payload); __saveStat.reason = null;
+        // v2.111.0（计划二 #67）：写世界是**唯一**需要留痕的动作面。
+        //   位置刻意的：只在写后读回校验**通过**之后记——“记了一条 save”与“这次 save 真的落盘了”
+        //   必须是同一件事（失败路径上不许产出成功的审计行）。
+        try {
+          if (WA.auditLog && typeof WA.auditLog.record === 'function') {
+            WA.auditLog.record('store.save', { chatId: chatId || null, bytes: __saveStat.bytes, stateRev: s.meta.stateRev },
+              { result: 'ok', surface: 'core/store.js' });
+          }
+        } catch (e) { /* 审计不许改产品行为：记不上也照样返回成功 */ }
         // v2.108.0 (plan-1 #18) L2 feeder: maintain the `_bak` fallback.
         //
         // Why here, and why the verified flag is the precondition: the ONLY thing worth

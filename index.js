@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.110.0'
+  const VERSION = '2.111.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -214,7 +214,10 @@
     //   值级 → 结构级 → 归属级，而 fault-context 是三层共用的「一次失败怎么讲清楚」。
     'core/fault-context.js',
     'core/schema.js',
-    'core/permissions.js',
+    'core/permissions.js',    // v2.111.0（计划二 #67/#69）：审计与消毒。
+    //   位置在 permissions 之后、settings-bus 之前：audit-log 在调用期读 WA.permissions（取当前用户），
+    //   sanitize 不读任何东西（纯函数）。两者对次序均无硬要求 —— 与 v2.110.0 三个基元同一批。
+    'core/audit-log.js', 'core/sanitize.js',
     'core/settings-bus.js',
     'core/store.js',
     'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）

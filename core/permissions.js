@@ -120,6 +120,9 @@
     if (!u || !a) { out.reason = 'missing-args'; _stat.denied++; return out; }
     const rec = USERS[u];
     if (!rec) { out.reason = 'unknown-user'; _stat.unknownUser++; _stat.denied++; return out; }
+    if (WA.auditLog && typeof WA.auditLog.record === 'function') {
+      try { WA.auditLog.record('permissions.deny', { user: u, action: a, reason: 'unknown-user' }, { result: 'denied', surface: 'core/permissions.js' }); } catch (e) {}
+    }
     const eff = effective(u) || [];
     if (eff.indexOf('*') >= 0) { out.ok = true; out.allowed = true; out.via = '*'; _stat.allowed++; return out; }
     if (eff.indexOf(a) >= 0) {
@@ -137,6 +140,11 @@
       }
     }
     out.reason = 'permission-denied';
+    // v2.111.0（计划二 #67）：**被拒**也要留痕。
+    //   只记「允许」的审计表在排查时会误导——“没有这条记录”与“当时被拒了”读起来一模一样。
+    if (WA.auditLog && typeof WA.auditLog.record === 'function') {
+      try { WA.auditLog.record('permissions.deny', { user: u, action: a, reason: 'permission-denied' }, { result: 'denied', surface: 'core/permissions.js' }); } catch (e) {}
+    }
     out.required = a;
     _stat.denied++;
     return out;

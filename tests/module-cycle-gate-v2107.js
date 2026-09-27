@@ -149,22 +149,23 @@ function runAll(A) {
 
   // ── B 运行时（现场真跑） ──
   const a = M.audit();
-  A(a.files === 119 && a.aliasFiles === 119 && a.refFiles === 118,
+  A(a.files === 121 && a.aliasFiles === 121 && a.refFiles === 119,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
-  A(a.edgesLoad === 23 && a.edgesCall === 881 && a.edgesAll === 904 && a.identityOk,
+  A(a.edgesLoad === 23 && a.edgesCall === 886 && a.edgesAll === 909 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
-    + '（运行期定案 23 条装载期读；静态引用 904 条里 881 条是调用期，'
-    + '拿 904 判次序会报 281 条噪声；v2.110.0（计划一 #21/#22 + 计划二 #39/#70）新增 core/fault-context.js / core/schema.js / core/permissions.js 三文件后：装载期边 23 不变、调用期 +9（归因为提供方）、文件面 +3）');
-  A(a.edgesLoad >= 20 && a.orderLen === 118,
+    + '（运行期定案 23 条装载期读；静态引用 909 条里 886 条是调用期，'
+    + '拿 909 判次序会报 281 条噪声；v2.110.0（计划一 #21/#22 + 计划二 #39/#70）新增 core/fault-context.js / core/schema.js / core/permissions.js 三文件后：装载期边 23 不变、调用期 +9（归因为提供方）、文件面 +3）'
+    + ' v2.111.0（计划二 #67/#69）新增 core/audit-log.js（auditLog）与 core/sanitize.js（sanitize）两文件后：装载期边 23 不变、调用期 +5（store 的审计写入 + permissions 两处拒绝留痕 + 面板字面调用 sanitize）、文件面 +2）');
+  A(a.edgesLoad >= 20 && a.orderLen === 120,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
-  A(a.nsProvided === 148 && a.nsLedger === 123 && a.nsRead === 137,
+  A(a.nsProvided === 150 && a.nsLedger === 125 && a.nsRead === 140,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
-  A(a.deadNs.length === 11, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 10, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

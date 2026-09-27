@@ -613,6 +613,7 @@
     // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块 —— 登记一次到位。
     //   漏登记一条的后果不是「报错」，而是「自检看不见的黑盒」（inventory 的未登记模块面）。
     'core/fault-context.js': 'faultContext', 'core/schema.js': 'schema', 'core/permissions.js': 'permissions',
+    'core/audit-log.js': 'auditLog', 'core/sanitize.js': 'sanitize',
     'core/undo.js': 'undo',
     'core/api-router.js': 'apiRouter',
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',

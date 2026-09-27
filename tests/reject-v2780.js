@@ -1004,127 +1004,35 @@ function runWitness(WA) {
     //   （v2.81.0 专锁踩过同款串扰）。
     if (Pm && typeof Pm.reset === 'function') Pm.reset();
   }
-  // ── v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块的九个码 ──
+  // ── v2.111.0（计划二 #67 + #69）：审计日志与转义面的三个码 ──
   //   同一把尺子：见证**不是声称**，用真 API 把码跑出来。
-  //   为什么这九个码必须见证而不是进死表：它们**全部由外部输入触发**——
-  //   「schema 里那个字段类型错了」「没注册过的用户来问权限」都是现网每天会发生的局面，
-  //   不是结构上不可达的分支。
+  //   这三个码**全部由外部输入触发**，故走见证而非死表：
+  //   · bad-action：调用方传空动作名 —— 「记一条没有名字的事实」不是事实（v2.98.0 起同一条纪律）；
+  //   · record-failed：`record()`「从不抛」这条契约的兜底出口。用真 API 喂一个「取属性就抛」
+  //     的敌意 opts：审计必须吞掉它并如实归因，而不是把调用方搞挂 —— 这就是
+  //     「审计不得改产品行为」的可执行形态（「不抛」不能靠读代码相信，要靠真跑出来）；
+  //   · permission-denied：人在册但没有该权限位。与 unknown-user 分开：前者答「他在这、这件
+  //     不能干」，后者答「谁都没说行」——两者塌成一个码，排查时分不清该查授权还是该查人。
   {
-    const Fc = WA.faultContext, Sc = WA.schema, Pm = WA.permissions;
-    // #21 faultContext：#成功路径**不**产码（那是反向共证，见专锁 [C] 段），
-    //   这里只负责「一次失败怎么被讲清楚」的两个码。
-    want('fault-handled', 'faultContext.wrap：被包装调用抛出且未声明 rethrow ⇒ 如实吞错并归因（v2.110.0 plan-1 #21）');
-    trip('fault-handled', function () {
-      return [Fc.wrap('witness.throw', function () { throw new Error('witness boom'); }).reason];
-    });
-    want('not-a-function', 'faultContext.wrap：第二参数不是函数 ⇒ 如实拒收（不是「没抛所以成功」，v2.110.0）');
-    trip('not-a-function', function () {
-      return [Fc.wrap('witness.nf', null).reason, Fc.wrap('witness.nf2', 123).reason];
-    });
-
-    // #22 schema：结构级拒收的两条出口（字段不合规 / 具名 schema 未注册）
-    want('invalid-input', 'schema.validate：字段缺失或类型不符 ⇒ invalid-input + errors 数组（v2.110.0 plan-1 #22）');
-    trip('invalid-input', function () {
-      return [
-        Sc.validate({ type: 'object', fields: { a: { type: 'string', required: true } } }, {}).reason,
-        Sc.validate({ type: 'object', fields: { n: { type: 'number' } } }, { n: '3' }).reason,
-        Sc.validate({ type: 'object', fields: { k: { type: 'enum', values: ['x'] } } }, { k: 'q' }).reason
-      ];
-    });
-    want('unknown-schema', 'schema.validateNamed：名字没注册过 ⇒ unknown-schema（**不**按空 spec 静默放过，v2.110.0）');
-    trip('unknown-schema', function () {
-      return [Sc.validateNamed('witness-未注册', { x: 1 }).reason, Sc.validateNamed('', {}).reason];
-    });
-
-    // #39 / #70 permissions：四类入参缺口 + 未声明用户。这是「未声明 ≠ 允许」的码面形态。
-    want('missing-user', 'permissions：用户名为空 ⇒ 如实报 missing-user（与 unknown-user 分开：前者是调用方漏参，后者是人不在册，v2.110.0 plan-2 #39/#70）');
-    trip('missing-user', function () {
-      return [Pm.grant('', 'gm').reason, Pm.grantDirect('', 'read').reason];
-    });
-    want('missing-role', 'permissions.defineRole：角色名为空 ⇒ 不注册并如实报（不静默建一个无名角色，v2.110.0）');
-    trip('missing-role', function () {
-      return [Pm.defineRole('', []).reason];
-    });
-    want('missing-perm', 'permissions.grantDirect：权限位为空 ⇒ 如实拒收（不静默授一个空位，v2.110.0）');
-    trip('missing-perm', function () {
-      return [Pm.grantDirect('witness-u', '').reason];
-    });
-    want('unknown-role', 'permissions.grant：角色名不在册 ⇒ unknown-role 并附已知名单（**不静默接受**，v2.110.0）');
-    trip('unknown-role', function () {
-      return [Pm.grant('witness-u', 'witness-不存在的角色').reason];
-    });
-    want('unknown-user', 'permissions.has：用户未注册 ⇒ unknown-user（「谁都没说不行」不等于「说了行」，v2.110.0）');
-    trip('unknown-user', function () {
-      return [
-        Pm.has('witness-查无此人', 'read').reason,
-        Pm.revoke('witness-查无此人', 'gm').reason,
-        Pm.check('witness-查无此人', 'read').reason
-      ];
-    });
-    // 复位：见证之间共享同一个 WA，把权限表留下会让后续 section 看到本段造的用户
-    //   （v2.81.0 专锁踩过同款串扰）。
-    if (Pm && typeof Pm.reset === 'function') Pm.reset();
-  }
-  // ── v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块的九个码 ──
-  //   同一把尺子：见证**不是声称**，用真 API 把码跑出来。
-  //   为什么这九个码必须见证而不是进死表：它们**全部由外部输入触发**——
-  //   「schema 里那个字段类型错了」「没注册过的用户来问权限」都是现网每天会发生的局面，
-  //   不是结构上不可达的分支。
-  {
-    const Fc = WA.faultContext, Sc = WA.schema, Pm = WA.permissions;
-    // #21 faultContext：#成功路径**不**产码（那是反向共证，见专锁 [C] 段），
-    //   这里只负责「一次失败怎么被讲清楚」的两个码。
-    want('fault-handled', 'faultContext.wrap：被包装调用抛出且未声明 rethrow ⇒ 如实吞错并归因（v2.110.0 plan-1 #21）');
-    trip('fault-handled', function () {
-      return [Fc.wrap('witness.throw', function () { throw new Error('witness boom'); }).reason];
-    });
-    want('not-a-function', 'faultContext.wrap：第二参数不是函数 ⇒ 如实拒收（不是「没抛所以成功」，v2.110.0）');
-    trip('not-a-function', function () {
-      return [Fc.wrap('witness.nf', null).reason, Fc.wrap('witness.nf2', 123).reason];
-    });
-
-    // #22 schema：结构级拒收的两条出口（字段不合规 / 具名 schema 未注册）
-    want('invalid-input', 'schema.validate：字段缺失或类型不符 ⇒ invalid-input + errors 数组（v2.110.0 plan-1 #22）');
-    trip('invalid-input', function () {
-      return [
-        Sc.validate({ type: 'object', fields: { a: { type: 'string', required: true } } }, {}).reason,
-        Sc.validate({ type: 'object', fields: { n: { type: 'number' } } }, { n: '3' }).reason,
-        Sc.validate({ type: 'object', fields: { k: { type: 'enum', values: ['x'] } } }, { k: 'q' }).reason
-      ];
-    });
-    want('unknown-schema', 'schema.validateNamed：名字没注册过 ⇒ unknown-schema（**不**按空 spec 静默放过，v2.110.0）');
-    trip('unknown-schema', function () {
-      return [Sc.validateNamed('witness-未注册', { x: 1 }).reason, Sc.validateNamed('', {}).reason];
-    });
-
-    // #39 / #70 permissions：四类入参缺口 + 未声明用户。这是「未声明 ≠ 允许」的码面形态。
-    want('missing-user', 'permissions：用户名为空 ⇒ 如实报 missing-user（与 unknown-user 分开：前者是调用方漏参，后者是人不在册，v2.110.0 plan-2 #39/#70）');
-    trip('missing-user', function () {
-      return [Pm.grant('', 'gm').reason, Pm.grantDirect('', 'read').reason];
-    });
-    want('missing-role', 'permissions.defineRole：角色名为空 ⇒ 不注册并如实报（不静默建一个无名角色，v2.110.0）');
-    trip('missing-role', function () {
-      return [Pm.defineRole('', []).reason];
-    });
-    want('missing-perm', 'permissions.grantDirect：权限位为空 ⇒ 如实拒收（不静默授一个空位，v2.110.0）');
-    trip('missing-perm', function () {
-      return [Pm.grantDirect('witness-u', '').reason];
-    });
-    want('unknown-role', 'permissions.grant：角色名不在册 ⇒ unknown-role 并附已知名单（**不静默接受**，v2.110.0）');
-    trip('unknown-role', function () {
-      return [Pm.grant('witness-u', 'witness-不存在的角色').reason];
-    });
-    want('unknown-user', 'permissions.has：用户未注册 ⇒ unknown-user（「谁都没说不行」不等于「说了行」，v2.110.0）');
-    trip('unknown-user', function () {
-      return [
-        Pm.has('witness-查无此人', 'read').reason,
-        Pm.revoke('witness-查无此人', 'gm').reason,
-        Pm.check('witness-查无此人', 'read').reason
-      ];
-    });
-    // 复位：见证之间共享同一个 WA，把权限表留下会让后续 section 看到本段造的用户
-    //   （v2.81.0 专锁踩过同款串扰）。
-    if (Pm && typeof Pm.reset === 'function') Pm.reset();
+    const Lg = WA.auditLog, Pm2 = WA.permissions;
+    if (Lg && typeof Lg.record === 'function') {
+      want('bad-action', 'auditLog.record：动作名为空 ⇒ 如实拒收且**不进环**（不静默记一条无名事实，v2.111.0 plan-2 #67）');
+      trip('bad-action', function () { return [Lg.record('').reason, Lg.record(null).reason]; });
+      want('record-failed', 'auditLog.record：连「取属性即抛」的敌意 opts 都吞成归因 ⇒ 从不抛、不改产品行为（v2.111.0 plan-2 #67）');
+      trip('record-failed', function () {
+        return [Lg.record('witness.hostile', null, new Proxy({}, { get: function () { throw new Error('witness hostile get'); } })).reason];
+      });
+    }
+    if (Pm2 && typeof Pm2.grant === 'function' && typeof Pm2.has === 'function') {
+      // 造一个「在册、但只有一个空角色」的用户：guest 内置角色权限集为空集，故任何位都答拒。
+      Pm2.grant('witness-audit-u', 'guest');
+      want('permission-denied', 'permissions.has/check：人在册但没有该权限位 ⇒ permission-denied（与 unknown-user 分开，v2.111.0 plan-2 #67）');
+      trip('permission-denied', function () {
+        return [Pm2.has('witness-audit-u', 'write').reason, (Pm2.check('witness-audit-u', 'write') || {}).reason];
+      });
+      // 复位：本段与前面的权限见证共享同一个 WA（v2.81.0 专锁踩过同款串扰）。
+      if (typeof Pm2.reset === 'function') Pm2.reset();
+    }
   }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });

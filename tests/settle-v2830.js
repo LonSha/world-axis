@@ -312,9 +312,9 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 123 && led.loadedCount === 115,
-    'v2830/mr: 命名空间 123 / 装载文件 115（与 LOAD_ORDER 的 118 差 3 个 ui/*——'
-    + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：118 - 3 = 115；'
+  a(led.nsCount === 125 && led.loadedCount === 117,
+    'v2830/mr: 命名空间 125 / 装载文件 117（与 LOAD_ORDER 的 120 差 3 个 ui/*——'
+    + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：120 - 3 = 117；'
     + 'v2.98.0 时为 112 - 3 = 109，v2.99.0 新增 engines/canon.js 后两边各 +1；'
     + 'v2.101.0 新增 engines/interop.js 后两边各 +1；'
     + 'v2.102.0 新增 engines/perf-trace.js（perfTrace 命名空间）后两边各 +1）'
@@ -325,7 +325,8 @@ async function judge(a) {
     + ' v2.99.0 新增 engines/canon.js（canon 命名空间）；'
     + ' v2.101.0 新增 engines/interop.js（interop 命名空间）；'
     + ' v2.110.0（计划一 #21/#22 + 计划二 #39/#70）新增 core/fault-context.js /'
-    + ' core/schema.js / core/permissions.js 三命名空间后两边各 +3');
+    + ' core/schema.js / core/permissions.js 三命名空间后两边各 +3；'
+    + ' v2.111.0（计划二 #67/#69）新增 core/audit-log.js / core/sanitize.js 两命名空间后两边各 +2）');
   const providers = Object.keys(led.modules).reduce(function (acc, rel) {
     led.modules[rel].requires.forEach(function (ns) { acc[ns] = true; });
     return acc;
