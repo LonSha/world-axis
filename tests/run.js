@@ -33,6 +33,12 @@ const vm = require('vm');
 //   改版漏改一处只会红一处（而那条红最容易被当成「判据写错」）；本模块把读数族登记成一张表，
 //   用现场唯一形态把站点全扫出来，再做「族内同值 / 等于现场实测 / 消息与比较值同批」三判据。
 const rd = require('./readings.js');
+// v2.107.0（计划一 #17）：拒收码的「预期分类库 + 覆盖率」。v2.78.0 治的是「无归属」，
+//   但三份名单各自的大小从没有人校对过分母（分母一变、总和不再相等，三份名单可以同时
+//   「各自看起来正常」）；且见证表用字典赋值 ⇒ 同码写两次时第二处静默顶掉第一处描述。
+const rcc = require('./reject-code-coverage.js');
+// v2.107.0（计划一 #20）：模块依赖静态图（refs 面）与运行时装载期边的双向交叉验证。
+const mcg = require('./module-cycle-gate.js');
 
 const BASE = path.join(__dirname, '..');
 let pass = 0, fail = 0;
@@ -10021,7 +10027,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.106.1' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10573,7 +10579,7 @@ assert(verF2500 === '2.106.1' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.106.1', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.107.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10864,7 +10870,7 @@ assert(verF2500 === '2.106.1' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.106.1', '入口版本为 2.106.1（实 ' + ver + '）');
+    assert(ver === '2.107.0', '入口版本为 2.107.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11395,7 +11401,7 @@ assert(verF2500 === '2.106.1' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.106.1', '入口版本为 2.106.1（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.107.0', '入口版本为 2.107.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11783,7 +11789,7 @@ assert(verF2500 === '2.106.1' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.106.1', '入口版本为 2.106.1（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.107.0', '入口版本为 2.107.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12153,7 +12159,7 @@ assert(verF2500 === '2.106.1' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.106.1', '入口版本为 2.106.1（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.107.0', '入口版本为 2.107.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12518,7 +12524,7 @@ assert(verF2500 === '2.106.1' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.106.1', '入口版本为 2.106.1（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.107.0', '入口版本为 2.107.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14841,7 +14847,7 @@ assert(verF2500 === '2.106.1' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.106.1', '入口 VERSION = 2.106.1（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.107.0', '入口 VERSION = 2.107.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -19044,6 +19050,103 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
     require('./readings-v2106.js').runAll(assert);
+  }
+
+  // ── v2.107.0（计划一 #17）：拒收码分类完备性 —— 「三份名单各自看起来正常」不构成证据 ──
+  //   治的病：见证 / 死表 / 基线三份名单从没有对过分母；分母一变、总和不再相等，没有任何东西会红。
+  //   本版把覆盖率变成**必须呈报**的读数，并与恒等式（sum === total）一起给出。
+  //   另治：见证表是字典赋值，同码写两次 ⇒ 第二处静默顶掉第一处的描述（与 dup-decl 同族）。
+  section('v2.107.0（计划一 #17）：拒收码覆盖率与恒等式（三集铺满分母 + 重复声明可见 + 延后须显式登记）');
+  {
+    const d = rcc.discover();
+    const c = d.coverage;
+    // 读数**必须打出来**：看不见的东西等于不存在
+    console.log('  ' + d.summary);
+    console.log('    · 声明面 ' + d.declarations.declared + ' 个码 / ' + d.declarations.occurrences
+      + ' 次出现 · 重复声明 ' + d.declarations.duplicated.length + ' 处'
+      + (d.declarations.duplicated.length ? '（'
+        + d.declarations.duplicated.map(function (x) { return x.code + '×' + x.count; }).join(' ') + '）' : ''));
+    console.log('    · 扫描面 ' + c.total + ' = 见证 ' + c.witnessed + ' + 死表 ' + c.dead + ' + 基线 ' + c.base
+      + '（和 ' + c.sum + '，差 ' + c.identities.leftover + '）· 恒等式 ' + (c.identityOk ? '平' : '不平'));
+
+    assert(c.total >= 300 && c.witnessed >= 100 && c.base >= 100,
+      'v2107: 覆盖率分母 ' + c.total + ' ≥300（见证 ' + c.witnessed + ' / 死表 ' + c.dead
+      + ' / 基线 ' + c.base + '）—— 空集上的覆盖率恒真');
+    assert(c.identityOk && c.sum === c.total && c.identities.leftover === 0,
+      'v2107: 三集恒等式 ' + c.witnessed + '+' + c.dead + '+' + c.base + ' = ' + c.sum
+      + ' === 扫描面 ' + c.total + '（差 ' + c.identities.leftover + '）');
+    assert(c.allInScan, 'v2107: 三集都是扫描面的子集（名单里有、源码里没有的码不许混进分母）');
+    assert(c.covered === c.witnessed + c.dead && Math.abs(c.rate - c.covered / c.total) < 1e-12,
+      'v2107: 覆盖率读数自洽（covered ' + c.covered + '，rate ' + (c.rate * 100).toFixed(2) + '%）');
+    assert(c.rate >= 0.3, 'v2107: 覆盖率下限 ' + (c.rate * 100).toFixed(2) + '% ≥30%（口径不许被悄悄改小）');
+    assert(Object.keys(require('./reject-code-gate.js').scan().hits).length === c.total,
+      'v2107: 覆盖率分母 === reject-code-gate 扫描面（'
+      + Object.keys(require('./reject-code-gate.js').scan().hits).length + ' === ' + c.total + '）');
+    assert(d.missing.length === 0 && d.unexpected.length === 0,
+      'v2107: 见证面零缺口（missing ' + d.missing.length + ' / unexpected ' + d.unexpected.length + '）');
+    assert(Object.keys(rcc.DEFERRED).length === 0 && d.deferred && Object.keys(d.deferred).length === 0,
+      'v2107: 延后登记表为空 —— 未登记的跑不出来一律算真缺口（默认一条都不许延后）');
+    console.log('    · 备注：重复声明是**读数**不是缺陷（字典语义本就如此），但它必须可见；'
+      + '当前 ' + d.declarations.duplicated.length + ' 处已在专锁里逐条锁定');
+
+    // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
+    require('./reject-code-coverage-v2107.js').runAll(assert);
+    require('./reject-code-coverage-v2107.js').runNegative(assert);
+  }
+
+  // ── v2.107.0（计划一 #20）：模块依赖静态图 —— 「静态面答不了必须先有谁」的那一半 ──
+  //   治的病：module-registry-gate 把边界写死了（静态只答「提到了谁」），但那一面**没人扫**：
+  //   读了无人提供的 ns、同名 ns 多文件赋值（后跑的静默顶掉先跑的）、以及装载期边的方向。
+  //   本版次序判据一律建立在**运行时定案的 requires 边**上（静态引用 895 条里只有 23 条是真装载期读，
+  //   拿全部引用判次序会报 607 条噪声——这正是「引用最多 ≠ 必须先装载」）。
+  section('v2.107.0（计划一 #20）：模块依赖静态图（未提供 + 装载次序 + 跨文件写 + 账本双向交叉验证）');
+  {
+    const a = mcg.audit();
+    console.log('  ' + mcg.summary());
+    console.log('    · 覆盖率：别名 ' + a.aliasFiles + '/' + a.files + ' · 有引用 ' + a.refFiles + '/'
+      + a.aliasFiles + ' · 登记在用 ' + a.registeredUsed + '/' + a.registeredTotal
+      + ' · 账本缺项文件 ' + a.runtimeMissing);
+    if (a.deadNs.length) {
+      console.log('    · 零读 ns（模块提供了但产品源面无人读；消费者可能是 tests/宿主，只报不红）：'
+        + a.deadNs.map(function (x) { return x.ns; }).join('、'));
+    }
+    console.log('    · 装载期边按 ns 定性 ' + a.unidentified.length + ' 条未定性 · 边归属错配 '
+      + a.misattributed.length + ' 条');
+
+    assert(a.scanAlive, 'v2107: 扫描面活着（提供方 ' + a.nsProvided + ' / 别名 ' + a.aliasFiles
+      + ' / 装载期边 ' + a.edgesLoad + ' 三者非零，否则「0 问题」是扫描器瞎了）');
+    assert(a.aliasFiles === a.files && a.refFiles >= a.aliasFiles - 1,
+      'v2107: 别名覆盖率 ' + a.aliasFiles + '/' + a.files + '（三种 alias 形态全认；'
+      + '初版只认一种时 15 个文件被当成无引用——「扫描器瞎了」长得像「没有边」）');
+    assert(a.unprovided.length === 0,
+      'v2107: 无「读了无人提供的 ns」（实 ' + a.unprovided.length
+      + (a.unprovided.length ? '：' + a.unprovided.map(function (u) { return u.ns; }).join(',') : '') + '）');
+    assert(a.orderViolation.length === 0,
+      'v2107: 装载期边无次序违规（供的人后装，实 ' + a.orderViolation.length + '）');
+    assert(a.edgesLoad >= 20,
+      'v2107: 装载期边 ' + a.edgesLoad + ' 条 ≥20（次序判据只在运行时定案的边上判，'
+      + '不拿 ' + a.edgesCall + ' 条调用期引用充数）');
+    assert(a.crossFileWrite.length === 0,
+      'v2107: 无未登记的跨文件写（实 ' + a.crossFileWrite.length
+      + (a.crossFileWrite.length ? '：' + a.crossFileWrite.map(function (c) { return c.ns; }).join(',') : '') + '）');
+    assert(a.staleRegistration.length === 0,
+      'v2107: 无过期登记（登记了却全仓无人读的入口/UI/外名，实 ' + a.staleRegistration.length + '）');
+    assert(a.unreflected.length === 0 && a.ownerMismatch.length === 0,
+      'v2107: 账本双向交叉验证干净（静态漏扫 ' + a.unreflected.length
+      + ' / 归属错配 ' + a.ownerMismatch.length + '）');
+    assert(a.nsFaceDrift.length === 0,
+      'v2107: 静态 ns 面与账本 ns 面无未登记差（实 ' + a.nsFaceDrift.length
+      + (a.nsFaceDrift.length ? '：' + a.nsFaceDrift.map(function (x) { return x.ns + '/' + x.side; }).join(',') : '')
+      + '）—— 差集不是噪声：其余 ' + (a.nsProvided - a.nsLedger) + ' 个差各有登记理由');
+    assert(a.identityOk && a.problems === 0 && a.ok,
+      'v2107: 四条判据全绿（problems ' + a.problems + '）· 恒等式 '
+      + (a.identityOk ? '平' : '不平') + ' · 无环 ' + (!a.cycle && !a.cycleWithProv));
+    assert(a.deadNs.length === 8 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
+      'v2107: 零读 ns 恰 ' + a.deadNs.length + ' 个且不含任何核心 ns（读数只报不红）');
+
+    // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
+    require('./module-cycle-gate-v2107.js').runAll(assert);
+    require('./module-cycle-gate-v2107.js').runNegative(assert);
   }
 
   }  // ── 汇总 ──

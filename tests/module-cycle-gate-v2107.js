@@ -1,0 +1,337 @@
+'use strict';
+/**
+ * tests/module-cycle-gate-v2107.js — 模块依赖静态图（计划一 #20）四段专锁。
+ *   A 静态契约：导出面形状、五张登记面形态、形态表不许放宽、锚点纯度。
+ *   B 运行时：真跑 module-cycle-gate，拿现场读数（覆盖率 / 三类边 / 恒等式 / 交叉验证）。
+ *   C 不变式：判据纯只读（连调不变量、不改被取证文件）。
+ *   N 负控制：**真源码破坏 → 装载破坏副本 → 在副本上重跑同款真判据**。
+ *
+ * 为什么负控制走「装载破坏副本」而不是改真文件：本门禁要治的病之一正是
+ *   「0 条边」与「扫描器全瞎了」长得一模一样；若验证判据真会现形要靠改真文件，
+ *   验证者自己就成了新的风险源。副本装载用 vm.runInNewContext 包 CommonJS 外壳，
+ *   `__dirname` 指到 tests/，故相对 require 与 path.join(__dirname,'..') 照原样工作
+ *   （这是「装载」而不是「字符串匹配」：破坏必须在**真模块**上现形）。
+ *
+ * 本锁自证（H 系列口径）：
+ *   H5 每个锚点字面量在其目标文件里恰中 1 次、且在本文件里恰声明 1 次（缺失与重复同罪）。
+ *   H6 判据两向自证：原版上必须为真（A/B 组），破坏副本上必须为假（N 组）；
+ *      且每处破坏必须**真的改变源码**（breakOnce 会抛，不许静默）。
+ */
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const BASE = path.join(__dirname, '..');
+const SELF_REL = 'tests/module-cycle-gate-v2107.js';
+const MOD_REL = 'tests/module-cycle-gate.js';
+const RUN_REL = 'tests/run.js';
+const LEDGER_REL = 'tests/module-registry-ledger.json';
+
+/**
+ * 统一锚点表（{rel, txt}；txt 在目标文件里恰中 1 次）。
+ * 一律取**不含反斜杠**的行首片段——含非换行反斜杠的锚点在统一纯度口径下结构性不可满足（R87 H7）。
+ */
+const ANCHORS = {
+  aAlias: { rel: MOD_REL, txt: 'const ALIAS_RE = (function () {' },
+  aExternal: { rel: MOD_REL, txt: 'const EXTERNAL = {};' },
+  aEntry: { rel: MOD_REL, txt: 'const ENTRY_NS = {' },
+  aSkip: { rel: MOD_REL, txt: 'if (refs[rel] !== undefined) return;' },
+  aOrder: { rel: MOD_REL, txt: 'if (pi > ci) orderViolation.push(' },
+  aAlive: { rel: MOD_REL, txt: 'scanAlive: g.coverage.nsProvided > 0' },
+  aLeak: { rel: MOD_REL, txt: 'const deadNs = Object.keys(g.nsOwner).filter(' },
+  aWire: { rel: RUN_REL, txt: "const mcg = require('./module-cycle-gate.js');" }
+};
+
+/** 现场破坏：**全部**出现处一次改掉（字符串版 replace 只改第一处——v2.105.0 的 D2 教训）。 */
+function allReplace(src, from, to) { return src.split(from).join(to); }
+
+function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+
+/** 真源码破坏，并证明破坏真的发生（没打中 ⇒ 抛，不许静默）。 */
+function breakOnce(src, from, to, label) {
+  const out = allReplace(src, from, to);
+  if (out === src) throw new Error('破坏未生效（锚点没打中）:: ' + label + ' :: ' + from);
+  return out;
+}
+
+/** 装载破坏副本（CommonJS 外壳 + 原目录 __dirname）。 */
+function loadCopy(rel, src) {
+  const dir = path.dirname(path.join(BASE, rel));
+  const m = { exports: {} };
+  // require 解析必须与 Node 同规矩：裸模块名（fs / path / vm）走模块查找，
+  // 只有相对路径才补 dir。若一律 path.resolve(dir, p)，`fs` 会被拼成 <dir>/fs ⇒
+  // Cannot find module（副本装载失败会被误读成「判据在破坏下也没反应」）。
+  const req = function (p) {
+    if (p.charAt(0) !== '.') return require(p);
+    return require(path.resolve(dir, p));
+  };
+  // shebang 不是合法 JS：包进 CommonJS 外壳后 `#!...` 会变成 SyntaxError
+  // （Invalid or unexpected token），而 `.js` 带 shebang 本身是对的（可执行入口）。
+  // 装载副本前必须先剥掉——本锁锚点一律取函数体/常量区，不取首行，故此剥离不影响破坏落点。
+  const body = src.replace(/^#![^\n]*\n/, '');
+  const fn = vm.runInNewContext(
+    '(function (module, exports, require, __filename, __dirname) {\n' + body + '\n})',
+    { console: console, process: process, Buffer: Buffer });
+  fn(m, m.exports, req, path.join(BASE, rel), dir);
+  return m.exports;
+}
+
+/** 锚点纯度（H5）。 */
+function auditAnchors(A) {
+  const self = rd(SELF_REL);
+  Object.keys(ANCHORS).forEach(function (k) {
+    const a = ANCHORS[k];
+    const nTarget = rd(a.rel).split(a.txt).length - 1;
+    const nSelf = self.split(a.txt).length - 1;
+    A(nTarget === 1, 'A5 锚点 ' + k + ' 在 ' + a.rel + ' 里恰 1 次（实 ' + nTarget + '）');
+    A(nSelf === 1, 'A5 锚点 ' + k + ' 在本锁里恰声明 1 次（实 ' + nSelf + '，缺失与重复同罪）');
+  });
+}
+
+/** 造一份最小假产品面（负控制用：不改真文件，全部走 opt.read 注入）。 */
+function fakeProduct(over) {
+  const d = {
+    'index.js': 'const WA = (function () { return (typeof G !== "undefined" ? (G.WorldAxis = G.WorldAxis || {}) : {}); })();\n',
+    'core/a.js': "const WA = window.WorldAxis = window.WorldAxis || {};\nWA.alpha = function () {};\nWA.beta = 1;\nWA.alpha();\n",
+    'core/b.js': 'const WA = (window.WorldAxis = window.WorldAxis || {});\nWA.gamma = 1;\nWA.alpha();\n'
+  };
+  return Object.assign(d, over || {});
+}
+
+function runAll(A) {
+  const S = rd(MOD_REL);
+  const M = require('./module-cycle-gate.js');
+
+  // ── A 静态契约 ──
+  const EXPORTS = ['scan', 'audit', 'summary', 'loadOrder', 'loadOrderSrc', 'productFiles',
+    'acyclic', 'readLedger', 'EXTERNAL', 'ENTRY_NS', 'UI_NS', 'CONTRACT_NS', 'SELF_REF_NS',
+    'NS_FACE_EXPECT', 'ALIAS_HOST_NS', 'EXTERNAL_PREFIX', 'NS_FIELD_MAP', 'ALIAS_RE', 'LEDGER'];
+  const keys = Object.keys(M).sort();
+  A(keys.join(',') === EXPORTS.slice().sort().join(','),
+    'A1 导出面恰为 ' + EXPORTS.length + ' 项（实 ' + keys.length + '：' + keys.join(',') + '）');
+  // 形态表必须**真宽**（三种 alias 形态都在同一正则里）
+  A(M.ALIAS_RE instanceof RegExp && !M.ALIAS_RE.global,
+    'A2 ALIAS_RE 是正则且非全局（逐文件 match 用）');
+  const reSrc = M.ALIAS_RE.source;
+  A(reSrc.indexOf('\\(?') >= 0 && reSrc.indexOf('\\)?') >= 0,
+    'A2b ALIAS_RE 允许外层括号（第二种形态：const WA = (window.WorldAxis = ...));');
+  A(reSrc.indexOf('WorldAxis') >= 0 && reSrc.indexOf('\\|\\|') >= 0,
+    'A2c ALIAS_RE 认 `HOST.WorldAxis || {}` 本体（宿主变量名不限，第三种形态靠它兜）');
+  // 五张登记面必须是对象（逐条理由表）
+  ['EXTERNAL', 'ENTRY_NS', 'UI_NS', 'CONTRACT_NS', 'SELF_REF_NS'].forEach(function (t) {
+    A(M[t] && typeof M[t] === 'object' && !Array.isArray(M[t]),
+      'A3 ' + t + ' 是「名字 -> 理由」的对象表（不是数组：每条必须给理由）');
+  });
+  A(Object.keys(M.CONTRACT_NS).length >= 1 && M.CONTRACT_NS.digest,
+    'A3b digest 的跨文件替换已登记在 CONTRACT_NS 并附理由（try/finally 成对，不是第二个提供方）');
+  A(Object.keys(M.EXTERNAL).length === 0,
+    'A4 EXTERNAL 显式为空 —— 本仓没有「由宿主提供、且以 A.ns 形态被读」的外名'
+    + '（别名宿主名走 ALIAS_HOST_NS，不进这条判据）');
+  A(M.EXTERNAL_PREFIX.length === 0,
+    'A4b EXTERNAL_PREFIX 为空 —— 不放宽到「凡下划线一律放行」（那是掩盖而非覆盖）');
+  A(Object.keys(M.NS_FACE_EXPECT).length === 3
+    && Array.isArray(M.NS_FACE_EXPECT.onlyStatic) && Array.isArray(M.NS_FACE_EXPECT.onlyLedger)
+    && Array.isArray(M.NS_FACE_EXPECT.internalPrefixed),
+    'A4c ns 面差集的三张登记面齐备（onlyStatic / onlyLedger / internalPrefixed）');
+  // 边界必须真写在实现里
+  A(S.indexOf('EXTERNAL_PREFIX.some') >= 0, 'A6 外名前缀真的参与了「未提供」判定');
+  A(S.indexOf('if (rel.indexOf(\'ui/\') === 0) return false;') >= 0,
+    'A6b notInOrder 跳过 ui/（UI 层由运行时外壳挂载，不进 LOAD_ORDER）');
+  A(S.indexOf(ANCHORS.aLeak.txt) >= 0 && S.indexOf('return !readAll[ns];') >= 0,
+    'A6c 零读 ns 的判据按 readAll（产品源面读集合）而不是「文件里出现过」');
+  A(S.indexOf('恒等式') >= 0 && S.indexOf('覆盖率') >= 0,
+    'A7 summary 同时给出覆盖率与恒等式态（缺一都无法区分「真没有」与「瞎了」）');
+  A(S.indexOf('if (mods) {') >= 0 && S.indexOf('refUnseen: true') >= 0,
+    'A8 账本有 requires 而静态面没扫到时不许静默丢边（补 refUnseen）');
+  A(S.indexOf("if (!led) return false;") >= 0 || S.indexOf('ledNs[ns]') >= 0,
+    'A9 ns 面差集读账本（账本不可用时整面跳过）');
+  auditAnchors(A);
+
+  // ── B 运行时（现场真跑） ──
+  const a = M.audit();
+  A(a.files === 116 && a.aliasFiles === 116 && a.refFiles === 115,
+    'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
+    + '（覆盖率三数一起报，不许只报边数）');
+  A(a.edgesLoad === 23 && a.edgesCall === 872 && a.edgesAll === 895 && a.identityOk,
+    'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
+    + '（运行期定案 23 条装载期读；静态引用 895 条里 872 条是调用期，'
+    + '拿 895 判次序会报 607 条噪声）');
+  A(a.edgesLoad >= 20 && a.orderLen === 115,
+    'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
+  A(a.orderViolation.length === 0,
+    'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
+  A(a.nsProvided === 145 && a.nsLedger === 120 && a.nsRead === 137,
+    'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
+    'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
+  A(a.deadNs.length === 8, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
+    && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
+    'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
+    + a.staleRegistration.length + ' / 静态漏扫 ' + a.unreflected.length
+    + ' / 归属错配 ' + a.ownerMismatch.length + '）');
+  A(a.problems === 0 && a.ok && a.scanAlive && !a.cycle && !a.cycleWithProv && !a.notInOrder.length,
+    'B9 总判据：problems ' + a.problems + ' / ok ' + a.ok + ' / 扫描面活着 ' + a.scanAlive
+    + ' / 环 无 / 悬空文件 ' + a.notInOrder.length);
+  A(a.registeredUsed === 15 && a.registeredTotal === 20,
+    'B10 登记面在用 ' + a.registeredUsed + '/' + a.registeredTotal
+    + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用）');
+  A(a.runtimeMissing === 4 && a.ledgerAvailable,
+    'B11 账本缺项文件 ' + a.runtimeMissing + ' 个（入口 + 三个 UI 文件，如实报出）');
+  // 次序判据方向的两向自证（用假产品面，不碰真文件）
+  const fakeOk = M.audit({
+    read: function (rel) { return fakeProduct()[rel] || ''; },
+    files: Object.keys(fakeProduct()),
+    indexSrc: 'const LOAD_ORDER = [\n  \'core/a.js\',\n  \'core/b.js\'\n];',
+    // 注入面必须与真源同构：readLedger 返回的是**账本对象**（含 modules 一层）。
+    // 少写一层 ⇒ 交叉验证面静默全空，「0 条违规」会在空集上恒真（不可用 ≠ 健康）。
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: ['alpha'], requiresFiles: ['core/a.js'] } } },
+    ledgerText: null
+  });
+  A(fakeOk.orderViolation.length === 0 && fakeOk.unprovided.length === 0,
+    'B12 假面上「供者先装」不报违规（实 ' + fakeOk.orderViolation.length + '）—— 判据不是恒真');
+  const fakeBad = M.audit({
+    read: function (rel) { return fakeProduct()[rel] || ''; },
+    files: Object.keys(fakeProduct()),
+    indexSrc: 'const LOAD_ORDER = [\n  \'core/b.js\',\n  \'core/a.js\'\n];',
+    // 注入面必须与真源同构：readLedger 返回的是**账本对象**（含 modules 一层）。
+    // 少写一层 ⇒ 交叉验证面静默全空，「0 条违规」会在空集上恒真（不可用 ≠ 健康）。
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: ['alpha'], requiresFiles: ['core/a.js'] } } },
+    ledgerText: null
+  });
+  A(fakeBad.orderViolation.length === 1
+    && fakeBad.orderViolation[0].from === 'core/b.js' && fakeBad.orderViolation[0].to === 'core/a.js',
+    'B12b 假面上把装载序倒过来 ⇒ 恰报 1 条次序违规（用者先装 b@0 → 供者 a@1）—— 判据真在测方向');
+  // 「未提供」判据的两向自证
+  const fakeGhost = M.audit({
+    read: function (rel) {
+      const f = fakeProduct({ 'core/b.js': 'const WA = window.WorldAxis = window.WorldAxis || {};\nWA.nobody = 1;\nWA.ghostNs();\n' });
+      return f[rel] || '';
+    },
+    files: Object.keys(fakeProduct()),
+    indexSrc: 'const LOAD_ORDER = [\n  \'core/a.js\',\n  \'core/b.js\'\n];',
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: [], requiresFiles: [] } } },
+    ledgerText: null
+  });
+  A(fakeGhost.unprovided.length === 1 && fakeGhost.unprovided[0].ns === 'ghostNs',
+    'B13 假面上读一个无人提供的 ns ⇒ 恰报 1 条未提供（'
+    + fakeGhost.unprovided.map(function (u) { return u.ns; }).join(',') + '）');
+  // 跨文件写判据的两向自证
+  const fakeDup = M.audit({
+    read: function (rel) {
+      const f = fakeProduct({ 'core/b.js': 'const WA = window.WorldAxis = window.WorldAxis || {};\nWA.alpha = function () {};\n' });
+      return f[rel] || '';
+    },
+    files: Object.keys(fakeProduct()),
+    indexSrc: 'const LOAD_ORDER = [\n  \'core/a.js\',\n  \'core/b.js\'\n];',
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: [], requiresFiles: [] } } },
+    ledgerText: null
+  });
+  A(fakeDup.crossFileWrite.length === 1 && fakeDup.crossFileWrite[0].ns === 'alpha',
+    'B14 假面上两文件都赋值 alpha ⇒ 恰报 1 条跨文件写（'
+    + fakeDup.crossFileWrite.map(function (c) { return c.ns; }).join(',') + '）');
+  void fakeOk;
+
+  // ── C 不变式 ──
+  const before = { mod: rd(MOD_REL), led: rd(LEDGER_REL) };
+  const a1 = M.audit(), a2 = M.audit(), a3 = M.audit();
+  A(JSON.stringify(a1) === JSON.stringify(a2) && JSON.stringify(a2) === JSON.stringify(a3),
+    'C1 audit 连调幂等（三次同值）');
+  A(M.summary() === M.summary(), 'C1b summary 连调幂等');
+  A(JSON.stringify(M.loadOrder()) === JSON.stringify(M.loadOrder()), 'C1c loadOrder 连调幂等');
+  A(rd(MOD_REL) === before.mod && rd(LEDGER_REL) === before.led,
+    'C2 判据纯只读：连调后模块与账本逐字未变（取证不得改变被取证对象）');
+  A(M.productFiles().length === a.files,
+    'C2b productFiles 连调同长且与现场文件面同源（' + M.productFiles().length
+    + ' === ' + a.files + '）');
+}
+
+function runNegative(A) {
+  const S = rd(MOD_REL);
+  let n = 0;
+  const done = function (label) { n += 1; return label; };
+
+  // ── N1 真源码破坏：ALIAS_RE 窄到只认一种形态 ⇒ 别名覆盖率塌陷 ──
+  const narrow = 'const ALIAS_RE = new RegExp("const\\\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\\\s*=\\\\s*window\\\\.WorldAxis\\\\s*=\\\\s*window\\\\.WorldAxis\\\\s*\\\\|\\\\|\\\\s*\\\\{\\\\s*\\\\}\\\\s*;");';
+  // 破坏必须换掉**整个 IIFE 块**：只换首行会留下孤立的 `})();`，破坏副本变成 SyntaxError，
+  // 于是「判据没反应」与「副本根本没装载起来」长得一模一样（本锁要治的正是这类混淆）。
+  // 块文本由切片取得（不是字面量），故锚点整串在本锁里仍只出现 1 次（锚点表那行）。
+  const n1i = S.indexOf(ANCHORS.aAlias.txt);
+  const n1j = S.indexOf('})();', n1i) + 5;
+  const aliasBlock = S.slice(n1i, n1j);
+  const n1src = breakOnce(S, aliasBlock, narrow, 'N1');
+  const n1 = loadCopy(MOD_REL, n1src);
+  const n1a = n1.audit();
+  A(n1a.aliasFiles < n1a.files,
+    done('N1b 装载破坏副本 ⇒ 别名面塌陷（' + n1a.aliasFiles + '/' + n1a.files
+      + ' < 116）—— 证明 B1 的下限判据真在测覆盖率，而不是恒真'));
+
+  // ── N2 真源码破坏：EXTERNAL 表填一个假外名 ⇒ 「过期登记」判据必须现形 ──
+  const n2src = breakOnce(S, ANCHORS.aExternal.txt, "const EXTERNAL = { ghostExternal: '假外名' };", 'N2');
+  const n2 = loadCopy(MOD_REL, n2src);
+  const n2a = n2.audit();
+  A(n2a.staleRegistration.some(function (s) { return s.ns === 'ghostExternal'; }),
+    done('N2b 装载破坏副本 ⇒ 报出过期登记 ' + n2a.staleRegistration.map(function (s) { return s.ns; }).join(',')
+      + '（原版为空）—— 证明 B8 的「无过期登记」不是恒真'));
+
+  // ── N3 真源码破坏：次序方向写反（pi < ci）⇒ 真源码上必须报违规 ──
+  const n3src = breakOnce(S, ANCHORS.aOrder.txt, 'if (pi < ci) orderViolation.push(', 'N3');
+  const n3 = loadCopy(MOD_REL, n3src);
+  const n3a = n3.audit();
+  A(n3a.orderViolation.length > 20,
+    done('N3b 装载破坏副本 ⇒ 方向写反后报出 ' + n3a.orderViolation.length
+      + ' 条「违规」（真源码上恒 0）—— 证明判据方向是现场测出来的，不是恒真'));
+
+  // ── N4 真源码破坏：恒真保护被抽掉 ⇒ 空扫描面也会判绿 ──
+  const n4src = breakOnce(S, ANCHORS.aAlive.txt, 'scanAlive: false && g.coverage.nsProvided > 0', 'N4');
+  const n4 = loadCopy(MOD_REL, n4src);
+  const n4a = n4.audit({ read: function () { return ''; }, files: ['index.js'], indexSrc: 'const LOAD_ORDER = [];' });
+  A(n4a.scanAlive === false && n4a.ok === false,
+    done('N4b 装载破坏副本 + 空扫描面 ⇒ ok 为假（恒真保护生效；原版上 scanAlive 为真）'
+      + '—— 证明「0 问题」不会被空集伪装'));
+
+  // ── N5 真源码破坏：账本漏扫不再补边 ⇒ 有 requires 却扫不到的边被静默丢掉 ──
+  const n5src = breakOnce(S, ANCHORS.aSkip.txt, 'if (true) return;', 'N5');
+  const n5 = loadCopy(MOD_REL, n5src);
+  const n5a = n5.audit({ read: function (rel) { return rel === 'core/a.js' ? fakeProduct()['core/a.js'] : ''; },
+    files: ['core/a.js'], indexSrc: "const LOAD_ORDER = ['core/a.js', 'core/b.js'];",
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: ['alpha'], requiresFiles: ['core/a.js'] } } } });
+  A(n5a.unreflected.length === 0 && n5a.edgesLoad === 0,
+    done('N5b 装载破坏副本 ⇒ 账本里 b→a 的装载期边整条消失（漏扫补丁失效，实装载期边 '
+      + n5a.edgesLoad + ' 条）—— 证明 A8 锁的「不许静默丢边」真在生效'));
+
+  // ── N6 假锚点（v2.107.0 开发期占位串，从未落进模块）⇒ breakOnce 必抛 ──
+  let threw = false;
+  try { breakOnce(S, 'const fld = s.raw || s.field;', 'X', 'N6'); } catch (e) { threw = true; }
+  A(threw, done('N6 破坏锚点不存在时 breakOnce 抛（不许静默通过）'
+    + '—— 证明「破坏没发生也会报绿」这条假路径被堵死'));
+
+  // ── N7 反向自证（H6）：原版上同款判据必须为真 ──
+  const M = require('./module-cycle-gate.js');
+  A(M.audit().aliasFiles === M.audit().files,
+    done('N7 原版上别名覆盖率满格为真，破坏副本上塌陷（N1b）—— 两向自证成立'));
+  A(M.audit().orderViolation.length === 0,
+    done('N7b 原版上零次序违规为真，方向反转后报 ' + '20+' + ' 条（N3b）—— 两向自证成立'));
+
+  // ── N8 破坏落点全部可核（不靠改真文件） ──
+  A([n1src, n2src, n3src, n4src, n5src].every(function (x) { return x !== S; }) && n >= 6,
+    done('N8 五处真源码破坏 + 一处「锚点不存在必抛」全部可核（本组共 ' + n + ' 项断言），'
+      + '且全部是内存副本，真文件逐字未动'));
+  A(rd(MOD_REL) === S, done('N8b 真文件在全部负控制跑完后逐字未变（负控制不得改真文件）'));
+}
+
+module.exports = { ANCHORS: ANCHORS, runAll: runAll, runNegative: runNegative };
+
+if (require.main === module) {
+  let P = 0, F = 0;
+  const A = function (c, m) { if (c) { P += 1; } else { F += 1; console.log('  ✗ ' + m); } };
+  try { runAll(A); } catch (e) { F += 1; console.log('  ✗ 异常：' + e.message); }
+  try { runNegative(A); } catch (e) { F += 1; console.log('  ✗ 负控制异常：' + e.message); }
+  console.log('MODULE-CYCLE-V2107: ' + (F === 0 ? 'pass（' + P + ' 项）' : 'FAIL ' + F + ' / ' + (P + F)));
+  process.exit(F === 0 ? 0 : 1);
+}

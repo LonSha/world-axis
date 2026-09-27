@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.106.1'
+  const VERSION = '2.107.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
