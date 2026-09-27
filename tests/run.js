@@ -3418,11 +3418,37 @@ const __ctxGuard = require('./context-guard.js').boundary();
   assert(typeof WA.store.loadStat === 'function', 'loadStat 已导出');
   // 场景：状态键被写坏（模拟部分写入/扩展冲突）→ load 隔离原始 payload，返回 null
   const good = JSON.stringify(WA.store.get());
-  global.localStorage.setItem('worldaxis_state_test_chat_001', '{"schemaVersion":1,"meta":{"trunc');
+  // v2.108.0 (plan-1 #18): 本块原为单一断言 `st138 === null`。自本版起 load() 在隔离之后
+  //   **追加**了三级自动修复（L1 截断到最后一个完整对象 / L2 同聊天后备键 / L3 诚实报告），
+  //   于是「损坏 ⇒ null」只对「三级都救不回来」成立。为**不丢掉那条可靠性**
+  //   （修复不了就绝不自造一个世界），此处把场景拆成两个**显式子用例**，两例都不依赖
+  //   「别的用例先跑过」这类隐式顺序：
+  //     A. 后备键在场 ⇒ L2 救回一份可用存档（新能力，须单列记账、不计入 hits）；
+  //     B. 后备键缺席 ⇒ L1 无 `}` 可截、L2 无键可读 ⇒ 必须仍返回 null（旧保证原样钉住）。
+  const cid138 = 'test_chat_001';
+  const bakKey138 = 'worldaxis_state_' + cid138 + '_bak';
+  const BAD138 = '{"schemaVersion":1,"meta":{"trunc';
+  const rep0 = WA.store.loadStat().repairs || 0;
+  // ── 子用例 A：后备键在场（save() 钩子已建）⇒ L2 救回 ──
+  assert(global.localStorage.getItem(bakKey138) !== null, '前置：L2 后备键已由 save() 钩子建立');
+  global.localStorage.setItem('worldaxis_state_test_chat_001', BAD138);
   const st138 = WA.store.load();
-  assert(st138 === null, '损坏 payload 返回 null');
   const ls138 = WA.store.loadStat();
+  assert(st138 !== null && st138.meta && typeof st138.meta === 'object', '损坏但后备键在场 ⇒ L2 救回可用存档（而非归零）');
+  assert((ls138.repairs || 0) === rep0 + 1 && ls138.lastRepair && ls138.lastRepair.ok === true
+    && ls138.lastRepair.stage === 'L2-backup' && ls138.lastRepair.marked === true,
+    '修复单列计量（不计入 hits）：repairs+1 / stage=L2-backup / 自愈标记已建');
   assert(ls138.errors >= 1 && ls138.lastError && ls138.lastError.length > 0, '损坏计入 loadStat.errors 并留错误摘要');
+  // ── 子用例 B：后备键缺席 ⇒ 必须仍返回 null（「绝不自造一个世界」）──
+  global.localStorage.removeItem(bakKey138);
+  global.localStorage.setItem('worldaxis_state_test_chat_001', BAD138);
+  const repA138 = WA.store.loadStat().repairs || 0;
+  const st138b = WA.store.load();
+  const ls138b = WA.store.loadStat();
+  assert(st138b === null, '三级（L1 截断 / L2 后备 / L3 报告）都救不回 ⇒ 仍返回 null，绝不自造世界');
+  assert((ls138b.repairs || 0) === repA138 && ls138b.lastRepair && ls138b.lastRepair.ok === false
+    && ls138b.lastRepair.stage === 'none', '救不回时 repairs 不推进，lastRepair.ok=false / stage=none（诚实报告）');
+  assert(global.localStorage.getItem(bakKey138) === null, '（现场）子用例 B 的后备键保持缺席，不影响后续断言');
   // 隔离键存在且内容 == 原始损坏 payload（mock 枚举走 _dump()）
   const corKeys = Object.keys(global.localStorage._dump()).filter(k => k.startsWith('worldaxis_state_test_chat_001_corrupt_'));
   assert(corKeys.length >= 1, '损坏 payload 已隔离到 *_corrupt_* 键');
@@ -10027,7 +10053,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.108.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10579,7 +10605,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.107.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.108.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10870,7 +10896,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.107.0', '入口版本为 2.107.0（实 ' + ver + '）');
+    assert(ver === '2.108.0', '入口版本为 2.108.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11155,7 +11181,11 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     //   故本门禁钉两件事：① 逐文件计数与冻结清单一致（新增/删除都必须显式落进清单）；
     //   ② 每一处附近必须有一次读侧归因投递（有清单还不够，得真有归因）。
     {
-      const INVENTORY_G16 = { 'core/settings-bus.js': 11, 'core/store.js': 19, 'core/workflow.js': 1,
+      // v2.108.0 (plan-1 #18): core/store.js 19 -> 20。新增的那处裸读在 L2 自愈的取回路径上
+      //   （`worldbook_state_<chat>_bak`），其旁已同批投递 noteStoreReadFail('recoverBak')。
+      //   本条清单的用途正是「新增裸读点必须显式落进清单」——故此处同步是**被门禁要求的动作**，
+      //   而不是为了让它变绿：计数不动就等于把一处新的「读失败静默与业务结论同形」的温床放行。
+      const INVENTORY_G16 = { 'core/settings-bus.js': 11, 'core/store.js': 20, 'core/workflow.js': 1,
         'engines/chatcache.js': 3, 'engines/checkpoints.js': 1, 'engines/tool-diag.js': 1,
         'engines/worldbook.js': 2, 'render/inject.js': 1, 'index.js': 2 };
       const ATTRIB_G16 = /noteReadFail\(|noteStoreReadFail\(|reportReadFail\(|reportHostReadFail\(|noteWbRead\(|noteRead\(/;
@@ -11203,7 +11233,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
         'G16 每处裸读点附近都有读侧归因（实无归因 ' + SCAN16.miss.length + ' 处'
         + (SCAN16.miss.length ? '：' + SCAN16.miss.slice(0, 5).join('、') : '') + '）');
       const total16 = Object.keys(countByFile16).reduce(function (a, k) { return a + countByFile16[k]; }, 0);
-      assert(total16 === 41, 'G16 裸读点总数为 41（v2.82.0 快照与分支 +1：checkpoints 库读点；实 ' + total16 + '）');
+      assert(total16 === 42, 'G16 裸读点总数为 42（v2.108.0 L2 自愈取回点 +1；此前 41 = v2.82.0 快照与分支 +1：checkpoints 库读点；实 ' + total16 + '）');
       // 负向探针：临时落一个含裸读点的文件，必须被检出（否则上面的计数只是「碰巧成立」）
       const probeRel16 = 'core/__g16_probe__.js';
       const probeAbs16 = path.join(BASE, probeRel16);
@@ -11401,7 +11431,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.107.0', '入口版本为 2.107.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.108.0', '入口版本为 2.108.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11789,7 +11819,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.107.0', '入口版本为 2.107.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.108.0', '入口版本为 2.108.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12159,7 +12189,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.107.0', '入口版本为 2.107.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.108.0', '入口版本为 2.108.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12308,7 +12338,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     assert(missing2110.length === 0,
       '（负向）每一处裸读点附近都有读侧归因投递（实无归因 ' + missing2110.length + ' 处'
       + (missing2110.length ? '：' + missing2110.slice(0, 5).join('、') : '') + '）');
-    assert(ROWS2110.length === 41, '产品代码裸读点总数为 41（v2.82.0 快照与分支 +1；实 ' + ROWS2110.length + '）');
+    assert(ROWS2110.length === 42, '产品代码裸读点总数为 42（v2.108.0 L2 自愈取回点 +1；此前 41 = v2.82.0 快照与分支 +1；实 ' + ROWS2110.length + '）');
   }
 
   // ── 块3：面B 指纹读侧消费（状态机 + `.d`/`.at` 首次被读 + 双消费端） ──
@@ -12524,7 +12554,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.107.0', '入口版本为 2.107.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.108.0', '入口版本为 2.108.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14847,7 +14877,7 @@ assert(verF2500 === '2.107.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.107.0', '入口 VERSION = 2.107.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.108.0', '入口 VERSION = 2.108.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -18481,6 +18511,9 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   两者的判据都在这一份文件里（B4 的读数取自 module-registry-ledger.json，
   //   由 tests/module-registry-gate.js 实测产出 —— 静态扫描测不出「必须先装载」，
   //   见该门禁头部留档的两次失败）。
+  //   render-pre 的 runAll 含一个 async 入口（theater.generate），须 await（与 settle-v2830 同规格）。
+  await require('./render-pre-v2108.js').runAll(assert);
+  await require('./render-pre-v2108.js').runNegative(assert);
   await require('./settle-v2830.js').runAll(assert);
   await require('./settle-v2830.js').runNegative(assert);
   // v2.84.0 A3 收口：**开关组合面**与**存档兼容**。
@@ -18787,6 +18820,9 @@ assert(r2900.dead.length === 454 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(String(rG2830.stdout || '').indexOf('命名空间 120') > 0 && String(rG2830.stdout || '').indexOf('文件 112') > 0,
       'v2830/mr: 端到端读数含「命名空间 120 / 文件 112」（v2.102.0：新增 engines/perf-trace.js；v2.101.0：新增 engines/interop.js；v2.99.0：新增 engines/canon.js；v2.96.0 X3 新增 engines/rumor.js；v2.97.0 X5 新增 engines/phone-bridge.js；v2.84.0 A2 新增 core/input-guard.js；v2.87.0 B7 新增 engines/theme.js）');
   }
+  // ── v2.108.0（计划一 #18 + #19）：本版两条能力各自的四段专锁必须真被执行 ──
+  require('./state-repair-v2108.js').runAll(assert);
+  require('./state-repair-v2108.js').runNegative(assert);
   require('./intel-v2530.js').runAll(assert);
   require('./life-v2520.js').runAll(assert);
   require('./longline-v2550.js').runAll(assert);

@@ -903,6 +903,33 @@ function runWitness(WA) {
       });
     }
   }
+  // ── 渲染层防御式边界（v2.108.0 plan-1 #19）：`pre-violation` ──
+  //   为什么需要一个**新码**而不是折进 `missing-find` / `not-found`：调用方传 `'str'`/`{}`/`123`
+  //   是「调用错了」，而传 `{find:''}` 是「输入被认识了但是空的」。把两者塌在一起，就是本仓
+  //   反复治的「两个根因在诊断面不可分」——前者叫用户去查自己的代码，后者叫用户去查规则内容。
+  //   见证策略：同一入口喂「类型错的参数」与原来的合法空值，断两者**归因不同**（不只是「不抛」）。
+  //   注：`theater.generate` 是 async，同步的 trip() 拿不到它的 Promise 结果，
+  //     故其 instruction-not-string 的运行时见证放在 v2.108.0 专锁的 [B] 段（用 await 断言）。
+  {
+    const Pr = WA.purifier, Th = WA.theater, Rd = WA.render;
+    const bad = [];
+    if (Pr && typeof Pr.addRuleSafe === 'function') {
+      bad.push(Pr.addRuleSafe('not-an-object').reason);        // 传字符串
+      bad.push(Pr.addRuleSafe(123).reason);                     // 传数字
+      bad.push(Pr.addRuleSafe([{ find: 'a' }]).reason);         // 传数组（不是朴素对象）
+    }
+    if (Pr && typeof Pr.removeRuleSafe === 'function') {
+      bad.push(Pr.removeRuleSafe(123).reason);                  // 传数字 id
+      bad.push(Pr.removeRuleSafe({ id: 'x' }).reason);          // 传对象 id
+    }
+    if (Th && typeof Th.send === 'function') bad.push(Th.send({}).reason);
+    if (Rd && typeof Rd.uninject === 'function') bad.push(Rd.uninject(123).reason);
+    want('pre-violation', '渲染层防御式边界：公开入口的参数类型错 ⇒ 明确归因（与「合法但空」的 missing-find/no-id/empty-text 分开，v2.108.0）');
+    trip('pre-violation', function () { return bad; });
+    // 反向共证（防「一律拒收」式的假通过）不放在这里：本函数的契约是「码 -> 真跑出来」，
+    //   往 expect 里塞非码键会污染码面。故反向共证（同入口喂**合法但空**的值仍答旧码
+    //   missing-find / no-id / empty-text）放在 v2.108.0 专锁的 [C] 不变式段里断言。
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

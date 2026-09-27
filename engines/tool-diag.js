@@ -2261,7 +2261,11 @@
         chatcacheInstallBack: '快照安装回读（唯一能发现静默截断处）',
         worldbookSelection: '世界书条目选择（读失败 ⇒ 注入静默少一块）',
         workflowHistory: '工作流历史', uninjectLedger: '撤销注入账本（读失败 ⇒ 重复注入）',
-        eventLog: '事件日志载入', errorLog: '错误日志载入'
+        eventLog: '事件日志载入', errorLog: '错误日志载入',
+        // v2.108.0 (plan-1 #18): store 域新增归因来源（L2 自愈读后备键）。
+        //   漏进本表 ⇒ 诊断包退回裸桶名；而「读不到后备键」与「没有后备键」是两种完全不同的
+        //   处置建议（前者查环境/隐私模式，后者查备份周期是否跑过），不可混同。
+        recoverBak: '后备存档读回（读失败 ⇒ L2 自愈不可用）'
       };
       const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
         .map(function (k) { return (SRC_LABEL[k] || k) + '×' + byS[k]; }).join('、');

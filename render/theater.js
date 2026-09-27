@@ -11,7 +11,16 @@
 
   WA.theater = {
     /** 生成一段番外小剧场（独立、不影响正文） */
+    /**
+     * v2.108.0 (plan-1 #19): `@pre` instruction must be a string (or absent).
+     *   Previously any non-string was interpolated straight into the prompt via
+     *   `(instruction || '生成一段日常番外')` -- an object would ship `[object Object]`
+     *   to the model as the director's note, with no error anywhere.
+     */
     async generate(instruction, opts) {
+      if (instruction !== null && instruction !== undefined && typeof instruction !== 'string') {
+        return { ok: false, reason: 'pre-violation', detail: 'instruction-not-string', got: typeof instruction };
+      }
       opts = opts || {};
       try {
         const cfg = WA.apiRouter.getChannel('inference');
@@ -38,7 +47,15 @@
      *   包装成折叠块 → 写入 ST 输入框 → 派发 input 事件让宿主感知（字数统计/按钮态）。
      *   输入框不可达时明确归因（不静默失败），调用方仍可用返回的 text 自行复制。
      */
+    /**
+     * v2.108.0 (plan-1 #19): `@pre` text must be a string (or absent).
+     *   The old body did `String(text == null ? '' : text).trim()`, which quietly turned
+     *   `{}` into `'[object Object]'` and shipped it into the message box as script output.
+     */
     send(text, opts) {
+      if (text !== null && text !== undefined && typeof text !== 'string') {
+        return { ok: false, reason: 'pre-violation', detail: 'text-not-string', got: typeof text };
+      }
       const o = opts || {};
       const body = String(text == null ? '' : text).trim();
       if (!body) { __thStat.sendFailed++; __thStat.lastReason = 'empty-text'; return { ok: false, reason: 'empty-text' }; }

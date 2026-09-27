@@ -797,7 +797,18 @@ style: false,
      * 幂等：无快照或无 setExtensionPrompt 时安全跳过，重复调用不报错。
      * v0.1.19: trigger 参数标注撤销来源（interceptor/chat-changed/manual），并写入台账。
      */
+    /**
+     * v2.108.0 (plan-1 #19): `@pre` trigger must be a string (or absent).
+     *   `trigger` is written verbatim into the undo ledger (`clearedBy`) and is compared
+     *   against it by uninjectAudit to detect "cleared by a different trigger than the one
+     *   that injected". A non-string there corrupts an audit judgement, so it is rejected
+     *   instead of being silently stored. Absent stays legal (defaults to 'manual').
+     */
     uninject(trigger) {
+      if (trigger !== null && trigger !== undefined && typeof trigger !== 'string') {
+        const r = { ok: false, reason: 'pre-violation', detail: 'trigger-not-string', got: typeof trigger };
+        recordUninject(trigger, r); return r;
+      }
       try {
         const c = (WA.mainWin && WA.mainWin.SillyTavern && WA.mainWin.SillyTavern.getContext) ? WA.mainWin.SillyTavern.getContext() : null;
         if (!c || !c.setExtensionPrompt) { const r = { ok: false, reason: 'no-host' }; recordUninject(trigger, r); return r; }

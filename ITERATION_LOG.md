@@ -13,6 +13,48 @@
 | 出口面契约 | 58 命名空间 / 321 成员 / 4094 字符 |
 
 ## 迭代记录
+
+### R92 · 2026-09-27 · v2.108.0 存档损坏三级自动修复 · 渲染层防御式边界（计划一 #18 + #19 合版）
+
+- **做了什么**（产品面两处落点，零新增导出 / 零新增容器 / 零新增设置键）：
+  - `core/store.js`（+229 行）：#18 **存档损坏三级自愈**。`bakKey(chatId)` / `recoveredKey(chatId)`（键名各自单一真源）；`__loadRepairStat = { attempts, repaired, failed, last }` 与 `__recoverStat = { baks, bakHits, bakBad, recovers, marks, lastAt, lastKey, lastStage }`——**五个计数器语义刻意分开**（`baks` 后备写成功 / `bakHits` L2 真救回 / `bakBad` 读或解析或形态或写失败 / `marks` 标记写成功 / `recovers` 修复事件），塌成一个数就再也说不出「没坏但也没救回」。
+  - L1 `truncateToLastComplete(raw)`：从最后一个 `}` 起最多回退 64 跳，要求 parse 成对象**且** `hasOwnProperty('schemaVersion')` 或 `meta` 是对象（判据是「像不像本仓的存档」，不是「像不像 JSON」），命中后 `ensureShape` 补齐，返回 `{ ok:true, stage:'L1-truncate', state, filled, conflicts, droppedChars }`。
+  - L2 `tryBackupRepair(chatId)`：读 `_bak`；读失败经 `noteStoreReadFail('recoverBak', key, e)` 单一投递（**这是本版新增的第 20 处裸读**），解析失败或形态不像存档则 `bakBad++`（**绝不把一段合法 JSON 当世界救回来**）。L3 = 全失败 ⇒ 空世界 + 损坏报告。
+  - `load()` 的 `catch (pe)` 分支：**保留**原有 `errors++` + `*_corrupt_*` 隔离 + `WA.log`，**追加**修复链——成功 ⇒ 写回主键 + `writeRecoverMark` 建 `_recovered` + `repairs++` + `lastRepair={ok:true,stage,marked}` + `return rep.state`；写回失败 ⇒ `lastRepair.ok=false` + `writeReason` + `return null`（**写不回去就不许交出一份「已修好」的现场**）；L3 ⇒ `stage:'none'` + `null`。
+  - `save()` 增后备写钩子（每会话首个成功保存时写一次 `_bak`，`init()` 有复位），`writeBackup(payload)` 接受对象或已序列化串且**自身不抛**。`classifyKey` 的 `recover` 判定**放在 `state` 之前**——`_bak` / `_recovered` 若落进 `state` 桶，会被当成「另一个聊天的存档」而永远不被归类为自愈痕迹。
+  - 五入口 `@pre` 契约（#19）：`purifier.addRuleSafe` / `purifier.removeRuleSafe` / `theater.generate` / `theater.send` / `inject.uninject` 各加类型守卫，违约返回 `{ ok:false, reason:'pre-violation', detail:'rule-not-object' | 'id-not-string' | 'instruction-not-string' | 'text-not-string' | 'trigger-not-string', got: typeof }`。**刻意不折进既有码**：既有 `missing-find` / `no-id` / `empty-text` 说的是「输入被识别但为空」，`pre-violation` 说的是「调用方传错」——两个根因，塌在一起就是本仓反复治的不可分缺陷。
+  - 三张标签表同源登记 `recoverBak`：`core/store.js` 的 `LAB` / `engines/tool-diag.js` 的 `SRC_LABEL` / `ui/panel.js` 的 `LAB_P`（三处键集必须一致，由 `ui-gate-sync.check()` 逐键比对）。
+  - `tests/state-repair-v2108.js`（新，四段专锁 **65/0**）：A 静态契约（零新导出 / `recover` 家族分类 / 判定次序 / 两份列表同步）+ B 三级各真跑一次 + 写回失败不交出「修好了」的现场 + C 只读幂等 + N 四处真源码破坏。**探针用专用聊天 `v2108_repair_probe`，绝不碰 `test_chat_001`。**
+  - `tests/render-pre-v2108.js`（新，四段专锁 **42/0**）：A 五入口在场 + 见证表真跑出 `pre-violation` + 三张标签表仍登记 `recoverBak` + B 逐入口「类型错」真跑 + 「合法但空」**反向共证**（仍答旧码）+ `theater.generate` 的 async 见证（`await Promise.resolve(g)`）+ C 不变式 + N 四处破坏（逐入口摘守卫）。
+  - `tests/run.js`：v0138 契约**强化拆分**（见下）+ G16 冻结计数两处同步（`core/store.js 19→20`、`total16 41→42`）+ 四个同步入口的 `pre-violation` 见证 + 四行接线（render-pre 两行走 `await`）。文件 19158 → **19185 行**。
+  - 升版同批：`index.js` / `manifest.json` / 三本台账 version / `tests/reject-lock-v2780.js` 版本期望值，以及 run.js **8 处**版本期望锚点（行内共 14 处）；`tools/bump_v2108.py`（110 行，五条守卫，`--dry` 通过后正式执行）+ `tools/seal_check_v2108.js`（**36 项绿**）；`reject-code-ledger.json` 追加 v2.108.0 沿革段。
+- **为什么**：#18 治的是「**一份坏存档 = 这个世界没了**」。此前 `load()` 遇到 `JSON.parse` 失败只有一条路：`errors++`、把原文塞进 `*_corrupt_*` 隔离、返回 `null`。后果是不可逆的——玩家那边看到的是「世界归零」，而磁盘上其实同时躺着（a）**同一份数据的前缀**（写盘被截断，只差最后一个 `}`）、（b）**上一版完好的 `_bak`**。本版把「救不救得回」变成**可判定的三级次序**，并把每一级的**证据**（`stage` / `droppedChars` / `filled` / `marked`）与**代价**（`repairs` 单列，**不计入 `hits`**）分开记账：`hits` 说的是「用户主动命中」，自愈若混进 `hits`，统计面就再也分不清「世界真变了」与「存档曾坏过」。#19 治的是「**调用方传错被记成世界里真发生了这件事**」——`theater.send(text)` 收到对象时，`String(x)` 会给出 `'[object Object]'` 并**真播出一段名叫 `[object Object]` 的台词**；`purifier.addRule('x')` 会静默建出一条空规则，此后每次净化都跑一次空转。这类缺陷的读数不是「报错」，而是**世界里多了一件从未发生过的事**。
+- **v0138 契约被强化改写（是加严，不是弱化——必须完整保留）**：原单一断言 `st138 === null` 在 L2 落地后**必然变红**（`test_chat_001` 是该测试套件的主测试聊天，在 run.js 633 / 648 / 665 / 672 行已被 `save()` 写过 ⇒ `_bak` 必然存在 ⇒ 救回成功、不再返回 null）。拆成的**两个显式子用例**把两种情形钉成两条独立判据：
+  - 子用例 A（后备键在场）：`assert(st138 !== null && st138.meta && typeof st138.meta === 'object', '损坏但后备键在场 ⇒ L2 救回可用存档（而非归零）')` + `assert((ls138.repairs||0) === rep0+1 && ls138.lastRepair.ok === true && ls138.lastRepair.stage === 'L2-backup' && ls138.lastRepair.marked === true, '修复单列计量（不计入 hits）')` + `assert(ls138.errors >= 1 && ls138.lastError.length > 0)`。
+  - 子用例 B（`removeItem(bakKey138)` 之后）：`assert(st138b === null, '三级都救不回 ⇒ 仍返回 null，绝不自造世界')` + `assert((ls138b.repairs||0) === repA138 && ls138b.lastRepair.ok === false && ls138b.lastRepair.stage === 'none')`。
+  - **这两条一起才构成完整契约**：只留 A 会放过「自造一个世界」，只留 B 会放过「有后备却不去救」。损坏串常量 `BAD138 = '{"schemaVersion":1,"meta":{"trunc'`（**能走到修复路径的形态**，见判据 (90)）。
+- **两处由本仓库既有成类锁当场抓出的问题（实测，不是纸面推演）**：
+  - ① **G16 冻结读数的第 20 处裸读**：L2 取回路径上新增一处 `localStorage.getItem`，`inventory` 的两处计数（`core/store.js: 19`、总数 41）**同批**必须改成 20 / 42——这是门禁要求的动作，不是为了让灯变绿。
+  - ② **三张标签表必须同源**：新键 `recoverBak` 若只登记一处，`ui-gate-sync.check()` 会逐键比出差异；同源登记后 `tool-diag` 的家族读数才与 `store` 的家族读数同源。
+- **影响范围**：`core/store.js`、`render/inject.js`、`render/purifier.js`、`render/theater.js`、`engines/tool-diag.js`、`ui/panel.js`、`tests/state-repair-v2108.js`（新）、`tests/render-pre-v2108.js`（新）、`tests/reject-v2780.js`、`tests/run.js`、`index.js`、`manifest.json`、`tests/dead-export-ledger.json`、`tests/reject-code-ledger.json`、`tests/module-registry-ledger.json`、`README.md`、`ITERATION_LOG.md`。`tools/*.py` / `tools/*.js` 不入库。
+- **门禁结果**：`node tests/run.js` → **通过 9186 / 失败 0**（v2.107.0 基线 9074/0，**+112** = 两把专锁 65 + 42 + 接线）；专锁独立跑 **65/0** 与 **42/0**；`tools/seal_check_v2108.js` → **SEAL-V2108: pass（36 项）**；`tests/export-contract.js` → `ns= 109 members= 694 chars= 8296`（**逐字未变**，零新增导出）；`tests/reject-code-gate.js` → 产品文件 116 / 内联拒收码 **363**（见证 **125** / 死表 5 / 基线 233，见证 +1 = 新增 `pre-violation` 带证）；`tests/test-surface-gate.js` → 文件面 **100** / 锁 **95** / 可达 100 / spawn 4 / **孤儿 0**；`tests/module-registry-gate.js` → 文件 112 / 命名空间 120 / 装载期边 23 / 硬边 0 / 调用期引用 44 / 结构问题 0；`tests/dead-export-gate.js` → dead 454 / uiDead 4 / dataOnly 169（**未增长**）；`tests/field-liveness-gate.js` → 骨架一级键 53 / 写侧越界 1（`ui/panel.js innerHTML`）/ 读侧 0；`tests/dup-decl-gate.js` → 227 文件 / 2732 顶层声明 / JSDoc 539 / 重复 0；`tests/readings-v2106.js` → 58/0（读数族 7 态随版本自动更新）；三本台账 version=**2.108.0**。
+- **本版现场读数**：#18 → `repairs` 单列（自愈不计 hits）、`lastRepair.stage` 三态（`L1-truncate` / `L2-backup` / `none`）、`exportAuditReport` 的 `recover(自愈痕迹)` 一行；#19 → 五入口违约全答 `pre-violation` 且「合法但空」仍答旧码（反向共证），拒收码见证面零缺口、死表仍 5 条。
+- **本版确立的可复用判据（编号续 R91）**：
+  - (90) **负控制必须喂「真能走到那条路径」的形态**：`state-repair-v2108.js` 的 N1 首版喂了一个**能 parse 成功**的 JSON 片段，而 `load()` 只在 **parse 失败**时才走修复路径 ⇒ 判据压根不被执行、该负控制成**空转**（两个负控制都绿得毫无意义）。这是「负控制假绿」的第二形（第一形是锚点没打中，见 R91 的 (86)）：**输入形态与判据分支不对齐时，破坏再真也不会现形。**
+  - (91) **「非探针键集合前后一致」只比存档域**：诊断日志键（`worldaxis_error_log_*` / `worldaxis_event_log_*`）是 `WA.log` 的正常产物，把它们算进「动了别的聊天」是**判据输入面过宽**——观测路径自己写日志不算污染。
+  - (92) **锚点必须取「单行内唯一」片段**：跨行锚点在统一纯度口径（恰好 1 次）下**结构性不可满足**——本版 `aWriteFail` 首版取跨行两行，实测 0 命中；改单行片段后即中。
+  - (93) **入口名必须对着产品真源码核实再写进专锁**：首版写 `S.sizeAuditReport()`，**产品里不存在这个名字**，真名是 `exportAuditReport()`——凭空写入口名等于判据恒假（与 R91 的 (88)「恒假断言」同族，形态不同）。
+  - (94) **回归隔离运行器的锁是目录不是文件**（`/tmp/worldaxis-regression-<hash>.lock/` 内含 `owner.json`），`rm -f` **清不掉**，必须 `rm -rf`；且 `run.js` 被隔离运行器复制到 `/tmp/worldaxis-regression-XXXXXX/work/` 后**脱离父进程**，`spawnSync` 拿不到结果，必须 `setsid nohup ... &` 后**轮询** `result.json` / `run.log`（本版三次卡死全部源于这两条）。
+  - (95) **补充测试调用会漂移 dead-export 台账的 `tref`**：新增测试引用会让复算值与账本冻结值不一致（症状文本 `证据失实：账本 tref=2，复算=3`），必须跑 `node tests/dead-export-gate.js --update` **收敛台账**而不是改判据（本轮 `store.load`：2 → 7）。**台账是证据，不是可以随手放水的断言。**
+  - (96) **追加 JSON 沿革段时，Python 源码里的换行转义会被解释成真实换行**：写成 `'\n'` 字面量时，Python 把它当**真实换行**写入，`json.loads` 立刻报 `Invalid control character at line 2 column 2878`；必须用 `chr(92) + 'n'` **显式构造转义序列**后再写入（与 R89 的③同源，本轮是它的第二次复现）。
+- **未覆盖（如实留在清单）**：
+  - `recover` 家族**未进 `sweepStaleKeys`** ⇒ 当前是「自愈痕迹永不清理」的保守默认，体积会随会话数线性增长（**这是刻意的保守选择，不是缺陷，但必须在清单上**）。
+  - 后备写每会话额外一次 `writeVerified` 会推高 `__integrityStat.writes` / `verified`（既有测试均为**相对比较**，本轮两轮回归 + 终局回归均绿，风险低但已留痕）。
+  - v151 段两次 `storageStat` 之间若有 `save` 触发后备写，理论上会打破那条**精确差值对账**（本轮三次回归该断言均绿，说明实际未触发）。
+  - L1 的 64 跳回退是**启发式上限**（超长截断 + 尾部恰好 64 个 `}` 全是噪声时会放弃，退到 L2）；L1 判据只要求「像本仓的存档」，不校验字段级语义。
+  - `FOUR_VERSION_PLAN.md`（246 行）**不含 #17–#20 原文** ⇒ 文档与记忆存在长期不一致隐患（计划原文的单一真源在记忆库，不在仓库）。
+  - **UI 层仍未做实机验证**（`ui/panel.js` 在无头回归里由 `ui-gate-sync` 的 mini-DOM 覆盖，**不是真浏览器**）。
+- **提交**：`（见本版提交）`。
 ### R91 · 2026-09-27 · v2.107.0 拒收码分类完备性审计 + 模块依赖静态图（计划一 #17 + #20 合版）
 
 - **做了什么**：

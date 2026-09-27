@@ -320,6 +320,129 @@
     return st;
   }
   function recoveryKey(chatId) { return 'worldaxis_recovery_' + (chatId || getChatId()); }
+  // v2.108.0 (plan-1 #18): bakKey / recoveredKey + repair accounting.
+  // bakKey: fixed per-chat backup key (never grows). recoveredKey: success mark.
+  // Both MUST live in their own family - see KEY_FAMILIES.recover note.
+  function bakKey(chatId) { return 'worldaxis_state_' + (chatId || getChatId()) + '_bak'; }
+  function recoveredKey(chatId) { return 'worldaxis_state_' + (chatId || getChatId()) + '_recovered'; }
+  const __loadRepairStat = { attempts: 0, repaired: 0, failed: 0, last: null };
+  // v2.108.0: backup-key observability. Counters are deliberately distinct:
+  //   baks    = backup generations successfully WRITTEN (the L2 feeder worked)
+  //   bakHits = times the L2 fallback actually RESCUED a broken state key
+  //   bakBad  = the backup key was unreadable / unparseable / foreign-shaped / unwritable
+  //   marks   = `_recovered` markers successfully written
+  //   recovers/recoversStage = repair events (any stage) with the last one's attribution
+  // Merging these would recreate exactly the defect this repo keeps treating: one number
+  //   that cannot tell "never written" from "written but unreadable".
+  const __recoverStat = { baks: 0, bakHits: 0, bakBad: 0, recovers: 0, marks: 0, lastAt: 0, lastKey: null, lastStage: null };
+  // v2.108.0: per-chat "backup already refreshed this session" memo (see save() hook).
+  const __bakDone = {};
+  function noteRecover(o) {
+    try {
+      __recoverStat.recovers++; __recoverStat.lastAt = clockWall();
+      __recoverStat.lastKey = (o && o.key) || null; __recoverStat.lastStage = (o && o.stage) || null;
+    } catch (e) {}
+  }
+  function writeRecoverMark(chatId, stage, droppedChars) {
+    try {
+      const w = writeVerified(recoveredKey(chatId), JSON.stringify({ at: clockNow('store.recovered'), stage: stage, droppedChars: droppedChars || 0 }));
+      if (w && w.ok) __recoverStat.marks++;
+      return !!(w && w.ok);
+    } catch (e) { return false; }
+  }
+  /**
+   * v2.108.0 (plan-1 #18) L1: truncate to the last complete object.
+   *
+   * Why first: the dominant failure shape of a half-written / quota-clipped /
+   * GC-reaped state key is tail loss with an intact head. So the prefix up to the
+   * last `}` is very likely a complete older save - repairing it needs no guessing.
+   *
+   * Two conditions, both required:
+   *   1) the prefix parses into an OBJECT (not array/scalar);
+   *   2) it LOOKS LIKE a world save (has schemaVersion, or an object meta) - otherwise an
+   *      unrelated-but-valid JSON fragment would be resurrected as "the world", which is
+   *      worse than zeroing: the user would believe the world survived.
+   * Returns { ok, state, filled, conflicts, droppedChars } or null (hand off to L2).
+   */
+  function truncateToLastComplete(raw) {
+    const s = String(raw == null ? '' : raw);
+    if (!s) return null;
+    let i = s.lastIndexOf('}');
+    let hops = 0;
+    const hasOwn = Object.prototype.hasOwnProperty;
+    while (i > 0 && hops < 64) {
+      const cand = s.slice(0, i + 1);
+      try {
+        const obj = JSON.parse(cand);
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+          const worldLike = hasOwn.call(obj, 'schemaVersion') || (obj.meta && typeof obj.meta === 'object');
+          if (worldLike) {
+            const r = ensureShape(obj, defaultWorldState());
+            return { ok: true, stage: 'L1-truncate', state: obj, filled: r.filled, conflicts: r.conflicts, droppedChars: s.length - cand.length };
+          }
+          return null;
+        }
+      } catch (e) { /* still incomplete - step back one `}` */ }
+      i = s.lastIndexOf('}', i - 1);
+      hops++;
+    }
+    return null;
+  }
+  /**
+   * v2.108.0 (plan-1 #18) L2: backup key `worldaxis_state_<chat>_bak`.
+   *
+   * Attribution must stay distinct from L1: L1 is the HEAD of this same payload,
+   * L2 is a DIFFERENT payload (an independent, possibly older save). Diagnostics
+   * must be able to say which one came back.
+   *
+   * Read failure and parse failure stay separate (repo rule: unreadable != absent):
+   * a read failure goes to the read ledger bucket `recoverBak`, while a bad/foreign
+   * parse only bumps __recoverStat.bakBad - neither counts as a successful repair.
+   */
+  function tryBackupRepair(chatId) {
+    const key = bakKey(chatId);
+    let bakRaw = null, bakErr = null;
+    try { bakRaw = mainWin.localStorage.getItem(key); } catch (e) { bakRaw = null; bakErr = e; }
+    if (bakErr) noteStoreReadFail('recoverBak', key, bakErr);
+    if (!bakRaw) return null;
+    let bObj = null;
+    try { bObj = JSON.parse(bakRaw); } catch (e) { bObj = null; }
+    const hasOwn = Object.prototype.hasOwnProperty;
+    if (bObj && typeof bObj === 'object' && !Array.isArray(bObj)
+        && (hasOwn.call(bObj, 'schemaVersion') || (bObj.meta && typeof bObj.meta === 'object'))) {
+      const r = ensureShape(bObj, defaultWorldState());
+      __recoverStat.bakHits++;
+      return { ok: true, stage: 'L2-backup', state: bObj, filled: r.filled, conflicts: r.conflicts, droppedChars: 0 };
+    }
+    __recoverStat.bakBad++;
+    return null;
+  }
+  /** Three-stage entry: L1 -> L2 -> null (L3 = caller falls back to defaultWorldState). */
+  function tryRepair(raw, chatId) {
+    const l1 = truncateToLastComplete(raw);
+    if (l1) return l1;
+    return tryBackupRepair(chatId);
+  }
+  /**
+   * v2.108.0 (plan-1 #18) L2 feeder: write a fallback generation.
+   *
+   * Accepts either a live payload object or an already-serialized string -- save()
+   *   has just serialized the state for the main key, so re-serializing it here would
+   *   burn a second full stringify of a tens-of-KB payload for nothing.
+   * Counters live here so "the fallback was never written" and "the fallback was written
+   *   but could not be read back" stay distinguishable on the observability surface.
+   * Never throws: the backup is auxiliary and must not be able to break a save.
+   * @returns {boolean} whether the fallback generation is verified on disk
+   */
+  function writeBackup(chatId, payload) {
+    try {
+      const str = (typeof payload === 'string') ? payload : JSON.stringify(payload);
+      const w = writeVerified(bakKey(chatId), str);
+      if (w && w.ok) { __recoverStat.baks++; return true; }
+      __recoverStat.bakBad++;
+      return false;
+    } catch (e) { try { __recoverStat.bakBad++; } catch (e2) {} return false; }
+  }
 
   let memCache = {}; // 内存态（当前聊天的权威副本）
   // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
@@ -629,7 +752,19 @@
     writerId: /^worldaxis_writer_id$/,
     corrupt: /^worldaxis_state_(.+)_corrupt_(\d+)$/,
     corruptSettings: /^worldaxis_(?!state_)([a-z_0-9]+)_corrupt_\d+$/,
-    wb: /^worldaxis_wb_selection_(.+)$/
+    wb: /^worldaxis_wb_selection_(.+)$/,
+    // v2.108.0 (plan-1 #18): repair leftovers (backup save / recovery mark).
+    // Why a SEPARATE family, not corrupt: corrupt has two hard count assertions
+    //   (tests/run.js `families.corrupt === 9` and `=== 7`, pinning "7 hosts + 2
+    //   current-chat copies" and the post-sweep value). Repair keys inside corrupt
+    //   would make those two assertions drift with "did this session repair anything"
+    //   -- yet what they pin is SWEEP semantics, which repair activity must not pollute.
+    // Why not the state family: `worldaxis_state_<chat>_bak` would be swallowed by the
+    //   state regex as "another chat named <chat>_bak" -- inflating `chats`, and letting
+    //   that key take part in sweep/verifyAll as SOMEONE ELSE'S SAVE (real consequence:
+    //   sweep believes a foreign chat exists, so that chat's recovery snapshot stops
+    //   being classed orphan).
+    recover: /^worldaxis_state_(.+)_(bak|recovered)$/
     // v2.5.0: 删除 `settingsSettings` 硬编码白名单。原因（实测口径）：
     //   ① 它是「12 个设置键」的第二份真源，必然漂移——实查已漏掉 calendar_settings_v1 与
     //      horizon_settings_v1 两个既存键（后者正是 v2.3.0 新加的）；
@@ -656,6 +791,10 @@
     if ((m = key.match(KEY_FAMILIES.corrupt))) return { family: 'corrupt', chat: m[1], quarantine: 'state' };
     if (KEY_FAMILIES.corruptSettings.test(key)) return { family: 'corrupt', chat: null, quarantine: 'settings' };
     if ((m = key.match(KEY_FAMILIES.stateDerived))) return { family: 'stateDerived', kind: m[2], chat: m[1] };
+    // v2.108.0 (plan-1 #18): repair leftovers MUST be classified BEFORE state --
+    //   `worldaxis_state_X_bak` DOES satisfy the state regex (its negative lookahead
+    //   only excludes syncrev / corrupt_\d+), so a later check would be swallowed.
+    if ((m = key.match(KEY_FAMILIES.recover))) return { family: 'recover', chat: m[1], kind: m[2] };
     if ((m = key.match(KEY_FAMILIES.state))) return { family: 'state', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.recovery))) return { family: 'recovery', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_eventLog))) return { family: 'diagnostic', kind: 'event_log', chat: m[1] };
@@ -1070,6 +1209,9 @@
         WA.log('warn', '聊天切换时存在在飞写合并批：已作废其未落盘改动（防跨聊天污染）');
       }
       memCache = this.load() || defaultWorldState();
+      // v2.108.0 (plan-1 #18): a fresh load starts a new backup cycle -- the first
+      //   successful save of this session refreshes the `_bak` baseline once.
+      try { __bakDone[getChatId()] = false; } catch (eB) {}
       __migrateReport = null;   // v0.1.47: 报告以「本次载入」为边界，不跨载入粘留（防议题永久挂红）
       // v0.5.0: 跨实例实时感知钩子（幂等安装）
       try { installStorageHook(); } catch (e) {}
@@ -1221,6 +1363,53 @@
         __loadStat.errors++; __loadStat.lastError = String((pe && pe.message) || pe);
         try { mainWin.localStorage.setItem(storageKey(chatId) + '_corrupt_' + clockNow('store.corrupt'), raw); } catch (e2) {}
         WA.log('error', 'store.load解析失败：状态键已隔离（*_corrupt_*），下次保存不会覆盖原始现场', pe);
+        // v2.108.0 (plan-1 #18): attempt REPAIR right after quarantine.
+        // Before: the three lines above preserved the SCENE but never rescued the WORLD --
+        //   callers got null, init() fell back to defaultWorldState(), and users watched
+        //   their world reset to zero with ZERO repair attempts on record.
+        // Three strictly conservative stages (L1 last-complete-object -> L2 backup key ->
+        //   L3 honestly report un-repaired), each degrading and logging in turn. Three invariants:
+        //   1) `errors++` and the `*_corrupt_*` quarantine stay EXACTLY as before (repair is
+        //      appended, not a replacement: the v0138 contract byte-compares the quarantined
+        //      payload, and diagnostics read `errors` to detect "was corrupted");
+        //   2) a successful repair does NOT count as a hit -- it is not a clean load but a
+        //      partial rescue, so it gets its own repairs/lastRepair counter instead of
+        //      inflating "loaded N times";
+        //   3) a failed WRITE-BACK is reported honestly (repaired does not increment,
+        //      lastRepair.ok=false) -- never pretend the world came back.
+        __loadRepairStat.attempts++;
+        let rep = null;
+        try { rep = tryRepair(raw, chatId); }
+        catch (eR) { rep = null; __loadRepairStat.last = { ok: false, stage: 'none', error: String((eR && eR.message) || eR), at: clockWall() }; }
+        if (rep && rep.ok) {
+          // Write back to the main key (single write path: writeVerified).
+          const w = writeVerified(storageKey(chatId), JSON.stringify(rep.state));
+          if (w && w.ok) {
+            const markOk = writeRecoverMark(chatId, rep.stage, rep.droppedChars);
+            __loadStat.repairs = (__loadStat.repairs || 0) + 1;
+            __loadStat.lastRepair = { ok: true, stage: rep.stage, droppedChars: rep.droppedChars, filled: rep.filled, conflicts: rep.conflicts, marked: markOk, at: clockWall() };
+            __loadRepairStat.repaired++; __loadRepairStat.last = __loadStat.lastRepair;
+            noteRecover({ key: storageKey(chatId), kind: 'state', stage: rep.stage });
+            WA.log('warn', 'store.load：状态键损坏，已按 ' + rep.stage + ' 自动修复并落盘（丢弃尾部 ' + rep.droppedChars
+              + ' 字符 / 补齐 ' + rep.filled + ' 字段 / 自愈标记' + (markOk ? '已建' : '**未建成**')
+              + '）——原始现场仍在 *_corrupt_* 隔离键中，可人工比对');
+            return rep.state;
+          }
+          // Parsed a repairable scene but could not persist it: report honestly
+          // (memory is usable, disk is still broken -- do not pretend it is fixed).
+          __loadRepairStat.failed++;
+          __loadStat.lastRepair = { ok: false, stage: rep.stage, droppedChars: rep.droppedChars, filled: rep.filled, conflicts: rep.conflicts, marked: false, writeReason: (w && w.reason) || null, at: clockWall() };
+          __loadRepairStat.last = __loadStat.lastRepair;
+          WA.log('error', 'store.load：已按 ' + rep.stage + ' 解析出可修复现场，但**写回失败**（' + ((w && w.reason) || 'unknown')
+            + '）——磁盘存档仍是损坏的，本次不返回该现场（避免「内存里看着好了、重启又坏」的假象）');
+          return null;
+        }
+        // L3: all three stages failed -> report un-repaired; caller falls back to
+        // defaultWorldState (unchanged pre-existing behaviour).
+        __loadRepairStat.failed++;
+        __loadStat.lastRepair = { ok: false, stage: 'none', droppedChars: 0, filled: 0, conflicts: 0, marked: false, at: clockWall() };
+        __loadRepairStat.last = __loadStat.lastRepair;
+        WA.log('error', 'store.load：三级修复（L1 截断 / L2 后备键 / L3 空世界）均未救回本次损坏——已留完整损坏报告，原始现场在 *_corrupt_* 隔离键中');
         return null;
       }
     },
@@ -1285,6 +1474,32 @@
         if (!w.ok) throw (w.error || new Error('write failed'));
         memCache = s;
         __saveStat.at = clockWall(); __saveStat.ok = true; __saveStat.bytes = byteLen(payload); __saveStat.reason = null;
+        // v2.108.0 (plan-1 #18) L2 feeder: maintain the `_bak` fallback.
+        //
+        // Why here, and why the verified flag is the precondition: the ONLY thing worth
+        //   putting in a fallback is a generation that we have PROVEN landed intact
+        //   (`writeVerified` byte-compares the readback). If the main write had been
+        //   truncated and the retry also failed, save() returns false above and we never
+        //   reach this line -- so `_bak` keeps the previous good generation, which is
+        //   precisely the target L2 needs.
+        //
+        // Why once per session (not per save): refreshing on every save would double the
+        //   write traffic (payload is tens of KB) AND make the fallback byte-identical to
+        //   the live key, so any corruption event correlated across both writes would take
+        //   out the fallback too. A session-start baseline is a genuinely DIFFERENT, older,
+        //   proven-good generation -- a strictly stronger recovery target. Bounded cost:
+        //   one extra verified write per chat load.
+        //
+        // Failure is recorded, never fatal: the backup is auxiliary, so a failed backup
+        //   write must not fail an otherwise-successful save (it does surface in
+        //   __recoverStat so "the fallback silently never existed" stays visible).
+        try {
+          const cidB = chatId || getChatId();
+          if (!__bakDone[cidB]) {
+            if (writeBackup(cidB, payload)) { __bakDone[cidB] = true; }
+            else { WA.log('warn', 'store.save：后备存档（_bak）未能通过读回校验——本次保存仍算成功，但损坏修复的 L2 后备键本轮不可用'); }
+          }
+        } catch (eBak) { /* writeBackup 自身不抛；此处只防 memo 访问异常 */ }
         return true;
       } catch (e) {
         // v0.1.22: save 失败归因 + 计数；内存副本仍推进，避免本轮结算在半份状态里丢失
@@ -1504,7 +1719,11 @@
           chatcacheState: '聊天快照', chatcacheRev: '同步修订号',
           chatcacheInstallBack: '快照安装回读', worldbookSelection: '世界书条目选择',
           workflowHistory: '工作流历史', uninjectLedger: '撤销注入账本',
-          eventLog: '事件日志载入', errorLog: '错误日志载入' };
+          eventLog: '事件日志载入', errorLog: '错误日志载入',
+          // v2.108.0 (plan-1 #18): L2 自愈取回后备键时的读失败归因来源。
+          //   标签缺失会让这一格在诊断上退回裸桶名，而它恰好是「世界回不去」时最该被读懂的一格：
+          //   读不到后备键 ≠ 没有后备键（后者是「从未写过」，前者是「写过但环境不让读」）。
+          recoverBak: '后备存档读回（L2 自愈的取回路径）' };
         const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
           .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');
         issues.push({ level: 'warn', key: 'storage.readFailed',
@@ -2529,6 +2748,10 @@
     loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, at: __migrateReport.at } : null,
       // v2.30.0: 镜像回落三计数同域可见——「本地 miss 但镜像救回」此前在诊断上全无痕迹
       mirrorHits: __loadStat.mirrorHits, mirrorMisses: __loadStat.mirrorMisses, mirrorErrors: __loadStat.mirrorErrors,
+      // v2.108.0 (plan-1 #18): repair metrics visible in the same domain (zero new exports --
+      //   consumers keep reading the same loadStat()).
+      repairs: __loadStat.repairs || 0,
+      lastRepair: __loadStat.lastRepair || null,
       lastError: __loadStat.lastError, lastAt: __loadStat.lastAt }; },
     /** v0.1.22: 体积画像——各顶层分区序列化字节数 Top N（长团膨胀排查入口） */
     sizeProfile(topN) {
@@ -2677,6 +2900,7 @@
         lines.push('- state(存档): ' + ss.families.state + ' 键 / ' + ss.perFamilyBytes.state + 'B · 派生槽(同步修订号): ' + ss.families.stateDerived + ' 键 · recovery(恢复点): ' + ss.families.recovery + ' / ' + ss.perFamilyBytes.recovery + 'B');
         lines.push('- diagnostic(诊断): ' + ss.families.diagnostic + ' 键 / ' + ss.perFamilyBytes.diagnostic + 'B · corrupt(隔离): ' + ss.families.corrupt + ' / ' + ss.perFamilyBytes.corrupt + 'B');
         lines.push('- settings(设置): ' + ss.families.settings + ' 键 · wb(世界书): ' + ss.families.wb + ' 键' + (ss.currentChatQuarantines > 0 ? ' · 当前聊天隔离副本: ' + ss.currentChatQuarantines + ' 个（受保护，需人工处置）' : ''));
+        lines.push('- recover(自愈痕迹): ' + (ss.families.recover || 0) + ' 键（后备存档/自愈标记，v2.108.0）');
         lines.push('- 跨聊天过期诊断键候选: ' + (ss.staleDiagCandidates || []).length + ' 个（store.sweepStaleKeys() 可清理）');
       } catch (e) { lines.push('- storageStat 不可用: ' + String(e && e.message)); }
       lines.push('');
@@ -2882,8 +3106,11 @@
       const __byBefore = {};
       Object.keys(__readStat.bySource).forEach(function (k) { __byBefore[k] = __readStat.bySource[k]; });
       const keys = listWorldAxisKeys();
-      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, other: 0 };
-      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, other: 0 };
+      // v2.108.0: the recover family (backup/mark) MUST be registered alongside
+      //   KEY_FAMILIES -- skipping it turns `families[cls.family]++` into NaN
+      //   (an occupancy table that reports "NaN keys").
+      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, other: 0 };
+      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, other: 0 };
       let totalBytes = 0, stateKeys = 0, stateDerivedKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0, curQuarantines = 0;
       let conflictKeys = 0, conflictBytes = 0;
       let keysReadFailed = 0;           // v2.10.0: 本次盘点中读失败的键数（体积表可信度判据）

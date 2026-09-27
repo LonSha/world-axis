@@ -3599,7 +3599,9 @@
             readSpotCheck: '诊断抽查列目录', chatcacheState: '聊天快照',
             chatcacheRev: '同步序号', chatcacheInstallBack: '安装回读',
             worldbookSelection: '世界书选择', workflowHistory: '工作流历史',
-            uninjectLedger: '撤销账本', eventLog: '事件日志', errorLog: '错误日志' };
+            uninjectLedger: '撤销账本', eventLog: '事件日志', errorLog: '错误日志',
+            // v2.108.0 (plan-1 #18): 与 store.LAB / toolDiag.SRC_LABEL 同源同键集（三份真源一同登记）
+            recoverBak: '后备存档读回' };
           const byP = rdStore2.bySource || {};
           const srcTxtP = Object.keys(byP).filter(function (k) { return byP[k] > 0; })
             .map(function (k) { return (LAB_P[k] || k) + ' ' + byP[k]; }).join(' / ');

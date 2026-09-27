@@ -78,7 +78,18 @@ function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
       return { ok: true, added: accepted.length, rejected: rejected, reasons: reasons };
     },
     /** v2.2.0: 删除规则（此前 removeRule 零调用 = 加错了删不掉） */
+    /**
+     * v2.108.0 (plan-1 #19): `@pre` id must be a string.
+     *   Falsy values keep answering `no-id` (unchanged); a truthy NON-string (number,
+     *   object) previously fell into `this.rules.filter(r => r.id !== id)` and came back as
+     *   `not-found` -- i.e. "no such rule" for an argument that could never have matched
+     *   any rule. Telling the caller "not found" when the argument was never searchable is
+     *   a false conclusion, so it gets its own code.
+     */
     removeRuleSafe(id) {
+      if (id !== null && id !== undefined && typeof id !== 'string') {
+        return { ok: false, reason: 'pre-violation', detail: 'id-not-string', got: typeof id };
+      }
       if (!id) return { ok: false, reason: 'no-id' };
       const before = this.rules.length;
       this.rules = this.rules.filter(r => r.id !== id);
@@ -87,7 +98,21 @@ function saveRules(rules) { WA.settingsBus.save(__REG, rules); }
       return { ok: true, remaining: this.rules.length };
     },
     /** v2.2.0: 新增规则（带准入，替代裸 addRule 的静默接受非法正则） */
+    /**
+     * v2.108.0 (plan-1 #19): defensive boundary. `@pre` rule must be a plain object.
+     *
+     * Why this needs its own rejection code instead of folding into `missing-find`: the
+     *   caller passing a STRING or a NUMBER is a different bug class from the caller passing
+     *   `{find: ''}`. Folding them together is exactly the "two root causes are
+     *   indistinguishable on the diagnostic surface" defect this repo keeps treating --
+     *   the first says "you called it wrong", the second says "your input was recognised but
+     *   empty". `null`/`undefined` stay on the old path (they legitimately mean "no rule"
+     *   and already answer `missing-find`), so this guard only fires on genuine misuse.
+     */
     addRuleSafe(rule) {
+      if (rule !== null && rule !== undefined && (typeof rule !== 'object' || Array.isArray(rule))) {
+        return { ok: false, reason: 'pre-violation', detail: 'rule-not-object', got: typeof rule };
+      }
       const r = rule || {};
       if (typeof r.find !== 'string' || !r.find) return { ok: false, reason: 'missing-find' };
       try { new RegExp(r.find, r.flags || 'g'); }
