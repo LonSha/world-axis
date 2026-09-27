@@ -14,7 +14,10 @@
  *   A. 同一读数族在**全部站点上同值**（不允许一处改了别处没改）；
  *   B. 该值等于**现场实测**（不允许是手写后过期的数字）；
  *   C. 同一断言里的**消息文本**数字与比较值一致（v2.81.0 的坑）。
- * 回填由 `tools/sync-hardcoded.js`（薄壳，纯委托本模块）执行：默认 dry-run 显 diff，命中 0 或 >1 拒绝改写。
+ * 回填由 `tools/sync-hardcoded.js`（薄壳，纯委托本模块）执行：默认 dry-run 显 diff；
+ * 命中 0 / 族内多值 / 消息已漂移 一律拒绝改写；写前复判、写后校验、失败回滚。
+ * 注意：回填**同时**改比较值与消息副本（#6）——只改前者会让自己的 message-mismatch 报红，
+ * 那正是 v2.81.0 的形态（v2.106.0 端到端验证时修）。
  *
  * 边界（如实登记，不假称已覆盖）：
  *   - 只覆盖**登记形态**的站点。其余写法（局部变量名不同 / 跨行拼接 / 模板串 / 正则内含）本轮未纳入，
@@ -98,11 +101,14 @@ function sites(src) {
     const raw = m[2];
     const field = FIELD_OF[raw];
     if (!field) continue;
-    out.push({ form: 'expr', prefix: 'r' + m[1], field: field, value: Number(m[3]), line: lineOf(m.index) });
+    // `raw` 是**站点上的原始字段名**（如 `dead.length`），`field` 是归一化族名（如 `dead`）。
+    //   回填必须用 raw 重建正则：拿族名去匹配，`dead` 会卡在 `.length` 前面而**静默 0 命中**
+    //   （v2.106.0 端到端验证时发现：refs 能回填，dead/uiDead/dataOnly 三个带后缀的族永远改不动）。
+    out.push({ form: 'expr', prefix: 'r' + m[1], field: field, raw: raw, value: Number(m[3]), line: lineOf(m.index) });
   }
   SITE_RE_B.lastIndex = 0;
   while ((m = SITE_RE_B.exec(src)) !== null) {
-    out.push({ form: 'ledgerKeys', prefix: 'led' + m[1], field: m[2], value: Number(m[3]), line: lineOf(m.index) });
+    out.push({ form: 'ledgerKeys', prefix: 'led' + m[1], field: m[2], raw: m[2], value: Number(m[3]), line: lineOf(m.index) });
   }
   return out;
 }
@@ -222,6 +228,43 @@ function labelValue(str, field) {
     if (m) return Number(m[1]);
   }
   return null;
+}
+
+/**
+ * 消息副本的**站点清单**：块内每个字符串字面量里，该族标签上的绝对值及其**精确串**。
+ * 为什么需要精确串（而不是只记数字）：回填要把消息里的数字一起改掉，而「数字」在整份源码里
+ * 到处都是；只有带上标签的**整段匹配**（如 `死子面 dead 454`）才能既改到消息副本、又不误伤
+ * 注解里的差量（`dead +1`）与比较值（`=== 454`）。
+ */
+function labelSites(src, field, opt) {
+  const pats = MESSAGE_LABEL[field] || [];
+  const blocks = assertBlocks(src);
+  const out = [];
+  // `opt.lines`：只统计**包含这些行号**的断言块。
+  //   为什么必须限定：本仓的历史叙述里也有同标签的旧数字（实测 13628 行 `dead 208`、`refs 1950`、
+  //   3989 行 `命名空间 120` 等）。那是**沿革记录**，不是当前读数的副本 —— 全文件扫会把它们一起回填，
+  //   等于篡改历史（v2.106.0 端到端验证时发现）。口径与 messageChecks 同源：**同块内**才算副本。
+  let allowed = null;
+  if (opt && opt.lines && opt.lines.length) {
+    allowed = {};
+    opt.lines.forEach(function (ln) {
+      blocks.forEach(function (b, i) {
+        const next = blocks[i + 1] ? blocks[i + 1].line : Infinity;
+        if (b.line <= ln && ln < next) allowed[b.line] = true;
+      });
+    });
+  }
+  blocks.forEach(function (b) {
+    if (allowed && !allowed[b.line]) return;
+    const textNow = stripLineComments(b.text);
+    literalsOf(textNow).forEach(function (msg) {
+      pats.forEach(function (re) {
+        const m = msg.match(re);
+        if (m) out.push({ line: b.line, str: m[0], value: Number(m[1]) });
+      });
+    });
+  });
+  return out;
 }
 
 /** 块内「消息文本数字」与「比较值」的比对（v2.81.0 假红的形态）。 */
@@ -358,11 +401,15 @@ function backfillPlan(src) {
     const vals = Array.from(new Set(g[field].map(function (s) { return s.value; })));
     if (live[field] === undefined) return;
     if (vals.length === 1 && vals[0] === live[field]) return;
+  // 只统计**与该族站点同块**的消息副本（历史叙述里的旧数字不是副本，不许回填）
+  const labels = labelSites(src, field, { lines: g[field].map(function (s) { return s.line; }) });
     plan.push({
       field: field,
       from: vals,
       to: live[field],
-      sites: g[field].map(function (s) { return { prefix: s.prefix, line: s.line, value: s.value }; })
+      sites: g[field].map(function (s) { return { prefix: s.prefix, line: s.line, value: s.value }; }),
+      // 消息副本（#6）：回填必须**同批**改掉，否则改完比较值是新的、消息里还写着旧的
+      labels: labels
     });
   });
   return plan;
@@ -381,18 +428,46 @@ function backfill(src, field, to) {
   if (vals.length > 1) return { ok: false, reason: 'multi-value', field: field, values: vals };
   if (vals[0] === to) return { ok: false, reason: 'already', field: field, value: to };
   const from = vals[0];
+  // #6：消息副本先把关——已与比较值不一致时**拒绝回填**（msg-drift）。
+  //   理由与 multi-value 同：这种状态下无法知道哪个是错的；回填会「把第二个错盖在第一个错上」。
+  // 只取**与该族站点同块**的消息副本（历史叙述里的旧数字不是副本，不许回填）
+  const labels = labelSites(src, field, { lines: g[field].map(function (s) { return s.line; }) });
+  const drift = labels.filter(function (x) { return x.value !== from; });
+  if (drift.length) {
+    return { ok: false, reason: 'message-drift', field: field,
+      values: Array.from(new Set(drift.map(function (x) { return x.value; }))),
+      lines: drift.map(function (x) { return x.line; }) };
+  }
   let changed = 0;
+  let labelChanged = 0;
   let next = src;
   sitesOf.forEach(function (s) {
+    // 用**站点现场字段名**重建正则（族名 ≠ 字段名：dead vs dead.length）。
+    const fld = s.raw || s.field;
     // 正则带 g 才是全量替换；字符串版 replace 只替换第一处（v2.105.0 的 D2 教训）。
     const re = s.form === 'ledgerKeys'
-      ? new RegExp('(Object\\.keys\\(' + s.prefix + '\\.' + s.field + '\\)\\.length\\s*===\\s*)' + from, 'g')
-      : new RegExp('(\\b' + s.prefix + '\\.' + s.field.replace(/\./g, '\\.') + '\\s*===\\s*)' + from, 'g');
+      ? new RegExp('(Object\\.keys\\(' + s.prefix + '\\.' + fld + '\\)\\.length\\s*===\\s*)' + from, 'g')
+      : new RegExp('(\\b' + s.prefix + '\\.' + fld.replace(/\./g, '\\.') + '\\s*===\\s*)' + from, 'g');
     const before = next;
     next = next.replace(re, '$1' + to);
     if (next !== before) changed++;
   });
-  return { ok: changed === sitesOf.length, reason: changed === sitesOf.length ? 'ok' : 'partial', field: field, from: from, to: to, changed: changed, total: sitesOf.length, src: next };
+  // #6：消息副本（静态头 / 「实 」段）里的同一读数**同批**改掉。
+  //   用带标签的整段精确串做全量替换（split/join）——单改数字会误伤注解里的差量。
+  const uniq = Array.from(new Set(labels.map(function (x) { return x.str; })));
+  uniq.forEach(function (str) {
+    // 只换**数字串本身**：本模块的 7 套标签模式都只含一个数字串（逐条核过），
+    // 故取第一个数字串就是该读数。**不要把前一个字符当整体前缀**——那样会连着标签一起丢掉
+    // （v2.106.0 端到端验证时踩过：`dead 111` 被算成 `d222`，回填后的消息成了 `dead222` 缺前缀）。
+    const to2 = str.replace(/[0-9]+/, String(to));
+    if (to2 === str) return;
+    const before = next;
+    next = next.split(str).join(to2);
+    if (next !== before) labelChanged += 1;
+  });
+  return { ok: changed === sitesOf.length, reason: changed === sitesOf.length ? 'ok' : 'partial',
+    field: field, from: from, to: to, changed: changed, total: sitesOf.length,
+    labels: uniq.length, labelChanged: labelChanged, src: next };
 }
 
 function summary() {
@@ -437,6 +512,7 @@ module.exports = {
   stripLineComments: stripLineComments,
   assertBlocks: assertBlocks,
   labelValue: labelValue,
+  labelSites: labelSites,
   summary: summary,
   discover: discover
 };

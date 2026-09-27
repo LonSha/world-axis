@@ -71,7 +71,7 @@ function runAll(assert) {
   // ═══════════ A 静态契约 ═══════════
   const exp = ['FIELD_OF', 'LEDGERS', 'MESSAGE_LABEL', 'sites', 'groups', 'measure', 'coherence',
     'messageChecks', 'ledgerReport', 'backfillPlan', 'backfill', 'versionOfIndex',
-    'stripLineComments', 'assertBlocks', 'labelValue', 'summary', 'discover'];
+    'stripLineComments', 'assertBlocks', 'labelValue', 'labelSites', 'summary', 'discover'];
   const missing = exp.filter(function (k) { return typeof R[k] === 'undefined'; });
   assert(missing.length === 0, 'A1 取值面导出齐备（缺：' + (missing.join(',') || '无') + '）');
   assert(Object.keys(R.FIELD_OF).length === 7, 'A2 读数族 7 态（实 ' + Object.keys(R.FIELD_OF).length + '）');
@@ -140,6 +140,20 @@ function runAll(assert) {
   const noteRows = led.rows.filter(function (r) { return r.hasNote; });
   assert(noteRows.length === 2 && noteRows.every(function (r) { return r.noteVersion === r.version; }),
     'B9 带 _note 的两本台账：末次版本词 === version');
+
+  // B14 消息副本面（#6 的两个观察位）在真源码上真有站点：一面为空则「消息与比较值同批」在空集上恒真。
+  // 注意：labelSites 收的是**归一化族名**（与 sites/groups 同空间，与 groups 的键一致）；
+  //   直接用 Object.keys(FIELD_OF) 会拿到站点字段名（dead.length 这种）——那是映射的**入参**空间，
+  //   拿它当族名查必然为空（与 B3 首跑同一处绕层错，此处不再绕）。
+  const familyNames = Array.from(new Set(Object.keys(R.FIELD_OF).map(function (k) { return R.FIELD_OF[k]; })));
+  const labelCover = familyNames.map(function (f) {
+    return { field: f, n: R.labelSites(runSrc, f).length };
+  });
+  const noLabel = labelCover.filter(function (x) { return x.n === 0; });
+  const labelTotal = labelCover.reduce(function (a, x) { return a + x.n; }, 0);
+  assert(noLabel.length === 0 && labelTotal >= 10,
+    'B14 每个读数族在真源码上都有消息副本可定位（缺：' + (noLabel.map(function (x) { return x.field; }).join(',') || '无')
+    + '；共 ' + labelTotal + ' 处）');
 
   const plan = R.backfillPlan(runSrc);
   assert(plan.length === 0, 'B10 当前无待回填项（现场与登记已同源；待回填：' + plan.length + ' 族）');
@@ -289,6 +303,47 @@ function runNegative(assert, ctx) {
   const refused = R.backfill(multi, 'refs', 333);
   assert(refused.ok === false && refused.reason === 'multi-value',
     'N9b 族内多值 ⇒ 回填拒绝（不做「猜哪个是对的」；实 ' + refused.reason + '）');
+  // N9d 回填必须**同批**改掉消息副本（#6）：只改比较值会让自己的 message-mismatch 报红 ——
+  //    这正是 v2.81.0 的形态。合成最小源码两向验。
+  const withMsg = [
+    "assert(r9001.dead.length === 111, '死子面 dead 111 / uiDead 4（实 ' + r9001.dead.length + '）');"
+  ].join('\n');
+  assert(R.labelSites(withMsg, 'dead').length === 1 && R.labelSites(withMsg, 'dead')[0].value === 111,
+    'N9d-1 消息副本可被定位（静态头里的 dead 111）');
+  const filledMsg = R.backfill(withMsg, 'dead', 222);
+  assert(filledMsg.ok && filledMsg.labelChanged === 1
+    && filledMsg.src.indexOf('=== 222') >= 0 && filledMsg.src.indexOf('dead 222') >= 0
+    && filledMsg.src.indexOf('dead 111') < 0,
+    'N9d-2 回填同批改消息副本（比较值 111->222、消息 dead 111->222；labelChanged='
+    + filledMsg.labelChanged + '）——只改一处就会与自己的 #6 判据相撞');
+  // N9e 消息已经与比较值漂移 => **拒绝回填**（不许把第二个错盖在第一个错上）
+  const driftSrc = [
+    "assert(r9001.dead.length === 111, '死子面 dead 999（实 ' + r9001.dead.length + '）');"
+  ].join('\n');
+  // N9f **带后缀字段名的族**也能被回填（族名 ≠ 站点字段名：dead vs dead.length）：
+  //   现场实测发现的真实缺陷——回填正则若用归一化族名重建，`dead` 会卡在 `.length` 前，
+  //   静默 0 命中（refs 能改、dead/uiDead/dataOnly 永远改不动）。这里对**全部 7 族**逐个验。
+  const suffixFamilies = ['dead', 'uiDead', 'dataOnly'];
+  const suffixBad = [];
+  suffixFamilies.forEach(function (f) {
+    const src2 = ["assert(r9001." + f + ".length === 111, 'x 111');"].join('\n');
+    const r2 = R.backfill(src2, f, 222);
+    if (!r2.ok || r2.src.indexOf('=== 222') < 0) suffixBad.push(f + ':' + (r2.reason || 'no-op'));
+  });
+  assert(suffixBad.length === 0,
+    'N9f 带后缀字段名的族也能回填（坏：' + (suffixBad.join(',') || '无') + '）——族名当字段名用会静默 0 命中');
+  // N9g 回填**不碰历史叙述**：同一标签的旧数字若住在别处（不在该族站点所在断言块里），
+  //   不得被一起改。合成：站点块写 111，另一段叙述写 999。
+  const histSrc = [
+    "assert(r9001.refs === 111, 'x 111');",
+    "// v9.9.9 沿革：当时是 refs 999 处"
+  ].join('\n');
+  const histOut = R.backfill(histSrc, 'refs', 222);
+  assert(histOut.ok && histOut.src.indexOf('=== 222') >= 0 && histOut.src.indexOf('refs 999') >= 0,
+    'N9g 回填不碰别处的历史叙述（叙述里的 refs 999 仍在）——观察位限同块');
+  const driftRefused = R.backfill(driftSrc, 'dead', 222);
+  assert(driftRefused.ok === false && driftRefused.reason === 'message-drift',
+    'N9e 消息已漂移 => 回填拒绝（实 ' + driftRefused.reason + '）——先让人看清哪个是错的');
   const noSite = R.backfill('const a = 1;', 'refs', 1);
   assert(noSite.ok === false && noSite.reason === 'no-site', 'N9c 命中 0 站点 ⇒ 回填拒绝（实 ' + noSite.reason + '）');
 
