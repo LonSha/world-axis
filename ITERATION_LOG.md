@@ -97,7 +97,7 @@
   - (38) **工具链也要专锁**：`tools/` 不受任何既有门禁管辖，而它们决定下一次改动会不会踩坑。工具专锁的负控制还有一个便利：**工具零相对依赖 ⇒ 破坏副本可直接落进临时目录 require**，不必装配宿主。
   - (39) **负控制不许把被测对象弄坏**：`coverage-report` 的一处破坏把 `catch` 整段删成空白，于是副本自己语法错、`loadBroken` 直接抛,判据根本没跑到。破坏必须**保留可运行性、只改行为**（改成 `catch (e) { throw e; }` 而不是删掉它）。
   - (40) **`reset()` 的边界要写清楚**：`permissions.reset()` 清**用户表与计数**、**不清角色定义**。首版专锁判「reset 后角色表恰等于内置五条」因而报红；真判据该钉「内置角色一个不少 + 自定义角色跨 reset 保留」——**把边界当缺陷改掉，就会让「先 defineRole 再 grant」变成隐形契约**。
-- **提交**：`（见本版提交）`
+- **提交**：`21832ab`
 
 ### R93 · 2026-09-27 · v2.109.0 性能观测深化 · UI 可测试性（计划一 #7-#16 合版）
 
@@ -119,7 +119,7 @@
 - **影响范围**：`engines/perf-trace.js`、`ui/panel.js`、`ui/settings.js`、`tests/perf-observability-v2109.js`（新）、`tests/perf-regression-gate.js`（新）、`tests/ui-a11y-gate.js`（新）、`tests/ui-components-v2109.js`（新）、`tests/perf-trace-v2102.js`、`tests/run.js`、`tests/dead-export-ledger.json`、`tests/module-registry-ledger.json`、`README.md`、`ITERATION_LOG.md`。`tools/patch_v2109_*.py`、`tools/bump_v2109.py` 不入库。
 - **门禁结果**：`node tests/run.js` → **通过 9695 / 失败 0**（v2.108.0 基线 9186/0；本段净增 62 条断言 + 四份专锁经 `section` 真被执行）；`tests/perf-observability-v2109.js` → **101 / 0**；`tests/ui-components-v2109.js` → **27 / 0**；`tests/ui-a11y-gate.js` → 控件 **453 / 有名 453**（**100.0%**，下限 85%）· 缺口 **0** · 名源分布 `aria-label=26 content=65 placeholder=124 title=130 wrap-label=108`；`tests/perf-regression-gate.js` → `本版 ? / 基线 无（首版） · 状态 first-baseline · 结构差 0 · 墙钟 n/a`；出口面契约 `ns= 109 members= 702 chars= 8381`（**逐字未变**，本版零新增导出）；`tests/inventory.js` → 产品文件 119 / 命名空间 118 / 成员 1394 / 静态引用 2653（四类悬空均 0）；`tests/test-surface-gate.js` → 测试文件面 108 / 锁 103 / 可达 108 / **孤儿 0** / 豁免 0。
 - **未覆盖（如实留在清单）**：**UI 层仍未做实机验证**（`ui/panel.js` 在无头回归里不装载 ⇒ a11y 门禁与组件单元锁读的是无头 DOM，不代表浏览器里念得出声）；`lowend` 基准是**同机放大估计**（`approx: true`），真机读数须实机；`perf-regression-gate` 当前是**首版**（`first-baseline`，没有可比对象 ⇒ 它这一轮的绿**只证明判据在场**，不证明「没劣化」）；墙钟判定需要调用方显式声明同机，本仓目前**没有**自带的跨版本基线文件（快照由人拿走）。
-- **提交**：`（见本版提交）`。
+- **提交**：`21832ab`。
 
 ### R92 · 2026-09-27 · v2.108.0 存档损坏三级自动修复 · 渲染层防御式边界（计划一 #18 + #19 合版）
 
@@ -161,7 +161,7 @@
   - L1 的 64 跳回退是**启发式上限**（超长截断 + 尾部恰好 64 个 `}` 全是噪声时会放弃，退到 L2）；L1 判据只要求「像本仓的存档」，不校验字段级语义。
   - `FOUR_VERSION_PLAN.md`（246 行）**不含 #17–#20 原文** ⇒ 文档与记忆存在长期不一致隐患（计划原文的单一真源在记忆库，不在仓库）。
   - **UI 层仍未做实机验证**（`ui/panel.js` 在无头回归里由 `ui-gate-sync` 的 mini-DOM 覆盖，**不是真浏览器**）。
-- **提交**：`（见本版提交）`。
+- **提交**：`d9b74b2`。
 ### R91 · 2026-09-27 · v2.107.0 拒收码分类完备性审计 + 模块依赖静态图（计划一 #17 + #20 合版）
 
 - **做了什么**：
@@ -279,7 +279,7 @@
   - (61) **「正在装载中」必须是独立可读的一档**：把 in-flight 文件归进「非统一」等于**分类错了却没有任何一条读数说它错了**；而三档之外若没有第四档，同一个文件会因为「谁先 require」而得到两种形态。
   - (62) **审计的旁证要能被观测**：破坏版的副作用（Node 的 circular 警告）应当被**收成一条断言**（临时接管 `process.emitWarning`），既不污染回归输出，又证明守卫确实拦下了一次真读取——「守卫存在」与「守卫起作用」是两件事。
   - (63) **同一把锁的两种运行态都要断言**（入口 `pending=1` / 被 require `pending=0`），否则「归类不依赖运行顺序」这句话没有被证明过。
-- **提交**：`（见本版提交）`。
+- **提交**：`a7dc0ab`。
 
 ### R86 · 2026-09-27 · v2.103.0 可选依赖可见性（第六十面：缺依赖却照样全绿，绿灯本身就不可信）
 - **做了什么**：一处新模块 + 一处替身增强 + 10 处接线 + 一把专锁 + 一轮版本收口：
@@ -333,7 +333,7 @@
 - **门禁结果**：全量回归 `node tests/run.js` → **8715 / 0**（v2.101.0 基线 8627/0，+88）；专锁 `tests/perf-trace-v2102.js` **88/0**；`tests/settle-v2830.js` 55/0；`tests/orphan-lock-v2750.js` pass；出口面契约 `ns= 109 members= 694 chars= 8296`；清册面 refs **2631** / 命名空间 **115** / 成员 **1349**；死子面 dead **454** / uiDead 4 / dataOnly **169**；拒收码 **362**（见证 **124** / 死表 5 / 基线 233）；模块注册 文件 **112** / 命名空间 **120** / 装载期边 23 / 硬边 0 / 调用期引用 44；**六道独立门禁全绿**；三本带版本同源判据的台账 version=2.102.0。
 - **未覆盖（如实留清单）**：**UI 层未做实机验证**（`ui/panel.js` 在无头回归里不装载，三枚出口只由静态门禁与专锁静态面覆盖）；`canonAlign` 的**幕表住在设置侧、不在 `stateRev` 里** ⇒ 单改幕表而世界没落盘时该面不会被判脏；`lowend` 档是**同机放大估计**（不可在无头环境真测真机）；`host`/`render` 两分列**本面无上报面**；历史曲线**有限窗口、不落盘持久化**；本面**不驱动**任何被观测面重建。
 - **一条与 O16 直接相关的现场发现（登记，未改动）**：`tests/run.js` 的 H4 块依赖 `require('jsdom')`，取不到时只打印 `⚠ jsdom 不可用，跳过块8 端到端断言（静态锚点已覆盖）` 便**静默放行**——「缺依赖 ⇒ 静默 skip ⇒ 门禁全绿」正是 A3（O16 维护工具与 UI 运行质量）要治的病。
-- **提交**：`（见本版提交）`。
+- **提交**：`7ecd361`。
 
 ### R84 · 2026-09-26 · v2.101.0 跨插件互操作验收面（第五十八面：装了没 ≠ 装对了没）
 - **做了什么**：一处新模块 + 三处消费侧 + 一把专锁：
@@ -355,7 +355,7 @@
 - **影响范围**：`engines/interop.js`（新增）；`engines/theme.js`（`separation()` 两处失真修复）；`ui/panel.js`（两枚入口 + 两段绑定）；`engines/tool-diag.js`（`MODULE_EXPORTS` + `secInterop` + `collect` 挂节 + `UI_BINDINGS` 登记）；`index.js`（LOAD_ORDER 插位 + 版本 2.101.0）；`tests/run.js`（专锁挂载 + `FROZEN2800` 整串回填 + `EC2430` + 清册/死子面读数 + 八处版本断言 + 模块注册 e2e 读数 + 新增 v2.101.0 核验块）；`manifest.json`（2.101.0）；`tests/interop-v2101.js`（新增）；`tests/reject-lock-v2780.js`（台账 version 断言）；`tests/reject-code-ledger.json` / `tests/dead-export-ledger.json` / `tests/module-registry-ledger.json`；`README.md` / `ITERATION_LOG.md` / `FOUR_VERSION_PLAN.md`。`tools/*.py` 不入库。
 - **门禁结果**：全量回归 `node tests/run.js` → **8627 / 0**；专锁 `tests/interop-v2101.js` **51 / 0**；出口面契约 `ns= 108 members= 678 chars= 8147`；清册面 refs **2587** / 命名空间 114 / 成员 **1322**；死子面 dead 445 / uiDead 4 / dataOnly 167；拒收码 **356**（不变）；模块注册 文件 111 / 命名空间 119 / 装载期边 23 / 硬边 0 / 调用期引用 44；测试文件面 85 文件 / 80 锁 / 孤儿 0；九道独立门禁全绿（dead-export / module-registry / field-liveness / reject-code / test-surface / dup-decl / export-contract 等）。
 - **未覆盖（如实留清单）**：**UI 层未做实机验证（如实登记）**——两枚入口住在 `ui/panel.js`，而它**在无头回归里不装载**；三插件缺席 / 部分接入 / 版本不兼容三态的**实机联调**由 C5（X13）承担；`freeze()` 只做冻结读数，**不做**协议协商与版本迁移器；`unknown` 的**重试策略**不在本版（只保证它与 `absent` 长得不一样）。
-- **提交**：`（见本版提交）`。
+- **提交**：`e5501d4`。
 
 ### R83 · 2026-09-26 · v2.100.0 原著对位（第五十七面：基准有了，但没人拿它去比）
 - **做了什么**：一处模块增量 + 两处消费侧 + 一把专锁，**架构一个字没动**：
@@ -378,7 +378,7 @@
 - **新增面撞坏既有锚点（本轮第二类坑，值得单列）**：v2.100.0 的 `gap()` 头部（`const o = outline(); if (!o) {...'no-outline'...}`）与坐标拒收段（`const m = raw.match(COORD_RE); if (!m) {...'bad-coord'...}`）与 `locate()` **逐字同构**，于是 v2.99.0 老锁的两个锚点在真源码里**各命中 2 次**，`must1` 抛异常 ⇒ **整套回归在 `runNegative` 处中断**（不是某一盏灯红，是整条链断）。处置是**锚点唯一化，不放宽判据**：`NO_FAKE_OUTLINE` 锚点扩到带 `function locate(coord) {` 函数头一行、`BAD_COORD_REJECT` 加 locate 专有尾缀行，两处 `BREAK` 破坏串同步。**教训：新增一个函数时，先跑一遍老锁的锚点唯一性检查——「逐字同构的守卫段」是锚点杀手。**
 - **门禁结果**：全量回归 `node tests/run.js` → **8576 / 0**（v2.99.0 基线 8523/0）；专锁 `tests/canon-align-v2100.js` **43 / 0**（B1–B15 / C1–C2 / 9 条逐锚负控制 + N0 / N1 / N10）；`tests/canon-v2990.js` **53 / 0**（锚点唯一化后）；出口面契约 `ns= 107 members= 672 chars= 8073`；清册面 refs **2565** / 命名空间 113 / 成员 **1311** / 四类悬空均 0；模块注册 文件 110 / 命名空间 118 / 装载期边 23 / 硬边 0 / 调用期引用 44 / 结构问题 0；死子面 dead 444 / uiDead 4 / dataOnly 163；拒收码 **356**（见证 118 / 死表 5 / 基线 233）；测试文件面 84 文件 / 79 锁 / 孤儿 0；九道独立门禁全绿（dead-export / module-registry / field-liveness / reject-code / test-surface / orphan-lock 等）。
 - **未覆盖（如实留清单）**：**UI 层未做实机验证（如实登记）**：本版新增的三个面板控件与两枚「按号」入口住在 `ui/panel.js`，而它**在无头回归里不装载**——`node tests/run.js` 全绿只证明无头环境下模块间契约成立（绑定在场、零幽灵引用由静态门禁覆盖），**不代表浏览器里点得动**。**不做**「偏离原著」的自动判定（本面只回答「撞上了什么、证据是什么」——判不判偏离是人的事，红线：不做没有作者标准支撑的通用偏离判决）；对位粒度是**题名级**（原著正文不入存档 ⇒ 正文级对位本就不可能）；题名不足 4 字标 `thin` 且不参与对位（两字题名在长篇里的假命中率极高）；规模上界如实生效（每源 24 行 / 总 48 行，超了报 `truncated` 而不静默截）；平手取幕号小者（口径写死，不是随机）；对位结果**不落盘**、不进注入源（它是「问一句答一句」的读数，不是世界状态）。
-- **提交**：`（见本版提交）`。
+- **提交**：`21b9e20`。
 
 ### R82 · 2026-09-26 · v2.99.0 原著幕目（第五十六面：原著向玩法最贵的三个问题在本仓不可答）
 - **做了什么**：一处新模块 + 一处注入源 + 两处消费侧 + 一把专锁：
@@ -400,7 +400,7 @@
 - **影响范围**：新增 `engines/canon.js` 与 `tests/canon-v2990.js`；`render/inject.js`（源表 / 开关表 / 源名 / 注入分支 / **`SRC_MOD_SETTING` 补两键**）；`ui/panel.js`（十五控件 + 绑定）；`engines/tool-diag.js`（`secCanon` + 守卫表 + `MODULE_EXPORTS`）；`engines/inject-budget.js`（`PRIORITY` + `ACCOUNTS`）；`core/store.js`（两条通配 cap）；`core/evict.js`（两条 `NON_EVICT` 说明）；`index.js` / `manifest.json`（版本与 LOAD_ORDER）；`tests/run.js`（专锁挂载 + `FROZEN2800` 回填 + `EC2430` 回填 + 四处读回值：`SOURCES` 48→49 / `dataOnly` 162→163 / 命名空间·装载文件 117·109→118·110 / advisory 计数）；`tests/reject-v2780.js`（七码见证）与 `tests/reject-lock-v2780.js`（计数 109→116）；`tests/settle-v2830.js`（命名空间读数与注释 112→113）；三本台账 version=2.99.0；`README.md` / `ITERATION_LOG.md` / `FOUR_VERSION_PLAN.md`。`tools/*.py` 不入库。
 - **门禁结果**：全量回归 `node tests/run.js` → **8523 / 0**（v2.98.0 基线 8464/0）；专锁 `tests/canon-v2990.js` **53 / 0**（A 静态面 / B1–B14 运行时 / C1–C2 不变式 / N1–N16 负控制，**14 个真源码破坏锚点** `NO_FAKE_OUTLINE` / `BAD_COORD_REJECT` / `OUT_OF_RANGE_NO_CLAMP` / `POINT_CUT_REPORT` / `ACT_CUT_REPORT` / `PICK_FALLBACK` / `ADOPT_SHAPE_GUARD` / `BUILD_THROW_ATTR` / `ADOPT_THROW_ATTR` / `CLEAR_THROW_ATTR` / `CLEAR_GUARD` / `TITLE_TRIM` / `EXACT_KEY_REMOVED` / `DIAG_PURE` 各恰中 1 次）；出口面契约 `ns= 107 members= 668 chars= 8043`；清册面 refs **2559** / 命名空间 113 / 成员 1307 / 四类悬空均 0；模块注册 文件 110 / 命名空间 118 / 装载期边 23 / 硬边 0 / 调用期引用 44 / 结构问题 0；死子面 dead 444 / uiDead 4 / dataOnly **163**；拒收码 **354**（见证 116 / 死表 5 / 基线 233）；测试文件面 83 文件 / 78 锁 / 孤儿 0；UI 渲染路径门禁 **53 / 0**；`settle-v2830` 55 项（账本 nsCount=118 / loadedCount=110 / loadOrderCount=113 / version=2.99.0）。
 - **未覆盖（如实留清单）**：总开关**默认关闭**；**只切分不改写**（点只保留题名与长度，**正文本身不进存储**；句间空白是唯一在账上丢掉的东西）；**不调模型**（分幕是纯算术——**模型分幕不可复现，而幕坐标一旦不可复现，「上次定位到第 3 幕」这句话就没有意义**）；信息量随篇幅**线性**（幕数 = 节数 / `perAct`，不是固定拍数）；原著文本**不入存档**（只有大纲落盘）；坐标是**标出来的**（越界一律照实不成立、**不夹到边界**）；**不做**「偏离原著」的自动判定（本版只给基准，判定是下一层的事）；分幕粒度由 `segChars` / `perAct` 决定，**不做语义分段**。
-- **提交**：`（见本版提交）`。
+- **提交**：`3282a4f`。
 
 ### R81 · 2026-09-26 · v2.98.0 磁带卷跨会话可查（第五十五面 / P2：证据出了会话就没了）
 > **本条为补记**：该版提交（`c0f1c3b`）时文档层未跟上（`git show --name-only` 无 md 改动），随 v2.99.0 收口一并补齐。回归读数系补记时在 `c0f1c3b` 干净工作树上**实跑取得**，非回忆值。
@@ -647,7 +647,7 @@
 ⑧ **冻结面断言的「比较值」与「消息文本」必须同批改**（R64 已立，本轮又踩中两次）：首次把 `assert(total16 === 40 …)` 改成 41 而**没动**同一断言里的消息串，全量回归报出「期望 41 却说 40」的自相矛盾红灯；r3 的 `r2700.namespaces === 108` 与紧邻消息 `'定义面 107 命名空间 …'` 同型。**只改一处等于产出一盏自我矛盾的灯。**
 ⑨ **负控制不得依赖「可选的外部样本」**：v2500 的 [H3] 原以 `tools/v2500_block.js` 作为「旧遍历器会射中的活样本」，本轮工程卫生清空 `tools/` 后该判据即失效。命题本身没错，坏在样本是外部可选文件。按仓库纪律改为**判据自带样本、跑完必删**（自建临时块文件 → 断言 → `unlink` → 再断言已清理）。
 ⑩ **口径面要问清「统计范围」**：`dist2800` 统计的是 **dead + uiDead 全集（448 条）**，而门禁输出里的「test-only 291」只是 **dead 面**；全集里 `test-only = 291 + 4(uiDead) = 295`。把两个范围的同名计数直接对齐，会写出与总量不自洽的断言。**同名指标先问「分母是谁」。**
-- **提交**：`（见本版提交）`。
+- **提交**：`49c9293`。
 ### R61 · 2026-09-24 · v2.78.0 拒收码可达性（第十二面）+ 缺陷猎捕（非法数守卫 / 读面活引用 / 不可达码）
 - **做了什么**：本版主题是「专门找 bug 和优化」，故先广度侦察再逐模块证伪，最后把新学到的口径工业化为常驻门禁。
   - **面**：产品源码 <b>264 个</b>内联 <code>reason: '&lt;code&gt;'</code>，此前<b>零判据</b>——码写在源码里 vs 码真跑得出来，在读数上不可分。新增第十二面：每个码必须属于 <code>witnessed</code>（有可执行见证）/ <code>dead</code>（已证不可达 + 钉住锚点）/ <code>base</code>（存量未分类，冻结台账）三者之一。<b>两向判据</b>：新增未分类码 ⇒ 红灯；台账里的码被接上见证或从源码消失 ⇒ <code>baseStale</code> 红灯（防台账永久比现实胖）。
@@ -658,7 +658,7 @@
 - **四条可复用口径（本版固化）**：其一，<b>不可达码的正确处置是登记 + 钉锚点，不是删除</b>——删了就没第三个人知道这里原本有一道防线，且它可能在别处复活；<code>deadLeak</code>（锚点消失）与 <code>deadMissing</code>（码消失）两向都要红。其二，<b>未被观察过的码必须显式归类</b>，否则下一次被改成别的意思也无人知晓。其三，<b>判据的输入面必须与「真会被执行的代码」同宽</b>：初版门禁按原文扫，把 <code>bridge.js</code> 文档注释里的调用示例（<code>reason: 'pull'</code>）算成了真码（265 里 1 条是注释）；改用去注释剥离器后 264。这是 v2.75.0 [D2]「提及不是引用」的同族。其四，<b>探针要在全 API 面上扫，而不是在「已知嫌疑点」上扫</b>：本轮最有价值的缺陷（NaN 守卫族）是广度扫出来的，不是猜出来的。
 - **影响范围**：产品侧 8 文件 13 处（<code>engines/gauge.js</code>、<code>engines/rivalry.js</code>、<code>engines/quota.js</code>、<code>engines/ledger-timeline.js</code>、<code>engines/floor-changes.js</code>、<code>engines/editor-events.js</code>、<code>engines/editor-faction.js</code>、<code>core/store.js</code>）；测试侧新增 <code>tests/reject-v2780.js</code>（见证表）、<code>tests/reject-code-gate.js</code>（门禁）、<code>tests/reject-code-ledger.json</code>（基线台账）、<code>tests/reject-lock-v2780.js</code>（专锁）；改 <code>tests/settle-v2700.js</code>（<code>rv-weight</code> 锚点随修法前移 + 两条非数 weight 断言——门禁在首跑时正是这样逮住我的改动的）、<code>tests/run.js</code>（八处版本断言 + 挂载新锁）、<code>tests/dead-export-ledger.json</code>（<code>--update</code>，<code>version=2.78.0</code>；本版新增测试引用只影响 9 条 <code>tref</code> 证据，dead/uiDead 规模不变）、<code>index.js</code>、<code>manifest.json</code>、<code>README.md</code>、<code>ITERATION_LOG.md</code>。
 - **门禁结果**：<code>node tests/run.js</code> → <b>6840 / 失败 0</b>（v2.77.0 为 6788；+52 = 新专锁 50 + v2.70.0 锁新增 2）；<code>node tests/reject-code-gate.js</code> → <b>产品文件 107 / 内联码 264（见证 52 / 死表 1 / 基线 211）</b>，三集合穷尽互斥；<code>node tests/reject-lock-v2780.js</code> → <b>50 / 失败 0</b>；<code>node tests/dead-export-gate.js</code> → 绿（<code>dead 413 · uiDead 4</code> 不变）；<code>node tests/test-surface-gate.js</code> → 真仓库零孤儿（新锁挂在可达面里）。
-- **提交**：`（见本版提交）`。
+- **提交**：`5dc6951`。
 
 ### R62 · 2026-09-24 · v2.79.0 输入与副作用可靠性（第十三面：拒收即提交 / 读面活引用 / 非法输入边界）
 - **做了什么**：R61 把「码存在 ≠ 码可达」立成了静态面（写得出 vs 跑得出来），本轮顺着同一条「契约声明了但没人执行」的线往下走，立**第十三面：把「已判定的失败」与「真发生的变化」分开**，并把三处早已存在、全仓零执行的契约变成常驻判据。
@@ -676,7 +676,7 @@
 - **影响范围**：产品侧 <code>engines/</code> 28 个文件（129 站点 <code>return false;</code>）+ <code>engines/rivalry.js</code>、<code>engines/parallel-world.js</code>、<code>actors/registry.js</code>、<code>core/store.js</code>、<code>engines/gauge.js</code>、<code>engines/survival.js</code>、<code>engines/temporal-lock.js</code>、<code>engines/threads.js</code>、<code>engines/quota.js</code>；测试侧新增 <code>tests/side-effect-lock-v2790.js</code>（23 项）、<code>tests/reference-isolation-lock-v2790.js</code>（43 项）、<code>tests/input-boundary-v2790.js</code>（44 项），改 <code>tests/run.js</code>（挂载三把新锁 + 版本字面量 + <b>三套历史套件的现场锚点接管</b>：<code>deadInTestsOnly</code> 260→261、双面 <code>test-only</code> 264→265、dead 侧 <code>self-only</code> 120→119）、<code>tests/dead-export-ledger.json</code>（<code>--update</code>，<code>version=2.79.0</code>）、<code>index.js</code>、<code>manifest.json</code>、<code>README.md</code>、<code>ITERATION_LOG.md</code>。
 - **锚点接管的定量归因（本条是本轮最值得留档的一处）**：全量回归首跑 <b>失败 21</b>、次跑 <b>失败 4</b>，全部为账本/清册元数据类，<b>零行为缺陷</b>。逐条复算后归因到<b>单一合法差量</b>：新增的 reference-isolation 锁把 <code>parallelWorld.state</code> 当作读面站点实测（该成员原本只有 3 处产品内部自用、零外部引用、零测试引用），于是它由 <code>self-only</code> 升格为 <code>test-only</code>（<code>tref</code> 0→2）⇒ <code>deadInTestsOnly</code> 260→261、dead 侧 <code>self-only</code> 120→119、<code>dead + uiDead</code> 双面 <code>test-only</code> 264→265。死子面规模（dead 413 / uiDead 4 / dataOnly 154）与清册面（refs 2171 / ns 106 / members 1165）<b>逐项零变化</b>——这正好反证三把新锁只动测试引用、没碰产品面。接管脚本 <code>/tmp/patch_v2790_anchors.py</code> 只改 <code>tests/run.js</code> 内三套历史套件的现场锚点（6 处锚点各恰命中 1 次、覆盖 10 行），不触碰任何判据逻辑，也不改 README / ITERATION_LOG 的历史记录。
 - **门禁结果**：<code>node tests/run.js</code> → <b>通过 6950 / 失败 0</b>（v2.78.0 为 6840，<b>+110 = 三把新锁 23 + 43 + 44</b>，算术逐字对齐）；<code>node tests/side-effect-lock-v2790.js</code> → <b>23 / 失败 0</b>；<code>node tests/reference-isolation-lock-v2790.js</code> → <b>43 / 失败 0</b>；<code>node tests/input-boundary-v2790.js</code> → <b>44 / 失败 0</b>；<code>node tests/test-surface-gate.js</code> → <b>测试文件面 48 · 锁 45 · 可达 48 · spawn 2 · 内联 2 · 孤儿 0</b>；<code>node tests/reject-code-gate.js</code> → <b>产品文件 107 个 / 内联拒收码 264 个（见证 52 / 死表 1 / 基线 211）</b>（无新增静默码）；<code>node tests/dead-export-gate.js --update</code> → dead 413 / uiDead 4 / dataOnly 154 / 仅测试 261 / 证据 417 条 / <code>version=2.79.0</code>。
-- **提交**：`（见本版提交）`。
+- **提交**：`d7f0184`。
 
 ### R63 · 2026-09-24 · v2.80.0 诊断与可观测性（第十四面：故障被记录了 ≠ 故障可被看见）
 - **做了什么**：R61 立了「码存在 ≠ 码可达」（静态面），R62 立了「判失败 ≠ 已回滚」（行为面）。本轮换到<b>读侧</b>：拒收被记下来之后，到底有没有人能看见。三处早已存在、却从未被读到的观测缺陷，全部变成常驻判据。
@@ -693,7 +693,7 @@
   - 其三，<b>破坏设计必须双向成立</b>（原版上判据为真 + 破坏后判据为假）。本版第三条破坏 <code>no-snapshot</code>（读数 <code>counts = f</code> 原样转手）在「27 个模块一律返回副本」的仓库里<b>不是可观测缺陷</b>，判据正确地判「没坏」；正确处置是<b>换掉这条破坏</b>（改为 <code>empty-padding</code>：把「空台账不进总目」改成恒真，负控制立刻现形），而不是放宽断言——「怎么破坏都为真」的断言不是判据。
 - **影响范围**：产品侧 4 文件（<code>engines/world.js</code>、<code>engines/shadow.js</code>、<code>engines/threads.js</code> 各 1 行；<code>engines/tool-diag.js</code> +49 / −1）；测试侧新增 <code>tests/fault-ledger-lock-v2800.js</code>（22 项）、<code>tests/fault-alias-lock-v2800.js</code>（26 项）、<code>tests/injection-restore-lock-v2800.js</code>（22 项）；改 <code>tests/run.js</code>（挂载两把新锁 + 八处版本字面量 + <b>两轮锚点接管</b>）、<code>tests/dead-export-ledger.json</code>（<code>--update</code>，<code>version=2.80.0</code>；新死子面条目 <code>toolDiag.secFaultLedger</code>）、<code>index.js</code>、<code>manifest.json</code>、<code>README.md</code>、<code>ITERATION_LOG.md</code>。<b>本版发生两轮锚点接管</b>：第一轮（17 对锚点）接产品改动的派生态（成员 1165→1166、dead 413→414、账本 417→418、self-only 119→120）；第二轮（7 对锚点）接<b>新锁文件自身的实测行为</b>（仅测试引用 261→262、<code>test-only</code> 265→266、<code>self-only</code> 120→119）——这正是 R62 记下的「判据写法四纪律与锚点接管次序」的第二次实战：<b>新增测试文件会改变 <code>deadInTestsOnly</code> 等派生态</b>，而产品的每一处分层改动都至少要跟一轮锚点。
 - **门禁结果**：<code>node tests/run.js</code> → <b>通过 7020 / 失败 0</b>（v2.79.0 为 6950；+70 = 三把新锁 22 + 26 + 22）；<code>node tests/test-surface-gate.js</code> → 测试文件面 53 · 锁 50 · 可达 53 · spawn 2 · 内联 2 · 孤儿 0；<code>node tests/reject-code-gate.js</code> → 产品文件 107 个 / 内联拒收码 264（见证 52 / 死表 1 / 基线 211，无新增静默码）；<code>node tests/dead-export-gate.js</code> → 冻结面规模 dead 414 · uiDead 4 · 归因分布 test-only 262 / 其余 152 / dataOnly 154 → 154。
-- **提交**：`（见本版提交）`。
+- **提交**：`3faa2ad`。
 ### R64 · 2026-09-24 · v2.81.0 事件调度（第十五面：排期 ≠ 触发）
 - **做了什么**：R61 立「码存在 ≠ 码可达」（静态面），R62 立「判失败 ≠ 已回滚」（写侧行为面），R63 立「故障被记录了 ≠ 故障可被看见」（读侧观测面）。本轮回到机制拓展（路线 B2）：`engines/events.js`（约 410 行）落地「事件调度」这一此前零覆盖的能力面。
   - **为什么这块是真空缺口（先说清不重复）**：仓库里已有四处碰「事件」——`engines/causal.js` 是**结算面**（原因→条件→行动→后果）、`engines/parallel-events.js` 是**登记面**（此刻别处在发生什么，防全知）、`engines/direct-event.js` 是**叙事面**（一轮生成、多轮解封）、`core/workflow.js` 是**管线面**（before/after 两链顺序执行）。**没有一处回答「排期」**：谁被排在什么时候、到点该不该动、动了之后下一次什么时候、失败了怎么办、同一件事会不会被触发两次。B2 的四条关键约束（同一事件不能无意重复执行 / 条件判断失败与执行失败必须区分 / 异常时有明确回滚策略 / 不能让失控周期事件拖垮主循环）没有一条有承载物。
@@ -710,7 +710,7 @@
   - 其四，**中断注入窗口 = 把探针永久留在产品文件里**。本轮把一次正在跑的回归 `kill` 掉，它恰在「注入 `engines/bridge.js` 探针 → 跑断言 → 还原」窗口内，`finally` 未执行，`function __ncProbeBridgeSnapshot()` 留在了产品文件末尾（md5 `035edca1` → `86eecccc`）。后果是三条全量断言同时红灯：`refs` 2185→2186、`bridge.snapshot` 离开死子面（dead 425→424）、死子面冻结断言失败。**§ 值得留档的一点**：R63 面 C 的那把 `tests/injection-restore-lock-v2800.js` **当场抓到了它**（A2「工作树与外部基线逐字节一致」/ A4「产品面无探针残留」/ D3「双向」三条红灯）——而 R63 记下的旧设计（基线取「读取当下」）恰恰永远抓不到，因为残留会被吸收进基线。**「还原的基线必须来自外部」这条纪律在本版得到了实测验证**，不是纸面结论。
 - **影响范围**：产品侧新增 `engines/events.js`（约 410 行），改 `index.js`、`manifest.json`、`core/evict.js`、`core/store.js`、`engines/tool-diag.js`、`render/inject.js`、`ui/panel.js`；测试侧新增 `tests/settle-v2810.js`（99 项）、改 `tests/reject-v2780.js`（+6 组见证）、`tests/run.js`（挂载专锁 + 八处版本字面量 + `SOURCES` 45→46 + `FROZEN2800` 7026→7044 字节 + **两轮锚点接管共 27 对**）、`tests/dead-export-ledger.json`（`--update`，dead 425 / 证据 429 条 / `version=2.81.0`）、`tests/field-liveness-ledger.json`、`README.md`、`ITERATION_LOG.md`。
 - **门禁结果**：`node tests/run.js` → **通过 7124 / 失败 0**（v2.80.0 基线为 **7011 通过 / 9 失败 = 7020 项**；净增 104，主要为新专锁 99 项与见证补登改变的断言面）。收口期共五轮全量回归：r1 `7007/18`（纯冻结计数漂移）、r3 `7114/10`（第一批回填后）、**r4 在注入窗口内被终止（作废）**、r5 `污染态读数（作废）`、**r6 `7124/0` 全绿**。其余门禁：`tests/settle-v2810.js` → **99 / 失败 0**；`tests/test-surface-gate.js` → **测试文件面 54 · 锁 51 · 可达 54 · spawn 2 · 内联 2 · 孤儿 0**；`tests/reject-code-gate.js` → **产品文件 108 个 / 内联拒收码 270 个（见证 58 / 死表 1 / 基线 211）**，✓ 每个码都有归属；`tests/reject-lock-v2780.js` → **50 / 失败 0**；`tests/field-liveness-gate.js` → **✓ 无幽灵读点、无写/读侧越界、骨架一级键未减少（51 个）**；`tests/dead-export-gate.js` → **dead 425 · uiDead 4 · dataOnly 157 · 归因 test-only 273 / 其余 152 · 证据 429 条 · `version=2.81.0`**，✓ 无新增、归因可读、证据可复算。
-- **提交**：`（见本版提交）`。
+- **提交**：`052c21f`。
 ### R1 · 2026-09-20 · 建立迭代日志
 - **做了什么**：新建本文件，固化基线指标与迭代节奏。
 - **为什么**：无人值守模式需要一个可追溯的变更台账。
@@ -1452,7 +1452,7 @@
 - **验证**：`tests/evict-meta-v2610.js` → `pass`（26 项，连跑两遍可重复）；全量回归 **5052 / 失败 0**（v2.60.0 为 5026，+26 即本版新锁）；死导出门禁绿 **dead 223 / uiDead 4 / dataOnly 122**；ui-wire-audit 9 / 0；出口面契约逐字一致 **ns 70 / members 466 / chars 5742**；field-liveness-gate 绿（无幽灵读点、写侧越界 1 处既有、读侧 0）。
 - **一条可直接复用的口径**：**有界容器的「排序键」是一条跨模块契约，必须有生产者供给面的判据**。只钉「淘汰按什么排」（站点声明 + 调用点存在）会让整族缺陷长期隐身——因为**声明与消费都对，错的是生产者**。判据必须**行为级**（灌满 → 写入 → 真淘汰 → 看存活），静态扫描只能做补充（C2/D）。
 - **本轮猎取路径（方法论，供后人复用）**：本版连续排除了三个候选面后才收敛——① 持久化往返（`run.js:8913` 早有 C13 断言、`run.js:968` 早有 toolSnapshot 往返用例，**不重复建设**）；② settingsBus 设置面（写三个探针实测：21 个注册项幻影声明 0、未约束 number 0；11 个有 `bounds/enums/sentinels` 的登记项从各自 `setSettings` 写越界值**全部正确夹取**；再用 Proxy 追踪 `settingsBus.read()` 的 83 个静态子键真实读取，唯一未命中的 `bridge` 4 键经核实是**探针调用链未触达 `buildSnapshot`** 的假阳性，源码侧确实消费）⇒ **该面健全**；③ clock/rand 单一出口（`core/clock.js:76` 自陈已被门禁 G20 覆盖）。转向正交信号——**`grep -rn 'draft.people' 清点容器的全部写入方**，与「淘汰消费的排序键」对照，一眼看出供给面缺口。
-- **提交**：`（见本版提交）`。
+- **提交**：`d08dc15`。
 
 ### R45 · 2026-09-23 · v2.62.0 交付（因果结算：阶段格 × 终态归因 锁·第四十七面：把「世界从记录变化到结算因果」钉上）
 - **做了什么**：
@@ -1486,7 +1486,7 @@
   · `tests/style-craft-v2510.js`：清空 `PERSP_TEXT` 正文表 ⇒ 覆盖度判据现形（captured 4 处）且行为真的改变（选了而正文表为空 ⇒ 该轴不出话、产物 0 字）；原版上 `uncovered=0`。
 - **验证**：`tests/causal-v2620.js` → `pass`（72 项）；`tests/registry-identity-v2620.js` → `pass`（45 项）；`tests/style-craft-v2510.js` → `pass`（55 项）；全量回归 **5232 / 失败 0**（v2.61.0 为 5060，+172 即本版三项新锁）；死导出门禁绿 **dead 223 / uiDead 4 / dataOnly 122 / 仅测试 131**；field-liveness-gate 绿（骨架一级键 21 个、写侧越界仅 `ui/panel.js::innerHTML` 1 处既有、读侧 0 处）；出口面契约 **ns 71 / members 483 / chars 5889**；中间一轮的 `refs 1701 → 1708` 显式冻结项**已确证增量全部来自新模块 `engines/causal.js` 的 7 处 `WA.` 引用**（`ns` / `members` / `dead` / `uiDead` / `dataOnly` / `deadInTestsOnly` 逐项未变 ⇒ 产品侧零漂移），按仓库既有口径回填（`refs` 采集面是**产品文件面**，不含 `tests/`）。
 - **一条可直接复用的口径**：**否定式能力必须用「不得发生什么」来钉**。因果结算最有价值的四件事（停住 / 失效 / 只报告 / 分开归因）在实现里都表现为「某个字段**没有**变成另一个值」，因此判据必须问「此刻它**不是**什么」——`stage` 仍是 `pending`、权威事实里**没有**该键、回声里**没有**该 id、终态**没有**被后续 tick 改写。存在面判据（有 `addChain` 吗 / 有 `TERMINAL` 吗）对这种实现与对「全都会做错」的实现**给出同样的结论**。
-- **提交**：`（见本版提交）`。
+- **提交**：`bdb5d79`。
 ### R46 · 2026-09-23 · v2.63.0 交付（世界织体 / 社交漩涡 / 悬案 三面锁 · 第四十八 / 四十九 / 五十面：把「人之间的时空关系」「不可逆的经历」「事情查到了哪」各自钉上）
 - **做了什么**：
   · 新建 `engines/world.js`（299 行，`WA.world`）：**人之间的时空关系**——地点与路途登记、可达性、共同日程与到场者、「同一时刻只能在一处」。为什么单独成模块，而不并进 `life.js` / `calendar.js`：`life` 管**一个人的**目标/承诺/日程（个体动机面），`calendar` 管**世界钟怎么走**（时间标尺面），本模块管**人之间的时空关系**——谁和谁在同一个地方、从这里到那里要多久、这一场集市点到场的人到底能不能到。「生活」与「共同生活」是两件事：并起来最直接的后果是「有人有事要做」与「有人真的到了场」在状态里长得一样。
@@ -1519,7 +1519,7 @@
   · 三把锁的破坏探针**只触发自己那一面**——这一点是本版「分三把锁而非合成一把」这一设计判断的直接实证。
 - **验证**：`tests/world-v2630.js` → `pass`（63 项）；`tests/shadow-v2630.js` → `pass`（65 项）；`tests/threads-v2630.js` → `pass`（78 项）；全量回归 **5453 / 失败 0**（v2.62.0 为 5232；+206 即本版三把新锁，另有 15 项为上一版冻结值按实跑产物回填后由红转绿）；死导出门禁绿 **dead 223 / uiDead 4 / dataOnly 123 / 仅测试 131**；field-liveness-gate 绿（骨架一级键 **24** 个、写侧越界仅 `ui/panel.js::innerHTML` 1 处既有、读侧 0 处）；ui-wire-audit **9 / 0**（零幽灵引用）；ui-gate **53 / 0**（逐页真实点击 331 个控件）；出口面契约 **ns 74 / members 527 / chars 6327**（较 v2.62.0 的 ns 71 / members 483 / chars 5889 净增 world 16 + shadow 14 + threads 14 成员）；清册面 refs 1814 / 命名空间 80 / 成员 906。索引与清单同源 **2.63.0**，死子面账本 `version` 与 `_note` 版本词三级同源。
 - **一条可直接复用的口径**：**当「最有价值的边界」是否定式且否定来源不同时，锁必须按来源拆开，且必须在判据最前验空白态**。三面各自最贵的失败都是「世界自己造了一个证据」（编一条街、编一条路、编一份名单、无秘密也照样升级、把矛盾平均成结论），它们在实现里都表现为「某个字段**没有**变成另一个值」或「某张表里**没有**多出一行」，因此判据必须问「此刻它**不是**什么」，并且不能在任何会重置共享状态的操作**之后**才问。
-- **提交**：`（见本版提交）`。
+- **提交**：`3cde185`。
 
 ### R47 · 2026-09-23 · v2.64.0 交付（随机性 / 独立性 / 敌意 三面专锁 · 第五十一 / 五十二 / 五十三面：把「没触发的那次到底算不算掷过」「推进时到底谁说了算」「没记下来的那些去哪了」各自钉上）
 - **做了什么**：
@@ -1549,7 +1549,7 @@
   · `tests/enemies-v2640.js`（49 项）：`A_DROPSHAPE`（两类合流）⇒「分开计数」现形；`A_DROPNAME`（静默吞掉）⇒「丢弃必须可观测」现形；`A_MAXACTIVE` ⇒「超容量即挤出」现形；`A_SHOW` ⇒「有界展开」现形；`A_APPLIED` ⇒「入账与丢弃成对」现形；`A_TERMROUND`（终结戳写回 null）⇒「终结窗口起算」现形。
 - **验证**：`tests/horizon-v2640.js` → `pass`（41 项）；`tests/parallel-world-v2640.js` → `pass`（50 项）；`tests/enemies-v2640.js` → `pass`（49 项）；全量回归 **5572 / 失败 0**（v2.63.0 为 5453；+140 即本版三把新锁，另 +21 为三处缺陷修复带出的断言）。冻结值按**实跑产物**回填：`export_contract` **ns 74 / members 539 / chars 6481**（前值 527 / 6327）；`inventory.collect()` refs **1845** / ns 80 / members **913**（前值 1814 / 906）/ dead **225** / uiDead 4 / dataOnly **117**（前值 223 / 4 / 123）/ 仅测试 131；`dead-export-gate` 绿（`dead 225 · uiDead 4`，归因分布 `test-only 131 / self-only 88 / unwired 6`——`unwired` 由 7 降到 6 即本版修掉的 `parallelWorld.getSettings` 转为**活导出**的实证）；`field-liveness-gate` 绿（骨架一级键 24、写侧越界 1 处既有 `ui/panel.js::innerHTML`、读侧 0）；`ui-wire-audit` 9 / 0；`ui-gate` 53 / 0（逐页真实点击控件 331 个，**未变**——本版面板只加只读行、不加控件）。
 - **一条可直接复用的口径**：**否定式能力的判据必须落在「不发生活动的那一侧也说得清」上**。三面最贵的边界分别是「没掷的那次别算成掷过」「没开的时候别写」「没进去的那些要说去哪了」——它们共同的特征是：**在状态里长得像「什么都没发生」**。凡是这种边界，都必须先在引擎里造一个**只在拒绝/跳过路径上增长**的计数器，再把判据钉在那个计数器与「真做了什么」的**互斥关系**上；只有计数、没有互斥关系，判据就退化成「计数存在」。（同型先例：v2.63.0 三面的 `stat.faults`。）
-- **提交**：`（见本版提交）`。
+- **提交**：`7a1bbdb`。
 
 ### R60 · 2026-09-24 · v2.77.0 好感结算端四纪律（阶段封顶 / 提案过期 / 行级撤销 / 纠错依据）
 - **做了什么**：<code>engines/fondness.js</code> 升 v2.77.0——① <code>advance()</code> 阶段授权（四条具名拒收 <code>stage-off</code>/<code>locked</code>/<code>not-at-cap</code>/<code>top-stage</code>，授权只放宽上限、不动读数）；② <code>mode:'confirm'</code> 提案入账与 <code>accept()</code> 过期核验（<code>stale-proposal</code>/<code>no-pending</code>/<code>already-pending</code>/<code>reject()</code>）；③ <code>undo()</code> 行级撤销（<code>not-undoable</code>）与 <code>correct()</code> 手动纠错（<code>bad-value</code>、不得降值）；④ 纠错依据进 <code>buildBlock()</code> 并明标「数据，不是角色记忆」。新增 <code>propose</code>/<code>accept</code>/<code>reject</code>/<code>undo</code>/<code>correct</code>/<code>advance</code> 六出口与 <code>stat</code> 六项计量、两个行内环站点（历史 8 / 纠错 8）。
@@ -1558,7 +1558,7 @@
 - **一条可直接复用的口径**：**「拒收码存在」不等于「拒收码可达」**。本版 <code>stale-proposal</code> 最初被 <code>undo()</code>/<code>correct()</code> 里的 <code>hit.pending = null</code> 顺手抹掉，现象是「过期的建议变成 no-pending」——问题被藏进另一个码里。凡新增拒收码，必须先用一条**从真实入口走到该码**的探针把它跑出来（本版 34 条行为探针就是这批码的可达性证明）；只在引擎里写 <code>if (...) return { reason: 'x' }</code> 就宣布「已有该判据」，与写死一个无人到达的分支没有区别。
 - **影响范围**：改 <code>engines/fondness.js</code>、<code>core/evict.js</code>、<code>core/store.js</code>、<code>tests/run.js</code>（八处版本断言 + 死子面/清册面冻结字面量 + 挂载 v2.77.0 专锁）、<code>tests/dead-export-ledger.json</code>（<code>--update</code>，<code>version=2.77.0</code>）、<code>index.js</code>、<code>manifest.json</code>、<code>README.md</code>、<code>ITERATION_LOG.md</code>；新增 <code>tests/settle-v2770.js</code>。
 - **门禁结果**：<code>node tests/settle-v2770.js</code> → <b>82 / 失败 0</b>（34 条行为探针 + 十条破坏锚点的双向自证）；<code>node tests/dead-export-gate.js</code> 绿（<code>dead 413 · uiDead 4</code>，归因 <code>test-only 264 / self-only 120 / unwired 33</code>，条目 417）；冻结字面量按实跑回填：清册面 <code>refs 2171 / ns 106 / members 1165</code>、死子面 <code>dead 413 / dataOnly 154 / 仅测试 260</code>。
-- **提交**：`（见本版提交）`。
+- **提交**：`4e0459e`。
 
 ### R59 · 2026-09-24 · v2.76.0 挂载后遗风（锁不得给宿主全局留残骸；把「靠顺序活着」判据化）
 - **做了什么**：① <code>tests/lock-assert.js</code> 增 <code>restoring(fn)</code>（<b>单一真源</b>），四个锁导出改为 <code>restoring(runAll)</code>；② <code>tests/test-surface-gate.js</code> 新增判据 D「宿主不变量」与 <code>globalResidueProbe()</code>（子进程探针，抳 <code>global.window</code> / <code>global.document</code> 整换或抹键）；③ <code>tests/orphan-lock-v2750.js</code> 新增四条自证（A 段断还原包装 / B 段断现场零残骸 / D7 探针两侧自证 / D8 撤掉包装后必被逮住）。版本号升至 2.76.0（<code>index.js</code> / <code>manifest.json</code> / <code>tests/run.js</code> 八处版本断言）；账本 <code>--update</code>（<code>version=2.76.0</code>）。
@@ -1572,7 +1572,7 @@
   · 教训四：<b>负控制要在临时文件上做并清理</b>，且要断「已删」；本版 D7/D8 两条都用临时文件，跑完断 <code>!fs.existsSync</code>。<b>测完不清理的负控制，本身就是下一个缺陷源。</b>
   · 实现坑（已进注释）：探针子进程里 <code>require('./tests/x.js')</code> 按<b>脚本自身目录</b>解析，即使 cwd 是仓库根也找不到模块。
 - **可复用的判据**：① 挂载前审进程级副作用（共享全局是否被整换/抹键）；② 进程级污染必须在子进程里探（不可在测试进程内自证）；③ 探针要有 <code>probe-broken</code> 自护；④ 负控制只碰临时/内存副本且断「已删」；⑤ 子进程相对路径按脚本目录解析。
-- **提交**：`（见本版提交）`。
+- **提交**：`60a4f14`。
 
 ### R58 · 2026-09-24 · v2.75.0 判据补面（测试文件面可达性：把「从不执行的测试文件」变成红灯）
 - **做了什么**：做两件事。① 把四个**从未进过全量回归**的专锁接上：<code>tests/intel-v2530.js</code> / <code>life-v2520.js</code> / <code>longline-v2550.js</code> / <code>org-v2540.js</code> 由「裸脚本 + 末尾 <code>console.log('XXX: pass')</code>」改造为 <code>runAll(a)</code> 锁（<b>断言实现逐字保留</b>，assert 改为注入），挂进 <code>tests/run.js</code> 新增 section <code>v2.75.0 test-file reachability x orphan-lock mount</code>。② 新增常驻门禁 <code>tests/test-surface-gate.js</code> 与专锁 <code>tests/orphan-lock-v2750.js</code>（138 项），并新增 <code>tests/lock-assert.js</code>（断言适配器，单一真源）。版本号升至 2.75.0（<code>index.js</code> / <code>manifest.json</code> / <code>tests/run.js</code> 八处版本断言）；账本跑 <code>--update</code>（<code>version=2.75.0</code>，411 条证据重算）。
@@ -1587,7 +1587,7 @@
   · C 段升级为双向自证：原计划「破坏后必须变红」，落地为 <b>C0 未破坏时同款断言零失败 + C1 破坏后必须现形</b>（记录失败或以异常逃出都算逮住），且破坏只写内存副本、<b>finally 里逐字还原并断哈希</b>。<b>教训：负控制只断「变红」会漏掉「基线本来就红」或「断言根本没跑」两种假绿；两侧都断才是自证。</b>
   · 豁免表当前为空：两个非 require 入口（spawn / 内联）判据自己认得出，<b>不需要人工白名单</b>。判据 B 专门防「豁免表变成白名单垃圾桶」（豁免项若已有 spawn/内联/require 入口即报冗余或腐烂）。<b>教训：能由判据自己判定的分类一律不要写进人工清单。</b>
 - **可复用的判据**：① 测试文件的「存在」≠「被执行」——建依赖图查可达性，不可达者必须显式分类；② 扫模块路径要看去注释但保留字面量的面（<code>codeFace</code> 会把路径抹掉）；③ 提及不是引用（注释里的路径不构成边）；④ 豁免表必须防腐烂（豁免项得真在孤儿里）且能自动识别的分类不写进人工清单；⑤ 反空转下限是判据的必需品（文件数 / 锁数 / 可达数 / spawn 行一起断）；⑥ 聚合器注入的断言面是自定义函数、不是 Node assert —— 既有测试文件改造时须过适配器，勿逐处改写；⑦ 负控制要两侧自证（基线零失败 + 破坏后现形），破坏只碰内存副本并逐字还原。
-- **提交**：`（见本版提交）`。
+- **提交**：`c1bc6af`。
 
 ### R57 · 2026-09-24 · v2.74.0 判据补面（重复定义门禁：把「补丁重跑」变成红灯）
 - **做了什么**：新增 `tests/dup-decl-gate.js`（重复定义门禁，179 文件逐份扫）与专锁 `tests/dup-decl-v2740.js`（28 项），并从 `tests/product-files.js` 删除一处**真重复**（`testFiles` 连同 JSDoc 出现两遍，:89 与 :107）。删除被弃用的中间产物 `tests/shadow-decl-gate.js`（括号深度法，见下）。门禁接入 `tests/run.js` 新增 section `v2.74.0 duplicate-declaration x patch-rerun-fingerprint lock`；版本号升至 2.74.0（`index.js` / `manifest.json` / `tests/run.js` 八处版本断言）；账本跑 `--update`（`version=2.74.0`，411 条证据重算）。
@@ -1605,7 +1605,7 @@
 ■ '`，运行结果一样、源码不是同一份）会被误报成同体。最终签名 = `name + ' ' + normBody(body)`（`normBody` 按**最小公共缩进**去行首缩进，其余空白原样保留）。
   · 专锁首跑 5 项红，**全是测试面自己的错**（非判据缺陷）：破坏数据与负控文案的 JSDoc 正文净长 55 / 44 字，**低于 `JSDOC_MIN=80`**，被判据自己的门槛过滤 —— 破坏根本没发生，判据当然「没现形」；「判据看对的面」一段拿 `dup-decl-gate.js` 当样本，而该文件通篇 `//` 注释、`/** */` 块数为 0（样本选错）；「非恒真」一段用 `kinds(scan)` 读反空转下限，但下限由 `judge()` 产生、不在 `scan()` 的 `problems` 里（调用对象用错）。**教训：判据先跑成红时，红的是测试面还是判据要分清 —— 本锁已自带前置断言，先把「测试数据能不能触发判据」自己验一遍。**
 - **可复用的判据**：① 补丁必须幂等（锚点 0/多次分别有确定行为）；② 重复顶层声明只能静态看见 ⇒ 必须有静态门禁；③ 判据的输入面必须与判据要观测的东西同面（扫 JSDoc 看原文、扫真引用看 codeFace）；④ 反空转下限是判据的必需品（文件数 / 声明数 / JSDoc 数一起断）；⑤ 带 `g` 标志的正则不要在模块级复用（本版改为每次新建实例，一并消除 `lastIndex` 污染这类隐蔽状态）；⑥ 判据宁窄勿宽，误报会把真信号淹掉。
-- **提交**：`（见本版提交）`。
+- **提交**：`f869d75`。
 
 ### R56 · 2026-09-24 · v2.73.0 口径修复（测试引用面覆盖全部测试文件）
 - **做了什么**：修一处**判据输入面比事实窄**的真缺陷——死子面冻结门禁的测试侧引用数 `tref` 只读 `tests/run.js` 一个文件。修改五处：① `tests/product-files.js` 新增 `testFiles(root)`（`tests/` 下全部 `.js`，38 个）作为**测试面单一真源**并加入导出；② `tests/inventory.js` 的 `testRefSet` 从「只读 run.js」改为遍历 `testFiles()` 全部文件（每文件仍过 `codeFace()` 只认真代码面）；③ `tests/dead-export-gate.js` 的快照字段 `__snap.run` → `__snap.tests`、`productSnapshot()` 签名与读取扩展覆盖全部测试文件、`testRefCount` 改为累加所有测试文件引用数；④ `tests/run.js` 四处硬编码口径锚点同步（v2.27.0 段 `deadInTestsOnly 131→253`，v2.28.0 段归因分布 `135/218/58 → 253/121/33`，v2.28.0 / v2.29.0 两段现场锚点「仅测试 131→253」，另 `dist` 双面值 `253→257` 含 uiDead）；⑤ `tests/dead-export-ledger.json` 跑 `--update` 刷新（411 条证据全部重算）。版本号升至 2.73.0（`index.js` / `manifest.json` / `tests/run.js` 八处版本断言），账本 `version` / `_note` / 入口 `VERSION` 三级同源。
@@ -1617,7 +1617,7 @@
   · 判据纯度自纠（本版踩的坑）：临时断言把 `dist2800` 的分母当成 dead 单面（253），实则为 **dead + uiDead 双面**（`uiDead` 4 项全为 test-only）⇒ 正确值 257。**教训：统计冻结面分布时必须先明确分母是单面还是双面；`deadInTestsOnly` 是单面值，`dist` 是双面值，两者不可互相验证。**
   · 探针误判排除（先于下结论）：`tools/w273_code_probe.js` 对四引擎 28 个声明拒收码做可达性探针，首跑 20/28，逐 FAIL 分析后确认**全是探针写错**（`maxRows:1/2` 被 `settingsBus.bounds` 归一化、`already-pending` 在 `roll()` 而非 `bump()`、`missing` 在 `drop()` 而非 `clear()`、tolerance 先报 `bad-kind` 后报 `disabled`——属**四引擎统一的「参数校验先于开关」设计**），非产品缺陷。**教训：探针变红时第一问是「探针写对了吗」，第二问才是「产品错了吗」；两向都要留证据。**
   · 其余三面逆向审计（全绿，无缺陷）：`evict` 三处同源（92 调用点 / 75 SITES / 86 store caps，无未登记、无死站点、无 cap 漂移）；接线矩阵（80 磁盘引擎 / 80 LOAD_ORDER / 80 MODULE_EXPORTS，无缺失无幽灵）；出口面消费（口径以官方 `tests/inventory.js` 为准，自有抽取器产生的 309 幽灵条目已丢弃）。
-- **提交**：`（见本版提交）`。
+- **提交**：`f91b96a`。
 
 ### R55 · 2026-09-24 · v2.72.0 交付（业力双轴 × 累积风险 × 边际折旧 × 手段耐受 · 第六十一面）
 - **做了什么**：`engines/karma.js`（新，业力双轴：功德/债独立记账 + 显式核销 + 干预阶梯）、`engines/hazard.js`（新，累积风险：目标值随次数下沉 + 决策流掷骰 + 暗账与显形延迟）、`engines/marginal.js`（新，边际折旧：ratio^count 折扣 + 冷却减半 + 两条清零路径）、`engines/tolerance.js`（新，手段耐受：滑动窗口查重 + burst 幂等 + 窗口自愈）。四引擎接入容量骨架（evict 5 站点含通配 / store 5 容器 / checked 71→75）、装载序、注入源（SOURCES 41→45）、UI 友好名、测试清单，版本号升至 2.72.0。专锁 `tests/settle-v2720.js`（520 行）覆盖 26 处破坏锚点与 N0–N5 负控制。
@@ -1630,7 +1630,7 @@
   · 缺陷③（引擎侧·绕过冻结种子）：`hazard.js` 掷骰写成 `(WA.rand && typeof WA.rand.dice === 'function') ? WA.rand.dice(sides, 'hazard') : (1 + Math.floor(Math.random() * sides))`——兜底分支是裸调 `Math.random`，绕过冻结时钟/种子（违反 v2.14.0 起「全库唯一允许 Math.random 的产品文件是 core/rand.js」的纪律），且同一剧本复现不出同一结果。修复：改为硬依赖决策流，`WA.rand` 不可用时**显式拒收** `rand-unavailable`（宁缺毋滥，绝不静默降级到不可复现的随机）。
   · 判据演进：专锁首跑 FAIL 7——① 三处破坏锚点的声明命中数与实际不符（`km-gate` 实 3 非 4、`mg-missing` 实 3 非 5、`tl-gate` 实 4 非 6）；② `km-addaxis` 的破坏串与原串语义等价（等价于没砸，N1 假绿），改为「只累加最后一轴并清空另一轴」的真破坏；③ 三处断言语义错——maxStage 调低**不会**回退存量 stage（单调不减是设计）、hazard rows cap 未在干净账上计数、tolerance 的 stale 在 window ≤ maxRepeat 时**不可达**（窗口内根本凑不满次数）。**教训：① 破坏串必须与判据的可观测行为真挂钩，等价替换 = 假绿；② 容量类判据必须先重置容器再从头数；③ 任何「上限」类机制都要检查上限是否可达（window 必须 > maxRepeat，stale 才有意义）。**
 - **可复用的判据**：① 新引擎的每个 `WA.evict.array` 调用点必须与 evict.SITES / store.__BOUNDED_CAPS 同名登记（三处同源）；② 引擎禁止裸调 Math.random，随机必须走 `WA.rand.*`，缺失时显式拒收而非兜底；③ 文档宣称的「唯一路径」必须配一条能证明其可达的断言；④ 破坏锚点先实测命中数（`grep -c` 或脚本统计）再写进 BROKEN，等价替换不算破坏；⑤ 上限类机制须验证上限可达（窗口/计数关系）。
-- **提交**：`（见本版提交）`。
+- **提交**：`727d7ad`。
 ### R54 · 2026-09-24 · v2.71.0 交付（信息暗礁 × 节奏齿轮 × 伏笔配给 × 聚光灯 · 第六十面）
 - **做了什么**：`engines/enigma.js`（新，信息暗礁：秘密知情名单边界账，双容量上限 + outsiders 反查）、`engines/tempo.js`（新，节奏齿轮：四挡速率 + 跨度核验 + 切挡留痕）、`engines/quota.js`（新，伏笔配给：短/长双池 + 过期只标不删 + 终态收口）、`engines/spotlight.js`（新，聚光灯：轮次结算 + 久缺名单 + 不阻断剧情的均衡读数）。四引擎接入容量骨架（evict 6 站点 / store 5 容器 / checked 66→71）、装载序、注入源（SOURCES 37→41）、UI 友好名、测试清单，版本号升至 2.71.0。专锁 `tests/settle-v2710.js`（347 行）覆盖 20 处破坏锚点与 N0–N5 负控制。
 - **为什么**：对 12 份酒馆预设做第二轮「叙事纪律」机制专项复扫。四件可证伪状态机值得进引擎：MoM 蛾摩拉的「信息差」管理（谁知道什么、谁不知道什么、谁不该表现出知道）、Phantasm 的叙事速率挡位、可待的「短期 3 条/30 次输出、长期 3 条/50 次输出」伏笔配额、MoM 果实与打工喵的「角色登场均衡」需求。
@@ -1642,7 +1642,7 @@
   · 缺陷③（v2.71.0 新发现·引擎侧）：`engines/quota.js` 的 `('seed_' + Date.now())` 为 G20 判定的 B 裸调（绕过冻结时钟）。修复为 `clockNow('quota')`。
   · 判据演进：专锁首跑 FAIL 6——测试设值 `maxRows: 1`（enigma bounds [4,64]）与 `maxRows: 2`（spotlight bounds [8,64]）被 settingsBus.normalize 的 clampNum 夹回最小值。修正为 bounds 内合法值（4 / 8）并重排填满逻辑。**教训：专锁设值必须先过 bounds 再断言容量行为。**
 - **可复用的判据**：① 专锁设值必须落在 settingsBus bounds 内（越界值会被静默夹取，导致容量测试失效）；② 冻结面回填的批量脚本必须内置幂等保护（锚点0次但新串已存在 ⇒ 跳过而非重插）；③ 叙事纪律类引擎的共同形态：只在拒绝/边界路径上增长的计数器 + 「未发生的那侧也说得清」的互斥断言。
-- **提交**：`（见本版提交）`。
+- **提交**：`c986d98`。
 ### R53 · 2026-09-23 · v2.70.0 交付（情境切片 × 阻尼量规 × 竞争焦点 · 第五十九面）
 - **做了什么**：`engines/scene-slice.js`（新，情境切片：空间属性白名单 + 七档时间段解析 + 室内天气抑制）、`engines/gauge.js`（新，阻尼量规：0..100 值域 + 单步限幅 + 里程碑事件强制 + 到顶拦截）、`engines/rivalry.js`（新，竞争焦点：三元键 + 权重反弹惩罚 + 显式注销）。三引擎接入容量骨架（evict/store 各 cap 20/16/16）、装载序、注入源（SOURCES 34→37）、UI 友好名、测试清单，版本号升至 2.70.0。专锁 `tests/settle-v2700.js` 覆盖 11 处破坏锚点与 N0–N5 负控制。
 - **为什么**：用户提供 12 份酒馆预设（约 10MB，105–320 个 prompt 块）要求评估可缝入内容。扫描确认 100% 为预设而非世界书，95% 以上是文风/破限/文学腔调（不可证伪，不收）。三件可证伪状态机值得进引擎：Phantasm 的日期/时间段/室内外资讯框要求、进度 0–100% 节点突变逻辑、打工喵与 MoM 的竞争关系与注意力均衡需求。
@@ -1653,7 +1653,7 @@
   · 缺陷②（引擎侧）：挤出调用写成 `WA.evict.array(list, 20)`——第二参数是容量数字而非站点名字符串，站点表反查判「声明悬空站点」（sceneSlice.rows/gauge.rows/rivalry.rows 零调用）。修正为 `WA.evict.array(list, 'sceneSlice.rows')` 等具名站点调用，与 appearance/ladder 同形；gauge 的 history 子数组挤出保留数字容量但补 `if (WA.evict)` 守卫。
   · 判据演进：冻结面回填 25 处（checked 63→66、版本常量 8 处、清册面三处、死子面四处、账本条目与归因分布、advisory、SOURCES、EC2430、settle 挂载），比较值与消息文本同批改。
 - **可复用的判据**：① 新引擎必须 IIFE 挂 `window.WorldAxis`，`module.exports` 在 ui-gate 沙盒不可见；② `WA.evict.array` 的第二参数是站点名字符串（与 evict.js 站点表键逐字一致），传数字容量会被站点反查判悬空；③ 12 份预设类材料的缝入口径：先全量结构扫描分离文风与状态机，只收能落成「登记→核验→拒收码」的机制。
-- **提交**：`（见本版提交）`。
+- **提交**：`f0cdf69`。
 ### R52 · 2026-09-23 · v2.69.0 交付（角色呈现契约 · 第五十八面：外貌分级 / 原型阶梯）
 - **做了什么**：`engines/appearance.js`（新，199 行，外貌分级契约：S/A/B/C 分级 + COVERAGE_REQ 覆盖率核验 + 关系加权单向升一级 + 异化三档 humanoid/half/true + 场景排他眼型脸型/服装风格同场唯一）、`engines/ladder.js`（新，149 行，原型阶梯：档位表 ≥2 且去重 + 升级必须登记事件 + 逐级推进禁跳档 + 到顶/到底拒收 + drop 重置）。来源材料评估：两份新世界书——ref7《外貌构建》（种族判定/分级扫描/Layer1-4 覆盖/比喻/行文顺序）与 ref8《ACG 角色心理模型 3.0.0》（94 条 = 2 元信息 + 92 条 ACG 心理原型，傲娇/病娇/三无/地雷系……）。**取舍口径**（沿 R50/R51）：能落成「登记→核验→拒收」的进引擎；文风块不收。ref7 只收分级覆盖契约、关系加权、异化档位与场景排他，几千词外貌要素库与比喻/光影规则留在预设层；ref8 铁板模板（【本质】92/92、【关系光谱】91/92、【破防】86/92）本质是给 LLM 的扮演词库，99% 不收，唯一可机制化的是病娇等条目的「禁止跳级、升级必须有事件推进」骨架，落成 ladder 引擎。
 - **为什么**：文风层预设要求写「S 级描写完整四层、C 级只抓单一特征」，但模型通常凭感觉堆词；心理模型要求「禁止一上来就暴走、必须有事件推进」，但缺乏状态追踪。本版把两份材料的结构性约束收编为引擎级契约，通过注入块把「当前状态 + 铁律」显式传递。
@@ -1664,7 +1664,7 @@
   · 缺陷②（文案同步）：全量回归暴露 6 处历史遗留的「入口版本为 2.23.0」旧文案（比较值已升级、消息文本未跟上），与 v2.68.0 判据演进②同型；本轮将 7 处版本断言、checked、清册面、死子面、账本数、SOURCES、出口面规模等共 24 处断言一次性同步。
   · 判据演进：ladder 的 disabled 总闸在 `define`/`escalate`/`deescalate`/`drop` 四条写路径均有独立出口，锚点声明 `hits:4` 并由 N0 判据核验实际命中数，沿用 v2.68.0 确立的显式命中数机制。
 - **可复用的判据**：① 加权升档（如关系加权 B→A）后的覆盖要求必须按**升档后的有效等级**校验，不能用原始等级放行——「等级提升即承担更高规格」是契约闭合的关键。② 阶梯状态机必须配对 `drop` 出口，重设前须显式 drop，防止调用方静默覆写已有阶梯的历史推进轨迹。③ 专锁必须含跨模块隔离断言（N3）：破坏 appearance 不得影响 ladder，破坏 ladder 不得影响 appearance。
-- **提交**：`（见本版提交）`。
+- **提交**：`87f0d69`。
 
 ### R51 · 2026-09-23 · v2.68.0 交付（世界运转四件套 · 第五十七面：资料片周期 / 生存三轴 / 通缉 / 驯兽）
 - **做了什么**：`engines/era-cycle.js`（新，140 行，资料片周期：四档状态机 + 倒计时正整数 + 跨档连续推进 + 结算转长草强制换事件）、`engines/survival.js`（新，129 行，生存三轴：饱食/精力 0..100、负重比上限、左开右闭分段、半成品行不连带拒绝）、`engines/warrant.js`（新，125 行，通缉：三档罪度、在案=未赦免、惯犯第 3 桩当场升级、重罪赦免须理由、不随死亡消除）、`engines/beast-bond.js`（新，161 行，驯兽：驯服满百转化方法定初始档、忠诚显式 delta、下调必须给 cause、噬主风险档）。来源材料评估（《艾尔德兰》网游世界书）：能落成「登记→核验→拒收」的四面收编；等级/经验/战斗结算系数属推演结算面不收（本仓库记账、不掷骰；倒计时取建议区间中位不随机）；种族大全等词库不进引擎。
@@ -1678,21 +1678,21 @@
   · 判据演进一：**锚点命中数显式声明**。era-cycle 的 disabled gate 在同一文件两条写路径各出现一次、warrant 的 disabled gate 与 bad-level 检查也各 2 次——这类共享字面量不再强求 `==1`，而是逐项声明 `hits` 并验证「实际命中 == 声明命中」（N0 判据）。精确的定义是「命中数被显式声明并被验证」，不是「必须为 1」。
   · 判据演进二：全量回归「编排扫描仍抓出未登记容器」一例的失败根因是**测试污染**（前序用例累积的数组节点在新版四容器加入后，在 `minBytes:64 / chunkNodes:5` 极小预算下挤占扫描趟数）；隔离探针证明引擎两版行为一致。修法是在该用例前加隔离事务（清场只留 clock/people）再建哨兵，使其不再随上游规模漂移。
 - **可复用的判据**：① 事务内计数一律用 draft 行，不用 `store.get()` 快照——「读自己刚写的」是事务语义的一部分。② 「在案」这类口径要先用反例钉住（升级后那桩还在不在数里？），状态机加档位时最容易把「升级」写成「出账」。③ 布尔守卫的覆盖范围要含全部子句：`a && b || c` 形式在 a 为假时第三项仍会执行，破坏面是 null 行（数组空洞）而不是常规输入，常规用例照不到——这类修复必须配「修复前源码反向验证为红」的钉。④ 冻结面回填时比较值与消息文本必须同批改（沿 R50）。
-- **提交**：`（见本版提交）`。
+- **提交**：`3f072c2`。
 ### R50 · 2026-09-23 · v2.67.0 交付（叙事纪律四件套 · 第五十六面：时间锁 / 双层性格 / 好感审计 / 场外事件）
 - **做了什么**：`engines/temporal-lock.js`（新，时间锁：锁定态显式登记、锁定期内每轮跨度必填/超限拒/倒退拒、零跨度是 frozen 不是错、解锁显式）、`engines/temperament.js`（新，双层性格：底色/习惯两层同时在场且不同、触发词命中才交棒给底色、日常默认习惯主导）、`engines/fondness.js`（新，好感审计：步进白名单 [+0.1,+0.3,+0.5,+0.8]、好感不降准则实现为「没有负入口」、冲突走 trust 对冲、上限 100 拒收不截断、五段区间语义）、`engines/parallel-events.js`（新，场外事件：三要素、主时钟同步 future-event 拒收、活跃容量 3、显式 resolve、防全知铁律进注入块）。来源材料评估（V1.41 + 梦鲸）：时间锁/动态性格/好感审计的数值纪律/平行事件四者能落成「登记→核验→拒收」进引擎；物哀逻辑/记忆筛选/宿敌张力等文风块、NSFW 模式库、平行时空观测报告留在预设层；假面逻辑 v2.66.0 已收编不重做。
 - **为什么**：R48/R49 留下的两个来源（V1.41 的「时间锁/动态性格」、梦鲸的「场景栏与平行事件」）本版收编完毕。本版新增一条接线纪律：**注入源 SOURCES 的键名必须与模块命名空间严格同名**——inject-sources 门禁判据 A 从 `applyInjections` 真代码面提取 `WA.<ns>.buildBlock(` 的 ns 并要求 ∈ SOURCES，先用了简写键名（temporal/pevents）被当场点名（v2560: 注入分支无一漏登记源表），改成同名键即对齐；判据 A 的方向是「分支→源表」，防的是「有注入分支但用户关不掉」。
 - **影响范围**：`engines/temporal-lock.js`、`engines/temperament.js`、`engines/fondness.js`、`engines/parallel-events.js`（均新）、`core/evict.js`、`core/store.js`、`index.js`、`manifest.json`、`render/inject.js`、`ui/panel.js`、`engines/tool-diag.js`、`tests/run.js`、`tests/settle-v2670.js`（新）、`tests/export_contract.txt`、`tests/dead-export-ledger.json`。`tools/w267_*.py` 不入库。
 - **门禁结果**：`node tests/run.js` → **5859 / 失败 0**（v2.66.0 为 5741）。专锁单独 98/0。出口面 ns 83 / members 549 / chars 6677（生成器产物逐字回填 `FROZEN2800`）。清册 refs 1950 / ns 89 / members 996，死子面 dead 284 / uiDead 4 / dataOnly 131，仅测试 131；账本由 `node tests/dead-export-gate.js --update` 写出，version 2.67.0，条目 288，归因 test-only 135 / self-only 129 / unwired 24。`checked` 53→57，`SOURCES` 24→28。
 - **可复用的判据**：① 单行对象站点（如锁定态）也要守骨架物化纪律：`kind:'object'` 的登记路径遇 `null` 骨架会判「类型错配」，未锁定态用**空对象**表达而不是 `null`；cap 必须容纳真实键数（label+at → cap 2，cap 1 会让 `evict.object` 在锁定态误删键）。② 冻结面回填时**比较值与消息文本必须同批改**：只改断言消息里的数字、不改 `=== 262` 的比较值，会产出「失败项里实与期望相同却仍红灯」的自相矛盾门禁（本轮 run2→run3 的 6 处失败全是这一类）。③ SOURCES 键名 = 命名空间名，不做缩写（判据 A 的 ns 提取面向真代码面）。
-- **提交**：`（见本版提交）`。
+- **提交**：`a8ec8dc`。
 ### R49 · 2026-09-23 · v2.66.0 交付（字段面四件套 · 第五十五面：情绪通道 / 关系六型 / 假面 / 摘要三列 + 选项梯度）
 - **做了什么**：`engines/affect.js`（新，情绪通道：情绪词不进任何出口、开放×硬关闭不相交、过载回退必须是已登记开放动作、四项调制量之和 ≥6 时开放通道收成回退）、`engines/bonds.js`（新，关系六型：类型表白名单、自对拒收、配对键无向、与血仇正交分账）、`engines/masks.js`（新，假面：口径与露馅同时在场且不一致才成立、撤销显式）、`engines/digest.js`（摘要三列：关系方向/物品状态/新旧伏笔，全部从已有证据现算）、`direction/choices.js`（`generateGraded` 选项梯度：两易一中一难、配额引擎核验、`WA.rand` 洗位，`generate` 保持旧行为）。来源材料评估（四份新上传）：两份《自动续杯 BottomsUp 2.6.0》是宿主层错误重试/截断续写脚本，属容错与流式解包，不进引擎；可借的「拒绝必须可观测 + 报错特征分类账」思路与本仓库 `stat.faults` 口径一致，等价实现已存在；《【日月西】Gemini & Claude v0.41》是叙事预设，其五条日月律作字段设计的语义依据（人物立体→假面、物体连续→物品状态列），破限头部/NSFW 条款/混淆长文/伪闭合标签一律不进引擎。
 - **为什么**：R48 留下的字段面（情绪通道、关系六型、假面、摘要方向、选项梯度）都出自 4.4 与《日月西》。本版的纪律是「预设给的是描写指令，引擎收的是结算含义」：情绪词→动作、人设锚→可归类结构账、摘要模板→从证据现算的片段、选项要求→引擎侧配额。全部模块总开关默认关，关闭时 `reason:'disabled'` 与「用户选了空」可区分。
 - **影响范围**：`engines/affect.js`、`engines/bonds.js`、`engines/masks.js`（均新）、`engines/digest.js`、`direction/choices.js`、`core/evict.js`、`core/store.js`、`index.js`、`manifest.json`、`render/inject.js`、`ui/panel.js`、`engines/tool-diag.js`、`tests/run.js`、`tests/settle-v2660.js`（新）、`tests/export_contract.txt`、`tests/dead-export-ledger.json`。`tools/w266_*.py` 不入库。
 - **门禁结果**：`node tests/run.js` → **5741 / 失败 0**（v2.65.0 为 5657）。专锁单独 69/0（首跑 64/5，3 项暴露真缺陷：`affect.setLoad` 的 `missing-fields` 检查先于 `bad-load`，纯非法字段走不到 `bad-load` 分支，检查顺序对调修复；另 2 项为判据自身的开关时序错误）。出口面 ns 79 / members 545 / chars 6584（生成器产物逐字回填 `FROZEN2800`）。清册 refs 1907 / ns 85 / members 968，死子面 dead 262 / uiDead 4 / dataOnly 129，仅测试 131；账本由 `node tests/dead-export-gate.js --update` 写出，version 2.66.0，条目 266，归因 test-only 135 / self-only 115 / unwired 16。`checked` 49→53，`SOURCES` 21→24。
 - **可复用的判据**：① 对象型站点的登记必须三处同批：evict.SITES（带 `kind:'object'`）、store `__BOUNDED_CAPS`（带 `kind:'object'`）、`evict.object` 调用点带排序键第三参——本轮漏了登记表的 `kind`，registryParity 判「类型错配（应为数组）」，健康分 95、11 项红灯；probe 先于全量回归抓到。② 拒绝分支的检查顺序是语义的一部分：`missing-fields` 放在 `bad-load` 之前会让后者对「只给了非法字段」的写入不可达，专锁的 [N2] 判据（原版必须报 bad-load）当场现形。③ 缝合预设材料的取舍口径：**能落成「登记→核验→拒收」的才进引擎；只能落成「给模型的一句话要求」的留在预设里**。
-- **提交**：`（见本版提交）`。
+- **提交**：`bcdc712`。
 
 ### R48 · 2026-09-23 · v2.65.0 交付（结算缺口四件套 · 第五十四面：行程表 / 天气物候 / 难度三档 / 情报延迟）
 - **做了什么**：
@@ -1707,7 +1707,7 @@
 - **影响范围**：`engines/world.js`、`engines/intel.js`、`engines/weather.js`（新）、`engines/difficulty.js`（新）、`core/evict.js`、`core/store.js`、`index.js`、`manifest.json`、`render/inject.js`、`ui/panel.js`、`engines/tool-diag.js`、`tests/run.js`、`tests/settle-v2650.js`（新）、`tests/dead-export-ledger.json`。`tools/*.py` 不入库。
 - **门禁结果**：`node tests/run.js` → **5657 / 失败 0**（v2.64.0 为 5572）。专锁单独 75/0。出口面 ns 76 / members 542 / chars 6532（生成器产物逐字回填 `FROZEN2800`）。清册 refs 1872 / ns 82 / members 942，死子面 dead 243 / uiDead 4 / dataOnly 125，仅测试 131；账本由 `node tests/dead-export-gate.js --update` 写出，version 2.65.0，条目 247，归因 test-only 135 / self-only 102 / unwired 10。`checked` 46→49，`SOURCES` 19→21。回填前全量是 5631/26，26 项全部是冻结计数，没有结算逻辑失败。
 - **可复用的判据**：否定式能力要钉在互斥计数上。关闭行程不是「返回了 disabled 字符串」就够了，必须同时证明没有调用 `move()`、没有减 `left`；关闭难度回落中性值时，`reason` 必须是 `disabled`，否则「用户选了中性」和「模块没开」在读面上不可区分。依赖面冻结串只收录被别的模块调用的成员：`depart` / `advance` / `releaseDue` 本版没有进串，因为还没有产品代码调用它们，这是口径而不是遗漏。
-- **提交**：`（见本版提交）`。
+- **提交**：`ff234e8`。
 
 ### R66 · v2.83.0 — 模块契约与配置迁移（第三十七面：引用多 ≠ 必须先装载）
 
@@ -1736,7 +1736,7 @@
   - ⑲ **交付物「在场」不等于「被执行」（v2.75.0 孤儿病的复发形态）**：`settle-v2830.js` 只对门禁做 `fs.existsSync`，于是 289 行、能独立跑出「装载期边 23 / 硬边 0」的 `module-registry-gate.js` 在测试文件面上被判 **orphan**——整套回归从未跑过它，而它恰是「依赖检查」的唯一判据面，漂移无人可见。修法按 v2400 惯例在 run.js 里 `spawnSync` 端到端跑一遍，并断言读数含关键值（防「空壳退出 0」）。**新写门禁必须同时接进执行面。**
   - ⑳ **`fresh()` 重装模块时，只增不减的注册表必须显式清空**：产品模块一律无条件 `concat`，故每次 `fresh()` 让 `__settingsRegs` 翻倍（54 → 109 → 163，54 键各重复 2/3 次）。两个后果都真实：① 重复登记在 `selfCheck()` 里是 error 级阻断项 ⇒ 任何在 `fresh()` 之后跑自洽判据的块都读到人造红灯；② 以登记表为真源的判据会读到累计脏数据 —— run.js 各块注入的 `module:'test'` 夹具一路活到别的块，把「键归属对不上真实命名空间」变成非确定性失败（本轮 `unmapped:test` 的唯一根因）。**重装即重建 ⇒ 重装前须清空（实测回到稳定 54 条、零重复）。**
   - ㉑ **`kill -9` 打断注入窗口会留下未还原的产品文件（v2.80.0 事故的再现）**：本轮回归被系统资源枯竭反复打断，其中一次恰停在 `bridge.js` 注入窗口内，残留一行 `function __ncProbeBridgeSnapshot() {…}`。症状不是报错而是**口径整体错位**：`refs 2219→2220`、`dead 444→443`，且 `bridge.snapshot` 引用数实测 1（期望 0）——多个「冻结读数」判据同时 ✗。定位手段：`git status` 列出不该改的文件 + mtime 晚于版本升档时刻。修法：`git checkout -- engines/bridge.js`（**不要手改**，尾部换行差异会让 diff 不干净）。**回归被外部中断后，先核 git 工作区再重跑。**
-- **提交**：`（见本版提交）`。
+- **提交**：`d5aa9e2`。
 
 ### R68 · 2026-09-25 · v2.85.0 注入效率 · 人物自主生活 · 地域与交通（第三十九面：承诺写在源码里，但没有判据问过它）
 - **做了什么**（四处落点，全部零新增导出 / 零新增容器 / 零新增设置键）：
@@ -1762,7 +1762,7 @@
   - (31) **归属守卫是双层的，负控制必须打到「没有守卫的实现」**：本版专锁首跑 2 处红，全在负控制层。实测只摘事务前那层，事务内的 `return false` 仍兜住（`reason` 变成 `store-unavailable`、归属没被改）⇒ 症状不现形；必须**两层一起**改成「没有守卫的实现」，症状才是这条判据要抓的「已有归属被静默改写」。**多锚点破坏需要基础设支持**（`also` 字段 + 逐锚 N0 判定），否则「破坏没打到靶」会被误读成「判据坏」。
   - (32) **`git checkout -- <目录>` 是收口期最危险的一条命令**：本轮误用 `git checkout -- tests/` 想回滚升档脚本的越界改写，**连带回滚了同一目录下两个已完成的交付物**（`reject-v2780.js` 的 6 个新码见证、`run.js` 的本版接线），而当时它们与「被误改的历史注释」混在同一目录里。**回滚的最小单位是文件、不是目录；回滚前先 `git status --short` 看清这个目录里还有哪些未提交的成果。**
   - (33) **升档属「多处字面量」任务，但历史注释不得跟着升**：`v2.84.0（B5）` 这类注释说的是「这个锚点由哪个版本引入」，升档时**逐字不动**；只有承载「当前版本」的断言值、冻结读数消息、账本元数据与自己写的注释要改。判据是查既有提交的惯例（`git show <上版提交> -- tests/run.js`），不是自己觉得该不该改。
-- **提交**：`（见本版提交）`。
+- **提交**：`05afec8`。
 
 ### R67 · 2026-09-25 · v2.84.0 测试上下文隔离 · 统一输入边界（第三十八面：共享的宿主面 / 「字符串化兜底」把非法值静默升格）
 - **做了什么**：
@@ -1784,4 +1784,4 @@
   - (26) **「共享」不等于「脏」——把共享当脏回收，等于用判据去改被测行为**：首版把「本 section 新增的全部 storage 键」一并回收，实测直接打破 4 个用例（观测切片 / 突发事件生成 / 突发事件激活(3轮) / 当前轮小纸条），它们复用前面 section 已写下的状态键。**差值口径只对「本 section 新增」生效，回收面必须收窄到 UI 装载面。**
   - (27) **锁身份用「pid + starttime」，陈旧锁绝不自动回收**：只看 pid 会把「pid 被复用」误当成「锁主人还活着」，陈旧锁永远收不回；自动回收则会在并发回归里删掉别人的活锁。释放时必须校验 token，防「误释放他人的锁」。
   - (28) **冻结读数必须全文残留扫描（R65⑱ 复审）**：本版 `ns 102→103 / members 573→580 / chars 7108→7169`、`命名空间 113→114 / 装载文件 105→106`，改完锚点后仍有一处陈旧读数（`settle-v2830.js` 的 `113 / 105`）被 r12 抓出。**版本升档与读数同步都是「多处字面量」任务，锚点改写不等于全文无残留。**
-- **提交**：`（见本版提交）`。
+- **提交**：`1260359`。
