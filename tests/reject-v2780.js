@@ -279,7 +279,7 @@ function runWitness(WA) {
   //   EF 在每条之后复位事件容器：见证之间共享同一个 WA，不复位会让
   //   「同 id 仍在活动态 ⇒ duplicate」之类的串扰变成假见证（v2.81.0 专锁踩过同款坑）。
   function EF() { if (!WA.store || !WA.store.transact) return;
-    WA.store.transact(function (d) { d.events = { rows: [], failQueue: [] }; }, 'reject-witness:events-reset'); }
+    WA.store.transact(function (d) { d.events = { rows: [], failQueue: [], res: [] }; }, 'reject-witness:events-reset'); }
   function ES() { const keep = (Ev && Ev.getSettings) ? Ev.getSettings() : null;
     if (Ev && Ev.setSettings) Ev.setSettings({ enabled: true }); return keep; }
   function EK(keep) { if (Ev && Ev.setSettings && keep) Ev.setSettings(keep); EF(); }
@@ -308,6 +308,19 @@ function runWitness(WA) {
   trip('not-claimed', function () { const keep = ES();
     try { Ev.schedule({ id: 'z8', title: 't' });
       return [Ev.complete('z8', { ok: true }).reason]; } finally { EK(keep); } });
+  // ── v2.116.0（规划 01 的 A2 第二段）新增两码 ──
+  want('budget', 'events.claim 本轮预算用尽 ⇒ 超额者进 deferred（显式留痕，不是静默跳过）');
+  trip('budget', function () { const keep = ES();
+    try { const cfg = Ev.getSettings(); Ev.setSettings({ maxClaims: 1 });
+      Ev.schedule({ id: 'z9a', title: 't' }); Ev.schedule({ id: 'z9b', title: 't' });
+      const out = Ev.claim(Date.now() + 1000, {});
+      Ev.setSettings(cfg);
+      return (out.deferred || []).map(function (x) { return x.reason; }); } finally { EK(keep); } });
+  want('duplicate-receipt', 'events.complete 同一 opId 二次回报（重放不二次结算）');
+  trip('duplicate-receipt', function () { const keep = ES();
+    try { Ev.schedule({ id: 'z10', title: 't' }); Ev.claim(Date.now() + 1000, {});
+      Ev.complete('z10', { ok: true });
+      return [Ev.complete('z10', { ok: true }).reason]; } finally { EK(keep); } });
   // ── engines/checkpoints.js（v2.82.0 第十六面：快照与分支）──
   //   这 11 个码全部**可达**，故逐条补真见证（不是声称可达）。
   const Cp = WA.checkpoints;

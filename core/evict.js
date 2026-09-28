@@ -181,7 +181,8 @@
     //   rows 上限 = maxRows 设置（与 schedule 容量拒收同源，改设置不漂移），
     //   failQueue 上限 = maxFails 设置（complete 失败分支消费，答「上次为什么没成」）。
     'events.rows':        { path: 'events.rows',        cap: 'per-call', kind: 'array', why: '事件队列（上限 = maxRows 设置，写入时传入）' },
-    'events.failQueue':   { path: 'events.failQueue',   cap: 'per-call', kind: 'array', why: '事件失败队列（上限 = maxFails 设置，写入时传入）' }
+    'events.failQueue':   { path: 'events.failQueue',   cap: 'per-call', kind: 'array', why: '事件失败队列（上限 = maxFails 设置，写入时传入）' },
+    'events.res':         { path: 'events.res',         cap: 'per-call', kind: 'array', why: '事件回执台账（上限 = maxFails 设置，写入时传入；v2.116.0 新增，口径同 failQueue）' }
   };
 
   // ── 非挤出站点（显式声明，防「假阴性」与「计数虚高」两头都错）──────────

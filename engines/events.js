@@ -42,6 +42,24 @@
  *      于是「参数不合法」这件事不会以任何形式改动世界——包括
  *      **不得顺手取消掉正在被改期的那条待办**。
  *   4 总开关默认关闭；关闭时不排期、不认领、不注入，也不凭空补写「已发生」。
+ *
+ * v2.116.0（规划 01 的 A2 第二段：任务预算与恢复协议）——四处缺口全在同一件事上：
+ * **「认领了、然后没人回报」这件事此前没有任何落点**。
+ *   ① **认领无预算**：`claim()` 一次把全部到点事件认领光，于是一次调用就能把整个世界
+ *      的待办搬进「执行中」；真实酒馆里那是几十个引擎同时开工。
+ *   ② **认领无所有权**：认领后那一行不带「谁认领的」，多个调用方（面板 / 自动流程 /
+ *      别的插件）之间的账根本对不上。
+ *   ③ **认领无租约**：崩一次 / 切一次聊天，`claimed` 的行既不再进 due（不是 pending）、
+ *      也不是终态（永远不会有结论）——「正在执行」与「永远不会有人来执行」**同形**，
+ *      那件事被静默丢掉且没有任何读数能发现。
+ *   ④ **回执无稳定操作 id**：`complete()` 只看「当前是不是 claimed」，于是任何重放
+ *      （重连、重试、宿主重复通知）都会**二次结算**同一件事。
+ * 对应修法：`maxClaims` 预算（超额者进 `deferred` 显式留痕，不静默跳过）+
+ *   `owner` / `opId`（默认 `id@到点时刻`，回收后重新认领仍是同一笔）+
+ *   `leaseMs` 租约（到期行在**同一次 claim 的同一事务里**先回收再进候选）+
+ *   `events.res` 有界回执台账（重复回执 ⇒ `duplicate-receipt` 拒收且零变化）。
+ * 一条口径边界（如实写明，不假称完备）：回执台账与 `failQueue` 同界，**极久之后的重放
+ *   无法去重**——那时它读到的是终端用户视角的「一笔新事」，不是「同一笔的重放」。
  */
 (function () {
   'use strict';
@@ -53,9 +71,11 @@
   //   理由：因果链是**历史**（挤掉最旧的仍答得出「发生过什么」），排期是**待办**
   //   （挤掉最旧的就是把那件事悄悄取消了，而调用方会以为它还在队列里）。
   //   `cancel()` 是唯一合法的取消入口——「世界没发生这件事」必须说得出口。
-  const DEF = { enabled: false, maxRows: 24, maxRuns: 12, maxFails: 12, retryDelayMs: 1000, maxRetries: 2 };
+  const DEF = { enabled: false, maxRows: 24, maxRuns: 12, maxFails: 12, retryDelayMs: 1000, maxRetries: 2,
+    maxClaims: 24, leaseMs: 0 };
   const __REG = { key: LS_KEY, def: DEF, module: 'events',
-    bounds: { maxRows: [1, 24], maxRuns: [1, 60], maxFails: [1, 24], retryDelayMs: [0, 600000], maxRetries: [0, 5] } };
+    bounds: { maxRows: [1, 24], maxRuns: [1, 60], maxFails: [1, 24], retryDelayMs: [0, 600000], maxRetries: [0, 5],
+      maxClaims: [1, 24], leaseMs: [0, 3600000] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
     return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
@@ -74,7 +94,8 @@
   const MIN_PRIORITY = 0;
   const MAX_PRIORITY = 9;
 
-  const stat = { scheduled: 0, claimed: 0, completed: 0, cancelled: 0, replaced: 0, exhausted: 0, failed: 0, conditionMisses: 0, lastReason: '', faults: {} };
+  const stat = { scheduled: 0, claimed: 0, completed: 0, cancelled: 0, replaced: 0, exhausted: 0, failed: 0,
+    conditionMisses: 0, reclaimed: 0, duplicates: 0, deferred: 0, late: 0, lastReason: '', faults: {} };
   function noteFault(reason) {
     const tag = String(reason == null ? 'unknown' : reason);
     stat.faults[tag] = (stat.faults[tag] || 0) + 1;
@@ -101,10 +122,15 @@
   function row(id) { const k = str(id, 40); return k ? (rows().filter(function (x) { return x && x.id === k; })[0] || null) : null; }
   function isActive(x) { return !!x && ACTIVE.indexOf(x.status) >= 0; }
   function isTerminal(x) { return !!x && TERMINAL.indexOf(x.status) >= 0; }
+  /** 比对用归一（只去空白）：**不截断**——截断后两个长 id 会坍成同一个别名。 */
+  function sameId(a, b) { return String(a == null ? '' : a).replace(/\s+/g, '') === String(b == null ? '' : b).replace(/\s+/g, ''); }
+  /** 租约到期视图（0 或未给 = 不生效：行为与 v2.115.0 逐字一致）。 */
+  function expired(x, t) { return !!x && x.status === 'claimed' && isFinite(x.leaseUntil) && x.leaseUntil > 0 && t >= x.leaseUntil; }
   function ensure(draft) {
-    if (!draft.events || typeof draft.events !== 'object' || Array.isArray(draft.events)) draft.events = { rows: [], failQueue: [] };
+    if (!draft.events || typeof draft.events !== 'object' || Array.isArray(draft.events)) draft.events = { rows: [], failQueue: [], res: [] };
     if (!Array.isArray(draft.events.rows)) draft.events.rows = [];
     if (!Array.isArray(draft.events.failQueue)) draft.events.failQueue = [];
+    if (!Array.isArray(draft.events.res)) draft.events.res = [];
     return draft.events;
   }
   /** 多件事同时到点时的先后：优先级高者先，其次到点早者先，最后按 id 定序（不得靠插入顺序）。 */
@@ -122,6 +148,7 @@
   }
   /** 到期判定：活动态 + 未认领 + 有限时刻 + 已到点。 */
   function ready(x, t) {
+    if (expired(x, t)) return true;   // v2.116.0：租约到期 ⇒ 重新进候选（否则崩溃一次那件事就永久卡在 claimed）
     return x.status === 'pending' && isFinite(x.scheduledAt) && t >= x.scheduledAt;
   }
   /** 只读视图（**逐字段拷贝**：读面不得回传 store 内部活引用，v2.79.0 面 B）。 */
@@ -130,6 +157,7 @@
       id: x.id, kind: x.kind, title: x.title, priority: x.priority, status: x.status,
       scheduledAt: x.scheduledAt, intervalMs: x.intervalMs, condition: x.condition,
       runs: x.runs || 0, retries: x.retries || 0, lastNote: x.lastNote || '',
+      owner: x.owner || '', opId: x.opId || '', leaseUntil: isFinite(x.leaseUntil) ? x.leaseUntil : 0,
       payload: (x.payload && typeof x.payload === 'object' && !Array.isArray(x.payload)) ? Object.assign({}, x.payload) : {}
     };
   }
@@ -220,7 +248,7 @@
         intervalMs: pl.intervalMs,
         condition: pl.condition,
         payload: payload,
-        runs: 0, retries: 0, conditionMisses: 0,
+        runs: 0, retries: 0, conditionMisses: 0, claims: 0,
         createdAt: now, claimedAt: 0, executedAt: 0, lastExecutedAt: 0, lastFailAt: 0, lastNote: ''
       };
       e.rows.push(item2);
@@ -267,22 +295,69 @@
     const t0 = finite(now);
     const t = isFinite(t0) ? t0 : clockNow('events');
     const met = metSet(opts);
-    const items = [], blocked = [];
+    const o = opts || {};
+    const owner = str(o.owner, 40);
+    const asked = finite(o.max);
+    // 本轮预算：显式 `max` 优先（但不得超设置上界），否则用设置 maxClaims。
+    const budget = (isFinite(asked) && asked > 0)
+      ? Math.max(1, Math.min(Math.floor(asked), cfg.maxClaims)) : cfg.maxClaims;
+    const lease = cfg.leaseMs > 0 ? t + cfg.leaseMs : 0;
+    const items = [], blocked = [], deferred = [];
+    let reclaimed = 0;
     let out = null;
     WA.store.transact(function (draft) {
       const e = ensure(draft);
+      // ① **先回收租约到期的行**（同一事务内：回收与认领一起提交，
+      //    不留下「标回 pending 却没真让位」的中间态）。
+      //    为什么必须有这一步：`claimed` 之后若调用方崩了 / 被切聊天打断，
+      //    那一行既不再是 `pending`（不再进 due）、也不是终态（永远不会有结论）——
+      //    「正在执行」与「永远不会有人来执行」在此之前完全同形，也就是那件事被**静默丢掉**。
       e.rows.forEach(function (x) {
-        if (!x || !ready(x, t)) return;
+        if (!x || !expired(x, t)) return;
+        x.status = 'pending';
+        x.claimedAt = 0;
+        x.leaseUntil = 0;
+        x.reclaimed = (x.reclaimed || 0) + 1;
+        reclaimed++;
+      });
+      // ② 候选按**同一套定序**取（不得走插入序：位置决定命运是 v2.115.0 刚治过的病）。
+      const cands = e.rows.filter(function (x) { return x && ready(x, t); }).sort(order);
+      // ③ 条件未足者状态零变化，且**不占预算**（它们本轮本来就不会被执行）。
+      const ready2 = [];
+      cands.forEach(function (x) {
         if (!conditionMet(x, met)) {
-          // 条件未足：**不写任何字段**（状态零变化是本模块的判据之一）。
           blocked.push({ id: x.id, reason: 'condition-unmet', condition: x.condition });
           return;
         }
+        ready2.push(x);
+      });
+      // ④ 本轮取用名额。
+      const take = Math.max(0, Math.min(budget, ready2.length));
+      // ⑤ 超额者**显式留痕**（跳过了谁、为什么）——否则「本轮为什么没推进它」又要靠猜。
+      ready2.slice(take).forEach(function (x) {
+        deferred.push({ id: x.id, reason: 'budget', priority: x.priority || 0, scheduledAt: x.scheduledAt || 0 });
+      });
+      // ⑥ 认领：钉下**所有者 / 稳定操作 id / 租约**。
+      //    `opId` 默认 = id@到点时刻 —— 同一笔待办在「回收后重新认领」时得到**同一个** opId，
+      //    于是重复回执按它去重（见 complete() 的口径）。
+      ready2.slice(0, take).forEach(function (x) {
         x.status = 'claimed';
         x.claimedAt = t;
+        x.owner = owner;
+        // **本次尝试**的稳定操作 id：由「内容」派生（id@到点时刻）+ 认领序号。
+        //   为什么必须每次重钉（实测修正）：`repeat` 成功后回到 `pending` 并带**新的**
+        //   scheduledAt 再次到点、`retry` 同理；若沿用上一次的 opId，第二次回报会被
+        //   自己的台账判成 duplicate-receipt——**周期事件只能执行一次**。
+        //   序号让「同一笔的第 N 次尝试」各自成键；崩溃重试（租约回收后重新认领）
+        //   得到 `#2`，如实记下「这是重试」，不假装它是第一次。
+        x.claims = (x.claims || 0) + 1;
+        x.opId = x.id + '@' + Math.floor(x.scheduledAt || 0) + '#' + x.claims;
+        x.leaseUntil = lease;
         items.push(view(x));
       });
-      out = { ok: true, at: t, count: items.length, ids: items.map(function (x) { return x.id; }), items: items, blocked: blocked };
+      out = { ok: true, at: t, count: items.length, ids: items.map(function (x) { return x.id; }),
+        items: items, blocked: blocked, deferred: deferred, reclaimed: reclaimed,
+        budget: budget, owner: owner, leaseUntil: lease };
     }, 'events:claim');
     if (!out) return { ok: false, reason: 'store-unavailable' };
     out.items.sort(order);
@@ -290,7 +365,10 @@
     out.count = out.items.length;
     stat.claimed += out.items.length;
     stat.conditionMisses += out.blocked.length;
-    stat.lastReason = out.items.length ? 'claimed' : (out.blocked.length ? 'condition-unmet' : 'nothing-due');
+    stat.deferred += out.deferred.length;
+    stat.reclaimed += out.reclaimed;
+    stat.lastReason = out.items.length ? 'claimed'
+      : (out.blocked.length ? 'condition-unmet' : (out.reclaimed ? 'reclaimed' : 'nothing-due'));
     return out;
   }
 
@@ -307,39 +385,74 @@
     if (!rid) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     const r = res || {};
     const note = str(r.note, 80);
+    // 回执的**稳定操作 id**：调用方给的是真源（它知道这一笔到底是什么）；
+    //   未给则沿用认领时钉下的 opId —— 于是「同一笔」在崩溃重试路径上仍是同一笔。
+    const wantOp = str(r.opId, 64);
     let out = null;
     WA.store.transact(function (draft) {
       const e = ensure(draft);
       const x = e.rows.filter(function (y) { return y && y.id === rid; })[0];
       if (!x) { out = { ok: false, reason: 'missing', id: rid }; return false; }
+      // ① **重复回执**：这一笔已经回报过了 ⇒ 拒收且零变化（不记 runs、不排重试、不动状态）。
+      //    判据是「回执台账里有同一个 opId」，不是「行当前是不是 claimed」——
+      //    一行可以在回报后被回收重新认领（opId 不变），此时它**不是** claimed，
+      //    但那不代表这一笔没结算过。旧口径只看状态，于是重放会二次结算。
+      //    台账有界（与 failQueue 同口径）：极久之后的重放无法去重，如实写明，不假称完备。
+      //    优先级：**调用方显式给的 opId 优先**，行上的只作兜底。
+      //    为什么不能让行上优先（v2.116.0 实测修正）：一笔**迟到回执**若被记到「回收后新一次
+      //    尝试」的 opId 名下，新尝试自己的回执随后就会被判成 duplicate-receipt——
+      //    救回来的活反而被旧回执挡死。调用方知道它在报哪一次，就该以它为准。
+      const have = str(x.opId, 64);
+      const key = wantOp || have;
+      if (key && e.res.some(function (q) { return q && sameId(q.opId, key); })) {
+        stat.duplicates++;
+        stat.lastReason = 'duplicate-receipt';
+        out = { ok: false, reason: 'duplicate-receipt', id: rid, opId: key };
+        return false;
+      }
       if (x.status !== 'claimed') { out = { ok: false, reason: 'not-claimed', id: rid, status: x.status }; return false; }
       const now = clockNow('events');
+      // ② **迟到回执**：租约已过期才回报 ⇒ 如实计数（不动状态、不拒收——
+      //    拒收它会让调用方连「这笔做完了」都提交不了）。回收与回报谁先到，这里读得出来。
+      const lateOne = isFinite(x.leaseUntil) && x.leaseUntil > 0 && now >= x.leaseUntil;
       if (r.ok === true) {
         x.runs = (x.runs || 0) + 1;
         x.lastExecutedAt = now;
         x.lastNote = note;
+        x.leaseUntil = 0;
         if (x.kind === 'repeat' && x.runs < settings().maxRuns) {
           x.status = 'pending';
           x.scheduledAt = now + (isFinite(x.intervalMs) ? x.intervalMs : 0);
         } else if (x.kind === 'repeat') {
           x.status = 'exhausted'; x.executedAt = now;
+          // 终态清空 opId：否则台账被挤出（有界）之后，一笔**早已跑满**的周期事件会在
+          //   「租约到期 ⇒ 重新进候选」的旧路上被重新认领执行（终态不得可回卷）。
+          x.opId = '';
         } else {
           x.status = 'executed'; x.executedAt = now;
         }
-        out = { ok: true, id: rid, status: x.status, runs: x.runs };
+        // ③ 回执入台账（有界）：已完成本地副作用与这个 id 的确认**一起持久化**。
+        e.res.push({ opId: key, id: rid, at: now, ok: true, note: note });
+        if (WA.evict) WA.evict.array(e.res, 'events.res', settings().maxFails);
+        out = { ok: true, id: rid, status: x.status, runs: x.runs, opId: key, late: lateOne };
       } else {
         x.retries = (x.retries || 0) + 1;
         x.lastFailAt = now;
         x.lastNote = note;
+        x.leaseUntil = 0;
         e.failQueue.push({ id: rid, at: now, note: note, retries: x.retries });
         if (WA.evict) WA.evict.array(e.failQueue, 'events.failQueue', settings().maxFails);
-        if (x.retries >= settings().maxRetries) { x.status = 'failed'; x.executedAt = now; }
+        if (x.retries >= settings().maxRetries) { x.status = 'failed'; x.executedAt = now; x.opId = ''; }
         else { x.status = 'pending'; x.scheduledAt = now + settings().retryDelayMs; }
-        out = { ok: true, id: rid, status: x.status, retries: x.retries, failed: x.status === 'failed' };
+        e.res.push({ opId: key, id: rid, at: now, ok: false, note: note });
+        if (WA.evict) WA.evict.array(e.res, 'events.res', settings().maxFails);
+        out = { ok: true, id: rid, status: x.status, retries: x.retries, failed: x.status === 'failed',
+          opId: key, late: lateOne };
       }
     }, 'events:complete');
     if (!out) return { ok: false, reason: 'store-unavailable' };
     if (!out.ok) noteFault(out.reason);
+    else if (out.late) { stat.late++; stat.lastReason = 'late-receipt'; }
     else if (out.status === 'exhausted') { stat.exhausted++; stat.lastReason = 'exhausted'; }
     else if (out.status === 'failed') { stat.failed++; stat.lastReason = 'failed'; }
     else if (out.retries) { stat.lastReason = 'retried'; }
@@ -353,8 +466,14 @@
     if (!rid) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     let out = null;
     WA.store.transact(function (draft) {
-      const x = ensure(draft).rows.filter(function (y) { return y && y.id === rid; })[0];
+      const e = ensure(draft);
+      const x = e.rows.filter(function (y) { return y && y.id === rid; })[0];
       if (!x) { out = { ok: false, reason: 'missing', id: rid }; return false; }
+      // 终态行不可取消。v2.116.0 复核结论（负向留档）：原先加过一条
+      //   「已回报 ⇒ `already-receipted`」守卫，实测**不可达**——回报成功的那一笔已经是
+      //   `executed`/`exhausted`/`failed`，上面这句抢先返回 `not-active`；
+      //   而它唯一可达的场合（周期事件两次触发之间的 `pending`，且上一次回执还在台账里）
+      //   会把**合法的取消**挡回去：周期事件从此不可取消。故已撤除，改为守住下面这句。
       if (isTerminal(x)) { out = { ok: false, reason: 'not-active', id: rid, status: x.status }; return false; }
       x.status = 'cancelled';
       x.executedAt = clockNow('events');
@@ -434,7 +553,7 @@
         intervalMs: pl.intervalMs,
         condition: pl.condition,
         payload: pl.payload,
-        runs: 0, retries: 0, conditionMisses: 0,
+        runs: 0, retries: 0, conditionMisses: 0, claims: 0,
         createdAt: now, claimedAt: 0, executedAt: 0, lastExecutedAt: 0, lastFailAt: 0, lastNote: ''
       };
       e.rows.push(row2);

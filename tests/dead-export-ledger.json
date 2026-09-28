@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。 本版沿革：**未新增任何产品侧内联拒收码**，也**未新增任何死面条目**（dead 505 → 505、uiDead 4 → 4 逐字不变）；但证据面必须重算 —— 计划一 E1–E4 收口改了三处引擎行为：engines/events.js 抽出纯函数 plan 并把 replace 改为单事务原子替换、engines/rumor.js 的 visibleTo 由链层前置门改为跳级过滤、engines/life.js 的 tick 由静态定序改为同级按组轮转。其中 plan 把「判形取整」从 schedule/replace 里抽走 ⇒ events 这一族的 own/tref 计数整体位移（schedule tref 35→53、replace 3→14、active/cancel/schedule 各 own 4→3、stat own 22→23）；外加三把新常驻锁（tests/events-e2-v2115.js / rumor-e3-v2115.js / life-e4-v2115.js）抬高了对应族的测试引用面。故本版走 --update 是**重基线证据**，不是把新死面登记进来 —— 结构与归因分布未变，变的只是每条证据现场复算出的引用数。（v2.115.0）",
-  "version": "2.115.0",
+  "_note": "WorldAxis 死子面冻结账本。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。 本版沿革：**未新增任何产品侧内联拒收码**，也**未新增任何死面条目**（dead 505 → 505、uiDead 4 → 4 逐字不变）；但证据面必须重算 —— 计划一 E1–E4 收口改了三处引擎行为：engines/events.js 抽出纯函数 plan 并把 replace 改为单事务原子替换、engines/rumor.js 的 visibleTo 由链层前置门改为跳级过滤、engines/life.js 的 tick 由静态定序改为同级按组轮转。其中 plan 把「判形取整」从 schedule/replace 里抽走 ⇒ events 这一族的 own/tref 计数整体位移（schedule tref 35→53、replace 3→14、active/cancel/schedule 各 own 4→3、stat own 22→23）；外加三把新常驻锁（tests/events-e2-v2115.js / rumor-e3-v2115.js / life-e4-v2115.js）抬高了对应族的测试引用面。故本版走 --update 是**重基线证据**，不是把新死面登记进来 —— 结构与归因分布未变，变的只是每条证据现场复算出的引用数。（v2.115.0）本版沿革（A2 第二段）：**未新增任何死面条目**（dead 505 → 505、uiDead 4 → 4 逐字不变），走 --update 是**重基线证据** —— 计划一 A2 第二段全段落在 engines/events.js 内部（新增回执台账 `events.res` 与 `maxClaims` / `leaseMs` 两个设置键，导出成员面**零新增**，故本账本条目数不变），变的是 events 族各口现场复算出的引用数（claim 12→26、complete 7→11、schedule 53→63、replace 4→6、due 5→6、cancel 3→4、setSettings 2→3、stat 8→9、stat own 23→29；evict.siteDecls 13→15）；另有两条新拒收码（budget / duplicate-receipt）走可执行见证、不入本账。⚠ 本账本 `_note` 由 build() 重建，故每次 --update 后**人工沿革段必须重新追加**（本版实测踩到）。（v2.116.0）",
+  "version": "2.116.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -1135,7 +1135,7 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 4,
       "own": 3
     },
     "events.claim": {
@@ -1143,7 +1143,7 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 12,
+      "tref": 26,
       "own": 3
     },
     "events.complete": {
@@ -1151,7 +1151,7 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 7,
+      "tref": 11,
       "own": 3
     },
     "events.due": {
@@ -1159,7 +1159,7 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 5,
+      "tref": 6,
       "own": 3
     },
     "events.fails": {
@@ -1184,14 +1184,14 @@
       "src": "engines/events.js",
       "refs": 0,
       "tref": 14,
-      "own": 4
+      "own": 6
     },
     "events.schedule": {
       "reason": "test-only",
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 53,
+      "tref": 63,
       "own": 3
     },
     "events.setSettings": {
@@ -1199,7 +1199,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 3,
       "own": 1
     },
     "events.stat": {
@@ -1207,8 +1207,8 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 8,
-      "own": 23
+      "tref": 9,
+      "own": 29
     },
     "evict.nonEvictDecls": {
       "reason": "test-only",
@@ -1231,7 +1231,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/evict.js",
       "refs": 0,
-      "tref": 13,
+      "tref": 15,
       "own": 3
     },
     "evict.summarize": {

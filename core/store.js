@@ -188,7 +188,9 @@
       marginal: { rows: [] },
       tolerance: { round: 0, rows: [] },
       // v2.81.0 事件调度（events.js）。登记了容量却不在骨架里，冷启动直写会炸事务。
-      events: { rows: [], failQueue: [] },
+      // v2.116.0：回执台账 `events.res` 同步物化——容量表登记了精确键就必须在骨架里存在，
+      //   否则 registryParity 报「未在骨架物化」、maintain 扣健康分，且冷启动直写会炸事务。
+      events: { rows: [], failQueue: [], res: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -1102,6 +1104,7 @@
     //   与 evict.SITES 同源；运行时由 events.js 显式传当前设置值，改设置不漂移）。
     'events.rows':      { cap: 24, site: 'events.js WA.evict.array(events.rows, maxRows)（per-call，取设置上界）' },
     'events.failQueue': { cap: 24, site: 'events.js WA.evict.array(events.failQueue, maxFails)（per-call，取设置上界）' },
+    'events.res':       { cap: 24, site: 'events.js WA.evict.array(events.res, maxFails)（per-call，取设置上界；v2.116.0 回执台账）' },
     // v2.96.0 传播与辟谣一容器（rumor.js）。cap 与 evict.SITES / rumor.js 三处同源；
     //   不登记会被 sizeAudit 报 unbounded。**跳与隐瞒不在此登记**：它们是每链自带的
     //   有界数组（maxHops / maxSuppressed，满员即拒收、不挤出），不是全局环形容器。
