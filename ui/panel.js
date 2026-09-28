@@ -559,6 +559,19 @@
       <div class="wa-row"><button class="wa-btn" id="wa-pb-note" title="登记一笔手机侧操作：按 opId 幂等（重复上报返回 reused 而不是第二条——手机侧重试是常态）；不认识的动作一律拒收 unknown-act，让外部替本扩展决定因果词汇表是更坏的选项">记一笔操作</button><button class="wa-btn" id="wa-pb-view" title="入站台账视图：最近几笔 + 未接链笔数 + 手机侧推送相位（相位三态，unknown 不等于 quiet）">看台账</button></div>
       <div class="wa-row"><input id="wa-pb-chain" class="wa-input" placeholder="因果链 id（须已存在）"/><button class="wa-btn" id="wa-pb-link" title="把这笔操作接到一条因果链上：链必须已存在（接一条不存在的链 = 用桥给世界造一条因果）；已接过别的链不覆盖（静默改写会让「这条链的因」事后被换掉而没人知道）">接链</button><button class="wa-btn" id="wa-pb-trace" title="追溯：一笔操作 → 它接在哪条链上（反过来问「这条链的因是不是手机侧」由因果工作台的证据面答）">查追溯</button></div>
       <div id="wa-pb-out" class="wa-out"></div>
+      <div class="wa-sec">因果链追踪（现在这个状态从哪一步来；撤回那一步会让谁失准）</div>
+      <label class="wa-row"><input id="wa-ch-enabled" type="checkbox" ${WA.chrono && WA.chrono.getSettings().enabled ? 'checked' : ''}/> 启用因果链追踪</label>
+      <div class="wa-row"><input id="wa-ch-anchor" class="wa-input" placeholder="锚点（改了哪条设定）"/><input id="wa-ch-base" class="wa-input" placeholder="踩在哪条记录上（空=根）"/><input id="wa-ch-note" class="wa-input" placeholder="备注（可空）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-ch-record" title="登记一次变更：依赖只认显式反向引用，不按时间接近去猜">记一步</button><button class="wa-btn" id="wa-ch-stale" title="只读：哪些下游踩在已被撤回的事实上（失准名单，不悄悄修）">失准名单</button><button class="wa-btn" id="wa-ch-undo" title="试算撤销：只回答「会让你看到什么」，不写世界">试算撤销</button><button class="wa-btn" id="wa-ch-apply" title="真撤销必须二次确认：追加一条 revert，不抹历史">确认撤销</button></div>
+      <div id="wa-ch-out" class="wa-out"></div>
+      <div class="wa-sec">协作会话（谁占着哪个角色、待重放队列、两端分歧）</div>
+      <label class="wa-row"><input id="wa-co-enabled" type="checkbox" ${WA.collab && WA.collab.getSettings().enabled ? 'checked' : ''}/> 启用协作会话</label>
+      <div class="wa-row"><input id="wa-co-sid" class="wa-input" placeholder="会话 id"/><input id="wa-co-who" class="wa-input" placeholder="角色 / 操作人"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-co-open" title="打开一个会话：不限制同时在线、不踢人">开会话</button><button class="wa-btn" id="wa-co-claim" title="占用角色：已被别人占用则 claimed-by-other，不静默夺取">占角色</button><button class="wa-btn" id="wa-co-pending" title="只读：待重放队列（同 opId 不产生第二条）">待重放</button><button class="wa-btn" id="wa-co-conflicts" title="只读：尚未裁决的两端分歧（单边改动不是冲突）">未裁决冲突</button></div>
+      <div id="wa-co-out" class="wa-out"></div>
+      <div class="wa-sec">插件钩子（进程内生命周期；不做市场／REST）</div>
+      <div class="wa-row"><input id="wa-pl-name" class="wa-input" placeholder="插件名…"/><button class="wa-btn" id="wa-pl-reg" title="注册一个只记日志的 beforeSave 示例插件">注册示例</button><button class="wa-btn" id="wa-pl-unreg" title="按名字卸载已注册的插件（注册的逆操作；不留残钩）">卸载</button><button class="wa-btn" id="wa-pl-list" title="只读已注册插件">列表</button><button class="wa-btn" id="wa-pl-fire" title="只读触发计数">读数</button></div>
+      <div id="wa-pl-out" class="wa-out"></div>
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
@@ -1484,6 +1497,7 @@
       <div class="wa-sec">状态快照导出 / 恢复</div>
       <div class="wa-row"><button class="wa-btn" id="wa-snap-dl" title="导全量快照（剔除运行期脏字段，可归档/传给别人/跨聊天移植）">导出 JSON</button><button class="wa-btn" id="wa-snap-up" title="从快照文件恢复（先校验格式/schema/字段完整性，通过才写入）">导入 JSON</button><input type="file" id="wa-snap-file" aria-label="要导入的快照文件" accept=".json" style="display:none"/></div>
       <div class="wa-dim">导出剔除运行时脏字段；导入先校验（格式/schema/字段完整性），通过才写入并自动留恢复点。</div>
+      <div class="wa-row"><input id="wa-snap-faces" class="wa-input" placeholder="面名，逗号分隔（如 people,world,weather）"/><button class="wa-btn" id="wa-snap-subset" title="只导出点名的顶层面；不识别的名字进 dropped 清单，不静默带上">导出子集</button></div>
       <div id="wa-snap-out" class="wa-out"></div>
       <div class="wa-sec">外部数据导入（自动识别类型）</div>
       <div class="wa-row"><button class="wa-btn" id="wa-imp-pick">选择 JSON 文件</button><input type="file" id="wa-imp-file" aria-label="要导入的 JSON 文件" accept=".json" style="display:none"/></div>
@@ -2369,6 +2383,7 @@
       pbOut(r.ok ? { ok: true, id: r.actLabel + (r.linked ? '：已接链 ' + r.chainId : '：尚未接链（手机侧的那笔世界里的因还没被指认）') }
         : { ok: false, reason: r.reason });
     });
+
     // v2.63.0：世界织体 / 社交漩涡 / 悬案三面的面板绑定。
     //   三面各自的关键**拒绝理由**都必须看得见——它们在世界状态里都长得像「什么都没发生」：
     //     · world   —— unknown-place（地点没登记，不猜）/ unreachable（路没登记，不抄近路）
@@ -2376,6 +2391,102 @@
     //     · shadow  —— no-shadow / shadow-closed（没有可加深的秘密，不凭空升级）；
     //     · threads —— no-basis（不得凭空结案）/ conflicts-unresolved（矛盾不得被平均）。
     const wv = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const chOut = function (r) { return plainOut('wa-ch-out', 'chronoOut', r); };
+    if (panelEl.dataset.chronoOut) { const o = $('#wa-ch-out'); if (o) o.textContent = panelEl.dataset.chronoOut; }
+    { const el = $('#wa-ch-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.chrono) return chOut({ ok: false, reason: 'module-missing' });
+        WA.chrono.setSettings({ enabled: !!el.checked });
+        chOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-ch-record', () => {
+      if (!WA.chrono) return chOut({ ok: false, reason: 'module-missing' });
+      const r = WA.chrono.record(wv('#wa-ch-anchor'), wv('#wa-ch-base') || null, { note: wv('#wa-ch-note') });
+      if (r.ok) panelEl.dataset.chronoId = r.id;
+      chOut(Object.assign({}, r, { id: r.ok ? (r.id + ':layer-' + r.layer) : r.reason }));
+    });
+    on('#wa-ch-stale', () => {
+      if (!WA.chrono) return chOut({ ok: false, reason: 'module-missing' });
+      const rows = WA.chrono.stale() || [];
+      const st = WA.chrono.stat();
+      chOut({ ok: true, id: '失准 ' + rows.length + ' / 层 ' + st.layers + (rows.length ? '：' + rows.slice(0, 8).map(function (x) { return x.id || x.anchor || x; }).join('、') : '（空）') });
+    });
+    on('#wa-ch-undo', () => {
+      if (!WA.chrono) return chOut({ ok: false, reason: 'module-missing' });
+      const id = wv('#wa-ch-base') || panelEl.dataset.chronoId || '';
+      const r = WA.chrono.undo(id);
+      chOut(r.ok ? { ok: true, id: '试算 ' + r.target + ' → 将失准 ' + ((r.affected || []).length) + '（不写世界）' } : r);
+    });
+    on('#wa-ch-apply', () => {
+      if (!WA.chrono) return chOut({ ok: false, reason: 'module-missing' });
+      const id = wv('#wa-ch-base') || panelEl.dataset.chronoId || '';
+      const r = WA.chrono.applyUndo(id, { confirm: true });
+      chOut(Object.assign({}, r, { id: r.ok ? ('已撤销 ' + r.revert) : r.reason }));
+    });
+    const coOut = function (r) { return plainOut('wa-co-out', 'collabOut', r); };
+    if (panelEl.dataset.collabOut) { const o = $('#wa-co-out'); if (o) o.textContent = panelEl.dataset.collabOut; }
+    { const el = $('#wa-co-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.collab) return coOut({ ok: false, reason: 'module-missing' });
+        WA.collab.setSettings({ enabled: !!el.checked });
+        coOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-co-open', () => {
+      if (!WA.collab) return coOut({ ok: false, reason: 'module-missing' });
+      const r = WA.collab.open(wv('#wa-co-sid') || wv('#wa-co-who') || 'session');
+      if (r.ok) panelEl.dataset.collabSid = r.session;
+      if (r.ok && $('#wa-co-sid')) $('#wa-co-sid').value = r.session;
+      coOut(Object.assign({}, r, { id: r.ok ? ('会话 ' + r.session) : r.reason }));
+    });
+    on('#wa-co-claim', () => {
+      if (!WA.collab) return coOut({ ok: false, reason: 'module-missing' });
+      const sid = wv('#wa-co-sid') || panelEl.dataset.collabSid || '';
+      const r = WA.collab.claim(wv('#wa-co-who'), sid);
+      coOut(Object.assign({}, r, { id: r.ok ? ('占用 ' + r.actor) : (r.reason + (r.holder ? '（持有者 ' + r.holder + '）' : '')) }));
+    });
+    on('#wa-co-pending', () => {
+      if (!WA.collab) return coOut({ ok: false, reason: 'module-missing' });
+      const rows = WA.collab.pending() || [];
+      const st = WA.collab.stat();
+      coOut({ ok: true, id: '待重放 ' + rows.length + ' / 开会话 ' + st.openSessions });
+    });
+    on('#wa-co-conflicts', () => {
+      if (!WA.collab) return coOut({ ok: false, reason: 'module-missing' });
+      const rows = (WA.collab.conflicts() || []).filter(function (c) { return c.open; });
+      coOut({ ok: true, id: '未裁决 ' + rows.length + (rows.length ? '：' + rows.slice(0, 6).map(function (c) { return c.actor; }).join('、') : '') });
+    });
+    const plOut = function (r) { return plainOut('wa-pl-out', 'pluginOut', r); };
+    on('#wa-pl-reg', () => {
+      if (!WA.plugin) return plOut({ ok: false, reason: 'module-missing' });
+      const name = wv('#wa-pl-name') || 'demo';
+      const r = WA.plugin.register({
+        name: name,
+        version: '0',
+        hooks: {
+          beforeSave: function (ctx) {
+            this.log('intercepted save');
+            return { ok: true };
+          }
+        }
+      });
+      plOut(r);
+    });
+    on('#wa-pl-unreg', () => {
+      if (!WA.plugin) return plOut({ ok: false, reason: 'module-missing' });
+      const name = wv('#wa-pl-name');
+      if (!name) return plOut({ ok: false, reason: 'empty-name（卸载必须给定名字，不猜）' });
+      const r = WA.plugin.unregister(name);
+      plOut(r.ok ? { ok: true, removed: r.name, left: WA.plugin.list().length }
+        : { ok: false, reason: r.reason === 'not-found' ? 'not-found（这个名字没注册过）' : r.reason });
+    });
+    on('#wa-pl-list', () => {
+      if (!WA.plugin) return plOut({ ok: false, reason: 'module-missing' });
+      plOut({ ok: true, list: WA.plugin.list() });
+    });
+    on('#wa-pl-fire', () => {
+      if (!WA.plugin) return plOut({ ok: false, reason: 'module-missing' });
+      plOut(WA.plugin.stat());
+    });
     // v2.63.0: 面板出口用到的两个只读小工具。
     //   两者都只**读**当前状态、取不到就返回空，由引擎按「缺字段/缺依据」如实归因——
     //   面板不得为了让按钮「看起来能按」而替用户补一个默认值。
@@ -2869,6 +2980,14 @@
       if (dl && WA.toolSnapshot) dl.onclick = () => {
         const r = WA.toolSnapshot.download();
         $('#wa-snap-out').textContent = r.ok ? ('已导出 ' + Math.round(r.bytes / 1024) + 'KB') : ('导出失败：' + r.reason);
+      };
+      const ss = $('#wa-snap-subset');
+      if (ss && WA.toolSnapshot) ss.onclick = () => {
+        const names = ($('#wa-snap-faces').value || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (!names.length) { $('#wa-snap-out').textContent = '请先填面名（逗号分隔）'; return; }
+        const r = WA.toolSnapshot.buildSubsetPayload(names);
+        $('#wa-snap-out').textContent = '子集：' + r.subsetFaces.join('、')
+          + (r.meta.dropped.length ? '；未识别丢弃 ' + r.meta.dropped.join('、') : '；无丢弃');
       };
       const up = $('#wa-snap-up');
       const upFile = $('#wa-snap-file');
@@ -3747,7 +3866,12 @@
             worldbookSelection: '世界书选择', workflowHistory: '工作流历史',
             uninjectLedger: '撤销账本', eventLog: '事件日志', errorLog: '错误日志',
             // v2.108.0 (plan-1 #18): 与 store.LAB / toolDiag.SRC_LABEL 同源同键集（三份真源一同登记）
-            recoverBak: '后备存档读回' };
+            recoverBak: '后备存档读回',
+            // v2.114.0：审计落盘面两处读失败来源（core/audit-log.js 投递）。
+            //   三份真源缺一份，那一份的消费端就退回裸桶名——面板这格是「历史读不到」时
+            //   用户唯一能看见的读数，裸桶名等于没有归因。
+            auditlogFlush: '审计日志落盘前的历史读回',
+            auditlogRestore: '审计日志历史读回' };
           const byP = rdStore2.bySource || {};
           const srcTxtP = Object.keys(byP).filter(function (k) { return byP[k] > 0; })
             .map(function (k) { return (LAB_P[k] || k) + ' ' + byP[k]; }).join(' / ');

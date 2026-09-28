@@ -270,15 +270,25 @@
   /**
    * 某人在本链上看得到什么。**只出公开层（fact / witness）**——转述与流言不过玩家面。
    * 纯读，不改任何状态。
+   *
+   * v2.115.0（规划 01 的 E3）修的是这里的两件事：
+   *   ① 此前用**链级** `c.layer` 做前置门：一条链只要被转述过（`c.layer` 落到 `hearsay`），
+   *      连「乙亲眼见过、停在目击层」的那一跳也一并不可见——乙的可见面从 1 条变 0 条。
+   *      链的当前层回答的是「这条链现在传到哪一层了」，与「这个人自己看到过什么」
+   *      **不是同一个问题**，不能拿前者去否后者（这正是本仓反复治理的「两态不可分」）。
+   *   ② 命中多跳时此前直接取数组**最后一个**、未判层：某人的最后一跳若停在流言层，
+   *      就答出三层之外的东西。现在先按公开层筛掉，再取最后一条。
    */
   function visibleTo(person) {
     const who = clean(person, 60);
     if (!who) return { ok: false, reason: 'missing-fields' };
     const out = [];
     chains().forEach(function (c) {
-      if (!c || PUBLIC_LAYERS.indexOf(c.layer) < 0) return;
+      if (!c) return;
       const hops = Array.isArray(c.hops) ? c.hops : [];
-      const seen = hops.filter(function (h) { return h && (h.from === who || h.to === who); });
+      const seen = hops.filter(function (h) {
+        return h && (h.from === who || h.to === who) && PUBLIC_LAYERS.indexOf(h.layer) >= 0;
+      });
       if (!seen.length) return;
       const last = seen[seen.length - 1];
       out.push({ id: c.id, factKey: c.factKey, layer: last.layer, value: last.value, conf: last.conf,

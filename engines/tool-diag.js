@@ -614,6 +614,11 @@
     //   漏登记一条的后果不是「报错」，而是「自检看不见的黑盒」（inventory 的未登记模块面）。
     'core/fault-context.js': 'faultContext', 'core/schema.js': 'schema', 'core/permissions.js': 'permissions',
     'core/audit-log.js': 'auditLog', 'core/sanitize.js': 'sanitize',
+    // v2.114.0（计划二 #56/#68）：生命周期钩子 / 进程内白名单沙箱。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**。两者都有产品真消费方
+    //   （store 的 save/init 调 WA.plugin.fire、tool-diag 的诊断节读 WA.sandbox.stat），
+    //   缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    'core/sandbox.js': 'sandbox', 'core/plugin.js': 'plugin',
     'core/undo.js': 'undo',
     'core/api-router.js': 'apiRouter',
     'engines/backstage.js': 'backstage', 'engines/evolution.js': 'evolution', 'engines/enemies.js': 'enemies',
@@ -626,6 +631,7 @@
     'engines/editor-faction.js': 'editorFaction', 'engines/editor-events.js': 'editorEvents',
     'engines/inspector-state.js': 'inspectorState', 'engines/tool-snapshot.js': 'toolSnapshot',
     'engines/tool-analyzer.js': 'toolAnalyzer', 'engines/tool-import.js': 'toolImport',
+    'engines/chrono.js': 'chrono', 'engines/collab.js': 'collab',
     'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag', 'engines/contract-audit.js': 'contractAudit', 'engines/memory-sampler.js': 'memorySampler', 'engines/sampler-check.js': 'samplerCheck', 'engines/inject-channel.js': 'injectChannel', 'engines/inject-slot-audit.js': 'injectSlotAudit', 'engines/proactive.js': 'proactive', 'engines/wb-inject.js': 'wbInject', 'engines/entry-router.js': 'entryRouter', 'engines/kaleidoscope.js': 'kaleidoscope',
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
     'engines/bridge.js': 'bridge',
@@ -919,6 +925,12 @@
             //   ② 活跃时间回落 0 = 最冷 ⇒ 该聊天的诊断键会被判为可回收（**读失败诱发误删除**）。
             //   故必须与「值就是空」严格可分辨，否则用户按诊断清空间会清错东西。
             read: WA.store.readStat ? WA.store.readStat() : null,
+            // v2.113.0（A1 收口）：**闸门读数**进诊断包。
+            //   此前 `permissions.gateStat` 只被测试消费（死子面记 self-only）——
+            //   「保护到底启用了没有、闸门放行了多少次」在产品侧没有一个落点，
+            //   于是 store 的写被闸门拦下时，诊断包回答不了「为什么被拦」。
+            //   与 store 侧写入台账同址（worldState.storage），纯只读、不触发任何写。
+            permissions: (WA.permissions && WA.permissions.gateStat) ? WA.permissions.gateStat() : null,
             // v0.7.0: 楼层结算守卫观测（settles/skips 归因 / 最后结算楼层）
             settleGuard: WA.settleGuard ? (function () { try { return WA.settleGuard.stat(); } catch (e) { return null; } })() : null,
             // v0.5.0: 多实例并发观测（写入者标识 / 冲突检出 / 现场 / 外部写入）
@@ -1235,7 +1247,7 @@
   //   cond   ：条件渲染的控件（依赖状态，如「有活跃事件才渲染中止按钮」；缺失不必然是缺陷）
   //   dynamic：由 JS 动态生成的节点集合，按其容器/模板锚点守（容器缺失才是断裂）
   const UI_BINDINGS = [
-    { page: 'tools', ids: ['wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
+    { page: 'tools', ids: ['wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-faces', 'wa-snap-subset', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
       // v2.2.0: 诊断出口收口——三个新增控件同样纳入「渲染 ↔ 绑定」一致性校验
       'wa-stat-reset', 'wa-compat-view', 'wa-wf-reset',
       // v2.2.0 块5：存档恢复点 / 设置键卫生
@@ -1311,6 +1323,11 @@
        //   与 style/causal/world/rumor 同一取舍：phone-bridge.js 是产品文件，缺席本身就是断裂。
        'wa-pb-enabled', 'wa-pb-opid', 'wa-pb-act', 'wa-pb-to',
        'wa-pb-note', 'wa-pb-view', 'wa-pb-chain', 'wa-pb-link', 'wa-pb-trace', 'wa-pb-out',
+        // v2.112.0：因果链追踪 / 协作会话（人物页）。无消费方不挂；守卫表是接线面唯一真源。
+        // v2.114.0：插件生命周期钩子面（计划二 #56）。`wa-pl-unreg` 是 plugin.unregister 的
+        //   **真产品消费方**（注册的逆操作），守卫表漏登记它 = 这个按钮的 id 写错也无人发现。
+        'wa-ch-enabled', 'wa-ch-anchor', 'wa-ch-base', 'wa-ch-note', 'wa-ch-record', 'wa-ch-stale', 'wa-ch-undo', 'wa-ch-apply', 'wa-ch-out',
+        'wa-co-enabled', 'wa-co-sid', 'wa-co-who', 'wa-co-open', 'wa-co-claim', 'wa-co-pending', 'wa-co-conflicts', 'wa-co-out', 'wa-pl-name', 'wa-pl-reg', 'wa-pl-unreg', 'wa-pl-list', 'wa-pl-fire', 'wa-pl-out',
        // v2.97.0（O9）：别名面三控件（渲染在人物页「人物身份」区）。
        //   同 v2.51.0 / v2.62.0 / v2.63.0 / v2.95.0 / v2.96.0 的理由——aliasOf / bindAlias /
        //   aliasStat 是本版新增的三个导出，它们**必须有真消费方**（无消费方不挂），
@@ -1744,6 +1761,57 @@
     }, {});
   }
 
+  // ── v2.112.0：因果链追踪（只读旁观；不调 record/applyUndo） ──
+  function secPlugin() {
+    return safe(function () {
+      if (!WA.plugin || typeof WA.plugin.stat !== 'function') {
+        return { error: 'core/plugin.js 未加载（插件面读数缺席）' };
+      }
+      const st = WA.plugin.stat();
+      const sb = (WA.sandbox && WA.sandbox.stat) ? WA.sandbox.stat() : null;
+      return {
+        plugins: st.plugins, fires: st.fires, blocked: st.blocked, hookThrow: st.hookThrow,
+        lastReason: st.lastReason || '', lastHook: st.lastHook || '', lastPlugin: st.lastPlugin || '',
+        sandbox: sb ? { runs: sb.runs, denied: sb.denied, timeouts: sb.timeouts, lastReason: sb.lastReason } : { error: 'sandbox-absent' },
+        note: '只报注册/触发/拦写计数（本节目不 register、不 fire）'
+      };
+    }, {});
+  }
+
+  function secChrono() {
+    return safe(function () {
+      if (!WA.chrono || typeof WA.chrono.stat !== 'function') {
+        return { error: 'engines/chrono.js 未加载（因果链读数缺席）' };
+      }
+      const st = WA.chrono.stat();
+      const staleN = (typeof WA.chrono.stale === 'function') ? (WA.chrono.stale() || []).length : 0;
+      return {
+        enabled: !!(WA.chrono.getSettings && WA.chrono.getSettings().enabled),
+        layers: st.layers, records: st.records, reverts: st.reverts, blocked: st.blocked,
+        lastReason: st.lastReason || '', stale: staleN,
+        faults: st.faults || {},
+        note: '只报已登记变更与失准下游计数（本节目不写世界、不试演撤销）'
+      };
+    }, {});
+  }
+
+  // ── v2.112.0：协作会话 / 队列 / 冲突（只读旁观；不调 claim/flush/resolve） ──
+  function secCollab() {
+    return safe(function () {
+      if (!WA.collab || typeof WA.collab.stat !== 'function') {
+        return { error: 'engines/collab.js 未加载（协作面读数缺席）' };
+      }
+      const st = WA.collab.stat();
+      return {
+        enabled: !!(WA.collab.getSettings && WA.collab.getSettings().enabled),
+        sessions: st.sessions, openSessions: st.openSessions, pending: st.pending,
+        openConflicts: st.openConflicts, blocked: st.blocked, lastReason: st.lastReason || '',
+        faults: st.faults || {},
+        note: '只报会话/队列/未裁决冲突计数（本节目不占角色、不重放、不裁决）'
+      };
+    }, {});
+  }
+
   // ── 汇总 ──
   function collect() {
     const diag = {
@@ -1767,6 +1835,9 @@
       // v2.102.0（A2/O12）：性能基线与分层增量。与 interop 同一取舍：读数**只念现场**，
       //   不替用户跑基准（跑基准是面板出口的事）。
       perfTrace: secPerfTrace(),
+      chrono: secChrono(),
+      collab: secCollab(),
+      plugin: secPlugin(),
       compat: secCompat(),
       // v2.50.0（第三十五面）：宿主两侧 + 时间轴三节
       hostWb: secHostWb(), floorChanges: secFloorChanges(), ledgerTimeline: secLedgerTimeline(),
@@ -2269,7 +2340,14 @@
         // v2.108.0 (plan-1 #18): store 域新增归因来源（L2 自愈读后备键）。
         //   漏进本表 ⇒ 诊断包退回裸桶名；而「读不到后备键」与「没有后备键」是两种完全不同的
         //   处置建议（前者查环境/隐私模式，后者查备份周期是否跑过），不可混同。
-        recoverBak: '后备存档读回（读失败 ⇒ L2 自愈不可用）'
+        recoverBak: '后备存档读回（读失败 ⇒ L2 自愈不可用）',
+        // v2.113.0（A1 收口）: 审计落盘面新增两个 store 域归因来源。
+        //   成因与 recoverBak 同型：v2.112.0 给 auditLog 加了落盘（flush / restore），两处裸读
+        //   localStorage 却**不投递归因**——「盘坏了」与「盘上本来就没历史」在诊断上同形。
+        //   两处已补投 store.reportReadFail（与 chatcache 同一条出口），故此处必须同步贴标签：
+        //   漏进本表 = 消费端退回裸桶名，等于把「读失败静默」换成「读失败可读但读不懂」。
+        auditlogFlush: '审计日志落盘前的历史读回（读失败 ⇒ 按「无历史」重建，磁盘前缀可能被覆盖）',
+        auditlogRestore: '审计日志历史读回（读失败 ⇒ 与「本次会话没有历史」同形）'
       };
       const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
         .map(function (k) { return (SRC_LABEL[k] || k) + '×' + byS[k]; }).join('、');

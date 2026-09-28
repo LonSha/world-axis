@@ -198,6 +198,18 @@
       // v2.63.0 悬案（threads.js：调查与情报玩法面）。数组根，每案自带 leads 环。
       //   为什么与 intel 分开：intel 是「某人以为」（可以错），本模块是「查到了哪」（必须有据）。
       threads: [],
+      // v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）：因果链追踪与协作面。
+      //   两个新容器都由对应模块**唯一写入**（各自 transact 回调里 `draft.chrono` / `draft.collab`），
+      //   骨架里必须声明：v2.40.0 骨架归属门禁的规则②判的就是这件事 —— 写侧写了骨架里
+      //   没有的顶层键 ⇒ 红灯（「登记了却不在骨架里」的反向形态：**写了却没人声明**）。
+      //   后果与 v2.65.0 天气那轮同型：冷启动直写一个不存在的键会炸事务，
+      //   而任何按骨架白名单裁剪/体检的路径都不认识它。
+      //   · chrono：{ seq, entries[] }，entries 每行 = 一次锚点变更 + `base` 反向引用
+      //     （不删事实：撤销只追加 kind:'revert' 的行，见 engines/chrono.js 边界①）。
+      //   · collab：{ seq, sessions[], claims{}, queue[], conflicts[] }，四张表各自由模块
+      //     的容量设置夹住（见 core/evict.js 的两条新站点登记）。
+      chrono: { seq: 0, entries: [] },
+      collab: { seq: 0, sessions: [], claims: {}, queue: [], conflicts: [] },
       // 元信息
       meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null }
     };
@@ -445,9 +457,53 @@
   }
 
   let memCache = {}; // 内存态（当前聊天的权威副本）
+  // v2.113.0（计划一 A1）：**已确认落盘**的内存代 + 提交语义的落点。
+  //   为什么必须有它：`memCache` 此前只回答「内存里现在是哪一份」，不回答「这一份到底写进去了没有」。
+  //   于是「批退出落盘失败」与「批提交成功」在内存上完全不可分辨——未确认的候选留在 `memCache` 里，
+  //   等下一次普通保存顺带落盘（E1 现场）。`__committed` 只在**写后读回校验通过**的那条路径上推进。
+  //   不变式：`memCache !== __committed` ⇒ 本次会话存在未确认落盘的改动（可判定的错误态）。
+  let __committed = memCache;
+
+  /** v2.113.0：把内存态退回最后一个**已确认落盘**的代。绝不猜测内容，退不回去就如实返回 false。 */
+  function rollbackMemory() {
+    try {
+      if (memCache === __committed) return true;      // 已是已确认态：无需退回，也不是「退不回去」
+      if (__committed) { memCache = __committed; return true; }
+    } catch (e) {}
+    return false;
+  }
+
+  /**
+   * v2.113.0（计划一 A1）：**变更之前**的授权检查（唯一会对内部写路径说「不」的检查点）。
+   *   门控（缺省全关，行为与 v2.112.0 逐字一致）：
+   *     · 已在事务中 → 关：提交延迟给最外层，最外层才是「变更之前」；
+   *     · 未显式登记当前使用者 → 关：本仓主场景是单机，「有权限表 ⇒ 拦一切写」是灾难
+   *       （permissions 文件头登记的同一条边界）；
+   *     · 跨纪元僵尸批 → 关：那条路径由 v0.1.35 的 `stale` 分支逐字把住，字节不动。
+   *   开启时同样**绝不抛**：闸门自身异常一律放行（与 permissions 的 fail-open 同纪律）。
+   *   返回 `null` = 放行；非 null = 拒收体（不执行 mutator、不替换内存）。
+   */
+  function gateBeforeChange(opts) {
+    try {
+      // `atCommit:true` 是**提交点**的调用形态：此刻栈上恰好只应有本事务自己的 draft，
+      //   而「已在事务中 ⇒ 关」那条规则是为了避免内层重复设闸（内层会被嵌套分支提前接管）。
+      //   不区分这两个位置就是一个真缺陷：提交前复检会在自己的 draft 上短路成「放行」，
+      //   于是它虽然写着、永不生效（专锁 B11 用它做反向证据：变更中登记的无权限使用者未被拦下）。
+      if (!(opts && opts.atCommit) && __tx.length) return null;
+      if (__batch.depth > 0 && __batch.orphaned) return null;
+      if (!WA.permissions || typeof WA.permissions.gate !== 'function') return null;
+      // 刻意**不**预读 `permissions.currentUser()` 做短路：闸门自己已经把「没人登记当前使用者」
+      //   单独计到 `gateStat().off`，再读一次当前使用者会开出同一条决策的第二个读数口
+      //   （本仓点名过的「同一件事两个真源」）。放行与否只由 `gate()` 回答。
+      return WA.permissions.gate('write');
+    } catch (e) { return null; }
+  }
   // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
   let __epoch = 0; // v0.1.35: 聊天纪元——init()（含切聊天）自增，在飞批跨纪元即作废
-  const __batch = { depth: 0, dirty: false, flushes: 0, lastFlushAt: 0, epoch: 0, orphaned: false };
+  // v2.113.0（A1）：`lastFlush` 是**上一次批退出落盘的结论**（ok / reason / safe / at）。
+  //   为什么必须进只读视图：止步于「写进去」的字段正是本仓反复点名的功能级失效
+  //   （有写入方、零读者）——批落盘失败只在日志里出现一次，面板与诊断都看不到。
+  const __batch = { depth: 0, dirty: false, flushes: 0, lastFlushAt: 0, epoch: 0, orphaned: false, lastFlush: null };
   // v0.1.33: 嵌套事务栈——非空时内层 transact 直接在最外层 draft 上修改，提交延迟到最外层
   const __tx = [];
   // v0.1.30: 事务计量——按提交状态聚合计数与耗时
@@ -1095,6 +1151,15 @@
     //   与「裁剪无人知晓」两个缺陷同时存在。上限与 summarizer.js 的 CAP_SMALL/CAP_BIG 同源。
     'memory.smallSummaries': { cap: 24, site: 'summarizer.js CAP_SMALL=24（v2.13.0 补登 + 接挤出台账）' },
     'memory.bigSummaries': { cap: 8, site: 'summarizer.js CAP_BIG=8（v2.13.0 补登 + 接挤出台账）' },
+    // v2.114.0（收 v2.112.0 的容量欠账）：collab 三表 + chrono 日志。
+    //   v2.112.0 只做了「准入闸」（maxSessions / maxQueue / maxConflicts / maxLayers），
+    //   而关闭的会话、已交付的队列行、已裁决的冲突行、追加的 revert 行**没有任何挤出侧**：
+    //   准入闸管「还能不能进」，本表管「进了的怎么出去」——两件事，缺一件就是无界增长。
+    //   登记键与 evict.SITES 的 path 同名同值（上面的把门判据逐键对账）。
+    'collab.sessions':  { cap: 64,  site: 'collab.js WA.evict.array(c.sessions)' },
+    'collab.queue':     { cap: 128, site: 'collab.js WA.evict.array(c.queue)' },
+    'collab.conflicts': { cap: 64,  site: 'collab.js WA.evict.array(c.conflicts)' },
+    'chrono.entries':   { cap: 128, site: 'chrono.js WA.evict.array(c.entries)' },
     // v2.13.0: 人物档案节（people.<id>.profile.<节>）的上限**逐节不同**，上面五条具名
     //   登记已足够说明「这些数组归谁管」；挤出侧站点 people.profile 的 path 是
     //   people.*.profile.*（per-call，写的时候才由 registry 逐节取值传入），
@@ -1209,6 +1274,12 @@
         WA.log('warn', '聊天切换时存在在飞写合并批：已作废其未落盘改动（防跨聊天污染）');
       }
       memCache = this.load() || defaultWorldState();
+      __committed = memCache;   // v2.113.0（A1）：新纪元以磁盘为准，内存与已确认态同步
+      try {
+        if (WA.plugin && typeof WA.plugin.fire === 'function') {
+          WA.plugin.fire('afterLoad', { chatId: getChatId() });
+        }
+      } catch (eAL) {}
       // v2.108.0 (plan-1 #18): a fresh load starts a new backup cycle -- the first
       //   successful save of this session refreshes the `_bak` baseline once.
       try { __bakDone[getChatId()] = false; } catch (eB) {}
@@ -1421,6 +1492,36 @@
         s.meta.updatedAt = clockNow('store.meta');
         // v0.5.0: 写入者标识与全局单调序号（多实例并发防护的可观测基础）
         const cidW = chatId || getChatId();
+        // v2.112.0（计划二 #39/#70 收尾）：**写路径闸门**——v2.110.0 的 permissions 此前只被读
+        //   （audit-log 用它取当前用户），没有任何一处拿它挡下一次写，那条边界是悬空的。
+        //   这里是唯一的写入口，故闸门只落在这一处。
+        //   默认放行：无人显式登记当前使用者时（本仓主场景＝单机）一律放行；登记了但没 write 位才拦。
+        //   拦下的形态与其余失败路径一致：**返回 false + 记账 + 告警**，不抛（调用方按既有契约处理）。
+        try {
+          if (WA.permissions && typeof WA.permissions.gate === 'function') {
+            const denied = WA.permissions.gate('write');
+            if (denied) {
+              __saveStat.at = clockWall(); __saveStat.ok = false; __saveStat.reason = 'permission-denied'; __saveStat.failCount++;
+              WA.log('error', 'store.save 被权限闸门拦下：当前使用者「' + (denied.user || '(未登记)')
+                + '」没有 write 位（required=' + denied.required + '）——本次世界写**未发生**');
+              return false;
+            }
+          }
+        } catch (e) { /* 闸门自身异常不许变成「写不出去」：放行（fail-open），与 audit-log 同一条纪律 */ }
+        // v2.114.0（计划二 #56）：beforeSave 钩子。快照冻结，钩子改不了即将落盘的对象。
+        //   返回 ok:false ⇒ 拦保存（plugin-blocked）；钩子抛错不拦（观测失败 ≠ 写失败）。
+        try {
+          if (WA.plugin && typeof WA.plugin.fire === 'function') {
+            const snap = (typeof Object.freeze === 'function') ? Object.freeze(Object.assign({}, s && s.meta ? { meta: s.meta } : {})) : { meta: s && s.meta };
+            const hookR = WA.plugin.fire('beforeSave', { chatId: cidW, meta: s && s.meta, snap: snap });
+            if (hookR && hookR.ok === false) {
+              __saveStat.at = clockWall(); __saveStat.ok = false; __saveStat.reason = hookR.reason || 'plugin-blocked'; __saveStat.failCount++;
+              WA.log('error', 'store.save 被插件钩子拦下：' + (hookR.plugin || '') + '/' + (hookR.hook || 'beforeSave')
+                + '（' + (hookR.detail || hookR.reason) + '）——本次世界写**未发生**');
+              return false;
+            }
+          }
+        } catch (eH) { /* 钩子调度异常 fail-open */ }
         let conflict = null;
         try {
           const dRevRes = diskRev(cidW);
@@ -1473,6 +1574,7 @@
         }
         if (!w.ok) throw (w.error || new Error('write failed'));
         memCache = s;
+        __committed = s;   // v2.113.0（A1）：**唯一的确认落盘点**——写后读回校验已通过
         __saveStat.at = clockWall(); __saveStat.ok = true; __saveStat.bytes = byteLen(payload); __saveStat.reason = null;
         // v2.111.0（计划二 #67）：写世界是**唯一**需要留痕的动作面。
         //   位置刻意的：只在写后读回校验**通过**之后记——“记了一条 save”与“这次 save 真的落盘了”
@@ -1483,6 +1585,15 @@
               { result: 'ok', surface: 'core/store.js' });
           }
         } catch (e) { /* 审计不许改产品行为：记不上也照样返回成功 */ }
+        // v2.112.0（计划二 #67 收尾）：**落盘点**。只在「一次已被验证落盘的世界写」之后 flush。
+        //   为什么是这里而不是 `record()` 内部：见 core/audit-log.js 文件头的取舍段——
+        //   把 I/O 挂在 record 上等于把「写盘失败」的风险接进每一条产品路径（record 在拒绝
+        //   路径上会被调得很密），而世界写本身是低频动作，代价与风险都落在可解释的位置。
+        //   为什么不是「每条都写盘」：那既违反 record 的「从不抛」纪律，也会把写放大约 2×。
+        //   与上面那条 record 同理：**审计落盘失败不许让世界写失败**（返回体照旧是 true）。
+        try {
+          if (WA.auditLog && typeof WA.auditLog.flush === 'function') WA.auditLog.flush();
+        } catch (e) { /* 同上：痕迹写不出去不是世界写失败的理由 */ }
         // v2.108.0 (plan-1 #18) L2 feeder: maintain the `_bak` fallback.
         //
         // Why here, and why the verified flag is the precondition: the ONLY thing worth
@@ -1549,10 +1660,28 @@
           // v0.1.35: 批横跨了聊天纪元（init 发生在批进行中）→ 丢弃 flush
           if (__batch.orphaned || __batch.epoch !== __epoch) {
             __batch.dirty = false; __batch.orphaned = false;
+            // v2.113.0（A1）：跨纪元批的候选**从内存里也丢掉**。此前只丢落盘（`dirty=false`），
+            //   而候选是否已经替换过 `memCache` 取决于批走到哪一步——「已丢弃」那句话当时
+            //   只对存储成立，对内存不成立（本仓对「声明与事实一致」的要求不允许这种含糊）。
+            rollbackMemory();
+            __batch.lastFlush = { ok: false, at: clockWall(), safe: true, reason: 'orphaned-epoch' };
             WA.log('warn', '写合并批跨聊天纪元退出：未落盘改动已丢弃');
           } else if (__batch.dirty) {
             __batch.dirty = false;
-            try { this.save(); __batch.flushes++; __batch.lastFlushAt = clockWall(); } catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
+            let persisted = false;
+            // v2.113.0（计划一 A1）：批的**完成状态必须可判断**。此前这一行忽略 `save()` 的
+            //   返回值（`save` 失败是 `return false`，不抛），于是「批没写成」与「批写成了」
+            //   在调用方看来一模一样，而未落盘的候选留在内存里，等下一次普通保存顺带提交。
+            try { persisted = (this.save() === true); __batch.flushes++; __batch.lastFlushAt = clockWall(); }
+            catch (e) { WA.log('error', 'batch 退出落盘失败', e); }
+            if (!persisted) {
+              const safe = rollbackMemory();
+              __batch.lastFlush = { ok: false, at: clockWall(), safe: safe, reason: __saveStat.reason || 'error' };
+              WA.log('error', '写合并批退出落盘失败（' + (__saveStat.reason || 'error') + '）：本批**未提交**'
+                + (safe ? '——内存态已退回上一个已确认落盘的代' : '——且内存态没能退回（落后于落盘态，需显式处理）'));
+            } else {
+              __batch.lastFlush = { ok: true, at: clockWall(), safe: true, reason: null };
+            }
           }
         }
       }
@@ -1560,7 +1689,12 @@
     /** v0.1.31: 批深度只读视图（诊断用：>0 表示当前处于写合并作用域） */
     batchDepth() { return __batch.depth; },
     /** v0.1.32: 批健康只读视图——flushes 即「写合并后实际落盘次数」（对照 txStat.batched 观察合并率） */
-    batchStat() { return { depth: __batch.depth, dirty: __batch.dirty, flushes: __batch.flushes, lastFlushAt: __batch.lastFlushAt, orphaned: __batch.orphaned }; },
+    /** v2.113.0（A1）：批健康只读视图——flushes 即「写合并后实际落盘次数」（对照 txStat.batched 观察合并率）。
+     *  `lastFlush` 给出**上一次批退出的结论**（`{ok, at, safe, reason}`）：ok:false 时 reason 取
+     *  `permission-denied`（闸门拦下）/ `orphaned-epoch`（跨纪元丢弃）/ 落盘错误归因；safe 表示
+     *  内存态是否已退回上一个确认落盘的代。此前这个结论只写在日志里，诊断与调用方都读不到 ——
+     *  而那正是本仓点名过的「有写入方、零读者」。 */
+    batchStat() { return { depth: __batch.depth, dirty: __batch.dirty, flushes: __batch.flushes, lastFlushAt: __batch.lastFlushAt, orphaned: __batch.orphaned, lastFlush: __batch.lastFlush || null }; },
     /**
      * v0.3.0: 配额救援（内部）——配额耗尽时回收可安全释放的键并重试一次落盘。
      * 安全边界：复用 sweepStaleKeys 的保守规则（绝不碰当前聊天/settings/wb/state 本体）。
@@ -1732,7 +1866,10 @@
           // v2.108.0 (plan-1 #18): L2 自愈取回后备键时的读失败归因来源。
           //   标签缺失会让这一格在诊断上退回裸桶名，而它恰好是「世界回不去」时最该被读懂的一格：
           //   读不到后备键 ≠ 没有后备键（后者是「从未写过」，前者是「写过但环境不让读」）。
-          recoverBak: '后备存档读回（L2 自愈的取回路径）' };
+          recoverBak: '后备存档读回（L2 自愈的取回路径）',
+          // v2.113.0（A1 收口）: 审计落盘面两处裸读补投归因（与 tool-diag 的 SRC_LABEL 同批）。
+          auditlogFlush: '审计日志落盘前的历史读回（按「无历史」重建）',
+          auditlogRestore: '审计日志历史读回（与「本次会话没有历史」同形）' };
         const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
           .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');
         issues.push({ level: 'warn', key: 'storage.readFailed',
@@ -2988,12 +3125,36 @@
         recTx(clockWall() - t0, 'ok-deferred');
         return { ok: true, deferred: true, state: outer, result };
       }
+      // v2.113.0（计划一 A1）：**授权在变更之前**。此前唯一的闸门在 `save()` 里 ——
+      //   批内 transact 已经把候选推进内存、闸门的拒绝只体现为「批退出那一次 save 返回 false」，
+      //   而那个返回值此前被忽略、脏标记也早已清掉。改动后：被拒的候选**根本不产生**。
+      const preDeny = gateBeforeChange();
+      if (preDeny) {
+        recTx(clockWall() - t0, 'aborted');
+        return { ok: false, denied: true, applied: false, persisted: false,
+          reason: 'permission-denied', required: preDeny.required || 'write',
+          rejected: preDeny.reason || 'permission-denied', state: memCache };
+      }
       const draft = cloneDraft(memCache);
       __tx.push(draft);
       let result, ret;
       try { result = mutator(draft); }
       catch (e) { __tx.pop(); recTx(clockWall() - t0, 'error'); WA.log('error', 'store.transact修改异常，未提交', e); return { ok: false, error: e }; }
       if (result === false) { __tx.pop(); recTx(clockWall() - t0, 'aborted'); return { ok: false, aborted: true }; }
+      // v2.113.0（计划一 A1）：**提交前复检授权**。mutator 可以是异步的（本仓多处 `await`
+      //   在 mutator 内），两次检查之间可能发生「退出会话」或「身份切换」。授权应当按
+      //   **提交时**的权限态判定，而不是变更开始时的快照（否则「批中权限改变」这一段是漏洞）。
+      const commitDeny = gateBeforeChange({ atCommit: true });
+      if (commitDeny) {
+        __tx.pop(); recTx(clockWall() - t0, 'aborted');
+        return { ok: false, denied: true, applied: false, persisted: false,
+          reason: 'permission-denied', required: commitDeny.required || 'write',
+          rejected: commitDeny.reason || 'permission-denied', state: memCache };
+      }
+      // v2.113.0（计划一 A1）：提交前的**脏栈防御**——到达此处 `__tx` 只应含本事务自己的 draft。
+      //   若不然（未来某处忘了 pop，或 mutator 内直接调了内部提交），继续走下去会把一个
+      //   「不知道还有谁在改」的候选写成权威内存。宁可本次不提交（不改世界），也不静默污染。
+      if (__tx.length !== 1 || __tx[0] !== draft) { __tx.pop(); recTx(clockWall() - t0, 'aborted'); return { ok: false, aborted: true, conflict: true, state: memCache }; }
       // v0.1.31: 批作用域内只推进内存，落盘延迟到批退出（写合并）
       if (__batch.depth > 0 && __batch.orphaned) {
         // v0.1.35: 跨纪元僵尸批——不执行 mutator（防旧轮逻辑改写新聊天状态）
@@ -3004,12 +3165,14 @@
       if (__batch.depth > 0) {
         memCache = draft; __batch.dirty = true;
         recTx(clockWall() - t0, 'ok-batched');
-        ret = { ok: true, persisted: null, batched: true, state: draft, result };
+        // v2.113.0（A1）：`applied:true` 与 `ok` 一并给出——调用方从此不必把
+        //   「事务体执行成功」读成「世界已提交」（计划一 A1 点名的那条口径）。
+        ret = { ok: true, persisted: null, batched: true, applied: true, state: draft, result };
       } else {
         const saved = this.save(draft);
         recTx(clockWall() - t0, saved ? 'ok' : 'save-failed');
         // ok=内存事务语义（v0.1.22 契约：落盘失败不回滚内存）；persisted=v0.1.30 新增落盘结果
-        ret = { ok: true, persisted: saved, state: draft, result };
+        ret = { ok: true, persisted: saved, applied: true, state: draft, result };
       }
       __tx.pop();
       return ret;

@@ -1034,6 +1034,163 @@ function runWitness(WA) {
       if (typeof Pm2.reset === 'function') Pm2.reset();
     }
   }
+  // ── v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）：时间与因果追踪 / 协作面的十四个码 ──
+  //   同一把尺子：见证**不是声称**，用真 API 把码跑出来。
+  //   为什么这十四个码必须见证而不是进死表：它们**全部由外部输入触发**——
+  //   「锚点名给空了」「会话 id 不存在」「占用被别人拿着」「只改了一边」都是现网每天会发生的局面，
+  //   不是结构上不可达的分支（死表是留给「结构上永不可达 + 带可复算前提」的那五条的）。
+  //
+  //   两个模块的开关默认都是关（`enabled:false`），故见证先显式打开、跑完**无条件还原**：
+  //   本仓的模块态在 run.js 里是**跨 section 共享**的，留着开关会让下一节看到本段造的会话与层。
+  {
+    const Ch = WA.chrono, Cl = WA.collab;
+    if (Ch && typeof Ch.record === 'function') {
+      // 开关先打开：两模块默认 `enabled:false`（出厂即关，是刻意的），不开则第一条码只会得到 'disabled'。
+      if (typeof Ch.setSettings === 'function') Ch.setSettings({ enabled: true });
+      want('bad-anchor', 'chrono.record：锚点名为空 ⇒ 如实拒收（不记一条没有锚点的变更，v2.112.0 plan-2 #31）');
+      trip('bad-anchor', function () { return [Ch.record('').reason, Ch.record(null).reason]; });
+      want('bad-base', 'chrono.record：`base` 给了但归一后为空（纯空白）⇒ bad-base（**不**当成「这是根」——'
+        + '「他说了有个上游」与「他说没有上游」是两件事，v2.112.0）');
+      trip('bad-base', function () { return [Ch.record('witness-anchor', '   ').reason]; });
+      want('no-base', 'chrono.record：`base` 指向不存在的记录 ⇒ no-base（不静默降级成根节点：'
+        + '降级会把断链伪装成合法分层，v2.112.0）');
+      trip('no-base', function () { return [Ch.record('witness-anchor', 'witness-查无此记录').reason]; });
+      want('no-entry', 'chrono.undo：记录 id 不在图里 ⇒ no-entry（读面同样要如实归因，不返回空计划，v2.112.0）');
+      trip('no-entry', function () { return [Ch.undo('witness-查无此记录').reason, Ch.simBranch('witness-查无此记录').reason]; });
+      want('need-confirm', 'chrono.applyUndo：缺 `{confirm:true}` ⇒ need-confirm（「试算」与「真做」'
+        + '必须分开说：默认走 undo 的 dryRun，绝不默认落地，v2.112.0 plan-2 #33）');
+      trip('need-confirm', function () { return [Ch.applyUndo('witness-x').reason, Ch.applyUndo('witness-x', {}).reason]; });
+      // 还原：本段把开关打开过（默认关闭），留着会让后续 section 看到非默认态。
+      if (typeof Ch.setSettings === 'function') Ch.setSettings({ enabled: false });
+    }
+    if (Cl && typeof Cl.open === 'function') {
+      if (typeof Cl.setSettings === 'function') Cl.setSettings({ enabled: true });
+      want('bad-session', 'collab.open/close/claim：会话标识归一后为空 ⇒ bad-session（不建一个无名会话，v2.112.0 plan-2 #36）');
+      trip('bad-session', function () { return [Cl.open('').reason, Cl.close('').reason, Cl.claim('witness-actor', '').reason]; });
+      want('no-session', 'collab.close/claim：会话 id 不在册（或已关闭）⇒ no-session（**不假称成功**：'
+        + '关闭一个不存在的会话若回 ok:true，调用方会以为自己关掉了什么，v2.112.0）');
+      trip('no-session', function () { return [Cl.close('witness-S-查无此会话').reason, Cl.claim('witness-actor', 'witness-S-查无此会话').reason]; });
+      want('bad-actor', 'collab.claim/release/noteConflict：actor 为空 ⇒ bad-actor（缺字段不猜：'
+        + '不按次序编一个人名，v2.112.0 plan-2 #37）');
+      trip('bad-actor', function () { return [Cl.claim('', 'witness-S1').reason, Cl.noteConflict('', 'a', 'b').reason]; });
+      want('claimed-by-other', 'collab.claim：同一 actor 已被**另一个**会话占用 ⇒ claimed-by-other 并带出持有者'
+        + '（不夺取、不做超时夺锁 —— 让调用方自己决定，v2.112.0 plan-2 #36）');
+      trip('claimed-by-other', function () {
+        const s1 = Cl.open('witness-A', { by: 'witness-A' });
+        const s2 = Cl.open('witness-B', { by: 'witness-B' });
+        if (!s1.ok || !s2.ok) return [];
+        Cl.claim('witness-shared', s1.session);
+        return [Cl.claim('witness-shared', s2.session).reason];
+      });
+      want('bad-strategy', 'collab.resolve：策略不在封闭集合里 ⇒ bad-strategy 并附可选策略'
+        + '（**不自动裁决**：分歧怎么判必须由人显式说出，v2.112.0 plan-2 #40）');
+      trip('bad-strategy', function () { return [Cl.resolve('witness-C1', 'witness-没这个策略', { confirm: true }).reason]; });
+      want('bad-conflict', 'collab.resolve：冲突 id 归一后为空 ⇒ bad-conflict（与 bad-session 分开：'
+        + '冲突与会话是两个对象，把前者报成后者会让排查查错表，v2.112.0）');
+      trip('bad-conflict', function () { return [Cl.resolve('', 'keep-a', { confirm: true }).reason]; });
+      want('no-conflict', 'collab.resolve：冲突 id 不在册 ⇒ no-conflict（不假称裁决了一条不存在的分歧，v2.112.0 plan-2 #40）');
+      trip('no-conflict', function () { return [Cl.resolve('witness-C-查无此冲突', 'keep-a', { confirm: true }).reason]; });
+      want('one-sided', 'collab.noteConflict：只有一侧改动 ⇒ one-sided（**单边改动不是冲突**：'
+        + '把它记成冲突会让复盘时到处是「谁跟谁冲突了」的假案，v2.112.0 plan-2 #38）');
+      trip('one-sided', function () {
+        return [Cl.noteConflict('witness-actor', 'people.lin.mood', null).reason,
+          Cl.noteConflict('witness-actor', null, null).reason];
+      });
+      // 还原：开关与两个模块的默认态都要回去（本仓的模块态跨 section 共享）。
+      if (typeof Cl.setSettings === 'function') Cl.setSettings({ enabled: false });
+    }
+  }
+  // ── v2.112.0（计划二 #67 收尾）：审计**落盘**面的三个码 ──
+  //   同一把尺子：见证**不是声称**，用真 API 把码跑出来。
+  //   三个码都在「宿主坏了」这一面上，且都**由外部输入触发**（浏览器禁用存储、
+  //   配额写满、读被拒），是现网会发生的局面，故走见证而非死表。
+  //   打桩方式：临时替换 `WA.mainWin`（`lsOf()` 的真源是 `(WA.mainWin || window).localStorage`），
+  //   跑完**无条件还原** —— 本仓的宿主态跨 section 共享，留着桩会让下一节看到假宿主。
+  {
+    const Lg2 = WA.auditLog;
+    if (Lg2 && typeof Lg2.flush === 'function') {
+      const keepWin = WA.mainWin;
+      // ① 无 localStorage：`{}.localStorage` 为 undefined ⇒ lsOf() 如实给 null。
+      //    这条码存在的唯一理由就是「不许把『根本没落』说成『落盘成功』」——
+      //    返回 ok:true/written:0 会让两种局面同形，故必须真跑一次证明它是 ok:false。
+      want('storage-unavailable', 'auditLog.flush/restore：宿主没有 localStorage ⇒ 如实报 storage-unavailable'
+        + '（**不**返回 ok:true/written:0 —— 那会让「落盘成功」与「根本没落」同形，v2.112.0）');
+      trip('storage-unavailable', function () {
+        WA.mainWin = {};
+        try { return [Lg2.flush().reason, Lg2.restore().reason]; } finally { WA.mainWin = keepWin; }
+      });
+      // ② 写得进去但写失败（配额满 / 被拒）：必须归到 flush-failed，而不是让异常穿出去。
+      want('flush-failed', 'auditLog.flush：setItem 抛错 ⇒ 吞成 flush-failed（落盘失败不许把调用方搞挂，'
+        + '与 record() 的「从不抛」同一条纪律，v2.112.0）');
+      trip('flush-failed', function () {
+        WA.mainWin = { localStorage: { getItem: function () { return null; },
+          setItem: function () { throw new Error('witness quota exceeded'); } } };
+        try { Lg2.record('witness.flushfail'); return [Lg2.flush().reason]; } finally { WA.mainWin = keepWin; }
+      });
+      // ③ 读得出来但读失败（被拒 / 抛错）：必须归到 restore-failed。
+      //    与 bad-format 分开：后者是「读到了但不是我认识的东西」，前者是「根本没读到」。
+      want('restore-failed', 'auditLog.restore：getItem 抛错 ⇒ 吞成 restore-failed'
+        + '（与 bad-format 分开：前者是「没读到」，后者是「读到了但不认识」，v2.112.0）');
+      trip('restore-failed', function () {
+        WA.mainWin = { localStorage: { getItem: function () { throw new Error('witness storage denied'); },
+          setItem: function () {} } };
+        try { return [Lg2.restore().reason]; } finally { WA.mainWin = keepWin; }
+      });
+    }
+  }
+  // ── v2.113.0（计划一 A1）：提交面的两个新语义码中的**新增**那一个 ──
+  //   同一把尺子：见证**不是声称**，用真 API 把码跑出来。
+  //   · orphaned-epoch：批横跨聊天纪元（批进行中发生 init/切聊天）⇒ 该批退出时既不落盘，
+  //     其候选也从内存丢弃。这条路径**现网真的会发生**（切聊天就在事件回调里调 init），
+  //     故走见证而不是进死表——「跨纪元批的候选从内存也丢掉」这句声明必须有可执行事实。
+  //   注意：本次改动**只**新增了这一个码。`permission-denied` 是本模块**已有**的码
+  //     （`core/permissions.js` 的 has/check 已见证），`transact` 返回体里出现的是同一个字符串，
+  //     不构成新码（扫描面按**码**去重，不按位置计数）。
+  {
+    const St = WA.store;
+    if (St && typeof St.batch === 'function' && typeof St.init === 'function') {
+      want('orphaned-epoch', 'store.batch：批横跨聊天纪元（批进行中 init/切聊天）⇒ 该批退出不落盘、'
+        + '且其候选从内存一并丢弃（声明的「已丢弃」必须同时对存储与内存成立，v2.113.0 A1）');
+      trip('orphaned-epoch', function () {
+        // 用**同步抛出**的批体：`batch()` 的 finally 因而同步执行，
+        //   于是在本同步探针里就能读到上一次批退出的结论（无需 await）。
+        const p = St.batch(function () { St.init(); throw new Error('witness:orphaned-batch'); });
+        if (p && typeof p.catch === 'function') p.catch(function () {});   // 已受理：不留未处理拒绝
+        const lf = St.batchStat().lastFlush || {};
+        return [lf.reason];
+      });
+    }
+  }
+  // ── v2.114.0（计划二 #56 + #68）：四个新码必须带可执行见证 ──
+  //   同一把尺子：见证不是声称。下面四条各自区分一对本该分开的局面：
+  //   「钩子说不行」/「钩子名不存在」/「脚本自己炸了」/「跑过头了」
+  //   —— 四种都是「没成功」，但修法完全不同；塌成一个字符串就再也问不出「哪一种」。
+  {
+    const Pl = WA.plugin, Sb = WA.sandbox;
+    if (Pl && typeof Pl.register === 'function') {
+      want('unknown-hook', 'plugin.fire：钩子名不在四钩子封闭集合里（init/beforeSave/afterLoad/onRender）'
+        + '⇒ unknown-hook，不把拼错的钩子名当成「没人监听」（v2.114.0）');
+      trip('unknown-hook', function () { return [Pl.fire('witness-bogus-hook', {}).reason]; });
+      want('plugin-blocked', 'plugin.register 的 beforeSave 钩子返回 ok:false ⇒ save 前拦下（plugin-blocked）；'
+        + '「钩子说不行」与「钩子没说话」必须分开（v2.114.0）');
+      trip('plugin-blocked', function () {
+        const nm = '__witness_block';
+        Pl.register({ name: nm, hooks: { beforeSave: function () { return { ok: false, reason: 'witness' }; } } });
+        try { return [Pl.fire('beforeSave', {}).reason]; } finally { WA.plugin.unregister(nm); }
+      });
+    }
+    if (Sb && typeof Sb.run === 'function') {
+      want('sandbox-throw', 'sandbox.run：脚本自己抛错 ⇒ 吞成 sandbox-throw'
+        + '（沙箱口不许把调用方搞挂；与「Access denied」分列——前者是脚本坏了，后者是边界挡下了，v2.114.0）');
+      trip('sandbox-throw', function () { return [Sb.run(function () { throw new Error('witness sandbox'); }, {}, []).reason]; });
+      want('sandbox-timeout', 'sandbox.run：同步体跑过 timeoutMs ⇒ sandbox-timeout'
+        + '（超时是读数不是崩：仍把已完成的返回值带出供调用方判，v2.114.0）');
+      trip('sandbox-timeout', function () {
+        const r = Sb.run(function () { const t0 = Date.now(); while (Date.now() - t0 < 40) {} return 'done'; }, {}, [], { timeoutMs: 1 });
+        return [r.reason];
+      });
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

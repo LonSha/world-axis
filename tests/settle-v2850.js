@@ -271,8 +271,12 @@ const BROKEN = [
     to: "",
     why: '删掉一个源声明 ⇒ plan().unranked 必须点名（覆盖判据现形）' },
   { key: 'basis', rel: 'engines/life.js',
-    from: "      }).filter(function (r) { return r.n > 0; })\n        .sort(function (a, b) { return (b.n - a.n) || (a.i - b.i); });",
-    to: "      });",
+    // v2.115.0（规划 01 的 E4）：ranking 段重构后锚点跟写 —— 同依据者从 `(a.i - b.i)` 改为
+    //   稳定序号 `r.j`，且后面多了「按依据分组 + 同级轮转」两段。本锚点的语义没变：
+    //   **摘掉筛空壳 + 排序两步**，退回插入序口径。故 from 取现行的连续三行（筛空壳 → 编序号 → 排序），
+    //   to 只留下编序号那一步 —— 于是「空壳人物重新占满名额、有依据者一个轮不到」仍然现形。
+    from: "      }).filter(function (r) { return r.n > 0; });\n      ranked.forEach(function (r, j) { r.j = j; });\n      ranked.sort(function (a, b) { return (b.n - a.n) || (a.j - b.j); });",
+    to: "      });\n      ranked.forEach(function (r, j) { r.j = j; });",
     why: '退回插入序口径（有依据者不再优先）⇒ 空壳人物重新占满名额、有依据者一个轮不到' }
 ];
 function specAnchors(spec) {

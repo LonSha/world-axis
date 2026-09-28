@@ -1,5 +1,5 @@
 /**
- * WorldAxis core/permissions.js (v2.110.0) — 权限系统与角色管理（计划二 #39 / #70 同一机制两处消费）
+ * WorldAxis core/permissions.js (v2.112.0) — 权限系统与角色管理（计划二 #39 / #70 同一机制两处消费）
  *
  * ── 病灶（它治什么）────────────────────────────────────────────────────
  *   本仓有「谁能改什么」的全部**前提**（`store.save` 的写入口、`core/undo.js` 的操作栈、
@@ -9,9 +9,14 @@
  *   两处病灶同源，故本模块**只做一处机制**：角色 → 权限位 → 判定。
  *
  * ── 三条设计边界（都是否定式）──────────────────────────────────────────
- *   ① **审计模式，不改变产品行为**：`check()` 只回答「允不允许」，**不阻断**任何既有调用。
- *      本仓的写路径全部是产品内部路径（不是多用户 API），在这里硬拦会把卡面自己写死。
- *      真正的阻断留给未来的 server/api 层 —— 那时它调用同一个 `check()`。
+ *   ① **判定与阻断是两件事**：`has()` / `check()` 只回答「允不允许」，**不阻断**任何调用 ——
+ *      这条永远成立。v2.112.0 起新增**显式闸门** `gate()`（消费方是 `core/store.js` 的 `save()`）：
+ *      只有在调用方**显式**登记了当前使用者（`session(name)`）且该使用者自己没有 `write` 位时，
+ *      写才被拦下。**没有登记当前使用者时一律放行** —— 本仓的主场景就是单机，
+ *      「有权限表 ⇒ 拦一切写」会让面板保存被自己的权限表挡回去。
+ *      取舍理由：v2.110.0 把阻断「留给未来的 server/api 层」，而 server 层已判不做（仓库红线），
+ *      于是这条边界此前是**悬空的**：判定接了真调用方（audit-log 读它取当前用户），
+ *      却没有任何一处拿它挡下一次写。v2.112.0 把它落到唯一的写入口上，同时保留单机默认放行。
  *   ② **未声明 ≠ 允许**：`has()` 对**未注册**用户返回 `allowed:false` + `reason:'unknown-user'`。
  *      「谁都没说不行」与「说了行」是两件事（本仓 `default answer` 的纪律）。
  *   ③ **通配只认一种写法**：`'*'` 是唯一的全域权限位；`'actor.*'` 这类前缀通配**支持**，
@@ -119,10 +124,16 @@
     const out = { ok: false, allowed: false, user: u, action: a, via: '', reason: '' };
     if (!u || !a) { out.reason = 'missing-args'; _stat.denied++; return out; }
     const rec = USERS[u];
-    if (!rec) { out.reason = 'unknown-user'; _stat.unknownUser++; _stat.denied++; return out; }
-    if (WA.auditLog && typeof WA.auditLog.record === 'function') {
+    // v2.112.0：**未注册用户也是「被拒」的一种**，同样要留痕 —— 原先这条审计写在了早退**之后**
+    //   （`return out` 不可达；v2.78.0 第十二面的规矩：永不执行的码要么造见证、要么进死表）。
+    //   它不该进死表：`unknown-user` 是本模块最要命的一种拒绝，而「没有这条记录」与「当时被拒了」
+    //   在排查时读起来一模一样。故把留痕块提到早退**之前**执行。
+    //   下一行**保持原样逐字不动**：tests/permissions-v2110.js 的负控制 N1 锚点指着它
+    //   （「锚点恰中 1 次」是那条判据的前置）。
+    if (!rec && WA.auditLog && typeof WA.auditLog.record === 'function') {
       try { WA.auditLog.record('permissions.deny', { user: u, action: a, reason: 'unknown-user' }, { result: 'denied', surface: 'core/permissions.js' }); } catch (e) {}
     }
+    if (!rec) { out.reason = 'unknown-user'; _stat.unknownUser++; _stat.denied++; return out; }
     const eff = effective(u) || [];
     if (eff.indexOf('*') >= 0) { out.ok = true; out.allowed = true; out.via = '*'; _stat.allowed++; return out; }
     if (eff.indexOf(a) >= 0) {
@@ -164,6 +175,57 @@
     return body;
   }
 
+  /* ── v2.112.0：闸门开关与当前使用者（收 v2.110.0 边界①的「不阻断」尾巴）──────
+   *
+   * 为什么需要一开关，而不是「有用户就自动拦」：
+   *   本仓的写路径**全部是产品内部路径**（45 处 store.save 调用点：面板保存、事务提交、
+   *   批退出落盘……），没有任何一处带着「谁按的按钮」这个信息。若「登记了某个用户 ⇒ 立刻
+   *   拦所有写」，那么单机使用者在面板里点一下保存就会被自己的权限表挡回去 —— 那是灾难。
+   *   故这里的语义是**显式启用**：`WA.permissions.session(name)` 是一次明确的
+   *   「从现在起，这个人是当前使用者」，此后写路径才要求 `write` 位。
+   *
+   * 与边界②（未声明 ≠ 允许）不矛盾，两条管的不是同一个问题：
+   *   · 边界②是对**判定函数**说的：`has(未注册用户)` 必须答 `allowed:false`。这条永远成立，
+   *     不受本开关影响（`has()` 一个字节都没改）。
+   *   · 本开关是对**写路径**说的：`WA.permissions` 是否具备「拦下产品内部写」的资格。
+   *     判据不同是本仓屡次踩过的坑（把「谁都没说不行」与「闸门没启用」读成同一件事）。
+   */
+  let _session = null;
+  let _gates = 0, _gatesAllowed = 0;
+  // v2.113.0（计划一 A1）：「保护**没启用**」也要单独可数。此前「没人登记当前使用者」
+  //   与「查过了、允许」都返回 `null`，读数上也分不出来 ⇒ 闸门形同虚设时看起来一切正常
+  //   （本仓反复点名的「没查 ≠ 通过」）。行为一个字不改（单机默认放行是刻意的），
+  //   改的是可分辨性：这一格单独计数，`gateStat().off` 读它。
+  let _gatesOff = 0;
+  /** 登记当前使用者（传空字符串 = 退出会话，闸门随之关闭）。 */
+  function session(user) {
+    const u = txt(user, 60);
+    _session = u || null;
+    return { ok: true, user: _session };
+  }
+  function currentUser() { return _session; }
+  /**
+   * 写路径闸门（**唯一实现**；`core/store.js` 的 `save()` 是唯一消费方）。
+   *   返回 `null` = 放行；返回拒收体 = 拦下（形态与 `check()` 一致）。
+   *   **默认放行**的三种情形，逐条都是刻意的：
+   *     ① 无当前使用者（单机场景，本仓的主场景）；
+   *     ② 调用方 `{auditOnly:true}`（诊断/测试需要无条件写）；
+   *     ③ 当前使用者自己没登记过 `write` 位 —— 这是**唯一**会拦的情形。
+   *   为什么不返回 `{allowed:true}`：本仓的放行形态一律是「无异议时不留噪声」（`check` 同款）。
+   */
+  function gate(action, opts) {
+    _gates++;
+    if (opts && opts.auditOnly) { _gatesAllowed++; return null; }
+    if (!_session) { _gatesOff++; _gatesAllowed++; return null; }
+    const r = has(_session, action);
+    if (r.allowed) { _gatesAllowed++; return null; }
+    return { ok: false, reason: r.reason === 'unknown-user' ? 'unknown-user' : 'permission-denied',
+      user: _session, required: 'write', action: txt(action, 40) || 'write' };
+  }
+  // v2.113.0（A1）：`off` = 因「没人登记当前使用者」而放行的次数——与 `allowed` 分开读，
+  //   否则「保护没开」与「保护开着且放行」在面板上是同一个数字。
+  function gateStat() { return { active: !!_session, user: _session, gates: _gates, allowed: _gatesAllowed, denied: _gates - _gatesAllowed, off: _gatesOff }; }
+
   /** 权限矩阵（用户 × 判定面）——诊断/UI 用；纯只读。 */
   function matrix(actions) {
     const acts = (Array.isArray(actions) && actions.length ? actions : ACTIONS).map(function (a) { return txt(a, 40); }).filter(Boolean);
@@ -176,13 +238,24 @@
   function stat() {
     return { checks: _stat.checks, allowed: _stat.allowed, denied: _stat.denied,
       unknownUser: _stat.unknownUser, grants: _stat.grants, revokes: _stat.revokes,
+      // v2.112.0：闸门读数（写路径真被拦了几次、放行了几次——「拦了」与「没查」必须可分）
+      gates: _gates, gatesAllowed: _gatesAllowed, gatesDenied: _gates - _gatesAllowed,
+      session: _session,
       users: Object.keys(USERS).length, roles: Object.keys(ROLES).sort(), actions: ACTIONS.slice() };
   }
-  function reset() { Object.keys(USERS).forEach(function (k) { delete USERS[k]; }); Object.keys(_stat).forEach(function (k) { _stat[k] = 0; }); }
+  function reset() {
+    Object.keys(USERS).forEach(function (k) { delete USERS[k]; });
+    Object.keys(_stat).forEach(function (k) { _stat[k] = 0; });
+    // v2.112.0：会话也是**状态面**（与用户表同族），reset 必须一并清 ——
+    //   留着会话会让「reset 之后谁在写」变成上一节的残留，而本仓的模块态在 run.js 里是跨 section 共享的。
+    _session = null; _gates = 0; _gatesAllowed = 0; _gatesOff = 0;
+  }
 
   WA.permissions = {
     defineRole: defineRole, grant: grant, revoke: revoke, grantDirect: grantDirect,
     effective: effective, has: has, can: can, check: check, matrix: matrix,
-    stat: stat, reset: reset, ROLE_LABELS: ROLE_LABELS, ACTIONS: ACTIONS.slice()
+    stat: stat, reset: reset, ROLE_LABELS: ROLE_LABELS, ACTIONS: ACTIONS.slice(),
+    // v2.112.0（收 v2.110.0 边界①的尾巴）：显式闸门 + 当前使用者。写路径的唯一消费方是 core/store.js。
+    session: session, currentUser: currentUser, gate: gate, gateStat: gateStat
   };
 })();

@@ -32,6 +32,11 @@
     //   名额不足（skipped）与协作未被回应（unreciprocated）是两件事：
     //   前者是资源约束，后者是**依据不足**。合成一个数就再也答不出该加名额还是该等对方。
     skipped: 0, unreciprocated: 0 };
+  // v2.115.0（规划 01 的 E4）：**同等依据者的轮转游标**（进程态，与 `skipped` 同族——
+  //   它记的是「这一轮从谁开始」，不是世界事实，故不落存档）。
+  //   为什么必须有它：静态排序 + 截断 ⇒ 同等依据的后段人物每一轮都被跳过，
+  //   而 `skipped` 只答「这一轮少推了几个人」，答不出「谁总也没轮到」。
+  let _turn = 0;
 
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function personId(name) { const n = clean(name, 60); return n ? 'p_' + n : ''; }
@@ -160,11 +165,46 @@
       };
       const ranked = Object.keys(draft.people || {}).map(function (id, i) {
         return { id: id, n: basisOf(id), i: i };
-      }).filter(function (r) { return r.n > 0; })
-        .sort(function (a, b) { return (b.n - a.n) || (a.i - b.i); });
+      }).filter(function (r) { return r.n > 0; });
+      ranked.forEach(function (r, j) { r.j = j; });
+      ranked.sort(function (a, b) { return (b.n - a.n) || (a.j - b.j); });
+      const N = ranked.length;
+      // v2.115.0（规划 01 的 E4）：**同等依据者按组轮转定序**。
+      //   旧口径同依据时固定按进场下标（`a.i - b.i`）+ 截断 —— 6 人同等依据、名额 4 时，
+      //   后两位**每一轮都被跳过**：`skipped` 有账，但「谁总也没轮到」不可见，
+      //   那两个人永远拿不到 `lastDecision`（静态排序 + 截断 = 位置决定命运）。
+      //   现口径分两层：
+      //     ① 组间**严格按下标**（依据多者绝对优先，同级才谈公平）；
+      //     ② 名额切点**所在的那一组**按 `_turn` 环形轮转 —— 每轮从上一轮的末尾接下去，
+      //        该组 `ceil(G / take)` 轮之内每人都排到过每一位。
+      //   为什么不是「全体一个大环」：那样某轮会把低依据者排在高依据者之前，
+      //   把「依据优先」这条更硬的规则破坏掉。轮转只在同级、只在切点处发生。
+      const groups = [];
+      ranked.forEach(function (row) {
+        const last = groups.length ? groups[groups.length - 1] : null;
+        if (last && last.n === row.n) last.rows.push(row);
+        else groups.push({ n: row.n, rows: [row] });
+      });
       // 名额不足时**必须留痕**：静默少推演一个人，与「他本来没事可做」在读数上长得一样。
-      skipped = Math.max(0, ranked.length - cfg.maxPeople);
-      ranked.slice(0, cfg.maxPeople).forEach(function (row) {
+      skipped = Math.max(0, N - cfg.maxPeople);
+      let rest = Math.max(0, cfg.maxPeople);
+      const picks = [];
+      groups.forEach(function (g) {
+        if (rest <= 0) return;
+        const G = g.rows.length;
+        const take = Math.min(G, rest);
+        let seq = g.rows;
+        // 整组装得下 ⇒ 不轮转（轮转只在「有人要等」的地方才有意义）；
+        // 只在这组装不下时把游标推进 `take`，于是下一轮从这一轮的末尾接着取。
+        if (take < G) {
+          const shift = _turn % G;
+          seq = g.rows.slice(shift).concat(g.rows.slice(0, shift));
+          _turn = (_turn + take) % G;
+        }
+        picks.push.apply(picks, seq.slice(0, take));
+        rest -= take;
+      });
+      picks.forEach(function (row) {
         const id = row.id;
         const p = draft.people[id]; if (!p || !p.life) return;
         const life = ensureLife(p);
@@ -217,6 +257,9 @@
     ACTIONS: ['wait', 'advance', 'ask', 'hide', 'seek', 'pause', 'keep'], COMMITMENTS: COMMITMENTS,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     addGoal: addGoal, addCommitment: addCommitment, addSchedule: addSchedule, tick: tick, decide: decide, buildBlock: buildBlock,
-    stat: function () { return Object.assign({}, stat); }
+    // v2.115.0（规划 01 的 E4）：`lastTurn` 挂在**既有成员** `stat()` 的返回里
+    //   （不改导出面：本仓纪律是「零消费能力当场删」，为读一个游标新开一口会立即变成死导出）。
+    //   它不落存档，故不进 store、不新增容器键。写侧只有 tick 一处。
+    stat: function () { return Object.assign({}, stat, { lastTurn: _turn }); }
   };
 })();

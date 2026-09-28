@@ -155,7 +155,8 @@ const NS_FIELD_MAP = {
   store: 'core/store.js',
   clock: 'core/clock.js',
   rand: 'core/rand.js',
-  digest: 'engines/digest.js'
+  digest: 'engines/digest.js',
+  registerModule: 'core/store.js'
 };
 
 /**

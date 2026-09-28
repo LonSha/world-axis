@@ -1,13 +1,13 @@
 {
- "version": "2.111.0",
- "loadOrderCount": 120,
- "loadedCount": 117,
+ "version": "2.115.0",
+ "loadOrderCount": 124,
+ "loadedCount": 121,
  "uiCount": 3,
- "nsCount": 125,
+ "nsCount": 129,
  "totals": {
-  "loadEdges": 23,
+  "loadEdges": 25,
   "hardEdges": 0,
-  "callRefs": 44,
+  "callRefs": 48,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -27,6 +27,8 @@
    "consumedBy": [
     "actors/monologue.js",
     "actors/profile.js",
+    "core/plugin.js",
+    "core/sandbox.js",
     "direction/oracle.js",
     "direction/tags.js",
     "engines/backstage.js",
@@ -179,6 +181,47 @@
    "requiresFiles": [],
    "providerOrderOk": true,
    "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "core/plugin.js",
+    "core/sandbox.js"
+   ]
+  },
+  "core/sandbox.js": {
+   "ns": [
+    "sandbox"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/plugin.js": {
+   "ns": [
+    "plugin"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
@@ -1657,6 +1700,34 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_ckpt_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/chrono.js": {
+   "ns": [
+    "chrono"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_chrono_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/collab.js": {
+   "ns": [
+    "collab"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_collab_settings_v1"
    ],
    "consumedBy": []
   },

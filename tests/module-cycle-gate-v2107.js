@@ -149,19 +149,20 @@ function runAll(A) {
 
   // ── B 运行时（现场真跑） ──
   const a = M.audit();
-  A(a.files === 121 && a.aliasFiles === 121 && a.refFiles === 119,
+  A(a.files === 125 && a.aliasFiles === 125 && a.refFiles === 123,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
-  A(a.edgesLoad === 23 && a.edgesCall === 886 && a.edgesAll === 909 && a.identityOk,
+  A(a.edgesLoad === 25 && a.edgesCall === 915 && a.edgesAll === 940 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
-    + '（运行期定案 23 条装载期读；静态引用 909 条里 886 条是调用期，'
+    + '（运行期定案 25 条装载期读；静态引用 940 条里 915 条是调用期，'
     + '拿 909 判次序会报 281 条噪声；v2.110.0（计划一 #21/#22 + 计划二 #39/#70）新增 core/fault-context.js / core/schema.js / core/permissions.js 三文件后：装载期边 23 不变、调用期 +9（归因为提供方）、文件面 +3）'
-    + ' v2.111.0（计划二 #67/#69）新增 core/audit-log.js（auditLog）与 core/sanitize.js（sanitize）两文件后：装载期边 23 不变、调用期 +5（store 的审计写入 + permissions 两处拒绝留痕 + 面板字面调用 sanitize）、文件面 +2）');
-  A(a.edgesLoad >= 20 && a.orderLen === 120,
+    + ' v2.111.0（计划二 #67/#69）新增 core/audit-log.js（auditLog）与 core/sanitize.js（sanitize）两文件后：装载期边 23 不变、调用期 +5（store 的审计写入 + permissions 两处拒绝留痕 + 面板字面调用 sanitize）、文件面 +2）'
+    + ' v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）新增 engines/chrono.js（chrono）与 engines/collab.js（collab）两文件后：装载期边 23 不变、调用期 +15（chrono 只读 store/clock、collab 只读 store/inputGuard，两者都不在装载期读 WA）、文件面 +2）' + ' v2.114.0（计划二 #56/#68）新增 core/sandbox.js（sandbox）与 core/plugin.js（plugin）两文件后：装载期边 23 → 25（两模块尾部都调 WA.registerModule 登记自己，而 registerModule 由 store 提供 ⇒ 各多 1 条装载期硬边；两者初版排在 store 之前，现场报 2 条 order-violation，已移到 store 之后修正）、调用期 +12（store 两处 WA.plugin.fire + tool-diag 诊断节 + 面板字面调用）、文件面 +2） v2.114.0 收口：engines/collab.js（prune 三处）与 engines/chrono.js（entries 落盘后挤出）各接 WA.evict.array ⇒ 调用期再 +2（915 / 940，2 条新站点引用 core/evict.js）');
+  A(a.edgesLoad >= 20 && a.orderLen === 124,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
-  A(a.nsProvided === 150 && a.nsLedger === 125 && a.nsRead === 140,
+  A(a.nsProvided === 154 && a.nsLedger === 129 && a.nsRead === 144,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');

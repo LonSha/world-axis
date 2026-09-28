@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.111.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.111.0",
+  "_note": "WorldAxis 死子面冻结账本。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。 本版沿革：**未新增任何产品侧内联拒收码**，也**未新增任何死面条目**（dead 505 → 505、uiDead 4 → 4 逐字不变）；但证据面必须重算 —— 计划一 E1–E4 收口改了三处引擎行为：engines/events.js 抽出纯函数 plan 并把 replace 改为单事务原子替换、engines/rumor.js 的 visibleTo 由链层前置门改为跳级过滤、engines/life.js 的 tick 由静态定序改为同级按组轮转。其中 plan 把「判形取整」从 schedule/replace 里抽走 ⇒ events 这一族的 own/tref 计数整体位移（schedule tref 35→53、replace 3→14、active/cancel/schedule 各 own 4→3、stat own 22→23）；外加三把新常驻锁（tests/events-e2-v2115.js / rumor-e3-v2115.js / life-e4-v2115.js）抬高了对应族的测试引用面。故本版走 --update 是**重基线证据**，不是把新死面登记进来 —— 结构与归因分布未变，变的只是每条证据现场复算出的引用数。（v2.115.0）",
+  "version": "2.115.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -136,6 +136,14 @@
       "src": "core/audit-log.js",
       "refs": 0,
       "tref": 0,
+      "own": 3
+    },
+    "auditLog.restore": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "core/audit-log.js",
+      "refs": 0,
+      "tref": 3,
       "own": 3
     },
     "auditLog.stat": {
@@ -618,6 +626,38 @@
       "tref": 0,
       "own": 8
     },
+    "chrono.derives": {
+      "reason": "self-only",
+      "detail": "engines/chrono.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/chrono.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "chrono.diff": {
+      "reason": "self-only",
+      "detail": "engines/chrono.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/chrono.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "chrono.layer": {
+      "reason": "test-only",
+      "detail": "engines/chrono.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/chrono.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 5
+    },
+    "chrono.simBranch": {
+      "reason": "self-only",
+      "detail": "engines/chrono.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/chrono.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "clock.advance": {
       "reason": "self-only",
       "detail": "core/clock.js 内部自用、外部零引用（过度导出）",
@@ -681,6 +721,78 @@
       "refs": 0,
       "tref": 0,
       "own": 4
+    },
+    "collab.active": {
+      "reason": "self-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "collab.close": {
+      "reason": "self-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "collab.enqueue": {
+      "reason": "self-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "collab.flush": {
+      "reason": "self-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "collab.holderOf": {
+      "reason": "test-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "collab.noteConflict": {
+      "reason": "self-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "collab.release": {
+      "reason": "self-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "collab.resolve": {
+      "reason": "self-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "collab.sessions": {
+      "reason": "self-only",
+      "detail": "engines/collab.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/collab.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 22
     },
     "compat.diagnose": {
       "reason": "unwired",
@@ -1015,7 +1127,7 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 3,
       "own": 4
     },
     "events.cancel": {
@@ -1024,14 +1136,14 @@
       "src": "engines/events.js",
       "refs": 0,
       "tref": 3,
-      "own": 4
+      "own": 3
     },
     "events.claim": {
       "reason": "test-only",
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 11,
+      "tref": 12,
       "own": 3
     },
     "events.complete": {
@@ -1071,7 +1183,7 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 14,
       "own": 4
     },
     "events.schedule": {
@@ -1079,15 +1191,15 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 35,
-      "own": 4
+      "tref": 53,
+      "own": 3
     },
     "events.setSettings": {
       "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 1
     },
     "events.stat": {
@@ -1096,7 +1208,7 @@
       "src": "engines/events.js",
       "refs": 0,
       "tref": 8,
-      "own": 22
+      "own": 23
     },
     "evict.nonEvictDecls": {
       "reason": "test-only",
@@ -2368,7 +2480,7 @@
       "src": "core/permissions.js",
       "refs": 0,
       "tref": 0,
-      "own": 6
+      "own": 7
     },
     "permissions.matrix": {
       "reason": "self-only",
@@ -2393,6 +2505,14 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "permissions.session": {
+      "reason": "self-only",
+      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
+      "src": "core/permissions.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
     },
     "permissions.stat": {
       "reason": "self-only",
@@ -2801,14 +2921,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "sanitize.text": {
-      "reason": "self-only",
-      "detail": "core/sanitize.js 内部自用、外部零引用（过度导出）",
-      "src": "core/sanitize.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 6
     },
     "sanitize.tpl": {
       "reason": "self-only",
@@ -3480,7 +3592,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 78
+      "own": 81
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -3664,7 +3776,7 @@
       "src": "engines/tool-snapshot.js",
       "refs": 0,
       "tref": 0,
-      "own": 6
+      "own": 7
     },
     "toolSnapshot.toJSON": {
       "reason": "test-only",
@@ -3679,7 +3791,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/tool-snapshot.js",
       "refs": 0,
-      "tref": 5,
+      "tref": 6,
       "own": 3
     },
     "warrant.getSettings": {
@@ -3946,7 +4058,7 @@
       "src": "ui/panel.js",
       "refs": 0,
       "tref": 25,
-      "own": 2
+      "own": 4
     },
     "ui.pages": {
       "reason": "test-only",
@@ -3966,6 +4078,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 184
+    "dataOnly": 191
   }
 }

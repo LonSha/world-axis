@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.111.0'
+  const VERSION = '2.115.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -220,6 +220,12 @@
     'core/audit-log.js', 'core/sanitize.js',
     'core/settings-bus.js',
     'core/store.js',
+    // v2.114.0（计划二 #56/#68）：生命周期钩子与进程内白名单沙箱。
+    //   位置**必须**在 store 之后：两模块尾部都调 WA.registerModule 登记自己
+    //   （registerModule 由 store 提供），排在 store 之前会 order-violation 装载期抛错。
+    //   调用期关系是反向的——store 在 save/init 里读 WA.plugin.fire，plugin 的钩子体走 WA.sandbox.run，
+    //   都在调用期取，故排在 store 之后不产生环。
+    'core/sandbox.js', 'core/plugin.js',
     'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）
     'core/api-router.js',
     'core/undo.js',           // v2.30.0: 参数编辑撤销栈（P0-2；须在 store 之后、UI 之前装载）
@@ -365,6 +371,14 @@
     // v2.82.0: 快照与分支（B3）。**无核心依赖**（只读 store.get / store.transact），
     //   位置只需早于 render/inject.js 的消费点（注入块与事件调度同批）。
     'engines/checkpoints.js',
+    // v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）：因果链追踪与协作面。位置与 tests/run.js 的 LOAD 同序。
+    //   · chrono 只读 `store.get/transact` 与 `clock.wallNow`，**不读**任何引擎出口 —— 故对次序无硬依赖，
+    //     放在 engines 区末尾（与 checkpoints 同批的「无核心依赖」面）。
+    //   · collab 同理（只读 store 与 inputGuard），两者都不在装载期读 WA，与 settings-bus 的次序无关。
+    //   为什么排在 render/inject.js **之前**：本版两者都没有注入消费点（不产 buildBlock），
+    //     但按惯例「engines 区一律早于 render」，以免后续接消费方时被迫改装载序。
+    'engines/chrono.js',
+    'engines/collab.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

@@ -56,6 +56,42 @@
     };
   }
 
+  /**
+   * v2.114.0（计划二 #59）：子集导出——只导出调用方点名的顶层面。
+   *   为什么是白名单（而不是黑名单）：存档面会长，黑名单永远跟不上，
+   *   新增的面会在「子集导出」里被静默带上。不识别的名字不是“接受”也不是“拒绝”，
+   *   而是如实进 dropped 清单（不静默、不猜）。
+   *   返回的载荷仍旧带 subset 标记（子集形态），restore 会以 subset-partial 拒收它。
+   */
+  function buildSubsetPayload(names, opts = {}) {
+    const state = WA.store.get() || {};
+    const want = Array.isArray(names) ? names : [];
+    const kept = {};
+    const dropped = [];
+    const seen = {};
+    want.forEach(function (k) {
+      const key = (k == null) ? '' : String(k);
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      if (!Object.prototype.hasOwnProperty.call(state, key)) { dropped.push(key); return; }
+      kept[key] = sanitize(deepClone(state[key]));
+    });
+    return {
+      worldaxis: FORMAT, subset: true, subsetFaces: Object.keys(kept),
+      exportedAt: new Date().toISOString(),
+      chatId: WA.store.chatId ? WA.store.chatId() : 'unknown',
+      chatLabel: opts.label || (state.clock && state.clock.label) || '',
+      schemaVersion: state.schemaVersion || 1,
+      state: kept,
+      meta: { subset: true, faces: Object.keys(kept), dropped: dropped, engineVersion: WA.version || '?' }
+    };
+  }
+
+  // 注：v2.114.0 首版这里还有一个 subsetJSON(names) 出口，但它的**唯一**消费者是测试
+  //   ⇒ 死导出（test-only）。子集导出真正需要的出口是 download({ payload })：面板先
+  //   buildSubsetPayload() 拿到载荷（据 dropped 如实报告），再交给同一条序列化/下载路径带出去。
+  //   于是导出面只留 buildSubsetPayload，不再多一个「只有测试读」的成员。
+
   /** 生成导出载荷（纯函数，不改 store） */
   function buildPayload(opts = {}) {
     const state = WA.store.get();
@@ -82,6 +118,10 @@
       catch (e) { return { ok: false, problems: ['不是合法 JSON：' + e.message] }; }
     }
     if (!data || typeof data !== 'object') return { ok: false, problems: ['载荷不是对象'] };
+    // v2.114.0（#59）：子集载荷是「读口」而不是「恢复口」。敢恢复它就是把未导出的面当成「该面本就是空的」写掉。
+    if (data.subset === true) {
+      return { ok: false, problems: ['子集载荷（subset）不可用于恢复：它只带 ' + ((data.subsetFaces || []).length) + ' 个面，恢复会把未导出的面当成空面写掉'] };
+    }
     const fmt = data.worldaxis !== undefined ? data.worldaxis : (data.version !== undefined ? 1 : undefined);
     if (fmt === undefined) problems.push('缺少 worldaxis/version 标识（非WorldAxis存档？）');
     else if (!ACCEPTED.includes(Number(fmt))) problems.push(`格式版本 ${fmt} 不受支持（支持 ${ACCEPTED.join('/')}）`);
@@ -118,16 +158,21 @@
     return { ok: true, recoveryCreated, counts: counts(WA.store.get()), format: v.format };
   }
 
-  /** 导出为浏览器文件（UI 用；node 环境返回 false） */
+  /**
+   * 下载：默认导**全量**载荷；给了 opts.payload 就导那份现成载荷（v2.114.0 #59 的子集导出走这里）。
+   *   为什么复用同一个出口而不是新开一个 subsetDownload：序列化 / 文件名 / 撤销 URL 三步
+   *   只该有一份实现——两份实现的漂移形态是「全量能下、子集下了个空文件」。
+   *   （UI 用；node 环境无 Blob/URL ⇒ 走 catch 如实返回 reason。）
+   */
   function download(opts = {}) {
     try {
-      const json = toJSON(opts);
+      const json = opts.payload ? JSON.stringify(opts.payload, null, 2) : toJSON(opts);
       const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = (WA.mainDoc || document).createElement('a');
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       a.href = url;
-      a.download = `worldaxis-${stamp}.json`;
+      a.download = `${opts.name || 'worldaxis'}-${stamp}.json`;
       a.click();
       URL.revokeObjectURL(url);
       return { ok: true, bytes: json.length };
@@ -136,7 +181,7 @@
 
   WA.toolSnapshot = {
     FORMAT, ACCEPTED,
-    buildPayload, toJSON, validate, restore, download, counts, sanitize
+    buildPayload, toJSON, buildSubsetPayload, validate, restore, download, counts, sanitize
   };
   if (WA.log) WA.log('info', '快照导出/恢复工具已加载');
 })();

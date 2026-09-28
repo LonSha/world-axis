@@ -110,7 +110,11 @@ function runN(a) {
       from: "ip: null", to: "ip: " + chr(34) + "127.0.0.1" + chr(34),
       probe: function (L) { L.record("a"); return L.recent(1)[0].ip; }, want: null },
     { n: 4, why: "N4: 去掉「环满挤出」以外的有序截断 ⇒ recent 不再是副本方向（用原行返回）",
-      from: "      const o = {};", to: "      const o = r; return r;",
+      // v2.114.0：锚点必须是**唯一的**。v2.112.0 给 core/audit-log.js 加了落盘读回段，
+      //   那里也有一行 `const o = {};`（缩进更深）——裸行锚点会 `split` 命中 2 次，
+      //   本条的 N0 自证随之报「恰中 1 次（实 2）」。加一行上文即可唯一（判据不变）。
+      from: "return _ring.slice(_ring.length - k).map(function (r) {\n      const o = {};",
+      to: "return _ring.slice(_ring.length - k).map(function (r) {\n      const o = r; return r;",
       probe: function (L) { L.record("t"); const c = L.recent(); c[0].action = "TAMPERED"; return L.recent()[0].action; }, want: "t" }
   ];
   CASES.forEach(function (cs) {

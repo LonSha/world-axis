@@ -265,7 +265,11 @@ function checkSrcMaps(opts) {
   // store 读侧：noteStoreReadFail 字面量 ∪ 各模块 store.reportReadFail 投递点
   const stTags = [];
   { const RX = /noteStoreReadFail\(\s*'([^']+)'/g; let mm; while ((mm = RX.exec(st))) if (stTags.indexOf(mm[1]) < 0) stTags.push(mm[1]); }
-  ['index.js', 'core/workflow.js', 'engines/worldbook.js', 'engines/chatcache.js', 'engines/tool-diag.js', 'render/inject.js'].forEach(function (f) {
+  //   扫描面必须覆盖**每一个**投递 store.reportReadFail 的产品文件；漏一个文件，该文件投的来源
+  //   就会在该表里被判成「幽灵键」（判据的输入面与结论面必须同宽）。v2.114.0 现场踩到：
+  //   core/audit-log.js 投了 auditlogFlush / auditlogRestore 两个来源，但它不在本清单里，
+  //   于是 LAB / SRC_LABEL 两处**都贴了标签**却被判成幽灵键（标签正确、判据虚红）。
+  ['index.js', 'core/workflow.js', 'core/audit-log.js', 'engines/worldbook.js', 'engines/chatcache.js', 'engines/tool-diag.js', 'render/inject.js'].forEach(function (f) {
     const t = _wdRead(f, ov);
     const RX = /report(?:Host)?ReadFail\(\s*'([^']+)'/g; let mm;
     while ((mm = RX.exec(t))) if (stTags.indexOf(mm[1]) < 0) stTags.push(mm[1]);

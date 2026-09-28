@@ -89,6 +89,17 @@
     //   台账记「手机侧按下过什么」：一笔操作带 opId（幂等认它）/ seq（递变序）/ chainId（事后接链）。
     //   它是因果链的**入站因**，与 chains（世界里的因）必须分表——见 phone-bridge.js 的口径 ②。
     'phoneBridge.ops': { path: 'causal.phoneOps', cap: 40, why: '手机侧操作台账环形（入站边：一笔手机动作就是一条链的因；满员走上游拒收，本表只兜底）' },
+    // ── v2.114.0 协作会话三表（collab.js）与变更日志（chrono.js）──
+    //   v2.112.0 把这两张持久表写进了骨架，却**只给了入队/入册侧的上限**（maxSessions /
+    //   maxQueue / maxConflicts 只管「开着的 / 未交付的 / 未裁决的」），而关闭的会话、
+    //   已交付的队列行、已裁决的冲突行**一条都不删**——长局里这三张表只增不减，
+    //   正是本表存在的意义（「有界但漏登」是 sizeAudit 唯一能抓到的那类膨胀）。
+    //   chrono.entries 同病：maxLayers 是**准入闸**（满员拒收），不是挤出上限，
+    //   而 entries 是「只增不减的事实环」——它必须有独立的历史上限。
+    'collab.sessions':  { path: 'collab.sessions',  cap: 64, why: '会话表环形（关闭的会话也要留痕，故不能在 close 时删——只能环形挤出）' },
+    'collab.queue':     { path: 'collab.queue',     cap: 128, why: '离线队列环形（已交付的行仍答「当时重放过什么」，只能环形挤出）' },
+    'collab.conflicts': { path: 'collab.conflicts', cap: 64, why: '冲突登记环形（已裁决的分歧是复盘证据，不在 resolve 时删）' },
+    'chrono.entries':   { path: 'chrono.entries',   cap: 128, why: '变更日志环形（撤销靠追加 revert 行，故历史只能环形挤出、不得原地删）' },
     // ── v2.63.0 世界织体（world.js）──
     'world.places': { path: 'world.places', cap: 24, why: '已登记地点环形（没登记的地方不存在，故这张表就是世界的全部可达面）' },
     'world.roads':  { path: 'world.roads',  cap: 40, why: '已登记道路环形（没登记的路走不通，故这张表决定谁能到哪）' },

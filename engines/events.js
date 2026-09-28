@@ -37,6 +37,10 @@
  *   2 不新增持久键；只新增 `events.rows` / `events.failQueue` 两个有界容器。
  *   3 不接管 workflow 的 before/after 链，也不自动定时——「轮」由调用方推进
  *     （与 causal.tick / parallelEvents 的用法一致：世界心跳在任何时刻都是显式的）。
+ *   3b **拒收 ⇒ 零变化**（v2.115.0 补，规划 01 的 E2）：`schedule()` / `replace()` 一律
+ *      「先纯校验、后落地」。校验提成 `plan()`（不碰 store、不写字段、不记 fault），
+ *      于是「参数不合法」这件事不会以任何形式改动世界——包括
+ *      **不得顺手取消掉正在被改期的那条待办**。
  *   4 总开关默认关闭；关闭时不排期、不认领、不注入，也不凭空补写「已发生」。
  */
 (function () {
@@ -131,48 +135,75 @@
   }
 
   /**
+   * 参数**纯校验**：只判形、只取整，不碰 store、不改任何行、不记 fault。
+   *
+   * 为什么必须把「校验」与「落地」拆成两件事（v2.115.0 · 规划 01 的 E2）：
+   *   `replace()` 此前的实现是「先 `cancel()` 旧行，再 `schedule()` 新参数」两步。
+   *   新参数不合法时（例如 `{ at: -1 }`），**旧行已经被取消**——返回值虽是 `bad-time`，
+   *   世界里那件事却已经从待办队列里消失了：调用方以为「改期失败 = 什么都没发生」，
+   *   实际丢了待办，而这正是本模块最不能出的错（排期是待办，不是历史）。
+   *   把校验提成纯函数之后，`schedule()` 与 `replace()` 都能**先校验、后落地**，
+   *   「拒收 ⇒ 状态零变化」才不靠约定，而是源码结构本身保证的。
+   *
+   * 返回：`{ ok: true, id, title, kind, at, hasTime, intervalMs, condition, priority, payload, now }`
+   *       或 `{ ok: false, reason: ... }`（reason 与 schedule 旧口径逐字一致，reject 面不变）。
+   *   `now` 是本次校验时刻（调用方落地时复用，避免一次改期读两次钟）。
+   */
+  function plan(it) {
+    const x = it || {};
+    const id = str(x.id, 40), title = str(x.title, 40);
+    const kind = str(x.kind, 16) || 'once';
+    if (!id || !title) return { ok: false, reason: 'missing-fields' };
+    if (KINDS.indexOf(kind) < 0) return { ok: false, reason: 'bad-kind', kinds: KINDS.slice() };
+    const hasAt = x.at !== undefined && x.at !== null;
+    const hasIn = x.inMs !== undefined && x.inMs !== null;
+    const hasTime = hasAt || hasIn;
+    let at = NaN;
+    if (hasAt) at = finite(x.at);
+    else if (hasIn) {
+      const rel = finite(x.inMs);
+      if (isFinite(rel) && rel >= 0) at = clockNow('events') + rel;
+    }
+    if (hasTime && !isFinite(at)) return { ok: false, reason: 'bad-time' };
+    if (isFinite(at) && at < 0) return { ok: false, reason: 'bad-time' };
+    let intervalMs = 0;
+    if (kind === 'repeat') {
+      const iv = finite(x.intervalMs);
+      if (!isFinite(iv) || iv <= 0) return { ok: false, reason: 'bad-trigger', need: 'intervalMs>0' };
+      intervalMs = iv;
+    }
+    const condition = str(x.condition, 60);
+    if (kind === 'conditional' && !condition) return { ok: false, reason: 'bad-trigger', need: 'condition' };
+    if (kind === 'delayed' && !isFinite(at)) return { ok: false, reason: 'bad-trigger', need: 'at|inMs' };
+    let priority = DEF_PRIORITY;
+    if (x.priority !== undefined && x.priority !== null) {
+      const pr = finite(x.priority);
+      if (!isFinite(pr) || pr < MIN_PRIORITY || pr > MAX_PRIORITY) return { ok: false, reason: 'bad-priority', min: MIN_PRIORITY, max: MAX_PRIORITY };
+      priority = Math.floor(pr);
+    }
+    const payload = (x.payload && typeof x.payload === 'object' && !Array.isArray(x.payload)) ? Object.assign({}, x.payload) : {};
+    return { ok: true, id: id, title: title, kind: kind, at: at, hasTime: hasTime,
+      intervalMs: intervalMs, condition: condition, priority: priority, payload: payload, now: clockNow('events') };
+  }
+
+  /**
    * 排期一个事件。四类 kind 的必填项不同：
    *   once        时刻可选（缺省 = 现在，即立即可认领）
    *   delayed     必须给 `at`（绝对时刻）或 `inMs`（相对毫秒）
    *   repeat      必须给正的 `intervalMs`（首触发时刻同上，缺省 = 现在）
    *   conditional 必须给非空 `condition`
    * 排期**不改写既有事件**：同 id 且仍在活动态 ⇒ `duplicate` 拒收（不静默覆盖）。
+   * 校验走 `plan()`（纯函数）：不合法时**一个字段都不写**，只记 fault。
    */
   function schedule(item) {
-    const it = item || {};
-    const id = str(it.id, 40), title = str(it.title, 40);
-    const kind = str(it.kind, 16) || 'once';
-    if (!id || !title) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    const pl = plan(item);
+    if (!pl.ok) { noteFault(pl.reason); return pl; }
+    const id = pl.id, title = pl.title, kind = pl.kind, priority = pl.priority;
     const cfg = settings();
     if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
-    if (KINDS.indexOf(kind) < 0) { noteFault('bad-kind'); return { ok: false, reason: 'bad-kind', kinds: KINDS.slice() }; }
-    const hasAt = it.at !== undefined && it.at !== null;
-    const hasIn = it.inMs !== undefined && it.inMs !== null;
-    let at = NaN;
-    if (hasAt) at = finite(it.at);
-    else if (hasIn) {
-      const rel = finite(it.inMs);
-      if (isFinite(rel) && rel >= 0) at = clockNow('events') + rel;
-    }
-    if ((hasAt || hasIn) && !isFinite(at)) { noteFault('bad-time'); return { ok: false, reason: 'bad-time' }; }
-    if (isFinite(at) && at < 0) { noteFault('bad-time'); return { ok: false, reason: 'bad-time' }; }
-    let intervalMs = 0;
-    if (kind === 'repeat') {
-      const iv = finite(it.intervalMs);
-      if (!isFinite(iv) || iv <= 0) { noteFault('bad-trigger'); return { ok: false, reason: 'bad-trigger', need: 'intervalMs>0' }; }
-      intervalMs = iv;
-    }
-    const condition = str(it.condition, 60);
-    if (kind === 'conditional' && !condition) { noteFault('bad-trigger'); return { ok: false, reason: 'bad-trigger', need: 'condition' }; }
-    if (kind === 'delayed' && !isFinite(at)) { noteFault('bad-trigger'); return { ok: false, reason: 'bad-trigger', need: 'at|inMs' }; }
-    let priority = DEF_PRIORITY;
-    if (it.priority !== undefined && it.priority !== null) {
-      const pr = finite(it.priority);
-      if (!isFinite(pr) || pr < MIN_PRIORITY || pr > MAX_PRIORITY) { noteFault('bad-priority'); return { ok: false, reason: 'bad-priority', min: MIN_PRIORITY, max: MAX_PRIORITY }; }
-      priority = Math.floor(pr);
-    }
-    const now = clockNow('events');
-    const payload = (it.payload && typeof it.payload === 'object' && !Array.isArray(it.payload)) ? Object.assign({}, it.payload) : {};
+    const at = pl.at;
+    const now = pl.now;
+    const payload = pl.payload;
     let out = null;
     WA.store.transact(function (draft) {
       const e = ensure(draft);
@@ -186,8 +217,8 @@
         id: id, kind: kind, title: title, priority: priority,
         status: 'pending',
         scheduledAt: isFinite(at) ? at : now,
-        intervalMs: intervalMs,
-        condition: condition,
+        intervalMs: pl.intervalMs,
+        condition: pl.condition,
         payload: payload,
         runs: 0, retries: 0, conditionMisses: 0,
         createdAt: now, claimedAt: 0, executedAt: 0, lastExecutedAt: 0, lastFailAt: 0, lastNote: ''
@@ -339,6 +370,16 @@
    * 替换：把旧排期取消（理由固定为 `replaced`，留痕可查）再按新参数排一条。
    * 新 id 缺省为 `旧id@时刻` —— 不用同一个 id 覆盖，因为「被替换过」本身是事实，
    * 覆盖掉就答不出「它原本排在什么时候、为什么换了」。
+   *
+   * v2.115.0 的两条纪律（规划 01 的 E2）：
+   *   ① **先校验、后落地**。旧实现是「先 cancel 再 schedule」：新参数不合法时旧行已被取消，
+   *      `bad-time` 成了「拒收但已造成损失」——排期队列里那件事凭空消失。
+   *      现在校验由纯函数 `plan()` 在前置完成，不合格 ⇒ **不进事务、旧行原样保留**。
+   *   ② **单事务原子替换**。旧行转 `cancelled` 与新行落地在**同一个** `transact` 里完成，
+   *      不会留下「旧的没了、新的没来」的半截状态（读侧要么看到改期前的样子，要么改期后的样子）。
+   *   另：patch 未给 `at`/`inMs` 时**沿用原时刻**。旧实现把 `at` 留成 NaN，而
+   *      schedule 的「缺省 = 现在」会把一次只想改标题的改期顺手挪到当下——
+   *      「只改我点名的字段」是 replace 的语义，时间轴不因此移动。
    */
   function replace(id, patch) {
     const rid = str(id, 40);
@@ -347,23 +388,63 @@
     if (!old) { noteFault('missing'); return { ok: false, reason: 'missing', id: rid }; }
     if (isTerminal(old)) { noteFault('not-active'); return { ok: false, reason: 'not-active', id: rid, status: old.status }; }
     const patch2 = patch || {};
+    const hasTime = (patch2.at !== undefined && patch2.at !== null) || (patch2.inMs !== undefined && patch2.inMs !== null);
     const p = {
       id: str(patch2.id, 40) || (rid + '@' + clockNow('events')),
       kind: patch2.kind !== undefined ? patch2.kind : old.kind,
       title: patch2.title !== undefined ? patch2.title : old.title,
       priority: patch2.priority !== undefined ? patch2.priority : old.priority,
-      at: patch2.at, inMs: patch2.inMs,
+      at: hasTime ? patch2.at : old.scheduledAt,
+      inMs: hasTime ? patch2.inMs : undefined,
       intervalMs: patch2.intervalMs !== undefined ? patch2.intervalMs : old.intervalMs,
       condition: patch2.condition !== undefined ? patch2.condition : old.condition,
       payload: patch2.payload !== undefined ? patch2.payload : old.payload
     };
-    const c = cancel(rid, 'replaced');
-    if (!c.ok) return c;
-    const s = schedule(p);
-    if (!s.ok) return s;
-    stat.replaced++;
-    stat.lastReason = 'replaced';
-    return { ok: true, replaced: rid, id: s.id, scheduledAt: s.scheduledAt };
+    // ① 纯校验：不合格 ⇒ 旧排期原样保留（零事务、零字段写入）
+    const pl = plan(p);
+    if (!pl.ok) { noteFault(pl.reason); return pl; }
+    const cfg = settings();
+    if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const now = pl.now;
+    const newId = pl.id;
+    // ② 单事务：旧行取消 + 新行落地一起提交（没有「旧的没了、新的没来」的中间态）
+    let out = null;
+    WA.store.transact(function (draft) {
+      const e = ensure(draft);
+      const x = e.rows.filter(function (y) { return y && y.id === rid; })[0];
+      if (!x) { out = { ok: false, reason: 'missing', id: rid }; return false; }
+      if (isTerminal(x)) { out = { ok: false, reason: 'not-active', id: rid, status: x.status }; return false; }
+      if (newId !== rid) {
+        const dup = e.rows.filter(function (y) { return y && y.id === newId && isActive(y); })[0];
+        if (dup) { out = { ok: false, reason: 'duplicate', id: newId, status: dup.status }; return false; }
+      }
+      // 容量口径：**将被替换的旧行算作已释放**——它同一事务里就转终态了。
+      //   故这里比 schedule 的闸门「宽一档」：`live` 含本行，用 `live - 1` 与本行让位后的
+      //   实际占用比较（若照抄 schedule 那行，一次满员时的改期会被自己的旧行挡回去，
+      //   而改期在语义上**不是新增待办**）。报出的 `live` 也是让位后的占用。
+      const live = e.rows.filter(isActive).length;
+      if (live - 1 >= cfg.maxRows) { out = { ok: false, reason: 'capacity', live: live - 1, max: cfg.maxRows }; return false; }
+      x.status = 'cancelled';
+      x.executedAt = now;
+      x.cancelReason = 'replaced';
+      const row2 = {
+        id: newId, kind: pl.kind, title: pl.title, priority: pl.priority,
+        status: 'pending',
+        scheduledAt: isFinite(pl.at) ? pl.at : now,
+        intervalMs: pl.intervalMs,
+        condition: pl.condition,
+        payload: pl.payload,
+        runs: 0, retries: 0, conditionMisses: 0,
+        createdAt: now, claimedAt: 0, executedAt: 0, lastExecutedAt: 0, lastFailAt: 0, lastNote: ''
+      };
+      e.rows.push(row2);
+      if (WA.evict) WA.evict.array(e.rows, 'events.rows', cfg.maxRows);
+      out = { ok: true, replaced: rid, id: newId, kind: pl.kind, scheduledAt: row2.scheduledAt };
+    }, 'events:replace');
+    if (!out) return { ok: false, reason: 'store-unavailable' };
+    if (out.ok) { stat.cancelled++; stat.replaced++; stat.lastReason = 'replaced'; }
+    else noteFault(out.reason);
+    return out;
   }
 
   /** 活动态清单（只读，按同一序）。 */
