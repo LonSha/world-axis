@@ -44,7 +44,9 @@
 | 模块注册面 | `engines/tool-diag.js` 的 `MODULE_EXPORTS` | 清册、自检 |
 | 装载次序 | `index.js` 的 `LOAD_ORDER` | 装载期断言 |
 | 拒收码手册 | `docs/ERROR_CODES.md`（生成物） | `tools/gen-error-codes.js --check` |
-| 版本条目（做了什么/为什么） | `ITERATION_LOG.md` | 人 |
+| 版本条目（做了什么/为什么，v2.80.0+） | `ITERATION_LOG.md` | 人 |
+| 版本条目存放形态（哪一段在哪个文件） | `tests/docs-archive-gate.js` | `tests/run.js` 的第九道门禁 |
+| 版本条目存档（v2.20.0 及更早，92 条） | `ITERATION_LOG.md` 的「版本条目存档」节 | 只读；`docs-archive-gate` 判它不许与 README 重复 |
 
 ## 注入链（一句话版）
 

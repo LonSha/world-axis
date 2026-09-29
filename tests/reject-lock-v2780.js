@@ -36,6 +36,16 @@ const LEDGER_PATH = path.join(__dirname, 'reject-code-ledger.json');
 
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex').slice(0, 16); }
 function loadLedger() { return JSON.parse(fs.readFileSync(LEDGER_PATH, 'utf8')); }
+/** 入口版本常量（**现场取**，不写死本版号）。
+ *  写死的代价实测过一次：升版后该断言变红，却看不出「是台账错了还是本锁忘了跟」——
+ *  于是每升一版都要人来同步一处没有判据价值的字面量。判据只关心「台账自称的版本
+ *  与入口同源」，同源关系不该由人肉维护。口径同 tests/readings-v2106.js 的 N6 注释。 */
+function indexVersion() {
+  const m = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8').match(/const VERSION = '([\d.]+)'/);
+  if (!m) throw new Error('index.js 里找不到 VERSION 常量（现场取版本的前提不成立）');
+  return m[1];
+}
+
 function ledgerMap(led) { const m = {}; (led.base || []).forEach(function (c) { m[c] = true; }); return m; }
 
 /** 内存覆盖读：在真源码上做定点破坏，判据在副本上重跑（真破坏，零文件改写）。 */
@@ -168,7 +178,7 @@ function runAll(a) {
   a(gate.FACE.indexOf('strip-comments') >= 0,
     'v2780: [A] 扫描面自称「去注释」（判据的输入面与结论面同宽）');
   const led = loadLedger();
-  a(Array.isArray(led.base) && led.base.length > 100 && typeof led._note === 'string' && led.version === '2.119.0',
+  a(Array.isArray(led.base) && led.base.length > 100 && typeof led._note === 'string' && led.version === indexVersion(),
     'v2780: [A] 台账形状（base ' + led.base.length + ' 条 / version ' + led.version + ' / 带 _note）'
     + '（v2.117.0：B1–B6 新增 59 码全部走见证，base 233→231 只减不增）');
   a(led._note.indexOf('两向') >= 0 && led._note.indexOf('去注释') >= 0,
