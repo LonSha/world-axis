@@ -25,6 +25,26 @@
 新版本要动 `index.js` 的 `VERSION`、`manifest.json` 的 `version`、以及 `tests/run.js` 里若干处硬编码断言值
 （多处字面量，漏一处就是红灯）。
 
+## 把门禁接到提交上（本仓已有工具，默认未装）
+
+门禁只在人想起来的时候跑，就会带着红灯提交 —— 本仓 v2.109.0 收口期实测有三次提交是带红灯进去的，
+发现它们的是下一次全量回归。`tools/hooks.js` 就是为这件事写的，但**默认没有装任何 hook**。
+
+```bash
+node tools/hooks.js status     # 看装了没有
+node tools/hooks.js install    # 装 pre-commit（三道秒级门禁）+ pre-push
+node tools/hooks.js uninstall  # 卸掉
+```
+
+设计上的取舍（值得沿用）：
+
+- **只把秒级门禁放进 pre-commit**（`export-contract` / `reject-code` / `module-registry`）。
+  全量回归约十分钟，塞进提交点只会让人习惯性 `--no-verify`，而一旦开始 `--no-verify`，所有 hook 就都失效了。
+- **pre-push 里的全量回归默认是注释掉的**，要自己打开。
+- **不碰别人的 hook**：同名 hook 已存在且不含本工具签名时拒绝覆盖（`--force` 才覆盖），原文件备份为 `<name>.pre-worldaxis`。
+
+这些 hook 装在 `.git/hooks/` 里，**不进版本库**，所以每个克隆都要自己 `install` 一次。
+
 ## 不要做的事
 
 - **不要为了过门禁去改实现**：门禁红了先问判据的输入面是不是比事实窄。
