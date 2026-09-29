@@ -478,6 +478,84 @@
     if (!c) return { planned: false, measured: 0, totalMs: 0, subTick: 0, bands: { short: 0, medium: 0, long: 0 }, accounts: {}, unclassified: [], unmeasured: [], unmeasuredCount: 0, slowest: null, rows: [] };
     return { planned: true, measured: c.measured, totalMs: c.totalMs, subTick: c.subTick, bands: c.bands, accounts: c.accounts, unclassified: c.unclassified, unmeasured: c.unmeasured, unmeasuredCount: c.unmeasuredCount, slowest: c.slowest, rows: c.rows };
   }
+  /**
+   * v2.123.0 P3：**局部重算观测**（纯函数；只观测，不做真增量优化）。
+   *
+   * 治的病：O1 的成本账只答「单源构建花了多少 ms」，答不出「改一条人物之后，
+   *   **这轮真算了几个源、又有几个源一个活都没干**」——于是「局部重算」这件事
+   *   在治理面上既看不见也证不了；而更要紧的是，**声称跳过的源若仍在重算**，
+   *   现状下没有任何读数会让它现形。
+   *
+   * 本账只报两个**已发生的事实**，不推任何依赖：
+   *   ① `touched`  —— 本轮**真被调用过**的源（= 调用方交来的耗时台账里有的源名）。
+   *      口径与 `costSummary` 的主键同源：账本键取自**真调用现场**，不是「进了 items 的源」
+   *      （产出空串 ≠ 没干活，v2.88.0 [A3] 钉着这一条）。同名只算一个源。
+   *   ② `untouched` —— 本模块**已知源面**里这轮一个活都没干的源（= 跳过集）。
+   *      源面取自 `PRIORITY` 的键（本模块自己的源名表，不新造第二份真源 ——
+   *      与 `ACCOUNTS` 同源已由 tests/cost-v2880.js 的 [A1] 成类锁看住）。
+   *
+   * **不变式**：`touched ∩ untouched = ∅` 且 `touched ∪ untouched = 已知源面`。
+   *   「声称跳过却仍重算」的落地形态正是这条被破坏：把 `touched` 写成全集 ⇒
+   *   `untouched` 空 ⇒ 「跳过 M 源」这句话再也说不出来（专锁的负控制打的就是这一枪）。
+   *
+   * 诚实边界（如实登记，不假装更强）：
+   *   · 本账**不报**「哪个世界键导致哪个源重算」。源级依赖表本仓不存在 —— 空世界下有些源
+   *     根本早退（不碰 store），隐式依赖住在代码里；硬抽一张表出来就是**新造第二套真源**
+   *     （v2.102.0 对 `perf-trace` 的同一裁决）。故 `dirtyKeys` 只作为**本轮为何重算**的
+   *     标注被照抄带回，不参与任何推导。
+   *   · `reuse` 面是**可选**输入（来自 `perf-trace.partial()` 的复用读数）。没传时如实报
+   *     `reuseKind: 'absent'`，不拿空数组冒充「一次都没复用」。
+   *   · 纯观测：不改任何裁决、不读 store、不落盘（与 `costSummary` 同承诺）。
+   *
+   * @param {object} costs  本轮真实耗时台账（键 = 源显示名，值 = ms 或 { ms, n }）
+   * @param {object} [opts] `{ dirtyKeys: string[], reuse: { reused: string[], recomputed: string[] } }`
+   */
+  function incrementalCost(costs, opts) {
+    const o = opts || {};
+    // 已知源面：本模块的优先级表就是源名真源（不引 render 侧的 SOURCES ——
+    //   两张表各有各的面，本模块读不到，也不该假设它同步）。
+    const known = Object.keys(PRIORITY);
+    // ① 本轮真被调用过的源：取自调用方交来的**现场台账**，只认本模块认识的源名。
+    //   不认识的源名如实另计到 `unrecognized`，不静默并入 touched ——
+    //   否则「源面长了一张表没跟上」这件事会被本账吞掉。
+    const cs = (costs && typeof costs === 'object') ? costs : {};
+    const touched = [], unrecognized = [];
+    Object.keys(cs).forEach(function (name) {
+      const ent = cs[name];
+      const obj = !!(ent && typeof ent === 'object');
+      const raw = obj ? ent.ms : ent;
+      if (typeof raw !== 'number' || !isFinite(raw)) return;   // 坏行不入账（与 costSummary 同口径）
+      if (known.indexOf(name) < 0) { if (unrecognized.indexOf(name) < 0) unrecognized.push(name); return; }
+      if (touched.indexOf(name) < 0) touched.push(name);
+    });
+    touched.sort();
+    const untouched = known.filter(function (k) { return touched.indexOf(k) < 0; }).sort();
+    // ② dirtyKeys：调用方声明的本轮变脏的世界键。**照抄**（去重 + 排序），不推导。
+    const dirtyKeys = (Array.isArray(o.dirtyKeys) ? o.dirtyKeys : [])
+      .map(function (k) { return String(k == null ? '' : k); })
+      .filter(function (k, i, arr) { return k && arr.indexOf(k) === i; })
+      .sort();
+    // ③ reuse 面：可选，缺则如实报缺（不拿空数组冒充「一次都没复用」）。
+    const rv = (o.reuse && typeof o.reuse === 'object') ? o.reuse : null;
+    const pick = function (x) { return (Array.isArray(x) ? x : []).map(function (s) { return String(s == null ? '' : s); }).filter(Boolean).sort(); };
+    const reused = rv ? pick(rv.reused) : [];
+    const recomputed = rv ? pick(rv.recomputed) : [];
+    const total = known.length;
+    return {
+      dirtyKeys: dirtyKeys, dirtyCount: dirtyKeys.length,
+      touched: touched, touchedCount: touched.length,
+      untouched: untouched, untouchedCount: untouched.length,
+      unrecognized: unrecognized,
+      knownCount: total,
+      // 覆盖率不看「跳过多少」而看「源面里有多少真干过活」——跳过的比例本身不是缺陷，
+      //   缺陷是「源面增长而本账不认识它」（`unrecognized` 非空即报）。
+      coverage: total ? Math.round((touched.length / total) * 1000) / 1000 : 0,
+      reuseKind: rv ? 'reported' : 'absent',
+      reused: reused, recomputed: recomputed,
+      note: '只报「这轮真算了什么 / 跳过了什么」；不报「哪个键导致哪个源重算」'
+        + '（源级依赖表本仓不存在，硬抽即新造第二套真源）'
+    };
+  }
   function summaryText(p) {
     if (!p) return '未规划';
     const tail = p.folded.length ? '｜折叠 ' + p.folded.length : '';
@@ -506,7 +584,12 @@
     //   COST_BANDS / ACCOUNTS / UNCLASSIFIED 是**实现细节而非承诺**，不导出：
     //   导出一个没人读的常量就是给自己加一份要维护的接口面（还要为它付冻结串的价）。
     //   需要它俩的地方在本模块内（costOf / costSummary），屏外一律走 plan + costView。
-    costOf, costView
+    // v2.123.0 P3：**局部重算观测**多导出第三个口，理由与前两个逐字同规格——它有真消费方：
+    //   · incrementalCost —— render/inject.js 在唯一引擎调用出口旁真调它并把读数落进
+    //     `lastInjection.recalc`，面板「本轮注入」段逐字段读出来（「重算 N 源 / 跳过 M 源」）。
+    //   本口仍是纯函数（不读 store、不落盘），故不破坏本模块的纯计算承诺。
+    costOf, costView,
+    incrementalCost
   };
   if (WA.log) WA.log('info', '注入预算裁判已加载');
 })();

@@ -1234,6 +1234,29 @@
         } else if (cv && cv.planned) {
           h += '<div class="wa-dim">本轮无引擎源可计（' + cv.unmeasuredCount + ' 项非计量）</div>';
         }
+        // v2.123.0 P3：**局部重算观测面**（`injectBudget.incrementalCost` 的真消费方）。
+        //   成本账答的是「这一轮的时间花在谁身上」，它答不出「这轮有几个源是白跑的」——
+        //   而「跳过」这个读数此前在库里根本不存在（全部源每轮重建，跳过与否无从判定）。
+        //   本块只报本账自己看得见的那一半：
+        //     · 真算过哪些源 —— 取自**现场耗时台账**（唯一引擎调用出口落表，46 处调用点全覆盖）；
+        //     · 跳过了哪些源 —— 源面求差（`known − touched`）；
+        //     · 世界哪几个顶层键本轮变脏 —— 键级指纹对上次采样比对。
+        //   **复用读数缺席就如实说缺席**（`reuseKind:'absent'`）：那条读数要真跑四个面
+        //   （含重量级诊断采集），它的家是「增量面」按钮 —— 面板不拿空数组冒充「一次都没复用」。
+        const rc = li.recalc || null;
+        if (rc) {
+          h += '<div class="wa-kv"><span>局部重算</span><b>重算 ' + esc(String(rc.touchedCount)) + ' 源 / 跳过 '
+            + esc(String(rc.untouchedCount)) + ' 源<span class="wa-dim">（源面 ' + esc(String(rc.knownCount)) + '）</span></b></div>';
+          const dk = rc.dirtyKeys || [];
+          const reuseTxt = (rc.reuseKind === 'reported')
+            ? '复用 ' + (rc.reused || []).length + ' / 重算 ' + (rc.recomputed || []).length
+            : '缺席（须真跑四面的读数走「增量面」按钮，不挂进每轮注入链）';
+          h += '<div class="wa-dim">脏键 ' + (dk.length ? esc(dk.join('、')) : '无')
+            + '（' + esc(rc.dirtyKind || '?') + (rc.rev != null ? '，rev ' + esc(String(rc.rev)) : '') + '）'
+            + '｜复用读数 ' + (((!rc.reuseKind || rc.reuseKind === 'absent')) ? esc(reuseTxt) : reuseTxt)
+            + (rc.unrecognized && rc.unrecognized.length ? '｜未识别源 ' + esc(rc.unrecognized.join('、')) : '')
+            + '</div>';
+        }
         return h;
       } catch (e) { return '<div class="wa-empty">读取预算快照失败（' + esc(e && e.message) + '）</div>'; }
     })();
@@ -1634,6 +1657,7 @@
         <button class="wa-btn" id="wa-perf-view" title="性能面：分层耗时 P50/P95、四个耗时分列、脏集与复用计数（只念已发生的读数，不触发基准）">性能面</button>
         <button class="wa-btn" id="wa-perf-bench" title="基准面：真跑冷启（四面各一遍）与热启（按脏集复用），并复核复用值是否等于现算值">基准面</button>
         <button class="wa-btn" id="wa-perf-partial" title="增量面：按每一面自己的输入（世界步进 stateRev）决定重算还是复用——同一世界步进下重复读取应为 0 重算；改过世界再点则如实重算">增量面</button>
+        <button class="wa-btn" id="wa-perf-band" title="档位面：短 / 中 / 长 / lowend 四档并排，本地与宿主 API 分列（每档取本档前后的差值，不是全局累计）；lowend 为同机放大估计，不参与判定">档位面</button>
       </div>
       <div class="wa-sec">审计取证<span class="wa-dim">（谁改过世界——把一段事实带出会话）</span></div>
       <div class="wa-row">
@@ -4476,6 +4500,39 @@
           + ' 面；已知边界：canonAlign 的幕表住在设置侧（不在 stateRev 里），单改幕表不会被判脏</div>';
         out.innerHTML = html;
       } catch (e) { out.textContent = '增量面读取失败：' + (e && e.message); }
+    };
+    // v2.123.0 P4：**档位面**——`bench()` 与成本账此前都只给**单点**读数。
+    //   「够快吗」没有一个可比的参照系，而四类耗时（本地 / 宿主 API / 序列化 / 渲染）
+    //   全混在一个 totalMs 里。本块把四档并排，并把**本地面**与 **API 面**分开列。
+    //   两条口径在读数上直接可见：
+    //     · 每档取**本档前后的差值**（`_span` 是自装载以来的累计桶，直接读会把前三档算进第四档）；
+    //     · 宿主 API 无上报时如实说「未上报」，**不写成 0ms**。
+    const perfBand = $('#wa-perf-band');
+    if (perfBand) perfBand.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out) return;
+      try {
+        const r = WA.perfTrace.bandCompare();
+        let html = '<div class="wa-sec">档位面（四档并排 + 本地 / 宿主 API 分列；每档取本档前后的差值）</div>';
+        html += '<div class="wa-dim">' + esc(r.note) + '</div>';
+        r.classes.forEach(function (C) {
+          const b = r.bands[C];
+          html += '<div class="wa-item"><b>' + esc(C) + '</b>'
+            + ' <span class="wa-dim">' + esc(b.note || '') + '</span>'
+            + (b.judgeable ? '' : ' <span class="wa-log-warn">（估计值，不参与判定）</span>')
+            + '<div class="wa-kv"><span>合计</span><b>' + esc(String(b.totalMs)) + 'ms'
+            + '<span class="wa-dim">（重复 ' + esc(String(b.repeats)) + ' 遍 / 预算 ' + esc(String(b.budget)) + 't / '
+            + esc(String(b.faces)) + ' 面）</span></b></div>'
+            + '<div class="wa-kv"><span>本档本地 / 序列化</span><b>' + esc(String(b.split.localMs)) + 'ms / '
+            + esc(String(b.split.serializeMs)) + 'ms</b></div>'
+            + '<div class="wa-kv"><span>本档宿主 API</span><b>'
+            + (b.split.apiReported ? esc(String(b.split.hostMs)) + 'ms' : '未上报')
+            + '<span class="wa-dim">（宿主调用面由外部上报；本面无上报时不写成 0ms）</span></b></div>'
+            + '<div class="wa-kv"><span>样本</span><b>' + esc(String(b.samples && b.samples.n))
+            + ' 次（门槛 ' + esc(String(b.minSamples)) + '）' + ((b.samples && b.samples.sufficient) ? '' : '（尚不足）') + '</b></div></div>';
+        });
+        html += '<div class="wa-dim">' + esc(r.driftNote) + '</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '档位面读取失败：' + (e && e.message); }
     };
     // v2.2.0: 运行痕迹清空出口——resetStats / resetHistory 此前无面板入口（画像只能越积越旧）
     const wfrBtn = $('#wa-wf-reset');

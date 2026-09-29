@@ -861,6 +861,84 @@
   }
   function benchAll(scope) { const out = {}; CLASSES.forEach(function (C) { out[C] = bench(C, scope); }); return out; }
 
+  /**
+   * v2.123.0 P4：**档位对照面**（短 / 中 / 长 / lowend × 本地 / API 分列）。
+   *
+   * 治的病：`bench()` 与 O1 的成本账都只给**单点**读数 ——「够快吗」没有可比参照系；
+   *   而 `split()` 把本地引擎耗时与宿主 API 耗时混在一个 `totalMs` 里（两类成本不同源）。
+   *   本面把四档并排，并把**本地面**与 **API 面**分开列：
+   *     · 本地面 = `local`（本进程计算）+ `serialize`（序列化），本面自己能量的；
+   *     · API 面  = `host`（宿主 API 调用）—— **须外部上报**，无头环境无宿主调用面。
+   *
+   * 三条口径（每条对应本仓付过价的一处）：
+   *   ① **每档的本地 / API 读数取本档前后的差值**，不是全局累计 —— `_span` 是自装载以来
+   *      的累计桶，跨档只增不减。直接读它，第四档会把前三档跑过的量一起算进来
+   *      （看着有值、却没有归属），这正是「读数张冠李戴」的老账。故本面在档前档后各取一次
+   *      `split()`，报的是 `after - before`。
+   *   ② **API 面无读数就如实说无读数**（`declared.host === false` + `apiReported:false`），
+   *      绝不拿 0ms 冒充「API 很快」。与 `split()` 的既有口径逐字同源。
+   *   ③ **lowend 档不参与判定**：它是同机放大估计（`approx:true`），读数带的是估计值。
+   *      故每档单列 `judgeable = !approx`，`minSamples` 只作为**够不够判**的门槛被读出；
+   *      本面**不下任何「快 / 慢」结论**——它是对照面，不是判定面。
+   *
+   * 漂移边界（与 v2.119 族⑥同源，写进读数）：墙钟读数**随机器漂移**（同机自比可用、
+   *   跨机不可比）。故本面对外承诺的是**结构项数恒定**（`classes.length` / `faces.length` /
+   *   `splitKeys.length` / 每档 `split` 键集合），毫秒值随现场变。任何判据只许断言结构项数，
+   *   不许断言具体 ms —— 与 `tests/perf-regression-gate.js` 的四条否定式口径同向。
+   *
+   * `opts.dryRun === true` ⇒ **只报结构面，不跑任何一档**（诊断是旁观者：看一眼体检
+   *   不该等于跑一轮基准 —— 与 `partial()` 不挂进注入链的那条裁决逐字同）。
+   */
+  function bandCompare(opts) {
+    const o = opts || {};
+    const classes = CLASSES.slice();
+    const minSamples = PERF_THRESHOLD.minSamples;
+    const bands = {};
+    classes.forEach(function (C) {
+      const def = CLASS_DEF[C] || {};
+      const judgeable = !def.approx;
+      if (o.dryRun) {
+        // 结构面：档位定义 + 判定门槛。读数**一律不编**（`ran:false` 是实情，不是 0ms）。
+        const sp = split();
+        bands[C] = { cls: C, repeats: def.repeats, budget: def.budget, approx: !!def.approx, note: def.note || '',
+          minSamples: minSamples, judgeable: judgeable, ran: false,
+          faces: FACE_KEYS.length, totalMs: null,
+          split: { localMs: null, hostMs: null, serializeMs: null, renderMs: null,
+            declared: { local: true, host: sp.declared.host, serialize: true, render: sp.declared.render },
+            apiReported: !!sp.declared.host, undeclared: sp.undeclared.slice(), localApiSeparated: true },
+          samples: null, baselines: null };
+        return;
+      }
+      const before = split();
+      const r = bench(C, o.scope);
+      const after = split();
+      const d = function (k) { return Math.round(((after[k] || 0) - (before[k] || 0)) * 100) / 100; };
+      // 该档跑完后注入层窗口的样本数：它才是「这一档够不够判」的现场依据。
+      const win = (function () { try { return baseline('inject').window; } catch (e) { return 0; } })();
+      bands[C] = { cls: C, repeats: r.repeats, budget: r.budget, approx: !!r.approx, note: r.note,
+        minSamples: minSamples, judgeable: judgeable, ran: true,
+        faces: (r.rows || []).length, totalMs: r.totalMs,
+        split: { localMs: d('localMs'), hostMs: d('hostMs'), serializeMs: d('serializeMs'), renderMs: d('renderMs'),
+          declared: { local: after.declared.local, host: after.declared.host, serialize: after.declared.serialize, render: after.declared.render },
+          undeclared: after.undeclared.slice(),
+          apiReported: !!after.declared.host,
+          localApiSeparated: true },
+        samples: { n: win, need: minSamples, sufficient: win >= minSamples },
+        baselines: r.baselines || null };
+    });
+    return {
+      classes: classes, bands: bands, minSamples: minSamples,
+      faces: FACE_KEYS.slice(), splitKeys: SPANS.slice(),
+      dryRun: !!o.dryRun,
+      localApiSplit: true,
+      judgeableClasses: classes.filter(function (C) { return !(CLASS_DEF[C] || {}).approx; }),
+      approxClasses: classes.filter(function (C) { return !!(CLASS_DEF[C] || {}).approx; }),
+      apiNote: '宿主 API 耗时须外部上报；无头环境无宿主调用面 ⇒ host 恒未上报，如实记 undeclared（不写成 0ms）',
+      driftNote: '墙钟读数随机器漂移（同机自比可用、跨机不可比）；本面对外承诺的是**结构项数恒定**，毫秒值随现场变',
+      note: '四档并排 + 本地 / API 分列（每档取前后差值，非全局累计）；lowend 为同机放大估计（不参与判定）'
+    };
+  }
+
   function stat() {
     return { calls: _stat.calls, marks: _stat.marks, reuse: _stat.reuse, recompute: _stat.recompute, miss: _stat.miss,
       evicted: _stat.evicted, forced: _stat.forced, dirtyHit: _stat.dirtyHit,
@@ -894,7 +972,7 @@
     ensure: ensure, slots: slots,
     coldWarmCheck: coldWarmCheck,
     coldStart: coldStart, warmStart: warmStart,
-    bench: bench, benchAll: benchAll,
+    bench: bench, benchAll: benchAll, bandCompare: bandCompare,
     baseline: baseline, curve: curve, curveAll: curveAll,
     noteSpan: noteSpan, split: split, partial: partial,
     CACHE_CAP: CACHE_CAP, EVICT_POLICIES: EVICT_POLICIES, FLAME_CAP: FLAME_CAP,

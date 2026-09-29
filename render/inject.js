@@ -394,7 +394,10 @@ style: false,
             };
             return pick(b.folded, 'folded').concat(pick(b.dropped, 'dropped'));
           })() } : null,
-        cost: cst ? { totalMs: cst.totalMs, measured: cst.measured, subTick: cst.subTick, slowest: cst.slowest } : null
+        cost: cst ? { totalMs: cst.totalMs, measured: cst.measured, subTick: cst.subTick, slowest: cst.slowest } : null,
+        // v2.123.0 P3：局部重算账（本轮真算了哪些源 / 跳过了哪些源 / 世界改了什么键）。
+        //   整份照抄落盘快照，本处不做任何再计算（解释面与存档同一批事实）。
+        recalc: li.recalc || null
       }
     };
   }
@@ -424,6 +427,51 @@ style: false,
     const out = {};
     Object.keys(engineCost).forEach(function (k) { out[k] = { ms: engineCost[k].ms, n: engineCost[k].n }; });
     return out;
+  }
+  // ══════════════════ v2.123.0 P3：局部重算观测的「脏键」真源 ══════════════════
+  /**
+   * 本轮**世界变脏的顶层键**（只读观测，进程态，不落盘、不改世界）。
+   *
+   * 为什么需要它：`incrementalCost()` 只回答「这轮真算了哪些源 / 跳过了哪些源」，
+   *   而「为什么重算」需要一个**真事实**去挂 —— 计划书点名的现场是「改一条人物之后」。
+   *   本函数用**键级指纹**把这个事实取出来：与上一次采样逐键比对，凡变了的进脏集。
+   *
+   * 三条口径（都是本仓反复付过价的那几条）：
+   *   ① **不新造第二份指纹实现**：同一个字符串复用 `timeline.hashText`（`perf-trace`
+   *      的 `worldRev` 同源）——两份实现迟早在边界字符上分叉。
+   *   ② **世界没往前走就不重复采样**：`meta.stateRev` 未变 ⇒ 直接返回空脏集，
+   *      不把每轮 68 个顶层键的序列化成本喂进它要观测的那本成本账（观测污染被观测者）。
+   *   ③ **观测自身的产物不算世界变脏**：`meta`（步进 / 写入序号）与 `lastInjection`
+   *      （上一轮的注入快照）逐键跳过 —— 它们每轮必变，收进来会让脏集恒为全集。
+   *
+   * 首轮采样如实报 `first`（没有前值可比 ⇒ 脏集为空），**不假装「什么都没改」**：
+   *   两种局面由 `kind` 分列。键被删掉也算变化（以 `-key` 形式报出）。
+   */
+  let __keyFp = null;        // 上一次采样的键 -> 指纹
+  let __keyRev = null;       // 上一次采样时的世界步进
+  function worldDirtyKeys() {
+    const st = (function () { try { return WA.store.get(); } catch (e) { return null; } })();
+    if (!st || !st.meta) return { keys: [], kind: 'no-state', rev: null };
+    const rev = (typeof st.meta.stateRev === 'number') ? st.meta.stateRev : null;
+    if (rev !== null && __keyRev === rev && __keyFp) return { keys: [], kind: 'unchanged-rev', rev: rev };
+    const hash = (function () { try { return (WA.timeline && WA.timeline.hashText) || null; } catch (e) { return null; } })();
+    const fp = {}, prev = __keyFp;
+    const SKIP = { meta: 1, lastInjection: 1 };
+    Object.keys(st).forEach(function (k) {
+      if (SKIP[k]) return;
+      const s = (function () { try { return JSON.stringify(st[k] === undefined ? null : st[k]); } catch (e) { return 'na'; } })();
+      fp[k] = hash ? hash(s) : s;
+    });
+    const keys = [];
+    if (prev) {
+      Object.keys(fp).forEach(function (k) {
+        if (!Object.prototype.hasOwnProperty.call(prev, k) || prev[k] !== fp[k]) keys.push(k);
+      });
+      Object.keys(prev).forEach(function (k) { if (!Object.prototype.hasOwnProperty.call(fp, k)) keys.push('-' + k); });
+    }
+    __keyFp = fp;
+    if (rev !== null) __keyRev = rev;
+    return { keys: keys.sort(), kind: prev ? 'diffed' : 'first', rev: rev };
   }
   function noteEngineFailure(ns, err) {
     const name = SRC_NAME[ns] || ns;
@@ -557,6 +605,9 @@ style: false,
       // v2.88.0 O1：成本账按轮清零——它记的是**本轮**注入链的引擎耗时，不是从开机累到现在。
       //   每轮清零后，注入构建花了多少时间才能与「这一轮 token 用了多少」同轴比较。
       resetCost();
+      // v2.123.0 P3：**脏键采样点**必须早于成本账读取 —— 它是「这轮世界改了什么」的真事实，
+      //   与本轮注入链自身写下的产物（lastInjection）无关，故不受「观测污染被观测者」影响。
+      const dirtyNow = worldDirtyKeys();
       // v2.90.0 O3：本轮的**轮次坐标**。此前 lastInjection 一个轮次都没记，
       //   于是「这一轮为什么这样」连问的是哪一轮都无从确认；轮次真源只有一个（evolution.roundOf），
       //   本处跟它走，不自己数。模块缺席时为 null（如实报缺，不拿 0 冲当“第 0 轮”）。
@@ -872,7 +923,26 @@ style: false,
           const slotSnap = (WA.injectSlotAudit && lastSlots)
             ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotResOut || slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          // v2.123.0 P3：**局部重算观测**的真正采样点。
+          //   位置刻意的——必须在本轮引擎调用**全部发生之后**读耗时台账，否则读到的是上一轮的。
+          //   两样输入都是现场事实，没有一样是猜的：
+          //     · costStat()    —— 本轮真被调用的源（唯一引擎调用出口落表，46 处调用点全覆盖）；
+          //     · dirtyNow.keys —— 本轮世界真变脏的顶层键（采样于本函数开头，早于任何引擎调用）。
+          //   **为什么这里不接 `perfTrace.partial()`**（计划书里写的那条复用读数）：
+          //   它一旦发现世界步进变了就会**重跑四个面**（含重量级 `toolDiag.collect()`）——
+          //   把一次体检挂进每轮注入链，正是本仓点名的「观测污染被观测者」。
+          //   故 `reuse` 如实报缺（`reuseKind: 'absent'`），由**面板的增量面按钮**另行真跑；
+          //   本账只报它自己看得见的那一半，不拿空数组冒充「一次都没复用」。
+          var recalc = (function () {
+            try {
+              if (!WA.injectBudget || typeof WA.injectBudget.incrementalCost !== 'function') return null;
+              var r = WA.injectBudget.incrementalCost(costStat(), { dirtyKeys: (dirtyNow && dirtyNow.keys) || [] });
+              r.dirtyKind = (dirtyNow && dirtyNow.kind) || 'unknown';
+              r.rev = (dirtyNow && typeof dirtyNow.rev === 'number') ? dirtyNow.rev : null;
+              return r;
+            } catch (e) { return null; }
+          })();
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }

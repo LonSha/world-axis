@@ -1954,6 +1954,12 @@
           return { cls: c, repeats: d.repeats, budget: d.budget, approx: !!d.approx, note: d.note };
         }),
         dirty: WA.perfTrace.dirtyAll(),
+        // v2.123.0 P4：**档位结构面**（`bandCompare` 的真消费方之一；此处只念结构）。
+        //   传 `dryRun: true` 是本节目的纪律所要求的：诊断是**旁观**，看一眼体检
+        //   不该等于跑一轮基准（四档真跑会真调四个面的真源）。故此处的读数是
+        //   「有哪几档 / 每档几面 / 哪档可判 / 哪档只是估计」，**不含任何毫秒**——
+        //   要 ms 走面板「档位面」按钮。
+        band: WA.perfTrace.bandCompare({ dryRun: true }),
         summary: WA.perfTrace.summaryText(),
         note: '只报已发生过的读数（本节目不触发基准）；host/render 未上报即 declared:false；lowend 档为同机放大估计（真机读数须实机）'
       };
