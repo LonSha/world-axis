@@ -6,21 +6,97 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.122.0 |
-| 全量回归 | `node tests/run.js` → **v2.120.0 为通过 11858 / 失败 0**；**v2.121.0 / v2.122.0 本轮未跑全量**（用户约束：整条计划做完前不跑），所有验证走单锁 + 轻量门禁 |
+| 版本 | v2.123.0 |
+| 全量回归 | `node tests/run.js` → **v2.120.0 为通过 11858 / 失败 0**；**v2.121.0 / v2.122.0 / v2.123.0 本轮未跑全量**（用户约束：整条计划做完前不跑），所有验证走单锁 + 轻量门禁 |
 | 产品文件面 | 140（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 128 / members= 869 / chars= 9882 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 139 · 锁 134 · 孤儿 0 · 豁免 0 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 128 / members= 871 / chars= 9910 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 140 · 锁 135 · 孤儿 0 · 豁免 0 |
 | 死子面 | `node tests/dead-export-gate.js` → dead 607 / uiDead 4 / 仅测试 349 / dataOnly 238 |
 | 拒收码 | `node tests/reject-code-gate.js` → 601 码（见证 362 / 死表 8 / 基线 231） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.122.0 |
-| 版本条目存放 | `node tests/docs-archive-gate.js` → README 89 条 / 日志存档 92 条 / 跨文件同号 **0** |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.123.0 · 现场 refs 3184 / 命名空间 139 / 成员 1748 |
+| 版本条目存放 | `node tests/docs-archive-gate.js` → README 90 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | tools/ | 只留**被可执行代码引用**的 12 个（一次性脚本不入库，见 `.gitignore`） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
 
+### R111 · 2026-09-29 · v2.123.0：局部重算观测 + 档位对照面（优化计划 P3 + P4）
+- **起点与终点**：起点 v2.122.0（全量回归仍停在 v2.120.0 的 11858 / 0，本轮未跑全量）；终点 v2.123.0。
+  本版是 P 线的第三、四项（`FOUR_VERSION_PLAN.md` 的 P3 / P4），**纯观测层**：不做任何「让它更快」的实质优化，
+  不改任何裁决结果、不改注入分支 —— 先把「谁被白跑了 / 够不够快」变成可核对的读数。
+- **P3 治的病**：`v2.88.0`（O1）的成本账答得出「这一轮的时间花在谁身上」，答不出「这轮有几个源是白跑的」。
+  「跳过」这个读数在库里此前**根本不存在**：全部源每轮重建，跳过与否无从判定，于是「增量」这件事连
+  「有没有发生」都无从观测，更谈不上优化。P3 把它变成一条可复算的读数。
+- **P3 落地三段**：① `engines/inject-budget.js` 新增 `incrementalCost(costs, opts)`——源面取**本模块自己的**
+  `PRIORITY` 键表（**不引** render 侧 `SOURCES`：两张表各有各的面，硬同步即新造第二套真源），
+  `touched` 取自调用方交来的**现场耗时台账**（唯一引擎调用出口落表，46 处调用点全覆盖；只认 known 里的源名，
+  不认识的名字单列 `unrecognized` 而**不静默并入** touched），`untouched = known − touched`，
+  核心不变式 `touched ∩ untouched = ∅` 且并集 = `known`——「声称跳过却仍重算」的落地形态正是这条被破坏。
+  ② `render/inject.js` 新增 `worldDirtyKeys()`——**键级**指纹对上次采样逐键比对（复用 `timeline.hashText`，
+  不新造第二份指纹实现；两份实现迟早在边界字符上分叉），三条口径：`meta` 与 `lastInjection` 两个**每轮必变**的键
+  逐键跳过、`meta.stateRev` 未变则直接返回 `unchanged-rev` 空脏集（否则每轮序列化 68 个顶层键的成本会喂进
+  它自己要观测的那本成本账）、首轮如实报 `first`（没有前值可比 ⇒ **不假装「什么都没改」**）、删键以 `-key` 报出。
+  采样点刻意落在 `applyInjections` 开头 `resetCost()` 之后（早于任何引擎调用，读到的才是本轮世界）。
+  ③ 落盘点写 `recalc:`、`explain()` 的 `omniscient.recalc` 逐字段照抄（解释面与存档**同一批事实**），
+  面板「本轮注入」段逐字段渲染（重算 N 源 / 跳过 M 源 / 脏键 / 复用读数 / 未识别源）。
+- **本版最有价值的一条裁决（计划书里没有，当场定的）**：**不把 `perfTrace.partial()` 接进注入链**。
+  计划书写的是「复用读数取自 `partial()`」，但 `partial()` 一旦发现世界步进变了就会**重跑四个面**
+  （含重量级 `toolDiag.collect()`）——把一次体检挂进每轮注入链，正是本仓点名的「观测污染被观测者」。
+  故 `reuse` 面**如实报缺**（`reuseKind: 'absent'`，**不拿空数组冒充「一次都没复用」**），
+  由面板的「增量面」按钮另行真跑。这条与 v2.102.0「诊断是旁观者、不触发基准」逐字同源。
+- **P4 的一处口径修正（以实际为准）**：计划书写「`perf-trace` 加 `baseline(band)`」，而 `baseline(layer)` 与四档
+  `CLASSES` / `CLASS_DEF`（short / medium / long / lowend）**本已存在**（v2.102.0）。故本项补的是**档位之间的对照面**
+  `bandCompare(opts)`，不是新造 `baseline` —— 这一点已写回计划书，避免下一个人照计划书去找一个不存在的入口。
+- **P4 落地两条口径（都落在读数上，不止写在注释里）**：① **每档的本地 / API 读数取本档前后的差值**，
+  不是全局累计。`_span` 是**自装载以来**的累计桶、跨档只增不减；直接读它，第四档会把前三档跑过的量一起算进来
+  （「读数看着有值、却没有归属」）。故档前档后各取一次 `split()`，报 `after − before`。
+  ② **宿主 API 无读数就如实说无读数**（`declared.host === false` + `apiReported:false` + `undeclared` 含 host），
+  **绝不拿 0ms 冒充「API 很快」**；`lowend` 是同机放大估计（`approx:true`），单列 `judgeable=false`
+  **不参与判定**；`dryRun` 只报结构面、**不跑任何一档**（诊断是旁观：看一眼体检 ≠ 跑一轮基准）。
+- **两个真消费方**：`engines/tool-diag.js` 的 `secPerfTrace` 读档位**结构**面（传 `dryRun: true`）+
+  `ui/panel.js` 新增「档位面」按钮逐档渲染（合计 / 本地 / 序列化 / 宿主 API / 样本门槛）；P3 侧则是
+  `render/inject.js`（每轮真调）+ 面板 + `explain()` 透传三处。**有出口必须有读者**这条判据由 run.js 的
+  v2.123.0 section 现场钉住。
+- **判据逼出的一条真实结构约束（本轮实测，写进引擎注释）**：把 `dryRun` 守卫置假后，档位面会真跑四档 ⇒
+  `diagnose` 面调 `toolDiag.collect()` ⇒ 该节回头读 `bandCompare` ⇒ **面级递归**（实测：跑满 120s 不返回、
+  RSS 一路涨）。这与 v2.111.0 记在 `secPerfTrace` 上的陈旧性缺口**同根**：`collect()` 自己不记「正在采集」。
+  本轮**不顺手修它**（那是诊断面的独立命题），但做了两件负责任的事：① 在 `bandCompare` 注释里写明这条回路；
+  ② 负控制 N6 **摘掉那条边再跑**，把「守卫失守 ⇒ 四档真跑」这一半单独证出来，并在日志里如实登记该缺口。
+- **另一条判据纪律（本轮踩到并修正）**：`tests/ui-gate-sync.js` 的 `fresh()` 与 `run.js` **复用同一个 vm 上下文**，
+  各模块 IIFE 每次装载都重写 `global.WorldAxis` 上的同名属性 ⇒ **早先取的 `WA` 引用会跟着变成最后装载的那份**
+  （「取引用 ≠ 钉住快照」）。专锁里凡做「破坏副本 vs 原版」对照的地方，对照必须用**最后一次 `fresh` 的引用**；
+  这条已在锁内注释写明，避免下一个人重犯。
+- **升版与台账**：`index.js` 的 `VERSION`、`manifest.json` 升至 **2.123.0**。`module-registry-gate --update`
+  写入（文件 136 / 命名空间 144 / 装载期边 37 / 硬边 0 / 调用期引用 72）；`dead-export-gate --update` 写入
+  （dead 607 → 607 · uiDead 4 → 4 · 证据复核 611 条）；reject-code 台账追加 v2.123.0 沿革并推进版本
+  （**三集逐字不变**：见证 362 / 死表 8 / 基线 231）。三本台账版本一致，读数发现器 `problems 0`。
+  `tests/run.js` 的八处版本比较值与配对消息副本同批升级；`FROZEN2800` 由 `tests/export-contract.txt`
+  **逐字回填**（9910 字符）；三族硬读数用 `node tools/sync-hardcoded.js --write` 回填
+  （`refs 3178→3184` / `members 1746→1748`，死子面三族不变）。
+- **验收（本轮实际执行）**：
+  - 新增专锁 `tests/perf-recalc-v2123.js`：直接调用 `runAll` + `runNegative`，**66 / 0**
+    （A 面 P3 结构 / B 面 P3 运行时 / C 面 P4 结构 / D 面 P4 运行时 / N1–N6 真源码破坏负控制）。
+    实测读数：首轮 `recalc = {touched:53, untouched:3, known:56, dirtyKind:'first', dirtyKeys:[]}`；
+    改一条人物（`d.people.p1.location='街'`）后 `dirtyKind:'diffed'`, `dirtyKeys:['people']`，
+    `touched/untouched` 仍 53/3；`bandCompare` 四档 `split` 键集合一致、各档 local 差值之和 287 ≤ 全局累计 287、
+    每档 `minSamples 8` 与现场样本数可复算。
+  - 门禁单跑（均已实际运行）：出口契约 `128 / 871 / 9910`；清册四类悬空 **0**（产品文件 140）；
+    测试面 `140 文件 / 135 锁 / 孤儿 0`；死子面 `607 / 4 / 238 · 仅测试 349`；拒收码 `601 = 362+8+231`；
+    模块注册 `136 / 144 / 37 / 0`；模块依赖图无违规、无环；重复定义零命中；活性面零幽灵读点；
+    `docs-archive-gate` 跨文件同号 0（README 90 条 / 存档 92 条）；`gen-error-codes --check` 双向一致；UI 接线面 9/0；
+    可访问性 694 / 694（100%）；`readings-v2106` **58 / 58**、`problems 0`、ledgerVersion 2.123.0。
+  - **全量回归 `node tests/run.js` 未运行**，遵守用户本轮明确禁令；不能据这些局部结果声称 v2.123.0 全量通过。
+    README 与本基线均保留 v2.120.0 的 11858/0 作为上一版读数。
+- **诚实边界**：① 本版的两项都是**观测**，**不含任何性能优化** —— 读数立起来之后，优化是后续版本的事；
+  ② `lowend` 档仍是**同机放大估计**（无头环境不可真测真机），读数带 `approx:true`，真机读数须实机；
+  ③ 上述「面级递归」缺口**已登记但未修**（属诊断面独立命题），负面后果（`collect()` 不可重入）仍在；
+  ④ UI 只有无头静态核验（`ui-gate-sync` / `ui-wire-audit` / `ui-a11y-gate`），**未做浏览器实机联调**；
+  ⑤ 本轮落成**两笔**：产品面（两处引擎 + `tool-diag` / `ui/panel` 消费方 + 专锁
+  `tests/perf-recalc-v2123.js`）为 `73be9de`；收口部分（`index.js` / `manifest.json` 升版、三本台账、
+  `tests/run.js` 版本站点与冻结串 / 读数回填、`FOUR_VERSION_PLAN.md` 写回、README / docs 同步）与之**分开**提交
+  —— 本轮不像 v2.121.0 那样把两者合并：产品面可以单独成立（专锁与门禁都能单独跑通），
+  强行合并反而会把「升版 + 台账收敛」这类纯收口改动混进产品语义里。收口笔的哈希在下一轮补记。
 ### R110 · 2026-09-29 · v2.122.0：解释下到「预算折叠 / 丢弃」层（优化计划 P2）
 - **起点与终点**：起点 v2.121.0（全量回归仍停在 v2.120.0 的 11858 / 0，本轮未跑全量）；终点 v2.122.0。
   本版是 P 线的第二项（`FOUR_VERSION_PLAN.md` 的 P2），**纯观测层**改动：不改任何裁决结果、不改注入分支。

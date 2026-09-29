@@ -1,6 +1,6 @@
 # 门禁
 
-九道门禁 + 几把专锁。**所有读数都是现场跑出来的**；下面括号里的数字是本文写作时（v2.122.0）的实测值，
+九道门禁 + 几把专锁。**所有读数都是现场跑出来的**；下面括号里的数字是本文写作时（v2.123.0）的实测值，
 只作「大概是什么量级」参考，随时会随版本推进而变 —— 引用请以现场输出为准。
 
 原则：门禁是**判据**，不是报告器。设计口径统一为「**双向自证**」：真源码破坏 ⇒ 判据必须现形；
@@ -9,7 +9,7 @@
 ## 一条命令的全量入口
 
 ```bash
-node tests/run.js          # v2.120.0：通过 11858 / 失败 0；v2.121.0 / v2.122.0 未跑全量（见 ITERATION_LOG.md 的 R109 / R110）
+node tests/run.js          # v2.120.0：通过 11858 / 失败 0；v2.121.0 / v2.122.0 / v2.123.0 未跑全量（见 ITERATION_LOG.md 的 R109 / R110 / R111）
 ```
 
 它是**闭包**：`tests/` 下每个锁/门禁都必须挂进 `LOAD`，否则被「测试面可达性」判为孤儿。
@@ -18,15 +18,15 @@ node tests/run.js          # v2.120.0：通过 11858 / 失败 0；v2.121.0 / v2.
 
 | 命令 | 治什么病 | 现在读什么 |
 |---|---|---|
-| `node tests/export-contract.js` | 成员被悄悄改名/删掉、调用方静默降级 | `ns= 128 members= 869 chars= 9882`（逐字冻结，产物在 `.gitignore` 内） |
+| `node tests/export-contract.js` | 成员被悄悄改名/删掉、调用方静默降级 | `ns= 128 members= 871 chars= 9910`（逐字冻结，产物在 `.gitignore` 内） |
 | `node tests/inventory.js` | 引用了根本不存在的东西；有文件没登记；死导出 | 四类悬空均 **0**（产品文件 140） |
 | `node tests/test-surface-gate.js` | 「从不执行的测试文件」（孤儿） | 测试面 139 · 锁 134 · 可达 139 · 孤儿 **0** |
 | `node tests/reject-code-gate.js` | 「码存在 ≠ 码可达」 | 产品文件 140 · 内联码 **601**（见证 362 / 死表 8 / 基线 231） |
 | `node tests/module-registry-gate.js` | 磁盘有模块、自检看不见 | 无未登记、无登记悬空 |
 | `node tests/module-cycle-gate.js` | 模块间循环依赖 | 无环 |
 | `node tests/dead-export-gate.js` | 死子面无账本（改名/新增无痕迹） | `dead 607 · uiDead 4 · 仅测试 349 · dataOnly 238` |
-| `node tests/readings-v2106.js` | 七族硬读数不自洽 | `problems 0` · 现场 refs 3178 / 命名空间 139 / 成员 1746（注：`readings.js` 是**库**，没有 CLI 分支 —— 单独 `node tests/readings.js` 不打印任何东西，别把它当门禁跑） |
-| `node tests/docs-archive-gate.js` | 版本条目出现**两份真源**（README 与日志存档节各存一份，改一处不改另一处 = 悄悄分叉） | README 版本历史 89 条 / 日志存档 92 条 · 跨文件重复 **0** · `ok` |
+| `node tests/readings-v2106.js` | 七族硬读数不自洽 | `problems 0` · 现场 refs 3184 / 命名空间 139 / 成员 1748（注：`readings.js` 是**库**，没有 CLI 分支 —— 单独 `node tests/readings.js` 不打印任何东西，别把它当门禁跑） |
+| `node tests/docs-archive-gate.js` | 版本条目出现**两份真源**（README 与日志存档节各存一份，改一处不改另一处 = 悄悄分叉） | README 版本历史 90 条 / 日志存档 92 条 · 跨文件重复 **0** · `ok` |
 
 补两项与生成物有关的：
 

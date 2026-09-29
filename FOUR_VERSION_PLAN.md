@@ -355,15 +355,44 @@
   · 验收：专锁 `tests/explain-budget-v2122.js` **67/0**（runAll 48 + runNegative 19，四条负控制走真源码破坏副本）；恒等式 `remainAt + ΣblockedBy.tokens = cap` 实测三例全成立（纯观测的证据）；`test-surface-gate` 139 文件 / 134 锁 / 孤儿 0；`readings` 58/58；出口契约与拒收码**零变化**（本版加的是字段不是导出）；本轮未跑全量回归（见 R110）。
   · 判据逼出的**真缺口**（计划里没写、本版当场补掉）：`decisions` 每行只对应 `SOURCES` 里的一个源键，而「世界状态」是六个快照源合成的**块名**（不在源表内），它被折叠时在解释面上无处落名 ⇒ 补块级出口，而不是往 `decisions` 塞行（那会碰 v2.91.0 的宽度判据）。
   · 本版未覆盖（如实留档）：`blockedBy` 记的是**裁决顺序上的占位者**，不是「谁该负责」（预算裁决只有先后、没有因果归属）；UI 只有无头静态核验，未做浏览器实机联调。
-- [ ] **P3 增量 / 局部重算观测**：O1 只到「单源构建耗时」⇒ 改一条人物要重算多少、哪些源级联重算不可见。
-  · 路径：`inject-budget` 加 `incrementalCost(dirtyKeys)` 观测面（只观测、不做真增量优化）。
-  · 消费者：`inject-budget.costView` → 面板耗时段。
+- [x] **P3 增量 / 局部重算观测**（v2.123.0 交付）：O1 只到「单源构建耗时」⇒ 改一条人物要重算多少、哪些源级联重算不可见。
+  · 路径：`inject-budget` 加 `incrementalCost(costs, opts)` 观测面（只观测、不做真增量优化）。
+  · 消费者：① `render/inject.js` 在唯一引擎调用出口之后真调它、把读数落进 `lastInjection.recalc`；
+    ② `ui/panel.js` 的「本轮注入」段逐字段渲染（重算 N 源 / 跳过 M 源 / 脏键 / 复用读数）；
+    ③ `render.explain()` 的 `omniscient.recalc` 透传（解释面与存档同一批事实）。
   · 正判据：改 1 个 NPC 后报「重算 N 源 / 跳过 M 源」；反判据：声称跳过却仍重算 ⇒ 红。
+  · 落地三段：① `inject-budget.js` 新增 `incrementalCost`——源面取**本模块自己的** `PRIORITY` 键表
+    （不引 render 侧 `SOURCES`：两张表各有各的面，硬同步即新造第二套真源），`touched` 取自现场耗时台账
+    （只认 known 里的源名，不认识的名字单列 `unrecognized` 而不是静默并入），`untouched = known − touched`，
+    不变式 `touched ∩ untouched = ∅` 且并集 = known；② `render/inject.js` 新增 `worldDirtyKeys()`——
+    键级指纹（复用 `timeline.hashText`，不新造第二份实现）对上次采样逐键比对，`meta` / `lastInjection`
+    两个每轮必变的键跳过，`stateRev` 未变则不重复采样（不然每轮序列化 68 个顶层键会污染它要观测的成本账），
+    首轮如实报 `first`、删键以 `-key` 报出；③ 落盘点写 `recalc:`、`explain()` 透传 `recalc`。
+  · **一条主动裁决（不写进计划书、本版当场定的）**：**不把 `perfTrace.partial()` 接进注入链**——
+    它一旦发现世界步进变了就会重跑四个面（含重量级 `toolDiag.collect()`），把一次体检挂进每轮注入链
+    正是本仓点名的「观测污染被观测者」。故 `reuse` 面**如实报缺**（`reuseKind:'absent'`，
+    不拿空数组冒充「一次都没复用」），由面板的增量面按钮另行真跑。
+  · 验收：专锁 `tests/perf-recalc-v2123.js` A/B/N 三段（P3 部分）· 面板与诊断两处真消费方判据在位；
+    实测「改 1 个 NPC ⇒ 报脏键 people / 重算 53 源 / 跳过 3 源（源面 56）」；
+    两轮注入后 `partialCalls` **未增**（观测不触发基准的可判形态）。
   · 本版不做：不做真正的增量计算（那是功能，属拓展线），先把「重算了什么」变成可观测。
-- [ ] **P4 性能基准三档对照（短 / 中 / 长 + 本地 / API 分列）**：O1 只单点 ⇒「够快吗」没基准；本地引擎与 API 耗时混在一起。
-  · 路径：`perf-trace` 加 `baseline(band)`；基准随墙钟漂移（v2.119 族⑥病）⇒ 改无条件断言锁项数恒定。
-  · 消费者：`tool-diag`。
-  · 正判据：三档各有 `minSamples` 且本地 / API 分列；反判据：基准不可复现 ⇒ 红。
+- [x] **P4 性能基准三档对照（短 / 中 / 长 + 本地 / API 分列）**（v2.123.0 交付）：O1 只单点 ⇒「够快吗」没基准；本地引擎与 API 耗时混在一起。
+  · 路径：`perf-trace` 加 `bandCompare(opts)`；基准随墙钟漂移（v2.119 族⑥病）⇒ 改无条件断言锁项数恒定。
+  · **计划书与实现的一处出入（以实际为准）**：`baseline(layer)` 与四档 `CLASSES` / `CLASS_DEF`
+    （short / medium / long / lowend）**本已存在**（v2.102.0），故本项补的是**档位之间的对照面**，
+    不是新造 `baseline`。
+  · 消费者：① `engines/tool-diag.js` 的 `secPerfTrace` 真读（且传 `dryRun: true` —— 诊断是旁观，
+    不跑基准）；② `ui/panel.js` 新增「档位面」按钮，逐档渲染合计 / 本地 / 序列化 / 宿主 API / 样本。
+  · 正判据：四档各有 `minSamples` 且本地 / API 分列（`splitKeys` 四键，每档 `split` 键集合一致）；
+    反判据：基准不可复现 ⇒ 红。
+  · 落地两条口径（都在读数上可见，不止写在注释里）：
+    ① **每档的本地 / API 读数取本档前后的差值**，不是全局累计 —— `_span` 是自装载以来的累计桶、
+       跨档只增不减，直接读它第四档会把前三档跑过的量一起算进来（读数看着有值、却没有归属）；
+    ② **宿主 API 无读数就如实说无读数**（`apiReported:false` + `undeclared` 含 host），
+       绝不拿 0ms 冒充「API 很快」；`lowend` 是同机放大估计（`approx:true`），单列 `judgeable=false`
+       **不参与判定**；`dryRun` 只报结构面、不跑任何一档。
+  · 验收：专锁 `tests/perf-recalc-v2123.js` C/D/N 三段（P4 部分）；
+    实测「四档 `split` 键集合一致 · 各档 local 差值之和 287 ≤ 全局累计 287 · 每档 `minSamples` 8 与现场样本数可复算」。
   · 本版不做：不做自动调优；基准只是对照面，不参与任何判定。
 - [ ] **P5 权限闸门接进真实写路径**：`core/permissions.js` 的判定「尚未接进任何写路径」（v2.111.0 留档）⇒ 机制立着但没人拦。
   · 路径：`core/store.transact` 前置点接 `permissions` 判定；越权写走 `permission-denied` 拒收且不落盘。

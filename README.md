@@ -67,10 +67,10 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.122.0）
+## 构建与验收（当前版本 v2.123.0）
 
 ```bash
-node tests/run.js               # 全量回归入口 → v2.120.0 为通过 11858 / 失败 0；v2.121.0 / v2.122.0 均未跑全量（用户约束：整条计划做完前不跑；见 ITERATION_LOG.md 的 R109 / R110）
+node tests/run.js               # 全量回归入口 → v2.120.0 为通过 11858 / 失败 0；v2.121.0 / v2.122.0 / v2.123.0 均未跑全量（用户约束：整条计划做完前不跑；见 ITERATION_LOG.md 的 R109 / R110 / R111）
 node tests/inventory.js         # 出口面清册 → 四类悬空均 0（产品文件 140 个）
 node tests/export-contract.js   # 出口面契约 → ns / members / chars（产物在 .gitignore 内）
 ```
@@ -95,12 +95,13 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（89 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（90 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
 - **v2.20.0 及更早**：条目在 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节（本版迁入）。
 
+<b>v2.123.0</b> — <b>局部重算观测 · 档位对照面（优化计划 P3 + P4）</b>。两项都是<b>观测与判据</b>层改动：不做任何「让它更快」的实质优化，先把「谁被白跑了 / 够不够快」变成可核对的读数。<b>P3 治的病</b>是成本账只答「时间花在谁身上」，答不出「这轮有几个源是白跑的」——「跳过」这个读数在库里此前<b>根本不存在</b>（全部源每轮重建，跳过与否无从判定）。<b>P4 治的病</b>是 <code>bench()</code> 只给<b>单点</b>读数，「够快吗」没有参照系；而本地引擎耗时与宿主 API 耗时混在一个 <code>totalMs</code> 里。<b>P3 落地</b>：<code>inject-budget.incrementalCost</code>（源面取本模块自己的 <code>PRIORITY</code> 键表，<code>touched</code> 取自现场耗时台账、<code>untouched = known − touched</code>，不变式 <code>touched ∩ untouched = ∅</code> 且并集 = known；不认识的名字单列 <code>unrecognized</code>）+ <code>render/inject.js</code> 的 <code>worldDirtyKeys()</code>（键级指纹复用 <code>timeline.hashText</code>，<code>meta</code> / <code>lastInjection</code> 逐轮跳过，步进未变则不重复采样，首轮如实报 <code>first</code>）+ 落盘点 <code>recalc</code> 与 <code>explain()</code> 透传，面板「本轮注入」段逐字段渲染。<b>P4 落地</b>：<code>perf-trace.bandCompare</code>——四档（短 / 中 / 长 / lowend）并排，<b>本地 / API 分列</b>，且每档读数取<b>本档前后的差值</b>（<code>_span</code> 是自装载以来的累计桶，直接读它第四档会把前三档算进来 —— 读数看着有值却没有归属）；宿主 API 无上报时如实记「未上报」（<b>不拿 0ms 冒充「API 很快」</b>），<code>lowend</code> 单列 <code>judgeable=false</code>（同机放大估计，不参与判定），<code>dryRun</code> 只报结构面、不跑任何一档。<b>一条主动裁决</b>：<b>不把 <code>perfTrace.partial()</code> 接进注入链</b> —— 它一旦发现世界步进变了就会重跑四个面（含重量级 <code>toolDiag.collect()</code>），把一次体检挂进每轮注入链正是本仓点名的「观测污染被观测者」；故 <code>reuse</code> 面如实报缺（<code>reuseKind:'absent'</code>，不拿空数组冒充「一次都没复用」）。<b>验收</b>：专锁 <code>tests/perf-recalc-v2123.js</code> <b>66/0</b>（含六条真源码破坏负控制）；实测「改 1 个 NPC ⇒ 报脏键 <code>people</code> / 重算 53 源 / 跳过 3 源（源面 56）」，「四档 <code>split</code> 键集合一致 / 各档 local 差值之和 287 ≤ 全局累计 287」；两轮注入后 <code>partialCalls</code> 未增（观测不触发基准的可判形态）。出口面 <code>ns= 128 members= 871 chars= 9910</code>（+2 成员），死子面 <b>607 / 4 / 238</b> 与拒收码 <b>601 = 362 + 8 + 231</b> 三集不变；<b>本轮未跑全量回归</b>（用户约束：整条计划做完前不跑）。
 <b>v2.116.0</b> — <b>事件调度恢复协议（计划一 A2 第二段：任务预算 / 所有权 / 租约 / 回执去重）</b>。规划 01 的 A2 原文六句话逐句落成可证伪的字段与判据；四处缺口全由「<b>认领了、然后没人回报</b>」这一句话派生；<b>产品侧零新增导出成员</b>（出口面 <code>ns= 116 members= 731 chars= 8667</code> <b>逐字未变</b>）。
   <b>四处缺口</b>：① <b>认领无预算</b>——旧 <code>claim()</code> 一次把全部到点事件认领光（真实酒馆里那是几十个引擎同时开工），新增 <code>maxClaims</code>（bounds <code>[1,24]</code>，默认 24），超额者进 <code>deferred</code> 带 <code>reason:'budget'</code> <b>显式留痕而非静默跳过</b>；② <b>认领无所有权</b>——新增 <code>x.owner</code>；③ <b>认领无租约</b>——新增 <code>leaseMs</code>（bounds <code>[0,3600000]</code>，默认 <b>0 = 不生效、行为与 v2.115.0 逐字一致</b>），<code>claim()</code> 在<b>同一事务内先回收</b>租约到期行，<code>ready()</code> 亦把到期行视为候选；④ <b>回执无稳定操作 ID</b>——认领时钉 <code>opId = id@scheduledAt#claims</code>（<b>每次重钉、序号自增</b>），<code>complete()</code> 以「<code>events.res</code> 台账里有同一 <code>opId</code>」为去重判据（新码 <code>duplicate-receipt</code>）。
   <b>四处「实测推翻纸面」的现场裁决（本版最有价值的部分）</b>：① <code>already-receipted</code> 守卫<b>撤除</b>——它不可达，且唯一可达的场合会把<b>合法的取消</b>挡回去 ⇒ <b>周期事件从此不可取消</b>；② <code>opId</code> <b>必须按次重钉</b>——沿用旧键会让 <code>repeat</code> 第二次到点被自己的台账判成重复 ⇒ <b>周期事件只能执行一次</b>；③ <b>终态必须清空 <code>opId</code></b>——台账被挤出后，跑满的周期事件会从 <code>exhausted</code> 被重新认领，<b>终态可回卷</b>；④ <b>回执键优先级「调用方优先」</b>——行上优先时迟到回执会把新尝试自己的回执挡死，<b>救回来的活反被旧回执挡死</b>。
