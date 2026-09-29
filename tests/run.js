@@ -15029,7 +15029,7 @@ assert(verF2500 === '2.119.0' && mfF2500.version === verF2500, '入口与清单�
     ['dead', 'uiDead'].forEach(function (k) {
       Object.keys(led2800[k] || {}).forEach(function (kk) { allEnt2800.push({ kind: k, key: kk, item: led2800[k][kk] }); });
     });
-    assert(allEnt2800.length === 553, '账本条目 553 条（v2.111.0：新增 auditLog 与 sanitize 两模块共 10 个口 ⇒ 486 + 10 = 496，其中 sanitize.html 接了真消费方故**出冻结面**（dead 492→491）⇒ 495；v2.110.0：新增三个基元模块的 26 个口按实测归因登记 ⇒ 460 + 26 = 486；v2.102.0：perf-trace 九口如实登记 self-only ⇒ 449 + 9 = 458；v2.101.0：interop.probePartner 按伙伴分发口如实登记为 self-only；v2.89.0：O2 磁带面——新增 causal.replayWith 如实登记，实 ' + allEnt2800.length + '）');
+    assert(allEnt2800.length === 612, '账本条目 612 条（v2.119.0：v2.117.0～v2.119.0 共 11 个新模块（act/opportunity/recipe + rehearsal/liaison/coop + plan/mend/economy/inst/probe/region/stage/session）的全部导出按现场归因入册 ⇒ 冻结面 553 → 612；v2.111.0：新增 auditLog 与 sanitize 两模块共 10 个口 ⇒ 486 + 10 = 496，其中 sanitize.html 接了真消费方故**出冻结面**（dead 492→491）⇒ 495；v2.110.0：新增三个基元模块的 26 个口按实测归因登记 ⇒ 460 + 26 = 486；v2.102.0：perf-trace 九口如实登记 self-only ⇒ 449 + 9 = 458；v2.101.0：interop.probePartner 按伙伴分发口如实登记为 self-only；v2.89.0：O2 磁带面——新增 causal.replayWith 如实登记，实 ' + allEnt2800.length + '）');
     const missingEv2800 = allEnt2800.filter(function (e) {
       return gate2800.EVIDENCE_KEYS.some(function (f) { return e.item[f] === undefined; });
     });
@@ -15047,8 +15047,8 @@ assert(verF2500 === '2.119.0' && mfF2500.version === verF2500, '入口与清单�
             //   uiDead 4 项全为 test-only ⇒ test-only = 293(dead 里的 test-only) + 4(uiDead) = 297（v2.93.0 现场）。
             //   v2.73.0 之前测试面只读 run.js，两侧分别是 135 / 4。
              //   v2.101.0：interop.probePartner 只有本模块内部调用 ⇒ self-only 119 → 120，总条目 448 → 449。
-assert(dist2800['test-only'] === 323 && dist2800['self-only'] === 194 && dist2800['unwired'] === 36,
-'归因分布 test-only 323 / self-only 194 / unwired 36（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块的全部导出按实测归因入册 ⇒ 分布由 {300/177/32}（面 509）变成 {323/194/36}（面 553）；v2.114.0：sandbox / plugin 两模块 12 口中，sandbox.freezeApi / sandbox.reset / plugin.reset 三项**当场删除**（能力未接线、白名单冻结只该是 run 内部步骤），sandbox.stat 由 tool-diag 的 secPlugin 真读、plugin.unregister 由面板 #wa-pl-unreg 卸载按钮真调 ⇒ 二者出冻结面；chrono / collab 新增口按实测归因入册（test-only +3 / self-only +2）；v2.111.0：auditLog / sanitize 两模块共 10 口，9 个留 self-only（sanitize.html 接了面板真消费方故由死转活）⇒ 157 + 9 = 166；v2.110.0：三个基元模块的 26 个口全部 self-only（模块内部自用、外部零引用）⇒ 131 + 26 = 157；另 6 个只读数据成员（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）走 advisory.dataOnly（172→178），**不进冻结面** —— 故 26 这个数是「方法与函数」，不含数据成员；v2.102.0：perf-trace 九口 self-only ⇒ 120 + 9 = 129；v2.101.0：interop.probePartner 记 self-only ⇒ 449；v2.93.0：死面 293 + 界面 4 = 297，实 ' + JSON.stringify(dist2800) + '）');
+assert(dist2800['test-only'] === 353 && dist2800['self-only'] === 215 && dist2800['unwired'] === 44,
+'归因分布 test-only 353 / self-only 215 / unwired 44（v2.119.0：面 553 → 612，分布 {323/194/36} → {353/215/44}（v2.117.0～v2.119.0 共 11 个新模块入册）；v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块的全部导出按实测归因入册 ⇒ 分布由 {300/177/32}（面 509）变成 {323/194/36}（面 553）；v2.114.0：sandbox / plugin 两模块 12 口中，sandbox.freezeApi / sandbox.reset / plugin.reset 三项**当场删除**（能力未接线、白名单冻结只该是 run 内部步骤），sandbox.stat 由 tool-diag 的 secPlugin 真读、plugin.unregister 由面板 #wa-pl-unreg 卸载按钮真调 ⇒ 二者出冻结面；chrono / collab 新增口按实测归因入册（test-only +3 / self-only +2）；v2.111.0：auditLog / sanitize 两模块共 10 口，9 个留 self-only（sanitize.html 接了面板真消费方故由死转活）⇒ 157 + 9 = 166；v2.110.0：三个基元模块的 26 个口全部 self-only（模块内部自用、外部零引用）⇒ 131 + 26 = 157；另 6 个只读数据成员（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）走 advisory.dataOnly（172→178），**不进冻结面** —— 故 26 这个数是「方法与函数」，不含数据成员；v2.102.0：perf-trace 九口 self-only ⇒ 120 + 9 = 129；v2.101.0：interop.probePartner 记 self-only ⇒ 449；v2.93.0：死面 293 + 界面 4 = 297，实 ' + JSON.stringify(dist2800) + '）');
     assert(gate2800.evidenceDrift(r2800, led2800).length === 0, '现场账本证据复算零失实');
 
     // ── E. 负控制：证据失实/缺证/归因与证据不符 各须现形 ──
@@ -16313,7 +16313,7 @@ assert(r2900.dead.length === 608 && r2900.uiDead.length === 4 && r2900.dataOnly.
       return bodySnap.indexOf("vis." + k) < 0;
     });
     assert(missingVis.length === 0, "v2380: 门禁——SOURCES 每项都在快照里有真读（缺: " + missingVis.join(",") + "）");
-    assert((W.render.SOURCES || []).length === 49, "v2380: SOURCES 为 49 项（v2.100.0 不新增源——原著对位是 canon 模块的读面，走面板与诊断节，不占注入源位；v2.99.0 追加 canon；v2.96.0 追加 rumor；v2.82.0 时为 47；实 " + (W.render.SOURCES || []).length + "）");
+    assert((W.render.SOURCES || []).length === 58, "v2380: SOURCES 为 58 项（v2.119.0：act/plan/mend/economy/inst/probe/region/stage/session 九个新源与注入分支同批登记 ⇒ 49 → 58；v2.100.0 不新增源——原著对位是 canon 模块的读面，走面板与诊断节，不占注入源位；v2.99.0 追加 canon；v2.96.0 追加 rumor；v2.82.0 时为 47；实 " + (W.render.SOURCES || []).length + "）");
     // E. 负向自证：把 echoes 分支从源码里抹掉 ⇒ 门禁必须现形
     const broken2380 = srcIj2380.split("if (vis.echoes)").join("if (false)");
     assert(broken2380 !== srcIj2380, "v2380: （负向自证）破坏锚点在真源码中恰命中（可观测改行为）");
@@ -19414,7 +19414,7 @@ assert(r2900.dead.length === 608 && r2900.uiDead.length === 4 && r2900.dataOnly.
       + (a.identityOk ? '平' : '不平') + ' · 无环 ' + (!a.cycle && !a.cycleWithProv));
     // v2.114.0：现场从 12 降到 10 —— modules 面与 index 面同步后零读 ns 收敛；
     //   读数只报不红，但「恰 N 个」这条判据本身仍须与现场同宽（否则它会在读数没异常时误红）。
-    assert(a.deadNs.length === 10 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
+    assert(a.deadNs.length === 13 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
       'v2107: 零读 ns 恰 ' + a.deadNs.length + ' 个且不含任何核心 ns（读数只报不红）');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
@@ -19731,6 +19731,31 @@ assert(r2900.dead.length === 608 && r2900.uiDead.length === 4 && r2900.dataOnly.
       assert(tB9.anchorHits(s) === 1,
         'v2118: 锁 ' + s.rel + ' 的锚点 ' + s.key + ' 在真源码中恰 1 次（撞车 ⇒ 该条静默跳过）');
     });
+  }
+  // ── v2.119.0（拓展计划 ①–⑧）：计划 / 关系修复 / 经济 / 制度 / 调查 / 地域 / 玩法包 / 连接层 ──
+  //   八把锁与 B1–B9 同一纪律：两向自证（真源码成绿 / 就地破坏现形）+ 锚点唯一性逐条断言。
+  //   它们此前**从未被全量回归执行过**：文件在、独立 node 跑得动，但 run.js 里没有挂载行。
+  //   v2.75.0 立的「每个测试文件都有可判定的执行入口」正是为了逮住这一类——
+  //   归因与判据不该建立在不执行的文件上。本版把它们挂上，孤儿面因此归零。
+  section('v2.119.0（拓展计划 ①–⑧）：计划 / 关系修复 / 经济 / 制度 / 调查 / 地域 / 玩法包 / 连接层');
+  {
+    runLock('./plan-v2119.js'); runLock('./plan-v2119.js', 'runNegative');
+    runLock('./mend-v2119.js'); runLock('./mend-v2119.js', 'runNegative');
+    runLock('./economy-v2119.js'); runLock('./economy-v2119.js', 'runNegative');
+    runLock('./inst-v2119.js'); runLock('./inst-v2119.js', 'runNegative');
+    runLock('./probe-v2119.js'); runLock('./probe-v2119.js', 'runNegative');
+    runLock('./region-v2119.js'); runLock('./region-v2119.js', 'runNegative');
+    runLock('./stage-v2119.js'); runLock('./stage-v2119.js', 'runNegative');
+    runLock('./session-v2119.js'); runLock('./session-v2119.js', 'runNegative');
+    ['./plan-v2119.js', './mend-v2119.js', './economy-v2119.js', './inst-v2119.js',
+      './probe-v2119.js', './region-v2119.js', './stage-v2119.js', './session-v2119.js']
+      .forEach(function (spec) {
+        const t = require(spec);
+        t.BROKEN.forEach(function (s) {
+          assert(t.anchorHits(s) === 1,
+            'v2119: 锁 ' + t.REL + ' 的锚点 ' + s.key + ' 在真源码中恰 1 次（撞车 ⇒ 该条静默跳过）');
+        });
+      });
   }
   }  // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

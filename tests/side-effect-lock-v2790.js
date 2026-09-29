@@ -17,9 +17,14 @@
 //
 //   实测（修前）：20 次连续拒收把 stateRev 从 23 推到 43；
 //     对照组 `transact(function () { return false; })` 的 rev 纹丝不动。
-//   修复面：129 个站点改为 `return false;`，**唯一豁免**是抱有意副作用的站点
+//   修复面：129 个站点改为 `return false;`，**豁免**是抱有意副作用的站点
 //     （fondness.accept 的 stale-proposal 分支：拒收本次采纳的同时作废过期建议，
 //      那个作废必须落盘才有效，v2.77.0 的测试明文要求它）——它登记在 INTENTIONAL 里。
+//   v2.119.1：INTENTIONAL 增至 2 处（第二处同型：opportunity 的 window-closed）。
+//     v2.117.0–v2.119.0 新增的三个引擎（intel 的三条入口、shadow 的四条入口）里，
+//     有 7 处 `out = { ok:false, ... }; return;` —— 它们是**漏网**而不是豁免：
+//     那些分支什么都没写进世界，裸 return 却让事务照常提交（rev 推进、落盘、updatedAt 更新）。
+//     已逐处改为 `return false;`；本锁的 [B] 判据从此对新增代码同样有效。
 //
 // 本锁做的是**证明判据两个方向都不假**：
 //   A 结构：transact 契约在场（中止分支真的存在），且本锁的扫描器导出面完整。
@@ -39,7 +44,12 @@ const { productFiles } = require('./product-files.js');
 //   判据不是「名字对得上」，而是「该分支内存在对非 out 目标的写操作」——见 scanner 的 writesInBranch。
 const INTENTIONAL = [
   { rel: 'engines/fondness.js', reason: 'stale-proposal',
-    why: 'accept 拒收过期建议的同时把它作废（hit.pending = null），作废必须落盘才有效' }
+    why: 'accept 拒收过期建议的同时把它作废（hit.pending = null），作废必须落盘才有效' },
+  { rel: 'engines/opportunity.js', reason: 'window-closed',
+    why: '同一条纪律的第二处实例：作答时窗口已过 ⇒ 把该行标成 lapsed 并拒收本次作答。'
+      + '「到点即作废」是世界的既有规则，与「这次作答被拒」是两件事：'
+      + '放弃整笔事务会把刚打上的作废标记一起回滚，行就永远停在 deferred/open 上，'
+      + '而「窗口真的会关」也就成了一句谁也看不到的声明。' }
 ];
 
 // ── 扫描器：掩码 + 括号匹配 + 嵌套深度，找「transact 回调内、拒收后裸 return」的站点 ──

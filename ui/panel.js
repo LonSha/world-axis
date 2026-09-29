@@ -554,7 +554,7 @@
       <div class="wa-row"><button class="wa-btn" id="wa-act-add" title="只登记候选行动，不开工——准入是 admit 的事；目标必须是此刻仍 active 的那个（目标被撤销后挂在它下面的行动不得照常开工）">登记行动</button><button class="wa-btn" id="wa-act-admit" title="准入：问「这一刻这个人能不能开始做这件事」。判据顺序从「这件事本身」到「世界条件」，全部只读、拒收零变化">准入</button></div>
       <div class="wa-row"><input id="wa-act-id" class="wa-input" placeholder="行动 id"/><button class="wa-btn" id="wa-act-advance" title="结算所有到点的活动作（与工作流 after 链每轮自动推进同一入口）；超额者进 deferred 显式留痕，不静默跳过">结算到期</button><button class="wa-btn" id="wa-act-abort" title="中止：已消耗部分与未执行部分分别落账（spent/left 各记一格）；在途者交世界侧标成 halted，位置未知">中止</button><button class="wa-btn" id="wa-act-replan" title="受阻后改计划：旧行变 replanned 并留痕、新行指回旧行。在途者不得用本入口改道——必须先中止，否则会把真实走过的路抹成没发生">改计划</button><button class="wa-btn" id="wa-act-view" title="只读：按状态分列，并如实带出「哪些种类没有确认器">看台账</button></div>
        <div id="wa-act-out" class="wa-out"></div>
-       <div class="wa-sec">人物多步计划（目标 → 有限步数 → 受挫改选）</div>
+       <div class="wa-sec">人物计划（目标 → 有限步数 → 受挫改选）</div>
        <label class="wa-row"><input id="wa-plan-enabled" type="checkbox" ${WA.plan && WA.plan.getSettings().enabled ? 'checked' : ''}/> 启用人物计划</label>
        <div class="wa-dim">计划只<b>展开一个已存在的 active 目标</b>（不建人、不建目标）。步骤用 〔序号(kind)文本〕 逐行写，可选 〔需要:资源×数量〕、〔前置:序号〕、〔地点:x〕、〔受阻改走:…〕。<b>受阻不等于放弃</b>——改选必须显式提交新步骤。</div>
        <div class="wa-row"><input id="wa-plan-person" class="wa-input" placeholder="人物"/><input id="wa-plan-goal" class="wa-input" placeholder="目标 id（留空取该人第一个 active 目标）"/></div>
@@ -572,7 +572,7 @@
        <div class="wa-row"><button class="wa-btn" id="wa-mend-apology" title="道歉：只有对方显式接受才算一步（acceptedBy 是谁接受的也是证据）">记道歉</button><button class="wa-btn" id="wa-mend-restitution" title="补偿：需要一笔真实转移的回执（receipt）——「我说我赔了」不算">记补偿</button><button class="wa-btn" id="wa-mend-keeping" title="守约：需要实际守约的证据（kept）">记守约</button><button class="wa-btn" id="wa-mend-guarantee" title="担保：担保人必须是第三方（当事人自己不算）">记担保</button></div>
        <div class="wa-row"><button class="wa-btn" id="wa-mend-view" title="只读：进度、四格各自做了没有、还缺什么、最后的关系回执——「还差什么」必须当场可答">看修复</button><button class="wa-btn" id="wa-mend-close" title="结案：fulfilled 需要进度达标 + 显式授权改关系两件事同时成立；失败也是结果，照实留痕">结案</button><button class="wa-btn" id="wa-mend-fail" title="修复失败：一等公民，不删行——「他求过一次，被拒了」是复盘证据">判失败</button></div>
        <div id="wa-mend-out" class="wa-out"></div>
-        <div class="wa-sec">供需与商路（到货 → 定价 → 成交/生产 → 时段消耗与价格响应）</div>
+        <div class="wa-sec">供需循环与商路（到货 → 定价 → 成交/生产 → 时段消耗与价格响应）</div>
         <label class="wa-row"><input id="wa-eco-enabled" type="checkbox" ${WA.economy && WA.economy.getSettings().enabled ? 'checked' : ''}/> 启用供需循环</label>
         <div class="wa-dim">价格只能落在<b>许可带</b>（基础价 ± spread）内，越界一律拒收；<b>库存不为负</b>，钱不够或货不够都不改状态（拒收不是赊账）。生产只认具名配方；同一时段只能推一次，响应只影响<b>下一笔</b>。</div>
         <div class="wa-row"><input id="wa-eco-place" class="wa-input" placeholder="地点"/><input id="wa-eco-res" class="wa-input" placeholder="资源/货"/><input id="wa-eco-qty" class="wa-input wa-num" type="number" min="1" placeholder="数量"/><input id="wa-eco-base" class="wa-input wa-num" type="number" min="0" step="0.1" placeholder="基础价（首次必填）"/></div>
@@ -603,7 +603,7 @@
         <div class="wa-row"><input id="wa-probe-who" class="wa-input" placeholder="对质对象"/><button class="wa-btn" id="wa-probe-confront" title="对质：手里证据不足 minSupport 条就不能去——「我觉得就是他」不是证据。认知变化走 intel.believe">对质</button><button class="wa-btn" id="wa-probe-decide" title="定案：支持够且无任何反证才定 guilty；否则记「未决」（证据不足是一等结论）">定案</button></div>
         <div class="wa-row"><input id="wa-probe-why" class="wa-input" placeholder="误指原因（必填）"/><button class="wa-btn" id="wa-probe-wrong" title="误指留痕：查错了人也记录在案，不静默删">记误指</button><button class="wa-btn" id="wa-probe-out-btn" title="只读：全库读数">看总览</button></div>
         <div id="wa-probe-out" class="wa-out"></div>
-        <div class="wa-sec">远方与传播（登记远方 → 出事 → 按里程落地）</div>
+        <div class="wa-sec">远方传播（登记远方 → 出事 → 按里程落地）</div>
         <label class="wa-row"><input id="wa-rg-enabled" type="checkbox" ${WA.region && WA.region.getSettings().enabled ? 'checked' : ''}/> 启用远方传播</label>
         <div class="wa-dim">远方必须写明<b>距离与渠道</b>（没有它们就算不出延迟）；<b>未到期不许提前落地</b>；路断不吞事——消息在原地等，解除后照常到；<b>本地逐条明细、远方只给类型与时辰</b>。</div>
         <div class="wa-row"><input id="wa-rg-place" class="wa-input" placeholder="远方名"/><input id="wa-rg-days" class="wa-input wa-num" type="number" min="0" step="0.5" placeholder="距本地多少天"/><input id="wa-rg-lane" class="wa-input" placeholder="road/river/rail/word"/><button class="wa-btn" id="wa-rg-register" title="登记远方：距离与渠道都是必需的（missing-distance）">登记远方</button></div>

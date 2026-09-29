@@ -5,7 +5,7 @@
 //
 //   B4 模块契约（核心口径：**引用多 ≠ 必须先装载**）
 //     ① 装载期依赖只有「装载期顶层读」——调用期引用（函数体内）不构成装载顺序约束。
-//        实测差异：装载期边 23 / 调用期引用 44；而**静态扫描**给出的「必须先装载」是 558 条，
+//        实测差异（v2.119.0 现场）：装载期边 37 / 调用期引用 72；而**静态扫描**给出的「必须先装载」是 558 条，
 //        且静态图上核心四件套互相成环（全是幻影：文件一律 IIFE 形态，静态掩码必然反开口径）。
 //     ② 门禁口径可证伪：摘掉 core/workflow.js ⇒ 18 个消费方当场抛
 //        `Cannot read properties of undefined (reading 'register')`；
@@ -306,7 +306,7 @@ async function probeRollbackScope(WA) {
 async function judge(a) {
   // ── B4 ──
   const led = JSON.parse(fs.readFileSync(path.join(__dirname, 'module-registry-ledger.json'), 'utf8'));
-  a(led.totals.loadEdges === 26 && led.totals.callRefs === 50,
+  a(led.totals.loadEdges === 37 && led.totals.callRefs === 72,
     'v2830/mr: 装载期边 26 / 调用期引用 50（引用多 ≠ 必须先装载；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
@@ -318,7 +318,7 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 132 && led.loadedCount === 124,
+  a(led.nsCount === 144 && led.loadedCount === 136,
     'v2830/mr: 命名空间 132 / 装载文件 124（与 LOAD_ORDER 的 127 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '

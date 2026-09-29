@@ -11,6 +11,59 @@
 //   存在但跑不到的码，要么把它变可达，要么明记为不可达并钉住它为何不可达。
 //   不能静默留着——从未被观察过的码，下一次被改成别的意思也没人知道。
 const DEAD = {
+  // v2.119.0（拓展⑧/⑨）备查：`store-absent` 在**产品层**结构不可观测 ——
+  //   它由三处 mutate 在「存储面没有 transact」时构造（world.js 的 mutate、causal /
+  //   phone-bridge / act / liaison / coop 的同名出口），但**没有任何一个调用方透传这个返回值**：
+  //   全仓 `return mutate(` 零命中，所有 mutate 调用点都是「事务外声明 out、事务回调里赋值」，
+  //   事务失败时各自走自己的兜底码（store-unavailable / 各自的前置闸）。
+  //   实测（/tmp/dbg_store6.js：保留 WA.exec、只摘掉 WA.store 的 transact）：
+  //     world.dropBlock → store-unavailable（源码里的兜底字面量，不是 mutate 的）
+  //     world.arrive / stop → store-unavailable
+  //     world.addRoad → bad-minutes、world.addBlock → unknown-place（更早的前置闸先拦）
+  //     causal.tick → ok:true nothing-to-do、phoneBridge.noteAction → store-unavailable
+  //   ⇒ 那个 `{ok:false, reason:'store-absent'}` 永远进不了任何返回值，不可观测。
+  //   （注：tests/perf-trace-v2102.js 锁的是 perf-trace 自己的 `kind:'store-absent'`，
+  //    字段名是 kind 且在 perf-trace.js 内被直接 return —— 与这三处 mutate 无关。）
+  //   不删：若将来某个调用方开始透传 mutate 的返回值，它是第一道防线；
+  //   届时本门禁会以 deadLeak 提醒「该码可能复活」。
+  'store-absent': {
+    anchor: "      ? facade.transact(fn, opt) : { ok: false, reason: 'store-absent' };",
+    why: '三处 mutate 在存储面缺 transact 时构造 store-absent，但全仓无一处透传该返回值'
+      + '（`return mutate(` 零命中；调用点一律是 out 变量 + 各自兜底码）⇒ 不可观测。'
+      + '实测：摘掉 store 的 transact 后，各入口给出的是 store-unavailable 或更早的前置闸。'
+      + '不删：将来若有调用方开始透传 mutate 的返回值，它是第一道防线。'
+  },
+  // v2.119.0（拓展⑧）备查：liaison.settleDeal 的关系后果分支里 `no-relation-face` 在现设计下
+  //   **结构不可达** —— 它是 `applyRelation(...)` 返回**假值**时的兜底：
+  //     `out.relation = rel ? {...rel} : { ok: false, reason: 'no-relation-face' }`
+  //   而 applyRelation 的所有出口都返回**真值对象**：`{ok:false, reason:'relation-absent'}`、
+  //   `{ok:false, reason:'missing-person'}`、`{ok:false, reason:'no-negative-step'}`、
+  //   `{ok:true, ...}`、`{ok:false, reason:'relation-threw'}`——没有一个出口返回 null/undefined/false。
+  //   故 `rel ?` 恒为真，三元表达式的 else 分支永远拿不到执行权。
+  //   不删：若将来 applyRelation 被改成「静默返回空」的形态，它是第一道防线；
+  //   届时本门禁会以 deadLeak 提醒「该码可能复活」。
+  'no-relation-face': {
+    anchor: "out.relation = rel ? Object.assign({ ok: !!rel.ok }, rel) : { ok: false, reason: 'no-relation-face' };",
+    why: 'liaison.settleDeal 的关系后果用一个三元兜底 `rel ? ... : no-relation-face`，'
+      + '但被调的 applyRelation 五条出口（relation-absent / missing-person / no-negative-step / 成功 / relation-threw）'
+      + '**每一条都返回真值对象**，无一返回假值 ⇒ `rel` 恒为真，else 分支恒不可达。'
+      + '不删：将来若 applyRelation 改成可能返回空值（例如把「没人可记」静默吞掉），它是那道兜底；'
+      + '届时本门禁会以 deadLeak 提醒它可能复活。'
+  },
+  // v2.119.0（拓展④）备查：inst.charter 的 kind-locked 在现设计下**结构不可达** ——
+  //   同一入口里前一道守卫是 `if (seen && !o.replace) return 'exists'`，而 kind-locked 的
+  //   条件是 `if (seen && seen.kind !== kind && !o.replace)`：凡是能走到第二道的输入，
+  //   其 `seen && !o.replace` 必为真 ⇒ 第一道已经先把调用**拒掉并返回**了。
+  //   即「重复建档」这一情形一律归因 exists，第二个分支永远拿不到执行权。
+  //   不删：若将来把 exists 的判据放宽（例如允许同名不同 kind 并存），它是第一道防线；
+  //   届时本门禁会以 deadLeak 提醒「该码可能复活」。
+  'kind-locked': {
+    anchor: "if (seen && seen.kind !== kind && !o.replace) {",
+    why: 'inst.charter 两道守卫次序相扣：第一道 `seen && !o.replace ⇒ exists` 先返回；'
+      + '第二道 `seen && seen.kind !== kind && !o.replace ⇒ kind-locked` 的输入集合是第一道的子集，'
+      + '故 kind-locked 恒不可达。实测：先 charter(会甲, 公司) 再 charter(会甲, 帮派)，返回 exists 而非 kind-locked。'
+      + '不删：若 exists 的判据将来放宽，它是第一道防线（届时 deadLeak 会提醒它可能复活）。'
+  },
   // v2.117.0（B2）备查：单地点天气封锁这一支在现设计下结构不可达（判定链路为
   //   reach 建图 → 逐段 effectiveBlockOf → 分通道容量，路段级封锁走 road-closed /
   //   blocked-delivered），但它的源码形状是 `out.reason = 'weather-blocked'`（赋值），
@@ -1636,6 +1689,1089 @@ function runWitness(WA) {
         });
         W2.org.debtsView = keep.db;
       }
+    }
+  }
+  // ══ v2.119.0（拓展计划 ③⑥）：经济与商路 / 跨地域传播 ══
+  {
+    const RG = WA.region;
+    if (RG && typeof RG.register === 'function') {
+      const keepCfg = RG.getSettings();
+      RG.setSettings({ enabled: true, maxEvents: 24, maxRoutes: 8 });
+      want('missing-distance', 'region.register：没给距离就算不出消息要走多久 ⇒ 如实拒收（拓展⑥）');
+      trip('missing-distance', function () { return [RG.register('远方', {}).reason]; });
+      want('bad-lane', 'region.register：渠道名不在表里 ⇒ 拒收并带出允许值（拓展⑥）');
+      trip('bad-lane', function () {
+        return [RG.register('远方', { distanceDays: 3, lane: 'nope' }).reason];
+      });
+      want('places-full', 'region.register：远方地区数已达上限 ⇒ 不许静默丢弃（拓展⑥）');
+      trip('places-full', function () {
+        RG.setSettings({ maxRoutes: 2 });
+        try {
+          RG.register('满一', { distanceDays: 1 });
+          RG.register('满二', { distanceDays: 2 });
+          return [RG.register('满三', { distanceDays: 3 }).reason];
+        } finally { RG.setSettings({ maxRoutes: 8 }); }
+      });
+      want('unknown-event', 'region.deliver：事件 id 不在册 ⇒ 不猜一件没有的事（拓展⑥）');
+      trip('unknown-event', function () { return [RG.deliver('rg_nope').reason]; });
+      want('events-full', 'region.occur：传播队列已满 ⇒ 拒收并带出上限（拓展⑥）');
+      trip('events-full', function () {
+        RG.setSettings({ maxEvents: 4 });
+        try {
+          RG.register('甲地', { distanceDays: 1 });
+          for (let i = 0; i < 8; i++) RG.occur('甲地', String(RG.EVENTS[0]));
+          return [RG.occur('甲地', String(RG.EVENTS[0])).reason];
+        } finally { RG.setSettings({ maxEvents: 24 }); }
+      });
+      want('too-early', 'region.deliver：还没走到就不许提前落地（带出还要等多久）（拓展⑥）');
+      trip('too-early', function () {
+        RG.setSettings({ maxEvents: 24 });
+        RG.register('乙地', { distanceDays: 10 });
+        const ev = RG.occur('乙地', String(RG.EVENTS[0]));
+        return [RG.deliver(ev.id, { now: 0 }).reason];
+      });
+      want('already-delivered', 'region.deliver：同一件事不许落地两次（拓展⑥）');
+      trip('already-delivered', function () {
+        RG.register('丙地', { distanceDays: 0 });
+        const ev = RG.occur('丙地', String(RG.EVENTS[0]));
+        RG.deliver(ev.id, { now: ev.dueAt });
+        return [RG.deliver(ev.id, { now: ev.dueAt }).reason];
+      });
+      want('route-blocked', 'region.deliver：路断了消息过不来 ⇒ 原地等，不许落地、也不许丢掉（拓展⑥）');
+      trip('route-blocked', function () {
+        RG.register('丁地', { distanceDays: 0 });
+        const ev = RG.occur('丁地', String(RG.EVENTS[0]));
+        RG.markLane('丁地', true, { why: '桥塌' });
+        try { return [RG.deliver(ev.id, { now: ev.dueAt + 1 }).reason]; }
+        finally { RG.markLane('丁地', false); }
+      });
+      RG.setSettings(keepCfg);
+    }
+  }
+
+  // ══ v2.119.0（拓展计划 ①）：人物多步计划与受挫重决策 ══
+  {
+    const PL = WA.plan;
+    if (PL && typeof PL.expand === 'function') {
+      const keepCfg = PL.getSettings();
+      PL.setSettings({ enabled: true, maxSteps: 4, maxPlans: 12, maxTries: 3 });
+      WA.store.transact(function (d) {
+        d.people = d.people || {};
+        d.people['p_计划甲'] = { id: 'p_计划甲', name: '计划甲', resources: { 粮: 5 },
+          life: { goals: [{ id: 'gg', text: '修堤', status: 'active' }] } };
+        d.people['p_计划乙'] = { id: 'p_计划乙', name: '计划乙', resources: {},
+          life: { goals: [{ id: 'gg', text: '修堤', status: 'done' }] } };
+      }, 'reject-witness:seed-plan');
+      const S1 = [{ text: '备料' }, { text: '开工' }];
+      want('missing-steps', 'plan.expand：一步都没给 ⇒ 没有计划可排（拓展①）');
+      trip('missing-steps', function () { return [PL.expand('计划甲', 'gg', []).reason]; });
+      want('bad-step', 'plan.expand：步骤不是对象 / 没有文本 ⇒ 不猜一步空白（拓展①）');
+      trip('bad-step', function () { return [PL.expand('计划甲', 'gg', [null]).reason]; });
+      want('too-many-steps', 'plan.expand：步数超过上限 ⇒ 拒收并带出上限（拓展①）');
+      trip('too-many-steps', function () {
+        const many = [];
+        for (let i = 0; i < 9; i++) many.push({ text: 's' + i });
+        return [PL.expand('计划甲', 'gg', many).reason];
+      });
+      want('bad-after', 'plan.expand：前置步指向自己或更后面的序号 ⇒ 会成环，拒收（拓展①）');
+      trip('bad-after', function () {
+        return [PL.expand('计划甲', 'gg', [{ text: 'a', after: '1' }, { text: 'b' }]).reason];
+      });
+      want('goal-not-active', 'plan.expand：目标已不是 active ⇒ 不给它排计划（拓展①）');
+      trip('goal-not-active', function () { return [PL.expand('计划乙', 'gg', S1).reason]; });
+      want('plans-full', 'plan.expand：在册计划数已达上限 ⇒ 不静默丢弃（拓展①）');
+      trip('plans-full', function () {
+        PL.setSettings({ maxPlans: 1 });
+        try {
+          PL.expand('计划甲', 'gg', S1);
+          WA.store.transact(function (d) {
+            d.people['p_计划丙'] = { id: 'p_计划丙', name: '计划丙', resources: {},
+              life: { goals: [{ id: 'gg', text: '修堤', status: 'active' }] } };
+          }, 'reject-witness:plan-c');
+          return [PL.expand('计划丙', 'gg', S1).reason];
+        } finally { PL.setSettings({ maxPlans: 12 }); }
+      });
+      want('no-plan', 'plan.current：这个人没有在册计划 ⇒ 如实说没有（拓展①）');
+      trip('no-plan', function () { return [PL.current('查无此人').reason]; });
+      want('nothing-to-choose', 'plan.candidates：已无待选步（全 done）⇒ 没得改选（拓展①）');
+      trip('nothing-to-choose', function () {
+        WA.store.transact(function (d) {
+          const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+          r.status = 'active'; r.tries = 0;
+          r.steps = [{ seq: 0, kind: 'step', text: 'a', status: 'done', afterSeq: undefined, need: null, fallback: '' }];
+        }, 'reject-witness:plan-done');
+        return [PL.candidates('计划甲').reason];
+      });
+      want('awaiting-after', 'plan.current：剩下的步都被前置卡住 ⇒ 如实报「等前置」，不挑一步顶上（拓展①）');
+      trip('awaiting-after', function () {
+        WA.store.transact(function (d) {
+          const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+          r.status = 'active'; r.tries = 0;
+          // 只有一步 pending，且它的前置步 seq=0 不存在（既非 done 也不是它自己）⇒ 永不被选中。
+          r.steps = [{ seq: 1, kind: 'step', text: 'b', status: 'pending', afterSeq: 0, need: null, fallback: '' }];
+        }, 'reject-witness:plan-await');
+        return [PL.current('计划甲').reason];
+      });
+      want('blocked', 'plan.current：当前步受阻 ⇒ 如实报「该决策了」（带出受阻步与原因）（拓展①）');
+      trip('blocked', function () {
+        PL.abandon('计划甲');
+        WA.store.transact(function (d) {
+          const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+          r.status = 'blocked'; r.reason = '桥断';
+          r.steps = [{ seq: 0, kind: 'step', text: 'a', status: 'blocked', reason: '桥断',
+            afterSeq: undefined, need: null, fallback: '' }];
+        }, 'reject-witness:plan-block');
+        return [PL.current('计划甲').reason];
+      });
+      want('tries-exhausted', 'plan.advance：尝试次数用尽 ⇒ 停下等人决定，不无限重试（拓展①）');
+      trip('tries-exhausted', function () {
+        PL.setSettings({ maxTries: 1 });
+        try {
+          PL.abandon('计划甲');
+          WA.store.transact(function (d) {
+            const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+            r.status = 'active'; r.tries = 5;
+            r.steps = [{ seq: 0, kind: 'step', text: 'a', status: 'pending', afterSeq: undefined, need: null, fallback: '' }];
+          }, 'reject-witness:plan-tries');
+          return [PL.advance('计划甲').reason];
+        } finally { PL.setSettings({ maxTries: 3 }); }
+      });
+      want('stale-step', 'plan.advance：交出前发现当前步已被换掉 ⇒ 不把旧步标成 running（拓展①）');
+      trip('stale-step', function () {
+        const keepStep = PL.current;
+        try {
+          PL.abandon('计划甲');
+          WA.store.transact(function (d) {
+            const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+            r.status = 'active'; r.tries = 0;
+            r.steps = [{ seq: 0, kind: 'step', text: 'a', status: 'pending', afterSeq: undefined, need: null, fallback: '' }];
+          }, 'reject-witness:plan-stale');
+          // 事务内把 seq 改掉：模拟「交出与落盘之间被改选」
+          const orig = WA.store.transact;
+          WA.store.transact = function (fn, why) {
+            return orig.call(WA.store, function (d) {
+              const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+              if (r && r.steps[0]) r.steps[0].seq = 99;
+              return fn(d);
+            }, why);
+          };
+          try { return [PL.advance('计划甲').reason]; }
+          finally { WA.store.transact = orig; }
+        } finally { PL.current = keepStep; }
+      });
+      want('step-running', 'plan.rechoose：正在做的步没结算就改选 ⇒ 拒收（否则「做了没有」无法判定）（拓展①）');
+      trip('step-running', function () {
+        PL.abandon('计划甲');
+        WA.store.transact(function (d) {
+          const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+          r.status = 'active'; r.tries = 0;
+          r.steps = [{ seq: 0, kind: 'step', text: 'a', status: 'running', afterSeq: undefined, need: null, fallback: '' }];
+        }, 'reject-witness:plan-run');
+        return [PL.rechoose('计划甲', [{ text: '改走别路' }]).reason];
+      });
+      PL.setSettings(keepCfg);
+    }
+  }
+
+  // ══ v2.119.0（拓展计划 ②）：关系修复与破裂 ══
+  //   两条码由 `tripDeep` 见证：`relation-threw` / `fondness-missing` 只在**结案成功**的
+  //   返回体 `relation.reason` 里（顶层是 ok:true），不认它们等于把「关系效果算失败」判成没发生。
+  {
+    const MD = WA.mend;
+    if (MD && typeof MD.mark === 'function') {
+      const keepCfg = MD.getSettings();
+      MD.setSettings({ enabled: true, maxRows: 12, minProgress: 2, maxSteps: 3 });
+      want('missing-hurt', 'mend.mark：没说伤的是什么事 ⇒ 记一条「为什么受伤」都答不出的账（拓展②）');
+      trip('missing-hurt', function () { return [MD.mark('修复甲', { with: '修复乙' }).reason]; });
+      want('bad-pair', 'mend.mark：自己和自己 ⇒ 这不是一段关系，不记这条账（拓展②）');
+      trip('bad-pair', function () {
+        return [MD.mark('修复丙', { with: '修复丙', hurt: '说了重话' }).reason];
+      });
+      const mk = MD.mark('修复甲', { with: '修复乙', hurt: '借钱没还' });
+      want('not-accepted', 'mend.step：道歉对方没接受 ⇒ 这一步不算做过（拓展②）');
+      trip('not-accepted', function () { return [MD.step('修复甲', mk.id, 'apology', {}).reason]; });
+      want('missing-accepter', 'mend.step：接受道歉的是谁必须写明，不给「有人说可以了」（拓展②）');
+      trip('missing-accepter', function () {
+        return [MD.step('修复甲', mk.id, 'apology', { accepted: true }).reason];
+      });
+      want('no-receipt', 'mend.step：没有真实转移回执的补偿 = 口头赔偿，不接受（拓展②）');
+      trip('no-receipt', function () { return [MD.step('修复甲', mk.id, 'restitution', {}).reason]; });
+      want('not-kept', 'mend.step：守约要有实际守约的证据，说了不算（拓展②）');
+      trip('not-kept', function () { return [MD.step('修复甲', mk.id, 'keeping', {}).reason]; });
+      want('missing-guarantor', 'mend.step：担保这件事没写谁担保 ⇒ 拒收（拓展②）');
+      trip('missing-guarantor', function () { return [MD.step('修复甲', mk.id, 'guarantee', {}).reason]; });
+      want('bad-guarantor', 'mend.step：担保人就是当事人之一 ⇒ 第三方才叫担保（拓展②）');
+      trip('bad-guarantor', function () {
+        return [MD.step('修复甲', mk.id, 'guarantee', { by: '修复乙' }).reason];
+      });
+      want('insufficient-progress', 'mend.close：修复动作不够格就结案「好了」⇒ 条件不足不结案（拓展②）');
+      trip('insufficient-progress', function () {
+        return [MD.close('修复甲', mk.id, 'fulfilled', {}).reason];
+      });
+      want('relation-not-authorized', 'mend.close：结案要改关系必须显式授权，不代改（拓展②）');
+      trip('relation-not-authorized', function () {
+        MD.step('修复甲', mk.id, 'apology', { accepted: true, acceptedBy: '修复乙' });
+        MD.step('修复甲', mk.id, 'keeping', { kept: true });
+        return [MD.close('修复甲', mk.id, 'fulfilled', {}).reason];
+      });
+      want('relation-threw', 'mend.close：关系引擎抛错 ⇒ 如实记在行上（不吞成「结案成功但没人知道关系没更）」（拓展②）');
+      tripDeep('relation-threw', function () {
+        const keepF = WA.fondness;
+        try {
+          WA.fondness = { apply: function () { throw new Error('witness'); } };
+          const r = MD.close('修复甲', mk.id, 'fulfilled', { applyRelation: true });
+          return r;
+        } finally { WA.fondness = keepF; }
+      });
+      want('fondness-missing', 'mend.close：关系引擎整个缺席 ⇒ 如实报 fondness-missing，不假装改过（拓展②）');
+      tripDeep('fondness-missing', function () {
+        const mk2 = MD.mark('修复丁', { with: '修复戊', hurt: '失约' });
+        MD.step('修复丁', mk2.id, 'apology', { accepted: true, acceptedBy: '修复戊' });
+        MD.step('修复丁', mk2.id, 'keeping', { kept: true });
+        const keepF = WA.fondness;
+        try {
+          WA.fondness = null;
+          return MD.close('修复丁', mk2.id, 'fulfilled', { applyRelation: true });
+        } finally { WA.fondness = keepF; }
+      });
+      want('already-closed', 'mend.close：已经结过的案不许再结一次（不静默改判）（拓展②）');
+      trip('already-closed', function () {
+        return [MD.close('修复甲', mk.id, 'failed', {}).reason];
+      });
+      want('too-many-tries', 'mend.step：修复尝试次数用尽 ⇒ 停下（不做无上限的「努力」）（拓展②）');
+      trip('too-many-tries', function () {
+        const mk3 = MD.mark('修复己', { with: '修复庚', hurt: '翻旧账' });
+        MD.setSettings({ maxSteps: 1 });
+        try {
+          MD.step('修复己', mk3.id, 'apology', { accepted: true, acceptedBy: '修复庚' });
+          MD.step('修复己', mk3.id, 'keeping', { kept: true });
+          return [MD.step('修复己', mk3.id, 'restitution', { receipt: true }).reason];
+        } finally { MD.setSettings({ maxSteps: 3 }); }
+      });
+      MD.setSettings(keepCfg);
+    }
+  }
+
+  // ══ v2.119.0（拓展计划 ③）：生产、消费与供需变化 ══
+  {
+    const EC = WA.economy;
+    if (EC && typeof EC.stock === 'function') {
+      const keepCfg = EC.getSettings();
+      EC.setSettings({ enabled: true, maxGoods: 16, maxOrders: 12, maxRoutes: 8, spreadPct: 30 });
+      WA.store.transact(function (d) {
+        d.people = d.people || {};
+        d.people['p_经甲'] = { id: 'p_经甲', name: '经甲', resources: { '银元': 100000000 } };
+        d.people['p_经乙'] = { id: 'p_经乙', name: '经乙', resources: { '铁': 0 } };
+        d.people['p_经穷'] = { id: 'p_经穷', name: '经穷', resources: { '银元': 0 } };
+      }, 'reject-witness:seed-eco');
+      want('bad-qty', 'economy.stock：数量不是正整数 ⇒ 不记一笔说不清的到货（拓展③）');
+      trip('bad-qty', function () { return [EC.stock('经市', '米', 1.5, { base: 10 }).reason]; });
+      want('missing-base', 'economy.stock：首次登记这件货却没给基础价 ⇒ 无基础价不定价（拓展③）');
+      trip('missing-base', function () { return [EC.stock('经市', '米', 5, {}).reason]; });
+      EC.stock('经市', '米', 100, { base: 10 });
+      want('bad-price', 'economy.price：价格非正数 ⇒ 这不是一个价（拓展③）');
+      trip('bad-price', function () { return [EC.price('经市', '米', -3).reason]; });
+      want('price-out-of-band', 'economy.price：报价越出定价带宽 ⇒ 拒收并带出上下界（拓展③）');
+      trip('price-out-of-band', function () { return [EC.price('经市', '米', 999).reason]; });
+      want('goods-full', 'economy.stock：在册货品数达上限 ⇒ 不静默丢弃（拓展③）');
+      trip('goods-full', function () {
+        EC.setSettings({ maxGoods: 4 });
+        try {
+          ['货一', '货二', '货三', '货四'].forEach(function (k) { EC.stock('经市', k, 1, { base: 5 }); });
+          return [EC.stock('经市', '货五', 1, { base: 5 }).reason];
+        } finally { EC.setSettings({ maxGoods: 16 }); }
+      });
+      want('unknown-good', 'economy.buy：这件货没登记过 ⇒ 不凭空交易（拓展③）');
+      trip('unknown-good', function () {
+        return [EC.buy('经市', '查无此货', 1, { by: '经甲' }).reason];
+      });
+      want('missing-buyer', 'economy.buy：买家不在册 ⇒ 这笔交易没有付款人（拓展③）');
+      trip('missing-buyer', function () {
+        return [EC.buy('经市', '米', 1, { by: '查无此人' }).reason];
+      });
+      want('cannot-afford', 'economy.buy：钱不够就是不够 ⇒ 不把欠款伪装成成交（拓展③）');
+      trip('cannot-afford', function () {
+        return [EC.buy('经市', '米', 5, { by: '经穷' }).reason];
+      });
+      want('short-stock', 'economy.buy：库存不够 ⇒ 拒收并带出现有量（拓展③）');
+      trip('short-stock', function () {
+        // 买家的钱足够（否则会先被资金闸拦下）⇒ 这一条只考库存闸。
+        return [EC.buy('经市', '米', 100000, { by: '经甲' }).reason];
+      });
+      want('orders-full', 'economy.buy：成交流水达上限 ⇒ 拒收，不静默丢单（拓展③）');
+      trip('orders-full', function () {
+        EC.setSettings({ maxOrders: 4, maxGoods: 16 });
+        try {
+          for (let i = 0; i < 4; i++) EC.buy('经市', '米', 1, { by: '经甲' });
+          return [EC.buy('经市', '米', 1, { by: '经甲' }).reason];
+        } finally { EC.setSettings({ maxOrders: 12 }); }
+      });
+      want('missing-maker', 'economy.craft：合成者不在册 ⇒ 这些原料没有主人（拓展③）');
+      trip('missing-maker', function () {
+        return [EC.craft('经市', '铁器', { by: '查无此人' }).reason];
+      });
+      want('short-input', 'economy.craft：原料不够 ⇒ 拒收并列明缺哪几样（拓展③）');
+      trip('short-input', function () { return [EC.craft('经市', '铁器', { by: '经乙' }).reason]; });
+      want('missing-stamp', 'economy.tick：时段戳为空 ⇒ 这次结算没有时间依据（拓展③）');
+      trip('missing-stamp', function () { return [EC.tick('').reason]; });
+      want('duplicate-tick', 'economy.tick：同一时段戳重复结算 ⇒ 拒收（否则一次时段被消费两遍）（拓展③）');
+      trip('duplicate-tick', function () {
+        EC.tick('T-1');
+        return [EC.tick('T-1').reason];
+      });
+      want('routes-full', 'economy.route：在册商路数达上限 ⇒ 不静默丢弃（拓展③）');
+      trip('routes-full', function () {
+        EC.setSettings({ maxRoutes: 2 });
+        try {
+          EC.route('路一', { lane: 'road', cost: 1 });
+          EC.route('路二', { lane: 'road', cost: 1 });
+          return [EC.route('路三', { lane: 'road', cost: 1 }).reason];
+        } finally { EC.setSettings({ maxRoutes: 8 }); }
+      });
+      want('unknown-route', 'economy.ship：商路 id 不在册 ⇒ 不猜一条不存在的路（拓展③）');
+      trip('unknown-route', function () {
+        return [EC.ship('查无此路', '经市', '米', 1, {}).reason];
+      });
+      EC.setSettings(keepCfg);
+    }
+  }
+
+  // ══ v2.119.0（拓展计划 ④）：组织制度、任职权限与权力交接 ══
+  {
+    const IN = WA.inst;
+    if (IN && typeof IN.charter === 'function') {
+      const keepCfg = IN.getSettings();
+      IN.setSettings({ enabled: true, maxOrgs: 8, maxPending: 12, maxBreaches: 12 });
+      want('unknown-org', 'inst.post：组织还没建档 ⇒ 无组织可设职位（拓展④）');
+      trip('unknown-org', function () { return [IN.post('查无此会', '会长', {}).reason]; });
+      want('orgs-full', 'inst.charter：在册组织数达上限 ⇒ 不静默丢弃（拓展④）');
+      trip('orgs-full', function () {
+        IN.setSettings({ maxOrgs: 2 });
+        try {
+          IN.charter('会一', { kind: '公司' });
+          IN.charter('会二', { kind: '学校' });
+          return [IN.charter('会三', { kind: '家族' }).reason];
+        } finally { IN.setSettings({ maxOrgs: 8 }); }
+      });
+      want('empty-post', 'inst.vacate：这个职位本来就没人占 ⇒ 没有可离任的人（拓展④）');
+      trip('empty-post', function () {
+        IN.charter('会乙', { kind: '机关' });
+        IN.post('会乙', '闲差', {});
+        return [IN.vacate('会乙', '闲差', { why: 'resigned' }).reason];
+      });
+      want('bad-reason', 'inst.vacate：离任理由不在表里 ⇒ 不给一个编不出的理由（拓展④）');
+      trip('bad-reason', function () {
+        IN.post('会乙', '主事', {});
+        IN.assign('会乙', '主事', '人甲', {});
+        return [IN.vacate('会乙', '主事', { why: '看他不顺眼' }).reason];
+      });
+      want('occupied', 'inst.assign：职位已有人占着 ⇒ 换人必须显式 replace（拓展④）');
+      trip('occupied', function () {
+        return [IN.assign('会乙', '主事', '人乙', {}).reason];
+      });
+      want('missing-handover', 'inst.succession：交接没写明在途项目数与旧承诺数 ⇒ 不许默认归零（拓展④）');
+      trip('missing-handover', function () {
+        return [IN.succession('会乙', '人甲', '人乙', {}).reason];
+      });
+      want('no-authority', 'inst.propose：这项决策需要的权限没人持有 ⇒ 不许挂起（挂起等于永远办不了）（拓展④）');
+      trip('no-authority', function () {
+        return [IN.propose('会乙', '拨一笔款', { by: '人甲', needs: 'grant' }).reason];
+      });
+      want('unknown-decision', 'inst.decide：决策 id 不在册 ⇒ 不猜一项没提过的事（拓展④）');
+      trip('unknown-decision', function () {
+        return [IN.decide('会乙', '查无此案', 'approved', { by: '人甲' }).reason];
+      });
+      want('missing-penalty', 'inst.breach：违约却没写罚则 ⇒ 本模块不自行判罚（拓展④）');
+      trip('missing-penalty', function () {
+        return [IN.breach('会乙', '人甲', '私自调货', {}).reason];
+      });
+      want('breaches-full', 'inst.breach：违约记录达上限 ⇒ 不静默丢弃（拓展④）');
+      trip('breaches-full', function () {
+        IN.setSettings({ maxBreaches: 4 });
+        try {
+          for (let i = 0; i < 4; i++) IN.breach('会乙', '人甲', '违约' + i, { penalty: '罚' });
+          return [IN.breach('会乙', '人甲', '再违约', { penalty: '罚' }).reason];
+        } finally { IN.setSettings({ maxBreaches: 12 }); }
+      });
+      want('missing-evidence', 'inst.settle：结案没有依据 ⇒ 不许无据结案（拓展④）');
+      trip('missing-evidence', function () { return [IN.settle('会乙', 'br-x', {}).reason]; });
+      want('unknown-breach', 'inst.settle：违约记录 id 不在册 ⇒ 不猜一条没登记的账（拓展④）');
+      trip('unknown-breach', function () {
+        return [IN.settle('会乙', 'br-nope', { evidence: '有据' }).reason];
+      });
+      // 造出一条真违约 → 先结案一次 → 再结第二次走 already-settled
+      const br = IN.breach('会丙', '人丙', '挪用', { penalty: '退赔' });
+      IN.charter('会丙', { kind: '家族' });
+      const br2 = IN.breach('会丙', '人丙', '挪用', { penalty: '退赔' });
+      IN.assign('会丙', '家老', '人丁', {});
+      IN.settle('会丙', br2.id, { evidence: '退还清单' });
+      want('already-settled', 'inst.settle：同一笔违约不许结两次（不静默改判）（拓展④）');
+      trip('already-settled', function () {
+        return [IN.settle('会丙', br2.id, { evidence: '又一份清单' }).reason];
+      });
+      // 待批决策 → 批准一次 → 第二次走 already-decided
+      IN.charter('会丁', { kind: '公司' });
+      IN.post('会丁', '总管', { perms: ['approve'] });
+      IN.assign('会丁', '总管', '人戊', {});
+      const pr = IN.propose('会丁', '开新铺', { by: '人戊', needs: 'approve' });
+      IN.decide('会丁', pr.id, 'approved', { by: '人戊' });
+      want('already-decided', 'inst.decide：同一项决策不许批两次（已决的案不能再决）（拓展④）');
+      trip('already-decided', function () {
+        return [IN.decide('会丁', pr.id, 'rejected', { by: '人戊' }).reason];
+      });
+      IN.setSettings(keepCfg);
+    }
+  }
+
+  // ── engines/probe.js（v2.119.0 拓展⑤：调查卷宗）──
+  //   这一面的纪律：支持与反驳**各自留行、不取平均**；证据不足时定「未决」而非宣布真相。
+  //   故下列码里凡是「拦在半路」的（方向缺失 / 假说指错 / 本钱不够 / 卷宗表满），
+  //   全部用产品真 API 跑出来，并顺手验证「被拒之后卷宗没被写脏」。
+  {
+    const PB = WA.probe;
+    if (PB && typeof PB.open === 'function') {
+      const keepCfg = PB.getSettings();
+      PB.setSettings({ enabled: true, maxCases: 2, maxEvidence: 4, minSupport: 2 });
+      WA.store.transact(function (d) { d.probe = { cases: [] }; }, 'reject-witness:probe-reset');
+
+      // ① 立案的两道「这不是调查」闸：只有一个可能性 / 两条候选其实是同一个人。
+      want('too-few-hypotheses', 'probe.open：单一假说（或空表）不是调查，是通知（拓展⑤）');
+      trip('too-few-hypotheses', function () {
+        return [PB.open('仓房失窃', ['老王']).reason, PB.open('仓房失窃', []).reason];
+      });
+      want('duplicate-hypothesis', 'probe.open：两条候选指向同一 id ⇒ 不把同一个人记两遍（拓展⑤）');
+      trip('duplicate-hypothesis', function () {
+        return [PB.open('仓房失窃', [{ id: 'h0', text: '老王' }, { id: 'h0', text: '老王' }]).reason];
+      });
+
+      // ② 容量闸：卷宗表满 ⇒ 先了结旧案，不静默挤掉。
+      WA.store.transact(function (d) {
+        d.probe = { cases: [
+          { id: 'case_a', question: '甲案', status: 'open', hypotheses: [], evidence: [], wrongs: [] },
+          { id: 'case_b', question: '乙案', status: 'open', hypotheses: [], evidence: [], wrongs: [] }] };
+      }, 'reject-witness:probe-fill');
+      want('cases-full', 'probe.open：卷宗表已满 ⇒ 不静默丢弃旧案（先结案再立案）（拓展⑤）');
+      trip('cases-full', function () { return [PB.open('丙案', ['甲说', '乙说']).reason]; });
+
+      // ③ 立一张真卷宗，后续举证 / 对质 / 误指都落在它上面。
+      WA.store.transact(function (d) { d.probe = { cases: [] }; }, 'reject-witness:probe-reset2');
+      const cid = PB.open('仓房失窃', [{ id: 'h0', text: '老王' }, { id: 'h1', text: '小李' }]).id;
+
+      want('unknown-case', 'probe：案子不存在 ⇒ 不凭一个 id 猜出一张卷宗（举证/对质/误指同一道闸）（拓展⑤）');
+      trip('unknown-case', function () {
+        return [PB.addEvidence('case_nope', '听说', { level: 'report', dir: 'support', about: 'h0' }).reason,
+          PB.confront('case_nope', '老王', { about: 'h0' }).reason,
+          PB.wrong('case_nope', '老王', { why: '查错人了' }).reason];
+      });
+      want('missing-direction', 'probe.addEvidence：不说支持还是反驳的线索不进卷宗（拓展⑤）');
+      trip('missing-direction', function () {
+        return [PB.addEvidence(cid, '不明方向的线索', { level: 'report', about: 'h0' }).reason];
+      });
+      want('evidence-full', 'probe.addEvidence：本案证据已达上限 ⇒ 不静默丢弃（先定案或另立一案）（拓展⑤）');
+      trip('evidence-full', function () {
+        for (let i = 0; i < 4; i++) PB.addEvidence(cid, '线索' + i, { level: 'report', dir: 'support', about: 'h0' });
+        return [PB.addEvidence(cid, '第五条', { level: 'report', dir: 'support', about: 'h0' }).reason];
+      });
+      want('unknown-hypothesis', 'probe：线索指的假说不在这张卷宗里 ⇒ 不新建一条假说兜住（拓展⑤）');
+      trip('unknown-hypothesis', function () {
+        return [PB.addEvidence(cid, '指错了假说', { level: 'report', dir: 'support', about: 'h9' }).reason,
+          PB.confront(cid, '老王', { about: 'h9' }).reason];
+      });
+      want('insufficient-support', 'probe.confront：手上证据不够 minSupport 就别去对质（拓展⑤）');
+      trip('insufficient-support', function () {
+        return [PB.confront(cid, '小李', { about: 'h1' }).reason];
+      });
+      // 对质要把结论记进情报库：情报面缺席 ⇒ intel-missing；情报面抛错 ⇒ intel-threw。
+      // 两者都是「不能因为下游不行就把这次对质当成没发生」，故都要留行。
+      //   注意取码路径：对质**本身是成功的**（卷宗照常留行），intel 的归因挂在返回体的
+      //   belief.reason 上——这正是「不能因为下游不行就把这次对质当成没发生」的形状，
+      //   故这里断言的是嵌套归因，而不是顶层 reason。
+      want('intel-missing', 'probe.confront：情报面（WA.intel）缺席 ⇒ 如实记 intel-missing，不假装记得（拓展⑤）');
+      trip('intel-missing', function () {
+        const keep = WA.intel;
+        try { WA.intel = null; } catch (e) { return []; }
+        let r;
+        try { const o = PB.confront(cid, '小李', { about: 'h0' }); r = [o && o.belief && o.belief.reason]; }
+        finally { WA.intel = keep; }
+        return r;
+      });
+      want('intel-threw', 'probe.confront：情报面抛错不吞掉 ⇒ 记为 intel-threw（拓展⑤）');
+      trip('intel-threw', function () {
+        const keep = WA.intel;
+        try { WA.intel = { believe: function () { throw new Error('intel down'); } }; } catch (e) { return []; }
+        let r;
+        try { const o = PB.confront(cid, '小李', { about: 'h0' }); r = [o && o.belief && o.belief.reason]; }
+        finally { WA.intel = keep; }
+        return r;
+      });
+      // 误指留痕同样受容量闸约束（「查错人」这一结论本身不撤销案卷）。
+      want('wrongs-full', 'probe.wrong：误指留痕达上限 ⇒ 不静默丢弃（查错人也要留下痕迹）（拓展⑤）');
+      trip('wrongs-full', function () {
+        PB.wrong(cid, '老王', { why: '门锁其实是他弟开的' });
+        PB.wrong(cid, '小李', { why: '当晚他在别处' });
+        return [PB.wrong(cid, '老张', { why: '第三个错人' }).reason];
+      });
+
+      WA.store.transact(function (d) { d.probe = { cases: [] }; }, 'reject-witness:probe-clear');
+      PB.setSettings(keepCfg);
+    }
+  }
+  // ── engines/session.js（v2.119.0 拓展⑥：多座位场次）──
+  //   这一面的纪律：**座位由凭证认，不由自称认**；历史窗口挤出后不许假装没漏。
+  //   故下列码分三组：入座闸（票 / 容量 / 角色占用）、续传闸（序号 / 领先 / 重同步）、
+  //   在座闸（不存在的座 / 已卸的座）。
+  {
+    const SE = WA.session;
+    if (SE && typeof SE.host === 'function') {
+      const keepCfg = SE.getSettings();
+      SE.setSettings({ enabled: true, maxSeats: 2, maxLog: 16, windowMs: 3600000 });
+      WA.store.transact(function (d) { d.session = { seats: [], log: [], seq: 0, rev: 0, host: '' }; },
+        'reject-witness:session-reset');
+
+      want('missing-token', 'session：入座必须持票 ⇒ 没票连座位都排不上（主持与加入同一道闸）（拓展⑥）');
+      trip('missing-token', function () {
+        return [SE.host('主持人', { role: 'GM' }).reason, SE.join('阿明', { role: '侦探' }).reason];
+      });
+
+      SE.host('主持人', { role: 'GM', token: 'tok-A' });
+      want('role-taken', 'session.join：这个角色已有人在座 ⇒ 不悄悄顶掉他（要顶得显式 takeover）（拓展⑥）');
+      trip('role-taken', function () {
+        return [SE.join('阿丁', { role: 'GM', token: 'tok-R', perms: ['post'] }).reason];
+      });
+      want('seats-full', 'session：座位已满 ⇒ 不挤掉先到的人（先有人卸座再进）（拓展⑥）');
+      trip('seats-full', function () {
+        SE.join('阿明', { role: '侦探', token: 'tok-M', perms: ['post'] });
+        return [SE.join('阿强', { role: '助手', token: 'tok-Q', perms: ['post'] }).reason];
+      });
+
+      want('bad-perms', 'session.join：申请的权限不在具名表里 ⇒ 不给他一个编不出的权限（拓展⑥）');
+      trip('bad-perms', function () {
+        return [SE.join('阿丁', { role: '打杂', token: 'tok-P', perms: ['post', 'godmode'] }).reason];
+      });
+      want('bad-token', 'session：票不对（指纹不符）⇒ 不认这张票（验票/发言/续传/卸座同一道闸）（拓展⑥）');
+      trip('bad-token', function () {
+        return [SE.auth('阿明', 'wrong').reason, SE.post('阿明', 'wrong', 'x').reason,
+          SE.since('阿明', 'wrong', 0).reason, SE.leave('阿明', 'wrong').reason];
+      });
+
+      want('unknown-seat', 'session：座上没有这个人 ⇒ 不凭一个名字凭空发他一条言（验票/发言/续传/卸座同一道闸）（拓展⑥）');
+      trip('unknown-seat', function () {
+        return [SE.auth('陌生人', 'tok-Z').reason, SE.post('陌生人', 'tok-Z', '我是谁').reason,
+          SE.since('陌生人', 'tok-Z', 0).reason, SE.leave('陌生人', 'tok-Z').reason];
+      });
+      want('out-of-order', 'session.post：楼号跳了 ⇒ 顺序是世界的一部分，不按你说的号补（拓展⑥）');
+      trip('out-of-order', function () {
+        return [SE.post('阿明', 'tok-M', '跳号', { seq: 99 }).reason];
+      });
+      want('bad-seq', 'session.since：交上来的序号不是个数 ⇒ 不猜你要哪一段（拓展⑥）');
+      trip('bad-seq', function () {
+        return [SE.since('阿明', 'tok-M', 'x').reason, SE.since('阿明', 'tok-M', NaN).reason];
+      });
+      want('ahead-of-head', 'session.since：认的序号比服务端还多 ⇒ 这份客户端不是这条线上来的（拓展⑥）');
+      trip('ahead-of-head', function () {
+        return [SE.since('阿明', 'tok-M', 99).reason];
+      });
+      want('need-resync', 'session.since：要的那段已挤出历史窗口 ⇒ 不假装没漏，先重同步（拓展⑥）');
+      trip('need-resync', function () {
+        for (let i = 0; i < 20; i++) SE.post('阿明', 'tok-M', 'm' + i);
+        return [SE.since('阿明', 'tok-M', 0).reason];
+      });
+      want('revoked', 'session：座已卸但票还在手里 ⇒ 不再认这份票（不删历史，只是不再当他在座）（拓展⑥）');
+      trip('revoked', function () {
+        SE.leave('阿明', 'tok-M');
+        return [SE.auth('阿明', 'tok-M').reason, SE.post('阿明', 'tok-M', '还在说').reason,
+          SE.since('阿明', 'tok-M', 0).reason];
+      });
+
+      WA.store.transact(function (d) { d.session = { seats: [], log: [], seq: 0, rev: 0, host: '' }; },
+        'reject-witness:session-clear');
+      SE.setSettings(keepCfg);
+    }
+  }
+  // ── engines/rehearsal.js（v2.117.0 B7：限定步数的试演）──
+  //   这一面的纪律：**没跑成的东西不进预览**（「试演过了」不能是一句无法反驳的话）。
+  //   故 run/preview/apply 三条路上的拒收都留见证，且都取出自己的码。
+  {
+    const RH = WA.rehearsal;
+    if (RH && typeof RH.run === 'function') {
+      const keepCfg = RH.getSettings();
+      RH.setSettings({ enabled: true, maxSteps: 4, keepPreviews: 6, stepMs: 60000, policy: 'limited' });
+      WA.store.transact(function (d) { d.rehearsal = { previews: [] }; }, 'reject-witness:rehearsal-reset');
+
+      want('no-steps', 'rehearsal：一步都没给 ⇒ 没有什么可试演的（空步表不是「安全通过」）（B7）');
+      trip('no-steps', function () {
+        return [RH.run([], { now: 1000 }).reason, RH.preview([], { now: 1000 }).reason];
+      });
+      want('missing-preview', 'rehearsal.checkPreview：预览不存在 ⇒ 不凭一个 id 认下一份没登记过的结论（B7）');
+      trip('missing-preview', function () {
+        return [RH.checkPreview('rv_nope').reason,
+          RH.apply('rv_nope', { steps: [{ kind: 'wait', who: '甲' }], now: 1000 }).reason];
+      });
+      want('missing-who', 'rehearsal.run：动作没写谁做的 ⇒ 不替任何人代办（拒绝并留痕在 trace 里）（B7）');
+      tripDeep('missing-who', function () {
+        return [RH.run([{ kind: 'wait' }], { now: 1000 })];
+      });
+      want('all-steps-refused', 'rehearsal.preview：一步都没跑成 ⇒ 不登记预览（读的人会以为它被验证过）（B7）');
+      trip('all-steps-refused', function () {
+        return [RH.preview([{ kind: 'wait' }], { now: 1000 }).reason];
+      });
+      want('exec-absent', 'rehearsal.run：执行面缺席 ⇒ 试演不做假装（没有执行面就没有「在快照上跑」）（B7）');
+      trip('exec-absent', function () {
+        const keep = WA.exec;
+        try { WA.exec = null; } catch (e) { return []; }
+        let r;
+        try { r = [RH.run([{ kind: 'wait', who: '甲' }], { now: 1000 }).reason]; }
+        finally { WA.exec = keep; }
+        return r;
+      });
+      want('sandbox-failed', 'rehearsal.run：隔离快照建不起来 ⇒ 不拿真世界试演（宁可拒收）（B7）');
+      trip('sandbox-failed', function () {
+        const keep = WA.exec;
+        try { WA.exec = { withContext: function (c, fn) { return fn(); }, cloneState: function () { return null; } }; }
+        catch (e) { return []; }
+        let r;
+        try { r = [RH.run([{ kind: 'wait', who: '甲' }], { now: 1000 }).reason]; }
+        finally { WA.exec = keep; }
+        return r;
+      });
+      want('stale-preview', 'rehearsal.apply：世界已不是预览时的那一份 ⇒ 拒收且零变化（旧预览不得覆盖新进度）（B7）');
+      trip('stale-preview', function () {
+        const pv = RH.preview([{ kind: 'wait', who: '甲' }], { now: 1000 });
+        WA.store.transact(function (d) { d.__waStaleProbe = (d.__waStaleProbe || 0) + 1; }, 'reject-witness:stale');
+        const r = [RH.checkPreview(pv.previewId).reason,
+          RH.apply(pv.previewId, { steps: [{ kind: 'wait', who: '甲' }], now: 1000 }).reason];
+        WA.store.transact(function (d) { delete d.__waStaleProbe; }, 'reject-witness:stale-restore');
+        return r;
+      });
+
+      WA.store.transact(function (d) { d.rehearsal = { previews: [] }; }, 'reject-witness:rehearsal-clear');
+      RH.setSettings(keepCfg);
+    }
+  }
+  // ── engines/stage.js（v2.119.0 拓展⑦：玩法包与阶段迁移）──
+  //   这一面的纪律：**玩法不能凭空发明**（指标得是包声明的）、**成就不可回卷**、
+  //   **换阶段不是一句宣告**（迁移清单要逐项生效）。故下面按 采纳 → 记进度 → 声明 → 换阶段
+  //   四段路各取自己的码，并在同一份真状态上串起来跑。
+  {
+    const SG = WA.stage;
+    if (SG && typeof SG.adopt === 'function') {
+      const keepCfg = SG.getSettings();
+      SG.setSettings({ enabled: true, maxMetrics: 4, maxTransitions: 2 });
+      WA.store.transact(function (d) { d.stage = { pack: '', stage: '', metrics: {}, transitions: [] }; },
+        'reject-witness:stage-reset');
+
+      want('unknown-pack', 'stage.adopt：包名不在具名表里 ⇒ 玩法不能凭空发明（拓展⑦）');
+      trip('unknown-pack', function () { return [SG.adopt('赛博朋克').reason]; });
+      want('already-adopted', 'stage.adopt：已经采纳了一套玩法 ⇒ 换玩法必须显式 replace（拓展⑦）');
+      trip('already-adopted', function () {
+        SG.adopt('悬疑');
+        return [SG.adopt('冒险').reason];
+      });
+      want('no-pack', 'stage：还没采纳任何玩法包 ⇒ 不凭空给一个指标记进度（记进度/声明迁移同一道闸）（拓展⑦）');
+      trip('no-pack', function () {
+        WA.store.transact(function (d) { d.stage = { pack: '', stage: '', metrics: {}, transitions: [] }; }, 'reject-witness:stage-nopack');
+        return [SG.mark('里程', 1).reason, SG.plan({ to: '深入', metric: '里程', need: 3, changes: ['x'] }).reason];
+      });
+
+      SG.adopt('冒险', { replace: true });
+      want('unknown-metric', 'stage：这个指标不是本包声明的 ⇒ 不发明一个新成就（记进度/声明迁移同一道闸）（拓展⑦）');
+      trip('unknown-metric', function () {
+        return [SG.mark('体重', 1).reason,
+          SG.plan({ to: '深入', metric: '体重', need: 3, changes: ['x'] }).reason];
+      });
+      want('not-advancing', 'stage.mark：增量为零或负数 ⇒ 成就不是可以往回拧的旋钮（拓展⑦）');
+      trip('not-advancing', function () {
+        return [SG.mark('里程', -1).reason, SG.mark('里程', 0).reason];
+      });
+      want('metrics-full', 'stage.mark：指标槽已满 ⇒ 不静默挤掉别人的格子（先自己清点）（拓展⑦）');
+      trip('metrics-full', function () {
+        WA.store.transact(function (d) {
+          d.stage = { pack: '冒险', stage: '启程', metrics: { 名望: 1, 积蓄: 1, 流水: 1, 人手: 1 }, transitions: [] };
+        }, 'reject-witness:stage-fill');
+        return [SG.mark('里程', 1).reason];
+      });
+
+      WA.store.transact(function (d) { d.stage = { pack: '冒险', stage: '启程', metrics: {}, transitions: [] }; },
+        'reject-witness:stage-clear');
+      want('missing-trigger', 'stage.plan：没写触发条件（指标 + 门槛）⇒ 没触发条件的迁移不是迁移（拓展⑦）');
+      trip('missing-trigger', function () { return [SG.plan({ to: '深入' }).reason]; });
+      want('missing-changes', 'stage.plan：没写迁移清单 ⇒ 不换一个没人知道要改什么的阶段（拓展⑦）');
+      trip('missing-changes', function () { return [SG.plan({ to: '深入', metric: '里程', need: 3 }).reason]; });
+      want('transitions-full', 'stage.plan：待换阶段清单已满 ⇒ 不静默丢弃旧迁移（先了结）（拓展⑦）');
+      trip('transitions-full', function () {
+        SG.plan({ to: '深入', metric: '里程', need: 3, changes: ['场景种子'] });
+        SG.plan({ to: '归返', metric: '声望', need: 3, changes: ['场景种子'] });
+        return [SG.plan({ to: '归返', metric: '里程', need: 3, changes: ['x'] }).reason];
+      });
+      want('unknown-transition', 'stage.transit：这条迁移不存在 ⇒ 不凭一个 id 换阶段（拓展⑦）');
+      trip('unknown-transition', function () { return [SG.transit('tr_nope', {}).reason]; });
+
+      WA.store.transact(function (d) { d.stage = { pack: '冒险', stage: '启程', metrics: {}, transitions: [] }; },
+        'reject-witness:stage-clear2');
+      const p1 = SG.plan({ to: '深入', metric: '里程', need: 3, changes: ['场景种子', '信息边界'] });
+      want('threshold-unmet', 'stage.transit：门槛未达 ⇒ 带出还差多少，不硬换阶段（拓展⑦）');
+      trip('threshold-unmet', function () {
+        SG.mark('里程', 2);
+        return [SG.transit(p1.id, { applied: ['场景种子', '信息边界'] }).reason];
+      });
+      want('change-not-applied', 'stage.transit：迁移清单没逐项生效 ⇒ 换阶段不是一句宣告（拓展⑦）');
+      trip('change-not-applied', function () {
+        SG.mark('里程', 1);
+        return [SG.transit(p1.id, { applied: ['场景种子'] }).reason];
+      });
+      want('already-transited', 'stage.transit：同一条迁移不许换两次（阶段只能往前走一格）（拓展⑦）');
+      trip('already-transited', function () {
+        SG.transit(p1.id, { applied: ['场景种子', '信息边界'] });
+        return [SG.transit(p1.id, { applied: ['场景种子', '信息边界'] }).reason];
+      });
+
+      WA.store.transact(function (d) { d.stage = { pack: '', stage: '', metrics: {}, transitions: [] }; },
+        'reject-witness:stage-restore');
+      SG.setSettings(keepCfg);
+    }
+  }
+  // ── engines/liaison.js（v2.117.0 B8：手机侧操作 → 世界侧约定）──
+  //   这一面的纪律：**登记 ≠ 送达**，五个阶段逐个表达；到期 ≠ 故意失约（好感不降）；
+  //   界面动作不无条件造成关系变化。下列码按 收件 → 约定 → 推进 → 结算 → 关系 五段路取。
+  {
+    const LI = WA.liaison;
+    if (LI && typeof LI.receive === 'function') {
+      const keepCfg = LI.getSettings();
+      const keepAct = WA.act.getSettings();
+      const keepBrd = WA.phoneBridge.getSettings();
+      WA.act.setSettings({ enabled: true, maxActs: 64 });
+      WA.phoneBridge.setSettings({ enabled: true, linkCausal: true });
+      LI.setSettings({ enabled: true, affectsRelation: false, maxDue: 4 });
+      WA.store.transact(function (d) {
+        d.people = {
+          'p_甲': { id: 'p_甲', name: '甲', resources: {}, knowledge: { intel: [] },
+            life: { goals: [{ id: 'g1', text: '去见乙', obstacle: '', status: 'active' }] }, schedule: [] },
+          'p_乙': { id: 'p_乙', name: '乙', resources: {}, knowledge: { intel: [] },
+            life: { goals: [] }, schedule: [] }
+        };
+        d.world = d.world && typeof d.world === 'object' ? d.world : {};
+        d.world.journeys = [];
+        d.acts = { rows: [], res: [] };
+        d.liaison = { inbox: [], deals: [], evidence: [] };
+        d.fondness = { rows: [] };
+      }, 'reject-witness:liaison-reset');
+
+      want('missing-from', 'liaison.receive：这笔操作没写谁发的 ⇒ 世界侧不认下来（拓展⑧）');
+      trip('missing-from', function () {
+        return [LI.receive({ opId: 'lx_nf', act: 'message', to: '乙' }).reason];
+      });
+      want('unknown-participant', 'liaison.receive：世界不认得这个名字 ⇒ 不放进闭环（谁的手机不代表世界的谁）（拓展⑧）');
+      trip('unknown-participant', function () {
+        return [LI.receive({ opId: 'lx_up', act: 'message', from: '甲', to: '陌生人' }).reason];
+      });
+      want('bridge-absent', 'liaison.receive：桥缺席 ⇒ 这笔只算「本侧暂存待确认」，不假装对方已收到（拓展⑧）');
+      tripDeep('bridge-absent', function () {
+        //   注意：桥「关闭」给出的是 disabled，absent 的真形态是**桥面整个不在**。
+        const keep = WA.phoneBridge;
+        try { WA.phoneBridge = null; } catch (e) { return []; }
+        let r;
+        try { r = [LI.receive({ opId: 'lx_ba', act: 'message', from: '甲', to: '乙' })]; }
+        finally { WA.phoneBridge = keep; }
+        return r;
+      });
+      want('bridge-threw', 'liaison.receive：桥登记时抛错 ⇒ 同样只降级为待确认，并如实报因（拓展⑧）');
+      tripDeep('bridge-threw', function () {
+        const keep = WA.phoneBridge;
+        try { WA.phoneBridge = { noteAction: function () { throw new Error('bridge down'); } }; } catch (e) { return []; }
+        let r;
+        try { r = [LI.receive({ opId: 'lx_bt', act: 'message', from: '甲', to: '乙' })]; }
+        finally { WA.phoneBridge = keep; }
+        return r;
+      });
+      want('missing-with', 'liaison.createDeal：没写约定对象 ⇒ 不建一份不知道跟谁的约定（拓展⑧）');
+      trip('missing-with', function () {
+        return [LI.receive({ opId: 'lx_mw', act: 'message', from: '甲', dueAt: 1000 }).reason];
+      });
+      want('missing-owner', 'liaison.createDeal：约定算不出发起方（世界不认这个人）⇒ 不凭空造人也不凭空建目标（拓展⑧）');
+      trip('missing-owner', function () {
+        //   构造跨版本存档 / 外部写入的真实形态：台账里有一笔带期限、桥侧尚未登记、尚无约定任务的行，
+        //   而它的发起方（from 空 ⇒ 落到对方身上）世界不认得。
+        //   桥恢复后 retry 补建约定 ⇒ 拒收。这里同时钉住 v2.119.0 修的那一处：
+        //   原先 retry 把 createDeal 的失败**丢在地上**（调用方读到 ok:true sent:true，
+        //   而世界侧约定根本没形成）；现在它与 receive 同一条纪律：如实分列。
+        WA.store.transact(function (d) {
+          d.acts.rows = [];
+          d.liaison.inbox = [{ id: 'lx_owner', opId: 'lx_owner', act: 'message', from: '', to: '查无此人',
+            stage: 'submitted', stageLabel: '已提交到桥', bridged: false, bridgeReason: 'bridge-absent',
+            dealId: '', reason: '', at: 1, seq: 1, updatedAt: 1, dueAt: 1000 }];
+        }, 'reject-witness:liaison-inbox');
+        return [LI.retry('lx_owner').reason];
+      });
+      want('deals-full', 'liaison.createDeal：约定表已满 ⇒ 不静默丢弃旧约定（先了结）（拓展⑧）');
+      trip('deals-full', function () {
+        WA.store.transact(function (d) {
+          const rows = [];
+          for (let i = 0; i < 24; i++) rows.push({ id: 'dl_f' + i, inboxId: '', opId: '', partA: '甲', partB: '乙',
+            status: 'pending', dueAt: 1000, actId: '', note: '', fulfilment: '', at: 1, updatedAt: 1 });
+          d.liaison.deals = rows;
+          d.acts.rows = [];
+        }, 'reject-witness:liaison-fill');
+        return [LI.receive({ opId: 'lx_df', act: 'message', from: '甲', to: '乙', dueAt: 1000 }).reason];
+      });
+
+      WA.store.transact(function (d) { d.liaison = { inbox: [], deals: [], evidence: [] }; d.acts.rows = []; },
+        'reject-witness:liaison-reset2');
+      // 一条真约定：用于推进 / 结算 / 关系三段路。
+      function mkDeal(opId) {
+        const r = LI.receive({ opId: opId, act: 'message', from: '甲', to: '乙', dueAt: 1000 });
+        return r;
+      }
+      want('settle-not-here', 'liaison.advance：终档不许从推进面走 ⇒ 结算只有一个出口（拓展⑧）');
+      trip('settle-not-here', function () { return [LI.advance('op_x', 'settled', '想直接收尾').reason]; });
+      want('stage-skip', 'liaison.advance：阶段只许逐档前言 ⇒ 不许从「已提交」跳到「对方已知晓」（拓展⑧）');
+      trip('stage-skip', function () {
+        mkDeal('op_skip');
+        return [LI.advance('op_skip', 'known', '我猜他知道了').reason];
+      });
+      want('missing-deal', 'liaison.settleDeal：约定不存在（或 id 为空）⇒ 不凭一个 id 结算一笔没发生的约定（拓展⑧）');
+      trip('missing-deal', function () {
+        return [LI.settleDeal('', 5000).reason, LI.settleDeal('dl_nope', 5000).reason];
+      });
+      want('relation-off', 'liaison.settleDeal：关系后果默认关 ⇒ 界面动作不无条件造成关系变化（B8 原文点名）');
+      tripDeep('relation-off', function () {
+        const r = mkDeal('op_roff');
+        WA.store.transact(function (d) { d.acts.rows[d.acts.rows.length - 1].status = 'done'; }, 'reject-witness:done1');
+        return [LI.settleDeal(r.dealId, 5000)];
+      });
+      want('relation-absent', 'liaison.applyRelation：关系面缺席 ⇒ 如实回报，不假装给过一步（拓展⑧）');
+      tripDeep('relation-absent', function () {
+        const r = mkDeal('op_rabs');
+        WA.store.transact(function (d) { d.acts.rows[d.acts.rows.length - 1].status = 'done'; }, 'reject-witness:done2');
+        LI.setSettings({ affectsRelation: true });
+        const keep = WA.fondness;
+        try { WA.fondness = null; } catch (e) { return []; }
+        let o;
+        try { o = [LI.settleDeal(r.dealId, 5000)]; }
+        finally { WA.fondness = keep; LI.setSettings({ affectsRelation: false }); }
+        return o;
+      });
+      want('relation-threw', 'liaison.applyRelation：关系面抛错 ⇒ 不吞掉，如实记为 relation-threw（拓展⑧）');
+      tripDeep('relation-threw', function () {
+        const r = mkDeal('op_rthr');
+        WA.store.transact(function (d) { d.acts.rows[d.acts.rows.length - 1].status = 'done'; }, 'reject-witness:done3');
+        LI.setSettings({ affectsRelation: true });
+        const keep = WA.fondness;
+        try { WA.fondness = { apply: function () { throw new Error('fondness down'); } }; } catch (e) { return []; }
+        let o;
+        try { o = [LI.settleDeal(r.dealId, 5000)]; }
+        finally { WA.fondness = keep; LI.setSettings({ affectsRelation: false }); }
+        return o;
+      });
+      want('no-negative-step', 'liaison.applyRelation：失约只记认知与证据，好感不降（不降准则，不擅自代填负向）（拓展⑧）');
+      tripDeep('no-negative-step', function () {
+        const r = mkDeal('op_nneg');
+        LI.setSettings({ affectsRelation: true });
+        let o;
+        try { o = [LI.settleDeal(r.dealId, 5000)]; }
+        finally { LI.setSettings({ affectsRelation: false }); }
+        return o;
+      });
+
+      WA.store.transact(function (d) { d.liaison = { inbox: [], deals: [], evidence: [] }; d.acts.rows = []; },
+        'reject-witness:liaison-clear');
+      LI.setSettings(keepCfg);
+      WA.phoneBridge.setSettings(keepBrd);
+      WA.act.setSettings(keepAct);
+    }
+  }
+  // ── engines/coop.js（v2.118.0 B9：协作裁决面）──
+  //   这一面的纪律：**确认前不标完成**；权威与提交不同人；世界改过就是改过（不做尽力应用）；
+  //   任一条路径应用不到 ⇒ 整份拒收（不做部分成功）。下列码按 提议 → 裁决 → 回执 三段路取。
+  {
+    const CP = WA.coop;
+    if (CP && typeof CP.propose === 'function') {
+      const keepCfg = CP.getSettings();
+      const keepCollab = WA.collab;
+      CP.setSettings({ enabled: true, horizon: 0, allowSelfApprove: false, maxTries: 3, maxView: 60 });
+      function seed() {
+        WA.store.transact(function (d) {
+          d.people = { 'p_甲': { id: 'p_甲', name: '甲' }, 'p_乙': { id: 'p_乙', name: '乙' }, 'p_丙': { id: 'p_丙', name: '丙' } };
+          d.world = d.world && typeof d.world === 'object' ? d.world : {};
+          d.world.places = [{ id: 'pl_A', name: '甲地' }];
+          d.coop = { proposals: [], archive: [], seq: 0 };
+          d.collab = { seq: 0, sessions: [], claims: {}, queue: [], conflicts: [] };
+        }, 'reject-witness:coop-reset');
+      }
+      seed();
+      if (WA.collab && typeof WA.collab.setSettings === 'function') {
+        WA.collab.setSettings({ enabled: true, maxSessions: 8, maxQueue: 16, maxConflicts: 8, maxActor: 60 });
+      }
+      const GOPS = [{ path: 'world.places', value: [{ id: 'pl_B', name: '乙地' }] }];
+      function mk(o) {
+        return CP.propose(Object.assign({ opId: 'op_x', by: '甲', baseRev: CP.stamp(), ops: GOPS }, o || {}));
+      }
+
+      want('missing-actor', 'coop：没写操作者 ⇒ 不认这份提议（谁提的必须是个世界里存在的人）（拓展⑨）');
+      trip('missing-actor', function () {
+        return [CP.propose({ opId: 'na', baseRev: CP.stamp(), ops: GOPS }).reason,
+          CP.confirm('cp_a', {}).reason, CP.reject('cp_a', { reason: 'x' }).reason, CP.retry('cp_a', {}).reason];
+      });
+      want('unknown-actor', 'coop.propose：提议涉及的角色世界不认得 ⇒ 不凭空建人（拓展⑨）');
+      trip('unknown-actor', function () {
+        return [mk({ opId: 'ua', actor: '查无此人' }).reason];
+      });
+      want('too-many-ops', 'coop.propose：一次改太多条（超上限）⇒ 不许一次动整个世界（拓展⑨）');
+      trip('too-many-ops', function () {
+        const ops = [];
+        for (let i = 0; i < 25; i++) ops.push({ path: 'world.places', value: [] });
+        return [mk({ opId: 'tmo', ops: ops }).reason];
+      });
+      want('proposals-full', 'coop.propose：待裁队列已满 ⇒ 不静默丢弃旧提议（先裁完）（拓展⑨）');
+      trip('proposals-full', function () {
+        WA.store.transact(function (d) {
+          const rows = [];
+          for (let i = 0; i < 24; i++) rows.push({ id: 'cp_f' + i, opId: 'o' + i, by: '甲', actor: '',
+            baseRev: { rev: 0, keys: 0, chars: 0 }, ops: GOPS.slice(), load: 1, status: 'pending',
+            statusLabel: '', note: '', tries: 0, receiptId: '', reason: '', at: 1, decidedAt: 0, decidedBy: '', updatedAt: 1 });
+          d.coop = { proposals: rows, archive: [], seq: 0 };
+        }, 'reject-witness:coop-fill');
+        return [mk({ opId: 'pf' }).reason];
+      });
+
+      seed();
+      want('bad-proposal', 'coop：提议 id 是空的 ⇒ 不凭一个空 id 裁决（确认/拒绝/重试同一道闸）（拓展⑨）');
+      trip('bad-proposal', function () {
+        return [CP.confirm('', { by: '乙' }).reason, CP.reject('', { by: '乙', reason: 'x' }).reason,
+          CP.retry('', { by: '甲' }).reason];
+      });
+      want('no-proposal', 'coop：这份提议不存在（也没在归档里）⇒ 不凭一个 id 编出一次裁决（确认/拒绝/重试同一道闸）（拓展⑨）');
+      trip('no-proposal', function () {
+        return [CP.confirm('cp_nope', { by: '乙' }).reason, CP.reject('cp_nope', { by: '乙', reason: 'x' }).reason,
+          CP.retry('cp_nope', { by: '甲' }).reason];
+      });
+      want('self-approve', 'coop.confirm：权威世界维护者不得是提议人自己（allowSelfApprove 可显式打开）（拓展⑨）');
+      trip('self-approve', function () {
+        const r = mk({ opId: 'sa' });
+        return [CP.confirm(r.id, { by: '甲' }).reason];
+      });
+      want('stale-base', 'coop.confirm：基础版本与世界当前版本不一致 ⇒ 请基于当前版本重新提交（不自动合并）（拓展⑨）');
+      trip('stale-base', function () {
+        const st = CP.stamp();
+        WA.store.transact(function (d) { d.world.places = [{ id: 'pl_C', name: '丙地' }]; }, 'reject-witness:coop-move');
+        const r = CP.propose({ opId: 'sb', by: '甲', baseRev: st, ops: GOPS });
+        return [CP.confirm(r.id, { by: '乙' }).reason];
+      });
+      want('unappliable', 'coop.confirm：任一条路径应用不到 ⇒ 整份拒收（不做部分成功）（拓展⑨）');
+      trip('unappliable', function () {
+        //   注意别顺手改世界：那会让第 ④ 步的 stale 先拦下来，看到的码就不是它了。
+        seed();
+        const r = mk({ opId: 'ua2', ops: [{ path: 'world.nope.deep', value: 1 }] });
+        const c = CP.confirm(r.id, { by: '乙' });
+        return [c.reason];
+      });
+      want('path-missing', 'coop.coopSetPath：路径末段那一格不存在 ⇒ 不凭空补一格出来（不代造中间层）（拓展⑨）');
+      tripDeep('path-missing', function () {
+        seed();
+        const r = mk({ opId: 'pm', ops: [{ path: 'world.brandnew', value: 1 }] });
+        return [CP.confirm(r.id, { by: '乙' })];
+      });
+      want('actor-claimed-by-other', 'coop.confirm：这个角色被别的会话占着 ⇒ 拒收并带出持有者（不夺取）（拓展⑨）');
+      trip('actor-claimed-by-other', function () {
+        seed();
+        const r = mk({ opId: 'ac', actor: '丙' });
+        const s = WA.collab.open('sess_claim', {});
+        const sid = s && (s.session || s.id);
+        //   占用必须**以「丙」的名义**声明：占的是这个角色，不是点按钮的人。
+        if (sid) WA.collab.claim('丙', sid);
+        const c = CP.confirm(r.id, { by: '乙' });
+        return [c.reason];
+      });
+      want('no-receipt-face', 'coop.confirm：回执面缺席 ⇒ 不标完成（确认前不标完成的另一半）（拓展⑨）');
+      trip('no-receipt-face', function () {
+        seed();
+        const r = mk({ opId: 'nrf' });
+        try { WA.collab = null; } catch (e) { return []; }
+        let c;
+        try { c = CP.confirm(r.id, { by: '乙' }); }
+        finally { WA.collab = keepCollab; }
+        return [c.reason];
+      });
+      want('receipt-failed', 'coop.confirm：回执没落 ⇒ 世界写入已发生但这次确认不标完成，并把提议退回待处理（拓展⑨）');
+      trip('receipt-failed', function () {
+        seed();
+        const r = mk({ opId: 'rf' });
+        WA.collab = { enqueue: function () { return { ok: false, reason: 'witness' }; } };
+        let c;
+        try { c = CP.confirm(r.id, { by: '乙' }); }
+        finally { WA.collab = keepCollab; }
+        return [c.reason];
+      });
+      want('receipt-threw', 'coop.confirm：回执面抛错 ⇒ 不吞掉，如实记为 receipt-threw（拓展⑨）');
+      trip('receipt-threw', function () {
+        seed();
+        const r = mk({ opId: 'rt' });
+        WA.collab = { enqueue: function () { throw new Error('collab down'); } };
+        let c;
+        try { c = CP.confirm(r.id, { by: '乙' }); }
+        finally { WA.collab = keepCollab; }
+        return [c.reason];
+      });
+
+      seed();
+      CP.setSettings(keepCfg);
+    }
+  }
+  // ── 跨模块收尾：顺着共享入口（桥 / 制度 / 关系面）把剩下的码取出来 ──
+  {
+    // ① phone-bridge.noteAction：这笔操作连编号都没有 ⇒ 不收下（收下了就再也没法对账）
+    want('missing-op', 'phoneBridge.noteAction：没写这笔操作的编号 ⇒ 不收下（幂等的根就是它）（B8 入口）');
+    trip('missing-op', function () {
+      return [WA.phoneBridge.noteAction({ act: 'message', from: '甲', to: '乙' }).reason];
+    });
+
+    // ② 制度面：职位不存在 ⇒ 不凭空挂人；批准人不在 approve 名册上 ⇒ 不让他批
+    const IN = WA.inst;
+    if (IN && typeof IN.charter === 'function') {
+      const keepInst = IN.getSettings();
+      IN.setSettings({ enabled: true });
+      IN.charter('收尾会', { kind: '公司', replace: true });
+      IN.post('收尾会', '总管', { perms: ['approve'] });
+      want('unknown-post', 'inst.assign：这个职位不存在 ⇒ 不凭空挂一个没定义过的人上去（拓展④）');
+      trip('unknown-post', function () {
+        return [IN.assign('收尾会', '没有这个职位', '人甲', {}).reason,
+          IN.vacate('收尾会', '没有这个职位', { why: 'resigned' }).reason];
+      });
+      want('not-authorized', 'inst.decide：批准人不在 approve 名册上 ⇒ 批准不是「谁点一下都行」（拓展④）');
+      trip('not-authorized', function () {
+        IN.assign('收尾会', '总管', '人乙', {});
+        const pr = IN.propose('收尾会', '开新铺', { by: '人乙', needs: 'approve' });
+        return [IN.decide('收尾会', pr.id, 'approved', { by: '人丙' }).reason];
+      });
+      IN.setSettings(keepInst);
+    }
+
+    // ③ 试演「改道」要交给 action 的准入面真判一次；准入面缺席 ⇒ 这一步拒收
+    const RH2 = WA.rehearsal;
+    if (RH2 && typeof RH2.run === 'function') {
+      const keepRh = RH2.getSettings();
+      RH2.setSettings({ enabled: true, maxSteps: 4, keepPreviews: 6, stepMs: 60000, policy: 'limited' });
+      want('act-absent', 'rehearsal.run：改道要交给行动准入面真判 ⇒ 准入面缺席时这一步拒收（不自己算结论）（B7）');
+      tripDeep('act-absent', function () {
+        const keep = WA.act;
+        try { WA.act = null; } catch (e) { return []; }
+        let r;
+        try { r = [RH2.run([{ kind: 'reroute', who: '甲', from: '甲地', to: '乙地' }], { now: 1000 })]; }
+        finally { WA.act = keep; }
+        return r;
+      });
+      RH2.setSettings(keepRh);
+    }
+
+    // ④ 约定的阶段只有五档：交上来一个不在表里的档 ⇒ 不猜你要推到哪
+    const LI2 = WA.liaison;
+    if (LI2 && typeof LI2.advance === 'function') {
+      const keepLi = LI2.getSettings();
+      LI2.setSettings({ enabled: true });
+      want('unknown-stage', 'liaison.advance：阶段名不在五档表里 ⇒ 不猜你要推到哪一档（拓展⑧）');
+      trip('unknown-stage', function () {
+        return [LI2.advance('op_x', '乱档', '我说了算').reason];
+      });
+      LI2.setSettings(keepLi);
     }
   }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });

@@ -107,8 +107,19 @@ function judge(env) {
 
 function readPanel() { return fs.readFileSync(path.join(BASE, PANEL_REL), 'utf8'); }
 
+// v2.119.1 补面（同族复发）：v2.117.0–v2.119.0 新增的三个模块总开关（人物计划 / 供需循环 /
+//   远方传播）落进了**近似词标题**（人物多步计划 / 供需与商路 / 远方与传播）——
+//   用户在面板上看到的是「哪个标题管这个开关」答不出来的并排控件，正是本锁 A 面要打红的那一类。
+//   三处标题已补入模块身份词（括号里的解释照旧），模块名与标题第一次一致。
+//
 // 负控制锚点：v2.57.0 补上的分区标题。它在真源码里必须恰中 1 次。
 const ANCHOR = '<div class="wa-sec">因果与情报</div>';
+// 第二个负控制锚点（v2.119.1）：B 面要的是「两个模块的开关并进同一区」，
+//   而原锚点**证明不了 B**：它后面紧跟的是『机会与题材配方（B6）』，那一区里没有任何
+//   模块总开关 ⇒ 删掉它只能让 A 现形，B 面天生无从现形（原 N4 长期红灯的根因不是闸松了，
+//   是锚点选得不能证明它声称的那一面）。本锚点选一个「后面紧跟另一个模块总开关」的分区标题：
+//   删掉它，人物计划与关系修复**两族开关并进人物行动区** ⇒ A 与 B 同时命中。
+const ANCHOR2 = '<div class="wa-sec">人物计划（目标 → 有限步数 → 受挫改选）</div>';
 
 function runAll(a) {
   const gate = require('./ui-gate-sync.js');
@@ -132,7 +143,15 @@ function runNegative(a) {
   const envB = gate.fresh({ srcOverride: { 'ui/panel.js': broken } });
   const jb = judge(envB);
   a(jb.titleViolations.length > 0, 'v2570: [N3] 破坏后 [A] 现形（违规: ' + (jb.titleViolations.join('；') || '无') + '）');
-  a(jb.sharedViolations.length > 0, 'v2570: [N4] 破坏后 [B] 现形（同区共存: ' + (jb.sharedViolations.join('；') || '无') + '）');
+  // N4：B 面专用的第二个锚点 —— 破坏它，A 与 B 必须**同时**命中
+  const n2 = src.split(ANCHOR2).length - 1;
+  a(n2 === 1, 'v2570: [N4][前置] 第二个锚点在真源码中恰中 1 次（实 ' + n2 + ' 次）');
+  const broken2 = src.replace(ANCHOR2, '');
+  a(broken2 !== src, 'v2570: [N4][前置] 破坏确实发生（删掉第二个分区标题）');
+  const jb2 = judge(gate.fresh({ srcOverride: { 'ui/panel.js': broken2 } }));
+  a(jb2.titleViolations.length > 0 && jb2.sharedViolations.length > 0,
+    'v2570: [N4] 破坏后 [A]+[B] 双双现形（A: ' + (jb2.titleViolations.join('；') || '无')
+    + ' / B: ' + (jb2.sharedViolations.join('；') || '无') + '）');
   const envOk = gate.fresh();
   const jg = judge(envOk);
   a(jg.titleViolations.length === 0 && jg.sharedViolations.length === 0, 'v2570: [N5] 原版上同款判据仍成立（双向自证：不是把判据写死）');

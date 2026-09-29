@@ -240,7 +240,7 @@
     WA.store.transact(function (draft) {
       const id = 'p_' + who;
       const p = personRow(draft, id, who, 'intel:believe');
-      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return; }
+      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return false; }
       // 拆成两行是**刻意的**：v2.61.0 的淘汰门禁把「单个语句行」当作逐字锚点
       //   （`p.lastSeenAt = clockNow('intel'); p.updatedAt = p.lastSeenAt;` 必须全仓恰 1 次，
       //   那里正是 addIntel 的第一次建行）。新增入口若照抄这一行，锚点变成 4 次 ⇒ 既有门禁红。
@@ -283,7 +283,7 @@
     WA.store.transact(function (draft) {
       const id = 'p_' + who;
       const p = personRow(draft, id, who, 'intel:verify');
-      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return; }
+      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return false; }
       // 拆成两行：v2.61.0 的淘汰门禁把「单个语句行」当逐字锚点，
       //   新增入口照抄会把锚点从 1 稀释成 3 ⇒ 既有门禁红。语义不变。
       p.lastSeenAt = clockNow('intel');
@@ -318,7 +318,7 @@
     WA.store.transact(function (draft) {
       const id = 'p_' + who;
       const p = personRow(draft, id, who, 'intel:correct');
-      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return; }
+      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return false; }
       // 拆成两行：v2.61.0 的淘汰门禁把「单个语句行」当逐字锚点，
       //   新增入口照抄会把锚点从 1 稀释成 3 ⇒ 既有门禁红。语义不变。
       p.lastSeenAt = clockNow('intel');

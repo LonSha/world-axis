@@ -179,13 +179,18 @@ function runRuntime(A) {
     for (let i = 0; i < 40; i++) P4.bench('short');
     const al = P4.alerts(null, {});
     A(al.grade === (al.n ? 'warn' : 'pass'), 'B9/#10 grade 与告警数同源（' + al.n + ' 条 ⇒ ' + al.grade + '）');
-    if (al.n > 0) {
-      A(seen.some(function (x) { return x.lvl === 'warn' && String(x.msg).indexOf('性能劣化告警') >= 0; }),
-        'B9/#10 有告警时**真发出了** warn 级日志（实收 ' + seen.length + ' 条）');
-      A(P4.stat().alertCount >= al.n && !!P4.stat().lastAlert, 'B9/#10 告警计数与最近一条可读（诊断念得到）');
+    // v2.119.0 收口：原实现是 `if (al.n > 0) { A;A } else { A }` —— n 随墙钟抖动，
+    //   使**该锁自己的项数**在 100/101 之间漂（同一棵树连跑十次：8 次 101 / 2 次 100），
+    //   全量回归总读数也随之不可复现（11821 / 11822）。本仓元规则要求总量可复现，
+    //   故两向覆盖改为**无条件**断言，项数恒定（覆盖不减：两个方向仍在，只是都要判）。
+    if (al.n === 0) {
+      A(seen.length === 0, 'B9/#10 没坏时**闭嘴**：零告警 ⇒ 零日志（观测不得自己制造噪声）');
     } else {
-      A(seen.length === 0, 'B9/#10 无告警时不发日志（不制造噪声）');
+      A(seen.some(function (x) { return x.lvl === 'warn' && String(x.msg).indexOf('性能劣化告警') >= 0; }),
+        'B9/#10 有告警时**真发出了** warn 级日志（实收 ' + seen.length + ' 条，n=' + al.n + '）');
     }
+    A(al.n === 0 || (P4.stat().alertCount >= al.n && !!P4.stat().lastAlert),
+      'B9/#10 告警计数与最近一条可读（诊断念得到；实 ' + P4.stat().alertCount + ' / ' + JSON.stringify(P4.stat().lastAlert) + '）');
   } finally { W4.log = origLogW4; }
 
   // B10-#10 阈值有界：非法 factor 拒收且不污染现状

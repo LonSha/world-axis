@@ -307,7 +307,7 @@
     WA.store.transact(function (draft) {
       const list = (draft.shadow && Array.isArray(draft.shadow.experiences)) ? draft.shadow.experiences : [];
       const t = list.filter(function (x) { return x && x.pair === k && x.what === clean(what, 80); }).pop();
-      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return; }
+      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return false; }
       t.views = t.views && typeof t.views === 'object' ? t.views : {};
       t.history = Array.isArray(t.history) ? t.history : [];
       const from = t.views[who] ? t.views[who].noticed : '';
@@ -344,7 +344,7 @@
     WA.store.transact(function (draft) {
       const list = (draft.shadow && Array.isArray(draft.shadow.experiences)) ? draft.shadow.experiences : [];
       const t = list.filter(function (x) { return x && x.pair === k && x.what === what; }).pop();
-      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return; }
+      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return false; }
       t.remedies = Array.isArray(t.remedies) ? t.remedies : [];
       const r = { kind: kind, by: by, note: clean(o.note, 120), accepted: false, at: clockNow('shadow') };
       t.remedies.push(r);
@@ -372,9 +372,9 @@
     WA.store.transact(function (draft) {
       const list = (draft.shadow && Array.isArray(draft.shadow.experiences)) ? draft.shadow.experiences : [];
       const t = list.filter(function (x) { return x && x.pair === k && x.what === w; }).pop();
-      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return; }
+      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return false; }
       const r = t.remedies.filter(function (x) { return x && x.by !== who && !x.accepted; })[0];
-      if (!r) { out = { ok: false, reason: 'nothing-to-accept' }; return; }
+      if (!r) { out = { ok: false, reason: 'nothing-to-accept' }; return false; }
       r.accepted = true; r.acceptedAt = clockNow('shadow'); r.acceptedBy = who;
       t.views = t.views && typeof t.views === 'object' ? t.views : {};
       t.history = Array.isArray(t.history) ? t.history : [];

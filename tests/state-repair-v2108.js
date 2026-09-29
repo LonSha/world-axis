@@ -52,7 +52,7 @@ const ANCHORS = {
   aRepairs: { rel: STORE_REL, txt: '__loadStat.repairs = (__loadStat.repairs || 0) + 1;' },
   aWriteBack: { rel: STORE_REL, txt: "const w = writeVerified(storageKey(chatId), JSON.stringify(rep.state));" },
   aFamily: { rel: STORE_REL, txt: "if ((m = key.match(KEY_FAMILIES.recover))) return { family: 'recover', chat: m[1], kind: m[2] };" },
-  aWire: { rel: RUN_REL, txt: "require('./state-repair-v2108.js').runAll(assert)" }
+  aWire: { rel: RUN_REL, txt: "runLock('./state-repair-v2108.js');" }
 };
 
 /** H5 锚点纯度：目标文件里恰 1 次 + 本文件里恰 1 次（缺失与重复同罪）。 */

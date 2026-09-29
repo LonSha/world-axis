@@ -506,6 +506,11 @@
       if (isFinite(dueAt)) {
         const d = createDeal(cur.id, { with: cur.to, from: cur.from, dueAt: dueAt, at: clockNow('liaison') });
         if (d.ok) S.deals++;
+        // 半成功必须**如实分列**（与 receive 同一条纪律）：桥侧收下了、世界侧约定没形成。
+        //   原先这里把 d 的失败丢在地上 ⇒ 调用方读到的是「重试成功」（ok:true, sent:true），
+        //   而世界侧其实什么都没发生 —— 真实发生的拒收报不出来，是本仓最忌讳的形态。
+        else { noteFault(d.reason); return { ok: false, reason: d.reason, kept: true, opId: op, pending: false,
+          note: '桥侧已收下，但世界侧约定没有形成' }; }
       }
     }
     const r = advance(op, 'sent', 'retry');

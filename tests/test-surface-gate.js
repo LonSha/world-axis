@@ -18,6 +18,16 @@
 //     而它炸的是别的锁；哪一个先炸取决于 run.js 里的**顺序**，靠顺序活着的东西必须判据化。
 //     判据在子进程里跑（污染是进程级的，必须隔离；且能拿到两个方向：污点被逮住 + 干净时零告警）。
 //
+// v2.119.1 补面（输入面不得窄于事实）：
+//   run.js 在 v2.117.0–v2.119.0 把 100 余处挂载行从字面量 `require('./x.js')` 改写成
+//   包装器 `runLock('./x.js')`（定义在 run.js 顶部，体内是真 `require(spec)[m](assert)`）。
+//   包装**照常执行**，但本门禁此前只认字面 `require(` 边 ⇒ 69 个文件被误判成
+//   「从不执行的孤儿」，而 orphan-lock-v2750 的 [B]「真仓库零孤儿」也随之变红 ——
+//   红灯本身是对的（输入面窄了），错的是判据的输入面。
+//   故本版把「包装入口」升格为一等入口面：`WRAP_CALL` 认 `IDENT('./x.js'` 形态，
+//   并要求 `IDENT` 确实是 run.js 里定义的执行包装器（体内含 require / 双层校验），
+//   而不是「任何调用里出现 './x.js'」（那会把注释、参数、数据文件全算成执行入口）。
+//
 // 判据的两条纪律（本仓在 v2.74.0 踩过同族坑，故写进自证）：
 //   ① 引用面必须在**去注释但保留字符串**的面上取：`require('./x.js')` 的路径是字符串字面量，
 //      用 inventory.codeFace（把字符串抹成空白）扫会得到零引用（见 runNegative 的 N4）。
@@ -43,6 +53,8 @@ const GLOBAL_PROBE = [
   { g: 'global.document', mark: 'mock DOM' }
 ];
 const INLINE_MARK = /内联|inline|embeds/i;
+// 包装入口：`IDENT('./x.js'` —— IDENT 必须先是本文件里**已定义且体内执行**的函数（见 wrapperOf）。
+const WRAP_CALL = /([A-Za-z_$][\w$]*)\s*\(\s*'\.\/([\w.-]+\.js)'/g;
 const SPAWN_CALL = /\b(spawnSync|spawn|execSync|exec)\s*\(/;
 const RE_REQUIRE = /require\s*\(\s*'(\.\/[\w.-]+\.js)'/g;
 const RE_TEST_PATH = /tests\/([\w.-]+\.js)/g;
@@ -105,6 +117,37 @@ function stripComments(src) {
   return out;
 }
 
+/**
+ * 哪些标识符是「执行包装器」：本文件里定义了同名函数，且**函数体内真的 require 了它的入参**。
+ *   两道都要，缺一不可：
+ *     ① 名字得先定义 —— 否则 `foo('./x.js')` 只是把路径当参数传给别人（不代表执行）；
+ *     ② 体内得真 require —— 否则 `function note(p) { log(p) }` 这种「记一笔」也会被算成挂载。
+ *   实测形态：run.js 的 `function runLock(spec, method) { const m = method || 'runAll';
+ *   try { require(spec)[m](assert); } ... }`。
+ */
+function wrapperOf(src) {
+  const text = stripComments(src);
+  const names = {};
+  const re = /function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const name = m[1];
+    const params = m[2].split(',').map(function (p) { return p.trim(); }).filter(Boolean);
+    // 取函数体（按花括号配平，字符串已被抹成空白面，故不需要再处理引号）
+    let i = re.lastIndex - 1, depth = 0, end = -1;
+    for (; i < text.length; i += 1) {
+      const c = text[i];
+      if (c === '{') depth += 1;
+      else if (c === '}') { depth -= 1; if (depth === 0) { end = i; break; } }
+    }
+    const body = end > 0 ? text.slice(re.lastIndex, end) : '';
+    const requiresParam = params.some(function (p) {
+      return p && new RegExp('\\brequire\\s*\\(\\s*' + p.replace(/[$]/g, '\\$&') + '\\b').test(body);
+    });
+    if (requiresParam) names[name] = true;
+  }
+  return names;
+}
 /** 从一段源码文本里取出直接 require 的兄弟测试文件（必须在去注释面上取）。 */
 function refsOf(src) {
   const text = stripComments(src);
@@ -118,6 +161,7 @@ function refsOf(src) {
 /** 从 run.js 文本里取「执行入口」：直接 require 边、spawn 行、内联标记行。 */
 function entriesOf(src, files) {
   const direct = refsOf(src).filter(function (r) { return files.indexOf(r) >= 0; });
+  const wrapped = wrappedOf(src, files);
   const spawned = [];
   const inline = [];
   let spawnLines = 0;
@@ -131,11 +175,27 @@ function entriesOf(src, files) {
       const rel = 'tests/' + m[1];
       if (files.indexOf(rel) < 0) continue;
       if (direct.indexOf(rel) >= 0) continue;
+      if (wrapped.indexOf(rel) >= 0) continue;
       if (SPAWN_CALL.test(l)) { if (spawned.indexOf(rel) < 0) spawned.push(rel); continue; }
       if (isComment && INLINE_MARK.test(l)) { if (inline.indexOf(rel) < 0) inline.push(rel); continue; }
     }
   });
-  return { direct: direct, spawned: spawned, inline: inline, spawnLines: spawnLines };
+  return { direct: direct, wrapped: wrapped, spawned: spawned, inline: inline, spawnLines: spawnLines };
+}
+/** 包装入口边：`IDENT('./x.js')` 且 IDENT 是本文件里的执行包装器（体内真 require）。 */
+function wrappedOf(src, files) {
+  const text = stripComments(src);
+  const names = wrapperOf(src);
+  if (!Object.keys(names).length) return [];
+  const out = [];
+  WRAP_CALL.lastIndex = 0;
+  let m;
+  while ((m = WRAP_CALL.exec(text))) {
+    if (!names[m[1]]) continue;
+    const rel = 'tests/' + m[2];
+    if (files.indexOf(rel) >= 0 && out.indexOf(rel) < 0) out.push(rel);
+  }
+  return out;
 }
 
 /** 可达性：从 run.js 出发的 require 图 BFS + 执行入口（spawn / 内联）作为并列根。 */
@@ -144,10 +204,13 @@ function buildReach(vfs) {
   const text = function (rel) { return vfs[rel]; };
   const graph = {};
   files.forEach(function (rel) {
-    graph[rel] = refsOf(text(rel)).filter(function (r) { return files.indexOf(r) >= 0; });
+    const mine = refsOf(text(rel));
+    // 包装入口也是边：否则 runLock 形态的挂载在全图里不存在（v2.119.1 补面）
+    wrappedOf(text(rel), files).forEach(function (r) { if (mine.indexOf(r) < 0) mine.push(r); });
+    graph[rel] = mine.filter(function (r) { return files.indexOf(r) >= 0; });
   });
   const hasRun = files.indexOf(RUN_REL) >= 0;
-  const ent = hasRun ? entriesOf(text(RUN_REL), files) : { direct: [], spawned: [], inline: [], spawnLines: 0 };
+  const ent = hasRun ? entriesOf(text(RUN_REL), files) : { direct: [], wrapped: [], spawned: [], inline: [], spawnLines: 0 };
   const roots = (hasRun ? [RUN_REL] : []).concat(ent.spawned, ent.inline);
   const reached = {};
   const queue = roots.slice();
@@ -165,6 +228,7 @@ function buildReach(vfs) {
   return {
     files: files,
     reach: files.filter(function (rel) { return !!reached[rel]; }),
+    wrapped: ent.wrapped,
     locks: locks,
     spawned: ent.spawned,
     inline: ent.inline,
@@ -250,6 +314,7 @@ function scan(opts) {
     aggregator: base.aggregator,
     reach: base.reach,
     locks: base.locks,
+    wrapped: base.wrapped,
     spawned: base.spawned,
     inline: base.inline,
     orphans: base.orphans,
@@ -264,7 +329,7 @@ function judge(report) { return report.problems; }
 
 function summary(report) {
   return '测试文件面 ' + report.files + ' · 锁 ' + report.locks.length + ' · 可达 ' + report.reach.length
-    + ' · spawn ' + report.spawned.length + ' · 内联 ' + report.inline.length
+    + ' · 包装 ' + report.wrapped.length + ' · spawn ' + report.spawned.length + ' · 内联 ' + report.inline.length
     + ' · 孤儿 ' + report.orphans.length + ' · spawn 行 ' + report.spawnLines;
     + ' · 宿主残骸 ' + report.globalResidue;
 }
@@ -294,6 +359,8 @@ module.exports = {
   MIN_SPAWN_LINES: MIN_SPAWN_LINES,
   stripComments: stripComments,
   refsOf: refsOf,
+  wrapperOf: wrapperOf,
+  wrappedOf: wrappedOf,
   entriesOf: entriesOf,
   buildReach: buildReach,
   scan: scan,

@@ -83,9 +83,10 @@ function runAll(a) {
   });
   const runSrc = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
   REPAIRED.forEach(function (t) {
-    const needle = "require('./" + t.rel.replace('tests/', '') + "').runAll(assert);";
+    const needle = "runLock('./" + t.rel.replace('tests/', '') + "');";
     assert.strictEqual(runSrc.split(needle).length - 1, 1,
-      'v2750: [A] run.js 挂起 ' + t.rel + '（恰 1 处，且走 runAll(assert)）');
+      'v2750: [A] run.js 挂起 ' + t.rel + '（恰 1 处，走 runLock 包装入口 ——'
+      + ' v2.117.0 起挂载统一为包装形态，判据跟随实际入口形态）');
   });
 
   // ════ B 现场：门禁在真仓库上零告警，且四个文件确实在可达面里 ════
@@ -165,7 +166,7 @@ function runNegative(a) {
     'v2750: [D1] 去注释副本确实不等于原件（副本不是纯拷）');
   //   D2 提及 ≠ 引用：把一条挂载行注释掉、并在注释里写出同样的路径 —— 该文件必须重新变成孤儿
   const target = REPAIRED[0];
-  const mount = "require('./" + target.rel.replace('tests/', '') + "').runAll(assert);";
+  const mount = "runLock('./" + target.rel.replace('tests/', '') + "');";
   assert.strictEqual(runSrc.split(mount).length - 1, 1, 'v2750: [D2][前置] 挂载行可定位且唯一');
   const mentioned = runSrc.replace(mount, '// 曾经挂过 ' + target.rel + '（此处只是提及，不是引用）');
   const repM = gate.scan({ vfs: vfsWith('tests/run.js', mentioned) });
