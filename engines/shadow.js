@@ -196,6 +196,196 @@
         other: x.holders.filter(function (h) { return h !== who; })[0] || '' }; });
   }
 
+
+  // ══ v2.117.0（B4）：关系经历与修复 ══════════════════════════════════════
+  /**
+   * 客观行为的五型。**「不得已」与「主动背弃」是两种事实**：
+   *   把它们合成一个「没做到」，就再也答不出「他是被拦住了还是压根没打算来」，
+   *   而那正是关系史上唯一要紧的问题（与 addExperience 的 kept/broken 同一条纪律）。
+   */
+  const NOTICE = ['kept', 'unintended', 'concealed', 'broken', 'forced'];
+  const OUTCOMES = ['open', 'kept', 'broken'];
+  const REMEDY_KINDS = ['explain', 'reschedule', 'restitution', 'follow-through'];
+
+  function expRows() {
+    const list = Array.isArray(node().experiences) ? node().experiences : [];
+    return list;
+  }
+  function findExp(a, b, what) {
+    const k = pairKey(a, b), w = clean(what, 80);
+    return expRows().filter(function (x) { return x && x.pair === k && x.what === w; }).pop() || null;
+  }
+  function liveView(row, who) { return (row && row.views && row.views[who]) ? row.views[who] : null; }
+
+  /**
+   * 记一次重要经历：客观行为 + 各方认知**分开落账**。
+   *   `views` 只写「给到的人」：没给的人没有认知 —— **不替他编一个看法**。
+   *   这是本模块与「关系量值」最要紧的分界：量值对双方永远对称，认知从来不对称。
+   */
+  function recordExperience(a, b, item) {
+    const o = item || {};
+    const nm = namesOf(a, b);
+    if (!nm[0] || !nm[1]) return { ok: false, reason: 'missing-fields' };
+    if (nm[0] === nm[1]) return { ok: false, reason: 'self-pair' };
+    const what = clean(o.what, 80);
+    if (!what) return { ok: false, reason: 'missing-what' };
+    const behavior = clean(o.behavior, 16);
+    if (NOTICE.indexOf(behavior) < 0) return { ok: false, reason: 'bad-behavior', notice: NOTICE.slice() };
+    const outcome = clean(o.outcome, 12) || 'open';
+    if (OUTCOMES.indexOf(outcome) < 0) return { ok: false, reason: 'bad-outcome' };
+    const views = o.views && typeof o.views === 'object' && !Array.isArray(o.views) ? o.views : {};
+    const vkeys = Object.keys(views);
+    const stray = vkeys.filter(function (k) { return nm.indexOf(clean(k, 60)) < 0; });
+    if (stray.length) return { ok: false, reason: 'not-a-party', people: stray };
+    for (let i = 0; i < vkeys.length; i++) {
+      const v = views[vkeys[i]] || {};
+      if (NOTICE.indexOf(clean(v.noticed, 16)) < 0) return { ok: false, reason: 'bad-behavior', notice: NOTICE.slice() };
+    }
+    const k = pairKey(a, b);
+    const at = clockNow('shadow');
+    let out = null;
+    WA.store.transact(function (draft) {
+      draft.shadow = draft.shadow && typeof draft.shadow === 'object' && !Array.isArray(draft.shadow) ? draft.shadow : {};
+      draft.shadow.experiences = Array.isArray(draft.shadow.experiences) ? draft.shadow.experiences : [];
+      const row = { id: 'exp_' + at + '_' + draft.shadow.experiences.length,
+        pair: k, holders: namesOf(a, b), what: what, outcome: outcome, behavior: behavior,
+        note: clean(o.note, 120), at: at, views: {}, remedies: [], history: [] };
+      vkeys.forEach(function (name) {
+        const who = clean(name, 60), v = views[name] || {};
+        row.views[who] = { noticed: clean(v.noticed, 16), note: clean(v.note, 120),
+          source: clean(v.source, 60), at: at };
+      });
+      draft.shadow.experiences.push(row);
+      WA.evict.array(draft.shadow.experiences, 'shadow.experiences');
+      out = { ok: true, id: row.id, pair: k, behavior: behavior, outcome: outcome, views: Object.keys(row.views) };
+    }, 'shadow:experience2');
+    if (out && out.ok) { stat.experiences++; stat.lastReason = 'noted:' + behavior; } else stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /** 某人**自己**对这件事的判断。查无此事报 no-such-experience；此人没有看法报 no-view。 */
+  function stanceOf(person, a, b, what) {
+    const who = clean(person, 60);
+    if (!who) return { ok: false, reason: 'missing-fields' };
+    const row = findExp(a, b, what);
+    if (!row) return { ok: false, reason: 'no-such-experience' };
+    if (Array.isArray(row.holders) && row.holders.indexOf(who) < 0) return { ok: false, reason: 'not-a-party' };
+    const v = liveView(row, who);
+    // 认知不对称：他可能完全不知道这件事发生过（客观行为已记在案，但**与他无关**）
+    if (!v) return { ok: false, reason: 'no-view', what: row.what, behavior: row.behavior, outcome: row.outcome };
+    const remedies = Array.isArray(row.remedies) ? row.remedies : [];
+    const pending = remedies.filter(function (r) { return r && r.by !== who && !r.accepted; })[0] || null;
+    const paid = remedies.some(function (r) { return r && r.accepted && r.kind === 'restitution'; });
+    return { ok: true, what: row.what, behavior: row.behavior, outcome: row.outcome,
+      noticed: v.noticed, note: v.note, source: v.source,
+      repaired: v.noticed === 'kept',
+      pendingRemedy: pending ? pending.kind : '',
+      // 「真正的资源损失仍待补偿」：主动/不得已中断且**没有已接受的归还**。
+      lossUnsettled: (row.behavior === 'broken' || row.behavior === 'forced') && !paid,
+      history: (row.history || []).slice(-4).map(function (h) { return { by: h.by, from: h.from, to: h.to, source: h.source, at: h.at }; }) };
+  }
+
+  /**
+   * 用证据修正判断。**必须有来源**（没有来源的「更正」只是另一次传言），
+   *   同义重复零变化；改动进 history 留痕 —— 判断可以变，变过这件事不能消失。
+   */
+  function reviseStance(person, a, b, what, evidence) {
+    const who = clean(person, 60);
+    const e = evidence || {};
+    const to = clean(e.noticed, 16);
+    const source = clean(e.source, 60);
+    if (!who) return { ok: false, reason: 'missing-fields' };
+    if (NOTICE.indexOf(to) < 0) return { ok: false, reason: 'bad-behavior', notice: NOTICE.slice() };
+    if (!source) return { ok: false, reason: 'missing-source' };
+    const row = findExp(a, b, what);
+    if (!row) return { ok: false, reason: 'no-such-experience' };
+    if (Array.isArray(row.holders) && row.holders.indexOf(who) < 0) return { ok: false, reason: 'not-a-party' };
+    const cur = liveView(row, who);
+    if (cur && cur.noticed === to) { stat.blocked++; stat.lastReason = 'no-change'; return { ok: false, reason: 'no-change', noticed: to }; }
+    const k = pairKey(a, b);
+    let out = null;
+    WA.store.transact(function (draft) {
+      const list = (draft.shadow && Array.isArray(draft.shadow.experiences)) ? draft.shadow.experiences : [];
+      const t = list.filter(function (x) { return x && x.pair === k && x.what === clean(what, 80); }).pop();
+      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return; }
+      t.views = t.views && typeof t.views === 'object' ? t.views : {};
+      t.history = Array.isArray(t.history) ? t.history : [];
+      const from = t.views[who] ? t.views[who].noticed : '';
+      t.history.push({ by: who, from: from, to: to, note: clean(e.note, 120), source: source, at: clockNow('shadow') });
+      t.views[who] = { noticed: to, note: clean(e.note, 120), source: source, at: clockNow('shadow') };
+      out = { ok: true, what: t.what, from: from, to: to, history: t.history.length };
+    }, 'shadow:revise');
+    if (out && out.ok) { stat.lastReason = 'revised'; } else stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 提出补救（解释 / 重新安排 / 归还损失 / 连续履行）。
+   *   只有当事人能提；**重复同类且尚未被接受的补救零变化** ——
+   *   「重复收到道歉不无限刷关系收益」这条纪律必须在写侧就成立，而不是靠读者自觉。
+   */
+  function offerRemedy(a, b, item) {
+    const o = item || {};
+    const nm = namesOf(a, b);
+    if (!nm[0] || !nm[1]) return { ok: false, reason: 'missing-fields' };
+    const by = clean(o.by, 60) || nm[0];
+    if (nm.indexOf(by) < 0) return { ok: false, reason: 'not-a-party', people: [by] };
+    const kind = clean(o.kind, 20);
+    if (REMEDY_KINDS.indexOf(kind) < 0) return { ok: false, reason: 'bad-kind', kinds: REMEDY_KINDS.slice() };
+    const what = clean(o.what, 80);
+    const row = findExp(a, b, what);
+    if (!row) return { ok: false, reason: 'no-such-experience' };
+    const dup = (Array.isArray(row.remedies) ? row.remedies : []).some(function (r) {
+      return r && r.by === by && r.kind === kind && !r.accepted;
+    });
+    if (dup) { stat.blocked++; stat.lastReason = 'no-new-remedy'; return { ok: false, reason: 'no-new-remedy', kind: kind, by: by }; }
+    const k = pairKey(a, b);
+    let out = null;
+    WA.store.transact(function (draft) {
+      const list = (draft.shadow && Array.isArray(draft.shadow.experiences)) ? draft.shadow.experiences : [];
+      const t = list.filter(function (x) { return x && x.pair === k && x.what === what; }).pop();
+      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return; }
+      t.remedies = Array.isArray(t.remedies) ? t.remedies : [];
+      const r = { kind: kind, by: by, note: clean(o.note, 120), accepted: false, at: clockNow('shadow') };
+      t.remedies.push(r);
+      out = { ok: true, kind: kind, by: by, pending: true, remedies: t.remedies.length };
+    }, 'shadow:remedy');
+    if (out && out.ok) { stat.lastReason = 'remedy:' + kind; } else stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 接受补救：**必须对方提、且此人本来就有看法**（不知道这事的人谈不上「接受」）。
+   *   接受只改**判断**：`behavior` 一字不改 —— 曾经发生过的事不因态度回升而消失。
+   */
+  function acceptRemedy(person, a, b, what) {
+    const who = clean(person, 60);
+    if (!who) return { ok: false, reason: 'missing-fields' };
+    const row = findExp(a, b, what);
+    if (!row) return { ok: false, reason: 'no-such-experience' };
+    if (Array.isArray(row.holders) && row.holders.indexOf(who) < 0) return { ok: false, reason: 'not-a-party' };
+    if (!liveView(row, who)) return { ok: false, reason: 'no-view', what: row.what };
+    const pend = (Array.isArray(row.remedies) ? row.remedies : []).filter(function (r) { return r && r.by !== who && !r.accepted; })[0] || null;
+    if (!pend) { stat.blocked++; stat.lastReason = 'nothing-to-accept'; return { ok: false, reason: 'nothing-to-accept', what: row.what }; }
+    const k = pairKey(a, b), w = clean(what, 80);
+    let out = null;
+    WA.store.transact(function (draft) {
+      const list = (draft.shadow && Array.isArray(draft.shadow.experiences)) ? draft.shadow.experiences : [];
+      const t = list.filter(function (x) { return x && x.pair === k && x.what === w; }).pop();
+      if (!t) { out = { ok: false, reason: 'no-such-experience' }; return; }
+      const r = t.remedies.filter(function (x) { return x && x.by !== who && !x.accepted; })[0];
+      if (!r) { out = { ok: false, reason: 'nothing-to-accept' }; return; }
+      r.accepted = true; r.acceptedAt = clockNow('shadow'); r.acceptedBy = who;
+      t.views = t.views && typeof t.views === 'object' ? t.views : {};
+      t.history = Array.isArray(t.history) ? t.history : [];
+      const from = t.views[who] ? t.views[who].noticed : '';
+      t.history.push({ by: who, from: from, to: 'kept', note: '接受补救：' + r.kind, source: 'remedy:' + r.kind, at: clockNow('shadow') });
+      t.views[who] = { noticed: 'kept', note: r.note, source: 'remedy:' + r.kind, at: clockNow('shadow') };
+      out = { ok: true, what: t.what, kind: r.kind, by: r.by, behavior: t.behavior, accepted: true };
+    }, 'shadow:accept');
+    if (out && out.ok) { stat.lastReason = 'accepted:' + out.kind; } else stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const live = rows().filter(function (x) { return x && x.status === 'active'; }).slice(0, cfg.maxRows);
@@ -218,6 +408,10 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     addShadow: addShadow, deepen: deepen, brighten: brighten,
     addExperience: addExperience, experiencesOf: experiencesOf,
+    // v2.117.0（B4）：关系经历与修复——客观行为与各方认知分开，补救双向且需前情。
+    NOTICE: NOTICE, REMEDY_KINDS: REMEDY_KINDS,
+    recordExperience: recordExperience, stanceOf: stanceOf, reviseStance: reviseStance,
+    offerRemedy: offerRemedy, acceptRemedy: acceptRemedy,
     getShadow: getShadow, visibleTo: visibleTo, buildBlock: buildBlock,
     shadowStat: function () {
       const all = rows();

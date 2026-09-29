@@ -97,6 +97,13 @@ function seed(WA) {
     d.people.p1 = { id: 'p1', name: '甲', location: 'A', action: '走' };
     d.evolution = d.evolution || {};
     d.evolution.round = 3;
+    // v2.119.0：**显式清空派系库存**。原因与上面那条「显式复位」同族：run.js 的各 section
+    //   共享宿主面（同一个 localStorage），而 resource-ledger-v2920 会在 d.evolution.factions
+    //   里留下 `resources`（它自己的正样本）。本锁的 B4 用 org 当「无内容」的对照源，
+    //   前序用例一旦留下库存，org 就真落地 ⇒ 对照源变成 landed，B4 的前提不成立
+    //   （实测：单跑 42/0 全绿，紧接 resource-ledger-v2920 之后跑则 B4 报「实 landed」）。
+    //   这不是产品缺陷（org 有库存就该落地），是本锁的前提需要自己保证。
+    d.evolution.factions = [];
     d.lastInjection = null;
     // v2.91.0：模块级总开关也**显式置定**。先前这里只设可见性，而本版起
     //   `module-off` 进归因链 ⇒ 前序用例关过哪个模块，本锁的读数就跟着变
@@ -199,7 +206,7 @@ function runAll(a) {
     inject(W4);
     ex4 = W4.render.explain();
     a(stateOf(ex4, 'life') === 'failed', 'v2900: [B4] 构建抛异常归 failed（实 ' + stateOf(ex4, 'life') + '）');
-    a(stateOf(ex4, 'org') === 'no-content', 'v2900: [B4] failed 与 no-content 互不混淆（坏 ≠ 没内容）');
+    a(stateOf(ex4, 'org') === 'no-content', 'v2900: [B4] failed 与 no-content 互不混淆（坏 ≠ 没内容；实 ' + stateOf(ex4, 'org') + '）');
   } finally { W4.life = keepLife; }
   a(!!ex4 && stateOf(ex4, 'life') !== stateOf(ex5, 'life'),
     'v2900: [B5] 同一个源在「没内容」与「坏了」两种局面上归因不同（' + stateOf(ex5, 'life') + ' vs ' + (ex4 && stateOf(ex4, 'life')) + '）——分列才有意义');

@@ -100,12 +100,84 @@
     'collab.queue':     { path: 'collab.queue',     cap: 128, why: '离线队列环形（已交付的行仍答「当时重放过什么」，只能环形挤出）' },
     'collab.conflicts': { path: 'collab.conflicts', cap: 64, why: '冲突登记环形（已裁决的分歧是复盘证据，不在 resolve 时删）' },
     'chrono.entries':   { path: 'chrono.entries',   cap: 128, why: '变更日志环形（撤销靠追加 revert 行，故历史只能环形挤出、不得原地删）' },
+    // ── v2.117.0（计划二 B6）：机会窗口在途行（opportunity.js）──
+    //   为什么必须有界：它是「世界正在发生的变化」的登记簿，长局里一轮一轮往上堆。
+    //   而它在途行**不能答完就删** —— taken / declined / deferred / lapsed 都是复盘证据
+    //   （「我拒过这件事」与「它从没出现过」必须可分辨），删除会让决策痕迹消失，
+    //   故只能环形挤出。cap 8 与引擎的 maxOpen 设置同源：**两处都管在途行数**，
+    //   这里是与站点同源的那份（准入闸管「还能不能进」，本表管「进了的怎么出去」）。
+    'opportunity.openings': { path: 'opportunity.openings', cap: 8, why: '机会窗口在途行环形（已答/已作废都留痕，只能环形挤出）' },
+    // ── v2.118.0（计划二 B7）：试演预览环形（rehearsal.js）──
+    //   预览行**不能应用完就删** —— 「当初试演过了什么、结论是什么」是作者据以决策的证据，
+    //   也是「旧预览为何被判 stale」唯一可追溯的凭据（删掉就只剩一句结论）。故只能环形挤出。
+    //   cap 与引擎的 keepPreviews 设置同源：两处都管在册预览数。
+    // cap 走 per-call：上限是**设置项** keepPreviews（滑块 [1,24]）。写成静态 6 的话，
+    //   滑块调到 2 也照样留 6 条 —— 声明与执行漂移，正是本仓库点名反对的那类失效。
+    'rehearsal.previews': { path: 'rehearsal.previews', cap: 'per-call', kind: 'array', why: '试演预览环形（上限 = keepPreviews 设置，写入时传入）' },
+    // v2.118.0（计划二 B8）：跨插件业务闭环（liaison.js 唯一写入 `draft.liaison`）。
+    //   三张表各自的语义不同，故**不合成一张**：inbox 答「手机侧按下过什么」，
+    //   deals 答「世界侧答应过什么」，evidence 答「凭什么这么记」。
+    //   合并任何两张都会让 B8 的验收判据失去落点（例如「登记」与「送达」同表即分不开）。
+    'liaison.inbox':    { path: 'liaison.inbox',    cap: 40, why: '收件台账环形（已确认/被拒/待确认都留痕：一笔操作发生过就不能在事后消失）' },
+    'liaison.deals':    { path: 'liaison.deals',    cap: 24, why: '约定任务环形（终态任务不删——「失约」是复盘证据，不在结算时消失）' },
+    'liaison.evidence': { path: 'liaison.evidence', cap: 40, why: '证据环形（含来源 opId/时间/有效范围；同一 deal 只落一条，重复载入不重复结算）' },
+    // v2.118.0（计划二 B9）：多人协作可靠性层（coop.js 唯一写入 `draft.coop`）。
+    //   两张表语义不同，故不合并：proposals 答「谁在等裁决」，archive 答「它最后被怎么裁的」。
+    //   归档**不删行**：终态（含被拒与重试次数）是复盘的唯一证据，只能在环形挤出时退场。
+    'coop.proposals':   { path: 'coop.proposals',   cap: 24, why: '待裁提议环形（上限 = LIMITS.ROWS；满了如实拒收，不静默丢）' },
+    'coop.archive':     { path: 'coop.archive',     cap: 40, why: '裁决归档环形（确认/拒绝/被取代都留痕，含重试次数与回执 id）' },
+    // ── v2.119.0（拓展计划 ①）：人物多步计划环形（plan.js）──
+    //   计划行**不能进终态就删** ——「他本来打算做第五步」与「他放弃了」都是复盘证据，
+    //   删了之后「这条计划为什么没做成」就只剩一句结论。故只能环形挤出。
+    //   cap 走 per-call：上限是设置项 maxPlans（滑块 [1,24]）。写成静态 12 的话，
+    //   滑块调到 4 也照样留 12 条 —— 声明与执行漂移，正是本仓库点名反对的那类失效。
+    'plan.plans':       { path: 'plan.plans',       cap: 'per-call', kind: 'array', why: '人物计划环形（上限 = maxPlans 设置，写入时传入）' },
+    // ── v2.119.0（拓展计划 ②）：关系修复环形（mend.js）──
+    //   同理：failed / dropped 的修复行**不删**——「他求过一次，被拒了」是复盘证据，
+    //   删掉就再也答不出「这段关系为什么没修好」。cap 与设置项 maxRows 同源（per-call）。
+    'mend.threads':     { path: 'mend.threads',     cap: 'per-call', kind: 'array', why: '关系修复环形（上限 = maxRows 设置，写入时传入）' },
+    // ── v2.119.0（拓展计划 ③）：供需循环三环（economy.js）──
+    //   cap 均为 per-call（上限即设置项），三张表均「不可删行」（见 store.js 同处理由）。
+    'economy.goods':    { path: 'economy.goods',    cap: 'per-call', kind: 'array', why: '地点货品环形（上限 = maxGoods）' },
+    'economy.orders':   { path: 'economy.orders',   cap: 'per-call', kind: 'array', why: '成交与生产流水环形（上限 = maxOrders）' },
+    'economy.routes':   { path: 'economy.routes',   cap: 'per-call', kind: 'array', why: '商路环形（上限 = maxRoutes）' },
+    'probe.cases':         { path: 'probe.cases',         cap: 'per-call', kind: 'array', why: '调查卷宗 环形' },
+    // ── v2.119.0（拓展计划 ⑥）：远方传播两环（region.js）──
+    //   v2.119.0（优化③）：**places 移入 NON_EVICT**（见下方声明表）。它与 events 不是同一类：
+    //     events 走 `WA.evict.array(rg.events, 'region.events', cfg.maxEvents)`（有调用点）；
+    //     places 是**写入侧硬上界**——`register()` 在 `rg.places.length >= cfg.maxRoutes` 时
+    //     直接 `{ ok:false, reason:'places-full' }` 拒写，从不截断既有项。原先登记为挤出站点
+    //     ⇒ 它是「零调用站点」（回归判据：「站点表每项都在产品源码里有调用点」当场红灯）。
+    'region.events':       { path: 'region.events',       cap: 'per-call', kind: 'array', why: '远方事件环形（上限 = maxEvents）' },
+    // ── v2.119.0（拓展计划 ⑦）：阶段迁移两环（stage.js）──
+    //   同 region.places 的理由：**metrics 移入 NON_EVICT**（写入侧 `metrics-full` 硬拒写；
+    //   且它的骨架形态是**对象映射** `{}`（指标名 → 值），根本不能当数组裁 —— 原先按
+    //   `kind:'array'` 登记还会让 `store.registryParity()` 报「类型错配（应为数组）」。
+    'stage.transitions':   { path: 'stage.transitions',   cap: 'per-call', kind: 'array', why: '阶段迁移环形（上限 = maxTransitions）' },
+    // ── v2.119.0（拓展计划 ⑧）：多人连接两环（session.js）──
+    'session.seats':       { path: 'session.seats',       cap: 'per-call', kind: 'array', why: '座位环形（上限 = maxSeats）' },
+    'session.log':         { path: 'session.log',         cap: 'per-call', kind: 'array', why: '消息日志环形（上限 = maxLog）' },
+    // ── v2.119.0（拓展计划 ④）：组织制度四环（inst.js）──
+    'inst.orgs':       { path: 'inst.orgs',       cap: 'per-call', kind: 'array', why: '组织档案环形（上限 = maxOrgs）' },
+    'inst.pending':    { path: 'inst.pending',    cap: 'per-call', kind: 'array', why: '待批决策环形（上限 = maxPending）' },
+    'inst.breaches':   { path: 'inst.breaches',   cap: 'per-call', kind: 'array', why: '违约记录环形（上限 = maxBreaches）' },
+    'inst.successions':{ path: 'inst.successions',cap: 'per-call', kind: 'array', why: '交接记录环形（上限 = maxPending）' },
     // ── v2.63.0 世界织体（world.js）──
     'world.places': { path: 'world.places', cap: 24, why: '已登记地点环形（没登记的地方不存在，故这张表就是世界的全部可达面）' },
     'world.roads':  { path: 'world.roads',  cap: 40, why: '已登记道路环形（没登记的路走不通，故这张表决定谁能到哪）' },
     'world.events': { path: 'world.events', cap: 12, why: '共同日程环形（集市/节庆/庭审/仪式/聚会）' },
     // v2.65.0 行程表：在途与已到达都留痕（「他走过这条路」是事实，不得到达即删）
     'world.journeys': { path: 'world.journeys', cap: 24, why: '行程表环形（在途 + 已到达；出发≠到达，故这张表就是「谁在路上」的全部证据）' },
+    // v2.117.0（B2 前半）：场所用途窗口（每地点各自一环，故 path 带 `*`）。
+    //   per-call：上限 = 用途封闭集合大小（USE_KINDS.length），由 world.js 调用点传入——
+    //   用途标签加了新词、上限自己跟着走，不会与登记表脱节。
+    'world.placeUses': { path: 'world.places.*.uses', cap: 'per-call', kind: 'array', why: '场所用途窗口环（每地点各一组，上限 = 用途封闭集合大小）' },
+    // v2.117.0（B2 后半）：封锁投递 / 货运在途 / 消息在途。
+    //   三张表都**有界**且各管一段事实：投递回答「这里现在过不过得去」，
+    //   货运回答「货在哪」，消息回答「话到哪了」——合并成一张就再也答不出是哪种在路上。
+    'world.blocks': { path: 'world.blocks', cap: 24, why: '封锁投递环形（天气/灾害/组织的封锁单，带 until 定时效；过了时刻自动失效）' },
+    'world.shipments': { path: 'world.shipments', cap: 16, why: '货运在途环形（货物受容量、交接与运输时间约束，故与人的行程分表）' },
+    'world.messages': { path: 'world.messages', cap: 24, why: '消息在途环形（走道路或走网络面，两种渠道的延迟互不相同）' },
     // v2.65.0 天气：同地覆盖，表本身有界。未登记站点会 unknown-site 且不截断。
     'weather.rows': { path: 'weather.rows', cap: 24, why: '已登记天气环形（没登记的地点不是晴天，故这张表就是天气的全部证据）' },
     // v2.65.0 情报延迟：未到期的不入账。到期后从队列移走，队列本身仍有界。
@@ -182,7 +254,16 @@
     //   failQueue 上限 = maxFails 设置（complete 失败分支消费，答「上次为什么没成」）。
     'events.rows':        { path: 'events.rows',        cap: 'per-call', kind: 'array', why: '事件队列（上限 = maxRows 设置，写入时传入）' },
     'events.failQueue':   { path: 'events.failQueue',   cap: 'per-call', kind: 'array', why: '事件失败队列（上限 = maxFails 设置，写入时传入）' },
-    'events.res':         { path: 'events.res',         cap: 'per-call', kind: 'array', why: '事件回执台账（上限 = maxFails 设置，写入时传入；v2.116.0 新增，口径同 failQueue）' }
+    'events.res':         { path: 'events.res',         cap: 'per-call', kind: 'array', why: '事件回执台账（上限 = maxFails 设置，写入时传入；v2.116.0 新增，口径同 failQueue）' },
+    // v2.117.0（计划二 B1）：行动执行两容器。同 events 口径——per-call 且由 act.js
+    //   显式传当前设置值（maxActs）；传漏即 bad-cap 归因，不静默回落到某个默认值。
+    'acts.rows':          { path: 'acts.rows',          cap: 'per-call', kind: 'array', why: '行动队列（上限 = maxActs 设置，写入时传入）' },
+    'acts.res':           { path: 'acts.res',           cap: 'per-call', kind: 'array', why: '行动回执台账（上限 = maxActs 设置，写入时传入）' },
+    // v2.117.0（计划二 B5）：组织行动两容器。**行内挂**（projects 挂势力、debts 挂人物），
+    //   故按通配路径登记；cap 为 'per-call'（上限 = org.js 的 PROJECT_CAP / DEBT_CAP，
+    //   调用点显式传入 —— 传漏即 bad-cap 归因，不悄悄回落成默认值）。
+    'org.projects': { path: 'evolution.factions.*.projects', cap: 'per-call', kind: 'array', why: '共同项目表（每势力一组，上限 = PROJECT_CAP）' },
+    'org.debts':    { path: 'people.*.debts',               cap: 'per-call', kind: 'array', why: '人对势力的欠账环（每行各自有界 = DEBT_CAP；与名册 owed 方向相反、表分开）' }
   };
 
   // ── 非挤出站点（显式声明，防「假阴性」与「计数虚高」两头都错）──────────
@@ -201,7 +282,16 @@
     //   两条都登记为通配形态（与 store 的 `__BOUNDED_CAPS` 同形）：中间段 `acts` 在未采纳态
     //   取不到，精确键会被 registryParity 报「未在骨架物化」——那不是缺陷，是诚实表示。
     'canon.outline.*.acts': '构造上界（未采纳时无骨架；截断在 buildOutline 落盘前完成，不走 evict）',
-    'canon.outline.acts.*.points': '同上：每幕点数 = perAct²（perAct 上界 40 ⇒ 1600），构造上界而非挤出上限'
+    'canon.outline.acts.*.points': '同上：每幕点数 = perAct²（perAct 上界 40 ⇒ 1600），构造上界而非挤出上限',
+    // v2.119.0（拓展计划 ⑥）：远方拓扑（region.js）。**写入侧硬上界**而不是挤出上限：
+    //   `register()` 在 `rg.places.length >= cfg.maxRoutes` 时 `{ ok:false, reason:'places-full' }`
+    //   拒写（既有项一条不动）。原先按挤出站点登记 ⇒ 零调用站点（回归红灯）；
+    //   按本表口径降级为「声明过的决定」——与 canon 两条同族：不是环形，故不走 evict。
+    'region.places': '写入侧硬上界（满则 places-full 拒写，从不截断既有项 ⇒ 不走 evict）',
+    // v2.119.0（拓展计划 ⑦）：进度指标（stage.js）。同族，且**形态是对象映射**而非数组：
+    //   `st.metrics[m] = value`；满则 `{ ok:false, reason:'metrics-full' }` 拒写。
+    //   原先按 kind:'array' 登记，还让 store.registryParity() 报「类型错配（应为数组）」。
+    'stage.metrics': '写入侧硬上界 + 对象映射形态（满则 metrics-full 拒写，不走 evict）'
   };
 
   // ── 记账 ──────────────────────────────────────────────────

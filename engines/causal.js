@@ -48,6 +48,21 @@
   //     与既有计数同规格——只增不减，供诊断与面板读；**不落盘**（磁带是内存物）。
   const stat = { chains: 0, acts: 0, deferred: 0, cancelled: 0, expired: 0, blocked: 0, lastReason: '',
     records: 0, replays: 0, recordFails: 0, lastTape: null, lastReplay: null };
+  // v2.118.0 B7：因果面显式跟随执行上下文；试演不回读真实 store、不污染进程计数。
+  function execMod() { return (WA.exec && typeof WA.exec.withContext === 'function') ? WA.exec : null; }
+  function storeOf() { const e = execMod(); return e ? e.storeOf(WA.store) : WA.store; }
+  function mutate(fn, opt) { const e = execMod(); const st = storeOf(); return e ? e.mutate(st, fn, opt) : (st && st.transact ? st.transact(fn, opt) : { ok: false, reason: 'store-absent' }); }
+  function statOf() {
+    const e = execMod(); const bag = e ? e.statBag(stat) : stat;
+    if (bag && bag !== stat) Object.keys(stat).forEach(function (k) {
+      if (bag[k] === undefined) {
+        const v = stat[k];
+        bag[k] = (v && typeof v === 'object') ? (Array.isArray(v) ? [] : Object.assign(Object.create(Object.getPrototypeOf(v)), v)) : v;
+      }
+    });
+    return bag || stat;
+  }
+  const S = (function () { const f = {}; Object.keys(stat).forEach(function (k) { Object.defineProperty(f, k, { enumerable: true, get: function () { return statOf()[k]; }, set: function (v) { statOf()[k] = v; } }); }); return f; })();
 
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   /**
@@ -64,7 +79,7 @@
     } catch (e) {}
     return null;
   }
-  function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
+  function state() { const st = storeOf(); return st && st.get ? (st.get() || {}) : {}; }
   function txt(v) { return (v === undefined || v === null) ? '' : String(v); }
   /** 原因是否已存在——单一真源指向 intel.knownCause；intel 缺席时按同一口径兜底 */
   function knownCause(id) {
@@ -127,7 +142,7 @@
     if (!cause || !action) return { ok: false, reason: 'missing-fields' };
     if (!knownCause(cause)) return { ok: false, reason: 'unknown-cause' };
     let out = null;
-    WA.store.transact(function (draft) {
+    mutate(function (draft) {
       const c = ensureCausal(draft);
       const now = clockNow('causal');
       const rowItem = {
@@ -158,7 +173,7 @@
       else if (c.chains.length > 24) c.chains.splice(0, c.chains.length - 24);
       out = { ok: true, id: rowItem.id, delayed: rowItem.delayed.length };
     }, 'causal:add-chain');
-    if (out && out.ok) { stat.chains++; stat.lastReason = 'added'; } else stat.blocked++;
+    if (out && out.ok) { S.chains++; S.lastReason = 'added'; } else S.blocked++;
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
@@ -169,19 +184,19 @@
    */
   function tick(facts) {
     const cfg = settings();
-    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: true, changed: 0, reason: 'disabled' }; }
+    if (!cfg.enabled) { S.lastReason = 'disabled'; return { ok: true, changed: 0, reason: 'disabled' }; }
     const f = facts || {};
     let n = null;
-    WA.store.transact(function (draft) {
+    mutate(function (draft) {
       // v2.87.0 B6：推进语义只有一份（advanceChains），真跑与试演共用。
       n = advanceChains(draft, f, cfg);
-      stat.expired += n.expired;
-      stat.acts += n.acted;
+      S.expired += n.expired;
+      S.acts += n.acted;
     }, 'causal:tick');
     const changed = n ? n.changed : 0, expired = n ? n.expired : 0;
-    if (n && n.pending) stat.lastReason = 'condition-open';
-    stat.lastReason = expired ? 'expired' : (changed ? 'advanced' : (stat.lastReason || 'nothing-to-do'));
-    return { ok: true, changed: changed, expired: expired, reason: stat.lastReason };
+    if (n && n.pending) S.lastReason = 'condition-open';
+    S.lastReason = expired ? 'expired' : (changed ? 'advanced' : (S.lastReason || 'nothing-to-do'));
+    return { ok: true, changed: changed, expired: expired, reason: S.lastReason };
   }
 
   /** 到点的延迟后果（**只报告，不自动结算**——预测不得自己变成事实） */
@@ -222,7 +237,7 @@
     const cid = clean(chainId, 80), did = clean(delayedId, 80);
     if (!cid || !did) return { ok: false, reason: 'missing-fields' };
     let out = null;
-    WA.store.transact(function (draft) {
+    mutate(function (draft) {
       const c = ensureCausal(draft);
       const x = c.chains.filter(function (y) { return y && y.id === cid; })[0];
       // 「还没发生」不得结算（见 settleBlockReason）：预测不得跳过行动直接变成既成事实
@@ -252,7 +267,7 @@
       else if (c.settled.length > 40) c.settled.splice(0, c.settled.length - 40);
       out = { ok: true, id: did, chainStatus: x.status };
     }, 'causal:settle');
-    if (out && out.ok) stat.lastReason = 'settled'; else stat.blocked++;
+    if (out && out.ok) S.lastReason = 'settled'; else S.blocked++;
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
@@ -261,14 +276,14 @@
     const cid = clean(chainId, 80);
     if (!cid) return { ok: false, reason: 'missing-fields' };
     let out = null;
-    WA.store.transact(function (draft) {
+    mutate(function (draft) {
       const x = ensureCausal(draft).chains.filter(function (y) { return y && y.id === cid; })[0];
       if (!x) { out = { ok: false, reason: 'missing-chain' }; return false; }
       if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return false; }
       x.status = 'cancelled'; x.cancelReason = clean(reason, 80) || '调用方取消'; x.updatedAt = clockNow('causal');
       out = { ok: true, id: x.id, status: x.status };
     }, 'causal:cancel');
-    if (out && out.ok) { stat.cancelled++; stat.lastReason = 'cancelled'; } else stat.blocked++;
+    if (out && out.ok) { S.cancelled++; S.lastReason = 'cancelled'; } else S.blocked++;
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
@@ -277,7 +292,7 @@
     const cid = clean(chainId, 80), by = Number(byMs);
     if (!cid || !isFinite(by) || by === 0) return { ok: false, reason: 'bad-args' };
     let out = null;
-    WA.store.transact(function (draft) {
+    mutate(function (draft) {
       const x = ensureCausal(draft).chains.filter(function (y) { return y && y.id === cid; })[0];
       if (!x) { out = { ok: false, reason: 'missing-chain' }; return false; }
       if (isTerminal(x)) { out = { ok: false, reason: 'chain-terminal', status: x.status }; return false; }
@@ -289,7 +304,7 @@
       x.status = 'delayed'; x.stage = 'delayed'; x.updatedAt = clockNow('causal');
       out = { ok: true, id: x.id, shifted: n };
     }, 'causal:defer');
-    if (out && out.ok) { stat.deferred++; stat.lastReason = 'deferred'; } else stat.blocked++;
+    if (out && out.ok) { S.deferred++; S.lastReason = 'deferred'; } else S.blocked++;
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
@@ -514,19 +529,19 @@
       // v2.89.0 O2：直呼产品导出（不绕别名 `tz`）——别名让**引用面门禁看不见这次调用**，
       //   于是 endTape 被判成「导出即无消费方」的死子面（实测：dead 443→446 里的一条）。
       //   守卫已过（tz 非空）之后没有理由再绕一层：配对出口的开门与关门都该被看得见。
-      try { if (WA.rand && WA.rand.endTape) stat.lastTape = WA.rand.endTape(); } catch (e2) {}
+      try { if (WA.rand && WA.rand.endTape) S.lastTape = WA.rand.endTape(); } catch (e2) {}
       try {
         if (prevMark && WA.rand && WA.rand.markCoord) WA.rand.markCoord(prevMark.round, prevMark.label, prevMark.at);
         else if (WA.rand && WA.rand.markCoord) WA.rand.markCoord(null, '', 0);
       } catch (e3) {}
     }
-    const tape = stat.lastTape;
-    stat.records++;
+    const tape = S.lastTape;
+    S.records++;
     // v2.89.0 O2 自纠：这里原先把 `endTape()` 的**回执**（{ok, tape, count, seed}）当成磁带交回，
     //   于是 `rec.tape.entries` 是 undefined —— 调用方按「磁带」用它（把这段部分录制退回去复核）
     //   会当场炸，而「推进中途抛了」恰恰是最该把已录部分留成证据的一条路径。
     //   实测证据：bad.tape = {ok:true, tape:{...}, count:1, seed:99}，bad.tape.entries === undefined。
-    if (err) { stat.recordFails++; return { ok: false, reason: 'fn-threw: ' + err, result: result, tape: (tape && tape.ok ? tape.tape : null), error: err }; }
+    if (err) { S.recordFails++; return { ok: false, reason: 'fn-threw: ' + err, result: result, tape: (tape && tape.ok ? tape.tape : null), error: err }; }
     if (!tape || !tape.ok) return { ok: false, reason: 'end-failed', result: result };
     return { ok: true, result: result, tape: tape.tape, count: tape.count, seed: tape.seed };
   }
@@ -563,14 +578,14 @@
       err = (e && e.message) ? e.message : String(e);
     } finally {
       // 同上：stopReplay 是 replay 的配对出口，同样直呼，理由一致。
-      try { if (WA.rand && WA.rand.stopReplay) stat.lastReplay = WA.rand.stopReplay(); } catch (e2) {}
+      try { if (WA.rand && WA.rand.stopReplay) S.lastReplay = WA.rand.stopReplay(); } catch (e2) {}
       try {
         if (prevMark && WA.rand && WA.rand.markCoord) WA.rand.markCoord(prevMark.round, prevMark.label, prevMark.at);
         else if (WA.rand && WA.rand.markCoord) WA.rand.markCoord(null, '', 0);
       } catch (e3) {}
     }
-    const rp = stat.lastReplay || {};
-    stat.replays++;
+    const rp = S.lastReplay || {};
+    S.replays++;
     const out = {
       ok: !err, result: result, error: err || undefined,
       used: rp.used || 0, miss: rp.miss || 0, consumed: rp.consumed || 0,
@@ -623,7 +638,7 @@
       draws: rnd ? rnd.draws : 0,
       channels: rnd && rnd.byChannel ? Object.keys(rnd.byChannel).sort() : [],
       chains: view.chains, byStatus: view.byStatus,
-      acts: stat.acts, expired: stat.expired, blocked: stat.blocked,
+      acts: S.acts, expired: S.expired, blocked: S.blocked,
       // v2.89.0 O2：回放证据（第四十三面）。`replayable` 与 `reproducible` **分列**：
       //   前者答「这一轮有没有一卷能重放的磁带」，后者答「种子是不是自己定的」。
       //   未播种时前者为 false 并给出原因——**不谎称可回放**（本计划写死的判据）。
@@ -640,7 +655,7 @@
       // 无坐标的格数：>0 说明「定位到第几轮第几步」这句话这次说不出口
       coordGaps: (function () {
         try {
-          const t = (stat.lastTape && stat.lastTape.ok) ? stat.lastTape.tape : null;
+          const t = (S.lastTape && S.lastTape.ok) ? S.lastTape.tape : null;
           if (!t || !WA.rand || typeof WA.rand.verifyTape !== 'function') return null;
           const v = WA.rand.verifyTape(t);
           return { orphanSlots: v.orphanSlots, withCoord: v.withCoord, rounds: v.rounds, checked: v.checked };
@@ -649,7 +664,7 @@
       replayable: canReplay,
       replayBlockedBy: canReplay ? '' : (!rnd ? 'rand-absent'
         : (!rnd.reproducible ? 'auto-seed' : (!hasTape ? 'no-tape' : 'tape-mismatch'))),
-      records: stat.records, replays: stat.replays, recordFails: stat.recordFails
+      records: S.records, replays: S.replays, recordFails: S.recordFails
     };
   }
   function classify(chainId) {

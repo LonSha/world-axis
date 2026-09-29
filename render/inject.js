@@ -51,7 +51,16 @@
     // v2.82.0: 'checkpoints'（快照与分支）。同批登记——只加分支不加源表 = 开关点了零效果。
     // v2.96.0: 'rumor'（传播与辟谣）。只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
     // v2.99.0: 'canon'（原著幕目）。只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
-    'events', 'checkpoints', 'rumor', 'canon'];
+    // v2.117.0（计划二 B1）：人物行动。与注入分支同批登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
+    'events', 'checkpoints', 'rumor', 'canon', 'act',
+    // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。与注入分支同批登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
+    'plan', 'mend',
+    // v2.119.0（拓展计划 ③）：供需循环。只报「有据可查的价与被推着动的原因」，不编行情叙事。
+    'economy', 'inst',
+    // v2.119.0（拓展计划 ⑤）：调查卷宗。只报「支持/反驳各多少」与「能不能定案」，不替任何人定案。
+    'probe', 'region', 'stage', 'session'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -63,7 +72,13 @@ style: false,
         causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
-        rumor: true, canon: true }, module: 'render' };
+        // v2.117.0：人物行动。同一条理由 —— 其模块总开关默认为关闭。
+        rumor: true, canon: true, act: true,
+        // v2.119.0：人物多步计划 / 关系修复。同一条理由——其模块总开关默认为关，
+        //   故注入面取默认 true 不给老用户凭空多出约束。
+        plan: true, mend: true,
+        // v2.119.0：供需循环。同一条理由（模块总开关默认关）。
+        economy: true, inst: true, probe: true, region: true, stage: true, session: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -202,6 +217,16 @@ style: false,
     rumor: '传开的与亲眼见的',
     // v2.99.0: 原著幕目。与 SOURCES 同批登记（不加显示名 ⇒ 失败台账报英文键名，用户看不懂）。
     canon: '原著幕目',
+    // v2.117.0（计划二 B1 主体）：人物行动。与 SOURCES 同批登记（不加显示名 ⇒
+    //   faceAudit 与注入失败台账会报英文键名 `act`，而那是用户唯一能开关它的地方）。
+    //   本版实测被 switch-matrix-v2910 的 C2 与 explain-v2900 的 A4/C1 抓出 ——
+    //   B1 期只给 ui/panel.js 的 VIS_NAMES 加了名，漏了这里。
+    act: '人物行动',
+    // v2.119.0（拓展计划 ①–⑧）：八个新引擎的显示名。缺名 ⇒ 失败台账与开关两面会裸露英文键
+    //   （v2.119.0 实测被 switch-matrix-v2910 的 C2、explain-v2900 的 A4/C1、cost-v2880 的 B7/C1 抓出）。
+    //   名字必须与注入项的 `source` 逐字同名——同一源两套名字的代价已由 v2.88.0 O1 付过一次。
+    plan: '人物计划', mend: '关系修复', economy: '供需与商路', inst: '组织制度',
+    probe: '调查卷宗', region: '远方', stage: '玩法进度', session: '多人场',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
@@ -594,6 +619,31 @@ style: false,
     //   否则模型会拿「A5 的题名」当剧本来就往下演，而那正是「提前演出后续幕」的入口。
     //   逐点全貌只在诊断的 actText 里（作者看得见，模型看不见）。
     if (vis.canon && WA.canon) { const cn = engineCall('canon', function () { return WA.canon.buildBlock(); }); if (cn) items.push({ source: '原著幕目', content: cn }); }
+      // v2.117.0（计划二 B1 主体）：人物行动。
+      //   本块只报**仍在进行**的行动（planned / running）——已结算的不进正文，
+      //   否则模型会把「上周去过码头」读成「他现在在码头」，那是把历史当成现场。
+      //   三处同批登记（v2.56.0 立的规矩），由 tests/inject-sources-v2560.js 两面锁。
+      if (vis.act && WA.act) { const ac = engineCall('act', function () { return WA.act.buildBlock(); }); if (ac) items.push({ source: '人物行动', content: ac }); }
+      // v2.119.0（拓展计划 ①）：人物多步计划。只报**当前那一步**与它的资源需求，
+      //   不把整条计划摊开（摊开会让模型照着后续步骤往下演，把「他打算做」写成「他已经做了」）。
+      //   受阻的步骤**照实报出受阻原因**——否则模型会把「卡住了」读成「正在推进」。
+      if (vis.plan && WA.plan) { const pl = engineCall('plan', function () { return WA.plan.buildBlock(); }); if (pl) items.push({ source: '人物计划', content: pl }); }
+      // v2.119.0（拓展计划 ②）：关系修复。只报**未了结**的伤害与还缺什么。
+      //   特别注意本块**不给数值**：修复进度不是好感分，把数字写进正文等于替角色宣告「已原谅」，
+      //   而那正是本模块要防的那件事（结案与否由 close 显式决定）。
+      if (vis.mend && WA.mend) { const md = engineCall('mend', function () { return WA.mend.buildBlock(); }); if (md) items.push({ source: '关系修复', content: md }); }
+      // v2.119.0（拓展计划 ③）：供需循环。只报**登记过的货与它们的许可带**——
+      //   没有登记过价的货不进正文（凭空报价正是本模块要防的那件事）。
+      if (vis.economy && WA.economy) { const ec = engineCall('economy', function () { return WA.economy.buildBlock(); }); if (ec) items.push({ source: '供需与商路', content: ec }); }
+      // v2.119.0（拓展计划 ④）：组织制度。只报「谁在任、什么权限、有几项待批」——
+      //   不报职位空缺的原因（那是纪事的活），也不替组织宣称制度运行良好。
+      if (vis.inst && WA.inst) { const ib = engineCall('inst', function () { return WA.inst.buildBlock(); }); if (ib) items.push({ source: '组织制度', content: ib }); }
+      // v2.119.0（拓展计划 ⑤）：调查卷宗。只报**在查**的案子，已定案的不进正文（定论归纪事）。
+      if (vis.probe && WA.probe) { const pb = engineCall('probe', function () { return WA.probe.buildBlock(); }); if (pb) items.push({ source: '调查卷宗', content: pb }); }
+      if (vis.region && WA.region) { const rg = engineCall('region', function () { return WA.region.buildBlock(); }); if (rg) items.push({ source: '远方', content: rg }); }
+      if (vis.stage && WA.stage) { const sg = engineCall('stage', function () { return WA.stage.buildBlock(); }); if (sg) items.push({ source: '玩法进度', content: sg }); }
+      // v2.119.0（拓展计划 ⑧）：多人场。只报「谁在场、到第几楼」，**不含任何凭证**。
+      if (vis.session && WA.session) { const se = engineCall('session', function () { return WA.session.buildBlock(); }); if (se) items.push({ source: '多人场', content: se }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块
       //   （它仍留在存档里，因为「秘密存在过」是事实，不是态度）。

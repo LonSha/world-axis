@@ -11,6 +11,17 @@
 //   存在但跑不到的码，要么把它变可达，要么明记为不可达并钉住它为何不可达。
 //   不能静默留着——从未被观察过的码，下一次被改成别的意思也没人知道。
 const DEAD = {
+  // v2.117.0（B2）备查：单地点天气封锁这一支在现设计下结构不可达（判定链路为
+  //   reach 建图 → 逐段 effectiveBlockOf → 分通道容量，路段级封锁走 road-closed /
+  //   blocked-delivered），但它的源码形状是 `out.reason = 'weather-blocked'`（赋值），
+  //   而扫描面的词法视角只认对象字面量 `reason: 'x'` ⇒ 它**从来不在这张表要盘的面上**。
+  //   故正确处置是只把它从台账 base 回收（消除「台账冗余」），**不写进死表**：
+  //   deadMissing 的判据是「死表码必须在源码里找得到」，而扫描面根本扫不到它。
+  //   可达的是**路段级**封锁（`road: [甲,乙]` 落成 `甲~乙` 复合键），它在 `transit` 里以
+  //   road-closed / blocked-delivered 如实归因；而 weatherBlockOf 读的是地点级的天气块，
+  //   本版所有「人/货/消息能不能过」的判定都先经 reach 建图、再逐段问 effectiveBlockOf，
+  //   分通道容量与路段封锁已把「这一段此刻不行」答尽 ⇒ 地点级 weather-blocked 没有入口。
+  //   不删：若将来放开「按地点整体封锁」，它是第一道防线（届时 deadLeak 会提醒它可能复活）。
   'bad-operator': {
     anchor: "else return { ok: false, reason: 'bad-operator', detail: v };",
     why: 'parseCmp 的筛选形式是：取 tk，要求 tk.t === "op"，p++，v := tk.v；'
@@ -72,6 +83,22 @@ function runWitness(WA) {
     try {
       const g = fn(); const arr = Array.isArray(g) ? g : [g];
       if (arr.indexOf(code) >= 0) { seen[code] = true; return true; }
+      return false;
+    } catch (e) { return false; }
+  }
+  /**
+   * 深层见证：顶层读不到、但**被如实构造出来**的码。
+   *   v2.117.0 有三条是这种：`opportunity.respond` 把行动侧的 `action-throw` / `no-action`
+   *   包进 `actReason`，`recipe.apply` 把 `theme-throw` 包进 `themeReason` —— 它们都在
+   *   返回体里，可顶层只有「外层的那个码」。不认它们，就等于把「归因被记下了」判成没发生。
+   *   只把**目标码**记进 seen：`unexpected`（冒出来的新码）检测不受影响。
+   */
+  function tripDeep(code, fn) {
+    try {
+      const g = fn();
+      let s = '';
+      try { s = JSON.stringify(g); } catch (e2) { s = String(g); }
+      if (String(s).indexOf(code) >= 0) { seen[code] = true; return true; }
       return false;
     } catch (e) { return false; }
   }
@@ -1202,6 +1229,413 @@ function runWitness(WA) {
         const r = Sb.run(function () { const t0 = Date.now(); while (Date.now() - t0 < 40) {} return 'done'; }, {}, [], { timeoutMs: 1 });
         return [r.reason];
       });
+    }
+  }
+  // ══ v2.117.0（计划二 B1–B6）：行动 / 通行 / 认知 / 关系经历 / 组织项目 / 机会窗口 ══
+  //   这 59 条码**全部由真实局面触发**（目标被撤、资源没备齐、路段被封、还没听说就想核实……），
+  //   不是结构上不可达的分支，故按台账规矩「新码一律走可执行见证，不进基线」。
+  //   三条例外用 tripDeep：`action-throw` / `no-action` 被 `opportunity.respond` 如实包进
+  //   `actReason`，`theme-throw` 被 `recipe.apply` 包进 `themeReason` —— 码在返回体里，
+  //   顶层只有外层那一个；不认它们就等于把「归因被记下了」判成没发生。
+  {
+    const AC = WA.act, WD = WA.world, IT = WA.intel, SH = WA.shadow,
+          OG = WA.org, OP = WA.opportunity, RC = WA.recipe;
+    // 夹具：一个目标在册的人 + 一个世界事实 + 一个势力（含三种档位的项目与名册）
+    WA.store.transact(function (d) {
+      d.people = d.people || {};
+      d.people['p_甲'] = { id: 'p_甲', name: '甲', resources: { 粮: 100 }, updatedAt: 1,
+        life: { goals: [{ id: 'g1', text: '去修堤', obstacle: '', status: 'active' }] } };
+      d.people['p_乙'] = { id: 'p_乙', name: '乙', resources: {}, updatedAt: 1 };
+      d.worldFacts = [{ key: 'X', value: '堤已加固', at: 1 }];
+      d.evolution = d.evolution || {};
+      d.evolution.factions = [{ name: '会', resources: { 粮: 100 }, roster: { '甲': {} },
+        projects: [
+          { what: '精确档', status: 'ongoing', by: '甲', due: 0, needs: [{ item: '粮', need: 5, tier: null }],
+            covered: { 粮: 5 }, startedAt: 1, updatedAt: 1 },
+          { what: '缺口档', status: 'ongoing', by: '甲', due: 0, needs: [{ item: '粮', need: 100, tier: null }],
+            covered: {}, startedAt: 1, updatedAt: 1 },
+          { what: '已结项', status: 'done', by: '甲', due: 0, needs: [], covered: {}, startedAt: 1, updatedAt: 1 }
+        ] },
+        { name: '会2', resources: {}, roster: {},
+          projects: [{ what: '叙事档', status: 'ongoing', by: '甲', due: 0,
+            needs: [{ item: '布', need: null, tier: 'tight' }], covered: {}, startedAt: 1, updatedAt: 1 }] },
+        { name: '会3', resources: {}, roster: {},
+          projects: [{ what: '未知档', status: 'ongoing', by: '甲', due: 0,
+            needs: [{ item: '铁', need: null, tier: null }], covered: {}, startedAt: 1, updatedAt: 1 }] }];
+      d.memory = d.memory || {};
+      d.memory.foreshadows = [{ id: 'W1', content: '修堤', status: 'waiting', dueAt: 1000 }];
+      d.opportunity = { openings: [] };
+      d.acts = { rows: [], res: [] };
+      d.shadow = d.shadow || {};
+    }, 'reject-witness:seed-v2117');
+    if (AC && AC.setSettings) AC.setSettings({ enabled: true });
+    if (WD && WD.setSettings) WD.setSettings({ enabled: true });
+    if (SH && SH.setSettings) SH.setSettings({ enabled: true });
+    if (OG && OG.setSettings) OG.setSettings({ enabled: true });
+    if (OP && OP.setSettings) OP.setSettings({ enabled: true, maxOpen: 8, defaultWindowMs: 60000 });
+    if (RC && RC.setSettings) RC.setSettings({ name: '' });
+
+    // ── engines/act.js（B1）──
+    if (AC && typeof AC.add === 'function') {
+      want('missing-goal', 'act.add：没给目标 id ⇒ 行动没有来源（B1）');
+      trip('missing-goal', function () { return [AC.add('甲', { kind: 'wait' }).reason]; });
+      want('unknown-goal', 'act.add：目标 id 不在册或已非 active ⇒ 悬空行动不得登记（B1）');
+      trip('unknown-goal', function () { return [AC.add('甲', { kind: 'wait', goalId: 'nope' }).reason]; });
+      want('bad-need', 'act.add：写了资源却没给量 ⇒ 必要条件不完整（B1）');
+      trip('bad-need', function () {
+        return [AC.add('甲', { kind: 'wait', goalId: 'g1', need: { resource: '粮', amount: 0 } }).reason];
+      });
+      want('org-missing', 'act.admit：要过资源闸却没有真源（org 缺席）⇒ 不猜库存（B1）');
+      trip('org-missing', function () {
+        const a = AC.add('甲', { kind: 'wait', goalId: 'g1', need: { resource: '粮', amount: 1 } });
+        const keep = WA.org.stockOf;
+        try { WA.org.stockOf = null; return [AC.admit(a.id, 0).reason]; } finally { WA.org.stockOf = keep; }
+      });
+      want('need-unmet', 'act.admit：资源不够就是不够，不把负数伪装成成功（B1）');
+      trip('need-unmet', function () {
+        const a = AC.add('甲', { kind: 'wait', goalId: 'g1', need: { resource: '铁', amount: 5 } });
+        return [AC.admit(a.id, 0).reason];
+      });
+      want('no-goal', 'act.admit：目标被撤销 ⇒ 挂在它下面的行动不得照常开工（B1）');
+      trip('no-goal', function () {
+        const a = AC.add('甲', { kind: 'wait', goalId: 'g1' });
+        let r = null;
+        WA.store.transact(function (d) { d.people['p_甲'].life.goals[0].status = 'done'; }, 'reject-witness:goal-off');
+        try { r = AC.admit(a.id, 0).reason; }
+        finally {
+          WA.store.transact(function (d) { d.people['p_甲'].life.goals[0].status = 'active'; }, 'reject-witness:goal-on');
+        }
+        return [r];
+      });
+      want('not-planned', 'act.admit：已开工的行动不得二次准入（两态不可分）（B1）');
+      trip('not-planned', function () {
+        const a = AC.add('甲', { kind: 'wait', goalId: 'g1', duration: 10 });
+        AC.admit(a.id, 0);
+        return [AC.admit(a.id, 0).reason];
+      });
+      want('not-running', 'act.abort：只有 running 的行能被中止（否则「已结束」与「还能中止」两态不可分）（B1）');
+      trip('not-running', function () {
+        const p = AC.add('甲', { kind: 'wait', goalId: 'g1', duration: 10 });
+        return [AC.abort(p.id, 'witness').reason];
+      });
+      want('unconfirmed', 'act.advance：take/tell/work 没有内置确认器 ⇒ 可见失败，不冒充完成（B1）');
+      trip('unconfirmed', function () {
+        // 同一时刻只允许一件事：先把本段前面留下的 running 行结算掉，否则 admit 会报 busy
+        //   （行停在 planned ⇒ advance 不动它 ⇒ 这条见证会静默失效）。
+        AC.advance(4000000);
+        const a = AC.add('甲', { kind: 'work', goalId: 'g1', duration: 10 });
+        AC.admit(a.id, 4000000);
+        AC.advance(4000010);
+        return (WA.store.get().acts.rows || []).map(function (x) { return x.reason; })
+          .concat((WA.store.get().acts.res || []).map(function (x) { return x.reason; }));
+      });
+    }
+
+    // ── engines/world.js（B2）──
+    if (WD && typeof WD.addPlace === 'function') {
+      // kind 必须在 PLACE_KINDS 里（home/work/market/public/wild/sacred）：写 'city' 是 bad-kind，
+      //   于是后面的 addRoad / depart / transit 会连锁失败成 unknown-place。
+      WD.addPlace({ name: '甲地', kind: 'public' });
+      WD.addPlace({ name: '乙地', kind: 'public' });
+      WD.addRoad('甲地', '乙地', 30);
+      want('bad-source', 'world.addBlock：封锁来源必须是登记过的三种之一，不猜（B2）');
+      trip('bad-source', function () {
+        return [WD.addBlock({ place: '甲地', source: 'nope', channels: ['person'] }).reason];
+      });
+      want('bad-use', 'world.addUse：用途词必须在 USE_KINDS 里，不猜（B2）');
+      trip('bad-use', function () { return [WD.addUse('甲地', { use: 'nope', open: 0, close: 100 }).reason]; });
+      WD.addUse('甲地', { use: 'business', open: 0, close: 1000 });
+      want('window-too-short', 'world.canBeAt：窗口容不下这件事 ⇒ 报短多少，不硬塞（B2）');
+      trip('window-too-short', function () {
+        return [WD.canBeAt('甲', '甲地', 0, 2000, 'business').reason];
+      });
+      want('pass', 'world.effectiveBlockOf：三层都放行时的正名（不是「没有理由」，是「可以过」）（B2）');
+      trip('pass', function () { return [WD.effectiveBlockOf('乙地', 'person').reason]; });
+      want('still-in-transit', 'world.arrive：还没到点 ⇒ 位置未知，不提前落点（B2）');
+      trip('still-in-transit', function () {
+        WD.depart('甲', '甲地', '乙地', 0);
+        return [WD.arrive('甲', 1000).reason];
+      });
+      want('halted', 'world.where：中止过的行程位置**未知**（既不在出发地也不在目的地）（B2）');
+      trip('halted', function () {
+        WD.stop('甲', 2000, 'witness');
+        return [WD.where('甲').reason];
+      });
+      want('road-closed', 'world.transit：到不了要答得出是**哪一层**断的——路段被封不是「路不存在」（B2）');
+      want('blocked-delivered', 'world.effectiveBlockOf：投递层封了该通道 ⇒ 报投递层（与天气层分列）（B2）');
+      WD.addBlock({ place: '甲地', source: 'hazard', channels: ['person'] });
+      trip('blocked-delivered', function () { return [WD.effectiveBlockOf('甲地', 'person').reason]; });
+      WD.addBlock({ road: ['甲地', '乙地'], source: 'hazard', channels: ['road'] });
+      trip('road-closed', function () { return [WD.transit('person', '甲地', '乙地').reason]; });
+    }
+
+    // ── engines/act.js（B1）：在途改道 ──
+    if (AC && typeof AC.replan === 'function' && WD && typeof WD.depart === 'function') {
+      // 自己一对**独立地点**：上一笔 road-closed 见证把 甲地~乙地 整段封了，
+      //   共用路段的话 admit 会在 reach 建图时就到不了（unreachable）⇒ 行停在 planned
+      //   ⇒ replan 走「非在途」分支，in-transit 永远跑不出来（见证静默失效）。
+      WD.addPlace({ name: '丙地', kind: 'public' });
+      WD.addPlace({ name: '丁地', kind: 'public' });
+      WD.addRoad('丙地', '丁地', 30);
+      want('in-transit', 'act.replan：在途者不得改道（改道会把一段真走过的路抹成没发生）（B1）');
+      trip('in-transit', function () {
+        const a = AC.add('甲', { kind: 'move', goalId: 'g1', from: '丙地', to: '丁地' });
+        const ad = AC.admit(a.id, 5000000);
+        if (!ad || ad.ok !== true) return ['admit-failed:' + ((ad && ad.reason) || 'unknown')];
+        return [AC.replan(a.id, {}, 5000010).reason];
+      });
+    }
+
+    // ── engines/intel.js（B3）──
+    if (IT && typeof IT.addIntel === 'function') {
+      IT.addIntel('甲', { claim: '堤要塌', source: '路人', level: 'report', about: 'X' });
+      want('not-entitled', 'intel.project：无资格者连「猜没猜对」都不泄露（堆数量换不来资格）（B3）');
+      trip('not-entitled', function () { return [IT.project('X', '甲').reason]; });
+      want('weak-evidence', 'intel.verify：弱证据不改认知 ⇒ 报 weak-evidence 且零变化（B3）');
+      trip('weak-evidence', function () {
+        return [IT.verify('甲', { about: 'X', level: 'report', source: '路人' }).reason];
+      });
+      want('nothing-to-verify', 'intel.verify：从没听说过就报 nothing-to-verify，不做「核实」旁路（B3）');
+      trip('nothing-to-verify', function () {
+        return [IT.verify('甲', { about: 'Y', level: 'record', source: '档册' }).reason];
+      });
+      want('nothing-to-correct', 'intel.correct：辟谣只对收到过该说法的人生效（B3）');
+      trip('nothing-to-correct', function () {
+        return [IT.correct('甲', { about: 'X', claim: '不存在', source: '路人' }).reason];
+      });
+    }
+
+    // ── engines/shadow.js（B4）──
+    if (SH && typeof SH.recordExperience === 'function') {
+      want('bad-behavior', 'shadow.recordExperience：观察结果词必须在 NOTICE 里，不猜（B4）');
+      trip('bad-behavior', function () {
+        return [SH.recordExperience('甲', '乙', { what: '修堤', behavior: 'nope' }).reason];
+      });
+      want('not-a-party', 'shadow.recordExperience：写了不在场的当事人 ⇒ 拒收（认知不能凭空产生）（B4）');
+      trip('not-a-party', function () {
+        return [SH.recordExperience('甲', '乙', { what: '修堤', behavior: 'kept',
+          views: { '丙': { noticed: 'kept' } } }).reason];
+      });
+      want('no-such-experience', 'shadow.stanceOf：查无此事 ⇒ 不回落成「没看法」（B4）');
+      trip('no-such-experience', function () { return [SH.stanceOf('甲', '甲', '乙', '不存在的事').reason]; });
+      SH.recordExperience('甲', '乙', { what: '修堤', behavior: 'broken', views: { '甲': { noticed: 'broken' } } });
+      want('no-view', 'shadow.stanceOf：认知不对称 ⇒ 客观行为在案而此人没有看法（B4）');
+      trip('no-view', function () { return [SH.stanceOf('乙', '甲', '乙', '修堤').reason]; });
+      want('nothing-to-accept', 'shadow.acceptRemedy：没有待接受的补救 ⇒ 不假装收到道歉（B4）');
+      trip('nothing-to-accept', function () { return [SH.acceptRemedy('甲', '甲', '乙', '修堤').reason]; });
+      want('no-new-remedy', 'shadow.offerRemedy：重复同类且未被接受的补救 ⇒ 零变化（B4）');
+      trip('no-new-remedy', function () {
+        SH.offerRemedy('甲', '乙', { by: '乙', kind: 'explain', what: '修堤' });
+        return [SH.offerRemedy('甲', '乙', { by: '乙', kind: 'explain', what: '修堤' }).reason];
+      });
+    }
+
+    // ── engines/org.js（B5）──
+    if (OG && typeof OG.openProject === 'function') {
+      want('no-needs', 'org.parseNeeds：需求串为空 ⇒ 没有可对账的清单（B5）');
+      trip('no-needs', function () { return [OG.openProject('会', { what: '空单', needs: '' }).reason]; });
+      want('bad-needs', 'org.parseNeeds：档位词表外的词不猜、不回落，照实拒收（B5）');
+      trip('bad-needs', function () { return [OG.openProject('会', { what: '怪单', needs: '有点紧' }).reason]; });
+      want('duplicate-project', 'org.openProject：同名未结项 ⇒ 拒收（否则账面答不出货进了哪一个）（B5）');
+      trip('duplicate-project', function () {
+        return [OG.openProject('会', { what: '缺口档', needs: '粮10' }).reason];
+      });
+      want('no-such-project', 'org.deliverToProject：项目不存在 ⇒ 拒收（不新建一个空项目兜住）（B5）');
+      trip('no-such-project', function () {
+        return [OG.deliverToProject('会', '不存在', '甲', '粮', 1).reason];
+      });
+      want('project-closed', 'org.deliverToProject：已结项不得再收货（B5）');
+      trip('project-closed', function () {
+        return [OG.deliverToProject('会', '已结项', '甲', '粮', 1).reason,
+          OG.closeProject('会', '已结项').reason];
+      });
+      want('not-needed', 'org.deliverToProject：只收清单上有的东西（把无关物资倒进来算进度 = 进度可伪造）（B5）');
+      trip('not-needed', function () {
+        return [OG.deliverToProject('会', '缺口档', '甲', '布', 1).reason];
+      });
+      want('already-covered', 'org.deliverToProject：精确档项收满即停 ⇒ 报 already-covered（B5）');
+      trip('already-covered', function () {
+        return [OG.deliverToProject('会', '精确档', '甲', '粮', 1).reason];
+      });
+      want('shortfall', 'org.closeProject：差一点不许写成「完成」，缺口照实报（B5）');
+      trip('shortfall', function () { return [OG.closeProject('会', '缺口档').reason]; });
+      want('missing-why', 'org.oweTo：没有原因的欠账日后没人答得出它是怎么来的 ⇒ 拒收（B5）');
+      trip('missing-why', function () { return [OG.oweTo('会', '甲', { amount: 1 }).reason]; });
+      want('not-on-roster', 'org.oweTo：不在名册上的人不能欠势力的账（B5）');
+      trip('not-on-roster', function () { return [OG.oweTo('会', '乙', { amount: 1, why: '罚没' }).reason]; });
+      // 这三条是 projectView 的**档位读数**：码的本义就是「这个项目的需求记到什么程度」，
+      //   载体是 tierReason（tierLine 的同一个值），故按读数面见证。
+      want('recorded', 'org.projectView：至少一项记了刻数 ⇒ 精确档读数（B5）');
+      trip('recorded', function () { return [OG.projectView('会').tierReason]; });
+      want('narrative-only', 'org.projectView：只记了档位词 ⇒ 叙事档读数（B5）');
+      trip('narrative-only', function () { return [OG.projectView('会2').tierReason]; });
+      want('nothing-recorded', 'org.projectView：两样都没记 ⇒ 未知档，**不给词**（B5）');
+      trip('nothing-recorded', function () { return [OG.projectView('会3').tierReason]; });
+    }
+
+    // ── engines/opportunity.js（B6）──
+    if (OP && typeof OP.sweep === 'function') {
+      OP.sweep(700000);
+      const OID = 'op:promise:W1';
+      want('missing-id', 'opportunity.respond：没给机会 id ⇒ 拒收（B6）');
+      trip('missing-id', function () { return [OP.respond('', 'decline', { now: 700000 }).reason, OP.view('').reason]; });
+      want('unknown-opportunity', 'opportunity.respond：机会不在册 ⇒ 拒收（不替人新建一条）（B6）');
+      trip('unknown-opportunity', function () {
+        return [OP.respond('op:nope', 'decline', { now: 700000 }).reason, OP.view('op:nope').reason];
+      });
+      want('bad-choice', 'opportunity.respond：作答词必须落 take/decline/defer 之一（B6）');
+      trip('bad-choice', function () { return [OP.respond(OID, 'nope', { now: 700000 }).reason]; });
+      want('no-actor', 'opportunity.respond：take 必须点名谁来接（接了却没人做 = 悬空行）（B6）');
+      // now 必须**显式**给：缺省是真实当前时间，而夹具窗口在 760000 就关了 ⇒
+      //   那会被 window-closed 抢在前面判掉，「窗口内的作答校验」就永远照不到。
+      trip('no-actor', function () { return [OP.respond(OID, 'take', { now: 700000 }).reason]; });
+      want('missing-window', 'opportunity.respond：延后必须显式给新窗口（先放着与没看见可分辨）（B6）');
+      trip('missing-window', function () { return [OP.respond(OID, 'defer', { actor: '甲', now: 700000 }).reason]; });
+      want('window-closed', 'opportunity.respond：过窗口末刻的作答一律拒收，且这次作废真落盘（B6）');
+      trip('window-closed', function () { return [OP.respond(OID, 'decline', { actor: '甲', now: 900000 }).reason]; });
+      want('already-answered', 'opportunity.respond：已作废的行不得再作答（两态不可分）（B6）');
+      trip('already-answered', function () {
+        return [OP.respond(OID, 'decline', { actor: '甲', now: 900000 }).reason];
+      });
+      want('not-entitled', 'opportunity.respond：世界侧记了涉及谁 ⇒ 之外的人不受理（B6）');
+      trip('not-entitled', function () {
+        WA.store.transact(function (d) {
+          d.people['p_甲'].knowledge = { intel: [{ id: 'I1', about: '堤', claim: '堤要塌',
+            source: '路人', level: 'report', confidence: 20, status: 'active' }] };
+        }, 'reject-witness:opp-intel');
+        OP.sweep(950000);
+        const row = (WA.store.get().opportunity.openings || []).filter(function (x) {
+          return x && (x.actors || []).length;
+        })[0];
+        return [row ? OP.respond(row.id, 'decline', { actor: '乙', now: 951000 }).reason : ''];
+      });
+      want('action-refused', 'opportunity.respond：行动侧拒绝 ⇒ 回滚阶段，不留「已接但没有动作」的悬空行（B6）');
+      want('no-action', 'opportunity.respond：行动侧缺席 ⇒ 把它的归因如实带进 actReason（B6）');
+      want('action-throw', 'opportunity.respond：行动侧抛错 ⇒ 归因如实带出，不吞成「不可用」（B6）');
+      trip('action-refused', function () {
+        OP.sweep(1000000);
+        const row = (WA.store.get().opportunity.openings || [])[0];
+        const keep = WA.act.add;
+        try {
+          WA.act.add = null;
+          return [OP.respond(row.id, 'take', { actor: '甲', kind: 'wait', goalId: 'g1', now: 1000000 }).reason];
+        } finally { WA.act.add = keep; }
+      });
+      tripDeep('no-action', function () {
+        OP.sweep(1100000);
+        const row = (WA.store.get().opportunity.openings || [])[0];
+        const keep = WA.act.add;
+        try {
+          WA.act.add = null;
+          return OP.respond(row.id, 'take', { actor: '甲', kind: 'wait', goalId: 'g1', now: 1100000 });
+        } finally { WA.act.add = keep; }
+      });
+      tripDeep('action-throw', function () {
+        OP.sweep(1200000);
+        const row = (WA.store.get().opportunity.openings || [])[0];
+        const keep = WA.act.add;
+        try {
+          WA.act.add = function () { throw new Error('witness'); };
+          return OP.respond(row.id, 'take', { actor: '甲', kind: 'wait', goalId: 'g1', now: 1200000 });
+        } finally { WA.act.add = keep; }
+      });
+    }
+
+    // ── engines/recipe.js（B6）──
+    if (RC && typeof RC.apply === 'function') {
+      want('unknown-recipe', 'recipe：未知配方拒收且不回落（回落会让「启用了」与「没启用」长得一样）（B6）');
+      trip('unknown-recipe', function () {
+        return [RC.preview('nope').reason, RC.apply('nope').reason, RC.seed('nope').reason];
+      });
+      want('theme-refused', 'recipe.apply：题材被真源拒收 ⇒ 不留半截配方名（B6）');
+      want('theme-throw', 'recipe.apply：题材侧抛错 ⇒ 归因带进 themeReason，不冒充「题材不支持」（B6）');
+      trip('theme-refused', function () {
+        const keep = WA.theme.apply;
+        try {
+          // 真源在、但**拒了这组题材**。缺席不算拒收：缺席时本模块根本不委托
+          //   （那是「没有题材面」，不是「题材说不」——把装载问题记成配置问题会更难查）。
+          WA.theme.apply = function () { return { ok: false, reason: 'unknown-theme' }; };
+          return [RC.apply('urban').reason];
+        } finally { WA.theme.apply = keep; }
+      });
+      tripDeep('theme-throw', function () {
+        const keep = WA.theme.apply;
+        try {
+          WA.theme.apply = function () { throw new Error('witness'); };
+          return RC.apply('urban');
+        } finally { WA.theme.apply = keep; }
+      });
+      want('no-scene', 'recipe.seed：该配方没有场景种子 ⇒ 拒收（不假装取到了一条）（B6）');
+      trip('no-scene', function () {
+        const keep = RC.RECIPES.urban.scenes;
+        try {
+          RC.RECIPES.urban.scenes = [];
+          return [RC.seed('urban').reason];
+        } finally { RC.RECIPES.urban.scenes = keep; }
+      });
+    }
+
+    // ── ui/panel.js（B5/B6）：五个回执出口的抛错归因 ──
+    //   这五条码只在面板处理器里产生（「侧边坏了」的如实回执），故见证走**真点击**：
+    //   点 tab 走真实绑定 → 处理器执行 → 结果落进面板的 dataset 回执位。
+    {
+      const uiGate = require('./ui-gate-sync.js');
+      const env = uiGate.fresh();
+      const dom = env.dom, W2 = env.WA;
+      const panelEl = dom.getElementById('wa-panel');
+      const tabs = panelEl ? panelEl.querySelectorAll('.wa-tab') : [];
+      const tab = tabs.filter(function (x) { return x.dataset && x.dataset.page === 'people'; })[0];
+      if (tab) tab.click();
+      const B = function (id) { return dom.getElementById(id); };
+      const keep = {};
+      if (W2.recipe) {
+        keep.seed = W2.recipe.seed;
+        W2.recipe.seed = function () { throw new Error('witness'); };
+        want('seed-throw', 'panel：取场景抛错 ⇒ 回执如实报 seed-throw（不吞成「未生效」）（B6）');
+        trip('seed-throw', function () {
+          const b = B('wa-rec-seed'); if (!b) return []; b.click();
+          return [String((panelEl.dataset || {}).recOut || '').split('：')[1]];
+        });
+        W2.recipe.seed = keep.seed;
+        keep.pv = W2.recipe.preview;
+        W2.recipe.preview = function () { throw new Error('witness'); };
+        want('preview-throw', 'panel：配方预览抛错 ⇒ 回执如实报 preview-throw（B6）');
+        trip('preview-throw', function () {
+          const nm = B('wa-rec-name'); if (nm) nm.value = 'urban';
+          const b = B('wa-rec-view'); if (!b) return []; b.click();
+          return [String((panelEl.dataset || {}).recOut || '').split('：')[1]];
+        });
+        W2.recipe.preview = keep.pv;
+      }
+      if (W2.opportunity) {
+        keep.sw = W2.opportunity.sweep;
+        W2.opportunity.sweep = function () { throw new Error('witness'); };
+        want('sweep-throw', 'panel：机会扫描抛错 ⇒ 回执如实报 sweep-throw（B6）');
+        trip('sweep-throw', function () {
+          const b = B('wa-opp-run'); if (!b) return []; b.click();
+          return [String((panelEl.dataset || {}).recOut || '').split('：')[1]];
+        });
+        W2.opportunity.sweep = keep.sw;
+      }
+      if (W2.org) {
+        keep.pj = W2.org.projectView;
+        W2.org.projectView = function () { throw new Error('witness'); };
+        want('project-throw', 'panel：项目读数抛错 ⇒ 回执如实报 project-throw（B5）');
+        trip('project-throw', function () {
+          const kd = B('wa-org-kind'); if (kd) kd.value = 'faction';
+          const b = B('wa-org-proj-view'); if (!b) return []; b.click();
+          return [String((panelEl.dataset || {}).orgOut || '').split('：')[1]];
+        });
+        W2.org.projectView = keep.pj;
+        keep.db = W2.org.debtsView;
+        W2.org.debtsView = function () { throw new Error('witness'); };
+        want('debts-throw', 'panel：欠账读数抛错 ⇒ 回执如实报 debts-throw（B5）');
+        trip('debts-throw', function () {
+          const b = B('wa-org-debts'); if (!b) return []; b.click();
+          return [String((panelEl.dataset || {}).orgOut || '').split('：')[1]];
+        });
+        W2.org.debtsView = keep.db;
+      }
     }
   }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });

@@ -3,7 +3,11 @@
 // v2.84.0: keep destructive regression inside an independent candidate tree.
 const __isolatedRunner = require('./isolated-runner.js');
 if (!__isolatedRunner.isWorker(require('path').join(__dirname, '..'))) {
-  __isolatedRunner.launch(require('path').join(__dirname, '..'))
+  __isolatedRunner.launch(require('path').join(__dirname, '..'),
+    // v2.119.0（优化一）：硬超时可配。默认 600000（历史值）意味着「跑不完 = interrupted」，
+    //   而 interrupted 看起来像环境问题、不像缺陷。慢机/长局可用 WA_REGRESSION_TIMEOUT_MS 放宽；
+    //   不设该变量时行为与 v2.118.0 逐字一致。
+    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 600000 })
     .then(code => { process.exitCode = code; })
     .catch(error => { console.error(error.message); process.exitCode = 3; });
   return;
@@ -88,7 +92,18 @@ function assert(cond, name, extra) {
 //   evict-meta 之后永久多出两个 worldaxis_*_test_chat_001 键。后果不只是"脏"：
 //   export 面口径里 OPTIONAL 三命名空间的"UI 未装载"前提，在 causal-v2620 之后就**不再成立**。
 //   故每个 section 边界做一次差值回收（只收回本节新增的，见 tests/context-guard.js 的两条纪律）。
+// v2.119.0（优化一）：分节耗时。治的病是「回归跑到一半被 SIGTERM，却不知道卡在哪一节」：
+//   此前整趟只有一个总耗时，而 interrupted 时连总耗时都没有（总摘要在最后一行）。
+//   现在每节开头打印上一节用时，并标出超过 60 秒的节——那是下一轮要治的对象。
+let __secT = 0, __secName = '起';
+let __slowSec119 = 0;
 function section(t) {
+  const __el119 = __secT ? (Date.now() - __secT) : 0;
+  if (__secT) {
+    if (__el119 > 60000) __slowSec119 += 1;
+    console.log('  ⏱ ' + (__el119 / 1000).toFixed(2) + 's  ← ' + __secName + (__el119 > 60000 ? '  ⚠ 超 60s' : ''));
+  }
+  __secT = Date.now(); __secName = t;
   __ctxRing.section = String(t);            // v2.110.0（#24）：失败行要能说清「是哪个 section」
   __ctxRing.recent.length = 0;              // 跨块的「最近通过」是噪声：本节之前的成功与此无关
   const row = __ctxGuard.close(t);          // 关掉上一节：回收其新增的硬痕迹
@@ -102,6 +117,24 @@ function section(t) {
   if (row && row.residualHard) console.log('  ⚠ 本节残留硬痕迹 ' + row.residualHard + ' 处（回收未能清空）');
   if (row && row.soft.length) console.log('  ℹ 只登记不回退：' + row.soft.join(' ; '));
   console.log('\n■ ' + t);
+}
+
+// v2.119.0（优化一）：专锁调用的结构性隔离。
+//   实测病灶：v2.89.0 的锁把「破坏锚点在真源码中恰 1 次」写成 throw（工具两向自证：不唯一必须抛），
+//   而这里过去是裸调 runAll(assert)。于是源码一行漂移（causal.js 的 stat.lastTape 改名为 S.lastTape）
+//   就让**整个回归以 code 2 崩在第 8494 行**：其后几千条判据一条没跑，summary 只留下子门禁的
+//   「通过 48 / 失败 1」——看起来像「门禁自己失败」，不像「有一条锁的锚点漂了」。
+//   本函数把「锁自己抛出来的」与「断言失败」分开：前者记一条**红**（带锁名与原因）并**继续跑**。
+//   不吞错：throw 只被转写成一条失败项，绝不当成通过（与 v2.29.0 负控「算不出来不得当作算过」同规）。
+function runLock(spec, method) {
+  const m = method || 'runAll';
+  try { require(spec)[m](assert); }
+  catch (e) {
+    fail++;
+    const msg = '[锁 ' + spec + ' 的 ' + m + ' 抛出] ' + (e && e.message ? e.message : String(e));
+    failures.push(msg);
+    console.log('  \u2717 ' + msg);
+  }
 }
 
 // 按依赖顺序加载扩展JS到同一vm上下文（跳过index.js与UI）
@@ -120,6 +153,10 @@ const LOAD = [
   //   settings-bus 之前；两者都不写存档、不抛异常，audit-log 只在调用期读 WA.permissions / WA.clock。
   'core/audit-log.js', 'core/sanitize.js',
   'core/settings-bus.js', 'core/store.js', 'core/sandbox.js', 'core/plugin.js', 'core/evict.js', 'core/api-router.js', 'core/undo.js', 'core/workflow.js', 'core/settle-guard.js', 'core/interceptor.js',
+  // v2.118.0（计划二 B7）：显式执行上下文。必须进 LOAD —— B7 专锁的破坏副本与正负探针都在
+  //   同一 vm 上下文里跑，且 act.js / world.js 在调用期经 WA.exec 取值；装载面没给它模块，
+  //   两条路径会各自静默降级成「一律按真世界执行」（专锁的隔离判据因而不成立却不报错）。
+  'core/exec.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
@@ -168,6 +205,14 @@ const LOAD = [
   'engines/events.js',
   // v2.82.0：快照与分支。位置与 index.js LOAD_ORDER 同序（都早于 render/inject.js 消费点）。
   'engines/checkpoints.js',
+  // v2.117.0（计划二 B1）：人物行动执行。位置与 index.js LOAD_ORDER 同序。
+  //   三条位置约束（与 act.js 尾部的心跳注册同源，缺一条就会拿旧数据算新结论）：
+  //     ① 须晚于 engines/life.js —— 行动的目标来源只读 life.goals（不另存一份目标副本）；
+  //     ② 须晚于 engines/world.js —— 准入依赖 canBeAt / reach / depart，结算依赖 arrive / stop；
+  //     ③ 须早于 render/inject.js —— 注入落地时消费 act.buildBlock()。
+  //   本文件进 LOAD 是**硬要求**：见证表用真 API 把码跑出来，而 runWitness(WA) 拿到的 WA
+  //   就是这里装载出来的那个 —— 上上一版漏装 chrono/collab 时，14 个码的见证整段静默跳过。
+  'engines/act.js',
   // v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）：因果链追踪与协作面。位置与 index.js
   //   LOAD_ORDER 同序。**这两个文件必须进 LOAD**：见证表（tests/reject-v2780.js）用真 API
   //   把码跑出来，而 runWitness(WA) 拿到的 WA 就是这里装载出来的那个 —— 上一版漏了这两行，
@@ -177,6 +222,24 @@ const LOAD = [
   //   「LOAD 区间内所有单引号串 = 文件路径」取装载面，注释里写一个类型名字符串
   //   会被当成一个不存在的文件（实测踩过：读 /tmp/wa_git/function 直接 ENOENT）。
   'engines/chrono.js', 'engines/collab.js',
+  // v2.117.0（计划二 B6）：机会形成 + 题材完整配置配方。位置与 index.js LOAD_ORDER 同序。
+  //   这两个文件必须进 LOAD：B6 专锁（tests/b6-opportunity-v2117.js）的破坏副本与正负探针
+  //   都在同一 vm 上下文里跑，装载面没给它模块，专锁的锚点核对就整段静默跳过。
+  'engines/opportunity.js', 'engines/recipe.js',
+  // v2.118.0（计划二 B7）：统一试演 / 回滚范围 / 原著分歧。位置与 index.js LOAD_ORDER 同序
+  //   （须晚于 act / phone-bridge / canon / causal，须早于 render/inject.js）：装载面没给它模块，
+  //   B7 专锁的锚点核对与负向探针就整段静默跳过。
+  'engines/rehearsal.js',
+  // v2.118.0（计划二 B8）：跨插件业务闭环。位置与 index.js LOAD_ORDER 同序
+  //   （须晚于 act / world / phone-bridge）。装载面没给它模块，
+  //   B8 专锁的锚点核对与负向探针就整段静默跳过。
+  'engines/liaison.js',
+    'engines/coop.js',
+  // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。位置与 index.js LOAD_ORDER 同序
+  //   （须晚于 life / org / fondness，须早于 render/inject.js）。**这两个文件必须进 LOAD**：
+  //   拓展锁（tests/plan-v2119.js / tests/mend-v2119.js）的破坏副本与正负探针都在同一 vm
+  //   上下文里跑，装载面没给它模块，锚点核对与负向探针就整段静默跳过。
+  'engines/plan.js', 'engines/mend.js', 'engines/economy.js', 'engines/inst.js', 'engines/probe.js', 'engines/region.js', 'engines/stage.js', 'engines/session.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
   // v2.101.0（O11）：跨插件互操作验收面。位置与 index.js LOAD_ORDER 同序
   //   （须晚于 lonsha-reader / phone-bridge，它读的是两者的现场读数）。
@@ -6835,7 +6898,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   const rpA1700 = WA.store.registryParity();
   assert(rpA1700.ok === true && rpA1700.missing.length === 0, '正常态 registryParity ok=true missing=0');
   assert(rpA1700.checked === arrayKeys1700.length + objKeys1700.length, 'checked 纳入精确 object 键（不再是仅 array）');
-  assert(rpA1700.checked === 84, 'checked 精确值 84（v2.116.0：events.res 回执台账登记 ⇒ 精确键 +1（83 → 84）；v2.114.0：collab 三表 + chrono.entries 补挤出站点登记 ⇒ +4（79 → 83）；v2.97.0：X5 新增 causal.phoneOps 一容器；v2.96.0 时为 78）');
+  assert(rpA1700.checked === 112, 'checked 精确值 112（v2.119.0（优化一）：B7/B8/B9 三批新增容器全部入表（28 项 = v2.117.0 六 + v2.118.0 六 + v2.119.0 十六：economy 三 / inst 四 / mend.threads / plan.plans / probe.cases / region.places+events / session.seats+log / stage.metrics+transitions / coop 两 / liaison 三 / rehearsal.previews / acts.rows+res / opportunity.openings / world.blocks+shipments+messages）——冻结值此前停在 90，正是「容器入表了而冻结计数没随实现刷新」；v2.117.0（计划二 B1–B6）：新增六个精确容器（acts / chrono / collab / opportunity / world.blocks+shipments+messages 等）⇒ 84 → 90；v2.116.0：events.res 回执台账登记 ⇒ 精确键 +1（83 → 84）；v2.114.0：collab 三表 + chrono.entries 补挤出站点登记 ⇒ +4（79 → 83）；v2.97.0：X5 新增 causal.phoneOps 一容器；v2.96.0 时为 78）');
   // ── B. object 键漏物化检出（v1.6.0 盲区修复）──
   fresh1700();
   WA.store.transact(d => { delete d.people; });
@@ -10104,7 +10167,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.119.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10656,7 +10719,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.116.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.119.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -10947,7 +11010,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.116.0', '入口版本为 2.111.0（实 ' + ver + '）');
+    assert(ver === '2.119.0', '入口版本为 2.119.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11363,7 +11426,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'affect:buildBlock|apiRouter:call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|appearance:buildBlock|auditLog:flush record|backstage:abort applyResult applyStat buildPrompt channelStat forceSimulate getSettings isRunning pending setSettings|beastBond:buildBlock|bonds:buildBlock|bridge:FLOOR_GAP id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|canon:actText actsBrief adopt alignView buildBlock buildOutline clearOutline coordOf gap getSettings locate outlineView position setSettings signal stat|causal:STAGES TERMINAL addChain buildBlock cancel classify conflicts defer due evidence getSettings knownCause previewIntervention record rehearse setSettings settle settleBlockReason stat stateView tick|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|checkpoints:buildBlock|choices:generate|chrono:applyUndo getSettings record setSettings stale stat undo|clock:clockStat freeze now wallNow|collab:claim conflicts getSettings open pending setSettings stat|compat:context detect snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|difficulty:buildBlock effective|digest:buildBlock generate|directEvent:abort create|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ASSET_STATUS ENEMY_STATUS ENEMY_TYPE apply applyBlackbox applyWorldTrends dropStat|enigma:buildBlock|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|eraCycle:buildBlock|events:buildBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings roundOf setSettings tick|floorChanges:markSubscribed onFloorEvent plan reset stat stateText|fondness:buildBlock|gauge:buildBlock|hazard:buildBlock|horizon:BASE_CHANCE COOLDOWN_ROUNDS LEDGER_THRESHOLD acceptResult bounds buildPromptBlock getSettings setSettings stat|hostWbTrace:crossCheck markSubscribed onActivated stat stateText|injectBudget:apply costOf costView plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inputGuard:check count list num oneOf text|inspectorState:flatten inspect summaryText|intel:CONFIDENCE LEVELS addIntel addLink buildBlock explain getSettings knownCause setSettings stat visibleTo|interceptor:install|interop:compatGaps freeze probeAll stat summaryText|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|karma:buildBlock|ladder:buildBlock|ledger:buildLedgerText recordChanges saveCheckpoint|ledgerTimeline:probeDefault reset stat summaryText|life:ACTIONS COMMITMENTS addCommitment addGoal addSchedule buildBlock decide getSettings setSettings stat tick|limits:applyStableUpdate clampBackstageResult locateStable|longline:TERMINAL buildBlock getSettings overdue pressure promise setSettings stat sweep|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID LONSHA_BRIDGE_VERSION describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|marginal:buildBlock|masks:buildBlock|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|org:KINDS assignRole buildBlock canAfford creditWork exportJournal getSettings grant ledgerView payroll penalize promote reconcile reconcileWith rosterView setSettings settleOwed stat stockOf transfer|parallelEvents:buildBlock|parallelWorld:CAP_MODULES CAP_NPCS CAP_RELATIONS IMPACTS IMPACT_LABEL INJECT_MIN_IMPACT addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings getSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings shouldAuto stat|perfTrace:CLASSES CLASS_DEF HISTORY_CAP LAYERS LAYER_LABEL alerts baseline cacheStat coldStart curve curveAll dirtyAll flamegraph heatHistogram importSnapshot partial slots snapshot spikeOf split stat summaryText thresholds warmStart|permissions:currentUser gate gateStat|phoneBridge:ACT_LABEL PHASES PHONE_ACTS getSettings id linkChain noteAction opTrace opsView phaseOf setSettings stat traceOf version|plugin:fire list register stat unregister|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|quota:buildBlock|rand:beginTape chance coordOf dice endTape id int markCoord next randStat replay seed stopReplay tape tapeVol verifyTape verifyTapeWith|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:aliasOf aliasStat bindAlias clearProfile danglingRefs ensurePerson getPersona getProfile getRelation idClear idStat identityOf list personOriginStat profileStat register relationBands relationStat setPersonaDice setProfileSafe setRelations slotStat traceOf unregister|render:SOURCES applyInjections buildWorldSnapshot explain getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rivalry:buildBlock|rules:ORDER coreSummary getAll getModule isNewModule listModules|rumor:LAYERS MOTIVES PUBLIC_LAYERS buildBlock conceal fullView getSettings investigate refute relay setSettings startChain stat visibleTo|samplerCheck:runChecks|sandbox:run stat|sanitize:html text|sceneSlice:buildBlock|settingsBus:boundsOf cfgStat cfgSurface clampNum deregisterOrphan dormantGhosts exportConfig ghostScan importConfig migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|shadow:SHADOW_KINDS STAKES addExperience addShadow brighten buildBlock deepen experiencesOf getSettings getShadow setSettings shadowStat stat visibleTo|spotlight:buildBlock|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId defaultWorldState diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|style:CHOICES CHOICE_LABELS buildBlock effectiveSettings getSettings setSettings styleStat summaryText textCoverage|summarizer:buildBlock|survival:buildBlock|temperament:buildBlock|tempo:buildBlock|temporalLock:buildBlock|theater:generate send stat wrap|theme:activeModules apply list preview separation statView|threads:RELIABILITY TERMINAL abandon addLead buildBlock converge explain getSettings open resolve setSettings stall stat threadStat|timeline:SOURCE_ID_KEY auditRefs captureRange hashText unionRefs|tolerance:buildBlock|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview previewPlan|toolSnapshot:buildSubsetPayload download restore|undo:capture clear peek pushValue stat undo|warrant:buildBlock|wbInject:activeOrders findCompanionName getConfig isEnabled|weather:buildBlock|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|world:CHANNELS EVENT_KINDS PLACE_KINDS addEvent addPlace addRoad attendees buildBlock canBeAt eventsBetween getSettings move reach setSettings stat tick transit whereStat|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries peekEntries previewActivation saveSelection triggerEnabled';
+    const FROZEN2800 = 'act:KINDS abort add admit advance buildBlock getSettings replan setSettings stat view|affect:buildBlock|apiRouter:call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|appearance:buildBlock|auditLog:flush record|backstage:abort applyResult applyStat buildPrompt channelStat forceSimulate getSettings isRunning pending setSettings|beastBond:buildBlock|bonds:buildBlock|bridge:FLOOR_GAP id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|canon:actText actsBrief adopt alignView buildBlock buildOutline clearOutline coordOf gap getSettings locate outlineView position setSettings signal stat|causal:STAGES TERMINAL addChain buildBlock cancel classify conflicts defer due evidence getSettings knownCause previewIntervention record rehearse setSettings settle settleBlockReason stat stateView tick|chapters:end start|chatcache:init installStat listSnapshots mirrorOwner|checkpoints:buildBlock topKeys|choices:generate|chrono:applyUndo getSettings record setSettings stale stat undo|clock:clockStat freeze now wallNow|collab:claim conflicts enqueue getSettings holderOf open pending setSettings stat|compat:context detect snapshot|compatMvu:init status|compatTH:init status|contractAudit:audit|difficulty:buildBlock effective|digest:buildBlock generate|directEvent:abort create|economy:buildBlock buy craft getSettings markRoute price route setSettings shelf ship statView stock tick view|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|enemies:ASSET_STATUS ENEMY_STATUS ENEMY_TYPE apply applyBlackbox applyWorldTrends dropStat|enigma:buildBlock|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|eraCycle:buildBlock|events:buildBlock|evict:array evictStat note object|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation getSettings roundOf setSettings tick|exec:mutate statBag storeOf withContext|floorChanges:markSubscribed onFloorEvent plan reset stat stateText|fondness:apply buildBlock|gauge:buildBlock|hazard:buildBlock|horizon:BASE_CHANCE COOLDOWN_ROUNDS LEDGER_THRESHOLD acceptResult bounds buildPromptBlock getSettings setSettings stat|hostWbTrace:crossCheck markSubscribed onActivated stat stateText|injectBudget:apply costOf costView plan summaryText|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|inputGuard:check count list num oneOf text|inspectorState:flatten inspect summaryText|inst:assign breach buildBlock charter decide getSettings post propose setSettings settle statView succession vacate view|intel:CONFIDENCE LEVELS addIntel addLink believe buildBlock explain getSettings knownCause setSettings stat visibleTo|interceptor:install|interop:compatGaps freeze probeAll stat summaryText|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|karma:buildBlock|ladder:buildBlock|ledger:buildLedgerText recordChanges saveCheckpoint|ledgerTimeline:probeDefault reset stat summaryText|life:ACTIONS COMMITMENTS addCommitment addGoal addSchedule buildBlock decide getSettings setSettings stat tick|limits:applyStableUpdate clampBackstageResult locateStable|longline:TERMINAL buildBlock getSettings overdue pressure promise setSettings stat sweep|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID LONSHA_BRIDGE_VERSION describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|marginal:buildBlock|masks:buildBlock|memory:buildMemoryBlock pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|mend:buildBlock close getSettings mark setSettings statView step view|observe:slice|opinion:buildOpinionBlock generate getSettings setSettings|opportunity:SOURCES collect getSettings list statView sweep|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|org:KINDS assignRole buildBlock canAfford closeProject creditWork debtsView deliverToProject exportJournal getSettings grant ledgerView openProject oweTo payroll penalize projectView promote reconcile reconcileWith rosterView setSettings settleDebt settleOwed stat stockOf transfer|parallelEvents:buildBlock|parallelWorld:CAP_MODULES CAP_NPCS CAP_RELATIONS IMPACTS IMPACT_LABEL INJECT_MIN_IMPACT addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings getSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings shouldAuto stat|perfTrace:CLASSES CLASS_DEF HISTORY_CAP LAYERS LAYER_LABEL alerts baseline cacheStat coldStart curve curveAll dirtyAll flamegraph heatHistogram importSnapshot partial slots snapshot spikeOf split stat summaryText thresholds warmStart|permissions:currentUser gate gateStat|phoneBridge:ACT_LABEL PHASES PHONE_ACTS getSettings id linkChain noteAction opTrace opsView phaseOf setSettings stat traceOf version|plan:abandon advance buildBlock candidates current expand getSettings setSettings settle statView view|plugin:fire list register stat unregister|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText|preset:getSegmentOverrides|proactive:isEnabled stat|probe:addEvidence buildBlock confront decide getSettings open setSettings statView view wrong|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|quota:buildBlock|rand:beginTape chance coordOf dice endTape id int markCoord next randStat replay seed stopReplay tape tapeVol verifyTape verifyTapeWith|recipe:catalogView preview seed statView|region:buildBlock deliver fine getSettings heard markLane occur places register setSettings statView|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:aliasOf aliasStat bindAlias clearProfile danglingRefs ensurePerson getPersona getProfile getRelation idClear idStat identityOf list personOriginStat profileStat register relationBands relationStat setPersonaDice setProfileSafe setRelations slotStat traceOf unregister|render:SOURCES applyInjections buildWorldSnapshot explain getVisibility injectionLedger loadUninjectLedger setVisibility uninject uninjectAudit visibilityStat|rivalry:buildBlock|rules:ORDER coreSummary getAll getModule isNewModule listModules|rumor:LAYERS MOTIVES PUBLIC_LAYERS buildBlock conceal fullView getSettings investigate refute relay setSettings startChain stat visibleTo|samplerCheck:runChecks|sandbox:run stat|sanitize:html text|sceneSlice:buildBlock|session:auth buildBlock getSettings host join leave post resync setSettings since statView view|settingsBus:boundsOf cfgStat cfgSurface clampNum deregisterOrphan dormantGhosts exportConfig ghostScan importConfig migrationStat normalize pendingOrphan read readEx readStat registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|shadow:SHADOW_KINDS STAKES addExperience addShadow brighten buildBlock deepen experiencesOf getSettings getShadow setSettings shadowStat stat visibleTo|spotlight:buildBlock|stage:PACKS adopt buildBlock getSettings mark plan setSettings statView transit view|store:SCHEMA_VERSION batch batchStat capsFor chatId classifyKey conflictStat createRecoveryPoint currentBranchId defaultWorldState diagBudget dropConflict dropQuarantine dropRecoveryPoint exportAuditReport exportConflict exportRecoveryPoints externalWriteStat get init integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport mirrorStat orphanSettingsKeys patch quarantineAudit quarantineStat read readStat recoveryStat removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat sizeAudit sizeAuditFull sizeProfile storageStat sweepStaleKeys transact txStat|style:CHOICES CHOICE_LABELS buildBlock effectiveSettings getSettings setSettings styleStat summaryText textCoverage|summarizer:buildBlock|survival:buildBlock|temperament:buildBlock|tempo:buildBlock|temporalLock:buildBlock|theater:generate send stat wrap|theme:THEMES activeModules apply list preview separation statView|threads:RELIABILITY TERMINAL abandon addLead buildBlock converge explain getSettings open resolve setSettings stall stat threadStat|timeline:SOURCE_ID_KEY auditRefs captureRange hashText unionRefs|tolerance:buildBlock|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview previewPlan|toolSnapshot:buildSubsetPayload download restore|undo:capture clear peek pushValue stat undo|warrant:buildBlock|wbInject:activeOrders findCompanionName getConfig isEnabled|weather:buildBlock|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|world:CHANNELS EVENT_KINDS PLACE_KINDS addEvent addPlace addRoad addUse arrive attendees buildBlock canBeAt depart eventsBetween getSettings move reach setSettings stat stop tick transit useWindowOf usesOf where whereStat|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries peekEntries previewActivation saveSelection triggerEnabled';
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
     } else {
@@ -11486,7 +11549,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.116.0', '入口版本为 2.111.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.119.0', '入口版本为 2.119.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11874,7 +11937,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.116.0', '入口版本为 2.111.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.119.0', '入口版本为 2.119.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12244,7 +12307,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.116.0', '入口版本为 2.111.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.119.0', '入口版本为 2.119.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12609,7 +12672,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.116.0', '入口版本为 2.111.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.119.0', '入口版本为 2.119.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14815,26 +14878,26 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 2758, '现场静态引用 2758 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；）');
-    assert(r2700.namespaces === 124 && r2700.members === 1459,
-      '定义面 124 命名空间 / 1459 成员（v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
-    assert(r2700.dead.length === 505 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 191,
-      '死子面 dead 505 / uiDead 4 / dataOnly 191（v2.102.0（A2/O12）：perf-trace 九口如实登记为 self-only（内部自用、外部零引用 = 过度导出），另六枚只读数据成员 ⇒ dataOnly +2；其中 slots / baseline / curveAll 已接面板真消费方故不在此列；v2.101.0：interop.probePartner 是按伙伴分发口、外部零引用 ⇒ dead +1；五枚只读数据成员零引用 ⇒ dataOnly +4；v2.99.0：canon.LIMITS 是数据成员、产品零引用 ⇒ dataOnly +1；v2.88.0：' + 'O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
+    assert(r2700.refs === 3170, '现场静态引用 3170 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；）');
+    assert(r2700.namespaces === 139 && r2700.members === 1744,
+      '定义面 139 命名空间 / 1744 成员（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.dead.length === 608 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 238,
+      '死子面 dead 608 / uiDead 4 / dataOnly 238（v2.102.0（A2/O12）：perf-trace 九口如实登记为 self-only（内部自用、外部零引用 = 过度导出），另六枚只读数据成员 ⇒ dataOnly +2；其中 slots / baseline / curveAll 已接面板真消费方故不在此列；v2.101.0：interop.probePartner 是按伙伴分发口、外部零引用 ⇒ dead +1；五枚只读数据成员零引用 ⇒ dataOnly +4；v2.99.0：canon.LIMITS 是数据成员、产品零引用 ⇒ dataOnly +1；v2.88.0：' + 'O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
       + '只有 causal.replayWith 如实登记为 test-only（它重跑代码，而会写世界的轮次不能用它，产品内确无安全调用点），实 '
       + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
-    assert(r2700.deadInTestsOnly === 296, '其中仅测试引用 296（v2.92.0：O5 的资源账本两口入此列，实 ' + r2700.deadInTestsOnly + '）');
+    assert(r2700.deadInTestsOnly === 349, '其中仅测试引用 349（v2.92.0：O5 的资源账本两口入此列，实 ' + r2700.deadInTestsOnly + '）');
     // ── D. 账本健全：条目数一致、归因在词表内、无占位 ──
     const led2700 = gate2700.loadLedger();
     assert(!!led2700 && typeof led2700 === 'object', '账本可加载（tests/dead-export-ledger.json）');
-    assert(Object.keys(led2700.dead).length === 505 && Object.keys(led2700.uiDead).length === 4,
-      '账本条目数与现场一致（dead 505 / uiDead 4；v2.110.0 新增三个基元模块的 26 个口'
+    assert(Object.keys(led2700.dead).length === 608 && Object.keys(led2700.uiDead).length === 4,
+      '账本条目数与现场一致（dead 608 / uiDead 4；v2.110.0 新增三个基元模块的 26 个口'
       + '按实测归因登记，面内净增为零）');
     const reasons2700 = Array.from(new Set(Object.keys(led2700.dead).concat(Object.keys(led2700.uiDead))
       .map(function (k) { return (led2700.dead[k] || led2700.uiDead[k] || {}).reason; })));
     assert(reasons2700.every(function (x) { return gate2700.REASON_CODES.indexOf(x) >= 0; }),
       '归因全在词表内（' + reasons2700.join(',') + '）');
     assert(JSON.stringify(led2700).indexOf('TODO') < 0, '账本无占位归因（归因由测量得出，不留 TODO）');
-    assert(led2700.advisory && led2700.advisory.dataOnly === 191, 'advisory 面只记计数不拦截（dataOnly=191，v2.110.0：新增三个基元模块的只读数据成员 +6（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）；v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS +1）');
+    assert(led2700.advisory && led2700.advisory.dataOnly === 238, 'advisory 面只记计数不拦截（dataOnly=238，v2.110.0：新增三个基元模块的只读数据成员 +6（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）；v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS +1）');
     // ── E. 判定四态（纯判定面，用现场结果驱动）──
     const clone2700 = function (o) { return JSON.parse(JSON.stringify(o)); };
     assert(gate2700.judge(r2700, led2700).ok === true, '（基线）现场与账本一致 ⇒ ok');
@@ -14933,7 +14996,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.116.0', '入口 VERSION = 2.111.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.119.0', '入口 VERSION = 2.119.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -14966,7 +15029,7 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
     ['dead', 'uiDead'].forEach(function (k) {
       Object.keys(led2800[k] || {}).forEach(function (kk) { allEnt2800.push({ kind: k, key: kk, item: led2800[k][kk] }); });
     });
-    assert(allEnt2800.length === 509, '账本条目 509 条（v2.111.0：新增 auditLog 与 sanitize 两模块共 10 个口 ⇒ 486 + 10 = 496，其中 sanitize.html 接了真消费方故**出冻结面**（dead 492→491）⇒ 495；v2.110.0：新增三个基元模块的 26 个口按实测归因登记 ⇒ 460 + 26 = 486；v2.102.0：perf-trace 九口如实登记 self-only ⇒ 449 + 9 = 458；v2.101.0：interop.probePartner 按伙伴分发口如实登记为 self-only；v2.89.0：O2 磁带面——新增 causal.replayWith 如实登记，实 ' + allEnt2800.length + '）');
+    assert(allEnt2800.length === 553, '账本条目 553 条（v2.111.0：新增 auditLog 与 sanitize 两模块共 10 个口 ⇒ 486 + 10 = 496，其中 sanitize.html 接了真消费方故**出冻结面**（dead 492→491）⇒ 495；v2.110.0：新增三个基元模块的 26 个口按实测归因登记 ⇒ 460 + 26 = 486；v2.102.0：perf-trace 九口如实登记 self-only ⇒ 449 + 9 = 458；v2.101.0：interop.probePartner 按伙伴分发口如实登记为 self-only；v2.89.0：O2 磁带面——新增 causal.replayWith 如实登记，实 ' + allEnt2800.length + '）');
     const missingEv2800 = allEnt2800.filter(function (e) {
       return gate2800.EVIDENCE_KEYS.some(function (f) { return e.item[f] === undefined; });
     });
@@ -14984,8 +15047,8 @@ assert(verF2500 === '2.116.0' && mfF2500.version === verF2500, '入口与清单�
             //   uiDead 4 项全为 test-only ⇒ test-only = 293(dead 里的 test-only) + 4(uiDead) = 297（v2.93.0 现场）。
             //   v2.73.0 之前测试面只读 run.js，两侧分别是 135 / 4。
              //   v2.101.0：interop.probePartner 只有本模块内部调用 ⇒ self-only 119 → 120，总条目 448 → 449。
-assert(dist2800['test-only'] === 300 && dist2800['self-only'] === 177 && dist2800['unwired'] === 32,
-'归因分布 test-only 300 / self-only 177 / unwired 32（v2.114.0：sandbox / plugin 两模块 12 口中，sandbox.freezeApi / sandbox.reset / plugin.reset 三项**当场删除**（能力未接线、白名单冻结只该是 run 内部步骤），sandbox.stat 由 tool-diag 的 secPlugin 真读、plugin.unregister 由面板 #wa-pl-unreg 卸载按钮真调 ⇒ 二者出冻结面；chrono / collab 新增口按实测归因入册（test-only +3 / self-only +2）；v2.111.0：auditLog / sanitize 两模块共 10 口，9 个留 self-only（sanitize.html 接了面板真消费方故由死转活）⇒ 157 + 9 = 166；v2.110.0：三个基元模块的 26 个口全部 self-only（模块内部自用、外部零引用）⇒ 131 + 26 = 157；另 6 个只读数据成员（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）走 advisory.dataOnly（172→178），**不进冻结面** —— 故 26 这个数是「方法与函数」，不含数据成员；v2.102.0：perf-trace 九口 self-only ⇒ 120 + 9 = 129；v2.101.0：interop.probePartner 记 self-only ⇒ 449；v2.93.0：死面 293 + 界面 4 = 297，实 ' + JSON.stringify(dist2800) + '）');
+assert(dist2800['test-only'] === 323 && dist2800['self-only'] === 194 && dist2800['unwired'] === 36,
+'归因分布 test-only 323 / self-only 194 / unwired 36（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块的全部导出按实测归因入册 ⇒ 分布由 {300/177/32}（面 509）变成 {323/194/36}（面 553）；v2.114.0：sandbox / plugin 两模块 12 口中，sandbox.freezeApi / sandbox.reset / plugin.reset 三项**当场删除**（能力未接线、白名单冻结只该是 run 内部步骤），sandbox.stat 由 tool-diag 的 secPlugin 真读、plugin.unregister 由面板 #wa-pl-unreg 卸载按钮真调 ⇒ 二者出冻结面；chrono / collab 新增口按实测归因入册（test-only +3 / self-only +2）；v2.111.0：auditLog / sanitize 两模块共 10 口，9 个留 self-only（sanitize.html 接了面板真消费方故由死转活）⇒ 157 + 9 = 166；v2.110.0：三个基元模块的 26 个口全部 self-only（模块内部自用、外部零引用）⇒ 131 + 26 = 157；另 6 个只读数据成员（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）走 advisory.dataOnly（172→178），**不进冻结面** —— 故 26 这个数是「方法与函数」，不含数据成员；v2.102.0：perf-trace 九口 self-only ⇒ 120 + 9 = 129；v2.101.0：interop.probePartner 记 self-only ⇒ 449；v2.93.0：死面 293 + 界面 4 = 297，实 ' + JSON.stringify(dist2800) + '）');
     assert(gate2800.evidenceDrift(r2800, led2800).length === 0, '现场账本证据复算零失实');
 
     // ── E. 负控制：证据失实/缺证/归因与证据不符 各须现形 ──
@@ -15016,11 +15079,11 @@ assert(dist2800['test-only'] === 300 && dist2800['self-only'] === 177 && dist280
     // ── F. 判据不越界：冻结面与归因宽度本版不动；现场锚点随 v2.29.0 真代码口径更新 ──
     assertDeepEq(gate2800.FROZEN_KINDS, ['dead', 'uiDead'], '冻结面仍为 dead/uiDead（本版不扩面）');
     assertDeepEq(gate2800.ADVISORY_KINDS, ['dataOnly'], 'advisory 面仍为 dataOnly（不升级为拦截）');
-assert(r2800.dead.length === 505 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 191
-&& r2800.deadInTestsOnly === 296,
-'现场锚点（dead 505 / uiDead 4 / dataOnly 191 / 仅测试 296，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥）');
-assert(r2800.refs === 2758 && r2800.namespaces === 124 && r2800.members === 1459,
-    '清册面（refs 2758 / 命名空间 124 / 成员 1459（v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
+assert(r2800.dead.length === 608 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 238
+&& r2800.deadInTestsOnly === 349,
+'现场锚点（dead 608 / uiDead 4 / dataOnly 238 / 仅测试 349，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥）');
+assert(r2800.refs === 3170 && r2800.namespaces === 139 && r2800.members === 1744,
+    '清册面（refs 3170 / 命名空间 139 / 成员 1744（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -15199,11 +15262,11 @@ assert(r2800.refs === 2758 && r2800.namespaces === 124 && r2800.members === 1459
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-assert(r2900.refs === 2758 && r2900.namespaces === 124 && r2900.members === 1459,
-'清册面（refs 2758 / 命名空间 124 / 成员 1459）——真代码口径下的现场值（v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
-assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 191
-&& r2900.deadInTestsOnly === 296,
-'死子面 dead 505 / uiDead 4 / dataOnly 191 / 仅测试 296（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
+assert(r2900.refs === 3170 && r2900.namespaces === 139 && r2900.members === 1744,
+'清册面（refs 3170 / 命名空间 139 / 成员 1744）——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
+assert(r2900.dead.length === 608 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 238
+&& r2900.deadInTestsOnly === 349,
+'死子面 dead 608 / uiDead 4 / dataOnly 238 / 仅测试 349（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
       + r2900.uiDead.length + '/' + r2900.dataOnly.length + '/' + r2900.deadInTestsOnly + '）');
     const soft2900 = ['rand.seed', 'clock.freeze', 'bridge.setSettings'];
     const ledKeys2900 = Object.keys(led2900.dead);
@@ -15231,7 +15294,7 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assertDeepEq(gate2900.EVIDENCE_KEYS, ['src', 'refs', 'tref', 'own'], '证据键不变（refs 与「死」的定义仍同宽）');
     assert(inv2900.PRODUCT_FILES.length === r2900.files.product && inv2900.REF_RE instanceof RegExp,
       '清册导出 PRODUCT_FILES / REF_RE 与产品面同源（门禁复算不另写扫描面）');
-    assert(led2900.advisory && led2900.advisory.dataOnly === 191, 'advisory 只记计数（dataOnly 191，v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS 数据成员 +1）');
+    assert(led2900.advisory && led2900.advisory.dataOnly === 238, 'advisory 只记计数（dataOnly 238，v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS 数据成员 +1）');
     // 旧灯一盏不少
     const ledAdd2900 = clone2900(led2900);
     delete ledAdd2900.dead[Object.keys(ledAdd2900.dead)[0]];
@@ -16040,7 +16103,7 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(tLed.indexOf('v2350火并') >= 0 && tLed.indexOf('第7轮') >= 0, 'v2350: 账本文本真读 evolution.ledger');
     const rp = WA2350.store.registryParity();
     assert(rp.ok, 'v2350: registryParity 仍绿（snapshots/ledger 已物化）');
-    assert(rp.checked === 84, 'v2350: checked 精确值 84（v2.116.0：events.res 登记 ⇒ +1；v2.114.0：collab 三表 + chrono.entries 登记挤出站点 ⇒ +4；v2.97.0 补登 causal.phoneOps 容器）');
+    assert(rp.checked === 112, 'v2350: checked 精确值 112（v2.119.0（优化一）：B7 批十六个真容器入表 ⇒ 96 → 112；v2.118.0：B7/B8/B9 新增 rehearsal.previews / liaison 三表 / coop 两表 ⇒ 90 → 96；v2.117.0：B1–B6 新增六个精确容器 ⇒ 84 → 90；v2.116.0：events.res 登记 ⇒ +1；v2.114.0：collab 三表 + chrono.entries 登记挤出站点 ⇒ +4；v2.97.0 补登 causal.phoneOps 容器）');
     assert((rp.checkedKeys || []).indexOf('parallelWorld.snapshots') >= 0, 'v2350: snapshots 进精确键');
     assert((rp.checkedKeys || []).indexOf('evolution.ledger') >= 0, 'v2350: ledger 进精确键');
 
@@ -16537,7 +16600,23 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
     //   射 + 调用全仓不存在的 escapeHtml），出口面 +1 成员（sanitize.html）；#67 让 core/store.js
     //   给审计真投一条事实（auditLog.record）⇒ +1 成员。两个命名空间由此从「零引用」升为
     //   「有真消费方」，故 ns 109→111、members 702→704、chars 8381→8411。
-    const EC2430 = 'ns= 116 members= 731 chars= 8667';
+    // v2.119.0（出口面契约收尾）：act.js 对 world.depart/arrive/stop 的依赖此前只经
+    //   `worldOf()` 取值，成员名字面落在 core/exec.js ⇒ 静态面上「零产品引用」
+    //   （契约会记下与事实相反的证据）；已按 README v2.11.0 先例改回逐字写全。
+    //   叠加 v2.117.0-v2.119.0 新增的 9 个命名空间（act/exec/checkpoints/collab 等
+    //   一并显形）与 6 个既有命名空间的新成员 ⇒ ns 119→128、members 766→866、
+    //   chars 8987→9853。本常量随 `node tests/export-contract.js` 实跑回填。
+    const EC2430 = 'ns= 128 members= 866 chars= 9853';
+    // v2.119.0（同一面，第二条链路）：规模行相同**不等于**成员集相同 ——
+    //   ns/members 计数可以不变而名字换掉（改名、同名互换）。故这里再加一条更锋利的锁：
+    //   产物文件与 FROZEN2800 **逐字节相等**。它跨的是「生成器→落盘」这条链路，
+    //   与 v2410 段的「本次运行产物 == FROZEN2800」互补（后者不含落盘那一步）。
+    const produced4300 = fs.readFileSync(path4300.join(__dirname, 'export_contract.txt'), 'utf8').trim();
+    const frozen4300 = (fs.readFileSync(path4300.join(__dirname, 'run.js'), 'utf8')
+      .match(/const FROZEN2800 = '([\s\S]*?)';/) || [])[1];
+    assert(!!frozen4300 && produced4300 === frozen4300,
+      'v2430: tests/export_contract.txt 与 FROZEN2800 逐字节相等（产物与冻结串同源；不符时先跑 node tests/export-contract.js 再回填）');
+
     // v2.113.0（A1 收口）：闸门真接到写路径后，出口面随之扩大——
     //   `permissions` 命名空间**第一次进入契约面**（gate 被 core/store.js 真调用、
     //   currentUser 被 core/audit-log.js 真调用、gateStat 被 engines/tool-diag.js 真读）；
@@ -18425,129 +18504,129 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   }
 
   section('v2.56.0 inject-sources class lock');
-  require('./inject-sources-v2560.js').runAll(assert);
-  require('./inject-sources-v2560.js').runNegative(assert);
+  runLock('./inject-sources-v2560.js');
+  runLock('./inject-sources-v2560.js', 'runNegative');
   section('v2.57.0 ui module section grouping lock');
-  require('./ui-module-section-v2570.js').runAll(assert);
-  require('./ui-module-section-v2570.js').runNegative(assert);
+  runLock('./ui-module-section-v2570.js');
+  runLock('./ui-module-section-v2570.js', 'runNegative');
   section('v2.58.0 inject visibility no-dead-switch lock');
-  require('./inject-vis-v2580.js').runAll(assert);
-  require('./inject-vis-v2580.js').runNegative(assert);
+  runLock('./inject-vis-v2580.js');
+  runLock('./inject-vis-v2580.js', 'runNegative');
   section('v2.59.0 relation contract x engine fields lock');
-  require('./rel-contract-v2590.js').runAll(assert);
-  require('./rel-contract-v2590.js').runNegative(assert);
+  runLock('./rel-contract-v2590.js');
+  runLock('./rel-contract-v2590.js', 'runNegative');
   section('v2.60.0 section field contract x engine read-surface lock');
-  require('./rel-contract-v2600.js').runAll(assert);
-  require('./rel-contract-v2600.js').runNegative(assert);
+  runLock('./rel-contract-v2600.js');
+  runLock('./rel-contract-v2600.js', 'runNegative');
   section('v2.61.0 bounded-container eviction meta-field producer supply lock');
-  require('./evict-meta-v2610.js').runAll(assert);
-  require('./evict-meta-v2610.js').runNegative(assert);
+  runLock('./evict-meta-v2610.js');
+  runLock('./evict-meta-v2610.js', 'runNegative');
   section('v2.62.0 causal settlement stage-ladder x terminal attribution lock');
-  require('./causal-v2620.js').runAll(assert);
-  require('./causal-v2620.js').runNegative(assert);
+  runLock('./causal-v2620.js');
+  runLock('./causal-v2620.js', 'runNegative');
   section('v2.51.0 narrative-craft settings面 frozen into repo (54 items, pinned at v2.62.0)');
-  require('./style-craft-v2510.js').runAll(assert);
-  require('./style-craft-v2510.js').runNegative(assert);
+  runLock('./style-craft-v2510.js');
+  runLock('./style-craft-v2510.js', 'runNegative');
   section('v2.62.0 stable person-id x identity-vs-state reconciliation lock');
-  require('./registry-identity-v2620.js').runAll(assert);
-  require('./registry-identity-v2620.js').runNegative(assert);
+  runLock('./registry-identity-v2620.js');
+  runLock('./registry-identity-v2620.js', 'runNegative');
   section('v2.63.0 world-fabric reachability x attendance-evidence lock');
-  require('./world-v2630.js').runAll(assert);
-  require('./world-v2630.js').runNegative(assert);
+  runLock('./world-v2630.js');
+  runLock('./world-v2630.js', 'runNegative');
   section('v2.63.0 social-vortex irreversible-experience x kept-vs-broken lock');
-  require('./shadow-v2630.js').runAll(assert);
-  require('./shadow-v2630.js').runNegative(assert);
+  runLock('./shadow-v2630.js');
+  runLock('./shadow-v2630.js', 'runNegative');
   section('v2.63.0 cold-case basis-required x conflict-not-averaged lock');
-  require('./threads-v2630.js').runAll(assert);
-  require('./threads-v2630.js').runNegative(assert);
+  runLock('./threads-v2630.js');
+  runLock('./threads-v2630.js', 'runNegative');
   section('v2.64.0 lane-randomness rolled-vs-skipped x guarantee-forced lock');
-  require('./horizon-v2640.js').runAll(assert);
-  require('./horizon-v2640.js').runNegative(assert);
+  runLock('./horizon-v2640.js');
+  runLock('./horizon-v2640.js', 'runNegative');
   section('v2.64.0 offscreen-independence exported-read-path x standalone-gate lock');
-  require('./parallel-world-v2640.js').runAll(assert);
-  require('./parallel-world-v2640.js').runNegative(assert);
+  runLock('./parallel-world-v2640.js');
+  runLock('./parallel-world-v2640.js', 'runNegative');
   section('v2.64.0 hostility recorded-drop-attribution x terminal-window lock');
-  require('./enemies-v2640.js').runAll(assert);
-  require('./enemies-v2640.js').runNegative(assert);
+  runLock('./enemies-v2640.js');
+  runLock('./enemies-v2640.js', 'runNegative');
   section('v2.65.0 settlement depart-not-arrival x weather-missing x enum-reject x intel-delay lock');
-  require('./settle-v2650.js').runAll(assert);
-  require('./settle-v2650.js').runNegative(assert);
+  runLock('./settle-v2650.js');
+  runLock('./settle-v2650.js', 'runNegative');
   section('v2.66.0 affect-channel x bonds-sixtypes x masks-face-tell lock');
-  require('./settle-v2660.js').runAll(assert);
-  require('./settle-v2660.js').runNegative(assert);
+  runLock('./settle-v2660.js');
+  runLock('./settle-v2660.js', 'runNegative');
   section('v2.67.0 temporal-lock x temperament-two-layer x fondness-never-drop x parallel-events lock');
-  require('./settle-v2670.js').runAll(assert);
-  require('./settle-v2670.js').runNegative(assert);
+  runLock('./settle-v2670.js');
+  runLock('./settle-v2670.js', 'runNegative');
   section('v2.68.0 era-cycle x survival-three-axis x warrant-hunted x beast-bond lock');
-  require('./settle-v2680.js').runAll(assert);
-  require('./settle-v2680.js').runNegative(assert);
+  runLock('./settle-v2680.js');
+  runLock('./settle-v2680.js', 'runNegative');
   section('v2.69.0 appearance-contract x ladder-escalation lock');
-  require('./settle-v2690.js').runAll(assert);
-  require('./settle-v2690.js').runNegative(assert);
+  runLock('./settle-v2690.js');
+  runLock('./settle-v2690.js', 'runNegative');
 
   section('v2.70.0 scene-slice x gauge x rivalry lock');
-  require('./settle-v2700.js').runAll(assert);
-  require('./settle-v2700.js').runNegative(assert);
+  runLock('./settle-v2700.js');
+  runLock('./settle-v2700.js', 'runNegative');
   section('v2.71.0 enigma-tide x tempo-gear x quota-seeds x spotlight-balance lock');
-  require('./settle-v2710.js').runAll(assert);
-  require('./settle-v2710.js').runNegative(assert);
+  runLock('./settle-v2710.js');
+  runLock('./settle-v2710.js', 'runNegative');
   section('v2.72.0 karma-dual-axis x hazard-accumulation x marginal-decay x tolerance-window lock');
-  require('./settle-v2720.js').runAll(assert);
-  require('./settle-v2720.js').runNegative(assert);
+  runLock('./settle-v2720.js');
+  runLock('./settle-v2720.js', 'runNegative');
 
   section('v2.74.0 duplicate-declaration x patch-rerun-fingerprint lock');
-  require('./dup-decl-v2740.js').runAll(assert);
-  require('./dup-decl-v2740.js').runNegative(assert);
+  runLock('./dup-decl-v2740.js');
+  runLock('./dup-decl-v2740.js', 'runNegative');
   section('v2.75.0 test-file reachability x orphan-lock mount');
 
   section('v2.77.0 fondness settlement-discipline lock (band-cap x stale-proposal x not-undoable x corrections)');
-  require('./settle-v2770.js').runAll(assert);
-  require('./settle-v2770.js').runNegative(assert);
+  runLock('./settle-v2770.js');
+  runLock('./settle-v2770.js', 'runNegative');
   // v2.78.0（第十二面）：拒收码可达性——每个内联 reason 码必须落入
   //   witnessed（有可执行见证）/ dead（已证不可达，带钉住的锚点）/ base（存量基线台账）三者之一；
   //   三者之外的新增码即红灯，台账冗余亦红灯（防台账永久比现实胖）。
   section('v2.78.0 reject-code reachability lock (witnessed x dead x base, two-way)');
-  require('./reject-lock-v2780.js').runAll(assert);
-  require('./reject-lock-v2780.js').runNegative(assert);
+  runLock('./reject-lock-v2780.js');
+  runLock('./reject-lock-v2780.js', 'runNegative');
   // v2.79.0（第十三面）：拒收即提交——transact 的中止契约（mutator 返回 false ⇒ 不落盘、
   //   不推进 meta.stateRev）此前全仓零使用：所有拒收分支写的都是裸 `return;`（返回值 undefined
   //   ≠ false），于是「已判定的失败」被当成成功提交，世界没变而序号推进、整份状态写盘。
   //   本版把 129 个站点改为 `return false;`，唯一豁免是抱有意副作用的站点（作废过期建议）。
   section('v2.79.0 reject-settles-nothing lock (submit-on-reject x intentional side-effect, two-way)');
-  require('./side-effect-lock-v2790.js').runAll(assert);
-  require('./side-effect-lock-v2790.js').runNegative(assert);
+  runLock('./side-effect-lock-v2790.js');
+  runLock('./side-effect-lock-v2790.js', 'runNegative');
   // v2.79.0（第十三面续 · 读面隔离）：写路径的准入只对走写路径的人有效。五个「只读」接口
   //   此前把 store 内部对象/数组原样交出去（editorEvents.list / editorFaction.list /
   //   rivalry.read / registry.getProfile / parallelWorld.state），消费方顺手写返回值即改持久态。
   section('v2.79.0 reference-isolation lock (read faces must not hand out live store refs, two-way)');
-  require('./reference-isolation-lock-v2790.js').runAll(assert);
-  require('./reference-isolation-lock-v2790.js').runNegative(assert);
+  runLock('./reference-isolation-lock-v2790.js');
+  runLock('./reference-isolation-lock-v2790.js', 'runNegative');
   // v2.79.0（第十三面续 · 输入边界）：29 入口 × 23 种坏输入实测 —— 两族缺陷：
   //   ① 未受控抛出（classifyKey/read/getProfile）打断整轮巡检，「没查出问题」与「没跑完」不可分；
   //   ② 字符串化兜底把非法值静默升格（String(NaN) → 'NaN'，建出空记录/荒唐锁名/NaN 悬案）。
   section('v2.79.0 input-boundary lock (bad-input matrix x no-silent-accept, two-way)');
-  require('./input-boundary-v2790.js').runAll(assert);
-  require('./input-boundary-v2790.js').runNegative(assert);
+  runLock('./input-boundary-v2790.js');
+  runLock('./input-boundary-v2790.js', 'runNegative');
   // v2.84.0 A2：统一输入边界的专锁。v2.79.0 的矩阵锁只做到「给 10 个入口加守卫 + 诚实登记
   //   8 处同型未覆盖」；本锁处理的是**那 8 处 + 新边界模块本身**：迁移锚点在场、零升格、
   //   零外抛、原版零问题、退回旧兜底必须现形。
-  require('./input-guard-v2840.js').runAll(assert);
-  require('./input-guard-v2840.js').runNegative(assert);
+  runLock('./input-guard-v2840.js');
+  runLock('./input-guard-v2840.js', 'runNegative');
   // v2.80.0（第十四面）：诊断与可观测性——故障被记录了 ≠ 故障可被看见。
   //   面 A · 故障台账总目：v2.63.0 起二十余个模块建了 stat().faults 台账，读侧只长了 3 个采集节
   //     （secWorld/secShadow/secThreads），其余模块的拒收在面板上与「什么也没发生」不可分。
   //     判据：凡以 stat().faults 记账的模块，必须出现在同一张会自己长大的总目里，
   //     且总目模块集合与独立遍历逐项相等（逐模块单列采集节在结构上兜不住「漏了谁」）。
   section('v2.80.0 fault-ledger lock (faults owners must appear in one self-growing ledger, two-way)');
-  require('./fault-ledger-lock-v2800.js').runAll(assert);
-  require('./fault-ledger-lock-v2800.js').runNegative(assert);
+  runLock('./fault-ledger-lock-v2800.js');
+  runLock('./fault-ledger-lock-v2800.js', 'runNegative');
   // v2.80.0（第十四面续 · 观测面隔离）：world/shadow/threads 三个模块的 stat() 是浅拷贝
   //   （`Object.assign({}, stat)`），返回值的 faults 与内部台账是同一对象 ⇒ 调用方改写返回值
   //   即可伪造/抹除观测记录。这是 v2.79.0 面 B「读面回传活引用」的镜像：那边改返回值改持久态，
   //   这边改返回值改观测记录。判据：全仓凡 stat() 交回 faults 的模块都不得交回内部活引用。
   section('v2.80.0 fault-alias lock (stat() must not hand out live fault ledger, two-way)');
-  require('./fault-alias-lock-v2800.js').runAll(assert);
-  require('./fault-alias-lock-v2800.js').runNegative(assert);
+  runLock('./fault-alias-lock-v2800.js');
+  runLock('./fault-alias-lock-v2800.js', 'runNegative');
   // v2.80.0（第十四面续 · 注入-还原不变量）：tests/run.js 的负向自证里有若干处「真源码注入 → 跑门禁
   //   → 还原」，只靠 try/finally 收尾；engines/bridge.js 是唯一被**原地改写**的产品文件。
   //   本版实测到一次真实事故：运行在注入窗口内被中断（输出止于 273525 字节、marker 未落），finally
@@ -18559,23 +18638,23 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   （还原 payload 恰为快照标识符，写成「快照 + 后缀」即注入）；③ 标记从注入载荷自动抽取，
   //   不靠人工白名单，新增一处注入即自动纳入分母。
   section('v2.80.0 injection-restore lock (product files must return to an external baseline, two-way)');
-  require('./injection-restore-lock-v2800.js').runAll(assert);
-  require('./injection-restore-lock-v2800.js').runNegative(assert);
+  runLock('./injection-restore-lock-v2800.js');
+  runLock('./injection-restore-lock-v2800.js', 'runNegative');
   // v2.81.0（第十五面）：事件调度——排期 ≠ 触发。锁住三态口径（pending/claimed/终态各自成词）、
   //   认领唯一闸（同一事件不会重复执行）、条件未足零变化（与执行失败严格分开）、失败重试与
   //   失败队列、容量只数活动态、replace 留痕、受控收窄（不 String() 静默升格）、stat 交回副本，
   //   外加接线核验（store 骨架 / render.SOURCES / evict per-call 站点三处同步登记）。
   section('v2.81.0 events scheduling-discipline lock (claim-gate x condition-zero-change x retry-queue x wiring)');
-  require('./settle-v2810.js').runAll(assert);
-  require('./settle-v2810.js').runNegative(assert);
+  runLock('./settle-v2810.js');
+  runLock('./settle-v2810.js', 'runNegative');
   // v2.82.0（第十六面）：快照与分支——存档 ≠ 保存过 = 分支。锁住三条承重设计
   //   （库在世界状态之外的独立键 / schemaVersion 是守卫键且**从不进快照** / 分支必须落地成
   //   一次真实 save 且父链可独立复述）、三范围各自成词、手自动分算容量、库读不出时绝不覆盖写、
   //   信封单格式号、导入默认不覆盖、删档如实报 orphans；外加接线核验（四处接线同批，
   //   反向断言 store 骨架与容量表**不得**含 checkpoints——库不在骨架里）。
   section('v2.82.0 checkpoints snapshots-discipline lock (lib-outside-state x guard-key x branch-must-land x wiring)');
-  require('./settle-v2820.js').runAll(assert);
-  require('./settle-v2820.js').runNegative(assert);
+  runLock('./settle-v2820.js');
+  runLock('./settle-v2820.js', 'runNegative');
   // v2.83.0（第三十七面）：模块契约（B4）+ 配置 schema/迁移（B6）。
   //   两者的判据都在这一份文件里（B4 的读数取自 module-registry-ledger.json，
   //   由 tests/module-registry-gate.js 实测产出 —— 静态扫描测不出「必须先装载」，
@@ -18592,9 +18671,9 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   「A 的关闭连累 B」这种缺陷是**瞎的**。
   //   另一半是存档兼容：本版 A2 收紧了输入边界（约 28 份 clean() 委托到 inputGuard），
   //   而没有任何判据回答「收紧之后旧存档还读不读得进」——「更严格」不得以误伤存档为代价。
-  require('./settle-v2841.js').runAll(assert);
+  runLock('./settle-v2841.js');
   require('./settle-v2841.js').runCompat(assert);
-  require('./settle-v2841.js').runNegative(assert);
+  runLock('./settle-v2841.js', 'runNegative');
   // v2.85.0（第三十九面）：注入效率(A4) + 人物自主生活(B1) + 地域与交通(B2)。
   //   本版三处落点治的是同一类病：**承诺写在源码里，但没有任何判据问过它**——
   //   ① A4：inject-budget 的 PRIORITY 承诺「pinned（rank≤2）优先保障、绝不静默丢弃」，
@@ -18607,54 +18686,54 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   ③ B2：本版新增的两条边界**全是否定式**（层级只说明归属≠可达；路走得通≠现在走得动），
   //      而存在面判据（有 parent 字段吗 / 有 cap 字段吗）对它们一无所知——
   //      「有字段」与「字段被当成什么读」是两件事。
-  require('./settle-v2850.js').runAll(assert);
-  require('./settle-v2850.js').runNegative(assert);
+  runLock('./settle-v2850.js');
+  runLock('./settle-v2850.js', 'runNegative');
   // v2.86.0（第四十面）：注入链韧性 + 失败分类（A5 第一部分）。
   //   实测：43 个源调用点里只有 style 一处在 try/catch 内 ⇒ 让 bonds 抛一次异常，
   //   47 个源**全部**丢失（连世界状态的时间/背景/人物一起消失），异常还冒泡出扩展。
   //   本锁把「源抛异常只丢该源 + 按显示名留痕 + 空串不计故障」做成可测事实。
-  require('./settle-v2860.js').runAll(assert);
-  require('./settle-v2860.js').runNegative(assert);
+  runLock('./settle-v2860.js');
+  runLock('./settle-v2860.js', 'runNegative');
   // v2.86.0（第四十面）：事实唯一写者（A3）。
   //   实测：人物条目有五个创建点（life / intel 两处 / backstage 两处 / registry），
   //   各写各的 `draft.people[id] = {...}` ⇒ 「这个条目是谁建出来的」完全不可见。
   //   本锁把「创建只此一处 + 每次新建打来源标签 + 残点必带 fallback」做成可测事实。
-  require('./identity-v2860.js').runAll(assert);
-  require('./identity-v2860.js').runNegative(assert);
+  runLock('./identity-v2860.js');
+  runLock('./identity-v2860.js', 'runNegative');
   // v2.87.0（第四十一面）：因果观测面 —— 当前状态与累计分列（B6）。
   //   实测：causal.stat() 是**进程累计**（刷新即零），而「这条链现在怎么了」
   //   此前只能逐条 classify —— tool-diag 与 ui/panel 读到的那个数既答不出
   //   「发生过几次」，也答不出「现在怎么样」。本锁把两份读数分列做成可测事实。
-  require('./causal-view-v2870.js').runAll(assert);
-  require('./causal-view-v2870.js').runNegative(assert);
+  runLock('./causal-view-v2870.js');
+  runLock('./causal-view-v2870.js', 'runNegative');
   // v2.87.0（第四十二面，结束版）：导演工作台 + 题材组合 + 导入差异预览。
   //   实测缺口一：干预只能「执行再看结果」——预览与试演都不存在；
   //   实测缺口二：rules.js 的 16 模块全量注入，题材无从装卸；
   //   实测缺口三：toolImport.preview 只报 kind/size/count，「会新增什么」看不到。
   //   本锁把「预览与真跑同源」「预览不覆盖」「未知题材不静默」做成可测事实。
-  require('./b6-b7-v2870.js').runAll(assert);
-  require('./b6-b7-v2870.js').runNegative(assert);
+  runLock('./b6-b7-v2870.js');
+  runLock('./b6-b7-v2870.js', 'runNegative');
   // v2.88.0（第四十二面）：注入成本的实测与分档（O1）。
   //   实测缺口：本仓库从 v0.9.3 起就报「注入用了多少 token、谁被折叠、谁被丢弃」，
   //   但**耗时**这一维从未被测量 —— 45 个源的注入链里，任何一处慢函数都只能以
   //   「反正有点慢」的体感存在。本锁把「计时落在唯一引擎出口」「账本主键是引擎真调过的源
   //   （而不是碰巧有内容的源）」「0ms 是低于精度不是很快」「分档不参与判定」做成可测事实。
-  require('./cost-v2880.js').runAll(assert);
-  require('./cost-v2880.js').runNegative(assert);
+  runLock('./cost-v2880.js');
+  runLock('./cost-v2880.js', 'runNegative');
   // v2.89.0（第四十三面）：因果回放证据升级（O2）。
   //   本仓库从 v2.14.0 起就报 `reproducible`（种子是不是显式定的），但**没有任何地方
   //   能证明「这一轮真能重放」**——种子相同而调用顺序漂移时，它会安静地换一整套数。
   //   本锁把「磁带按位置记答案、错位被当场报出、回放不碰派生流、复核不擦掉证据、
   //   replayable 与 reproducible 分列」做成可测事实，并用三个真源码破坏点逐锚自证。
-  require('./replay-v2890.js').runAll(assert);
-  require('./replay-v2890.js').runNegative(assert);
+  runLock('./replay-v2890.js');
+  runLock('./replay-v2890.js', 'runNegative');
   // v2.90.0（第四十四面）：每轮执行解释 —— 玩家面与全知面分列（O3）。
   //   实测缺口：`applyInjections` 逐段写 `if (vis.xx && WA.xx)`，于是「用户关的 / 模块没加载 /
   //   本轮没内容 / 构建抛异常」四种截然不同的局面，在存档上长得一模一样（都是「这个源没进正文」）。
   //   本锁把「源表逐项事后归因」「玩家面只给进了什么与还有几项没进（不剧透未落地源名）」
   //   「轮次不符照实拒答」「纯读不改存档」做成可测事实，并用三个真源码破坏点逐锚自证。
-  require('./explain-v2900.js').runAll(assert);
-  require('./explain-v2900.js').runNegative(assert);
+  runLock('./explain-v2900.js');
+  runLock('./explain-v2900.js', 'runNegative');
   // v2.92.0（第四十五面）：因果与状态批量治理 —— 开关矩阵的两面真值 + 悬空身份引用（O4）。
   //   实测缺口：① 决定「源进不进正文」的是**两个开关相与**（渲染可见性 × 模块级总开关），
   //   而 settle-v2841 只翻了可见性那一面；勾着 longline 却关掉模块时产物零字节，
@@ -18664,8 +18743,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   本锁把「归因码新增 module-off（七态封闭）」「逐源两面对账（on/vis-off/mod-off/unavailable）」
   //   「悬空引用只报不删且点名到人」做成可测事实，并用四个真源码破坏点逐锚自证
   //   （其中负控制同时覆盖「静默报零」与「失去分辨力」两个方向）。
-  require('./switch-matrix-v2910.js').runAll(assert);
-  require('./switch-matrix-v2910.js').runNegative(assert);
+  runLock('./switch-matrix-v2910.js');
+  runLock('./switch-matrix-v2910.js', 'runNegative');
   // v2.92.0（第四十六面）：资源账本健康面 —— 先落观测不落功能（O5）。
   //   实测缺口：`engines/org.js` 从 v2.54.0 起只有**累计计数**（grants / transfers / blocked），
   //   于是「某笔交易后存量 == 存量 ± 流量」这句话在此之前**不可判定**——计数只知道发生了
@@ -18673,8 +18752,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   本锁把「增量守恒（存量 ± 流量）」「被拒交易不记流水」「异常笔三类单列」「对账现形
   //   （绕过产品写路径的篡改必须被报出）」「挤出即记账」「纯读不改存档」做成可测事实，
   //   并用五个真源码破坏点逐锚自证（含「静默报零」与「失去分辨力」两个方向）。
-  require('./resource-ledger-v2920.js').runAll(assert);
-  require('./resource-ledger-v2920.js').runNegative(assert);
+  runLock('./resource-ledger-v2920.js');
+  runLock('./resource-ledger-v2920.js', 'runNegative');
   // v2.93.0（第四十七面）：天气封锁联动 —— 三层通行判定（X4）。
   //   实测缺口：world.reach 只答「路通不通」，weather.effect 只答「耗时乘几」，
   //   两者从不交谈——于是「暴风雪封了乙镇：人过不去、货过不去，但口信送到了」
@@ -18683,8 +18762,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   本锁把「三层分列（person/goods/message）」「封锁归因带地点与天气名」
   //   「未登记天气不回落成晴也不回落成封锁」「关闭不是天气很差」做成可测事实，
   //   并用六个真源码破坏点逐锚自证（含「静默放行」与「静默掠过的不知」两向）。
-  require('./transit-v2930.js').runAll(assert);
-  require('./transit-v2930.js').runNegative(assert);
+  runLock('./transit-v2930.js');
+  runLock('./transit-v2930.js', 'runNegative');
   // v2.94.0（第四十八面）：流水落盘与跨会话可查 —— 账本三面收口（O6 + O7 + O8）。
   //   实测缺口：三句话在 v2.93.0 都答不上来——① 「上一节会话里那笔之后存量对不对」
   //   （流水只驻内存，`reconcile` 在环形挤出后只能核**带内**）；② 「库存被写坏了吗」
@@ -18693,8 +18772,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   自相矛盾与存量背离」「卷不合规四态各自点名」「经济风三态不回落成『平稳』」
   //   「异常笔真的被健康分消费」「挤出期说清只核带内」做成可测事实，
   //   并用六个真源码破坏点逐锚自证（每个负控制都在破坏副本上重跑**同款判据**）。
-  require('./journal-v2940.js').runAll(assert);
-  require('./journal-v2940.js').runNegative(assert);
+  runLock('./journal-v2940.js');
+  runLock('./journal-v2940.js', 'runNegative');
   // v2.95.0（第四十九面）：经济引擎 —— 职册 / 功簿 / 薪俸 / 欠薪 / 罚没（X2 · B3）。
   //   实测缺口：四句话在 v2.94.0 都答不上来——① 「这个组织里有谁、各任什么职」
   //   （org 从 v2.54.0 起只有库存与累计计数，没有名册）；② 「这一期该发多少、
@@ -18705,8 +18784,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   「发薪/补发/罚没走同一支 transfer 因而自动进 O5 流水、可被 O6 带外对账核」
   //   「欠就是欠：ok（流程跑完）与 settled（从此不欠谁）分开」做成可测事实，
   //   并用六个真源码破坏点逐锚自证（每个负控制都在破坏副本上重跑**同款判据**）。
-  require('./org-econ-v2950.js').runAll(assert);
-  require('./org-econ-v2950.js').runNegative(assert);
+  runLock('./org-econ-v2950.js');
+  runLock('./org-econ-v2950.js', 'runNegative');
   // ── v2.96.0 两锁端到端 ──
   //   X6（hazard ↔ weather 联动）：判定面只读天气、四态如实（link-off / engine-absent /
   //   missing / ok + disabled 显式归成不可用）、硬下界 1、导出面零新增。
@@ -18714,15 +18793,15 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //     · 未给地点这一路原本不可达（`at` 空串被三目当假值吃掉 ⇒ 回执里根本不出现天气面读数）；
   //     · 天气总开关关闭时 `effect()` 返回 `{ok:true,factor:1,reason:'disabled'}`，
   //       原样转手会让「关闭」与「晴天」在回执里逐字相同——恰好是本版要防的那件事。
-  require('./hazard-weather-v2960.js').runAll(assert);
-  require('./hazard-weather-v2960.js').runNegative(assert);
+  runLock('./hazard-weather-v2960.js');
+  runLock('./hazard-weather-v2960.js', 'runNegative');
   // ── X3（传播与辟谣）：四层显式分层、一事实一链、改层不许升格、
   //   未声明的改写一律拒收、intact 累积不可恢复、玩家面只出公开层、全知视图进诊断。
   //   面板段（B17）同样是真消费：起链后 id 回填必须活到下一次点击——
   //   本轮实测的正是「回填被紧随的 renderBody() 抹掉」这条：输出留得住、id 留不住，
   //   紧接着的转述/调查就当场变成 missing-fields。面板侧已改为「id 与输出同源缓存 + 起链不重建」。
-  require('./rumor-v2960.js').runAll(assert);
-  require('./rumor-v2960.js').runNegative(assert);
+  runLock('./rumor-v2960.js');
+  runLock('./rumor-v2960.js', 'runNegative');
   // ── v2.97.0（第五十面 / X5）：跨插件因果桥（入站边）—— 手机侧动作进世界台账 ──
   //   入站是**显式动作**（不猜、不轮询）；绝不覆盖世界状态，只写 causal.phoneOps；
   //   按 opId 幂等；不认识的动作拒收而不是吞掉；能力缺席如实降级；可追溯靠真源比对。
@@ -18732,20 +18811,20 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   O10 回放语义坐标：坐标是**标记出来的**不是猜的（无人标记照实报 null，不编默认轮次）；
   //   只在录制时落格（回放不写磁带）；`n` 是位置真源、坐标是附加语义层，两者分列——
   //   「第 7 格对不上」与「第 2 轮 causal.tick 段第 3 步对不上」是两句不同的话。
-  require('./phone-bridge-v2970.js').runAll(assert);
-  require('./phone-bridge-v2970.js').runNegative(assert);
-  require('./alias-trace-v2970.js').runAll(assert);
-  require('./alias-trace-v2970.js').runNegative(assert);
-  require('./coord-v2970.js').runAll(assert);
-  require('./coord-v2970.js').runNegative(assert);
+  runLock('./phone-bridge-v2970.js');
+  runLock('./phone-bridge-v2970.js', 'runNegative');
+  runLock('./alias-trace-v2970.js');
+  runLock('./alias-trace-v2970.js', 'runNegative');
+  runLock('./coord-v2970.js');
+  runLock('./coord-v2970.js', 'runNegative');
   // ── v2.98.0（第五十五面 / P2）：磁带卷跨会话可查 —— 导出 / 校验 / 带外核对 ──
   //   到此为止「可复现」的证据面全在进程内（磁带只驻内存），上一节会话那一轮抽取对不对跨会话不可判定。
   //   本版补上另一半：显式导出（纯读）+ 带外核对（零状态触碰），与 v2.94.0 O6 的流水卷同规格。
   //   最贵的一条是**位置真源照搬**：每格的 `n` 由录制时现算，导出与核对都**不重算**——
   //   重算会把「导出」变成一次改写，被手改过的位置会被洗白成「自洽」，于是「这卷被动过」永远说不出口。
   //   故核对把位置链与值链**分列**（posBroken 答「被改过」，outcome 答「值链是否与种子相符」），互不掩盖。
-  require('./tape-vol-v2980.js').runAll(assert);
-  require('./tape-vol-v2980.js').runNegative(assert);
+  runLock('./tape-vol-v2980.js');
+  runLock('./tape-vol-v2980.js', 'runNegative');
   // ── v2.99.0（第五十六面）：原著幕目 —— 把长文本切成可定位的「幕 → 剧情点」骨架 ──
   //   本仓叙事状态全是**世界侧**的，「原著里本该长什么样」此前零输入面；于是
   //   「现在演到原著哪一段了」只能靠人记，「已偏离哪一段」「哪一段不可能再发生」连基准都没有。
@@ -18756,8 +18835,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   先截点再分幕）、坐标越界**照实不成立而不夹到边界**（夹了就说不出「你指的这段不存在」）。
   //   两处自纠留在锁内：诊断节若改用会改 stat 的入口，「看一眼」就变成「动了一下」；
   //   `pick` 加固成全域总之后，用怪异输入撞内部异常的老写法会静默变成假绿。
-  require('./canon-v2990.js').runAll(assert);
-  require('./canon-v2990.js').runNegative(assert);
+  runLock('./canon-v2990.js');
+  runLock('./canon-v2990.js', 'runNegative');
   // ── v2.100.0（第五十七面）：原著对位 —— 拿世界侧已发生的事去撞幕目题名 ──
   //   上一面只交了「基准」（幕目骨架），于是「现在演到哪一幕了」仍只能靠人记。
   //   本面补上「可观测的那一半」，并把五条最容易被顺手破坏的口径逐条钉住：
@@ -18768,8 +18847,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //        仍要报原著总幕数）；⑤ 幕号越界照实不成立（夹到边界等于说了一句假话）。
   //   另有一条自纠留在锁内：evidence 是**重叠**二字窗，拼起来不等于原短语——
   //   最初的 `evidence.join('') === 短语` 是恒假判据（长得像绿灯的那种坏判据）。
-  require('./canon-align-v2100.js').runAll(assert);
-  require('./canon-align-v2100.js').runNegative(assert);
+  runLock('./canon-align-v2100.js');
+  runLock('./canon-align-v2100.js', 'runNegative');
   // ── v2.101.0（第五十八面）：跨插件互操作验收面 —— 「装了没」与「装对了没」是两件事 ──
   //   前面的面全是**本扩展内部**的自洽性（模块契约 / 存档 / 读面口径 / 原著对位），
   //   而本扩展真正的运行前提是**三个外部件**：SillyTavern+TavernHelper 宿主、
@@ -18785,8 +18864,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   `WA.settingsBus.orphanSettingsKeys()`（真源在 `store`，settingsBus 上无此口），
   //   `try/catch` 把 ReferenceError 吞成 `-1` ⇒ 恒报「-1 个幽灵键」而没人发现。
   //   静态面判据（A1–A6）不做负控制：它们读的是**真文件文本**，破坏必须真写坏源码（见专锁 N2）。
-  require('./interop-v2101.js').runAll(assert);
-  require('./interop-v2101.js').runNegative(assert);
+  runLock('./interop-v2101.js');
+  runLock('./interop-v2101.js', 'runNegative');
   // ── v2.102.0（A2/O12）：性能基线与分层增量 —— 「快不快」与「变了才不算」都要能被核对 ──
   //   上一面（O11）治的是「装了没 / 装对了没」，本面治的是**同一件事在时间轴上的另一半**：
   //   注入链每轮把全部源重建一遍，而「哪些源真受影响」「冷启一次要多久」此前都无从判定；
@@ -18797,8 +18876,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
   //   （只比「缓存 vs 缓存」是自指的，恒真 ⇒ 判据必须对**独立再算一遍**的那份）。
   //   一条自纠留在锁内：`ensure` 不计时（计时归调用方）——两处都计一遍会让同一笔账进两个桶，
   //   而那种失真在读数上完全看不出来（两边都「有数」）。
-  require('./perf-trace-v2102.js').runAll(assert);
-  require('./perf-trace-v2102.js').runNegative(assert);
+  runLock('./perf-trace-v2102.js');
+  runLock('./perf-trace-v2102.js', 'runNegative');
   // ── v2.100.0（第五十七面）：出口面增量 / 数据面位置 / 见证面 —— 三处都在「跑得动」上面 ──
   //   本面新增四个模块口（canon: alignView / gap / position / signal），全部接真消费方
   //   （面板两枚「按号」入口 + 诊断节只读 + 对位读数），出口面契约随之 members 668→672、
@@ -18884,14 +18963,14 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
       + (rG2830.status === 0 ? '' : ' :: ' + String(rG2830.stdout || '') + String(rG2830.stderr || '').slice(0, 200)));
     assert(String(rG2830.stdout || '').indexOf('硬边 0') > 0,
       'v2830/mr: 端到端读数含「硬边 0」（门禁真跑了实测装载，不是空壳退出）');
-    assert(String(rG2830.stdout || '').indexOf('装载期边 25') > 0,
-      'v2830/mr: 端到端读数含「装载期边 25」（与账本读数同源）');
-    assert(String(rG2830.stdout || '').indexOf('命名空间 129') > 0 && String(rG2830.stdout || '').indexOf('文件 121') > 0,
-      'v2830/mr: 端到端读数含「命名空间 129 / 文件 121」（v2.114.0：新增 core/sandbox.js / core/plugin.js；v2.112.0：新增 engines/chrono.js / engines/collab.js；v2.111.0：新增 core/audit-log.js / core/sanitize.js；v2.110.0：新增 core/fault-context.js / core/schema.js / core/permissions.js；v2.102.0：新增 engines/perf-trace.js；v2.101.0：新增 engines/interop.js；v2.99.0：新增 engines/canon.js；v2.96.0 X3 新增 engines/rumor.js；v2.97.0 X5 新增 engines/phone-bridge.js；v2.84.0 A2 新增 core/input-guard.js；v2.87.0 B7 新增 engines/theme.js）');
+    assert(String(rG2830.stdout || '').indexOf('装载期边 37') > 0,
+      "'v2830/mr: 端到端读数含「装载期边 37」（与账本读数同源；v2.119.0 新增 engines/plan.js / mend.js / economy.js / inst.js / probe.js / region.js / stage.js / session.js 八模块后 29 → 37；v2.118.0（计划二 B7/B8/B9）新增 engines/rehearsal.js / engines/liaison.js / engines/coop.js 三模块后 26 → 29）'");
+    assert(String(rG2830.stdout || '').indexOf('命名空间 144') > 0 && String(rG2830.stdout || '').indexOf('文件 136') > 0,
+      'v2830/mr: 端到端读数含「命名空间 144 / 文件 136」（v2.119.0：新增 engines/plan.js / mend.js / economy.js / inst.js / probe.js / region.js / stage.js / session.js 八模块 ⇒ 命名空间 +8 / 文件 +8；v2.118.0（计划二 B7/B8/B9）：新增 engines/rehearsal.js / engines/liaison.js / engines/coop.js 三模块 ⇒ 命名空间 +3 / 文件 +3；v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 文件 +3；v2.114.0：新增 core/sandbox.js / core/plugin.js；v2.112.0：新增 engines/chrono.js / engines/collab.js；v2.111.0：新增 core/audit-log.js / core/sanitize.js；v2.110.0：新增 core/fault-context.js / core/schema.js / core/permissions.js；v2.102.0：新增 engines/perf-trace.js；v2.101.0：新增 engines/interop.js；v2.99.0：新增 engines/canon.js；v2.96.0 X3 新增 engines/rumor.js；v2.97.0 X5 新增 engines/phone-bridge.js；v2.84.0 A2 新增 core/input-guard.js；v2.87.0 B7 新增 engines/theme.js）');
   }
   // ── v2.108.0（计划一 #18 + #19）：本版两条能力各自的四段专锁必须真被执行 ──
-  require('./state-repair-v2108.js').runAll(assert);
-  require('./state-repair-v2108.js').runNegative(assert);
+  runLock('./state-repair-v2108.js');
+  runLock('./state-repair-v2108.js', 'runNegative');
   // ── v2.109.0（计划一 #7-#16）：性能观测深化 + UI 可测试性 ──
   //   本段的存在本身就是一处判据：三份新文件若不在这里被 require，就会被
   //   test-surface-gate 判成「从不执行的孤儿」（v2.75.0 点名的那类交付物）。
@@ -18972,12 +19051,12 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
     uiComp.runAll(assert);
     uiComp.runNegative(assert);
   }
-  require('./intel-v2530.js').runAll(assert);
-  require('./life-v2520.js').runAll(assert);
-  require('./longline-v2550.js').runAll(assert);
-  require('./org-v2540.js').runAll(assert);
-  require('./orphan-lock-v2750.js').runAll(assert);
-  require('./orphan-lock-v2750.js').runNegative(assert);
+  runLock('./intel-v2530.js');
+  runLock('./life-v2520.js');
+  runLock('./longline-v2550.js');
+  runLock('./org-v2540.js');
+  runLock('./orphan-lock-v2750.js');
+  runLock('./orphan-lock-v2750.js', 'runNegative');
   // ── v2.84.0 A1：隔离运行器自己的锁必须**真被执行**，不能只是文件在场 ──
   //   同 v2.83.0 对 module-registry-gate 的处理：按 v2400 惯例在子进程里跑一遍（真进程、真退出码）。
   //   没有这一段，本文件就是 v2.75.0 点名的孤儿——一份能独立跑出 isolation N/0 的锁，
@@ -19133,7 +19212,7 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
       'v2104: 审计面非空（统一锁 ≥10 / 锚点 ≥100）——空表上的「健康」恒真');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 负控制）
-    require('./negative-control-audit-v2104.js').runAll(assert);
+    runLock('./negative-control-audit-v2104.js');
   }
 
   // ── v2.105.0（计划一 #3）：门禁超时熔断 —— 「门禁会不会卡死」不该是一条没有读数的命题 ──
@@ -19186,7 +19265,7 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
       + '（缺 -k 只杀写端、读端照挂）');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 负控制）
-    require('./gate-timeout-v2105.js').runAll(assert);
+    runLock('./gate-timeout-v2105.js');
   }
 
   // ── v2.106.0（计划一 #4/#5/#6）：硬读数一致性三面收口 —— 「同一个数写在四处」这件事本身没人管 ──
@@ -19234,7 +19313,7 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
       'v2106: ' + sites2106.length + ' 个登记站点逐个带行号（判据按站点断言，不按「文件里存在」断言）');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
-    require('./readings-v2106.js').runAll(assert);
+    runLock('./readings-v2106.js');
   }
 
   // ── v2.107.0（计划一 #17）：拒收码分类完备性 —— 「三份名单各自看起来正常」不构成证据 ──
@@ -19275,8 +19354,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
       + '当前 ' + d.declarations.duplicated.length + ' 处已在专锁里逐条锁定');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
-    require('./reject-code-coverage-v2107.js').runAll(assert);
-    require('./reject-code-coverage-v2107.js').runNegative(assert);
+    runLock('./reject-code-coverage-v2107.js');
+    runLock('./reject-code-coverage-v2107.js', 'runNegative');
   }
 
   // ── v2.107.0（计划一 #20）：模块依赖静态图 —— 「静态面答不了必须先有谁」的那一半 ──
@@ -19339,8 +19418,8 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
       'v2107: 零读 ns 恰 ' + a.deadNs.length + ' 个且不含任何核心 ns（读数只报不红）');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
-    require('./module-cycle-gate-v2107.js').runAll(assert);
-    require('./module-cycle-gate-v2107.js').runNegative(assert);
+    runLock('./module-cycle-gate-v2107.js');
+    runLock('./module-cycle-gate-v2107.js', 'runNegative');
   }
 
   // ── v2.110.0（计划一 #21-#30 · 计划二 #39/#70）：三个基元模块 + 工具链七件 ──
@@ -19566,7 +19645,96 @@ assert(r2900.dead.length === 505 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(hasRes, 'v2116/容器: events.res 已登记挤出站点（未登记 ⇒ 挤出静默失败）');
   }
 
+  // ── v2.117.0（计划二 B1–B5）：行动 / 通行 / 情报 / 关系经历 / 组织行动 ──
+  //   同一件事的五个面，各自专锁两向自证（真源码成绿 / 就地破坏现形）。这五把锁若不在这里
+  //   require，就会被 test-surface-gate 判成「从不执行的孤儿」——而它们锁的恰是
+  //   「写出来了、某个条件下永远不会成立」的那一类：行动需要确认者在场、通行需要分层容量、
+  //   情报需要来源、经历需要当事人认知、项目需要清单与缺口。锚点撞车会让破坏无从下手
+  //   （该条静默跳过），故逐条断言锚点在真源码中恰 1 次。
+  section('v2.117.0（计划二 B1–B5）：行动 / 通行 / 情报 / 关系经历 / 组织行动');
+  {
+    const tB1 = require('./act-b1-v2117.js');
+    tB1.runAll(assert); tB1.runNegative(assert);
+    const tB2 = require('./b2-travel-v2117.js');
+    tB2.runAll(assert);
+    const tB3 = require('./b3-intel-v2117.js');
+    tB3.runAll(assert); tB3.runNegative(assert);
+    const tB4 = require('./b4-relation-v2117.js');
+    tB4.runAll(assert); tB4.runNegative(assert);
+    const tB5 = require('./b5-org-v2117.js');
+    tB5.runAll(assert); tB5.runNegative(assert);
+    [tB1, tB3, tB4, tB5].forEach(function (t) {
+      t.BROKEN.forEach(function (s) {
+        assert(t.anchorHits(s) === 1,
+          'v2117: 锁 ' + t.REL + ' 的锚点 ' + s.key + ' 在真源码中恰 1 次（撞车 ⇒ 该条静默跳过）');
+      });
+    });
+  }
+  // ── v2.117.0（计划二 B6）：机会形成 + 题材完整配置配方 ──
+  //   与 B1–B5 同一纪律：两向自证、锚点唯一性逐条断言。这把锁额外守住两类新病灶：
+  //   ① 判据在**注入环境**里建世界（早先的写法自建干净 fresh()，破坏根本没进过被测代码，
+  //      于是 N1 一路全绿——「全绿」被当成了通过）；
+  //   ② 「未核」与「落空」是两个词：未核不许被印成落空，也不许被印成通过。
+  section('v2.117.0（计划二 B6）：机会形成 + 题材完整配置配方');
+  {
+    const tB6 = require('./b6-opportunity-v2117.js');
+    tB6.runAll(assert); tB6.runNegative(assert);
+    tB6.BROKEN.forEach(function (s) {
+      assert(tB6.anchorHits(s) === 1,
+        'v2117: 锁 ' + tB6.REL + ' 的锚点 ' + s.key + ' 在真源码中恰 1 次（撞车 ⇒ 该条静默跳过）');
+    });
+  }
+  // v2.118.0（计划二 B7）：统一试演 / 回滚范围 / 原著分歧。
+  //   与 B1–B6 同一纪律：两向自证、锚点唯一性逐条断言。这把锁额外守住三类病灶：
+  //   ① 试演**回读真世界**（B7 原文点名的「当轮因果推进里读取全局状态的分支」）；
+  //   ② 「预览登记完即 stale」——指纹被自己的记账污染（本版实测抓到的真缺陷）；
+  //   ③ 判据前提被实测证伪（破坏锚点根本不在那条路径上时，N1 会一路全绿）。
+  section('v2.118.0（计划二 B7）：统一试演 / 回滚范围 / 原著分歧');
+  {
+    const tB7 = require('./b7-rehearsal-v2118.js');
+    tB7.runAll(assert); tB7.runNegative(assert);
+    tB7.BROKEN.forEach(function (s) {
+      assert(tB7.anchorHits(s) === 1,
+        'v2118: 锁 ' + s.rel + ' 的锚点 ' + s.key + ' 在真源码中恰 1 次（撞车 ⇒ 该条静默跳过）');
+    });
+  }
+  // v2.118.0（计划二 B8）：跨插件业务闭环。与 B7 同一纪律：两向自证 + 锚点唯一性逐条断言。
+  //   这把锁额外守住三类病灶：
+  //   ① 「登记被冒充成送达」——阶段五档被合并成一档（B8 的第一条否定式）；
+  //   ② 无依据推进（sent 不要桥确认 / delivered 不要行动依据 / known 不要在场依据）；
+  //   ③ 关系后果无条件生效 —— 界面动作直接改关系（B8 点名禁止）。
+  //   另有两类**不可现形**的冗余门（终态复检内外两层、证据去重）：它们不设破坏项，
+  //   而由 A 段的「两道都在」静态断言钉住 —— 留一条永远绿的假破坏项比不设更坏。
+  section('v2.118.0（计划二 B8）：跨插件业务闭环（三插件业务联动）');
+  {
+    const tB8 = require('./b8-liaison-v2118.js');
+    tB8.runAll(assert); tB8.runNegative(assert);
+    tB8.BROKEN.forEach(function (s) {
+      assert(tB8.anchorHits(s) === 1,
+        'v2118: 锁 ' + s.rel + ' 的锚点 ' + s.key + ' 在真源码中恰 1 次（撞车 ⇒ 该条静默跳过）');
+    });
+  }
+  // v2.118.0（计划二 B9）：多人协作可靠性层。同一纪律：两向自证 + 锚点唯一性逐条断言。
+  //   这把锁额外守住五类病灶：
+  //   ① 「确认前不标完成」被绕过 —— propose 出来的行被直接标成已确认；
+  //   ② 版本戳退化 —— 用事务计数器当版本，于是任何提议一提交就把自己弄 stale（谁也裁不了）；
+  //   ③ 视点泄漏 —— 别人的私有条目对第三方也可见；
+  //   ④ 「不标完成」只做一半 —— 回执失败只把行搬回待裁队列、状态仍写着已确认；
+  //   ⑤ 身份取自本地声明 —— 涉及角色被写成操作者自己的会话身份（B9 点名禁止）。
+  //   另有一条**不可单独现形**的冗余门（事务前的干跑）：store 在回调返回 false 时整片回滚，
+  //   撤掉干跑行为不变 ⇒ 不设破坏项，改由锁的 A 段静态断言钉住「两道都在」。
+  section('v2.118.0（计划二 B9）：多人协作可靠性层（权威裁决 / 视点隔离 / 回执回退）');
+  {
+    const tB9 = require('./b9-coop-v2118.js');
+    tB9.runAll(assert); tB9.runNegative(assert);
+    tB9.BROKEN.forEach(function (s) {
+      assert(tB9.anchorHits(s) === 1,
+        'v2118: 锁 ' + s.rel + ' 的锚点 ' + s.key + ' 在真源码中恰 1 次（撞车 ⇒ 该条静默跳过）');
+    });
+  }
   }  // ── 汇总 ──
+  console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
+  console.log('  ⏱ 超 60s 的节：' + __slowSec119 + ' 个');
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
   if (failures.length) { console.log('失败项: ' + failures.join(' | ')); process.exit(1); }

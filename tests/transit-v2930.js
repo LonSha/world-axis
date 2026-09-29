@@ -59,7 +59,7 @@ const A_LV_STORM = "storm: { person: false, goods: false, message: true },";
 const A_LV_CLEAR = "rain: { person: true, goods: true, message: true },\n    clear: { person: true, goods: true, message: true } };";
 const A_WB_DISABLED = "blocked: { person: true, goods: true, message: true }, reason: 'disabled' }";
 const A_WB_UNKNOWN = "if (!lv) return { ok: true, available: true, place: pl, kind: e.kind, blocked: null, reason: 'unknown-kind' };";
-const A_BLOCK_CNT = "stat.blocks[ch] = (stat.blocks[ch] || 0) + 1;";
+const A_BLOCK_CNT = "S.blocks[ch] = (S.blocks[ch] || 0) + 1;";
 // 破坏形态：条件/映射置反，**不删行**——删行会留下悬空结构，语法错证明不了判据敏感
 const B_LV_OPEN = "storm: { person: true, goods: true, message: true },";
 const B_LV_RAIN_ONLY = "rain: { person: true, goods: true, message: true } };";

@@ -186,10 +186,188 @@
     });
     return lines.length ? '[因果与情报]\n' + lines.join('\n') + '\n人物只能依据自己持有的情报行动；怀疑不得写成既成事实，缺少来源的内容不得补写。' : '';
   }
+
+  // ══ v2.117.0（B3）：认知层 ══════════════════════════════════════════════
+  /**
+   * 某事的**真相**：只读既有事实源（worldFacts / memory.facts / evolution.events / currents）。
+   *   查不到报 `unknown-subject`——不回落成「没有这件事」。本函数**零写侧**。
+   */
+  function truthOf(about) {
+    const key = clean(about, 80);
+    if (!key) return { ok: false, reason: 'missing-fields' };
+    const st = state();
+    // 两份事实源的**版本语义不同**，必须分开读——把两者合成一个数组再取首命中，
+    //   会把 memory.facts 里**已被取代**的旧版本当成当前真相（那份旧的 value 恰恰是错的）。
+    //   · worldFacts：backstage 就地覆写（同一 key 只留一行），首命中即当前值；
+    //   · memory.facts：版本化追加（旧行留痕标 active:false），**只认 active 的那一行**。
+    //   两份都在时以 worldFacts 为准（它就是「世界事实」，memory.facts 是长期记忆沉淀）。
+    const wf = (st.worldFacts || []).filter(function (x) { return x && (x.key === key || x.id === key); })[0];
+    if (wf) return { ok: true, about: key, value: wf.value, source: 'fact', at: wf.at };
+    const mf = ((st.memory || {}).facts || []).filter(function (x) { return x && x.active !== false && (x.key === key || x.id === key); })[0];
+    if (mf) return { ok: true, about: key, value: mf.value, source: 'fact', at: mf.at };
+    const ev = (((st.evolution || {}).events) || []).filter(function (x) { return x && x.id === key; })[0];
+    if (ev) return { ok: true, about: key, value: ev.title || ev.summary || ev.id, source: 'event', at: ev.at };
+    const cur = (st.currents || []).filter(function (x) { return x && x.id === key; })[0];
+    if (cur) return { ok: true, about: key, value: cur.title || cur.summary || cur.id, source: 'current', at: cur.updatedAt || cur.createdAt };
+    return { ok: false, reason: 'unknown-subject', about: key };
+  }
+  /** 某人关于某事的认知行（未指定事由则全部）。**只读**，不补建人物行。 */
+  function rowsOf(person, about) {
+    const who = clean(person, 60), key = clean(about, 80);
+    const p = (state().people || {})['p_' + who];
+    const rows = (p && p.knowledge && Array.isArray(p.knowledge.intel)) ? p.knowledge.intel : [];
+    return rows.filter(function (x) { return x && (!key || x.about === key); });
+  }
+  function liveRows(person, about) {
+    return rowsOf(person, about).filter(function (x) {
+      return x && x.status !== 'retracted' && x.status !== 'superseded';
+    });
+  }
+  /** 有资格看真相者：亲见（witness）或记档（record）。**堆数量不能换来资格**。 */
+  function entitledTo(person, about) {
+    return liveRows(person, about).some(function (x) {
+      return x.level === 'witness' || x.level === 'record';
+    });
+  }
+  /** 「相信」：落成此人相信它（suspected/believed）。**不改世界事实**。 */
+  function believe(person, item) {
+    const who = clean(person, 60), claim = clean(item && item.claim, 100), source = clean(item && item.source, 60);
+    const level = LEVELS.indexOf(item && item.level) >= 0 ? item.level : '';
+    if (!who || !claim || !source || !level) return { ok: false, reason: 'missing-fields' };
+    const about = clean(item && item.about, 80);
+    if (about && !knownCause(about) && !truthOf(about).ok) return { ok: false, reason: 'unknown-subject' };
+    let out = null;
+    WA.store.transact(function (draft) {
+      const id = 'p_' + who;
+      const p = personRow(draft, id, who, 'intel:believe');
+      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return; }
+      // 拆成两行是**刻意的**：v2.61.0 的淘汰门禁把「单个语句行」当作逐字锚点
+      //   （`p.lastSeenAt = clockNow('intel'); p.updatedAt = p.lastSeenAt;` 必须全仓恰 1 次，
+      //   那里正是 addIntel 的第一次建行）。新增入口若照抄这一行，锚点变成 4 次 ⇒ 既有门禁红。
+      //   语义完全不变，只是不让新代码把老锚点稀释掉。
+      p.lastSeenAt = clockNow('intel');
+      p.updatedAt = p.lastSeenAt;
+      p.knowledge = p.knowledge && typeof p.knowledge === 'object' ? p.knowledge : {};
+      p.knowledge.intel = Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
+      const row = { id: 'intel_' + clockNow('intel') + '_' + p.knowledge.intel.length,
+        claim: claim, source: source, level: level, confidence: CONF[level], about: about,
+        status: CONF[level] >= 75 ? 'believed' : 'suspected', at: clockNow('intel') };
+      p.knowledge.intel = p.knowledge.intel.concat([row]).slice(-12);
+      out = { ok: true, id: row.id, status: row.status, about: about, level: level, confidence: row.confidence };
+    }, 'intel:believe');
+    if (out && out.ok) { stat.intel++; stat.lastReason = 'believed'; } else stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  /** 核实/抬升：只有**更强**证据才改动认知；弱证据报 weak-evidence 且零变化。 */
+  function verify(person, item) {
+    const who = clean(person, 60), about = clean(item && item.about, 80);
+    const level = LEVELS.indexOf(item && item.level) >= 0 ? item.level : '';
+    const source = clean(item && item.source, 60);
+    const claim = clean(item && item.claim, 100);
+    if (!who || !about || !level || !source) return { ok: false, reason: 'missing-fields' };
+    const live = liveRows(who, about);
+    // 「核实」的前提是**本来就有这一说**。对方从没听说过，就报 nothing-to-verify：
+    //   给他入一条 90 分的档册级说法，等于**用「核实」旁路把情报塞进一个空脑子**
+    //   （来源与等级看上去都合法，可这个人从未接触过这条消息）。这与 addIntel 是不同的口子：
+    //   addIntel 是「情报传递」，核实是「把已有的说法换一个更硬的凭据」。
+    if (!live.length) {
+      stat.blocked++; stat.lastReason = 'nothing-to-verify';
+      return { ok: false, reason: 'nothing-to-verify', about: about };
+    }
+    const best = live.reduce(function (m, x) { return Math.max(m, Number(x.confidence) || 0); }, 0);
+    if (CONF[level] <= best) {
+      stat.blocked++; stat.lastReason = 'weak-evidence';
+      return { ok: false, reason: 'weak-evidence', about: about, had: best, got: CONF[level] };
+    }
+    let out = null;
+    WA.store.transact(function (draft) {
+      const id = 'p_' + who;
+      const p = personRow(draft, id, who, 'intel:verify');
+      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return; }
+      // 拆成两行：v2.61.0 的淘汰门禁把「单个语句行」当逐字锚点，
+      //   新增入口照抄会把锚点从 1 稀释成 3 ⇒ 既有门禁红。语义不变。
+      p.lastSeenAt = clockNow('intel');
+      p.updatedAt = p.lastSeenAt;
+      p.knowledge = p.knowledge && typeof p.knowledge === 'object' ? p.knowledge : {};
+      p.knowledge.intel = Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
+      let n = 0;
+      p.knowledge.intel.forEach(function (x) {
+        if (x && x.about === about && x.status !== 'retracted' && x.status !== 'superseded') { x.status = 'superseded'; n++; }
+      });
+      const row = { id: 'intel_' + clockNow('intel') + '_' + p.knowledge.intel.length,
+        claim: claim || about, source: source, level: level, confidence: CONF[level], about: about,
+        status: CONF[level] >= 75 ? 'believed' : 'suspected', at: clockNow('intel') };
+      p.knowledge.intel = p.knowledge.intel.concat([row]).slice(-12);
+      out = { ok: true, id: row.id, status: row.status, superseded: n, level: level, confidence: row.confidence };
+    }, 'intel:verify');
+    if (out && out.ok) { stat.intel++; stat.lastReason = 'verified'; } else stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  /** 辟谣：**只对已经收到过这条说法的人生效**；没听过报 nothing-to-correct。 */
+  function correct(person, item) {
+    const who = clean(person, 60), about = clean(item && item.about, 80);
+    const wrong = clean(item && item.claim, 100), right = clean(item && item.right, 100);
+    const source = clean(item && item.source, 60);
+    if (!who || !about || !wrong || !source) return { ok: false, reason: 'missing-fields' };
+    const hit = liveRows(who, about).filter(function (x) { return String(x.claim) === wrong; });
+    if (!hit.length) {
+      stat.blocked++; stat.lastReason = 'nothing-to-correct';
+      return { ok: false, reason: 'nothing-to-correct', about: about, claim: wrong };
+    }
+    let out = null;
+    WA.store.transact(function (draft) {
+      const id = 'p_' + who;
+      const p = personRow(draft, id, who, 'intel:correct');
+      if (!p) { out = { ok: false, reason: 'store-unavailable' }; return; }
+      // 拆成两行：v2.61.0 的淘汰门禁把「单个语句行」当逐字锚点，
+      //   新增入口照抄会把锚点从 1 稀释成 3 ⇒ 既有门禁红。语义不变。
+      p.lastSeenAt = clockNow('intel');
+      p.updatedAt = p.lastSeenAt;
+      p.knowledge = p.knowledge && typeof p.knowledge === 'object' ? p.knowledge : {};
+      p.knowledge.intel = Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
+      let n = 0;
+      p.knowledge.intel.forEach(function (x) {
+        if (x && x.about === about && String(x.claim) === wrong && x.status !== 'retracted') { x.status = 'retracted'; n++; }
+      });
+      const row = { id: 'intel_' + clockNow('intel') + '_' + p.knowledge.intel.length,
+        claim: right || ('更正：' + wrong + '不实'), source: source, level: 'record', confidence: CONF.record,
+        about: about, status: 'believed', correctedFrom: wrong, at: clockNow('intel') };
+      p.knowledge.intel = p.knowledge.intel.concat([row]).slice(-12);
+      out = { ok: true, id: row.id, corrected: n, about: about };
+    }, 'intel:correct');
+    if (out && out.ok) { stat.intel++; stat.lastReason = 'corrected'; } else stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  /** 视点投影：无资格者 truth=null 且 knows=null（连「猜没猜对」都不泄露）。 */
+  function project(about, person) {
+    const t = truthOf(about);
+    if (!t.ok) return t;
+    const who = clean(person, 60);
+    const live = liveRows(who, about);
+    const seen = live.map(function (x) { return { claim: x.claim, level: x.level, status: x.status, source: x.source }; });
+    const ent = entitledTo(who, about);
+    if (!ent) {
+      // `withheld`：**只报条数，不报内容**。推演需要知道「他手上有东西但看不到真相」，
+      //   而这与「他什么都没听说」是两种不同的处境（前者会被一轮追问逼出破绽，后者不会）；
+      //   但条数之外一个字都不能给——否则投影就成了绕过资格的旁道。
+      return { ok: true, about: t.about, person: who, entitled: false, truth: null,
+        seen: seen, withheld: seen.length, guessed: [], knows: null, mayAssert: false,
+        reason: live.length ? 'not-entitled' : 'no-knowledge' };
+    }
+    const known = live.some(function (x) { return String(x.claim) === String(t.value); });
+    const guessed = live.filter(function (x) { return String(x.claim) !== String(t.value); })
+      .map(function (x) { return x.claim; });
+    return { ok: true, about: t.about, person: who, entitled: true, truth: t.value,
+      seen: seen, withheld: 0, guessed: guessed, knows: known, mayAssert: known,
+      reason: live.length ? (known ? 'matches' : 'differs') : 'no-knowledge' };
+  }
   WA.intel = {
     LEVELS: LEVELS, CONFIDENCE: CONF,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     addLink: addLink, addIntel: addIntel, releaseDue: releaseDue, visibleTo: visibleTo, explain: explain, knownCause: knownCause, buildBlock: buildBlock,
+    // v2.117.0（B3）：认知层——真相只读、相信不改事实、弱证据不抬升、辟谣只对收到者生效。
+    truthOf: truthOf, rowsOf: rowsOf, entitledTo: entitledTo, believe: believe,
+    verify: verify, correct: correct, project: project,
     stat: function () { return Object.assign({}, stat); }
   };
 })();

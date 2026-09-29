@@ -306,8 +306,11 @@ async function probeRollbackScope(WA) {
 async function judge(a) {
   // ── B4 ──
   const led = JSON.parse(fs.readFileSync(path.join(__dirname, 'module-registry-ledger.json'), 'utf8'));
-  a(led.totals.loadEdges === 25 && led.totals.callRefs === 48,
-    'v2830/mr: 装载期边 25 / 调用期引用 48（引用多 ≠ 必须先装载；'
+  a(led.totals.loadEdges === 26 && led.totals.callRefs === 50,
+    'v2830/mr: 装载期边 26 / 调用期引用 50（引用多 ≠ 必须先装载；'
+    + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
+    + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
+    + '三者调用期读 store/clock/evict/org/intel 等 ⇒ 调用期 +2）；'
     + 'v2.114.0 新增 core/sandbox.js / core/plugin.js 后各 +2：两者尾部都调 WA.registerModule'
     + '（由 core/store.js 提供）⇒ 各多 1 条装载期边；调用期 +4 来自 store 读 WA.plugin.fire'
     + '与 plugin 钩子体走 WA.sandbox.run）');
@@ -315,9 +318,11 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 129 && led.loadedCount === 121,
-    'v2830/mr: 命名空间 129 / 装载文件 121（与 LOAD_ORDER 的 124 差 3 个 ui/*——'
-    + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：124 - 3 = 121；'
+  a(led.nsCount === 132 && led.loadedCount === 124,
+    'v2830/mr: 命名空间 132 / 装载文件 124（与 LOAD_ORDER 的 127 差 3 个 ui/*——'
+    + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
+    + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
+    + 'engines/recipe.js 三命名空间后两边各 +3；'
     + 'v2.98.0 时为 112 - 3 = 109，v2.99.0 新增 engines/canon.js 后两边各 +1；'
     + 'v2.101.0 新增 engines/interop.js 后两边各 +1；'
     + 'v2.102.0 新增 engines/perf-trace.js（perfTrace 命名空间）后两边各 +1）'

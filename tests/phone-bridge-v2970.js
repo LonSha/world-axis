@@ -51,7 +51,7 @@ const ANCHORS = {
   // 口径⑥ 已接过别的链**不覆盖**
   LINK_NO_OVERWRITE: { rel: PB, txt: "      if (hit.chainId) { out = { ok: false, reason: 'already-linked', opId: op, chainId: hit.chainId, want: cid }; return false; }" },
   // 口径⑥ 链必须**已存在**（接一条不存在的链 = 用桥给世界造一条因果）
-  LINK_CHAIN_EXISTS: { rel: PB, txt: "    if (!exists) { stat.linkFails++; return { ok: false, reason: 'unknown-chain', chainId: cid }; }" },
+  LINK_CHAIN_EXISTS: { rel: PB, txt: "    if (!exists) { S.linkFails++; return { ok: false, reason: 'unknown-chain', chainId: cid }; }" },
   // 口径⑤ 零上报 ⇒ unknown（不是 quiet）
   PHASE_NO_FAKE_QUIET: { rel: PB, txt: "    if (!last) return { phase: 'unknown', sinceMs: -1, note: '本会话尚未收到过任何手机侧上报（与「它没在推」不是同一件事）' };" }
 };
@@ -60,7 +60,7 @@ const BREAK = {
   IDEMPOTENT_FIRST: "      const hit = null; // 破坏：不认重复 ⇒ 手机侧重试会把台账写胀",
   CAP_REJECT: "      if (false) { out = { ok: false, reason: 'ops-full', cap: MAX_OPS }; return false; }",
   LINK_NO_OVERWRITE: "      if (false) { out = { ok: false, reason: 'already-linked', opId: op, chainId: hit.chainId, want: cid }; return false; }",
-  LINK_CHAIN_EXISTS: "    if (false && !exists) { stat.linkFails++; return { ok: false, reason: 'unknown-chain', chainId: cid }; }",
+  LINK_CHAIN_EXISTS: "    if (false && !exists) { S.linkFails++; return { ok: false, reason: 'unknown-chain', chainId: cid }; }",
   PHASE_NO_FAKE_QUIET: "    if (!last) return { phase: 'quiet', sinceMs: -1, note: '本会话尚未收到过任何手机侧上报（与「它没在推」不是同一件事）' };"
 };
 function breakOne(key) {

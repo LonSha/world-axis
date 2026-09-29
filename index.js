@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.116.0'
+  const VERSION = '2.119.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -220,6 +220,11 @@
     'core/audit-log.js', 'core/sanitize.js',
     'core/settings-bus.js',
     'core/store.js',
+    // v2.118.0（计划二 B7）：显式执行上下文（试演的承重结构）。位置只需**早于** engines 区 ——
+    //   act.js / world.js 都在**调用期**经 WA.exec 取值（装载期不读），故对次序无硬要求；
+    //   放在 store 之后是刻意的：它自身不读 WA.store，但 cloneState 的入参是 WA（含 store），
+    //   与 store 同批便于「存储层 → 执行层」的阅读次序。
+    'core/exec.js',
     // v2.114.0（计划二 #56/#68）：生命周期钩子与进程内白名单沙箱。
     //   位置**必须**在 store 之后：两模块尾部都调 WA.registerModule 登记自己
     //   （registerModule 由 store 提供），排在 store 之前会 order-violation 装载期抛错。
@@ -371,6 +376,13 @@
     // v2.82.0: 快照与分支（B3）。**无核心依赖**（只读 store.get / store.transact），
     //   位置只需早于 render/inject.js 的消费点（注入块与事件调度同批）。
     'engines/checkpoints.js',
+    // v2.117.0（计划二 B1）：行动执行。位置与 tests/run.js 的 LOAD 同序。
+    //   · 须晚于 engines/life.js：行动的目标来源只读 life.goals（不另存副本）；
+    //   · 须晚于 engines/world.js：准入读 canBeAt/reach/depart，结算读 arrive/stop；
+    //   · 须早于 render/inject.js：注入落地时消费 act.buildBlock()。
+    //   · 尾部自带 workflow 心跳注册（after / order 21）——它读 WA.workflow，而 core/workflow.js
+    //     在 core 区早已装载，故此处对装载期无硬依赖；带守卫调用（同 calendar/bridge 的做法）。
+    'engines/act.js',
     // v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）：因果链追踪与协作面。位置与 tests/run.js 的 LOAD 同序。
     //   · chrono 只读 `store.get/transact` 与 `clock.wallNow`，**不读**任何引擎出口 —— 故对次序无硬依赖，
     //     放在 engines 区末尾（与 checkpoints 同批的「无核心依赖」面）。
@@ -379,6 +391,58 @@
     //     但按惯例「engines 区一律早于 render」，以免后续接消费方时被迫改装载序。
     'engines/chrono.js',
     'engines/collab.js',
+    // v2.117.0（计划二 B6）：机会形成 + 题材完整配置配方。位置与 tests/run.js 的 LOAD 同序。
+    //   · opportunity 只读五处引擎出口（longline.overdue / org.projectView / life.goals /
+    //     intel.entitledTo / causal.due）⇒ 须晚于这五个模块；模块缺席时如实不产候选，
+    //     不在装载期读 WA。
+    //   · recipe 在装载期只读两处**静态表**（WA.act.KINDS 与 WA.theme.THEMES）做核对
+    //     ⇒ 须晚于 engines/theme.js 与 engines/act.js；其 preview / apply 都在调用期委托
+    //     既有的 theme.preview / theme.apply，不另立写盘路径。
+    //   · 两者本版都不产注入消费点（recipe 无 buildBlock；opportunity 的 buildBlock
+    //     尚无调用方），按引擎区惯例仍排在 render/inject.js 之前，以免后续接消费方时改装载序。
+    'engines/opportunity.js',
+    'engines/recipe.js',
+    // v2.118.0（计划二 B7）：统一试演 / 回滚范围 / 原著分歧。位置与 tests/run.js 的 LOAD 同序。
+    //   三条硬约束，缺一条就会在真跑里引用未装载的引擎（试演的危害比真跑更大：
+    //   它给出的是「看起来已经验证过」的结论）：
+    //     · 须晚于 engines/act.js —— 改道走 act.add + act.admit 真判（不自算结论）；
+    //     · 须晚于 engines/phone-bridge.js —— 提前通知走 noteAction 入站面；
+    //     · 须晚于 engines/canon.js —— 分歧报告复用 canon.alignView（不另造对位口径）；
+    //   · 另须晚于 core/exec.js（同批）与 engines/causal.js（推进面）。
+    'engines/rehearsal.js',
+    // v2.118.0（计划二 B8）：跨插件业务闭环。位置与 tests/run.js 的 LOAD 同序。
+    //   三条硬约束，缺一条就会静默降级成「无业务判断的台账」：
+    //     · 须晚于 engines/act.js —— 约定任务走 act.add 真准入（不自造一份行动规则）；
+    //     · 须晚于 engines/world.js —— 「对方在场吗」只问 world.where 的真源；
+    //     · 须晚于 engines/phone-bridge.js —— 出站边走 noteAction 入站面。
+    //   另：它复用 core/exec.js 的上下文门面（B7），故须晚于 core/exec.js。
+    'engines/liaison.js',
+    'engines/coop.js',
+    // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。位置与 tests/run.js 的 LOAD 同序。
+    //   两条硬约束，缺一条就会在真跑里读到未装载的精算模块（两者都在装载期读 WA 本体，
+    //   故必须在调用期之前把它们排在依赖项之后）：
+    //     · 须晚于 engines/life.js —— 计划的唯一来源是 life.goals（本模块不自建目标、不自建人）；
+    //     · 须晚于 engines/org.js  —— 步骤的资源真源是 org.stockOf（本模块不复制一份库存判定）；
+    //     · 须晚于 engines/fondness.js —— 修复结案时唯一一次调 fondness.apply（不自造关系口径）。
+    //   两者都须早于 render/inject.js：注入落地时读 plan.buildBlock() / mend.buildBlock()。
+    'engines/plan.js',
+    'engines/mend.js',
+    // v2.119.0（拓展计划 ③）：供需循环。须晚于 core/store（读写 people.resources），
+    //   须早于 render/inject.js（注入落地时读 economy.buildBlock()）。
+    'engines/economy.js',
+    'engines/probe.js',
+    // v2.119.0（拓展计划 ⑥）：跨地域传播。须晚于 core/clock（延迟按 clock 算），
+    //   须早于 render/inject.js（注入落地时读 region.buildBlock()）。
+    'engines/region.js',
+    // v2.119.0（拓展计划 ⑦）：玩法包与阶段迁移。须晚于 recipe（槽位真源在那里），
+    //   须早于 render/inject.js（注入落地时读 stage.buildBlock()）。
+    'engines/stage.js',
+    // v2.119.0（拓展计划 ⑧）：多人连接层。须晚于 coop（裁决语义在那里），
+    //   须早于 render/inject.js（注入落地时读 session.buildBlock()）。
+    'engines/session.js',
+    // v2.119.0（拓展计划 ④）：组织制度。须晚于 core/store（读 people / org 现状），
+    //   须早于 render/inject.js（注入落地时读 inst.buildBlock()）。
+    'engines/inst.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

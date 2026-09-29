@@ -1,13 +1,13 @@
 {
- "version": "2.116.0",
- "loadOrderCount": 124,
- "loadedCount": 121,
+ "version": "2.119.0",
+ "loadOrderCount": 139,
+ "loadedCount": 136,
  "uiCount": 3,
- "nsCount": 129,
+ "nsCount": 144,
  "totals": {
-  "loadEdges": 25,
+  "loadEdges": 37,
   "hardEdges": 0,
-  "callRefs": 48,
+  "callRefs": 72,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -27,25 +27,37 @@
    "consumedBy": [
     "actors/monologue.js",
     "actors/profile.js",
+    "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
     "direction/oracle.js",
     "direction/tags.js",
+    "engines/act.js",
     "engines/backstage.js",
     "engines/bridge.js",
     "engines/calendar.js",
     "engines/chapters.js",
+    "engines/coop.js",
     "engines/direct-event.js",
+    "engines/economy.js",
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
+    "engines/inst.js",
     "engines/kaleidoscope.js",
+    "engines/liaison.js",
     "engines/memory.js",
+    "engines/mend.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
+    "engines/plan.js",
     "engines/pmem.js",
     "engines/proactive.js",
+    "engines/probe.js",
+    "engines/region.js",
     "engines/regional.js",
+    "engines/session.js",
+    "engines/stage.js",
     "engines/summarizer.js",
     "engines/wb-inject.js",
     "render/purifier.js"
@@ -150,6 +162,7 @@
     "actors/profile.js",
     "direction/oracle.js",
     "direction/tags.js",
+    "engines/act.js",
     "engines/backstage.js",
     "engines/bridge.js",
     "engines/calendar.js",
@@ -184,9 +197,39 @@
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": [
+    "core/exec.js",
     "core/plugin.js",
-    "core/sandbox.js"
+    "core/sandbox.js",
+    "engines/coop.js",
+    "engines/economy.js",
+    "engines/inst.js",
+    "engines/liaison.js",
+    "engines/mend.js",
+    "engines/plan.js",
+    "engines/probe.js",
+    "engines/region.js",
+    "engines/session.js",
+    "engines/stage.js"
    ]
+  },
+  "core/exec.js": {
+   "ns": [
+    "exec"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
   },
   "core/sandbox.js": {
    "ns": [
@@ -281,6 +324,7 @@
     "actors/profile.js",
     "direction/oracle.js",
     "direction/tags.js",
+    "engines/act.js",
     "engines/backstage.js",
     "engines/bridge.js",
     "engines/calendar.js",
@@ -1703,6 +1747,27 @@
    ],
    "consumedBy": []
   },
+  "engines/act.js": {
+   "ns": [
+    "act"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_act_settings_v1"
+   ],
+   "consumedBy": []
+  },
   "engines/chrono.js": {
    "ns": [
     "chrono"
@@ -1728,6 +1793,258 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_collab_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/opportunity.js": {
+   "ns": [
+    "opportunity"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_opportunity_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/recipe.js": {
+   "ns": [
+    "recipe"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_recipe_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rehearsal.js": {
+   "ns": [
+    "rehearsal"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rehearsal_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/liaison.js": {
+   "ns": [
+    "liaison"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_liaison_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/coop.js": {
+   "ns": [
+    "coop"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_coop_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/plan.js": {
+   "ns": [
+    "plan"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_plan_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/mend.js": {
+   "ns": [
+    "mend"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_mend_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/economy.js": {
+   "ns": [
+    "economy"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_economy_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/probe.js": {
+   "ns": [
+    "probe"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_probe_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/region.js": {
+   "ns": [
+    "region"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_region_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/stage.js": {
+   "ns": [
+    "stage"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_stage_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/session.js": {
+   "ns": [
+    "session"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_session_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/inst.js": {
+   "ns": [
+    "inst"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_inst_settings_v1"
    ],
    "consumedBy": []
   },

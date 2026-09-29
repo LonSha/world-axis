@@ -172,6 +172,57 @@
       const keys = Object.keys(stockOf(p)).slice(0, cfg.maxItems);
       if (keys.length) lines.push(p.name + '：' + keys.map(function (k) { return k + stockOf(p)[k]; }).join('、'));
     });
+
+    // v2.117.0（计划二 B5）：共同项目与欠账——**同一条注入面**追加两段。
+    //   为什么不能另开一条通道：「组织在办什么」与「组织有什么」是同一件事的两面，
+    //   分开会让模型看到「会：粮30」却不知道这 30 是留着做什么的。
+    //   只报未结项的项目（已结项的是历史，历史不占注入预算）；欠账只报有欠的、逐条带原因。
+    const projLines = [];
+    (((state().evolution || {}).factions) || []).forEach(function (f) {
+      if (!f || projLines.length >= 4) return;
+      projectRows(f).forEach(function (p) {
+        if (!p || projLines.length >= 4) return;
+        if (!isLive(p)) return;
+        const tl = tierLine(p);
+        const cov = coverageOf(f, p);
+        // 两档分述：记了刻数的报「已备/需备」，只记了档位词的报词并注明**不计缺口**。
+        const spec = cov.filter(function (x) { return x.need !== null; });
+        const narr = cov.filter(function (x) { return x.need === null; });
+        projLines.push(clean(f.name, 40) + '「' + clean(p.what, 60) + '」' + (p.status === 'ongoing' ? '进行中' : '待办')
+          + (spec.length ? '：' + spec.map(function (x) { return x.item + ' ' + x.covered + '/' + x.need; }).join('、') : '')
+          + (narr.length ? '；' + narr.map(function (x) { return x.item + ' ' + (x.tierWord || '未记数量'); }).join('、')
+            + '（未记数量，不计缺口）' : '')
+          + (spec.some(function (x) { return x.gap > 0; }) ? '（尚缺 '
+            + spec.filter(function (x) { return x.gap > 0; }).map(function (x) { return x.item + x.gap; }).join('、') + '）'
+            : (spec.length ? '（备齐）' : ''))
+          + (tl.tier === 'narrative' ? '〔' + tl.words.join('、') + '〕' : ''));
+      });
+    });
+    const debtLines = [];
+    const stNow = state();
+    (((stNow.evolution || {}).factions) || []).forEach(function (f) {
+      if (!f) return;
+      const rs = rosterOf(f);
+      Object.keys(rs).sort().forEach(function (p) {
+        if (debtLines.length >= 5) return;
+        const amt = typeof rs[p].owed === 'number' ? rs[p].owed : 0;
+        if (amt > 0) debtLines.push(clean(f.name, 40) + ' 欠 ' + p + ' ' + clean(rs[p].owedItem || '粮', 30) + '×' + amt + '（薪俸未清）');
+      });
+    });
+    Object.keys(stNow.people || {}).forEach(function (pid) {
+      const per = stNow.people[pid];
+      if (!per || debtLines.length >= 5) return;
+      (Array.isArray(per.debts) ? per.debts : []).forEach(function (d) {
+        if (debtLines.length >= 5) return;
+        if (d && (qty(d.amount) || 0) > 0) {
+          debtLines.push(clean(per.name || pid, 60) + ' 欠 ' + clean(d.to, 40) + ' '
+            + clean(d.item, 30) + '×' + (qty(d.amount) || 0) + (d.why ? '（' + clean(d.why, 80) + '）' : ''));
+        }
+      });
+    });
+    if (projLines.length) lines.push('共同项目：' + projLines.join('；'));
+    if (debtLines.length) lines.push('欠账：' + debtLines.join('；'));
+    if (projLines.length || debtLines.length) lines.push('项目缺料就照实说缺、照实算缺口；已结项的事不因进度重算而消失。');
     return lines.length ? '[资源与组织]\n' + lines.slice(0, cfg.maxItems + 2).join('\n') + '\n资源不足时不得完成转移或消耗；不得凭空增加库存。' : '';
   }
   // ── v2.95.0（X2 · B3）：经济引擎——职册 / 功簿 / 薪俸 / 欠薪 / 罚没 ──────────
@@ -564,6 +615,392 @@
         }).slice(0, 6) };
     } catch (e) { return { available: false, reason: 'climate-throw', climate: null, signals: [] }; }
   }
+  // ── v2.117.0（计划二 B5）：从资源与职位记录延伸到组织行动 ────────────────
+  // 治的病：本模块此前答得出「谁在册、谁欠薪、罚了谁多少」，答不出**组织在干什么**——
+  //   没有共同项目（目标 / 所需物资 / 参与者 / 交付），于是「缺钱缺货会驱动行动与冲突」
+  //   这句话在本仓无输入面：库存在动，组织不动（与 v2.95.0 当年的「经济风只是读数」同型）。
+  //
+  // 三条口径：
+  //   ① **交付走同一支笔**：材料交给项目 = transfer(人 → 势力)。不为项目另开一条
+  //      「直接加库存」的通道——那会让项目进度与流水对不上，而对不上正是 O5 存在的理由。
+  //   ② **短缺照实报**：结项时缺多少就报多少（missing 逐项），既不四舍五入也不静默放弃。
+  //   ③ **两档不互换**：tierOf 只有确凿刻数才叫 precise；只有档位词才叫 narrative；
+  //      两样都没有就是 unknown，**不给词**。
+  const PROJECT_STATUS = ['planned', 'ongoing', 'done', 'failed'];
+  const PROJECT_CAP = 6;      // 每势力项目环上限（与 evict 站点 per-call 实参同值）
+  const DEBT_CAP = 12;        // 每人债务环上限
+  const PROJECT_TIERS = ['precise', 'narrative', 'unknown'];
+  // 叙事档的档位词。**与精确刻数并存于同一条需求串**（"粮100、布 紧张"）：
+  //   「未记录具体数量时保持未知」是原文最后一句，也是本表存在的理由——
+  //   没有它，叙事档就只能在「经济风不可读」时出现，而那根本不是叙事档的定义。
+  const NEED_TIERS = { 充足: 'ample', 紧张: 'tight', 短缺: 'short' };
+  const NEED_TIER_CN = { ample: '充足', tight: '紧张', short: '短缺' };
+
+  function factionRow(name, root) {
+    const st = root || state();
+    const key = clean(name, 40);
+    return (((st.evolution || {}).factions) || []).filter(function (f) { return f && clean(f.name, 40) === key; })[0] || null;
+  }
+  function projectRows(row) {
+    const r = row && row.projects;
+    return Array.isArray(r) ? r : [];
+  }
+  function findProject(row, what) {
+    const w = clean(what, 60);
+    return projectRows(row).filter(function (p) { return p && clean(p.what, 60) === w; }).pop() || null;
+  }
+  /** 未结项 = 状态在册且不是终态。**表外状态不当成未结项**（不猜）——若把任何
+   *  没见过的状态都当「还在办」，一个拼错的 status 就能让项目永远关不掉。 */
+  function isLive(p) {
+    const st = clean(p && p.status, 12);
+    return PROJECT_STATUS.indexOf(st) >= 0 && st !== 'done' && st !== 'failed';
+  }
+  /** 需求串解析："粮100、布20" / "粮100,布:20" / "布 紧张" ⇒ [{item, need?, tier?}]。
+   *   两种记法**可以混在一条串里**：记了刻数的用精确档，没记刻数的用档位词。
+   *   两样都没写的项整条拒收（bad-needs）——「照单子发货」不允许有猜的成分。
+   *   档位词表外的词（如"有点紧"）不猜、不回落，当解析失败照实拒收。 */
+  function parseNeeds(text) {
+    const s = clean(text, 200);
+    if (!s) return { ok: false, reason: 'no-needs' };
+    const out = [];
+    const parts = s.split(/[,，、;；]+/);
+    for (let i = 0; i < parts.length; i++) {
+      const seg = String(parts[i] || '').trim();
+      if (!seg) continue;
+      const m = seg.match(/^([^\d:：\s]+)[:：]?\s*(\d+)$/);
+      if (m) {
+        const item = clean(m[1], 30), need = qty(m[2]);
+        if (!item || !need) return { ok: false, reason: 'bad-needs', at: seg };
+        out.push({ item: item, need: need, tier: null });
+        continue;
+      }
+      const t = seg.match(/^([^\d:：\s]+)\s*[:：]?\s*(\S+)$/);
+      if (!t || !NEED_TIERS[t[2]]) return { ok: false, reason: 'bad-needs', at: seg };
+      const item2 = clean(t[1], 30);
+      if (!item2) return { ok: false, reason: 'bad-needs', at: seg };
+      out.push({ item: item2, need: null, tier: NEED_TIERS[t[2]] });
+    }
+    if (!out.length) return { ok: false, reason: 'no-needs' };
+    return { ok: true, items: out };
+  }
+  /**
+   * 档位：精确档（至少一项记了刻数） / 叙事档（至少一项记了档位词）/ 未知（两样都没有）。
+   *   为什么不是「看经济风能不能读」：那是**外部读数**，与「这个项目记了多少」无关。
+   *   本函数答的是原文那一句「未记录具体数量时保持未知」——未知就**不给词**。
+   */
+  function tierOf(proj) {
+    const needs = Array.isArray(proj && proj.needs) ? proj.needs : [];
+    if (needs.some(function (n) { return n && typeof n.need === 'number'; })) return 'precise';
+    if (needs.some(function (n) { return n && n.tier && NEED_TIER_CN[n.tier]; })) return 'narrative';
+    return 'unknown';
+  }
+  /** 档位对应的读数行（诊断/面板共用）：精确档给刻数，叙事档给词，未知**不给词**。
+   *  未知档的 word 是空串而不是 null——空串拼进文本什么也不出现，null 会印出「null」。 */
+  function tierLine(proj) {
+    const t = tierOf(proj);
+    if (t === 'precise') return { tier: 'precise', word: '', words: [], reason: 'recorded' };
+    if (t === 'narrative') {
+      const words = (Array.isArray(proj && proj.needs) ? proj.needs : [])
+        .filter(function (n) { return n && n.tier; })
+        .map(function (n) { return n.item + ' ' + (NEED_TIER_CN[n.tier] || ''); });
+      return { tier: 'narrative', word: words.join('、'), words: words, reason: 'narrative-only' };
+    }
+    return { tier: 'unknown', word: '', words: [], reason: 'nothing-recorded' };
+  }
+  /** 交付覆盖：逐项算 have / covered / missing。**纯读**。
+   *   叙事档项（只有词、没有刻数）**不进缺口**：不知道要多少，就不能说「还缺多少」——
+   *   那是把「未知」算成 0 的另一张脸（与 v2.117.0 B3/B4 的不回落同一条红线）。 */
+  function coverageOf(row, proj) {
+    const stock = stockOf(row);
+    const covered = (proj && proj.covered && typeof proj.covered === 'object' && !Array.isArray(proj.covered)) ? proj.covered : {};
+    return (Array.isArray(proj && proj.needs) ? proj.needs : []).map(function (n) {
+      const got = qty(covered[n.item]) || 0;
+      const hasN = typeof n.need === 'number';
+      return { item: n.item, need: hasN ? n.need : null, tier: n.tier || null,
+        tierWord: (n.tier && NEED_TIER_CN[n.tier]) || '',
+        covered: hasN ? Math.min(got, n.need) : got,
+        gap: hasN ? Math.max(0, n.need - got) : null,
+        have: qty(stock[n.item]) || 0 };
+    });
+  }
+  /**
+   * 立项目：目标 + 所需物资（逐项刻数）+ 发起人 + 期限。
+   *   同名项目未结项时拒收（duplicate-project）——并存两个同名项目，
+   *   账面就再也答不出「交付的这批货进了哪一个」，而那是交付面的全部意义。
+   */
+  function openProject(factionName, item) {
+    const f = clean(factionName, 40);
+    const o = item || {};
+    const what = clean(o.what || o.title, 60);
+    if (!f) return { ok: false, reason: 'bad-name' };
+    if (!what) return { ok: false, reason: 'bad-name' };
+    if (!holder('faction', f)) return { ok: false, reason: 'missing-holder' };
+    const parsed = parseNeeds(o.needs || o.need);
+    if (!parsed.ok) return parsed;
+    const by = clean(o.by, 60);
+    const due = Number(o.due) || 0;   // 0 = 没记期限（**不是**「已经过了」）
+    const row0 = holder('faction', f);
+    const live = findProject(row0, what);
+    if (live && live.status !== 'done' && live.status !== 'failed') {
+      stat.blocked++; stat.lastReason = 'duplicate-project';
+      return { ok: false, reason: 'duplicate-project', what: what, status: live.status };
+    }
+    let out = null;
+    WA.store.transact(function (draft) {
+      const row = factionRow(f, draft);
+      if (!row) { out = { ok: false, reason: 'missing-holder' }; return false; }
+      row.projects = Array.isArray(row.projects) ? row.projects : [];
+      row.projects.push({ what: what, status: 'planned', by: by, due: due,
+        needs: parsed.items.slice(),
+        covered: {}, startedAt: clockNow('org'), updatedAt: clockNow('org') });
+      WA.evict.array(row.projects, 'org.projects', PROJECT_CAP);
+      out = { ok: true, faction: f, what: what, needs: parsed.items, by: by, due: due,
+        count: row.projects.length };
+    }, 'org:project-open');
+    if (out && out.ok) { stat.lastReason = 'project-opened'; }
+    else if (out) { stat.blocked++; if (!stat.lastReason) stat.lastReason = out.reason; }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  /**
+   * 交付物资给项目：**走 transfer（人 → 势力）**，再把这批记进该项目的 covered。
+   *   两件事在**同一次 transact** 里：分开写会在中间失败时留下「流水有、项目没记」
+   *   或反过来，而这两种账面都答不出「这批货算不算数」。
+   *   只收清单上有的东西（not-needed）：把无关物资倒进来算进度，等于进度可被伪造。
+   */
+  function deliverToProject(factionName, projectName, personName, item, amount) {
+    const f = clean(factionName, 40), p = clean(personName, 60);
+    const what = clean(projectName, 60), it = clean(item, 30), n = qty(amount);
+    if (!f || !p || !what) return { ok: false, reason: 'bad-name' };
+    if (!it || !n) return { ok: false, reason: 'bad-resource' };
+    const row0 = factionRow(f);
+    if (!row0) return { ok: false, reason: 'missing-holder' };
+    const proj0 = findProject(row0, what);
+    if (!proj0) return { ok: false, reason: 'no-such-project' };
+    if (proj0.status === 'done' || proj0.status === 'failed') {
+      stat.blocked++; stat.lastReason = 'project-closed';
+      return { ok: false, reason: 'project-closed', status: proj0.status };
+    }
+    const onList = (Array.isArray(proj0.needs) ? proj0.needs : []).some(function (x) { return x && x.item === it; });
+    if (!onList) { stat.blocked++; stat.lastReason = 'not-needed'; return { ok: false, reason: 'not-needed', item: it }; }
+    const cov0 = coverageOf(row0, proj0).filter(function (x) { return x.item === it; })[0];
+    // 精确档项：按缺口收，收满即停（take = min(n, gap)）。
+    //   叙事档项（只记了词、没记刻数）**没有「收满」这回事**——不知道要多少，就不能
+    //   拿「已经够了」把人挡回去（那是把未知当成 0 的另一张脸）。照实全收。
+    const isSpec = !!(cov0 && typeof cov0.need === 'number');
+    if (isSpec && !cov0.gap) {
+      stat.blocked++; stat.lastReason = 'already-covered';
+      return { ok: false, reason: 'already-covered', item: it };
+    }
+    const take = isSpec ? Math.min(n, cov0.gap) : n;
+    const tr = transfer('person', p, 'faction', f, it, take);
+    if (!tr.ok) return tr;
+    let out = null;
+    WA.store.transact(function (draft) {
+      const row = factionRow(f, draft);
+      if (!row) { out = { ok: false, reason: 'missing-holder' }; return false; }
+      const proj = findProject(row, what);
+      if (!proj) { out = { ok: false, reason: 'no-such-project' }; return false; }
+      proj.covered = (proj.covered && typeof proj.covered === 'object' && !Array.isArray(proj.covered)) ? proj.covered : {};
+      proj.covered[it] = (qty(proj.covered[it]) || 0) + take;
+      if (proj.status === 'planned') proj.status = 'ongoing';
+      proj.updatedAt = clockNow('org');
+      const cov = coverageOf(row, proj);
+      out = { ok: true, faction: f, what: what, item: it, took: take, offered: n, short: n - take,
+        status: proj.status, covered: cov.map(function (x) { return { item: x.item, covered: x.covered, need: x.need }; }),
+        complete: cov.every(function (x) { return x.need !== null && x.gap === 0; }) };
+    }, 'org:project-deliver');
+    if (out && out.ok) { stat.lastReason = 'project-delivered'; }
+    else if (out) stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  /** 项目读数（纯读）：逐项目的状态 / 需求 / 已覆盖 / 缺口 / 参与者 + 当前档位。 */
+  function projectView(factionName) {
+    const f = clean(factionName, 40);
+    if (!f) return { ok: false, reason: 'bad-name' };
+    const row = factionRow(f);
+    if (!row) return { ok: false, reason: 'missing-holder' };
+    const rows = projectRows(row).map(function (p) {
+      const cov = coverageOf(row, p);
+      const tOf = tierOf(p);   // 档位由**这个项目自己记了多少**决定，不是外部气候读数
+      return { what: clean(p.what, 60), status: clean(p.status, 12), by: clean(p.by, 60), live: isLive(p),
+        due: Number(p.due) || 0, tier: tOf, tierReason: tierLine(p).reason,
+        tierWords: cov.filter(function (x) { return x.need === null; })
+          .map(function (x) { return x.item + ' ' + (x.tierWord || '未记数量'); }),
+        needs: cov.map(function (x) { return { item: x.item, need: x.need, tier: x.tier }; }),
+        covered: cov, missing: cov.filter(function (x) { return x.gap > 0; })
+          .map(function (x) { return { item: x.item, gap: x.gap }; }),
+        canClose: cov.every(function (x) { return x.need !== null && x.gap === 0; }) };
+    });
+    const anyPrecise = rows.some(function (r) { return r.tier === 'precise'; });
+    const anyNarr = rows.some(function (r) { return r.tier === 'narrative'; });
+    return { ok: true, faction: f, count: rows.length,
+      tier: anyPrecise ? 'precise' : (anyNarr ? 'narrative' : 'unknown'),
+      tierReason: !rows.length ? 'no-project'
+        : (anyPrecise ? 'recorded' : (anyNarr ? 'narrative-only' : 'nothing-recorded')),
+      hasPrecise: anyPrecise, hasNarrative: anyNarr,
+      projects: rows.slice(0, PROJECT_CAP) };
+  }
+  /**
+   * 结项：全部覆盖才算完成（done），缺口照实报（shortfall，状态不动）。
+   *   不把「差一点」写成「完成」——那是本仓库最贵的一类默认值在项目面上的翻版。
+   */
+  function closeProject(factionName, projectName) {
+    const f = clean(factionName, 40), what = clean(projectName, 60);
+    if (!f || !what) return { ok: false, reason: 'bad-name' };
+    const row0 = factionRow(f);
+    if (!row0) return { ok: false, reason: 'missing-holder' };
+    const proj0 = findProject(row0, what);
+    if (!proj0) return { ok: false, reason: 'no-such-project' };
+    if (proj0.status === 'done' || proj0.status === 'failed') {
+      return { ok: false, reason: 'project-closed', status: proj0.status };
+    }
+    const covAll = coverageOf(row0, proj0);
+    const miss = covAll.filter(function (x) { return x.gap > 0; })
+      .map(function (x) { return { item: x.item, gap: x.gap, have: x.have }; });
+    // 叙事档项（只记了词、没记刻数）：**不能算满足**——不知道要多少就答不出「够了没有」。
+    //   照实并入 shortfall 并注明原因，不给「缺口 0」的假备齐。
+    const unknownNeed = covAll.filter(function (x) { return x.need === null; })
+      .map(function (x) { return { item: x.item, tier: x.tier, why: 'unrecorded-need' }; });
+    if (miss.length || unknownNeed.length) {
+      stat.blocked++; stat.lastReason = 'shortfall';
+      return { ok: false, reason: 'shortfall', what: what, missing: miss, unrecorded: unknownNeed };
+    }
+    let out = null;
+    WA.store.transact(function (draft) {
+      const row = factionRow(f, draft);
+      if (!row) { out = { ok: false, reason: 'missing-holder' }; return false; }
+      const proj = findProject(row, what);
+      if (!proj) { out = { ok: false, reason: 'no-such-project' }; return false; }
+      proj.status = 'done';
+      proj.closedAt = clockNow('org');
+      proj.updatedAt = proj.closedAt;
+      out = { ok: true, faction: f, what: what, status: 'done', closedAt: proj.closedAt };
+    }, 'org:project-close');
+    if (out && out.ok) { stat.lastReason = 'project-closed-ok'; } else if (out) stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  /**
+   * 登记债务：**谁欠谁、欠什么、为什么**。没有原因字段的欠账，日后没人答得出它是怎么来的
+   *   （「罚没」有据、「欠薪」有据，「他欠势力 30 粮」没据就是在编）。
+   *   债务挂在**人**身上（`person.debts`），与名册的 `owed`（势力欠人）方向相反、表也分开。
+   */
+  function oweTo(factionName, personName, opts) {
+    const f = clean(factionName, 40), p = clean(personName, 60);
+    const o = opts || {};
+    const it = clean(o.item || '粮', 30), n = qty(o.amount);
+    const why = clean(o.why, 80);
+    if (!f || !p) return { ok: false, reason: 'bad-name' };
+    if (!it || !n) return { ok: false, reason: 'bad-resource' };
+    if (!why) return { ok: false, reason: 'missing-why' };
+    const prow = holder('person', p);
+    if (!prow) return { ok: false, reason: 'missing-holder' };
+    if (!holder('faction', f)) return { ok: false, reason: 'missing-holder' };
+    if (!rosterOf(holder('faction', f))[p]) return { ok: false, reason: 'not-on-roster' };
+    let out = null;
+    WA.store.transact(function (draft) {
+      const person = holder('person', p, draft);
+      if (!person) { out = { ok: false, reason: 'missing-holder' }; return false; }
+      person.debts = Array.isArray(person.debts) ? person.debts : [];
+      const hit = person.debts.filter(function (d) { return d && d.to === f && d.item === it; })[0] || null;
+      if (hit) { hit.amount = (qty(hit.amount) || 0) + n; hit.updatedAt = clockNow('org'); }
+      else person.debts.push({ to: f, item: it, amount: n, why: why, at: clockNow('org'), updatedAt: clockNow('org') });
+      WA.evict.array(person.debts, 'org.debts', DEBT_CAP);
+      const total = person.debts.filter(function (d) { return d && d.to === f && d.item === it; })
+        .reduce(function (a, b) { return a + (qty(b.amount) || 0); }, 0);
+      out = { ok: true, faction: f, person: p, item: it, added: n, amount: total, why: why, count: person.debts.length };
+    }, 'org:owe');
+    if (out && out.ok) stat.lastReason = 'owed-to'; else if (out) stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  /** 清偿人对势力的欠账：**只还得起的量**（与 settleOwed 同一条「债可分批」口径），
+   *  余额照实留着；走 transfer（人 → 势力），与罚没同一支笔。 */
+  function settleDebt(factionName, personName, opts) {
+    const f = clean(factionName, 40), p = clean(personName, 60);
+    const o = opts || {};
+    if (!f || !p) return { ok: false, reason: 'bad-name' };
+    const person = holder('person', p);
+    if (!person) return { ok: false, reason: 'missing-holder' };
+    const debts = Array.isArray(person.debts) ? person.debts : [];
+    const it = clean(o.item, 30);
+    const hit = debts.filter(function (d) { return d && d.to === f && (!it || d.item === it); })[0] || null;
+    if (!hit) return { ok: false, reason: 'no-debt' };
+    const owed = qty(hit.amount) || 0;
+    if (owed <= 0) return { ok: false, reason: 'no-debt' };
+    const have = qty(stockOf(person)[hit.item]) || 0;
+    const pay = Math.min(owed, have);
+    if (!pay) return { ok: false, reason: 'insufficient', owed: owed, have: have, item: hit.item };
+    const tr = transfer('person', p, 'faction', f, hit.item, pay);
+    if (!tr.ok) return tr;
+    let out = null;
+    WA.store.transact(function (draft) {
+      const per = holder('person', p, draft);
+      if (!per || !Array.isArray(per.debts)) { out = { ok: false, reason: 'no-debt' }; return false; }
+      const h = per.debts.filter(function (d) { return d && d.to === f && d.item === hit.item; })[0] || null;
+      if (!h) { out = { ok: false, reason: 'no-debt' }; return false; }
+      const left = (qty(h.amount) || 0) - pay;
+      if (left <= 0) per.debts = per.debts.filter(function (d) { return d !== h; });
+      else { h.amount = left; h.updatedAt = clockNow('org'); }
+      out = { ok: true, faction: f, person: p, item: hit.item, paid: pay, owed: owed, left: Math.max(0, left),
+        settled: left <= 0 };
+    }, 'org:debt-settle');
+    if (out && out.ok) stat.lastReason = out.settled ? 'debt-settled' : 'debt-partial';
+    else if (out) stat.blocked++;
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  /**
+   * 债权债务双向读数。**逐条带对象与原因**（欠谁的、欠什么、为什么），不汇总成一个净额——
+   *   净额会把「甲欠我 10 粮」和「我欠甲 10 布」抵成 0，而这两件事一件都不能忘。
+   */
+  function debtsView(kind, name) {
+    const k = clean(kind, 20) || 'person';
+    const nm = clean(name, 60);
+    if (!nm) return { ok: false, reason: 'bad-name' };
+    if (k === 'person') {
+      const person = holder('person', nm);
+      if (!person) return { ok: false, reason: 'missing-holder' };
+      const owes = (Array.isArray(person.debts) ? person.debts : []).map(function (d) {
+        return { to: clean(d.to, 40), item: clean(d.item, 30), amount: qty(d.amount) || 0, why: clean(d.why, 80) };
+      }).filter(function (d) { return d.amount > 0; });
+      const owedTo = [];
+      (((state().evolution || {}).factions) || []).forEach(function (fr) {
+        if (!fr) return;
+        const rec = rosterOf(fr)[nm];
+        if (!rec) return;
+        const amt = typeof rec.owed === 'number' ? rec.owed : 0;
+        if (amt > 0) owedTo.push({ from: clean(fr.name, 40), item: clean(rec.owedItem || '粮', 30), amount: amt, why: '薪俸未清' });
+      });
+      const pay = owes.reduce(function (a, b) { return a + b.amount; }, 0);
+      const recv = owedTo.reduce(function (a, b) { return a + b.amount; }, 0);
+      return { ok: true, kind: 'person', name: nm, payable: owes, receivable: owedTo,
+        payableTotal: pay, receivableTotal: recv, count: owes.length + owedTo.length };
+    }
+    if (k === 'faction') {
+      const row = factionRow(nm);
+      if (!row) return { ok: false, reason: 'missing-holder' };
+      const receivable = [];
+      const rs = rosterOf(row);
+      Object.keys(rs).sort().forEach(function (p) {
+        const amt = typeof rs[p].owed === 'number' ? rs[p].owed : 0;
+        if (amt > 0) receivable.push({ from: p, item: clean(rs[p].owedItem || '粮', 30), amount: amt, why: '薪俸未清' });
+      });
+      const payable = [];
+      const st = state();
+      Object.keys(st.people || {}).forEach(function (pid) {
+        const per = st.people[pid];
+        if (!per) return;
+        (Array.isArray(per.debts) ? per.debts : []).forEach(function (d) {
+          if (d && clean(d.to, 40) === nm && (qty(d.amount) || 0) > 0) {
+            payable.push({ to: clean(per.name || pid, 60), item: clean(d.item, 30), amount: qty(d.amount) || 0, why: clean(d.why, 80) });
+          }
+        });
+      });
+      const recv = receivable.reduce(function (a, b) { return a + b.amount; }, 0);
+      const pay = payable.reduce(function (a, b) { return a + b.amount; }, 0);
+      return { ok: true, kind: 'faction', name: nm, receivable: receivable, payable: payable,
+        receivableTotal: recv, payableTotal: pay, count: receivable.length + payable.length };
+    }
+    return { ok: false, reason: 'bad-kind', want: ['faction', 'person'] };
+  }
   function ledgerView() {
     const st = state();
     const holders = [];
@@ -609,6 +1046,14 @@
     //   异常时进 O7 健康分——同一本账，没有影子账。
     assignRole: assignRole, creditWork: creditWork, promote: promote, rosterView: rosterView,
     payroll: payroll, settleOwed: settleOwed, penalize: penalize,
+    // v2.117.0（计划二 B5）：组织行动七口——**每个口一个真消费方**：
+    //   openProject / projectView / closeProject / deliverToProject → 诊断 secOrg（项目面）
+    //     + inject 注入面（buildBlock 的「共同项目」段，模型据此知道组织正在办什么）；
+    //   oweTo / settleDebt / debtsView → 诊断 secOrg（债务面）+ buildBlock 的欠账读数。
+    //   交付一律走 transfer（在 deliverToProject / settleDebt 内部），**不开影子账**。
+    openProject: openProject, projectView: projectView, closeProject: closeProject,
+    deliverToProject: deliverToProject, oweTo: oweTo, settleDebt: settleDebt, debtsView: debtsView,
+    TIERS: PROJECT_TIERS,
     stat: function () { return Object.assign({}, stat); }
   };
 })();

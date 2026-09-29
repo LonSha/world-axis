@@ -127,7 +127,18 @@ let __passDepth = 0;
 let __passResolved = false;
 function beginPass() { if (__passDepth === 0) __passResolved = false; __passDepth += 1; }
 function endPass() { __passDepth -= 1; if (__passDepth <= 0) { __passDepth = 0; __passResolved = false; } }
+function walkPass(fn) {
+  // v2.119.0（优化一/四）：显式「一趟」——同一趟内产品/测试文件面只核一次签名。
+  //   为什么必须显式：本文件的三层缓存有一层依赖 __passDepth>0，而 classify()/ownRefCount()
+  //   从 judge() 的**趟外**被调——那一层对它们失效，于是「每条冻结项核一次全量签名」，
+  //   608 条 x (66+测试面) 48次 stat 族 =每趟 40 秒（实测），而 evidenceDrift 本体只要 81ms。
+  beginPass();
+  try { return fn(); } finally { endPass(); }
+}
 function productSnapshot() {
+  // v2.119.0：本函数自身即一趟——调用方无需知道缓存层级。
+  beginPass();
+  try {
   if (__passDepth > 0 && __passResolved && __snap.byFile) return __snap;
   const rels = inventory.PRODUCT_FILES || [];
   // v2.73.0：测试面 = tests/ 下全部 .js（单一真源 tests/product-files.js）。
@@ -160,8 +171,10 @@ function productSnapshot() {
   __snap.sig = sig;
   __snap.byFile = byFile;
   __snap.tests = tests;
+  __snap.rebuilds = (__snap.rebuilds || 0) + 1;
   if (__passDepth > 0) __passResolved = true;
   return __snap;
+  } finally { endPass(); }
 }
 // 在**已剥离的真代码面**上按 word-boundary 计数（countRefs 的纯核）
 function countRefsOnCode(code, mem) {
@@ -255,6 +268,9 @@ function detailOf(code, fileMap, rec) {
 function byKey(a, b) { return keyOf(a) < keyOf(b) ? -1 : 1; }
 // 依据一次 collect() 结果生成账本（逐条 reason + detail + 证据）
 function build(result, version) {
+  return walkPass(function () { return buildInner(result, version); });
+}
+function buildInner(result, version) {
   const fileMap = nsToFile();
   const out = {
     _note: 'WorldAxis 死子面冻结账本（v' + version + '）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：'
@@ -381,6 +397,10 @@ function evidenceDrift(result, ledger) {
 }
 // 判定：added / staleReason / metadata / evidence 是红灯；gone 只提示
 function judge(result, ledger, opts) {
+  return walkPass(function () { return judgeInner(result, ledger, opts); });
+}
+function judgeInner(result, ledger, opts) {
+  const rb0_119 = __snap.rebuilds || 0;
   const fileMap = nsToFile();
   const entryVersion = (opts && opts.entryVersion) || versionOf();
   const out = { added: [], gone: [], staleReason: [], metadata: [], evidence: [], advisory: {}, ok: true };
@@ -413,6 +433,10 @@ function judge(result, ledger, opts) {
   out.evidence = evidenceDrift(result, ledger);
   out.ok = out.added.length === 0 && out.staleReason.length === 0
     && out.metadata.length === 0 && out.evidence.length === 0;
+  // v2.119.0（优化一）：趟内一致性读数。一趟里若发生 >1 次快照重建，就是趟中有文件被写盘
+  //   （签名变了）——本趟结论建在两代现场之上。它不是性能读数，是判据纯度读数：
+  //   正例恒 false，注入写盘即 true（静态门禁不得掩盖它）。
+  out.midPassRebuild = ((__snap.rebuilds || 0) - rb0_119) > 1;
   return out;
 }
 function report(result, verdict) {
@@ -475,6 +499,7 @@ function main() {
 if (require.main === module) main();
 module.exports = { LEDGER_PATH: LEDGER_PATH, FROZEN_KINDS: FROZEN_KINDS, ADVISORY_KINDS: ADVISORY_KINDS,
   REASON_CODES: REASON_CODES, EVIDENCE_KEYS: EVIDENCE_KEYS, loadLedger: loadLedger, build: build, refresh: refresh,
+  walkPass: walkPass, beginPass: beginPass, endPass: endPass, snapshotRebuilds: function () { return __snap.rebuilds || 0; },
   judge: judge, classify: classify, detailOf: detailOf, selfUsed: selfUsed, nsToFile: nsToFile, keyOf: keyOf,
   versionOf: versionOf, versionNotes: versionNotes, metadataProblems: metadataProblems, evidenceDrift: evidenceDrift,
   evidenceOf: evidenceOf, countRefs: countRefs, ownRefCount: ownRefCount, refCountIn: refCountIn,

@@ -152,7 +152,10 @@
       //   为什么三张表都要有界：它们都是「会被 AI 源源不断写进来」的容器，
       //   无界 = 存档体积被单机长跑拖垮；而**在场者名单不落盘**（由日程+地点现算，
       //   落盘就成了一份会过期的第二真源——「谁在场」必须永远能从证据重新推出来）。
-      world: { places: [], roads: [], events: [], journeys: [] },
+      world: { places: [], roads: [], events: [], journeys: [],
+        // v2.117.0（B2 后半）：新容器必须**物化**——登记了却不在默认状态里，
+        //   registryParity 的「声明了但不存在」正是为此而设（默认状态就是那张表的物证）。
+        blocks: [], shipments: [], messages: [] },
       // v2.65.0 天气与在途情报。登记了容量却不在骨架里，冷启动直写会炸事务。
       weather: { rows: [] },
       intelQueue: [],
@@ -191,6 +194,11 @@
       // v2.116.0：回执台账 `events.res` 同步物化——容量表登记了精确键就必须在骨架里存在，
       //   否则 registryParity 报「未在骨架物化」、maintain 扣健康分，且冷启动直写会炸事务。
       events: { rows: [], failQueue: [], res: [] },
+      // v2.117.0（计划二 B1）：行动执行（act.js）。登记了容量却不在骨架里，冷启动直写会炸事务。
+      //   rows：候选与在执行的动作（目标来源 / 动作种类 / 时长与窗口 / 结果依据 / opId）
+      //   res ：结算回执台账（已完成本地副作用 + 该 opId 的确认，答「重复结算不重复扣费」）
+      //   两张表都必须有界：它们由 AI 一轮一轮写进来，无界 = 存档体积被长局拖垮。
+      acts: { rows: [], res: [] },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -212,6 +220,63 @@
       //     的容量设置夹住（见 core/evict.js 的两条新站点登记）。
       chrono: { seq: 0, entries: [] },
       collab: { seq: 0, sessions: [], claims: {}, queue: [], conflicts: [] },
+      // v2.117.0（计划二 B6）：机会形成（opportunity.js 唯一写入 `draft.opportunity`）。
+      //   openings 每行 = 一个「此刻可参与的窗口」及其作答痕迹；四个必答项
+      //   （由哪项变化产生 / 涉及谁 / 窗口多久 / 忽略会怎样）逐行落在行里。
+      //   为什么是新顶层键而不是挂进既有容器：它既不是因果链（causal 答「为什么发生」），
+      //   也不是伏笔（foreshadows 答「答应过什么」）——它答的是**可参与性本身**，
+      //   而这一格此前**没有任何状态承载**（引擎各自报「世界上正在发生什么」，
+      //   却没人把它们收敛成「此刻有一个窗口」）。
+      opportunity: { openings: [] },
+      // v2.118.0（计划二 B7）：统一试演与回滚范围（rehearsal.js 唯一写入 `draft.rehearsal`）。
+      //   previews 每行 = 一次试演及其**世界指纹**（rev + 顶层键数 + JSON 长度）。
+      //   指纹不是装饰：它是「旧预览不许覆盖新进度」唯一可判定的依据 ——
+      //   只比 `meta.stateRev` 会漏掉「批内已改内存、尚未落盘」的那一类变化。
+      rehearsal: { previews: [] },
+      // v2.118.0（计划二 B8）：跨插件业务闭环（liaison.js 唯一写入 `draft.liaison`）。
+      //   inbox 每行 = 一笔手机侧操作及其**阶段**（submitted…settled 五档逐个表达，
+      //   不合并）；deals 每行 = 世界侧答应过的约定任务（真源是 acts.rows，本表只记 id 与状态）；
+      //   evidence 每行 = 一条**带来源**的证据（opId + 时间 + 有效范围）。
+      //   为什么是新顶层键：它答的是「这件事在世界里成不成立」，与 phone-bridge 的
+      //   「手机侧按下过什么」是两件事 —— 合成一个容器，两者在状态里就长得一样了。
+      liaison: { inbox: [], deals: [], evidence: [] },
+      // v2.118.0（计划二 B9）：多人协作可靠性层。
+      //   proposals 每行 = 一份**带基础版本**的待裁提议；archive 每行 = 一份终态提议（不删）。
+      //   为什么是独立顶层键：它答的是「别人的提交该不该并进这个世界」，与 collab 的
+      //   「谁此刻占着哪个角色」是两件事 —— 合成一个容器，「占用」与「裁决」就分不开了。
+      coop: { proposals: [], archive: [] },
+      // v2.119.0（拓展计划 ①）：人物多步计划（plan.js 唯一写入 `draft.plan`）。
+      //   plans 每行 = 一个人的**有限步数计划**（步骤含 need / after / place / fallback 四个显式声明），
+      //   答的是「这个人接下来打算做哪几步」。为什么是新顶层键：life.goals 只有一个字符串格子，
+      //   答不出「这一步之后干什么、卡住了改走哪条路」——而计划一旦落进 goals 的同一个格子里，
+      //   「已声明的意图」与「模型顺手编的后续」在状态里就长得一样了。
+      //   计划行**不能完成后就删**（已放弃/已受阻都是复盘证据），故只能环形挤出。
+      plan: { plans: [] },
+      // v2.119.0（拓展计划 ②）：关系修复与破裂（mend.js 唯一写入 `draft.mend`）。
+      //   threads 每行 = 一次**具体伤害**及其待履行的修复条件（四种手段各占一格，互不顶替）。
+      //   为什么与 fondness 分表：fondness 记关系温度读数（可逆量值），本表记
+      //   「伤到哪一步才算好」这件**不可逆的条件**。并表会让「她到底是原谅了还是在忍着」不可答。
+      mend: { threads: [] },
+      probe: { cases: [] },
+      // v2.119.0（拓展计划 ⑥）：跨地域持续变化与传播链（region.js 唯一写入 `draft.region`）。
+      //   places 每行 = 一处远方的“传播拓扑”（距离、渠道、是否受阻）；events 每行 = 一件事从发生到落地的过程。
+      //   为什么与 world 分表：world 记“谁能不能到那里”，本表记“那边的消息要走多久才到”——
+      //   合成一表，可达性与消息延迟就分不开了。
+      region: { places: [], events: [] },
+      // v2.119.0（拓展计划 ⑦）：题材玩法包与长篇阶段变化（stage.js 唯一写入 `draft.stage`）。
+      //   为什么与 recipe 分表：recipe 记「怎么做」（槽位与政策），本表记「玩到哪一步了、什么时候该换」——
+      //   合成一表，配方内容与进度就分不开了，而进度不是配方的一部分（同一配方可以玩到不同阶段）。
+      stage: { pack: '', stage: '', metrics: {}, transitions: [] },
+      // v2.119.0（拓展计划 ⑧）：多人共享世界的连接层（session.js 唯一写入 `draft.session`）。
+      //   为什么与 coop 分表：coop 记「提议该不该并进这个世界」（裁决语义），本表记
+      //   「人是谁、他持什么票、消息到第几条」（连接语义）——合成一表，身份与内容就分不开了。
+      //   **凭证不入本表**：只存指纹（fp），日志里看不到能冒充人的东西。
+      session: { seats: [], log: [], seq: 0, rev: 0, host: '' },
+      // v2.119.0（拓展计划 ④）：组织制度与权力交接（inst.js 唯一写入 `draft.inst`）。
+      //   为什么与 org 分表：org 记「谁在组织里、有多少资源」，本表记「这笔决策要不要批准、
+      //   这个职位能拍什么板、他离任后在途的项目归谁」——合成一表，制度就与成员名单分不开了。
+      inst: { orgs: [], pending: [], breaches: [], successions: [] },
+      economy: { goods: [], orders: [], routes: [] },
       // 元信息
       meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null }
     };
@@ -1060,6 +1125,14 @@
     'world.events': { cap: 12, site: 'world.js WA.evict.array(world.events)' },
     // v2.65.0 行程表与天气。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
     'world.journeys': { cap: 24, site: 'world.js WA.evict.array(world.journeys)' },
+    // v2.117.0（B2 后半）：封锁投递 / 货运 / 消息三个新容器（与 evict.SITES 同值同源）。
+    'world.blocks': { cap: 24, site: 'world.js WA.evict.array(world.blocks)' },
+    'world.shipments': { cap: 16, site: 'world.js WA.evict.array(world.shipments)' },
+    'world.messages': { cap: 24, site: 'world.js WA.evict.array(world.messages)' },
+    // v2.117.0（B2 前半）：场所用途窗口。**每个地点各自的窗口环**，故走通配键；
+    //   上限不是拍出来的数：用途是封闭集合（USE_KINDS），同一地点同一用途只有一行，
+    //   故长度 ≤ USE_KINDS.length。cap 与执行同源（调用点显式传 USE_KINDS.length，per-call）。
+    'world.places.*.uses': { cap: 8, kind: 'array', wildcard: true, site: 'world.js WA.evict.array(row.uses, world.placeUses, USE_KINDS.length)（per-call）' },
     'weather.rows': { cap: 24, site: 'weather.js WA.evict.array(weather.rows)' },
     'intelQueue': { cap: 24, site: 'intel.js WA.evict.array(intel.queue)' },
     // v2.66.0 情绪通道 / 关系六型 / 假面。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
@@ -1105,6 +1178,47 @@
     'events.rows':      { cap: 24, site: 'events.js WA.evict.array(events.rows, maxRows)（per-call，取设置上界）' },
     'events.failQueue': { cap: 24, site: 'events.js WA.evict.array(events.failQueue, maxFails)（per-call，取设置上界）' },
     'events.res':       { cap: 24, site: 'events.js WA.evict.array(events.res, maxFails)（per-call，取设置上界；v2.116.0 回执台账）' },
+    // v2.117.0（计划二 B1）：行动执行两容器（act.js 走 WA.evict.array 单一出口，cap 与 evict.SITES 同源）。
+    //   同 events 口径：上限 = 设置上界（maxActs），运行时由 act.js 显式传当前设置值，改设置不漂移。
+    'acts.rows':        { cap: 24, site: 'act.js WA.evict.array(acts.rows, maxActs)（per-call，取设置上界；v2.117.0）' },
+    'acts.res':         { cap: 24, site: 'act.js WA.evict.array(acts.res, maxActs)（per-call，取设置上界；v2.117.0 回执台账）' },
+    // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复（两模块各自走 WA.evict.array 单一出口）。
+    //   两条 cap 与引擎设置同源（maxPlans / maxRows），运行时由调用点显式传当前设置值。
+    //   **终态行不删**：已放弃的计划与已失败（或被拒）的修复都是复盘证据，
+    //   「他求过一次、被拒了」与「他从没求过」必须可分辨——故只能环形挤出。
+    'plan.plans':       { cap: 12, site: 'plan.js WA.evict.array(draft.plan.plans, maxPlans)（per-call，取设置上界；v2.119.0）' },
+    'mend.threads':     { cap: 12, site: 'mend.js WA.evict.array(draft.mend.threads, maxRows)（per-call，取设置上界；v2.119.0）' },
+    'probe.cases':         { cap: 8, site: 'probe.js per-call' },
+    // v2.119.0（拓展计划 ⑥）：远方传播两容器（均 per-call）。
+    //   事件**不删行**：已落地的消息是纪事材料，“那边出过什么事”必须数得出来。
+    'region.places':       { cap: 8,  site: 'region.js 写入侧硬上界（places-full 拒写，不走 evict；v2.119.0 优化③ 移出挤出站点）' },
+    'region.events':       { cap: 24, site: 'region.js WA.evict.array(rg.events, maxEvents)（per-call）' },
+    // v2.119.0（拓展计划 ⑦）：阶段迁移两容器（均 per-call）。迁移记录**不删行**（已走完的阶段是长篇骨架）。
+    //   metrics 的 `kind` 是 **object**：骨架形态是 `metrics: {}`（指标名 → 值），
+    //   原先按默认 array 登记 ⇒ store.registryParity() 报「类型错配（应为数组）」；
+    //   它同时也不是挤出站点（写入侧 metrics-full 硬拒写），正确性是「两个字段都要对」。
+    'stage.metrics':       { cap: 24, kind: 'object', site: 'stage.js 写入侧硬上界（metrics-full 拒写，不走 evict；v2.119.0 优化③ 移出挤出站点）' },
+    'stage.transitions':   { cap: 12, site: 'stage.js WA.evict.array(st.transitions, maxTransitions)（per-call）' },
+    // v2.119.0（拓展计划 ⑧）：多人连接两容器（均 per-call）。日志**不删行**（历史不可篡改）。
+    'session.seats':       { cap: 8,  site: 'session.js WA.evict.array(ss.seats, maxSeats)（per-call）' },
+    'session.log':         { cap: 64, site: 'session.js WA.evict.array(ss.log, maxLog)（per-call）' },
+    'inst.orgs':       { cap: 8,  site: 'inst.js WA.evict.array(it.orgs, maxOrgs)（per-call）' },
+    // v2.119.0（拓展计划 ④）：组织制度四容器（均 per-call）。
+    //   待批与违约都**不删行**：撤回的提议、已结的违约都是复盘证据。
+    'inst.successions':{ cap: 12, site: 'inst.js WA.evict.array(og.successions, maxPending)（per-call）' },
+    'inst.pending':    { cap: 12, site: 'inst.js WA.evict.array(og.pending, maxPending)（per-call）' },
+    'inst.breaches':   { cap: 12, site: 'inst.js WA.evict.array(og.breaches, maxBreaches)（per-call）' },
+    // v2.119.0（拓展计划 ③）：经济循环三容器（均 per-call：上限就是各自的设置项）。
+    //   三张表都**不能删行**：流水是台账（删了就算不出「这个月他赚了多少」），
+    //   商路受阻是状态（删了世界就忘了曾经有条路）。故一律环形挤出。
+    'economy.goods':    { cap: 16, site: 'economy.js WA.evict.array(ec.goods, maxGoods)（per-call）' },
+    'economy.orders':   { cap: 12, site: 'economy.js WA.evict.array(ec.orders, maxOrders)（per-call）' },
+    'economy.routes':   { cap: 8,  site: 'economy.js WA.evict.array(ec.routes, maxRoutes)（per-call）' },
+    // v2.117.0（计划二 B5）：组织行动两容器（行内挂，故为通配键；cap 与 evict.SITES 同源）。
+    //   通配键不参与 registryParity（按定义不在默认骨架里），但**必须登记**——
+    //   否则 sizeAudit 会把它报成无界容器（v1.0.0「有界但漏登」那类误报的另一半）。
+    'evolution.factions.*.projects': { cap: 6,  kind: 'array', wildcard: true, site: 'org.js WA.evict.array(row.projects)（per-call）' },
+    'people.*.debts':                 { cap: 12, kind: 'array', wildcard: true, site: 'org.js WA.evict.array(person.debts)（per-call）' },
     // v2.96.0 传播与辟谣一容器（rumor.js）。cap 与 evict.SITES / rumor.js 三处同源；
     //   不登记会被 sizeAudit 报 unbounded。**跳与隐瞒不在此登记**：它们是每链自带的
     //   有界数组（maxHops / maxSuppressed，满员即拒收、不挤出），不是全局环形容器。
@@ -1163,6 +1277,19 @@
     'collab.queue':     { cap: 128, site: 'collab.js WA.evict.array(c.queue)' },
     'collab.conflicts': { cap: 64,  site: 'collab.js WA.evict.array(c.conflicts)' },
     'chrono.entries':   { cap: 128, site: 'chrono.js WA.evict.array(c.entries)' },
+    // v2.117.0（计划二 B6）：机会窗口在途行。登记键与 evict.SITES 的 path 同名同值
+    //   （上面的把门判据逐键对账）。cap 8 与引擎 DEF.maxOpen 同源。
+    'opportunity.openings': { cap: 8, site: 'opportunity.js WA.evict.array(rs)' },
+    'rehearsal.previews': { cap: 24, site: 'rehearsal.js WA.evict.array(draft.rehearsal.previews, keepPreviews)（per-call，取设置上界；DEF.keepPreviews 默认 6；v2.118.0）' },
+    // v2.118.0（计划二 B8）：跨插件业务闭环三表。登记键与 evict.SITES 的 path 同名同值
+    //   （上面的把门判据逐键对账）。三条 cap 与 engines/liaison.js 的 LIMITS 同源。
+    'liaison.inbox':    { cap: 40, site: 'liaison.js WA.evict.array(n.inbox, \'liaison.inbox\')（LIMITS.ROWS=40）' },
+    'liaison.deals':    { cap: 24, site: 'liaison.js WA.evict.array(n.deals, \'liaison.deals\')（LIMITS.DEALS=24）' },
+    'liaison.evidence': { cap: 40, site: 'liaison.js WA.evict.array(n.evidence, \'liaison.evidence\')（LIMITS.ROWS=40）' },
+    // v2.118.0（计划二 B9）：协作提议两表。登记键与 evict.SITES 的 path 同名同值
+    //   （上面的把门判据逐键对账）。两条 cap 与 engines/coop.js 的 LIMITS 同源。
+    'coop.proposals':   { cap: 24, site: "coop.js WA.evict.array(n.proposals, 'coop.proposals')（LIMITS.ROWS=24）" },
+    'coop.archive':     { cap: 40, site: "coop.js WA.evict.array(n.archive, 'coop.archive')（LIMITS.ARCHIVE=40）" },
     // v2.13.0: 人物档案节（people.<id>.profile.<节>）的上限**逐节不同**，上面五条具名
     //   登记已足够说明「这些数组归谁管」；挤出侧站点 people.profile 的 path 是
     //   people.*.profile.*（per-call，写的时候才由 registry 逐节取值传入），

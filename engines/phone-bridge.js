@@ -66,13 +66,28 @@
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, __REG.def, next || {})));
   }
   const stat = { noted: 0, reused: 0, blocked: 0, linked: 0, linkFails: 0, lastReason: '',
-    lastAct: '', lastOpId: '', faults: {}, byAct: {} };
+    lastAct: '', lastOpId: '', faults: Object.create(null), byAct: Object.create(null) };
+  // v2.118.0 B7：入站桥跟随显式执行上下文；试演操作只写隔离 sink。
+  function execMod() { return (WA.exec && typeof WA.exec.withContext === 'function') ? WA.exec : null; }
+  function storeOf() { const e = execMod(); return e ? e.storeOf(WA.store) : WA.store; }
+  function mutate(fn, opt) { const e = execMod(); const st = storeOf(); return e ? e.mutate(st, fn, opt) : (st && st.transact ? st.transact(fn, opt) : { ok: false, reason: 'store-absent' }); }
+  function statOf() {
+    const e = execMod(); const bag = e ? e.statBag(stat) : stat;
+    if (bag && bag !== stat) Object.keys(stat).forEach(function (k) {
+      if (bag[k] === undefined) {
+        const v = stat[k];
+        bag[k] = (v && typeof v === 'object') ? (Array.isArray(v) ? [] : Object.assign(Object.create(null), v)) : v;
+      }
+    });
+    return bag || stat;
+  }
+  const S = (function () { const f = {}; Object.keys(stat).forEach(function (k) { Object.defineProperty(f, k, { enumerable: true, get: function () { return statOf()[k]; }, set: function (v) { statOf()[k] = v; } }); }); return f; })();
   function noteFault(reason) {
-    stat.faults[reason] = (stat.faults[reason] || 0) + 1;
-    stat.blocked++; stat.lastReason = reason;
+    S.faults[reason] = (S.faults[reason] || 0) + 1;
+    S.blocked++; S.lastReason = reason;
   }
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
-  function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
+  function state() { const st = storeOf(); return st && st.get ? (st.get() || {}) : {}; }
   function ops() { const p = state().causal; return (p && Array.isArray(p.phoneOps)) ? p.phoneOps : []; }
   /** 动作是否白名单内（未知动作报空串，**不回落成 message**——那是替外部决定语义）。 */
   function actOf(v) {
@@ -97,7 +112,7 @@
     const cfg = settings();
     if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
     let out = null;
-    WA.store.transact(function (draft) {
+    mutate(function (draft) {
       const c = (draft.causal && typeof draft.causal === 'object') ? draft.causal : (draft.causal = { chains: [], settled: [] });
       if (!Array.isArray(c.phoneOps)) c.phoneOps = [];
       // 幂等：同一笔操作重复上报（手机侧重试是常态）返回原样，不追加第二条
@@ -128,10 +143,10 @@
       return true;
     }, 'phone-bridge:note-action');
     if (out && out.ok) {
-      stat.noted++; stat.lastReason = out.reused ? 'reused' : 'noted';
-      stat.lastAct = act; stat.lastOpId = opId;
-      if (out.reused) stat.reused++;
-      else stat.byAct[act] = (stat.byAct[act] || 0) + 1;
+      S.noted++; S.lastReason = out.reused ? 'reused' : 'noted';
+      S.lastAct = act; S.lastOpId = opId;
+      if (out.reused) S.reused++;
+      else S.byAct[act] = (S.byAct[act] || 0) + 1;
     }
     return out || { ok: false, reason: 'store-unavailable' };
   }
@@ -150,9 +165,9 @@
     const exists = (function () {
       try { const cs = (state().causal || {}).chains || []; return cs.some(function (x) { return x && x.id === cid; }); } catch (e) { return false; }
     })();
-    if (!exists) { stat.linkFails++; return { ok: false, reason: 'unknown-chain', chainId: cid }; }
+    if (!exists) { S.linkFails++; return { ok: false, reason: 'unknown-chain', chainId: cid }; }
     let out = null;
-    WA.store.transact(function (draft) {
+    mutate(function (draft) {
       const c = (draft.causal && typeof draft.causal === 'object') ? draft.causal : null;
       if (!c || !Array.isArray(c.phoneOps)) { out = { ok: false, reason: 'no-ops' }; return false; }
       const hit = c.phoneOps.filter(function (x) { return x && x.opId === op; })[0];
@@ -165,7 +180,7 @@
       out = { ok: true, already: false, opId: op, chainId: cid };
       return true;
     }, 'phone-bridge:link');
-    if (out && out.ok && !out.already) stat.linked++;
+    if (out && out.ok && !out.already) S.linked++;
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
@@ -234,10 +249,10 @@
     stat: function () {
       return {
         enabled: !!settings().enabled, linkCausal: !!settings().linkCausal, maxOps: MAX_OPS,
-        noted: stat.noted, reused: stat.reused, blocked: stat.blocked,
-        linked: stat.linked, linkFails: stat.linkFails,
-        lastReason: stat.lastReason, lastAct: stat.lastAct, lastOpId: stat.lastOpId,
-        byAct: Object.assign({}, stat.byAct), faults: Object.assign({}, stat.faults),
+        noted: S.noted, reused: S.reused, blocked: S.blocked,
+        linked: S.linked, linkFails: S.linkFails,
+        lastReason: S.lastReason, lastAct: S.lastAct, lastOpId: S.lastOpId,
+        byAct: Object.assign({}, S.byAct), faults: Object.assign({}, S.faults),
         // 台账现值（只读存档）
         rows: ops().length,
         unlinked: ops().filter(function (x) { return x && !x.chainId; }).length,

@@ -37,10 +37,20 @@
     //   （另有同名风险：舆情面内部还有一个 `opinion.canon`，但那是**状态键**不是注入源，
     //   不会出现在 SOURCES 里，两者不存在键集冲突。）
     canon: '原著幕目',
+    // v2.117.0（计划二 B1 主体）：人物行动。与 SOURCES 同批登记 ——
+    //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 `act`，
+    //   而那是用户唯一能开关它的地方（本版实测被 inject-sources-v2560 的 D 判据抓出）。
+    act: '人物行动',
     // v2.66.0: 情绪通道 / 关系六型 / 假面。与 SOURCES 同批登记（不加显示名 ⇒ 面板裸露英文键名）。
     affect: '情绪通道', bonds: '关系六型', masks: '假面', temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', parallelEvents: '场外事件',
     eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉', beastBond: '驯兽',
-    appearance: '外貌契约', ladder: '原型阶梯', sceneSlice: '情境切片', gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮', quota: '伏笔配给', spotlight: '焦点分配', karma: '业力双轴', hazard: '累积风险', marginal: '边际折旧', tolerance: '手段耐受', events: '事件调度', checkpoints: '快照与分支' };
+    appearance: '外貌契约', ladder: '原型阶梯', sceneSlice: '情境切片', gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮', quota: '伏笔配给', spotlight: '焦点分配', karma: '业力双轴', hazard: '累积风险', marginal: '边际折旧', tolerance: '手段耐受', events: '事件调度', checkpoints: '快照与分支',
+    // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。与 SOURCES 同批登记 ——
+    //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 `plan`/`mend`，
+    //   而那是用户唯一能开关这两个注入源的地方（同 v2.56.0 / v2.96.0 / v2.117.0 的理由）。
+    plan: '人物计划', mend: '关系修复',
+    // v2.119.0（拓展计划 ③）：供需循环。与 SOURCES 同批登记（否则注入页裸露英文键名 `economy`）。
+    economy: '供需与商路', inst: '组织制度', probe: '调查卷宗', region: '远方', stage: '玩法进度', session: '多人场' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
@@ -491,7 +501,14 @@
       <div class="wa-row"><input id="wa-org-person" class="wa-input" placeholder="成员姓名"/><input id="wa-org-role" class="wa-input" placeholder="职阶 novice/member/steward/chief 或 帮闲/管事/主事/当家"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-org-assign" title="编入名册或改任（同一人重复编入 = 改职，不叠加——「本来就是他」与「刚收进来」必须可区分）">编入</button><button class="wa-btn" id="wa-org-credit" title="记功：只记在册者，单次上限 99；够门槛只报 ready，不自动晋升（晋升是显式决策，不是记账的副作用）">记功</button><button class="wa-btn" id="wa-org-promote" title="晋升：贡献够门槛才升一阶；不够就照实报差多少——不四舍五入、不「看表现」">晋升</button><button class="wa-btn" id="wa-org-roster" title="名册：逐人职阶 / 贡献 / 欠薪 / 下一阶门槛 / 本期应付 + 当前经济风（两档同账不同词）">名册</button></div>
       <div class="wa-row"><button class="wa-btn" id="wa-org-pay" title="发薪：逐人把本期应付从势力转给本人（走 transfer——同一支笔，自动进流水与带外对账）；发不出就记欠薪，不静默减半">发薪</button><button class="wa-btn" id="wa-org-settle" title="补发欠薪：只补得起的量，余额照实留着（不把「还欠着」抹成「清了」）">补发欠薪</button><button class="wa-btn" id="wa-org-penalize" title="罚没：本人 → 势力一次 transfer 走完（不是「先 grant 再扣」两步——两步之间没有原子性，中途失败会凭空多出资源）">罚没</button></div>
+      <div class="wa-row"><input id="wa-org-project" class="wa-input" placeholder="项目名（如 修堤）"/><input id="wa-org-needs" class="wa-input" placeholder="所需物资：粮100、布20"/><input id="wa-org-due" class="wa-input" placeholder="期限(可空)"/><input id="wa-org-why" class="wa-input" placeholder="欠账原因（登记欠账必填）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-org-proj-open" title="立项目：目标 + 所需物资逐项刻数 + 发起人；同名未结项的项目拒收（并存两个同名项目，账面就答不出交付的货进了哪一个）">立项目</button><button class="wa-btn" id="wa-org-proj-deliver" title="交付：本人 → 势力一次 transfer（同一支笔，自动进流水与带外对账），并记进该项目的覆盖；只收清单上有的东西——把无关物资倒进来算进度，等于进度可伪造">交付物资</button><button class="wa-btn" id="wa-org-proj-view" title="项目读数：逐项目状态 / 需求 / 已覆盖 / 缺口 + 当前档位（精确档给刻数、叙事档给词、不可读即 unknown——不给词）">项目</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-org-proj-close" title="结项：全部覆盖才算完成；缺多少就报多少（shortfall），不把「差一点」写成「完成」">结项</button><button class="wa-btn" id="wa-org-owe" title="登记债务：谁欠谁、欠什么、为什么。没有原因字段的欠账，日后没人答得出它是怎么来的">登记欠账</button><button class="wa-btn" id="wa-org-debt-settle" title="清偿欠账：只还得起的量（债可分批），余额照实留着；走 transfer（人 → 势力），与罚没同一支笔">清偿欠账</button><button class="wa-btn" id="wa-org-debts" title="债权债务双向读数：逐条带对象与原因，不汇总成净额（净额会把「甲欠我 10 粮」与我欠甲 10 布抵成 0）">债务</button></div>
       <div id="wa-org-out" class="wa-out"></div>
+      <div class="wa-sec">机会与题材配方（B6）</div>
+      <div class="wa-row"><input id="wa-rec-name" class="wa-input" placeholder="配方名 urban/mystery/business/survival（留空看当前档）"/><button class="wa-btn" id="wa-rec-view" title="配方预览：装配面 + 规则冲突 + 基础事实核对结论。纯计算、不落设置——预览不改任何东西（wrote 恒为 null）">配方预览</button><button class="wa-btn" id="wa-rec-seed" title="取一条场景种子（取用制）：不调就一个字节都不进上下文；场景只含起手情形，不含人名与世界设定">取场景</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-opp-run" title="扫描机会：把世界状态的变化收敛成「此刻可参与的窗口」（承诺逾期/项目缺口/目标互斥/情报未核实/欠账未清/因果后果到期）。到窗口末尾的在途行转「作废」，已接/已拒永不重开">扫描机会</button><button class="wa-btn" id="wa-opp-view" title="机会读数：在途窗口逐条带「涉及谁 / 窗口多久」；涉及者未记录就印未记录，不猜一个人名填上">机会读数</button></div>
+      <div id="wa-rec-out" class="wa-out"></div>
       <div class="wa-sec">因果与情报</div>
       <label class="wa-row"><input id="wa-intel-enabled" type="checkbox" ${WA.intel && WA.intel.getSettings().enabled ? 'checked' : ''}/> 启用因果与情报</label>
       <div class="wa-row"><input id="wa-intel-cause" class="wa-input" placeholder="已有前因"/><input id="wa-intel-effect" class="wa-input" placeholder="结果"/></div>
@@ -523,7 +540,96 @@
       <div class="wa-row"><input id="wa-world-ev-title" class="wa-input" placeholder="共同日程名"/><input id="wa-world-ev-place" class="wa-input" placeholder="地点"/><button class="wa-btn" id="wa-world-addevent">登记日程</button><button class="wa-btn" id="wa-world-tick">推进日程</button><button class="wa-btn" id="wa-world-who" title="到场者只认日程证据——没依据的人不会出现在名单里">查到会人</button></div>
       <div class="wa-row"><input id="wa-world-mv-who" class="wa-input" placeholder="人物"/><input id="wa-world-mv-from" class="wa-input" placeholder="从"/><input id="wa-world-mv-to" class="wa-input" placeholder="到"/><button class="wa-btn" id="wa-world-move" title="先问路通不通，再问此人这一刻在不在别处">移动</button><button class="wa-btn" id="wa-world-canbe">能否在场</button></div>
       <div class="wa-row"><input id="wa-world-tr-ch" class="wa-input" placeholder="person / goods / message"/><button class="wa-btn" id="wa-world-transit" title="按通道判通行：人可到 / 物可到 / 消息可到分开作答；恶劣天气封锁路线（人/物不可，消息可）">判通行</button></div>
-      <div id="wa-world-out" class="wa-out"></div>
+      <div class="wa-sec">场所用途与时间窗口</div>
+      <div class="wa-dim">用途是**封闭集合**（business/duty/class/visit/meeting/custom）——自由文本会让「哪个用途的窗口管这一件事」永远没有答案。这里登记的是「某地某用途的开放时段」，只影响该地点的判定；没登记用途的地点仍按地点自身开闭（空白地点保持抽象）。</div>
+      <div class="wa-row"><input id="wa-world-use-place" class="wa-input" placeholder="地点（留空取左侧登记地点）"/><input id="wa-world-use-kind" class="wa-input" placeholder="用途 business/duty/class/visit/meeting/custom"/><input id="wa-world-use-open" class="wa-input" placeholder="开（毫秒时刻或日期）"/><input id="wa-world-use-close" class="wa-input" placeholder="关"/></div>
+      <div class="wa-row"><input id="wa-world-use-note" class="wa-input" placeholder="备注（可空，只在填了才会覆盖旧备注）"/><button class="wa-btn" id="wa-world-use-add" title="登记或更新一条用途窗口：同一地点同一用途重登记即更新；窗口容不下要办的事报 window-too-short 并回报差多少">登记用途窗口</button><button class="wa-btn" id="wa-world-use-list" title="只读：这个地点已登记哪些用途窗口。地点没登记一律报 unknown-place——不返回空名单冒充「没有用途」">看用途窗口</button><button class="wa-btn" id="wa-world-use-win" title="只读：某地某用途此刻生效的窗口。found:false 表示没登记该用途 ⇒ 回落到地点自身开闭">查某用途窗口</button></div>
+      <div id="wa-world-use-out" class="wa-out"></div>
+      <div class="wa-sec">人物行动（目标 → 候选行动 → 准入 → 执行 → 完成或失败 → 后果）</div>
+      <label class="wa-row"><input id="wa-act-enabled" type="checkbox" ${WA.act && WA.act.getSettings().enabled ? 'checked' : ''}/> 启用人物行动</label>
+      <div class="wa-dim">目标表达「想实现什么」（来自人物生活区的目标）；行动表达「怎么做」。<b>没有内置确认器的种类（tell/work）一律落成可见失败</b>——不凭一句话创造「已完成」。</div>
+      <div class="wa-row"><input id="wa-act-person" class="wa-input" placeholder="人物（留空取人物生活区的人）"/><input id="wa-act-kind" class="wa-input" placeholder="wait/rest/move/meet/tell/work/deliver"/><input id="wa-act-text" class="wa-input" placeholder="目标来源或行动说明"/></div>
+      <div class="wa-row"><input id="wa-act-with" class="wa-input" placeholder="对象（meet 的对方 / deliver 的收方）"/><input id="wa-act-item" class="wa-input" placeholder="物（deliver）"/><input id="wa-act-amount" class="wa-input wa-num" type="number" min="0" placeholder="数量"/><input id="wa-act-place" class="wa-input" placeholder="地点（可空）"/></div>
+      <div class="wa-row"><input id="wa-act-from" class="wa-input" placeholder="从（move）"/><input id="wa-act-to" class="wa-input" placeholder="到（move）"/><input id="wa-act-use" class="wa-input" placeholder="用途（可空）"/><input id="wa-act-dur" class="wa-input wa-num" type="number" min="0" placeholder="时长毫秒（可空取默认）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-act-add" title="只登记候选行动，不开工——准入是 admit 的事；目标必须是此刻仍 active 的那个（目标被撤销后挂在它下面的行动不得照常开工）">登记行动</button><button class="wa-btn" id="wa-act-admit" title="准入：问「这一刻这个人能不能开始做这件事」。判据顺序从「这件事本身」到「世界条件」，全部只读、拒收零变化">准入</button></div>
+      <div class="wa-row"><input id="wa-act-id" class="wa-input" placeholder="行动 id"/><button class="wa-btn" id="wa-act-advance" title="结算所有到点的活动作（与工作流 after 链每轮自动推进同一入口）；超额者进 deferred 显式留痕，不静默跳过">结算到期</button><button class="wa-btn" id="wa-act-abort" title="中止：已消耗部分与未执行部分分别落账（spent/left 各记一格）；在途者交世界侧标成 halted，位置未知">中止</button><button class="wa-btn" id="wa-act-replan" title="受阻后改计划：旧行变 replanned 并留痕、新行指回旧行。在途者不得用本入口改道——必须先中止，否则会把真实走过的路抹成没发生">改计划</button><button class="wa-btn" id="wa-act-view" title="只读：按状态分列，并如实带出「哪些种类没有确认器">看台账</button></div>
+       <div id="wa-act-out" class="wa-out"></div>
+       <div class="wa-sec">人物多步计划（目标 → 有限步数 → 受挫改选）</div>
+       <label class="wa-row"><input id="wa-plan-enabled" type="checkbox" ${WA.plan && WA.plan.getSettings().enabled ? 'checked' : ''}/> 启用人物计划</label>
+       <div class="wa-dim">计划只<b>展开一个已存在的 active 目标</b>（不建人、不建目标）。步骤用 〔序号(kind)文本〕 逐行写，可选 〔需要:资源×数量〕、〔前置:序号〕、〔地点:x〕、〔受阻改走:…〕。<b>受阻不等于放弃</b>——改选必须显式提交新步骤。</div>
+       <div class="wa-row"><input id="wa-plan-person" class="wa-input" placeholder="人物"/><input id="wa-plan-goal" class="wa-input" placeholder="目标 id（留空取该人第一个 active 目标）"/></div>
+       <div class="wa-row"><textarea id="wa-plan-steps" class="wa-input" rows="3" placeholder="0(work)去码头搬货&#10;1(work)攒够路费 前置:0 需要:银元×3&#10;2(move)搭船去乙地 前置:1 受阻改走:改走陆路"></textarea></div>
+       <div class="wa-row"><button class="wa-btn" id="wa-plan-expand" title="展开为有限步数的计划：步数超上限一律拒收（too-many-steps），不静默截断；前置必须指向更小的序号（防环）">展开计划</button><button class="wa-btn" id="wa-plan-current" title="只读：当前该做哪一步（第一个前置都已完成的 pending 步）；没有计划报 no-plan，不造一条空计划">看当前步</button><button class="wa-btn" id="wa-plan-advance" title="交出当前步并标 running——只登记「他打算做这一步」，不执行（真正开工走人物行动的准入）">登记开工</button></div>
+       <div class="wa-row"><button class="wa-btn" id="wa-plan-done" title="这一步真的完成了 ⇒ 前进；全部完成 ⇒ 计划终态 done">结算完成</button><button class="wa-btn" id="wa-plan-blocked" title="这条路走不通 ⇒ 进受阻（计一次尝试，超上限报 tries-exhausted 然后停下等人决定）">结算受阻</button><button class="wa-btn" id="wa-plan-refused" title="被世界或他人拒绝 ⇒ 回到待办且不计尝试次数：拒收不是他的错">结算被拒</button></div>
+       <div class="wa-row"><input id="wa-plan-reason" class="wa-input" placeholder="受阻/被拒原因（可空）"/><button class="wa-btn" id="wa-plan-candidates" title="只读：给出被卡住的步、它声明的改选路径、仍可行的后续步与剩余次数——本模块不替调用方选">看候选</button><button class="wa-btn" id="wa-plan-view" title="只读：整条计划逐步列出（含资源需求与受阻原因）">看计划</button><button class="wa-btn" id="wa-plan-abandon" title="显式放弃：留痕（已放弃的计划不删，答得出「他为什么没做成」）">放弃</button></div>
+       <div id="wa-plan-out" class="wa-out"></div>
+       <div class="wa-sec">关系修复（伤害 → 道歉/补偿/守约/担保 → 结案或失败）</div>
+       <label class="wa-row"><input id="wa-mend-enabled" type="checkbox" ${WA.mend && WA.mend.getSettings().enabled ? 'checked' : ''}/> 启用关系修复</label>
+       <div class="wa-dim">四种手段<b>不可互相顶替</b>：道歉要对方显式接受、补偿要一笔真实转移的回执、守约要有守约证据、担保要第三方。<b>没有回执不算补偿</b>；结案改关系必须显式授权，且进度不达标一律拒收。</div>
+       <div class="wa-row"><input id="wa-mend-person" class="wa-input" placeholder="当事人"/><input id="wa-mend-with" class="wa-input" placeholder="对方"/><input id="wa-mend-hurt" class="wa-input" placeholder="伤的是「什么」（必填，不能只写「他伤了我」）"/></div>
+       <div class="wa-row"><button class="wa-btn" id="wa-mend-mark" title="登记一次具体伤害：伤害与「感受」分开记——情绪归情绪通道，本模块记待履行的修复条件">登记伤害</button><button class="wa-btn" id="wa-mend-id" disabled>（下方 id 框）</button></div>
+       <div class="wa-row"><input id="wa-mend-id2" class="wa-input" placeholder="修复 id（登记后自动回填）"/><input id="wa-mend-acceptby" class="wa-input" placeholder="谁接受了道歉"/><input id="wa-mend-guarantor" class="wa-input" placeholder="第三方担保人"/><input id="wa-mend-evidence" class="wa-input" placeholder="证据（可空）"/></div>
+       <div class="wa-row"><button class="wa-btn" id="wa-mend-apology" title="道歉：只有对方显式接受才算一步（acceptedBy 是谁接受的也是证据）">记道歉</button><button class="wa-btn" id="wa-mend-restitution" title="补偿：需要一笔真实转移的回执（receipt）——「我说我赔了」不算">记补偿</button><button class="wa-btn" id="wa-mend-keeping" title="守约：需要实际守约的证据（kept）">记守约</button><button class="wa-btn" id="wa-mend-guarantee" title="担保：担保人必须是第三方（当事人自己不算）">记担保</button></div>
+       <div class="wa-row"><button class="wa-btn" id="wa-mend-view" title="只读：进度、四格各自做了没有、还缺什么、最后的关系回执——「还差什么」必须当场可答">看修复</button><button class="wa-btn" id="wa-mend-close" title="结案：fulfilled 需要进度达标 + 显式授权改关系两件事同时成立；失败也是结果，照实留痕">结案</button><button class="wa-btn" id="wa-mend-fail" title="修复失败：一等公民，不删行——「他求过一次，被拒了」是复盘证据">判失败</button></div>
+       <div id="wa-mend-out" class="wa-out"></div>
+        <div class="wa-sec">供需与商路（到货 → 定价 → 成交/生产 → 时段消耗与价格响应）</div>
+        <label class="wa-row"><input id="wa-eco-enabled" type="checkbox" ${WA.economy && WA.economy.getSettings().enabled ? 'checked' : ''}/> 启用供需循环</label>
+        <div class="wa-dim">价格只能落在<b>许可带</b>（基础价 ± spread）内，越界一律拒收；<b>库存不为负</b>，钱不够或货不够都不改状态（拒收不是赊账）。生产只认具名配方；同一时段只能推一次，响应只影响<b>下一笔</b>。</div>
+        <div class="wa-row"><input id="wa-eco-place" class="wa-input" placeholder="地点"/><input id="wa-eco-res" class="wa-input" placeholder="资源/货"/><input id="wa-eco-qty" class="wa-input wa-num" type="number" min="1" placeholder="数量"/><input id="wa-eco-base" class="wa-input wa-num" type="number" min="0" step="0.1" placeholder="基础价（首次必填）"/></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-eco-stock" title="到货入库：首次登记这件货必须给基础价（missing-base）——凭空的价不是价">入库</button><input id="wa-eco-price-in" class="wa-input wa-num" type="number" min="0" step="0.1" placeholder="定价"/><button class="wa-btn" id="wa-eco-price" title="定价：必须落在许可带内，越界 price-out-of-band 并带出 lo/hi（带外的价等于「这笔交易不必发生」）">定价</button><button class="wa-btn" id="wa-eco-buy" title="买：一手交钱一手交货。钱不够/货不够一律不改状态，库存不变负">买</button></div>
+        <div class="wa-row"><input id="wa-eco-buyer" class="wa-input" placeholder="买主"/><input id="wa-eco-maker" class="wa-input" placeholder="生产者"/><input id="wa-eco-recipe" class="wa-input" placeholder="配方（面包/铁器）"/><input id="wa-eco-times" class="wa-input wa-num" type="number" min="1" placeholder="次数（可空取 1）"/><button class="wa-btn" id="wa-eco-craft" title="生产：配方是具名表，输入不足 short-input（带出缺什么、缺多少），够了才扣料出货">生产</button></div>
+        <div class="wa-row"><input id="wa-eco-stamp" class="wa-input" placeholder="时段标记（如 D3）"/><button class="wa-btn" id="wa-eco-tick" title="时段推进：消耗 + 价格响应。同一时段只能推一次（duplicate-tick）——重复推演不得造成第二次消耗">推时段</button><button class="wa-btn" id="wa-eco-view" title="只读：当前这一件货的库存、现价、基础价与许可带">看货</button><button class="wa-btn" id="wa-eco-shelf" title="只读：某地货架">看货架</button></div>
+        <div class="wa-row"><input id="wa-eco-route" class="wa-input" placeholder="商路 id"/><input id="wa-eco-lane" class="wa-input" placeholder="road/river/sea/rail"/><input id="wa-eco-from" class="wa-input" placeholder="从"/><input id="wa-eco-to" class="wa-input" placeholder="到"/><input id="wa-eco-cost" class="wa-input wa-num" type="number" min="0" placeholder="运费"/></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-eco-route-add" title="登记商路（已存在则改运费）">登记商路</button><button class="wa-btn" id="wa-eco-route-block" title="阻断：状态标记，不删行——世界仍记得有这条路，可解除后续运">阻断</button><button class="wa-btn" id="wa-eco-route-open" title="解除阻断">解除</button><button class="wa-btn" id="wa-eco-ship" title="经这条路运送：路受阻则 route-blocked，货不动（受阻可解除后续运，不消耗货）">运送</button><button class="wa-btn" id="wa-eco-routes" title="只读：商路台账">看商路</button></div>
+<div id="wa-eco-out" class="wa-out"></div>
+        <div class="wa-sec">组织制度（建档 → 设职 → 任免 → 批准链 → 交接）</div>
+        <label class="wa-row"><input id="wa-inst-enabled" type="checkbox" ${WA.inst && WA.inst.getSettings().enabled ? 'checked' : ''}/> 启用组织制度</label>
+        <div class="wa-dim">权限是<b>具名表</b>（approve/grant/hire/punish），自造权限一律拒收；<b>无职不任</b>、<b>一职一人</b>（换人要显式）；<b>没人能批的事不许挂起</b>；交接必须写明在途项目与旧承诺，<b>不因换人自动作废</b>。</div>
+        <div class="wa-row"><input id="wa-inst-org" class="wa-input" placeholder="组织 id"/><input id="wa-inst-kind" class="wa-input" placeholder="公司/学校/家族/帮派/机关"/><input id="wa-inst-name" class="wa-input" placeholder="显示名（可空）"/><button class="wa-btn" id="wa-inst-charter" title="建档：一个组织一个 kind；重复建档须显式 replace">建档</button></div>
+        <div class="wa-row"><input id="wa-inst-post" class="wa-input" placeholder="职位名"/><input id="wa-inst-perms" class="wa-input" placeholder="权限（逗号分隔：approve,grant）"/><button class="wa-btn" id="wa-inst-setpost" title="设职：权限必须落在具名权限表内——自造权限等于自造权力，下一任接不了手">设职</button></div>
+        <div class="wa-row"><input id="wa-inst-person" class="wa-input" placeholder="人"/><label class="wa-row"><input id="wa-inst-replace" type="checkbox"/> 显式换人</label><button class="wa-btn" id="wa-inst-assign" title="任职：职位必须先存在；同职只一人，换人必须勾选显式换人">任职</button><button class="wa-btn" id="wa-inst-vacate" title="离任：必须写明理由（resigned/dismissed/succeeded）">离任</button></div>
+        <div class="wa-row"><input id="wa-inst-why" class="wa-input" placeholder="离任理由"/><input id="wa-inst-from" class="wa-input" placeholder="交接：从"/><input id="wa-inst-to" class="wa-input" placeholder="交接：到"/><input id="wa-inst-projects" class="wa-input wa-num" type="number" min="0" placeholder="在途项目数"/><input id="wa-inst-oaths" class="wa-input wa-num" type="number" min="0" placeholder="旧承诺数"/><button class="wa-btn" id="wa-inst-succeed" title="交接：必须写明在途项目数与旧承诺数——不写明就拒收，而不是默认归零">登记交接</button></div>
+        <div class="wa-row"><input id="wa-inst-dec" class="wa-input" placeholder="待批事项"/><input id="wa-inst-needs" class="wa-input" placeholder="需要的权限（默认 approve）"/><button class="wa-btn" id="wa-inst-propose" title="提一项待批：若需要的权限无人持有，一律拒收——挂起等于永远办不了">提交待批</button></div>
+        <div class="wa-row"><input id="wa-inst-dec2" class="wa-input" placeholder="决策 id"/><input id="wa-inst-by" class="wa-input" placeholder="批准人"/><button class="wa-btn" id="wa-inst-approve" title="批准：批准者本人必须持有 approve——批准不是「谁点一下都行」">批准</button><button class="wa-btn" id="wa-inst-reject" title="否决：同样要有批准权">否决</button></div>
+        <div class="wa-row"><input id="wa-inst-breach" class="wa-input" placeholder="违约事项"/><input id="wa-inst-penalty" class="wa-input" placeholder="罚则（必填，本模块不自行判罚）"/><button class="wa-btn" id="wa-inst-mark-breach" title="违约：必须写明罚则">记违约</button><input id="wa-inst-br2" class="wa-input" placeholder="违约 id"/><input id="wa-inst-evidence" class="wa-input" placeholder="结案依据"/><button class="wa-btn" id="wa-inst-settle" title="违约结案：必须有据">结案</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-inst-view" title="只读：职位/在任者/权限/待批数/未结违约/交接记录">看组织</button><button class="wa-btn" id="wa-inst-out-btn" title="只读：全库读数">看总览</button></div>
+        <div id="wa-inst-out" class="wa-out"></div>
+        <div class="wa-sec">调查卷宗（立案 → 举证 → 对质 → 定案或未决）</div>
+        <label class="wa-row"><input id="wa-probe-enabled" type="checkbox" ${WA.probe && WA.probe.getSettings().enabled ? 'checked' : ''}/> 启用调查卷宗</label>
+        <div class="wa-dim">立案<b>至少两条假说</b>（只有一个可能性的不是调查，是通知）；来源必须具名（rumor/report/witness/record）；<b>支持与反驳各自留行</b>不得取平均；支持够且有反证时只能定「未决」；<b>对质要有本钱</b>，误指也留痕。</div>
+        <div class="wa-row"><input id="wa-probe-q" class="wa-input" placeholder="要查的问题"/><input id="wa-probe-hyps" class="wa-input" placeholder="假说（分号分隔，至少两条）"/><button class="wa-btn" id="wa-probe-open" title="立案：问题必填，至少两条假说">立案</button></div>
+        <div class="wa-row"><input id="wa-probe-case" class="wa-input" placeholder="案件 id"/><input id="wa-probe-claim" class="wa-input" placeholder="线索内容"/><input id="wa-probe-level" class="wa-input" placeholder="来源等级"/><input id="wa-probe-about" class="wa-input" placeholder="指向哪条假说（h0/h1…）"/></div>
+        <div class="wa-row"><input id="wa-probe-by" class="wa-input" placeholder="举证人"/><button class="wa-btn" id="wa-probe-support" title="支持：支持与反驳各自留行，不取平均">记支持</button><button class="wa-btn" id="wa-probe-refute" title="反驳：反证不合并，永远单独占一行">记反驳</button><button class="wa-btn" id="wa-probe-view" title="只读：各假说支持/反驳数与「能不能定案」">看卷宗</button></div>
+        <div class="wa-row"><input id="wa-probe-who" class="wa-input" placeholder="对质对象"/><button class="wa-btn" id="wa-probe-confront" title="对质：手里证据不足 minSupport 条就不能去——「我觉得就是他」不是证据。认知变化走 intel.believe">对质</button><button class="wa-btn" id="wa-probe-decide" title="定案：支持够且无任何反证才定 guilty；否则记「未决」（证据不足是一等结论）">定案</button></div>
+        <div class="wa-row"><input id="wa-probe-why" class="wa-input" placeholder="误指原因（必填）"/><button class="wa-btn" id="wa-probe-wrong" title="误指留痕：查错了人也记录在案，不静默删">记误指</button><button class="wa-btn" id="wa-probe-out-btn" title="只读：全库读数">看总览</button></div>
+        <div id="wa-probe-out" class="wa-out"></div>
+        <div class="wa-sec">远方与传播（登记远方 → 出事 → 按里程落地）</div>
+        <label class="wa-row"><input id="wa-rg-enabled" type="checkbox" ${WA.region && WA.region.getSettings().enabled ? 'checked' : ''}/> 启用远方传播</label>
+        <div class="wa-dim">远方必须写明<b>距离与渠道</b>（没有它们就算不出延迟）；<b>未到期不许提前落地</b>；路断不吞事——消息在原地等，解除后照常到；<b>本地逐条明细、远方只给类型与时辰</b>。</div>
+        <div class="wa-row"><input id="wa-rg-place" class="wa-input" placeholder="远方名"/><input id="wa-rg-days" class="wa-input wa-num" type="number" min="0" step="0.5" placeholder="距本地多少天"/><input id="wa-rg-lane" class="wa-input" placeholder="road/river/rail/word"/><button class="wa-btn" id="wa-rg-register" title="登记远方：距离与渠道都是必需的（missing-distance）">登记远方</button></div>
+        <div class="wa-row"><input id="wa-rg-kind" class="wa-input" placeholder="market/strife/plague/disaster/feast"/><input id="wa-rg-text" class="wa-input" placeholder="细节（可空）"/><button class="wa-btn" id="wa-rg-occur" title="远方出事：事件类型必须具名；登记即进入传播队列（延迟 = 距离 ÷ 渠道速率）">记出事</button><button class="wa-btn" id="wa-rg-view" title="只读：远方拓扑与事件台账">看台账</button></div>
+        <div class="wa-row"><input id="wa-rg-eid" class="wa-input" placeholder="事件 id"/><button class="wa-btn" id="wa-rg-deliver" title="落地：未到期一律拒收（too-early），路阻则原地等（route-blocked）">落地</button><input id="wa-rg-why" class="wa-input" placeholder="阻断原因"/><button class="wa-btn" id="wa-rg-block" title="阻断通路：状态标记，不删行">阻断</button><button class="wa-btn" id="wa-rg-open" title="解除阻断">解除</button></div>
+        <div class="wa-row"><input id="wa-rg-who" class="wa-input" placeholder="听说的人"/><button class="wa-btn" id="wa-rg-heard" title="本地认知：只有已落地的事件才被听说，且传闻会随时间变淡">听说了什么</button><button class="wa-btn" id="wa-rg-fine" title="近处精细、远处粗粒度：本地逐条明细，远方只给类型与时辰">看粒度</button><button class="wa-btn" id="wa-rg-out-btn" title="只读：全库读数">看总览</button></div>
+        <div id="wa-rg-out" class="wa-out"></div>
+        <div class="wa-sec">玩法进度（采纳玩法包 → 记进度 → 声明迁移 → 换阶段）</div>
+        <label class="wa-row"><input id="wa-st-enabled" type="checkbox" ${WA.stage && WA.stage.getSettings().enabled ? 'checked' : ''}/> 启用玩法进度</label>
+        <div class="wa-dim">玩法包必须<b>具名</b>（都市生活/经营/悬疑/冒险）；指标是包声明的且<b>只能递增</b>；迁移必须写明<b>条件与清单</b>；<b>清单未落实就不得进入下一阶段</b>；未达条件的迁移不进正文（不剧透）。</div>
+        <div class="wa-row"><input id="wa-st-pack" class="wa-input" placeholder="玩法包"/><label class="wa-row"><input id="wa-st-replace" type="checkbox"/> 显式换包</label><button class="wa-btn" id="wa-st-adopt" title="采纳玩法包：包名必须具名，且一套一采纳（换包要显式）">采纳</button></div>
+        <div class="wa-row"><input id="wa-st-metric" class="wa-input" placeholder="指标（包声明）"/><input id="wa-st-delta" class="wa-input wa-num" type="number" min="0.1" step="0.1" placeholder="增量（只能为正）"/><button class="wa-btn" id="wa-st-mark" title="记进度：指标必须在包声明的表内，且只能递增——成就不可回卷">记进度</button></div>
+        <div class="wa-row"><input id="wa-st-to" class="wa-input" placeholder="下一阶段"/><input id="wa-st-need" class="wa-input wa-num" type="number" min="0" step="1" placeholder="门槛"/><input id="wa-st-changes" class="wa-input" placeholder="要变的槽位（逗号分隔）"/><button class="wa-btn" id="wa-st-plan" title="声明迁移：触发条件与迁移清单缺一不可">声明迁移</button></div>
+        <div class="wa-row"><input id="wa-st-tid" class="wa-input" placeholder="迁移 id"/><input id="wa-st-applied" class="wa-input" placeholder="已落实的槽位（逗号分隔）"/><button class="wa-btn" id="wa-st-transit" title="换阶段：门槛未达拒收；清单未逐项确认已生效也拒收（换阶段不是一句宣告）">换阶段</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-st-view" title="只读：当前阶段、指标、已声明未到的迁移与已完成的迁移">看进度</button><button class="wa-btn" id="wa-st-out-btn" title="只读：全库读数">看总览</button></div>
+        <div id="wa-st-out" class="wa-out"></div>
+        <div class="wa-sec">多人场（入座 → 验票 → 发言 → 续传/重同步）</div>
+        <label class="wa-row"><input id="wa-se-enabled" type="checkbox" ${WA.session && WA.session.getSettings().enabled ? 'checked' : ''}/> 启用多人场</label>
+        <div class="wa-dim">入座<b>必须持票</b>（只存指纹，不落明文）；一个名字一个座、<b>角色独占</b>（接管要显式）；发言<b>序号必须连续</b>；越窗不许假装没漏，<b>必须重同步</b>；视点按权限过滤（主持人看全量）。</div>
+        <div class="wa-row"><input id="wa-se-name" class="wa-input" placeholder="名字"/><input id="wa-se-role" class="wa-input" placeholder="角色"/><input id="wa-se-token" class="wa-input" placeholder="凭证（本机留存，不写进状态）"/><label class="wa-row"><input id="wa-se-takeover" type="checkbox"/> 显式接管</label></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-se-host" title="开主持座：主持人是权限最全的座">开主持</button><input id="wa-se-perms" class="wa-input" placeholder="权限（逗号分隔：post,decide）"/><button class="wa-btn" id="wa-se-join" title="玩家入座：重名拒收；角色被占除非勾选接管；权限必须是具名表子集">入座</button><button class="wa-btn" id="wa-se-auth" title="验票：只认凭证，不认「他说他是谁」">验票</button></div>
+        <div class="wa-row"><input id="wa-se-body" class="wa-input" placeholder="发言内容"/><input id="wa-se-seq" class="wa-input wa-num" type="number" min="1" placeholder="顺序号（可空取下一个）"/><button class="wa-btn" id="wa-se-post" title="发言：顺序号必须连续（跳号拒收，带出期望值）">发言</button></div>
+        <div class="wa-row"><input id="wa-se-last" class="wa-input wa-num" type="number" min="0" placeholder="已收到的最大序号"/><button class="wa-btn" id="wa-se-since" title="续传：越窗一律拒收，必须先重同步">续传</button><button class="wa-btn" id="wa-se-resync" title="重同步：给带版本号与历史水位的快照">重同步</button><button class="wa-btn" id="wa-se-leave" title="卸座：不删已发消息（历史不可篡改）">卸座</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-se-view" title="只读：按权限过滤的视点（主持人看全量）">看视点</button><button class="wa-btn" id="wa-se-out-btn" title="只读：在场与进度总览">看总览</button></div>
+        <div id="wa-se-out" class="wa-out"></div>
+        <div id="wa-world-out" class="wa-out"></div>
       <div class="wa-sec">社交漩涡（共同隐瞒、关系经历）</div>
       <label class="wa-row"><input id="wa-shadow-enabled" type="checkbox" ${WA.shadow && WA.shadow.getSettings().enabled ? 'checked' : ''}/> 启用社交漩涡</label>
       <div class="wa-row"><input id="wa-shadow-a" class="wa-input" placeholder="甲"/><input id="wa-shadow-b" class="wa-input" placeholder="乙"/><input id="wa-shadow-secret" class="wa-input" placeholder="共同隐瞒的事"/></div>
@@ -2119,7 +2225,149 @@
       orgOut(Object.assign({}, r, { id: r.ok ? (r.item + ':' + r.amount + '→' + r.to) : r.id }), true);
       renderBody();
     });
+    // ── v2.117.0（计划二 B5）：组织行动——立项目 / 交付 / 结项 / 债务。
+    //   每个口一个**真消费方**（本处即消费方）；交付一律走 transfer（在引擎内部），
+    //   于是这些按钮产生的每一笔都自动进 O5 流水、可被 O6 带外对账核、异常时进 O7 健康分。
+    on('#wa-org-proj-open', () => {
+      if (!WA.org || !WA.org.openProject) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.openProject(orgVal('#wa-org-kind'), { what: orgVal('#wa-org-project'),
+        needs: orgVal('#wa-org-needs'), by: orgVal('#wa-org-person') || orgVal('#wa-org-name'), due: orgVal('#wa-org-due') });
+      orgOut(Object.assign({}, r, { id: r.ok ? (r.what + ':' + r.needs.map(function (x) { return x.item + x.need; }).join('+')) : r.id }), true);
+      renderBody();
+    });
+    on('#wa-org-proj-deliver', () => {
+      if (!WA.org || !WA.org.deliverToProject) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.deliverToProject(orgVal('#wa-org-kind'), orgVal('#wa-org-project'),
+        orgVal('#wa-org-person') || orgVal('#wa-org-name'), orgVal('#wa-org-item'), orgVal('#wa-org-qty'));
+      // take < offered 时照实报还差多少没进去（short），不静默截断。
+      orgOut(Object.assign({}, r, { id: r.ok ? (r.item + ':' + r.took + '/' + r.offered + (r.complete ? ':ready' : ':partial')) : r.id }), true);
+      renderBody();
+    });
+    on('#wa-org-proj-view', () => {
+      if (!WA.org || !WA.org.projectView) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      let v = null; try { v = WA.org.projectView(orgVal('#wa-org-kind')); } catch (e) { return orgOut({ ok: false, reason: 'project-throw' }, true); }
+      if (!v || !v.ok) return orgOut({ ok: false, reason: (v && v.reason) || 'project-unavailable' }, true);
+      const open = v.projects.filter(function (p) { return p.live; });
+      const miss = v.projects.filter(function (p) { return p.missing.length; });
+      // 逐项目独立标档：精确档给刻数、叙事档给词、两样都没记**不给词**（不印 null）。
+      const tail = v.projects.map(function (p) {
+        const spec = p.covered.filter(function (x) { return x.need !== null; });
+        const narr = p.covered.filter(function (x) { return x.need === null; });
+        const seg = (spec.length ? spec.map(function (x) { return x.item + x.covered + '/' + x.need; }).join('+') : '')
+          + (narr.length ? (spec.length ? '+' : '') + narr.map(function (x) { return x.item + (x.tierWord || '未记数量'); }).join('+') : '')
+          + (p.canClose ? ':ready' : ':partial');
+        return p.what + '(' + p.status + ',' + seg + ')';
+      }).join(' ');
+      const text = '项目 · ' + v.faction + ' · 未结项 ' + open.length + ' · 有缺口 ' + miss.length
+        + ' · 档位 ' + (v.tier === 'narrative' ? '叙事' : (v.tier === 'precise' ? '精确' : '未知（未记数量）'))
+        + (tail ? ' — ' + tail : '');
+      const o = $('#wa-org-out');
+      panelEl.dataset.orgOut = text;
+      if (o) o.textContent = text;
+    });
+    on('#wa-org-proj-close', () => {
+      if (!WA.org || !WA.org.closeProject) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.closeProject(orgVal('#wa-org-kind'), orgVal('#wa-org-project'));
+      // 缺口照实印（逐项 item:gap），不把「差一点」写成「完成」；
+      //   只记了档位词没记刻数的项**不能算满足**，另印 need?（不以缺口 0 冒充备齐）。
+      orgOut(Object.assign({}, r, { id: r.ok ? ('closed:' + r.what)
+        : (r.reason === 'shortfall'
+          ? ('short:' + (r.missing || []).map(function (x) { return x.item + x.gap; }).join('+')
+            + ((r.unrecorded || []).length ? ('|need?' + r.unrecorded.map(function (x) { return x.item; }).join('+')) : ''))
+          : r.id) }), true);
+      renderBody();
+    });
+    on('#wa-org-owe', () => {
+      if (!WA.org || !WA.org.oweTo) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.oweTo(orgVal('#wa-org-kind'), orgVal('#wa-org-person') || orgVal('#wa-org-name'),
+        // 原因**不回落成「未注明」**：引擎侧 missing-why 守得住「没原因不许登记」，
+        //   但壳若替人补一个原因，那道闸在真实使用里就永远不触发。
+        { item: orgVal('#wa-org-item'), amount: orgVal('#wa-org-qty'), why: orgVal('#wa-org-why') });
+      orgOut(Object.assign({}, r, { id: r.ok ? (r.person + '→' + r.faction + ':' + r.item + r.amount) : r.id }), true);
+      renderBody();
+    });
+    on('#wa-org-debt-settle', () => {
+      if (!WA.org || !WA.org.settleDebt) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.org.settleDebt(orgVal('#wa-org-kind'), orgVal('#wa-org-person') || orgVal('#wa-org-name'), { item: orgVal('#wa-org-item') });
+      // 只还得起的量：余额照实留着（partial 与 settled 分开印）。
+      orgOut(Object.assign({}, r, { id: r.ok ? ((r.settled ? 'cleared:' : 'partial:') + r.paid + ':' + r.left) : r.id }), true);
+      renderBody();
+    });
+    on('#wa-org-debts', () => {
+      if (!WA.org || !WA.org.debtsView) return orgOut({ ok: false, reason: 'module-missing' }, true);
+      let v = null; try { v = WA.org.debtsView(orgVal('#wa-org-kind'), orgVal('#wa-org-person') || orgVal('#wa-org-name')); } catch (e) { return orgOut({ ok: false, reason: 'debts-throw' }, true); }
+      if (!v || !v.ok) return orgOut({ ok: false, reason: (v && v.reason) || 'debts-unavailable' }, true);
+      // 双向分开印：应收 / 应付各一条，不做净额。
+      const text = '债务 · ' + v.kind + ':' + v.name + ' · 应收 ' + v.receivableTotal + ' · 应付 ' + v.payableTotal
+        + ' · 明细 ' + v.count + ' 条（逐条带对象与原因，不抵净额）';
+      const o = $('#wa-org-out');
+      panelEl.dataset.orgOut = text;
+      if (o) o.textContent = text;
+    });
     on('#wa-org-check', () => { if (!WA.org) return orgOut({ ok: false, reason: 'module-missing' }, true); const ok = WA.org.canAfford(orgVal('#wa-org-kind'), orgVal('#wa-org-name'), orgVal('#wa-org-item'), orgVal('#wa-org-qty')); const st = WA.org.stat(); orgOut({ ok: ok, id: (ok ? 'affordable' : 'insufficient') + ':' + st.blocked, reason: ok ? '' : 'insufficient' }, true); });
+    // v2.117.0（计划二 B6）：配方面三枚 + 机会面三枚。三面同批（渲染 + 绑定 + 守卫登记）——
+    //   缺一面，新出口上的「绑错了 id」就没人发现。
+    const recVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const recOut = function (r, keep) {
+      const text = r && r.ok ? ('配方 ' + (r.id || r.reason || 'ok')) : ('未生效：' + ((r && r.reason) || '未知原因'));
+      if (keep) panelEl.dataset.recOut = text;
+      const o = $('#wa-rec-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.recOut) { const saved = $('#wa-rec-out'); if (saved) saved.textContent = panelEl.dataset.recOut; }
+    on('#wa-rec-view', () => {
+      if (!WA.recipe) return recOut({ ok: false, reason: 'module-missing' }, true);
+      const name = recVal('#wa-rec-name');
+      // 未填配方名 ⇒ 报当前档（**不替人挑一张**）；填了则报该配方的预览与冲突。
+      if (!name) {
+        const v = WA.recipe.statView();
+        const cat = WA.recipe.catalogView ? WA.recipe.catalogView() : null;
+        const text = '配方 · 当前：' + (v.name || '（未生效）') + ' · 可选 ' + v.known.length + ' 张'
+          + ' · 静态漂移 ' + (v.staleness.total || 0)
+          + ' · 基础事实 落空 ' + ((v.basicsStale || []).length ? v.basicsStale.join('/') : '无')
+          + ' / 未核 ' + ((v.basicsUnverified || []).length ? v.basicsUnverified.join('/') : '无')
+          + (cat ? (' · 题材叠加冲突 ' + cat.themeClash.length + ' 条') : '');
+        panelEl.dataset.recOut = text;
+        const o = $('#wa-rec-out'); if (o) o.textContent = text;
+        return;
+      }
+      let v = null; try { v = WA.recipe.preview(name); } catch (e) { return recOut({ ok: false, reason: 'preview-throw' }, true); }
+      if (!v || !v.ok) return recOut({ ok: false, reason: (v && v.reason) || 'preview-unavailable' }, true);
+      // 冲突只报不改：这一行只印「这么配会发生什么」，决定权在调用方。
+      const cl = (v.clashes.themes.length + v.clashes.policies.length);
+      const text = '配方预览 · ' + v.name + '（' + v.cn + '）· 题材 ' + v.requires.themes.join('+')
+        + ' · 政策 ' + v.policies.length + ' 条 · 冲突 ' + cl + ' 条'
+        + ' · 动作词汇 ' + v.kinds.length + ' 项 · 场景 ' + v.scenes.length + ' 条 · 基础事实 落空 '
+        + ((v.basicsStale || []).length ? v.basicsStale.join('/') : '无')
+        + ' / 未核 ' + ((v.basicsUnverified || []).length ? v.basicsUnverified.join('/') : '无')
+        + ' · 未写盘（预览）';
+      panelEl.dataset.recOut = text;
+      const o = $('#wa-rec-out'); if (o) o.textContent = text;
+    });
+    on('#wa-rec-seed', () => {
+      if (!WA.recipe) return recOut({ ok: false, reason: 'module-missing' }, true);
+      let r = null; try { r = WA.recipe.seed(recVal('#wa-rec-name')); } catch (e) { return recOut({ ok: false, reason: 'seed-throw' }, true); }
+      // 取用制：不调 seed 就一个字节都不进上下文；这条回执是它被取用的唯一痕迹。
+      recOut(Object.assign({}, r, { id: r.ok ? (r.scene.id + ':' + r.index + '/' + r.count) : r.id }), true);
+    });
+    on('#wa-opp-run', () => {
+      if (!WA.opportunity) return recOut({ ok: false, reason: 'module-missing' }, true);
+      let r = null; try { r = WA.opportunity.sweep(); } catch (e) { return recOut({ ok: false, reason: 'sweep-throw' }, true); }
+      recOut(Object.assign({}, r, { id: r.ok ? ('formed:' + r.formed + ':' + r.added + ':' + r.active) : r.id }), true);
+      renderBody();
+    });
+    on('#wa-opp-view', () => {
+      if (!WA.opportunity) return recOut({ ok: false, reason: 'module-missing' }, true);
+      const v = WA.opportunity.statView();
+      const act = WA.opportunity.list ? WA.opportunity.list() : [];
+      // 在途窗口逐条带「涉及谁」；涉及者未记录就印「未记录」，不猜一个人名填上。
+      const rows = act.slice(0, 6).map(function (x) {
+        return x.id + '(' + x.sourceLabel + ',' + x.stage + ',' + (x.actors.length ? x.actors.join('/') : '未记录') + ')';
+      }).join(' ');
+      const text = '机会 · 在途 ' + v.active + ' · 总 ' + v.total + ' · 扫 ' + v.sweeps + ' 次'
+        + ' · 作废 ' + v.lapsed + ' · 重开 ' + v.reopens + ' · 拒收 ' + v.refused + (rows ? ' — ' + rows : '');
+      panelEl.dataset.recOut = text;
+      const o = $('#wa-rec-out'); if (o) o.textContent = text;
+    });
     const intelVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
     const intelOut = function (r, keep) {
       const text = r && r.ok ? ('已记录 ' + (r.id || r.status || 'ok')) : ('未记录：' + ((r && r.reason) || '未知原因'));
@@ -2607,6 +2855,645 @@
       if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
       const r = WA.world.canBeAt(wv('#wa-world-mv-who'), wv('#wa-world-mv-to'), clockNow('ui.world'));
       worldOut(r.ok ? Object.assign({}, r, { id: '在场许可' }) : r);
+    });
+    // ── v2.117.0（计划二 B2 前半）：场所用途与时间窗口 ──
+    //   三个入口各自分开：登记（写）/ 看名单（只读）/ 查某一用途（只读）。
+    //   「地点没登记」与「登记了但没有这个用途」是**两件事**，不得合成一句「没有」。
+    const usePlace = function () { return wv('#wa-world-use-place') || wv('#wa-world-place'); };
+    const useOut = function (r) {
+      const o = $('#wa-world-use-out');
+      if (!o) return;
+      if (r && r.ok && Array.isArray(r.uses)) {
+        o.textContent = r.place + '：' + (r.uses.length
+          ? r.uses.map(function (x) { return x.use + '[' + x.open + '~' + x.close + (x.note ? ' ' + x.note : '') + ']'; }).join(' ')
+          : '未登记任何用途窗口（该地点仍按自身开闭判定）');
+        return;
+      }
+      if (r && r.ok && r.found === false) { o.textContent = r.place + ' 未登记「' + r.use + '」用途 ⇒ 回落地点自身开闭 [' + r.open + '~' + r.close + ']'; return; }
+      if (r && r.ok) { o.textContent = r.place + '「' + r.use + '」窗口 [' + r.open + '~' + r.close + ']' + (r.existed ? '（已更新）' : '（新增）'); return; }
+      const why = (r && r.reason) || 'unknown';
+      // 拒收理由逐条讲清楚：三件事的修法完全不同。
+      const extra = why === 'bad-use' ? '（可选：' + ((r && r.uses) || []).join('/') + '）'
+        : why === 'unknown-place' ? '（地点没登记：先去上面登记地点）'
+        : why === 'bad-time' ? '（起止须为有限数且 关 > 开）'
+        : why === 'missing-fields' ? '（地点与用途都要填）' : '';
+      o.textContent = '未登记：' + why + extra;
+    };
+    on('#wa-world-use-add', () => {
+      if (!WA.world || !WA.world.addUse) return useOut({ ok: false, reason: 'module-missing' });
+      const r = WA.world.addUse(usePlace(), { use: wv('#wa-world-use-kind'),
+        open: wv('#wa-world-use-open'), close: wv('#wa-world-use-close'), note: wv('#wa-world-use-note') });
+      useOut(r);
+    });
+    on('#wa-world-use-list', () => {
+      if (!WA.world || !WA.world.usesOf) return useOut({ ok: false, reason: 'module-missing' });
+      useOut(WA.world.usesOf(usePlace()));
+    });
+    on('#wa-world-use-win', () => {
+      if (!WA.world || !WA.world.useWindowOf) return useOut({ ok: false, reason: 'module-missing' });
+      useOut(WA.world.useWindowOf(usePlace(), wv('#wa-world-use-kind')));
+    });
+    // ── v2.117.0（计划二 B1 主体）：人物行动 ──
+    //   七个入口一律走真 API，且**不替模块编造默认值**：人物默认向人物生活区借（那里正在编辑的人），
+    //   目标 id 取该人第一个 active 目标（行动必须有目标来源，没有来源就不许开工）。
+    const actOut = function (r) { return plainOut('wa-act-out', 'actOut', r); };
+    const actGoalOf = function (waPerson) {
+      try {
+        const p = (WA.store.get().people || {})['p_' + waPerson];
+        const gs = (p && p.life && Array.isArray(p.life.goals)) ? p.life.goals : [];
+        const g = gs.filter(function (x) { return x && x.status === 'active'; })[0];
+        return g ? g.id : '';
+      } catch (e) { return ''; }
+    };
+    on('#wa-act-add', () => {
+      if (!WA.act) return actOut({ ok: false, reason: 'module-missing' });
+      const who = wv('#wa-act-person') || (($('#wa-life-person') || {}).value || '').trim();
+      const r = WA.act.add(who, { kind: wv('#wa-act-kind'), text: wv('#wa-act-text'),
+        goalId: actGoalOf(who), with: wv('#wa-act-with'), target: wv('#wa-act-with'),
+        item: wv('#wa-act-item'), amount: wv('#wa-act-amount'), place: wv('#wa-act-place'),
+        from: wv('#wa-act-from'), to: wv('#wa-act-to'), use: wv('#wa-act-use'),
+        duration: wv('#wa-act-dur') });
+      // 登记成功时把新 id 回填到 id 框——下一件事（准入/结算/中止）都要它，
+      //   否则用户得从台账里自己抄一遍，那是把「回填」这件机械活推给人。
+      if (r && r.ok) { const el = $('#wa-act-id'); if (el) el.value = r.id; }
+      actOut(r.ok ? Object.assign({}, r, { id: r.id + ' 时长 ' + r.duration + 'ms' }) : r);
+      renderBody();
+    });
+    on('#wa-act-admit', () => {
+      if (!WA.act) return actOut({ ok: false, reason: 'module-missing' });
+      const r = WA.act.admit(wv('#wa-act-id'), clockNow('ui.act'));
+      if (r && r.ok) {
+        const bits = ['已开工', r.opId];
+        if (r.travel) bits.push('路程 ' + r.travel.minutes + ' 分钟');
+        if (r.window) bits.push('窗口至 ' + r.window.until);
+        actOut(Object.assign({}, r, { id: bits.join(' · ') }));
+      } else actOut(r);
+      renderBody();
+    });
+    on('#wa-act-advance', () => {
+      if (!WA.act) return actOut({ ok: false, reason: 'module-missing' });
+      const r = WA.act.advance(clockNow('ui.act'));
+      // 「本轮到期几件」与「为什么没结算」分开报——只报前者会让「零件」永远说不出原因。
+      actOut({ ok: !!r.ok, id: '完成 ' + r.completed + ' / 失败 ' + r.failed + ' / 仍在途 ' + r.still
+        + ' / 超额留痕 ' + ((r.deferred || []).length) + ' / 重放忽略 ' + r.duplicates + '（' + r.reason + '）',
+        reason: r.ok ? '' : r.reason });
+      renderBody();
+    });
+    on('#wa-act-abort', () => {
+      if (!WA.act) return actOut({ ok: false, reason: 'module-missing' });
+      const r = WA.act.abort(wv('#wa-act-id'), wv('#wa-act-text') || '手动中止', clockNow('ui.act'));
+      actOut(r.ok ? Object.assign({}, r, { id: '已中止 · 已消耗 ' + r.spent + 'ms / 未执行 ' + r.left + 'ms'
+        + (r.halted ? ' · 行程已标中止（位置未知）' : '') }) : r);
+      renderBody();
+    });
+    on('#wa-act-replan', () => {
+      if (!WA.act) return actOut({ ok: false, reason: 'module-missing' });
+      const from = wv('#wa-act-id');
+      const who = wv('#wa-act-person') || (($('#wa-life-person') || {}).value || '').trim();
+      const r = WA.act.replan(from, { kind: wv('#wa-act-kind'), text: wv('#wa-act-text'),
+        with: wv('#wa-act-with'), target: wv('#wa-act-with'), item: wv('#wa-act-item'),
+        amount: wv('#wa-act-amount'), place: wv('#wa-act-place'),
+        from: wv('#wa-act-from'), to: wv('#wa-act-to'), use: wv('#wa-act-use'),
+        duration: wv('#wa-act-dur') }, clockNow('ui.act'));
+      if (r && r.ok) { const el = $('#wa-act-id'); if (el) el.value = r.id; }
+      actOut(r.ok ? Object.assign({}, r, { id: r.id + '（原计划 ' + (r.replannedFrom || from) + ' 已标改计划）' }) : r);
+      renderBody();
+    });
+    on('#wa-act-view', () => {
+      if (!WA.act) return actOut({ ok: false, reason: 'module-missing' });
+      const v = WA.act.view({ limit: 8 });
+      // 无确认器的种类**如实带出**：诊断不许把它显示成「正常无事」。
+      const rows = (v.recent || []).map(function (x) {
+        return x.id + ' ' + x.person + '/' + x.kind + ' ' + x.status
+          + (x.result ? '（' + x.result + '）' : '') + (x.reason ? ' 因 ' + x.reason : '');
+      });
+      // v2.117.0：累计读数同一条出口。`stat` 回答的是「这一路各阶段各拒收过几次」，
+      //   与上面的「现在剩几条」是同一件事的即时面与累计面 —— 分开占两个控件反而要让用户
+      //   自己把两处读数拼起来。faults 是**按拒收码分列**的（不是总数），
+      //   否则「受阻过 7 次」永远说不出是哪一类受阻。
+      const st = WA.act.stat ? WA.act.stat() : null;
+      const fl = (st && st.faults) ? Object.keys(st.faults).map(function (k) { return k + '×' + st.faults[k]; }).join(' ') : '';
+      actOut({ ok: true, id: '共 ' + v.total + ' 条 / 进行中 ' + v.open + ' / 回执 ' + v.receipts
+        + ' · 状态 ' + JSON.stringify(v.byStatus) + ' · 无确认器 ' + v.noConfirmer.join('/')
+        + (st ? ' · 累计 登记' + st.added + '/准入' + st.admitted + '/完成' + st.completed + '/失败' + st.failed
+          + '/中止' + st.aborted + '/改计划' + st.replanned + '/重放' + st.duplicates + '/无确认器' + st.unconfirmed
+          + (fl ? ' · 拒收 ' + fl : '') : '')
+        + (rows.length ? ' ｜ ' + rows.join(' ； ') : '') });
+    });
+    { const el = $('#wa-act-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.act) return actOut({ ok: false, reason: 'module-missing' });
+        WA.act.setSettings({ enabled: !!el.checked });
+        actOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    // ── v2.119.0（拓展计划 ①）：人物多步计划与受挫重决策 ──
+    //   面板只做「登记与结算」，**不替人物挑替代路**：改选必须显式提交新步骤（rechoose），
+    //   本区没有「自动选一条 fallback」的按钮 —— 有的话「他为什么改主意」就永远答不出。
+    const planOut = function (r) { return plainOut('wa-plan-out', 'planOut', r); };
+    const planWho = function () { return wv('#wa-plan-person'); };
+    const planSteps = function () {
+      // 行格式：`1(move)搭船去乙地 前置:0 需要:银元×3 地点:码头 受阻改走:改走陆路`
+      //   解析失败**不补默认值** —— 坏行照实交给引擎，由它报 bad-step（面板不替用户猜意图）。
+      return String((($('#wa-plan-steps') || {}).value) || '').split('\n').map(function (line) {
+        const raw = line.trim();
+        if (!raw) return null;
+        const head = raw.match(/^(\d+)\s*(?:[（(]([^）)]*)[）)])?\s*(.*)$/);
+        if (!head) return null;
+        const text = (head[3] || '').split(/\s+(?=前置[:：]|需要[:：]|地点[:：]|受阻改走[:：])/)[0].trim();
+        const step = { kind: head[2] || 'step', text: text };
+        const take = function (re) { const m = raw.match(re); return m ? m[1].trim() : ''; };
+        const need = take(/需要[:：]\s*([^\s×]+×\d+)/);
+        if (need) { const mm = need.split('×'); step.need = { resource: mm[0], amount: Number(mm[1]) }; }
+        const after = take(/前置[:：]\s*(\d+)/);
+        if (after) step.after = after;
+        const place = take(/地点[:：]\s*([^\s]+)/);
+        if (place) step.place = place;
+        const fb = take(/受阻改走[:：]\s*([^\n]+)/);
+        if (fb) step.fallback = fb;
+        return step;
+      }).filter(Boolean);
+    };
+    if (panelEl.dataset.planOut) { const o = $('#wa-plan-out'); if (o) o.textContent = panelEl.dataset.planOut; }
+    { const el = $('#wa-plan-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+        WA.plan.setSettings({ enabled: !!el.checked });
+        planOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-plan-expand', () => {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      const who = planWho();
+      // 目标留空 ⇒ 取该人第一个 active 目标（**只读**该人自己的 life.goals，不做模糊猜）。
+      let goalId = wv('#wa-plan-goal');
+      if (!goalId && who) {
+        try {
+          const p = ((WA.store.get() || {}).people || {})['p_' + who] || {};
+          const g = ((p.life && p.life.goals) || []).filter(function (x) { return x && x.status === 'active'; })[0];
+          goalId = (g && g.id) || '';
+        } catch (e) { goalId = ''; }
+      }
+      const r = WA.plan.expand(who, goalId, planSteps());
+      planOut(r.ok ? Object.assign({}, r, { id: r.id + '（' + r.steps + ' 步）' }) : r);
+    });
+    on('#wa-plan-current', () => {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      const r = WA.plan.current(planWho());
+      planOut(r.ok ? Object.assign({}, r, { id: '第 ' + r.seq + ' 步（' + r.kind + '）' + r.text }) : r);
+    });
+    on('#wa-plan-advance', () => {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      const r = WA.plan.advance(planWho());
+      planOut(r.ok ? Object.assign({}, r, { id: '第 ' + r.seq + ' 步已登记开工：' + r.text }) : r);
+    });
+    const planSettle = function (kind) {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      const r = WA.plan.settle(planWho(), kind, { reason: wv('#wa-plan-reason') });
+      planOut(r.ok ? Object.assign({}, r, { id: kind + ' · 下一步 ' + (r.next < 0 ? '（无）' : r.next) + ' · 尝试 ' + r.tries }) : r);
+    };
+    on('#wa-plan-done', () => planSettle('done'));
+    on('#wa-plan-blocked', () => planSettle('blocked'));
+    on('#wa-plan-refused', () => planSettle('refused'));
+    on('#wa-plan-candidates', () => {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      const r = WA.plan.candidates(planWho());
+      // 余量用尽时**照实带出**：调用方该知道「他没有余量了」。
+      planOut(r.ok ? Object.assign({}, r, { id: '受阻「' + r.stuck.text + '」→ ' + r.hint
+        + ' · 余量 ' + r.tries + (r.exhausted ? '（已用尽）' : '') }) : r);
+    });
+    on('#wa-plan-view', () => {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      const v = WA.plan.view(planWho());
+      if (!v.ok) return planOut(v);
+      const rows = v.steps.map(function (s) {
+        return s.seq + '(' + s.kind + ')' + s.text + '[' + s.status + ']'
+          + (s.afterSeq >= 0 ? ' 前置' + s.afterSeq : '')
+          + (s.need ? ' 需要 ' + s.need.resource + '×' + s.need.amount : '');
+      });
+      const st = WA.plan.statView();
+      planOut({ ok: true, id: v.goalText + ' · ' + v.status + ' · 尝试 ' + v.tries
+        + ' · 共 ' + st.rows + ' 条计划（受阻 ' + st.blocked + '）'
+        + (rows.length ? ' ｜ ' + rows.join(' ； ') : '') });
+    });
+    on('#wa-plan-abandon', () => {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      const r = WA.plan.abandon(planWho(), wv('#wa-plan-reason'));
+      planOut(r.ok ? Object.assign({}, r, { id: '已放弃（留痕，不删行）' }) : r);
+    });
+    // ── v2.119.0（拓展计划 ②）：关系修复与破裂 ──
+    //   四道门全在引擎侧判；面板**只转发操作者写下的依据**，绝不替操作者假定「对方接受了」：
+    //   `acceptedBy` 在场 ⇒ 道歉那一格依据在场；`evidence` 在场 ⇒ 补偿回执 / 守约证据在场。
+    //   依据不在场就由引擎如实报 not-accepted / no-receipt / not-kept（面板不许代填）。
+    const mendOut = function (r) { return plainOut('wa-mend-out', 'mendOut', r); };
+    const mendId = function () { return wv('#wa-mend-id2'); };
+    if (panelEl.dataset.mendOut) { const o = $('#wa-mend-out'); if (o) o.textContent = panelEl.dataset.mendOut; }
+    { const el = $('#wa-mend-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.mend) return mendOut({ ok: false, reason: 'module-missing' });
+        WA.mend.setSettings({ enabled: !!el.checked });
+        mendOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' });
+      }; }
+    on('#wa-mend-mark', () => {
+      if (!WA.mend) return mendOut({ ok: false, reason: 'module-missing' });
+      const r = WA.mend.mark(wv('#wa-mend-person'), { with: wv('#wa-mend-with'), hurt: wv('#wa-mend-hurt') });
+      if (r.ok) { const el = $('#wa-mend-id2'); if (el) el.value = r.id; }
+      mendOut(r.ok ? Object.assign({}, r, { id: r.id + '（伤的是：' + r.hurt + '）' }) : r);
+    });
+    const mendStep = function (kind) {
+      if (!WA.mend) return mendOut({ ok: false, reason: 'module-missing' });
+      const acceptedBy = wv('#wa-mend-acceptby'), evidence = wv('#wa-mend-evidence');
+      const r = WA.mend.step(wv('#wa-mend-person'), mendId(), kind, {
+        accepted: kind === 'apology' ? (!!acceptedBy) : undefined,
+        acceptedBy: acceptedBy,
+        receipt: kind === 'restitution' ? (!!evidence) : undefined,
+        kept: kind === 'keeping' ? (!!evidence) : undefined,
+        by: wv('#wa-mend-guarantor'),
+        evidence: evidence });
+      mendOut(r.ok ? Object.assign({}, r, { id: kind + ' 进度 ' + r.progress + '/' + r.need
+        + (r.repeated ? '（同格重复：格数即格数）' : '') }) : r);
+    };
+    on('#wa-mend-apology', () => mendStep('apology'));
+    on('#wa-mend-restitution', () => mendStep('restitution'));
+    on('#wa-mend-keeping', () => mendStep('keeping'));
+    on('#wa-mend-guarantee', () => mendStep('guarantee'));
+    on('#wa-mend-view', () => {
+      if (!WA.mend) return mendOut({ ok: false, reason: 'module-missing' });
+      const v = WA.mend.view(wv('#wa-mend-person'), wv('#wa-mend-with'));
+      if (!v.ok) return mendOut(v);
+      const st = WA.mend.statView();
+      const done = v.acts.filter(function (a) { return a.done; }).map(function (a) { return a.kind; });
+      mendOut({ ok: true, id: v.person + '↔' + v.with + ' · ' + v.hurt + ' · ' + v.status
+        + ' · 进度 ' + v.progress + '/' + v.need
+        + ' · 已做 ' + (done.length ? done.join('/') : '无')
+        + ' · 尚缺 ' + (v.missing.length ? v.missing.join('、') : '无')
+        + ' · 关系 ' + (v.relation ? (v.relation.ok ? '已生效' : '未生效：' + v.relation.reason) : '未触发')
+        + ' · 共 ' + st.rows + ' 条修复（未结 ' + st.open + '）' });
+    });
+    on('#wa-mend-close', () => {
+      if (!WA.mend) return mendOut({ ok: false, reason: 'module-missing' });
+      // 这一处是**唯一**把 applyRelation 置真的地方 —— 结案改关系必须显式授权（不是默认）。
+      const r = WA.mend.close(wv('#wa-mend-person'), mendId(), 'fulfilled', { applyRelation: true });
+      mendOut(r.ok ? Object.assign({}, r, { id: '已结案 ' + r.status + ' · 进度 ' + r.progress
+        + ' · 关系 ' + (r.relation ? (r.relation.ok ? '已生效' : '未生效：' + r.relation.reason) : '未触发') }) : r);
+    });
+    on('#wa-mend-fail', () => {
+      if (!WA.mend) return mendOut({ ok: false, reason: 'module-missing' });
+      // 失败是**一等公民**：照实留痕，不删行。
+      const r = WA.mend.close(wv('#wa-mend-person'), mendId(), 'failed', { reason: '修复失败' });
+      mendOut(r.ok ? Object.assign({}, r, { id: '已判失败（留痕，不删行）' }) : r);
+    });
+    const ecoOut = function (t) { const el = $('#wa-eco-out'); if (el) el.innerHTML = '<div class="wa-dim">' + String(t) + '</div>'; };
+    { const el = $('#wa-eco-enabled');
+      if (el) el.onchange = function () { WA.economy.setSettings({ enabled: el.checked }); ecoOut(el.checked ? '供需循环已开启' : '已关闭（关闭时不入库、不定价、不成交、不推时段）'); }; }
+    const ecoQty = function () { const v = parseFloat($('#wa-eco-qty').value); return isFinite(v) ? v : NaN; };
+    { const el = $('#wa-eco-stock');
+      if (el) el.onclick = function () {
+        // 首次登记必须给基础价；留空就不传 base，由引擎报 missing-base（面板不替用户填一个默认价）。
+        const b = parseFloat($('#wa-eco-base').value);
+        const o = isFinite(b) ? { base: b } : {};
+        const r = WA.economy.stock($('#wa-eco-place').value, $('#wa-eco-res').value, ecoQty(), o);
+        ecoOut(r.ok ? '入库：' + r.resource + ' 存 ' + r.stock + '（基础价 ' + r.base + '）' : '入库失败：' + r.reason);
+      }; }
+    { const el = $('#wa-eco-price');
+      if (el) el.onclick = function () {
+        const v = parseFloat($('#wa-eco-price-in').value);
+        const r = WA.economy.price($('#wa-eco-place').value, $('#wa-eco-res').value, isFinite(v) ? v : NaN);
+        ecoOut(r.ok ? '定价 ' + r.price + '（许可带 ' + r.lo + '-' + r.hi + '）'
+          : '定价失败：' + r.reason + (r.lo !== undefined ? '（许可带 ' + r.lo + '-' + r.hi + '）' : ''));
+      }; }
+    { const el = $('#wa-eco-buy');
+      if (el) el.onclick = function () {
+        // 面板不替买主垫钱、也不替卖家赊账：钱不够/货不够都原样报出。
+        const r = WA.economy.buy($('#wa-eco-place').value, $('#wa-eco-res').value, ecoQty(), { by: $('#wa-eco-buyer').value });
+        ecoOut(r.ok ? '成交 ' + r.qty + '件，付 ' + r.total + '，余额 ' + r.balance + '，余货 ' + r.stock
+          : '未成交：' + r.reason + (r.want !== undefined ? '（要 ' + r.want + '，有 ' + r.have + '）' : ''));
+      }; }
+    { const el = $('#wa-eco-craft');
+      if (el) el.onclick = function () {
+        const t = parseInt($('#wa-eco-times').value, 10);
+        const r = WA.economy.craft($('#wa-eco-place').value, $('#wa-eco-recipe').value,
+          { by: $('#wa-eco-maker').value, times: isFinite(t) ? t : 1 });
+        ecoOut(r.ok ? '产出 ' + JSON.stringify(r.made) : '未能生产：' + r.reason + (r.short ? '（还缺 ' + JSON.stringify(r.short) + '）' : ''));
+      }; }
+    { const el = $('#wa-eco-tick');
+      if (el) el.onclick = function () {
+        // 同一时段只能推一次：重复推演不得造成第二次消耗（拒收理由照实显示）。
+        const r = WA.economy.tick($('#wa-eco-stamp').value);
+        ecoOut(r.ok ? '时段 ' + r.stamp + '：' + (r.rows.map(function (x) { return x.resource + ' 消耗 ' + x.consumed + '，价 ' + x.price + '→' + x.next; }).join('；') || '无货可推')
+          : '未推进：' + r.reason);
+      }; }
+    { const el = $('#wa-eco-view');
+      if (el) el.onclick = function () {
+        const r = WA.economy.view($('#wa-eco-place').value, $('#wa-eco-res').value);
+        ecoOut(r.ok ? r.resource + '：存 ' + r.stock + '，现价 ' + r.price + '，基础 ' + r.base + '，许可带 ' + r.lo + '-' + r.hi : '无此货：' + r.reason);
+      }; }
+    { const el = $('#wa-eco-shelf');
+      if (el) el.onclick = function () {
+        const r = WA.economy.shelf($('#wa-eco-place').value);
+        ecoOut(r.ok ? r.place + '：' + r.goods.map(function (g) { return g.resource + '×' + g.stock + '@' + g.price; }).join('、') : '货架为空：' + r.reason);
+      }; }
+    { const el = $('#wa-eco-route-add');
+      if (el) el.onclick = function () {
+        const c = parseFloat($('#wa-eco-cost').value);
+        const r = WA.economy.route($('#wa-eco-route').value,
+          { lane: $('#wa-eco-lane').value, from: $('#wa-eco-from').value, to: $('#wa-eco-to').value, cost: isFinite(c) ? c : NaN });
+        ecoOut(r.ok ? '商路 ' + r.id + '（' + r.lane + '）：' + r.status + '，运费 ' + r.cost : '未能登记：' + r.reason);
+      }; }
+    { const el = $('#wa-eco-route-block');
+      if (el) el.onclick = function () {
+        // 阻断是状态标记，不删行：世界仍记得有这条路，可解除后续运。
+        const r = WA.economy.markRoute($('#wa-eco-route').value, false, { reason: '路断' });
+        ecoOut(r.ok ? '已阻断：' + r.id + '（' + r.reason + '）' : '未阻断：' + r.reason);
+      }; }
+    { const el = $('#wa-eco-route-open');
+      if (el) el.onclick = function () {
+        const r = WA.economy.markRoute($('#wa-eco-route').value, true);
+        ecoOut(r.ok ? '已解除：' + r.id : '未解除：' + r.reason);
+      }; }
+    { const el = $('#wa-eco-ship');
+      if (el) el.onclick = function () {
+        // 路受阻则货不动（不消耗）；解除后可续运。
+        const r = WA.economy.ship($('#wa-eco-route').value, $('#wa-eco-place').value, $('#wa-eco-res').value, ecoQty());
+        ecoOut(r.ok ? '经 ' + r.id + ' 到货 ' + r.qty + '（余 ' + r.stock + '，运费 ' + r.cost + '）'
+          : '未运送：' + r.reason + (r.why ? '（' + r.why + '）' : ''));
+      }; }
+    { const el = $('#wa-eco-routes');
+      if (el) el.onclick = function () {
+        const s = WA.economy.statView();
+        ecoOut('商路 ' + s.routes + ' 条（受阻 ' + s.stuck + '）；货 ' + s.goods + ' 项，订单 ' + s.orders + ' 笔');
+      }; }
+    const instOut = function (t) { const el = $('#wa-inst-out'); if (el) el.innerHTML = '<div class="wa-dim">' + String(t) + '</div>'; };
+    const instOrg = function () { return wv('#wa-inst-org'); };
+    const instPerms = function () {
+      // 面板只把用户写下的字拆开，不替他补默认权限（自造权限由引擎 bad-perms 收）。
+      return wv('#wa-inst-perms').split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x.length; });
+    };
+    { const el = $('#wa-inst-enabled');
+      if (el) el.onchange = function () { WA.inst.setSettings({ enabled: el.checked }); instOut(el.checked ? '组织制度已开启' : '已关闭（关闭时建档/设职/任免/批准一律拒收）'); }; }
+    on('#wa-inst-charter', () => {
+      const r = WA.inst.charter(instOrg(), { kind: wv('#wa-inst-kind'), name: wv('#wa-inst-name') });
+      instOut(r.ok ? '已建档：' + r.id + '（' + r.kind + '，职位 ' + r.posts + ' 个）' : '未能建档：' + r.reason);
+    });
+    on('#wa-inst-setpost', () => {
+      // 权限必须落在具名表内——面板不替用户改名，原样交给引擎。
+      const r = WA.inst.post(instOrg(), wv('#wa-inst-post'), { perms: instPerms() });
+      instOut(r.ok ? '已设职：' + r.title + '（' + r.perms.join('/') + '）' : '未能设职：' + r.reason);
+    });
+    on('#wa-inst-assign', () => {
+      // 换人必须用户显式勾选：面板不替他推定「反正是换人」。
+      const r = WA.inst.assign(instOrg(), wv('#wa-inst-post'), wv('#wa-inst-person'), { replace: !!($('#wa-inst-replace') || {}).checked });
+      instOut(r.ok ? '已任职：' + r.title + '=' + r.holder + (r.replaced ? '（显式换人）' : '') : '未能任职：' + r.reason);
+    });
+    on('#wa-inst-vacate', () => {
+      const r = WA.inst.vacate(instOrg(), wv('#wa-inst-post'), { why: wv('#wa-inst-why') });
+      instOut(r.ok ? '已离任：' + r.title + '（原 ' + r.from + '，' + r.why + '）' : '未能离任：' + r.reason);
+    });
+    on('#wa-inst-succeed', () => {
+      // 交接受检：在途与旧承诺留空就不传，由引擎报 missing-handover（面板不替他填 0）。
+      const p = parseFloat($('#wa-inst-projects').value), o = parseFloat($('#wa-inst-oaths').value);
+      const opt = {};
+      if (isFinite(p)) opt.openProjects = p;
+      if (isFinite(o)) opt.oldOaths = o;
+      const r = WA.inst.succession(instOrg(), wv('#wa-inst-from'), wv('#wa-inst-to'), opt);
+      instOut(r.ok ? '已交接：' + r.from + '→' + r.to + '（在途 ' + r.openProjects + '，旧承诺 ' + r.oldOaths + '，不自动作废）'
+        : '未能交接：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-inst-propose', () => {
+      const r = WA.inst.propose(instOrg(), wv('#wa-inst-dec'), { by: wv('#wa-inst-person'), needs: wv('#wa-inst-needs') || 'approve' });
+      instOut(r.ok ? '已挂待批：' + r.id + '（需 ' + r.needs + '，持有者 ' + (r.holders || []).join('、') + '）'
+        : '未挂起：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-inst-approve', () => {
+      // 批准者本人必须持有 approve：面板只转发「谁批的」，不替他选人。
+      const r = WA.inst.decide(instOrg(), wv('#wa-inst-dec2'), 'approved', { by: wv('#wa-inst-by') });
+      instOut(r.ok ? '已批准：' + r.id + '（由 ' + r.decider + '）' : '未能批准：' + r.reason);
+    });
+    on('#wa-inst-reject', () => {
+      const r = WA.inst.decide(instOrg(), wv('#wa-inst-dec2'), 'rejected', { by: wv('#wa-inst-by') });
+      instOut(r.ok ? '已否决：' + r.id + '（由 ' + r.decider + '）' : '未能否决：' + r.reason);
+    });
+    on('#wa-inst-mark-breach', () => {
+      // 罚则必填：本模块不自行判罚，面板也不替他编一条。
+      const r = WA.inst.breach(instOrg(), wv('#wa-inst-person'), wv('#wa-inst-breach'), { penalty: wv('#wa-inst-penalty') });
+      instOut(r.ok ? '已记违约：' + r.id + '（罚则 ' + r.penalty + '）' : '未能记录：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-inst-settle', () => {
+      const r = WA.inst.settle(instOrg(), wv('#wa-inst-br2'), { evidence: wv('#wa-inst-evidence') });
+      instOut(r.ok ? '违约已结：' + r.id + '（依据已留痕）' : '未能结案：' + r.reason);
+    });
+    on('#wa-inst-view', () => {
+      const r = WA.inst.view(instOrg());
+      if (!r.ok) return instOut('无此组织：' + r.reason);
+      instOut(r.name + '（' + r.kind + '）：' + (r.posts.length ? r.posts.map(function (p) { return p.title + '=' + (p.holder || '空缺') + '[' + p.perms.join('/') + ']'; }).join('，') : '无职位')
+        + '；待批 ' + r.open + '，未结违约 ' + r.breaches + '，交接 ' + r.successions + ' 次；可批准者 ' + (r.canApprove.join('、') || '无'));
+    });
+    on('#wa-inst-out-btn', () => {
+      const s = WA.inst.statView();
+      instOut('组织 ' + s.orgs + ' 个，职位 ' + s.posts + '，待批 ' + s.pending + '，未结违约 ' + s.openBreaches);
+    });
+    const probeOut = function (t) { const el = $('#wa-probe-out'); if (el) el.innerHTML = '<div class="wa-dim">' + String(t) + '</div>'; };
+    const probeCase = function () { return wv('#wa-probe-case'); };
+    { const el = $('#wa-probe-enabled');
+      if (el) el.onchange = function () { WA.probe.setSettings({ enabled: el.checked }); probeOut(el.checked ? '调查卷宗已开启' : '已关闭（关闭时不立案、不举证、不对质、不定案）'); }; }
+    on('#wa-probe-open', () => {
+      // 至少两条假说：面板按分号拆开原样交给引擎，不替他补第二条。
+      const hyps = wv('#wa-probe-hyps').split(';').map(function (x) { return x.trim(); }).filter(function (x) { return x.length; });
+      const r = WA.probe.open(wv('#wa-probe-q'), hyps);
+      probeOut(r.ok ? '已立案：' + r.id + '（' + r.hypotheses + ' 条假说）' : '未能立案：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    const probeEv = (dir) => {
+      // 支持与反驳走同一入口、只差方向：面板不把两者合成一个数。
+      const r = WA.probe.addEvidence(probeCase(), wv('#wa-probe-claim'),
+        { level: wv('#wa-probe-level'), dir: dir, about: wv('#wa-probe-about'), by: wv('#wa-probe-by') });
+      probeOut(r.ok ? '已记' + (dir === 'support' ? '支持' : '反驳') + '：' + r.hypothesis + '（支持 ' + r.support + '／反驳 ' + r.refute + '）'
+        : '未能记录：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    };
+    on('#wa-probe-support', () => probeEv('support'));
+    on('#wa-probe-refute', () => probeEv('refute'));
+    on('#wa-probe-confront', () => {
+      // 对质要有本钱：支持不足时引擎报 insufficient-support，面板原样显示。
+      const r = WA.probe.confront(probeCase(), wv('#wa-probe-who'), { about: wv('#wa-probe-about'), level: wv('#wa-probe-level'), by: wv('#wa-probe-by') });
+      probeOut(r.ok ? '已对质：' + r.who + '（凭 ' + r.support + ' 条支持；认知' + (r.belief && r.belief.ok ? '已改变' : '未改变：' + ((r.belief || {}).reason || '')) + '）'
+        : '未能对质：' + r.reason + (r.need !== undefined ? '（有 ' + r.support + '，需 ' + r.need + '）' : ''));
+    });
+    on('#wa-probe-decide', () => {
+      const r = WA.probe.decide(probeCase(), { note: wv('#wa-probe-why') });
+      if (!r.ok) return probeOut('未能定案：' + r.reason);
+      probeOut(r.verdict === 'guilty' ? '已定案：' + r.leader + '（支持 ' + r.support + '，无反驳）'
+        : '定为未决（证据不足是一等结论）：最强 ' + r.leader + ' 支持 ' + r.support + '／反驳 ' + r.refute);
+    });
+    on('#wa-probe-wrong', () => {
+      const r = WA.probe.wrong(probeCase(), wv('#wa-probe-who'), { why: wv('#wa-probe-why') });
+      probeOut(r.ok ? '已记误指：' + r.who + '（卷宗留下「查错人」这件事）' : '未能记录：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-probe-view', () => {
+      const r = WA.probe.view(probeCase());
+      if (!r.ok) return probeOut('无此案：' + r.reason);
+      probeOut(r.question + '（' + r.status + (r.verdict ? '／' + r.verdict : '') + '）：'
+        + r.hypotheses.map(function (h) { return h.text + '[支持' + h.support + '/反驳' + h.refute + ']'; }).join('，')
+        + '；' + (r.decidable ? '可定案' : '不可定案（' + (r.blockedBy === 'refuted' ? '有反证未解' : '证据不足') + '）'));
+    });
+    on('#wa-probe-out-btn', () => {
+      const s = WA.probe.statView();
+      probeOut('案件 ' + s.cases + '（在查 ' + s.open + '）；线索 ' + s.evidence + '，误指 ' + s.wrongs
+        + '；定案 ' + s.byVerdict.guilty + '，未决 ' + s.byVerdict.undecided + '，误指结案 ' + s.byVerdict.clear);
+    });
+    const rgOut = function (t) { const el = $('#wa-rg-out'); if (el) el.innerHTML = '<div class="wa-dim">' + String(t) + '</div>'; };
+    const rgPlace = function () { return wv('#wa-rg-place'); };
+    { const el = $('#wa-rg-enabled');
+      if (el) el.onchange = function () { WA.region.setSettings({ enabled: el.checked }); rgOut(el.checked ? '远方传播已开启' : '已关闭（关闭时不登记远方、不记事件、不落地）'); }; }
+    on('#wa-rg-register', () => {
+      // 距离与渠道都是必需的：留空就不传，由引擎报 missing-distance（面板不替他填一个默认距离）。
+      const d = parseFloat($('#wa-rg-days').value);
+      const o = {};
+      if (isFinite(d)) o.distanceDays = d;
+      const l = wv('#wa-rg-lane'); if (l) o.lane = l;
+      const r = WA.region.register(rgPlace(), o);
+      rgOut(r.ok ? '已登记：' + r.name + '（距本地 ' + r.distanceDays + ' 天，走 ' + r.lane + '）' : '未能登记：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-rg-occur', () => {
+      const r = WA.region.occur(rgPlace(), wv('#wa-rg-kind'), { text: wv('#wa-rg-text') });
+      rgOut(r.ok ? '已记：' + r.place + ' ' + r.kind + '（消息 ' + Math.round(r.delayMs / 3600000) + ' 小时后到）' : '未能记录：' + r.reason);
+    });
+    on('#wa-rg-deliver', () => {
+      // 未到期一律拒收：面板把「还需多久」原样报出来，不替他抢跑。
+      const r = WA.region.deliver(wv('#wa-rg-eid'));
+      rgOut(r.ok ? '已落地：' + r.place + ' ' + r.kind : '未落地：' + r.reason
+        + (r.waitMs !== undefined ? '（还需 ' + Math.round(r.waitMs / 3600000) + ' 小时）' : '')
+        + (r.why ? '（' + r.why + '）' : ''));
+    });
+    on('#wa-rg-block', () => {
+      const r = WA.region.markLane(rgPlace(), true, { why: wv('#wa-rg-why') || '路断' });
+      rgOut(r.ok ? '已阻断：' + r.name + '（' + r.why + '）——消息原地等，不消失' : '未能阻断：' + r.reason);
+    });
+    on('#wa-rg-open', () => {
+      const r = WA.region.markLane(rgPlace(), false);
+      rgOut(r.ok ? '已解除：' + r.name + '——积压的消息可以上路了' : '未能解除：' + r.reason);
+    });
+    on('#wa-rg-heard', () => {
+      const r = WA.region.heard(wv('#wa-rg-who'));
+      if (!r.ok) return rgOut('未能查：' + r.reason);
+      rgOut(r.person + ' 听说了 ' + r.heard + ' 件：' + (r.rows.map(function (x) { return x.place + '的' + x.kind + (x.fresh ? '' : '（旧闻）'); }).join('、') || '无'));
+    });
+    on('#wa-rg-fine', () => {
+      // 近处精细、远处粗粒度：面板如实报「这一屏是什么粒度」，不把粗粒度装成明细。
+      const r = WA.region.fine(rgPlace());
+      if (!r.ok) return rgOut('未能查：' + r.reason);
+      rgOut(r.place + '（' + (r.grain === 'fine' ? '本地精细' : '远方粗粒度') + '）：'
+        + r.rows.map(function (x) { return x.kind + (x.text ? '——' + x.text : ''); }).join('；'));
+    });
+    on('#wa-rg-view', () => {
+      const s = WA.region.statView();
+      rgOut('远方 ' + s.places + ' 处，事件 ' + s.events + '（待落地 ' + s.pending + '，已落地 ' + s.delivered + '），受阻 ' + s.blocked + ' 处');
+    });
+    on('#wa-rg-out-btn', () => {
+      const s = WA.region.statView();
+      rgOut('远方 ' + s.places + ' 处：' + WA.region.places().map(function (p) { return p.name + '(' + p.distanceDays + '天/' + p.lane + (p.blocked ? '/受阻' : '') + ')'; }).join('，'));
+    });
+    const stOut = function (t) { const el = $('#wa-st-out'); if (el) el.innerHTML = '<div class="wa-dim">' + String(t) + '</div>'; };
+    const stList = function (sel) { return wv(sel).split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x.length; }); };
+    { const el = $('#wa-st-enabled');
+      if (el) el.onchange = function () { WA.stage.setSettings({ enabled: el.checked }); stOut(el.checked ? '玩法进度已开启' : '已关闭（关闭时不采纳、不记分、不迁移）'); }; }
+    on('#wa-st-adopt', () => {
+      // 换包必须用户显式勾选：面板不替他推定「反正是换包」。
+      const r = WA.stage.adopt(wv('#wa-st-pack'), { replace: !!($('#wa-st-replace') || {}).checked });
+      stOut(r.ok ? '已采纳：' + r.pack + '（阶段 ' + r.stage + '；指标 ' + r.metrics.join('/') + '）' : '未能采纳：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-st-mark', () => {
+      const d = parseFloat($('#wa-st-delta').value);
+      const r = WA.stage.mark(wv('#wa-st-metric'), isFinite(d) ? d : NaN);
+      stOut(r.ok ? '已记：' + r.metric + ' ' + r.before + '→' + r.value : '未能记录：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-st-plan', () => {
+      // 条件与清单缺一不可：留空就不传，由引擎报 missing-trigger / missing-changes。
+      const n = parseFloat($('#wa-st-need').value);
+      const o = { to: wv('#wa-st-to'), changes: stList('#wa-st-changes') };
+      const m = wv('#wa-st-metric'); if (m) o.metric = m;
+      if (isFinite(n)) o.need = n;
+      const r = WA.stage.plan(o);
+      stOut(r.ok ? '已声明：' + r.from + '→' + r.to + '（需 ' + r.metric + '≥' + r.need + '；要变 ' + r.changes.join('、') + '）'
+        : '未能声明：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-st-transit', () => {
+      // 门槛未达与清单未落实都原样报出：面板不替他跳过任何一项。
+      const r = WA.stage.transit(wv('#wa-st-tid'), { applied: stList('#wa-st-applied') });
+      stOut(r.ok ? '已换阶段：' + r.from + '→' + r.to : '未能换阶段：' + r.reason
+        + (r.have !== undefined ? '（有 ' + r.have + '，需 ' + r.need + '）' : '')
+        + (r.missing ? '（还缺 ' + r.missing.join('、') + '）' : ''));
+    });
+    on('#wa-st-view', () => {
+      const r = WA.stage.view();
+      if (!r.ok) return stOut('未采纳玩法包：' + r.reason);
+      stOut(r.pack + '（' + r.stage + '）：' + r.metrics.map(function (m) { return m.metric + '=' + m.value; }).join('，')
+        + '；待推进 ' + r.pending.map(function (t) { return t.to + '(' + t.have + '/' + t.need + (t.ready ? '·可推进' : '') + ')'; }).join('，')
+        + (r.done.length ? '；已走 ' + r.done.map(function (t) { return t.from + '→' + t.to; }).join('，') : ''));
+    });
+    on('#wa-st-out-btn', () => {
+      const s = WA.stage.statView();
+      stOut(s.pack ? ('当前 ' + s.pack + '·' + s.stage + '；待推进 ' + s.pending + '，已走 ' + s.done + '，指标 ' + s.metrics + ' 项')
+        : '尚未采纳玩法包（可选项：' + WA.stage.PACKS.join('/') + '）');
+    });
+    const seOut = function (t) { const el = $('#wa-se-out'); if (el) el.innerHTML = '<div class="wa-dim">' + String(t) + '</div>'; };
+    const seList = function (sel) { return wv(sel).split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x.length; }); };
+    { const el = $('#wa-se-enabled');
+      if (el) el.onchange = function () { WA.session.setSettings({ enabled: el.checked }); seOut(el.checked ? '多人场已开启' : '已关闭（关闭时不入座、不验票、不发言）'); }; }
+    on('#wa-se-host', () => {
+      // 凭证由用户自己提供：面板不生成、不回显、不落盘（只在本次操作里用）。
+      const r = WA.session.host(wv('#wa-se-name'), { role: wv('#wa-se-role'), token: wv('#wa-se-token') });
+      seOut(r.ok ? '已开主持座：' + r.name + '（' + r.role + '，权限 ' + r.perms.join('/') + '，版本 ' + r.rev + '）' : '未能开座：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-se-join', () => {
+      const r = WA.session.join(wv('#wa-se-name'), { role: wv('#wa-se-role'), token: wv('#wa-se-token'),
+        perms: seList('#wa-se-perms'), takeover: !!($('#wa-se-takeover') || {}).checked });
+      seOut(r.ok ? '已入座：' + r.name + '（' + r.role + '，权限 ' + (r.perms.join('/') || '无') + '）' : '未能入座：' + r.reason);
+    });
+    on('#wa-se-auth', () => {
+      const r = WA.session.auth(wv('#wa-se-name'), wv('#wa-se-token'));
+      seOut(r.ok ? '验票通过：' + r.name + '（' + r.role + '）' : '验票失败：' + r.reason);
+    });
+    on('#wa-se-post', () => {
+      // 顺序号留空就不传：由引擎取下一个（面板不替他算，算了就会掩盖跳号）。
+      const n = parseFloat($('#wa-se-seq').value);
+      const o = {};
+      if (isFinite(n)) o.seq = n;
+      const r = WA.session.post(wv('#wa-se-name'), wv('#wa-se-token'), wv('#wa-se-body'), o);
+      seOut(r.ok ? '已发言：第 ' + r.seq + ' 条' : '未能发言：' + r.reason
+        + (r.expect !== undefined ? '（应为第 ' + r.expect + ' 条）' : ''));
+    });
+    on('#wa-se-since', () => {
+      const n = parseFloat($('#wa-se-last').value);
+      const r = WA.session.since(wv('#wa-se-name'), wv('#wa-se-token'), isFinite(n) ? n : NaN);
+      seOut(r.ok ? '续传 ' + r.count + ' 条（到第 ' + r.head + ' 条）'
+        : '未能续传：' + r.reason + (r.oldest !== undefined ? '（窗口最早第 ' + r.oldest + ' 条，须重同步）' : ''));
+    });
+    on('#wa-se-resync', () => {
+      const r = WA.session.resync(wv('#wa-se-name'), wv('#wa-se-token'));
+      seOut(r.ok ? '已重同步：水位第 ' + r.watermark + ' 条，版本 ' + r.snapshot.rev + '，含 ' + r.snapshot.rows.length + ' 条与 ' + r.snapshot.seats.length + ' 座'
+        : '未能重同步：' + r.reason);
+    });
+    on('#wa-se-leave', () => {
+      const r = WA.session.leave(wv('#wa-se-name'), wv('#wa-se-token'));
+      seOut(r.ok ? '已卸座：' + r.name + '（历史保留 ' + r.kept + ' 条，不撤回）' : '未能卸座：' + r.reason);
+    });
+    on('#wa-se-view', () => {
+      const r = WA.session.view(wv('#wa-se-name'), wv('#wa-se-token'));
+      if (!r.ok) return seOut('未能看视点：' + r.reason);
+      // v2.119.0（优化③·真缺陷修复）：`view(name, token)` 有**两个分支**——
+      //   ① 有 name：本人视点，返回 { name, role, scope, rows }；
+      //   ② name 为空：**作者面总览**，返回 { host, seq, seats, log }——**没有 rows**。
+      //   原先这里无条件 `r.rows.map(...)` ⇒ 名字栏留空点按钮就崩
+      //   （`Cannot read properties of undefined (reading 'map')`，实测）。
+      //   判「有没有 rows」而不是判「name 空不空」：语义锚点在后者的**返回值形状**上，
+      //   这样即便将来总览也带上 rows，本分支仍然自洽。
+      if (!Array.isArray(r.rows)) {
+        return seOut('作者面总览：主持 ' + (r.host || '尚未开座') + '；在场 ' + r.seats.length
+          + ' 座，已到第 ' + r.seq + ' 条（历史 ' + r.log + ' 条）——填名字与令牌可看本人视点');
+      }
+      seOut(r.name + '（' + r.role + '，' + (r.scope === 'all' ? '全量' : '仅自己') + '）：'
+        + (r.rows.map(function (x) { return '#' + x.seq + ' ' + x.by + '：' + x.text; }).join('；') || '无'));
+    });
+    on('#wa-se-out-btn', () => {
+      const s = WA.session.statView();
+      seOut(s.host ? ('主持 ' + s.host + '；在场 ' + s.active + '/' + s.seats + '，已到第 ' + s.seq + ' 条') : '尚未开座');
     });
     { const el = $('#wa-shadow-enabled');
       if (el) el.onchange = function () {

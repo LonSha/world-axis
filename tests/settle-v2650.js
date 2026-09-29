@@ -15,7 +15,11 @@ require('./mock.js');
 const LS = global.localStorage;
 const TAG = '__st2650_';
 
-const A_GATE = "if (!settings().enabled) { stat.blocked++; return { ok: false, reason: 'disabled', person: who }; }";
+// v2.118.0 补：计数访问器改造（stat.blocked++ → S.blocked++）后本锚点曾整段失效 ——
+//   锚点命中 0 会让 N0 报红、并让整把锁在 brokenOverride 里抛错（本仓纪律：
+//   锚点撞车/失配必须抛，不得静默跳过）。此处同步到真源码的当前形态（仍恰 1 次：
+//   该行只出现在 gateOff 定义处，另外两处是调用点 `const g = gateOff(who);`）。
+const A_GATE = "if (!settings().enabled) { S.blocked++; return { ok: false, reason: 'disabled', person: who }; }";
 const A_ZERO = "if (m.minutes === 0) return { ok: false, reason: 'already-there', person: who, place: m.to };";
 const A_ARRIVE = "if (j.left === 0) { j.status = 'arrived'; arrived.push(j.person + '→' + j.to); }";
 const A_MISS = "if (!hit) { noteFault('missing'); return { ok: false, reason: 'missing', place: pl }; }";

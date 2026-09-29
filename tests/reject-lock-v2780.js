@@ -168,8 +168,9 @@ function runAll(a) {
   a(gate.FACE.indexOf('strip-comments') >= 0,
     'v2780: [A] 扫描面自称「去注释」（判据的输入面与结论面同宽）');
   const led = loadLedger();
-  a(Array.isArray(led.base) && led.base.length > 100 && typeof led._note === 'string' && led.version === '2.116.0',
-    'v2780: [A] 台账形状（base ' + led.base.length + ' 条 / version ' + led.version + ' / 带 _note）');
+  a(Array.isArray(led.base) && led.base.length > 100 && typeof led._note === 'string' && led.version === '2.119.0',
+    'v2780: [A] 台账形状（base ' + led.base.length + ' 条 / version ' + led.version + ' / 带 _note）'
+    + '（v2.117.0：B1–B6 新增 59 码全部走见证，base 233→231 只减不增）');
   a(led._note.indexOf('两向') >= 0 && led._note.indexOf('去注释') >= 0,
     'v2780: [A] 台账自称两向判据 + 去注释扫描面（把口径写进台账，防后人换口径）');
 

@@ -210,6 +210,57 @@
           : { error: 'organizationSummary 不可用' },
         climate: cli ? { available: cli.available, reason: cli.reason, climate: cli.climate,
           recognized: !!cli.recognized, signals: (cli.signals || []).length } : { error: 'climate 不可用' },
+        // v2.117.0（计划二 B5）：项目面与债务面——「组织在办什么 / 欠着谁为什么」。
+        //   纯读：projectView / debtsView 都不调 grant / transfer。
+        //   逐个势力取项目（诊断面要看到全部势力的项目，不只第一个），债务同理。
+        projects: (function () {
+          if (!WA.org || typeof WA.org.projectView !== 'function') return { error: 'projectView 不可用' };
+          return safe(function () {
+            const st2 = WA.store.get() || {};
+            const facs = ((st2.evolution || {}).factions) || [];
+            const rows = [];
+            let openCount = 0, missingCount = 0;
+            facs.forEach(function (f) {
+              if (!f) return;
+              const v = WA.org.projectView(f.name);
+              if (!v || !v.ok) return;
+              v.projects.forEach(function (p) {
+                if (p.live) openCount++;
+                if (p.missing.length) missingCount++;
+                rows.push({ faction: f.name, what: p.what, status: p.status, by: p.by, due: p.due,
+                  live: p.live, tier: p.tier, tierWords: p.tierWords,
+                  covered: p.covered.filter(function (x) { return x.need !== null; })
+                    .map(function (x) { return x.item + ':' + x.covered + '/' + x.need; }).join(','),
+                  narrative: p.covered.filter(function (x) { return x.need === null; })
+                    .map(function (x) { return x.item + ':' + (x.tierWord || 'unrecorded'); }).join(','),
+                  missing: p.missing.map(function (x) { return x.item + ':' + x.gap; }).join(','),
+                  canClose: p.canClose });
+              });
+            });
+            return { count: rows.length, openCount: openCount, missingCount: missingCount,
+              rows: rows.slice(0, 12) };
+          }, { error: 'projectView-throw' });
+        })(),
+        debts: (function () {
+          if (!WA.org || typeof WA.org.debtsView !== 'function') return { error: 'debtsView 不可用' };
+          return safe(function () {
+            const st2 = WA.store.get() || {};
+            const facs = (((st2.evolution || {}).factions) || []).map(function (f) { return f && f.name; }).filter(Boolean);
+            const byFaction = facs.map(function (n) {
+              const v = WA.org.debtsView('faction', n);
+              if (!v || !v.ok) return { faction: n, error: v && v.reason };
+              return { faction: n, receivable: v.receivableTotal, payable: v.payableTotal,
+                receivableRows: v.receivable.length, payableRows: v.payable.length,
+                // 逐条带原因：欠账答不出「为什么欠」，日后没人核得出它是不是编的。
+                reasons: v.receivable.concat(v.payable).slice(0, 6)
+                  .map(function (x) { return (x.item || '') + ':' + (x.why || ''); }) };
+            });
+            const tot = byFaction.reduce(function (a2, b) {
+              return { recv: a2.recv + (b.receivable || 0), pay: a2.pay + (b.payable || 0) };
+            }, { recv: 0, pay: 0 });
+            return { factions: byFaction.slice(0, 8), receivableTotal: tot.recv, payableTotal: tot.pay };
+          }, { error: 'debtsView-throw' });
+        })(),
         // v2.94.0（O6）：流水卷头（能否跨会话可查，看它是不是空卷 + 有没有被截断）。
         journal: vol && vol.error ? vol : (vol ? {
           format: vol.format, formatVersion: vol.formatVersion, cap: vol.cap,
@@ -253,6 +304,43 @@
    *   这三者此前在世界状态里长得一模一样（都表现为「链没了」），本节的全部意义
    *   就是让它们**分得开**——「悄悄消失的旧计划」是本仓库最贵的一类静默失败。
    */
+  // v2.117.0（计划二 B6）：机会面——「此刻有几个可参与的窗口 / 都由什么变化产生」。
+  //   纯读：collect 是不登记的发现在册（不写盘），statView 只读在途行。
+  //   此处**刻意不调 sweep**：诊断必须零副作用，而扫描会改阶段、会挤出、会写 stat。
+  //   三档如实：模块缺席报不可用，不回落成「没有机会」（那正是本模块要治的病）。
+  function secOpportunity() {
+    return safe(function () {
+      if (!WA.opportunity || typeof WA.opportunity.statView !== 'function') return { error: 'opportunity 模块不可用' };
+      const v = WA.opportunity.statView();
+      const cfg = WA.opportunity.getSettings ? WA.opportunity.getSettings() : {};
+      let found = null;
+      try { found = WA.opportunity.collect ? WA.opportunity.collect().length : null; } catch (e) { found = null; }
+      return { enabled: !!cfg.enabled, maxOpen: cfg.maxOpen, defaultWindowMs: cfg.defaultWindowMs,
+        total: v.total, active: v.active, open: v.open, taken: v.taken, declined: v.declined,
+        deferred: v.deferred, lapsed: v.lapsed, sweeps: v.sweeps, formed: v.formed,
+        candidates: found, lapses: v.lapses, reopens: v.reopens, refused: v.refused,
+        lastReason: v.lastReason, sources: (WA.opportunity.SOURCES || []).slice(), faults: v.faults };
+    });
+  }
+  // v2.117.0（计划二 B6）：配方面——「这一局按哪张配方跑 / 静态核对有没有漂移」。
+  //   三项漂移（动作词汇不在 act.KINDS / 题材不在 theme.THEMES / 政策不在封闭集合）
+  //   与两处声明面（basicsStale：基础事实的代码锚点；themeClash：题材叠加冲突）逐项带出。
+  //   `basicsStale`（确凿落空）与 `basicsUnverified`（未核）**分列两个字段**——
+  //   不把「没核对过」与「核对落空」印成同一个词，两者也都不等于「核对通过」。
+  function secRecipe() {
+    return safe(function () {
+      if (!WA.recipe || typeof WA.recipe.statView !== 'function') return { error: 'recipe 模块不可用' };
+      const v = WA.recipe.statView();
+      const cat = (WA.recipe.catalogView ? WA.recipe.catalogView() : null);
+      return { name: v.name, known: (v.known || []).slice(), policyCount: v.policyCount,
+        staleness: v.staleness, basicsStale: (v.basicsStale || []).slice(),
+        basicsUnverified: (v.basicsUnverified || []).slice(),
+        recipes: cat ? cat.recipes.length : 0,
+        themeClash: cat ? cat.themeClash.map(function (c) { return c.id; }) : [],
+        previews: v.previews, applies: v.applies, rejects: v.rejects, seeds: v.seeds,
+        lastReason: v.lastReason, faults: v.faults };
+    });
+  }
   function secCausal() {
     return safe(function () {
       if (!WA.causal || typeof WA.causal.stat !== 'function') return { error: 'causal 模块不可用' };
@@ -632,6 +720,10 @@
     'engines/inspector-state.js': 'inspectorState', 'engines/tool-snapshot.js': 'toolSnapshot',
     'engines/tool-analyzer.js': 'toolAnalyzer', 'engines/tool-import.js': 'toolImport',
     'engines/chrono.js': 'chrono', 'engines/collab.js': 'collab',
+    // v2.118.0（计划二 B7/B8/B9）：三个引擎此前已进 LOAD 清单却漏了这份声明表。
+    //   漏登记的后果不是「少一行字」：tests/inventory.js 的定义面（命名空间 / 成员）与
+    //   tool-diag 的诊断面都从本表取，漏了就等于这三块在定义面上不存在。
+    'engines/rehearsal.js': 'rehearsal', 'engines/liaison.js': 'liaison', 'engines/coop.js': 'coop',
     'engines/inject-inspector.js': 'injectInspector', 'engines/inject-budget.js': 'injectBudget', 'engines/tool-diag.js': 'toolDiag', 'engines/contract-audit.js': 'contractAudit', 'engines/memory-sampler.js': 'memorySampler', 'engines/sampler-check.js': 'samplerCheck', 'engines/inject-channel.js': 'injectChannel', 'engines/inject-slot-audit.js': 'injectSlotAudit', 'engines/proactive.js': 'proactive', 'engines/wb-inject.js': 'wbInject', 'engines/entry-router.js': 'entryRouter', 'engines/kaleidoscope.js': 'kaleidoscope',
     'engines/calendar.js': 'calendar', 'engines/memory.js': 'memory', 'engines/opinion.js': 'opinion',
     'engines/bridge.js': 'bridge',
@@ -693,6 +785,31 @@
     'engines/tolerance.js': 'tolerance',
     'engines/events.js': 'events',
     'engines/checkpoints.js': 'checkpoints',
+    // v2.117.0（计划二 B1）：行动执行（意图 → 候选 → 准入 → 执行 → 完成或失败 → 后果）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**；act.js 是产品文件，
+    //   它缺席（LOAD 漏登记 / 文件被删）本身就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/act.js': 'act',
+    // v2.117.0（计划二 B6）：机会形成 + 题材完整配置配方。两者都是产品文件，
+    //   缺席（LOAD 漏登记 / 文件被删）本身就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/opportunity.js': 'opportunity', 'engines/recipe.js': 'recipe',
+    // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。两者都是产品文件，
+    //   缺席（LOAD 漏登记 / 文件被删）本身就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/plan.js': 'plan', 'engines/mend.js': 'mend',
+    // v2.119.0（优化③）：core/exec.js 进本表。它自 v2.118.0（计划二 B7）起就是**产品承重结构**
+    //   （act / world / causal / phone-bridge / rehearsal 都在调用期经 WA.exec 取值），
+    //   却一直漏在这份声明表之外 —— 后果不是「少一行字」，而是「自检看不见的黑盒」：
+    //   tests/inventory.js 的定义面与 tool-diag 的诊断面都从本表取，漏登记等于它在两面都不存在。
+    //   由 tests/run.js:1409「诊断清单覆盖全部磁盘模块」盯着（本版实测报「缺 core/exec.js」）。
+    'core/exec.js': 'exec',
+    // v2.119.0（拓展计划 ③）：供需循环。同 plan/mend 口径：产品文件，缺席本身就是断裂。
+    'engines/economy.js': 'economy',
+    // v2.119.0（拓展计划 ④）：组织制度。同口径：产品文件，缺席本身就是断裂。
+    'engines/inst.js': 'inst',
+    // v2.119.0（拓展计划 ⑤）：调查卷宗。同口径：产品文件，缺席本身就是断裂。
+    'engines/probe.js': 'probe',
+    'engines/region.js': 'region',
+    'engines/stage.js': 'stage',
+    'engines/session.js': 'session',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1282,6 +1399,13 @@
        // v2.95.0（X2）：经济引擎——职册 / 功簿 / 薪俸 / 欠薪 / 罚没九控件。
        //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
        //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+// v2.117.0（计划二 B5）：组织行动控件——项目名 / 需求 / 期限 / 欠账原因四输入 + 七个按钮。
+        //   同 v2.51.0 的理由——新控件必须同时「渲染 + 绑定 + 守卫登记」，
+        //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+        //   `wa-org-why` 是**欠账原因**：引擎侧 missing-why 守得住「没原因不许登记」，
+        //   但壳若不提供这个输入（或回落成「未注明」），那道闸在真实使用里永不触发。
+        'wa-org-project', 'wa-org-needs', 'wa-org-due', 'wa-org-why', 'wa-org-proj-open', 'wa-org-proj-deliver',
+        'wa-org-proj-view', 'wa-org-proj-close', 'wa-org-owe', 'wa-org-debt-settle', 'wa-org-debts',
        'wa-org-person', 'wa-org-role', 'wa-org-assign', 'wa-org-credit', 'wa-org-promote', 'wa-org-roster', 'wa-org-pay', 'wa-org-settle', 'wa-org-penalize', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
        // v2.62.0: 因果结算控件（渲染在人物页）+ 稳定人物 ID 控件。
        //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
@@ -1300,6 +1424,48 @@
       'wa-world-mv-who', 'wa-world-mv-from', 'wa-world-mv-to', 'wa-world-move', 'wa-world-canbe',
       'wa-world-tr-ch', 'wa-world-transit',
       'wa-world-out',
+      // v2.117.0（计划二 B1 主体 + B2 前半）：人物行动与场所用途窗口共 29 个控件。
+      //   同 v2.51.0 / v2.62.0 / v2.63.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
+      //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+      //   两者一律**无条件渲染**（模块缺席时整段降级，控件仍在场 ⇒ 本组会如实报 missing）；
+      //   与 world/threads 同一取舍：act.js 是产品文件，缺席本身就是断裂。
+      'wa-world-use-place', 'wa-world-use-kind', 'wa-world-use-open', 'wa-world-use-close',
+      'wa-world-use-note', 'wa-world-use-add', 'wa-world-use-list', 'wa-world-use-win', 'wa-world-use-out',
+      'wa-act-enabled', 'wa-act-person', 'wa-act-kind', 'wa-act-text', 'wa-act-with', 'wa-act-item',
+      'wa-act-amount', 'wa-act-place', 'wa-act-from', 'wa-act-to', 'wa-act-use', 'wa-act-dur',
+      'wa-act-add', 'wa-act-admit', 'wa-act-id', 'wa-act-advance', 'wa-act-abort', 'wa-act-replan',
+      'wa-act-view', 'wa-act-out',
+      // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复共 33 个控件（同样渲染在人物页）。
+      //   理由与前十几批完全一致：新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，
+      //   否则「按钮渲染了但绑定的 id 写错」这一类断裂在新增出口上无人发现。
+      //   一律**无条件渲染**（模块缺席时整段降级成 module-missing、控件仍在场 ⇒ 本组会如实报 missing）；
+      //   与 act/world/threads 同一取舍：plan.js / mend.js 是产品文件，缺席本身就是断裂。
+      //   `wa-plan-steps` 是 textarea、`wa-mend-id2` 是回填框：它们上方那一行只是**暂存**
+      //   而不是状态，故不进 dynamic（第一屏就渲染，缺失即真断裂）。
+      'wa-plan-enabled', 'wa-plan-person', 'wa-plan-goal', 'wa-plan-steps', 'wa-plan-expand',
+      'wa-plan-current', 'wa-plan-advance', 'wa-plan-done', 'wa-plan-blocked', 'wa-plan-refused',
+      'wa-plan-reason', 'wa-plan-candidates', 'wa-plan-view', 'wa-plan-abandon', 'wa-plan-out',
+      'wa-mend-enabled', 'wa-mend-person', 'wa-mend-with', 'wa-mend-hurt', 'wa-mend-mark',
+      'wa-mend-id',
+      'wa-mend-id2', 'wa-mend-acceptby', 'wa-mend-guarantor', 'wa-mend-evidence',
+      'wa-mend-apology', 'wa-mend-restitution', 'wa-mend-keeping', 'wa-mend-guarantee',
+      'wa-mend-view', 'wa-mend-close', 'wa-mend-fail', 'wa-mend-out',
+      // v2.119.0（拓展计划 ⑤）：调查卷宗控件（自面板实际 id 提取，共 19 个）。
+      //   一律无条件渲染（模块缺席时整段降级成 module-missing，控件仍在场 ⇒ 本组会如实报 missing）。
+      // v2.119.0（拓展计划 ⑥）：远方传播控件（自面板实际 id 提取，共 19 个）。
+      // v2.119.0（拓展计划 ⑦）：玩法进度控件（自面板实际 id 提取，共 17 个）。
+      // v2.119.0（拓展计划 ⑧）：多人场控件（自面板实际 id 提取，共 19 个）。
+      'wa-se-enabled', 'wa-se-name', 'wa-se-role', 'wa-se-token', 'wa-se-takeover', 'wa-se-host', 'wa-se-perms', 'wa-se-join', 'wa-se-auth', 'wa-se-body', 'wa-se-seq', 'wa-se-post', 'wa-se-last', 'wa-se-since', 'wa-se-resync', 'wa-se-leave', 'wa-se-view', 'wa-se-out-btn', 'wa-se-out',
+      'wa-st-enabled', 'wa-st-pack', 'wa-st-replace', 'wa-st-adopt', 'wa-st-metric', 'wa-st-delta', 'wa-st-mark', 'wa-st-to', 'wa-st-need', 'wa-st-changes', 'wa-st-plan', 'wa-st-tid', 'wa-st-applied', 'wa-st-transit', 'wa-st-view', 'wa-st-out-btn', 'wa-st-out',
+      'wa-rg-enabled', 'wa-rg-place', 'wa-rg-days', 'wa-rg-lane', 'wa-rg-register', 'wa-rg-kind', 'wa-rg-text', 'wa-rg-occur', 'wa-rg-view', 'wa-rg-eid', 'wa-rg-deliver', 'wa-rg-why', 'wa-rg-block', 'wa-rg-open', 'wa-rg-who', 'wa-rg-heard', 'wa-rg-fine', 'wa-rg-out-btn', 'wa-rg-out',
+      'wa-probe-enabled', 'wa-probe-q', 'wa-probe-hyps', 'wa-probe-open', 'wa-probe-case', 'wa-probe-claim', 'wa-probe-level', 'wa-probe-about', 'wa-probe-by', 'wa-probe-support', 'wa-probe-refute', 'wa-probe-view', 'wa-probe-who', 'wa-probe-confront', 'wa-probe-decide', 'wa-probe-why', 'wa-probe-wrong', 'wa-probe-out-btn', 'wa-probe-out',
+      // v2.119.0（拓展计划 ④）：组织制度控件（自面板实际 id 提取，共 34 个）。
+      //   一律无条件渲染（模块缺席时整段降级成 module-missing，控件仍在场 ⇒ 本组会如实报 missing）。
+      'wa-inst-enabled', 'wa-inst-org', 'wa-inst-kind', 'wa-inst-name', 'wa-inst-charter', 'wa-inst-post', 'wa-inst-perms', 'wa-inst-setpost', 'wa-inst-person', 'wa-inst-replace', 'wa-inst-assign', 'wa-inst-vacate', 'wa-inst-why', 'wa-inst-from', 'wa-inst-to', 'wa-inst-projects', 'wa-inst-oaths', 'wa-inst-succeed', 'wa-inst-dec', 'wa-inst-needs', 'wa-inst-propose', 'wa-inst-dec2', 'wa-inst-by', 'wa-inst-approve', 'wa-inst-reject', 'wa-inst-breach', 'wa-inst-penalty', 'wa-inst-mark-breach', 'wa-inst-br2', 'wa-inst-evidence', 'wa-inst-settle', 'wa-inst-view', 'wa-inst-out-btn', 'wa-inst-out',
+      // v2.119.0（拓展计划 ③）：供需循环控件（自面板实际 id 提取，共 29 个）。
+      //   一律**无条件渲染**（模块缺席时整段降级成 module-missing、控件仍在场 ⇒ 本组会如实报 missing）；
+      //   与 plan/mend 同一取舍：economy.js 是产品文件，缺席本身就是断裂。
+      'wa-eco-enabled', 'wa-eco-place', 'wa-eco-res', 'wa-eco-qty', 'wa-eco-base', 'wa-eco-stock', 'wa-eco-price-in', 'wa-eco-price', 'wa-eco-buy', 'wa-eco-buyer', 'wa-eco-maker', 'wa-eco-recipe', 'wa-eco-times', 'wa-eco-craft', 'wa-eco-stamp', 'wa-eco-tick', 'wa-eco-view', 'wa-eco-shelf', 'wa-eco-route', 'wa-eco-lane', 'wa-eco-from', 'wa-eco-to', 'wa-eco-cost', 'wa-eco-route-add', 'wa-eco-route-block', 'wa-eco-route-open', 'wa-eco-ship', 'wa-eco-routes', 'wa-eco-out',
       'wa-shadow-enabled', 'wa-shadow-a', 'wa-shadow-b', 'wa-shadow-secret', 'wa-shadow-add',
       'wa-shadow-deepen', 'wa-shadow-brighten', 'wa-shadow-lookup', 'wa-shadow-what',
       'wa-shadow-exp-kept', 'wa-shadow-exp-broken', 'wa-shadow-visible', 'wa-shadow-out',
@@ -1378,6 +1544,10 @@
       //   `panel 渲染的每个控件都在守卫表内（未覆盖：[...]）`——本版实测正是被它抓出来的。
       'wa-cw-vol', 'wa-cw-vol-check', 'wa-cw-vol-text',
       'wa-cw-id', 'wa-cw-act', 'wa-cw-intervene', 'wa-cw-out'] },
+    // v2.117.0（计划二 B6）：配方面三枚 + 机会面三枚（同渲染在人物页）。
+    //   同 v2.83.0 的规格——必须同时「渲染 + 绑定 + 守卫登记」，否则
+    //   「控件渲染了但绑定 id 写错」在新出口上无人发现。
+    { page: 'people', ids: ['wa-rec-name', 'wa-rec-view', 'wa-rec-seed', 'wa-rec-out', 'wa-opp-run', 'wa-opp-view'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
@@ -1815,7 +1985,7 @@
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), causal: secCausal(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
       //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，

@@ -65,7 +65,9 @@ const ANCHOR_NEXT = "    if (__mode === 'replay') {\n      const r = take(name, 
 const ANCHOR_IDX = "    const e = (t.idx < t.entries.length) ? t.entries[t.idx] : null;";
 // v2.89.0 O2 同步：收卷改为直呼 `WA.rand.endTape`之后，锚点必须跟着走——
 //   否则命中数变 0，整套负控制会“全绿”地失效。
-const ANCHOR_UNWIND = "      try { if (WA.rand && WA.rand.endTape) stat.lastTape = WA.rand.endTape(); } catch (e2) {}";
+// v2.119.0（优化一）修正：锚点写的是历史源码形态（stat.lastTape），而 causal.js 早已改用局部台账 `S`。
+//   锚点漂移的后果不是「测试少跑一条」，而是 hits() 抛穿 assert ⇒ 整个回归崩在第 8494 行。
+const ANCHOR_UNWIND = "      try { if (WA.rand && WA.rand.endTape) S.lastTape = WA.rand.endTape(); } catch (e2) {}";
 
 /** 锚点命中计数，要求恰为 1（工具两向自证：不存在 / 不唯一都必须抛） */
 function hits(s, anchor) {
