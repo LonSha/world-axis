@@ -10167,7 +10167,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.124.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10719,7 +10719,7 @@ assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.123.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.124.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -11010,7 +11010,7 @@ assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.123.0', '入口版本为 2.123.0（实 ' + ver + '）');
+    assert(ver === '2.124.0', '入口版本为 2.123.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11549,7 +11549,7 @@ assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.123.0', '入口版本为 2.123.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.124.0', '入口版本为 2.123.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11937,7 +11937,7 @@ assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.123.0', '入口版本为 2.123.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.124.0', '入口版本为 2.123.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12307,7 +12307,7 @@ assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.123.0', '入口版本为 2.123.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.124.0', '入口版本为 2.123.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12672,7 +12672,7 @@ assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.123.0', '入口版本为 2.123.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.124.0', '入口版本为 2.123.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -14878,7 +14878,7 @@ assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 3184, '现场静态引用 3184 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；）');
+    assert(r2700.refs === 3204, '现场静态引用 3204 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；）');
     assert(r2700.namespaces === 139 && r2700.members === 1748,
       '定义面 139 命名空间 / 1748 成员（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
     assert(r2700.dead.length === 607 && r2700.uiDead.length === 4 && r2700.dataOnly.length === 238,
@@ -14996,7 +14996,7 @@ assert(verF2500 === '2.123.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.123.0', '入口 VERSION = 2.123.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.124.0', '入口 VERSION = 2.123.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -15082,8 +15082,8 @@ assert(dist2800['test-only'] === 353 && dist2800['self-only'] === 214 && dist280
 assert(r2800.dead.length === 607 && r2800.uiDead.length === 4 && r2800.dataOnly.length === 238
 && r2800.deadInTestsOnly === 349,
 '现场锚点（dead 607 / uiDead 4 / dataOnly 238 / 仅测试 349，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥）');
-assert(r2800.refs === 3184 && r2800.namespaces === 139 && r2800.members === 1748,
-    '清册面（refs 3184 / 命名空间 139 / 成员 1748（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
+assert(r2800.refs === 3204 && r2800.namespaces === 139 && r2800.members === 1748,
+    '清册面（refs 3204 / 命名空间 139 / 成员 1748（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -15262,8 +15262,8 @@ assert(r2800.refs === 3184 && r2800.namespaces === 139 && r2800.members === 1748
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-assert(r2900.refs === 3184 && r2900.namespaces === 139 && r2900.members === 1748,
-'清册面（refs 3184 / 命名空间 139 / 成员 1748）——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
+assert(r2900.refs === 3204 && r2900.namespaces === 139 && r2900.members === 1748,
+'清册面（refs 3204 / 命名空间 139 / 成员 1748）——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出）');
 assert(r2900.dead.length === 607 && r2900.uiDead.length === 4 && r2900.dataOnly.length === 238
 && r2900.deadInTestsOnly === 349,
 '死子面 dead 607 / uiDead 4 / dataOnly 238 / 仅测试 349（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
@@ -16611,7 +16611,15 @@ assert(r2900.dead.length === 607 && r2900.uiDead.length === 4 && r2900.dataOnly.
     //   —— 它此前是 self-only（产品零引用），因此不在契约面；现在有了真消费方，契约面自然扩大。
     //   故 auditLog 段 `flush record` → `exportVol flush record stat verifyVolWith`，
     //   members 866→869、chars 9853→9882（+29 = 新口字面与分隔符）。
-    const EC2430 = 'ns= 128 members= 869 chars= 9882';
+    // v2.123.0（P3 + P4 收口 · v2.124.0 补账）：本常量在 v2.123.0 **漏了回填** ——
+    //   P3 让 render/inject.js 真调 `injectBudget.incrementalCost` 与 `timeline.hashText`
+    //   （2 个新成员），P4 让 ui/panel.js 与 engines/tool-diag.js 真调
+    //   `perfTrace.bandCompare`（1 个新成员），三处新消费使出口面自然扩大：
+    //   members 869→871、chars 9882→9910（+28 = 两个成员名与分隔符）。
+    //   注意 `FROZEN2800` **当版已同步回填**（同一提交），故「产物逐字节相等」那条一直是绿的；
+    //   红的只有这个**独立**的规模行常量 —— 两条判据各管一条链路，本条漏改不会让那条连坐，
+    //   于是「三版没跑全量回归」的欠账只在这一处显形。
+    const EC2430 = 'ns= 128 members= 871 chars= 9910';
     // v2.119.0（同一面，第二条链路）：规模行相同**不等于**成员集相同 ——
     //   ns/members 计数可以不变而名字换掉（改名、同名互换）。故这里再加一条更锋利的锁：
     //   产物文件与 FROZEN2800 **逐字节相等**。它跨的是「生成器→落盘」这条链路，
@@ -19844,6 +19852,39 @@ assert(r2900.dead.length === 607 && r2900.uiDead.length === 4 && r2900.dataOnly.
     const diagSrc2123 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
     assert(diagSrc2123.indexOf('band: WA.perfTrace.bandCompare({ dryRun: true }),') > 0,
       'v2123: 诊断采集真读档位**结构**面（且带 dryRun —— 诊断是旁观，不跑基准）');
+  }
+  // ── v2.124.0（优化计划 P5 + P6）：删除出口权限闸门 + 玩家可见的引擎心跳 ──
+  //   P5 的计划书字面目标是「`core/store.transact` 前置点接 `permissions` 判定」，但那一项
+  //   **自 v2.113.0 起就已落地**（`gateBeforeChange` 接在 transact 两处 + save 一处，参数一律
+  //   `'write'`）。真正的缺口在另一侧：`permissions.ACTIONS` 的 `delete` 位**全库零消费**、
+  //   `gate()` 的 `required` 还被硬编码成 `'write'` —— 也就是「改得动世界的写被拦了、
+  //   删得掉世界的删一个闸门都没过」。本版把 delete 位接进两个受控删除出口的**内部**。
+  //   P6 治的是**玩家层**不可判定（R105 只治了机制层）：概览页新增一块三源聚合的心跳，
+  //   纯展示、零控件、不新增页签。
+  section('v2.124.0（优化计划 P5 + P6）：删除出口权限闸门 + 引擎心跳');
+  {
+    runLock('./delete-gate-v2124.js');
+    runLock('./delete-gate-v2124.js', 'runNegative');
+    // 真消费方判据：有出口必须有读者（导出了没人看 = 不存在）。
+    const panelSrc2124 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    assert(panelSrc2124.indexOf('function heartbeatBlock() {') > 0
+      && panelSrc2124.indexOf('${heartbeatBlock()}${evictBlock()}') > 0,
+      'v2124: 心跳块挂在**既有**概览页（不新增页签 —— PAGES 恰 14 页是既有断言钉住的）');
+    assert(panelSrc2124.indexOf('WA.causal.stateView()') > 0
+      && panelSrc2124.indexOf('WA.injectBudget.costView') > 0
+      && panelSrc2124.indexOf('WA.perfTrace.bandCompare({ dryRun: true })') > 0,
+      'v2124: 心跳块三源都是既有真消费方（非幽灵绑定），且档位面带 dryRun（看一眼概览页 ≠ 跑一轮基准）');
+    // P5 的落地面：没有它，「闸门接没接上」只能靠读源码。
+    assert(panelSrc2124.indexOf('WA.permissions.gateStat()') > 0,
+      'v2124: 面板真读按位闸门读数（P5 的可见面 —— gateStat().byAction 有真读者）');
+    const busSrc2124 = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
+    assert(busSrc2124.indexOf("WA.permissions.gate('delete')") > 0
+      && busSrc2124.indexOf('removeDenied: stats.removeDenied') > 0,
+      'v2124: 设置总线侧删除闸门在 `rmRemove` **内部**（6 个内部调用点 + `remove()` 一并覆盖）');
+    const storeSrc2124 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
+    assert(storeSrc2124.indexOf('const __deny = gateDelete();') > 0
+      && storeSrc2124.indexOf("return WA.permissions.gate('delete');") > 0,
+      'v2124: store 侧删除闸门在 `removeVerified` **内部**（5 个内部调用点 + 4 个对外消费方一并覆盖）');
   }
   }  // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

@@ -90,7 +90,16 @@
     //   于是全部落进兜底桶 `setItem`，诊断里被报成「删除被拒」，而实际是隔离或迁移路径的删除
     //   失败。归因**不实**比缺失归因更坏：用户会照着「删除被拒（权限/策略）」去查权限。
     //   故改为：已知来源显式声明 + 未知来源动态建桶（新增调用点时归因不丢，不必改这张表）。
-    removeFailedBy: { guarded: 0, missing: 0, setItem: 0, quarantine: 0, legacy: 0, settings: 0 },
+    // v2.124.0（P5）: `permission` 是**新增桶**——「被权限拦下」既不是底层拒（setItem）、
+    //   也不是复核仍在（guarded），更不是登记项缺 key（missing）。不加这一桶，删除闸门拦下的
+    //   每一次都会被兜底进 setItem 桶，诊断里报成「存储拒了这次删除」——而归因不实比缺失归因
+    //   更坏（用户会照着「存储坏了」去查，真相是「当前使用者没有 delete 位」）。
+    removeFailedBy: { guarded: 0, missing: 0, setItem: 0, quarantine: 0, legacy: 0, settings: 0, permission: 0 },
+    // v2.124.0（P5）: 删除侧的第四种结局——**被拒绝**。前三种是「删成功」（removes）、
+    //   「删失败」（removeFailed/removeFailedBy）、「没啥可删」（removeAbsent）；缺这一格时
+    //   「闸门拦下了这次删除」在整个台账上不可见，于是闸门接没接上只能靠读源码。
+    //   与 store 侧 `__removeStat.denied` 同口径。
+    removeDenied: 0, lastRemoveDenied: null,
     // v2.9.0: 「键本就不存在」单独计量——它不是删除成功。
     //   删除一个缺席的键是**幂等的无操作**，把它计进 removes 会让「N 次删除全部复核通过」
     //   这类结论虚高（与 v2.6.0 修掉的「writes 计尝试而非成功」同型）。
@@ -497,6 +506,35 @@
    * @returns {{ok:boolean, error?:*, existed?:boolean}}
    */
   function rmRemove(key, from, opts) {
+    // v2.124.0（P5）：**删除出口闸门**——设置家族的每一次真实删除都必须经过这里
+    //   （本函数就是那个「唯一删除出口」，6 个内部调用点 + 对外 `remove()` 全部经它）。
+    //   站在读存在性**之前**：被拦下的那次不去碰存储（连一次读都不做）——
+    //   「被拒」与「读不出来」是两种不同的归因，混在一起会让用户去查存储可读性。
+    //   与 store 侧的 `gateDelete` 同纪律：缺省放行、闸门异常一律放行（fail-open）。
+    //   为什么放在出口内部而不是各调用点：调用点有 6 个（备份环轮转 / 回滚 / 损坏隔离 /
+    //   legacy 迁移 / legacy 隔离 / 对外 remove），逐个加等于把同一条判据写六遍，
+    //   而漏一处就是「有一个删除点不过闸门」——本仓反复点名的「同一件事多个实现」。
+    const __deny = (function () {
+      try {
+        if (!WA.permissions || typeof WA.permissions.gate !== 'function') return null;
+        return WA.permissions.gate('delete');
+      } catch (e) { return null; }
+    })();
+    if (__deny) {
+      // 走**既有的**删除失败记账（`noteRemoveFail` —— 单一实现，一处自增一处分桶一处归因）：
+      //   本版新增 `permission` 桶，它既不是底层拒（setItem）也不是复核仍在（guarded），
+      //   混进兜底桶会把「当前使用者没有 delete 位」报成「存储拒了这次删除」——归因不实
+      //   比缺失归因更坏（用户会照着「存储坏了」去查）。
+      noteRemoveFail('permission', { message: 'delete-denied' }, 'permission: ');
+      // 与 `removeFailed` 分开的第二格：那格是「删不掉」，这格是「不让删」。
+      //   缺它时闸门接没接上在整个台账上不可见（只能读源码）。
+      stats.removeDenied++;
+      stats.lastRemoveDenied = { key: key, from: from || 'setItem', at: wallNow(),
+        user: __deny.user || null, required: __deny.required || 'delete',
+        reason: __deny.reason || 'permission-denied' };
+      return { ok: false, error: { message: 'permission-denied' }, existed: false, denied: true,
+        required: __deny.required || 'delete' };
+    }
     const ls = (WA.mainWin || window).localStorage;
     const o = opts || {};
     let existed = false;
@@ -1307,9 +1345,11 @@
      * v2.9.0: 删除侧观测视图（只读）——与 writeStat 对称。
      */
     removeStat() {
+      // v2.124.0（P5）：新增 removeDenied / lastRemoveDenied 两个**字段**（不新增导出成员）。
       return { removes: stats.removes, removeAbsent: stats.removeAbsent, removeFailed: stats.removeFailed,
         removeFailedBy: Object.assign({}, stats.removeFailedBy),
         removeVerified: stats.removeVerified, removeStaged: stats.removeStaged, lastRemove: stats.lastRemove,
+        removeDenied: stats.removeDenied, lastRemoveDenied: stats.lastRemoveDenied,
         lastRemoveError: stats.lastRemoveError, lastRemoveStaged: stats.lastRemoveStaged };
     },
     toBool: toBool,

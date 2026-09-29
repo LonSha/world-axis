@@ -152,11 +152,28 @@ function runAll(A) {
   A(a.files === 140 && a.aliasFiles === 140 && a.refFiles === 138,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
-  A(a.edgesLoad === 37 && a.edgesCall === 1054 && a.edgesAll === 1091 && a.identityOk,
+  // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
+  //   现场逐条 diff（`git show 73be9de^:<file>` 对照工作区，只算 WA.<ns>.<mem> 形态的
+  //   静态引用，排除注释行与自引用）得到**恰好三条新增**，与 +3 逐条对得上：
+  //     · render/inject.js +timeline.hashText        （P3 的键级指纹复用既有实现）
+  //     · render/inject.js +injectBudget.incrementalCost（P3 的观测面真调用）
+  //     · engines/tool-diag.js +perfTrace.bandCompare（P4 的诊断结构面）
+  //   三条都在调用期（无一条落在装载期）⇒ 装载期 37 不变、调用期 1054→1057、总 1091→1094。
+  //   再叠上 v2.124.0（P5 + P6）本版自己新增的两条：
+  //     · core/settings-bus.js +permissions.gate（rmRemove 的删除闸门 —— `permissions` 这个
+  //       命名空间此前只有 core/store.js 一处消费方，现在多了设置总线这一处）
+  //     · ui/panel.js +permissions.gateStat（心跳块的删除闸门那一格）
+  //   ⇒ 调用期 1057→1059、总 1094→1096。两条都由现场 diff 逐条核对过，不是「+2 就对了」。
+  //   ui/panel.js 的 `perfTrace.bandCompare` 与 tool-diag 同属**同一命名空间同一成员**，
+  //   集合去重后只算一条 —— 这也是为什么「文件改了两处、边只多一条」。
+  A(a.edgesLoad === 37 && a.edgesCall === 1059 && a.edgesAll === 1096 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
     + '三者调用期读 store/clock/evict/org/intel/theme ⇒ 调用期 +33）'
+    + '（v2.123.0（优化计划 P3 + P4）：render/inject.js 真调 injectBudget.incrementalCost 与'
+    + ' timeline.hashText、engines/tool-diag.js 真读 perfTrace.bandCompare（面板那一处同成员去重）'
+    + ' ⇒ 调用期 +3，37 / 1054 / 1091 → 37 / 1057 / 1094；本常量在 v2.123.0 漏回填，v2.124.0 补账）'
     + '（运行期定案 37 条装载期读；静态引用 1091 条里 1054 条是调用期，'
     + '拿 909 判次序会报 281 条噪声；v2.110.0（计划一 #21/#22 + 计划二 #39/#70）新增 core/fault-context.js / core/schema.js / core/permissions.js 三文件后：装载期边 23 不变、调用期 +9（归因为提供方）、文件面 +3）'
     + ' v2.111.0（计划二 #67/#69）新增 core/audit-log.js（auditLog）与 core/sanitize.js（sanitize）两文件后：装载期边 23 不变、调用期 +5（store 的审计写入 + permissions 两处拒绝留痕 + 面板字面调用 sanitize）、文件面 +2）'

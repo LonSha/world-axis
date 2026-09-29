@@ -353,6 +353,104 @@
       '「未外供」与「显式为空」是两件事（本扩展尊重对方 v3.174 的三态自述），故分别列出。<br>' +
       'v2.18.0 起读的**不只是 `clock` 一个字段**：对方八本账 + 一本对读读数逐本看图，并对三本账报差集。</div></div>';
   }
+  // ── v2.124.0（优化计划 P6）：引擎心跳（三源聚合 · 一页答「引擎在不在转」）──
+  //   治的病：玩家根本不知道引擎在不在转 —— 「这扩展有用吗」在界面上答不出。
+  //   R105 治的是**机制层**不可判定（导出了却零消费），P6 治的是**玩家层**：
+  //   三源都已是既有真消费方（perf-trace 在诊断节与档位面按钮、causal.stateView 在因果
+  //   工作台、inject-budget.costView 在注入预算裁决段），本块只是把它们**并排**放到概览页。
+  //
+  //   三条纪律（与 evictBlock / randBlock / clockBlock / bridgeBlock / lonshaBlock 同款）：
+  //     · **纯展示、零控件** —— 不引入任何 id/按钮，故不触碰 UI 绑定守卫与接线门禁；
+  //       需要动作时去对应页（因果工作台 / 档位面按钮 / 诊断页）。
+  //     · **缺模块时如实说缺**，不返回空串装作「没什么可报」（那是本仓点名的「没有这条记录」
+  //       与「当时确实是零」同形）。三源逐一降级，缺哪一个由哪一句说。
+  //     · **不编造读数**：宿主 API 耗时在无头/未上报环境一律写「未上报」，绝不拿 0ms
+  //       冒充「API 很快」（P4 在 `bandCompare` 的 `apiNote` 里登记过的同一条）。
+  function heartbeatBlock() {
+    const out = [];
+    // ① 世界链在不在走（causal.stateView —— 纯读存档，不推进世界）
+    try {
+      const cv = (WA.causal && typeof WA.causal.stateView === 'function') ? WA.causal.stateView() : null;
+      if (!cv) out.push('<div class="wa-kv">世界链：<span class="wa-dim">因果模块未装载</span></div>');
+      else {
+        const byS = Object.keys(cv.byStatus || {}).filter(function (k) { return cv.byStatus[k] > 0; })
+          .map(function (k) { return k + '×' + cv.byStatus[k]; }).join('、');
+        out.push('<div class="wa-kv">世界链：共 <b>' + esc(String(cv.chains == null ? '?' : cv.chains)) + '</b> 条'
+          + '｜<b>' + esc(String(cv.live)) + '</b> 进行中 / <b>' + esc(String(cv.terminal)) + '</b> 已终结'
+          + (byS ? '<span class="wa-dim">（' + esc(byS) + '）</span>' : '')
+          + (cv.pending ? '<span class="wa-dim">｜待结算 ' + esc(String(cv.pending)) + '</span>' : '')
+          + (cv.scheduledDelayed ? '<span class="wa-dim">｜延后 ' + esc(String(cv.scheduledDelayed)) + '</span>' : '')
+          + '</div>');
+      }
+    } catch (e) { out.push('<div class="wa-kv">世界链：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
+    // ② 本轮注入在不在转（lastInjection.budget.cost + lastInjection.recalc —— 既有真源）
+    try {
+      const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
+      if (!li) out.push('<div class="wa-kv">本轮注入：<span class="wa-dim">尚未发生注入（推演一轮后此处显示本轮读数）</span></div>');
+      else {
+        const cv = (WA.injectBudget && WA.injectBudget.costView) ? WA.injectBudget.costView(li.budget && li.budget.cost) : null;
+        const sp = (WA.perfTrace && typeof WA.perfTrace.split === 'function') ? WA.perfTrace.split() : null;
+        const bits = [];
+        if (cv && cv.planned) {
+          bits.push('耗时 <b>' + esc(String(cv.totalMs)) + 'ms</b>');
+          bits.push(esc(String(cv.measured)) + ' 源计入');
+        } else bits.push('<span class="wa-dim">本轮无成本账（无可裁项或旧存档快照）</span>');
+        if (sp) {
+          bits.push('本地 ' + esc(String(sp.localMs)) + 'ms');
+          bits.push('序列化 ' + esc(String(sp.serializeMs)) + 'ms');
+          // 「未上报」与「0ms」必须分得开（P4 的 apiNote 同一条口径）
+          bits.push('宿主 ' + ((sp.declared && sp.declared.host) ? esc(String(sp.hostMs)) + 'ms' : '<span class="wa-dim">未上报</span>'));
+        }
+        out.push('<div class="wa-kv">本轮注入：' + bits.join('｜') + '</div>');
+        const rc = li.recalc || null;
+        if (rc) {
+          out.push('<div class="wa-kv">局部重算：重算 <b>' + esc(String(rc.touchedCount)) + '</b> 源 / 跳过 <b>'
+            + esc(String(rc.untouchedCount)) + '</b> 源<span class="wa-dim">（源面 ' + esc(String(rc.knownCount)) + '）'
+            + '｜脏键 ' + esc((rc.dirtyKeys || []).length ? (rc.dirtyKeys || []).join('、') : '无') + '</span></div>');
+        }
+      }
+    } catch (e) { out.push('<div class="wa-kv">本轮注入：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
+    // ③ 基准对照面（dryRun：**只报结构面**，不跑任何一档 —— 看一眼概览页不该等于跑一轮基准）
+    try {
+      const bc = (WA.perfTrace && typeof WA.perfTrace.bandCompare === 'function') ? WA.perfTrace.bandCompare({ dryRun: true }) : null;
+      if (!bc) out.push('<div class="wa-kv">基准档位：<span class="wa-dim">性能模块未装载</span></div>');
+      else {
+        out.push('<div class="wa-kv">基准档位：四档结构面在场（' + esc((bc.judgeableClasses || []).join('/')) + ' 可判'
+          + ((bc.approxClasses || []).length ? '、' + esc((bc.approxClasses || []).join('/')) + ' 仅估计' : '')
+          + '）｜判定门槛 ' + esc(String(bc.minSamples)) + ' 样本'
+          + '<span class="wa-dim">（本格为结构面：毫秒读数随机器漂移，要真跑请去「档位面」按钮）</span></div>');
+      }
+    } catch (e) { out.push('<div class="wa-kv">基准档位：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
+    // ④ v2.124.0（P5）落地面：删除闸门到底在不在挡（与 P5 同一版交付的可见面）
+    //    没有这一格，P5 的「delete 位接进删除出口」只能靠读源码验证 —— 玩家与制作者都看不见。
+    try {
+      const gs = (WA.permissions && typeof WA.permissions.gateStat === 'function') ? WA.permissions.gateStat() : null;
+      if (!gs) out.push('<div class="wa-kv">删除闸门：<span class="wa-dim">权限模块未装载</span></div>');
+      else {
+        const byA = gs.byAction || {};
+        const line = function (k) {
+          const b = byA[k];
+          if (!b) return k + ' 未判定';
+          return k + ' 判定 ' + b.gates + '（拒 ' + b.denied + '／闸门未启用 ' + b.off + '）';
+        };
+        const rmS = (WA.store && typeof WA.store.removeStat === 'function') ? (function () { try { return WA.store.removeStat(); } catch (e) { return null; } })() : null;
+        const rmB = (WA.settingsBus && typeof WA.settingsBus.removeStat === 'function') ? (function () { try { return WA.settingsBus.removeStat(); } catch (e) { return null; } })() : null;
+        const blocked = (rmS ? (rmS.denied || 0) : 0) + (rmB ? (rmB.removeDenied || 0) : 0);
+        out.push('<div class="wa-kv">删除闸门：' + (gs.active
+          ? '<b>' + esc(String(gs.user)) + '</b> 在用'
+          : '<span class="wa-dim">未启用（单机默认放行；登记使用者后写/删路径才过闸门）</span>')
+          + '<span class="wa-dim">｜' + esc(line('write')) + '｜' + esc(line('delete')) + '</span></div>');
+        if (blocked > 0) out.push('<div class="wa-kv wa-bad">删除出口已拦下 ' + esc(String(blocked)) + ' 次'
+          + '<span class="wa-dim">（被拦下的删除一个字节都没碰存储）</span></div>');
+      }
+    } catch (e) { out.push('<div class="wa-kv">删除闸门：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
+    return '<div class="wa-card"><div class="wa-card-h">引擎心跳（三源聚合 · 只读）</div>'
+      + out.join('')
+      + '<div class="wa-hint">三行分别答：<b>世界链在不在走</b>（因果链条数与状态）、'
+      + '<b>本轮注入在不在转</b>（耗时与局部重算）、<b>基准够不够判</b>（四档结构是否在场）。<br>'
+      + '全部只读、零动作：真正的操作入口在「因果工作台」「档位面」「增量面」与「诊断」页。<br>'
+      + '「未上报」与「0ms」是两件事 —— 宿主 API 耗时无上报时照实写未上报，不拿 0ms 冒充「API 很快」。</div></div>';
+  }
   function renderOverview() {
     const s = WA.store.get();
     const nodes = WA.workflow.list();
@@ -366,7 +464,7 @@
         <div class="wa-stat"><div class="wa-stat-v">${s.evolution.round}</div><div class="wa-stat-k">演化回合</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${beforeN}+${afterN}</div><div class="wa-stat-k">工作流节点</div></div>
       </div>
-      ${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}
+      ${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}
       <div class="wa-sec">工作流节点开关</div>
       <div class="wa-node-list">${nodes.map(n => `
         <label class="wa-node">
@@ -4774,7 +4872,7 @@
           } else if (rmSt.lastRemoveError) {
             const byR = rmSt.removeFailedBy || {};
             const rSrcTxt = Object.keys(byR).filter(function (k) { return byR[k] > 0; })
-              .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口', verifyBack: '写后/删后复核读回' }[k] || k) + '×' + byR[k]; }).join('、');
+              .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口', verifyBack: '写后/删后复核读回', permission: '无 delete 位被拦' }[k] || k) + '×' + byR[k]; }).join('、');
             html += '<div class="wa-log wa-log-warn">删除侧：最近一次删除未成功（' + esc(String(rmSt.lastRemoveError)) + '）'
               + '；本会话累计 ' + rmSt.removeFailed + ' 次未成功、' + rmSt.removes + ' 次成功'
               + (rSrcTxt ? '（来源：' + esc(rSrcTxt) + '）' : '')

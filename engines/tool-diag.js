@@ -1407,6 +1407,12 @@
       // v2.102.0（A2/O12）：性能面两枚出口。同 v2.101.0 的理由——「渲染了但绑定写错 id」
       //   这类断裂只有在守卫登记过的控件上才会被发现。
       'wa-perf-view', 'wa-perf-bench', 'wa-perf-partial',
+      // v2.124.0（R1 · 补 v2.123.0 欠账）：**档位面**按钮。v2.123.0 加了 `wa-perf-band`
+      //   却漏了这一步登记 —— 渲染了不登记 ⇒ 守卫表永远查不到它，而「渲染了但绑定的 id
+      //   写错」这类断裂只有在登记过的控件上才会被发现（本表的全部意义）。漏登记的代价是
+      //   实测过的：守卫门禁如实报「未覆盖：["wa-perf-band"]」，而 v2.121–2.123 三版都
+      //   没跑全量回归，于是这条红一直没被人看见。
+      'wa-perf-band',
       // v2.34.0: 记忆采样预览三件
       'wa-samp-preview', 'wa-samp-copy', 'wa-samp-out',
       // v2.121.0（P1）：审计卷两枚按钮 + 一枚粘贴框 + 一个输出区（渲染在工具页审计取证段）。
@@ -2416,7 +2422,7 @@
     else if (rmD && rmD.lastRemoveError) {
       const byR = rmD.removeFailedBy || {};
       const srcRTxt = Object.keys(byR).filter(function (k) { return byR[k] > 0; })
-        .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口', verifyBack: '写后/删后复核读回' }[k] || k) + '×' + byR[k]; }).join('、');
+        .map(function (k) { return ({ guarded: '删完仍在', missing: '登记项缺 key', setItem: '删除被拒', quarantine: '隔离路径', legacy: '旧键迁移', settings: '设置键出口', verifyBack: '写后/删后复核读回', permission: '无 delete 位被拦' }[k] || k) + '×' + byR[k]; }).join('、');
       issues.push({ level: 'warn', key: 'settingsBus.remove',
         detail: '设置键删除失败 ' + rmD.removeFailed + ' 次（成功 ' + rmD.removes + ' 次）'
           + (srcRTxt ? '，来源：' + srcRTxt : '')

@@ -213,18 +213,52 @@
    *     ③ 当前使用者自己没登记过 `write` 位 —— 这是**唯一**会拦的情形。
    *   为什么不返回 `{allowed:true}`：本仓的放行形态一律是「无异议时不留噪声」（`check` 同款）。
    */
-  function gate(action, opts) {
-    _gates++;
-    if (opts && opts.auditOnly) { _gatesAllowed++; return null; }
-    if (!_session) { _gatesOff++; _gatesAllowed++; return null; }
-    const r = has(_session, action);
-    if (r.allowed) { _gatesAllowed++; return null; }
-    return { ok: false, reason: r.reason === 'unknown-user' ? 'unknown-user' : 'permission-denied',
-      user: _session, required: 'write', action: txt(action, 40) || 'write' };
+  // v2.124.0（P5）：**按位分桶**。此前 `gate()` 的返回体把 `required` 写死成 `'write'`，
+  //   而 `gateStat()` 只有三个全局计数 —— 「write 被拒几次」与「delete 被拒几次」在读数上
+  //   同形。P5 让闸门按 `action` 分别记帐后，两件事必须能分开读，否则「delete 位全库零消费」
+  //   这个缺口修完仍然证不了（修了和没修，读数都是同一个 `denied` 数字）。
+  //   边界（如实登记）：分桶只统计**经 `gate()` 的判定**，不统计 `has()` 的直接调用
+  //   （那是判定函数的计量面，住 `stat()`，两者不是同一件事）。
+  let _byAction = {};
+  /** 取（必要时建）某个动作位的分桶。未知动作名动态建桶——新增位时不丢归因。 */
+  function _actBucket(a) {
+    const k = txt(a, 40) || 'write';
+    if (!_byAction[k]) _byAction[k] = { gates: 0, allowed: 0, denied: 0, off: 0 };
+    return _byAction[k];
   }
+  function gate(action, opts) {
+    // v2.124.0（P5）: `required` 不再写死 'write' —— 按位判定要求「哪一位被要、哪一位被拒」
+    //   在返回体上一致。此前 `required: 'write'` 会让 `gate('delete')` 的拒收体自相矛盾
+    //   （required 说 write、action 说 delete），调用方照着 required 去查权限表就查错了位。
+    const act = txt(action, 40) || 'write';
+    const b = _actBucket(act);
+    _gates++; b.gates++;
+    if (opts && opts.auditOnly) { _gatesAllowed++; b.allowed++; return null; }
+    if (!_session) { _gatesOff++; _gatesAllowed++; b.off++; b.allowed++; return null; }
+    const r = has(_session, act);
+    if (r.allowed) { _gatesAllowed++; b.allowed++; return null; }
+    b.denied++;
+    return { ok: false, reason: r.reason === 'unknown-user' ? 'unknown-user' : 'permission-denied',
+      user: _session, required: act, action: act };
+  }
+  // v2.124.0（P5）: `has()` 的拒收体已经在返回体上带 `required`（见上面 `out.required = a;`），
+  //   `gate()` 此前是**唯一**把它覆盖成常量 'write' 的地方。两条判定出口的 `required` 语义
+  //   至此一致：都是「被要的那一位」。
   // v2.113.0（A1）：`off` = 因「没人登记当前使用者」而放行的次数——与 `allowed` 分开读，
   //   否则「保护没开」与「保护开着且放行」在面板上是同一个数字。
-  function gateStat() { return { active: !!_session, user: _session, gates: _gates, allowed: _gatesAllowed, denied: _gates - _gatesAllowed, off: _gatesOff }; }
+  function gateStat() {
+    // v2.124.0（P5）: `byAction` 是**新增字段**，既有五个字段（active/user/gates/allowed/
+    //   denied/off）语义与值一字不动 —— 三处既有消费方（tool-diag 的 secPermissions、
+    //   面板、store-commit 专锁 B4/B7）读的是它们，多一个字段不改变任何旧判据。
+    //   返回**深拷贝**：`stat()` 的边界（诊断读数不许反过来篡改闸门台账）在这里同样成立。
+    const byAction = {};
+    Object.keys(_byAction).forEach(function (k) {
+      const x = _byAction[k];
+      byAction[k] = { gates: x.gates, allowed: x.allowed, denied: x.denied, off: x.off };
+    });
+    return { active: !!_session, user: _session, gates: _gates, allowed: _gatesAllowed,
+      denied: _gates - _gatesAllowed, off: _gatesOff, byAction: byAction };
+  }
 
   /** 权限矩阵（用户 × 判定面）——诊断/UI 用；纯只读。 */
   function matrix(actions) {
@@ -249,6 +283,9 @@
     // v2.112.0：会话也是**状态面**（与用户表同族），reset 必须一并清 ——
     //   留着会话会让「reset 之后谁在写」变成上一节的残留，而本仓的模块态在 run.js 里是跨 section 共享的。
     _session = null; _gates = 0; _gatesAllowed = 0; _gatesOff = 0;
+    // v2.124.0（P5）：按位分桶与全局闸门计数同族 —— 两者不同步清会让「reset 之后
+    //   gateStat().gates 为 0、byAction.write.gates 还是上一节的数」这种自相矛盾的读数出现。
+    _byAction = {};
   }
 
   WA.permissions = {

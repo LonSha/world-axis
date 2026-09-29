@@ -102,7 +102,21 @@ function parseInto(doc, root, html) {
     if (c === '/') {
       var gt = html.indexOf('>', lt);
       if (gt < 0) break;
-      if (stack.length > 1) stack.pop();
+      if (stack.length > 1) {
+        var closed = stack[stack.length - 1];
+        // v2.124.0（R2 · 替身保真度）：真 DOM 里 `<textarea>文本</textarea>` 的**内容就是
+        //   它的 value**（HTML 解析器对 textarea 的「可编辑值」的初始化规则）。替身此前把
+        //   这段文本留在 `_text` 里、`value` 恒为空串 —— 于是「面板预填现有档案」那条端到端
+        //   判据（`pInD.value.indexOf('初始') >= 0`）在**缺 jsdom 的机器上恒假**：
+        //   判的是「预填失效」，而真相是「替身没实现这个规则」。
+        //   这正是本仓点名的「缺依赖 ⇒ 静默少跑 / 结论与事实脱钩」的另一种形态：
+        //   门禁没跳过、也没报错，只是**判据的输入面被替身阉了**。
+        //   只在 `_text` 非空时设：`<textarea></textarea>` 与显式 `value` 属性两种形态
+        //   一字不动（避免把「本来就没预填」也改写成有值）。只有 textarea 走这条 ——
+        //   input 的值来自 `value` 属性，已由 setAttr 处理。
+        if (closed._tag === 'textarea' && closed._text) closed.value = closed._text;
+        stack.pop();
+      }
       i = gt + 1;
       continue;
     }

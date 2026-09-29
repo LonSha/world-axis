@@ -6,20 +6,96 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.123.0 |
-| 全量回归 | `node tests/run.js` → **v2.120.0 为通过 11858 / 失败 0**；**v2.121.0 / v2.122.0 / v2.123.0 本轮未跑全量**（用户约束：整条计划做完前不跑），所有验证走单锁 + 轻量门禁 |
+| 版本 | v2.124.0 |
+| 全量回归 | `node tests/run.js` → **v2.124.0 为通过 12141 / 失败 0 · Status: passed · unchanged: true**（长超时启动器，见 R112）；此前 **v2.121.0 / v2.122.0 / v2.123.0 未跑全量**（用户约束：整条计划做完前不跑），三版验证只走单锁 + 轻量门禁 |
 | 产品文件面 | 140（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
 | 出口面契约 | `node tests/export-contract.js` → ns= 128 / members= 871 / chars= 9910 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 140 · 锁 135 · 孤儿 0 · 豁免 0 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 141 · 锁 136 · 孤儿 0 · 豁免 0 |
 | 死子面 | `node tests/dead-export-gate.js` → dead 607 / uiDead 4 / 仅测试 349 / dataOnly 238 |
 | 拒收码 | `node tests/reject-code-gate.js` → 601 码（见证 362 / 死表 8 / 基线 231） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.123.0 · 现场 refs 3184 / 命名空间 139 / 成员 1748 |
-| 版本条目存放 | `node tests/docs-archive-gate.js` → README 90 条 / 日志存档 92 条 / 跨文件同号 **0** |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.124.0 · 现场 refs 3204 / 命名空间 139 / 成员 1748 |
+| 版本条目存放 | `node tests/docs-archive-gate.js` → README 91 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | tools/ | 只留**被可执行代码引用**的 12 个（一次性脚本不入库，见 `.gitignore`） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+
+### R112 · 2026-09-29 · v2.124.0：删除出口权限闸门（P5）+ 玩家可见的引擎心跳（P6）
+- **起点与终点**：起点 v2.123.0；终点 v2.124.0。本版是 P 线的第五、六项（`FOUR_VERSION_PLAN.md` 的 P5 / P6），
+  两项合成一轮（同属一面「可判定性」，符合本仓「每版 2 项」的既有节奏）。
+- **P5 的计划书字面目标与真实缺口（本版最重要的发现）**：计划书 397 行写「路径：`core/store.transact` 前置点接
+  `permissions` 判定」—— 但现场实测，那一项**自 v2.113.0 起早已落地**：`core/store.js:553` 的 `gateBeforeChange()`
+  已接在 `transact` 的两处（`3261` 变更前 / `3277` 提交前）与 `save()` 的 `1632` 一处，三处参数**一律是 `'write'`**。
+  按字面执行会做一件已经做完的事，而**真实缺口在另一侧**：
+  · `permissions.ACTIONS` 的 `delete` 位**全库零消费**（`permissions.gate(` 全库仅两处调用点，参数全是 `'write'`）；
+  · `gate()` 的返回体把 `required` **硬编码成 `'write'`**（`user: _session, required: 'write', action: …`）——
+    连按位判定都做不到，`gate('delete')` 的拒收体会自相矛盾（required 说 write、action 说 delete）。
+  一句话：**改得动世界的写被拦了，删得掉世界的删一个闸门都没过。**
+- **P5 落地三段**：① `core/permissions.js` 的 `gate(action, opts)` 改**按位判定**（`required` 取 `action`），
+  新增 `_byAction` 按位分桶与 `gateStat().byAction` 新字段（`reset()` 同族清空）——**不新增任何导出成员**，
+  导出面白名单 17 项与冻结串 `ns= 128 members= 871 chars= 9910` 逐字未变。
+  ② `core/store.js` 新增 `gateDelete()` 助手（与 `gateBeforeChange` 同纪律：**缺省放行 + 闸门异常一律放行**），
+  接在 `removeVerified` **内部最前面**。为什么在出口内部：该函数是受控删除的**唯一实现**，5 个内部调用点
+  （冲突现场轮转 / 巡视自动回收 / `dropConflict` / `sweepStaleKeys` / `dropQuarantine`）与 4 个对外消费方
+  （`workflow.resetHistory` / `render.clearUninjectLedger` / `index.clearEventLog` 两键）**全部**经它 ——
+  闸门长在这里则全部下游一并覆盖，且**不新增任何裸删除点**（G14 门禁只允许本文件里恰 1 处裸 `removeItem`，
+  出口外新加删除点会同时打红正反两条断言）。③ `core/settings-bus.js` 的 `rmRemove` 同样在**最前面**接闸门
+  （6 个内部调用点 + 对外 `remove()` 一并覆盖），新增 `removeDenied` / `lastRemoveDenied` 字段与
+  `removeFailedBy.permission` 桶 —— 不加这一桶，闸门拦下的每一次会被兜底进 `setItem` 桶，诊断里报成
+  「存储拒了这次删除」（**归因不实比缺失归因更坏**）。归因走**既有的** `noteRemoveFail`（单一实现）。
+- **P5 四条纪律（逐条有专锁判据）**：① 被拒时 `attempts` **不增**（口径是「真的去碰了存储的受控删除次数」，
+  被拦下的那次一个字节都没碰）、`lastKey` **不被污染**（否则面板的「最近一次受控删除」会指向一次**根本没发生**
+  的删除，改由 `lastDenied` 点名）、`removes` / `removeAbsent` / `removeVerified` 均不变 —— 与 v2.9.0
+  「删不掉不得计入 removes」同一条纪律；② **fail-open**（闸门自身抛错一律放行，否则「审计失败」会升级成
+  「删不掉用户的存档」，而清理策略正是最需要「删不掉也别崩」的那条路径）；③ 闸门调用点在两个文件里**各恰 1 处**
+  （不散落到各调用点 —— 散落即「同一条判据写十一遍，漏一处就是有一个删除点不过闸门」）；
+  ④ **逐位核，不做角色层级推断**：`editor` 只持有 `write`、**不**持有 `delete` ⇒ 仍被拒（`gm` / `owner` 才放行）。
+- **P6 落地**：`ui/panel.js` 新增 `heartbeatBlock()` —— 概览页**既有位置**挂一块（`${heartbeatBlock()}${evictBlock()}…`，
+  **不新增页签**，14 页是既有断言钉住的）。三源都是**既有真消费方**（非幽灵绑定）：`causal.stateView()`（世界链条数
+  与 live/terminal 分列）、`lastInjection.budget.cost` 经 `injectBudget.costView` + `lastInjection.recalc`（本轮耗时
+  与局部重算）、`perfTrace.bandCompare({dryRun:true})`（四档**结构面**，不跑任何一档 —— 看一眼概览页不该等于跑一轮
+  基准）。第四格是 P5 的落地面：`gateStat().byAction` 的逐位读数（没有它，闸门接没接上只能靠读源码）。
+  **零控件**（块内无 `id="`，不触碰 UI 绑定守卫与接线门禁），宿主 API 无上报时照实写「未上报」（不拿 0ms 冒充
+  「API 很快」）。
+- **收口期全量回归抓到五条既存红灯（v2.121–2.123 三版未跑全量的欠账）**——这是本版第二个有价值的发现：
+  ① `panel 渲染的每个控件都在守卫表内（未覆盖：["wa-perf-band"]）`：v2.123.0 加了 `wa-perf-band` 按钮却**漏登记**
+  `tool-diag.UI_BINDINGS`（P4 的专锁 A4 只钉了前三枚）。已补登记。
+  ② `编辑器预填现有档案（不丢已录内容）` **恒假**：根因是 `tests/ui-dom.js` 的 `JSDOMShim`（jsdom 缺席时的零依赖替身）
+  **不把 `<textarea>文本</textarea>` 的文本解析为 `value`** —— 而真 DOM 的规则正是「textarea 的内容就是它的 value」。
+  判据没跳过、没报错，只是**输入面被替身阉了**（与 v2.103.0 治的「缺依赖 ⇒ 静默少跑」同族）。已在替身的闭标签分支
+  补上该规则（只在 `_text` 非空时设，`<textarea></textarea>` 与显式 `value` 属性两种形态一字不动）。
+  ③ `EC2430 出口面契约规模`：期望 869/9882、实 871/9910 —— v2.123.0（P3 + P4）让三处新消费显形
+  （`render/inject.js` 的 `incrementalCost` 与 `hashText`、`ui/panel.js` 与 `tool-diag` 的 `bandCompare`），
+  `FROZEN2800` **当版已同步回填**（故「产物逐字节相等」那条一直是绿的），漏的只有这个**独立**的规模行常量。
+  ④ `B2 边恒等式`：期望 1054/1091、实 1057/1094 —— 现场逐条 diff（`git show 73be9de^` 对照工作区）得到
+  **恰好三条新增**，与 +3 逐条对得上；本版 P5/P6 再叠两条（`settings-bus` → `permissions.gate`、
+  `ui/panel` → `permissions.gateStat`）⇒ 1059/1096，两版一起补账。
+  ⑤ `docs-archive/B: README 版本历史条目 = 89`：实 90（v2.121.0 入册未回填）+ 本版 +1 ⇒ 91。
+- **验收**：专锁 `tests/delete-gate-v2124.js` **63/0**（A 结构 / B 运行时 9 组 / C 结构 / D 运行时 / N1–N6 六条
+  真源码破坏负控制 —— 每条走「真源码破坏（锚点恰中 1 次）→ 装载破坏副本 → 在副本上重跑同款真判据」，
+  配 H5 判据纯度与 N6 真文件逐字未变自证）；`test-surface-gate` 文件面 141 / 锁 136 / 孤儿 0；
+  `readings` 回填 refs 3184 → 3204（3/3 站点，`tools/sync-hardcoded.js --write` 写后校验通过）；
+  出口面契约 **逐字未变**（`ns= 128 members= 871 chars= 9910`，本版只加字段不加口）；
+  全部改动文件 `node --check` / `python3 -m ast` 语法全绿。
+- **全量回归结果（收口收网）**：`node tests/run.js` → **通过 12141 / 失败 0 · Status: passed · unchanged: true**（隔离运行器 `sourceDigest` 前后一致 ⇒ 判据全程没改过被观测源码；19 个改动文件 md5 逐一复核 OK）。
+  收网过程本身抓到**两条真缺陷**（都是本版新增代码的缺陷，不是既存欠账）：
+  ① **拒收码面漏同步**：`settings-bus` 新增 `removeFailedBy.permission` 桶后，`ui/panel.js` 与 `engines/tool-diag.js`  两处**删除桶中文标签表**没跟着加这一项 ⇒ `ui-gate-sync` 的 `rSrcTxt` 判据报「ui 7 / eng 8」（这正是那张表的全部意义：  「桶新增了但标签没跟上」= 用户看到裸桶名 `permission`，等于没有归因）。已两处同批补 `permission: '无 delete 位被拦'`。
+  ② **新锁自己违反 H5 判据纯度**：`delete-gate-v2124.js` 的 A/C 面判据里**把锚点串又写了一遍**  ⇒ 全仓负控制锚点审计报 5 条 `impure`（「字面量在本文件出现 N 次；判据不得引用锚点串」）。
+  修法是判据一律改引 `ANCHORS.x.txt`；其中 `storeGateImpl` 与 `busGateImpl` 两串**同文**（都是  `return WA.permissions.gate('delete');`），仅靠改引仍会各出现 2 次 ⇒ 用**缩进形态**区分  （store 6 空格 / bus 8 空格；该形态在对方文件里不出现，故两边仍各恰中 1 次）。修后审计 problems 0 / 49 项全过。
+  这两条恰好是本仓两条纪律的活样本：「声明了却没人消费 / 新增了却没同步」与「判据不得引用锚点串」。
+
+- **本版一条主动裁决**：**不新增页签、不新增导出成员**。P6 的「心跳」挂在既有概览页（改 `PAGES` 会连坐
+  `pages.tested === 14` 与 `pages2330.length === 14` 两处断言，而收益只是多一个页签）；P5 的按位读数做成
+  `gateStat()` 的**新字段**（新增导出成员会连坐 `tests/permissions-v2110.js` 的 19 项白名单 A 段与冻结串
+  `FROZEN2800`）—— 两条都是「最小改动路径」，且都写进了本版专锁的 A 面判据。
+- **未覆盖（如实登记，不伪称已完成）**：① 删除闸门只覆盖**受控删除出口**（`removeVerified` / `rmRemove`），
+  **不含数组 eviction**——`engines/*` 里大量 `splice` 型数组收缩与 `dropRecoveryPoint` 的
+  「`splice` + `setItem`」改写式删除都是**写路径**（它们真写盘），由 `write` 位覆盖，不在 `delete` 面上；
+  ② 闸门分桶只统计**经 `gate()` 的判定**，不统计 `has()` 的直接调用（那是判定函数的计量面，住 `stat()`）；
+  ③ **P6 的 UI 层仍未做实机验证**（沿用 P-实机约定：无头回归不装载 UI 层，UI 另由 `ui-gate-sync` /
+  `ui-wire-audit` 两道门禁覆盖）—— 心跳块是纯字符串产出 + 零控件，静态面判据已足够，但**渲染观感未实机确认**；
+  ④ 本版**不扩展到 `transact` 之外的全部写路径**（计划书本就不做，如实留档）。
 
 ### R111 · 2026-09-29 · v2.123.0：局部重算观测 + 档位对照面（优化计划 P3 + P4）
 - **起点与终点**：起点 v2.122.0（全量回归仍停在 v2.120.0 的 11858 / 0，本轮未跑全量）；终点 v2.123.0。

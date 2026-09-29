@@ -565,6 +565,39 @@
       return WA.permissions.gate('write');
     } catch (e) { return null; }
   }
+  /**
+   * v2.124.0（P5）：**删除之前**的授权检查（唯一会对受控删除说「不」的检查点）。
+   *
+   *   治的病（计划书 P5 的字面目标**早已达成**，真实缺口在另一侧）：
+   *     计划书原文写「`core/store.transact` 前置点接 `permissions` 判定」，但 `gateBeforeChange`
+   *     自 v2.113.0 起已接在 `transact` 的两处（变更前 / 提交前）与 `save()` 一处，三处参数
+   *     **一律是 `'write'`**；而 `permissions.ACTIONS` 里的 `delete` 位在全库**零消费** ——
+   *     删除出口一个闸门都没过（`permissions.gate` 的 `required` 还被硬编码成 `'write'`，
+   *     连按位判定都做不到）。也就是说：**改得动世界的写被拦了，删得掉世界的删没被拦**。
+   *
+   *   为什么落在这里（而不是在 store 外面另设一道）：
+   *     · `removeVerified` 是受控删除的**唯一实现**，5 个内部调用点（冲突现场轮转 / 巡视自动
+   *       回收 / dropConflict / sweepStaleKeys / dropQuarantine）与 4 个对外消费方（workflow
+   *       resetHistory / render clearUninjectLedger / index clearEventLog 两键）**全部**经它 ——
+   *       闸门长在这里，全部下游一并覆盖，且**不新增任何裸删除点**（G14 门禁只允许本文件里
+   *       恰好 1 处裸 `localStorage.removeItem`，出口外新加删除点会同时打红正反两条断言）。
+   *     · 与 `gateBeforeChange` 逐字同纪律：**缺省放行**（无当前使用者 = 单机主场景）、
+   *       **闸门自身异常一律放行**（fail-open）——否则「审计失败」会升级成「删不掉用户的存档」，
+   *       而清理策略正是最需要「删不掉也别崩」的那条路径。
+   *     · 刻意**不**预读 `permissions.currentUser()` 做短路：闸门自己已经把「没人登记当前使用者」
+   *       单独计到 `gateStat().off`，再读一次会开出同一条决策的第二个读数口
+   *       （`gateBeforeChange` 里登记过的同一条裁决）。
+   *   返回值：`null` = 放行；非 null = 拒收体（不执行任何删除、不记账）。
+   *   边界（如实登记，不假装更宽）：`evict.array` 型数组收缩与 `dropRecoveryPoint` 的
+   *   `splice + setItem` 改写式删除都是**写路径**（它们真写盘），由 `write` 位覆盖，
+   *   不在本闸门面上。
+   */
+  function gateDelete() {
+    try {
+      if (!WA.permissions || typeof WA.permissions.gate !== 'function') return null;
+      return WA.permissions.gate('delete');
+    } catch (e) { return null; }
+  }
   // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
   let __epoch = 0; // v0.1.35: 聊天纪元——init()（含切聊天）自增，在飞批跨纪元即作废
   // v2.113.0（A1）：`lastFlush` 是**上一次批退出落盘的结论**（ok / reason / safe / at）。
@@ -631,7 +664,11 @@
   //   删除失败则可能**静默无效**（键仍在、无异常），此时清理策略会报「已释放 N 字节」而磁盘
   //   一个字节都没释放，用户按提示继续清理却永远清不出空间。
   //   判据与 writeVerified 同规格：删完立刻读回，仍能读到即视为**这次删除没有发生**。
-  const __removeStat = { attempts: 0, removed: 0, failed: 0, verified: 0, staged: 0, lastKey: null, lastAt: 0, lastReason: null };
+  // v2.124.0（P5）：新增 `denied` —— 「被权限拦下」与「删不掉」是两件事，混在一个 failed 里
+  //   会让用户照着「删不掉」去查存储权限，而真相是「当前使用者没有 delete 位」。
+  //   它是**当次调用**即返回的形态（闸门在最前面），故不进 attempts —— attempts 的口径是
+  //   「真的去碰了存储的受控删除次数」，被拦下的那次一个字节都没碰。
+  const __removeStat = { attempts: 0, removed: 0, failed: 0, verified: 0, staged: 0, denied: 0, lastDenied: null, lastKey: null, lastAt: 0, lastReason: null };
   /**
    * v2.9.0: 受控删除（唯一实现）——删除后读回复核，失败分类留痕。
    *
@@ -642,6 +679,20 @@
    *   removed=true 表示「本次调用确实把键删掉了」；键本来就不存在时 ok=true 但 removed=false。
    */
   function removeVerified(key) {
+    // v2.124.0（P5）：**删除出口闸门**——受控删除的唯一入口，闸门站在最前面。
+    //   放在 `attempts++` **之前**：被拦下的那次没有碰过存储，把它计进 attempts 会让
+    //   「受控删除尝试 N 次」这个读数虚高（与 v2.9.0「删不掉不得计入 removes」同一条纪律）。
+    //   放在 `lastKey/lastAt` **之前**：被拦下时用 `lastDenied` 点名，而不是污染 `lastKey`
+    //   ——否则面板的「最近一次受控删除」会指向一次**根本没发生**的删除。
+    const __deny = gateDelete();
+    if (__deny) {
+      __removeStat.denied++;
+      __removeStat.lastDenied = { key: key, at: clockWall(), user: __deny.user || null,
+        required: __deny.required || 'delete', reason: __deny.reason || 'permission-denied' };
+      __removeStat.lastReason = 'permission-denied';
+      return { ok: false, removed: false, reason: 'permission-denied', denied: true,
+        required: __deny.required || 'delete', user: __deny.user || null };
+    }
     __removeStat.attempts++;
     __removeStat.lastKey = key;
     __removeStat.lastAt = clockWall();
@@ -2917,7 +2968,10 @@
      */
     removeStat() {
       const r = __removeStat;
-      return { attempts: r.attempts, removed: r.removed, failed: r.failed, verified: r.verified, staged: r.staged, lastKey: r.lastKey, lastAt: r.lastAt, lastReason: r.lastReason };
+      // v2.124.0（P5）：新增 denied / lastDenied 两个**字段**（不新增导出成员）——
+      //   没有它，「删不掉」与「不让删」在面板上仍是同一个数字。
+      return { attempts: r.attempts, removed: r.removed, failed: r.failed, verified: r.verified, staged: r.staged,
+        denied: r.denied, lastDenied: r.lastDenied, lastKey: r.lastKey, lastAt: r.lastAt, lastReason: r.lastReason };
     },
     /**
      * v2.9.0: 受控删除（对外）——清理类调用方应走这里而非裸 removeItem。
