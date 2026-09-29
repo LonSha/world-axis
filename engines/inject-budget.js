@@ -265,33 +265,47 @@
     const optional = list.filter(function (x) { return x.rank > 2; }).sort(function (a, b) { return a.rank - b.rank; });
     const kept = [], folded = [], dropped = [];
     let used = 0;
+    // v2.122.0 P2：**占位账** —— 裁决是**顺序**发生的，而「这源为什么没进」在旧账上只留下
+    //   结果（reason），留不下过程：它被裁决时，预算已经分给了谁。于是「折叠 / 丢弃」只能
+    //   答「为什么」（no_budget 等），答不出「哪条挤掉了哪条」。
+    //   这里在裁决过程中顺带记下占位序列：每个被折叠 / 丢弃的项带 `remainAt`（裁决当时的
+    //   余量；pinned 保底可能把预算挤爆，此时照实为负——钳到 0 会把它说成「刚好用完」）
+    //   与 `blockedBy`（裁决当时已占用预算的项，按裁决顺序；折叠项按折叠后计）。
+    //   两项都是**事后推导不出来**的事实（重算要重跑 plan，而输入内容不留档），故必须在此记。
+    //   纯观测：不改变任何裁决结果（恒等式 remainAt + ΣblockedBy.tokens = budget 因此恒成立）。
+    const occupied = [];
+    const occSnap = function () {
+      return occupied.map(function (o) { return { source: o.source, tokens: o.tokens }; });
+    };
 
     // ① pinned 优先：整体超预算时，从 rank 最末开始折叠（不静默丢弃 pinned）
     let pinnedTokens = pinned.reduce(function (s, x) { return s + x.tokens; }, 0);
     pinned.forEach(function (x) {
-      if (pinnedTokens <= budget || used + x.tokens <= budget) { kept.push(x); used += x.tokens; return; }
+      if (pinnedTokens <= budget || used + x.tokens <= budget) { kept.push(x); used += x.tokens; occupied.push({ source: x.source, tokens: x.tokens }); return; }
       const floorTokens = Math.min(x.tokens, Math.max(FOLD_FLOOR_TOKENS, Math.floor(x.tokens * 0.25)));
       const t = trim(x.content, Math.min(floorTokens, x.tokens));
       const nt = tokensOf(t);
-      folded.push({ id: x.id, source: x.source, reason: 'pinned_over_budget', from: x.tokens, to: nt, content: t });
+      folded.push({ id: x.id, source: x.source, reason: 'pinned_over_budget', from: x.tokens, to: nt, content: t, remainAt: budget - used, blockedBy: occSnap() });
       kept.push({ id: x.id, source: x.source, tokens: nt });
       used += nt;
+      occupied.push({ source: x.source, tokens: nt });
     });
 
     // ② optional 按优先级填充
     optional.forEach(function (x) {
       const remain = budget - used;
-      if (x.tokens <= remain) { kept.push(x); used += x.tokens; return; }
+      if (x.tokens <= remain) { kept.push(x); used += x.tokens; occupied.push({ source: x.source, tokens: x.tokens }); return; }
       if (!x.fold || remain < MIN_KEEP_TOKENS) {
-        dropped.push({ id: x.id, source: x.source, reason: x.fold ? 'no_budget' : 'not_foldable', tokens: x.tokens });
+        dropped.push({ id: x.id, source: x.source, reason: x.fold ? 'no_budget' : 'not_foldable', tokens: x.tokens, remainAt: remain, blockedBy: occSnap() });
         return;
       }
       const t = trim(x.content, remain);
       const nt = tokensOf(t);
-      if (nt < MIN_KEEP_TOKENS) { dropped.push({ id: x.id, source: x.source, reason: 'folded_too_small', tokens: x.tokens }); return; }
-      folded.push({ id: x.id, source: x.source, reason: 'over_budget', from: x.tokens, to: nt, content: t });
+      if (nt < MIN_KEEP_TOKENS) { dropped.push({ id: x.id, source: x.source, reason: 'folded_too_small', tokens: x.tokens, remainAt: remain, blockedBy: occSnap() }); return; }
+      folded.push({ id: x.id, source: x.source, reason: 'over_budget', from: x.tokens, to: nt, content: t, remainAt: remain, blockedBy: occSnap() });
       kept.push({ id: x.id, source: x.source, tokens: nt });
       used += nt;
+      occupied.push({ source: x.source, tokens: nt });
     });
 
     return {

@@ -67,10 +67,10 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.120.0）
+## 构建与验收（当前版本 v2.122.0）
 
 ```bash
-node tests/run.js               # 全量回归入口 → 通过 11858 / 失败 0 · Status: passed
+node tests/run.js               # 全量回归入口 → v2.120.0 为通过 11858 / 失败 0；v2.121.0 / v2.122.0 均未跑全量（用户约束：整条计划做完前不跑；见 ITERATION_LOG.md 的 R109 / R110）
 node tests/inventory.js         # 出口面清册 → 四类悬空均 0（产品文件 140 个）
 node tests/export-contract.js   # 出口面契约 → ns / members / chars（产物在 .gitignore 内）
 ```

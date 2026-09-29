@@ -1635,6 +1635,13 @@
         <button class="wa-btn" id="wa-perf-bench" title="基准面：真跑冷启（四面各一遍）与热启（按脏集复用），并复核复用值是否等于现算值">基准面</button>
         <button class="wa-btn" id="wa-perf-partial" title="增量面：按每一面自己的输入（世界步进 stateRev）决定重算还是复用——同一世界步进下重复读取应为 0 重算；改过世界再点则如实重算">增量面</button>
       </div>
+      <div class="wa-sec">审计取证<span class="wa-dim">（谁改过世界——把一段事实带出会话）</span></div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-audit-vol" title="导出一卷审计事实（纯读：不挤出、不清环、不改计数）——这一节会话里世界被谁改过，只有把它带出去才答得上">导出审计</button>
+        <button class="wa-btn" id="wa-audit-vol-check" title="核对一卷从别处拿来的审计（序号链 + 时间链），零状态触碰：不并入环、不改序号、不写盘">带外核对</button>
+      </div>
+      <textarea id="wa-audit-vol-text" class="wa-ta" placeholder="把一卷审计（JSON）粘在这里再点「带外核对」——上一节会话导出的那种。本侧无卷时照实说「先导出一卷」，不假装核对过"></textarea>
+      <div id="wa-audit-vol-out" class="wa-out"></div>
       <div class="wa-sec">恢复与撤销<span class="wa-dim">（改错了能退回去）</span></div>
       <div class="wa-row">
         <button class="wa-btn" id="wa-recovery-dl" title="导出当前状态的恢复点文件">导出恢复点</button>
@@ -3951,6 +3958,63 @@
     on('#wa-log-err', () => { __logErrOnly = !__logErrOnly; renderBody(); __persistPanel(); });   // v2.109.0（#15）：开关即落盘
     on('#wa-err-report', () => { if (navigator.clipboard && WA.toolDiag && WA.toolDiag.buildErrorReport) { navigator.clipboard.writeText(WA.toolDiag.buildErrorReport()); const tip = $('#wa-err-report'); if (tip) { tip.textContent = '已复制✓'; setTimeout(() => { tip.textContent = '复制错误报告'; renderBody(); }, 1500); } } });
     on('#wa-audit-copy', () => { if (navigator.clipboard && WA.store && WA.store.exportAuditReport) { navigator.clipboard.writeText(WA.store.exportAuditReport()); const out = $('#wa-diag-out'); if (out) out.textContent = '✓ 内存/持久化审计报告 (sizeAudit) 已复制到剪贴板！'; } });
+    // ── v2.121.0 P1：审计卷（跨会话可查）。**显式触发**——本模块不自动落盘，
+    //   与磁带卷（v2.98.0 P2）/ 流水卷（v2.94.0 O6）同规格：要不要把这一卷带出会话，
+    //   是按下这一刻的决定。这两枚按钮就是 exportVol / verifyVolWith 的真消费方。
+    const auditOut = (html) => { const o = $('#wa-audit-vol-out'); if (o) o.innerHTML = html; };
+    on('#wa-audit-vol', () => {
+      if (!WA.auditLog || typeof WA.auditLog.exportVol !== 'function') { auditOut('<div class="wa-dim">审计模块未加载</div>'); return; }
+      let v = null; try { v = WA.auditLog.exportVol(); } catch (e) { return auditOut('<div class="wa-dim">导出审计失败：导出抛错（export-throw）</div>'); }
+      if (!v || !v.ok) { auditOut('<div class="wa-dim">导出审计：' + esc((v && v.reason) || 'export-throw') + '（卷不可导出）</div>'); return; }
+      const t = $('#wa-audit-vol-text');
+      const json = JSON.stringify(v);
+      if (t) t.value = json;
+      // 「空环」与「导不出」是两件事：空环导出成功但 0 条，照实说没东西可核，不假装导出了证据。
+      const summary = '审计卷 · ' + esc(v.format) + ' v' + v.formatVersion + ' · ' + v.entries + ' 条'
+        + '｜环容量 ' + v.cap + '｜累计记录 ' + v.recorded + '｜挤出 ' + v.dropped
+        + (v.truncated ? ' · <b>已截断</b>：环挤过 ⇒ 卷首无上游可核，只含带内' : ' · 完整卷（环未挤出过）')
+        + (v.lineageResets ? ' · 谱系重启过 ' + v.lineageResets + ' 次（reset 是唯一来源）' : '');
+      auditOut('<div class="wa-item"><b>已导出一卷审计</b>：' + summary
+        + '<div class="wa-dim">' + (v.entries ? '卷已填进下面的粘贴框（' + json.length + ' 字符）——把它带到别处（或下一节会话），再用「带外核对」核。'
+          : '环里此刻一条都没有——导出成功了，但没什么可核的（「空环」与「导不出」是两件事）。')
+        + '注意本模块<b>没有</b>替你写盘：要不要留下这一卷由你决定。</div></div>');
+    });
+    on('#wa-audit-vol-check', () => {
+      if (!WA.auditLog || typeof WA.auditLog.verifyVolWith !== 'function') { auditOut('<div class="wa-dim">审计模块未加载</div>'); return; }
+      const raw = ($('#wa-audit-vol-text') ? ($('#wa-audit-vol-text').value || '') : '').trim();
+      // 没有卷时不假装核对过：「没核」与「核过一致」是两件事（与磁带/流水两口的 no-volume 同口径）。
+      if (!raw) { auditOut('<div class="wa-dim">带外核对：no-volume —— 先把一卷审计粘进上面的框里再核。'
+        + '<br>（本侧不会替你从 localStorage 里找一个卷出来：那样做等于假装有第二份真源，而读回不比对任何东西。）</div>'); return; }
+      let vol = null;
+      try { vol = JSON.parse(raw); } catch (e) { auditOut('<div class="wa-dim">带外核对：bad-volume —— 粘进来的不是合法 JSON（' + esc(String(e && e.message || e)) + '）</div>'); return; }
+      let r = null; try { r = WA.auditLog.verifyVolWith(vol); } catch (e) { auditOut('<div class="wa-dim">带外核对：核对抛错（本口承诺不抛——这是一个缺陷，不是配置问题）</div>'); return; }
+      if (!r) { auditOut('<div class="wa-dim">带外核对：无结论</div>'); return; }
+      // 拒收（格式头/行面）照原码带出，不与「核过了但不一致」混成一句
+      if (r.ok === false && r.reason) {
+        const want = r.want !== undefined ? ('（期望 ' + esc(String(r.want)) + '，实为 ' + esc(String(r.got)) + '）') : '';
+        auditOut('<div class="wa-item"><b>带外核对：卷不合规，未核对</b> ' + esc(String(r.reason)) + want
+          + (r.reason === 'bad-rows' ? '<div class="wa-dim">行面读不了——卷里的条不是对象。连读都读不了的卷不该说成「核对不一致」，两者是两件事。</div>' : '')
+          + '</div>');
+        return;
+      }
+      if (r.outcome === 'empty') { auditOut('<div class="wa-item"><b>带外核对</b>：卷里一条都没有（empty）——「空卷」不等于「核过且一致」，本口不把它算作通过。</div>'); return; }
+      const seqLine = r.seqOk ? '序号链完整（' + r.entries + ' 条逐条 +1，无跳号）'
+        : '<b>序号链断了</b> ' + (r.seqBroken || []).length + ' 处（首处第 ' + ((r.seqBroken || [{}])[0].at | 0) + ' 条：期望 seq=' + ((r.seqBroken || [{}])[0].want) + '，实为 ' + esc(String((r.seqBroken || [{}])[0].got)) + '）'
+          + '——这卷被改过，或由别的东西拼出来';
+      const atLine = r.atOk ? '时间链未倒退（本批 ' + r.entries + ' 条时间戳单调）'
+        : '<b>时间链倒退</b> ' + (r.atRegressions || []).length + ' 处（首处第 ' + ((r.atRegressions || [{}])[0].at | 0) + ' 条）——一定被动过';
+      // 「自称完整却缺头」单独念：它不是「被删过行」的直接证据，但两者在同一句话里说不清时
+      //   读的人会自己编一句（卷首 seq 不从 1 起有两种成因：缺头，或 reset 后的新谱系）。
+      const headLine = r.headless
+        ? '<b>自称完整却缺头</b>：卷首 seq=' + esc(String(vol.rows[0].seq)) + ' 而非 1，但卷自称未截断——成因要么是卷首被删，要么是 reset 后的新谱系（卷内 lineageResets 可分辨）。'
+        : '卷首序号与自称一致。';
+      auditOut('<div class="wa-item"><b>带外核对（零状态触碰：不并入环、不改序号、不写盘）</b>'
+        + '<div class="wa-dim">' + seqLine + '</div>'
+        + '<div class="wa-dim">' + atLine + '</div>'
+        + '<div class="wa-dim">' + headLine + '</div>'
+        + '<div class="wa-dim">核的是<b>卷自身</b>：本侧不回答「它与本机 localStorage 里那份是否一致」——读回不比对任何东西，两者是两条不同的证据。</div>'
+        + '</div>');
+    });
     // v0.1.52: 存储键体检——dry-run 计划 + 确认执行（二次确认制，apply 权在用户）
     const keyChk = $('#wa-key-check');
     if (keyChk) keyChk.onclick = () => {
@@ -4949,7 +5013,35 @@
       const om = ex.omniscient;
       const lines = ['第 ' + om.round + ' 轮（' + _msTs(om.at) + '）：候选 ' + om.candidates + ' / 落地 ' + om.landedCount + ' / 未落地 ' + om.missedCount];
       om.decisions.forEach((d) => { lines.push('  · ' + d.name + '：' + d.state); });
-      if (om.budget) lines.push('预算 ' + om.budget.used + '/' + om.budget.cap + 't' + (om.budget.overBudget ? '（超）' : '') + '｜折叠 ' + om.budget.folded + ' / 丢弃 ' + om.budget.dropped);
+      if (om.budget) {
+        lines.push('预算 ' + om.budget.used + '/' + om.budget.cap + 't' + (om.budget.overBudget ? '（超）' : '') + '｜折叠 ' + om.budget.folded + ' / 丢弃 ' + om.budget.dropped);
+        // v2.122.0 P2：折叠 / 丢弃下到**逐项**——「哪条挤掉了哪条」第一次在解释面上可读。
+        //   计数答「挤掉几条」；明细答「裁决那刻还剩多少余量、预算正被谁占着」。
+        //   只挂全知面（`all` 分支先前已 return）：玩家面不列未落地项的名字，本段一处也不进玩家分支。
+        const occText = function (arr) {
+          if (!arr || !arr.length) return '无占位';
+          const shown = arr.slice(0, 6).map(function (oc) { return oc.source + '(' + oc.tokens + 't)'; }).join('、');
+          return '被占：' + shown + (arr.length > 6 ? '…等 ' + arr.length + ' 项' : '');
+        };
+        (om.budget.foldedDetail || []).forEach(function (fd) {
+          lines.push('  · [折叠] ' + fd.source + '：' + (fd.reason || '') + '（' + fd.from + '→' + fd.to + 't）｜裁决时余量 ' + (fd.remainAt == null ? '?' : fd.remainAt) + 't｜' + occText(fd.blockedBy));
+        });
+        (om.budget.droppedDetail || []).forEach(function (dd) {
+          lines.push('  · [丢弃] ' + dd.source + '：' + (dd.reason || '') + '（' + dd.tokens + 't）｜裁决时余量 ' + (dd.remainAt == null ? '?' : dd.remainAt) + 't｜' + occText(dd.blockedBy));
+        });
+        // v2.122.0 P2：**块级出口**。上面两串按源名挂，而 `decisions` 只覆盖源表内的键——
+        //   「世界状态」这类**块名**（六个快照源合成的一块）挂不上任何一行，于是它被折叠时
+        //   在上面的输出里凭空消失，而它恰恰是 pinned 里最常被折的那一个。
+        //   这里把挂不上源键的记录补报出来，并明说「无对应源键」——不让读的人以为
+        //   「上面没有就是没发生」。
+        (om.budget.unmappedDetail || []).forEach(function (ud) {
+          const head = ud.kind === 'folded' ? '[折叠·块] ' : '[丢弃·块] ';
+          const size = ud.kind === 'folded' ? (ud.from + '→' + ud.to + 't') : (ud.tokens + 't');
+          lines.push('  · ' + head + ud.source + '：' + (ud.reason || '') + '（' + size + '）｜裁决时余量 '
+            + (ud.remainAt == null ? '?' : ud.remainAt) + 't｜' + occText(ud.blockedBy)
+            + '｜该名不在源表内（合成块，无对应源键）');
+        });
+      }
       if (om.cost) lines.push('耗时 ' + om.cost.totalMs + 'ms｜' + om.cost.measured + ' 源可计' + (om.cost.slowest ? '｜最慢 ' + om.cost.slowest.source + ' ' + om.cost.slowest.ms + 'ms' : ''));
       setOut('#wa-inj-out', lines.join('\n'));
     };

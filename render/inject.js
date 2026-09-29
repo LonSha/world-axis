@@ -307,9 +307,10 @@ style: false,
    *   不是隐瞒：拿不到的粒度不假装拿到（诊断面同口径）。
    */
   const SNAP_SOURCES = ['clock', 'pulse', 'background', 'people', 'currents', 'echoes'];
-  function sourceDecisions(vis, landedNames, failNames) {
+  function sourceDecisions(vis, landedNames, failNames, budgetBySource) {
     const landedSet = landedNames || [];
     const fails = failNames || {};
+    const budget = budgetBySource || null;   // v2.122.0 P2：按源归拢的预算去向（null = 本轮未受预算裁决）。
     const stateSnap = landedSet.indexOf('世界状态') >= 0;
     return SOURCES.map(function (k) {
       const name = SRC_NAME[k] || k;
@@ -322,7 +323,7 @@ style: false,
       else if (moduleEnabled(k) === false) st = 'module-off';
       else if (fails[name]) st = 'failed';
       else st = 'no-content';
-      return { key: k, name: name, state: st };
+      return { key: k, name: name, state: st, budgetOutcome: (budget && budget[name]) || null };
     });
   }
   /**
@@ -368,7 +369,31 @@ style: false,
         main: { len: li.len | 0, count: (typeof li.mainCount === 'number') ? li.mainCount : null,
           sources: Array.isArray(li.sources) ? li.sources.slice() : [] },
         budget: b ? { used: b.used, cap: b.cap, overBudget: !!b.overBudget,
-          folded: (b.folded || []).length, dropped: (b.dropped || []).length } : null,
+          folded: (b.folded || []).length, dropped: (b.dropped || []).length,
+          // v2.122.0 P2：折叠 / 丢弃逐项明细（计数答「挤掉几条」，明细答「谁挤的、裁决时还剩多少」）。
+          //   恒等式：remainAt + ΣblockedBy.tokens = cap（pinned 保底可把余量挤成负数，照实）。
+          foldedDetail: (b.folded || []).slice(), droppedDetail: (b.dropped || []).slice(),
+          // v2.122.0 P2 自纠：**块级出口**。`decisions` 的每一行对应 `SOURCES` 里的**一个源键**，
+          //   而注入面里还有不在源表内的**块名**——「世界状态」是六个快照源合成的一块
+          //   （`items.push({ source: '世界状态' })`，见 applyInjections），它恰好是 pinned 里最常被
+          //   折叠的那一个。本版首跑专锁时实测：预算账里躺着 2 条「世界状态」折叠，
+          //   而 `decisions` 上**没有一行**能挂它（块名无对应源键）⇒ 最要紧的那条折叠
+          //   在解释面上凭空消失。修法不是往 `decisions` 里塞行（那会破坏宽度判据），
+          //   而是把**挂不上源键的记录**单列一处如实报出：按源提问的路走不通，就走块级的路。
+          //   纯计算视图（只过滤已落盘的事实），不新增落盘字段、不改任何裁决。
+          unmappedDetail: (function () {
+            const names = {};
+            dec.forEach(function (x) { names[x.name] = true; });
+            const pick = function (arr, kind) {
+              return (arr || []).filter(function (r) { return !names[r.source]; })
+                .map(function (r) {
+                  const o = { kind: kind, source: r.source, reason: r.reason || null, remainAt: r.remainAt, blockedBy: (r.blockedBy || []).slice() };
+                  if (kind === 'folded') { o.from = r.from; o.to = r.to; } else { o.tokens = r.tokens; }
+                  return o;
+                });
+            };
+            return pick(b.folded, 'folded').concat(pick(b.dropped, 'dropped'));
+          })() } : null,
         cost: cst ? { totalMs: cst.totalMs, measured: cst.measured, subTick: cst.subTick, slowest: cst.slowest } : null
       }
     };
@@ -808,7 +833,24 @@ style: false,
       trace.forEach(function (t) { if (traceSummary[t.to] !== undefined) traceSummary[t.to]++; });
       // v2.90.0 O3：本轮源决策台账。口径 = 源表 + 真落地名集合 + 故障台账，三者都是现场已有的事实。
       const landedNames = finalItems.map(function (i) { return (i && i.source) || '未命名'; });
-      const decisions = sourceDecisions(vis, landedNames, engineFailuresView());
+      // v2.122.0 P2（每轮执行解释下到「预算折叠 / 丢弃」层）：把 plan() 的折叠/丢弃记录按**源**归拢。
+      //   去向账（trace）按输入位置记「这一项去哪了」；解释面按源提问（「这个源为什么短了 / 没了」），
+      //   故这里按源归拢：折叠几条、丢弃几条、各是什么原因、裁决时余量多少、被谁占的位。
+      //   remainAt / blockedBy 是裁决**当场**的快照（事后推不出来：重算要重跑 plan），
+      //   由 plan() 在裁决时记录、此处只做归拢与透传，不重算。
+      const budgetBySource = (function () {
+        if (!planInfo || typeof planInfo.inputCount !== 'number' || planInfo.inputCount !== items.length) return null;
+        const out = {};
+        const rec = function (name) { return out[name] || (out[name] = { folded: [], dropped: [] }); };
+        (planInfo.folded || []).forEach(function (f) {
+          rec(f.source).folded.push({ reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() });
+        });
+        (planInfo.dropped || []).forEach(function (x) {
+          rec(x.source).dropped.push({ reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() });
+        });
+        return out;
+      })();
+      const decisions = sourceDecisions(vis, landedNames, engineFailuresView(), budgetBySource);
       try {
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
@@ -830,7 +872,7 @@ style: false,
           const slotSnap = (WA.injectSlotAudit && lastSlots)
             ? WA.injectSlotAudit.snapshotSlots(lastSlots, slotResOut || slotCount)
             : null;
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }
