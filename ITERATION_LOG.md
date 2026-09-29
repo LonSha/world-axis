@@ -6,20 +6,61 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.124.0 |
-| 全量回归 | `node tests/run.js` → **v2.124.0 为通过 12141 / 失败 0 · Status: passed · unchanged: true**（长超时启动器，见 R112）；此前 **v2.121.0 / v2.122.0 / v2.123.0 未跑全量**（用户约束：整条计划做完前不跑），三版验证只走单锁 + 轻量门禁 |
+| 版本 | v2.125.0 |
+| 全量回归 | `node tests/run.js` → **v2.125.0 为通过 12181 / 失败 0 · Status: passed · unchanged: true**（长超时启动器）；v2.124.0 为 12141 / 0；**v2.121.0 / v2.122.0 / v2.123.0 未跑全量**（用户约束：整条计划做完前不跑），三版验证只走单锁 + 轻量门禁 |
 | 产品文件面 | 140（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 128 / members= 871 / chars= 9910 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 141 · 锁 136 · 孤儿 0 · 豁免 0 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 128 / members= 872 / chars= 9926 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 142 · 锁 137 · 孤儿 0 · 豁免 0 |
 | 死子面 | `node tests/dead-export-gate.js` → dead 607 / uiDead 4 / 仅测试 349 / dataOnly 238 |
 | 拒收码 | `node tests/reject-code-gate.js` → 601 码（见证 362 / 死表 8 / 基线 231） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.124.0 · 现场 refs 3204 / 命名空间 139 / 成员 1748 |
-| 版本条目存放 | `node tests/docs-archive-gate.js` → README 91 条 / 日志存档 92 条 / 跨文件同号 **0** |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.124.0 · 现场 refs 3206 / 命名空间 139 / 成员 1749 |
+| 版本条目存放 | `node tests/docs-archive-gate.js` → README 92 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | tools/ | 只留**被可执行代码引用**的 12 个（一次性脚本不入库，见 `.gitignore`） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+
+### R113 · 2026-09-29 · v2.125.0：沙箱能力边界收口（P7）
+- **起点与终点**：起点 v2.124.0（全量回归 12141 / 0）；终点 v2.125.0。本版是 P 线第七项。
+- **治的病**：`core/sandbox.js` 的三条否定式（不提供文件系统/网络/动态加载、不把 WA 整棵树交给脚本、
+  超时只对同步函数生效）自 v2.114.0 起**只写在注释里**。注释不是读数 —— 外部消费者读 `stat()`
+  只看到 runs/denied/timeouts 三格，读不出「这不等于真隔离」；而这类**能力边界**一旦只以注释形式存在，
+  就会随代码演进而**静默失真**（改了一处没改另一处）。
+- **落地**：`sandbox.isolationReport()` —— 三面齐备的如实报告：
+  · `isolated`（真挡住的）**每项都附一个具名探针**：`forbidProbe`（禁名是否真被 defineProperty 成
+    非枚举拒收 getter）、`denyProbe`（真读一次禁名是否真按 `Access denied` 归类）、`freezeProbe`
+    （白名单是否真被 `Object.freeze`）；
+  · `notIsolated`（**明确没做**的）逐条给原因，共四条：异步隔离（`run()` 只等同步返回，返回的 Promise
+    不被等待）、内存隔离（进程内沙箱与宿主共享堆）、超时的强制中止（只记账 + **下一次**入口拒收）、
+    同名拼装串（`FORBIDDEN` 是名字清单不是语法分析 —— `this["requ"+"ire"]` 拿到的仍是拒收 getter，
+    故是「取不到」而不是「拦住了」）；
+  · `probes`（报告自身的证据）—— 报告不是自述，是可复算的（与「判据输入面 = 结论面」同一条纪律）。
+- **真消费方**：`engines/tool-diag.js` 的 `secPlugin` 诊断节真读，并透出 `isolation` 三项
+  （`isolated` / `notIsolated` / `probesOk`）。**面板零渲染** —— 这是机制层收口，不是面板功能，
+  重复展示同一读数只会多一处会漂移的地方。
+- **一条口径（写进专锁 D 面）**：报告内部**有意**真跑一次 `run()`（报告要给出「外部观测到的那个形态」），
+  故 `runs` +1、`denied` +2 是**实情而不是污染**。判据按现场写、不按期许写 —— 若写成「什么都不许动」，
+  它就会因为「实现按设计做了它该做的事」而变红，那是最坏的一种红灯（把人引向改对的东西）。
+  真正钉住的是**不变的边界**：`throws` / `timeouts` 一格不动（报告不得制造新失败类型）。
+- **本版主动裁决**：**只加一个导出成员**（`isolationReport`）。报告形态用数组 + 探针对象，
+  不再往外挂新成员 —— 出口面每加一口都要动冻结串、契约规模常量与死面账本，而收益只是少一层嵌套。
+- **验收**：专锁 `tests/sandbox-isolation-v2125.js` **36/0**（A 结构 / B 运行时交叉验证 / C 消费方 /
+  D 不改行为 / N1–N4 真源码破坏负控制 + 纯度）；全仓负控制锚点审计 `problems 0`（**本版新锁一开始
+  自己踩了 H5**：判据里把锚点串又写了一遍，5 条 `impure` —— 已改为一律引用 `ANCHORS.x.txt`，
+  其中两个锚点串同文时用**缩进形态**区分）；`test-surface-gate` 文件面 142 / 锁 137 / 孤儿 0；
+  `readings` 回填 refs 3204 → 3206 / 成员 1748 → 1749（3/3 站点，`tools/sync-hardcoded.js` 写后校验通过）；
+  出口面契约 `ns= 128 members= 872 chars= 9926`（+1 成员）；死面账本与模块登记账本同批推进到 2.125.0。
+- **全量回归结果（收口收网）**：`node tests/run.js` → **通过 12181 / 失败 0 · Status: passed · unchanged: true**（隔离运行器 `sourceDigest` 前后一致 ⇒ 判据全程没改过被观测源码）。
+  **收网过程本身抓到两条本版新代码的真缺陷**：① 新锁违反了它自己遵守的那条纪律 ——  `tests/sandbox-isolation-v2125.js` 的判据里**把锚点串又写了一遍**（5 条 `impure`），  且 `storeGateImpl` / `busGateImpl` 两个锚点串同文时仅改引仍会各出现 2 次 ⇒ 用**缩进形态**区分；
+  ② D 面判据一开始把「零副作用」写过头（写成 denied 不变），而报告内部**有意**真跑一次 `run()`，  故读数恒红 —— **判据按现场写、不按期许写**：实测 runs +1 / denied +2 后按事实重写。
+  这两条与 R112 的同类缺陷是同一家族：**新加的断言自己会成为下一轮审计的对象**，
+  而全仓锚点审计与逐版全量回归正是那个审计。
+
+- **未覆盖（如实登记，不伪称已完成）**：① 报告描述的是**当前实现的边界**，不做真实隔离验证
+  （真异步 / 内存隔离是计划书 P7 明确判定「不做」的，成本与收益不成比）；② `notIsolated` 是**人工维护的
+  清单**：新增一类未隔离能力时须同步补一条，判据只能钉住「已知的四条在场」，不能自动发现第五条；
+  ③ 探针覆盖的是白名单冻结与拒收路径，不覆盖「宿主 API 本身被替换」这类外部篡改。
 
 ### R112 · 2026-09-29 · v2.124.0：删除出口权限闸门（P5）+ 玩家可见的引擎心跳（P6）
 - **起点与终点**：起点 v2.123.0；终点 v2.124.0。本版是 P 线的第五、六项（`FOUR_VERSION_PLAN.md` 的 P5 / P6），

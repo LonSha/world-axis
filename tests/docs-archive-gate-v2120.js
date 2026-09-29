@@ -132,7 +132,7 @@ function runB(a) {
   //   （v2.121.0 入册时 89→90，本版 v2.124.0 再 +1 ⇒ 91），而 v2.121–2.123 三版都没跑全量
   //   回归 ⇒ 这条红一直没被人看见。判据本身是对的（README 条目数是单一真源的读数），
   //   需要的是**回填**而不是放宽 —— 精确等值继续钉着「条目被误删」这件事。
-  a(r.facts.readmeEntries === 91, 'docs-archive/B: README 版本历史条目 = 91（实 ' + r.facts.readmeEntries + '）');
+  a(r.facts.readmeEntries === 92, 'docs-archive/B: README 版本历史条目 = 92（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

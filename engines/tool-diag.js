@@ -1984,7 +1984,22 @@
         plugins: st.plugins, fires: st.fires, blocked: st.blocked, hookThrow: st.hookThrow,
         lastReason: st.lastReason || '', lastHook: st.lastHook || '', lastPlugin: st.lastPlugin || '',
         sandbox: sb ? { runs: sb.runs, denied: sb.denied, timeouts: sb.timeouts, lastReason: sb.lastReason } : { error: 'sandbox-absent' },
-        note: '只报注册/触发/拦写计数（本节目不 register、不 fire）'
+        // v2.125.0（P7）：把「隔离了什么 / 没隔离什么」一并纳入诊断 —— 此前那三条边界
+        //   只写在 core/sandbox.js 的注释里，诊断只报三个计数，读的人看不出「这不等于真隔离」。
+        //   报告自身带当场探针（probes），故它与事实脱钩时**同一条读数**就现形。
+        //   刻意**只读**这几个字段（不整段透传）：诊断是旁观者，不该让一份会随时间膨胀的
+        //   结构整包进入诊断包体积。
+        isolation: (function () {
+          try {
+            if (!WA.sandbox || typeof WA.sandbox.isolationReport !== 'function') return { error: 'report-absent' };
+            const ir = WA.sandbox.isolationReport();
+            const pr = ir.probes || {};
+            return { isolated: ir.isolated.length, notIsolated: ir.notIsolated.length,
+              probesOk: !!(pr.forbidProbe && pr.forbidProbe.blocked && pr.freezeProbe && pr.freezeProbe.frozen
+                && pr.denyProbe && pr.denyProbe.reached) };
+          } catch (e) { return { error: String((e && e.message) || e).slice(0, 80) }; }
+        })(),
+        note: '只报注册/触发/拦写计数（本节目不 register、不 fire）；isolation 三项是只读读数'
       };
     }, {});
   }

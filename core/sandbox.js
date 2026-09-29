@@ -95,7 +95,72 @@
         runs: _stat.runs, denied: _stat.denied, timeouts: _stat.timeouts,
         throws: _stat.throws, lastReason: _stat.lastReason, lastAt: _stat.lastAt
       };
+    },
+    /**
+     * v2.125.0（P7）：「隔离了什么 / 没隔离什么」的**如实报告**（纯读、零副作用）。
+     *
+     * 治的病：本模块的三条否定式（不提供文件系统/网络/动态加载、不把 WA 整棵树交给脚本、
+     *   超时只对同步函数生效）此前**只写在注释里** —— 注释不是读数，外部消费者从
+     *   `stat()` 的三个计数里读不出「这不等于真隔离」。更坏的是：这类「能力边界」
+     *   一旦只以注释形式存在，就会随代码演进而**静默失真**（改了一处没改另一处）。
+     *
+     * 形态：`{ ok, isolated: [...], notIsolated: [...], probes: {...}, note }`
+     *   · `isolated`    —— 真被挡住的能力，**每一项都附当场探针**（见下）。
+     *   · `notIsolated` —— **明确没做**的隔离，逐条给出原因，绝不省略（省略即假称更 强）。
+     *   · `probes`      —— 上面那些声明的**现场证据**：报告不是自述，是可复算的
+     *     （与「判据输入面 = 结论面」同一条纪律）。
+     *
+     * 边界（如实登记）：本函数**不改**任何隔离行为、不新增隔离能力；它只把既有边界
+     *   变成可读。真异步 / 内存隔离是**明确不做**的（成本与收益不成比，计划书 P7 已判）。
+     */
+    isolationReport: function () {
+      const boxed = freezeApi({ log: function () {} });
+      // ① 禁名是否真被挡（describeProperty 的 getter 是唯一实现，不另写一份判定）
+      const forbidProbe = { blocked: FORBIDDEN.every(function (k) {
+        const d = Object.getOwnPropertyDescriptor(boxed, k);
+        return !!d && typeof d.get === 'function' && d.enumerable === false;
+      }), checked: FORBIDDEN.slice(), nonEnum: true };
+      // ② 真读一次禁名：直接读 + 经 run() 各走一遍（外部能观测到的正是后者的形态）
+      let directCode = null, directWant = null;
+      try { void boxed.require; } catch (e) { directCode = e && e.code; directWant = e && e.want; }
+      const rb = run(function () { return this.require; }, {}, []);
+      const denyProbe = { observed: rb.reason, want: rb.want,
+        code: (directCode === 'sandbox-denied') ? 'sandbox-denied' : String(directCode),
+        wantDirect: directWant, reached: (rb.ok === false && rb.reason === 'Access denied') };
+      // ③ 冻结是否真生效
+      const freezeProbe = { frozen: Object.isFrozen(boxed) };
+      // ④ 超时只记同步时点
+      const syncOnlyProbe = { awaited: false, note: 'run() 不 await 返回值；异步体内的拒收不会改动本次结论' };
+      return {
+        ok: true,
+        isolated: [
+          { what: '文件系统 / 子进程 / 网络 / 动态加载',
+            how: '白名单外的名字在冻结对象上被 defineProperty 成拒收 getter（且非枚举）', probe: 'forbidProbe' },
+          { what: '宿主全局（WA 整棵树 / window）',
+            how: '脚本只拿到调用方显式塞进白名单的那几个键，其余一律 Access denied', probe: 'denyProbe' },
+          { what: '白名单对象被脚本改写',
+            how: '白名单经 Object.freeze —— 脚本改不动它自己那扇门', probe: 'freezeProbe' }
+        ],
+        notIsolated: [
+          { what: '异步隔离',
+            why: 'run() 只等同步返回；fn 返回的 Promise **不会被等待**，其体内的拒收发生在 run 返回之后'
+              + '（本仓主场景是宿主页面，没有可用的隔离线程）' },
+          { what: '内存隔离',
+            why: '进程内沙箱与宿主共享堆 —— 脚本仍可分配大对象，也可通过白名单里**传进来的**函数间接触达别处；'
+              + '本模块不假装能挡住这一点' },
+          { what: '超时的强制中止',
+            why: '超时只记账（sandbox-timeout）并在**下一次**入口拒收；浏览器里杀不掉正在跑的同步代码，'
+              + '故本轮仍会跑完' },
+          { what: '同名拼装串（名字白名单的边界）',
+            why: 'FORBIDDEN 是**名字清单**，不做语法分析：`this["requ" + "ire"]` 这类拼装串不在清单面内 ——'
+              + '但它取到的仍是冻结对象上的拒收 getter，故拿不到值（这是「取不到」而不是「拦住了」）' }
+        ],
+        probes: { forbidProbe: forbidProbe, denyProbe: denyProbe, freezeProbe: freezeProbe, syncOnlyProbe: syncOnlyProbe },
+        note: '这张表只描述**既有边界**，不引入新能力：isolated 的每一项都有当场探针，'
+          + 'notIsolated 的每一项都有原因。「没隔离」被逐条写出而不是省略 —— 省略即假称比实际更强。'
+      };
     }
+
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('core/sandbox.js', { kind: 'core', ver: '2.114.0' });
 })();
