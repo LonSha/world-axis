@@ -23,6 +23,14 @@
  *   · `permissions` 回答「**允许吗**」（判定面）；本模块回答「**发生了什么**」（事实面）。
  *     两者唯一的接触点是 `record()` 的 `user` 解析：能解析就写用户名，解析不到写 `null`。
  *   · `undo` 是**可逆**的操作栈（面向用户编辑）；本模块是**只增不减**的事实环（面向排查）。
+ *
+ * ── v2.121.0 P1：取证三件套的第三件（跨会话可查）──────────
+ *   本仓已有两件同形的「显式导出 + 带外核对」通道：磁带（`core/rand.js` 的
+ *   `tapeVol` / `verifyTapeWith`）与流水（`engines/org.js` 的 `exportJournal` /
+ *   `reconcileWith`）。审计事实环是唯一缺这一件的一处 —— 它只有 `flush`（把痕迹留在
+ *   本机 localStorage）与 `restore`（读回来、且明确不并进环）。本版补上 `exportVol` /
+ *   `verifyVolWith`，口径与另两件逐字同规格（不自动落盘 / 导出不改本侧 / 序号真源照搬）。
+ *   两处**刻意分开**：`restore` 答「本机存过什么」，`verifyVolWith` 答「手里这卷自洽吗」。
  */
 (function () {
   'use strict';
@@ -298,10 +306,143 @@
     }
   }
 
+  /* ── v2.121.0 P1：审计卷——取证三件套的第三件（跨会话可查）──────────────
+   *   磁带（core/rand.js v2.98.0 的 tapeVol / verifyTapeWith）与流水（engines/org.js
+   *   v2.94.0 的 exportJournal / reconcileWith）各自已有「显式导出 + 带外核对」这一对通道；
+   *   审计事实环一直缺这一件 —— 它只有 flush / restore：flush 是**断点续写**（把痕迹留在
+   *   本机 localStorage），restore 明确「不并进内存环」。于是「把一段审计带出去、在别处核
+   *   一遍」在这条线上无处可说：本机磁盘上那一份能读回来，但它**不能核**（读回不比对任何
+   *   东西）。本段补的正是这个缺口。
+   *
+   *   三条口径与另两件**逐字同规格**：
+   *     ① **不自动落盘**：本模块不替调用方写盘。卷由调用方拿走 ——「要不要留下这一卷」是人的决定。
+   *     ② 导出**不改本侧**：不挤出、不清环、不改 `_seq`、不改 stat 任何一格（取证动作不得
+   *        改变被取证对象 —— 这一条在本仓库从不打折）。
+   *     ③ **序号真源照搬**：每条的 `seq` 是 `record()` 时现算的，导出与带外核对**都不重算**。
+   *        重算会把被手改的卷洗白成「自洽」，于是「这卷有没有被动过」永远说不出口。
+   *
+   *   【边界照实说（本版刻意不假装更强）】
+   *     · 本侧环是**环形**（CAP=256，挤出即丢）⇒ 挤出过就说明卷首无上游可核，此时
+   *       `truncated=true` 如实带出，不假装完整。
+   *     · `reset()` 会重启序号谱系 ⇒ 卷内 `seq` 可能不从 1 起。这不是缺陷，是事实；
+   *       故 `truncated=false` 而首条 `seq !== 1` 时另报 `headless=true`（自称完整却缺头，
+   *       这两件事**必须分开说**，合成一句就是失实）。
+   *     · 本口**不回答**「这卷与本机 localStorage 里那份是否一致」：那是 `restore()` 的
+   *       读回面，且读回不比对。带外核对的比对对象只有卷**自己**。
+   *
+   *   【与 flush / restore 的分工】flush 是「把痕迹留在本机」的自动通道；本口是「把一段
+   *     事实带出会话」的显式通道。载体不同（一个 localStorage、一个调用方手里），互不替代：
+   *     核对一份卷**不读** localStorage，也不写它。
+   */
+  const VOL_FORMAT = 'worldaxis.audit.vol';
+  const VOL_FORMAT_VERSION = 1;
+  /** 导出一卷审计事实（**纯读**）。空环与无环是两件事：空环导出成功但 rows=0。 */
+  function exportVol() {
+    try {
+      return {
+        ok: true, format: VOL_FORMAT, formatVersion: VOL_FORMAT_VERSION,
+        cap: CAP, entries: _ring.length,
+        recorded: _stat.records, dropped: _stat.dropped,
+        // 环是环形的：挤出过就说明卷首无上游可核 —— 照实带出，不假装完整。
+        truncated: _stat.dropped > 0,
+        // 谱系重启过几次（`reset()` 是唯一来源）：读的人据此判断「seq 不从 1 起」是
+        //   缺头还是新谱系。这一位是事实，不是占位。
+        lineageResets: _stat.lineageResets,
+        savedAt: clockWall(),
+        // 序号真源照搬：**不重算**（见口径③）。字段顺序即 FIELDS 的顺序。
+        rows: _ring.map(function (r) {
+          return { seq: r.seq, at: r.at, user: r.user, action: r.action, surface: r.surface,
+            params: r.params, paramsTruncated: r.paramsTruncated, result: r.result, ip: r.ip };
+        })
+      };
+    } catch (e) { return { ok: false, reason: 'export-throw' }; }
+  }
+  /** 校验一卷外来审计（**不导入、不写环**）—— 读的人先知道这卷能不能用。 */
+  function inspectVol(vol) {
+    if (!vol || typeof vol !== 'object') return { ok: false, reason: 'bad-volume' };
+    if (vol.format !== VOL_FORMAT) return { ok: false, reason: 'bad-format', want: VOL_FORMAT, got: vol.format };
+    if (vol.formatVersion !== VOL_FORMAT_VERSION) return { ok: false, reason: 'bad-version', want: VOL_FORMAT_VERSION, got: vol.formatVersion };
+    if (!Array.isArray(vol.rows)) return { ok: false, reason: 'bad-rows' };
+    return { ok: true, format: VOL_FORMAT, formatVersion: VOL_FORMAT_VERSION,
+      entries: vol.rows.length, truncated: !!vol.truncated, savedAt: vol.savedAt || 0 };
+  }
+  /**
+   * 带外核对一卷外来审计（**零状态触碰**：不并入环、不改 `_seq`、不改 stat、不写盘）。
+   *   「带外」= 卷出自别的会话（或别处），本侧没有第二份真源能与它对应；核对只能靠卷
+   *   **自带**的两条线索：序号链（`seq`）与时间链（`at`）。
+   *
+   *   三态照实分列，**绝不合并**成一句「通过 / 失败」：
+   *     · `seqOk`     —— 序号逐条 +1（`record()` 里 `++_seq` 是唯一来源）。断了就是被手改过
+   *                      或由别的东西拼出来；它与时间链对不对无关，故独立返回。
+   *     · `atOk`      —— 时间戳非倒退（`clockWall()` 单调推进的推论）。**注意**：它只在
+   *                      序号链也完整时才有意义 —— 一条被抽掉中间行的卷，剩下的 `at` 照样
+   *                      递增。故 `atOk=false` 一定意味着「被动过」，而 `atOk=true` 只说明
+   *                      「这一批的时间没倒退」，不说明「没被删过行」。
+   *     · `outcome`   —— `empty`（卷里一条都没有）/ `self-consistent`（两链都过）/
+   *                      `broken`（至少一链断）；行不是对象时另以 `reason='bad-rows'` 如实拒收。
+   *     · `headless`  —— `truncated=false` 而首条 `seq !== 1`：自称完整却缺头。**这与
+   *                      「被删过行」是同一类证据的两个侧面**，但只在卷自称完整时才成立。
+   *   拒绝与缺项都**不抛**：核对口自己炸掉比没有核对口更坏（对齐磁带/流水两口的既有口径）。
+   */
+  function verifyVolWith(vol) {
+    const ins = inspectVol(vol);
+    if (!ins.ok) return ins;
+    const rows = vol.rows;
+    // 行面：非对象行当场归因（不静默跳过 —— 跳过等于把它们算进「核过了」）
+    const badRows = rows.filter(function (r) { return !r || typeof r !== 'object'; }).length;
+    if (badRows) return { ok: false, reason: 'bad-rows', badRows: badRows, entries: rows.length };
+    if (!rows.length) {
+      return { ok: true, outcome: 'empty', entries: 0, compared: 0, seqOk: true, atOk: true,
+        seqBroken: [], atRegressions: [], headless: false,
+        truncated: !!vol.truncated, savedAt: vol.savedAt || 0 };
+    }
+    // ① 序号链：`seq` 由 record() 现算，**不重算**。逐条 +1；首条从哪儿起不判（见 headless）。
+    const seqBroken = [];
+    for (let i = 1; i < rows.length; i++) {
+      const prev = Number(rows[i - 1].seq), cur = Number(rows[i].seq);
+      if (!isFinite(cur) || Math.floor(cur) !== cur || cur !== prev + 1) {
+        seqBroken.push({ at: i, got: (rows[i].seq === undefined ? null : rows[i].seq), want: (isFinite(prev) ? prev + 1 : null) });
+        if (seqBroken.length >= 5) break;
+      }
+    }
+    // ② 时间链：非倒退（只在序号链也过时才有判别力 —— 见上面口径）
+    const atRegressions = [];
+    for (let i = 1; i < rows.length; i++) {
+      const prev = Number(rows[i - 1].at), cur = Number(rows[i].at);
+      if (isFinite(prev) && isFinite(cur) && cur < prev) {
+        atRegressions.push({ at: i, got: rows[i].at, prevAt: rows[i - 1].at });
+        if (atRegressions.length >= 5) break;
+      }
+    }
+    const seqOk = seqBroken.length === 0, atOk = atRegressions.length === 0;
+    // ③ 自称完整却缺头：truncated=false 且首条 seq !== 1（`reset()` 后的新谱系也落在这里，
+    //    故这一位只报「与自称不符」，不替读的人断定成因 —— 成因由 lineageResets 说）
+    const headless = !vol.truncated && Number(rows[0].seq) !== 1;
+    const ok = seqOk && atOk;
+    return {
+      ok: ok, outcome: ok ? 'self-consistent' : 'broken',
+      entries: rows.length, compared: rows.length,
+      seqOk: seqOk, atOk: atOk,
+      seqBroken: seqBroken, atRegressions: atRegressions,
+      headless: headless,
+      truncated: !!vol.truncated, savedAt: vol.savedAt || 0,
+      // 卷自带的两条读数照实带出（不替读的人重算，也不吞掉）
+      cap: (typeof vol.cap === 'number' ? vol.cap : null),
+      recorded: (typeof vol.recorded === 'number' ? vol.recorded : null),
+      dropped: (typeof vol.dropped === 'number' ? vol.dropped : null)
+    };
+  }
+
   WA.auditLog = {
     record: record, recent: recent, byAction: byAction, count: count,
     stat: stat, reset: reset,
     flush: flush, restore: restore,
+    // v2.121.0 P1：审计卷（跨会话可查）。两个口各有真消费方，**与磁带/流水同形**：
+    //   · exportVol     —— 纯读导出一卷（消费方：面板「导出审计」按钮 + 诊断 secAudit）
+    //   · verifyVolWith —— 带外核对（消费方：面板「带外核对」按钮）
+    // 口径**刻意**与 restore 分开（两个问题，两个口，缺一留缝）：
+    //   restore 答「本机存过什么」，verifyVolWith 答「手里这卷自身自洽吗」。
+    exportVol: exportVol, verifyVolWith: verifyVolWith,
     CAP: CAP, PARAM_CAP: PARAM_CAP, PERSIST_KEY: PERSIST_KEY, PERSIST_CAP: PERSIST_CAP,
     FIELDS: FIELDS.slice(), FORBIDDEN: FORBIDDEN.slice()
   };

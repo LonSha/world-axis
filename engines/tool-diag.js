@@ -397,6 +397,30 @@
     });
   }
 
+  // v2.121.0 P1：审计事实面（取证三件套的第三件）。诊断侧只读，且**只调纯读口**：
+  //   · exportVol() —— 纯读导出当前环（不挤出、不清环、不改计数）。诊断侧拿它当「此刻环里
+  //     有什么」的直接读数，与上面直读 tape / verifyTape 同规格（自己去看，不转发摘要）。
+  //   · 为什么不在这里调 verifyVolWith —— 核对的对象是**外来卷**，而诊断现场没有外来卷；
+  //     本机那一份在 localStorage（走 restore 读回），且 restore 明确「不并进环」。把自己
+  //     刚导出的卷再核一遍只会答「自洽」——那是废话，不是证据（同 v2.98.0 对磁带两口的判断）。
+  function secAudit() {
+    return safe(function () {
+      if (!WA.auditLog || typeof WA.auditLog.stat !== 'function') return { error: 'auditLog 模块不可用' };
+      const st = WA.auditLog.stat();
+      const vol = (typeof WA.auditLog.exportVol === 'function') ? WA.auditLog.exportVol() : null;
+      return {
+        records: st.records, inRing: st.inRing, cap: st.cap,
+        dropped: st.dropped, unknowns: st.unknowns, badAction: st.badAction, truncated: st.truncated,
+        // 落盘面（v2.112.0）：flush / restore 的读数——「本机存过什么」那一路
+        flushes: st.flushes, persisted: st.persisted, flushFailed: st.flushFailed,
+        restored: st.restored, restoreFailed: st.restoreFailed, lost: st.lost, lineageResets: st.lineageResets,
+        // v2.121.0：卷面读数（照实带出；导不出就 null，不编一个空卷出来）
+        vol: (vol && vol.ok) ? { format: vol.format, formatVersion: vol.formatVersion,
+          entries: vol.entries, truncated: vol.truncated, lineageResets: vol.lineageResets } : null
+      };
+    });
+  }
+
   /**
    * v2.63.0：世界织体采集节。
    *   报出的重点不是「登记了几个地点」，而是**时空面拒了什么**（按原因分列）：
@@ -1384,7 +1408,12 @@
       //   这类断裂只有在守卫登记过的控件上才会被发现。
       'wa-perf-view', 'wa-perf-bench', 'wa-perf-partial',
       // v2.34.0: 记忆采样预览三件
-      'wa-samp-preview', 'wa-samp-copy', 'wa-samp-out'],
+      'wa-samp-preview', 'wa-samp-copy', 'wa-samp-out',
+      // v2.121.0（P1）：审计卷两枚按钮 + 一枚粘贴框 + 一个输出区（渲染在工具页审计取证段）。
+      //   同 v2.98.0 P2 的理由——exportVol / verifyVolWith 是本版新增的两个导出，它们
+      //   **必须有真消费方**（无消费方不挂），UI_BINDINGS 就是那两个消费方的接线真源。
+      //   不登记时，下面这条门禁会如实报「未覆盖」——本版实测正是被它抓出来的。
+      'wa-audit-vol', 'wa-audit-vol-check', 'wa-audit-vol-text', 'wa-audit-vol-out'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
       dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue',
       // v2.83.0（B6）：配置包面板里的动态控件（点开才渲染）。
@@ -2009,6 +2038,9 @@
       collab: secCollab(),
       plugin: secPlugin(),
       compat: secCompat(),
+      // v2.121.0 P1：审计事实面（取证三件套的第三件）。与 causal 节并列——
+      //   那一节报「世界被推进得怎么样」，这一节报「世界被谁改过」。两节都不写世界。
+      audit: secAudit(),
       // v2.50.0（第三十五面）：宿主两侧 + 时间轴三节
       hostWb: secHostWb(), floorChanges: secFloorChanges(), ledgerTimeline: secLedgerTimeline(),
       // v2.80.0（第十四面）：故障台账总目（凡以 stat().faults 记账的模块必须出现在这里）

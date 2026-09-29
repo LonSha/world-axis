@@ -11,7 +11,11 @@ const vm = require("vm");
 const synthHost = require("./synth-host.js");
 const BASE = path.join(__dirname, "..");
 const REL = "core/audit-log.js";
-const KEYS = ["record", "recent", "byAction", "count", "stat", "reset", "CAP", "PARAM_CAP", "FIELDS", "FORBIDDEN"];
+const KEYS = ["record", "recent", "byAction", "count", "stat", "reset", "CAP", "PARAM_CAP", "FIELDS", "FORBIDDEN",
+  // v2.121.0 P1：审计卷两口。本锁是 v2.111.0 的**历史快照**，只钉「本版当时那十口仍在位」；
+  //   新增口由 v2.112.0 锁（及后续锁）负责钉。此处不加新口 —— 旧锁钉旧面，
+  //   把新口塞进旧锁会让「这份快照说明的是哪一版」变成假话。
+];
 const MUST_BE_ABSENT = ["remove", "clear", "delete", "splice", "drop", "purge"];
 const FIELDS = ["seq", "at", "user", "action", "surface", "params", "paramsTruncated", "result", "ip"];
 function srcOf() { return fs.readFileSync(path.join(BASE, REL), "utf8"); }

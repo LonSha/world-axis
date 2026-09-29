@@ -25,6 +25,9 @@ const BASE = path.join(__dirname, '..');
 const REL = 'core/audit-log.js';
 // 导出面（v2.111.0 十口 + v2.112.0 两口）。**多一个口就要在这里多一行**（A 段会报红）。
 const KEYS = ['record', 'recent', 'byAction', 'count', 'stat', 'reset', 'flush', 'restore',
+  // v2.121.0 P1：审计卷两口（同 v2.98.0 磁带卷的 exportVol / verifyVolWith 规格）。
+  //   多一个口就要在这里多一行（A 段会报红）——这是有意的：接口面变动必须有人确认过。
+  'exportVol', 'verifyVolWith',
   'CAP', 'PARAM_CAP', 'PERSIST_KEY', 'PERSIST_CAP', 'FIELDS', 'FORBIDDEN'];
 // 只能追加：这些名字在导出面上必须**不存在**（v2.111.0 的否定面，本版重钉一遍 ——
 //   新增两个口不许顺手破坏它）。
