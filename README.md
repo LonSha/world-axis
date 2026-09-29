@@ -67,11 +67,32 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
+## 构建与验收（当前版本 v2.119.0）
+
+```bash
+node tests/run.js               # 全量回归入口 → 通过 11822 / 失败 0 · Status: passed
+node tests/inventory.js         # 出口面清册 → 四类悬空均 0（产品文件 140 个）
+node tests/export-contract.js   # 出口面契约 → ns / members / chars（产物在 .gitignore 内）
+```
+
+零依赖：只用 Node 内置模块，无 `package.json`、无 `node_modules`。
+每次收口走同一套门禁：出口面契约（逐字冻结）· 死子面账本 · 模块注册与依赖图 ·
+拒收码归属 · 测试面可达性 · 读数一致性（`readings`）· 负控制锚点审计 · 生成物一致性。
+
+### tools/ 的取舍
+
+**只有被可执行代码引用的工具才入库**（12 个：`gen-error-codes` / `gen-lock` / `scan_drift` /
+`sync-hardcoded` / `doc-gate` / `coverage-report` / `impact-analysis` / `patch-idempotency` /
+`hooks` / `gen-changelog` / `diag_inject_v2860` / `patch_o17_v2104`）。其余一次性脚本与补丁
+（`patch_*` / `bump_*` / `seal_check_*` / `doc_*` / `wire_*`）不入库：它们是收官动作，不是交付物。
+历史归档可随时从 git 历史取回，`.gitignore` 已按此口径落规则。
+
 ## 十四页面板
 概览 / 世界 / 人物 / 记忆（四层回顾·事实·伏笔生命周期·溯源）/ 仇敌（总览·状态推进·天下大势·黑盒）/ 平行世界（主线之外独立推演·NPC 档案·认知边界·事件影响分级）/ 注入（健康度·预算折叠·槽位）/ 事件（势力·声誉·经济·风声·远方泳道·推演叙事）/ 导演 / 设置 / 连接 / 助手 / 工具 / 日志
 
 ---
 License: 各源项目机制参考已获原作者授权（非商业缝合）。
+
 <b>v2.116.0</b> — <b>事件调度恢复协议（计划一 A2 第二段：任务预算 / 所有权 / 租约 / 回执去重）</b>。规划 01 的 A2 原文六句话逐句落成可证伪的字段与判据；四处缺口全由「<b>认领了、然后没人回报</b>」这一句话派生；<b>产品侧零新增导出成员</b>（出口面 <code>ns= 116 members= 731 chars= 8667</code> <b>逐字未变</b>）。
   <b>四处缺口</b>：① <b>认领无预算</b>——旧 <code>claim()</code> 一次把全部到点事件认领光（真实酒馆里那是几十个引擎同时开工），新增 <code>maxClaims</code>（bounds <code>[1,24]</code>，默认 24），超额者进 <code>deferred</code> 带 <code>reason:'budget'</code> <b>显式留痕而非静默跳过</b>；② <b>认领无所有权</b>——新增 <code>x.owner</code>；③ <b>认领无租约</b>——新增 <code>leaseMs</code>（bounds <code>[0,3600000]</code>，默认 <b>0 = 不生效、行为与 v2.115.0 逐字一致</b>），<code>claim()</code> 在<b>同一事务内先回收</b>租约到期行，<code>ready()</code> 亦把到期行视为候选；④ <b>回执无稳定操作 ID</b>——认领时钉 <code>opId = id@scheduledAt#claims</code>（<b>每次重钉、序号自增</b>），<code>complete()</code> 以「<code>events.res</code> 台账里有同一 <code>opId</code>」为去重判据（新码 <code>duplicate-receipt</code>）。
   <b>四处「实测推翻纸面」的现场裁决（本版最有价值的部分）</b>：① <code>already-receipted</code> 守卫<b>撤除</b>——它不可达，且唯一可达的场合会把<b>合法的取消</b>挡回去 ⇒ <b>周期事件从此不可取消</b>；② <code>opId</code> <b>必须按次重钉</b>——沿用旧键会让 <code>repeat</code> 第二次到点被自己的台账判成重复 ⇒ <b>周期事件只能执行一次</b>；③ <b>终态必须清空 <code>opId</code></b>——台账被挤出后，跑满的周期事件会从 <code>exhausted</code> 被重新认领，<b>终态可回卷</b>；④ <b>回执键优先级「调用方优先」</b>——行上优先时迟到回执会把新尝试自己的回执挡死，<b>救回来的活反被旧回执挡死</b>。
@@ -354,6 +375,7 @@ License: 各源项目机制参考已获原作者授权（非商业缝合）。
   <b>本版实测到的一起事故（最该记住的一件）</b>：收口期把一次正在跑的回归 <code>kill</code> 掉，它恰在「注入 <code>engines/bridge.js</code> 探针 → 跑断言 → 还原」窗口内，<code>finally</code> 未执行，<code>function __ncProbeBridgeSnapshot()</code> 留在了产品文件末尾（md5 <code>035edca1</code> → <code>86eecccc</code>），随即让三条全量断言同时红灯（<code>refs</code> 2185→2186、<code>bridge.snapshot</code> 离开死子面、冻结断言失败）。<b>v2.80.0 面 C 的 <code>tests/injection-restore-lock-v2800.js</code> 当场抓到了它</b>（A2 与外部基线逐字节一致 / A4 产品面无探针残留 / D3 双向），而旧设计（基线取「读取当下」）永远抓不到——残留会被吸收进基线。这条纪律由此获得实测验证。<b>教训：不得终止正在跑注入窗口的回归；改产品面后必须核 <code>git diff</code> 是否只含预期改动。</b>
   <b>门禁</b>：<code>node tests/run.js</code> → <b>通过 7124 / 失败 0</b>（v2.80.0 基线 <b>7011/9 = 7020</b>；净增 104，主要为新专锁 99 项）；<code>tests/settle-v2810.js</code> → <b>99 / 0</b>；<code>tests/reject-code-gate.js</code> → <b>产品文件 108 个 / 内联拒收码 270 个（见证 58 / 死表 1 / 基线 211）</b>；<code>tests/reject-lock-v2780.js</code> → <b>50 / 0</b>；<code>tests/test-surface-gate.js</code> → <b>测试文件面 54 · 锁 51 · 可达 54 · 孤儿 0</b>；<code>tests/field-liveness-gate.js</code> → <b>骨架一级键 51 个 · 产品文件 108 个 · 无越界</b>；<code>tests/dead-export-gate.js</code> → <b>dead 425 · uiDead 4 · dataOnly 157 · 归因 test-only 273 · 证据 429 条 · version=2.81.0</b>。
   <b>与 v2.80.0 的关系</b>：v2.80.0 让「已记下的失败能被读到」（读侧），本版把「排期」从调用方自觉变成状态机判据（新增能力面）——两者共同点是同一条纪律：<b>把「两态不可分」的地方拆成独立成词的事实</b>。
+
 ## 版本历史
 <b>v2.80.0</b> — <b>诊断与可观测性（第十四面：故障被记录了 ≠ 故障可被看见）</b>。三把专锁，各两向自证（真源码破坏 ⇒ 判据现形 / 原版上判据不假）。本版不新增机制，只把「已经记下来的失败」接到能被读到的地方。
   <b>面 A · 读侧空洞（本版核心）</b>：<code>ok:false</code> 出口全仓 <b>782 处</b>，其中 <b>761 处带 <code>reason</code></b>；<code>noteFault(...)</code> 调用点 <b>206 处</b>；维护 <code>stat.faults</code> 台账容器的模块 <b>27 个</b>——拒收确实被记下来了。但<b>读侧消费点只有 3 个</b>（<code>engines/tool-diag.js</code> 的 <code>secWorld</code> / <code>secShadow</code> / <code>secThreads</code>）：其余 <b>24 个模块</b>的拒收，在面板与诊断上与「什么也没发生」<b>在读数上不可分</b>。危害不是「少一个数字」：冷却中的、被守卫拦下的、参数不合格的调用全部消失，使用者拿到的世界一片祥和。修法：新增 <code>secFaultLedger()</code> 采集节——一张<b>会自己长大的总目</b>，凡以 <code>stat().faults</code> 记账的模块都自动出现（实测 <code>owners=27</code>）。为什么不逐模块单列采集节：那样在结构上兜不住这条——漏一个模块，它的采集节与它一起缺席，面板照绿。实现纪律：只读观测、模块缺席 / <code>stat</code> 抛错 / 无 <code>faults</code> 一律跳过、读数一律快照拷贝、空台账不进总目、只报不判（不新增 error 级判语）。
