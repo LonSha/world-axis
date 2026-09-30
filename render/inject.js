@@ -69,6 +69,10 @@
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
     //   （v2.38.0 的 echoes 原样复刻）。键名 = 命名空间名（rhythmLoop / beatMask 是驼峰）。
     'userlock', 'rhythmLoop', 'motif', 'beatMask', 'powerAnchor',
+    // v2.130.0（拓展计划 A4 / C2）：两条新注入源。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。键名 = 命名空间名。
+    'reasoning', 'storyTone',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
@@ -93,7 +97,10 @@ style: false,
         chrono: true,
         // v2.129.0：五条叙事纪律源。取默认 true（同四条理由——其模块总开关默认为关），
         //   不给老用户凭空多出约束。
-        userlock: true, rhythmLoop: true, motif: true, beatMask: true, powerAnchor: true }, module: 'render' };
+        userlock: true, rhythmLoop: true, motif: true, beatMask: true, powerAnchor: true,
+        // v2.130.0：两条新源。取默认 true（同四条理由——其模块总开关默认为关），
+        //   不给老用户凭空多出约束。
+        reasoning: true, storyTone: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -250,6 +257,10 @@ style: false,
     //   SOURCES（键）/ 注入分支 source 名 / 本表。三者名字逐字同名——同一源两套名字的代价已由
     //   v2.88.0 O1 付过一次。
     userlock: '用户锁定', rhythmLoop: '节奏环', motif: '文体档案', beatMask: '信息迷雾', powerAnchor: '战力锚',
+    // v2.130.0（拓展计划 A4 / C2）：两条新注入源的显示名。缺此项 ⇒ 失败台账（SRC_NAME）
+    //   会报英文键名，而 switch-matrix-v2910 的 C2 与 explain-v2900 的 A4/C1 要求源表三项
+    //   同批：SOURCES（键）/ 注入分支 source 名 / 本表。三者名字逐字同名。
+    reasoning: '思考开销', storyTone: '剧情倾向',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
@@ -296,7 +307,12 @@ style: false,
     //   于是对账面上本源一律落在 `unavailable`（「没有模块级总开关」——而它明明有），
     //   用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
     //   同一类漏登记 v2.99.0 已为 rumor/canon 各付过一次学费。
-    chrono: 'worldaxis_chrono_settings_v1' };
+    chrono: 'worldaxis_chrono_settings_v1',
+    // v2.130.0（拓展计划 A4 / C2）：两条新源**确有**模块级总开关
+    //   （worldaxis_reasoning_settings_v1 / worldaxis_storytone_settings_v1）。
+    //   不登记会怎样：moduleEnabled 查不到键就返回 null，于是对账面上本源一律落在
+    //   unavailable（「没有模块级总开关」——而它明明有），排查方向被指错。
+    reasoning: 'worldaxis_reasoning_settings_v1', storyTone: 'worldaxis_storytone_settings_v1' };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -829,6 +845,12 @@ style: false,
       if (vis.beatMask && WA.beatMask) { const bm = engineCall('beatMask', function () { return WA.beatMask.buildBlock(); }); if (bm) items.push({ source: '信息迷雾', content: bm }); }
       // v2.129.0（缝 A8）：战力锚。报已定级的区间，明写「不得机械膨胀」。
       if (vis.powerAnchor && WA.powerAnchor) { const pa = engineCall('powerAnchor', function () { return WA.powerAnchor.buildBlock(); }); if (pa) items.push({ source: '战力锚', content: pa }); }
+      // v2.130.0（拓展计划 A4）：思考开销。只报「思考该多克制 + 正文不得为空」——
+      //   它是**产出保底**而非情报：告诉模型写了多少思考就欠了多少正文。
+      if (vis.reasoning && WA.reasoning) { const rz = engineCall('reasoning', function () { return WA.reasoning.buildBlock(); }); if (rz) items.push({ source: '思考开销', content: rz }); }
+      // v2.130.0（拓展计划 C2）：剧情倾向。只报用户设过的档位及其含义（没设的不占位）——
+      //   倾向是**方向不是预告**：只约束「往哪边走」，不得据此提前写出尚未发生的情节。
+      if (vis.storyTone && WA.storyTone) { const stc = engineCall('storyTone', function () { return WA.storyTone.buildBlock(); }); if (stc) items.push({ source: '剧情倾向', content: stc }); }
       if (vis.session && WA.session) { const se = engineCall('session', function () { return WA.session.buildBlock(); }); if (se) items.push({ source: '多人场', content: se }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块

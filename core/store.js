@@ -109,6 +109,15 @@
       motif: { round: 0, rows: [] },         // 文体档案 / 意象登记（motif.js）
       beatMask: { round: 0, rows: [] },      // 信息迷雾 / 蓝图遮罩（beat-mask.js）
       powerAnchor: { round: 0, rows: [] },   // 战力锚（power-anchor.js）
+      // v2.130.0（拓展计划 B1/C1/C2/D3）：三个新引擎的顶层键。
+      //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
+      //   ——登记不等于物化，两件事都要做。
+      //   ⚠ staleGuard / purifyScope / groupGuard / reasoning / archiveHide / wordBudget /
+      //   rehearse / refine / polish **不在此列**：前六个是纯内存或纯函数（无持久状态），
+      //   rehearse 只做预演与快照（不落存档），refine / polish 是纯文本变换。
+      storyTone: { rows: [], seq: 0 },       // 剧情倾向档（story-tone.js）
+      calendarPlan: { months: [], seq: 0, at: 0 },   // 自定义历法月表（calendar-custom.js）
+      binding: { chat: {}, char: {}, default: {}, seq: 0 },   // 配置绑定三层（binding.js）
 
       // 一致性记录（冲突诊断，不静默覆盖）
       consistency: [],          // {kind, detail, at}
@@ -1360,7 +1369,16 @@
     'rhythm.devices':  { cap: 64,  site: 'rhythm-loop.js WA.evict.array(b.devices, \'rhythm.devices\')（per-call，取 maxDevices 上界；v2.129.0）' },
     'motif.rows':      { cap: 120, site: 'motif.js WA.evict.array(b.rows, \'motif.rows\')（per-call，取 maxRows 上界；v2.129.0）' },
     'beatMask.rows':   { cap: 200, site: 'beat-mask.js WA.evict.array(b.rows, \'beatMask.rows\')（per-call，取 maxRows 上界；v2.129.0）' },
-    'powerAnchor.rows':{ cap: 128, site: 'power-anchor.js WA.evict.array(b.rows, \'powerAnchor.rows\')（per-call，取 maxRows 上界；v2.129.0）' }
+    'powerAnchor.rows':{ cap: 128, site: 'power-anchor.js WA.evict.array(b.rows, \'powerAnchor.rows\')（per-call，取 maxRows 上界；v2.129.0）' },
+    // v2.130.0（拓展计划 C2/C1/D3）：三个新引擎的有界容器。
+    //   登记键与骨架物化的顶层键逐个同源（registryParity 的「未在骨架物化」靠它过）。
+    //   三条 cap 都是设置上界；写侧由各自引擎以 per-call 传入（站点侧 cap:'per-call'）。
+    //   binding 的 kind 是 **object**：它按层存键值对，不是数组（登记成 array 会当场被报类型错配）。
+    'storyTone.rows':    { cap: 64, site: 'story-tone.js WA.evict.array(b.rows, \'storyTone.rows\')（per-call，取 maxRows 上界；v2.130.0）' },
+    'calendarPlan.months': { cap: 48, site: 'calendar-custom.js WA.evict.array(b.months, \'calendarPlan.months\')（per-call，取 maxMonths 上界；v2.130.0）' },
+    'binding.chat':     { cap: 200, kind: 'object', site: 'binding.js 写入侧硬上界（maxKeys 满员拒写，不走 evict；v2.130.0）' },
+    'binding.char':     { cap: 200, kind: 'object', site: 'binding.js 写入侧硬上界（maxKeys 满员拒写，不走 evict；v2.130.0）' },
+    'binding.default':  { cap: 200, kind: 'object', site: 'binding.js 写入侧硬上界（maxKeys 满员拒写，不走 evict；v2.130.0）' }
     // v2.13.0: 人物档案节（people.<id>.profile.<节>）的上限**逐节不同**，上面五条具名
     //   登记已足够说明「这些数组归谁管」；挤出侧站点 people.profile 的 path 是
     //   people.*.profile.*（per-call，写的时候才由 registry 逐节取值传入），

@@ -1,13 +1,13 @@
 {
- "version": "2.129.0",
- "loadOrderCount": 149,
- "loadedCount": 146,
+ "version": "2.130.0",
+ "loadOrderCount": 161,
+ "loadedCount": 158,
  "uiCount": 3,
- "nsCount": 154,
+ "nsCount": 166,
  "totals": {
-  "loadEdges": 47,
+  "loadEdges": 59,
   "hardEdges": 0,
-  "callRefs": 92,
+  "callRefs": 116,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -33,9 +33,12 @@
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
+    "engines/archive-hide.js",
     "engines/backstage.js",
     "engines/beat-mask.js",
+    "engines/binding.js",
     "engines/bridge.js",
+    "engines/calendar-custom.js",
     "engines/calendar.js",
     "engines/chapters.js",
     "engines/coop.js",
@@ -44,6 +47,7 @@
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
+    "engines/group-refuse.js",
     "engines/inst.js",
     "engines/kaleidoscope.js",
     "engines/liaison.js",
@@ -54,22 +58,30 @@
     "engines/parallel-world.js",
     "engines/plan.js",
     "engines/pmem.js",
+    "engines/polish.js",
     "engines/power-anchor.js",
     "engines/preset-world.js",
     "engines/proactive.js",
     "engines/probe.js",
+    "engines/purify-scope.js",
+    "engines/reasoning.js",
+    "engines/refine.js",
     "engines/region.js",
     "engines/regional.js",
+    "engines/rehearse.js",
     "engines/request-viewer.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/session.js",
     "engines/stage.js",
+    "engines/stale-guard.js",
+    "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/summarizer.js",
     "engines/userlock.js",
     "engines/wb-inject.js",
     "engines/wb-search.js",
+    "engines/word-budget.js",
     "render/purifier.js"
    ]
   },
@@ -210,26 +222,38 @@
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
+    "engines/archive-hide.js",
     "engines/beat-mask.js",
+    "engines/binding.js",
+    "engines/calendar-custom.js",
     "engines/coop.js",
     "engines/economy.js",
+    "engines/group-refuse.js",
     "engines/inst.js",
     "engines/liaison.js",
     "engines/mend.js",
     "engines/motif.js",
     "engines/plan.js",
+    "engines/polish.js",
     "engines/power-anchor.js",
     "engines/preset-world.js",
     "engines/probe.js",
+    "engines/purify-scope.js",
+    "engines/reasoning.js",
+    "engines/refine.js",
     "engines/region.js",
+    "engines/rehearse.js",
     "engines/request-viewer.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/session.js",
     "engines/stage.js",
+    "engines/stale-guard.js",
+    "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/userlock.js",
-    "engines/wb-search.js"
+    "engines/wb-search.js",
+    "engines/word-budget.js"
    ]
   },
   "core/exec.js": {
@@ -2275,6 +2299,256 @@
    ],
    "ghostRefs": [],
    "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/stale-guard.js": {
+   "ns": [
+    "staleGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_staleguard_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/purify-scope.js": {
+   "ns": [
+    "purifyScope"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_purifyscope_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/group-refuse.js": {
+   "ns": [
+    "groupGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/reasoning.js": {
+   "ns": [
+    "reasoning"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_reasoning_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/story-tone.js": {
+   "ns": [
+    "storyTone"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_storytone_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/calendar-custom.js": {
+   "ns": [
+    "calendarPlan"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_calendarplan_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rehearse.js": {
+   "ns": [
+    "preflight"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_preflight_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/archive-hide.js": {
+   "ns": [
+    "archiveHide"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_archivehide_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/word-budget.js": {
+   "ns": [
+    "wordBudget"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_wordbudget_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/binding.js": {
+   "ns": [
+    "binding"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_binding_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/refine.js": {
+   "ns": [
+    "refine"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_refine_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/polish.js": {
+   "ns": [
+    "polish"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_polish_settings_v1"
+   ],
    "consumedBy": []
   },
   "render/inject.js": {

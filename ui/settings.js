@@ -76,6 +76,24 @@
       + '<label class="wa-row" title="给对手钉战力区间，防「三流打手变五五开」的机械膨胀"><input type="checkbox" id="wa-sw-poweranchor" data-sw-ns="powerAnchor"' + (ini('powerAnchor') ? ' checked' : '') + dis('powerAnchor') + '/> 战力锚</label>'
       + '<label class="wa-row" title="落账最近若干份发往副 API 的报文（密钥打码，只存内存不写盘）"><input type="checkbox" id="wa-sw-requestviewer" data-sw-ns="requestViewer"' + (ini('requestViewer') ? ' checked' : '') + dis('requestViewer') + '/> 请求报文预览器</label>'
       + '<label class="wa-row" title="按标题/关键词/正文三面搜索条目缓存（纯读，恒开）"><input type="checkbox" id="wa-sw-wbsearch" data-sw-ns="wbSearch"' + (ini('wbSearch', true) ? ' checked' : '') + ' disabled/> 世界书即时搜索 <span class="wa-dim">（恒开：只读一份内存数组，关掉无收益）</span></label>'
+      // v2.130.0（拓展计划 A1..A4 / B1 / C1 / C2 / D1..D4）：十二个新引擎的总开关（同
+      //   v2.129.0 理由：渲染 + 绑定 + 守卫登记三件齐做，否则 id 写错无人发现）。
+      //   控件 id 一律**字面量**写死（不走变量拼接）：门禁 H2 用 /id="(wa-[a-z0-9\-]+)"/
+      //   从 ui/*.js 源码采集渲染控件再与 UI_BINDINGS 对账，动态拼出的 id 在采集面「不存在」。
+      + '<label class="wa-row" title="切聊天/切角色/换源后，在途请求的结果一律作废（裸写会把旧聊天的账写进新聊天）"><input type="checkbox" id="wa-sw-staleguard" data-sw-ns="staleGuard"' + (ini('staleGuard') ? ' checked' : '') + dis('staleGuard') + '/> 迟到结果拦截</label>'
+      + '<label class="wa-row" title="只净化正文：状态栏/结构块/代码块先剥离再拼回（防规则把它们误删）"><input type="checkbox" id="wa-sw-purifyscope" data-sw-ns="purifyScope"' + (ini('purifyScope') ? ' checked' : '') + dis('purifyScope') + '/> 净化作用域保护</label>'
+      + '<label class="wa-row" title="写清「思考该多克制」；正文空或不足阈值时报不短于判断线（防预算被思考吃光）"><input type="checkbox" id="wa-sw-reasoning" data-sw-ns="reasoning"' + (ini('reasoning') ? ' checked' : '') + dis('reasoning') + '/> 思考开销与正文保底</label>'
+      + '<label class="wa-row" title="按角色设走向档：自然发展 / 温暖向好 / 冲突增强 / 悲剧倾向（只约束方向，不预告情节）"><input type="checkbox" id="wa-sw-storytone" data-sw-ns="storyTone"' + (ini('storyTone') ? ' checked' : '') + dis('storyTone') + '/> 剧情倾向档</label>'
+      + '<label class="wa-row" title="自定义月名与每月天数；超范围标「日期待确认」不推算"><input type="checkbox" id="wa-sw-calendarplan" data-sw-ns="calendarPlan"' + (ini('calendarPlan') ? ' checked' : '') + dis('calendarPlan') + '/> 自定义历法</label>'
+      + '<label class="wa-row" title="写前预演：报「这份修复有 N 处这张卡不接受」，不改任何状态"><input type="checkbox" id="wa-sw-preflight" data-sw-ns="preflight"' + (ini('preflight') ? ' checked' : '') + dis('preflight') + '/> 写前预演与检查存档</label>'
+      + '<label class="wa-row" title="只隐藏有逐楼记忆覆盖的旧楼，保最近 N 层；缺 L0 保持可见"><input type="checkbox" id="wa-sw-archivehide" data-sw-ns="archiveHide"' + (ini('archiveHide') ? ' checked' : '') + dis('archiveHide') + '/> 自动隐藏归档楼层</label>'
+      + '<label class="wa-row" title="核字数，不足目标九成即报「续写后再落地」"><input type="checkbox" id="wa-sw-wordbudget" data-sw-ns="wordBudget"' + (ini('wordBudget') ? ' checked' : '') + dis('wordBudget') + '/> 字数闭环</label>'
+      + '<label class="wa-row" title="配置按 聊天 > 角色 > 默认 三级取；离场即回落下层"><input type="checkbox" id="wa-sw-binding" data-sw-ns="binding"' + (ini('binding') ? ' checked' : '') + dis('binding') + '/> 配置绑定优先级</label>'
+      + '<label class="wa-row" title="档案规范化 / 合并重复 / 提炼浓缩（不生成新内容）"><input type="checkbox" id="wa-sw-refine" data-sw-ns="refine"' + (ini('refine') ? ' checked' : '') + dis('refine') + '/> 档案精编</label>'
+      + '<label class="wa-row" title="把一句话润色成多个版本供选；选中后才进主链"><input type="checkbox" id="wa-sw-polish" data-sw-ns="polish"' + (ini('polish') ? ' checked' : '') + dis('polish') + '/> 输入润色</label>'
+      // 群聊拒绝是**只读问路器**（无总开关）：控件恒开且置灰，仅作“当前是不是群聊”的可见读数。
+      + '<label class="wa-row" title="本扩展只支持单主角对话；群聊下世界推演与写入一律拒绝并阻止写世界书"><input type="checkbox" id="wa-sw-grouprefuse"' + ((WA.groupGuard && typeof WA.groupGuard.isGroup === 'function' && WA.groupGuard.isGroup()) ? ' checked' : '') + ' disabled/> 群聊拒绝 <span class="wa-dim">（恒开：只读问路器）</span></label>'
+      + '<label class="wa-row" title="净化/思考/字数三块只作用于当前那一次输出，不改世界状态"><input type="checkbox" id="wa-sw-note2130" disabled/> v2.130.0 十二引擎 <span class="wa-dim">（产注入块的两个：思考开销 / 剧情倾向——还须在「导演」页勾选对应源）</span></label>'
       + '<div id="wa-sw-out" class="wa-out"></div>'
       + '<div class="wa-dim">注：产注入块的五个（用户锁定 / 节奏环 / 文体档案 / 信息迷雾 / 战力锚）'
       + '还须在「导演」页勾选对应注入源，否则开关点了正文也不变。</div>';

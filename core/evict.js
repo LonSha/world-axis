@@ -274,7 +274,14 @@
     'rhythm.devices': { path: 'rhythm.devices', cap: 'per-call', kind: 'array', why: '叙事手法冷却表环形（上限 = maxDevices 设置，写入时传入）' },
     'motif.rows':     { path: 'motif.rows',     cap: 'per-call', kind: 'array', why: '意象登记环形（上限 = maxRows 设置，写入时传入）' },
     'beatMask.rows':  { path: 'beatMask.rows',  cap: 'per-call', kind: 'array', why: '节拍遮罩登记环形（上限 = maxRows 设置，写入时传入）' },
-    'powerAnchor.rows': { path: 'powerAnchor.rows', cap: 'per-call', kind: 'array', why: '战力锚登记环形（上限 = maxRows 设置，写入时传入）' }
+    'powerAnchor.rows': { path: 'powerAnchor.rows', cap: 'per-call', kind: 'array', why: '战力锚登记环形（上限 = maxRows 设置，写入时传入）' },
+    //  v2.130.0（拓展计划 C2 / C1）：两个新引擎的环形容器。
+    //   两条调用点均在各自引擎的 transact 回调内（story-tone.js / calendar-custom.js），
+    //   站点名与调用点字面量一一对应（门禁 G18 双向核对）。
+    //   两条都必须是**环形容器**而非写入侧硬上界：剧情倾向改过几次、历法换过几版
+    //   都是复盘材料（「什么时候他把这本书定成了悲剧倾向」必须答得出），故只能环形挤出。
+    'storyTone.rows':    { path: 'storyTone.rows', cap: 'per-call', kind: 'array', why: '剧情倾向档环形（上限 = maxRows 设置，写入时传入）' },
+    'calendarPlan.months': { path: 'calendarPlan.months', cap: 'per-call', kind: 'array', why: '自定义历法月表环形（上限 = maxMonths 设置，写入时传入）' }
   };
 
   // ── 非挤出站点（显式声明，防「假阴性」与「计数虚高」两头都错）──────────
@@ -302,7 +309,13 @@
     // v2.119.0（拓展计划 ⑦）：进度指标（stage.js）。同族，且**形态是对象映射**而非数组：
     //   `st.metrics[m] = value`；满则 `{ ok:false, reason:'metrics-full' }` 拒写。
     //   原先按 kind:'array' 登记，还让 store.registryParity() 报「类型错配（应为数组）」。
-    'stage.metrics': '写入侧硬上界 + 对象映射形态（满则 metrics-full 拒写，不走 evict）'
+    'stage.metrics': '写入侧硬上界 + 对象映射形态（满则 metrics-full 拒写，不走 evict）',
+    // v2.130.0（拓展计划 D3）：配置绑定三层（binding.js）。**写入侧硬上界**而不是挤出上限：
+    //   `bind()` 在总键数达 maxKeys 时 `{ ok:false, reason:'too-long' }` 拒写（既有绑定一条不动）。
+    //   形态是**对象映射**（层 -> 键 -> 值），不是数组，故同 stage.metrics 一族的双重要求。
+    'binding.chat': '写入侧硬上界 + 对象映射形态（满则 too-long 拒写，不走 evict）',
+    'binding.char': '同上：角色层绑定表（与聊天层分开存，互不覆盖）',
+    'binding.default': '同上：默认层绑定表（离场回落的落点）'
   };
 
   // ── 记账 ──────────────────────────────────────────────────

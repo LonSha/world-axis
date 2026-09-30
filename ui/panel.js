@@ -59,6 +59,11 @@
     //   插在 chrono 行**之前**（而非其后）：chrono 行是 v2.127.0 那条锁的锚点字面量，
     //   改动它会同时触发 anchor-scan 与负控制审计的 not-unique（实测踩过）。
     userlock: '用户锁定', rhythmLoop: '节奏环', motif: '文体档案', beatMask: '信息迷雾', powerAnchor: '战力锚',
+    // v2.130.0（拓展计划 A4 / C2）：两条新注入源。与 SOURCES 同批登记 ——
+    //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名，而那是用户唯一能开关它的地方。
+    //   插在 chrono 行**之前**（而非其后）：chrono 行是 v2.127.0 那条锁的锚点字面量，
+    //   改动它会同时触发 anchor-scan 与负控制审计的 not-unique（实测踩过）。
+    reasoning: '思考开销', storyTone: '剧情倾向',
     chrono: '世界编年史' };
 
   // v0.6 新增组件样式注入

@@ -48,7 +48,7 @@ const ANCHORS = {
   injBranch: { rel: INJ, txt: "if (vis.chrono && WA.chrono) { const chb = engineCall('chrono', function () { return WA.chrono.buildBlock(); }); if (chb) items.push({ source: '世界编年史', content: chb }); }" },
   injSrc: { rel: INJ, txt: "'chrono'];" },
   injName: { rel: INJ, txt: "chrono: '世界编年史'," },
-  injMod: { rel: INJ, txt: "chrono: 'worldaxis_chrono_settings_v1' };" },
+  injMod: { rel: INJ, txt: "worldaxis_chrono_settings_v1'," },
   panelName: { rel: PANEL, txt: "chrono: '世界编年史' };" },
   diagRead: { rel: DIAG, txt: "const cr = WA.chrono.chronicle({ limit: 12 });" }
 };

@@ -6,21 +6,102 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.129.0 |
-| 全量回归 | `node tests/run.js` → **v2.129.0 为通过 12767 / 失败 0 · WORKER_EXIT=0**（长超时启动器 + `isolated-runner` 隔离）|
-| 产品文件面 | 150（`tests/product-files.js` 单一真源） |
+| 版本 | v2.130.0 |
+| 全量回归 | `node tests/run.js` → **v2.130.0 为通过 12822 / 失败 0 · WORKER_EXIT=0**（长超时启动器 + `isolated-runner` 隔离；默认 10 分钟会在 v2.118.0 段被截断，需 `WA_REGRESSION_TIMEOUT_MS` 放宽）|
+| 产品文件面 | 162（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 138 / members= 913 / chars= 10400 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 141 / members= 918 / chars= 10483 |
 | 测试面 | `node tests/test-surface-gate.js` → 文件面 151 · 锁 146 · 孤儿 0 · 豁免 0 |
-| 死子面 | `node tests/dead-export-gate.js` → dead 678 / uiDead 4 / 仅测试 348 / dataOnly 236 |
+| 死子面 | `node tests/dead-export-gate.js` → dead 753 / uiDead 4 / 仅测试 351 / dataOnly 241 |
 | 拒收码 | `node tests/reject-code-gate.js` → 607 码（见证 368 / 死表 8 / 基线 231） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.129.0 · 现场 refs 3415 / 命名空间 149 / 成员 1859 |
-| 版本条目存放 | `node tests/docs-archive-gate.js` → README 93 条 / 日志存档 92 条 / 跨文件同号 **0** |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.130.0 · 现场 refs 3510 / 命名空间 161 / 成员 1944 |
+| 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | 锚点覆盖 | `node tools/anchor-scan.js` → 锁 111 把 · 覆盖 49（44.14%）＝ 统一档 29 + 非统一档已识别 20 · 未识别 62 · 非统一档问题 12（**只报不红**） |
 | tools/ | 只留**被可执行代码引用**的 12 个（一次性脚本不入库，见 `.gitignore`） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+
+### R116 · 2026-09-29 · v2.130.0：十二引擎缝合（拓展计划 A1–A4 / B1 / C1 / C2 / D1–D4）与全量回归同源化
+- **起点与终点**：起点 v2.129.0（全量回归 12767 / 0，`6935efb`）；终点 v2.130.0（全量回归 **12822 / 0**）。
+  本版是一次真交付：按「缝合」方法论把十三份外部开源卡（ST-SevenDaysCal / The-Veridis-Lion / story-oracle /
+  ST-Evolution-World-Assistant / SoulLink v1.7.4 / world-backstage 2.5.8 / st-theater / choice）的机制
+  移植成十二个本仓引擎，并一次性走完全部接线面与门禁收敛。
+- **十二个引擎（文件 / 命名空间 / 缝线 / 缝合来源 / 行数）**：
+  `engines/stale-guard.js`（`WA.staleGuard` / A1 / ST-SevenDaysCal / 162）·
+  `engines/purify-scope.js`（`WA.purifyScope` / A2 / The-Veridis-Lion + story-oracle / 160）·
+  `engines/group-refuse.js`（`WA.groupGuard` / A3 / ST-Evolution-World-Assistant / 108）·
+  `engines/reasoning.js`（`WA.reasoning` / A4 / SoulLink v1.7.4 / 105，产 `buildBlock`）·
+  `engines/archive-hide.js`（`WA.archiveHide` / B1 / world-backstage 2.5.8 / 101）·
+  `engines/word-budget.js`（`WA.wordBudget` / B2 / st-theater / 95）·
+  `engines/calendar-custom.js`（`WA.calendarPlan` / C1 / ST-SevenDaysCal 3.7.10 / 142，物化 `months`）·
+  `engines/story-tone.js`（`WA.storyTone` / C2 / ST-SevenDaysCal / 150，产 `buildBlock` + 物化 `rows`）·
+  `engines/rehearse.js`（`WA.preflight` / D1 / story-oracle v1.89.0 / 141）·
+  `engines/refine.js`（`WA.refine` / D2 / SoulLink / 143）·
+  `engines/binding.js`（`WA.binding` / D3 / choice + The-Veridis-Lion / 146，物化 chat/char/default）·
+  `engines/polish.js`（`WA.polish` / D4 / choice / 123）。合计约 1576 行。
+- **治的病（每个模块对应本仓一处此前全处不可观测的缺口）**：① 异步链结果回来后**不再比对发出时的现场**
+  （旧聊天的回音直接写进新聊天的世界状态）；② 净化是**全文级**的，规则里一个 `.*` 就能精确删掉状态栏
+  而输出仍非空 ⇒ 空结果守卫不报；③ 整套推演建在**单一主角线**上，而**全库到 v2.129.0 零处检测群聊**；
+  ④ 推理模型把预算花在思考上，**没有任何一处管「够不够留给正文」**；⑤ 楼层管理只有「记忆覆盖」一条路，
+  旧楼**仍在上下文里**；⑥ 正文长度只有 `maxTokens` 一个上限、**没有下限**；⑦ 世界钟只有「第 N 日」，
+  **不知道月与年**；⑧ 长期走向只有单格 `life.goals.next`，**没有总体倾向**；⑨ 写入是直接落地的，
+  **「这张卡接不接受这份改动」写之前无人可问**（`registryParity` 是事后检查）；⑩ 档案只增不减，
+  **没有一处能规范化 / 去重 / 压短**；⑪ 配置全局一份，换聊天只能手动改回且**上一份找不回来**；
+  ⑫ 输入侧只有 `inputGuard`（做约束），**零处能做润色**。
+- **三条命名避让（开工前实测的冲突）**：① `WA.calendar` 已被 `engines/calendar.js`（世界钟）占用 ⇒
+  新历法模块定名 `engines/calendar-custom.js`、命名空间 `WA.calendarPlan`；② `choices` 命名空间已被占用 ⇒
+  `polish.js` 不立新自选面，改走 `core/api-router.js` 的 `rewrite` 通道；③ 群聊守卫落 `WA.groupGuard`，
+  不与既有 `guard` 语义混名。
+- **只物化三个真写世界的容器**：`storyTone.rows` / `calendarPlan.months` / `binding` 三层。其余九个模块
+  **不写 store**（旁路能力：拦截 / 变换 / 换算 / 预演 / 预览，均产出「建议集」或一段可注入文本）——
+  这是本仓「不凭空物化容器」纪律的直接应用。
+- **落地（受控写入，每步带计数校验）**：
+  ① 十二个模块分三批落盘，逐个 `node --check`；其中 `purify-scope.js` 首次写入因输出流中断失败，
+     改为分 part 追加写入后通过。
+  ② 接线面全量登记：`index.js`（`VERSION` 2.130.0 + `LOAD_ORDER` 十二条，末计 322 条）·
+     `tests/run.js`（`LOAD` 十二条，末计 316 条）· `engines/tool-diag.js`（十二条 `MODULE_EXPORTS` +
+     新增诊断节 `secStitch2130()` 十二席位 + `UI_BINDINGS` 13 个控件）· `core/store.js`（三个顶层键 +
+     `__BOUNDED_CAPS` 五键）· `core/evict.js`（`SITES` 两站 + `NON_EVICT` binding 三键）·
+     `render/inject.js`（`SOURCES` 64 → 66）· `ui/panel.js`（`VIS_NAMES` 刻意插在 `chrono` 行**之前**——
+     chrono 行是 v2.127.0 锁住的锚点字面量）· `ui/settings.js`（十一个总开关 + `wa-sw-grouprefuse` +
+     `wa-sw-note2130`）· `engines/inject-budget.js`（`PRIORITY` / `ACCOUNTS` 各两行）。
+  ③ 出口面契约重生成：`ns= 138→141` / `members= 913→918` / `chars= 10400→10483`，`FROZEN2800` 逐字回填。
+  ④ 三本台账 `--update` 与版本前进（`dead 678→753`、`dataOnly 236→241`、`version` 与 `_note` 末词均 `2.130.0`）。
+  ⑤ `node tools/sync-hardcoded.js --write` 回填六族硬读数。
+- **口径澄清（本版点清的）**：① 「新增模块不进出口面契约」不是遗漏而是口径——契约记的是**跨文件依赖面**，
+  九个模块的读者是诊断节与测试面，只有 `groupGuard:detect isGroup` / `reasoning:buildBlock` /
+  `storyTone:buildBlock` 三个进契约（与 v2.129.0 同规）。② 拒收码台账的 `r.total` 是**去重后的码数**
+  （607 = 见证 368 + 死表 8 + 基线 231 恰好相加），本版新增的是 **56 处字面量 / 14 个既有码**，
+  码面**零变动**——把「字面量处数」当成「码数」写进沿革就是口径失实。
+- **本轮现场抓到并修掉的六处（4 条红灯 + 2 处台账口径失实）**：
+  ① `tests/run.js:15066` 的归因分布断言停在 `352/267/63`（旧值），实测 `351/319/87`；
+  ② `tests/run.js:15047` 的「冻结面 610 → 693」是 `--update` 中态，已标注；
+  ③④ `tests/run.js:18999/19001` 与 `tests/settle-v2830.js:310/322` 的端到端读数停在
+     `装载期边 47 / 命名空间 154 / 文件 146 / 调用期引用 92`，实测 `59 / 166 / 158 / 116`；
+  ⑤ `tests/run.js:19449` 的「零读 ns 恰 13 个」实测已 **22**（九个新命名空间此前零读者）；
+  ⑥ 两本台账 `_note`：把「内联码面 607 不变」误写成「607 → 655」，把冻结面增量写成笼统的
+     「682 → 757」——已改为带明细的准确表述（+76：self-only +52 / unwired +24；−1：
+     `store.registryParity` 出冻结面）。
+- **工程障碍（本轮踩到的，值得留账）**：`tests/run.js` 走 `tests/isolated-runner.js` 的隔离机制，
+  **默认超时 600000ms（10 分钟）**。第一次完整回归的 `result.json` 是
+  `status: source-changed` + `stopping: "timeout"`、`summary` 只有「通过 49 / 失败 0」、日志停在
+  v2.118.0 段（约 50% 处）——**这不是「少跑了一些」，是结果整体失效**（且所有源码改动的 mtime 都晚于
+  那次启动时间）。修法：`pkill` 清残留 + `rm -f /tmp/worldaxis-regression-*.lock` +
+  以 `WA_REGRESSION_TIMEOUT_MS=5400000`（90 分钟）重跑，得到 `status: passed` /
+  「通过 12822 / 失败 0」/ `unchanged: true`。**判据按现场写**：读 `result.json` 时必须同时看
+  `status` 与 `stopping`，只看 `summary` 会把一次被截断的运行读成绿灯。
+- **门禁结果**：全量回归 `node tests/run.js` → **通过 12822 / 失败 0**；
+  `module-registry-gate` 文件 158 / 命名空间 166 / 装载期边 59 / 硬边 0 / 调用期引用 116 / 结构问题 0 ·
+  `module-cycle-gate-v2107` pass 65 项（`deadNs 22` / `problems 0`）· `dead-export-gate` EXIT 0 ·
+  `readings-v2106` pass 58 项 · `reject-code-gate` 607 码全归属 · `inventory` 四类悬空 0 ·
+  `test-surface-gate` 孤儿 0 / 豁免 0 · `docs-archive-gate` README 94 条 / 跨文件同号 0 ·
+  负控制锚点审计 `problems 0`（111 把锁 / 243 条锚点）。
+- **未覆盖（如实登记）**：① `stale-guard.verdict` / `archive-hide.plan` / `rehearse.preview` /
+  `groupGuard.guard` 目前只产出「建议集」或裁决，**真正落地动作尚未接进主写路径**（当前只有测试面与
+  诊断节消费）；② UI 层未做实机验证（无头回归不装载 `ui/panel.js` 与 `ui/settings.js`，全绿只证明
+  契约成立与绑定在场，不代表浏览器可点）；③ `anchor-scan` 的非统一档 12 条问题与未识别 62 把是
+  **基线状态**（已用 `/tmp/wa_head/` 对照树确认非本版引入）。
 
 ### R115 · 2026-09-29 · v2.129.0：收口轮（拓展计划 A1–A10 的十个新引擎入册与全量回归同源化）
 - **起点与终点**：起点 v2.126.0（全量回归 12212 / 0）；终点 v2.129.0（全量回归 **12767 / 0**）。

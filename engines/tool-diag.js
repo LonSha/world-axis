@@ -841,6 +841,15 @@
     'engines/rhythm-loop.js': 'rhythmLoop', 'engines/motif.js': 'motif', 'engines/beat-mask.js': 'beatMask',
     'engines/preset-world.js': 'presetWorld', 'engines/power-anchor.js': 'powerAnchor',
     'engines/request-viewer.js': 'requestViewer', 'engines/wb-search.js': 'wbSearch',
+    // v2.130.0（拓展计划 A1..A4 / B1 / C1 / C2 / D1..D4）：十二个新引擎。登记在此 =
+    //   该文件缺席时 secModules 会**如实报 missing**。漏登记的后果不是「少一行字」：
+    //   inventory 的定义面与出口面契约都从本表取，漏了就等于这些模块在定义面上不存在。
+    'engines/stale-guard.js': 'staleGuard', 'engines/purify-scope.js': 'purifyScope',
+    'engines/group-refuse.js': 'groupGuard', 'engines/reasoning.js': 'reasoning',
+    'engines/story-tone.js': 'storyTone', 'engines/calendar-custom.js': 'calendarPlan',
+    'engines/rehearse.js': 'preflight', 'engines/archive-hide.js': 'archiveHide',
+    'engines/word-budget.js': 'wordBudget', 'engines/binding.js': 'binding',
+    'engines/refine.js': 'refine', 'engines/polish.js': 'polish',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1644,6 +1653,13 @@
       //   否则 id 写错无人发现）。这些是 A1–A10 十项能力在面板上的**唯一**入口。
       'wa-sw-userlock', 'wa-sw-rewriter', 'wa-sw-storyclock', 'wa-sw-rhythmloop', 'wa-sw-motif',
       'wa-sw-beatmask', 'wa-sw-presetworld', 'wa-sw-poweranchor', 'wa-sw-requestviewer', 'wa-sw-wbsearch',
+      // v2.130.0（拓展计划 A1..A4 / B1 / C1 / C2 / D1..D4）：十二个新引擎的总开关（同
+      //   v2.129.0 理由：渲染 + 绑定 + 守卫登记三件齐做，否则 id 写错无人发现）。
+      //   `wa-sw-grouprefuse` 是**只读读数**（群聊拒绝无总开关，控件恒开置灰），
+      //   登记它的意义同其它控件：id 写错要有人发现。`wa-sw-note2130` 是说明行。
+      'wa-sw-staleguard', 'wa-sw-purifyscope', 'wa-sw-reasoning', 'wa-sw-storytone',
+      'wa-sw-calendarplan', 'wa-sw-preflight', 'wa-sw-archivehide', 'wa-sw-wordbudget',
+      'wa-sw-binding', 'wa-sw-refine', 'wa-sw-polish', 'wa-sw-grouprefuse', 'wa-sw-note2130',
       'wa-sw-out',
       'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
@@ -2209,6 +2225,34 @@
         })() : { error: 'engines/request-viewer.js 未加载（报文预览器缺席）' };
       return { rewriter: rw, presetWorld: pw, requestViewer: rv,
         note: '只报席位与计数（本节目不改写、不落盘、不捕获报文）' };
+    }, {});
+  }
+
+  /* ── v2.130.0（拓展计划 A1..A4 / B1 / C1 / C2 / D1..D4）：十二个引擎的只读读数 ──
+   *   本批十二个引擎里，只有两个产注入块（reasoning / storyTone），其余十个是
+   *   「旁路能力」（拦截 / 变换 / 换算 / 预演 / 预览）——它们的消费者是面板与用户。
+   *   本节是这十项能力在**产品侧的唯一读者**：没它们就是冻结面上的死导出（口径：
+   *   产品零引用即冻结）。同 secStitch2129 / secChrono 纪律：**只报读数、不写世界**
+   *   （不替换文本、不写配置、不落存档、不发请求）。
+   */
+  function secStitch2130() {
+    return safe(function () {
+      function st(ns) {
+        const m = WA[ns];
+        if (!m || typeof m.stat !== 'function') return { error: 'engines/' + ns + ' 未加载（席位缺席）' };
+        const s = m.stat();
+        const cfg = (typeof m.getSettings === 'function') ? m.getSettings() : {};
+        return { enabled: !!cfg.enabled, blocked: s.blocked, lastReason: s.lastReason || '',
+          faults: s.faults || {}, counts: Object.keys(s).filter(function (k) { return k !== 'faults' && k !== 'lastReason' && typeof s[k] === 'number'; }).map(function (k) { return k + '=' + s[k]; }) };
+      }
+      return {
+        staleGuard: st('staleGuard'), purifyScope: st('purifyScope'),
+        groupGuard: (WA.groupGuard && typeof WA.groupGuard.detect === 'function') ? (function () { const g = WA.groupGuard.detect(); return { group: !!g.group, unknown: !!g.unknown, reasons: (g.reasons || []).length }; })() : { error: 'engines/group-refuse.js 未加载' },
+        reasoning: st('reasoning'), storyTone: st('storyTone'), calendarPlan: st('calendarPlan'),
+        preflight: st('preflight'), archiveHide: st('archiveHide'), wordBudget: st('wordBudget'),
+        binding: st('binding'), refine: st('refine'), polish: st('polish'),
+        note: '只报席位与计数（本节目不拦截、不替换文本、不写配置、不落存档）'
+      };
     }, {});
   }
 
@@ -3214,6 +3258,7 @@
     secFaultLedger, // v2.80.0（第十四面）
     secHorizon, secEnemies, secParallelWorld,        // v2.64.0（第五十一 / 五十二 / 五十三面）
     secStitch2129,                                   // v2.129.0（缝 A2 / A7 / A9：改写器 / 静态设定 / 报文预览）
+    secStitch2130,                                   // v2.130.0（十二引擎：拦截 / 变换 / 换算 / 预演旁路能力）
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');

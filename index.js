@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.129.0'
+  const VERSION = '2.130.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -461,6 +461,26 @@
     'engines/preset-world.js',
     'engines/request-viewer.js',
     'engines/wb-search.js',
+    // v2.130.0（拓展计划 B1/C1/C2/D1/D2/D3/D4/A1/A2/A3/A4）：十二个新引擎。
+    //   位置与 tests/run.js 的 LOAD 同序，且**一律早于** render/inject.js：
+    //   reasoning（思考开销约束）与 story-tone（剧情倾向）产注入块，注入落地时读它们的
+    //   buildBlock()。其余十个不产注入块（纯调用期模块：改写前拦截 / 净化范围 /
+    //   群聊闸门 / 历法换算 / 写前预演 / 归档隐藏 / 字数闭环 / 配置绑定 / 档案精编 / 输入润色），
+    //   对次序无硬要求；与产块的两个并列成一批，便于「本批十二引擎」一眼看全。
+    //   写世界状态的四个（story-tone / calendar-custom / binding / rehearse）
+    //   都走调用期的 store.transact，不构成装载期依赖。
+    'engines/stale-guard.js',
+    'engines/purify-scope.js',
+    'engines/group-refuse.js',
+    'engines/reasoning.js',
+    'engines/story-tone.js',
+    'engines/calendar-custom.js',
+    'engines/rehearse.js',
+    'engines/archive-hide.js',
+    'engines/word-budget.js',
+    'engines/binding.js',
+    'engines/refine.js',
+    'engines/polish.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',
