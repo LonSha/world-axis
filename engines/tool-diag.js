@@ -863,11 +863,27 @@
     // v2.87.0 B7：题材规则组合的现场读数（启用哪些题材 / 生效模块 / 拒收次数）。
     //   它是 WA.theme.statView 的真消费方——「题材装上了没」在诊断面必须可答。
     const theme = safe(function () { return WA.theme && WA.theme.statView ? WA.theme.statView() : null; }, null);
+    // X7（v2.128.0）：题材**差异对照**的现场读数（B7 收口）。
+    //   它是 `render.themeContrast` 的真消费方——「题材到底影响不影响注入面」必须在诊断面可答，
+    //   否则「两题材装出来一样」这种缺陷没有任何出口能看见。默认对**全量 → 当前题材**做一次对照
+    //   （当前无题材时两侧一致，那是如实结论，不是缺陷）。
+    const themeContrast = safe(function () {
+      if (!WA.render || typeof WA.render.themeContrast !== 'function') return null;
+      const cur = (WA.theme && WA.theme.statView) ? (WA.theme.statView().themes || []) : [];
+      const r = WA.render.themeContrast([], cur);
+      if (!r || !r.ok) return r || null;
+      return { ok: true, from: '全量', to: cur, identical: r.identical,
+        addedSources: r.addedSources, removedSources: r.removedSources,
+        addedModules: r.addedModules, removedModules: r.removedModules,
+        coverage: r.coverage, note: r.note };
+    }, null);
     return {
       loadedCount: loaded.length,
       missingCount: missing.length,
       personOrigin: personOrigin,
       theme: theme,
+      // X7（v2.128.0）：题材差异对照读数（主体是 render.themeContrast）。
+      themeContrast: themeContrast,
       // v2.91.0 O4：跨模块身份引用的**悬空对账**（只报不删）。
       //   它是 registry.danglingRefs 的真消费方——关系 / 量值 / 承诺三类行里的 target
       //   都是名字引用，而「名字的生死」此前没有任何出口可见（idStat 只对账
@@ -1808,7 +1824,15 @@
         debounced: s.debounced, refused: s.refused,
         externalReads: s.externalReads, failures: s.failures,
         lastReason: s.lastReason, lastInvalidateReason: s.lastInvalidateReason, byInvalidate: s.byInvalidate,
-        lastRefusal: s.lastRefusal, lastFailure: s.lastFailure, floor: s.floor
+        lastRefusal: s.lastRefusal, lastFailure: s.lastFailure, floor: s.floor,
+        // X8（v2.128.0）：**契约握手**读数。本节答「本桥活着没有」，本字段答「三条边
+        //   （对外投影 / 上游快照 / 手机侧入站）的**契约**对不对得上」——
+        //   「对端装了但契约版本不是这一版」此前与「对端没装」在读数上同形。
+        //   纯读：不驱动对端（不调它的 refresh），缺席如实降级。
+        handshake: safe(function () {
+          const h = WA.bridge.handshake();
+          return h ? { matched: h.matched, matchedCount: h.matchedCount, degraded: h.degraded, edges: h.edges, note: h.note } : null;
+        }, null)
       };
     }, {});
   }
@@ -2011,16 +2035,115 @@
       }
       const st = WA.chrono.stat();
       const staleN = (typeof WA.chrono.stale === 'function') ? (WA.chrono.stale() || []).length : 0;
+      // v2.127.0（X2）：世界编年史读数。此前 `chronicle` 只有定义、全库零外部读者 ——
+      //   而「这世界此前发生过什么、有几条被 hidden 挡在表外」正是本节的活。
+      //   读不到就如实置 null（不拿 stat().records 冒充编年史行数：两者是两件事）。
+      let chron = null;
+      try {
+        if (typeof WA.chrono.chronicle === 'function') {
+          const cr = WA.chrono.chronicle({ limit: 12 });
+          chron = { count: cr.count, total: cr.total, capped: cr.capped,
+            hiddenCount: cr.hiddenCount, themes: cr.themes.length };
+        }
+      } catch (eCh) { chron = null; }
       return {
         enabled: !!(WA.chrono.getSettings && WA.chrono.getSettings().enabled),
         layers: st.layers, records: st.records, reverts: st.reverts, blocked: st.blocked,
         lastReason: st.lastReason || '', stale: staleN,
         faults: st.faults || {},
+        chronicle: chron,
         note: '只报已登记变更与失准下游计数（本节目不写世界、不试演撤销）'
       };
     }, {});
   }
 
+  /* ── v2.128.0（拓展计划 X3–X6）：四个「此前不可判定」面的只读读数 ──
+   *   四节同规格：**只报读数、不写世界**（不 roll / 不 resolve / 不 approve / 不 identify），
+   *   与 secCollab「不占角色、不重放、不裁决」同纪律 —— 诊断是旁观者。
+   */
+  function secRegion() {
+    return safe(function () {
+      if (!WA.region || typeof WA.region.statView !== 'function') {
+        return { error: 'engines/region.js 未加载（远方传播面读数缺席）' };
+      }
+      const v = WA.region.statView();
+      const st = WA.region.stat ? WA.region.stat() : {};
+      // X3 的活：离线推进**动没动**。累计计数答不出「上一次推了多远」，
+      //   故 `lastOffline` 是这一节的主读（first=true 表示只落了基准、还没结算过）。
+      return {
+        enabled: !!v.enabled, places: v.places, events: v.events,
+        pending: v.pending, delivered: v.delivered, blocked: v.blocked,
+        offlineRuns: st.offline || 0,
+        offlineDelivered: st.offlineDelivered || 0,
+        offlineOccurred: st.offlineOccurred || 0,
+        offlineSkipped: st.offlineSkipped || 0,
+        lastOffline: st.lastOffline || null,
+        faults: st.faults || {},
+        note: '只报登记过的远方与离线结算读数（本节目不 roll、不落地、不推进）'
+      };
+    }, {});
+  }
+  function secProbe() {
+    return safe(function () {
+      if (!WA.probe || typeof WA.probe.statView !== 'function') {
+        return { error: 'engines/probe.js 未加载（调查卷宗读数缺席）' };
+      }
+      const v = WA.probe.statView();
+      // X4 的活：卷宗读得出来，但「两条并排线索互相打脸时该采信谁」此前无口可问。
+      //   本节报**裁决面的存在与边界**（等级表 + 定案仍只走 decide），不替任何卷宗定案。
+      return {
+        enabled: !!v.enabled, cases: v.cases, open: v.open,
+        evidence: v.evidence, wrongs: v.wrongs, byVerdict: v.byVerdict,
+        levels: (WA.probe.LEVELS || []).slice(),
+        hasResolve: typeof WA.probe.resolve === 'function',
+        hasAudit: typeof WA.probe.auditRecord === 'function',
+        note: '只报卷宗计数与裁决面能力（本节目不举证、不对质、不定案、不裁决）'
+      };
+    }, {});
+  }
+  function secInst() {
+    return safe(function () {
+      if (!WA.inst || typeof WA.inst.statView !== 'function') {
+        return { error: 'engines/inst.js 未加载（组织制度读数缺席）' };
+      }
+      const v = WA.inst.statView();
+      // X5 的活：制度答不出「要不要批准、谁能拍板、离任后在途项目归谁」。
+      //   本节把三问各自的**可判定面**报出来：权限表（谁能拍板）、审批出口是否存在、
+      //   以及各组织当前的在途项目数（离任时的归属靠它说得清）。
+      return {
+        enabled: !!v.enabled, orgs: v.orgs, posts: v.posts, holders: v.holders,
+        decisions: v.decisions, open: v.open, breached: v.breached,
+        perms: (WA.inst.PERMS || []).slice(),
+        reasons: (WA.inst.REASONS || []).slice(),
+        hasApprove: typeof WA.inst.approve === 'function',
+        note: '只报组织/职位/决策计数与制度能力（本节目不任免、不批准、不交接）'
+      };
+    }, {});
+  }
+  function secSession() {
+    return safe(function () {
+      if (!WA.session || typeof WA.session.statView !== 'function') {
+        return { error: 'engines/session.js 未加载（多人场读数缺席）' };
+      }
+      const v = WA.session.statView();
+      // X6 的活：coop 是「单机上的多个身份」，答不出「这个人是谁、授权到哪」。
+      //   本节报身份面的现状（在座几席、有没有主持人、授权出口是否在位），
+      //   **不含任何凭证**（与注入面同纪律：指纹永不出场）。
+      return {
+        enabled: !!v.enabled, seats: v.seats, active: v.active, host: v.host || '',
+        posts: v.posts, rev: v.rev,
+        seatPerms: (WA.session.SEAT_PERMS || []).slice(),
+        hostPerms: (WA.session.HOST_PERMS || []).slice(),
+        hasIdentify: typeof WA.session.identify === 'function',
+        // X5（v2.128.0）：`authority` 这一问的出口在不在（「谁能拍板」的另一半）。
+        hasAuthority: !!(WA.inst && typeof WA.inst.authority === 'function'),
+        // X6（v2.128.0）：`identify` 落到写闸门走的是 `permissions.adopt`（X6 依赖 P5 的那条边）。
+        //   本节只报「那口在不在」——闸门到底拦不拦由 gate 一栏答，两者分开才读得出「认了人但拦不住」。
+        hasAdopt: !!(WA.permissions && typeof WA.permissions.adopt === 'function'),
+        note: '只报席位/序号/授权面读数，**不含凭证指纹**（本节目不入座、不发消息、不验票）'
+      };
+    }, {});
+  }
   // ── v2.112.0：协作会话 / 队列 / 冲突（只读旁观；不调 claim/flush/resolve） ──
   function secCollab() {
     return safe(function () {
@@ -2062,6 +2185,10 @@
       //   不替用户跑基准（跑基准是面板出口的事）。
       perfTrace: secPerfTrace(),
       chrono: secChrono(),
+      // v2.128.0（拓展计划 X3–X6）：远方离线演化 / 认知冲突裁决 / 组织制度 / 多人身份。
+      //   四节都在这里登记 —— 诊断包是这四个新面**唯一**的产品侧读者，
+      //   漏登记 ⇒ 死导出面当场红灯（口径：产品零引用即冻结面）。
+      region: secRegion(), probe: secProbe(), inst: secInst(), session: secSession(),
       collab: secCollab(),
       plugin: secPlugin(),
       compat: secCompat(),

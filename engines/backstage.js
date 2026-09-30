@@ -462,6 +462,12 @@
         //   是「推演必须复用以下实体，不得重复创建同义实体」，但全库唯一调用方是 tool-analyzer（诊断）
         //   与测试；backstage 只在结算侧 applyEntities 写入，提示词侧从不读 ⇒ 实体库只进不出，
         //   防重复机制形同虚设（实测：库里有「淮北盐帮」，提示词里查无此名）。
+        // v2.127.0（X1）：人物意图链。此前本文件对 `plan` **零引用** —— 而 R105 ① 的病正是
+        //   「长期意图退化成一句注释」：推演引擎要结算「这一步走没走成」，却拿不到「他在第几步、
+        //   缺什么前置、卡在哪」。不给链状态，它会替人物另编一条合理后续（那正是那条病的形状）。
+        //   与注入侧的 `plan.buildBlock()` 分工明确：那个给**正文模型**（只说当前这一步），
+        //   这个给**推演引擎**（要给链状态）。关闭 / 无计划时返回空串，零 token。
+        (WA.plan && WA.plan.chainBlock ? WA.plan.chainBlock() : ''),
         (WA.entities && WA.entities.buildEntitiesBlock ? WA.entities.buildEntitiesBlock() : ''),
         '【近期正文（最新锚点=m' + anchor.idx + '）】',
         recentText(8)

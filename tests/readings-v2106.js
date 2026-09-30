@@ -274,7 +274,7 @@ function runNegative(assert, ctx) {
 
   // N7 台账 L2 破坏（内存注入）：_note 末次版本词与 version 脱钩
   const b7read = injectLedger('tests/dead-export-ledger.json', function (t) {
-    return mutOnce(t, '（v' + V2106 + '）', '（v9.9.9）', 'N7');
+    return mutOnce(t, '（v' + V2106 + ' ·', '（v9.9.9', 'N7');
   });
   const p7 = R.ledgerReport({ read: b7read });
   assert(p7.problems.filter(function (p) { return p.kind === 'note-mismatch'; }).length >= 1,

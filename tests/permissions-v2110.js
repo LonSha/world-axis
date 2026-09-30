@@ -24,7 +24,7 @@ const KEYS = ['defineRole', 'grant', 'revoke', 'grantDirect', 'effective', 'has'
   // v2.112.0（收边界①的尾巴）：显式闸门与当前使用者。写路径唯一消费方 = core/store.js 的 save()。
   //   枚举口径不变：导出面上**多一个口就要在这里多一行**，否则 A 段会以「未登记的多余口」报红
   //   （这正是想要的效果 —— 出口面只能显式增长）。
-  'session', 'currentUser', 'gate', 'gateStat'];
+  'session', 'currentUser', 'gate', 'gateStat', 'adopt'];
 
 function srcOf() { return fs.readFileSync(path.join(BASE, REL), 'utf8'); }
 function freshHost() {

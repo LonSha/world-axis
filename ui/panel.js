@@ -50,7 +50,11 @@
     //   而那是用户唯一能开关这两个注入源的地方（同 v2.56.0 / v2.96.0 / v2.117.0 的理由）。
     plan: '人物计划', mend: '关系修复',
     // v2.119.0（拓展计划 ③）：供需循环。与 SOURCES 同批登记（否则注入页裸露英文键名 `economy`）。
-    economy: '供需与商路', inst: '组织制度', probe: '调查卷宗', region: '远方', stage: '玩法进度', session: '多人场' };
+    economy: '供需与商路', inst: '组织制度', probe: '调查卷宗', region: '远方', stage: '玩法进度', session: '多人场',
+    // v2.127.0（X2）：世界编年史。与 SOURCES 同批登记 ——
+    //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 `chrono`，
+    //   而那是用户唯一能开关它的地方（同 v2.56.0 / v2.96.0 / v2.117.0 的理由）。
+    chrono: '世界编年史' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
@@ -1912,9 +1916,26 @@
     };
     on('#wa-theme-preview', () => {
       if (!WA.theme) { themeOut('题材模块未加载'); return; }
-      const p = WA.theme.preview(themePicked());
-      themeOut('预览：' + p.moduleCount + ' 模块 / ' + p.chars + ' 字（当前 ' + p.currentChars + ' 字，差异 ' + (p.deltaChars >= 0 ? '+' : '') + p.deltaChars + '）'
-        + '｜新增 ' + p.added.length + '：' + (p.added.join('、') || '无') + '｜移除 ' + p.removed.length + '：' + (p.removed.join('、') || '无') + '（预览未落设置）');
+      const picked = themePicked();
+      const p = WA.theme.preview(picked);
+      let text = '预览：' + p.moduleCount + ' 模块 / ' + p.chars + ' 字（当前 ' + p.currentChars + ' 字，差异 ' + (p.deltaChars >= 0 ? '+' : '') + p.deltaChars + '）'
+        + '｜新增 ' + p.added.length + '：' + (p.added.join('、') || '无') + '｜移除 ' + p.removed.length + '：' + (p.removed.join('、') || '无') + '（预览未落设置）';
+      // X7（v2.128.0）：**题材生成差异对照**——上面那行只答模块与字数，答不出「注入面哪里不一样」。
+      //   这里把「当前生效题材 → 勾选的题材」当一组 A/B 做对照（B7 收口的口径：对注入面做**结构** diff，
+      //   不评判生成内容质量）。两侧一致时明说一致，那就是题材没真影响的现场证据。
+      const cur = (WA.theme.statView && WA.theme.statView().themes) || [];
+      const c = (WA.render && typeof WA.render.themeContrast === 'function') ? WA.render.themeContrast(cur, picked) : null;
+      if (c && c.ok) {
+        text += c.identical
+          ? '｜注入面对照：两侧一致（题材对注入面无结构影响）'
+          //   读数取**引擎给的 readout**（模块级承重，并说明差异落在哪一层）：
+          //   面板自己拼句子时，遇到「源级增删为空、模块级有差异」会显示成「新增源 无」。
+          : '｜注入面对照：' + (c.readout || ('新增源 ' + (c.addedSources.join('、') || '无')
+            + '；移除源 ' + (c.removedSources.join('、') || '无')))
+            + '（源级投影覆盖 ' + c.coverage.mapped + '/' + c.coverage.sources + ' 个源）';
+        if (c.coverage.unmapped.length) text += '｜未映射源 ' + c.coverage.unmapped.length + ' 个：' + c.coverage.unmapped.join('、');
+      }
+      themeOut(text);
     });
     on('#wa-theme-apply', () => {
       if (!WA.theme) { themeOut('题材模块未加载'); return; }
@@ -3199,8 +3220,24 @@
           + (s.need ? ' 需要 ' + s.need.resource + '×' + s.need.amount : '');
       });
       const st = WA.plan.statView();
+      // v2.127.0（X1）：把意图链读数一并带出。此前 `chain` 只有定义没有外部读者 ——
+      //   而「他在第几步、缺什么前置、漂移没有」正是操作者按下「查看」时要知道的东西。
+      //   读不出来就如实说读不出来（不拿 view 的读数冒充链接论）。
+      let link = '';
+      try {
+        const c = WA.plan.chain(planWho());
+        if (c.ok) {
+          link = ' ｜ 第 ' + ((c.step && c.step.seq) || 0) + '/' + c.total + ' 步'
+            + (c.blockedBy.length ? ' 卡在 ' + c.blockedBy.map(function (b) {
+                return b.kind === 'need' ? '缺 ' + b.detail : '前置第 ' + b.seq + ' 步'; }).join('、') : '')
+            + (c.rest.length ? ' 之后还有 ' + c.rest.length + ' 步' : '')
+            + (c.drift ? '（next 已漂移：' + c.goalNext + '）' : '');
+        } else {
+          link = ' ｜ 意图链：' + c.reason;
+        }
+      } catch (e) { link = ''; }
       planOut({ ok: true, id: v.goalText + ' · ' + v.status + ' · 尝试 ' + v.tries
-        + ' · 共 ' + st.rows + ' 条计划（受阻 ' + st.blocked + '）'
+        + ' · 共 ' + st.rows + ' 条计划（受阻 ' + st.blocked + '）' + link
         + (rows.length ? ' ｜ ' + rows.join(' ； ') : '') });
     });
     on('#wa-plan-abandon', () => {
@@ -3393,8 +3430,13 @@
     });
     on('#wa-inst-approve', () => {
       // 批准者本人必须持有 approve：面板只转发「谁批的」，不替他选人。
-      const r = WA.inst.decide(instOrg(), wv('#wa-inst-dec2'), 'approved', { by: wv('#wa-inst-by') });
-      instOut(r.ok ? '已批准：' + r.id + '（由 ' + r.decider + '）' : '未能批准：' + r.reason);
+      // X5（v2.128.0）：走**专用批准口** `inst.approve` —— 它体内就是那一次
+      //   `decide(...,'approved',...)`（同一件事只有一个实现），差别只在返回体多带
+      //   `required`/`holders`。此前此处直调 `decide`，于是 `approve` 全仓零读者：
+      //   批准口没人用 = 那一层「凭什么能批」永远答不出来。
+      const r = WA.inst.approve(instOrg(), wv('#wa-inst-dec2'), { by: wv('#wa-inst-by') });
+      instOut(r.ok ? '已批准：' + r.id + '（由 ' + r.decider + '）'
+        : '未能批准：' + r.reason + (r.holders && r.holders.length ? '（持批准权者 ' + r.holders.join('、') + '）' : ''));
     });
     on('#wa-inst-reject', () => {
       const r = WA.inst.decide(instOrg(), wv('#wa-inst-dec2'), 'rejected', { by: wv('#wa-inst-by') });
@@ -3412,8 +3454,18 @@
     on('#wa-inst-view', () => {
       const r = WA.inst.view(instOrg());
       if (!r.ok) return instOut('无此组织：' + r.reason);
+      // X5（v2.128.0）：`view().canApprove` 只报 approve 一档，答不出「这个人能拍什么板」。
+      //   `authority` 正面答那一问（含「不在任 ⇒ 空集」，而不是让人从「查不到」反推）。
+      //   取批准人输入框里的人来问 —— 用户点「看组织」时想知道的往往正是这个人。
+      const whoA = wv('#wa-inst-by');
+      const auth = (whoA && WA.inst && typeof WA.inst.authority === 'function')
+        ? (function () { try { return WA.inst.authority(instOrg(), whoA); } catch (e) { return null; } })() : null;
+      const authLine = (auth && auth.ok)
+        ? ('｜' + auth.who + '：' + (auth.inOffice ? ('在职 ' + auth.posts.join('/') + '，权限 ' + (auth.perms.join('/') || '无') + (auth.canApprove ? '（可拍板）' : '（不可拍板）')) : '不在任（能拍板的范围是空集）'))
+        : '';
       instOut(r.name + '（' + r.kind + '）：' + (r.posts.length ? r.posts.map(function (p) { return p.title + '=' + (p.holder || '空缺') + '[' + p.perms.join('/') + ']'; }).join('，') : '无职位')
-        + '；待批 ' + r.open + '，未结违约 ' + r.breaches + '，交接 ' + r.successions + ' 次；可批准者 ' + (r.canApprove.join('、') || '无'));
+        + '；待批 ' + r.open + '，未结违约 ' + r.breaches + '，交接 ' + r.successions + ' 次；可批准者 ' + (r.canApprove.join('、') || '无')
+        + authLine);
     });
     on('#wa-inst-out-btn', () => {
       const s = WA.inst.statView();
@@ -3457,9 +3509,13 @@
     on('#wa-probe-view', () => {
       const r = WA.probe.view(probeCase());
       if (!r.ok) return probeOut('无此案：' + r.reason);
+      // X4：`auditRecord` 的真读者**就在这** —— 用户输入的案件 id 是真输入，
+      //   读数落在既有输出节点上。只有 `typeof === 'function'` 的能力申报不算「有人看」。
+      const au = (function () { try { return WA.probe.auditRecord(probeCase()); } catch (e) { return null; } })();
       probeOut(r.question + '（' + r.status + (r.verdict ? '／' + r.verdict : '') + '）：'
         + r.hypotheses.map(function (h) { return h.text + '[支持' + h.support + '/反驳' + h.refute + ']'; }).join('，')
-        + '；' + (r.decidable ? '可定案' : '不可定案（' + (r.blockedBy === 'refuted' ? '有反证未解' : '证据不足') + '）'));
+        + '；' + (r.decidable ? '可定案' : '不可定案（' + (r.blockedBy === 'refuted' ? '有反证未解' : '证据不足') + '）')
+        + (au && au.ok ? ('；审计 线索' + au.evidence + '／对质' + au.confronts + '／误指' + au.wrongs) : '；审计 读不出'));
     });
     on('#wa-probe-out-btn', () => {
       const s = WA.probe.statView();
@@ -3577,7 +3633,21 @@
     });
     on('#wa-se-auth', () => {
       const r = WA.session.auth(wv('#wa-se-name'), wv('#wa-se-token'));
-      seOut(r.ok ? '验票通过：' + r.name + '（' + r.role + '）' : '验票失败：' + r.reason);
+      if (!r.ok) return seOut('验票失败：' + r.reason);
+      // X6（v2.128.0）：验票通过只答「票是对的」，答不出「这个人是谁、授权到哪」。
+      //   `identify` 才是身份那一问（它凭票认人并把结果落到写闸门）——两问必须分开报，
+      //   否则「验过了」会被读成「授权到位了」。
+      const idn = (WA.session && typeof WA.session.identify === 'function')
+        ? (function () { try { return WA.session.identify(wv('#wa-se-token')); } catch (e) { return { ok: false, reason: 'threw' }; } })()
+        : null;
+      let tail = '';
+      if (idn && idn.ok) {
+        tail = '｜身份 ' + idn.identity + (idn.known ? '（座 ' + idn.role + '）' : '')
+          + '；授权位 ' + ((idn.perms || []).join('/') || '无')
+          + (idn.knownToPerms ? '；已在权限表' : '；**不在权限表**')
+          + (idn.gated ? '；写闸门按位拦' : '；写闸门此刻仍放行');
+      } else if (idn) tail = '｜身份未能确定：' + idn.reason;
+      seOut('验票通过：' + r.name + '（' + r.role + '）' + tail);
     });
     on('#wa-se-post', () => {
       // 顺序号留空就不传：由引擎取下一个（面板不替他算，算了就会掩盖跳号）。
@@ -3622,7 +3692,17 @@
     });
     on('#wa-se-out-btn', () => {
       const s = WA.session.statView();
-      seOut(s.host ? ('主持 ' + s.host + '；在场 ' + s.active + '/' + s.seats + '，已到第 ' + s.seq + ' 条') : '尚未开座');
+      const base = s.host ? ('主持 ' + s.host + '；在场 ' + s.active + '/' + s.seats + '，已到第 ' + s.seq + ' 条') : '尚未开座';
+      // X6（v2.128.0）：identity 是**纯只读**的身份现状口（不动闸门），故挂在只读按钮上。
+      //   与 statView 分工：那一格答「几个座、到第几条」，这一格答「此刻谁在场、授权到哪」。
+      const idn = (WA.session && typeof WA.session.identity === 'function')
+        ? (function () { try { return WA.session.identity(); } catch (e) { return null; } })() : null;
+      let tail = '';
+      if (idn && idn.ok) {
+        tail = '｜在场 ' + (idn.seats.map(function (x) { return x.name + '(' + x.role + ':' + (x.perms.join('/') || '无') + ')'; }).join('、') || '（空场）')
+          + (idn.gate ? '；写闸门 ' + (idn.gate.active ? ('当前使用者 ' + idn.gate.user + '，拒 ' + idn.gate.denied + '／未启用 ' + idn.gate.off) : '未启用（无人登记 ⇒ 一律放行）') : '');
+      }
+      seOut(base + tail);
     });
     { const el = $('#wa-shadow-enabled');
       if (el) el.onchange = function () {
@@ -3905,10 +3985,18 @@
     on('#wa-rm-investigate', () => {
       if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });
       const r = WA.rumor.investigate(wv('#wa-rm-id'));
+      // X4（v2.128.0）：裁决面（`probe.resolve`）的显示口 —— 复用既有「调查」按钮，零新增控件。
+      //   「问不出来」（ruling=null：probe 缺席 / 未知层 / 值为空）与「问出来是僵局」（undecided）
+      //   在这里也必须读得不一样，否则两态又被合成一句好听话。
+      const rl = r.ruling;
+      const rlTxt = !rl ? '裁决 问不出来（缺裁决面或缺来源等级）'
+        : ((rl.verdict === 'both' ? '裁决 互相印证（同向，不构成冲突）'
+          : (rl.verdict === 'a' ? '裁决 采信事实侧' : (rl.verdict === 'b' ? '裁决 采信终态侧' : '裁决 未决')))
+          + '（' + rl.reason + '；存疑 ' + rl.doubtedCount + '）');
       // 「传到最后还是不是原来那条」——只报事实：被改过就报 drift 的 from→to，没被改就报原样。
       rumorOut(r.ok ? Object.assign({}, r, { id: '层 ' + r.layer + ':' + r.hopCount + '跳:'
         + (r.tampered ? ('已改写 ' + (r.drift ? (r.drift.from + '→' + r.drift.to) : '')) : '未被改写')
-        + ':隐瞒 ' + r.suppressed }) : r);
+        + ':隐瞒 ' + r.suppressed + '；' + rlTxt }) : r);
     });
     on('#wa-rm-fullview', () => {
       if (!WA.rumor) return rumorOut({ ok: false, reason: 'module-missing' });

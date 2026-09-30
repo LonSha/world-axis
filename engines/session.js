@@ -62,6 +62,9 @@
   const HOST_PERMS = ['post', 'advance', 'decide', 'invite'];
 
   const stat = { hosted: 0, joined: 0, posts: 0, authed: 0, resyncs: 0, refused: 0,
+    // X6（v2.128.0）：身份面三读 —— 认出几个、其中几个真进了权限表、几个认不出。
+    //   「认过 5 次」答不出「5 次里有没有一次是冒充的」——这正是本版要能分辨的那件事。
+    identified: 0, adopted: 0, unidentified: 0,
     lastReason: '', faults: {} };
   function noteFault(reason) {
     stat.faults[reason] = (stat.faults[reason] || 0) + 1;
@@ -315,11 +318,95 @@
     }, 'session:leave');
     return out || { ok: false, reason: 'store-unavailable' };
   }
+  /* ── X6（v2.128.0）身份与授权边界：这张票是谁的、授权到哪 ──────────────
+   *   R105 ⑧ 的病：本模块有座、有票、有顺序号，却答不出「这个人**是谁**、**授权到哪**」——
+   *   调用方每次都得自己拿名字+票来问（`auth`），而「刚才那一步是谁做的」在闸门那边
+   *   只能读到 `permissions.currentUser()`（一个全局字符串），改不了、也留不下痕。
+   *   本版补两口：`identify()` 把票换成**会话身份**（并通过 `permissions.adopt` 落到闸门上，
+   *   此后写路径按位分权）；`identity()` 只读回报「此刻谁在场、授权到哪、门开着没有」。
+   */
+  /**
+   * 凭票认人，并把结论**落到写路径闸门上**。
+   *   三态各归各位（不许「验不过就当真」）：
+   *     · 验不过 ⇒ 归 `anonymous`：恒注册、**一位不带**，并解除闸门当前使用者；
+   *     · 验得过且该名字已登记权限表（`permissions.has` 认得它）⇒ 直接采用，闸门按位拦；
+   *     · 验得过但权限表里没有这个人 ⇒ 如实报 `adopted:false`，并在**当前集合里**注册，
+   *       不带任何权限位 —— 绝不往权限表里塞一个名字（那是权限模块自己的登记面）。
+   *   边界：本口**不写世界**（不改席位、不落盘），只动会话身份与闸门。
+   */
+  function identify(token) {
+    const t = clean(token, 120);
+    if (!t) { noteFault('missing-token'); return { ok: false, reason: 'missing-token' }; }
+    if (!settings().enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const fp = fpOf(t);
+    const seat = seatByToken(fp);
+    const Pm = WA.permissions;
+    if (!seat) {
+      // 验不过：落到匿名，且**收回**闸门上的当前使用者 —— 否则失败之后闸门还替上一次的人把门。
+      stat.unidentified++;
+      stat.lastReason = 'unidentified';
+      const anon = { ok: true, known: false, identity: 'anonymous', perms: [], adopted: false, gated: false,
+        note: '票对不上任何座位 ⇒ 归 anonymous（不带任何权限位）。' };
+      if (Pm && typeof Pm.adopt === 'function') {
+        const a = WA.permissions.adopt('anonymous', []);
+        anon.adopted = !!(a && a.adopted);
+        anon.gated = !!(a && a.gated);
+      }
+      return anon;
+    }
+    if (!seat.active) {
+      stat.unidentified++;
+      noteFault('revoked');
+      const rv = { ok: true, known: false, identity: 'anonymous', name: clean(seat.name, 40),
+        perms: [], adopted: false, gated: false, reason: 'revoked',
+        note: '此座已卸 ⇒ 票不再作数，归 anonymous。' };
+      if (Pm && typeof Pm.adopt === 'function') {
+        const a = WA.permissions.adopt('anonymous', []);
+        rv.adopted = !!(a && a.adopted);
+        rv.gated = !!(a && a.gated);
+      }
+      return rv;
+    }
+    const who = clean(seat.name, 40);
+    const perms = (seat.perms || []).slice();
+    let known = false;
+    if (Pm && typeof Pm.has === 'function') {
+      try { known = Pm.has(who, 'read').allowed === true; } catch (e) { known = false; }
+    }
+    let adopted = false, gated = false;
+    if (Pm && typeof Pm.adopt === 'function') {
+      const a = WA.permissions.adopt(who, perms);
+      adopted = !!(a && a.adopted);
+      gated = !!(a && a.gated);
+    }
+    stat.identified++; stat.adopted += adopted ? 1 : 0;
+    stat.lastReason = 'identified';
+    return { ok: true, known: true, name: who, role: clean(seat.role, 40), identity: who,
+      host: !!seat.host, perms: perms, knownToPerms: known, adopted: adopted, gated: gated,
+      note: known ? '已在权限表中：闸门按位拦。'
+        : '不在权限表中：**不在本口登记**（那是权限模块的登记面）；已按当前集合注册，位为空 ⇒ 同样过不去写闸门。' };
+  }
+  /** 此刻谁在场、授权到哪、写闸门开着没有（**纯只读**：认人走 identify，它动闸门）。 */
+  function identity() {
+    const cur = ssOf() || {};
+    const seats = seatsOf().filter(function (s) { return s && s.active; })
+      .map(function (s) { return { name: clean(s.name, 40), role: clean(s.role, 40), perms: (s.perms || []).slice(), host: !!s.host }; });
+    const gate = (WA.permissions && typeof WA.permissions.gateStat === 'function')
+      ? (function () { try { return WA.permissions.gateStat(); } catch (e) { return null; } })() : null;
+    return { ok: true, enabled: settings().enabled, host: cur.host || '', seats: seats,
+      anonymous: seats.length === 0,
+      gate: gate ? { active: gate.active, user: gate.user, gates: gate.gates, denied: gate.denied, off: gate.off } : null,
+      note: '身份只在**凭票认人**（identify）时确定；本口只报现状，不认人、不改授权。' };
+  }
   function statView() {
     const cur = ssOf() || {};
     return { enabled: settings().enabled, host: cur.host || '', seats: seatsOf().length,
       active: seatsOf().filter(function (s) { return s && s.active; }).length,
-      seq: cur.seq || 0, log: logOf().length, rev: cur.rev || 0 };
+      seq: cur.seq || 0, log: logOf().length, rev: cur.rev || 0,
+      // X6（v2.128.0）：身份面三读。此前只有「验票通过几次」（authed），
+      //   而「几次认不出」与「认出的人里几次真进了权限表」在读数上无处可寻 ——
+      //    那正是「身份冒充无痕迹」这条红线的可观测形态。
+      identified: stat.identified, adopted: stat.adopted, unidentified: stat.unidentified };
   }
   /** 注入块：只报「有谁在场、到第几楼」，不含凭证与视点外内容。 */
   function buildBlock() {
@@ -336,6 +423,9 @@
     SEAT_PERMS: SEAT_PERMS.slice(), HOST_PERMS: HOST_PERMS.slice(),
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     host: host, join: join, auth: auth, post: post, since: since, resync: resync, view: view, leave: leave,
+    // X6（v2.128.0）：身份与授权边界。`identify` 凭票认人并落到写闸门（调 permissions.adopt）；
+    //   `identity` 只读回报在场与授权现状。两者各有真读者（诊断 secSession 与面板两枚控件）。
+    identify: identify, identity: identity,
     statView: statView, buildBlock: buildBlock,
     fingerprint: function (t) { return fpOf(t); },
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }

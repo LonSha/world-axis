@@ -205,6 +205,46 @@
   }
   function currentUser() { return _session; }
   /**
+   * X6（v2.128.0）：**带权限位**登记当前使用者（`session()` 的加强版）。
+   *
+   *   为什么需要它：`session(name)` 只登记「谁在写」，而「这个人**凭什么**能写」由权限表
+   *   说话 —— 会话层的座位权限（`session.SEAT_PERMS`：post/advance/decide/invite）与权限
+   *   模块的位（read/write/delete/admin/…）**是两套词表**。座位上的 `decide` 换不成闸门认得
+   *   的位时，认了人也拦不住写（或反过来，认了半天谁都能写）。
+   *
+   *   三条口径：
+   *     ① **不越权登记**：本函数**不往权限表里塞人**（那是本模块自己的登记面 `grant`）；
+   *        传入的位只在**该用户已在表内**时按 `grantDirect` 逐位追加 ——
+   *        表外的名字如实报 `adopted:false`，并仍然登记成当前使用者（位为空 ⇒ 什么都拦得住）。
+   *     ② **位是白名单**：只接受 `ACTIONS`（READ_ACTOR/WRITE_ACTOR/DELETE_ACTOR/ADMIN 与
+   *        read/write/delete/admin/publish/review）与 `SESSION_BRIDGE`（post/advance/decide/invite）
+   *        两个词表里的名字（**并集**，因为会话座位的词表与权限模块的词表是两套），
+   *        其余一律丢弃并如实计数 ——「自造权限等于自造权力」。
+   *     ③ **匿名可传**：`adopt('anonymous', [])` 是**收回**闸门当前使用者（退到未启用态），
+   *        与 `session('')` 同义，供「验票失败」那种局面使用。
+   *
+   *   返回 `{ok, adopted, user, perms, gated}`：`gated` 为 true 表示**闸门此后会按位拦**
+   *   （即当前使用者真在位且至少有一个位），为 false 表示此刻仍是「放行」态 ——
+   *   「认了人」与「拦得住」在读数上必须分得开。
+   */
+  const SESSION_BRIDGE = ['post', 'advance', 'decide', 'invite'];
+  function adopt(user, perms) {
+    const u = txt(user, 60);
+    if (!u || u === 'anonymous') {
+      _session = null;
+      return { ok: true, adopted: false, user: null, perms: [], gated: false, reason: 'anonymous' };
+    }
+    const want = (Array.isArray(perms) ? perms : []).map(function (p) { return txt(p, 40); }).filter(Boolean);
+    const allowed = want.filter(function (p) { return ACTIONS.indexOf(p) >= 0 || SESSION_BRIDGE.indexOf(p) >= 0; });
+    _session = u;
+    if (!USERS[u]) {
+      return { ok: true, adopted: false, user: u, perms: [], gated: false, dropped: want.length, reason: 'not-in-table' };
+    }
+    allowed.forEach(function (p) { grantDirect(u, p); });
+    const eff = effective(u) || [];
+    return { ok: true, adopted: true, user: u, perms: eff, gated: eff.length > 0, dropped: want.length - allowed.length };
+  }
+  /**
    * 写路径闸门（**唯一实现**；`core/store.js` 的 `save()` 是唯一消费方）。
    *   返回 `null` = 放行；返回拒收体 = 拦下（形态与 `check()` 一致）。
    *   **默认放行**的三种情形，逐条都是刻意的：
@@ -293,6 +333,10 @@
     effective: effective, has: has, can: can, check: check, matrix: matrix,
     stat: stat, reset: reset, ROLE_LABELS: ROLE_LABELS, ACTIONS: ACTIONS.slice(),
     // v2.112.0（收 v2.110.0 边界①的尾巴）：显式闸门 + 当前使用者。写路径的唯一消费方是 core/store.js。
-    session: session, currentUser: currentUser, gate: gate, gateStat: gateStat
+    session: session, currentUser: currentUser, gate: gate, gateStat: gateStat,
+    // X6（v2.128.0）：**带位登记**当前使用者。唯一消费方是 engines/session.js 的 identify()
+    //   （凭票认人后把结论落到写闸门上）。它与 `session()` 的分工：`session()` 只登记「谁在写」，
+    //   本口还管「凭什么能写」，并且**不往权限表里塞人**。
+    adopt: adopt
   };
 })();

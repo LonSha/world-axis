@@ -60,6 +60,10 @@
   const MS_PER_DAY = 86400000;
 
   const stat = { places: 0, events: 0, delivered: 0, blocked: 0, late: 0,
+    // X3（v2.128.0）：离线推进计数与**最近一次**结算摘要（驻内存，与 org 的流水同口径：
+    //   观测面不落盘、不注入，只让「那边到底动没动」在诊断里可读）。累计 `offline`
+    //   只说「推进了几次」，答不出「上一次推了多远、动了几个地区」—— 那正是本条的活。
+    offline: 0, offlineDelivered: 0, offlineOccurred: 0, offlineSkipped: 0, lastOffline: null,
     lastReason: '', faults: {} };
   function noteFault(reason) {
     stat.faults[reason] = (stat.faults[reason] || 0) + 1;
@@ -83,6 +87,9 @@
       ? draft.region : { places: [], events: [] };
     if (!Array.isArray(draft.region.places)) draft.region.places = [];
     if (!Array.isArray(draft.region.events)) draft.region.events = [];
+    // X3（v2.128.0）：离线推进的**基准点**。缺省即 `undefined`（首次结算只落基准、不回头猜），
+    //   故这里刻意**不补 0** —— 补 0 会把「没有基准」伪装成「基准在纪元起点」，
+    //   于是第一次 tickOffline 会算出「你离开了一千九百七十天」这种凭空的远方历史。
     return draft.region;
   }
   /** ① 登记远方地区：**距离与渠道都是必需的**（没有它们就算不出延迟）。 */
@@ -235,6 +242,131 @@
       .filter(function (e) { return e && clean(e.place, 40) === far.name; })
       .map(function (e) { return { id: e.id, kind: e.kind, at: e.at }; }) };
   }
+/* ── X3（v2.128.0）离线推进：玩家不在场时，远方按世界钟自己往下走 ── */
+  /**
+   * ── 它治什么（缺口）────────────────────────────────────────────
+   *   本模块此前有一个**未写明的隐含前提**：结算发生在「有人看着」的时候 ——
+   *   `occur` 要有人登记、`deliver` 要有人到时点催。玩家一走，那些地方就停在离开那一刻。
+   *   现场结果正是 R105 ⑥ 的病：**「玩家离开之后那地方还在变吗」答不出**。
+   *   兄弟模块 `regional` 早就有「每轮回合计」（`tick`），而远方**一条都没有** ——
+   *   同一套世界里，本地会呼吸、远方是布景板，差别只在「玩家在不在场」。
+   *
+   * ── 本函数做三件事，每一件都受同一批硬条件约束 ────────────────
+   *   ① **追平**：已登记未落地的远路事件，按世界钟推进到它应到的时点即落地
+   *   ② **发生**：离开期间超过静默期的远方，按**确定性**掷骰自行发生
+   *   ③ **记账**：结算了什么、跳过了什么、下一次基准点在哪，一律如实带出
+   *
+   * ── 七条边界（全是否定式）──────────────────────────────────────
+   *   ① **只结算报备过的远方**：没 `register` 的地区不在这里长出新事件（控成本，同 X3 口径）。
+   *   ② **本地不在此列**：`distanceDays === 0` 的地区归本地骰子（`roll`）—— 两处都管
+   *      会让同一件事被推两遍，而「推了两遍」在读数上与「推进很快」长得一模一样。
+   *   ③ **受阻不推进**：`blocked` 的地区整体跳过（记进 `skipped`）—— 路断了消息就过不来，
+   *      「那边照样在变」与「我们这边收不到」是两件事，本函数只负责后者说得清。
+   *   ④ **不编细节**：自行发生的事件**不带正文**（`text` 为空），注入面只把它报成「传来消息」。
+   *      细节只能由调用方经 `occur` 显式给 —— 离线推演不该替世界编出具体的人与事。
+   *   ⑤ **不发散历史**：一个窗口一个地区最多一件；容量满了记 `events-full` 并停手，
+   *      **不挤出**既有事件（离线推演无权删掉玩家已经见过的那段历史）。
+   *   ⑥ **没有基准点不假装**：首次调用只落基准、不结算 ——
+   *      「我不知道你走了多久」与「你走了零秒」是两件事（同本仓「未声明 ≠ 允许」的纪律）。
+   *   ⑦ **随机源不依赖现场**：掷骰只由 (地区, 窗口) 决定。用 `WA.rand` 会让同一次离开
+   *      在两次重放里长出两段不同的远方历史 —— 那正是「不可复现」本身。
+   */
+  const OFFLINE_CHANCE = 0.4;    // 每个一天窗口里，一个远方地区自己出事的概率（如实写死，不做旋钮）
+  /**
+   * 确定性掷骰：同一 `(name, win, salt)` 恒得同一值（FNV-1a）。
+   *   为什么不用 `WA.rand`：那是**现场**骰子（玩家回来那一刻才掷），同一次离开重放两次
+   *   会得到两段不同的远方历史。离线演化的可复现性要求随机源只依赖 (地区, 时间)。
+   */
+  function rollOffline(name, win, salt) {
+    const s = String(name) + '|' + String(win) + '|' + String(salt);
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h / 4294967296;
+  }
+  /**
+   * 离线推进。**必须在事务里调用**（与 `regional.applyIncident(draft, …)` 同规格）——
+   *   本函数改的是 `draft.region`，自己不开事务，避免嵌套事务与半提交。
+   * @param {object} draft 事务草稿
+   * @param {{now?:number}} [opts] `now` 缺省取世界钟（调用方已在事务内时应显式传入）
+   */
+  function tickOffline(draft, opts) {
+    if (!settings().enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const o = opts || {};
+    if (!draft || typeof draft !== 'object') { noteFault('no-draft'); return { ok: false, reason: 'no-draft' }; }
+    const now = num(o.now) === null ? clockNow('region') : num(o.now);
+    const rg = openReg(draft);
+    const last = num(rg.lastSettledAt);
+    // ⑥ 没有基准点：只落基准。第一次结算告诉你「从这里起算」，不回头猜你走了多久。
+    if (last === null) {
+      rg.lastSettledAt = now;
+      stat.lastOffline = { first: true, from: now, to: now, elapsedDays: 0, windows: 0,
+        delivered: 0, occurred: 0, skipped: 0, at: now };
+      return { ok: true, first: true, from: now, to: now, elapsedMs: 0, elapsedDays: 0,
+        delivered: 0, occurred: 0, settled: [], skipped: [] };
+    }
+    const elapsed = now - last;
+    if (elapsed <= 0) {
+      return { ok: true, first: false, from: last, to: now, elapsedMs: elapsed, elapsedDays: 0,
+        delivered: 0, occurred: 0, settled: [], skipped: [] };
+    }
+    const cfg = settings();
+    const settled = [], skipped = [];
+    let delivered = 0, occurred = 0;
+    const win = Math.floor(now / MS_PER_DAY);
+    const win0 = Math.floor(last / MS_PER_DAY);
+    rg.places.forEach(function (p) {
+      if (!p || !p.name) return;
+      // ② 本地不在此列（本地由 roll() 管）；③ 受阻不推进。
+      if (p.distanceDays === 0) { skipped.push({ name: p.name, why: 'local' }); return; }
+      if (!LANES[p.lane]) { skipped.push({ name: p.name, why: 'bad-lane' }); return; }
+      if (p.blocked) { skipped.push({ name: p.name, why: 'route-blocked' }); return; }
+      // ① 追平：该地区已登记未落地的事件，按世界钟认到了就落地。
+      //   落地时点取 `dueAt` 而不是 `now`：它是在路上**早就该到**的，不该被推成「你回来那刻刚到」。
+      rg.events.filter(function (e) { return e && !e.deliveredAt && clean(e.place, 40) === clean(p.name, 40); })
+        .forEach(function (e) {
+          if (!(e.dueAt <= now)) return;
+          e.deliveredAt = e.dueAt;
+          delivered++;
+          settled.push({ kind: 'delivered', id: e.id, place: p.name, at: e.dueAt });
+        });
+      // ② 发生：逐窗口确定性掷骰（从离开后的第一个窗口起算，含离开当天之后的每一天）。
+      for (let w = win0 + 1; w <= win; w++) {
+        if (rollOffline(p.name, w, 'event') >= OFFLINE_CHANCE) continue;
+        // ⑤ 容量满即停手：**不挤出**既有事件（那是玩家已经见过的那段历史）。
+        if (rg.events.length >= cfg.maxEvents) { skipped.push({ name: p.name, why: 'events-full' }); break; }
+        const ki = Math.min(EVENTS.length - 1, Math.max(0,
+          Math.floor(rollOffline(p.name, w, 'kind') * EVENTS.length)));
+        const kind = EVENTS[ki];
+        const at = w * MS_PER_DAY;
+        const delay = Math.round((p.distanceDays / LANES[p.lane]) * MS_PER_DAY);
+        const dueAt = at + delay;
+        const id = 'rg_off_' + w + '_' + clean(p.name, 40);
+        // ④ text 留空：细节只能由调用方给 —— 离线推演不替世界编人与事。
+        rg.events.push({ id: id, place: p.name, kind: kind, text: '', at: at, dueAt: dueAt,
+          deliveredAt: (dueAt <= now ? dueAt : 0), lane: p.lane, distanceDays: p.distanceDays,
+          offline: true });
+        occurred++;
+        if (dueAt <= now) delivered++;
+        settled.push({ kind: 'occurred', id: id, place: p.name, atKind: kind, dueAt: dueAt, landed: dueAt <= now });
+      }
+    });
+    rg.lastSettledAt = now;
+    stat.offline = (stat.offline || 0) + 1;
+    stat.offlineDelivered += delivered;
+    stat.offlineOccurred += occurred;
+    stat.offlineSkipped += skipped.length;
+    // 「最近一次推了多远」——只有累计计数时，「一次推了 0 个地区」与「一次没跑」在读数上
+    //   长得一模一样（同 v2.92.0 给 org 补流水的理由：计数不知道每一次的前后值）。
+    stat.lastOffline = { first: false, from: last, to: now,
+      elapsedDays: elapsed / MS_PER_DAY, windows: Math.max(0, win - win0),
+      delivered: delivered, occurred: occurred, skipped: skipped.length, at: now };
+    stat.lastReason = 'offline';
+    return { ok: true, first: false, from: last, to: now, elapsedMs: elapsed,
+      elapsedDays: elapsed / MS_PER_DAY, windows: Math.max(0, win - win0),
+      delivered: delivered, occurred: occurred, settled: settled, skipped: skipped,
+      // 「结算了这一趟」与「结算了什么事」都要能答 —— 只报计数会让 skipped 里的原因无处可寻。
+      note: '离线推进只结算**登记过的远方**；本地归 roll()，受阻地区整体跳过。' };
+  }
   function statView() {
     const rows = eventsOf();
     const byPlace = {};
@@ -269,6 +401,13 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     register: register, markLane: markLane, occur: occur, deliver: deliver,
     heard: heard, fine: fine, statView: statView, buildBlock: buildBlock,
+    // X3（v2.128.0）：离线推进。消费者是 `engines/regional.js` 的 after 链节点
+    //   （`regional.offline`，紧挨既有的 `regional.tick`）—— 那儿是「一轮刚结束、
+    //   世界该往前走一步」的唯一统一时机，与本地回合计同源。
+    //   为什么由 regional 消费而不是自己注册：region 是**拓扑与传播**（路有几条、几天到），
+    //   regional 是**时间驱动**（每轮往前走）。让 region 自己挂 after 链会让两个模块
+    //   各持一个「世界往前走了一步」的时机，那正是本仓反复治理的「两处各说一遍」。
+    tickOffline: tickOffline,
     places: function () { return placesOf().map(function (p) { return { name: p.name, distanceDays: p.distanceDays, lane: p.lane, blocked: !!p.blocked }; }); },
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };

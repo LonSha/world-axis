@@ -265,6 +265,99 @@
     if (out && out.ok) { stat.wrongs++; stat.lastReason = 'wrong-accusation'; }
     return out || { ok: false, reason: 'store-unavailable' };
   }
+  /** 实例：审计读取口。**只读**——不删行、不改状态（与 view/statView 同族）。 */
+  function auditRecord(caseId) {
+    const c = findCase(caseId);
+    if (!c) return { ok: false, reason: 'unknown-case', id: clean(caseId, 60) };
+    return { ok: true, id: c.id, question: c.question, evidence: (c.evidence || []).length,
+      confronts: (c.confronts || []).length, wrongs: (c.wrongs || []).length,
+      verdict: c.verdict || '', note: '审计只读：本口不删行、不改卷宗状态。' };
+  }
+  /* ── X4（v2.128.0）认知冲突裁决：两条线索互相打脸时，采信谁、为什么、存疑什么 ── */
+  /**
+   * ── 它治什么（缺口）────────────────────────────────────────────
+   *   本模块的卷宗**已经把支持与反驳分开记**（`tally` 各自留行、不取平均），
+   *   但「**两条并排的线索互相打脸时该采信谁**」这个问题无处可问 —— 卷宗只知道
+   *   「有几条支持、几条反驳」，不知道「哪条更值得信」。
+   *   现场于是只剩两种做法：要么一有线索就真相大白（悬疑变通知），
+   *   要么永远悬着（没有可判定的收束条件）。R105 ⑤ 的病正是前者。
+   *
+   * ── 本函数只做三件事 ────────────────────────────────────────────
+   *   ① `verdict`  采信谁：`a` / `b` / `both`（同向印证，不是冲突）/ `undecided`（真·打脸）
+   *   ② `why`      为什么：一句人话，说明是等级压过、还是同向印证、还是同强对撞
+   *   ③ `doubted`  存疑什么：**逐条带因**，绝不静默丢弃（存疑不是删除）
+   *
+   * ── 六条边界（全是否定式）──────────────────────────────────────
+   *   ① **同源等级**：强度表由 `LEVELS` 直接派生，不另立第二套尺子 ——
+   *      两套尺子必然分叉（v2.88.0 O1 已付过一次学费），而分叉的后果是「同一个来源
+   *      在两个地方判出两种可信度」。
+   *   ② **同向不是冲突**：两条同方向线索**互相印证**（`corroborated`），
+   *      不报 `undecided` —— 把印证读成僵局，与「一有线索就真相大白」是同一个病的两面。
+   *   ③ **等强对撞不硬裁**：同样强的一支持一反驳 ⇒ `undecided`（`cross-tie`）。
+   *      硬选一个等于替世界发布真相，而本模块的职责是**把可判定性说清楚**，不是替人拍板。
+   *   ④ **不写存档**：本函数一个字都不落盘 —— 《定案》仍然只走 `decide`。
+   *      `resolve` 给的是**裁决所依据的读数**，不是裁决结果本身。
+   *   ⑤ **来源等级与方向都必填**：缺等级（`bad-level`）或缺方向（`missing-direction`）一律拒收 ——
+   *      不说「凭什么信」或不说「支持还是反驳」的线索，本身就构不成冲突。
+   *   ⑥ **不跨链合并**（沿用 X3 取舍）：只裁给定的两条，不替调用方去找「还有没有第三条」。
+   */
+  const STRENGTH = {};
+  LEVELS.forEach(function (k, i) { STRENGTH[k] = i + 1; });
+  function resolve(a, b, opts) {
+    const o = opts || {};
+    const sides = [a, b].map(function (s) {
+      const x = s || {};
+      return { claim: clean(x.claim, 80), level: clean(x.level, 20), dir: clean(x.dir, 20),
+        about: clean(x.about, 40), by: clean(x.by, 40) };
+    });
+    for (let i = 0; i < 2; i++) {
+      const s = sides[i];
+      if (!s.claim) { noteFault('missing-claim'); return { ok: false, reason: 'missing-claim', side: i === 0 ? 'a' : 'b' }; }
+      if (LEVELS.indexOf(s.level) < 0) { noteFault('bad-level'); return { ok: false, reason: 'bad-level', side: i === 0 ? 'a' : 'b', allowed: LEVELS.slice() }; }
+      if (s.dir !== 'support' && s.dir !== 'refute') { noteFault('missing-direction'); return { ok: false, reason: 'missing-direction', side: i === 0 ? 'a' : 'b' }; }
+    }
+    const A = sides[0], Bs = sides[1];
+    const sa = STRENGTH[A.level], sb = STRENGTH[Bs.level];
+    const doubted = [];
+    const label = function (s) { return s.claim + '（' + s.level + '）'; };
+    let verdict, reason, why;
+    if (A.dir === Bs.dir) {
+      // ② 同向：这是**印证**，不是冲突。
+      if (sa === sb) {
+        verdict = 'both'; reason = 'corroborated';
+        why = '两条同向且**同等可信**（都是 ' + A.level + '）⇒ 互相印证，不构成冲突。';
+      } else {
+        const win = sa > sb ? 'a' : 'b';
+        const strong = sa > sb ? A : Bs, weak = sa > sb ? Bs : A;
+        verdict = win; reason = 'stronger-level';
+        why = '两条同向，采信来源更强的「' + label(strong) + '」（' + strong.level + ' 高于 ' + weak.level + '）。';
+        doubted.push({ side: win === 'a' ? 'b' : 'a', claim: weak.claim, level: weak.level,
+          why: 'weaker-level', note: '同向但来源更弱：仍成立，只是不作为主要依据。' });
+      }
+    } else if (sa === sb) {
+      // ③ 等强反向：真·打脸。不硬裁。
+      verdict = 'undecided'; reason = 'cross-tie';
+      why = '一支持一反驳且**同等可信**（都是 ' + A.level + '）⇒ 两条并排成立，谁也不能压过谁。'
+        + '此时定案与宣布真相都不是本函数的事：要么补齐更强的证据，要么如实记「未决」。';
+      doubted.push({ side: 'a', claim: A.claim, level: A.level, why: 'cross-tie' });
+      doubted.push({ side: 'b', claim: Bs.claim, level: Bs.level, why: 'cross-tie' });
+    } else {
+      const win = sa > sb ? 'a' : 'b';
+      const strong = sa > sb ? A : Bs, weak = sa > sb ? Bs : A;
+      verdict = win; reason = 'stronger-level';
+      why = '方向相反，采信来源更强的「' + label(strong) + '」（' + strong.level + ' 高于 ' + weak.level + '）；'
+        + '反方不是被删掉，而是**存疑留档**。';
+      doubted.push({ side: win === 'a' ? 'b' : 'a', claim: weak.claim, level: weak.level,
+        why: 'outweighed', note: '被更强来源压过：只有当更强那条被推翻时才轮到它。' });
+    }
+    return { ok: true, verdict: verdict, reason: reason, why: why,
+      levels: { a: A.level, b: Bs.level }, strength: { a: sa, b: sb },
+      trusted: verdict === 'a' ? A : (verdict === 'b' ? Bs : null),
+      doubted: doubted, doubtedCount: doubted.length,
+      // 与 `decide` 的分工写进返回体：这里给**依据**，那里给**结论**。
+      note: '本函数只报「该采信谁、为什么、存疑什么」，不替卷宗定案（定案走 decide）。',
+      by: clean(o.by, 40), dryRun: true };
+  }
   function view(caseId) {
     const c = findCase(caseId);
     if (!c) return { ok: false, reason: 'unknown-case', id: clean(caseId, 60) };
@@ -314,6 +407,12 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     open: openCase, addEvidence: addEvidence, confront: confront, decide: decide, wrong: wrong,
     view: view, statView: statView, buildBlock: buildBlock,
+    // X4（v2.128.0）：认知冲突裁决。两个口**各有一个真读者**（能力申报不算读者）——
+    //   · `resolve` ← `engines/rumor.js` 的 `investigate`（同一时间握着「事实侧原始值」与
+    //     「链终态值」两条并排线索的只有那条链自己），读数再由面板「调查」按钮显示；
+    //   · `auditRecord` ← 面板「看卷宗」按钮（用户输入的案件 id 是真输入，读数落在既有输出节点上）。
+    //   两个都**不落盘**：卷宗定案仍然只走 `decide`（同一件事只有一个实现）。
+    auditRecord: auditRecord, resolve: resolve,
     tally: function (caseId, hid) { const c = findCase(caseId); return c ? tally(c, hid) : null; },
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };

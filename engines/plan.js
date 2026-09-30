@@ -385,6 +385,130 @@
           afterSeq: (s.afterSeq === undefined ? -1 : s.afterSeq) };
       }) };
   }
+  /**
+   * X1（v2.127.0）长期意图链 —— 把「人物当前计划」与「它挂靠的目标」对成一条可判定的链。
+   *
+   * ── 它治什么（缺口）────────────────────────────────────────────
+   *   `life.goals` 的 `next` 是一个**字符串格子**：`life.tick` 走到 `advance` 时把它写死成
+   *   `'推进中'`，而真正的步骤住在 `plan.steps`。「这一步之后干什么 / 缺什么前置 / 卡在哪」
+   *   三问里，前两问只有本模块答得出、第三问只有 life 侧那句字符串在猜 —— 两侧从未摆在一起过。
+   *   现场那句原话（R105 ①）正是这个：**「长期意图」退化成一句注释**。
+   *
+   * ── 本函数只读，做四件事 ────────────────────────────────────────
+   *   ① `step`      当前第几步（复用 `currentStep`；**正在做的那一步也算当前**）
+   *   ② `blockedBy` 卡在哪 —— 资源不足（need）与前置步未完成（after）**分开报**
+   *   ③ `rest`      这一步之后干什么（后续 pending 步，按 seq 升序）
+   *   ④ `drift`     目标的 `next` 与当前步是否**同指**（不同指即如实报，不修、不猜）
+   *
+   * ── v2.127.0 修掉的两处（都是「答不出」而非「答错」）───────────────
+   *   · 只认 pending 步 ⇒ 第 0 步已 `advance`（running）而后续步都在等它时，`step` 答 `null`，
+   *     而那一刻他明明正在做第 0 步。凡「这一步走没走成」的问句都会读到一个空步骤。
+   *   · 「缺前置」原先只对 `at` 自己判前置，而 `at` 能取到的三种形态（current / blocked /
+   *     running）**其前置必然已完成**（`advance` 的前置准入把它写死了）⇒ 那一段读数是
+   *     **永远取不到值的分支**。现在改为对**最早的待办步**判：它在等谁、那个人什么状态。
+   *
+   * ── 四条边界（全是否定式）──────────────────────────────────────
+   *   ① **不建链**：目标不在 `life.goals` 里、或计划不在场 ⇒ 如实报 `no-plan` / `unknown-goal`，
+   *      绝不顺手造一条空链（那会把「他没打算做」变成「他打算做但没写」）。
+   *   ② **不改状态**：本函数一个字节都不写存档（推进仍只走 advance / settle / rechoose）。
+   *   ③ **不自动规划**：`rest` 只列**已声明**的后续步；「该走哪条」是叙事决定，本模块不代选。
+   *   ④ **漂移只报不修**：`drift:true` 是读数不是错误 —— 对齐不由本函数做。
+   */
+  function chain(personName) {
+    const who = clean(personName, 60);
+    const row = planOf(who);
+    if (!row) return { ok: false, reason: 'no-plan', person: who };
+    const p = personOf(who);
+    // 目标必须**真的**在这人自己的 life.goals 里 —— 计划挂着的目标被人删了就如实报。
+    const goal = p ? goalOf(p, row.goalId) : null;
+    if (!goal) return { ok: false, reason: 'unknown-goal', id: row.id, goalId: clean(row.goalId, 60) };
+    const done = row.steps.filter(function (s) { return s && s.status === 'done'; }).length;
+    const cur = currentStep(row);
+    const stuck = row.status === 'blocked'
+      ? (row.steps.filter(function (s) { return s && s.status === 'blocked'; })[0] || null) : null;
+    // v2.127.0：正在做的那一步（running）**也是当前** —— 只认 pending 会让「第 0 步已开工、
+    //   后续步都在等它」的那一刻答 `step:null`，而那一刻他明明在做第 0 步。
+    const running = row.steps.filter(function (s) { return s && s.status === 'running'; })[0] || null;
+    const at = cur || running || stuck || null;
+    // 「卡在哪」拆成两种不同的事：资源不够（可以等）与前置没完成（得先做前面的）。
+    const blockedBy = [];
+    if (at) {
+      if (at.need) blockedBy.push({ kind: 'need', detail: at.need.resource + '×' + at.need.amount });
+    }
+    // 前置面：对**最早的待办步**判它在等谁。为什么不判 `at` 自己的前置：`at` 的三种形态
+    //   （current / running / blocked）都经过 advance 的前置准入 —— 它们的前置**必然已完成**，
+    //   判了也永远是空（一段读不出值的判据比没有判据更坏）。
+    //   真正会「等」的是**待办步**：上一步受阻（blocked）或正在做（running）时，
+    //   它后面的待办步链上就断了，而这一刻的链状态此前无人答得出（R105 ① 的形状）。
+    const todo = row.steps.filter(function (s) { return s && s.status === 'pending'; })[0] || null;
+    const head = todo || at;
+    if (head && head.afterSeq !== undefined) {
+      const pre = row.steps.filter(function (s) { return s && s.seq === head.afterSeq; })[0];
+      if (pre && pre.status !== 'done') {
+        blockedBy.push({ kind: 'after', seq: pre.seq, text: pre.text, status: pre.status,
+          // 它在等的那一步此刻什么状态：running=正在做（等它完工）、blocked=那一步自己卡住了、
+          //   pending=还没轮到自己（链上的顺序约束）。三态各自通向不同的处置。
+          waitingOn: pre.status, forSeq: head.seq });
+      }
+    }
+    // 后续步：**只列已声明**的（按 seq 升序），不补一条「合理的下一步」。
+    //   起点是 `at`（他此刻在做/在等的那一步）—— 故 `head` 不会重复出现在这里：
+    //   同一个步骤既报「卡在它前面」又报「之后还有它」会让读者把一步读成两步。
+    const rest = row.steps.filter(function (s) {
+      return s && s.status === 'pending' && (!at || s.seq > at.seq);
+    }).map(function (s) {
+      return { seq: s.seq, text: s.text, need: s.need ? Object.assign({}, s.need) : null };
+    });
+    // 漂移：`next` 是 tick 写死的那句注释；当前步才是真在做的。两者不同指即如实报。
+    const goalNext = clean(goal.next, 60);
+    const stepText = at ? at.text : '';
+    return { ok: true, id: row.id, personId: row.personId, goalId: row.goalId,
+      goalText: clean(goal.text, 80), goalStatus: clean(goal.status, 20),
+      status: row.status, reason: row.reason || '', tries: row.tries || 0,
+      total: row.steps.length, done: done, cursor: row.cursor,
+      step: at ? { seq: at.seq, kind: at.kind, text: at.text, status: at.status } : null,
+      blockedBy: blockedBy, rest: rest, goalNext: goalNext,
+      drift: !!(goalNext && stepText && goalNext !== stepText),
+      // 卡住了**不等于**放弃：与 life.decide 的 wait 同口径（「现在做不了」≠「这条路走不通」）。
+      note: stuck ? '受阻不等于放弃：可再 advance 一次重试，或按 fallback 显式改选' : '' };
+  }
+  /**
+   * X1：意图链的**推演侧**块（消费者是 `backstage.buildPrompt` 的 user 段）。
+   *
+   * 与 `buildBlock()` 的分工（两块谁看什么，绝不混）：
+   *   · `buildBlock()` 给**正文模型**：只说「他现在打算做这一步」——摊开后续步骤会让模型照着演。
+   *   · `chainBlock()` 给**推演引擎**：要说「他在第几步、缺什么前置、卡在哪」，因为推演引擎的活
+   *     正是结算「这一步走没走成」；不给链状态，它会另编一条合理后续（那正是 R105 ① 的病）。
+   *
+   * 三条边界：① 关闭时返回空串；② 每人只出**未终结**的计划；③ 出错整块吞掉（推演提示词
+   * 不该因为一个读数异常而整体失败 —— 与 `backstage` 其余附属段的纪律一致）。
+   */
+  function chainBlock() {
+    const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
+    const lines = [];
+    try {
+      rowsOf().filter(function (r) { return r && FINAL.indexOf(r.status) < 0; })
+        .slice(0, cfg.maxPlans).forEach(function (r) {
+          const c = chain(String(r.personId || '').replace(/^p_/, ''));
+          if (!c.ok) return;
+          const bits = ['第 ' + ((c.step && c.step.seq) || 0) + '/' + c.total + ' 步'];
+          if (c.step) bits.push('「' + c.step.text + '」');
+          if (c.blockedBy.length) {
+            bits.push('卡在：' + c.blockedBy.map(function (b) {
+              // v2.127.0：两类受阻都说得出「等的是什么」——资源类报缺额，前置类报它在等第几步。
+              //   此前只渲染 need，前置面即使被算出来也进不了推演提示词（算得出、说不到）。
+              return b.kind === 'need' ? '缺 ' + b.detail : '前置第 ' + b.seq + ' 步（' + b.status + '）未完成';
+            }).join('、'));
+          }
+          if (c.rest.length) bits.push('之后还有 ' + c.rest.length + ' 步');
+          lines.push(c.goalText + '：' + bits.join('，'));
+        });
+    } catch (e) { return ''; }
+    if (!lines.length) return '';
+    return '【人物意图链】' + String.fromCharCode(10) + lines.join(String.fromCharCode(10))
+      + String.fromCharCode(10) + '只按这些**已声明**的步骤结算「这一步走没走成」；'
+      + '缺前置 / 缺资源就如实推进受阻，不要替人物另编一条后续。';
+  }
   /** 台账（诊断/面板读；只读不改）。 */
   function statView() {
     const rows = rowsOf();
@@ -417,6 +541,9 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     expand: expand, current: current, advance: advance, settle: settle,
     candidates: candidates, rechoose: rechoose, abandon: abandon,
+    // X1（v2.127.0）：长期意图链的只读读数（消费者是 backstage 推演与 tool-diag）。
+    //   chain 给读数，chainBlock 给推演提示词段 —— 两块各有一个真消费方，不留裸导出。
+    chain: chain, chainBlock: chainBlock,
     view: view, statView: statView, buildBlock: buildBlock,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };

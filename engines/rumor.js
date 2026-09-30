@@ -243,6 +243,48 @@
   }
 
   /**
+   * X4（v2.128.0）：把「事实侧的原始值」与「这条链传到最后的终态值」当成**两条并排的线索**
+   *   交给 `probe.resolve` 裁决 —— 那是本仓唯一一处回答得了「两条线索互相打脸时采信谁」的地方。
+   *
+   * 为什么消费者在这里（而不是别处）：`resolve` 要的输入是「两条线索 + 各自来源等级」，
+   *   而**同一时间握着这两条线索的只有这条链自己**（原始值 `factValue` 与终态值 `finalValue`
+   *   都长在链上）。等级一律由 `LAYER_LEVEL` 单源反查（fact→record、终态层→对应 intel 层级），
+   *   本模块**不自建第二把尺子** —— 与 `confOf` 同一取舍：两把尺子必然分叉。
+   *
+   * 方向由两个值是否一致决定：一致 ⇒ 同向（这是**印证**，不是冲突）；
+   *   不一致 ⇒ 方向相反（终态反着事实说），此时 `resolve` 按等级表给答案：
+   *   事实侧的 `record` 是整张表里最强的等级，所以「传到最后那条压不过事实本身」是算出来的，不是写死的。
+   *
+   * 三态如实（**问不出来** ≠ **问出来是僵局**）：
+   *   · `probe` 缺席 / 等级反查不出（未知层，不猜）/ 任一侧值为空（构不成冲突）⇒ `ruling: null`；
+   *   · `null` 表示「这个问题在这里问不出来」，而 `verdict:'undecided'` 表示「问出来了，是僵局」——
+   *     两者在读数上必须分得开。
+   * 纯读：`resolve` 带合法输入时零 fault、不落盘，本函数亦不写任何状态
+   *   （与 `investigate` 的「观测不得改变被观测对象」同规）。
+   */
+  function rulingOf(c, finalValue) {
+    if (!WA.probe || typeof WA.probe.resolve !== 'function') return null;
+    if (!c) return null;
+    const lvFact = LAYER_LEVEL.fact;
+    const lvEnd = LAYER_LEVEL[clean(c.layer, 20)];
+    // 未知层不猜：反查不出层级就不去问 —— 追一个自造的等级等于让「我觉得可靠」当证据。
+    if (!lvFact || !lvEnd) return null;
+    const va = String(c.factValue == null ? '' : c.factValue);
+    const vb = String(finalValue == null ? '' : finalValue);
+    // 空值构不成冲突：说不出内容的线索不进裁决（与 probe 的 `missing-claim` 同一口径）。
+    if (!va || !vb) return null;
+    let r = null;
+    try {
+      r = WA.probe.resolve(
+        { claim: va, level: lvFact, dir: 'support', about: c.factKey, by: '链' },
+        { claim: vb, level: lvEnd, dir: (va === vb) ? 'support' : 'refute', about: c.factKey, by: '链' });
+    } catch (e) { return null; }
+    if (!r || r.ok !== true) return null;
+    return { verdict: r.verdict, reason: r.reason, why: r.why,
+      doubted: r.doubted || [], doubtedCount: r.doubtedCount || 0,
+      levels: r.levels, strength: r.strength };
+  }
+  /**
    * 证据调查：把一条链的**全部**经手逐跳列出，并回答那个唯一的问题——
    *   「传到最后还是不是原来那条」。**纯读**：不落盘、不动 stat、不触发挤出。
    * 四态如实：开关关闭 / 链名缺失 / 链不存在 / 正常（不把「没找到」与「没传」混为一谈）。
@@ -264,7 +306,9 @@
       // 除非有人显式以 distort 动机改过它——那时 intact 为 false，且 hops 里能看到是哪一跳改的。
       layer: c.layer, intact: !!c.intact, tampered: !c.intact,
       finalValue: finalValue, drift: (finalValue === String(c.factValue)) ? null : { from: String(c.factValue), to: finalValue },
-      hops: hops, hopCount: hops.length, suppressed: (Array.isArray(c.suppressed) ? c.suppressed : []).length };
+      hops: hops, hopCount: hops.length, suppressed: (Array.isArray(c.suppressed) ? c.suppressed : []).length,
+      // X4：裁决面读数（谁更值得信 / 为什么 / 存疑什么）。`null` = 这里问不出来，与 `undecided` 是两件事。
+      ruling: rulingOf(c, finalValue) };
   }
 
   /**

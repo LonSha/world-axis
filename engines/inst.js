@@ -242,12 +242,21 @@
       if (!og) { out = { ok: false, reason: 'unknown-org', id: clean(orgId, 60) }; return false; }
       const now = clockNow('inst');
       if (!Array.isArray(og.successions)) og.successions = [];
+      // X5（v2.128.0）：**账目核对**。在途数由调用方填，但组织自己的台账也要算一遍 ——
+      //   此前「走的人手里有几件事」全凭调用方一句话，填 0 就归零，而账上有事时读数上无人现形。
+      //   不一致**不拒收**（账外事项可能真实存在），但如实标 `consistent:false` 并记故障 ——
+      //   「不得默认归零」在这里的落地形态是「说得清哪里对不上」，而不是拦住这一次交接。
+      const openOnBooks = (og.pending || []).filter(function (x) { return x && x.status === 'approved'; }).length
+        + (og.breaches || []).filter(function (x) { return x && x.status !== 'settled'; }).length;
+      const consistent = openOnBooks === o.openProjects;
+      if (!consistent) noteFault('handover-drift');
       og.successions.push({ at: now, from: f, to: t2,
-        openProjects: o.openProjects, oldOaths: o.oldOaths,
+        openProjects: o.openProjects, oldOaths: o.oldOaths, openOnBooks: openOnBooks, consistent: consistent,
         keep: o.keep !== false, note: clean(o.note, 60) });
       WA.evict.array(og.successions, 'inst.successions', cfg.maxPending);
       og.updatedAt = now;
       out = { ok: true, id: og.id, from: f, to: t2, openProjects: o.openProjects, oldOaths: o.oldOaths,
+        openOnBooks: openOnBooks, consistent: consistent,
         keep: o.keep !== false, count: og.successions.length };
     }, 'inst:succession');
     if (out && out.ok) { stat.successions++; stat.lastReason = 'succeeded'; }
@@ -379,6 +388,49 @@
     if (out && out.ok) { stat.settled++; stat.lastReason = 'settled'; }
     return out || { ok: false, reason: 'store-unavailable' };
   }
+  /* ── X5（v2.128.0）制度落地：谁拍板、批不批得动 ──────────────────────
+   *   R105 ④ 的病：org 答不出「制度」——要不要批准（`propose` 已答 no-authority）、
+   *   **谁能拍板**（此前只能从 `view().canApprove` 反推，而它只报 approve 一档）、
+   *   **离任后在途项目归谁**（`succession` 的在途数是**调用方手填**的，填 0 就归零）。
+   *   本版把后两问补成可判定：`authority()` 正答「这个人能拍什么板」，
+   *   交接时组织自己台账再算一遍（填的数与账不一致 ⇒ 现形，不静默归零）。
+   */
+  /**
+   * 专用批准口。**不另立第二套判定** —— 内部就是 `decide(…, 'approved', …)` 那一次调用，
+   *   差别只在返回体：这里额外带出「凭什么能批」（当前持 `approve` 位的人）。
+   *   为什么不合进 `decide` 的一个参数：两者问的不是同一件事 —— 「谁有权说行」比
+   *   「谁有权说不行」窄；合并会让权限表跟着调用方的心情走（同一件事两个入口的旧账本仓付过多次）。
+   */
+  function approve(orgId, decId, opts) {
+    const org = findOrg(orgId);
+    if (!org) { noteFault('unknown-org'); return { ok: false, reason: 'unknown-org', id: clean(orgId, 60) }; }
+    const holders = holdersOf(org, 'approve');
+    const r = decide(orgId, decId, 'approved', opts);
+    // 越权时 `decide` 已经给出 `not-authorized` 并带 holders；这里逐字透传，不覆写成另一个码。
+    return Object.assign({}, r, { holders: (r && r.holders) ? r.holders : holders, required: 'approve' });
+  }
+  /**
+   * 「这个人此刻能拍什么板」——R105 ④ 的**正面回答**。
+   *   返回答不出「不在任」的正面形态（`inOffice:false` + 空权限集），而不是让调用方
+   *   从「查不到他」反推「他大概没什么权」——后者与「查的方法错了」长得一模一样。
+   */
+  function authority(orgId, who) {
+    const org = findOrg(orgId);
+    if (!org) { noteFault('unknown-org'); return { ok: false, reason: 'unknown-org', id: clean(orgId, 60) }; }
+    const w = clean(who, 40);
+    if (!w) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    const seats = (org.posts || []).filter(function (p) { return p && clean(p.holder, 40) === w; });
+    if (!seats.length) {
+      return { ok: true, inOffice: false, who: w, posts: [], perms: [], canApprove: false,
+        note: '此人此刻不在该组织任任何职位 ⇒ 能拍板的范围是**空集**（不是「默认能」）。' };
+    }
+    const perms = [];
+    seats.forEach(function (p) { (p.perms || []).forEach(function (x) { if (perms.indexOf(x) < 0) perms.push(x); }); });
+    return { ok: true, inOffice: true, who: w,
+      posts: seats.map(function (p) { return clean(p.title, 40); }), perms: perms,
+      canApprove: perms.indexOf('approve') >= 0,
+      note: '能拍板的范围**只来自在职职位**；离任即空集（历史记录不延续权限）。' };
+  }
   function view(orgId) {
     const o = findOrg(orgId);
     if (!o) return { ok: false, reason: 'unknown-org', id: clean(orgId, 60) };
@@ -396,7 +448,13 @@
     return { enabled: settings().enabled, orgs: rows.length, byKind: kinds,
       posts: rows.reduce(function (n, o) { return n + ((o.posts || []).length); }, 0),
       pending: rows.reduce(function (n, o) { return n + ((o.pending || []).filter(function (r) { return r && r.status === 'pending'; }).length); }, 0),
-      openBreaches: rows.reduce(function (n, o) { return n + ((o.breaches || []).filter(function (r) { return r && r.status !== 'settled'; }).length); }, 0) };
+      openBreaches: rows.reduce(function (n, o) { return n + ((o.breaches || []).filter(function (r) { return r && r.status !== 'settled'; }).length); }, 0),
+      // X5（v2.128.0）：交接面两读 —— 「交了几次」与「其中几次**账对不上**」。
+      //   只有计数时，「交接过且账目一致」与「交接过、填的数跟账上差着」在读数上长得一样。
+      successions: rows.reduce(function (n, o) { return n + ((o.successions || []).length); }, 0),
+      handoverDrift: rows.reduce(function (n, o) {
+        return n + ((o.successions || []).filter(function (r) { return r && r.consistent === false; }).length);
+      }, 0) };
   }
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
@@ -418,6 +476,9 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     charter: charter, post: post, assign: assign, vacate: vacate, succession: succession,
     propose: propose, decide: decide, breach: breach, settle: settle,
+    // X5（v2.128.0）：制度落地两口 —— `approve` 是专用批准口（拍板），`authority` 正答
+    //   「这个人此刻能拍什么板」。两者各有一个真读者（诊断 secInst 与面板两处控件）。
+    approve: approve, authority: authority,
     view: view, statView: statView, buildBlock: buildBlock,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };

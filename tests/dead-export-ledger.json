@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.126.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.126.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.126.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。\n（v2.127.0 · 拓展计划 X1 + X2）本版未触及拒收码面：内联码 601（见证 362 / 死表 8 / 基线 231）三集逐字不变。X1（长期意图链）与 X2（世界编年史）新增的四个出口里，`plan.chain` / `chrono.chronicle` 是**只读读数**（读不出拒收码），`plan.chainBlock` / `chrono.buildBlock` 沿既有各 buildBlock 的纪律「出错整块吞掉、关闭返回空串」，同样不新造码。本台账内容未变，version 字段与末次版本词按三级同源口径同批前进。\n（v2.128.0 · 拓展计划 X3–X8）本版未触及拒收码面：内联码 601（见证 362 / 死表 8 / 基线 231）三集逐字不变。六项的新出口均为只读裁决或读数（复用既有拒收字面量，不新造码）：X3 远方演化 `region.tickOffline`、X4 认知冲突裁决 `probe.resolve`、X5 组织制度 `inst.approve` / `inst.authority`、X6 多会话身份 `session.identify` / `session.identity`、X7 题材对照 `theme.contrast` / `render.themeContrast`、X8 跨插件握手 `bridge.handshake`。其中 `session.identity` 为两处同名定义合一、`render.themeContrast` 的 `readout` 为文案补全（把「有差异但源级增删为空」说清楚），均不引入新的拒收路径。死子面：`region.stat` 由死导出接通真消费方（诊断节只读），dead 607 → 606。本台账内容未变，version 字段与末次版本词按三级同源口径同批前进。\n",
+  "version": "2.128.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -272,7 +272,7 @@
       "src": "engines/bridge.js",
       "refs": 0,
       "tref": 0,
-      "own": 5
+      "own": 6
     },
     "bridge.setSettings": {
       "reason": "unwired",
@@ -288,7 +288,7 @@
       "src": "engines/bridge.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 6
     },
     "bridge.splitCurrents": {
       "reason": "self-only",
@@ -663,7 +663,7 @@
       "detail": "core/clock.js 内部自用、外部零引用（过度导出）",
       "src": "core/clock.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 3,
       "own": 3
     },
     "clock.frozen": {
@@ -695,7 +695,7 @@
       "detail": "core/clock.js 内部自用、外部零引用（过度导出）",
       "src": "core/clock.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 3,
       "own": 3
     },
     "clock.virtualAt": {
@@ -2840,7 +2840,7 @@
       "src": "core/permissions.js",
       "refs": 0,
       "tref": 0,
-      "own": 4
+      "own": 5
     },
     "permissions.grant": {
       "reason": "self-only",
@@ -2856,7 +2856,7 @@
       "src": "core/permissions.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 4
     },
     "permissions.has": {
       "reason": "self-only",
@@ -3306,14 +3306,6 @@
       "tref": 0,
       "own": 5
     },
-    "region.stat": {
-      "reason": "self-only",
-      "detail": "engines/region.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/region.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 19
-    },
     "regional.active": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -3664,7 +3656,7 @@
       "src": "engines/session.js",
       "refs": 0,
       "tref": 0,
-      "own": 25
+      "own": 35
     },
     "settingsBus.applyDefaults": {
       "reason": "self-only",
@@ -4288,7 +4280,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 86
+      "own": 92
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -4894,6 +4886,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 238
+    "dataOnly": 233
   }
 }

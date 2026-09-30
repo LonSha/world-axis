@@ -173,4 +173,27 @@
     id: 'regional.tick', chain: 'after', order: 35, label: '区域突发事件·回合计',
     async run() { WA.regional.tick(); }
   });
+
+  /**
+   * X3（v2.128.0）：远方离线推进 —— **消费者在这里**，而不是 region 自己再挂一个 after 节点。
+   *   分工：`regional` 管「一轮过去了」这个**时机**（与本地回合计、世界钟同源），
+   *   `region` 管「路有几条、消息走几天」这套**拓扑**。
+   *   两处各挂一个时序节点会让「世界往前走了一步」出现两个时机 —— 本仓反复治理的形态。
+   *
+   *   `critical: false`：离线演化失败绝不能拖住、更不能回滚世界推演主链
+   *   （与 `bridge.publish` 同规格：附属面的异常不是主链的异常）。
+   *   R105 ⑥ 的病（「玩家离开之后那地方还在变吗」）在这条节点落地前是**无解**的——
+   *   远方的一切都要有人看着才动，而玩家恰恰不在场。
+   */
+  WA.workflow.register({
+    id: 'region.offline', chain: 'after', order: 36, critical: false,
+    label: '远方离线推进（玩家不在场时那边也在变）',
+    async run() {
+      try {
+        if (!WA.region || typeof WA.region.tickOffline !== 'function') return;
+        if (!WA.region.getSettings().enabled) return;   // 关闭时零开销早退（不白开一次事务）
+        WA.store.transact(function (draft) { WA.region.tickOffline(draft, {}); }, 'region:offline');
+      } catch (e) { /* 附属面失败不拖主链（与 bridge.publish 同规格） */ }
+    }
+  });
 })();

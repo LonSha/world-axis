@@ -33,7 +33,7 @@
     fantasy: { label: '奇幻', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'enemy', 'regional', 'blackbox', 'trends', 'persona', 'relation', 'craft', 'protocol'] },
     business: { label: '经营', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'regional', 'trends', 'persona', 'relation', 'craft', 'protocol'] }
   };
-  const stat = { applies: 0, previews: 0, rejects: 0, lastTheme: '', lastReason: '' };
+  const stat = { applies: 0, previews: 0, rejects: 0, contrasts: 0, lastTheme: '', lastReason: '' };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
     return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
@@ -101,10 +101,66 @@
     if (!t.length) return null;   // null = 未启用题材 => 全量（绝不悄悄改变既有注入）
     return compose(t).modules;
   }
+  /**
+   * X7（v2.128.0）：**题材差异对照**（B7 收口）。
+   *   B7 只做到「模块进没进注入面」，答不出「换了题材，注入面到底哪里不一样」——
+   *   用户勾掉一个题材后，能看到的只有总字数变了，看不到**结构性**的差异（多了哪个模块、
+   *   少了哪个模块）。两个不同题材装出来要是逐字一样，那题材就是摆设，而这种「摆设」
+   *   在没有对照实验时**是看不出来的**（R105 那类「不可判定」的又一例）。
+   *
+   *   本函数对**同一世界快照**（`WA.rules` 的模块正文此刻是什么就是什么）在两种题材下
+   *   的注入面做**结构 diff**：模块集合的增删、字数差、共有的部分。
+   *
+   *   三条口径：
+   *     ① **纯计算**（与 `preview` 同规）：不落设置、不改题材、不碰存档。
+   *     ② **两侧都可为空**：`contrast([], ['urban'])` 是合法问题——
+   *        空题材侧取**全量 ORDER**（与 `preview` 的基线口径逐字一致，见 v2.87.0 自纠），
+   *        不是 `compose([])` 那四个核模块。用错了基线的差异预览会撒谎。
+   *     ③ **不做内容质量评判**：只对结构（模块名与字数）做 diff，不比较正文措辞。
+   *        「哪个题材写得更好」不是本函数能答的问题，硬答就是越界。
+   *
+   *   源级投影（「题材 A 注入了 X 源而 B 没有」）**不在本函数**：源表住在 render/inject.js，
+   *   本文件不该反向依赖它。回的是模块级的结构 diff，由 `render.themeContrast()` 接过去做投影。
+   */
+  function contrast(a, b) {
+    stat.contrasts++;
+    const A = Array.isArray(a) ? a.slice() : [];
+    const B = Array.isArray(b) ? b.slice() : [];
+    const bad = A.concat(B).filter(function (n) { return !known(n); });
+    if (bad.length) {
+      stat.lastReason = 'unknown-theme';
+      return { ok: false, reason: 'unknown-theme', unknown: bad, known: Object.keys(THEMES) };
+    }
+    const order = (WA.rules && Array.isArray(WA.rules.ORDER)) ? WA.rules.ORDER : [];
+    // 空题材侧 = 全量（与 preview 的基线口径同规：未启用题材时注入面就是整张 ORDER）。
+    const setOf = function (names) { return names.length ? compose(names).modules : order.slice(); };
+    const sa = setOf(A), sb = setOf(B);
+    const chars = function (mods) {
+      if (!WA.rules || typeof WA.rules.getModule !== 'function') return 0;
+      return mods.reduce(function (n, k) { return n + (WA.rules.getModule(k) || '').length; }, 0);
+    };
+    // added = 只在 B 出现的模块；removed = 只在 A 出现的模块。命名以 A→B 的迁移方向为准。
+    const added = sb.filter(function (k) { return sa.indexOf(k) < 0; });
+    const removed = sa.filter(function (k) { return sb.indexOf(k) < 0; });
+    const identical = added.length === 0 && removed.length === 0;
+    stat.lastReason = identical ? 'identical' : 'diff';
+    return { ok: true, identical: identical,
+      a: { themes: A, modules: sa.slice(), count: sa.length, chars: chars(sa), all: A.length === 0 },
+      b: { themes: B, modules: sb.slice(), count: sb.length, chars: chars(sb), all: B.length === 0 },
+      added: added.slice(), removed: removed.slice(),
+      common: sa.filter(function (k) { return sb.indexOf(k) >= 0; }).slice(),
+      deltaChars: chars(sb) - chars(sa),
+      // 反判据的读数形态：两侧一致时把原因写明白，让「红」有据可查，而不是只有一句「一样」。
+      note: identical
+        ? '两题材的模块集合完全一致 —— 题材对注入面无结构影响（若两者本应不同，这就是缺陷）。'
+        : '只做注入面**结构** diff（模块增删与字数），不评判生成内容质量。',
+      contrastOnly: true };
+  }
   function statView() {
     const t = settings().themes || [];
     return { themes: t.slice(), active: activeModules(), applies: stat.applies,
-      previews: stat.previews, rejects: stat.rejects, lastTheme: stat.lastTheme, lastReason: stat.lastReason,
+      previews: stat.previews, rejects: stat.rejects, contrasts: stat.contrasts,
+      lastTheme: stat.lastTheme, lastReason: stat.lastReason,
       available: Object.keys(THEMES) };
   }
   /**
@@ -146,6 +202,19 @@
         { owner: 'LonSha', duty: '证据读取', owns: ['lonshaReader'], present: !!d && d.tavernHelper === true, state: lonState },
         { owner: 'RubyPhone', duty: '交互执行', owns: ['phoneBridge'], present: phone.present, state: phone.state, note: phone.note }
       ],
+      // X8（v2.128.0）：**契约握手**。上面 roles 答「谁在不在」，本字段答「契约对不对得上」——
+      //   「装了但契约版本不是这一版」此前与「没装」在读数上长得一样（同一个 `absent`），
+      //   处置却相反。握手是**惰性只读**（只在调用 separation 时读一次现场），
+      //   且**不驱动对端**（不调它的 refresh），缺席如实降级、绝不写死「已接入」。
+      handshake: (function () {
+        try {
+          if (!WA.bridge || typeof WA.bridge.handshake !== 'function') return null;
+          const h = WA.bridge.handshake();
+          return h ? { matched: h.matched, matchedCount: h.matchedCount, degraded: (h.degraded || []).slice(),
+            edges: (h.edges || []).map(function (x) { return { key: x.key, id: x.id, present: x.present, version: x.version, expect: x.expect, matched: x.matched, why: x.why }; }),
+            note: h.note } : null;
+        } catch (e) { return { error: 'handshake-threw' }; }
+      })(),
       host: d ? { sillyTavern: d.sillyTavern, tavernHelper: d.tavernHelper, variables: d.variables, worldbook: d.worldbook } : null,
       // 去重/隔离/来源版本的现状：如实报告，不宣称「已实现」
       dedupe: 'chatcache 按 chatId 隔离快照',
@@ -156,9 +225,9 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   // v2.87.0：known()/compose() 是本文件内部自用口（preview/apply/activeModules 消费，
-  //   外部零引用 = 过度导出），故不进导出面。题材能力对外由 list/preview/apply/
-  //   activeModules/statView/separation 六个有真消费方的口表达。
-  WA.theme = { THEMES, CORE, list: list, preview: preview,
+  //   外部零引用 = 过度导出），故不进导出面。题材能力对外由 list/preview/contrast/apply/
+  //   activeModules/statView/separation 七个有真消费方的口表达。
+  WA.theme = { THEMES, CORE, list: list, preview: preview, contrast: contrast,
     apply: apply, activeModules: activeModules, statView: statView, separation: separation };
   if (WA.log) WA.log('info', '题材规则组合已加载');
 })();

@@ -340,6 +340,109 @@
     });
   } catch (e) {}
 
+  // ── X8（v2.128.0）：跨插件契约的**自描述握手**（三插件实机协议）─────────────
+  //   治的病（v2.87.0 / v2.101.0 留档）：`separation()` 报三插件分工，但**无头下没有对端**，
+  //   真机联调只能靠人肉对着界面看；而「有没有接上」这件事在代码里的唯一判据是
+  //   `WA.xxx` 存不存在——同一个「不在」既可能表示「插件没装」，也可能表示「装了但没加载」，
+  //   还可能表示「加载了但契约版本不是这一版」。三者在人眼里长得一样，处置却相反。
+  //
+  //   本函数把那条判据变成**可判定**：对每一个对端桥，同时核三件事并逐件报出证据——
+  //     ① **在不在**：桥对象挂在全局上没有；
+  //     ② **对端自报版本**：桥自己声明的契约版本（`version` / `LONSHA_BRIDGE_VERSION`）；
+  //     ③ **本侧认的版本**：我们这一版代码认的版本（不是从对端读来的，是本模块自己的常量）。
+  //   三者凑齐才算一次**握手成功**；缺任一件如实降级，**绝不写死「已接入」**。
+  //
+  //   与 `interop.probeAll()` 的分工（不建第二套真源）：
+  //     · `interop` 答「这个伙伴**整体**是什么状态」（五态：ready/partial/absent/incompatible/unknown），
+  //       它关心的是能力面（快照有没有、引擎就位没有）；
+  //     · 本函数答「**契约**这一层握手达成没有」，只做**版本对齐**这一件事，逐边给出
+  //       `{present, version, expect, matched}`。
+  //   两条面的读数**必须互不矛盾**：本函数在 `expect` 缺失时（我方没登记该边版本）
+  //   如实报 `unknown` 而不是猜一个数字——那正是「降级可见」在契约层的形态。
+  //
+  //   纯读：只读全局对象上的对端桥，**不调它们的 refresh / 不写任何一边的状态**（诊断不是命令）。
+  const EDGES = [
+    // out：本扩展 → 外部（对外只读投影）。这一边的「对端」就是宿主全局那枚桥对象本身——
+    //   在场与否要**真去全局上找**（`mounted` 同款判据），不是拿「本模块已加载」当在场。
+    { key: 'out', id: BRIDGE_ID, expect: BRIDGE_VERSION, duty: '对外只读投影（本扩展 → 外部）',
+      probe: function () {
+        let mounted = false;
+        try { mounted = (WA.mainWin || window)[BRIDGE_ID] === bridge; } catch (e) { mounted = false; }
+        return { present: mounted, version: mounted ? BRIDGE_VERSION : null, side: 'self',
+          why: mounted ? 'mounted' : 'not-mounted-on-host' };
+      } },
+    // in：上游快照（只读消费）。对端 = LonSha 记忆插件。
+    { key: 'lonsha', id: 'lonsha_memory_bridge_v1', expect: null, duty: '上游快照（只读消费）',
+      probe: function () {
+        const lr = WA.lonshaReader;
+        if (!lr || typeof lr.lonshaSource !== 'function') return { present: false, version: null, why: 'consumer-missing' };
+        const expect = (typeof lr.LONSHA_BRIDGE_VERSION === 'number') ? lr.LONSHA_BRIDGE_VERSION : null;
+        // 真源是 lonshaSource()：它回 mounted / sourceState / lastError / hasSnapshot / reason。
+        //   **不自行推断**（旧 separation() 读不存在的 s.state 就是这么错的，v2.101.0 已付过学费）。
+        const s = lr.lonshaSource(lr.LONSHA_BRIDGE_ID);
+        if (!s || s.mounted !== true) return { present: false, version: null, expect: expect, why: clean(s && s.reason, 40) || 'not-mounted' };
+        // 对端**自报版本**只有一处真源：它快照里的 `version` 字段（桥对象本身不自报）。
+        //   `refresh:false` 是硬纪律——本面是诊断不是命令，让对端重建快照就等于改了别人的状态。
+        let ver = null;
+        try {
+          const rd = (typeof lr.readLonshaSnapshot === 'function') ? lr.readLonshaSnapshot({ refresh: false }) : null;
+          if (rd && rd.ok && rd.snapshot && typeof rd.snapshot.version === 'number') ver = rd.snapshot.version;
+        } catch (eRD) { ver = null; }
+        return { present: true, version: ver, expect: expect, sourceState: clean(s.sourceState, 24) || null, why: 'mounted' };
+      } },
+    // in：下游手机侧操作（显式写入）。对端 = RubyPhone 的入站桥。
+    { key: 'rubyphone', id: 'worldaxis_phone_ops_v1', expect: 1, duty: '手机侧操作（显式写入）',
+      probe: function () {
+        const pb = WA.phoneBridge;
+        if (!pb || typeof pb.phaseOf !== 'function') return { present: false, version: null, why: 'inbound-bridge-missing' };
+        const p = pb.phaseOf();
+        const ph = clean(p && p.phase, 16);
+        // 对端自报版本 = 桥自己声明的 `version`；本侧认的版本是上面的常量 `expect`
+        //   （与 `interop.probeRubyphone` 的 `want` 同值——两处都是「本侧认的」，
+        //    改动契约版本时须同步，否则两条面会互相打脸）。
+        return { present: true, version: (typeof pb.version === 'number') ? pb.version : null,
+          phase: ph || null, why: ph === 'disabled' ? 'disabled' : 'mounted' };
+      } }
+  ];
+  function clean(v, max) { const s = String(v === null || v === undefined ? '' : v); return s.length > (max || 40) ? s.slice(0, max || 40) : s; }
+  /**
+   * 版本化握手（**纯读**，X8）。
+   * @returns {{ok:boolean, bridge:string, expectVersion:number, edges:Array, matched:boolean,
+   *            matchedCount:number, degraded:Array, note:string}}
+   *   每边形态：`{key, id, duty, present, version, expect, matched, why}`
+   *     · `matched` 为 true 当且仅当**对端在场**且**两版版本都是数字**且**相等**；
+   *     · 对端在场但版本读不到（旧版无字段）⇒ `matched:false` 且 `why:'version-unknown'`
+   *       （**不当作匹配**：把「不知道」说成「对上了」正是本面要治的那种病）；
+   *     · 缺席 ⇒ `present:false` 照实留档，**不写死「已接入」**。
+   *   反判据的落点：`degraded` 里每一条都是「没握手成」的边，缺席却报 matched ⇒ 红。
+   */
+  function handshake() {
+    const at = clockWall();
+    const edges = EDGES.map(function (e) {
+      let r;
+      try { r = e.probe() || {}; } catch (err) { r = { present: false, why: 'probe-threw:' + clean(err && (err.message || err), 40) }; }
+      const expect = (typeof r.expect === 'number') ? r.expect : ((typeof e.expect === 'number') ? e.expect : null);
+      const version = (typeof r.version === 'number') ? r.version : null;
+      let matched = false, why = r.why || '';
+      if (r.present !== true) { matched = false; why = why || 'absent'; }
+      else if (expect === null || version === null) { matched = false; why = 'version-unknown'; }
+      else if (version === expect) { matched = true; why = 'matched'; }
+      else { matched = false; why = 'version-mismatch'; }
+      const out = { key: e.key, id: e.id, duty: e.duty, present: r.present === true,
+        version: version, expect: expect, matched: matched, why: why };
+      if (r.side) out.side = r.side;
+      if (r.phase) out.phase = r.phase;
+      if (r.sourceState) out.sourceState = r.sourceState;
+      return out;
+    });
+    const degraded = edges.filter(function (x) { return x.matched !== true; }).map(function (x) { return x.key + ':' + x.why; });
+    const matchedCount = edges.length - degraded.length;
+    return { ok: true, at: at, bridge: BRIDGE_ID, expectVersion: BRIDGE_VERSION,
+      edges: edges, matched: degraded.length === 0, matchedCount: matchedCount, degraded: degraded,
+      // 口径明写：本函数只核**契约**这一层，不宣称「真机已联调过」——无头环境里没有对端，
+      //   缺席就是缺席，这一点由 `edges[].present` 如实承载，不由本函数的 ok 承载。
+      note: '只核契约（在不在 / 对端自报版本 / 本侧认的版本），不驱动对端、不宣称实机已验证；缺席与版本读不到都如实降级。' };
+  }
   const bridge = WA.bridge = {
     id: BRIDGE_ID,
     version: BRIDGE_VERSION,
@@ -353,6 +456,9 @@
     invalidate: invalidate,
     // settings() 也会被**外部**调用（诊断节、健康分、宿主侧探测），同规格不抛。
     settings: function () { try { return loadSettings(); } catch (eS) { return Object.assign({}, __REG.def); } },
+    // X8（v2.128.0）：版本化握手（**纯读**）。真消费方是 `theme.separation()`——
+    //   三插件分工那一面从此带得动「契约对不对得上」这一件事实，而不是只有「谁在不在」。
+    handshake: handshake,
     setSettings: function (patch) { const next = saveSettings(patch); invalidate('settings-changed'); return next; },
     stat: function () {
       return {

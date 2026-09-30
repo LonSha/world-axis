@@ -341,6 +341,110 @@
       reached: sim.length, capped: sim.length < n ? true : false, dryRun: true };
   }
 
+  /* ── X2（v2.127.0）世界编年史：把 L3 沉淀与已结算事实压成一层可注入的叙事 ── */
+  /**
+   * ── 它治什么（缺口）────────────────────────────────────────────
+   *   本仓的记忆已有 L0–L3 分层（`memory.l3` 记「长线主题 / 世界变迁」）、也有归档历史
+   *   （`store.chronicle`），但**两者从未合成一句「这个世界发生过什么大事」**：
+   *   L3 给的是主题词，chronicle 给的是逐条流水，而注入面只看后者里最近那几条。
+   *   现场结果：三章之后模型读到的是「一堆事件行」，答不出「这个世界的走向」——
+   *   于是它每轮重新推断一次基调，长局里基调随最新一条事件漂。
+   *
+   * ── 本函数只做四件事 ────────────────────────────────────────────
+   *   ① `rows`    **已结算事实**（`store.chronicle`：backstage 的结算段 + horizon/regional 两处
+   *      第二写入方）按 `at` 升序排成一条表
+   *   ② `themes`  `memory.l3` 的长线沉淀（**切片保留原顺序**，不重排、不合并同义词）
+   *   ③ `hidden`  **被挡下的条数**（不是被删掉——只是不进这张表），逐条带因
+   *   ④ `buildBlock()` 把 `rows` 出成注入块（消费者是 `render/inject.js` 的新源 `chrono`）
+   *
+   * ── v2.127.0 收口：两张表**没有**合成一张 ────────────────────────
+   *   首版头注释写的是「合成一条按时间升序的表」，而实现里 `rows` 只收 chronicle、`themes`
+   *   单列 —— 口径与实现不一致是这一类模块最坏的形态（读注释的人会以为 L3 已进表）。
+   *   现在按**读者**分开，不再假装合成：`rows` 给正文模型（发生过什么），`themes` 给诊断
+   *   与面板（这世界的基调），两边的排序单位不同（`at` vs `t`），合起来排没有意义。
+   *
+   * ── 五条边界（全是否定式）──────────────────────────────────────
+   *   ① **不剧透 hidden 级**：显式标了 `visibility:'hidden'` 的历史行一律**不进**这张表
+   *      （如实记进 `hidden`）。未结算暗流**整类不收** —— 非 hidden 的那部分已由既有的
+   *      `currents` 源逐轮进正文，两张表分工按时间轴分（此处只答「此前发生过什么」）。
+   *   ② **不改写、只切分**（沿用 canon 的取舍）：本函数只读，一个字都不写存档。
+   *   ③ **不替世界书写设定**：`themes` 只出 L3 里**已有的**主题词，不生成新主题。
+   *   ④ **不做摘要**：`rows` 保留原题名与摘要切片，不把多条压成一句「世界震荡」——
+   *      压出来的那句话没有来源，正是本模块要防的形态。
+   *   ⑤ **容量如实**：超过 `maxRows` 只保留**最近**的若干行并如实报 `capped`，
+   *      不静默丢弃（丢弃会让「早期的大事」凭空消失）。
+   */
+  function chronicle(opts) {
+    stat.checked++;
+    const o = (opts && typeof opts === 'object') ? opts : {};
+    const s = state();
+    const cfg = settings();
+    const maxRows = (function () {
+      const n = Number(o.limit);
+      return (typeof n === 'number' && isFinite(n) && n > 0) ? Math.min(256, Math.floor(n)) : 48;
+    })();
+    const rows = [];
+    const hidden = [];
+    // ① **只收已结算的归档历史**（写入方：backstage 的 chronicle 段 + horizon）。
+    //   为什么不把未结算暗流一起收：非 hidden 的暗流**已经**由既有的 `currents` 注入源
+    //   逐轮进正文（快照六源之一），本表再收一次就是同一件事两个实现 —— 那正是
+    //   「同一个源两套名字、两本账对不上」的温床（v2.88.0 O1 / v2.99.0 各付过一次学费）。
+    //   两张表的分工是**时间轴上的位置**：`currents` 答「此刻世界在酝酿什么」（每轮会变），
+    //   本表答「这世界此前发生过什么」（只增不减）。
+    const chron = Array.isArray(s.chronicle) ? s.chronicle : [];
+    chron.forEach(function (c) {
+      if (!c || typeof c !== 'object') return;
+      // hidden 判据只看**显式声明**：归档历史默认可见（backstage 写入时已按 visibility 过滤过一遍），
+      //   猜一个「看起来像秘密」的标题去挡，会把正常的大事一起挡掉。
+      if (txt(c.visibility, 20) === 'hidden') {
+        hidden.push({ kind: 'chronicle', title: txt(c.title, 40), why: 'visibility=hidden' });
+        return;
+      }
+      rows.push({ at: (typeof c.at === 'number' && isFinite(c.at)) ? c.at : 0,
+        kind: 'fact', label: txt(c.kind, 20) || 'event',
+        title: txt(c.title, 80), text: txt(c.summary, 120), refs: Array.isArray(c.refs) ? c.refs.slice(0, 4) : [] });
+    });
+    rows.sort(function (a, b) { return a.at - b.at; });
+    const capped = rows.length > maxRows;
+    const kept = capped ? rows.slice(-maxRows) : rows;
+    // ③ L3 长线沉淀：只出**已有**的主题词（切片保留原顺序，不重排）
+    const l3 = (s.memory && Array.isArray(s.memory.l3)) ? s.memory.l3 : [];
+    const themes = l3.map(function (e) {
+      if (!e || typeof e !== 'object') return null;
+      return { t: (typeof e.t === 'number' && isFinite(e.t)) ? e.t : 0,
+        theme: txt(e.theme, 120), worldShift: txt(e.worldShift, 80),
+        refs: Array.isArray(e.refs) ? e.refs.slice(0, 4) : [] };
+    }).filter(Boolean);
+    return { ok: true, rows: kept, count: kept.length, total: rows.length, capped: capped,
+      themes: themes, hidden: hidden, hiddenCount: hidden.length, dryRun: true };
+  }
+  /**
+   * X2：编年史的**注入侧**块（消费者是 `render/inject.js` 的新源 `chrono`）。
+   *
+   * 与 `chronicle()` 的分工：那个给**读数**（逐条行、主题、被挡下的），本块给**行文本** ——
+   *   只出「什么时候、发生了什么」，不把 L3 主题词与 hidden 计数一起塞给正文模型
+   *   （主题词是给作者看的基调摘要，塞进正文等于替模型定了基调，正是本模块要防的那件事）。
+   *
+   * 三条边界：① 关闭 / 无存档 ⇒ 空串（零 token）；② **只出最近若干行**（默认 12），
+   *   超出的如实记 `capped`；③ 出错整块吞掉（与既有各 buildBlock 同纪律：一个读数异常
+   *   不该让整条注入链失败）。
+   */
+  function buildBlock() {
+    const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
+    try {
+      const r = chronicle({ limit: 12 });
+      if (!r.ok || !r.rows.length) return '';
+      const lines = r.rows.map(function (x) {
+        // 行文本只带**已声明的内容**：题名 + 摘要切片。时间戳是内部读数（不进正文——
+        //   正文的时间口径归 `clock`，两处各报一个时间会让「现在是什么时辰」出现两个真源）。
+        return '· ' + (x.title || '（无题）') + (x.text ? '：' + x.text : '');
+      });
+      if (!lines.length) return '';
+      return '【世界编年史】' + String.fromCharCode(10) + lines.join(String.fromCharCode(10))
+        + String.fromCharCode(10) + '以上是世界**已经发生过**的事（只增不减的归档）；'
+        + '它们只供你理解这世界的走向，不要据此推断尚未发生的事，也不要点明「有一条暗流」这类系统口径。';
+    } catch (e) { return ''; }
+  }
   function statOf() {
     return Object.assign({}, stat, {
       faults: Object.assign({}, stat.faults),
@@ -354,6 +458,10 @@
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     record: record, layer: layer, derives: derives, undo: undo, applyUndo: applyUndo,
     stale: stale, diff: diff, simBranch: simBranch,
+    // X2（v2.127.0）：世界编年史。chronicle 给读数（诊断 / 面板），buildBlock 给注入段 ——
+    //   两块各有一个真消费方（`engines/tool-diag.js` 的 secChrono 与 `render/inject.js` 的新源
+    //   `chrono`），不留裸导出（dead-export-gate 的口径是「产品零引用即冻结面」）。
+    chronicle: chronicle, buildBlock: buildBlock,
     stat: statOf
   };
 })();

@@ -2774,6 +2774,71 @@ function runWitness(WA) {
       LI2.setSettings(keepLi);
     }
   }
+  // ══ v2.128.0（拓展计划 X3–X8）：本批新增的六个码，逐条配可执行见证 ══
+  //   口径与既有各条一致：**走产品真 API 把码跑出来**，不往台账 base 里塞行换绿。
+  //   六条各自治的那个「不可判定」见 FOUR_VERSION_PLAN.md 的 X3–X8 施工图。
+  {
+    // ① X3：离线推进必须**在事务里**拿到草稿 —— 没草稿时它不假装推进了零天。
+    const RG = WA.region;
+    if (RG && typeof RG.tickOffline === 'function') {
+      const keepRg = RG.getSettings();
+      RG.setSettings({ enabled: true, maxEvents: 8, maxRoutes: 6, stalenessMs: 86400000 });
+      want('no-draft', 'region.tickOffline：没拿到事务草稿 ⇒ 拒收（不把「我拿不到草稿」说成「你走了零秒」）（X3）');
+      trip('no-draft', function () {
+        return [RG.tickOffline(null).reason, RG.tickOffline('不是草稿').reason];
+      });
+      RG.setSettings(keepRg);
+    }
+    // ② X6：认人落到写闸门（`permissions.adopt`）的两条降级路径。
+    //   ③ 条是「匿名收权」（`session.identify` 验票失败时就走它）；
+    //   ④ 条是「表外的人」——**不往权限表里塞人**，位为空 ⇒ 同样过不去写闸门。
+    const PM = WA.permissions;
+    if (PM && typeof PM.adopt === 'function') {
+      want('anonymous', 'permissions.adopt：匿名即**收回**闸门当前使用者（退到未启用态），不是登记一个「什么都不许的座」（X6）');
+      trip('anonymous', function () {
+        return [PM.adopt('anonymous', []).reason, PM.adopt('', ['read']).reason];
+      });
+      want('not-in-table', 'permissions.adopt：人不在权限表 ⇒ adopted:false 且一位不授（不越权登记）（X6）');
+      trip('not-in-table', function () {
+        return [PM.adopt('__x6_不在表里的人__', ['read', 'write']).reason];
+      });
+      PM.adopt('anonymous', []);   // 复位：不留一个半开的使用者给后续见证
+    }
+    // ③ X7：题材差异对照的三条边界。`themeContrast` 是源级投影口，
+    //   「题材面缺席 / 对照抛错 / 对照返回空」三种坏状态都必须**如实归因**，
+    //   而不是静默返回一个看起来像「两侧一致」的空结果 —— 那正是 X7 要治的病。
+    const RD2 = WA.render;
+    if (RD2 && typeof RD2.themeContrast === 'function') {
+      const keepTheme = WA.theme;
+      want('theme-absent', 'render.themeContrast：题材面缺席 ⇒ 如实归因，不假装「两题材一样」（X7）');
+      trip('theme-absent', function () {
+        let r;
+        try { WA.theme = null; r = RD2.themeContrast([], ['urban']); }
+        finally { WA.theme = keepTheme; }
+        return [r.reason];
+      });
+      want('contrast-thrown', 'render.themeContrast：模块级对照抛错 ⇒ 不吞掉，如实记为 contrast-thrown（X7）');
+      want('contrast-failed', 'render.themeContrast：对照返回空 ⇒ 如实归因 contrast-failed（不把它读成「一致」）（X7）');
+      trip('contrast-thrown', function () {
+        let r;
+        const keepTh = keepTheme && keepTheme.contrast;
+        try {
+          keepTheme.contrast = function () { throw new Error('contrast down'); };
+          r = RD2.themeContrast([], ['urban']);
+        } finally { keepTheme.contrast = keepTh; }
+        return [r.reason];
+      });
+      trip('contrast-failed', function () {
+        let r;
+        const keepTh = keepTheme && keepTheme.contrast;
+        try {
+          keepTheme.contrast = function () { return null; };
+          r = RD2.themeContrast([], ['urban']);
+        } finally { keepTheme.contrast = keepTh; }
+        return [r.reason];
+      });
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

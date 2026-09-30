@@ -166,7 +166,7 @@ function runAll(A) {
   //   ⇒ 调用期 1057→1059、总 1094→1096。两条都由现场 diff 逐条核对过，不是「+2 就对了」。
   //   ui/panel.js 的 `perfTrace.bandCompare` 与 tool-diag 同属**同一命名空间同一成员**，
   //   集合去重后只算一条 —— 这也是为什么「文件改了两处、边只多一条」。
-  A(a.edgesLoad === 37 && a.edgesCall === 1059 && a.edgesAll === 1096 && a.identityOk,
+  A(a.edgesLoad === 37 && a.edgesCall === 1072 && a.edgesAll === 1109 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'

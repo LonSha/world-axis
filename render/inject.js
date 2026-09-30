@@ -60,7 +60,12 @@
     // v2.119.0（拓展计划 ③）：供需循环。只报「有据可查的价与被推着动的原因」，不编行情叙事。
     'economy', 'inst',
     // v2.119.0（拓展计划 ⑤）：调查卷宗。只报「支持/反驳各多少」与「能不能定案」，不替任何人定案。
-    'probe', 'region', 'stage', 'session'];
+    'probe', 'region', 'stage', 'session',
+    // v2.127.0（X2）：世界编年史。与注入分支同批登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
+    //   分工：`currents` 答「此刻世界在酝酿什么」（每轮会变），本表答「这世界此前发生过什么」（只增不减）。
+    //   未结算的暗流整类不进本表——它们已经由 `currents` 源逐轮进正文，再收一次就是同一件事两个实现。
+    'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -78,7 +83,10 @@ style: false,
         //   故注入面取默认 true 不给老用户凭空多出约束。
         plan: true, mend: true,
         // v2.119.0：供需循环。同一条理由（模块总开关默认关）。
-        economy: true, inst: true, probe: true, region: true, stage: true, session: true }, module: 'render' };
+        economy: true, inst: true, probe: true, region: true, stage: true, session: true,
+        // v2.127.0（X2）：世界编年史。同一条理由——其模块总开关默认为关，故注入面取默认 true
+        //   不给老用户凭空多出约束。
+        chrono: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -227,6 +235,9 @@ style: false,
     //   名字必须与注入项的 `source` 逐字同名——同一源两套名字的代价已由 v2.88.0 O1 付过一次。
     plan: '人物计划', mend: '关系修复', economy: '供需与商路', inst: '组织制度',
     probe: '调查卷宗', region: '远方', stage: '玩法进度', session: '多人场',
+    // v2.127.0（X2）：世界编年史。与 SOURCES 同批登记（缺名 ⇒ 失败台账与开关两面裸露英文键
+    //   `chrono`）。名字与注入项的 `source` **逐字同名**——同一源两套名字的代价已由 v2.88.0 O1 付过一次。
+    chrono: '世界编年史',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
@@ -267,7 +278,13 @@ style: false,
     //   用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
     //   v2.96.0 加 rumor 时 SOURCES 登记了、这张映射表漏了——**两张面必须同时增长**（同 v2.56.0 的教训）。
     rumor: 'worldaxis_rumor_settings_v1',
-    canon: 'worldaxis_canon_settings_v1' };
+    canon: 'worldaxis_canon_settings_v1',
+    // v2.127.0（X2）：世界编年史**确有**模块级总开关（engines/chrono.js 第 38 行
+    //   `worldaxis_chrono_settings_v1`）。不登记会怎样：`moduleEnabled` 查不到键就返回 null，
+    //   于是对账面上本源一律落在 `unavailable`（「没有模块级总开关」——而它明明有），
+    //   用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
+    //   同一类漏登记 v2.99.0 已为 rumor/canon 各付过一次学费。
+    chrono: 'worldaxis_chrono_settings_v1' };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -539,6 +556,70 @@ style: false,
           note: face === 'mod-off' ? '可见性勾着也无效：模块总开关关着' : (face === 'unavailable' ? '该源无模块级总开关（由 store 直供）' : '') };
         });
       })() }; },
+    /**
+     * X7（v2.128.0）：**题材生成差异对照**（B7 收口 · render 侧的取数口）。
+     *   `theme.contrast()` 只答模块级的结构 diff（源表住在本文件，theme 不该反向依赖它）。
+     *   本口把模块 diff **投影到注入面**，答出计划书要的那句话：
+     *   「题材 A 注入了 X 源而 B 没有」。
+     *
+     *   归属走**两跳既有真源**，不新造映射表：
+     *     源键 --`SRC_MOD_SETTING`（v2.91.0 O4 建的显式映射）--> 模块 settings 键
+     *          --`WA.__settingsRegs[].module`（模块装载时自登记）--> 模块名
+     *   两跳都有真源，故归属是可核对的；任一跳缺失则如实报 `unmapped`，**不硬归一个模块**
+     *   （硬归会让「源没进注入面」被说成「某个模块没进」——指错排查方向，v2.99.0 付过学费）。
+     *
+     *   反判据的读数形态：模块级与源级**两侧都一致**才记 `identical:true`。两题材装出来
+     *   逐源一样 ⇒ 题材对注入面无影响 ⇒ 红（题材是摆设，而这在没做对照时看不出来）。
+     *
+     *   纯只读：不跑注入链、不改题材、不写存档（与 `theme.preview`/`theme.contrast` 同规）。
+     */
+    themeContrast(a, b) {
+      if (!WA.theme || typeof WA.theme.contrast !== 'function') return { ok: false, reason: 'theme-absent' };
+      const c = (function () { try { return WA.theme.contrast(a, b); } catch (e) { return { ok: false, reason: 'contrast-thrown', error: String(e && (e.message || e)) }; } })();
+      if (!c || !c.ok) return c || { ok: false, reason: 'contrast-failed' };
+      const regs = WA.__settingsRegs || [];
+      const modOf = function (key) {
+        const sk = SRC_MOD_SETTING[key];
+        if (!sk) return null;
+        for (let i = 0; i < regs.length; i++) { if (regs[i] && regs[i].key === sk) return regs[i].module || null; }
+        return null;
+      };
+      const unmapped = [];
+      const attribute = {};        // 源键 -> 模块名（null 记入 unmapped），一次算好
+      SOURCES.forEach(function (k) {
+        const m = modOf(k);
+        attribute[k] = m;
+        if (!m) unmapped.push(k);
+      });
+      const pick = function (mods) { return SOURCES.filter(function (k) { return attribute[k] && mods.indexOf(attribute[k]) >= 0; }); };
+      const sa = pick(c.a.modules), sb = pick(c.b.modules);
+      const addedSources = sb.filter(function (k) { return sa.indexOf(k) < 0; });
+      const removedSources = sa.filter(function (k) { return sb.indexOf(k) < 0; });
+      const identical = c.identical === true && addedSources.length === 0 && removedSources.length === 0;
+      return { ok: true, identical: identical,
+        a: { themes: c.a.themes.slice(), modules: c.a.modules.slice(), sources: sa.slice(), moduleCount: c.a.count, sourceCount: sa.length, chars: c.a.chars },
+        b: { themes: c.b.themes.slice(), modules: c.b.modules.slice(), sources: sb.slice(), moduleCount: c.b.count, sourceCount: sb.length, chars: c.b.chars },
+        addedModules: c.added.slice(), removedModules: c.removed.slice(),
+        addedSources: addedSources.slice(), removedSources: removedSources.slice(),
+        commonSources: sa.filter(function (k) { return sb.indexOf(k) >= 0; }).slice(),
+        deltaChars: c.deltaChars,
+        // 覆盖诚实：本对照只对**有模块归属**的源答话，剩下的如实列出（不假装全都能投影）。
+        coverage: { sources: SOURCES.length, mapped: SOURCES.length - unmapped.length, unmapped: unmapped.slice() },
+        note: identical
+          ? '两题材在模块与源两层都完全一致 —— 题材对注入面无影响（若两者本应不同，这就是缺陷）。'
+          : '源级投影只覆盖有模块归属的源；`coverage.unmapped` 里的源不参与对照（如实列出，不硬归）。',
+        // v2.128.0（X7 自纠）：**给读者的一句读数**。此前面板拿 `addedSources/removedSources`
+        //   自己拼句子，于是遇到「源级增删为空、模块级却有差异」的情形时显示
+        //   「新增源 无；移除源 无」而 `identical:false` —— 看起来像「有差异但差异是空的」。
+        //   实情是：题材增删的那几个模块（blackbox / trends / economy / enemy / regional）
+        //   走的是非模块级注入源，本就没有源归属。读数由**模块级**承重并明说差异落在哪一层。
+        readout: identical ? '两侧在模块与源两层都一致'
+          : (addedSources.length || removedSources.length
+            ? '新增源 ' + (addedSources.join('、') || '无') + '；移除源 ' + (removedSources.join('、') || '无')
+            : '差异在**模块层**：新增模块 ' + (c.added.join('、') || '无') + '；移除模块 '
+              + (c.removed.join('、') || '无') + '（这几个模块的注入不经源表，故源级增删为空）'),
+        contrastOnly: true };
+    },
     getVisibility() { return loadVis(); },
     setVisibility(k, on) { const v = loadVis(); v[k] = !!on; WA.settingsBus.save(__REG, v); },
 
@@ -716,6 +797,10 @@ style: false,
       if (vis.inst && WA.inst) { const ib = engineCall('inst', function () { return WA.inst.buildBlock(); }); if (ib) items.push({ source: '组织制度', content: ib }); }
       // v2.119.0（拓展计划 ⑤）：调查卷宗。只报**在查**的案子，已定案的不进正文（定论归纪事）。
       if (vis.probe && WA.probe) { const pb = engineCall('probe', function () { return WA.probe.buildBlock(); }); if (pb) items.push({ source: '调查卷宗', content: pb }); }
+      // v2.127.0（X2）：世界编年史。只报**已结算归档**里最近若干条（未结算暗流归既有 `currents` 源，
+      //   两个源各答各的问题：那个答「此刻在酝酿什么」，这个答「此前发生过什么」）。
+      //   显式标 hidden 的历史行由 `chrono.chronicle` 挡在表外，本块不另做一遍过滤。
+      if (vis.chrono && WA.chrono) { const chb = engineCall('chrono', function () { return WA.chrono.buildBlock(); }); if (chb) items.push({ source: '世界编年史', content: chb }); }
       if (vis.region && WA.region) { const rg = engineCall('region', function () { return WA.region.buildBlock(); }); if (rg) items.push({ source: '远方', content: rg }); }
       if (vis.stage && WA.stage) { const sg = engineCall('stage', function () { return WA.stage.buildBlock(); }); if (sg) items.push({ source: '玩法进度', content: sg }); }
       // v2.119.0（拓展计划 ⑧）：多人场。只报「谁在场、到第几楼」，**不含任何凭证**。
