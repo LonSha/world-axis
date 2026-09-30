@@ -1,5 +1,5 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.130.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。\n\n（v2.130.0 · 拓展计划 A1–A4 / B1 / C1 / C2 / D1–D4）本版新增十二个引擎（stale-guard / purify-scope / group-refuse / reasoning / story-tone / calendar-custom / rehearse / archive-hide / word-budget / binding / refine / polish）。其中产注入块的两个（reasoning / storyTone）在 render/inject.js 真调 buildBlock 并各接真读者，故不在冻结面；产持久状态的两个（storyTone.rows / calendarPlan.months）走真实站点挤出，站点与登记表逐键同源。其余十个是旁路能力（拦截 / 变换 / 换算 / 预演 / 预览），由新增的 secStitch2130 诊断节接通产品侧读者；groupGuard 的 detect / isGroup 由面板的群聊读数控件与诊断节接通（产品侧真读者），但两者在定义文件外仍无产品代码引用 ⇒ 仍登记在冻结面（不与 reason 归因混为一谈）。冻结面 682 → 757（新增 76 项：self-only +52 / unwired +24；另有 1 项出冻结面——`store.registryParity` 由 engines/rehearse.js 的 `capability()` 真读 ⇒ test-only 352 → 351）；advisory dataOnly 236 → 241（binding 三层的对象映射形态被算作只读数据成员）。本段由 --update 之外**手工追加**：buildInner 每次重建 _note 只写基础句（这也是 tests/readings-v2106.js 的 N7 负控制所依赖的锚点形态）。\n\n（v2.131.0 · O15/O16/O18）本版不新增死导出、不动归因分布：O18 把锚点扫描器的形态面从「只认 ANCHOR* 前缀」宽化到「任意具名锚点常量」（覆盖率 44.14% → 90.99%）；O16 新增 tools/sync-e2e-readings.js 并把端到端读数回填接进门禁；O15 把全量回归硬超时改为实测驱动的 660000ms。三本台账 version 同步 2.131.0。",
+  "_note": "WorldAxis 死子面冻结账本（v2.131.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。\n\ndead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。\n\n（v2.130.0 · 拓展计划 A1–A4 / B1 / C1 / C2 / D1–D4）本版新增十二个引擎（stale-guard / purify-scope / group-refuse / reasoning / story-tone / calendar-custom / rehearse / archive-hide / word-budget / binding / refine / polish）。其中产注入块的两个（reasoning / storyTone）在 render/inject.js 真调 buildBlock 并各接真读者，故不在冻结面；产持久状态的两个（storyTone.rows / calendarPlan.months）走真实站点挤出，站点与登记表逐键同源。其余十个是旁路能力（拦截 / 变换 / 换算 / 预演 / 预览），由新增的 secStitch2130 诊断节接通产品侧读者；groupGuard 的 detect / isGroup 由面板的群聊读数控件与诊断节接通（产品侧真读者），但两者在定义文件外仍无产品代码引用 ⇒ 仍登记在冻结面（不与 reason 归因混为一谈）。冻结面 682 → 757（新增 76 项：self-only +52 / unwired +24；另有 1 项出冻结面——`store.registryParity` 由 engines/rehearse.js 的 `capability()` 真读 ⇒ test-only 352 → 351）；advisory dataOnly 236 → 241（binding 三层的对象映射形态被算作只读数据成员）。本段由 --update 之外**手工追加**：buildInner 每次重建 _note 只写基础句（这也是 tests/readings-v2106.js 的 N7 负控制所依赖的锚点形态）。\n\n（v2.131.0 · O13/O15/O16/O18）本版两处变动：O13 把 `staleGuard.begin/verdict` 接进 `engines/backstage.js` 的主写路径（发请求前取票、结算写库前校验；拒收即丢弃整份推演结果）⇒ 两项出冻结面（751）；O18 把锚点扫描器的形态面从「只认 ANCHOR* 前缀」宽化到「任意具名锚点常量」。证据面 refs 由 3510 升到 3514（backstage 新增两处调用）。",
   "version": "2.131.0",
   "dead": {
     "affect.channel": {
@@ -4690,14 +4690,6 @@
       "tref": 0,
       "own": 20
     },
-    "staleGuard.begin": {
-      "reason": "self-only",
-      "detail": "engines/stale-guard.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/stale-guard.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "staleGuard.clear": {
       "reason": "self-only",
       "detail": "engines/stale-guard.js 内部自用、外部零引用（过度导出）",
@@ -4753,14 +4745,6 @@
       "refs": 0,
       "tref": 0,
       "own": 14
-    },
-    "staleGuard.verdict": {
-      "reason": "self-only",
-      "detail": "engines/stale-guard.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/stale-guard.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "store.batchDepth": {
       "reason": "test-only",

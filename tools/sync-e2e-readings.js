@@ -69,6 +69,18 @@ function liveReadings() {
     const vm2 = /const\s+VERSION\s*=\s*'([\d.]+)'/.exec(idx);
     if (vm2) out.version = vm2[1]; else out.missing.push('index.js#VERSION');
   } catch (e) { out.missing.push('index.js#VERSION'); }
+  // v2.131.0（O16 收口）：**动态审计读数**（`module-cycle-gate.audit()` 的现场值）。
+  //   为何要它：`tests/module-cycle-gate-v2107.js` 的 B 面把 `nsProvided/nsLedger/nsRead`
+  //   与 `deadNs.length` **写成了字面量**（191/166/169、22）—— 这同样是「人工回填面」，
+  //   只是住在锁里而不是 run.js 里；接口面一动（如 O13 新增两处产品调用）就会红。
+  //   真源取**门禁自己的审计函数**（不重算、不复制口径）。
+  try {
+    const mcg = require(path.join(ROOT, 'tests/module-cycle-gate.js'));
+    const a = mcg.audit();
+    out.nsProvided = a.nsProvided; out.nsLedger = a.nsLedger; out.nsRead = a.nsRead;
+    out.deadNsCount = a.deadNs.length;
+    out.edgesLoad = a.edgesLoad; out.edgesCall = a.edgesCall; out.edgesAll = a.edgesAll;
+  } catch (e) { out.missing.push('module-cycle-gate.audit()'); }
   if (!reg) { out.missing.push('module-registry-ledger.json'); }
   else {
     out.loadEdges = (reg.totals && reg.totals.loadEdges);
@@ -163,10 +175,61 @@ const SITES = [
     //   多值门当场把它拦下（拒绝回填）；收窄后只剩真正的入口版本断言。
     re: /(\b(?:ver|VER)[A-Za-z0-9_]*\s*===\s*')(\d+\.\d+\.\d+)(')/g,
     skipComment: true,
+    tailGroup: true,          // 三组形态：尾组是闭引号，必须原样拼回（见 applyPlan 的修正②）
     live: function (L) { return L.version; },
     // v2.131.0：**字符串取值档**。默认档走 `Number(m[2])`，而版本号 `'2.130.0'`
     //   经 Number() 得到 `NaN`——现场表现为 `NaN → 2.130.0`（判据在报数，报的是错的数）。
     rawValue: true
+  },
+  {
+    id: 'nsFace', desc: '命名空间三面（静态提供方 / 账本 / 读面）',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    // 形态 F：`a.nsProvided === 191 && a.nsLedger === 166 && a.nsRead === 169`
+    //   三个数在**同一条断言**里，故按「第一组各取一处」逐条登记（每条一个 capture）。
+    re: /(a\.nsProvided\s*===\s*)(\d+)/g,
+    live: function (L) { return L.nsProvided; }
+  },
+  {
+    id: 'nsLedger', desc: '命名空间：账本面',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(&&\s*a\.nsLedger\s*===\s*)(\d+)/g,
+    live: function (L) { return L.nsLedger; }
+  },
+  {
+    id: 'nsRead', desc: '命名空间：读面',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(a\.nsRead\s*===\s*)(\d+)/g,
+    live: function (L) { return L.nsRead; }
+  },
+  {
+    id: 'deadNsCount', desc: '零读命名空间个数',
+    // 两处都在册：锁（module-cycle-gate-v2107.js 的 B7）与 run.js 的诊断节内联断言。
+    files: ['tests/module-cycle-gate-v2107.js', 'tests/run.js'],
+    re: /(a\.deadNs\.length\s*===\s*)(\d+)/g,
+    live: function (L) { return L.deadNsCount; }
+  },
+  {
+    id: 'edgesCall', desc: '调用期引用边（module-cycle-gate 实测）',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    // 形态 G：`a.edgesLoad === 59 && a.edgesCall === 1176 && a.edgesAll === 1235 && a.identityOk`
+    //   —— 与形态 F 同族（一条断言里多个读数）。**现场实测**：O13 给 backstage 添了两处产品调用
+    //   ⇒ 调用期 1176 → 1177、总边 1235 → 1236（真源取审计函数，不重算）。
+    re: /(&&\s*a\.edgesCall\s*===\s*)(\d+)/g,
+    live: function (L) { return L.edgesCall; }
+  },
+  {
+    id: 'edgesAll', desc: '装载期+调用期边合计',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(&&\s*a\.edgesAll\s*===\s*)(\d+)/g,
+    live: function (L) { return L.edgesAll; }
+  },
+  {
+    id: 'edgesLoad', desc: '装载期边（module-cycle-gate 实测）',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    // 收窄到 `&& a.edgesLoad === `：**现场实测**裸模式会多命中一处负控制里的
+    //   `a.edgesLoad === 0`（破坏副本的期望值），而被多值门拦下。
+    re: /(&&\s*a\.edgesLoad\s*===\s*)(\d+)/g,
+    live: function (L) { return L.edgesLoad; }
   }
 ];
 
@@ -283,11 +346,16 @@ function applyPlan(plan) {
           return g1 + item.to;
         }
         changed++;
-        // v2.131.0（O16 收口）**现场事故修正**：形态 E 是**三组**（前缀 / 数字 / **闭引号**），
+        // v2.131.0（O16 收口）**现场事故修正①**：形态 E 是**三组**（前缀 / 数字 / **闭引号**），
         //   而初版一律只重建 `prefix + 新值` ⇒ 把闭引号吃掉，`'2.130.0'` 变成 `'2.131.0`
-        //   —— 直接把 tests/run.js 的语法写坏（`node --check` 立刻报错，已回滚重做）。
-        //   纪律：形态有几组就重建几组；末尾组原样拼回（它是不该被替换的一部分）。
-        return g1 + item.to + (g3 === undefined ? '' : g3);
+        //   —— 直接把 tests/run.js 的语法写坏（已回滚重做）。
+        //   纪律：形态有几组就重建几组；末尾组原样拼回。
+        // **现场事故修正②（更隐蔽）**：初版用 `g3 === undefined` 判断「有没有第三组」——
+        //   错的：JS 的 `String.replace` 回调**在组数不足时仍会传参**，多出来的位置依次是
+        //   **offset（数字）与整串**，于是 `g1 + to + g3` 把 offset 拼了进去，
+        //   `=== 757` 被改写成 `=== 755939179`（值 = 新值+offset）。多值/语法两条门都拦不住它。
+        //   故尾组必须由站点**显式声明**（`tailGroup`），不从回调实参猜。
+        return site.tailGroup ? (g1 + item.to + g3) : (g1 + item.to);
       });
       report.push({ rel: rel, id: item.id, key: item.key || null, from: item.from, to: item.to, changed: changed });
     });

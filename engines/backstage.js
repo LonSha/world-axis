@@ -335,9 +335,29 @@
       try {
         // v0.8 账本存档点：推演前快照演化状态
         if (WA.ledger) WA.ledger.saveCheckpoint();
+        // ── v2.131.0（O13）：**迟到结果拦截接进主写路径**（stale-guard 的首次真实消费）──
+        //   病灶（O13 计划原文）：本引擎在 v2.130.0 落地了 `begin` / `verdict` 两面，但
+        //   **产品侧只有设置开关与诊断读数**，于是「旧聊天的推演结果写进新聊天」这条链
+        //   在本仓依旧无人拦：每次请求都带着「发出时的现场」记账，结果回来时现场可能
+        //   已经是另一个聊天 / 另一个角色了。
+        //   接法：**发请求前取票**（t0 现场），**结算写库前校验**（落库那一刻的现场）。
+        //   关（默认）：`begin` 返回 `{ok:false}`，`verdict` 对任何票一律放行 ⇒ 行为与本版之前**逐字一致**。
+        const sgTicket = (WA.staleGuard && typeof WA.staleGuard.begin === 'function')
+          ? (function () { try { return WA.staleGuard.begin('backstage'); } catch (e) { return null; } })()
+          : null;
         const result = await this._runInference(anchor, ac.signal);
         if (ac.signal.aborted) return { ok: false, aborted: true };
         if (result) {
+          // 落地前问「还算数吗」：**拒收即丢弃整份结果**（不写库、不落人格），
+          //   并把拒收写进日志 —— 「推演没生效」与「模型没给」必须能分开读。
+          if (WA.staleGuard && typeof WA.staleGuard.verdict === 'function' && sgTicket) {
+            const v = (function () { try { return WA.staleGuard.verdict(sgTicket, 'backstage'); } catch (e) { return null; } })();
+            if (v) {
+              WA.log('warn', '推演结果作废（现场已变：' + ((v.faces || []).join('/') || v.reason) + '）'
+                + (v.was && v.now ? '：' + JSON.stringify({ was: v.was, now: v.now }) : ''));
+              return { ok: false, stale: true, verdict: v, anchor: anchor };
+            }
+          }
           // 字数限制截断（v0.5 limits引擎）
           const clamped = WA.limits ? WA.limits.clampBackstageResult(result) : result;
           const tx = WA.store.transact(draft => { this.applyResult(draft, clamped, anchor); });

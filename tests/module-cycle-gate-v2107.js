@@ -166,7 +166,7 @@ function runAll(A) {
   //   ⇒ 调用期 1057→1059、总 1094→1096。两条都由现场 diff 逐条核对过，不是「+2 就对了」。
   //   ui/panel.js 的 `perfTrace.bandCompare` 与 tool-diag 同属**同一命名空间同一成员**，
   //   集合去重后只算一条 —— 这也是为什么「文件改了两处、边只多一条」。
-  A(a.edgesLoad === 59 && a.edgesCall === 1176 && a.edgesAll === 1235 && a.identityOk,
+  A(a.edgesLoad === 59 && a.edgesCall === 1177 && a.edgesAll === 1236 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -189,11 +189,11 @@ function runAll(A) {
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
-  A(a.nsProvided === 191 && a.nsLedger === 166 && a.nsRead === 169,
+  A(a.nsProvided === 191 && a.nsLedger === 166 && a.nsRead === 170,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
-  A(a.deadNs.length === 22, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 21, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
