@@ -209,6 +209,25 @@ async function launch(root, options) {
     try { signalGroup(child, 'SIGKILL'); } catch (e) { result.signalError = e.code; }
     fs.closeSync(fd);
     const text = fs.readFileSync(logFile, 'utf8');
+    // v2.131.0（O15 ①）：**被超时掐掉时补写中断摘要**。现场实测的坑：子进程被 SIGKILL
+    //   （stop('timeout') → 2s 后 SIGKILL），kill 不可捕获，故 run.js 里的 SIGTERM 处理器
+    //   根本没机会跑；而 run.log 是**同一个 fd** 直写，故 fsync 后内容仍完整。
+    //   于是「跑到哪一节」可以**从日志尾部还原**（每节开头是 `■ 标题`），补写成一条可读摘要。
+    //   不这么做的话，跑不完的整趟只剩 `Status: interrupted`，读起来像环境问题。
+    //   注：判据用 `stopping`（而不是「日志里有没有 `通过 N / 失败 M`」）—— 现场实测踩到过：
+    //   某些**子门禁**自己也会打印一行 `通过 49 / 失败 0`，用「有无该行」当判据会误判成
+    //   「已经跑完」，于是中断摘要不补写、跑不完的整趟又变回一句 `Status: interrupted`。
+    if (stopping) {
+      const secs = text.match(/^■ .*$/gm) || [];
+      const times = text.match(/⏱ ([\d.]+)s/g) || [];
+      const last = secs.length ? secs[secs.length - 1].replace(/^■ /, '') : '(尚未进入任何 section)';
+      const slow = (text.match(/超 60s/g) || []).length;
+      const line = '（中断摘要·由运行器依日志尾补写）跑到「' + last + '」· 已完成节 '
+        + Math.max(0, secs.length - 1) + ' / ' + secs.length + ' 可见 · 本节耗时 ' + (times.length ? times[times.length - 1] : '?')
+        + ' · 超 60s 节 ' + slow + ' 个 · 结束原因 ' + stopping;
+      fs.appendFileSync(logFile, '\n' + line + '\n');
+      result.interruptedSummary = line;
+    }
     const summary = text.match(/通过 (\d+) \/ 失败 (\d+)/g);
     result = { ...result, ...exit, summary: summary ? summary[summary.length - 1] : null,
       unchanged: JSON.stringify(snapshot(root)) === JSON.stringify(prepared.before),

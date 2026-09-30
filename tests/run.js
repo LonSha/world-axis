@@ -4,10 +4,15 @@
 const __isolatedRunner = require('./isolated-runner.js');
 if (!__isolatedRunner.isWorker(require('path').join(__dirname, '..'))) {
   __isolatedRunner.launch(require('path').join(__dirname, '..'),
-    // v2.119.0（优化一）：硬超时可配。默认 600000（历史值）意味着「跑不完 = interrupted」，
-    //   而 interrupted 看起来像环境问题、不像缺陷。慢机/长局可用 WA_REGRESSION_TIMEOUT_MS 放宽；
-    //   不设该变量时行为与 v2.118.0 逐字一致。
-    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 600000 })
+    // v2.119.0（优化一）：硬超时可配。
+    // v2.131.0（O15 ②）：**默认值由实测驱动**（不再是历史值 600000）。现场实测：
+    //   整趟 439.0s（409.05s 节内合计 + 开销；`tools/slow-sections.js` 归集到的 195 节合计 435.04s），
+    //   而 196 节里只有 2 节超 60s（v2.106.0 86.70s / v2.82.0 80.87s）——**问题是总时长，不是单节**。
+    //   旧默认 600000（10 分钟）比实测总时长还短 ⇒ 每次跑都会在 v2.118.0 段被 SIGKILL，
+    //   而截断现场只留 `Status: interrupted`（读起来像环境问题，不像「跑不完」）。
+    //   新默认 = slow-sections 的建议口径 «合计 x 1.5，向上取整到分钟» = 660000ms。
+    //   慢机/长局仍可用 WA_REGRESSION_TIMEOUT_MS 放宽；不设该变量时用下面这个实测口径值。
+    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 660000 })
     .then(code => { process.exitCode = code; })
     .catch(error => { console.error(error.message); process.exitCode = 3; });
   return;
@@ -47,6 +52,36 @@ const mcg = require('./module-cycle-gate.js');
 const BASE = path.join(__dirname, '..');
 let pass = 0, fail = 0;
 const failures = [];
+// v2.131.0（O15 ①）：**中断摘要**。治的病（现场实测）：整趟回归 **439.0s**（196 节，
+//   只有 2 节超 60s），而 `isolated-runner` 硬超时默认 **600000ms（10 分钟）**！
+//   —— 超时那一刻子进程被杀，摘要（在最后一行）根本没机会打印：
+//   现场只剩 `result.json` 里的 `code` 与一句「通过 N / 失败 M」的**空摘要**，
+//   读起来像环境问题、不像「跑不完」。故把摘要注册到**退出前**与**信号**两条路径上，
+//   被 SIGTERM 掐掉时也能说明「跑到哪一节、通过多少、慢在哪」。
+let __interrupted = null;
+function __summaryLine() {
+  return '（中断摘要）已通过 ' + pass + ' / 失败 ' + fail
+    + ' · 跑到「' + __secName + '」（本节已 ' + ((__secT ? Date.now() - __secT : 0) / 1000).toFixed(1) + 's）'
+    + ' · 本趟超 60s 的节 ' + __slowSec119 + ' 个'
+    + ' · 提示：慢是主因，可用 WA_REGRESSION_TIMEOUT_MS 放宽或按节分档跑';
+}
+function __dumpOnExit() {
+  if (__interrupted && !__dumped) {
+    __dumped = true;
+    console.log(__summaryLine());
+    if (!failures.length) console.log('失败项: （无 —— 是被超时掐掉，不是判据红）');
+  }
+}
+let __dumped = false;
+process.on('exit', __dumpOnExit);
+['SIGTERM', 'SIGINT'].forEach(function (sig) {
+  process.on(sig, function () {
+    __interrupted = sig;
+    console.log('\n⚠ 收到 ' + sig + '（多为硬超时）：' + __summaryLine());
+    __dumpOnExit();
+    process.exit(124);
+  });
+});
 function assertDeepEq(actual, expected, name) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
   if (a !== e) { throw new Error('断言失败[' + name + ']: ' + a + ' !== ' + e); }
@@ -19451,6 +19486,26 @@ assert(r2900.dead.length === 753 && r2900.uiDead.length === 4 && r2900.dataOnly.
     //   读数只报不红，但「恰 N 个」这条判据本身仍须与现场同宽（否则它会在读数没异常时误红）。
     assert(a.deadNs.length === 22 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
       'v2107: 零读 ns 恰 ' + a.deadNs.length + ' 个且不含任何核心 ns（读数只报不红）');
+
+    // v2.131.0（O16 收口）：**端到端读数与账本现场同源**（把 R115/R116 的人工漏改面接进自动化）。
+    //   背景：这些数字形态各异（`assert(a === N)` / `indexOf('… N')` / 三元比较），
+    //   `tools/sync-hardcoded.js` 的读数族表管不到，过去两轮迭代各漏改一次（R115 一处、R116 四处）。
+    //   判据不是「再写一遍数字」（那只是第二个真源），而是**让工具自己核**：
+    //   真源取门禁当场写盘的两本账本（module-registry-ledger / dead-export-ledger），
+    //   逐站点比对；失配即非零退出，并把位置报出来。
+    //   注 ①：本段只**核**不写（`--verify` 同规格），与 tools/sync-hardcoded.js 的 `--check` 同。
+    //   注 ②：**必须同时要求「真核了站点」**（`checked > 0`）—— 只看 `ok` 的话，
+    //     形态表失灵（一处站点都认不出）会得到 `ok=true 而 checked=0` 的假绿。
+    const e2e = require(path.join(BASE, 'tools/sync-e2e-readings.js'));
+    const e2eR = e2e.verifySync();
+    assert(e2eR.checked > 0, 'v2131/O16: 端到端读数核验**真核了站点**（实 ' + e2eR.checked
+      + ' 个 —— 为 0 说明形态表失灵，`ok` 会是假绿）');
+    assert(e2eR.ok && e2eR.mismatch.length === 0,
+      'v2131/O16: 端到端读数与账本现场同源（核过站点 ' + e2eR.checked + ' 个 · 失配 '
+      + e2eR.mismatch.length + ' 处'
+      + (e2eR.mismatch.length ? '：' + e2eR.mismatch.slice(0, 3).map(function (x) {
+        return x.file + ':' + x.line + ' 现 ' + x.now + ' / 账本 ' + x.want;
+      }).join(' ; ') : '') + '）');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
     runLock('./module-cycle-gate-v2107.js');

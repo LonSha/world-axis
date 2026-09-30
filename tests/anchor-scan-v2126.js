@@ -111,13 +111,46 @@ function runB(a) {
   // 三类归因都出现了（not-found / impure 至少各一；not-unique 或 ambiguous 至少一）
   const kinds = {};
   r.issues.forEach(function (p) { kinds[p.kind] = (kinds[p.kind] || 0) + 1; });
-  a((kinds['not-found'] || 0) >= 1 && (kinds['impure'] || 0) >= 1,
-    'v2126/B: 真找出了问题（not-found ' + (kinds['not-found'] || 0) + ' / impure ' + (kinds['impure'] || 0) + '）');
+  a((kinds['impure'] || 0) >= 1,
+    'v2126/B: 真找出了问题（impure ' + (kinds['impure'] || 0) + '）');
   a(((kinds['not-unique'] || 0) + (kinds['ambiguous-target'] || 0)) >= 1,
     'v2126/B: 唯一性面有归因（not-unique ' + (kinds['not-unique'] || 0)
       + ' / ambiguous-target ' + (kinds['ambiguous-target'] || 0) + '）');
   a(r.issues.every(function (p) { return p.pattern && p.evidence; }),
     'v2126/B: 每条问题都带形态与证据（否则读的人只能看一个数字，无从复核）');
+  // v2.131.0（O18）：`not-found` 面**由「计数 ≥ 1」改为「两向能力自证」**。
+  //   为何必须改：O18 把形态面从「只认 ANCHOR* 前缀」宽化到「任意具名锚点常量」后，
+  //   原先那批 not-found **全是转义形态（`\\n`）导致的假阴性**（现场：act-b1 的 8 个真锚点
+  //   命中数全部为 1，唯一「问题」是 TAG 假阳性），修掉后 not-found 如实归零。
+  //   计数判据随之过期 —— 但**不许放宽**（那会把真判据也变成永真）：改为在**破坏副本**上
+  //   证明这条归因仍然活着（真源码破坏 → 装载破坏副本 → 同判据重跑），
+  //   同时要求原版上同一判据**不为假报**。这是「破坏可观测」两向，比计数更强。
+  const probe = 'b2-travel-v2117.js';
+  const ex = M.extract(src('tests/' + probe));
+  const targets = ex.targets;
+  a(targets.length === 1 && ex.anchors.length >= 1,
+    'v2126/B: not-found 能力探针前提成立（目标 ' + targets.length + ' 个 / 锚点 ' + ex.anchors.length + ' 条）');
+  const tgtRel = targets[0];
+  const realTgt = src(tgtRel);
+  let victim = null, victimForm = null;
+  ex.anchors.forEach(function (an) {
+    if (victim) return;
+    [an.txt, an.txt.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r')].forEach(function (f) {
+      if (!victim && f && realTgt.indexOf(f) >= 0) { victim = an.txt; victimForm = f; }
+    });
+  });
+  a(!!victim, 'v2126/B: 在目标文件里定位到一个可破坏的锚点原文（实 ' + (victim ? JSON.stringify(victim.slice(0, 40)) : '无') + '）');
+  if (victim) {
+    const broken = realTgt.split(victimForm).join('[O18破坏]');
+    const cache = function (rel) { return { src: rel === tgtRel ? broken : src(rel) }; };
+    const real = function (rel) { return { src: src(rel) }; };
+    const rBroken = M.scanLock(probe, cache);
+    const rReal = M.scanLock(probe, real);
+    const brokeHas = rBroken.problems.some(function (p) { return p.kind === 'not-found' && p.evidence === victim.slice(0, 70); });
+    const realHas = rReal.problems.some(function (p) { return p.kind === 'not-found' && p.evidence === victim.slice(0, 70); });
+    a(brokeHas, 'v2126/B:（破坏可观测）把该锚点原文从目标文件删掉 ⇒ 同款判据立刻报 not-found');
+    a(!realHas, 'v2126/B:（纯度）原版目标文件上同一锚点**不**被误报为 not-found —— 两向自证成立');
+  }
 }
 // ── C 面：负控制（真源码破坏 ⇒ 同款判据现形）────────────────────────
 function runC(a) {
