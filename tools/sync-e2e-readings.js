@@ -60,6 +60,15 @@ function liveReadings() {
   const reg = readJson(REG_LEDGER);
   const dead = readJson(DEAD_LEDGER);
   const out = { missing: [] };
+  // v2.131.0（O16 形态 E）：**版本的权威真源是入口**（`index.js` 的 `VERSION`）。
+  //   为何不取账本：账本里的 version 由门禁从入口推导 —— 取「推导结果」会把
+  //   「入口改了、门禁没跑」这种状态判成同源（正是要治的那类假绿）。
+  //   故直接读入口那一行，读不到就如实报缺（missing），不回落。
+  try {
+    const idx = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
+    const vm2 = /const\s+VERSION\s*=\s*'([\d.]+)'/.exec(idx);
+    if (vm2) out.version = vm2[1]; else out.missing.push('index.js#VERSION');
+  } catch (e) { out.missing.push('index.js#VERSION'); }
   if (!reg) { out.missing.push('module-registry-ledger.json'); }
   else {
     out.loadEdges = (reg.totals && reg.totals.loadEdges);
@@ -140,6 +149,24 @@ const SITES = [
     re: /(dist\d{4}\['(test-only|self-only|unwired)'\]\s*===\s*)(\d+)/g,
     live: function (L) { return L.dist; },
     isGroup: true
+  },
+  {
+    id: 'versionConst', desc: '版本常量断言（入口 VERSION 的一致性面）',
+    files: ['tests/run.js', 'tests/settle-v2830.js'],
+    // 形态 E：`<变量> === '2.130.0'`（入口与清单同源 / 入口版本断言）。
+    //   现场的病灶（O16 的真实目标面）：这些断言字面量是**手写**的，每次升版都要逐处改；
+    //   改法与 R115/R116 的漏改同源 —— 且历史注释里还留着上一版的口号（`入口版本为 2.123.0`）。
+    //   真源 = `index.js` 的 `VERSION`（入口是唯一的权威；账本/清单都由门禁从它推导）。
+    //   正则**必须带变量名前缀**（`ver*|VER*`）：现场首版用裸 `=== '2.130.0'` 撞过车 ——
+    //   `tests/run.js:14349` 的 `sumOK.pluginVersion === '3.175.0'` 是**跨插件夹具的合成数据**
+    //   （故意用一个不同的版本号来验「摘要带出对方快照的自述」），与「本仓入口版本」同形不同义。
+    //   多值门当场把它拦下（拒绝回填）；收窄后只剩真正的入口版本断言。
+    re: /(\b(?:ver|VER)[A-Za-z0-9_]*\s*===\s*')(\d+\.\d+\.\d+)(')/g,
+    skipComment: true,
+    live: function (L) { return L.version; },
+    // v2.131.0：**字符串取值档**。默认档走 `Number(m[2])`，而版本号 `'2.130.0'`
+    //   经 Number() 得到 `NaN`——现场表现为 `NaN → 2.130.0`（判据在报数，报的是错的数）。
+    rawValue: true
   }
 ];
 
@@ -149,16 +176,26 @@ function scanSite(src, site) {
   const out = [];
   const re = new RegExp(site.re.source, site.re.flags);
   let m;
+  let searchFrom = 0;
   while ((m = re.exec(src)) !== null) {
     const line = src.slice(0, m.index).split('\n').length;
+    const raw = lines[line - 1] || '';
+    // v2.131.0（O16 收口）**注释行门**：现场实测踩到 —— 判据/说明的**注释**里会举例写出
+    //   被替换前的字面量（`// 现场病灶：assert(ver === '2.130.0', …)`），而形态正则会把它
+    //   当成真站点收走 ⇒ 回填时把注释里的举例也改掉，甚至造成多值误判（O18 同族假阳性）。
+    //   判据取「该行首个非空白字符是 `/` 或 `*`」（行注释 / 块注释续行），**不改行内注释**
+    //   （`code(); // 说明` 这种里若真出现形态，仍按站点处理 —— 本仓的举例一律在行首）。
+    if (site.skipComment && /^\s*(\/\/|\*|\/\*)/.test(raw)) { searchFrom = re.lastIndex; continue; }
     out.push({
       line: line,
       // 形态 D 的组键在 group 2、值在 group 3；其余为前缀 + 值
       key: m[2] && /[a-z-]/.test(m[2]) ? m[2] : null,
-      value: Number(site.isGroup ? m[3] : m[2]),
-      context: (lines[line - 1] || '').trim().slice(0, 90)
+      value: site.rawValue ? m[2] : Number(site.isGroup ? m[3] : m[2]),
+      context: raw.trim().slice(0, 90)
     });
+    searchFrom = re.lastIndex;
   }
+  void searchFrom;
   return out;
 }
 
@@ -212,7 +249,9 @@ function buildPlan() {
       plan.push({
         id: site.id, desc: site.desc, rel: rel, kind: 'stale',
         from: vals[0], to: want,
-        sites: hits.map(function (h) { return { line: h.line, context: h.context }; })
+        // v2.131.0（O16 收口）：非组站点的命中同样要带 `value`（与组站点同一处修正；
+        //   缺它时门禁侧把 `now` 印成 `undefined`）。
+        sites: hits.map(function (h) { return { line: h.line, value: h.value, context: h.context }; })
       });
     });
   });
@@ -236,19 +275,38 @@ function applyPlan(plan) {
       if (!site) return;
       let changed = 0;
       const re = new RegExp(site.re.source, site.re.flags);
-      next = next.replace(re, function (match, prefix, g2, g3) {
+      next = next.replace(re, function (match, g1, g2, g3) {
         if (site.isGroup) {
           // 只改「这个归因键」的那一条
           if (g2 !== item.key) return match;
           changed++;
-          return prefix + item.to;
+          return g1 + item.to;
         }
         changed++;
-        return prefix + item.to;
+        // v2.131.0（O16 收口）**现场事故修正**：形态 E 是**三组**（前缀 / 数字 / **闭引号**），
+        //   而初版一律只重建 `prefix + 新值` ⇒ 把闭引号吃掉，`'2.130.0'` 变成 `'2.131.0`
+        //   —— 直接把 tests/run.js 的语法写坏（`node --check` 立刻报错，已回滚重做）。
+        //   纪律：形态有几组就重建几组；末尾组原样拼回（它是不该被替换的一部分）。
+        return g1 + item.to + (g3 === undefined ? '' : g3);
       });
       report.push({ rel: rel, id: item.id, key: item.key || null, from: item.from, to: item.to, changed: changed });
     });
     if (next !== orig) {
+      // v2.131.0（O16 收口）**写后语法校验**：上面的闭引号事故说明「字符串替换成功」
+      //   与「产物仍是合法 JS」是两件事。故对 .js 目标在落盘前先过一遍 `node --check`
+      //   （用一次性临时文件，不污染仓库）；不通过就**不写**，如实报错。
+      if (/\.js$/.test(rel)) {
+        const tmp = path.join(require('os').tmpdir(), 'wa_e2e_check_' + Date.now() + '.js');
+        fs.writeFileSync(tmp, next, 'utf8');
+        const r = require('child_process').spawnSync(process.execPath, ['--check', tmp], { encoding: 'utf8' });
+        try { fs.unlinkSync(tmp); } catch (e) { /* 忽略清理失败 */ }
+        if (r.status !== 0) {
+          report.push({ rel: rel, id: '(语法校验)', key: null, from: '-', to: '-', changed: 0,
+            failed: true, why: String(r.stderr || '').split('\n').slice(0, 2).join(' ') });
+          console.log('  ✗ ' + rel + ' 回填后**语法不通过**，已放弃写盘：' + String(r.stderr || '').split('\n')[0]);
+          return;
+        }
+      }
       fs.writeFileSync(p + '.bak', orig, 'utf8');
       fs.writeFileSync(p, next, 'utf8');
     }

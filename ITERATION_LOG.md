@@ -6,21 +6,68 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.130.0 |
-| 全量回归 | `node tests/run.js` → **v2.130.0 为通过 12822 / 失败 0 · WORKER_EXIT=0**（长超时启动器 + `isolated-runner` 隔离；默认 10 分钟会在 v2.118.0 段被截断，需 `WA_REGRESSION_TIMEOUT_MS` 放宽）|
+| 版本 | v2.131.0 |
+| 全量回归 | `node tests/run.js` → **v2.131.0 为通过 12828 / 失败 0 · WORKER_EXIT=0**（长超时启动器 + `isolated-runner` 隔离）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
 | 产品文件面 | 162（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
 | 出口面契约 | `node tests/export-contract.js` → ns= 141 / members= 918 / chars= 10483 |
 | 测试面 | `node tests/test-surface-gate.js` → 文件面 151 · 锁 146 · 孤儿 0 · 豁免 0 |
 | 死子面 | `node tests/dead-export-gate.js` → dead 753 / uiDead 4 / 仅测试 351 / dataOnly 241 |
 | 拒收码 | `node tests/reject-code-gate.js` → 607 码（见证 368 / 死表 8 / 基线 231） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.130.0 · 现场 refs 3510 / 命名空间 161 / 成员 1944 |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.131.0 · 现场 refs 3510 / 命名空间 161 / 成员 1944 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
-| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 111 把 · 覆盖 49（44.14%）＝ 统一档 29 + 非统一档已识别 20 · 未识别 62 · 非统一档问题 12（**只报不红**） |
-| tools/ | 只留**被可执行代码引用**的 12 个（一次性脚本不入库，见 `.gitignore`） |
+| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 111 把 · 覆盖 101（**90.99%**）＝ 统一档 29 + 非统一档已识别 72 · 未识别 10 · 非统一档问题 69（**只报不红**，逐条带证据与命中行类别） |
+| 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核，`checked` = 17 站点） |
+| tools/ | 只留**被可执行代码引用**的 14 个（一次性脚本不入库，见 `.gitignore`） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+### R117 · 2026-10-01 · v2.131.0：O 线三项落地（O15 回归超时实测驱动 / O16 端到端读数挂门禁 / O18 锚点覆盖 44%→91%）
+- **起点与终点**：起点 v2.130.0（全量回归 12822 / 0，`11ac0e3`）；终点 v2.131.0（全量回归 **12828 / 0**）。
+  本版按「先 O 后 E」的优先级（O15/O16 是验证基建 → O18 是治理面覆盖）落地三项，全部以**现场实测**
+  替代历史文档里的数字，并把三处「人工回填/人工核对」改成**工具化 + 门禁化**。
+- **O18 锚点审计覆盖率提升（44.14% → 90.99%，真值）**：
+  - 根因（现场实测 `~/.tmp` 扫描脚本）：未识别 62 把锁里 58 把是「认不出锚点原文」，其常量**前缀分布**
+    为 `A_ 352 · （无下划线）20 · B_ 15 · NEW_ 2 · M_ 2 · DEF_ 1 · CHAT_ 1 · OLD_ 1` —— 而原
+    `anchor-const` 模式**只认 `ANCHOR*` 前缀**，352 个锚点一条都认不出。
+  - 修正一：把形态面宽化到「任意具名锚点常量」，并加**值拒收表** `VALUE_DENY`（单一真源）
+    挡掉 `TAG = '__b2v2117_'` / `LS_KEY = …` / `causal.chains` / `README.md` 这类非代码片段。
+    **被证伪的判据（不留）**：曾用「值出现在 `from: NAME` 里」当纯度门 —— 实测**误杀 134 条真锚点**
+    （`ANCHOR_ROWS`、`A_RUN` 等并不用 `from:` 引用），且 `re.source` 反推的 `isDecl` 恒 false（假绿门）。
+  - 修正二：锚点原文里的**转义换行**（`\\n`）与目标文件里的**真实换行**不是同一串 ——
+    比对前做形态归一（`forms()` 双形态试命中）。实测这一条修掉 8 条 `not-found` 假阴性。
+  - 修正三：`uniqHits` 未命中**返回 0 而非 -1**（-1 会被 `n !== 1` 分支归成 `not-unique`，类别漂移）。
+  - 新增 **`--self-test`（H6 两向自证）**，**当场抓出两处死判据**并据实删除：`txt-field`（非统一档
+    不存在该形态，摘掉后全仓锚点数不变）、`valueForm`（被 `VALUE_DENY` 全包，零贡献）。
+    自证范围为**全仓识别总量**而非单把探针锁（单锁范围会把真判据误报成死判据）。
+  - 收口：`tests/anchor-scan-v2126.js` 的 B 面判据由「`not-found` 计数 ≥ 1」改为**两向能力自证**
+    （真源码破坏 → 装载破坏副本 → 同判据重跑），不放宽计量、只证明归因仍活着。
+- **O16 端到端读数回填（挂进门禁）**：
+  - 新增 `tools/sync-e2e-readings.js`：真源取门禁当场写盘的两本账本，登记 8 类站点（装载期边 /
+    调用期引用 / 命名空间 / 装载文件 / 冻结面条目 / stdout 读数串 / 归因分布 / **版本常量断言**）。
+  - `tests/run.js` 的硬读数节新增两条断言（`checked > 0` + 同源），**不 spawn 子进程**（回归里已握现场）。
+  - 破坏可观测自证：把 `dist2800['test-only'] === 351` 改成 `350` ⇒ 判据当场报
+    `tests/run.js:15066 现 350 / 账本 351`；还原即绿。**过程中修掉工具自身的两个取值缺陷**：
+    组站点命中缺 `value`（门禁侧印 `undefined`）、版本号走 `Number()` 变 `NaN`。
+  - 形态 E 的正则**必须带变量名前缀**：裸 `=== '2.130.0'` 撞上跨插件夹具的合成数据
+    `sumOK.pluginVersion === '3.175.0'`（多值门当场拦下、拒绝盲目替换）。
+- **O15 全量回归超时（实测驱动，不改判据只改载体）**：
+  - 现场实测：整趟 **439.0s / 196 节**（`result.json` 的 start/finish 之差），其中只有 **2 节**超 60s
+    （v2.106.0 86.70s / v2.82.0 80.87s）—— **问题是总时长，不是单节**，而旧硬超时默认 600000
+    比总时长还短 ⇒ 每次跑都在 v2.118.0 段被 SIGKILL，现场只剩 `Status: interrupted`。
+  - ① 中断摘要（可见性）：`tests/isolated-runner.js` 在 `stopping` 时依**日志尾**补写
+    「跑到哪一节 / 已完成节 / 本节耗时 / 超 60s 节数 / 结束原因」。为何不改 `run.js` 的信号处理器：
+    子进程死于 **SIGKILL**（`stop()` → 2s 后强杀），SIGTERM 处理器**根本没有机会跑**（实测踩到）。
+  - ② `tools/slow-sections.js`（慢节清单 + 超时建议，自带合成日志自证与破坏可观测）：
+    实测归集 195 节 / 合计 435.04s ⇒ 建议 **660000ms**，据此把默认硬超时由 600000 改为 **660000**。
+  - 门槛实测：`WA_REGRESSION_TIMEOUT_MS=25000` 复现截断 ⇒
+    `跑到「v2.28.0…」· 已完成节 122 / 123 可见 · 结束原因 timeout`。
+- **过时计划项的现场纠正（不当作任务做）**：计划里的 O17「经济风与资源账本深度联动」**已由既有版本落地**
+  （v2.94.0 O8 把 `climateOf()` 纳入 `ledgerView`；v2.95.0 X2 并入 `organizationSummary`），
+  现场 `engines/org.js:1018` 逐字可见 —— 如实记录为「已完成，无需重做」，不制造重复劳动。
+- **门禁结果**：全量回归 **12828 / 0**（新增 2 条 O16 断言）；`tools/anchor-scan.js --self-test` 绿；
+  `tools/sync-e2e-readings.js --self-test` 绿（覆盖全命中 + 破坏可观测）。
+
 
 ### R116 · 2026-09-29 · v2.130.0：十二引擎缝合（拓展计划 A1–A4 / B1 / C1 / C2 / D1–D4）与全量回归同源化
 - **起点与终点**：起点 v2.129.0（全量回归 12767 / 0，`6935efb`）；终点 v2.130.0（全量回归 **12822 / 0**）。
