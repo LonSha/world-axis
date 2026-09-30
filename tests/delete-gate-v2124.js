@@ -101,7 +101,7 @@ function runA(a) {
   const keysSeg = pv.slice(pv.indexOf('const KEYS = ['), pv.indexOf('];', pv.indexOf('const KEYS = [')));
   const nKeys = (keysSeg.match(/'[A-Za-z_$][\w$]*'/g) || []).length;
   // 现场数（不写估值）：本版**不新增**导出成员，白名单项数必须与基线逐字一致。
-  a(nKeys === 17, 'v2124/A: permissions 导出面白名单仍是 17 项（实 ' + nKeys + '）—— 本版只加字段不加口');
+  a(nKeys === 18, 'v2124/A: permissions 导出面白名单 18 项（实 ' + nKeys + '）—— v2.128.0（X6 多会话身份）新增 `adopt` 一口 ⇒ 17 → 18；v2.124.0 当时只加字段不加口');
   a(src(STORE).indexOf("removeDenied: stats.removeDenied") === -1,
     'v2124/A: bus 的 `removeStat()` 加的是**字段**（`removeDenied`），不是新导出成员');
 }
