@@ -1,13 +1,13 @@
 {
- "version": "2.128.0",
- "loadOrderCount": 139,
- "loadedCount": 136,
+ "version": "2.129.0",
+ "loadOrderCount": 149,
+ "loadedCount": 146,
  "uiCount": 3,
- "nsCount": 144,
+ "nsCount": 154,
  "totals": {
-  "loadEdges": 37,
+  "loadEdges": 47,
   "hardEdges": 0,
-  "callRefs": 72,
+  "callRefs": 92,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -34,6 +34,7 @@
     "direction/tags.js",
     "engines/act.js",
     "engines/backstage.js",
+    "engines/beat-mask.js",
     "engines/bridge.js",
     "engines/calendar.js",
     "engines/chapters.js",
@@ -48,18 +49,27 @@
     "engines/liaison.js",
     "engines/memory.js",
     "engines/mend.js",
+    "engines/motif.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
     "engines/plan.js",
     "engines/pmem.js",
+    "engines/power-anchor.js",
+    "engines/preset-world.js",
     "engines/proactive.js",
     "engines/probe.js",
     "engines/region.js",
     "engines/regional.js",
+    "engines/request-viewer.js",
+    "engines/rewriter.js",
+    "engines/rhythm-loop.js",
     "engines/session.js",
     "engines/stage.js",
+    "engines/storyclock.js",
     "engines/summarizer.js",
+    "engines/userlock.js",
     "engines/wb-inject.js",
+    "engines/wb-search.js",
     "render/purifier.js"
    ]
   },
@@ -200,16 +210,26 @@
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
+    "engines/beat-mask.js",
     "engines/coop.js",
     "engines/economy.js",
     "engines/inst.js",
     "engines/liaison.js",
     "engines/mend.js",
+    "engines/motif.js",
     "engines/plan.js",
+    "engines/power-anchor.js",
+    "engines/preset-world.js",
     "engines/probe.js",
     "engines/region.js",
+    "engines/request-viewer.js",
+    "engines/rewriter.js",
+    "engines/rhythm-loop.js",
     "engines/session.js",
-    "engines/stage.js"
+    "engines/stage.js",
+    "engines/storyclock.js",
+    "engines/userlock.js",
+    "engines/wb-search.js"
    ]
   },
   "core/exec.js": {
@@ -2046,6 +2066,215 @@
    "stateKeys": [
     "worldaxis_inst_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/userlock.js": {
+   "ns": [
+    "userlock"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_userlock_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rhythm-loop.js": {
+   "ns": [
+    "rhythmLoop"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rhythm_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/motif.js": {
+   "ns": [
+    "motif"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_motif_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/beat-mask.js": {
+   "ns": [
+    "beatMask"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_beatmask_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/power-anchor.js": {
+   "ns": [
+    "powerAnchor"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_poweranchor_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rewriter.js": {
+   "ns": [
+    "rewriter"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rewriter_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/storyclock.js": {
+   "ns": [
+    "storyclock"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_storyclock_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/preset-world.js": {
+   "ns": [
+    "presetWorld"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_presetworld_data_v1",
+    "worldaxis_presetworld_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/request-viewer.js": {
+   "ns": [
+    "requestViewer"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_requestviewer_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/wb-search.js": {
+   "ns": [
+    "wbSearch"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "render/inject.js": {

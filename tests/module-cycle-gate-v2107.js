@@ -149,7 +149,7 @@ function runAll(A) {
 
   // ── B 运行时（现场真跑） ──
   const a = M.audit();
-  A(a.files === 140 && a.aliasFiles === 140 && a.refFiles === 138,
+  A(a.files === 150 && a.aliasFiles === 150 && a.refFiles === 148,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -166,7 +166,7 @@ function runAll(A) {
   //   ⇒ 调用期 1057→1059、总 1094→1096。两条都由现场 diff 逐条核对过，不是「+2 就对了」。
   //   ui/panel.js 的 `perfTrace.bandCompare` 与 tool-diag 同属**同一命名空间同一成员**，
   //   集合去重后只算一条 —— 这也是为什么「文件改了两处、边只多一条」。
-  A(a.edgesLoad === 37 && a.edgesCall === 1072 && a.edgesAll === 1109 && a.identityOk,
+  A(a.edgesLoad === 47 && a.edgesCall === 1131 && a.edgesAll === 1178 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -177,12 +177,19 @@ function runAll(A) {
     + '（运行期定案 37 条装载期读；静态引用 1091 条里 1054 条是调用期，'
     + '拿 909 判次序会报 281 条噪声；v2.110.0（计划一 #21/#22 + 计划二 #39/#70）新增 core/fault-context.js / core/schema.js / core/permissions.js 三文件后：装载期边 23 不变、调用期 +9（归因为提供方）、文件面 +3）'
     + ' v2.111.0（计划二 #67/#69）新增 core/audit-log.js（auditLog）与 core/sanitize.js（sanitize）两文件后：装载期边 23 不变、调用期 +5（store 的审计写入 + permissions 两处拒绝留痕 + 面板字面调用 sanitize）、文件面 +2）'
-    + ' v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）新增 engines/chrono.js（chrono）与 engines/collab.js（collab）两文件后：装载期边 23 不变、调用期 +15（chrono 只读 store/clock、collab 只读 store/inputGuard，两者都不在装载期读 WA）、文件面 +2）' + ' v2.114.0（计划二 #56/#68）新增 core/sandbox.js（sandbox）与 core/plugin.js（plugin）两文件后：装载期边 23 → 25（两模块尾部都调 WA.registerModule 登记自己，而 registerModule 由 store 提供 ⇒ 各多 1 条装载期硬边；两者初版排在 store 之前，现场报 2 条 order-violation，已移到 store 之后修正）、调用期 +12（store 两处 WA.plugin.fire + tool-diag 诊断节 + 面板字面调用）、文件面 +2） v2.114.0 收口：engines/collab.js（prune 三处）与 engines/chrono.js（entries 落盘后挤出）各接 WA.evict.array ⇒ 调用期再 +2（915 / 940，2 条新站点引用 core/evict.js）');
-  A(a.edgesLoad >= 20 && a.orderLen === 139,
+    + ' v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）新增 engines/chrono.js（chrono）与 engines/collab.js（collab）两文件后：装载期边 23 不变、调用期 +15（chrono 只读 store/clock、collab 只读 store/inputGuard，两者都不在装载期读 WA）、文件面 +2）' + ' v2.114.0（计划二 #56/#68）新增 core/sandbox.js（sandbox）与 core/plugin.js（plugin）两文件后：装载期边 23 → 25（两模块尾部都调 WA.registerModule 登记自己，而 registerModule 由 store 提供 ⇒ 各多 1 条装载期硬边；两者初版排在 store 之前，现场报 2 条 order-violation，已移到 store 之后修正）、调用期 +12（store 两处 WA.plugin.fire + tool-diag 诊断节 + 面板字面调用）、文件面 +2） v2.114.0 收口：engines/collab.js（prune 三处）与 engines/chrono.js（entries 落盘后挤出）各接 WA.evict.array ⇒ 调用期再 +2（915 / 940，2 条新站点引用 core/evict.js）'
+    + ' v2.129.0（拓展计划 A1–A10）：新增十个引擎文件（userlock / rewriter / storyclock / rhythm-loop / motif /'
+    + ' beat-mask / preset-world / power-anchor / request-viewer / wb-search）⇒ 文件面 140 → 150、有引用 148。'
+    + '装载期边 37 → 47：十个文件尾部各调 WA.registerModule（registerModule 由 store 提供）⇒ 各 +1；'
+    + '它们分三组插在 render/inject.js 之前与之后，全部排在 store 之后，现场 order-violation 0。'
+    + '调用期 1072 → 1125（+53）：五条产注入块的引擎（userlock / rhythm-loop / motif / beat-mask / power-anchor）'
+    + '在 render/inject.js 真调 buildBlock；rewriter / storyclock 为旁路；preset-world / request-viewer /'
+    + ' wb-search 三条旁路只在 tests/run.js 与 ui/panel.js 接读者。LOAD_ORDER 139 → 149（同十个文件）。');
+  A(a.edgesLoad >= 20 && a.orderLen === 149,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
-  A(a.nsProvided === 169 && a.nsLedger === 144 && a.nsRead === 156,
+  A(a.nsProvided === 179 && a.nsLedger === 154 && a.nsRead === 166,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');

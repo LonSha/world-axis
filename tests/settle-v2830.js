@@ -306,8 +306,8 @@ async function probeRollbackScope(WA) {
 async function judge(a) {
   // ── B4 ──
   const led = JSON.parse(fs.readFileSync(path.join(__dirname, 'module-registry-ledger.json'), 'utf8'));
-  a(led.totals.loadEdges === 37 && led.totals.callRefs === 72,
-    'v2830/mr: 装载期边 26 / 调用期引用 50（引用多 ≠ 必须先装载；'
+  a(led.totals.loadEdges === 47 && led.totals.callRefs === 92,
+    'v2830/mr: 装载期边 47 / 调用期引用 92（引用多 ≠ 必须先装载；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
     + '三者调用期读 store/clock/evict/org/intel 等 ⇒ 调用期 +2）；'
@@ -318,8 +318,8 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 144 && led.loadedCount === 136,
-    'v2830/mr: 命名空间 132 / 装载文件 124（与 LOAD_ORDER 的 127 差 3 个 ui/*——'
+  a(led.nsCount === 154 && led.loadedCount === 146,
+    'v2830/mr: 命名空间 154 / 装载文件 146（v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三命名空间后两边各 +3；'

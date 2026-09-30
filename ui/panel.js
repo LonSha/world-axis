@@ -54,6 +54,11 @@
     // v2.127.0（X2）：世界编年史。与 SOURCES 同批登记 ——
     //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 `chrono`，
     //   而那是用户唯一能开关它的地方（同 v2.56.0 / v2.96.0 / v2.117.0 的理由）。
+    // v2.129.0（缝 A1/A4/A5/A6/A8）：五条叙事纪律源。与 SOURCES 同批登记 ——
+    //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名，而那是用户唯一能开关它的地方。
+    //   插在 chrono 行**之前**（而非其后）：chrono 行是 v2.127.0 那条锁的锚点字面量，
+    //   改动它会同时触发 anchor-scan 与负控制审计的 not-unique（实测踩过）。
+    userlock: '用户锁定', rhythmLoop: '节奏环', motif: '文体档案', beatMask: '信息迷雾', powerAnchor: '战力锚',
     chrono: '世界编年史' };
 
   // v0.6 新增组件样式注入
@@ -2202,7 +2207,17 @@
         const rows = WA.worldbook.previewActivation(__wbScan);
         const n = rows.filter(function (r) { return r.active; }).length;
         renderBody();
-        setOut('#wa-wb-out', '预览：注入 ' + n + '/' + rows.length + (__wbScan ? '（扫描 ' + __wbScan.length + ' 字）' : '（无扫描文本）'));
+        setOut('#wa-wb-out', '预览：注入 ' + n + '/' + rows.length + (__wbScan ? '（扫描 ' + __wbScan.length + ' 字）' : '（无扫描文本）')
+          + (function () {
+            // v2.129.0（A10）：即时搜索面。此前“条目多到找不到”与“条目根本不存在”
+            //   在面板上是同一幅画面（都是没看见）——用扫描文本反查**哪些条目真的写过它**。
+            //   读点挂在**既有**控件上（零新增控件 ⇒ 不触碰 UI 绑定守卫）。
+            if (!WA.wbSearch || typeof WA.wbSearch.count !== 'function') return '';
+            const q = __wbScan.trim();
+            if (!q) return '';
+            const hit = WA.wbSearch.count(q);
+            return (hit && hit.ok) ? '｜按词条搜同串：命中 ' + hit.matched + '/' + hit.total + ' 条' : '';
+          })());
       });
     })();
     on('#wa-ent-add', function () {

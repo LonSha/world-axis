@@ -403,6 +403,10 @@
         SIM_MODES[st.simulationMode] || SIM_MODES.balanced,
         TIME_POLICIES[st.timePolicy] || TIME_POLICIES.cautious,
         PULSE_LEVELS[st.pulseActivity] || PULSE_LEVELS.normal,
+        // v2.129.0（A3）：正文时间锚点纪律。世界钟（calendar/chrono）与正文里的时间
+        //   **从不互相校准**（全库无一条边是“从正文回读”），而推演引擎正是把
+        //   “此刻几日”写进世界的那一个——不给它锚点纪律，它就只能据模型自己编。
+        (WA.storyclock && WA.storyclock.discipline ? WA.storyclock.discipline() : ''),
         st.customInstruction ? '【用户自定义推演指令】' + st.customInstruction : '',
         '',
         '【输出契约】必须且只能回复一个JSON对象，结构：',

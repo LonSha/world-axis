@@ -143,6 +143,10 @@
           stream: false
         };
         WA.log('info', `API[${channel}] → ${cfg.model} (${messages.length}条消息)`);
+        // v2.129.0（A9）：请求报文落账。此前“刚才到底发出去的是什么”全库答不出——
+        //   报文一出进程就没了。这里在 **fetch 之前** 捕获一份（capture 自身带总开关，
+        //   默认关闭时零开销、不落账）；预览器故障绝不能拖垓真调用 ⇒ try/catch 收住。
+        try { if (WA.requestViewer && typeof WA.requestViewer.capture === 'function') WA.requestViewer.capture(channel, messages); } catch (e) { /* 预览器故障不阻断调用 */ }
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },

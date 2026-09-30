@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.128.0'
+  const VERSION = '2.129.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -443,6 +443,24 @@
     // v2.119.0（拓展计划 ④）：组织制度。须晚于 core/store（读 people / org 现状），
     //   须早于 render/inject.js（注入落地时读 inst.buildBlock()）。
     'engines/inst.js',
+    // v2.129.0（缝 A1/A4/A5/A6/A8）：五个叙事纪律引擎。位置须**早于** render/inject.js：
+    //   注入落地时读 userlock / rhythmLoop / motif / beatMask / powerAnchor 的 buildBlock()。
+    //   rhythm-loop 另须晚于 core/store（它读写 rhythm 容器）；其余四个只读 store。
+    'engines/userlock.js',
+    'engines/rhythm-loop.js',
+    'engines/motif.js',
+    'engines/beat-mask.js',
+    'engines/power-anchor.js',
+    // v2.129.0（缝 A2/A3）：改写通道（调副 API）与正文时间戳审计。纯调用期模块，不产注入块，
+    //   对次序无硬要求；与同批新引擎并列，便于「本批五引擎 + 两旁路」一眼看全。
+    'engines/rewriter.js',
+    'engines/storyclock.js',
+    // v2.129.0（缝 A7/A9/A10）：静态设定缓存 / 请求报文预览 / 世界书搜索。三者都不产注入块。
+    //   A10 在**调用期**读 WA.worldbook.peekEntries，A9 在**调用期**读 WA.apiRouter.getChannel ——
+    //   都在调用期取，不构成装载期依赖。A7 只写自己的 localStorage 键（一次不碰 store）。
+    'engines/preset-world.js',
+    'engines/request-viewer.js',
+    'engines/wb-search.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

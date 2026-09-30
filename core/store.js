@@ -98,6 +98,18 @@
       directEvents: [],         // {id,title,totalTurns,currentTurn,status:active|done|aborted,opponent,box,notes:[],createdAt}
       // v2.34.0 平行世界（parallel-world.js：主线之外的独立推演 —— NPC档案/关系网/事件模块）
       parallelWorld: { clock: '', npcs: [], relations: [], modules: [], round: 0, snapshots: [] },
+      // v2.129.0（缝 A1/A2/A3/A4/A5/A6）：六个新引擎的顶层键。
+      //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
+      //   ——登记不等于物化，两件事都要做。
+      //   ⚠ presetWorld / requestViewer / wbSearch **不在此列**：前者的数据存在自己的 localStorage 键里
+      //   （不进世界状态），后两者是纯只读面（无状态、不写 store）。给它们加骨架键 = 凭空多出
+      //   一个没有写入方的容器（registryParity 的「每项登记都要有写入方」对账会当场红灯）。
+      userlock: { rows: [], seq: 0 },        // 用户锁定记忆（userlock.js）
+      rhythm: { phase: 'unset', seq: 0, cycles: 0, devices: [] },   // 呼吸式节奏环（rhythm-loop.js）
+      motif: { round: 0, rows: [] },         // 文体档案 / 意象登记（motif.js）
+      beatMask: { round: 0, rows: [] },      // 信息迷雾 / 蓝图遮罩（beat-mask.js）
+      powerAnchor: { round: 0, rows: [] },   // 战力锚（power-anchor.js）
+
       // 一致性记录（冲突诊断，不静默覆盖）
       consistency: [],          // {kind, detail, at}
       // 世界脉搏（backstage结算）
@@ -1341,6 +1353,14 @@
     //   （上面的把门判据逐键对账）。两条 cap 与 engines/coop.js 的 LIMITS 同源。
     'coop.proposals':   { cap: 24, site: "coop.js WA.evict.array(n.proposals, 'coop.proposals')（LIMITS.ROWS=24）" },
     'coop.archive':     { cap: 40, site: "coop.js WA.evict.array(n.archive, 'coop.archive')（LIMITS.ARCHIVE=40）" },
+    // v2.129.0（缝 A1/A4/A5/A6/A8）：五个新引擎的有界容器。
+    //   登记键与 evict.SITES 的 path 同名同值（G18 逐键对账）；cap 为设置上界，
+    //   执行时由各自引擎以 per-call 传入（站点侧 cap:'per-call'，不在 G18 值比对面内）。
+    'userlock.rows':   { cap: 200, site: 'userlock.js WA.evict.array(b.rows, \'userlock.rows\')（上限 = maxRows 设置上界）' },
+    'rhythm.devices':  { cap: 64,  site: 'rhythm-loop.js WA.evict.array(b.devices, \'rhythm.devices\')（per-call，取 maxDevices 上界；v2.129.0）' },
+    'motif.rows':      { cap: 120, site: 'motif.js WA.evict.array(b.rows, \'motif.rows\')（per-call，取 maxRows 上界；v2.129.0）' },
+    'beatMask.rows':   { cap: 200, site: 'beat-mask.js WA.evict.array(b.rows, \'beatMask.rows\')（per-call，取 maxRows 上界；v2.129.0）' },
+    'powerAnchor.rows':{ cap: 128, site: 'power-anchor.js WA.evict.array(b.rows, \'powerAnchor.rows\')（per-call，取 maxRows 上界；v2.129.0）' }
     // v2.13.0: 人物档案节（people.<id>.profile.<节>）的上限**逐节不同**，上面五条具名
     //   登记已足够说明「这些数组归谁管」；挤出侧站点 people.profile 的 path 是
     //   people.*.profile.*（per-call，写的时候才由 registry 逐节取值传入），

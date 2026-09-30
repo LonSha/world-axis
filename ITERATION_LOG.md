@@ -6,21 +6,68 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.126.0 |
-| 全量回归 | `node tests/run.js` → **v2.126.0 为通过 12212 / 失败 0 · Status: passed · unchanged: true**（长超时启动器）；v2.125.0 12181 / 0；v2.124.0 12141 / 0；**v2.121.0 / v2.122.0 / v2.123.0 未跑全量**（用户约束：整条计划做完前不跑），三版验证只走单锁 + 轻量门禁 |
-| 产品文件面 | 140（`tests/product-files.js` 单一真源） |
+| 版本 | v2.129.0 |
+| 全量回归 | `node tests/run.js` → **v2.129.0 为通过 12767 / 失败 0 · WORKER_EXIT=0**（长超时启动器 + `isolated-runner` 隔离）|
+| 产品文件面 | 150（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 128 / members= 872 / chars= 9926 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 143 · 锁 138 · 孤儿 0 · 豁免 0 |
-| 死子面 | `node tests/dead-export-gate.js` → dead 607 / uiDead 4 / 仅测试 349 / dataOnly 238 |
-| 拒收码 | `node tests/reject-code-gate.js` → 601 码（见证 362 / 死表 8 / 基线 231） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.124.0 · 现场 refs 3206 / 命名空间 139 / 成员 1749 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 138 / members= 913 / chars= 10400 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 151 · 锁 146 · 孤儿 0 · 豁免 0 |
+| 死子面 | `node tests/dead-export-gate.js` → dead 678 / uiDead 4 / 仅测试 348 / dataOnly 236 |
+| 拒收码 | `node tests/reject-code-gate.js` → 607 码（见证 368 / 死表 8 / 基线 231） |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.129.0 · 现场 refs 3415 / 命名空间 149 / 成员 1859 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 93 条 / 日志存档 92 条 / 跨文件同号 **0** |
-| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 103 把 · 覆盖 41（39.81%）＝ 统一档 21 + 非统一档已识别 20 · 未识别 62 · 非统一档问题 12（**只报不红**） |
+| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 111 把 · 覆盖 49（44.14%）＝ 统一档 29 + 非统一档已识别 20 · 未识别 62 · 非统一档问题 12（**只报不红**） |
 | tools/ | 只留**被可执行代码引用**的 12 个（一次性脚本不入库，见 `.gitignore`） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+
+### R115 · 2026-09-29 · v2.129.0：收口轮（拓展计划 A1–A10 的十个新引擎入册与全量回归同源化）
+- **起点与终点**：起点 v2.126.0（全量回归 12212 / 0）；终点 v2.129.0（全量回归 **12767 / 0**）。
+  本版不是新功能，而是把 v2.127.0–v2.129.0 三个未出全量的版本一次性收口（X 线：X1/X2 的 v2.127 锁、
+  X3–X8 的 v2.128 锁、X9 的 A1–A10 缝线十条）。
+- **治的病**：三个新版本改动了产品面，但**没有任何一个读数门禁把「改动后现场应该长什么样」重新算一遍** ——
+  于是同一改动的四个人工登记处（死子面冻结账本 / 出口面契约 / 硬读数回填 / 依赖图门禁）各自漂移。
+  开工时现场是**三盏红灯同源**：
+  · `tests/dead-export-gate.js` EXIT 1：①新增死导出 1 项 `toolDiag.secStitch2129 [self-only]`；
+    ②归因证据失实 1 项 `toolDiag.safe own=92 vs 复算 93`；③已登记死导出**消失 12 项**。
+  · `tests/module-cycle-gate-v2107.js`：边恒等式 / 零读 ns / 命名空间面四条常量全部停在旧版现场。
+  · `tests/readings.js`：`refs / members / dead / dataOnly` 四族读数与现场不同源（`refs` 3391 vs 3415）。
+- **根因（不是「已提交缺陷」，是收口遗漏）**：账本是在**新引擎还没有读者那一刻**做的 `--update`（v2.129.0 十个新引擎
+  刚落盘），于是 `rewriter / preset-world / request-viewer` 三个引擎的 12 个成员被冻结成「死子」；
+  之后缝线才接通（`engines/tool-diag.js` 的 `secStitch2129` 是 `rewriter/presetWorld/requestViewer` 11 个成员的
+  **唯一新读者**，另有 `storyclock.discipline`（engines/backstage.js）、`wbSearch.count`（ui/panel.js）、
+  `requestViewer.capture`（core/api-router.js）由产品侧接通）—— 账本没再收敛。
+  而本版**零个 v2.129.0 专属测试**，所以 `secStitch2129` 自身又成了新的 self-only 死导出。
+  两条加起来就是那「一增一减十二」同一个原因的两面。
+- **口径澄清（这次点清的）**：同一个 `toolDiag` 有**两套不重叠的口径**，不可互相折算——
+  · 死子面（`tests/inventory.js` 的 `collect()`）= 运行时 `WA[ns]` 对象的**可枚举 api 成员**，穷举全部 48 个 sec；
+  · 出口面契约（`tests/export_contract.txt`）= **跨文件依赖面**（谁读 `WA.toolDiag.X`），只列 5 个入口。
+  因此「48 个 sec 里 30 个未导出」与「账本把 20 条 `toolDiag.*` 当死子」**不矛盾**（前者是命名空间面，后者是成员面）。
+- **落地（受控写入，每步带计数校验）**：
+  ① `node tests/dead-export-gate.js --update`：dead 689 → **678**（`secStitch2129` 已登记为 self-only，
+     `toolDiag.safe` 证据回填为 own=93；归因分布 test-only 348 / self-only 267 / unwired 63）。
+  ② `node tools/sync-hardcoded.js --write`：回填四族读数（refs 3391→3415 / members 1858→1859 / dead 689→678 /
+     dataOnly 237→236），写前复判 + 写后校验 + 失败回滚；工具视野外的 5 处手写断言另行校对。
+  ③ `node tests/export-contract.js` 重生成契约：ns= 133→138 · members= 900→913 · chars= 10239→10400，
+     并同步 `tests/run.js` 里的 `FROZEN2800`（逐字一致校验 True）与 `EC2430`。
+  ④ `tests/module-cycle-gate-v2107.js` 与 `tests/run.js` 的 B2/B5/B7 三处常量与现场对齐：
+     边 1131 / 1178 · `nsRead` 166 · 零读 ns **13**（现场实测，名单逐一核对，无核心 ns 混入）。
+  ⑤ 恢复账本 `_note` 的手工段（`--update` 只重建基础句，会冲掉手工追加段与 N7 的版本锚点）。
+- **门禁结果**：全量回归 `node tests/run.js` → **通过 12767 / 失败 0（WORKER_EXIT=0）**；
+  `dead-export-gate` EXIT 0 · `module-cycle-gate-v2107` pass 65 项（含 `runNegative`）· `readings-v2106` pass 58 项 ·
+  `sync-hardcoded` 无需回填 · `inventory` 四类悬空 0 · `test-surface-gate` 孤儿 0 / 豁免 0 ·
+  `reject-code-gate` 607 码全归属 · `docs-archive-gate` 跨文件同号 0 条。
+- **工程障碍（本轮踩过的）**：`tests/run.js` 走 `tests/isolated-runner.js` 的隔离机制 —— 父进程持
+  `worldaxis-regression-<digest>.lock`，worker 有 `watchParent` 孤儿看护（父消失即自杀）；
+  `detached` 启动会被看护回收（status=interrupted）。旁路做法：自建长驻父进程（写 `.wa-run-owner.json`，
+  文件名是关键，写成 `owner.json` 会判成非 worker）、显式 `recoverLock()` 回收 stale 锁、
+  副本树另建 `git init` 基线（供 `injection-restore-lock-v2800.js` 的 `git show HEAD:<file>` 取外部基线）。
+  这也是为什么本轮的 6 个「失败」里有几个是**装置产物**（无 `.git` 树失败）而非真缺陷。
+- **本轮保留的手工活（下一轮的对象）**：`tests/` 里「不按现场重新算」的那几处常量（v2107 与出口面契约的桶值）
+  仍是**人工回填**：`sync-hardcoded` 管不到它们，本次就漏改了一处 `run.js:19441`（`deadNs.length === 18`），
+  是从全量回归的尾部读数里才捞出来的。把这两处也接进同一回填入口，是下一轮的题。
+
 
 ### R114 · 2026-09-29 · v2.126.0：锚点审计覆盖到非统一锁（P8，P 线收尾）
 - **起点与终点**：起点 v2.125.0（全量回归 12181 / 0）；终点 v2.126.0。本版是 P 线**最后一项**（P8）。

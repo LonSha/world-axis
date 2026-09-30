@@ -263,7 +263,18 @@
     //   故按通配路径登记；cap 为 'per-call'（上限 = org.js 的 PROJECT_CAP / DEBT_CAP，
     //   调用点显式传入 —— 传漏即 bad-cap 归因，不悄悄回落成默认值）。
     'org.projects': { path: 'evolution.factions.*.projects', cap: 'per-call', kind: 'array', why: '共同项目表（每势力一组，上限 = PROJECT_CAP）' },
-    'org.debts':    { path: 'people.*.debts',               cap: 'per-call', kind: 'array', why: '人对势力的欠账环（每行各自有界 = DEBT_CAP；与名册 owed 方向相反、表分开）' }
+    'org.debts':    { path: 'people.*.debts',               cap: 'per-call', kind: 'array', why: '人对势力的欠账环（每行各自有界 = DEBT_CAP；与名册 owed 方向相反、表分开）' },
+    // ── v2.129.0（缝 A1/A4/A5/A6）：四个新引擎的环形容器 ──
+    //   四条调用点均在各自引擎的 transact 回调内（userlock.js / rhythm-loop.js /
+    //   motif.js / beat-mask.js），站点名与调用点字面量一一对应（门禁 G18 双向核对）。
+    //   逐条都必须是**环形容器**而非「写入侧硬上界」：这四张表都答「曾发生过什么」
+    //   （锁过谁 / 用过哪些手法 / 用过哪些意象 / 排过哪些节拍），故只能环形挤出、
+    //   不得在解锁/冷却结束/节拍到点时原地删——那会让复盘凭据消失。
+    'userlock.rows':  { path: 'userlock.rows',  cap: 200, why: '用户锁定行环形（解锁是删指定行，历史锁痕只能环形挤出）' },
+    'rhythm.devices': { path: 'rhythm.devices', cap: 'per-call', kind: 'array', why: '叙事手法冷却表环形（上限 = maxDevices 设置，写入时传入）' },
+    'motif.rows':     { path: 'motif.rows',     cap: 'per-call', kind: 'array', why: '意象登记环形（上限 = maxRows 设置，写入时传入）' },
+    'beatMask.rows':  { path: 'beatMask.rows',  cap: 'per-call', kind: 'array', why: '节拍遮罩登记环形（上限 = maxRows 设置，写入时传入）' },
+    'powerAnchor.rows': { path: 'powerAnchor.rows', cap: 'per-call', kind: 'array', why: '战力锚登记环形（上限 = maxRows 设置，写入时传入）' }
   };
 
   // ── 非挤出站点（显式声明，防「假阴性」与「计数虚高」两头都错）──────────

@@ -40,6 +40,67 @@
       <div class="wa-dim">保存后还需在「导演」页的注入可见性里开启「叙事工艺」源，否则不注入正文。</div>`;
   }
 
+  /**
+   * v2.129.0（缝合 A1–A10）: 十引擎总开关面板。
+   *   治的病：这十个引擎的 `enabled` 默认都是 false，而全仓**零 UI 入口** ——
+   *   能力已落盘、也各接了读者，用户却一个都开不了（等同不可用）。
+   *   本块逐行调各引擎既有的 `setSettings`（不新增第二套写口），
+   *   并把「开关点了零效果」的真因就地标出来（模块未装载 / 注入源未勾选）。
+   *   注：十一行一律**字面量**写 id（不走 `id="${变量}"`）——门禁 H2 从 ui/*.js 源码
+   *   采集 `id="wa-…"` 再与 UI_BINDINGS 对账，动态拼出的 id 在采集面「不存在」，
+   *   会被当场判成僵尸条目（与 v2.51.0 叙事工艺五控件同一条坑）。
+   */
+  function switchBlockHtml() {
+    // 控件 id 一律**字面量**写在模板里。门禁 H2 用 /id="(wa-[a-z0-9\-]+)"/ 从
+    //   ui/*.js 源码采集「渲染出的控件」再与 UI_BINDINGS 对账「无僵尸条目」——
+    //   id 若由变量拼出（id="' + lit + '"），采集面看不到它，而它又已写进守卫表
+    //   ⇒ 门禁当场报僵尸条目（v2.51.0 叙事工艺五控件踩过同一条坑）。
+    //   故这里十行**逐行写死**，只把 checked / disabled 做成运行时求值。
+    const ini = function (ns, always) {
+      if (always) return true;
+      if (!WA[ns] || typeof WA[ns].getSettings !== 'function') return false;
+      return !!WA[ns].getSettings().enabled;
+    };
+    const dis = function (ns, always) {
+      if (always) return ' disabled';
+      return (WA[ns] && typeof WA[ns].setSettings === 'function') ? '' : ' disabled';
+    };
+    return '<div class="wa-sec">缝合引擎总开关（v2.129.0 · A1–A10）<span class="wa-dim">（十项默认全关；模块未装载时置灰）</span></div>'
+      + '<label class="wa-row" title="用户亲手改定的条目，自动推演不得静默覆盖"><input type="checkbox" id="wa-sw-userlock" data-sw-ns="userlock"' + (ini('userlock') ? ' checked' : '') + dis('userlock') + '/> 用户锁定记忆</label>'
+      + '<label class="wa-row" title="走 rewrite 通道改写文本（instruction 必填，失败一律回原文）"><input type="checkbox" id="wa-sw-rewriter" data-sw-ns="rewriter"' + (ini('rewriter') ? ' checked' : '') + dis('rewriter') + '/> AI 改写命中内容</label>'
+      + '<label class="wa-row" title="要求每楼正文产出自描述时间标签，供与「世界钟」对账"><input type="checkbox" id="wa-sw-storyclock" data-sw-ns="storyclock"' + (ini('storyclock') ? ' checked' : '') + dis('storyclock') + '/> 正文时间锚点</label>'
+      + '<label class="wa-row" title="蓄势/保持/释放/停顿单向推进相位，并管叙事手法冷却"><input type="checkbox" id="wa-sw-rhythmloop" data-sw-ns="rhythmLoop"' + (ini('rhythmLoop') ? ' checked' : '') + dis('rhythmLoop') + '/> 呼吸式节奏环</label>'
+      + '<label class="wa-row" title="登记意象使用次数；窗口内用过头即报「已过量」"><input type="checkbox" id="wa-sw-motif" data-sw-ns="motif"' + (ini('motif') ? ' checked' : '') + dis('motif') + '/> 文体档案</label>'
+      + '<label class="wa-row" title="未到达的蓝图节拍一个字都不许提前写（只报计数，不给内容）"><input type="checkbox" id="wa-sw-beatmask" data-sw-ns="beatMask"' + (ini('beatMask') ? ' checked' : '') + dis('beatMask') + '/> 信息迷雾</label>'
+      + '<label class="wa-row" title="开聊前先写设定（存本模块自己的键，不进世界状态）"><input type="checkbox" id="wa-sw-presetworld" data-sw-ns="presetWorld"' + (ini('presetWorld') ? ' checked' : '') + dis('presetWorld') + '/> 静态设定缓存</label>'
+      + '<label class="wa-row" title="给对手钉战力区间，防「三流打手变五五开」的机械膨胀"><input type="checkbox" id="wa-sw-poweranchor" data-sw-ns="powerAnchor"' + (ini('powerAnchor') ? ' checked' : '') + dis('powerAnchor') + '/> 战力锚</label>'
+      + '<label class="wa-row" title="落账最近若干份发往副 API 的报文（密钥打码，只存内存不写盘）"><input type="checkbox" id="wa-sw-requestviewer" data-sw-ns="requestViewer"' + (ini('requestViewer') ? ' checked' : '') + dis('requestViewer') + '/> 请求报文预览器</label>'
+      + '<label class="wa-row" title="按标题/关键词/正文三面搜索条目缓存（纯读，恒开）"><input type="checkbox" id="wa-sw-wbsearch" data-sw-ns="wbSearch"' + (ini('wbSearch', true) ? ' checked' : '') + ' disabled/> 世界书即时搜索 <span class="wa-dim">（恒开：只读一份内存数组，关掉无收益）</span></label>'
+      + '<div id="wa-sw-out" class="wa-out"></div>'
+      + '<div class="wa-dim">注：产注入块的五个（用户锁定 / 节奏环 / 文体档案 / 信息迷雾 / 战力锚）'
+      + '还须在「导演」页勾选对应注入源，否则开关点了正文也不变。</div>';
+  }
+
+  /** 总开关绑定：逐行调各引擎**既有** setSettings（不新增第二套写口）。 */
+  function switchBind(panelEl) {
+    Array.prototype.forEach.call(panelEl.querySelectorAll('[data-sw-ns]'), function (cb) {
+      cb.onchange = function () {
+        const ns = cb.dataset.swNs;
+        const mod = WA[ns];
+        const o = panelEl.querySelector('#wa-sw-out');
+        if (!mod || typeof mod.setSettings !== 'function') { if (o) o.textContent = '✗ 模块未装载：' + ns; return; }
+        let w = null;
+        try { w = mod.setSettings({ enabled: !!cb.checked }); }
+        catch (e) { if (o) o.textContent = '✗ 保存异常：' + ((e && e.message) || e); return; }
+        if (o) {
+          o.textContent = (w && w.ok === false)
+            ? ('✗ 保存失败：' + (w.reason || '未知原因') + '（改动未落盘）')
+            : ('✓ ' + ns + ' 已' + (cb.checked ? '开启' : '关闭'));
+        }
+      };
+    });
+  }
+
   WA.uiSettings = {
     render() {
       const bs = WA.backstage.getSettings();
@@ -160,7 +221,8 @@
             + tail;
         })()}
         <div id="wa-set-out" class="wa-out"></div>
-        ${styleBlockHtml()}`;
+        ${styleBlockHtml()}
+        ${switchBlockHtml()}`;
     },
     bind(panelEl) {
       const $ = sel => panelEl.querySelector(sel);
@@ -373,6 +435,7 @@
           + '｜生效轴 ' + axN + ' 项'
           + (visOn ? '｜注入可见性：已开启（下轮注入生效）' : '｜注入可见性：**未开启** —— 需到「导演」页开启「叙事工艺」源，否则不进正文');
       };
+      switchBind(panelEl);
     }
   };
 })();

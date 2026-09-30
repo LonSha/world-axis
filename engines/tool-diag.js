@@ -834,6 +834,13 @@
     'engines/region.js': 'region',
     'engines/stage.js': 'stage',
     'engines/session.js': 'session',
+    // v2.129.0（缝 A1..A10）：十个新引擎。登记在此 = 该文件缺席时 secModules 会**如实报 missing**。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于这些模块在定义面上不存在（自检看不见的黑盒）。
+    'engines/userlock.js': 'userlock', 'engines/rewriter.js': 'rewriter', 'engines/storyclock.js': 'storyclock',
+    'engines/rhythm-loop.js': 'rhythmLoop', 'engines/motif.js': 'motif', 'engines/beat-mask.js': 'beatMask',
+    'engines/preset-world.js': 'presetWorld', 'engines/power-anchor.js': 'powerAnchor',
+    'engines/request-viewer.js': 'requestViewer', 'engines/wb-search.js': 'wbSearch',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1633,6 +1640,11 @@
       //   它缺席本身就是断裂，不该被 cond 层「依赖态、缺失不判失败」掩盖）。
       'wa-st-block', 'wa-st-para', 'wa-st-persp', 'wa-st-pron', 'wa-st-takeover', 'wa-st-narrate',
       'wa-st-custom', 'wa-st-save', 'wa-st-out',
+      // v2.129.0（缝 A1–A10）：十个新引擎的总开关（同 v2.51.0 理由：渲染 + 绑定 + 守卫登记三件齐做，
+      //   否则 id 写错无人发现）。这些是 A1–A10 十项能力在面板上的**唯一**入口。
+      'wa-sw-userlock', 'wa-sw-rewriter', 'wa-sw-storyclock', 'wa-sw-rhythmloop', 'wa-sw-motif',
+      'wa-sw-beatmask', 'wa-sw-presetworld', 'wa-sw-poweranchor', 'wa-sw-requestviewer', 'wa-sw-wbsearch',
+      'wa-sw-out',
       'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
     // v2.33.0: 记忆页 / 注入页——本版把「能力面」第一次接到「呈现面」：memory（92 方法，
@@ -2161,6 +2173,45 @@
     }, {});
   }
 
+  /* ── v2.129.0（缝 A1–A10）：三个“侧路”引擎的只读读数 ──
+   *   A2 改写器 / A7 静态设定缓存 / A9 报文预览器 三者都不产注入块
+   *   （没有 `buildBlock`）——它们的消费者是面板、创世纪与用户。而本节是这三项能力在
+   *   **产品侧的唯一读者**：没它们就是冻结面上的死导出（口径：产品零引用即冻结）。
+   *   同 secChrono / secRegion 纪律：**只报读数、不写世界**（不 rewrite、不 put、不 capture）。
+   */
+  function secStitch2129() {
+    return safe(function () {
+      const rw = (WA.rewriter && typeof WA.rewriter.stat === 'function')
+        ? (function () {
+          const st = WA.rewriter.stat();
+          const cfg = (WA.rewriter.getSettings ? WA.rewriter.getSettings() : {});
+          return { enabled: !!cfg.enabled, channel: WA.rewriter.CHANNEL || null,
+            runs: st.runs, changed: st.changed, unchanged: st.unchanged,
+            blocked: st.blocked, lastReason: st.lastReason || '', faults: st.faults || {} };
+        })() : { error: 'engines/rewriter.js 未加载（AI 改写通道席位缺席）' };
+      const pw = (WA.presetWorld && typeof WA.presetWorld.preview === 'function')
+        ? (function () {
+          const pv = WA.presetWorld.preview();
+          const cfg = (WA.presetWorld.getSettings ? WA.presetWorld.getSettings() : {});
+          const st = (typeof WA.presetWorld.stat === 'function') ? WA.presetWorld.stat() : {};
+          return { enabled: !!cfg.enabled, rows: pv.total, byKind: pv.byKind,
+            cap: cfg.maxRows, updatedAt: pv.updatedAt,
+            puts: st.puts, overrides: st.overrides, drops: st.drops };
+        })() : { error: 'engines/preset-world.js 未加载（静态设定缓存缺席）' };
+      const rv = (WA.requestViewer && typeof WA.requestViewer.stat === 'function')
+        ? (function () {
+          const st = WA.requestViewer.stat();
+          const cfg = (WA.requestViewer.getSettings ? WA.requestViewer.getSettings() : {});
+          const chans = (typeof WA.requestViewer.CHANNELS === 'function') ? WA.requestViewer.CHANNELS() : [];
+          return { enabled: !!cfg.enabled, kept: WA.requestViewer.size(), maxKeep: cfg.maxKeep,
+            maskKey: !!cfg.maskKey, channels: chans.length,
+            previews: st.previews, captures: st.captures, drops: st.drops, blocked: st.blocked };
+        })() : { error: 'engines/request-viewer.js 未加载（报文预览器缺席）' };
+      return { rewriter: rw, presetWorld: pw, requestViewer: rv,
+        note: '只报席位与计数（本节目不改写、不落盘、不捕获报文）' };
+    }, {});
+  }
+
   // ── 汇总 ──
   function collect() {
     const diag = {
@@ -2185,6 +2236,9 @@
       //   不替用户跑基准（跑基准是面板出口的事）。
       perfTrace: secPerfTrace(),
       chrono: secChrono(),
+      // v2.129.0（缝 A1–A10）：三个侧路引擎（改写器 / 静态设定 / 报文预览）的只读读数。
+      //   这三项不产注入块，故本节是它们在产品侧的唯一读者；漏登记 ⇒ 死导出面当场红灯。
+      stitch2129: secStitch2129(),
       // v2.128.0（拓展计划 X3–X6）：远方离线演化 / 认知冲突裁决 / 组织制度 / 多人身份。
       //   四节都在这里登记 —— 诊断包是这四个新面**唯一**的产品侧读者，
       //   漏登记 ⇒ 死导出面当场红灯（口径：产品零引用即冻结面）。
@@ -3159,6 +3213,7 @@
     secHostWb, secFloorChanges, secLedgerTimeline,   // v2.50.0（第三十五面）
     secFaultLedger, // v2.80.0（第十四面）
     secHorizon, secEnemies, secParallelWorld,        // v2.64.0（第五十一 / 五十二 / 五十三面）
+    secStitch2129,                                   // v2.129.0（缝 A2 / A7 / A9：改写器 / 静态设定 / 报文预览）
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');
