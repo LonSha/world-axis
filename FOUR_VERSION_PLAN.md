@@ -460,6 +460,32 @@
   · 本版不做：不在无头环境伪称实机已验证（如实留档，沿用 P-实机约定）。
 - [ ] 未覆盖（如实留在清单，不伪称已完成）：X6 / X8 分别依赖 **P5 / P1** 先落地（P 线是 X 线的地基）；X1 / X4 只结算**显式声明**的链与冲突，不做 AI 自动推断；X2 / X3 的注入都受既有可见性双轴约束，hidden 级绝不进正文；全部八项的 UI 层仍不做实机验证（沿用 P-实机约定，如实留档）。
 
+## v2.137.0 UI 实机验证通道（O 线优化提升 O14）
+- [x] **O14 UI 实机验证通道已交付（v2.137.0）**。它治的病是本仓**长寿的一处未覆盖项**：
+  自 v2.103.0 起每一版都如实写着「**UI 层仍未做实机验证**（`ui/panel.js` 在无头回归里不装载）」，
+  而全部 UI 结论建立在 `tests/ui-dom.js` 的 mini-DOM 替身上 —— 替身与真浏览器有一处
+  **返回值类型**差异：`querySelectorAll()` 在替身里返回**普通数组**、在真浏览器里返回 **NodeList**
+  （有 `forEach`、**没有 `filter`**）。于是 `querySelectorAll(...).filter(...)` 这一族链
+  在替身里永远过、在真机上一律抛。
+- **接通真浏览器后第一次运行就抓到活体**：`ui/panel.js` 的 `#wa-inj-diag`（注入页「去自检」，
+  把用户送到工具页并点「跑诊断」的那一枚）在真机上**整枚控件不可达**
+  （`TypeError: panelEl.querySelectorAll(...).filter is not a function`），而**全库零告警、所有既有门禁全绿**。
+  修法：`Array.prototype.filter.call(panelEl.querySelectorAll('.wa-tab'), ...)` ——
+  对数组与 NodeList **同时成立**，不依赖调用面类型。
+- **落地**：`tests/ui-live.js`（真浏览器通道：`route.fulfill` 从磁盘喂源码、真 `localStorage` 往返、
+  14 页 728 个控件逐个点）＋ `tests/ui-live-v2137.js`（版本专锁：A 结构面 / B 运行时 / C 负控制五条，
+  **每条两向**）；`tests/run.js` 新增子进程调用点（真跑整套，**不是文件在场**）；
+  `tests/dependency-guard.js` 的 `OPTIONAL_DEPS` 由 1 项扩到 2 项（`playwright-core`，带 reason / fallback /
+  fallbackProof / affects）；`tests/gate-timeout.js` 的 `TIMEOUT_ARMED` / `ARMED_SITES` / `GATES` 三表各加一条。
+- **口径**：只验证**已有控件**（不造新 UI）；**不验证排版与像素**；宿主缺席时如实降级 `engine-absent`
+  （读数标 `host: 'stub'`）；`probe()` 三档 + **降档必带非空 why，不许静默通过**。
+- **收口读数**：`files=165 loaded=165 pages=14 controls=728 thrown=0 rej=0 pageErr=0 roundtrip=ok`；
+  专锁 `runAll 29 / 0` + `runNegative 48 / 0` = **77 项**；`gate-timeout` 自洽零问题（现场调用点 12 = 武装表 12）。
+- **本版不做**：不做排版/像素级回归；不覆盖 `index.js` 的 CDN 多源容灾链（页面走磁盘喂源码，不起 HTTP）；
+  不在无浏览器环境伪称实机已验证（降档可见，读数会变少但 **不许假称通过**）。
+- **本项对「两份计划协同点」的兑现**：O14 原计划定位就是「覆盖全部新面板入口」的底座 ——
+  本版把**通道本身**接通并钉住，E 线后续新增面板入口可直接复用同一个 `runLive()`（无需再造一条通道）。
+
 ## 两份计划的关系与落地次序
 - **P 线是 X 线的地基**：X6（身份）依赖 P5（权限闸门）、X8（握手）依赖 P1（持久化）⇒ **先 P1 / P5，再 X6 / X8**。
 - **版本节奏**：P 线建议 v2.121–v2.124 四版（每版 2 项），X 线 v2.125–v2.128 四版（每版 2 项）；每版收口才同步 `index.js` / `manifest.json`，未完成不提前升版（沿用既有纪律）。

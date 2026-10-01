@@ -6,7 +6,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.136.0 |
+| 版本 | v2.137.0 |
 | 全量回归 | `node tests/run.js` → **v2.135.0 为通过 13100 / 失败 0 · status: passed**（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
 | 产品文件面 | 163（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
@@ -22,6 +22,119 @@
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+### R123 · 2026-10-01 · v2.137.0：O14 UI 实机验证通道 —— 把「无头全绿」与「浏览器里点得动」分开
+- **起点与终点**：起点 v2.136.0（全量回归 13153 / 0，`992ef17`）；终点 v2.137.0。
+- **它治的病**：本仓全部 UI 结论自 v2.12.0 起建立在 `tests/ui-dom.js` 的 **mini-DOM**（自写替身）上 ——
+  而替身与真浏览器有一处**返回值类型**的差异：`element.querySelectorAll()` 在替身里返回**普通数组**，
+  在真浏览器里返回 **NodeList**（有 `forEach`、**没有 `filter`**）。于是 `querySelectorAll(...).filter(...)`
+  这一族链在替身里永远过、在真机上一律抛。**接通真浏览器后第一次运行就抓到活体**：
+  `ui/panel.js:5383` 的 `#wa-inj-diag`（注入页「跑诊断 / 去自检」）整枚控件在真机上**点了没反应**
+  （`TypeError: panelEl.querySelectorAll(...).filter is not a function`），而**全库零告警、所有既有门禁全绿**。
+- **可行性这一关是硬前提**：容器里**没有任何浏览器**（`which chromium/chrome/firefox` 全空），
+  但网络通（registry 200）、`/tmp` 有空闲、`uid=0` ⇒ `npm install playwright-core` +
+  `npx playwright@1.49.0 install chromium` 后真起得来（**版本配对是坑**：`playwright-core@1.63.0` 的
+  `executablePath()` 指向 `chromium-1243/.../chrome-linux-arm64/chrome`（不存在），`1.49.0` 才指向
+  `chromium-1148/chrome-linux/chrome`（存在）⇒ 这条直接决定了 `findBrowser()` 必须**三级探测**，
+  不能只信驱动默认路径）。
+- **新增面**：`tests/ui-live.js`（实机通道，378 行）＋ `tests/ui-live-v2137.js`（版本专锁，315 行）。
+  - 通道口径：产品序取自 `index.js` 的 `LOAD_ORDER`、UI 清单取自 `product-files.js` 的 `discoverUIFiles()`
+    ——**不另立副本**；页面用 `route.fulfill` **从磁盘喂源码**（不起 HTTP 服务、不留端口、origin 固定
+    `http://walive.test`，路径**相对仓库根**，与 v2.41.0 成类静态锁同一条纪律）；宿主走 `tests/mock.js`
+    同形的桩（读数如实标 `host: 'stub'`）；`probe()` 给三档 `full`/`fallback`/`missing`，
+    **降档必带非空 why**，不许静默。
+  - 专锁判据：**A 结构面**（纯静态，任何机器上都必须全绿：装载面同源 / 三档定义 / 无绝对路径字面量 /
+    探针脚本形态 / 往返两半可分 / **A6 全仓静态锁「产品面零 `querySelectorAll(...).<数组专属方法>` 链」** /
+    锚点唯一性 / 依赖登记）＋ **B 运行时**（条件面：非 full 档如实报降档，**不静默跳过、不假称通过**）
+    ＋ **C 负控制五条，每条两向**（C1 源码 handler 改必抛 ⇒ 点击面必须报出；C2 `pages()` 改名 ⇒ 页数现形为 0；
+    C3 删 `.wa-body` ⇒ 必须报「无 .wa-body」；C4 吞 `setItem` ⇒ `storedOk` 必须翻假；C5 驱动与缓存同时指空 ⇒
+    `probe()` 必须给 fallback 且 `why` 非空）。
+- **收口读数**（实机实测）：`summary: files=165 loaded=165 pages=14 controls=728 thrown=0 rej=0 pageErr=0 roundtrip=ok`；
+  最终定稿读数（工作树冻结后的整轮隔离回归）：`通过 13159 / 失败 0 · Status: passed · unchanged: true`（`/tmp/worldaxis-regression-FWmxjx/result.json`）；其中本版新 section 的四条断言在隔离环境里以 **fallback 档（32 项）** 逐条报绿 —— 档位随环境，读数不撒谎；
+  专锁 `runAll 29 / 0` ＋ `runNegative 48 / 0` = **77 项**；CLI 默认跑全量（A+B+C）约 **44s**，`--static` 约 **0.8s**。
+- **本版最有价值的方法论产出：负控制自纠三连（全部是「破坏没打得到靶」的同族坑，且第三处是通道自己的缺陷）**：
+  ① **运行态补 handler 无效** —— 点击循环里 `on('#...')` 回调会触发 `renderBody()` 整片重绘，页面重查拿到的是
+     **新节点**、循环手里是**旧节点**，补的 handler 不在被点对象上（实测 `thrown=0`）⇒ 破坏要落在**源码本体**。
+  ② **只包 try/catch 的观测面看不见「handler 本体抛错」** —— DOM 规范规定事件监听器抛出的异常**不冒泡**到
+     `.click()` 调用方，它走「报告异常」路径交给全局 error 事件。实测对照：破坏后 `pageErrors=[__wa_c1_probe_boom__]`、
+     `thrown=[]` ⇒ **通道对「控件 handler 抛错」这一整类（包括本版抓到的那枚 `#wa-inj-diag`）是结构性失明的**。
+     修法：页内挂全局 `error` 收集器 ＋ 逐控件取长度差**归因到刚被点的那个控件**，与同步抛出合并成 `thrown`
+     （三类分列：`structThrown` / `syncThrown` / `handlerThrown`）。
+  ③ **tab 自己也是一枚控件** —— 点 `tab` 就触发 `renderBody()`，`.wa-body` 不在树里时它抛 TypeError（同样不冒泡）；
+     而随后的 `!body` 分支又 `continue`，把「页尾补收」整段跳掉 ⇒ 整页失败**无声消失**
+     （实测：删 `.wa-body` 后 `pages=0 / thrown=[] / pageErrors=14`，判据报「0 条」，看起来像通过）。
+  ④ **合并面只许在一处生成，且带上每一路** —— 结构缺失原先是直接 `push` 进 `out.thrown` 的，而末行又
+     `out.thrown = concat(...)` 重新赋值 ⇒ 把刚推的那条**覆盖掉**（「无 .wa-body」永远报不出来）。
+  收敛出的纪律一句话：**「破坏必须打得到靶」有两层 —— 破坏要落在被观测的对象上，且观测面要覆盖该对象出错的全部路径。少任一层，红灯的缺席都证明不了判据承重。**
+- **挂成真消费面（不是文件在场）**：`tests/run.js` 新增 section 真起子进程跑整套（与 v2.136.0「ui-gate.js 必须真被执行」同一条纪律）；
+  **新开的子进程调用点一并入表** —— `tests/gate-timeout.js` 的 `TIMEOUT_ARMED` / `ARMED_SITES` / `GATES` 三张表各加一条
+  `ui-live-2137`（预算 96000ms 统一值）。实测自洽：`coherence()` 零问题 · 现场调用点块数 **12 = 武装表 12** · 锚点 12/12 全定位。
+- **可选依赖单一真源**：`tests/dependency-guard.js` 的 `OPTIONAL_DEPS` 由 **1 项扩到 2 项**
+  （`playwright-core` 带 reason / fallback / fallbackProof / affects ×3；`siteNeedle` 走 `'playwright-core'`）；
+  专锁 `dependency-guard-v2103` 复跑 **29 / 0**（登记表从 1 项变 2 项不红）。
+- **产品侧修法（一处，活体）**：`ui/panel.js` 的 `#wa-inj-diag` handler 由
+  `panelEl.querySelectorAll('.wa-tab').filter(...)` 改为 `Array.prototype.filter.call(panelEl.querySelectorAll('.wa-tab'), ...)`
+  —— 对数组与 NodeList **同时成立**，不依赖调用面类型。
+- **台账／文档回填**：`module-registry-ledger`（version 2.137.0）· `dead-export-ledger`（version 2.137.0 ＋ 沿革段）·
+  `reject-code-ledger`（version 2.137.0 ＋ 沿革段；**三集逐字不变 608 = 见证 369 / 死表 9 / 基线 230** ——
+  等价写法修缺陷，拒收面不需要跟着变胖）· `index.js` / `manifest.json` → 2.137.0。
+- **收口段实测（全量回归从 13156/1 走到 13159/0 的六项）** —— 这一段产出的不是新功能，而是
+  **六条「判据自己出错」的实证**，全部已固化成断言或写法纪律：
+  ① **升版回填必须走工具，不许手改**：本版手改了 `version` 与 `_note`，却漏掉 `tests/run.js` 里
+     14 处硬读数（8 处版本常量断言 + 6 处消息文本口号）。现场两条门禁当场报出：
+     `v2131/O16: 端到端读数与账本现场同源（核过站点 34 个 · 失配 8 处）` 与
+     `版本断言的消息文本与比较值同批（在册 6 处 · 不一致 6 处）`。
+     修法：`node tools/sync-e2e-readings.js --write` 一次回填 8 处（工具自带「写前复判 + 写后复核 + 失败回滚」），
+     消息文本用**只改字符串字面量**的参数化脚本补 6 处（比较值已由工具回填，不能再被脚本碰到）。
+  ② **拼装路径 = 让边消失**（`test-surface-gate` 的引用边取自源码**字面串**）：
+     新锁把 `require('./ui-live.js')` 写成 `require('./' + path.basename(LIVE_REL))`，
+     语义没错，但 `RE_REQUIRE` 是文本匹配 ⇒ **边在源码里不存在** ⇒ `tests/ui-live.js` 被判成
+     「从不执行且未登记豁免」的孤儿，`orphan-lock-v2750` 的 [B] 真仓库零孤儿随之报 2 条。
+     同一形态在 `run.js` 一侧重演：spawn 参数写成 `path.join('tests', 'ui-live-v2137.js')`，
+     而 `RE_TEST_PATH` 要求 `tests/` 紧跟文件名（现场其余 11 个 spawn 站点全是字面量）。
+     修法：`function liveMod() { return require('./ui-live.js'); }` + spawn 参数改字面量
+     `['tests/ui-live-v2137.js']`，并**同步** `gate-timeout.js` 的锚点（锚点指向的就是那一行，必须逐字跟上）。
+     纪律：**门禁读源码文本时，边必须是字面量**；把路径藏进变量或拼接里，等于让边消失 ——
+     而「文件在场」和「有人执行」是两件事，正是 v2.75.0 点名的那类病。
+  ③ **锚点纯度：转义口径决定自核数**（`negative-control-audit` 的 H5）：
+     新锁的 `clickTry` 锚点用了 `\"` 转义成串，而纯度判据只把 `\n` 折回 `\\n` 一种转义
+     ⇒ 自核数 **0** ⇒ 报 `impure`（全仓唯一一条，同时带红 `v2104: 全仓锚点问题 0 条`、
+     `B5 全仓负控制锚点健康`、`v2126/B: 统一档零问题且门禁面为零` 三处）。
+     修法：锚点原文里没有单引号 ⇒ 改**单引号成串**，逐字无损且自核数归 1。三处连带全绿。
+  ④ **N7 的靶必须是「唯一命中且就是末次版本词」**（`readings-v2106`）：
+     N7 用 `t.replace('（v' + V + ' ·', '（v9.9.9')` 制造脱钩 —— `replace` 只改**第一处**，
+     而判据取**末次**版本词。本版三段实测：
+     （a）段尾塞裸版本词 `…三段）。v2.137.0` ⇒ 末次词落在裸词上，标题被改而末次词不动 ⇒ N7 失明；
+     （b）段首标题与段尾收束标记**同时**写 `（v2.137.0 ·` ⇒ 命中 2 次 ⇒ `replace` 只改段首 ⇒ 仍失明；
+     （c）末次词位置对了，但段内「（先例：v2.133.0 / v2.134.0 / v2.136.0 三段）」把末次词**拽回旧号** ⇒ B7/B9 复红。
+     修法：**回到两本台账各自 HEAD 的成文先例** —— `dead-export-ledger` 段首标题不带版本词前缀、
+     版本词只留在段尾 `本段沿革完（vX.Y.Z · 本段沿革终）`；`reject-code-ledger` 段首标题带版本词、
+     段尾不加，且**段内不得再出现任何版本词**。合格形态的三个硬条件（已写成脚本断言）：
+     `（vX.Y.Z ·` 恰中 1 次 · 末次版本词 === version · 该命中点位置就是末次词位置。
+  ⑤ **判据下限必须随档位，否则逼被测对象撒谎**（本版**唯一**一条全量红灯）：
+     `run.js` 的新 section 初版写 `Number(n) >= 40` —— 拿 **full 档**的断言总数当普遍下限。
+     而隔离回归 `tests/isolated-runner.js` 的 `cleanEnv` 把 `HOME` 重定向到 task 目录，
+     浏览器缓存住在 `~/.cache/ms-playwright` ⇒ **隔离树里探不到浏览器** ⇒ 通道**如实降档
+     `fallback`（32 项 = A 面 29 + C5 两向 + 跳过声明）** ⇒ 这条判据在**唯一真正跑全量的那个环境里**
+     必然变红。病灶性质与 v2.131.0 / v2.132.0 / v2.133.0 同型（**判据范围 ≠ 被测对象**，这是第四次）：
+     若照旧绿，唯一办法是「让通道假装 full」—— 恰是本版要治的病（读数撒谎）。
+     修法：**下限随档位**（full ≥ 40 / 非 full ≥ 29 = A 面下限），并把本版核心口径
+     「**非 full 档必须带非空降档理由**」升格为第二条断言（`/tier=fallback（[^）]{5,}）/`）。
+     负控制（镜像目录真源码破坏，真仓库字节零改动）：把 `ui-live.js` 第二个 fallback 的 `why` 抹空
+     ⇒ 原版 A1/A2 皆绿、破坏版 **A2 报红而 A1 仍绿**（两条判据不互相冒充）、真源码逐字未变。
+  ⑥ **一次全量中断的根因是环境级 flake，不是产品缺陷**：`/tmp/worldaxis-regression-tZcTbK/run.log`
+     尾部先出 `Error: ENOSYS: function not implemented, open '…/work/engines/life.js'`，
+     随后 node 在 `ResetStdio()` 里断言 `(*__errno_location()) == 9` 失败并 native abort。
+     **是 proot 容器下 `open` 偶发 ENOSYS 导致 node 收尾自断言**，与候选树、判据均无关
+     （同一次回归改用后台落盘 + `WA_REGRESSION_TIMEOUT_MS=2400000` 重跑即 **13157 / 0 · `unchanged: true`**）。
+     配套纪律（本轮一并验证）：回归**不要用管道 `| tail`**（管道阻塞导致进程被杀）；
+     硬超时默认 660000ms 在慢机不够（本轮曾在 195/196 节被 SIGKILL）；
+     **回归运行期间不得改工作树**（`isolated-runner` 的 `unchanged` 判据会把 `status` 判成 `source-changed`）。
+
+- **未覆盖（如实留在清单，不伪称已完成）**：本通道只验证「控件可达 / 点击不抛 / 设置往返一致 / 渲染成树」，
+  **不验证排版与像素**；页面用 `route.fulfill` 从磁盘喂源码，**不覆盖** `index.js` 的 CDN 多源容灾链（`loadScriptOnce` 三域回退）；
+  真宿主 SillyTavern 缺席，宿主交互面走同形桩，读数标 `host: 'stub'`；**通道需外部浏览器** ⇒ 本仓「零 npm 依赖」
+  的底线不变，无浏览器时 B/C 如实降档（读数变少，但不许假称通过）；C5 的降档证明只能覆盖「探针面」，
+  **不能**证明真浏览器里产品行为正确（那要 full 档）；E 线七项与 O18 的现场状态本轮只做勘验、未做改动。
 ### R122 · 2026-10-01 · v2.136.0：O16 A3（维护工具与 UI 运行质量）—— 把「没人执行的规则」变成门禁
 - **起点与终点**：起点 v2.135.0（全量回归 13100 / 0，`92c0e3b`）；终点 v2.136.0。
 - **它治的病**（三件，全部是无人看管面）：
