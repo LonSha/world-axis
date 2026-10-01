@@ -67,10 +67,10 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.134.0）
+## 构建与验收（当前版本 v2.136.0）
 
 ```bash
-node tests/run.js               # 全量回归入口 → v2.134.0 为通过 13015 / 失败 0（硬超时默认 660000ms，由 v2.131.0 的实测驱动改为 660000 —— 整趟实测 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL；慢机可用 WA_REGRESSION_TIMEOUT_MS 再放宽）
+node tests/run.js               # 全量回归入口 → v2.135.0 为通过 13100 / 失败 0（硬超时默认 660000ms，由 v2.131.0 的实测驱动改为 660000 —— 整趟实测 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL；慢机可用 WA_REGRESSION_TIMEOUT_MS 再放宽）
 node tests/inventory.js         # 出口面清册 → 四类悬空均 0（产品文件 162 个）
 node tests/export-contract.js   # 出口面契约 → ns / members / chars（产物在 .gitignore 内）
 ```
@@ -83,12 +83,16 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（15 个，`git ls-files tools/ | wc -l` 为准：
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（14 个，`git ls-files tools/ | wc -l` 为准：
 `anchor-scan` / `coverage-report` / `diag_inject_v2860` / `doc-gate` / `gen-changelog` /
 `gen-error-codes` / `gen-lock` / `hooks` / `impact-analysis` / `patch-idempotency` /
-`patch_o17_v2104` / `scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded`）。
-其余一次性脚本与补丁（`patch_*` / `bump_*` / `seal_check_*` / `doc_*` / `wire_*`）不入库：它们是收官动作，不是交付物。
+`scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded`）。
+其余一次性脚本与补丁（`patch_*` / `bump_*` / `seal_check_*` / `doc_*` / `wire_*`）不入库：它们是收官动作，不是交付物
+（v2.136.0 实测补一处漏网：`patch_o17_v2104` 自 2.104.0 起一直在索引里，与前半句「只有被引用才入库」
+和本条自身都矛盾 —— 它零代码引用、且 `patch_*` 本就在不入库之列，已按既有判据 `git rm --cached`，磁盘留存）。
 历史归档可随时从 git 历史取回，`.gitignore` 已按此口径落规则。
+**这句判据自 v2.136.0 起由 `tests/toolchain-gate.js` 当场执行**（此前没有任何一道门禁看过 tools/ ——
+`tests/product-files.js` 的 `SKIP_DIRS` 把整个目录排掉，于是「名单 / 个数 / 引用档 / 入口档」四件事无人核）。
 
 ## 十四页面板
 概览 / 世界 / 人物 / 记忆（四层回顾·事实·伏笔生命周期·溯源）/ 仇敌（总览·状态推进·天下大势·黑盒）/ 平行世界（主线之外独立推演·NPC 档案·认知边界·事件影响分级）/ 注入（健康度·预算折叠·槽位）/ 事件（势力·声誉·经济·风声·远方泳道·推演叙事）/ 导演 / 设置 / 连接 / 助手 / 工具 / 日志

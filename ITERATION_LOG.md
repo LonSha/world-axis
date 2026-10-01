@@ -6,22 +6,36 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.135.0 |
+| 版本 | v2.136.0 |
 | 全量回归 | `node tests/run.js` → **v2.135.0 为通过 13100 / 失败 0 · status: passed**（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
 | 产品文件面 | 163（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
 | 出口面契约 | `node tests/export-contract.js` → ns= 143 / members= 926 / chars= 10570 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 155 · 锁 150 · 孤儿 0 · 豁免 0 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 157 · 锁 152 · 孤儿 0 · 豁免 0 |
 | 死子面 | `node tests/dead-export-gate.js` → dead 757 / uiDead 4 / 仅测试 347 / dataOnly 241 |
 | 拒收码 | `node tests/reject-code-gate.js` → 608 码（见证 369 / 死表 9 / 基线 230） |
 | 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.135.0 · 现场 refs 3547 / 命名空间 162 / 成员 1956 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | 锚点覆盖 | `node tools/anchor-scan.js` → 锁 112 把 · 覆盖 **112（100%）**＝ 统一档 29 + 非统一档已识别 83 · **未识别 0** · 非统一档问题 83（**只报不红**，逐条带证据与命中行类别）· 记录内配对锚点 22 |
 | 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核；v2.135.0 扩到 `checked` = 34 站点） |
-| tools/ | 只留**被可执行代码引用**的 15 个（一次性脚本不入库，见 `.gitignore`） |
+| tools/ | 只留**被可执行代码引用**的 14 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据 |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+### R122 · 2026-10-01 · v2.136.0：O16 A3（维护工具与 UI 运行质量）—— 把「没人执行的规则」变成门禁
+- **起点与终点**：起点 v2.135.0（全量回归 13100 / 0，`92c0e3b`）；终点 v2.136.0。
+- **它治的病**（三件，全部是无人看管面）：
+  1. **README 里那句判据没人执行**：README「### tools/ 的取舍」写着「只有被可执行代码引用（或被门禁链引用）的工具才入库（N 个，`git ls-files tools/ | wc -l` 为准）」，而 `tests/product-files.js` 的 `SKIP_DIRS = ['tests','tools']` 把整个目录排掉 —— `export-contract` / `inventory` / `module-registry` / `dead-export` 四面**都看不见 tools/**。于是「名单 / 个数 / 引用档 / 入口档」四件事无人核：某次迭代把零引用脚本加进 tools/ 并跟踪、或让某工具失去全部引用，读数不会有任何变化、门禁照样全绿。
+  2. **门禁一落盘就抓出两条真缺口**：① `tools/diag_inject_v2860.js` 第 3 行写死 `require('/tmp/wa_git/tests/ui-gate-sync.js')` —— 回归跑在 `tests/isolated-runner.js` 用 `git archive HEAD` 造的**候选树**里，那个路径不存在，要么直接抛、要么（本机恰有该目录时）require 到**另一个仓库**、把实验结论归给错的树；② `tools/patch_o17_v2104.py` 自 2.104.0 起一直在索引里，而它**零代码引用**、且 `patch_*` 本就在 README 自述的不入库之列 —— 与那句判据自身矛盾。两者按既有判据处置：前者改相对路径（`__dirname/../tests/`），后者 `git rm --cached`（磁盘留存 3781 字节）。索引 15 → 14，README 名单与个数按现场回填。
+  3. **测试面上的同族病（本版真正的意外）**：`tests/ui-gate.js`（239 行，UI 渲染路径门禁，独立跑 **53/0**、含 **728 个真实控件点击**）在 git 索引里，但 `tests/run.js` **从未挂过它** —— 全仓只有 34 处注释提到它。更糟的是 `tests/test-surface-gate.js` 报「孤儿 0」：它把该文件判为 `inline`（已内嵌可达），依据是 run.js 里一句 `// This block embeds the tests/ui-gate.js cases verbatim (same implementation, no copy)`（12757 行）——**「提及不是引用」**，本仓在 v2.74.0 就写进自证的两条纪律之一，在自家门禁上重演了一遍。而且实测逐字比对：内嵌副本**缺 2 条静态不变式断言**（`PAGES 里每页都有对应 RENDERERS 条目` / `RENDERERS 字面量可定位`），那句「verbatim」今天已不成立。处置：`run.js` 按 v2.83.0 / v2.84.0 惯例在子进程里**真跑**它，并把读数（`通过 N / 失败 0`、`N ≥ 50`）钉成断言。
+- **新增面**：`tests/toolchain-gate.js`（工具链门禁，五面：名单同源 / 个数同源 / 引用可达 / 入口存在 / 绝对路径；导出 `audit` / `selfTest` / `scanTool` / `readmeClaim` / `trackedTools` / `trackedTests` / `jsRefIndex` / `deadTests`）＋ `tests/toolchain-gate-v2136.js`（专锁 43 项：A 结构 / B 运行时 / C 两向负控制，C1–C7 每一组都「先制造病灶让判据现形 → 再摘掉该判据证明是它在承重」）。挂载在 `tests/run.js` 末节（真消费面，不是文件在场）。
+- **单一真源**：名单**不另立第二份常量** —— 门禁解析 README 本身（名单句有明确起止：以含 `git ls-files tools/ | wc -l` 的行为起点、以 `）。` 收尾的行为终点）；在册集合取自 **git 索引**而非磁盘（磁盘上的一次性脚本不该被要求）。
+- **收尾期抓出的自身缺陷（门禁 5 处 + 专锁 8 处，全部实测，不是纸面推演）**：
+  - 门禁：① README 名单正则把同段「其余一次性脚本（`patch_*` / `.gitignore`）」也收成在册工具 ⇒ 加**形态门**（小写字母开头的 kebab/snake 串，不含通配符、不以点开头）；② 自证期望表写错（`tools/self.js` 只被自己注释提到 ⇒ 应为 `orphan`）；③ **零命中不算通过**（索引读空时 `problems` 为空是**假绿**，必须报红 —— 与 v2.103.0 O16 同族否决式口径）；④ `absLiteral` 未排注释行（解释病灶的文字不是病灶）；⑤ 名单句范围过宽（同段新补的解释句被判成「在名单却不在索引」）⇒ 名单句必须有明确起止。
+  - 专锁：① heredoc 回显污染导致两次落盘不完整（改「先落盘 → `node --check` → 现场读数」）；② 子进程输出用 `lastIndexOf('{')` 定位 JSON 会切进内层对象 ⇒ 改**唯一前缀标记**；③ A6/A7 用整文件正则扫 `require(` 会把 selfTest 夹具里的示例串当成依赖 ⇒ 只判**顶层**零缩进行；④ 镜像根对目录软链**不递归** ⇒ 顶层全软链 + `tests/` `tools/` 逐文件副本；⑤ `bad5b = bad5.replace(ANCHORS.emptyIndex, …)` **漏了 `.txt`** ⇒ `replace(对象)` 转成 `[object Object]` 匹配不到，破坏压根没发生（本锁最隐蔽的一处）；⑥ C3 靶子名写进**自变量注释**里，于是该注释成了靶子的 `documented` 引用兜底（`scanTool` 按行判），「让靶子失去全部引用」永造不出 orphan ⇒ 靶子名走常量（并加 A9 把该形态焊死）；⑦ 病灶替换名用了**靶名的超串**（`coverage-report` → `coverage-reportX`）⇒ 行过滤器 `indexOf('tools/'+base)` 仍命中，orphan 恒造不出 ⇒ 换不含子串的假名（并把「残留 0」写成断言）；⑧ C3-d 拿**读数**（`reach`）当判据的期望 ⇒ 实际应验**判据的输出**（`kinds`）：摘掉 `problems.push` 后 `reach` 两侧**完全相同**，唯一变化是「还有没有东西报出来」——这反而把承重关系钉得更死。
+- **收口读数**：`tests/toolchain-gate.js` → `selfTest ok=true` / `audit ok=true`（在册 14 / README 自述 14 / 已跟踪测试文件 155 / 死链 0）；`tests/toolchain-gate-v2136.js` → **pass（43 项）**；`tests/ui-gate.js` → **通过 53 / 失败 0**；`tests/test-surface-gate.js` → 文件面 157 · 锁 152 · 孤儿 0 · 豁免 0；`module-registry-gate` 文件 159 / 命名空间 167 / 装载期边 60 / 硬边 0 / 调用期 120；`dead-export-gate` dead 757 / uiDead 4 / 归因可读；`reject-code-gate` 608 码（见证 369 / 死表 9 / 基线 230）；`readings` problems 0。
+- **本轮写入注释的纪律**：① 「提及不是引用」必须在**每个**可达性判据里成立，包括注释里的「已内嵌」自述；② 判据的**分母**要与被测对象同宽（工具面看工具，测试面看测试文件；把 `run.js` 这种执行者算成被引用方会一口气报 12 条假红）；③ 破坏必须**打得到靶**（选引用全部集中在一处的靶子，替换名不得是靶名的超串）；④ 两向证明的期望要落在**判据的输出**上，不是现场读数。
+- [ ] 未覆盖（如实留在清单，不伪称已完成）：本版**不拆**既有的内嵌副本（run.js 12757 起那段 `verbatim` 副本与 `tests/ui-gate.js` 已实测分叉：副本缺 2 条 `PAGES↔RENDERERS` 静态不变式断言），只补上「真执行」这半边 —— 副本的删除与摘要化属结构性改动，风险与收益不成比例，留待后续版本；`tests/ui-gate.js` 仍未被 `tests/test-surface-gate.js` 的 `inline` 口径如实覆盖（它今天进表靠的是 run.js 的**真 spawn**，不是那句注释）；tools/ 仍有 22 个 `*.py` 在磁盘上（按 `.gitignore` 不入库，本版未逐一核引用）；UI 层仍未做实机验证。
 
 ### R121 · 2026-10-01 · v2.135.0：伏笔生命周期（计划一 E 系列后继节点 E6）接入全部产品面
 - **起点与终点**：起点 v2.134.0（全量回归 13015 / 0）；终点 v2.135.0（全量回归 **13100 / 0**，+85 断言）。

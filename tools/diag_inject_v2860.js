@@ -1,6 +1,10 @@
 'use strict';
 // 决定性实验：单个源 buildBlock 抛异常 ⇒ 注入链其余部分是否完好？
-const gate = require('/tmp/wa_git/tests/ui-gate-sync.js');
+// v2.136.0（O16 收尾）：原为**绝对路径字面量** require('/tmp/wa_git/...') —— 而回归跑在
+//   `git archive HEAD` 出来的候选树里（tests/isolated-runner.js），那个路径不存在 ⇒ 脚本
+//   要么直接抛错，要么（若本机恰有 /tmp/wa_git）require 到**另一个仓库**、把实验结论
+//   归给错的树。改相对路径：跟随脚本自身位置。
+const gate = require(require('path').join(__dirname, '..', 'tests', 'ui-gate-sync.js'));
 
 function productText(WA) {
   let snap = '', inj = '';

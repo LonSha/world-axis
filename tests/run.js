@@ -10221,7 +10221,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.135.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.136.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10778,7 +10778,7 @@ assert(verF2500 === '2.135.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.135.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.136.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -11069,7 +11069,7 @@ assert(verF2500 === '2.135.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.135.0', '入口版本为 2.135.0（实 ' + ver + '）');
+    assert(ver === '2.136.0', '入口版本为 2.136.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11614,7 +11614,7 @@ assert(verF2500 === '2.135.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.135.0', '入口版本为 2.135.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.136.0', '入口版本为 2.136.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -12002,7 +12002,7 @@ assert(verF2500 === '2.135.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.135.0', '入口版本为 2.135.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.136.0', '入口版本为 2.136.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12372,7 +12372,7 @@ assert(verF2500 === '2.135.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.135.0', '入口版本为 2.135.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.136.0', '入口版本为 2.136.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12737,7 +12737,7 @@ assert(verF2500 === '2.135.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.135.0', '入口版本为 2.135.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.136.0', '入口版本为 2.136.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -15061,7 +15061,7 @@ assert(verF2500 === '2.135.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.135.0', '入口 VERSION = 2.135.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.136.0', '入口 VERSION = 2.136.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -20319,6 +20319,52 @@ assert(r2900.dead.length === 757 && r2900.uiDead.length === 4 && r2900.dataOnly.
       'v2133: 门禁面仍只算统一档且为零（非统一档「只报不红」口径未被本版改动）');
     // 两把扫描器锁并存：v2126 的 31 项判据不得因本版而红（同文件、不同锚点）
     runLock('./anchor-scan-v2126.js');
+  }
+  // ── v2.136.0（O16 A3 收尾面）：维护工具的运行质量 + 测试面可达 ──
+  //   O16 余下部分是「维护工具与 UI 运行质量」。本版落到两件**真**事上：
+  //   ① README「tools/ 的取舍」里那句「只有被可执行代码引用才入库」自写下那天起没人执行
+  //      —— tests/product-files.js 的 SKIP_DIRS 把 tools/ 整个排掉，export-contract /
+  //      inventory / module-registry / dead-export 四面都看不见它。现由
+  //      tests/toolchain-gate.js 当场执行；本段是它的**真消费面**（文件在场不算数）。
+  //   ② 同一把门禁顺手抓到测试面上的真孤儿：tests/ui-gate.js（239 行 UI 渲染路径门禁，
+  //      独立跑 53/0、含 728 个真实控件点击）在索引里，却从未被本文件挂过 ——
+  //      全仓只有 34 处注释提到它，**没有一次回归执行过它一句断言**。
+  {
+    const tg2136 = require('./toolchain-gate.js');
+    const st2136 = tg2136.selfTest();
+    assert(st2136.ok === true,
+      'v2136/tc: 工具链门禁自证（两向）通过（实 ' + JSON.stringify(st2136.fails) + '）');
+    const aud2136 = tg2136.audit();
+    assert(aud2136.tracked.length >= 10,
+      'v2136/tc: 在册工具 ≥ 10（实 ' + aud2136.tracked.length + '）—— 零命中不算通过');
+    assert(aud2136.claim.count === aud2136.tracked.length
+      && aud2136.claim.names.length === aud2136.tracked.length,
+      'v2136/tc: README 自述名单/个数与 git 索引逐字同源（' + aud2136.claim.count + '/'
+        + aud2136.claim.names.length + ' vs ' + aud2136.tracked.length + '）');
+    const other2136 = aud2136.problems.filter(function (p) { return p.kind !== 'dead-test'; });
+    assert(other2136.length === 0,
+      'v2136/tc: 工具链四面（名单/引用/入口/绝对路径）零问题（实 '
+        + JSON.stringify(other2136.map(function (p) { return p.kind + ':' + p.detail; })) + '）');
+    assert(aud2136.trackedTests.length >= 150,
+      'v2136/tc: 已跟踪测试文件 ≥ 150（实 ' + aud2136.trackedTests.length + '）');
+    const dead2136 = aud2136.problems.filter(function (p) { return p.kind === 'dead-test'; });
+    assert(dead2136.length === 0,
+      'v2136/tc: 测试面零死链（在册却零执行引用）（实 '
+        + JSON.stringify(dead2136.map(function (p) { return p.detail; })) + '）');
+    runLock('./toolchain-gate-v2136.js');
+    // tests/ui-gate.js 必须**真被执行**（不是文件在场）：按 v2.83.0 / v2.84.0 惯例在子进程里跑，
+    //   真进程、真退出码、真汇总行。它用 ~12s 换 53 项 UI 渲染路径断言（含 728 个真实控件点击）。
+    const rUG2136 = require('child_process').spawnSync(process.execPath, [path.join('tests', 'ui-gate.js')],
+      { cwd: BASE, encoding: 'utf8', timeout: 240000 });
+    const outUG2136 = String(rUG2136.stdout || '');
+    const mUG2136 = outUG2136.match(/通过 (\d+) \/ 失败 (\d+)/);
+    assert(rUG2136.status === 0,
+      'v2136/ug: tests/ui-gate.js 端到端 exit 0（实 ' + rUG2136.status + '）'
+        + (rUG2136.status === 0 ? '' : ' :: ' + outUG2136.slice(-300)
+          + String(rUG2136.stderr || '').slice(0, 200)));
+    assert(!!mUG2136 && Number(mUG2136[2]) === 0 && Number(mUG2136[1]) >= 50,
+      'v2136/ug: 读数「通过 N / 失败 0」且 N ≥ 50（实 ' + (mUG2136 ? mUG2136[0] : '无汇总行') + '）'
+        + (mUG2136 ? '' : ' :: ' + outUG2136.slice(-300)));
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
