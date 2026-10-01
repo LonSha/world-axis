@@ -106,8 +106,16 @@ function runB(a) {
     'v2126/B: 未识别数逐条可查（实 ' + r.unidentified.length + ' 条，与汇总同源）');
   a(r.unidentified.every(function (u) { return u.file && u.why; }),
     'v2126/B: 每条未识别都给出原因（缺锚点 / 缺目标）—— 不拿「零问题」冒充「已覆盖」');
-  a(r.nonUniform.unidentified > 0,
-    'v2126/B: 如实存在认不出的锁（实 ' + r.nonUniform.unidentified + ' 把）——若为 0，说明模式表宽到能吞一切，那是另一种不可信');
+  // v2.134.0（O18 第三刀）：原判据是 `unidentified > 0`，即以「未识别数不为零」
+  //   代理「模式表没宽到能吞一切」。**同型错第四次**：v2.133.0 把覆盖推到 92.86% 后
+  //   本仓现场出现「真的全认得出」的情形（O18 第三刀把 8 把全部认完 ⇒ 未识别 0），
+  //   零未识别被误报成「另一种不可信」。判据范围（未识别计数）与被测对象（模式表
+  //   有无判别力）不是同一件事 —— 判别力改由 C1 的**两向自证**直接证明
+  //   （摘掉形态表 ⇒ 非统一档一个都认不出）。本处只保留**完备性**：每把锁都必须
+  //   落进「已识别 / 未识别」之一，不许有锁从两档之间漏掉。
+  a(r.nonUniform.unidentified + r.nonUniform.scanned === r.nonUniform.total,
+    'v2126/B: 非统一档每把锁都归入已识别/未识别两档（实 ' + r.nonUniform.scanned + ' + '
+      + r.nonUniform.unidentified + ' = ' + r.nonUniform.total + '）—— 判别力由 C1 两向自证把住');
   // 三类归因都出现了（not-found / impure 至少各一；not-unique 或 ambiguous 至少一）
   const kinds = {};
   r.issues.forEach(function (p) { kinds[p.kind] = (kinds[p.kind] || 0) + 1; });

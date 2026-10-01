@@ -116,7 +116,58 @@ const PATTERNS = [
     kind: 'target', group: 2 },
   { id: 'rel-plain-value', what: "rel: 'engines/x.js'（对象字段里的相对路径）",
     re: /(?:\brel|\bpath|\bfile)\s*:\s*(['"])([a-z][\w.-]*\/[\w.-]+\.js)\1/g,
-    kind: 'target', group: 2 }
+    kind: 'target', group: 2 },
+  // ── v2.134.0（O18 第三刀）：**站点表记录形态**（配对核验） ─────────────
+  //   现场形态（8 把未识别锁里占 5 把，/tmp/wa_o18_3detail.js 逐条取证）：
+  //     · input-guard-v2840：`{ name: 'hazard.bump', rel: 'engines/hazard.js', anchor: "…" }`
+  //     · orphan-lock-v2750：`{ rel: 'tests/…', engine: 'engines/intel.js', tag: '…', anchor: "…" }`
+  //     · reference-isolation-lock-v2790：`{ rel: 'engines/…', api: '…', copyAnchor: 'const c = {};', breakInto: '…' }`
+  //     · evict-meta-v2610：`{ name: 'backstage.people', file: 'engines/backstage.js', neu: '…', old: '…' }`
+  //     · rel-contract-v2600：`{ name: 'people', neu: '…', old: '…' }`
+  //   为什么单列一种 kind：**一条记录一对（目标 ↔ 锚点）**，而扫描器的既有模型是
+  //   「锚点全集 × 目标全集」的笛卡尔积 —— 于是「同一段锚点原文出现在两条不同记录的
+  //   各自目标里」会被报成 `ambiguous-target`（归属不明），可它其实**归属明确**。
+  //   配对后：锚点只对它**自己那条记录**里的目标核（见 `own` 与 `scanLock`）。
+  { id: 'record-site', what: "{ rel|file|engine: '…', anchor|copyAnchor|neu: '…' }（站点表记录：锚点与目标同记录）",
+    //   外层为什么要 `(?:\{[^{}]*\}[^{}]*)*` 而不是裸 `[^{}]*`：锚点**值里本身带大括号**——
+    //   现场（/tmp/o18_3cli.log 第一版读数）：`copyAnchor: 'const c = {};'`（reference-isolation）
+    //   与 `neu: '…"resources":{},'`（rel-contract）两把锁**整体认不出**，正是因为裸 `[^{}]*`
+    //   在值的 `{}` 处提前收尾，记录被截断成不含完整锚点值的半截。
+    //   允许**一层**嵌套后两把锁均认得出（实测：未识别 2 → 0）；再深的嵌套不在现场，
+    //   不为它写更宽的正则（那会把函数体等大块代码当成记录吞进来）。
+    re: /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g,
+    kind: 'pair',
+    tgt: /\b(?:rel|file|engine|path)\s*:\s*(['"])([a-z][\w.-]*\/[\w.-]+\.js)\1/g,
+    anc: /\b(?:anchor|copyAnchor|neu)\s*:\s*(['"`])((?:\\.|(?!\1)[\s\S])*)\1/g },
+  // ── 自由锚点形态（非记录） ──────────────────────────────────────────
+  //   · style-craft-v2510：`const anchor = 'const PERSP_TEXT = {';`（局部锚点常量）
+  //   · tools-v2110：`wreck(src23, '  if (existed && prev.indexOf(SIGN) < 0 …', …)`（破坏调用第 2 实参）
+  { id: 'local-anchor-const', what: "const anchor = '…'（局部锚点常量）",
+    re: /\bconst\s+anchor\s*=\s*(['"`])((?:\\.|(?!\1)[\s\S])*)\1/g,
+    kind: 'anchor', group: 2 },
+  { id: 'wreck-arg', what: "wreck(src, '…', …)（破坏调用的第 2 实参）",
+    re: /\bwreck\(\s*[^,]+,\s*(['"`])((?:\\.|(?!\1)[\s\S])*)\1/g,
+    kind: 'anchor', group: 2 },
+  //   · docs-archive-gate-v2120：`{ rel: README_REL, text: '## 版本历史' }` —— `rel` 是**标识符**
+  //     （不是字面量），故它不进配对面；锚点是**文档标题 / 段落片段**，同样是真破坏锚点
+  //     （该锁的 `breakOnce` 要求它在目标文档里恰 1 次），单列一条字段形态认它。
+  { id: 'text-field', what: "text: '…'（文档标题 / 段落片段型锚点字段）",
+    re: /\btext\s*:\s*(['"`])((?:\\.|(?!\1)[\s\S])*)\1/g,
+    kind: 'anchor', group: 2 },
+  // ── 目标面补形态 ──────────────────────────────────────────────────
+  //   · orphan-lock-v2750 的 `engine: 'engines/intel.js'` **不单列形态**：它的猎物
+  //     已被 `record-site` 的 `tgt` 子模式（含 `engine`）一并收走 —— 现场摘除实测
+  //     （/tmp/o18_3abl.js）单列版摘掉后 **锚点/目标/锁/配对四项零变化**，即死判据，
+  //     按本仓「零消费能力当场删」纪律删除。
+  //   · tools-v2110：`const src23 = srcOf('tools/gen-lock.js');`（取源码文件的调用）
+  { id: 'srcOf-call', what: "srcOf('tools/x.js')（取源码文件的调用）",
+    re: /\bsrcOf\(\s*(['"])([a-z][\w.-]*\/[\w.-]+\.js)\1\s*\)/g,
+    kind: 'target', group: 2 },
+  //   · docs-archive-gate-v2120：`const README_REL = 'README.md';`（**文档**文件常量；
+  //     既有 `file-const-multi` 只收 `…/….js`，文档门的目标文件因此认不出）
+  { id: 'file-const-doc', what: "const NAME = 'README.md'（文档文件常量）",
+    re: /\bconst\s+([A-Z][A-Z0-9_]*)\s*=\s*(['"])([\w.-]+\.md)\2/g,
+    kind: 'target', group: 3 }
 ];
 /** 自引用排除：本工具与统一档审计器本身不是被测锁。 */
 const SELF = ['anchor-scan.js'];
@@ -141,7 +192,8 @@ function isLock(src) { return AUDIT.isLock(src); }
  *   命中任一形态即算命中（消除「同一个锚点因写法不同而结论不同」的抖动）。
  */
 function forms(v) {
-  const un = v.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r');
+  const un = v.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r')
+    .replace(/\\'/g, "'").replace(/\\"/g, '"');
   return un === v ? [v] : [v, un];
 }
 function hitsAny(src, v) {
@@ -168,6 +220,35 @@ function extract(src, pats, deny) {
     P.re.lastIndex = 0;
     let m;
     while ((m = P.re.exec(src))) {
+      // v2.134.0（O18 第三刀）：**配对记录**（`kind: 'pair'`）——一条记录里同时取
+      //   「目标文件」与「锚点原文」，并让锚点带上 `own`（它自己那条记录的目标集合）。
+      //   为什么不走下面的通用路径：通用路径把锚点与目标都丢进两个全集，
+      //   归属信息（谁属于谁）**在这一步就丢了**，后面补不回来。
+      if (P.kind === 'pair') {
+        const own = [];
+        let mm;
+        P.tgt.lastIndex = 0;
+        while ((mm = P.tgt.exec(m[0]))) {
+          const tv = mm[2];
+          if (tv && tv.length >= 8) { if (!seenT[tv]) { seenT[tv] = 1; targets.push(tv); } own.push(tv); }
+        }
+        P.anc.lastIndex = 0;
+        while ((mm = P.anc.exec(m[0]))) {
+          const v = mm[2];
+          if (!v || v.length < 8) continue;              // 太短的一律不算锚点（与通用路径同门）
+          if (DENY.test(v)) continue;                     // 值拒收表（单一真源，同门）
+          const prev = seenA[v];
+          if (prev) {
+            // 同一段锚点原文出现在多条记录里 ⇒ 归属取**并集**（如实登记，不丢记录）
+            own.forEach(function (t) { if (prev.own.indexOf(t) < 0) prev.own.push(t); });
+            continue;
+          }
+          const rec = { txt: v, pattern: P.id, own: P.noOwn ? [] : own.slice() };
+          seenA[v] = rec;
+          anchors.push(rec);
+        }
+        continue;
+      }
       // v2.133.0（O18 第二刀）：**子模式**（`each`）——外层模式负责切出「一条声明串」，
       //   内层模式在串内逐个取目标。为什么要这层：逗号分隔的声明串里可能同时有多个文件常量
       //   （`const ORG = 'engines/org.js', STORE = 'core/store.js', DIAG = …, PANEL = …;`），
@@ -222,7 +303,19 @@ function scanLock(file, readCache) {
   ex.anchors.forEach(function (a) {
     // 目标：唯一文件常量时用它；多文件时要求锚点原文至少命中其中一个（否则无从归属）
     let tgt = only, n = -1;
-    if (tgt) n = uniqHits(readCache(tgt).src, a.txt);
+    if (a.own && a.own.length) {
+      // v2.134.0（O18 第三刀）：**记录内配对**——锚点只对它自己那条记录里的目标核。
+      //   现场取证（/tmp/wa_o18_3detail.js）：不配对时 8 把新识别锁刷出 7 条 `ambiguous-target`
+      //   （`orphan-lock` 4 条：锚点同时命中同记录里 `rel` 的测试文件与 `engine` 的产品文件），
+      //   而它们**归属明确** —— 配对后按「谁真含锚点原文」定归属。
+      let found = null, cnt = 0;
+      a.own.forEach(function (t) {
+        const c = uniqHits(readCache(t).src, a.txt);
+        if (c > 0) { cnt++; found = t; n = c; }
+      });
+      tgt = cnt === 1 ? found : null;
+      if (cnt !== 1) n = -1;
+    } else if (tgt) n = uniqHits(readCache(tgt).src, a.txt);
     else {
       let found = null, cnt = 0;
       ex.targets.forEach(function (t) {
@@ -341,7 +434,7 @@ module.exports = { PATTERNS: PATTERNS, extract: extract, scanLock: scanLock, sca
  */
 function totalAnchors(pats, deny) {
   const uni = AUDIT.audit();
-  let anchors = 0, targets = 0, locks = 0;
+  let anchors = 0, targets = 0, locks = 0, owned = 0;
   uni.locks.forEach(function (l) {
     if (l.kind !== AUDIT.KINDS.NON_UNIFORM) return;
     if (SELF.indexOf(l.file) >= 0) return;
@@ -351,8 +444,10 @@ function totalAnchors(pats, deny) {
     anchors += ex.anchors.length;          // v2.133.0：**不再以「已识别」为门**（教训二）
     targets += ex.targets.length;
     if (ex.anchors.length && ex.targets.length) locks++;
+    // v2.134.0（O18 第三刀）：**配对锚点数**（`own` 非空）——配对机制本身也要可观测
+    ex.anchors.forEach(function (a) { if (a.own && a.own.length) owned++; });
   });
-  return { anchors: anchors, targets: targets, locks: locks };
+  return { anchors: anchors, targets: targets, locks: locks, owned: owned };
 }
 /** 破坏可观测的判据：任一分量变化即算参与判定（否则该模式是死判据）。 */
 function observable(full, got) {
@@ -360,6 +455,7 @@ function observable(full, got) {
   if (got.anchors !== full.anchors) d.push('锚点 ' + (got.anchors - full.anchors));
   if (got.targets !== full.targets) d.push('目标 ' + (got.targets - full.targets));
   if (got.locks !== full.locks) d.push('已识别锁 ' + (got.locks - full.locks));
+  if (got.owned !== full.owned) d.push('配对锚点 ' + (got.owned - full.owned));
   return d;
 }
 function selfTest() {
@@ -372,7 +468,7 @@ function selfTest() {
   console.log('  ① 覆盖自证：' + probe + ' → 锚点 ' + base.anchors.length + ' 条 / 目标 ' + base.targets.length + ' 个');
   const full = totalAnchors(PATTERNS);
   console.log('  ② 全仓面基线：锚点 ' + full.anchors + ' 条 · 目标 ' + full.targets
-    + ' 个 · 两面都认得出的锁 ' + full.locks + ' 把');
+    + ' 个 · 两面都认得出的锁 ' + full.locks + ' 把 · 其中配对锚点 ' + full.owned + ' 条');
   // ② 逐个摘掉：**全部模式**（含 target 面）——目标面模式同样必须证明自己在参与判定
   PATTERNS.forEach(function (p) {
     const got = totalAnchors(PATTERNS.filter(function (q) { return q !== p; }));
@@ -414,9 +510,21 @@ function selfTest() {
   console.log('     摘掉 exclude 的声明串门 ⇒ 锚点 ' + withDecl.anchors + ' 条'
     + (declChanged ? ' · 破坏可观测 ✓' : ' · **无变化 ⇒ 该门未参与判定** ✗'));
   if (!declChanged) fails.push('破坏不可观测：摘掉 exclude 声明串门后全仓识别总量不变');
+  // ⑥ v2.134.0（O18 第三刀）：**记录内配对自证**。`own` 是判据的一部分（锚点只对它自己
+  //   那条记录的目标核），但它不是一个 PATTERN ⇒ 上面的「逐个摘掉」摸不到它。
+  //   做法：给配对模式注入 `noOwn`（照旧取锚点与目标，但**丢掉归属**），全仓配对锚点数
+  //   必须从 >0 变成 0（即：归属信息真在参与判定，不是装饰）。
+  const noOwn = PATTERNS.map(function (p) {
+    return p.kind === 'pair' ? Object.assign({}, p, { noOwn: true }) : p;
+  });
+  const withNoOwn = totalAnchors(noOwn);
+  const ownChanged = withNoOwn.owned !== full.owned;
+  console.log('     丢掉记录内配对（noOwn） ⇒ 配对锚点 ' + withNoOwn.owned + ' 条（原 ' + full.owned + ' 条）'
+    + (ownChanged && full.owned > 0 ? ' · 破坏可观测 ✓' : ' · **无变化 ⇒ 配对未参与判定** ✗'));
+  if (!(ownChanged && full.owned > 0)) fails.push('破坏不可观测：丢掉记录内配对后全仓配对锚点数不变');
   if (fails.length) { console.log('  ✗ 自证失败：'); fails.forEach(function (f) { console.log('     · ' + f); }); return 1; }
   console.log('  ✓ 自证通过（覆盖 + 形态表 ' + PATTERNS.length
-    + ' 项全摘一遍 + 值拒收表 + 收尾门 + exclude 声明串门，全部破坏可观测）');
+    + ' 项全摘一遍 + 值拒收表 + 收尾门 + exclude 声明串门 + 记录内配对，全部破坏可观测）');
   return 0;
 }
 if (require.main === module) {
