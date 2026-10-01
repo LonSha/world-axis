@@ -107,6 +107,15 @@ function liveReadings() {
     });
     out.dist = dist;
   }
+  // v2.135.0（E6 收尾）：注入源表项数。真源取 render/inject.js 的 SOURCES 解析——
+  //   不写第二份解析器：直接借 tests/inject-sources-v2560.js 的 parseSources，
+  //   它与那把锁 A/C 面的判据同源（该锁已拥有「声明不唯一 / 未闭合即抛」的守卫）。
+  //   读不到就如实报缺（missing），不猜。
+  try {
+    const injectSrc = fs.readFileSync(path.join(ROOT, 'render/inject.js'), 'utf8');
+    const injMod = require(path.join(ROOT, 'tests/inject-sources-v2560.js'));
+    out.sourcesCount = injMod.parseSources(injectSrc).length;
+  } catch (e) { out.missing.push('render/inject.js#SOURCES'); }
   return out;
 }
 
@@ -230,6 +239,80 @@ const SITES = [
     //   `a.edgesLoad === 0`（破坏副本的期望值），而被多值门拦下。
     re: /(&&\s*a\.edgesLoad\s*===\s*)(\d+)/g,
     live: function (L) { return L.edgesLoad; }
+  },
+  // ── v2.135.0（E6 收尾）：四族「比较值 / 消息副本」形态 ──
+  //   背景：全量回归暴露 6 处失败，其中 4 处由上面已有的站点族覆盖，
+  //   另 2 处（SOURCES 项数、子进程 stdout 的「命名空间 N / 文件 M」）**一处站点都没有**；
+  //   而已被覆盖的 4 处里，**消息副本**（「装载期边 59」、`归因分布 …`）也没被收进来
+  //   —— 现场表现为比较值改对了、消息里还写着旧数（本仓点名的 R116 同族失真）。
+  //   口径与既有站点表一致：逐条显式登记、命中 0 不算错、同族多值即拒绝回填。
+  {
+    id: 'sourcesCount', desc: '注入源表项数（比较值）',
+    files: ['tests/run.js'],
+    //   形态与前缀必须成套：scanSite 取 m[2] 作值，只有组数是「(前缀)(数字)」才取得到数。
+    re: /(\(W\.render\.SOURCES \|\| \[\]\)\.length\s*===\s*)(\d+)/g,
+    live: function (L) { return L.sourcesCount; }
+  },
+  {
+    id: 'sourcesCountMsg', desc: '注入源表项数（消息副本）',
+    files: ['tests/run.js'],
+    //   现场实测：此处消息与比较值**本来就不同步**（消息写 64、比较值写 66），
+    //   两处都按真值收敛（#6 纪律：比较值与消息文本必须同批）。
+    re: /(SOURCES 为\s+)(\d+)(?=\s*项)/g,
+    live: function (L) { return L.sourcesCount; }
+  },
+  {
+    id: 'stdoutNsCount', desc: '子进程 stdout 里的「命名空间 N」（比较侧）',
+    files: ['tests/run.js'],
+    re: /(indexOf\('命名空间\s+)(\d+)/g,
+    live: function (L) { return L.nsCount; }
+  },
+  {
+    id: 'stdoutFileCount', desc: '子进程 stdout 里的「文件 N」（比较侧）',
+    files: ['tests/run.js'],
+    re: /(indexOf\('文件\s+)(\d+)/g,
+    live: function (L) { return L.loadedCount; }
+  },
+  {
+    id: 'stdoutLoadEdgesMsg', desc: '「装载期边 N」消息副本',
+    files: ['tests/run.js'],
+    //   现场实测：不加注释门时 L19036 的说明文字（「能独立跑出『装载期边 23 / 硬边 0』」）
+    //   也被收进来，同族多值拒填。口径与既有站点一致：行首注释不算站点。
+    skipComment: true,
+    //   收窄到带「」的形态：既有 stdoutLoadEdges 站点的后顾要求数字后面紧跟引号，
+    //   而消息副本里数字后面是 `」` ⇒ 它从未被那个站点收走（现场实测只命中 1 处）。
+    re: /(「装载期边\s+)(\d+)/g,
+    live: function (L) { return L.loadEdges; }
+  },
+  {
+    id: 'stdoutNsMsg', desc: '「命名空间 N / 文件 M」消息副本（命名空间侧）',
+    files: ['tests/run.js'],
+    re: /(端到端读数含「命名空间\s+)(\d+)/g,
+    live: function (L) { return L.nsCount; }
+  },
+  {
+    id: 'stdoutFileMsg', desc: '「命名空间 N / 文件 M」消息副本（文件侧）',
+    files: ['tests/run.js'],
+    re: /(端到端读数含「命名空间\s+\d+\s*\/\s*文件\s+)(\d+)/g,
+    live: function (L) { return L.loadedCount; }
+  },
+  {
+    id: 'distMsgTestOnly', desc: '归因分布消息副本（test-only）',
+    files: ['tests/run.js'],
+    re: /(归因分布\s+test-only\s+)(\d+)/g,
+    live: function (L) { return L.dist['test-only']; }
+  },
+  {
+    id: 'distMsgSelfOnly', desc: '归因分布消息副本（self-only）',
+    files: ['tests/run.js'],
+    re: /(归因分布\s+test-only\s+\d+\s*\/\s*self-only\s+)(\d+)/g,
+    live: function (L) { return L.dist['self-only']; }
+  },
+  {
+    id: 'distMsgUnwired', desc: '归因分布消息副本（unwired）',
+    files: ['tests/run.js'],
+    re: /(归因分布\s+test-only\s+\d+\s*\/\s*self-only\s+\d+\s*\/\s*unwired\s+)(\d+)/g,
+    live: function (L) { return L.dist['unwired']; }
   }
 ];
 
@@ -338,7 +421,14 @@ function applyPlan(plan) {
       if (!site) return;
       let changed = 0;
       const re = new RegExp(site.re.source, site.re.flags);
-      next = next.replace(re, function (match, g1, g2, g3) {
+      next = next.replace(re, function (match, g1, g2, g3, offset) {
+        // v2.135.0（E6 收尾）**现场事故修正③**：`skipComment` 此前只在**扫描侧**生效，
+        //   而 replace 是纯正则全量替换 ⇒ 注释行里同形的历史叙述会被一并改掉（现场：「装载期边 23」被改成 60）。
+        //   修法：用 offset 定位匹配处所在行，行首是「//」「*」「/*」则原样返回。
+        if (site.skipComment) {
+          const ls = next.lastIndexOf('\n', offset - 1) + 1;
+          if (/^\s*(\/\/|\*|\/\*)/.test(next.slice(ls, offset))) return match;
+        }
         if (site.isGroup) {
           // 只改「这个归因键」的那一条
           if (g2 !== item.key) return match;
@@ -403,7 +493,11 @@ function coverageReport() {
 
 const SELF_TEST = argv.indexOf('--self-test') >= 0;
 /** 站点表里「必须真扫到」的站点（有站点表却不命中 = 正则坏了）。 */
-const REQUIRED = ['loadEdges', 'callRefs', 'nsCount', 'loadedCount', 'ledgerEntries', 'stdoutLoadEdges', 'dist'];
+const REQUIRED = ['loadEdges', 'callRefs', 'nsCount', 'loadedCount', 'ledgerEntries', 'stdoutLoadEdges', 'dist',
+  // v2.135.0（E6 收尾）：新登记的四族站点也必须真扫到——「没扫到」与「读数正确」在输出上必须可分（H6 两向自证）。
+  'sourcesCount', 'sourcesCountMsg', 'stdoutNsCount', 'stdoutFileCount',
+  'stdoutLoadEdgesMsg', 'stdoutNsMsg', 'stdoutFileMsg',
+  'distMsgTestOnly', 'distMsgSelfOnly', 'distMsgUnwired'];
 
 /** 自我测试（H6 第二向）：把某站点的真值**改掉一个数**，证明 buildPlan 真能报出 stale。 */
 function selfTest() {

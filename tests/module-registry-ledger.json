@@ -1,13 +1,13 @@
 {
- "version": "2.134.0",
- "loadOrderCount": 161,
- "loadedCount": 158,
+ "version": "2.135.0",
+ "loadOrderCount": 162,
+ "loadedCount": 159,
  "uiCount": 3,
- "nsCount": 166,
+ "nsCount": 167,
  "totals": {
-  "loadEdges": 59,
+  "loadEdges": 60,
   "hardEdges": 0,
-  "callRefs": 118,
+  "callRefs": 120,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -47,6 +47,7 @@
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
+    "engines/foreshadow.js",
     "engines/group-refuse.js",
     "engines/inst.js",
     "engines/kaleidoscope.js",
@@ -230,6 +231,7 @@
     "engines/calendar-custom.js",
     "engines/coop.js",
     "engines/economy.js",
+    "engines/foreshadow.js",
     "engines/group-refuse.js",
     "engines/inst.js",
     "engines/liaison.js",
@@ -1303,6 +1305,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_longline_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/foreshadow.js": {
+   "ns": [
+    "foreshadow"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_foreshadow_settings_v1"
    ],
    "consumedBy": []
   },

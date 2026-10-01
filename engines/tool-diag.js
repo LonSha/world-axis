@@ -280,6 +280,28 @@
     });
   }
 
+  /**
+   * v2.135.0（E6）：伏笔生命周期的只读读数。
+   *   本节的消费面与 secLongline 同规格——诊断包是这些读数的**产品侧真读者**
+   *   （漏登记 ⇒ 对应成员落进死导出面，当场红灯）。
+   *   报三桶 + 五态计数 + 计量账；`faults` 只记异常（disabled / bad-id / bad-text /
+   *   missing-event / store-unavailable），业务拒收走 counters.blocked（口径见引擎头部边界 6）。
+   */
+  function secForeshadow() {
+    return safe(function () {
+      if (!WA.foreshadow || typeof WA.foreshadow.stat !== 'function') return { error: 'foreshadow 模块不可用' };
+      const st = WA.foreshadow.stat(); const cfg = WA.foreshadow.getSettings ? WA.foreshadow.getSettings() : {};
+      return { enabled: !!cfg.enabled, staleMs: cfg.staleMs, maxItems: cfg.maxItems, cap: cfg.cap,
+        total: st.total || 0, active: st.active || 0, resolved: st.resolved || 0, closed: st.closed || 0,
+        stale: st.stale || 0, avgResolveMs: st.avgResolveMs || 0, resolveSamples: st.resolveSamples || 0,
+        byStatus: st.byStatus || {}, counters: st.counters || {}, faults: st.faults || {},
+        // 三个封闭集合一并报出（五态枚举是判据的比对基准，不是装饰）。
+        statuses: (WA.foreshadow.STATUS || []).slice(),
+        activeStates: (WA.foreshadow.ACTIVE || []).slice(),
+        terminalStates: (WA.foreshadow.TERMINAL || []).slice() };
+    });
+  }
+
   function secLife() {
     return safe(function () {
       if (!WA.life || typeof WA.life.stat !== 'function') return { error: 'life 模块不可用' };
@@ -769,6 +791,9 @@
     'engines/intel.js': 'intel',
     'engines/org.js': 'org',
     'engines/longline.js': 'longline',
+    // v2.135.0（E6）：伏笔生命周期（埋了没收 / 兑现 / 过期）。
+    //   漏登记的后果不是「少一行字」：该模块在定义面上不存在（inventory 的定义面取本表）。
+    'engines/foreshadow.js': 'foreshadow',
     // v2.62.0：因果结算
     'engines/causal.js': 'causal',
     // v2.97.0（X5）：跨插件因果桥（入站边）
@@ -1667,6 +1692,9 @@
       'wa-sw-staleguard', 'wa-sw-purifyscope', 'wa-sw-reasoning', 'wa-sw-storytone',
       'wa-sw-calendarplan', 'wa-sw-preflight', 'wa-sw-archivehide', 'wa-sw-wordbudget',
       'wa-sw-binding', 'wa-sw-refine', 'wa-sw-polish', 'wa-sw-grouprefuse', 'wa-sw-note2130',
+      // v2.135.0（E6）：伏笔生命周期总开关（同 v2.51.0 理由：渲染 + 绑定 + 守卫登记
+      //   三件齐做，否则 id 写错无人发现）。
+      'wa-sw-foreshadow',
       'wa-sw-out',
       'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
@@ -2266,7 +2294,7 @@
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
       //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，

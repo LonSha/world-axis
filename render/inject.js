@@ -73,6 +73,12 @@
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
     //   （v2.38.0 的 echoes 原样复刻）。键名 = 命名空间名。
     'reasoning', 'storyTone',
+    // v2.135.0（E6）：伏笔台账。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。键名 = 命名空间名。
+    //   插在 chrono 行**之前**：chrono 行的邻近字面量是 v2.127.0 那条锁的锚点区，
+    //   动它会同时触发 anchor-scan 与负控制审计的 not-unique（ui/panel.js 同款惯例）。
+    'foreshadow',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
@@ -100,7 +106,10 @@ style: false,
         userlock: true, rhythmLoop: true, motif: true, beatMask: true, powerAnchor: true,
         // v2.130.0：两条新源。取默认 true（同四条理由——其模块总开关默认为关），
         //   不给老用户凭空多出约束。
-        reasoning: true, storyTone: true }, module: 'render' };
+        reasoning: true, storyTone: true,
+        // v2.135.0（E6）：伏笔台账。取默认 true（同四条理由——其模块总开关默认为关），
+        //   不给老用户凭空多出约束。
+        foreshadow: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -261,6 +270,10 @@ style: false,
     //   会报英文键名，而 switch-matrix-v2910 的 C2 与 explain-v2900 的 A4/C1 要求源表三项
     //   同批：SOURCES（键）/ 注入分支 source 名 / 本表。三者名字逐字同名。
     reasoning: '思考开销', storyTone: '剧情倾向',
+    // v2.135.0（E6）：伏笔台账。缺此项 ⇒ 失败台账（SRC_NAME）会报英文键名，
+    //   而 cost-v2880 的 C1 与 switch-matrix-v2910 的 C2 要求源表三项同批：
+    //   SOURCES（键）/ 注入分支 source 名 / 本表。三者名字逐字同名。
+    foreshadow: '伏笔台账',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
@@ -312,7 +325,14 @@ style: false,
     //   （worldaxis_reasoning_settings_v1 / worldaxis_storytone_settings_v1）。
     //   不登记会怎样：moduleEnabled 查不到键就返回 null，于是对账面上本源一律落在
     //   unavailable（「没有模块级总开关」——而它明明有），排查方向被指错。
-    reasoning: 'worldaxis_reasoning_settings_v1', storyTone: 'worldaxis_storytone_settings_v1' };
+    reasoning: 'worldaxis_reasoning_settings_v1', storyTone: 'worldaxis_storytone_settings_v1',
+    // v2.135.0（E6）：伏笔生命周期**确有**模块级总开关
+    //   （engines/foreshadow.js 第 50 行 `worldaxis_foreshadow_settings_v1`）。
+    //   不登记会怎样：moduleEnabled 查不到键就返回 null，于是对账面上本源一律落在
+    //   unavailable（「没有模块级总开关」——而它明明有），排查方向被指错。
+    //   同一类漏登记 v2.99.0 已为 rumor/canon、v2.127.0 为 chrono、v2.130.0 为
+    //   reasoning/storyTone 各付过一次学费。
+    foreshadow: 'worldaxis_foreshadow_settings_v1' };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -851,6 +871,10 @@ style: false,
       // v2.130.0（拓展计划 C2）：剧情倾向。只报用户设过的档位及其含义（没设的不占位）——
       //   倾向是**方向不是预告**：只约束「往哪边走」，不得据此提前写出尚未发生的情节。
       if (vis.storyTone && WA.storyTone) { const stc = engineCall('storyTone', function () { return WA.storyTone.buildBlock(); }); if (stc) items.push({ source: '剧情倾向', content: stc }); }
+      // v2.135.0（E6）：伏笔台账。报「埋下但尚未兑现」的伏笔，并明写两条边界：
+      //   兑现只看显式标记（不做语义推断）、过期只提示不自动回收。
+      //   收束与否由剧情决定 —— 它只把「答应过的事」送回上下文。
+      if (vis.foreshadow && WA.foreshadow) { const fb = engineCall('foreshadow', function () { return WA.foreshadow.buildBlock(); }); if (fb) items.push({ source: '伏笔台账', content: fb }); }
       if (vis.session && WA.session) { const se = engineCall('session', function () { return WA.session.buildBlock(); }); if (se) items.push({ source: '多人场', content: se }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块

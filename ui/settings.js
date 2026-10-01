@@ -91,6 +91,11 @@
       + '<label class="wa-row" title="配置按 聊天 > 角色 > 默认 三级取；离场即回落下层"><input type="checkbox" id="wa-sw-binding" data-sw-ns="binding"' + (ini('binding') ? ' checked' : '') + dis('binding') + '/> 配置绑定优先级</label>'
       + '<label class="wa-row" title="档案规范化 / 合并重复 / 提炼浓缩（不生成新内容）"><input type="checkbox" id="wa-sw-refine" data-sw-ns="refine"' + (ini('refine') ? ' checked' : '') + dis('refine') + '/> 档案精编</label>'
       + '<label class="wa-row" title="把一句话润色成多个版本供选；选中后才进主链"><input type="checkbox" id="wa-sw-polish" data-sw-ns="polish"' + (ini('polish') ? ' checked' : '') + dis('polish') + '/> 输入润色</label>'
+      // v2.135.0（E6）：伏笔生命周期总开关（同 v2.129.0/v2.130.0 理由：渲染 + 绑定 +
+      //   守卫登记三件齐做，否则 id 写错无人发现）。控件 id 一律**字面量**写死（不走
+      //   变量拼接）：门禁 H2 用 /id="(wa-[a-z0-9\-]+)"/ 从 ui/*.js 源码采集渲染控件
+      //   再与 UI_BINDINGS 对账，动态拼出的 id 在采集面「不存在」。
+      + '<label class="wa-row" title="登记伏笔并提出「埋了没收」的清单；兑现只看显式标记，过期只提示不自动回收"><input type="checkbox" id="wa-sw-foreshadow" data-sw-ns="foreshadow"' + (ini('foreshadow') ? ' checked' : '') + dis('foreshadow') + '/> 伏笔生命周期</label>'
       // 群聊拒绝是**只读问路器**（无总开关）：控件恒开且置灰，仅作“当前是不是群聊”的可见读数。
       + '<label class="wa-row" title="本扩展只支持单主角对话；群聊下世界推演与写入一律拒绝并阻止写世界书"><input type="checkbox" id="wa-sw-grouprefuse"' + ((WA.groupGuard && typeof WA.groupGuard.isGroup === 'function' && WA.groupGuard.isGroup()) ? ' checked' : '') + ' disabled/> 群聊拒绝 <span class="wa-dim">（恒开：只读问路器）</span></label>'
       + '<label class="wa-row" title="净化/思考/字数三块只作用于当前那一次输出，不改世界状态"><input type="checkbox" id="wa-sw-note2130" disabled/> v2.130.0 十二引擎 <span class="wa-dim">（产注入块的两个：思考开销 / 剧情倾向——还须在「导演」页勾选对应源）</span></label>'

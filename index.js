@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.134.0'
+  const VERSION = '2.135.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -308,6 +308,11 @@
     'engines/org.js',
     // v2.55.0：长线伏笔。须早于 render/inject.js，注入时读取 longline.buildBlock()。
     'engines/longline.js',
+    // v2.135.0（E6）：伏笔生命周期。须**晚于** engines/longline.js —— 它的 resolve/recycle
+    //   要清掉 longline 设的承诺时刻（dueAt / promisedAt），先装会出现「清了但还没人设」的窗口；
+    //   须早于 render/inject.js，注入时读取 foreshadow.buildBlock()。
+    //   真源是既有的 memory.foreshadows（不新开容器）—— 见模块头部边界 2。
+    'engines/foreshadow.js',
     // v2.62.0：因果结算。须早于 render/inject.js，注入时读取 causal.buildBlock()；
     //   且须**晚于** intel.js —— knownCause 单一真源指向 intel.knownCause。
     'engines/causal.js',

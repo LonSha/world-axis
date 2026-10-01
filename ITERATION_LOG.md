@@ -6,22 +6,36 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.134.0 |
-| 全量回归 | `node tests/run.js` → **v2.134.0 为通过 13015 / 失败 0 · WORKER_EXIT=0**（长超时启动器 + `isolated-runner` 隔离）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
-| 产品文件面 | 162（`tests/product-files.js` 单一真源） |
+| 版本 | v2.135.0 |
+| 全量回归 | `node tests/run.js` → **v2.135.0 为通过 13100 / 失败 0 · status: passed**（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
+| 产品文件面 | 163（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 142 / members= 920 / chars= 10508 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 154 · 锁 149 · 孤儿 0 · 豁免 0 |
-| 死子面 | `node tests/dead-export-gate.js` → dead 751 / uiDead 4 / 仅测试 347 / dataOnly 241 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 143 / members= 926 / chars= 10570 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 155 · 锁 150 · 孤儿 0 · 豁免 0 |
+| 死子面 | `node tests/dead-export-gate.js` → dead 757 / uiDead 4 / 仅测试 347 / dataOnly 241 |
 | 拒收码 | `node tests/reject-code-gate.js` → 608 码（见证 369 / 死表 9 / 基线 230） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.134.0 · 现场 refs 3521 / 命名空间 161 / 成员 1944 |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.135.0 · 现场 refs 3547 / 命名空间 162 / 成员 1956 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | 锚点覆盖 | `node tools/anchor-scan.js` → 锁 112 把 · 覆盖 **112（100%）**＝ 统一档 29 + 非统一档已识别 83 · **未识别 0** · 非统一档问题 83（**只报不红**，逐条带证据与命中行类别）· 记录内配对锚点 22 |
-| 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核，`checked` = 24 站点） |
+| 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核；v2.135.0 扩到 `checked` = 34 站点） |
 | tools/ | 只留**被可执行代码引用**的 15 个（一次性脚本不入库，见 `.gitignore`） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+
+### R121 · 2026-10-01 · v2.135.0：伏笔生命周期（计划一 E 系列后继节点 E6）接入全部产品面
+- **起点与终点**：起点 v2.134.0（全量回归 13015 / 0）；终点 v2.135.0（全量回归 **13100 / 0**，+85 断言）。
+- **它治的病**：记忆页伏笔区（ui/panel.js 约 1044 行）与三处操作（`data-fsst` 五态推进 / `data-fsdrop` 放弃 / `data-fsdel` 删除）**全部裸改 `WA.store.patch('memory.foreshadows', next)`，绕过引擎**：状态机（waiting/developing/triggered/recycled/dropped）、终态门、`resolveMs` 计时、dueAt/promisedAt 清理均不在现场。
+- **落点**：新增 `engines/foreshadow.js`（foreshadow 命名空间，零新增导出——`stat()` 合并 `stat3()+counters/faults`）；产品面六文件 14 处接线（tool-diag 诊断节 + MODULE_EXPORTS + UI_BINDINGS；render/inject 四张表 + 注入分支；ui/panel
+  VIS_NAMES；ui/settings 总开关；inject-budget PRIORITY/ACCOUNTS）；装载位置在 engines/longline.js **之后**（resolve/recycle 要清 longline 设的承诺时刻，先装会出现「清了但还没人设」的窗口）。
+- **两份台账 + 专锁 + 冻结串回填**：`module-registry-ledger`（文件 159 / 命名空间 167 / 载入期边 60 / 调用期 120）；`dead-export-ledger`（dead 751→757）；`reject-code-ledger`（version 2.135.0）；`FROZEN2800`（10508→10570）；`EC2430`（ns=143 members=926）；settle-v2830（4 处）；module-cycle-gate-v2107（5 处）。
+- **收尾期抓出的三个真缺陷**（全在 `tools/sync-e2e-readings.js`，已修）：
+  1. **站点表覆盖不足**：回归暴露 6 处失败，工具只能回填 4 处；SOURCES 项数与子进程 stdout 的「命名空间 N / 文件 M」**一处站点都没有**，且已覆盖的 4 处里**消息副本**没被收进来（比较值改对了、消息里还写着旧数）。补登记 10 个站点。
+  2. **新站点缺前缀捕获组**：`sourcesCount` 首版正则只有一个捕获组 ⇒ `scanSite` 取 m[2] 得 undefined ⇒ 读数成 NaN，且替换回调会拿「数字串」当前缀拼成 `6667`（与 v2.131.0 「事故修正②」同族）。
+  3. **`skipComment` 只在扫描侧生效**：`applyPlan` 是纯正则全量替换 ⇒ L19036 的**历史叙述**（「能独立跑出『装载期边 23 / 硬边 0』」）被一并改成 60（回填碰历史叙述）。改为替换回调接 `offset` 、行首是注释则原样返回，并逐行回退被误改的注释行。
+- **收口读数**：`node tests/run.js` → **13100 / 0 · status: passed · unchanged: true**；`export-contract` **ns= 143 / members= 926 / chars= 10570**；`module-registry-gate` pass（文件 159 / 命名空间 167 / 载入期边 60 / 硬边 0 / 调用期 120）；`dead-export-gate` pass（dead 757 / uiDead 4 / dataOnly 241）；`reject-code-gate` pass（608 码 = 见证 369 / 死表 9 / 基线 230，逐字不变）；`test-surface-gate` 全部通过（文件面 155 / 锁 150 / 孤儿 0 / 豁免 0）；`readings` problems 0；`gen-error-codes --check` 文档与三源一致。
+- **本轮写入注释的纪律**：① 站点表的正则必须与 `scanSite` 的取值口径成套（前缀组 + 数值组，不能只写一个组）；② `skipComment` 属于「扫描 + 替换」**两侧**的属性，只写在扫描侧等于没写（执行侧仍会打中注释）；③ 新站点登记必须同步进 `REQUIRED`（否则「没扫到」与「读数正确」在输出上不可分）。
+- [ ] 未覆盖（如实留在清单，不伪称已完成）：E6 只做了**状态机与时间轴**，不做 AI 自动推断伏笔；`ui/panel.js` 伏笔区仍走受控写入（符合本仓对变量间接调用的静态口径，已在账本如实登记）；UI 层仍未做实机验证。
 ### R120 · 2026-10-01 · v2.134.0：O18 第三刀（锚点覆盖率 92.86% → 100%）+ 收口期抓出的两个真缺陷
 - **起点与终点**：起点 v2.133.0（全量回归 13015 / 0，`175db4d`）；终点 v2.134.0（全量回归 **13015 / 0**，`checks` 逐字不变）。
   本版主线是 **O18 第三刀**：把 `tools/anchor-scan.js` 的**未识别锁从 8 把收到 0 把**、覆盖率从
