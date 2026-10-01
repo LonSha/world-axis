@@ -55,18 +55,54 @@ const PATTERNS = [
     // 反向排除：文件常量（相对路径形态）归 target 面，不当锚点。
     exclude: function (name, val) {
       return /^(REL|FILE|PATH|MOD|SRC|TARGET)[A-Z0-9_]*$/.test(name)
-        || /^[a-z][\w.-]*\/[\w.-]+\.js$/.test(val);
+        || /^[a-z][\w.-]*\/[\w.-]+\.js$/.test(val)
+        // v2.133.0（O18 第二刀）：**声明串**（`const A = 'x', B = 'y';`）不是锚点原文。
+        //   现场取证（/tmp/wa_o18g.js，全仓非统一档锁实测）：`anchor-const` 的 5 条假锚点
+        //   100% 是声明串 —— journal-v2940（`ORG` / `STORE` / `DIAG` / `PANEL` 一条串）、
+        //   perf-recalc-v2123（两条）、life-turn-v2132、rumor-e3-v2115
+        //   （`PLAIN = '甲', EYE = '乙', FAR = '丙'`，短名测试常量）。
+        //   共同形态：值里出现「逗号 + `NAME = '…'`」= 一条串装了**多个常量**。
+        //   这类是 `file-const-multi` 的猎物（归 target 面），不是锚点原文。
+        //   不误杀真锚点：真锚点（`A_*` / `ANCHOR_*` / `B_*`）的值里没有次级声明。
+        || /,\s*[A-Z][A-Z0-9_]*\s*=\s*['"`]/.test(val);
     } },
-  // v2.131.0（O18）：原 `txt-field` 模式经 `--self-test` 实测**零贡献**（摘掉后全仓锚点数不变）
-  //   —— 非统一档锁里 `txt:` 字段不存在（那是统一档的形态，已由委托审计器覆盖），
-  //   如实删除，不留死判据。
+  // v2.133.0（O18 第二刀）**翻案**：v2.131.0 曾以「`--self-test` 实测零贡献」为由删掉本模式。
+  //   现场证伪（/tmp/wa_o18j.js 变体对照 + /tmp/wa_txt2.js 全仓取证）：那条结论是**判据范围**造成的假象 ——
+  //   v2.131.0 的自证口径是「**已识别锁**的锚点总量」（`ex.anchors.length && ex.targets.length`），
+  //   而 `txt:` 字段在非统一档锁里**只存在于 journal-v2940.js 一把**，它当时因目标面认不出
+  //   （声明串形态）整体落在 `unidentified` ⇒ 它那 6 条 txt 锚点**从不进入统计** ⇒ 「零贡献」。
+  //   实测：修好目标面（`file-const-multi`）后，journal-v2940 的锚点 1 条 → **7 条**（+6 条全是 txt）。
+  //   这是本仓「代理判据」教训的又一例：判据范围（只统计已识别锁）与被测对象（识别能力）不是同一件事。
+  //   故本模式**恢复**，并把自证范围一并改成「全部锚点总量」（见 `totalAnchors` 的口径注释）。
+  { id: 'txt-field', what: 'txt: "…"（破坏锚点的 txt 字段，ANCHORS 表形态）',
+    re: /\btxt\s*:\s*(['"`])([\s\S]*?)\1/g,
+    kind: 'anchor', group: 2 },
   { id: 'from-field', what: 'from: "…"（破坏锚点的 from 字段）',
     re: /from\s*:\s*(['"`])([\s\S]*?)\1/g,
     kind: 'anchor', group: 2, requireEnd: true },
   // ── 目标文件 ────────────────────────────────────────────────
-  { id: 'file-const', what: 'const REL/FILE/MOD = "rel"（唯一的文件常量）',
-    re: /const\s+[A-Z][A-Z0-9_]*\s*=\s*(['"])([a-z][\w.-]*\/[\w.-]+\.js)\1\s*;/g,
-    kind: 'target', group: 2 },
+  // v2.133.0（O18 第二刀）：**`const` 声明串**——一条 `const` 语句里可能装多个文件常量。
+  //   形态一（单条）：`const REL = 'engines/x.js';`
+  //   形态二（声明串）：`const ORG = 'engines/org.js', STORE = 'core/store.js', DIAG = '…';`
+  //   为什么合并成一条而不是留两条：本仓「零消费能力当场删」纪律 —— 摘除自证实测
+  //   （/tmp/wa_abl.js）单条版 `file-const` 摘掉后 **anchors / targets / locks 三项零变化**
+  //   （它的猎物全被本模式的 `each` 一并收走）⇒ 留着它就是一条不参与判定的死判据。
+  //   合并后外层 re 用 `[^;]*?`（**允许跨行**），把单条版原本独占的「跨行声明」形态也吃进来，
+  //   能力只增不减。each 要求 `NAME = 'dir/name.js'`（全大写常量 + `=`），
+  //   故对象字段（`rel: 'x/y.js'`）不会被误收 —— 小写 key 不匹配。
+  //   现场形态（三把锁实测）：journal-v2940（`ORG` / `STORE` / `DIAG` / `PANEL` 一条串）、
+  //   perf-recalc-v2123（`BUDGET` / `INJECT` / `PERF` / `DIAG` / `PANEL`）、
+  //   life-turn-v2132（`LIFE` / `DIAG` / `PANEL`）。它们此前全部落在「认不出目标文件」。
+  //   为什么值得宽化而不是「让作者改写法」：这是**本仓自己的惯用写法**（一行钉住本锁
+  //   关心的全部目标文件），要求作者拆成多行等于「为了迁就扫描器而改源码形态」——
+  //   扫描器该适配真实写法，不是反过来。
+  //   边界（如实登记）：只吃「声明串里**字面量**形式的 `NAME = 'dir/name.js'`」；
+  //   `const A = 'x', B = path.join(...)` 这种混合形态的第二项仍认不出（如实登记，
+  //   不为它写更宽的正则——那会把 `foo: 'a/b.js'` 这类对象字段也吞进来）。
+  { id: 'file-const-multi', what: "const A = 'engines/x.js'; / const A = 'x', B = 'engines/y.js';（声明串里的文件常量）",
+    re: /\bconst\s+([^;]*?)\s*;/g,
+    kind: 'target', group: 0,
+    each: /\b([A-Z][A-Z0-9_]*)\s*=\s*(['"`])([a-z][\w.-]*\/[\w.-]+\.js)\2/g },
   { id: 'path-join', what: 'path.join(BASE, "rel")',
     re: /path\.join\(\s*BASE\s*,\s*(['"])([a-z][\w.-]*\/[\w.-]+\.js)\1\s*\)/g,
     kind: 'target', group: 2 },
@@ -132,6 +168,21 @@ function extract(src, pats, deny) {
     P.re.lastIndex = 0;
     let m;
     while ((m = P.re.exec(src))) {
+      // v2.133.0（O18 第二刀）：**子模式**（`each`）——外层模式负责切出「一条声明串」，
+      //   内层模式在串内逐个取目标。为什么要这层：逗号分隔的声明串里可能同时有多个文件常量
+      //   （`const ORG = 'engines/org.js', STORE = 'core/store.js', DIAG = …, PANEL = …;`），
+      //   而 `group` 只取得到一个捕获组 —— 单靠分组取不到「一条串里的全部目标」。
+      //   只对 `kind === 'target'` 生效（锚点面没有多值形态，不为它加抽象）。
+      if (P.each && P.kind === 'target') {
+        P.each.lastIndex = 0;
+        let e;
+        while ((e = P.each.exec(m[0]))) {
+          const ev = e[3];
+          if (!ev || ev.length < 8) continue;
+          if (!seenT[ev]) { seenT[ev] = 1; targets.push(ev); }
+        }
+        continue;
+      }
       const v = m[P.group];
       if (!v || v.length < 8) continue;                      // 太短的一律不算锚点（噪声）
       // v2.131.0（O18）：`exclude(name, val)` 钩子——锚点面要能与目标面**互斥**：
@@ -271,26 +322,45 @@ module.exports = { PATTERNS: PATTERNS, extract: extract, scanLock: scanLock, sca
  *   为什么必须有：本工具改了形态判据后「覆盖率上升」这件事**无法自证**——
  *   一个只会报绿的判据与一个真在检查的判据，输出一样。故必须证明两件事：
  *     ① 覆盖自证：当前形态表能在**真锁**上认出锚点（≥1 条，且目标文件认得出来）；
- *     ② 破坏可观测：把形态表的锚点模式**逐个摘掉**后，**全仓识别总量**必须改变
+ *     ② 破坏可观测：把形态表的模式**逐个摘掉**后，**全仓识别总量**必须改变
  *        （若无变化 ⇒ 该模式不参与任何判定 ⇒ 死判据 ⇒ 当场失败）。
  *   破坏在**副本**上做（真源码形态表不动），符合本仓「破坏可观测」纪律。
- *   判据范围教训（本次现场）：初版自证只拿**单把探针锁**比 —— 在 `b2-travel-v2117.js` 上
+ *   判据范围教训一（v2.131.0 现场）：初版自证只拿**单把探针锁**比 —— 在 `b2-travel-v2117.js` 上
  *     `txt-field` / `from-field` / 值门都「无变化」，但它们在**别的锁**上真在贡献锚点
  *     （如 `from-field` 在 `b5-org-v2117.js`）。单锁范围会把真判据误报成死判据，
- *     故范围为**全部非统一档锁的识别总量**。
+ *     故范围为**全部非统一档锁**。
+ *   判据范围教训二（v2.133.0 现场，**同一类错再犯一次**）：上一版口径是
+ *     「**已识别锁**的锚点总量」（`if (ex.anchors.length && ex.targets.length)`），
+ *     于是 `txt-field` 被判「零贡献」而遭删除 —— 但真相是 `txt:` 字段只存在于
+ *     `journal-v2940.js`，它当时因目标面（声明串）认不出而整体落在 `unidentified`，
+ *     那 6 条锚点**从不进入统计**。判据范围（只统计已识别锁）与被测对象（识别能力）
+ *     不是同一件事 ⇒ 这就是一条**代理判据**。
+ *     本版改为**三个分量分别统计、分别判变化**：`anchors`（全部锁的锚点，含未识别锁）·
+ *     `targets`（全部锁的目标，含未识别锁）· `locks`（两面都认得出的锁）。
+ *     破坏可观测 = **任一分量变化**即算（锚点模式动 `anchors`，目标模式动 `targets`）。
  */
 function totalAnchors(pats, deny) {
   const uni = AUDIT.audit();
-  let n = 0, locked = 0;
+  let anchors = 0, targets = 0, locks = 0;
   uni.locks.forEach(function (l) {
     if (l.kind !== AUDIT.KINDS.NON_UNIFORM) return;
     if (SELF.indexOf(l.file) >= 0) return;
     let src = '';
     try { src = fs.readFileSync(path.join(TESTS, l.file), 'utf8'); } catch (e) { return; }
     const ex = extract(src, pats, deny);
-    if (ex.anchors.length && ex.targets.length) { n += ex.anchors.length; locked++; }
+    anchors += ex.anchors.length;          // v2.133.0：**不再以「已识别」为门**（教训二）
+    targets += ex.targets.length;
+    if (ex.anchors.length && ex.targets.length) locks++;
   });
-  return { anchors: n, locks: locked };
+  return { anchors: anchors, targets: targets, locks: locks };
+}
+/** 破坏可观测的判据：任一分量变化即算参与判定（否则该模式是死判据）。 */
+function observable(full, got) {
+  const d = [];
+  if (got.anchors !== full.anchors) d.push('锚点 ' + (got.anchors - full.anchors));
+  if (got.targets !== full.targets) d.push('目标 ' + (got.targets - full.targets));
+  if (got.locks !== full.locks) d.push('已识别锁 ' + (got.locks - full.locks));
+  return d;
 }
 function selfTest() {
   const fails = [];
@@ -301,19 +371,20 @@ function selfTest() {
   if (!base.targets.length) fails.push('覆盖自证失败：' + probe + ' 认不出目标文件');
   console.log('  ① 覆盖自证：' + probe + ' → 锚点 ' + base.anchors.length + ' 条 / 目标 ' + base.targets.length + ' 个');
   const full = totalAnchors(PATTERNS);
-  console.log('  ② 全仓面基线：' + full.locks + ' 把已识别锁 · 锚点 ' + full.anchors + ' 条');
-  PATTERNS.filter(function (p) { return p.kind === 'anchor'; }).forEach(function (p) {
-    const broken = PATTERNS.filter(function (q) { return q !== p; });
-    const got = totalAnchors(broken);
-    const changed = got.anchors !== full.anchors;
-    console.log('     摘掉 ' + p.id + ' ⇒ ' + got.anchors + ' 条'
-      + (changed ? ' · 破坏可观测 ✓' : ' · **无变化 ⇒ 死判据** ✗'));
-    if (!changed) fails.push('破坏不可观测：摘掉 ' + p.id + ' 后全仓识别总量不变（死判据）');
+  console.log('  ② 全仓面基线：锚点 ' + full.anchors + ' 条 · 目标 ' + full.targets
+    + ' 个 · 两面都认得出的锁 ' + full.locks + ' 把');
+  // ② 逐个摘掉：**全部模式**（含 target 面）——目标面模式同样必须证明自己在参与判定
+  PATTERNS.forEach(function (p) {
+    const got = totalAnchors(PATTERNS.filter(function (q) { return q !== p; }));
+    const d = observable(full, got);
+    console.log('     摘掉 ' + p.id.padEnd(17) + '[' + p.kind + '] ⇒ '
+      + (d.length ? '破坏可观测 ✓  ' + d.join(' / ') : '**无变化 ⇒ 死判据** ✗'));
+    if (!d.length) fails.push('破坏不可观测：摘掉 ' + p.id + ' 后全仓识别总量不变（死判据）');
   });
   // ③ 值拒收表自证：把 `VALUE_DENY` 放宽到「永不拒收」，全仓锚点总量必须变化（否则它是摆设）
   const withNone = totalAnchors(PATTERNS, /(?:)/);
   const denyChanged = withNone.anchors !== full.anchors;
-  console.log('     值拒收表放宽到「永不拒收」 ⇒ ' + withNone.anchors + ' 条'
+  console.log('     值拒收表放宽到「永不拒收」 ⇒ 锚点 ' + withNone.anchors + ' 条'
     + (denyChanged ? ' · 可观测 ✓' : ' · **无变化 ⇒ 值拒收表未参与判定** ✗'));
   if (!denyChanged) fails.push('破坏不可观测：值拒收表放宽后全仓识别总量不变');
   // ④ 收尾门自证：把 `requireEnd` 全部摘掉，全仓锚点总量必须变化
@@ -322,12 +393,30 @@ function selfTest() {
   });
   const withEnd = totalAnchors(noEnd);
   const endChanged = withEnd.anchors !== full.anchors;
-  console.log('     摘掉 from-field 收尾门 ⇒ ' + withEnd.anchors + ' 条'
+  console.log('     摘掉 from-field 收尾门 ⇒ 锚点 ' + withEnd.anchors + ' 条'
     + (endChanged ? ' · 破坏可观测 ✓' : ' · **无变化 ⇒ 收尾门未参与判定** ✗'));
   if (!endChanged) fails.push('破坏不可观测：摘掉收尾门后全仓识别总量不变');
+  // ⑤ v2.133.0：**`exclude` 钩子自证**。锚点面的 `exclude` 是判据的一部分（把文件常量与
+  //   声明串推回目标面），但它不是一条 PATTERN ⇒ 上面的「逐个摘掉」摸不到它。
+  //   做法：把 `anchor-const` 的 exclude 换回**基础版**（只挡文件常量名与相对路径值），
+  //   全仓锚点总量必须变化（声明串与文件常量会被误收成锚点）。
+  const noDecl = PATTERNS.map(function (p) {
+    if (p.id !== 'anchor-const' || typeof p.exclude !== 'function') return p;
+    const o = Object.assign({}, p);
+    o.exclude = function (name, val) {
+      return /^(REL|FILE|PATH|MOD|SRC|TARGET)[A-Z0-9_]*$/.test(name)
+        || /^[a-z][\w.-]*\/[\w.-]+\.js$/.test(val);
+    };
+    return o;
+  });
+  const withDecl = totalAnchors(noDecl);
+  const declChanged = withDecl.anchors !== full.anchors;
+  console.log('     摘掉 exclude 的声明串门 ⇒ 锚点 ' + withDecl.anchors + ' 条'
+    + (declChanged ? ' · 破坏可观测 ✓' : ' · **无变化 ⇒ 该门未参与判定** ✗'));
+  if (!declChanged) fails.push('破坏不可观测：摘掉 exclude 声明串门后全仓识别总量不变');
   if (fails.length) { console.log('  ✗ 自证失败：'); fails.forEach(function (f) { console.log('     · ' + f); }); return 1; }
-  console.log('  ✓ 自证通过（覆盖 + 形态表 ' + PATTERNS.filter(function (p) { return p.kind === 'anchor'; }).length
-    + ' 项 + 值拒收表 + 收尾门，全部破坏可观测）');
+  console.log('  ✓ 自证通过（覆盖 + 形态表 ' + PATTERNS.length
+    + ' 项全摘一遍 + 值拒收表 + 收尾门 + exclude 声明串门，全部破坏可观测）');
   return 0;
 }
 if (require.main === module) {

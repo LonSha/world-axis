@@ -10217,7 +10217,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.132.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.133.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10774,7 +10774,7 @@ assert(verF2500 === '2.132.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.132.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.133.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -11065,7 +11065,7 @@ assert(verF2500 === '2.132.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.132.0', '入口版本为 2.132.0（实 ' + ver + '）');
+    assert(ver === '2.133.0', '入口版本为 2.133.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11610,7 +11610,7 @@ assert(verF2500 === '2.132.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.132.0', '入口版本为 2.132.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.133.0', '入口版本为 2.133.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -11998,7 +11998,7 @@ assert(verF2500 === '2.132.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.132.0', '入口版本为 2.132.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.133.0', '入口版本为 2.133.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12368,7 +12368,7 @@ assert(verF2500 === '2.132.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.132.0', '入口版本为 2.132.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.133.0', '入口版本为 2.133.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12733,7 +12733,7 @@ assert(verF2500 === '2.132.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.132.0', '入口版本为 2.132.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.133.0', '入口版本为 2.133.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -15057,7 +15057,7 @@ assert(verF2500 === '2.132.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.132.0', '入口 VERSION = 2.132.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.133.0', '入口 VERSION = 2.133.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -19525,23 +19525,41 @@ assert(r2900.dead.length === 751 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(e2eTools.indexOf('verifySync') >= 0 && e2eTools.indexOf('buildPlan') >= 0,
       'v2131/O16: 工具导出面就位（实 ' + e2eTools + '）—— 「我 require 到的工具确实有我要调的入口」');
     // v2.131.0（O16 收口②）：**比较值与消息文本同批**（与 readings.js 的 #6 同一纪律）。
-    //   现场病灶：`assert(ver === '2.132.0', '入口版本为 2.123.0（实 …）')` —— 比较值被历轮升版
+    //   现场病灶：`assert(ver === '2.133.0', '入口版本为 2.123.0（实 …）')` —— 比较值被历轮升版
     //   追上了，**消息里的口号却停在三版之前**（实测 6 处）。后果不是「打印不好看」：
     //   断言失败时读的人会照着消息去查一个**从不存在**的版本号（R115/R116 同族失真）。
     //   取值面**必须排除注释行**（含本段自己的注释）：现场实测 —— 不排除时判据会命中
     //   上面那一行举例说明里的旧版本号，把「解释病灶的文字」当成病灶（O18 同族假阳性）。
-    const runLines = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8').split('\n')
-      .filter(function (l) { return !/^\s*(\/\/|\*|\/\*)/.test(l); });
+    // v2.133.0（O18 第二刀收口）：**判据范围必须与被测对象同宽**。
+    //   现场病灶：原正则写成 `/入口(?:版本为| VERSION = ) 2\.\d+\.\d+（实 /` —— `VERSION = ` 这一支
+    //   末尾**多带一个空格**，而现场那一处写的是 `入口 VERSION = 2.132.0（实 `（空格在分支内部）
+    //   ⇒ 该形态**从未进入取值面**：判据自称「在册 5 处」而真站点有 6 处，
+    //   漏掉的那一处正是本轮升版时**没被改**的消息文本。这是「判据范围 ≠ 被测对象」的第三次现身
+    //   （前两次：v2.131.0 的「单锁范围 vs 全仓范围」、v2.132.0 的「只统计已识别锁」）。
+    //   同时把比对真源从**硬编码版本号**（`indexOf('2.132.0')`）改为
+    //   **同一行上的比较值**（`=== '2.X.Y'`）+ 入口现场版本：
+    //   判据引用被测对象（硬编码常量），就永远发现不了自己已过时。
+    const liveVer133 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
+      .match(/const VERSION = '([\d.]+)'/) || [])[1];
     const msgSites = [];
-    runLines.forEach(function (l) { 
-      const m = l.match(/入口(?:版本为| VERSION = ) 2\.\d+\.\d+（实 /g);
-      if (m) m.forEach(function (x) { msgSites.push(x); });
+    //   逐行扫原始行（不先 filter）：实行号是报警时读的人唯一能用的坐标。
+    fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8').split('\n').forEach(function (l, i) {
+      if (/^\s*(\/\/|\*|\/\*)/.test(l)) return;   // 注释行门（同 O16 原口径）
+      const m = l.match(/入口\s*(?:版本为 |VERSION = )2\.\d+\.\d+（实 /g);
+      if (!m) return;
+      const cmp = (l.match(/===\s*'(\d+\.\d+\.\d+)'/) || [])[1] || null;
+      m.forEach(function (x) {
+        msgSites.push({ line: i + 1, text: x, msgVer: (x.match(/2\.\d+\.\d+/) || [])[0], cmpVer: cmp });
+      });
     });
-    const msgDrift = msgSites.filter(function (x) { return x.indexOf('2.132.0') < 0; });
-    assert(msgSites.length >= 5 && msgDrift.length === 0,
-      'v2131/O16: 版本断言的消息文本与比较值同批（在册 ' + msgSites.length + ' 处 · 旧版口号 '
-      + msgDrift.length + ' 处' + (msgDrift.length ? '：' + msgDrift.slice(0, 3).join(' ; ') : '')
-      + '）—— 同时在册数必须 ≥ 5，否则本判据是空转');
+    const msgDrift = msgSites.filter(function (s) {
+      return s.msgVer !== s.cmpVer || s.msgVer !== liveVer133;
+    });
+    assert(msgSites.length >= 6 && msgDrift.length === 0,
+      'v2131/O16: 版本断言的消息文本与比较值同批（在册 ' + msgSites.length + ' 处 · 与同批比较值/入口版本不一致 '
+      + msgDrift.length + ' 处' + (msgDrift.length ? '：' + msgDrift.slice(0, 3).map(function (s) {
+        return 'L' + s.line + ' 口号 ' + s.msgVer + ' vs 比较值 ' + s.cmpVer; }).join(' ; ') : '')
+      + '）—— 同时在册数必须 ≥ 6（含 `入口 VERSION = ` 形态），否则本判据是空转');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
     runLock('./module-cycle-gate-v2107.js');
@@ -20246,7 +20264,49 @@ assert(r2900.dead.length === 751 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(o19Residue === 0, 'v2132/O19: 本节跑完 crossSession 回到 false（不传染后面的 section）');
     assert(String(global.localStorage.getItem('worldaxis_life_turn_v1')) === 'null',
       'v2132/O19: 本节跑完游标键已清（实 ' + String(global.localStorage.getItem('worldaxis_life_turn_v1')) + '）');
-  }  // ── 汇总 ──
+  }
+  // ── v2.133.0（O18 第二刀）：锚点扫描器认出「声明串」与翻案恢复 txt-field ──────
+  //   病一：`journal-v2940` / `perf-recalc-v2123` / `life-turn-v2132` 三把锁的目标面是
+  //     `const A = 'engines/x.js', B = 'core/y.js', …;`（本仓惯用写法），而 v2.126.0 的
+  //     `file-const` 只认单条声明 ⇒ 三把锁整体落在「认不出目标文件」。
+  //   病二（更值钱）：v2.131.0 用「`--self-test` 实测零贡献」删掉了 `txt-field` —— 那是
+  //     **代理判据**：自证口径只统计「已识别锁」，而 `txt:` 字段只存在于 `journal-v2940`，
+  //     它当时因目标面认不出而整体未识别 ⇒ 那 6 条锚点从不进入统计。
+  //   落点：`file-const-multi`（带 `each` 子模式）+ `txt-field` 恢复 + `exclude` 声明串门
+  //     + 单条版 `file-const` 删除（零消费能力）；自证口径改三分量、摘除范围扩到全部模式。
+  section('v2.133.0（O18 第二刀）：锚点扫描器认出声明串');
+  {
+    runLock('./anchor-scan-v2133.js');
+    // 锚点唯一性逐条断言（与 v2.119.0 / v2.126.0 / v2.127.0 三批同规格）
+    const t2133 = require('./anchor-scan-v2133.js');
+    Object.keys(t2133.ANCHORS).forEach(function (k) {
+      const an = t2133.ANCHORS[k];
+      const n = fs.readFileSync(path.join(BASE, an.rel), 'utf8').split(an.txt).length - 1;
+      if (k === 'deadFileConst') {
+        assert(n === 0, 'v2133: 反向锚点 ' + k + ' 在 ' + an.rel + ' 中 0 次（死判据已删，实 ' + n + '）');
+      } else {
+        assert(n === 1, 'v2133: 锚点 ' + k + ' 在 ' + an.rel + ' 中恰 1 次（实 ' + n + '）');
+      }
+    });
+    // 真消费面：扫描器的**读数**（覆盖率与未识别数）必须真被推宽 —— 否则本版只是改了正则
+    const scanR2133 = require(path.join(BASE, 'tools/anchor-scan.js')).scan({});
+    assert(scanR2133.summary.reach >= 104 && scanR2133.summary.reachRate >= 92,
+      'v2133: 覆盖率 ≥ 92%（实 ' + scanR2133.summary.reachRate + '% / '
+        + scanR2133.summary.reach + ' 把）—— O18 第一刀 90.18% 之上再推一档');
+    assert(scanR2133.nonUniform.unidentified <= 8,
+      'v2133: 未识别 ≤ 8 把（实 ' + scanR2133.nonUniform.unidentified + '；O18 第一刀为 11）');
+    const unid2133 = scanR2133.unidentified.map(function (u) { return u.file; });
+    ['journal-v2940.js', 'perf-recalc-v2123.js', 'life-turn-v2132.js'].forEach(function (f) {
+      assert(unid2133.indexOf(f) < 0, 'v2133: ' + f + ' 不再落在未识别（声明串目标面已认出）');
+    });
+    // 「只报不红」口径未变：门禁面仍只算统一档
+    assert(scanR2133.summary.gateProblems === scanR2133.uniform.problems
+      && scanR2133.summary.gateProblems === 0,
+      'v2133: 门禁面仍只算统一档且为零（非统一档「只报不红」口径未被本版改动）');
+    // 两把扫描器锁并存：v2126 的 31 项判据不得因本版而红（同文件、不同锚点）
+    runLock('./anchor-scan-v2126.js');
+  }
+  // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
   console.log('  ⏱ 超 60s 的节：' + __slowSec119 + ' 个');
   console.log('\n══════════════════════');
