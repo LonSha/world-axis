@@ -959,7 +959,19 @@
     //   that key take part in sweep/verifyAll as SOMEONE ELSE'S SAVE (real consequence:
     //   sweep believes a foreign chat exists, so that chat's recovery snapshot stops
     //   being classed orphan).
-    recover: /^worldaxis_state_(.+)_(bak|recovered)$/
+    recover: /^worldaxis_state_(.+)_(bak|recovered)$/,
+    // v2.132.0（O19）: 跨会话轮转游标（life 的「这一轮从谁开始」）。
+    //   为什么要单列一个家族，而不是让它落进兜底的 settingsUnregistered：
+    //     ① 那个桶的语义是「**设置**家族里没人认领的幽灵键」（面板体检视图逐字显示
+    //        「未登记设置 N」），而本键**根本不是设置**——它是进程记忆（见 engines/life.js
+    //        的 TURN_KEY 注释：刻意不进世界存档）。混进去等于把一件进程态的事报成用户配置。
+    //     ② sweepStaleKeys 对 settingsUnregistered 的口径是「默认保留，ghostSettings:true
+    //        才纳入候选」——本键与那个出口的语义也不匹配（它既不该被当成幽灵设置清掉，
+    //        也不该出现在「幽灵设置」的候选清单里）。
+    //   与 v2.108.0 的 recover 家族同一裁决逻辑：单列是为了**不让它污染既有计数面**
+    //     （`families.settingsUnregistered` 是面板与断言都读的读数，不得被新键悄悄加一）。
+    lifeTurn: /^worldaxis_life_turn_v1$/
+  };
     // v2.5.0: 删除 `settingsSettings` 硬编码白名单。原因（实测口径）：
     //   ① 它是「12 个设置键」的第二份真源，必然漂移——实查已漏掉 calendar_settings_v1 与
     //      horizon_settings_v1 两个既存键（后者正是 v2.3.0 新加的）；
@@ -968,7 +980,6 @@
     //      **结果完全一致**。即：删掉它不改变任何行为，只消除一份会过期的副本。
     //   ③ 真源在 `WA.__settingsRegs`（各模块自持登记），需要「这个键是不是设置」时应查登记表，
     //      而不是维护第十三条清单。
-  };
   function classifyKey(key) {
     // v2.79.0（第十三面续 · 输入边界）：键必须先真的是字符串。
     //   此前 key=null/undefined/数字/对象/日期全会抛 TypeError（key.match is not a function）——
@@ -990,6 +1001,9 @@
     //   `worldaxis_state_X_bak` DOES satisfy the state regex (its negative lookahead
     //   only excludes syncrev / corrupt_\d+), so a later check would be swallowed.
     if ((m = key.match(KEY_FAMILIES.recover))) return { family: 'recover', chat: m[1], kind: m[2] };
+    // v2.132.0（O19）: 必须在 settings 兜底**之前**判定——否则本键会落进
+    //   settingsUnregistered（面板体检视图的「未登记设置」桶），把一件进程记忆报成用户配置。
+    if (KEY_FAMILIES.lifeTurn.test(key)) return { family: 'lifeTurn', chat: null };
     if ((m = key.match(KEY_FAMILIES.state))) return { family: 'state', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.recovery))) return { family: 'recovery', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_eventLog))) return { family: 'diagnostic', kind: 'event_log', chat: m[1] };
@@ -2088,7 +2102,12 @@
           recoverBak: '后备存档读回（L2 自愈的取回路径）',
           // v2.113.0（A1 收口）: 审计落盘面两处裸读补投归因（与 tool-diag 的 SRC_LABEL 同批）。
           auditlogFlush: '审计日志落盘前的历史读回（按「无历史」重建）',
-          auditlogRestore: '审计日志历史读回（与「本次会话没有历史」同形）' };
+          auditlogRestore: '审计日志历史读回（与「本次会话没有历史」同形）',
+          // v2.132.0（O19）: 跨会话轮转游标的读回（engines/life.js 的 noteRead('lifeTurn')）。
+          //   三份真源（本表 / ui/panel.js 的 LAB_P / engines/tool-diag.js 的 SRC_LABEL）同键集，
+          //   缺一份那一份的消费端就退回裸桶名——「游标读不出来」与「游标本来就是 0」是两件事，
+          //   而它们在没有标签时长得一模一样（life 读失败时刻意**不回落**、如实答「从 0 开始」）。
+          lifeTurn: '跨会话轮转游标读回（读失败 ⇒ 本轮起点按 0 计，与「真的从 0 开始」同形）' };
         const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
           .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');
         issues.push({ level: 'warn', key: 'storage.readFailed',
@@ -3503,8 +3522,8 @@
       // v2.108.0: the recover family (backup/mark) MUST be registered alongside
       //   KEY_FAMILIES -- skipping it turns `families[cls.family]++` into NaN
       //   (an occupancy table that reports "NaN keys").
-      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, other: 0 };
-      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, other: 0 };
+      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, other: 0 };
+      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, other: 0 };
       let totalBytes = 0, stateKeys = 0, stateDerivedKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0, curQuarantines = 0;
       let conflictKeys = 0, conflictBytes = 0;
       let keysReadFailed = 0;           // v2.10.0: 本次盘点中读失败的键数（体积表可信度判据）

@@ -32,11 +32,71 @@
     //   名额不足（skipped）与协作未被回应（unreciprocated）是两件事：
     //   前者是资源约束，后者是**依据不足**。合成一个数就再也答不出该加名额还是该等对方。
     skipped: 0, unreciprocated: 0 };
-  // v2.115.0（规划 01 的 E4）：**同等依据者的轮转游标**（进程态，与 `skipped` 同族——
-  //   它记的是「这一轮从谁开始」，不是世界事实，故不落存档）。
+  // v2.115.0（规划 01 的 E4）：**同等依据者的轮转游标**。
   //   为什么必须有它：静态排序 + 截断 ⇒ 同等依据的后段人物每一轮都被跳过，
   //   而 `skipped` 只答「这一轮少推了几个人」，答不出「谁总也没轮到」。
+  // v2.132.0（O19 跨会话游标）：**游标从进程态升级为盘上态**。
+  //   v2.115.0 → v2.131.1 的四版留档里，这条缺口逐字重复出现在「未覆盖」清单：
+  //   「`_turn` 是**进程态**，跨会话不延续」——它治的是**跨轮**的不公平，
+  //   而**跨会话**时每载入一次模块就归零：一个会话只跑一轮的长局里，
+  //   游标恒为 0 ⇒ 「谁总也没轮到」退回到 v2.115.0 之前那句话（位置决定命运）。
+  //   为什么会这样：`let` 初值只在求值期跑一次，而本模块的求值**每个会话都发生一次**。
+  //   故「跨轮」这件事此前只在**同一进程内的多次 tick** 里成立。
   let _turn = 0;
+  // 单真源：一个键、一个结构 `{ chatId, turn }`。落盘走 localStorage（与 chatcache / worldbook 同口径）。
+  //   为什么**不**落进世界存档（v2.115.0 的原始口径「不落存档」继续成立）：
+  //   游标记的是「这一轮从谁开始」，不是世界事实；进存档会让它变成一份会过期的第二真源
+  //   （导出/导入世界会连「上次从谁开始」一起搬走，而那是**进程的**记忆，不是世界的）。
+  const TURN_KEY = 'worldaxis_life_turn_v1';
+  // **开关门**：它是这次升级的**原子交换点**，也是老口径的逃生舱。
+  //   关闭（默认）⇒ 逐字退回 v2.115.0：`_turn` 是进程态、永不落盘、永不读盘。
+  //   打开 ⇒ 载入时读回、tick 后写盘。一盏灯管两件事（读与写），不存在「只读不写」的半开状态。
+  const TURN_DEF = { crossSession: false };
+  const TURN_REG = { key: 'worldaxis_life_settings_v1', def: TURN_DEF, module: 'life' };
+  function turnCfg() {
+    // 复用主设置键的读路径（**不**注册第二个键：本模块的设置键只有 `LS_KEY` 一个，
+    //   另开一键会让「设置归属」类判据读到两个来源）。
+    const raw = WA.settingsBus ? WA.settingsBus.read(TURN_REG) : TURN_DEF;
+    const v = raw && raw.crossSession;
+    // 老口径是布尔声明：手改盘面 / 旧版写入可能产出 "true" 这类字符串，此处显式收窄成布尔。
+    return v === true;
+  }
+  function win() { return WA.mainWin || (typeof window !== 'undefined' ? window : null); }
+  // 裸读归因（与 chatcache / worldbook / checkpoints 同一条出口）：
+  //   「读不出来」最坏的形态不是抛错，而是**被当成「没有这回事」**——
+  //   游标读不出来时我们答的是「本会话从 0 开始」，这与「真的从 0 开始」同形。
+  //   投递 `store.reportReadFail` 是让那件事在诊断里留下痕迹的唯一出口（G16 门禁冻结此清单）。
+  function noteRead(source, key, err) {
+    try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail(source, key, err); } catch (e) {}
+  }
+  function curChatId() {
+    // 与 core/store 同源（同机多聊天各有一份世界，游标也各归各的）。
+    try { return WA.store && WA.store.chatId ? String(WA.store.chatId()) : 'wa_default'; } catch (e) { return 'wa_default'; }
+  }
+  function turnLoad() {
+    if (!turnCfg()) return null;
+    const w = win(); if (!w || !w.localStorage) return null;
+    let row = null;
+    try { row = JSON.parse(w.localStorage.getItem(TURN_KEY) || 'null'); }
+    catch (e) { noteRead('lifeTurn', TURN_KEY, e); row = null; }
+    // **不得回落**：文件在、但是本聊天的、结构对 ⇒ 才认。认不出就如实答「不知道」，
+    //   而不是悄悄从 0 开始（后者会让「跨会话延续」这件事在读数上无法与「归零」分辨）。
+    if (!row || typeof row !== 'object' || row.chatId !== curChatId()) return null;
+    const n = Number(row.turn);
+    return isFinite(n) && n >= 0 ? Math.floor(n) : null;
+  }
+  function turnStore() {
+    if (!turnCfg()) return { ok: false, reason: 'disabled' };
+    const w = win(); if (!w || !w.localStorage) return { ok: false, reason: 'no-localStorage' };
+    try {
+      w.localStorage.setItem(TURN_KEY, JSON.stringify({ chatId: curChatId(), turn: _turn }));
+      return { ok: true, turn: _turn };
+    } catch (e) { return { ok: false, reason: 'write-failed' }; }
+  }
+  // 载入一次，之后 `_turn` 就是本会话的工作副本（tick 每轮改它，不每轮读盘——
+  //   盘上那份是**恢复用**的，不是逐轮真源）。
+  const _restored = turnLoad();
+  if (_restored !== null) _turn = _restored;
 
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function personId(name) { const n = clean(name, 60); return n ? 'p_' + n : ''; }
@@ -233,12 +293,16 @@
         p.intent = decision.action === 'wait' ? '等待条件' : decision.reason; p.updatedAt = f.now || stat.lastAt; changed++;
       });
     }, 'life:tick');
+    // v2.132.0（O19）：本轮游标推完才写盘 —— 盘上那份永远等于「上一次结算结束时他从哪一位接着排」。
+    //   写在事务**之外**（游标不是世界事实，事务里写它就是拿一个进程量去改世界快照）。
+    //   关闭开关时 `turnStore()` 直接返回 disabled，**零写盘**。
+    const persisted = turnStore();
     stat.ticks++; stat.changed += changed; if (!changed) stat.blocked++;
     stat.skipped += skipped; stat.unreciprocated += unrecip;
     stat.lastReason = changed ? 'updated' : 'nothing-to-do';
     // skipped 与 unreciprocated 进返回值：调用方要能当场看见「没被推演」的原因，
     //   而不是只能事后从 stat 里猜。
-    return { ok: true, changed: changed, reason: stat.lastReason, skipped: skipped, unreciprocated: unrecip };
+    return { ok: true, changed: changed, reason: stat.lastReason, skipped: skipped, unreciprocated: unrecip, turn: persisted };
   }
 
   function buildBlock() {
@@ -259,7 +323,10 @@
     addGoal: addGoal, addCommitment: addCommitment, addSchedule: addSchedule, tick: tick, decide: decide, buildBlock: buildBlock,
     // v2.115.0（规划 01 的 E4）：`lastTurn` 挂在**既有成员** `stat()` 的返回里
     //   （不改导出面：本仓纪律是「零消费能力当场删」，为读一个游标新开一口会立即变成死导出）。
-    //   它不落存档，故不进 store、不新增容器键。写侧只有 tick 一处。
-    stat: function () { return Object.assign({}, stat, { lastTurn: _turn }); }
+    // v2.132.0（O19）：同一口径再加两个读数——`turnRestored`（本会话开局是从盘上恢复的还是归零的）
+    //   与 `turnPersisted`（上一次结算的落盘结论）。**零新增导出**：三口读数全在这一个既有成员里。
+    //   它不进 store（见 TURN_KEY 上方：进了存档就等于把「上次从谁开始」当成世界事实，
+    //   而导出/导入世界会把它一起搬走）。写侧只有 tick 一处。
+    stat: function () { return Object.assign({}, stat, { lastTurn: _turn, turnRestored: _restored !== null }); }
   };
 })();

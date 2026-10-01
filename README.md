@@ -67,10 +67,10 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.130.0）
+## 构建与验收（当前版本 v2.132.0）
 
 ```bash
-node tests/run.js               # 全量回归入口 → v2.130.0 为通过 12822 / 失败 0（默认 10 分钟超时会被长回归截断，须用 WA_REGRESSION_TIMEOUT_MS 放宽；v2.121.0–v2.129.0 期间未跑全量的欠账见 ITERATION_LOG.md 的 R109–R115）
+node tests/run.js               # 全量回归入口 → v2.132.0 为通过 12917 / 失败 0（硬超时默认 660000ms，由 v2.131.0 的实测驱动改为 660000 —— 整趟实测 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL；慢机可用 WA_REGRESSION_TIMEOUT_MS 再放宽）
 node tests/inventory.js         # 出口面清册 → 四类悬空均 0（产品文件 162 个）
 node tests/export-contract.js   # 出口面契约 → ns / members / chars（产物在 .gitignore 内）
 ```
@@ -83,10 +83,11 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用的工具才入库**（12 个：`gen-error-codes` / `gen-lock` / `scan_drift` /
-`sync-hardcoded` / `doc-gate` / `coverage-report` / `impact-analysis` / `patch-idempotency` /
-`hooks` / `gen-changelog` / `diag_inject_v2860` / `patch_o17_v2104`）。其余一次性脚本与补丁
-（`patch_*` / `bump_*` / `seal_check_*` / `doc_*` / `wire_*`）不入库：它们是收官动作，不是交付物。
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（15 个，`git ls-files tools/ | wc -l` 为准：
+`anchor-scan` / `coverage-report` / `diag_inject_v2860` / `doc-gate` / `gen-changelog` /
+`gen-error-codes` / `gen-lock` / `hooks` / `impact-analysis` / `patch-idempotency` /
+`patch_o17_v2104` / `scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded`）。
+其余一次性脚本与补丁（`patch_*` / `bump_*` / `seal_check_*` / `doc_*` / `wire_*`）不入库：它们是收官动作，不是交付物。
 历史归档可随时从 git 历史取回，`.gitignore` 已按此口径落规则。
 
 ## 十四页面板

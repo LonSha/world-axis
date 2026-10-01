@@ -2574,7 +2574,10 @@
     on('#wa-life-goal', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addGoal(x.person, { text: x.text }), true); renderBody(); });
     on('#wa-life-promise', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addCommitment(x.person, { kind: 'promise', target: '玩家', text: x.text }), true); renderBody(); });
     on('#wa-life-schedule', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); lifeOut(WA.life.addSchedule(x.person, { activity: x.text, start: now, end: now + 3600000 }), true); renderBody(); });
-    on('#wa-life-tick', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); const person = WA.store && x.person ? ((WA.store.get()||{}).people||{})['p_'+x.person] : null; const goal = person && person.life && (person.life.goals||[]).filter(g=>g.status==='active')[0]; const decision = person && goal && WA.life.decide ? WA.life.decide(goal, person, { now: now, with: '玩家' }) : null; const r = WA.life.tick({ now: now, with: '玩家', decision: decision }); const why = decision ? (decision.action + '/' + decision.reason) : (r.reason || ''); lifeOut({ ok: !!r.ok, id: (r.changed || 0) + ':' + why, reason: r.reason }, true); renderBody(); });
+    // v2.132.0（O19）：结算输出补游标读数 —— 玩家此前看不到「这一轮从谁开始」，
+    //   于是「跨会话延续」与「每次都从 0 开始」在面板上不可分辨。`(续)` 标的是**本会话开局**
+    //   是否从盘上恢复过（与 tick 次数无关，故只在恢复过时出现）。
+    on('#wa-life-tick', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); const person = WA.store && x.person ? ((WA.store.get()||{}).people||{})['p_'+x.person] : null; const goal = person && person.life && (person.life.goals||[]).filter(g=>g.status==='active')[0]; const decision = person && goal && WA.life.decide ? WA.life.decide(goal, person, { now: now, with: '玩家' }) : null; const r = WA.life.tick({ now: now, with: '玩家', decision: decision }); const why = decision ? (decision.action + '/' + decision.reason) : (r.reason || ''); const st = WA.life.stat ? WA.life.stat() : {}; lifeOut({ ok: !!r.ok, id: (r.changed || 0) + ':' + why + '·轮转起点' + (st.lastTurn || 0) + (st.turnRestored ? '(续)' : ''), reason: r.reason }, true); renderBody(); });
     // v2.62.0：因果结算——原因必须已存在（knownCause 单一真源），延迟后果到点**只报告**，
     //   由用户显式结算；「取消」与「前提消失的失效」分开归因（两者都不得静默删记录）。
     const causalVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
@@ -5085,7 +5088,11 @@
             //   三份真源缺一份，那一份的消费端就退回裸桶名——面板这格是「历史读不到」时
             //   用户唯一能看见的读数，裸桶名等于没有归因。
             auditlogFlush: '审计日志落盘前的历史读回',
-            auditlogRestore: '审计日志历史读回' };
+            auditlogRestore: '审计日志历史读回',
+            // v2.132.0（O19）: 与 store.LAB / toolDiag.SRC_LABEL 同源同键集（三份真源一同登记）。
+            //   面板这格是「游标读不出来」时用户唯一能看见的读数——裸桶名等于没有归因，
+            //   而 life 读失败时刻意不回落（如实答「本轮从 0 开始」），无标签时两件事同形。
+            lifeTurn: '跨会话轮转游标读回' };
           const byP = rdStore2.bySource || {};
           const srcTxtP = Object.keys(byP).filter(function (k) { return byP[k] > 0; })
             .map(function (k) { return (LAB_P[k] || k) + ' ' + byP[k]; }).join(' / ');

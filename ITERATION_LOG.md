@@ -6,22 +6,93 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.131.0 |
-| 全量回归 | `node tests/run.js` → **v2.131.0 为通过 12828 / 失败 0 · WORKER_EXIT=0**（长超时启动器 + `isolated-runner` 隔离）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
+| 版本 | v2.132.0 |
+| 全量回归 | `node tests/run.js` → **v2.132.0 为通过 12917 / 失败 0 · WORKER_EXIT=0**（长超时启动器 + `isolated-runner` 隔离）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
 | 产品文件面 | 162（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 141 / members= 918 / chars= 10483 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 151 · 锁 146 · 孤儿 0 · 豁免 0 |
-| 死子面 | `node tests/dead-export-gate.js` → dead 753 / uiDead 4 / 仅测试 351 / dataOnly 241 |
-| 拒收码 | `node tests/reject-code-gate.js` → 607 码（见证 368 / 死表 8 / 基线 231） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.131.0 · 现场 refs 3510 / 命名空间 161 / 成员 1944 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 142 / members= 920 / chars= 10508 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 153 · 锁 148 · 孤儿 0 · 豁免 0 |
+| 死子面 | `node tests/dead-export-gate.js` → dead 751 / uiDead 4 / 仅测试 347 / dataOnly 241 |
+| 拒收码 | `node tests/reject-code-gate.js` → 608 码（见证 369 / 死表 9 / 基线 230） |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.132.0 · 现场 refs 3521 / 命名空间 161 / 成员 1944 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
-| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 111 把 · 覆盖 101（**90.99%**）＝ 统一档 29 + 非统一档已识别 72 · 未识别 10 · 非统一档问题 69（**只报不红**，逐条带证据与命中行类别） |
+| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 112 把 · 覆盖 101（**90.18%**）＝ 统一档 29 + 非统一档已识别 72 · 未识别 11 · 非统一档问题 69（**只报不红**，逐条带证据与命中行类别） |
 | 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核，`checked` = 17 站点） |
-| tools/ | 只留**被可执行代码引用**的 14 个（一次性脚本不入库，见 `.gitignore`） |
+| tools/ | 只留**被可执行代码引用**的 15 个（一次性脚本不入库，见 `.gitignore`） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+### R118 · 2026-10-01 · v2.132.0：O19 跨会话轮转游标 + 收口期抓出的三个真缺陷
+- **起点与终点**：起点 v2.131.1（全量回归 12828 / 0，`8ae0fee`）；终点 v2.132.0（全量回归 **12917 / 0**）。
+  本版主线是 **O19**（把 `engines/life.js` 的轮转游标从「进程态 `let`」升级为「跨会话盘上态」），
+  收口过程中**另行抓出并修掉三个此前无人识别的真缺陷**（详见下）。
+- **O19 它治的病**：v2.115.0（E4）把 tick 的截断从静态定序改成同级轮转，游标 `_turn` 是模块级 `let`
+  —— 治的是**跨轮**不公平，而 `let` 初值只在求值期跑一次、本模块**每个会话都求值一次** ⇒ 跨会话归零。
+  后果与 v2.115.0 之前那句原话同形：「一个会话只跑一轮」的长局里 `_turn` 恒为 0，位置再次决定命运，
+  而 `stat().lastTurn` 会**看起来很正常**（它如实报 0）—— **账在进程里、答案在世界外**，
+  这正是 v2.115.0 → v2.131.1 四版「未覆盖」清单里逐字重复过四遍的那一条。
+- **落点（单真源）**：游标落盘 `worldaxis_life_turn_v1` = `{ chatId, turn }`，载入时恢复一次、tick 末写回一次；
+  开关 `crossSession`（默认 **false** ⇒ 老口径逐字保留）。**不落存档**（游标记的是「这一轮从谁开始」，
+  不是世界事实；进存档会跟着导出/导入搬家）。读面：`life.stat()` 多一口 `turnRestored`，
+  `tool-diag` 的 life 节补 `lastTurn` / `turnRestored` / `crossSession`，面板「结算」输出带「轮转起点 N(续)」。
+  **全程零新增导出**（为读一个量新开一口会立刻变成死导出）。
+- **收口期抓出的三个真缺陷（本版最有价值的部分，均不在原计划内）**：
+  1. **`no-localStorage` 结构不可达（拒收码归类）**：新增的 `no-localStorage` 未分类。
+     三次探针实测后**推翻了自己最初的判断**——探针 `/tmp/wa_probe_nols5.js` 实测
+     `settingsBus.read(life 注册项)`：有存储 `{enabled:true,crossSession:true}` / 无存储
+     `{enabled:false,maxPeople:4,maxItems:2}`（`crossSession` 键消失）。据此证明宿主无 localStorage 时
+     settingsBus 读回落 `def` ⇒ `turnCfg()` 必为 false ⇒ `turnStore()` **第一行**就 `disabled`，
+     永远走不到该分支 ⇒ **结构不可达**。按 v2.119.0 死表先例登记进 `DEAD`（8 → **9** 项，带可复算锚点
+     + 不可达推导 + 探针文件名），**不删**（注释写明：与 `write-failed` 是两件事，将来若 `turnCfg()`
+     改读缓存，它是第一道防线，届时 deadLeak 会提醒复活）。同时探针 `/tmp/wa_probe_wf.js` 实测
+     `write-failed` **可达**，遂补可执行见证并从 `reject-code-ledger.json` 的 `base` 回收（231 → 230）。
+  2. **`lifeTurn` 家族单列（新键落错家族、污染体检读数）**：`worldaxis_life_turn_v1` 原本被判为
+     `settingsUnregistered`（幽灵设置）——后果有二：① 面板体检视图把「进程记忆」显示成「未登记设置 N」；
+     ② 污染 `families.settingsUnregistered` 读数（面板与断言都读）。按 v2.108.0 `recover` 家族先例单列
+     `lifeTurn`，`classifyKey` 里**必须在 settings 兜底之前**判定（顺序有实质意义），`families` /
+     `perFamilyBytes` 两表各加一桶（引 v2.108.0 教训：漏登记会让 `families[cls.family]++` 变 NaN）。
+  3. **`ui-gate-sync` 的扫描面是硬编码七个文件名（同型教训第二次现形）**：`engines/life.js` 新增
+     `noteRead('lifeTurn', …)` 却不在清单里 ⇒ `lifeTurn` 在真源键集里**根本不存在**，而三张标签表里
+     贴了标签的那一份反被判成「幽灵键」（**标签正确、判据虚红**——与 v2.114.0 的 audit-log.js 同型）。
+     修法不是「再补一个文件名」（只是把下次踩坑推迟），而是换成**文件面单一真源**
+     `tests/product-files.js` 的 `productFiles()`（v2.43.0 立的规矩），凡新增模块自动进面。
+     同时给 `core/store.js` 的 `LAB` / `ui/panel.js` 的 `LAB_P` 补 `lifeTurn` 标签（三份真源同键集）。
+- **两条「代理判据」的收窄（本版纪律：判据要钉在真正的病灶上，不钉在代理量上）**：
+  `tests/run.js` 与 `tests/life-turn-v2132.js` 原用「`core/store.js` 全文不含该键字面量」表达
+  「游标不进存档」—— 家族单列后该键**必然**出现在 store.js（家族正则 + 家族桶），代理判据当场失真。
+  收窄为：① `defaultWorldState()` 的返回体里不得出现该键（**世界骨架** = 导出/导入世界的载荷面）；
+  ② store.js 里该键的每一处出现都必须落在**归类面**（任何一处落到别处即现形）。
+- **本段最重要的坐标修正**：上一份交接摘要记「现场 refs 3519」，本段 dry-run **实测为 3521** ——
+  差值 5 全部来自 O19 新代码的产品面引用（`settingsBus.read` ×1 + `store.reportReadFail` ×2 +
+  `store.chatId` ×2）。**教训：不得照抄上一份摘要的读数，必须现场实测**（与仓库「以现场为准、
+  不信文档自评」的纪律一致）。回填工具 `tools/sync-hardcoded.js` 实测：`refs :3514 -> 3521`（3/3 站点，写后校验通过）。
+- **工具行为的两处重要发现（写给下一次用它们的人）**：
+  · `dead-export-gate.js --update` **会丢掉 `_note` 的沿革叙述**（`buildInner` 每次重建只写基础句，
+    沿革段是历次手工追加的）。本次从备份读回旧沿革段与新基础句拼接后再追加新版段，恢复后
+    `_note` 末词 `v2.132.0` / 首词 `v2.132.0` / len 1908。`reject-code-ledger.json` 的沿革同理保全
+    （末词 `v2.132.0` / 首词 `v2.97.0`）。
+  · 本段多次遇到 `create_file` / `edit_file` 报 `Current ROOT unavailable`（sleep 15–60s 后重试恢复）、
+    `edit_file` 需显式传 `environment=linux`、`git diff` 卡 pager（发 `q` 退出）。**不影响产物正确性**，
+    但排障时不要把这类抖动误读成「文件写坏了」——判据是 `node --check` + 落盘字节数。
+- **未覆盖（如实登记，不伪称已完成）**：① **UI 层仍未实机验证**——无头回归不装载 `ui/panel.js`
+  与 `ui/settings.js`，本轮 `LAB_P` 与面板「轮转起点」的改动只证明**契约与绑定在场**，
+  浏览器里是否真的渲染出那行字未验证（沿用 P-实机约定）；② `FOUR_VERSION_PLAN.md` 的复选框
+  仍不可信（X1–X8 实际已于 v2.127.0 交付而文件里仍标 `[ ]`，E 线编号在仓库任何 `.md` 里都 grep 不到）
+  —— 本轮**仍未动该文档**，只做「不照抄文档自评」的裁决，如实留档为欠账；
+  ③ 锚点未识别数由 10 增至 **11**（新增的 `tests/life-turn-v2132.js` 用了 `path.join(BASE, rel)`
+  的**变量形式**，现有 `path-join` 模式只认字面量）—— 如实登记为未识别，**不**为了让数字好看而放宽模式。
+- **门禁结果**：全量回归 **12917 / 0**（较 v2.131.1 的 12828 净增 89：O19 专锁 48 项 + 拒收码/家族/判据收窄相关断言）；
+  `export-contract` 逐字未变（`ns= 142 members= 920 chars= 10508`）；`module-registry-gate` pass
+  （文件 158 / 命名空间 166 / 装载期边 59 / 硬边 0 / 调用期引用 118 / 结构问题 0）；`dead-export-gate` ✓（dead 751 / uiDead 4）；
+  `readings-v2106` pass（58 项）；`reject-code-gate` ✓（608 = 见证 369 + 死表 9 + 基线 230）；
+  `reject-lock-v2780` pass (50)；`docs-archive-gate` ✓（README 94 / 存档 92 / 跨文件同号 0）；
+  `docs/ERROR_CODES.md` 由 `node tools/gen-error-codes.js` 重生成并 `--check` 双向校验通过。
+- **`docs-archive-gate` 的边界（本轮确认，写在条目里备查）**：它的条目正则只认**行首闭合标记**
+  （`- **vX.Y.Z**` / `<b>vX.Y.Z</b>`），正文里的版本号**不计为条目**。本仓 v2.80.0 及之后的口径是
+  「详细条目在 ITERATION_LOG（单一真源），README 只留摘要」，而本版**未往 README 补 v2.131.0 / v2.132.0 条目**
+  —— 这是**有意为之**（补摘要会与「详细条目以日志为准」的口径打架，且 README 的摘要条目计数被门禁钉住）。
+  后续若要补，须先决定口径（是「README 也留 v2.8x 之后的摘要」还是「README 只到 v2.130.0」），**不擅自补**。
+
 ### R117 · 2026-10-01 · v2.131.0：O 线三项落地（O15 回归超时实测驱动 / O16 端到端读数挂门禁 / O18 锚点覆盖 44%→91%）
 - **起点与终点**：起点 v2.130.0（全量回归 12822 / 0，`11ac0e3`）；终点 v2.131.0（全量回归 **12828 / 0**）。
   本版按「先 O 后 E」的优先级（O15/O16 是验证基建 → O18 是治理面覆盖）落地三项，全部以**现场实测**

@@ -1,5 +1,5 @@
 {
- "version": "2.131.0",
+ "version": "2.132.0",
  "loadOrderCount": 161,
  "loadedCount": 158,
  "uiCount": 3,
@@ -7,7 +7,7 @@
  "totals": {
   "loadEdges": 59,
   "hardEdges": 0,
-  "callRefs": 116,
+  "callRefs": 118,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -51,6 +51,7 @@
     "engines/inst.js",
     "engines/kaleidoscope.js",
     "engines/liaison.js",
+    "engines/life.js",
     "engines/memory.js",
     "engines/mend.js",
     "engines/motif.js",
@@ -194,6 +195,7 @@
     "engines/entry-router.js",
     "engines/evolution.js",
     "engines/kaleidoscope.js",
+    "engines/life.js",
     "engines/memory.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
@@ -1252,7 +1254,10 @@
    "requires": [],
    "requiresFiles": [],
    "providerOrderOk": true,
-   "callRefs": [],
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_life_settings_v1"

@@ -289,6 +289,13 @@
         enabled: !!cfg.enabled, maxPeople: cfg.maxPeople, maxItems: cfg.maxItems,
         ticks: st.ticks || 0, changed: st.changed || 0, blocked: st.blocked || 0,
         lastReason: st.lastReason || '', lastAt: st.lastAt || 0,
+        // v2.132.0（O19）：游标三口读数进诊断面。
+        //   为什么必须报：这是一个**只可观测才能判得清对错**的量 ——
+        //   「跨会话延续了吗」在面板与诊断里此前都是空白，于是「延续」与「每次都从 0 开始」
+        //   两件事长得一模一样（本仓的老病：账在进程里、答案在世界外）。
+        lastTurn: isFinite(Number(st.lastTurn)) ? Number(st.lastTurn) : 0,
+        turnRestored: st.turnRestored === true,
+        crossSession: cfg.crossSession === true,
         actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       };
     });
@@ -2801,7 +2808,13 @@
         //   两处已补投 store.reportReadFail（与 chatcache 同一条出口），故此处必须同步贴标签：
         //   漏进本表 = 消费端退回裸桶名，等于把「读失败静默」换成「读失败可读但读不懂」。
         auditlogFlush: '审计日志落盘前的历史读回（读失败 ⇒ 按「无历史」重建，磁盘前缀可能被覆盖）',
-        auditlogRestore: '审计日志历史读回（读失败 ⇒ 与「本次会话没有历史」同形）'
+        auditlogRestore: '审计日志历史读回（读失败 ⇒ 与「本次会话没有历史」同形）',
+        // v2.132.0（O19）: 跨会话轮转游标的读回（life.turnLoad 的 JSON 解析失败）。
+        //   漏进本表 = 消费端退回裸桶名，读者只看到 `lifeTurn×1` 而不知其后果。
+        //   为什么这条**必须可读**：读失败时本模块如实答「本会话从 0 开始」（**不回落**是
+        //   刻意设计），而那与「真的从 0 开始」在面板与诊断上同形 —— 标签就是那个唯一的分辨口
+        //   （「游标读不出来 ⇒ 这一轮从谁开始是猜的」，与「游标本来就是 0」是两件事）。
+        lifeTurn: '跨会话轮转游标读回（读失败 ⇒ 本会话轮转起点按 0 计，与「真的从 0 开始」同形）'
       };
       const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
         .map(function (k) { return (SRC_LABEL[k] || k) + '×' + byS[k]; }).join('、');

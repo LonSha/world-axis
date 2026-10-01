@@ -116,6 +116,23 @@ const DEAD = {
       + '穷举验证（/tmp/diag7.js）：registerMigration(-2..0) 全返回 missing-fields；'
       + 'migrate({worldaxisCheckpoint:0}) 返回 no-migration。不删：将来若新增 format 2 与相应迁移，'
       + '它是第一道防线（届时本门禁会以 deadLeak 提醒「该码可能复活」）。'
+  },
+  'no-localStorage': {
+    anchor: "const w = win(); if (!w || !w.localStorage) return { ok: false, reason: 'no-localStorage' };",
+    why: 'life.turnStore（v2.132.0 O19）的「宿主没有 localStorage」出口，在现有设计下'
+      + '**结构上不可达**：进入该行的前提是 `turnCfg()` 已返回 true，而 `turnCfg()` 读的是'
+      + '`settingsBus.read(TURN_REG)` —— 与 `win()` 同一个真源（core/settings-bus.js 全库 10 处'
+      + '统一写作 `(WA.mainWin || window).localStorage`）。宿主没有 localStorage 时，'
+      + 'settingsBus 读不到盘、回落登记项的 `def`（`{ crossSession: false }`）⇒ `turnCfg()` 必为 false'
+      + '⇒ `turnStore()` 在**第一行**就以 `disabled` 返回，永远走不到本码。'
+      + '实测（/tmp/wa_probe_nols5.js）：把 `WA.mainWin` 换成 `{}` 后，'
+      + '`settingsBus.read(life 注册项)` 由 `{enabled:true,crossSession:true}` 变为'
+      + '`{enabled:false,maxPeople:4,maxItems:2}`（crossSession 键消失）；'
+      + '另一探针（/tmp/wa_probe_nols4.js，先写盘开双开关再摘掉宿主存储）给出的 tick 仍是'
+      + '`reason:"disabled"` —— 两向都指回同一个前置闸。'
+      + '不删：它与 `write-failed` 是**两件事**（「根本没落盘能力」vs「有盘但写失败」），'
+      + '将来若 `turnCfg()` 改为读缓存/内存镜像（不再依赖宿主存储），它是第一道防线；'
+      + '届时本门禁会以 deadLeak 提醒「该码可能复活」。'
   }
 };
 
@@ -296,6 +313,26 @@ function runWitness(WA) {
   trip('time-conflict', function () {
     Lf.addSchedule('__W_人间', { activity: '巡逻', start: 0, end: 100 });
     return [Lf.addSchedule('__W_人间', { activity: '巡逻2', start: 50, end: 150 }).reason]; });
+  // v2.132.0（O19）：跨会话轮转游标的落盘失败出口 —— 新增码，故必须带可执行见证。
+  //   为什么它是**现网会发生的局面**（而非死表）：配额写满 / 隐私模式下的 setItem 抛错
+  //   是本仓已有先例（auditLog 的 flush-failed 走的就是这条）。
+  //   打桩方式与 auditLog 段同规格：临时替换 `WA.mainWin`（`win()` 与 settingsBus 的真源
+  //   都是 `(WA.mainWin || window).localStorage`），跑完**无条件还原** —— 宿主态跨 section 共享。
+  //   要点：这盏桩必须**同时**让 `getItem` 读出 `crossSession:true`（否则 `turnCfg()` 为假，
+  //   首行就以 disabled 返回、跑不到写分支），并让 `setItem` 抛错 —— 一个桩管住两个条件。
+  want('write-failed', 'life.tick：游标落盘时 setItem 抛错 ⇒ 吞成 write-failed 并如实进返回值'
+    + '（不假装落盘成功，也不让异常穿出去把调用方搞挂；v2.132.0 O19）');
+  trip('write-failed', function () {
+    const keepWin = WA.mainWin;
+    WA.mainWin = { localStorage: {
+      getItem: function (k) { return k === 'worldaxis_life_settings_v1'
+        ? JSON.stringify({ enabled: true, crossSession: true }) : null; },
+      setItem: function () { throw new Error('witness quota exceeded'); },
+      removeItem: function () {}, key: function () { return null; }, length: 0
+    } };
+    try { return [Lf.tick({ now: 30 }).turn.reason]; }
+    finally { WA.mainWin = keepWin; }
+  });
 
   // ── engines/causal.js ──
   want('missing-fields', 'causal 必填字段缺失');

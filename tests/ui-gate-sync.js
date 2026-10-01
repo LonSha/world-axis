@@ -269,7 +269,18 @@ function checkSrcMaps(opts) {
   //   就会在该表里被判成「幽灵键」（判据的输入面与结论面必须同宽）。v2.114.0 现场踩到：
   //   core/audit-log.js 投了 auditlogFlush / auditlogRestore 两个来源，但它不在本清单里，
   //   于是 LAB / SRC_LABEL 两处**都贴了标签**却被判成幽灵键（标签正确、判据虚红）。
-  ['index.js', 'core/workflow.js', 'core/audit-log.js', 'engines/worldbook.js', 'engines/chatcache.js', 'engines/tool-diag.js', 'render/inject.js'].forEach(function (f) {
+  //   v2.132.0（O19）: 这份清单此前是**硬编码的七个文件名**，于是同一条「扫描面与结论面
+  //   必须同宽」的教训**第二次**现形——`engines/life.js` 新增了一处
+  //   `noteRead('lifeTurn', …)`（跨会话轮转游标的读回归因），它不在清单里，于是
+  //   `lifeTurn` 在真源键集里**根本不存在**，而三张标签表里贴了标签的那一份反被判成
+  //   「幽灵键」（标签正确、判据虚红——与 v2.114.0 的 audit-log.js 同型）。
+  //   修法不是「再往清单里补一个文件名」（那只是把下一次踩坑推迟），而是**把清单换成
+  //   文件面单一真源**：`tests/product-files.js` 的 `productFiles()` 已经是全仓产品文件的
+  //   唯一出处（v2.43.0 立的规矩），凡新增模块一律自动进入扫描面。
+  //   边界（如实登记）：`productFiles()` 排除 `tests/` 与 `tools/` —— 与 LAB_P / LAB /
+  //   SRC_LABEL 三张表的消费面（产品面）同宽，正是判据要的输入面。
+  const _pfFiles = require('./product-files.js').productFiles();
+  _pfFiles.forEach(function (f) {
     const t = _wdRead(f, ov);
     const RX = /report(?:Host)?ReadFail\(\s*'([^']+)'/g; let mm;
     while ((mm = RX.exec(t))) if (stTags.indexOf(mm[1]) < 0) stTags.push(mm[1]);
