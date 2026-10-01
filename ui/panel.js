@@ -5380,7 +5380,16 @@
       if (r.applied) renderBody();
     });
     on('#wa-inj-diag', () => {
-      const toolTab = panelEl.querySelectorAll('.wa-tab').filter(t => t.dataset.page === 'tools')[0];
+      // v2.137.0（O14）：`querySelectorAll` 返回 **NodeList**（有 forEach、**没有 filter**）。
+      //   本行原写 `.filter(...)` —— 在 mini-DOM 里能过是因为替身的 `qsa()` 返回的是**普通数组**，
+      //   而真浏览器里这条链一律抛 `TypeError: ...querySelectorAll(...).filter is not a function`，
+      //   于是「注入诊断」按钮（把用户送到工具页并点「跑诊断」的那一枚）在真机上**点了没反应**。
+      //   这不是排版问题，是控件功能整体不可达 —— 而它此前从未被任何门禁看见：
+      //   mini-DOM 的数组返回值把该形态**结构性隐身**了（同族：v2.40.0 的陈旧常量、v2.42.0 的副本清单）。
+      //   处置：改 `Array.prototype.filter.call`（对数组与 NodeList 同时成立，不依赖调用面类型），
+      //   并把该形态升格成检测面（tests/ui-live-v2137.js 的静态锁）—— 形态本身从此有人守。
+      const toolTab = Array.prototype.filter.call(panelEl.querySelectorAll('.wa-tab'),
+        t => t.dataset.page === 'tools')[0];
       if (toolTab) toolTab.click();
       const btn = $('#wa-diag-run'); if (btn) btn.click();
     });

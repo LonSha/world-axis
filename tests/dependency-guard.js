@@ -43,6 +43,20 @@ const OPTIONAL_DEPS = [
     affects: ['v2.2.0 块3/4/5/6/8 端到端', 'v2.3.0 块3 泳道区端到端', 'v2.5.0 块5 面板端到端',
       'v2.6.0 块5/块7 设置键页端到端'],
     siteNeedle: "require('jsdom')"
+  },
+  {
+    name: 'playwright-core',
+    reason: 'UI 实机验证通道（tests/ui-live.js）。真浏览器 + 真 localStorage 才能证伪'
+      + '「点击抛不抛 / 存住了没有」这两类结论 —— 而它同样是开发机上的临时安装'
+      + '（/tmp/node_modules）+ 缓存的浏览器可执行文件，别人机器上不存在。'
+      + '本仓零 npm 依赖，故它**不得**成为回归的必需项。',
+    fallback: '测试面 mini-DOM 静态判据（tests/ui-dom.js + tests/ui-gate.js 的 53 项）+'
+      + ' tests/ui-live.js 自带的 C 面静态锁（querySelectorAll 链形态，无需浏览器）',
+    fallbackProof: 'tests/ui-live.js 的 probe() 三档：驱动不可达 / 浏览器缺失 ⇒ tier=fallback；'
+      + ' 两种情况下 run.js 打印降档理由、静态锁照跑',
+    affects: ['v2.137.0（O14）UI 实机验证通道', '控件点击可达性（728 个真实控件）',
+      '设置往返一致性（真 localStorage 落盘 + 产品读回）'],
+    siteNeedle: "'playwright-core'"
   }
 ];
 

@@ -79,7 +79,12 @@ const TIMEOUT_ARMED = {
   'field-liveness-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'module-registry-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'isolated-runner-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'ui-gate-2136': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'ui-gate-2136': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.137.0（O14）：UI 实机通道的调用点。**它比 ui-gate.js 重一档**——后者是 mini-DOM 上的
+  //   端到端（~12s），前者要真起 Chromium 跑 9 轮（1 轮原版 + C1/C2/C3/C4 各一轮破坏 + 每轮
+  //   还夹一轮原版对照），实测约 60s。预算仍走统一值 96000ms（口径一：统一预算不许逐道紧贴），
+  //   但把 raw 实测登记进 GATES 供 coherence() 自洽核对（96000 ≥ 60000×? 见 GATES 条目）。
+  'ui-live-2137': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -121,7 +126,10 @@ const ARMED_SITES = [
   // v2.136.0（O16 A3）：tests/ui-gate.js 从「从未被 run.js 挂过」改为**真跑** —— 新开的
   //   子进程调用点必须一并入表，否则它正是本模块治的病（无预算的静默挂起路径）。
   { key: 'ui-gate-2136', mode: 'spawn',
-    anchor: "const rUG2136 = require('child_process').spawnSync(process.execPath, [path.join('tests', 'ui-gate.js')]," }
+    anchor: "const rUG2136 = require('child_process').spawnSync(process.execPath, [path.join('tests', 'ui-gate.js')]," },
+  // v2.137.0（O14）：UI 实机验证通道的调用点。登记**锚点**（整行行首片段，run.js 里恰 1 次）。
+  { key: 'ui-live-2137', mode: 'spawn',
+    anchor: "const rUL2137 = require('child_process').spawnSync(process.execPath, ['tests/ui-live-v2137.js']," }
 ];
 
 /**
