@@ -19,7 +19,7 @@
 //   ③ 入口存在：`--self-test`（selfTest）/ `require.main` 守卫（cli）/
 //      纯脚本体（script：无 module.exports 且零绝对路径字面量）三档之一；
 //      三者皆无（bare）⇒ 报红。
-//      「零绝对路径」这一条是运行质量的实义面：候选树不在 /tmp/wa_git，
+//      「零绝对路径」这一条是运行质量的实义面：候选树是 isolated-runner 造的临时副本，
 //      脚本里写死绝对路径 ⇒ 它 require 的是**别的仓库**（测错对象）。
 //
 // 【单一真源】入口判据（ENTRY_SELFTEST / ENTRY_CLI）、引用判据（CODE_KINDS）、
@@ -134,7 +134,7 @@ function scanTool(rel, opt) {
     });
   });
   // 绝对路径字面量**必须逐行判、排注释行**（v2.136.0 收口期实测抓出的第三条自身缺陷）：
-  //   修 diag_inject 的同一轮里，本判据把它**注释里**引用的历史路径 `'/tmp/wa_git/...'` 也算成了
+  //   修 diag_inject 的同一轮里，本判据把它**注释里**引用的历史绝对路径也算成了
   //   活字面量 ⇒ 一条假红。本仓对「取值面」的既有口径就是「注释行门」（v2.131.0 O16 判据、
   //   ui-wire-audit 同款）：解释病灶的文字不是病灶。
   const absLines = [];
@@ -259,6 +259,9 @@ function selfTest(opt) {
   const os = require('os');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wa2136-tc-'));
   const fails = [];
+  // v2.136.0 修：夹具里的绝对路径**由运行时构造**（判据自身不含字面量）——
+  //   v2.41.0 的测试面判据按行扫 .js 源码字面量，写死一处即被计为无移植性的死路径。
+  const absDir = os.tmpdir();
   const mk = function (rel, text) {
     const p = path.join(tmp, rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -268,7 +271,7 @@ function selfTest(opt) {
   mk('tools/self.js', "'use strict';\n// --self-test\nconsole.log(1);\n");
   mk('tools/guarded.js', "'use strict';\nif (require.main === module) console.log(1);\nmodule.exports = { a: 1 };\n");
   mk('tools/plain.js', "'use strict';\nconsole.log('纯脚本体');\n");
-  mk('tools/abs.js', "'use strict';\nrequire('/tmp/wa_git/x.js');\n");
+  mk('tools/abs.js', "'use strict';\nrequire('" + absDir + "/x.js');\n");
   mk('tools/bare.js', "'use strict';\nmodule.exports = { b: 1 };\n");
   mk('tests/use.js', "'use strict';\nconst a = require('../tools/guarded.js');\n// tools/plain.js 见下\n");
   const files = textFiles(tmp);
@@ -283,7 +286,7 @@ function selfTest(opt) {
   });
   if (!sc('tools/abs.js').absLiteral) fails.push('绝对路径字面量未被认出');
   // 注释行门：历史叙述里引用的绝对路径不得被当成活字面量（v2.136.0 实测形态）
-  mk('tools/cmtabs.js', "'use strict';\n// 当年用 require('/tmp/wa_git/x.js') 跑过\nconsole.log(2);\n");
+  mk('tools/cmtabs.js', "'use strict';\n// 当年用 require('" + absDir + "/x.js') 跑过\nconsole.log(2);\n");
   const cmtFiles = textFiles(tmp);
   const cmt = scanTool('tools/cmtabs.js', { root: tmp, files: cmtFiles });
   if (cmt.absLiteral) fails.push('注释行里的绝对路径被误算（假阳）');

@@ -19303,14 +19303,14 @@ assert(r2900.dead.length === 757 && r2900.uiDead.length === 4 && r2900.dataOnly.
   }
 
   // ── v2.105.0（计划一 #3）：门禁超时熔断 —— 「门禁会不会卡死」不该是一条没有读数的命题 ──
-  //   治的病：run.js 的 10 个 spawnSync 调用点此前**无一**声明 timeout（唯一的兜底是外层
+  //   治的病：run.js 的每个 spawnSync 调用点此前**无一**声明 timeout（唯一的兜底是外层
   //   isolated-runner 的 10 分钟 SIGKILL，而全量回归实测 6~8 分钟 ⇒ 余量不足一倍）；
   //   真被强杀时日志里只剩一行 "Status: runner-failed"，卡在哪一道门禁、卡死前最后说了
   //   什么，全部丢失 —— 这三件事正是本版要变成**读数**的东西。
   //   阈值口径：**不许照抄计划里的 3s / 20s / 5s** —— 实测最重门禁 12s、export-contract 0.58s，
   //   故预算 =「最重那道门禁实测 × 8」= 96000ms，全表统一（多一档就多一处会漂移的地方；
   //   本版第一次落盘正是「表算 96s、现场写 90s」两套预算并存，故把自洽钉成可调用判据）。
-  section('v2.105.0（计划一 #3）：门禁超时熔断（10 个调用点全部武装 + 卡死取证块 + 逐站点现场核对）');
+  section('v2.105.0（计划一 #3）：门禁超时熔断（现场调用点全部武装 + 卡死取证块 + 逐站点现场核对）');
   {
     const gt = require('./gate-timeout.js');
     const d = gt.discover();
@@ -19346,6 +19346,13 @@ assert(r2900.dead.length === 757 && r2900.uiDead.length === 4 && r2900.dataOnly.
     assert(unarmed.length === 0,
       'v2105: 每个调用点**自己的**整段 options 里都有 timeout（缺的：'
       + ((unarmed.map(function (s) { return s.key; }).join(',')) || '无') + '）——病根是否复发就看这一条');
+    // v2.136.0 补：**现场调用点块数 = 武装表条数**。原判据只比两张表
+    //   （armedCount vs sites.length），抓不到「run.js 新开一个子进程调用点却没入表」
+    //   —— 本版给 tests/ui-gate.js 造调用点时正是这个形态（现场 11 / 表 10）。
+    //   留一个没登记的调用点 = 留一条静默挂起的路径。
+    assert(gt.parseCallBlocks(runSrc).length === Object.keys(gt.TIMEOUT_ARMED).length,
+      'v2105: 现场调用点块数 = 武装表条数（' + gt.parseCallBlocks(runSrc).length + ' vs '
+      + Object.keys(gt.TIMEOUT_ARMED).length + '）—— 新开的调用点不入表即红');
     const fuse = gt.findSiteBlock(runSrc, gt.ARMED_SITES[3].anchor);
     assert(!!fuse && fuse.text.indexOf(String(d.limits.shellMs) + ' tar') > 0 && fuse.text.indexOf('-k ') > 0,
       'v2105: 管道形态的调用点另有 `timeout -k <grace> ' + d.limits.shellMs + ' tar` 保险丝'
@@ -20355,7 +20362,7 @@ assert(r2900.dead.length === 757 && r2900.uiDead.length === 4 && r2900.dataOnly.
     // tests/ui-gate.js 必须**真被执行**（不是文件在场）：按 v2.83.0 / v2.84.0 惯例在子进程里跑，
     //   真进程、真退出码、真汇总行。它用 ~12s 换 53 项 UI 渲染路径断言（含 728 个真实控件点击）。
     const rUG2136 = require('child_process').spawnSync(process.execPath, [path.join('tests', 'ui-gate.js')],
-      { cwd: BASE, encoding: 'utf8', timeout: 240000 });
+      { cwd: BASE, encoding: 'utf8', timeout: 96000 });
     const outUG2136 = String(rUG2136.stdout || '');
     const mUG2136 = outUG2136.match(/通过 (\d+) \/ 失败 (\d+)/);
     assert(rUG2136.status === 0,

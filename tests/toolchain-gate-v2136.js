@@ -113,7 +113,7 @@ function runA(a) {
   a(s.indexOf('ENTRY_SELFTEST') > 0 && s.indexOf('ENTRY_CLI') > 0 && s.indexOf('ENTRY_EXPORTS') > 0,
     'v2136/A4: 入口三档常量就位（--self-test / require.main / module.exports）');
   a(s.indexOf('module.exports = {') > 0, 'v2136/A5: 导出面就位（audit / selfTest / scanTool …）');
-  // A6/A7 只判顶层（行首零缩进）的 require：本锁的 selfTest 夹具里写着 require('/tmp/...')
+  // A6/A7 只判顶层（行首零缩进）的 require：本锁的 selfTest 夹具里写着绝对路径
   //   这类示例串，它们是缩进的字符串字面量，不是门禁的依赖。
   const topReq = [];
   s.split('\n').forEach(function (l) {
@@ -209,7 +209,7 @@ function runC(a) {
     'v2136/C3-d: 同一病灶 + 摘掉该判据 ⇒ kinds 里的 orphan 消失而读数不变（实 kinds ' + JSON.stringify(r3b.kinds) + ' / reach ' + JSON.stringify(r3b.reach) + '）—— 承重判据');
   // C4 注释行门（两向）：注释里写绝对路径不得被算成活字面量
   const dj = src('tools/diag_inject_v2860.js');
-  const djGhost = dj.replace("'use strict';", "'use strict';\n// 历史叙述：当年用 require('/tmp/wa_git/tests/x.js') 跑过");
+  const djGhost = dj.replace("'use strict';", "'use strict';\n// 历史叙述：当年用 require('" + os.tmpdir() + "/wa_git/tests/x.js') 跑过");
   a(djGhost !== dj, 'v2136/C4-a: 病灶真落在副本上');
   const r4a = probeRun({ files: { 'tools/diag_inject_v2860.js': djGhost } });
   a((r4a.absTool || []).indexOf('tools/diag_inject_v2860.js') < 0,

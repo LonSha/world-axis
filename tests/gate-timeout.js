@@ -1,7 +1,7 @@
 // WorldAxis tests/gate-timeout.js (v2.105.0, 计划一 #3) — 「门禁超时熔断」的单一真源
 //
 // 【它治的病】「门禁会卡死」此前是一个**没有任何读数的命题**：
-//   · run.js 里 10 个 spawnSync 调用点（export-contract / dead-export-gate /
+//   · run.js 里 10 个 spawnSync 调用点（v2.136.0 起 11 个）（export-contract / dead-export-gate /
 //     field-liveness-gate / module-registry-gate / isolated-runner-lock / tar / --check …）
 //     **无一**声明 timeout ⇒ 任一门禁 hang 住，整趟回归就静静挂着；
 //   · 唯一的兜底是外层 isolated-runner 的 10 分钟 SIGKILL，而全量回归实测 6~8 分钟
@@ -50,7 +50,7 @@ const RATIOS = { spawn: 8, inline: 4, heavy: 4 };
 
 /**
  * 预算单一真源。
- *   spawnMs  = 最重门禁（dead-export-gate 12s）实测 × 8 —— **全部 10 个调用点共用**；
+ *   spawnMs  = 最重门禁（dead-export-gate 12s）实测 × 8 —— **全部调用点共用**（现场数由 siteStats 给出）；
  *   shellMs  = tar 那句的 shell 侧保险丝（240s：它治「永远不返回」，不是「慢」）。
  */
 const GATE_TIMEOUTS = {
@@ -59,7 +59,7 @@ const GATE_TIMEOUTS = {
 };
 
 /**
- * run.js 现场武装表。**10 个调用点全部入表**（病根就在「无一声明 timeout」，
+ * run.js 现场武装表。**现场调用点全部入表**（病根就在「无一声明 timeout」，
  *   留一个就是留一条静默挂起的路径）。
  *   `mode` 说明该点的形态：
  *     spawn = 主体是 node 门禁/自锁/副本；
@@ -78,7 +78,8 @@ const TIMEOUT_ARMED = {
   'negative-probe-v2410': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   'field-liveness-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'module-registry-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'isolated-runner-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'isolated-runner-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'ui-gate-2136': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -116,7 +117,11 @@ const ARMED_SITES = [
   { key: 'module-registry-gate', mode: 'spawn',
     anchor: "const rG2830 = cp2830.spawnSync(process.execPath, ['tests/module-registry-gate.js']," },
   { key: 'isolated-runner-lock', mode: 'spawn',
-    anchor: "const rI2840 = cp2840.spawnSync(process.execPath, ['tests/isolated-runner-lock.js']," }
+    anchor: "const rI2840 = cp2840.spawnSync(process.execPath, ['tests/isolated-runner-lock.js']," },
+  // v2.136.0（O16 A3）：tests/ui-gate.js 从「从未被 run.js 挂过」改为**真跑** —— 新开的
+  //   子进程调用点必须一并入表，否则它正是本模块治的病（无预算的静默挂起路径）。
+  { key: 'ui-gate-2136', mode: 'spawn',
+    anchor: "const rUG2136 = require('child_process').spawnSync(process.execPath, [path.join('tests', 'ui-gate.js')]," }
 ];
 
 /**
@@ -208,7 +213,8 @@ const GATES = [
   { key: 'export-contract-external', rel: 'tests/export-contract.js', argv: ['<repo>/tests/export-contract.js'], kind: 'spawn', raw: 600, why: '非仓库根 cwd 下跑生成器（cwd 由调用方给）' },
   { key: 'tar-copy', rel: '', argv: ['sh', '-c', 'timeout -k 5 240 tar --exclude=.git -cf - . | (cd <tmp> && tar -xf -)'], kind: 'spawn+shell', raw: 100, why: '仓库副本（外部命令；另有 240s 的 shell 侧保险丝）' },
   { key: 'negative-probe-v2410', rel: 'tests/inventory.js', argv: ['<tmp>/notdir.js'], kind: 'heavy', raw: 700, why: 'v2.41.0 负向自证：BASE 指向不存在目录 ⇒ 非零退出' },
-  { key: 'syntax-check', rel: 'tests/run.js', argv: ['--check', '<副本>/tests/run.js'], kind: 'spawn-only', raw: 120, why: '破坏副本的语法校验（node --check 读全文件）' }
+  { key: 'syntax-check', rel: 'tests/run.js', argv: ['--check', '<副本>/tests/run.js'], kind: 'spawn-only', raw: 120, why: '破坏副本的语法校验（node --check 读全文件）' },
+  { key: 'ui-gate-2136', rel: 'tests/ui-gate.js', argv: ['tests/ui-gate.js'], kind: 'spawn', raw: 12000, why: 'UI 渲染路径门禁（真装载 ui/panel.js + 728 个真实控件点击）' }
 ];
 
 /** 逐门禁建议上限（仅作证据／自洽判据，不参与 run.js 现场武装）。 */
@@ -291,7 +297,7 @@ function coherenceSummary(table) {
 }
 
 /**
- * spawnSync 的 options 片段。**10 个调用点全部返回对象**（本版的主口径：
+ * spawnSync 的 options 片段。**现场调用点全部返回对象**（本版的主口径：
  *   不留任何一个没有 timeout 的调用点）。带 killSignal 的点用 SIGKILL，
  *   否则默认 SIGTERM——子进程理论上可以忽略，故出口三处显式给 SIGKILL。
  */

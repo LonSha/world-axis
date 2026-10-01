@@ -74,6 +74,9 @@ const ANCHORS = {
 // ── 破坏形态（一律「条件置假」：把预算改小、把计数改错，而不是删掉判据本身）──
 const BREAK_HEAD = "  spawnMs: 1,";
 const BREAK_ARMED = "  let armed = -10;";
+/** BREAK_ARMED 相对 ARMED_TXT 的偏移量（-10）—— N7 的不变式要的是「破坏前后差 = 这个数」，
+ *   而不是「破坏后恰好 0」：后者只在现场恰好 10 处时成立（v2.136.0 实测踩到）。 */
+const ARMED_SHIFT = Number(BREAK_ARMED.replace(/[^-\d]/g, '')) - Number(ARMED_TXT.replace(/[^-\d]/g, ''));
 
 /** run.js 现场逐站点核对（主判据；正控与负控共用同一份实现） */
 function locateOptions(block, name) {
@@ -148,9 +151,12 @@ function runAll(a) {
   a(gt.GATE_TIMEOUTS.spawnMs === 96000,
     'A4 单一真源：现场所有调用点只读一个预算（' + gt.GATE_TIMEOUTS.spawnMs + 'ms）——留第二档就是留一处会漂移的地方');
   a(d.coherence.length === 0, 'A5 自洽：' + d.coherenceSummary);
-  a(d.siteStats.sites === 10 && d.siteStats.armedSites === 10 && d.siteStats.budget === 10,
+  // v2.136.0 修：原写死 `10` —— 现场数变 11 就假红。判据要答的是「三数相等且与现场同宽」，
+  //   不是「现场恰好 10 个」。（硬编码读数的第二副本，与 A10/B13/N2/N7/N10 同族。）
+  a(d.siteStats.sites === gt.ARMED_SITES.length && d.siteStats.armedSites === d.siteStats.sites
+    && d.siteStats.budget === d.siteStats.sites,
     'A6 现场读数 调用点/武装点/预算处 = ' + d.siteStats.sites + '/' + d.siteStats.armedSites + '/' + d.siteStats.budget
-    + '（三者相等才叫「10 个调用点一个不漏」）');
+    + '（三者相等且与站点清单同宽 ' + gt.ARMED_SITES.length + ' —— 一个调用点一个不漏）');
   a(typeof d.summary === 'string' && d.summary.indexOf('全部有 timeout') >= 0,
     'A7 汇总口径自述：「' + d.summary.slice(0, 46) + '…」');
 
@@ -173,7 +179,7 @@ function runAll(a) {
   a(rd.every(function (r) { return r.span >= 1; }) &&
     anchored.every(function (l) { return blockLines.indexOf(l) >= 0; }) &&
     anchored.every(function (l, i) { return i === 0 || l > anchored[i - 1]; }),
-    'A10 十个站点行号逐个落在真实调用点块上且严格递增（' + anchored.join(',')
+    'A10 ' + rd.length + ' 个站点行号逐个落在真实调用点块上且严格递增（' + anchored.join(',')
     + '；调用点块 ' + blockLines.length + ' 个）—— 不写死行号：写死一份，上方插一行就假红');
 
   // 判据纯度（H5：负控代码块内锚点字面量只准声明一次，判据不得引用锚点串）
@@ -187,6 +193,12 @@ function runAll(a) {
 
   a(rd.length === gt.ARMED_SITES.length && gt.ARMED_SITES.length === Object.keys(gt.TIMEOUT_ARMED).length,
     'A13 站点清单与武装表数量一致（' + gt.ARMED_SITES.length + ' vs ' + Object.keys(gt.TIMEOUT_ARMED).length + '）——两张表各说一套时，逐站点核对与「入表了却没人核」会同时发生');
+  // A13b 现场调用点块数 = 武装表条数（**新开的调用点不入表即红**）。
+  //   A13 只比两张**表**，现场多出来的调用点它抓不到 —— 本版给 tests/ui-gate.js
+  //   造调用点时正是这个形态（现场 11 / 表 10）。
+  a(gt.siteStats(runSrc).sites === Object.keys(gt.TIMEOUT_ARMED).length,
+    'A13b 现场调用点块数 = 武装表条数（' + gt.siteStats(runSrc).sites + ' vs '
+    + Object.keys(gt.TIMEOUT_ARMED).length + '）—— 新开的调用点不入表即红');
   const mc = gt.modeCounts();
   a(mc.spawn >= 6 && mc['spawn+shell'] === 1 && mc['spawn-only'] === 1,
     'A14 三档形态齐备（' + JSON.stringify(mc) + '）——外部命令形态不许被静默抹平成普通 spawn');
@@ -225,11 +237,16 @@ function runAll(a) {
     'B9 tailLines 空输入返回 []（不是 [\'\']）、短输入不补空行');
   a(gt.siteStats('').sites === 0 && gt.siteStats('').budget === 0,
     'B10 空源码的现场读数全 0（配 N10 一起看：病根可被读数抓到）');
-  a(rd.every(function (r) { return r.ms === 96000; }), 'B11 现场每处调用点的预算都是统一真源值（10/10）');
+  a(rd.every(function (r) { return r.ms === gt.GATE_TIMEOUTS.spawnMs; }),
+    'B11 现场每处调用点的预算都是统一真源值（'
+    + rd.filter(function (r) { return r.ms === gt.GATE_TIMEOUTS.spawnMs; }).length + '/' + rd.length + '）');
   a(gt.stripLiterals("a('x(y', z) // )") === 'a("", z) ',
     'B12 剥字面量/注释的解析器是真谓词（实 ' + JSON.stringify(gt.stripLiterals("a('x(y', z) // )")) + '）——括号平衡只看代码面');
-  a(gt.parseCallBlocks(runSrc).length === 10 && gt.findSiteBlock(runSrc, 'const rI2840 = cp2840.spawnSync').span === 2,
-    'B13 括号平衡切块在真源码上成立（10 块；跨行块 span=2）');
+  // v2.136.0 修：块数改现场取数；跨行探针改按**站点 key** 取锚点（不把 run.js 的行首片段写死在锁里）。
+  const irSite = gt.ARMED_SITES.filter(function (s) { return s.key === 'isolated-runner-lock'; })[0];
+  const irBlk = irSite ? gt.findSiteBlock(runSrc, irSite.anchor) : null;
+  a(gt.parseCallBlocks(runSrc).length === gt.ARMED_SITES.length && !!irBlk && irBlk.span === 2,
+    'B13 括号平衡切块在真源码上成立（' + gt.parseCallBlocks(runSrc).length + ' 块；跨行块 span=2）');
 
   // ══════════ C. 不变式 ══════════
   const runBefore = srcOf(RUN_REL);
@@ -268,15 +285,15 @@ function runNegative(a, runSrc, d) {
   a(String(n1b).indexOf('timeout: 96000') >= 0 && checkArmedSites(n1b).length === 1,
     'N1b 别处仍有 timeout 时逐站点判据照样现形（全局存在性口径会漏报，故本锁不用它）');
 
-  // N2 预算紧贴实测 / 大到等于没有超时 ⇒ 现场逐站点核对器两向现形（10 处都要现形）
+  // N2 预算紧贴实测 / 大到等于没有超时 ⇒ 现场逐站点核对器两向现形（每一处都要现形）
   const n2Src = runSrc.split('timeout: 96000').join('timeout: 10');
   const n2 = checkArmedSites(n2Src);
-  a(n2.length === 10 && n2.every(function (x) { return x.kind === 'value-mismatch'; }),
-    'N2 预算改成 10ms ⇒ 10 处逐站点全部现形（实 ' + n2.length + ' 条 value-mismatch）');
+  a(n2.length === gt.ARMED_SITES.length && n2.every(function (x) { return x.kind === 'value-mismatch'; }),
+    'N2 预算改成 10ms ⇒ ' + gt.ARMED_SITES.length + ' 处逐站点全部现形（实 ' + n2.length + ' 条 value-mismatch）');
   const n2bSrc = runSrc.split('timeout: 96000').join('timeout: 9999999');
   const n2b = checkArmedSites(n2bSrc);
-  a(n2b.length === 10 && n2b.every(function (x) { return x.kind === 'value-mismatch'; }),
-    'N2b 预算改成 9999999ms ⇒ 同样 10 处现形（实 ' + n2b.length + ' 条）——两向都不是恒真');
+  a(n2b.length === gt.ARMED_SITES.length && n2b.every(function (x) { return x.kind === 'value-mismatch'; }),
+    'N2b 预算改成 9999999ms ⇒ 同样 ' + gt.ARMED_SITES.length + ' 处现形（实 ' + n2b.length + ' 条）——两向都不是恒真');
 
   // N3 破坏副本模块：预算改成 1ms ⇒ 同款自洽判据给出不同答案
   must1(modSrc, MEASURED_TXT, 'n3');
@@ -318,8 +335,10 @@ function runNegative(a, runSrc, d) {
   must1(modSrc, ARMED_TXT, 'n7');
   const b7 = loadBroken(modSrc.replace(ARMED_TXT, BREAK_ARMED));
   const st7 = b7.siteStats(srcOf(RUN_REL));
-  a(st7.armedSites === 0 && gt.siteStats(srcOf(RUN_REL)).armedSites === 10,
-    'N7 把现场武装计数起点改错（10 → -10）⇒ 读数当场变 0（破坏副本 ' + st7.armedSites + ' / 原版 ' + gt.siteStats(srcOf(RUN_REL)).armedSites + '）'
+  const st7orig = gt.siteStats(srcOf(RUN_REL)).armedSites;
+  a(ARMED_SHIFT === -10 && st7.armedSites === st7orig + ARMED_SHIFT
+    && st7orig === gt.ARMED_SITES.length,
+"N7 把现场武装计数起点改错（武装计数起点偏移 " + ARMED_SHIFT + "）⇒ 读数比原版少同样多（破坏副本 " + st7.armedSites + " / 原版 " + st7orig + "）"
     + ' —— 判据读的是真实行为，不是它自己声明的常量');
 
   // N8 withTimeout 的能力边界如实（非函数 / 非正超时都必须抛，不许静默通过）
@@ -339,10 +358,11 @@ function runNegative(a, runSrc, d) {
   try { process.kill(r.pid, 0); alive = true; } catch (e) { alive = (e.code === 'EPERM'); }
   a(alive === false, 'N9 熔断后直接子进程确实已死（kill 0 探活失败）——熔断不是「接口返回了错而已」');
 
-  // N10 全删 timeout ⇒ 未武装计数 = 全部 10 处，且逐站点核对全部现形
+  // N10 全删 timeout ⇒ 未武装计数 = 全部现场调用点，且逐站点核对全部现形
   const stripped = runSrc.split(/timeout: \d+,?\s*/).join('');
   const st = gt.siteStats(stripped);
-  a(st.armedSites === 0 && st.sites === 10 && checkArmedSites(stripped).length === 10,
+  a(st.armedSites === 0 && st.sites === gt.parseCallBlocks(runSrc).length
+    && checkArmedSites(stripped).length === gt.ARMED_SITES.length,
     'N10 全删 timeout ⇒ 未武装计数 = 全部 ' + st.sites + ' 处、逐站点核对全部现形（病根可被读数抓到）');
 
   console.log('  · v2105 概要：' + JSON.stringify({
