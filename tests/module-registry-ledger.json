@@ -1,13 +1,13 @@
 {
- "version": "2.137.0",
- "loadOrderCount": 162,
- "loadedCount": 159,
+ "version": "2.138.0",
+ "loadOrderCount": 163,
+ "loadedCount": 160,
  "uiCount": 3,
- "nsCount": 167,
+ "nsCount": 168,
  "totals": {
-  "loadEdges": 60,
+  "loadEdges": 62,
   "hardEdges": 0,
-  "callRefs": 120,
+  "callRefs": 124,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -45,10 +45,12 @@
     "engines/direct-event.js",
     "engines/economy.js",
     "engines/enemies.js",
+    "engines/ensemble.js",
     "engines/entry-router.js",
     "engines/evolution.js",
     "engines/foreshadow.js",
     "engines/group-refuse.js",
+    "engines/hazard.js",
     "engines/inst.js",
     "engines/kaleidoscope.js",
     "engines/liaison.js",
@@ -195,6 +197,7 @@
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
+    "engines/hazard.js",
     "engines/kaleidoscope.js",
     "engines/life.js",
     "engines/memory.js",
@@ -231,6 +234,7 @@
     "engines/calendar-custom.js",
     "engines/coop.js",
     "engines/economy.js",
+    "engines/ensemble.js",
     "engines/foreshadow.js",
     "engines/group-refuse.js",
     "engines/inst.js",
@@ -381,6 +385,7 @@
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
+    "engines/hazard.js",
     "engines/kaleidoscope.js",
     "engines/memory.js",
     "engines/opinion.js",
@@ -1753,10 +1758,17 @@
    "ns": [
     "hazard"
    ],
-   "requires": [],
-   "requiresFiles": [],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
    "providerOrderOk": true,
-   "callRefs": [],
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_hazard_settings_v1"
@@ -2576,6 +2588,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_polish_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/ensemble.js": {
+   "ns": [
+    "ensemble"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_ensemble_settings_v1"
    ],
    "consumedBy": []
   },

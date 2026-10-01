@@ -418,7 +418,7 @@ const BROKEN = [
   { key: 'km-notes', rel: 'engines/karma.js', from: A_KM_NOTES, to: "if (WA.evict) WA.evict.array(row.notes, 'karma-unregistered-site');" },
   { key: 'hz-gate', rel: 'engines/hazard.js', from: A_HZ_GATE, to: kill(A_HZ_GATE), hits: 6 },
   { key: 'hz-dup', rel: 'engines/hazard.js', from: A_HZ_DUP, to: kill(A_HZ_DUP) },
-  { key: 'hz-rows', rel: 'engines/hazard.js', from: A_HZ_ROWS, to: kill(A_HZ_ROWS) },
+  { key: 'hz-rows', rel: 'engines/hazard.js', from: A_HZ_ROWS, to: kill(A_HZ_ROWS), hits: 2 },
   { key: 'hz-pending', rel: 'engines/hazard.js', from: A_HZ_PENDING, to: kill(A_HZ_PENDING) },
   { key: 'hz-rand', rel: 'engines/hazard.js', from: A_HZ_RAND, to: 'if (false) { out = { ok: false, reason: "x" }; return; }' },
   { key: 'hz-notpend', rel: 'engines/hazard.js', from: A_HZ_NOTPEND, to: kill(A_HZ_NOTPEND) },

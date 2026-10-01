@@ -149,7 +149,7 @@ function runAll(A) {
 
   // ── B 运行时（现场真跑） ──
   const a = M.audit();
-  A(a.files === 163 && a.aliasFiles === 163 && a.refFiles === 161,
+  A(a.files === 164 && a.aliasFiles === 164 && a.refFiles === 162,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -166,7 +166,7 @@ function runAll(A) {
   //   ⇒ 调用期 1057→1059、总 1094→1096。两条都由现场 diff 逐条核对过，不是「+2 就对了」。
   //   ui/panel.js 的 `perfTrace.bandCompare` 与 tool-diag 同属**同一命名空间同一成员**，
   //   集合去重后只算一条 —— 这也是为什么「文件改了两处、边只多一条」。
-  A(a.edgesLoad === 60 && a.edgesCall === 1185 && a.edgesAll === 1245 && a.identityOk,
+  A(a.edgesLoad === 62 && a.edgesCall === 1191 && a.edgesAll === 1253 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -185,16 +185,33 @@ function runAll(A) {
     + '调用期 1072 → 1125（+53）：五条产注入块的引擎（userlock / rhythm-loop / motif / beat-mask / power-anchor）'
     + '在 render/inject.js 真调 buildBlock；rewriter / storyclock 为旁路；preset-world / request-viewer /'
     + ' wb-search 三条旁路只在 tests/run.js 与 ui/panel.js 接读者。LOAD_ORDER 139 → 149（同十个文件）。'
-    + ' v2.136.0（E6）：新增 engines/foreshadow.js（foreshadow 命名空间）⇒ 文件面 162 → 163、有引用 160 → 161、LOAD_ORDER 161 → 162；装载期边 59 → 60（尾部调 WA.registerModule，registerModule 由 store 提供）；调用期 1178 → 1185（它读 store / clock / inputGuard / settingsBus 四 ns，并经 tool-diag 的诊断节与 render/inject.js 的注入分支各被读一次）；命名空间面：静态提供方 191 → 192、账本 166 → 167、读面 170 → 171。');
-  A(a.edgesLoad >= 20 && a.orderLen === 162,
+    + ' v2.136.0（E6）：新增 engines/foreshadow.js（foreshadow 命名空间）⇒ 文件面 162 → 163、有引用 160 → 161、LOAD_ORDER 161 → 162；装载期边 59 → 60（尾部调 WA.registerModule，registerModule 由 store 提供）；调用期 1178 → 1185（它读 store / clock / inputGuard / settingsBus 四 ns，并经 tool-diag 的诊断节与 render/inject.js 的注入分支各被读一次）；命名空间面：静态提供方 191 → 192、账本 166 → 167、读面 170 → 171。'
+    + ' v2.138.0（E7 + E5）：文件面 163 → 164、有引用 161 → 162、LOAD_ORDER 162 → 163；'
+    + '装载期边 60 → 62、调用期 1185 → 1191、合计 1245 → 1253；命名空间面：静态提供方 192 → 193、'
+    + '账本 167 → 168、读面 171 不变（新增的 apiRouter / inputGuard / workflow 三个 ns 都早已在读面内）。'
+    + ' **逐条 diff（HEAD 树 256aead vs 工作区，只算 (file, ns) 对、集合去重）实测恰好 8 条新增、0 条消失**：'
+    + ' E7 给 engines/hazard.js 加 workflow 节点（chain after / order 13），尾部真调 `WA.workflow.register`'
+    + ' ⇒ +1 装载期边（workflow 由 core/workflow.js 提供，供者 LOAD_ORDER 下标在前，order-violation 仍 0）；'
+    + ' 另有 ui/settings.js → hazard 一条**调用期**边 —— E7 的面板读数行（wa-hzwx-view）真读'
+    + ' hazard.getSettings / hazard.stat，这也是那两个成员从死导出面离场的原因（人真读了）。'
+    + ' E7 自身**没有再添调用期边**：rollAll 新读的 settingsBus（联动开关）与 clock（上轮结算时刻）'
+    + '在基线就已作为 (engines/hazard.js, ns) 对存在（E6 的结算链同读这两个 ns），集合去重后计数不动 ——'
+    + ' 这正与 v2.124.0 记过的「文件改了两处、边只多一条」同款：边是 (file, ns) 对，不是站点数。'
+    + ' E5 新增 engines/ensemble.js（ensemble 命名空间）⇒ 尾部同样调 WA.registerModule'
+    + '（registerModule 由 store 提供）⇒ +1 装载期边；调用期 +5：apiRouter（并发取模型通道）/'
+    + ' clock（超时与耗时刻度）/ inputGuard（入参净化，与 hazard 同款口径）/ settingsBus（配置面）'
+    + ' / __settingsRegs（设置注册槽，全仓同一形态）。合计装载期 +2、调用期 +6、总计 +8 = 实测 8 条，'
+    + ' 恒等式 62 + 1191 = 1253。专锁 tests/ensemble-v2138.js 的 N 面另钉「它零 store.transact / 零 store.patch」'
+    + '（本门禁的 store 边只算 ns 对，读不出这一层；两条判据互补，不互相代替）。');
+  A(a.edgesLoad >= 20 && a.orderLen === 163,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
-  A(a.nsProvided === 192 && a.nsLedger === 167 && a.nsRead === 171,
+  A(a.nsProvided === 193 && a.nsLedger === 168 && a.nsRead === 171,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
-  A(a.deadNs.length === 21, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 22, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

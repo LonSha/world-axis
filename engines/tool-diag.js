@@ -882,6 +882,10 @@
     'engines/rehearse.js': 'preflight', 'engines/archive-hide.js': 'archiveHide',
     'engines/word-budget.js': 'wordBudget', 'engines/binding.js': 'binding',
     'engines/refine.js': 'refine', 'engines/polish.js': 'polish',
+    // v2.138.0（E5）：多模型并发推演与结果仲裁。登记在此 = 该文件缺席时 secModules 会**如实报 missing**。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
+    'engines/ensemble.js': 'ensemble',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1695,6 +1699,11 @@
       // v2.135.0（E6）：伏笔生命周期总开关（同 v2.51.0 理由：渲染 + 绑定 + 守卫登记
       //   三件齐做，否则 id 写错无人发现）。
       'wa-sw-foreshadow',
+      // v2.138.0（E7）：天气→灾害反向联动。两个控件：开关（wa-sw-hazardwx）+ 读数行（wa-hzwx-view）。
+      //   开关**故意不挂 data-sw-ns**（通用通道一律写 enabled，而它管的是 weatherLink ⇒
+      //   会被通用绑定顺手改掉总开关语义），故绑定走 ui/settings.js 里那段专用 onchange；
+      //   本组只保证「渲染 ↔ 守卫登记」成对。读数行随渲染出，同 wa-sw-out 规格。
+      'wa-sw-hazardwx', 'wa-hzwx-view',
       'wa-sw-out',
       'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },

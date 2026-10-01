@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.137.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。\n\n（v2.130.0 · 拓展计划 A1–A4 / B1 / C1 / C2 / D1–D4）本版新增十二个引擎（stale-guard / purify-scope / group-refuse / reasoning / story-tone / calendar-custom / rehearse / archive-hide / word-budget / binding / refine / polish）。其中产注入块的两个（reasoning / storyTone）在 render/inject.js 真调 buildBlock 并各接真读者，故不在冻结面；产持久状态的两个（storyTone.rows / calendarPlan.months）走真实站点挤出，站点与登记表逐键同源。其余十个是旁路能力（拦截 / 变换 / 换算 / 预演 / 预览），由新增的 secStitch2130 诊断节接通产品侧读者；groupGuard 的 detect / isGroup 由面板的群聊读数控件与诊断节接通（产品侧真读者），但两者在定义文件外仍无产品代码引用 ⇒ 仍登记在冻结面（不与 reason 归因混为一谈）。冻结面 682 → 757（新增 76 项：self-only +52 / unwired +24；另有 1 项出冻结面——`store.registryParity` 由 engines/rehearse.js 的 `capability()` 真读 ⇒ test-only 352 → 351）；advisory dataOnly 236 → 241（binding 三层的对象映射形态被算作只读数据成员）。本段由 --update 之外**手工追加**：buildInner 每次重建 _note 只写基础句（这也是 tests/readings-v2106.js 的 N7 负控制所依赖的锚点形态）。\n\n（v2.131.0 · O13/O15/O16/O18）本版两处变动：O13 把 `staleGuard.begin/verdict` 接进 `engines/backstage.js` 的主写路径（发请求前取票、结算写库前校验；拒收即丢弃整份推演结果）⇒ 两项出冻结面（751）；O18 把锚点扫描器的形态面从「只认 ANCHOR* 前缀」宽化到「任意具名锚点常量」。证据面 refs 由 3510 升到 3514（backstage 新增两处调用）。\n\n（v2.132.0 · O19）本版两处变动：① O19 把 life 的轮转游标从进程态升级为盘上态（键 worldaxis_life_turn_v1，开关 crossSession 默认 false、复用既有设置键），engines/life.js 新增 5 处产品面引用（settingsBus.read 1 + store.reportReadFail 2 + store.chatId 2）⇒ 证据面 refs 由 3514 升到 3521；② 新增拒收码 no-localStorage 经实测**结构不可达**（宿主无 localStorage 时 settingsBus 读回落登记项 def ⇒ crossSession 必为 false ⇒ turnStore 首行即 disabled），登记进死表；write-failed 由新增见证跑出、从基线回收。三集划分 608 = 见证 369 / 死表 9 / 基线 230。冻结面 dead 751 / uiDead 4 逐字不变（life.js 未新增导出，游标挂在既有成员 stat() 里）。\n（v2.133.0 · O18 第二刀）本版只动 tools/anchor-scan.js（锚点扫描器的形态表与自证口径），产品源码与拒收码面零改动 —— 故三集划分与冻结面读数逐字不变（608 = 见证 369 / 死表 9 / 基线 230；dead 751 / uiDead 4）。本段台账 version 随入口同步 2.133.0（先例：三本台账与入口同批，见前一轮 O16 沿革）。\n（v2.134.0 · O18 第三刀）本版只动 tools/anchor-scan.js（锚点扫描器的形态表与自证口径），产品源码与拒收码面零改动 —— 故三集划分与冻结面读数逐字不变（608 = 见证 369 / 死表 9 / 基线 230；dead 751 / uiDead 4 / advisory dataOnly 241）。本段沿革由手工追加（先例见前一轮 O16：三本台账与入口同批，且不走 --update）。\n（E6 伏笔生命周期 · 本段沿革由手工追加，不走 --update）本版新增 engines/foreshadow.js（foreshadow 命名空间）并接入产品面六站：render/inject.js 的源表四张（SOURCES / def / SRC_NAME / SRC_MOD_SETTING）与注入分支、ui/panel.js 的 VIS_NAMES、ui/settings.js 的总开关（wa-sw-foreshadow）、engines/inject-budget.js 的 PRIORITY / ACCOUNTS、engines/tool-diag.js 的 MODULE_EXPORTS 与诊断节 secForeshadow。它的 12 个导出里，stat / getSettings / buildBlock / STATUS / ACTIVE / TERMINAL 被诊断节与注入分支真读；track / develop / resolve / recycle / check 与 setSettings 当前只有内部自用或间接调用（settings.js 的总开关走 data-sw-ns 变量间接调 setSettings，静态面看不到归属），故按本仓现行口径登记进冻结面（+6 项：self-only ×5 / unwired ×1）——与 v2.129 / v2.130 二十二个引擎的动作动词同款情形（它们的 setSettings 也全在冻结面）。冻结面 dead 751 → 757（+6）；另有 1 项证据变更：tool-diag.safe 的 own 94 → 95（诊断节多一处调用）。uiDead 4 / advisory dataOnly 241 逐字不变。本段沿革完（v2.136.0 · 本段沿革终）\n（O14 UI 实机验证通道）本版改动全在 tests/ 侧，**冻结面与拒收面均逐字不变**：① 新增 tests/ui-live.js（真浏览器通道：route.fulfill 从磁盘喂源码、真 localStorage 往返、728 控件逐个点）与 tests/ui-live-v2137.js（版本专锁：A 结构面 / B 运行时 / C 负控制五条，每条两向）；② tests/run.js 新增子进程调用点（真跑整套「不是文件在场」）；③ tests/dependency-guard.js 的 OPTIONAL_DEPS 由 1 项扩到 2 项（playwright-core）；④ 产品侧修掉一处活体缺陷（ui/panel.js 的 `#wa-inj-diag`：`querySelectorAll(...).filter(...)` → `Array.prototype.filter.call(...)`）—— 它不新增导出、不改任何导出语义，故 dead / uiDead / advisory 三面不变。（先例：v2.133.0 / v2.134.0 / v2.136.0 三段）。本段沿革完（v2.137.0 · 本段沿革终）收口段实测六项（全部是「判据自己出错」的实证，已固化）：① 升版回填走 tools/sync-e2e-readings.js（8 处）；② 拼装路径 = 让边消失（require 与 spawn 参数改字面量，同步 gate-timeout 锚点）；③ 锚点转义口径决定纯度自核数（clickTry 改单引号成串）；④ N7 的靶必须唯一且就是末次版本词（两本台账各按本本先例收）；⑤ 判据下限随档位（full >= 40 / 非 full >= 29），并把「非 full 档必须带非空降档理由」升格为断言；⑥ 一次全量中断是 proot 下 open 偶发 ENOSYS 导致 node 收尾自断言（环境级 flake，非产品缺陷）。全量回归 13157 / 0。",
-  "version": "2.137.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.138.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。（v2.137.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。\n\n（v2.130.0 · 拓展计划 A1–A4 / B1 / C1 / C2 / D1–D4）本版新增十二个引擎（stale-guard / purify-scope / group-refuse / reasoning / story-tone / calendar-custom / rehearse / archive-hide / word-budget / binding / refine / polish）。其中产注入块的两个（reasoning / storyTone）在 render/inject.js 真调 buildBlock 并各接真读者，故不在冻结面；产持久状态的两个（storyTone.rows / calendarPlan.months）走真实站点挤出，站点与登记表逐键同源。其余十个是旁路能力（拦截 / 变换 / 换算 / 预演 / 预览），由新增的 secStitch2130 诊断节接通产品侧读者；groupGuard 的 detect / isGroup 由面板的群聊读数控件与诊断节接通（产品侧真读者），但两者在定义文件外仍无产品代码引用 ⇒ 仍登记在冻结面（不与 reason 归因混为一谈）。冻结面 682 → 757（新增 76 项：self-only +52 / unwired +24；另有 1 项出冻结面——`store.registryParity` 由 engines/rehearse.js 的 `capability()` 真读 ⇒ test-only 352 → 351）；advisory dataOnly 236 → 241（binding 三层的对象映射形态被算作只读数据成员）。本段由 --update 之外**手工追加**：buildInner 每次重建 _note 只写基础句（这也是 tests/readings-v2106.js 的 N7 负控制所依赖的锚点形态）。\n\n（v2.131.0 · O13/O15/O16/O18）本版两处变动：O13 把 `staleGuard.begin/verdict` 接进 `engines/backstage.js` 的主写路径（发请求前取票、结算写库前校验；拒收即丢弃整份推演结果）⇒ 两项出冻结面（751）；O18 把锚点扫描器的形态面从「只认 ANCHOR* 前缀」宽化到「任意具名锚点常量」。证据面 refs 由 3510 升到 3514（backstage 新增两处调用）。\n\n（v2.132.0 · O19）本版两处变动：① O19 把 life 的轮转游标从进程态升级为盘上态（键 worldaxis_life_turn_v1，开关 crossSession 默认 false、复用既有设置键），engines/life.js 新增 5 处产品面引用（settingsBus.read 1 + store.reportReadFail 2 + store.chatId 2）⇒ 证据面 refs 由 3514 升到 3521；② 新增拒收码 no-localStorage 经实测**结构不可达**（宿主无 localStorage 时 settingsBus 读回落登记项 def ⇒ crossSession 必为 false ⇒ turnStore 首行即 disabled），登记进死表；write-failed 由新增见证跑出、从基线回收。三集划分 608 = 见证 369 / 死表 9 / 基线 230。冻结面 dead 751 / uiDead 4 逐字不变（life.js 未新增导出，游标挂在既有成员 stat() 里）。\n（v2.133.0 · O18 第二刀）本版只动 tools/anchor-scan.js（锚点扫描器的形态表与自证口径），产品源码与拒收码面零改动 —— 故三集划分与冻结面读数逐字不变（608 = 见证 369 / 死表 9 / 基线 230；dead 751 / uiDead 4）。本段台账 version 随入口同步 2.133.0（先例：三本台账与入口同批，见前一轮 O16 沿革）。\n（v2.134.0 · O18 第三刀）本版只动 tools/anchor-scan.js（锚点扫描器的形态表与自证口径），产品源码与拒收码面零改动 —— 故三集划分与冻结面读数逐字不变（608 = 见证 369 / 死表 9 / 基线 230；dead 751 / uiDead 4 / advisory dataOnly 241）。本段沿革由手工追加（先例见前一轮 O16：三本台账与入口同批，且不走 --update）。\n（E6 伏笔生命周期 · 本段沿革由手工追加，不走 --update）本版新增 engines/foreshadow.js（foreshadow 命名空间）并接入产品面六站：render/inject.js 的源表四张（SOURCES / def / SRC_NAME / SRC_MOD_SETTING）与注入分支、ui/panel.js 的 VIS_NAMES、ui/settings.js 的总开关（wa-sw-foreshadow）、engines/inject-budget.js 的 PRIORITY / ACCOUNTS、engines/tool-diag.js 的 MODULE_EXPORTS 与诊断节 secForeshadow。它的 12 个导出里，stat / getSettings / buildBlock / STATUS / ACTIVE / TERMINAL 被诊断节与注入分支真读；track / develop / resolve / recycle / check 与 setSettings 当前只有内部自用或间接调用（settings.js 的总开关走 data-sw-ns 变量间接调 setSettings，静态面看不到归属），故按本仓现行口径登记进冻结面（+6 项：self-only ×5 / unwired ×1）——与 v2.129 / v2.130 二十二个引擎的动作动词同款情形（它们的 setSettings 也全在冻结面）。冻结面 dead 751 → 757（+6）；另有 1 项证据变更：tool-diag.safe 的 own 94 → 95（诊断节多一处调用）。uiDead 4 / advisory dataOnly 241 逐字不变。本段沿革完（v2.136.0 · 本段沿革终）\n（O14 UI 实机验证通道）本版改动全在 tests/ 侧，**冻结面与拒收面均逐字不变**：① 新增 tests/ui-live.js（真浏览器通道：route.fulfill 从磁盘喂源码、真 localStorage 往返、728 控件逐个点）与 tests/ui-live-v2137.js（版本专锁：A 结构面 / B 运行时 / C 负控制五条，每条两向）；② tests/run.js 新增子进程调用点（真跑整套「不是文件在场」）；③ tests/dependency-guard.js 的 OPTIONAL_DEPS 由 1 项扩到 2 项（playwright-core）；④ 产品侧修掉一处活体缺陷（ui/panel.js 的 `#wa-inj-diag`：`querySelectorAll(...).filter(...)` → `Array.prototype.filter.call(...)`）—— 它不新增导出、不改任何导出语义，故 dead / uiDead / advisory 三面不变。（先例：v2.133.0 / v2.134.0 / v2.136.0 三段）。本段沿革完（v2.137.0 · 本段沿革终）收口段实测六项（全部是「判据自己出错」的实证，已固化）：① 升版回填走 tools/sync-e2e-readings.js（8 处）；② 拼装路径 = 让边消失（require 与 spawn 参数改字面量，同步 gate-timeout 锚点）；③ 锚点转义口径决定纯度自核数（clickTry 改单引号成串）；④ N7 的靶必须唯一且就是末次版本词（两本台账各按本本先例收）；⑤ 判据下限随档位（full >= 40 / 非 full >= 29），并把「非 full 档必须带非空降档理由」升格为断言；⑥ 一次全量中断是 proot 下 open 偶发 ENOSYS 导致 node 收尾自断言（环境级 flake，非产品缺陷）。全量回归 13157 / 0。\n（E7 区域天气与灾害深度联动 + E5 多模型并发推演 · 本段沿革由手工追加，不走 --update）本版给 engines/weather.js 加 places() 清单读口、给 engines/hazard.js 加 weatherTrigger / rollAll / CAUSED_BY / TRIGGER_KINDS 四出口，并在 after 链挂 hazard.weatherTrigger（order 13 · critical false）。冻结面三处变动：① **新增两项**自用导出（hazard.weatherTrigger / weather.places）——**tref=0 不等于零消费**：本仓见证表 tests/reject-v2780.js 与本版专锁 tests/hazard-trigger-v2138.js 都真调它们，但两者都走本地别名（`W.hazard.weatherTrigger(`），门禁的 REF_RE（`WA.ns.mem`）只在 ui/settings.js 与 engines/hazard.js 自身那类字面形态上命中 ——与 E6 的 setSettings（面板走 data-sw-ns 间接调）同款情形，故按本仓现行口径登记进冻结面；② **两项离场**：hazard.getSettings / hazard.stat —— 本版面板新读数行（wa-hzwx-view）真读它们（`WA.hazard.getSettings()` / `WA.hazard.stat()` @ ui/settings.js），冻结面 757 → 757（+2 新 · −2 旧，数目恰好相抵）；③ **一项证据变更**：hazard.targetFor 的 own 8 → 9（weatherTrigger 建行时调 targetFor(0) 又多一处文件内自用，自用不改变归因，仍为 [own]）。advisory dataOnly 241 → 242。同批 E5 新增 engines/ensemble.js（ensemble 命名空间，与 E7 同批交付）。它的 8 个导出里 STRATEGIES（策略词表）与 getSettings / setSettings / stat 是配置与读数面，normalize / agreementOf / concurrency / run 是推演主体 —— 当前**只有专锁 tests/ensemble-v2138.js 真调**（getSettings / setSettings / normalize / run / stat 五口 均为本地别名形态 `E.getSettings()`），产品侧尚无消费方：面板未接开关、诊断节未列读数行。 按本仓现行口径（与 E6 的 foreshadow.track 等、v2.129/v2.130 二十二个引擎的动作动词同款）**如实登记进冻结面**， 不伪接线、不删能力：冻结面 dead 757 → 764（+7：self-only ×5 —— normalize / agreementOf / concurrency / run / stat；unwired ×2 —— getSettings / setSettings）。证据面同步重算（本段由 --update 写入现场后手工追加）。 advisory dataOnly 242 → 243（STRATEGIES 是只读词表，属数据成员）。本段沿革完（v2.138.0 · 本段沿革终）",
+  "version": "2.138.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -1394,6 +1394,62 @@
       "tref": 2,
       "own": 3
     },
+    "ensemble.agreementOf": {
+      "reason": "self-only",
+      "detail": "engines/ensemble.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ensemble.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "ensemble.concurrency": {
+      "reason": "self-only",
+      "detail": "engines/ensemble.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ensemble.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "ensemble.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/ensemble.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "ensemble.normalize": {
+      "reason": "self-only",
+      "detail": "engines/ensemble.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ensemble.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
+    "ensemble.run": {
+      "reason": "self-only",
+      "detail": "engines/ensemble.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ensemble.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ensemble.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/ensemble.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "ensemble.stat": {
+      "reason": "self-only",
+      "detail": "engines/ensemble.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ensemble.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 33
+    },
     "entities.ensureState": {
       "reason": "self-only",
       "detail": "engines/entities.js 内部自用、外部零引用（过度导出）",
@@ -1962,14 +2018,6 @@
       "tref": 0,
       "own": 3
     },
-    "hazard.getSettings": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/hazard.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
-    },
     "hazard.open": {
       "reason": "test-only",
       "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
@@ -2002,21 +2050,13 @@
       "tref": 12,
       "own": 1
     },
-    "hazard.stat": {
-      "reason": "self-only",
-      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/hazard.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 18
-    },
     "hazard.targetFor": {
       "reason": "self-only",
       "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
       "src": "engines/hazard.js",
       "refs": 0,
       "tref": 0,
-      "own": 8
+      "own": 9
     },
     "hazard.tick": {
       "reason": "test-only",
@@ -2025,6 +2065,14 @@
       "refs": 0,
       "tref": 1,
       "own": 3
+    },
+    "hazard.weatherTrigger": {
+      "reason": "self-only",
+      "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hazard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
     },
     "horizon.laneCfg": {
       "reason": "test-only",
@@ -5786,6 +5834,14 @@
       "tref": 0,
       "own": 1
     },
+    "weather.places": {
+      "reason": "self-only",
+      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weather.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "weather.season": {
       "reason": "self-only",
       "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
@@ -6094,6 +6150,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 241
+    "dataOnly": 243
   }
 }

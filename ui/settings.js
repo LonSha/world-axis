@@ -50,6 +50,13 @@
    *   采集 `id="wa-…"` 再与 UI_BINDINGS 对账，动态拼出的 id 在采集面「不存在」，
    *   会被当场判成僵尸条目（与 v2.51.0 叙事工艺五控件同一条坑）。
    */
+  // v2.138.0（E7）：天气造灾害开关的取值读数 —— 与上面的 ini() 分列的理由是**它们问的是两件事**：
+  //   ini() 问「总开关开没开」（enabled），这里问「联动开没开」（weatherLink）。合并成一个函数
+  //   会在未来某一版被某个人顺手复用（那时两个开关就共用一个答案了）。
+  function hzwxOn() {
+    if (!WA.hazard || typeof WA.hazard.getSettings !== 'function') return false;
+    try { return !!WA.hazard.getSettings().weatherLink; } catch (e) { return false; }
+  }
   function switchBlockHtml() {
     // 控件 id 一律**字面量**写在模板里。门禁 H2 用 /id="(wa-[a-z0-9\-]+)"/ 从
     //   ui/*.js 源码采集「渲染出的控件」再与 UI_BINDINGS 对账「无僵尸条目」——
@@ -96,6 +103,23 @@
       //   变量拼接）：门禁 H2 用 /id="(wa-[a-z0-9\-]+)"/ 从 ui/*.js 源码采集渲染控件
       //   再与 UI_BINDINGS 对账，动态拼出的 id 在采集面「不存在」。
       + '<label class="wa-row" title="登记伏笔并提出「埋了没收」的清单；兑现只看显式标记，过期只提示不自动回收"><input type="checkbox" id="wa-sw-foreshadow" data-sw-ns="foreshadow"' + (ini('foreshadow') ? ' checked' : '') + dis('foreshadow') + '/> 伏笔生命周期</label>'
+      // v2.138.0（E7）：天气→灾害反向联动的开关（同 v2.129.0/v2.130.0/v2.135.0 理由：
+      //   渲染 + 绑定 + 守卫登记三件齐做，否则 id 写错无人发现）。
+      //   ⚠ 本行**故意不挂** data-sw-ns：那条通道一律写 `{ enabled: ... }`，而本开关管的是
+      //   `weatherLink` —— 走同一通道会把 hazard 自己的总开关顺手改掉（一个控件改两个语义，
+      //   正是「两套数并存」那一类最贵的缺陷）。故给它专用属性 + 专用绑定（见 switchBind 尾段）。
+      + '<label class="wa-row" title="暴雨/暴雪达阈值时自动建一行灾害账（只建账：不改天气、不改通行）；默认关闭"><input type="checkbox" id="wa-sw-hazardwx" data-hzwx="link"' + (hzwxOn() ? ' checked' : '') + dis('hazard') + '/> 天气造灾害（累积风险）</label>'
+      // 读数行：只说「开关状态 / 已触发几行 / 认哪几种天气」——**不假装有内容**（未开启时恒 0）。
+      //   本行是 show-and-tell 的落点：v2.135.0 之后的教训是「能力落盘但用户无从确认它是否在跑」。
+      + (function () {
+        if (!WA.hazard || typeof WA.hazard.stat !== 'function') return '';
+        const st = WA.hazard.stat();
+        const on = WA.hazard.getSettings().weatherLink;
+        const kinds = (WA.hazard.TRIGGER_KINDS || []).join(' / ') || '—';
+        return '<div class="wa-dim" id="wa-hzwx-view">天气造灾害：' + (on ? '<b>已开</b>' : '关闭')
+          + '｜已触发 ' + (Number(st.triggers) || 0) + ' 行｜认的天气：' + esc(kinds)
+          + (on ? '' : '（关闭时一次账都不建）') + '</div>';
+      })()
       // 群聊拒绝是**只读问路器**（无总开关）：控件恒开且置灰，仅作“当前是不是群聊”的可见读数。
       + '<label class="wa-row" title="本扩展只支持单主角对话；群聊下世界推演与写入一律拒绝并阻止写世界书"><input type="checkbox" id="wa-sw-grouprefuse"' + ((WA.groupGuard && typeof WA.groupGuard.isGroup === 'function' && WA.groupGuard.isGroup()) ? ' checked' : '') + ' disabled/> 群聊拒绝 <span class="wa-dim">（恒开：只读问路器）</span></label>'
       + '<label class="wa-row" title="净化/思考/字数三块只作用于当前那一次输出，不改世界状态"><input type="checkbox" id="wa-sw-note2130" disabled/> v2.130.0 十二引擎 <span class="wa-dim">（产注入块的两个：思考开销 / 剧情倾向——还须在「导演」页勾选对应源）</span></label>'
@@ -459,6 +483,25 @@
           + (visOn ? '｜注入可见性：已开启（下轮注入生效）' : '｜注入可见性：**未开启** —— 需到「导演」页开启「叙事工艺」源，否则不进正文');
       };
       switchBind(panelEl);
+      /* E7：天气→灾害联动开关。专用绑定，不走通用通道（见 switchBlockHtml 里的理由）。 */
+      const hzwx = panelEl.querySelector('[data-hzwx]');
+      if (hzwx) {
+        hzwx.onchange = function () {
+          const o = panelEl.querySelector('#wa-sw-out');
+          const hz = WA.hazard;
+          if (!hz || typeof hz.setSettings !== 'function') { if (o) o.textContent = '✗ 模块未装载：hazard'; return; }
+          let w = null;
+          try { w = hz.setSettings({ weatherLink: !!hzwx.checked }); }
+          catch (e) { if (o) o.textContent = '✗ 保存异常：' + ((e && e.message) || e); return; }
+          if (o) {
+            o.textContent = (w && w.ok === false)
+              ? ('✗ 保存失败：' + (w.reason || '未知原因') + '（改动未落盘）')
+              : ('✓ 天气造灾害已' + (hzwx.checked ? '开启' : '关闭')
+                + (hzwx.checked && !hz.getSettings().enabled
+                  ? '（⚠ 累积风险总开关仍是关闭 —— 联动不会生效，请打开「开关」组里的累积风险）' : ''));
+          }
+        };
+      }
     }
   };
 })();

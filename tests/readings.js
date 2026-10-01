@@ -46,6 +46,14 @@ const FIELD_OF = {
 const SITE_RE_A = /\br(\d{4})\.([A-Za-z]+(?:\.[A-Za-z]+)?)\s*===\s*(\d+)/g;
 /** 站点形态二：`Object.keys(led<四位>.<面>).length === <数字>`（台账条目数）。 */
 const SITE_RE_B = /\bObject\.keys\(led(\d{4})\.(dead|uiDead)\)\.length\s*===\s*(\d+)/g;
+/**
+ * 站点形态三（v2.138.0 E7 收口）：`led<四位>.advisory.dataOnly === <数字>`。
+ *   形态一收不到（前缀不是 `r`、字段带点），形态二也收不到（不是 `Object.keys(...).length`）。
+ *   现场实测：这一族此前**不在任何回填面内** —— 本轮全量回归的两条红正是它。
+ *   口径与形态二一致：前缀 + 值；`raw` 取**站点原文形态**（`advisory.dataOnly`），
+ *   回填靠它重建正则（拿族名 `dataOnly` 去匹配会卡在 `advisory.` 处静默 0 命中）。
+ */
+const SITE_RE_C = /\b(led(\d{4})\.advisory\.dataOnly\s*===\s*)(\d+)/g;
 
 /** 三本台账（#5 三级同源校验的 L1/L2 面）。 */
 const LEDGERS = [
@@ -68,6 +76,33 @@ function versionOfIndex() {
   return m ? m[1] : null;
 }
 
+/**
+ * 账本侧的 advisory 读数（`dead-export-ledger.advisory.dataOnly`）。
+ * 为什么要单独取：形态三的判据（run.js 第 14969/15367 条）读的就是**账本**，
+ *   回填的真源必须与判据同源；拿探针的 243 去改虽也对，但那是「碰巧同源」。
+ *   本仓口径（tools/sync-e2e-readings.js 同款）：真源取门禁当场写盘的那一份。
+ */
+function dataOnlyOfLedger() {
+  try {
+    const L = JSON.parse(read('tests/dead-export-ledger.json'));
+    const v = L && L.advisory && L.advisory.dataOnly;
+    return typeof v === 'number' ? v : null;
+  } catch (e) { return null; }
+}
+/**
+ * L3 交叉校验（v2.138.0 E7 收口）：探针面与账本面**必须一致**。
+ *   两处读数（inventory 解析出的 dataOnly 长度 / 账本的 advisory.dataOnly）若分家，
+ *   说明「谁是谁的真源」已经不清 —— 这时**不许**挑一个信，如实报出来。
+ */
+function dataOnlyCrossCheck(src) {
+  const inv = measure().dataOnly;
+  const led = dataOnlyOfLedger();
+  const rows = (groups(src).dataOnly || []).map(function (s) {
+    return { prefix: s.prefix, line: s.line, value: s.value, stale: s.value !== led };
+  });
+  return { inv: inv, ledger: led, sites: rows,
+    ok: led !== null && inv === led && rows.every(function (r) { return !r.stale; }) };
+}
 /** 现场实测：真跑探针拿真值（不读任何历史常量）。 */
 function measure() {
   const inv = require('./inventory.js');
@@ -109,6 +144,12 @@ function sites(src) {
   SITE_RE_B.lastIndex = 0;
   while ((m = SITE_RE_B.exec(src)) !== null) {
     out.push({ form: 'ledgerKeys', prefix: 'led' + m[1], field: m[2], raw: m[2], value: Number(m[3]), line: lineOf(m.index) });
+  }
+  // 形态三（v2.138.0 E7 收口）：`led<四位>.advisory.dataOnly === N`
+  SITE_RE_C.lastIndex = 0;
+  while ((m = SITE_RE_C.exec(src)) !== null) {
+    out.push({ form: 'advisoryKey', prefix: 'led' + m[2], field: 'dataOnly', raw: 'advisory.dataOnly',
+      value: Number(m[3]), line: lineOf(m.index) });
   }
   return out;
 }
@@ -216,7 +257,10 @@ const MESSAGE_LABEL = {
   members: [/(\d+)\s*成员/, /成员\s+(\d+)/],
   dead: [/\bdead\s+(\d+)/],
   uiDead: [/\buiDead\s+(\d+)/],
-  dataOnly: [/\bdataOnly\s+(\d+)/],
+  //   v2.138.0（E7 收口）：分隔符放宽到 `[\s=]+` —— 现场 14969 的消息是 `dataOnly=242`
+  //     形态，旧模式（只认空白）收不到它 ⇒ 回填后比较值新、消息旧（R116 同族失真）。
+  //     界限：差量 `dataOnly +2` 里的 `+` 不在字符类里，**不会被当绝对值收走**。
+  dataOnly: [/\bdataOnly[\s=]+(\d+)/],
   deadInTestsOnly: [/仅测试(?:引用)?\s*(\d+)/]
 };
 
@@ -396,17 +440,21 @@ function ledgerReport(opt) {
 function backfillPlan(src) {
   const g = groups(src);
   const live = measure();
+  const advWant = dataOnlyOfLedger();
   const plan = [];
   Object.keys(g).forEach(function (field) {
     const vals = Array.from(new Set(g[field].map(function (s) { return s.value; })));
-    if (live[field] === undefined) return;
-    if (vals.length === 1 && vals[0] === live[field]) return;
+    // 形态三（advisory 点路径）的真源是账本；其余族仍取探针（既有口径不动）。
+    const isAdv = g[field].length > 0 && g[field][0].form === 'advisoryKey';
+    const want = isAdv ? advWant : live[field];
+    if (want === undefined || want === null) return;
+    if (vals.length === 1 && vals[0] === want) return;
   // 只统计**与该族站点同块**的消息副本（历史叙述里的旧数字不是副本，不许回填）
   const labels = labelSites(src, field, { lines: g[field].map(function (s) { return s.line; }) });
     plan.push({
       field: field,
       from: vals,
-      to: live[field],
+      to: want,
       sites: g[field].map(function (s) { return { prefix: s.prefix, line: s.line, value: s.value }; }),
       // 消息副本（#6）：回填必须**同批**改掉，否则改完比较值是新的、消息里还写着旧的
       labels: labels
@@ -508,6 +556,8 @@ module.exports = {
   ledgerReport: ledgerReport,
   backfillPlan: backfillPlan,
   backfill: backfill,
+  dataOnlyOfLedger: dataOnlyOfLedger,
+  dataOnlyCrossCheck: dataOnlyCrossCheck,
   versionOfIndex: versionOfIndex,
   stripLineComments: stripLineComments,
   assertBlocks: assertBlocks,

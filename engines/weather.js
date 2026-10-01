@@ -72,7 +72,19 @@
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
-  /** \u67e5\u67d0\u5730\u5929\u6c14\u3002\u6ca1\u767b\u8bb0\u5c31\u662f missing\uff0c\u4e0d\u56de\u843d\u6210\u6674\u3002 */
+  /**
+   * v2.138.0（E7）：**已登记天气的地点清单**（纯读，只报名字）。
+   *   为什么得有它：E7 的反向联动（天气造灾害）要从「哪些地方此刻有天气」出发结算，
+   *   而此前天气面只有 `weatherOf(单点)` / `effect(单点)` 两个单点读口 —— 于是调用方
+   *   只能自己伸手去翻天气的存档（那是本仓库反复治理的「两套真源」）。
+   *   本函数让**清单的唯一真源仍是天气自己的表**：谁要枚举，就向天气问。
+   *   不改任何状态、不推进任何东西、不写记事。
+   */
+  function places() {
+    return rows().filter(function (x) { return x && typeof x.place === 'string' && x.place; })
+      .map(function (x) { return x.place; });
+  }
+  /** 查某地天气。没登记就是 missing，不回落成晴。 */
   function weatherOf(place) {
     const pl = clean(place, 40);
     if (!pl) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
@@ -119,6 +131,8 @@
     WEATHERS: WEATHERS, SEASONS: SEASONS, FACTOR: FACTOR,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     season: season, setWeather: setWeather, weatherOf: weatherOf, effect: effect, travelMinutes: travelMinutes,
+    // v2.138.0（E7）：地点清单读口。只读、不推进、只报名字 —— 见函数定义处的理由。
+    places: places,
     buildBlock: buildBlock, stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

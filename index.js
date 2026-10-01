@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.137.0'
+  const VERSION = '2.138.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -486,6 +486,12 @@
     'engines/binding.js',
     'engines/refine.js',
     'engines/polish.js',
+    // v2.138.0（E5）：多模型并发推演与结果仲裁。
+    //   位置与 tests/run.js 的 LOAD 同序，且**须早于** render/inject.js 之后的任何消费者。
+    //   它对本批无装载期依赖（只读 apiRouter / settingsBus / clock / inputGuard，四者都早已在场），
+    //   也不产注入块 —— 与 polish 并列成「调用期模块」的一批，便于一眼看全。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/ensemble.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

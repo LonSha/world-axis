@@ -253,8 +253,36 @@ function probeDisabledNotSunny(W) {
   } catch (e) { return false; }
 }
 // ══════════════ A / B / C 判据 ══════════════
+// v2.138.0（E7）修订：本列表原是本版的「导出面与 v2.95.0 逐字相同」钉子（零增零删）。
+//   E7 补的正是 X6 的反向（天气造灾害），必然要挂两个新出口 —— 于是这颗钉子按**版本升级**
+//   走到它的下一站，而不是被删掉：
+//     · `weatherTrigger` 是天气造灾害的**唯一**入口（有真消费者：面板开关 + 本仓见证表）；
+//     · `CAUSED_BY` / `TRIGGER_KINDS` 是判据的**单一真源**（面板要标成因、见证要驱动触发，
+//       若各自抄一份字面量，枚举改了就是静默漂移 —— 本仓库最贵的一类缺陷）。
+//   判定面仍不许新增出口：weatherAt / targetWith / weatherGain 三个内部助手照旧不在导出面（A3 未动）。
 const EXP_NAMES = ['getSettings', 'setSettings', 'open', 'bump', 'roll', 'tick', 'confirm', 'read', 'drop',
-  'buildBlock', 'targetFor', 'stat'];
+  'buildBlock', 'targetFor', 'stat',
+  'weatherTrigger', 'CAUSED_BY', 'TRIGGER_KINDS', 'rollAll'];
+// v2.138.0（E7）：`weatherTrigger` 一旦挂上导出面，就必须有人**调用**它 —— 否则导出即是空承诺。
+  //   ⚠ 这里数的是**真调用点**（`weatherTrigger(` 且前面不是 `function ` / `: `），
+  //   不是「文件里提到这个名字」：第一次写这版判据时把「面板渲染了一个开关」也算成了消费者，
+  //   当场被 C2 自己抓到（面板只写设置、从不触发结算 ⇒ 那份清单是自欺）。
+  //   本版真消费者两处：
+  //     · `engines/hazard.js` 的 `rollAll()` —— 逐落地结算，主链上真调；
+  //     · `tests/reject-v2780.js` —— 见证表真调（第十二面可见性）。
+  const TRIGGER_CONSUMERS = ['engines/hazard.js', 'tests/reject-v2780.js'];
+  function realCalls(s) {
+    let n = 0, i = 0;
+    while ((i = s.indexOf('weatherTrigger(', i + 1)) >= 0) {
+      const pre = s.slice(Math.max(0, i - 16), i);
+      // 只排除**定义**那一处（`function weatherTrigger(`）。方法调用（`Hz.weatherTrigger(`）
+      //   与模块内直调（`return weatherTrigger(`）都算真调用 —— 第一版把 `.` 也当成引用标记，
+      //   于是把见证表的三次真调用全滤掉了，C2 报「无调用点」。
+      if (/\bfunction\s*$/.test(pre)) continue;
+      n++;
+    }
+    return n;
+  }
 function runAll(a) {
   const hSrc = src(HZ);
   // ── A 静态面 ──
@@ -437,8 +465,16 @@ function runAll(a) {
     + '判据数的是**调用**而非注释散文，实 dice 调用 '
     + (hits(hSrc, "dice(sides, 'hazard')") - 1) + ' 处 / Math.random( ' + hits(hSrc, 'Math.random(') + ' 处）');
   const missC = EXP_NAMES.filter(function (n) { return expPart.indexOf(n) >= 0; });
-  a(missC.length === EXP_NAMES.length,
-    'v2960hz: [C2] 源码导出清单与 v2.95.0 逐字相同（本版零增零删；实 ' + missC.length + '/' + EXP_NAMES.length + '）');
+  // v2.138.0（E7）：C2 由「零增零删」升级为「清单在、且新出口真有人用」。
+  //   两半都必须成立：清单缺项说明导出名被写坏；清单齐了但无人消费，说明挂出去的是空承诺
+  //   ——后者正是 v2.129.0 十引擎「能力已落盘、面板零入口」的同型病，故一并钉住。
+  const conMiss = TRIGGER_CONSUMERS.filter(function (f) {
+    try { return realCalls(fs.readFileSync(path.join(ROOT, f), 'utf8')) === 0; } catch (e) { return true; }
+  });
+  a(missC.length === EXP_NAMES.length && conMiss.length === 0,
+    'v2960hz: [C2] 源码导出清单齐备（本版按 E7 增三个出口：weatherTrigger / CAUSED_BY / TRIGGER_KINDS；实 '
+    + missC.length + '/' + EXP_NAMES.length + '）且新出口有真调用点（缺或只是「提到」：'
+    + (conMiss.join('、') || '无') + '）');
 }
 // ══════════════ 负控制（真源码破坏 → 破坏副本 → 副本上重跑同款真判据）══════════════
 function runNegative(a) {

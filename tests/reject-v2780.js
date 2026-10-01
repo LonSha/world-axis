@@ -742,6 +742,35 @@ function runWitness(WA) {
         trip('link-off', function () { return [((Hz.roll(HK, { at: '' }).weather) || {}).reason]; });
       } finally { WA.rand = keep; }
     }
+    // ── v2.138.0（E7）：天气造灾害（X6 的反向）三个新出口的见证 ──
+    //   同一把尺子：见证**不是声称**，用真 API 把码跑出来。
+    //   三条各自对应一句产品承诺：
+    //     · triggered     —— 天气真恶劣到阈值时**建一行账**（此前天气再坏也不会自己长账）；
+    //     · already-open  —— 同地同天气**不堆行**（否则一次连阴雨会长出几十行同样的账）；
+    //     · below-threshold —— 「天气没恶劣到」与「联动没打开」分得开（后者是 link-off）。
+    //   三个码都可被外部输入触发（天气是宿主面写进来的），故写见证而非列死表。
+    if (Hz && typeof Hz.weatherTrigger === 'function' && Wt && typeof Wt.setWeather === 'function') {
+      const HP = '见证镇';
+      const keepHW = { enabled: Hz.getSettings().enabled, weatherLink: Hz.getSettings().weatherLink };
+      const keepWxE = Wt.getSettings().enabled;
+      try {
+        Wd.addPlace({ name: HP, kind: 'public' });
+        Wt.setSettings({ enabled: true });
+        Hz.setSettings({ enabled: true, weatherLink: true });
+        Wt.setWeather(HP, 'storm');
+        want('triggered', 'hazard.weatherTrigger 天气达阈值 ⇒ 自动建一行灾害账（X6 的反向，v2.138.0 E7）');
+        trip('triggered', function () { return [Hz.weatherTrigger(HP).reason]; });
+        // 第二次必须命中已有行：测的是「不堆行」，不是「再建一行」
+        want('already-open', 'hazard.weatherTrigger 同地同天气**不堆行**（只累加触发计数，v2.138.0 E7）');
+        trip('already-open', function () { return [Hz.weatherTrigger(HP).reason]; });
+        Wt.setWeather(HP, 'clear');
+        want('below-threshold', 'hazard.weatherTrigger 天气没恶劣到 ⇒ 不建账（与「联动没打开」的 link-off 分列，v2.138.0 E7）');
+        trip('below-threshold', function () { return [Hz.weatherTrigger(HP).reason]; });
+      } finally {
+        Hz.setSettings({ enabled: keepHW.enabled, weatherLink: keepHW.weatherLink });
+        Wt.setSettings({ enabled: keepWxE });
+      }
+    }
   }
   // ── v2.97.0（O9）别名表与追溯链：五个新码，各自一条真 API 见证 ──
   //   为何这些码值得有见证而不进死表：它们全都**可被外部输入触发**——
