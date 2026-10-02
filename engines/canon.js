@@ -52,12 +52,17 @@
     // 幕数硬上限（超出报 truncated，不静默丢弃）
     maxActs: 24,
     // 剧情点总数硬上限（先于分幕生效）
-    maxPoints: 600
+    maxPoints: 600,
+    // v2.139.0（E11）：偏离度告警线。**读数与策略分列**——本设置只决定
+    //   「多少算偏得多」（跨线时调用方发一条 info），它**不改任何分**。
+    //   设成 1 即等于关掉告警（分数上界就是 1，`>` 恒假）。
+    deviationAlert: 0.7
   };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'canon',
     bounds: { segChars: [200, 20000], minPointChars: [10, 2000], maxPointChars: [40, 8000],
-      perAct: [1, 40], maxActs: [1, 200], maxPoints: [20, 5000] }
+      perAct: [1, 40], maxActs: [1, 200], maxPoints: [20, 5000],
+      deviationAlert: [0, 1] }
   };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
@@ -76,6 +81,9 @@
     // v2.100.0：对位面三个计数。**与 builds / adopted / cleared 分列**——
     //   「我看了几眼对位」与「我整理了几次原著」是两件事，挤进同一个计数器就再也分不出。
     signals: 0, aligns: 0, gaps: 0,
+    // v2.139.0（E11）：偏离度面一个计数，**与上面三个分列**——
+    //   「我看了几眼对位」与「我量了几次偏离」不是一件事（前者问坐标，后者问程度）。
+    deviations: 0,
     lastReason: '', lastActs: 0, lastPoints: 0, lastChars: 0, lastAt: 0 };
   function noteFault(kind, e) {
     try { stat.faults[kind] = (stat.faults[kind] || 0) + 1; } catch (x) {}
@@ -576,6 +584,119 @@
       acts: r.acts, total: r.total, passed: r.passed, remain: r.remain,
       cutActs: !!(r.truncated && r.truncated.acts), cutPoints: !!(r.truncated && r.truncated.points) };
   }
+  // ── E11（v2.139.0）：剧情偏离度量化 ─────────────────────────────
+  // 【它治的病：`align` 只答「撞上了什么」，不判偏离】
+  //   v2.100.0 的三口（signal / position / gap）把「现在像第几幕」答清楚了，
+  //   但它们**一个字都没说「偏了多少」**——「第 7 幕」是坐标，「偏了 0.62」才是判定。
+  //   没有这个数，长局里没人看得出「越走越远」，直到已经收不回来。
+  //
+  // 【口径（全是否定式）】
+  //   ① **偏离不自动拉回**：本函数**只报不改**（零 store.transact、零 patch）。
+  //      拉回是创作决定，不是引擎决定——引擎悄悄把坐标拽回大纲，等于替作者改剧情。
+  //   ② **原著文本不入存档**：参与计算的只有**已采纳的大纲**（题名级）与世界侧历史行，
+  //      故 `scope` 如实写 `ALIGN_TITLE`（与 signal / position 同一粒度，不假装逐句比对）。
+  //   ③ **未采纳大纲时如实报 `no-outline`**：**不拿 0 分冒充「严格遵循」**。
+  //      0 分是个有意义的结论（真的严丝合缝），而「没算」必须长得不一样。
+  //   ④ **不做语义推断**：只按大纲机械比对（题名覆盖 + 幕号推进），不判「这段剧情该不该发生」。
+  //   ⑤ **两个数不可合并**：`spread`（撞上了几幕，散不散）与 `lag`（推进到第几幕，
+  //      快不快）**各自成数**——合成一个 `score` 之后，「走得太快但很集中」与
+  //      「走得刚好但四处开花」会得到同一个分，而它们的处置完全相反。
+  //   ⑥ **样本不足如实标**：历史行太少（`rows < MIN_ROWS`）时 `ok:true` 但 `thin:true`，
+  //      不拿一行的样本给一个看起来精确的分（一行文本的偏离度恒真）。
+  const DEVIATION_MIN_ROWS = 3;
+  function deviation(opts) {
+    const o = outline();
+    if (!o || !o.acts || !o.acts.length) {
+      stat.blocked++; stat.lastReason = 'no-outline';
+      return { ok: false, reason: 'no-outline' };
+    }
+    const rows = historyRows(clean((opts && opts.scope) || '', 20));
+    if (!rows.length) {
+      stat.blocked++; stat.lastReason = 'no-history';
+      return { ok: false, reason: 'no-history' };
+    }
+    const arch = o.acts.length;
+    const total = o.acts0 || arch;
+    // 逐行定位（复用 bestAct —— 与 position 同一处实现，不另写一套「像哪一幕」）
+    const scored = rows.map(function (r) {
+      return { src: r.src, label: r.label, cand: bestAct(gramSet(r.text), o.acts) };
+    });
+    const hit = scored.filter(function (x) { return !!x.cand; });
+    if (!hit.length) {
+      stat.blocked++; stat.lastReason = 'no-signal';
+      return { ok: false, reason: 'no-signal', rows: rows.length, scope: ALIGN_TITLE };
+    }
+    const hitNos = {};
+    hit.forEach(function (x) { hitNos[x.cand.actNo] = (hitNos[x.cand.actNo] || 0) + 1; });
+    const distinct = Object.keys(hitNos).map(Number).sort(function (a, b) { return a - b; });
+    // `spread`：撞上的幕里，**相邻两幕的幕号跨度**占「还没走过的幕数」的比例。
+    //   为什么不用「不同幕数 ÷ 总幕数」：那会把「第 1 幕与第 20 幕各撞一次」
+    //   与「第 10 幕与第 11 幕各撞一次」算成同一个数（都是 2/24），而前者是四处开花、
+    //   后者是稳步推进 —— 跨度才答得出这件事。
+    const span = distinct.length > 1 ? (distinct[distinct.length - 1] - distinct[0]) : 0;
+    const spanDen = Math.max(1, total - 1);
+    const spread = Math.max(0, Math.min(1, span / spanDen));
+    // `lag`：最新一行落在哪一幕 —— 与「已推进到第几幕」同义（取最后一行而非最高幕号：
+    //   历史是**有序**的，最后一行才是「现在」，取最高幕号会把一次偶然的高幕号读成进度）。
+    const lastRow = hit[hit.length - 1];
+    const at = lastRow.cand.actNo;
+    const lag = Math.max(0, Math.min(1, 1 - (at / Math.max(1, total))));
+    // `score`：两个数的**加权和**（0 = 严格遵循，1 = 完全偏离）。权重如实写在返回里，
+    //   让人能自己复算 —— 报一个说不出来路的综合分等于让人替引擎背书。
+    const score = Math.round((spread * 0.6 + lag * 0.4) * 1000) / 1000;
+    const thin = rows.length < DEVIATION_MIN_ROWS;
+    // 阈值告警：**读数与策略分列**（口径⑦）——分数是观测值，阈值是策略；
+    //   `over` 只答「跨没跨过你设的那条线」，它**不改分数**、也不触发任何拉回（口径①）。
+    const cfg = settings();
+    const th = (typeof cfg.deviationAlert === 'number' && isFinite(cfg.deviationAlert)) ? cfg.deviationAlert : DEF.deviationAlert;
+    const over = score > th;
+    stat.deviations++;
+    stat.lastReason = 'deviation';
+    return {
+      ok: true, scope: ALIGN_TITLE,
+      score: score,
+      // 两个分量**各自报出**（口径⑤）：合成一个数就答不出「偏在哪一种偏法上」。
+      spread: Math.round(spread * 1000) / 1000,
+      lag: Math.round(lag * 1000) / 1000,
+      weights: { spread: 0.6, lag: 0.4 },
+      at: at, total: total, acts: arch,
+      rows: rows.length, hitRows: hit.length, thin: thin,
+      hits: distinct.map(function (n) { return 'A' + n; }),
+      counts: distinct.map(function (n) { return { coord: 'A' + n, votes: hitNos[n] }; }),
+      // 阈值告警：只报「跨没跨线」，不做任何处置（拉回与否是人的决定）
+      alert: th, over: over,
+      note: '只报不改（偏离不自动拉回）；原著文本不入存档，参与计算的只有已采纳大纲的题名'
+    };
+  }
+  /**
+   * 偏离曲线（最近 N 轮）：诊断面与面板共用的只读读数。
+   *   **零 stat 写入**（与 alignView 同口径）：「看一眼曲线」不该改账。
+   *   每一行是**当时的**世界侧历史窗口算出的分，故它是「怎么走到今天」的证据，
+   *   而不是「今天怎么样」的另一个说法。
+   */
+  function deviationTrend(n) {
+    const o = outline();
+    if (!o || !o.acts || !o.acts.length) return { ok: true, adopted: false, points: [] };
+    const want = pick(n, 1, 50, 20);
+    const rows = historyRows('');
+    const pts = [];
+    // 逐点扩窗：第 k 个点用「前 k 行」当历史 —— 单调扩窗即可画出走势，
+    //   不需要真的存每一轮的快照（存快照会把「最近 50 轮」变成又一份持久化面）。
+    for (let k = DEVIATION_MIN_ROWS; k <= rows.length; k++) {
+      const win = rows.slice(0, k);
+      const hit = win.map(function (r) { return bestAct(gramSet(r.text), o.acts); })
+        .filter(function (c) { return !!c; });
+      if (!hit.length) continue;
+      const nos = {}; hit.forEach(function (c) { nos[c.actNo] = 1; });
+      const ds = Object.keys(nos).map(Number).sort(function (a, b) { return a - b; });
+      const total = o.acts0 || o.acts.length;
+      const span = ds.length > 1 ? (ds[ds.length - 1] - ds[0]) : 0;
+      const spread = Math.max(0, Math.min(1, span / Math.max(1, total - 1)));
+      const lag = Math.max(0, Math.min(1, 1 - (hit[hit.length - 1].actNo / Math.max(1, total))));
+      pts.push({ at: k, score: Math.round((spread * 0.6 + lag * 0.4) * 1000) / 1000 });
+    }
+    return { ok: true, adopted: true, points: pts.slice(-want), rows: rows.length, thin: rows.length < DEVIATION_MIN_ROWS };
+  }
   // ── 只读视图 ─────────────────────────────────────────────
   function outlineView() {
     const o = outline();
@@ -607,6 +728,12 @@
     position: position,
     gap: gap,
     alignView: alignView,
+    // v2.139.0（E11）：偏离度两口，**每口一个真消费方**——
+    //   deviation → 面板「导演」页的偏离按钮（贴出分数与两个分量）；
+    //   deviationTrend → 面板「偏离曲线」按钮 + 诊断 secCanon.deviation。
+    //   两口都是纯读（零 store 写入、零 markCoord）——口径①「只报不改」。
+    deviation: deviation,
+    deviationTrend: deviationTrend,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

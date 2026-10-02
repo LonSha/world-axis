@@ -99,6 +99,11 @@
     'collab.sessions':  { path: 'collab.sessions',  cap: 64, why: '会话表环形（关闭的会话也要留痕，故不能在 close 时删——只能环形挤出）' },
     'collab.queue':     { path: 'collab.queue',     cap: 128, why: '离线队列环形（已交付的行仍答「当时重放过什么」，只能环形挤出）' },
     'collab.conflicts': { path: 'collab.conflicts', cap: 64, why: '冲突登记环形（已裁决的分歧是复盘证据，不在 resolve 时删）' },
+    // v2.139.0（E10）：协作任务表环形。与上面三条同型：准入闸（DEF.maxTasks 满员拒收）
+    //   不是挤出上限，已结算的任务仍要答「当时谁欠了、后来罚没罚」——故只能环形挤出。
+    //   **本表必须与 core/store.js 的 __BOUNDED_CAPS['collab.tasks'] 同名同值**（把门判据逐键对账）：
+    //   SITES 缺此键时 evict.array 会走 unknown-site **静默失败**（挤出压根不发生，而调用方以为做了）。
+    'collab.tasks':     { path: 'collab.tasks',     cap: 24, why: '协作任务环形（已结算的任务是违约复盘证据，不在 settle 时删）' },
     'chrono.entries':   { path: 'chrono.entries',   cap: 128, why: '变更日志环形（撤销靠追加 revert 行，故历史只能环形挤出、不得原地删）' },
     // ── v2.117.0（计划二 B6）：机会窗口在途行（opportunity.js）──
     //   为什么必须有界：它是「世界正在发生的变化」的登记簿，长局里一轮一轮往上堆。

@@ -149,7 +149,7 @@ function runAll(A) {
 
   // ── B 运行时（现场真跑） ──
   const a = M.audit();
-  A(a.files === 164 && a.aliasFiles === 164 && a.refFiles === 162,
+  A(a.files === 165 && a.aliasFiles === 165 && a.refFiles === 163,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -166,7 +166,7 @@ function runAll(A) {
   //   ⇒ 调用期 1057→1059、总 1094→1096。两条都由现场 diff 逐条核对过，不是「+2 就对了」。
   //   ui/panel.js 的 `perfTrace.bandCompare` 与 tool-diag 同属**同一命名空间同一成员**，
   //   集合去重后只算一条 —— 这也是为什么「文件改了两处、边只多一条」。
-  A(a.edgesLoad === 62 && a.edgesCall === 1191 && a.edgesAll === 1253 && a.identityOk,
+  A(a.edgesLoad === 63 && a.edgesCall === 1202 && a.edgesAll === 1265 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -203,11 +203,11 @@ function runAll(A) {
     + ' / __settingsRegs（设置注册槽，全仓同一形态）。合计装载期 +2、调用期 +6、总计 +8 = 实测 8 条，'
     + ' 恒等式 62 + 1191 = 1253。专锁 tests/ensemble-v2138.js 的 N 面另钉「它零 store.transact / 零 store.patch」'
     + '（本门禁的 store 边只算 ns 对，读不出这一层；两条判据互补，不互相代替）。');
-  A(a.edgesLoad >= 20 && a.orderLen === 163,
+  A(a.edgesLoad >= 20 && a.orderLen === 164,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
-  A(a.nsProvided === 193 && a.nsLedger === 168 && a.nsRead === 171,
+  A(a.nsProvided === 194 && a.nsLedger === 169 && a.nsRead === 172,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');

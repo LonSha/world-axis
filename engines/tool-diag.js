@@ -302,6 +302,50 @@
     });
   }
 
+  /**
+   * v2.139.0（E9）：势力关系网采集节。
+   *   报的**不是**「有几条边」这种一眼能数出来的量，而是三种**只在读数上分得开**的情形：
+   *     · `nodes/edges` —— 图有多大（规模）；
+   *     · `reason` —— 最近一次是 `built` 还是 `empty-graph`（**算出来的空图**与
+   *       「没东西可算」是两件事，前者是 `ok:true` 的合法结果）；
+   *     · `dropped` —— 有多少节点**没进图**（超容量 / 重名 / 名字为空）。
+   *   末一条是本节的要点：图小与势力少在旧读数上长得一样，`dropped` 让它们分开。
+   *   **零副作用**：只读 stat 与 settings，不建图（建图会计数、会污染现场读数）。
+   */
+  function secFactionGraph() {
+    return safe(function () {
+      if (!WA.factionGraph || typeof WA.factionGraph.stat !== 'function') return { error: 'engines/faction-graph.js 未加载（势力关系网读数缺席）' };
+      const st = WA.factionGraph.stat();
+      const cfg = WA.factionGraph.getSettings ? WA.factionGraph.getSettings() : {};
+      return {
+        enabled: !!cfg.enabled, allyIdx: cfg.allyIdx, hostileIdx: cfg.hostileIdx, maxNodes: cfg.maxNodes,
+        builds: st.builds || 0, tensions: st.tensions || 0, clusters: st.clusters || 0,
+        nodes: st.nodes || 0, edges: st.edges || 0,
+        // dropped 与 nodes 必须**分开报**：合成「共 N 个」之后，就再也答不出
+        //   「图为什么比势力少」（超容量？重名？空名？三种处置完全不同）。
+        dropped: st.dropped || 0,
+        blocked: st.blocked || 0, lastReason: st.lastReason || '', lastAt: st.lastAt || 0,
+        faults: Object.assign({}, st.faults || {}),
+        relationKeys: (WA.factionGraph.RELATION_KEYS && WA.factionGraph.RELATION_KEYS()) || null,
+        // v2.139.0（E9）：状态词表也一并带出。两套词表都是**单一真源**（evolution 的
+        //   FACTION_RELATION / FACTION_STATUS）——诊断面把两份都报出来，才能交叉核对
+        //   「引擎用的档位」与「编辑器能填的档位」是同一套（各带副本必然漂移）。
+        statusKeys: (WA.factionGraph.STATUS_KEYS && WA.factionGraph.STATUS_KEYS()) || null,
+        // v2.139.0（E9）：逐节点热度前几名（`heat` 的真产品消费方）。
+        //   为什么不是又一份「全表」：这张表答的是「**最紧张的是谁**」——诊断包里先给
+        //   头部几行就够定位，全量逐节点留给面板的关系网入口。两处都读同一个 heat()。
+        hot: (function () {
+          try {
+            const h = WA.factionGraph.heat ? WA.factionGraph.heat() : null;
+            if (!h || !h.ok) return null;
+            return h.rows.slice(0, 5).map(function (r) {
+              return { name: r.name, hostiles: r.hostiles, allies: r.allies, unknowns: r.unknowns };
+            });
+          } catch (e) { return null; }
+        })()
+      };
+    });
+  }
   function secLife() {
     return safe(function () {
       if (!WA.life || typeof WA.life.stat !== 'function') return { error: 'life 模块不可用' };
@@ -318,7 +362,16 @@
         lastTurn: isFinite(Number(st.lastTurn)) ? Number(st.lastTurn) : 0,
         turnRestored: st.turnRestored === true,
         crossSession: cfg.crossSession === true,
-        actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
+        // v2.139.0（E8）：二阶公平读数进诊断面。三个字段各自答一个问题，**不可合并**：
+        //   sd        —— 「最近 10 轮里大家被推演的频率差多少」（null = 样本不足，还没法判）；
+        //   fair      —— 「按同一处阈值判下来公平吗」（null 同上，**不拿 false 冒充**）；
+        //   throws    —— 「加权随机有没有在背后静默降级回环形定序」（> 0 即机制没在跑）。
+        //   少了 throws 这一口，「公平」会变成一个**永远为真**的读数（退回环形也照样公平）。
+        fairnessSd: (st.fairness && st.fairness.sd !== null && isFinite(Number(st.fairness.sd))) ? Number(st.fairness.sd) : null,
+        fairnessFair: (st.fairness && st.fairness.fair === true) ? true : (st.fairness && st.fairness.fair === false ? false : null),
+        fairnessThrows: (st.fairness && isFinite(Number(st.fairness.throws))) ? Number(st.fairness.throws) : 0,
+        fairRounds: isFinite(Number(st.fairRounds)) ? Number(st.fairRounds) : 0,
+actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       };
     });
   }
@@ -554,6 +607,20 @@
           cutActs: !!align.cutActs, cutPoints: !!align.cutPoints } : null,
         // 对位面三计数与整理面分列（signals/aligns/gaps —— 「看了几眼」不是「整理了几次」）
         signals: st.signals || 0, aligns: st.aligns || 0, gaps: st.gaps || 0,
+        // v2.139.0（E11）：偏离度面。**零 stat 写入**（deviationTrend 内部不碰任何计数）——
+        //   与 alignView 同口径：「看一眼曲线」不该改账。两个分量各自报出（口径⑤）。
+        deviation: (typeof WA.canon.deviationTrend === 'function')
+          ? safe(function () {
+            const t = WA.canon.deviationTrend(10);
+            if (!t || !t.adopted) return { adopted: false, points: 0 };
+            const last = t.points.length ? t.points[t.points.length - 1] : null;
+            return { adopted: true, points: t.points.length, thin: !!t.thin,
+              last: last ? last.score : null,
+              series: t.points.map(function (p) { return p.score; }) };
+          }, null)
+          : null,
+        deviations: st.deviations || 0,
+        deviationAlert: (typeof cfg.deviationAlert === 'number') ? cfg.deviationAlert : null,
         faults: st.faults || {}, faultKinds: Object.keys(st.faults || {}).sort() };
     });
   }
@@ -886,6 +953,9 @@
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
     //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
     'engines/ensemble.js': 'ensemble',
+    // v2.139.0（E9）：势力关系动态图。登记为**必载**——它读 evolution（档位/状态词表的
+    //   单一真源）与 store，缺席就是「关系网读数缺席」，那本身就是断裂，不该被静默兜住。
+    'engines/faction-graph.js': 'factionGraph',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1596,7 +1666,14 @@
         // v2.114.0：插件生命周期钩子面（计划二 #56）。`wa-pl-unreg` 是 plugin.unregister 的
         //   **真产品消费方**（注册的逆操作），守卫表漏登记它 = 这个按钮的 id 写错也无人发现。
         'wa-ch-enabled', 'wa-ch-anchor', 'wa-ch-base', 'wa-ch-note', 'wa-ch-record', 'wa-ch-stale', 'wa-ch-undo', 'wa-ch-apply', 'wa-ch-out',
-        'wa-co-enabled', 'wa-co-sid', 'wa-co-who', 'wa-co-open', 'wa-co-claim', 'wa-co-pending', 'wa-co-conflicts', 'wa-co-out', 'wa-pl-name', 'wa-pl-reg', 'wa-pl-unreg', 'wa-pl-list', 'wa-pl-fire', 'wa-pl-out',
+        'wa-co-enabled', 'wa-co-sid', 'wa-co-who', 'wa-co-open', 'wa-co-claim', 'wa-co-pending', 'wa-co-conflicts', 'wa-co-out',
+        // v2.139.0（E10）：协作任务与违约十二控件（同样渲染在人物页）。
+        //   同 v2.51.0 / v2.62.0 / v2.63.0 / v2.95.0 / v2.96.0 / v2.97.0 / v2.112.0 的理由：
+        //   新控件必须同时「渲染 + 绑定 + 守卫登记」，否则「按钮渲染了但绑定的 id 写错」无人发现。
+        'wa-task-goal', 'wa-task-deadline', 'wa-task-partners', 'wa-task-create', 'wa-task-id',
+        'wa-task-person', 'wa-task-amount', 'wa-task-contribute', 'wa-task-settle',
+        'wa-task-penalize', 'wa-task-view', 'wa-task-out',
+        'wa-pl-name', 'wa-pl-reg', 'wa-pl-unreg', 'wa-pl-list', 'wa-pl-fire', 'wa-pl-out',
        // v2.97.0（O9）：别名面三控件（渲染在人物页「人物身份」区）。
        //   同 v2.51.0 / v2.62.0 / v2.63.0 / v2.95.0 / v2.96.0 的理由——aliasOf / bindAlias /
        //   aliasStat 是本版新增的三个导出，它们**必须有真消费方**（无消费方不挂），
@@ -1620,9 +1697,20 @@
        //   一律**无条件渲染**（模块缺席时整段降级成提示、控件不在场 ⇒ 本组报 missing）；
        //   canon.js 是产品文件，缺席本身就是断裂。
        //   `wa-cn-check` 是 input（手贴一段正文用）——它不是**状态**，故不进 dynamic。
-       'wa-cn-check', 'wa-cn-signal', 'wa-cn-position', 'wa-cn-gap'],
+       'wa-cn-check', 'wa-cn-signal', 'wa-cn-position', 'wa-cn-gap',
+       // v2.139.0（E11）：偏离度两枚入口（偏离度 / 偏离曲线）。同 v2.51.0 起的理由：
+       //   新控件「渲染 + 绑定 + 守卫登记」三件齐做，否则 id 写错无人发现。
+       'wa-cn-deviation', 'wa-cn-trend'],
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
-    { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text'],
+    { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text',
+      // v2.139.0（E9）：势力关系网三枚读数入口（渲染在事件页「势力」区下方）。
+      //   上面那段注释写了三枚，这里必须真有 —— 注释不是登记。
+      'wa-fg-tension', 'wa-fg-clusters', 'wa-fg-edges', 'wa-fg-pa', 'wa-fg-pb', 'wa-fg-pair', 'wa-fg-hot', 'wa-fg-out'],
+      // v2.139.0（E9）：势力关系网读数入口共四枚，各答一个问题、**互不替代**：
+      //   张力（网有多紧，含分母可复算）/ 同盟簇（图分成几块，单点单列）/
+      //   关系网（逐条边，带 basis 可复盘）/ 查两家（就这两家什么关系，edgeOf 的真消费方）。
+      //   判定面留在引擎侧（factionGraph），本组只保证「渲染 ↔ 守卫登记」成对 ——
+      //   四枚中任何一枚 id 写错都要有人发现。
       // v2.11.0: `wa-bs-abort` 是**条件渲染**控件（只在推演运行中出现），故归入 cond 层——
       //   与 wa-de-abort（有活跃突发事件才渲染）同一语义。纳入守卫表后，「按钮渲染了但
       //   绑定代码引用了别的 id」这类断裂会被发现（本版新增的绑定正需要这道守）。
@@ -1704,6 +1792,15 @@
       //   会被通用绑定顺手改掉总开关语义），故绑定走 ui/settings.js 里那段专用 onchange；
       //   本组只保证「渲染 ↔ 守卫登记」成对。读数行随渲染出，同 wa-sw-out 规格。
       'wa-sw-hazardwx', 'wa-hzwx-view',
+      // v2.139.0（E9）：势力关系网总开关（渲染在设置页）。走通用 data-sw-ns 通道 ⇒ 写 {enabled}。
+      //   同 v2.135.0/v2.138.0 规格：**渲染 + 绑定 + 守卫登记**三件齐做，
+      //   否则「控件渲染了但绑定 id 写错」在这个新出口上无人发现。
+      //   （事件页那三个读数入口登记在 events 组 —— 守卫表**按页分组**，放错组就等于报错页。）
+      'wa-sw-factiongraph',
+      // v2.139.0（E11）：偏离度告警线（设置页数值控件）。
+      //   它**不是开关**而是阈值：与上面一排开关同登记（同一页、同一「渲染 + 绑定 + 守卫登记」纪律），
+      //   但语义分列 —— 开关答「算不算」，阈值答「多少算偏得多」。
+      'wa-sw-deviationalert',
       'wa-sw-out',
       'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
@@ -2228,7 +2325,12 @@
         sessions: st.sessions, openSessions: st.openSessions, pending: st.pending,
         openConflicts: st.openConflicts, blocked: st.blocked, lastReason: st.lastReason || '',
         faults: st.faults || {},
-        note: '只报会话/队列/未裁决冲突计数（本节目不占角色、不重放、不裁决）'
+        // v2.139.0（E10）：协作任务面。三桶 + 两份留步**分开报**：
+        //   breachRecorded 是「记下了」，penalized 是「真罚了」——合成一个数就答不出
+        //   「违约有没有被处置」。taskTotal 与 st.tasks（累计建过几个）也不是同一件事。
+        taskActive: st.openTasks, taskTotal: st.taskTotal,
+        breachRecorded: st.breachesRecorded, penalized: st.penalized,
+        note: '只报会话/队列/未裁决冲突与任务三桶（本节目不占角色、不重放、不裁决、不罚没）'
       };
     }, {});
   }
@@ -2303,7 +2405,7 @@
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), intel: secIntel(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), intel: secIntel(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
       //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，

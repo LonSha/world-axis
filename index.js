@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.138.0'
+  const VERSION = '2.139.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -492,6 +492,12 @@
     //   也不产注入块 —— 与 polish 并列成「调用期模块」的一批，便于一眼看全。
     //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
     'engines/ensemble.js',
+    // v2.139.0（E9）：势力关系动态图与张力热力图。
+    //   装载位置：**须晚于** engines/evolution.js（档位词表 FACTION_RELATION / FACTION_STATUS 的
+    //   单一真源在那里，本模块**不自带副本** —— 两份枚举必然漂移），
+    //   且**须早于** readers —— engines/tool-diag.js 与 ui/panel.js 都要读它的现场读数。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/faction-graph.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

@@ -765,7 +765,7 @@
       <div class="wa-row"><input id="wa-cn-peract" class="wa-input wa-num" type="number" min="1" max="40" value="${WA.canon ? WA.canon.getSettings().perAct : 6}" title="每幕合并多少节（节 = 该点数的剧情点）。架构源 ADR-0009 的「幕数 ≈ 节数/6」即此值取 6。调小 ⇒ 幕更密"/><button class="wa-btn" id="wa-cn-build" title="纯计算：按字符/段落边界切分成「幕 → 剧情点」，只切分不改写，**不采纳**（不写存档）。要落盘请再点「采纳」">切分试算</button><button class="wa-btn" id="wa-cn-adopt" title="唯一写入口：把上一次试算的大纲落盘（原著全文**不入存档**，只落可定位的骨架）。已采纳过则覆盖并留下 replacedAt">采纳大纲</button></div>
       <textarea id="wa-cn-text" class="wa-ta" placeholder="把原著正文粘在这里（只用于本次切分，不会进存档）——超上限一律拒收，不静默截断"></textarea>
       <div class="wa-row"><input id="wa-cn-src" class="wa-input" placeholder="来源备注（第几卷/哪个译本，可空）"/><input id="wa-cn-coord" class="wa-input" placeholder="定位坐标（如 A3.5）"/><button class="wa-btn" id="wa-cn-locate" title="按幕/点坐标定位回原文骨架——坐标是标出来的，越界一律照实说「不成立」，不夹到边界">定位</button><button class="wa-btn" id="wa-cn-view" title="只读：已采纳哪一份大纲、多少幕多少点、有没有被截断（截断必须报出，不然你会以为全整理完了）">当前大纲</button><button class="wa-btn" id="wa-cn-clear" title="清掉已采纳的大纲（只清大纲，不动世界状态）">清空</button></div>
-       <div class="wa-row"><input id="wa-cn-check" class="wa-input" placeholder="贴当前这一段正文，看它最像原著哪一幕（对的是题名，不是正文）"/><button class="wa-btn" id="wa-cn-signal" title="拿你贴的这段文本去撞幕目题名，报「最像第几幕」**并给证据**（共有的二字片段是哪几个）。说不出证据的读数只能让人替引擎背书。粒度是题名级——原著正文不入存档，故引擎手里只有题名">对位试算</button><button class="wa-btn" id="wa-cn-position" title="拿**世界侧已经发生的事**（纪事 / 暗流 / 回声 / 章节）去撞幕目题名，答「现在最接近原著第几幕」。它是猜测、不是判定——「有没有偏离」由你看着这些证据自己说">用世界侧历史对位</button><button class="wa-btn" id="wa-cn-gap" title="按上面的幕号，答「还剩几幕」= 总数 − 这个幕号。**只报数，不判偏离**：「还剩 4 幕」是事实，「所以你不该在这里」是判定，判定不是引擎的活">看推进度</button></div>
+       <div class="wa-row"><input id="wa-cn-check" class="wa-input" placeholder="贴当前这一段正文，看它最像原著哪一幕（对的是题名，不是正文）"/><button class="wa-btn" id="wa-cn-signal" title="拿你贴的这段文本去撞幕目题名，报「最像第几幕」**并给证据**（共有的二字片段是哪几个）。说不出证据的读数只能让人替引擎背书。粒度是题名级——原著正文不入存档，故引擎手里只有题名">对位试算</button><button class="wa-btn" id="wa-cn-position" title="拿**世界侧已经发生的事**（纪事 / 暗流 / 回声 / 章节）去撞幕目题名，答「现在最接近原著第几幕」。它是猜测、不是判定——「有没有偏离」由你看着这些证据自己说">用世界侧历史对位</button><button class="wa-btn" id="wa-cn-gap" title="按上面的幕号，答「还剩几幕」= 总数 − 这个幕号。**只报数，不判偏离**：「还剩 4 幕」是事实，「所以你不该在这里」是判定，判定不是引擎的活">看推进度</button><button class="wa-btn" id="wa-cn-deviation" title="偏离度量化：当前世界侧历史 vs 已采纳大纲的事件差异（撞上了哪几幕）与推进度，给出 score ∈ [0,1]（0 = 严格遵循）。**只报不改**——偏离不自动拉回；且 spread（散不散）与 lag（快不快）各自报出，合成一个数就答不出偏在哪一种偏法上">偏离度</button><button class="wa-btn" id="wa-cn-trend" title="偏离曲线（最近若干轮）：**怎么走到今天**的走势，而不是「今天怎么样」的另一个说法。用它看「是不是越走越远」——单点分数看不出这件事">偏离曲线</button></div>
        <div id="wa-cn-out" class="wa-out"></div>
        <div class="wa-row"><input id="wa-cn-actno" class="wa-input wa-num" type="number" min="1" placeholder="幕号"/><input id="wa-cn-ptno" class="wa-input wa-num" type="number" min="1" placeholder="点号（可空 = 整幕）"/><button class="wa-btn" id="wa-cn-go" title="按幕/点号拼出坐标再定位。拼坐标这一步**只有 coordOf 一处实现**——面板不自己拼 'A'+a+'.'+p：手拼的写法会绕开边界判定，于是 A0 / A999 这类号先被拼出来再撞进 locate，报错理由从「号不对」（bad-coord）变成「越界」（out-of-range），两句话的处置完全不同">按号定位</button><button class="wa-btn" id="wa-cn-act" title="取某一幕的剧情点题名（作者面，不进正文）。与「当前大纲」分列：那个答「整理到哪了」，这个答「这一幕里有哪些点」">看这一幕的点</button></div>
       <div class="wa-sec">传播与辟谣（一条事实在人际间怎么传、传到最后还是不是原来那条）</div>
@@ -792,6 +792,13 @@
       <div class="wa-row"><input id="wa-co-sid" class="wa-input" placeholder="会话 id"/><input id="wa-co-who" class="wa-input" placeholder="角色 / 操作人"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-co-open" title="打开一个会话：不限制同时在线、不踢人">开会话</button><button class="wa-btn" id="wa-co-claim" title="占用角色：已被别人占用则 claimed-by-other，不静默夺取">占角色</button><button class="wa-btn" id="wa-co-pending" title="只读：待重放队列（同 opId 不产生第二条）">待重放</button><button class="wa-btn" id="wa-co-conflicts" title="只读：尚未裁决的两端分歧（单边改动不是冲突）">未裁决冲突</button></div>
       <div id="wa-co-out" class="wa-out"></div>
+      <div class="wa-sec">协作任务与违约（约好一起做什么、到点各人做到没有）</div>
+      <div class="wa-row"><input id="wa-task-goal" class="wa-input" placeholder="目标（如 修水渠）"/><input id="wa-task-partners" class="wa-input" placeholder="参与人：甲:3,乙:3（冒号后是承诺量，可省）"/><input id="wa-task-deadline" class="wa-input" placeholder="多少秒后截止（如 600）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-task-create" title="建一个协作任务：参与人须属同一势力（缺归属与分属两家分开报）——多势力协作要先建联合势力，不把两家合成一个任务">建任务</button><button class="wa-btn" id="wa-task-view" title="只读：活跃/完成/违约三桶 + 违约记录数与真罚数（两个数不可合并：一个答『记下了』、一个答『真罚了』）">任务读数</button></div>
+      <div class="wa-row"><input id="wa-task-id" class="wa-input" placeholder="任务号（如 T1）"/><input id="wa-task-person" class="wa-input" placeholder="人物（罚没可留空=按违约名单逐人）"/><input id="wa-task-amount" class="wa-input" placeholder="数额（贡献/罚没）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-task-contribute" title="记一笔贡献：只有正数（回撤不是贡献）；不在任务名册上的人拒收 not-on-roster">记贡献</button><button class="wa-btn" id="wa-task-settle" title="到点结算：未到截止拒收 not-due；本操作只记不罚（缺缴者进违约名单），真罚要另按罚没">结算</button><button class="wa-btn" id="wa-task-penalize" title="显式罚没：逐人交给 org.penalize（本人 → 势力的一次转移），结果原话转述；未结算的任务不许罚（还没有违约名单）">罚没</button></div>
+      <div id="wa-task-out" class="wa-out"></div>
+
       <div class="wa-sec">插件钩子（进程内生命周期；不做市场／REST）</div>
       <div class="wa-row"><input id="wa-pl-name" class="wa-input" placeholder="插件名…"/><button class="wa-btn" id="wa-pl-reg" title="注册一个只记日志的 beforeSave 示例插件">注册示例</button><button class="wa-btn" id="wa-pl-unreg" title="按名字卸载已注册的插件（注册的逆操作；不留残钩）">卸载</button><button class="wa-btn" id="wa-pl-list" title="只读已注册插件">列表</button><button class="wa-btn" id="wa-pl-fire" title="只读触发计数">读数</button></div>
       <div id="wa-pl-out" class="wa-out"></div>
@@ -855,6 +862,30 @@
 
       <div class="wa-sec">势力（${factions.length}）</div>
       <div class="wa-list">${factions.slice(0,6).map(f => `<div class="wa-item">${factionBadge(f.status)} <b>${esc(f.name)}</b> <span class="wa-badge">${esc(f.status)}</span> <span class="wa-dim">${relBadge(f.relation)}${esc(f.relation)}</span>${f.currentGoal ? `<div class="wa-dim">目标：${esc(f.currentGoal)}</div>` : ''}</div>`).join('') || '<div class="wa-empty">暂无势力</div>'}</div>
+      ${(() => {
+        // v2.139.0（E9）：势力**关系网**读数。
+        //   它治的病：上面那一行列表只逐势力报「它对主视角的态度」，而「谁跟谁一伙、
+        //   谁跟谁对着」在这张面板上此前**完全不可见**（逐行求和 ≠ 图）。
+        //   三个按钮各答一个问题、**互不替代**：
+        //     · 张力 —— 整张网有多紧（一个数，含分母，可复算）；
+        //     · 同盟簇 —— 图被分成几块（含单点，否则「团数」会被读成「块数」）；
+        //     · 关系网 —— 逐条边（**带 basis**：这条边由哪两个字段算出来的，随时可复盘）。
+        //   四种未算成的情形**一律显式报出**，不留空面板：
+        //     模块缺席 / 开关未开 / 无势力 / 空图 —— 空白面板会把「没算」与「算出来是空的」塌成一件事。
+        const FG = WA.factionGraph;
+        if (!FG) return '<div class="wa-dim">势力关系网未加载</div>';
+        const fr = panelEl.dataset.fgOut || '';
+        return `<div class="wa-row">`
+          + `<button class="wa-btn wa-mini" id="wa-fg-tension" aria-label="势力关系网张力" title="全局张力 = 敌对边权重和 ÷ 有效边数（分母是边数，可复算；零边时如实标注分母被保护）">张力</button>`
+          + `<button class="wa-btn wa-mini" id="wa-fg-clusters" aria-label="势力关系网同盟簇" title="同盟簇 = 倾向达到「盟友」档及以上的连通子图；单点势力单列（不并入簇数，否则「同盟团数」会被读成「图分成几块」）">同盟簇</button>`
++ `<button class="wa-btn wa-mini" id="wa-fg-edges" aria-label="势力关系网逐条边" title="逐条边 JSON（含 basis：这条边由哪两个势力的对外态度算出）。边是**推导值**，不是观测到的势力间关系">关系网</button>`
+           + `</div><div class="wa-row">`
+           + `<input id="wa-fg-pa" class="wa-input" aria-label="势力关系网查边甲" placeholder="势力甲（查两家关系）"/>`
+           + `<input id="wa-fg-pb" class="wa-input" aria-label="势力关系网查边乙" placeholder="势力乙"/>`
+           + `<button class="wa-btn wa-mini" id="wa-fg-pair" aria-label="势力关系网查两家关系" title="就这两家到底什么关系：给出档位与亲疏，并带出这条边的依据（由哪两个对外态度推出）。自环与未知势力名一律报 bad-faction —— 「自己跟自己」不是一条边">查两家</button>`
+           + `<button class="wa-btn wa-mini" id="wa-fg-hot" aria-label="势力关系网最紧张者" title="逐节点热度排行：谁跟最多家敌对、谁跟最多家同盟。unknowns 单列 —— 「档位不在词表里、算不出来」与「真的没有敌对」绝不同形">最紧张</button>`
+           + `</div><div id="wa-fg-out" class="wa-out wa-dim">${esc(fr)}</div>`;
+      })()}
 
       <div class="wa-sec">声誉四维</div>
       <div class="wa-item wa-rep-grid">${['authority','common','shadow','circuit'].map(dim => {
@@ -2582,7 +2613,18 @@
     // v2.132.0（O19）：结算输出补游标读数 —— 玩家此前看不到「这一轮从谁开始」，
     //   于是「跨会话延续」与「每次都从 0 开始」在面板上不可分辨。`(续)` 标的是**本会话开局**
     //   是否从盘上恢复过（与 tick 次数无关，故只在恢复过时出现）。
-    on('#wa-life-tick', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); const person = WA.store && x.person ? ((WA.store.get()||{}).people||{})['p_'+x.person] : null; const goal = person && person.life && (person.life.goals||[]).filter(g=>g.status==='active')[0]; const decision = person && goal && WA.life.decide ? WA.life.decide(goal, person, { now: now, with: '玩家' }) : null; const r = WA.life.tick({ now: now, with: '玩家', decision: decision }); const why = decision ? (decision.action + '/' + decision.reason) : (r.reason || ''); const st = WA.life.stat ? WA.life.stat() : {}; lifeOut({ ok: !!r.ok, id: (r.changed || 0) + ':' + why + '·轮转起点' + (st.lastTurn || 0) + (st.turnRestored ? '(续)' : ''), reason: r.reason }, true); renderBody(); });
+    on('#wa-life-tick', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); const person = WA.store && x.person ? ((WA.store.get()||{}).people||{})['p_'+x.person] : null; const goal = person && person.life && (person.life.goals||[]).filter(g=>g.status==='active')[0]; const decision = person && goal && WA.life.decide ? WA.life.decide(goal, person, { now: now, with: '玩家' }) : null; const r = WA.life.tick({ now: now, with: '玩家', decision: decision }); const why = decision ? (decision.action + '/' + decision.reason) : (r.reason || ''); const st = WA.life.stat ? WA.life.stat() : {}; lifeOut({ ok: !!r.ok, id: (r.changed || 0) + ':' + why + '·轮转起点' + (st.lastTurn || 0) + (st.turnRestored ? '(续)' : '')
+      // v2.139.0（E8）：二阶公平读数就地并入这一行，**不新增控件 id**。
+      //   理由：H2 门禁按 id 采集渲染控件再与 UI_BINDINGS 对账，新增一个 id 就要同步
+      //   改守卫表；而这一行本就是「结算结果」的落点，把频率摘要挂在这里既不增面、
+      //   也确实回答了用户唯一想知道的那个问题（他这轮排上了没有、长期匀不匀）。
+      //   样本不足时如实说「样本不足」，不拿 0.000 冒充「非常平均」。
+      + (function () { const fa = st.fairness || null;
+        if (!fa) return '';
+        if (fa.sd === null) return '·频率：样本不足（至少 2 人）';
+        return '·频率 SD=' + fa.sd + (fa.fair === true ? '（公平）' : (fa.fair === false ? '（偏斜）' : ''))
+          + (fa.throws ? '·⚠降级 ' + fa.throws + ' 次' : ''); })()
+      , reason: r.reason }, true); renderBody(); });
     // v2.62.0：因果结算——原因必须已存在（knownCause 单一真源），延迟后果到点**只报告**，
     //   由用户显式结算；「取消」与「前提消失的失效」分开归因（两者都不得静默删记录）。
     const causalVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
@@ -2880,6 +2922,56 @@
       if (!WA.collab) return coOut({ ok: false, reason: 'module-missing' });
       const rows = (WA.collab.conflicts() || []).filter(function (c) { return c.open; });
       coOut({ ok: true, id: '未裁决 ' + rows.length + (rows.length ? '：' + rows.slice(0, 6).map(function (c) { return c.actor; }).join('、') : '') });
+    });
+    // v2.139.0（E10）：协作任务与违约（六口的真产品消费方 —— 每口至少一个）。
+    const tkOut = function (r) { return plainOut('wa-task-out', 'taskOut', r); };
+    if (panelEl.dataset.taskOut) { const o = $('#wa-task-out'); if (o) o.textContent = panelEl.dataset.taskOut; }
+    // 参与人文本 → 结构化：`甲:3,乙:3`。冒号后非正数视为未承诺（不猜一个默认量）。
+    const tkPartners = function () {
+      return (wv('#wa-task-partners') || '').split(',').map(function (s) { return s.trim(); })
+        .filter(function (s) { return !!s; })
+        .map(function (s) {
+          const i = s.indexOf(':');
+          if (i < 0) return s;
+          return { name: s.slice(0, i).trim(), pledge: Number(s.slice(i + 1).trim()) };
+        });
+    };
+    on('#wa-task-create', () => {
+      if (!WA.collab || !WA.collab.createTask) return tkOut({ ok: false, reason: 'module-missing' });
+      const sec = Number(wv('#wa-task-deadline'));
+      // 截止是**世界时钟刻度**，而用户只该说「多久之后」——换算放在这一层，不让面板泄漏刻度语义。
+      //   时间源走 clockNow（决策时间单一出口）：裸调 Date.now() 会被 G20 门禁抓，
+      //   且冻结世界钟时面板算出的截止会与 collab 的判定时钟不同源。
+      const dl = (isFinite(sec) && sec > 0) ? (clockNow('panel.task') + sec * 1000) : NaN;
+      const r = WA.collab.createTask(tkPartners(), wv('#wa-task-goal'), dl);
+      if (r.ok && $('#wa-task-id')) $('#wa-task-id').value = r.task;
+      tkOut(r.ok ? { ok: true, id: r.task + '（' + r.faction + ' · ' + r.partners.join('、') + '）' } : r);
+    });
+    on('#wa-task-contribute', () => {
+      if (!WA.collab || !WA.collab.contribute) return tkOut({ ok: false, reason: 'module-missing' });
+      const r = WA.collab.contribute(wv('#wa-task-person'), wv('#wa-task-id'), Number(wv('#wa-task-amount')));
+      tkOut(r.ok ? { ok: true, id: r.person + ' → ' + r.task + ' 累计 ' + r.contributed } : r);
+    });
+    on('#wa-task-settle', () => {
+      if (!WA.collab || !WA.collab.settle) return tkOut({ ok: false, reason: 'module-missing' });
+      const r = WA.collab.settle(wv('#wa-task-id'));
+      if (!r.ok) return tkOut(r);
+      tkOut(r.already ? { ok: true, id: '已结算过（不重复记违约）' }
+        : { ok: true, id: r.breached ? ('违约 ' + r.missed.length + ' 人：' + r.missed.join('、') + '（只记不罚）') : '全部履约' });
+    });
+    on('#wa-task-penalize', () => {
+      if (!WA.collab || !WA.collab.penalize) return tkOut({ ok: false, reason: 'module-missing' });
+      const r = WA.collab.penalize(wv('#wa-task-id'), wv('#wa-task-person') || null, '粮', Number(wv('#wa-task-amount')));
+      const refused = (r.rows || []).filter(function (x) { return !x.ok; });
+      tkOut(r.ok ? { ok: true, id: '罚没 ' + r.applied + ' 人 → ' + r.faction
+        + (refused.length ? '（部分被拒：' + refused.map(function (x) { return x.name + ':' + x.reason; }).join('、') + '）' : '') } : r);
+    });
+    on('#wa-task-view', () => {
+      if (!WA.collab || !WA.collab.taskStat) return tkOut({ ok: false, reason: 'module-missing' });
+      const st = WA.collab.taskStat();
+      tkOut({ ok: true, id: '活跃 ' + st.active + ' / 完成 ' + st.completed + ' / 违约 ' + st.breached
+        + '（记 ' + st.breachRecorded + ' · 罚 ' + st.penalized + '）'
+        + (st.rows.length ? '：' + st.rows.slice(-3).map(function (t) { return t.id + (t.short.length ? '(' + t.short.join('/') + '欠)' : '✓'); }).join('、') : '') });
     });
     const plOut = function (r) { return plainOut('wa-pl-out', 'pluginOut', r); };
     on('#wa-pl-reg', () => {
@@ -3962,6 +4054,26 @@
       return canonOut({ ok: true, id: r.coord + ' 之后还剩 ' + r.remain + ' 幕（共 ' + r.total + ' 幕'
         + (r.archived < r.total ? '，已整理 ' + r.archived + ' 幕' : '') + '）· 只报数，不判偏离' });
     });
+    // v2.139.0（E11）：偏离度与偏离曲线（`deviation` / `deviationTrend` 的真产品消费方）。
+    //   两枚各答一个问题、**互不替代**：偏离度答「现在偏了多少」（含两个分量），
+    //   偏离曲线答「是不是越走越远」（单点分数看不出趋势）。
+    //   口径①在 UI 上的体现：两枚都**只读**——不 markCoord、不写 store、不改大纲。
+    on('#wa-cn-deviation', () => {
+      if (!WA.canon || !WA.canon.deviation) return canonOut({ ok: false, reason: 'module-missing' });
+      const r = WA.canon.deviation({});
+      if (!r.ok) return canonOut(r);
+      return canonOut({ ok: true, id: '偏离 ' + r.score + '（散 ' + r.spread + ' · 慢 ' + r.lag
+        + '；撞上 ' + r.hits.join('/') + '；共 ' + r.rows + ' 行'
+        + (r.thin ? '，样本不足' : '')
+        + (r.over ? ' 已越过告警线 ' + r.alert : '') + '）· 只报不改' });
+    });
+    on('#wa-cn-trend', () => {
+      if (!WA.canon || !WA.canon.deviationTrend) return canonOut({ ok: false, reason: 'module-missing' });
+      const r = WA.canon.deviationTrend(20);
+      if (!r.adopted) return canonOut({ ok: false, reason: 'no-outline' });
+      return canonOut({ ok: true, id: (r.points.length ? r.points.map(function (p) { return p.score; }).join(' → ') : '暂无（历史行不足）')
+        + '（共 ' + r.points.length + ' 点 · 只报不改）' });
+    });
     // v2.96.0（X3）：传播与辟谣的面板绑定。
     //   五类拒绝理由都必须看得见——它们在世界状态里都长得像「什么都没发生」：
     //     · unknown-fact（事实没登记，不凭空造一条）/ layer-ascend（不许升格成既成事实）；
@@ -4041,6 +4153,53 @@
       }).join('；')) : '无（只出事实与亲历两层）') } : r);
     });
     on('#wa-de-abort', () => { WA.directEvent.abort(); renderBody(); });
+
+    // v2.139.0（E9）：势力关系网三个入口的绑定。
+    //   四种「没算成」的情形一律**显式报出**（不留空面板）：这四种在空白面板上长得一模一样，
+    //   而处置方式完全不同 —— 模块坏了 / 开关没开 / 世界没有势力 / 图真的是空的。
+    const fgOut = function (text) { panelEl.dataset.fgOut = text; const o = $('#wa-fg-out'); if (o) o.textContent = text; };
+    const fgWhy = function (r) {
+      const m = { disabled: '关系网开关未开（设置里打开后才有图）', 'module-missing': '档位词表真源（evolution）缺席 —— 不拿自带副本顶替',
+        'no-factions': '世界里还没有势力（无东西可算，与「图是空的」不是一回事）', 'empty-graph': '只有一个势力，图算出来了但没有边' };
+      return m[r] || ('未能计算：' + r);
+    };
+    on('#wa-fg-tension', () => {
+      const r = WA.factionGraph.tension();
+      if (!r.ok) return fgOut(fgWhy(r.reason));
+      fgOut('张力 ' + r.value + '（敌对 ' + r.hostile + ' ÷ 边 ' + r.denominator + '；中立边 ' + r.neutral
+        + (r.worstTier ? '；最差 ' + r.worstTier : '') + (r.denominatorGuarded ? '；零边：分母已保护' : '') + '）');
+    });
+    on('#wa-fg-clusters', () => {
+      const r = WA.factionGraph.clusters();
+      if (!r.ok) return fgOut(fgWhy(r.reason));
+      fgOut('同盟簇 ' + r.count + ' 团（≥' + (r.allyTier || '?') + '）：'
+        + (r.clusters.map(c => c.join('+')).join(' / ') || '无')
+        + '；单点 ' + r.singletons.length + ' 个（图共 ' + r.blocks + ' 块）');
+    });
+    on('#wa-fg-edges', () => {
+      const g = WA.factionGraph.buildGraph();
+      if (!g.ok) return fgOut(fgWhy(g.reason));
+      fgOut('边 ' + g.edges.length + ' 条（推导值）：' + g.edges.map(e => e.a + '—' + e.b + '：' + e.tier + '(' + e.affinity + ')').join('；'));
+    });
+    // v2.139.0（E9）：单对势力查边（`edgeOf` 的真产品消费方）。
+    //   为什么不是又一个「看全部」按钮：上面那枚答「这张网长什么样」，这一枚答
+    //   「**就这两个**到底什么关系」—— 势力多起来之后逐条读全表不可用，
+    //   而「两家的关系」是最常被问的那一问。
+    on('#wa-fg-pair', () => {
+      const a = wv('#wa-fg-pa'), b = wv('#wa-fg-pb');
+      const r = WA.factionGraph.edgeOf(a, b);
+      if (!r.ok) return fgOut(fgWhy(r.reason) + (r.reason === 'bad-faction' ? '（自环与未知势力名都算「不是一条边」）' : ''));
+      fgOut(a + '—' + b + '：' + r.edge.tier + '（亲疏 ' + r.edge.affinity + '，由 ' + r.edge.basis.join(' 与 ') + ' 推出——推导值不是观测值）');
+    });
+    // v2.139.0（E9）：最紧张的是谁（`heat` 的真产品消费方）。
+    //   逐节点热度排行：`unknowns` 与 `hostiles` 分列 —— 前者是「不知道」，后者是「知道是零」。
+    on('#wa-fg-hot', () => {
+      const r = WA.factionGraph.heat();
+      if (!r.ok) return fgOut(fgWhy(r.reason));
+      fgOut('最紧张：' + (r.rows.slice(0, 4).map(x => x.name + '（敌对 ' + x.hostiles + ' / 同盟 ' + x.allies
+        + (x.unknowns ? ' / 档位不明 ' + x.unknowns : '') + '）').join('、') || '无')
+        + '；共 ' + r.nodes + ' 家');
+    });
     // v2.11.0: 推演中止——引擎侧 `abort()` 已实现却无人调用（用户只能刷页面打断）
     on('#wa-bs-abort', () => { WA.backstage.abort(); WA.log('warn', '世界推演已请求中止'); renderBody(); });
     // 势力/事件编辑器绑定（v0.9.0）

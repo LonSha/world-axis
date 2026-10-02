@@ -772,6 +772,84 @@ function runWitness(WA) {
       }
     }
   }
+  // ── v2.139.0（E9）：势力关系动态图三个新出口的见证 ──
+  //   同一把尺子（见 E7 段）：见证**不是声称**，用真 API 把码跑出来。
+  //   三条都不是「参数写错」，而各自对应「世界上真没有可算的东西」的**三种不同情形**：
+  //     · no-factions  —— 一个势力都没有（没东西可算）；
+  //     · empty-graph  —— 算出来了但零边（「算出来是空的」与「没东西可算」不是一回事）；
+  //     · bad-faction  —— 自环或未知势力名（「自己跟自己」不是一条边）。
+  //   三者都可由外部输入触发（势力是编辑器/导入写进世界的），故写见证而非列死表。
+  //   收卷契约（本段实测踩到，与 X5 / O9 段同规格）：本段往**世界**写真势力行，
+  //     写完不收回，后续锁在世界里就会多出一个势力。先留底，finally 无条件还原。
+  if (WA.factionGraph && typeof WA.factionGraph.buildGraph === 'function') {
+    const Fg = WA.factionGraph;
+    const keepFg = Fg.getSettings();
+    const keepFactions = WA.store.get().evolution ? (WA.store.get().evolution.factions || null) : null;
+    try {
+      WA.store.transact(function (d) { d.evolution = d.evolution || {}; d.evolution.factions = []; }, 'reject-witness:fg0');
+      Fg.setSettings({ enabled: true });
+      want('no-factions', 'factionGraph.buildGraph 世界无势力 ⇒ no-factions（v2.139.0 E9 新增）');
+      trip('no-factions', function () { return [Fg.buildGraph().reason]; });
+      WA.store.transact(function (d) {
+        d.evolution = d.evolution || {};
+        d.evolution.factions = [{ id: 'wg1', name: '见证势力', status: '稳固', relation: '中立', scope: '' }];
+      }, 'reject-witness:fg1');
+      want('empty-graph', 'factionGraph 只有一个势力 ⇒ empty-graph（算出来是空的，与 no-factions 分列，v2.139.0 E9 新增）');
+      trip('empty-graph', function () { return [Fg.buildGraph().reason]; });
+      want('bad-faction', 'factionGraph.edgeOf 自环 / 未知势力名 ⇒ bad-faction（v2.139.0 E9 新增）');
+      trip('bad-faction', function () {
+        return [Fg.edgeOf('见证势力', '见证势力').reason, Fg.edgeOf('见证势力', '查无此势力').reason];
+      });
+    } finally {
+      Fg.setSettings(keepFg);
+      WA.store.transact(function (d) { d.evolution = d.evolution || {}; d.evolution.factions = keepFactions; }, 'reject-witness:fg-restore');
+    }
+  }
+  // ── v2.139.0（E10）：协作任务与违约四枚新码的见证 ──
+  //   同一把尺子（见 E7 / E9 段）：见证**不是声称**，用真 API 把码跑出来。
+  //   四枚各对应一句产品承诺，且都能被外部输入触发（人在不在名册、到没到截止、几个人）：
+  //     · bad-task      —— 任务号坏 / 不存在（不是「参数写错」，是**查无此任务**）；
+  //     · not-due       —— 还没到截止（「没到点」与「做没做」不是一件事）；
+  //     · too-few       —— 参与人数不足 2（一个人的任务不是协作任务，它是日程）；
+  //     · not-on-roster —— 罚没目标不在名册（org.penalize 的原话，转到任务面如实转述）。
+  //   收卷契约（与 E9 段同规格）：本段往**世界**写势力 / 人名册 / 人手粮与任务表，
+  //     写完不收回，后续锁在世界里就会多出这些行。先留底，finally 无条件还原。
+  if (WA.collab && typeof WA.collab.createTask === 'function') {
+    const Cb = WA.collab;
+    const keepCb = Cb.getSettings();
+    const keepCollab = WA.store.get().collab || null;
+    const keepEvo = WA.store.get().evolution || null;
+    const keepPeople = WA.store.get().people || null;
+    try {
+      // 造一个能建任务的最小世界：一个势力 + 名册里两个人 + 两人各有粮。
+      WA.store.transact(function (d) {
+        d.evolution = d.evolution || {};
+        d.evolution.factions = [{ id: 'wc1', name: '见证村', status: '中立', relation: '中立',
+          resources: { '粮': 100 }, roster: { '见证甲': { role: 'member' }, '见证乙': { role: 'member' } } }];
+        d.people = d.people || {};
+        d.people['p_见证甲'] = { name: '见证甲', resources: { '粮': 10 } };
+        d.people['p_见证乙'] = { name: '见证乙', resources: { '粮': 10 } };
+        d.collab = { seq: 0, sessions: [], claims: {}, queue: [], conflicts: [], tasks: [] };
+      }, 'reject-witness:cb0');
+      Cb.setSettings({ enabled: true });
+      want('bad-task', 'collab.settle 任务号不存在 ⇒ bad-task（v2.139.0 E10 新增）');
+      trip('bad-task', function () { return [Cb.settle('查无此任务').reason]; });
+      const wTask = Cb.createTask([{ name: '见证甲', pledge: 1 }, { name: '见证乙', pledge: 1 }], '见证任务', Date.now() + 600000);
+      want('not-due', 'collab.settle 未到截止 ⇒ not-due（v2.139.0 E10 新增）');
+      trip('not-due', function () { return [Cb.settle(wTask.task).reason]; });
+      want('too-few', 'collab.createTask 参与人数不足 2 ⇒ too-few（v2.139.0 E10 新增）');
+      trip('too-few', function () { return [Cb.createTask(['见证甲'], '独干', Date.now() + 600000).reason]; });
+      want('not-on-roster', 'collab.penalize 目标不在任务名册 ⇒ not-on-roster（v2.139.0 E10 新增）');
+      trip('not-on-roster', function () { return [Cb.penalize(wTask.task, '查无此人', '粮', 1).reason]; });
+    } finally {
+      Cb.setSettings(keepCb);
+      WA.store.transact(function (d) {
+        d.collab = keepCollab;
+        d.evolution = keepEvo;
+        d.people = keepPeople;
+      }, 'reject-witness:cb-restore');
+    }
+  }
   // ── v2.97.0（O9）别名表与追溯链：五个新码，各自一条真 API 见证 ──
   //   为何这些码值得有见证而不进死表：它们全都**可被外部输入触发**——
   //   旧存档里的环、外部导入的深链、面板上填错的旧名，三样都会走到这里。

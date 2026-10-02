@@ -240,7 +240,8 @@
       //   · collab：{ seq, sessions[], claims{}, queue[], conflicts[] }，四张表各自由模块
       //     的容量设置夹住（见 core/evict.js 的两条新站点登记）。
       chrono: { seq: 0, entries: [] },
-      collab: { seq: 0, sessions: [], claims: {}, queue: [], conflicts: [] },
+      // E10: collab jia di-wu zhang biao tasks. gu-jia bi-xu sheng-ming ta.
+      collab: { seq: 0, sessions: [], claims: {}, queue: [], conflicts: [], tasks: [] },
       // v2.117.0（计划二 B6）：机会形成（opportunity.js 唯一写入 `draft.opportunity`）。
       //   openings 每行 = 一个「此刻可参与的窗口」及其作答痕迹；四个必答项
       //   （由哪项变化产生 / 涉及谁 / 窗口多久 / 忽略会怎样）逐行落在行里。
@@ -1362,6 +1363,8 @@
     'collab.sessions':  { cap: 64,  site: 'collab.js WA.evict.array(c.sessions)' },
     'collab.queue':     { cap: 128, site: 'collab.js WA.evict.array(c.queue)' },
     'collab.conflicts': { cap: 64,  site: 'collab.js WA.evict.array(c.conflicts)' },
+    // E10: ren-wu-biao. cap 24 yu DEF.maxTasks tong-zhi.
+    'collab.tasks':     { cap: 24,  site: "collab.js WA.evict.array(c.tasks, 'collab.tasks')" },
     'chrono.entries':   { cap: 128, site: 'chrono.js WA.evict.array(c.entries)' },
     // v2.117.0（计划二 B6）：机会窗口在途行。登记键与 evict.SITES 的 path 同名同值
     //   （上面的把门判据逐键对账）。cap 8 与引擎 DEF.maxOpen 同源。

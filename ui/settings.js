@@ -109,6 +109,16 @@
       //   `weatherLink` —— 走同一通道会把 hazard 自己的总开关顺手改掉（一个控件改两个语义，
       //   正是「两套数并存」那一类最贵的缺陷）。故给它专用属性 + 专用绑定（见 switchBind 尾段）。
       + '<label class="wa-row" title="暴雨/暴雪达阈值时自动建一行灾害账（只建账：不改天气、不改通行）；默认关闭"><input type="checkbox" id="wa-sw-hazardwx" data-hzwx="link"' + (hzwxOn() ? ' checked' : '') + dis('hazard') + '/> 天气造灾害（累积风险）</label>'
+      // v2.139.0（E9）：势力关系网读数（只读的图读数，渲染在事件页势力区下方）。
+      //   挂在 settings 页是为了让「这张图能不能算」在**一处**可见：
+      //   事件页那三枚按钮报的是读数本身，这里报的是它的开关档。
+      + '<label class="wa-row" title="按势力的对外态度档推导关系网（边是**推导值**，带 basis 可复盘）；只算不写，不合并势力、不触发事件"><input type="checkbox" id="wa-sw-factiongraph" data-sw-ns="factionGraph"' + (ini('factionGraph') ? ' checked' : '') + dis('factionGraph') + '/> 势力关系网（只读图读数）</label>'
+      // v2.139.0（E11）：剧情偏离度告警线。**读数与策略分列**——这条线只决定
+      //   「多少算偏得多」（跨线时面板上标一个 ⚠），它**不改任何分**，也不触发任何拉回。
+      //   与上面几行同取「挂 data-sw-ns 让通用通道写」：本设置只改一个数，
+      //   走那条通道即可；`dis()` 保证设置面缺席时仍渲染（缺席本身就是断裂）。
+      + '<div class="wa-set-row"><span>偏离度告警线（0–1，越线只在面板标 ⚠）</span>'
+      + '<input type="number" min="0" max="1" step="0.05" value="' + (function () { try { return WA.canon ? WA.canon.getSettings().deviationAlert : 0.7; } catch (e) { return 0.7; } })() + '" aria-label="偏离度告警线" id="wa-sw-deviationalert" data-sw-ns="deviationAlert" class="wa-input wa-w60"/></div>'
       // 读数行：只说「开关状态 / 已触发几行 / 认哪几种天气」——**不假装有内容**（未开启时恒 0）。
       //   本行是 show-and-tell 的落点：v2.135.0 之后的教训是「能力落盘但用户无从确认它是否在跑」。
       + (function () {

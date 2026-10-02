@@ -38,7 +38,7 @@
 //     B10 clear-throw：清空事务抛异常 ⇒ 如实归因，且**大纲不被当成已清掉**
 //     B11 clearOutline 的闸：没大纲时清空报 no-outline（不能把「没得清」当「清成功」）
 //     B12 注入块的题名收尾：幕题名自带句末标点，拼接前必须剥掉（不许出现「。。」）
-//     B13 出口面恰为 13 个成员（新增导出必付代价——加成员就得来改本锁）
+//     B13 出口面恰为 19 个成员（新增导出必付代价——加成员就得来改本锁）
 //     B14 **观测不得改变被观测对象**：诊断节只读（collect() 不改 buildOutline 的计数）
 //   C 不变式：coordOf 拼出来的坐标与 locate 解析出来的坐标同一（拼装只有一处实现）。
 //   N1–N15 负控制：真源码破坏 ⇒ 装载破坏副本 ⇒ 在副本上重跑**同款**真判据。
@@ -315,12 +315,14 @@ function probeTitleTrim(W) {
 function probeExactKey(W) {
   try {
     const keys = Object.keys(W.canon);
-    // v2.100.0：出口面 13 → 17。新增四口**必须**在场（只改数字、不验成员名，
-    //   会让「删掉 signal 又加一个无关成员」照样绿——那是把判据放宽，不是收口）。
-    return keys.length === 17 && keys.indexOf('coordOf') >= 0 && keys.indexOf('actText') >= 0
+    // v2.100.0：出口面 13 → 17；v2.139.0（E11）：17 → 19（deviation / deviationTrend）。
+    //   新增口**必须**在场（只改数字、不验成员名，会让「删掉 signal 又加一个无关成员」
+    //   照样绿——那是把判据放宽，不是收口）。
+    return keys.length === 19 && keys.indexOf('coordOf') >= 0 && keys.indexOf('actText') >= 0
       && keys.indexOf('LIMITS') >= 0 && keys.indexOf('stat') >= 0
       && keys.indexOf('signal') >= 0 && keys.indexOf('position') >= 0
-      && keys.indexOf('gap') >= 0 && keys.indexOf('alignView') >= 0;
+      && keys.indexOf('gap') >= 0 && keys.indexOf('alignView') >= 0
+      && keys.indexOf('deviation') >= 0 && keys.indexOf('deviationTrend') >= 0;
   } catch (e) { return false; }
 }
 /** B14 观测不得改变被观测对象：诊断节只读（collect 不改计数）。 */
@@ -344,12 +346,13 @@ function runAll(a) {
     'v2990: [A1] 不调模型（口径③：canon.js 零提及 WA.apiRouter——分幕是纯算术，模型分幕不可复现）；'
     + '判据刻意认 `WA.apiRouter` 而不是裸字串 `apiRouter`：后者在头部说明里本来就出现一次（自纠，'
     + '原判据把「注释里说了这件事」误判成「代码里做了这件事」）');
-  a(panSrc.indexOf('WA.canon') >= 0 && hits(panSrc, "on('#wa-cn-") === 10,
-    'v2990: [A2] 面板真接线（v2.100.0 起 10 条 canon 绑定：build / adopt / locate / view / clear / go / act'
-    + ' + 对位三枚 signal / position / gap——新增导出各有一个**真消费方**，无消费方不挂导出）');
-  a(hits(diagSrc, "'wa-cn-") === 19,
-    'v2990: [A2] 诊断节的 UI_BINDINGS 登记 19 个 canon 控件 id（渲染 + 绑定 + 守卫登记三件齐做；'
-    + 'v2.100.0 新增 wa-cn-check / wa-cn-signal / wa-cn-position / wa-cn-gap 四枚）');
+  // v2.139.0（E11）：10 → 12（新增 deviation / trend 两枚，各接一个真导出）。
+  a(panSrc.indexOf('WA.canon') >= 0 && hits(panSrc, "on('#wa-cn-") === 12,
+    'v2990: [A2] 面板真接线（10 条既有 + E11 两枚 = 12 条——新增导出各有一个**真消费方**，无消费方不挂导出）');
+  // v2.139.0（E11）：19 → 21。
+  a(hits(diagSrc, "'wa-cn-") === 21,
+    'v2990: [A2] 诊断节的 UI_BINDINGS 登记 21 个 canon 控件 id（渲染 + 绑定 + 守卫登记三件齐做；'
+    + 'E11 新增 wa-cn-deviation / wa-cn-trend 两枚）');
   a(diagSrc.indexOf("'engines/canon.js': 'canon',") >= 0
     && diagSrc.indexOf("const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat'];") >= 0,
     'v2990: [A3] canon 登记为**必载**模块（不在 OPTIONAL_EXPORTS 里——缺席即断裂，不该被静默兜住）');
@@ -381,7 +384,7 @@ function runAll(a) {
   a(probeTitleTrim(env().WA),
     'v2990: [B12] 门面文字收尾：题名末尾句号剥掉（不出现「。。」；多幕用分号分隔）');
   a(probeExactKey(env().WA),
-    'v2990: [B13] 出口面恰为 17 个成员（v2.100.0 起；加成员就得来改本锁——「新增导出必付代价」）');
+    'v2990: [B13] 出口面恰为 19 个成员（v2.139.0 E11 起；加成员就得来改本锁——「新增导出必付代价」）');
   a(probeDiagPureRead(env().WA),
     'v2990: [B14] 观测不得改变被观测对象：诊断节只读（collect() 不改 buildOutline 的计数）');
   // ── C 不变式 ──

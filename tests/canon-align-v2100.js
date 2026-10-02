@@ -441,14 +441,16 @@ function runAll(a) {
   a(hits(canonSrc, 'WA.apiRouter') === 0 && canonSrc.indexOf('不调模型') >= 0,
     'v2100: [A1] 不调模型（口径②：对位是纯算术——模型判定不可复现，「上次定位到第 3 幕」就没有意义）；'
     + '判据认 `WA.apiRouter` 而不是裸字串（后者在注释里本来就出现）');
-  a(panSrc.indexOf('WA.canon') >= 0 && hits(panSrc, "on('#wa-cn-") === 10,
-    'v2100: [A2] 面板真接线（v2.100.0 起 10 条 canon 绑定：7 条既有 + 对位三枚 signal / position / gap）');
+  // v2.139.0（E11）：canon 绑定 10 → 12（新增偏离度 / 偏离曲线两枚）。
+  a(panSrc.indexOf('WA.canon') >= 0 && hits(panSrc, "on('#wa-cn-") === 12,
+    'v2100: [A2] 面板真接线（v2.100.0 起 10 条 canon 绑定 + E11 的 deviation / trend 两枚 = 12 条）');
   a(panSrc.indexOf('WA.canon.signal(') >= 0 && panSrc.indexOf('WA.canon.position(') >= 0
     && panSrc.indexOf('WA.canon.gap(') >= 0,
     'v2100: [A2] 三枚对位按钮各接一个**真**导出（无消费方不挂导出——只在测试里活的导出不算交付）');
-  a(hits(diagSrc, "'wa-cn-") === 19,
-    'v2100: [A2] 诊断节的 UI_BINDINGS 登记 19 个 canon 控件 id（渲染 + 绑定 + 守卫登记三件齐做；'
-    + 'v2.100.0 新增 wa-cn-check / wa-cn-signal / wa-cn-position / wa-cn-gap 四枚）');
+  // v2.139.0（E11）：19 → 21（wa-cn-deviation / wa-cn-trend）。
+  a(hits(diagSrc, "'wa-cn-") === 21,
+    'v2100: [A2] 诊断节的 UI_BINDINGS 登记 21 个 canon 控件 id（渲染 + 绑定 + 守卫登记三件齐做；'
+    + 'E11 新增 wa-cn-deviation / wa-cn-trend 两枚）');
   a(diagSrc.indexOf("'engines/canon.js': 'canon',") >= 0
     && diagSrc.indexOf("const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat'];") >= 0,
     'v2100: [A3] canon 登记为**必载**模块（不在 OPTIONAL_EXPORTS 里——缺席即断裂，不该被静默兜住）');

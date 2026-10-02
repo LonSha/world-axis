@@ -1,13 +1,13 @@
 {
- "version": "2.138.0",
- "loadOrderCount": 163,
- "loadedCount": 160,
+ "version": "2.139.0",
+ "loadOrderCount": 164,
+ "loadedCount": 161,
  "uiCount": 3,
- "nsCount": 168,
+ "nsCount": 169,
  "totals": {
-  "loadEdges": 62,
+  "loadEdges": 63,
   "hardEdges": 0,
-  "callRefs": 124,
+  "callRefs": 126,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -48,6 +48,7 @@
     "engines/ensemble.js",
     "engines/entry-router.js",
     "engines/evolution.js",
+    "engines/faction-graph.js",
     "engines/foreshadow.js",
     "engines/group-refuse.js",
     "engines/hazard.js",
@@ -235,6 +236,7 @@
     "engines/coop.js",
     "engines/economy.js",
     "engines/ensemble.js",
+    "engines/faction-graph.js",
     "engines/foreshadow.js",
     "engines/group-refuse.js",
     "engines/inst.js",
@@ -2609,6 +2611,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_ensemble_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/faction-graph.js": {
+   "ns": [
+    "factionGraph"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_faction_graph_settings_v1"
    ],
    "consumedBy": []
   },

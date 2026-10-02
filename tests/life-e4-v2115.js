@@ -21,13 +21,26 @@ const TAG = '__e4v2115_';
 const REL = 'engines/life.js';
 // ── 破坏锚点（逐字取自真源码，各恰 1 次）──
 // ① 破坏「按组轮转」：整个环形取前 take 段摘掉（退回静态定序 —— 切点之后永远轮不到）
-const A_ROT = "const shift = _turn % G;\n          seq = g.rows.slice(shift).concat(g.rows.slice(0, shift));\n          _turn = (_turn + take) % G;";
+// ── E8（v2.139.0）之后的语义边界（本锁 2024 修订）────────────────────
+//   E8 把「组内定序」交还了可注入的加权随机源（`fairSpin`），确定性环形**降为兜底**
+//   （随机源缺席 / 抛错 / 拒绝采样触顶时才走）。于是「2 轮必覆盖全部 6 人」这类
+//   **确定性**判据在本锁里只能在**兜底路径**上判：在随机路径上判它，等于要求随机源
+//   必须复现环形 —— 那是把两条路合成一条，也正是 E8 要治的那个病。
+//   做法：把 `fairSpin` 的调用点换成 `null`（等价于随机源当场不可用）⇒ 走兜底路径，
+//   E4 语义原封不动地在那里被判。字面量只在此声明一次（判据侧引用本常量）。
+const A_SPIN = "const spin = fairSpin(g.rows, take);";
+function spinless() {
+  const src = fs.readFileSync(path.join(BASE, REL), 'utf8');
+  if (src.split(A_SPIN).length - 1 !== 1) throw new Error('A_SPIN 锚点不唯一');
+  return { 'engines/life.js': src.split(A_SPIN).join('const spin = null;') };
+}
+const A_ROT = "const spin = fairSpin(g.rows, take);\n          if (spin) { seq = spin.rows; _turn = (_turn + take) % G; stat.fairRounds++; }\n          else {\n            const shift = _turn % G;\n            seq = g.rows.slice(shift).concat(g.rows.slice(0, shift));\n            _turn = (_turn + take) % G;\n          }";
 // ② 破坏「留痕」：名额不足不再计数（静默少推演一个人，与「他本来没事可做」长得一样）
 const A_SKIP = "skipped = Math.max(0, N - cfg.maxPeople);";
 // ③ 破坏「组间严格按下标」：把所有人并成一组（低依据者可能挤掉高依据者）
 const A_GROUP = "const groups = [];\n      ranked.forEach(function (row) {\n        const last = groups.length ? groups[groups.length - 1] : null;\n        if (last && last.n === row.n) last.rows.push(row);\n        else groups.push({ n: row.n, rows: [row] });\n      });";
 const BROKEN = [
-  { key: 'rot', from: A_ROT, to: "seq = g.rows;" },
+  { key: 'rot', from: A_ROT, to: "seq = g.rows;" },   // E8 后：整段定序机制（加权随机 + 环形兜底）一起摘掉
   { key: 'skip', from: A_SKIP, to: "skipped = 0;" },
   { key: 'group', from: A_GROUP, to: "const groups = [{ n: ranked.length ? ranked[0].n : 0, rows: ranked }];" }
 ];
@@ -47,6 +60,8 @@ function anchorHits(spec) { return fs.readFileSync(path.join(BASE, REL), 'utf8')
 function guarded(fn) { return function (WA) { try { return fn(WA); } catch (e) { return 'threw:' + (e && e.message); } }; }
 function probeWith(spec, fn) { return guarded(fn)(fresh({ srcOverride: brokenOverride(spec) })); }
 function probeClean(fn) { return guarded(fn)(fresh()); }
+// 兜底路径上的同一探针（E8 之后 E4 语义只在这条路上，见 A_SPIN 段）
+function probeSpinless(fn) { return guarded(fn)(fresh({ srcOverride: spinless() })); }
 // ── 造场景 ──
 function setup(WA, spec) {
   WA.store.init();
@@ -138,7 +153,7 @@ function probeNoSpin(WA) {
     ? 'stable' : 'spinning';
 }
 function judge(a) {
-  const WA = fresh();
+  const WA = fresh({ srcOverride: spinless() });   // 兜底路径（见 A_SPIN 段）
   setup(WA, { people: ['A', 'B', 'C', 'D', 'E', 'F'], basis: { A: ['g'], B: ['g'], C: ['g'], D: ['g'], E: ['g'], F: ['g'] }, maxPeople: 4 });
   const rs = rounds(WA, 3, 100);
   a(rs.every(function (x) { return x.names.length === 4; }),
@@ -155,7 +170,7 @@ function judge(a) {
   a(rs.every(function (x) { return x.skipped === 2; }),
     'v2115/e4: [3] 每轮 skipped=2 留痕（实 ' + JSON.stringify(rs.map(function (x) { return x.skipped; })) + '）');
   // ② 依据优先不得被轮转破坏
-  const WA2 = fresh();
+  const WA2 = fresh({ srcOverride: spinless() });
   const basis2 = { S1: ['g', 'c'], S2: ['g', 'c'], S3: ['g', 'c'], W1: ['g'], W2: ['g'], W3: ['g'], W4: ['g'], W5: ['g'] };
   setup(WA2, { people: Object.keys(basis2), basis: basis2, maxPeople: 4 });
   const rs2 = rounds(WA2, 3, 200);
@@ -199,7 +214,7 @@ function runNegative(a) {
   a(probeWith(BROKEN[B.skip], probeSkip) === '0',
     'v2115/e4: [N1] 去掉留痕 ⇒ 名额不足静默发生（读不出「少推了谁」）');
   // N2 真源码成绿
-  a(probeClean(probeFair) === 'rotating', 'v2115/e4: [N2] 原版：同级轮转生效');
+  a(probeSpinless(probeFair) === 'rotating', 'v2115/e4: [N2] 兜底路径：同级环形轮转生效（E8 后确定性语义住在这里）');
   a(probeClean(probeStrong) === 'strong-first', 'v2115/e4: [N2] 原版：依据优先生效');
   a(probeClean(probeSkip) === '2', 'v2115/e4: [N2] 原版：名额不足如实留痕');
   a(probeClean(probeNoSpin) === 'stable', 'v2115/e4: [N2] 原版：整组装得下时不轮转');

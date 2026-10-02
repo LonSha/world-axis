@@ -31,7 +31,16 @@
     // v2.85.0 B1：两个「本可以推演却没推演」的原因必须分开计数——
     //   名额不足（skipped）与协作未被回应（unreciprocated）是两件事：
     //   前者是资源约束，后者是**依据不足**。合成一个数就再也答不出该加名额还是该等对方。
-    skipped: 0, unreciprocated: 0 };
+    skipped: 0, unreciprocated: 0,
+    // v2.139.0（E8）：**二阶公平**的两个留痕位。
+    //   E4（v2.115.0）治的是「同一组里总有个人排在后面」——它把静态定序换成环形轮转，
+    //   但环上的位置一旦定下就**永远不变**：同一组里「谁总排前面」仍然固定，
+    //   长期看依旧是位置决定命运，只是换了种排法。
+    //   本版把组内定序交还随机源（加权：依据多者概率大），于是「谁排前面」每轮都可能不同，
+    //   且**长期频率**第一次成了可被读数检验的东西（固定序做不到这一点）。
+    //   fairRounds 与 fairThrows 必须分开记：一个答「这套机制到底在不在跑」，
+    //   一个答「它有没有在背后静默降级」——合成一个数就再也答不出是哪一种。
+    fairRounds: 0, fairThrows: 0 };
   // v2.115.0（规划 01 的 E4）：**同等依据者的轮转游标**。
   //   为什么必须有它：静态排序 + 截断 ⇒ 同等依据的后段人物每一轮都被跳过，
   //   而 `skipped` 只答「这一轮少推了几个人」，答不出「谁总也没轮到」。
@@ -98,6 +107,73 @@
   const _restored = turnLoad();
   if (_restored !== null) _turn = _restored;
 
+  // ── v2.139.0（E8）：二阶公平的两个零件 ─────────────────────────────────────
+  // 【零件一：可注入的随机源】
+  //   本仓的随机一律走 `WA.rand`（core/rand.js）：它有显式播种与 `randStat().reproducible`，
+  //   于是「加权随机」这件事可以被**复现**（同一个 seed 必得同一个序）。
+  //   为什么不用 `Math.random()`：那样「它公平吗」在无头回归里没有答案，
+  //   判据只能放宽成「看起来像随机」——本仓明令禁止的形态（判据不可证伪）。
+  //   注意 `rand.pickWeighted(items, wf, ch)` 的契约是**返回单个元素**（内部一次带权滚动），
+  //   不是返回 `take` 个的抽样器；本模块要的恰是「按权逐个取且不重复」，
+  //   故用 `rand.next('life')`（单次均匀）配**权重接受/拒绝**自建，语义显式、且同样可复现。
+  function fairSpin(rows, take) {
+    const R = WA.rand;
+    if (!R || typeof R.next !== 'function') { stat.fairThrows++; return null; }
+    const pool = rows.slice();
+    const out = [];
+    let guard = 0;
+    while (out.length < take) {
+      // 硬上限：拒绝采样在最坏情况下可以长跑，而「某轮卡住」比「排得不够随机」严重得多。
+      //   触顶即**如实记 fairThrows 并整体退回环形定序**（不做半个结果）。
+      if (++guard > 64 + rows.length * 32) { stat.fairThrows++; return null; }
+      let u = null;
+      try { u = R.next('life'); } catch (e) { stat.fairThrows++; return null; }
+      if (typeof u !== 'number' || !isFinite(u)) { stat.fairThrows++; return null; }
+      const idx = Math.floor(Math.max(0, Math.min(0.999999999, u)) * pool.length);
+      const cand = pool[idx];
+      if (!cand) { stat.fairThrows++; return null; }
+      // 接受概率 = 依据条数 / 候选组内最大依据条数 ⇒ 依据多者更容易被接受，
+      //   低依据者仍**有机会**（这是与 E4 环形轮转的分水岭：这里没有固定环）。
+      const maxN = rows.reduce(function (a, r) { const n = Math.max(1, Number(r.n) || 1); return n > a ? n : a; }, 1);
+      const w = Math.max(1, Number(cand.n) || 1);
+      if (u * maxN < w) { out.push(cand); pool.splice(idx, 1); }
+      if (!pool.length) break;
+    }
+    // 取不满即整体失败（不做半个结果）：候选本就够 `take` 个，池被抽空只可能是契约外情形。
+    if (out.length !== take) { stat.fairThrows++; return null; }
+    return { rows: out };
+  }
+  // 【零件二：10 轮窗口读数】
+  //   判据是「最近 10 轮里每人实际推进次数的**标准差** < 2」——这是**统计**判据而非结构判据，
+  //   正是加权随机与环形轮转的分水岭：环形轮转拍胸脯说「每 G 轮必轮到一次」，
+  //   却答不出「实际频率」；加权随机答不了「下一轮是谁」，但**频率**可被检验。
+  //   窗口是进程态的环形缓冲（与 `_turn` 同族：不落盘、不新增容器键、不进存档）。
+  const FAIR_WINDOW = 10;
+  const _fairRounds = [];
+  function fairPush(id) {
+    if (!id) return;
+    _fairRounds.push(id);
+    if (_fairRounds.length > FAIR_WINDOW) _fairRounds.shift();
+  }
+  function fairnessOf() {
+    const counts = {};
+    _fairRounds.forEach(function (id) { counts[id] = (counts[id] || 0) + 1; });
+    const ids = Object.keys(counts);
+    const rows = ids.map(function (id) { return { id: id, n: counts[id] }; })
+      .sort(function (a, b) { return (b.n - a.n) || (a.id < b.id ? -1 : 1); });
+    // 样本少于 2 人时**标准差无意义**（一个人「非常平均」是恒真句）⇒ 如实报 null 而不是 0。
+    let sd = null;
+    if (rows.length >= 2) {
+      const mean = rows.reduce(function (a, r) { return a + r.n; }, 0) / rows.length;
+      sd = Math.sqrt(rows.reduce(function (a, r) { return a + (r.n - mean) * (r.n - mean); }, 0) / rows.length);
+      sd = Math.round(sd * 1000) / 1000;
+    }
+    return { window: FAIR_WINDOW, rounds: _fairRounds.length, sd: sd,
+      // `fair` 就是**判据本身**（与专锁同一处阈值）：SD 可算且 < 2 才算公平；
+      //   样本不足时为 null —— 「还没法判」与「判下来是公平的」绝不同形。
+      fair: sd === null ? null : sd < 2,
+      roundsUsed: stat.fairRounds, throws: stat.fairThrows, counts: counts, rows: rows };
+  }
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function personId(name) { const n = clean(name, 60); return n ? 'p_' + n : ''; }
   function ensureLife(person) {
@@ -257,9 +333,17 @@
         // 整组装得下 ⇒ 不轮转（轮转只在「有人要等」的地方才有意义）；
         // 只在这组装不下时把游标推进 `take`，于是下一轮从这一轮的末尾接着取。
         if (take < G) {
-          const shift = _turn % G;
-          seq = g.rows.slice(shift).concat(g.rows.slice(0, shift));
-          _turn = (_turn + take) % G;
+          // v2.139.0（E8）二阶治理：把「组内定序」交给可注入的加权随机源。
+          //   权重 = 依据条数（下限 1）⇒ 依据多者概率大、低依据者仍有机会；
+          //   依据为 0 者早被 `ranked` 滤掉，**不进候选**（加权随机不改准入门槛）。
+          //   抽不出来（无随机源 / 抛错 / 拒绝采样触顶）⇒ 退回 E4 的环形定序并记 fairThrows。
+          const spin = fairSpin(g.rows, take);
+          if (spin) { seq = spin.rows; _turn = (_turn + take) % G; stat.fairRounds++; }
+          else {
+            const shift = _turn % G;
+            seq = g.rows.slice(shift).concat(g.rows.slice(0, shift));
+            _turn = (_turn + take) % G;
+          }
         }
         picks.push.apply(picks, seq.slice(0, take));
         rest -= take;
@@ -292,6 +376,9 @@
         //   于是本轮真正在行动的人物，在淘汰排序上仍是「最旧」。
         p.intent = decision.action === 'wait' ? '等待条件' : decision.reason; p.updatedAt = f.now || stat.lastAt; changed++;
       });
+      // 窗口只在**真的推演过**时累积：`picks` 是这一轮真正走到决策的人，
+      //   用 `ranked` 会把「没排上的人」也算成推过一次（频率当场失真）。
+      picks.forEach(function (row) { fairPush(row.id); });
     }, 'life:tick');
     // v2.132.0（O19）：本轮游标推完才写盘 —— 盘上那份永远等于「上一次结算结束时他从哪一位接着排」。
     //   写在事务**之外**（游标不是世界事实，事务里写它就是拿一个进程量去改世界快照）。
@@ -327,6 +414,9 @@
     //   与 `turnPersisted`（上一次结算的落盘结论）。**零新增导出**：三口读数全在这一个既有成员里。
     //   它不进 store（见 TURN_KEY 上方：进了存档就等于把「上次从谁开始」当成世界事实，
     //   而导出/导入世界会把它一起搬走）。写侧只有 tick 一处。
-    stat: function () { return Object.assign({}, stat, { lastTurn: _turn, turnRestored: _restored !== null }); }
+    stat: function () { return Object.assign({}, stat, { lastTurn: _turn, turnRestored: _restored !== null,
+      // v2.139.0（E8）：二阶公平读数挂在**既有成员**里——本仓纪律是「为读一个量新开一口，
+      //   那一口当场就是死导出」，故 `life.fairness` 这个口**刻意不存在**。
+      fairness: fairnessOf() }); }
   };
 })();
