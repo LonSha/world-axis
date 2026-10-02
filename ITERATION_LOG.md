@@ -6,15 +6,15 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.142.0 |
-| 全量回归 | `node tests/run.js` → **v2.142.0 为通过 13760 / 失败 0 · status: passed**（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
+| 版本 | v2.143.0 |
+| 全量回归 | `node tests/run.js` → **v2.143.0 待计划全部完成后单跑**（遵用户纪律「在做完计划全部内容前不要跑全量」）。v2.142.0 为通过 13760 / 失败 0 · status: passed（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）；硬超时默认 660000ms，慢机可用 `WA_REGRESSION_TIMEOUT_MS` 放宽 |
 | 产品文件面 | 168（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 147 / members= 976 / chars= 11074 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 168 · 锁 162 · 可达 168 · 孤儿 0 · 豁免 0 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 147 / members= 977 / chars= 11079 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 169 · 锁 163 · 可达 169 · 孤儿 0 · 豁免 0 |
 | 死子面 | `node tests/dead-export-gate.js` → dead 764 / uiDead 4 / 仅测试 346 / dataOnly 248 |
-| 拒收码 | `node tests/reject-code-gate.js` → 625 码（见证 386 / 死表 9 / 基线 230） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.142.0 · 现场 refs 3707 / 命名空间 167 / 成员 2021 |
+| 拒收码 | `node tests/reject-code-gate.js` → 629 码（见证 390 / 死表 9 / 基线 230） |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.143.0 · 现场 refs 3707 / 命名空间 167 / 成员 2021 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | 锚点覆盖 | `node tools/anchor-scan.js` → 锁 121 把 · 覆盖 **121（100%）**＝ 统一档 37（锚点 294 · 问题 0）+ 非统一档已识别 84 · **未识别 0** · 非统一档问题 102（**只报不红**，逐条带证据与命中行类别） |
 | 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核；v2.135.0 扩到 `checked` = 34 站点） |
@@ -257,6 +257,75 @@
   `tests/reject-v2780.js`、`tests/settle-v2830.js`、`tests/module-cycle-gate-v2107.js`、
   `tests/dead-export-ledger.json`、`tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、
   `docs/ERROR_CODES.md`、`ITERATION_LOG.md`。
+
+### R129 · 2026-10-03 · v2.143.0：F4 在岗闸门（在职 ≠ 在岗）
+- **起点与终点**：起点 v2.142.0（`4604483`）；终点 v2.143.0（全量回归待计划全部完成后单跑）。
+- **它治的病：有权查阅 ≠ 已经查阅**。这是 F 线同型病的**第四例** —— 「**声明在注释里，落点不在代码里**」
+  （F1 防全知 / F2 时点 / F3 视角已各修一例）。缺口原句（心之壁【职分】）：
+  「一个角色有职位、有权查阅某份档案，不等于它此刻真的去查阅了」。实测：仓库**已有三个零件**——
+  `inst.authority`（在职面）/ `life.schedule`（日程面）/ `world.canBeAt`（在场面）——
+  但**没有一个函数把三者合读**；`rules.js` 第 22/65 行有「知情路径铁律」，却是给模型的**软约束**、
+  零引擎判据兜底。后果：一个正在休假的人，正文里照样能「坐在办公室里翻完卷宗」，两句都过闸。
+- **新增一口 `duty(person, orgId, at)`**。**签名与文档原稿的 `(person, factId, at)` 有意不同**：
+  本闸门答的是「**他此刻在不在这个岗上**」，与「问的是哪件事」无关；若把 `factId` 塞进签名，
+  就逼本模块**猜组织归属**（本仓点名的禁止形态）。故第二参取 `orgId`，缺它即 `missing-fields`。
+- **三态如实**（缺一就答不出该改日程还是该走任职流程）：
+  · `{known:false}` —— **任职面缺席**（`inst` 未加载 / 该组织无在册记录）⇒ 如实报缺席，
+    **不冒充「不在岗」**（这是本仓最反复治理的一条：问不出来 ≠ 问出来是否）；
+  · `{onDuty:false, reason:'off-duty', via:'scheduled'|'place-closed'}` —— **在职但此刻不在岗**
+    （被日程占住 / 该地此刻关着）⇒ 等排班、改日程；
+  · `{inOffice:false, onDuty:false, reason:'not-in-office'}` —— **压根不在职** ⇒ 先走任职流程。
+  两道前置拒收：总开关关 ⇒ `disabled`；第三轴关 ⇒ `duty-off`（**如实报这一轴缺席**，与「查不到」严格分开）。
+- **两码不进 `knows()` 的一票否决**（本版最要紧的取舍）：**人下班了，知道的事不会忘掉** ——
+  把 `off-duty` / `not-in-office` 塞进 `knows` 的 `deniedBy`，会把「他此刻在休假」读成
+  「他不知道这件事」，那是**另一种失真**。两个真源不可合并：`knows` 答「知道吗」，`duty` 答「在岗吗」。
+  故两码只出现在 `duty()` 的返回与 `boundary()` 的两条计数里，**不与 `not-holder` / `out-of-range` /
+  `premature` 混报**。判据真源**不新开**，只做一次合读（`inst.authority` × `life.schedule` × `world.canBeAt`）。
+- **码表**：复用 `disabled` / `missing-fields`；新开两码 `off-duty` / `not-in-office`；
+  `duty-off` 为**轴缺席读数**（与既有 `range-off` 同规格：前置于真判据，不产生上述两码）。
+- **产品面接线三站**（新导出必须有独立消费方，缺一不挂）：
+  ① `engines/tool-diag.js` 的 `secNoesis` 加三读数（`dutyEnabled` 第三轴开关位 + `offDuty` / `notInOffice`
+  **分开报**），并在 `UI_BINDINGS` 的 noesis 组登记 `wa-noe-duty`；
+  ② `ui/panel.js` 加「在岗闸门」按钮 + handler（组织名走「事实」输入框；`known !== true` 时报
+  「无话可说：任职面缺席」，否则按 `onDuty` / `reason` 出「在岗 / 在职但不在岗 / 不在职」三态）；
+  ③ `render` 注入链 `buildBlock` 加**在岗纪律段**（`if (cfg.dutyEnabled && (stat.offDuty > 0 ||
+  stat.notInOffice > 0))`）—— **零 token 占用、不列组织名/人名**。
+- **专锁 `tests/duty-v2143.js`（390 行，新建）**：A 结构（duty 在场 + `dutyEnabled` 默认 true + 总开关默认 false）
+  + B 运行时 B1–B19（on-duty / off-duty / not-in-office / 任职面缺席 / 缺参 / 总开关关 / 第三轴关 /
+  **与 knows 不互相否决** / 注入块纪律 / `boundary` 只读）+ C 消费方 C0–C7（诊断真读者 + 面板真渲染 + 点击）
+  + **八处真源码破坏锚点**（`master` 总开关闸摘掉 / `dutyOff` 第三轴闸摘掉 / `fallback` not-in-office
+  回落成 on-duty / `sched` 日程面摘掉 / `block` 注入链在岗纪律摘掉 / `diag` 两码合成一个读数 /
+  `diagAxis` 诊断面不报 `dutyEnabled` / `panel` 面板不渲染入口），每处须**恰中 1 次**；
+  H5 纯度（锚点字面量只准在 ANCHORS 表里声明、判据层零内联）+ 正控制 + N1–N8 负控 + N 纯度（真文件逐字未变）。
+  实跑 `DUTY-V2143: pass 30 项` + `NEGATIVE: pass 63 项`（合计 **93 项全绿**）。
+- **见证表四条新码（`tests/reject-v2780.js`，+124 行）**：`off-duty`（建组织+在职职位+覆盖此刻日程 ⇒
+  造场自证必须出 `off-duty` + `via:'scheduled'`）/ `not-in-office`（组织在册、席位在册但无人任职 ⇒
+  自证核 `authority.inOffice===false` 且 `view.posts.length===1`，确保是「有岗无人」而非「根本没岗」）/
+  `on-duty`（在职+无日程 ⇒ 正常归因，与既有 `omniscient` / `reuse` 同规格：同一词法形状出现，故必须有归属）/
+  `duty-off`（`dutyEnabled:false` ⇒ 如实报缺席）。**造场两处真 bug 已修**：
+  `inst.post(orgId, title, opts)` 第二参是 **title 字符串**（原稿误传对象）；`charter` 必须**先于** `post`
+  （否则 `post` 报 `unknown-org`）。见证 386 → 390。
+- **出口面契约**：`ns= 147 / members= 977 / chars= 11079`（较 v2.142.0 的 976 / 11074 各 **+1 / +5**，
+  因新增 `noesis.duty`）；`FROZEN2800` 的 noesis 节改为
+  `noesis:boundary buildBlock duty gateScene getSettings knows leakScan perceive setSettings stat`；`EC2430` 同步。
+- **门禁结果（全绿）**：`module-registry-gate` 文件 164 / 命名空间 172 / 装载期边 66 / 硬边 0 /
+  调用期引用 132 / 结构问题 0 · `dead-export-gate` dead 764 / uiDead 4 / 元数据同源 ·
+  `reject-code-gate` **629 码（见证 390 / 死表 9 / 基线 230）** · `export-contract` 977 / 11079 ·
+  `docs-archive-gate` 跨文件同号 0 · `test-surface-gate` 文件面 169 / 锁 163 / 可达 169 / 孤儿 0 ·
+  `inventory` 四类悬空均 0 · `module-cycle-gate` 环无 · `ui-gate` 通过 53 · `ui-wire-audit` 通过 9 ·
+  `anchor-scan-v2126` 31 项 / `anchor-scan-v2133` 55 项 · `negative-control-audit` EXIT=0 ·
+  `dup-decl-gate` 重复 0 · `field-liveness-gate` 无幽灵读点 · `toolchain-gate` EXIT=0 ·
+  `cost-v2880` / `settle-v2860` EXIT=0；三把老专锁复跑（`noesis-v2140` pass / `lifeline-v2141` pass 79 /
+  `perspective-lock-v2142` pass 109）。
+- **收口期修一处真缺陷（账本格式漂移）**：`tests/module-registry-ledger.json` 被一次性补丁脚本
+  按 `indent=2` 重写，产生 **2808 行纯缩进 churn**（`git diff -w` 下只剩 version 1 行真实变更）。
+  修法：**让门禁自己重生成**（`node tests/module-registry-gate.js --update`，其规范格式是
+  `JSON.stringify(report, null, 1)`）—— 手工补丁不得替门禁写它自己的产物。`reject-code-ledger.json`
+  同因缩进漂移，按 `indent=1` 复原后 `git diff` 从 468 行收敛到 **4 行**。
+- **影响范围**：`engines/noesis.js`、`engines/tool-diag.js`、`ui/panel.js`、`index.js`、`manifest.json`、
+  `tests/duty-v2143.js`（新）、`tests/run.js`、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、
+  `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
+  `ITERATION_LOG.md`。
 
 ### R124 · 2026-10-01 · v2.138.0：E7 区域天气与灾害深度联动（含 E5 多模型 ensemble 同批）
 - **起点与终点**：起点 v2.137.0（全量回归 13159 / 0，`256aead`）；终点 v2.138.0。

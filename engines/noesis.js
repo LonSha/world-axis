@@ -1,5 +1,19 @@
 /**
- * WorldAxis engines/noesis.js (v2.141.0) — 防全知闸门（知情边界统一裁决）
+ * WorldAxis engines/noesis.js (v2.143.0) — 防全知闸门（知情边界统一裁决）
+ *
+ * v2.143.0（F4）本版做一件事：把「在职 ≠ 在岗」从**注释里的说法**变成**可判定的引擎闸门** ──
+ *   缺口原句（心之壁【职分】）：「有权查阅 ≠ 已经查阅」——一个角色有职位、有权查阅某份档案，
+ *   不等于它此刻真的去查阅了（可能在休假、可能在别处、可能日程占满）。
+ *   实测：仓库有三个零件（`inst.authority` 在职面 / `life.schedule` 日程面 /
+ *   `world.canBeAt` 在场面），但**没有一个函数把三者合读**；`rules.js` 第 22/65 行有
+ *   「知情路径铁律」，却是给模型的**软约束**、零引擎判据兜底 —— 与本模块前身
+ *   （F1 防全知 / F2 时点 / F3 视角）是同一形态的第四例：**声明在注释里，落点不在代码里**。
+ *   本版新增 `duty(person, orgId, at)` 一口，两码不合并：
+ *     · `off-duty`      此人在职，但此刻被日程占住 / 不在该地 ⇒ 等排班、改日程；
+ *     · `not-in-office` 此人压根不在职 ⇒ 先走任职流程，与上面完全不同的处置。
+ *   两码**不进 knows() 的一票否决**：人下班了，知道的事不会忘掉——把它塞进 knows
+ *   会把「他此刻在休假」读成「他不知道这件事」，那是另一种失真。两个真源不可合并：
+ *   knows 答「知道吗」，duty 答「在岗吗」。
  *
  * v2.141.0（F2）本版做四件事，全是**上一版声明了、却没有落点**的那一类缺口 ────────
  *   ① `srcIntel` 修形态误读（第三种）：`intel.visibleTo` 返回的是**数组**，
@@ -46,10 +60,12 @@
  *     专锁 N 面钉的就是这条）。leakScan 检出穿帮**只留痕不删文**——删文是叙事决定，不是引擎决定。
  *   3 **不自动改正文**：gateScene 只回答「哪些人不该知道哪些事」，把处置权交还作者/模型。
  *     自动改写会把作者的笔抢走（与 E11「只报不改」同一条纪律）。
- *   4 五个归因码**不可合并**：\`not-registered\`（没登记过）/ \`not-holder\`（登记了但此人不知）/
- *     \`out-of-range\`（空间不可达）/ \`premature\`（时间未到）/ \`attenuated\`（在场但没注意到）。
+ *   4 七个归因码**不可合并**：\`not-registered\`（没登记过）/ \`not-holder\`（登记了但此人不知）/
+ *     \`out-of-range\`（空间不可达）/ \`premature\`（时间未到）/ \`attenuated\`（在场但没注意到）/
+ *     \`off-duty\`（在职但不在岗）/ \`not-in-office\`（压根不在职）。
  *     合成一个「不知」，就再也答不出「是边界没划、人不在场、时辰未到，还是他没留意」——
- *     四种处置完全不同（补账 / 拦人 / 等时间 / 叫他一声）。
+ *     四种处置完全不同（补账 / 拦人 / 等时间 / 叫他一声）；后两码（F4）同理分开：
+ *     一个要改日程，一个要走任职流程。
  *     v2.141.0（F2）如实登记：\`premature\` 在此版之前**只是这一句声明**——
  *     \`timeEnabled\` 在 DEF/boundary/stat 三处露脸却零消费方，\`docs/ERROR_CODES.md\` 里
  *     连它一行都没有；\`attenuated\` 是本版新开的第五码，它把边界 7 那句话变成可判定的。
@@ -71,14 +87,24 @@
  *     premature       时间未到（信息尚未产生就被引用）—— v2.141.0 起**有真产生方**
  *                     （timeGate：读 intel.truthOf 的 at 与决策时间比一次）
  *     attenuated      在场但没注意到（感知容量被病况/载荷削弱）—— v2.141.0 新开
+ *     off-duty        在职但在岗面不成立（被日程占住 / 不在该地）—— v2.143.0 新开（duty）
+ *     not-in-office   压根不在职（无任何在职职位）—— v2.143.0 新开（duty）
  *     leak            事后扫描检出的人物越界发言（留痕码，非拒收码）
+ *
+ * ── v2.143.0（F4）与既有四码的关系 ────────────────────────────
+ *   `off-duty` / `not-in-office` **不进 knows() 的 deniedBy**（见 dutyGate 注释）：
+ *   knows 答「知道吗」，duty 答「在岗吗」，是两个真源。它们只出现在 duty() 的返回与
+ *   boundary() 的两条计数里，**不与 not-holder / out-of-range / premature 混报**。
  */
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_noesis_settings_v1';
-  const DEF = { enabled: false, rangeEnabled: true, timeEnabled: true, maxLeaks: 8 };
+  // v2.143.0（F4）：`dutyEnabled` 是**在岗闸门**的总开关，与 `timeEnabled`（时点）/
+  //   `rangeEnabled`（空间）并列成第三轴。三者各自可关：关掉一轴不是「放宽纪律」，
+  //   而是**如实报这一轴缺席**（`duty-off` / `range-off`），与「查不到」严格分开。
+  const DEF = { enabled: false, rangeEnabled: true, timeEnabled: true, dutyEnabled: true, maxLeaks: 8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'noesis',
     bounds: { maxLeaks: [1, 32] } };
 
@@ -95,6 +121,10 @@
     // v2.141.0（F2）：premature 计数单列。**不与 denies 合并**——denies 是「人在界外」，
     //   premature 是「时辰未到」；合成一个读数就再也答不出该补划边界还是该等时间。
     premature: 0, perceiveIn: 0, perceiveOut: 0, perceiveUnknown: 0,
+    // v2.143.0（F4）：在岗闸门两码**分开计**。off-duty（此人在职但此刻不在岗）
+    //   与 not-in-office（此人根本不在职）处置不同——前者等排班，后者先任命；
+    //   合成一个「没资格」就再也答不出该改日程还是该走任职流程。
+    offDuty: 0, notInOffice: 0,
     lastReason: '', lastAt: 0, faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
@@ -245,6 +275,94 @@
     if (!isFinite(at) || at <= 0) return { known: true, premature: false, atKnown: false };
     const now = clockNow('noesis.time');
     return { known: true, premature: at > now, at: at, atKnown: true, source: tr.source };
+  }
+
+  /**
+   * 在岗闸门（v2.143.0 F4）：**在职不等于在岗**。
+   *   为什么必须有它：本仓「谁有资格做这件事」有三个零件，但没有一个把三者合读 ——
+   *     · `inst.authority(orgId, who)` 答「此人此刻在该组织任什么职、能拍什么板」（**在职面**）；
+   *     · `life` 的 `schedule` 答「此人此刻的日程落在哪一段」（**在岗面**）；
+   *     · `world.canBeAt(who, place)` 答「此人此刻在不在那个地方」（**在场面**）。
+   *   三者各自都对，可「他在职 ⇒ 他能立刻履职」这句话在本仓库**无法表达**：
+   *   职务是常驻属性，日程与在场是逐时属性；`inst.authority` 只看 `org.posts[].holder`，
+   *   压根不读日程与在场，于是「有权查阅」被当成「已经查阅」。
+   *   这正是 F 线同型病的第四例形态：**声明在注释里，落点不在代码里**
+   *   （rules.js 第 22/65 行有「知情路径铁律」，但「在职 ≠ 在岗」这一句零判据）。
+   *   判据真源**不新开**，只做一次合读：在职面缺席 ⇒ 本轴无话可说（不冒充「不在岗」）；
+   *   在职且此刻不在岗/不在场 ⇒ `off-duty`；压根不在职 ⇒ `not-in-office`。两码不合并。
+   *   三态严格分开（与全模块同一条纪律）：
+   *     · 在职面缺席（inst 未加载 / 此人不在任何组织）⇒ { known:false }（**不冒充**「不在岗」）
+   *     · 在职但此刻不在岗（日程冲突 / 已离场 / 不在该地）⇒ { onDuty:false, reason:'off-duty' }
+   *     · 此人不在职 ⇒ { inOffice:false, onDuty:false, reason:'not-in-office' }
+   *   边界：只读。不写任何容器，不改日程，不改任职。
+   *   **为什么锚点是「组织」而不是「事实」**：本闸门答的是「他此刻在不在这个岗上」，
+   *   而「在不在岗」与「问的是哪件事」无关——它只取决于**哪个组织的岗**。
+   *   若把 factId 塞进签名，就逼本模块从「事实」反推「这事归哪个组织管」，
+   *   那是猜组织归属（本仓禁止的形态）。故签名取 `(person, orgId, at)`，
+   *   与文档原稿的 `(person, factId, at)` 有意不同，此处如实登记差异。
+   *   **为什么不进 knows() 的一票否决**：`off-duty` 推翻的是「他正在履职」，
+   *   不是「他知道」——人下班了，知道的事不会忘掉。把它塞进 knows 会让
+   *   「他此刻在休假」被读成「他不知道这件事」，那是另一种失真。
+   *   两个真源不可合并：knows 答「知道吗」，duty 答「在岗吗」。
+   */
+  function dutyGate(person, orgId, at) {
+    const cfg = settings();
+    // 总开关与第三轴**两道闸都要过**（与 knows / perceive / gateScene 同规）：
+    //   总开关关闭 ⇒ 一律拒收 disabled（不是「查不到在岗」，也不是「不在岗」）；
+    //   第三轴单独关闭 ⇒ 如实报 duty-off（这一轴缺席，不是「他在岗」）。
+    if (!cfg.enabled) return { known: false, reason: 'disabled' };
+    if (!cfg.dutyEnabled) return { known: false, off: true, reason: 'duty-off' };
+    const who = clean(person, 40), oid = clean(orgId, 60);
+    if (!who) return { known: false };
+    const inst = WA.inst;
+    if (!inst || typeof inst.authority !== 'function') return { known: false };
+    let au = null;
+    try { au = inst.authority(oid, who); } catch (e) { return { known: false }; }
+    if (!au || au.ok !== true) return { known: false };   // 组织查不到 ⇒ 本面缺席
+    if (au.inOffice !== true) {
+      // 压根不在职：**不回落成「在岗」**，也不与「在职但不在岗」合并。
+      stat.notInOffice = (stat.notInOffice || 0) + 1;
+      stat.lastReason = 'not-in-office'; stat.lastAt = clockNow('noesis');
+      return { known: true, inOffice: false, onDuty: false, reason: 'not-in-office',
+        posts: [], who: who, org: oid };
+    }
+    // 在职。再看此刻在不在岗：日程冲突（life.schedule）与在场（world.canBeAt）两读合成一档。
+    const t = isFinite(Number(at)) ? Number(at) : clockNow('noesis.duty');
+    let offReason = null, place = null;
+    try {
+      const st = state();
+      const p = (st.people || {})['p_' + who];
+      const lf = p && p.life;
+      const sch = lf && Array.isArray(lf.schedule) ? lf.schedule : [];
+      // 日程面：命中一条 active 且覆盖此刻的日程 ⇒ 他在别处（本组织之外的事）。
+      //   日程不记「属于哪个组织」——那会逼本模块猜组织归属（本仓禁止）。故口径为：
+      //   此刻被**任一**日程占住 ⇒ 报 off-duty，并把该日程的 activity 带出，由调用方判断。
+      const hit = sch.filter(function (x) {
+        return x && x.status === 'active' && isFinite(Number(x.start)) && isFinite(Number(x.end))
+          && t >= Number(x.start) && t < Number(x.end);
+      })[0];
+      if (hit) { offReason = 'scheduled'; place = hit.activity || null; }
+    } catch (e) { /* 日程面缺席 ⇒ 本读无话可说 */ }
+    if (!offReason) {
+      // 在场判据只在**调用方给了地点**时生效：不给地点就不拿「他不在某地」冒充「他不在岗」。
+      const pid = clean(place, 40);
+      if (pid && WA.world && typeof WA.world.canBeAt === 'function') {
+        try {
+          const at2 = WA.world.canBeAt(who, pid, t);
+          if (at2 && at2.ok === false && (at2.reason === 'closed' || at2.reason === 'window-too-short')) {
+            offReason = 'place-closed';
+          }
+        } catch (e) { /* 在场面缺席 ⇒ 本读无话可说 */ }
+      }
+    }
+    if (offReason) {
+      stat.offDuty = (stat.offDuty || 0) + 1;
+      stat.lastReason = 'off-duty'; stat.lastAt = clockNow('noesis');
+      return { known: true, inOffice: true, onDuty: false, reason: 'off-duty',
+        via: offReason, posts: au.posts || [], perms: au.perms || [], who: who, org: oid, at: t };
+    }
+    return { known: true, inOffice: true, onDuty: true, reason: 'on-duty',
+      posts: au.posts || [], perms: au.perms || [], who: who, org: oid, at: t };
   }
 
   /**
@@ -437,6 +555,10 @@
       //   感知三态也分开（在场 / 在场但削弱 / 不可达），否则「他没注意到」与「他不在场」
       //   在读数上长得一样 —— 那正是本模块存在的理由。
       premature: stat.premature || 0,
+      // v2.143.0（F4）：在岗两码**分开报**（在职但不在岗 / 压根不在职），
+      //   与「时辰未到」「人不在场」并列成第三轴的读数——四种处置各不相同。
+      offDuty: stat.offDuty || 0, notInOffice: stat.notInOffice || 0,
+      dutyEnabled: !!cfg.dutyEnabled,
       perceiveIn: stat.perceiveIn || 0, perceiveOut: stat.perceiveOut || 0,
       perceiveUnknown: stat.perceiveUnknown || 0,
       gates: stat.gates, scans: stat.scans, leaks: stat.leaks,
@@ -459,6 +581,12 @@
     lines.push('· 每个角色只能依据它实际知道的演绎；不得让任何角色「全知」——');
     lines.push('  不在场、未被告知、无传播或通讯渠道的事，该角色一概不知。');
     if (stat.leaks > 0) lines.push('· 已留痕 ' + stat.leaks + ' 处疑似越界发言（细节见作者诊断面，不在此列名）。');
+    // v2.143.0（F4）：在岗纪律。**只在有账时提**——零在岗账时不占 token（与全模块同口径）。
+    //   只输出纪律，不列组织名/人名（列出即把未揭示的任职关系写进正文）。
+    if (cfg.dutyEnabled && (stat.offDuty > 0 || stat.notInOffice > 0)) {
+      lines.push('· 在职不等于在岗：有职位、有权查阅，都不等于此刻人在岗、已履职；');
+      lines.push('  此刻被日程占住、已离场、或不在该地的人，不得当作正在办事。');
+    }
     return lines.join('\n');
   }
 
@@ -470,11 +598,17 @@
     //   SRCS 内部查询面不导出（无独立消费方不挂）：要复核裁决走 knows() 的 deniedBy/knownBy
     //   与 boundary() 的 sources 段——那是可复算的读数，不是又一份实现。
     knows: knows, perceive: perceive, gateScene: gateScene, leakScan: leakScan,
+    // v2.143.0（F4）：在岗闸门。真消费方三处（与其余各口同规格，缺一不挂）：
+    //   ① 注入链：buildBlock 的「在岗纪律」段（模型据此知道「在职不等于在岗」）；
+    //   ② 面板：人物页「在岗核查」按钮（wa-noe-duty）；
+    //   ③ 诊断：secNoesis 的 offDuty / notInOffice 两码读数。
+    duty: dutyGate,
     boundary: boundary, buildBlock: buildBlock,
     stat: function () {
       return Object.assign({}, stat, { faults: Object.assign({}, stat.faults),
-        enabled: settings().enabled, rangeEnabled: settings().rangeEnabled, timeEnabled: settings().timeEnabled });
+        enabled: settings().enabled, rangeEnabled: settings().rangeEnabled,
+        timeEnabled: settings().timeEnabled, dutyEnabled: settings().dutyEnabled });
     }
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/noesis.js', { kind: 'engine', ver: '2.141.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/noesis.js', { kind: 'engine', ver: '2.143.0' });
 })();

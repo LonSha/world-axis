@@ -647,7 +647,7 @@
       <div class="wa-sec">防全知闸门（这个人此刻该不该知道这件事）</div>
       <label class="wa-row"><input id="wa-noe-enabled" type="checkbox" ${WA.noesis && WA.noesis.getSettings().enabled ? 'checked' : ''}/> 启用防全知闸门</label>
       <div class="wa-row"><input id="wa-noe-person" class="wa-input" placeholder="人物"/><input id="wa-noe-fact" class="wa-input" placeholder="事实 / 秘密名"/></div>
-      <div class="wa-row"><button class="wa-btn" id="wa-noe-knows" title="裁决：这个人此刻该不该知道这件事。四个归因码分开报——没登记过（not-registered）/登记了但此人不知（not-holder）/人不在场（out-of-range）/时辰未到（premature），合成一个「不知」就答不出是边界没划、人不在场、还是时辰未到">裁决知情</button><button class="wa-btn" id="wa-noe-scan" title="事后泄露扫描：把「人物=秘密名」逐条核，检出有谁说出了它不该知道的事。只留痕不删文——删文是叙事决定，不是引擎决定">泄露扫描</button><button class="wa-btn" id="wa-noe-boundary" title="只读：防全知引擎现场（几个知情面在把门 / 裁决数 / 穿帮留痕数）。穿帮数与扫描数分开报——真穿帮多要改边界，扫得勤只是用法不同">边界读数</button><button class="wa-btn" id="wa-noe-gate" title="生成前闸门：一组人物 × 一组事实，逐条答「哪些人不该知道哪些事」。只报不改正文——自动改写会把作者的笔抢走（与 E11「只报不改」同一条纪律）">生成前闸门</button><button class="wa-btn" id="wa-noe-perceive" title="感知半径：这个人此刻能否感知那个地点发生的事。三态封闭（在场 / 可达 / 不可达），不可达如实报 out-of-range——不回落成可达">感知半径</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-noe-knows" title="裁决：这个人此刻该不该知道这件事。四个归因码分开报——没登记过（not-registered）/登记了但此人不知（not-holder）/人不在场（out-of-range）/时辰未到（premature），合成一个「不知」就答不出是边界没划、人不在场、还是时辰未到">裁决知情</button><button class="wa-btn" id="wa-noe-scan" title="事后泄露扫描：把「人物=秘密名」逐条核，检出有谁说出了它不该知道的事。只留痕不删文——删文是叙事决定，不是引擎决定">泄露扫描</button><button class="wa-btn" id="wa-noe-boundary" title="只读：防全知引擎现场（几个知情面在把门 / 裁决数 / 穿帮留痕数）。穿帮数与扫描数分开报——真穿帮多要改边界，扫得勤只是用法不同">边界读数</button><button class="wa-btn" id="wa-noe-gate" title="生成前闸门：一组人物 × 一组事实，逐条答「哪些人不该知道哪些事」。只报不改正文——自动改写会把作者的笔抢走（与 E11「只报不改」同一条纪律）">生成前闸门</button><button class="wa-btn" id="wa-noe-perceive" title="感知半径：这个人此刻能否感知那个地点发生的事。三态封闭（在场 / 可达 / 不可达），不可达如实报 out-of-range——不回落成可达">感知半径</button><button class="wa-btn" id="wa-noe-duty" title="在岗闸门：此人此刻在不在这个岗上（在职 ≠ 在岗）。三态封闭——任职面缺席报「无话可说」/ 在职但被日程占住报 off-duty（等排班）/ 压根不在职报 not-in-office（走任职流程）。两码不合并，也不回落成「在岗」；只答在不在岗，不答知不知道（人下班了知道的事不会忘）">在岗闸门</button></div>
       <div id="wa-noe-out" class="wa-out"></div>
       <div class="wa-sec">生理与照护层（带着什么状况、到哪一段、限制什么）</div>
       <label class="wa-row"><input id="wa-lfn-enabled" type="checkbox" ${WA.lifeline && WA.lifeline.getSettings().enabled ? 'checked' : ''}/> 启用生理与照护层</label>
@@ -2711,6 +2711,24 @@
       const word = r.range === 'present' ? '在场' : (r.range === 'out' ? '不可达' : (r.range === 'impaired' ? '在场但没注意到' : '未知'));
       noeOut('感知半径：' + p + ' 对「' + pid + '」⇒ ' + word + (r.reason ? '（' + r.reason + '）' : '')
         + (r.via ? ' · 依据：' + r.via : ''), true);
+    });
+    // v2.143.0（F4）：在岗闸门 —— duty() 的真消费方。
+    //   三态口径与引擎同源：**不回落成「在岗」**；两码不合并（off-duty 等排班 / not-in-office 走任职流程）；
+    //   本枚只答「在不在岗」，不答「知不知道」（人下班了，知道的事不会忘 —— 那是另一个真源）。
+    //   组织名走「事实」输入框（与其余五枚共用），不是新造一个控件：本闸门的锚点是**组织**不是事实。
+    on('#wa-noe-duty', () => {
+      if (!WA.noesis || !WA.noesis.duty) return noeOut('未记录：module-missing', true);
+      const p = noeVal('#wa-noe-person'), org = noeVal('#wa-noe-fact');
+      if (!p || !org) return noeOut('未记录：missing-fields（人物与组织名都要填；本闸门问的是「他在这个组织中在不在岗」）', true);
+      const r = WA.noesis.duty(p, org);
+      if (r.known !== true) return noeOut('无话可说：任职面缺席（' + p + ' 在该组织无任职记录，或该组织查不到）'
+        + ' —— 「查不到」不等于「不在岗」，故如实报缺席而不是替他答一个', true);
+      const word = r.onDuty === true ? '在岗' : (r.reason === 'off-duty' ? '在职但不在岗' : '不在职');
+      noeOut('在岗闸门：' + p + ' 在「' + org + '」⇒ ' + word + '（' + r.reason + '）'
+        + (r.reason === 'off-duty' ? ' · 被日程占住（' + (r.via || '') + '）⇒ 该等排班或改日程' : '')
+        + (r.reason === 'not-in-office' ? ' · 无任何在职职位 ⇒ 该先走任职流程' : '')
+        + (r.posts && r.posts.length ? ' · 在职职位：' + r.posts.join('、') : '')
+        + ' · 只答在不在岗，不答知不知道', true);
     });
     // v2.141.0（F2）：生理与照护层。三枚写/读入口各自对上一个真出口——
     //   控件与 handler 同批（只加控件不加 handler = 点了没反应；只加 handler 不加控件 = 死代码）。

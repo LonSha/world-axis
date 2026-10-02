@@ -3089,9 +3089,129 @@ function runWitness(WA) {
         }
       });
     }
+    // ⑥ v2.143.0（F4）新开码 1/2：在岗闸门 —— `off-duty`（在职但此刻不在岗）。
+    //   治的病：本仓三个零件（inst.authority 在职面 / life.schedule 日程面 /
+    //   world.canBeAt 在场面）各自都对，却**没有一个函数把三者合读**，「在职 ⇒ 在岗」
+    //   这句话在本仓库无法表达。判据真源不新开，只做一次合读。
+    //   造场：建一个组织 + 一个在职职位（甲任「见证岗」） ⇒ 在职面为真；
+    //   再给甲排一条**覆盖此刻**的日程 ⇒ 在岗面不成立。
+    if (Ns && typeof Ns.duty === 'function' && WA.inst && WA.inst.charter) {
+      want('off-duty', 'noesis.duty：此人在职但此刻被日程占住 ⇒ 答 onDuty:false + off-duty（「在职但不在岗」与「压根不在职」是两回事：一个改日程，一个走任职流程）');
+      trip('off-duty', function () {
+        var keepD = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, dutyEnabled: true });
+          if (WA.inst.setSettings) WA.inst.setSettings({ enabled: true });
+          var t0 = WA.clock ? WA.clock.now('reject-witness:duty') : Date.now();
+          WA.store.transact(function (d) {
+            d.inst = { orgs: [] };
+            d.people = d.people || {};
+            d.people['p_甲'] = d.people['p_甲'] || { id: 'p_甲', name: '甲' };
+            d.people['p_甲'].life = { goals: [], commitments: [], schedule: [] };
+          }, 'reject-witness:duty-reset');
+          WA.inst.charter('见证司', { kind: '机关', replace: true });
+          WA.inst.post('见证司', '见证岗', { perms: ['approve'], replace: true });
+          WA.inst.assign('见证司', '见证岗', '甲', { replace: true });
+          // 覆盖此刻的日程（start 在过去、end 在未来）⇒ 在职面真、在岗面假。
+          //   写前先核在职面**确实成立**：造场若不成立，本码会以「不在职」的形态
+          //   落进 not-in-office —— 那是另一个码，见证会静默变成假绿。
+          var auD = WA.inst.authority('见证司', '甲');
+          if (!auD || auD.inOffice !== true) return [];
+          WA.store.transact(function (d) {
+            var p = d.people['p_甲'];
+            p.life = p.life || { goals: [], commitments: [], schedule: [] };
+            p.life.schedule = [{ id: 'sch_duty_witness', activity: '外出办事', start: t0 - 3600000, end: t0 + 3600000, status: 'active' }];
+          }, 'reject-witness:duty-sched');
+          var r = Ns.duty('甲', '见证司', t0);
+          // 造场自证：在职面真 + 日程面真 ⇒ 出的必须是 off-duty（不是 not-in-office / on-duty）
+          if (!(r && r.reason === 'off-duty' && r.via === 'scheduled')) return [];
+          return [r.reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ dutyEnabled: keepD.dutyEnabled !== false });
+          if (WA.inst && WA.inst.setSettings) WA.inst.setSettings({ enabled: false });
+        }
+      });
+    }
+    // ⑦ v2.143.0（F4）新开码 2/2：在岗闸门 —— `not-in-office`（压根不在职）。
+    //   与 off-duty 严格分开：off-duty 是「有岗没上」，not-in-office 是「没有岗」。
+    //   造场：组织在册，但此题中人不任任何职位。
+    if (Ns && typeof Ns.duty === 'function' && WA.inst && WA.inst.charter) {
+      want('not-in-office', 'noesis.duty：此人不在该组织任任何职位 ⇒ 答 inOffice:false + not-in-office（**不回落成「在岗」**，也不与「在职但不在岗」合并）');
+      trip('not-in-office', function () {
+        var keepD2 = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, dutyEnabled: true });
+          if (WA.inst.setSettings) WA.inst.setSettings({ enabled: true });
+          var t1 = WA.clock ? WA.clock.now('reject-witness:duty2') : Date.now();
+          WA.store.transact(function (d) {
+            d.inst = { orgs: [] };
+            d.people = d.people || {};
+            d.people['p_丙'] = d.people['p_丙'] || { id: 'p_丙', name: '丙' };
+            d.people['p_丙'].life = { goals: [], commitments: [], schedule: [] };
+          }, 'reject-witness:duty2-reset');
+          WA.inst.charter('见证局', { kind: '机关', replace: true });
+          // 席位**确实建出来了**（岗在册但无人任职）——不能靠 post 失败意外造出空岗：
+          //   那样「不在职」的成因是「组织里根本没岗」，与本码要治的「有岗无人」混成一体。
+          WA.inst.post('见证局', '空岗', { perms: ['approve'], replace: true });
+          var auD2 = WA.inst.authority('见证局', '丙');
+          if (!auD2 || auD2.ok !== true || auD2.inOffice !== false) return [];
+          var vD2 = WA.inst.view ? WA.inst.view('见证局') : null;
+          if (!(vD2 && vD2.ok === true && vD2.posts && vD2.posts.length === 1)) return [];
+          var r = Ns.duty('丙', '见证局', t1);
+          if (!(r && r.reason === 'not-in-office')) return [];
+          return [r.reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ dutyEnabled: keepD2.dutyEnabled !== false });
+          if (WA.inst && WA.inst.setSettings) WA.inst.setSettings({ enabled: false });
+        }
+      });
+    }
+    // ⑧ v2.143.0（F4）：在岗闸门的两条**非否定**读数。
+    //   与既有先例同规格（`omniscient` / `reuse`）：它们以同一词法形状（`reason:'x'`）出现，
+    //   按台账规矩必须有归属 —— 要么见证、要么死表。二者都**不是拒收码**：
+    //     · `on-duty`  正常归因（在职且此刻在岗，无话可拦）；
+    //     · `duty-off` 这一轴被作者关掉（如实报缺席，不是「他不在岗」）。
+    //   故走见证而不是死表：它们由真实局面触发，且行为改动必须能让门禁红灯。
+    if (Ns && typeof Ns.duty === 'function' && WA.inst && WA.inst.charter) {
+      want('on-duty', 'noesis.duty：在职且此刻无日程占住 ⇒ 答 onDuty:true + on-duty（**正常归因，不是拒收码**；与 omniscient 同规格：同一词法形状出现，故必须有归属）');
+      trip('on-duty', function () {
+        var keepD3 = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, dutyEnabled: true });
+          if (WA.inst.setSettings) WA.inst.setSettings({ enabled: true });
+          var t2 = WA.clock ? WA.clock.now('reject-witness:duty3') : Date.now();
+          WA.store.transact(function (d) {
+            d.inst = { orgs: [] };
+            d.people = d.people || {};
+            d.people['p_戊'] = { id: 'p_戊', name: '戊', life: { goals: [], commitments: [], schedule: [] } };
+          }, 'reject-witness:duty3-reset');
+          WA.inst.charter('见证署', { kind: '机关', replace: true });
+          WA.inst.post('见证署', '常驻岗', { perms: ['approve'], replace: true });
+          WA.inst.assign('见证署', '常驻岗', '戊', { replace: true });
+          var auD3 = WA.inst.authority('见证署', '戊');
+          if (!auD3 || auD3.inOffice !== true) return [];
+          var r3 = Ns.duty('戊', '见证署', t2);
+          if (!(r3 && r3.reason === 'on-duty' && r3.onDuty === true)) return [];
+          return [r3.reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ dutyEnabled: keepD3.dutyEnabled !== false });
+          if (WA.inst && WA.inst.setSettings) WA.inst.setSettings({ enabled: false });
+        }
+      });
+      want('duty-off', 'noesis.duty：本轴（dutyEnabled）被作者关掉 ⇒ 如实报 duty-off（**不回落成「在岗」也不回落成「不在岗」**：「没开这条闸」与「他在不在岗」是两回事，与 range-off 同规格）');
+      trip('duty-off', function () {
+        var keepD4 = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, dutyEnabled: false });
+          var r4 = Ns.duty('甲', '见证司');
+          if (!(r4 && r4.reason === 'duty-off' && r4.known === false)) return [];
+          return [r4.reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ dutyEnabled: keepD4.dutyEnabled !== false });
+        }
+      });
+    }
   }
-
-  // ── engines/perspective-lock.js（v2.142.0 F3：视角锁）──
   //   本版四个新字面量全部**由真实局面触发**，故按台账规矩走见证、不进基线。
   //   本表与回归共用同一个 vm 全局与同一份世界存储 —— 前面几十个块留下的 perspective.rows
   //   会让「一行都没登记」这个前提当场不成立（实测首版就是这个形态：no-scene 静默落进 missing）。

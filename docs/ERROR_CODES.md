@@ -1,15 +1,15 @@
 # WorldAxis 拒收码手册（自动生成：`node tools/gen-error-codes.js`）
 
-> 台账 version：`2.142.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
+> 台账 version：`2.143.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **625** 个内联拒收码：见证 386 / 死表 9 / 基线 230
+共 **629** 个内联拒收码：见证 390 / 死表 9 / 基线 230
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（386）
+## 见证（可执行）（390）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -120,6 +120,7 @@
 | `duplicate-project` | engines/org.js | org.openProject：同名未结项 ⇒ 拒收（否则账面答不出货进了哪一个）（B5） |
 | `duplicate-receipt` | engines/act.js, engines/events.js | events.complete 同一 opId 二次回报（重放不二次结算） |
 | `duplicate-tick` | engines/economy.js | economy.tick：同一时段戳重复结算 ⇒ 拒收（否则一次时段被消费两遍）（拓展③） |
+| `duty-off` | engines/noesis.js | noesis.duty：本轴（dutyEnabled）被作者关掉 ⇒ 如实报 duty-off（**不回落成「在岗」也不回落成「不在岗」**：「没开这条闸」与「他在不在岗」是两回事，与 range-off 同规格） |
 | `empty-graph` | engines/faction-graph.js | factionGraph 只有一个势力 ⇒ empty-graph（算出来是空的，与 no-factions 分列，v2.139.0 E9 新增） |
 | `empty-post` | engines/inst.js | inst.vacate：这个职位本来就没人占 ⇒ 没有可离任的人（拓展④） |
 | `events-full` | engines/region.js | region.occur：传播队列已满 ⇒ 拒收并带出上限（拓展⑥） |
@@ -243,6 +244,7 @@
 | `not-due` | engines/checkpoints.js, engines/collab.js, engines/liaison.js | collab.settle 未到截止 ⇒ not-due（v2.139.0 E10 新增） |
 | `not-entitled` | engines/opportunity.js | opportunity.respond：世界侧记了涉及谁 ⇒ 之外的人不受理（B6） |
 | `not-holder` | engines/noesis.js | noesis.knows：事实已登记，但此人不在任一知情面 ⇒ 答 false 并把否决源逐条带出（不取平均不投票：不知是不可逆的，六源里一源铁证就足够） |
+| `not-in-office` | engines/noesis.js | noesis.duty：此人不在该组织任任何职位 ⇒ 答 inOffice:false + not-in-office（**不回落成「在岗」**，也不与「在职但不在岗」合并） |
 | `not-in-table` | core/permissions.js | permissions.adopt：人不在权限表 ⇒ adopted:false 且一位不授（不越权登记）（X6） |
 | `not-kept` | engines/mend.js | mend.step：守约要有实际守约的证据，说了不算（拓展②） |
 | `not-needed` | engines/org.js | org.deliverToProject：只收清单上有的东西（把无关物资倒进来算进度 = 进度可伪造）（B5） |
@@ -259,7 +261,9 @@
 | `nothing-to-correct` | engines/intel.js | intel.correct：辟谣只对收到过该说法的人生效（B3） |
 | `nothing-to-verify` | engines/intel.js | intel.verify：从没听说过就报 nothing-to-verify，不做「核实」旁路（B3） |
 | `occupied` | engines/inst.js | inst.assign：职位已有人占着 ⇒ 换人必须显式 replace（拓展④） |
+| `off-duty` | engines/noesis.js | noesis.duty：此人在职但此刻被日程占住 ⇒ 答 onDuty:false + off-duty（「在职但不在岗」与「压根不在职」是两回事：一个改日程，一个走任职流程） |
 | `omniscient` | engines/perspective-lock.js | perspective.allows：全知档下任何笔都放行 ⇒ reason:omniscient（正常归因，不是拒收码；作者视角是唯一的例外） |
+| `on-duty` | engines/noesis.js | noesis.duty：在职且此刻无日程占住 ⇒ 答 onDuty:true + on-duty（**正常归因，不是拒收码**；与 omniscient 同规格：同一词法形状出现，故必须有归属） |
 | `one-sided` | engines/collab.js | collab.noteConflict：只有一侧改动 ⇒ one-sided（**单边改动不是冲突**：把它记成冲突会让复盘时到处是「谁跟谁冲突了」的假案，v2.112.0 plan-2 #38） |
 | `ops-full` | engines/phone-bridge.js | phoneBridge.noteAction：台账满 ⇒ 拒收而非静默挤掉（挤掉一笔 = 让「这条链的因」事后消失，v2.97.0 X5） |
 | `orders-full` | engines/economy.js | economy.buy：成交流水达上限 ⇒ 拒收，不静默丢单（拓展③） |
