@@ -6,17 +6,17 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.141.0 |
-| 全量回归 | `node tests/run.js` → **v2.141.0 为通过 13679 / 失败 0 · status: passed**（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
-| 产品文件面 | 167（`tests/product-files.js` 单一真源） |
+| 版本 | v2.142.0 |
+| 全量回归 | `node tests/run.js` → **v2.142.0 为通过 13760 / 失败 0 · status: passed**（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
+| 产品文件面 | 168（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 146 / members= 965 / chars= 10966 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 167 · 锁 161 · 可达 167 · 孤儿 0 · 豁免 0 |
-| 死子面 | `node tests/dead-export-gate.js` → dead 765 / uiDead 4 / 仅测试 348 / dataOnly 248 |
-| 拒收码 | `node tests/reject-code-gate.js` → 621 码（见证 382 / 死表 9 / 基线 230） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.141.0 · 现场 refs 3672 / 命名空间 166 / 成员 2011 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 147 / members= 976 / chars= 11074 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 168 · 锁 162 · 可达 168 · 孤儿 0 · 豁免 0 |
+| 死子面 | `node tests/dead-export-gate.js` → dead 764 / uiDead 4 / 仅测试 346 / dataOnly 248 |
+| 拒收码 | `node tests/reject-code-gate.js` → 625 码（见证 386 / 死表 9 / 基线 230） |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.142.0 · 现场 refs 3707 / 命名空间 167 / 成员 2021 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
-| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 120 把 · 覆盖 **120（100%）**＝ 统一档 36（锚点 286 · 问题 0）+ 非统一档已识别 84 · **未识别 0** · 非统一档问题 102（**只报不红**，逐条带证据与命中行类别） |
+| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 121 把 · 覆盖 **121（100%）**＝ 统一档 37（锚点 294 · 问题 0）+ 非统一档已识别 84 · **未识别 0** · 非统一档问题 102（**只报不红**，逐条带证据与命中行类别） |
 | 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核；v2.135.0 扩到 `checked` = 34 站点） |
 | tools/ | 只留**被可执行代码引用**的 14 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据 |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
@@ -176,6 +176,88 @@
   `tests/reject-v2780.js`、`tests/module-cycle-gate-v2107.js`、`tests/dead-export-ledger.json`、
   `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
   `ITERATION_LOG.md`。
+
+### R128 · 2026-10-02 · v2.142.0：F3 视角锁（叙事视角闸门）
+- **起点与终点**：起点 v2.141.0（`1a3df63`）；终点 v2.142.0（全量回归 **13760 / 0 · passed**，基线 13679 → +81）。
+- **它治的病：镜头是描述性的，没有任何东西能拦住它**。此前世界知道「谁在场」（`perceive`）、「谁知情」（`intel`）、
+  「谁还记得」（`noesis`），但**没有一处在管「这一段该由谁的眼睛说」** —— 同一个场景里，叙述者可以上午写
+  「她不知道门外是谁」、下午写「她隔着门听见了他的脚步」，两句都过闸：**视角漂移不留痕、不拒收、更没人记账**。
+  镜头（全知 / 第一人称 / 有限 / 群像 / 摄影机）恰恰是**最容易被顺手违反**的一条：它不做判断，只做取景。
+- **新引擎 `engines/perspective-lock.js`（390 行）：叙事视角闸门**。三张具名词表：
+  - `LENSES`（5：omniscient / first / limited / ensemble / camera）—— **顺序即叙述者可见范围由宽到窄**；
+  - `CHANNELS`（5：narrator / interior / dialogue / document / flashback）—— **`interior` 是唯一被闸死的渠道**
+    （其余四渠道可借外部证据开合，唯独内心活动不可代述）；
+  - `ACCESS`（4：witnessed / perceived / inferred / exterior）—— 分开「亲眼看见」「感知到」「推断出」「只有外部件」。
+  导出面 `WA.perspective` 七口：`assign` / `current` / `allows` / `audit` / `leakScan` / `buildBlock` / `boundary`
+  （另附 `getSettings` / `setSettings` / `stat`）。
+- **八条否定式边界**（最要紧的四条）：① **总开关默认关**（`enabled:false`，不登记不生效，绝不悄悄夺走叙事权）；
+  ② **不写正文**（引擎只回答「这个视角准不准」，不生成一个字）；③ **未登记视角不回落全知**（缺字段 /
+  表外值 / 自造视角一律拒收，**没有「默认全知」这条退路**）；④ **不重裁决知情面**
+  （`intel` 的账不为视角让路 —— 视角只做取景，不改谁的账）。
+- **判据顺序硬约束**：「缺字段 → 表外值 → 未登记视角 → 全知例外 → 内心闸 → 在不在视角里」。顺序本身就是判据 ——
+  先问「说清楚了没有」，再问「这个视角存不存在」，最后才问「这件事准不准许说」；反过来就会把「还没登记」
+  误判成「不许说」。
+- **容量有界**：`MAX_POV=8`（常量，不做滑块）、`maxScenes` / `maxLeaks` 才是滑块（`bounds` 2–24 / 1–32）；
+  行环形挤出交 `core/evict.js`。
+- **码表**：复用 `disabled` / `missing-fields` / `bad-value` / `exists` / `rows-full` / `store-unavailable`；
+  新开四码 `bad-lens` / `no-scene` / `out-of-lens` / `interior-blocked` 与留痕码 `lens-leak` ——
+  **留痕不拦截**（视角外泄是「要记账」而不是「要拒绝」，否则改稿会整段卡住）。
+- **产品面接线七站**（新增引擎必须逐站登记，否则「渲染了不登记」「有导出无消费方」当场红灯）：
+  ① `core/evict.js` 挤出站点 `perspective.rows`（cap 12）；② `core/store.js` 的 `__BOUNDED_CAPS` +
+  `defaultWorldState()` 骨架 `perspective: { rows: [] }`；③ `index.js` 的 `LOAD_ORDER`（插在 `core/store`
+  之后、`render/inject.js` 之前）；④ `engines/tool-diag.js` 的 `MODULE_EXPORTS` 一行 + `secPerspective()`
+  诊断节 + `collect()` 挂节；⑤ `render/inject.js` 四张源表同批加 `perspective`（SOURCES / def / SRC_NAME
+  「视角锁」/ `worldaxis_perspective_settings_v1` 模块开关）+ 注入分支 `WA.perspective.buildBlock()`；
+  ⑥ `engines/inject-budget.js` 加 `'视角锁': { rank: 6, fold: true }` 与 ACCOUNTS；⑦ `engines/probe.js`
+  的 `view(caseId, opts)` 新增 `truthSubject` 认知投影只读读数（走 `WA.intel.project`，**事实锚点由 opts.fact
+  显式给，未给报 null，不拿 accused 顶替**）。
+- **面板**：人物页新增 14 枚控件（id 前缀 `wa-per-`：enabled / scene / lens / persons / assign / current /
+  boundary / who / channel / access / allows / leak / block / out）；`engines/tool-diag.js` 的 `UI_BINDINGS`
+  在同页登记**同组 14 枚** —— 守卫表是控件接线面的唯一真源，不登记则「渲染了却绑定错 id」无人发现
+  （与 v2.83.0 / v2.117.0 / v2.121.0 / v2.139.0 / v2.140.0 / v2.141.0 同规格）。
+- **专锁 `tests/perspective-lock-v2142.js`**：结构对齐 `noesis-v2140.js`，八处真源码破坏锚点（`noScene` 未登记
+  视角不回落全知 / `interior` 内心闸 / `outOfLens` 在不在视角里 / `badLens` 自造视角拒收 / `diagSec` 诊断节 /
+  `panel` 面板入口 / `truthSubj` 认知投影读数 / `intelReader` 面板「查认知投影」调 `intel.project`），
+  每处须**恰中 1 次**；H5 纯度判据（锚点字面量只准在 ANCHORS 表里声明、判据层零内联）；N5 钉「四个真文件逐字未变」。
+- **收口 4 红（三族）**：首轮全量回归 **通过 13756 / 失败 4**，同趟修完：
+  - **族一（`checked` 冻结值两站）**：`tests/run.js` 两处断言停在 `checked === 124`，而 F3 给 `__BOUNDED_CAPS`
+    新增 `perspective.rows` ⇒ 真值 **125**。属 v2.106.0 硬读数族的**未登记形态**（`rp.checked` /
+    `rpA1700.checked` 不在 `readings.js` 的 `FIELD_OF` 表里，`sync-hardcoded.js` 管不到），只能手改。
+    中途我按花括号配平数出 143 条、一度以为 125 是错的 —— 复核后确认 143 = **非通配 125 + 通配 18**，
+    `checked` 口径正是「非通配非 object 键」，**125 正确**。真源是现场，不是推断。
+  - **族二（O16 版本断言消息副本 6 处）**：`5 × 「入口版本为 2.141.0（实 」` 与 `1 × 「入口 VERSION = 2.141.0（实 」`
+    随升版改 2.142.0。
+  - **族三（x4 尾锚失效）**：`tests/x4-resolve-v2128.js` 的精确尾锚 `'  function view(caseId) {'` 因 `probe.view`
+    新增第二参（认知投影读数）而失配，`slice(-1)` 把扫界塌到文件尾、误吞后段真 `saveSettings(`。
+    修法：锚点改**前缀形态** `'  function view(caseId'` —— 对签名扩展免疫。
+- **另修一例测试侧 flaky（消散骰）**：#3 回归 **13759 / 1**，唯一红是「风声长期沉寂后消散」—— evolution 的
+  `decayWinds` 走 `WA.rand.dice(100,'evolution.windDecay')`，未显式播种时 `ensureSeed()` 走 `Math.random()`
+  ⇒ **该用例天然 flaky**。修法：改为显式播种的**有界重试**（`WA.rand.seed(k)` 循环至多 20 次；`core/rand.js`
+  的 `seed()` 会清空 `__streams` 派生流，每轮重拨真换序列），残余失败率 ≤ 5%的 20 次方 ≈ 1e-26。
+- **账本证据按 R127 族二口径收敛**：#4 反而出 **13745 / 15** —— 铁证 `rand.seed tref=18，复算=19`：新增的
+  `WA.rand.seed(k)` **真调用**使 `tests/run.js` 对 `rand.seed` 的测试侧引用 +1，账本证据过期。修法照旧：
+  `node tests/dead-export-gate.js --update` 重建账本并复核全部 768 条 `src` / `refs` / `tref` 证据
+  （dead 764 不变、账本 version = 2.142.0），随后静态读数族**零漂移**。
+- **教训（两条，都记在回归器机制上）**：① **回归运行期间真树必须冻结** —— `isolated-runner` 的 `prepare()`
+  跑前快照全树、跑后若 `unchanged=false` 就把 `passed` 降级为 `source-changed`；#1 / #2 两次都是**在回归运行
+  期间改了 `tests/run.js`**（跑前快照已固化）⇒ 全绿也报 `source-changed`。② **改测试侧真调用会连带过期账本证据** ——
+  新增一次 `WA.rand.seed(k)` 这种「无害」改动，会经 `tref` 复算把 15 处读数判据全部抖红。
+- **门禁结果（全绿）**：全量回归 **13760 / 0 · status: passed · unchanged: true**；
+  `PERSPECTIVE-LOCK-V2142: pass` · `MODULE-CYCLE-V2107: pass（65 项）` · `SETTLE-V2830: pass (55)` ·
+  `module-registry-gate` 文件 164 / 命名空间 172 / 装载期边 66 / 硬边 0 / 调用期引用 132 / 结构问题 0 ·
+  `dead-export-gate` dead 764 / uiDead 4 / 仅测试 346 / dataOnly 248 · `reject-code-gate` 625 码
+  （见证 386 / 死表 9 / 基线 230）· `export-contract` ns= 147 / members= 976 / chars= 11074 ·
+  `inventory` 产品文件 168 / 命名空间 167 / 成员 2021 / 静态引用 3707（四类悬空均 0）·
+  `test-surface-gate` 文件面 168 · 锁 162 · 可达 168 · 孤儿 0 · 豁免 0 · `docs-archive-gate` 跨文件同号 0 ·
+  `dup-decl-gate` 扫描 350 文件 / 重复 0 处 · 读数一致性 problems 0 / ledgerVersion 2.142.0 ·
+  现场 refs 3707 / 命名空间 167 / 成员 2021 · `anchor-scan` 锁 121 · 覆盖 **121（100%）**。
+- **影响范围**：`engines/perspective-lock.js`（新）、`engines/probe.js`、`engines/tool-diag.js`、
+  `engines/inject-budget.js`、`core/evict.js`、`core/store.js`、`index.js`、`manifest.json`、`render/inject.js`、
+  `ui/panel.js`、`tests/perspective-lock-v2142.js`（新）、`tests/run.js`、`tests/x4-resolve-v2128.js`、
+  `tests/reject-v2780.js`、`tests/settle-v2830.js`、`tests/module-cycle-gate-v2107.js`、
+  `tests/dead-export-ledger.json`、`tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、
+  `docs/ERROR_CODES.md`、`ITERATION_LOG.md`。
+
 ### R124 · 2026-10-01 · v2.138.0：E7 区域天气与灾害深度联动（含 E5 多模型 ensemble 同批）
 - **起点与终点**：起点 v2.137.0（全量回归 13159 / 0，`256aead`）；终点 v2.138.0。
 - **它治的病**：X6 交付的天气与灾害是**两条互不知情的链** —— 天气会变（`weather.tick`）、灾害能建

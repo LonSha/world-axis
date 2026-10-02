@@ -1,13 +1,13 @@
 {
- "version": "2.141.0",
- "loadOrderCount": 166,
- "loadedCount": 163,
+ "version": "2.142.0",
+ "loadOrderCount": 167,
+ "loadedCount": 164,
  "uiCount": 3,
- "nsCount": 171,
+ "nsCount": 172,
  "totals": {
-  "loadEdges": 65,
+  "loadEdges": 66,
   "hardEdges": 0,
-  "callRefs": 130,
+  "callRefs": 132,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -63,6 +63,7 @@
     "engines/noesis.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
+    "engines/perspective-lock.js",
     "engines/plan.js",
     "engines/pmem.js",
     "engines/polish.js",
@@ -247,6 +248,7 @@
     "engines/mend.js",
     "engines/motif.js",
     "engines/noesis.js",
+    "engines/perspective-lock.js",
     "engines/plan.js",
     "engines/polish.js",
     "engines/power-anchor.js",
@@ -2678,6 +2680,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_lifeline_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/perspective-lock.js": {
+   "ns": [
+    "perspective"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_perspective_settings_v1"
    ],
    "consumedBy": []
   },

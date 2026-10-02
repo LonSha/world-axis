@@ -392,6 +392,33 @@
       };
     });
   }
+  /**
+   * v2.142.0（F3）：视角锁的诊断节。
+   *   报**计数 + 四类拒绝分布 + 三张表规模**，不报视角人物名与场景名
+   *   —— 视角行里可能有作者预登记、尚未登场的角色，列名就是剧透
+   *   （与 noesis「不列秘密名」、lifeline「不列症状名」同一条纪律）。
+   */
+  function secPerspective() {
+    return safe(function () {
+      if (!WA.perspective || typeof WA.perspective.boundary !== 'function') return { error: 'engines/perspective-lock.js 未加载（视角锁读数缺席）' };
+      const b = WA.perspective.boundary();
+      return {
+        enabled: !!b.enabled, maxScenes: b.maxScenes, strictInterior: !!b.strictInterior,
+        maxLeaks: b.maxLeaks,
+        assigns: b.assigns || 0, allows: b.allows || 0, permits: b.permits || 0,
+        audits: b.audits || 0, scans: b.scans || 0, leaks: b.leaks || 0,
+        // 四类拒绝**分开报**（见边界 5）：合成一个「不许写」之后，
+        //   作者就再也知道该改词表、先登记、补共视角，还是换渠道。
+        outOfLens: b.outOfLens || 0, interiorBlocked: b.interiorBlocked || 0,
+        noScene: b.noScene || 0, rows: b.rows || 0,
+        lastReason: b.lastReason || '', lastAt: b.lastAt || 0,
+        faults: Object.assign({}, b.faults || {}),
+        // 三张表的规模：词表被改小/改大在这里看得见（判据口径的可观测面）。
+        lenses: (b.LENSES || []).length, channels: (b.CHANNELS || []).length,
+        access: (b.ACCESS || []).length, maxPov: b.MAX_POV || 0
+      };
+    });
+  }
   function secLife() {
     return safe(function () {
       if (!WA.life || typeof WA.life.stat !== 'function') return { error: 'life 模块不可用' };
@@ -1008,6 +1035,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
     //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
     'engines/lifeline.js': 'lifeline',
+    // v2.142.0（F3）：视角锁。登记在此 = 缺席时 secModules 会**如实报 missing**。
+    'engines/perspective-lock.js': 'perspective',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1631,7 +1660,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         //   但壳若不提供这个输入（或回落成「未注明」），那道闸在真实使用里永不触发。
         'wa-org-project', 'wa-org-needs', 'wa-org-due', 'wa-org-why', 'wa-org-proj-open', 'wa-org-proj-deliver',
         'wa-org-proj-view', 'wa-org-proj-close', 'wa-org-owe', 'wa-org-debt-settle', 'wa-org-debts',
-       'wa-org-person', 'wa-org-role', 'wa-org-assign', 'wa-org-credit', 'wa-org-promote', 'wa-org-roster', 'wa-org-pay', 'wa-org-settle', 'wa-org-penalize', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
+       'wa-org-person', 'wa-org-role', 'wa-org-assign', 'wa-org-credit', 'wa-org-promote', 'wa-org-roster', 'wa-org-pay', 'wa-org-settle', 'wa-org-penalize', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-intel-project', 'wa-intel-correct', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
        // v2.62.0: 因果结算控件（渲染在人物页）+ 稳定人物 ID 控件。
        //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
        //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
@@ -1813,6 +1842,14 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'people', ids: ['wa-lfn-enabled', 'wa-lfn-person', 'wa-lfn-cond', 'wa-lfn-kind',
     'wa-lfn-limits', 'wa-lfn-care', 'wa-lfn-register', 'wa-lfn-course', 'wa-lfn-advance',
     'wa-lfn-capacity', 'wa-lfn-gap', 'wa-lfn-view', 'wa-lfn-out'] },
+    // v2.142.0（F3）：视角锁（渲染在人物页）。同 v2.83.0 / v2.117.0 / v2.121.0 / v2.139.0 / v2.140.0 / v2.141.0 的规格——
+    //   新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，否则「按钮渲染了但绑定的 id 写错」
+    //   这一类断裂在新增出口上无人发现。
+    //   一律无条件渲染（perspective 是产品文件，缺席本身就是断裂，不降级成提示）。
+    //   wa-per-out 是输出区（与 wa-rec-out / wa-noe-out / wa-lfn-out 同规格：它是面板回显，不是控件）。
+    { page: 'people', ids: ['wa-per-enabled', 'wa-per-scene', 'wa-per-lens', 'wa-per-persons',
+      'wa-per-assign', 'wa-per-current', 'wa-per-boundary', 'wa-per-who', 'wa-per-channel',
+      'wa-per-access', 'wa-per-allows', 'wa-per-leak', 'wa-per-block', 'wa-per-out'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
@@ -2479,7 +2516,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), intel: secIntel(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), intel: secIntel(), perspective: secPerspective(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
       //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，

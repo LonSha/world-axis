@@ -90,7 +90,7 @@ function runA(a) {
       a(p.indexOf(k) > 0, 'v2128/x4: [A] 边界留证在位：' + k);
     });
   // 纯函数：resolve 体内零落盘、零事务
-  const body = p.slice(p.indexOf('  function resolve(a, b, opts) {'), p.indexOf('  function view(caseId) {'));
+  const body = p.slice(p.indexOf('  function resolve(a, b, opts) {'), p.indexOf('  function view(caseId'));
   ['WA.store.transact', 'WA.store.save', 'saveSettings('].forEach(function (bad) {
     a(body.indexOf(bad) < 0, 'v2128/x4: [A] resolve 体内零 `' + bad + '`（给的是裁决**依据**，不是裁决结果）');
   });

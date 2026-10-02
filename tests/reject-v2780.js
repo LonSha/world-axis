@@ -3091,6 +3091,69 @@ function runWitness(WA) {
     }
   }
 
+  // ── engines/perspective-lock.js（v2.142.0 F3：视角锁）──
+  //   本版四个新字面量全部**由真实局面触发**，故按台账规矩走见证、不进基线。
+  //   本表与回归共用同一个 vm 全局与同一份世界存储 —— 前面几十个块留下的 perspective.rows
+  //   会让「一行都没登记」这个前提当场不成立（实测首版就是这个形态：no-scene 静默落进 missing）。
+  //   判据要的场必须自己造；环境的不确定性不是判据的一部分。
+  {
+    const Pv = WA.perspective;
+    if (Pv && typeof Pv.assign === 'function') {
+      if (WA.store && WA.store.transact) {
+        WA.store.transact(function (d) { d.perspective = { rows: [] }; }, 'reject-witness:perspective-reset');
+      }
+      const keepP = Pv.getSettings ? Pv.getSettings() : {};
+      if (Pv.setSettings) Pv.setSettings({ enabled: true });
+      // ① 自造视角 ⇒ 拒收，并把可选表带出（自造视角等于自造判定）
+      want('bad-lens', 'perspective.assign：视角名不在 LENSES 五档里 ⇒ bad-lens + allowed（自造视角等于自造判定，下一手无从接手）');
+      trip('bad-lens', function () {
+        return [Pv.assign('见证幕一', '上帝视角', ['甲']).reason];
+      });
+      // ② 一行都没登记就问「当前视角」⇒ no-scene，**不回落成全知**
+      //    （「没登记」与「随便写」是两件事：前者要作者先划边界，后者是放任）
+      want('no-scene', 'perspective.current：一处视角都没登记 ⇒ no-scene（不回落成全知——「没登记」与「随便写」是两件事）');
+      trip('no-scene', function () {
+        if (WA.store && WA.store.transact) {
+          WA.store.transact(function (d) { d.perspective = { rows: [] }; }, 'reject-witness:perspective-clear');
+        }
+        return [Pv.current().reason];
+      });
+      if (typeof Pv.allows === 'function') {
+        // ③ 内心闸：三条不同的 via，**不可合并** —— 三种处置完全不同
+        //   （补共视角 / 换视角档 / 换取证档）
+        want('interior-blocked', 'perspective.allows：内心腔只属于视角人物本人 —— 不在视角里的人写内心 / 客观镜头写内心 / 用推断档冒充心声，三者各自拒收并带 via');
+        trip('interior-blocked', function () {
+          if (WA.store && WA.store.transact) {
+            WA.store.transact(function (d) { d.perspective = { rows: [] }; }, 'reject-witness:perspective-clear2');
+          }
+          const outs = [];
+          Pv.assign('见证幕甲', 'first', ['甲']);
+          outs.push(Pv.allows({ who: '乙', channel: 'interior', access: 'witnessed' }).reason);   // via: not-pov
+          Pv.assign('见证幕乙', 'camera', [], { replace: true });
+          outs.push(Pv.allows({ who: '甲', channel: 'interior', access: 'witnessed' }).reason);   // via: objective
+          Pv.assign('见证幕丙', 'limited', ['甲'], { replace: true });
+          outs.push(Pv.allows({ who: '甲', channel: 'interior', access: 'inferred' }).reason);    // via: access
+          return outs;
+        });
+        // ③b 「在不在视角里」：第一/有限视角下，镜头外的人不能用叙述腔交代
+        //   （**与内心闸不可合并**：内心是「渠道不许」，这里是「人不在场」——补共视角与换渠道是两种处置）
+        want('out-of-lens', 'perspective.allows：此人不在本视角里（第一/有限档）⇒ out-of-lens + pov 名单（补共视角，或换一个场景视角）');
+        trip('out-of-lens', function () {
+          Pv.assign('见证幕外', 'first', ['甲'], { replace: true });
+          return [Pv.allows({ who: '乙', channel: 'narrator', access: 'witnessed' }).reason];
+        });
+        // ④ 全知场景下的一笔：**正常归因**（按作者视角放行），不是拒收
+        //   —— 同 v2.102.0 的 `reuse`：以同一词法形状出现，故按「有归属」处理并带见证。
+        want('omniscient', 'perspective.allows：全知档下任何笔都放行 ⇒ reason:omniscient（正常归因，不是拒收码；作者视角是唯一的例外）');
+        trip('omniscient', function () {
+          Pv.assign('见证幕全知', 'omniscient', ['甲'], { replace: true });
+          const r = Pv.allows({ who: '乙', channel: 'interior', access: 'inferred' });
+          return [r.reason];
+        });
+      }
+      if (Pv.setSettings) Pv.setSettings({ enabled: keepP.enabled !== false });
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

@@ -156,7 +156,11 @@ function runAll(A) {
   // v2.141.0（F2）：新增 engines/lifeline.js（lifeline 命名空间）⇒ 文件面 166 → 167、
   //   解析出别名 166 → 167、有引用 164 → 165（零引用仍恰 core/input-guard.js / core/sanitize.js
   //   两个声明过的纯函数基元——lifeline 读 store（登记自己）故有引用，不落零引用名单）。
-  A(a.files === 167 && a.aliasFiles === 167 && a.refFiles === 165,
+  // v2.142.0（F3）：新增 engines/perspective-lock.js（perspective 命名空间）⇒ 文件面 167 → 168、
+  //   解析出别名 167 → 168、有引用 165 → 166（零引用仍恰 core/input-guard.js / core/sanitize.js
+  //   两个声明过的纯函数基元 —— perspective-lock 读 store（登记自己）故有引用，不落零引用名单）。
+  //   现场读数由 M.audit() 采，非估算；增量逐条可核（+1 文件、+1 别名、+1 有引用）。
+  A(a.files === 168 && a.aliasFiles === 168 && a.refFiles === 166,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -186,7 +190,16 @@ function runAll(A) {
   //      ui/panel.js（13 枚控件真读 register / advance / capacityOf / careGap / view / getSettings / setSettings）、
   //      engines/noesis.js（attenuationOf 读 lifeline.capacityOf，感知第二轴的真源）
   //      —— 同 v2.124.0 记过的「边是 (file, ns) 对，不是站点数」，故 +11 而非按控件数膨胀。
-  A(a.edgesLoad === 65 && a.edgesCall === 1225 && a.edgesAll === 1290 && a.identityOk,
+  // v2.142.0（F3）：两条新硬边，逐条可核——
+  //   ① engines/perspective-lock.js 尾部真调 WA.registerModule（registerModule 由 store 提供）
+  //      ⇒ 装载期边 65 → 66；
+  //   ② 调用期 1225 → 1234（+9）：它读的 ns 里 store / clock / settingsBus / inputGuard / evict
+  //      早已在调用期面内（集合去重后不新增边），真正新增的 (file, ns) 对来自**四处新读者**：
+  //      render/inject.js（注入分支读 perspective.buildBlock）、engines/tool-diag.js（secPerspective 读 boundary）、
+  //      ui/panel.js（8 枚控件真读 assign / current / allows / boundary / buildBlock / leakScan / getSettings / setSettings）、
+  //      engines/probe.js（`view` 的第二参读 intel.project —— 这正是 D2 信息生态收口那条口）
+  //      —— 同 v2.124.0 记过的「边是 (file, ns) 对，不是站点数」，故 +9 而非按控件数膨胀。
+  A(a.edgesLoad === 66 && a.edgesCall === 1234 && a.edgesAll === 1300 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -225,13 +238,16 @@ function runAll(A) {
     + '（本门禁的 store 边只算 ns 对，读不出这一层；两条判据互补，不互相代替）。');
   // v2.140.0（F1）：LOAD_ORDER 164 → 165（engines/noesis.js 入序）。
   // v2.141.0（F2）：LOAD_ORDER 165 → 166（engines/lifeline.js 入序，紧随 noesis）。
-  A(a.edgesLoad >= 20 && a.orderLen === 166,
+  // v2.142.0（F3）：LOAD_ORDER 166 → 167（engines/perspective-lock.js 入序，紧随 lifeline）。
+  A(a.edgesLoad >= 20 && a.orderLen === 167,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
   // v2.141.0（F2）：静态提供方 195 → 196、账本 170 → 171、读面 173 → 174（lifeline 由
   //   module-registry-gate --update 落进账本，读面含上面那五处新读者）。
-  A(a.nsProvided === 196 && a.nsLedger === 171 && a.nsRead === 174,
+  // v2.142.0（F3）：静态提供方 196 → 197、账本 171 → 172、读面 174 → 175（perspective 由
+  //   module-registry-gate --update 落进账本，读面含上面那四处新读者）。
+  A(a.nsProvided === 197 && a.nsLedger === 172 && a.nsRead === 175,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');

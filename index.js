@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.141.0'
+  const VERSION = '2.142.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -509,6 +509,13 @@
     //   排在这里是刻意的：感知第二轴的真源就在本模块，两条相邻便于阅读「谁给感知划档」。
     //   **只读**：读取面零 store.transact，写侧只有 register / advance 两口（专锁 N 面钉这条）。
     'engines/lifeline.js',
+    // v2.142.0（F3）：视角锁。装载位置紧随 lifeline 之后（与 tests/run.js 的 LOAD 同序）——
+    //   两条硬约束：① 须**晚于** core/store（它读写 `draft.perspective`）；
+    //   ② 须**早于** render/inject.js（注入落地时读 perspective.buildBlock()）。
+    //   与 noesis 是**串联而非取代**：noesis 答「他知道吗」，本模块答「这笔该不该现在由这个视角写」
+    //   —— 两个真源不可合并（本模块不调 noesis.knows，见边界 4）。
+    //   写侧只有 assign 一口（专锁 N 面钉这条）。
+    'engines/perspective-lock.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

@@ -358,7 +358,10 @@
       note: '本函数只报「该采信谁、为什么、存疑什么」，不替卷宗定案（定案走 decide）。',
       by: clean(o.by, 40), dryRun: true };
   }
-  function view(caseId) {
+  function view(caseId, opts) {
+    // v2.142.0（D2 收口）：加第二参 opts —— 只用于「认知投影」那一条只读读数（见下）。
+    //   不传时行为与旧版逐字相同（读数恒为 null），故既有调用方零改动。
+    const o = opts || {};
     const c = findCase(caseId);
     if (!c) return { ok: false, reason: 'unknown-case', id: clean(caseId, 60) };
     const cfg = settings();
@@ -367,6 +370,19 @@
       return { id: h.id, text: h.text, support: t.support, refute: t.refute };
     });
     const leader = hyps.slice().sort(function (a, b) { return (b.support - b.refute) - (a.support - a.refute); })[0] || null;
+    // v2.142.0（D2 收口）：本卷宗候选人「此刻对这一条知道多少」的只读投影 —— 走 `intel.project`
+    //   （真相只读 / 有无资格由取证档决定 / 无资格时只报条数不报内容）。
+    //   **事实锚点由调用方显式给**（`opts.fact`）：没给就报 null，不拿 `accused` 顶替 ——
+    //   人名当「事由」查出来的只会是「关于这个人的说法」，与「这个人知道这件事多少」是两个问句。
+    const tsq = clean(o.fact, 80);
+    const tsPerson = clean(o.accused, 40) || clean(c.accused, 40);
+    const truthSubject = tsq
+      ? { about: tsq, person: tsPerson, read: (function () {
+        if (!WA.intel || typeof WA.intel.project !== 'function') return { ok: false, reason: 'intel-missing' };
+        try { return WA.intel.project(tsq, tsPerson); }
+        catch (e) { return { ok: false, reason: 'intel-threw' }; }
+      })() }
+      : null;
     return { ok: true, id: c.id, question: c.question, status: c.status, verdict: c.verdict,
       conclusion: c.conclusion || '', accused: c.accused || '',
       hypotheses: hyps, evidence: (c.evidence || []).length,
@@ -374,7 +390,9 @@
       leader: leader ? leader.id : '', need: cfg.minSupport,
       // 「能不能定案」当场可答：支持够且**无任何反证**才行。
       decidable: !!(leader && leader.support >= cfg.minSupport && leader.refute === 0),
-      blockedBy: leader && leader.refute > 0 ? 'refuted' : (leader && leader.support < cfg.minSupport ? 'thin' : '') };
+      blockedBy: leader && leader.refute > 0 ? 'refuted' : (leader && leader.support < cfg.minSupport ? 'thin' : ''),
+      // v2.142.0（D2 收口）：认知投影读数。`null` = 调用方没给事实锚点（不猜、不回落）。
+      truthSubject: truthSubject };
   }
   function statView() {
     const rows = casesOf();

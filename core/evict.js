@@ -213,6 +213,13 @@
     //   （把门判据逐键对账）：SITES 缺此键时 evict.array 会走 unknown-site
     //   **静默失败**（挤出压根不发生，而调用方以为做了）。
     'lifeline.rows': { path: 'lifeline.rows', cap: 12, why: '病况环形（程段历史与限制是复盘证据，不在恢复/稳定时删）' },
+    // v2.142.0（F3）：视角锁（perspective-lock.js）。
+    //   同样必须是**环形容器**而不是写入侧硬上界：编号与视角人物名单是复盘材料
+    //   （「这一幕当时是谁的视角、后来换成了谁」必须答得出），故只能环形挤出、不得在换视角时原地删。
+    //   本表必须与 core/store.js 的 __BOUNDED_CAPS['perspective.rows'] 同名同值
+    //   （把门判据逐键对账）：SITES 缺此键时 evict.array 会走 unknown-site
+    //   **静默失败**（挤出压根不发生，而调用方以为做了）。
+    'perspective.rows': { path: 'perspective.rows', cap: 12, why: '视角行环形（一幕一行；历史与视角人物名单是复盘证据，不在换视角时删）' },
     'warrant.rows': { path: 'warrant.rows', cap: 16, why: '通缉环形（罪度三档，不随死亡消除，惯犯升级）' },
     'beastBond.rows': { path: 'beastBond.rows', cap: 10, why: '驯兽环形（驯服满百清零转化，红线状态机）' },
     // ── v2.69.0 外貌分级契约 / 原型阶梯（appearance.js / ladder.js）──

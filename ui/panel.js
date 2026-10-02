@@ -76,6 +76,11 @@
     // v2.141.0（F2）：生理与照护真实层。缺此项 ⇒ inject-sources-v2560 的 D 判据当场红灯
     //   （SOURCES 每一项在 VIS_NAMES 里都要有显示名）。
     lifeline: '生理与照护',
+    // v2.142.0（F3）：视角锁。与 SOURCES 同批登记 —— 只加源表不加显示名 ⇒
+    //   注入页/导演页裸露英文键名 perspective（本版被 v2.22.0 renderDirector 键集判据与
+    //   inject-sources-v2560 的 D 判据当场抓出）。插在 chrono 行之前（与 foreshadow /
+    //   noesis 同款理由：chrono 行是 v2.127.0 锚点区，改动它会触发 anchor-scan not-unique）。
+    perspective: '视角锁',
     chrono: '世界编年史' };
 
   // v0.6 新增组件样式注入
@@ -637,7 +642,7 @@
       <label class="wa-row"><input id="wa-intel-enabled" type="checkbox" ${WA.intel && WA.intel.getSettings().enabled ? 'checked' : ''}/> 启用因果与情报</label>
       <div class="wa-row"><input id="wa-intel-cause" class="wa-input" placeholder="已有前因"/><input id="wa-intel-effect" class="wa-input" placeholder="结果"/></div>
       <div class="wa-row"><input id="wa-intel-person" class="wa-input" placeholder="知情人物"/><input id="wa-intel-claim" class="wa-input" placeholder="情报"/><input id="wa-intel-source" class="wa-input" placeholder="来源"/></div>
-      <div class="wa-row"><button class="wa-btn" id="wa-intel-link">加因果</button><button class="wa-btn" id="wa-intel-add">加情报</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-intel-link">加因果</button><button class="wa-btn" id="wa-intel-add">加情报</button><button class="wa-btn" id="wa-intel-project" title="认知投影（只读）：这个人此刻对这一条「知道多少」。走 intel.project —— 真相只读，谁有资格听由取证档决定；无资格时**只报条数、不报内容**（「他手上有东西但看不到真相」与「他什么都没听说」是两种处境：前者会被一轮追问逼出破绽，后者不会）。查不出来与「知道得对」不许同形">查认知投影</button><button class="wa-btn" id="wa-intel-correct" title="更正：辟谣只对收到过该说法的人生效。此人从没听说过这条就报 nothing-to-correct —— 不做「更正」旁路把一条新说法塞进空脑子（那与 addIntel 是不同的口子）。旧说法标 retracted 并留痕，不删行">更正认知</button></div>
       <div id="wa-intel-out" class="wa-out"></div>
       <div class="wa-sec">防全知闸门（这个人此刻该不该知道这件事）</div>
       <label class="wa-row"><input id="wa-noe-enabled" type="checkbox" ${WA.noesis && WA.noesis.getSettings().enabled ? 'checked' : ''}/> 启用防全知闸门</label>
@@ -652,6 +657,14 @@
       <div class="wa-row"><input id="wa-lfn-course" class="wa-input" placeholder="推进到哪一段 onset/progress/flare/remission/recovery/stable/longterm"/><button class="wa-btn" id="wa-lfn-advance" title="推进程段：只许沿七格**前进一格或原地**。跨格与回退一律拒收并带 from/to——「昨天病危、今天痊愈」在慢性病与创伤上是最刺眼的一种失真">推进程段</button></div>
       <div class="wa-row"><button class="wa-btn" id="wa-lfn-capacity" title="容量面（只读）：这个人此刻哪些活动受限、限到哪一档。known:false（查不到）与「无限制」严格分开——查不到不许冒充「他很健康」">容量读数</button><button class="wa-btn" id="wa-lfn-gap" title="照护缺口（只读）：按七步流程报「哪几步还没有落账」。它只答流程差，不写医疗结果——结果归别处真源">照护缺口</button><button class="wa-btn" id="wa-lfn-view" title="只读明细：这个人此刻带着的全部状况与程段历史。只报程段与限制，不列症状细节">看明细</button></div>
       <div id="wa-lfn-out" class="wa-out"></div>
+      <div class="wa-sec">视角锁（这一笔该不该由这个视角交代）</div>
+      <label class="wa-row"><input id="wa-per-enabled" type="checkbox" ${WA.perspective && WA.perspective.getSettings().enabled ? 'checked' : ''}/> 启用视角锁</label>
+      <div class="wa-row"><input id="wa-per-scene" class="wa-input" placeholder="场景名（不填 = 最近登记的那一幕）"/><input id="wa-per-lens" class="wa-input" placeholder="视角五档 omniscient/first/limited/ensemble/camera"/></div>
+      <div class="wa-row"><input id="wa-per-persons" class="wa-input" placeholder="视角人物（多个用「、」；camera 可空 —— 无主摄像机不是视角）"/><button class="wa-btn" id="wa-per-assign" title="登记一处场景视角。**这是本模块唯一的写口** —— 视角只能被登记，不能被推断。同名重登记必须显式 replace（不静默覆盖：覆盖之后没人答得出原来是哪一档）。除 camera 外，视角必须有至少一个视角人物">登记视角</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-per-current" title="当前视角（只读）：给了场景取该场景，没给则取最近登记的那一幕。一行都没有报 no-scene — **不回落成全知**（「没登记」与「随便写」是两件事）">当前视角</button><button class="wa-btn" id="wa-per-boundary" title="只读：视角锁引擎现场（几处已登记 / 四类拒绝各多少次）。四类拒绝分开报 —— 合成一个「不许写」之后，作者就再也知道该改词表、先登记、补共视角，还是换渠道">边界读数</button></div>
+      <div class="wa-row"><input id="wa-per-who" class="wa-input" placeholder="这一笔写谁"/><input id="wa-per-channel" class="wa-input" placeholder="渠道 narrator/interior/dialogue/document/flashback"/><input id="wa-per-access" class="wa-input" placeholder="取证 witnessed/perceived/inferred/exterior"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-per-allows" title="单笔裁决：这一笔能不能由当前视角交代。内心是唯一被闸死的渠道 —— 除全知外，内心只属于视角人物本人（此条任何档位下都不放宽）。不查知情面：那是防全知闸门的活，两个真源不可合并">单笔裁决</button><button class="wa-btn" id="wa-per-leak" title="事后扫描：在已经写进正文的笔里检出越界项（只核 written:true 的）。只留痕不删文 —— 删文是叙事决定，不是引擎决定">越界扫描</button><button class="wa-btn" id="wa-per-block" title="注入块预览：只报纪律与当前模式，不列视角人物名 —— 视角行里可能有作者预登记、尚未登场的角色，列名就是剧透">注入块预览</button></div>
+      <div id="wa-per-out" class="wa-out"></div>
       <div class="wa-sec">人物生活（目标、承诺、日程）</div>
       <label class="wa-row"><input id="wa-life-enabled" type="checkbox" ${WA.life && WA.life.getSettings().enabled ? 'checked' : ''}/> 启用人物生活</label>
       <div class="wa-row"><input id="wa-life-person" class="wa-input" placeholder="人物"/><input id="wa-life-text" class="wa-input" placeholder="目标、承诺或日程"/></div>
@@ -2608,6 +2621,26 @@
         intelOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' }, true);
       }; }
     on('#wa-intel-link', () => { if (!WA.intel) return intelOut({ ok: false, reason: 'module-missing' }, true); const effect = intelVal('#wa-intel-effect'); const known = WA.intel.knownCause(intelVal('#wa-intel-cause')); const r = WA.intel.addLink({ cause: intelVal('#wa-intel-cause'), effect: effect }); const ex = r.ok ? WA.intel.explain(effect) : null; intelOut(Object.assign({}, r, { id: r.ok ? (effect + ':' + (known ? 'known' : 'unknown') + ':' + ((ex && ex.causes || []).length)) : r.id }), true); renderBody(); });
+    // v2.142.0（D2 收口）：`intel.project` / `intel.correct` 的真读者**就在这** ——
+    //   用户输入的人物与事由是真输入，读数落在既有 `wa-intel-out` 节点上（与 X4 的
+    //   auditRecord ← 面板「看卷宗」同款口径：「能力申报」不算读者）。
+    on('#wa-intel-project', () => {
+      if (!WA.intel || !WA.intel.project) return intelOut({ ok: false, reason: 'module-missing' }, true);
+      const person = intelVal('#wa-intel-person'), about = intelVal('#wa-intel-effect');
+      const r = WA.intel.project(about, person);
+      if (!r.ok) return intelOut({ ok: false, reason: r.reason || '未知原因' }, true);
+      // 两态严格分开：`ok:true` 是「查得出来」；`entitled:false` 是**查得出来、但他没资格听**。
+      intelOut({ ok: true, id: r.person + '·' + r.about + ' ⇒ '
+        + (r.entitled
+          ? ((r.knows ? '知道得对' : '说法与真相不符') + '（听过 ' + r.seen.length + ' 条，猜错 ' + r.guessed.length + ' 条）')
+          : ('无资格听真相（手上有 ' + r.withheld + ' 条，只报条数）')) + '：' + r.reason }, true);
+    });
+    on('#wa-intel-correct', () => {
+      if (!WA.intel || !WA.intel.correct) return intelOut({ ok: false, reason: 'module-missing' }, true);
+      const r = WA.intel.correct(intelVal('#wa-intel-person'), { about: intelVal('#wa-intel-effect'),
+        claim: intelVal('#wa-intel-claim'), right: intelVal('#wa-intel-source'), source: intelVal('#wa-intel-source') });
+      intelOut(r.ok ? { ok: true, id: '已更正 ' + r.corrected + ' 条旧说法（' + r.about + '）' } : r, true);
+    });
     on('#wa-intel-add', () => { if (!WA.intel) return intelOut({ ok: false, reason: 'module-missing' }, true); const person = intelVal('#wa-intel-person'); const r = WA.intel.addIntel(person, { claim: intelVal('#wa-intel-claim'), source: intelVal('#wa-intel-source'), level: 'report', about: intelVal('#wa-intel-effect') }); const seen = r.ok ? WA.intel.visibleTo(person, intelVal('#wa-intel-effect')) : []; intelOut(Object.assign({}, r, { id: r.ok ? (r.status + ':' + seen.length + ':' + ((seen[0] && WA.intel.CONFIDENCE[seen[0].level]) || '')) : r.id }), true); renderBody(); });
     // v2.140.0（F1）：防全知闸门。三枚控件都是 noesis 的真消费方（裁决 / 扫描 / 读数）。
     //   口径与引擎同源：只读世界不改世界；泄露扫描只留痕不删文；四码分开报不合并。
@@ -2745,6 +2778,80 @@
       lfnOut('明细：' + r.rows.map(function (x) {
         return x.cond + '（' + x.kind + '，' + x.course + '，限制 ' + (x.limits.join('/') || '无') + '）';
       }).join('；'), true);
+    });
+    // v2.142.0（F3）：视角锁。六枚出口各自对上一个真出口 ——
+    //   控件与 handler 同批（只加控件不加 handler = 点了没反应；只加 handler 不加控件 = 死代码）。
+    const perVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const perOut = function (text, keep) {
+      if (keep) panelEl.dataset.perOut = text;
+      const o = $('#wa-per-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.perOut) { const saved = $('#wa-per-out'); if (saved) saved.textContent = panelEl.dataset.perOut; }
+    const perSplit = function (v) {
+      return String(v || '').split(/[\u3001,\uff0c]/).map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+    };
+    { const el = $('#wa-per-enabled');
+      if (el) el.addEventListener('change', function () {
+        if (!WA.perspective) return perOut('未记录：module-missing', true);
+        WA.perspective.setSettings({ enabled: !!el.checked });
+        perOut('已记录 ' + (el.checked ? 'enabled' : 'disabled'), true);
+      });
+    }
+    // 裁决类三枚共用一个读数格式化：四类拒绝**分开报**（见引擎边界 5）。
+    const perWord = function (r) {
+      if (r.allowed === false) {
+        const w = r.reason === 'out-of-lens' ? '此人不在本视角里（补共视角，或换一个场景视角）'
+          : (r.reason === 'interior-blocked' ? '内心渠道被封（' + (r.via || '') + '）' : '不许写');
+        return '越界：' + w;
+      }
+      return '合法（' + (r.reason || '') + '）';
+    };
+    on('#wa-per-assign', () => {
+      if (!WA.perspective || !WA.perspective.assign) return perOut('未记录：module-missing', true);
+      const r = WA.perspective.assign(perVal('#wa-per-scene'), perVal('#wa-per-lens'), perSplit(perVal('#wa-per-persons')), { replace: true });
+      if (!r.ok) return perOut('未记录：' + (r.reason || '未知原因')
+        + (r.allowed ? '（可选视角：' + r.allowed.join('/') + '）' : ''), true);
+      perOut('已登记 ' + r.scene + ' ⇒ ' + r.lens + '（视角人物 ' + r.persons.length + ' 位）', true);
+    });
+    on('#wa-per-current', () => {
+      if (!WA.perspective || !WA.perspective.current) return perOut('未记录：module-missing', true);
+      const r = WA.perspective.current(perVal('#wa-per-scene'));
+      if (!r.ok) return perOut('当前视角：未记录（' + (r.reason || '未知原因') + ' —— 没登记就是没登记，不按全知写）', true);
+      perOut('当前视角：' + r.scene + ' ⇒ ' + r.lens + '（视角人物 ' + r.persons.length + ' 位，历史 ' + r.history.length + ' 条）', true);
+    });
+    on('#wa-per-allows', () => {
+      if (!WA.perspective || !WA.perspective.allows) return perOut('未记录：module-missing', true);
+      const r = WA.perspective.allows({ scene: perVal('#wa-per-scene'), who: perVal('#wa-per-who'),
+        channel: perVal('#wa-per-channel'), access: perVal('#wa-per-access') });
+      // 两态严格分开：ok:false 是「查不出来」（缺字段 / 场景未登记 / 模块关），
+      //   ok:true 才是裁决本体（allowed 可能为 false —— 那是裁决结论，不是错误）。
+      if (!r.ok) return perOut('未记录：' + (r.reason || '未知原因'), true);
+      perOut('裁决：' + r.who + ' / ' + r.channel + ' ⇒ ' + perWord(r), true);
+    });
+    on('#wa-per-leak', () => {
+      if (!WA.perspective || !WA.perspective.leakScan) return perOut('未记录：module-missing', true);
+      const r = WA.perspective.leakScan([{ written: true, scene: perVal('#wa-per-scene'), who: perVal('#wa-per-who'),
+        channel: perVal('#wa-per-channel'), access: perVal('#wa-per-access') }]);
+      if (!r.ok) return perOut('未记录：' + (r.reason || '未知原因'), true);
+      perOut('越界扫描：扫 ' + r.scanned + ' 笔，检出 ' + r.count + ' 处'
+        + (r.count ? '（' + r.leaks.map(function (x) { return x.who + '/' + x.reason; }).join('、') + '）' : '')
+        + ' · 只留痕不删文', true);
+    });
+    on('#wa-per-boundary', () => {
+      if (!WA.perspective || !WA.perspective.boundary) return perOut('未记录：module-missing', true);
+      const b = WA.perspective.boundary();
+      const st = (WA.perspective && WA.perspective.stat) ? WA.perspective.stat() : null;
+      const fl = (st && st.faults) ? Object.keys(st.faults).map(function (k) { return k + '×' + st.faults[k]; }).join(' ') : '';
+      perOut('视角锁：' + (b.enabled ? '开' : '关') + ' · 已登记场景 ' + b.rows + '/' + b.maxScenes
+        + ' · 四类拒绝分开报 —— 不在视角 ' + b.outOfLens + '/内心封 ' + b.interiorBlocked
+        + '/未登记 ' + b.noScene + '/留痕 ' + b.leaks
+        + (fl ? ' · 拒收 ' + fl : ''), true);
+    });
+    on('#wa-per-block', () => {
+      if (!WA.perspective || !WA.perspective.buildBlock) return perOut('未记录：module-missing', true);
+      const t = WA.perspective.buildBlock();
+      perOut(t ? ('注入块：' + t.split(String.fromCharCode(10)).length + ' 行 · 不列视角人物名（防剧透）')
+        : '注入块：空（开关未开，零 token 占用）', true);
     });
     // v2.52.0：人物生活只写用户明确提交的内容；关闭开关后停止结算与注入。
     const lifeText = function () {
