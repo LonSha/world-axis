@@ -1,5 +1,23 @@
 /**
- * WorldAxis engines/noesis.js (v2.143.0) — 防全知闸门（知情边界统一裁决）
+ * WorldAxis engines/noesis.js (v2.144.0) — 防全知闸门（知情边界统一裁决）
+ *
+ * v2.144.0（F5）本版做一件事：把「记着 ≠ 记对」从**注释里的说法**变成**可判定的引擎闸门** ──
+ *   缺口原句（`rumor.js` 边界 5）：「未声明的改写一律拒收……`intact` 仍是 true，而值已经不一样了」；
+ *   以及它自己的记账面：`intact` / `tampered` / `drift` 三读数。
+ *   实测：这三个读数**只有作者面消费方**（`ui/panel.js` 的链详情与 `tool-diag` 的计数），
+ *   **裁决面（`knows` / `gateScene` / `buildBlock`）完全不知道「他记的是不是原版」** ——
+ *   于是本闸门一路放行：一个只听过失真版本的人，`knows` 照样答 `known:true`，
+ *   注入块照样告诉模型「该角色知道这件事」，角色随后把改写过的版本当既成事实写进正文。
+ *   这是 F 线同型病（**声明在注释里，落点不在代码里**）的**第五例**。
+ *   本版新增 `fidelity(person, factId)` 一口，三态如实：
+ *     · `{known:false}`        这条链上没有此人 / 传播面缺席 ⇒ **不冒充「原版」**；
+ *     · `{faithful:true}`      他接到的那一跳 `intact` 为真 ⇒ 手里是原版；
+ *     · `{faithful:false, reason:'distorted', drift}` 他接到的是被改写过的版本。
+ *   **一处必须写明的精度边界**：链级 `intact` 是**累积值**（一旦被改写就再也回不来），
+ *   但「**这个人手里是哪一版**」要看**他接到的那一跳**的 `intact` ——
+ *   拿链级累积值去答个人版本，会把「改写在传给他之后才发生」误判成「他手里的也变了」。
+ *   两个真源不可合并：`knows` 答「知道吗」，`fidelity` 答「记的是原版吗」；
+ *   与前四例同规 —— 人记岔了不等于他不知道，所以**不进 `knows` 的一票否决**。
  *
  * v2.143.0（F4）本版做一件事：把「在职 ≠ 在岗」从**注释里的说法**变成**可判定的引擎闸门** ──
  *   缺口原句（心之壁【职分】）：「有权查阅 ≠ 已经查阅」——一个角色有职位、有权查阅某份档案，
@@ -104,7 +122,10 @@
   // v2.143.0（F4）：`dutyEnabled` 是**在岗闸门**的总开关，与 `timeEnabled`（时点）/
   //   `rangeEnabled`（空间）并列成第三轴。三者各自可关：关掉一轴不是「放宽纪律」，
   //   而是**如实报这一轴缺席**（`duty-off` / `range-off`），与「查不到」严格分开。
-  const DEF = { enabled: false, rangeEnabled: true, timeEnabled: true, dutyEnabled: true, maxLeaks: 8 };
+  const DEF = { enabled: false, rangeEnabled: true, timeEnabled: true, dutyEnabled: true,
+    // v2.144.0（F5）：`fidelityEnabled` 是**记忆失真面**的第四轴（与空间 / 时点 / 在岗并列）。
+    //   关掉一轴不是「放宽纪律」，而是**如实报这一轴缺席**（`fidelity-off`）。
+    fidelityEnabled: true, maxLeaks: 8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'noesis',
     bounds: { maxLeaks: [1, 32] } };
 
@@ -125,6 +146,10 @@
     //   与 not-in-office（此人根本不在职）处置不同——前者等排班，后者先任命；
     //   合成一个「没资格」就再也答不出该改日程还是该走任职流程。
     offDuty: 0, notInOffice: 0,
+    // v2.144.0（F5）：失真面计数。`distorted` 记「读到的是被改写过的版本」的次数，
+    //   与 denies 分开：denies 是「不该知道」，distorted 是「知道了但记岔了」——
+    //   合成一个「有问题」就再也答不出该拦人还是该更正记录。
+    distorted: 0,
     lastReason: '', lastAt: 0, faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
@@ -366,6 +391,59 @@
   }
 
   /**
+   * 记忆失真面（v2.144.0 F5）：**这个人手里拿的是不是原版**。
+   *
+   * 与 `knows` 的分工是硬的：`knows` 答「知道吗」，本口答「记的是原版吗」。
+   *   **不进 knows 的一票否决** —— 人记岔了不等于他不知道；把它塞进 knows 会让
+   *   「他听到的是被改过的版本」被读成「他不知道这件事」，那是另一种失真。
+   *
+   * 判据真源**不新开**：只读 `rumor` 已经记下的链（`factKey` / `hops[].to` / `hops[].intact` / `value`），
+   *   本模块不重算「传了几手」、更不自己造一份版本。
+   *
+   * 三态如实（**问不出来 ≠ 问出来是原版**）：
+   *   · 传播面缺席 / 没有这条链 / 此人不在链上 ⇒ `{known:false}`，不冒充「原版」；
+   *   · 他接到那一跳 `intact` 为真 ⇒ `{known:true, faithful:true, reason:'faithful'}`；
+   *   · 他接到那一跳 `intact` 为假 ⇒ `{known:true, faithful:false, reason:'distorted'}`，
+   *     并带出 `drift {from,to}`（**由调用方处置**：更正 / 对质 / 让它继续错下去都是叙事决定）。
+   *
+   * 两道前置闸（与 duty / perceive 同规）：总开关关 ⇒ `disabled`；
+   *   第四轴关 ⇒ `fidelity-off`（**如实报这一轴缺席**，不是「他记的是原版」）。
+   */
+  function fidelityGate(person, factId) {
+    const cfg = settings();
+    if (!cfg.enabled) return { known: false, reason: 'disabled' };
+    if (!cfg.fidelityEnabled) return { known: false, faithful: null, reason: 'fidelity-off' };
+    const who = clean(person, 40), fid = clean(factId, 80);
+    if (!who || !fid) return { known: false, reason: 'missing-fields' };
+    const r = WA.rumor;
+    if (!r) return { known: false };   // 传播面缺席 ⇒ 本面无话可说，不冒充「原版」
+    let c = null;
+    try {
+      const ch = (state().rumor || {}).chains;
+      c = (Array.isArray(ch) ? ch : []).filter(function (x) {
+        return x && (x.factKey === fid || x.id === fid);
+      })[0];
+    } catch (e) { return { known: false }; }
+    if (!c) return { known: false };   // 没有这条链 ⇒ 缺席（不是「原版」，也不是「失真」）
+    const hops = Array.isArray(c.hops) ? c.hops : [];
+    // **本面只答「经手过的人」**：没接到过这条链的人，谈不上「他手里是哪一版」。
+    const recv = hops.filter(function (h) { return h && h.to === who; });
+    if (!recv.length) return { known: false, who: who, fact: fid, reason: 'not-on-chain' };
+    const last = recv[recv.length - 1];
+    const from = String(c.factValue == null ? '' : c.factValue);
+    const to = String(last.value == null ? '' : last.value);
+    if (last.intact === true) {
+      return { known: true, faithful: true, reason: 'faithful', who: who, fact: fid,
+        chain: c.id, layer: last.layer, value: to, hops: hops.length };
+    }
+    // 失真：**只报不改**（更正记录是叙事决定，不是引擎决定——与 leakScan「只留痕不删文」同规）。
+    stat.distorted = (stat.distorted || 0) + 1;
+    stat.lastReason = 'distorted'; stat.lastAt = clockNow('noesis');
+    return { known: true, faithful: false, reason: 'distorted', who: who, fact: fid,
+      chain: c.id, layer: last.layer, via: last.motive, value: to,
+      drift: (to === from) ? null : { from: from, to: to }, hops: hops.length };
+  }
+  /**
    * 统一裁决口：person 此刻是否知道 factId。
    *   一票否决：任一源认定不知 ⇒ known:false，并把每个否决源的归因码逐条带出。
    *   全源缺席/无账 ⇒ not-registered（事实没登记过，不拿「没拦」冒充「该知道」）。
@@ -559,6 +637,10 @@
       //   与「时辰未到」「人不在场」并列成第三轴的读数——四种处置各不相同。
       offDuty: stat.offDuty || 0, notInOffice: stat.notInOffice || 0,
       dutyEnabled: !!cfg.dutyEnabled,
+      // v2.144.0（F5）：失真面读数。`distorted` 与 denies **分开报**——
+      //   「他记岔了」与「他不该知道」处置不同（更正记录 vs 拦住发言）。
+      distorted: stat.distorted || 0,
+      fidelityEnabled: !!cfg.fidelityEnabled,
       perceiveIn: stat.perceiveIn || 0, perceiveOut: stat.perceiveOut || 0,
       perceiveUnknown: stat.perceiveUnknown || 0,
       gates: stat.gates, scans: stat.scans, leaks: stat.leaks,
@@ -587,6 +669,12 @@
       lines.push('· 在职不等于在岗：有职位、有权查阅，都不等于此刻人在岗、已履职；');
       lines.push('  此刻被日程占住、已离场、或不在该地的人，不得当作正在办事。');
     }
+    // v2.144.0（F5）：记忆失真纪律。**只在有账时提**（零账零 token，与全模块同口径）。
+    //   只输出纪律，不列事实名/人名（列出即把未揭示的失真写进正文）。
+    if (cfg.fidelityEnabled && stat.distorted > 0) {
+      lines.push('· 记着不等于记对：有人「知道」的是被改写过的版本；');
+      lines.push('  凡经转述得知的事，不得当作亲眼所见或既成事实复述。');
+    }
     return lines.join('\n');
   }
 
@@ -603,12 +691,18 @@
     //   ② 面板：人物页「在岗核查」按钮（wa-noe-duty）；
     //   ③ 诊断：secNoesis 的 offDuty / notInOffice 两码读数。
     duty: dutyGate,
+    // v2.144.0（F5）：记忆失真面。真消费方三处（与其余各口同规格，缺一不挂）：
+    //   ① 注入链：buildBlock 的「记忆失真纪律」段；
+    //   ② 面板：人物页「记忆失真核查」按钮（wa-noe-fidelity）；
+    //   ③ 诊断：secNoesis 的 distorted 读数 + fidelityEnabled 第四轴开关位。
+    fidelity: fidelityGate,
     boundary: boundary, buildBlock: buildBlock,
     stat: function () {
       return Object.assign({}, stat, { faults: Object.assign({}, stat.faults),
         enabled: settings().enabled, rangeEnabled: settings().rangeEnabled,
-        timeEnabled: settings().timeEnabled, dutyEnabled: settings().dutyEnabled });
+        timeEnabled: settings().timeEnabled, dutyEnabled: settings().dutyEnabled,
+        fidelityEnabled: settings().fidelityEnabled });
     }
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/noesis.js', { kind: 'engine', ver: '2.143.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/noesis.js', { kind: 'engine', ver: '2.144.0' });
 })();

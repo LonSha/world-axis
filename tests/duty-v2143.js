@@ -123,8 +123,10 @@ function clickNoe(WA, id, person, fact) {
 // ── 真源码破坏锚点（各须恰中 1 次）────────────────────────────────────
 const ANCHORS = {
   // ① 总开关闸被摘掉 ⇒ 关闭态下不再拒收 disabled，「没开闸」被当成真有话可说
-  master: { rel: NOE, txt: "    if (!cfg.enabled) return { known: false, reason: 'disabled' };",
-    to: "    if (false && !cfg.enabled) return { known: false, reason: 'disabled' };" },
+  //   锚点带函数签名与两道闸的注释行：本仓每个新引擎闸门都以同款 `if (!cfg.enabled)`
+  //   开头，裸这一行会在下一个引擎落地时撞车（v2.144.0 实测 hits=2）——锚点必须**本闸门独有**。
+  master: { rel: NOE, txt: "  function dutyGate(person, orgId, at) {\n    const cfg = settings();\n    // 总开关与第三轴**两道闸都要过**（与 knows / perceive / gateScene 同规）：\n    //   总开关关闭 ⇒ 一律拒收 disabled（不是「查不到在岗」，也不是「不在岗」）；\n    //   第三轴单独关闭 ⇒ 如实报 duty-off（这一轴缺席，不是「他在岗」）。\n    if (!cfg.enabled) return { known: false, reason: 'disabled' };",
+    to: "  function dutyGate(person, orgId, at) {\n    const cfg = settings();\n    // 总开关与第三轴**两道闸都要过**（与 knows / perceive / gateScene 同规）：\n    //   总开关关闭 ⇒ 一律拒收 disabled（不是「查不到在岗」，也不是「不在岗」）；\n    //   第三轴单独关闭 ⇒ 如实报 duty-off（这一轴缺席，不是「他在岗」）。\n    if (false && !cfg.enabled) return { known: false, reason: 'disabled' };" },
   // ② 第三轴闸被摘掉 ⇒ 关掉在岗轴之后照旧给出「在岗 / 不在岗」的判决（一轴缺席被冒充成有结论）
   dutyOff: { rel: NOE, txt: "    if (!cfg.dutyEnabled) return { known: false, off: true, reason: 'duty-off' };",
     to: "    if (false && !cfg.dutyEnabled) return { known: false, off: true, reason: 'duty-off' };" },
@@ -338,11 +340,17 @@ function runNegative(a) {
     else console.log('  ✓ N0 ' + b.key + ' 锚点恰中 1 次');
   });
   // H5 判据纯度：判据层不许内联锚点串（锚点字面量只准在 ANCHORS 里声明一次）
-  const self = src(SELF);
+  //   比的是**语义串**：锚点 txt 在源码里以 `\n` / `\"` / `\'` 的转义形态出现，
+  //   故两侧统一反转义后再计数（否则带换行或双引号的锚点恒为 0 次，纯度检查形同虚设）。
+  const unesc = function (x) {
+    return String(x).replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\'/g, "'");
+  };
+  const self = unesc(src(SELF));
   const anchorsBlock = self.slice(self.indexOf('const ANCHORS'), self.indexOf('function brokenOverride'));
   const judgeBlock = self.slice(self.indexOf('function mustFail'), self.indexOf('function caseSpec'));
   [ANCHORS.master.txt, ANCHORS.dutyOff.txt, ANCHORS.fallback.txt, ANCHORS.sched.txt,
-    ANCHORS.block.txt, ANCHORS.diag.txt, ANCHORS.diagAxis.txt, ANCHORS.panel.txt].forEach(function (lit) {
+    ANCHORS.block.txt, ANCHORS.diag.txt, ANCHORS.diagAxis.txt, ANCHORS.panel.txt].forEach(function (raw) {
+    const lit = unesc(raw);
     const inAnchors = hits(anchorsBlock, lit);
     const inJudge = hits(judgeBlock, lit);
     checks++;

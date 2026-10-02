@@ -6,17 +6,17 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.143.0 |
-| 全量回归 | `node tests/run.js` → **v2.143.0 待计划全部完成后单跑**（遵用户纪律「在做完计划全部内容前不要跑全量」）。v2.142.0 为通过 13760 / 失败 0 · status: passed（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）；硬超时默认 660000ms，慢机可用 `WA_REGRESSION_TIMEOUT_MS` 放宽 |
+| 版本 | v2.144.0 |
+| 全量回归 | `node tests/run.js` → **v2.144.0 待计划全部完成后单跑**（遵用户纪律「在做完计划全部内容前不要跑全量」）。v2.142.0 为通过 13760 / 失败 0 · status: passed（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）；硬超时默认 660000ms，慢机可用 `WA_REGRESSION_TIMEOUT_MS` 放宽 |
 | 产品文件面 | 168（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 147 / members= 977 / chars= 11079 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 169 · 锁 163 · 可达 169 · 孤儿 0 · 豁免 0 |
-| 死子面 | `node tests/dead-export-gate.js` → dead 764 / uiDead 4 / 仅测试 346 / dataOnly 248 |
-| 拒收码 | `node tests/reject-code-gate.js` → 629 码（见证 390 / 死表 9 / 基线 230） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.143.0 · 现场 refs 3707 / 命名空间 167 / 成员 2021 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 147 / members= 978 / chars= 11088 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 170 · 锁 164 · 可达 170 · 孤儿 0 · 豁免 0 |
+| 死子面 | `node tests/dead-export-gate.js` → dead 764 / uiDead 4 / 仅测试 350 / dataOnly 248 |
+| 拒收码 | `node tests/reject-code-gate.js` → 633 码（见证 394 / 死表 9 / 基线 230） |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.144.0 · 现场 refs 3713 / 命名空间 167 / 成员 2023 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
-| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 121 把 · 覆盖 **121（100%）**＝ 统一档 37（锚点 294 · 问题 0）+ 非统一档已识别 84 · **未识别 0** · 非统一档问题 102（**只报不红**，逐条带证据与命中行类别） |
+| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 123 把 · 覆盖 **123（100%）**＝ 统一档 39（锚点 311 · 问题 0）+ 非统一档已识别 84 · **未识别 0** · 非统一档问题 102（**只报不红**，逐条带证据与命中行类别） |
 | 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核；v2.135.0 扩到 `checked` = 34 站点） |
 | tools/ | 只留**被可执行代码引用**的 14 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据 |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
@@ -324,6 +324,91 @@
   同因缩进漂移，按 `indent=1` 复原后 `git diff` 从 468 行收敛到 **4 行**。
 - **影响范围**：`engines/noesis.js`、`engines/tool-diag.js`、`ui/panel.js`、`index.js`、`manifest.json`、
   `tests/duty-v2143.js`（新）、`tests/run.js`、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、
+  `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
+  `ITERATION_LOG.md`。
+
+### R130 · 2026-10-03 · v2.144.0：F5 记忆失真面（记着 ≠ 记对）
+- **起点与终点**：起点 v2.143.0（`422a722`）；终点 v2.144.0（全量回归待计划全部完成后单跑）。
+- **它治的病：账面上早就有读数，裁决面却看不见**。这是 F 线同型病的**第五例** —— 「**声明在注释里，
+  落点不在代码里**」（F1 防全知 / F2 时点与注意力 / F3 视角锁 / F4 在岗已各修一例）。
+  缺口原句（`engines/rumor.js` 边界注释）：「未声明的改写一律拒收……`intact` 仍是 true，
+  而值已经不一样了」。实测：`rumor` 从 X3 起就记着三个读数 —— `intact` / `tampered` / `drift` ——
+  但它们的**消费方只有作者面**：`ui/panel.js` 的链详情 / 查链 / 链列表（三处）与
+  `engines/tool-diag.js` 的 rumor 计数节；而**裁决面（`knows` / `gateScene` / `buildBlock`）
+  完全不知道「他记的是不是原版」** —— 一个只听过失真版本的人，`knows` 照样答 `known:true`，
+  注入块照样告诉模型「该角色知道这件事」。
+- **新增一口 `fidelity(person, factId)`**，三态如实（缺一就答不出该更正记录还是该拦住发言）：
+  · `{known:false, reason:'not-on-chain'}` —— **传播面缺席 / 无此链 / 此人不在链上** ⇒ 如实报缺席，
+    **不冒充「原版」**（本仓最反复治理的一条：问不出来 ≠ 问出来是原版）；
+  · `{faithful:true, reason:'faithful'}` —— 他接到的那一跳 `intact` 为真 ⇒ 原版；
+  · `{faithful:false, reason:'distorted', drift:{from,to}, via}` —— 他接到的是被改写版本，
+    **只报不改**（更正记录是叙事决定，不是引擎决定——与 `leakScan`「只留痕不删文」同规）。
+  两道前置拒收：总开关关 ⇒ `disabled`；第四轴关 ⇒ `fidelity-off`（**如实报这一轴缺席**，
+  `faithful` 置 `null` —— 「这一轴没查」与「他记对了」是两回事，与 `duty-off` 同规格）。
+- **本版最要紧的技术判断（精度边界）：链级累积值答不了个人版本**。`c.intact` 是**累积值**
+  （`c.intact = !!c.intact && h.intact`）—— 一旦被改写就再也回不来。但「这个人手里是哪一版」
+  要看**他接到的那一跳**的 `intact`（`recv[recv.length - 1]`，不是 `hops[hops.length - 1]`）：
+  拿累积值去答个人版本，会把「改写在传给他之后才发生」误判成「他手里的也变了」——
+  甲如实收到、乙之后才被改写，**甲手里的仍是原版**。专锁 B6/B7 与负控 `lastHop` 专门钉住这一条。
+- **本闸门不进 `knows()` 的一票否决**（第二处最要紧的取舍）：**人记岔了，不等于他不知道** ——
+  把 `distorted` 塞进 `knows` 的 `deniedBy`，会把「他手里是失真版本」读成「他不该知道这件事」，
+  那是**另一种失真**。两个真源不可合并：`knows` 答「知道吗」，`fidelity` 答「记的是原版吗」。
+  故 `distorted` 只出现在 `fidelity()` 的返回与 `boundary()` 的 `distorted` 计数里，
+  **不与 `denies` 混报**（前者该更正记录，后者该拦住发言）。
+- **码表**：复用 `disabled` / `missing-fields`；新开两码 `distorted` / `fidelity-off`；
+  `faithful` / `not-on-chain` 为**正常归因**（与既有 `reuse` / `omniscient` / `on-duty` 同规格：
+  同一词法形状出现，故必须有归属）。
+- **产品面接线三站**（新导出必须有独立消费方，缺一不挂）：
+  ① `engines/tool-diag.js` 的 `secNoesis` 加两读数（`fidelityEnabled` 第四轴开关位 +
+  `distorted` **单列报**），并在 `UI_BINDINGS` 的 noesis 组登记 `wa-noe-fidelity`；
+  ② `ui/panel.js` 加「记忆失真核查」按钮 + handler（按四态出：`fidelity-off` 报「这一轴已关」/
+  `known !== true` 报「无话可说」/ `faithful` 报「⇒ 原版」带层与跳数 / 否则报「**已失真**」
+  带 `drift.from → drift.to` 与经手动机，并显式声明「只报不改」）；
+  ③ `render` 注入链 `buildBlock` 加**记忆失真纪律段**（`if (cfg.fidelityEnabled &&
+  stat.distorted > 0)`）—— **零 token 占用、不列事实名/人名**（列出即把未揭示的失真写进正文）。
+- **专锁 `tests/fidelity-v2144.js`（432 行，新建）**：A 结构（fidelity 在场 + `fidelityEnabled`
+  默认 true + 总开关默认 false + `stat()` 可复算开关位）+ B 运行时 B1–B31（faithful / distorted +
+  drift + via / **链级累积值 vs 他接到的那一跳** / 缺席三态 / 两道前置闸 / 缺参 / 读数进位由真调用
+  驱动 / `boundary` 只读 / **只报不改**（核查前后 `store.get().rumor` 逐字节相等）/
+  **与 knows 不互相否决** / 注入块纪律 / 关闭时空串）+ C 消费方 C0–C9（诊断真读者 + 面板真渲染 +
+  点击四态）+ **九处真源码破坏锚点**（`master` 总开关闸摘掉 / `axisOff` 第四轴闸摘掉 /
+  `onchain` not-on-chain 回落成 faithful / `lastHop` 取全链最后一跳 / `intact` 原版判据翻面 /
+  `counter` 失真读数不进位 / `block` 注入链失真纪律摘掉 / `diag` 诊断面不报开关位 /
+  `panel` 面板不渲染入口），每处须**恰中 1 次**；H5 纯度 + 正控制 + N1–N9 负控 +
+  N 纯度（真文件逐字未变）。实跑 `FIDELITY-V2144: pass 45 项` + `NEGATIVE: pass 82 项`（合计 **127 项全绿**）。
+- **见证表四条新码（`tests/reject-v2780.js`，+97 行）**：`distorted`（起链 → 甲如实收到 →
+  乙以 `distort` 动机收到 ⇒ **造场自证必须核「链级 `intact` 已为假，而甲那一跳仍为真」**，
+  自证 `fidelity('甲')` 仍 `faithful:true`、`fidelity('乙')` 得 `distorted` + `drift.to` 正确）/
+  `faithful`（如实收到 ⇒ 正常归因）/ `fidelity-off`（`fidelityEnabled:false` ⇒ 如实报缺席且
+  `faithful === null`）/ `not-on-chain`（不在链上 ⇒ 缺席）。**造场一处真 bug 已修**：
+  `memory.upsertFact` 需要 memory **先初始化**（实测抛 `Cannot read properties of undefined
+  (reading 'facts')`，导致 `startChain` 报 `unknown-fact`）⇒ 改用 `worldFacts` **直写**
+  （`rumor.factRow` 的真源之一），与清链合并成单条 transact。见证 390 → 394。
+- **出口面契约**：`ns= 147 / members= 978 / chars= 11088`（较 v2.143.0 的 977 / 11079 各
+  **+1 / +9**，因新增 `noesis.fidelity`）；`FROZEN2800` 的 noesis 节改为
+  `noesis:boundary buildBlock duty fidelity gateScene getSettings knows leakScan perceive setSettings stat`；
+  `EC2430` 同步。
+- **门禁结果（全绿）**：`module-registry-gate` 文件 164 / 命名空间 172 / 装载期边 66 / 硬边 0 /
+  调用期引用 132 / 结构问题 0 · `dead-export-gate` dead 764 / uiDead 4 / 元数据同源 ·
+  `reject-code-gate` **633 码（见证 394 / 死表 9 / 基线 230）** · `export-contract` 978 / 11088 ·
+  `docs-archive-gate` 跨文件同号 0 · `test-surface-gate` 文件面 170 / 锁 164 / 可达 170 / 孤儿 0 ·
+  `inventory` 四类悬空均 0 · `module-cycle-gate` 环无 · `ui-gate` 通过 53 · `ui-wire-audit` 通过 9 ·
+  `anchor-scan` 锁 123 / 覆盖 123（100%）· `anchor-scan-v2126` 31 项 / `anchor-scan-v2133` 55 项 ·
+  `negative-control-audit` EXIT=0 · `dup-decl-gate` 重复 0 · `field-liveness-gate` 无幽灵读点 ·
+  `toolchain-gate` EXIT=0；`sync-e2e-readings --verify` 与账本现场同源；四把老专锁复跑
+  （`noesis-v2140` pass 55 / `lifeline-v2141` pass 79 / `perspective-lock-v2142` pass 109 /
+  `duty-v2143` pass 93）。
+- **收口期修两处真缺陷**（都是「新引擎落地 ⇒ 旧锚点不再唯一」这一形态）：
+  ① `tests/duty-v2143.js` 的 `master` 锚点是**裸的一行** `if (!cfg.enabled) return { known: false,
+  reason: 'disabled' };` —— 本仓每个新引擎闸门都以同款开头，`noesis.js` 里 F5 一落地即 **hits=2**，
+  该锁当场 FAIL。修法：锚点带上**函数签名与两道闸的注释行**（`function dutyGate(...)` 起 6 行），
+  使其**本闸门独有**。教训：新引擎闸门的锚点必须与函数签名同锚，裸 `if (!cfg.enabled)` 是**共用片段**。
+  ② 两把锁（`duty-v2143` / `fidelity-v2144`）的 H5 纯度检查此前按**源码原文**计数锚点字面量 ——
+  锚点在源码里以 `\n` / `\"` / `\'` 的**转义形态**出现，于是带换行或双引号的锚点恒为 **0 次**，
+  纯度检查**形同虚设**（恒过）。修法：两侧统一**反转义**后再计数（`unesc()`）。
+- **影响范围**：`engines/noesis.js`、`engines/tool-diag.js`、`ui/panel.js`、`index.js`、`manifest.json`、
+  `tests/fidelity-v2144.js`（新）、`tests/run.js`、`tests/reject-v2780.js`、`tests/duty-v2143.js`、
+  `tests/module-cycle-gate-v2107.js`、`tests/dead-export-ledger.json`、
   `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
   `ITERATION_LOG.md`。
 

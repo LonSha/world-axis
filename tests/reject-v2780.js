@@ -3211,6 +3211,103 @@ function runWitness(WA) {
         }
       });
     }
+    // ⑨ v2.144.0（F5）新开码 1/2：记忆失真面 —— `distorted`（记着 ≠ 记对）。
+    //   治的病：`rumor` 早就记下了 `intact` / `tampered` / `drift` 三个读数，
+    //   但它们的**消费方只有作者面**（panel 链详情 / tool-diag 计数），
+    //   **裁决面（knows / gateScene / buildBlock）完全不知道「他记的是不是原版」** ——
+    //   于是本闸门一路放行：只听过失真版本的人，knows 照样答 known:true。
+    //   造场：起一条链 → 甲如实收到（原版）→ 乙以 distort 动机收到（失真版本）。
+    //   判据真源不新开：只读 rumor 链上「**他接到的那一跳**」的 intact。
+    if (Ns && typeof Ns.fidelity === 'function' && WA.rumor && WA.rumor.startChain) {
+      want('distorted', 'noesis.fidelity：此人接到的是**被改写过的版本** ⇒ 答 faithful:false + distorted 并带出 drift（「他记岔了」与「他不该知道」是两回事：一个更正记录，一个拦住发言）');
+      trip('distorted', function () {
+        var keepF = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, fidelityEnabled: true });
+          if (WA.rumor.setSettings) WA.rumor.setSettings({ enabled: true });
+          if (WA.intel && WA.intel.setSettings) WA.intel.setSettings({ enabled: true });
+          // 造场：事实真源走 worldFacts 直写（rumor.factRow 的真源之一）——
+          //   memory.upsertFact 需要 memory 先初始化，见证表不依赖那条前置。
+          WA.store.transact(function (d) {
+            d.worldFacts = [{ key: 'fid失真源', value: '甲见过乙', reason: 'witness', active: true }];
+            d.rumor = { chains: [] };
+          }, 'reject-witness:fid-reset');
+          WA.rumor.startChain('fid失真源', '见证');
+          // 第一跳：甲如实收到 ⇒ 甲手里是原版。
+          var h1 = WA.rumor.relay('rm_fid失真源', { from: '源头', to: '甲', motive: 'honest' });
+          if (!(h1 && h1.ok === true)) return [];
+          // 第二跳：乙以 distort 收到 ⇒ 乙手里是被改写过的版本（**改写在传给他这一跳上发生**）。
+          var h2 = WA.rumor.relay('rm_fid失真源', { from: '甲', to: '乙', motive: 'distort', value: '乙听说甲见过丙' });
+          if (!(h2 && h2.ok === true)) return [];
+          // 造场自证：链级 intact 已为假（累积值），但**甲的那一跳仍为真** ——
+          //   这正是本面存在的理由：拿链级累积值答个人版本会误判。
+          var rJia = Ns.fidelity('甲', 'fid失真源');
+          if (!(rJia && rJia.known === true && rJia.faithful === true)) return [];
+          var rYi = Ns.fidelity('乙', 'fid失真源');
+          if (!(rYi && rYi.known === true && rYi.faithful === false && rYi.reason === 'distorted')) return [];
+          if (!(rYi.drift && rYi.drift.to === '乙听说甲见过丙')) return [];
+          return [rYi.reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ fidelityEnabled: keepF.fidelityEnabled !== false });
+          if (WA.rumor && WA.rumor.setSettings) WA.rumor.setSettings({ enabled: false });
+        }
+      });
+      want('faithful', 'noesis.fidelity：此人接到的是**原版** ⇒ 答 faithful:true + faithful（**正常归因，不是拒收码**；与 omniscient / on-duty 同规格：同一词法形状出现，故必须有归属）');
+      trip('faithful', function () {
+        var keepF2 = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, fidelityEnabled: true });
+          if (WA.rumor.setSettings) WA.rumor.setSettings({ enabled: true });
+          if (WA.intel && WA.intel.setSettings) WA.intel.setSettings({ enabled: true });
+          WA.store.transact(function (d) {
+            d.worldFacts = [{ key: 'fid原版源', value: '甲见过丁', reason: 'witness', active: true }];
+            d.rumor = { chains: [] };
+          }, 'reject-witness:fid2-reset');
+          WA.rumor.startChain('fid原版源', '见证');
+          var h3 = WA.rumor.relay('rm_fid原版源', { from: '源头', to: '庚', motive: 'honest' });
+          if (!(h3 && h3.ok === true)) return [];
+          var rG = Ns.fidelity('庚', 'fid原版源');
+          if (!(rG && rG.known === true && rG.faithful === true && rG.reason === 'faithful')) return [];
+          return [rG.reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ fidelityEnabled: keepF2.fidelityEnabled !== false });
+          if (WA.rumor && WA.rumor.setSettings) WA.rumor.setSettings({ enabled: false });
+        }
+      });
+      want('fidelity-off', 'noesis.fidelity：本轴（fidelityEnabled）被作者关掉 ⇒ 如实报 fidelity-off（**不回落成「他记的是原版」**：「没开这条闸」与「他记对了」是两回事，与 duty-off / range-off 同规格）');
+      trip('fidelity-off', function () {
+        var keepF3 = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, fidelityEnabled: false });
+          var r5 = Ns.fidelity('甲', 'fid失真源');
+          if (!(r5 && r5.reason === 'fidelity-off' && r5.known === false && r5.faithful === null)) return [];
+          return [r5.reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ fidelityEnabled: keepF3.fidelityEnabled !== false });
+        }
+      });
+      want('not-on-chain', 'noesis.fidelity：此人**不在该事实的传播链上**（没接到过）⇒ 如实报 not-on-chain（问不出来不等于问出来是原版：他压根没听过这件事，谈不上「他手里是哪一版」）');
+      trip('not-on-chain', function () {
+        var keepF4 = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, fidelityEnabled: true });
+          if (WA.rumor.setSettings) WA.rumor.setSettings({ enabled: true });
+          WA.store.transact(function (d) {
+            d.worldFacts = [{ key: 'fid旁观源', value: '甲见过戊', reason: 'witness', active: true }];
+            d.rumor = { chains: [] };
+          }, 'reject-witness:fid3-reset');
+          WA.rumor.startChain('fid旁观源', '见证');
+          var h4 = WA.rumor.relay('rm_fid旁观源', { from: '源头', to: '辛', motive: 'honest' });
+          if (!(h4 && h4.ok === true)) return [];
+          var rZ = Ns.fidelity('壬', 'fid旁观源');
+          if (!(rZ && rZ.known === false && rZ.reason === 'not-on-chain')) return [];
+          return [rZ.reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ fidelityEnabled: keepF4.fidelityEnabled !== false });
+          if (WA.rumor && WA.rumor.setSettings) WA.rumor.setSettings({ enabled: false });
+        }
+      });
+    }
   }
   //   本版四个新字面量全部**由真实局面触发**，故按台账规矩走见证、不进基线。
   //   本表与回归共用同一个 vm 全局与同一份世界存储 —— 前面几十个块留下的 perspective.rows

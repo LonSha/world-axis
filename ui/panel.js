@@ -647,7 +647,7 @@
       <div class="wa-sec">防全知闸门（这个人此刻该不该知道这件事）</div>
       <label class="wa-row"><input id="wa-noe-enabled" type="checkbox" ${WA.noesis && WA.noesis.getSettings().enabled ? 'checked' : ''}/> 启用防全知闸门</label>
       <div class="wa-row"><input id="wa-noe-person" class="wa-input" placeholder="人物"/><input id="wa-noe-fact" class="wa-input" placeholder="事实 / 秘密名"/></div>
-      <div class="wa-row"><button class="wa-btn" id="wa-noe-knows" title="裁决：这个人此刻该不该知道这件事。四个归因码分开报——没登记过（not-registered）/登记了但此人不知（not-holder）/人不在场（out-of-range）/时辰未到（premature），合成一个「不知」就答不出是边界没划、人不在场、还是时辰未到">裁决知情</button><button class="wa-btn" id="wa-noe-scan" title="事后泄露扫描：把「人物=秘密名」逐条核，检出有谁说出了它不该知道的事。只留痕不删文——删文是叙事决定，不是引擎决定">泄露扫描</button><button class="wa-btn" id="wa-noe-boundary" title="只读：防全知引擎现场（几个知情面在把门 / 裁决数 / 穿帮留痕数）。穿帮数与扫描数分开报——真穿帮多要改边界，扫得勤只是用法不同">边界读数</button><button class="wa-btn" id="wa-noe-gate" title="生成前闸门：一组人物 × 一组事实，逐条答「哪些人不该知道哪些事」。只报不改正文——自动改写会把作者的笔抢走（与 E11「只报不改」同一条纪律）">生成前闸门</button><button class="wa-btn" id="wa-noe-perceive" title="感知半径：这个人此刻能否感知那个地点发生的事。三态封闭（在场 / 可达 / 不可达），不可达如实报 out-of-range——不回落成可达">感知半径</button><button class="wa-btn" id="wa-noe-duty" title="在岗闸门：此人此刻在不在这个岗上（在职 ≠ 在岗）。三态封闭——任职面缺席报「无话可说」/ 在职但被日程占住报 off-duty（等排班）/ 压根不在职报 not-in-office（走任职流程）。两码不合并，也不回落成「在岗」；只答在不在岗，不答知不知道（人下班了知道的事不会忘）">在岗闸门</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-noe-knows" title="裁决：这个人此刻该不该知道这件事。四个归因码分开报——没登记过（not-registered）/登记了但此人不知（not-holder）/人不在场（out-of-range）/时辰未到（premature），合成一个「不知」就答不出是边界没划、人不在场、还是时辰未到">裁决知情</button><button class="wa-btn" id="wa-noe-scan" title="事后泄露扫描：把「人物=秘密名」逐条核，检出有谁说出了它不该知道的事。只留痕不删文——删文是叙事决定，不是引擎决定">泄露扫描</button><button class="wa-btn" id="wa-noe-boundary" title="只读：防全知引擎现场（几个知情面在把门 / 裁决数 / 穿帮留痕数）。穿帮数与扫描数分开报——真穿帮多要改边界，扫得勤只是用法不同">边界读数</button><button class="wa-btn" id="wa-noe-gate" title="生成前闸门：一组人物 × 一组事实，逐条答「哪些人不该知道哪些事」。只报不改正文——自动改写会把作者的笔抢走（与 E11「只报不改」同一条纪律）">生成前闸门</button><button class="wa-btn" id="wa-noe-perceive" title="感知半径：这个人此刻能否感知那个地点发生的事。三态封闭（在场 / 可达 / 不可达），不可达如实报 out-of-range——不回落成可达">感知半径</button><button class="wa-btn" id="wa-noe-duty" title="在岗闸门：此人此刻在不在这个岗上（在职 ≠ 在岗）。三态封闭——任职面缺席报「无话可说」/ 在职但被日程占住报 off-duty（等排班）/ 压根不在职报 not-in-office（走任职流程）。两码不合并，也不回落成「在岗」；只答在不在岗，不答知不知道（人下班了知道的事不会忘）">在岗闸门</button><button class="wa-btn" id="wa-noe-fidelity" title="记忆失真核查：此人手里记的是不是原版（记着 ≠ 记对）。三态封闭——传播面缺席/此人不在链上报「无话可说」/ 接到的是原版报 faithful / 接到的是被改写过的版本报 distorted 并带出改写前后的值。只报不改：更正记录是叙事决定，不是引擎决定。与「知情裁决」严格分开——人记岔了不等于他不知道">记忆失真核查</button></div>
       <div id="wa-noe-out" class="wa-out"></div>
       <div class="wa-sec">生理与照护层（带着什么状况、到哪一段、限制什么）</div>
       <label class="wa-row"><input id="wa-lfn-enabled" type="checkbox" ${WA.lifeline && WA.lifeline.getSettings().enabled ? 'checked' : ''}/> 启用生理与照护层</label>
@@ -2729,6 +2729,27 @@
         + (r.reason === 'not-in-office' ? ' · 无任何在职职位 ⇒ 该先走任职流程' : '')
         + (r.posts && r.posts.length ? ' · 在职职位：' + r.posts.join('、') : '')
         + ' · 只答在不在岗，不答知不知道', true);
+    });
+    // v2.144.0（F5）：记忆失真核查 —— fidelity() 的真消费方。
+    //   与上一枚的分工是硬的：那一枚答「知道吗」，本枚答「记的是原版吗」。
+    //   三态口径与引擎同源：**不回落成「原版」**（问不出来 ≠ 是原版）；
+    //   只报不改（更正记录是叙事决定，不是引擎决定 —— 与 leakScan 同规）。
+    on('#wa-noe-fidelity', () => {
+      if (!WA.noesis || !WA.noesis.fidelity) return noeOut('未记录：module-missing', true);
+      const p = noeVal('#wa-noe-person'), f = noeVal('#wa-noe-fact');
+      if (!p || !f) return noeOut('未记录：missing-fields（人物与事实名都要填）', true);
+      const r = WA.noesis.fidelity(p, f);
+      if (r.reason === 'fidelity-off') return noeOut('无话可说：记忆失真面这一轴已关（fidelity-off）'
+        + ' —— 「这一轴没查」不等于「他记的是原版」，故如实报缺席', true);
+      if (r.known !== true) return noeOut('无话可说：' + (r.reason === 'not-on-chain'
+        ? '此人不在该事实的传播链上（没接到过，谈不上他手里是哪一版）'
+        : '传播面缺席或这条链不存在') + ' —— 问不出来不等于问出来是原版', true);
+      if (r.faithful === true) return noeOut('记忆失真核查：' + p + ' 对「' + f + '」⇒ 原版'
+        + '（' + (r.layer || '') + ' 层 · 链 ' + (r.chain || '') + ' · 共 ' + r.hops + ' 跳）', true);
+      noeOut('记忆失真核查：' + p + ' 对「' + f + '」⇒ **已失真**（' + r.reason + '）'
+        + (r.drift ? ' · 改写：' + r.drift.from + ' → ' + r.drift.to : '')
+        + (r.via ? ' · 经手动机：' + r.via : '')
+        + ' · 只报不改（更正记录是叙事决定，不是引擎决定）', true);
     });
     // v2.141.0（F2）：生理与照护层。三枚写/读入口各自对上一个真出口——
     //   控件与 handler 同批（只加控件不加 handler = 点了没反应；只加 handler 不加控件 = 死代码）。

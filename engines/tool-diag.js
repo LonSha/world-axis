@@ -372,7 +372,10 @@
         perceiveIn: b.perceiveIn || 0, perceiveOut: b.perceiveOut || 0, perceiveUnknown: b.perceiveUnknown || 0,
         // v2.143.0（F4）：在岗闸门两码同样**分开报** —— off-duty（有岗没上）该等排班 / 改日程，
         //   not-in-office（没有岗）该走任职流程。合成一个「不在岗」就再也答不出该动哪一手。
-        offDuty: b.offDuty || 0, notInOffice: b.notInOffice || 0
+        offDuty: b.offDuty || 0, notInOffice: b.notInOffice || 0,
+        // v2.144.0（F5）：记忆失真面。第四轴开关位必须能被看见（关掉一轴 = 如实报缺席）；
+        //   `distorted` 与 denies 分开报 —— 「他记岔了」该更正记录，「他不该知道」该拦住发言。
+        fidelityEnabled: !!b.fidelityEnabled, distorted: b.distorted || 0
       };
     });
   }
@@ -1838,7 +1841,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'people', ids: ['wa-noe-enabled', 'wa-noe-person', 'wa-noe-fact',
       'wa-noe-knows', 'wa-noe-scan', 'wa-noe-boundary', 'wa-noe-gate', 'wa-noe-perceive',
       // v2.143.0（F4）：在岗闸门一枚 —— 渲染 + 绑定 + 守卫登记三件齐做。
-      'wa-noe-duty',
+      'wa-noe-duty', 'wa-noe-fidelity',
       'wa-noe-out'] },
     // v2.141.0（F2）：生理与照护真实层（渲染在人物页）。同 v2.83.0 / v2.117.0 / v2.121.0 / v2.139.0 / v2.140.0 的规格——
     //   新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，否则「按钮渲染了但绑定的 id 写错」
