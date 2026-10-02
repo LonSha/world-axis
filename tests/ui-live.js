@@ -231,6 +231,9 @@ const CLICK_SOURCE = [
   '    const body = panel.querySelector(".wa-body");',
   '    if (!body) { out.structThrown.push(page + " | 无 .wa-body（renderBody 未跑）"); continue; }',
   '    const ctrls = Array.prototype.slice.call(body.querySelectorAll("button,input,select,textarea"));',
+  '    const rdAll = Array.prototype.slice.call(body.querySelectorAll("[id]")).filter(function (e) { return !/^(button|input|select|textarea)$/i.test(e.tagName); });',
+  '    const readings = rdAll.map(function (e) { return e.id; });',
+  '    const readingsLen = rdAll.map(function (e) { return String(e.textContent || "").trim().length; });',
   '    const html = body.innerHTML;',
   '    let n = 0;',
   '    for (const c of ctrls) {',
@@ -250,7 +253,8 @@ const CLICK_SOURCE = [
   '      }',
   '    }',
   '    out.pages.push({ page: page, controls: n, html: html.length,',
-  '      inTree: body.querySelectorAll("button,input,select,textarea").length });',
+  '      inTree: body.querySelectorAll("button,input,select,textarea").length,',
+  '      readings: readings, readingsLen: readingsLen });',
   '    await new Promise(function (r) { setTimeout(r, 20); });',
   '    if (window.__werr.length > werr0page) {',
   '      const rest = window.__werr.slice(werr0page).join(" / ");',
@@ -259,6 +263,7 @@ const CLICK_SOURCE = [
   '    }',
   '  }',
   '  out.rejections = (window.__rej || []).slice(0, 30);',
+  '  out.readings = []; out.pages.forEach(function (p) { p.readings.forEach(function (id, i) { out.readings.push(p.page + " | " + id + " | " + (p.readingsLen[i] || 0)); }); });',
   // 合并成统一的 `thrown` 面：**同步抛出 + handler 抛出**都算「这个控件点不了」。
   //   两半在返回值里分开留着（`syncThrown` / `handlerThrown`），便于定位是哪一类；
   //   `thrown` 是判红用的合并面（调用方只需看它，不需要知道 DOM 的报错路径有几条）。
@@ -320,7 +325,7 @@ async function runLive(opts) {
   const out = {
     tier: p.tier, available: p.available, driver: p.driver, exe: p.exe, why: p.why,
     host: 'stub', origin: null, files: 0, loaded: 0, failedLoad: [], storeError: null,
-    pages: [], controls: 0, thrown: [], rejections: [], missingTab: [],
+    pages: [], controls: 0, readings: [], thrown: [], rejections: [], missingTab: [],
     roundtrip: null, pageErrors: [], consoleErrors: [], errors: []
   };
   if (!p.available) return out;
@@ -383,6 +388,7 @@ async function runLive(opts) {
     out.pageErrorsSeen = (clicked && clicked.pageErrorsSeen) || 0;
     out.rejections = (clicked && clicked.rejections) || [];
     out.missingTab = (clicked && clicked.missingTab) || [];
+    out.readings = (clicked && clicked.readings) || [];
     try { out.roundtrip = await page.evaluate(ROUNDTRIP_SOURCE); }
     catch (e) { out.errors.push('roundtrip 抛出：' + ((e && e.message) || e)); }
     await browser.close();
@@ -399,7 +405,7 @@ function summarize(r) {
   if (!r) return '（无读数）';
   if (r.tier !== 'full') return 'tier=' + r.tier + '（' + r.why + '）';
   return 'files=' + r.files + ' loaded=' + r.loaded + ' pages=' + r.pages.length
-    + ' controls=' + r.controls + ' thrown=' + r.thrown.length + ' rej=' + r.rejections.length
+    + ' controls=' + r.controls + ' readings=' + (r.readings ? r.readings.length : 0) + ' thrown=' + r.thrown.length + ' rej=' + r.rejections.length
     + ' pageErr=' + r.pageErrors.length + ' roundtrip=' + (r.roundtrip && r.roundtrip.ok ? 'ok' : 'no');
 }
 module.exports = {

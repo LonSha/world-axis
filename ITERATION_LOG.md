@@ -6,7 +6,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.144.0 |
+| 版本 | v2.145.0 |
 | 全量回归 | `node tests/run.js` → **v2.144.0 待计划全部完成后单跑**（遵用户纪律「在做完计划全部内容前不要跑全量」）。v2.142.0 为通过 13760 / 失败 0 · status: passed（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）；硬超时默认 660000ms，慢机可用 `WA_REGRESSION_TIMEOUT_MS` 放宽 |
 | 产品文件面 | 168（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
@@ -326,6 +326,39 @@
   `tests/duty-v2143.js`（新）、`tests/run.js`、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、
   `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
   `ITERATION_LOG.md`。
+
+### R131 · 2026-10-03 · v2.145.0：O23 UI 实机观测面补齐（读数行进实机视野）
+- **起点与终点**：起点 v2.144.0（`b5c9fb3`）；终点 v2.145.0（全量回归待计划全部完成后单跑）。
+- **它治的病：读数行在实机上是隐形的**。v2.137.0（O14）把真浏览器接通了，但 `tests/ui-live.js`
+  的点击面只数 `button,input,select,textarea` —— **读数行（`wa-hzwx-view` / `wa-*-out` / `wa-noe-out`
+  等带 id 的 div/pre）从不进入观测面**。后果：「读数行 id 写错」与「读数行渲染断裂」在实机上
+  无人发现；v2.138.0 的 `wa-hzwx-view` 正是因此「登记了却永远查不到」（已在 ITERATION_LOG R124
+  如实登记「未被实机点击覆盖」）。这与 O14 通道**自己**的教训同型：观测面缺一块，那一块上的
+  破坏永远不会被报出。
+- **修法（只动测试面，产品源码零改动）**：
+  ① `tests/ui-live.js` 的 `CLICK_SOURCE` 在逐页点控件之外，**另扫带 id 的非控件**（读数行），
+  聚合 `out.readings`（`page | id | 文本长度` 三列），各页 `readings` / `readingsLen` 分列；
+  `summarize()` 补 `readings=N`。实测现场 **79 条**读数行全部进入视野，`wa-hzwx-view` 在场。
+  ② `tests/ui-live-v2137.js` 加 **A9**（观测面结构判据）与 **C6 负控制两向**：把 `wa-noe-out`
+  的 id 改名为 `wa-zz-c6-out`（真源码破坏副本，不改磁盘）⇒ 观测面必须**报不到它**（正向）；
+  原版同判据下该行恰 1 条在面（反向，证非恒真）。专锁 30 → 54 项全绿（A30 + C24）。
+  ③ `tests/run.js` 挂 O23 段（实机读数行面非空 ≥ 70），O14 下限随档位升级（full 40→48 / fallback 29→31）。
+- **口径**：本版**无码面增减、无出口面变化**（产品源码零改动）——见证 394 / 死表 9 / 基线 230 = 633 码
+  逐字不变，`FROZEN2800` 与 `EC2430` 不变。三本台账 version 升 2.145.0；`reject-code-ledger`
+  补沿革段（v2.145.0）。
+- **门禁结果（全绿，快读数）**：`reject-code-gate` rc=0 · `export-contract` rc=0 ·
+  `module-registry-gate` 文件 164 / 命名空间 172 / 装载期边 66 / 硬边 0 / 调用期引用 132 / 结构问题 0 ·
+  `dead-export-gate` dead 764 / uiDead 4 / 元数据同源 · `test-surface-gate` 全过 ·
+  `docs-archive-gate` 跨文件同号 0 · `inventory` 四类悬空 0 · `ui-gate` 全过 · `ui-wire-audit` 全过。
+- **实机读数（full 档）**：`tests/ui-live.js` runLive → `files=170 loaded=170 pages=14
+  controls=793 readings=79 thrown=0 rej=0 pageErr=0 roundtrip=ok`；专锁 `UI-LIVE-V2137: tier=full
+  —— pass / 54 项全绿`。
+- **未覆盖（如实登记，不伪称已完成）**：本面只核「读数行**在场**且 id 可被观测」，**不核读数内容**
+  的正确性（那是各引擎专锁与诊断面的事）；排版与像素仍不覆盖（沿用 O14 边界）；真宿主
+  SillyTavern 缺席，宿主交互面走同形桩（`host: 'stub'`）；CDN 回退链不覆盖（需真网络）。
+- **影响范围**：`tests/ui-live.js`、`tests/ui-live-v2137.js`、`tests/run.js`、`index.js`、
+  `manifest.json`、`tests/module-registry-ledger.json`、`tests/dead-export-ledger.json`、
+  `tests/reject-code-ledger.json`、`ITERATION_LOG.md`。
 
 ### R130 · 2026-10-03 · v2.144.0：F5 记忆失真面（记着 ≠ 记对）
 - **起点与终点**：起点 v2.143.0（`422a722`）；终点 v2.144.0（全量回归待计划全部完成后单跑）。

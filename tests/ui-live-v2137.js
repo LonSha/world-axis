@@ -149,6 +149,11 @@ function runAll(assert) {
   const probeLive = L.probe();
   assert(probeLive.tier === 'full' || probeLive.tier === 'fallback',
     'A8 probe() 只出两档之一（实 ' + probeLive.tier + '）');
+  // A9 读数行观测面（v2.145.0 / O23）：通道必须扫出**带 id 的非控件**（读数行），
+  //   不能只点 button/input/select/textarea —— 否则「读数行 id 写错」无人发现（wa-hzwx-view 教训）。
+  assert(srcLive.indexOf('out.readings') > 0 && srcLive.indexOf('readingsLen') > 0
+    && srcLive.indexOf("body.querySelectorAll(\"[id]\")") > 0,
+    'A9 读数行观测面在位（扫带 id 非控件 + 聚合 out.readings + 各页 readingsLen）');
 }
 
 async function runNegative(assert) {
@@ -287,6 +292,27 @@ async function runNegative(assert) {
       assert(base.roundtrip && base.roundtrip.ok === true,
         'C4（反向）原版往返成立（storedOk=' + (base.roundtrip && base.roundtrip.storedOk)
         + ' / readBackOk=' + (base.roundtrip && base.roundtrip.readBackOk) + '）');
+    }
+  }
+  // ── C6 读数行缺失必须被检出（v2.145.0 / O23）──
+  {
+    const panel = src(PANEL_REL);
+    const anchor = '<div id="wa-noe-out" class="wa-out"></div>';
+    assert(hit(panel, anchor) === 1, 'C6 破坏锚点（noesis 读数行）恰中 1 次（实 ' + hit(panel, anchor) + '）');
+    const broken = panel.replace(anchor, '<div id="wa-zz-c6-out" class="wa-out"></div>');
+    assert(broken !== panel, 'C6 破坏确实改到了源码');
+    const r = await L.runLive({ srcOverride: makeOv(PANEL_REL, broken) });
+    if (r.tier !== 'full') { assert(true, 'C6 跳过：本轮实机档位为 ' + r.tier); }
+    else {
+      const hitMiss = r.readings.filter(function (x) { return x.indexOf('wa-noe-out') >= 0; });
+      assert(hitMiss.length === 0,
+        'C6（正向）读数行 id 改名 ⇒ 观测面报不到它（实命中 ' + hitMiss.length + ' 条）');
+      const base = await L.runLive();
+      const baseHit = base.readings.filter(function (x) { return x.indexOf('wa-noe-out') >= 0; });
+      assert(baseHit.length === 1,
+        'C6（反向）原版该读数行在观测面恰 1 条（实 ' + baseHit.length + ' 条：' + (baseHit[0]||'') + '）');
+      assert(base.readings.length >= 70,
+        'C6（反向）原版读数行面非空（实 ' + base.readings.length + ' 条）');
     }
   }
 }
