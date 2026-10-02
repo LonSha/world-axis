@@ -430,6 +430,90 @@
     return { ok: true, counts: n, changes: changes, facts: n.facts.slice(), after: summarize(draft), dryRun: true };
   }
   /**
+   * v2.146.0（F2 后果涟漪网）：把「单层链」推成「二阶网」。
+   *   它治的病：chains 是**单层**的——一条链结算完就停在 settled，
+   *   它的「后果」从不被当成**新原因**去读。于是「这件事接下来又撬动了什么」
+   *   全库零回答：secondOrder / ripple / cascade 全仓零命中（F 线同型病第六例：
+   *   声明了「后果」概念，却无「后果的级联」观测面）。
+   *   口径（与 leakScan / fidelity「只报不改」同规）：
+   *     · **只读推导**，零 store.transact / 零 patch——「涟漪」是推导值，不是观测值；
+   *     · 一阶 = 各链的已结算后果（delayed status='settled' 的项 + echoes）；
+   *     · 二阶 = 该后果**作为新原因**被后续链引用（settledCause 单一真源）。
+   *       一条已结算后果若从未被任何后续链当 cause 引用 ⇒ 它是**终点**（degree 1）；
+   *       若被引用 ⇒ 记一条二阶边（from 后果 → to 后续链）。
+   *     · **不编造**：没有二阶边就如实报「无涟漪」（degree 全 1，不拿「有后果」冒充「有级联」）。
+   *   返回 { ok, nodes, edges, depth, endpoints, reason }。depth 为最大推导深度（无网时为 0）。
+   */
+  function rippleWeb() {
+    const cfg = settings();
+    if (!cfg.enabled) return { ok: false, reason: 'disabled', nodes: [], edges: [], depth: 0, endpoints: 0 };
+    const st = state() || {};
+    const chains = ((st.causal || {}).chains) || [];
+    // 一阶节点：每条链 + 它已结算的后果
+    const nodes = [], edges = [];
+    const byId = {};
+    chains.forEach(function (x) {
+      if (!x || !x.id) return;
+      const settledD = (x.delayed || []).filter(function (d) { return d && d.status === 'settled'; });
+      const node = { id: x.id, cause: x.cause, action: x.action, settled: settledD.length, degree: 1 };
+      byId[x.id] = node;
+      nodes.push(node);
+    });
+    // 二阶边：一条链的 cause 指向另一条链的已结算后果（或回声）⇒ 级联
+    chains.forEach(function (y) {
+      if (!y || !y.id || !y.cause) return;
+      chains.forEach(function (x) {
+        if (!x || !x.id || x.id === y.id) return;
+        // y.cause 指向 x 的某条已结算后果（或 x 本身已结算）⇒ 记边 x -> y
+        const linked = (x.delayed || []).some(function (d) {
+          return d && d.status === 'settled' && (y.cause === d.id || y.cause === ('ec_' + d.id));
+        }) || (x.status === 'settled' && (y.cause === x.id || y.cause === ('ec_' + x.id)));
+        if (linked) {
+          edges.push({ from: x.id, to: y.id, via: y.cause });
+          const nx = byId[x.id]; if (nx) nx.degree = Math.max(nx.degree, 2);
+        }
+      });
+    });
+    const depth = edges.length ? 2 : 0;
+    const endpoints = nodes.filter(function (n) { return n.degree === 1; }).length;
+    return { ok: true, nodes: nodes, edges: edges, depth: depth, endpoints: endpoints,
+      chains: chains.length, reason: edges.length ? 'ripple' : 'no-ripple' };
+  }
+
+  /**
+   * v2.146.0（W3 多结局分支预演）：从**当前**状态出发，把每条未终态链的「各走向」
+   *   推成一棵结局树（只读预演，零副作用——与 rehearse 同一份 dryRun 纪律）。
+   *   它治的病：checkpoints 有 branch（分支存档）、causal 有 rehearse（单步试演），
+   *   但「把这步走完，**可能**落到哪几种结局」全库零回答（endings / endingTree 零命中）。
+   *   口径：终态三态（settled / cancelled / expired）是**结局的词表**——
+   *     每条在途链各自可推演出的终态集合 = 它可能贡献的结局；
+   *     树 = 从 now 一层（各链当前 stage）到 leaves（各链可达终态）。
+   *     **不预测哪条会发生**（那是叙事决定），只把「可达结局」列全、并标出 blocked 的（有因无果）。
+   *   返回 { ok, roots, leaves, blocked, reason }。
+   */
+  function endingsTree() {
+    const cfg = settings();
+    if (!cfg.enabled) return { ok: false, reason: 'disabled', roots: 0, leaves: [], blocked: 0 };
+    const st = state() || {};
+    const chains = ((st.causal || {}).chains) || [];
+    const live = chains.filter(function (x) { return x && !isTerminal(x); });
+    const leaves = [];
+    let blocked = 0;
+    live.forEach(function (x) {
+      const block = settleBlockReason(x);
+      // 每条在途链的可达终态：cancelled（总可取消）恒在；settled 仅当已行动（hasActed）；
+      // expired 仅当原因已消失（!knownCause）。blocked = 既未行动又原因还在 ⇒ 卡 pending。
+      const reach = ['cancelled'];
+      if (hasActed(x)) reach.push('settled');
+      if (!knownCause(x.cause)) reach.push('expired');
+      if (!hasActed(x) && knownCause(x.cause) && block) blocked++;
+      leaves.push({ id: x.id, stage: x.stage, reachable: reach, blocked: !!block && !hasActed(x) });
+    });
+    return { ok: true, roots: live.length, leaves: leaves, blocked: blocked,
+      reason: live.length ? 'tree' : 'no-live-chains' };
+  }
+
+  /**
    * v2.87.0 B6：干预预览——「现在对这条链做这个动作，会变成什么」（只读，零副作用）。
    *   导演面所有误操作都源于「先执行再看结果」；预览不留痕，才谈得上
    *   「干预预览留痕」——留痕的是**选择**，不是预览本身。
@@ -694,7 +778,20 @@
     });
     return '[因果结算]\n' + lines.join('\n')
       + '\n以上是正在推进的因果链。「待发生」不等于已发生，不得把延迟后果写成既成事实；'
-      + '条件未足时事情必须停住，不得替它提前完成。';
+      + '条件未足时事情必须停住，不得替它提前完成。'
+      + (function () { const d = rippleDiscipline(); return d ? ('\n' + d) : ''; })();
+  }
+  // v2.146.0（F2/W3）：后果涟漪纪律段——只报计数、零 token 占用、不列链名/后果名
+  //   （列出即把未揭示的级联写进正文，与 leakScan「只留痕不删文」同规）。
+  function rippleDiscipline() {
+    const cfg = settings();
+    if (!cfg.enabled) return '';
+    let w = null;
+    try { w = rippleWeb(); } catch (e) { return ''; }
+    if (!w || w.ok !== true || !w.edges || !w.edges.length) return '';
+    return '[后果涟漪]' + '\n'
+      + '已有 ' + w.edges.length + ' 条后果级联边（深度 ' + w.depth + '）——'
+      + '后果的后果已在世界里生效，写后续时请让它可被察觉，不要当成从未发生。';
   }
 
   WA.causal = {
@@ -721,6 +818,11 @@
     // v2.89.0 O2：录制一次推进 / 按磁带重放（两个口，都有真实消费方：
     //   面板「导演 · 回放」按钮与 tool-diag 的 secCausal 回放段）。
     record: record,
-    replayWith: replayWith
+    replayWith: replayWith,
+    // v2.146.0（F2/W3）：后果涟漪网 + 多结局分支预演（都只读推导、零副作用）。
+    //   rippleDiscipline 不挂导出面——它只被 buildBlock 内部拼接（注入纪律段），
+    //   挂出即「导出但外部零消费」的 self-only 过度导出（同 v2.62.0 isTerminal 先例：摘除）。
+    rippleWeb: rippleWeb,
+    endingsTree: endingsTree
   };
 })();

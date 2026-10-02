@@ -676,7 +676,11 @@
       <div class="wa-row"><input id="wa-causal-immediate" class="wa-input" placeholder="直接后果（落进世界事实）"/><input id="wa-causal-delayed" class="wa-input" placeholder="延迟后果（只排期，不到期不算发生）"/><input id="wa-causal-delayed-min" class="wa-input" placeholder="多久后(分钟)"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-causal-add">建链</button><button class="wa-btn" id="wa-causal-tick">推进一轮</button><button class="wa-btn" id="wa-causal-due">查到期</button><button class="wa-btn" id="wa-causal-classify">查状态</button></div>
       <div class="wa-row"><input id="wa-causal-id" class="wa-input" placeholder="链 id"/><input id="wa-causal-by" class="wa-input" placeholder="延期毫秒(可负)"/><button class="wa-btn" id="wa-causal-defer">延期</button><button class="wa-btn" id="wa-causal-cancel">取消</button><button class="wa-btn" id="wa-causal-settle">结算到期</button></div>
-      <div id="wa-causal-out" class="wa-out"></div>
+      <div class="wa-row">
+  <button class="wa-btn" id="wa-causal-ripple" title="后果涟漪网（只读推导）：把单层链推成二阶网——已结算后果作为新原因被后续链引用即记一条级联边。无网如实报无涟漪，不编造。">后果涟漪网</button>
+  <button class="wa-btn" id="wa-causal-endings" title="多结局分支预演（只读预演）：从当前状态把每条在途链可推演出的终态集合列全（settled/cancelled/expired），并标出有因无果的 blocked。不预测哪条会发生。">多结局预演</button>
+</div>
+<div id="wa-causal-out" class="wa-out"></div>
       <div class="wa-sec">人物身份（持久 ID ↔ 存档键）</div>
       <div class="wa-row"><input id="wa-id-name" class="wa-input" placeholder="人物姓名"/><button class="wa-btn" id="wa-id-lookup">查身份</button><button class="wa-btn" id="wa-id-bindall" title="为当前聊天里已经注册、但还没有持久编号的人物补上编号（不改动任何状态）">补全已注册</button><button class="wa-btn" id="wa-id-clear" title="只解除身份绑定，不删除该人物的任何状态">解除绑定</button></div>
       <div class="wa-row"><input id="wa-id-aliasname" class="wa-input" placeholder="旧名（改名之前的名字）"/><button class="wa-btn" id="wa-id-bindalias" title="登记一条改名台账：旧名永久可解析（只增不删），于是「改过名」不再等于「断过链」。规范名须已在册（给不存在的人登记历史名 = 凭空造一个身份）；一个旧名只有一个主人；链可以深但必须有边界（超过 8 跳当场拒收）">登记旧名</button><button class="wa-btn" id="wa-id-aliasof" title="查改名：对历史名也作答——它现在是谁、经过几跳、路径是什么。查不到就说查不到（unknown-name），不替它编一个规范名">查改名</button><button class="wa-btn" id="wa-id-aliasstat" title="改名台账：几对旧名 / 涉及几人 / 最深几跳（上限 8）">改名台账</button></div>
@@ -3019,6 +3023,27 @@
       const o = $('#wa-id-out'); if (o) o.textContent = text;
     };
     if (panelEl.dataset.idOut) { const saved = $('#wa-id-out'); if (saved) saved.textContent = panelEl.dataset.idOut; }
+    on('#wa-causal-ripple', () => {
+      if (!WA.causal || typeof WA.causal.rippleWeb !== 'function') { causalOut({ ok: false, reason: 'module-missing' }); return; }
+      const r = WA.causal.rippleWeb();
+      if (r.ok === false) { causalOut({ ok: false, reason: r.reason }); return; }
+      const lines = ['【后果涟漪网】链 ' + r.chains + ' ｜ 级联边 ' + r.edges.length + ' ｜ 深度 ' + r.depth + ' ｜ 终点 ' + r.endpoints];
+      if (!r.edges.length) lines.push('无涟漪：没有已结算后果被后续链当新原因引用（如实报，不编造）。');
+      r.edges.slice(0, 12).forEach(function (e) { lines.push('· ' + e.from + ' → ' + e.to + '（经 ' + e.via + '）'); });
+      const oR = $('#wa-causal-out'); if (oR) oR.textContent = lines.join('\n');
+    });
+    on('#wa-causal-endings', () => {
+      if (!WA.causal || typeof WA.causal.endingsTree !== 'function') { causalOut({ ok: false, reason: 'module-missing' }); return; }
+      const r = WA.causal.endingsTree();
+      if (r.ok === false) { causalOut({ ok: false, reason: r.reason }); return; }
+      const lines = ['【多结局预演】在途链 ' + r.roots + ' ｜ 有因无果 ' + r.blocked];
+      if (!r.leaves.length) lines.push('无在途链（所有链已到终态）。');
+      r.leaves.slice(0, 12).forEach(function (l) {
+        lines.push('· ' + l.id + '［' + l.stage + '］可达：' + l.reachable.join('/') + (l.blocked ? '（有因无果）' : ''));
+      });
+      lines.push('只列可达结局，不预测哪条会发生（叙事决定，不是引擎决定）。');
+      const oE = $('#wa-causal-out'); if (oE) oE.textContent = lines.join('\n');
+    });
     on('#wa-id-lookup', () => {
       if (!WA.registry || typeof WA.registry.identityOf !== 'function') return idOut({ reason: 'registry-missing' }, true);
       const nm = idVal();

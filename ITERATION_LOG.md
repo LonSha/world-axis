@@ -6,7 +6,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.145.0 |
+| 版本 | v2.146.0 |
 | 全量回归 | `node tests/run.js` → **v2.144.0 待计划全部完成后单跑**（遵用户纪律「在做完计划全部内容前不要跑全量」）。v2.142.0 为通过 13760 / 失败 0 · status: passed（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）；硬超时默认 660000ms，慢机可用 `WA_REGRESSION_TIMEOUT_MS` 放宽 |
 | 产品文件面 | 168（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
@@ -326,6 +326,37 @@
   `tests/duty-v2143.js`（新）、`tests/run.js`、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、
   `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
   `ITERATION_LOG.md`。
+
+### R132 · 2026-10-03 · v2.146.0：F2 后果涟漪网 + W3 多结局分支预演
+
+**它治的病**：causal（v2.62.0）让「一件事的后果落成事实」，但「后果的**后果**」全库零回答——
+`consequence-web`/`ripple`/`secondOrder` 零命中（F2）；「当前状态能落到哪几种结局」零命中（W3）。
+一个把级联边漏记、把被引用源链 degree 打成 NaN、把「恒可取消」抹出结局词表的实现，
+与正确实现一样能过所有存在面判据。
+
+**做了什么**：
+- `engines/causal.js` 新增两口**只读推导**（零 transact/零 patch，涟漪是推导值不是观测值）：
+  - `rippleWeb()`：一阶=各链+已结算 delayed 项；二阶边=一条链的 cause 指向另一条链的已结算后果
+    （或回声 `ec_<did>`）⇒ 记边 `{from,to,via}`，被引用源链 degree=2。无网如实 `no-ripple`，不编造。
+  - `endingsTree()`：每条在途链的可达终态集合（cancelled 恒在 / settled 仅 hasActed / expired 仅 !knownCause），
+    blocked=既未行动又原因还在。不预测哪条会发生，只列全可达结局并标出 blocked。
+- `buildBlock` 末尾拼接**涟漪纪律段**（`rippleDiscipline`）：有级联边时输出计数句
+  「已有 N 条后果级联边（深度 2）」，零 token、不列链名/后果名（列出即把未揭示的级联写进正文，同 leakScan 规）。
+  - `rippleDiscipline` **不挂导出面**——只被 buildBlock 内部消费，挂出即 self-only 过度导出
+    （同 v2.62.0 isTerminal 先例：摘除）。dead 子面净零增长（764→765→764）。
+- 接线三站：tool-diag secCausal 加 `ripple`/`endings` 两读数（只读消费）；UI_BINDINGS causal 组登记
+  `wa-causal-ripple`/`wa-causal-endings`；panel 两按钮 + 两 handler（直写 `#wa-causal-out`，绕过 causalOut 固定模板）。
+
+**修掉的自身缺陷**（运行时验证抓出）：
+- `byId[x.id] = x`（存原始链而非 node）⇒ degree 打点成 `Math.max(undefined,2)=NaN`，源链 degree 永不升 2。
+  改为 `byId[x.id] = node`（N1 负控制锚点，复活此 bug 即现形）。
+
+**专锁** `tests/causal-ripple-v2146.js`（22 项）：
+A 面 14（级联网边/深度/degree/endpoints、边三元组、no-ripple 不编造、结局树 cancelled/blocked/settled、
+disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N2×2/N3×2，三锚点（byid/linked/reach）各恰中 1 次。
+
+**未覆盖**：涟漪网深度封顶 2（只推一阶→二阶，不递归三阶以上）；endingsTree 只列可达终态集合、
+不推各结局的概率/路径长度；纪律段只报计数不报方向（防泄剧情）。
 
 ### R131 · 2026-10-03 · v2.145.0：O23 UI 实机观测面补齐（读数行进实机视野）
 - **起点与终点**：起点 v2.144.0（`b5c9fb3`）；终点 v2.145.0（全量回归待计划全部完成后单跑）。
