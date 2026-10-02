@@ -6,22 +6,176 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.138.0 |
-| 全量回归 | `node tests/run.js` → **v2.138.0 为通过 13429 / 失败 0 · status: passed**（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
-| 产品文件面 | 164（`tests/product-files.js` 单一真源） |
+| 版本 | v2.141.0 |
+| 全量回归 | `node tests/run.js` → **v2.141.0 为通过 13679 / 失败 0 · status: passed**（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）。硬超时默认已由**实测驱动**改为 660000ms（v2.131.0 O15：实测整趟 439.0s/196 节，旧默认 600000 会在 v2.118.0 段被 SIGKILL）；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 再放宽 |
+| 产品文件面 | 167（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 143 / members= 929 / chars= 10601 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 161 · 锁 155 · 可达 161 · 孤儿 0 · 豁免 0 |
-| 死子面 | `node tests/dead-export-gate.js` → dead 764 / uiDead 4 / 仅测试 347 / dataOnly 243 |
-| 拒收码 | `node tests/reject-code-gate.js` → 611 码（见证 372 / 死表 9 / 基线 230） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.138.0 · 现场 refs 3566 / 命名空间 163 / 成员 1969 |
+| 出口面契约 | `node tests/export-contract.js` → ns= 146 / members= 965 / chars= 10966 |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 167 · 锁 161 · 可达 167 · 孤儿 0 · 豁免 0 |
+| 死子面 | `node tests/dead-export-gate.js` → dead 765 / uiDead 4 / 仅测试 348 / dataOnly 248 |
+| 拒收码 | `node tests/reject-code-gate.js` → 621 码（见证 382 / 死表 9 / 基线 230） |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.141.0 · 现场 refs 3672 / 命名空间 166 / 成员 2011 |
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
-| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 114 把 · 覆盖 **114（100%）**＝ 统一档 30（锚点 250 · 问题 0）+ 非统一档已识别 84 · **未识别 0** · 非统一档问题 101（**只报不红**，逐条带证据与命中行类别） |
+| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 120 把 · 覆盖 **120（100%）**＝ 统一档 36（锚点 286 · 问题 0）+ 非统一档已识别 84 · **未识别 0** · 非统一档问题 102（**只报不红**，逐条带证据与命中行类别） |
 | 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核；v2.135.0 扩到 `checked` = 34 站点） |
 | tools/ | 只留**被可执行代码引用**的 14 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据 |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+
+### R125 · 2026-10-01 · v2.139.0：E 线收口（E8 人物推进公平性二阶治理 · E9 势力关系图 · E10 协作任务与违约 · E11 剧情偏离度）
+- **起点与终点**：起点 v2.138.0（全量回归 13429 / 0）；终点 v2.139.0。27 个文件（+3116 / −117）。
+- **E8 · 公平性只治了一半**：v2.115.0（E4）把 tick 截断从静态定序改成同级环形轮转，治的是「同一组
+  里总有个人排在后面」——但**环上位置一旦定下就永远不变**，长期看依旧是位置决定命运；而 E4 给出的
+  读数（`lastTurn` / `skipped`）**答不出频率**。本版把组内定序交还随机源：`engines/life.js` 新增
+  `fairSpin(rows, take)` —— `WA.rand.next('life')` 配**权重接受/拒绝**（接受概率 = 依据条数 / 组内
+  最大依据条数）逐个取不重复的 `take` 个。为什么不用 `Math.random()`：本仓随机一律走 `core/rand.js`，
+  它有显式播种与 `randStat().reproducible` ⇒「它公平吗」**可复现、可证伪**。并加读数
+  `life.stat().fairness`：最近 **10 轮**窗口里每人实际推进次数 + 标准差（SD < 2 判公平）。
+- **E9 · 势力一张一张列着，但它们之间的关系网没人看得见**：`evolution` 有六档状态、七档关系、容量站、
+  编辑器、面板徽章，**全是逐势力**的——「谁跟谁一伙、谁跟谁对着」在数据上根本没有存储，「这张网整体
+  有多紧」全库零回答，「哪些势力结成一块」需要连通性计算而全库零图算法。新引擎
+  `engines/faction-graph.js`（347 行）补上三件事。**本版最要紧的一条：边是推导值，不是观测值**——
+  本仓没有势力间成对关系字段（`f.relation` 是「该势力对主视角」的态度），把它当甲↔乙的边就是
+  **编一份数据**。故把这件事钉成结构判据：每条边必须带 `derived: true` 与 `basis`（这条边由哪两个
+  字段算出来的），且「血盟 × 世仇 ⇒ 中立」（`6 + 0 − 6 = 0`）——**单方态度无法单独决定一条边**，
+  这就是「同仇不加分」的证明。
+- **E10 · 三张表答不出「承诺有没有被兑现」**：`collab` 已有 sessions / claims / queue / conflicts
+  四张表，一个字都没说「几个人约好一起做一件事，到点各人做到没有」（`life.reciprocated` 只做两方
+  对称持有的双向检查，不问到点做到没有，也没有「几个人」）。本版新开**第五张表 `tasks`**。两条
+  不可合并（本锁最要紧的）：① `breachRecorded`（记下了）与 `penalized`（真罚了）**不可合并**——
+  合成一个数，事后就答不出「违约有没有被处置」；故把「只记不罚」钉成行为判据：`settle` 之后
+  `breachRecorded` 涨而 `penalized` **必须仍是 0**，只有显式 `penalize` 才动它。② `taskTotal`
+  （表里还剩几个，会被挤出）与 `stat.tasks`（累计建过几个，只增）同样不可合并。
+- **E11 · `align` 只答「撞上了什么」，不判偏离**：v2.100.0 的三口把「现在像第几幕」答清楚了，却
+  **一个字都没说「偏了多少」**——「第 7 幕」是坐标，「偏了 0.62」才是判定。没有这个数，长局里没人
+  看得出「越走越远」。`engines/canon.js` 新增 `deviation` / `deviationTrend`。四条口径：① **只报
+  不改**（源码级可核：两函数体内零 `store.transact`、零 `patch`——「偏离不自动拉回」不是声明，是
+  零写入）；② **未采纳大纲 ⇒ `no-outline`**，**不拿 0 分冒充「严格遵循」**；③ 两个分量不可合并：
+  `spread`（散不散）与 `lag`（快不快）各自成数；④ 造「幕号跨度大但推进度高」与「跨度小但推进度低」
+  两个场分别钉两分量。
+- **专锁四把（四把都零红）**：`tests/life-e8-v2139.js`（负控制 51）· `tests/faction-graph-v2139.js`
+  （69）· `tests/collab-tasks-v2139.js`（81）· `tests/canon-deviation-v2139.js`（50）。
+- **影响范围**：`engines/life.js`、`engines/canon.js`、`engines/collab.js`、`engines/faction-graph.js`（新）、
+  `engines/tool-diag.js`、`core/evict.js`、`core/store.js`、`index.js`、`manifest.json`、`ui/panel.js`、
+  `ui/settings.js`、四把新锁 + 四把既有锁的读数对齐、`tests/run.js`、`tests/reject-v2780.js`、
+  `tests/settle-v2830.js`、`tests/module-cycle-gate-v2107.js`、三本台账、`docs/ERROR_CODES.md`、
+  `FOUR_VERSION_PLAN.md`、`README.md`、`ITERATION_LOG.md`。
+### R126 · 2026-10-01 · v2.140.0：F1 防全知闸门（知情边界统一裁决）
+- **起点与终点**：起点 v2.139.0（全量回归见 R125）；终点 v2.140.0（`e64330b`）。17 个文件（+1028 / −57）。
+- **它治的病：零件全，闸门缺**。仓库已有六个信息不对称零件（`enigma` 知情名单 / `intel` 来源置信 /
+  `rumor` 传播降级 / `masks` 假面 / `probe` 卷宗 / `shadow` 共同隐瞒），各自都很硬，但都是**记账员**
+  ——没有一个在「正文生成前」当**守门员**。`rules.js` 第 22 / 65 行的「知情路径铁律」是给模型的
+  **软约束**，没有引擎判据兜底。后果：模型要全知时没有任何统一拦截点，玩家眼看 NPC 说出它不可能
+  知道的事，沉浸感当场崩。
+- **落地**：新引擎 `engines/noesis.js`（311 行）—— 把六个知情面聚成单一裁决点，四口
+  `knows` / `gateScene` / `leakScan` / `perceive`。**本版最要紧的一条：一票否决，不取平均不投票**：
+  六个知情面里**任一**判定「此人不知此事」，`knows()` 就答 `known:false`，并把每个否决源的键名
+  逐条带出（`deniedBy`）。为什么不取平均：「不知道」**不可逆**——一个角色一旦在正文里说出它不该
+  知道的事，这次穿帮无法被「另外五源都觉得它该知道」抵消。
+- **三个拒收码全见证**（本版只开三码，语义不可合并）：`not-registered`（事实未登记 / 补账）·
+  `not-holder`（登记了但此人不知 / 拦人）· `out-of-range`（空间不可达 / 等时间）。三码全部走
+  **见证**（`tests/reject-v2780.js` 依次 trip），故三集划分 611 → 614（基线零新增）。
+- **专锁 `tests/noesis-v2140.js`（378 行）**：A 结构 / B 运行时 / C 消费方 / N0–N6 真源码破坏负控制
+  （负控制 55 项），六个破坏锚点各恰中 1 次。
+- **收口六处门禁红**：`reject-code-gate`（未分类「premature / attenuated」两码的见证或死表归属）·
+  `module-cycle-gate-v2107`（常量 B1–B6 失配）· `module-registry-gate --update` 重建账本 ·
+  `dead-export-gate` 的 `toolDiag.safe` 证据失实（own 98 → 99）与账本 version 不自洽 ·
+  `sync-e2e-readings --write` · `sync-hardcoded --write`；并重建 `docs/ERROR_CODES.md`。
+- **影响范围**：`engines/noesis.js`（新）、`engines/inject-budget.js`、`engines/tool-diag.js`、`index.js`、
+  `manifest.json`、`render/inject.js`、`ui/panel.js`、`tests/noesis-v2140.js`（新）、`tests/readings-v2106.js`、
+  `tests/run.js`、`tests/reject-v2780.js`、`tests/settle-v2830.js`、`tests/module-cycle-gate-v2107.js`、
+  三本台账、`docs/ERROR_CODES.md`、`ITERATION_LOG.md`。
+
+### R127 · 2026-10-02 · v2.141.0：F2 时点与注意力闸门 + 生理与照护真实层
+- **起点与终点**：起点 v2.140.0（`e64330b`）；终点 v2.141.0（全量回归 **13679 / 0 · passed**）。
+- **它治的病一：同一形态的第三、第四例（读口形态误读）**。v2.140.0 已修过两例同型（`srcRumor` /
+  `srcShadow` 把「命中」读成「缺席」）。本版复扫发现同型的第三、第四例：
+  - **`srcIntel` 恒返回 null（「有账」被读成「无账」）**：`engines/intel.js` 的 `visibleTo(person, subject)`
+    返回的是**行数组**（`rows.filter(...).slice(-4)`），而 noesis 初版按 `{known}` / `{ok}` 布尔对象读
+    ⇒ 两分支皆不成立 ⇒ 该源恒 null。修法：按行数组读、在**行上取键**（`x.about === factId || x.id === factId`），
+    `rows.length ? has : null`。
+  - **`srcShadow` 命中即缺席（凭空多一票否决）**：上一版注释写「未命中一律缺席」、代码却是
+    `rows.length ? has : null` —— 此人名下**有任何一条**共同隐瞒，就会把别的事判成「不知」。
+    与 intel 处**镜像对称**。修法：`return has ? true : null`，与注释对齐。
+- **它治的病二：`premature` 只会声明，没有产生方**。v2.140.0 的码表里 `premature`（时辰未到）只在
+  文件头写着，全库零判定点。本版新增 `timeGate(factId)`：读 `intel.truthOf(about)` 的 `at` 与决策
+  时间比一次 ⇒ `premature` 从**声明**变成**真判据**（这也是 `timeEnabled` 首次被真消费）。
+- **它治的病三：感知只有「在不在场」一轴**。在场 ≠ 注意到。`perceive` 补第二轴：在场后再看
+  `attenuationOf(who)`（合成 `lifeline.capacityOf` 的 heavy / 感官限制与 `affect.loads` 的
+  fatigue / pain 载荷），削弱答 `range:'impaired' / reason:'attenuated'` —— **新开第五码**。
+  至此五归因码各自有真产生方，且**绝不可合并**（四种处置不同：补账 / 拦人 / 等时间 / 叫他一声）。
+- **新引擎 `engines/lifeline.js`（282 行）：生理与照护真实层**。缝合「鲜活世界」条目集里七条
+  （健康疾病与病况的真实呈现 / 神经多样性与认知差异 / 创伤压力与应对 / 医疗系统与照护的真实呈现 /
+  残障无障碍与合理便利 / 生殖性与激素健康 / 注意感知与记忆）。四张具名词表：`KINDS`（8：acute /
+  chronic / injury / mental / neuro / trauma / disability / reproductive）· `COURSE`（7 格，顺序即
+  推演方向：onset → progress → flare → remission → recovery → stable → longterm）· `LIMITS`（9：
+  energy / sleep / appetite / cognition / sensory / mobility / social / work / medication）· `STEPS`
+  （7：triage / exam / diagnosis / treatment / monitoring / rehab / access）。导出八口
+  `register` / `advance` / `capacityOf` / `careGap` / `view` / `boundary` / `buildBlock` / `stat`。
+  八条否定式边界里最要紧的三条：① **不诊断**（零「由症状推病名」，未登记一律 `unknown-subject`）；
+  ② **程段不跳**（`advance` 只许前进一格或原地，跨格 / 回退拒收并带 `from` / `to`）；③
+  **`known:false` 与 `known:true` 不同形**（「查不到」不许冒充「他很健康」）。
+- **`engines/act.js` 加「合法不行动」判定面**：缝合 BSW 动态受力推演约束引擎的推演原则——「行动、
+  拒绝行动、延迟行动与状态维持均为合法的推演结果」。新增 `VERDICTS = ['action','refuse','delay','status-quo']`、
+  `BLOCKED_VERDICT` 映射（busy → status-quo / need-unmet → refuse / closed → delay 等）与只读判定口
+  `verdict(kind, opts)`。**它不是第四个写口**（写口仍只有 add / admit / advance / abort / replan）。
+- **产品面接线七站**（新增引擎必须逐站登记，否则「渲染了不登记」「有导出无消费方」当场红灯）：
+  ① `core/evict.js` 挤出站点 `lifeline.rows`（cap 12）；② `core/store.js` 的 `__BOUNDED_CAPS` 与
+  `defaultWorldState()` 骨架键 `lifeline: { rows: [] }`；③ `index.js` 的 `LOAD_ORDER`（插在
+  `engines/noesis.js` 之后、`render/inject.js` 之前）；④ `tests/run.js` 的 LOAD 同序 + 挂专锁；
+  ⑤ `render/inject.js` 四张源表同批加 `lifeline`（SOURCES / def / SRC_NAME「生理与照护」/
+  SRC_MOD_SETTING）+ 注入分支，并顺手补上 **v2.140.0 漏登记的** `noesis: 'worldaxis_noesis_settings_v1'`；
+  ⑥ `engines/inject-budget.js` 加 `'生理与照护': { rank: 5, fold: true }` 与 ACCOUNTS；
+  ⑦ `engines/tool-diag.js` 加 `MODULE_EXPORTS` 一行 + `secLifeline()` 诊断节 + `collect()` 挂节，
+  并给 `secNoesis` 补 `premature` / `perceiveIn` / `perceiveOut` / `perceiveUnknown` 四读数。
+- **面板**：人物页新增 13 枚控件（id 前缀 `wa-lfn-` —— 刻意避开 v2.55.0 长线伏笔段已占用的
+  `wa-ll-`；最初用 `wa-ll-` 时标识符 `llVal` / `llOut` 冲突且 id 撞车，批量替换脚本又误伤
+  `wa-ll-enabled` / `wa-ll-out`，逐行确认后改回）；行动段新增 `wa-act-verdict`；`noesis` 感知半径
+  显示新增 `impaired` →「在场但没注意到」分支。
+- **专锁 `tests/lifeline-v2141.js`（453 行）**：结构对齐 `noesis-v2140.js` —— A 结构 / B 运行时 /
+  C 消费方 / N0–N6 真源码破坏负控制（**负控制 79 项全绿**）。六个破坏锚点（`step` 程段闸门 /
+  `unknownCap` 容量回落 / `timeGate` 时点闸门 / `attenuate` 感知第二轴 / `diagSec` 诊断节 /
+  `panel` 面板入口）各须**恰中 1 次**；判据层零内联（H5 纯度：锚点字面量只准在 ANCHORS 表里出现）；
+  N5 钉「四个真文件逐字未变」。正判据 B1–B36 覆盖 lifeline 八口、noesis 两处形态修复、
+  `premature` / `attenuated` 两新码与 `act.verdict` 四档。
+- **收口 21 红（四族）——其中最有价值的一处是方向判反了**。首轮全量回归 **通过 13614 / 失败 21**：
+  - **族一（1 处，判反方向）**：`tests/settle-v2830.js` 的断言 `led.totals.loadEdges === 65` /
+    `led.nsCount === 171` **本来就是账本真值**，停在旧值的是**消息文本**（写 64 / 169）。我先按
+    「断言写错了」把断言改成 64 / 128、170 / 162，随后被 `node tools/sync-e2e-readings.js --verify`
+    当场驳回——它的输出是「**待回填 4 项：64 → 65 / 128 → 130 / 170 → 171 / 162 → 163**」，
+    真源取**账本**而非任何一侧文本。教训与 v2.81.0 同型：同一断言里**消息文本与比较值必须同批**，
+    但**「哪一侧是真值」仍要人判**——回填工具能保证同批，不能代替判据。
+  - **族二（12 处，真源是账本不是断言）**：`dead-export-ledger.json` 的 `advisory.dataOnly` 停在
+    **243**，而现场与 `tests/run.js` 的断言都是 **248**（v2.138.0 E7 起 weather.places 入册 +1、
+    v2.129.0 十引擎零数据成员入册）。连带 `enigma.setSettings` 的 `tref` 证据失实（账本 11 / 复算 13）
+    也一并由它解决。修法**不是改断言**，而是跑门禁自带的收敛入口
+    `node tests/dead-export-gate.js --update` —— 它会重建账本并**顺带复核全部 769 条 `src` / `refs` / `tref`
+    证据**，跑完门禁转绿。另需**手工**追加 `dead-export-ledger.json` 的 `_note` 沿革（该入口不写 `_note`，
+    而元数据三级同源判据要求它自称版本）。
+  - **族三（2 处，纯回填）**：`checked 精确值 123` → **124**（两处断言各带一段长注释，属 v2.106.0
+    硬读数族的**未登记形态**——`rp.checked` / `rpA1700.checked` 不在 `readings.js` 的 `FIELD_OF` 表里，
+    故 `sync-hardcoded.js` 管不到，只能手改）；`EC2430` 出口面契约规模从
+    `ns= 145 members= 954 chars= 10859` → 现场 `ns= 146 members= 965 chars= 10966`（lifeline 一个
+    命名空间 / 11 个成员 / 107 个字符面）。
+  - **族四（2 处，接线面登记）**：UI 绑定守卫表未覆盖 `wa-lfn-*` 13 枚 + `wa-act-verdict`——在
+    `engines/tool-diag.js` 的 `UI_BINDINGS` 里给人物页组补一组（lifeline）并在 act 段补一枚。
+    **守卫表是控件接线面的唯一真源**：不登记时「按钮渲染了但绑定的 id 写错」这类断裂在新增出口上
+    无人发现——本条门禁正是被它抓出来的（与 v2.83.0 / v2.117.0 / v2.121.0 / v2.139.0 / v2.140.0 同规格）。
+- **门禁结果（全绿）**：全量回归 **13679 / 0 · status: passed · unchanged: true**；
+  `LIFELINE-V2141: pass`（负控制 79）· `NOESIS-V2140: pass`（55）· `MODULE-CYCLE-V2107: pass`（65 项）·
+  `module-registry-gate` 文件 163 / 命名空间 171 / 装载期边 65 / 硬边 0 / 调用期引用 130 / 结构问题 0 ·
+  `dead-export-gate` dead 765 / uiDead 4 / 仅测试 348 / dataOnly 248 · `reject-code-gate` 621 码
+  （见证 382 / 死表 9 / 基线 230）· `export-contract` ns= 146 / members= 965 / chars= 10966 ·
+  `docs-archive-gate` 跨文件同号 0 · `dup-decl-gate` 扫描 348 文件 / 重复 0 处 ·
+  读数一致性 problems 0 · 现场 refs 3672 / 命名空间 166 / 成员 2011 ·
+  `sync-hardcoded --check` 与 `sync-e2e-readings --verify` 均「与账本现场同源」。
+- **影响范围**：`engines/lifeline.js`（新）、`engines/noesis.js`、`engines/act.js`、`engines/inject-budget.js`、
+  `engines/tool-diag.js`、`core/evict.js`、`core/store.js`、`index.js`、`manifest.json`、`render/inject.js`、
+  `ui/panel.js`、`tests/lifeline-v2141.js`（新）、`tests/run.js`、`tests/settle-v2830.js`、
+  `tests/reject-v2780.js`、`tests/module-cycle-gate-v2107.js`、`tests/dead-export-ledger.json`、
+  `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
+  `ITERATION_LOG.md`。
 ### R124 · 2026-10-01 · v2.138.0：E7 区域天气与灾害深度联动（含 E5 多模型 ensemble 同批）
 - **起点与终点**：起点 v2.137.0（全量回归 13159 / 0，`256aead`）；终点 v2.138.0。
 - **它治的病**：X6 交付的天气与灾害是**两条互不知情的链** —— 天气会变（`weather.tick`）、灾害能建

@@ -3027,6 +3027,55 @@ function runWitness(WA) {
         return [Ns.knows('甲', '见证无账事实-从未登记').reason];
       });
     }
+    // ④ v2.141.0（F2）新开码 1/2：时点闸门 —— `premature`（时辰未到）。
+    //   在此之前它**只在文件头声明里存在**（timeEnabled 三处露脸、零产生方、ERROR_CODES 无行）；
+    //   本版把它接成真判据：读 intel.truthOf(about) 的 at 与决策时间比一次。
+    //   造场：往 worldFacts 里放一条 at 明确在**未来**的事实（决策时间之后）。
+    if (Ns && typeof Ns.knows === 'function' && WA.store && WA.store.transact) {
+      want('premature', 'noesis.knows：这件事的成立时刻在决策时间之后 ⇒ 答 false + premature（「时辰未到」与「此人在界外」是两回事：一个要等，一个要拦）');
+      trip('premature', function () {
+        if (Ns.setSettings) Ns.setSettings({ enabled: true, timeEnabled: true });
+        var futureAt = (WA.clock ? WA.clock.now('reject-witness:prem') : Date.now()) + 86400000;
+        WA.store.transact(function (d) {
+          d.worldFacts = Array.isArray(d.worldFacts) ? d.worldFacts : [];
+          d.worldFacts = d.worldFacts.filter(function (x) { return !x || x.key !== '见证未到事'; });
+          d.worldFacts.push({ id: 'wf_prem', key: '见证未到事', value: '尚未发生', scope: 'world', source: 'witness', at: futureAt });
+        }, 'reject-witness:premature-set');
+        return [Ns.knows('甲', '见证未到事').reason];
+      });
+    }
+    // ⑤ v2.141.0（F2）新开码 2/2：感知第二轴 —— `attenuated`（在场但没注意到）。
+    //   在此之前该模块文件头边界 7 的那句话**只在注释里成立**（人在场就直接答 present）；
+    //   本版把第二轴接成可判定：在场之后再看感知容量（lifeline）与感官载荷（affect）。
+    //   造场：把人放在他已登记的地点（canBeAt 为真），再经 lifeline 登记一条 heavy 限制。
+    if (Ns && typeof Ns.perceive === 'function' && WA.lifeline && WA.lifeline.register) {
+      want('attenuated', 'noesis.perceive：人在场但感知容量被削弱 ⇒ 报 range:impaired + attenuated（「他没注意到」与「他不在场」是两回事：一个是叫他一声，一个是走开）');
+      trip('attenuated', function () {
+        var keep = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, rangeEnabled: true });
+          if (WA.lifeline.setSettings) WA.lifeline.setSettings({ enabled: true });
+          // 事件现场：登记一处地点，并让甲此刻可以在那里（canBeAt 为真）。
+          var at = WA.clock ? WA.clock.now('reject-witness:att') : Date.now();
+          WA.store.transact(function (d) {
+            d.world = d.world && typeof d.world === 'object' ? d.world : { places: [], roads: [], events: [], journeys: [] };
+            d.world.places = Array.isArray(d.world.places) ? d.world.places : [];
+            d.world.places = d.world.places.filter(function (x) { return !x || x.name !== '见证削弱场'; });
+            d.world.places.push({ id: 'pl_att', name: '见证削弱场', kind: 'room', open: 0, close: 0, at: at });
+            d.people = d.people || {};
+            d.people['p_甲'] = d.people['p_甲'] || { id: 'p_甲', name: '甲' };
+            d.people['p_甲'].life = { goals: [], schedule: [] };
+          }, 'reject-witness:attenuated-set');
+          // heavy 档：三条以上感官/认知限制 ⇒ capacityOf 判 heavy ⇒ 感知削弱。
+          WA.lifeline.register('甲', '见证削弱况', { kind: 'mental', limits: ['cognition', 'sensory', 'sleep'], replace: true });
+          var r = Ns.perceive('甲', '见证削弱场');
+          return [r.range === 'impaired' ? r.reason : (r.range + '/' + (r.reason || 'none'))];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ rangeEnabled: keep.rangeEnabled !== false });
+          if (WA.lifeline && WA.lifeline.setSettings) WA.lifeline.setSettings({ enabled: false });
+        }
+      });
+    }
     // ③ 感知半径开关真关 ⇒ 如实报 unknown，**不回落成可达**（开关事与不可达事绝不同形）。
     if (Ns && typeof Ns.perceive === 'function') {
       want('range-off', 'noesis.perceive：感知半径开关关闭 ⇒ 如实报 range:unknown + range-off，不把它读成「可达」（「没开这条闸」与「人真不可达」是两回事）');

@@ -361,7 +361,34 @@
         blocked: b.blocked || 0, lastReason: b.lastReason || '', lastAt: b.lastAt || 0,
         faults: Object.assign({}, b.faults || {}),
         // 四源在场面：哪个知情面缺席，裁决就少一票——诊断面必须能看出来「现在有几源在把门」。
-        sources: (b.sources || []).map(function (s) { return { key: s.key, loaded: !!s.loaded }; })
+        sources: (b.sources || []).map(function (s) { return { key: s.key, loaded: !!s.loaded }; }),
+        // v2.141.0（F2）：四码分布**分开报**。合成一个「不知」之后，就再也答不出
+        //   该补账（not-registered）、该拦人（not-holder）、该等时间（premature），
+        //   还是该叫他一声（attenuated）——四种处置完全不同。
+        //   感知三态同理：perceiveIn / perceiveOut / perceiveUnknown 各占一格。
+        premature: b.premature || 0,
+        perceiveIn: b.perceiveIn || 0, perceiveOut: b.perceiveOut || 0, perceiveUnknown: b.perceiveUnknown || 0
+      };
+    });
+  }
+  /**
+   * v2.141.0（F2）：生理与照护真实层的诊断节。
+   *   报**计数 + 枚举表规模 + 现场行数**，不报病名 —— 病名是剧情内容，
+   *   诊断包会被导出与分享，症状与病名不该随包外流（与 noesis「不列秘密名」同一条纪律）。
+   */
+  function secLifeline() {
+    return safe(function () {
+      if (!WA.lifeline || typeof WA.lifeline.boundary !== 'function') return { error: 'engines/lifeline.js 未加载（生理与照护读数缺席）' };
+      const b = WA.lifeline.boundary();
+      return {
+        enabled: !!b.enabled, maxRows: b.maxRows,
+        regs: b.regs || 0, advances: b.advances || 0, reads: b.reads || 0,
+        blocked: b.blocked || 0, lastReason: b.lastReason || '',
+        faults: Object.assign({}, b.faults || {}),
+        // 四张表的规模：词表被改小/改大在这里看得见（判据口径的可观测面）。
+        kinds: (b.KINDS || []).length, course: (b.COURSE || []).length,
+        limits: (b.LIMITS || []).length, steps: (b.STEPS || []).length,
+        rows: b.rows || 0
       };
     });
   }
@@ -977,6 +1004,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/faction-graph.js': 'factionGraph',
     // v2.140.0（F1）：防全知闸门。登记在此 = 缺席时 secModules 会**如实报 missing**。
     'engines/noesis.js': 'noesis',
+    // v2.141.0（F2）：生理与照护真实层。登记在此 = 缺席时 secModules 会**如实报 missing**。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
+    'engines/lifeline.js': 'lifeline',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1629,6 +1660,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-act-amount', 'wa-act-place', 'wa-act-from', 'wa-act-to', 'wa-act-use', 'wa-act-dur',
       'wa-act-add', 'wa-act-admit', 'wa-act-id', 'wa-act-advance', 'wa-act-abort', 'wa-act-replan',
       'wa-act-view', 'wa-act-out',
+       // v2.141.0（F2）：合法不行动判定口（act.verdict）的真消费方。同 v2.51.0 的理由——
+       //   新增导出必须有真消费方；不登记时下面那条门禁会如实报「未覆盖」。
+       'wa-act-verdict',
       // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复共 33 个控件（同样渲染在人物页）。
       //   理由与前十几批完全一致：新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，
       //   否则「按钮渲染了但绑定的 id 写错」这一类断裂在新增出口上无人发现。
@@ -1770,6 +1804,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'people', ids: ['wa-noe-enabled', 'wa-noe-person', 'wa-noe-fact',
       'wa-noe-knows', 'wa-noe-scan', 'wa-noe-boundary', 'wa-noe-gate', 'wa-noe-perceive',
       'wa-noe-out'] },
+    // v2.141.0（F2）：生理与照护真实层（渲染在人物页）。同 v2.83.0 / v2.117.0 / v2.121.0 / v2.139.0 / v2.140.0 的规格——
+    //   新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，否则「按钮渲染了但绑定的 id 写错」
+    //   这一类断裂在新增出口上无人发现。本版实测正是被这条门禁抓出来的：
+    //   `panel 渲染的每个控件都在守卫表内（未覆盖：["wa-lfn-enabled",...]）`。
+    //   一律无条件渲染（lifeline 是产品文件，缺席本身就是断裂，不降级成提示）。
+    //   wa-lfn-out 是输出区（与 wa-rec-out / wa-noe-out 同规格：它是面板回显，不是控件）。
+    { page: 'people', ids: ['wa-lfn-enabled', 'wa-lfn-person', 'wa-lfn-cond', 'wa-lfn-kind',
+    'wa-lfn-limits', 'wa-lfn-care', 'wa-lfn-register', 'wa-lfn-course', 'wa-lfn-advance',
+    'wa-lfn-capacity', 'wa-lfn-gap', 'wa-lfn-view', 'wa-lfn-out'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
@@ -2436,7 +2479,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), intel: secIntel(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), intel: secIntel(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
       //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，

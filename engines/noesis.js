@@ -1,5 +1,19 @@
 /**
- * WorldAxis engines/noesis.js (v2.140.0) — 防全知闸门（知情边界统一裁决）
+ * WorldAxis engines/noesis.js (v2.141.0) — 防全知闸门（知情边界统一裁决）
+ *
+ * v2.141.0（F2）本版做四件事，全是**上一版声明了、却没有落点**的那一类缺口 ────────
+ *   ① `srcIntel` 修形态误读（第三种）：`intel.visibleTo` 返回的是**数组**，
+ *      初版按 `{known}/{ok}` 布尔对象读 ⇒ 该源恒返回 null ⇒ 在 intel 确有账的世界里，
+ *      knows() 把「有账」读成「无账」（not-registered），而它该答 not-holder。
+ *   ② `srcShadow` 修落地与注释矛盾（第四种）：注释写「未命中一律缺席」，代码写的是
+ *      `rows.length ? has : null` ⇒ 此人名下有**任何**一条共同隐瞒，就把别的事判成「不知」。
+ *      闸门于是从「少一票」变成「凭空多一票否决」。
+ *   ③ 时点闸门：`premature` 从**只声明不产生**变成真判据。判据真源不新开，
+ *      走 `intel.truthOf(about)` 的 `at`（worldFacts → memory.facts(active) → events → currents）
+ *      与决策时间比一次。`timeEnabled` 由此第一次被真消费。
+ *   ④ 感知第二轴：在场之后再看感知容量（lifeline.capacityOf + affect.loads 的疲劳/疼痛载荷）。
+ *      新增独立码 `attenuated`（在场但没注意到），与 `out-of-range`（人不在场）严格分开。
+ *   四件事共同的形态：**声明在注释/开关里，落点不在代码里**。本仓点名的招牌缺陷。
  *
  * ── 它治什么（缺口）──────────────────────────────────────────
  *   仓库已有六个信息不对称零件，各自都很硬，但都是「记账员」，没有一个在「正文生成前」
@@ -32,15 +46,21 @@
  *     专锁 N 面钉的就是这条）。leakScan 检出穿帮**只留痕不删文**——删文是叙事决定，不是引擎决定。
  *   3 **不自动改正文**：gateScene 只回答「哪些人不该知道哪些事」，把处置权交还作者/模型。
  *     自动改写会把作者的笔抢走（与 E11「只报不改」同一条纪律）。
- *   4 四个归因码**不可合并**：\`not-registered\`（没登记过）/ \`not-holder\`（登记了但此人不知）/
- *     \`out-of-range\`（空间不可达）/ \`premature\`（时间未到）。合成一个「不知」，就再也答不出
- *     「是边界没划、人不在场、还是时辰未到」——三种处置完全不同。
+ *   4 五个归因码**不可合并**：\`not-registered\`（没登记过）/ \`not-holder\`（登记了但此人不知）/
+ *     \`out-of-range\`（空间不可达）/ \`premature\`（时间未到）/ \`attenuated\`（在场但没注意到）。
+ *     合成一个「不知」，就再也答不出「是边界没划、人不在场、时辰未到，还是他没留意」——
+ *     四种处置完全不同（补账 / 拦人 / 等时间 / 叫他一声）。
+ *     v2.141.0（F2）如实登记：\`premature\` 在此版之前**只是这一句声明**——
+ *     \`timeEnabled\` 在 DEF/boundary/stat 三处露脸却零消费方，\`docs/ERROR_CODES.md\` 里
+ *     连它一行都没有；\`attenuated\` 是本版新开的第五码，它把边界 7 那句话变成可判定的。
  *   5 观测不得改变被观测对象：knows / gateScene / leakScan / perceive 是纯读（除 stat 计数），
  *     不落盘、不动世界状态、不触发挤出。
  *   6 事实真源不在本模块：\`factId\` 指向 memory.upsertFact 写下的那条；本模块只裁决「谁知道」，
  *     不写「发生了什么」。事实的唯一写者是 memory（与 rumor 边界 2 同源）。
- *   7 感知半径三态：在场 / 可达 / 不可达。**不可达不回落成可达**——「他不知道因为他不在场」
+ *   7 感知半径三态：在场 / 在场但削弱 / 不可达。**不可达不回落成在场**——「他不知道因为他不在场」
  *     与「他在场但没注意到」是两回事，合并就判不出该怪距离还是怪注意力。
+ *     v2.141.0（F2）如实登记：这一句在 v2.140.0 里**只在注释里成立**（人在场就直接答 present）；
+ *     本版补上第二轴（容量面 + 载荷面），削弱答 \`range:'impaired' / reason:'attenuated'\`。
  *
  * ── 拒收/归因码（沿用 v2.139.0 先例：能复用则复用，缺对应说法才新开）────────────
  *   复用：disabled / module-missing / bad-value / missing-fields。
@@ -48,7 +68,9 @@
  *     not-registered  事实未登记（六源都没有这条账）
  *     not-holder      事实已登记，但此人不在任一知情面
  *     out-of-range    空间不可达（不在场且无传播/通讯路径）
- *     premature       时间未到（信息尚未产生就被引用）
+ *     premature       时间未到（信息尚未产生就被引用）—— v2.141.0 起**有真产生方**
+ *                     （timeGate：读 intel.truthOf 的 at 与决策时间比一次）
+ *     attenuated      在场但没注意到（感知容量被病况/载荷削弱）—— v2.141.0 新开
  *     leak            事后扫描检出的人物越界发言（留痕码，非拒收码）
  */
 (function () {
@@ -69,7 +91,11 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
-  const stat = { knows: 0, allows: 0, denies: 0, gates: 0, leaks: 0, scans: 0, blocked: 0, lastReason: '', lastAt: 0, faults: {} };
+  const stat = { knows: 0, allows: 0, denies: 0, gates: 0, leaks: 0, scans: 0, blocked: 0,
+    // v2.141.0（F2）：premature 计数单列。**不与 denies 合并**——denies 是「人在界外」，
+    //   premature 是「时辰未到」；合成一个读数就再也答不出该补划边界还是该等时间。
+    premature: 0, perceiveIn: 0, perceiveOut: 0, perceiveUnknown: 0,
+    lastReason: '', lastAt: 0, faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -100,8 +126,28 @@
         const r = it.visibleTo(person, factId);
         if (r == null) return null;
         if (typeof r === 'boolean') return r;
-        if (r && typeof r.known === 'boolean') return r.known;
-        if (r && typeof r.ok === 'boolean') return r.ok;
+        // v2.141.0（F2）修一处真缺陷：`intel.visibleTo(person, subject)` 的**返回形态是数组**
+        //   （实现是 `rows.filter(...).slice(-4)`），而初版按 `{known}` / `{ok}` **布尔对象**读
+        //   ⇒ 两个 typeof 分支都不成立 ⇒ 这个源**永远返回 null**，从不投票。
+        //   后果不是「少一票」，而是**把「有账」读成「无账」**：在 intel 确有账的世界里，
+        //   knows() 答的是 `known:null + not-registered`（事实没登记过）——
+        //   而它明明是「登记了、此人不在知情面」，该答 not-holder。
+        //   与 v2.140.0 修掉的 srcRumor（在对象行数组上 indexOf 字符串，恒 -1）与
+        //   srcShadow（把数组当 `{secrets}` 对象读）是**同一形态的第三例**。
+        //   命中必须在**行上取键**。intel 行结构：
+        //     { id, claim, source, level, confidence, about, status, at, from, to }
+        //   其中 `about` 才是「这件事」的键（`id` 是这条账自己的编号，留一层兜底）。
+        //   同族可用面：intel.rowsOf(person, about) / liveRows / entitledTo —— 本模块**不**改用它
+        //   们，理由是 visibleTo 已把 `about` 过滤做掉、且它是这三个里唯一有「只取最近 4 条」
+        //   语义的（与 buildBlock 的可见面同口径）；换用别的口会让闸门看到的账与模型看到的账
+        //   不是同一份 —— 那正是本模块最不该出的错。
+        const rows = Array.isArray(r) ? r : (r.rows || r.items || []);
+        const has = rows.some(function (x) {
+          return x && (x.about === factId || x.id === factId);
+        });
+        // 一张账都没有 ⇒ 本面无账（不冒充知情，也不冒充否决）；
+        //   有账（且其中有/无这一条）⇒ 命中即知，未命中即认定不知。
+        return rows.length ? has : null;
       }
     } catch (err) { return null; }
     return null;
@@ -145,7 +191,18 @@
         const has = rows.some(function (x) {
           return x && (x.pair === factId || x.kind === factId || x.factKey === factId);
         });
-        return rows.length ? has : null;
+        // v2.141.0（F2）修同一形态的第四例（**与上一版注释自相矛盾的落地**）：
+        //   上一版把这段注释写对了（「shadow 的行以 pair/kind 为键、不认 factId，
+        //   所以『本面无这条账』只能答 null（缺席），不许冒充否决」），
+        //   但**代码写的是 `rows.length ? has : null`** —— 只要此人名下有**任何**一条
+        //   共同隐瞒行、且没有一条恰好等于这个 factId，它就答 `false`（否决）。
+        //   后果与 intel 那处镜像对称：一个跟这桩事毫无关系的共同隐瞒，
+        //   会把**任何**事实判成「此人不知」——闸门于是从「少一票」变成「凭空多一票否决」。
+        //   正确的形态只有一种：shadow 的行不认 factId ⇒ 命中即知，**未命中一律缺席**。
+        //   （能断言「知」是因为行上确实写着这人在场；断言不了「不知」，因为
+        //     「这行不是这件事」推不出「此人不知这件事」——本模块最要紧的不可合并。
+        //     这一条也是「注释说对了、代码没做到」的现场：判据必须落在代码上。）
+        return has ? true : null;
       }
     } catch (err) { return null; }
     return null;
@@ -161,9 +218,43 @@
   ];
 
   /**
+   * 时点闸门（v2.141.0 F2）：这件事**此刻到底发生了没有**。
+   *   为什么必须有它：本模块文件头自 v2.140.0 起就把 `premature`（时间未到）写进
+   *   「四个归因码不可合并」的声明里，而 `timeEnabled` 也一直在 DEF / boundary / stat 三处露脸
+   *   —— 但**全库没有一处产生它**：knows() 从不读 `timeEnabled`，
+   *   `docs/ERROR_CODES.md` 里连 `premature` 这一行都没有。
+   *   这正是本仓招牌缺陷形态「声明了消费口径、却没有产生方」（有说法、零落点）。
+   *   判据的真源**不新开**：`intel.truthOf(about)` 是 v2.117.0（B3）就建好的
+   *   「某事的真相」统一读口（worldFacts → memory.facts(active) → evolution.events → currents），
+   *   它返回的 `at` 就是这件事**成立/发生**的时刻。本模块只做一件事：把它与决策时间比一次。
+   *   三态严格分开（与全模块同一条纪律）：
+   *     · 查不到这件事        ⇒ { known:false }（缺席，不冒充「未到」也不冒充「已发生」）
+   *     · at 是未来时刻        ⇒ { premature:true, at }（**时间未到**）
+   *     · at 缺失 / 不可比     ⇒ { premature:false, atKnown:false }（不拿缺数据当「未到」）
+   *   边界：只读。不写任何容器，不改任何事实。
+   */
+  function timeGate(factId) {
+    const cfg = settings();
+    if (!cfg.timeEnabled) return { known: false, off: true };
+    const it = WA.intel;
+    if (!it || typeof it.truthOf !== 'function') return { known: false };
+    let tr = null;
+    try { tr = it.truthOf(factId); } catch (e) { return { known: false }; }
+    if (!tr || tr.ok !== true) return { known: false };   // 这件事查不到 ⇒ 本面缺席
+    const at = Number(tr.at);
+    if (!isFinite(at) || at <= 0) return { known: true, premature: false, atKnown: false };
+    const now = clockNow('noesis.time');
+    return { known: true, premature: at > now, at: at, atKnown: true, source: tr.source };
+  }
+
+  /**
    * 统一裁决口：person 此刻是否知道 factId。
    *   一票否决：任一源认定不知 ⇒ known:false，并把每个否决源的归因码逐条带出。
    *   全源缺席/无账 ⇒ not-registered（事实没登记过，不拿「没拦」冒充「该知道」）。
+   *   v2.141.0（F2）：时点闸门**先于**四源聚合 —— 一件事还没发生，谈不上谁知道它。
+   *     顺序是硬约束：若把 premature 排在聚合之后，`deniedBy` 里会混进「某人不在知情面」
+   *     这类**与时间无关**的否决源，于是「时辰未到」与「此人在界外」在读数上又合成一个
+   *     —— 而这正是本模块最要紧的那条不可合并。
    */
   function knows(person, factId) {
     stat.knows++;
@@ -171,6 +262,14 @@
     if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
     const who = clean(person, 40), fid = clean(factId, 80);
     if (!who || !fid) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    // ── 时点闸门（premature 的唯一产生方）──
+    const tg = timeGate(fid);
+    if (tg.premature === true) {
+      stat.denies++; stat.premature = (stat.premature || 0) + 1;
+      stat.lastReason = 'premature'; stat.lastAt = clockNow('noesis');
+      return { ok: true, known: false, reason: 'premature', person: who, fact: fid,
+        at: tg.at, deniedBy: ['premature'], knownBy: [] };
+    }
     const deny = [], saw = [];
     let anySource = false;
     SRCS.forEach(function (s) {
@@ -196,6 +295,17 @@
   /**
    * 感知半径：person 对 placeId 处的发生是否可感知。三态：在场 / 可达 / 不可达。
    *   不可达 ⇒ out-of-range；**不回落成可达**。
+   *   v2.141.0（F2）：在场**不等于**感知到了。文件头边界 7 写的是
+   *   「『他不知道因为他不在场』与『他在场但没注意到』是两回事」——
+   *   而 v2.140.0 的实现在人**在场**时直接答 `present` 就返回，
+   *   上面那句话于是**只在注释里成立**（在场即感知，第二轴压根不存在）。
+   *   本版把第二轴补成**可判定**的：在场之后再看这个人的**感知容量**——
+   *   注意力/感官处理/认知/用药（lifeline.capacityOf）与感官状态载荷
+   *   （affect.loads 的 fatigue/pain，与「鲜活世界·注意、感知与记忆」条目的
+   *   「感知既受身体影响」同一条口径）。
+   *   容量面**缺席≠无削弱**：「查不到」不许冒充「没事」，故 known:false 一律回落 present。
+   *   削弱档 → `impaired`（reason 仍为 out-of-range 家族里的**独立码** `attenuated`），
+   *   与「人根本不在场」（out）严格分开——两者处置完全不同：一个是走开，一个是叫他一声。
    */
   function perceive(person, placeId) {
     const cfg = settings();
@@ -203,14 +313,67 @@
     if (!cfg.rangeEnabled) return { ok: true, range: 'unknown', reason: 'range-off' };
     const who = clean(person, 40), pid = clean(placeId, 60);
     if (!who || !pid) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    // ── 第一轴：空间可达（人不在场，什么都谈不上）──
+    let at = null;
     try {
-      if (WA.world && typeof WA.world.canBeAt === 'function') {
-        const r = WA.world.canBeAt(who, pid);
-        if (r && r.ok === true) return { ok: true, range: 'present', person: who, place: pid };
-        if (r && r.reason) return { ok: true, range: 'out', reason: 'out-of-range', person: who, place: pid, via: r.reason };
+      if (WA.world && typeof WA.world.canBeAt === 'function') at = WA.world.canBeAt(who, pid);
+    } catch (err) { at = null; }
+    if (at && at.ok === true) {
+      stat.perceiveIn = (stat.perceiveIn || 0) + 1;
+      // ── 第二轴：感知容量（在场未必注意到）──
+      const att = attenuationOf(who);
+      if (att.impaired) {
+        stat.perceiveUnknown = (stat.perceiveUnknown || 0) + 1;
+        stat.lastReason = 'attenuated';
+        return { ok: true, range: 'impaired', reason: 'attenuated', person: who, place: pid,
+          via: att.via, band: att.band, load: att.load };
       }
-    } catch (err) { /* 缺席走 unknown */ }
+      return { ok: true, range: 'present', person: who, place: pid, attenuated: false };
+    }
+    if (at && at.reason) {
+      stat.perceiveOut = (stat.perceiveOut || 0) + 1;
+      return { ok: true, range: 'out', reason: 'out-of-range', person: who, place: pid, via: at.reason };
+    }
+    stat.perceiveUnknown = (stat.perceiveUnknown || 0) + 1;
     return { ok: true, range: 'unknown', person: who, place: pid };
+  }
+
+  /**
+   * 感知削弱（只读，**不新开真源**）：两处既有读数合成一档。
+   *   ① lifeline.capacityOf(who)：病况带来的活动限制（cognition / sensory / medication / sleep
+   *      / energy）—— band 为 heavy 即「此刻明显削弱」；
+   *   ② affect.loads[who]：fatigue / pain 载荷合计 ≥ 5（其中任一 ≥ 3 单独成立）——
+   *      与 affect 的过载阈值 6 同量级但**不是同一个阈值**：过载管的是情绪通道回退，
+   *      这里管的是「注意不到」；两者混用会让「他很累」与「他没看见」合成一件事。
+   *   缺失一律不削弱（缺席 ≠ 无能力，也 ≠ 有病）：查不到容量、没有载荷行，
+   *   都 None 留给「未知」，绝不当成「削弱」或「正常」的既成结论。
+   */
+  function attenuationOf(who) {
+    let band = 'none', via = null, load = null;
+    try {
+      if (WA.lifeline && typeof WA.lifeline.capacityOf === 'function') {
+        const c = WA.lifeline.capacityOf(who);
+        if (c && c.ok === true && c.known === true) {
+          band = c.band;
+          const keys = Object.keys(c.limits || {});
+          const senseKeys = keys.filter(function (k) {
+            return k === 'cognition' || k === 'sensory' || k === 'medication' || k === 'sleep' || k === 'energy';
+          });
+          if (band === 'heavy' || senseKeys.length >= 2) { via = 'lifeline.capacityOf'; }
+        }
+      }
+    } catch (e) { /* 容量面缺席 ⇒ 本轴无话可说 */ }
+    try {
+      const st = state();
+      const a = st && st.affect;
+      const row = a && a.loads && a.loads[who];
+      if (row && typeof row === 'object') {
+        const f = Number(row.fatigue) || 0, p = Number(row.pain) || 0;
+        load = f + p;
+        if (load >= 5 || f >= 3 || p >= 3) via = via ? (via + '+affect.loads') : 'affect.loads';
+      }
+    } catch (e) { /* 载荷面缺席 ⇒ 本轴无话可说 */ }
+    return { impaired: !!via, via: via, band: band, load: load };
   }
 
   /**
@@ -270,6 +433,12 @@
       enabled: !!cfg.enabled, rangeEnabled: !!cfg.rangeEnabled, timeEnabled: !!cfg.timeEnabled,
       maxLeaks: cfg.maxLeaks,
       knows: stat.knows, allows: stat.allows, denies: stat.denies,
+      // v2.141.0（F2）：四码分布**分开报**。premature 单列（时辰未到 vs 人在界外）；
+      //   感知三态也分开（在场 / 在场但削弱 / 不可达），否则「他没注意到」与「他不在场」
+      //   在读数上长得一样 —— 那正是本模块存在的理由。
+      premature: stat.premature || 0,
+      perceiveIn: stat.perceiveIn || 0, perceiveOut: stat.perceiveOut || 0,
+      perceiveUnknown: stat.perceiveUnknown || 0,
       gates: stat.gates, scans: stat.scans, leaks: stat.leaks,
       blocked: stat.blocked, lastReason: stat.lastReason, lastAt: stat.lastAt,
       faults: Object.assign({}, stat.faults),
@@ -307,5 +476,5 @@
         enabled: settings().enabled, rangeEnabled: settings().rangeEnabled, timeEnabled: settings().timeEnabled });
     }
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/noesis.js', { kind: 'engine', ver: '2.140.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/noesis.js', { kind: 'engine', ver: '2.141.0' });
 })();

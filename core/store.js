@@ -193,6 +193,10 @@
       // v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽。登记了容量却不在骨架里，冷启动直写会炸事务。
       eraCycle: { rows: [] },
       survival: { rows: [] },
+      // v2.141.0（F2）：生理与照护真实层（lifeline.js）。
+      //   登记了容量却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写会炸事务
+      //   —— 登记不等于物化，两件事都要做。
+      lifeline: { rows: [] },
       warrant: { rows: [] },
       beastBond: { rows: [] },
       // v2.69.0 外貌分级契约 / 原型阶梯。登记了容量却不在骨架里，冷启动直写会炸事务。
@@ -1238,6 +1242,11 @@
     // v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
     'eraCycle.rows': { cap: 8, site: 'era-cycle.js WA.evict.array(eraCycle.rows)' },
     'survival.rows': { cap: 12, site: 'survival.js WA.evict.array(survival.rows)' },
+    // v2.141.0（F2）：生理与照护真实层（lifeline.js 唯一写入 `draft.lifeline`）。
+    //   形如 { rows: [ { who, cond, kind, course, limits[], care[], history[] } ] }。
+    //   本键必须与 core/evict.js 的 SITES['lifeline.rows'] 同名同值（把门逐键对账）：
+    //   两处只改一边 ⇒ 一边挤出、一边静默或报 unknown-site，正是本仓点名的漂移。
+    'lifeline.rows': { cap: 12, site: 'lifeline.js WA.evict.array(lifeline.rows)' },
     'warrant.rows': { cap: 16, site: 'warrant.js WA.evict.array(warrant.rows)' },
     'beastBond.rows': { cap: 10, site: 'beast-bond.js WA.evict.array(beastBond.rows)' },
     // v2.69.0 外貌分级契约 / 原型阶梯。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。

@@ -1,13 +1,13 @@
 {
- "version": "2.140.0",
- "loadOrderCount": 165,
- "loadedCount": 162,
+ "version": "2.141.0",
+ "loadOrderCount": 166,
+ "loadedCount": 163,
  "uiCount": 3,
- "nsCount": 170,
+ "nsCount": 171,
  "totals": {
-  "loadEdges": 64,
+  "loadEdges": 65,
   "hardEdges": 0,
-  "callRefs": 128,
+  "callRefs": 130,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -56,6 +56,7 @@
     "engines/kaleidoscope.js",
     "engines/liaison.js",
     "engines/life.js",
+    "engines/lifeline.js",
     "engines/memory.js",
     "engines/mend.js",
     "engines/motif.js",
@@ -242,6 +243,7 @@
     "engines/group-refuse.js",
     "engines/inst.js",
     "engines/liaison.js",
+    "engines/lifeline.js",
     "engines/mend.js",
     "engines/motif.js",
     "engines/noesis.js",
@@ -2655,6 +2657,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_noesis_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/lifeline.js": {
+   "ns": [
+    "lifeline"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_lifeline_settings_v1"
    ],
    "consumedBy": []
   },

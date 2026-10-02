@@ -73,6 +73,9 @@
     //   注入页/导演页裸露英文键名 noesis（本版被 v2.22.0 renderDirector 键集判据抓出）。
     //   插在 chrono 行之前（与 foreshadow 同款理由：chrono 行是 v2.127.0 锚点区）。
     noesis: '知情边界',
+    // v2.141.0（F2）：生理与照护真实层。缺此项 ⇒ inject-sources-v2560 的 D 判据当场红灯
+    //   （SOURCES 每一项在 VIS_NAMES 里都要有显示名）。
+    lifeline: '生理与照护',
     chrono: '世界编年史' };
 
   // v0.6 新增组件样式注入
@@ -641,6 +644,14 @@
       <div class="wa-row"><input id="wa-noe-person" class="wa-input" placeholder="人物"/><input id="wa-noe-fact" class="wa-input" placeholder="事实 / 秘密名"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-noe-knows" title="裁决：这个人此刻该不该知道这件事。四个归因码分开报——没登记过（not-registered）/登记了但此人不知（not-holder）/人不在场（out-of-range）/时辰未到（premature），合成一个「不知」就答不出是边界没划、人不在场、还是时辰未到">裁决知情</button><button class="wa-btn" id="wa-noe-scan" title="事后泄露扫描：把「人物=秘密名」逐条核，检出有谁说出了它不该知道的事。只留痕不删文——删文是叙事决定，不是引擎决定">泄露扫描</button><button class="wa-btn" id="wa-noe-boundary" title="只读：防全知引擎现场（几个知情面在把门 / 裁决数 / 穿帮留痕数）。穿帮数与扫描数分开报——真穿帮多要改边界，扫得勤只是用法不同">边界读数</button><button class="wa-btn" id="wa-noe-gate" title="生成前闸门：一组人物 × 一组事实，逐条答「哪些人不该知道哪些事」。只报不改正文——自动改写会把作者的笔抢走（与 E11「只报不改」同一条纪律）">生成前闸门</button><button class="wa-btn" id="wa-noe-perceive" title="感知半径：这个人此刻能否感知那个地点发生的事。三态封闭（在场 / 可达 / 不可达），不可达如实报 out-of-range——不回落成可达">感知半径</button></div>
       <div id="wa-noe-out" class="wa-out"></div>
+      <div class="wa-sec">生理与照护层（带着什么状况、到哪一段、限制什么）</div>
+      <label class="wa-row"><input id="wa-lfn-enabled" type="checkbox" ${WA.lifeline && WA.lifeline.getSettings().enabled ? 'checked' : ''}/> 启用生理与照护层</label>
+      <div class="wa-row"><input id="wa-lfn-person" class="wa-input" placeholder="人物"/><input id="wa-lfn-cond" class="wa-input" placeholder="状况名（不是症状描述）"/></div>
+      <div class="wa-row"><input id="wa-lfn-kind" class="wa-input" placeholder="类别 acute/chronic/injury/mental/neuro/trauma/disability/reproductive"/><input id="wa-lfn-limits" class="wa-input" placeholder="限制（多个用「、」：energy/sleep/cognition/sensory/mobility/social/work/medication）"/></div>
+      <div class="wa-row"><input id="wa-lfn-care" class="wa-input" placeholder="照护已落账步骤（多个用「、」：triage/exam/diagnosis/treatment/monitoring/rehab/access）"/><button class="wa-btn" id="wa-lfn-register" title="登记一个病况。**这是本模块唯一的创建口**——病况只能被登记，不能被推断（零「由症状推病名」）。同名重登记必须显式 replace，不静默覆盖">登记状况</button></div>
+      <div class="wa-row"><input id="wa-lfn-course" class="wa-input" placeholder="推进到哪一段 onset/progress/flare/remission/recovery/stable/longterm"/><button class="wa-btn" id="wa-lfn-advance" title="推进程段：只许沿七格**前进一格或原地**。跨格与回退一律拒收并带 from/to——「昨天病危、今天痊愈」在慢性病与创伤上是最刺眼的一种失真">推进程段</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-lfn-capacity" title="容量面（只读）：这个人此刻哪些活动受限、限到哪一档。known:false（查不到）与「无限制」严格分开——查不到不许冒充「他很健康」">容量读数</button><button class="wa-btn" id="wa-lfn-gap" title="照护缺口（只读）：按七步流程报「哪几步还没有落账」。它只答流程差，不写医疗结果——结果归别处真源">照护缺口</button><button class="wa-btn" id="wa-lfn-view" title="只读明细：这个人此刻带着的全部状况与程段历史。只报程段与限制，不列症状细节">看明细</button></div>
+      <div id="wa-lfn-out" class="wa-out"></div>
       <div class="wa-sec">人物生活（目标、承诺、日程）</div>
       <label class="wa-row"><input id="wa-life-enabled" type="checkbox" ${WA.life && WA.life.getSettings().enabled ? 'checked' : ''}/> 启用人物生活</label>
       <div class="wa-row"><input id="wa-life-person" class="wa-input" placeholder="人物"/><input id="wa-life-text" class="wa-input" placeholder="目标、承诺或日程"/></div>
@@ -678,7 +689,7 @@
       <div class="wa-row"><input id="wa-act-with" class="wa-input" placeholder="对象（meet 的对方 / deliver 的收方）"/><input id="wa-act-item" class="wa-input" placeholder="物（deliver）"/><input id="wa-act-amount" class="wa-input wa-num" type="number" min="0" placeholder="数量"/><input id="wa-act-place" class="wa-input" placeholder="地点（可空）"/></div>
       <div class="wa-row"><input id="wa-act-from" class="wa-input" placeholder="从（move）"/><input id="wa-act-to" class="wa-input" placeholder="到（move）"/><input id="wa-act-use" class="wa-input" placeholder="用途（可空）"/><input id="wa-act-dur" class="wa-input wa-num" type="number" min="0" placeholder="时长毫秒（可空取默认）"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-act-add" title="只登记候选行动，不开工——准入是 admit 的事；目标必须是此刻仍 active 的那个（目标被撤销后挂在它下面的行动不得照常开工）">登记行动</button><button class="wa-btn" id="wa-act-admit" title="准入：问「这一刻这个人能不能开始做这件事」。判据顺序从「这件事本身」到「世界条件」，全部只读、拒收零变化">准入</button></div>
-      <div class="wa-row"><input id="wa-act-id" class="wa-input" placeholder="行动 id"/><button class="wa-btn" id="wa-act-advance" title="结算所有到点的活动作（与工作流 after 链每轮自动推进同一入口）；超额者进 deferred 显式留痕，不静默跳过">结算到期</button><button class="wa-btn" id="wa-act-abort" title="中止：已消耗部分与未执行部分分别落账（spent/left 各记一格）；在途者交世界侧标成 halted，位置未知">中止</button><button class="wa-btn" id="wa-act-replan" title="受阻后改计划：旧行变 replanned 并留痕、新行指回旧行。在途者不得用本入口改道——必须先中止，否则会把真实走过的路抹成没发生">改计划</button><button class="wa-btn" id="wa-act-view" title="只读：按状态分列，并如实带出「哪些种类没有确认器">看台账</button></div>
+      <div class="wa-row"><input id="wa-act-id" class="wa-input" placeholder="行动 id"/><button class="wa-btn" id="wa-act-advance" title="结算所有到点的活动作（与工作流 after 链每轮自动推进同一入口）；超额者进 deferred 显式留痕，不静默跳过">结算到期</button><button class="wa-btn" id="wa-act-abort" title="中止：已消耗部分与未执行部分分别落账（spent/left 各记一格）；在途者交世界侧标成 halted，位置未知">中止</button><button class="wa-btn" id="wa-act-replan" title="受阻后改计划：旧行变 replanned 并留痕、新行指回旧行。在途者不得用本入口改道——必须先中止，否则会把真实走过的路抹成没发生">改计划</button><button class="wa-btn" id="wa-act-view" title="只读：按状态分列，并如实带出「哪些种类没有确认器">看台账</button><button class="wa-btn" id="wa-act-verdict" title="合法不行动：判这一笔的结果属于哪一档（action/refuse/delay/status-quo）。四档不可合并——「他没动」不等于「这一轮没算」。只判定，不写世界">判结果档</button></div>
        <div id="wa-act-out" class="wa-out"></div>
        <div class="wa-sec">人物计划（目标 → 有限步数 → 受挫改选）</div>
        <label class="wa-row"><input id="wa-plan-enabled" type="checkbox" ${WA.plan && WA.plan.getSettings().enabled ? 'checked' : ''}/> 启用人物计划</label>
@@ -2664,9 +2675,76 @@
       if (!p || !pid) return noeOut('未记录：missing-fields（人物与地点名都要填）', true);
       const r = WA.noesis.perceive(p, pid);
       if (!r.ok) return noeOut('未记录：' + (r.reason || '未知原因'), true);
-      const word = r.range === 'present' ? '在场' : (r.range === 'out' ? '不可达' : '未知');
+      const word = r.range === 'present' ? '在场' : (r.range === 'out' ? '不可达' : (r.range === 'impaired' ? '在场但没注意到' : '未知'));
       noeOut('感知半径：' + p + ' 对「' + pid + '」⇒ ' + word + (r.reason ? '（' + r.reason + '）' : '')
         + (r.via ? ' · 依据：' + r.via : ''), true);
+    });
+    // v2.141.0（F2）：生理与照护层。三枚写/读入口各自对上一个真出口——
+    //   控件与 handler 同批（只加控件不加 handler = 点了没反应；只加 handler 不加控件 = 死代码）。
+    const lfnVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const lfnOut = function (text, keep) {
+      if (keep) panelEl.dataset.lfnOut = text;
+      const o = $('#wa-lfn-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.lfnOut) { const saved = $('#wa-lfn-out'); if (saved) saved.textContent = panelEl.dataset.lfnOut; }
+    const llSplit = function (v) {
+      return String(v || '').split(/[\u3001,\uff0c]/).map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+    };
+    { const el = $('#wa-lfn-enabled');
+      if (el) el.addEventListener('change', function () {
+        if (!WA.lifeline) return lfnOut('未记录：module-missing', true);
+        WA.lifeline.setSettings({ enabled: !!el.checked });
+        lfnOut('已记录 ' + (el.checked ? 'enabled' : 'disabled'), true);
+      });
+    }
+    on('#wa-lfn-register', () => {
+      if (!WA.lifeline || !WA.lifeline.register) return lfnOut('未记录：module-missing', true);
+      const r = WA.lifeline.register(lfnVal('#wa-lfn-person'), lfnVal('#wa-lfn-cond'),
+        { kind: lfnVal('#wa-lfn-kind'), course: 'onset', limits: llSplit(lfnVal('#wa-lfn-limits')),
+          care: llSplit(lfnVal('#wa-lfn-care')), replace: true });
+      if (!r.ok) return lfnOut('未记录：' + (r.reason || '未知原因'), true);
+      lfnOut('已登记 ' + r.who + '「' + r.cond + '」（' + r.kind + '）⇒ ' + r.course, true);
+    });
+    on('#wa-lfn-advance', () => {
+      if (!WA.lifeline || !WA.lifeline.advance) return lfnOut('未记录：module-missing', true);
+      const r = WA.lifeline.advance(lfnVal('#wa-lfn-person'), lfnVal('#wa-lfn-cond'), lfnVal('#wa-lfn-course'));
+      if (!r.ok) {
+        return lfnOut('未记录：' + (r.reason || '未知原因')
+          + (r.from ? '（' + r.from + ' → ' + r.to + '，程段只许前进一格或原地）' : ''), true);
+      }
+      lfnOut('程段：' + r.who + '「' + r.cond + '」' + r.from + ' → ' + r.to, true);
+    });
+    on('#wa-lfn-capacity', () => {
+      if (!WA.lifeline || !WA.lifeline.capacityOf) return lfnOut('未记录：module-missing', true);
+      const r = WA.lifeline.capacityOf(lfnVal('#wa-lfn-person'));
+      if (!r.ok) return lfnOut('未记录：' + (r.reason || '未知原因'), true);
+      if (!r.known) return lfnOut('容量：未记录（此人没有任何已登记的病况 —— 查不到，不是「他很健康」）', true);
+      const ks = Object.keys(r.limits || {});
+      // v2.141.0（F2）：累计读数同一条出口。`stat` 回答「这一路各阶段各几笔」，
+      //   与上面的「此刻剩几项受限」是同一件事的即时面与累计面（与 act 的「看台账」同规）。
+      //   faults 按拒收码分列 —— 否则「被拒过 7 次」永远说不出是哪一类被拒。
+      const st = (WA.lifeline && WA.lifeline.stat) ? WA.lifeline.stat() : null;
+      const fl = (st && st.faults) ? Object.keys(st.faults).map(function (k) { return k + '×' + st.faults[k]; }).join(' ') : '';
+      lfnOut('容量：' + r.who + ' 受限 ' + ks.length + ' 项（' + r.band + '）：'
+        + (ks.length ? ks.map(function (k) { return k + '×' + r.limits[k]; }).join('、') : '无限制登记')
+        + (st ? ' · 累计 登记' + st.regs + '/推进' + st.advances + '/读' + st.reads
+          + (fl ? ' · 拒收 ' + fl : '') : ''), true);
+    });
+    on('#wa-lfn-gap', () => {
+      if (!WA.lifeline || !WA.lifeline.careGap) return lfnOut('未记录：module-missing', true);
+      const r = WA.lifeline.careGap(lfnVal('#wa-lfn-person'), lfnVal('#wa-lfn-cond'));
+      if (!r.ok) return lfnOut('未记录：' + (r.reason || '未知原因'), true);
+      lfnOut('照护缺口：已落账 ' + r.done.length + ' 步；未落账 ' + (r.gap.length ? r.gap.join('、') : '（无）')
+        + ' · 只答流程差，不写结果', true);
+    });
+    on('#wa-lfn-view', () => {
+      if (!WA.lifeline || !WA.lifeline.view) return lfnOut('未记录：module-missing', true);
+      const r = WA.lifeline.view(lfnVal('#wa-lfn-person'));
+      if (!r.ok) return lfnOut('未记录：' + (r.reason || '未知原因'), true);
+      if (!r.count) return lfnOut('明细：未记录（此人没有已登记的状况）', true);
+      lfnOut('明细：' + r.rows.map(function (x) {
+        return x.cond + '（' + x.kind + '，' + x.course + '，限制 ' + (x.limits.join('/') || '无') + '）';
+      }).join('；'), true);
     });
     // v2.52.0：人物生活只写用户明确提交的内容；关闭开关后停止结算与注入。
     const lifeText = function () {
@@ -3328,6 +3406,17 @@
           + '/中止' + st.aborted + '/改计划' + st.replanned + '/重放' + st.duplicates + '/无确认器' + st.unconfirmed
           + (fl ? ' · 拒收 ' + fl : '') : '')
         + (rows.length ? ' ｜ ' + rows.join(' ； ') : '') });
+    });
+    // v2.141.0（F2）：合法不行动。判「这一笔的结果属于哪一档」——四档不可合并。
+    //   输入框复用「行动 id」旁的种类框：填种类判未受阻档，填「种类@拒收码」判受阻档。
+    on('#wa-act-verdict', () => {
+      if (!WA.act || !WA.act.verdict) return actOut({ ok: false, reason: 'module-missing' });
+      const raw = wv('#wa-act-kind');
+      const at = raw.indexOf('@');
+      const kind = at >= 0 ? raw.slice(0, at).trim() : raw.trim();
+      const blockedReason = at >= 0 ? raw.slice(at + 1).trim() : '';
+      const r = WA.act.verdict(kind, blockedReason ? { blockedReason: blockedReason } : {});
+      actOut(r);
     });
     { const el = $('#wa-act-enabled');
       if (el) el.onchange = function () {

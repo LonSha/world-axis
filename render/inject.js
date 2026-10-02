@@ -83,6 +83,10 @@
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
     //   插在 chrono 行**之前**（与 foreshadow 同款理由：chrono 行邻近字面量是锚点区，动它会触发 not-unique）。
     'noesis',
+    // v2.141.0（F2）：生理与照护真实层。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
+    //   同样插在 chrono 行**之前**（chrono 行邻近字面量是 v2.127.0 那条锁的锚点区）。
+    'lifeline',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
@@ -116,7 +120,10 @@ style: false,
         foreshadow: true,
         // v2.140.0（F1）：防全知闸门。取默认 true（其模块总开关默认为关），
         //   不给老用户凭空多出约束。
-        noesis: true }, module: 'render' };
+        noesis: true,
+        // v2.141.0（F2）：生理与照护真实层。取默认 true（其模块总开关默认为关），
+        //   不给老用户凭空多出约束。
+        lifeline: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -283,6 +290,8 @@ style: false,
     foreshadow: '伏笔台账',
     // v2.140.0（F1）：防全知闸门显示名。SOURCES（键）/ 注入分支 source 名 / 本表三者逐字同名。
     noesis: '知情边界',
+    // v2.141.0（F2）：生理与照护真实层显示名。SOURCES（键）/ 注入分支 source 名 / 本表三者逐字同名。
+    lifeline: '生理与照护',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
@@ -341,7 +350,16 @@ style: false,
     //   unavailable（「没有模块级总开关」——而它明明有），排查方向被指错。
     //   同一类漏登记 v2.99.0 已为 rumor/canon、v2.127.0 为 chrono、v2.130.0 为
     //   reasoning/storyTone 各付过一次学费。
-    foreshadow: 'worldaxis_foreshadow_settings_v1' };
+    foreshadow: 'worldaxis_foreshadow_settings_v1',
+    // v2.141.0（F2）如实登记：以下两条**确有**模块级总开关，而 noesis 那一行是
+    //   v2.140.0（F1）加源时**漏登记的存量缺口**（本版顺手补上，不新开面）——
+    //   漏登记的后果不是「少一行」：`moduleEnabled` 查不到键就返回 null，于是「开关两面一致」
+    //   把这两个源一律报成 `unavailable`（「这个源没有模块级总开关」——而它们明明有），
+    //   用户勾了模块总开关却看到「模块没加载」，排查方向被指错。
+    //   同一类漏登记 v2.99.0 已为 rumor/canon、v2.127.0 为 chrono、v2.130.0 为
+    //   reasoning/storyTone、v2.135.0 为 foreshadow 各付过一次学费。
+    noesis: 'worldaxis_noesis_settings_v1',
+    lifeline: 'worldaxis_lifeline_settings_v1' };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -887,6 +905,11 @@ style: false,
       // v2.140.0（F1）：防全知闸门。只报**纪律与留痕计数**，不带任何具体秘密名 ——
       //   列出秘密名就是把未揭示剧情写进正文。本块是「只依据角色可知信息演绎」的引擎判据兜底。
       if (vis.noesis && WA.noesis) { const no = engineCall('noesis', function () { return WA.noesis.buildBlock(); }); if (no) items.push({ source: '知情边界', content: no }); }
+      // v2.141.0（F2）：生理与照护真实层。只报**程段与限制档**，不列症状细节 ——
+      //   症状名会暗示剧情走向（与 noesis 同一条防剧透纪律）。
+      //   本块是「病况是持续状态、照护有流程与不可得」这两条纪律的引擎判据兜底：
+      //   它把「这一程走到哪一段、限制哪些活动」变成读数，而不是留给模型即兴。
+      if (vis.lifeline && WA.lifeline) { const ll = engineCall('lifeline', function () { return WA.lifeline.buildBlock(); }); if (ll) items.push({ source: '生理与照护', content: ll }); }
       if (vis.session && WA.session) { const se = engineCall('session', function () { return WA.session.buildBlock(); }); if (se) items.push({ source: '多人场', content: se }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块

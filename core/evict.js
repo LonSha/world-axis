@@ -205,6 +205,14 @@
     // ── v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽（era-cycle.js / survival.js / warrant.js / beast-bond.js）──
     'eraCycle.rows': { path: 'eraCycle.rows', cap: 8, why: '资料片周期环形（四档状态机 + 倒计时，结算转长草强制换事件）' },
     'survival.rows': { path: 'survival.rows', cap: 12, why: '生存三轴环形（饱食/精力/负重分段，归零惩罚如实报出）' },
+    // v2.141.0（F2）：生理与照护真实层（lifeline.js）。
+    //   必须是**环形容器**而不是写入侧硬上界：登记过的病况「后来稳定了/长期带着」
+    //   都是复盘材料（「他什么时候开始带这个病的、到哪一段了」必须答得出），
+    //   故只能环形挤出、不得在程段推进或恢复时原地删。
+    //   本表必须与 core/store.js 的 __BOUNDED_CAPS['lifeline.rows'] 同名同值
+    //   （把门判据逐键对账）：SITES 缺此键时 evict.array 会走 unknown-site
+    //   **静默失败**（挤出压根不发生，而调用方以为做了）。
+    'lifeline.rows': { path: 'lifeline.rows', cap: 12, why: '病况环形（程段历史与限制是复盘证据，不在恢复/稳定时删）' },
     'warrant.rows': { path: 'warrant.rows', cap: 16, why: '通缉环形（罪度三档，不随死亡消除，惯犯升级）' },
     'beastBond.rows': { path: 'beastBond.rows', cap: 10, why: '驯兽环形（驯服满百清零转化，红线状态机）' },
     // ── v2.69.0 外貌分级契约 / 原型阶梯（appearance.js / ladder.js）──

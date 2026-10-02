@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.140.0'
+  const VERSION = '2.141.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -502,6 +502,13 @@
     //   （enigma / intel / rumor / shadow 均在前），且晚于 world（感知半径的真源）。
     //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
     'engines/noesis.js',
+    // v2.141.0（F2）：生理与照护真实层。装载位置紧随 noesis 之后（与 tests/run.js 的 LOAD 同序）——
+    //   两条硬约束：① 须**晚于** core/store（它读写 `draft.lifeline`）；
+    //   ② 须**早于** render/inject.js（注入落地时读 lifeline.buildBlock()）。
+    //   noesis.perceive 在**调用期**读 WA.lifeline（不是装载期），故两者次序无硬要求；
+    //   排在这里是刻意的：感知第二轴的真源就在本模块，两条相邻便于阅读「谁给感知划档」。
+    //   **只读**：读取面零 store.transact，写侧只有 register / advance 两口（专锁 N 面钉这条）。
+    'engines/lifeline.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

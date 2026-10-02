@@ -41,6 +41,12 @@
  *   · 「知不知道备用路线」属于认知面（B3），本模块只承认**可达性**证据：
  *     不知道路的人在框架上不会因此自动选对——但「按认知选路」由 B3 落地。
  *   · 租约 / 崩溃恢复只覆盖本模块自己的状态机；跨进程互斥不在范围内（同 events 的口径）。
+ *   · **合法不行动**（v2.141.0 F2）：`verdict()` 判**这一笔的结果属于哪一档**
+ *     （action / refuse / delay / status-quo，四档不可合并）。它是只读判定面，
+ *     **不是写口** —— 本模块的写口仍然只有 add / admit / advance / abort / replan。
+ *     本仓此前的现场：准入制答得出「能不能开工」，答不出「他合法地什么都没做」，
+ *     于是「没动」与「没算」在状态里同形（缝合自 BSW 推演原则的「行动、拒绝行动、
+ *     延迟行动与状态维持均为合法的推演结果」）。
  *   · 总开关默认关闭；关闭时不登记、不准入、不结算、不注入。
  */
 (function () {
@@ -81,6 +87,70 @@
   const CONFIRMERS = { move: 'world.journey', deliver: 'org.transfer', meet: 'world.canBeAt' };
   // 需要外部确认器、但本版未接的种类（如实登记，供诊断与文档引用同一份真源）。
   const NO_CONFIRMER = ['tell', 'work'];
+  // ── 合法不行动（v2.141.0 F2）────────────────────────────────────────
+  //   缝合来源：BSW 动态受力推演约束引擎的推演原则（原文逐字）：
+  //     「行动、拒绝行动、延迟行动与状态维持（即维持现状）均为合法的推演结果。」
+  //     「当当前受力形成稳定僵局时，不强行制造角色行动；允许时间流逝、环境变化、
+  //      外部事件或关系互动作为新的输入。」
+  //   本仓此前的现场：`admit` 是**准入制**——它答得出「这一笔能不能开工」，
+  //   却答不出「他这一轮**合法地什么都没做**」；于是「他没动」在状态里只能表现为
+  //   「行数没变」，与「这一轮根本没算」长得一模一样（本仓反复治的两态不可分）。
+  //   四种结果的处置完全不同，故**不合并成一个「没行动」**：
+  //     action      真做了（本轮有可观察的行动落地）；
+  //     refuse      拒绝了（有能力、路也通，但按性格/立场/代价不愿做）——要写理由与代价；
+  //     delay       延后了（时辰未到/窗口不合/条件不齐）——条件变了会自动重新显现；
+  //     status-quo  维持现状（他在忙别的、目标已撤、或有更重的事）——这一轮合法地没有变化。
+  //   边界（如实写明）：本函数只**判定与归类**，不写世界、不改行动状态。
+  //   它刻意不是第四个写口 —— 本模块的写口仍然只有 add / admit / advance / abort / replan。
+  const VERDICTS = ['action', 'refuse', 'delay', 'status-quo'];
+  /** 未受阻的活体行动按种类落档：等待/休息就是「延后」，其余是「真做了」。 */
+  function verdictOfRow(row) {
+    const k = str((row && typeof row === 'object') ? row.kind : row, 20);
+    if (k === 'wait' || k === 'rest') return 'delay';
+    return 'action';
+  }
+  /**
+   * 受阻断时的档位映射。**只映射本模块自己的拒收原因**（别处的码不猜）。
+   *   不在这张表里的一律落 `refuse` 兜底，并把原码逐字带出（`original`），
+   *   而不是悄悄塞进某一档 —— 「为什么没做成」必须能从读数反推回那句拒收。
+   */
+  const BLOCKED_VERDICT = {
+    'busy': 'status-quo',            // 他在做别的事：这一轮合法地没有新变化
+    'no-goal': 'status-quo',         // 目标已撤：不是他拒绝，是这件事不再算他的事
+    'missing-person': 'status-quo',  // 人不在册：谈不上行动，也谈不上拒绝
+    'not-planned': 'status-quo',     // 这一笔本就不在待开工态
+    'need-unmet': 'refuse',          // 资源不够：做不了（要写代价与替代）
+    'org-missing': 'refuse',         // 连库存真源都没有：做不了
+    'unreachable': 'refuse',         // 路不通
+    'missing-route': 'refuse',
+    'closed': 'delay',               // 门关着：时辰不对，不是不愿
+    'window-too-short': 'delay',
+    'scheduled-elsewhere': 'status-quo',
+    'bad-time': 'delay',
+    'world-missing': 'refuse'
+  };
+  /**
+   * 判定面（只读）：**这一笔的合法结果是什么档**。
+   *   两种入参形态，都是调用方实际会拿到的东西：
+   *     · 传一个动作种类（'wait'/'move'/…）⇒ 未受阻时的档位；
+   *     · 传 opts.blockedReason（admit / advance 的拒收码）⇒ 受阻断时的档位。
+   *   返回体里 `allowed` 四档齐带 —— 「有哪几档合法」本身是纪律的一部分，
+   *   不许让它只活在注释里（本仓点名过的「声明了却没有产生方」）。
+   */
+  function verdict(kind, opts) {
+    const k = str(kind, 20);
+    if (KINDS.indexOf(k) < 0) return { ok: false, reason: 'bad-kind', kinds: KINDS.slice() };
+    const o = opts || {};
+    const hit = str(o.blockedReason, 40);
+    let v = verdictOfRow(k), blocked = false;
+    if (hit) {
+      blocked = true;
+      v = BLOCKED_VERDICT[hit] || 'refuse';
+    }
+    return { ok: true, kind: k, verdict: v, blocked: blocked,
+      reason: hit || null, original: hit || null, allowed: VERDICTS.slice(),
+      note: '行动、拒绝行动、延迟行动与状态维持都是合法结果：「他没动」不等于「这一轮没算」。' };
+  }
 
   const stat = { added: 0, admitted: 0, completed: 0, failed: 0, aborted: 0, replanned: 0,
     deferred: 0, duplicates: 0, unconfirmed: 0, lastReason: '', faults: {} };
@@ -596,8 +666,12 @@
 
   WA.act = {
     KINDS: KINDS, ACTIVE: ACTIVE, TERMINAL: TERMINAL, CONFIRMERS: CONFIRMERS, NO_CONFIRMER: NO_CONFIRMER,
+    // v2.141.0（F2）：四档合法结果同表导出（面板与诊断都要判档，各写一份必然漂移）。
+    VERDICTS: VERDICTS.slice(),
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     add: add, admit: admit, advance: advance, abort: abort, replan: replan, view: view, buildBlock: buildBlock,
+    // 判定面（只读）：这一笔的合法结果落在哪一档。**不是写口**，不动行动状态（见头部边界）。
+    verdict: verdict,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
   // ── 工作流节点注册（v2.117.0）─────────────────────────────────────────
