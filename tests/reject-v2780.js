@@ -2983,6 +2983,65 @@ function runWitness(WA) {
       });
     }
   }
+  // ── engines/noesis.js（v2.140.0 F1：防全知闸门）──
+  //   三个新开码全部**由真实局面触发**（事实登记了但此人不在知情面 / 事实一条账都没有 /
+  //   感知半径开关真关），不是结构上不可达的分支，故按台账规矩「新码一律走见证，不进基线」。
+  //   三者共用同一个道理：它们是**三种不同的处置**（补账 / 划边界 / 开开关），
+  //   合成一个「不知」就再也答不出该做哪一件 —— 这正是本模块最要紧的一条取舍。
+  {
+    const Ns = WA.noesis;
+    // 本段要先有**一个确定的世界**（与 tests/noesis-v2140.js 的 seed 同规格）。
+    //   本表与回归共用同一个 vm 全局与同一份世界存储，前面几十个块留下的 rumor 链
+    //   / shadow 共同隐瞒 / intel 情报会让「未登记」这个词读到的不是「六源都没这条账」，
+    //   而是「其中一源认定此人不知」—— 两个码当场合成一个，见证就成了假见证。
+    //   实测（v2.140.0）：不清账时 not-registered 静默落进 missing，门禁报「见证缺失」。
+    //   判据要的场必须自己造；环境的不确定性不是判据的一部分。
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.enigma = { rows: [] };
+        d.rumor = { chains: [] };
+        d.shadow = { rows: [] };
+        d.people = d.people || {};
+        Object.keys(d.people).forEach(function (k) {
+          const p = d.people[k];
+          if (p && p.knowledge && Array.isArray(p.knowledge.intel)) p.knowledge.intel = [];
+        });
+      }, 'reject-witness:noesis-reset');
+    }
+    if (Ns && typeof Ns.knows === 'function') {
+      // ① 事实已登记、此人不在任一知情面 ⇒ 一票否决，并把否决源逐条带出。
+      //   先 drop 再 mark：本表与回归共用同一份世界存储，同名的旧名单会让「甲在界外」
+      //   这个前提不成立（实测：不 drop 时 deniedBy 会带出上一轮留下的源）。
+      want('not-holder', 'noesis.knows：事实已登记，但此人不在任一知情面 ⇒ 答 false 并把否决源逐条带出（不取平均不投票：不知是不可逆的，六源里一源铁证就足够）');
+      trip('not-holder', function () {
+        if (Ns.setSettings) Ns.setSettings({ enabled: true });
+        if (WA.enigma && WA.enigma.setSettings) WA.enigma.setSettings({ enabled: true });
+        if (WA.enigma && WA.enigma.drop) WA.enigma.drop('见证界外事');
+        if (WA.enigma && WA.enigma.mark) WA.enigma.mark('见证界外事', '乙');
+        return [Ns.knows('甲', '见证界外事').reason];
+      });
+      // ② 这个事实在六源里一条账都没有 ⇒ known:null（**不拿「没人拦」冒充「该知道」**）。
+      want('not-registered', 'noesis.knows：事实六源里一条账都没有 ⇒ known:null + not-registered（「边界还没划」与「边界划了此人在界外」是两回事，处置完全不同）');
+      trip('not-registered', function () {
+        if (Ns.setSettings) Ns.setSettings({ enabled: true });
+        return [Ns.knows('甲', '见证无账事实-从未登记').reason];
+      });
+    }
+    // ③ 感知半径开关真关 ⇒ 如实报 unknown，**不回落成可达**（开关事与不可达事绝不同形）。
+    if (Ns && typeof Ns.perceive === 'function') {
+      want('range-off', 'noesis.perceive：感知半径开关关闭 ⇒ 如实报 range:unknown + range-off，不把它读成「可达」（「没开这条闸」与「人真不可达」是两回事）');
+      trip('range-off', function () {
+        const keep = Ns.getSettings ? Ns.getSettings() : {};
+        try {
+          if (Ns.setSettings) Ns.setSettings({ enabled: true, rangeEnabled: false });
+          return [Ns.perceive('甲', '城南').reason];
+        } finally {
+          if (Ns.setSettings) Ns.setSettings({ rangeEnabled: keep.rangeEnabled !== false });
+        }
+      });
+    }
+  }
+
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

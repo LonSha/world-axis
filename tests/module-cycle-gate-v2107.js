@@ -149,7 +149,11 @@ function runAll(A) {
 
   // ── B 运行时（现场真跑） ──
   const a = M.audit();
-  A(a.files === 165 && a.aliasFiles === 165 && a.refFiles === 163,
+  // v2.140.0（F1 防全知闸门）：新增 engines/noesis.js（noesis 命名空间）⇒ 文件面 165 → 166、
+  //   解析出别名 165 → 166、有引用 163 → 164（零引用仍恰 core/input-guard.js / core/sanitize.js
+  //   两个声明过的纯函数基元——noesis 读 store（登记自己）故有引用，不落零引用名单）。
+  //   现场读数由 M.audit() 采，非估算；增量逐条可核（+1 文件、+1 别名、+1 有引用）。
+  A(a.files === 166 && a.aliasFiles === 166 && a.refFiles === 164,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -166,7 +170,11 @@ function runAll(A) {
   //   ⇒ 调用期 1057→1059、总 1094→1096。两条都由现场 diff 逐条核对过，不是「+2 就对了」。
   //   ui/panel.js 的 `perfTrace.bandCompare` 与 tool-diag 同属**同一命名空间同一成员**，
   //   集合去重后只算一条 —— 这也是为什么「文件改了两处、边只多一条」。
-  A(a.edgesLoad === 63 && a.edgesCall === 1202 && a.edgesAll === 1265 && a.identityOk,
+  // v2.140.0（F1）：engines/noesis.js 尾部真调 WA.registerModule('engines/noesis.js', …)
+  //   （registerModule 由 store 提供）⇒ 装载期边 63 → 64；调用期 1215 不变——
+  //   它读的 store / clock / settingsBus 三个 ns 早在调用期面内，集合去重后不新增边
+  //   （同 v2.124.0 记过的「文件改两处、边只多一条」：边是 (file, ns) 对，不是站点数）。
+  A(a.edgesLoad === 64 && a.edgesCall === 1215 && a.edgesAll === 1279 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -203,11 +211,12 @@ function runAll(A) {
     + ' / __settingsRegs（设置注册槽，全仓同一形态）。合计装载期 +2、调用期 +6、总计 +8 = 实测 8 条，'
     + ' 恒等式 62 + 1191 = 1253。专锁 tests/ensemble-v2138.js 的 N 面另钉「它零 store.transact / 零 store.patch」'
     + '（本门禁的 store 边只算 ns 对，读不出这一层；两条判据互补，不互相代替）。');
-  A(a.edgesLoad >= 20 && a.orderLen === 164,
+  // v2.140.0（F1）：LOAD_ORDER 164 → 165（engines/noesis.js 入序）。
+  A(a.edgesLoad >= 20 && a.orderLen === 165,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
-  A(a.nsProvided === 194 && a.nsLedger === 169 && a.nsRead === 172,
+  A(a.nsProvided === 195 && a.nsLedger === 170 && a.nsRead === 173,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');

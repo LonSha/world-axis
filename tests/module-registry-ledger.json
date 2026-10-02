@@ -1,13 +1,13 @@
 {
- "version": "2.139.0",
- "loadOrderCount": 164,
- "loadedCount": 161,
+ "version": "2.140.0",
+ "loadOrderCount": 165,
+ "loadedCount": 162,
  "uiCount": 3,
- "nsCount": 169,
+ "nsCount": 170,
  "totals": {
-  "loadEdges": 63,
+  "loadEdges": 64,
   "hardEdges": 0,
-  "callRefs": 126,
+  "callRefs": 128,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -59,6 +59,7 @@
     "engines/memory.js",
     "engines/mend.js",
     "engines/motif.js",
+    "engines/noesis.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
     "engines/plan.js",
@@ -243,6 +244,7 @@
     "engines/liaison.js",
     "engines/mend.js",
     "engines/motif.js",
+    "engines/noesis.js",
     "engines/plan.js",
     "engines/polish.js",
     "engines/power-anchor.js",
@@ -2632,6 +2634,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_faction_graph_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/noesis.js": {
+   "ns": [
+    "noesis"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_noesis_settings_v1"
    ],
    "consumedBy": []
   },

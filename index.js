@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.139.0'
+  const VERSION = '2.140.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -498,6 +498,10 @@
     //   且**须早于** readers —— engines/tool-diag.js 与 ui/panel.js 都要读它的现场读数。
     //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
     'engines/faction-graph.js',
+    // v2.140.0（F1）：防全知闸门。装载位置晚于它所聚合的四个知情面真源
+    //   （enigma / intel / rumor / shadow 均在前），且晚于 world（感知半径的真源）。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/noesis.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

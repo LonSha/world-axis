@@ -346,6 +346,25 @@
       };
     });
   }
+  function secNoesis() {
+    return safe(function () {
+      if (!WA.noesis || typeof WA.noesis.boundary !== 'function') return { error: 'engines/noesis.js 未加载（防全知读数缺席）' };
+      const b = WA.noesis.boundary();
+      return {
+        enabled: !!b.enabled, rangeEnabled: !!b.rangeEnabled, timeEnabled: !!b.timeEnabled,
+        maxLeaks: b.maxLeaks,
+        knows: b.knows || 0, allows: b.allows || 0, denies: b.denies || 0,
+        gates: b.gates || 0, scans: b.scans || 0,
+        // leaks 与 scans 必须**分开报**：合成「查过 N 次」之后，就再也答不出
+        //   「是真穿帮多，还是只是扫得勤」（前者要改边界，后者只是用法不同）。
+        leaks: b.leaks || 0,
+        blocked: b.blocked || 0, lastReason: b.lastReason || '', lastAt: b.lastAt || 0,
+        faults: Object.assign({}, b.faults || {}),
+        // 四源在场面：哪个知情面缺席，裁决就少一票——诊断面必须能看出来「现在有几源在把门」。
+        sources: (b.sources || []).map(function (s) { return { key: s.key, loaded: !!s.loaded }; })
+      };
+    });
+  }
   function secLife() {
     return safe(function () {
       if (!WA.life || typeof WA.life.stat !== 'function') return { error: 'life 模块不可用' };
@@ -956,6 +975,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.139.0（E9）：势力关系动态图。登记为**必载**——它读 evolution（档位/状态词表的
     //   单一真源）与 store，缺席就是「关系网读数缺席」，那本身就是断裂，不该被静默兜住。
     'engines/faction-graph.js': 'factionGraph',
+    // v2.140.0（F1）：防全知闸门。登记在此 = 缺席时 secModules 会**如实报 missing**。
+    'engines/noesis.js': 'noesis',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1739,6 +1760,16 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   同 v2.83.0 的规格——必须同时「渲染 + 绑定 + 守卫登记」，否则
     //   「控件渲染了但绑定 id 写错」在新出口上无人发现。
     { page: 'people', ids: ['wa-rec-name', 'wa-rec-view', 'wa-rec-seed', 'wa-rec-out', 'wa-opp-run', 'wa-opp-view'] },
+    // v2.140.0（F1）：防全知闸门九枚（渲染在人物页「防全知闸门」区）。
+    //   同 v2.83.0 / v2.117.0 / v2.121.0 / v2.139.0 的规格——新控件必须
+    //   「渲染 + 绑定 + 守卫登记」三件齐做，否则「按钮渲染了但绑定的 id 写错」
+    //   这一类断裂在新增出口上无人发现。本版实测正是被这条门禁抓出来的：
+    //   `panel 渲染的每个控件都在守卫表内（未覆盖：["wa-noe-enabled",...]）`。
+    //   一律无条件渲染（noesis 是产品文件，缺席本身就是断裂，不降级成提示）。
+    //   wa-noe-out 是输出区（与 wa-rec-out 同规格：它是面板回显，不是控件）。
+    { page: 'people', ids: ['wa-noe-enabled', 'wa-noe-person', 'wa-noe-fact',
+      'wa-noe-knows', 'wa-noe-scan', 'wa-noe-boundary', 'wa-noe-gate', 'wa-noe-perceive',
+      'wa-noe-out'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
@@ -2405,7 +2436,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), intel: secIntel(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), intel: secIntel(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
       //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，

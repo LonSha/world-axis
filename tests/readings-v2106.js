@@ -272,9 +272,33 @@ function runNegative(assert, ctx) {
   assert(p6b.problems.filter(function (p) { return p.kind === 'version-mismatch'; }).length >= 1,
     'N6b 台账 version 是另一只**合法**版本号 ⇒ 仍报 version-mismatch（判的是同源，不是形状）');
 
+  /**
+   * v2.140.0（F1）N7 靶子定位：返回 { tail, last } —— last 是 _note 的**末次**版本词，
+   *   tail 是它在 _note 里的尾段（前 40 字 + 版本词 + 后 20 字，越界即夹到端点）。
+   *   为什么不直接拿 last 做靶：同一版本号在 _note 里可出现多次（基句 + 沿革段收尾），
+   *   而 mutOnce 要求靶恰中 1 次；尾段按定义是文件末尾的那一段，天然唯一。
+   *   不写死本版号（升版后仍成立），也不假设沿革段的收尾形态（两本台账形态本就不同）。
+   */
+  const headAnchor = function (t) {
+    const j = JSON.parse(t);
+    const note = String(j._note || '');
+    const all = note.match(/v\d+\.\d+\.\d+/g) || [];
+    if (!all.length) throw new Error('N7 靶子不存在：_note 里找不到版本词（本台账是否忘了写 _note？）');
+    const last = all[all.length - 1];
+    const at = note.lastIndexOf(last);
+    const tail = note.slice(Math.max(0, at - 40), at + last.length + 20);
+    if (t.split(tail).length - 1 !== 1) throw new Error('N7 靶子不唯一（尾段在文件里出现多次）');
+    return { tail: tail, last: last };
+  };
   // N7 台账 L2 破坏（内存注入）：_note 末次版本词与 version 脱钩
   const b7read = injectLedger('tests/dead-export-ledger.json', function (t) {
-    return mutOnce(t, '（v' + V2106 + ' ·', '（v9.9.9', 'N7');
+    // v2.140.0（F1）：靶子改为**现场取末次版本词的尾段**（headAnchor），不再假设末次词后面跟「 ·」——
+    //   dead-export-ledger 的沿革段由人工按本本先例收尾（末段写「（vX.Y.Z · 本段沿革终）」），
+    //   而 reject-code-ledger 的 _note 压根不以沿革段收尾（末句是散文）。写死一种形态，换本台账
+    //   就静默打空；写死「末次词」本身则不够唯一（它在本文件里可出现多次）。取法：末次词 + 其前后
+    //   共 60 字的**尾段**作为靶（尾段按定义唯一），版本号仍现场取——与 N6/N6b 的 V2106 同一条纪律。
+    const hit7 = headAnchor(t);
+    return mutOnce(t, hit7.tail, hit7.tail.replace(hit7.last, 'v9.9.9'), 'N7');
   });
   const p7 = R.ledgerReport({ read: b7read });
   assert(p7.problems.filter(function (p) { return p.kind === 'note-mismatch'; }).length >= 1,

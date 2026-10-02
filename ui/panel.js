@@ -69,6 +69,10 @@
     //   插在 chrono 行**之前**（而非其后）：chrono 行是 v2.127.0 那条锁的锚点字面量，
     //   改动它会同时触发 anchor-scan 与负控制审计的 not-unique（实测踩过）。
     foreshadow: '伏笔台账',
+    // v2.140.0（F1）：防全知闸门。与 SOURCES 同批登记 —— 只加源表不加显示名 ⇒
+    //   注入页/导演页裸露英文键名 noesis（本版被 v2.22.0 renderDirector 键集判据抓出）。
+    //   插在 chrono 行之前（与 foreshadow 同款理由：chrono 行是 v2.127.0 锚点区）。
+    noesis: '知情边界',
     chrono: '世界编年史' };
 
   // v0.6 新增组件样式注入
@@ -632,6 +636,11 @@
       <div class="wa-row"><input id="wa-intel-person" class="wa-input" placeholder="知情人物"/><input id="wa-intel-claim" class="wa-input" placeholder="情报"/><input id="wa-intel-source" class="wa-input" placeholder="来源"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-intel-link">加因果</button><button class="wa-btn" id="wa-intel-add">加情报</button></div>
       <div id="wa-intel-out" class="wa-out"></div>
+      <div class="wa-sec">防全知闸门（这个人此刻该不该知道这件事）</div>
+      <label class="wa-row"><input id="wa-noe-enabled" type="checkbox" ${WA.noesis && WA.noesis.getSettings().enabled ? 'checked' : ''}/> 启用防全知闸门</label>
+      <div class="wa-row"><input id="wa-noe-person" class="wa-input" placeholder="人物"/><input id="wa-noe-fact" class="wa-input" placeholder="事实 / 秘密名"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-noe-knows" title="裁决：这个人此刻该不该知道这件事。四个归因码分开报——没登记过（not-registered）/登记了但此人不知（not-holder）/人不在场（out-of-range）/时辰未到（premature），合成一个「不知」就答不出是边界没划、人不在场、还是时辰未到">裁决知情</button><button class="wa-btn" id="wa-noe-scan" title="事后泄露扫描：把「人物=秘密名」逐条核，检出有谁说出了它不该知道的事。只留痕不删文——删文是叙事决定，不是引擎决定">泄露扫描</button><button class="wa-btn" id="wa-noe-boundary" title="只读：防全知引擎现场（几个知情面在把门 / 裁决数 / 穿帮留痕数）。穿帮数与扫描数分开报——真穿帮多要改边界，扫得勤只是用法不同">边界读数</button><button class="wa-btn" id="wa-noe-gate" title="生成前闸门：一组人物 × 一组事实，逐条答「哪些人不该知道哪些事」。只报不改正文——自动改写会把作者的笔抢走（与 E11「只报不改」同一条纪律）">生成前闸门</button><button class="wa-btn" id="wa-noe-perceive" title="感知半径：这个人此刻能否感知那个地点发生的事。三态封闭（在场 / 可达 / 不可达），不可达如实报 out-of-range——不回落成可达">感知半径</button></div>
+      <div id="wa-noe-out" class="wa-out"></div>
       <div class="wa-sec">人物生活（目标、承诺、日程）</div>
       <label class="wa-row"><input id="wa-life-enabled" type="checkbox" ${WA.life && WA.life.getSettings().enabled ? 'checked' : ''}/> 启用人物生活</label>
       <div class="wa-row"><input id="wa-life-person" class="wa-input" placeholder="人物"/><input id="wa-life-text" class="wa-input" placeholder="目标、承诺或日程"/></div>
@@ -2589,6 +2598,76 @@
       }; }
     on('#wa-intel-link', () => { if (!WA.intel) return intelOut({ ok: false, reason: 'module-missing' }, true); const effect = intelVal('#wa-intel-effect'); const known = WA.intel.knownCause(intelVal('#wa-intel-cause')); const r = WA.intel.addLink({ cause: intelVal('#wa-intel-cause'), effect: effect }); const ex = r.ok ? WA.intel.explain(effect) : null; intelOut(Object.assign({}, r, { id: r.ok ? (effect + ':' + (known ? 'known' : 'unknown') + ':' + ((ex && ex.causes || []).length)) : r.id }), true); renderBody(); });
     on('#wa-intel-add', () => { if (!WA.intel) return intelOut({ ok: false, reason: 'module-missing' }, true); const person = intelVal('#wa-intel-person'); const r = WA.intel.addIntel(person, { claim: intelVal('#wa-intel-claim'), source: intelVal('#wa-intel-source'), level: 'report', about: intelVal('#wa-intel-effect') }); const seen = r.ok ? WA.intel.visibleTo(person, intelVal('#wa-intel-effect')) : []; intelOut(Object.assign({}, r, { id: r.ok ? (r.status + ':' + seen.length + ':' + ((seen[0] && WA.intel.CONFIDENCE[seen[0].level]) || '')) : r.id }), true); renderBody(); });
+    // v2.140.0（F1）：防全知闸门。三枚控件都是 noesis 的真消费方（裁决 / 扫描 / 读数）。
+    //   口径与引擎同源：只读世界不改世界；泄露扫描只留痕不删文；四码分开报不合并。
+    const noeVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const noeOut = function (text, keep) {
+      if (keep) panelEl.dataset.noeOut = text;
+      const o = $('#wa-noe-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.noeOut) { const saved = $('#wa-noe-out'); if (saved) saved.textContent = panelEl.dataset.noeOut; }
+    { const el = $('#wa-noe-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.noesis) return noeOut('未记录：module-missing', true);
+        WA.noesis.setSettings({ enabled: !!el.checked });
+        noeOut('已记录 ' + (el.checked ? 'enabled' : 'disabled'), true);
+      }; }
+    on('#wa-noe-knows', () => {
+      if (!WA.noesis || !WA.noesis.knows) return noeOut('未记录：module-missing', true);
+      const r = WA.noesis.knows(noeVal('#wa-noe-person'), noeVal('#wa-noe-fact'));
+      if (!r.ok) return noeOut('未记录：' + (r.reason || '未知原因'), true);
+      const verdict = r.known === true ? '知道' : (r.known === false ? '不该知道' : '未登记');
+      noeOut('裁决：' + r.person + ' 「' + r.fact + '」⇒ ' + verdict + '（' + r.reason + '）'
+        + (r.deniedBy && r.deniedBy.length ? ' · 否决源：' + r.deniedBy.join('、') : '')
+        + (r.knownBy && r.knownBy.length ? ' · 知情源：' + r.knownBy.join('、') : ''), true);
+    });
+    on('#wa-noe-scan', () => {
+      if (!WA.noesis || !WA.noesis.leakScan) return noeOut('未记录：module-missing', true);
+      const p = noeVal('#wa-noe-person'), f = noeVal('#wa-noe-fact');
+      if (!p || !f) return noeOut('未记录：missing-fields（人物与秘密名都要填，逐条核）', true);
+      const r = WA.noesis.leakScan([{ person: p, factId: f, uttered: true }]);
+      noeOut(r.count ? ('穿帮留痕 ' + r.count + ' 处：' + r.leaks.map(function (x) { return x.person + ' 说出了「' + x.fact + '」（' + x.reason + '）'; }).join('；') + ' · 只留痕不删文')
+        : '未发现穿帮（' + p + ' 对「' + f + '」的知情边界成立）', true);
+    });
+    on('#wa-noe-boundary', () => {
+      if (!WA.noesis || !WA.noesis.boundary) return noeOut('未记录：module-missing', true);
+      // v2.140.0（F1）：本枚原名「边界读数」——它只读 boundary()，于是**两道辅助闸的开关位
+      //   在面板上完全不可见**：感知半径与时点闸真关还是真开，只能靠引擎读数去猜。现同时
+      //   读 stat() 的设置三态 —— stat 因此有了一个**独立于 boundary 的外部消费方**
+      //   （「无独立消费方不挂导出」是本仓硬纪律；只在 boundary 内部被调用不算外部消费方，
+      //   那正是本版被 dead-export-gate 记为 self-only 的那一项）。
+      const b = WA.noesis.boundary();
+      const st = (typeof WA.noesis.stat === 'function') ? WA.noesis.stat() : {};
+      const on = (b.sources || []).filter(function (s) { return s.loaded; }).map(function (s) { return s.key; });
+      noeOut('防全知：' + (b.enabled ? '开' : '关') + ' · 在把门 ' + on.length + '/4 源（' + (on.join('、') || '无') + '）'
+        + ' · 裁决 ' + b.knows + '（准 ' + b.allows + ' / 否 ' + b.denies + '）· 扫描 ' + b.scans + ' · 穿帮留痕 ' + b.leaks
+        + ' · 闸位：感知半径 ' + (st.rangeEnabled ? '开' : '关') + ' / 时点 ' + (st.timeEnabled ? '开' : '关') + ' / 穿帮上限 ' + st.maxLeaks + ' 条', true);
+    });
+    // v2.140.0（F1）：生成前闸门与感知半径两枚 —— gateScene / perceive 的真消费方。
+    //   同 v2.121.0（P1）的规格：新增导出必须接真消费方（无独立消费方不挂导出，
+    //   只在测试里活的导出不算交付）；UI_BINDINGS 就是这两处消费方的接线真源。
+    //   两者共用上方「人物 / 事实」两个输入框：人物与事实各支持多个（用「、」分隔）。
+    on('#wa-noe-gate', () => {
+      if (!WA.noesis || !WA.noesis.gateScene) return noeOut('未记录：module-missing', true);
+      const ps = noeVal('#wa-noe-person').split(/[\u3001,\uff0c]/).map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+      const fs2 = noeVal('#wa-noe-fact').split(/[\u3001,\uff0c]/).map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+      if (!ps.length || !fs2.length) return noeOut('未记录：missing-fields（人物与事实各填至少一个，多个用「、」分隔）', true);
+      const g = WA.noesis.gateScene(ps, fs2);
+      if (!g.ok) return noeOut('未记录：' + (g.reason || '未知原因'), true);
+      noeOut('生成前闸门：' + g.persons + ' 人 × ' + g.facts + ' 事 ⇒ ' + (g.allow ? '全放行' : ('拦下 ' + g.blocked.length + ' 条'))
+        + (g.blocked.length ? '：' + g.blocked.map(function (x) { return x.person + ' 不该知道「' + x.fact + '」（' + x.reason + '）'; }).join('；') : '')
+        + ' · 只报不改正文', true);
+    });
+    on('#wa-noe-perceive', () => {
+      if (!WA.noesis || !WA.noesis.perceive) return noeOut('未记录：module-missing', true);
+      const p = noeVal('#wa-noe-person'), pid = noeVal('#wa-noe-fact');
+      if (!p || !pid) return noeOut('未记录：missing-fields（人物与地点名都要填）', true);
+      const r = WA.noesis.perceive(p, pid);
+      if (!r.ok) return noeOut('未记录：' + (r.reason || '未知原因'), true);
+      const word = r.range === 'present' ? '在场' : (r.range === 'out' ? '不可达' : '未知');
+      noeOut('感知半径：' + p + ' 对「' + pid + '」⇒ ' + word + (r.reason ? '（' + r.reason + '）' : '')
+        + (r.via ? ' · 依据：' + r.via : ''), true);
+    });
     // v2.52.0：人物生活只写用户明确提交的内容；关闭开关后停止结算与注入。
     const lifeText = function () {
       const person = ($('#wa-life-person') || {}).value || '';
