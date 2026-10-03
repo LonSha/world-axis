@@ -84,7 +84,9 @@ const TIMEOUT_ARMED = {
   //   端到端（~12s），前者要真起 Chromium 跑 9 轮（1 轮原版 + C1/C2/C3/C4 各一轮破坏 + 每轮
   //   还夹一轮原版对照），实测约 60s。预算仍走统一值 96000ms（口径一：统一预算不许逐道紧贴），
   //   但把 raw 实测登记进 GATES 供 coherence() 自洽核对（96000 ≥ 60000×? 见 GATES 条目）。
-  'ui-live-2137': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'ui-live-2137': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.145.0（O23）：实机读数行面调用点（ui-live.js 的 runLive，读 readings.length）。
+  'ui-live-2145': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -129,7 +131,11 @@ const ARMED_SITES = [
     anchor: "const rUG2136 = require('child_process').spawnSync(process.execPath, [path.join('tests', 'ui-gate.js')]," },
   // v2.137.0（O14）：UI 实机验证通道的调用点。登记**锚点**（整行行首片段，run.js 里恰 1 次）。
   { key: 'ui-live-2137', mode: 'spawn',
-    anchor: "const rUL2137 = require('child_process').spawnSync(process.execPath, ['tests/ui-live-v2137.js']," }
+    anchor: "const rUL2137 = require('child_process').spawnSync(process.execPath, ['tests/ui-live-v2137.js']," },
+  // v2.145.0（O23）：实机读数行面调用点（ui-live.js 的 runLive，读 readings.length）。
+  //   上一版登记到 ui-live-2137 为止，本调用点一直在跑却不在表上 —— 全量回归首跑暴露。
+  { key: 'ui-live-2145', mode: 'spawn',
+    anchor: "const rUL2145 = require('child_process').spawnSync(process.execPath, ['-e'," }
 ];
 
 /**
