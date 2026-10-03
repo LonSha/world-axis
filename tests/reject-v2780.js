@@ -3379,6 +3379,118 @@ function runWitness(WA) {
       if (Pv.setSettings) Pv.setSettings({ enabled: keepP.enabled !== false });
     }
   }
+  // ══ v2.148.0（RP1+RP2）：性能台账与磁带仓库暴露的码 ══
+  //   两个新模块的内联字面量里，有五个是**扫描面上此前没有归属**的（`type` 是共享码，
+  //   但本版是它第一次被登记——此前产品面里没有任何一处内联 `reason: 'type'`）。
+  //   五码全部**由真实局面触发**（参数传错 / 源数超限 / 卷版本不同 / 空卷 / 查无此号），
+  //   不是结构上不可达的分支 ⇒ 按台账规矩走见证、不进基线。
+  //   一条边界（本段最要紧的判断）：`tape-version-mismatch`（格式版本不同 ⇒ 不做迁移器）
+  //   与 `bad-tape`（行面读不了）**绝不可合成一个「用不了」** —— 前者是「格式换代了」，
+  //   后者是「这一卷本身坏了」，处置一个是等迁移器、一个是重录，合成即让两者在读数上
+  //   长得一样。
+  {
+    const Pl = WA.perfLedger, Tp = WA.tapeStore;
+    if (Pl && typeof Pl.ingest === 'function') {
+      // ① 参数类型违约：批次级（非对象入参 / 非数轮次）与样本级（负数 ms / 空名）都要如实拒收。
+      //   见证只走**产品导出面**（`ingest` / `stat`）——`record` 是内部实现，
+      //   拿内部口去见证等于测了实现细节而不是契约（上一版见证段就因调 record 而整块静默跳过）。
+      want('type', 'perfLedger 收数口的参数类型违约如实拒收并带 field（批次级与样本级同一码：同一件事不立两本账）（v2.148.0 RP1）');
+      trip('type', function () {
+        const out = [Pl.ingest(null).reason, Pl.ingest('x').reason,
+          Pl.ingest({ 'z': { ms: 5 } }, 'z').reason];   // 批次级三态
+        const t0 = (Pl.stat().skipReasons || {})['type'] || 0;
+        Pl.ingest({ '负一': { ms: -1 } });              // 样本级：负数 → record 拒 → 归因表记 type
+        Pl.ingest({ '': { ms: 5 } });                    // 样本级：空名
+        if (((Pl.stat().skipReasons || {})['type'] || 0) - t0 === 2) out.push('type');
+        return out;
+      });
+      // ② 源数上限：台账是**有界面**，不登记就等于允许它随世界长大而无限膨胀
+      want('source-cap', 'perfLedger 源数超 CAP_KNOWN 时如实拒收（台账是有界面，不许随世界长大而膨胀）（v2.148.0 RP1）');
+      trip('source-cap', function () {
+        const cap = Pl.stat().caps.known;
+        const free = cap - Pl.stat().sources;   // 已存在的源不占新槽
+        for (let i = 0; i < free + 4; i++) Pl.ingest((function () { const o = {}; o['__cap_' + i] = { ms: 1 + i }; return o; })(), i);
+        return ((Pl.stat().skipReasons || {})['source-cap'] || 0) > 0 ? ['source-cap'] : ['no-cap-hit'];
+      });
+    }
+    if (Tp && typeof Tp.save === 'function') {
+      // ③ 格式版本不同 ⇒ 如实拒收（本版不做迁移器），**且不落盘**
+      want('tape-version-mismatch', 'tapeStore.save：卷的 formatVersion 与本仓不同 ⇒ 如实拒收并不落盘（本版不做迁移器；与 bad-tape「这一卷本身坏了」是两回事）（v2.148.0 RP2）');
+      trip('tape-version-mismatch', function () {
+        const before = Tp.list().total;
+        const r = Tp.save({ format: 'worldaxis.rand.tape', formatVersion: 99, seed: 1,
+          rows: [{ c: 'x', v: 1, k: 'd', n: 1, r: null, s: null }] });
+        const after = Tp.list().total;
+        if (!(r.ok === false && r.reason === 'tape-version-mismatch' && after === before)) return [];
+        return [r.reason];
+      });
+      // ④ 空卷拒收：存一卷「零格」等于往仓库里塞一个查不出问题、也用不上的东西
+      want('empty-tape', 'tapeStore.save：rows 为空数组 ⇒ 如实拒收（存一卷零格 = 仓库里多一个既查不出问题也用不上的东西）（v2.148.0 RP2）');
+      trip('empty-tape', function () {
+        const r = Tp.save({ format: 'worldaxis.rand.tape', formatVersion: 1, seed: 1, rows: [] });
+        return [r.reason];
+      });
+      // ⑤ 查无此号：按号取回 / 按号删除都要如实答「没有这一卷」，不静默成功
+      want('no-such-vol', 'tapeStore.load/drop：仓库里没有该 id ⇒ 如实拒答（不静默成功、不返回空卷）（v2.148.0 RP2）');
+      trip('no-such-vol', function () {
+        return [Tp.load('t0_不存在').reason, Tp.drop('t0_不存在').reason];
+      });
+      // ⑤b 同上两口的参数类型违约（与 perfLedger 共用一个 `type` 码：同一件事不立两本账）
+      want('type', 'perfLedger 收数口与 record 的参数类型违约如实拒收并带 field（v2.148.0 RP1）');
+      trip('type', function () {
+        return [Tp.load(123).reason, Tp.drop(null).reason];
+      });
+    }
+  }
+  // ══ v2.150.0（RP4）：注入价值评估暴露的四个拒答码 ══
+  //   四码**全部由真实局面触发**（空观测 / 无待结算读数 / 正文过短 / 轮次不符），
+  //   不是结构上不可达的分支 ⇒ 按台账规矩走见证、**不进基线**。
+  //   一条边界（本段最要紧的判断）：四码绝不可合成一个「没结算」——
+  //     「cafe没收到注入」（empty-observation）、「这一轮压根没观察过」（no-reading）、
+  //     「正文太短量不出来」（text-too-short）、「拿到的是别的轮的正文」（stale-round）
+  //     四种处置互不相同：前三者分别要改注入面 / 等下一轮 / 等正文长起来，后者是程序顺序事。
+  //   另一条如实边界：本模块的 stale-round 判定以 `store.lastInjection.round` 为当前轮真源（与
+  //     render/inject.js 同源），`currentRound()` 读不到时返 0；而 0 在判据里是假值
+  //     ⇒ 那一格下**不做比对**（宁可放行不可误报）。故见证必须先把
+  //     `lastInjection.round` 置成真值，再用**显式轮次**观察，两边才会真比。
+  {
+    const Iv = WA.injectValue;
+    if (Iv && typeof Iv.settle === 'function' && typeof Iv.observe === 'function') {
+      const LONG = '北方大军压境的传闻，街上立刻安静了下来，BloodHand 的旗子升起。';
+      const prevOn = (typeof Iv.getSettings === 'function' ? Iv.getSettings() : {}).enabled;
+      if (Iv.setSettings) Iv.setSettings({ enabled: true });   // 关着的话四码全被 disabled 抢先
+      // ① 参数类型违约（两端口）
+      //   type 是共享码（perfLedger 段 v2.148.0 已登记），本段**重申声**以标明本模块的触发面：
+      //   声明面重复计数会 +1（带字段 field），该计数无判据拦截（读数在 v2.107.0 段当场打出）。
+      want('type', 'injectValue 观察口（items 非数组）与结算口（text 非字符串）的参数类型违约如实拒收并带 field（v2.150.0 RP4）');
+      trip('type', function () {
+        return [Iv.observe(null).reason, Iv.observe({}).reason, Iv.settle(123).reason, Iv.settle(null).reason];
+      });
+      // ② 空观测：观察面在场（items 是数组）但这一轮零源
+      want('empty-observation', 'injectValue.settle：本轮观察到的源数为 0 ⇒ 如实拒答（不把「没收到东西」判成「都没被引用」）（v2.150.0 RP4）');
+      trip('empty-observation', function () {
+        Iv.observe({ round: 0, items: [] });
+        return [Iv.settle(LONG).reason];
+      });
+      // ③ 无待结算读数：上一笔已被消费（此刻 _pending 为空）
+      want('no-reading', 'injectValue.settle：没有待结算的观察 ⇒ 如实拒答（不拿别的轮次凑数）（v2.150.0 RP4）');
+      trip('no-reading', function () { return [Iv.settle(LONG).reason]; });
+      // ④ 正文过短：空读数不当判据
+      want('text-too-short', 'injectValue.settle：正文短于下限 ⇒ 如实拒答（空读数不是「零引用」）（v2.150.0 RP4）');
+      trip('text-too-short', function () {
+        Iv.observe({ round: 0, items: [{ source: '仇敌', content: '北方大军压境 BloodHand 盘踞城东' }] });
+        return [Iv.settle('短').reason];
+      });
+      // ⑤ 轮次不符：先把当前轮置成真值 9，再用显式轮次 5 观察 ⇒ 两边才会真比
+      want('stale-round', 'injectValue.settle：观察轮次与当前轮次不符 ⇒ 如实拒答（拿别的轮的正文凑数会让每轮读数都不成立）（v2.150.0 RP4）');
+      trip('stale-round', function () {
+        WA.store.transact(function (d) { d.lastInjection = { round: 9, len: 0, sources: [] }; });
+        Iv.observe({ round: 5, items: [{ source: '仇敌', content: '北方大军压境' }] });
+        return [Iv.settle(LONG).reason];
+      });
+      if (Iv.setSettings) Iv.setSettings({ enabled: prevOn !== false });
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

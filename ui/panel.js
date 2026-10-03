@@ -81,6 +81,11 @@
     //   inject-sources-v2560 的 D 判据当场抓出）。插在 chrono 行之前（与 foreshadow /
     //   noesis 同款理由：chrono 行是 v2.127.0 锚点区，改动它会触发 anchor-scan not-unique）。
     perspective: '视角锁',
+    // v2.149.0（X1）：世界沉积层。与 SOURCES 同批登记 —— 只加源表不加显示名 ⇒
+    //   注入页/导演页裸露英文键名 sediment，而那是用户唯一能开关它的地方
+    //   （同 v2.56.0 / v2.96.0 / v2.117.0 / v2.142.0 的理由）。插在 chrono 行之前
+    //   （chrono 行是 v2.127.0 那条锁的锚点字面量，改动它会触发 anchor-scan not-unique）。
+    sediment: '此地沉积',
     chrono: '世界编年史' };
 
   // v0.6 新增组件样式注入
@@ -107,6 +112,10 @@
     { id: 'enemies', icon: '⚔️', label: '仇敌' },
     { id: 'parallel', icon: '🌀', label: '平行世界' },
     { id: 'inject', icon: '💉', label: '注入' },
+    // v2.149.0（X1）：世界沉积层。**插在 inject 之后而非 world 之后**：pages[3..6]
+    //   是 v2.33.0/v2.34.0 两条硬读数（memory/enemies/parallel/inject）锚定的位置，
+    //   插在 people 之后会把它们整体后移一位，那是与本次改动无关的读数抖动。
+    { id: 'sediment', icon: '⛰', label: '沉积' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -475,7 +484,38 @@
           + '<span class="wa-dim">（被拦下的删除一个字节都没碰存储）</span></div>');
       }
     } catch (e) { out.push('<div class="wa-kv">删除闸门：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
-    return '<div class="wa-card"><div class="wa-card-h">引擎心跳（三源聚合 · 只读）</div>'
+    // ④ 性能在不在慢下来（perfLedger.trend —— 纯读内存台账，不计时、不落盘）
+    //   v2.148.0（RP1）：三源答「在不在转」，第四源答「一直在变慢吗」——
+    //   本轮 3ms 与 200 轮前的 3ms 长得一样，但斜率知道区别。
+    try {
+      const pl = (WA.perfLedger && typeof WA.perfLedger.trend === 'function') ? WA.perfLedger.trend() : null;
+      if (!pl) {
+        out.push('<div class="wa-dim">④ 性能趋势：perf-ledger 未加载（性能历史台账缺席）</div>');
+      } else if (!pl.ok) {
+        out.push('<div class="wa-dim">④ 性能趋势：' + esc(pl.reason || 'unknown') + '</div>');
+      } else {
+        const st = WA.perfLedger.stat();
+        const top = pl.rows.length ? pl.rows[0] : null;
+        // 退场归因行（只在真退过东西时出现）：只报「N 源在记」会盖掉「有样本被退」，
+        //   而「退得多」才是要查的信号——源数超限该调容量，参数违约该修生产方。
+        const sr = st.skipReasons || {};
+        const srKeys = Object.keys(sr).filter(function (k) { return sr[k] > 0; });
+        out.push('<div>④ 性能趋势：<b>' + st.sources + '</b> 源在记 · ' + st.recorded + ' 样本 · '
+          + (pl.degrading > 0
+            ? ('<b class="wa-warn">' + pl.degrading + ' 个源在劣化</b>（斜率 &gt; 阈值）——最陡：' + esc(top.source) + ' ' + top.slope + 'ms/样本')
+            : '零劣化源（所有源斜率 ≤ 阈值或样本不足）')
+          + '</div>');
+        if (srKeys.length) {
+          out.push('<div class="wa-kv wa-dim">④b 未入账归因：'
+            + srKeys.sort(function (a2, b2) { return sr[b2] - sr[a2]; })
+              .map(function (k) { return esc(k) + ' ×' + sr[k]; }).join(' · ')
+            + '</div>');
+        }
+      }
+    } catch (e) {
+      out.push('<div class="wa-dim">④ 性能趋势：读取抛错（' + esc(String(e && e.message || e)) + '）</div>');
+    }
+    return '<div class="wa-card"><div class="wa-card-h">引擎心跳（四源聚合 · 只读）</div>'
       + out.join('')
       + '<div class="wa-hint">三行分别答：<b>世界链在不在走</b>（因果链条数与状态）、'
       + '<b>本轮注入在不在转</b>（耗时与局部重算）、<b>基准够不够判</b>（四档结构是否在场）。<br>'
@@ -495,7 +535,7 @@
         <div class="wa-stat"><div class="wa-stat-v">${s.evolution.round}</div><div class="wa-stat-k">演化回合</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${beforeN}+${afterN}</div><div class="wa-stat-k">工作流节点</div></div>
       </div>
-      ${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}
+      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}</div>
       <div class="wa-sec">工作流节点开关</div>
       <div class="wa-node-list">${nodes.map(n => `
         <label class="wa-node">
@@ -1366,6 +1406,12 @@
     const vis = (function () { try { return WA.render.getVisibility(); } catch (e) { return {}; } })();
     const SOURCES = (WA.render && WA.render.SOURCES) || [];
     const NAMES = VIS_NAMES;   // v2.51.0: 单一真源（此前是本函数内的局部手写表，与导演页各一份）
+    // v2.150.0(RP4): 注入价值三枚控件的当前值。取不到时按模块 DEF 兜底（渲染不因模块缺席而消失：
+    //   控件在场而模块不在 ⇒ 点下去会如实报 module-missing，比「控件凭空不见」可诊断）。
+    const ivCfg = (function () {
+      try { return (WA.injectValue && WA.injectValue.getSettings) ? WA.injectValue.getSettings() : { enabled: true, zeroRefRounds: 3, maxKeys: 12 }; }
+      catch (e) { return { enabled: true, zeroRefRounds: 3, maxKeys: 12 }; }
+    })();
     let out = '';
     out += '<div class="wa-sec">本轮注入落地<span class="wa-dim">（世界状态到底进没进最终 prompt）</span></div>';
     out += (function () {
@@ -1737,21 +1783,69 @@
       + '<button class="wa-btn" id="wa-ka-eval" title="只算不写：立刻重算三态并打印本回合会注入的块">试算</button>'
       + '<button class="wa-btn" id="wa-ka-clear" title="清空全部派生量与规则（不改世界状态）">清空</button></div>'
       + '<div id="wa-ka-out" class="wa-out"></div>';
-    out += '<div class="wa-sec">注入自检</div>'
+    out += '<div data-omniscient><div class="wa-sec">注入自检</div>'
       + '<div class="wa-row"><button class="wa-btn" id="wa-inj-refresh" title="重新读取当前注入快照（只读，不改变任何状态）">刷新快照</button>'
       + '<button class="wa-btn" id="wa-inj-explain" title="本轮为何这样：只报“进了什么”与“还有几项没进”（玩家视图）；逐项原因属制作者视图">本轮解释</button>'
       + '<button class="wa-btn" id="wa-inj-explain-all" title="逐源列名 + 归因码（可见性关 / 模块缺席 / 构建失败 / 本轮无内容），供制作者定位">全知面明细</button>'
       + '<button class="wa-btn" id="wa-inj-face" title="开关两面真值：只报「可见性勾着、模块总开关却关着」的源——那些源本轮一个字节都进不来">开关两面</button>'
       + '<button class="wa-btn" id="wa-inj-diag" title="跳转工具页运行完整自检">去自检</button></div>'
-      + '<div id="wa-inj-out" class="wa-out"></div>';
+      + '<div id="wa-inj-out" class="wa-out"></div>'
+      // v2.150.0(RP4): 注入价值段 —— 「预算告诉你花掉了，价值告诉你有没有白花」。
+      //   三条口径必须写在用户看得见的地方，否则这张榜单会被读成「AI 觉得这个源不好」：
+      //     ① 引用率 ≠ 采纳率（提到了不等于这笔状态被吸收）；② 跨源通用片段不算数
+      //     （每条源都有的句子命中了也说明不了任何关于这个源的事）；③ 算不出来 ≠ 算出来是 0。
+      + '<div class="wa-sec">注入价值<span class="wa-dim">（注入进去的东西有没有被正文用上）</span></div>'
+      + '<div class="wa-dim">只读评估：它不改注入、不改世界、不评判生成质量。排序按 <b>排除跨源通用片段后的引用率</b>升序 —— 最没用的排在最前（这张表是给「处置」用的，不是给「表彰」用的）。连击指「最近连续 N 轮一次都没被引用」。</div>'
+      + '<div class="wa-row"><button class="wa-btn" id="wa-iv-refresh" title="按当前台账重算榜单（只读，不改变任何状态）">刷新榜单</button></div>'
+      + '<label class="wa-row"><input id="wa-iv-enabled" type="checkbox" ' + (ivCfg.enabled ? 'checked' : '') + '/> 启用注入价值评估（纯只读：关掉之后读数恒空，不是「都没用上」）</label>'
+      + '<div class="wa-row"><input id="wa-iv-zero" class="wa-input wa-num" value="' + ivCfg.zeroRefRounds + '" aria-label="零引用连击阈值"/> 连续零引用阈值（1–20 轮）'
+      + '<input id="wa-iv-max" class="wa-input wa-num" value="' + ivCfg.maxKeys + '" aria-label="每源片段上限"/> 每源片段上限（4–48）</div>'
+      + '</div>';   // v2.149.0（P3）：注入自检段（制作者面）的 data-omniscient 收口
     return out;
   }
+
+
+  // ── v2.149.0（X1）：世界沉积层 ─────────────────────────────────────────
+  //   治的病：「这地方发生过什么」在引擎里只有一张**当下**的事实表（worldFacts），
+  //   事实一旦过期就什么都不剩 —— 玩家走过一条街，看不出这里打过仗、这里死过人、
+  //   这里曾经是刑场。本模块让地点**自己记得**：痕迹按档沉积（隐约可见 / 清晰可辨 /
+  //   遍地残骸），随时间**只降档、不消失**（降到传说档即永驻）。
+  //
+  //   面板三条纪律（与既有各模块同款）：
+  //     · 总开关走模块自己的 settings（worldaxis_sediment_settings_v1）。关闭时
+  //       不记录、不注入 —— 但既有痕迹仍在存档里：「不再注入」与「抹掉了历史」是两件事。
+  //     · 每条读数的**拒绝理由**必须看得见：缺地点 / 缺键 / 痕迹档表外 —— 三个码分开报。
+  //       合成一个「没记上」之后，用户答不出是没填地点、没填键，还是档位写错了。
+  //     · 只读出口（读此地 / 台账 / 块预览）不写任何状态；「登记」是本模块唯一的写口。
+  function renderSediment() {
+    const cfg = (WA.sediment && WA.sediment.getSettings) ? WA.sediment.getSettings() : null;
+    const en = !!(cfg && cfg.enabled);
+    const traces = (WA.sediment && WA.sediment.TRACES) || ['minor', 'marked', 'scar'];
+    const labels = (WA.sediment && WA.sediment.LABEL) || {};
+    const opt = function (t) {
+      return '<option value="' + t + '"' + (t === 'marked' ? ' selected' : '') + '>' + esc(labels[t] || t) + '</option>';
+    };
+    return `
+      <div class="wa-sec">世界沉积层（此地的历史痕迹）</div>
+      <div class="wa-dim">痕迹是「这个地方发生过什么」，不是「谁此刻在场」。三档 <b>隐约可见 / 清晰可辨 / 遍地残骸</b>，
+        随时间只降档、<b>不消失</b>（降到传说档即永驻）——「这里曾经遍地残骸」是事实，不因为后来有人扫了地就假装没发生过。</div>
+      <label class="wa-row"><input id="wa-sed-enabled" type="checkbox" ${en ? 'checked' : ''}/> 启用世界沉积层</label>
+      <div class="wa-row"><input id="wa-sed-place" class="wa-input" placeholder="地点（不填 = 此刻所在的场景）"/><select id="wa-sed-trace" class="wa-input wa-w60" aria-label="痕迹档（隐约可见/清晰可辨/遍地残骸）">${traces.map(opt).join('')}</select></div>
+      <div class="wa-row"><input id="wa-sed-key" class="wa-input" placeholder="事实键（同一地点同一键只记一次）"/><input id="wa-sed-text" class="wa-input" placeholder="痕迹描述（如「墙根下还留着弹孔」）"/></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-sed-settle" title="登记一条痕迹。**这是本模块唯一的写口** —— 痕迹只能被登记，不能被推断。同一地点同一键重复登记只刷新痕迹与时间，且痕迹**只升不降**（后来者不许把「遍地残骸」降回「隐约可见」）">登记痕迹</button><button class="wa-btn" id="wa-sed-feel" title="读此地（只读）：列出此处全部痕迹与**当前**档位。衰减是现算的、不写回字段 —— 写回即第二真源。查不到就说查不到，不回落成「这里什么都没有发生过」">读此地</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-sed-block" title="注入块预览（只读）：把此刻会递进正文的那一段原样打出来。传说档不进块（它已是最久远的底噪，再占预算就挤掉了近事）">注入块预览</button><button class="wa-btn" id="wa-sed-stat" title="只读：沉积台账（几处地方 / 几条痕迹 / 几条已降到传说档 / 三容器上限）。空集如实报 0，不编造">台账读数</button></div>
+      <div id="wa-sed-out" class="wa-out"></div>`;
+}
 
   function renderDirector() {
     const vis = WA.render.getVisibility();
     const plan = WA.oracle.plan;
     const activeThemes = (WA.theme && typeof WA.theme.statView === 'function') ? (WA.theme.statView().themes || []) : [];
-    return `
+    // v2.149.0（P3）：导演页整页是**制作者面**（注入可见性枚举、题材组合、剧情引导、
+    //   AI 参谋、因果工作台、磁带仓库）—— 没有一件是「玩家该看到的」。整页挂在
+    //   一个 data-omniscient 容器下，玩家视角下整页摘除（而不是逐控件标记 60 次：
+    //   逐控件标记的失效模式是「新增控件时忘了标记」，而整页标记的失效模式是零）。
+    return `<div data-omniscient>
       <div class="wa-sec">注入可见性（哪些世界信息递给正文）</div>
       ${WA.render.SOURCES.map(k => `<label class="wa-node"><input type="checkbox" data-vis="${k}" ${vis[k] ? 'checked' : ''}/><span class="wa-node-label">${VIS_NAMES[k] || k}</span></label>`).join('')}
       <div class="wa-sec">题材规则组合（B7）</div>
@@ -1785,8 +1879,12 @@
       <div class="wa-row"><input id="wa-cw-id" class="wa-input" placeholder="链 id"/><input id="wa-cw-act" class="wa-input" placeholder="动作 advance/cancel/settle"/><button class="wa-btn" id="wa-cw-intervene" title="先预览「做这个动作会变成什么」，允许与否都给原因码，零副作用">干预预览</button></div>
       <div class="wa-row">      <button class="wa-btn" id="wa-cw-vol" title="导出最近一卷磁带（纯读：不丢卷、不清留存、不改计数）——上一节会话那一轮凭什么，只有把它带出去才答得上">导出磁带</button><button class="wa-btn" id="wa-cw-vol-check" title="核对一卷从别处拿来的磁带（值链 + 位置链），零状态触碰：不装卷、不推进、不改当前模式">带外核对</button></div>
       <textarea id="wa-cw-vol-text" class="wa-ta" placeholder="把一卷磁带（JSON）粘在这里再点「带外核对」——上一节会话导出的那种。本侧无卷时照实说「先导出一卷」，不假装核对过"></textarea>
+      <div class="wa-sec">磁带仓库（跨会话持久 · 环形 20 卷）</div>
+      <div class="wa-row"><button class="wa-btn" id="wa-cw-store-save" title="把导出框里那卷磁带存入仓库（localStorage 持久，跨会话可取回）——保存是显式动作，机制不替你决定哪一卷值得留">存入仓库</button><button class="wa-btn" id="wa-cw-store-list" title="列出仓库里的全部卷（只读）">仓库清单</button><button class="wa-btn" id="wa-cw-store-load" title="按 id 取回一卷还原为可回放磁带对象（纯读，不自动进回放）">按号取回</button><button class="wa-btn" id="wa-cw-store-drop" title="显式删一卷（破坏性，确认后执行）">删除一卷</button></div>
+      <input id="wa-cw-store-id" class="wa-input" placeholder="卷 id（如 t1730000000000_1）——取回 / 删除都按这个号"/>
+      <div id="wa-cw-store-out" class="wa-out"></div>
       <div id="wa-cw-out" class="wa-out"></div>
-      <div id="wa-choices-out" class="wa-out"></div>`;
+      <div id="wa-choices-out" class="wa-out"></div></div>`;
   }
 
   function renderConnect() {
@@ -1908,7 +2006,7 @@
       <div class="wa-logbox">${src.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -1934,6 +2032,15 @@
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
     body.innerHTML = RENDERERS[currentPage]();
+    // ── v2.149.0（P3）：观测视角过滤**必须挂在重绘出口上** ──
+    //   为什么不挂在 bindBody 里、也不逐页手动调：面板每次重绘都整块重建 DOM
+    //   （`body.innerHTML = …`），于是上一次过滤的结果**一并被抹掉** —— 挂在重绘出口上
+    //   是唯一能保证「过滤结果与渲染结果同寿」的位置。逐页调用会漏页：新增一页时
+    //   没人记得补，而那一页在玩家视角下就是全知数据直接外泄（静默、不报错）。
+    //   摘除是**DOM 层**的（不是 CSS 隐藏）：CSS 隐藏的数据仍在 DOM 里可读。
+    try {
+      if (WA.perspective && typeof WA.perspective.applyView === 'function') WA.perspective.applyView(mainDoc);
+    } catch (e) { if (WA.log) WA.log('warn', '观测视角过滤失败', e); }
     bindBody();
   }
 
@@ -2200,6 +2307,53 @@
         + '<div class="wa-dim">' + valLine + '</div>'
         + '<div class="wa-dim">' + scopeLine + '</div>'
         + '</div>');
+    });
+    // v2.148.0（RP2）：磁带仓库四口——面板是真消费方。「存入」读导出框里的卷（JSON），
+    //   不重新导出（重新导出 = 对同一对象做第二次取证动作）；「取回」只还原对象，
+    //   不自动进回放（回放是因果页「回放」按钮的既有职责）。
+    on('#wa-cw-store-save', () => {
+      const out = $('#wa-cw-store-out'); const setStoreOut = (h) => { if (out) out.innerHTML = h; };
+      if (!WA.tapeStore || typeof WA.tapeStore.save !== 'function') { setStoreOut('<div class="wa-dim">磁带仓库未加载</div>'); return; }
+      const t = $('#wa-cw-vol-text');
+      const raw = t ? (t.value || '').trim() : '';
+      if (!raw) { setStoreOut('<div class="wa-dim">存入仓库：导出框为空——先点「导出磁带」把当前卷带出来，或粘贴一卷 JSON</div>'); return; }
+      let vol = null;
+      try { vol = JSON.parse(raw); } catch (e) { setStoreOut('<div class="wa-dim">存入仓库：JSON 解析失败（' + esc(String(e && e.message || e)) + '）</div>'); return; }
+      const r = WA.tapeStore.save(vol);
+      if (!r || !r.ok) { setStoreOut('<div class="wa-dim">存入仓库：' + esc((r && r.reason) || 'unknown') + (r && r.reason === 'tape-version-mismatch' ? '（卷的格式版本与本仓不同——本版不做迁移器，如实拒收）' : '') + '</div>'); return; }
+      setStoreOut('<div>已存入：' + esc(r.id) + ' · ' + r.entries + ' 格' + (r.evicted && r.evicted.length ? ' · 回收最旧 ' + r.evicted.length + ' 卷' : '') + '</div>');
+    });
+    on('#wa-cw-store-list', () => {
+      const out = $('#wa-cw-store-out'); const setStoreOut = (h) => { if (out) out.innerHTML = h; };
+      if (!WA.tapeStore || typeof WA.tapeStore.list !== 'function') { setStoreOut('<div class="wa-dim">磁带仓库未加载</div>'); return; }
+      const li = WA.tapeStore.list();
+      if (!li || !li.ok) { setStoreOut('<div class="wa-dim">仓库清单：' + esc((li && li.reason) || 'unknown') + '</div>'); return; }
+      if (!li.rows.length) { setStoreOut('<div class="wa-dim">仓库为空——存入第一卷后这里会有清单</div>'); return; }
+      setStoreOut('<div>' + li.rows.map((r) => ('<div class="wa-dim">' + esc(r.id) + ' · seed=' + (r.seed === null || r.seed === undefined ? '无' : r.seed) + ' · ' + r.entries + ' 格 · ' + new Date(r.savedAt).toLocaleString() + '</div>')).join('') + '</div>');
+    });
+    on('#wa-cw-store-load', () => {
+      const out = $('#wa-cw-store-out'); const setStoreOut = (h) => { if (out) out.innerHTML = h; };
+      if (!WA.tapeStore || typeof WA.tapeStore.load !== 'function') { setStoreOut('<div class="wa-dim">磁带仓库未加载</div>'); return; }
+      const idIn = $('#wa-cw-store-id');
+      const id = idIn ? (idIn.value || '').trim() : '';
+      if (!id) { setStoreOut('<div class="wa-dim">按号取回：先填卷 id（点「仓库清单」可查看全部 id）</div>'); return; }
+      const r = WA.tapeStore.load(id);
+      if (!r || !r.ok) { setStoreOut('<div class="wa-dim">按号取回：' + esc((r && r.reason) || 'unknown') + '</div>'); return; }
+      // 取回结果写回导出框（与「带外核对」共用输入面），回放走因果页既有「回放」路径
+      const t = $('#wa-cw-vol-text');
+      if (t) t.value = JSON.stringify({ format: 'worldaxis.rand.tape', formatVersion: 1, seed: r.tape.seed, rows: r.tape.entries.map((e) => ({ c: e.c, v: e.v, k: e.k, n: e.n, r: e.r, s: e.s })) });
+      setStoreOut('<div>已取回 ' + esc(id) + '：' + r.tape.entries.length + ' 格已写回导出框——要回放请点上方「回放」相关入口</div>');
+    });
+    on('#wa-cw-store-drop', () => {
+      const out = $('#wa-cw-store-out'); const setStoreOut = (h) => { if (out) out.innerHTML = h; };
+      if (!WA.tapeStore || typeof WA.tapeStore.drop !== 'function') { setStoreOut('<div class="wa-dim">磁带仓库未加载</div>'); return; }
+      const idIn = $('#wa-cw-store-id');
+      const id = idIn ? (idIn.value || '').trim() : '';
+      if (!id) { setStoreOut('<div class="wa-dim">删除一卷：先填卷 id</div>'); return; }
+      if (!window.confirm('删除卷 ' + id + '？此操作不可逆。')) { setStoreOut('<div class="wa-dim">已取消</div>'); return; }
+      const r = WA.tapeStore.drop(id);
+      if (!r || !r.ok) { setStoreOut('<div class="wa-dim">删除一卷：' + esc((r && r.reason) || 'unknown') + '</div>'); return; }
+      setStoreOut('<div>已删除 ' + esc(id) + '</div>');
     });
     on('#wa-cw-intervene', () => {
       if (!WA.causal) return;
@@ -2916,6 +3070,57 @@
         WA.life.setSettings({ enabled: !!el.checked });
         lifeOut({ ok: true, id: el.checked ? 'enabled' : 'disabled' }, true);
       }; }
+    // ── v2.149.0（X1）：世界沉积层。五枚出口各自对上一个真出口 ——
+    //   控件与 handler 同批（只加控件不加 handler = 点了没反应；只加 handler 不加控件 = 死代码）。
+    //   拒绝理由**分开报**：缺地点（missing-fields）/ 缺键（missing-fields+field）/ 档位表外
+    //   （bad-value+allowed）——合成一个「没记上」之后，用户答不出到底哪一项没填对。
+    const sedVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const sedOut = function (text, keep) {
+      if (keep) panelEl.dataset.sedOut = text;
+      const o = $('#wa-sed-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.sedOut) { const saved = $('#wa-sed-out'); if (saved) saved.textContent = panelEl.dataset.sedOut; }
+    const sedErr = function (r) {
+      return '未记录：' + (r.reason || '未知原因')
+        + (r.field ? '（' + r.field + '）' : '')
+        + (r.allowed ? '（可选痕迹档：' + r.allowed.join('/') + '）' : '');
+    };
+    { const el = $('#wa-sed-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.sediment || !WA.sediment.setSettings) return sedOut('未记录：module-missing', true);
+        WA.sediment.setSettings({ enabled: !!el.checked });
+        // 「不再注入」与「抹掉了历史」是两件事：关掉之后既有痕迹仍在存档里，明说。
+        sedOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（既有痕迹保留在存档里，只是不再进正文）'), true);
+      };
+    }
+    on('#wa-sed-settle', () => {
+      if (!WA.sediment || !WA.sediment.settle) return sedOut('未记录：module-missing', true);
+      const r = WA.sediment.settle(sedVal('#wa-sed-place'), { key: sedVal('#wa-sed-key'), text: sedVal('#wa-sed-text'), trace: sedVal('#wa-sed-trace') });
+      if (!r.ok) return sedOut(sedErr(r), true);
+      sedOut('已登记 ' + r.place + ' · ' + r.key + ' ⇒ ' + r.trace + (r.updated ? '（同键更新：痕迹只升不降）' : '（新增）') + '，此处共 ' + r.size + ' 条', true);
+    });
+    on('#wa-sed-feel', () => {
+      if (!WA.sediment || !WA.sediment.feel) return sedOut('未记录：module-missing', true);
+      const r = WA.sediment.feel(sedVal('#wa-sed-place'));
+      if (!r.ok) return sedOut(sedErr(r), true);
+      // absent 与「空列表」分开：查不到就说查不到，不回落成「这里什么都没发生过」。
+      if (r.absent) return sedOut('此处：未记录（' + r.place + ' 没有任何痕迹 —— 「查不到」不是「什么都没有发生过」）', true);
+      sedOut('此处 ' + r.place + '：共 ' + r.count + ' 条，当前最强 ' + (r.peak || '无') + '｜'
+        + r.rows.map(function (x) { return x.label + '·' + (x.text || x.key) + (x.faded ? '（已淡）' : ''); }).join('；'), true);
+    });
+    on('#wa-sed-block', () => {
+      if (!WA.sediment || !WA.sediment.buildBlock) return sedOut('未记录：module-missing', true);
+      const t = WA.sediment.buildBlock(sedVal('#wa-sed-place'));
+      sedOut(t ? t : '本轮不进正文（关闭 / 无地点 / 此处无痕迹 / 只剩传说档 —— 四种局面都可能是空块）', true);
+    });
+    on('#wa-sed-stat', () => {
+      if (!WA.sediment || !WA.sediment.stat) return sedOut('未记录：module-missing', true);
+      const s = WA.sediment.stat();
+      const c = s.caps || {};
+      sedOut('沉积台账：' + (s.enabled ? '开' : '关') + '｜地方 ' + s.places + '/' + c.places
+        + ' · 痕迹 ' + s.events + '/' + c.events + '（总上限 ' + c.total + '）'
+        + ' · 已降到传说档 ' + s.legends + ' 条｜登记 ' + s.settled + ' 次 / 读 ' + s.feels + ' 次 / 出块 ' + s.blocks + ' 次', true);
+    });
     on('#wa-life-goal', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addGoal(x.person, { text: x.text }), true); renderBody(); });
     on('#wa-life-promise', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addCommitment(x.person, { kind: 'promise', target: '玩家', text: x.text }), true); renderBody(); });
     on('#wa-life-schedule', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); lifeOut(WA.life.addSchedule(x.person, { activity: x.text, start: now, end: now + 3600000 }), true); renderBody(); });
@@ -5851,6 +6056,42 @@
         + off.map((r) => '  · ' + r.name + '（' + r.key + '）—— ' + r.note).join('\n')
         + '\n这些源本轮一个字节都不会进正文；要让它们生效请开对应模块。');
     });
+    // ── v2.150.0(RP4)：注入价值。三枚控件 + 一枚只读出口，与引擎的读/写两口逐一对应 ——
+    //   只加控件不加 handler = 点了没反应；只加 handler 不加控件 = 死代码（与 sediment 同规）。
+    //   阈值/上限走**同一个写口** setSettings（settingsBus.saveOrThrow：写后读回校验、失败分桶），
+    //   故这里按返回的 r.ok 如实报「未落盘」——不吞掉写失败（吞了就成了「点了像成功」）。
+    const ivWrite = function (patch) {
+      if (!WA.injectValue || !WA.injectValue.setSettings) return '未落盘：module-missing';
+      let r = null;
+      try { r = WA.injectValue.setSettings(patch); } catch (e) { return '未落盘：' + String((e && e.message) || e); }
+      if (!r || r.ok !== true) return '未落盘：' + ((r && r.reason) || 'write-failed');
+      const cfg = WA.injectValue.getSettings();
+      return '已落盘：零引用阈值 ' + cfg.zeroRefRounds + ' 轮 · 片段上限 ' + cfg.maxKeys + (cfg.enabled ? '（评估开）' : '（评估关）');
+    };
+    const ivRows = function (rep) {
+      if (!rep || !rep.ok) return '（读数不可用：' + ((rep && rep.reason) || 'unknown') + '）';
+      if (!rep.rows.length) return '还没有已结算的轮次（读数空不等于「都没用上」）。';
+      const lines = ['已结算 ' + rep.rounds + '/' + rep.cap + ' 轮｜标注阈值 ' + rep.zeroRefRounds + ' 轮连续零引用'];
+      if (rep.flagged.length) lines.push('该处置（连续零引用）：' + rep.flagged.join('、'));
+      rep.rows.forEach(function (r) {
+        lines.push('  · ' + r.source + '：独有引用 ' + (r.refDistinctAvg == null ? '无读数' : r.refDistinctAvg + ' 处/轮')
+          + '｜采纳 ' + (r.adoptAvg == null ? '无读数' : r.adoptAvg + ' 条/轮')
+          + '｜连击 ' + r.zeroStreak + ' 轮｜判定 ' + r.rounds + ' 轮（最近第 ' + r.lastRound + ' 轮）'
+          + (r.code ? '｜' + r.code : ''));
+      });
+      if (rep.note) lines.push(rep.note);
+      return lines.join('\n');
+    };
+    on('#wa-iv-refresh', () => {
+      const rep = (WA.injectValue && WA.injectValue.report) ? WA.injectValue.report() : null;
+      setOut('#wa-inj-out', ivRows(rep));
+    });
+    { const el = $('#wa-iv-enabled');
+      if (el) el.onchange = function () { setOut('#wa-inj-out', ivWrite({ enabled: !!el.checked })); }; }
+    { const el = $('#wa-iv-zero');
+      if (el) el.onchange = function () { setOut('#wa-inj-out', ivWrite({ zeroRefRounds: Number(el.value) })); }; }
+    { const el = $('#wa-iv-max');
+      if (el) el.onchange = function () { setOut('#wa-inj-out', ivWrite({ maxKeys: Number(el.value) })); }; }
     // v2.45.0: 条目路由控件（读写引擎公共面，非别名引用）
     on('#wa-er-add', () => {
       const id = ($('#wa-er-id') || {}).value ? $('#wa-er-id').value.trim() : '';
@@ -6132,12 +6373,53 @@
   // ── 面板与悬浮球 ──
   function buildPanel() {
     panelEl = h(`<div id="wa-panel" class="wa-hidden">
-      <div class="wa-head"><span class="wa-title">◈ 世界枢轴 <span class="wa-ver">v${WA.version}</span></span><span class="wa-close">✕</span></div>
+      <div class="wa-head"><span class="wa-title">◈ 世界枢轴 <span class="wa-ver">v${WA.version}</span></span><span class="wa-view">${(() => {
+        // ── v2.149.0（P3）：观测视角选择器（面板顶部常驻）──
+        //   为什么常驻头部而不放进某一页：视角回答「这个面板给谁看」，它属于面板而不是任何
+        //   一页 —— 放进页里，切页后选择器消失，用户会以为它没生效。
+        //   与「视角锁」区（wa-per-*）严格分开：那个管**正文该怎么写**（叙事视角），
+        //   这个管**面板给谁看**（观测视角）。合成一个会让「作者想这么写」与
+        //   「玩家该看到这个吗」互相冒充（引擎侧同一条边界，见 perspective-lock 的 VIEWS）。
+        //   选项表取自引擎 VIEWS 单一真源 —— 面板不自带第二份视角清单（自造视角等于自造判定）。
+        //   模块缺席时如实说缺，不给一个点了没反应的下拉。
+        const pv = WA.perspective;
+        if (!pv || !pv.setView) return '<span class="wa-dim">观测视角：模块未装载</span>';
+        const views = pv.VIEWS || [];
+        // 读当前档走**全名** `WA.perspective.getView`（不是上面那个别名 pv.getView）：
+        //   清册的引用面只认 `WA.<ns>.<mem>` 形态，别名调用让「这个导出有没有人用」在
+        //   死导出门禁里看不见 —— getView 会被判成 self-only 过度导出（v2.149.0 实测）。
+        //   别名本身保留（views/setView 两处照旧），只是当前档这一口必须留下可数的引用。
+        const cur = (typeof WA.perspective.getView === 'function') ? WA.perspective.getView().view : '';
+        const vn = function (v) { return v === 'player' ? '玩家视角' : (v === 'omniscient' ? '全知视角' : v); };
+        return '<select id="wa-view-sel" class="wa-input wa-viewsel" aria-label="观测视角（面板给谁看）">'
+          + views.map(function (v) { return '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + esc(vn(v)) + '</option>'; }).join('')
+          + '</select><span id="wa-view-out" class="wa-dim"></span>';
+      })()}</span><span class="wa-close">✕</span></div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}">${p.icon} ${p.label}</button>`).join('')}</div>
       <div class="wa-body"></div>
     </div>`);
     mainDoc.body.appendChild(panelEl);
     panelEl.querySelector('.wa-close').onclick = () => toggle(false);
+    // v2.149.0（P3）：观测视角选择器。**绑定在 buildPanel 里而不是 bindBody 里** ——
+    //   它在 wa-head 上，而 wa-head 不参与 renderBody 的整块重建（面板头只建一次）。
+    //   放进 bindBody 的后果是：每次重绘都重新绑一次，且重绘后选择器节点已不在
+    //   重建范围内（重复绑定 + 每次重绘丢焦点，用户拖一下就被打断）。
+    (function () {
+      const sel = panelEl.querySelector('#wa-view-sel');
+      if (!sel) return;
+      sel.onchange = function () {
+        const out = panelEl.querySelector('#wa-view-out');
+        const set = function (t) { if (out) out.textContent = t; };
+        if (!WA.perspective || typeof WA.perspective.setView !== 'function') return set('未记录：module-missing');
+        const r = WA.perspective.setView(sel.value);
+        // 两态严格分开：ok:false 是「没记上」（表外值），ok:true 才是本体
+        //   （changed:false 是「本来就是这一档」——那不是失败，是幂等）。
+        if (!r.ok) { set('未记录：' + (r.reason || '未知原因') + (r.allowed ? '（可选：' + r.allowed.join('/') + '）' : '')); return; }
+        set(r.changed ? ('已切到 ' + r.to + '（重绘后过滤生效）') : ('本来就是 ' + r.to));
+        if (WA.log) WA.log('info', '观测视角：' + r.from + ' → ' + r.to);
+        renderBody();
+      };
+    })();
     // v2.109.0（#15）：切页即落盘（走 __persistPanel 的单一写路径）——点同一页也写一次：
     //   saveOrThrow 内含写后读回校验，重复写同值不产生副作用，却能让「落盘能力断了」
     //   这件事**在第一次点击时就暴露**，而不是等到用户下次重载才发现视图状态没了。

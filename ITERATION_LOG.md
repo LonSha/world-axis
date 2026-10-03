@@ -6,19 +6,19 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.147.0 |
+| 版本 | v2.150.0 |
 | 全量回归 | `node tests/run.js` → **v2.144.0 待计划全部完成后单跑**（遵用户纪律「在做完计划全部内容前不要跑全量」）。v2.142.0 为通过 13760 / 失败 0 · status: passed（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）；硬超时默认 660000ms，慢机可用 `WA_REGRESSION_TIMEOUT_MS` 放宽 |
-| 产品文件面 | 168（`tests/product-files.js` 单一真源） |
-| 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
-| 出口面契约 | `node tests/export-contract.js` → ns= 147 / members= 978 / chars= 11088 |
-| 测试面 | `node tests/test-surface-gate.js` → 文件面 170 · 锁 164 · 可达 170 · 孤儿 0 · 豁免 0 |
-| 死子面 | `node tests/dead-export-gate.js` → dead 764 / uiDead 4 / 仅测试 350 / dataOnly 248 |
-| 拒收码 | `node tests/reject-code-gate.js` → 633 码（见证 394 / 死表 9 / 基线 230） |
-| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.144.0 · 现场 refs 3713 / 命名空间 167 / 成员 2023 |
-| 版本条目存放 | `node tests/docs-archive-gate.js` → README 94 条 / 日志存档 92 条 / 跨文件同号 **0** |
-| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 123 把 · 覆盖 **123（100%）**＝ 统一档 39（锚点 311 · 问题 0）+ 非统一档已识别 84 · **未识别 0** · 非统一档问题 102（**只报不红**，逐条带证据与命中行类别） |
-| 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核；v2.135.0 扩到 `checked` = 34 站点） |
-| tools/ | 只留**被可执行代码引用**的 14 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据 |
+| 产品文件面 | 172（`tests/product-files.js` 单一真源） |
+| 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0（产品文件 172 / 成员 2054 / 静态引用 3818） |
+| 出口面契约 | `node tests/export-contract.js` → ns= 151 / members= 1008 / chars= 11365（`FROZEN2800` 与 `EC2430` 同批回填） |
+| 测试面 | `node tests/test-surface-gate.js` → 文件面 176 · 锁 170 · 可达 176 · 包装 114 · spawn 5 · 内联 2 · 孤儿 0 · 豁免（无） |
+| 死子面 | `node tests/dead-export-gate.js` → dead 763 / uiDead 4 / 仅测试 345 / dataOnly 250 |
+| 拒收码 | `node tests/reject-code-gate.js` → 643 码（见证 404 / 死表 9 / 基线 230） |
+| 读数一致性 | `node -e "require('./tests/readings.js').discover()"` → problems 0 / ledgerVersion 2.150.0 · 现场 refs 3818 / 命名空间 171 / 成员 2054 |
+| 版本条目存放 | `node tests/docs-archive-gate.js` → README 95 条 / 日志存档 92 条 / 跨文件同号 **0** |
+| 锚点覆盖 | `node tools/anchor-scan.js` → 锁 128 把 · 覆盖 **128（100%）**＝ 统一档 39（锚点 311 · 问题 0）+ 非统一档已识别 89（693 条锚点）· **未识别 0** · 非统一档问题 110（**只报不红**，逐条带证据与命中行类别） |
+| 端到端读数 | `node tools/sync-e2e-readings.js --verify` → 与账本现场同源（v2.131.0 起由 `tests/run.js` 直接核；v2.149.0 把 module-cycle-gate 锁 B 面其余硬读数也登记为站点 ⇒ `checked` 扩到 39 站点；v2.150.0 收口把三个版本积压的过期读数全部回填 —— 端到端 21 项 / 29 处站点 + 硬读数 3 族 / 9 处站点，`--verify` 与 `--check` 双双同源） |
+| tools/ | 只留**被可执行代码引用**的 15 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据 |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
@@ -326,6 +326,87 @@
   `tests/duty-v2143.js`（新）、`tests/run.js`、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、
   `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
   `ITERATION_LOG.md`。
+
+### R135 · 2026-10-03 · v2.150.0：RP4 注入价值评估 + RP5 跨模块契约漂移静态扫描
+
+**它治的病**：① RP4 —— 「注入了什么 / 正文引用了什么」此前无人回答：注入面有一堆预算与折叠读数（`injectBudget`），但**没有任何一处把「注入过」与「真被正文引用」对起来**，于是「哪一路源每轮都在占预算却从不被引用」不可见。② RP5 —— `engines/contract-audit.js` 有**运行时**对账，但那是跑起来才说话的：一条字段被两个模块用两套字面量写、一个同名枚举在三个模块里写成三种词、一个拒收码在源码里写着却没有任何归属，这三件事在**回归之前**全是不可见的。
+- **RP4 · 观测面不是调优面**：新 `engines/inject-value.js` 三出口 —— `observe(rec)`（记下本轮**实际注入面**）、`settle(text)`（正文落地后结算引用率/采纳率）、`report(opt)`（按线上实际值排行）。两处**位置是硬约束**：`observe` 必须在 `render/inject.js` 的 `finalItems` 定稿之后（拿注入前候选集来观察，会把被折叠/丢弃的项也记成「注入过却没被引用」）；`settle` 必须在 `core/interceptor.js` 的 `after` 链**推进世界之前**（推进即 `round++`，落地后 `store.lastInjection.round` 已是下一轮，每轮都会被自己判成轮次不符）。
+- **四个新码分开归因，绝不可合成一个「没结算」**：`no-reading`（还没观察过）/ `empty-observation`（观察到的源数为 0）/ `text-too-short`（正文短于下限 ⇒ 空读数不当判据）/ `stale-round`（拿到的是别的轮的正文）。四种处置互不相同：分别要等下一轮 / 改注入面 / 等正文长起来 / 查程序顺序。同段并重申声共享码 `type`（观察口 items 非数组 / 结算口 text 非字符串，与 perfLedger、tapeStore 同一个码：同一件事不立两本账）。
+- **`stale-round` 的真源边界（本版最要紧的一条口径）**：当前轮的真源是 `store.lastInjection.round`（与 `render/inject.js` 的 `roundNow` 同源，不另立计数器）；读不到时取 0，而 **0 在判据里是假值 ⇒ 那一格下不做比对**（宁可放行不可误报）。见证因此必须先把 `lastInjection.round` 置成真值、再用**显式轮次**观察，两边才会真比——首版见证直接 `observe({round:5})` 时该码静默落进 missing，根因就在这里，不是产品缺陷。
+- **RP5 · 三面全部以现场读数为准**：新 `tools/contract-scan.js` —— ① `codes` 拒收码归属完备性（产品面每个内联码必须落在 base ∪ 见证声明 ∪ 死表之一）；② `enums` 同名具名常量的跨模块值域分歧（配一张**必须逐条给理由**的 EXEMPT 表）；③ `fields` 跨模块字段写者聚类（同一 `d.<path>` 被 ≥2 个模块写时，若各自写的**字符串字面量**两两不相交即报）。
+- **单一真源委托**：产品面走 `tests/product-files.js`、注释剥离走 `tests/test-surface-gate.js`、codes 扫描面走 `tests/reject-code-gate.js`、死表走 `reject-v2780.js` 的 `DEAD`、台账走 `reject-code-ledger.json` 的 `base`、见证声明走 `want()` 字面量（先剥注释）——本文件不另写第二份遍历器。
+- **零命中不算通过**：空产品面必须报 `empty-product-face`，不许以「problems 为空」冒充健康。**名单会过期**：EXEMPT 表双向核对（登记项必须仍分歧，否则报 `stale-exempt`；分歧项必须已登记，否则报缺理由）——过期名单比没有名单更坏。
+- **边界四条（如实登记）**：① 静态解析、不做 AST —— 具名常量只认一行内 `const NAME = [ 'a', 'b' ]` 形态，跨行数组 / 动态拼装 / `Object.freeze([...])` 一律认不出，不报也不伪归；② fields 面只对字符串字面量判，变量 / 表达式 / 模板串同样不报也不伪归（与 reject-code-gate 的「拼接写法不报错也不伪归」同规）；③ 注释行一律不进三面扫描；④ 原版 fields 面「写点路径 2 条、分歧 0」属**低产面**，它的承重由专锁 C4（成对真源码破坏）当场证明，而不是等现场出漂移。
+- **收口期抓到的三条自身缺陷（全部固化）**：① fields 面首版用 `d.evolution = {` 做锚点 —— **它没打过靶**：原版两侧写的都是 `{}`（非字面量），只破坏一侧时该路径连第二个写者都没有，判据按「不足两个模块」跳过 ⇒ 破坏看似成立而判据不响；改为**成对破坏**（两侧各写一个互不重叠的字面量）后才真现形。② enums 面首版期望「破坏已豁免的枚举 ⇒ 报红」—— 错：豁免的语义是「已登记的同名不同义」，该面仍认得它是分歧、但不再报红；判据改为「divergent 认出 + problems 不含它」。
+③ 专锁 A11 首版照抄 toolchain-gate-v2136 的 A9（「本锁不得出现靶名」）—— **场景不同**：那里靶子是 documented-only 工具，本锁是 wired 工具，出现名字不构成兜底；改为「本锁由 run.js 的 runLock 真执行」+「可单独跑」。另修一处产品侧字面缺陷：`print()` 里的 `\n` 被双写，CLI 人读出口打出了字面 backslash-n（已改单写，并把报告行抽成 `reportLines()` 单一真源，print 与 --json 共用）。
+- **门禁读数（全部现场实测）**：`product-files` 172 文件 · `export-contract` `ns= 151 members= 1008 chars= 11365`（`FROZEN2800` 逐字一致）· `inventory` 产品文件 172 / 成员 2054 / 静态引用 3818 / 四类悬空 0 · `dead-export-gate` `dead 763 / uiDead 4`（证据 767 条）· `reject-code-gate` 内联码 **643 = 见证 404 / 死表 9 / 基线 230**（零未分类）· `module-registry-gate` 文件 168 / 命名空间 176 / 装载期边 68 / 调用期引用 136 / 结构问题 0 · `contract-scan` 契约漂移 **0**（codes 归属 643/643 · enums 分歧 16 / EXEMPT 16 条过期 0 缺理由 0 · fields 0）· `toolchain-gate` 在册 15 / README 同源 / 零问题 · `anchor-scan` 统一档 311 锚点 **问题 0** · `test-surface-gate` 文件面 176 / 锁 170 / 孤儿 0。
+- **专锁**：`tests/inject-value-v2150.js`（56 项：结构面 + 运行时 + N0/N1/N2/N3 负控制）· `tests/contract-scan-v2150.js`（54 项：A 结构 13 / B 运行时 18 / C 负控制 10 —— 含「真源码破坏现形」与「破坏点不在扫描面上时读数逐字不变」两向）。
+- **接线**：`tests/run.js` 的 `LOAD` 加入 `engines/inject-value.js`（专锁的两个生产方探针都在这个 vm 上下文里跑）；v2.150.0 段 72 项 + RP5 段 19 项（扫描器的**真消费面**，含三面真源码破坏的负控制）。
+- **工具链**：`tools/contract-scan.js` 入索引 ⇒ README「tools/ 的取舍」名单 14 → 15、`git ls-files tools/` 同源、引用档 wired、入口档 selfTest（三档齐备）。
+- **未覆盖（如实登记）**：① UI 层未做实机验证（无头回归不装载 `ui/panel.js` 与 `ui/settings.js`，全绿只证明契约成立与绑定在场）；② 全量回归待计划全部完成后单跑（遵用户纪律）。
+
+### R134 · 2026-10-03 · v2.149.0：P3 观测视角贯穿 + X1 世界沉积层（玩家能感知的第一波）
+
+**它治的病**：① P3 —— 「观测视角」此前是**引擎级**概念（v2.142.0 的透视锁管的是「谁能写谁的内心」），
+面板上**没有观察者自己站哪儿的开关**；而只写引擎不接面板，玩家永远看不到「换视角之后这页少了什么」。
+② X1 —— 「这个地方发生过什么」全库零回答（`sediment` / `沉积` / `痕迹带` 零命中）：事件账答「什么时候发生」、
+地点账答「在哪儿」，但**地点视角的历史沉积**（一行行痕迹，随回合衰减、分三档）没有任何载体。
+一个「只升档不衰减」「衰减步数写错」「痕迹带永驻不下沉」的实现，与正确实现一样能过所有**存在面**判据。
+
+**做了什么**：
+- `engines/sediment.js`（新）：`settle(placeId, fact)` 落一行痕迹、`feel(placeId)` 读当前痕迹带、
+  `buildBlock()` 产出注入块（只报最近与档位计数，**不列全部地点** —— 列全部就是剧透地图）、`stat()` / `getSettings()` / `setSettings()`。
+  三档 `minor / marked / scar` + legend 永驻；`TRACES` 表外的一律拒收（`bad-value` 带 `allowed`）。
+- P3 面板面：概览页新增 `#wa-view-sel` 观测视角选择器（五档具名，顺序即可见范围由宽到窄）+ `#wa-view-out` 读数行；
+  `renderBody` **重绘出口**挂 `WA.perspective.applyView(mainDoc)` —— 玩家视角下带 `data-omniscient` 的节点在
+  **DOM 层被摘除**（不是 CSS 隐藏：隐藏只骗眼睛，节点仍在树里、仍能被选中与读出）。挂别处（如渲染中段）会被整块重建抹掉。
+- 新增**第 15 页**「沉积」：十枚控件（总开关 / 地点 / 档位 / 键 / 文本 / 落痕 / 读痕 / 注入块 / 读数 / 回执），
+  页签**插在 inject 之后**（刻意不插在 people 之后：`tests/run.js` 的页序断言 `pages2330[3..6]` 钉着 memory/enemies/parallel/inject 四条索引）。
+- 接线三站：`tool-diag.UI_BINDINGS` 登记两组（overview 两枚 + sediment 十枚）、`RENDERERS` 登记 `sediment`、
+  `style.css` 加 `.wa-view` / `.wa-viewsel` / `.wa-view .wa-dim`；`render/inject.js` 的 `SOURCES` 加 sediment 总开关键与 buildBlock 消费。
+
+**收口期抓到的三处真实产品缺陷（都在产品文件里，不在测试里）**：
+1. **`sediment.setSettings` 从未导出**（面板引用 2 次、引擎零导出）⇒「启用世界沉积层」开关**恒走 module-missing 分支**：
+   点了没反应、不报错、看起来像没实现。**为什么既有门禁抓不到**：出口面契约（FROZEN2800）登记的是**引用面**，
+   不校验「被引用的成员是否真实存在」；引用侧与导出侧各有门禁，中间这一格是空的。修法：补 `saveSettings` 并导出。
+2. **`boundary()` 未返回 view 四字段**（诊断 `secPerspective` 读的是 `boundary()`，而四字段只挂在 `stat()` 上）
+   ⇒ 诊断 view 段恒取默认值。更坏的是 `view: b.view || 默认档` 会把「字段缺席」**伪装成「默认档」**。修法：`boundary()` 补四字段。
+3. **`panel` 读当前档走别名 `pv.getView`** ⇒ 清册的 `REF_RE` 只认 `WA.<ns>.<mem>` 形态，别名调用让死导出门禁把
+   `getView` 判成 `self-only` 过度导出。修法：改走全名（保留别名，仅这一口留可数引用）。
+
+**专锁** `tests/p3-x1-v2149.js`（454 行 / **54 项**）：八条真源码破坏锚点（`viewgate` / `viewfilter` / `boundview` / `tracegate` /
+`onlyup` / `decay` / `omni` / `writeset`）各恰中 1 次；P3 四探针 + X1 六探针；负控制 N0/N0b/N1a–N1h/N2a–N2f/N3a–N3f 两向自证。
+**两轮自纠共 11 处**（全是判据自身缺陷，不是产品缺陷）：其中一条认知值得记住 —— **mini-DOM 下 `innerHTML.length` 是解析前的字符串缓存**，
+摘除节点**不改它**（实测 9739→9739 假红）；只有 `body.childNodes.length`（真树结构）才是「DOM 层摘除」的判据。
+
+**门禁**（本轮按用户纪律**不跑全量**，只跑专锁与门禁）：`reject-code-gate` 639 码（见证 400 / 死表 9 / 基线 230，三集逐字不变 ——
+新引擎四码全部复用既有字面量）；`module-registry-gate` 文件 167 / 命名空间 175 / 装载期边 67 / 硬边 0 / 调用期引用 134 / 结构问题 0；
+`module-cycle-gate` 全绿（ns 面漂移 0 / 零读 ns 22 / 账本缺项文件 4）；`dead-export-gate` dead 763 / uiDead 4 / 归因可读 / 元数据同源 / 证据可复算；
+UI 五道门禁全绿（`ui-gate` 53/0 实 **15 页**、`ui-a11y-gate` 812/812 100.0%、`ui-gate-sync` rc=0、`ui-module-section-v2570` 11 项、`ui-wire-audit` 9/0）；
+逐把专锁直跑全绿（`p3-x1` 54 / `perf-tape` 36 / `perspective-lock` 76 / `readings` 58 / `module-cycle-gate` 65 / `reject-code-coverage` 59 /
+`toolchain` 43 / `docs-archive` 33 / `inject-sources` 20 / `ui-module-section` 11；`settle-v2830` 以自身 CLI 跑 55）。
+
+**收口期又抓到三类「读数面」欠账（一并收敛，不是新缺陷）**：
+① `tests/run.js` 两处**写死页数 14**（加页即误报）⇒ 改自维护口径（`pages.tested === (WA.ui.pages()||[]).length && > 0`；
+   页序断言改 `length >= 14 && indexOf(sediment) >= 0`）；
+② `tests/run.js` 六族硬读数（清册 refs/命名空间/成员 + 死子面 dead/dataOnly/仅测试）与 `EC2430` 冻结串停在旧版 ⇒ 走 `tools/sync-hardcoded.js` /
+   手工回填；
+③ `tools/sync-e2e-readings.js` 的站点表**没有覆盖** `module-cycle-gate-v2107.js` 的 B1/B3 面（文件面 / 别名面 / 有引用 / LOAD_ORDER）
+   —— 它们与已被覆盖的 ns 面三数**同属「住在锁里的人工回填面」**，故本轮把五条一并**登记成站点**（根治：下次接口面一动由真源自动接管，不再逐版手改）。
+
+**几条口径（本版最要紧的判断）**：
+- `bad-value`（档位/视角名不在表内）与 `missing-fields`（地点/键没给）**绝不可合成一个「没记上」** —— 前者要改写法、后者要补输入；
+  面板侧把两面分开回执（`sedErr` 分别打印 `field` 与 `allowed`），让这条边界在 UI 上也看得见。
+- 过滤**挂在重绘出口**而不是 CSS 隐藏：隐藏只是视觉，节点仍在树里；判据也据此取**子节点数**而不是字符串长度。
+- 「总开关未开」与「算出来没痕迹」**不许同形**（诊断面如实报 `disabled`，不回落成 0 行）。
+
+**未覆盖（如实登记）**：① 本轮**未跑全量回归**（遵用户纪律「做完全部前不跑全量」）；② **UI 实机通道无驱动**（`playwright-core` / `playwright` /
+`puppeteer-core` 三者均 require 失败）⇒ `ui-live` 如实报 `tier=fallback`，33 项静态判据全绿，**界面真机效果未验**；
+③ 沉积层的痕迹带只在**地点视角**下产出，跨地点的迁移沉积（「从 A 带到 B」）不在本版范围。
+
+**影响范围**：`engines/sediment.js`（新）、`engines/perspective-lock.js`、`engines/tool-diag.js`、`ui/panel.js`、`style.css`、`render/inject.js`、
+`index.js`、`manifest.json`、`core/store.js`、`core/evict.js`、`tests/p3-x1-v2149.js`（新）、`tests/run.js`、`tests/dead-export-ledger.json`、
+`tests/module-registry-ledger.json`、`tests/module-cycle-gate-v2107.js`、`tools/sync-e2e-readings.js`、`docs/ERROR_CODES.md`、`README.md`、`ITERATION_LOG.md`。
 
 ### R133 · 2026-10-03 · v2.147.0：W1 跨模块因果追溯图谱（以事实为轴心的双向 BFS）
 

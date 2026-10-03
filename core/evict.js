@@ -187,6 +187,13 @@
     'weather.rows': { path: 'weather.rows', cap: 24, why: '已登记天气环形（没登记的地点不是晴天，故这张表就是天气的全部证据）' },
     // v2.65.0 情报延迟：未到期的不入账。到期后从队列移走，队列本身仍有界。
     'intel.queue': { path: 'intelQueue', cap: 24, why: '在途情报环形（未到期前接收者不可见；路不通则不入队）' },
+    // ── v2.149.0（X1）世界沉积层两环（sediment.js；cap 与 store.__BOUNDED_CAPS 同名同值）──
+    //   地点环与事件环**必须分开**：前者答「世界记住几处地方」，后者答「一处地方记住几件事」。
+    //   合成一个 cap 就再也答不出是谁先撑爆的（地点太多 vs 某地事太密）。
+    //   **跨地点总量上限（capTotal）不在此表**：它不是「某个数组的 cap」，而是引擎在挤出后
+    //   按时间跨地点裁剪的总量闸；登记成站点会让「cap 单一真源」出现两个答案。
+    'sediment.places': { path: 'sediment.rows', cap: 24, why: '沉积地点环（地点数上限；跨地点总量另由引擎 capTotal 兜底）' },
+    'sediment.events': { path: 'sediment.rows.*.events', cap: 48, why: '单地点沉积事件环（每地点各自一环，故 path 带 `*`）' },
     // ── v2.66.0 情绪通道 / 关系六型 / 假面（affect.js / bonds.js / masks.js）──
     'affect.channels': { path: 'affect.channels', cap: 12, why: '情绪通道环形（每人一行：开放动作/硬关闭动作/过载回退，不含情绪词）' },
     'affect.loads': { path: 'affect.loads', cap: 24, kind: 'object', why: '调制量（疲惫/饥饿/疼痛/社交消耗，每键一人）' },

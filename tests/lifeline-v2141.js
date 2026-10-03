@@ -116,8 +116,8 @@ const ANCHORS = {
   attenuate: { rel: NOE, txt: '      const att = attenuationOf(who);',
     to: '      const att = { impaired: false };' },
   // ⑤ 诊断节不再报 lifeline 读数（作者那面重新变黑）
-  diagSec: { rel: DIAG, txt: 'lifeline: secLifeline(), intel: secIntel(),',
-    to: 'intel: secIntel(),' },
+  diagSec: { rel: DIAG, txt: 'lifeline: secLifeline(), perfLedger: secPerfLedger(),',
+    to: 'perfLedger: secPerfLedger(),' },
   // ⑥ 面板不再渲染生理与照护入口
   panel: { rel: PANEL, txt: 'id="wa-lfn-register" title="登记一个病况',
     to: 'id="wa-lfn-register2" title="登记一个病况' }

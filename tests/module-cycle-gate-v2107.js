@@ -160,7 +160,7 @@ function runAll(A) {
   //   解析出别名 167 → 168、有引用 165 → 166（零引用仍恰 core/input-guard.js / core/sanitize.js
   //   两个声明过的纯函数基元 —— perspective-lock 读 store（登记自己）故有引用，不落零引用名单）。
   //   现场读数由 M.audit() 采，非估算；增量逐条可核（+1 文件、+1 别名、+1 有引用）。
-  A(a.files === 168 && a.aliasFiles === 168 && a.refFiles === 166,
+  A(a.files === 172 && a.aliasFiles === 172 && a.refFiles === 170,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -199,7 +199,7 @@ function runAll(A) {
   //      ui/panel.js（8 枚控件真读 assign / current / allows / boundary / buildBlock / leakScan / getSettings / setSettings）、
   //      engines/probe.js（`view` 的第二参读 intel.project —— 这正是 D2 信息生态收口那条口）
   //      —— 同 v2.124.0 记过的「边是 (file, ns) 对，不是站点数」，故 +9 而非按控件数膨胀。
-  A(a.edgesLoad === 66 && a.edgesCall === 1235 && a.edgesAll === 1301 && a.identityOk,
+  A(a.edgesLoad === 68 && a.edgesCall === 1267 && a.edgesAll === 1335 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -239,7 +239,7 @@ function runAll(A) {
   // v2.140.0（F1）：LOAD_ORDER 164 → 165（engines/noesis.js 入序）。
   // v2.141.0（F2）：LOAD_ORDER 165 → 166（engines/lifeline.js 入序，紧随 noesis）。
   // v2.142.0（F3）：LOAD_ORDER 166 → 167（engines/perspective-lock.js 入序，紧随 lifeline）。
-  A(a.edgesLoad >= 20 && a.orderLen === 167,
+  A(a.edgesLoad >= 20 && a.orderLen === 171,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -247,7 +247,7 @@ function runAll(A) {
   //   module-registry-gate --update 落进账本，读面含上面那五处新读者）。
   // v2.142.0（F3）：静态提供方 196 → 197、账本 171 → 172、读面 174 → 175（perspective 由
   //   module-registry-gate --update 落进账本，读面含上面那四处新读者）。
-  A(a.nsProvided === 197 && a.nsLedger === 172 && a.nsRead === 175,
+  A(a.nsProvided === 201 && a.nsLedger === 176 && a.nsRead === 179,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');

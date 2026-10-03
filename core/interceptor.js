@@ -114,6 +114,16 @@
             };
             // v0.1.31: 写合并——after 链同样只推进内存，链结束统一落盘一次
             try {
+              // v2.150.0(RP4): 价值结算的唯一生产方。位置是硬约束——必须在 after 链推进
+              //   世界之前：workflow.run('after') 会把 round++，推进之后再去读
+              //   store.lastInjection.round 比对，拿到的已是下一轮，于是每轮都会被自己判成
+              //   「轮次不符(stale-round)」而全军覆没。正文取 tailMsg.mes——与 after 链读的是
+              //   同一个对象（净化原文已在上方临时还原），不另取一份。
+              try {
+                if (WA.injectValue && typeof WA.injectValue.settle === 'function') {
+                  WA.injectValue.settle(tailMsg && tailMsg.mes);
+                }
+              } catch (eIV) { /* 观测失败不影响世界推进 */ }
               const runAfter = async () => {
                 await WA.workflow.run('after', actx);
                 // v0.7.0: 结算完成才记录楼层（批内提交，随批落盘；失败阻断则下轮重试）

@@ -92,6 +92,13 @@
     //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**（chrono 行邻近字面量
     //   是 v2.127.0 那条锁的锚点区，动它会同时触发 anchor-scan 与负控制审计的 not-unique）。
     'perspective',
+    // v2.149.0（X1）：世界沉积层。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**（chrono 行邻近字面量
+    //   是 v2.127.0 那条锁的锚点区，动它会同时触发 anchor-scan 与负控制审计的 not-unique）。
+    //   分工：`chrono` 答「这世界此前发生过什么」（时间序流水），本表答「**这处地方**留下了什么」
+    //   （地点视角的投影，带衰减）。合成一个源会让「什么事发生过」与「在哪里留下了痕」互相冒充。
+    'sediment',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
@@ -131,7 +138,11 @@ style: false,
         lifeline: true,
         // v2.142.0（F3）：视角锁。取默认 true（其模块总开关默认为关），
         //   不给老用户凭空多出约束。
-        perspective: true }, module: 'render' };
+        perspective: true,
+        // v2.149.0（X1）：世界沉积层。取默认 true（其模块总开关默认为关——
+        //   sediment 的 DEF.enabled=false，未开时 buildBlock 返回空串），
+        //   不给老用户凭空多出约束。
+        sediment: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -302,6 +313,10 @@ style: false,
     lifeline: '生理与照护',
     // v2.142.0（F3）：视角锁显示名。SOURCES（键）/ 注入分支 source 名 / 本表三者逐字同名。
     perspective: '视角锁',
+    // v2.149.0（X1）：世界沉积层显示名。缺此项 ⇒ 失败台账（SRC_NAME）会报英文键名 `sediment`，
+    //   而 switch-matrix-v2910 的 C2 与 explain-v2900 的 A4/C1 要求源表三项同批：
+    //   SOURCES（键）/ 注入分支 source 名 / 本表。三者名字逐字同名。
+    sediment: '此地沉积',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
@@ -376,7 +391,14 @@ style: false,
     //   用户勾了模块总开关却看到「模块没加载」，排查方向被指错。
     //   同一类漏登记 v2.99.0 已为 rumor/canon、v2.127.0 为 chrono、v2.130.0 为 reasoning/storyTone、
     //   v2.135.0 为 foreshadow、v2.140.0（本版顺手补）为 noesis 各付过一次学费。
-    perspective: 'worldaxis_perspective_settings_v1' };
+    perspective: 'worldaxis_perspective_settings_v1',
+    // v2.149.0（X1）：世界沉积层**确有**模块级总开关（sediment.js 的
+    //   `worldaxis_sediment_settings_v1`）。不登记会怎样：`moduleEnabled` 查不到键就返回 null，
+    //   于是对账面上本源一律落在 `unavailable`（「没有模块级总开关」——而它明明有），
+    //   用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
+    //   同一类漏登记已为 rumor/canon（v2.99.0）、chrono（v2.127.0）、reasoning/storyTone
+    //   （v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0 顺手补）各付过一次学费。
+    sediment: 'worldaxis_sediment_settings_v1' };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -524,6 +546,9 @@ style: false,
    *   在账上长得一模一样。
    */
   const engineCost = {};
+  // v2.148.0（RP1）：上一轮的事务累计数——「事务落盘」源靠它判「本轮是否有新读数」，
+  //   而不是拿上一轮的 ms 当这一轮的花费（那是把历史记成现场）。
+  let __lastTxCount = null;
   function noteCost(ns, ms) {
     const name = SRC_NAME[ns] || ns;
     const rec = engineCost[name] || (engineCost[name] = { ms: 0, n: 0 });
@@ -932,6 +957,11 @@ style: false,
       //   （与 noesis「不列秘密名」、lifeline「不列症状名」同一条纪律）。
       //   本块与「知情边界」是**串联而非取代**：那个答「他知道吗」，本块答「这笔该不该现在由这个视角写」。
       if (vis.perspective && WA.perspective) { const pv = engineCall('perspective', function () { return WA.perspective.buildBlock(); }); if (pv) items.push({ source: '视角锁', content: pv }); }
+      // v2.149.0（X1）：世界沉积层。只报**当前所在此地**留下的痕迹（未给 placeId 时由
+      //   sceneSlice 现取地点），不列遍全世界的地点沉积 —— 列全部地点就是剧透地图。
+      //   本块与「世界编年史」是**串联而非取代**：那个答「这世界此前发生过什么」（时间序流水），
+      //   本块答「**这处地方**留下了什么」（地点视角投影，带衰减）。
+      if (vis.sediment && WA.sediment) { const sd = engineCall('sediment', function () { return WA.sediment.buildBlock(); }); if (sd) items.push({ source: '此地沉积', content: sd }); }
       if (vis.session && WA.session) { const se = engineCall('session', function () { return WA.session.buildBlock(); }); if (se) items.push({ source: '多人场', content: se }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块
@@ -1146,6 +1176,25 @@ style: false,
           //   把一次体检挂进每轮注入链，正是本仓点名的「观测污染被观测者」。
           //   故 `reuse` 如实报缺（`reuseKind: 'absent'`），由**面板的增量面按钮**另行真跑；
           //   本账只报它自己看得见的那一半，不拿空数组冒充「一次都没复用」。
+          // v2.148.0（RP1）：**性能历史台账的真生产方**。
+          //   位置刻意的——必须在本轮引擎调用**全部发生之后**（costStat 才有本轮的读数），
+          //   且与 recalc 同一处但**先落台账**：recalc 是「这轮算了什么」，台账是「这轮花了多久」，
+          //   后者是前者的事实基础（先有耗时读数，才谈得上趋势）。
+          //   两样都是**已经发生**的现场读数：engineCall 的 finally 计过的 ms（不重跑、不重计时），
+          //   加上事务侧 recTx 已经记下的 lastMs（只在事务数真的涨了这一轮才收）。
+          try {
+            if (WA.perfLedger && typeof WA.perfLedger.ingest === 'function') {
+              var costNow = costStat();
+              var txNow = (WA.store && typeof WA.store.txStat === 'function') ? WA.store.txStat() : null;
+              // 「事务落盘」源：只在**本轮真发生过事务**时收一个样本（count 未涨 = 没有新读数，
+              //   收进去就是拿上一轮的耗时刻成这一轮的账）。
+              if (txNow && typeof txNow.count === 'number' && typeof txNow.lastMs === 'number') {
+                if (__lastTxCount !== null && txNow.count > __lastTxCount) costNow['事务落盘'] = { ms: txNow.lastMs, n: txNow.count - __lastTxCount };
+                __lastTxCount = txNow.count;
+              }
+              WA.perfLedger.ingest(costNow, roundNow);
+            }
+          } catch (ePF) { /* 观测失败不影响注入 */ }
           var recalc = (function () {
             try {
               if (!WA.injectBudget || typeof WA.injectBudget.incrementalCost !== 'function') return null;
@@ -1156,6 +1205,15 @@ style: false,
             } catch (e) { return null; }
           })();
           WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          // v2.150.0(RP4): 价值观察的唯一生产方。位置刻意——必须在预算裁决(finalItems)
+          //   与槽位路由都定完之后：观察面要的是「这一轮真落地了哪些源」，拿注入前的候选集
+          //   来观察，会把被折叠/丢弃的项也记成「注入过却没被引用」——那是把没发生的事判成没用。
+          //   与 lastInjection 同一份 finalItems 同刻写入。只观察、不改注入。
+          try {
+            if (WA.injectValue && typeof WA.injectValue.observe === 'function') {
+              WA.injectValue.observe({ round: roundNow, items: finalItems });
+            }
+          } catch (eIV) { /* 观测失败不影响注入 */ }
         } catch (e) { /* 快照失败不影响注入 */ }
         if (combined) WA.log('info', '注入落地：' + mainItems.map(i => i.source).join(' + ') + '（' + combined.length + '字）' + (slotCount ? '｜独立槽位 ' + slotCount + ' 路' : ''));
       } catch (e) { WA.log('error', 'setExtensionPrompt失败', e); }

@@ -1,13 +1,13 @@
 {
- "version": "2.147.0",
- "loadOrderCount": 167,
- "loadedCount": 164,
+ "version": "2.150.0",
+ "loadOrderCount": 171,
+ "loadedCount": 168,
  "uiCount": 3,
- "nsCount": 172,
+ "nsCount": 176,
  "totals": {
-  "loadEdges": 66,
+  "loadEdges": 68,
   "hardEdges": 0,
-  "callRefs": 132,
+  "callRefs": 136,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -52,6 +52,7 @@
     "engines/foreshadow.js",
     "engines/group-refuse.js",
     "engines/hazard.js",
+    "engines/inject-value.js",
     "engines/inst.js",
     "engines/kaleidoscope.js",
     "engines/liaison.js",
@@ -80,6 +81,7 @@
     "engines/request-viewer.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
+    "engines/sediment.js",
     "engines/session.js",
     "engines/stage.js",
     "engines/stale-guard.js",
@@ -242,6 +244,7 @@
     "engines/faction-graph.js",
     "engines/foreshadow.js",
     "engines/group-refuse.js",
+    "engines/inject-value.js",
     "engines/inst.js",
     "engines/liaison.js",
     "engines/lifeline.js",
@@ -262,6 +265,7 @@
     "engines/request-viewer.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
+    "engines/sediment.js",
     "engines/session.js",
     "engines/stage.js",
     "engines/stale-guard.js",
@@ -2701,6 +2705,76 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_perspective_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/perf-ledger.js": {
+   "ns": [
+    "perfLedger"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_perf_ledger_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/tape-store.js": {
+   "ns": [
+    "tapeStore"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_tape_store_cfg_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/sediment.js": {
+   "ns": [
+    "sediment"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_sediment_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/inject-value.js": {
+   "ns": [
+    "injectValue"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_inject_value_v1"
    ],
    "consumedBy": []
   },

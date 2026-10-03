@@ -14,6 +14,11 @@
 .wa-title{color:#5eead4;font-weight:600;letter-spacing:.5px}
 .wa-ver{opacity:.5;font-size:11px;font-weight:400}
 .wa-close{cursor:pointer;opacity:.6;padding:2px 8px}.wa-close:hover{opacity:1}
+/* v2.149.0（P3）：观测视角选择器 —— 常驻面板头部。刻意**不**做成醒目控件：
+   它是「给谁看」的设置，不是需要反复点的动作；但必须可见可读（.wa-dim 的读数在右侧）。 */
+.wa-view{display:flex;align-items:center;gap:6px;margin-left:auto;margin-right:10px}
+.wa-viewsel{flex:0 0 auto;max-width:110px;padding:3px 6px;font-size:11px}
+.wa-view .wa-dim{font-size:11px;opacity:.7;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}
 .wa-tabs{display:flex;overflow-x:auto;border-bottom:1px solid rgba(255,255,255,.08);scrollbar-width:none}
 .wa-tabs::-webkit-scrollbar{display:none}
 .wa-tab{background:none;border:none;color:#8b96a3;padding:8px 12px;cursor:pointer;white-space:nowrap;font-size:12px;border-bottom:2px solid transparent}

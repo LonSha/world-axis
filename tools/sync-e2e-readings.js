@@ -80,6 +80,10 @@ function liveReadings() {
     out.nsProvided = a.nsProvided; out.nsLedger = a.nsLedger; out.nsRead = a.nsRead;
     out.deadNsCount = a.deadNs.length;
     out.edgesLoad = a.edgesLoad; out.edgesCall = a.edgesCall; out.edgesAll = a.edgesAll;
+    // v2.149.0：module-cycle-gate-v2107.js 的 B1/B3 面同为「住在锁里的人工回填面」——
+    //   与上面三数同源（都取自 M.audit() 的现场值），故一并登记，不让人再逐版手改。
+    out.cycleFiles = a.files; out.cycleAliasFiles = a.aliasFiles; out.cycleRefFiles = a.refFiles;
+    out.cycleOrderLen = a.orderLen;
   } catch (e) { out.missing.push('module-cycle-gate.audit()'); }
   if (!reg) { out.missing.push('module-registry-ledger.json'); }
   else {
@@ -313,6 +317,45 @@ const SITES = [
     files: ['tests/run.js'],
     re: /(归因分布\s+test-only\s+\d+\s*\/\s*self-only\s+\d+\s*\/\s*unwired\s+)(\d+)/g,
     live: function (L) { return L.dist['unwired']; }
+  },
+  // ── v2.149.0（P3+X1 收口）：module-cycle-gate-v2107.js 的 B 面其余硬读数 ──
+  //   与 nsFace / nsLedger / nsRead 三站同族（同一份 audit() 真源、同一种「住在锁里
+  //   的人工回填面」）。收窄口径见本轮的 patch_2149_h.py 头注：edgesLoad 那条必须带
+  //   `A(` 前缀，否则会在 N5 段的 `n5a.edgesLoad` 上命中子串 ⇒ 多值拒填。
+  {
+    id: 'cycleFiles', desc: '依赖图：文件面',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(A\(a\.files\s*===\s*)(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.cycleFiles; }
+  },
+  {
+    id: 'cycleAliasFiles', desc: '依赖图：解析出别名的文件数',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(a\.aliasFiles\s*===\s*)(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.cycleAliasFiles; }
+  },
+  {
+    id: 'cycleRefFiles', desc: '依赖图：有引用的文件数',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(a\.refFiles\s*===\s*)(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.cycleRefFiles; }
+  },
+  {
+    id: 'cycleEdgesLoad', desc: '装载期边（B2 恒等式断言行）',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(A\(a\.edgesLoad\s*===\s*)(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.edgesLoad; }
+  },
+  {
+    id: 'cycleOrderLen', desc: 'LOAD_ORDER 条数',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(a\.orderLen\s*===\s*)(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.cycleOrderLen; }
   }
 ];
 

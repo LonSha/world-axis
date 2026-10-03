@@ -312,6 +312,49 @@
    *   末一条是本节的要点：图小与势力少在旧读数上长得一样，`dropped` 让它们分开。
    *   **零副作用**：只读 stat 与 settings，不建图（建图会计数、会污染现场读数）。
    */
+  /**
+   * v2.148.0（RP1）：性能历史台账读数——「一直在变慢吗」第一次可答。
+   *   只读 stat 与 trend（trend 纯读内存台账，不计时、不落盘、不重跑基准）。
+   *   **零副作用**：不调 record（record 是 interceptor 计时点的职责，诊断只旁观）。
+   */
+  function secPerfLedger() {
+    return safe(function () {
+      if (!WA.perfLedger || typeof WA.perfLedger.stat !== 'function') return { error: 'engines/perf-ledger.js 未加载（性能历史读数缺席）' };
+      const st = WA.perfLedger.stat();
+      const cfg = WA.perfLedger.getSettings();
+      const tr = WA.perfLedger.trend();
+      return {
+        enabled: st.enabled, sources: st.sources, recorded: st.recorded, trendCalls: st.trendCalls,
+        caps: st.caps, degradeSlope: cfg.degradeSlope,
+        // v2.148.0：退场归因（disabled / type / source-cap / no-reading）。
+        //   只报 recorded 的话，「台账在长」与「台账在退」在诊断面上长得一样——
+        //   而这两种局面一个不用管、一个要立刻查（源数超限？生产方传错参数？）。
+        skipReasons: st.skipReasons || {},
+        degrading: tr.ok ? tr.degrading : null,
+        rows: tr.ok ? tr.rows.slice(0, 5) : null, // 只带 Top5（诊断包体积纪律）
+        degradingNote: tr.ok && tr.degrading > 0 ? ('趋势检出 ' + tr.degrading + ' 个劣化源（斜率 > ' + cfg.degradeSlope + 'ms/样本）') : null
+      };
+    });
+  }
+
+  /**
+   * v2.148.0（RP2）：磁带卷仓库读数——跨会话重放的仓库面。
+   *   只读 stat 与 list。**零副作用**：不 save / 不 load / 不 drop（那些是面板按钮的职责）。
+   */
+  function secTapeStore() {
+    return safe(function () {
+      if (!WA.tapeStore || typeof WA.tapeStore.stat !== 'function') return { error: 'engines/tape-store.js 未加载（磁带仓库读数缺席）' };
+      const st = WA.tapeStore.stat();
+      const li = WA.tapeStore.list();
+      return {
+        total: st.total, cap: st.cap, saved: st.saved, loaded: st.loaded, evicted: st.evicted,
+        writeFails: st.writeFails, lastWriteFailReason: st.lastWriteFailReason,
+        rows: li.ok ? li.rows.slice(0, 5) : null,
+        storageNote: st.total + '/' + st.cap + ' 卷' + (st.writeFails > 0 ? '；落盘失败 ' + st.writeFails + ' 次' : '')
+      };
+    });
+  }
+
   function secFactionGraph() {
     return safe(function () {
       if (!WA.factionGraph || typeof WA.factionGraph.stat !== 'function') return { error: 'engines/faction-graph.js 未加载（势力关系网读数缺席）' };
@@ -423,7 +466,58 @@
         faults: Object.assign({}, b.faults || {}),
         // 三张表的规模：词表被改小/改大在这里看得见（判据口径的可观测面）。
         lenses: (b.LENSES || []).length, channels: (b.CHANNELS || []).length,
-        access: (b.ACCESS || []).length, maxPov: b.MAX_POV || 0
+        access: (b.ACCESS || []).length, maxPov: b.MAX_POV || 0,
+        // v2.149.0（P3）：全局观测视角（面板给谁看）。viewSwitches 是切换留痕——
+        //   「谁在什么时候把它切到玩家视角」这件事必须可审计（否则「这页为什么少了一块」无从追）。
+        view: b.view || 'omniscient', viewSwitches: b.viewSwitches || 0,
+        viewFiltered: b.viewFiltered || 0, viewLastAt: b.viewLastAt || 0
+      };
+    });
+  }
+  /**
+   * v2.149.0（X1）：世界沉积层读数——地点视角的痕迹面。
+   *   只读 stat（**不跑 feel / 不跑 buildBlock**：那两个会写 stat 计数与 blocks，
+   *   诊断面必须在任何面上留不下痕迹——与 secTapeStore「零副作用」同规）。
+   */
+  function secSediment() {
+    return safe(function () {
+      if (!WA.sediment || typeof WA.sediment.stat !== 'function') return { error: 'engines/sediment.js 未加载（地点沉积读数缺席）' };
+      const st = WA.sediment.stat();
+      const cfg = WA.sediment.getSettings();
+      return {
+        enabled: st.enabled, places: st.places, events: st.events, legends: st.legends,
+        settled: st.settled, feels: st.feels, blocks: st.blocks, evicted: st.evicted,
+        byTrace: st.byTrace || {}, caps: st.caps, traceWindowMs: cfg.traceWindowMs,
+        // 表外痕迹档 / 缺地点 / 缺键 的拒收分布：合成一个「没记上」之后，
+        //   作者就再也知道该改档位写法、补地点，还是补键（与 secPerspective 的 faults 同规）。
+        faults: Object.assign({}, st.faults || {}),
+        sedimentNote: st.places + '/' + (st.caps ? st.caps.places : '?') + ' 地点 · '
+          + st.events + '/' + (st.caps ? st.caps.total : '?') + ' 条沉积'
+          + (st.legends > 0 ? '（' + st.legends + ' 条已淡为传说）' : '')
+      };
+    });
+  }
+  /**
+   * v2.150.0(RP4): 注入价值读数——「预算告诉你花掉了，价值告诉你有没有白花」。
+   *   只读 stat（**不跑 report**：report 会遍历已结算轮次做聚合、按源归拢，那是一份
+   *   读数生成物，面板要榜单时自己调；诊断面必须在任何面上留不下痕迹——与
+   *   secSediment「不跑 feel / 不跑 buildBlock」同规）。
+   */
+  function secInjectValue() {
+    return safe(function () {
+      if (!WA.injectValue || typeof WA.injectValue.stat !== 'function') return { error: 'engines/inject-value.js 未加载（注入价值读数缺席）' };
+      const st = WA.injectValue.stat();
+      return {
+        enabled: st.enabled, zeroRefRounds: st.zeroRefRounds, maxKeys: st.maxKeys,
+        observes: st.observes, settles: st.settles, judged: st.judged, reObserved: st.reObserved,
+        rounds: st.rounds, pending: st.pending, sources: st.sources, caps: st.caps,
+        selfMs: st.selfMs, perfIngest: st.perfIngest,
+        textTruncated: st.textTruncated, dropped: st.dropped, lastReason: st.lastReason,
+        // 拒答归因（disabled / type / no-reading / stale-round / empty-observation / text-too-short）。
+        //   只报 settles 的话，「还没打几轮」与「接线断了、每轮都被拒」在诊断面上长得一样——
+        //   而这两种局面一个不用管、一个要立刻查（与 secPerfLedger 的 skipReasons 同规）。
+        skipReasons: st.skipReasons || {},
+        note: st.judged === 0 ? '还没有已结算的轮次（读数空不等于「都没用上」）' : null
       };
     });
   }
@@ -1049,6 +1143,17 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/lifeline.js': 'lifeline',
     // v2.142.0（F3）：视角锁。登记在此 = 缺席时 secModules 会**如实报 missing**。
     'engines/perspective-lock.js': 'perspective',
+    // v2.148.0（RP1）：性能历史台账。登记为必载——面板「性能」页与 secPerfLedger 读它的现场读数。
+    'engines/perf-ledger.js': 'perfLedger',
+    // v2.148.0（RP2）：磁带卷仓库。登记为必载——面板「因果」页与 secTapeStore 读它的仓库读数。
+    'engines/tape-store.js': 'tapeStore',
+    // v2.149.0（X1）：世界沉积层。登记为必载——注入链 sediment 源与 secSediment 读它的现场读数。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
+    'engines/sediment.js': 'sediment',
+    // v2.150.0（RP4）：注入价值评估。登记为必载——注入链 observe / interceptor settle 两个
+    //   生产方与 secInjectValue 均读它，缺席就是「价值面读数缺席」本身，不该被静默兜住。
+    'engines/inject-value.js': 'injectValue',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1835,6 +1940,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   UI_BINDINGS 就是那两个消费方的接线真源。不登记时，下面这条门禁会如实报「未覆盖」：
       //   `panel 渲染的每个控件都在守卫表内（未覆盖：[...]）`——本版实测正是被它抓出来的。
       'wa-cw-vol', 'wa-cw-vol-check', 'wa-cw-vol-text',
+      // v2.148.0 RP2：跨会话磁带仓库四按钮 + id 输入 + 输出区，渲染/绑定/守卫登记三件齐。
+      'wa-cw-store-save', 'wa-cw-store-list', 'wa-cw-store-load', 'wa-cw-store-drop',
+      'wa-cw-store-id', 'wa-cw-store-out',
       'wa-cw-id', 'wa-cw-act', 'wa-cw-intervene', 'wa-cw-out'] },
     // v2.117.0（计划二 B6）：配方面三枚 + 机会面三枚（同渲染在人物页）。
     //   同 v2.83.0 的规格——必须同时「渲染 + 绑定 + 守卫登记」，否则
@@ -1870,6 +1978,14 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-per-assign', 'wa-per-current', 'wa-per-boundary', 'wa-per-who', 'wa-per-channel',
       'wa-per-access', 'wa-per-allows', 'wa-per-leak', 'wa-per-block', 'wa-per-out'] },
     { page: 'logs', ids: ['wa-log-copy', 'wa-log-err', 'wa-err-report'] },
+    // v2.149.0（P3 + X1）：观测视角选择器（**渲染在面板头部，不属于任何一页**）+
+    //   世界沉积层九枚控件。守卫表是控件接线面的唯一真源：渲染了不登记 ⇒
+    //   「渲染了但绑定的 id 写错」这类断裂在这批控件上**永不可见**
+    //   （v2.124.0 的 wa-perf-band 漏登记就是这么被漏掉的）。
+    //   头部选择器挂到 'overview' 组：它在任何页都在场，任选一组都成立；
+    //   挂 overview 是因为那是默认页（首次打开即校验，不需要用户先切页）。
+    { page: 'overview', ids: ['wa-view-sel', 'wa-view-out'] },
+    { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat', 'wa-sed-out'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
@@ -1961,7 +2077,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
       'wa-inj-explain', 'wa-inj-explain-all',
       // v2.91.0（O4）：开关两面真值按钮——同 v2.90.0 的理由，渲染在注入页故登记到本组。
-      'wa-inj-face'] }
+      'wa-inj-face',
+      // v2.150.0（RP4）：注入价值榜单三枚控件（渲染在**注入页** renderInject，故登记到本组）。
+      //   同 v2.50.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，否则「渲染了但绑定
+      //   写错 id」这类断裂在新增出口上无人发现；登记错页比不登记更坏（看起来已被覆盖）。
+      'wa-iv-refresh', 'wa-iv-enabled', 'wa-iv-zero', 'wa-iv-max'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。
@@ -2535,7 +2655,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), intel: secIntel(), perspective: secPerspective(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), perfLedger: secPerfLedger(), tapeStore: secTapeStore(), intel: secIntel(), perspective: secPerspective(), sediment: secSediment(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
       //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，
@@ -2572,7 +2692,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.50.0（第三十五面）：宿主两侧 + 时间轴三节
       hostWb: secHostWb(), floorChanges: secFloorChanges(), ledgerTimeline: secLedgerTimeline(),
       // v2.80.0（第十四面）：故障台账总目（凡以 stat().faults 记账的模块必须出现在这里）
-      faultLedger: secFaultLedger()
+      faultLedger: secFaultLedger(),
+      // v2.150.0(RP4)：注入价值面。与 inject 节相邻但不合并——那一节答「这一轮注入了什么、
+      //   花掉多少预算」，这一节答「注入进去的东西有没有被正文用上」，两问的失效模式不同。
+      injectValue: secInjectValue()
     };
     diag.verdict = verdict(diag);
     return diag;

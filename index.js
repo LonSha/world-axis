@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.147.0'
+  const VERSION = '2.150.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -516,6 +516,21 @@
     //   —— 两个真源不可合并（本模块不调 noesis.knows，见边界 4）。
     //   写侧只有 assign 一口（专锁 N 面钉这条）。
     'engines/perspective-lock.js',
+    // v2.148.0（RP1+RP2）：性能历史台账 + 磁带卷仓库。装载位置晚于 inject-budget /
+    //   perf-trace（两模块的现场读数是它的输入面），早于 render/inject.js（engineCall
+    //   计时点之后分流入账）。tape-store 与 rand 磁带语义解耦（仓库不改录制/回放语义）。
+    //   perf-ledger **只读**（零 store.transact）；tape-store 写侧只有仓库键读写。
+    'engines/perf-ledger.js',
+    'engines/tape-store.js',
+    // v2.149.0（X1）：世界沉积层。装载位置在**所有地点源之后**（sceneSlice / world / chrono）——
+    //   它的 buildBlock 在调用期读 WA.sceneSlice.read()「此刻在哪」，故 sceneSlice 必须先装载；
+    //   与 tests/run.js 的 LOAD 同序。只读 + 三容器环（sediment.places / sediment.events）。
+    'engines/sediment.js',
+    // v2.150.0(RP4): 注入价值评估。装载位置**晚于 perf-ledger**（它把自己每次判定的耗时
+    //   经 perfLedger.ingest 报进性能台账）、**早于 render/inject.js**（后者在注入链末尾
+    //   调它的 observe 交本轮真落地项）。口径：只读评估 + 进程态内存环（_pending / _rounds
+    //   不落盘、不登记 store 骨架——写在这两处会把「重启清零」伪装成「有界容器」）。
+    'engines/inject-value.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

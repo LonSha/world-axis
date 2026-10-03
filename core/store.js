@@ -208,6 +208,9 @@
       sceneSlice: { rows: [] },
       gauge: { rows: [] },
       rivalry: { rows: [] },
+      // v2.149.0（X1）：世界沉积层（sediment.js）。登记了容量却不在骨架里，registryParity
+      //   会报「未在骨架物化」，冷启动直写会炸事务——登记不等于物化，两件事都要做。
+      sediment: { rows: [] },
       // v2.71.0 叙事纪律四件套。登记了容量却不在骨架里，冷启动直写会炸事务。
       enigma: { rows: [] },
       tempo: { gear: 'andante', shifts: [] },
@@ -1200,6 +1203,21 @@
     'parallelWorld.relations': { cap: 120, site: 'parallel-world.js CAP_RELATIONS=120' },
     'parallelWorld.modules': { cap: 80, site: 'parallel-world.js CAP_MODULES=80' },
     'parallelWorld.snapshots': { cap: 12, site: 'parallel-world.js CAP_SNAPSHOTS=12（v2.35.0）' },
+    // v2.148.0（RP1/RP2）：性能台账与磁带仓库**不进本表**。
+    //   本条是实施自纠（第三刀）：两者初版曾被登记在此（perfLedger.samples / tapeStore.vols），
+    //   但本表是 **world state 容量登记表**——它的另一半用途是 registryParity 的
+    //   「每个登记键都在骨架里物化」判定。而这两个容器都不在世界状态里：
+    //     · perfLedger.samples 是**进程态内存 Map**（不落盘、重启清零，与 causal 的进程态读数同口径）；
+    //     · tapeStore.vols 住在**自己的 localStorage 键**（worldaxis_tape_store_v1），
+    //       独立于聊天 state 键，一次会话的世界存档里根本没有它。
+    //   登记它们会让 registryParity 报「未在骨架物化」，也会让 v2.13.0 的有界登记表门禁
+    //   报「有界登记表每项都能被挤出侧解释」红灯（它们既不走 WA.evict，也不在世界状态里）。
+    //   「有界」这件事仍如实可查：两个模块的 stat() 各自透出 caps（240/56 与 20/20）。
+    // v2.149.0（X1）：世界沉积层三容器（sediment.js 走 WA.evict 单一出口，cap 与 evict.SITES 同源）。
+    //   三重上限缺一不可：单地点事件环（capEvents）、地点数环（capPlaces）、**跨地点总量**（capTotal）——
+    //   只有前两者时「每个地点都不超、合起来撑爆存档」这条路仍然通着。
+    'sediment.places': { cap: 24, site: 'sediment.js WA.evict.array(sediment.rows)' },
+    'sediment.events': { cap: 48, site: 'sediment.js WA.evict.array(row.events)' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },
     'chapters.history': { cap: 20, site: 'chapters.js pruneHistory(MAX_HISTORY=20)' },
     // v2.62.0 因果结算两容器（causal.js 走 WA.evict.array 单一出口，cap 与 evict.SITES 同源）。

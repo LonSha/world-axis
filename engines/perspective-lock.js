@@ -81,7 +81,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_perspective_settings_v1';
-  const DEF = { enabled: false, maxScenes: 12, strictInterior: true, maxLeaks: 8 };
+  const DEF = { enabled: false, maxScenes: 12, strictInterior: true, maxLeaks: 8, view: 'omniscient' };
   const __REG = { key: LS_KEY, def: DEF, module: 'perspective',
     bounds: { maxScenes: [2, 24], maxLeaks: [1, 32] } };
 
@@ -109,6 +109,55 @@
 
   const stat = { assigns: 0, allows: 0, permits: 0, blocks: 0, audits: 0, scans: 0, leaks: 0,
     outOfLens: 0, interiorBlocked: 0, noScene: 0, lastReason: '', lastAt: 0, faults: {} };
+  // v2.149.0（P3）：全局观测视角面。与此前的**叙事视角锁**（assign/verdict，管正文该怎么写）
+  //   是两件事：这里是**面板该给谁看**（玩家视角 vs 全知上帝）。分开的理由：
+  //     · 叙事视角是「这一笔能不能由这个视角交代」——写作决定；
+  //     · 观测视角是「这一页该不该给玩家看」——呈现决定。
+  //   合成一个「视角」会让「作者想这么写」与「玩家该看到这个吗」互相冒充。
+  // VIEWS 成表（自造视角等于自造判定，与 LENSES 同规）。
+  const VIEWS = ['omniscient', 'player'];
+  const view = { current: null, switches: 0, lastAt: 0, filtered: 0, lastReason: '' };
+  function viewNow() {
+    const v = settings().view;
+    return VIEWS.indexOf(v) >= 0 ? v : 'omniscient';
+  }
+  /** 切全局观测视角。返回旧值（面板据此重渲染），并留痕。 */
+  function setView(next) {
+    const to = String(next == null ? '' : next);
+    if (VIEWS.indexOf(to) < 0) { noteFault('bad-value'); return { ok: false, reason: 'bad-value', field: 'view', allowed: VIEWS.slice() }; }
+    const from = viewNow();
+    if (from === to) return { ok: true, from: from, to: to, changed: false };
+    saveSettings(Object.assign(settings(), { view: to }));
+    view.switches++;
+    view.lastAt = clockNow('perspective');
+    view.lastReason = 'switched';
+    return { ok: true, from: from, to: to, changed: true };
+  }
+  function getView() { return { view: viewNow(), switches: view.switches, lastAt: view.lastAt }; }
+  /**
+   * 观测面过滤：**在 DOM 层**就不渲染全知数据（不是 CSS 隐藏——CSS 隐藏的数据仍在 DOM 里可读）。
+   *   判据：玩家视角下带 `data-omniscient` 标记的节点被摘除；全知视角下原样保留。
+   *   为什么以属性为判据：面板的每个观测面各行自报「这一行是全知数据」，比在此维护一张
+   *   页名清单更不易漏（漏一个页名 = 那一页在玩家视角下泄露全知数据）。
+   * @returns {{ok:boolean, view:string, removed:number, kept:number}}
+   */
+  function applyView(root) {
+    const cfg = settings();
+    const v = viewNow();
+    if (!cfg.enabled) return { ok: true, view: v, removed: 0, kept: 0, disabled: true };
+    const doc = root || (typeof document !== 'undefined' ? document : null);
+    if (!doc || !doc.querySelectorAll) return { ok: true, view: v, removed: 0, kept: 0, noDom: true };
+    let omni = [];
+    try { omni = Array.prototype.slice.call(doc.querySelectorAll('[data-omniscient]')); } catch (e) { omni = []; }
+    if (v !== 'player') return { ok: true, view: v, removed: 0, kept: omni.length };
+    let removed = 0;
+    omni.forEach(function (el) {
+      if (el && el.parentNode) { el.parentNode.removeChild(el); removed++; }
+    });
+    view.filtered += removed;
+    view.lastReason = removed ? 'filtered' : view.lastReason;
+    return { ok: true, view: v, removed: removed, kept: omni.length - removed };
+  }
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocks++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -370,7 +419,13 @@
       noScene: stat.noScene || 0,
       rows: rows().length,
       lastReason: stat.lastReason, lastAt: stat.lastAt,
-      faults: Object.assign({}, stat.faults)
+      faults: Object.assign({}, stat.faults),
+      // v2.149.0（P3）：全局观测视角四字段。**必须挂在 boundary 上，不能只留在 stat()** ——
+      //   诊断面（secPerspective）读的是 boundary()，不挂上去那一整段恒取默认值，
+      //   而 `view: b.view || 'omniscient'` 会把「字段缺席」伪装成「默认档」：
+      //   于是「谁把它切到了玩家视角」在诊断里永远看不见（这正是本版要治的那种静默）。
+      view: viewNow(), viewSwitches: view.switches,
+      viewFiltered: view.filtered, viewLastAt: view.lastAt
     };
   }
 
@@ -381,9 +436,16 @@
     //   —— 每一口都有真消费方（面板「导演」页 / 注入链 perspective 源 / 诊断 secPerspective）。
     assign: assign, current: current, allows: allows, audit: audit, leakScan: leakScan,
     buildBlock: buildBlock, boundary: boundary,
+    // v2.149.0（P3）：全局观测视角三口。真消费方三处（缺一不挂）：
+    //   ① 面板顶部视角选择器（setView）与重渲染时的 DOM 过滤（applyView，玩家页真调）；
+    //   ② 诊断 secPerspective 的 view 段（getView 的 switches 留痕）；
+    //   ③ 面板重渲染钩子（每次 render 后 applyView 摘除 data-omniscient 节点）。
+    VIEWS: VIEWS.slice(),
+    setView: setView, getView: getView, applyView: applyView,
     stat: function () {
       return Object.assign({}, stat, { faults: Object.assign({}, stat.faults),
-        enabled: settings().enabled, strictInterior: settings().strictInterior !== false });
+        enabled: settings().enabled, strictInterior: settings().strictInterior !== false,
+        view: viewNow(), viewSwitches: view.switches, viewFiltered: view.filtered, viewLastAt: view.lastAt });
     }
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/perspective-lock.js', { kind: 'engine', ver: '2.142.0' });
