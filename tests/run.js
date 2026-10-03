@@ -20591,22 +20591,31 @@ assert(r2900.dead.length === 764 && r2900.uiDead.length === 4 && r2900.dataOnly.
     //   本版把「带 id 的非控件」扩进观测面（out.readings），并在专锁加 C6 负控制两向自证。
     const liveSrc2145 = fs.readFileSync(path.join(BASE, 'tests/ui-live.js'), 'utf8');
     assert(liveSrc2145.indexOf('out.readings') > 0 && liveSrc2145.indexOf('readingsLen') > 0
-      && liveSrc2145.indexOf("!^(button|input|select|textarea)$") > 0,
+      && liveSrc2145.indexOf("!/^(button|input|select|textarea)$/") > 0,
       'v2145/O23: 通道观测面含读数行（扫带 id 非控件 + out.readings + 各页 readingsLen）');
     const ulLock2145 = fs.readFileSync(path.join(BASE, 'tests/ui-live-v2137.js'), 'utf8');
     assert(ulLock2145.indexOf('wa-zz-c6-out') > 0 && ulLock2145.indexOf('C6（正向）') > 0,
       'v2145/O23: 专锁含 C6 读数行缺失负控制（两向）');
     // 实机这一轮读数行面必须非空（full 档实测 79 条；非 full 档如实报降档，由 O14 段把住）
     const rUL2145 = require('child_process').spawnSync(process.execPath, ['-e',
-      "require('./tests/ui-live.js').runLive().then(function(o){console.log('READINGS='+o.readings.length);})"],
+      "require('./tests/ui-live.js').runLive().then(function(o){console.log('READINGS='+o.readings.length+' TIER='+o.tier+' WHY='+(o.why||''));})"],
       { cwd: BASE, encoding: 'utf8', timeout: 96000 });
     const outUL2145 = String(rUL2145.stdout || '');
     const mRD = outUL2145.match(/READINGS=(\d+)/);
-    assert(rUL2145.status === 0 && !!mRD && Number(mRD[1]) >= 70,
-      'v2145/O23: 实机读数行面非空（实 ' + (mRD ? mRD[1] : 'n/a') + ' 条 ≥ 70）'
+    const mT215 = outUL2145.match(/TIER=(\S+)/);
+    // 档位口径与 v2137/O14 段同源：隔离回归（isolated-runner cleanEnv）把 HOME 重定向到
+    //   task 目录，浏览器缓存（~/.cache/ms-playwright）探不到 ⇒ 通道如实降档 fallback。
+    //   full 档实测 79 条；fallback 档 readings=0 是**如实**（没起浏览器），只判降档理由非空。
+    assert(rUL2145.status === 0 && !!mRD
+      && (Number(mRD[1]) >= 70
+        || (mT215 && mT215[1] === 'fallback'
+          && (outUL2145.match(/WHY=([^\n]*)/) || ['',''])[1].length >= 5)),
+      'v2145/O23: 实机读数行面非空（full 档实 ' + (mRD ? mRD[1] : 'n/a')
+        + ' 条 ≥ 70 / fallback 档 TIER 与降档理由非空）'
         + (rUL2145.status === 0 ? '' : ' :: ' + outUL2145.slice(-300)));
   }
-  section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— 链与链之间的级联 / 当前状态的可达结局');
+
+section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— 链与链之间的级联 / 当前状态的可达结局');
   {
     // 它治的病：causal 让「一件事的后果落成事实」，但「后果的**后果**」全库零回答
     //   （consequence-web / ripple / secondOrder 零命中 = F2；endings / endingTree 零命中 = W3）。
