@@ -559,6 +559,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         // v2.146.0（F2/W3）：后果涟漪网 + 多结局预演（只读推导，零副作用——诊断只读不改）。
         ripple: (WA.causal.rippleWeb ? WA.causal.rippleWeb() : null),
         endings: (WA.causal.endingsTree ? WA.causal.endingsTree() : null),
+        trace: (WA.causal.traceGraph ? WA.causal.traceGraph('') : null),
         stages: WA.causal.STAGES || [], terminal: WA.causal.TERMINAL || [] };
     });
   }
@@ -1678,6 +1679,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
        'wa-causal-enabled', 'wa-causal-cause', 'wa-causal-condition', 'wa-causal-action', 'wa-causal-immediate', 'wa-causal-delayed', 'wa-causal-delayed-min', 'wa-causal-add', 'wa-causal-tick', 'wa-causal-due', 'wa-causal-classify', 'wa-causal-id', 'wa-causal-by', 'wa-causal-defer', 'wa-causal-cancel', 'wa-causal-settle',
       // v2.146.0（F2/W3）：后果涟漪网 + 多结局预演两枚出口（渲染 + 绑定 + 守卫登记三件齐做）。
       'wa-causal-ripple', 'wa-causal-endings',
+      // v2.147.0（W1）：因果追溯图谱出口（按钮 + 事实键输入框）。
+      'wa-causal-trace', 'wa-causal-trace-key',
       'wa-causal-out', 'wa-id-name', 'wa-id-lookup', 'wa-id-bindall', 'wa-id-clear', 'wa-id-out',
       // v2.63.0: 世界织体 / 社交漩涡 / 悬案控件（同样渲染在人物页）。
       //   三条理由与 v2.51.0 / v2.62.0 一致：新控件必须同时「渲染 + 绑定 + 守卫登记」，

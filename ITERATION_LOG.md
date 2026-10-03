@@ -6,7 +6,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.146.0 |
+| 版本 | v2.147.0 |
 | 全量回归 | `node tests/run.js` → **v2.144.0 待计划全部完成后单跑**（遵用户纪律「在做完计划全部内容前不要跑全量」）。v2.142.0 为通过 13760 / 失败 0 · status: passed（长超时启动器 + `isolated-runner` 隔离，`unchanged: true`）；硬超时默认 660000ms，慢机可用 `WA_REGRESSION_TIMEOUT_MS` 放宽 |
 | 产品文件面 | 168（`tests/product-files.js` 单一真源） |
 | 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0 |
@@ -326,6 +326,38 @@
   `tests/duty-v2143.js`（新）、`tests/run.js`、`tests/reject-v2780.js`、`tests/dead-export-ledger.json`、
   `tests/module-registry-ledger.json`、`tests/reject-code-ledger.json`、`docs/ERROR_CODES.md`、
   `ITERATION_LOG.md`。
+
+### R133 · 2026-10-03 · v2.147.0：W1 跨模块因果追溯图谱（以事实为轴心的双向 BFS）
+
+**它治的病**：rippleWeb（v2.146.0）答「在途链谁引用谁」——节点只有链；coop.traceOf 是「单提议级」
+追溯。两者都不是「一个**事实**从哪来、被谁引用、级联到哪」的全链路追溯。`traceGraph`/`causalTrace`/
+`追溯图谱` 全库零命中 = W1 真缺口。一个把「事实→引用它的链→链产出的新事实→再引用」走廊漏记、
+把跨模块归属打错、把深度上限放开成无限的实现，与正确实现一样能过所有存在面判据。
+
+**做了什么**：
+- `engines/causal.js` 新增 `traceGraph(factKey)`（**只读推导**，零 transact/零 patch）：
+  - 节点三类（fact/chain/echo，id 前缀 f:/c:/e:）、边三类（produced 链产出事实 / cited 事实或回声被链引用 /
+    echoed 事实被结算回声引用）；以任一事实键为轴心**双向 BFS**（深度限 3，锚点 `const MAX_DEPTH = 3;` 恰中 1 次）。
+  - 跨模块口径：每节点带 module（fact 用 source；链溯 cause 事实的 source），modules=去重集合，
+    答「这条因果跨了哪几个模块」。
+  - 无图谱如实：查无此事实 no-trace / 有事实无人引用 no-edges，不编造节点。
+- 接线三站：tool-diag secCausal 加 `trace` 读数（空串走 missing-fields）；UI_BINDINGS causal 组登记
+  `wa-causal-trace`/`wa-causal-trace-key`；panel 输入框 + 按钮 + handler（直写 `#wa-causal-out`）。
+- `no-trace` 新拒收码按 want/trip 范式在 reject-v2780 见证（trip 内先 setSettings 再 traceGraph 不存在事实）。
+
+**运行时验证**：级联场（F1→A[immediate+delayed]→回声→B）traceGraph('F1') 得 traced、
+三类节点/三类边齐全、modules=[causal,politics]；causal:A 直入口 produced 边不丢；深链场
+（F1→A→B→C→D）MAX_DEPTH=3 剪枝 nodes=4/edges=3、C/D 被剪；孤立事实 no-edges/nodes=1；
+负向 no-trace/missing-fields/disabled 全对。
+
+**专锁** `tests/causal-trace-v2147.js`（26 项）：
+A 面 18（traced/三类节点/三类边/produced 在/causal:A 入口/模块跨走廊/深链剪枝/孤立 no-edges/负向三态/形状+词表）
++ 负控制 N0/N0b/N1×3/N2×2/N3×2，三锚点（depth/cite/echo）各恰中 1 次。修掉一处探针陷阱：回声有两条
+边来源（fact 分支③受 refCurrent 锚点保护 vs 链分支直遍历 delayed 不受保护），N1 用 causal:A 入口无法现形，
+补 probeEcho（F1 入口专测受保护的 root echoed 边）后才两向成立。
+
+**未覆盖**：深度限固定 3（不配参）；回声的 echoed 边只从事实轴心发起（回声→链由 cited 覆盖）；
+modules 只记模块名不记命名空间细粒度。
 
 ### R132 · 2026-10-03 · v2.146.0：F2 后果涟漪网 + W3 多结局分支预演
 

@@ -514,6 +514,115 @@
   }
 
   /**
+   * v2.147.0（W1 跨模块因果追溯图谱）：以**事实为轴心**的全链路追溯（只读推导，零副作用）。
+   *   rippleWeb 答「在途链谁引用谁」（链→链，节点只有链）；本口答「一个事实从哪来、
+   *   被谁用过、级联到哪」——节点三类（fact/chain/echo），边三类
+   *   （produced 链产出事实 / cited 因果被引用 / echoed 回声），从任一事实键出发
+   *   双向 BFS（深度限 3，回声是叶子但回声被链引用的边不漏）。
+   *   跨模块口径：每个节点带 module（fact 的 source；链节点溯它 cause 事实的 source），
+   *   modules = 去重集合，答「这条因果跨了哪几个模块」。
+   *   无图谱如实（无此事实 no-trace / 有事实无人引用 no-edges），不编造节点。
+   *   返回 { ok, root, nodes, edges, modules, reason }。
+   */
+  function traceGraph(factKey) {
+    const cfg = settings();
+    const EMPTY = { nodes: [], edges: [], modules: [] };
+    if (!cfg.enabled) return Object.assign({ ok: false, reason: 'disabled' }, EMPTY);
+    const key = clean(factKey, 120);
+    if (!key) return Object.assign({ ok: false, reason: 'missing-fields' }, EMPTY);
+    const st0 = state() || {};
+    const facts = st0.worldFacts || [];
+    const chains = ((st0.causal || {}).chains) || [];
+    const echoes = st0.echoes || [];
+    const root = facts.filter(function (w) { return w && (w.key === key || w.id === key); })[0] || null;
+    if (!root) return Object.assign({ ok: false, reason: 'no-trace', root: key }, EMPTY);
+
+    const nodeMap = {}, edges = [];
+    const addNode = function (n) { if (!nodeMap[n.id]) nodeMap[n.id] = n; };
+    const addEdge = function (from, to, kind) {
+      if (from === to) return;
+      if (!edges.some(function (x) { return x.from === from && x.to === to && x.kind === kind; })) edges.push({ from: from, to: to, kind: kind });
+    };
+    const factOf = {};
+    facts.forEach(function (w) { if (w && w.key) factOf[w.key] = w; });
+    const byId = {};
+    chains.forEach(function (x) { if (x && x.id) byId[x.id] = x; });
+    const chainLabel = function (x) { return (x.cause || '?') + '→' + (x.action || '?'); };
+    const moduleOfCause = function (cause) { const f = factOf[cause]; return (f && f.source) || ''; };
+    /** 以 keyOrId 为原因的链（cited 边的统一来源） */
+    const citeChains = function (keyOrId) {
+      return chains.filter(function (y) { return y && y.id && y.cause === keyOrId; });
+    };
+    /** 结算回声的引用链（以 ec_<did> 为 cause） */
+    const echoCiteChains = function (eid) { return citeChains(eid); };
+
+    addNode({ id: 'f:' + root.key, kind: 'fact', label: root.key, module: root.source || '' });
+    const queue = [{ kind: 'fact', key: root.key, depth: 0 }];
+    const MAX_DEPTH = 3;
+    while (queue.length) {
+      const cur = queue.shift();
+      if (cur.depth >= MAX_DEPTH) continue;
+      if (cur.kind === 'fact') {
+        // ① 来源：causal:<chainId> 事实 ⇒ 产出它的链
+        if (cur.key.indexOf('causal:') === 0) {
+          const src = byId[cur.key.slice(7)];
+          if (src) {
+            addNode({ id: 'c:' + src.id, kind: 'chain', label: chainLabel(src), module: moduleOfCause(src.cause) });
+            addEdge('c:' + src.id, 'f:' + cur.key, 'produced');
+            queue.push({ kind: 'chain', id: src.id, depth: cur.depth + 1 });
+          }
+        }
+        // ② 去向：哪些链以这个事实为原因
+        citeChains(cur.key).forEach(function (y) {
+          addNode({ id: 'c:' + y.id, kind: 'chain', label: chainLabel(y), module: moduleOfCause(y.cause) });
+          addEdge('f:' + cur.key, 'c:' + y.id, 'cited');
+          queue.push({ kind: 'chain', id: y.id, depth: cur.depth + 1 });
+        });
+        // ③ 回声：refCurrent 指向这个事实（它的结算结果引用了它）
+        echoes.forEach(function (ec) {
+          if (!ec || !ec.id || ec.refCurrent !== cur.key) return;
+          addNode({ id: 'e:' + ec.id, kind: 'echo', label: ec.result || '', module: 'causal' });
+          addEdge('f:' + cur.key, 'e:' + ec.id, 'echoed');
+          echoCiteChains(ec.id).forEach(function (y) {
+            addNode({ id: 'c:' + y.id, kind: 'chain', label: chainLabel(y), module: moduleOfCause(y.cause) });
+            addEdge('e:' + ec.id, 'c:' + y.id, 'cited');
+            queue.push({ kind: 'chain', id: y.id, depth: cur.depth + 1 });
+          });
+        });
+      } else {
+        const x = byId[cur.id];
+        if (!x) continue;
+        // 链产出的因果事实（immediate 落成 causal:<id>）
+        const fk = 'causal:' + x.id;
+        if (factOf[fk]) {
+          addNode({ id: 'f:' + fk, kind: 'fact', label: fk, module: 'causal' });
+          addEdge('c:' + x.id, 'f:' + fk, 'produced');
+          queue.push({ kind: 'fact', key: fk, depth: cur.depth + 1 });
+        }
+        // 链已结算 delayed 项的回声 + 引用该回声的后续链
+        (x.delayed || []).forEach(function (d) {
+          if (!d || d.status !== 'settled') return;
+          const eid = 'ec_' + d.id;
+          const erow = echoes.filter(function (e2) { return e2 && e2.id === eid; })[0];
+          if (!erow) return;
+          addNode({ id: 'e:' + eid, kind: 'echo', label: erow.result || d.text || '', module: 'causal' });
+          addEdge('c:' + x.id, 'e:' + eid, 'echoed');
+          echoCiteChains(eid).forEach(function (y) {
+            addNode({ id: 'c:' + y.id, kind: 'chain', label: chainLabel(y), module: moduleOfCause(y.cause) });
+            addEdge('e:' + eid, 'c:' + y.id, 'cited');
+            queue.push({ kind: 'chain', id: y.id, depth: cur.depth + 1 });
+          });
+        });
+      }
+    }
+    const nodes = Object.keys(nodeMap).map(function (k) { return nodeMap[k]; });
+    const modules = [];
+    nodes.forEach(function (n) { if (n.module && modules.indexOf(n.module) < 0) modules.push(n.module); });
+    return { ok: true, root: root.key, nodes: nodes, edges: edges, modules: modules.sort(),
+      reason: edges.length ? 'traced' : 'no-edges' };
+  }
+
+  /**
    * v2.87.0 B6：干预预览——「现在对这条链做这个动作，会变成什么」（只读，零副作用）。
    *   导演面所有误操作都源于「先执行再看结果」；预览不留痕，才谈得上
    *   「干预预览留痕」——留痕的是**选择**，不是预览本身。
@@ -822,7 +931,9 @@
     // v2.146.0（F2/W3）：后果涟漪网 + 多结局分支预演（都只读推导、零副作用）。
     //   rippleDiscipline 不挂导出面——它只被 buildBlock 内部拼接（注入纪律段），
     //   挂出即「导出但外部零消费」的 self-only 过度导出（同 v2.62.0 isTerminal 先例：摘除）。
+    // v2.147.0（W1）：跨模块因果追溯图谱（只读推导）。
     rippleWeb: rippleWeb,
-    endingsTree: endingsTree
+    endingsTree: endingsTree,
+    traceGraph: traceGraph
   };
 })();

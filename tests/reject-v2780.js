@@ -543,6 +543,14 @@ function runWitness(WA) {
   //     （v2.87.0 B7；承诺面是「未知题材不静默当空集」，故必须真跑 apply 而不是只问 known）。
   want('unknown-theme', '未知题材拒收且不改设置（v2.87.0 B7：不静默当空集）');
   trip('unknown-theme', function () { return [WA.theme.apply(['no-such-theme']).reason]; });
+  // v2.147.0（W1）：因果追溯图谱暴露的码。traceGraph 对「查无此事实」如实拒答——
+  //   空输入（missing-fields）与查无此事实（no-trace）是两个不同的码：前者连根都没给，
+  //   后者给了根但世界里没有它。见证真跑启用态引擎（与 unknown-action 同法先置种子面）。
+  want('no-trace', 'traceGraph 查无此事实如实拒答（v2.147.0 W1）');
+  trip('no-trace', function () {
+    C.setSettings({ enabled: true });
+    return [C.traceGraph('reject-witness-v2147-no-such-fact').reason];
+  });
   // v2.89.0 O2：磁带面（rand 六口 + causal 两口）暴露的码。
   //   这一段本身就是本版「取证不得靠声称」的同一把尺子用在自家新口上：
   //   12 个码逐个用真 API 跑出来，唯一跑不到的（end-failed）进死表并附可复算前提。

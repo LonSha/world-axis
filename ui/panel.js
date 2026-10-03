@@ -679,6 +679,8 @@
       <div class="wa-row">
   <button class="wa-btn" id="wa-causal-ripple" title="后果涟漪网（只读推导）：把单层链推成二阶网——已结算后果作为新原因被后续链引用即记一条级联边。无网如实报无涟漪，不编造。">后果涟漪网</button>
   <button class="wa-btn" id="wa-causal-endings" title="多结局分支预演（只读预演）：从当前状态把每条在途链可推演出的终态集合列全（settled/cancelled/expired），并标出有因无果的 blocked。不预测哪条会发生。">多结局预演</button>
+<input id="wa-causal-trace-key" class="wa-in" placeholder="要追溯的事实键（如 causal:链id）" maxlength="120" />
+<button class="wa-btn" id="wa-causal-trace" title="因果追溯图谱（只读推导）：以任一事实为轴心双向追溯——它由哪条链产出、被哪些链与回声引用、级联到哪，并标出因果跨了哪几个模块。无图谱如实报，不编造。">因果追溯图谱</button>
 </div>
 <div id="wa-causal-out" class="wa-out"></div>
       <div class="wa-sec">人物身份（持久 ID ↔ 存档键）</div>
@@ -3043,6 +3045,17 @@
       });
       lines.push('只列可达结局，不预测哪条会发生（叙事决定，不是引擎决定）。');
       const oE = $('#wa-causal-out'); if (oE) oE.textContent = lines.join('\n');
+    });
+    on('#wa-causal-trace', () => {
+      if (!WA.causal || typeof WA.causal.traceGraph !== 'function') { causalOut({ ok: false, reason: 'module-missing' }); return; }
+      const kf = ($('#wa-causal-trace-key') || {}).value || '';
+      const r = WA.causal.traceGraph(String(kf).trim());
+      const oT = $('#wa-causal-out'); if (!oT) return;
+      if (r.ok === false) { oT.textContent = '未追溯：' + (r.reason || 'unknown') + (r.root ? ('（' + r.root + '）') : ''); return; }
+      const lines = ['【因果追溯】根 ' + r.root + ' ｜ 节点 ' + r.nodes.length + ' ｜ 边 ' + r.edges.length + ' ｜ 模块 ' + r.modules.join('/')];
+      r.nodes.slice(0, 12).forEach(function (n) { lines.push('  ' + n.kind + ' ' + n.label + (n.module ? ('（' + n.module + '）') : '')); });
+      if (r.nodes.length > 12) lines.push('  …共 ' + r.nodes.length + ' 个节点');
+      oT.textContent = lines.join('\n');
     });
     on('#wa-id-lookup', () => {
       if (!WA.registry || typeof WA.registry.identityOf !== 'function') return idOut({ reason: 'registry-missing' }, true);
