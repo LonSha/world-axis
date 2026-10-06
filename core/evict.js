@@ -227,6 +227,15 @@
     //   为什么 cap 是 'per-call'：上限 = `libCap` 设置（用户可调），写入时传入 ——
     //   静态登记而设置另有一套，就会变成一个「点了没效果的开关」（v2.154.0 为这条付过价）。
     'worldSeed.library': { path: 'worldSeed.library', cap: 'per-call', why: '世界生成种子库环（上限 = libCap 设置，写入时传入；同一结构不存两份）' },
+    // v2.164.0（TX5）：版本化完整世界蓝图库（world-blueprint.js）。
+    //   与 worldSeed.library 同款：cap 是 'per-call'（上限 = `libCap` 设置，用户可调，
+    //   写入时传入）—— 静态登记而设置另有一套，就会变成一个「点了没效果的开关」。
+    //   本表必须与 core/store.js 的 __BOUNDED_CAPS['blueprint.library'] 同名同值（逐键对账）：
+    //   SITES 缺此键时 evict.array 会走 unknown-site 静默失败，蓝图库就成了唯一一个
+    //   「登记了容量却没人执行」的环。
+    //   `blueprint.installed` **不在此表**：它是单值留痕（不是数组环），登记会把「一个字段」
+    //   伪装成「一个有界容器」（与 worldBridge.title 同口径）。
+    'blueprint.library': { path: 'blueprint.library', cap: 'per-call', why: '世界蓝图库环（上限 = libCap 设置，写入时传入；一张蓝图比一颗种子大得多，上限刻意更小）' },
     // ── v2.66.0 情绪通道 / 关系六型 / 假面（affect.js / bonds.js / masks.js）──
     'affect.channels': { path: 'affect.channels', cap: 12, why: '情绪通道环形（每人一行：开放动作/硬关闭动作/过载回退，不含情绪词）' },
     'affect.loads': { path: 'affect.loads', cap: 24, kind: 'object', why: '调制量（疲惫/饥饿/疼痛/社交消耗，每键一人）' },

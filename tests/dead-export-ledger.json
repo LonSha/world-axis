@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.163.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.163.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.164.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.164.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -1632,14 +1632,6 @@
       "src": "core/evict.js",
       "refs": 0,
       "tref": 10,
-      "own": 3
-    },
-    "evict.siteDecls": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "core/evict.js",
-      "refs": 0,
-      "tref": 27,
       "own": 3
     },
     "evict.summarize": {
@@ -4927,7 +4919,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 29,
+      "tref": 31,
       "own": 1
     },
     "store.staleSinceExternal": {
@@ -5416,7 +5408,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 113
+      "own": 114
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -6182,6 +6174,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 264
+    "dataOnly": 267
   }
 }

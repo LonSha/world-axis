@@ -48,6 +48,32 @@ function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 
 /** 现场破坏：把**全部**出现处一次改掉（字符串版 replace 只替换第一处——v2.105.0 的 D2 教训）。 */
 function allReplace(src, from, to) { return src.split(from).join(to); }
+/**
+ * 清册断言（refs 族）的**站点枚举**与**精确靶子**——v2.164.0 修正。
+ *
+ * 站点的字面形态有两族（同一族内部并不统一）：
+ *   ① 裸值行：`assert(r2700.refs === 4447, '…')`
+ *   ② 数值多值同行：`assert(r2800.refs === 4447 && r2800.namespaces === 184 && …`
+ * 第②族的行内**另有数字**，而本文件的破坏器是**全量**替换（`allReplace` 故意一次改掉全部命中，
+ * 见 49 行注释），于是原先那条 `prefix + '=== ' + 旧值` 的靶子在这里会同时改掉**别的观察位**：
+ * 行语义从「多值合判」塌成「同值重言」，比较值那一半根本没变 ⇒ 判据静默消失、破坏看似没发生
+ * （v2.164.0 现场：N1 报「破坏未生效（锚点没打中）」，而真因是**打中了、却把靶子连同判据一起吞掉**）。
+ *
+ * 两条修法，合起来才够：
+ *   · **站点集合现场枚举**（不写死 r2700 / r2800 / r2900）——写死会在站点改形态后静默打空，
+ *     而打空抛在负控制段里 ⇒ N1 起全部未执行（C 段注释点过的「锚点漂移 = 覆盖消失」）。
+ *   · **靶子带上该观察位自己的数值**（`refsSite()`）——带上之后 `rNNNN.refs === 旧值` 这个串
+ *     在全仓唯一命中，替换只落在这一个观察位上，行内别的比较值不受牵连。
+ */
+/** refs 族某个站点的**观察位前缀**（`rNNNN.refs `，含尾空格）——站点枚举与靶子共用同一份口径。 */
+function refsUnitOf(text) { return text.replace(/ *$/, '') + ' '; }
+function refsSitesOf(src) {
+  return Array.from(new Set((src.match(/r\d+\.refs +=== /g) || []).map(function (s) {
+    return refsUnitOf(s.replace(/ *===.*$/, ''));
+  })));
+}
+/** 靶子：`<观察位>=== <值>` —— 精确到「这一个观察位等于这一个数」。 */
+function refsSite(unit, want) { return unit + '=== ' + want; }
 
 /** 在真源码上做一次破坏，并证明破坏真的发生了（没打中 ⇒ 抛，不许静默）。 */
 function breakOnce(src, from, to, label) {
@@ -217,21 +243,29 @@ function runNegative(assert, ctx) {
   //   静默打空，而打空不会报「读数过期」—— 它让整把锁的负向段当场中断。v2.109.0 实测：
   //   清册 refs 与 dead、dataOnly 三族都长过（见 tests/run.js 的现场断言），四处锚点全空，
   //   N1 抛出后 N2 起全部未执行 —— 这正是「锚点漂移 = 覆盖消失」的又一次实证。
-  const refsAt = function (n) { return 'r' + n + '.refs === ' + LIVE.refs; };
-  const falseRefs = function (n) { return 'r' + n + '.refs === ' + (LIVE.refs - 1); };
-  const b1 = breakOnce(runSrc, refsAt(2700), 'r2700.refs === ' + (LIVE.refs + 1), 'N1');
+  const refsSites = refsSitesOf(runSrc);
+  assert(refsSites.length >= 3,
+    'N0 refs 族站点现场枚举 ≥ 3（实 ' + refsSites.length + '：' + refsSites.join(' / ') + '）');
+  const b1 = breakOnce(runSrc, refsSite(refsSites[0], LIVE.refs),
+    refsSite(refsSites[0], LIVE.refs + 1), 'N1');
   const p1 = R.coherence(b1, { live: LIVE });
   assert(p1.filter(function (p) { return p.kind === 'intra-drift' && p.field === 'refs'; }).length === 1,
     'N1 单站点漂移 ⇒ 报 intra-drift/refs（实 ' + kindsOf(p1).join(',') + '）');
-
-  // N2 全族覆盖（三站同改）⇒ stale-reading（同值但与实测不符）
-  const b2 = breakOnce(breakOnce(breakOnce(runSrc,
-    refsAt(2700), falseRefs(2700), 'N2a'),
-    refsAt(2800), falseRefs(2800), 'N2b'),
-    refsAt(2900), falseRefs(2900), 'N2c');
+  // N2 全族覆盖（**现场枚举到的每一个**站点同改）⇒ stale-reading（同值但与实测不符）
+  //   —— 不再手写三个号：站点数是现场读数，「几处」不是本判据的语义。
+  const b2 = refsSites.reduce(function (src, s) {
+    return breakOnce(src, refsSite(s, LIVE.refs), refsSite(s, LIVE.refs - 1), 'N2-' + s);
+  }, runSrc);
   const p2 = R.coherence(b2, { live: LIVE });
   assert(p2.filter(function (p) { return p.kind === 'stale-reading' && p.field === 'refs'; }).length === 1,
     'N2 全族同改 ⇒ 报 stale-reading/refs（实 ' + kindsOf(p2).join(',') + '）');
+  // N2b 半族覆盖（只改首个站点，其余站点一字不动）⇒ 仍报 intra-drift（**不是** stale-reading）
+  //   —— 「单站点 / 半族」与「整族」两态必须可分辨：若半族也报 stale-reading，两条判据就同形了。
+  const b2b = breakOnce(runSrc, refsSite(refsSites[0], LIVE.refs),
+    refsSite(refsSites[0], LIVE.refs - 1), 'N2b');
+  const p2b = R.coherence(b2b, { live: LIVE });
+  assert(p2b.filter(function (p) { return p.kind === 'intra-drift' && p.field === 'refs'; }).length === 1,
+    'N2b 半族覆盖 ⇒ 仍报 intra-drift/refs（与整族覆盖可分辨）');
 
   // N3 比较值与消息脱钩（v2.81.0 的形态）：消息一字不动，判据也必须现形
   const b3 = breakOnce(runSrc, 'r2700.dead.length === ' + LIVE.dead,

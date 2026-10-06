@@ -1,13 +1,13 @@
 {
- "version": "2.163.0",
- "loadOrderCount": 183,
- "loadedCount": 179,
+ "version": "2.164.0",
+ "loadOrderCount": 184,
+ "loadedCount": 180,
  "uiCount": 4,
- "nsCount": 187,
+ "nsCount": 188,
  "totals": {
-  "loadEdges": 81,
+  "loadEdges": 82,
   "hardEdges": 0,
-  "callRefs": 160,
+  "callRefs": 162,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -101,6 +101,7 @@
     "engines/wb-inject.js",
     "engines/wb-search.js",
     "engines/word-budget.js",
+    "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-seed.js",
     "render/purifier.js"
@@ -296,6 +297,7 @@
     "engines/userlock.js",
     "engines/wb-search.js",
     "engines/word-budget.js",
+    "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-seed.js"
    ]
@@ -3094,6 +3096,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_world_seed_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-blueprint.js": {
+   "ns": [
+    "worldBlueprint"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_blueprint_v1"
    ],
    "consumedBy": []
   },

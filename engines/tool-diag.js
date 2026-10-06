@@ -709,6 +709,44 @@
   }
 
   /**
+   * v2.164.0（TX5）：版本化完整世界蓝图读数。
+   *   为什么单列一节而不并进 worldSeed 节：种子那节答「我抽到了什么格局」（**有损**，
+   *   只有显示名），本节答「我导出了一份能不能原样搬走的世界」（**无损**，稳定 ID + 别名 +
+   *   方向化关系 + 道路端点）。两问的失效模式不同：种子失效在「同名合并了却没人知道」，
+   *   蓝图失效在「版本对不上却按 v1 猜着收」——后者会静默污染目标存档，必须把
+   *   bpVer / 待确认票据 / 安装留痕三组读数摊开，而不是只报「导出了 N 条」。
+   *   两个「没得看」的态要分开：「没导出过」（exports 0）与「导出了没存」（total 0）
+   *   —— 前者去 exportBlueprint，后者去 save。
+   */
+  function secWorldBlueprint() {
+    return safe(function () {
+      if (!WA.worldBlueprint || typeof WA.worldBlueprint.stat !== 'function') return { error: 'engines/world-blueprint.js 未加载（蓝图库读数缺席）' };
+      const st = WA.worldBlueprint.stat();
+      const li = (typeof WA.worldBlueprint.list === 'function') ? WA.worldBlueprint.list() : { rows: [] };
+      return {
+        enabled: st.enabled, libCap: st.libCap, total: st.total,
+        exports: st.exports, saves: st.saves, previews: st.previews, imports: st.imports, refused: st.refused,
+        lastReason: st.lastReason, faults: Object.assign({}, st.faults || {}),
+        bpVer: st.bpVer,
+        keepLevels: (st.keepLevels || []).slice(),
+        scenes: (st.scenes || []).slice(),
+        hasPending: !!st.hasPending, hasInstalled: !!st.hasInstalled,
+        hasLast: !!st.hasLast, lastSig: st.lastSig,
+        installedBpVer: st.installedBpVer, installedSig: st.installedSig,
+        limits: Object.assign({}, st.limits || {}),
+        retainNote: st.retainNote,
+        rows: (li.rows || []).map(function (r) {
+          return { id: r.id, name: r.name, tags: (r.tags || []).slice(), at: r.at,
+            bpVer: r.bpVer, bpSig: r.bpSig, keep: r.keep, counts: r.counts };
+        }),
+        note: st.hasPending ? '有一张待确认的导入票据尚未 settle —— 未确认的导入不落盘（防「预览了一下世界就被换了」）'
+          : (st.exports === 0 ? '尚未导出过任何蓝图（exportBlueprint 未调用）——「没导出过」不等于「这个世界不值得搬」'
+            : (st.total === 0 ? '导出过但没有存进库（save 未调用）—— 蓝图不落库就不会被清空存档的操作碰到' : null))
+      };
+    });
+  }
+
+  /**
    * v2.156.0（SP1）：时间来源与游玩活动基准读数。
    *   为什么单列一节而不并进 life 节：life 那节答「人物这一轮做了什么」，
    *   本节答「玩家离开的这段真实时间被谁记着」——两问的失效模式不同
@@ -1427,6 +1465,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.155.0（RX8）：世界生成种子库。登记为必载 —— 面板「工具」页种子库段与本文件的
     //   secWorldSeed 都读它，缺席就是「种子库读数缺席」本身，不该被静默兜住。
     'engines/world-seed.js': 'worldSeed',
+    // v2.164.0（TX5）：版本化完整世界蓝图。登记为必载 —— 面板「工具」页蓝图段与本文件的
+    //   secWorldBlueprint 都读它，缺席就是「蓝图库读数缺席」本身，不该被静默兜住。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取。
+    'engines/world-blueprint.js': 'worldBlueprint',
     // v2.156.0（SP1）：游玩活动基准。登记为必载 —— 面板「会话」页基准段与本文件的
     //   secPlaytime 都读它，缺席就是「活动基准读数缺席」本身，不该被静默兜住。
     'engines/playtime.js': 'playtime',
@@ -2351,6 +2393,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.158.0（S3 + SP6）：种子转移与初始化五枚（转移包 / 包粘贴 / 导入 / 预览 / 确认）。
       //   同口径：渲染了不登记 ⇒ 绑定断裂永不可见（v2.124.0 的 wa-perf-band 漏登记即此病）。
       'wa-ws-pack', 'wa-ws-packin', 'wa-ws-import', 'wa-ws-init', 'wa-ws-confirm'] },
+    // v2.164.0（TX5）：世界蓝图 14 枚 —— 面板「工具」页（导出 / 保存 / 取 / 删 / 预览 / 安装 / 台账）。
+    //   同 v2.155.0 的登记口径：无条件渲染（world-blueprint 是产品文件，缺席本身就是断裂，
+    //   不降级成提示）。渲染了不登记 ⇒ 绑定断裂永不可见（v2.124.0 的 wa-perf-band 漏登记即此病）。
+    { page: 'tools', ids: ['wa-bp-enabled', 'wa-bp-name', 'wa-bp-tags', 'wa-bp-save',
+      'wa-bp-export', 'wa-bp-list', 'wa-bp-stat', 'wa-bp-id', 'wa-bp-get', 'wa-bp-drop',
+      'wa-bp-check', 'wa-bp-empty',
+      'wa-bp-keep', 'wa-bp-preview', 'wa-bp-import', 'wa-bp-out'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
@@ -3073,6 +3122,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   一个答「别的世界传过来什么、本世界的身份是什么」，一个答「这个世界自己前后对不对得上」；
       //   前者失效在「传说被当成本地事实 / 同名异世界被认成同一个」，后者失效在「四本账互相矛盾却看不见」。
       worldBridge: secWorldBridge(), ecoAudit: secEcoAudit(), worldSeed: secWorldSeed(),
+      // v2.164.0（TX5）：版本化完整世界蓝图。与 worldSeed 节分列不合并 ——
+      //   一个答「我抽到了什么格局」（有损、只有显示名），一个答「我导出的世界能不能原样搬走」
+      //   （无损、稳定 ID + 方向化关系 + 道路端点）；前者失效在「同名被静默合并」，
+      //   后者失效在「版本对不上却按 v1 猜着收 ⇒ 静默污染目标存档」。
+      worldBlueprint: secWorldBlueprint(),
       // v2.156.0（SP1）：时间来源与游玩活动基准。与 life 节分列不合并（两问的失效模式不同）。
       playtime: secPlaytime(),
       // v2.156.0（S1）：离线恢复编排。与 playtime 节分列不合并 ——

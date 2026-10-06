@@ -236,6 +236,14 @@
       //   （「重开一局想选上一局那个格局」要求它活过会话），而 eco-audit 是进程态只读面。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务。
       worldSeed: { library: [], seq: 0 },
+      // v2.164.0（TX5）：版本化完整世界蓝图库（world-blueprint.js）。
+      //   与 worldSeed 同款**进骨架**：蓝图库是**跨会话要留下**的世界资产（「把这局的世界
+      //   原样搬到另一段聊天」要求它活过会话），而 importBlueprint 还会写 installed 留痕
+      //   （跨会话知道这个世界从哪张蓝图来）。登记了却不在骨架里，registryParity 会报
+      //   「未在骨架物化」，冷启动直写也会炸事务 —— 登记不等于物化，两件事都要做。
+      //   installed：最近一次成功导入的留痕（bpVer / bpSig / worldKey / keep / at / counts）；
+      //     它是**进度**不是结构，故不进库、不参与去重，只在 targetEmpty 清点时被认作「非空」。
+      blueprint: { library: [], seq: 0, installed: null },
       // v2.160.0（TP4）：跨引擎提交回执（core/commit.js）。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
       //   ——登记不等于物化，两件事都要做。
@@ -1395,6 +1403,12 @@
     //   与 plotGauge / perfLedger.samples 同口径 —— 登记会把「重启清零」伪装成「有界容器」。
     // v2.155.0（RX8）：种子库环（cap 与 store 骨架的 libCap 设置同源）。
     'worldSeed.library': { cap: 12, site: 'world-seed.js save()（走 evict 单一出口；上限 = libCap 设置）' },
+    // v2.164.0（TX5）：蓝图库环（cap 与 evict.SITES 同名同值，逐键对账）。
+    //   与 worldSeed.library 同款 per-call：上限 = `libCap` 设置（用户可调），写入时传入 ——
+    //   静态登记而设置另有一套，就会变成一个「点了没效果的开关」。
+    //   `blueprint.installed` **不登记**：它是单值留痕（不是数组环），登记会把「一个字段」
+    //   伪装成「一个有界容器」（与 worldBridge.title 同口径）。
+    'blueprint.library': { cap: 8, site: 'world-blueprint.js save() WA.evict.array(b.library, blueprint.library, cfg.libCap)（per-call，取设置上界）' },
     'worldBridge.legends': { cap: 24, site: 'world-bridge.js WA.evict.array(b.legends, maxLegends)（per-call，取设置上界）' },
     'worldBridge.exported': { cap: 12, site: 'world-bridge.js WA.evict.array(b.exported)' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },

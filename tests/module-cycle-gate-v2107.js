@@ -166,7 +166,7 @@ function runAll(A) {
   // v2.154.0（RX4+RX7）：新增 engines/world-bridge.js 与 engines/eco-audit.js ⇒
   //   文件面 178 → 180、解析出别名 178 → 180、有引用 176 → 178（两模块都读 store（登记自己）
   //   故有引用，零引用仍恰 core/input-guard.js / core/sanitize.js 两个声明过的纯函数基元）。
-  A(a.files === 184 && a.aliasFiles === 184 && a.refFiles === 182,
+  A(a.files === 185 && a.aliasFiles === 185 && a.refFiles === 183,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -219,7 +219,7 @@ function runAll(A) {
   //   ② 调用期 1313 → 1335：真正新增的 (file, ns) 对来自五处新读者（world-bridge 读 store/rumor/chronicle，
   //      eco-audit 读 causal/chrono/people/rumor，两者都不产注入块）—— 同 v2.124.0 记过的
   //      「边是 (file, ns) 对，不是站点数」，故不按控件数膨胀。
-  A(a.edgesLoad === 81 && a.edgesCall === 1383 && a.edgesAll === 1464 && a.identityOk,
+  A(a.edgesLoad === 82 && a.edgesCall === 1395 && a.edgesAll === 1477 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -269,7 +269,7 @@ function runAll(A) {
   // v2.142.0（F3）：LOAD_ORDER 166 → 167（engines/perspective-lock.js 入序，紧随 lifeline）。
   // v2.153.0（RX5+RX6）：LOAD_ORDER 175 → 177（两个新引擎入序，紧随 storage-forecast）。
   // v2.154.0（RX4+RX7）：LOAD_ORDER 177 → 179（两个新引擎入序，紧跟 branch-tree）。
-  A(a.edgesLoad >= 20 && a.orderLen === 183,
+  A(a.edgesLoad >= 20 && a.orderLen === 184,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -283,7 +283,7 @@ function runAll(A) {
   // v2.154.0（RX4+RX7）：静态提供方 207 → 209、账本 181 → 183、读面 186 → 188
   //   （worldBridge / ecoAudit 由 module-registry-gate --update 落进账本，
   //   读面含 tool-diag 两节与 ui/panel.js 的联网页控件）。
-  A(a.nsProvided === 213 && a.nsLedger === 187 && a.nsRead === 192,
+  A(a.nsProvided === 214 && a.nsLedger === 188 && a.nsRead === 193,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。

@@ -78,22 +78,60 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | v2.162.0 |
+| 版本 | v2.164.0 |
 | 全量回归 | **通过 15441 / 失败 0** · `status: passed` · `unchanged: true`（v2.162.0 收口轮，工作区 `/tmp/wa_git`，跑法：`isolated-runner.launch(root, { timeoutMs: 1800000 })`，整趟约 17 分钟）。**这是解除纪律后的第一趟真全量**，首跑即拿出 **15433 / 10** —— 10 条**全部是历史欠账**（三条根因族：陈旧精确读数 / 抖动带阈值 / 判据锚点写错），无一条由本版产品代码引入；逐条归因与修法见 R148 的「收口轮」段。本读数与此前各版不同源、不可直接相减（断言总数随版本增长）。 |
 | 产品文件面 | **184**（`tests/product-files.js` 单一真源；v2.158.0 新增 `core/commit.js`；v2.162.0 未新增文件，改动面 = `core/evict.js` / `core/store.js` / `engines/world.js` / `engines/tool-diag.js`） |
-| 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0（产品文件 **184** / 声明表登记 **183** / 命名空间 **183** / 成员 **2196** / 静态引用 **4376**） |
-| 出口面契约 | `node tests/export-contract.js` → **ns= 164 / members= 1123 / chars= 12517**（v2.162.0 未新增命名空间与成员；`FROZEN2800` 与落盘产物同批核对） |
+| 出口面清册 | `node tests/inventory.js` → 四类悬空均为 0（产品文件 **185** / 声明表登记 **184** / 命名空间 **184** / 成员 **2211** / 静态引用 **4447**） |
+| 出口面契约 | `node tests/export-contract.js` → **ns= 165 / members= 1136 / chars= 12663**（v2.164.0 新增 `worldBlueprint` 命名空间与 13 成员；`FROZEN2800` 与落盘产物同批核对，逐字一致 True） |
 | 测试面 | `node tests/test-surface-gate.js` → 文件面 **199** · 锁 **193** · 可达 **199** · 包装 **137** · spawn 5 · 内联 3 · 孤儿 0 · 豁免（无） |
-| 死子面 | `node tests/dead-export-gate.js` → dead **769** / uiDead 3 / 仅测试 **350** / dataOnly **264**（账本 version 同步 2.162.0，证据现场复核写入） |
-| 拒收码 | `node tests/reject-code-gate.js` → **708 码（见证 470 / 死表 9 / 基线 229）**· 扫描面 **184** 文件（v2.162.0 新增 `in-transit-full` 一码，带可执行见证、不进基线） |
-| 读数一致性 | `node tests/readings.js` 派生面 → 台账三级同源（version **2.162.0** / `_note` 末次版本词一致）· 现场 refs **4376** / 命名空间 **183** / 成员 **2196** |
-| 版本条目存放 | `node tests/docs-archive-gate.js` → README **108** 条 / 日志存档 92 条 / 跨文件同号 **0** |
+| 死子面 | `node tests/dead-export-gate.js` → dead **768** / uiDead 3 / 仅测试 **349** / dataOnly **267**（账本 version 同步 2.164.0，证据现场复核写入 771 条） |
+| 拒收码 | `node tests/reject-code-gate.js` → **716 码（见证 478 / 死表 9 / 基线 229）**· 扫描面 **185** 文件（v2.164.0 新增 8 个字面量，带可执行见证、不进基线） |
+| 读数一致性 | `node tests/readings.js` 派生面 → 台账三级同源（version **2.164.0** / `_note` 末次版本词一致）· 现场 refs **4447** / 命名空间 **184** / 成员 **2211** |
+| 版本条目存放 | `node tests/docs-archive-gate.js` → README **110** 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | 锚点覆盖 | `node tools/anchor-scan.js` → 锁 **150** 把 · 覆盖 **150（100%）**＝ 统一档 39（锚点 311 · 问题 0）+ 非统一档已识别 **111**（848 条锚点）· **未识别 0** · 非统一档问题 **175**（**只报不红**） |
-| 端到端读数 | `node tools/sync-e2e-readings.js --verify` → ✓ 全部端到端读数与账本现场同源（装载期边 **81** / 调用期引用 **160** / 硬边 0 / 命名空间 187 / 装载文件 179 / 冻结面条目 772）；`node tools/sync-hardcoded.js --check` → 无需回填 |
+| 端到端读数 | `node tools/sync-e2e-readings.js --verify` → ✓ 全部端到端读数与账本现场同源（装载期边 **82** / 调用期引用 **162** / 硬边 0 / 命名空间 188 / 装载文件 180 / 冻结面条目 771）；`node tools/sync-hardcoded.js --check` → 无需回填 |
 | tools/ | 只留**被可执行代码引用**的 16 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据（v2.162.0 收口轮：`test-audit` 解除误排除后由 15 → 16） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录
+
+### R150 · 2026-10-06 · v2.164.0：TX5 版本化完整世界蓝图
+
+**范围**：**拓展线第一批**。交付 **TX5**（不勾选 —— 四栏制的「真实宿主」一栏仍未验收）。新增 `engines/world-blueprint.js`（831 行，命名空间 `WA.worldBlueprint`）。
+
+**缺口**：本仓的「新局」一直是**生成**出来的（种子 → 人物 / 势力 / 地点 / 时代），却没有任何地方能把一个已经**成型**的世界骨架取出来、带版本地交给另一个存档。「换个局重新玩」只能重新生成，而生成是**随机的** —— 玩家碰到的那个世界留不下来，也没法分发给别人。TX5 补的就是这一层。
+
+**四条设计约束（每条都对应一处「不这样做会怎样」）**：
+
+① **稳定 key 是全部引用的地基**。`stableKey(kind, name, idx)` 用 FNV-1a 低 32 位对 `kind|name|idx` 取签名。为什么 `idx` 要进签名：**同名不合并**是玩家可见的语义（两个「张伟」是两个不同的人），去掉 `idx` 就会让两个同名人物撞成同一个 key，而撞键的后果不是「少了一个人」而是「所有指向他们的边都指到同一个人身上」——负控制 N1 就是照这条路走的（去掉两处 `idx` ⇒ 导出当场被 `checkIntegrity` 的 `dupIds` 拦下）。为什么不用数组下标：下标一挪，关系边与道路端点全部指错人。
+
+② **白名单提取而非黑名单过滤**。人设只取 `personality / worldview / family` 三节、机制只取 `enabled` 一键。黑名单会随产品新增字段**静默漏出**（新字段默认被带出去，没人会记得回来补一条排除），白名单则相反（默认不带，想带要显式登记）——这与本仓「白名单提取而非黑名单过滤」的既有纪律同源。
+
+③ **拒收要趁早要带名字**。18 个拒收码每个都答得出「哪里不对、期待什么」：`bad-bp-ver` 带 `got/supported`、`library-full` 带 `cap`、`not-empty` 带 `what` 清单、`duplicate-id` 带重复的 key。其中两条边界单独写下：`library-full`（库里蓝图条数达上限，`cap=8`）与 `too-many`（**一次导入的成员总数**超限）绝不可合成一个「太多了」—— 合成就不出「是哪一层满」；`duplicate-blueprint`（同签名已存过，发生在**库**）与 `already`（目标世界已装过这张蓝图，发生在**世界**，且是 `ok:true` 幂等不是拒收）绝不可同形。
+
+④ **装世界只作用于空新局**。`previewImport` 对非空目标直接拒 `not-empty`（预览就拒，不等到写入才发现）；`importBlueprint` 另有**事务外预检 + 事务内 draft 复核两道** ——前者读 `memCache`（快，但可能被过时现场骗过），后者读 draft（事务里刚写脏的那一份）。**这两道的唯一分歧入口是嵌套事务**：别的引擎在自己的 `transact` 里调 `importBlueprint`，外层 mutator 已写脏 draft 而 `memCache` 仍空 ⇒ 事务外预检放行、内层复核拦住 ——这正是「事务外那道可以被过时现场骗过，事务内那道是最后一道」的字面含义。负控制 N3 必须真起嵌套事务才碰得到它（单机顺序调用里两道恒同，测什么都是同一件事）。
+
+**六处登记（登记 ≠ 物化，一处不做就是悬空）**：① `index.js` `LOAD_ORDER`；② `tests/run.js` `LOAD`（同序）；③ `engines/tool-diag.js`（`MODULE_EXPORTS` + `secWorldBlueprint()` + `collect()` 汇总行 + `UI_BINDINGS` 16 枚控件）；④ `core/store.js` `defaultWorldState()` 物化 `blueprint` 容器 + `__BOUNDED_CAPS` 补 `'blueprint.library': {cap:8,…}`；⑤ `core/evict.js` `SITES` 补 `'blueprint.library'`（per-call，与 store **逐键同名同值**）；⑥ `ui/panel.js` 消费方（16 枚控件 + `bpOut` + 处理器 + `UI_BINDINGS`）。
+
+**专锁**：`tests/s3-tx5-v2164.js`（**59 / 0**）—— A 结构面 21 条（七锚点各恰中 1 次 / 白名单三键 / 自报登记 / `__settingsRegs` / 恰两处 `transact` / 六处登记面 / 面板两处 / 两处登记逐键同值 cap=8 vs per-call）+ B 行为面 B1–B10（往返可复现 / 同名不合并 / 端点按 key 复原且关系方向化 / 白名单三节不进而静态人设进 / 写口只动 `library` / 空新局预览不写世界 + `_fixed` + `zeroed` / 空新局装完 + `installed` + 进度清零 + 关系按 key 复原 + 重复报 `already` / 预览后变脏拒 `not-empty` / 未知版本拒 `bad-bp-ver` + `got/supported` / 库满拒 `library-full` + `cap`）+ N 负控制 N0–N4（前置真判据 / 稳定 key 丢同名序号 ⇒ 撞键被 `dupIds` 拦下 / 版本门一律放行 ⇒ `bpVer=999` 静默收下 / 事务内非空复核拆掉 ⇒ 嵌套事务里刚写脏的 draft 被放行 / 真源逐字未变）。
+
+**专锁第二版的三条实测教训（如实留账，它们都不是「写错了」，而是「判据测错了对象」）**：
+
+- **夹具人设必须是裸字符串**。三节写成 `{text:'谨慎'}` 对象时，`rosterOf` 的 `clean(x,120)` 取 `String(x)` 会串成 `[object Object]`，于是「静态人设进没进」这条判据测的是一串噪声 ——判据绿/红都与产品无关。
+- **`previewImport` 对非空目标本就拒 `not-empty`**。原 B6 在非空局上跑预览，于是 `pv.plan` 是 undefined、后续取 `_fixed` 当场抛 `TypeError`。正确写法是**在空新局上预览**（证明它真跑到了），把「非空拒收」还给 B8 ——两条判据各测各的，不许一条判据同时证两件事。
+- **负控制的破坏点必须真能改变行为**。N1 原先只去掉了一处 `idx`，而 `stableKey` 的 key 尾部仍带 `_idx` 后缀 ⇒ **不会撞键**，破坏看似「没生效」。修法是两处都去掉，破坏才真落到「同名合并」这条语义上。
+
+**升版面同批同步（本版现场暴露的读数失实，逐条留账）**：
+
+- **三本台账**：`module-registry-ledger` 由 `--update` 收敛（文件 180 / 命名空间 188 / 装载期边 82 / 硬边 0 / 调用期引用 162 / 结构问题 0，version 写入 2.164.0）；`dead-export-ledger` 由 `--update` 收敛（dead 768 / uiDead 3，version 写入 2.164.0）；`reject-code-ledger` 的 `version` 与 `_note` 沿革段（新增 8 个见证码，三集划分 708 → **716 = 见证 478 / 死表 9 / 基线 229**）手工追加。`tests/readings.js` 的台账三级同源判据要求 **version 字段 === `_note` 末次版本词** ——两处只改一处就是 `note-mismatch`。
+- **9 处版本钉**（`tests/run.js` 的 `verF2500` / `verF2600` / `ver` / `ver2800` / `ver2900` / `ver2100v` / `ver2110` / `VER2800` / `vM2158`）：用 `tools/bump_v2164.py` **逐行号**改写，不做全局替换 —— 全仓 `2.163.0` 大量出现在沿革注释与历史段里（如 `section('v2.163.0（O14 驱动面）…')`），全局替换会把历史改成假的。其中 **5 处同一行含两处版本串**（断言值 + 消息文本），必须**同批**改：只改断言值会让失败消息把当期读成历史（这正是 O16「比较值与消息必须同批」的靶子）。
+- **端到端读数 23 项 + 硬读数 6 族**：`tools/sync-e2e-readings.js --write` 回填 23 项（含 `module-cycle-gate-v2107.js` 的 `cycleFiles` / `cycleEdgesLoad` / `cycleOrderLen` 等）；`tools/sync-hardcoded.js --write` 回填 6 族（refs 4376→4447、namespaces 183→184、members 2196→2211、dead 769→768、dataOnly 264→267、deadInTestsOnly 350→349）。
+- **`FROZEN2800` 冻结串**：复用既有脚本 `tools/fill_frozen_tp2.py` 回填，`old len 12517 -> new len 12663 / 逐字一致: True / 新串命中次数: 1`。
+- **`tests/readings-v2106.js` 的负控制锚点失效（本版新暴露的真缺陷）**：它的 N1/N2 把靶子写成 `rNNNN.refs === <值>`，靠三处站点的**字面形态**恰好一致；而清册断言其实有两族 —— 裸值行 `assert(r2700.refs === 4447, '…')` 与**数值与消息同行的多值表达式** `assert(r2800.refs === 4447 && r2800.namespaces === 184 && …`。第②族的行内**另有数字**，而该文件的破坏器是 `allReplace`（**全量**替换）：不带数值的靶子会把那个「另一个数」也改成同一读数，行语义从「多值合判」塌成「同值重言」⇒比较值没变、判据静默消失。修法两条：站点集合**现场枚举**（`refsSitesOf`，不写死 `r2700/2800/2900`）+ 靶子**带上该观察位自己的数值**（`refsSite(unit, want)`）。修后 **58 → 60 项全绿**（新增 N0 现场枚举断言与 N2b 半族覆盖 ⇒ 仍报 `intra-drift`，与整族覆盖的 `stale-reading` 可分辨）。
+
+**门禁读数（全部现场实测）**：`reject-code-gate` 产品文件 185 / 内联码 716（见证 478 / 死表 9 / 基线 229）✓ 每个码都有归属；`dead-export-gate` 冻结面 dead 768 · uiDead 3 · dataOnly 267，元数据同源、证据可复算 ✓；`module-registry-gate` 文件 180 / 命名空间 188 / 装载期边 82 / 硬边 0 / 调用期引用 162 / 结构问题 0 ✓；`inventory` 四类悬空 0 ✓；`sync-e2e-readings --verify` 全部同源 ✓；`sync-hardcoded --check` 无需回填 ✓；`test-surface-gate` 测试文件面 200 · 锁 194 · 可达 200 · 孤儿 0 ✓。
+
+**边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 16 枚控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② `ui/panel.js` 在无头回归里不装载，「六处登记」里 UI 那一处靠**文本锚点**判据（不是运行时行为）；③ 全量回归按本次指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数。
 
 ### R149 · 2026-10-06 · v2.163.0：O14 驱动面 —— UI 实机通道的零依赖内置 CDP 驱动
 

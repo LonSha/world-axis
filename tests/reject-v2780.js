@@ -4328,6 +4328,108 @@ function runWitness(WA) {
       });
     }
   }
+  // ══ v2.164.0（TX5）：版本化完整世界蓝图新增拒收码 ====
+  //   本段与前面各段同规矩：新增字面量全部由**真实局面**触发，走可执行见证、不进基线。
+  //   归类判断：本引擎 18 个码里 8 个是**新增字面量**（bad-bp-ver / bad-blueprint /
+  //   bad-bp-keys / duplicate-id / dangling-ref / empty-blueprint / duplicate-blueprint /
+  //   unknown-blueprint），在本段逐一见证；其余 10 个（disabled / missing-fields /
+  //   library-full / not-empty / no-preview / pending-mismatch / foreign-chat / stale-epoch /
+  //   already / too-many）复用既有词表，已在前段见证过 —— 不在此重列，重列会把
+  //   「一个码只有一个定义处」稀释成两份口径。
+  //   全部见证走**内存桩**（临时替换 store.get / 造非空目标）而不去清真实存档 ——
+  //   见证不得给后面的段留下一个被清空的世界。
+  {
+    const Bp = WA.worldBlueprint;
+    if (Bp && typeof Bp.exportBlueprint === 'function') {
+      const keepBp = Bp.getSettings();
+      const snap = JSON.parse(JSON.stringify(WA.store.get() || {}));
+      try {
+        Bp.setSettings({ enabled: true, libCap: 8 });
+        WA.store.transact(function (d) {
+          d.blueprint = { library: [], seq: 0, installed: null };
+          d.people = {};
+          d.world = Object.assign({}, d.world, { places: [], roads: [] });
+          d.evolution = Object.assign({}, d.evolution, { factions: [], round: 0 });
+          d.background = Object.assign({}, d.background, { text: 'rw2164乱世之初。' });
+          d.chronicle = []; d.currents = []; d.echoes = []; d.worldFacts = [];
+          d.meta = Object.assign({}, d.meta, { initFrom: null });
+          if (d.economy) d.economy.goods = [];
+        }, 'reject-witness:bp-reset');
+        // 人物必须经**唯一写者**（registry.ensurePerson）落进真实 draft —— 传 null 会被
+        //   它如实拒收 bad-draft（那正是「产品面禁自塞 people 行」这条纪律的入口守卫）。
+        WA.store.transact(function (d) {
+          WA.registry.ensurePerson(d, 'np_rw2164a', 'rw2164甲', 'reject-witness');
+          WA.registry.ensurePerson(d, 'np_rw2164b', 'rw2164乙', 'reject-witness');
+        }, 'reject-witness:bp-people');
+        WA.world.addPlace({ name: 'rw2164甲城', kind: 'home' });
+        WA.world.addPlace({ name: 'rw2164乙城', kind: 'market' });
+        WA.world.addRoad('rw2164甲城', 'rw2164乙城', 30);
+        WA.store.transact(function (d) {
+          d.evolution = Object.assign({}, d.evolution, { factions: [{ id: 'fa_rw2164', name: 'rw2164甲势力', power: 40 }] });
+        }, 'reject-witness:bp-fa');
+        want('empty-blueprint', 'worldBlueprint.exportBlueprint：人物/势力/地点/时代四张表全空 ⇒ 拒收（空蓝图装出来的是空世界，与「还没开局」不可分）');
+        trip('empty-blueprint', function () {
+          const keep = WA.store.get;
+          WA.store.get = function () { return {}; };
+          try { return [Bp.exportBlueprint().reason]; } finally { WA.store.get = keep; }
+        });
+        const ex = Bp.exportBlueprint();
+        if (ex.ok) {
+          want('bad-bp-ver', 'worldBlueprint.previewImport：bpVer 对不上 ⇒ 拒收并给出 got/supported（不按 v1 猜着收 —— 未知版本的蓝图装下去会静默污染目标存档）');
+          trip('bad-bp-ver', function () {
+            const bad = JSON.parse(JSON.stringify(ex.blueprint)); bad.bpVer = 999;
+            return [Bp.previewImport(bad).reason];
+          });
+          want('bad-blueprint', 'worldBlueprint.previewImport：蓝图不是对象、或缺 ids 结构 ⇒ 拒收（形状不对就不谈内容）');
+          trip('bad-blueprint', function () {
+            const a = Bp.previewImport(null).reason;
+            const b = (function () { const x = JSON.parse(JSON.stringify(ex.blueprint)); delete x.ids; return Bp.previewImport(x).reason; })();
+            return [a, b];
+          });
+          want('bad-bp-keys', 'worldBlueprint.previewImport：蓝图含未知顶层键 ⇒ 拒收并列出（未来格式或恶意载荷 —— 静默收下等于把「不确定能装」伪装成「装下了」）');
+          trip('bad-bp-keys', function () {
+            const x = JSON.parse(JSON.stringify(ex.blueprint)); x.evil = 1;
+            return [Bp.previewImport(x).reason];
+          });
+          want('duplicate-id', 'worldBlueprint.previewImport：同一稳定 ID 出现在两张表 / 同表两次 ⇒ 拒收（id 重复即「按 key 引用」这条地基塌了）');
+          trip('duplicate-id', function () {
+            const x = JSON.parse(JSON.stringify(ex.blueprint));
+            if (!x.ids.people.length || !x.ids.places.length) return [];
+            x.ids.places[0].key = x.ids.people[0].key;
+            return [Bp.previewImport(x).reason];
+          });
+          want('dangling-ref', 'worldBlueprint.previewImport：关系边 / 道路端点指向不存在的 key ⇒ 拒收（悬空引用装进去就是一条指向虚空的边）');
+          trip('dangling-ref', function () {
+            const out = [];
+            // 两条通路各证一次：关系边（若本局面有）与道路端点（必有 —— 上面刚建了路）。
+            const x1 = JSON.parse(JSON.stringify(ex.blueprint));
+            if (x1.relations.length) { x1.relations[0].to = 'bk_no_such_key_0'; out.push(Bp.previewImport(x1).reason); }
+            const x2 = JSON.parse(JSON.stringify(ex.blueprint));
+            if (x2.roads.length) { x2.roads[0].a = 'bk_no_such_key_1'; out.push(Bp.previewImport(x2).reason); }
+            return out;
+          });
+          want('duplicate-blueprint', 'worldBlueprint.save：同签名（换个名字仍是同一结构）存第二次 ⇒ 拒收并给出已有 id —— 库不是存档格，重复结构再多也只是噪声');
+          trip('duplicate-blueprint', function () {
+            const first = Bp.save('rw2164甲蓝图', 'other');
+            if (!first.ok) return [];
+            return [Bp.save('rw2164换名同结构', 'other').reason];
+          });
+          want('unknown-blueprint', 'worldBlueprint.get/drop：蓝图 id 不在库内 ⇒ 拒收（不替世界编一张不存在的蓝图）');
+          trip('unknown-blueprint', function () {
+            return [Bp.get('bp_rw2164_不存在').reason, Bp.drop('bp_rw2164_不存在').reason];
+          });
+        }
+      } finally {
+        try { Bp.setSettings(keepBp); } catch (e1) {}
+        try {
+          WA.store.transact(function (d) {
+            Object.keys(d).forEach(function (k) { delete d[k]; });
+            Object.keys(snap).forEach(function (k) { d[k] = snap[k]; });
+          }, 'reject-witness:bp-restore');
+        } catch (e2) {}
+      }
+    }
+  }
 
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });

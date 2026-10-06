@@ -2093,6 +2093,9 @@
     //   「库是空的」与「这一面被关掉了」在界面上必须分得开 —— 与 v2.154.0 同一句纪律）。
     const wscfg = (WA.worldSeed && WA.worldSeed.getSettings) ? WA.worldSeed.getSettings() : null;
     const wsOn = !!(wscfg && wscfg.enabled);
+    // v2.164.0（TX5 世界蓝图）：同款读数常驻（「库是空的」与「这一面被关掉了」必须分得开）。
+    const bpcfg = (WA.worldBlueprint && WA.worldBlueprint.getSettings) ? WA.worldBlueprint.getSettings() : null;
+    const bpOn = !!(bpcfg && bpcfg.enabled);
     return `
       <div class="wa-sec">世界态势分析（纯只读体检）</div>
       <button class="wa-btn" id="wa-an-run">立即分析</button>
@@ -2173,6 +2176,22 @@
       <div class="wa-row"><button class="wa-btn" id="wa-ws-init" title="初始化预览：把种子映射到现有状态字段（id 映射 + 引用完整性 + 保留层级说明）。变异在此生成一次，确认应用同一份（不重抽）">初始化预览</button><button class="wa-btn" id="wa-ws-confirm" title="写口（大）：一次事务装完整结构（势力/关系网/地名/时代），进度归零，写 meta.initFrom。只作用于空新局 —— 非空目标拒收 not-empty">初始化确认</button></div>
 
       <div id="wa-ws-out" class="wa-out"></div>
+
+      <div class="wa-sec">世界蓝图（把这一局的世界原样搬走 / 搬来）</div>
+      <div class="wa-dim">蓝图存的是<b>结构</b>：人物稳定 ID 与别名、方向化关系、势力权重、地点（含归属与开关时刻）、
+        <b>道路端点</b>与时长容量、时代与日历起点、受支持的静态人设与机制开关。
+        它<b>不含</b>人物私密记忆 / 聊天文本 / 已完成事件 / 编年史 / 暗流 / 回声 / 事实 / 外部凭据与脚本 ——
+        蓝图搬的是「这个世界长什么样」，不是「这一局发生过什么」。与种子库的分水岭：种子<b>只有显示名</b>
+        （两个同名人物会被合并），蓝图给每个实体一个<b>稳定 ID</b>（同一份输入永远得到同一个 key，同名不合并）。
+        安装只作用于<b>空新局</b>：非空目标拒收 not-empty，不覆盖既有存档。此刻：<b>${bpOn ? '开' : '关'}</b>
+        （关闭时导出／保存／预览／安装一并拒收，读数会一直空 —— 这与「还没导出过」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-bp-enabled" type="checkbox" ${bpOn ? 'checked' : ''}/> 启用世界蓝图</label>
+      <div class="wa-row"><input id="wa-bp-name" class="wa-input" placeholder="蓝图名（如：三足鼎立·完整版）"/><input id="wa-bp-tags" class="wa-input" placeholder="标签，逗号分隔（三国鼎立 / 都市商战 / 田园）"/><button class="wa-btn" id="wa-bp-save" title="写口：把上一次导出的蓝图存进库（一次 transact、只写 blueprint.library）。同结构不存两份（duplicate-blueprint 带已有 id）、库满拒收 library-full —— 不静默挤掉旧蓝图。去重靠签名不靠名字">保存蓝图</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-bp-export" title="纯读：从当前世界导出完整结构蓝图（白名单提取）。四张表全空时拒收 empty-blueprint —— 不产空蓝图。导出后当场自检引用完整性，悬空即报 dangling-ref（问题出在导出侧而非导入侧）">导出蓝图</button><button class="wa-btn" id="wa-bp-list" title="只读：库内清单（名字/标签/签名/各面条数）">蓝图清单</button><button class="wa-btn" id="wa-bp-stat" title="只读：导出/保存/预览/安装次数、库上限与拒收归因">台账</button></div>
+      <div class="wa-row"><input id="wa-bp-id" class="wa-input" placeholder="蓝图 id（如 bp_1a2b3c4d_5e6f）"/><button class="wa-btn" id="wa-bp-get" title="只读：取一张蓝图（含结构与签名）">取蓝图</button><button class="wa-btn" id="wa-bp-drop" title="写口：从库内删掉一张蓝图（只动 blueprint.library 这一格）">删蓝图</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-bp-check" title="纯读：对库内一张蓝图跑引用完整性三判据（重复 ID / 悬空引用 / 未知顶层键）—— 这是安装前的**独立**校验口，与安装侧共用同一份判据，不另写一套">校验蓝图</button><button class="wa-btn" id="wa-bp-empty" title="纯读：当前世界是不是空新局（12 项逐格清点：人物/地点/道路/势力/轮次/纪事/暗流/回声/事实/货品/初始化来源/蓝图安装留痕）。答的是「现在能不能装」，不是「装过没有」">目标空局检查</button></div>
+      <div class="wa-row"><input id="wa-bp-keep" class="wa-input" placeholder="保留层级 structure / roster / mech（留空=roster）"/><button class="wa-btn" id="wa-bp-preview" title="纯读预览：把库内一张蓝图映射到现有状态字段（六道门：版本/形状/白名单键/重复 ID/悬空引用/容量 + 目标非空）。预览只做一次映射，确认应用同一份">导入预览</button><button class="wa-btn" id="wa-bp-import" title="写口（大）：一次事务装完整结构（势力/人物/关系/地点/道路/时代），进度归零，写 blueprint.installed。只作用于空新局 —— 非空目标拒收 not-empty；无预览拒收 no-preview">安装蓝图</button></div>
+      <div id="wa-bp-out" class="wa-out"></div>
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
 
@@ -4025,6 +4044,129 @@
         + '｜标签闭集 ' + s.tags.join('/')
         + '｜上次 ' + (s.lastReason || '无')
         + (s.hasLast ? '（身上有未保存的提取：' + s.lastSig + '）' : '（尚未提取过 —— 「没提取过」不等于「这个格局不值得存」）')
+        + (fk ? '｜拒收归因 ' + fk : ''), true);
+    });
+    // ── v2.164.0（TX5 世界蓝图）：九枚控件 + 一个输出区（渲染在「工具」页）。
+    //   三件齐做（渲染 + 绑定 + UI_BINDINGS 守卫登记）—— 理由与 v2.155.0 种子库同批一致。
+    //   与种子库共用 wsErr 的形状，但**不共用输出区**：种子库那栏答的是「格局存了没」，
+    //   这一栏答的是「这个世界能不能原样搬走」——合成一栏就是把两件事说成一件事。
+    const bpOut = function (text, keep) {
+      if (keep) panelEl.dataset.bpOut = text;
+      setOut('#wa-bp-out', text);
+    };
+    if (panelEl.dataset.bpOut) setOut('#wa-bp-out', panelEl.dataset.bpOut);
+    { const el = $('#wa-bp-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.worldBlueprint || !WA.worldBlueprint.setSettings) return bpOut('未记录：module-missing', true);
+        WA.worldBlueprint.setSettings({ enabled: !!el.checked });
+        bpOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（库内蓝图仍留在存档里，只是不再导出／保存／安装）'), true);
+      };
+    }
+    on('#wa-bp-export', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.exportBlueprint) return bpOut('未记录：module-missing', true);
+      const r = WA.worldBlueprint.exportBlueprint({ keep: wsVal('#wa-bp-keep') || undefined });
+      if (!r.ok) return bpOut(wsErr(r) + (r.reason === 'empty-blueprint' ? '（四张结构表全空 —— 不产空蓝图）' : ''), true);
+      bpOut('已导出 签名 ' + r.bpSig + '｜保留层级 ' + r.blueprint.keep + '｜人物 ' + r.counts.people
+        + ' · 势力 ' + r.counts.powers + ' · 地点 ' + r.counts.places + ' · 关系 ' + r.counts.relations
+        + ' · 道路 ' + r.counts.roads
+        + '｜本蓝图不含：' + r.excluded.join('/') + '（搬的是结构，不是这一局发生过什么）', true);
+    });
+    on('#wa-bp-save', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.save) return bpOut('未记录：module-missing', true);
+      const r = WA.worldBlueprint.save(wsVal('#wa-bp-name'), wsVal('#wa-bp-tags'));
+      if (!r.ok) return bpOut(wsErr(r), true);
+      bpOut('已保存 ' + r.id + '「' + r.name + '」｜库内 ' + r.total + ' 张'
+        + '（人物 ' + r.counts.people + ' · 势力 ' + r.counts.powers + ' · 地点 ' + r.counts.places
+        + ' · 道路 ' + r.counts.roads + '）', true);
+      renderBody();
+    });
+    on('#wa-bp-list', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.list) return bpOut('未记录：module-missing', true);
+      const r = WA.worldBlueprint.list();
+      if (!r.rows.length) return bpOut('库是空的（还没保存过蓝图）—— 这不是「没有可搬的世界」', true);
+      bpOut(r.rows.map(function (x) {
+        return x.id + '「' + x.name + '」[' + (x.tags.join('/') || '无标签') + '] v' + x.bpVer + ' ∈ ' + x.bpSig
+          + '（人物 ' + x.counts.people + '／势力 ' + x.counts.powers + '／地点 ' + x.counts.places + '／道路 ' + x.counts.roads + '）';
+      }).join('；'), true);
+    });
+    on('#wa-bp-get', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.get) return bpOut('未记录：module-missing', true);
+      const r = WA.worldBlueprint.get(wsVal('#wa-bp-id'));
+      if (!r.ok) return bpOut(wsErr(r), true);
+      const bp = r.row.bp || {};
+      bpOut('取到 ' + r.row.id + '「' + r.row.name + '」v' + bp.bpVer + ' 签名 ' + bp.bpSig
+        + '｜势力 ' + ((bp.ids && bp.ids.powers || []).map(function (p) { return p.name + '(' + p.weight + ')'; }).join('、') || '无')
+        + '｜地点 ' + ((bp.ids && bp.ids.places || []).map(function (p) { return p.name; }).join('、') || '无')
+        + '｜道路 ' + ((bp.roads || []).length) + ' 条'
+        + '｜时代 ' + ((bp.era && (bp.era.label || bp.era.title)) || '无'), true);
+    });
+    on('#wa-bp-drop', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.drop) return bpOut('未记录：module-missing', true);
+      const r = WA.worldBlueprint.drop(wsVal('#wa-bp-id'));
+      if (!r.ok) return bpOut(wsErr(r), true);
+      bpOut('已删除 ' + r.id + '｜库内剩 ' + r.total + ' 张', true);
+      renderBody();
+    });
+    on('#wa-bp-check', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.checkIntegrity) return bpOut('未记录：module-missing', true);
+      const g = WA.worldBlueprint.get(wsVal('#wa-bp-id'));
+      if (!g.ok) return bpOut(wsErr(g), true);
+      const ic = WA.worldBlueprint.checkIntegrity(g.row.bp);
+      if (ic.ok) return bpOut('引用完整性通过：无重复 ID · 无悬空引用 · 无未知顶层键（三判据与安装侧同源，不是另写一套）', true);
+      bpOut('引用完整性不通过：'
+        + (ic.dupIds.length ? '重复 ID ' + ic.dupIds.slice(0, 8).join('、') + '｜' : '')
+        + (ic.dangling.length ? '悬空引用 ' + ic.dangling.slice(0, 8).join('、') + '｜' : '')
+        + (ic.unknownKeys.length ? '未知顶层键 ' + ic.unknownKeys.slice(0, 8).join('、') : ''), true);
+    });
+    on('#wa-bp-empty', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.targetEmpty) return bpOut('未记录：module-missing', true);
+      const ec = WA.worldBlueprint.targetEmpty();
+      bpOut(ec.empty
+        ? '当前是空新局（12 项逐格清点全空）—— 可以安装蓝图'
+        : '当前**不是**空新局：' + ec.what.join('、')
+          + '（蓝图安装只作用于空新局 —— 不覆盖既有存档；要装请先开新局）', true);
+    });
+    on('#wa-bp-preview', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.previewImport) return bpOut('未记录：module-missing', true);
+      const g = WA.worldBlueprint.get(wsVal('#wa-bp-id'));
+      if (!g.ok) return bpOut(wsErr(g), true);
+      const r = WA.worldBlueprint.previewImport(g.row.bp);
+      if (!r.ok) return bpOut(wsErr(r), true);
+      const p = r.plan;
+      bpOut('导入预览（**世界一个字没动**，安装才落笔）：v' + p.bpVer + ' · 签名 ' + p.bpSig + ' · 保留层级 ' + p.keep
+        + '｜拟装：人物 ' + p.ids.people.length + ' · 势力 ' + p.ids.powers.length
+        + ' · 地点 ' + p.ids.places.length + ' · 关系 ' + p.relations.length + ' · 道路 ' + p.roads.length
+        + ' · 时代「' + (p.era.label || p.era.title || '无') + '」'
+        + '｜场景起点 ' + p.scene.id + (p.scene.enabled ? '（启用）' : '（未启用）') + ' · 进度归零 ' + (p.scene.zeroed ? '是' : '否')
+        + (r.ambiguousNames && r.ambiguousNames.length ? '｜同名多 key（按 key 引用，不静默挑一个）：' + r.ambiguousNames.join('/') : '')
+        + (r.retainNote ? '\n' + r.retainNote : ''), true);
+    });
+    on('#wa-bp-import', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.importBlueprint) return bpOut('未记录：module-missing', true);
+      const r = WA.worldBlueprint.importBlueprint();
+      if (r.ok && r.reason === 'already') {
+        bpOut('这个世界已从蓝图（签名 ' + r.bpSig + '）安装过 —— 本次不重装（安装于 ' + r.installedAt + '）', true);
+        return;
+      }
+      if (!r.ok) return bpOut(wsErr(r)
+        + (r.reason === 'not-empty' && r.what ? '（非空：' + r.what.join('、') + '）' : ''), true);
+      const i = r.installed;
+      bpOut('已安装蓝图：人物 ' + i.people + ' · 势力 ' + i.powers + ' · 地点 ' + i.places
+        + ' · 关系 ' + i.relations + ' · 道路 ' + i.roads + '（**端点如实复原** —— 这是蓝图对种子的净增量）'
+        + '｜进度归零，安装留痕已写入 blueprint.installed（签名 ' + r.bpSig + '）—— 可以继续游玩了', true);
+      renderBody();
+    });
+    on('#wa-bp-stat', () => {
+      if (!WA.worldBlueprint || !WA.worldBlueprint.stat) return bpOut('未记录：module-missing', true);
+      const s = WA.worldBlueprint.stat();
+      const f = s.faults || {};
+      const fk = Object.keys(f).map(function (k) { return k + '×' + f[k]; }).join('、');
+      bpOut('蓝图台账：' + (s.enabled ? '开' : '关') + '｜导出 ' + s.exports + ' 次 · 保存 ' + s.saves
+        + ' 次 · 预览 ' + s.previews + ' 次 · 安装 ' + s.imports + ' 次｜库内 ' + s.total + '／上限 ' + s.libCap
+        + '｜蓝图版本 v' + s.bpVer + ' · 保留层级 ' + s.keepLevels.join('/') + ' · 场景 ' + s.scenes.join('/')
+        + '｜上次 ' + (s.lastReason || '无')
+        + (s.hasPending ? '（有未确认的导入票据 —— 未确认不落盘）' : '')
+        + (s.hasInstalled ? '（已安装留痕：v' + s.installedBpVer + ' · ' + s.installedSig + '）' : '')
         + (fk ? '｜拒收归因 ' + fk : ''), true);
     });
     on('#wa-life-goal', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addGoal(x.person, { text: x.text }), true); renderBody(); });

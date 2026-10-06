@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.163.0'
+  const VERSION = '2.164.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -579,6 +579,13 @@
     //   它在调用期读 world / evolution / people / background 四个既有面（全部在本行之前装载），
     //   且只写自己那一格 `worldSeed.library` —— 不依赖任何后装模块。
     'engines/world-seed.js',
+    // v2.164.0（TX5）：版本化完整世界蓝图。位置在 world-seed 之后 ——
+    //   两者回答**同一族问题的两个档位**（有损种子 vs 无损结构蓝图），且都只写自己那一格
+    //   （worldSeed.library / blueprint.library），互不调用。放在紧随其后是刻意的：
+    //   读代码的人一眼看到「同一个世界导出有两条路径，边界在格式上」。
+    //   调用期依赖：registry（人物唯一写者）/ world（地点与道路形状）/ evict（蓝图库容量）
+    //   —— 全在调用期取，故此处对装载期无硬依赖。
+    'engines/world-blueprint.js',
     // v2.156.0（SP1）：时间来源与游玩生命周期（engines/playtime.js）。位置在 world-seed 之后、
     //   ui/panel.js 之前：它在调用期读 store / settingsBus / clock / inputGuard（全部在本行之前装载），
     //   且只写自己那一格 localStorage 键——不依赖任何后装模块。
