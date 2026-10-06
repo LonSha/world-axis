@@ -83,10 +83,13 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（15 个，`git ls-files tools/ | wc -l` 为准：
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（16 个，`git ls-files tools/ | wc -l` 为准：
 `anchor-scan` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `doc-gate` / `gen-changelog` /
 `gen-error-codes` / `gen-lock` / `hooks` / `impact-analysis` / `patch-idempotency` /
-`scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded`）。
+`scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded` / `test-audit`）。
+（v2.162.0 收口轮：`test-audit` 此前被 `.gitignore` 的形态规则误挡在库外，而它是 `tests/run.js`（RP8 段）
+与 `tests/test-audit-v2155.js`（`require`）的**必跑依赖** ⇒ 干净克隆跑全量会当场 ENOENT。
+解除排除并入库后索引由 15 → 16，本名单随之补上 —— **入库不是终点，本名单必须同一轮跟上**。）
 其余一次性脚本与补丁（`patch_*` / `bump_*` / `seal_check_*` / `doc_*` / `wire_*`）不入库：它们是收官动作，不是交付物
 （v2.136.0 实测补一处漏网：`patch_o17_v2104` 自 2.104.0 起一直在索引里，与前半句「只有被引用才入库」
 和本条自身都矛盾 —— 它零代码引用、且 `patch_*` 本就在不入库之列，已按既有判据 `git rm --cached`，磁盘留存）。

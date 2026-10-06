@@ -90,7 +90,7 @@
 | 版本条目存放 | `node tests/docs-archive-gate.js` → README **108** 条 / 日志存档 92 条 / 跨文件同号 **0** |
 | 锚点覆盖 | `node tools/anchor-scan.js` → 锁 **150** 把 · 覆盖 **150（100%）**＝ 统一档 39（锚点 311 · 问题 0）+ 非统一档已识别 **111**（848 条锚点）· **未识别 0** · 非统一档问题 **175**（**只报不红**） |
 | 端到端读数 | `node tools/sync-e2e-readings.js --verify` → ✓ 全部端到端读数与账本现场同源（装载期边 **81** / 调用期引用 **160** / 硬边 0 / 命名空间 187 / 装载文件 179 / 冻结面条目 772）；`node tools/sync-hardcoded.js --check` → 无需回填 |
-| tools/ | 只留**被可执行代码引用**的 15 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据 |
+| tools/ | 只留**被可执行代码引用**的 16 个（一次性脚本不入库，见 `.gitignore`）—— v2.136.0 起由 `tests/toolchain-gate.js` 当场执行此判据（v2.162.0 收口轮：`test-audit` 解除误排除后由 15 → 16） |
 | docs/ | `README` / `architecture` / `gates` / `contributing` + 生成物 `ERROR_CODES.md` |
 
 ## 迭代记录

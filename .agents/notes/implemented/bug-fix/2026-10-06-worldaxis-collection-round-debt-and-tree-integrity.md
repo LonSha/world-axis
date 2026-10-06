@@ -148,6 +148,26 @@ every run. It is a derived artifact, and the `.gitignore` comment says so.
   the collection round now also looks for *duplicate* sources of one criterion
   and for defects in the checkout face, neither of which any gate reads.
 
+## Follow-up found by re-running on a fresh baseline (same round)
+
+Tracking `tools/test-audit.js` was correct, but it changed a *reading* that a
+gate compares: the tracked tool count went 15 -> 16 while the roster sentence in
+`README.md` still said 15, so `tests/toolchain-gate-v2136.js` reports
+**FAIL 8 / 43** on the new baseline. It was fixed in the same round (README
+roster 15 -> 16 plus the `test-audit` entry, `ITERATION_LOG.md` tools row
+aligned, gate back to 43/43).
+
+Why the full run did not catch it: `tests/isolated-runner.js` builds its work
+tree by `git archive HEAD`, then `git init` + `git add -A` + commit — that
+creates a **baseline index** — and only then overlays candidate files. Gates that
+read `git ls-files` therefore measure the *baseline*, not the candidate. The
+run that reported 15441 / 0 had the old baseline (15 tools, roster 15), so it
+was green. The inconsistency only became visible when a tree whose baseline
+already contained the new index was exercised. Consequence to keep: **an index
+reading is not covered by a full regression run; the roster must be updated in
+the same edit that changes the index.** The `.gitignore` comment gained the
+matching note, and the roster line now carries the version that changed it.
+
 ## Same-series notes
 
 The audit performed while writing this note (searching proposed + implemented
