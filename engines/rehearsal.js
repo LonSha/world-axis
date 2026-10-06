@@ -131,6 +131,8 @@
    *     则「刚登记完」就已经和钉住的指纹不符（登记动作自己也改变了世界）。
    *   · `meta`：store 每次事务都改写 `updatedAt` / `writeSeq` / `stateRev`。
    *     若不排除，则**任何**事务都会让指纹失效，包括本模块的记账事务。
+   * 为什么不是「所有非世界键」：那等于让真改世界被判成无变化（判据变恒真话），
+   *   故记账面是一份显式清单（BOOKS），由 b7 锁的 fp3/fp4 两向探针钉着。
    * 为什么不用 `meta.stateRev`：它是全局事务计数器，区分不了
    *   「世界变了」与「我自己记了一笔账」——而 B7 问的是**真实世界**版本是否仍匹配。
    * `rev` 保留在返回值里只作**附注**（视图展示用），**不参与**比对。
@@ -138,10 +140,22 @@
    * 为什么是逐格长度而不是总长度：总长度对「某格同长替换」完全瞎
    *   （把一个 id 换成等长的另一个 id，总长度一字不变）。逐格序列能看出「哪一格动了」。
    */
+  // ── 记账面（不进指纹）──────────────────────────────────────────────
+  //   这几个顶层键是**观测 / 记账簿**，不是世界内容：它们每一个都**必然**在
+  //   「登记一笔账」这个动作里被改写，而登记本身不改变世界的语义。
+  //   v2.153.0（分支树接线时实测出来的缺口）：这里原先只删 `rehearsal`（本模块自己的簿），
+  //   于是**别的**账本一登记，本模块刚钉下的预览就永久 stale ——
+  //   实测：fork 登记一个分叉点后 `checkPreview` 立刻 `match:false`（chars 2357 → 2400），
+  //   即 replay 从出生起就恒报 not-comparable，而树上一切看着正常。
+  //   同族：把 `branchTree` 换成任何"每登记一次就改一次"的簿，缺口一模一样。
+  //   反面同样不许：把这层扩大成「所有非世界键」等于让真改世界被判成无变化（判据变恒真话）。
+  //   故它是一份**显式清单**，两边都由 tests/b7-rehearsal-v2118.js 的 fp3/fp4 探针钉着。
+  const BOOKS = ['rehearsal', 'branchTree'];
+
   function fingerprint() {
     const s = state();
     const world = Object.assign({}, s || {});
-    delete world.rehearsal;
+    BOOKS.forEach(function (k) { delete world[k]; });
     delete world.meta;
     const keys = Object.keys(world).sort();
     const parts = [];

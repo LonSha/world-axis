@@ -498,6 +498,54 @@
     });
   }
   /**
+   * v2.153.0(RX5): 剧情深度仪读数——「这个故事现在发展到什么程度」。
+   *   只读 stat 与一次**无副作用**指数（`tension({push:false})`：不推趋势环）。
+   *   为什么不跑入环版本：诊断面每次调用都会往趋势环里塞一个样本，于是「打开诊断」
+   *   这件事本身会改变走向读数 —— 观测污染被观测者（与 secSediment「不跑 feel」同规）。
+   *   四分量与权重**全量透出**：合成值失真的第一诊断手段就是「看哪个分量在动」。
+   */
+  function secPlotGauge() {
+    return safe(function () {
+      if (!WA.plotGauge || typeof WA.plotGauge.stat !== 'function') return { error: 'engines/plot-gauge.js 未加载（剧情深度读数缺席）' };
+      const st = WA.plotGauge.stat();
+      const t = (typeof WA.plotGauge.tension === 'function') ? WA.plotGauge.tension({ push: false }) : null;
+      const tr = (typeof WA.plotGauge.trend === 'function') ? WA.plotGauge.trend() : null;
+      return {
+        enabled: st.enabled, gauges: st.gauges, rejected: st.rejected, lastReason: st.lastReason,
+        samples: st.samples, caps: st.caps, risingDelta: st.risingDelta,
+        // 无副作用指数：ok:false 时带 reason（no-signal / disabled），**不拿 0 分冒充「故事刚开始」**
+        score: (t && t.ok) ? t.score : null, band: (t && t.ok) ? t.band : null,
+        reason: (t && t.ok) ? '' : ((t && t.reason) || 'unavailable'),
+        components: (t && t.ok) ? t.components : [],
+        sources: (t && t.ok) ? t.sources : null,
+        trend: tr ? { ok: !!tr.ok, direction: tr.ok ? tr.direction : '', reason: tr.ok ? '' : tr.reason,
+          samples: (typeof tr.samples === 'number') ? tr.samples : 0 } : null,
+        faults: Object.assign({}, st.faults || {})
+      };
+    });
+  }
+  /**
+   * v2.153.0(RX6): 多结局分支树读数——「我的选择把故事引向了多少种可能」。
+   *   只读 stat 与 tree()（两者都是纯读，不推演、不预演）。
+   *   `dangling` 单列：悬空边恒应为 0，但**报出来才是可核的**（不报就等于没人核）。
+   */
+  function secBranchTree() {
+    return safe(function () {
+      if (!WA.branchTree || typeof WA.branchTree.stat !== 'function') return { error: 'engines/branch-tree.js 未加载（分支树读数缺席）' };
+      const st = WA.branchTree.stat();
+      const t = (typeof WA.branchTree.tree === 'function') ? WA.branchTree.tree() : null;
+      return {
+        enabled: st.enabled, nodes: st.nodes, roots: st.roots,
+        withChoice: st.withChoice, withPreview: st.withPreview,
+        forks: st.forks, refused: st.refused, lastReason: st.lastReason, caps: st.caps,
+        edges: (t && t.ok) ? t.edges.length : null,
+        dangling: (t && t.ok) ? t.dangling : null,
+        treeReason: (t && t.ok) ? t.reason : ((t && t.reason) || 'unavailable'),
+        faults: Object.assign({}, st.faults || {})
+      };
+    });
+  }
+  /**
    * v2.150.0(RP4): 注入价值读数——「预算告诉你花掉了，价值告诉你有没有白花」。
    *   只读 stat（**不跑 report**：report 会遍历已结算轮次做聚合、按源归拢，那是一份
    *   读数生成物，面板要榜单时自己调；诊断面必须在任何面上留不下痕迹——与
@@ -521,6 +569,207 @@
       };
     });
   }
+  /**
+   * v2.151.0（RX2）：跨会话记忆锚读数。
+   *   只读 stat（**不跑 tick / 不跑 buildBlock**：那两个会写 stat 计数与 blocks，
+   *   诊断面必须在任何面上留不下痕迹——与 secSediment「不跑 feel」同规）。
+   */
+  function secOfflineTick() {
+    return safe(function () {
+      if (!WA.offlineTick || typeof WA.offlineTick.stat !== 'function') return { error: 'engines/offline-tick.js 未加载（离线推进读数缺席）' };
+      const st = WA.offlineTick.stat();
+      const cfg = WA.offlineTick.getSettings();
+      return {
+        enabled: st.enabled, anchors: st.anchors, released: st.released, batches: st.batches, skips: st.skips,
+        ticks: st.ticks, firsts: st.firsts, anchored: st.anchored, protectedRows: st.protectedRows,
+        rounds: st.rounds, lastReason: st.lastReason, byKind: st.byKind || {}, caps: st.caps,
+        stepMs: cfg.stepMs, maxRounds: cfg.maxRounds, minGapMs: cfg.minGapMs,
+        // 拒收归因（disabled / missing-fields / bad-value / anchors-full / unknown-anchor /
+        //   no-draft / no-elapsed / too-short / apply-throw / no-apply / store-unavailable）。
+        //   只报 ticks 的话，「玩家很久没回来」与「接线断了、每调必拒」在诊断面上长得一样——
+        //   而这两种局面一个不用管、一个要立刻查（与 secInjectValue 的 skipReasons 同规）。
+        faults: Object.assign({}, st.faults || {}),
+        note: st.ticks === 0 && st.firsts > 0 ? '已落基准但没有跨会话批次（「不知道你走了多久」不等于「你走了零秒」）' : null
+      };
+    });
+  }
+  /**
+   * v2.151.0（RX3）：远方世界脉搏读数。
+   *   只读 stat（**不跑 tick / deliver / settlePulse**：那几个都会改世界与计数；
+   *   partition 只读 region.places()，与面板同一口子，故这里读它不算副作用）。
+   */
+  function secFarfield() {
+    return safe(function () {
+      if (!WA.farfield || typeof WA.farfield.stat !== 'function') return { error: 'engines/farfield.js 未加载（远方脉搏读数缺席）' };
+      const st = WA.farfield.stat();
+      const cfg = WA.farfield.getSettings();
+      return {
+        enabled: st.enabled, pulses: st.pulses, pendingInFlight: st.pendingInFlight, heard: st.heard,
+        nearCount: st.nearCount, farCount: st.farCount, ticks: st.ticks, delivered: st.delivered,
+        distorted: st.distorted, skipped: st.skipped, settled: st.settled, relays: st.relays,
+        lastReason: st.lastReason, byTrend: st.byTrend || {}, caps: st.caps,
+        // v2.157.0（SP4 + S2）：四类上限的消费现场。三个新计数各自可独立
+        //   抓到一个局面：预算没推完 / 在途满而暂停 / 自动真跑过没有。
+        carriedOnce: st.carriedOnce, pendingFull: st.pendingFull, transfers: st.transfers,
+        autoTicks: st.autoTicks, autoFirsts: st.autoFirsts, autoOn: !!cfg.auto,
+        autoDay: (function () { try { const f = (WA.store.get() || {}).farfield; return (f && f.autoDay != null) ? f.autoDay : null; } catch (e) { return null; } })(),
+        nearDays: cfg.nearDays, maxItems: cfg.maxItems, autoMaxWindows: cfg.autoMaxWindows, capTransfer: cfg.capTransfer,
+        // 拒收归因（disabled / no-draft / no-far / too-early / nothing-pending /
+        //   missing-fields / unknown-pulse / unknown-message / sediment-absent / rumor-absent /
+        //   settle-failed / relay-failed）。六码处置不同：分别要建远场地区 / 等世界钟走 / 补事实键 /
+        //   救沉积或 rumor 模块，故必须分列而不合成一个「没成」。
+        faults: Object.assign({}, st.faults || {}),
+        note: st.ticks === 0 ? '还没有推进过远场（读数空不等于「远方没事发生」）' : null
+      };
+    });
+  }
+/**
+   * v2.154.0（RX4）：世界联网面读数。
+   *   只读 stat / worldKey / view —— **不跑 exportLegends / importLegends / toRumor**
+   *   （那三个都会改世界状态或写入传说链）。`worldKey()` 只把身份读出来，零副作用。
+   */
+  function secWorldBridge() {
+    return safe(function () {
+      if (!WA.worldBridge || typeof WA.worldBridge.stat !== 'function') return { error: 'engines/world-bridge.js 未加载（世界联网面读数缺席）' };
+      const st = WA.worldBridge.stat();
+      const cfg = WA.worldBridge.getSettings();
+      return {
+        enabled: st.enabled, sig: st.sig || null, label: st.label || null,
+        identityComplete: !!st.identityComplete,
+        legends: st.legends, exportedSigs: st.exportedSigs, seeds: st.seeds,
+        exported: st.exported, imported: st.imported, relays: st.relays, dropped: st.dropped,
+        redacted: st.redacted, reads: st.reads, refusals: st.refusals, lastReason: st.lastReason,
+        kinds: st.kinds || [], caps: st.caps,
+        maxExported: cfg.maxExported, maxItems: cfg.maxItems,
+        // 拒收归因（disabled / identity-incomplete / no-chronicle / nothing-to-export /
+        //   self-origin / bad-payload / no-legends / nothing-to-import / unknown-legend /
+        //   rumor-absent / relay-failed）。五码处置不同：分别要填身份 / 等世界攒下大事 /
+        //   换一份传说包 / 换一个来源世界，故必须分列而不合成一个「没成」。
+        faults: Object.assign({}, st.faults || {}),
+        note: st.legends === 0 ? '还没有收进任何别世界传说（空不等于「别处没事」，只说明还没导入过）' : null
+      };
+    });
+  }
+
+  /**
+   * v2.154.0（RX7）：世界生态自洽审计读数。
+   *   取 stat() + lastSweep()（**不跑 sweep**：重扫会把审计器自己的开销塞进一次诊断调用，
+   *   而「打开诊断」本身不该改变世界 —— 与 v2.153.0 对张力取 `push:false` 同一条纪律）。
+   *   从没扫过时如实报 `never-swept`，不拿一个 0 冒充「四类全过」。
+   */
+  function secEcoAudit() {
+    return safe(function () {
+      if (!WA.ecoAudit || typeof WA.ecoAudit.stat !== 'function') return { error: 'engines/eco-audit.js 未加载（自洽审计读数缺席）' };
+      const st = WA.ecoAudit.stat();
+      const cfg = WA.ecoAudit.getSettings();
+      const last = (typeof WA.ecoAudit.lastSweep === 'function') ? WA.ecoAudit.lastSweep() : null;
+      const has = !!(last && last.ok === true);
+      return {
+        enabled: st.enabled, rules: st.rules, cats: (WA.ecoAudit.CATS || []).slice(),
+        sweeps: st.sweeps, issues: st.issues, truncated: st.truncated,
+        byCode: Object.assign({}, st.byCode || {}), byCat: Object.assign({}, st.byCat || {}),
+        lastMs: st.lastMs, lastAt: st.lastAt, lastReason: st.lastReason,
+        // 「扫过」与「没扫过」分开报（同 maintain 的 patrol.degraded 纪律）。
+        swept: has, lastErrors: has ? last.errors : 0, lastWarns: has ? last.warns : 0,
+        lastTotal: has ? last.total : 0, lastTruncated: has ? last.truncated : 0,
+        lastFailedSections: has ? last.failedSections : 0,
+        sources: has ? Object.assign({}, last.sources) : null,
+        caps: { issues: cfg.maxIssues, people: cfg.maxPeople },
+        perfSource: st.perfSource,
+        note: has ? null : '自洽审计尚未扫描过（never-swept）——「没扫」不等于「四类都对得上」'
+      };
+    });
+  }
+
+  /**
+   * 世界生成种子库读数（RX8）。
+   *   与 secEcoAudit 同规格：直读现场，不转发摘要。
+   *   两个「没得看」的态要分开：「没有提取过」（hasLast false）与「库是空的」（total 0）
+   *   —— 前者是还没拍快照，后者是拍了没存，处置不同（一个去 extract，一个去 save）。
+   */
+  function secWorldSeed() {
+    return safe(function () {
+      if (!WA.worldSeed || typeof WA.worldSeed.stat !== 'function') return { error: 'engines/world-seed.js 未加载（种子库读数缺席）' };
+      const st = WA.worldSeed.stat();
+      const cfg = WA.worldSeed.getSettings();
+      const li = (typeof WA.worldSeed.list === 'function') ? WA.worldSeed.list() : { rows: [] };
+      return {
+        enabled: st.enabled, libCap: st.libCap, total: st.total,
+        extracts: st.extracts, saves: st.saves, sows: st.sows, refused: st.refused,
+        lastReason: st.lastReason, faults: Object.assign({}, st.faults || {}),
+        hasLast: st.hasLast, lastSig: st.lastSig,
+        seedVer: st.seedVer, variance: Object.assign({}, st.variance || {}),
+        tags: (st.tags || []).slice(),
+        rows: (li.rows || []).map(function (r) {
+          return { id: r.id, name: r.name, tags: (r.tags || []).slice(), sig: r.sig, counts: r.counts };
+        }),
+        note: st.hasLast ? null : '尚未提取过任何种子（extract 未调用）——「没提取过」不等于「这个格局不值得存」'
+      };
+    });
+  }
+
+  /**
+   * v2.156.0（SP1）：时间来源与游玩活动基准读数。
+   *   为什么单列一节而不并进 life 节：life 那节答「人物这一轮做了什么」，
+   *   本节答「玩家离开的这段真实时间被谁记着」——两问的失效模式不同
+   *   （前者失效在「人物没动」，后者失效在「基准丢了 ⇒ 离线间隔被抹平」，
+   *   而后者还有一个更坏的形态：「从没记过」与「盘读不出来」长得一模一样）。
+   */
+  function secPlaytime() {
+    return safe(function () {
+      if (!WA.playtime || typeof WA.playtime.stat !== 'function') return { error: 'engines/playtime.js 未加载（游玩活动基准读数缺席）' };
+      const st = WA.playtime.stat();
+      const la = (typeof WA.playtime.lastActive === 'function') ? WA.playtime.lastActive() : { ok: false, reason: 'module-missing' };
+      const sc = (typeof WA.playtime.story === 'function') ? WA.playtime.story() : { ok: false, reason: 'module-missing' };
+      // 取用表进诊断面：四种时间「各自的读法 / 用途 / 是否写盘」是 SP1 的拟交付物之一，
+      //   而**只导出不消费**等于它没交付 —— 诊断面是它唯一的读者（读的人不必去猜边界在哪）。
+      const tb = (typeof WA.playtime.sources === 'function') ? WA.playtime.sources() : [];
+      return {
+        enabled: st.enabled, updateMinMs: st.updateMinMs, maxChats: st.maxChats,
+        touches: st.touches, throttled: st.throttled, reads: st.reads,
+        readFails: st.readFails, writeFails: st.writeFails, pruned: st.pruned,
+        lastReason: st.lastReason, faults: Object.assign({}, st.faults || {}),
+        names: (WA.playtime.SOURCE_NAMES || []).slice(),
+        sourcesTable: tb.map(function (r) { return { name: r.name, api: r.api, writes: !!r.writes }; }),
+        dataKey: WA.playtime.DATA_KEY, dataVer: st.dataVer,
+        hasBaseline: !!la.ok, baselineAt: la.ok ? la.at : 0, baselineAgeMs: la.ok ? la.ageMs : null,
+        storyOk: !!sc.ok, storyLabel: sc.ok ? sc.label : '', storyReason: sc.ok ? '' : sc.reason,
+        note: la.ok ? null : (st.readFails > 0
+          ? '活动基准读不出，且本会话有 ' + st.readFails + ' 次存储读失败 —— 这是存储故障，不是「本聊天从没记过」'
+          : '本聊天尚未记过活动基准（touch 未被调用过）—— 「没记过」不等于「你走了零秒」')
+      };
+    });
+  }
+
+  /**
+   * v2.156.0（S1）：离线恢复编排读数。
+   *   为什么单列一节：playtime 那节答「你上次什么时候在」，本节答「这段离开被怎么结算、
+   *   有没有被重复结算」—— 后者的失效模式是**静默的**（重复推演与真的又离开一次
+   *   在读数上同形），故票据/重试/磁带三组计数必须摊开。
+   */
+  function secOfflineReturn() {
+    return safe(function () {
+      if (!WA.offlineReturn || typeof WA.offlineReturn.stat !== 'function') return { error: 'engines/offline-return.js 未加载（离线恢复编排读数缺席）' };
+      const st = WA.offlineReturn.stat();
+      return {
+        enabled: !!st.enabled, deferMs: st.deferMs,
+        recovers: st.recovers, firsts: st.firsts, skipped: st.skipped, fails: st.fails,
+        retries: st.retries, settleTicks: st.settleTicks, rounds: st.rounds, protectedRows: st.protectedRows,
+        ticketChecks: st.ticketChecks, staleTickets: st.staleTickets,
+        consumeChecks: st.consumeChecks, consumes: st.consumes, consumeSkips: st.consumeSkips,
+        running: !!st.running, subscribed: !!st.subscribed, hasRetryTape: !!st.hasRetryTape,
+        chatId: st.chatId, settledAt: st.settledAt, pending: st.pending,
+        offlineTickEnabled: !!st.offlineTickEnabled, stepMs: st.stepMs, minGapMs: st.minGapMs,
+        lastReason: st.lastReason || '', lastAt: st.lastAt || 0, lastGapMs: st.lastGapMs,
+        faults: Object.assign({}, st.faults || {}),
+        src: st.src, settingsKey: st.settingsKey,
+        note: st.staleTickets > 0
+          ? '本会话有 ' + st.staleTickets + ' 次票据复核未过 —— 那是「同一段离线被拦下第二次」的现场，不是失败'
+          : null
+      };
+    });
+  }
+
   function secLife() {
     return safe(function () {
       if (!WA.life || typeof WA.life.stat !== 'function') return { error: 'life 模块不可用' };
@@ -1103,6 +1352,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   tests/inventory.js 的定义面与 tool-diag 的诊断面都从本表取，漏登记等于它在两面都不存在。
     //   由 tests/run.js:1409「诊断清单覆盖全部磁盘模块」盯着（本版实测报「缺 core/exec.js」）。
     'core/exec.js': 'exec',
+    // v2.160.0（TP4）：跨引擎提交契约。登记在此 = 该文件缺席时 secModules 会**如实报 missing**。
+    //   它有产品真消费方（tool-diag 的诊断节读 WA.commit.stat），缺席就是断裂。
+    'core/commit.js': 'commit',
     // v2.119.0（拓展计划 ③）：供需循环。同 plan/mend 口径：产品文件，缺席本身就是断裂。
     'engines/economy.js': 'economy',
     // v2.119.0（拓展计划 ④）：组织制度。同口径：产品文件，缺席本身就是断裂。
@@ -1154,6 +1406,36 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.150.0（RP4）：注入价值评估。登记为必载——注入链 observe / interceptor settle 两个
     //   生产方与 secInjectValue 均读它，缺席就是「价值面读数缺席」本身，不该被静默兜住。
     'engines/inject-value.js': 'injectValue',
+    // v2.151.0（RX2+RX3）：跨会话记忆锚 + 远方世界脉搏。登记为必载——注入链两条
+    //   新源与 secOfflineTick / secFarfield 块均读它们，缺席就是「离线/远方读数缺席」本身，不该被静默兜住。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取。
+    'engines/offline-tick.js': 'offlineTick',
+    'engines/farfield.js': 'farfield',
+    // v2.152.0（RP7）：存储水位预测。登记为必载——面板「会话」页性能与水位段读它的读数。
+    'engines/storage-forecast.js': 'storageForecast',
+    // v2.153.0（RX5+RX6）：剧情深度仪 + 多结局分支树。登记为必载 —— 面板「导演」页两段
+    //   与 secPlotGauge / secBranchTree 均读它们，缺席就是「深度/分支读数缺席」本身。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取。
+    'engines/plot-gauge.js': 'plotGauge',
+    'engines/branch-tree.js': 'branchTree',
+    // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。登记为必载 —— 注入链的
+    //   `远方的传说` 源读 worldBridge.buildBlock，面板「联网」页与本文件的 secWorldBridge /
+    //   secEcoAudit 都读它们，缺席就是「联网/自洽读数缺席」本身，不该被静默兜住。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取。
+    'engines/world-bridge.js': 'worldBridge',
+    'engines/eco-audit.js': 'ecoAudit',
+    // v2.155.0（RX8）：世界生成种子库。登记为必载 —— 面板「工具」页种子库段与本文件的
+    //   secWorldSeed 都读它，缺席就是「种子库读数缺席」本身，不该被静默兜住。
+    'engines/world-seed.js': 'worldSeed',
+    // v2.156.0（SP1）：游玩活动基准。登记为必载 —— 面板「会话」页基准段与本文件的
+    //   secPlaytime 都读它，缺席就是「活动基准读数缺席」本身，不该被静默兜住。
+    'engines/playtime.js': 'playtime',
+    // v2.156.0（S1）：离线恢复编排。登记为必载 —— 面板「会话」页恢复段与本文件的
+    //   secOfflineReturn 都读它；它自己不算数值、不写键，但缺席就是「恢复编排缺席」本身
+    //   （离线批要么不发生、要么重复发生，而两者在读数上同形）。
+    'engines/offline-return.js': 'offlineReturn',
+    // v2.152.0（RP6）：面板渲染性能观测。登记为必载——renderBody 分流与面板读数段都读它。
+    'ui/render-perf.js': 'renderPerf',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -1167,7 +1449,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'ui/panel.js': 'ui', 'ui/settings.js': 'uiSettings', 'ui/assistant.js': 'assistant'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
-  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat'];
+  // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，
+  //   而是 secModules 把 ui/render-perf.js 报成 missing，而它本来该归 optionalMissing
+  //   （「无头环境缺席」与「产品文件断裂」是两件事，混在一起会让自检的红灯失去信息量）。
+  //   另注：tests/export-contract.js 里有一份**同名口径的第二副本**（OPTIONAL），两处必须同改。
+  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf'];
   function secModules() {
     const missing = [], loaded = [], optionalMissing = [];
     Object.keys(MODULE_EXPORTS).forEach(function (file) {
@@ -1410,6 +1696,30 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
             permissions: (WA.permissions && WA.permissions.gateStat) ? WA.permissions.gateStat() : null,
             // v0.7.0: 楼层结算守卫观测（settles/skips 归因 / 最后结算楼层）
             settleGuard: WA.settleGuard ? (function () { try { return WA.settleGuard.stat(); } catch (e) { return null; } })() : null,
+            // v2.159.0（TP1/TP2）：**异步归属票据**台账 —— 被拒的写回必须可见。
+            //   此前「模型没返回」与「返回了但被归属检查丢掉」在读数上同形（用户只看到
+            //   摘要/档案不动，无从判断原因）。本行把 issued/passed/blocked/byReason 摊开。
+            claims: WA.store.claimStat ? (function () { try { return WA.store.claimStat(); } catch (e) { return null; } })() : null,
+            // v2.160.0（TP4）：**跨引擎提交台账**。claims 只答「票据层面放行了多少」，
+            //   而「一条跨引擎的链整条提交过没有、副作用落了没有」只有 core/commit.js 知道。
+            //   两者分开报，是因为「票据放行但链没提交」与「链提交了但副作用没落」是两回事。
+            commit: WA.commit ? (function () { try { return WA.commit.stat(); } catch (e) { return null; } })() : null,
+            // v2.159.0（TP2）：**各消费者自己的写回台账**。store 的 claimStat 只答「票据层面
+            //   放行了多少」；「这次写回究竟写进了哪一层（摘要/记忆/档案/舆情）」只有各引擎
+            //   自己知道。两者分开报，是因为「票据放行但引擎没写」与「票据拒收」是两回事。
+            writeback: {
+              summarizer: (WA.summarizer && WA.summarizer.stat) ? (function () { try {
+                // `cursorOf` 一并报出：它是本版写回判据依赖的那个游标 —— 不报的话，
+                // 「摘要为什么被判过期」只能靠猜（游标变了 = 这一段原文动过）。
+                return Object.assign({}, WA.summarizer.stat(), {
+                  cursor: (typeof WA.summarizer.cursorOf === 'function') ? WA.summarizer.cursorOf() : null
+                });
+              } catch (e) { return null; } })() : null,
+              pmem: (WA.pmem && WA.pmem.stat) ? (function () { try { return WA.pmem.stat(); } catch (e) { return null; } })() : null,
+              memory: (WA.memory && WA.memory.claimStat) ? (function () { try { return WA.memory.claimStat(); } catch (e) { return null; } })() : null,
+              opinion: (WA.opinion && WA.opinion.claimStat) ? (function () { try { return WA.opinion.claimStat(); } catch (e) { return null; } })() : null,
+              profile: (WA.profile && WA.profile.stat) ? (function () { try { return WA.profile.stat(); } catch (e) { return null; } })() : null
+            },
             // v0.5.0: 多实例并发观测（写入者标识 / 冲突检出 / 现场 / 外部写入）
             concurrency: (WA.store.conflictStat && WA.store.externalWriteStat) ? (function () {
               try {
@@ -1755,7 +2065,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   同 v2.98.0 P2 的理由——exportVol / verifyVolWith 是本版新增的两个导出，它们
       //   **必须有真消费方**（无消费方不挂），UI_BINDINGS 就是那两个消费方的接线真源。
       //   不登记时，下面这条门禁会如实报「未覆盖」——本版实测正是被它抓出来的。
-      'wa-audit-vol', 'wa-audit-vol-check', 'wa-audit-vol-text', 'wa-audit-vol-out'],
+      'wa-audit-vol', 'wa-audit-vol-check', 'wa-audit-vol-text', 'wa-audit-vol-out',
+      // v2.159.0（TP2）：异步写回票据台账出口。store.claimStat 是本版新增导出，
+      //   **必须有真消费方**（无消费方不挂）——UI_BINDINGS 就是这个消费方的接线真源。
+      'wa-claim-view'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
       dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue',
       // v2.83.0（B6）：配置包面板里的动态控件（点开才渲染）。
@@ -1986,6 +2299,58 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   挂 overview 是因为那是默认页（首次打开即校验，不需要用户先切页）。
     { page: 'overview', ids: ['wa-view-sel', 'wa-view-out'] },
     { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat', 'wa-sed-out'] },
+    // v2.151.0（RX2+RX3）：会话页十六枚控件（跨会话记忆锚八枚 + 远方世界脉搏四枚 + 共用输出区一枚）。
+    //   守卫表是控件接线面的唯一真源：渲染了不登记 ⇒「渲染了但绑定的 id 写错」这类断裂
+    //   在这批控件上永不可见（v2.124.0 的 wa-perf-band 漏登记就是这么被漏掉的）。
+    //   一律无条件渲染（两引擎是产品文件，缺席本身就是断裂，不降级成提示）。
+    { page: 'offline', ids: ['wa-ot-enabled', 'wa-ot-path', 'wa-ot-kind', 'wa-ot-note',
+      'wa-ot-anchor', 'wa-ot-anchors', 'wa-ot-release', 'wa-ot-tick', 'wa-ot-summary', 'wa-ot-block', 'wa-ot-stat',
+      'wa-ff-enabled', 'wa-ff-partition', 'wa-ff-pending', 'wa-ff-stat',
+      // v2.157.0（SP4 + S2）：四枚新控件（自动推进开关 / 按剧情日推一次 / 转移包 / 输出区）。
+      //   同口径：渲染了不登记 ⇒ 绑定断裂永不可见。
+      'wa-ff-auto', 'wa-ff-tick', 'wa-ff-transfer', 'wa-ff-out',
+      // v2.152.0（RP6+RP7）：性能与水位段九枚（渲染开关/渲染读数/渲染趋势/清空观测/水位开关/采样本/水位预测/水位台账 + 共用输出区）。
+      //   登记口径与上一批一致 —— 渲染了不登记，「渲染了但绑定的 id 写错」在这批控件上永不可见。
+      'wa-rp-enabled', 'wa-rp-stat', 'wa-rp-trend', 'wa-rp-reset',
+      'wa-sf-enabled', 'wa-sf-sample', 'wa-sf-forecast', 'wa-sf-stat',
+      // v2.153.0（RX5+RX6）：剧情深度与分支树段十二枚（深度仪四按钮 + 开关 + 分支树三按钮 +
+      //   比对两输入 + 分支树开关 + 共用输出区）。同 v2.152.0 的登记口径 ——
+      //   渲染了不登记，「渲染了但绑定的 id 写错」在这批控件上永不可见。
+      //   一律无条件渲染（两引擎是产品文件，缺席本身就是断裂，不降级成提示）。
+      'wa-pg-enabled', 'wa-pg-read', 'wa-pg-trend', 'wa-pg-advice', 'wa-pg-stat',
+      'wa-bt-enabled', 'wa-bt-tree', 'wa-bt-compare', 'wa-bt-nodes', 'wa-bt-a', 'wa-bt-b',
+      // v2.154.0 收口期补：分支记账的**写口**（v2.153.0 只落了读口，产品面零调用点 ⇒ 分支树恒为空树）。
+      //   与 v2.149.0 的 sediment（settle/feel/buildBlock 三写口 + stat）同规格：写口与读口并存。
+      'wa-bt-round', 'wa-bt-prompt', 'wa-bt-opts', 'wa-bt-fork',
+      'wa-bt-id', 'wa-bt-choice', 'wa-bt-choose', 'wa-bt-replay',
+      // v2.155.0 收口（全量回归当场抓到）：两个面板回显区此前**渲染了但没登记** ——
+      //   守卫表是控件接线面的唯一真源，输出区与控件同规格（同 wa-pg-out / wa-nb-out 的登记口径）。
+      'wa-ot-out', 'wa-rp-out',
+      'wa-pg-out',
+      // v2.156.0（SP1+S1）：会话页追加七枚（游玩基准三枚 + 离线恢复编排三枚 + 共用输出区一枚）。
+      //   登记口径与上一批一致 —— 渲染了不登记，「渲染了但绑定的 id 写错」在这批控件上永不可见。
+      'wa-pt-enabled', 'wa-pt-read', 'wa-pt-touch',
+      'wa-or-enabled', 'wa-or-recover', 'wa-or-stat', 'wa-or-out'] },
+    // v2.154.0（RX4+RX7）：联网页二十一枚——联网面（开关/两身份输入/保存身份/签名/落种子/导出/
+    //   导入/包输入/传说清单/传说 id/转投/注入块/台账 + 输出区）+ 自洽审计（开关/四类别/保存类别/
+    //   扫描/问题清单/上次读数/台账 + 输出区）。同 v2.153.0 的登记口径 —— 渲染了不登记，
+    //   「渲染了但绑定的 id 写错」在这批控件上永不可见；一律无条件渲染（两引擎是产品文件，
+    //   缺席本身就是断裂，不降级成提示）。两个输出区**分开登记**：与 wa-ot-out/wa-pg-out 同规格
+    //   （面板回显，不是控件，但守卫表仍要收 —— 否则「渲染了没人收」这一半没人看）。
+    { page: 'net', ids: ['wa-nb-enabled', 'wa-nb-title', 'wa-nb-player', 'wa-nb-ident',
+      'wa-nb-key', 'wa-nb-seed', 'wa-nb-export', 'wa-nb-import', 'wa-nb-pack', 'wa-nb-legends',
+      'wa-nb-lg', 'wa-nb-relay', 'wa-nb-block', 'wa-nb-stat', 'wa-nb-out',
+      'wa-ec-enabled', 'wa-ec-tl', 'wa-ec-sp', 'wa-ec-cog', 'wa-ec-cau', 'wa-ec-save',
+      'wa-ec-sweep', 'wa-ec-issues', 'wa-ec-last', 'wa-ec-stat', 'wa-ec-out'] },
+    // v2.155.0（RX8）：世界生成种子库 14 枚 —— 面板「工具」页（按 NEXT_PLAN 原文「消费者：
+    //   面板「工具」页（种子库管理：提取/保存/播种/变异）」；同 v2.154.0 的登记口径，
+    //   无条件渲染（world-seed 是产品文件，缺席本身就是断裂，不降级成提示）。
+    { page: 'tools', ids: ['wa-ws-enabled', 'wa-ws-name', 'wa-ws-tags', 'wa-ws-extract',
+      'wa-ws-save', 'wa-ws-list', 'wa-ws-id', 'wa-ws-variance', 'wa-ws-sow', 'wa-ws-get',
+      'wa-ws-drop', 'wa-ws-stat', 'wa-ws-out',
+      // v2.158.0（S3 + SP6）：种子转移与初始化五枚（转移包 / 包粘贴 / 导入 / 预览 / 确认）。
+      //   同口径：渲染了不登记 ⇒ 绑定断裂永不可见（v2.124.0 的 wa-perf-band 漏登记即此病）。
+      'wa-ws-pack', 'wa-ws-packin', 'wa-ws-import', 'wa-ws-init', 'wa-ws-confirm'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
@@ -2695,7 +3060,24 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       faultLedger: secFaultLedger(),
       // v2.150.0(RP4)：注入价值面。与 inject 节相邻但不合并——那一节答「这一轮注入了什么、
       //   花掉多少预算」，这一节答「注入进去的东西有没有被正文用上」，两问的失效模式不同。
-      injectValue: secInjectValue()
+      injectValue: secInjectValue(),
+      // v2.151.0（RX2+RX3）：离线推进面 + 远方世界脉搏。两节分列不合并：
+      //   一个答「你不在的这段时间世界推进了什么、哪些没许动」，
+      //   一个答「你不在的地方此刻在发生什么」（前者失效在「没保护住关键进展」，后者在「距离被抹平」）。
+      offlineTick: secOfflineTick(), farfield: secFarfield(),
+      // v2.153.0（RX5+RX6）：导演面两节。分列不合并 ——
+      //   一个答「故事发展到什么程度」（合成指数 + 走向），一个答「玩家分过几次叉」（历史账）；
+      //   前者失效在「指数不反映实际节奏」，后者失效在「分叉点丢了或悬空边」，两问互不覆盖。
+      plotGauge: secPlotGauge(), branchTree: secBranchTree(),
+      // v2.154.0（RX4+RX7）：联网面与自洽审计面。两节分列不合并 ——
+      //   一个答「别的世界传过来什么、本世界的身份是什么」，一个答「这个世界自己前后对不对得上」；
+      //   前者失效在「传说被当成本地事实 / 同名异世界被认成同一个」，后者失效在「四本账互相矛盾却看不见」。
+      worldBridge: secWorldBridge(), ecoAudit: secEcoAudit(), worldSeed: secWorldSeed(),
+      // v2.156.0（SP1）：时间来源与游玩活动基准。与 life 节分列不合并（两问的失效模式不同）。
+      playtime: secPlaytime(),
+      // v2.156.0（S1）：离线恢复编排。与 playtime 节分列不合并 ——
+      //   一个答「基准在不在」，一个答「这段离开被结算了几次、有没有被重复结算」。
+      offlineReturn: secOfflineReturn()
     };
     diag.verdict = verdict(diag);
     return diag;
@@ -2900,7 +3282,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     }
     // v0.1.47: 跨版本迁移留痕——失败步必须报红（否则只存在于瞬时日志）
     const mig = (ldStat && ldStat.migrated) || null;
-    if (mig && (mig.failed > 0 || mig.steps > 0)) {
+    // v2.162.0（TP7）：未来档**拒收**必须报红——拒收是「本次没救回」，不是「无迁移」（后者静默）。
+    //   复用同一议题键（不新增键面）：两者同属「存档版本与代码版本对不上」这一件事。
+    if (mig && mig.refused === 'future-schema') {
+      issues.push({ level: 'error', key: 'schemaMigrate', detail: '存档 schema v' + mig.from + ' 高于当前代码 v' + mig.current + '——已拒收不降级（请升级扩展；旧代码本次未改写任何存档字节）' });
+    } else if (mig && (mig.failed > 0 || mig.steps > 0)) {
       if (mig.failed > 0) {
         issues.push({ level: 'error', key: 'schemaMigrate', detail: '存档迁移有 ' + mig.failed + ' 步失败（v' + mig.from + '→v' + mig.to + '），部分字段可能未转换' });
       } else {
@@ -3206,7 +3592,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         //   为什么这条**必须可读**：读失败时本模块如实答「本会话从 0 开始」（**不回落**是
         //   刻意设计），而那与「真的从 0 开始」在面板与诊断上同形 —— 标签就是那个唯一的分辨口
         //   （「游标读不出来 ⇒ 这一轮从谁开始是猜的」，与「游标本来就是 0」是两件事）。
-        lifeTurn: '跨会话轮转游标读回（读失败 ⇒ 本会话轮转起点按 0 计，与「真的从 0 开始」同形）'
+        lifeTurn: '跨会话轮转游标读回（读失败 ⇒ 本会话轮转起点按 0 计，与「真的从 0 开始」同形）',
+        // v2.156.0（SP1）：与 store.LAB / panel.LAB_P 同源同键集。漏进本表 ⇒ 消费端退回裸桶名，
+        //   而「活动基准读不出来」与「本聊天从没记过」在无标签时同形（前者要查存储，后者是正常开局）。
+        playtime: '游玩活动基准读回（读失败 ⇒ 与「本聊天从没记过」同形）',
+        // v2.156.0（S1）：离线恢复**不新增任何存储键**（票据就是世界状态里的 lastSettledAt），
+        //   故本表没有它对应的条目 —— 这不是遗漏，是「零 localStorage」这条边界在诊断面上的样子。
+        tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）'
       };
       const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
         .map(function (k) { return (SRC_LABEL[k] || k) + '×' + byS[k]; }).join('、');

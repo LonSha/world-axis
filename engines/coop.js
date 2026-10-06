@@ -171,6 +171,11 @@
    *   刻意**不含时刻**：把 now 放进戳里会让「什么都没变的两次提交」永不相等。
    */
   const BOOK = { meta: 1, coop: 1, collab: 1 };
+  // v2.160.0（TP4）：跨引擎提交回执（commit.receipts）是**簿记**不是世界事实 —— 与
+  //   meta / coop / collab 同口径从内容指纹里排除。不排除的后果：确认一份提议会写一条
+  //   回执 ⇒ 指纹被推动 ⇒ **别的在途提议当场被判 stale**（b9 的「协作簿记不得推动
+  //   指纹」判据治的正是这一类）。
+  BOOK.commit = 1;
   function contentOf() {
     const s = state();
     const w = {};
@@ -470,6 +475,13 @@
         return true;
       }, 'coop:receipt');
       S.receipts++;
+      // v2.160.0（TP4）：确认回执落位后补记**跨引擎提交回执** —— 「已提交但当时没记」
+      //   的补账口（core/commit.js 的 settle 只写 commit.receipts，不碰本模块任何世界键）。
+      //   落在这里而不是 confirm 的事务里：settle 是**事务外**的一次独立写入，
+      //   与 collab 回执同处一个「世界已写、通知刚发」的时点。
+      if (WA.commit && typeof WA.commit.settle === 'function') {
+        try { WA.commit.settle('coop:' + pid, { site: 'coop', note: 'coop-apply' }); } catch (e) {}
+      }
     }
     S.accepted++; S.lastReason = 'accepted';
     return { ok: true, reused: false, id: pid, status: 'accepted', statusLabel: STATUS_CN.accepted,
@@ -587,7 +599,23 @@
     const live = rowsOf().filter(function (x) { return x && x.id === pid; })[0] || null;
     const gone = archiveOf().filter(function (x) { return x && x.id === pid; })[0] || null;
     const row = live || gone;
-    if (!row) return { ok: false, reason: 'no-proposal', id: pid };
+    if (!row) {
+      // v2.160.0（TP4）：归档是**环形容器**（ARCHIVE=40）—— 被挤出之后，「这一笔的裁决
+      //   在哪」仍要答得出，故回落到**跨引擎提交回执**（core/commit.js 的 replay，
+      //   跨刷新可用；回执写在提交那一刻的同一个事务里，不靠进程态）。
+      //   注意本分支**只在 live/gone 都没有时**才走 —— 不动既有判据链（既有行一律
+      //   按原口径回答，破坏项的现形路径一条不遮）。
+      const rp = (WA.commit && typeof WA.commit.replay === 'function')
+        ? (function () { try { return WA.commit.replay('coop:' + pid); } catch (e) { return null; } })()
+        : null;
+      if (rp && rp.ok === true && rp.receipt) {
+        return { ok: true, id: pid, opId: 'coop:' + pid, by: rp.receipt.site || '', actor: '',
+          status: 'accepted', statusLabel: STATUS_CN.accepted, archived: true, load: 0, tries: 0,
+          baseRev: {}, decidedAt: rp.receipt.at || 0, decidedBy: '',
+          receiptId: 'r_' + pid, reason: '', viaCommitReceipt: true };
+      }
+      return { ok: false, reason: 'no-proposal', id: pid };
+    }
     return { ok: true, id: pid, opId: row.opId, by: row.by, actor: row.actor,
       status: row.status, statusLabel: STATUS_CN[row.status] || row.status,
       archived: !live, load: row.load, tries: row.tries,

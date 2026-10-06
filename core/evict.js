@@ -1,6 +1,9 @@
 /**
  * WorldAxis core/evict.js (v2.65.0) — 挤出侧完整性（七面治理的最后一面）
  *
+ * v2.162.0（TP7）：挤出侧增**在途豁免**——在途货/信/行程/传闻/待重放/在履约不得被静默挤出；
+ *   在途自身超 cap 时不截断并归因 in-transit-full（宁可超 cap 也不丢未完成的义务）。
+ *
  * 为什么需要它：
  *   本仓库已把写侧（v2.6.0/v2.7.0）、删侧（v2.9.0）、读侧（v2.10.0）、活性面（v2.11.0）
  *   逐一收口，UI 渲染路径也已被真实执行覆盖（v2.12.0）。但**挤出侧一行治理都没有**：
@@ -194,6 +197,36 @@
     //   按时间跨地点裁剪的总量闸；登记成站点会让「cap 单一真源」出现两个答案。
     'sediment.places': { path: 'sediment.rows', cap: 24, why: '沉积地点环（地点数上限；跨地点总量另由引擎 capTotal 兜底）' },
     'sediment.events': { path: 'sediment.rows.*.events', cap: 48, why: '单地点沉积事件环（每地点各自一环，故 path 带 `*`）' },
+    // ── v2.151.0（RX2+RX3）两引擎的六个环（cap 与 store.__BOUNDED_CAPS 同名同值）──
+    //   未登记站点 ⇒ evict.array 走 unknown-site 静默失败（挤出压根不发生，而调用方以为做了）
+    //   ——本仓已在 v2.77.0 / v2.142.0 两度付过这笔学费。
+    //   锚环不是锁：被挤出的锚只是不再受保护，值一个字节都不变（锁是 userlock 的事）。
+    'offlineTick.anchors': { path: 'offlineTick.anchors', cap: 24, why: '记忆锚环（路径/类别/文本/时间/是否已释放）' },
+    'offlineTick.batches': { path: 'offlineTick.batches', cap: 12, why: '跨会话批次环（最近 12 次的时长/轮数/是否截断/保护行数）' },
+    'offlineTick.skips': { path: 'offlineTick.skips', cap: 48, why: '保护跳过明细环（与锚相抵的改动逐条留痕；跳过而非回滚，故必须看得见）' },
+    // v2.157.0（SP4）：三条容量的 cap 改为**读模块设置**（与 evolution.winds 同形）——
+    //   此前它们写死 48/24/32，而 farfield 的 DEF 里有 maxPulses / capPending / capHeard
+    //   三个旋钮：面板把 capPending 调小，挤出侧照样按 24 算 ⇒「旋钮点了没效果」，
+    //   而读数上（设置值 vs 实际保留数）看不出漂移。改函数读同一份设置是唯一同源做法。
+    'farfield.pulses': { path: 'farfield.pulses', cap: function () { return ffCap('maxPulses', 48); }, why: '远方大事记环（远场自身的大势流水）' },
+    // 在途环：SP4 起在 tick 里还有一道**背压闸**（满即暂停接收新批次）——
+    //   闸是业务裁决（不静默丢一条还没到的信），evict 是最后一道兜底；两者同源同值。
+    'farfield.pending': { path: 'farfield.pending', cap: function () { return ffCap('capPending', 24); }, why: '在途传闻环（未到期的不入近场；在路上不是没发生）' },
+    'farfield.heard': { path: 'farfield.heard', cap: function () { return ffCap('capHeard', 32); }, why: '已传到近场的远方消息环（已落地、可转述；注入块只念这一环）' },
+
+    // ── v2.153.0（RX5+RX6）分支树一环（branch-tree.js；cap 与 store.__BOUNDED_CAPS 同名同值）──
+    //   SITES 缺此键时 evict.array 会走 unknown-site **静默失败**（挤出压根不发生，
+    //   而调用方以为做了）—— 长局下分叉点会无界膨胀。
+    'branchTree.nodes': { path: 'branchTree.nodes', cap: 40, why: '剧情分叉点环（玩家做过的重大选择，跨会话保留）' },
+    // v2.154.0（RX4）：世界联网面两条容器（cap 与 store.__BOUNDED_CAPS 同名同值，逐键对账）。
+    //   两条必须分开：前者是「收进来的别世界传说」（注入块只念这一环），
+    //   后者是「见过哪些来源世界」（去重账，只记签名与条数）。
+    'worldBridge.legends': { path: 'worldBridge.legends', cap: 'per-call', why: '收进来的别世界传说环（上限 = maxLegends 设置，写入时传入；传说不进世界事实）' },
+    'worldBridge.exported': { path: 'worldBridge.exported', cap: 12, why: '见过的来源世界签名环（去重账；只记签名与条数，不记传说内容）' },
+    // v2.155.0（RX8）：世界生成种子库（world-seed.js）。
+    //   为什么 cap 是 'per-call'：上限 = `libCap` 设置（用户可调），写入时传入 ——
+    //   静态登记而设置另有一套，就会变成一个「点了没效果的开关」（v2.154.0 为这条付过价）。
+    'worldSeed.library': { path: 'worldSeed.library', cap: 'per-call', why: '世界生成种子库环（上限 = libCap 设置，写入时传入；同一结构不存两份）' },
     // ── v2.66.0 情绪通道 / 关系六型 / 假面（affect.js / bonds.js / masks.js）──
     'affect.channels': { path: 'affect.channels', cap: 12, why: '情绪通道环形（每人一行：开放动作/硬关闭动作/过载回退，不含情绪词）' },
     'affect.loads': { path: 'affect.loads', cap: 24, kind: 'object', why: '调制量（疲惫/饥饿/疼痛/社交消耗，每键一人）' },
@@ -308,6 +341,10 @@
     //   两条都必须是**环形容器**而非写入侧硬上界：剧情倾向改过几次、历法换过几版
     //   都是复盘材料（「什么时候他把这本书定成了悲剧倾向」必须答得出），故只能环形挤出。
     'storyTone.rows':    { path: 'storyTone.rows', cap: 'per-call', kind: 'array', why: '剧情倾向档环形（上限 = maxRows 设置，写入时传入）' },
+    // v2.160.0（TP4）：跨引擎提交回执台账环形。与 core/store.js 的 __BOUNDED_CAPS['commit.receipts']
+    //   同名同值（把门判据逐键对账）；SITES 缺此键时 evict.array 会走 unknown-site **静默失败**
+    //   （挤出压根不发生，而调用方以为做了）。
+    'commit.receipts':    { path: 'commit.receipts', cap: 64, why: '跨引擎提交回执环形（已提交的世界操作必须跨刷新仍答得出，故不能在提交时删——只能环形挤出）' },
     'calendarPlan.months': { path: 'calendarPlan.months', cap: 'per-call', kind: 'array', why: '自定义历法月表环形（上限 = maxMonths 设置，写入时传入）' }
   };
 
@@ -358,6 +395,29 @@
     lastFail: null      // { site, reason, at }
   };
 
+  // ── v2.162.0（TP7）：**在途行豁免表**（挤出侧）────────────────────────
+  //   实测缺口：world.deliverGoods 连发 25 批货（cap=16）——前 8 批**在途未到**的货被
+  //   slice 静默挤掉，调用方拿到 {ok:true}，evictStat 只留下「丢了 shp_*」的名字。
+  //   「货运回答『货在哪』」这张表一旦按环形丢，答案就变成「不知道」；
+  //   而 TP7 原文要求「**对未完成义务不静默挤出**」。
+  //   语义分层（承重）：**终态行本就是要退场的可回收历史**（arrived / halted / done /
+  //   delivered / flushed）——它们仍按环形退场；**在途行是未完成的义务**，不得被静默挤出。
+  //   与 farfield.pending 的三层范式逐字同形：写入侧容量闸（业务裁决，满即如实拒收）
+  //   + 挤出侧豁免（最后一道兜底也不丢在途）+ 读数（liveHeld / liveFull）。
+  //   为什么必须两处都做：只在写入侧加闸，历史遗留的超限存档仍会在下一次挤出里丢在途；
+  //   只在挤出侧豁免，用户会看到「操作成功但世界悄悄胀大」而没有拒收理由。
+  const IN_TRANSIT = {
+    'world.shipments':   function (x) { return !!x && x.status === 'in-transit'; },
+    'world.messages':    function (x) { return !!x && x.status === 'in-transit'; },
+    'world.journeys':    function (x) { return !!x && x.status === 'in-transit'; },
+    'farfield.pending':  function (x) { return !!x && x.deliveredAt == null; },
+    'collab.queue':      function (x) { return !!x && x.flushedAt == null; },
+    'liaison.deals':     function (x) { return !!x && (x.status === 'pending' || x.status === 'due'); }
+  };
+  // 在途保护的读数（**不**进 evictFailed / failedBy —— 超限不是实现缺陷，是容量裁决；
+  //   混进 failedBy 会让「挤出器坏了」与「世界真的满了」在诊断上长得一样）。
+  const liveStat = { held: 0, full: 0, lastSite: null, lastAt: 0 };
+
   // v2.15.0: 挤出记录只活在内存台账（bySite.lastAt / lastDropped.at），不落盘 → 测量时间。
   function now() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
 
@@ -383,6 +443,17 @@
     stats.failedBy[reason] = (stats.failedBy[reason] || 0) + 1;
     stats.lastFail = { site: site, reason: reason, at: now() };
     try { WA.log('error', '挤出失败：站点 ' + site + ' 原因 ' + reason + '（未做任何截断）'); } catch (e) {}
+  }
+
+  /** v2.157.0（SP4）：远场三环的 cap 从模块设置取（单一真源是 farfield 的 DEF/bounds）。
+   *    模块未装 / 读失败时回落常量 —— 与 SITES 表里的默认值逐字一致，
+   *    故「模块缺席」与「默认配置」在容量上同值。 */
+  function ffCap(key, dflt) {
+    try {
+      const cfg = (WA.farfield && typeof WA.farfield.getSettings === 'function') ? WA.farfield.getSettings() : null;
+      const n = cfg ? Number(cfg[key]) : NaN;
+      return isFinite(n) && n >= 0 ? n : dflt;
+    } catch (e) { return dflt; }
   }
 
   function capOf(site) {
@@ -413,6 +484,29 @@
     const before = arr.length;
     if (before <= cap) { stats.evictNoops++; return { ok: true, dropped: 0, before: before, after: before }; }
     const dropped = before - cap;
+    // v2.162.0（TP7）：在途行豁免——先保在途，剩余额度才给终态行（终态仍环形退场，cap 不变）。
+    const isLive = IN_TRANSIT[site];
+    if (isLive) {
+      const keepIdx = {};
+      let liveN = 0;
+      for (let i = 0; i < arr.length; i++) { if (isLive(arr[i])) { keepIdx[i] = true; liveN++; } }
+      if (liveN > cap) {
+        // 在途行自身就超了上限：**不做任何截断**（宁可超 cap 也不静默丢未完成的货/信/行程），
+        //   归因 in-transit-full 并向调用方/诊断交出证据。
+        liveStat.full++; liveStat.lastSite = site; liveStat.lastAt = now();
+        return { ok: false, reason: 'in-transit-full', dropped: 0, before: arr.length, after: arr.length,
+          inTransit: liveN, cap: cap };
+      }
+      let room = cap - liveN;
+      for (let i = arr.length - 1; i >= 0 && room > 0; i--) { if (!keepIdx[i]) { keepIdx[i] = true; room--; } }
+      const survivors = [], droppedItems = [];
+      for (let i = 0; i < arr.length; i++) { (keepIdx[i] ? survivors : droppedItems).push(arr[i]); }
+      arr.length = 0;
+      for (let i = 0; i < survivors.length; i++) arr.push(survivors[i]);
+      liveStat.held += droppedItems.length; liveStat.lastSite = site; liveStat.lastAt = now();
+      record(site, cap, before, arr.length, droppedItems.length, droppedItems.map(summarize));
+      return { ok: true, dropped: droppedItems.length, before: before, after: arr.length, inTransitKept: liveN };
+    }
     // 先摘摘要再切——切完就拿不到了
     const tail = arr.slice(0, dropped);
     arr.splice(0, dropped);
@@ -508,6 +602,9 @@
       bySite: byS,
       lastDropped: stats.lastDropped.map(function (x) { return Object.assign({}, x); }),
       sites: Object.keys(SITES).length,
+      // v2.162.0（TP7）：在途保护读数——held=因豁免而未丢的终态+在途混排中被保下的行数，
+      //   full=「在途自身超 cap」而放弃截断的次数（**不是**实现缺陷，故不进 failedBy）。
+      live: { held: liveStat.held, full: liveStat.full, lastSite: liveStat.lastSite, lastAt: liveStat.lastAt },
       nonEvict: Object.assign({}, NON_EVICT)
     };
   }

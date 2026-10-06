@@ -15,6 +15,9 @@
 只输出JSON：{"personality":["..."],"worldview":["..."],"family":["..."],"relationships":[{"target":"...","relation":"...","dynamic":"..."}],"memory":["..."]}`;
 
   function getCtx() { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } }
+  // v2.159.0（TP2）：写回台账。被拒的写回必须可见 —— 否则「模型没返回」与
+  //   「返回了但被归属检查丢掉」同形，用户只看到「档案不动」，无从判断原因。
+  const _stat = { blocked: 0, passed: 0, lastBlockedReason: null };
   function recentText(n) {
     const ctx = getCtx(); const chat = (ctx && ctx.chat) || [];
     return chat.slice(Math.max(0, chat.length - (n || 6))).map(m => (m.is_user ? '【玩家】' : '【正文】') + String(m.mes || '').slice(0, 800)).join('\n---\n');
@@ -40,11 +43,42 @@
         relationships: tail(old.relationships, 'relationships', 15),
         memory: tail(old.memory, 'memory', 25)
       };
+      // v2.159.0（TP2）：取票。档案的写回依赖**这个人的档案行**与**它据以推断的近期正文**——
+      //   请求在飞期间这人被改名/被删、或正文被编辑换滑动，这份增量就会挂到一个已经不存在的
+      //   人或一段已经不在的正文上（悬空引用，且读数上看不出来）。
+      //   依赖读面统一走 store 基座（人物表指纹 + 近期正文内容指纹）；去重键按人分，
+      //   同一人并发只维护一次（否则同一份档案被两份增量各写一次）。
+      const depOf = function () {
+        const row = (WA.store && typeof WA.store.peopleSig === 'function') ? WA.store.peopleSig() : '';
+        const sig = (WA.store && typeof WA.store.recentSig === 'function') ? WA.store.recentSig(6) : '';
+        const fl = (WA.store && typeof WA.store.floorSig === 'function') ? WA.store.floorSig() : '';
+        return name + '#' + row + '#' + sig + '@' + fl;
+      };
+      let ticket = null;
+      if (WA.store && typeof WA.store.claimAsync === 'function') {
+        const c = WA.store.claimAsync('profile:maintain', { dep: depOf, key: 'profile:' + name });
+        if (!c || !c.ok) {
+          _stat.blocked++; _stat.lastBlockedReason = (c && c.reason) || 'claim-failed';
+          WA.log('info', '档案维护跳过 ' + name + '：' + _stat.lastBlockedReason);
+          return { ok: false, reason: _stat.lastBlockedReason };
+        }
+        ticket = c.ticket;
+      }
       const r = await WA.apiRouter.call('digest', [
         { role: 'system', content: PROFILE_SYS },
         { role: 'user', content: '【NPC】' + name + '\n【现有档案】' + JSON.stringify(compactOld) + '\n【近期剧情】\n' + recentText(6) }
       ], { json: true, maxTokens: 1200, temperature: 0.4 }).catch(() => null);
-      if (!r) return { ok: false, reason: 'api-fail' };
+      if (!r) { _stat.blocked++; _stat.lastBlockedReason = 'api-fail'; return { ok: false, reason: 'api-fail' }; }
+      // v2.159.0（TP2）：落地前复核。拒收 ⇒ 明确丢弃这次增量（不偷偷写回已离开的旧局）。
+      if (ticket && WA.store && typeof WA.store.settleAsync === 'function') {
+        const v = WA.store.settleAsync(ticket, { site: 'profile:maintain' });
+        if (!v || v.ok !== true) {
+          const rs = (v && v.reason) || 'missing-key';
+          _stat.blocked++; _stat.lastBlockedReason = rs;
+          WA.log('warn', '档案写回被拒（' + rs + '）：' + ((v && v.detail) || ''));
+          return { ok: false, reason: rs };
+        }
+      }
       // v2.2.0: 改走 registry.setProfileSafe 契约（此前直接改 store = 与 getProfile/setProfile 双写漂移：
       //   registry 的剪裁上限来自容量登记表，直写方却写死常量，任一处调整即产生 drifted 误报）。
       const res = WA.registry.setProfileSafe(name, {
@@ -52,6 +86,7 @@
         memory: r.memory, relationships: (r.relationships || []).slice(0, 5)
       });
       if (!res || !res.ok) return { ok: false, reason: (res && res.reason) || 'write-fail' };
+      _stat.passed++;
       WA.log('info', '档案维护完成：' + name);
       return { ok: true, added: res.added };
     },
@@ -67,7 +102,10 @@
       for (const n of active.slice(0, 3)) { // 单轮最多维护3人
         await this.maintain(n).catch(e => WA.log('warn', '档案维护失败 ' + n, e.message));
       }
-    }
+    },
+
+    /** v2.159.0（TP2）：写回台账只读视图（tool-diag / 专锁消费）。 */
+    stat() { return { blocked: _stat.blocked, passed: _stat.passed, lastBlockedReason: _stat.lastBlockedReason }; }
   };
 
   // 每4轮触发一次档案维护（避免每轮都调用）

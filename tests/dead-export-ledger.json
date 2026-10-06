@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.150.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.150.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.162.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.162.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -192,7 +192,7 @@
       "src": "engines/backstage.js",
       "refs": 0,
       "tref": 1,
-      "own": 2
+      "own": 3
     },
     "beastBond.bond": {
       "reason": "test-only",
@@ -425,6 +425,14 @@
       "refs": 0,
       "tref": 0,
       "own": 9
+    },
+    "branchTree.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/branch-tree.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
     },
     "bridge.buildSnapshot": {
       "reason": "self-only",
@@ -903,7 +911,7 @@
       "detail": "core/clock.js 内部自用、外部零引用（过度导出）",
       "src": "core/clock.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 4,
       "own": 3
     },
     "clock.frozen": {
@@ -1631,7 +1639,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/evict.js",
       "refs": 0,
-      "tref": 23,
+      "tref": 27,
       "own": 3
     },
     "evict.summarize": {
@@ -1640,7 +1648,7 @@
       "src": "core/evict.js",
       "refs": 0,
       "tref": 0,
-      "own": 6
+      "own": 7
     },
     "evolution.addEvent": {
       "reason": "test-only",
@@ -1745,6 +1753,46 @@
       "refs": 0,
       "tref": 3,
       "own": 1
+    },
+    "farfield.deliver": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/farfield.js",
+      "refs": 0,
+      "tref": 6,
+      "own": 4
+    },
+    "farfield.heard": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/farfield.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 11
+    },
+    "farfield.relayToRumor": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/farfield.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "farfield.settlePulse": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/farfield.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "farfield.tick": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/farfield.js",
+      "refs": 0,
+      "tref": 13,
+      "own": 5
     },
     "faultContext.classify": {
       "reason": "self-only",
@@ -3354,6 +3402,22 @@
       "tref": 0,
       "own": 23
     },
+    "plotGauge.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/plot-gauge.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "plotGauge.tensionCore": {
+      "reason": "self-only",
+      "detail": "engines/plot-gauge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plot-gauge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
     "pmem.buildUserPrompt": {
       "reason": "self-only",
       "detail": "engines/pmem.js 内部自用、外部零引用（过度导出）",
@@ -3935,7 +3999,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/rand.js",
       "refs": 0,
-      "tref": 19,
+      "tref": 20,
       "own": 33
     },
     "rand.seeded": {
@@ -4146,14 +4210,6 @@
       "tref": 3,
       "own": 4
     },
-    "rehearsal.checkPreview": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/rehearsal.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 4
-    },
     "rehearsal.divergence": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -4186,14 +4242,6 @@
       "tref": 5,
       "own": 24
     },
-    "rehearsal.preview": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/rehearsal.js",
-      "refs": 0,
-      "tref": 9,
-      "own": 3
-    },
     "rehearsal.rollbackScope": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -4215,7 +4263,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/rehearsal.js",
       "refs": 0,
-      "tref": 4,
+      "tref": 6,
       "own": 1
     },
     "rehearsal.stat": {
@@ -4879,7 +4927,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 27,
+      "tref": 29,
       "own": 1
     },
     "store.staleSinceExternal": {
@@ -5368,7 +5416,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 104
+      "own": 113
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -6124,14 +6172,6 @@
       "tref": 26,
       "own": 15
     },
-    "ui.pages": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "ui/panel.js",
-      "refs": 0,
-      "tref": 21,
-      "own": 1
-    },
     "ui.rerenderStat": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -6142,6 +6182,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 250
+    "dataOnly": 264
   }
 }

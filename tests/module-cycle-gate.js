@@ -120,7 +120,13 @@ const ENTRY_NS = {
 const UI_NS = {
   ui: 'UI 面板门面（ui/panel.js）',
   uiSettings: 'UI 设置门面（ui/settings.js）',
-  assistant: '助手门面（ui/assistant.js）'
+  assistant: '助手门面（ui/assistant.js）',
+  // v2.152.0：第四个 UI 层命名空间。本仓的 UI ns 名单在两处，必须同批 ——
+  //   tests/run.js 的 UI_NS2800、tests/export-contract.js 的 OPTIONAL、
+  //   engines/tool-diag.js 的 OPTIONAL_EXPORTS；本表是第四处（静态图侧）。
+  //   漏在这里的后果不是「少一行字」：renderPerf 会被判成「未登记的一对一差」（ns 面漂移），
+  //   而它明明是 UI 层——先装后装的差别被读成「接线出了问题」。
+  renderPerf: 'UI 面板渲染观测（ui/render-perf.js）'
 };
 
 /**

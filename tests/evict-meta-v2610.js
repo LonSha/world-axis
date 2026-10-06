@@ -349,6 +349,13 @@ function runAll(a) {
   // ── C2. 生产者清单 ⇄ 源码面 ──
   const sites = producerSites();
   const knownModules = new Set(PRODUCERS.map(function (p) { return p.file; }));
+  // v2.158.0（S3）：`engines/world-seed.js` 的 initConfirm 也建 people 条目，但它**结构免疫**
+  //   于「新建条目被挤出」这一风险 —— initConfirm 的前置是 emptyCheck（目标世界必须为空），
+  //   而淘汰只在容器**满**时发生：两者不可能同时成立，故它无法被行为驱动探测
+  //   （硬塞一个假 drive 只会让 C 段报 notCreated —— 那是把夹具的错记在被测代码头上）。
+  //   但它仍必须落在已覆盖文件内，且建人点必须带排序键（静态可核，见下面的 C2b）。
+  const STATIC_ONLY = ['engines/world-seed.js'];
+  STATIC_ONLY.forEach(function (f) { knownModules.add(f); });
   const uncovered = sites.filter(function (s) { return !knownModules.has(s.file); });
   a(uncovered.length === 0,
     'v2610: [C2] 源码面枚举到的 people 条目生产者都落在已覆盖文件内（未覆盖: '
@@ -358,6 +365,23 @@ function runAll(a) {
   a(hitKeys.size >= 3,
     'v2610: [C2] 源码面确实枚举到生产者语句（实 ' + sites.length + ' 处 / ' + hitKeys.size
     + ' 个文件，判据不在空集上恒真）');
+  // ── C2b. 结构免疫文件的建人点仍须带淘汰排序键（静态可核）──
+  //   为什么不能因为「它跑不出淘汰」就放过排序键：免疫来自**前置条件**（世界必须为空），
+  //   前置条件一旦被放宽，缺键的建人点会立刻变成「刚建好就被优先挤出」的真缺陷。
+  //   静态判据是这条免疫的**担保**，不是它的替代。
+  const noKey = [];
+  STATIC_ONLY.forEach(function (f) {
+    // 行号必须与 producerSites() **同源**：它扫的是 stripComments 之后的文本，
+    //   报出的 s.line 是**剥离坐标**（原文行号会偏，因为文件头注释被去掉）。
+    const lines = stripComments(fs.readFileSync(path.join(BASE, f), 'utf8')).split('\n');
+    sites.filter(function (s) { return s.file === f; }).forEach(function (s) {
+      const seg = lines.slice(s.line - 1, s.line + 8).join('\n');
+      if (seg.indexOf('updatedAt') < 0) noKey.push(f + ':' + s.line);
+    });
+  });
+  a(noKey.length === 0,
+    'v2610: [C2b] 结构免疫文件（' + STATIC_ONLY.join('、') + '）的建人点仍带淘汰排序键 updatedAt（缺: '
+    + (noKey.join('、') || '无') + '）—— 免疫来自前置条件（世界必须为空），前置一旦放宽即变真缺陷');
 
   // ── D. 声明 ⇄ 写入方（防幽灵字段） ──
   const meta = declaredMetaFields();

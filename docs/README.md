@@ -4,7 +4,7 @@
 
 | 文件 | 是什么 | 谁生成 |
 |---|---|---|
-| [ERROR_CODES.md](ERROR_CODES.md) | 拒收码手册（601 个内联码的归属与见证） | `node tools/gen-error-codes.js`（生成物，`--check` 双向校验） |
+| [ERROR_CODES.md](ERROR_CODES.md) | 拒收码手册（每个内联码的归属与见证；**码数不写在这里** —— 随各版生成器刷新，现场跑 `node tools/gen-error-codes.js` 看读数） | `node tools/gen-error-codes.js`（生成物，`--check` 双向校验） |
 | [architecture.md](architecture.md) | 分层、装载次序、单一真源清单 | 手写 |
 | [gates.md](gates.md) | 九道门禁逐条：它治什么病、怎么跑、怎么读读数 | 手写 |
 | [contributing.md](contributing.md) | 改代码的规矩（零依赖、不动冻结面、文档同步） | 手写 |

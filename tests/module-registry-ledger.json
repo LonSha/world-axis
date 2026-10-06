@@ -1,13 +1,13 @@
 {
- "version": "2.150.0",
- "loadOrderCount": 171,
- "loadedCount": 168,
- "uiCount": 3,
- "nsCount": 176,
+ "version": "2.162.0",
+ "loadOrderCount": 183,
+ "loadedCount": 179,
+ "uiCount": 4,
+ "nsCount": 187,
  "totals": {
-  "loadEdges": 68,
+  "loadEdges": 81,
   "hardEdges": 0,
-  "callRefs": 136,
+  "callRefs": 160,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -27,6 +27,7 @@
    "consumedBy": [
     "actors/monologue.js",
     "actors/profile.js",
+    "core/commit.js",
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
@@ -37,18 +38,21 @@
     "engines/backstage.js",
     "engines/beat-mask.js",
     "engines/binding.js",
+    "engines/branch-tree.js",
     "engines/bridge.js",
     "engines/calendar-custom.js",
     "engines/calendar.js",
     "engines/chapters.js",
     "engines/coop.js",
     "engines/direct-event.js",
+    "engines/eco-audit.js",
     "engines/economy.js",
     "engines/enemies.js",
     "engines/ensemble.js",
     "engines/entry-router.js",
     "engines/evolution.js",
     "engines/faction-graph.js",
+    "engines/farfield.js",
     "engines/foreshadow.js",
     "engines/group-refuse.js",
     "engines/hazard.js",
@@ -62,10 +66,14 @@
     "engines/mend.js",
     "engines/motif.js",
     "engines/noesis.js",
+    "engines/offline-return.js",
+    "engines/offline-tick.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
     "engines/perspective-lock.js",
     "engines/plan.js",
+    "engines/playtime.js",
+    "engines/plot-gauge.js",
     "engines/pmem.js",
     "engines/polish.js",
     "engines/power-anchor.js",
@@ -85,6 +93,7 @@
     "engines/session.js",
     "engines/stage.js",
     "engines/stale-guard.js",
+    "engines/storage-forecast.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/summarizer.js",
@@ -92,6 +101,8 @@
     "engines/wb-inject.js",
     "engines/wb-search.js",
     "engines/word-budget.js",
+    "engines/world-bridge.js",
+    "engines/world-seed.js",
     "render/purifier.js"
    ]
   },
@@ -203,10 +214,12 @@
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
+    "engines/farfield.js",
     "engines/hazard.js",
     "engines/kaleidoscope.js",
     "engines/life.js",
     "engines/memory.js",
+    "engines/offline-return.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
     "engines/pmem.js",
@@ -231,17 +244,21 @@
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": [
+    "core/commit.js",
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
     "engines/archive-hide.js",
     "engines/beat-mask.js",
     "engines/binding.js",
+    "engines/branch-tree.js",
     "engines/calendar-custom.js",
     "engines/coop.js",
+    "engines/eco-audit.js",
     "engines/economy.js",
     "engines/ensemble.js",
     "engines/faction-graph.js",
+    "engines/farfield.js",
     "engines/foreshadow.js",
     "engines/group-refuse.js",
     "engines/inject-value.js",
@@ -251,8 +268,12 @@
     "engines/mend.js",
     "engines/motif.js",
     "engines/noesis.js",
+    "engines/offline-return.js",
+    "engines/offline-tick.js",
     "engines/perspective-lock.js",
     "engines/plan.js",
+    "engines/playtime.js",
+    "engines/plot-gauge.js",
     "engines/polish.js",
     "engines/power-anchor.js",
     "engines/preset-world.js",
@@ -269,11 +290,14 @@
     "engines/session.js",
     "engines/stage.js",
     "engines/stale-guard.js",
+    "engines/storage-forecast.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/userlock.js",
     "engines/wb-search.js",
-    "engines/word-budget.js"
+    "engines/word-budget.js",
+    "engines/world-bridge.js",
+    "engines/world-seed.js"
    ]
   },
   "core/exec.js": {
@@ -397,9 +421,11 @@
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
+    "engines/farfield.js",
     "engines/hazard.js",
     "engines/kaleidoscope.js",
     "engines/memory.js",
+    "engines/offline-return.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
     "engines/pmem.js",
@@ -417,6 +443,25 @@
    "requiresFiles": [],
    "providerOrderOk": true,
    "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/commit.js": {
+   "ns": [
+    "commit"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
@@ -2778,6 +2823,51 @@
    ],
    "consumedBy": []
   },
+  "engines/offline-tick.js": {
+   "ns": [
+    "offlineTick"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_offline_tick_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/farfield.js": {
+   "ns": [
+    "farfield"
+   ],
+   "requires": [
+    "registerModule",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_farfield_settings_v1"
+   ],
+   "consumedBy": []
+  },
   "render/inject.js": {
    "ns": [
     "render"
@@ -2879,6 +2969,177 @@
    "callRefs": [],
    "ghostRefs": [],
    "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/storage-forecast.js": {
+   "ns": [
+    "storageForecast"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_storage_forecast_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/plot-gauge.js": {
+   "ns": [
+    "plotGauge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_plot_gauge_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/branch-tree.js": {
+   "ns": [
+    "branchTree"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_branch_tree_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-bridge.js": {
+   "ns": [
+    "worldBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_bridge_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/eco-audit.js": {
+   "ns": [
+    "ecoAudit"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_eco_audit_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-seed.js": {
+   "ns": [
+    "worldSeed"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_seed_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/playtime.js": {
+   "ns": [
+    "playtime"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_playtime_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/offline-return.js": {
+   "ns": [
+    "offlineReturn"
+   ],
+   "requires": [
+    "registerModule",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_offline_return_v1"
+   ],
    "consumedBy": []
   }
  }

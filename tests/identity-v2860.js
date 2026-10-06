@@ -22,7 +22,8 @@
 //
 // 【判据】（A 静态 / B 运行时 / C 兜底 / N 负控制）
 //   A1 唯一写者：registry 真源码里「往 people 表落新行」恰 1 次。
-//   A2 残点清点：产品面「直接建人」的字面残点恰 4 处（三处 fallback 兜底 + 1 处注释）。
+//   A2 残点清点：产品面「直接建人」的字面残点恰 5 处（四处 fallback 兜底 + 1 处注释；
+//      第 5 处为 v2.158.0 的 engines/world-seed.js initConfirm 兜底分支）。
 //   A3 残点性质：每一处代码残点都**打 fallback 标签**（不是裸建）。
 //   A4 调用点形态：每个 ensurePerson 调用都在能力探测守卫内（缺 registry 时降级，不抛）。
 //   A5 观测出口有真消费方：tool-diag 的模块节读 personOriginStat。
@@ -91,7 +92,11 @@ function runAll(a) {
       + countIn(s, ANCHOR_ROW) + '）');
     a(judgeLabeled(s), 'v2860/id: [A1] 新建必打来源标签（实 ' + countIn(s, ANCHOR_TAG) + ' 次）');
     const dc = directCreates();
-    a(dc.length === 4, 'v2860/id: [A2] 产品面「直接建人」残点恰 4 处（实 ' + dc.length + '：'
+    // v2.158.0（S3）：第 5 处来自 engines/world-seed.js 的 initConfirm —— 它把种子里的
+    //   人物装进空新局，走的是**能力探测 + :fallback 兜底**（同一口径，A3 覆盖），
+    //   且前置 emptyCheck 保证只在空世界发生（无 registry 的合成宿主桩才走兜底）。
+    //   数量是**显式登记**的事实：新增残点必须显式改本判据，不许静默长出。
+    a(dc.length === 5, 'v2860/id: [A2] 产品面「直接建人」残点恰 5 处（实 ' + dc.length + '：'
       + dc.map(function (h) { return h.rel + ':' + h.line; }).join('、') + '）');
     const unlabeled = dc.filter(function (h) { return h.text.indexOf('fallback') < 0; });
     a(unlabeled.length === 0, 'v2860/id: [A3] 每处残点都打 fallback 标签，不是裸建（裸: '

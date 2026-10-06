@@ -27,7 +27,12 @@
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  const stat = { ticks: 0, changed: 0, blocked: 0, lastAt: 0, lastReason: '',
+  // v2.156.0（SP2 承重结构）：`stat` 由 const 改为 let —— 试演期（离线批）在**影子袋**上
+  //   跑同一段结算逻辑时，stat 整体临时重指向袋内副本（见 tickDraft / makeBag 注释）。
+  //   为什么不是「逐字段重定向」：BODY 里对 stat 的写是**字面** `stat.fairRounds++` 这类
+  //   表达式（多个既有锁的锚点逐字钉住它们），替换成 bag.fairRounds 会破坏那些锚点。
+  //   整体重指向让字面原样保留，语义由「当前 stat 指向谁」决定，退出时无条件还原。
+  let stat = { ticks: 0, changed: 0, blocked: 0, lastAt: 0, lastReason: '',
     // v2.85.0 B1：两个「本可以推演却没推演」的原因必须分开计数——
     //   名额不足（skipped）与协作未被回应（unreciprocated）是两件事：
     //   前者是资源约束，后者是**依据不足**。合成一个数就再也答不出该加名额还是该等对方。
@@ -150,10 +155,14 @@
   //   窗口是进程态的环形缓冲（与 `_turn` 同族：不落盘、不新增容器键、不进存档）。
   const FAIR_WINDOW = 10;
   const _fairRounds = [];
+  // v2.156.0（SP2）：当前活跃的**结算袋**（试演期非空，真跑为 null）。见 tickDraft 头注。
+  let __bag = null;
   function fairPush(id) {
     if (!id) return;
-    _fairRounds.push(id);
-    if (_fairRounds.length > FAIR_WINDOW) _fairRounds.shift();
+    // v2.156.0：袋在场时写进袋的队列副本（试演失败可整体丢弃），否则写模块级环。
+    const q = (__bag && Array.isArray(__bag.fair)) ? __bag.fair : _fairRounds;
+    q.push(id);
+    if (q.length > FAIR_WINDOW) q.shift();
   }
   function fairnessOf() {
     const counts = {};
@@ -282,11 +291,24 @@
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
-  function tick(facts) {
-    const cfg = settings(); stat.lastAt = clockNow('life');
-    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: true, changed: 0, reason: 'disabled' }; }
-    const f = facts || {}; let changed = 0, skipped = 0, unrecip = 0;
-    WA.store.transact(function (draft) {
+  /**
+   * v2.156.0（SP2）：**带草稿的结算体**（tick 与试演路径共用）。
+   *   门（enabled）与游标写盘留在公开入口 `tick` 里；本函数只做「在给定草稿上把这一轮推完」
+   *   + stat 记账（ticks/changed/blocked/skipped/unreciprocated/lastReason）。
+   *   袋子 `bag` 非空时（试演）：stat 与轮转游标 `_turn` 的读写都落在袋内副本上，
+   *   fairPush 也写袋（见 __bag）；退出时无条件还原 —— 失败可整袋丢弃，
+   *   世界草稿则由调用方的事务层决定提交或丢弃。真跑路径 bag 为 null，行为与旧版逐字一致。
+   * @param {object} draft 事务草稿
+   * @param {object} [facts] 与旧 tick 同一形状
+   * @param {object|null} [bag] 结算袋（makeBag() 的产物）
+   */
+  function tickDraft(draft, facts, bag) {
+    const prevBag = __bag, prevStat = stat, prevTurn = _turn;
+    if (bag) { __bag = bag; stat = bag.stat; _turn = bag.turn; }
+    try {
+      const cfg = settings(); stat.lastAt = clockNow('life');
+      if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: true, changed: 0, skipped: 0, unreciprocated: 0, reason: 'disabled' }; }
+      const f = facts || {}; let changed = 0, skipped = 0, unrecip = 0;
       // v2.85.0 B1：名单不再按插入序截断。旧口径 `Object.keys(...).slice(0, maxPeople)`
       //   让「谁被推演」取决于谁先进场——有依据的人插在第 5 位之后就永远轮不到。
       //   现口径：**有依据者优先**（依据条数多者先，同依据按下标稳定），无依据者不占名额。
@@ -379,17 +401,49 @@
       // 窗口只在**真的推演过**时累积：`picks` 是这一轮真正走到决策的人，
       //   用 `ranked` 会把「没排上的人」也算成推过一次（频率当场失真）。
       picks.forEach(function (row) { fairPush(row.id); });
+      stat.ticks++; stat.changed += changed; if (!changed) stat.blocked++;
+      stat.skipped += skipped; stat.unreciprocated += unrecip;
+      stat.lastReason = changed ? 'updated' : 'nothing-to-do';
+      return { ok: true, changed: changed, reason: stat.lastReason, skipped: skipped, unreciprocated: unrecip };
+    } finally {
+      if (bag) { __bag = prevBag; stat = prevStat; _turn = prevTurn; }
+    }
+  }
+
+  function tick(facts) {
+    const cfg = settings(); stat.lastAt = clockNow('life');
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: true, changed: 0, reason: 'disabled' }; }
+    let changed = 0, skipped = 0, unrecip = 0;
+    WA.store.transact(function (draft) {
+      const r = tickDraft(draft, facts, null);
+      changed = r.changed; skipped = r.skipped; unrecip = r.unreciprocated;
     }, 'life:tick');
     // v2.132.0（O19）：本轮游标推完才写盘 —— 盘上那份永远等于「上一次结算结束时他从哪一位接着排」。
     //   写在事务**之外**（游标不是世界事实，事务里写它就是拿一个进程量去改世界快照）。
     //   关闭开关时 `turnStore()` 直接返回 disabled，**零写盘**。
     const persisted = turnStore();
-    stat.ticks++; stat.changed += changed; if (!changed) stat.blocked++;
-    stat.skipped += skipped; stat.unreciprocated += unrecip;
-    stat.lastReason = changed ? 'updated' : 'nothing-to-do';
     // skipped 与 unreciprocated 进返回值：调用方要能当场看见「没被推演」的原因，
     //   而不是只能事后从 stat 里猜。
     return { ok: true, changed: changed, reason: stat.lastReason, skipped: skipped, unreciprocated: unrecip, turn: persisted };
+  }
+
+  // ── v2.156.0（SP2）：结算袋三件套 ─────────────────────────────────────
+  //   试演（离线批）要在**不碰真世界、不碰模块真读数**的前提下把一轮推完，成功后整体并回。
+  //   袋子把 stat（全字段标量）与轮转游标 _turn 接住；fair 窗口由 fairPush 直接写袋。
+  //   失败路径：整袋丢弃、零残留；成功路径：commitBag 并回。
+  /** 造一只空袋：stat 浅拷贝（全字段标量）+ fair 窗口副本 + 游标副本。 */
+  function makeBag() {
+    return { stat: Object.assign({}, stat), fair: _fairRounds.slice(), turn: _turn };
+  }
+  /** 把袋内结果并回模块态（逐字段赋值，保持 stat 对象同一性：既有读者持有同一引用）。 */
+  function commitBag(bag) {
+    if (!bag || typeof bag !== 'object') return false;
+    if (bag.stat && typeof bag.stat === 'object') {
+      Object.keys(bag.stat).forEach(function (k) { stat[k] = bag.stat[k]; });
+    }
+    if (Array.isArray(bag.fair)) { _fairRounds.length = 0; bag.fair.forEach(function (id) { _fairRounds.push(id); }); }
+    if (isFinite(Number(bag.turn))) _turn = Number(bag.turn);
+    return true;
   }
 
   function buildBlock() {
@@ -408,6 +462,9 @@
     ACTIONS: ['wait', 'advance', 'ask', 'hide', 'seek', 'pause', 'keep'], COMMITMENTS: COMMITMENTS,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     addGoal: addGoal, addCommitment: addCommitment, addSchedule: addSchedule, tick: tick, decide: decide, buildBlock: buildBlock,
+    // v2.156.0（SP2）：离线批（offline-return）的**结算入口**。tickDraft 在给定草稿上把一轮推完；
+    //   makeBag/commitBag 是「试演期整体隔离、成功整体并回」的两端（失败路径整袋丢弃、零残留）。
+    tickDraft: tickDraft, makeBag: makeBag, commitBag: commitBag,
     // v2.115.0（规划 01 的 E4）：`lastTurn` 挂在**既有成员** `stat()` 的返回里
     //   （不改导出面：本仓纪律是「零消费能力当场删」，为读一个游标新开一口会立即变成死导出）。
     // v2.132.0（O19）：同一口径再加两个读数——`turnRestored`（本会话开局是从盘上恢复的还是归零的）

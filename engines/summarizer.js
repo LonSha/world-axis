@@ -27,6 +27,11 @@
   const CAP_BIG = 8;
   const SMALL_ROUNDS = 3;     // 每次纪要压缩最近3条已定稿对话
 
+  // v2.159.0（TP2）·写回台账。为什么必须可见：被拒的写回此前**完全无痕** ——
+  //   「模型没返回」与「返回了但被归属检查丢掉」在面板上同形，用户只看到「摘要不动」，
+  //   无从判断是没配好还是被判过期（本仓反复点名的「读数不实」）。
+  const _stat = { blocked: 0, claimBlocked: 0, lastBlockedReason: null, passed: 0, deduped: 0 };
+
   const clean = v => WA.inputGuard.text(v, 80);
 
   const SMALL_SYSTEM = `你是世界进程的纪要记录员。你的工作不是评价剧情，而是留下以后可以据此还原现场的事件记录。
@@ -58,6 +63,25 @@
     return { text, startLayer: from, endLayer: chat.length - 1 };
   }
 
+  /**
+   * v2.159.0（TP2）·压缩游标 —— 本次写回**依赖的那一格**。
+   *   为什么游标要单独算：摘要的结论只依赖「上一次压到哪」这一个数（外加本段原文），
+   *   与世界里其它任何更新无关。拿全局 stateRev 当依赖会让「预览之后干点别的再确认」
+   *   这类完全正当的用法永久失败（TP2 点名的饿死路径）。
+   *   第二版修正：首版游标 = `lastEnd@ctxLen`，两个分量都只是**计数**。同长度换内容
+   *   （编辑一楼、换滑动到等长文本）时游标纹丝不动 ⇒ 指纹说「没变」而输入已换，
+   *   属假放行。现在并入本段原文的内容指纹（走 store 基座，判据住一处）。
+   */
+  function cursorOf() {
+    const s = WA.store.get();
+    const arr = (s.memory && s.memory.smallSummaries) || [];
+    const last = arr.slice(-1)[0] || null;
+    const sig = (WA.store && typeof WA.store.recentSig === 'function') ? WA.store.recentSig(SMALL_ROUNDS) : '';
+    // 楼层/滑动版本：TP2 要求的「输入楼层·滑动版本」面（换滑动/删楼都要能被看见）
+    const fl = (WA.store && typeof WA.store.floorSig === 'function') ? WA.store.floorSig() : '';
+    return (last && typeof last.endLayer === 'number' ? last.endLayer : -1) + '@' + sig + '@' + fl;
+  }
+
   // ── 小纪要 ────────────────────────────────────────────
   async function makeSmallSummary(cfgOverride) {
     const cfg = cfgOverride || WA.apiRouter.getChannel('digest');
@@ -70,11 +94,40 @@
     if (typeof lastEnd === 'number' && ctxLen - lastEnd <= 1) return null;
     const range = recentRounds(SMALL_ROUNDS);
     if (!range.text) return null;
+    // v2.159.0（TP2）：发出请求**之前**取票 —— 归属（聊天/纪元）+ 依赖读面（压缩游标）
+    //   + 在飞去重键（同一区间并发只受理一次）。三条都是「回来时世界已经换了」的防线：
+    //   只有归属，挡不住「同聊天里这段被删了/换滑动」；只有游标，挡不住「切到别的聊天」。
+    const claimOpt = { dep: cursorOf, key: 'small:' + range.startLayer + '-' + range.endLayer };
+    let ticket = null;
+    if (WA.store && typeof WA.store.claimAsync === 'function') {
+      const c = WA.store.claimAsync('summarizer:small', claimOpt);
+      if (!c || !c.ok) {
+        // 同一区间已有请求在飞 ⇒ 不重复受理（这次不产生第二笔入账）
+        WA.log('info', '纪要跳过：' + ((c && c.reason) || 'claim-failed'));
+        _stat.claimBlocked++; _stat.blocked++;
+        _stat.lastBlockedReason = (c && c.reason) || 'claim-failed';
+        return null;
+      }
+      ticket = c.ticket;
+    }
     const msgs = [
       { role: 'system', content: SMALL_SYSTEM },
       { role: 'user', content: `【待总结对话】\n${range.text}\n\n请只返回 JSON。` }
     ];
-    const r = await WA.apiRouter.call('digest', msgs, { json: true, maxTokens: 400, temperature: 0.3 }).catch(() => null);
+    let r = null;
+    try {
+      r = await WA.apiRouter.call('digest', msgs, { json: true, maxTokens: 400, temperature: 0.3 }).catch(() => null);
+    } catch (e) { r = null; }
+    // v2.159.0（TP2）：落地前复核。拒收 ⇒ 明确丢弃这次结果（不偷偷写回已离开的旧局，也不进新局）。
+    if (ticket && WA.store && typeof WA.store.settleAsync === 'function') {
+      const v = WA.store.settleAsync(ticket, { site: 'summarizer:small' });
+      if (!v || v.ok !== true) {
+        const rs = (v && v.reason) || 'missing-key';
+        _stat.claimBlocked++; _stat.blocked++; _stat.lastBlockedReason = rs;
+        WA.log('warn', '纪要写回被拒（' + rs + '）：' + ((v && v.detail) || ''));
+        return null;
+      }
+    }
     if (!r || !clean(r.small_summary)) return null;
     WA.store.transact(draft => {
       ensureState(draft);
@@ -88,6 +141,7 @@
       else draft.memory.smallSummaries = draft.memory.smallSummaries.slice(-CAP_SMALL);
     });
     WA.log('info', '纪要入账');
+    _stat.passed++;
     return r.small_summary;
   }
 
@@ -102,11 +156,48 @@
     const batch = pending.slice(-SMALL_BATCH);
     const sourceLen = batch.reduce((t, x) => t + x.content.length, 0);
     const maxLen = Math.max(500, Math.ceil(sourceLen / 2));
+    // v2.159.0（TP2）：总述同样取票。依赖读面 = **这一批纪要的身份**（at 时间戳列表）——
+    //   总述的结论只依赖它消费的那几条纪要，与其它任何更新无关；去重键 = 批次签名
+    //   （同一批纪要并发只编一次，否则同一段会被编成两条总述、且两条都消费同一批）。
+    const batchSig = batch.map(function (x) { return x.at; }).join(',');
+    //   指纹里并入**这批纪要正文的内容指纹**：`at` 只标识「是哪几条」，若某条纪要
+    //   在请求在飞期间被改写（同一 at、内容已换），只看 at 会判成「没变」。
+    const batchBody = (WA.store && typeof WA.store.fnv1a === 'function')
+      ? WA.store.fnv1a(batch.map(function (x) { return x.content; }).join('\u0000')) : '';
+    const depOf = function () {
+      const st = WA.store.get();
+      const arr = (st.memory && st.memory.smallSummaries) || [];
+      // 指纹 = 这一批纪要是否还在、是否已被消费（被删/被消费即输入变了）+ 正文内容
+      return batchSig + '#' + arr.filter(function (x) { return batchSig.indexOf(String(x.at)) >= 0; })
+        .map(function (x) { return (x.used ? '1' : '0'); }).join('') + '#' + batchBody;
+    };
+    let ticket = null;
+    if (WA.store && typeof WA.store.claimAsync === 'function') {
+      const c = WA.store.claimAsync('summarizer:big', { dep: depOf, key: 'big:' + batchSig });
+      if (!c || !c.ok) {
+        _stat.blocked = _stat.blocked + 1; _stat.lastBlockedReason = (c && c.reason) || 'claim-failed';
+        WA.log('info', '总述跳过：' + _stat.lastBlockedReason);
+        return false;
+      }
+      ticket = c.ticket;
+    }
     const msgs = [
       { role: 'system', content: BIG_SYSTEM },
       { role: 'user', content: `【本次篇幅】\n总述正文不少于500字、不超过${maxLen}字。\n\n【待整理的阶段纪要】\n` + batch.map((x, i) => `${i + 1}. [楼层 ${x.startLayer}-${x.endLayer}] ${x.content}`).join('\n') }
     ];
-    const r = await WA.apiRouter.call('digest', msgs, { json: true, maxTokens: 1200, temperature: 0.4 }).catch(() => null);
+    let r = null;
+    try {
+      r = await WA.apiRouter.call('digest', msgs, { json: true, maxTokens: 1200, temperature: 0.4 }).catch(() => null);
+    } catch (e) { r = null; }
+    if (ticket && WA.store && typeof WA.store.settleAsync === 'function') {
+      const v = WA.store.settleAsync(ticket, { site: 'summarizer:big' });
+      if (!v || v.ok !== true) {
+        const rs = (v && v.reason) || 'missing-key';
+        _stat.blocked = _stat.blocked + 1; _stat.lastBlockedReason = rs;
+        WA.log('warn', '总述写回被拒（' + rs + '）：' + ((v && v.detail) || ''));
+        return false;
+      }
+    }
     if (!r || !clean(r.big_summary)) return false;
     WA.store.transact(draft => {
       ensureState(draft);
@@ -119,6 +210,7 @@
       draft.memory.smallSummaries.forEach(x => { if (ids.has(x.at)) x.used = true; });
     });
     WA.log('info', '总述入账');
+    _stat.passed++;
     return true;
   }
 
@@ -133,7 +225,13 @@
     return '';
   }
 
-  WA.summarizer = { SMALL_SYSTEM, BIG_SYSTEM, makeSmallSummary, makeBigSummary, buildBlock, ensureState, SMALL_BATCH, CAP_SMALL, CAP_BIG };
+  /** v2.159.0（TP2）：写回台账只读视图 —— 被拒的写回必须可见（否则与「模型没返回」同形）。 */
+  function statOf() {
+    return { blocked: _stat.blocked, claimBlocked: _stat.claimBlocked, passed: _stat.passed, deduped: _stat.deduped,
+      lastBlockedReason: _stat.lastBlockedReason };
+  }
+
+  WA.summarizer = { SMALL_SYSTEM, BIG_SYSTEM, makeSmallSummary, makeBigSummary, buildBlock, ensureState, SMALL_BATCH, CAP_SMALL, CAP_BIG, stat: statOf, cursorOf: cursorOf };
 
   WA.workflow.register({
     id: 'summarizer.run', chain: 'after', order: 46, label: '双层叙事摘要（纪要→总述）',

@@ -211,6 +211,39 @@
       // v2.149.0（X1）：世界沉积层（sediment.js）。登记了容量却不在骨架里，registryParity
       //   会报「未在骨架物化」，冷启动直写会炸事务——登记不等于物化，两件事都要做。
       sediment: { rows: [] },
+      // v2.151.0（RX2+RX3）：跨会话记忆锚（offline-tick.js）与远方世界脉搏（farfield.js）。
+      //   两条引擎各自的三容器都登记了容量，故必须在骨架里物化 —— 登记了却不在骨架里，
+      //   registryParity 会报「未在骨架物化」，冷启动直写也会炸事务（登记 != 物化，两件事都要做）。
+      offlineTick: { anchors: [], batches: [], skips: [], lastSettledAt: null, rounds: 0 },
+      // v2.157.0（S2）：auto*/ 三个字段是自动推演游标 —— 与容器同骨架物化，
+      //   否则 registryParity 报「未在骨架物化」、冷启动直写会炸事务。
+      farfield: { pulses: [], pending: [], heard: [], lastTickAt: null, rounds: 0,
+        autoDay: null, autoAt: null, autoReason: '' },
+      // v2.153.0（RX5+RX6）：剧情深度仪 + 多结局分支树。
+      //   plotGauge **不进骨架** —— 它的趋势环是进程态内存环（与 perfLedger 同口径，
+      //     登记进骨架会让 registryParity 报「未在骨架物化」，也会把「重启清零」伪装成「有界容器」）。
+      //   branchTree **必须进骨架** —— 分叉点账是玩家做过的选择，跨会话要留下；
+      //     登记了容量却不在骨架里，冷启动直写会炸事务（v2.116.0 付过价的那条）。
+      branchTree: { nodes: [] },
+      // v2.154.0（RX4）：世界联网面（world-bridge.js）。三条容器都登记了容量，故必须在骨架里
+      //   物化 —— 登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写会炸事务。
+      //   legends：收进来的别世界传说（本模块唯一写入口 importLegends）
+      //   exported：已见过的来源签名环（**只记签名与条数，不记传说内容** —— 它是去重账，不是第二份传说环）
+      //   seeds/title/player/sig：本世界的身份留痕（跨会话要留下：换了会话世界还是同一个世界）
+      worldBridge: { legends: [], exported: [], seeds: 0, title: '', player: '', sig: '', seededAt: null, lastImportAt: null },
+      // v2.155.0（RX8）：世界生成种子库（world-seed.js）。
+      //   为什么它**进骨架**而 eco-audit 不进：种子库是**跨会话要留下**的世界资产
+      //   （「重开一局想选上一局那个格局」要求它活过会话），而 eco-audit 是进程态只读面。
+      //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务。
+      worldSeed: { library: [], seq: 0 },
+      // v2.160.0（TP4）：跨引擎提交回执（core/commit.js）。
+      //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
+      //   ——登记不等于物化，两件事都要做。
+      commit: { receipts: [] },
+      // v2.154.0（RX7）：世界生态自洽审计（eco-audit.js）**不进骨架** ——
+      //   它是纯只读审计面（零 store.transact），读数全在进程态（lastRow / stat）。
+      //   登记进骨架会让 registryParity 报「未在骨架物化」，也会把「重启清零」伪装成「有界容器」
+      //   （与 plotGauge / perfLedger.samples 同口径）。
       // v2.71.0 叙事纪律四件套。登记了容量却不在骨架里，冷启动直写会炸事务。
       enigma: { rows: [] },
       tempo: { gear: 'andante', shifts: [] },
@@ -310,7 +343,10 @@
       inst: { orgs: [], pending: [], breaches: [], successions: [] },
       economy: { goods: [], orders: [], routes: [] },
       // 元信息
-      meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null }
+      // v2.158.0（S3）：初始化来源留痕（world-seed.js initConfirm 唯一写入方）。
+      //   跨会话要留下：换会话仍知道「这个世界从哪颗种子来」。登记了却不在骨架里，
+      //   registryParity 会报「未在骨架物化」，冷启动直写也会炸事务。
+      meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null, initFrom: null }
     };
   }
 
@@ -632,6 +668,105 @@
   }
   // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
   let __epoch = 0; // v0.1.35: 聊天纪元——init()（含切聊天）自增，在飞批跨纪元即作废
+
+  // ── v2.159.0（TP1/TP2/TP4）：异步归属票据 ──────────────────────────
+  //   病（本轮探针实证两处）：`worldSeed.initPreview` 的待确认计划住在**模块级变量**里、
+  //     不带目标聊天 —— 在 A 聊天预览、切到 B 聊天确认，B 会被装上 A 的预览结果。
+  //     同族的还有一批「await 之后直接对当前 store 开事务」的引擎（摘要 / 主观记忆 / 档案 /
+  //     分层记忆 / 舆情）：请求在 A 发出，响应回来时已经是 B，迟到结果照写进 B。
+  //     两者的共同点是**结果落地时没有任何一处问过「这还是当初那个局吗」**。
+  //   本原语只做这一件事：`claimAsync` 取票（记下取票时的聊天、聊天纪元与读集版本），
+  //     `settleAsync` 在落地前复核。**票据不落盘** —— 它描述的是「请求飞在半空」这一瞬，
+  //     不是世界事实（与 staleGuard 的快照同口径）。因此也不进 __BOUNDED_CAPS：
+  //     那张表是 **world state 容量登记表**，而这里根本没有存档键（同 perfLedger.samples /
+  //     tapeStore.vols 两条注释的理由）。上界由本文件的 CLAIM_CAP / CLAIM_TTL_MS 承担。
+  //   与 `WA.staleGuard` 的分工：staleGuard 是**可开关的观测拦截**（默认关，让用户选
+  //     「迟到结果一律作废」）；本原语是**正确性约束**，默认生效、不可关 —— 因为
+  //     「A 的结果写进 B 的世界」在任何开关状态下都是错的，不该交给用户去选。
+  //   判据分级（这一条决定默认行为，取舍写在这里，避免以后被读成漏判）：
+  //     · 聊天 / 纪元不一致 ⇒ **默认拒收**（`foreign-chat` / `stale-epoch`）。
+  //       这是本轮实证的缺陷形态，也是唯一不可能有正当用法的情形。
+  //     · 读集版本变化 ⇒ **默认只记账不拒收**（`claimStat().lastRevChanged`），要严格的调用方
+  //       传 `strictRev:true`。为什么不能默认拒收：一轮生成里多个引擎各自写回，摘要请求在
+  //       after 链中途发出、回来时同一聊天的 stateRev 早已推进 —— 默认拒收会让所有异步摘要
+  //       **永久饿死**，而「什么都没记」与「记了但被判过期」在读数上同形（本仓反复治理的形态）。
+  //       `strictRev` 留给能证明独立性的调用（如 worldSeed 的「只装空世界」）。
+  const __claims = {};
+  // v2.159.0（TP2）：**在飞去重键** —— key → 票据号。答的是「同一份输入是不是已经有一次请求飞在半空」。
+  //   为什么不能只靠「读集版本变了」兜：并发两次同范围请求各自 await，回来时两条都会过归属检查，
+  //   于是同一段被压两遍 —— 两条回执都合法、两笔入账都成功，读数上看不出任何异常。
+  const __claimKeys = {};
+  let __claimSeq = 0;
+  const __claimStat = { issued: 0, passed: 0, blocked: 0, expired: 0, lastReason: '', lastRevChanged: false, lastDepChanged: false, byReason: {} };
+  const CLAIM_CAP = 64;
+  const CLAIM_TTL_MS = 30 * 60 * 1000;
+  function pruneClaims() {
+    const now = clockWall();
+    const keys = Object.keys(__claims);
+    for (let i = 0; i < keys.length; i++) {
+      const c = __claims[keys[i]];
+      if (c && CLAIM_TTL_MS > 0 && now - c.at > CLAIM_TTL_MS) { delete __claims[keys[i]]; __claimStat.expired++; }
+    }
+    const ks = Object.keys(__claims);
+    if (ks.length > CLAIM_CAP) {
+      ks.sort(function (a, b) { return (__claims[a].at || 0) - (__claims[b].at || 0); });
+      for (let i = 0; i < ks.length - CLAIM_CAP; i++) delete __claims[ks[i]];
+    }
+  }
+  function claimBlock(reason, detail, extra) {
+    __claimStat.blocked++; __claimStat.lastReason = reason;
+    __claimStat.byReason[reason] = (__claimStat.byReason[reason] || 0) + 1;
+    return Object.assign({ ok: false, reason: reason, detail: detail }, extra || {});
+  }
+
+  // ── v2.159.0（TP2）：依赖读面基座 ────────────────────────────────────
+  //   病：TP2 要求调用方交出「这次写回依赖的那几格」的指纹，而**全库没有内容指纹函数**。
+  //     现场已有的两个都是各自私有的弱化版：core/interceptor.js 的 `roundSig` 只取
+  //     `mes.length`（同长度换内容 ⇒ 签名不变），engines/backstage.js 的
+  //     `latestAnchor().hash` 只取「长度 + 末 32 字」（同末 32 字改开头 ⇒ 不变）。
+  //     拿它们当依赖指纹，就会出现「依赖读面明明变了、指纹说没变」的**假放行** ——
+  //     正是 TP2 点名要挡的那一类（结论建立在过期输入上，且读数上看不出来）。
+  //   收口：指纹函数只住一处（与同文件的 `sameId` 同纪律：判据住一处，调用方只消费）。
+  //     `floorSig` 的形态与 core/settle-guard.js 的结算签名**同构**（floor + swipe + 内容指纹），
+  //     因为两者问的是同一个问题：「这一楼还是当初那一楼吗」。
+  //   为什么住在 store 而不是新开一个 util：TP2 的消费者（summarizer / pmem / profile）
+  //     本来就只依赖 store，挂在这里不给它们引入新依赖；而 settle-guard 带开关语义，
+  //     不该被当工具库取用（取用会让「守卫关了」与「指纹不可用」两件事混成一件）。
+  function fnv1a(str) {
+    const s = String(str == null ? '' : str);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return h.toString(36);
+  }
+  /** 楼层指纹 `floor_s{swipe}:{len}:{hash}`；无聊天 / 空聊天 ⇒ `no-chat`（与「有聊天」可分）。 */
+  function floorSig() {
+    const ctx = getCtx();
+    const chat = ctx && ctx.chat;
+    if (!chat || !chat.length) return 'no-chat';
+    const idx = chat.length - 1;
+    const m = chat[idx] || {};
+    const mes = String(m.mes == null ? '' : m.mes);
+    return idx + '_s' + (Number(m.swipe_id) || 0) + ':' + mes.length + ':' + fnv1a(mes);
+  }
+  /** 近期正文指纹：最近 n 楼逐条 `u|a + 长度 + 内容指纹`。同长度换内容、换滑动都能分辨。 */
+  function recentSig(n) {
+    const ctx = getCtx();
+    const chat = (ctx && ctx.chat) || [];
+    const k = Math.max(0, chat.length - (n || 4));
+    const parts = [];
+    for (let i = k; i < chat.length; i++) {
+      const m = chat[i] || {};
+      const mes = String(m.mes == null ? '' : m.mes);
+      parts.push((m.is_user ? 'u' : 'a') + mes.length + ':' + fnv1a(mes));
+    }
+    return parts.join('|');
+  }
+  /** 人物行指纹：`id:名字` 清单（排序后）。改名、增人、删人都算变化。 */
+  function peopleSig() {
+    const s = memCache || {};
+    const p = s.people || {};
+    return Object.keys(p).sort().map(function (k) { return k + ':' + ((p[k] && p[k].name) || ''); }).join(',');
+  }
   // v2.113.0（A1）：`lastFlush` 是**上一次批退出落盘的结论**（ok / reason / safe / at）。
   //   为什么必须进只读视图：止步于「写进去」的字段正是本仓反复点名的功能级失效
   //   （有写入方、零读者）——批落盘失败只在日志里出现一次，面板与诊断都看不到。
@@ -935,7 +1070,11 @@
     //     mirrorHits   = 本次确实从镜像救回了世界（带 from/rev/bytes 证据）
     //     mirrorMisses = 镜像里也没有（真·空白分支，归零是正确行为）
     //     mirrorErrors = 镜像在/可能在上，但**读不出来或解析不了**（绝不与「没有」同形）
-    mirrorHits: 0, mirrorMisses: 0, mirrorErrors: 0, lastMirror: null };
+    mirrorHits: 0, mirrorMisses: 0, mirrorErrors: 0, lastMirror: null,
+    // v2.162.0（TP7）：未来档拒收的可见面——「拒收了」与「没迁移」绝不可同形（后者静默）。
+    //   为什么必须有独立字段：migrateRefused 是**累计计数**，而 lastRefused 带 from/current/at，
+    //   诊断要答得出「哪一份档、对哪一版代码、什么时候」。只有计数时两次拒收之间无法区分。
+    migrateRefused: 0, lastRefused: null };
   // v2.30.0: 镜像命中台账（最近一次回落的完整归因，UI/诊断据此说「这份世界从哪来」）
   let __lastMirror = null;
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
@@ -981,7 +1120,12 @@
     //        也不该出现在「幽灵设置」的候选清单里）。
     //   与 v2.108.0 的 recover 家族同一裁决逻辑：单列是为了**不让它污染既有计数面**
     //     （`families.settingsUnregistered` 是面板与断言都读的读数，不得被新键悄悄加一）。
-    lifeTurn: /^worldaxis_life_turn_v1$/
+    lifeTurn: /^worldaxis_life_turn_v1$/,
+    // v2.156.0（SP1）：每聊天的「真实活动基准」键（engines/playtime.js 的 DATA_KEY）。
+    //   与 lifeTurn 同一裁决（见上）：它既**不是设置**、也**不是存档本体**——
+    //   单列是为了不让它污染既有计数面（`families.settingsUnregistered` 是面板与断言
+    //   都读的读数，不得被新键悄悄加一）。
+    playtime: /^worldaxis_playtime_v1$/
   };
     // v2.5.0: 删除 `settingsSettings` 硬编码白名单。原因（实测口径）：
     //   ① 它是「12 个设置键」的第二份真源，必然漂移——实查已漏掉 calendar_settings_v1 与
@@ -1015,6 +1159,9 @@
     // v2.132.0（O19）: 必须在 settings 兜底**之前**判定——否则本键会落进
     //   settingsUnregistered（面板体检视图的「未登记设置」桶），把一件进程记忆报成用户配置。
     if (KEY_FAMILIES.lifeTurn.test(key)) return { family: 'lifeTurn', chat: null };
+    // v2.156.0（SP1）：同上——必须在 settings 兜底**之前**判定，否则活动基准键
+    //   会落进 settingsUnregistered，把一件进程侧记忆报成用户配置。
+    if (KEY_FAMILIES.playtime.test(key)) return { family: 'playtime', chat: null };
     if ((m = key.match(KEY_FAMILIES.state))) return { family: 'state', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.recovery))) return { family: 'recovery', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_eventLog))) return { family: 'diagnostic', kind: 'event_log', chat: m[1] };
@@ -1084,6 +1231,7 @@
   }
   // v0.1.47: 最近一次 migrate 的报告（观测层承载，不写进 state，避免污染持久 payload）
   let __migrateReport = null;
+  // v2.162.0（TP7）：未来档拒收计数（与 __migrateReport.refused 同源，供 loadStat 直读）
   function classifySaveError(e) {
     const name = (e && e.name) || '';
     const msg = String((e && e.message) || e);
@@ -1213,11 +1361,42 @@
     //   登记它们会让 registryParity 报「未在骨架物化」，也会让 v2.13.0 的有界登记表门禁
     //   报「有界登记表每项都能被挤出侧解释」红灯（它们既不走 WA.evict，也不在世界状态里）。
     //   「有界」这件事仍如实可查：两个模块的 stat() 各自透出 caps（240/56 与 20/20）。
-    // v2.149.0（X1）：世界沉积层三容器（sediment.js 走 WA.evict 单一出口，cap 与 evict.SITES 同源）。
+    // v2.149.0（X1）：世界沉积层三重上限（sediment.js 走 WA.evict 单一出口）。
+    //   登记键必须描述真实状态路径：地点环是 sediment.rows；每地点事件环是
+    //   sediment.rows.*.events（通配子容器不参与精确骨架物化计数，但参与容量查找）。
+    //   旧键 sediment.places / sediment.events 同时造成「站点 path 无法解释」与
+    //   registryParity 把虚构路径当成骨架键的双重漂移；站点名仍保留业务语义。
     //   三重上限缺一不可：单地点事件环（capEvents）、地点数环（capPlaces）、**跨地点总量**（capTotal）——
     //   只有前两者时「每个地点都不超、合起来撑爆存档」这条路仍然通着。
-    'sediment.places': { cap: 24, site: 'sediment.js WA.evict.array(sediment.rows)' },
-    'sediment.events': { cap: 48, site: 'sediment.js WA.evict.array(row.events)' },
+    'sediment.rows': { cap: 24, site: 'sediment.js WA.evict.array(sediment.rows)' },
+    'sediment.rows.*.events': { cap: 48, kind: 'array', wildcard: true, site: 'sediment.js WA.evict.array(row.events)' },
+    // v2.151.0（RX2+RX3）：两个新引擎的六条容器（cap 与 evict.SITES 同名同值，逐键对账）。
+    //   offlineTick：锚环（保护名单）/ 批次环（你不在时那批次的账，注入块的唯一数据源）/ 跳过明细环。
+    //   farfield：远方大事记环 / 在途传闻环（未到期不得落地）/ 已传到近场环（已落地、可转述）。
+    //   三环必须分开：后者答远方自己记住了什么、中者答它还在路上、前者答我们听说了什么 ——
+    //   合成一个 cap 就再也答不出是谁先撑爆的。
+    'offlineTick.anchors': { cap: 24, site: 'offline-tick.js WA.evict.array(b.anchors)' },
+    'offlineTick.batches': { cap: 12, site: 'offline-tick.js WA.evict.array(b.batches)' },
+    'offlineTick.skips': { cap: 48, site: 'offline-tick.js WA.evict.array(b.skips)' },
+    'farfield.pulses': { cap: 48, site: 'farfield.js WA.evict.array(b.pulses)' },
+    // v2.157.0（SP4）：在途环的 cap 由 tick 的背压闸承担责任（满即暂停接新批次）——
+    //   site 如实改成闸门所在，避免读者去找一处已经不存在的 evict 调用。
+    'farfield.pending': { cap: 24, site: 'farfield.js tick 背压闸（pending-full ⇒ 暂停接新批次）' },
+    'farfield.heard': { cap: 32, site: 'farfield.js WA.evict.array(b.heard)' },
+    // v2.153.0（RX5+RX6）：分支树一条容器（cap 与 evict.SITES 同名同值，逐键对账）。
+    //   plotGauge 的趋势环**不登记**：它是进程态内存环（自带 maxPulses cap），
+    //   与 perfLedger.samples 同口径 —— 登记会让「重启清零」被读成「有界容器」。
+    'branchTree.nodes': { cap: 40, site: 'branch-tree.js WA.evict.array(b.nodes)' },
+    // v2.154.0（RX4）：世界联网面两条容器（cap 与 evict.SITES 同名同值，逐键对账）。
+    //   legends：收进来的别世界传说环（注入块只念这一环）；
+    //   exported：已见过的来源签名环（去重账 + 「别处的世界来过」的留痕，不记传说内容）。
+    //   两条必须分开：合成一个 cap 就再也答不出是「传说攒多了」还是「来过的世界太多」。
+    //   eco-audit **不登记**：它是纯只读审计面（零 store.transact、读数全在进程态），
+    //   与 plotGauge / perfLedger.samples 同口径 —— 登记会把「重启清零」伪装成「有界容器」。
+    // v2.155.0（RX8）：种子库环（cap 与 store 骨架的 libCap 设置同源）。
+    'worldSeed.library': { cap: 12, site: 'world-seed.js save()（走 evict 单一出口；上限 = libCap 设置）' },
+    'worldBridge.legends': { cap: 24, site: 'world-bridge.js WA.evict.array(b.legends, maxLegends)（per-call，取设置上界）' },
+    'worldBridge.exported': { cap: 12, site: 'world-bridge.js WA.evict.array(b.exported)' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },
     'chapters.history': { cap: 20, site: 'chapters.js pruneHistory(MAX_HISTORY=20)' },
     // v2.62.0 因果结算两容器（causal.js 走 WA.evict.array 单一出口，cap 与 evict.SITES 同源）。
@@ -1429,7 +1608,12 @@
     'calendarPlan.months': { cap: 48, site: 'calendar-custom.js WA.evict.array(b.months, \'calendarPlan.months\')（per-call，取 maxMonths 上界；v2.130.0）' },
     'binding.chat':     { cap: 200, kind: 'object', site: 'binding.js 写入侧硬上界（maxKeys 满员拒写，不走 evict；v2.130.0）' },
     'binding.char':     { cap: 200, kind: 'object', site: 'binding.js 写入侧硬上界（maxKeys 满员拒写，不走 evict；v2.130.0）' },
-    'binding.default':  { cap: 200, kind: 'object', site: 'binding.js 写入侧硬上界（maxKeys 满员拒写，不走 evict；v2.130.0）' }
+    'binding.default':  { cap: 200, kind: 'object', site: 'binding.js 写入侧硬上界（maxKeys 满员拒写，不走 evict；v2.130.0）' },
+    // v2.160.0（TP4）：跨引擎提交回执台账。登记键与 evict.SITES 的 path 同名同值
+    //   （G18 逐键对账）。它是**环形容器**：回执答「这一笔世界操作做过没有」，
+    //   而「做过没有」必须跨刷新仍答得出（故不能提交完就删），只能环形挤出。
+    //   cap 与 core/commit.js 的 LIMITS.RECEIPTS 同源。
+    'commit.receipts':  { cap: 64, site: 'commit.js WA.evict.array(draft.commit.receipts, \'commit.receipts\', LIMITS.RECEIPTS)' }
     // v2.13.0: 人物档案节（people.<id>.profile.<节>）的上限**逐节不同**，上面五条具名
     //   登记已足够说明「这些数组归谁管」；挤出侧站点 people.profile 的 path 是
     //   people.*.profile.*（per-call，写的时候才由 registry 逐节取值传入），
@@ -1535,6 +1719,124 @@
     sizeCaps() { const c = {}; Object.keys(__BOUNDED_CAPS).forEach(function (k) { c[k] = { cap: __BOUNDED_CAPS[k].cap, site: __BOUNDED_CAPS[k].site, kind: __BOUNDED_CAPS[k].kind || 'array', wildcard: __BOUNDED_CAPS[k].wildcard === true ? true : undefined }; }); return c; },
     defaultWorldState,
     chatId: getChatId,        // v0.9.1: 供导出/诊断读取当前聊天id
+    /** v2.159.0（TP1/TP2/TP4）：当前聊天纪元。init()（含切聊天）自增，是「这还是当初那个局吗」的权威判据。 */
+    epoch: function () { return __epoch; },
+    /** v2.159.0（TP1）：已确认落盘态的读集版本（`__committed`，不是 `memCache`）。
+     *   为什么取 `__committed` 而不是内存态：`meta.stateRev` 只在**写后读回校验通过**时推进，
+     *   而 `memCache` 可能带着一批尚未落盘的候选。票据要回答的是「世界是否已经换了一代」，
+     *   拿未落盘的中间态当版本，会让同一批里的多次写回互相判过期（TP2 注释里那条饿死路径）。 */
+    committedRev: function () {
+      try { return (__committed && __committed.meta && typeof __committed.meta.stateRev === 'number') ? __committed.meta.stateRev : 0; } catch (e) { return 0; }
+    },
+    /**
+     * v2.159.0（TP1/TP2/TP4）：取一张**异步归属票据**。在发出请求**之前**调用。
+     * @param {string} [site] 调用点名字（只进台账，不参与比对）
+     * @param {{dep?:function, key?:string}} [opt]
+     *   · `dep` —— **依赖读面指纹**：返回一个字符串，取票时算一次、结算时再算一次。
+     *     它答的是「这次写回依赖的那些输入，还是当初那份吗」。为什么必须由调用方给：
+     *     只有调用方知道自己的结论依赖哪几格（摘要依赖压缩游标、档案依赖人物行）；
+     *     由 store 统一给一个「世界版本」会把无关更新也算进去 —— 那正是 TP2 点名的
+     *     「一次无关状态更新使所有摘要永久饿死」。
+     *   · `key` —— **相同输入去重键**：同一 key 已有在册票据时，本次取票直接拒
+     *     （`duplicate-inflight`）。为什么要它：并发两次同范围请求各自 await，
+     *     回来时两条都会过归属检查，于是同一段被压两遍（重复入账，读数还都对）。
+     * @returns {ok, ticket, chatId, epoch, rev, at} 或 {ok:false, reason}
+     */
+    claimAsync: function (site, opt) {
+      opt = opt || {};
+      pruneClaims();
+      const chatId = getChatId();
+      const key = (typeof opt.key === 'string' && opt.key) ? opt.key.slice(0, 80) : null;
+      if (key && __claimKeys[key]) {
+        return claimBlock('duplicate-inflight', '同一输入已有在册票据（并发重复请求）—— 本次不重复受理',
+          { key: key, holder: __claimKeys[key] });
+      }
+      let dep = null;
+      if (typeof opt.dep === 'function') { try { const d = opt.dep(); dep = (d === null || d === undefined) ? '' : String(d); } catch (e) { dep = null; } }
+      __claimSeq++;
+      const ticket = 'c' + __claimSeq.toString(36) + '-' + clockWall().toString(36);
+      __claims[ticket] = { at: clockWall(), chatId: chatId, epoch: __epoch, rev: this.committedRev(),
+        site: String(site == null ? '' : site).slice(0, 40),
+        dep: dep, depFn: (typeof opt.dep === 'function') ? opt.dep : null, key: key };
+      if (key) __claimKeys[key] = ticket;
+      __claimStat.issued++; __claimStat.lastReason = 'issued';
+      return { ok: true, ticket: ticket, chatId: chatId, epoch: __epoch, rev: __claims[ticket].rev, at: __claims[ticket].at };
+    },
+    /**
+     * v2.159.0：落地前复核。返回 `{ok:true}` 才允许写回；否则调用方**必须**丢弃这次结果。
+     *   四条判据（聊天 / 纪元 / 读集版本 / 依赖读面），前两条默认拒收、第三条默认只记账
+     *   （理由见上方常量段）、第四条按调用方给的指纹精确判（变了即拒收 —— 它本来就是为
+     *   「这一次写回依赖的输入」定制的，比全局版本精确得多）。
+     *   放行时票据即消费（一次票一次落地）；拒收时也消费 —— 一张废票不该被反复拿去试。
+     * @param {string} ticket claimAsync 返回的票号
+     * @param {{site?:string, strictRev?:boolean}} [opt]
+     */
+    settleAsync: function (ticket, opt) {
+      opt = opt || {};
+      if (ticket === undefined || ticket === null || typeof ticket !== 'string' || !ticket) {
+        return claimBlock('missing-key', '票号必填（claimAsync 返回的那个）', { site: opt.site || null });
+      }
+      const c = __claims[ticket];
+      if (!c) return claimBlock('missing-key', '票号不在册（已过期或被挤出）', { ticket: ticket, site: opt.site || null });
+      delete __claims[ticket];
+      if (c.key && __claimKeys[c.key] === ticket) delete __claimKeys[c.key];
+      const nowChat = getChatId();
+      if (c.chatId !== nowChat) {
+        // 本轮实证的缺陷形态：A 的预览/响应落到 B。带上两面，调用方与用户都看得见「从哪来到哪去」。
+        return claimBlock('foreign-chat', '请求发出后已切换聊天（' + c.chatId + ' → ' + nowChat + '）',
+          { was: { chatId: c.chatId, epoch: c.epoch }, now: { chatId: nowChat, epoch: __epoch }, site: opt.site || c.site || null });
+      }
+      if (c.epoch !== __epoch) {
+        // 同聊天但纪元已换（重载/重新 init）：内存里那些「请求发出时的现场」已经不是同一份了。
+        return claimBlock('stale-epoch', '请求发出后聊天纪元已推进（' + c.epoch + ' → ' + __epoch + '）',
+          { was: { epoch: c.epoch, rev: c.rev }, now: { epoch: __epoch, rev: this.committedRev() }, site: opt.site || c.site || null });
+      }
+      // 依赖读面：调用方给的指纹变了 ⇒ 这次的结论已经建立在过期的输入上。
+      //   为什么排在 rev 之前：它比 rev 精确 —— rev 变了可能与本结论无关（只记账），
+      //   而指纹变了就一定是本结论的输入被动过（拒收才是对的，不是饿死）。
+      if (c.depFn) {
+        let nowDep = null;
+        try { const d = c.depFn(); nowDep = (d === null || d === undefined) ? '' : String(d); } catch (e) { nowDep = null; }
+        if (c.dep !== nowDep) {
+          __claimStat.lastDepChanged = true;
+          return claimBlock('dep-changed', '写回所依赖的输入已变化（依赖读面指纹不一致）—— 这次结论建立在过期的输入上',
+            { was: { dep: c.dep }, now: { dep: nowDep }, site: opt.site || c.site || null });
+        }
+      }
+      const nowRev = this.committedRev();
+      const revChanged = (c.rev !== nowRev);
+      if (revChanged) {
+        __claimStat.lastRevChanged = true;
+        if (opt.strictRev) {
+          return claimBlock('stale-rev', '世界读集版本已变化（' + c.rev + ' → ' + nowRev + '）且调用方要求严格',
+            { was: { rev: c.rev }, now: { rev: nowRev }, site: opt.site || c.site || null });
+        }
+      }
+      __claimStat.passed++; __claimStat.lastReason = revChanged ? 'passed-rev-changed' : 'passed';
+      return { ok: true, revChanged: revChanged, was: { chatId: c.chatId, epoch: c.epoch, rev: c.rev }, now: { rev: nowRev }, site: opt.site || c.site || null };
+    },
+    /** v2.159.0：主动丢弃一张票（用户取消 / 请求失败）。只能丢自己的票号。 */
+    dropAsync: function (ticket) {
+      if (typeof ticket !== 'string' || !ticket || !__claims[ticket]) return { ok: false, reason: 'not-found' };
+      const c = __claims[ticket];
+      if (c && c.key && __claimKeys[c.key] === ticket) delete __claimKeys[c.key];
+      delete __claims[ticket];
+      return { ok: true, ticket: ticket };
+    },
+    /** v2.159.0（TP2）：**依赖读面基座**（指纹函数只住一处，消费者只消费）。 */
+    fnv1a: fnv1a,
+    floorSig: floorSig,
+    recentSig: recentSig,
+    peopleSig: peopleSig,
+    /** v2.159.0：异步归属票据只读视图（tool-diag / 面板 / 专锁消费）。 */
+    claimStat: function () {
+      return { issued: __claimStat.issued, passed: __claimStat.passed, blocked: __claimStat.blocked,
+        expired: __claimStat.expired, live: Object.keys(__claims).length, keys: Object.keys(__claimKeys).length,
+        cap: CLAIM_CAP, ttlMs: CLAIM_TTL_MS,
+        lastReason: __claimStat.lastReason, lastRevChanged: __claimStat.lastRevChanged,
+        lastDepChanged: __claimStat.lastDepChanged,
+        byReason: Object.assign({}, __claimStat.byReason) };
+    },
 
     init() {
       // v0.1.35: 聊天切换/重载时，作废在飞写合并批——旧聊天的未落盘改动不再写向新聊天键
@@ -1608,9 +1910,36 @@
           }
         }
       } catch (e) {}
+      // ── v2.162.0（TP7）：**未来档拒收**（载入路径的第一道门，与 migrate 内部守卫同源）──
+      //   实测现场（无头）：把 schemaVersion=6 写入存档后调 init()，旧代码走的是
+      //   「非空且低于当前版本」这条判断的**否分支** —— 于是未来档**压根不进 migrate**，
+      //   而是直接跌到 ensureShape 并被 save() 写回磁盘：实测 3691 字节 → 3730 字节
+      //   （旧代码拿**自己的骨架**补齐了一份未来存档）。
+      //   同仓 tool-snapshot.validate 对同一件事的处置是**拒收**（'存档 schema 6 高于当前 1
+      //   （请升级扩展）'），故此处对齐它：拒收、不写入、不归一版本号。
+      //   为什么早退落在这里而不是 load 里：这是全函数**最后一个可能写盘的分支之前**的位置，
+      //   且与下方迁移早退共用同一个读数面。放进 load 会让「载入失败」与「拒收」同形。
+      const __futureV = (memCache && typeof memCache.schemaVersion === 'number') ? memCache.schemaVersion : null;
+      if (__futureV !== null && __futureV > SCHEMA_VERSION) {
+        __migrateReport = { from: __futureV, to: __futureV, path: [], steps: 0, failed: [],
+          refused: 'future-schema', current: SCHEMA_VERSION, at: clockWall() };
+        __loadStat.migrateRefused = (__loadStat.migrateRefused || 0) + 1;
+        __loadStat.lastRefused = { from: __futureV, current: SCHEMA_VERSION, at: clockWall() };
+        WA.log('error', 'store.init：存档 schema v' + __futureV + ' 高于当前代码 v' + SCHEMA_VERSION
+          + '——**已拒收不降级**（请升级扩展；本次未改写任何存档字节）');
+        return;
+      }
       if (!memCache.schemaVersion || memCache.schemaVersion < SCHEMA_VERSION) {
         this.createRecoveryPoint(); // 升级前先留恢复点
+        const __migIn = memCache;
         memCache = this.migrate(memCache);
+        // v2.162.0（TP7）：迁移**拒收**（未来档）时不得落盘——旧代码无权把低版本号写回磁盘。
+        //   （守卫在 migrate 内；此处的判据是「回来的对象还是同一个 / 版本号没被归一」。）
+        const __migRep = __migrateReport;
+        if (__migRep && __migRep.refused) {
+          __loadStat.lastRefused = { from: __migRep.from, current: __migRep.current, at: __migRep.at };
+          return;
+        }
         this.save();
       }
       // v0.1.45: 结构自愈——版本号相同但字段较旧（分阶段演进的历史存档）同样补齐
@@ -1648,6 +1977,23 @@
       // 起始版本必须读 state 原值：Object.assign 会让缺 schemaVersion 的远古存档
       // 继承默认值(SCHEMA_VERSION)，从而跳过整条版本链
       const fromV = (state && typeof state.schemaVersion === 'number') ? state.schemaVersion : 0;
+      // ── v2.162.0（TP7）：**未来档拒收，不降级**─────────────────────────
+      //   实测缺口（无头现场）：SCHEMA_VERSION=1 的代码上 migrate({schemaVersion:6}) 返回
+      //   schemaVersion=1、零步、failed:[] —— 一次**静默降级**。同仓 tool-snapshot.validate
+      //   对同一件事的处置却是「拒收」（'存档 schema 6 高于当前 1（请升级扩展）'），
+      //   同一件事两本账（本仓最贵的一类漂移）。降级的后果：旧代码按旧结构读一份含未来
+      //   字段的 payload（未来字段语义无保证），而下游若落盘则把低版本号**写回**存档。
+      //   故对齐 tool-snapshot：拒收、不改写、原样交回；不补默认值、不归一版本号、不删残留。
+      //   作用域：**仅当调用方未显式指定 targetVersion**（= init/载入的真实路径；
+      //   显式 target 是文档写明的「跨多版本链测试与调试」口，那个口的语义由调用方拥有）。
+      if (fromV > SCHEMA_VERSION && (typeof targetVersion !== 'number' || targetVersion < fromV)) {
+        __migrateReport = { from: fromV, to: fromV, path: [], steps: 0, failed: [],
+          refused: 'future-schema', current: SCHEMA_VERSION, at: clockWall() };
+        __loadStat.migrateRefused = (__loadStat.migrateRefused || 0) + 1;
+        WA.log('error', 'store.migrate：存档 schema v' + fromV + ' 高于当前代码 v' + SCHEMA_VERSION
+          + '——**拒收不降级**（请升级扩展；本次不改写任何存档字节）');
+        return state;
+      }
       const out = Object.assign(defaultWorldState(), state);
       // targetVersion 可显式指定（默认当前版本）：便于跨多版本链的测试与调试
       const target = typeof targetVersion === 'number' && targetVersion >= 0 ? targetVersion : SCHEMA_VERSION;
@@ -2144,7 +2490,12 @@
           //   三份真源（本表 / ui/panel.js 的 LAB_P / engines/tool-diag.js 的 SRC_LABEL）同键集，
           //   缺一份那一份的消费端就退回裸桶名——「游标读不出来」与「游标本来就是 0」是两件事，
           //   而它们在没有标签时长得一模一样（life 读失败时刻意**不回落**、如实答「从 0 开始」）。
-          lifeTurn: '跨会话轮转游标读回（读失败 ⇒ 本轮起点按 0 计，与「真的从 0 开始」同形）' };
+          lifeTurn: '跨会话轮转游标读回（读失败 ⇒ 本轮起点按 0 计，与「真的从 0 开始」同形）',
+          // v2.156.0（SP1）：与上面三条同键集（三份真源一同登记）。
+          //   缺这一份，「活动基准读不出来」与「本聊天从没记过」在读数上同形——
+          //   而它们是「存储故障」与「正常开局」两种处置。
+          playtime: '游玩活动基准读回（读失败 ⇒ 与「本聊天从没记过」同形）',
+          tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）' };
         const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
           .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');
         issues.push({ level: 'warn', key: 'storage.readFailed',
@@ -2675,6 +3026,11 @@
       // v2.94.0（O7）：资源账本异常笔——健康分此前对「库存被写坏」完全无感（O5 只把异常笔
       //   送进诊断与面板，体检结论仍可能报 ok）。计数与归因分开：只读，不调 grant/transfer。
       let orgAnomaliesN = 0, orgDriftN = 0, orgNegativeN = 0, orgOverpayN = 0, orgJournalDroppedN = 0;
+      // v2.154.0（RX7）：世界生态自洽审计的读数位。**读上一轮扫描结果、本轮不重扫** ——
+      //   巡视挂在每轮链路上，重扫会把审计器自己的开销塞进每一轮（正是本仓点名的「观测污染被观测者」）。
+      //   `cohFresh` 区分「本轮之前真扫过」与「开着但从没扫过」——后者不是「四类都对得上」。
+      let cohErrorsN = 0, cohWarnsN = 0, cohTruncatedN = 0, cohSweptAt = 0, cohByCode = {}, cohFresh = false;
+      let cohEnabledN = false;
       // v2.17.0: 记忆桥消费面——上面那组信号答的是「我发得出去吗」，这组答「我读得进来吗」。
       //   两者是同一套互操作的两条边：只有发文没有读入，说明这个扩展只把世界摆在门口，
       //   却不看另一个插件记的那本账，「两个钟对不上」就永远没人发现。
@@ -2850,6 +3206,49 @@
           }
         }
       } catch (eOrg) { markDegraded('org.ledger', eOrg); }
+      // ── 9.11 世界生态自洽审计（v2.154.0 / RX7）──
+      //   为什么健康分要看它：eco-audit 把四本账（编年史 / 日程 / 传播链 / 因果链）**彼此之间**
+      //   的矛盾算出来了，但只送进诊断与面板——**体检结论照样能报 ok**。于是「一个人同时被排在
+      //   两处、一条链引用了它之后才发生的事」在健康分层面仍然不可见：面板要用户主动点「自洽审计」
+      //   才看得到（与 v2.94.0 的资源账本异常笔同型）。
+      //   分级：error 级问题 ⇒ 扣分并报 error 议题（世界自证「我这里前后对不上」）；
+      //       只有 warn 级 ⇒ info 议题（可追溯，不扣分）；本轮已扫过、这次没重扫 ⇒ 如实标『读的是上一轮读数』
+      //       （**观测不得改变被观测对象**：常规巡视不重扫，重扫会把它自己挂进每一轮的开销里）。
+      //   空集（真干净）⇒ info 议题：**「扫过且干净」与「没扫」必须可分**。
+      try {
+        if (WA.ecoAudit && typeof WA.ecoAudit.stat === 'function') {
+          const eaCfg = (typeof WA.ecoAudit.getSettings === 'function') ? WA.ecoAudit.getSettings() : null;
+          const eaSt = WA.ecoAudit.stat();
+          cohEnabledN = !!(eaCfg && eaCfg.enabled);
+          if (eaCfg && eaCfg.enabled) {
+            const last = (typeof WA.ecoAudit.lastSweep === 'function') ? WA.ecoAudit.lastSweep() : null;
+            const fresh = !!(last && last.ok === true);
+            cohErrorsN = fresh ? last.errors : 0;
+            cohWarnsN = fresh ? last.warns : 0;
+            cohTruncatedN = fresh ? last.truncated : 0;
+            cohSweptAt = fresh ? last.at : 0;
+            cohByCode = fresh ? Object.assign({}, last.byCode) : {};
+            cohFresh = fresh;
+            if (fresh && last.errors > 0) {
+              score -= Math.min(18, last.errors * 6);
+              issues.push({ level: 'error', key: 'ecology.incoherent', detail: '世界生态自洽审计检出 ' + last.errors + ' 条 error 级矛盾（共 ' + last.total + ' 条）——四本账前后对不上，世界自证不一致；面板「联网」页看逐条明细' });
+              actions.push({ id: 'review-ecology', safe: true, detail: '面板「联网」页查看自洽审计逐条明细（本版只报不改）' });
+            } else if (fresh && last.warns > 0) {
+              issues.push({ level: 'info', key: 'ecology.warn', detail: '自洽审计 ' + last.warns + ' 条 warn 级议题（无 error）——可追溯，不扣分' });
+            } else if (fresh) {
+              issues.push({ level: 'info', key: 'ecology.clean', detail: '自洽审计四类全过（最近一次扫描于 ' + new Date(last.at).toLocaleTimeString() + '）' });
+            } else if (last && last.reason === 'stale') {
+              issues.push({ level: 'info', key: 'ecology.stale', detail: '世界或审计规则已变化，上一份自洽读数已过期，需重新扫描；旧读数不参与当前健康分' });
+            } else {
+              // 开着但**从没扫过**：这不是「干净」，是「没体检」——如实报，不冒充健康。
+              issues.push({ level: 'info', key: 'ecology.unswept', detail: '自洽审计已启用但本轮之前从未扫描过——「没扫」不等于「四类都对得上」' });
+            }
+            if (cohTruncatedN > 0) {
+              issues.push({ level: 'info', key: 'ecology.truncated', detail: '自洽审计有 ' + cohTruncatedN + ' 条超出本轮上限被截（调大 ecoAudit 的 maxIssues 可看全）' });
+            }
+          }
+        }
+      } catch (eEco) { markDegraded('ecology.audit', eEco); }
       // ── 10. 巡视自身完整性（v2.0.0）──
       //   采集节静默失败会让 signals 归零、健康分假绿——「体检没做」与「体检健康」必须可区分。
       let degradedN = 0;
@@ -2954,6 +3353,12 @@
             //   orgJournalDropped>0 是设计内行为但要说清「对账只核到带内」。
             orgAnomalies: orgAnomaliesN, orgDrift: orgDriftN, orgNegative: orgNegativeN,
             orgOverpay: orgOverpayN, orgJournalDropped: orgJournalDroppedN,
+            // v2.154.0（RX7）：世界生态自洽审计——`cohErrors>0` 是缺陷（四本账前后对不上），
+            //   `cohWarns>0` 是议题（可追溯、不扣分）；`cohFresh=false` 且 `cohEnabled=true`
+            //   说明「开着但从没扫过」——它与「扫过且四类全过」是两种事实，不可合成一个 0。
+            cohEnabled: cohEnabledN, cohErrors: cohErrorsN, cohWarns: cohWarnsN,
+            cohTruncated: cohTruncatedN, cohFresh: cohFresh, cohSweptAt: cohSweptAt,
+            cohByCode: Object.assign({}, cohByCode),
             // v2.17.0: 记忆桥消费面——lonshaAvailable=false 且 lonshaVerdict 为归因字符串时，
             //   说明「读不到」这件事本身是**可归因**的（未装/未就绪/契约不匹配各有其名），
             //   而不是一个无名的 null。lonshaDays 为真不一致时的天数。
@@ -3169,7 +3574,7 @@
       memCache = st;
       return { ok: true, bytes: byteLen(m.raw), fromChatId: from, inherited: !!(from && from !== cid) };
     },
-    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, at: __migrateReport.at } : null,
+    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, migrateRefused: __loadStat.migrateRefused || 0, lastRefused: __loadStat.lastRefused ? { from: __loadStat.lastRefused.from, current: __loadStat.lastRefused.current, at: __loadStat.lastRefused.at } : null, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, refused: __migrateReport.refused || null, current: __migrateReport.current || null, at: __migrateReport.at } : null,
       // v2.30.0: 镜像回落三计数同域可见——「本地 miss 但镜像救回」此前在诊断上全无痕迹
       mirrorHits: __loadStat.mirrorHits, mirrorMisses: __loadStat.mirrorMisses, mirrorErrors: __loadStat.mirrorErrors,
       // v2.108.0 (plan-1 #18): repair metrics visible in the same domain (zero new exports --
@@ -3559,8 +3964,8 @@
       // v2.108.0: the recover family (backup/mark) MUST be registered alongside
       //   KEY_FAMILIES -- skipping it turns `families[cls.family]++` into NaN
       //   (an occupancy table that reports "NaN keys").
-      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, other: 0 };
-      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, other: 0 };
+      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, playtime: 0, other: 0 };
+      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, playtime: 0, other: 0 };
       let totalBytes = 0, stateKeys = 0, stateDerivedKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0, curQuarantines = 0;
       let conflictKeys = 0, conflictBytes = 0;
       let keysReadFailed = 0;           // v2.10.0: 本次盘点中读失败的键数（体积表可信度判据）

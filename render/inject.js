@@ -98,6 +98,25 @@
     //   是 v2.127.0 那条锁的锚点区，动它会同时触发 anchor-scan 与负控制审计的 not-unique）。
     //   分工：`chrono` 答「这世界此前发生过什么」（时间序流水），本表答「**这处地方**留下了什么」
     //   （地点视角的投影，带衰减）。合成一个源会让「什么事发生过」与「在哪里留下了痕」互相冒充。
+    // v2.151.0（RX2+RX3）：跨会话记忆锚 + 远方世界脉搏。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。键名 = 命名空间名（offlineTick 是驼峰）。
+    //   同样插在 chrono 行**之前**（chrono 行邻近字面量是 v2.127.0 那条锁的锚点区，
+    //   动它会同时触发 anchor-scan 与负控制审计的 not-unique）。
+    //   分工：`sediment` 答「**这处地方**留下了什么」（地点视角投影）；
+    //   本两条答的是时间维的两面 —— offlineTick 答「你不在这段时间世界推进了什么、哪些没许动」，
+    //   farfield 答「你不在的地方此刻在发生什么」。三者不可合并：把「你不在时」并进地点沉积，
+    //   「这段时间」与「这处地方」会互相冒充。
+    'offlineTick', 'farfield',
+    // v2.154.0（RX4）：世界联网面。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。键名 = 命名空间名（worldBridge 是驼峰）。
+    //   同样插在 chrono 行**之前**（chrono 行邻近字面量是 v2.127.0 那条锁的锚点区，
+    //   动它会同时触发 anchor-scan 与负控制审计的 not-unique）。
+    //   分工：`sediment` 答「这处地方留下了什么」；`farfield` 答「你不在的地方此刻在发生什么」；
+    //   本源答「**别的世界**传过来什么」（标了来源、且明确禁止当成本地事实）——
+    //   把「远方听说的事」与「别世界的事」并成一个源，读者就分不出哪件是这里真发生过的。
+    'worldBridge',
     'sediment',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
@@ -142,7 +161,15 @@ style: false,
         // v2.149.0（X1）：世界沉积层。取默认 true（其模块总开关默认为关——
         //   sediment 的 DEF.enabled=false，未开时 buildBlock 返回空串），
         //   不给老用户凭空多出约束。
-        sediment: true }, module: 'render' };
+        sediment: true,
+        // v2.151.0（RX2+RX3）：两条新源。取默认 true（同四条理由——其模块总开关默认为关：
+        //   offlineTick / farfield 的 DEF.enabled 皆为 false，未开时 buildBlock 返回空串），
+        //   不给老用户凭空多出约束。
+        offlineTick: true, farfield: true,
+        // v2.154.0（RX4）：世界联网面。取默认 true（同四条理由——其模块总开关默认为关：
+        //   worldBridge 的 DEF.enabled=false，未开时 buildBlock 返回空串），
+        //   不给老用户凭空多出约束。
+        worldBridge: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -316,6 +343,13 @@ style: false,
     // v2.149.0（X1）：世界沉积层显示名。缺此项 ⇒ 失败台账（SRC_NAME）会报英文键名 `sediment`，
     //   而 switch-matrix-v2910 的 C2 与 explain-v2900 的 A4/C1 要求源表三项同批：
     //   SOURCES（键）/ 注入分支 source 名 / 本表。三者名字逐字同名。
+    // v2.151.0（RX2+RX3）：两条新注入源的显示名。缺此项 ⇒ 失败台账（SRC_NAME）
+    //   会报英文键名，而 switch-matrix-v2910 的 C2 与 explain-v2900 的 A4/C1 要求源表三项
+    //   同批：SOURCES（键）/ 注入分支 source 名 / 本表。三者名字逐字同名。
+    offlineTick: '你不在时', farfield: '远方的脉搏',
+    // v2.154.0（RX4）：世界联网面的显示名。与 SOURCES（键）/ 注入分支 source 名 / SRC_MOD_SETTING
+    //   三者逐字同名登记（switch-matrix-v2910 的 C2 与 explain-v2900 的 A4/C1 要的同批口径）。
+    worldBridge: '远方的传说',
     sediment: '此地沉积',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
@@ -398,7 +432,23 @@ style: false,
     //   用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
     //   同一类漏登记已为 rumor/canon（v2.99.0）、chrono（v2.127.0）、reasoning/storyTone
     //   （v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0 顺手补）各付过一次学费。
-    sediment: 'worldaxis_sediment_settings_v1' };
+    sediment: 'worldaxis_sediment_settings_v1',
+    // v2.151.0（RX2+RX3）：两条新源**确有**模块级总开关（offline-tick.js 的
+    //   `worldaxis_offline_tick_settings_v1`、farfield.js 的 `worldaxis_farfield_settings_v1`）。
+    //   不登记会怎样：`moduleEnabled` 查不到键就返回 null，于是对账面上本源一律落在
+    //   `unavailable`（「没有模块级总开关」——而它明明有），用户勾了模块总开关却在
+    //   「开关两面一致」上看到「模块没加载」，排查方向被指错。
+    //   同一类漏登记已为 rumor/canon（v2.99.0）、chrono（v2.127.0）、reasoning/storyTone
+    //   （v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0）、sediment（v2.149.0）各付过一次学费。
+    offlineTick: 'worldaxis_offline_tick_settings_v1',
+    farfield: 'worldaxis_farfield_settings_v1',
+    // v2.154.0（RX4）：世界联网面确有模块级总开关（world-bridge.js 的
+    //   `worldaxis_world_bridge_settings_v1`）。不登记会怎样：`moduleEnabled` 查不到键就返回 null，
+    //   于是对账面上本源一律落在 `unavailable`（「没有模块级总开关」——而它明明有），
+    //   用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
+    //   同一类漏登记已为 rumor/canon（v2.99.0）、chrono（v2.127.0）、reasoning/storyTone
+    //   （v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0）、sediment（v2.149.0）各付过一次学费。
+    worldBridge: 'worldaxis_world_bridge_settings_v1' };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -962,6 +1012,17 @@ style: false,
       //   本块与「世界编年史」是**串联而非取代**：那个答「这世界此前发生过什么」（时间序流水），
       //   本块答「**这处地方**留下了什么」（地点视角投影，带衰减）。
       if (vis.sediment && WA.sediment) { const sd = engineCall('sediment', function () { return WA.sediment.buildBlock(); }); if (sd) items.push({ source: '此地沉积', content: sd }); }
+      // v2.151.0（RX2+RX3）：跨会话记忆锚。只报**离线这一批**的批次账（轮数、时长、
+      //   与锚相抵被跳过的改动）——不把自己当成「推进器」（推进由既有引擎负责，本模块只决定
+      //   轮数 + 保护）。关闭或无批次时 buildBlock 返回空串，不占预算。
+      if (vis.offlineTick && WA.offlineTick) { const ot = engineCall('offlineTick', function () { return WA.offlineTick.buildBlock(); }); if (ot) items.push({ source: '你不在时', content: ot }); }
+      // v2.151.0（RX2+RX3）：远方世界脉搏。只念**已传到近场**的消息（在途的一条都不念——
+      //   把「还在路上」写进正文就等于把延迟抹平，读者会以为已经听说了），并逐条标明是否已失真。
+      if (vis.farfield && WA.farfield) { const ff = engineCall('farfield', function () { return WA.farfield.buildBlock(); }); if (ff) items.push({ source: '远方的脉搏', content: ff }); }
+      // v2.154.0（RX4）：世界联网面。只念**收进来**的别世界传说，且逐条标来源与「已传开几次」——
+      //   没这条标注，模型会把「别的世界发生过的事」当成这里发生过的事实写下去（这正是本源的失
+      //   效模式：不是「没内容」，是「内容被当成了本地事实」）。关闭或无传说时 buildBlock 返回空串。
+      if (vis.worldBridge && WA.worldBridge) { const wb = engineCall('worldBridge', function () { return WA.worldBridge.buildBlock(); }); if (wb) items.push({ source: '远方的传说', content: wb }); }
       if (vis.session && WA.session) { const se = engineCall('session', function () { return WA.session.buildBlock(); }); if (se) items.push({ source: '多人场', content: se }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块

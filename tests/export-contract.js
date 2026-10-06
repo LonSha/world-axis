@@ -27,7 +27,11 @@ const mi = diagSrc.indexOf('const MODULE_EXPORTS = {');
 const mj = diagSrc.indexOf('\n  };', mi);
 const MODULE_EXPORTS = vm.runInNewContext('(' + diagSrc.slice(diagSrc.indexOf('{', mi), mj + 4) + ')');
 const OWNER = {}; Object.keys(MODULE_EXPORTS).forEach(function (f) { OWNER[MODULE_EXPORTS[f]] = f; });
-const OPTIONAL = ['ui', 'uiSettings', 'assistant'];   // 仅 UI 层依赖宿主；compat 无头可装载
+const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf'];   // 仅 UI 层依赖宿主；compat 无头可装载
+// v2.152.0：新增 ui 模块（ui/render-perf.js）必须同步进本名单。口径与 tool-diag 的
+//   OPTIONAL_EXPORTS 相同但**是第二份副本** —— 如实登记：这两处同属「无头环境缺席的命名空间」
+//   这一事实，理想形态是收成一份（如 product-files.js 对文件面所做的那样）；本轮只做同步，
+//   不在此处顺手重构（改口径会牵动契约串与冻结值，属于独立一次改动的事）。
 const WA = global.WorldAxis;
 
 function files() {

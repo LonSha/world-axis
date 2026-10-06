@@ -581,7 +581,13 @@ function runAll(a) {
   const iSrc = src(PF), diagSrc = src(DIAG), panSrc = src(PANEL), runSrc = src(RUNJS), idxSrc = src(INDEX);
   // ── A 静态面（消费方在位；这类判据读真文件，故不做负控制，见文件头）──
   a(diagSrc.indexOf("'engines/perf-trace.js': 'perfTrace',") >= 0
-    && diagSrc.indexOf("const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat'];") >= 0,
+    // v2.155.0 收口：原判据把 OPTIONAL_EXPORTS 的**字面量**写死（v2.102.0 时的五项→六项已漂移，
+    //   而字面量停在旧样 ⇒ 判据红的是「名单变了」而不是「本模块被当成可选」。本意是后者，
+    //   故改为从 tool-diag 真源码抽**列表内容**再判：名单可以长，但不得包含本模块。
+    && (function () {
+      const m = diagSrc.match(/const OPTIONAL_EXPORTS = \[([^\]]*)\]/);
+      return !!m && m[1].indexOf("'perfTrace'") < 0;
+    })(),
     'v2102: [A1] perfTrace 登记为**必载**模块（缺席即断裂，不该被静默兜住）');
   a(diagSrc.indexOf('function secPerfTrace()') >= 0 && diagSrc.indexOf('perfTrace: secPerfTrace(),') >= 0
     && diagSrc.indexOf('WA.perfTrace.stat') >= 0 && diagSrc.indexOf('WA.perfTrace.curve') >= 0,

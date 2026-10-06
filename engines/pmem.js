@@ -25,6 +25,17 @@
   const CAP_PER_PERSON = 6;
   const BATCH_MAX = 8;
 
+  // v2.159.0（TP2）：写回台账。此前 `extractRound` 里直接读写 `_stat`，而**它从未声明**——
+  //   取票被拒或结算被拒那一刻会抛 ReferenceError（异常被 workflow 的 try 吞掉，
+  //   表现成「本轮没有主观记忆」，与「模型没返回」同形）。这类「读数不实」正是 TP2
+  //   要治的形态：被拒的写回必须可见。
+  const _stat = { blocked: 0, passed: 0, deduped: 0, lastBlockedReason: null };
+  /** 写回台账只读视图（tool-diag / 专锁消费）。 */
+  function statOf() {
+    return { blocked: _stat.blocked, passed: _stat.passed, deduped: _stat.deduped,
+      lastBlockedReason: _stat.lastBlockedReason };
+  }
+
   const clean = v => WA.inputGuard.text(v, 80);
   const normalized = v => clean(v).toLocaleLowerCase();
   const strArray = v => (Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]))
@@ -226,7 +237,43 @@
         conversation: recentText(4)
       }) }
     ];
-    const r = await WA.apiRouter.call('digest', msgs, { json: true, maxTokens: 900, temperature: 0.2 }).catch(() => null);
+    // v2.159.0（TP2）：取票。主观记忆的写回依赖**当前人物行**（记忆是挂在人身上的）——
+    //   依赖读面 = 人物表指纹 + 本轮正文指纹；本轮之后人物被换掉/被挤出，或正文被
+    //   编辑/换滑动，这次提取出来的记忆就会挂到一个已经不存在的人身上、或挂到一段
+    //   已经不在的正文上（悬空引用，且读数上看不出来）。
+    //   为什么不用「长度」当指纹（首版如此，属弱化判据）：同长度换内容时长度不变，
+    //   指纹说「没变」而输入其实已换 —— 假放行。指纹统一走 store 的基座（判据住一处）。
+    const depOf = function () {
+      // 人物行指纹走 store 基座（判据住一处）；正文指纹 + 楼层/滑动版本同理。
+      const rows = (WA.store && typeof WA.store.peopleSig === 'function') ? WA.store.peopleSig() : '';
+      const sig = (WA.store && typeof WA.store.recentSig === 'function') ? WA.store.recentSig(4) : '';
+      // 楼层/滑动版本：TP2 要求的「输入楼层·滑动版本」面 —— 换滑动或删楼都要能被看见
+      const fl = (WA.store && typeof WA.store.floorSig === 'function') ? WA.store.floorSig() : '';
+      return rows + '#' + sig + '@' + fl;
+    };
+    let ticket = null;
+    if (WA.store && typeof WA.store.claimAsync === 'function') {
+      const c = WA.store.claimAsync('pmem:extract', { dep: depOf, key: 'pmem:' + depOf() });
+      if (!c || !c.ok) {
+        _stat.blocked = (_stat.blocked || 0) + 1; _stat.lastBlockedReason = (c && c.reason) || 'claim-failed';
+        WA.log('info', '主观记忆跳过：' + _stat.lastBlockedReason);
+        return null;
+      }
+      ticket = c.ticket;
+    }
+    let r = null;
+    try {
+      r = await WA.apiRouter.call('digest', msgs, { json: true, maxTokens: 900, temperature: 0.2 }).catch(() => null);
+    } catch (e) { r = null; }
+    if (ticket && WA.store && typeof WA.store.settleAsync === 'function') {
+      const v = WA.store.settleAsync(ticket, { site: 'pmem:extract' });
+      if (!v || v.ok !== true) {
+        const rs = (v && v.reason) || 'missing-key';
+        _stat.blocked = (_stat.blocked || 0) + 1; _stat.lastBlockedReason = rs;
+        WA.log('warn', '主观记忆写回被拒（' + rs + '）：' + ((v && v.detail) || ''));
+        return null;
+      }
+    }
     if (!r) return null;
     const result = { added: 0, skipped: 0, entityUpdates: 0 };
     WA.store.transact(draft => {
@@ -237,6 +284,7 @@
       }
     });
     if (result.added || result.entityUpdates) WA.log('info', `主观记忆入账: 记忆+${result.added} 实体更新${result.entityUpdates}`);
+    _stat.passed++;
     return result;
   }
 
@@ -250,7 +298,8 @@
     //   属纯漏导出（实现一直在用），非功能缺失；但静态看是悬空引用、行为上看是静默降级。
     recentText,
     knownPeopleNames, peopleList,   // v1.1.0: 导出人物清单（别名可达性 + 测试/调试）
-    CAP_TOTAL, CAP_PER_PERSON, BATCH_MAX
+    CAP_TOTAL, CAP_PER_PERSON, BATCH_MAX,
+    stat: statOf                    // v2.159.0（TP2）：写回台账只读视图
   };
 
   WA.workflow.register({

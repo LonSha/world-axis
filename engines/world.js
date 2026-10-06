@@ -26,6 +26,8 @@
  *   ── v2.117.0 追加（B2 前半：场所用途窗口 + 行程结算与中止，全是否定式）──
  *   8 窗口不只要「此刻开着」，还要**容得下这件事**：needMs（路上时间 + 这件事的时长）装不下
  *     就是装不下（window-too-short 并回报还差多少）——不得让「快关门了才开始一场两小时的会」通过。
+ *   10 v2.162.0（TP7）：在途容器满**如实拒收**（in-transit-full），不交给挤出器静默丢——
+ *      「货在哪 / 话到哪了 / 谁在路上」三张表一旦按环形丢，答案就从事实变成「不知道」。
  *   9 中止在途行程**不猜位置**：既不停在出发地、也不假装到达，`place` 一律为 null，
  *     已消耗与未执行分别落账。「把人物退回出发状态」会把一段真走过的路抹成没发生。
  */
@@ -867,7 +869,13 @@
         total: m.minutes, left: m.minutes, departAt: m.departAt, arriveAt: m.arriveAt,
         status: 'in-transit', at: clockNow('world') };
       draft.world.journeys.push(row);
-      WA.evict.array(draft.world.journeys, 'world.journeys');
+      // v2.162.0（TP7）：写入侧容量闸——在途行程自身已满时**如实拒收**，
+      //   不把未完成的行程交给挤出器当可回收历史丢（与 farfield.pending 的背压闸同形）。
+      const evJ = WA.evict.array(draft.world.journeys, 'world.journeys');
+      if (evJ && evJ.ok === false && evJ.reason === 'in-transit-full') {
+        out = { ok: false, reason: 'in-transit-full', channel: 'person', person: who, inTransit: evJ.inTransit, cap: evJ.cap };
+        return false;
+      }
       out = { ok: true, id: row.id, person: who, from: row.from, to: row.to, left: row.left, status: row.status };
     }, 'world:depart');
     if (out && out.ok) { S.departed++; S.lastReason = 'departed'; } else S.blocked++;
@@ -1098,7 +1106,13 @@
         path: tr.path.slice(), total: minutes, left: minutes,
         departAt: at, arriveAt: at + minutes * 60000, status: 'in-transit', at: clockNow('world') };
       draft.world.shipments.push(row);
-      WA.evict.array(draft.world.shipments, 'world.shipments');
+      // v2.162.0（TP7）：写入侧容量闸——在途货运满则如实拒收（「货运回答『货在哪』」
+      //   不得因环形挤出而变成「不知道」；实测原形态 25 批发出去 8 批在途货凭空消失）。
+      const evS = WA.evict.array(draft.world.shipments, 'world.shipments');
+      if (evS && evS.ok === false && evS.reason === 'in-transit-full') {
+        out = { ok: false, reason: 'in-transit-full', channel: 'goods', inTransit: evS.inTransit, cap: evS.cap };
+        return false;
+      }
       out = { ok: true, id: row.id, from: row.from, to: row.to, item: it, amount: row.amount,
         minutes: minutes, arriveAt: row.arriveAt, status: row.status };
     }, 'world:deliver-goods');
@@ -1146,7 +1160,12 @@
         path: path, total: minutes, left: minutes,
         departAt: at, arriveAt: at + minutes * 60000, status: 'in-transit', at: clockNow('world') };
       draft.world.messages.push(row);
-      WA.evict.array(draft.world.messages, 'world.messages');
+      // v2.162.0（TP7）：写入侧容量闸——同货运口径（「消息回答『话到哪了』」）。
+      const evM = WA.evict.array(draft.world.messages, 'world.messages');
+      if (evM && evM.ok === false && evM.reason === 'in-transit-full') {
+        out = { ok: false, reason: 'in-transit-full', channel: 'message', inTransit: evM.inTransit, cap: evM.cap };
+        return false;
+      }
       out = { ok: true, id: row.id, via: via, from: f, to: t, minutes: minutes, arriveAt: row.arriveAt, status: row.status };
     }, 'world:send-message');
     if (out && out.ok) { S.messages++; S.lastReason = 'message-sent'; } else S.blocked++;
@@ -1199,18 +1218,41 @@
   function tick(facts) {
     const cfg = settings(); const f = facts || {};
     if (!cfg.enabled) { S.lastReason = 'disabled'; return { ok: true, changed: 0, reason: 'disabled' }; }
-    const now = isFinite(Number(f.now)) ? Number(f.now) : clockNow('world');
     let changed = 0;
     mutate(storeOf(), function (draft) {
+      changed = tickDraft(draft, f);
+    }, 'world:tick');
+    S.lastReason = changed ? 'advanced' : 'nothing-to-do';
+    return { ok: true, changed: changed, reason: S.lastReason };
+  }
+  /**
+   * v2.156.0（SP2）：**带草稿的日程推进** —— 真跑与离线批试演共用同一段逻辑。
+   *   公开入口 `tick` 只保留「门（enabled）+ mutate 外壳 + 收尾台账」，
+   *   事务回调体逐字搬到这里；离线批（S1 的 offline-return）直接拿既成 draft 调本函数。
+   *   于是「一场共同日程何时落成 planned / ongoing / done」只有一份实现。
+   *
+   * 门在外面：本函数**不做**开关判定——关闭时真跑入口当场返回 disabled，
+   *   那条早退逐字留在 `tick` 里；离线批的合成侧必须自己过同一门，
+   *   否则「世界织体关着」在离线批里会静默推进。
+   * 返回**本轮状态变更数**（changed 的增量）：调用方自持计数器即可 ——
+   *   本函数不写模块台账（那是外壳的事，草稿体只管草稿）。
+   * 执行上下文取值也留在外壳：`mutate` / `storeOf` 的 exec 降级逻辑在 `tick` 里逐字未动，
+   *   本函数只认传进来的那份草稿。
+   * @param {object} draft 事务草稿
+   * @param {object} [opts] 与旧 tick 的入参同一形状（取 now）
+   * @returns {number} changed
+   */
+  function tickDraft(draft, opts) {
+    const f = opts || {};
+    const now = isFinite(Number(f.now)) ? Number(f.now) : clockNow('world');
+    let changed = 0;
       const list = (draft.world && Array.isArray(draft.world.events)) ? draft.world.events : [];
       list.forEach(function (e) {
         if (!e || e.status === 'done') return;
         const want = now >= e.end ? 'done' : (now >= e.start ? 'ongoing' : 'planned');
         if (want !== e.status) { e.status = want; changed++; }
       });
-    }, 'world:tick');
-    S.lastReason = changed ? 'advanced' : 'nothing-to-do';
-    return { ok: true, changed: changed, reason: S.lastReason };
+    return changed;
   }
 
   function buildBlock() {
@@ -1264,7 +1306,7 @@
     deliverGoods: deliverGoods, shipments: shipments, shipmentsInTransit: function () { return shipments().filter(function (s) { return s && s.status === 'in-transit'; }); },
     sendMessage: sendMessage, messages: messages, messagesInTransit: function () { return messages().filter(function (m) { return m && m.status === 'in-transit'; }); },
     tickCourier: tickCourier,
-    where: where, tick: tick, buildBlock: buildBlock,
+    where: where, tickDraft: tickDraft, tick: tick, buildBlock: buildBlock,
     whereStat: function () {
       return { places: places().length, roads: roads().length, events: events().length,
         upcoming: events().filter(function (e) { return e && e.status !== 'done'; }).length };

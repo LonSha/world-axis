@@ -35,6 +35,29 @@
 
   const SANDBOX_SYS = `你是「闲逛沙盒」生成器（NON-CANON，非正史）。产出一些与主线弱相关的生活化碎片：路人对话、街头小事、网络热帖。这些内容不进正史，只为世界增添烟火气。只输出JSON：{"fragments":[{"kind":"overheard|street|trending","text":"...","mood":"..."}]}，≤4条。`;
 
+  // v2.159.0（TP2）：写回台账与取票/结算助手。被拒的写回必须可见 —— 否则「模型没返回」
+  //   与「返回了但被归属检查丢掉」同形（用户只看到舆情不动，无从判断原因）。
+  const _stat = { blocked: 0, passed: 0, lastBlockedReason: null };
+  /** 取票 + 台账；返回 null = 无原语（不设防）、undefined = 被拒、字符串 = 票号。 */
+  function claimOf(site, depFn, key) {
+    if (!WA.store || typeof WA.store.claimAsync !== 'function') return null;
+    const c = WA.store.claimAsync(site, { dep: depFn, key: key });
+    if (!c || !c.ok) { _stat.blocked++; _stat.lastBlockedReason = (c && c.reason) || 'claim-failed'; return undefined; }
+    return c.ticket;
+  }
+  /** 落地前复核；true = 允许写回。 */
+  function settleOf(ticket, site) {
+    if (!ticket || !WA.store || typeof WA.store.settleAsync !== 'function') return true;
+    const v = WA.store.settleAsync(ticket, { site: site });
+    if (!v || v.ok !== true) {
+      const rs = (v && v.reason) || 'missing-key';
+      _stat.blocked++; _stat.lastBlockedReason = rs;
+      WA.log('warn', '舆情写回被拒（' + rs + '）：' + ((v && v.detail) || ''));
+      return false;
+    }
+    return true;
+  }
+
   const opinion = WA.opinion = {
     getSettings: loadSettings,
     /** v2.7.0（收口）: 写入即归一——与 regional/horizon 同规格。此前 `Object.assign(read(), patch)`
@@ -50,11 +73,24 @@
         .map(c => ({ id: c.id, t: c.title, pub: c.publicity, pt: c.public_trace || '', st: c.stage }));
       if (!candidates.length) return { ok: false, reason: 'no-candidates' };
       const prev = (s.opinion.canon || []).slice(-6).map(o => ({ t: o.title, cl: o.claim_status }));
+      // v2.159.0（TP2）：取票。舆情结论依赖**候选公开事件清单**与**上轮舆情快照**——
+      //   请求在飞期间事件被撤/公开度被改，这份舆情就会挂到一组已经不存在的事件上
+      //   （related_event_id 悬空，且读数上看不出来：条目形状完好）。
+      const dep = function () {
+        const st2 = WA.store.get();
+        const cands = (st2.currents || []).filter(c => c.publicity === 'trace' || c.publicity === 'public')
+          .slice(0, 12).map(c => c.id + ':' + c.stage).join(',');
+        const prevSig = (st2.opinion && st2.opinion.canon || []).slice(-6).map(o => o.title).join('|');
+        return cands + '#' + prevSig;
+      };
+      const ticket = claimOf('opinion:generate', dep, 'opinion:' + dep());
+      if (ticket === undefined) return { ok: false, reason: _stat.lastBlockedReason || 'claim-failed' };
       const r = await WA.apiRouter.call('observe', [
         { role: 'system', content: OPINION_SYS },
         { role: 'user', content: '【候选公开事件】' + JSON.stringify(candidates) + '\n【上轮舆情快照】' + JSON.stringify(prev) }
       ], { json: true, maxTokens: 3000, temperature: 0.8 }).catch(e => { WA.log('warn', '舆情生成失败', e.message); return null; });
       if (!r) return { ok: false, reason: 'api-fail' };
+      if (!settleOf(ticket, 'opinion:generate')) return { ok: false, reason: _stat.lastBlockedReason || 'settle-rejected' };
       const now = clockNow('opinion');
       const validTitles = new Set(candidates.map(c => c.t));
       const news = (r.news || []).slice(0, 3).filter(n => n && n.title && validTitles.has(n.related_event_id))
@@ -75,6 +111,7 @@
         draft.opinion.updatedAt = now;
       });
       WA.log('info', `舆情结算：新闻${news.length}条 论坛${forums.length}主题`);
+      _stat.passed++;
       return { ok: true, news: news.length, forums: forums.length };
     },
 
@@ -82,17 +119,26 @@
     async generateSandbox() {
       const cfg = WA.apiRouter.getChannel('observe');
       if (!cfg.baseUrl || !cfg.model) return { ok: false, reason: 'no-channel' };
+      // v2.159.0（TP2）：沙盒碎片虽 NON-CANON，也**写进本聊天的世界存档**（opinion.sandbox）——
+      //   在 A 生成、回来时已是 B，碎片照样落进 B 的存档。
+      const dep = function () { const st2 = WA.store.get(); return String((st2.opinion && st2.opinion.sandbox || []).length); };
+      const ticket = claimOf('opinion:sandbox', dep, 'sandbox:' + dep());
+      if (ticket === undefined) return { ok: false, reason: _stat.lastBlockedReason || 'claim-failed' };
       const r = await WA.apiRouter.call('observe', [
         { role: 'system', content: SANDBOX_SYS },
         { role: 'user', content: '生成一批世界碎片（纯氛围，NON-CANON）。' }
       ], { json: true, maxTokens: 1500, temperature: 1.0 }).catch(() => null);
       if (!r || !r.fragments) return { ok: false, reason: 'api-fail' };
+      if (!settleOf(ticket, 'opinion:sandbox')) return { ok: false, reason: _stat.lastBlockedReason || 'settle-rejected' };
       const now = clockNow('opinion');
       WA.store.transact(draft => {
         draft.opinion.sandbox = (r.fragments || []).slice(0, 4).map(f => ({ kind: f.kind || 'street', text: String(f.text || '').slice(0, 200), mood: f.mood || '', at: now }));
       });
       return { ok: true, count: (r.fragments || []).length };
     },
+
+    /** v2.159.0（TP2）：写回台账只读视图（tool-diag / 专锁消费）。 */
+    claimStat() { return { blocked: _stat.blocked, passed: _stat.passed, lastBlockedReason: _stat.lastBlockedReason }; },
 
     /** 舆情注入块（before链，visibility=opinion开启时） */
     buildOpinionBlock() {

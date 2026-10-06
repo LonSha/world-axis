@@ -255,6 +255,8 @@
   //   待事务提交后由 _start 落库（写失败只降级为日志，不回滚已结算的世界状态）。
   const __personaWrites = [];
   const __relationWrites = [];
+  // v2.160.0（TP4）：推演结算的显式 opId 序号（见 _start 里的取票注释）。
+  let __simSeq = 0;
 
   const backstage = WA.backstage = {
     getSettings: loadSettings,
@@ -360,12 +362,60 @@
           }
           // 字数限制截断（v0.5 limits引擎）
           const clamped = WA.limits ? WA.limits.clampBackstageResult(result) : result;
-          const tx = WA.store.transact(draft => { this.applyResult(draft, clamped, anchor); });
-          if (tx.ok) {
+          // ── v2.160.0（TP4）：推演结算接入**跨引擎提交契约**（core/commit.js）────
+          //   缺口（TP4 原文）：「新外交、运输、履约和地点效果将同时触及多引擎，**局部
+          //   幂等不能直接推出整条链幂等**」。本链正是这样一条链：世界写入（people /
+          //   world / evolution / events…）→ 事务外的人格与关系落库 → 通知；而原先的
+          //   幂等面全是局部的（applyResult 自己答不出「这一楼推演过没有」）。
+          //   接法：取票（显式 opId = 楼层/滑动 + 本轮结算序号）→ begin（同键已提交过
+          //   ⇒ 只回原回执、不重做）→ commit（世界写入与**回执同一事务**）→ defer /
+          //   flush（不可同草稿执行的 registry 写口在事务提交后统一落库；失败可经
+          //   retryEffects **单独重试**，绝不重做已提交的世界写入）。
+          //   为什么显式给 opId 而不用 `store.floorSig()` 的默认键：推演结果来自模型，
+          //   不是可重放的确定性操作 —— 同一楼层手动再推演一次是**正当操作**，按楼层
+          //   去重会把它误判成重复（这是「默认键」在产品侧的边界，如实登记在此）。
+          //   降级可见：`WA.commit` 缺席时**逐字走下面那行原路径**（与 v2.159.0 一致）。
+          const __ck = (WA.commit && typeof WA.commit.opKey === 'function')
+            ? (function () {
+              try { return WA.commit.opKey({ opId: 'backstage@' + anchorBranchId(anchor) + '#' + String(++__simSeq), site: 'backstage' }); }
+              catch (e) { return ''; }
+            })()
+            : '';
+          const __cb = (__ck && WA.commit && typeof WA.commit.begin === 'function')
+            ? (function () {
+              try {
+                return WA.commit.begin(__ck, { site: 'backstage', floor: anchor && anchor.idx, swipe: (anchor && anchor.swipe) || 0 });
+              } catch (e) { return null; }
+            })()
+            : null;
+          let tx = null;
+          let __chStat = null;
+          if (__cb && __cb.ok === true) {
+            // 人格/关系落库走 registry（自带事务、不可同草稿执行）⇒ 登记为**事务后副作用**。
+            try {
+              WA.commit.defer(__cb.chain, 'persona-channels', () => { __chStat = this.flushPersonaChannels(); return true; });
+            } catch (e) { WA.log('warn', 'commit.defer 失败（人格/关系将退回直调）', e && e.message); }
+            tx = WA.commit.commit(__cb.chain, draft => this.applyResult(draft, clamped, anchor));
+            if (tx && tx.reused === true) WA.log('info', '世界推演重复提交被拒（opId=' + __cb.key + ' 已有回执，世界不再写一次）');
+          } else {
+            tx = WA.store.transact(draft => { this.applyResult(draft, clamped, anchor); });
+          }
+          if (tx && tx.ok) {
             WA.log('info', '世界推演结算完成 anchor=m' + anchor.idx);
             // v2.51.0：事务提交后落人格/关系（registry 自带事务，故必须在 tx 之外）
             try {
-              const chStat = this.flushPersonaChannels();
+              if (__cb && __cb.ok === true) {
+                const fr = WA.commit.flush(__cb.chain);
+                if (fr && fr.pending) {
+                  // 提交后副作用未落 ⇒ **只重试副作用**（世界写入不重做 —— TP4 点名）。
+                  const rr = WA.commit.retryEffects(__cb.chain);
+                  WA.log('warn', '推演结算副作用未落，已单独重试 pending=' + fr.pending
+                    + ' reasons=' + JSON.stringify((rr && rr.reasons) || {}));
+                }
+              } else {
+                __chStat = this.flushPersonaChannels();
+              }
+              const chStat = __chStat;
               // v2.51.0：落库结果进日志（真实业务消费点）——此前成败不可见，
               //   「推演产出了人格但没落库」与「模型根本没给」在日志里长得一样。
               if (chStat && (chStat.personaTry || chStat.relTry)) {

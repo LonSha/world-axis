@@ -54,8 +54,9 @@ const A_SDB   = "    const base = ex.cloneState(WA);\n    if (!base) return null
 const A_SINK  = "      sink: base,";
 const A_CTX   = "    return { ctx: c, base: base, store: sand };";
 const A_WSINK = "    if (c && c.sink) {\n      c.writes = (c.writes || 0) + 1;";
-const A_FP1   = "    const world = Object.assign({}, s || {});\n    delete world.rehearsal;\n    delete world.meta;";
+const A_FP1   = "    BOOKS.forEach(function (k) { delete world[k]; });\n    delete world.meta;";
 const A_FP2   = "    return a.keys === b.keys && a.chars === b.chars && a.digest === b.digest;";
+const A_FP1B  = "    BOOKS.forEach(function (k) { delete world[k]; });";
 const A_RER   = "      WA.exec.withContext(ctx, function () {\n        added = WA.act.add(who,";
 const A_NOT   = "    WA.exec.withContext(ctx, function () {\n      na = WA.phoneBridge.noteAction(";
 const A_CAU   = "    WA.exec.withContext(ctx, function () { r = WA.causal.tick({ now: atMs }); });";
@@ -82,9 +83,13 @@ const BROKEN = [
   { rel: REL_X, key: 'wsink', from: A_WSINK, to: "    if (false) {\n      c.writes = (c.writes || 0) + 1;",
     why: '试演写入不计数 ⇒ writes 恒 0，「试演会产生副作用吗」失去读数' },
   { rel: REL,   key: 'fp1',   from: A_FP1,   to: "    const world = Object.assign({}, s || {});",
-    why: '自身记账进指纹 ⇒ 登记完即 stale（预览永远无法匹配）' },
+    why: '记账面完全不排除（自身簿进指纹）⇒ preview 的登记事务自己把指纹顶脏，登记完即 stale' },
   { rel: REL,   key: 'fp2',   from: A_FP2,   to: "    return a.rev === b.rev && a.keys === b.keys && a.chars === b.chars;",
     why: 'rev 进比对 ⇒ 登记完即 stale（判据变恒真话）' },
+  { rel: REL,   key: 'fp3',   from: A_FP1B,  to: "    delete world.rehearsal;",
+    why: '记账面清单收窄成「只删自己的簿」⇒ 别的账本一登记，预览就永久 stale（v2.153.0 分支树实测到的缺口）' },
+  { rel: REL,   key: 'fp4',   from: A_FP1B,  to: "    delete world.rehearsal;\n    delete world.world;\n    delete world.meta;",
+    why: '记账面清单扩宽到真世界键 ⇒ 真改世界被判无变化（判据变恒真话）' },
   { rel: REL,   key: 'rer',   from: A_RER,   to: "      if (true) {\n        added = WA.act.add(who,",
     why: '改道不经上下文 ⇒ 试演在真世界登记行动' },
   { rel: REL,   key: 'not',   from: A_NOT,   to: "    if (true) {\n      na = WA.phoneBridge.noteAction(",
@@ -114,7 +119,8 @@ const B = {};
 BROKEN.forEach(function (s, i) { B[s.key] = i; });
 const OK = {
   ex1: 'exec-absent-refused', sdb: 'snapshot-isolated', sink: 'sink-mounted', ctx: 'ctx-passed',
-  wsink: 'writes-counted', fp1: 'meta-excluded', fp2: 'rev-not-compared', rer: 'reroute-in-ctx',
+  wsink: 'writes-counted', fp1: 'meta-excluded', fp2: 'rev-not-compared',
+  fp3: 'books-explicit', fp4: 'books-explicit', rer: 'reroute-in-ctx',
   not: 'notify-in-ctx', cau: 'causal-in-ctx', stale: 'stale-refused', ext: 'external-irreversible',
   claim: 'claim-honest', comb: 'comparable-split', ring: 'ring-bounded', okno: 'refused-counted',
   step: 'apply-real-run', prev: 'no-preview-on-fail', mut: 'mut-counted'
@@ -247,6 +253,29 @@ const PROBES = {
     if (!pv.ok) return 'no/' + pv.reason;
     const c = WA.rehearsal.checkPreview(pv.previewId);
     return c.match === true ? 'self-clean' : 'self-dirty';
+  },
+  // ⑥b 别的账本登记之后，本模块预览仍须 match（记账面清单**不能只删自己**）
+  //   v2.153.0 实测：branchTree 一登录分叉点，指纹 chars 2357 → 2400 ⇒ match:false，
+  //   即任何 fork 之后 replay 恒报 not-comparable —— 那是「登记一本账」冒充「世界变了」。
+  pFpOther: function (env) {
+    const WA = mkW(env.ov);
+    const pv = WA.rehearsal.preview([WAIT], { now: 1000 });
+    if (!pv.ok) return 'no/' + pv.reason;
+    // 模拟另一个模块的账本被登记（夹具用 branchTree 真实节点，形状与真登记一致）
+    WA.store.transact(function (d) {
+      d.branchTree = d.branchTree || { nodes: [] };
+      d.branchTree.nodes.push({ id: 'br_x_1', round: 1, prompt: '岔路', options: ['左', '右'], parent: '' });
+    }, TAG + 'book');
+    const c = WA.rehearsal.checkPreview(pv.previewId);
+    return c.match === true ? 'other-book-clean' : 'other-book-dirty';
+  },
+  // ⑥c 扩宽清单（把真世界键也删掉）⇒ 真改世界必须被判过（反向：判据非恒真）
+  pFpReal: function (env) {
+    const WA = mkW(env.ov);
+    const pv = WA.rehearsal.preview([WAIT], { now: 1000 });
+    WA.store.transact(function (d) { d.world.places.push({ id: 'pl_C', name: '丙地', kind: 'public' }); }, TAG + 'bump');
+    const c = WA.rehearsal.checkPreview(pv.previewId);
+    return c.match === false ? 'stale-detected' : 'blind';
   },
   // ⑦ 真改世界后判 stale
   pStale: function (env) {
@@ -419,17 +448,19 @@ function judge(a) {
   a(src.indexOf("WA.exec.withContext(ctx, function () {") >= 0, 'v2118/b7: [A5] 试演经显式上下文执行');
   a(src.indexOf("runStep(null, steps[i], now)") >= 0, 'v2118/b7: [A6] apply 与试演共用同一 runStep（真跑一侧）');
   a(src.indexOf("reversible: false") >= 0, 'v2118/b7: [A7] 外部动作标不可撤销');
+  a(src.indexOf('const BOOKS = [') >= 0 && src.indexOf("'branchTree'") >= 0,
+    'v2118/b7: [A7b] 记账面是显式清单（不只删自己一本簿）');
   // ⑧ 原著分歧不强迫 NPC 复刻：政策只改提示口径（源码层：三分支都有 hint，无状态写入）
   a(src.indexOf('不自动掰回') >= 0 && src.indexOf('只记当前坐标') >= 0, 'v2118/b7: [A8] 三政策只改提示口径');
   // ── B 运行时段 ──
   Object.keys(OK).forEach(function (k) {
     if (!PROBES['p' + k[0].toUpperCase() + k.slice(1)] && !{
-      ex1: 1, sdb: 1, sink: 1, ctx: 1, wsink: 1, fp1: 1, fp2: 1, rer: 1, not: 1, cau: 1,
+      ex1: 1, sdb: 1, sink: 1, ctx: 1, wsink: 1, fp1: 1, fp2: 1, fp3: 1, fp4: 1, rer: 1, not: 1, cau: 1,
       stale: 1, ext: 1, claim: 1, comb: 1, ring: 1, okno: 1, step: 1, prev: 1, mut: 1
     }[k]) return;
   });
   const map = { ex1: 'pEx1', sdb: 'pSnap', sink: 'pSink', ctx: 'pCtx', wsink: 'pWrites',
-    fp1: 'pFpSelf', fp2: 'pFpSelf', rer: 'pCtx', not: 'pCtx', cau: 'pCtx',
+    fp1: 'pFpSelf', fp2: 'pFpSelf', fp3: 'pFpOther', fp4: 'pFpReal', rer: 'pCtx', not: 'pCtx', cau: 'pCtx',
     stale: 'pStale', ext: 'pExt', claim: 'pClaim', comb: 'pComb', ring: 'pRing',
     okno: 'pOkNo', step: 'pApplyReal', prev: 'pPrevFail', mut: 'pMut' };
   Object.keys(map).forEach(function (k) {
@@ -470,15 +501,27 @@ function judge(a) {
     'v2118/b7: [C] 提前通知只登记到桥（submitted），不假装送达');
 }
 function runNegative(a) {
-  a(BROKEN.length === 19 && new Set(BROKEN.map(function (x) { return x.key; })).size === 19,
-    'v2118/b7: [N0] 破坏面覆盖 19 个互异锚点');
+  a(BROKEN.length === 21 && new Set(BROKEN.map(function (x) { return x.key; })).size === 21,
+    'v2118/b7: [N0] 破坏面覆盖 21 个互异锚点');
   BROKEN.forEach(function (s) { a(anchorHits(s) === 1, 'v2118/b7: [N0] 锚点在真源码中恰 1 次 :: ' + s.key + ' @ ' + s.rel); });
   N1.forEach(function (it) {
     const got = probeWith(BROKEN[B[it.k]], it.p);
     a(got !== it.okk, 'v2118/b7: [N1] ' + it.note + '（缺口复现；实测 ' + got + '）');
   });
+  const N1b = [
+    { k: 'fp3', p: PROBES.pFpOther, okk: 'other-book-clean',
+      note: '记账面清单收窄 ⇒ 别的账本登记即 stale（fork 之后 replay 恒不可回放）' },
+    { k: 'fp4', p: PROBES.pFpReal,  okk: 'stale-detected',
+      note: '记账面清单扩宽到真世界键 ⇒ 真改世界被判无变化' }
+  ];
+  N1b.forEach(function (it) {
+    const got = probeWith(BROKEN[B[it.k]], it.p);
+    a(got !== it.okk, 'v2118/b7: [N1] ' + it.note + '（缺口复现；实测 ' + got + '）');
+  });
   // N2：原版成立（语义常量串，逐条对照）
   a(probeClean(PROBES.pFpSelf) === 'self-clean', 'v2118/b7: [N2] 原版成立 :: 指纹不被自身记账污染');
+  a(probeClean(PROBES.pFpOther) === 'other-book-clean', 'v2118/b7: [N2] 原版成立 :: 别的账本登记不污染指纹');
+  a(probeClean(PROBES.pFpReal) === 'stale-detected', 'v2118/b7: [N2] 原版成立 :: 真改世界仍被判 stale（清单没有宽到把世界删掉）');
   a(probeClean(PROBES.pStale) === 'stale-detected', 'v2118/b7: [N2] 原版成立 :: 真改世界后被判 stale');
   a(probeClean(PROBES.pStaleRefuse) === 'stale-refused', 'v2118/b7: [N2] 原版成立 :: stale 时 apply 拒收');
   a(probeClean(PROBES.pApplyReal) === 'apply-real-run', 'v2118/b7: [N2] 原版成立 :: apply 走真跑同一路径');

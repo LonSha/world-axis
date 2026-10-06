@@ -160,7 +160,13 @@ function runAll(A) {
   //   解析出别名 167 → 168、有引用 165 → 166（零引用仍恰 core/input-guard.js / core/sanitize.js
   //   两个声明过的纯函数基元 —— perspective-lock 读 store（登记自己）故有引用，不落零引用名单）。
   //   现场读数由 M.audit() 采，非估算；增量逐条可核（+1 文件、+1 别名、+1 有引用）。
-  A(a.files === 172 && a.aliasFiles === 172 && a.refFiles === 170,
+  // v2.153.0（RX5+RX6）：新增 engines/plot-gauge.js 与 engines/branch-tree.js ⇒
+  //   文件面 176 → 178、解析出别名 176 → 178、有引用 174 → 176（两模块都读 store（登记自己）
+  //   故有引用，零引用仍恰 core/input-guard.js / core/sanitize.js 两个声明过的纯函数基元）。
+  // v2.154.0（RX4+RX7）：新增 engines/world-bridge.js 与 engines/eco-audit.js ⇒
+  //   文件面 178 → 180、解析出别名 178 → 180、有引用 176 → 178（两模块都读 store（登记自己）
+  //   故有引用，零引用仍恰 core/input-guard.js / core/sanitize.js 两个声明过的纯函数基元）。
+  A(a.files === 184 && a.aliasFiles === 184 && a.refFiles === 182,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -199,7 +205,21 @@ function runAll(A) {
   //      ui/panel.js（8 枚控件真读 assign / current / allows / boundary / buildBlock / leakScan / getSettings / setSettings）、
   //      engines/probe.js（`view` 的第二参读 intel.project —— 这正是 D2 信息生态收口那条口）
   //      —— 同 v2.124.0 记过的「边是 (file, ns) 对，不是站点数」，故 +9 而非按控件数膨胀。
-  A(a.edgesLoad === 68 && a.edgesCall === 1267 && a.edgesAll === 1335 && a.identityOk,
+  // v2.153.0（RX5+RX6）：两条新硬边，逐条可核——
+  //   ① 两个新引擎尾部各真调 WA.registerModule（registerModule 由 store 提供）⇒ 装载期边 71 → 73；
+  //   ② 调用期 1297 → 1313（+16）：它们读的 ns 里 store / clock / settingsBus / inputGuard / evict
+  //      早已在调用期面内（集合去重后不新增边），真正新增的 (file, ns) 对来自**五处新读者**：
+  //      engines/rehearsal.js（branch-tree 经 rehearsal.preview / checkPreview 反读，指纹面同批）
+  //      —— 实为 tools 侧；render/inject.js 无（两者都不产注入块）、engines/tool-diag.js
+  //      （secPlotGauge / secBranchTree 两节）、ui/panel.js（11 枚控件真读）、
+  //      engines/branch-tree.js 与 engines/plot-gauge.js 各读彼此无关的 ns。
+  //      —— 同 v2.124.0 记过的「边是 (file, ns) 对，不是站点数」。
+  // v2.154.0（RX4+RX7）：两条新硬边 + 调用期 1313 → 1335（+22）——逐条可核：
+  //   ① 两个新引擎尾部各真调 WA.registerModule（registerModule 由 store 提供）⇒ 装载期边 73 → 75；
+  //   ② 调用期 1313 → 1335：真正新增的 (file, ns) 对来自五处新读者（world-bridge 读 store/rumor/chronicle，
+  //      eco-audit 读 causal/chrono/people/rumor，两者都不产注入块）—— 同 v2.124.0 记过的
+  //      「边是 (file, ns) 对，不是站点数」，故不按控件数膨胀。
+  A(a.edgesLoad === 81 && a.edgesCall === 1383 && a.edgesAll === 1464 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -236,10 +256,20 @@ function runAll(A) {
     + ' / __settingsRegs（设置注册槽，全仓同一形态）。合计装载期 +2、调用期 +6、总计 +8 = 实测 8 条，'
     + ' 恒等式 62 + 1191 = 1253。专锁 tests/ensemble-v2138.js 的 N 面另钉「它零 store.transact / 零 store.patch」'
     + '（本门禁的 store 边只算 ns 对，读不出这一层；两条判据互补，不互相代替）。');
+    // v2.161.0（TP3 页面恢复入口）：调用期 1382 → 1383（+1）、装载期 81 不变。
+    //   新增的唯一一条 (file, ns) 对是 **engines/offline-return.js → index.js 的 mainWin** ——
+    //   页面恢复入口要拿宿主窗口挂 `visibilitychange` / `pageshow`（与 playtime.win() 同规：
+    //   `WA.mainWin || window`，故「真实宿主存在」时这条边在）。其余读面（clock / store /
+    //   playtime / offlineTick / evolution / world / life / rand / inputGuard / settingsBus / log）
+    //   在基线就已作为 (file, ns) 对存在，集合去重后不动。恒等式 81 + 1383 = 1464。
+    //   为什么页面入口不新增**装载期**边：它不调 WA.registerModule、也不调 WA.workflow.register
+    //   （入口是事件面的，不是链上的）—— 这一点由 tests/s3-tp3-v2161.js 的 A 段单独钉住。
   // v2.140.0（F1）：LOAD_ORDER 164 → 165（engines/noesis.js 入序）。
   // v2.141.0（F2）：LOAD_ORDER 165 → 166（engines/lifeline.js 入序，紧随 noesis）。
   // v2.142.0（F3）：LOAD_ORDER 166 → 167（engines/perspective-lock.js 入序，紧随 lifeline）。
-  A(a.edgesLoad >= 20 && a.orderLen === 171,
+  // v2.153.0（RX5+RX6）：LOAD_ORDER 175 → 177（两个新引擎入序，紧随 storage-forecast）。
+  // v2.154.0（RX4+RX7）：LOAD_ORDER 177 → 179（两个新引擎入序，紧跟 branch-tree）。
+  A(a.edgesLoad >= 20 && a.orderLen === 183,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -247,11 +277,22 @@ function runAll(A) {
   //   module-registry-gate --update 落进账本，读面含上面那五处新读者）。
   // v2.142.0（F3）：静态提供方 196 → 197、账本 171 → 172、读面 174 → 175（perspective 由
   //   module-registry-gate --update 落进账本，读面含上面那四处新读者）。
-  A(a.nsProvided === 201 && a.nsLedger === 176 && a.nsRead === 179,
+  // v2.153.0（RX5+RX6）：静态提供方 205 → 207、账本 179 → 181、读面 183 → 186
+  //   （plotGauge / branchTree 由 module-registry-gate --update 落进账本，
+  //   读面含 tool-diag 两节与 ui/panel.js 的 11 枚控件）。
+  // v2.154.0（RX4+RX7）：静态提供方 207 → 209、账本 181 → 183、读面 186 → 188
+  //   （worldBridge / ecoAudit 由 module-registry-gate --update 落进账本，
+  //   读面含 tool-diag 两节与 ui/panel.js 的联网页控件）。
+  A(a.nsProvided === 213 && a.nsLedger === 187 && a.nsRead === 192,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
-  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 25,
+  // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
+  //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
+  // v2.153.0（RX5+RX6）：差仍为 26 —— 两个新 ns 都进了账本（引擎层不是 static-only 差）。
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 26,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
-  A(a.deadNs.length === 22, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.153.0（RX5+RX6）：零读 ns 22 → 21（plotGauge 与 branchTree 都被 tool-diag 与面板真读，
+  //   从零读名单里离场）。
+  A(a.deadNs.length === 21, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
@@ -260,11 +301,15 @@ function runAll(A) {
   A(a.problems === 0 && a.ok && a.scanAlive && !a.cycle && !a.cycleWithProv && !a.notInOrder.length,
     'B9 总判据：problems ' + a.problems + ' / ok ' + a.ok + ' / 扫描面活着 ' + a.scanAlive
     + ' / 环 无 / 悬空文件 ' + a.notInOrder.length);
-  A(a.registeredUsed === 15 && a.registeredTotal === 20,
+    // v2.153.0（RX5+RX6）：**B10 不变**（16/21）—— 本表数的是入口 ns（17）+ UI 层 ns（4），
+  //   两个新引擎是普通引擎模块（进的是账本，不是这张表）。改动本项前先看这一行，
+  //   否则会把「引擎进账本」误读成「登记表多两项」（本轮实测过一次）。
+  A(a.registeredUsed === 16 && a.registeredTotal === 21,
     'B10 登记面在用 ' + a.registeredUsed + '/' + a.registeredTotal
     + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用）');
-  A(a.runtimeMissing === 4 && a.ledgerAvailable,
-    'B11 账本缺项文件 ' + a.runtimeMissing + ' 个（入口 + 三个 UI 文件，如实报出）');
+  // v2.153.0（RX5+RX6）：两个新引擎进账本 ⇒ 账本缺项文件面收缩，缺项 5 不变（UI 层仍 4 文件）。
+  A(a.runtimeMissing === 5 && a.ledgerAvailable,
+    'B11 账本缺项文件 ' + a.runtimeMissing + ' 个（入口 + 四个 UI 文件，如实报出）');
   // 次序判据方向的两向自证（用假产品面，不碰真文件）
   const fakeOk = M.audit({
     read: function (rel) { return fakeProduct()[rel] || ''; },

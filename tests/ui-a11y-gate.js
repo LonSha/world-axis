@@ -120,6 +120,19 @@ function audit(env) {
     const tab = panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === page; })[0];
     if (!tab) continue;
     tab.click();
+    // The persistent header control is outside page bodies; audit it once alongside all page controls.
+    if (i === 0) {
+      const headControls = panel.querySelectorAll('.wa-head ' + CONTROL_SEL);
+      for (let h = 0; h < headControls.length; h++) {
+        const c = headControls[h], tag = String(c.tagName || '').toLowerCase();
+        const type = normType(c) || tag;
+        out.total++;
+        const name = accName(c);
+        out.byHow[name.how || '(none)'] = (out.byHow[name.how || '(none)'] || 0) + 1;
+        if (name.how) out.named++;
+        else { out.gaps.push({ page: '(面板头部)', kind: tag + '/' + type, id: c.id || '', tag: tag, type: type }); out.byPage['(面板头部)'] = (out.byPage['(面板头部)'] || 0) + 1; }
+      }
+    }
     const body = panel.querySelector('.wa-body');
     if (!body) continue;
     const ctrls = body.querySelectorAll(CONTROL_SEL);

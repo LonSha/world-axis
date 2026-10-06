@@ -85,6 +85,14 @@
     //   注入页/导演页裸露英文键名 sediment，而那是用户唯一能开关它的地方
     //   （同 v2.56.0 / v2.96.0 / v2.117.0 / v2.142.0 的理由）。插在 chrono 行之前
     //   （chrono 行是 v2.127.0 那条锁的锚点字面量，改动它会触发 anchor-scan not-unique）。
+    // v2.151.0（RX2+RX3）：两条新注入源的显示名。与 SOURCES 同批登记 ——
+    //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名，而那是用户唯一能开关它的地方。
+    offlineTick: '你不在时', farfield: '远方的脉搏',
+    // v2.155.0 收口（全量回归当场抓到）：worldBridge 是 v2.154.0 新增的注入源。
+    //   源表（render/inject.js 的 SOURCES）与注入分支、SRC_NAME、SRC_MOD_SETTING 四处都同批登记了，
+    //   唯有**面板显示名**这一处漏了 —— 而面板是用户唯一能开关它的地方（注入页/导演页会裸露英文键名）。
+    //   同 v2.56.0 / v2.96.0 / v2.117.0 / v2.142.0 / v2.149.0 的理由 —— D 判据两向都锁：漏名与悬空名。
+    worldBridge: '远方的传说',
     sediment: '此地沉积',
     chrono: '世界编年史' };
 
@@ -116,6 +124,18 @@
     //   是 v2.33.0/v2.34.0 两条硬读数（memory/enemies/parallel/inject）锚定的位置，
     //   插在 people 之后会把它们整体后移一位，那是与本次改动无关的读数抖动。
     { id: 'sediment', icon: '⛰', label: '沉积' },
+    // v2.151.0（RX2）：跨会话记忆锚与远方世界脉搏。同样插在 sediment 之后：
+    //   pages[3..6]（memory/enemies/parallel/inject）是 v2.33.0/v2.34.0 两条硬读数
+    //   锁定的位置，插在它们之前会把整体后移一位（与本次改动无关的读数抖动）。
+    //   远方地图（RX3）不新增页签：挂在既有「世界」页
+    //   （同 v2.124.0 心跳块挂概览页的惯例）。
+    { id: 'offline', icon: '⏳', label: '会话' },
+    // v2.154.0（RX4+RX7）：世界联网面与生态自洽审计。同样插在既有页**之后**（offline 之后）：
+    //   pages[3..6]（memory/enemies/parallel/inject）是 v2.33.0/v2.34.0 两条硬读数锁定的位置，
+    //   插在它们之前会把整体后移一位（与本次改动无关的读数抖动）。
+    //   两块合页而不是各开一页：它们回答的是**同一件事的两个方向** ——
+    //   「这片世界与外面通着吗」（传说进出）与「这片世界自己前后对得上吗」（四本账）。
+    { id: 'net', icon: '🛰', label: '联网' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -606,7 +626,26 @@
           + '<textarea id="wa-wb-scan" class="wa-ta" placeholder="扫描文本（预览关键词命中，可空）">' + esc(__wbScan) + '</textarea>'
           + '<div class="wa-list" id="wa-wb-list">' + list + '</div>'
           + '<div id="wa-wb-out" class="wa-out"></div>';
-      })()}`;
+      })()}
+      ${(() => {
+         // v2.151.0（RX3）：远方世界脉搏（只读概览）。控件一律登记在「会话」页，本块**不引入任何控件**
+         //   （纯文本），避免同一出口两处渲染（同 v2.96.0 传播链只读块挂在世界页的惯例）。
+         if (!WA.farfield || typeof WA.farfield.stat !== 'function') return '<div class="wa-sec">远方世界脉搏</div><div class="wa-dim">模块未装载</div>';
+         const fcfg = (typeof WA.farfield.getSettings === 'function') ? WA.farfield.getSettings() : null;
+         if (!fcfg) return '<div class="wa-sec">远方世界脉搏</div><div class="wa-dim">模块未装载</div>';
+         if (!fcfg.enabled) return '<div class="wa-sec">远方世界脉搏</div><div class="wa-dim">关闭（远场不推进，也不注入；在会话页打开）</div>';
+         const st = WA.farfield.stat();
+         const pend = (typeof WA.farfield.pending === 'function') ? WA.farfield.pending() : null;
+         const prows = (pend && Array.isArray(pend.rows)) ? pend.rows : [];
+         return '<div class="wa-sec">远方世界脉搏（近场 ' + st.nearCount + ' 处 / 远场 ' + st.farCount + ' 处）</div>'
+           + '<div class="wa-dim">近场由眼前的世界自行呈现，本块只报远场。划分线以 region.places() 的距离为单一真源（本模块不另存一份地区表）。</div>'
+           + '<div class="wa-dim">远方大事记 ' + st.pulses + ' · 在途传闻 ' + st.pendingInFlight + ' · 已传到近场 ' + st.heard + ' · 已失真 ' + st.distorted + '</div>'
+           + (prows.length ? '<div class="wa-list">' + prows.slice(-8).map(function (m) {
+               return '<div class="wa-item"><b>' + esc(m.place) + '</b> <span class="wa-dim">' + esc(String(m.trend))
+                 + ' · 距离延迟 ' + esc(String(m.delayDays)) + ' 天</span></div>';
+             }).join('') + '</div>'
+             : '<div class="wa-dim">无在途传闻（远场还静着，或已全部落地）</div>');
+       })()}`;
 
   }
 
@@ -1104,6 +1143,10 @@
   //   注意「留得住」的只是它——用户可以切页回来看，但面板重绘后按钮仍要重按（这是有意的：
   //   采纳是**写存档**动作，「上次试算」不该跨重绘静默生效）。
   let __cnBuilt = null;
+  // v2.154.0（RX4）：上一次导出的传说包暂存槽。同 __cnBuilt 的理由 —— 它的体积随编年史条数增长
+  //   （整包 JSON），塞进 DOM 属性等于把整份包复制到属性树上，而 renderBody() 整块重建 DOM。
+  //   「留得住」的只是**内容**：用户可以切页回来再导一次；导出本身是纯读，故留得住也不构成静默写。
+  let __nbPack = null;
 
   function _msTs(t) { if (!t) return ''; try { return new Date(t).toLocaleString(); } catch (e) { return String(t); } }
   function _msAudit(refs) { try { return (WA.timeline && WA.timeline.auditRefs) ? WA.timeline.auditRefs(refs || []) : null; } catch (e) { return null; } }
@@ -1783,7 +1826,8 @@
       + '<button class="wa-btn" id="wa-ka-eval" title="只算不写：立刻重算三态并打印本回合会注入的块">试算</button>'
       + '<button class="wa-btn" id="wa-ka-clear" title="清空全部派生量与规则（不改世界状态）">清空</button></div>'
       + '<div id="wa-ka-out" class="wa-out"></div>';
-    out += '<div data-omniscient><div class="wa-sec">注入自检</div>'
+    out += '<div data-omniscient><div class="wa-sec">注入自检</div><div class="wa-sec">注入价值评估</div>'
+      + '<div class="wa-sec">注入价值评估（纯只读：关掉之后读数恒空，不是「都没用上」）</div>'
       + '<div class="wa-row"><button class="wa-btn" id="wa-inj-refresh" title="重新读取当前注入快照（只读，不改变任何状态）">刷新快照</button>'
       + '<button class="wa-btn" id="wa-inj-explain" title="本轮为何这样：只报“进了什么”与“还有几项没进”（玩家视图）；逐项原因属制作者视图">本轮解释</button>'
       + '<button class="wa-btn" id="wa-inj-explain-all" title="逐源列名 + 归因码（可见性关 / 模块缺席 / 构建失败 / 本轮无内容），供制作者定位">全知面明细</button>'
@@ -1836,6 +1880,147 @@
       <div class="wa-row"><button class="wa-btn" id="wa-sed-block" title="注入块预览（只读）：把此刻会递进正文的那一段原样打出来。传说档不进块（它已是最久远的底噪，再占预算就挤掉了近事）">注入块预览</button><button class="wa-btn" id="wa-sed-stat" title="只读：沉积台账（几处地方 / 几条痕迹 / 几条已降到传说档 / 三容器上限）。空集如实报 0，不编造">台账读数</button></div>
       <div id="wa-sed-out" class="wa-out"></div>`;
 }
+
+  /**
+   * v2.151.0（RX2+RX3）：跨会话记忆锚 + 远方世界脉搏。五条口径（全是本仓反复付过价的那几条）：
+   *   · 控件必须「渲染 + 绑定 + 守卫登记」三件齐做，否则「按钮渲染了但绑定的 id 写错」
+   *     这类断裂在新出口上无人发现（UI_BINDINGS 是接线面的唯一真源）。
+   *   · wa-ot-out 是输出区（与 wa-sed-out / wa-noe-out 同规格：面板回显，不是控件），仍登记。
+   *   · 「报错」与「空结果」分开：空结果不当红色错误报，而按真实局面说明为何是空。
+   *   · 两类读数**不合并**：「你不在这段时间」与「你不在的地方」是两件事 ——
+   *     合成一页、共用一栏输出，但各有各的台账与各有各的开关（口径不合并）。
+   *   · 本页写口与读口并存：开关/登记/结算写，清单/摘要/台账只读，逐枚在 title 里标明。
+   */
+  function renderOffline() {
+    const cfg = (WA.offlineTick && WA.offlineTick.getSettings) ? WA.offlineTick.getSettings() : null;
+    const en = !!(cfg && cfg.enabled);
+    const kinds = (WA.offlineTick && WA.offlineTick.KINDS) || ['task', 'pact', 'feud'];
+    const labels = (WA.offlineTick && WA.offlineTick.KIND_LABEL) || {};
+    const opt = function (k) {
+      return '<option value="' + k + '"' + (k === 'task' ? ' selected' : '') + '>' + esc(labels[k] || k) + '</option>';
+    };
+    // v2.156.0（SP1/S1）：同 rpcfg/sfcfg 的理由 ——「读数是空的」与「这一类被关掉了」在界面上本是两件事。
+    const ptcfg = (WA.playtime && WA.playtime.getSettings) ? WA.playtime.getSettings() : null;
+    const orcfg = (WA.offlineReturn && WA.offlineReturn.getSettings) ? WA.offlineReturn.getSettings() : null;
+    const fcfg = (WA.farfield && WA.farfield.getSettings) ? WA.farfield.getSettings() : null;
+    // v2.152.0（RP6）：渲染观测面的**设置读数**。为什么它必须是产品消费方：
+    //   「读数一直是空的」与「观测被关掉了」在界面上本是两件事，只看输出区是不可分的。
+    //   所以这里把 enabled 摆到段落说明里——控制台里手调一次不算接线，用户要能看见。
+    const rpcfg = (WA.renderPerf && WA.renderPerf.getSettings) ? WA.renderPerf.getSettings() : null;
+    const sfcfg = (WA.storageForecast && WA.storageForecast.getSettings) ? WA.storageForecast.getSettings() : null;
+    // v2.153.0（RX5/RX6）：同 rpcfg/sfcfg 的理由 ——「读数是空的」与「这一类被关掉了」在界面上本是两件事。
+    const pgcfg = (WA.plotGauge && WA.plotGauge.getSettings) ? WA.plotGauge.getSettings() : null;
+    const btcfg = (WA.branchTree && WA.branchTree.getSettings) ? WA.branchTree.getSettings() : null;
+    return `
+      <div class="wa-sec">跨会话记忆锚（你不在的这段时间）</div>
+      <div class="wa-dim">锚是「这条线是玩家推出来的」的声明，<b>不是锁</b>：它不冻结任何数值，只对离线这一批负责 ——
+        离线推演不许覆盖它；遇到与锚相抵的改动一律记为跳过（不回滚：回滚会把同一轮里无关的好改动一起撤掉）。</div>
+      <label class="wa-row"><input id="wa-ot-enabled" type="checkbox" ${en ? 'checked' : ''}/> 启用跨会话记忆锚</label>
+      <div class="wa-row"><input id="wa-ot-path" class="wa-input" placeholder="路径（如 people.p1.life / worldFacts）"/><select id="wa-ot-kind" class="wa-input wa-w60" aria-label="锚类别">${kinds.map(opt).join('')}</select></div>
+      <div class="wa-row"><input id="wa-ot-note" class="wa-input" placeholder="备注（如「找回了姐姐」）"/><button class="wa-btn" id="wa-ot-anchor" title="登记一条锚（同路径幂等：只刷新文本与时间，不重复入账）">登记锚</button><button class="wa-btn" id="wa-ot-anchors" title="只读：当前在场（未释放）的锚路径清单">锚清单</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-ot-release" title="释放一条锚（破坏性，故必须显式）：世界真的变了——任务被推翻、同盟破裂。不删行，行保留为已释放（「曾经锚过」是复盘材料）">释放锚</button><button class="wa-btn" id="wa-ot-tick" title="按世界钟离线时长结一轮（步长与轮数上限由设置决定）。首调只落基准——「不知道你走了多久」不等于「你走了零秒」">结算离线时长</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-ot-summary" title="只读：最近一批的「你不在时发生了什么」摘要">摘要</button><button class="wa-btn" id="wa-ot-block" title="注入块预览（只读）：把此刻会递进正文的那一段原样打出来">注入块</button><button class="wa-btn" id="wa-ot-stat" title="只读：锚/批次/跳过三环与上限读数">台账</button></div>
+      <div class="wa-sec">远方世界脉搏（你不在的地方）</div>
+      <div class="wa-dim">近场（<b>玩家所在</b>）与远场（其他地方）分开：远场有自己简化的持续状态（只记大势，不记人名与明细），
+        纯规则驱动 —— <b>不消耗 AI</b>。消息按距离延迟渗入近场，且转述会失真（「原话」与「听说的」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-ff-enabled" type="checkbox" ${(fcfg && fcfg.enabled) ? 'checked' : ''}/> 启用远方世界脉搏</label>
+      <div class="wa-row"><button class="wa-btn" id="wa-ff-partition" title="只读：按距离切近/远场。划分线以 region.places() 为单一真源（本模块不另存一份地区表）">分区</button><button class="wa-btn" id="wa-ff-pending" title="只读：在途传闻（未到期的必须在这里看得见 ——「在路上」不是「没发生」）">在途</button><button class="wa-btn" id="wa-ff-stat" title="只读：远方大事记/在途/已传到近场三环与上限读数（含四类上限：推演/窗口预算/在途/转移包）">台账</button></div>
+      <div class="wa-dim">v2.157.0 四类上限<b>分列</b>（它们此前挤在一个数字上）：「一次推几窗」（推演上限）／
+        「窗口预算」（同时也是大事记环长）／「在途能装几条」（满即<b>暂停接新批次</b>，不静默挤掉没到的信）／
+        「一次转移包几条」（<b>整批交付或整批拒收</b>，不做部分交付）。</div>
+      <label class="wa-row"><input id="wa-ff-auto" type="checkbox" ${(fcfg && fcfg.auto) ? 'checked' : ''}/> 按剧情时间自动推进远方</label>
+      <div class="wa-row"><button class="wa-btn" id="wa-ff-tick" title="写口：按当前剧情日推进一次（读 playtime.story().dayIndex，窗口数由「剧情日走了几日」决定；零时间/倒退/重放一窗不推）">按剧情日推一次</button><button class="wa-btn" id="wa-ff-transfer" title="只读：把已传到近场的消息打成一个转移包（整批或拒收，超容量报 too-many）">转移包</button></div>
+      <div id="wa-ff-out" class="wa-out"></div>
+      <div id="wa-ot-out" class="wa-out"></div>
+      <div class="wa-sec">游玩活动基准与时间来源（v2.156.0）</div>
+      <div class="wa-dim">四种时间各有各的读法，<b>不合并</b>：墙钟（测量）／决策时间（可复现，回放冻结的是这一条）／
+        剧情时间（正文世界钟，<b>缺失即拒算</b>——不拿真实时间顶替）／真实活动基准（每聊天「上次有效活动」）。</div>
+      <div class="wa-dim">活动基准的价值是一句话：<b>「不知道你走了多久」与「你走了零秒」必须可分</b>。
+        它是进程侧记忆（刻意不进世界存档），且<b>读取不改基准</b>——只有「更新基准」会推进它
+        （先读后写是恢复编排的纪律：先刷新基准会把离线间隔抹掉）。</div>
+      <div class="wa-dim">活动基准此刻：<b>${(ptcfg && ptcfg.enabled) ? '开' : '关'}</b>（关闭时写入被拒收，读数会一直空——这与「本聊天还没活动过」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-pt-enabled" type="checkbox" ${(ptcfg && ptcfg.enabled) ? 'checked' : ''}/> 启用游玩活动基准</label>
+      <div class="wa-row"><button class="wa-btn" id="wa-pt-read" title="只读：读回本聊天的活动基准（**不改基准**）。「从没记过」与「存储读不出来」在这里分列">读基准</button><button class="wa-btn" id="wa-pt-touch" title="写口：更新本聊天的活动基准（显式动作，绕过节流——节流是给自动调用方的有界频率，不是给按钮的）">更新基准</button></div>
+      <div class="wa-sec">离线恢复编排（v2.156.0）</div>
+      <div class="wa-dim">玩家离开的这段真实时间，<b>由谁去结算</b>与<b>结算成什么</b>是两件事：本段管前者 ——
+        它读活动基准、按配置恢复一轮离线推演，并把「你不在时」的摘要交给注入链。默认<b>关</b>
+        （它会写世界，本仓对写入型模块一律默认关）。失败不假装：拒收码逐条如实报，
+        重试沿用同一条随机磁带——重试不该再掷一次骰子。</div>
+      <div class="wa-dim">恢复编排此刻：<b>${(orcfg && orcfg.enabled) ? '开' : '关'}</b>（关闭时不自动恢复，手动按钮仍可显式跑一次）。</div>
+      <label class="wa-row"><input id="wa-or-enabled" type="checkbox" ${(orcfg && orcfg.enabled) ? 'checked' : ''}/> 启用离线恢复编排</label>
+      <div class="wa-row"><button class="wa-btn" id="wa-or-recover" title="按当前活动基准恢复一轮（先读后写：基准在恢复前先取快照，否则刷新基准会把离线间隔抹掉）">恢复一轮</button><button class="wa-btn" id="wa-or-stat" title="只读：恢复/跳过/失败三环与票据复核读数">台账</button></div>
+      <div id="wa-or-out" class="wa-out"></div>
+      <div class="wa-sec">性能与水位（v2.152.0）</div>
+      <div class="wa-dim">两条观测链分列：面板渲染链（切页/重绘的耗时与 DOM 规模）与存储水位（按增速外推多少轮后到达配额档位）。
+        都是<b>只读观测</b>——不做增量优化、不自动清理（发现劣化的是读数，改配置的是人）。
+        渲染观测此刻：<b>${(rpcfg && rpcfg.enabled) ? '开' : '关'}</b>（关闭时不记任何一次重绘，读数会一直空——这与「还没切过页」不是一回事）。</div>
+      <div class="wa-sec">记录面板渲染读数（v2.152.0）</div>
+      <label class="wa-row"><input id="wa-rp-enabled" type="checkbox" ${(rpcfg && rpcfg.enabled) ? 'checked' : ''}/> 记录面板渲染读数</label>
+      <div class="wa-row"><button class="wa-btn" id="wa-rp-stat" title="只读：逐页渲染读数（次数/平均耗时/平均节点数/最近耗时）">渲染读数</button><button class="wa-btn" id="wa-rp-trend" title="只读：三基准均值对照（近10/近50/全窗）">渲染趋势</button><button class="wa-btn" id="wa-rp-reset" title="清空两条观测链的内存环（渲染样本环 + 存储样本环）。只清进程态读数，不动存档、不改配置——「重新量一遍」与「抹掉证据」是两件事，故此处只清前者">清空观测</button></div>
+      <div class="wa-sec">存储水位预测（v2.152.0）</div>
+      <label class="wa-row"><input id="wa-sf-enabled" type="checkbox" ${(sfcfg && sfcfg.enabled) ? 'checked' : ''}/> 启用存储水位预测</label>
+      <div class="wa-row"><button class="wa-btn" id="wa-sf-sample" title="采一次当前总字节样本（每轮结算后由调用方采，此处手动补采）">采样本</button><button class="wa-btn" id="wa-sf-forecast" title="只读：按最小二乘外推到达 50%/75%/90%/100% 配额的轮数">水位预测</button><button class="wa-btn" id="wa-sf-stat" title="只读：样本环与拒收归因读数">台账</button></div>
+      <div id="wa-rp-out" class="wa-out"></div>
+      <div class="wa-sec">剧情深度与分支树（v2.153.0）</div>
+      <div class="wa-dim">两条只读面。<b>张力指数</b>是四分量加权合成（悬念存量 30／推进动能 30／暗流成熟 25／到期压力 15），
+        分量缺席时**该分量与它的权重一并剔除**、按在场权重归一 ——「没有线程」是<b>无从判定</b>，不是「暗流全不成熟」（算 0 分就是把后者伪装成前者）。
+        <b>分支树</b>记的是玩家**实际做过**的选择；回放用的是当时那次预演钉下的那份世界指纹，世界变了就如实说不可回放。
+        两条都不写世界：不自动收线、不自动推进、**零自动登记**。</div>
+      <div class="wa-sec">剧情深度仪（v2.153.0）</div>
+      <label class="wa-row"><input id="wa-pg-enabled" type="checkbox" ${(pgcfg && pgcfg.enabled) ? 'checked' : ''}/> 启用剧情深度仪</label>
+      <div class="wa-row"><button class="wa-btn" id="wa-pg-read" title="只读：张力指数与四个分量（分量各自可读 —— 合成值失真的第一诊断手段就是「看哪个分量在动」）">张力读数</button><button class="wa-btn" id="wa-pg-trend" title="只读：走向（末 3 次比较方向一致才算连续）。两个点连不成趋势，不足 3 点如实说">走向</button><button class="wa-btn" id="wa-pg-advice" title="只读：收线建议（不是剧情建议）—— 每条都带它自己读到的数">收线建议</button><button class="wa-btn" id="wa-pg-stat">台账</button></div>
+      <div class="wa-row"><input id="wa-bt-round" class="wa-input" placeholder="第几轮（如 12）"/><input id="wa-bt-prompt" class="wa-input" placeholder="面对什么（如「要不要说出真相」）"/><input id="wa-bt-opts" class="wa-input" placeholder="走法（逗号分隔，至少两条）"/><button class="wa-btn" id="wa-bt-fork" title="写口：登记一个分叉点。零自动登记 —— 谁在哪个点分叉由调用方决定（自动判断『这是重大选择』需要叙事判断，本模块不替模型做这件事）。走法不足两条拒收 no-options：一条走法的「选择」是流水账，不是分叉">登记分叉点</button></div>
+      <div class="wa-row"><input id="wa-bt-id" class="wa-input" placeholder="分叉点 id"/><input id="wa-bt-choice" class="wa-input" placeholder="实际选了哪条（须在登记表内）"/><button class="wa-btn" id="wa-bt-choose" title="写口：记录实际选择（只补一格，不新增节点）。选了登记表以外的走法一律拒收 bad-value —— 不悄悄追加，否则「我登记了三条、实际走了第四条」在树上长得像正常分支">记录选择</button><button class="wa-btn" id="wa-bt-replay" title="写口（只读语义）：回放某点的预演结论。世界已变即如实报 not-comparable —— 不拿一个旧结论冒充可以回放">回放</button></div>
+      <div class="wa-sec">多结局分支树（v2.153.0）</div>
+      <label class="wa-row"><input id="wa-bt-enabled" type="checkbox" ${(btcfg && btcfg.enabled) ? 'checked' : ''}/> 启用多结局分支树</label>
+      <div class="wa-row"><button class="wa-btn" id="wa-bt-tree" title="只读：分支树 JSON（节点 = 分叉点，边 = 选择）。只给 JSON，不做图形渲染">分支树</button><button class="wa-btn" id="wa-bt-compare" title="只读：两个分叉点的可比性对比。缺指纹是 unknown（没得比），不是 diff（比出来不一样）">比对两点</button><button class="wa-btn" id="wa-bt-nodes" title="只读：分叉点清单（含各自有没有预览、选了哪条）">节点清单</button><input id="wa-bt-a" class="wa-input" placeholder="基点 id"/><input id="wa-bt-b" class="wa-input" placeholder="另一点 id"/></div>
+      <div id="wa-pg-out" class="wa-out"></div>`;
+  }
+
+  // ===== v2.154.0（RX4 世界联网面 + RX7 生态自洽审计）=====
+  // 设计动机（两张面摆上界面）：
+  //   · RX4 世界联网面：一个世界产生的大事要能被**别的世界**知道。但「知道」在本仓里有三条
+  //     互不相同的路径，本页把三条**分开摆**（合成一个按钮就是把三件事说成一件事）：
+  //       导出 = 从本世界编年史取三类大事、逐句脱敏后打包 —— **纯读**，不改任何状态；
+  //       导入 = 把别处来的包以「听说的」身份存进传说链 —— 唯一写入口，且只写传说；
+  //       转投 = 显式把某条传说落成一条世界事实、再起 rumor 链（两步独立事务，理由见引擎注释）。
+  //     三条分工不合并：传说直接写成世界事实，下一轮它就变成「这里发生过的事」。
+  //   · RX7 生态自洽审计：时间线/空间/认知/因果四类**跨模块**一致性，只报不改 ——
+  //     面板只呈现，不自动修复（自动改架空的正是「世界为什么自洽」这件事本身）。
+  //   两段共用一句纪律：「读数是空的」与「这一面被关掉了」在界面上必须可分辨。
+  function renderNet() {
+    const nbcfg = (WA.worldBridge && WA.worldBridge.getSettings) ? WA.worldBridge.getSettings() : null;
+    const eccfg = (WA.ecoAudit && WA.ecoAudit.getSettings) ? WA.ecoAudit.getSettings() : null;
+    const nbOn = !!(nbcfg && nbcfg.enabled);
+    const ecOn = !!(eccfg && eccfg.enabled);
+    const on = function (v) { return v ? 'checked' : ''; };
+    return `
+      <div class="wa-sec">世界联网面（别人家的大事传到这里）</div>
+      <div class="wa-dim">世界身份 = <b>(世界观 ID + 玩家 ID)</b> 两段派生哈希合成 ——
+        半份身份一律不成签名（拿半份身份去判「是不是同一个世界」是假判据，故这里如实说缺哪一半）。
+        传说只有三种走法：<b>导出</b>（编年史三类大事逐句脱敏后打包，纯读）、
+        <b>导入</b>（别处的包以「听说的」身份进传说链，唯一写入口）、
+        <b>转投 rumor</b>（显式落一条世界事实再起链）。<b>传说不写世界事实</b> ——
+        写了它就变成「这里发生过的事」，模型下一轮会照着它推本地人物的行动。
+        联网面此刻：<b>${nbOn ? '开' : '关'}</b>（关闭时导出/导入/转投三处一并拒收，读数会一直空 ——
+        这与「还没传过」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-nb-enabled" type="checkbox" ${on(nbOn)}/> 启用世界联网面</label>
+      <div class="wa-row"><input id="wa-nb-title" class="wa-input" placeholder="世界观 ID（留空回落宿主角色名）" value="${esc(nbcfg ? nbcfg.worldTitle : '')}"/><input id="wa-nb-player" class="wa-input" placeholder="玩家 ID（留空回落宿主 name1）" value="${esc(nbcfg ? nbcfg.playerName : '')}"/><button class="wa-btn" id="wa-nb-ident" title="保存两段身份（世界签名的输入；改身份会改变签名，故是显式写动作）">保存身份</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-nb-key" title="只读：世界签名（两段派生值 + 合成哈希 + 缺哪一半）">世界签名</button><button class="wa-btn" id="wa-nb-seed" title="把当前身份与计数记进本世界的联网档案（幂等：同签名重复只累加计数）">落种子</button><button class="wa-btn" id="wa-nb-export" title="纯读：从编年史取「大战/大案/大人物崛起」三类，逐句脱敏后打包。脱敏剔了几句随读数给出；脱敏后什么都不剩的整条剔除（不导出空传说）">导出传说</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-nb-import" title="唯一写入口：把别处来的传说包以「听说的」身份存进传说链。同签名 = 本世界自己的回灌，硬拒收（「拒收」不是「导入了 0 条」）；档位写错的行逐条剔除并如实报数">导入传说</button><input id="wa-nb-pack" class="wa-input" placeholder="传说包 JSON（留空则用本页上一次导出的包）"/><button class="wa-btn" id="wa-nb-legends" title="只读：收进来的传说清单（逐条标明来自哪个世界、已传开几次）">传说清单</button></div>
+      <div class="wa-row"><input id="wa-nb-lg" class="wa-input" placeholder="传说 id（如 lg_1a2b3c4d_5e6f7a8b）"/><button class="wa-btn" id="wa-nb-relay" title="把这条传说落成一条世界事实、再起 rumor 链（两步独立事务）。为什么不自动转交：rumor 的链只能挂在已存在的事实键上（unknown-fact 是硬拒收），不落事实而直接起链，唯一结果是它永远传不出去；链没起成时**事实不回滚**（它确实被记下了，删掉就是篡改）">转投 rumor</button><button class="wa-btn" id="wa-nb-block" title="只读：注入块预览（只念收进来的传说，逐条标「来自别处」—— 没有这条标注，模型会把听说的远方事当成本地既成事实写下去）">注入块</button><button class="wa-btn" id="wa-nb-stat" title="只读：传说/已导入签名/种子三环与上限、导出脱敏与拒收归因">台账</button></div>
+      <div id="wa-nb-out" class="wa-out"></div>
+      <div class="wa-sec">世界生态自洽审计（v2.154.0）</div>
+      <div class="wa-dim">四类跨模块一致性，<b>只报不改</b>：<b>时间线</b>（排期倒挂 / 引用未来的事）、
+        <b>空间</b>（同一人同时出现在两处）、<b>认知</b>（知道了他不该知道的事 —— 判据以 rumor.visibleTo 为单一真源，
+        缺席时如实回落到 local-hops 并标出来）、<b>因果</b>（原因不成立 / 无因之果）。
+        审计器**不参与修复**：自动改架空的正是「世界为什么自洽」这件事本身。审计器自身耗时进性能台账。
+        此刻：<b>${ecOn ? '开' : '关'}</b>（关闭时不扫，读数会一直空 —— 这与「扫过没问题」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-ec-enabled" type="checkbox" ${on(ecOn)}/> 启用世界生态自洽审计</label>
+      <div class="wa-row"><label><input id="wa-ec-tl" type="checkbox" ${on(eccfg && eccfg.timelineEnabled)}/> 时间线</label><label><input id="wa-ec-sp" type="checkbox" ${on(eccfg && eccfg.spaceEnabled)}/> 空间</label><label><input id="wa-ec-cog" type="checkbox" ${on(eccfg && eccfg.cognitionEnabled)}/> 认知</label><label><input id="wa-ec-cau" type="checkbox" ${on(eccfg && eccfg.causalEnabled)}/> 因果</label><button class="wa-btn" id="wa-ec-save" title="保存四类开关（关掉的那一类不进本次扫描，读数里如实标 off —— 不拿「没扫」冒充「没问题」）">保存类别</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-ec-sweep" title="扫一遍（唯一真入口：面板与常规巡视读的是同一份读数，不另立两套判据）">扫描</button><button class="wa-btn" id="wa-ec-issues" title="只读：上一次的问题清单（逐条带码、类别、级别与两个读数）。行数被上限截断时如实报「还有多少条没列出来」">问题清单</button><button class="wa-btn" id="wa-ec-last" title="只读：上一次扫描读数（四类开关状态/判据来源/截断数/没做成的小节）。从未扫过报 never-swept —— 不拿 0 条冒充「干净」">上次读数</button><button class="wa-btn" id="wa-ec-stat" title="只读：扫描次数/问题累计/按码按类分布/降级小节">台账</button></div>
+      <div id="wa-ec-out" class="wa-out"></div>`;
+  }
 
   function renderDirector() {
     const vis = WA.render.getVisibility();
@@ -1904,6 +2089,10 @@
   }
 
   function renderTools() {
+    // v2.155.0（RX8 世界种子库）：读数在「工具」页常驻，开关状态进渲染（
+    //   「库是空的」与「这一面被关掉了」在界面上必须分得开 —— 与 v2.154.0 同一句纪律）。
+    const wscfg = (WA.worldSeed && WA.worldSeed.getSettings) ? WA.worldSeed.getSettings() : null;
+    const wsOn = !!(wscfg && wscfg.enabled);
     return `
       <div class="wa-sec">世界态势分析（纯只读体检）</div>
       <button class="wa-btn" id="wa-an-run">立即分析</button>
@@ -1936,6 +2125,7 @@
         <button class="wa-btn" id="wa-orphan-view" title="设置键：未登记却已落盘的幽灵设置">设置键</button>
         <button class="wa-btn" id="wa-cfg-view" title="配置包：整包导出/导入设置家族键，含 schema 版本、备份环与失败不污染">配置包</button>
         <button class="wa-btn" id="wa-settle-view" title="结算守卫：同一楼层是否被重复结算">结算守卫</button>
+        <button class="wa-btn" id="wa-claim-view" title="异步写回票据：摘要/记忆/档案/舆情的迟到结果被放行还是拒收，以及拒收归因（只看已发生的读数）">写回票据</button>
         <button class="wa-btn" id="wa-compat-view" title="宿主兼容层：当前宿主提供了哪些能力、缺哪些">宿主兼容层</button>
         <button class="wa-btn" id="wa-net-view" title="跨插件互操作：宿主能力 / 上游证据读取 / 手机侧交互执行，三伙伴五态分列（只读，不驱动对方重建快照）">跨插件面</button>
         <button class="wa-btn" id="wa-net-freeze" title="协议冻结面：三座桥的 id 与契约版本、诊断节键、拒收码词表——外部读者认的就是这些字符串">协议冻结面</button>
@@ -1966,6 +2156,23 @@
         <button class="wa-btn" id="wa-wf-reset" title="清空工作流运行历史与失败台账">清空运行痕迹</button>
       </div>
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
+
+      <div class="wa-sec">世界种子库（把这一局的格局存下来，换一局再开）</div>
+      <div class="wa-dim">种子存的是<b>骨头</b>：势力格局 / 人物关系网 / 地理 / 时代背景。它<b>不含</b>编年史 / 暗流 / 回声 / 章节 ——
+        存了进度就不是新局，是同一个世界的续集。签名的输入只有结构面，故<b>换个名字存同一格局仍会被去重</b>。
+        <b>播种只返回计划、不写世界</b>：真去重开一局是宿主（/reset、新对话）的动作 ——
+        一个「自己会开新局」的引擎在长局里不可接受。此刻：<b>${wsOn ? '开' : '关'}</b>（关闭时提取／保存／播种一并拒收，
+        读数会一直空 —— 这与「还没存过种子」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-ws-enabled" type="checkbox" ${wsOn ? 'checked' : ''}/> 启用世界种子库</label>
+      <div class="wa-row"><input id="wa-ws-name" class="wa-input" placeholder="种子名（如：三足鼎立·第一次）"/><input id="wa-ws-tags" class="wa-input" placeholder="标签，逗号分隔（三国鼎立 / 都市商战 / 田园 / 门派 / other）"/><button class="wa-btn" id="wa-ws-save" title="写口：把上一次提取的种子存进库（一次 transact、只写 worldSeed.library）。同结构不存两份（duplicate-seed 带已有 id）、库满拒收 library-full —— 不静默挤掉旧种子。去重靠签名不靠名字">保存种子</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-ws-extract" title="纯读：从当前世界提取结构种子（势力/关系网/地理/时代）。四张表全空时拒收 nothing-to-extract —— 不产空种子">提取种子</button><button class="wa-btn" id="wa-ws-list" title="只读：库内清单（名字/标签/签名/各面条数）">种子清单</button><button class="wa-btn" id="wa-ws-stat" title="只读：提取/保存/播种次数、库上限与拒收归因">台账</button></div>
+      <div class="wa-row"><input id="wa-ws-id" class="wa-input" placeholder="种子 id（如 ws_1a2b3c4d_5e6f）"/><button class="wa-btn" id="wa-ws-get" title="只读：取一个种子（含结构面与签名）">取种子</button><button class="wa-btn" id="wa-ws-drop" title="写口：从库内删掉一个种子（只动 worldSeed.library 这一格）">删种子</button></div>
+      <div class="wa-row"><input id="wa-ws-variance" class="wa-input" placeholder="变异度 0–100（留空=0）"/><button class="wa-btn" id="wa-ws-sow" title="只读推导：给一个种子的播种计划（骨头 + 进度归零）。变异度越界拒收 bad-value（不静默夹住）—— 「你要的变异度」与「真发生的变异度」长得一样是最坏的读数">播种计划</button></div>
+      <!-- v2.158.0（S3 + SP6）：种子转移与初始化四控件（转移包 / 包粘贴 / 导入 / 预览 / 确认）。 -->
+      <div class="wa-row"><button class="wa-btn" id="wa-ws-pack" title="转移包：把库里一颗种子打包成可跨聊天转移的 JSON（带格式版本/来源/结构签名/容量界限）。全选复制到目标聊天的「导入转移包」即可">打转移包</button><input id="wa-ws-packin" class="wa-input" placeholder="粘贴转移包 JSON（目标聊天导入用）"/><button class="wa-btn" id="wa-ws-import" title="写口：白名单校验接收转移包（bad-pack-ver / bad-seed-keys / duplicate-seed / library-full 四道门，整批交付或整批拒收）">导入转移包</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-ws-init" title="初始化预览：把种子映射到现有状态字段（id 映射 + 引用完整性 + 保留层级说明）。变异在此生成一次，确认应用同一份（不重抽）">初始化预览</button><button class="wa-btn" id="wa-ws-confirm" title="写口（大）：一次事务装完整结构（势力/关系网/地名/时代），进度归零，写 meta.initFrom。只作用于空新局 —— 非空目标拒收 not-empty">初始化确认</button></div>
+
+      <div id="wa-ws-out" class="wa-out"></div>
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
 
@@ -2006,7 +2213,7 @@
       <div class="wa-logbox">${src.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -2031,6 +2238,10 @@
 
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
+    // v2.152.0（RP6）：面板渲染链的耗时与 DOM 规模读数。计时包住「渲染 + 过滤 + 绑定」
+    //   整段（用户感知到的就是这一整段），读数分流给 ui/render-perf.js（它不自带计时器，
+    //   只收数——观测污染被观测者）。renderPerf 缺席时静默跳过（观测面不许拖垮渲染本体）。
+    const __rpT0 = (WA.renderPerf && typeof clockWall === 'function') ? clockWall() : null;
     body.innerHTML = RENDERERS[currentPage]();
     // ── v2.149.0（P3）：观测视角过滤**必须挂在重绘出口上** ──
     //   为什么不挂在 bindBody 里、也不逐页手动调：面板每次重绘都整块重建 DOM
@@ -2042,6 +2253,12 @@
       if (WA.perspective && typeof WA.perspective.applyView === 'function') WA.perspective.applyView(mainDoc);
     } catch (e) { if (WA.log) WA.log('warn', '观测视角过滤失败', e); }
     bindBody();
+    try {
+      if (__rpT0 !== null && WA.renderPerf && typeof WA.renderPerf.observe === 'function') {
+        WA.renderPerf.observe(currentPage, clockWall() - __rpT0,
+          body.querySelectorAll('button,input,select,textarea').length);
+      }
+    } catch (e) { /* 观测面自身失败不进渲染链 */ }
   }
 
   function bindBody() {
@@ -3120,6 +3337,695 @@
       sedOut('沉积台账：' + (s.enabled ? '开' : '关') + '｜地方 ' + s.places + '/' + c.places
         + ' · 痕迹 ' + s.events + '/' + c.events + '（总上限 ' + c.total + '）'
         + ' · 已降到传说档 ' + s.legends + ' 条｜登记 ' + s.settled + ' 次 / 读 ' + s.feels + ' 次 / 出块 ' + s.blocks + ' 次', true);
+    });
+    // v2.151.0（RX2+RX3）：跨会话记忆锚八枚 + 远方脉搏四枚。
+    //   与 v2.149.0（P3+X1）的同规格：渲染 + 绑定 + 守卫登记三件齐做，
+    //   否则「按钮渲染了但绑定的 id 写错」这类断裂在新出口上无人发现。
+    const otVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const otOut = function (text, keep) {
+      if (keep) panelEl.dataset.otOut = text;
+      const o = $('#wa-ot-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.otOut) { const saved = $('#wa-ot-out'); if (saved) saved.textContent = panelEl.dataset.otOut; }
+    const otErr = function (r) {
+      return '未记录：' + (r.reason || '未知原因') + (r.field ? '（' + r.field + '）' : '')
+        + (r.cap ? '（上限 ' + r.cap + '）' : '');
+    };
+    { const el = $('#wa-ot-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.offlineTick || !WA.offlineTick.setSettings) return otOut('未记录：module-missing', true);
+        WA.offlineTick.setSettings({ enabled: !!el.checked });
+        // 「不再锚」与「抹掉了锚」是两件事：关掉之后既有锚仍在存档里，明说。
+        otOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（既有锚保留在存档里，只是不再保护离线推演）'), true);
+      };
+    }
+    on('#wa-ot-anchor', () => {
+      if (!WA.offlineTick || !WA.offlineTick.anchor) return otOut('未记录：module-missing', true);
+      const r = WA.offlineTick.anchor(otVal('#wa-ot-path'), { kind: otVal('#wa-ot-kind'), text: otVal('#wa-ot-note') });
+      if (!r.ok) return otOut(otErr(r), true);
+      otOut('已锚 ' + r.path + ' · ' + r.kind + (r.created ? '（新增）' : '（同路径幂等刷新）'), true);
+    });
+    on('#wa-ot-anchors', () => {
+      if (!WA.offlineTick || !WA.offlineTick.anchorPaths) return otOut('未记录：module-missing', true);
+      const ps = WA.offlineTick.anchorPaths();
+      const st = (typeof WA.offlineTick.stat === 'function') ? WA.offlineTick.stat() : {};
+      otOut(ps.length ? '在场锚 ' + ps.length + '/' + ((st.caps || {}).anchors || '-') + '：' + ps.join('、')
+                      : '无在场锚（离线推演不保护任何路径；「没登记过」不是「不必保护」）', true);
+    });
+    on('#wa-ot-release', () => {
+      if (!WA.offlineTick || !WA.offlineTick.release) return otOut('未记录：module-missing', true);
+      const r = WA.offlineTick.release(otVal('#wa-ot-path'));
+      if (!r.ok) return otOut(otErr(r), true);
+      otOut('已释放 ' + r.path + '（行保留为已释放——「曾经锚过」是复盘材料）', true);
+    });
+    on('#wa-ot-tick', () => {
+      if (!WA.offlineTick || !WA.offlineTick.tick) return otOut('未记录：module-missing', true);
+      let r = null;
+      // **必须在事务里调用**（与本模块边界一致：它只改 draft.offlineTick，自己不开事务）。
+      //   本枚不接 apply：面板不替世界推演（推进由既有引擎负责），故如实报 no-apply。
+      WA.store.transact(function (d) { r = WA.offlineTick.tick(d, { now: clockNow('ui.offlineTick') }); }, 'ui:offlineTick');
+      if (!r || !r.ok) return otOut(otErr(r || { reason: 'store-unavailable' }), true);
+      if (r.first) return otOut('已落基准（首次调用不结算：「不知道你走了多久」不等于「你走了零秒」）', true);
+      otOut('离线 ' + r.elapsedMs + 'ms ⇒ ' + r.rounds + ' 轮'
+        + (r.capped ? '（已按上限截断）' : '') + ' · 保护跳过 ' + r.protectedRows + ' 行'
+        + (r.reason ? '（' + r.reason + '）' : ''), true);
+    });
+    on('#wa-ot-summary', () => {
+      if (!WA.offlineTick || !WA.offlineTick.summary) return otOut('未记录：module-missing', true);
+      const r = WA.offlineTick.summary();
+      if (!r.ok) return otOut(otErr(r), true);
+      otOut(r.lines.join(' '), true);
+    });
+    on('#wa-ot-block', () => {
+      if (!WA.offlineTick || !WA.offlineTick.buildBlock) return otOut('未记录：module-missing', true);
+      const t = WA.offlineTick.buildBlock();
+      otOut(t ? t : '本轮不进正文（关闭 / 无批次 / 无内容 —— 三种局面都可能是空块）', true);
+    });
+    on('#wa-ot-stat', () => {
+      if (!WA.offlineTick || !WA.offlineTick.stat) return otOut('未记录：module-missing', true);
+      const s = WA.offlineTick.stat();
+      const c = s.caps || {};
+      otOut('离线台账：' + (s.enabled ? '开' : '关') + '｜锚 ' + s.anchors + '/' + c.anchors
+        + '（已释放 ' + s.released + '）· 批次 ' + s.batches + '/' + c.batches
+        + ' · 跳过 ' + s.skips + '/' + c.skips + '｜结算 ' + s.ticks + ' 次 / 落基准 ' + s.firsts
+        + ' 次 / 共 ' + s.rounds + ' 轮 · 保护行 ' + s.protectedRows, true);
+    });
+    // v2.156.0（SP1+S1）：游玩活动基准三枚 + 离线恢复编排三枚（含共用输出区）。
+    //   与 v2.151.0 / v2.153.0 同规格：渲染 + 绑定 + 守卫登记三件齐做，
+    //   否则「按钮渲染了但绑定的 id 写错」这类断裂在这批控件上永不可见。
+    const orOut = function (text, keep) {
+      if (keep) panelEl.dataset.orOut = text;
+      const o = $('#wa-or-out'); if (o) o.textContent = text;
+    };
+    if (panelEl.dataset.orOut) { const saved = $('#wa-or-out'); if (saved) saved.textContent = panelEl.dataset.orOut; }
+    { const el = $('#wa-pt-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.playtime || !WA.playtime.setSettings) return orOut('未记录：module-missing', true);
+        WA.playtime.setSettings({ enabled: !!el.checked });
+        // 「不再记」与「抹掉了基准」是两件事：关掉之后既有基准仍在盘上，明说。
+        orOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（既有活动基准保留在盘上，只是不再更新）'), true);
+      };
+    }
+    on('#wa-pt-read', () => {
+      if (!WA.playtime || !WA.playtime.lastActive) return orOut('未记录：module-missing', true);
+      const names = (WA.playtime.SOURCE_NAMES || []).join('／');
+      const r = WA.playtime.lastActive();
+      // 「从没记过」（no-baseline）与「读存储失败」（readFails > 0）是两件事，分开报。
+      if (!r.ok) {
+        const st = (typeof WA.playtime.stat === 'function') ? WA.playtime.stat() : {};
+        return orOut('基准读回：' + r.reason + '（' + (r.chatId || '-') + '）'
+          + ((st.readFails > 0) ? ' · 本会话读失败 ' + st.readFails + ' 次（这是存储故障，不是「没记过」）'
+            : '（本聊天尚未记过——「没记过」不等于「你走了零秒」）')
+          + '｜四种时间：' + names, true);
+      }
+      orOut('基准读回（纯读，未推进）：' + r.chatId + ' @ ' + r.at + '，距今 ' + r.ageMs + 'ms · 累计更新 ' + r.updates
+        + ' 次｜四种时间：' + names, true);
+    });
+    on('#wa-pt-touch', () => {
+      if (!WA.playtime || !WA.playtime.touch) return orOut('未记录：module-missing', true);
+      const r = WA.playtime.touch({ force: true });
+      if (!r.ok) return orOut(otErr(r), true);
+      orOut(r.updated ? ('已更新基准：' + r.chatId + ' @ ' + r.at + '（第 ' + r.updates + ' 次）')
+        : ('未推进：throttled（距上次活动不足 updateMinMs，基准仍在 ' + r.at + '）—— 节流是频率闸，不是失败'), true);
+    });
+    { const el = $('#wa-or-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.offlineReturn || !WA.offlineReturn.setSettings) return orOut('未记录：module-missing', true);
+        WA.offlineReturn.setSettings({ enabled: !!el.checked });
+        orOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（既有票据与台账保留，只是不再自动恢复）'), true);
+      };
+    }
+    on('#wa-or-recover', () => {
+      if (!WA.offlineReturn || !WA.offlineReturn.recover) return orOut('未记录：module-missing', true);
+      const r = WA.offlineReturn.recover({ trigger: 'panel' });
+      if (!r.ok) return orOut(otErr(r), true);
+      if (r.first) return orOut('已落基准（首见这个聊天没有活动基准：「不知道你走了多久」不等于「你走了零秒」）', true);
+      orOut('恢复：' + r.reason + (isFinite(r.gapMs) ? '（离线 ' + r.gapMs + 'ms）' : '')
+        + (r.rounds ? ' · 推进 ' + r.rounds + ' 轮' : '')
+        + (r.protectedRows ? ' · 保护跳过 ' + r.protectedRows + ' 行' : ''), true);
+    });
+    on('#wa-or-stat', () => {
+      if (!WA.offlineReturn || !WA.offlineReturn.stat) return orOut('未记录：module-missing', true);
+      const s = WA.offlineReturn.stat();
+      orOut('恢复台账：' + (s.enabled ? '开' : '关') + '｜恢复 ' + s.recovers + ' 次 / 跳过 ' + s.skips
+        + ' / 失败 ' + s.fails + '（重试 ' + s.retries + '）· 票据复核 ' + s.ticketChecks
+        + '（其中陈旧 ' + s.staleTickets + '）｜最近 ' + (s.lastReason || '-'), true);
+    });
+    on('#wa-ff-stat', () => {
+      if (!WA.farfield || !WA.farfield.stat) return otOut('未记录：module-missing', true);
+      const s = WA.farfield.stat();
+      const c = s.caps || {};
+      otOut('远方脉搏：' + (s.enabled ? '开' : '关') + (s.autoOn ? '／自动推进开' : '') + '｜近场 ' + s.nearCount + ' / 远场 ' + s.farCount
+        + ' 处 · 大事记 ' + s.pulses + '/' + c.pulses + '（推演上限 ' + c.autoMaxWindows + '）· 在途 ' + s.pendingInFlight + '/' + c.pending
+        + ' · 已传到近场 ' + s.heard + '/' + c.heard + '（失真 ' + s.distorted + '）｜转移包容量 ' + c.transfer
+        + '｜推进 ' + s.ticks + ' 次 · 投递 ' + s.delivered
+        + '｜预算没推完 ' + (s.carriedOnce || 0) + ' 次 · 在途满暂停 ' + (s.pendingFull || 0) + ' 次'
+        + '｜自动 ' + (s.autoTicks || 0) + ' 次（首调 ' + (s.autoFirsts || 0) + '）', true);
+    });
+    on('#wa-ff-partition', () => {
+      if (!WA.farfield || !WA.farfield.partition) return otOut('未记录：module-missing', true);
+      const p = WA.farfield.partition();
+      otOut('分区（划分线 ' + p.nearDays + ' 天）：近场 ' + p.near.length + ' 处'
+        + (p.near.length ? '（' + p.near.map(function (x) { return x.name; }).join('、') + '）' : '')
+        + ' · 远场 ' + p.far.length + ' 处'
+        + (p.far.length ? '（' + p.far.map(function (x) { return x.name; }).join('、') + '）' : '')
+        + '；已报备 ' + p.known + ' 处（远场是简化的：只记大势，不替远方编人名与明细）', true);
+    });
+    on('#wa-ff-pending', () => {
+      if (!WA.farfield || !WA.farfield.pending) return otOut('未记录：module-missing', true);
+      const p = WA.farfield.pending();
+      otOut(p.count ? '在途 ' + p.count + ' 条：' + p.rows.map(function (m) {
+        return m.place + '·' + m.trend + '（延迟 ' + m.delayDays + ' 天）';
+      }).join('；') + '。未到期的不许提前落地——提前落地等于把距离抹平' : '无在途传闻（远场还静着）', true);
+    });
+    { const el = $('#wa-ff-auto');
+      if (el) el.onchange = function () {
+        if (!WA.farfield || !WA.farfield.setSettings) return otOut('未记录：module-missing', true);
+        WA.farfield.setSettings({ auto: !!el.checked });
+        otOut('已记录 auto=' + (el.checked ? 'on' : 'off') + '（总开关另有其开关：关着时自动也不跑）');
+      };
+    }
+    on('#wa-ff-tick', () => {
+      if (!WA.farfield || !WA.farfield.auto) return otOut('未记录：module-missing', true);
+      let r = null;
+      try {
+        WA.store.transact(function (draft) { r = WA.farfield.auto(draft, {}); }, 'farfield:auto-panel');
+      } catch (e) { return otOut('推进失败：' + ((e && e.message) || e), true); }
+      if (!r || !r.ok) return otOut('未推进：' + ((r && r.reason) || 'unknown') + '（关闭 / auto 未开 / 无世界钟 / 剧情日没动，四者分列）', true);
+      otOut('自动推进：剧情日 ' + r.from + ' → ' + r.day + (r.first ? '（首调只落起点）' : '')
+        + '｜本步窗口 ' + r.windows + (r.budget ? '（剩 ' + r.budget.carried + ' 未处理）' : '')
+        + ' · 新脉搏 ' + r.pulses + ' · 落地 ' + r.delivered + (r.held ? ' · 封路扣留 ' + r.held : '') + '｜游标 ' + r.to, true);
+    });
+    on('#wa-ff-transfer', () => {
+      if (!WA.farfield || !WA.farfield.transferPack) return otOut('未记录：module-missing', true);
+      const r = WA.farfield.transferPack({});
+      otOut(r.ok ? ('转移包 ' + r.count + '/' + r.cap + ' 条' + (r.count ? '：' + r.rows.map(function (x) { return x.place + '·' + x.said; }).join('；') : '（近场还没有远方消息）')
+        + '｜在途 ' + r.inFlight + ' 条不进包')
+        : ('打包拒收：' + r.reason + (r.cap ? '（上限 ' + r.cap + '，要 ' + r.wanted + '）' : '')), true);
+    });
+    { const el = $('#wa-ff-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.farfield || !WA.farfield.setSettings) return otOut('未记录：module-missing', true);
+        WA.farfield.setSettings({ enabled: !!el.checked });
+        // 「不再推进」与「远场停了」是两件事：关掉后既有大事记与在途传闻仍在存档里。
+        otOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（既有大事记与在途传闻保留在存档里，只是不再推进）'), true);
+      };
+    }
+    // ── v2.152.0（RP6/RP7）：性能与水位段（与 offline 页共用输出区）──
+    const rpOut = function (text) { setOut('#wa-rp-out', text); };
+    on('#wa-rp-stat', () => {
+      if (!WA.renderPerf || !WA.renderPerf.renderStat) return rpOut('未记录：module-missing');
+      const s = WA.renderPerf.renderStat();
+      rpOut(s.pages ? '渲染读数：' + s.pages + ' 页 · ' + s.observed + ' 次 · 拒收 ' + s.rejected
+        + '｜' + s.rows.slice(0, 8).map(function (r) {
+          return r.page + ' ' + r.renders + '次/' + r.avgMs + 'ms' + (r.avgNodes !== null ? '/' + r.avgNodes + '控件' : '');
+        }).join('；') : '还没有渲染读数（先切几次页）');
+    });
+    on('#wa-rp-trend', () => {
+      if (!WA.renderPerf || !WA.renderPerf.renderTrend) return rpOut('未记录：module-missing');
+      const t = WA.renderPerf.renderTrend();
+      rpOut(t.rows.length ? t.basis + '｜' + t.rows.slice(0, 8).map(function (r) {
+        return r.page + ' 近10=' + r.short + ' / 近50=' + r.mid + ' / 全窗=' + r.full;
+      }).join('；') : '还没有渲染趋势（先切几次页）');
+    });
+    on('#wa-rp-reset', () => {
+      // v2.152.0：两条观测链的 reset 在这里合用一个入口。为什么合用而不是各给一个：
+      //   它们清的是同一类东西（进程态观测环），且「重新量一遍」这个动作天然成对
+      //   （渲染样本被清而存储样本留着，会得到一条跨了两代的趋势）。任一侧缺席时如实报哪侧缺席。
+      const missing = [];
+      if (!(WA.renderPerf && WA.renderPerf.reset)) missing.push('renderPerf');
+      if (!(WA.storageForecast && WA.storageForecast.reset)) missing.push('storageForecast');
+      if (missing.length) return rpOut('未清空：module-missing（' + missing.join('、') + '）');
+      WA.renderPerf.reset();
+      WA.storageForecast.reset();
+      rpOut('观测环已清空：渲染样本与存储样本都回到 0。存档与配置未动（只清进程态读数）');
+    });
+    { const el = $('#wa-rp-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.renderPerf || !WA.renderPerf.setSettings) return rpOut('未记录：module-missing');
+        WA.renderPerf.setSettings({ enabled: !!el.checked });
+        rpOut('已记录 ' + (el.checked ? 'enabled（从此每次重绘入账）' : 'disabled（已入账的读数保留，只是不再记新的）'));
+      };
+    }
+    { const el = $('#wa-sf-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.storageForecast || !WA.storageForecast.setSettings) return rpOut('未记录：module-missing');
+        WA.storageForecast.setSettings({ enabled: !!el.checked });
+        rpOut('已记录 ' + (el.checked ? 'enabled（下一轮结算后开始采样）' : 'disabled（已采样本保留在内存环里，只是不再采）'));
+      };
+    }
+    on('#wa-sf-sample', () => {
+      if (!WA.storageForecast || !WA.storageForecast.sample) return rpOut('未记录：module-missing');
+      const r = WA.storageForecast.sample();
+      rpOut(r.ok ? '样本已入账：第 ' + r.round + ' 轮 · ' + r.bytes + ' 字节 · 环内 ' + r.count + ' 条'
+        : '未入账：' + r.reason + (r.need ? '（需 ≥' + r.need + ' 条）' : ''));
+    });
+    on('#wa-sf-forecast', () => {
+      if (!WA.storageForecast || !WA.storageForecast.forecast) return rpOut('未记录：module-missing');
+      const r = WA.storageForecast.forecast();
+      if (!r.ok) return rpOut('未预测：' + r.reason + (r.need ? '（样本 ' + r.samples + '/' + r.need + '）' : ''));
+      rpOut('水位预测：' + r.samples + ' 样本 · 窗口 ' + r.windowRounds + ' 轮 · 增速 ' + r.slopeBytesPerRound
+        + ' B/轮 · 当前 ' + r.lastBytes + ' B｜' + r.rows.map(function (x) {
+          return (x.level * 100) + '%=' + (x.inRounds === null ? '到不了' : x.inRounds + '轮');
+        }).join('；') + '（' + r.note + '）');
+    });
+    on('#wa-sf-stat', () => {
+      if (!WA.storageForecast || !WA.storageForecast.stat) return rpOut('未记录：module-missing');
+      const s = WA.storageForecast.stat();
+      rpOut('水位台账：' + (s.enabled ? '开' : '关') + '｜样本环 ' + s.samplesInRing + '/' + s.cap
+        + '（第 ' + s.firstRound + '–' + s.lastRound + ' 轮）· 预测 ' + s.forecasts + ' 次'
+        + ' · 拒收 ' + s.rejected + (s.lastReason ? '（最近：' + s.lastReason + '）' : ''));
+    });
+    // ── v2.153.0（RX5/RX6）：剧情深度与分支树段（与性能与水位段共用输出区）──
+    const pgOut = function (text) { setOut('#wa-pg-out', text); };
+    on('#wa-pg-read', () => {
+      if (!WA.plotGauge || !WA.plotGauge.tension) return pgOut('未记录：module-missing');
+      // 面板读数**也走 push:false**：打开面板不该改变走向（「看一次」与「推一次」是两件事）。
+      const r = WA.plotGauge.tension({ push: false });
+      if (!r.ok) return pgOut('不足：' + r.reason
+        + (r.reason === 'no-signal' ? '（三源都不在场 —— 该补数据源，不是「张力 0」）'
+          : (r.reason === 'no-reading' ? '（三源在场但一条在途线都没有 —— 空世界是合法状态，不是故障）'
+            : (r.reason === 'disabled' ? '（总开关关着）' : ''))));
+      pgOut('张力 ' + r.score + '（' + r.band + '）· 在场权重 ' + r.activeWeight
+        + '｜' + r.components.map(function (c) {
+          return c.label + (c.present ? '=' + c.value + '(权重' + c.weight + ')' : '=缺席(权重' + c.weight + '已剔除)');
+        }).join('；'));
+    });
+    on('#wa-pg-trend', () => {
+      if (!WA.plotGauge || !WA.plotGauge.trend) return pgOut('未记录：module-missing');
+      const t = WA.plotGauge.trend();
+      if (!t.ok) return pgOut('不足：' + t.reason + (t.need ? '（样本 ' + t.samples + '/' + t.need + ' —— 两个点连不成趋势）' : ''));
+      pgOut('走向 ' + t.direction + '｜' + t.from + ' → ' + t.to + '（Δ' + t.delta + '）· ' + t.samples + ' 点｜' + t.basis);
+    });
+    on('#wa-pg-advice', () => {
+      if (!WA.plotGauge || !WA.plotGauge.advice) return pgOut('未记录：module-missing');
+      const a = WA.plotGauge.advice();
+      if (!a.ok) return pgOut('不足：' + a.reason);
+      pgOut('张力 ' + a.score + '（' + a.band + '）｜' + a.rows.map(function (x) {
+        return '【' + x.label + '】' + x.detail;
+      }).join('／') + '｜' + a.basis);
+    });
+    on('#wa-pg-stat', () => {
+      if (!WA.plotGauge || !WA.plotGauge.stat) return pgOut('未记录：module-missing');
+      const s = WA.plotGauge.stat();
+      pgOut('深度仪台账：' + (s.enabled ? '开' : '关') + '｜读数 ' + s.gauges + ' 次 · 拒收 ' + s.rejected
+        + (s.lastReason ? '（最近：' + s.lastReason + '）' : '') + '｜趋势环 ' + s.samples + '/' + s.caps.maxPulses
+        + '（进程态内存环，不落盘）' + (Object.keys(s.faults).length ? '｜分桶 ' + JSON.stringify(s.faults) : ''));
+    });
+    { const el = $('#wa-pg-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.plotGauge || !WA.plotGauge.setSettings) return pgOut('未记录：module-missing');
+        WA.plotGauge.setSettings({ enabled: !!el.checked });
+        pgOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（趋势环清空，已读过的数不再留）'));
+      };
+    }
+    const btVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+    const btErr = function (r) {
+      return '未记录：' + ((r && r.reason) || '未知原因')
+        + ((r && r.field) ? '（' + r.field + '）' : '')
+        + ((r && r.allowed) ? '（可选走法：' + r.allowed.join('/') + '）' : '')
+        + ((r && r.have !== undefined) ? '（给了 ' + r.have + ' 条，至少需 ' + r.need + ' 条）' : '');
+    };
+    on('#wa-bt-fork', () => {
+      if (!WA.branchTree || !WA.branchTree.fork) return pgOut('未记录：module-missing');
+      // 走法用逗号分隔——至少两条（一条走法的「选择」是流水账，不是分叉）。
+      const opts = btVal('#wa-bt-opts').split(/[,，]/).map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+      const r = WA.branchTree.fork({ round: Number(btVal('#wa-bt-round')), prompt: btVal('#wa-bt-prompt'), options: opts });
+      if (!r.ok) return pgOut(btErr(r));
+      pgOut('已登记 ' + r.id + '（第' + r.round + '轮 · ' + r.options + ' 走法）'
+        + (r.preview && r.preview.ok ? '·预览 ' + r.preview.id : '·无预览（未给 steps ⇒ 不跑 rehearsal）'));
+    });
+    on('#wa-bt-choose', () => {
+      if (!WA.branchTree || !WA.branchTree.choose) return pgOut('未记录：module-missing');
+      const r = WA.branchTree.choose(btVal('#wa-bt-id'), btVal('#wa-bt-choice'));
+      if (!r.ok) return pgOut(btErr(r));
+      pgOut('已记录 ' + r.id + ' ⇒ 选了「' + r.choice + '」');
+    });
+    on('#wa-bt-replay', () => {
+      if (!WA.branchTree || !WA.branchTree.replay) return pgOut('未记录：module-missing');
+      const r = WA.branchTree.replay(btVal('#wa-bt-id'));
+      // not-comparable 必须照实说：那是「这份预演钉的世界已经变了」，不是「回放成功」。
+      if (!r.ok) return pgOut(btErr(r) + (r.why ? '（' + r.why + '）' : '')
+        + (r.reason === 'not-comparable' ? '（世界已变或从未预演 —— 不拿一个旧结论冒充可以回放）' : ''));
+      pgOut('可回放 ' + r.id + '：预览 ' + r.previewId + (r.choice ? ' ⇒ 选了「' + r.choice + '」' : '（尚未记录实际选择）'));
+    });
+    on('#wa-bt-tree', () => {
+      if (!WA.branchTree || !WA.branchTree.tree) return pgOut('未记录：module-missing');
+      const t = WA.branchTree.tree();
+      if (!t.ok) return pgOut('不足：' + t.reason);
+      if (!t.nodes.length) return pgOut('还没有分叉点（本模块零自动登记 —— 谁在哪个点分叉由调用方决定）');
+      pgOut('分支树 ' + t.nodes.length + ' 点 · ' + t.edges.length + ' 边 · ' + t.roots + ' 根 · 悬空边 ' + t.dangling
+        + '（恒应为 0，报出来才是可核的）｜' + t.nodes.slice(0, 8).map(function (n) {
+          return '第' + n.round + '轮「' + n.label + '」' + n.options + '走法' + (n.choice ? '→选了' + n.choice : '（未选）') + (n.preview ? '·有预览' : '');
+        }).join('；'));
+    });
+    on('#wa-bt-nodes', () => {
+      if (!WA.branchTree || !WA.branchTree.stat) return pgOut('未记录：module-missing');
+      const s = WA.branchTree.stat();
+      pgOut('分支台账：' + (s.enabled ? '开' : '关') + '｜节点 ' + s.nodes + '/' + s.caps.maxNodes + '（根 ' + s.roots
+        + '）· 已选 ' + s.withChoice + ' · 有预览 ' + s.withPreview + '｜登记 ' + s.forks + ' 次 · 拒收 ' + s.refused
+        + (s.lastReason ? '（最近：' + s.lastReason + '）' : ''));
+    });
+    on('#wa-bt-compare', () => {
+      if (!WA.branchTree || !WA.branchTree.compare) return pgOut('未记录：module-missing');
+      const ea = $('#wa-bt-a'), eb = $('#wa-bt-b');
+      const r = WA.branchTree.compare((ea && ea.value) || '', (eb && eb.value) || '');
+      if (!r.ok) return pgOut('不足：' + r.reason + (r.missing ? '（缺：' + r.missing + '）' : '')
+        + (r.reason === 'not-comparable' ? '（两侧都没有可比指纹 —— 没得比不是「一模一样」）' : ''));
+      pgOut('比对 ' + r.a + ' ↔ ' + r.b + '：差异 ' + r.differing + ' 项 · 未知 ' + r.unknown + ' 项｜'
+        + r.rows.map(function (x) { return x.key + '=' + x.state; }).join('；'));
+    });
+    { const el = $('#wa-bt-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.branchTree || !WA.branchTree.setSettings) return pgOut('未记录：module-missing');
+        WA.branchTree.setSettings({ enabled: !!el.checked });
+        pgOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（账本不动，只是不再登记新点）'));
+      };
+    }
+    // ── v2.154.0（RX4 世界联网面）：九枚控件 + 一个输出区（渲染在联网页）。
+    //   三件齐做（渲染 + 绑定 + UI_BINDINGS 守卫登记）—— 理由与 v2.151.0/v2.153.0 各批一致：
+    //   渲染了不登记，「渲染了但绑定的 id 写错」在这批控件上永不可见。
+    //   输出区分两栏：联网面（wa-nb-out）与自洽审计（wa-ec-out）不共用 —— 两者的读数口径不同
+    //   （一个是「传了什么」，一个是「世界哪里不自洽」），合成一栏就是把两件事说成一件事。
+    const nbOut = function (text, keep) {
+      if (keep) panelEl.dataset.nbOut = text;
+      setOut('#wa-nb-out', text);
+    };
+    if (panelEl.dataset.nbOut) setOut('#wa-nb-out', panelEl.dataset.nbOut);
+    // 拒收原因一律照实转述引擎原话 —— 面板**不替引擎解释**（解释一处走偏，四处读数全部失真）。
+    const nbErr = function (r) {
+      return '未记录：' + ((r && r.reason) || '未知原因')
+        + ((r && r.field) ? '（' + r.field + '）' : '')
+        + ((r && r.malformed) ? '（剔除了 ' + r.malformed + ' 条格式不对的）' : '');
+    };
+    { const el = $('#wa-nb-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.worldBridge || !WA.worldBridge.setSettings) return nbOut('未记录：module-missing', true);
+        WA.worldBridge.setSettings({ enabled: !!el.checked });
+        // 「不再联网」与「传过来的传说被删了」是两件事：关掉后既有传说仍在存档里。
+        nbOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（既有传说与导入签名保留在存档里，只是不再导出／导入／转投）'), true);
+      };
+    }
+    on('#wa-nb-ident', () => {
+      if (!WA.worldBridge || !WA.worldBridge.setSettings) return nbOut('未记录：module-missing', true);
+      const t = $('#wa-nb-title'), p = $('#wa-nb-player');
+      WA.worldBridge.setSettings({ worldTitle: (t && t.value ? t.value.trim() : ''), playerName: (p && p.value ? p.value.trim() : '') });
+      const k = WA.worldBridge.worldKey();
+      nbOut('已记录身份：' + k.label + '｜签名 ' + (k.sig || '(不成签名：' + (k.complete ? '?' : '缺 ' + (!k.title ? 'worldTitle' : 'playerName')) + ')'), true);
+    });
+    on('#wa-nb-key', () => {
+      if (!WA.worldBridge || !WA.worldBridge.worldKey) return nbOut('未记录：module-missing', true);
+      const k = WA.worldBridge.worldKey();
+      nbOut('世界签名：' + (k.sig || '(不成签名)')
+        + '｜titleId ' + (k.titleId || '-') + ' · playerId ' + (k.playerId || '-')
+        + '｜' + k.label + '（两段派生值缺任一段就整份不成签名 —— '
+        + '拿半份身份去判「是不是同一个世界」是假判据）', true);
+    });
+    on('#wa-nb-seed', () => {
+      if (!WA.worldBridge || !WA.worldBridge.seed) return nbOut('未记录：module-missing', true);
+      if (!WA.store || !WA.store.transact) return nbOut('未记录：store-unavailable', true);
+      let r = null;
+      // **必须在事务里调用**（seed 改的是 draft.worldBridge，自己不开事务 —— 与本仓边界一致）。
+      WA.store.transact(function (d) { r = WA.worldBridge.seed(d); }, 'ui:worldBridge');
+      if (!r || !r.ok) return nbOut(nbErr(r || { reason: 'store-unavailable' }), true);
+      nbOut('已落种子 ' + r.sig + '（第 ' + r.seeds + ' 次）· ' + r.label, true);
+    });
+    on('#wa-nb-export', () => {
+      if (!WA.worldBridge || !WA.worldBridge.exportLegends) return nbOut('未记录：module-missing', true);
+      const r = WA.worldBridge.exportLegends();
+      if (!r.ok) return nbOut(nbErr(r) + (r.reason === 'no-chronicle' ? '（编年史还是空的 —— 推演几轮后才有大事可传）' : ''), true);
+      __nbPack = r.pack;
+      nbOut('已导出 ' + r.exported + '/' + r.total + ' 条（三类：大战／大案／大人物崛起）· 脱敏剔除 ' + r.redacted + ' 句'
+        + '（口径：' + (r.privateWords || []).join('、') + '）· 整条剔除 ' + r.dropped + ' 条'
+        + '｜包已暂存本页，导入时留空即用它', true);
+    });
+    on('#wa-nb-import', () => {
+      if (!WA.worldBridge || !WA.worldBridge.importLegends) return nbOut('未记录：module-missing', true);
+      const box = $('#wa-nb-pack');
+      const raw = box && box.value ? box.value.trim() : '';
+      let pack = __nbPack;
+      if (raw) {
+        try { pack = JSON.parse(raw); } catch (e) { return nbOut('未记录：bad-payload（粘贴的不是合法 JSON）', true); }
+      }
+      if (!pack) return nbOut('未记录：missing-fields（pack）—— 先导出一次，或把传说包 JSON 粘进输入框', true);
+      const r = WA.worldBridge.importLegends(pack, { remember: true });
+      if (!r.ok) return nbOut(nbErr(r), true);
+      if (!r.added) return nbOut('已记录 0 条：' + r.reason + '（' + r.dup + ' 条都收过 —— 「都收过」不是「别处什么都没传」）', true);
+      nbOut('已收下 ' + r.added + ' 条（重复 ' + r.dup + ' · 格式剔除 ' + r.malformed + '）· 传说链共 ' + r.total + ' 条｜来自 ' + r.source
+        + '（存的是「听说的」，不是本世界的事实）', true);
+    });
+    on('#wa-nb-legends', () => {
+      if (!WA.worldBridge || !WA.worldBridge.view) return nbOut('未记录：module-missing', true);
+      const v = WA.worldBridge.view();
+      nbOut(v.count ? '传说 ' + v.count + ' 条：' + v.rows.slice(0, 8).map(function (x) {
+        return x.id + '「' + x.title + '」(' + x.label + '·来自 ' + (x.fromTitle || x.from) + (x.heard ? '·已传开 ' + x.heard + ' 次' : '') + ')';
+      }).join('；') : '还没有收下任何传说（联网面关着也会是空的 —— 两种局面在「台账」里可分辨）', true);
+    });
+    on('#wa-nb-relay', () => {
+      if (!WA.worldBridge || !WA.worldBridge.toRumor) return nbOut('未记录：module-missing', true);
+      const box = $('#wa-nb-lg');
+      const r = WA.worldBridge.toRumor(box && box.value ? box.value.trim() : '');
+      if (!r.ok) {
+        return nbOut(nbErr(r) + (r.factAdded ? '｜但事实 ' + r.factKey + ' 已落下（不回滚：它确实被记下了，删掉就是篡改）' : ''), true);
+      }
+      nbOut('已转投 ' + r.id + '：事实 ' + r.factKey + (r.factAdded ? '（新落）' : '（已存在，复用）')
+        + ' · rumor 链 ' + r.chain + ' · 已传开 ' + r.heard + ' 次', true);
+    });
+    on('#wa-nb-block', () => {
+      if (!WA.worldBridge || !WA.worldBridge.buildBlock) return nbOut('未记录：module-missing', true);
+      const t = WA.worldBridge.buildBlock();
+      nbOut(t ? t : '本轮不进正文（关闭 / 无传说 —— 两种局面都可能是空块，台账可分辨）', true);
+    });
+    on('#wa-nb-stat', () => {
+      if (!WA.worldBridge || !WA.worldBridge.stat) return nbOut('未记录：module-missing', true);
+      const s = WA.worldBridge.stat();
+      const c = s.caps || {};
+      const f = s.faults || {};
+      const fk = Object.keys(f).map(function (k) { return k + '×' + f[k]; }).join('、');
+      nbOut('联网台账：' + (s.enabled ? '开' : '关') + '｜签名 ' + (s.sig || '(不成签名)')
+        + ' · 身份' + (s.identityComplete ? '齐' : '不全') + ' · 落种子 ' + s.seeds + ' 次'
+        + '｜传说 ' + s.legends + '/' + c.legends + ' · 已导入签名 ' + s.exportedSigs + '/' + c.exported
+        + '｜导出 ' + s.exported + ' 次（剔句 ' + s.redacted + '·空条 ' + s.dropped + '）· 导入 ' + s.imported
+        + ' 条 · 转投 ' + s.relays + ' 次 · 读 ' + s.reads + ' 次 · 拒收 ' + s.refusals
+        + (s.lastReason ? '（最近：' + s.lastReason + '）' : '')
+        + (fk ? '｜归因：' + fk : ''), true);
+    });
+    // ── v2.154.0（RX7 生态自洽审计）：四枚只读出口 + 一枚扫描 + 四类开关 ──
+    const ecOut = function (text, keep) {
+      if (keep) panelEl.dataset.ecOut = text;
+      setOut('#wa-ec-out', text);
+    };
+    if (panelEl.dataset.ecOut) setOut('#wa-ec-out', panelEl.dataset.ecOut);
+    { const el = $('#wa-ec-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.ecoAudit || !WA.ecoAudit.setSettings) return ecOut('未记录：module-missing', true);
+        WA.ecoAudit.setSettings({ enabled: !!el.checked });
+        // 「不再扫」与「扫过是干净的」是两件事：关掉后上一次读数仍在，但已不是**当前**世界的读数。
+        ecOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（上一次读数还在，但它已不是当前世界的读数了）'), true);
+      };
+    }
+    on('#wa-ec-save', () => {
+      if (!WA.ecoAudit || !WA.ecoAudit.setSettings) return ecOut('未记录：module-missing', true);
+      const rd = function (id) { const e = $(id); return !!(e && e.checked); };
+      WA.ecoAudit.setSettings({ timelineEnabled: rd('#wa-ec-tl'), spaceEnabled: rd('#wa-ec-sp'),
+        cognitionEnabled: rd('#wa-ec-cog'), causalEnabled: rd('#wa-ec-cau') });
+      const c = WA.ecoAudit.getSettings();
+      ecOut('已记录类别：时间线 ' + (c.timelineEnabled ? '开' : '关') + ' · 空间 ' + (c.spaceEnabled ? '开' : '关')
+        + ' · 认知 ' + (c.cognitionEnabled ? '开' : '关') + ' · 因果 ' + (c.causalEnabled ? '开' : '关')
+        + '（关掉的那一类不进扫描，读数里如实标 off —— 不拿「没扫」冒充「没问题」）', true);
+    });
+    on('#wa-ec-sweep', () => {
+      if (!WA.ecoAudit || !WA.ecoAudit.sweep) return ecOut('未记录：module-missing', true);
+      const r = WA.ecoAudit.sweep();
+      if (!r.ok) return ecOut('未记录：' + r.reason, true);
+      ecOut('已扫：' + r.ms + 'ms · 问题 ' + r.total + '（error ' + r.errors + ' · warn ' + r.warns + '）'
+        + (r.truncated ? '（已按上限截断，另有 ' + r.truncated + ' 条没列出来）' : '')
+        + (r.failedSections ? ' · 没做成的小节 ' + r.failedSections + ' 个（本类读数不可信）' : '')
+        + '｜判据来源：认知 ' + r.sources.cognition + ' · 因果 ' + r.sources.causal
+        + '（只报不改 —— 自动改架空的正是「世界为什么自洽」本身）', true);
+    });
+    on('#wa-ec-issues', () => {
+      if (!WA.ecoAudit || !WA.ecoAudit.lastSweep) return ecOut('未记录：module-missing', true);
+      const r = WA.ecoAudit.lastSweep();
+      if (r.reason === 'stale') return ecOut('上一份自洽读数已过期，需重新扫描。', true);
+      if (!r.ok) return ecOut('还没有扫描读数（先按一次「扫描」）—— 「没扫过」不等于「扫过是干净的」', true);
+      if (!r.total) return ecOut('上一次扫描：0 条问题（四类全扫过）· 用时 ' + r.ms + 'ms', true);
+      ecOut('上一次扫描 ' + r.total + ' 条' + (r.truncated ? '（另截断 ' + r.truncated + ' 条）' : '') + '：'
+        + r.issues.map(function (i) { return '[' + i.level + ']' + i.code + '「' + (i.detail || '') + '」'; }).join('；'), true);
+    });
+    on('#wa-ec-last', () => {
+      if (!WA.ecoAudit || !WA.ecoAudit.lastSweep) return ecOut('未记录：module-missing', true);
+      const r = WA.ecoAudit.lastSweep();
+      if (r.reason === 'stale') return ecOut('上一份自洽读数已过期，需重新扫描。', true);
+      if (!r.ok) return ecOut('never-swept：本会话还没扫过。审计读到的是**当前世界**的自洽性，'
+        + '故不缓存上一次会话的结论 —— 空读数与「干净」必须分得开', true);
+      ecOut('上次读数：' + r.total + ' 条（error ' + r.errors + ' · warn ' + r.warns + '）· ' + r.ms + 'ms'
+        + '｜规则 时间线' + (r.rules.timeline ? '✓' : '✗') + ' 空间' + (r.rules.space ? '✓' : '✗')
+        + ' 认知' + (r.rules.cognition ? '✓' : '✗') + ' 因果' + (r.rules.causal ? '✓' : '✗')
+        + '｜判据 认知 ' + r.sources.cognition + ' · 因果 ' + r.sources.causal
+        + (r.failedSections ? ' · 没做成 ' + r.failedSections + ' 个小节' : ''), true);
+    });
+    on('#wa-ec-stat', () => {
+      if (!WA.ecoAudit || !WA.ecoAudit.stat) return ecOut('未记录：module-missing', true);
+      const s = WA.ecoAudit.stat();
+      const f = s.faults || {};
+      const fk = Object.keys(f).map(function (k) { return k + '×' + f[k]; }).join('、');
+      const dc = Object.keys(s.degraded || {}).map(function (k) { return k + '×' + s.degraded[k]; }).join('、');
+      ecOut('审计台账：' + (s.enabled ? '开' : '关') + '｜扫描 ' + s.sweeps + ' 次 · 累计问题 ' + s.issues
+        + '（截断 ' + s.truncated + '）· 上次 ' + s.lastIssues + ' 条'
+        + '（' + s.lastScannedAt + '，用时 ' + s.lastMs + 'ms）'
+        + '｜按码 ' + (Object.keys(s.byCode).map(function (k) { return k + '×' + s.byCode[k]; }).join('、') || '无')
+        + '｜按类 ' + (Object.keys(s.byCat).map(function (k) { return k + '×' + s.byCat[k]; }).join('、') || '无')
+        + '｜上限 问题 ' + s.caps.issues + ' · 人 ' + s.caps.people
+        + (dc ? '｜降级小节 ' + dc : '')
+        + (fk ? '｜归因：' + fk : ''), true);
+    });
+
+    // ── v2.155.0（RX8 世界种子库）：十三枚控件 + 一个输出区（渲染在「工具」页）。
+    //   输出区独立于联网面（wa-nb-out）与自洽审计（wa-ec-out）：三者的读数口径不同
+    //   （一个是「传了什么」、一个是「世界哪里不自洽」、一个是「这一局是什么格局」）。
+    const wsOut = function (text, keep) {
+      if (keep) panelEl.dataset.wsOut = text;
+      setOut('#wa-ws-out', text);
+    };
+    if (panelEl.dataset.wsOut) setOut('#wa-ws-out', panelEl.dataset.wsOut);
+    // 拒收原因一律照实转述引擎原话（含 existing / allowed / hint 三个诊断字段）——
+    //   面板不替引擎解释：解释一处走偏，四处读数全部失真。
+    const wsErr = function (r) {
+      return '未记录：' + ((r && r.reason) || '未知原因')
+        + ((r && r.field) ? '（' + r.field + '）' : '')
+        + ((r && r.existing) ? '（已有同结构种子 ' + r.existing + '）' : '')
+        + ((r && r.allowed) ? '（允许 ' + r.allowed[0] + '–' + r.allowed[1] + '）' : '')
+        + ((r && r.hint) ? '（' + r.hint + '）' : '');
+    };
+    const wsVal = function (sel) { const el = $(sel); return (el && el.value) ? String(el.value).trim() : ''; };
+    { const el = $('#wa-ws-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.worldSeed || !WA.worldSeed.setSettings) return wsOut('未记录：module-missing', true);
+        WA.worldSeed.setSettings({ enabled: !!el.checked });
+        wsOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（库内种子仍留在存档里，只是不再提取／保存／播种）'), true);
+      };
+    }
+    on('#wa-ws-extract', () => {
+      if (!WA.worldSeed || !WA.worldSeed.extract) return wsOut('未记录：module-missing', true);
+      const r = WA.worldSeed.extract();
+      if (!r.ok) return wsOut(wsErr(r) + (r.reason === 'nothing-to-extract' ? '（四张结构表全空 —— 不产空种子）' : ''), true);
+      wsOut('已提取 签名 ' + r.sig + '｜势力 ' + r.counts.powers + ' · 关系节点 ' + r.counts.nodes
+        + ' · 关系边 ' + r.counts.edges + ' · 地名 ' + r.counts.places
+        + '｜本种子不含：' + r.excluded.join('/') + '（存的是格局，不是进度 —— 有进度的种子播出来是续集）', true);
+    });
+    on('#wa-ws-save', () => {
+      if (!WA.worldSeed || !WA.worldSeed.save) return wsOut('未记录：module-missing', true);
+      const t = wsVal('#wa-ws-tags');
+      const r = WA.worldSeed.save(wsVal('#wa-ws-name'), t);
+      if (!r.ok) return wsOut(wsErr(r), true);
+      wsOut('已保存 ' + r.id + '「' + r.name + '」标签 ' + (r.tags.join('/') || '无') + '｜库内 ' + r.total + ' 个'
+        + ((t && !r.tags.length) ? '（标签不在闭集内，未记入 —— 不猜你要的是哪一个）' : ''), true);
+      renderBody();
+    });
+    on('#wa-ws-list', () => {
+      if (!WA.worldSeed || !WA.worldSeed.list) return wsOut('未记录：module-missing', true);
+      const r = WA.worldSeed.list();
+      if (!r.rows.length) return wsOut('库是空的（还没保存过种子）—— 这不是「没有可存的格局」', true);
+      wsOut(r.rows.map(function (x) {
+        return x.id + '「' + x.name + '」[' + (x.tags.join('/') || '无标签') + '] ∈ ' + x.sig
+          + '（势力 ' + x.counts.powers + '／节点 ' + x.counts.nodes + '／地名 ' + x.counts.places + '）';
+      }).join('；'), true);
+    });
+    on('#wa-ws-get', () => {
+      if (!WA.worldSeed || !WA.worldSeed.get) return wsOut('未记录：module-missing', true);
+      const r = WA.worldSeed.get(wsVal('#wa-ws-id'));
+      if (!r.ok) return wsOut(wsErr(r), true);
+      const sd = r.row.seed || {};
+      wsOut('取到 ' + r.row.id + '「' + r.row.name + '」签名 ' + sd.sig
+        + '｜势力 ' + ((sd.powers || []).map(function (p) { return p.name + '(' + p.weight + ')'; }).join('、') || '无')
+        + '｜地名 ' + ((sd.geo && sd.geo.places || []).join('、') || '无')
+        + '｜时代 ' + ((sd.era && (sd.era.label || sd.era.title)) || '无'), true);
+    });
+    on('#wa-ws-sow', () => {
+      if (!WA.worldSeed || !WA.worldSeed.sow) return wsOut('未记录：module-missing', true);
+      const v = wsVal('#wa-ws-variance');
+      const r = WA.worldSeed.sow(wsVal('#wa-ws-id'), v === '' ? undefined : v);
+      if (!r.ok) return wsOut(wsErr(r), true);
+      const p = r.plan;
+      wsOut('播种计划（**只是计划，世界一个字没动**）：自「' + p.name + '」· 签名 ' + p.sig
+        + ' · 变异度 ' + p.variance
+        + '｜势力 ' + (p.powers.map(function (x) { return x.name + '(' + x.weight + ')'; }).join('、') || '无')
+        + '｜地名 ' + (p.geo.places.join('、') || '无')
+        + '｜进度归零 ' + (p.zeroProgress ? '是' : '否')
+        + '（轮 ' + p.progress.round + '／编年史 ' + p.progress.chronicle + '／暗流 ' + p.progress.currents
+        + '／回声 ' + p.progress.echoes + '）—— 重开一局这个动作属于宿主，不属于本引擎', true);
+    });
+    on('#wa-ws-drop', () => {
+      if (!WA.worldSeed || !WA.worldSeed.drop) return wsOut('未记录：module-missing', true);
+      const r = WA.worldSeed.drop(wsVal('#wa-ws-id'));
+      if (!r.ok) return wsOut(wsErr(r), true);
+      wsOut('已删除 ' + r.id + '｜库内剩 ' + r.total + ' 个', true);
+      renderBody();
+    });
+    // v2.158.0（S3 + SP6）：转移包 / 导入包 / 初始化预览 / 初始化确认 四处理器。
+    on('#wa-ws-pack', () => {
+      if (!WA.worldSeed || !WA.worldSeed.transferPack) return wsOut('未记录：module-missing', true);
+      const r = WA.worldSeed.transferPack(wsVal('#wa-ws-id'));
+      if (!r.ok) return wsOut(wsErr(r), true);
+      const pk = r.pack;
+      wsOut('转移包（复制以下 JSON 到目标聊天）：包版本 v' + pk.packVer + '｜来源 ' + pk.chatId
+        + '｜种子「' + pk.name + '」· 签名 ' + pk.seed.sig
+        + '｜势力 ' + pk.counts.powers + ' · 节点 ' + pk.counts.nodes + ' · 边 ' + pk.counts.edges
+        + ' · 地名 ' + pk.counts.places + '\n' + JSON.stringify(pk), true);
+    });
+    on('#wa-ws-import', () => {
+      if (!WA.worldSeed || !WA.worldSeed.importPack) return wsOut('未记录：module-missing', true);
+      const raw = wsVal('#wa-ws-packin');
+      if (!raw) return wsOut('未记录：请先粘贴转移包 JSON', true);
+      let pk;
+      try { pk = JSON.parse(raw); } catch (e) { return wsOut('未记录：包 JSON 解析失败（' + (e && e.message) + '）', true); }
+      const r = WA.worldSeed.importPack(pk);
+      if (!r.ok) return wsOut(wsErr(r), true);
+      wsOut('已导入转移包：新种子 ' + r.id + '（' + r.name + '）｜来自 ' + r.fromChat
+        + '｜库内 ' + r.total + ' 个 —— 下一步「初始化预览」', true);
+    });
+    on('#wa-ws-init', () => {
+      if (!WA.worldSeed || !WA.worldSeed.initPreview) return wsOut('未记录：module-missing', true);
+      const v = wsVal('#wa-ws-variance');
+      const r = WA.worldSeed.initPreview(wsVal('#wa-ws-id'), v === '' ? undefined : v);
+      if (!r.ok) return wsOut(wsErr(r), true);
+      const p = r.plan;
+      wsOut('初始化预览（**世界一个字没动**，确认才落笔）：自「' + p.name + '」· 签名 ' + p.sig
+        + ' · 变异度 ' + p.variance + (p._fixed ? '（已定格，确认不重抽）' : '')
+        + '｜拟装：势力 ' + p.powers.length + '（' + p.powers.map(function (x) { return x.name + '(' + x.weight + ')'; }).join('、') + '）'
+        + ' · 人物 ' + p.network.nodes.length + ' · 关系边 ' + p.network.edges.length
+        + ' · 地名 ' + p.geo.places.length + (p.geo.roads ? '（另记道路数 ' + p.geo.roads + '，不还原端点）' : '')
+        + ' · 时代「' + (p.era.label || p.era.title || '无') + '」'
+        + '｜进度归零（轮 0 / 编年史 0 / 暗流 0 / 回声 0）'
+        + (r.retainNote ? '\n' + r.retainNote : ''), true);
+    });
+    on('#wa-ws-confirm', () => {
+      if (!WA.worldSeed || !WA.worldSeed.initConfirm) return wsOut('未记录：module-missing', true);
+      const r = WA.worldSeed.initConfirm();
+      if (!r.ok) return wsOut(wsErr(r), true);
+      if (r.reason === 'already') {
+        wsOut('这个世界已从种子「' + r.name + '」（签名 ' + r.sig + '）初始化过 —— 本次不重装（安装于 ' + r.installedAt + '）', true);
+        return;
+      }
+      const i = r.installed;
+      wsOut('已初始化新局：势力 ' + i.factions + ' · 人物 ' + i.nodes + ' · 关系边 ' + i.edges
+        + ' · 地名 ' + i.places + '（道路如实 0 条：种子只记数量不记端点）'
+        + '｜进度归零，来源已记入 meta.initFrom（签名 ' + r.sig + ' · 变异度 ' + r.variance + '）—— 可以继续游玩了', true);
+      renderBody();
+    });
+    on('#wa-ws-stat', () => {
+      if (!WA.worldSeed || !WA.worldSeed.stat) return wsOut('未记录：module-missing', true);
+      const s = WA.worldSeed.stat();
+      const f = s.faults || {};
+      const fk = Object.keys(f).map(function (k) { return k + '×' + f[k]; }).join('、');
+      wsOut('种子库台账：' + (s.enabled ? '开' : '关') + '｜提取 ' + s.extracts + ' 次 · 保存 ' + s.saves
+        + ' 次 · 播种 ' + s.sows + ' 次｜库内 ' + s.total + '／上限 ' + s.libCap
+        + '｜种子版本 v' + s.seedVer + ' · 变异度 ' + s.variance.min + '–' + s.variance.max
+        + '｜标签闭集 ' + s.tags.join('/')
+        + '｜上次 ' + (s.lastReason || '无')
+        + (s.hasLast ? '（身上有未保存的提取：' + s.lastSig + '）' : '（尚未提取过 —— 「没提取过」不等于「这个格局不值得存」）')
+        + (fk ? '｜拒收归因 ' + fk : ''), true);
     });
     on('#wa-life-goal', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addGoal(x.person, { text: x.text }), true); renderBody(); });
     on('#wa-life-promise', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addCommitment(x.person, { kind: 'promise', target: '玩家', text: x.text }), true); renderBody(); });
@@ -5115,6 +6021,25 @@
     };
     // v0.7.0: 结算守卫——查看归因计数 + 强制下一轮结算（escape hatch）
     const sgBtn = $('#wa-settle-view');
+    // v2.159.0（TP2）：异步写回台账——被拒的写回必须可见。此前「模型没返回」与
+    //   「返回了但被归属检查丢掉」同形，用户只看到摘要/档案不动，无从判断原因。
+    const clBtn = $('#wa-claim-view');
+    if (clBtn) clBtn.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.store || !WA.store.claimStat) return;
+      try {
+        const c = WA.store.claimStat();
+        const by = Object.keys(c.byReason || {}).map(k => k + '×' + c.byReason[k]).join(' · ') || '无';
+        let html = '<div class="wa-log wa-log-' + (c.blocked ? 'warn' : 'info') + '">异步写回票据：发 ' + c.issued
+          + ' · 放行 ' + c.passed + ' · 拒收 ' + c.blocked + ' · 过期 ' + c.expired + ' · 在册 ' + c.live
+          + '<br>拒收归因：' + esc(by) + '</div>'
+          + '<div class="wa-item">去重键在册 ' + esc(String(c.keys)) + ' / 上限 ' + esc(String(c.cap))
+          + ' · 票据有效期 ' + Math.round(c.ttlMs / 60000) + ' 分钟</div>'
+          + '<div class="wa-item">最近判据：<b>' + esc(String(c.lastReason || '-')) + '</b>'
+          + (c.lastDepChanged ? '<div class="wa-dim">⚠ 最近一次拒收因「依赖读面已变」——这次结论建立在过期的输入上</div>' : '')
+          + (c.lastRevChanged ? '<div class="wa-dim">注：最近一次放行时世界版本已变化（已记账，未拒收）</div>' : '') + '</div>';
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '票据台账读取失败：' + (e && e.message); }
+    };
     if (sgBtn) sgBtn.onclick = () => {
       const out = $('#wa-diag-out'); if (!out || !WA.settleGuard) return;
       try {
@@ -5813,7 +6738,10 @@
             // v2.132.0（O19）: 与 store.LAB / toolDiag.SRC_LABEL 同源同键集（三份真源一同登记）。
             //   面板这格是「游标读不出来」时用户唯一能看见的读数——裸桶名等于没有归因，
             //   而 life 读失败时刻意不回落（如实答「本轮从 0 开始」），无标签时两件事同形。
-            lifeTurn: '跨会话轮转游标读回' };
+            lifeTurn: '跨会话轮转游标读回',
+            // v2.156.0（SP1）：与 store.LAB / toolDiag.SRC_LABEL 同源同键集（三份真源一同登记）。
+            playtime: '游玩活动基准读回',
+            tapeStore: '磁带仓库读回' };
           const byP = rdStore2.bySource || {};
           const srcTxtP = Object.keys(byP).filter(function (k) { return byP[k] > 0; })
             .map(function (k) { return (LAB_P[k] || k) + ' ' + byP[k]; }).join(' / ');

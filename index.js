@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.150.0'
+  const VERSION = '2.162.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -236,6 +236,10 @@
     'core/undo.js',           // v2.30.0: 参数编辑撤销栈（P0-2；须在 store 之后、UI 之前装载）
     'core/workflow.js',
     'core/settle-guard.js',
+    // v2.160.0（TP4）：跨引擎提交契约。位置**必须**在 store / evict 之后 ——
+    //   它尾调 WA.registerModule（由 store 提供），且写入侧经 WA.evict.array 走挤出台账。
+    //   调用期关系：它读 WA.store / WA.clock / WA.evict，全在调用期取，故排在此处不产生环。
+    'core/commit.js',
     'core/interceptor.js',
     'engines/backstage.js',
     'engines/evolution.js',
@@ -531,6 +535,15 @@
     //   调它的 observe 交本轮真落地项）。口径：只读评估 + 进程态内存环（_pending / _rounds
     //   不落盘、不登记 store 骨架——写在这两处会把「重启清零」伪装成「有界容器」）。
     'engines/inject-value.js',
+    // v2.151.0（RX2+RX3）：跨会话记忆锚 + 远方世界脉搏。位置在既有 v2.150.0 段之后、
+    //   render/inject.js **之前**（注入落地时读 offlineTick.buildBlock() 与
+    //   farfield.buildBlock()）——两条硬约束：① 须晚于 core/store（它们读写
+    //   draft.offlineTick / draft.farfield）；② 须早于 render/inject.js。
+    //   farfield 在**调用期**读 WA.region.places()（远方地区的单一真源）与
+    //   WA.sediment.settle（联动口），两者皆在本行之前装载，故无装载期次序要求。
+    //   两者都**写**世界状态（各自两条/三条容器环），故模块总开关默认关。
+    'engines/offline-tick.js',
+    'engines/farfield.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',
@@ -547,7 +560,39 @@
     //   render.visibilityStat / render.buildWorldSnapshot / toolDiag.collect / canon.alignView，
     //   不是自己另探一遍；先于它们装载只会让基线一律落到「模块缺席」。
     'engines/perf-trace.js',
+    // v2.152.0（RP7）：存储水位预测（纯读：sample 只收 store 的字节数读数，不枚举存储）。
+    //   装在 perf-trace 之后、ui 之前：forecast 读的是 store.sizeAudit/saveStat 的派生量，
+    //   与 perf-trace 同为观测面，无装载期依赖，但保持「观测面在 ui 之前」的既有次序。
+    'engines/storage-forecast.js',
+    // v2.153.0（RX5+RX6）：剧情深度仪 + 多结局分支树。位置**必须在 causal / foreshadow / threads /
+    //   rehearsal 之后** —— 两者都在调用期读它们（plot-gauge 取三源计数、branch-tree 把预演交给
+    //   rehearsal.preview），排在前面会让「源全空」被读成「故事还没开始」。二者不互相依赖。
+    'engines/plot-gauge.js',
+    'engines/branch-tree.js',
+    // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。位置在 branch-tree 之后、
+    //   ui/panel.js 之前：两者在调用期读 rumor / causal / chronicle / worldFacts 与 perfLedger
+    //   （全部在本行之前装载），且 eco-audit 的读数由面板「联网」页与 store.maintain 消费 ——
+    //   两者互不依赖，也不写世界状态（world-bridge 只写自己的两条环）。
+    'engines/world-bridge.js',
+    'engines/eco-audit.js',
+    // v2.155.0（RX8）：世界生成种子库。位置在 eco-audit 之后、ui/panel.js 之前：
+    //   它在调用期读 world / evolution / people / background 四个既有面（全部在本行之前装载），
+    //   且只写自己那一格 `worldSeed.library` —— 不依赖任何后装模块。
+    'engines/world-seed.js',
+    // v2.156.0（SP1）：时间来源与游玩生命周期（engines/playtime.js）。位置在 world-seed 之后、
+    //   ui/panel.js 之前：它在调用期读 store / settingsBus / clock / inputGuard（全部在本行之前装载），
+    //   且只写自己那一格 localStorage 键——不依赖任何后装模块。
+    'engines/playtime.js',
+    // v2.156.0（S1）：离线恢复编排（engines/offline-return.js）。位置在 playtime 之后、
+    //   ui/panel.js 之前：它在调用期读 playtime / offlineTick / life / evolution / world / rand
+    //   （全部在本行之前装载），并把推演整体委托给 SP2 的草稿体 —— 自己不算任何数值、
+    //   不写任何键（零 localStorage），故不依赖任何后装模块。
+    'engines/offline-return.js',
     'ui/panel.js',
+    // v2.152.0（RP6）：面板渲染性能观测。**必须在 panel.js 之后**：observe 的页 id
+    //   白名单读 WA.ui.pages()（PAGES 表是 panel.js 的真源），先装会让白名单恒空、
+    //   一切 observe 被拒收成 unknown-page（观测面静默失效，比不装更坏）。
+    'ui/render-perf.js',
     'ui/settings.js',
     'ui/assistant.js',
   ];

@@ -51,19 +51,65 @@
 
   // v0.1.40: 分层巩固计量——每层耗时与最近结果（tool-diag 消费）
   const __memStat = { rounds: 0, lastMs: 0, totalMs: 0, layers: {}, lastAt: 0 };
+
+  // ── v2.159.0（TP2）：分层巩固的写回归属 ─────────────────────────────
+  //   病（与 summarizer / pmem / profile 同型）：四个写回口都在 `await apiRouter.call` 之后
+  //     直接 `WA.store.transact` —— 请求在 A 聊天发出、响应回来时已经是 B，迟到摘要照写进 B。
+  //     分层巩固还多一条：它**会推进自己那一层**（l1 入账后把 l0 尾部截掉），
+  //     所以两次并发巩固不只是重复入账，还会把中间那批摘要**吃掉**（谁先提交谁截）。
+  //   依赖读面：各层只依赖**自己消费的那一批**（外加 l0 依赖近期正文）——
+  //     拿全局 stateRev 当依赖会让「这一层在飞时别的引擎写了世界」变成永久饿死。
+  //   去重键：按层 + 批次指纹，同一批并发只巩固一次。
+  const _stat = { blocked: 0, passed: 0, lastBlockedReason: null };
+  /** 取票 + 台账（无 store 原语时回落 null = 不设防，与旧行为逐字一致）。 */
+  function claimOf(site, depFn, key) {
+    if (!WA.store || typeof WA.store.claimAsync !== 'function') return null;
+    const c = WA.store.claimAsync(site, { dep: depFn, key: key });
+    if (!c || !c.ok) {
+      _stat.blocked++; _stat.lastBlockedReason = (c && c.reason) || 'claim-failed';
+      WA.log('info', '记忆巩固跳过：' + _stat.lastBlockedReason);
+      return undefined;   // undefined = 被拒；null = 未设防
+    }
+    return c.ticket;
+  }
+  /** 落地前复核；返回 true = 允许写回。 */
+  function settleOf(ticket, site) {
+    if (!ticket || !WA.store || typeof WA.store.settleAsync !== 'function') return true;
+    const v = WA.store.settleAsync(ticket, { site: site });
+    if (!v || v.ok !== true) {
+      const rs = (v && v.reason) || 'missing-key';
+      _stat.blocked++; _stat.lastBlockedReason = rs;
+      WA.log('warn', '记忆写回被拒（' + rs + '）：' + ((v && v.detail) || ''));
+      return false;
+    }
+    return true;
+  }
+  /** 批次指纹：一批条目的 `t + 正文` 内容指纹（同长度换内容也能分辨）。 */
+  function batchSig(arr, n) {
+    const tail = (arr || []).slice(-(n || 0));
+    const body = tail.map(function (x) { return String((x && x.t) || '') + '\u0001' + String((x && (x.s || x.theme)) || ''); }).join('\u0000');
+    return (WA.store && typeof WA.store.fnv1a === 'function') ? WA.store.fnv1a(body) : String(tail.length);
+  }
 const memory = WA.memory = {
     /** v1.2.0: 终态伏笔回收（单一实现，backstage 容量控制段复用，防两处口径漂移） */
     pruneForeshadows: pruneForeshadows,
     /** v0.1.40: 分层巩固计量只读视图（tool-diag 消费） */
     stats() { return { rounds: __memStat.rounds, lastMs: __memStat.lastMs, avgMs: Math.round(__memStat.totalMs / Math.max(1, __memStat.rounds)), lastAt: __memStat.lastAt, layers: JSON.parse(JSON.stringify(__memStat.layers)) }; },
+    /** v2.159.0（TP2）：写回台账只读视图（tool-diag / 专锁消费）。 */
+    claimStat() { return { blocked: _stat.blocked, passed: _stat.passed, lastBlockedReason: _stat.lastBlockedReason }; },
     async digestRound() {
       const cfg = WA.apiRouter.getChannel('digest');
       if (!cfg.baseUrl || !cfg.model) return null;
+      // v2.159.0（TP2）：取票（依赖读面 = 本轮正文指纹；去重键 = 正文指纹）
+      const dep = function () { return (WA.store && WA.store.recentSig) ? WA.store.recentSig(3) : ''; };
+      const ticket = claimOf('memory:digestRound', dep, 'l0:' + dep());
+      if (ticket === undefined) return null;
       const r = await WA.apiRouter.call('digest', [
         { role: 'system', content: '你是记忆摘要器。把最近一段剧情压缩为一条≤80字的客观摘要（第三人称、含关键事实与状态变化）。只输出JSON：{"summary":"..."}' },
         { role: 'user', content: recentText(3) }
       ], { json: true, maxTokens: 300, temperature: 0.3 }).catch(() => null);
       if (!r || !r.summary) return null;
+      if (!settleOf(ticket, 'memory:digestRound')) return null;
       WA.store.transact(draft => {
         draft.memory.l0.push({ t: clockNow('memory'), s: String(r.summary).slice(0, 120), refs: recentRefs(3) });
         if (WA.evict) WA.evict.array(draft.memory.l0, 'memory.l0'); else draft.memory.l0 = draft.memory.l0.slice(-CAP.l0);
@@ -78,11 +124,16 @@ const memory = WA.memory = {
       const cfg = WA.apiRouter.getChannel('digest');
       if (!cfg.baseUrl || !cfg.model) return false;
       const batch = l0.slice(-L1_EVERY);
+      // v2.159.0（TP2）：取票（依赖读面 = 这批 l0 的内容指纹；去重键 = 同批并发只巩固一次）
+      const dep = function () { return batchSig(WA.store.get().memory.l0, L1_EVERY); };
+      const ticket = claimOf('memory:consolidateL1', dep, 'l1:' + batchSig(batch, L1_EVERY));
+      if (ticket === undefined) return false;
       const r = await WA.apiRouter.call('digest', [
         { role: 'system', content: '你是记忆巩固器。把多条单轮摘要合成一条阶段性回顾（≤150字，保留关键转折与人物状态）。同时提取≤3条长期事实候选与≤1条伏笔候选。只输出JSON：{"recap":"...","facts":[{"key":"...","value":"..."}],"foreshadow":{"content":"..."}或null}' },
         { role: 'user', content: batch.map((b, i) => (i + 1) + '. ' + b.s).join('\n') }
       ], { json: true, maxTokens: 600, temperature: 0.3 }).catch(() => null);
       if (!r || !r.recap) return false;
+      if (!settleOf(ticket, 'memory:consolidateL1')) return false;
       WA.store.transact(draft => {
         draft.memory.l1.push({ t: clockNow('memory'), s: String(r.recap).slice(0, 200), refs: inheritRefs(batch) });
         if (WA.evict) WA.evict.array(draft.memory.l1, 'memory.l1'); else draft.memory.l1 = draft.memory.l1.slice(-CAP.l1);
@@ -105,11 +156,15 @@ const memory = WA.memory = {
       const cfg = WA.apiRouter.getChannel('digest');
       if (!cfg.baseUrl || !cfg.model) return false;
       const batch = l1.slice(-L2_EVERY);
+      const dep = function () { return batchSig(WA.store.get().memory.l1, L2_EVERY); };
+      const ticket = claimOf('memory:consolidateL2', dep, 'l2:' + batchSig(batch, L2_EVERY));
+      if (ticket === undefined) return false;
       const r = await WA.apiRouter.call('digest', [
         { role: 'system', content: '你是章节回顾器。把多条阶段回顾合并为一条章节级叙事（≤250字，呈现主线进展与重大转折）。同时更新≤3条长期事实。只输出JSON：{"chapter":"...","facts":[{"key":"...","value":"..."}]}' },
         { role: 'user', content: batch.map((b, i) => (i + 1) + '. ' + b.s).join('\n') }
       ], { json: true, maxTokens: 800, temperature: 0.3 }).catch(() => null);
       if (!r || !r.chapter) return false;
+      if (!settleOf(ticket, 'memory:consolidateL2')) return false;
       WA.store.transact(draft => {
         draft.memory.l2.push({ t: clockNow('memory'), s: String(r.chapter).slice(0, 350), refs: inheritRefs(batch) });
         if (WA.evict) WA.evict.array(draft.memory.l2, 'memory.l2'); else draft.memory.l2 = draft.memory.l2.slice(-CAP.l2);
@@ -128,11 +183,15 @@ const memory = WA.memory = {
       const cfg = WA.apiRouter.getChannel('digest');
       if (!cfg.baseUrl || !cfg.model) return false;
       const batch = l2.slice(-L3_EVERY);
+      const dep = function () { return batchSig(WA.store.get().memory.l2, L3_EVERY); };
+      const ticket = claimOf('memory:consolidateL3', dep, 'l3:' + batchSig(batch, L3_EVERY));
+      if (ticket === undefined) return false;
       const r = await WA.apiRouter.call('digest', [
         { role: 'system', content: '你是长线沉淀器。把多条章节回顾提炼为贯穿性长线主题/世界底层变化（≤200字，如势力格局演变、角色关系网定型、时代基调）。只输出JSON：{"theme":"...","worldShift":"..."}' },
         { role: 'user', content: batch.map((b, i) => (i + 1) + '. ' + b.s).join('\n') }
       ], { json: true, maxTokens: 600, temperature: 0.3 }).catch(() => null);
       if (!r || !r.theme) return false;
+      if (!settleOf(ticket, 'memory:consolidateL3')) return false;
       WA.store.transact(draft => {
         draft.memory.l3.push({ t: clockNow('memory'), theme: String(r.theme).slice(0, 250), worldShift: String(r.worldShift || '').slice(0, 200), refs: inheritRefs(batch) });
         if (WA.evict) WA.evict.array(draft.memory.l3, 'memory.l3'); else draft.memory.l3 = draft.memory.l3.slice(-CAP.l3);

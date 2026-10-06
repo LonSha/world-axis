@@ -140,6 +140,29 @@
       if (!WA.settingsBus.toBool(st.diceEnabled, true)) return [];
       const results = [];
       WA.store.transact(draft => {
+        this.rollEventsDraft(draft, results);
+      });
+      return results;
+    },
+    /**
+     * v2.156.0（SP2）：**带草稿的事件骰推进** —— 真跑与离线批试演共用同一段逻辑。
+     *   公开入口 `rollEvents` 只保留「门（diceEnabled）+ 事务外壳 + 结果回收」，
+     *   事务体逐字搬到这里；离线批（S1 的 offline-return）直接拿既成 draft 调本函数。
+     *   于是「一轮怎么推」只有一份实现：两条路径不会各自漂移。
+     *
+     * `this` 约束（别改成裸函数）：体内沿用 `this.getMaxFails` / `this.advanceStageRound`
+     *   / `this._num` —— 这三类字面被静态锁逐字钉住（数值回落点全库恰 4 处，）
+     *   故调用方**必须**以成员形式调用（真跑路径是 `this.rollEventsDraft(...)`，
+     *   离线批经 `evolution` 命名空间引用同一成员）；解引用成裸函数会在严格模式下丢 this
+     *   （this 为 undefined），第一处 `this.getMaxFails` 就抛。
+     *
+     * 门在外面：本函数**不做**开关判定——真跑的门留在 `rollEvents` 里；
+     *   离线批的合成侧必须自己过同一门，否则「关了骰子」在离线批里会静默失效。
+     * @param {object} draft 事务草稿
+     * @param {Array} results 结果收集数组（调用方自持；本函数只追加）
+     */
+    rollEventsDraft(draft, results) {
+      const st = loadSettings();
         (draft.evolution.events || []).forEach(ev => {
           delete ev.evolveResult;
           if (!ev.type || !STAGE_MAP[ev.type]) ev.type = 'conflict';
@@ -176,8 +199,6 @@
             results.push({ name: ev.name || ev.title, result: '保持', stage: ev.stage, dice, threshold });
           }
         });
-      });
-      return results;
     },
 
     // ════════════════════════════════════════════════════
@@ -203,6 +224,21 @@
     decayWinds() {
       const decayed = [];
       WA.store.transact(draft => {
+        this.decayWindsDraft(draft, decayed);
+      });
+      if (decayed.length) WA.log('info', '风声消散：' + decayed.join('、'));
+      return decayed;
+    },
+    /**
+     * v2.156.0（SP2）：**带草稿的风声消散** —— 真跑与离线批试演共用同一段逻辑。
+     *   公开入口 `decayWinds` 只保留事务外壳与收尾日志（`WA.log` 是外部副作用，
+     *   留在入口、不进草稿体）；离线批直接调本函数。理由同 `rollEventsDraft`：
+     *   「哪条风声本轮消失」的判据只有一份实现。
+     *   消散主题由调用方自持数组接住，本函数只追加；体量小，但同样不复制。
+     * @param {object} draft 事务草稿
+     * @param {Array} decayed 消散主题收集数组（调用方自持）
+     */
+    decayWindsDraft(draft, decayed) {
         const survivors = [];
         for (const w of (draft.evolution.winds || [])) {
           const params = WIND_DECAY[w.type] || WIND_DECAY.rumor;
@@ -215,9 +251,6 @@
           if (dice <= chance) decayed.push(w.topic); else survivors.push(w);
         }
         draft.evolution.winds = survivors;
-      });
-      if (decayed.length) WA.log('info', '风声消散：' + decayed.join('、'));
-      return decayed;
     },
 
     // ════════════════════════════════════════════════════

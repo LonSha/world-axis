@@ -3491,6 +3491,844 @@ function runWitness(WA) {
       if (Iv.setSettings) Iv.setSettings({ enabled: prevOn !== false });
     }
   }
+  // ══ v2.151.0（RX2+RX3）：跨会话离线结算 + 远方脉搏新增码 ══
+  //   只声明产品扫描面新增的十一个码；bad-value / missing-fields / disabled /
+  //   store-unavailable / no-draft 等共享码由既有声明承担，避免重复计入恒等式。
+  {
+    const Ot = WA.offlineTick, Ff = WA.farfield;
+    if (Ot && Ff) {
+      const keepOt2151 = Ot.getSettings(), keepFf2151 = Ff.getSettings();
+      Ot.setSettings(Object.assign({}, keepOt2151, { enabled: true }));
+      Ff.setSettings(Object.assign({}, keepFf2151, { enabled: true }));
+      want('anchors-full', 'offlineTick.anchor：活动锚达到配置上限后拒收新锚（v2.151.0 RX2）');
+      trip('anchors-full', function () {
+        const keep = Ot.getSettings(); Ot.setSettings(Object.assign({}, keep, { enabled: true, maxAnchors: 4 }));
+        try {
+          WA.store.transact(function (d) { d.offlineTick = { anchors: [], batches: [], skips: [], lastSettledAt: null, rounds: 0 }; }, 'reject-witness:v2151-offline-cap-reset');
+          for (let i = 0; i < 4; i++) Ot.anchor('__rw2151_' + i, { kind: 'task' });
+          return [Ot.anchor('__rw2151_over', { kind: 'pact' }).reason];
+        } finally { Ot.setSettings(keep); }
+      });
+      want('unknown-anchor', 'offlineTick.release：释放不存在的记忆锚明确拒收（v2.151.0 RX2）');
+      trip('unknown-anchor', function () { return [Ot.release('__rw2151_missing').reason]; });
+      want('no-elapsed', 'offlineTick.tick：离线间隔为零时不伪装为一次结算（v2.151.0 RX2）');
+      trip('no-elapsed', function () {
+        Ot.setSettings(Object.assign({}, Ot.getSettings(), { enabled: true }));
+        const d = { offlineTick: { anchors: [], batches: [], skips: [], lastSettledAt: 1700000000000, rounds: 0 } };
+        return [Ot.tick(d, { now: 1700000000000 }).reason];
+      });
+      want('too-short', 'offlineTick.tick：低于 minGapMs 的短间隔与零间隔分开归因（v2.151.0 RX2）');
+      trip('too-short', function () {
+        const keep = Ot.getSettings(); Ot.setSettings(Object.assign({}, keep, { enabled: true, minGapMs: 1000 }));
+        try { const d = { offlineTick: { anchors: [], batches: [], skips: [], lastSettledAt: 1700000000000, rounds: 0 } }; return [Ot.tick(d, { now: 1700000000500 }).reason]; }
+        finally { Ot.setSettings(keep); }
+      });
+      want('no-batch', 'offlineTick.summary：尚无离线批次时拒绝伪造空摘要（v2.151.0 RX2）');
+      trip('no-batch', function () {
+        WA.store.transact(function (d) { d.offlineTick = { anchors: [], batches: [], skips: [], lastSettledAt: null, rounds: 0 }; }, 'reject-witness:v2151-offline-summary-reset');
+        return [Ot.summary().reason];
+      });
+      want('apply-throw', 'offlineTick.tick：逐轮推演回调异常如实记入故障读数（v2.151.0 RX2）');
+      trip('apply-throw', function () {
+        const d = { offlineTick: { anchors: [], batches: [], skips: [], lastSettledAt: 1700000000000, rounds: 0 } };
+        Ot.tick(d, { now: 1700000000000 + 3600000, apply: function () { throw new Error('controlled witness'); } });
+        return Object.keys(Ot.stat().faults || {}).filter(function (k) { return k === 'apply-throw' && Ot.stat().faults[k] > 0; });
+      });
+      want('no-far', 'farfield.tick：没有登记远方地区时不虚构脉搏（v2.151.0 RX3）');
+      trip('no-far', function () {
+        const keep = Ff.getSettings(); Ff.setSettings(Object.assign({}, keep, { enabled: true }));
+        try { WA.region.setSettings({ enabled: true }); WA.store.transact(function (d) { d.region = { places: [], events: [] }; }, 'reject-witness:v2151-far-reset');
+          const d = { farfield: { pulses: [], pending: [], heard: [], lastTickAt: 1700000000000, rounds: 0 } };
+          return [Ff.tick(d, { now: 1700000000000 + 86400000 }).reason]; }
+        finally { Ff.setSettings(keep); }
+      });
+      want('too-early', 'farfield.deliver：未到路程推算的到期时刻不得提前送达（v2.151.0 RX3）');
+      trip('too-early', function () {
+        const keep = Ff.getSettings(); Ff.setSettings(Object.assign({}, keep, { enabled: true }));
+        try { const d = { farfield: { pulses: [], pending: [{ id: 'rw2151', place: '远方', trend: 'war', at: 2000, dueAt: 9000, delayDays: 1, deliveredAt: 0 }], heard: [], lastTickAt: 1, rounds: 0 } }; return [Ff.deliver(d, { now: 8000 }).reason]; }
+        finally { Ff.setSettings(keep); }
+      });
+      want('unknown-pulse', 'farfield.settlePulse：地点脉搏不存在时拒绝沉积（v2.151.0 RX3）');
+      trip('unknown-pulse', function () { return [Ff.settlePulse('rw2151-no-pulse').reason]; });
+      want('sediment-absent', 'farfield.settlePulse：明确挂号的沉积消费者缺席时如实拒绝（v2.151.0 RX3）');
+      trip('sediment-absent', function () {
+        const keep = Ff.getSettings(), old = WA.sediment; Ff.setSettings(Object.assign({}, keep, { enabled: true }));
+        try { WA.store.transact(function (d) { d.farfield = { pulses: [{ id: 'rw2151-pulse', place: '远方', trend: 'war', label: '兵戈', at: 1, sedimentPending: true }], pending: [], heard: [], lastTickAt: 1, rounds: 0 }; }, 'reject-witness:v2151-sediment-seed');
+          WA.sediment = null; return [Ff.settlePulse('rw2151-pulse').reason]; }
+        finally { WA.sediment = old; Ff.setSettings(keep); }
+      });
+      want('unknown-message', 'farfield.relayToRumor：在途或不存在的消息不能转交传闻链（v2.151.0 RX3）');
+      trip('unknown-message', function () { return [Ff.relayToRumor('rw2151-unheard', { factKey: 'rw2151-fact' }).reason]; });
+      want('rumor-absent', 'farfield.relayToRumor：已有听闻但 rumor 消费者缺席时明确拒绝（v2.151.0 RX3）');
+      trip('rumor-absent', function () {
+        const keep = Ff.getSettings(), old = WA.rumor; Ff.setSettings(Object.assign({}, keep, { enabled: true }));
+        try { WA.store.transact(function (d) { d.farfield = { pulses: [], pending: [], heard: [{ id: 'rw2151-heard', place: '远方', trend: 'war', at: 1, deliveredAt: 2, said: '兵戈', distorted: true }], lastTickAt: 1, rounds: 0 }; }, 'reject-witness:v2151-rumor-seed');
+          WA.rumor = null; return [Ff.relayToRumor('rw2151-heard', { factKey: 'rw2151-fact' }).reason]; }
+        finally { WA.rumor = old; Ff.setSettings(keep); }
+      });
+      Ot.setSettings(keepOt2151);
+      Ff.setSettings(keepFf2151);
+    }
+  }
+
+  // ══ v2.157.0（SP4 + S2）：farfield 新增的四个拒收码 ══
+  //   四个都由**真实局面**触发（在途满、转移包超容量、auto 未开、世界钟未设定），
+  //   按台账规矩走**可执行见证**、不进基线。桩一律在 finally 里还原；远场桶用前
+  //   快照、用后还原 —— 本段跑在真 run.js 里，给后面的段留下一个被改过的世界是越界。
+  {
+    const Ff = WA.farfield, Rg = WA.region;
+    if (Ff && typeof Ff.auto === 'function' && Rg) {
+      const keepFf = Ff.getSettings(), keepRg = Rg.getSettings();
+      const snap = JSON.parse(JSON.stringify((WA.store.get() || {})));
+      const DAY = 86400000;
+      try {
+        Rg.setSettings({ enabled: true });
+        // auto-off：总开关开着而自动门关着 ⇒ 两个码分列（关闭 / 自动未开）
+        want('auto-off', 'farfield.auto：总开关开着而自动推进未开 ⇒ 拒收 auto-off（与 disabled 分列：一个是意图，一个是没要求）');
+        trip('auto-off', function () {
+          Ff.setSettings(Object.assign({}, Ff.getSettings(), { enabled: true, auto: false }));
+          const d = {};
+          return [Ff.auto(d, { day: 2 }).reason];
+        });
+        // no-clock：世界钟未设定 ⇒ 不猜日期
+        want('no-clock', 'farfield.auto：世界钟未设定 ⇒ 拒收 no-clock（不拿真实时间顶替剧情时间）');
+        trip('no-clock', function () {
+          Ff.setSettings(Object.assign({}, Ff.getSettings(), { enabled: true, auto: true }));
+          WA.store.transact(function (d) { d.clock = { iso: '', label: '', dayIndex: 0, source: 'unset' };
+            d.farfield = { pulses: [], pending: [], heard: [], lastTickAt: null, rounds: 0, autoDay: null, autoAt: null, autoReason: '' }; }, 'reject-witness:v2157-noclock');
+          const d = {};
+          return [Ff.auto(d, {}).reason];
+        });
+        // 注：farfield 的在途背压用的是 skipped 里的 `why: 'pending-full'`（**不是** `reason:`），
+        //   故扫描面本来就不把它算成一个内联拒收码 —— 它由专锁 sp4-s2-v2157 的行为判据锁住；
+        //   而 `pending-full` 这个**字符串**另有 inst.js / spotlight.js 的真见证，见基线台账。
+        // too-many：转移包整批拒收
+        want('too-many', 'farfield.transferPack：一次转述包超过容量 ⇒ 整批拒收 too-many（不做部分交付）');
+        trip('too-many', function () {
+          Ff.setSettings(Object.assign({}, Ff.getSettings(), { enabled: true, capTransfer: 2 }));
+          return [Ff.transferPack({ max: 3 }).reason];
+        });
+      } finally {
+        Ff.setSettings(keepFf); Rg.setSettings(keepRg);
+        try { WA.store.transact(function (d) { Object.keys(snap).forEach(function (k) { d[k] = snap[k]; }); }, 'reject-witness:v2157-restore'); } catch (e) {}
+      }
+    }
+  }
+  // ══ v2.152.0（RP6+RP7）：面板渲染观测 + 存储水位预测新增码 ══
+  //   六个码全部由真实局面触发，按台账规矩走**可执行见证**、**不进基线**：
+  //     · ui/render-perf.js（RP6）：unknown-page / pages-full；
+  //     · engines/storage-forecast.js（RP7）：no-bytes / non-monotonic /
+  //       insufficient-samples / flat-rounds。
+  //   两条边界（本段最要紧的判断）：
+  //     ① `unknown-page`（页 id 不在白名单）与 `pages-full`（页数到顶）**绝不可合成一个「收不了」**
+  //       —— 前者要改调用方传的页名，后者要扩 CAP_PAGES 或分窗；合成即让两种处置在读数上长得一样。
+  //     ② `insufficient-samples`（还没攒够样本）与 `flat-rounds`（样本够但解不出斜率）同理，
+  //       绝不可合成一个「算不出」—— 前者要等采够，后者是数值退化（判据 `n*sxx - sx*sx === 0`），
+  //       处置一个是等、一个是改采样点；合成即让「等下一轮」与「这组样本废了」不可分。
+  //   一条如实口径：UI 层模块**不在 run.js 的 LOAD 里**（LOAD 刻意不含 ui/*），故 RP6 两码
+  //     与 B6 那五条 UI 码同规格，走 ui-gate-sync.fresh()（真装载 ui/* + mini-DOM）；
+  //     RP7 是引擎层（engines/storage-forecast.js 在 LOAD 内），直接用传入的 WA。
+  {
+    const Sf = WA.storageForecast;
+    if (Sf && typeof Sf.sample === 'function') {
+      const keepSf = Sf.getSettings();
+      Sf.setSettings(Object.assign({}, keepSf, { enabled: true }));
+      want('no-bytes', 'storageForecast.sample：store 的体积读数取不到 ⇒ 拒收（不把「量不出来」记成 0 字节）（RP5）');
+      trip('no-bytes', function () {
+        const old = WA.store;
+        try { WA.store = {}; return [Sf.sample(1).reason]; }
+        finally { WA.store = old; }
+      });
+      want('non-monotonic', 'storageForecast.sample：本轮次不大于已入环的末次轮 ⇒ 拒收（序列无序即趋势无意义）（RP5）');
+      trip('non-monotonic', function () {
+        Sf.reset(); Sf.sample(5);
+        return [Sf.sample(3).reason];
+      });
+      want('insufficient-samples', 'storageForecast.forecast：样本数低于 minSamples ⇒ 拒收（绝不拿两个点外推出「还能玩一万轮」）（RP5）');
+      trip('insufficient-samples', function () { Sf.reset(); return [Sf.forecast().reason]; });
+      // 数值退化：样本够但最小二乘分母恰为 0（n*sxx - sx*sx === 0）。
+      //   造法走**超大轮次 + 可表示步长**：轮数数量级一大，乘积项把差吃掉 ⇒ d 恰为 0。
+      //   为什么不用「字节数一直不变」造：那让斜率恰为 0 而 d !== 0 ⇒ 返回 ok:true，是**假见证**
+      //   （实测 base=1e16/step=2 与 base=1e15/step=2 都落到那条，只有 step>=8 才真退化）。
+      want('flat-rounds', 'storageForecast.forecast：样本够但最小二乘分母为零（数值退化，解不出斜率）⇒ 拒收（RP5）');
+      trip('flat-rounds', function () {
+        Sf.reset();
+        const base = 1e16;
+        for (let i = 0; i < 8; i++) { const r = Sf.sample(base + i * 64); if (!r.ok) return []; }
+        return [Sf.forecast().reason];
+      });
+      Sf.reset();
+      Sf.setSettings(keepSf);
+    }
+    // ── ui/render-perf.js（RP4）：两个码只在面板渲染链上产生 ──
+    {
+      const uiGate2 = require('./ui-gate-sync.js');
+      const W3 = uiGate2.fresh().WA;
+      const Rp = W3.renderPerf;
+      want('unknown-page', 'renderPerf.observe：页 id 不在 WA.ui.pages() 白名单内 ⇒ 拒收并带出允许集（RP4）');
+      want('pages-full', 'renderPerf.observe：已观测页数达 CAP_PAGES 上限且是新页 ⇒ 拒收（RP4）');
+      if (Rp && typeof Rp.observe === 'function') {
+        const keepRp = Rp.getSettings();
+        const keepPages = W3.ui && W3.ui.pages;
+        Rp.setSettings(Object.assign({}, keepRp, { enabled: true }));
+        trip('unknown-page', function () { return [Rp.observe('__rw2152_no_such_page', 1).reason]; });
+        // 页数到顶：把页源换成 30 页的探针表 ⇒ CAP_PAGES(24) 之后的新页如实拒收。
+        //   为什么打桩是正当的：白名单本来就是**运行时依赖**（WA.ui.pages()），本仓对它的口径是
+        //   「读运行时真源、不存副本」——打桩改的是输入面，判据与守卫一行未动。
+        trip('pages-full', function () {
+          if (!(W3.ui && typeof W3.ui.pages === 'function')) return [];
+          const fake = []; for (let i = 0; i < 30; i++) fake.push('__rw2152_p' + i);
+          try {
+            W3.ui.pages = function () { return fake.slice(); };
+            Rp.reset();
+            const hit = [];
+            for (let i = 0; i < 30; i++) { const r = Rp.observe('__rw2152_p' + i, 1, 1); if (r.reason) hit.push(r.reason); }
+            return hit;
+          } finally { if (keepPages) W3.ui.pages = keepPages; Rp.reset(); }
+        });
+        Rp.setSettings(keepRp);
+      }
+    }
+  }
+  // ══ v2.153.0（RX5+RX6）：剧情深度仪 + 多结局分支树新增码 ══
+  //   四个码全部由真实局面触发，按台账规矩走**可执行见证**、**不进基线**：
+  //     · engines/plot-gauge.js（RX5）：无新增未分类码（no-signal / no-reading 已在既有面归位）；
+  //     · engines/branch-tree.js（RX6）：no-options / branches-full / not-comparable / rehearsal-absent。
+  //   两条边界（本段最要紧的判断）：
+  //     ① `no-options`（走法不足两条）与 `branches-full`（节点数到顶）**绝不可合成一个「收不了」**
+  //       —— 前者要补走法（一条走法的「分叉」是流水账），后者要扩 maxNodes 或另起一局；
+  //       合成即让「这不是分叉」与「这局满了」在读数上长得一样。
+  //     ② `not-comparable`（没得比）与「比出来不一样」同理：前者要先把预览钉下来，
+  //       后者才是真差异；合成即让「无从判定」冒充「判定为不同」。
+  {
+    const Bt = WA.branchTree;
+    if (Bt && typeof Bt.fork === 'function') {
+      const keepBt = Bt.getSettings();
+      try {
+        Bt.setSettings(Object.assign({}, keepBt, { enabled: true, maxNodes: 40, maxOptions: 6 }));
+        want('no-options', 'branchTree.fork：可选走法不足两条 ⇒ 拒收（一条走法的「选择」不是分叉，是流水账）（RX6）');
+        trip('no-options', function () {
+          return [Bt.fork({ round: 1, prompt: 'rw2153-只有一个走法', options: ['唯一'] }).reason];
+        });
+        want('branches-full', 'branchTree.fork：节点数达 maxNodes 上限 ⇒ 拒收（长局不许无界膨胀）（RX6）');
+        trip('branches-full', function () {
+          const keep2 = Bt.getSettings();
+          try {
+            Bt.setSettings(Object.assign({}, keep2, { enabled: true, maxNodes: 2 }));
+            Bt.fork({ round: 1, prompt: 'rw2153-a', options: ['x', 'y'] });
+            Bt.fork({ round: 2, prompt: 'rw2153-b', options: ['x', 'y'] });
+            return [Bt.fork({ round: 3, prompt: 'rw2153-c', options: ['x', 'y'] }).reason];
+          } finally { Bt.setSettings(keep2); }
+        });
+        want('not-comparable', 'branchTree.replay：该分叉点没有可回放的预览 ⇒ 如实报不可比（不拿旧结论冒充可以回放）（RX6）');
+        trip('not-comparable', function () {
+          // 不传 steps ⇒ 没有预览（这正是「零自动登记」的日常形态：分叉点记下了，但没预演过）
+          const f = Bt.fork({ round: 4, prompt: 'rw2153-没预演过', options: ['甲', '乙'] });
+          return [Bt.replay(f.id).reason];
+        });
+        want('rehearsal-absent', 'branchTree.fork：预演层缺席时如实标 rehearsal-absent（不假装预演过）（RX6）');
+        trip('rehearsal-absent', function () {
+          const old = WA.rehearsal;
+          try {
+            WA.rehearsal = null;
+            const f = Bt.fork({ round: 5, prompt: 'rw2153-预演层缺席', options: ['甲', '乙'],
+              steps: [{ kind: 'wait', who: '甲', ms: 1000 }] });
+            return [f.preview && f.preview.reason];
+          } finally { WA.rehearsal = old; }
+        });
+      } finally { Bt.setSettings(keepBt); }
+    }
+  }
+  // ══ v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计新增码 ══
+  //   本段与前面各段同规矩：新增的字面量全部由**真实局面**触发，走可执行见证、不进基线。
+  //
+  //   一条如实边界（本版最要紧的归类判断）：两个新引擎里的「码」其实分属**两个不同家族**——
+  //     · 第一家族是**拒收码**（`return { ok:false, reason:'x' }`）：本次 10 个。它们是扫描面的
+  //       词法面（`reason: 'x'`）认得的东西，故必须在这里跑出来；
+  //     · 第二家族是**审计议题码**（`push('x', cat, row)` 进 issues[]）：本次 7 个
+  //       （link-after / clock-backward / schedule-overlap / knowledge-beyond / cause-broken /
+  //       orphan-effect / section-failed）。它们是「世界的读数」，不是「接口的拒收」：
+  //       调用方拿到的是一张问题清单，其中每条自带码/类别/级别/明细。
+  //       两者的处置完全不同（拒收要改调用、议题要改世界），**绝不可为了凑台账把它们合成一类**——
+  //       合成就会让「你传错了参数」与「你的世界里前后对不上」在读数上长得一样。
+  //       议题码由 tests/eco-audit-v2154.js 的 B7–B16 逐条可执行见证兜底，
+  //       并由本版新增的反污染断言钉住「它们不得改走 reason: 通道」（否则会从扫描面漏过去）。
+  {
+    const Wb = WA.worldBridge;
+    if (Wb && typeof Wb.exportLegends === 'function') {
+      const keepWb = Wb.getSettings();
+      const LEG = [{ kind: 'war', title: 'rw2154大战', summary: '两军对峙三日。', at: 3 },
+        { kind: 'crime', title: 'rw2154奇案', summary: '失窃发生在夜半。', at: 5 },
+        { kind: 'rise', title: 'rw2154崛起', summary: '他一年之内升到将军。', at: 2 },
+        { kind: 'weather', title: '晴', summary: '今日无云。', at: 9 }];
+      const putChron = function (rows) {
+        WA.store.transact(function (d) {
+          d.chronicle = rows;
+          d.worldBridge = { legends: [], exported: [], seeds: 0, lastExportAt: null, lastImportAt: null };
+        }, 'reject-witness:wb-chron');
+      };
+      try {
+        Wb.setSettings(Object.assign({}, keepWb, { enabled: true, worldTitle: 'rw2154世界', playerName: 'rw2154玩家' }));
+        // ① 身份两段缺一即不成签名：半份身份是假判据，故与「没大事可传」分开归因
+        want('identity-incomplete', 'worldBridge.exportLegends：身份缺一半 ⇒ 拒收（「不知道你是谁」与「没有大事可传」是两件事）');
+        trip('identity-incomplete', function () {
+          const keep2 = Wb.getSettings();
+          try {
+            Wb.setSettings({ playerName: '' });
+            return [Wb.exportLegends().reason];
+          } finally { Wb.setSettings(keep2); }
+        });
+        // ② 编年史为空
+        want('no-chronicle', 'worldBridge.exportLegends：编年史为空 ⇒ 拒收（推演几轮后才有大事可传）');
+        trip('no-chronicle', function () { putChron([]); return [Wb.exportLegends().reason]; });
+        // ③ 有编年史但一类大事都没有（与「一条都还没发生」分开）
+        want('nothing-to-export', 'worldBridge.exportLegends：一条大事都没沾上三类 ⇒ 拒收（「没发生过大事」不是「读不到世界」）');
+        trip('nothing-to-export', function () {
+          putChron([{ id: 'w1', kind: 'weather', title: '晴', summary: '无云。', at: 1 }]);
+          return [Wb.exportLegends().reason];
+        });
+        putChron(LEG);
+        const pack = Wb.exportLegends().pack;
+        // ④ 同签名回灌：硬拒收，**不是**「导入了 0 条」
+        want('self-origin', 'worldBridge.importLegends：本世界自己的包回灌 ⇒ 硬拒收（「拒收」退化成「导入 0 条」，就与「别处刚好传了空的」长得一样）');
+        trip('self-origin', function () { return [Wb.importLegends(pack).reason]; });
+        // ⑤⑥⑦ 坏负载三码彼此**不可合成**：一个要改负载形态、一个要改来源、一个要改去重口径
+        want('bad-payload', 'worldBridge.importLegends：legends 不是数组 ⇒ bad-payload（负载形态不对）');
+        trip('bad-payload', function () { return [Wb.importLegends({ sig: 'rw2154x', legends: '不是数组' }).reason]; });
+        want('no-legends', 'worldBridge.importLegends：legends 是空数组 ⇒ no-legends（来源真的什么都没传）');
+        trip('no-legends', function () { return [Wb.importLegends({ sig: 'rw2154y', legends: [] }).reason]; });
+        want('nothing-to-import', 'worldBridge.importLegends：整包一条都收不下（档位均不在闭集）⇒ 拒收并如实报剔除数');
+        trip('nothing-to-import', function () {
+          return [Wb.importLegends({ sig: 'rw2154z', legends: [{ kind: 'zzz', title: 't' }] }).reason];
+        });
+        // ⑧ 全重复是 ok:true 的**读数**（「都收过」≠「别处什么都没传」）
+        want('all-duplicates', 'worldBridge.importLegends：同一包再收一次 ⇒ all-duplicates（ok:true / added:0 的读数，不是坏状态）');
+        trip('all-duplicates', function () {
+          const p2 = JSON.parse(JSON.stringify(pack));
+          p2.sig = 'rw2154dup';
+          Wb.setSettings({ maxLegends: 24 });
+          const first = Wb.importLegends(p2);
+          if (!first.ok) return [];
+          return [Wb.importLegends(p2).reason];
+        });
+        // ⑨ 未知传说：不凭空编一条事实
+        want('unknown-legend', 'worldBridge.toRumor：传说 id 不在传说链里 ⇒ 拒收（不替世界编一条事实）');
+        trip('unknown-legend', function () { return [Wb.toRumor('lg_rw2154_不存在').reason]; });
+      } finally { Wb.setSettings(keepWb); }
+    }
+  }
+  {
+    const Ec = WA.ecoAudit;
+    if (Ec && typeof Ec.lastSweep === 'function') {
+      // ⑩ 从未扫过：**不拿 0 条冒充「干净」**（「没扫」与「扫过没问题」是两件事）
+      want('never-swept', 'ecoAudit.lastSweep：本会话从未扫过 ⇒ never-swept（空读数不得冒充「四类都对得上」）');
+      trip('never-swept', function () { return [Ec.lastSweep().reason]; });
+    }
+  }
+  // ══ v2.155.0（RX8）：世界生成种子库新增拒收码 ====
+  //   本段与前面各段同规矩：新增字面量全部由**真实局面**触发，走可执行见证、不进基线。
+  //   一条归类判断：本引擎的八个码里只有四个是**新增字面量**（其余四个 —— disabled /
+  //   missing-fields / bad-value / store-unavailable —— 复用既有词表，已在前段见证过，
+  //   故不在这里重列：重列会把「一个码只有一个定义处」稀释成两份口径）。
+  //   「四张表全空」的见证走**内存桩**（临时把 store.get 换成空对象），
+  //   而不去清真实存档 —— 见证不得给后面的段留下一个被清空的世界。
+  {
+    const Ws = WA.worldSeed;
+    if (Ws && typeof Ws.extract === 'function') {
+      const keepWs = Ws.getSettings();
+      const keepGet = WA.store.get;
+      try {
+        Ws.setSettings({ enabled: true, libCap: 12 });
+        // ① 四张结构表全空 ⇒ 不产空种子
+        want('nothing-to-extract', 'worldSeed.extract：势力/关系网/地理/时代四张表全空 ⇒ 拒收（空种子播种出来的是空世界，与「还没开局」不可分）');
+        trip('nothing-to-extract', function () {
+          const keep = WA.store.get;
+          WA.store.get = function () { return {}; };
+          try { return [Ws.extract().reason]; } finally { WA.store.get = keep; }
+        });
+        // 清库并造一个非空榻局（只动结构面，不动进度面）
+        WA.store.transact(function (d) {
+          d.worldSeed = { library: [], seq: 0 };
+          d.evolution = Object.assign({}, d.evolution, { factions: [
+            { id: 'f1', name: 'rw2155甲势力', power: 30 }] });
+          d.world = Object.assign({}, d.world, { places: [{ id: 'pl1', name: 'rw2155甲城' }], roads: [{ id: 'r1' }] });
+          d.background = Object.assign({}, d.background, { text: 'rw2155乱世之初。' });
+        }, 'reject-witness:ws-reset');
+        Ws.extract();
+        // ② 同一结构存第二次：去重靠签名、不靠名字
+        want('duplicate-seed', 'worldSeed.save：同签名（换个名字仍是同一榻局）存第二次 ⇒ 拒收并给出已有 id —— 库不是存档格，重复结构再多也只是噪声');
+        trip('duplicate-seed', function () {
+          const first = Ws.save('rw2155甲', 'other');
+          if (!first.ok) return [];
+          return [Ws.save('rw2155换名同榻局', 'other').reason];
+        });
+        // ③ 库满：不静默挤掉旧种子
+        want('library-full', 'worldSeed.save：库达上限 ⇒ 拒收并给出 cap（不静默挤掉旧种子 —— 旧种子挤掉的代价是玩家自己不知道）');
+        trip('library-full', function () {
+          const put = function (nm) {
+            WA.store.transact(function (d) {
+              d.evolution = Object.assign({}, d.evolution, { factions: [{ id: 'f1', name: nm, power: 30 }] });
+            }, 'reject-witness:ws-bones2');
+            Ws.extract();
+            return Ws.save(nm, 'other');
+          };
+          Ws.setSettings({ libCap: 2 });
+          const b = put('rw2155乙势力');
+          if (!b.ok) return [];            // 库内 2 个，到顶
+          const c = put('rw2155丙势力');
+          return [c.reason];
+        });
+        // ④ 未知种子：不凭空造一个
+        want('unknown-seed', 'worldSeed.get / drop：种子 id 不在库里 ⇒ 拒收（不凭空造一个种子出来，也不假装删掉了）');
+        trip('unknown-seed', function () {
+          return [Ws.get('ws_rw2155_exists_not').reason, Ws.drop('ws_rw2155_exists_not').reason];
+        });
+      } finally { WA.store.get = keepGet; Ws.setSettings(keepWs); }
+    }
+  }
+  // ── v2.156.0（SP1 + S1）：playtime 与 offline-return 的**新增**拒收码 ──
+  //   与前面各段同规矩：新增字面量全部由**真实局面**触发，不进基线。
+  //   几条只能用内存桩造前提（「换个聊天」「存储面抛错」这类局面在单进程里造不出来），
+  //   桩一律在 finally 里还原，且**批次账与注入现场用前先快照、用后还原** ——
+  //   本段跑在真 run.js 的第 12 面位置，给后面的段留下一个被改过的世界是越界。
+  {
+    const Pt = WA.playtime, Or = WA.offlineReturn, Ot = WA.offlineTick;
+    if (Pt && Or && Ot) {
+      const keepLa = Pt.lastActive, keepChatId = WA.store.chatId, keepMark = Ot.markConsumed;
+      const keepPtCfg = Pt.getSettings(), keepOtCfg = Ot.getSettings(), keepOrCfg = Or.getSettings();
+      const snap = JSON.parse(JSON.stringify((WA.store.get() || {})));
+      /** 造一批待判的账 + 本轮注入现场（用完还原）。 */
+      function putBatch(consumedAt, sources) {
+        WA.store.transact(function (d) {
+          d.offlineTick = Object.assign({}, d.offlineTick, {
+            anchors: [], skips: [], rounds: 2, lastSettledAt: 1000,
+            batches: [{ from: 1, to: 2, elapsedMs: 7200000, rounds: 2, protectedRows: 0, applied: true, at: 2, consumedAt: consumedAt }]
+          });
+          d.lastInjection = { at: 3, sources: sources, injected: 1, len: 1, mainCount: 1 };
+        }, 'reject-witness:or-batch');
+      }
+      try {
+        Pt.setSettings({ enabled: true });
+        Ot.setSettings({ enabled: true });
+        Or.setSettings({ enabled: true });
+
+        want('no-baseline', 'playtime.lastActive：这个聊天从没记过活动基准 ⇒ 拒收 no-baseline（「没记过」不等于「你走了零秒」）');
+        trip('no-baseline', function () { return [Pt.lastActive('rw2156_no_such_chat').reason]; });
+
+        want('first-baseline', 'offlineReturn.recover：没有活动基准 ⇒ 只落两本账的起点、不结算（first-baseline）');
+        trip('first-baseline', function () {
+          Pt.lastActive = function () { return { ok: false, reason: 'no-baseline', chatId: 'rw2156' }; };
+          try { return [Or.recover({ now: Date.now() }).reason]; } finally { Pt.lastActive = keepLa; }
+        });
+
+        want('first', 'offlineReturn.recover：offlineTick 侧也没有结算点 ⇒ 只落基准（first）—— 「不知道你走了多久」≠「你走了零秒」');
+        trip('first', function () {
+          WA.store.transact(function (d) {
+            d.offlineTick = { anchors: [], batches: [], skips: [], lastSettledAt: null, rounds: 0 };
+          }, 'reject-witness:or-first');
+          Pt.lastActive = function () { return { ok: true, chatId: 'rw2156', at: Date.now() - 3600000, ageMs: 3600000, updates: 1, firstAt: 0 }; };
+          try { return [Or.recover({ now: Date.now() }).reason]; } finally { Pt.lastActive = keepLa; }
+        });
+
+        want('backward', 'offlineReturn.recover：now 早于活动基准（时钟回拨 / 同刻重入）⇒ 拒收 backward（不把负时长当 0）');
+        trip('backward', function () {
+          Pt.lastActive = function () { return { ok: true, chatId: 'rw2156', at: Date.now() + 1000, ageMs: 0, updates: 1, firstAt: 0 }; };
+          try { return [Or.recover({ now: Date.now() }).reason]; } finally { Pt.lastActive = keepLa; }
+        });
+
+        want('stale-chat', 'offlineReturn.recover：进门到真跑之间换了聊天 ⇒ 拒收 stale-chat（别人的票据推不了这个世界的演）');
+        trip('stale-chat', function () {
+          let n = 0;
+          Pt.lastActive = function () { return { ok: true, chatId: 'rw2156', at: Date.now() - 3600000, ageMs: 3600000, updates: 1, firstAt: 0 }; };
+          WA.store.chatId = function () { n++; return n === 1 ? 'rw2156_A' : 'rw2156_B'; };
+          try { return [Or.recover({ now: Date.now() }).reason]; }
+          finally { Pt.lastActive = keepLa; WA.store.chatId = keepChatId; }
+        });
+
+        want('stale-baseline', 'offlineReturn.recover：事务内复核发现结算点已被前移（并发的第二次恢复）⇒ 拒收 stale-baseline（宁可什么都不做，也不把同一段离线推两遍）');
+        trip('stale-baseline', function () {
+          let inner = null;
+          WA.store.transact(function (d) {
+            d.offlineTick = Object.assign({}, d.offlineTick, { lastSettledAt: 1000 });
+            Pt.lastActive = function () { return { ok: true, chatId: 'rw2156', at: Date.now() - 7200000, ageMs: 7200000, updates: 1, firstAt: 0 }; };
+            d.offlineTick.lastSettledAt = 1001;
+            try { inner = Or.recover({ now: Date.now() }); } finally { Pt.lastActive = keepLa; }
+            return true;
+          }, 'reject-witness:or-race');
+          return [inner && inner.reason];
+        });
+
+        want('not-injected', 'offlineReturn.consume：这一轮真落地的源里没有本模块那一源 ⇒ 拒收 not-injected 且**不记消费**（宁可多注入一次，也不把没发生的事记成发生）');
+        trip('not-injected', function () {
+          putBatch(null, ['世界状态']);
+          return [Or.consume().reason];
+        });
+
+        want('already-consumed', 'offlineReturn.consume：这一批早已经被消费过 ⇒ 幂等返回 already-consumed（重试不该把它记成两次消费）');
+        trip('already-consumed', function () {
+          putBatch(5, ['你不在时']);
+          return [Or.consume().reason];
+        });
+
+        want('consume-failed', 'offlineReturn.consume：账口抛错 ⇒ 如实归因 consume-failed（消费面故障与被消费不该同形）');
+        trip('consume-failed', function () {
+          putBatch(null, ['你不在时']);
+          Ot.markConsumed = function () { throw new Error('rw2156-stub'); };
+          try { return [Or.consume().reason]; } finally { Ot.markConsumed = keepMark; }
+        });
+      } finally {
+        Pt.lastActive = keepLa; WA.store.chatId = keepChatId; Ot.markConsumed = keepMark;
+        Pt.setSettings(keepPtCfg); Ot.setSettings(keepOtCfg); Or.setSettings(keepOrCfg);
+        WA.store.transact(function (d) {
+          d.offlineTick = snap.offlineTick;
+          d.lastInjection = snap.lastInjection;
+        }, 'reject-witness:or-restore');
+      }
+    }
+  }
+
+  // ══ v2.158.0（S3）：world-seed 的转移包 / 空新局初始化新增码 ══
+  //   九个码全部由**真实局面**触发（包形状坏、格式版本旧、白名单外键、空种子、签名格式坏、
+  //   包超容量、目标非空、无预览、重复确认），故按台账规矩走**可执行见证**、不进基线。
+  //   两条边界（本段最要紧的判断）：
+  //     ① `pack-too-big` 与 `library-full` 绝不可合成一个「收不下」—— 前者要重打包（内容超限），
+  //        后者要清库或扩 cap（容量到顶）；合成即让两种处置在读数上长得一样。
+  //     ② `no-preview`（没预览过）与 `already`（装过了）绝不可合成一个「不能再确认」——
+  //        前者要补 initPreview()，后者是幂等成功（ok:true，不是拒收）；合成会把
+  //        「照做了但顺序错」与「已经成功过」变成同一个读数。
+  //   本段只读/只写 worldSeed 自己那一格与 meta.initFrom；桩一律在 finally 还原。
+  {
+    const Ws = WA.worldSeed;
+    if (Ws && typeof Ws.importPack === 'function' && typeof Ws.initPreview === 'function') {
+      const keepCfg = Ws.getSettings();
+      const snap = JSON.parse(JSON.stringify((WA.store.get() || {})));
+      // 空新局宿主：S3 的预览/确认只作用于空世界，故先把世界清成「骨架默认」。
+      function blank() {
+        WA.store.transact(function (d) {
+          d.people = {}; d.currents = []; d.chronicle = []; d.worldFacts = []; d.echoes = [];
+          d.world = { places: [], roads: [], blocks: [] };
+          d.evolution = Object.assign({}, d.evolution, { factions: [], round: 0 });
+          d.meta = {}; d.background = { text: '' }; d.clock = { label: '', source: 'unset' };
+          d.branch = null;
+        }, 'reject-witness:v2158-blank');
+      }
+      // 一枚合法种子（够小，能过 pack-too-big 之前的各道门）。
+      const okSeed = { ver: 1, sig: '0a0b0c0d', at: 1,
+        powers: [{ name: '见证甲势力', weight: 30 }],
+        network: { nodes: ['见证甲', '见证乙'], edges: [['见证甲', '见证乙', 'near']] },
+        geo: { places: ['见证甲城'], roads: 1 },
+        era: { title: '见证之世', label: '见证历', note: '见证乱世之初。' } };
+      function packOf(sd, packVer) {
+        return { packVer: packVer === undefined ? 1 : packVer, chatId: 'witness-src',
+          at: 1, counts: {}, name: '见证包', tags: ['other'], seed: sd };
+      }
+      try {
+        Ws.setSettings(Object.assign({}, keepCfg, { enabled: true, libCap: 12 }));
+        blank();
+        WA.store.transact(function (d) { d.worldSeed = { library: [], seq: 0 }; }, 'reject-witness:v2158-clear');
+
+        // ── 包形状坏 ──
+        want('bad-pack', 'worldSeed.importPack：包不是对象（null / 数组 / 字符串）⇒ 拒收 bad-pack（不把「不是包」当「空包」收下）');
+        trip('bad-pack', function () {
+          return [Ws.importPack(null).reason, Ws.importPack([]).reason, Ws.importPack('x').reason];
+        });
+        want('bad-pack', 'worldSeed.importPack：包是对象但缺 seed 字段 ⇒ 同一个 bad-pack（形状缺件，与「不是对象」同处置：重打包）');
+        trip('bad-pack', function () { return [Ws.importPack({ packVer: 1 }).reason]; });
+
+        // ── 格式版本旧 ──
+        want('bad-pack-ver', 'worldSeed.importPack：包格式版本与支持的 PACK_VER 不符 ⇒ 拒收 bad-pack-ver（带 supported）—— 「包是好的只是旧」与「包是坏的」处置不同（等迁移器 vs 重打包）');
+        trip('bad-pack-ver', function () { return [Ws.importPack(packOf(okSeed, 99)).reason]; });
+
+        // ── 白名单外的键 ──
+        want('bad-seed-keys', 'worldSeed.importPack：种子里出现白名单外的键 ⇒ 拒收 bad-seed-keys（带 extra）—— 不认识的键 = 未来格式或恶意载荷，静默收下等于把「不确定能装」伪装成「装下了」');
+        trip('bad-seed-keys', function () {
+          const bad = Object.assign({}, okSeed, { chronicle: [{ id: 'ch1' }] });
+          return [Ws.importPack(packOf(bad)).reason];
+        });
+
+        // ── 空种子 ──
+        want('empty-seed', 'worldSeed.importPack：四结构面（势力 / 节点 / 地名 / 时代标题）全空 ⇒ 拒收 empty-seed（空种子播出来的是空世界，与「还没开局」在读数上不可分）');
+        trip('empty-seed', function () {
+          const empty = { ver: 1, sig: '0a0b0c0d', at: 1, powers: [], network: { nodes: [], edges: [] }, geo: { places: [], roads: 0 }, era: {} };
+          return [Ws.importPack(packOf(empty)).reason];
+        });
+
+        // ── 签名格式坏 ──
+        want('bad-sig', 'worldSeed.importPack：签名不是 8 位十六进制 ⇒ 拒收 bad-sig（带 got）—— 签名是去重的唯一依据，格式坏即无法判重');
+        trip('bad-sig', function () {
+          const bad = Object.assign({}, okSeed, { sig: 'ZZZ' });
+          return [Ws.importPack(packOf(bad)).reason];
+        });
+
+        // ── 包超容量（导入侧）──
+        want('pack-too-big', 'worldSeed.importPack：包内任一面超过容量界限（powers 24 / nodes 60 / edges 120 / places 40）⇒ 整批拒收 pack-too-big（带 counts 与 limits）—— 不做部分交付');
+        trip('pack-too-big', function () {
+          const big = Object.assign({}, okSeed, { powers: new Array(25).fill(0).map(function (_, i) { return { name: 'p' + i, weight: 1 }; }) });
+          return [Ws.importPack(packOf(big)).reason];
+        });
+
+        // ── 包超容量（转移侧）──
+        //   为什么单独见证：导入侧的门在**包**上，转移侧的门在**库里的种子**上（防被改大 / 未来格式）。
+        //   活世界造不出 >24 势力（extract 侧已 slice(0,24)），故直接往库里注入一枚超限种子。
+        want('pack-too-big', 'worldSeed.transferPack：库里那枚种子任一面超限 ⇒ 拒收 pack-too-big —— 门防的是「库里的种子被改大 / 未来格式」，不是活世界（活世界在提取侧已被截断）');
+        trip('pack-too-big', function () {
+          WA.store.transact(function (d) {
+            d.worldSeed = { library: [{ id: 'ws_witness_over', name: '超限种子', tags: [], at: 1,
+              seed: { ver: 1, sig: 'aabbccdd', at: 1,
+                powers: new Array(25).fill(0).map(function (_, i) { return { name: 'p' + i, weight: 1 }; }),
+                network: { nodes: [], edges: [] }, geo: { places: [], roads: 0 }, era: { title: 'T' } } }], seq: 1 };
+          }, 'reject-witness:v2158-over');
+          return [Ws.transferPack('ws_witness_over').reason];
+        });
+
+        // ── 目标非空 ──
+        want('not-empty', 'worldSeed.initPreview：目标世界非空（带 what 清单）⇒ 拒收 not-empty —— 种子初始化只作用于空新局，不覆盖既有存档');
+        trip('not-empty', function () {
+          WA.store.transact(function (d) {
+            d.people = { p1: { id: 'p1', name: '既有的人', profile: null } };
+          }, 'reject-witness:v2158-nonempty');
+          return [Ws.initPreview('ws_witness_over').reason];
+        });
+        blank();
+        WA.store.transact(function (d) { d.worldSeed = { library: [], seq: 0 }; }, 'reject-witness:v2158-clear2');
+        const im = Ws.importPack(packOf(okSeed));
+        if (!im.ok) throw new Error('见证前提未建立：合法包导入失败 ' + JSON.stringify(im));
+
+        // ── 无预览 ──
+        want('no-preview', 'worldSeed.initConfirm：没预览过就直接确认 ⇒ 拒收 no-preview（带 hint）—— 「没预览过」与「装过了」（already，ok:true）绝不可同形：前者要补 initPreview()，后者是幂等成功');
+        trip('no-preview', function () { return [Ws.initConfirm().reason]; });
+
+        // ── 重复确认 ──
+        want('already', 'worldSeed.initConfirm：目标世界已带 meta.initFrom ⇒ 返回 already（ok:true 幂等，不是拒收）—— 确认后 _pending 已消费清空，再确认若先查 _pending 会误报 no-preview');
+        trip('already', function () {
+          const pv = Ws.initPreview(im.id);
+          if (!pv.ok) throw new Error('见证前提未建立：预览失败 ' + JSON.stringify(pv));
+          const c1 = Ws.initConfirm();
+          if (!c1.ok) throw new Error('见证前提未建立：首次确认失败 ' + JSON.stringify(c1));
+          return [Ws.initConfirm().reason];
+        });
+      } finally {
+        try { Ws.setSettings(keepCfg); } catch (e0) {}
+        try {
+          WA.store.transact(function (d) {
+            Object.keys(d).forEach(function (k) { delete d[k]; });
+            Object.keys(snap).forEach(function (k) { d[k] = snap[k]; });
+          }, 'reject-witness:v2158-restore');
+        } catch (e2) {}
+      }
+    }
+  }
+
+  // ══ v2.160.0（TP4）：跨引擎提交契约 + 异步归属票据新增拒收码 ════
+  //   本段与前面各段同规矩：新增字面量全部由**真实局面**触发，走可执行见证、不进基线。
+  //   分两组：
+  //     A 组 core/commit.js（九个新码）—— 这一层此前**零见证零基线**，属「静默新增码」，
+  //       正是本面门禁要拦的形态。
+  //     B 组 TP1/TP2 遗留 —— store 的异步归属票据三码 + world-seed 的票据失效码。
+  //       为什么此前没有见证：TP1/TP2 落地时本门禁的 base 里没有它们，而它们又不在
+  //       见证表里 ⇒ 一直是 unclassified。本轮一并补齐（不留「下一版再说」）。
+  {
+    const Cm = WA.commit;
+    if (Cm && typeof Cm.begin === 'function') {
+      // ── A1 缺参：链与副作用都必须是真对象/真函数 ──
+      want('bad-chain', 'commit.commit / flush / retryEffects：链参数缺失或非对象 ⇒ 拒收 bad-chain（三条入口同一口径，不各自造一个码）');
+      trip('bad-chain', function () {
+        return [Cm.commit(null, function () {}).reason, Cm.flush(null).reason, Cm.retryEffects(null).reason];
+      });
+      want('bad-defer', 'commit.defer：副作用不是函数 ⇒ 拒收 bad-defer（登记一个不可执行的东西等于把「事务后要做什么」变成空承诺）');
+      trip('bad-defer', function () { return [Cm.defer(null, 'k', null).reason]; });
+      want('missing-opid', 'commit.settle / replay：操作号为空 ⇒ 拒收 missing-opid（没有 opId 就没有「这一笔」可言，凭空键去重会把不同操作认成同一笔）');
+      trip('missing-opid', function () { return [Cm.settle('', {}).reason, Cm.replay('').reason]; });
+      want('no-receipt', 'commit.replay：该 opId 从未提交过 ⇒ 拒收 no-receipt（「没提交过」与「提交过但归档没了」不可同形）');
+      trip('no-receipt', function () { return [Cm.replay('tp4w-never-committed').reason]; });
+      // ── A2 容量：副作用登记数达上限 ──
+      want('deferred-full', 'commit.defer：单链副作用登记数达 LIMITS.DEFERRED ⇒ 拒收并给出 pending —— 无上限的待办列表等于把「事务后要做什么」变成不可预期的长尾');
+      trip('deferred-full', function () {
+        const b = Cm.begin('tp4w-deferfull');
+        if (!b.ok) return [];
+        for (let i = 0; i < 40; i++) Cm.defer(b.chain, 'k' + i, function () { return true; });
+        return [Cm.defer(b.chain, 'overflow', function () { return true; }).reason];
+      });
+      // ── A3 幂等：提交过之后同键再开 ──
+      want('duplicate-op', 'commit.begin：同一 opId 已有**落盘回执** ⇒ 拒收 duplicate-op 并回原回执（跨刷新可判，不靠进程态在册表）');
+      trip('duplicate-op', function () {
+        const b = Cm.begin('tp4w-dup');
+        if (!b.ok) return [];
+        const r = Cm.commit(b.chain, function (d) { d.__zz = { n: 1 }; });
+        if (!r.ok) return [];
+        return [Cm.begin('tp4w-dup').reason];
+      });
+      // ── A4 提交失败：存储面写不动 ──
+      want('settle-failed', 'commit.settle：事务外补记回执时写盘失败 ⇒ 拒收 settle-failed（如实报「补账没成功」，不粉饰成 ok）');
+      trip('settle-failed', function () {
+        const keep = WA.store.transact;
+        WA.store.transact = function () { return { ok: false, error: new Error('tp4w-write-fail') }; };
+        try { return [Cm.settle('tp4w-settle', { site: 'probe' }).reason]; }
+        finally { WA.store.transact = keep; }
+      });
+    }
+  }
+  // ── B 组：store 的异步归属票据（TP1/TP2 落地，本轮补见证）──
+  {
+    const St = WA.store;
+    if (St && typeof St.claimAsync === 'function' && typeof St.settleAsync === 'function') {
+      const host = global.SillyTavern.getContext();
+      const keepChat = host.chatId, keepMeta = host.chatMetadata;
+      try {
+        // ── B1 跨聊天：A 取票 → 切到 B → 结算 ──
+        want('foreign-chat', 'store.settleAsync：请求发出后已切换聊天 ⇒ 拒收 foreign-chat 并带出「从哪来到哪去」（A 的预览/响应不得落到 B）');
+        trip('foreign-chat', function () {
+          host.chatId = 'tp4w_chatA'; host.chatMetadata = {}; St.init();
+          const tk = St.claimAsync('tp4w');
+          if (!tk || !tk.ok) return [];
+          host.chatId = 'tp4w_chatB'; host.chatMetadata = {}; St.init();
+          return [St.settleAsync(tk.ticket, { site: 'tp4w' }).reason];
+        });
+        // ── B2 纪元：同聊天重载（store.init）后结算 ──
+        want('stale-epoch', 'store.settleAsync：同聊天但纪元已推进（重载/重新 init）⇒ 拒收 stale-epoch —— 内存里那些「请求发出时的现场」已经不是同一份了');
+        trip('stale-epoch', function () {
+          host.chatId = 'tp4w_epoch'; host.chatMetadata = {}; St.init();
+          const tk = St.claimAsync('tp4w');
+          if (!tk || !tk.ok) return [];
+          St.init();
+          return [St.settleAsync(tk.ticket, { site: 'tp4w' }).reason];
+        });
+        // ── B3 读集版本：调用方显式要求严格时才拒（默认只记账 —— 见 store 常量段）──
+        want('stale-rev', 'store.settleAsync（strictRev）：世界已确认读集版本被推进且调用方要求严格 ⇒ 拒收 stale-rev —— 默认只记账（「无关更新不该让所有结论饿死」），严格档是调用方的显式选择');
+        trip('stale-rev', function () {
+          host.chatId = 'tp4w_rev'; host.chatMetadata = {}; St.init();
+          const tk = St.claimAsync('tp4w');
+          if (!tk || !tk.ok) return [];
+          WA.store.transact(function (d) { d.__zz = { n: 99 }; }, 'tp4w:write');
+          return [St.settleAsync(tk.ticket, { site: 'tp4w', strictRev: true }).reason];
+        });
+      } finally {
+        try { host.chatId = keepChat; host.chatMetadata = keepMeta; St.init(); } catch (e0) {}
+      }
+    }
+  }
+  // ── B4：world-seed 的票据失效码（TP1 落地，本轮补见证）──
+  {
+    const Ws = WA.worldSeed;
+    if (Ws && typeof Ws.initPreview === 'function' && typeof Ws.initConfirm === 'function'
+        && WA.store && typeof WA.store.dropAsync === 'function') {
+      want('pending-mismatch', 'worldSeed.initConfirm：预览票据已不在册（过期 / 被挤出 / 已被消费）⇒ 拒收 pending-mismatch 并给出「重新预览」提示 —— 它与 no-preview（从没预览过）绝不可同形：前者要重预览，后者要补预览');
+      trip('pending-mismatch', function () {
+        const snap = JSON.parse(JSON.stringify(WA.store.get() || {}));
+        const keepCfg = Ws.getSettings();
+        try {
+          Ws.setSettings({ enabled: true });
+          // 造一个空新局 + 一枚可预览的种子
+          WA.store.transact(function (d) {
+            d.people = {}; d.currents = []; d.chronicle = []; d.worldFacts = []; d.echoes = [];
+            d.world = { places: [], roads: [], blocks: [] };
+            d.evolution = Object.assign({}, d.evolution, { factions: [], round: 0 });
+            d.meta = {}; d.background = { text: '' }; d.clock = { label: '', source: 'unset' };
+            d.branch = null;
+            d.worldSeed = { library: [{ id: 'ws_tp4w', name: '票据见证种子', tags: [], at: 1,
+              seed: { ver: 1, sig: 'a1b2c3d4', at: 1, powers: [{ name: '见证势力', weight: 30 }],
+                network: { nodes: [], edges: [] }, geo: { places: ['见证城'], roads: 0 }, era: { title: '见证之世' } } }], seq: 1 };
+          }, 'reject-witness:tp4w-seed');
+          const pv = Ws.initPreview('ws_tp4w', 0);
+          if (!pv.ok || !pv.ticket) return [];
+          // 把票从在册表里丢掉（模拟过期/被挤出）——「计划还在，票没了」
+          WA.store.dropAsync(pv.ticket);
+          return [Ws.initConfirm().reason];
+        } finally {
+          try { Ws.setSettings(keepCfg); } catch (e1) {}
+          try {
+            WA.store.transact(function (d) {
+              Object.keys(d).forEach(function (k) { delete d[k]; });
+              Object.keys(snap).forEach(function (k) { d[k] = snap[k]; });
+            }, 'reject-witness:tp4w-restore');
+          } catch (e2) {}
+        }
+      });
+    }
+  }
+
+  // ── v2.161.0（TP3）：页面恢复入口的**合并窗** ──
+  //   本码的特殊之处：它的执行点在 recover 内部（页面入口与总线订阅共用同一道判定），
+  //   所以见证必须经**真 API** 造出「同一次回前台连发两拍」的局面 —— 不能只调一个内部函数。
+  //   第一拍刻意选**零写入**的路径（时钟回拨 ⇒ backward，早退发生在任何 base 落盘与事务之前），
+  //   于是本见证不需要快照/还原世界 ——改动世界的见证要自己负责把世界放回去，此处刻意避开。
+  {
+    const Or = WA.offlineReturn, Pt = WA.playtime;
+    if (Or && Pt && typeof Or.recover === 'function' && typeof Pt.lastActive === 'function') {
+      want('coalesced', 'offlineReturn.recover：宿主对同一次回前台连发多拍 ⇒ 窗内只跑一次，后到的那拍如实拒收 coalesced。'
+        + '「合并了几拍」与「那一拍后来怎么了」必须分开报：合成一个码会让宿主重复通知与通知来了但没得跑在读数上同形，而两者处置不同。');
+      trip('coalesced', function () {
+        const keepCfg = Or.getSettings();
+        const keepLa = Pt.lastActive;
+        try {
+          Or.setSettings({ enabled: true });
+          // 基准打桩在**未来**一秒：第一拍注入更早的时刻 ⇒ gap 为负 ⇒ backward（零写入早退）。
+          const t0 = Date.now();
+          Pt.lastActive = function () { return { ok: true, chatId: 'rw2161', at: t0 + 1000, ageMs: 0, updates: 1, firstAt: 0 }; };
+          const a = Or.recover({ trigger: 'page-visibility', now: t0 - 5000 });
+          const b = Or.recover({ trigger: 'page-pageshow' });
+          // 自证：第一拍真走到判定（backward），第二拍才被合并窗拦住。
+          if (!a || a.reason !== 'backward') return [];
+          return [b && b.reason];
+        } finally { Or.setSettings(keepCfg); Pt.lastActive = keepLa; }
+      });
+    }
+  }
+
+  // ── v2.162.0（TP7）：在途义务的容量裁决 ──
+  //   这个码与前面那些的形态不同：它在**两个执行点**共享同一个名字 ——
+  //     ① 写入侧闸（engines/world.js 的 depart / deliverGoods / sendMessage）：
+  //        在途塞满 ⇒ 如实拒收，不再把「操作成功」写在面上而把在途货悄悄挤掉；
+  //     ② 挤出侧豁免（core/evict.js 的 IN_TRANSIT 表）：超限存档的下一次挤出里也不丢在途行，
+  //        且「在途自身就超过 cap」时**放弃截断**并回报同一个码。
+  //   故见证必须经**真 API**把「在途塞满」这个局面造出来，不能只调挤出器：
+  //   只测挤出器就把「用户看到的是什么」整段漏掉（原形态里用户看到的是 {ok:true}）。
+  //   实测原形态（无头现场）：cap=16 而连发 24 批，24 批**全部**返回 {ok:true}，
+  //   其中 8 批在途未到的货被 slice 静默挤掉，而仓库头注写着「货运回答『货在哪』」——
+  //   这张表一旦按环形丢，答案就从事实变成「不知道」。
+  {
+    const Wd2 = WA.world;
+    if (Wd2 && typeof Wd2.addPlace === 'function' && typeof Wd2.deliverGoods === 'function'
+        && WA.evict && typeof WA.evict.siteDecls === 'function') {
+      want('in-transit-full', 'world.deliverGoods：在途货运已达容量上限 ⇒ 写入侧如实拒收 in-transit-full，不静默挤出未完成的货'
+        + '（同一码亦由 core/evict 的在途豁免回报：历史遗留的超限存档放弃截断，宁可超 cap 也不丢在途行）。'
+        + '它与既有容量码绝不可同形：这里丢的不是可回收历史，而是「还没到的那批货」。');
+      trip('in-transit-full', function () {
+        const snap = JSON.parse(JSON.stringify(WA.store.get() || {}));
+        const keepCfg = Wd2.getSettings();
+        try {
+          Wd2.setSettings({ enabled: true });
+          // 本段前面已把 甲地~乙地 整段封锁（road-closed 见证），故另开一对**独立地点**：
+          //   共用路段的话 deliverGoods 会在 transit 就失败成 road-closed，
+          //   于是本见证测的是「路断了」而不是「在途满了」——那是静默失效的经典形态。
+          Wd2.addPlace({ name: 'rw2162戊地', kind: 'market' });
+          Wd2.addPlace({ name: 'rw2162己地', kind: 'market' });
+          const rd = Wd2.addRoad('rw2162戊地', 'rw2162己地', 30);
+          if (!rd || rd.ok !== true) return ['road-failed:' + ((rd && rd.reason) || 'unknown')];
+          WA.store.transact(function (d) {
+            d.world = (d.world && typeof d.world === 'object') ? d.world : {};
+            d.world.shipments = [];   // 只清这张表：容量裁决的现场（其余世界状态本见证一概不动）
+          }, 'reject-witness:tp7-seed');
+          const cap = WA.evict.siteDecls()['world.shipments'].cap;
+          const codes = [];
+          for (let i = 0; i < cap + 8; i++) {
+            const r = Wd2.deliverGoods('rw2162戊地', 'rw2162己地', '盐', 1, { at: 7000000 });
+            if (r && r.reason) codes.push(r.reason);
+          }
+          return codes;
+        } finally {
+          try { Wd2.setSettings(keepCfg); } catch (e1) {}
+          try {
+            WA.store.transact(function (d) {
+              Object.keys(d).forEach(function (k) { delete d[k]; });
+              Object.keys(snap).forEach(function (k) { d[k] = snap[k]; });
+            }, 'reject-witness:tp7-restore');
+          } catch (e2) {}
+        }
+      });
+    }
+  }
+
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

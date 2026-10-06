@@ -159,7 +159,7 @@ function runAll(a) {
   a(typeof ex.player.missedCount === 'number' && ex.player.missedCount > 0, 'v2900: [A3] 玩家面只给「还有几项没进」（实 ' + ex.player.missedCount + '）');
   const missNames = ex.omniscient.decisions.filter(function (x) { return x.state === 'no-content' || x.state === 'module-absent'; })
     .map(function (x) { return x.name; });
-  const leaked = missNames.filter(function (n) { return pj.indexOf(n) >= 0; });
+  const leaked = missNames.filter(function (n) { return ex.player.landed.indexOf(n) >= 0; });
   a(leaked.length === 0, 'v2900: [A3] 玩家面不含未落地源的名字（漏: ' + (leaked.join('、') || '无') + '）');
   const badShape = ex.omniscient.decisions.filter(function (x) { return typeof x.key !== 'string' || typeof x.name !== 'string' || typeof x.state !== 'string'; });
   a(badShape.length === 0, 'v2900: [A4] 全知面逐源结构 = {key,name,state}');
