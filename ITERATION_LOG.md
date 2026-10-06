@@ -95,6 +95,39 @@
 
 ## 迭代记录
 
+### R149 · 2026-10-06 · v2.163.0：O14 驱动面 —— UI 实机通道的零依赖内置 CDP 驱动
+
+**范围**：**测试面驱动通道**扩充（非产品功能）。本版不给产品加任何能力，治的是「判据写好了、驱动拿不到」这一**验证能力**缺口。**不勾选**任何优化项 —— 四栏制不变。
+
+**它治的病**：本仓自 v2.137.0 起就有实机通道（`tests/ui-live.js`：真浏览器 / 真控件 / 真 `localStorage` / 真往返），是全仓**唯一**真正跑产品的面。但它的**驱动面**只有一族路 —— `playwright-core` 等三个 npm 包（外加两条 fallback 路径仍是同族包）。在没装这些包的机器上 `probe()` **恒为 fallback 档**，于是 B 面运行时判据与 C 面负控制**整段休眠**：判据都在，驱动拿不到。而本仓是**零依赖**契约（无 `package.json`、无 `node_modules`、只用 Node 内置模块），「装上 Playwright 就行」不是可用答案。
+
+**让它值得修的那个矛盾**：**同一台机器**的 L4 层（`tests/browser/browser-runner.mjs`）早就用系统已有 Chromium **零依赖**跑得通 —— 即 L4 层已经证明那个 npm 依赖是多余的，而实机通道还在声称它必需。同一件事两本账，本仓最贵的一类漂移，这次出在测试面。
+
+**三条真因，全部实测，全部同一种伪装（驱动缺陷伪装成产品缺陷）**：
+① **`route` 对象没有 `fulfill` 方法** —— 拦截回调首行调 `routeObj.fulfill()` 抛 `TypeError`，外层 `catch` 把抛错**吞掉**并改答 `Fetch.failRequest`；症状是主文档导航 `net::ERR_FAILED`，读起来像「产品没装载」而不是「驱动答错了」。
+② **`goto` 不认 `about:blank`** —— 浏览器起页就在 `about:blank`，而它的 `readyState` **本来就是 `complete`**，就绪轮询第一次即命中，`goto` 在导航真正发生前就返回，整轮跑在空白页里（`location.origin` 读成 `""`）。
+③ **模态对话框从不被应答** —— 产品面板控件弹 `window.prompt()`（实测提示文案：`设定世界时间（如「三日目·黄昏」）：`）。Playwright 默认自动 dismiss，裸 CDP 不会，渲染器主线程被**永久冻死**，`Runtime.evaluate`（`awaitPromise`）永不结算。
+
+**修法**：① **补第四条通道** `builtin-cdp@node-websocket` —— 用 Node 自带 WebSocket 直连 CDP，**不引入任何依赖**；通道与三条 npm 路一并枚举，降档理由因此始终是**一串尝试**而不是一个布尔。② **两驱动共用一个骨架**：`runLive()` 持有装载与观测序列，`ctx` 收五个回调（`route` / `onPageError` / `onConsole` / `onDialog` / `afterGoto`），只有传输层分居 `drivePlaywright` / `driveBuiltin`。**为什么必须共用**：两份独立实现必然漂移，而漂移在这里的后果是最坏的 —— **同一个读数按驱动不同渲染成两个不同结论**。故 `CdpPage` 按 Playwright page 对象**形状兼容**构造（`on` / `route` / `goto` / `evaluate`），而非「够今天这版用」。③ **驱动故障必须有出口，且不许挂产品的名**：真因①之所以隐形，正是因为驱动**吞了自己的错**再报一个**产品级症状**；现在 `out.fulfillErrors`（暂停了却没被喂到的请求数）与 `out.routeErrors`（回调抛错数）双双计入 `out.errors`（`内置驱动应答失败`），「驱动答错了」与「产品没装载」从此不同形。④ route 对象自带四方法 + 意图标记（`request` / `fulfill` / `continue` / `abort` 加 `__waAction`）。⑤ `goto` 要求**文档真的换过**：就绪轮询除 `readyState` 外还确认 `location.href` 已离开 `about:blank`，并读取 `Page.navigate` 的 `errorText`（空白页不是已载入页）。⑥ **对话框一律应答**：订阅 `Page.javascriptDialogOpening`，一律 `Page.handleJavaScriptDialog({accept: false})` —— 实机通道要证的是控件在位且接线，不是某个答案被人采纳。⑦ **浏览器搜索面不许依赖 `HOME`**：缓存扫描路的根走 `os.homedir()`，而隔离回归（`isolated-runner` 的干净环境）把 `HOME` 重定向到任务目录 ⇒ **本机明明有浏览器也判「不存在」**；补 `SYSTEM_BROWSER_PATHS`（系统级标准落点，以 `how: 'system:'` 上报）。**只有这一条**让隔离环境够得着 full 档。
+
+**实测读数（本机，`tests/ui-live.js` 852 行）**：`probe: tier=full driver=builtin-cdp@node-websocket why=实机通道可用（cache-scan:chromium_headless_shell-1148）`；`runLive: files=187 loaded=187 pages=17 controls=915 readings=89 thrown=0 rej=0 pageErr=0 fillErr=0 dlg=1 roundtrip=ok origin="http://walive.test" failedLoad=0 errors=[] dialogTypes=["prompt"]`。其中 **`dlg=1` 不是噪声**：那正是过去把整轮冻死的那个 `window.prompt()`，现在是「被应答了一次」。隔离环境**如实降档且理由自证**：`tier=fallback why=驱动在位（builtin-cdp）但找不到浏览器可执行文件（试过 7 条路径，末 4 条：/usr/bin/google-chrome-stable / /usr/lib/chromium/chromium / /opt/google/chrome/chrome / /snap/bin/chromium）⇒ 落到测试面静态判据` —— 「真没装」与「没找对地方」由此可分辨。
+
+**专锁**：`tests/ui-live-v2137.js` 本机 full 档 **54 / 0**（此前从未离开 fallback 分支）。v2137 判据 `A2 降档必须带非空理由` 靠锚点 `落到测试面静态判据` 命中，该短语在改写中被**逐字保留**。
+
+**`tests/run.js` 新增 v2.163.0 段（12 条断言，落在 v2.162.0 段之后、`// ── 汇总 ──` 之前）**：结构面 7 条（内置驱动枚举在位 / 两驱动共用骨架且 `afterGoto` 只写一次 / route 自带 `fulfill` / `goto` 认 `about:blank` 与 `errorText` / 对话框自动应答 / 驱动静默失败有出口 / 搜索面含系统级落点与降档理由自证）+ 真运行 spawn 探针 5 条（探针跑到底 / 驱动侧 `fulfillErrors` 与 `routeErrors` **恒 0** / full 档则读数非空 / 非 full 档则理由非空 / `errors` 为空 / 入口版本面不早于 2.163.0）。**下限刻意取 `loaded > 100` 而不写死 187** —— 写死会让「产品新增一个模块」变成一条假红，正是本仓已点过的「精确读数陈旧」族。
+
+**本版自查出的两处问题，如实留账**：① **插入脚本首版是脏版**：草稿里带一处占位断言 `assert(false, 'PLACEHOLDER_MUST_BE_REMOVED')` 与一处含**中文变量名**的语法错误（`!!mL有S === false || true`）。该脚本**从未被执行**（`tests/run.js` 行数停在 21545 未变，是「钉前进、段缺席」的悬空状态被读出来才发现的）；重写为干净版（**幂等守卫**：`MARK in s` 即拒绝重复插入）后执行，`node --check` 通过，21545 → **21644** 行。**口径**：复杂脚本一律先落盘、先 AST 校验、执行后核对锚点命中次数；「写完了」不等于「落盘完整」，更不等于「执行成功了」。② **自伤的纯度违规**：A3 纯度判据命中了**我自己注释里**的字面量 `fetch("/x.js")` —— 判据分不清代码与散文，修法是改注释（不是改判据），`badAbs=0`。本仓第二次出现「判据被自己的文档触发」。
+
+**版本三级同源（14 处钉，逐处核对命中次数）**：`index.js` 的 `VERSION` 1 处、`manifest.json` 的 `version` 1 处、`tests/run.js` 的当前入口版本钉 **9** 处、三本台账（`dead-export-ledger` / `module-registry-ledger` / `reject-code-ledger`）各 1 处。升级前基线 md5 备份于 `/tmp/wa_bak_2162/`（`index.js` `477a9eba…` / `manifest.json` `0dd8517f…` / `tests/run.js` `cc9ef2d4…`）。
+
+**全量回归（收口读数：通过 15455 / 失败 0 · `status: passed`）**：跑法**必须**是 `isolated-runner.launch(root, { timeoutMs: 1800000 })` —— 直接 `node tests/run.js` 会在中段被 SIGKILL 而只留 `Status: interrupted`（那是**跑法错误**，不是判据失败）。改动前基线 15441 / 0（v2.162.0 收口轮）；收口读数 **15455 = 15441 + 本版新增 14 条断言**，逐条对得上。
+
+**收口首跑暴露 19 条失败，全部由本版版本升级引起（三族，逐条归因）**：① **版本钉消息文本不同批（6 处）** —— `tests/run.js` 的 `'入口版本为 2.162.0'` / `'入口 VERSION = 2.162.0'` 共 6 处消息文本没跟比较值走，被 **O16「比较值与消息必须同批」**判据（v2.161.0 立的纪律）精确点出（L11172 / L11742 / L12130 / L12500 / L12865 / L15197）；**教训**：消息文本不是注释，它承判据 —— 「历史沿革措辞」在本仓**不存在**这种豁免，那条 O16 判据的靶子正是它。② **台账末次版本词未跟（两本）** —— `dead-export-ledger`（`WorldAxis 死子面冻结账本（v2.162.0）`）与 `reject-code-ledger`（`_note` 末次版本词 `v2.162.0`）；`module-registry-ledger` 无版本词，不受影响。③ **新开调用点未入武装表（14 vs 13）** —— 本版新增的 spawn 探针成为第 14 个现场调用点，`gate-timeout` 的「新开的调用点不入表即红」当场现形；**它在隔离回归里还同时暴露一处更细的问题**：该探针初写 `timeout: 120000`，而全场统一预算是 `96000`（14 个调用点里唯一的孤例）⇒「一套预算」的自洽判据被打破。修正后：`gate-timeout-v2105` **54 / 0**（`armed 14 / sites 14 / budgetSites 14 / coherence 自洽`）、`readings-v2106` **58 / 0**（台账 version 2.163.0）、O16 判据 **PASS**（在册 6 处 / 漂移 0）。
+
+**一趟污染读数的教训（如实留账）**：收口首跑同时报出 `Status: source-changed` 与 `通过 15436 / 失败 19` —— 因为**跑全量的同时我在改工作区文档**（README / ITERATION_LOG / NEXT_PLAN / TP_OPTIMIZATION）。`isolated-runner` 检出源树变化后如实标 `source-changed`，该读数**不可用于收口**。第二趟改为**全量期间只做只读操作**，才拿到 `status: passed`。**两条口径**：① 「跑全量」与「改工作区」不可并行，否则读数作废；② `source-changed` 不是失败信号，是「这趟不作数」的信号 —— 它和 `interrupted`（跑法错）与真失败（判据红）是三件事。`15436` 这个中间数也留下一个可读的线索：它是 15441 − 5，差的 5 条正是 `gate-timeout-v2105` 里被那个 `120000` 孤例连带打掉的双向自证条目。
+
+**边界（如实登记）**：① 三条 npm 路未在有这些包的机器上复验（本版只证内置路可用，枚举优先级仍偏向 npm 路）；② 「两驱动读数逐字可比」是**结构声明**（一个骨架、一个 `afterGoto`）而非两次 live 并排实测；③ `tests/browser/`（L4 层六文件）**已按属主裁定入库**（收口轮之后裁定）。入库前未改一字，只做证据复核：在本机 Playwright 缓存（`~/.cache/ms-playwright/chromium-1148`）的真 Chromium 131 上实跑两场景，`tp9-host-boot` **19 / 0**、`tp9-player-paths` **19 / 0**，两场景共 38 条读数全绿、`served=188 / 187` 个真实文件请求 —— 证明这六个文件是**活文件**而非遗留草稿；此前「文件在盘上、不在库内」正是收口轮刚修过的那一类；④ 真机行为不受本版影响（实机通道跑的是无头浏览器对本地测试源，不是在手机上）。
+
 ### R148 · 2026-10-06 · v2.162.0：TP7 容量、存储失败与格式迁移的长局保障
 
 **范围**：双计划优化线第五批。本版交付 **TP7**（两个承重缺口）并同批把 **TP5** 的负控制面从「一处破坏」推到「三处破坏、每处两向」。**不勾选** —— 四栏里只做到源码与无头两栏。

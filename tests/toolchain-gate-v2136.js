@@ -90,7 +90,16 @@ function probeRun(opt) {
     const r = cp.spawnSync(process.execPath, ['-e', code], { encoding: 'utf8', timeout: 180000 });
     const out = String(r.stdout || '');
     const at = out.indexOf(MARK);
-    if (at < 0) return { error: 'no-marker :: ' + out.slice(0, 160) + ' :: ' + String(r.stderr || '').slice(0, 160) };
+    // v2.163.0 补：本行原先只带 stdout / stderr 两段，**把最能归因的三个字段丢了** ——
+    //   spawnSync 的 r.error（ETIMEDOUT / ENOMEM / EAGAIN …）、r.signal、r.status。
+    //   实证：全量回归里 B0 曾报 `no-marker ::  :: `（两段皆空，看不出是超时、被杀、
+    //   还是 spawn 失败）；同一锁单跑 43 项全过 ⇒ 失败是环境瞬态而非源码缺陷，
+    //   而判据当时**无法把这句话说清楚**。仓内口径：报红必须自带来路，
+    //   「诊断信息里缺的那一块」就是下一次排查的全部成本。
+    if (at < 0) return { error: 'no-marker :: out=' + out.slice(0, 160) + ' :: err='
+      + String(r.stderr || '').slice(0, 160)
+      + ' :: spawnError=' + String(r.error && (r.error.code || r.error.message) || 'none')
+      + ' :: signal=' + String(r.signal || 'none') + ' :: status=' + String(r.status) };
     const j = JSON.parse(out.slice(at + MARK.length));
     j.status = r.status;
     return j;

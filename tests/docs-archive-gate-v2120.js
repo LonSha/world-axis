@@ -150,7 +150,14 @@ function runB(a) {
   //   README 导语里的「（N 个版本）」同样落后一版（v2.161.0 入册时未跟），本次一并校正，
   //   于是「导语自述数」与「本面实测数」第一次同源 —— 两条读数各写一处是本仓的老毛病。
   //   判据继续钉**精确等值**（防条目被误删），需要的是回填而不是放宽。
-  a(r.facts.readmeEntries === 108, 'docs-archive/B: README 版本历史条目 = 108（实 ' + r.facts.readmeEntries + '）');
+  // v2.163.0 补账：本版当期条目 +1（README 版本历史首条 = v2.163.0），108 → 109。
+  //   **同型账已是第七次**（v2.124.0 / v2.130.0 / v2.152.0 / v2.155.0 / v2.156.0 / v2.162.0 /
+  //   本版）—— 共性未变：「纪律期内不进全量就看不到自己过时」。本版这条不是纪律期欠账
+  //   （v2.163.0 收口轮跑过全量 15455/0），而是**收口后补的这一笔**：收口轮把 README 的
+  //   「当前版本行 + 六条摘要 + 版本计数」都带上了，唯独漏了本文件这个历史钉 ——
+  //   可见「同一件事在多处各写一遍」的账，改一处不等于改全。
+  //   判据继续钉**精确等值**（防条目被误删），需要的是回填而不是放宽。
+  a(r.facts.readmeEntries === 109, 'docs-archive/B: README 版本历史条目 = 109（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

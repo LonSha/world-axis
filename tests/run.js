@@ -10314,7 +10314,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.162.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.163.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10878,7 +10878,7 @@ assert(verF2500 === '2.162.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.162.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.163.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -11169,7 +11169,7 @@ assert(verF2500 === '2.162.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.162.0', '入口版本为 2.162.0（实 ' + ver + '）');
+    assert(ver === '2.163.0', '入口版本为 2.163.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11739,7 +11739,7 @@ assert(verF2500 === '2.162.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.162.0', '入口版本为 2.162.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.163.0', '入口版本为 2.163.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -12127,7 +12127,7 @@ assert(verF2500 === '2.162.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.162.0', '入口版本为 2.162.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.163.0', '入口版本为 2.163.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12497,7 +12497,7 @@ assert(verF2500 === '2.162.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.162.0', '入口版本为 2.162.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.163.0', '入口版本为 2.163.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12862,7 +12862,7 @@ assert(verF2500 === '2.162.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.162.0', '入口版本为 2.162.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.163.0', '入口版本为 2.163.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -15194,7 +15194,7 @@ assert(verF2500 === '2.162.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.162.0', '入口 VERSION = 2.162.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.163.0', '入口 VERSION = 2.163.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -21454,7 +21454,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   「版本双落」。改为从 index.js **精确抽取** const VERSION = '...' 再与显式期望比对
     //   （与 v2.125.0 段的 verF2500 同规格：显式常量 + 与 manifest 同源同值）。
     const vM2158 = (idxSrc2158.match(/const VERSION = '([^']+)'/) || [])[1] || '';
-    assert(vM2158 === '2.162.0' && maniSrc2158.version === vM2158,
+    assert(vM2158 === '2.163.0' && maniSrc2158.version === vM2158,
       'v2158: 入口 VERSION 与 manifest.json 同源同值（实 ' + vM2158 + ' / ' + maniSrc2158.version + '）');
     const wsSrc2158 = fs.readFileSync(path.join(BASE, 'engines/world-seed.js'), 'utf8');
     assert(wsSrc2158.indexOf('function transferPack(seedId, max)') >= 0
@@ -21534,6 +21534,105 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     runLock('./s3-tp7-v2162.js', 'runNegative');
   }
 
+  section('v2.163.0（O14 驱动面）：UI 实机通道的零依赖内置 CDP 驱动 —— 通道不再取决于开发机装没装 npm 包');
+  {
+    // 它治的病：本仓自 v2.137.0 起就有实机通道（真浏览器 / 真控件 / 真 localStorage），
+    //   但**驱动面**只有一条路 —— require('playwright-core') 等三个 npm 包（外加两条
+    //   fallback 路径仍是同一族包）。在没装这些包的机器上 probe() 恒为 fallback 档，
+    //   于是 B 面运行时判据与 C 面负控制**整段休眠**：「判据写好了、驱动拿不到」。
+    //   而同一台机器的 L4 层（tests/browser/browser-runner.mjs）用系统已有 Chromium
+    //   **零依赖**跑得通 —— 这正说明那个 npm 依赖是多余的。
+    //   本版补第四条通道：Node 自带 WebSocket 直连 CDP（builtin-cdp@node-websocket），
+    //   与 npm 路径**共用同一个骨架**（装载与观测步骤只写一处，两处读数形状逐字可比）。
+    const liveSrc2163 = fs.readFileSync(path.join(BASE, 'tests/ui-live.js'), 'utf8');
+    // ① 通道枚举含内置驱动：enumerateDrivers() 逐轮现场枚举，降档理由逐条可述。
+    assert(liveSrc2163.indexOf('BUILTIN_DRIVER') > 0
+      && liveSrc2163.indexOf('builtin-cdp@node-websocket') > 0
+      && liveSrc2163.indexOf('function enumerateDrivers') > 0,
+      'v2163: 驱动面枚举含零依赖内置 CDP 通道（builtin-cdp@node-websocket）');
+    // ② 两条驱动共用一个骨架：drivePlaywright 与 driveBuiltin 都必须存在，
+    //   且装载/观测步骤只在骨架里写一次（否则两处各写一份必然漂移，
+    //   而漂移的后果是「同一个读数在两种驱动下显示成不同结论」）。
+    assert(liveSrc2163.indexOf('async function drivePlaywright') > 0
+      && liveSrc2163.indexOf('async function driveBuiltin') > 0
+      && liveSrc2163.indexOf('const afterGoto = async function (page)') > 0,
+      'v2163: 两种驱动共用骨架（afterGoto 只写一次，读数形状逐字可比）');
+    // ③ 三条实测教训必须留在源码里（它们都是「驱动缺陷伪装成产品缺陷」的形态，
+    //   删掉注释等于把下次踩坑的线索一起删掉）：
+    //   (a) route 对象必须自带 fulfill —— 缺它会让主文档导航 net::ERR_FAILED；
+    //   (b) goto 必须确认 location.href 换过文档 —— about:blank 的 readyState 本来就是 complete；
+    //   (c) 模态对话框必须自动应答 —— 裸 CDP 不自动 dismiss，渲染器会被永久冻死。
+    assert(liveSrc2163.indexOf('__waAction') > 0 && liveSrc2163.indexOf('fulfill: function') > 0,
+      'v2163: route 对象自带 fulfill/continue（缺它 ⇒ 回调首行抛错 ⇒ 主文档 ERR_FAILED）');
+    assert(liveSrc2163.indexOf("href === 'about:blank'") > 0
+      && liveSrc2163.indexOf('errorText') > 0,
+      'v2163: goto 认导航 errorText 且不把 about:blank 当成就绪（about:blank 的 readyState 本就是 complete）');
+    assert(liveSrc2163.indexOf('Page.handleJavaScriptDialog') > 0
+      && liveSrc2163.indexOf('javascriptDialogOpening') > 0,
+      'v2163: 模态对话框自动应答（裸 CDP 不自动 dismiss ⇒ 渲染器冻死 ⇒ evaluate 永不结算）');
+    // ④ 驱动侧的静默失败必须有出口：「请求被暂停但没被喂到」「route 回调抛错」两种驱动缺陷
+    //   此前只会表现为「页面模块整批 Failed to fetch」，看着像产品没装载。现在两者都计入
+    //   out.errors（未执行不报通过）。
+    assert(liveSrc2163.indexOf('out.fulfillErrors') > 0
+      && liveSrc2163.indexOf('out.routeErrors') > 0
+      && liveSrc2163.indexOf('内置驱动应答失败') > 0,
+      'v2163: 驱动侧静默失败有出口（fulfillErrors / routeErrors 进 errors，不伪装成产品缺陷）');
+    // ⑤ 浏览器搜索面与 HOME 无关：缓存根走 os.homedir()，而隔离回归（isolated-runner
+    //   cleanEnv）把 HOME 重定向到 task 目录 ⇒ 本机明明有浏览器也会被判「不存在」。
+    //   系统级标准落点（/usr/bin/chromium 等）与 HOME 无关，补上它隔离环境才够得着 full 档。
+    assert(liveSrc2163.indexOf('SYSTEM_BROWSER_PATHS') > 0
+      && liveSrc2163.indexOf("how: 'system:'") > 0,
+      'v2163: 浏览器搜索面含系统级标准落点（与 HOME 无关，隔离环境不再必然降档）');
+    // ⑥ 降档理由必须自证「找过哪里」：只报「可执行文件不存在」分不清「真没装」与「没找对地方」。
+    assert(liveSrc2163.indexOf('找不到浏览器可执行文件（试过 ') > 0,
+      'v2163: 降档理由自证（列出试过的条数与末几条路径）');
+    // ⑦ 真运行：内置驱动这一轮必须真把通道升到 full 并留下非空读数（不是「文件在场」）。
+    //   档位口径与 v2137/O14 段同源 —— 隔离环境无浏览器时如实降档，故此处同样只判
+    //   「full 档则读数够 / 非 full 档则理由非空」，不替环境做决定。
+    const rUL2163 = require('child_process').spawnSync(process.execPath, ['-e',
+      "const L=require('./tests/ui-live.js');const p=L.probe();"
+      + "console.log('TIER='+p.tier+' DRIVER='+(p.driver||'-'));"
+      + "console.log('WHY0='+String(p.why||'').split('\\n')[0].slice(0,200));"
+      + "L.runLive().then(function(o){console.log('LOADED='+o.loaded+' PAGES='+o.pages.length"
+      + "+' CONTROLS='+o.controls+' READINGS='+o.readings.length+' RT='+(o.roundtrip&&o.roundtrip.ok?'ok':'no')"
+      + "+' FILLERR='+o.fulfillErrors+' ROUTEERR='+(o.routeErrors||0)+' ERRS='+o.errors.length);});"],
+      { cwd: BASE, encoding: 'utf8', timeout: 96000 });
+    const outUL2163 = String(rUL2163.stdout || '');
+    const mT2163 = outUL2163.match(/TIER=(\w+)/);
+    const mW2163 = outUL2163.match(/WHY0=(.+)/);
+    const mLD2163 = outUL2163.match(/LOADED=(\d+)/);
+    const mRD2163 = outUL2163.match(/READINGS=(\d+)/);
+    const mFE2163 = outUL2163.match(/FILLERR=(\d+)/);
+    const mRE2163 = outUL2163.match(/ROUTEERR=(\d+)/);
+    const mER2163 = outUL2163.match(/ERRS=(\d+)/);
+    assert(rUL2163.status === 0 && !!mT2163,
+      'v2163: 真运行探针跑到底（实 status=' + rUL2163.status + '）'
+        + (rUL2163.status === 0 ? '' : ' :: ' + outUL2163.slice(-300) + String(rUL2163.stderr || '').slice(0, 200)));
+    // 驱动侧静默失败恒为 0：非零即意味着「请求被暂停过但没被喂到」或「route 回调抛错」，
+    //   那会让模块整批装载失败而看上去像产品缺陷 —— 这条判据是本版最贵的一条。
+    assert(mFE2163 && Number(mFE2163[1]) === 0 && mRE2163 && Number(mRE2163[1]) === 0,
+      'v2163: 驱动侧零静默失败（fulfillErrors / routeErrors 恒 0；实 '
+        + (mFE2163 ? mFE2163[1] : 'n/a') + ' / ' + (mRE2163 ? mRE2163[1] : 'n/a') + '）');
+    const tier2163 = mT2163 ? mT2163[1] : null;
+    // full 档：装载必须真发生、控件面非空、读数面非空、往返成立。
+    //   下限刻意取 loaded > 100 而不是写死 187 —— 写死会让「产品新增一个模块」
+    //   变成一条假红（这正是本仓点过的「精确读数陈旧」族）。
+    assert(tier2163 !== 'full'
+      || (mLD2163 && Number(mLD2163[1]) > 100 && mRD2163 && Number(mRD2163[1]) > 0
+          && outUL2163.indexOf('RT=ok') > 0),
+      'v2163: full 档实机读数非空（tier ' + tier2163
+        + ' / loaded ' + (mLD2163 ? mLD2163[1] : 'n/a')
+        + ' / readings ' + (mRD2163 ? mRD2163[1] : 'n/a')
+        + ' / roundtrip ' + ((outUL2163.match(/RT=(\w+)/) || [])[1] || 'n/a') + '）');
+    // 非 full 档：理由必须非空（与 v2137/O14 段同一条纪律，不许静默通过）。
+    assert(tier2163 === 'full' || (!!mW2163 && mW2163[1].trim().length > 0),
+      'v2163: 非 full 档如实降档且理由非空（实 tier=' + tier2163
+        + ' / why0=' + (mW2163 ? mW2163[1].slice(0, 90) : 'n/a') + '）');
+    assert(mER2163 && Number(mER2163[1]) === 0,
+      'v2163: 实机这一轮 errors 为空（实 ' + (mER2163 ? mER2163[1] : 'n/a') + ' 条）');
+    assert(/const VERSION = '2\.16[3-9]\.\d+'/.test(fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')),
+      'v2163: 入口版本面不早于 2.163.0');
+  }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
   console.log('  ⏱ 超 60s 的节：' + __slowSec119 + ' 个');

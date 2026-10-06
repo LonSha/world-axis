@@ -86,7 +86,12 @@ const TIMEOUT_ARMED = {
   //   但把 raw 实测登记进 GATES 供 coherence() 自洽核对（96000 ≥ 60000×? 见 GATES 条目）。
   'ui-live-2137': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   // v2.145.0（O23）：实机读数行面调用点（ui-live.js 的 runLive，读 readings.length）。
-  'ui-live-2145': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'ui-live-2145': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.163.0（O14 驱动面）：同一支实机通道的**驱动面**探针（run.js 的 v2.163.0 段，
+  //   真跑内置 CDP 驱动并读 tier/loaded/readings/fillErr/routeErr/errs 七字段）。
+  //   它与 ui-live-2145 是**两个不同调用点**（前者读 ui-live-v2137 专锁，后者读 ui-live.js
+  //   的 runLive 探针），故各占一条；新开调用点不入表正是本模块治的病。
+  'ui-live-2163': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -135,7 +140,12 @@ const ARMED_SITES = [
   // v2.145.0（O23）：实机读数行面调用点（ui-live.js 的 runLive，读 readings.length）。
   //   上一版登记到 ui-live-2137 为止，本调用点一直在跑却不在表上 —— 全量回归首跑暴露。
   { key: 'ui-live-2145', mode: 'spawn',
-    anchor: "const rUL2145 = require('child_process').spawnSync(process.execPath, ['-e'," }
+    anchor: "const rUL2145 = require('child_process').spawnSync(process.execPath, ['-e'," },
+  // v2.163.0（O14 驱动面）：驱动面探针调用点。**锚点必须带变量名**——它与 ui-live-2145 的
+  //   调用形态逐字同形（都是 `spawnSync(process.execPath, ['-e',`），只有左值变量名不同；
+  //   取到 options 之前的行首片段，唯一性由 `rUL2163` 保证（整行唯一 ⇒ 任何前缀也唯一）。
+  { key: 'ui-live-2163', mode: 'spawn',
+    anchor: "const rUL2163 = require('child_process').spawnSync(process.execPath, ['-e'," }
 ];
 
 /**
