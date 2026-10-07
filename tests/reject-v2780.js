@@ -193,6 +193,32 @@ const DEAD = {
   'unknown-source': {
     anchor: "if (!g) { noteFault('unknown-source'); return { ok: false, reason: 'unknown-source', place: src, resource: res }; }",
     why: 'freight.dispatch: source goods not found. Needs place/resource not in economy.goods.'
+  },
+  // v2.168.0（TX4）：story-choice 拒收码 DEAD 表登记（engines/story-choice.js）。
+  //   以下 6 码在标准 boot 环境需要复杂前置条件（需先 setup branchTree/rehearsal/commit 数据）。
+  'already-confirmed': {
+    anchor: "if (rec.choice) { noteFault('already-confirmed'); return { ok: false, reason: 'already-confirmed', id: rec.id, choice: rec.choice }; }",
+    why: 'storyChoice.confirm: choice point already confirmed. Needs prior present + confirm.'
+  },
+  'branchtree-absent': {
+    anchor: "if (!A.branchTree || typeof A.branchTree.fork !== 'function') { noteFault('branchtree-absent'); return { ok: false, reason: 'branchtree-absent' }; }",
+    why: 'storyChoice.present/confirm: branchTree module not loaded. Cannot trigger in standard boot (branchTree always loaded).'
+  },
+  'choose-failed': {
+    anchor: "if (!cr || !cr.ok) { noteFault('choose-failed'); return { ok: false, reason: 'choose-failed', detail: cr ? cr.reason : 'no-result' }; }",
+    why: 'storyChoice.confirm: branchTree.choose returned failure. Needs branchTree to reject the choose call.'
+  },
+  'fork-failed': {
+    anchor: "if (!fr || !fr.ok) { noteFault('fork-failed'); return { ok: false, reason: 'fork-failed', detail: fr ? fr.reason : 'no-result' }; }",
+    why: 'storyChoice.present: branchTree.fork returned failure. Needs branchTree to reject the fork call.'
+  },
+  'preview-rejected': {
+    anchor: "if (!optRec.allowed) { noteFault('preview-rejected'); return { ok: false, reason: 'preview-rejected', option: opt, rejects: (optRec.preview && optRec.preview.reject) || [] }; }",
+    why: 'storyChoice.confirm: option ops failed rehearsal.preview whitelist. Needs ops that get rejected by preview.'
+  },
+  'no-result': {
+    anchor: "detail: cr ? cr.reason : 'no-result'",
+    why: 'storyChoice.confirm: branchTree.choose returned null/undefined (not ok:false). Cannot trigger in standard boot.'
   }
 };
 

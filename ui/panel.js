@@ -98,6 +98,7 @@
     diplomacy: '外交事实',
     agency: '行动调度',
     freight: '货运在途',
+    storyChoice: '故事分支',
     sediment: '此地沉积',
     chrono: '世界编年史' };
 

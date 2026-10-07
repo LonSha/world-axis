@@ -1,13 +1,13 @@
 {
- "version": "2.167.0",
- "loadOrderCount": 187,
- "loadedCount": 183,
+ "version": "2.168.0",
+ "loadOrderCount": 188,
+ "loadedCount": 184,
  "uiCount": 4,
- "nsCount": 191,
+ "nsCount": 192,
  "totals": {
-  "loadEdges": 85,
+  "loadEdges": 86,
   "hardEdges": 0,
-  "callRefs": 168,
+  "callRefs": 170,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -97,6 +97,7 @@
     "engines/stage.js",
     "engines/stale-guard.js",
     "engines/storage-forecast.js",
+    "engines/story-choice.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/summarizer.js",
@@ -298,6 +299,7 @@
     "engines/stage.js",
     "engines/stale-guard.js",
     "engines/storage-forecast.js",
+    "engines/story-choice.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/userlock.js",
@@ -2110,6 +2112,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_freight_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/story-choice.js": {
+   "ns": [
+    "storyChoice"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_story_choice_settings_v1"
    ],
    "consumedBy": []
   },

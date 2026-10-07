@@ -133,6 +133,15 @@
 
 **边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 16 枚控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② `ui/panel.js` 在无头回归里不装载，「六处登记」里 UI 那一处靠**文本锚点**判据（不是运行时行为）；③ 全量回归按本次指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数。
 
+### R154 · 2026-10-07 · v2.168.0：TX4 可选择、可兑现后果的故事分支
+**范围**：**拓展线第五批**。交付 **TX4**（宿主/玩家两栏待验收）。新增 `engines/story-choice.js`（命名空间 `WA.storyChoice`，10 成员导出）。
+**缺口**：branchTree/rehearsal/commit 三模块各自就位，但没有一条闭合的「选择→预演→确认→兑现」链。story-choice 补的就是这一层。
+**八条否定式边界**：① 默认关；② choose 记账 ≠ 世界兑现；③ ops 须经白名单；④ 状态变了重新预演；⑤ 不把 diff 直接写 live store；⑥ 过期/未知/不可比较分别显示；⑦ review 只读不写；⑧ 不凭空造 ops。
+**六个拒收码登记 DEAD 表**：already-confirmed/branchtree-absent/choose-failed/fork-failed/preview-rejected/no-result。死表 23 → 29。
+**注入链七点同批登记**（显示名「故事分支」rank 5）。panel 6 控件 + tool-diag secStoryChoice 四点接线。
+**专锁**：`tests/s3-tx4-v2168.js`（**42 / 0**）。冒烟 `tools/tx4_smoke.js` 13/13。
+**升版面同批同步**：index.js + manifest.json 升 2.168.0；module-registry-ledger --update（184/192/86/170）；dead-export-ledger --update（dead 777/uiDead 3）；reject-code-ledger 手工追加 v2.168.0 沿革段；reject-v2780.js DEAD 表追加 6 码；module-cycle-gate-v2107 八钉重算（189/189/187/86+1437=1523/188/221/192/197/29/24，65 项全绿）；settle-v2830 两钉更新（86/170/192/184，55 项全绿）；TX3+TX2 专锁版本钉跟版。
+**边界**：① 真实宿主一栏仍未验收；② 全量回归延后。
 ### R153 · 2026-10-07 · v2.167.0：TX3 区域供需、在途运输与商路选择
 **范围**：**拓展线第四批**。交付 **TX3**（宿主/玩家两栏待验收）。新增 `engines/freight.js`（命名空间 `WA.freight`，10 成员导出：getSettings/setSettings + dispatch/arrive/cancel/reroute + view/buildBlock/diagnose/stat）。
 **缺口**：economy 已有库存/价格/买卖/路线；region 有地理/道路/封路。但货物从 A 地到 B 地是**即时的**（economy.ship 直接到货无源扣减），没有在途状态、没有运输时长、没有到货确认、没有取消退货、没有改道。freight 补的就是这一层：dispatch 扣源库存 + 创建在途记录（status='transit'），arrive 到货入库（幂等），cancel 退货 + 损运费，reroute 换路线 + 重估 ETA，view 含守恒校验。

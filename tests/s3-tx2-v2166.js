@@ -93,10 +93,10 @@ function runA(a) {
 
   // A10 manifest 版本
   const mani = read(REL_MANIFEST);
-  a(mani.indexOf('"2.167.0"') !== -1 || mani.indexOf('"2.166.0"') !== -1, 'v2166/tx2 A10: manifest 版本 2.166.0+');
+  a(mani.indexOf('"2.168.0"') !== -1 || mani.indexOf('"2.167.0"') !== -1 || mani.indexOf('"2.166.0"') !== -1, 'v2166/tx2 A10: manifest 版本 2.166.0+');
 
   // A11 版本常量
-  a(idx.indexOf("VERSION = '2.167.0'") !== -1 || idx.indexOf("VERSION = '2.166.0'") !== -1, 'v2166/tx2 A11: index.js VERSION 2.166.0+');
+  a(idx.indexOf("VERSION = '2.168.0'") !== -1 || idx.indexOf("VERSION = '2.167.0'") !== -1 || idx.indexOf("VERSION = '2.166.0'") !== -1, 'v2166/tx2 A11: index.js VERSION 2.166.0+');
 
   // A12 panel 6 控件
   ['wa-ag-enabled', 'wa-ag-person', 'wa-ag-schedule', 'wa-ag-receipts', 'wa-ag-diag', 'wa-ag-out'].forEach(function (id) {
