@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.169.0'
+  const VERSION = '2.170.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -444,6 +444,7 @@
     'engines/freight.js',
     'engines/story-choice.js',
     'engines/commission.js',
+    'engines/investigation.js',
     'engines/probe.js',
     // v2.119.0（拓展计划 ⑥）：跨地域传播。须晚于 core/clock（延迟按 clock 算），
     //   须早于 render/inject.js（注入落地时读 region.buildBlock()）。

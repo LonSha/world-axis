@@ -99,10 +99,10 @@ ok('A6 UI_BINDINGS freight', DIAG.indexOf('wa-fr-enabled') >= 0);
 ok('A7 LOAD_ORDER freight', IDX.indexOf("'engines/freight.js'") >= 0);
 
 // A8: manifest version 2.167.0
-ok('A8 manifest version', MAN.version === '2.167.0' || MAN.version === '2.168.0' || MAN.version === '2.169.0');
+ok('A8 manifest version', MAN.version === '2.167.0' || MAN.version === '2.168.0' || MAN.version === '2.169.0' || MAN.version === '2.170.0');
 
 // A9: index.js VERSION 2.167.0
-ok('A9 VERSION 2.167.0', IDX.indexOf("'2.167.0'") >= 0 || IDX.indexOf("'2.168.0'") >= 0 || IDX.indexOf("'2.169.0'") >= 0 || IDX.indexOf("'2.169.0'") >= 0);
+ok('A9 VERSION 2.167.0', IDX.indexOf("'2.167.0'") >= 0 || IDX.indexOf("'2.168.0'") >= 0 || IDX.indexOf("'2.169.0'") >= 0 || IDX.indexOf("'2.170.0'") >= 0 || IDX.indexOf("'2.169.0'") >= 0);
 
 // A10: run.js LOAD has freight
 ok('A10 run.js LOAD freight', RUN.indexOf("'engines/freight.js'") >= 0);

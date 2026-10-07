@@ -1,13 +1,13 @@
 {
- "version": "2.169.0",
- "loadOrderCount": 189,
- "loadedCount": 185,
+ "version": "2.170.0",
+ "loadOrderCount": 190,
+ "loadedCount": 186,
  "uiCount": 4,
- "nsCount": 193,
+ "nsCount": 194,
  "totals": {
-  "loadEdges": 87,
+  "loadEdges": 88,
   "hardEdges": 0,
-  "callRefs": 172,
+  "callRefs": 174,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -62,6 +62,7 @@
     "engines/hazard.js",
     "engines/inject-value.js",
     "engines/inst.js",
+    "engines/investigation.js",
     "engines/kaleidoscope.js",
     "engines/liaison.js",
     "engines/life.js",
@@ -273,6 +274,7 @@
     "engines/group-refuse.js",
     "engines/inject-value.js",
     "engines/inst.js",
+    "engines/investigation.js",
     "engines/liaison.js",
     "engines/lifeline.js",
     "engines/mend.js",
@@ -2156,6 +2158,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_commission_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/investigation.js": {
+   "ns": [
+    "investigation"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_investigation_settings_v1"
    ],
    "consumedBy": []
   },

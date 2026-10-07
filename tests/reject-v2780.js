@@ -237,6 +237,23 @@ const DEAD = {
   'too-many-stages': {
     anchor: "if (stages.length > cfg.maxStages) { noteFault('too-many-stages'); return { ok: false, reason: 'too-many-stages', cap: cfg.maxStages }; }",
     why: 'commission.create: stages exceed maxStages cap. Needs >8 stages in spec.'
+  },
+  // v2.170.0（TX7）: investigation 拒收码 DEAD 表登记（engines/investigation.js）。
+  'already-revealed': {
+    anchor: "if (clue.revealedTo.indexOf(who) >= 0) { noteFault('already-revealed'); return { ok: false, reason: 'already-revealed' }; }",
+    why: 'investigation.reveal: clue already revealed to this person.'
+  },
+  'clues-full': {
+    anchor: "if (clues().length >= cfg.maxClues) { noteFault('clues-full'); return { ok: false, reason: 'clues-full', cap: cfg.maxClues }; }",
+    why: 'investigation.register: max clues reached. Needs 32+ existing clues in state.'
+  },
+  'enigma-failed': {
+    anchor: "noteFault('enigma-failed'); return { ok: false, reason: 'enigma-failed', detail: mr.reason };",
+    why: 'investigation.reveal: enigma.mark failed. Needs enigma to reject the mark call.'
+  },
+  'insufficient-evidence': {
+    anchor: "noteFault('insufficient-evidence'); return { ok: false, reason: 'insufficient-evidence', verdict: chk.verdict };",
+    why: 'investigation.reveal: evidence verdict not verified/cannot-judge. Needs insufficient evidence.'
   }
 };
 

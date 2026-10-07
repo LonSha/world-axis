@@ -40,8 +40,8 @@ ok('A10: panel VIS_NAMES 含 storyChoice', PAN.indexOf("storyChoice: '故事分�
 ok('A11: budget PRIORITY 含 故事分支', BUD.indexOf("'故事分支': { rank: 5, fold: true }") >= 0);
 ok('A12: budget ACCOUNTS 含 故事分支', BUD.indexOf("['故事分支', '叙事推进', '承载']") >= 0);
 ok('A13: LOAD_ORDER 含 story-choice.js', IDX.indexOf("'engines/story-choice.js'") >= 0 && RUN.indexOf("'engines/story-choice.js'") >= 0);
-ok('A14: VERSION = 2.168.0+', /VERSION\s*=\s*'2\.(168|169)\.0'/.test(IDX));
-ok('A15: manifest version = 2.168.0+', MAN.version === '2.168.0' || MAN.version === '2.169.0');
+ok('A14: VERSION = 2.168.0+', /VERSION\s*=\s*'2\.(168|169|170)\.0'/.test(IDX));
+ok('A15: manifest version = 2.168.0+', MAN.version === '2.168.0' || MAN.version === '2.169.0' || MAN.version === '2.170.0');
 ok('A16: tool-diag 模块映射含 story-choice.js', DIAG.indexOf("'engines/story-choice.js': 'storyChoice'") >= 0);
 ok('A17: tool-diag secStoryChoice 函数', DIAG.indexOf('function secStoryChoice()') >= 0);
 ok('A18: tool-diag diag 对象含 storyChoice', DIAG.indexOf('storyChoice: secStoryChoice()') >= 0);

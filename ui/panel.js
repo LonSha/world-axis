@@ -100,6 +100,7 @@
     freight: '货运在途',
     storyChoice: '故事分支',
     commission: '委托履约',
+    investigation: '线索调查',
     sediment: '此地沉积',
     chrono: '世界编年史' };
 

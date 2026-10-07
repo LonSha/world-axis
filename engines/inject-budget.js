@@ -185,7 +185,8 @@
     //   在途货运是后续供需结算的裁决基准。
     '货运在途': { rank: 5, fold: true },
     '故事分支': { rank: 5, fold: true },
-    '委托履约': { rank: 5, fold: true }
+    '委托履约': { rank: 5, fold: true },
+    '线索调查': { rank: 5, fold: true }
   };
   const DEFAULT_RANK = 6;
 
@@ -326,7 +327,8 @@
     //   A1/A2 成类锁盯着「源面 ⇄ PRIORITY ⇄ ACCOUNTS」三者逐字同键集。
     ['货运在途', '叙事推进', '承载'],
   ['故事分支', '叙事推进', '承载'],
-  ['委托履约', '叙事推进', '承载']
+  ['委托履约', '叙事推进', '承载'],
+  ['线索调查', '叙事推进', '承载']
   ].forEach(function (r) { ACCOUNTS[r[0]] = { account: r[1], role: r[2] }; });
   const UNCLASSIFIED = '未归类';
 
