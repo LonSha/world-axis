@@ -184,7 +184,8 @@
     // v2.167.0（TX3）：守恒运输面。落 rank 5，与「外交事实」「组织制度」「用户锁定」同层 ——
     //   在途货运是后续供需结算的裁决基准。
     '货运在途': { rank: 5, fold: true },
-    '故事分支': { rank: 5, fold: true }
+    '故事分支': { rank: 5, fold: true },
+    '委托履约': { rank: 5, fold: true }
   };
   const DEFAULT_RANK = 6;
 
@@ -324,7 +325,8 @@
     // v2.167.0（TX3）：守恒运输面。与 PRIORITY 同批登记 —— tests/cost-v2880.js 的
     //   A1/A2 成类锁盯着「源面 ⇄ PRIORITY ⇄ ACCOUNTS」三者逐字同键集。
     ['货运在途', '叙事推进', '承载'],
-  ['故事分支', '叙事推进', '承载']
+  ['故事分支', '叙事推进', '承载'],
+  ['委托履约', '叙事推进', '承载']
   ].forEach(function (r) { ACCOUNTS[r[0]] = { account: r[1], role: r[2] }; });
   const UNCLASSIFIED = '未归类';
 

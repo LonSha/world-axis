@@ -219,6 +219,24 @@ const DEAD = {
   'no-result': {
     anchor: "detail: cr ? cr.reason : 'no-result'",
     why: 'storyChoice.confirm: branchTree.choose returned null/undefined (not ok:false). Cannot trigger in standard boot.'
+  },
+  // v2.169.0（TX6）: commission 拒收码 DEAD 表登记（engines/commission.js）。
+  //   以下 4 码在标准 boot 环境需要复杂前置条件（需先 setup 足够多的合同或预算不足的 org）。
+  'contracts-full': {
+    anchor: "if (cur.length >= cfg.maxContracts) { noteFault('contracts-full'); return { ok: false, reason: 'contracts-full', cap: cfg.maxContracts }; }",
+    why: 'commission.create: max contracts reached. Needs 24+ existing contracts in state.'
+  },
+  'no-budget': {
+    anchor: "if (!aff) { noteFault('no-budget'); return { ok: false, reason: 'no-budget', principal: principal, reward: reward }; }",
+    why: 'commission.create: principal cannot afford reward. Needs org.canAfford to return false.'
+  },
+  'no-stages': {
+    anchor: "if (stages.length < 1) { noteFault('no-stages'); return { ok: false, reason: 'no-stages', have: stages.length, need: 1 }; }",
+    why: 'commission.create: zero stages provided. Witnessed by passing empty stages array.'
+  },
+  'too-many-stages': {
+    anchor: "if (stages.length > cfg.maxStages) { noteFault('too-many-stages'); return { ok: false, reason: 'too-many-stages', cap: cfg.maxStages }; }",
+    why: 'commission.create: stages exceed maxStages cap. Needs >8 stages in spec.'
   }
 };
 

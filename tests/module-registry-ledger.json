@@ -1,13 +1,13 @@
 {
- "version": "2.168.0",
- "loadOrderCount": 188,
- "loadedCount": 184,
+ "version": "2.169.0",
+ "loadOrderCount": 189,
+ "loadedCount": 185,
  "uiCount": 4,
- "nsCount": 192,
+ "nsCount": 193,
  "totals": {
-  "loadEdges": 86,
+  "loadEdges": 87,
   "hardEdges": 0,
-  "callRefs": 170,
+  "callRefs": 172,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -44,6 +44,7 @@
     "engines/calendar-custom.js",
     "engines/calendar.js",
     "engines/chapters.js",
+    "engines/commission.js",
     "engines/coop.js",
     "engines/diplomacy.js",
     "engines/direct-event.js",
@@ -259,6 +260,7 @@
     "engines/binding.js",
     "engines/branch-tree.js",
     "engines/calendar-custom.js",
+    "engines/commission.js",
     "engines/coop.js",
     "engines/diplomacy.js",
     "engines/eco-audit.js",
@@ -2133,6 +2135,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_story_choice_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/commission.js": {
+   "ns": [
+    "commission"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_commission_settings_v1"
    ],
    "consumedBy": []
   },
