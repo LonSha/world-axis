@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.165.0'
+  const VERSION = '2.166.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -544,6 +544,10 @@
     //   两者都**写**世界状态（各自两条/三条容器环），故模块总开关默认关。
     'engines/offline-tick.js',
     'engines/farfield.js',
+    // v2.166.0（TX2）：行动反馈闭环。装载位置**须晚于** plan.js（读 plan.current/settle）、
+    //   act.js（读 act.stat/view/add/admit），且**须早于** render/inject.js（注入落地时读
+    //   agency.buildBlock()）。本模块只调用 life/plan/act 既有 API，不复制状态。
+    'engines/agency.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

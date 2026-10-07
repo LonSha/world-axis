@@ -792,6 +792,36 @@
       };
     });
   }
+  // v2.166.0（TX2）：行动调度诊断面（agency.diagnose / agency.stat 的诊断消费方）。
+  //   与 secDiplomacy 同规格：模块缺席报 error，开关关着报 note，自证面探 closedLoop。
+  //   诊断节是「按什么口径算」的唯一答处——这里当场探闭环完整性，不等外部脚本旁证。
+  function secAgency() {
+    return safe(function () {
+      if (!WA.agency || typeof WA.agency.diagnose !== 'function') return { error: 'engines/agency.js 未加载（行动调度读数缺席）' };
+      var d = WA.agency.diagnose();
+      var st = (typeof WA.agency.stat === 'function') ? WA.agency.stat() : {};
+      return {
+        enabled: d.enabled,
+        maxSchedulePerTurn: d.maxSchedulePerTurn,
+        maxReceiptsPerTurn: d.maxReceiptsPerTurn,
+        autoPlanExpand: d.autoPlanExpand,
+        scheduled: st.scheduled || 0, admitted: st.admitted || 0,
+        receipts: st.receipts || 0, stepsDone: st.stepsDone || 0,
+        stepsBlocked: st.stepsBlocked || 0, goalsDone: st.goalsDone || 0,
+        goalsBlocked: st.goalsBlocked || 0, deferred: st.deferred || 0,
+        lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}),
+        lifeAvailable: d.lifeAvailable,
+        planAvailable: d.planAvailable,
+        actAvailable: d.actAvailable,
+        closedLoop: d.closedLoop,
+        self: d,
+        note: !d.enabled ? '行动闭环总开关关闭（默认关）—— 关闭时不调度、不处理回执、不注入'
+          : (!d.closedLoop ? '开关开着但闭环不完整（life / plan / act 有缺席）—— 调度会返回 module-unavailable'
+            : null)
+      };
+    });
+  }
 
   /**
    * v2.156.0（SP1）：时间来源与游玩活动基准读数。
@@ -1517,6 +1547,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取。
     'engines/world-blueprint.js': 'worldBlueprint',
     'engines/diplomacy.js': 'diplomacy',
+    'engines/agency.js': 'agency',
+    // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。登记为必载 —
+    //   面板「世界」页行动调度段与本文件的 secAgency 都读它，缺席就是
+    //   「行动闭环读数缺席」本身，不该被静默兜住。
     // v2.156.0（SP1）：游玩活动基准。登记为必载 —— 面板「会话」页基准段与本文件的
     //   secPlaytime 都读它，缺席就是「活动基准读数缺席」本身，不该被静默兜住。
     'engines/playtime.js': 'playtime',
@@ -2455,6 +2489,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'world', ids: ['wa-dp-enabled', 'wa-dp-view', 'wa-dp-a', 'wa-dp-b', 'wa-dp-pair', 'wa-dp-applies', 'wa-dp-from', 'wa-dp-to',
       'wa-dp-terms', 'wa-dp-propose', 'wa-dp-id', 'wa-dp-kind', 'wa-dp-basis', 'wa-dp-reply', 'wa-dp-sign',
       'wa-dp-pairid', 'wa-dp-term', 'wa-dp-ev', 'wa-dp-fulfil', 'wa-dp-breach', 'wa-dp-expire', 'wa-dp-out'] },
+    // v2.166.0（TX2）：行动调度 6 枚 —— 面板「世界」页（启用开关 / 调度 / 回执 / 诊断）。
+    //   同口径：无条件渲染（agency 是产品文件，缺席本身就是断裂，不降级成提示）；
+    //   渲染了不登记 ⇒ 绑定断裂永不可见。
+    { page: 'world', ids: ['wa-ag-enabled', 'wa-ag-person', 'wa-ag-schedule', 'wa-ag-receipts', 'wa-ag-diag', 'wa-ag-out'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
@@ -3183,6 +3221,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   后者失效在「版本对不上却按 v1 猜着收 ⇒ 静默污染目标存档」。
       worldBlueprint: secWorldBlueprint(),
       diplomacy: secDiplomacy(),
+      agency: secAgency(),
+      // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。与 diplomacy 节分列不合并
+      //   —— 一个答「谈成的事实」，一个答「谁在做什么、计划步到哪、有没有在途行动」。
       // v2.156.0（SP1）：时间来源与游玩活动基准。与 life 节分列不合并（两问的失效模式不同）。
       playtime: secPlaytime(),
       // v2.156.0（S1）：离线恢复编排。与 playtime 节分列不合并 ——

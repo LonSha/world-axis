@@ -96,6 +96,7 @@
     // v2.165.0（TX1）：势力外交事实面。与 SOURCES / 注入分支 source 名 / SRC_NAME 同批 ——
     //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 diplomacy，而那是用户唯一能开关它的地方。
     diplomacy: '外交事实',
+    agency: '行动调度',
     sediment: '此地沉积',
     chrono: '世界编年史' };
 
@@ -1041,6 +1042,22 @@
             + `<button class="wa-btn wa-mini" id="wa-dp-breach" aria-label="违约留证" title="违约留证：本模块不判罚，只把条款标成 breached 并留证；罚则与资源后果由调用方（inst / org）决定">违约</button>`
             + `<button class="wa-btn wa-mini" id="wa-dp-expire" aria-label="到期收敛" title="到期收敛：把到期条款标成 expired 并按剩余条款重算关系状态。幂等 —— 同一个时刻连调两次，第二次零改动（changed:0）">到期</button>`
             + `</div><div id="wa-dp-out" class="wa-out wa-dim">${esc(dr)}</div>`;
+        })()}
+      </div>
+      <div class="wa-sec">行动调度（动机 / 计划 / 行动闭环）</div>
+      <div class="wa-item">
+        <div class="wa-dim">人物有目标、目标有计划步、行动有回执——回执驱动步结算，不是定时器自动推。<b>不凭空造</b>：目标 / 计划 / 行动各自是唯一写者的产物，本模块只协调。</div>
+        ${(() => {
+          const AG = WA.agency;
+          if (!AG) return '<div class="wa-dim">行动调度未加载</div>';
+          const ar = panelEl.dataset.agOut || '';
+          const agOn = (WA.agency.getSettings && WA.agency.getSettings().enabled) ? true : false;
+return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type="checkbox" ${agOn ? 'checked' : ''}/> 启用行动闭环</label></div><div class="wa-row">`
+            + `<input id="wa-ag-person" class="wa-input" aria-label="人物名" placeholder="人物名"/>`
+            + `<button class="wa-btn wa-mini" id="wa-ag-schedule" aria-label="调度行动" title="调度行动：读该人物当前目标与计划步 → 检查前置 → 准入一个行动。无计划时返回 need-steps（本模块不编步骤，步骤由 AI 文本经结构预检产生或由预设模板提供）">调度行动</button>`
+            + `<button class="wa-btn wa-mini" id="wa-ag-receipts" aria-label="处理回执" title="处理回执：读已完成的行动台帐 → 结算步 → 更新目标进度。行动回执驱动步结算——不是定时器自动推进步">处理回执</button>`
+            + `<button class="wa-btn wa-mini" id="wa-ag-diag" aria-label="诊断" title="诊断：检查 life / plan / act 三模块均在 + 闭环完整性。自证面汇报模块出席与接线状况">诊断</button>`
+            + `</div><div id="wa-ag-out" class="wa-out wa-dim">${esc(ar)}</div>`;
         })()}
       </div>
 
@@ -5914,6 +5931,42 @@
       const r = WA.diplomacy.expire({});
       if (!r.ok) return dpOut(dpWhy(r.reason));
       dpOut('到期收敛：改动 ' + r.changed + ' 处（幂等 —— 同一时刻再点一次应为 0）');
+    });
+    // v2.166.0（TX2）：行动调度六个入口的绑定。
+    //   schedule 与 processReceipts 是 agency 模块两个主入口的真产品消费方。
+    //   协调者而非替代者：只调 life / plan / act 既有 API，不复制状态。
+    //   schedule 返回 need-steps 时不编步骤——步骤由 AI 文本经结构预检产生或由预设模板提供。
+    const agOut = function (text) { panelEl.dataset.agOut = text; const o = $('#wa-ag-out'); if (o) o.textContent = text; };
+    { const el = $('#wa-ag-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.agency || !WA.agency.setSettings) return agOut('未记录：module-missing', true);
+        WA.agency.setSettings({ enabled: !!el.checked });
+        agOut('已记录 ' + (el.checked ? 'enabled（调度 / 回执链恢复可用；注入源「行动调度」随总开关出正文）' : 'disabled（调度 / 回执链暂停；注入源「行动调度」不出正文）'));
+      };
+    }
+    on('#wa-ag-schedule', () => {
+      if (!WA.agency) return agOut('行动调度未加载');
+      const v = WA.agency.getSettings();
+      if (!v.enabled) return agOut('行动闭环未开（设置里打开后才有调度）');
+      const person = wv('#wa-ag-person');
+      if (!person) return agOut('填人物名');
+      const r = WA.agency.schedule(person, WA.clock && WA.clock.now ? WA.clock.now("agency") : Date.now());
+      if (r && r.needSteps) return agOut(person + ' 无计划步——需先为其建立计划步骤（need-steps）');
+      if (!r || !r.ok) return agOut(r ? (r.reason || '调度失败') : '调度失败');
+      agOut('已调度：' + r.person + ' → 行动「' + r.action + '」（目标 ' + r.goal + '，步 ' + r.stepIndex + '/' + r.stepTotal + '）');
+    });
+    on('#wa-ag-receipts', () => {
+      if (!WA.agency) return agOut('行动调度未加载');
+      const v = WA.agency.getSettings();
+      if (!v.enabled) return agOut('行动闭环未开');
+      const r = WA.agency.processReceipts(WA.clock && WA.clock.now ? WA.clock.now("agency") : Date.now());
+      if (!r || !r.ok) return agOut(r ? (r.reason || '处理回执失败') : '处理回执失败');
+      agOut('处理回执：结算 ' + r.settled + ' 步（' + (r.details || '') + '）');
+    });
+    on('#wa-ag-diag', () => {
+      if (!WA.agency) return agOut('行动调度未加载');
+      const r = WA.agency.diagnose();
+      agOut(r.report || '诊断完成');
     });
     // v2.139.0（E9）：单对势力查边（`edgeOf` 的真产品消费方）。
     //   为什么不是又一个「看全部」按钮：上面那枚答「这张网长什么样」，这一枚答

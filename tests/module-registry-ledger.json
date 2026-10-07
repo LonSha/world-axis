@@ -1,13 +1,13 @@
 {
- "version": "2.165.0",
- "loadOrderCount": 185,
- "loadedCount": 181,
+ "version": "2.166.0",
+ "loadOrderCount": 186,
+ "loadedCount": 182,
  "uiCount": 4,
- "nsCount": 189,
+ "nsCount": 190,
  "totals": {
-  "loadEdges": 83,
+  "loadEdges": 84,
   "hardEdges": 0,
-  "callRefs": 164,
+  "callRefs": 166,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -34,6 +34,7 @@
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
+    "engines/agency.js",
     "engines/archive-hide.js",
     "engines/backstage.js",
     "engines/beat-mask.js",
@@ -250,6 +251,7 @@
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
+    "engines/agency.js",
     "engines/archive-hide.js",
     "engines/beat-mask.js",
     "engines/binding.js",
@@ -2869,6 +2871,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_farfield_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/agency.js": {
+   "ns": [
+    "agency"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_agency_settings_v1"
    ],
    "consumedBy": []
   },

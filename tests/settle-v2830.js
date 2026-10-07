@@ -306,7 +306,7 @@ async function probeRollbackScope(WA) {
 async function judge(a) {
   // ── B4 ──
   const led = JSON.parse(fs.readFileSync(path.join(__dirname, 'module-registry-ledger.json'), 'utf8'));
-  a(led.totals.loadEdges === 83 && led.totals.callRefs === 164,
+  a(led.totals.loadEdges === 84 && led.totals.callRefs === 166,
     'v2830/mr: 装载期边 65 / 调用期引用 130（引用多 ≠ 必须先装载；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
@@ -314,12 +314,13 @@ async function judge(a) {
     + 'v2.114.0 新增 core/sandbox.js / core/plugin.js 后各 +2：两者尾部都调 WA.registerModule'
     + '（由 core/store.js 提供）⇒ 各多 1 条装载期边；调用期 +4 来自 store 读 WA.plugin.fire'
     + '与 plugin 钩子体走 WA.sandbox.run）；'
-    + 'v2.165.0（TX1）：新增 engines/diplomacy.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/settingsBus）');
+    + 'v2.165.0（TX1）：新增 engines/diplomacy.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/settingsBus）'
+    + '; v2.166.0（TX2）：新增 engines/agency.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/settingsBus）');
   a(led.totals.loadEdges < led.totals.callRefs,
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 189 && led.loadedCount === 181,
+  a(led.nsCount === 190 && led.loadedCount === 182,
     'v2830/mr: 命名空间 171 / 装载文件 163（v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
@@ -339,7 +340,8 @@ async function judge(a) {
     + ' v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）新增 engines/chrono.js / engines/collab.js'
      + ' 两命名空间后两边各 +2；'
      + ' v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js 两命名空间后两边各 +2；'
-     + ' v2.165.0（TX1）新增 engines/diplomacy.js（diplomacy 命名空间）⇒ 两边各 +1）');
+     + ' v2.165.0（TX1）新增 engines/diplomacy.js（diplomacy 命名空间）⇒ 两边各 +1）'
+     + '; v2.166.0（TX2）新增 engines/agency.js（agency 命名空间）⇒ 两边各 +1）');
   const providers = Object.keys(led.modules).reduce(function (acc, rel) {
     led.modules[rel].requires.forEach(function (ns) { acc[ns] = true; });
     return acc;

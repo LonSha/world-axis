@@ -133,6 +133,29 @@
 
 **边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 16 枚控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② `ui/panel.js` 在无头回归里不装载，「六处登记」里 UI 那一处靠**文本锚点**判据（不是运行时行为）；③ 全量回归按本次指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数。
 
+### R152 · 2026-10-07 · v2.166.0：TX2 人物动机、计划、行动与反馈闭环
+**范围**：**拓展线第三批**。交付 **TX2**（宿主/玩家两栏待验收）。新增 `engines/agency.js`（命名空间 `WA.agency`，7 成员导出：getSettings/setSettings + schedule/processReceipts + buildBlock/diagnose/stat）。
+
+**缺口**：life 已有目标/承诺/日程/决策；plan 有步骤/推进/结算；act 有移动/交付/会面/回执。但整条生命周期**没有一个协调者** —— 谁把目标映射成计划？谁把行动回执驱动步骤结算？谁在失败时保留阻塞理由？agency 补的就是这一层。
+
+**协调者边界（本版最要紧的七条）**：① 同一目标只建一条当前计划（不并行的多条计划互相覆盖）；② 行动回执驱动步骤结算（不是定时器自动推进步，tell/work 类需确认的保持待确认）；③ 失败保留阻塞理由（不静默吞掉）；④ 条件改变后重排或由玩家决定放弃（不自动删目标）；⑤ 人物自主性有预算、权限和冲突规则（`maxSchedulePerTurn`/`maxReceiptsPerTurn`，不无限新建）；⑥ 未获知后果的人物不提前改记忆（agency 不写 life 的记忆面）；⑦ 不凭空造人/造目标/造行动（registry/life/act 各自是唯一写者，agency 只读不写这三面）。
+
+**七个死导出全部接真实消费方**：`getSettings`/`setSettings` → 面板「启用行动闭环」复选框（`wa-ag-enabled`）；`schedule` → 面板「调度」按钮（`wa-ag-schedule`，调 `WA.agency.schedule(person, clock.now)`）；`processReceipts` → 面板「处理回执」按钮（`wa-ag-receipts`）；`buildBlock` → `render/inject.js` 新注入源（source 名「行动调度」）；`diagnose` → 面板「诊断」按钮（`wa-ag-diag`）+ `tool-diag` secAgency 自证面；`stat` → tool-diag stat 节。
+
+**注入链七点同批登记**：`SOURCES` 数组（`'agency'` 插在 `'diplomacy'` 与 `'chrono'` 之间）/ `__REG.def`（`agency: true`）/ `SRC_NAME`（`agency: '行动调度'`）/ `SRC_MOD_SETTING` / 注入分支 / `VIS_NAMES`（`agency: '行动调度'`）/ `PRIORITY+ACCOUNTS`（rank 4，与「人物生活」「人物多步计划」「人物行动」同层）。显示名「行动调度」在七处逐字同名。
+
+**专锁**：`tests/s3-tx2-v2166.js`（**47 / 0**）—— A 面含 12 条结构断言（导出 7 成员、DEF.enabled=false、need-steps 返回、导出数检查、注入链七点、budget 接线、panel VIS_NAMES、tool-diag 四点接线、LOAD_ORDER、manifest 版本、VERSION 常量、panel 6 控件），B 面含 11 条行为断言（模块加载、默认关、disabled/missing-person/no-active-goal/need-steps 四码拒收、diagnose closedLoop、stat、buildBlock、`__agencyWarn` 未触发、toolDiag 有 agency 节），N 面含 3 条负控制（破坏默认关、破坏 need-steps、真文件逐字未变）。冒烟脚本 `tools/tx2_smoke.js` 7/0。
+
+**升版面同批同步**：`index.js` 与 `manifest.json` 升 2.166.0；`module-registry-ledger` 由 `--update` 收敛（文件 182 / 命名空间 190 / 装载期边 84 / 硬边 0 / 调用期引用 166）；`dead-export-ledger` 由 `--update` 收敛（dead 768 / uiDead 3 不变）；`reject-code-ledger` 手工追加沿革段 + `disabled` 码从基线回收（229→228，已有见证不再计入基线）；`reject-v2780.js` agency 见证段追加 4 码 want+trip + DEAD 表新增 7 码（死表 9→16）；`export-contract` 重生成（含 `agency:buildBlock diagnose getSettings processReceipts schedule setSettings stat`）；`module-cycle-gate-v2107` 八处钉重算（文件 187/别名 187/有引用 185/边 1499/LOAD_ORDER 186/未提供 0/漂移 0/problems 0，65 项全绿）+ `__agencyWarn` 内部 ns 登记；`settle-v2830` 两处计数钉更新（loadEdges 83→84 / callRefs 164→166 / nsCount 189→190 / loadedCount 181→182，55 项全绿）。
+
+**四条实测教训（如实留账）**：
+- **`activeGoalOf` 读 `people[who]` 但 life.js 用 `'p_' + who` 存键**。agency 调 `life.addGoal('test', ...)` 成功后，store 的 people 键是 `'p_test'`（life.js 的 `personId(name)` 格式），但 `activeGoalOf` 直接读 `people['test']` 永远找不到目标，返回 null 导致 `no-active-goal`。改为 `people['p_' + who]` 后修复。这是 life 的内部键格式与 agency 读取面的口径不一致 —— 同一个名字在不同模块里有不同的键形态，协调者必须匹配被协调者的键口径。
+- **`buildBlock` 传 ID 给 `plan.current` 导致双重前缀**。`buildBlock(id)` 内部调 `plan.current(id)`，而 `plan.current` 内部会再做 `'p_' + who`。传 `'p_test'` 进去变成 `'p_p_test'`，永远找不到。改为传原始名 `p.name || id.replace(/^p_/, '')` 后修复。
+- **agency.js 别名形态不匹配 module-cycle-gate ALIAS_RE 正则**。首版用了 `typeof global !== 'undefined' ? global : ...` 形态，导致静态扫描无法识别 agency 命名空间为"已提供"。改为标准形态 `const A = window.WorldAxis = window.WorldAxis || {}` 后修复 —— 与仓内纪律"别名形态必须匹配 ALIAS_RE 正则"一致。
+- **panel.js 中 `WA.clockNow` 是错误写法**。应为 `WA.clock && WA.clock.now ? WA.clock.now("agency") : Date.now()`，错误写法导致 module-cycle-gate 报 `clockNow` 为未提供命名空间。用 Python 脚本替换 4 处后修复。
+
+**边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 6 枚 ag 控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② 全量回归按指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数；③ `tools/tx2_smoke.js` 是本轮新建的辅助冒烟工具，随 TX2 提交。
+
 ### R151 · 2026-10-07 · v2.165.0：TX1 可谈判、可履约的势力外交
 
 **范围**：**拓展线第二批**。交付 **TX1**（宿主/玩家两栏待验收）。新增 `engines/diplomacy.js`（命名空间 `WA.diplomacy`，21 成员导出）。
