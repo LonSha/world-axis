@@ -133,6 +133,28 @@
 
 **边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 16 枚控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② `ui/panel.js` 在无头回归里不装载，「六处登记」里 UI 那一处靠**文本锚点**判据（不是运行时行为）；③ 全量回归按本次指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数。
 
+### R151 · 2026-10-07 · v2.165.0：TX1 可谈判、可履约的势力外交
+
+**范围**：**拓展线第二批**。交付 **TX1**（宿主/玩家两栏待验收）。新增 `engines/diplomacy.js`（命名空间 `WA.diplomacy`，21 成员导出）。
+
+**缺口**：faction-graph 能从双方各自的对外态度推导关系图，边恒为 `derived:true`；但这不是成对外交事实。两方谈了什么、签了什么、约到何时、谁欠谁 —— 这些**事实**此前没有载体。TX1 补的就是这一层。
+
+**事实面与推导面的分离（本版最要紧的边界）**：diplomacy 是**事实面**（pairId/双边态度/条约/有效期/履约回执），faction-graph 是**推导面**（`derived:true`，按态度计算两家关系）。推导结果不自动迁成事实。注入源显示名选「外交事实」而非「势力外交」—— 明示本源只装谈成的事实，与势力关系网的推导值划清边界。PRIORITY 落 rank 5（与「组织制度」「用户锁定」同层）—— 已生效条约是后续剧情的裁决基准。
+
+**六个死导出全部接真实消费方（而非用 `--update` 掩盖）**：`getSettings`/`setSettings` → 面板「启用势力外交」复选框（`wa-dp-enabled`）；`applies` → 面板「条款适用？」按钮（`wa-dp-applies`）；`buildBlock` → `render/inject.js` 新注入源（source 名「外交事实」）；`pairId`/`diagnose` → `tool-diag` secDiplomacy 增 `pairSymmetry` 探针与 `self` 自证面。死导出门禁复跑后 dead 768（与账本一致），六个死导出全部消红。
+
+**注入链七点同批登记**：`SOURCES` 数组（`'diplomacy'` 插在 `'sediment'` 与 `'chrono'` 之间）/ `__REG.def`（`diplomacy: true`）/ `SRC_NAME`（`diplomacy: '外交事实'`）/ `SRC_MOD_SETTING` / 注入分支 / `VIS_NAMES` / `PRIORITY+ACCOUNTS`。显示名「外交事实」在七处逐字同名。
+
+**专锁**：`tests/s3-tx1-v2165.js`（**49 / 0**）—— A 面含 A16 容量四处同名登记、A17 面板 wa-dp-sign 渲染+绑定、A18 UI_BINDINGS 含 wa-dp-sign/wa-dp-out、A19 七锚点自引用；B/N 面覆盖行为与负控制。注入链四锁全绿：`inject-sources-v2560` pass(20)、`cost-v2880` pass、`explain-v2900` pass、`switch-matrix-v2910` pass(73)。冒烟脚本 `tools/tx1_smoke.js` 13/13。
+
+**升版面同批同步**：`index.js` 与 `manifest.json` 升 2.165.0；`module-registry-ledger` 由 `--update` 收敛（文件 181 / 命名空间 189 / 装载期边 83 / 硬边 0 / 调用期引用 164）；`dead-export-ledger` 由 `--update` 收敛（dead 768 / uiDead 3，与计划预期完全一致）；`reject-code-ledger` 手工追加沿革段（18 个码全部复用既有词表、三集不变 716 = 见证 478 / 死表 9 / 基线 229）；`export-contract` 重生成（ns=166/members=1153/chars=12804）；`FROZEN2800` 回填（12663→12804 字符）；`run.js` 九处版本钉 + 四族读数钉回填（refs 4489/namespaces 185/members 2232/dataOnly 271）；`module-cycle-gate-v2107` 八处钉重算 + `__diplomacyWarn` 内部 ns 登记修复（65 项全绿）；`settle-v2830` 两处计数钉更新（loadEdges 82→83 / callRefs 162→164 / nsCount 188→189 / loadedCount 180→181，55 项全绿）。
+
+**两条实测教训（如实留账）**：
+- **`DP.getSettings` 局部别名导致死导出门禁误报 unwired**。panel.js 里用了 `DP.getSettings()` 而门禁归因只识别全名引用 `WA.diplomacy.getSettings`，改为全名引用后修复。这不是产品缺陷，是门禁扫描面的口径限制 —— 但也正因如此，「局部别名绕过门禁」这条路被堵住了。
+- **`__diplomacyWarn` 内部 ns 未登记导致 module-cycle-gate 红灯**。`engines/diplomacy.js` 尾部自证块在写口数目不符时写 `WA.__diplomacyWarn`，这是一个 `__` 前缀的内部 ns，但未登记在 `tests/module-cycle-gate.js` 的 `NS_FACE_EXPECT.internalPrefixed` 例外表里（该表原只有 6 项）。追加 `'__diplomacyWarn'` 后修复 —— 与既有 `__settingsRegs`/`__loaderState` 等 6 个 `__` 前缀内部 ns 同性质。
+
+**边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 22 枚 dp 控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② 全量回归按指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数；③ `tools/tx1_smoke.js` 是本轮新建的辅助冒烟工具，随 TX1 提交（非产品文件也非专锁，是开发期验证工具）。
+
 ### R149 · 2026-10-06 · v2.163.0：O14 驱动面 —— UI 实机通道的零依赖内置 CDP 驱动
 
 **范围**：**测试面驱动通道**扩充（非产品功能）。本版不给产品加任何能力，治的是「判据写好了、驱动拿不到」这一**验证能力**缺口。**不勾选**任何优化项 —— 四栏制不变。

@@ -93,6 +93,9 @@
     //   唯有**面板显示名**这一处漏了 —— 而面板是用户唯一能开关它的地方（注入页/导演页会裸露英文键名）。
     //   同 v2.56.0 / v2.96.0 / v2.117.0 / v2.142.0 / v2.149.0 的理由 —— D 判据两向都锁：漏名与悬空名。
     worldBridge: '远方的传说',
+    // v2.165.0（TX1）：势力外交事实面。与 SOURCES / 注入分支 source 名 / SRC_NAME 同批 ——
+    //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 diplomacy，而那是用户唯一能开关它的地方。
+    diplomacy: '外交事实',
     sediment: '此地沉积',
     chrono: '世界编年史' };
 
@@ -1004,6 +1007,42 @@
            + `<button class="wa-btn wa-mini" id="wa-fg-hot" aria-label="势力关系网最紧张者" title="逐节点热度排行：谁跟最多家敌对、谁跟最多家同盟。unknowns 单列 —— 「档位不在词表里、算不出来」与「真的没有敌对」绝不同形">最紧张</button>`
            + `</div><div id="wa-fg-out" class="wa-out wa-dim">${esc(fr)}</div>`;
       })()}
+
+      <div class="wa-sec">势力外交（成对事实）</div>
+      <div class="wa-item">
+        <div class="wa-dim">与上面的「关系网」<b>不是同一个东西</b>：那一栏是<b>推导值</b>（按双方各自的对外态度算出来的图，<code>derived:true</code>），这一栏是<b>谈成的事实</b>（成对条目 / 双边态度 / 条约 / 有效期 / 履约回执）。推导结果<b>不会</b>自动迁成事实 —— 「算出来的」不许冒充「谈成的」。</div>
+        ${(() => {
+          const DP = WA.diplomacy;
+          if (!DP) return '<div class="wa-dim">势力外交未加载</div>';
+          const dr = panelEl.dataset.dpOut || '';
+          const dpOn = (WA.diplomacy.getSettings && WA.diplomacy.getSettings().enabled) ? true : false;
+          return `<div class="wa-row"><label class="wa-row"><input id="wa-dp-enabled" type="checkbox" ${dpOn ? 'checked' : ''}/> 启用势力外交</label></div><div class="wa-row">`
+            + `<button class="wa-btn wa-mini" id="wa-dp-view" aria-label="外交总览" title="全部成对条目与未结提案：状态 / 双边态度 / 有效条款（带到期日）/ 未结提案阶段。两个「没得看」的态分开报：开关关着 vs 一对都没谈过">外交总览</button>`
+            + `<input id="wa-dp-a" class="wa-input" aria-label="外交查对甲" placeholder="势力甲"/>`
+            + `<input id="wa-dp-b" class="wa-input" aria-label="外交查对乙" placeholder="势力乙"/>`
+            + `<button class="wa-btn wa-mini" id="wa-dp-pair" aria-label="查一对关系" title="就这两家此刻是什么关系：状态 + 两个方向各自的态度（非对称态度必须保留，不合成一个数）。没有成对条目就是 unknown —— 「未接触」不等于「中立」（中立是一个谈成过的状态）">查这对</button>`
+            + `<button class="wa-btn wa-mini" id="wa-dp-applies" aria-label="查条款适用性" title="这一条款此刻对这两家适用吗：只回答适用性（生效中 = 适用），资源后果由调用方经 org 完成。未接触（unknown）时报「不适用」——「没谈过」与「谈崩了」绝不同形">条款适用？</button>`
+            + `</div><div class="wa-row">`
+            + `<input id="wa-dp-from" class="wa-input" aria-label="提案发起方" placeholder="发起方"/>`
+            + `<input id="wa-dp-to" class="wa-input" aria-label="提案受方" placeholder="受方"/>`
+            + `<input id="wa-dp-terms" class="wa-input" aria-label="条款" placeholder="条款（trade / mutual-aid / armistice / embargo，逗号分隔）"/>`
+            + `<button class="wa-btn wa-mini" id="wa-dp-propose" aria-label="提出外交提案" title="提出提案：不产生正式世界效果（只落 proposals）。预检顺序固定：开关 → 字段 → 势力存在性 → 条款 → 时长 → 容量。自造条款一律拒收 —— 条款不成表，执行方就无从写代码">提提案</button>`
+            + `</div><div class="wa-row">`
+            + `<input id="wa-dp-id" class="wa-input" aria-label="提案号" placeholder="提案号"/>`
+            + `<select id="wa-dp-kind" class="wa-input" aria-label="答复种类"><option value="accept">接受</option><option value="counter">还价</option><option value="reject">拒绝</option></select>`
+            + `<input id="wa-dp-basis" class="wa-input" aria-label="答复依据" placeholder="答复依据（必填）"/>`
+            + `<button class="wa-btn wa-mini" id="wa-dp-reply" aria-label="答复提案" title="作出有据答复：必须给 by（受方）与 basis（依据）。没有依据的答复一律拒收 —— 「为什么答应 / 为什么拒绝」是这条链上唯一值得留存的东西">答复</button>`
+            + `<button class="wa-btn wa-mini" id="wa-dp-sign" aria-label="确认签约" title="确认签约：这一步才写 pairs。四道门：开关 → 提案为 accepted → 权限预检（读 inst.authority 真源；查不到 inst 一律拒收，不作默许放行）→ 容量。已生效的同名条款不重复签（duplicate-term）">确认签约</button>`
+            + `</div><div class="wa-row">`
+            + `<input id="wa-dp-pairid" class="wa-input" aria-label="成对号" placeholder="成对号（pairId）"/>`
+            + `<input id="wa-dp-term" class="wa-input" aria-label="条款" placeholder="条款（trade 等）"/>`
+            + `<input id="wa-dp-ev" class="wa-input" aria-label="证据" placeholder="证据（必填）"/>`
+            + `<button class="wa-btn wa-mini" id="wa-dp-fulfil" aria-label="履约回执" title="履约回执：必须有据（谁在何时怎么做到）。无据的「完成了」不结算 —— 同一完成证据不得重复结算（已结算再报 already）">履约</button>`
+            + `<button class="wa-btn wa-mini" id="wa-dp-breach" aria-label="违约留证" title="违约留证：本模块不判罚，只把条款标成 breached 并留证；罚则与资源后果由调用方（inst / org）决定">违约</button>`
+            + `<button class="wa-btn wa-mini" id="wa-dp-expire" aria-label="到期收敛" title="到期收敛：把到期条款标成 expired 并按剩余条款重算关系状态。幂等 —— 同一个时刻连调两次，第二次零改动（changed:0）">到期</button>`
+            + `</div><div id="wa-dp-out" class="wa-out wa-dim">${esc(dr)}</div>`;
+        })()}
+      </div>
 
       <div class="wa-sec">声誉四维</div>
       <div class="wa-item wa-rep-grid">${['authority','common','shadow','circuit'].map(dim => {
@@ -5785,6 +5824,96 @@
       const g = WA.factionGraph.buildGraph();
       if (!g.ok) return fgOut(fgWhy(g.reason));
       fgOut('边 ' + g.edges.length + ' 条（推导值）：' + g.edges.map(e => e.a + '—' + e.b + '：' + e.tier + '(' + e.affinity + ')').join('；'));
+    });
+    // v2.165.0（TX1）：势力外交八个入口的绑定。
+    //   四种「没做成」的情形一律显式报出（不留空面板）：模块缺席 / 开关未开 / 势力名不在
+    //   世界里 / 提案阶段不对 —— 空白面板会把「没做」与「做了是空的」塌成一件事。
+    //   与上面关系网的关键区别写在按钮 title 里：那栏是推导值，这栏是谈成的事实。
+    const dpOut = function (text) { panelEl.dataset.dpOut = text; const o = $('#wa-dp-out'); if (o) o.textContent = text; };
+    // v2.165.0（TX1）：启用开关（getSettings / setSettings 的真产品消费方，仿 v2.164.0
+    //   wa-bp-enabled 范式）。读面渲染初值，写面落模块设置键；module-missing 如实报，不猜。
+    { const el = $('#wa-dp-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.diplomacy || !WA.diplomacy.setSettings) return dpOut('未记录：module-missing', true);
+        WA.diplomacy.setSettings({ enabled: !!el.checked });
+        dpOut('已记录 ' + (el.checked ? 'enabled（提案 / 答复 / 签约 / 履约链恢复可用；注入源「外交事实」随总开关出正文）'
+          : 'disabled（pairs 与 proposals 仍留在存档里，只是不再提案、不再签约、不再注入）'), true);
+      };
+    }
+    const dpWhy = function (r) {
+      const m = { disabled: '外交开关未开（设置里打开后才有外交事实）',
+        'missing-fields': '缺字段（看提示里的 hint）',
+        'unknown-proposal': '提案号不在册', 'unknown-pair': '成对号不在册或该条款不在有效期内',
+        'bad-stage': '提案阶段不对（只有 accepted 可签）',
+        'no-authority': '权限预检未过 —— inst.authority 未认可发起方的批准权（查不到不作默许放行）',
+        'same-faction': '一对势力必须不同（自己跟自己不是一对）',
+        'bad-term': '条款不在词表（支持：trade / mutual-aid / armistice / embargo）' };
+      return m[r] || ('未做成：' + r);
+    };
+    on('#wa-dp-view', () => {
+      const v = WA.diplomacy.view();
+      if (!v.enabled) return dpOut('外交开关未开（设置里打开后才有外交事实）');
+      if (!v.pairs.length && !v.open.length) return dpOut('开关开着但一对都没谈过（「没谈过」不等于「推导图上写着中立」）');
+      dpOut('成对 ' + v.counts.pairs + ' / 未结提案 ' + v.counts.open + ' / 条款 ' + v.counts.terms + '：'
+        + (v.pairs.map(r => r.a + '×' + r.b + '［' + r.stateLabel + '｜有约 ' + r.activeTerms.length + '］').join('；') || '无成对')
+        + (v.open.length ? '｜未结：' + v.open.map(p => p.from + '→' + p.to + '(' + p.stage + ')').join('、') : ''));
+    });
+    // v2.165.0（TX1）：条款适用性（applies 的真产品消费方）。复用甲/乙输入与条款输入，
+    //   答一问：「这一条款此刻对这两家适用吗」——适用 = 条款在生效中（带到期日）。
+    //   未接触（unknown）与「谈崩了」不同形，输出里保留 state 让读者分得开。
+    on('#wa-dp-applies', () => {
+      const a = ($('#wa-dp-a') || {}).value || '', b = ($('#wa-dp-b') || {}).value || '';
+      const term = (($('#wa-dp-term') || {}).value || '').trim();
+      const r = WA.diplomacy.applies(a, b, term);
+      if (!r.ok) return dpOut(dpWhy(r.reason) + (r.hint ? '：' + r.hint : ''));
+      dpOut('条款「' + r.term + '」' + (r.applies ? '适用' : '不适用') + '（' + a + '×' + b + '，状态 ' + r.state
+        + (r.until ? '，至 ' + r.until : '') + '，pairId ' + (r.pairId || '—') + '）'
+        + (r.applies ? '—— 资源后果由调用方经 org 结算，本模块只答适用性'
+          : (r.state === 'unknown' ? '—— 未接触即不适用（「没谈过」不等于「谈崩了」）' : '—— 本对没有生效中的该条款')));
+    });
+    on('#wa-dp-pair', () => {
+      const a = ($('#wa-dp-a') || {}).value || '', b = ($('#wa-dp-b') || {}).value || '';
+      const r = WA.diplomacy.pairView(a, b);
+      if (!r.ok) return dpOut(dpWhy(r.reason) + (r.hint ? '：' + r.hint : ''));
+      dpOut(r.state === 'unknown' ? (r.note || '未接触') : (a + ' × ' + b + '：' + r.stateLabel + '（' + r.state + '）'
+        + '｜甲→乙 ' + r.att.a2b + ' / 乙→甲 ' + r.att.b2a + '（两个方向各自独立）'
+        + '｜有效条款 ' + (r.active.map(x => x.label + (x.until ? '(至' + new Date(x.until).toISOString().slice(0, 10) + ')' : '(无期限)')).join('、') || '无')));
+    });
+    on('#wa-dp-propose', () => {
+      const terms = (($('#wa-dp-terms') || {}).value || '').split(',').map(s => s.trim()).filter(Boolean)
+        .map(t => ({ term: t, days: null }));
+      const r = WA.diplomacy.propose({ from: ($('#wa-dp-from') || {}).value, to: ($('#wa-dp-to') || {}).value, terms: terms });
+      if (!r.ok) return dpOut(dpWhy(r.reason) + (r.hint ? '：' + r.hint : '') + (r.supported ? '（支持：' + r.supported.join('/') + '）' : ''));
+      dpOut('提案已立 ' + r.id + '（' + r.stage + '）—— ' + (r.note || ''));
+    });
+    on('#wa-dp-reply', () => {
+      const r = WA.diplomacy.reply({ id: ($('#wa-dp-id') || {}).value, kind: ($('#wa-dp-kind') || {}).value,
+        by: ($('#wa-dp-to') || {}).value, basis: ($('#wa-dp-basis') || {}).value });
+      if (!r.ok) return dpOut(dpWhy(r.reason) + (r.hint ? '：' + r.hint : ''));
+      dpOut('答复已记：' + r.id + ' → ' + r.stage + (r.note ? '（' + r.note + '）' : ''));
+    });
+    on('#wa-dp-sign', () => {
+      const r = WA.diplomacy.sign({ id: ($('#wa-dp-id') || {}).value });
+      if (!r.ok) return dpOut(dpWhy(r.reason) + (r.hint ? '：' + r.hint : ''));
+      dpOut('已签约 ' + r.pairId + '：状态 ' + r.state + '｜条款 '
+        + r.terms.map(x => x.label + (x.until ? '(至' + new Date(x.until).toISOString().slice(0, 10) + ')' : '(无期限)')).join('、'));
+    });
+    on('#wa-dp-fulfil', () => {
+      const r = WA.diplomacy.fulfil({ pairId: ($('#wa-dp-pairid') || {}).value, term: ($('#wa-dp-term') || {}).value,
+        evidence: ($('#wa-dp-ev') || {}).value });
+      if (!r.ok) return dpOut(dpWhy(r.reason) + (r.hint ? '：' + r.hint : ''));
+      dpOut('履约已结算 ' + r.term + '（证据：' + r.evidence + '）');
+    });
+    on('#wa-dp-breach', () => {
+      const r = WA.diplomacy.breach({ pairId: ($('#wa-dp-pairid') || {}).value, term: ($('#wa-dp-term') || {}).value,
+        evidence: ($('#wa-dp-ev') || {}).value });
+      if (!r.ok) return dpOut(dpWhy(r.reason) + (r.hint ? '：' + r.hint : ''));
+      dpOut('违约已留证 ' + r.term + '（状态 ' + r.state + '）—— ' + (r.note || ''));
+    });
+    on('#wa-dp-expire', () => {
+      const r = WA.diplomacy.expire({});
+      if (!r.ok) return dpOut(dpWhy(r.reason));
+      dpOut('到期收敛：改动 ' + r.changed + ' 处（幂等 —— 同一时刻再点一次应为 0）');
     });
     // v2.139.0（E9）：单对势力查边（`edgeOf` 的真产品消费方）。
     //   为什么不是又一个「看全部」按钮：上面那枚答「这张网长什么样」，这一枚答

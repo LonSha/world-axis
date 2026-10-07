@@ -227,6 +227,11 @@
     //   为什么 cap 是 'per-call'：上限 = `libCap` 设置（用户可调），写入时传入 ——
     //   静态登记而设置另有一套，就会变成一个「点了没效果的开关」（v2.154.0 为这条付过价）。
     'worldSeed.library': { path: 'worldSeed.library', cap: 'per-call', why: '世界生成种子库环（上限 = libCap 设置，写入时传入；同一结构不存两份）' },
+    // v2.165.0（TX1）：外交两环（diplomacy.js）。cap 同为 'per-call'（上限 = maxPairs /
+    //   maxProposals 设置，用户可调，写入时传入）—— 静态登记而设置另有一套，就会变成
+    //   一个「点了没效果的开关」。本表必须与 core/store.js 的 __BOUNDED_CAPS 同名同值。
+    'diplomacy.pairs': { path: 'diplomacy.pairs', cap: 'per-call', kind: 'object', why: '外交成对条目（按 pairId 键；上限 = maxPairs 设置，写入时传入）' },
+    'diplomacy.proposals': { path: 'diplomacy.proposals', cap: 'per-call', kind: 'object', why: '外交提案链（按提案号键；上限 = maxProposals 设置，写入时传入）' },
     // v2.164.0（TX5）：版本化完整世界蓝图库（world-blueprint.js）。
     //   与 worldSeed.library 同款：cap 是 'per-call'（上限 = `libCap` 设置，用户可调，
     //   写入时传入）—— 静态登记而设置另有一套，就会变成一个「点了没效果的开关」。

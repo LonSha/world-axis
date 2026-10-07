@@ -1,13 +1,13 @@
 {
- "version": "2.164.0",
- "loadOrderCount": 184,
- "loadedCount": 180,
+ "version": "2.165.0",
+ "loadOrderCount": 185,
+ "loadedCount": 181,
  "uiCount": 4,
- "nsCount": 188,
+ "nsCount": 189,
  "totals": {
-  "loadEdges": 82,
+  "loadEdges": 83,
   "hardEdges": 0,
-  "callRefs": 162,
+  "callRefs": 164,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -44,6 +44,7 @@
     "engines/calendar.js",
     "engines/chapters.js",
     "engines/coop.js",
+    "engines/diplomacy.js",
     "engines/direct-event.js",
     "engines/eco-audit.js",
     "engines/economy.js",
@@ -255,6 +256,7 @@
     "engines/branch-tree.js",
     "engines/calendar-custom.js",
     "engines/coop.js",
+    "engines/diplomacy.js",
     "engines/eco-audit.js",
     "engines/economy.js",
     "engines/ensemble.js",
@@ -3117,6 +3119,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_world_blueprint_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/diplomacy.js": {
+   "ns": [
+    "diplomacy"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_diplomacy_settings_v1"
    ],
    "consumedBy": []
   },

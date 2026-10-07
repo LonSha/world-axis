@@ -236,6 +236,11 @@
       //   （「重开一局想选上一局那个格局」要求它活过会话），而 eco-audit 是进程态只读面。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务。
       worldSeed: { library: [], seq: 0 },
+      // v2.165.0（TX1）：势力外交事实（diplomacy.js）。
+      //   pairs 是**成对条目**（key = pairId，稳定 ID），proposals 是提案链。
+      //   进骨架的理由与 blueprint 同款：外交事实是**跨会话要留下**的世界资产
+      //   （「我们之间签过什么、到没到期」不能因为关一次会话就消失）。
+      diplomacy: { pairs: {}, proposals: {}, seq: 0 },
       // v2.164.0（TX5）：版本化完整世界蓝图库（world-blueprint.js）。
       //   与 worldSeed 同款**进骨架**：蓝图库是**跨会话要留下**的世界资产（「把这局的世界
       //   原样搬到另一段聊天」要求它活过会话），而 importBlueprint 还会写 installed 留痕
@@ -1409,6 +1414,11 @@
     //   `blueprint.installed` **不登记**：它是单值留痕（不是数组环），登记会把「一个字段」
     //   伪装成「一个有界容器」（与 worldBridge.title 同口径）。
     'blueprint.library': { cap: 8, site: 'world-blueprint.js save() WA.evict.array(b.library, blueprint.library, cfg.libCap)（per-call，取设置上界）' },
+    // v2.165.0（TX1）：外交成对条目与提案链两环（diplomacy.js）。
+    //   两处逐键同名同值登记：本表 + core/evict.js SITES —— SITES 缺键时
+    //   evict.array 会走 unknown-site 静默失败，环就成了「登记了容量却没人执行」。
+    'diplomacy.pairs': { cap: 'per-call', site: 'diplomacy.js sign() 入口 maxPairs 预检（per-call，取设置上界）' },
+    'diplomacy.proposals': { cap: 'per-call', site: 'diplomacy.js propose() 入口 maxProposals 预检（per-call，取设置上界）' },
     'worldBridge.legends': { cap: 24, site: 'world-bridge.js WA.evict.array(b.legends, maxLegends)（per-call，取设置上界）' },
     'worldBridge.exported': { cap: 12, site: 'world-bridge.js WA.evict.array(b.exported)' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },

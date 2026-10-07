@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.164.0'
+  const VERSION = '2.165.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -586,6 +586,12 @@
     //   调用期依赖：registry（人物唯一写者）/ world（地点与道路形状）/ evict（蓝图库容量）
     //   —— 全在调用期取，故此处对装载期无硬依赖。
     'engines/world-blueprint.js',
+    // v2.165.0（TX1）：可谈判、可履约的势力外交（engines/diplomacy.js）。位置紧随
+    //   world-blueprint：它在调用期读 store / evolution.factions / inst.authority / clock /
+    //   inputGuard（全在本行之前装载），不依赖任何后装模块。
+    //   与 faction-graph 的分工写在模块头：前者是**推导面**（derived 边），本模块是**事实面**
+    //   （pairId / 双边态度 / 条约 / 履约回执）—— 两者不相迁（推导结果不静默写进事实表）。
+    'engines/diplomacy.js',
     // v2.156.0（SP1）：时间来源与游玩生命周期（engines/playtime.js）。位置在 world-seed 之后、
     //   ui/panel.js 之前：它在调用期读 store / settingsBus / clock / inputGuard（全部在本行之前装载），
     //   且只写自己那一格 localStorage 键——不依赖任何后装模块。

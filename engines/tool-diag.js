@@ -747,6 +747,53 @@
   }
 
   /**
+   * v2.165.0（TX1）：势力外交读面。
+   *   与 faction-graph 节的分工必须在这里说清：那一节答「按双方立场**推导**出来的关系图是
+   *   什么样」（derived:true），本节答「**谈成了什么**」（pairId / 双边态度 / 有效条款 / 到期）。
+   *   两问的失效模式完全不同：推导面失效在「算出来没人看」，事实面失效在
+   *   「条约到期了没人收」—— 后者会让一张早该失效的禁运永远挂在商路上，
+   *   故本节必须把 `activeTerms` 与 `open`（未结提案）分列读数，而不是只报「有几对势力」。
+   *   两个「没得看」的态也要分开：「开关关着」（enabled false）与「开关开着但一对都没谈过」
+   *   —— 前者去设置页，后者去 propose。
+   */
+  function secDiplomacy() {
+    return safe(function () {
+      if (!WA.diplomacy || typeof WA.diplomacy.stat !== 'function') return { error: 'engines/diplomacy.js 未加载（外交事实读数缺席）' };
+      const st = WA.diplomacy.stat();
+      const v = (typeof WA.diplomacy.view === 'function') ? WA.diplomacy.view() : { pairs: [], open: [] };
+      return {
+        enabled: st.enabled,
+        pairs: st.live ? st.live.pairs : 0,
+        open: st.live ? st.live.open : 0,
+        activeTerms: st.live ? st.live.activeTerms : 0,
+        signed: st.signed, refused: st.refused, lastReason: st.lastReason,
+        faults: Object.assign({}, st.faults || {}),
+        terms: (WA.diplomacy.TERMS || []).slice(),
+        states: (WA.diplomacy.STATES || []).slice(),
+        rows: (v.pairs || []).map(function (r) {
+          return { pairId: r.pairId, a: r.a, b: r.b, state: r.state, stateLabel: r.stateLabel,
+            att: { a2b: r.att.a2b, b2a: r.att.b2a },
+            active: (r.activeTerms || []).map(function (x) { return { term: x.term, label: x.label, until: x.until }; }) };
+        }),
+        // v2.165.0（TX1）：pairId 对称性探针 + 自证面（pairId / diagnose 的诊断消费方）。
+        //   为什么在这里再探一次：诊断节是「按什么口径算」的唯一答处——同一对势力
+        //   参数顺序颠倒后 id 必须相同（[a,b].sort() + FNV-1a 的契约），这里当场证，
+        //   不等外部脚本旁证。
+        pairSymmetry: (typeof WA.diplomacy.pairId === 'function')
+          ? { probe: '甲盟×乙邦 正反各算一次', same: WA.diplomacy.pairId('甲盟', '乙邦') === WA.diplomacy.pairId('乙邦', '甲盟'),
+              sample: WA.diplomacy.pairId('甲盟', '乙邦') }
+          : { error: 'pairId 未导出（稳定 ID 契约缺席）' },
+        self: (typeof WA.diplomacy.diagnose === 'function')
+          ? WA.diplomacy.diagnose()
+          : { error: 'diagnose 未导出（自证面缺席）' },
+        note: !st.enabled ? '外交总开关关闭（默认关）—— 关闭时不提案、不签约、不注入'
+          : ((st.live && st.live.pairs === 0) ? '开关开着但一对都没谈过（propose 未调用）——「没谈过」不等于「推导图上写着中立」'
+            : ((st.live && st.live.open > 0) ? '有未结提案（proposed / countered / accepted）—— 未签约提案不产生正式世界效果' : null))
+      };
+    });
+  }
+
+  /**
    * v2.156.0（SP1）：时间来源与游玩活动基准读数。
    *   为什么单列一节而不并进 life 节：life 那节答「人物这一轮做了什么」，
    *   本节答「玩家离开的这段真实时间被谁记着」——两问的失效模式不同
@@ -1469,6 +1516,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   secWorldBlueprint 都读它，缺席就是「蓝图库读数缺席」本身，不该被静默兜住。
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取。
     'engines/world-blueprint.js': 'worldBlueprint',
+    'engines/diplomacy.js': 'diplomacy',
     // v2.156.0（SP1）：游玩活动基准。登记为必载 —— 面板「会话」页基准段与本文件的
     //   secPlaytime 都读它，缺席就是「活动基准读数缺席」本身，不该被静默兜住。
     'engines/playtime.js': 'playtime',
@@ -2400,6 +2448,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-bp-export', 'wa-bp-list', 'wa-bp-stat', 'wa-bp-id', 'wa-bp-get', 'wa-bp-drop',
       'wa-bp-check', 'wa-bp-empty',
       'wa-bp-keep', 'wa-bp-preview', 'wa-bp-import', 'wa-bp-out'] },
+    // v2.165.0（TX1）：势力外交 22 枚 —— 面板「世界」页（外交总览 / 查对 / 提案适用性 / 提提案 /
+    //   答复 / 签约 / 履约 / 违约 / 到期 / 启用开关）。同口径：无条件渲染（diplomacy 是产品文件，
+    //   缺席本身就是断裂，不降级成提示）；渲染了不登记 ⇒ 绑定断裂永不可见（v2.124.0 的
+    //   wa-perf-band 漏登记即此病）。
+    { page: 'world', ids: ['wa-dp-enabled', 'wa-dp-view', 'wa-dp-a', 'wa-dp-b', 'wa-dp-pair', 'wa-dp-applies', 'wa-dp-from', 'wa-dp-to',
+      'wa-dp-terms', 'wa-dp-propose', 'wa-dp-id', 'wa-dp-kind', 'wa-dp-basis', 'wa-dp-reply', 'wa-dp-sign',
+      'wa-dp-pairid', 'wa-dp-term', 'wa-dp-ev', 'wa-dp-fulfil', 'wa-dp-breach', 'wa-dp-expire', 'wa-dp-out'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
@@ -3127,6 +3182,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   （无损、稳定 ID + 方向化关系 + 道路端点）；前者失效在「同名被静默合并」，
       //   后者失效在「版本对不上却按 v1 猜着收 ⇒ 静默污染目标存档」。
       worldBlueprint: secWorldBlueprint(),
+      diplomacy: secDiplomacy(),
       // v2.156.0（SP1）：时间来源与游玩活动基准。与 life 节分列不合并（两问的失效模式不同）。
       playtime: secPlaytime(),
       // v2.156.0（S1）：离线恢复编排。与 playtime 节分列不合并 ——

@@ -16,13 +16,13 @@
 | TP6 / TP8 / TP9 | 未开始 / 部分 | TP9 的文档面逐版落：README 补 v2.158.0–v2.163.0 六条并更新当前版本行；真实宿主四栏仍未齐 |
 | O14 验证能力面（非优化项） | 已交付（v2.163.0） | UI 实机通道补第四条驱动 `builtin-cdp@node-websocket`（Node 自带 WebSocket 直连 CDP，零依赖）；两驱动共用骨架；三条实测驱动缺陷同批修（route 缺 `fulfill` / `goto` 不认 `about:blank` / 模态对话框不应答）；搜索面补 `SYSTEM_BROWSER_PATHS` 使隔离环境可达 full 档；专锁 `tests/ui-live-v2137.js` **54 / 0** |
 | TX5 版本化完整世界蓝图 | 已交付（v2.164.0） | `engines/world-blueprint.js`（十一口 + 面板 16 控件 + 骨架容器 `blueprint`，`library` cap=8 两处逐键同值登记）；专锁 `tests/s3-tx5-v2164.js` **59 / 0**；真实宿主面板未验 |
-| TX1–TX4 / TX6–TX9 | 未开始 | 见拓展线计划 |
+| TX1 可谈判、可履约的势力外交 | 已交付（v2.165.0） | `engines/diplomacy.js`（21 成员：词表 TERMS/STATES/STAGES/CODES + propose/reply/sign + fulfil/breach/expire + view/pairView/applies/buildBlock + pairId/diagnose/stat + getSettings/setSettings）；六个死导出全部接真实消费方（面板控件+注入源+诊断探针）；注入链七点同批登记；专锁 `tests/s3-tx1-v2165.js` **49 / 0**；冒烟 `tools/tx1_smoke.js` 13/13；真实宿主面板未验 |
 
 - [优化提升计划：TP1–TP9](plans/TP_OPTIMIZATION.md)：先修两项已复现的跨聊天写入，再收口已有路径、提交、证据、性能、容量、注入和宿主体验。
 - [功能拓展计划：TX1–TX9](plans/TX_EXPANSION.md)：外交、人物行动、区域供需、可玩分支、完整蓝图，以及委托、调查、地点后果、组织运营。
 - [提案理由、旧项对照与大更新排期](.agents/notes/proposed/architecture/2026-10-05-worldaxis-tp-tx-plans.md)。
 
-**旧信息校正**：下方 RP/RX/SP/S 为历史计划，勾选只保留其对应交付/验收口径。当前 S2 已有 farfield.auto 工作流；S3 已有种子转移/导入/预览/确认；SP6 已有面板控件和 mini-DOM 锁，真实宿主仍未验收。S1 有 before/after 与成功运行后建立的 chat:changed 订阅；**v2.161.0 已补上页面恢复入口**（`visibilitychange` / `pageshow`，惰性挂载 + 合并窗），真实宿主触发仍待验收。种子确认与迟到摘要的跨聊天缺陷本轮复跑仍成立。README 的当前版本已更新到 v2.164.0（v2.158.0–v2.164.0 摘要已补；**v2.164.0 是 TX5 拓展线第一批，属产品能力 ⇒ 本页优化四栏状态不变，拓展线多一项已交付**）；architecture 的部分数量仍可能过时，实际版本以 manifest/index 为准；旧全量数字不代表当前源码。
+**旧信息校正**：下方 RP/RX/SP/S 为历史计划，勾选只保留其对应交付/验收口径。当前 S2 已有 farfield.auto 工作流；S3 已有种子转移/导入/预览/确认；SP6 已有面板控件和 mini-DOM 锁，真实宿主仍未验收。S1 有 before/after 与成功运行后建立的 chat:changed 订阅；**v2.161.0 已补上页面恢复入口**（`visibilitychange` / `pageshow`，惰性挂载 + 合并窗），真实宿主触发仍待验收。种子确认与迟到摘要的跨聊天缺陷本轮复跑仍成立。README 的当前版本已更新到 v2.165.0（v2.158.0–v2.165.0 摘要已补；**v2.165.0 是 TX1 拓展线第二批，属产品能力 ⇒ 本页优化四栏状态不变，拓展线多一项已交付**）；architecture 的部分数量仍可能过时，实际版本以 manifest/index 为准；旧全量数字不代表当前源码。
 
 ---
 
