@@ -1,13 +1,13 @@
 {
- "version": "2.170.0",
- "loadOrderCount": 190,
- "loadedCount": 186,
+ "version": "2.171.0",
+ "loadOrderCount": 191,
+ "loadedCount": 187,
  "uiCount": 4,
- "nsCount": 194,
+ "nsCount": 195,
  "totals": {
-  "loadEdges": 88,
+  "loadEdges": 89,
   "hardEdges": 0,
-  "callRefs": 174,
+  "callRefs": 176,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -34,6 +34,7 @@
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
+    "engines/aftermath.js",
     "engines/agency.js",
     "engines/archive-hide.js",
     "engines/backstage.js",
@@ -255,6 +256,7 @@
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
+    "engines/aftermath.js",
     "engines/agency.js",
     "engines/archive-hide.js",
     "engines/beat-mask.js",
@@ -2179,6 +2181,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_investigation_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/aftermath.js": {
+   "ns": [
+    "aftermath"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_aftermath_settings_v1"
    ],
    "consumedBy": []
   },

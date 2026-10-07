@@ -394,6 +394,7 @@ const LOAD = [
   'engines/story-choice.js',
   'engines/commission.js',
   'engines/investigation.js',
+  'engines/aftermath.js',
    // v2.156.0（SP1）：时间来源与游玩生命周期（与 index.js LOAD_ORDER 同序）。
   //   必须进 LOAD：专锁（tests/playtime-v2156.js）要在同一 vm 上下文里装载它；
   //   且 reject-code-gate 的见证面从本文件提取 LOAD —— 缺席会让本模块的拒收码见证

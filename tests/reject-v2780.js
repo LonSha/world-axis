@@ -254,6 +254,15 @@ const DEAD = {
   'insufficient-evidence': {
     anchor: "noteFault('insufficient-evidence'); return { ok: false, reason: 'insufficient-evidence', verdict: chk.verdict };",
     why: 'investigation.reveal: evidence verdict not verified/cannot-judge. Needs insufficient evidence.'
+  },
+  // v2.171.0（TX8）: aftermath 拒收码 DEAD 表登记（engines/aftermath.js）。
+  'duplicate-event': {
+    anchor: "if (findByEvent(eventId)) { noteFault('duplicate-event'); return { ok: false, reason: 'duplicate-event', eventId: eventId }; }",
+    why: 'aftermath.register: same eventId already registered. Needs 2nd register with same eventId.'
+  },
+  'effects-full': {
+    anchor: "if (effects().length >= cfg.maxEffects) { noteFault('effects-full'); return { ok: false, reason: 'effects-full', cap: cfg.maxEffects }; }",
+    why: 'aftermath.register: max effects reached. Needs 48+ existing effects in state.'
   }
 };
 

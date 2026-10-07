@@ -882,6 +882,14 @@
       checks: d.checks, version: d.version,
       stat: iv.stat() };
   }
+  function secAftermath() {
+    var af = WA.aftermath;
+    if (!af) return { error: 'aftermath 模块未装载', closedLoop: false };
+    var d = af.diagnose();
+    return { module: 'aftermath', loaded: true, closedLoop: d.closedLoop,
+      checks: d.checks, version: d.version,
+      stat: af.stat() };
+  }
   /**
    * v2.156.0（SP1）：时间来源与游玩活动基准读数。
    *   为什么单列一节而不并进 life 节：life 那节答「人物这一轮做了什么」，
@@ -1614,6 +1622,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/story-choice.js': 'storyChoice',
     'engines/commission.js': 'commission',
     'engines/investigation.js': 'investigation',
+    'engines/aftermath.js': 'aftermath',
     // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。登记为必载 —
     //   面板「世界」页行动调度段与本文件的 secAgency 都读它，缺席就是
     //   「行动闭环读数缺席」本身，不该被静默兜住。
@@ -2563,6 +2572,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'world', ids: ['wa-sc-enabled', 'wa-sc-present', 'wa-sc-confirm', 'wa-sc-review', 'wa-sc-pending', 'wa-sc-out'] },
     { page: 'world', ids: ['wa-cm-enabled', 'wa-cm-create', 'wa-cm-advance', 'wa-cm-settle', 'wa-cm-cancel', 'wa-cm-view', 'wa-cm-pending', 'wa-cm-out'] },
     { page: 'world', ids: ['wa-iv-enabled', 'wa-iv-register', 'wa-iv-investigate', 'wa-iv-check', 'wa-iv-reveal', 'wa-iv-view', 'wa-iv-pending', 'wa-iv-out'] },
+    { page: 'world', ids: ['wa-af-enabled', 'wa-af-register', 'wa-af-repair', 'wa-af-inspect', 'wa-af-active', 'wa-af-view', 'wa-af-cancel', 'wa-af-out'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
@@ -3296,6 +3306,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       storyChoice: secStoryChoice(),
       commission: secCommission(),
       investigation: secInvestigation(),
+      aftermath: secAftermath(),
       // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。与 diplomacy 节分列不合并
       //   —— 一个答「谈成的事实」，一个答「谁在做什么、计划步到哪、有没有在途行动」。
       // v2.156.0（SP1）：时间来源与游玩活动基准。与 life 节分列不合并（两问的失效模式不同）。
