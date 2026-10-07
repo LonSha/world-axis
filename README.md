@@ -67,7 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.166.0）
+## 构建与验收（当前版本 v2.167.0）
 
 ```bash
 node tests/run.js               # 全量回归入口 → **通过 15455 / 失败 0**（`status: passed`，v2.163.0 收口轮实测，整趟约 15 分钟）。**跑法很要紧**：`node tests/run.js` 直接跑会在中段被 SIGKILL 而只留 `Status: interrupted`（那是**跑法错误**，不是判据失败）—— 正确入口是 `isolated-runner.launch(root, { timeoutMs: 1800000 })`，即须传 `WA_REGRESSION_TIMEOUT_MS`（本机整趟 >660s；默认 660000ms 由 v2.131.0 的实测驱动设定）。此前纪律期「不跑全量」已随计划全部落盘而解除 —— 解除后的**第一趟**即拿出 15433 / 10，10 条全是历史欠账（陈旧精确读数 / 抖动带阈值 / 判据锚点写错三族），逐条归因见 `ITERATION_LOG.md` 的 R148「收口轮」段；v2.163.0 收口轮又拿出 15436 / 19，19 条**全部由本版版本升级引起**（版本钉消息文本不同批 / 台账末次版本词未跟 / 新开调用点未入武装表），逐条归因见 R149。
@@ -123,6 +123,12 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 <b>消费方接线</b>（七个导出全部接上真实产品消费方）：<code>getSettings</code>/<code>setSettings</code> → 面板「启用行动闭环」复选框（<code>wa-ag-enabled</code>）；<code>schedule</code> → 面板「调度行动」按钮（<code>wa-ag-schedule</code>）；<code>processReceipts</code> → 面板「处理回执」按钮（<code>wa-ag-receipts</code>）；<code>buildBlock</code> → <code>render/inject.js</code> 新注入源（source 名「行动调度」）；<code>diagnose</code>/<code>stat</code> → <code>tool-diag</code> secAgency。注入链七点同批登记。
 <b>实测读数</b>：<code>module-registry-gate</code> 文件 <b>182</b> / 命名空间 <b>190</b> / 装载期边 <b>84</b> / 硬边 0 / 调用期引用 <b>166</b>；拒收码 <b>725 码（见证 481 / 死表 16 / 基线 228）</b>；<code>module-cycle-gate-v2107</code> pass(65)。
 <b>专锁 <code>tests/s3-tx2-v2166.js</code> 47 / 0</b>。冒烟脚本 <code>tools/tx2_smoke.js</code> 7/0。
+<b>v2.167.0</b> — <b>TX3 区域供需、在途运输与商路选择</b>（<b>拓展线第三批</b>：为 economy/region 补上在途运输层 —— dispatch 扣源库存 + 创建在途记录，arrive 到货入库（幂等），cancel 退货 + 损运费，reroute 改道 + 重估 ETA）。
+<b>它治什么</b>：economy 的 <code>ship</code> 是即时的（直接增加目的地库存无源扣减），没有在途状态、没有运输时长、没有到货确认。TX3 补的就是这一层：<code>engines/freight.js</code> —— 协调者而非替代者，只扣/加 economy 既有库存，不凭空造库存/造路线/造资源。
+<b>八条否定式边界</b>：① 默认关；② 守恒（源扣减 + 在途 = 原量）；③ 未到货库存不可买；④ 缺路线/缺运输时长 → 拒算；⑤ 封路保留货物；⑥ 取消按已执行阶段结算；⑦ 重复到货幂等拦截；⑧ 不凭空造库存/造路线/造资源。
+<b>消费方接线</b>（十个导出全部接上真实产品消费方）：<code>getSettings</code>/<code>setSettings</code> → 面板「启用货运在途」复选框（<code>wa-fr-enabled</code>）；<code>dispatch</code>/<code>arrive</code>/<code>cancel</code>/<code>reroute</code> → 面板四枚按钮；<code>view</code> → 面板输出区（<code>wa-fr-out</code>）；<code>buildBlock</code> → <code>render/inject.js</code> 新注入源（source 名「货运在途」）；<code>diagnose</code>/<code>stat</code> → <code>tool-diag</code> secFreight。注入链七点同批登记。
+<b>实测读数</b>：<code>module-registry-gate</code> 文件 <b>183</b> / 命名空间 <b>191</b> / 装载期边 <b>85</b> / 硬边 0 / 调用期引用 <b>168</b>；拒收码 <b>732 码（见证 481 / 死表 23 / 基线 228）</b>；<code>module-cycle-gate-v2107</code> pass(65)。
+<b>专锁 <code>tests/s3-tx3-v2167.js</code> 66 / 0</b>。冒烟脚本 <code>tools/tx3_smoke.js</code> 11/0。
 <b>v2.164.0</b> — <b>TX5 版本化完整世界蓝图</b>（<b>拓展线第一批</b>：把「一个世界的骨架」做成<b>可导出 / 可校验 / 可装载</b>的对象 —— 而不是一次写死的初始化）。
 <b>它治什么</b>：本仓的「新局」一直是<b>生成</b>出来的（种子 → 人物 / 势力 / 地点 / 时代），却没有任何地方能把一个已经<b>成型</b>的世界骨架取出来、带版本地交给另一个存档。「换个局重新玩」只能重新生成，而生成是<b>随机的</b> —— 玩家碰到的那个世界留不下来，也没法分发给别人。TX5 补的就是这一层：<code>engines/world-blueprint.js</code>。
 <b>四条设计约束</b>：① <b>稳定 key 是全部引用的地基</b>：<code>stableKey(kind, name, idx)</code> 用 FNV-1a 低 32 位对 <code>kind|name|idx</code> 取签名，于是<b>同名不合并</b>（<code>idx</code> 进签名）、<b>换名字即换 key</b>、同一份骨架在两边算出同一串 key —— 关系边与道路端点都按 key 引用，不用数组下标（下标一挪，所有边都指错人）。② <b>白名单提取而非黑名单过滤</b>：人设只取 <code>personality / worldview / family</code> 三节、机制只取 <code>enabled</code> 一键 —— 黑名单会随产品新增字段静默漏出（新字段默认被带出去），白名单则相反（默认不带，想带要显式登记）。③ <b>拒收要趁早要带名字</b>：18 个拒收码每个都答得出「哪里不对、期待什么」（<code>bad-bp-ver</code> 带 <code>got/supported</code>、<code>library-full</code> 带 <code>cap</code>、<code>not-empty</code> 带 <code>what</code> 清单、<code>duplicate-id</code> 带重复的 key）。④ <b>装世界只作用于空新局</b>：<code>previewImport</code> 对非空目标直接拒 <code>not-empty</code>（预览就拒，不等到写入才发现），<code>importBlueprint</code> 另有<b>事务外预检 + 事务内 draft 复核两道</b> —— 前者读 <code>memCache</code>（快，但可能被过时现场骗过），后者读 draft（事务里刚写脏的那一份，是最后一道）。

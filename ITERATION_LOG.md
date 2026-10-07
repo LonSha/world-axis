@@ -133,6 +133,22 @@
 
 **边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 16 枚控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② `ui/panel.js` 在无头回归里不装载，「六处登记」里 UI 那一处靠**文本锚点**判据（不是运行时行为）；③ 全量回归按本次指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数。
 
+### R153 · 2026-10-07 · v2.167.0：TX3 区域供需、在途运输与商路选择
+**范围**：**拓展线第四批**。交付 **TX3**（宿主/玩家两栏待验收）。新增 `engines/freight.js`（命名空间 `WA.freight`，10 成员导出：getSettings/setSettings + dispatch/arrive/cancel/reroute + view/buildBlock/diagnose/stat）。
+**缺口**：economy 已有库存/价格/买卖/路线；region 有地理/道路/封路。但货物从 A 地到 B 地是**即时的**（economy.ship 直接到货无源扣减），没有在途状态、没有运输时长、没有到货确认、没有取消退货、没有改道。freight 补的就是这一层：dispatch 扣源库存 + 创建在途记录（status='transit'），arrive 到货入库（幂等），cancel 退货 + 损运费，reroute 换路线 + 重估 ETA，view 含守恒校验。
+**协调者边界（本版最要紧的八条）**：① 默认关（enabled:false）；② 守恒：源扣减 + 在途 = 原量；到货后在途→目的地；③ 未到货库存不可买（在途 ≠ 已抵达）；④ 缺路线/缺运输时长 → 拒算（不凭空造距离）；⑤ 封路保留货物（不消失，可解除续运）；⑥ 取消按已执行阶段结算（退货运、损运费）；⑦ 重复到货被状态标记拦截（幂等）；⑧ 不凭空造库存/造路线/造资源（economy 是库存真源，本模块只协调）。
+**七个拒收码全部登记 DEAD 表**：already-arrived（幂等拦截）/ bad-state（状态错乱）/ missing-dest（路线缺目的地）/ missing-transit-time（运输时长未指定）/ shipments-full（在途容量满）/ unknown-shipment（货运单不存在）/ unknown-source（源库存不存在）。七码在标准 boot 环境需要复杂前置条件（需先 setup economy 数据），无法在无数据 boot 直接 trip，但源码结构可达，故走 DEAD 表（带可复算锚点 + why），不进基线。死表 16 → 23。
+**注入链七点同批登记**：SOURCES 数组（'freight' 插在 'agency' 与 'chrono' 之间）/ __REG.def / SRC_NAME（freight: '货运在途'）/ SRC_MOD_SETTING / 注入分支 / VIS_NAMES / PRIORITY+ACCOUNTS（rank 5，与「外交事实」「组织制度」「用户锁定」同层）。显示名「货运在途」在七处逐字同名。
+**panel 13 控件 + handler**：wa-fr-enabled/route/from/res/qty/days/dispatch/arrive/cancel/reroute/view/diag/out。tool-diag secFreight 四点接线（模块映射/secFreight 函数 35 行/UI_BINDINGS 13 控件/diag 对象）。
+**专锁**：`tests/s3-tx3-v2167.js`（**66 / 0**）—— A 面 16 条结构断言（10 导出/DEF.enabled=false/自证块/注入链七点/panel 8 控件/tool-diag 四点/LOAD_ORDER/manifest/VERSION/run.js/__freightWarn/UI sync），B 面 14 条行为断言（模块加载/默认关/disabled/unknown-route/route-blocked/short-stock/missing-transit-time 拒收/dispatch 守恒/arrive 幂等/cancel 退货/diagnose closedLoop/stat/__freightWarn 未触发/toolDiag），N 面 3 条负控制。冒烟 `tools/tx3_smoke.js` 11/0。
+**升版面同批同步**：index.js 与 manifest.json 升 2.167.0；module-registry-ledger --update（文件 183/命名空间 191/装载期边 85/调用期引用 168）；dead-export-ledger --update（dead 768/uiDead 3 不变）；reject-code-ledger 手工追加 v2.167.0 沿革段 + version 升 2.167.0；reject-v2780.js DEAD 表追加 7 码（死表 16→23）；export-contract 重生成；module-cycle-gate-v2107 八钉重算（文件 188/别名 188/有引用 186/边 1510/LOAD_ORDER 187，65 项全绿）+ __freightWarn 登记；settle-v2830 两钉更新（loadEdges 85/callRefs 168/nsCount 191/loadedCount 183，55 项全绿）。TX2 专锁版本钉跟版（接受 2.166.0 或 2.167.0）。
+**五条实测教训（如实留账）**：
+- **panel.js 模板字符串嵌套导致 SyntaxError**。首版 HTML 控件使用嵌套反引号（在 `${(() => { return \`<div...\` })()}` 内），导致 `SyntaxError: Unexpected token 'class'`。改用单引号字符串拼接后修复。
+- **Python 脚本 anchor 不匹配**。HTML anchor 含额外空行 `\n\n`，修正后匹配成功。
+- **sync.check 不是 ui-gate-sync.js 的导出**。导出的是 fresh/checkPages/checkClickable/checkSrcMaps，改为文本断言（PAN.indexOf / DIAG.indexOf）后修复。
+- **vm sandbox 无法加载 economy/freight**。const WA = window.WorldAxis = ... 在 sandbox 中创建新 {} 而非复用 sandbox，导致 WA.economy/WA.freight undefined。改用 sync.fresh({}).WA 创建完整 boot 环境后修复（与 TX1/TX2 同口径）。
+- **TX2 专锁版本钉硬编码 2.166.0**。升版后报 2 fail，改为接受 2.166.0 或 2.167.0 后修复。
+**边界（如实登记）**：① 真实宿主一栏仍未验收——面板 13 枚 fr 控件只经无头 mini-DOM 与专锁锚点判据，未在手机浏览器真跑；② 全量回归按指令放在全部计划项做完之后统一跑一次；③ `tools/tx3_smoke.js` 是本轮新建辅助冒烟工具，随 TX3 提交。
 ### R152 · 2026-10-07 · v2.166.0：TX2 人物动机、计划、行动与反馈闭环
 **范围**：**拓展线第三批**。交付 **TX2**（宿主/玩家两栏待验收）。新增 `engines/agency.js`（命名空间 `WA.agency`，7 成员导出：getSettings/setSettings + schedule/processReceipts + buildBlock/diagnose/stat）。
 

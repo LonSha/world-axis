@@ -18,6 +18,7 @@
 | TX5 版本化完整世界蓝图 | 已交付（v2.164.0） | `engines/world-blueprint.js`（十一口 + 面板 16 控件 + 骨架容器 `blueprint`，`library` cap=8 两处逐键同值登记）；专锁 `tests/s3-tx5-v2164.js` **59 / 0**；真实宿主面板未验 |
 | TX1 可谈判、可履约的势力外交 | 已交付（v2.165.0） | `engines/diplomacy.js`（21 成员：词表 TERMS/STATES/STAGES/CODES + propose/reply/sign + fulfil/breach/expire + view/pairView/applies/buildBlock + pairId/diagnose/stat + getSettings/setSettings）；六个死导出全部接真实消费方（面板控件+注入源+诊断探针）；注入链七点同批登记；专锁 `tests/s3-tx1-v2165.js` **49 / 0**；冒烟 `tools/tx1_smoke.js` 13/13；真实宿主面板未验 |
 | TX2 人物动机、计划、行动与反馈闭环 | 已交付（v2.166.0） | `engines/agency.js`（7 成员：getSettings/setSettings + schedule/processReceipts + buildBlock/diagnose/stat；DEF{enabled:false,maxSchedulePerTurn:4,maxReceiptsPerTurn:8,autoPlanExpand:true}）；七个死导出全部接真实消费方（面板 6 控件+注入源+诊断探针 secAgency）；注入链七点同批登记（显示名「行动调度」rank 4）；专锁 `tests/s3-tx2-v2166.js` **47 / 0**；冒烟 `tools/tx2_smoke.js` 7/0；真实宿主面板未验 |
+| TX3 区域供需、在途运输与商路选择 | 已交付（v2.167.0） | `engines/freight.js`（10 成员：getSettings/setSettings + dispatch/arrive/cancel/reroute + view/buildBlock/diagnose/stat；DEF{enabled:false,maxShipments:32,maxDispatchPerTurn:4}）；七个拒收码全部登记 DEAD 表（源码可达 + 带锚点 why）；注入链七点同批登记（显示名「货运在途」rank 5）；panel 13 控件 + handler；tool-diag secFreight 四点接线；专锁 `tests/s3-tx3-v2167.js` **66 / 0**；冒烟 `tools/tx3_smoke.js` 11/0；真实宿主面板未验 |
 - [优化提升计划：TP1–TP9](plans/TP_OPTIMIZATION.md)：先修两项已复现的跨聊天写入，再收口已有路径、提交、证据、性能、容量、注入和宿主体验。
 - [功能拓展计划：TX1–TX9](plans/TX_EXPANSION.md)：外交、人物行动、区域供需、可玩分支、完整蓝图，以及委托、调查、地点后果、组织运营。
 - [提案理由、旧项对照与大更新排期](.agents/notes/proposed/architecture/2026-10-05-worldaxis-tp-tx-plans.md)。

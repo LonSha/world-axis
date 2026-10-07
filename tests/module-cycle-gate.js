@@ -179,7 +179,7 @@ const NS_FACE_EXPECT = {
    * 显式登记以免把「口径差」当成「漂移」。
    */
   internalPrefixed: ['__settingsRegs', '__loaderState', '__loadOrder', '__loadFailed',
-    '__inited', '__inputGuardInternal', '__diplomacyWarn', '__agencyWarn']
+    '__inited', '__inputGuardInternal', '__diplomacyWarn', '__agencyWarn', '__freightWarn']
 };
 
 /** 别名形态：const A = ( HOST.WorldAxis = HOST.WorldAxis || {} ) ; */

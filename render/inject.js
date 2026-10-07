@@ -127,6 +127,7 @@
     //   合并两源会让「算出来的」冒充「谈成的」。
     'diplomacy',
     'agency',
+    'freight',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
@@ -181,7 +182,7 @@ style: false,
         // v2.165.0（TX1）：势力外交。取默认 true（同四条理由——其模块总开关默认为关：
         //   diplomacy 的 DEF.enabled=false，未开时 buildBlock 返回空串），
         //   不给老用户凭空多出约束。
-        worldBridge: true, diplomacy: true, agency: true }, module: 'render' };
+        worldBridge: true, diplomacy: true, agency: true, freight: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -368,6 +369,7 @@ style: false,
     //   「外交事实」明示**本源只装谈成的事实**，与「势力关系网」的推导值划清边界。
     diplomacy: '外交事实',
     agency: '行动调度',
+    freight: '货运在途',
     sediment: '此地沉积',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
@@ -474,7 +476,8 @@ style: false,
     //   同一类漏登记已为 rumor/canon（v2.99.0）、chrono（v2.127.0）、reasoning/storyTone
     //   （v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0）、sediment（v2.149.0）各付过一次学费。
     diplomacy: 'worldaxis_diplomacy_settings_v1',
-    agency: 'worldaxis_agency_settings_v1' };
+    agency: 'worldaxis_agency_settings_v1',
+    freight: 'worldaxis_freight_settings_v1' };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -1055,6 +1058,7 @@ style: false,
       if (vis.diplomacy && WA.diplomacy) { const dpb = engineCall('diplomacy', function () { return WA.diplomacy.buildBlock(); }); if (dpb) items.push({ source: '外交事实', content: dpb }); }
       // v2.166.0（TX2）：行动反馈闭环。本源答「谁在做什么、计划步到哪、有没有在途行动」。
       if (vis.agency && WA.agency) { const agb = engineCall('agency', function () { return WA.agency.buildBlock(); }); if (agb) items.push({ source: '行动调度', content: agb }); }
+      if (vis.freight && WA.freight) { const frb = engineCall('freight', function () { return WA.freight.buildBlock(); }); if (frb) items.push({ source: '货运在途', content: frb }); }
       if (vis.session && WA.session) { const se = engineCall('session', function () { return WA.session.buildBlock(); }); if (se) items.push({ source: '多人场', content: se }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。
       //   口径：秘密只对被持有者公开（未持有者在本块里看不到它）；已变淡的秘密不进正文块

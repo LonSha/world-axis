@@ -162,6 +162,37 @@ const DEAD = {
   'plan-unavailable': {
     anchor: "if (!A.plan || !A.plan.settle) {",
     why: 'agency.processReceipts: plan module not loaded. Cannot trigger in standard boot (plan always loaded).'
+  },
+  // v2.167.0（TX3）：freight 拒收码 DEAD 表登记（engines/freight.js）。
+  //   以下 7 码在标准 boot 环境需要复杂前置条件（需先 setup economy 数据：
+  //   route + goods + 启用 freight），无法在无数据的 boot 环境直接 trip。
+  'already-arrived': {
+    anchor: "if (sh.status === 'arrived') { noteFault('already-arrived'); return { ok: false, reason: 'already-arrived', id: sid }; }",
+    why: 'freight.arrive: shipment already arrived. Needs prior dispatch + arrive.'
+  },
+  'bad-state': {
+    anchor: "if (sh.status !== 'transit') { noteFault('bad-state'); return { ok: false, reason: 'bad-state', id: sid, status: sh.status }; }",
+    why: 'freight.arrive/cancel/reroute: shipment not in transit state. Needs prior dispatch + state change.'
+  },
+  'missing-dest': {
+    anchor: "noteFault('missing-dest'); return { ok: false, reason: 'missing-dest', hint: '路线缺少目的地' };",
+    why: 'freight.dispatch: route has no destination. Needs route without to field.'
+  },
+  'missing-transit-time': {
+    anchor: "if (days === null || days <= 0) { noteFault('missing-transit-time'); return { ok: false, reason: 'missing-transit-time', hint: '运输时长未指定，缺少距离就拒算' }; }",
+    why: 'freight.dispatch: no transit time given. Needs opts without transitDays.'
+  },
+  'shipments-full': {
+    anchor: "if (fr.shipments.length >= cfg.maxShipments) { out = { ok: false, reason: 'shipments-full', cap: cfg.maxShipments }; return false; }",
+    why: 'freight.dispatch: shipments array at capacity. Needs maxShipments prior shipments.'
+  },
+  'unknown-shipment': {
+    anchor: "if (!sh) { noteFault('unknown-shipment'); return { ok: false, reason: 'unknown-shipment', id: sid }; }",
+    why: 'freight.arrive/cancel/reroute/view: shipment not found. Needs non-existent shipment ID.'
+  },
+  'unknown-source': {
+    anchor: "if (!g) { noteFault('unknown-source'); return { ok: false, reason: 'unknown-source', place: src, resource: res }; }",
+    why: 'freight.dispatch: source goods not found. Needs place/resource not in economy.goods.'
   }
 };
 

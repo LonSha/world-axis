@@ -1,13 +1,13 @@
 {
- "version": "2.166.0",
- "loadOrderCount": 186,
- "loadedCount": 182,
+ "version": "2.167.0",
+ "loadOrderCount": 187,
+ "loadedCount": 183,
  "uiCount": 4,
- "nsCount": 190,
+ "nsCount": 191,
  "totals": {
-  "loadEdges": 84,
+  "loadEdges": 85,
   "hardEdges": 0,
-  "callRefs": 166,
+  "callRefs": 168,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -56,6 +56,7 @@
     "engines/faction-graph.js",
     "engines/farfield.js",
     "engines/foreshadow.js",
+    "engines/freight.js",
     "engines/group-refuse.js",
     "engines/hazard.js",
     "engines/inject-value.js",
@@ -265,6 +266,7 @@
     "engines/faction-graph.js",
     "engines/farfield.js",
     "engines/foreshadow.js",
+    "engines/freight.js",
     "engines/group-refuse.js",
     "engines/inject-value.js",
     "engines/inst.js",
@@ -2087,6 +2089,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_economy_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/freight.js": {
+   "ns": [
+    "freight"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_freight_settings_v1"
    ],
    "consumedBy": []
   },

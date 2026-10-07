@@ -824,6 +824,41 @@
   }
 
   /**
+   * v2.167.0（TX3）：守恒运输与在途履约读数。
+   *   为什么单列一节而不并进 economy 节：economy 那节答「货架上的价与量」，
+   *   本节答「这批货从哪发到哪、走到哪了、能不能取消/改道」——两问的失效模式不同
+   *   （前者失效在「没库存」，后者失效在「在途丢了 ⇒ 守恒断裂」，
+   *   而后者还有一个更坏的形态：「已到货」与「在途」看起来都是「有货在路上」）。
+   */
+  function secFreight() {
+    return safe(function () {
+      if (!WA.freight || typeof WA.freight.diagnose !== 'function') return { error: 'engines/freight.js 未加载（货运读数缺席）' };
+      var d = WA.freight.diagnose();
+      var st = (typeof WA.freight.stat === 'function') ? WA.freight.stat() : {};
+      return {
+        enabled: d.enabled,
+        economyAvailable: d.economyAvailable,
+        storeAvailable: d.storeAvailable,
+        closedLoop: d.closedLoop,
+        shipments: d.shipments,
+        inTransit: d.inTransit,
+        arrived: d.arrived,
+        cancelled: d.cancelled,
+        cap: d.cap,
+        dispatched: st.dispatched || 0,
+        cancelledCount: st.cancelled || 0,
+        rerouted: st.rerouted || 0,
+        blocked: st.blocked || 0,
+        lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}),
+        self: d,
+        note: !d.enabled ? '货运总开关关闭（默认关）—— 关闭时不发运、不到货、不注入'
+          : (!d.closedLoop ? '开关开着但闭环不完整（economy 或 store 缺席）—— dispatch 会返回 store-unavailable'
+            : null)
+      };
+    });
+  }
+  /**
    * v2.156.0（SP1）：时间来源与游玩活动基准读数。
    *   为什么单列一节而不并进 life 节：life 那节答「人物这一轮做了什么」，
    *   本节答「玩家离开的这段真实时间被谁记着」——两问的失效模式不同
@@ -1548,6 +1583,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/world-blueprint.js': 'worldBlueprint',
     'engines/diplomacy.js': 'diplomacy',
     'engines/agency.js': 'agency',
+    // v2.167.0（TX3）：守恒运输（在途货运）。登记为必载 —
+    //   面板「世界」页货运段与本文件的 secFreight 都读它，缺席就是
+    //   「货运读数缺席」本身，不该被静默兜住。
+    'engines/freight.js': 'freight',
     // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。登记为必载 —
     //   面板「世界」页行动调度段与本文件的 secAgency 都读它，缺席就是
     //   「行动闭环读数缺席」本身，不该被静默兜住。
@@ -2493,6 +2532,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   同口径：无条件渲染（agency 是产品文件，缺席本身就是断裂，不降级成提示）；
     //   渲染了不登记 ⇒ 绑定断裂永不可见。
     { page: 'world', ids: ['wa-ag-enabled', 'wa-ag-person', 'wa-ag-schedule', 'wa-ag-receipts', 'wa-ag-diag', 'wa-ag-out'] },
+    { page: 'world', ids: ['wa-fr-enabled', 'wa-fr-route', 'wa-fr-from', 'wa-fr-res', 'wa-fr-qty', 'wa-fr-days', 'wa-fr-dispatch', 'wa-fr-arrive', 'wa-fr-cancel', 'wa-fr-reroute', 'wa-fr-view', 'wa-fr-diag', 'wa-fr-out'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
@@ -3222,6 +3262,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       worldBlueprint: secWorldBlueprint(),
       diplomacy: secDiplomacy(),
       agency: secAgency(),
+      freight: secFreight(),
       // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。与 diplomacy 节分列不合并
       //   —— 一个答「谈成的事实」，一个答「谁在做什么、计划步到哪、有没有在途行动」。
       // v2.156.0（SP1）：时间来源与游玩活动基准。与 life 节分列不合并（两问的失效模式不同）。

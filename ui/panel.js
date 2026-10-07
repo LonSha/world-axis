@@ -97,6 +97,7 @@
     //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 diplomacy，而那是用户唯一能开关它的地方。
     diplomacy: '外交事实',
     agency: '行动调度',
+    freight: '货运在途',
     sediment: '此地沉积',
     chrono: '世界编年史' };
 
@@ -1058,6 +1059,30 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
             + `<button class="wa-btn wa-mini" id="wa-ag-receipts" aria-label="处理回执" title="处理回执：读已完成的行动台帐 → 结算步 → 更新目标进度。行动回执驱动步结算——不是定时器自动推进步">处理回执</button>`
             + `<button class="wa-btn wa-mini" id="wa-ag-diag" aria-label="诊断" title="诊断：检查 life / plan / act 三模块均在 + 闭环完整性。自证面汇报模块出席与接线状况">诊断</button>`
             + `</div><div id="wa-ag-out" class="wa-out wa-dim">${esc(ar)}</div>`;
+        })()}
+      </div>
+      <div class="wa-sec">货运在途（守恒运输）</div>
+      <div class="wa-item">
+        <div class="wa-dim">economy.ship 是即时补货（旧语义保留）。本段是守恒运输：源扣减→在途→到货。<b>不凭空造库存</b>：economy.goods 是库存唯一真源。</div>
+        ${(() => {
+          const FR = WA.freight;
+          if (!FR) return '<div class="wa-dim">货运未加载</div>';
+          const fr = panelEl.dataset.frOut || '';
+          const frOn = (FR.getSettings && FR.getSettings().enabled) ? true : false;
+          return '<div class="wa-row"><label class="wa-row"><input id="wa-fr-enabled" type="checkbox" ' + (frOn ? 'checked' : '') + '/> 启用守恒运输</label></div><div class="wa-row">'
+            + '<input id="wa-fr-route" class="wa-input wa-mini" aria-label="路线ID" placeholder="路线ID" value="r1"/>'
+            + '<input id="wa-fr-from" class="wa-input wa-mini" aria-label="出发地" placeholder="出发地" value="城中集市"/>'
+            + '<input id="wa-fr-res" class="wa-input wa-mini" aria-label="资源" placeholder="资源" value="布匹"/>'
+            + '<input id="wa-fr-qty" class="wa-input wa-mini" aria-label="数量" placeholder="数量" value="10"/>'
+            + '<input id="wa-fr-days" class="wa-input wa-mini" aria-label="天数" placeholder="天数" value="3"/>'
+            + '</div><div class="wa-row">'
+            + '<button class="wa-btn wa-mini" id="wa-fr-dispatch" aria-label="发运" title="发运：扣源库存→创建在途记录">发运</button>'
+            + '<button class="wa-btn wa-mini" id="wa-fr-arrive" aria-label="到货" title="到货：在途→目的地库存">到货</button>'
+            + '<button class="wa-btn wa-mini" id="wa-fr-cancel" aria-label="取消" title="取消：退货至源、损运费">取消</button>'
+            + '<button class="wa-btn wa-mini" id="wa-fr-reroute" aria-label="改道" title="改道：换路线、重估ETA">改道</button>'
+            + '<button class="wa-btn wa-mini" id="wa-fr-view" aria-label="查看" title="查看：单笔货运守恒校验">查看</button>'
+            + '<button class="wa-btn wa-mini" id="wa-fr-diag" aria-label="诊断" title="诊断：economy+store双在+闭环完整性">诊断</button>'
+            + '</div><div id="wa-fr-out" class="wa-out wa-dim">' + esc(fr) + '</div>';
         })()}
       </div>
 
@@ -5968,6 +5993,63 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       const r = WA.agency.diagnose();
       agOut(r.report || '诊断完成');
     });
+    // v2.167.0 (TX3): freight panel controls.
+    const frOut = function (text) { panelEl.dataset.frOut = text; const o = $('#wa-fr-out'); if (o) o.textContent = text; };
+    on('#wa-fr-enabled', 'change', () => {
+        if (!WA.freight || !WA.freight.setSettings) return frOut('未记录：module-missing');
+        WA.freight.setSettings({ enabled: $('#wa-fr-enabled').checked });
+        frOut('已记录 ' + ($('#wa-fr-enabled').checked ? 'enabled' : 'disabled'));
+    });
+    on('#wa-fr-dispatch', () => {
+        if (!WA.freight) return frOut('货运未加载');
+        var v = WA.freight.getSettings();
+        if (!v.enabled) return frOut('货运未开');
+        var route = wv('#wa-fr-route'), from = wv('#wa-fr-from'), res = wv('#wa-fr-res');
+        var qty = parseInt(wv('#wa-fr-qty'), 10), days = parseFloat(wv('#wa-fr-days'));
+        var r = WA.freight.dispatch(route, from, res, qty, { transitDays: days });
+        if (!r || !r.ok) return frOut(r ? (r.reason || '发运失败') : '发运失败');
+        frOut('已发运：' + r.id + ' ' + r.from + '->' + r.to + ' ' + r.resource + ' ' + r.qty + '（源库存余 ' + r.stock + '）');
+    });
+    on('#wa-fr-arrive', () => {
+        if (!WA.freight) return frOut('货运未加载');
+        if (!WA.freight.getSettings().enabled) return frOut('货运未开');
+        var sid = wv('#wa-fr-route');
+        var r = WA.freight.arrive(sid, { force: true });
+        if (!r || !r.ok) return frOut(r ? (r.reason || '到货失败') : '到货失败');
+        frOut('已到货：' + r.id + ' ' + r.resource + ' ' + r.qty + '->' + r.to + '（库存 ' + r.stock + '）');
+    });
+    on('#wa-fr-cancel', () => {
+        if (!WA.freight) return frOut('货运未加载');
+        if (!WA.freight.getSettings().enabled) return frOut('货运未开');
+        var sid = wv('#wa-fr-route');
+        var r = WA.freight.cancel(sid);
+        if (!r || !r.ok) return frOut(r ? (r.reason || '取消失败') : '取消失败');
+        frOut('已取消：' + r.id + ' 退货 ' + r.refund + ' 损运费 ' + r.loss);
+    });
+    on('#wa-fr-reroute', () => {
+        if (!WA.freight) return frOut('货运未加载');
+        if (!WA.freight.getSettings().enabled) return frOut('货运未开');
+        var sid = wv('#wa-fr-route');
+        var nr = wv('#wa-fr-from');
+        var days = parseFloat(wv('#wa-fr-days')) || 5;
+        var r = WA.freight.reroute(sid, nr, { transitDays: days });
+        if (!r || !r.ok) return frOut(r ? (r.reason || '改道失败') : '改道失败');
+        frOut('已改道：' + r.id + ' 新路线 ' + r.newRouteId);
+    });
+    on('#wa-fr-view', () => {
+        if (!WA.freight) return frOut('货运未加载');
+        var sid = wv('#wa-fr-route');
+        var r = WA.freight.view(sid);
+        if (!r || !r.ok) return frOut(r ? (r.reason || '查看失败') : '查看失败');
+        frOut(r.id + ' ' + r.status + ' ' + r.from + '->' + r.to + ' ' + r.resource + ' ' + r.qty + ' | ' + r.conservation);
+    });
+    on('#wa-fr-diag', () => {
+        if (!WA.freight) return frOut('货运未加载');
+        var r = WA.freight.diagnose();
+        if (!r) return frOut('诊断失败');
+        frOut('enabled=' + r.enabled + ' closedLoop=' + r.closedLoop + ' economy=' + r.economyAvailable + ' store=' + r.storeAvailable + ' shipments=' + r.shipments + ' transit=' + r.inTransit + ' cap=' + r.cap);
+    });
+
     // v2.139.0（E9）：单对势力查边（`edgeOf` 的真产品消费方）。
     //   为什么不是又一个「看全部」按钮：上面那枚答「这张网长什么样」，这一枚答
     //   「**就这两个**到底什么关系」—— 势力多起来之后逐条读全表不可用，
