@@ -13,7 +13,9 @@
 | TP3 离线恢复入口与时间编排收口 | 已交付（v2.161.0） | 页面恢复入口（`visibilitychange` / `pageshow`，惰性 + 合并窗）+ 时间源分域（判定走测量时间、推进走决策时间）；专锁 `tests/s3-tp3-v2161.js` **39 / 0**；真实宿主触发仍待验收 |
 | TP5 验收证据、行为判据与负控制覆盖 | 贯穿中 | 四条新专锁均带真源码破坏两向自证；同批修掉 6 处陈旧消息文本与 1 处弱判据 |
 | TP7 容量、存储失败与格式迁移 | 已交付（v2.162.0） | 在途义务三层（挤出侧豁免 + 写入侧闸 + 读数分域）+ 未来档拒收不降级；专锁 `tests/s3-tp7-v2162.js` **53 / 0**；真实宿主存储压力仍待验收 |
-| TP6 / TP8 / TP9 | 未开始 / 部分 | TP9 的文档面逐版落：README 补 v2.158.0–v2.163.0 六条并更新当前版本行；真实宿主四栏仍未齐 |
+| TP6 | 未开始（需现场基线） | 需真实手机环境采集 p50/p95 基线，终端环境无法推进 |
+| TP8 | 未开始（依赖 TP6 成本数据） | 依赖 TP6 现场基线与各 TX 真实回执消费，终端环境无法推进 |
+| TP9 | 文档面 ✓ / 宿主面 ⏳ | README/NEXT_PLAN/ITERATION_LOG 逐版同步至 v2.172.0；真实宿主四栏（源码/无头/宿主/玩家）仍缺真实 SillyTavern 环境验收 |
 | O14 验证能力面（非优化项） | 已交付（v2.163.0） | UI 实机通道补第四条驱动 `builtin-cdp@node-websocket`（Node 自带 WebSocket 直连 CDP，零依赖）；两驱动共用骨架；三条实测驱动缺陷同批修（route 缺 `fulfill` / `goto` 不认 `about:blank` / 模态对话框不应答）；搜索面补 `SYSTEM_BROWSER_PATHS` 使隔离环境可达 full 档；专锁 `tests/ui-live-v2137.js` **54 / 0** |
 | TX5 版本化完整世界蓝图 | 已交付（v2.164.0） | `engines/world-blueprint.js`（十一口 + 面板 16 控件 + 骨架容器 `blueprint`，`library` cap=8 两处逐键同值登记）；专锁 `tests/s3-tx5-v2164.js` **59 / 0**；真实宿主面板未验 |
 | TX1 可谈判、可履约的势力外交 | 已交付（v2.165.0） | `engines/diplomacy.js`（21 成员：词表 TERMS/STATES/STAGES/CODES + propose/reply/sign + fulfil/breach/expire + view/pairView/applies/buildBlock + pairId/diagnose/stat + getSettings/setSettings）；六个死导出全部接真实消费方（面板控件+注入源+诊断探针）；注入链七点同批登记；专锁 `tests/s3-tx1-v2165.js` **49 / 0**；冒烟 `tools/tx1_smoke.js` 13/13；真实宿主面板未验 |
