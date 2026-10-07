@@ -1623,6 +1623,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/commission.js': 'commission',
     'engines/investigation.js': 'investigation',
     'engines/aftermath.js': 'aftermath',
+    'engines/operations.js': 'operations',
     // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。登记为必载 —
     //   面板「世界」页行动调度段与本文件的 secAgency 都读它，缺席就是
     //   「行动闭环读数缺席」本身，不该被静默兜住。
@@ -2232,6 +2233,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   //   ids    ：无条件渲染的控件（面板/页面打开即在场；缺失 = 真断裂）
   //   cond   ：条件渲染的控件（依赖状态，如「有活跃事件才渲染中止按钮」；缺失不必然是缺陷）
   //   dynamic：由 JS 动态生成的节点集合，按其容器/模板锚点守（容器缺失才是断裂）
+  function secOperations() {
+    var op = WA.operations;
+    if (!op) return { error: 'operations 模块未装载', closedLoop: false };
+    var d = op.diagnose();
+    return { module: 'operations', loaded: true, closedLoop: d.closedLoop,
+      checks: d.checks, version: d.version };
+  }
   const UI_BINDINGS = [
     { page: 'tools', ids: ['wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-faces', 'wa-snap-subset', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
       // v2.2.0: 诊断出口收口——三个新增控件同样纳入「渲染 ↔ 绑定」一致性校验
@@ -2572,6 +2580,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'world', ids: ['wa-sc-enabled', 'wa-sc-present', 'wa-sc-confirm', 'wa-sc-review', 'wa-sc-pending', 'wa-sc-out'] },
     { page: 'world', ids: ['wa-cm-enabled', 'wa-cm-create', 'wa-cm-advance', 'wa-cm-settle', 'wa-cm-cancel', 'wa-cm-view', 'wa-cm-pending', 'wa-cm-out'] },
     { page: 'world', ids: ['wa-iv-enabled', 'wa-iv-register', 'wa-iv-investigate', 'wa-iv-check', 'wa-iv-reveal', 'wa-iv-view', 'wa-iv-pending', 'wa-iv-out'] },
+    { page: 'world', ids: ['wa-ops-enabled', 'wa-ops-enact', 'wa-ops-disburse', 'wa-ops-settle', 'wa-ops-handover', 'wa-ops-active', 'wa-ops-view', 'wa-ops-cancel', 'wa-ops-out'] },
     { page: 'world', ids: ['wa-af-enabled', 'wa-af-register', 'wa-af-repair', 'wa-af-inspect', 'wa-af-active', 'wa-af-view', 'wa-af-cancel', 'wa-af-out'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
@@ -3307,6 +3316,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       commission: secCommission(),
       investigation: secInvestigation(),
       aftermath: secAftermath(),
+      operations: secOperations(),
       // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。与 diplomacy 节分列不合并
       //   —— 一个答「谈成的事实」，一个答「谁在做什么、计划步到哪、有没有在途行动」。
       // v2.156.0（SP1）：时间来源与游玩活动基准。与 life 节分列不合并（两问的失效模式不同）。

@@ -187,7 +187,8 @@
     '故事分支': { rank: 5, fold: true },
     '委托履约': { rank: 5, fold: true },
     '线索调查': { rank: 5, fold: true },
-    '地点后果': { rank: 5, fold: true }
+    '地点后果': { rank: 5, fold: true },
+    '运营结算': { rank: 5, fold: true }
   };
   const DEFAULT_RANK = 6;
 
@@ -330,7 +331,8 @@
   ['故事分支', '叙事推进', '承载'],
   ['委托履约', '叙事推进', '承载'],
   ['线索调查', '叙事推进', '承载'],
-  ['地点后果', '叙事推进', '承载']
+  ['地点后果', '叙事推进', '承载'],
+  ['运营结算', '地点后果', '承载']
   ].forEach(function (r) { ACCOUNTS[r[0]] = { account: r[1], role: r[2] }; });
   const UNCLASSIFIED = '未归类';
 

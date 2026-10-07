@@ -263,6 +263,47 @@ const DEAD = {
   'effects-full': {
     anchor: "if (effects().length >= cfg.maxEffects) { noteFault('effects-full'); return { ok: false, reason: 'effects-full', cap: cfg.maxEffects }; }",
     why: 'aftermath.register: max effects reached. Needs 48+ existing effects in state.'
+  },
+  // v2.172.0 (TX9): operations reject codes DEAD table (engines/operations.js)
+  'duplicate-enact': {
+    anchor: "if (findByDecision(decId)) { noteFault('duplicate-enact'); return { ok: false, reason: 'duplicate-enact', decisionId: decId }; }",
+    why: 'operations.enact: same decisionId already enacted. Needs 2nd enact with same decisionId.'
+  },
+  'not-approved': {
+    anchor: "if (dec.status !== 'approved') { noteFault('not-approved'); return { ok: false, reason: 'not-approved', status: dec.status }; }",
+    why: 'operations.enact: decision not in approved state. Needs pending/rejected decision.'
+  },
+  'not-authorized': {
+    anchor: "if (!auth || !auth.ok || !auth.canApprove) { noteFault('not-authorized'); return { ok: false, reason: 'not-authorized', by: approver }; }",
+    why: 'operations.enact: approver lacks approve permission. Needs non-authorized person.'
+  },
+  'projects-full': {
+    anchor: "if (projects().length >= cfg.maxProjects) { noteFault('projects-full'); return { ok: false, reason: 'projects-full', cap: cfg.maxProjects }; }",
+    why: 'operations.enact: max projects reached. Needs 32+ existing projects.'
+  },
+  'over-budget': {
+    anchor: "if (rec.spent + amount > rec.budget) { noteFault('over-budget'); return { ok: false, reason: 'over-budget', spent: rec.spent, budget: rec.budget, requested: amount }; }",
+    why: 'operations.disburse: spending exceeds budget. Needs disburse amount over remaining budget.'
+  },
+  'duplicate-settle': {
+    anchor: "if (rec.cycleTag === cycleTag) { noteFault('duplicate-settle'); return { ok: false, reason: 'duplicate-settle', cycleTag: cycleTag }; }",
+    why: 'operations.settle: same cycleTag already settled. Needs 2nd settle with same cycleTag.'
+  },
+  'not-owner': {
+    anchor: "if (rec.owner !== from) { noteFault('not-owner'); return { ok: false, reason: 'not-owner', current: rec.owner, attempted: from }; }",
+    why: 'operations.handover: caller is not current owner. Needs wrong fromPerson.'
+  },
+  'insufficient-budget': {
+    anchor: "if (_factionExists && !A.org.canAfford('faction', orgId, budgetType, budget)) { noteFault('insufficient-budget'); return { ok: false, reason: 'insufficient-budget', need: budget, type: budgetType }; }",
+    why: 'operations.enact: org has insufficient resources for budget. Needs faction with low gold.'
+  },
+  'insufficient-funds': {
+    anchor: "if (!A.org.canAfford('faction', rec.orgId, itemType, amount)) { noteFault('insufficient-funds'); return { ok: false, reason: 'insufficient-funds', type: itemType, need: amount }; }",
+    why: 'operations.disburse: org cannot afford disbursement. Needs faction with insufficient resources.'
+  },
+  'transfer-failed': {
+    anchor: "if (!tr || !tr.ok) { noteFault('transfer-failed'); return { ok: false, reason: 'transfer-failed', detail: tr ? tr.reason : 'none' }; }",
+    why: 'operations.disburse: org.transfer failed. Needs transfer to fail.'
   }
 };
 

@@ -21,6 +21,7 @@
 | TX3 区域供需、在途运输与商路选择 | 已交付（v2.167.0） | `engines/freight.js`（10 成员：getSettings/setSettings + dispatch/arrive/cancel/reroute + view/buildBlock/diagnose/stat；DEF{enabled:false,maxShipments:32,maxDispatchPerTurn:4}）；七个拒收码全部登记 DEAD 表（源码可达 + 带锚点 why）；注入链七点同批登记（显示名「货运在途」rank 5）；panel 13 控件 + handler；tool-diag secFreight 四点接线；专锁 `tests/s3-tx3-v2167.js` **66 / 0**；冒烟 `tools/tx3_smoke.js` 11/0；真实宿主面板未验 |
 | TX6 多阶段委托、交付核验与资源履约 | 已交付（v2.169.0） | engines/commission.js (12 exports); inject 7+diag 4; s3-tx6-v2169 **49/0**; smoke 13/13; 真实宿主面板未验 |
 | TX7 线索调查、证据核验与秘密揭示 | 已交付（v2.170.0） | engines/investigation.js (12 exports); inject 7+diag 4; s3-tx7-v2170 **44/0**; smoke 13/13; 真实宿主面板未验 |
+| TX9 权限批准、组织项目与运营结算 | 已交付（v2.172.0） | engines/operations.js (14 exports); inject 7+diag 4 (UI 9 wa-ops-*); s3-tx9-v2172 **46/0**; smoke 16/16; 真实宿主面板未验 |
 | TX8 地点历史的实际后果、修复与复访 | 已交付（v2.171.0） | engines/aftermath.js (13 exports); inject 7+diag 4 (UI 8 wa-af-*); s3-tx8-v2171 **49/0**; smoke 13/13; 真实宿主面板未验 |
 | TX4 可选择、可兑现后果的故事分支 | 已交付（v2.168.0） | `engines/story-choice.js`（10 成员：getSettings/setSettings + present/confirm/review/pending + buildBlock/diagnose/stat/reset；DEF{enabled:false,maxPending:16,maxOptions:6}）；六个拒收码全部登记 DEAD 表；注入链七点同批登记（显示名「故事分支」rank 5）；panel 6 控件 ID + tool-diag secStoryChoice；专锁 `tests/s3-tx4-v2168.js` **42 / 0**；冒烟 `tools/tx4_smoke.js` 13/13；真实宿主面板未验 |
 - [优化提升计划：TP1–TP9](plans/TP_OPTIMIZATION.md)：先修两项已复现的跨聊天写入，再收口已有路径、提交、证据、性能、容量、注入和宿主体验。

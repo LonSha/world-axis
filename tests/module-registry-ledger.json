@@ -1,13 +1,13 @@
 {
- "version": "2.171.0",
- "loadOrderCount": 191,
- "loadedCount": 187,
+ "version": "2.172.0",
+ "loadOrderCount": 192,
+ "loadedCount": 188,
  "uiCount": 4,
- "nsCount": 195,
+ "nsCount": 196,
  "totals": {
-  "loadEdges": 89,
+  "loadEdges": 90,
   "hardEdges": 0,
-  "callRefs": 176,
+  "callRefs": 178,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -74,6 +74,7 @@
     "engines/noesis.js",
     "engines/offline-return.js",
     "engines/offline-tick.js",
+    "engines/operations.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
     "engines/perspective-lock.js",
@@ -284,6 +285,7 @@
     "engines/noesis.js",
     "engines/offline-return.js",
     "engines/offline-tick.js",
+    "engines/operations.js",
     "engines/perspective-lock.js",
     "engines/plan.js",
     "engines/playtime.js",
@@ -2202,6 +2204,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_aftermath_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/operations.js": {
+   "ns": [
+    "operations"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_operations_settings_v1"
    ],
    "consumedBy": []
   },

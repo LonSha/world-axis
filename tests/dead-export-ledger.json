@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.171.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.171.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.172.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.172.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -3353,6 +3353,110 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "operations.active": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "operations.cancel": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "operations.diagnose": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "operations.disburse": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "operations.enact": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 3
+    },
+    "operations.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 15
+    },
+    "operations.handover": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "operations.pending": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "operations.reset": {
+      "reason": "self-only",
+      "detail": "engines/operations.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "operations.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "operations.settle": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "operations.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "operations.view": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/operations.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 4
     },
     "opportunity.buildBlock": {
       "reason": "self-only",
