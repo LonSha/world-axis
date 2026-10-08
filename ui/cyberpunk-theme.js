@@ -397,3 +397,80 @@
     version: '2.174.0'
   };
 })();
+
+/**
+ * v2.174.1: 背景动效增强
+ */
+(function () {
+  const mainDoc = WA.mainDoc || document;
+
+  // 添加背景动效CSS
+  const BG_EFFECTS = `
+    /* 六角网格背景 */
+    .wa-body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(30deg, rgba(0,217,255,0.02) 12%, transparent 12.5%, transparent 87%, rgba(0,217,255,0.02) 87.5%, rgba(0,217,255,0.02)),
+        linear-gradient(150deg, rgba(0,217,255,0.02) 12%, transparent 12.5%, transparent 87%, rgba(0,217,255,0.02) 87.5%, rgba(0,217,255,0.02)),
+        linear-gradient(30deg, rgba(0,217,255,0.02) 12%, transparent 12.5%, transparent 87%, rgba(0,217,255,0.02) 87.5%, rgba(0,217,255,0.02)),
+        linear-gradient(150deg, rgba(0,217,255,0.02) 12%, transparent 12.5%, transparent 87%, rgba(0,217,255,0.02) 87.5%, rgba(0,217,255,0.02));
+      background-size: 80px 140px;
+      background-position: 0 0, 0 0, 40px 70px, 40px 70px;
+      pointer-events: none;
+      z-index: 0;
+      animation: wa-hex-drift 60s linear infinite;
+    }
+
+    @keyframes wa-hex-drift {
+      from { background-position: 0 0, 0 0, 40px 70px, 40px 70px; }
+      to { background-position: 80px 140px, 80px 140px, 120px 210px, 120px 210px; }
+    }
+
+    /* 扫描线效果 */
+    .wa-body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        to bottom,
+        transparent 50%,
+        rgba(0,217,255,0.03) 50%
+      );
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 1;
+      animation: wa-scanline 8s linear infinite;
+    }
+
+    @keyframes wa-scanline {
+      from { transform: translateY(0); }
+      to { transform: translateY(100%); }
+    }
+
+    /* 确保内容在动效之上 */
+    .wa-body > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* 数据流粒子 */
+    @keyframes wa-particle-float {
+      0% { transform: translateY(100vh) translateX(0) scale(0); opacity: 0; }
+      10% { opacity: 0.3; }
+      90% { opacity: 0.3; }
+      100% { transform: translateY(-20vh) translateX(20px) scale(1); opacity: 0; }
+    }
+  `;
+
+  const style = mainDoc.createElement('style');
+  style.textContent = BG_EFFECTS;
+  (mainDoc.head || mainDoc.documentElement).appendChild(style);
+})();
