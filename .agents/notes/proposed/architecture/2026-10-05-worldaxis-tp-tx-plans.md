@@ -2,6 +2,8 @@
 
 Status: proposed
 
+> **代际状态（2026-10-08 审计）**：本篇的 TP/TX 台账已被 [v2.173.0 之后的双九项计划（O1–O9 / E1–E9）](2026-10-08-worldaxis-o-e-plans.md) **完全取代**。下表所记"基线 v2.158.0"与"TX5–TX9 未开始"已与现场不符：TX1–TX9 九项全部交付，TP 线只剩 TP6/TP8 两项且均卡在现场环境。本笔记按纪律保持 `proposed` 原文不改写，只作历史决策副本；当前台账见 [plans/O_OPTIMIZATION.md](../../../../plans/O_OPTIMIZATION.md) 与 [plans/E_EXPANSION.md](../../../../plans/E_EXPANSION.md)。仍成立的部分是"证据分四栏（源码 / 无头 / 宿主 / 玩家）"这一口径，已被 O1 接管。
+
 ## Problem
 
 用户要求基于当前仓库制定两份各九项计划，并辨别过时信息、已完成能力和未闭环玩家路径。当前 manifest.json 与 index.js 为 v2.158.0；README 的当前版本、NEXT_PLAN 的旧 S2/S3 状态和上一代提案的 S3/SP6“未实施”描述落后于源码。直接复制 RP/RX 或 SP/S 会重复建设已交付模块，也会把无头操作锁误读成真实宿主验收。
