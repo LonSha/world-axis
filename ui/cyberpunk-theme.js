@@ -378,22 +378,42 @@
     }
   `;
 
-  // 注入样式
-  function injectTheme() {
-    const existing = mainDoc.getElementById('wa-cyberpunk-theme');
-    if (existing) return;
-    
-    const style = mainDoc.createElement('style');
-    style.id = 'wa-cyberpunk-theme';
-    style.textContent = CYBERPUNK_CSS;
-    (mainDoc.head || mainDoc.documentElement).appendChild(style);
+  // ── v2.181.0：主题样式注册表（本套 UI 从「加载即生效」改为「可切换主题」的地基） ──
+  //   单一真源：全部赛博朋克样式文本登记在此，注入/移除只走 register/apply/remove
+  //   三个出口。为什么必须收口（实测过的代价）：7 个模块此前各自 createElement('style')
+  //   后直接 appendChild，没有一个带幂等守卫（只有本文件查过 id）——扩展重载即叠第二份
+  //   样式表，DOM 里出现同名规则、后加载者胜，视觉随机漂移且无法回收。
+  //   默认主题下本套样式不注入，界面与 v2.173.0 逐像素一致。
+  const THEME_STYLES = WA.themeStyles = WA.themeStyles || { _reg: {}, _on: {} };
+  function registerThemeStyle(id, css) { THEME_STYLES._reg[id] = css; }
+  function applyThemeStyle(id) {
+    const css = THEME_STYLES._reg[id];
+    if (!css) return null;
+    const doc = WA.mainDoc || document;
+    if (doc.getElementById(id)) return null;
+    const style = doc.createElement('style');
+    style.id = id;
+    style.textContent = css;
+    (doc.head || doc.documentElement).appendChild(style);
+    THEME_STYLES._on[id] = true;
+    return style;
   }
-
-  // 自动注入
-  injectTheme();
-
+  function removeThemeStyle(id) {
+    const doc = WA.mainDoc || document;
+    const el = doc.getElementById(id);
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    delete THEME_STYLES._on[id];
+  }
+  THEME_STYLES.register = registerThemeStyle;
+  THEME_STYLES.apply = applyThemeStyle;
+  THEME_STYLES.remove = removeThemeStyle;
+  THEME_STYLES.ids = function () { return Object.keys(THEME_STYLES._reg); };
+  THEME_STYLES.active = function () { return Object.keys(THEME_STYLES._on); };
+  // v2.181.0：不再自动注入——改为登记，由主题开关按当前主题决定装卸
+  registerThemeStyle('wa-cyberpunk-theme', CYBERPUNK_CSS);
   WA.cyberpunkTheme = {
-    inject: injectTheme,
+    // 兼容出口：旧调用方仍可强制注入本套样式
+    inject: function () { return applyThemeStyle('wa-cyberpunk-theme'); },
     version: '2.174.0'
   };
 })();
@@ -402,6 +422,10 @@
  * v2.174.1: 背景动效增强
  */
 (function () {
+  'use strict';
+  // v2.181.0：本段此前缺 WA 声明（直接引用 WA.mainDoc），在 WA 尚未定义时抛
+  //   ReferenceError —— 上一轮全量回归红灯的真实根因。声明补齐。
+  const WA = window.WorldAxis = window.WorldAxis || {};
   const mainDoc = WA.mainDoc || document;
 
   // 添加背景动效CSS
@@ -470,7 +494,6 @@
     }
   `;
 
-  const style = mainDoc.createElement('style');
-  style.textContent = BG_EFFECTS;
-  (mainDoc.head || mainDoc.documentElement).appendChild(style);
+  // v2.181.0：背景动效同样登记进注册表（原先裸 appendChild，无 id、无幂等守卫）
+  if (WA.themeStyles && WA.themeStyles.register) WA.themeStyles.register('wa-cyberpunk-bg', BG_EFFECTS);
 })();

@@ -170,19 +170,37 @@ module.exports = { accName: accName, audit: audit, summary: summary,
   BASIS: 'HTML-AAM accname 闭集：aria-labelledby / aria-label / label[for] / 包裹 label / alt / title / input[value] / placeholder(文本类，裸 input 按规范缺省为 text) / 内容(button,summary,a)' };
 
 /**
- * 源面名源计数：ui 模组源文本里 `aria-label` 的出现数 **减去** `aria-labelledby` 的出现数。
+ * 源面名源计数：ui 模组源文本里**挂在控件上**的 `aria-label` 出现数。
  *   与 `audit().byHow['aria-label']` 是**两个不同的观察面**（一个数源码文本、一个数渲染后的 DOM），
  *   互为佐证：两处相等，才说明「模板里写了多少」真的到了「树上多少」。
  *   文件面**委托 product-files.uiFiles**（单一真源）—— 本文件不自带第二份 ui 文件清单：
  *   v2.43.0 立过规矩，那份清单每多一份副本，新增 ui/ 模组就在某道门禁里静默不可见。
- *   减 `aria-labelledby` 是因为它在文本里以 `aria-label` 为前缀，不扣会重复计数。
+ *
+ *   v2.181.0 收口（输入面必须与结论面同宽）：
+ *     原口径数的是**整个源文本**里的 `aria-label`，而 DOM 侧只走 `CONTROL_SEL`
+ *     （button/input/select/textarea）—— 于是「把 aria-label 挂在一个非控件容器上」
+ *     （v2.181.0 的主题菜单：`role="menu"` 的 div，这是完全合法的 ARIA 用法）
+ *     会让源面比 DOM 面多 1，报出的却是「读数自说自话」。
+ *     红的是**两个面本来就不同宽**，不是谁读错了。故源面同样只数控件上的名源：
+ *     从每个 `aria-label` 出现处向前找最近的 `<`，其标签名在控件集内才计数；
+ *     容器/`setAttribute` 形态不计（它们不是控件面，DOM 侧也不数）。
+ *     `aria-labelledby` 以 `aria-label` 为前缀，用负向前瞻一次排除，不再做两次 split 相减。
  */
+const SRC_CTRL_TAG_RE = /<\s*(button|input|select|textarea)\b/i;
 function srcLabelCount(root) {
   const base = root || BASE;
   const src = require('./product-files.js').uiFiles(base).map(function (rel) {
     try { return fs.readFileSync(path.join(base, rel), 'utf8'); } catch (e) { return ''; }
   }).join('\n');
-  return (src.split('aria-label').length - 1) - (src.split('aria-labelledby').length - 1);
+  const re = /aria-label(?!ledby)/g;
+  let n = 0, m;
+  while ((m = re.exec(src)) !== null) {
+    const lt = src.lastIndexOf('<', m.index);
+    if (lt < 0) continue;
+    const head = src.slice(lt, lt + 40);
+    if (SRC_CTRL_TAG_RE.test(head)) n++;
+  }
+  return n;
 }
 
 if (require.main === module) {

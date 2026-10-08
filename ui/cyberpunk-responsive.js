@@ -376,10 +376,8 @@
   // 注入样式
   function injectResponsive() {
     if (mainDoc.getElementById('wa-cyberpunk-responsive')) return;
-    const style = mainDoc.createElement('style');
-    style.id = 'wa-cyberpunk-responsive';
-    style.textContent = RESPONSIVE_CSS;
-    (mainDoc.head || mainDoc.documentElement).appendChild(style);
+    // v2.181.0：样式登记进主题注册表，不再自动注入（可切换主题的地基）
+    if (WA.themeStyles && WA.themeStyles.register) WA.themeStyles.register('wa-cyberpunk-responsive', RESPONSIVE_CSS);
   }
   injectResponsive();
 

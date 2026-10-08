@@ -10341,7 +10341,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.181.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -10905,7 +10905,7 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.173.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.181.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -11196,7 +11196,7 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.173.0', '入口版本为 2.173.0（实 ' + ver + '）');
+    assert(ver === '2.181.0', '入口版本为 2.181.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11222,7 +11222,19 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     //   否则本块的内联契约会把 renderPerf 段收进来，而 tests/export-contract.js（它的
     //   OPTIONAL 名单已同步）在无头环境**不收**，于是 FROZEN2800 与落盘产物逐字节失配。
     //   口径与本仓既有裁决一致：UI 层的可用性取决于宿主，纳入冻结契约只会让清单随环境漂移。
-    const UI_NS2800 = ['ui', 'uiSettings', 'assistant', 'renderPerf'];
+    const UI_NS2800 = ['ui', 'uiSettings', 'assistant', 'renderPerf',
+      // v2.181.0：赛博朋克 UI 主题层 9 个 ns。本名单与 tests/export-contract.js 的 OPTIONAL
+      //   有互相比较的判据（两处口径必须一致），故两边同批加同样 9 项。
+      'cyberUI',
+      'cyberDashboard',
+      'cyberPeople',
+      'cyberLogs',
+      'cyberAnimate',
+      'cyberResponsive',
+      'cyberpunkTheme',
+      'themeStyles',
+      'themeSwitch',
+    ];
     // ── G14（v2.9.0）：删除侧适用范围契约——产品代码里的裸 removeItem 只能有一处 ──
     //   为什么值得一条断言：本台账声称「删除可观测」时，指的是**所有删除都经受控出口**。
     //   若日后有人再加一个裸 removeItem（绕过复核与计量），「删除可观测」会重新变成假结论。
@@ -11727,15 +11739,26 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     //   测试块侧 UI_NS2800 同步加了 renderPerf，生成器侧也跟了——**两处口径其实一致**，
     //   但判据比的是 v2.151.0 那份三项字面量 ⇒ 红的是「字面量旧了」，不是「两处口径分家」。
     //   本意是后者：故改为两侧都现取列表内容再比集合（两边一起长、一起短都会被看见）。
+    // v2.181.0 收口：名单字面量里**可以带注释**（本版两边各写了一行来历说明）。
+    //   原口径直接对整段字面量剥引号/空白再 split(',')，于是注释文字被当成一个「成员」，
+    //   两侧注释写法不同（生成器一行、本文件两行）就报「口径分家」——红的是注释排版，
+    //   不是名单内容。判据的输入面必须与结论面同宽：**名单是字符串元素，注释不是名单**。
+    //   故两侧都先剥行注释再取集合；注释位置从此自由，名单才是被比的东西。
+    const stripLineComments2800 = function (s) {
+      return String(s == null ? '' : s).split('\n').map(function (ln) {
+        const i = ln.indexOf('//');
+        return i < 0 ? ln : ln.slice(0, i);
+      }).join('\n');
+    };
     const genOptional2800 = (genSrc2800.match(/const OPTIONAL = \[([^\]]*)\]/) || [])[1];
-    const genOptSet2800 = String(genOptional2800 || '').replace(/['"\s]/g, '').split(',').filter(Boolean).sort().join(',');
+    const genOptSet2800 = stripLineComments2800(genOptional2800).replace(/['"\s]/g, '').split(',').filter(Boolean).sort().join(',');
     // v2.155.0 收口补记：本判据的两侧**都现取**（生成器侧抽自己的 OPTIONAL，测试块侧抽本文件
     //   自己声明的那行）——前一次改写误引用了 v2.8.0 块1 作用域里的同名常量，块级作用域下
     //   解析不到，整趟直接挂在 ReferenceError 上。判据只比「两侧名单是否同口径」，
     //   故两侧都从源码里（而不是从运行期变量/字面量）取，才是最诚实的口径。
     const selfSrc2800 = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
     const selfOptional2800 = (selfSrc2800.match(/const UI_NS2800 = \[([^\]]*)\]/) || [])[1];
-    const selfOptSet2800 = String(selfOptional2800 || '').replace(/['"\s]/g, '').split(',').filter(Boolean).sort().join(',');
+    const selfOptSet2800 = stripLineComments2800(selfOptional2800).replace(/['"\s]/g, '').split(',').filter(Boolean).sort().join(',');
     assert(!!genOptional2800 && !!selfOptional2800 && genOptSet2800 === selfOptSet2800,
       '生成器的排除名单与测试块同口径（仅 UI 层依赖宿主；compat 无头可装载）——实生成器 ['
       + genOptSet2800 + '] vs 测试块 [' + selfOptSet2800 + ']');
@@ -11766,7 +11789,7 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.173.0', '入口版本为 2.173.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.181.0', '入口版本为 2.181.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -12154,7 +12177,7 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.173.0', '入口版本为 2.173.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.181.0', '入口版本为 2.181.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12524,7 +12547,7 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.173.0', '入口版本为 2.173.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.181.0', '入口版本为 2.181.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -12889,7 +12912,7 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.173.0', '入口版本为 2.173.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.181.0', '入口版本为 2.181.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -15103,26 +15126,26 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 4766, '现场静态引用 4766 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31；）');
-    assert(r2700.namespaces === 192 && r2700.members === 2310,
-      '定义面 192 命名空间 / 2310 成员（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
-    assert(r2700.dead.length === 785 && r2700.uiDead.length === 3 && r2700.dataOnly.length === 271,
-      '死子面 dead 785 / uiDead 3 / dataOnly 271（v2.102.0（A2/O12）：perf-trace 九口如实登记为 self-only（内部自用、外部零引用 = 过度导出），另六枚只读数据成员 ⇒ dataOnly +2；其中 slots / baseline / curveAll 已接面板真消费方故不在此列；v2.101.0：interop.probePartner 是按伙伴分发口、外部零引用 ⇒ dead +1；五枚只读数据成员零引用 ⇒ dataOnly +4；v2.99.0：canon.LIMITS 是数据成员、产品零引用 ⇒ dataOnly +1；v2.88.0：' + 'O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
+    assert(r2700.refs === 4780, '现场静态引用 4780 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31；）');
+    assert(r2700.namespaces === 200 && r2700.members === 2361,
+      '定义面 200 命名空间 / 2361 成员（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.dead.length === 820 && r2700.uiDead.length === 3 && r2700.dataOnly.length === 279,
+      '死子面 dead 820 / uiDead 3 / dataOnly 279（v2.102.0（A2/O12）：perf-trace 九口如实登记为 self-only（内部自用、外部零引用 = 过度导出），另六枚只读数据成员 ⇒ dataOnly +2；其中 slots / baseline / curveAll 已接面板真消费方故不在此列；v2.101.0：interop.probePartner 是按伙伴分发口、外部零引用 ⇒ dead +1；五枚只读数据成员零引用 ⇒ dataOnly +4；v2.99.0：canon.LIMITS 是数据成员、产品零引用 ⇒ dataOnly +1；v2.88.0：' + 'O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
       + '只有 causal.replayWith 如实登记为 test-only（它重跑代码，而会写世界的轮次不能用它，产品内确无安全调用点），实 '
       + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
     assert(r2700.deadInTestsOnly === 361, '其中仅测试引用 361（v2.92.0：O5 的资源账本两口入此列，实 ' + r2700.deadInTestsOnly + '）');
     // ── D. 账本健全：条目数一致、归因在词表内、无占位 ──
     const led2700 = gate2700.loadLedger();
     assert(!!led2700 && typeof led2700 === 'object', '账本可加载（tests/dead-export-ledger.json）');
-    assert(Object.keys(led2700.dead).length === 785 && Object.keys(led2700.uiDead).length === 3,
-      '账本条目数与现场一致（dead 785 / uiDead 3；v2.110.0 新增三个基元模块的 26 个口'
+    assert(Object.keys(led2700.dead).length === 820 && Object.keys(led2700.uiDead).length === 3,
+      '账本条目数与现场一致（dead 820 / uiDead 3；v2.110.0 新增三个基元模块的 26 个口'
       + '按实测归因登记，面内净增为零）');
     const reasons2700 = Array.from(new Set(Object.keys(led2700.dead).concat(Object.keys(led2700.uiDead))
       .map(function (k) { return (led2700.dead[k] || led2700.uiDead[k] || {}).reason; })));
     assert(reasons2700.every(function (x) { return gate2700.REASON_CODES.indexOf(x) >= 0; }),
       '归因全在词表内（' + reasons2700.join(',') + '）');
     assert(JSON.stringify(led2700).indexOf('TODO') < 0, '账本无占位归因（归因由测量得出，不留 TODO）');
-    assert(led2700.advisory && led2700.advisory.dataOnly === 271, 'advisory 面只记计数不拦截（dataOnly=271，v2.138.0（E7）：weather.places 是纯读出口、被 weather 的导出面登记 ⇒ +1；v2.129.0（A1–A10）：十个新引擎无一新增只读数据成员（它们的可调面全部落在设置表与容器上）⇒ 计数不变；v2.110.0：新增三个基元模块的只读数据成员 +6（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）；v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS +1）');
+    assert(led2700.advisory && led2700.advisory.dataOnly === 279, 'advisory 面只记计数不拦截（dataOnly=279，v2.138.0（E7）：weather.places 是纯读出口、被 weather 的导出面登记 ⇒ +1；v2.129.0（A1–A10）：十个新引擎无一新增只读数据成员（它们的可调面全部落在设置表与容器上）⇒ 计数不变；v2.110.0：新增三个基元模块的只读数据成员 +6（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）；v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS +1）');
     // ── E. 判定四态（纯判定面，用现场结果驱动）──
     const clone2700 = function (o) { return JSON.parse(JSON.stringify(o)); };
     assert(gate2700.judge(r2700, led2700).ok === true, '（基线）现场与账本一致 ⇒ ok');
@@ -15179,11 +15202,32 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     assert(rc2700 !== 0, '（负向自证）判据被破坏后清册以非零码退出（exit ' + rc2700 + '）');
     let boom2700 = null;
     try { boom2700 = JSON.parse(cout2700); } catch (e) { boom2700 = null; }
-    // 破坏后 ALREADY 恒真 ⇒ 跳过 LOAD 装载，只剩无条件装载的 UI 3 个命名空间；
-    // 1202 处引用全判为悬空、dead 归零。实测 3 / 1189 / 0（原版对照 64 / 0 / 211）。
-    assert(boom2700 && boom2700.namespaces < 10 && boom2700.phantom.length > 1000 && boom2700.dead.length === 0,
+    // 破坏后 ALREADY 恒真 ⇒ 跳过 LOAD 装载，只剩**无条件装载的 UI 面**。
+    // 该面会随 ui/ 目录增长：v2.93.0 现场 3（ui/uiSettings/assistant）；
+    //   v2.181.0 起为 12（再加赛博朋克主题层九个 ns）——故不能写死 <10：
+    //   判据的语义是「塌成只剩 UI 面」，不是「恰好 3 个」。写成现场值 + 说明来历，
+    //   让下一次新增 ui 模块时红的是这条读数（可定位），而不是一句无从复盘的「症状不可读」。
+    // 1202 处引用全判为悬空。v2.181.0 实测 12 / 4744 / 35（原版对照 64 / 0 / 211）。
+    //
+    // v2.181.0 收口（dead 不再归零 —— 是口径变了，不是判据坏了）：
+    //   v2.93.0 现场这条写的是 `dead.length === 0`，语义是「产品模块全缺席 ⇒ 没有定义面可判死」。
+    //   而 inventory 的 UI 装载面是**无条件**的（按 ui/ 目录动态发现），v2.181.0 新增的九个 UI 模块
+    //   （cyberpunk-*.js / theme-switch.js）**不触宿主 DOM 即可求值**（只做注册与纯函数定义，
+    //   与 ui/render-perf.js 同型），于是破坏后它们照样被装进来 ⇒ dead 塌成「只剩这九个模块的成员」。
+    //   判据的语义因此从「恰好 0」改成「**全部落在 ui/ 层**」：
+    //     · 前者自 v2.181.0 起恒假（真因被误读成「症状不可读」）；
+    //     · 后者才是「产品面塌成 0」这件事的真观察位，且不随 ui/ 目录增长再误红。
+    const boomFiles2700 = {};
+    boom2700 && boom2700.dead.forEach(function (d) {
+      const f = fileMap2700[d.ns] || ('(未登记:' + d.ns + ')');
+      boomFiles2700[f] = (boomFiles2700[f] || 0) + 1;
+    });
+    assert(boom2700 && boom2700.namespaces <= 12 && boom2700.phantom.length > 1000
+      && boom2700.dead.every(function (d) { return /^ui\//.test(fileMap2700[d.ns] || ''); }),
       '（负向自证）症状可读：命名空间 ' + (boom2700 ? boom2700.namespaces : '?')
-      + ' / 悬空 ' + (boom2700 ? boom2700.phantom.length : '?') + '（正是 CLI 首跑踩到的塌面）');
+      + ' / 悬空 ' + (boom2700 ? boom2700.phantom.length : '?')
+      + ' / 残留死面 ' + (boom2700 ? boom2700.dead.length : '?') + '（须全在 ui/ 层：'
+      + Object.keys(boomFiles2700).sort().map(function (f) { return f + '=' + boomFiles2700[f]; }).join(' ') + '）');
     console.log('  ✓ 口径单源（collect 复用、依赖单向无环、复用判据不退回宿主壳）');
     console.log('  ✓ 现场锚点（refs 1950 / 命名空间 89 / 成员 996 / dead 284 · uiDead 3 · dataOnly 131）');
     console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
@@ -15221,7 +15265,7 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.173.0', '入口 VERSION = 2.173.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.181.0', '入口 VERSION = 2.181.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -15254,7 +15298,7 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
     ['dead', 'uiDead'].forEach(function (k) {
       Object.keys(led2800[k] || {}).forEach(function (kk) { allEnt2800.push({ kind: k, key: kk, item: led2800[k][kk] }); });
     });
-    assert(allEnt2800.length === 788, '账本条目 792 条（v2.129.0（拓展计划 A1–A10）：新增十个引擎的导出按现场归因入册 ⇒ 冻结面 610 → 693（属 `--update` 当时的中态，已被 v2.129.0 收口的再收敛覆盖为 682），分布 {353/213/44} → {352/274/67}——新增的 83 项里 7 项带着 tests/run.js 的真引用（userlock/rewriter/storyclock/rhythmLoop/motif/beatMask/powerAnchor 的取样入口与 guard 读数，属 test-only），其余 76 项是定义文件内部自用、外部零引用（self-only：容器与内部步进器）；`requestViewer.getSettings/setSettings/size` 与 `presetWorld.getSettings/setSettings/round` 是 UI 尚未接线的能力（unwired，如实登记不粉饰）；v2.121.0：auditLog.stat 被 secAudit 真读 ⇒ 出冻结面，612 → 611；v2.119.0：v2.117.0～v2.119.0 共 11 个新模块（act/opportunity/recipe + rehearsal/liaison/coop + plan/mend/economy/inst/probe/region/stage/session）的全部导出按现场归因入册 ⇒ 冻结面 553 → 612；v2.111.0：新增 auditLog 与 sanitize 两模块共 10 个口 ⇒ 486 + 10 = 496，其中 sanitize.html 接了真消费方故**出冻结面**（冻结面 492 → 491）⇒ 495；v2.110.0：新增三个基元模块的 26 个口按实测归因登记 ⇒ 460 + 26 = 486；v2.102.0：perf-trace 九口如实登记 self-only ⇒ 449 + 9 = 458；v2.101.0：interop.probePartner 按伙伴分发口如实登记为 self-only；v2.89.0：O2 磁带面——新增 causal.replayWith 如实登记，实 ' + allEnt2800.length + '）');
+    assert(allEnt2800.length === 823, '账本条目 823 条（v2.181.0：赛博朋克主题层九个 UI 模块入册，dead 785 → 820 ⇒ 冻结面 788 → 823；v2.129.0（拓展计划 A1–A10）：新增十个引擎的导出按现场归因入册 ⇒ 冻结面 610 → 693（属 `--update` 当时的中态，已被 v2.129.0 收口的再收敛覆盖为 682），分布 {353/213/44} → {352/274/67}——新增的 83 项里 7 项带着 tests/run.js 的真引用（userlock/rewriter/storyclock/rhythmLoop/motif/beatMask/powerAnchor 的取样入口与 guard 读数，属 test-only），其余 76 项是定义文件内部自用、外部零引用（self-only：容器与内部步进器）；`requestViewer.getSettings/setSettings/size` 与 `presetWorld.getSettings/setSettings/round` 是 UI 尚未接线的能力（unwired，如实登记不粉饰）；v2.121.0：auditLog.stat 被 secAudit 真读 ⇒ 出冻结面，612 → 611；v2.119.0：v2.117.0～v2.119.0 共 11 个新模块（act/opportunity/recipe + rehearsal/liaison/coop + plan/mend/economy/inst/probe/region/stage/session）的全部导出按现场归因入册 ⇒ 冻结面 553 → 612；v2.111.0：新增 auditLog 与 sanitize 两模块共 10 个口 ⇒ 486 + 10 = 496，其中 sanitize.html 接了真消费方故**出冻结面**（冻结面 492 → 491）⇒ 495；v2.110.0：新增三个基元模块的 26 个口按实测归因登记 ⇒ 460 + 26 = 486；v2.102.0：perf-trace 九口如实登记 self-only ⇒ 449 + 9 = 458；v2.101.0：interop.probePartner 按伙伴分发口如实登记为 self-only；v2.89.0：O2 磁带面——新增 causal.replayWith 如实登记，实 ' + allEnt2800.length + '）');
     const missingEv2800 = allEnt2800.filter(function (e) {
       return gate2800.EVIDENCE_KEYS.some(function (f) { return e.item[f] === undefined; });
     });
@@ -15273,8 +15317,8 @@ assert(verF2500 === '2.173.0' && mfF2500.version === verF2500, '入口与清单�
             //   v2.73.0 之前测试面只读 run.js，两侧分别是 135 / 4。
              //   v2.101.0：interop.probePartner 只有本模块内部调用 ⇒ self-only 119 → 120，总条目 448 → 449。
              //   v2.129.0：十个新引擎入册 ⇒ 总条目 610 → 693（test-only 352 / self-only 274 / unwired 67）。
-assert(dist2800['test-only'] === 364 && dist2800['self-only'] === 335 && dist2800['unwired'] === 89,
-'归因分布 test-only 364 / self-only 335 / unwired 89（v2.130.0（拓展计划 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎的导出按现场归因入册（新增 76 项：self-only +52 / unwired +24），另有 1 项出冻结面——`store.registryParity` 由 engines/rehearse.js 的 `capability()` 真读（冻结面 682 → 757）；v2.129.0 收口：三条旁路燃录的读者接通后 11 项出冻结面、secStitch2129 入册⇒ {352/267/63}；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 项入册 ⇒ {353/213/44} → {352/274/67}（test-only 竟减 1：`worldbook.matchKey` 因为 A10 世界书搜索接了**产品侧**真消费方而出冻结面）；v2.128.0（拓展计划 X3–X8）：`region.stat` 由死导出接通真消费方（诊断节只读）出冻结面 ⇒ 面 611 → 610、self-only 214 → 213；v2.121.0：auditLog.stat 被 engines/tool-diag.js 的 secAudit 真读 ⇒ 由 self-only 出冻结面，面 612 → 611、self-only 215 → 214；v2.119.0：面 553 → 612，分布 {323/194/36} → {353/215/44}（v2.117.0～v2.119.0 共 11 个新模块入册）；v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块的全部导出按实测归因入册 ⇒ 分布由 {300/177/32}（面 509）变成 {323/194/36}（面 553）；v2.114.0：sandbox / plugin 两模块 12 口中，sandbox.freezeApi / sandbox.reset / plugin.reset 三项**当场删除**（能力未接线、白名单冻结只该是 run 内部步骤），sandbox.stat 由 tool-diag 的 secPlugin 真读、plugin.unregister 由面板 #wa-pl-unreg 卸载按钮真调 ⇒ 二者出冻结面；chrono / collab 新增口按实测归因入册（test-only +3 / self-only +2）；v2.111.0：auditLog / sanitize 两模块共 10 口，9 个留 self-only（sanitize.html 接了面板真消费方故由死转活）⇒ 157 + 9 = 166；v2.110.0：三个基元模块的 26 个口全部 self-only（模块内部自用、外部零引用）⇒ 131 + 26 = 157；另 6 个只读数据成员（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）走 advisory.dataOnly（172→178），**不进冻结面** —— 故 26 这个数是「方法与函数」，不含数据成员；v2.102.0：perf-trace 九口 self-only ⇒ 120 + 9 = 129；v2.101.0：interop.probePartner 记 self-only ⇒ 449；v2.93.0：死面 293 + 界面 4 = 297，实 ' + JSON.stringify(dist2800) + '）');
+assert(dist2800['test-only'] === 364 && dist2800['self-only'] === 337 && dist2800['unwired'] === 122,
+'归因分布 test-only 364 / self-only 337 / unwired 122（v2.181.0：赛博朋克主题层九个 UI 模块的导出按现场归因入册——cyberpunk-*.js 与 theme-switch.js 在无头环境不装载，其成员产品面零引用、且不属 UI 可选面（UI_OPTIONAL 三项）⇒ self-only +2 / unwired +33，test-only 不变（新成员没有一条被 tests/ 真读）；冻结面 788 → 823；v2.130.0（拓展计划 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎的导出按现场归因入册（新增 76 项：self-only +52 / unwired +24），另有 1 项出冻结面——`store.registryParity` 由 engines/rehearse.js 的 `capability()` 真读（冻结面 682 → 757）；v2.129.0 收口：三条旁路燃录的读者接通后 11 项出冻结面、secStitch2129 入册⇒ {352/267/63}；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 项入册 ⇒ {353/213/44} → {352/274/67}（test-only 竟减 1：`worldbook.matchKey` 因为 A10 世界书搜索接了**产品侧**真消费方而出冻结面）；v2.128.0（拓展计划 X3–X8）：`region.stat` 由死导出接通真消费方（诊断节只读）出冻结面 ⇒ 面 611 → 610、self-only 214 → 213；v2.121.0：auditLog.stat 被 engines/tool-diag.js 的 secAudit 真读 ⇒ 由 self-only 出冻结面，面 612 → 611、self-only 215 → 214；v2.119.0：面 553 → 612，分布 {323/194/36} → {353/215/44}（v2.117.0～v2.119.0 共 11 个新模块入册）；v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块的全部导出按实测归因入册 ⇒ 分布由 {300/177/32}（面 509）变成 {323/194/36}（面 553）；v2.114.0：sandbox / plugin 两模块 12 口中，sandbox.freezeApi / sandbox.reset / plugin.reset 三项**当场删除**（能力未接线、白名单冻结只该是 run 内部步骤），sandbox.stat 由 tool-diag 的 secPlugin 真读、plugin.unregister 由面板 #wa-pl-unreg 卸载按钮真调 ⇒ 二者出冻结面；chrono / collab 新增口按实测归因入册（test-only +3 / self-only +2）；v2.111.0：auditLog / sanitize 两模块共 10 口，9 个留 self-only（sanitize.html 接了面板真消费方故由死转活）⇒ 157 + 9 = 166；v2.110.0：三个基元模块的 26 个口全部 self-only（模块内部自用、外部零引用）⇒ 131 + 26 = 157；另 6 个只读数据成员（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）走 advisory.dataOnly（172→178），**不进冻结面** —— 故 26 这个数是「方法与函数」，不含数据成员；v2.102.0：perf-trace 九口 self-only ⇒ 120 + 9 = 129；v2.101.0：interop.probePartner 记 self-only ⇒ 449；v2.93.0：死面 293 + 界面 4 = 297，实 ' + JSON.stringify(dist2800) + '）');
     assert(gate2800.evidenceDrift(r2800, led2800).length === 0, '现场账本证据复算零失实');
 
     // ── E. 负控制：证据失实/缺证/归因与证据不符 各须现形 ──
@@ -15305,11 +15349,11 @@ assert(dist2800['test-only'] === 364 && dist2800['self-only'] === 335 && dist280
     // ── F. 判据不越界：冻结面与归因宽度本版不动；现场锚点随 v2.29.0 真代码口径更新 ──
     assertDeepEq(gate2800.FROZEN_KINDS, ['dead', 'uiDead'], '冻结面仍为 dead/uiDead（本版不扩面）');
     assertDeepEq(gate2800.ADVISORY_KINDS, ['dataOnly'], 'advisory 面仍为 dataOnly（不升级为拦截）');
-assert(r2800.dead.length === 785 && r2800.uiDead.length === 3 && r2800.dataOnly.length === 271
+assert(r2800.dead.length === 820 && r2800.uiDead.length === 3 && r2800.dataOnly.length === 279
 && r2800.deadInTestsOnly === 361,
-'现场锚点（dead 785 / uiDead 3 / dataOnly 271 / 仅测试 361，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥；v2.129.0（拓展计划 A1–A10）：新增十个引擎（userlock / rewriter / storyclock / rhythm-loop / motif / beat-mask / preset-world / power-anchor / request-viewer / wb-search），冻结面 610 → 693，其中 7 项带 tests/run.js 真引用、76 项本模块自用、6 项待接线）');
-assert(r2800.refs === 4766 && r2800.namespaces === 192 && r2800.members === 2310,
-    '清册面（refs 4766 / 命名空间 192 / 成员 2310（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
+'现场锚点（dead 820 / uiDead 3 / dataOnly 279 / 仅测试 361，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥；v2.129.0（拓展计划 A1–A10）：新增十个引擎（userlock / rewriter / storyclock / rhythm-loop / motif / beat-mask / preset-world / power-anchor / request-viewer / wb-search），冻结面 610 → 693，其中 7 项带 tests/run.js 真引用、76 项本模块自用、6 项待接线）');
+assert(r2800.refs === 4780 && r2800.namespaces === 200 && r2800.members === 2361,
+    '清册面（refs 4780 / 命名空间 200 / 成员 2361（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -15488,11 +15532,11 @@ assert(r2800.refs === 4766 && r2800.namespaces === 192 && r2800.members === 2310
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-assert(r2900.refs === 4766 && r2900.namespaces === 192 && r2900.members === 2310,
-'清册面（refs 4766 / 命名空间 192 / 成员 2310）——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
-assert(r2900.dead.length === 785 && r2900.uiDead.length === 3 && r2900.dataOnly.length === 271
+assert(r2900.refs === 4780 && r2900.namespaces === 200 && r2900.members === 2361,
+'清册面（refs 4780 / 命名空间 200 / 成员 2361）——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
+assert(r2900.dead.length === 820 && r2900.uiDead.length === 3 && r2900.dataOnly.length === 279
 && r2900.deadInTestsOnly === 361,
-'死子面 dead 785 / uiDead 3 / dataOnly 271 / 仅测试 361（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
+'死子面 dead 820 / uiDead 3 / dataOnly 279 / 仅测试 361（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
       + r2900.uiDead.length + '/' + r2900.dataOnly.length + '/' + r2900.deadInTestsOnly + '）');
     const soft2900 = ['rand.seed', 'clock.freeze', 'bridge.setSettings'];
     const ledKeys2900 = Object.keys(led2900.dead);
@@ -15520,7 +15564,7 @@ assert(r2900.dead.length === 785 && r2900.uiDead.length === 3 && r2900.dataOnly.
     assertDeepEq(gate2900.EVIDENCE_KEYS, ['src', 'refs', 'tref', 'own'], '证据键不变（refs 与「死」的定义仍同宽）');
     assert(inv2900.PRODUCT_FILES.length === r2900.files.product && inv2900.REF_RE instanceof RegExp,
       '清册导出 PRODUCT_FILES / REF_RE 与产品面同源（门禁复算不另写扫描面）');
-    assert(led2900.advisory && led2900.advisory.dataOnly === 271, 'advisory 只记计数（dataOnly 271（v2.138.0（E7）：weather.places 纯读出口入册 +1）v2.129.0：十个新引擎零数据成员入册）v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS 数据成员 +1）');
+    assert(led2900.advisory && led2900.advisory.dataOnly === 279, 'advisory 只记计数（dataOnly 279（v2.138.0（E7）：weather.places 纯读出口入册 +1）v2.129.0：十个新引擎零数据成员入册）v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS 数据成员 +1）');
     // 旧灯一盏不少
     const ledAdd2900 = clone2900(led2900);
     delete ledAdd2900.dead[Object.keys(ledAdd2900.dead)[0]];
@@ -16985,7 +17029,7 @@ assert(r2900.dead.length === 785 && r2900.uiDead.length === 3 && r2900.dataOnly.
       'v2430: （负向自证）临时树 ui/ 两个模块 ⇒ uiFiles 跟随（实 ' + pf4300.uiFiles(tmpTree4300).join('、') + '）');
     assert(pf4300.productFiles(tmpTree4300).join(',') === 'engines/c.js,ui/a.js,ui/b.js',
       'v2430: （负向自证）productFiles 跟随临时树并排除 tests/tools（实 ' + pf4300.productFiles(tmpTree4300).join('、') + '）');
-    assert(uiDisk4300.length === 4 && pf4300.uiFiles(tmpTree4300).length === 2,
+    assert(uiDisk4300.length === 12 && pf4300.uiFiles(tmpTree4300).length === 2,
       // v2.155.0 收口：仓库侧由 3 改 4（v2.152.0 新增 ui/render-perf.js）；口径同 v2420 那条 ——
       //   本判据断言的是「两侧不等」，不是「仓库恰 3 个」。
       'v2430: （负向自证）仓库 ' + uiDisk4300.length + ' 个 vs 临时 2 个——发现面取决于目录内容，非恒值');
@@ -17019,10 +17063,14 @@ assert(r2900.dead.length === 785 && r2900.uiDead.length === 3 && r2900.dataOnly.
     const negDyn4300 = collectIds4300(negDir4300, negUIFiles4300);              // 修复后：委托真源
     const OLD_LIT4300 = QUOTED4300.map(function (q) { return q.slice(1, -1); });  // 旧硬编码三文件（字面量不落此判据）
     const negHard4300 = collectIds4300(negDir4300, OLD_LIT4300);               // 旧形态：硬编码三文件
+    // v2.181.0 口径修正：原文把「副本旧面」与「仓库新面」比（negHard4300 vs repoDyn4300），
+    //   那只在「仓库新面里没有任何旧三文件之外的 id」时成立——是历史巧合，不是判据本意。
+    //   本判据要证的是「旧硬编码面看不见新注入的 zb_extra」，同副本内比才是它该有的形态。
+    const repoHard4300 = collectIds4300(BASE, OLD_LIT4300);                    // 仓库旧面（同口径对照）
     const repoDyn4300 = collectIds4300(BASE, pf4300.uiFiles(BASE));
     assert(negDyn4300.length === repoDyn4300.length + 1 && negDyn4300.indexOf('wa-zb-untracked') >= 0,
       'v2430: （坐实）修复后的采集面看得见新控件（' + repoDyn4300.length + ' → ' + negDyn4300.length + '，含 wa-zb-untracked）');
-    assert(negHard4300.length === repoDyn4300.length && negHard4300.indexOf('wa-zb-untracked') < 0,
+    assert(negHard4300.length === repoHard4300.length && negHard4300.indexOf('wa-zb-untracked') < 0,
       'v2430: （坐实）旧硬编码采集面**看不见**它（恒 ' + negHard4300.length + '，漏 wa-zb-untracked）—— 这就是漏网那处的后果');
     const invis4300 = negDyn4300.filter(function (id) { return negHard4300.indexOf(id) < 0; });
     assert(invis4300.length === 1 && invis4300[0] === 'wa-zb-untracked',
@@ -21481,7 +21529,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   「版本双落」。改为从 index.js **精确抽取** const VERSION = '...' 再与显式期望比对
     //   （与 v2.125.0 段的 verF2500 同规格：显式常量 + 与 manifest 同源同值）。
     const vM2158 = (idxSrc2158.match(/const VERSION = '([^']+)'/) || [])[1] || '';
-    assert(vM2158 === '2.173.0' && maniSrc2158.version === vM2158,
+    assert(vM2158 === '2.181.0' && maniSrc2158.version === vM2158,
       'v2158: 入口 VERSION 与 manifest.json 同源同值（实 ' + vM2158 + ' / ' + maniSrc2158.version + '）');
     const wsSrc2158 = fs.readFileSync(path.join(BASE, 'engines/world-seed.js'), 'utf8');
     assert(wsSrc2158.indexOf('function transferPack(seedId, max)') >= 0

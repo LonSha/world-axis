@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.173.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.173.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.181.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.181.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -1265,6 +1265,246 @@
       "refs": 0,
       "tref": 3,
       "own": 3
+    },
+    "cyberAnimate.addRipple": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-animations.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberAnimate.animateNumber": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-animations.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberAnimate.hideLoading": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-animations.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberAnimate.showLoading": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-animations.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberDashboard.engineList": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-dashboard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberDashboard.memoryChart": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-dashboard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberDashboard.quickActions": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-dashboard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberDashboard.timeCard": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-dashboard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberDashboard.timeline": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-dashboard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberLogs.escapeHtml": {
+      "reason": "self-only",
+      "detail": "ui/cyberpunk-logs.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/cyberpunk-logs.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "cyberLogs.filters": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-logs.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberLogs.formatTime": {
+      "reason": "self-only",
+      "detail": "ui/cyberpunk-logs.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/cyberpunk-logs.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "cyberLogs.liveIndicator": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-logs.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberLogs.logsContainer": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-logs.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberLogs.searchBox": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-logs.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberLogs.stats": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-logs.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberPeople.peopleGrid": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-people.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberPeople.personDetail": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-people.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberResponsive.chunk": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-responsive.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberResponsive.inject": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-responsive.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberResponsive.isMobile": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-responsive.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberResponsive.listChunk": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-responsive.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberResponsive.rerenderMs": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-responsive.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberUI.badge": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-components.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberUI.checkbox": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-components.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberUI.progress": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-components.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberUI.progressCircular": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-components.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberUI.spinner": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-components.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberUI.toggle": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-components.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "cyberpunkTheme.inject": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/cyberpunk-theme.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
     },
     "difficulty.actionCost": {
       "reason": "self-only",
@@ -5370,6 +5610,46 @@
       "tref": 3,
       "own": 3
     },
+    "themeSwitch.close": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/theme-switch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "themeSwitch.current": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/theme-switch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "themeSwitch.open": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/theme-switch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "themeSwitch.set": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/theme-switch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "themeSwitch.themes": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/theme-switch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
     "timeline.chatId": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -5544,7 +5824,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 117
+      "own": 118
     },
     "toolDiag.secCapabilities": {
       "reason": "self-only",
@@ -6310,6 +6590,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 271
+    "dataOnly": 279
   }
 }

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.180.0'
+  const VERSION = '2.181.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -621,6 +621,9 @@
     'ui/cyberpunk-logs.js',
     'ui/cyberpunk-animations.js',
     'ui/cyberpunk-responsive.js',
+    // v2.181.0：主题切换（右键悬浮球）。必须排在全部 cyberpunk 模块**之后**：
+    //   它们在装载期把样式文本登记进 WA.themeStyles，本模块要读那张表来装卸。
+    'ui/theme-switch.js',
     // v2.152.0（RP6）：面板渲染性能观测。**必须在 panel.js 之后**：observe 的页 id
     //   白名单读 WA.ui.pages()（PAGES 表是 panel.js 的真源），先装会让白名单恒空、
     //   一切 observe 被拒收成 unknown-page（观测面静默失效，比不装更坏）。

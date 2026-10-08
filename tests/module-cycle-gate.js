@@ -126,7 +126,19 @@ const UI_NS = {
   //   engines/tool-diag.js 的 OPTIONAL_EXPORTS；本表是第四处（静态图侧）。
   //   漏在这里的后果不是「少一行字」：renderPerf 会被判成「未登记的一对一差」（ns 面漂移），
   //   而它明明是 UI 层——先装后装的差别被读成「接线出了问题」。
-  renderPerf: 'UI 面板渲染观测（ui/render-perf.js）'
+  renderPerf: 'UI 面板渲染观测（ui/render-perf.js）',
+  // v2.181.0：赛博朋克 UI 主题层的 9 个命名空间（ui/cyberpunk-*.js + ui/theme-switch.js）。
+  //   本仓的 UI ns 名单有四份副本，必须同批 —— 漏在本表的后果是它们被判成「未登记的一对一差」
+  //   （ns 面漂移），而它们明明是 UI 层。
+  cyberUI: 'UI 主题层（ui/cyberpunk-components.js）',
+  cyberDashboard: 'UI 主题层（ui/cyberpunk-dashboard.js）',
+  cyberPeople: 'UI 主题层（ui/cyberpunk-people.js）',
+  cyberLogs: 'UI 主题层（ui/cyberpunk-logs.js）',
+  cyberAnimate: 'UI 主题层（ui/cyberpunk-animations.js）',
+  cyberResponsive: 'UI 主题层（ui/cyberpunk-responsive.js）',
+  cyberpunkTheme: 'UI 主题层（ui/cyberpunk-theme.js）',
+  themeStyles: 'UI 主题层（ui/cyberpunk-theme.js）',
+  themeSwitch: 'UI 主题层（ui/theme-switch.js）',
 };
 
 /**

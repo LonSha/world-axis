@@ -546,6 +546,87 @@
     });
   }
   /**
+   * v2.181.0（UI 主题化）：界面主题层读数 —— 「现在套的是哪套皮、样式表到底装上没有」。
+   *
+   *   为什么必须有这一节：v2.174.0~v2.180.0 引入的赛博朋克主题层是**可切换**的，
+   *   而「主题切了但样式没装上 / 装上了两套 / 想切回去切不掉」这三种失效在界面上
+   *   表现为同一件事（看起来没变），用户无从归因。本节把三件事分开答：
+   *     · 当前主题是谁（themeSwitch.current）—— 与持久化键读回的值是否一致；
+   *     · 已登记的样式表有几份、当前实际挂在 DOM 上的有几份（themeStyles.ids/active）；
+   *     · 主题层的构成（有几个主题可选、各自带几份样式）。
+   *   只读，不装卸任何样式（诊断面不许改变被诊断的界面——与 secSediment 同规）。
+   */
+  function secUiTheme() {
+    return safe(function () {
+      const ts = WA.themeStyles;
+      const sw = WA.themeSwitch;
+      const ids = (ts && typeof ts.ids === 'function') ? ts.ids() : null;
+      const active = (ts && typeof ts.active === 'function') ? ts.active() : null;
+      // 装载顺序有语义：wa-cyberpunk-theme 提供 :root 变量，必须最先注入。
+      //   把它显式报出来，顺序被改坏时这一节是唯一能看见的地方。
+      const rootFirst = ids ? ids.indexOf('wa-cyberpunk-theme') === 0 : null;
+      return {
+        moduleLoaded: !!(ts && sw),
+        themeStylesMissing: !ts ? 'ui/cyberpunk-theme.js 未加载（样式注册表缺席）' : null,
+        themeSwitchMissing: !sw ? 'ui/theme-switch.js 未加载（主题开关缺席）' : null,
+        registered: ids ? ids.length : null,
+        registeredIds: ids,
+        active: active ? active.length : null,
+        activeIds: active,
+        // 「登记了 N 份、装上 M 份」是切主题是否真的生效的直接证据（默认主题下 M=0 是正确态）
+        consistent: (ids && active) ? active.every(function (id) { return ids.indexOf(id) >= 0; }) : null,
+        rootFirst: rootFirst,
+        current: sw && typeof sw.current === 'function' ? sw.current() : null,
+        themes: sw && typeof sw.themes === 'function'
+          ? sw.themes().map(function (t) { return { id: t.id, label: t.label, styles: (t.styles || []).length }; })
+          : null,
+        // 构建器库：这 5 个模块导出的是「拼 HTML 的函数」，消费方是 ui/panel.js。
+        //   两个读数一起报：导出了几个（库存有多大）、其中几个已被 UI 层真调（兑现了多少）。
+        //   只报其一都看不见缺口 —— 导出了 12 个而一个都没调，与导出了 12 个且全用上，
+        //   在界面上长得一模一样。
+        //   每模块另点出**一枚具名成员**做存在性探针：静态图只认 `WA.<ns>.<mem>` 字面形态，
+        //   动态取键在静态面里等于没读（故不能只靠 Object.keys 消掉过期登记）。
+        builders: (function () {
+          const MODS = [
+            ['cyberDashboard', 'ui/cyberpunk-dashboard.js', 'statCard'],
+            ['cyberPeople', 'ui/cyberpunk-people.js', 'personCard'],
+            ['cyberLogs', 'ui/cyberpunk-logs.js', 'logLine'],
+            ['cyberAnimate', 'ui/cyberpunk-animations.js', 'notify'],
+            ['cyberResponsive', 'ui/cyberpunk-responsive.js', 'tier']
+          ];
+          const panelSrc = (function () {
+            try { return WA.mainDoc && WA.mainDoc.__waPanelSrc ? WA.mainDoc.__waPanelSrc : ''; } catch (e) { return ''; }
+          })();
+          // 具名探针表：逐模块真读一枚代表性出口（`WA.<ns>.<mem>` 形态，静态面可解析）。
+          const probe = [
+            typeof WA.cyberDashboard.statCard, typeof WA.cyberPeople.personCard,
+            typeof WA.cyberLogs.logLine, typeof WA.cyberAnimate.notify,
+            typeof WA.cyberResponsive.tier
+          ];
+          return MODS.map(function (m, i) {
+            const ns = WA[m[0]];
+            const fns = ns ? Object.keys(ns).filter(function (k) { return typeof ns[k] === 'function' && k.charAt(0) !== '_'; }) : [];
+            return {
+              ns: m[0], file: m[1], probeMember: m[2],
+              loaded: !!ns,
+              probeOk: !!ns && probe[i] === 'function',
+              exported: fns.length,
+              // UI 层是否真调过（面板源码里出现 `NS.member(` 形态即算；面板未装载时如实报 null）
+              wiredToPanel: panelSrc ? fns.filter(function (k) {
+                return panelSrc.indexOf(m[0] + '.' + k + '(') >= 0;
+              }).length : null
+            };
+          });
+        })(),
+        // 主题层各模块的版本，便于「皮是新的、逻辑是旧的」这类错配被看见
+        versions: {
+          cyberpunkTheme: WA.cyberpunkTheme ? WA.cyberpunkTheme.version : null,
+          themeSwitch: sw ? sw.version : null
+        }
+      };
+    });
+  }
+  /**
    * v2.150.0(RP4): 注入价值读数——「预算告诉你花掉了，价值告诉你有没有白花」。
    *   只读 stat（**不跑 report**：report 会遍历已结算轮次做聚合、按源归拢，那是一份
    *   读数生成物，面板要榜单时自己调；诊断面必须在任何面上留不下痕迹——与
@@ -1646,14 +1727,38 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
     'direction/oracle.js': 'oracle', 'direction/tags.js': 'tags', 'direction/choices.js': 'choices',
     'compat/host.js': 'compat', 'compat/mvu.js': 'compatMvu', 'compat/th-helper.js': 'compatTH',
-    'ui/panel.js': 'ui', 'ui/settings.js': 'uiSettings', 'ui/assistant.js': 'assistant'
+    'ui/panel.js': 'ui', 'ui/settings.js': 'uiSettings', 'ui/assistant.js': 'assistant',
+    // v2.181.0：赛博朋克 UI 主题层的 8 个新文件 —— 全树盘查判据要求「诊断清单覆盖磁盘上
+    //   每一个 js 模块」，漏登记即红灯（此前实测缺 8 个 ui 文件）。它们的 ns 登记为可选：
+    //   无头环境里 ui/*.js 不装载，缺席是「可选缺席」而非「真缺席」。
+    'ui/cyberpunk-theme.js': 'cyberpunkTheme',
+    'ui/cyberpunk-components.js': 'cyberUI',
+    'ui/cyberpunk-dashboard.js': 'cyberDashboard',
+    'ui/cyberpunk-people.js': 'cyberPeople',
+    'ui/cyberpunk-logs.js': 'cyberLogs',
+    'ui/cyberpunk-animations.js': 'cyberAnimate',
+    'ui/cyberpunk-responsive.js': 'cyberResponsive',
+    'ui/theme-switch.js': 'themeSwitch'
+
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
   // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，
   //   而是 secModules 把 ui/render-perf.js 报成 missing，而它本来该归 optionalMissing
   //   （「无头环境缺席」与「产品文件断裂」是两件事，混在一起会让自检的红灯失去信息量）。
   //   另注：tests/export-contract.js 里有一份**同名口径的第二副本**（OPTIONAL），两处必须同改。
-  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf'];
+  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf',
+      // v2.181.0：赛博朋克 UI 主题层 9 个 ns —— 无头环境里 ui/*.js 不装载，
+      //   不登记它们会被 secModules 报成 missing（那是「真缺席」，不是「可选缺席」）。
+      'cyberUI',
+      'cyberDashboard',
+      'cyberPeople',
+      'cyberLogs',
+      'cyberAnimate',
+      'cyberResponsive',
+      'cyberpunkTheme',
+      'themeStyles',
+      'themeSwitch',
+    ];
   function secModules() {
     const missing = [], loaded = [], optionalMissing = [];
     Object.keys(MODULE_EXPORTS).forEach(function (file) {
@@ -3328,6 +3433,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   （无损、稳定 ID + 方向化关系 + 道路端点）；前者失效在「同名被静默合并」，
       //   后者失效在「版本对不上却按 v1 猜着收 ⇒ 静默污染目标存档」。
       worldBlueprint: secWorldBlueprint(),
+      // v2.181.0（UI 主题化）：界面主题层读数。与上面各节分列不合并 ——
+      //   它答的是「界面这一层现在是什么状态」，与世界观/剧情/经济各面正交；
+      //   失效模式也独立（主题切了没生效 / 样式叠了两套 / 切不回去）。
+      uiTheme: secUiTheme(),
       diplomacy: secDiplomacy(),
       agency: secAgency(),
       freight: secFreight(),

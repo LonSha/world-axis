@@ -27,7 +27,18 @@ const mi = diagSrc.indexOf('const MODULE_EXPORTS = {');
 const mj = diagSrc.indexOf('\n  };', mi);
 const MODULE_EXPORTS = vm.runInNewContext('(' + diagSrc.slice(diagSrc.indexOf('{', mi), mj + 4) + ')');
 const OWNER = {}; Object.keys(MODULE_EXPORTS).forEach(function (f) { OWNER[MODULE_EXPORTS[f]] = f; });
-const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf'];   // 仅 UI 层依赖宿主；compat 无头可装载
+const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
+  // v2.181.0：赛博朋克 UI 主题层 9 个 ns（与 tests/run.js 的 UI_NS2800 同口径）。
+  'cyberUI',
+  'cyberDashboard',
+  'cyberPeople',
+  'cyberLogs',
+  'cyberAnimate',
+  'cyberResponsive',
+  'cyberpunkTheme',
+  'themeStyles',
+  'themeSwitch',
+];   // 仅 UI 层依赖宿主；compat 无头可装载
 // v2.152.0：新增 ui 模块（ui/render-perf.js）必须同步进本名单。口径与 tool-diag 的
 //   OPTIONAL_EXPORTS 相同但**是第二份副本** —— 如实登记：这两处同属「无头环境缺席的命名空间」
 //   这一事实，理想形态是收成一份（如 product-files.js 对文件面所做的那样）；本轮只做同步，

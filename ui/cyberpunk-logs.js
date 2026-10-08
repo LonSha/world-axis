@@ -330,11 +330,8 @@
     }
   `;
 
-  // 注入样式
-  const style = document.createElement('style');
-  style.id = 'wa-cyberpunk-logs';
-  style.textContent = LOGS_CSS;
-  (document.head || document.documentElement).appendChild(style);
+  // v2.181.0：样式登记进主题注册表，不再自动注入（可切换主题的地基）
+  if (WA.themeStyles && WA.themeStyles.register) WA.themeStyles.register('wa-cyberpunk-logs', LOGS_CSS);
 
   // 日志系统构建器
   WA.cyberLogs = {
@@ -360,7 +357,7 @@
     // 日志容器
     logsContainer: function(logs) {
       return `
-        <div class="wa-logs-container" id="wa-logs-output">
+        <div class="wa-logs-container">
           ${logs.map(l => this.logLine(l)).join('')}
         </div>
       `;
@@ -386,7 +383,7 @@
     searchBox: function() {
       return `
         <div class="wa-log-search">
-          <input type="text" class="wa-log-search-input" placeholder="搜索日志..." id="wa-log-search">
+          <input type="text" class="wa-log-search-input" placeholder="搜索日志...">
           <span class="wa-log-search-icon">🔍</span>
         </div>
       `;

@@ -361,11 +361,8 @@
     .wa-delay-500 { animation-delay: 500ms; }
   `;
 
-  // 注入样式
-  const style = document.createElement('style');
-  style.id = 'wa-cyberpunk-animations';
-  style.textContent = ANIMATIONS_CSS;
-  (document.head || document.documentElement).appendChild(style);
+  // v2.181.0：样式登记进主题注册表，不再自动注入（可切换主题的地基）
+  if (WA.themeStyles && WA.themeStyles.register) WA.themeStyles.register('wa-cyberpunk-animations', ANIMATIONS_CSS);
 
   // 动效工具集
   WA.cyberAnimate = {
@@ -395,7 +392,7 @@
     // 显示通知
     notify: function(options) {
       const { type, title, message, duration } = options;
-      const id = 'wa-notif-' + Date.now();
+      const id = 'wa-notif-' + WA.clock.now();
       const icons = {
         info: 'ℹ️',
         success: '✓',
