@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.172.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.172.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.173.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.173.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -50,22 +50,6 @@
       "tref": 0,
       "own": 11
     },
-    "aftermath.active": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 8
-    },
-    "aftermath.cancel": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
-    },
     "aftermath.diagnose": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -82,36 +66,12 @@
       "tref": 2,
       "own": 14
     },
-    "aftermath.inspect": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
     "aftermath.pending": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/aftermath.js",
       "refs": 0,
       "tref": 1,
-      "own": 3
-    },
-    "aftermath.register": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 6,
-      "own": 3
-    },
-    "aftermath.repair": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 4,
       "own": 3
     },
     "aftermath.reset": {
@@ -122,28 +82,12 @@
       "tref": 0,
       "own": 3
     },
-    "aftermath.setSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 3
-    },
     "aftermath.stat": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/aftermath.js",
       "refs": 0,
       "tref": 1,
-      "own": 3
-    },
-    "aftermath.view": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 2,
       "own": 3
     },
     "apiRouter.fetchModels": {
@@ -1106,30 +1050,6 @@
       "tref": 0,
       "own": 22
     },
-    "commission.advance": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 5,
-      "own": 3
-    },
-    "commission.cancel": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
-    },
-    "commission.create": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 7,
-      "own": 3
-    },
     "commission.diagnose": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -1146,14 +1066,6 @@
       "tref": 2,
       "own": 13
     },
-    "commission.pending": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
     "commission.reset": {
       "reason": "self-only",
       "detail": "engines/commission.js 内部自用、外部零引用（过度导出）",
@@ -1162,36 +1074,12 @@
       "tref": 0,
       "own": 3
     },
-    "commission.setSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 3
-    },
-    "commission.settle": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
-    },
     "commission.stat": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/commission.js",
       "refs": 0,
       "tref": 1,
-      "own": 3
-    },
-    "commission.view": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 2,
       "own": 3
     },
     "compat.diagnose": {
@@ -1538,14 +1426,6 @@
       "tref": 0,
       "own": 1
     },
-    "enigma.mark": {
-      "reason": "test-only",
-      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/enigma.js",
-      "refs": 0,
-      "tref": 25,
-      "own": 3
-    },
     "enigma.outsiders": {
       "reason": "test-only",
       "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
@@ -1553,14 +1433,6 @@
       "refs": 0,
       "tref": 2,
       "own": 3
-    },
-    "enigma.read": {
-      "reason": "test-only",
-      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/enigma.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 4
     },
     "enigma.setSettings": {
       "reason": "test-only",
@@ -1807,7 +1679,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/evict.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 3,
       "own": 1
     },
     "evict.resetEvictStat": {
@@ -2634,22 +2506,6 @@
       "tref": 3,
       "own": 3
     },
-    "intel.rowsOf": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/intel.js",
-      "refs": 0,
-      "tref": 10,
-      "own": 4
-    },
-    "intel.truthOf": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/intel.js",
-      "refs": 0,
-      "tref": 5,
-      "own": 5
-    },
     "intel.verify": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -2664,14 +2520,6 @@
       "src": "engines/interop.js",
       "refs": 0,
       "tref": 0,
-      "own": 4
-    },
-    "investigation.checkEvidence": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 2,
       "own": 4
     },
     "investigation.diagnose": {
@@ -2690,30 +2538,6 @@
       "tref": 2,
       "own": 13
     },
-    "investigation.investigate": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 4,
-      "own": 3
-    },
-    "investigation.pending": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "investigation.register": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 3
-    },
     "investigation.reset": {
       "reason": "self-only",
       "detail": "engines/investigation.js 内部自用、外部零引用（过度导出）",
@@ -2722,36 +2546,12 @@
       "tref": 0,
       "own": 3
     },
-    "investigation.reveal": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "investigation.setSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 3
-    },
     "investigation.stat": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/investigation.js",
       "refs": 0,
       "tref": 1,
-      "own": 3
-    },
-    "investigation.view": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 2,
       "own": 3
     },
     "karma.balance": {
@@ -3354,44 +3154,12 @@
       "tref": 0,
       "own": 3
     },
-    "operations.active": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 4
-    },
-    "operations.cancel": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
-    },
     "operations.diagnose": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/operations.js",
       "refs": 0,
       "tref": 1,
-      "own": 3
-    },
-    "operations.disburse": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
-    },
-    "operations.enact": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 4,
       "own": 3
     },
     "operations.getSettings": {
@@ -3402,44 +3170,12 @@
       "tref": 2,
       "own": 15
     },
-    "operations.handover": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "operations.pending": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 4
-    },
     "operations.reset": {
       "reason": "self-only",
       "detail": "engines/operations.js 内部自用、外部零引用（过度导出）",
       "src": "engines/operations.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
-    },
-    "operations.setSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 3
-    },
-    "operations.settle": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 2,
       "own": 3
     },
     "operations.stat": {
@@ -3449,14 +3185,6 @@
       "refs": 0,
       "tref": 1,
       "own": 3
-    },
-    "operations.view": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 4
     },
     "opportunity.buildBlock": {
       "reason": "self-only",
@@ -5322,14 +5050,6 @@
       "tref": 5,
       "own": 4
     },
-    "storyChoice.confirm": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/story-choice.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 3
-    },
     "storyChoice.diagnose": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -5346,44 +5066,12 @@
       "tref": 2,
       "own": 11
     },
-    "storyChoice.pending": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/story-choice.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 4
-    },
-    "storyChoice.present": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/story-choice.js",
-      "refs": 0,
-      "tref": 5,
-      "own": 3
-    },
     "storyChoice.reset": {
       "reason": "self-only",
       "detail": "engines/story-choice.js 内部自用、外部零引用（过度导出）",
       "src": "engines/story-choice.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
-    },
-    "storyChoice.review": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/story-choice.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
-    },
-    "storyChoice.setSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/story-choice.js",
-      "refs": 0,
-      "tref": 3,
       "own": 3
     },
     "storyChoice.stat": {

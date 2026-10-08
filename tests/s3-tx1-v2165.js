@@ -176,7 +176,7 @@ function runA(a) {
     'v2165/tx1 A15: store 骨架**物化** diplomacy 容器（登记了却不在骨架里，registryParity 会报未物化）');
   a(st.indexOf("'diplomacy.pairs':") >= 0 && ev.indexOf("'diplomacy.pairs':") >= 0
     && st.indexOf("'diplomacy.proposals':") >= 0 && ev.indexOf("'diplomacy.proposals':") >= 0,
-    'v2165/tx1 A16: 两环容量登记与挤出站点四处逐键同名登记');
+    'v2165/tx1 A16: 两环容量登记四处逐键同名登记（store 容量 + evict 侧声明；v2.173.0 起 evict 侧落 NON_EVICT 而非 SITES）');
   a(pn.indexOf('id="wa-dp-sign"') >= 0 && pn.indexOf("'#wa-dp-sign'") >= 0,
     'v2165/tx1 A17: 面板有产品消费方（渲染 + 绑定）—— 死导出门禁的另一半');
   a(dg.indexOf("'wa-dp-sign'") >= 0 && dg.indexOf("'wa-dp-out'") >= 0,
@@ -187,16 +187,29 @@ function runA(a) {
     && countOcc(self, A_CODES) >= 1,
     'v2165/tx1 A19: 七个锚点在本文件里至少各引用 1 次');
   // 两处登记逐键同值（cap 与 kind 都要对得上）
+  //   v2.173.0（TX4b）口径迁移：两环是**写入侧硬上界**（满即拒写，既有项一条不动），
+  //   与 region.places / stage.metrics / binding.* 同族 ⇒ 从 SITES 迁入 NON_EVICT，
+  //   **不走 evict**（否则就是零调用挤出站点）。故本判据改为三条同时成立：
+  //     ① store.sizeCaps() 里 cap:'per-call' + kind:'object'（容量声明真源仍在 store）
+  //     ② evict.nonEvictDecls() 里两环存在（「为什么不给它记账」是声明过的决定）
+  //     ③ evict.siteDecls() 里两环**不存在**（明确不在挤出站点表 = 不走 evict 的可执行证据；
+  //        同时防止有人把它加回 SITES，那会重新变成零调用站点）
+  //   三条合起来比旧版（只钉「在 SITES」）更强，不是放宽。
   const WA = boot();
   const caps = WA.store.sizeCaps ? WA.store.sizeCaps() : {};
   const decls = WA.evict.siteDecls ? WA.evict.siteDecls() : {};
-  a(!!caps['diplomacy.pairs'] && !!decls['diplomacy.pairs']
-    && caps['diplomacy.pairs'].cap === 'per-call' && decls['diplomacy.pairs'].cap === 'per-call'
-    && !!caps['diplomacy.proposals'] && !!decls['diplomacy.proposals']
-    && decls['diplomacy.proposals'].kind === 'object',
-    'v2165/tx1 A20: 两处登记同键同值（store per-call / evict per-call + kind:object；实 '
-      + JSON.stringify(caps['diplomacy.pairs'] && caps['diplomacy.pairs'].cap) + '/'
-      + JSON.stringify(decls['diplomacy.pairs'] && decls['diplomacy.pairs'].cap) + '）');
+  const nonEvict = WA.evict.nonEvictDecls ? WA.evict.nonEvictDecls() : {};
+  a(!!caps['diplomacy.pairs'] && !!caps['diplomacy.proposals']
+    && caps['diplomacy.pairs'].cap === 'per-call' && caps['diplomacy.pairs'].kind === 'object'
+    && caps['diplomacy.proposals'].cap === 'per-call' && caps['diplomacy.proposals'].kind === 'object'
+    && !!nonEvict['diplomacy.pairs'] && !!nonEvict['diplomacy.proposals']
+    && !decls['diplomacy.pairs'] && !decls['diplomacy.proposals'],
+    'v2165/tx1 A20: 容量声明真源在 store（per-call/object）+ 两环在 NON_EVICT 且**不在** SITES'
+      + '（写入侧硬上界不走 evict；实 store '
+      + JSON.stringify(caps['diplomacy.pairs'] && caps['diplomacy.pairs'].cap)
+      + '/' + JSON.stringify(caps['diplomacy.pairs'] && caps['diplomacy.pairs'].kind)
+      + ' · nonEvict ' + (!!nonEvict['diplomacy.pairs']) + '/' + (!!nonEvict['diplomacy.proposals'])
+      + ' · siteDecls ' + JSON.stringify(decls['diplomacy.pairs'] || null) + '）');
   // 与 faction-graph 的分工必须在源码里写明（「不自动迁成事实」是 TX1 边界原文）
   a(src.indexOf('不自动迁成联盟或战争') >= 0 && src.indexOf('derived') >= 0,
     'v2165/tx1 A21: 模块头写明与 faction-graph 的分工（推导面 vs 事实面；推导结果不自动迁成事实）');

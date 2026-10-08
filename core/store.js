@@ -241,6 +241,24 @@
       //   进骨架的理由与 blueprint 同款：外交事实是**跨会话要留下**的世界资产
       //   （「我们之间签过什么、到没到期」不能因为关一次会话就消失）。
       diplomacy: { pairs: {}, proposals: {}, seq: 0 },
+      // v2.173.0（TX4b）：TX3/TX4/TX6/TX7/TX8/TX9 六模块的世界状态容器。
+      //   这六张表此前**一处都没进骨架**（也没有 __BOUNDED_CAPS / evict SITES 条目），
+      //   而它们都是跨会话要留下的剧情资产 —— 与上面 diplomacy / blueprint / worldSeed
+      //   同性质，待遇应当一致：
+      //     freight.shipments          在途货运单（守恒运输三段）
+      //     storyChoice.points         玩家见过的分歧点与选择（回执可追溯）
+      //     commission.contracts       委托合同（分阶段交付与结算）
+      //     investigation.clues        线索与证据（调查链）
+      //     aftermath.effects          地点创伤（灾后余波与修复进度）
+      //     operations.projects        运营项目（批准 → 立项 → 拨付）
+      //   不进骨架的后果不是「少个默认值」，而是冷启动第一次 transact 就写在一个
+      //   不存在的顶层键上（本仓 v2.116.0 为这条付过价）。
+      freight: { shipments: [] },
+      storyChoice: { points: [] },
+      commission: { contracts: [] },
+      investigation: { clues: [], evidence: [] },
+      aftermath: { effects: [] },
+      operations: { projects: [] },
       // v2.164.0（TX5）：版本化完整世界蓝图库（world-blueprint.js）。
       //   与 worldSeed 同款**进骨架**：蓝图库是**跨会话要留下**的世界资产（「把这局的世界
       //   原样搬到另一段聊天」要求它活过会话），而 importBlueprint 还会写 installed 留痕
@@ -1417,8 +1435,25 @@
     // v2.165.0（TX1）：外交成对条目与提案链两环（diplomacy.js）。
     //   两处逐键同名同值登记：本表 + core/evict.js SITES —— SITES 缺键时
     //   evict.array 会走 unknown-site 静默失败，环就成了「登记了容量却没人执行」。
-    'diplomacy.pairs': { cap: 'per-call', site: 'diplomacy.js sign() 入口 maxPairs 预检（per-call，取设置上界）' },
-    'diplomacy.proposals': { cap: 'per-call', site: 'diplomacy.js propose() 入口 maxProposals 预检（per-call，取设置上界）' },
+    //   v2.172.0（TX9 收尾修正）：两环都是**对象**（key = pairId / pid），走写入侧
+    //   硬上界（满员拒写 `pairs-full` / `proposals-full`，不走 evict），与 stage.metrics
+    //   同款 —— 故必须显式标 kind:'object'。缺它时 registryParity 按数组判型，
+    //   对 `{}` 报「类型错配（应为数组）」⇒ 常态即红灯（TX1 遗留，本轮修正）。
+    'diplomacy.pairs': { cap: 'per-call', kind: 'object', site: 'diplomacy.js sign() 入口 maxPairs 预检（per-call，取设置上界）' },
+    'diplomacy.proposals': { cap: 'per-call', kind: 'object', site: 'diplomacy.js propose() 入口 maxProposals 预检（per-call，取设置上界）' },
+    // v2.173.0（TX4b）：TX3/TX4/TX6/TX7/TX8/TX9 六模块的容器登记。
+    //   它们此前是「登记也没有」的最坏形态：写在骨架里不存在的顶层键上，
+    //   而 registryParity 只查本表登记过的键 ⇒ 查不到 ⇒ 永绿。
+    //   cap 与各模块 DEF 的上界同源（per-call 由调用点传入设置值）。
+    //   freight.shipments 与 world.shipments **不是同一张表**：world.shipments 是
+    //   世界织体自己的货运环，freight.shipments 是守恒运输台账（源扣减 → 在途 → 到货）。
+    'freight.shipments': { cap: 'per-call', site: 'freight.js dispatch() WA.evict.array(fr.shipments, freight.shipments, cfg.maxShipments)（per-call，取设置上界）' },
+    'storyChoice.points': { cap: 'per-call', site: 'story-choice.js present() 入口 maxPending 预检（per-call，取设置上界）' },
+    'commission.contracts': { cap: 'per-call', site: 'commission.js create() 入口 maxContracts 预检（per-call，取设置上界）' },
+    'investigation.clues': { cap: 'per-call', site: 'investigation.js register() 入口 maxClues 预检（per-call，取设置上界）' },
+    'investigation.evidence': { cap: 'per-call', site: 'investigation.js investigate() 入口 maxEvidence 预检（per-call，取设置上界）' },
+    'aftermath.effects': { cap: 'per-call', site: 'aftermath.js register() 入口 maxEffects 预检（per-call，取设置上界）' },
+    'operations.projects': { cap: 'per-call', site: 'operations.js enact() 入口 maxProjects 预检（per-call，取设置上界）' },
     'worldBridge.legends': { cap: 24, site: 'world-bridge.js WA.evict.array(b.legends, maxLegends)（per-call，取设置上界）' },
     'worldBridge.exported': { cap: 12, site: 'world-bridge.js WA.evict.array(b.exported)' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },

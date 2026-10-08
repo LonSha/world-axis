@@ -34,7 +34,7 @@ const A_DEF = "  const DEF = { enabled: false, maxSchedulePerTurn: 4, maxReceipt
 // 锚点二取**need-steps 返回**：无计划时不编步骤——步骤由 AI 文本经结构预检产生或由预设模板提供。
 const A_NEED_STEPS = "      return { ok: false, reason: 'need-steps', person: who, goalId: goal.id,";
 // 锚点三取**导出数检查**：7 个成员是契约（getSettings/setSettings/schedule/processReceipts/buildBlock/diagnose/stat）。
-const A_EXPORT_COUNT = "  if (__exportCount !== 7) A.__agencyWarn = { expected: 7, got: __exportCount };";
+const A_EXPORT_COUNT = "  if (__exportCount !== 7) WA.__agencyWarn = { expected: 7, got: __exportCount };";
 
 function countOcc(s, sub) { return s.split(sub).length - 1; }
 function read(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
@@ -50,8 +50,8 @@ function boot(srcOv) {
 function runA(a) {
   const src = read(REL);
   // A1 导出成员恰 7
-  const m = src.match(/A\.agency\s*=\s*\{[\s\S]*?\};/);
-  a(!!m, 'v2166/tx2 A1: A.agency 导出块存在');
+  const m = src.match(/WA\.agency\s*=\s*\{[\s\S]*?\};/);
+  a(!!m, 'v2166/tx2 A1: WA.agency 导出块存在');
   if (m) {
     const keys = (m[0].match(/^\s+(\w+):/gm) || []).map(function (s) { return s.trim().replace(':', ''); });
     a(keys.length === 7, 'v2166/tx2 A1: 导出 7 成员（实 ' + keys.length + '：' + keys.join('/') + '）');
@@ -93,10 +93,10 @@ function runA(a) {
 
   // A10 manifest 版本
   const mani = read(REL_MANIFEST);
-  a(mani.indexOf('"2.168.0"') !== -1 || mani.indexOf('"2.167.0"') !== -1 || mani.indexOf('"2.166.0"') !== -1 || mani.indexOf('"2.169.0"') !== -1 || mani.indexOf('"2.170.0"') !== -1 || mani.indexOf('"2.171.0"') !== -1 || mani.indexOf('"2.172.0"') !== -1 || mani.indexOf('"2.172.0"') !== -1, 'v2166/tx2 A10: manifest 版本 2.166.0+');
+  a(mani.indexOf('"2.168.0"') !== -1 || mani.indexOf('"2.167.0"') !== -1 || mani.indexOf('"2.166.0"') !== -1 || mani.indexOf('"2.169.0"') !== -1 || mani.indexOf('"2.170.0"') !== -1 || mani.indexOf('"2.171.0"') !== -1 || mani.indexOf('"2.173.0"') !== -1 || mani.indexOf('"2.172.0"') !== -1, 'v2166/tx2 A10: manifest 版本 2.166.0+');
 
   // A11 版本常量
-  a(idx.indexOf("VERSION = '2.168.0'") !== -1 || idx.indexOf("VERSION = '2.167.0'") !== -1 || idx.indexOf("VERSION = '2.166.0'") !== -1 || idx.indexOf("VERSION = '2.169.0'") !== -1 || idx.indexOf("VERSION = '2.170.0'") !== -1 || idx.indexOf("VERSION = '2.171.0'") !== -1 || idx.indexOf("VERSION = '2.172.0'") !== -1 || idx.indexOf("VERSION = '2.172.0'") !== -1, 'v2166/tx2 A11: index.js VERSION 2.166.0+');
+  a(idx.indexOf("VERSION = '2.168.0'") !== -1 || idx.indexOf("VERSION = '2.167.0'") !== -1 || idx.indexOf("VERSION = '2.166.0'") !== -1 || idx.indexOf("VERSION = '2.169.0'") !== -1 || idx.indexOf("VERSION = '2.170.0'") !== -1 || idx.indexOf("VERSION = '2.171.0'") !== -1 || idx.indexOf("VERSION = '2.173.0'") !== -1 || idx.indexOf("VERSION = '2.172.0'") !== -1, 'v2166/tx2 A11: index.js VERSION 2.166.0+');
 
   // A12 panel 6 控件
   ['wa-ag-enabled', 'wa-ag-person', 'wa-ag-schedule', 'wa-ag-receipts', 'wa-ag-diag', 'wa-ag-out'].forEach(function (id) {

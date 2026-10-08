@@ -223,7 +223,7 @@ function runAll(A) {
   //   ② 调用期 1313 → 1335：真正新增的 (file, ns) 对来自五处新读者（world-bridge 读 store/rumor/chronicle，
   //      eco-audit 读 causal/chrono/people/rumor，两者都不产注入块）—— 同 v2.124.0 记过的
   //      「边是 (file, ns) 对，不是站点数」，故不按控件数膨胀。
-  A(a.edgesLoad === 90 && a.edgesCall === 1481 && a.edgesAll === 1571 && a.identityOk,
+  A(a.edgesLoad === 90 && a.edgesCall === 1486 && a.edgesAll === 1576 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -280,6 +280,14 @@ function runAll(A) {
     //   它的三处新读者 —— render/inject.js 注入分支、ui/panel.js 控件（含 getSettings 初值渲染
     //   与 setSettings 开关）、engines/tool-diag.js 诊断节（secAgency 读 diagnose/stat））。
     //   恒等式 84 + 1415 = 1499。
+  // v2.173.0（TX4b）：装载期 90 不变、调用期 1481 → 1486、合计 1571 → 1576。
+  //   归因**实证而非估计**：把 HEAD 与工作区的边集各自 dump 成 `from|ns|kind` 行再逐行 diff，
+  //   实测恰好 5 条新增、0 条消失，且全部同族 —— ui/panel.js → aftermath / commission /
+  //   investigation / operations / storyChoice（各 1 条 call 边）。即本轮把 TX4/TX6/TX7/TX8/TX9
+  //   五段面板接上真消费方后，面板第一次读这五个模块的命名空间；这与 TX1/TX2 记过的
+  //   「diplomacy / agency 自身读七 ns，真正新增的 (file, ns) 对来自它的三处新读者（含 ui/panel.js）」
+  //   是同款。**装载期 90 不变**：本轮不新增模块，故没有新的 registerModule 尾调边
+  //   （TX3 freight 的装载期边在 v2.167.0 就已入账）。恒等式 90 + 1486 = 1576。
   // v2.140.0（F1）：LOAD_ORDER 164 → 165（engines/noesis.js 入序）。
   // v2.141.0（F2）：LOAD_ORDER 165 → 166（engines/lifeline.js 入序，紧随 noesis）。
   // v2.142.0（F3）：LOAD_ORDER 166 → 167（engines/perspective-lock.js 入序，紧随 lifeline）。

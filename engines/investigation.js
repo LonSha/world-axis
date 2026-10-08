@@ -34,32 +34,32 @@
  */
 (function () {
   'use strict';
-  const A = window.WorldAxis = window.WorldAxis || {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_investigation_settings_v1';
   var DEF = { enabled: false, maxClues: 32, maxEvidence: 64 };
   var __REG = { key: LS_KEY, def: DEF, module: 'investigation',
     bounds: { maxClues: [4, 128], maxEvidence: [8, 256] } };
   function getSettings() {
-    var raw = A.settingsBus ? A.settingsBus.read(__REG) : null;
+    var raw = WA.settingsBus ? WA.settingsBus.read(__REG) : null;
     var base = Object.assign({}, DEF);
-    return A.settingsBus ? A.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
+    return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
                           : Object.assign(base, raw || {});
   }
   function setSettings(patch) {
-    return A.settingsBus ? A.settingsBus.saveOrThrow(__REG, A.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
+    return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
       : Object.assign({}, getSettings(), patch || {});
   }
-  A.__settingsRegs = (A.__settingsRegs || []).concat([__REG]);
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   var _stat = { registered: 0, investigated: 0, revealed: 0, refused: 0, lastReason: '', faults: {} };
   function noteFault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
-  function clean(v, max) { return A.inputGuard ? A.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
-  var clockNow = function (tag) { try { return A.clock.now(tag || 'investigation'); } catch (e) { return Date.now(); } };
-  function state() { return (A.store && A.store.get) ? (A.store.get() || {}) : {}; }
+  function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
+  const clockNow = function (tag) { try { return WA.clock.now(tag || 'investigation'); } catch (e) { return Date.now(); } };
+  function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function bucket(root) { var r = root || state(); if (!r.investigation) r.investigation = { clues: [], evidence: [] }; if (!Array.isArray(r.investigation.clues)) r.investigation.clues = []; if (!Array.isArray(r.investigation.evidence)) r.investigation.evidence = []; return r.investigation; }
   function clues() { return bucket().clues || []; }
   function evidence() { return bucket().evidence || []; }
   function findClue(id) { var k = clean(id, 60); return clues().filter(function (x) { return x && x.id === k; })[0] || null; }
-  function newId() { return A.rand ? A.rand.id('inv_', 4, 'id') : 'inv_0000'; }
+  function newId() { return WA.rand ? WA.rand.id('inv_', 4, 'id') : 'inv_0000'; }
 
   // ── 1. register：登记可发现线索 ──
   function register(spec) {
@@ -72,8 +72,8 @@
     if (!subject) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', field: 'subject' }; }
     if (clues().length >= cfg.maxClues) { noteFault('clues-full'); return { ok: false, reason: 'clues-full', cap: cfg.maxClues }; }
     // 检查相关命题是否在 truthOf 中存在（如果 truthOf 可用）
-    if (A.intel && typeof A.intel.truthOf === 'function') {
-      var truth = A.intel.truthOf(subject);
+    if (WA.intel && typeof WA.intel.truthOf === 'function') {
+      var truth = WA.intel.truthOf(subject);
       if (!truth.ok && truth.reason === 'unknown-subject') {
         // unknown 是合法状态——不阻断登记，但标记为 unverified
       }
@@ -91,11 +91,11 @@
       revealedTo: [],
       evidenceIds: []
     };
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) { bucket(d).clues.push(rec); }, 'investigation:register');
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) { bucket(d).clues.push(rec); }, 'investigation:register');
     } else { clues().push(rec); }
-    if (A.evict && typeof A.evict.array === 'function') {
-      try { A.evict.array(bucket().clues, 'investigation.clues'); } catch (e) {}
+    if (WA.evict && typeof WA.evict.array === 'function') {
+      try { WA.evict.array(bucket().clues, 'investigation.clues'); } catch (e) {}
     }
     _stat.registered++;
     return { ok: true, id: rec.id, title: title, subject: subject };
@@ -120,8 +120,8 @@
     if (evidence().length >= cfg.maxEvidence) { noteFault('evidence-full'); return { ok: false, reason: 'evidence-full', cap: cfg.maxEvidence }; }
     // 检查证人/地点条件（如果线索指定了证人，检查该证人是否在 noesis 中可接触）
     var witnessAccessible = true;
-    if (clue.witness && A.noesis && typeof A.noesis.knows === 'function') {
-      var nk = A.noesis.knows(who, clue.witness);
+    if (clue.witness && WA.noesis && typeof WA.noesis.knows === 'function') {
+      var nk = WA.noesis.knows(who, clue.witness);
       // knows 返回 deniedBy/knownBy——如果 who 不知道 witness，不一定阻止调查但标记条件
       if (nk && nk.deniedBy && nk.deniedBy.length > 0) {
         // who 不能接触该证人——不阻断但标记为受限
@@ -137,8 +137,8 @@
       status: 'collected',
       content: clean(o.content || '', 200)
     };
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         b.evidence.push(ev);
         var c = b.clues.filter(function (x) { return x && x.id === clue.id; })[0];
@@ -163,14 +163,14 @@
     if (!evs.length) return { ok: true, clueId: clue.id, verdict: 'no-evidence', count: 0 };
     // 读 truthOf 获取事实面
     var truth = null;
-    if (A.intel && typeof A.intel.truthOf === 'function') {
-      truth = A.intel.truthOf(clue.subject);
+    if (WA.intel && typeof WA.intel.truthOf === 'function') {
+      truth = WA.intel.truthOf(clue.subject);
     }
     // 读 intel rowsOf 获取认知面
     var knownRows = [];
-    if (A.intel && typeof A.intel.rowsOf === 'function') {
+    if (WA.intel && typeof WA.intel.rowsOf === 'function') {
       evs.forEach(function (e) {
-        var rows = A.intel.rowsOf(e.person, clue.subject);
+        var rows = WA.intel.rowsOf(e.person, clue.subject);
         if (rows && rows.length) knownRows = knownRows.concat(rows);
       });
     }
@@ -209,22 +209,22 @@
       noteFault('insufficient-evidence'); return { ok: false, reason: 'insufficient-evidence', verdict: chk.verdict };
     }
     // 调 enigma.mark 扩展知情
-    if (A.enigma && typeof A.enigma.mark === 'function') {
-      var mr = A.enigma.mark(clue.subject, who);
+    if (WA.enigma && typeof WA.enigma.mark === 'function') {
+      var mr = WA.enigma.mark(clue.subject, who);
       if (mr && !mr.ok && mr.reason !== 'disabled') {
         noteFault('enigma-failed'); return { ok: false, reason: 'enigma-failed', detail: mr.reason };
       }
     }
     // 调 intel.addIntel 传递线索结论（如果 truthOf 有值）
-    if (A.intel && typeof A.intel.addIntel === 'function') {
-      var truth = A.intel.truthOf(clue.subject);
+    if (WA.intel && typeof WA.intel.addIntel === 'function') {
+      var truth = WA.intel.truthOf(clue.subject);
       if (truth && truth.ok) {
-        A.intel.addIntel(who, { about: clue.subject, claim: truth.value, level: 'record', source: 'investigation:' + clue.id });
+        WA.intel.addIntel(who, { about: clue.subject, claim: truth.value, level: 'record', source: 'investigation:' + clue.id });
       }
     }
     // 更新线索状态
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var c = b.clues.filter(function (x) { return x && x.id === clue.id; })[0];
         if (c) { c.revealedTo.push(who); c.status = 'resolved'; }
@@ -274,11 +274,11 @@
   // ── 8. diagnose：闭环检查 ──
   function diagnose() {
     var checks = {
-      intel: !!(A.intel && typeof A.intel.truthOf === 'function' && typeof A.intel.addIntel === 'function' && typeof A.intel.rowsOf === 'function'),
-      enigma: !!(A.enigma && typeof A.enigma.mark === 'function' && typeof A.enigma.read === 'function'),
-      noesis: !!(A.noesis && typeof A.noesis.knows === 'function'),
-      store: !!(A.store && typeof A.store.transact === 'function'),
-      settingsBus: !!(A.settingsBus && typeof A.settingsBus.read === 'function')
+      intel: !!(WA.intel && typeof WA.intel.truthOf === 'function' && typeof WA.intel.addIntel === 'function' && typeof WA.intel.rowsOf === 'function'),
+      enigma: !!(WA.enigma && typeof WA.enigma.mark === 'function' && typeof WA.enigma.read === 'function'),
+      noesis: !!(WA.noesis && typeof WA.noesis.knows === 'function'),
+      store: !!(WA.store && typeof WA.store.transact === 'function'),
+      settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     var ok = checks.intel && checks.enigma && checks.store;
     return { ok: ok, closedLoop: ok, checks: checks, version: '2.170.0' };
@@ -299,7 +299,7 @@
   // ── 10. reset ──
   function reset() { _stat.registered = 0; _stat.investigated = 0; _stat.revealed = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; return { ok: true }; }
 
-  A.investigation = {
+  WA.investigation = {
     getSettings: getSettings,
     setSettings: function (patch) { return setSettings(patch); },
     register: register,
@@ -314,7 +314,7 @@
     reset: reset
   };
   var EXPORT_COUNT = 12;
-  var _exported = Object.keys(A.investigation).length;
+  var _exported = Object.keys(WA.investigation).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('investigation: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof A.registerModule === 'function') A.registerModule('engines/investigation.js', { kind: 'engine', ver: '2.170.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/investigation.js', { kind: 'engine', ver: '2.170.0' });
 })();

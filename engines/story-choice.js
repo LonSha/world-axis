@@ -36,31 +36,31 @@
  */
 (function () {
   'use strict';
-  const A = window.WorldAxis = window.WorldAxis || {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_story_choice_settings_v1';
   var DEF = { enabled: false, maxPending: 16, maxOptions: 6 };
   var __REG = { key: LS_KEY, def: DEF, module: 'storyChoice',
     bounds: { maxPending: [2, 64], maxOptions: [2, 12] } };
   function getSettings() {
-    var raw = A.settingsBus ? A.settingsBus.read(__REG) : null;
+    var raw = WA.settingsBus ? WA.settingsBus.read(__REG) : null;
     var base = Object.assign({}, DEF);
-    return A.settingsBus ? A.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
+    return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
                           : Object.assign(base, raw || {});
   }
   function setSettings(patch) {
-    return A.settingsBus ? A.settingsBus.saveOrThrow(__REG, A.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
+    return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
       : Object.assign({}, getSettings(), patch || {});
   }
-  A.__settingsRegs = (A.__settingsRegs || []).concat([__REG]);
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   var _stat = { presented: 0, confirmed: 0, refused: 0, applied: 0, lastReason: '', faults: {} };
   function noteFault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
-  function clean(v, max) { return A.inputGuard ? A.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
-  var clockNow = function (tag) { try { return A.clock.now(tag || 'storyChoice'); } catch (e) { return Date.now(); } };
-  function state() { return (A.store && A.store.get) ? (A.store.get() || {}) : {}; }
+  function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
+  const clockNow = function (tag) { try { return WA.clock.now(tag || 'storyChoice'); } catch (e) { return Date.now(); } };
+  function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function bucket(root) { var r = root || state(); if (!r.storyChoice) r.storyChoice = { points: [] }; if (!Array.isArray(r.storyChoice.points)) r.storyChoice.points = []; return r.storyChoice; }
   function list() { return bucket().points || []; }
   function find(id) { var k = clean(id, 60); return list().filter(function (x) { return x && x.id === k; })[0] || null; }
-  function nodeId(round) { return A.rand ? A.rand.id('sc_' + (round || 0) + '_', 4, 'id') : 'sc_' + (round || 0) + '_0000'; }
+  function nodeId(round) { return WA.rand ? WA.rand.id('sc_' + (round || 0) + '_', 4, 'id') : 'sc_' + (round || 0) + '_0000'; }
 
   /**
    * 登记一个选择点。调 branchTree.fork 记账 + 对每个选项的 ops 跑 rehearsal.preview 白名单校验。
@@ -83,27 +83,27 @@
     }).filter(function (o) { return !!o.label; });
     if (opts.length < 2) { noteFault('no-options'); return { ok: false, reason: 'no-options', have: opts.length, need: 2 }; }
     // 调 branchTree.fork 记账（选项标签列表）
-    if (!A.branchTree || typeof A.branchTree.fork !== 'function') { noteFault('branchtree-absent'); return { ok: false, reason: 'branchtree-absent' }; }
+    if (!WA.branchTree || typeof WA.branchTree.fork !== 'function') { noteFault('branchtree-absent'); return { ok: false, reason: 'branchtree-absent' }; }
     var labels = opts.map(function (o) { return o.label; });
-    var fr = A.branchTree.fork({ round: n.round, prompt: prompt, options: labels, parent: n.parent, steps: n.steps });
+    var fr = WA.branchTree.fork({ round: n.round, prompt: prompt, options: labels, parent: n.parent, steps: n.steps });
     if (!fr || !fr.ok) { noteFault('fork-failed'); return { ok: false, reason: 'fork-failed', detail: fr ? fr.reason : 'no-result' }; }
     // 对每个选项的 ops 跑 rehearsal.preview 白名单校验
     var optResults = opts.map(function (o) {
       if (!o.ops) return { label: o.label, costs: o.costs, preview: null, allowed: true };
-      if (!A.rehearsal || typeof A.rehearsal.preview !== 'function') return { label: o.label, costs: o.costs, preview: { ok: false, reason: 'rehearsal-absent' }, allowed: false };
+      if (!WA.rehearsal || typeof WA.rehearsal.preview !== 'function') return { label: o.label, costs: o.costs, preview: { ok: false, reason: 'rehearsal-absent' }, allowed: false };
       var r = null;
-      try { r = A.rehearsal.preview(o.ops); } catch (e) { r = { ok: false, reason: 'preview-throw' }; }
+      try { r = WA.rehearsal.preview(o.ops); } catch (e) { r = { ok: false, reason: 'preview-throw' }; }
       var allowed = r && r.ok && (!r.reject || r.reject.length === 0);
       return { label: o.label, costs: o.costs, preview: r, allowed: allowed };
     });
     var rec = { id: fr.id, round: fr.round, at: clockNow('storyChoice'), prompt: prompt,
       options: optResults, parent: n.parent ? clean(n.parent, 60) : '',
       choice: '', chosenAt: 0, receiptId: '', appliedAt: 0, forkId: fr.id };
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) { var b = bucket(d); b.points.push(rec); }, 'storyChoice:present');
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) { var b = bucket(d); b.points.push(rec); }, 'storyChoice:present');
     } else { list().push(rec); }
-    if (A.evict && typeof A.evict.array === 'function') {
-      try { A.evict.array(bucket().points, 'storyChoice.points'); } catch (e) { /* 站点未登记时静默 */ }
+    if (WA.evict && typeof WA.evict.array === 'function') {
+      try { WA.evict.array(bucket().points, 'storyChoice.points'); } catch (e) { /* 站点未登记时静默 */ }
     }
     _stat.presented++;
     return { ok: true, id: rec.id, round: rec.round, options: optResults };
@@ -125,18 +125,18 @@
     if (!optRec) { noteFault('bad-value'); return { ok: false, reason: 'bad-value', field: 'option', allowed: rec.options.map(function (o) { return o.label; }) }; }
     if (!optRec.allowed) { noteFault('preview-rejected'); return { ok: false, reason: 'preview-rejected', option: opt, rejects: (optRec.preview && optRec.preview.reject) || [] }; }
     // 第一步：记账（branchTree.choose）
-    if (!A.branchTree || typeof A.branchTree.choose !== 'function') { noteFault('branchtree-absent'); return { ok: false, reason: 'branchtree-absent' }; }
-    var cr = A.branchTree.choose(id, opt);
+    if (!WA.branchTree || typeof WA.branchTree.choose !== 'function') { noteFault('branchtree-absent'); return { ok: false, reason: 'branchtree-absent' }; }
+    var cr = WA.branchTree.choose(id, opt);
     if (!cr || !cr.ok) { noteFault('choose-failed'); return { ok: false, reason: 'choose-failed', detail: cr ? cr.reason : 'no-result' }; }
     // 第二步：兑现（commit）——如果选项有 ops
     var applied = false, receiptId = '';
-    if (optRec.ops && A.commit && typeof A.commit.begin === 'function') {
+    if (optRec.ops && WA.commit && typeof WA.commit.begin === 'function') {
       var o = opts || {};
-      var br = A.commit.begin(o.opId || ('choice_' + id), { site: 'storyChoice', floor: o.floor, swipe: o.swipe });
+      var br = WA.commit.begin(o.opId || ('choice_' + id), { site: 'storyChoice', floor: o.floor, swipe: o.swipe });
       if (br && br.ok) {
         var chain = br.chain;
         var opsRef = optRec.ops;
-        var cm = A.commit.commit(chain, function (draft) {
+        var cm = WA.commit.commit(chain, function (draft) {
           var paths = Object.keys(opsRef);
           for (var i = 0; i < paths.length; i++) {
             var p = paths[i], top = String(p).split('.')[0];
@@ -148,13 +148,13 @@
         });
         if (cm && cm.ok) {
           applied = true; receiptId = cm.opId || '';
-          if (A.commit.flush) { try { A.commit.flush(chain); } catch (e) { /* 副作用失败不回滚世界事实 */ } }
+          if (WA.commit.flush) { try { WA.commit.flush(chain); } catch (e) { /* 副作用失败不回滚世界事实 */ } }
         } else { noteFault('commit-failed'); }
       } else { noteFault('begin-failed'); }
     }
     // 第三步：回写回执
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.points.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) { t.choice = opt; t.chosenAt = clockNow('storyChoice'); t.receiptId = receiptId; t.appliedAt = applied ? clockNow('storyChoice') : 0; }
@@ -178,9 +178,9 @@
     var previewState = 'none';
     var previewDetail = null;
     if (rec.choice && opt_previewId(rec)) {
-      if (A.rehearsal && typeof A.rehearsal.checkPreview === 'function') {
+      if (WA.rehearsal && typeof WA.rehearsal.checkPreview === 'function') {
         var r = null;
-        try { r = A.rehearsal.checkPreview(opt_previewId(rec)); } catch (e) { r = null; }
+        try { r = WA.rehearsal.checkPreview(opt_previewId(rec)); } catch (e) { r = null; }
         if (r && r.ok) { previewState = r.stale ? 'stale' : 'fresh'; previewDetail = r; }
         else if (r && r.reason === 'stale') { previewState = 'stale'; previewDetail = r; }
         else { previewState = 'unknown'; previewDetail = r; }
@@ -217,11 +217,11 @@
 
   function diagnose() {
     var checks = {
-      branchTree: !!(A.branchTree && typeof A.branchTree.fork === 'function' && typeof A.branchTree.choose === 'function'),
-      rehearsal: !!(A.rehearsal && typeof A.rehearsal.preview === 'function' && typeof A.rehearsal.checkPreview === 'function'),
-      commit: !!(A.commit && typeof A.commit.begin === 'function' && typeof A.commit.commit === 'function'),
-      store: !!(A.store && typeof A.store.transact === 'function'),
-      settingsBus: !!(A.settingsBus && typeof A.settingsBus.read === 'function')
+      branchTree: !!(WA.branchTree && typeof WA.branchTree.fork === 'function' && typeof WA.branchTree.choose === 'function'),
+      rehearsal: !!(WA.rehearsal && typeof WA.rehearsal.preview === 'function' && typeof WA.rehearsal.checkPreview === 'function'),
+      commit: !!(WA.commit && typeof WA.commit.begin === 'function' && typeof WA.commit.commit === 'function'),
+      store: !!(WA.store && typeof WA.store.transact === 'function'),
+      settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     var ok = checks.branchTree && checks.rehearsal && checks.commit && checks.store;
     return { ok: ok, closedLoop: ok, checks: checks, version: '2.168.0' };
@@ -238,7 +238,7 @@
 
   function reset() { _stat.presented = 0; _stat.confirmed = 0; _stat.applied = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; return { ok: true }; }
 
-  A.storyChoice = {
+  WA.storyChoice = {
     getSettings: getSettings,
     setSettings: function (patch) { return setSettings(patch); },
     present: present,
@@ -252,7 +252,7 @@
   };
   // 自证块：导出数必须 === 10
   var EXPORT_COUNT = 10;
-  var _exported = Object.keys(A.storyChoice).length;
+  var _exported = Object.keys(WA.storyChoice).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('story-choice: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof A.registerModule === 'function') A.registerModule('engines/story-choice.js', { kind: 'engine', ver: '2.168.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/story-choice.js', { kind: 'engine', ver: '2.168.0' });
 })();

@@ -133,6 +133,127 @@
 
 **边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 16 枚控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② `ui/panel.js` 在无头回归里不装载，「六处登记」里 UI 那一处靠**文本锚点**判据（不是运行时行为）；③ 全量回归按本次指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数。
 
+### R159（v2.173.0 / TX4b）
+TX4/TX6/TX7/TX8/TX9 五模块面板接线：这些模块此前**登记在 UI_BINDINGS 却从未渲染**，56 个导出全部落在死子面账本（storyChoice 9 / commission 11 / investigation 11 / aftermath 12 / operations 13），连自身 getSettings/setSettings 都是 test-only。本版补 world 页五段真实栏位（渲染 + 绑定 + 登记三面同步），并修 TX3 的 `on(id, 'change', fn)` 三参绑定缺陷（on() 是 onclick 接线，三参会把 onclick 赋成字符串 ⇒ 货运启用开关点了没反应）。TX7 前缀 wa-iv-* 改 wa-inv-*——前者被 v2.150.0 注入价值榜单占用。dead 824→789（test-only 400→365，35 项出冻结面）· uiDead 3 · dataOnly 271，死子面门禁 ✓ · UI gate 53/0（逐页真实点击 1045 控件零抛出）· 渲染↔登记双向零缺口
+**同批修出的更重缺陷：六模块向骨架未声明的顶层键写入（登记≠物化，且连登记都没有）。**
+`engines/freight.js`（TX3）及 TX4/6/7/8/9 向 `defaultWorldState()` 未声明的顶层键写入，三处登记全缺：
+骨架无声明、`__BOUNDED_CAPS` 无条目、`evict.SITES` 无条目。**`registryParity` 只查本表登记过的键 ⇒
+未登记者查不到 ⇒ 永绿**——这是「登记≠物化」的更坏变体（连登记都没有）。按仓库三段式补齐：
+骨架声明 + CAPS 登记 + SITES 登记，cap 取各模块 `DEF` 上界（freight.maxShipments 32 /
+storyChoice.maxPending 16 / commission.maxContracts 24 / investigation.maxClues 32 + maxEvidence 64 /
+aftermath.maxEffects 48 / operations.maxProjects 32，均 per-call）。骨架一级键 **87 → 93**、
+`registryParity.checked` **140 → 147**，field-liveness-gate 转绿（写侧越界仅剩豁免的 panel.js innerHTML 1 处）。
+注：`freight.shipments` 与 `world.shipments` **不是同一张表**（前者是守恒运输台账，后者是世界织体货运环）；
+`investigation.evidence` 无 evict 调用点（只剪 clues）。
+
+**两处预先存在失败的收敛（均实证定因，不靠推测）**：
+① `evict-meta-v2610` 27/0（原 FAIL 2）——A 面「每个对象型站点都能定位到淘汰调用点」悬空
+`diplomacy.pairs,diplomacy.proposals`：两环走**写入侧硬上界拒写**（满则 pairs-full / proposals-full，
+既有项一条不动），**从不走 evict**，v2.165.0（TX1）却把它们登记进了挤出站点表 SITES。
+按仓库既有正解 `NON_EVICT` 表迁移（`region.places` / `stage.metrics` / `binding.*` 三条注释逐字记载过
+同一结论：「原先按挤出站点登记 ⇒ 零调用站点（回归红灯）；按本表口径降级为『声明过的决定』」），
+`__BOUNDED_CAPS` 里的 cap 与 `kind:'object'` 保留（registryParity 类型校验不受影响）。
+② 同锁 C2 报 `people` 条目生产者未覆盖 `engines/world-blueprint.js`：该文件 `install()` 与
+`world-seed.initConfirm` **同族**（都先判 `targetEmpty(root).empty`，而淘汰只在容器满时发生 ⇒
+不可能同时成立 ⇒ 无法行为驱动探测），此前白名单只登记了 world-seed。同时在其 `fallback` 建人分支
+**发现并修掉一处真实缺陷**：它只写 `createdAt`、**缺淘汰排序键 `updatedAt`**（主路走
+`registry.ensurePerson` 后在 708 行统一补，旁路漏了）——一走到该分支，刚装好的世界会因缺键被优先挤出，
+正是 C2b 立论「免疫来自前置条件，前置一旦放宽即变真缺陷」的实例。修后 27/0。
+③ `module-cycle-gate-v2107` 65/0（原 FAIL 1）——B2 边恒等式 90/1481/1571 → **90/1486/1576**。
+归因**实证而非估计**：把 HEAD 与工作区的边集各自 dump 成 `from|ns|kind` 行再逐行 diff，实测恰好
+**5 条新增、0 条消失**，全部同族 —— `ui/panel.js` → aftermath / commission / investigation /
+operations / storyChoice（各 1 条 call 边），即本轮五段面板接上真消费方后第一次读这五个命名空间；
+装载期 90 不变（本轮不新增模块，无新的 registerModule 尾调边）。
+
+**另一处真幽灵修复**：`wa-cm-reason` / `wa-af-reason` 被 handler 的 `wv('#...')` 读，但渲染块里没有
+对应控件（UI 接线后新引入）⇒ 取消/撤销原因永远取默认值 `'cancelled'`。按其消费语义补两个输入框
+（委托「取消原因」/ 灾后余波「撤销原因」），并同步补进 `UI_BINDINGS` 登记表（渲染↔登记双向一致）。
+**实测教训（如实留账）：该补丁非幂等，重复执行把两个输入框各插了两遍。** 锚点是「取消/撤销按钮
+那一行」，而插入是**在该行之前加一行**——插入后锚点行**依然存在**，故补丁每执行一次就再插一行
+（`s.replace(old, new, 1)` 的 `count==1` 断言只保证「执行当时锚点唯一」，**不保证「执行后幂等」**）。
+这正是本仓库反复记过的那条：「补丁须幂等 + 执行后用 `grep -c` 核对锚点命中次数」。
+发现方式：逐个读回渲染块时肉眼看到相邻两行完全相同（同 id 重复 ⇒ 两个控件抢一个 id）。
+修法：按「相邻两行完全相同」去重（只删重复的一行）。教训的一般形式——**以「某行的存在」为锚点
+做「在该行前插入」，天然非幂等**；要么改锚点为「唯一边界」（如整段替换），要么在补丁里加
+「插入后立即断言目标串计数仍为 1」的自检。
+ui-wire-audit 10/0（引用 927 / 渲染提及 1307）· ui-gate 53/0。
+
+**本批门禁**：field-liveness-gate ✓ · module-registry-gate ✓ · dup-decl-gate ✓（重复 0）·
+docs-archive-gate ✓ · contract-scan ✓（漂移 0）· ui-wire-audit 10/0 · ui-gate 53/0 ·
+evict-meta-v2610 27/0 · module-cycle-gate-v2107 65/0 · settle-v2830 55/0 · reject-v2780 ✓ ·
+TX 五张专锁 42/49/44/49/46 全 0 失败。
+
+
+### R159 收尾段 · 2026-10-08 · v2.173.0 全量回归债务清偿（15533/37 → 15680/0）
+
+**范围**：本版功能面已在 R159 正文留账；本段只记**全量回归**四轮收敛，逐条归因、不留「已修」的笼统说法。
+
+**四轮读数**：15533 / 37 → 15551 / 19 → 15668 / 12 → **15680 / 0**（`status: passed`）。
+日志分别为 `/tmp/worldaxis-regression-*/run.log`（隔离副本，跑法走 `isolated-runner`）。
+
+**第一轮 37 条 → 五族**（逐条 diff 归因，不按名字配对）：
+① **死表移除**（not-authorized 一族）——产品已不再产生该码，死表仍登记 ⇒ 移除；
+② **台账更新**（reject-code-ledger）——版本词与沿革段未跟版 ⇒ `--update`；
+③ **端到端读数**（dist2800 / deadInTestsOnly / deadNs / 版本正则 / 文件数）——全部是**同一读数族**的副本未跟版；
+④ **TX 专锁挂载**（TX1–TX8 八张 + `tx*_smoke` 八个工具）——新文件未进 `tests/run.js` 挂载面与 `tools/` 名单；
+⑤ **README 工具名单**（16 → 24）——入库不是终点，名单必须同轮跟上（v2.136.0 已立此规，本次是第二次同型）。
+
+**第二轮 19 条的关键发现：别名失真（真正根因，实证而非推测）**。
+现象是 G20 守卫「fallback 未共现 7 处」，看着像时间源治理问题。实证定位到两件事同源：
+**7 个 TX 引擎（aftermath / agency / commission / freight / investigation / operations / story-choice）用了局部别名
+`const A = window.WorldAxis`，而全库其余 170 个文件统一用 `const WA`。** 后果两处同时失明：
+· **G20 守卫判据**只认 `return WA.clock` 形态 ⇒ 7 文件写成 `A.clock`、且 5 个用 `var clockNow`（连形态门都过不了）
+  ⇒ 声明 188 vs fallback 195，未共现 7；
+· **`tests/inventory.js` 的 `REF_RE`**（`/WA\s*\.\s*(ns)\s*\.\s*(mem)/`）只认 `WA.ns.mem` ⇒ **207 处真引用在引用面完全不可见**，
+  4 个导出（`enigma.mark` / `enigma.read` / `intel.rowsOf` / `intel.truthOf`）被误判**死导出**（refs:0 假证据）。
+**修法**（`/tmp/patch_alias.py`）：别名声明 `const A` → `const WA`、真代码面 `A.` → `WA.`（先过 `codeFace()` 核实 `A.` 不落在字符串/注释里）、
+`var clockNow` → `const clockNow`；7 张 TX 专锁里的源码形态正则同步跟版。**实测**：G20 守卫 188/195/7 → **195/195/0**；
+inventory refs 4560 → **4767**（+207）、dead 789 → **785**（−4）、deadInTestsOnly 365 → **361**。
+**这一条的教训**：一处别名不一致，同时打瞎**两条不同层的判据**（守卫声明面 + 引用面），
+而两条判据各自都「看起来在工作」——假绿不是判据坏了，是**判据的输入面**被绕过了。
+
+**第三轮 12 条逐条归因**：
+① **v2750 孤儿挂载形态（14 处）**——`test-surface-gate.js` 的 `entriesOf()` 要求 `SPAWN_CALL` 与 `tests/<file>.js`
+   路径字面量**同一行**，而 14 处挂载全跨行（`spawnSync(process.execPath,\n  [path.join(BASE, ...)]`）⇒ 修法把路径提到 spawnSync 同行；
+② **v2105 超时武装（14 调用点）**——新开的子进程调用点未声明 `timeout` 也未入 `TIMEOUT_ARMED` / `ARMED_SITES` 表（现场 28/14/14）
+   ⇒ 补 `timeout: 96000, killSignal: 'SIGKILL'` + 两表各 14 条锚点，修后 28/28/28；
+③ **agency.js 悬空引用**——`WA.agency.hasOwnProperty(k)` 被出口面契约判为悬空（`hasOwnProperty` 来自 `Object.prototype`，
+   不是 `WA.agency` 的成员）⇒ 改为 `Object.prototype.hasOwnProperty.call(WA.agency, k)`（全库既有写法，语义逐字不变）；
+④ **TX2 A4 字符串常量跟版**——产品改名后锁仍写旧形态 `A.__agencyWarn` ⇒ 修字符串常量与消息文本；
+⑤ **TX1 A20 口径迁移**——diplomacy 两环从 `SITES` 迁入 `NON_EVICT` 后，锁仍断言「在 SITES」⇒ 改为三条同时成立
+   （`sizeCaps()` 有 `cap:'per-call'` + `kind:'object'` / `nonEvictDecls()` 有 / `siteDecls()` **无**，防加回 SITES），比旧判据更强；
+⑥ **dist2800 归因分布跟版**——`allEnt2800` 792 → 788、`dist2800['test-only']` 368 → 364；
+⑦ **FROZEN2800 同步**——`export-contract` 重生成后差异恰为 **4 个转活导出**（`enigma:buildBlock` → `buildBlock mark read`；
+   `intel:...project` → `...project rowsOf ... truthOf`），冻结串 13380 → **13405 字符 / 173 段**；
+⑧ **死表 5 条锚点跟版**——`act-unavailable` / `plan-unavailable` / `branchtree-absent` / `insufficient-budget` / `insufficient-funds`
+   含 `A.` 形态被别名修复连带破坏（分布在 agency.js 2 条 / story-choice.js 1 条 / operations.js 2 条）⇒ 跟版为 `WA.`，全部在产品源码中可命中。
+
+**第四轮：refs 差 1（4767 vs 4766）——差值的归属也实证到底，不靠推测。**
+第三轮收尾后 `readings-v2106` 仍报 N1「破坏未生效（锚点没打中）」：破坏用的是**登记值** `LIVE.refs`，
+而现场实测是 4766、登记写 4767 ⇒ 破坏串在源码里不存在。差值归属实证：
+**`WA.agency.hasOwnProperty(k)` 原先被 `REF_RE` 计为 1 处引用**（引用的还是 `WA.agency` 上不存在的成员＝悬空引用），
+改成 `Object.prototype.hasOwnProperty.call(...)` 后不再命中 ⇒ refs **真实 −1**。**现场 4766 才是真值，登记 4767 是过时。**
+修法用 `readings.js` 自带的 `backfill()`（观察位限同块、历史叙述不碰）回填 3 站点 + 2 处消息副本，
+**不手写替换**（手写会再漂）。修后 `readings-v2106` **pass（60 项）**、全仓 `4767` 残留 **0**。
+
+**另修出的文档面实账（本段同批收敛，如实留账）**：
+· **README「构建与验收」区块被历次插入改坏**——标题成 `## 构建与验收（当前版本 ### ### v2.173.0（TX4b）`，
+  正文仍是 v2.172.0（TX9）那一行，且夹着两行插入事故残片（`v2.169.0（TX6）` 与 `v2.168.0）`）。
+  `git log -S'### ###'` 定位：**v2.170.0 提交起引入**——与 R159 正文里记的「以某行的存在为锚点做插入，天然非幂等」
+  是**同一个坑的第二次现形**（这次坑在文档面）。修法：整块替换为单行版本说明，清残片。
+· **README 版本历史断档**——现场 114 条、最高 v2.168.0，**v2.169.0–v2.173.0 五条全缺**，
+  而 `docs-archive-gate-v2120` 的 `readmeEntries` 期望值此前已被补到 114 ⇒ 断档即实账。
+  补五条后 114 → **119**，门禁期望值同批跟版（并补「同型账第十次」注释）。
+· **bash 块读数跟版**——回归读数 15455（v2.163.0 收口轮）→ **15680**、产品文件 184 → **193**。
+
+**本批门禁（全部现场实测）**：`node tests/run.js` → **通过 15680 / 失败 0**；
+`readings-v2106` 60/0 · `reject-lock-v2780` 50/0 · `orphan-lock-v2750` pass · `gate-timeout` pass ·
+`export-contract` 13405 字符（与 `FROZEN2800` 逐字节相等）· `docs-archive-gate` ✓（119 / 92 / 零交集）·
+`dead-export-gate` dead 785 / uiDead 3（账本 `--update` 后恰 1 条 diff：`evict.nonEvictDecls` 的 tref 1 → 3）。
+
+**如实留账（未覆盖）**：① 真实宿主一栏仍未验收（无头只证明模块间契约成立，不代表浏览器里能跑）；
+② `ui/panel.js` 的五段新栏位只经无头 mini-DOM 与锚点判据，未在真浏览器点过；
+③ 本段收敛的是**回归债务**，不新增产品能力。
 ### R158（v2.172.0 / TX9）
 TX9 权限批准、组织项目与运营结算：engines/operations.js（14 exports）+ 注入链七点 + 版本面 2.172.0 + LOAD_ORDER + tool-diag 四点 + 专锁 46/0 + 冒烟 16/16 + 台账 + 门禁钉 + reject-code 10 码（死表 39→49）+ 版本钉跟版 + 14 门禁全绿 + 文档同步
 ### R157（v2.171.0 / TX8）

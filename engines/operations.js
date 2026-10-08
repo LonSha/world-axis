@@ -25,32 +25,32 @@
  */
 (function () {
   'use strict';
-  const A = window.WorldAxis = window.WorldAxis || {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_operations_settings_v1';
   var DEF = { enabled: false, maxProjects: 32 };
   var __REG = { key: LS_KEY, def: DEF, module: 'operations',
     bounds: { maxProjects: [4, 128] } };
   function getSettings() {
-    var raw = A.settingsBus ? A.settingsBus.read(__REG) : null;
+    var raw = WA.settingsBus ? WA.settingsBus.read(__REG) : null;
     var base = Object.assign({}, DEF);
-    return A.settingsBus ? A.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
+    return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
                           : Object.assign(base, raw || {});
   }
   function setSettings(patch) {
-    return A.settingsBus ? A.settingsBus.saveOrThrow(__REG, A.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
+    return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
       : Object.assign({}, getSettings(), patch || {});
   }
-  A.__settingsRegs = (A.__settingsRegs || []).concat([__REG]);
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   var _stat = { enacted: 0, disbursed: 0, settled: 0, handedOver: 0, cancelled: 0, refused: 0, lastReason: '', faults: {} };
   function noteFault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
-  function clean(v, max) { return A.inputGuard ? A.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
-  var clockNow = function (tag) { try { return A.clock.now(tag || 'operations'); } catch (e) { return Date.now(); } };
-  function state() { return (A.store && A.store.get) ? (A.store.get() || {}) : {}; }
+  function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
+  const clockNow = function (tag) { try { return WA.clock.now(tag || 'operations'); } catch (e) { return Date.now(); } };
+  function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function bucket(root) { var r = root || state(); if (!r.operations) r.operations = { projects: [] }; if (!Array.isArray(r.operations.projects)) r.operations.projects = []; return r.operations; }
   function projects() { return bucket().projects || []; }
   function find(id) { var k = clean(id, 60); return projects().filter(function (x) { return x && x.id === k; })[0] || null; }
   function findByDecision(decisionId) { var k = clean(decisionId, 60); return projects().filter(function (x) { return x && x.decisionId === k; })[0] || null; }
-  function newId() { return A.rand ? A.rand.id('ops_', 4, 'id') : 'ops_0000'; }
+  function newId() { return WA.rand ? WA.rand.id('ops_', 4, 'id') : 'ops_0000'; }
 
   // ── 1. enact：以 inst 批准回执创建运营项目 ──
   function enact(decisionId, spec) {
@@ -66,8 +66,8 @@
     var approver = clean(s.approver, 40);
     if (!approver) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', field: 'approver' }; }
     // 验证 inst 批准状态——只有 approved 才能创建
-    if (A.inst && typeof A.inst.authority === 'function') {
-      var auth = A.inst.authority(orgId, approver);
+    if (WA.inst && typeof WA.inst.authority === 'function') {
+      var auth = WA.inst.authority(orgId, approver);
       if (!auth || !auth.ok || !auth.canApprove) { noteFault('not-authorized'); return { ok: false, reason: 'not-authorized', by: approver }; }
     }
     // 从 store 读组织数据查找决策状态
@@ -82,10 +82,10 @@
     var budget = s.budget ? Number(s.budget) : 0;
     var budgetType = clean(s.budgetType || 'gold', 30);
     // 检查预算可用性——仅当组织已注册为 faction 时检查资源（inst org 不是 faction 时走内部预算跟踪）
-    if (budget > 0 && A.org && typeof A.org.canAfford === 'function') {
+    if (budget > 0 && WA.org && typeof WA.org.canAfford === 'function') {
       var _factions = ((state().evolution || {}).factions) || [];
       var _factionExists = _factions.some(function (f) { return f && clean(f.name, 40) === orgId; });
-      if (_factionExists && !A.org.canAfford('faction', orgId, budgetType, budget)) { noteFault('insufficient-budget'); return { ok: false, reason: 'insufficient-budget', need: budget, type: budgetType }; }
+      if (_factionExists && !WA.org.canAfford('faction', orgId, budgetType, budget)) { noteFault('insufficient-budget'); return { ok: false, reason: 'insufficient-budget', need: budget, type: budgetType }; }
     }
     var now = clockNow('operations');
     var milestones = Array.isArray(s.milestones) ? s.milestones.slice(0, 8).map(function (m, i) {
@@ -100,11 +100,11 @@
       cycleTag: '', lastSettledAt: 0,
       status: 'active', createdAt: now, closedAt: 0
     };
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) { bucket(d).projects.push(rec); }, 'operations:enact');
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) { bucket(d).projects.push(rec); }, 'operations:enact');
     } else { projects().push(rec); }
-    if (A.evict && typeof A.evict.array === 'function') {
-      try { A.evict.array(bucket().projects, 'operations.projects'); } catch (e) {}
+    if (WA.evict && typeof WA.evict.array === 'function') {
+      try { WA.evict.array(bucket().projects, 'operations.projects'); } catch (e) {}
     }
     _stat.enacted++;
     return { ok: true, id: rec.id, name: rec.name, owner: rec.owner, budget: budget };
@@ -126,19 +126,19 @@
     // 检查预算
     if (rec.spent + amount > rec.budget) { noteFault('over-budget'); return { ok: false, reason: 'over-budget', spent: rec.spent, budget: rec.budget, requested: amount }; }
     // 检查组织资源可用性——仅当组织已注册为 faction 时检查
-    if (A.org && typeof A.org.canAfford === 'function') {
+    if (WA.org && typeof WA.org.canAfford === 'function') {
       var _dfactions = ((state().evolution || {}).factions) || [];
       var _dfactionExists = _dfactions.some(function (f) { return f && clean(f.name, 40) === clean(rec.orgId, 40); });
       if (_dfactionExists) {
-        if (!A.org.canAfford('faction', rec.orgId, itemType, amount)) { noteFault('insufficient-funds'); return { ok: false, reason: 'insufficient-funds', type: itemType, need: amount }; }
-        if (typeof A.org.transfer === 'function') {
-          var tr = A.org.transfer('faction', rec.orgId, 'person', by, itemType, amount);
+        if (!WA.org.canAfford('faction', rec.orgId, itemType, amount)) { noteFault('insufficient-funds'); return { ok: false, reason: 'insufficient-funds', type: itemType, need: amount }; }
+        if (typeof WA.org.transfer === 'function') {
+          var tr = WA.org.transfer('faction', rec.orgId, 'person', by, itemType, amount);
           if (!tr || !tr.ok) { noteFault('transfer-failed'); return { ok: false, reason: 'transfer-failed', detail: tr ? tr.reason : 'none' }; }
         }
       }
     }
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) { t.spent += amount; }
@@ -168,8 +168,8 @@
     if (milestoneIdx >= 0 && rec.milestones[milestoneIdx]) {
       milestoneDone = true;
     }
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) {
@@ -207,8 +207,8 @@
     var from = clean(fromPerson, 40), to = clean(toPerson, 40);
     if (!from || !to) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     if (rec.owner !== from) { noteFault('not-owner'); return { ok: false, reason: 'not-owner', current: rec.owner, attempted: from }; }
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) { t.owner = to; }
@@ -257,8 +257,8 @@
     if (!rec) { noteFault('not-found'); return { ok: false, reason: 'not-found', id: clean(id, 60) }; }
     if (rec.status !== 'active') { noteFault('not-active'); return { ok: false, reason: 'not-active', status: rec.status }; }
     var rsn = clean(reason || 'cancelled', 60);
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) { t.status = 'cancelled'; t.closedAt = clockNow('operations'); }
@@ -285,10 +285,10 @@
   // ── 10. diagnose ──
   function diagnose() {
     var checks = {
-      inst: !!(A.inst && typeof A.inst.view === 'function' && typeof A.inst.authority === 'function'),
-      org: !!(A.org && typeof A.org.transfer === 'function' && typeof A.org.canAfford === 'function'),
-      store: !!(A.store && typeof A.store.transact === 'function'),
-      settingsBus: !!(A.settingsBus && typeof A.settingsBus.read === 'function')
+      inst: !!(WA.inst && typeof WA.inst.view === 'function' && typeof WA.inst.authority === 'function'),
+      org: !!(WA.org && typeof WA.org.transfer === 'function' && typeof WA.org.canAfford === 'function'),
+      store: !!(WA.store && typeof WA.store.transact === 'function'),
+      settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     var ok = checks.store;
     return { ok: ok, closedLoop: ok, checks: checks, version: '2.172.0' };
@@ -310,7 +310,7 @@
   // ── 12. reset ──
   function reset() { _stat.enacted = 0; _stat.disbursed = 0; _stat.settled = 0; _stat.handedOver = 0; _stat.cancelled = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; return { ok: true }; }
 
-  A.operations = {
+  WA.operations = {
     getSettings: getSettings,
     setSettings: function (patch) { return setSettings(patch); },
     enact: enact,
@@ -327,7 +327,7 @@
     reset: reset
   };
   var EXPORT_COUNT = 14;
-  var _exported = Object.keys(A.operations).length;
+  var _exported = Object.keys(WA.operations).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('operations: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof A.registerModule === 'function') A.registerModule('engines/operations.js', { kind: 'engine', ver: '2.172.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/operations.js', { kind: 'engine', ver: '2.172.0' });
 })();

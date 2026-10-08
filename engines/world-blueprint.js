@@ -702,7 +702,10 @@
         keyToId[r0.key] = id;
         const p = (WA.registry && typeof WA.registry.ensurePerson === 'function')
           ? (WA.registry.ensurePerson(root, id, r0.name, 'worldBlueprint').row || null)
-          : (root.people[id] = { id: id, name: r0.name, knowledge: {}, createdVia: 'worldBlueprint:fallback', createdAt: now });
+          // v2.173.0（TX4b）：fallback 建人点**必须同带淘汰排序键 updatedAt** —— 主路
+          //   （registry.ensurePerson）在下面统一补，这条旁路若不补，registry 缺席时
+          //   刚装好的世界会因缺键被优先挤出（evict-meta C2b 的立论同款）。
+          : (root.people[id] = { id: id, name: r0.name, knowledge: {}, createdVia: 'worldBlueprint:fallback', createdAt: now, updatedAt: now });
         if (!p) return;
         p.profile = { relations: [] };
         p.updatedAt = now;             // 淘汰排序键：缺这一格，刚装好的世界会优先被挤出

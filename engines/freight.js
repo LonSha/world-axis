@@ -29,25 +29,25 @@
  */
 (function () {
   'use strict';
-  const A = window.WorldAxis = window.WorldAxis || {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
   // ── 工具函数（与 economy/agency 同规格）──
-  function clean(v, max) { return A.inputGuard ? A.inputGuard.text(v, max || 60) : (typeof v === 'string' ? v.slice(0, max || 60) : ''); }
+  function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : (typeof v === 'string' ? v.slice(0, max || 60) : ''); }
   function num(v) { return (typeof v === 'number' && isFinite(v)) ? v : null; }
-  function clockNow(site) { try { return A.clock ? A.clock.now(site || 'freight') : Date.now(); } catch (e) { return Date.now(); } }
+  function clockNow(site) { try { return WA.clock ? WA.clock.now(site || 'freight') : Date.now(); } catch (e) { return Date.now(); } }
   var MS_PER_DAY = 86400000;
   // ── 设置 ──
   var LS_KEY = 'worldaxis_freight_settings_v1';
-  var DEF = { enabled: false, maxShipments: 32, maxDispatchPerTurn: 4 };
+  var DEF = { enabled: false, maxShipments: 32 };
   var __REG = { key: LS_KEY, def: DEF, module: 'freight',
-    bounds: { maxShipments: [4, 64], maxDispatchPerTurn: [1, 12] } };
+    bounds: { maxShipments: [4, 64] } };
   function settings() {
-    var raw = A.settingsBus ? A.settingsBus.read(__REG) : DEF;
-    return A.settingsBus ? A.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
+    var raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
+    return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
   }
   function saveSettings(next) {
-    return A.settingsBus.saveOrThrow(__REG, A.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
+    return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
-  A.__settingsRegs = (A.__settingsRegs || []).concat([__REG]);
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   // ── 统计 ──
   var stat = { dispatched: 0, arrived: 0, cancelled: 0, rerouted: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) {
@@ -55,7 +55,7 @@
     stat.blocked++; stat.lastReason = reason;
   }
   // ── Store 辅助（读 economy 既有面 + 自有 shipments 台账）──
-  function state() { return A.store && A.store.get ? (A.store.get() || {}) : {}; }
+  function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
   function ecoOf(root) { return (root && root.economy) ? root.economy : { goods: [], orders: [], routes: [] }; }
   function ecoGoods(root) { var c = ecoOf(root || state()); return Array.isArray(c.goods) ? c.goods : []; }
   function ecoRoutes(root) { var c = ecoOf(root || state()); return Array.isArray(c.routes) ? c.routes : []; }
@@ -109,7 +109,7 @@
     var now = clockNow('freight');
     var eta = now + Math.round(days * MS_PER_DAY);
     var out = null;
-    A.store.transact(function (draft) {
+    WA.store.transact(function (draft) {
       var gg = findGoods(src, res, draft);
       if (!gg || gg.stock < n) { out = { ok: false, reason: 'short-stock', resource: res, want: n, have: gg ? gg.stock : 0 }; return false; }
       var rr = findRoute(rid, draft);
@@ -128,7 +128,7 @@
         lane: rr.lane, cost: rr.cost, destBase: destBase || (destGoods ? destGoods.base : null),
         at: now, updatedAt: now
       });
-      A.evict.array(fr.shipments, 'freight.shipments', cfg.maxShipments);
+      WA.evict.array(fr.shipments, 'freight.shipments', cfg.maxShipments);
       out = { ok: true, id: sid, qty: n, from: src, to: dest, resource: res, eta: eta, stock: gg.stock };
     }, 'freight:dispatch');
     if (out && out.ok) { stat.dispatched++; stat.lastReason = 'dispatched'; }
@@ -150,7 +150,7 @@
       return { ok: false, reason: 'too-early', id: sid, eta: sh.eta, remaining: sh.eta - now };
     }
     var out = null;
-    A.store.transact(function (draft) {
+    WA.store.transact(function (draft) {
       var fr = openFreight(draft);
       var s = fr.shipments.filter(function (x) { return x && clean(x.id, 60) === sid; })[0] || null;
       if (!s) { out = { ok: false, reason: 'unknown-shipment', id: sid }; return false; }
@@ -186,7 +186,7 @@
     if (sh.status !== 'transit') { noteFault('bad-state'); return { ok: false, reason: 'bad-state', id: sid, status: sh.status }; }
     var now = clockNow('freight');
     var out = null;
-    A.store.transact(function (draft) {
+    WA.store.transact(function (draft) {
       var fr = openFreight(draft);
       var s = fr.shipments.filter(function (x) { return x && clean(x.id, 60) === sid; })[0] || null;
       if (!s) { out = { ok: false, reason: 'unknown-shipment', id: sid }; return false; }
@@ -225,7 +225,7 @@
     var now = clockNow('freight');
     var newEta = now + Math.round(days * MS_PER_DAY);
     var out = null;
-    A.store.transact(function (draft) {
+    WA.store.transact(function (draft) {
       var fr = openFreight(draft);
       var s = fr.shipments.filter(function (x) { return x && clean(x.id, 60) === sid; })[0] || null;
       if (!s) { out = { ok: false, reason: 'unknown-shipment', id: sid }; return false; }
@@ -265,7 +265,7 @@
   // ── 注入块：只报在途货物，不编行情叙事 ──
   function buildBlock() {
     var cfg = settings();
-    if (!cfg.enabled || !A.store) return '';
+    if (!cfg.enabled || !WA.store) return '';
     var ships = shipmentsOf();
     if (!ships.length) return '';
     var transit = ships.filter(function (s) { return s && s.status === 'transit'; });
@@ -286,9 +286,9 @@
     var cancelled = ships.filter(function (s) { return s && s.status === 'cancelled'; });
     return {
       enabled: cfg.enabled,
-      economyAvailable: !!(A.economy),
-      storeAvailable: !!(A.store && A.store.get && A.store.transact),
-      closedLoop: !!(A.economy && A.store),
+      economyAvailable: !!(WA.economy),
+      storeAvailable: !!(WA.store && WA.store.get && WA.store.transact),
+      closedLoop: !!(WA.economy && WA.store),
       shipments: ships.length,
       inTransit: transit.length,
       arrived: arrived.length,
@@ -301,7 +301,7 @@
     return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) });
   }
   // ── 导出 ──
-  A.freight = {
+  WA.freight = {
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign({}, settings(), patch || {})); },
     dispatch: dispatch,
@@ -315,9 +315,9 @@
   };
   // ── 自证块（导出数 === 10）──
   var EXPECTED = ['getSettings','setSettings','dispatch','arrive','cancel','reroute','view','buildBlock','diagnose','stat'];
-  var exported = Object.keys(A.freight).sort();
+  var exported = Object.keys(WA.freight).sort();
   if (exported.length !== EXPECTED.length) {
-    A.__freightWarn = 'export mismatch: expected ' + EXPECTED.length + ' got ' + exported.length;
+    WA.__freightWarn = 'export mismatch: expected ' + EXPECTED.length + ' got ' + exported.length;
   }
-  if (typeof A.registerModule === 'function') A.registerModule('engines/freight.js', { kind: 'engine', ver: '2.167.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/freight.js', { kind: 'engine', ver: '2.167.0' });
 })();

@@ -91,7 +91,24 @@ const TIMEOUT_ARMED = {
   //   真跑内置 CDP 驱动并读 tier/loaded/readings/fillErr/routeErr/errs 七字段）。
   //   它与 ui-live-2145 是**两个不同调用点**（前者读 ui-live-v2137 专锁，后者读 ui-live.js
   //   的 runLive 探针），故各占一条；新开调用点不入表正是本模块治的病。
-  'ui-live-2163': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'ui-live-2163': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.173.0（TX4b 收尾）：TX1–TX9 批次的 14 个子进程调用点（8 个 TX 专锁 + 6 个
+  //   tx*_smoke 工具）。它们此前既未声明 timeout、也未入表 —— 正是本模块治的病
+  //   （「留一个没声明的调用点就是留一条静默挂起的路径」）。全量回归第二轮暴露。
+  'tx1-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx2-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx3-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx4-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx6-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx6-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx7-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx8-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx9-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -145,7 +162,36 @@ const ARMED_SITES = [
   //   调用形态逐字同形（都是 `spawnSync(process.execPath, ['-e',`），只有左值变量名不同；
   //   取到 options 之前的行首片段，唯一性由 `rUL2163` 保证（整行唯一 ⇒ 任何前缀也唯一）。
   { key: 'ui-live-2163', mode: 'spawn',
-    anchor: "const rUL2163 = require('child_process').spawnSync(process.execPath, ['-e'," }
+    anchor: "const rUL2163 = require('child_process').spawnSync(process.execPath, ['-e'," },
+  // v2.173.0（TX4b 收尾）：同上 14 个调用点的锚点（整行唯一 ⇒ 任何前缀也唯一）。
+  { key: 'tx1-smoke', mode: 'spawn',
+    anchor: "const rSM_tx1_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx1_smoke.js')]," },
+  { key: 'tx2-smoke', mode: 'spawn',
+    anchor: "const rSM_tx2_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx2_smoke.js')]," },
+  { key: 'tx3-lock', mode: 'spawn',
+    anchor: "const rTX3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx3-v2167.js')]," },
+  { key: 'tx3-smoke', mode: 'spawn',
+    anchor: "const rSM_tx3_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx3_smoke.js')]," },
+  { key: 'tx4-lock', mode: 'spawn',
+    anchor: "const rTX4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx4-v2168.js')]," },
+  { key: 'tx4-smoke', mode: 'spawn',
+    anchor: "const rSM_tx4_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx4_smoke.js')]," },
+  { key: 'tx6-lock', mode: 'spawn',
+    anchor: "const rTX6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx6-v2169.js')]," },
+  { key: 'tx6-smoke', mode: 'spawn',
+    anchor: "const rSM_tx6_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx6_smoke.js')]," },
+  { key: 'tx7-lock', mode: 'spawn',
+    anchor: "const rTX7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx7-v2170.js')]," },
+  { key: 'tx7-smoke', mode: 'spawn',
+    anchor: "const rSM_tx7_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx7_smoke.js')]," },
+  { key: 'tx8-lock', mode: 'spawn',
+    anchor: "const rTX8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx8-v2171.js')]," },
+  { key: 'tx8-smoke', mode: 'spawn',
+    anchor: "const rSM_tx8_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx8_smoke.js')]," },
+  { key: 'tx9-lock', mode: 'spawn',
+    anchor: "const rTX9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx9-v2172.js')]," },
+  { key: 'tx9-smoke', mode: 'spawn',
+    anchor: "const rSM_tx9_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx9_smoke.js')]," }
 ];
 
 /**

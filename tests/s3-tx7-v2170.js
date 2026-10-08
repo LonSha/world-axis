@@ -16,7 +16,7 @@ const RUN = fs.readFileSync('tests/run.js', 'utf8');
 var pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log('FAIL: ' + name); } }
 // A 结构面
-ok('A1: 12 导出成员', /A\.investigation\s*=\s*\{[\s\S]*getSettings[\s\S]*setSettings[\s\S]*register[\s\S]*investigate[\s\S]*checkEvidence[\s\S]*reveal[\s\S]*pending[\s\S]*view[\s\S]*buildBlock[\s\S]*diagnose[\s\S]*stat[\s\S]*reset[\s\S]*\}/.test(SRC));
+ok('A1: 12 导出成员', /WA\.investigation\s*=\s*\{[\s\S]*getSettings[\s\S]*setSettings[\s\S]*register[\s\S]*investigate[\s\S]*checkEvidence[\s\S]*reveal[\s\S]*pending[\s\S]*view[\s\S]*buildBlock[\s\S]*diagnose[\s\S]*stat[\s\S]*reset[\s\S]*\}/.test(SRC));
 ok('A2: 导出数自证 === 12', /EXPORT_COUNT = 12/.test(SRC));
 ok('A3: DEF.enabled=false', /enabled:\s*false/.test(SRC));
 ok('A4: 自证块', /investigation: export count mismatch/.test(SRC));
@@ -29,8 +29,8 @@ ok('A10: panel VIS_NAMES 含 investigation', PAN.indexOf("investigation: '线索
 ok('A11: budget PRIORITY 含 线索调查', BUD.indexOf("'线索调查': { rank: 5, fold: true }") >= 0);
 ok('A12: budget ACCOUNTS 含 线索调查', BUD.indexOf("['线索调查', '叙事推进', '承载']") >= 0);
 ok('A13: LOAD_ORDER 含 investigation.js', IDX.indexOf("'engines/investigation.js'") >= 0 && RUN.indexOf("'engines/investigation.js'") >= 0);
-ok('A14: VERSION = 2.170.0+', /VERSION\s*=\s*'2\.(169|170|171|172)\.0'/.test(IDX));
-ok('A15: manifest version = 2.170.0+', MAN.version === '2.169.0' || MAN.version === '2.170.0' || MAN.version === '2.171.0' || MAN.version === '2.172.0' || MAN.version === '2.172.0');
+ok('A14: VERSION = 2.170.0+', /VERSION\s*=\s*'2\.(169|170|171|172|173)\.0'/.test(IDX));
+ok('A15: manifest version = 2.170.0+', MAN.version === '2.169.0' || MAN.version === '2.170.0' || MAN.version === '2.171.0' || MAN.version === '2.173.0' || MAN.version === '2.172.0');
 ok('A16: tool-diag 模块映射含 investigation.js', DIAG.indexOf("'engines/investigation.js': 'investigation'") >= 0);
 ok('A17: tool-diag secInvestigation 函数', DIAG.indexOf('function secInvestigation()') >= 0);
 ok('A18: tool-diag diag 对象含 investigation', DIAG.indexOf('investigation: secInvestigation()') >= 0);

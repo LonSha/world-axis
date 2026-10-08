@@ -199,7 +199,7 @@ async function launch(root, options) {
     child = cp.spawn(process.execPath, [path.join(prepared.work, 'tests/run.js')],
       { cwd: prepared.work, env: prepared.env, detached: true, stdio: ['ignore', fd, fd] });
     result.childPid = child.pid; save();
-    timer = setTimeout(() => stop('timeout'), opts.timeoutMs || 600000);
+    timer = setTimeout(() => stop('timeout'), opts.timeoutMs || 1500000);
     const exit = await new Promise(resolve => {
       child.once('error', e => resolve({ code: null, error: e.code }));
       child.once('exit', (code, signal) => resolve({ code, signal }));

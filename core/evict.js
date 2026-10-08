@@ -186,6 +186,15 @@
     'world.blocks': { path: 'world.blocks', cap: 24, why: '封锁投递环形（天气/灾害/组织的封锁单，带 until 定时效；过了时刻自动失效）' },
     'world.shipments': { path: 'world.shipments', cap: 16, why: '货运在途环形（货物受容量、交接与运输时间约束，故与人的行程分表）' },
     'world.messages': { path: 'world.messages', cap: 24, why: '消息在途环形（走道路或走网络面，两种渠道的延迟互不相同）' },
+    // ── v2.173.0（TX4b）：TX3/TX4/TX6/TX7/TX8/TX9 六模块的环（cap 与 store.__BOUNDED_CAPS 同名同值）──
+    //   本表缺键时 evict.array 走 unknown-site **静默失败**：调用点写着要剪枝，
+    //   实际一次也没剪。TX3 的 freight.shipments 正是这样写的（有调用、无站点）。
+    //   以下七环的 cap 是 **per-call**（上限 = 各模块 DEF 的设置上界，用户可调，
+    //   写入时传入），写入侧走入口预检（满即拒写），**不走 evict**。
+    //   与 diplomacy.pairs/proposals、region.places、stage.metrics 同族
+    //   （v2.119.0 起同一口径：写入侧硬上界，既有项一条不动）。
+    //   cap 与 kind:'object' 登记在 core/store.js __BOUNDED_CAPS。
+    //   v2.173.0（TX4b）：七环从 SITES 迁入 NON_EVICT（同 diplomacy 两环同款迁移）。
     // v2.65.0 天气：同地覆盖，表本身有界。未登记站点会 unknown-site 且不截断。
     'weather.rows': { path: 'weather.rows', cap: 24, why: '已登记天气环形（没登记的地点不是晴天，故这张表就是天气的全部证据）' },
     // v2.65.0 情报延迟：未到期的不入账。到期后从队列移走，队列本身仍有界。
@@ -227,11 +236,12 @@
     //   为什么 cap 是 'per-call'：上限 = `libCap` 设置（用户可调），写入时传入 ——
     //   静态登记而设置另有一套，就会变成一个「点了没效果的开关」（v2.154.0 为这条付过价）。
     'worldSeed.library': { path: 'worldSeed.library', cap: 'per-call', why: '世界生成种子库环（上限 = libCap 设置，写入时传入；同一结构不存两份）' },
-    // v2.165.0（TX1）：外交两环（diplomacy.js）。cap 同为 'per-call'（上限 = maxPairs /
-    //   maxProposals 设置，用户可调，写入时传入）—— 静态登记而设置另有一套，就会变成
-    //   一个「点了没效果的开关」。本表必须与 core/store.js 的 __BOUNDED_CAPS 同名同值。
-    'diplomacy.pairs': { path: 'diplomacy.pairs', cap: 'per-call', kind: 'object', why: '外交成对条目（按 pairId 键；上限 = maxPairs 设置，写入时传入）' },
-    'diplomacy.proposals': { path: 'diplomacy.proposals', cap: 'per-call', kind: 'object', why: '外交提案链（按提案号键；上限 = maxProposals 设置，写入时传入）' },
+    // v2.173.0（TX4b）：外交两环（diplomacy.pairs / diplomacy.proposals）**已从本表摘除**，
+    //   迁入 NON_EVICT —— 它们是写入侧硬上界（满则 pairs-full / proposals-full 拒写，
+    //   既有项一条不动），**不走 evict**。原先按挤出站点登记 ⇒ 零调用站点（evict-meta A 面
+    //   悬空红灯）。同 region.places / stage.metrics / binding.* 三族的既有口径：
+    //   「不是环形，故不走 evict；让『为什么不给它记账』是声明过的决定」。
+    //   cap 仍在 core/store.js 的 __BOUNDED_CAPS 里（kind:'object' 的类型校验不受影响）。
     // v2.164.0（TX5）：版本化完整世界蓝图库（world-blueprint.js）。
     //   与 worldSeed.library 同款：cap 是 'per-call'（上限 = `libCap` 设置，用户可调，
     //   写入时传入）—— 静态登记而设置另有一套，就会变成一个「点了没效果的开关」。
@@ -393,7 +403,24 @@
     //   形态是**对象映射**（层 -> 键 -> 值），不是数组，故同 stage.metrics 一族的双重要求。
     'binding.chat': '写入侧硬上界 + 对象映射形态（满则 too-long 拒写，不走 evict）',
     'binding.char': '同上：角色层绑定表（与聊天层分开存，互不覆盖）',
-    'binding.default': '同上：默认层绑定表（离场回落的落点）'
+    'binding.default': '同上：默认层绑定表（离场回落的落点）',
+    // v2.173.0（TX4b）：外交两环（diplomacy.js）。cap 是 'per-call'（上限 = maxPairs /
+    //   maxProposals 设置，用户可调，写入时传入）—— 静态登记而设置另有一套，就会变成
+    //   一个「点了没效果的开关」。cap 与 kind:'object' 登记在 core/store.js __BOUNDED_CAPS，
+    //   但**不设挤出站点**：两环走写入侧硬上界，满即拒写（pairs-full / proposals-full），
+    //   既有项一条不动 ⇒ 不走 evict。与 region.places 三条同款（v2.119.0 起同一口径）。
+    'diplomacy.pairs': '写入侧硬上界 + 对象映射形态（满则 pairs-full 拒写，不走 evict）',
+    'diplomacy.proposals': '同上：外交提案链（按提案号键；满则 proposals-full 拒写，不走 evict）',
+    // v2.173.0（TX4b）：TX3/TX4/TX6/TX7/TX8/TX9 六模块的七环。cap 是 per-call（各模块 DEF
+    //   设置上界），写入侧走入口预检（满即拒写），产品源码零 WA.evict.* 调用。
+    //   与 diplomacy 两环、region.places、stage.metrics 同族（v2.119.0 起同一口径）。
+    'freight.shipments': '写入侧硬上界（满则 shipments-full 拒写，不走 evict）',
+    'storyChoice.points': '写入侧硬上界（满则 points-full 拒写，不走 evict）',
+    'commission.contracts': '写入侧硬上界（满则 contracts-full 拒写，不走 evict）',
+    'investigation.clues': '写入侧硬上界（满则 clues-full 拒写，不走 evict）',
+    'investigation.evidence': '写入侧硬上界（满则 evidence-full 拒写，不走 evict）',
+    'aftermath.effects': '写入侧硬上界（满则 effects-full 拒写，不走 evict）',
+    'operations.projects': '写入侧硬上界（满则 projects-full 拒写，不走 evict）'
   };
 
   // ── 记账 ──────────────────────────────────────────────────

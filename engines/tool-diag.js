@@ -2577,11 +2577,30 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   渲染了不登记 ⇒ 绑定断裂永不可见。
     { page: 'world', ids: ['wa-ag-enabled', 'wa-ag-person', 'wa-ag-schedule', 'wa-ag-receipts', 'wa-ag-diag', 'wa-ag-out'] },
     { page: 'world', ids: ['wa-fr-enabled', 'wa-fr-route', 'wa-fr-from', 'wa-fr-res', 'wa-fr-qty', 'wa-fr-days', 'wa-fr-dispatch', 'wa-fr-arrive', 'wa-fr-cancel', 'wa-fr-reroute', 'wa-fr-view', 'wa-fr-diag', 'wa-fr-out'] },
-    { page: 'world', ids: ['wa-sc-enabled', 'wa-sc-present', 'wa-sc-confirm', 'wa-sc-review', 'wa-sc-pending', 'wa-sc-out'] },
-    { page: 'world', ids: ['wa-cm-enabled', 'wa-cm-create', 'wa-cm-advance', 'wa-cm-settle', 'wa-cm-cancel', 'wa-cm-view', 'wa-cm-pending', 'wa-cm-out'] },
-    { page: 'world', ids: ['wa-iv-enabled', 'wa-iv-register', 'wa-iv-investigate', 'wa-iv-check', 'wa-iv-reveal', 'wa-iv-view', 'wa-iv-pending', 'wa-iv-out'] },
-    { page: 'world', ids: ['wa-ops-enabled', 'wa-ops-enact', 'wa-ops-disburse', 'wa-ops-settle', 'wa-ops-handover', 'wa-ops-active', 'wa-ops-view', 'wa-ops-cancel', 'wa-ops-out'] },
-    { page: 'world', ids: ['wa-af-enabled', 'wa-af-register', 'wa-af-repair', 'wa-af-inspect', 'wa-af-active', 'wa-af-view', 'wa-af-cancel', 'wa-af-out'] },
+    // v2.173.0（TX4b）：下面五组此前**只有登记、没有渲染**——五模块 56 个导出全部躺在
+    //   死子面账本上（storyChoice 9 / commission 11 / investigation 11 / aftermath 12 /
+    //   operations 13），连各自的 getSettings/setSettings 都是 test-only。对照实验把界线
+    //   画得很清楚：邻居 diplomacy / agency / freight 的同类口是活的，差别只在面板上
+    //   有没有那一栏。登记在 UI_BINDINGS 只是字符串，不算消费方。
+    //   本版同时补齐**承载参数的输入 id**：原登记集只有动作控件，而委托要标题/委托方/
+    //   受托方/阶段、运营要决策号/组织号/批准人——缺了它们，按钮点了也无参可递。
+    //   渲染在 ui/panel.js 的 renderWorld（TX3 货运段之后、声誉四维之前）。
+    { page: 'world', ids: ['wa-sc-enabled', 'wa-sc-round', 'wa-sc-prompt', 'wa-sc-opts',
+      'wa-sc-present', 'wa-sc-id', 'wa-sc-option', 'wa-sc-confirm', 'wa-sc-review', 'wa-sc-pending', 'wa-sc-out'] },
+    { page: 'world', ids: ['wa-cm-enabled', 'wa-cm-title', 'wa-cm-principal', 'wa-cm-agent', 'wa-cm-stages', 'wa-cm-create',
+      'wa-cm-id', 'wa-cm-receipt', 'wa-cm-advance', 'wa-cm-settle', 'wa-cm-reason', 'wa-cm-cancel', 'wa-cm-view', 'wa-cm-pending', 'wa-cm-out'] },
+    // TX7 前缀是 wa-inv-* 而非 wa-iv-*：`wa-iv-*` 这个 id 空间在 v2.150.0 已被
+    //   **注入价值榜单**占用（wa-iv-refresh / wa-iv-enabled / wa-iv-zero / wa-iv-max，
+    //   渲染在 renderInject）。两处同名 = 两个控件抢一个 id，先渲染的赢，后者静默失效。
+    { page: 'world', ids: ['wa-inv-enabled', 'wa-inv-title', 'wa-inv-subject', 'wa-inv-witness', 'wa-inv-register',
+      'wa-inv-id', 'wa-inv-person', 'wa-inv-receipt', 'wa-inv-investigate', 'wa-inv-check', 'wa-inv-reveal',
+      'wa-inv-view', 'wa-inv-pending', 'wa-inv-out'] },
+    { page: 'world', ids: ['wa-ops-enabled', 'wa-ops-decision', 'wa-ops-org', 'wa-ops-approver', 'wa-ops-name',
+      'wa-ops-budget', 'wa-ops-milestones', 'wa-ops-enact',
+      'wa-ops-id', 'wa-ops-amount', 'wa-ops-item', 'wa-ops-disburse', 'wa-ops-cycle', 'wa-ops-settle',
+      'wa-ops-from', 'wa-ops-to', 'wa-ops-handover', 'wa-ops-active', 'wa-ops-pending', 'wa-ops-view', 'wa-ops-cancel', 'wa-ops-out'] },
+    { page: 'world', ids: ['wa-af-enabled', 'wa-af-place', 'wa-af-event', 'wa-af-type', 'wa-af-desc', 'wa-af-register',
+      'wa-af-id', 'wa-af-repair', 'wa-af-inspect', 'wa-af-active', 'wa-af-view', 'wa-af-reason', 'wa-af-cancel', 'wa-af-out'] },
     { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },

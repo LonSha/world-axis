@@ -96,7 +96,7 @@ function runAll(a) {
     //   人物装进空新局，走的是**能力探测 + :fallback 兜底**（同一口径，A3 覆盖），
     //   且前置 emptyCheck 保证只在空世界发生（无 registry 的合成宿主桩才走兜底）。
     //   数量是**显式登记**的事实：新增残点必须显式改本判据，不许静默长出。
-    a(dc.length === 5, 'v2860/id: [A2] 产品面「直接建人」残点恰 5 处（实 ' + dc.length + '：'
+    a(dc.length === 6, 'v2860/id: [A2] 产品面「直接建人」残点恰 6 处（实 ' + dc.length + '：'
       + dc.map(function (h) { return h.rel + ':' + h.line; }).join('、') + '）');
     const unlabeled = dc.filter(function (h) { return h.text.indexOf('fallback') < 0; });
     a(unlabeled.length === 0, 'v2860/id: [A3] 每处残点都打 fallback 标签，不是裸建（裸: '

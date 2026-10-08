@@ -1091,6 +1091,139 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         })()}
       </div>
 
+
+      <div class="wa-sec">剧情选择点（决策前置）</div>
+      <div class="wa-item">
+        <div class="wa-dim">每个选择点<b>前置</b>登记：分歧点 + 至少两个选项，各选项的 ops 先过 rehearsal 白名单预检（拒收项<b>当场标出</b>，不给玩家看不可兑现的选项）。确认时对选中项的 ops 走 commit 三段兑现。<b>本模块不写世界</b>——它只把「选了哪个」变成可追溯的回执。</div>
+        ${(() => {
+          const SC = WA.storyChoice;
+          if (!SC) return '<div class="wa-dim">剧情选择未加载</div>';
+          const sr = panelEl.dataset.scOut || '';
+          const scOn = (SC.getSettings && SC.getSettings().enabled) ? true : false;
+          return '<div class="wa-row"><label class="wa-row"><input id="wa-sc-enabled" type="checkbox" ' + (scOn ? 'checked' : '') + '/> 启用剧情选择</label></div><div class="wa-row">'
+            + '<input id="wa-sc-round" class="wa-input wa-mini" aria-label="轮次" placeholder="轮次" value="1"/>'
+            + '<input id="wa-sc-prompt" class="wa-input" aria-label="分歧点" placeholder="分歧点（你这个回合要玩家选什么）"/>'
+            + '<input id="wa-sc-opts" class="wa-input" aria-label="选项" placeholder="选项（逗号分隔，至少两个）"/>'
+            + '<button class="wa-btn wa-mini" id="wa-sc-present" aria-label="登记选择点" title="登记选择点：选项的 ops 逐项过 rehearsal.preview 白名单预检；不足两项、无分歧点一律拒收（no-options / missing-fields）">登记</button>'
+            + '</div><div class="wa-row">'
+            + '<input id="wa-sc-id" class="wa-input wa-mini" aria-label="选择点ID" placeholder="选择点 ID"/>'
+            + '<input id="wa-sc-option" class="wa-input wa-mini" aria-label="选项标签" placeholder="选中哪个"/>'
+            + '<button class="wa-btn wa-mini" id="wa-sc-confirm" aria-label="确认选择" title="确认选择：对该选项的 ops 走 commit 三段兑现（begin → commit → flush），三段可分离——「选了」与「兑现了」不是同一件事">确认选择</button>'
+            + '<button class="wa-btn wa-mini" id="wa-sc-review" aria-label="复盘" title="复盘：这一点的选项、选了什么、证据回执、兑现时刻；已选时附带预览新鲜度（fresh / stale / unknown）——预检过期不代表兑现失败，但必须看得见">复盘</button>'
+            + '<button class="wa-btn wa-mini" id="wa-sc-pending" aria-label="未确认清单" title="未确认清单：还没选的那些点（含选项数与容量）。「没选」与「没有点」绝不同形">未确认</button>'
+            + '</div><div id="wa-sc-out" class="wa-out wa-dim">' + esc(sr) + '</div>';
+        })()}
+      </div>
+      <div class="wa-sec">委托履约（分期交付）</div>
+      <div class="wa-item">
+        <div class="wa-dim">委托是<b>分阶段</b>的：每阶段有独立的交付物、验收规则与报酬。阶段推进<b>必须凭回执</b>（同一回执不得重复用），报酬按已完成阶段结算并经 org.transfer 支付。<b>本模块不写库存</b>——钱走 org 的唯一真源。</div>
+        ${(() => {
+          const CM = WA.commission;
+          if (!CM) return '<div class="wa-dim">委托履约未加载</div>';
+          const cr = panelEl.dataset.cmOut || '';
+          const cmOn = (CM.getSettings && CM.getSettings().enabled) ? true : false;
+          return '<div class="wa-row"><label class="wa-row"><input id="wa-cm-enabled" type="checkbox" ' + (cmOn ? 'checked' : '') + '/> 启用委托履约</label></div><div class="wa-row">'
+            + '<input id="wa-cm-title" class="wa-input" aria-label="委托名" placeholder="委托名"/>'
+            + '<input id="wa-cm-principal" class="wa-input wa-mini" aria-label="委托方" placeholder="委托方"/>'
+            + '<input id="wa-cm-agent" class="wa-input wa-mini" aria-label="受托方" placeholder="受托方"/>'
+            + '<input id="wa-cm-stages" class="wa-input" aria-label="阶段" placeholder="阶段（逗号分隔，每段一个交付物）"/>'
+            + '<button class="wa-btn wa-mini" id="wa-cm-create" aria-label="建委托" title="建委托：标题 / 委托方 / 受托方 / 至少一个阶段。四道预检：开关 → 字段 → 阶段数上限 → 容量；有报酬且 org 在场时另检委托方付得起">建委托</button>'
+            + '</div><div class="wa-row">'
+            + '<input id="wa-cm-id" class="wa-input wa-mini" aria-label="委托号" placeholder="委托号"/>'
+            + '<input id="wa-cm-receipt" class="wa-input wa-mini" aria-label="阶段回执" placeholder="阶段回执"/>'
+            + '<button class="wa-btn wa-mini" id="wa-cm-advance" aria-label="推进阶段" title="推进阶段：必须凭回执。同一回执重复使用一律拒收（duplicate-receipt）——「第二次说完成了」不结算第二次">推进阶段</button>'
+            + '<button class="wa-btn wa-mini" id="wa-cm-settle" aria-label="结算" title="结算：按已完成阶段算报酬并经 org.transfer 支付；已结算再报 already-settled。托管余额按已完成部分退回">结算</button>'
+            + '<input id="wa-cm-reason" class="wa-input wa-mini" aria-label="取消原因" placeholder="取消原因（可空）"/>'
+            + '<button class="wa-btn wa-mini" id="wa-cm-cancel" aria-label="取消" title="取消：按已执行阶段结算余额，托管多余部分退回委托方">取消</button>'
+            + '<button class="wa-btn wa-mini" id="wa-cm-view" aria-label="查看" title="查看：逐阶段状态 / 回执 / 已完成时刻 / 报酬与预付">查看</button>'
+            + '<button class="wa-btn wa-mini" id="wa-cm-pending" aria-label="在办清单" title="在办清单：状态为 active 的委托（含当前阶段与总阶段数）">在办</button>'
+            + '</div><div id="wa-cm-out" class="wa-out wa-dim">' + esc(cr) + '</div>';
+        })()}
+      </div>
+      <div class="wa-sec">线索调查（证据与揭示）</div>
+      <div class="wa-item">
+        <div class="wa-dim">调查链是<b>三段</b>：登记线索 → 取证（凭回执）→ 揭示给某人。揭示前必须先核对证据：verdict 为 <code>verified</code> 或 <code>cannot-judge</code> 才放行——「证据不足」不冒充「真相」。证人能不能接触走 noesis 的知情面真源。</div>
+        ${(() => {
+          const IV = WA.investigation;
+          if (!IV) return '<div class="wa-dim">线索调查未加载</div>';
+          const ivr = panelEl.dataset.invOut || '';
+          const ivOn = (IV.getSettings && IV.getSettings().enabled) ? true : false;
+          return '<div class="wa-row"><label class="wa-row"><input id="wa-inv-enabled" type="checkbox" ' + (ivOn ? 'checked' : '') + '/> 启用线索调查</label></div><div class="wa-row">'
+            + '<input id="wa-inv-title" class="wa-input" aria-label="线索名" placeholder="线索名"/>'
+            + '<input id="wa-inv-subject" class="wa-input wa-mini" aria-label="命题" placeholder="针对谁的什么命题"/>'
+            + '<input id="wa-inv-witness" class="wa-input wa-mini" aria-label="证人" placeholder="证人（可空）"/>'
+            + '<button class="wa-btn wa-mini" id="wa-inv-register" aria-label="登记线索" title="登记线索：标题 + 命题。命题在 intel.truthOf 里查不到时**不阻断**——unknown 是合法状态，只是记为未核验，不许冒充已知">登记线索</button>'
+            + '</div><div class="wa-row">'
+            + '<input id="wa-inv-id" class="wa-input wa-mini" aria-label="线索号" placeholder="线索号"/>'
+            + '<input id="wa-inv-person" class="wa-input wa-mini" aria-label="取证者" placeholder="谁去查"/>'
+            + '<input id="wa-inv-receipt" class="wa-input wa-mini" aria-label="取证回执" placeholder="取证回执"/>'
+            + '<button class="wa-btn wa-mini" id="wa-inv-investigate" aria-label="取证" title="取证：凭回执落一条证据（同一回执不得重复用）。线索指定的证人若在 noesis 里接触不到，如实标注可接触性，不静默放行">取证</button>'
+            + '<button class="wa-btn wa-mini" id="wa-inv-check" aria-label="核对证据" title="核对证据：读 intel.truthOf 的事实面与 rowsOf 的认知面，给 verdict（no-evidence / verified / contradicted / cannot-judge）。一条证据都没有时如实报 no-evidence">核对证据</button>'
+            + '<button class="wa-btn wa-mini" id="wa-inv-reveal" aria-label="揭示" title="揭示：把这条线索告诉某人。前置是 verdict 达标（verified / cannot-judge），否则 insufficient-evidence —— 「我猜的」不许走揭示口">揭示</button>'
+            + '<button class="wa-btn wa-mini" id="wa-inv-view" aria-label="查看" title="查看：线索状态 / 地点 / 证人 / 成本 / 证据条数 / 已揭示给谁">查看</button>'
+            + '<button class="wa-btn wa-mini" id="wa-inv-pending" aria-label="在查清单" title="在查清单：discoverable 与 investigating 两态的线索（各带证据条数）">在查</button>'
+            + '</div><div id="wa-inv-out" class="wa-out wa-dim">' + esc(ivr) + '</div>';
+        })()}
+      </div>
+      <div class="wa-sec">灾后余波（地点创伤与修复）</div>
+      <div class="wa-item">
+        <div class="wa-dim">事件在<b>地点</b>上留下的创伤是独立事实：同一事件只生效一次（duplicate-event），地点必须在场（unknown-place）。修复是<b>投入过程</b>（材料/工期逐步推进），不是一按就干净。</div>
+        ${(() => {
+          const AF = WA.aftermath;
+          if (!AF) return '<div class="wa-dim">灾后余波未加载</div>';
+          const afr = panelEl.dataset.afOut || '';
+          const afOn = (AF.getSettings && AF.getSettings().enabled) ? true : false;
+          return '<div class="wa-row"><label class="wa-row"><input id="wa-af-enabled" type="checkbox" ' + (afOn ? 'checked' : '') + '/> 启用灾后余波</label></div><div class="wa-row">'
+            + '<input id="wa-af-place" class="wa-input wa-mini" aria-label="地点" placeholder="地点"/>'
+            + '<input id="wa-af-event" class="wa-input wa-mini" aria-label="事件号" placeholder="事件号"/>'
+            + '<input id="wa-af-type" class="wa-input wa-mini" aria-label="创伤类型" placeholder="创伤类型（damage 等）"/>'
+            + '<input id="wa-af-desc" class="wa-input" aria-label="描述" placeholder="描述"/>'
+            + '<button class="wa-btn wa-mini" id="wa-af-register" aria-label="登记创伤" title="登记创伤：地点 + 事件号 + 类型。同一事件号只生效一次（duplicate-event）；地点查不到一律拒收（unknown-place），不默认放行">登记创伤</button>'
+            + '</div><div class="wa-row">'
+            + '<input id="wa-af-id" class="wa-input wa-mini" aria-label="创伤号" placeholder="创伤号"/>'
+            + '<button class="wa-btn wa-mini" id="wa-af-repair" aria-label="投入修复" title="投入修复：每次推进一份进度（默认 1），累计到 repairTime 才算修好。进度是**过程量**，不是布尔">投入修复</button>'
+            + '<button class="wa-btn wa-mini" id="wa-af-inspect" aria-label="勘查地点" title="勘查地点：该地点的活跃创伤 + 历史创伤计数 + sediment 感知面（只读）。「现在还在」与「曾经有过」分列">勘查地点</button>'
+            + '<button class="wa-btn wa-mini" id="wa-af-active" aria-label="活跃清单" title="活跃清单：状态为 active 的全部创伤（含生效类型与来源事件）">活跃</button>'
+            + '<button class="wa-btn wa-mini" id="wa-af-view" aria-label="查看" title="查看：单条创伤的完整读数（含修复进度 / 修复工期 / 登记与修复时刻）">查看</button>'
+            + '<input id="wa-af-reason" class="wa-input wa-mini" aria-label="撤销原因" placeholder="撤销原因（可空）"/>'
+            + '<button class="wa-btn wa-mini" id="wa-af-cancel" aria-label="撤销" title="撤销：把活跃创伤标成 cancelled 并留时刻。只对 active 生效——已修复的不能被撤销">撤销</button>'
+            + '</div><div id="wa-af-out" class="wa-out wa-dim">' + esc(afr) + '</div>';
+        })()}
+      </div>
+      <div class="wa-sec">运营项目（批准 → 立项 → 拨付）</div>
+      <div class="wa-item">
+        <div class="wa-dim">批准不等于动工：<b>只有 approved 的决策</b>能立成项目，且需 <code>inst.authority</code> 权限预检（查不到 inst 一律拒收，不作默许放行）。拨付走 org 资源真源，超预算一律 over-budget。</div>
+        ${(() => {
+          const OP = WA.operations;
+          if (!OP) return '<div class="wa-dim">运营项目未加载</div>';
+          const opr = panelEl.dataset.opsOut || '';
+          const opsOn = (OP.getSettings && OP.getSettings().enabled) ? true : false;
+          return '<div class="wa-row"><label class="wa-row"><input id="wa-ops-enabled" type="checkbox" ' + (opsOn ? 'checked' : '') + '/> 启用运营项目</label></div><div class="wa-row">'
+            + '<input id="wa-ops-decision" class="wa-input wa-mini" aria-label="决策号" placeholder="决策号"/>'
+            + '<input id="wa-ops-org" class="wa-input wa-mini" aria-label="组织号" placeholder="组织号"/>'
+            + '<input id="wa-ops-approver" class="wa-input wa-mini" aria-label="批准人" placeholder="批准人"/>'
+            + '<input id="wa-ops-name" class="wa-input wa-mini" aria-label="项目名" placeholder="项目名"/>'
+            + '<input id="wa-ops-budget" class="wa-input wa-mini" aria-label="预算" placeholder="预算"/>'
+            + '<input id="wa-ops-milestones" class="wa-input" aria-label="里程碑" placeholder="里程碑（逗号分隔）"/>'
+            + '<button class="wa-btn wa-mini" id="wa-ops-enact" aria-label="立项" title="立项：决策须为 approved（否则 not-approved）、组织须在 inst.orgs 里（unknown-org）、批准人须有 canApprove（not-authorized）；再查容量与预算（仅当该组织已注册为 faction 时按资源真源查，否则走内部预算跟踪）">立项</button>'
+            + '</div><div class="wa-row">'
+            + '<input id="wa-ops-id" class="wa-input wa-mini" aria-label="项目号" placeholder="项目号"/>'
+            + '<input id="wa-ops-amount" class="wa-input wa-mini" aria-label="拨付额" placeholder="拨付额"/>'
+            + '<input id="wa-ops-item" class="wa-input wa-mini" aria-label="科目" placeholder="科目"/>'
+            + '<button class="wa-btn wa-mini" id="wa-ops-disburse" aria-label="拨付" title="拨付：金额必填且为正；累计不得超预算（over-budget 报出已花/预算/本次申请三个数）；组织在场时另查资源可用性">拨付</button>'
+            + '<input id="wa-ops-cycle" class="wa-input wa-mini" aria-label="结算周期" placeholder="结算周期"/>'
+            + '<button class="wa-btn wa-mini" id="wa-ops-settle" aria-label="周期结算" title="周期结算：周期标签必填，同一周期不重复结算（duplicate-settle）；可选推进一个里程碑">周期结算</button>'
+            + '<input id="wa-ops-from" class="wa-input wa-mini" aria-label="移交人" placeholder="移交人"/>'
+            + '<input id="wa-ops-to" class="wa-input wa-mini" aria-label="接任人" placeholder="接任人"/>'
+            + '<button class="wa-btn wa-mini" id="wa-ops-handover" aria-label="交接" title="交接：移交人必须是当前负责人（not-owner 会报出当前负责人与被试者两个名字），不核对身份就换人等于伪造交接">交接</button>'
+            + '</div><div class="wa-row">'
+            + '<button class="wa-btn wa-mini" id="wa-ops-active" aria-label="在建清单" title="在建清单：status 为 active 的项目（含组织 / 负责人 / 已花 / 预算）">在建</button>'
+            + '<button class="wa-btn wa-mini" id="wa-ops-pending" aria-label="待推进清单" title="待推进清单：里程碑未走完的在建项目（含已完成数与总数）">待推进</button>'
+            + '<button class="wa-btn wa-mini" id="wa-ops-view" aria-label="查看" title="查看：单项目完整读数（决策号 / 组织 / 里程碑逐项 / 周期 / 结算时刻）">查看</button>'
+            + '<button class="wa-btn wa-mini" id="wa-ops-cancel" aria-label="取消" title="取消：只对 active 生效，标成 cancelled 并留关闭时刻">取消</button>'
+            + '</div><div id="wa-ops-out" class="wa-out wa-dim">' + esc(opr) + '</div>';
+        })()}
+      </div>
       <div class="wa-sec">声誉四维</div>
       <div class="wa-item wa-rep-grid">${['authority','common','shadow','circuit'].map(dim => {
         const labels = {authority:'朝堂',common:'民间',shadow:'江湖',circuit:'商界'};
@@ -5980,7 +6113,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       if (!v.enabled) return agOut('行动闭环未开（设置里打开后才有调度）');
       const person = wv('#wa-ag-person');
       if (!person) return agOut('填人物名');
-      const r = WA.agency.schedule(person, WA.clock && WA.clock.now ? WA.clock.now("agency") : Date.now());
+      const r = WA.agency.schedule(person, clockNow("agency"));
       if (r && r.needSteps) return agOut(person + ' 无计划步——需先为其建立计划步骤（need-steps）');
       if (!r || !r.ok) return agOut(r ? (r.reason || '调度失败') : '调度失败');
       agOut('已调度：' + r.person + ' → 行动「' + r.action + '」（目标 ' + r.goal + '，步 ' + r.stepIndex + '/' + r.stepTotal + '）');
@@ -5989,7 +6122,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       if (!WA.agency) return agOut('行动调度未加载');
       const v = WA.agency.getSettings();
       if (!v.enabled) return agOut('行动闭环未开');
-      const r = WA.agency.processReceipts(WA.clock && WA.clock.now ? WA.clock.now("agency") : Date.now());
+      const r = WA.agency.processReceipts(clockNow("agency"));
       if (!r || !r.ok) return agOut(r ? (r.reason || '处理回执失败') : '处理回执失败');
       agOut('处理回执：结算 ' + r.settled + ' 步（' + (r.details || '') + '）');
     });
@@ -6000,7 +6133,8 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
     });
     // v2.167.0 (TX3): freight panel controls.
     const frOut = function (text) { panelEl.dataset.frOut = text; const o = $('#wa-fr-out'); if (o) o.textContent = text; };
-    on('#wa-fr-enabled', 'change', () => {
+    on('#wa-fr-enabled', () => {
+    // v2.173.0（TX4b）：on() 是 onclick 接线，三参形态会把 onclick 赋成字符串
         if (!WA.freight || !WA.freight.setSettings) return frOut('未记录：module-missing');
         WA.freight.setSettings({ enabled: $('#wa-fr-enabled').checked });
         frOut('已记录 ' + ($('#wa-fr-enabled').checked ? 'enabled' : 'disabled'));
@@ -6074,6 +6208,247 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         + (x.unknowns ? ' / 档位不明 ' + x.unknowns : '') + '）').join('、') || '无')
         + '；共 ' + r.nodes + ' 家');
     });
+
+    // v2.173.0（TX4b）：TX4/TX6/TX7/TX8/TX9 五模块的面板消费方。
+    //   为什么这五段必须存在：这五个模块的 56 个导出此前**全部**落在死子面账本上
+    //   （storyChoice 9 / commission 11 / investigation 11 / aftermath 12 / operations 13），
+    //   连它们自己的 getSettings/setSettings 都在里面 —— 而隔壁 diplomacy / agency / freight
+    //   的同类口是活的，分界线就是「面板上有没有这一栏」。登记在 UI_BINDINGS 不等于接线：
+    //   那只是一张字符串表，不构成消费方。
+    {
+      const out = function (id, text) { const o = $(id); if (o) o.textContent = text; };
+      const act = function (id, fn) { const b = $(id); if (b) b.onclick = fn; };
+      const sw = function (id, onchange) { const c = $(id); if (c) c.onchange = onchange; };
+      const ok = function (r) { return (r && r.ok) ? '' : ('失败：' + ((r && (r.reason || r.id)) || 'unknown')); };
+      const js = function (r) { try { return JSON.stringify(r); } catch (e) { return String(r); } };
+      // ── TX4 剧情选择点 ──
+      sw('#wa-sc-enabled', function () {
+        if (!WA.storyChoice) return out('#wa-sc-out', '未记录：module-missing');
+        WA.storyChoice.setSettings({ enabled: !!(this.checked) });
+        out('#wa-sc-out', '已记录 ' + (this.checked ? 'enabled' : 'disabled'));
+      });
+      act('#wa-sc-present', function () {
+        if (!WA.storyChoice) return out('#wa-sc-out', '剧情选择未加载');
+        const labels = wv('#wa-sc-opts').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        const r = WA.storyChoice.present({ round: Number(wv('#wa-sc-round')) || 1, prompt: wv('#wa-sc-prompt'),
+          options: labels.map(function (l) { return { label: l }; }) });
+        if (!r.ok) return out('#wa-sc-out', '登记失败：' + r.reason + (r.need ? '（给 ' + r.have + ' 项，至少 ' + r.need + ' 项）' : ''));
+        out('#wa-sc-out', '已登记 ' + r.id + '（轮 ' + r.round + '）：' + r.options.map(function (o) { return o.label + (o.allowed ? '✓' : '✗'); }).join('、'));
+      });
+      act('#wa-sc-confirm', function () {
+        if (!WA.storyChoice) return out('#wa-sc-out', '剧情选择未加载');
+        const r = WA.storyChoice.confirm(wv('#wa-sc-id'), wv('#wa-sc-option'));
+        if (!r.ok) return out('#wa-sc-out', '确认失败：' + r.reason + (r.allowed ? '（可选 ' + r.allowed.join('、') + '）' : ''));
+        out('#wa-sc-out', '已选 ' + r.option + '：兑现 ' + (r.applied ? '成功' : '未成功') + '（回执 ' + (r.receipt || '无') + '）');
+      });
+      act('#wa-sc-review', function () {
+        if (!WA.storyChoice) return out('#wa-sc-out', '剧情选择未加载');
+        const r = WA.storyChoice.review(wv('#wa-sc-id'));
+        if (!r.ok) return out('#wa-sc-out', '复盘失败：' + r.reason);
+        out('#wa-sc-out', '「' + r.prompt + '」已选「' + (r.choice || '未选') + '」· 预览 ' + r.preview + ' · 兑现时刻 ' + (r.appliedAt || 0));
+      });
+      act('#wa-sc-pending', function () {
+        if (!WA.storyChoice) return out('#wa-sc-out', '剧情选择未加载');
+        const r = WA.storyChoice.pending();
+        if (!r.ok) return out('#wa-sc-out', '未确认清单失败：' + r.reason);
+        out('#wa-sc-out', '未确认 ' + r.count + '/' + r.cap + '：' + (r.points.map(function (p) { return p.id + '（' + p.options + ' 项）'; }).join('、') || '无'));
+      });
+      // ── TX6 委托履约 ──
+      sw('#wa-cm-enabled', function () {
+        if (!WA.commission) return out('#wa-cm-out', '未记录：module-missing');
+        WA.commission.setSettings({ enabled: !!(this.checked) });
+        out('#wa-cm-out', '已记录 ' + (this.checked ? 'enabled' : 'disabled'));
+      });
+      act('#wa-cm-create', function () {
+        if (!WA.commission) return out('#wa-cm-out', '委托履约未加载');
+        const stages = wv('#wa-cm-stages').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+          .map(function (l) { return { label: l, deliverable: l }; });
+        const r = WA.commission.create({ title: wv('#wa-cm-title'), principal: wv('#wa-cm-principal'),
+          agent: wv('#wa-cm-agent'), stages: stages });
+        if (!r.ok) return out('#wa-cm-out', '建委托失败：' + r.reason + (r.field ? '（缺 ' + r.field + '）' : ''));
+        out('#wa-cm-out', '已建 ' + r.id + '「' + r.title + '」共 ' + r.stages + ' 阶段');
+      });
+      act('#wa-cm-advance', function () {
+        if (!WA.commission) return out('#wa-cm-out', '委托履约未加载');
+        const r = WA.commission.advance(wv('#wa-cm-id'), wv('#wa-cm-receipt'));
+        if (!r.ok) return out('#wa-cm-out', '推进失败：' + r.reason);
+        out('#wa-cm-out', r.id + ' 推进到阶段 ' + r.stage + '（回执 ' + r.receiptId + '）');
+      });
+      act('#wa-cm-settle', function () {
+        if (!WA.commission) return out('#wa-cm-out', '委托履约未加载');
+        const r = WA.commission.settle(wv('#wa-cm-id'));
+        if (!r.ok) return out('#wa-cm-out', '结算失败：' + r.reason);
+        out('#wa-cm-out', r.id + ' 已结算：应得 ' + r.totalReward + ' / 预付 ' + r.prepaid + ' / 补付 ' + r.due + '（' + (r.paid ? '已付' : '未付') + '）');
+      });
+      act('#wa-cm-cancel', function () {
+        if (!WA.commission) return out('#wa-cm-out', '委托履约未加载');
+        const r = WA.commission.cancel(wv('#wa-cm-id'), wv('#wa-cm-reason') || 'cancelled');
+        if (!r.ok) return out('#wa-cm-out', '取消失败：' + r.reason);
+        out('#wa-cm-out', r.id + ' 已取消：已挣 ' + r.earned + ' / 退托管 ' + r.refund);
+      });
+      act('#wa-cm-view', function () {
+        if (!WA.commission) return out('#wa-cm-out', '委托履约未加载');
+        const r = WA.commission.view(wv('#wa-cm-id'));
+        if (!r.ok) return out('#wa-cm-out', '查看失败：' + r.reason);
+        out('#wa-cm-out', '「' + r.title + '」' + r.status + ' · ' + r.principal + '→' + r.agent
+          + ' · 阶段 ' + (r.currentStage + 1) + '/' + r.stages.length + ' · 报酬 ' + r.reward);
+      });
+      act('#wa-cm-pending', function () {
+        if (!WA.commission) return out('#wa-cm-out', '委托履约未加载');
+        const r = WA.commission.pending();
+        if (!r.ok) return out('#wa-cm-out', '在办清单失败：' + r.reason);
+        out('#wa-cm-out', '在办 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.title + '（' + (x.stage + 1) + '/' + x.total + '）'; }).join('、') || '无'));
+      });
+      // ── TX7 线索调查 ──
+      //   前缀是 wa-inv-* 而非 wa-iv-*：后者被 v2.150.0 的注入价值榜单占用（同一个 id 空间）。
+      sw('#wa-inv-enabled', function () {
+        if (!WA.investigation) return out('#wa-inv-out', '未记录：module-missing');
+        WA.investigation.setSettings({ enabled: !!(this.checked) });
+        out('#wa-inv-out', '已记录 ' + (this.checked ? 'enabled' : 'disabled'));
+      });
+      act('#wa-inv-register', function () {
+        if (!WA.investigation) return out('#wa-inv-out', '线索调查未加载');
+        const r = WA.investigation.register({ title: wv('#wa-inv-title'), subject: wv('#wa-inv-subject'),
+          witness: wv('#wa-inv-witness') });
+        if (!r.ok) return out('#wa-inv-out', '登记失败：' + r.reason + (r.field ? '（缺 ' + r.field + '）' : ''));
+        out('#wa-inv-out', '已登记 ' + r.id + '（' + r.effectType + '）');
+      });
+      act('#wa-inv-investigate', function () {
+        if (!WA.investigation) return out('#wa-inv-out', '线索调查未加载');
+        const r = WA.investigation.investigate(wv('#wa-inv-id'), wv('#wa-inv-person'), { receiptId: wv('#wa-inv-receipt') });
+        if (!r.ok) return out('#wa-inv-out', '取证失败：' + r.reason);
+        out('#wa-inv-out', '已取证：' + js(r));
+      });
+      act('#wa-inv-check', function () {
+        if (!WA.investigation) return out('#wa-inv-out', '线索调查未加载');
+        const r = WA.investigation.checkEvidence(wv('#wa-inv-id'));
+        if (!r.ok) return out('#wa-inv-out', '核对失败：' + r.reason);
+        out('#wa-inv-out', '裁决 ' + r.verdict + ' · 证据 ' + r.count + ' 条 · ' + js(r));
+      });
+      act('#wa-inv-reveal', function () {
+        if (!WA.investigation) return out('#wa-inv-out', '线索调查未加载');
+        const r = WA.investigation.reveal(wv('#wa-inv-id'), wv('#wa-inv-person'));
+        if (!r.ok) return out('#wa-inv-out', '揭示失败：' + r.reason + (r.verdict ? '（证据裁决 ' + r.verdict + '）' : ''));
+        out('#wa-inv-out', '已揭示：' + js(r));
+      });
+      act('#wa-inv-view', function () {
+        if (!WA.investigation) return out('#wa-inv-out', '线索调查未加载');
+        const r = WA.investigation.view(wv('#wa-inv-id'));
+        if (!r.ok) return out('#wa-inv-out', '查看失败：' + r.reason);
+        out('#wa-inv-out', '「' + r.title + '」' + r.status + ' · 命题 ' + r.subject + ' · 证据 ' + r.evidence
+          + ' 条 · 已知情 ' + (r.revealedTo.length ? r.revealedTo.join('、') : '无'));
+      });
+      act('#wa-inv-pending', function () {
+        if (!WA.investigation) return out('#wa-inv-out', '线索调查未加载');
+        const r = WA.investigation.pending();
+        if (!r.ok) return out('#wa-inv-out', '在查清单失败：' + r.reason);
+        out('#wa-inv-out', '在查 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.title + '（' + x.status + ' / 证据 ' + x.evidence + '）'; }).join('、') || '无'));
+      });
+      // ── TX8 灾后余波 ──
+      sw('#wa-af-enabled', function () {
+        if (!WA.aftermath) return out('#wa-af-out', '未记录：module-missing');
+        WA.aftermath.setSettings({ enabled: !!(this.checked) });
+        out('#wa-af-out', '已记录 ' + (this.checked ? 'enabled' : 'disabled'));
+      });
+      act('#wa-af-register', function () {
+        if (!WA.aftermath) return out('#wa-af-out', '灾后余波未加载');
+        const r = WA.aftermath.register({ placeId: wv('#wa-af-place'), eventId: wv('#wa-af-event'),
+          effectType: wv('#wa-af-type'), description: wv('#wa-af-desc') });
+        if (!r.ok) return out('#wa-af-out', '登记失败：' + r.reason + (r.placeId ? '（地点 ' + r.placeId + '）' : ''));
+        out('#wa-af-out', '已登记 ' + r.id + '（' + r.placeId + ' · ' + r.effectType + '）');
+      });
+      act('#wa-af-repair', function () {
+        if (!WA.aftermath) return out('#wa-af-out', '灾后余波未加载');
+        const r = WA.aftermath.repair(wv('#wa-af-id'), {});
+        if (!r.ok) return out('#wa-af-out', '修复失败：' + r.reason);
+        out('#wa-af-out', '已投入修复：' + js(r));
+      });
+      act('#wa-af-inspect', function () {
+        if (!WA.aftermath) return out('#wa-af-out', '灾后余波未加载');
+        const r = WA.aftermath.inspect(wv('#wa-af-place'));
+        if (!r.ok) return out('#wa-af-out', '勘查失败：' + r.reason);
+        out('#wa-af-out', r.placeId + '：活跃 ' + r.activeCount + ' / 历史 ' + r.historyCount
+          + ' · 余韵 ' + (r.sediment ? js(r.sediment) : '无感知面'));
+      });
+      act('#wa-af-active', function () {
+        if (!WA.aftermath) return out('#wa-af-out', '灾后余波未加载');
+        const r = WA.aftermath.active();
+        if (!r.ok) return out('#wa-af-out', '活跃清单失败：' + r.reason);
+        out('#wa-af-out', '活跃 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.placeId + '·' + x.effectType; }).join('、') || '无'));
+      });
+      act('#wa-af-view', function () {
+        if (!WA.aftermath) return out('#wa-af-out', '灾后余波未加载');
+        const r = WA.aftermath.view(wv('#wa-af-id'));
+        if (!r.ok) return out('#wa-af-out', '查看失败：' + r.reason);
+        out('#wa-af-out', r.id + ' ' + r.status + ' · ' + r.placeId + ' · ' + r.effectType
+          + ' · 修复 ' + r.repairProgress + '/' + (r.repairTime || 1));
+      });
+      act('#wa-af-cancel', function () {
+        if (!WA.aftermath) return out('#wa-af-out', '灾后余波未加载');
+        const r = WA.aftermath.cancel(wv('#wa-af-id'), wv('#wa-af-reason') || 'cancelled');
+        if (!r.ok) return out('#wa-af-out', '撤销失败：' + r.reason);
+        out('#wa-af-out', r.id + ' 已撤销（' + r.reason + '）');
+      });
+      // ── TX9 运营项目 ──
+      sw('#wa-ops-enabled', function () {
+        if (!WA.operations) return out('#wa-ops-out', '未记录：module-missing');
+        WA.operations.setSettings({ enabled: !!(this.checked) });
+        out('#wa-ops-out', '已记录 ' + (this.checked ? 'enabled' : 'disabled'));
+      });
+      act('#wa-ops-enact', function () {
+        if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
+        const ms = wv('#wa-ops-milestones').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+          .map(function (l) { return { label: l }; });
+        const r = WA.operations.enact(wv('#wa-ops-decision'), { orgId: wv('#wa-ops-org'), approver: wv('#wa-ops-approver'),
+          name: wv('#wa-ops-name'), budget: Number(wv('#wa-ops-budget')) || 0, milestones: ms, owner: wv('#wa-ops-approver') });
+        if (!r.ok) return out('#wa-ops-out', '立项失败：' + r.reason + (r.status ? '（决策状态 ' + r.status + '）' : '') + (r.by ? '（' + r.by + ' 无批准权）' : ''));
+        out('#wa-ops-out', '已立项 ' + r.id + '「' + r.name + '」负责人 ' + r.owner + ' · 预算 ' + r.budget);
+      });
+      act('#wa-ops-disburse', function () {
+        if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
+        const r = WA.operations.disburse(wv('#wa-ops-id'), { amount: Number(wv('#wa-ops-amount')) || 0,
+          itemType: wv('#wa-ops-item'), by: wv('#wa-ops-approver') });
+        if (!r.ok) return out('#wa-ops-out', '拨付失败：' + r.reason + (r.budget !== undefined ? '（已花 ' + r.spent + '/' + r.budget + '，本次 ' + r.requested + '）' : ''));
+        out('#wa-ops-out', '已拨付：' + js(r));
+      });
+      act('#wa-ops-settle', function () {
+        if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
+        const r = WA.operations.settle(wv('#wa-ops-id'), { cycleTag: wv('#wa-ops-cycle') });
+        if (!r.ok) return out('#wa-ops-out', '结算失败：' + r.reason + (r.cycleTag ? '（本周期 ' + r.cycleTag + '）' : ''));
+        out('#wa-ops-out', '已结算：' + js(r));
+      });
+      act('#wa-ops-handover', function () {
+        if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
+        const r = WA.operations.handover(wv('#wa-ops-id'), wv('#wa-ops-from'), wv('#wa-ops-to'));
+        if (!r.ok) return out('#wa-ops-out', '交接失败：' + r.reason + (r.current ? '（现任 ' + r.current + '，提交 ' + r.attempted + '）' : ''));
+        out('#wa-ops-out', '已交接：' + js(r));
+      });
+      act('#wa-ops-active', function () {
+        if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
+        const r = WA.operations.active();
+        if (!r.ok) return out('#wa-ops-out', '在建清单失败：' + r.reason);
+        out('#wa-ops-out', '在建 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.name + '（' + x.orgId + ' / ' + x.spent + ':' + x.budget + '）'; }).join('、') || '无'));
+      });
+      act('#wa-ops-pending', function () {
+        if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
+        const r = WA.operations.pending();
+        if (!r.ok) return out('#wa-ops-out', '待推进清单失败：' + r.reason);
+        out('#wa-ops-out', '待推进 ' + r.count + '：' + (r.items.map(function (x) { return x.name + '（' + x.completed + '/' + x.total + '）'; }).join('、') || '无'));
+      });
+      act('#wa-ops-view', function () {
+        if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
+        const r = WA.operations.view(wv('#wa-ops-id'));
+        if (!r.ok) return out('#wa-ops-out', '查看失败：' + r.reason);
+        out('#wa-ops-out', '「' + r.name + '」' + r.status + ' · ' + r.orgId + ' · 负责人 ' + r.owner
+          + ' · 里程碑 ' + r.completedMilestones + '/' + r.milestones.length + ' · 已花 ' + r.spent + '/' + r.budget);
+      });
+      act('#wa-ops-cancel', function () {
+        if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
+        const r = WA.operations.cancel(wv('#wa-ops-id'), wv('#wa-ops-cycle') || 'cancelled');
+        if (!r.ok) return out('#wa-ops-out', '取消失败：' + r.reason);
+        out('#wa-ops-out', r.id + ' 已取消（' + r.reason + '）');
+      });
+    }
     // v2.11.0: 推演中止——引擎侧 `abort()` 已实现却无人调用（用户只能刷页面打断）
     on('#wa-bs-abort', () => { WA.backstage.abort(); WA.log('warn', '世界推演已请求中止'); renderBody(); });
     // 势力/事件编辑器绑定（v0.9.0）

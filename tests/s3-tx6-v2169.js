@@ -29,7 +29,7 @@ const RUN = fs.readFileSync(REL_RUN, 'utf8');
 var pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log('FAIL: ' + name); } }
 // A 结构面
-ok('A1: 12 导出成员', /A\.commission\s*=\s*\{[\s\S]*getSettings[\s\S]*setSettings[\s\S]*create[\s\S]*advance[\s\S]*settle[\s\S]*cancel[\s\S]*view[\s\S]*pending[\s\S]*buildBlock[\s\S]*diagnose[\s\S]*stat[\s\S]*reset[\s\S]*\}/.test(SRC));
+ok('A1: 12 导出成员', /WA\.commission\s*=\s*\{[\s\S]*getSettings[\s\S]*setSettings[\s\S]*create[\s\S]*advance[\s\S]*settle[\s\S]*cancel[\s\S]*view[\s\S]*pending[\s\S]*buildBlock[\s\S]*diagnose[\s\S]*stat[\s\S]*reset[\s\S]*\}/.test(SRC));
 ok('A2: 导出数自证 === 11', /EXPORT_COUNT = 12/.test(SRC));
 ok('A3: DEF.enabled=false', /enabled:\s*false/.test(SRC));
 ok('A4: 自证块', /commission: export count mismatch/.test(SRC));
@@ -42,8 +42,8 @@ ok('A10: panel VIS_NAMES 含 commission', PAN.indexOf("commission: '委托履约
 ok('A11: budget PRIORITY 含 委托履约', BUD.indexOf("'委托履约': { rank: 5, fold: true }") >= 0);
 ok('A12: budget ACCOUNTS 含 委托履约', BUD.indexOf("['委托履约', '叙事推进', '承载']") >= 0);
 ok('A13: LOAD_ORDER 含 commission.js', IDX.indexOf("'engines/commission.js'") >= 0 && RUN.indexOf("'engines/commission.js'") >= 0);
-ok('A14: VERSION = 2.169.0', /VERSION\s*=\s*'2\.(169|170|171|172)\.0'/.test(IDX));
-ok('A15: manifest version = 2.169.0', MAN.version === '2.169.0' || MAN.version === '2.170.0' || MAN.version === '2.171.0' || MAN.version === '2.172.0' || MAN.version === '2.172.0');
+ok('A14: VERSION = 2.169.0', /VERSION\s*=\s*'2\.(169|170|171|172|173)\.0'/.test(IDX));
+ok('A15: manifest version = 2.169.0', MAN.version === '2.169.0' || MAN.version === '2.170.0' || MAN.version === '2.171.0' || MAN.version === '2.173.0' || MAN.version === '2.172.0');
 ok('A16: tool-diag 模块映射含 commission.js', DIAG.indexOf("'engines/commission.js': 'commission'") >= 0);
 ok('A17: tool-diag secCommission 函数', DIAG.indexOf('function secCommission()') >= 0);
 ok('A18: tool-diag diag 对象含 commission', DIAG.indexOf('commission: secCommission()') >= 0);

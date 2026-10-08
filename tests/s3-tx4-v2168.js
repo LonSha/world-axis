@@ -27,7 +27,7 @@ const RUN = fs.readFileSync(REL_RUN, 'utf8');
 var pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log('FAIL: ' + name); } }
 // A 结构面
-ok('A1: 10 导出成员', /A\.storyChoice\s*=\s*\{[\s\S]*getSettings[\s\S]*setSettings[\s\S]*present[\s\S]*confirm[\s\S]*review[\s\S]*pending[\s\S]*buildBlock[\s\S]*diagnose[\s\S]*stat[\s\S]*reset[\s\S]*\}/.test(SRC));
+ok('A1: 10 导出成员', /WA\.storyChoice\s*=\s*\{[\s\S]*getSettings[\s\S]*setSettings[\s\S]*present[\s\S]*confirm[\s\S]*review[\s\S]*pending[\s\S]*buildBlock[\s\S]*diagnose[\s\S]*stat[\s\S]*reset[\s\S]*\}/.test(SRC));
 ok('A2: 导出数自证 === 10', /EXPORT_COUNT = 10/.test(SRC));
 ok('A3: DEF.enabled=false', /enabled:\s*false/.test(SRC));
 ok('A4: 自证块', /story-choice: export count mismatch/.test(SRC));
@@ -40,8 +40,8 @@ ok('A10: panel VIS_NAMES 含 storyChoice', PAN.indexOf("storyChoice: '故事分�
 ok('A11: budget PRIORITY 含 故事分支', BUD.indexOf("'故事分支': { rank: 5, fold: true }") >= 0);
 ok('A12: budget ACCOUNTS 含 故事分支', BUD.indexOf("['故事分支', '叙事推进', '承载']") >= 0);
 ok('A13: LOAD_ORDER 含 story-choice.js', IDX.indexOf("'engines/story-choice.js'") >= 0 && RUN.indexOf("'engines/story-choice.js'") >= 0);
-ok('A14: VERSION = 2.168.0+', /VERSION\s*=\s*'2\.(168|169|170|171|172)\.0'/.test(IDX));
-ok('A15: manifest version = 2.168.0+', MAN.version === '2.168.0' || MAN.version === '2.169.0' || MAN.version === '2.170.0' || MAN.version === '2.171.0' || MAN.version === '2.172.0' || MAN.version === '2.172.0');
+ok('A14: VERSION = 2.168.0+', /VERSION\s*=\s*'2\.(168|169|170|171|172|173)\.0'/.test(IDX));
+ok('A15: manifest version = 2.168.0+', MAN.version === '2.168.0' || MAN.version === '2.169.0' || MAN.version === '2.170.0' || MAN.version === '2.171.0' || MAN.version === '2.173.0' || MAN.version === '2.172.0');
 ok('A16: tool-diag 模块映射含 story-choice.js', DIAG.indexOf("'engines/story-choice.js': 'storyChoice'") >= 0);
 ok('A17: tool-diag secStoryChoice 函数', DIAG.indexOf('function secStoryChoice()') >= 0);
 ok('A18: tool-diag diag 对象含 storyChoice', DIAG.indexOf('storyChoice: secStoryChoice()') >= 0);

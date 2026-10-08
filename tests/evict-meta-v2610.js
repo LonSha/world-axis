@@ -354,7 +354,12 @@ function runAll(a) {
   //   而淘汰只在容器**满**时发生：两者不可能同时成立，故它无法被行为驱动探测
   //   （硬塞一个假 drive 只会让 C 段报 notCreated —— 那是把夹具的错记在被测代码头上）。
   //   但它仍必须落在已覆盖文件内，且建人点必须带排序键（静态可核，见下面的 C2b）。
-  const STATIC_ONLY = ['engines/world-seed.js'];
+  // v2.173.0（TX4b）：`engines/world-blueprint.js` 的 install() 与 world-seed.initConfirm
+  //   是**同一族**：两者都先判 `targetEmpty(root).empty`（目标世界必须为空）再建人，
+  //   而淘汰只在容器**满**时发生 —— 两者不可能同时成立，故同样无法被行为驱动探测。
+  //   它的建人点两条分支都带 updatedAt（主路走 ensurePerson 后统一补，fallback 字面量
+  //   本轮补上），静态可核，见 C2b。
+  const STATIC_ONLY = ['engines/world-seed.js', 'engines/world-blueprint.js'];
   STATIC_ONLY.forEach(function (f) { knownModules.add(f); });
   const uncovered = sites.filter(function (s) { return !knownModules.has(s.file); });
   a(uncovered.length === 0,

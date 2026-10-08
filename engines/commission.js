@@ -31,31 +31,31 @@
  */
 (function () {
   'use strict';
-  const A = window.WorldAxis = window.WorldAxis || {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_commission_settings_v1';
   var DEF = { enabled: false, maxContracts: 24, maxStages: 8 };
   var __REG = { key: LS_KEY, def: DEF, module: 'commission',
     bounds: { maxContracts: [2, 64], maxStages: [2, 16] } };
   function getSettings() {
-    var raw = A.settingsBus ? A.settingsBus.read(__REG) : null;
+    var raw = WA.settingsBus ? WA.settingsBus.read(__REG) : null;
     var base = Object.assign({}, DEF);
-    return A.settingsBus ? A.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
+    return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
                           : Object.assign(base, raw || {});
   }
   function setSettings(patch) {
-    return A.settingsBus ? A.settingsBus.saveOrThrow(__REG, A.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
+    return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
       : Object.assign({}, getSettings(), patch || {});
   }
-  A.__settingsRegs = (A.__settingsRegs || []).concat([__REG]);
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   var _stat = { created: 0, advanced: 0, settled: 0, cancelled: 0, refused: 0, lastReason: '', faults: {} };
   function noteFault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
-  function clean(v, max) { return A.inputGuard ? A.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
-  var clockNow = function (tag) { try { return A.clock.now(tag || 'commission'); } catch (e) { return Date.now(); } };
-  function state() { return (A.store && A.store.get) ? (A.store.get() || {}) : {}; }
+  function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
+  const clockNow = function (tag) { try { return WA.clock.now(tag || 'commission'); } catch (e) { return Date.now(); } };
+  function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function bucket(root) { var r = root || state(); if (!r.commission) r.commission = { contracts: [] }; if (!Array.isArray(r.commission.contracts)) r.commission.contracts = []; return r.commission; }
   function list() { return bucket().contracts || []; }
   function find(id) { var k = clean(id, 60); return list().filter(function (x) { return x && x.id === k; })[0] || null; }
-  function newId() { return A.rand ? A.rand.id('cm_', 4, 'id') : 'cm_0000'; }
+  function newId() { return WA.rand ? WA.rand.id('cm_', 4, 'id') : 'cm_0000'; }
 
   function create(spec) {
     var cfg = getSettings();
@@ -73,8 +73,8 @@
     if (cur.length >= cfg.maxContracts) { noteFault('contracts-full'); return { ok: false, reason: 'contracts-full', cap: cfg.maxContracts }; }
     // 检查预算（如果有报酬且 org 在）
     var reward = Number(s.reward) || 0;
-    if (reward > 0 && A.org && typeof A.org.canAfford === 'function') {
-      var aff = A.org.canAfford(principal, reward);
+    if (reward > 0 && WA.org && typeof WA.org.canAfford === 'function') {
+      var aff = WA.org.canAfford(principal, reward);
       if (!aff) { noteFault('no-budget'); return { ok: false, reason: 'no-budget', principal: principal, reward: reward }; }
     }
     var stageList = stages.map(function (st, i) {
@@ -98,11 +98,11 @@
       status: 'active', at: clockNow('commission'),
       settledAt: 0, cancelledAt: 0, cancelReason: ''
     };
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) { bucket(d).contracts.push(rec); }, 'commission:create');
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) { bucket(d).contracts.push(rec); }, 'commission:create');
     } else { list().push(rec); }
-    if (A.evict && typeof A.evict.array === 'function') {
-      try { A.evict.array(bucket().contracts, 'commission.contracts'); } catch (e) {}
+    if (WA.evict && typeof WA.evict.array === 'function') {
+      try { WA.evict.array(bucket().contracts, 'commission.contracts'); } catch (e) {}
     }
     _stat.created++;
     return { ok: true, id: rec.id, title: title, stages: stageList.length };
@@ -122,8 +122,8 @@
     var used = rec.stages.some(function (x) { return x.receiptId === rid; });
     if (used) { noteFault('duplicate-receipt'); return { ok: false, reason: 'duplicate-receipt', receiptId: rid }; }
     // 推进阶段
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.contracts.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) {
@@ -163,11 +163,11 @@
     var due = Math.max(0, totalReward - paid);
     // 通过 org.transfer 支付
     var paid_ok = false;
-    if (due > 0 && A.org && typeof A.org.transfer === 'function') {
-      try { var r = A.org.transfer(rec.principal, rec.agent, due, 'commission:settle'); paid_ok = r && r.ok !== false; } catch (e) { noteFault('transfer-failed'); }
+    if (due > 0 && WA.org && typeof WA.org.transfer === 'function') {
+      try { var r = WA.org.transfer(rec.principal, rec.agent, due, 'commission:settle'); paid_ok = r && r.ok !== false; } catch (e) { noteFault('transfer-failed'); }
     } else { paid_ok = due === 0; }
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.contracts.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) { t.status = 'settled'; t.settledAt = clockNow('commission'); }
@@ -190,11 +190,11 @@
     var prepaid = rec.prepaid || 0;
     var refund = Math.max(0, prepaid - earned);
     // 退回托管
-    if (refund > 0 && A.org && typeof A.org.transfer === 'function' && rec.escrow) {
-      try { A.org.transfer(rec.escrow, rec.principal, refund, 'commission:cancel-refund'); } catch (e) {}
+    if (refund > 0 && WA.org && typeof WA.org.transfer === 'function' && rec.escrow) {
+      try { WA.org.transfer(rec.escrow, rec.principal, refund, 'commission:cancel-refund'); } catch (e) {}
     }
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.contracts.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) { t.status = 'cancelled'; t.cancelledAt = clockNow('commission'); t.cancelReason = rsn; }
@@ -237,9 +237,9 @@
 
   function diagnose() {
     var checks = {
-      org: !!(A.org && typeof A.org.transfer === 'function' && typeof A.org.canAfford === 'function'),
-      store: !!(A.store && typeof A.store.transact === 'function'),
-      settingsBus: !!(A.settingsBus && typeof A.settingsBus.read === 'function')
+      org: !!(WA.org && typeof WA.org.transfer === 'function' && typeof WA.org.canAfford === 'function'),
+      store: !!(WA.store && typeof WA.store.transact === 'function'),
+      settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     var ok = checks.org && checks.store;
     return { ok: ok, closedLoop: ok, checks: checks, version: '2.169.0' };
@@ -256,7 +256,7 @@
 
   function reset() { _stat.created = 0; _stat.advanced = 0; _stat.settled = 0; _stat.cancelled = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; return { ok: true }; }
 
-  A.commission = {
+  WA.commission = {
     getSettings: getSettings,
     setSettings: function (patch) { return setSettings(patch); },
     create: create,
@@ -271,7 +271,7 @@
     reset: reset
   };
   var EXPORT_COUNT = 12;
-  var _exported = Object.keys(A.commission).length;
+  var _exported = Object.keys(WA.commission).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('commission: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof A.registerModule === 'function') A.registerModule('engines/commission.js', { kind: 'engine', ver: '2.169.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/commission.js', { kind: 'engine', ver: '2.169.0' });
 })();

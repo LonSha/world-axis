@@ -26,12 +26,12 @@
  */
 (function () {
   'use strict';
-  const A = window.WorldAxis = window.WorldAxis || {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
   // ── 工具函数（与 act/plan/liaison 同规格）──
-  function clean(v, max) { return A.inputGuard ? A.inputGuard.text(v, max || 60) : (typeof v === 'string' ? v.slice(0, max || 60) : ''); }
+  function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : (typeof v === 'string' ? v.slice(0, max || 60) : ''); }
   function str(v, max) { return (typeof v === 'string') ? v.slice(0, max || 60) : ''; }
   function finite(v) { const n = Number(v); return isFinite(n) && n > 0 ? n : NaN; }
-  function clockNow(site) { try { return A.clock ? A.clock.now(site || 'agency') : Date.now(); } catch (e) { return Date.now(); } }
+  function clockNow(site) { try { return WA.clock ? WA.clock.now(site || 'agency') : Date.now(); } catch (e) { return Date.now(); } }
 
   // ── 设置 ──
   const LS_KEY = 'worldaxis_agency_settings_v1';
@@ -39,13 +39,13 @@
   const __REG = { key: LS_KEY, def: DEF, module: 'agency',
     bounds: { maxSchedulePerTurn: [1, 12], maxReceiptsPerTurn: [1, 24] } };
   function settings() {
-    const raw = A.settingsBus ? A.settingsBus.read(__REG) : DEF;
-    return A.settingsBus ? A.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
+    const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
+    return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
   }
   function saveSettings(next) {
-    return A.settingsBus.saveOrThrow(__REG, A.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
+    return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
-  A.__settingsRegs = (A.__settingsRegs || []).concat([__REG]);
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   // ── 统计 ──
   const stat = { scheduled: 0, admitted: 0, receipts: 0, stepsDone: 0, stepsBlocked: 0, goalsDone: 0, goalsBlocked: 0, deferred: 0, lastReason: '', faults: {} };
@@ -53,10 +53,10 @@
 
   // ── 内部命名空间（自证块用，与 diplomacy.__diplomacyWarn 同性质）──
   //   写口数目不符时写一条警告到内部 ns，供 module-cycle-gate 的 internalPrefixed 例外表登记。
-  A.__agencyWarn = null;
+  WA.__agencyWarn = null;
 
   // ── 私有辅助 ──
-  function storeOf() { return A.store; }
+  function storeOf() { return WA.store; }
   function state() { const s = storeOf(); return s && s.get ? (s.get() || {}) : {}; }
 
   /**
@@ -114,10 +114,10 @@
 
     // ② 检查 plan 是否已有计划
     let planRow = null;
-    try { if (A.plan && A.plan.current) planRow = A.plan.current(who); } catch (e) { planRow = null; }
+    try { if (WA.plan && WA.plan.current) planRow = WA.plan.current(who); } catch (e) { planRow = null; }
 
     // 如果没有计划且 autoPlanExpand 开启，尝试展开
-    if ((!planRow || !planRow.ok) && cfg.autoPlanExpand && A.plan && A.plan.expand) {
+    if ((!planRow || !planRow.ok) && cfg.autoPlanExpand && WA.plan && WA.plan.expand) {
       // plan.expand 需要 steps —— 但本模块不编步骤。
       // 真实部署中，步骤由 AI 文本经结构预检产生或由预设模板提供。
       // 此处返回 need-steps 让调用方知道：要建计划得给步骤。
@@ -138,7 +138,7 @@
     }
 
     // ④ 准入行动（调 act.add + act.admit）
-    if (!A.act || !A.act.add || !A.act.admit) {
+    if (!WA.act || !WA.act.add || !WA.act.admit) {
       return { ok: false, reason: 'act-unavailable', person: who };
     }
 
@@ -150,13 +150,13 @@
       place: step.place || undefined,
       to: step.place || undefined
     };
-    const added = A.act.add(who, actSpec);
+    const added = WA.act.add(who, actSpec);
     if (!added.ok) {
       stat.lastReason = 'add-failed:' + added.reason;
       return Object.assign(added, { person: who, planId: planRow.id, stepSeq: step.seq });
     }
 
-    const admitted = A.act.admit(added.id, t, {});
+    const admitted = WA.act.admit(added.id, t, {});
     if (!admitted.ok) {
       stat.lastReason = 'admit-failed:' + admitted.reason;
       return Object.assign(admitted, { person: who, planId: planRow.id, stepSeq: step.seq, actId: added.id });
@@ -177,9 +177,9 @@
     if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
     const t = isFinite(finite(at)) ? Number(at) : clockNow('agency');
 
-    if (!A.act || !A.act.stat) return { ok: false, reason: 'act-unavailable' };
+    if (!WA.act || !WA.act.stat) return { ok: false, reason: 'act-unavailable' };
 
-    const actStat = A.act.stat();
+    const actStat = WA.act.stat();
     const completed = actStat.completed || 0;
     const failed = actStat.failed || 0;
 
@@ -193,7 +193,7 @@
 
     let out = { ok: true, processed: 0, stepsDone: 0, stepsBlocked: 0, goalsDone: 0, goalsBlocked: 0, deferred: [] };
 
-    if (!A.plan || !A.plan.settle) {
+    if (!WA.plan || !WA.plan.settle) {
       stat.lastReason = 'plan-unavailable';
       return Object.assign(out, { reason: 'plan-unavailable' });
     }
@@ -209,7 +209,7 @@
 
       // 查计划当前步
       let planRow = null;
-      try { if (A.plan.current) planRow = A.plan.current(who); } catch (e) { planRow = null; }
+      try { if (WA.plan.current) planRow = WA.plan.current(who); } catch (e) { planRow = null; }
       if (!planRow || !planRow.ok) { out.deferred.push({ receipt: r.opId, reason: 'no-plan', person: who }); return; }
 
       const step = planRow.step;
@@ -226,7 +226,7 @@
         opts.reason = str(r.reason || r.result || 'action-failed', 40);
       }
 
-      const settled = A.plan.settle(who, outcome, opts);
+      const settled = WA.plan.settle(who, outcome, opts);
       if (settled && settled.ok) {
         out.processed++;
         if (outcome === 'done') { out.stepsDone++; stat.stepsDone++; }
@@ -253,7 +253,7 @@
   // ── 注入面 ──
   function buildBlock() {
     const cfg = settings();
-    if (!cfg.enabled || !A.store) return '';
+    if (!cfg.enabled || !WA.store) return '';
     const st = state();
     const lines = [];
     // 扫描所有有 active goal 的人物
@@ -266,8 +266,8 @@
       // 查计划状态（传原始名给 plan.current，它内部用 personId 做 p_ 前缀查找）
       let planInfo = '';
       try {
-        if (A.plan && A.plan.current) {
-          const pr = A.plan.current(p.name || id.replace(/^p_/, ''));
+        if (WA.plan && WA.plan.current) {
+          const pr = WA.plan.current(p.name || id.replace(/^p_/, ''));
           if (pr && pr.ok) {
             planInfo = '计划步' + (pr.step ? pr.step.seq : '?') + '=' + (pr.step ? pr.step.status : '?');
             if (pr.status === 'blocked') planInfo += '（阻塞：' + (pr.reason || '') + '）';
@@ -277,8 +277,8 @@
       // 查行动状态
       let actInfo = '';
       try {
-        if (A.act && A.act.view) {
-          const av = A.act.view(id);
+        if (WA.act && WA.act.view) {
+          const av = WA.act.view(id);
           if (av && av.ok && av.rows && av.rows.length) {
             const running = av.rows.filter(function (r) { return r && r.status === 'running'; });
             if (running.length) actInfo = '在途行动' + running.length + '笔';
@@ -310,16 +310,16 @@
       lastReason: stat.lastReason,
       faults: Object.assign({}, stat.faults),
       // 自证面：life/plan/act 三模块均在
-      lifeAvailable: !!(A.life && A.life.stat),
-      planAvailable: !!(A.plan && A.plan.current),
-      actAvailable: !!(A.act && A.act.stat),
+      lifeAvailable: !!(WA.life && WA.life.stat),
+      planAvailable: !!(WA.plan && WA.plan.current),
+      actAvailable: !!(WA.act && WA.act.stat),
       // 自证面：闭环链路完整性
-      closedLoop: !!(A.life && A.plan && A.act && A.plan.settle && A.act.stat)
+      closedLoop: !!(WA.life && WA.plan && WA.act && WA.plan.settle && WA.act.stat)
     };
   }
 
   // ── 导出 ──
-  A.agency = {
+  WA.agency = {
     // 设置面
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
@@ -337,9 +337,9 @@
   //   写口数目检查：导出面有 6 个成员（getSettings/setSettings/schedule/processReceipts/buildBlock/diagnose/stat）。
   //   不符时写内部 ns 供门禁例外表登记。
   var __exportCount = 0;
-  for (var k in A.agency) { if (A.agency.hasOwnProperty(k)) __exportCount++; }
-  if (__exportCount !== 7) A.__agencyWarn = { expected: 7, got: __exportCount };
+  for (var k in WA.agency) { if (Object.prototype.hasOwnProperty.call(WA.agency, k)) __exportCount++; }
+  if (__exportCount !== 7) WA.__agencyWarn = { expected: 7, got: __exportCount };
 
   // ── 模块登记 ──
-  if (typeof A.registerModule === 'function') A.registerModule('engines/agency.js', { kind: 'engine', ver: '2.166.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/agency.js', { kind: 'engine', ver: '2.166.0' });
 })();

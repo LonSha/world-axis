@@ -156,11 +156,11 @@ const DEAD = {
     why: 'agency.processReceipts: receipt found act but step not in running state.'
   },
   'act-unavailable': {
-    anchor: "if (!A.act || !A.act.add || !A.act.admit) {",
+    anchor: "if (!WA.act || !WA.act.add || !WA.act.admit) {",
     why: 'agency.schedule: act module not loaded. Cannot trigger in standard boot (act always loaded).'
   },
   'plan-unavailable': {
-    anchor: "if (!A.plan || !A.plan.settle) {",
+    anchor: "if (!WA.plan || !WA.plan.settle) {",
     why: 'agency.processReceipts: plan module not loaded. Cannot trigger in standard boot (plan always loaded).'
   },
   // v2.167.0（TX3）：freight 拒收码 DEAD 表登记（engines/freight.js）。
@@ -201,7 +201,7 @@ const DEAD = {
     why: 'storyChoice.confirm: choice point already confirmed. Needs prior present + confirm.'
   },
   'branchtree-absent': {
-    anchor: "if (!A.branchTree || typeof A.branchTree.fork !== 'function') { noteFault('branchtree-absent'); return { ok: false, reason: 'branchtree-absent' }; }",
+    anchor: "if (!WA.branchTree || typeof WA.branchTree.fork !== 'function') { noteFault('branchtree-absent'); return { ok: false, reason: 'branchtree-absent' }; }",
     why: 'storyChoice.present/confirm: branchTree module not loaded. Cannot trigger in standard boot (branchTree always loaded).'
   },
   'choose-failed': {
@@ -273,10 +273,9 @@ const DEAD = {
     anchor: "if (dec.status !== 'approved') { noteFault('not-approved'); return { ok: false, reason: 'not-approved', status: dec.status }; }",
     why: 'operations.enact: decision not in approved state. Needs pending/rejected decision.'
   },
-  'not-authorized': {
-    anchor: "if (!auth || !auth.ok || !auth.canApprove) { noteFault('not-authorized'); return { ok: false, reason: 'not-authorized', by: approver }; }",
-    why: 'operations.enact: approver lacks approve permission. Needs non-authorized person.'
-  },
+  // v2.173.0（TX4b 修复）：not-authorized 从死表移除——inst.decide 路径有真见证（L3062），
+  //   不再是结构不可达。同一个 reason 码同时出现在 operations.enact（anchor 指向此处）
+  //   和 inst.decide（见证 trip 跑出）两条路径上——后者可达，故整个码不是 dead。
   'projects-full': {
     anchor: "if (projects().length >= cfg.maxProjects) { noteFault('projects-full'); return { ok: false, reason: 'projects-full', cap: cfg.maxProjects }; }",
     why: 'operations.enact: max projects reached. Needs 32+ existing projects.'
@@ -294,11 +293,11 @@ const DEAD = {
     why: 'operations.handover: caller is not current owner. Needs wrong fromPerson.'
   },
   'insufficient-budget': {
-    anchor: "if (_factionExists && !A.org.canAfford('faction', orgId, budgetType, budget)) { noteFault('insufficient-budget'); return { ok: false, reason: 'insufficient-budget', need: budget, type: budgetType }; }",
+    anchor: "if (_factionExists && !WA.org.canAfford('faction', orgId, budgetType, budget)) { noteFault('insufficient-budget'); return { ok: false, reason: 'insufficient-budget', need: budget, type: budgetType }; }",
     why: 'operations.enact: org has insufficient resources for budget. Needs faction with low gold.'
   },
   'insufficient-funds': {
-    anchor: "if (!A.org.canAfford('faction', rec.orgId, itemType, amount)) { noteFault('insufficient-funds'); return { ok: false, reason: 'insufficient-funds', type: itemType, need: amount }; }",
+    anchor: "if (!WA.org.canAfford('faction', rec.orgId, itemType, amount)) { noteFault('insufficient-funds'); return { ok: false, reason: 'insufficient-funds', type: itemType, need: amount }; }",
     why: 'operations.disburse: org cannot afford disbursement. Needs faction with insufficient resources.'
   },
   'transfer-failed': {

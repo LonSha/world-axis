@@ -25,36 +25,36 @@
  */
 (function () {
   'use strict';
-  const A = window.WorldAxis = window.WorldAxis || {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_aftermath_settings_v1';
   var DEF = { enabled: false, maxEffects: 48 };
   var __REG = { key: LS_KEY, def: DEF, module: 'aftermath',
     bounds: { maxEffects: [4, 128] } };
   function getSettings() {
-    var raw = A.settingsBus ? A.settingsBus.read(__REG) : null;
+    var raw = WA.settingsBus ? WA.settingsBus.read(__REG) : null;
     var base = Object.assign({}, DEF);
-    return A.settingsBus ? A.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
+    return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign(base, raw || {}))
                           : Object.assign(base, raw || {});
   }
   function setSettings(patch) {
-    return A.settingsBus ? A.settingsBus.saveOrThrow(__REG, A.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
+    return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, getSettings(), patch || {})))
       : Object.assign({}, getSettings(), patch || {});
   }
-  A.__settingsRegs = (A.__settingsRegs || []).concat([__REG]);
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   var _stat = { registered: 0, repaired: 0, expired: 0, cancelled: 0, refused: 0, lastReason: '', faults: {} };
   function noteFault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
-  function clean(v, max) { return A.inputGuard ? A.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
-  var clockNow = function (tag) { try { return A.clock.now(tag || 'aftermath'); } catch (e) { return Date.now(); } };
-  function state() { return (A.store && A.store.get) ? (A.store.get() || {}) : {}; }
+  function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
+  const clockNow = function (tag) { try { return WA.clock.now(tag || 'aftermath'); } catch (e) { return Date.now(); } };
+  function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function bucket(root) { var r = root || state(); if (!r.aftermath) r.aftermath = { effects: [] }; if (!Array.isArray(r.aftermath.effects)) r.aftermath.effects = []; return r.aftermath; }
   function effects() { return bucket().effects || []; }
   function find(id) { var k = clean(id, 60); return effects().filter(function (x) { return x && x.id === k; })[0] || null; }
   function findByEvent(eventId) { var k = clean(eventId, 60); return effects().filter(function (x) { return x && x.eventId === k; })[0] || null; }
-  function newId() { return A.rand ? A.rand.id('aft_', 4, 'id') : 'aft_0000'; }
+  function newId() { return WA.rand ? WA.rand.id('aft_', 4, 'id') : 'aft_0000'; }
   function isValidPlace(placeId) {
     if (!placeId) return false;
-    if (A.region && typeof A.region.places === 'function') {
-      var places = A.region.places();
+    if (WA.region && typeof WA.region.places === 'function') {
+      var places = WA.region.places();
       return places.some(function (p) { return p && p.name === placeId; });
     }
     return true; // 无 region 时不阻断（测试环境兼容）
@@ -92,11 +92,11 @@
       repairedAt: 0,
       cancelledAt: 0
     };
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) { bucket(d).effects.push(rec); }, 'aftermath:register');
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) { bucket(d).effects.push(rec); }, 'aftermath:register');
     } else { effects().push(rec); }
-    if (A.evict && typeof A.evict.array === 'function') {
-      try { A.evict.array(bucket().effects, 'aftermath.effects'); } catch (e) {}
+    if (WA.evict && typeof WA.evict.array === 'function') {
+      try { WA.evict.array(bucket().effects, 'aftermath.effects'); } catch (e) {}
     }
     _stat.registered++;
     return { ok: true, id: rec.id, placeId: placeId, effectType: effectType };
@@ -113,8 +113,8 @@
     var progress = o.progress ? Number(o.progress) : 1;
     rec.repairProgress += progress;
     var done = rec.repairProgress >= (rec.repairTime || 1);
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.effects.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) {
@@ -142,8 +142,8 @@
     var history = effects().filter(function (x) { return x && x.placeId === pid && x.status !== 'active'; });
     // 读 sediment 感知面（只读，不写）
     var sedimentFeel = null;
-    if (A.sediment && typeof A.sediment.feel === 'function') {
-      try { sedimentFeel = A.sediment.feel(pid); } catch (e) {}
+    if (WA.sediment && typeof WA.sediment.feel === 'function') {
+      try { sedimentFeel = WA.sediment.feel(pid); } catch (e) {}
     }
     return { ok: true, placeId: pid, active: active.map(function (x) { return { id: x.id, effectType: x.effectType, description: x.description, repairProgress: x.repairProgress, repairTime: x.repairTime }; }),
       activeCount: active.length, historyCount: history.length, sediment: sedimentFeel };
@@ -194,10 +194,10 @@
   // ── 8. diagnose ──
   function diagnose() {
     var checks = {
-      sediment: !!(A.sediment && typeof A.sediment.feel === 'function'),
-      region: !!(A.region && typeof A.region.places === 'function'),
-      store: !!(A.store && typeof A.store.transact === 'function'),
-      settingsBus: !!(A.settingsBus && typeof A.settingsBus.read === 'function')
+      sediment: !!(WA.sediment && typeof WA.sediment.feel === 'function'),
+      region: !!(WA.region && typeof WA.region.places === 'function'),
+      store: !!(WA.store && typeof WA.store.transact === 'function'),
+      settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     var ok = checks.store;
     return { ok: ok, closedLoop: ok, checks: checks, version: '2.171.0' };
@@ -222,8 +222,8 @@
     if (!rec) { noteFault('not-found'); return { ok: false, reason: 'not-found', id: clean(id, 60) }; }
     if (rec.status !== 'active') { noteFault('not-active'); return { ok: false, reason: 'not-active', status: rec.status }; }
     var rsn = clean(reason || 'cancelled', 60);
-    if (A.store && typeof A.store.transact === 'function') {
-      A.store.transact(function (d) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (d) {
         var b = bucket(d);
         var t = b.effects.filter(function (x) { return x && x.id === rec.id; })[0];
         if (t) { t.status = 'cancelled'; t.cancelledAt = clockNow('aftermath'); }
@@ -236,7 +236,7 @@
   // ── 11. reset ──
   function reset() { _stat.registered = 0; _stat.repaired = 0; _stat.expired = 0; _stat.cancelled = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; return { ok: true }; }
 
-  A.aftermath = {
+  WA.aftermath = {
     getSettings: getSettings,
     setSettings: function (patch) { return setSettings(patch); },
     register: register,
@@ -252,7 +252,7 @@
     reset: reset
   };
   var EXPORT_COUNT = 13;
-  var _exported = Object.keys(A.aftermath).length;
+  var _exported = Object.keys(WA.aftermath).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('aftermath: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof A.registerModule === 'function') A.registerModule('engines/aftermath.js', { kind: 'engine', ver: '2.171.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/aftermath.js', { kind: 'engine', ver: '2.171.0' });
 })();

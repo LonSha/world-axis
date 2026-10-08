@@ -89,6 +89,7 @@ const EXEMPT = {
   SCOPES: '同名不同义的「作用域表」：binding=绑定范围、checkpoints=存档范围、liaison=联络范围',
   STAGES: '同名不同义的「阶段表」：causal/era-cycle/liaison/opportunity 各推各的阶段',
   STATUS: '同名不同义的「状态表」：coop/foreshadow/mend 各说各的状态',
+  STATES: '同名不同义的「状态集」：diplomacy=外交关系态（accord/alliance/cold/…）、interop=互操作就绪态（absent/incompatible/partial/ready/unknown）',
   STRATEGIES: '同名不同义的「合并策略表」：collab=冲突取值策略（保留甲/保留乙/后写胜）、ensemble=多路选优策略（混合/取首/投票）',
   TERMINAL: '同名不同义的「终态表」：act/causal/events/foreshadow+longline/inst/mend 各自的终态集合，互不通约',
   TIERS: '同名不同义的「档位表」：choices=难度档（易/中/难）、appearance=外观品级（A/B/C/S）',
