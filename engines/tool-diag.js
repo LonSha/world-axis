@@ -2554,13 +2554,18 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-audit-vol', 'wa-audit-vol-check', 'wa-audit-vol-text', 'wa-audit-vol-out',
       // v2.159.0（TP2）：异步写回票据台账出口。store.claimStat 是本版新增导出，
       //   **必须有真消费方**（无消费方不挂）——UI_BINDINGS 就是这个消费方的接线真源。
-      'wa-claim-view'],
+      'wa-claim-view',
+      // v2.184.0（E3）：存档槽 20 个静态控件。渲染在工具页「状态快照」之后 ——
+      //   与该区块同页同族（快照 = 可移植归档；存档槽 = 世界状态槽），接线面必须一并覆盖。
+      'wa-ck-enabled', 'wa-ck-name', 'wa-ck-save', 'wa-ck-list', 'wa-ck-id', 'wa-ck-read', 'wa-ck-restore', 'wa-ck-remove', 'wa-ck-cmp', 'wa-ck-compare', 'wa-ck-branch', 'wa-ck-fork', 'wa-ck-max', 'wa-ck-every', 'wa-ck-auton', 'wa-ck-cfg', 'wa-ck-export', 'wa-ck-import', 'wa-ck-stat', 'wa-ck-text'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
       dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue',
       // v2.83.0（B6）：配置包面板里的动态控件（点开才渲染）。
       //   wa-cfg-copy / wa-cfg-import 在第一屏；wa-cfg-text / wa-cfg-check / wa-cfg-go /
       //   wa-cfg-abort / wa-cfg-cancel 在「粘贴 → 校验 → 二次确认」两步流程里逐步出现。
-      'wa-cfg-copy', 'wa-cfg-import', 'wa-cfg-text', 'wa-cfg-check', 'wa-cfg-cancel', 'wa-cfg-go', 'wa-cfg-abort'] },
+      'wa-cfg-copy', 'wa-cfg-import', 'wa-cfg-text', 'wa-cfg-check', 'wa-cfg-cancel', 'wa-cfg-go', 'wa-cfg-abort',
+      // v2.184.0（E3）：存档槽的读数出口（动态写入，同上面 tools 页两条的口径）。
+      'wa-ck-out'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg', 'wa-next-day', 'wa-wb-trigger', 'wa-wb-refresh', 'wa-wb-preview', 'wa-wb-scan', 'wa-wb-list', 'wa-wb-out'], dynamic: ['wa-conc-v'] },
     { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-ledger', 'wa-org-out',
        // v2.94.0（O6）：流水导出 / 带外对账 / 经济风三控件。同 v2.51.0 的理由——新控件必须

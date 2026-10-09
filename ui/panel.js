@@ -2326,6 +2326,10 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
     const capOn = !!(capcfg && capcfg.enabled);
     const pblcfg = (WA.perfBaseline && WA.perfBaseline.getSettings) ? WA.perfBaseline.getSettings() : null;
     const pblOn = !!(pblcfg && pblcfg.enabled);
+    // v2.184.0（E3）：存档槽的开关与三个容量参数常驻读数 ——
+    //   「库是空的」与「这一面被关掉了」必须分得开（同 v2.164.0/v2.182.0 的惯例）。
+    const ckcfg = (WA.checkpoints && WA.checkpoints.getSettings) ? WA.checkpoints.getSettings() : null;
+    const ckOn = !!(ckcfg && ckcfg.enabled);
     return `
       <div class="wa-sec">世界态势分析（纯只读体检）</div>
       <button class="wa-btn" id="wa-an-run">立即分析</button>
@@ -2335,6 +2339,46 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       <div class="wa-dim">导出剔除运行时脏字段；导入先校验（格式/schema/字段完整性），通过才写入并自动留恢复点。</div>
       <div class="wa-row"><input id="wa-snap-faces" class="wa-input" placeholder="面名，逗号分隔（如 people,world,weather）"/><button class="wa-btn" id="wa-snap-subset" title="只导出点名的顶层面；不识别的名字进 dropped 清单，不静默带上">导出子集</button></div>
       <div id="wa-snap-out" class="wa-out"></div>
+      <div class="wa-sec">存档槽（世界状态槽 · 可命名 / 载入 / 分叉）</div>
+      <div class="wa-dim">与上面「全量快照」的<b>分工</b>：这里是<b>世界状态槽</b>——存在独立 localStorage 键里
+        （<b>不在世界状态里</b>，故载入世界不动库），用于「存一版、试试另一条路、不满意再回来」；
+        上面那个是<b>可移植归档</b>（导出 JSON、可传给别人、跨聊天）。两者不做彼此的替代品：
+        存档槽不承担聊天存档的职责。<br/>
+        自动快照的开关是 <code>autoEvery</code>（每 N 轮一份），<b>不是</b>下面这个总开关 ——
+        开了自动却忘开总开关时自动档照存（那是刻意的：静默不存比多存一份更坏）。
+        此刻：总开关 <b>${ckOn ? '开' : '关'}</b>，手动上限 <b>${ckcfg ? ckcfg.maxSlots : '?'}</b>，
+        自动每次保留 <b>${ckcfg ? ckcfg.autoSlots : '?'}</b>，节奏 <b>${ckcfg && ckcfg.autoEvery > 0 ? ('每 ' + ckcfg.autoEvery + ' 轮') : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-ck-enabled" type="checkbox" ${ckOn ? 'checked' : ''}/> 启用存档槽</label>
+      <div class="wa-row">
+        <input id="wa-ck-name" class="wa-input" placeholder="存档名（必填）"/>
+        <button class="wa-btn" id="wa-ck-save" title="命名保存当前世界状态（关着时拒收 —— 拒收原因与「存满了」不是一回事）">保存</button>
+        <button class="wa-btn" id="wa-ck-list" title="列出全部存档（最新在前，含自动档）；列表不回传世界状态本体">列表</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-ck-id" class="wa-input" placeholder="存档 id（从列表里抄）"/>
+        <button class="wa-btn" id="wa-ck-read" title="读一个槽位：回带元信息与状态深拷贝（读面不回传库内活引用）">读</button>
+        <button class="wa-btn" id="wa-ck-restore" title="载入：整份替换世界状态（快照里没有的顶层键不该留在世界里）。载入不触碰库本身">载入</button>
+        <button class="wa-btn" id="wa-ck-remove" title="删除这个槽位（唯一合法的「这档我不要了」入口；库读不出时拒收，不覆盖写）">删除</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-ck-cmp" class="wa-input" placeholder="比较：两个 id，逗号分隔（如 ck1,ck2）"/>
+        <button class="wa-btn" id="wa-ck-compare" title="按顶层键粒度比较两个存档：差异量级是「哪几块不同」，不是几千行字节差">比较</button>
+        <input id="wa-ck-branch" class="wa-input" placeholder="分叉名（从上面 id 分出新档）"/>
+        <button class="wa-btn" id="wa-ck-fork" title="从该存档分叉：先把世界恢复到它，再另存一份带父指针的新档（原档逐字不变）">分叉</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-ck-max" class="wa-input" placeholder="手动上限（1–24）"/>
+        <input id="wa-ck-every" class="wa-input" placeholder="自动节奏（0=关，最多 100）"/>
+        <input id="wa-ck-auton" class="wa-input" placeholder="自动保留（0–12）"/>
+        <button class="wa-btn" id="wa-ck-cfg" title="写容量参数：越界值被夹到区间上界，未写的子键保持默认">存参数</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-ck-export" title="导出单档（带信封 + 校验和 + 格式号；格式号是迁移判定的唯一来源）">导出单档</button>
+        <button class="wa-btn" id="wa-ck-import" title="导入单档：先判信封、后判开关（反过来的话「关着时丢进垃圾」会报成 disabled，用户会以为打开就能导入）">导入单档</button>
+        <button class="wa-btn" id="wa-ck-stat" title="自证面：库可读性 / 手动与自动水位 / 逐项计数">诊断</button>
+      </div>
+      <textarea id="wa-ck-text" class="wa-ta" placeholder="导出结果出现在下面；导入时把单档 JSON 粘到这里再点「导入单档」…"></textarea>
+      <div id="wa-ck-out" class="wa-out"></div>
       <div class="wa-sec">外部数据导入（自动识别类型）</div>
       <div class="wa-row"><button class="wa-btn" id="wa-imp-pick">选择 JSON 文件</button><input type="file" id="wa-imp-file" aria-label="要导入的 JSON 文件" accept=".json" style="display:none"/></div>
       <div class="wa-dim">支持：全量存档 / 区域事件 / 势力清单 / 事件链清单 / 人物主观记忆 / 世界书条目组（自动判别）</div>
@@ -6670,6 +6714,177 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
           upFile.value = '';
         };
       }
+      // ── v2.184.0（E3）：存档槽（世界状态槽）──
+      //   引擎（engines/checkpoints.js，28 导出）此前**面板零控件**：能力全在、玩家够不着。
+      //   本区块只做接线，**不新建存储层** —— 库、容量、迁移、导入导出全走既有导出。
+      //   三件事分别报，不合成一个绿点：
+      //     · 总开关（关着时保存/载入/分叉**都**拒收，且拒收原因与「存满了」不是一回事）
+      //     · 库读不出（lib-unreadable：它是**拒绝覆盖写**的理由，不是「没有存档」）
+      //     · 容量水位（手动 ≤ maxSlots / 自动 ≤ autoSlots，逐项报，不合成一个「快满了」）
+      const ckOut = function (html) { const o = $('#wa-ck-out'); if (o) o.innerHTML = html; };
+      const ckText = function (t) { const o = $('#wa-ck-text'); if (o) o.value = t; };
+      const ckWhy = function (reason) {
+        const M = {
+          disabled: '这一面关着（上面的开关打开后才有存档动作）—— 这与「库是空的」不是一回事',
+          'lib-unreadable': '库读不出来 —— 本模块**拒绝覆盖写**（宁可什么都不做，也不拿一份读不出的库去覆盖它）',
+          'missing-fields': '缺必填字段（存档名 / 存档 id 不能空）',
+          'missing': '这个 id 不在库里（可能已被删除，或本来就是别的名字）',
+          'store-unavailable': '世界状态面不可用 —— 载入需要 store.transact',
+          'bad-format': '不是本模块的单档信封（导入**先判信封、后判开关**：判的是「这份东西坏在哪」）',
+          'checksum-mismatch': '校验和不符 —— 搬运途中被改写',
+          'no-slots': '库是空的（还没有任何存档）',
+          'scope-unsupported': '这个作用域本版不支持'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      const ckCfg = $('#wa-ck-enabled');
+      if (ckCfg) ckCfg.onchange = function () {
+        if (!WA.checkpoints || !WA.checkpoints.setSettings) return ckOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        WA.checkpoints.setSettings({ enabled: !!ckCfg.checked });
+        // 自动档的开关**不是**这个总开关（是 autoEvery）—— 关掉它不等于关掉自动快照，
+        //   这句话必须当场说出来，否则用户会以为「关了它就什么都不存了」。
+        const st = WA.checkpoints.getSettings();
+        ckOut('<div class="wa-log wa-log-info">已记录 ' + (ckCfg.checked ? 'enabled' : 'disabled（保存 / 载入 / 分叉一并拒收）')
+          + '。注意：自动快照的开关是「节奏」(autoEvery)，此刻为 '
+          + (st.autoEvery > 0 ? ('每 ' + st.autoEvery + ' 轮一份 —— 它**不受**本开关管辖') : '关') + '。</div>');
+      };
+      const ckSlotLine = function (x) {
+        return '<div class="wa-item"><b>' + esc(x.name) + '</b> <span class="wa-dim">' + esc(x.id)
+          + (x.auto ? ' · 自动' : '') + '</span>'
+          + '<div class="wa-dim">' + esc(x.at || '') + (x.label ? ' · ' + esc(x.label) : '')
+          + (x.parent ? ' · 父 ' + esc(x.parent) : '') + (x.root ? ' · 根 ' + esc(x.root) : '')
+          + (x.scope ? ' · 作用域 ' + esc(x.scope) : '') + '</div>'
+          + (x.note ? '<div class="wa-dim">' + esc(x.note) + '</div>' : '') + '</div>';
+      };
+      on('#wa-ck-save', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const nm = wv('#wa-ck-name');
+        if (!nm) return ckOut('<div class="wa-log wa-log-warn">填存档名（保存要一个名字，否则列表里认不出哪份是哪份）</div>');
+        const r = WA.checkpoints.save(nm, {});
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        ckOut('<div class="wa-log wa-log-info">已保存：' + esc(r.name) + '（id ' + esc(r.id) + '，作用域 ' + esc(r.scope)
+          + '，库内 ' + r.count + ' 份）</div>'
+          + ((r.evicted || []).length ? '<div class="wa-dim">被挤出（超出容量）：'
+            + esc(r.evicted.map(function (e) { return e.name + '(' + e.id + ')'; }).join('、'))
+            + ' —— 挤出是**有提示的**，不是静默丢弃</div>' : ''));
+      });
+      on('#wa-ck-list', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const r = WA.checkpoints.list();
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.err ? 'lib-unreadable' : r.reason)) + '</div>');
+        if (!r.count) return ckOut('<div class="wa-log wa-log-info">库里还没有存档 —— 这是「空」，不是「读不到」</div>');
+        ckOut('<div class="wa-log wa-log-info">共 ' + r.count + ' 份（最新在前）</div>'
+          + r.slots.map(ckSlotLine).join(''));
+      });
+      on('#wa-ck-read', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const id = wv('#wa-ck-id');
+        if (!id) return ckOut('<div class="wa-log wa-log-warn">填存档 id（从列表里抄）</div>');
+        const r = WA.checkpoints.read(id);
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        const keys = Object.keys(r.slot.state || {});
+        ckOut('<div class="wa-log wa-log-info">' + esc(r.slot.name) + '（' + esc(r.slot.id) + '）</div>'
+          + '<div class="wa-item">顶层键 ' + keys.length + ' 个</div>'
+          + '<div class="wa-dim">' + esc(keys.slice(0, 24).join('、')) + (keys.length > 24 ? ' …' : '') + '</div>'
+          + '<div class="wa-dim">读面回带的是**深拷贝** —— 改它改不动库里的存档。</div>');
+      });
+      on('#wa-ck-restore', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const id = wv('#wa-ck-id');
+        if (!id) return ckOut('<div class="wa-log wa-log-warn">填存档 id</div>');
+        const r = WA.checkpoints.restore(id, {});
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        renderBody();   // 先重绘（刷新顶部常驻读数），**再**写回执 —— 反序会把回执整块抹掉
+        ckOut('<div class="wa-log wa-log-info">已载入「' + esc(r.name) + '」（作用域 ' + esc(r.scope) + '）</div>'
+          + '<div class="wa-dim">世界状态已替换；**库本身没被动过** —— 这正是「世界状态槽」与「聊天存档」的分工。</div>');
+      });
+      on('#wa-ck-remove', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const id = wv('#wa-ck-id');
+        if (!id) return ckOut('<div class="wa-log wa-log-warn">填存档 id</div>');
+        const r = WA.checkpoints.remove(id);
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        ckOut('<div class="wa-log wa-log-info">已删除「' + esc(r.name) + '」（库内剩 ' + r.remaining + ' 份）</div>'
+          + ((r.orphans || []).length ? '<div class="wa-dim">因此失父的分支档：'
+            + esc(r.orphans.map(function (o) { return o.name + '(' + o.id + ')'; }).join('、'))
+            + ' —— 删档**不静默孤立**子档，这件事当场说出来</div>' : ''));
+      });
+      on('#wa-ck-compare', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const raw = wv('#wa-ck-cmp');
+        const parts = raw.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+        if (parts.length !== 2) return ckOut('<div class="wa-log wa-log-warn">填两个 id，逗号分隔（如 ck1,ck2）</div>');
+        const r = WA.checkpoints.compare(parts[0], parts[1]);
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        ckOut('<div class="wa-log wa-log-info">' + esc(r.a.name) + ' ⇄ ' + esc(r.b.name)
+          + (r.identical ? '：两份逐键相同' : '') + (r.sameRoot ? '　同根（' + esc(r.a.root || r.a.name) + '）' : '') + '</div>'
+          + '<div class="wa-item">只在前者：' + esc(r.onlyA.join('、') || '无') + '</div>'
+          + '<div class="wa-item">只在后者：' + esc(r.onlyB.join('、') || '无') + '</div>'
+          + '<div class="wa-item">逐键不同（' + r.differing.length + '）：'
+          + esc(r.differing.slice(0, 12).map(function (d) { return d.key + '[a:' + d.aLen + ' b:' + d.bLen + ']'; }).join('、') || '无') + '</div>'
+          + '<div class="wa-dim">比较的粒度是**顶层键**（答案是「哪几块不同」，不是几千行字节差）。</div>');
+      });
+      on('#wa-ck-fork', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const id = wv('#wa-ck-id');
+        const nm = wv('#wa-ck-branch');
+        if (!id || !nm) return ckOut('<div class="wa-log wa-log-warn">要填两个：存档 id（从哪分叉）+ 分叉名</div>');
+        const r = WA.checkpoints.branch(id, nm, {});
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        renderBody();
+        ckOut('<div class="wa-log wa-log-info">已从「' + esc(r.fromName) + '」分叉出「' + esc(r.name) + '」（id ' + esc(r.id) + '，根 ' + esc(r.root) + '）</div>'
+          + '<div class="wa-dim">原档**逐字不变**：分叉是「先恢复到它、再另存一份带父指针的新档」。</div>');
+      });
+      on('#wa-ck-cfg', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const patch = {};
+        const mx = wv('#wa-ck-max'), ev = wv('#wa-ck-every'), an = wv('#wa-ck-auton');
+        if (mx) patch.maxSlots = Number(mx);
+        if (ev) patch.autoEvery = Number(ev);
+        if (an) patch.autoSlots = Number(an);
+        if (!Object.keys(patch).length) return ckOut('<div class="wa-log wa-log-warn">至少填一项参数</div>');
+        const r = WA.checkpoints.setSettings(patch);
+        renderBody();
+        ckOut('<div class="wa-log wa-log-info">参数已写：手动上限 ' + r.maxSlots + ' / 自动节奏 ' + r.autoEvery + ' / 自动保留 ' + r.autoSlots + '</div>'
+          + '<div class="wa-dim">越界值被夹到区间上界，**未写的子键保持默认**（不塌成 undefined）。</div>');
+      });
+      on('#wa-ck-export', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const id = wv('#wa-ck-id');
+        if (!id) return ckOut('<div class="wa-log wa-log-warn">填存档 id</div>');
+        const r = WA.checkpoints.exportOne(id);
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        ckText(r.text);
+        ckOut('<div class="wa-log wa-log-info">已导出（' + r.text.length + ' 字符，校验和 ' + esc(r.env ? r.env.checksum : '?') + '）—— 全文在下面的框里，可复制带走</div>'
+          + '<div class="wa-dim">信封里的格式号是**迁移判定的唯一来源**：正文里那份格式号只给人看与算校验和。</div>');
+      });
+      on('#wa-ck-import', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const raw = (($('#wa-ck-text') || {}).value || '').trim();
+        if (!raw) return ckOut('<div class="wa-log wa-log-warn">把单档 JSON 粘到下面的框里再点导入</div>');
+        const r = WA.checkpoints.importOne(raw, {});
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        renderBody();
+        ckOut('<div class="wa-log wa-log-info">已导入：' + esc(r.name || '?') + '（id ' + esc(r.id || '?') + '，库内 ' + (r.count === undefined ? '?' : r.count) + ' 份）</div>'
+          + '<div class="wa-dim">导入**先判信封、后判开关** —— 判的是「这份东西坏在哪里」，不是「此刻能不能动」。</div>');
+      });
+      on('#wa-ck-stat', () => {
+        if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const st = WA.checkpoints.stat();
+        const cfg = WA.checkpoints.getSettings();
+        ckOut('<div class="wa-log wa-log-' + (st.libErr ? 'warn' : 'info') + '">库可读：'
+          + (st.libErr ? '✗（拒绝覆盖写）' : '✓') + '　总开关 ' + (cfg.enabled ? '开' : '关') + '</div>'
+          + '<div class="wa-item">水位：手动 ' + st.manual + ' / ≤' + cfg.maxSlots + '　自动 ' + st.autoSlotsUsed + ' / ≤' + cfg.autoSlots
+          + '　合计 ' + st.slots + ' 份</div>'
+          + '<div class="wa-item">动作计数：保存 ' + st.saved + ' · 自动 ' + st.autoSaved + ' · 载入 ' + st.restored
+          + ' · 分叉 ' + st.branched + ' · 挤出 ' + st.evicted + ' · 导出 ' + st.exported + ' · 导入 ' + st.imported + '</div>'
+          + (st.lastReason ? '<div class="wa-dim">最近一次：' + esc(st.lastReason) + '</div>' : '')
+          + ((st.lastEvicted || []).length ? '<div class="wa-dim">最近被挤出：'
+            + esc(st.lastEvicted.map(function (e) { return e.name + '(' + e.id + ')' + (e.auto ? '·自动' : ''); }).join('、'))
+            + ' —— 「库里现在有多少」与「最近丢了谁」分开报（后者是过程后果）</div>' : '')
+          + '<div class="wa-dim">「库是空的」与「库读不出」在这里分别成词 —— 后者是本模块拒绝动手的理由。</div>');
+      });
+
       const impPick = $('#wa-imp-pick');
       const impFile = $('#wa-imp-file');
       if (impPick && impFile) {

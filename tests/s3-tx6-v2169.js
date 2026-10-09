@@ -42,8 +42,8 @@ ok('A10: panel VIS_NAMES 含 commission', PAN.indexOf("commission: '委托履约
 ok('A11: budget PRIORITY 含 委托履约', BUD.indexOf("'委托履约': { rank: 5, fold: true }") >= 0);
 ok('A12: budget ACCOUNTS 含 委托履约', BUD.indexOf("['委托履约', '叙事推进', '承载']") >= 0);
 ok('A13: LOAD_ORDER 含 commission.js', IDX.indexOf("'engines/commission.js'") >= 0 && RUN.indexOf("'engines/commission.js'") >= 0);
-ok('A14: VERSION = 2.169.0', /VERSION\s*=\s*'2\.(169|170|171|172|173|181|182|183)\.0'/.test(IDX));
-ok('A15: manifest version = 2.169.0', ["2.166.0", "2.167.0", "2.168.0", "2.169.0", "2.170.0", "2.171.0", "2.172.0", "2.173.0", "2.182.0" || MAN.version === "2.183.0", "2.182.0" || MAN.version === "2.183.0"].indexOf(MAN.version) >= 0);
+ok('A14: VERSION = 2.169.0', /VERSION\s*=\s*'2\.(169|170|171|172|173|181|182|183|184)\.0'/.test(IDX));
+ok('A15: manifest version = 2.169.0', ["2.166.0", "2.167.0", "2.168.0", "2.169.0", "2.170.0", "2.171.0", "2.172.0", "2.173.0", "2.182.0" || MAN.version === "2.183.0" || MAN.version === "2.184.0", "2.182.0" || MAN.version === "2.183.0" || MAN.version === "2.184.0"].indexOf(MAN.version) >= 0);
 ok('A16: tool-diag 模块映射含 commission.js', DIAG.indexOf("'engines/commission.js': 'commission'") >= 0);
 ok('A17: tool-diag secCommission 函数', DIAG.indexOf('function secCommission()') >= 0);
 ok('A18: tool-diag diag 对象含 commission', DIAG.indexOf('commission: secCommission()') >= 0);

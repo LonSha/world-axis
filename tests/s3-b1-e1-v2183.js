@@ -115,8 +115,19 @@ function runA(a) {
   a(readOf('tests/run.js').indexOf('|pendingCenter:bySource describe diagnose getSettings items setSettings soon stat|') >= 0,
     'e1v2183/A26: FROZEN2800 逐字含本模块的契约成员集（reset 不在其中：产品侧零消费 ⇒ 它走 test-only 账本，'
     + '不进跨文件契约 —— 契约收的是「产品真引用的成员」，把测试侧引用也算进去会让契约随测试漂移）');
-  a(/VERSION = '2\.183\.0'/.test(readOf('index.js')) && JSON.parse(readOf('manifest.json')).version === '2.183.0',
-    'e1v2183/A27: 版本钉一致（index.js + manifest）');
+  // 本锁的版本判据是**下界**（本版是 v2.183.0 交付的），不是「恰好等于」——
+  //   后续升版（v2.184.0…）不该让这条判据变红：旧锁钉的是「该版本及以上」
+  //   （与仓内 s3-tx* 系列旧锁同一口径，它们把新版本词**追加**进白名单而不是替换）。
+  //   同时钉住**入口与清单必须同值**——那才是这条判据真正要防的事。
+  const idxSrc = readOf('index.js'), manVer = JSON.parse(readOf('manifest.json')).version;
+  const mv = (idxSrc.match(/VERSION = '([0-9.]+)'/) || [])[1] || '';
+  const cmp = function (a, b) {
+    const A = String(a).split('.').map(Number), B = String(b).split('.').map(Number);
+    for (let i = 0; i < 3; i++) { if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) - (B[i] || 0); }
+    return 0;
+  };
+  a(cmp(mv, '2.183.0') >= 0, 'e1v2183/A27: 入口版本不低于本锁的交付版本（实 ' + mv + '）');
+  a(mv === manVer, 'e1v2183/A27b: 入口与清单版本同值（实 ' + mv + ' / ' + manVer + '）');
 }
 
 // ── B 段：运行时行为 ─────────────────────────────────────────────────────
