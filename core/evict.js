@@ -1,0 +1,677 @@
+/**
+ * WorldAxis core/evict.js (v2.65.0) — 挤出侧完整性（七面治理的最后一面）
+ *
+ * v2.162.0（TP7）：挤出侧增**在途豁免**——在途货/信/行程/传闻/待重放/在履约不得被静默挤出；
+ *   在途自身超 cap 时不截断并归因 in-transit-full（宁可超 cap 也不丢未完成的义务）。
+ *
+ * 为什么需要它：
+ *   本仓库已把写侧（v2.6.0/v2.7.0）、删侧（v2.9.0）、读侧（v2.10.0）、活性面（v2.11.0）
+ *   逐一收口，UI 渲染路径也已被真实执行覆盖（v2.12.0）。但**挤出侧一行治理都没有**：
+ *   全库 30+ 处持久容器截断（slice(-N) / splice(0, len-N) / length = CAP）全是
+ *   **静默的破坏性丢弃**——元素被丢掉之后再也拿不回来，而用户与诊断都看不到任何痕迹。
+ *
+ *   这里的现场比写入/删除更隐蔽：
+ *     · 写失败 → 数据没变（用户能看出「没保存」）；
+ *     · 删失败 → 数据还在（复核即可发现）；
+ *     · **挤出成功 → 数据真的没了，而且这正是代码的本意**。
+ *     于是「长局跑了 200 轮之后 NPC 只剩 48 个」「伏笔被终态条目挤掉」这类现象
+ *     在面板、诊断包、健康分上完全没有出口，只能靠用户凭记忆发现少了谁。
+ *
+ * 三条口径（本模块存在的全部意义）：
+ *   ① **挤出 ≠ 取样**。「对持久容器的破坏性截断」是挤出（须记账）；
+ *      「对只读输入/输出的展示切分」（chat.slice(-3)、面板 slice(-10) 渲染）
+ *      是取样（不改变任何持久状态，**不得**计进挤出——否则计数虚高，
+ *      与 v2.6.0 修掉的「writes 计尝试而非成功」、v2.9.0 修掉的
+ *      「removeAbsent 计成 removes」完全同型）。分类只能由站点显式声明，不能猜。
+ *   ② **cap 与站点同源**。SITES 表是本模块唯一真源：站点只报自己的名字，
+ *      cap 由本表给出（可为函数，读运行时单源如 MAX_EVENTS / MAX_WINDS）。
+ *      此前 __BOUNDED_CAPS[k].site 是一段**自由文本**（'backstage.js slice(-200)'），
+ *      代码改了 cap 没人知道，登记表还会继续自称权威。改为可执行表之后，
+ *      「声明」与「执行」之间的漂移第一次可以被机器判定（见门禁 G18）。
+ *   ③ **未知站点是缺陷，不是后备**。站点名未登记 ⇒ unknown-site 失败并归因，
+ *      **不做任何截断**（宁可超限也不要静默丢弃一个没人声明过的容器）。
+ *      「先丢掉再说」是本仓库最贵的一类默认值。
+ *
+ * 记账层次（与写侧 writes/writeFailed/writeFailedBy、删侧 removes/removeAbsent 对偶）：
+ *   · evicts / evicted   —— 真正发生挤出的次数与被丢元素总数；
+ *   · evictNoops         —— 未超限的调用次数（幂等无操作，**不是**挤出成功）；
+ *   · evictFailed        —— 参数非法 / 站点未登记（实现缺陷，须改代码而非清存储）；
+ *   · bySite             —— 逐站点 evicts / dropped / lastAt（「谁在丢东西」）；
+ *   · lastDropped        —— **丢了什么**（最近 12 条元素摘要）。
+ *     只记「丢了几条」等于什么都没说：用户想知道的是「丢的是不是张三」。
+ */
+(function () {
+  'use strict';
+  const WA = window.WorldAxis = window.WorldAxis || {};
+
+  // ── 站点登记表：cap 的单一真源 ───────────────────────────────
+  // 每项：{ path: 状态路径（与 store.__BOUNDED_CAPS 同键）, cap: 数字或函数,
+  //         kind: 'array'（默认）| 'object', why: 该容器为何必须有界 }
+  // 站点名格式 模块.容器，与代码里的调用点字面量一一对应（门禁 G18 校验双向）。
+  const SITES = {
+    // ── 结算尾部容量控制（backstage 结算段）──
+    'backstage.echoes':      { path: 'echoes',      cap: 40,  why: '暗流回声环形（正文触面）' },
+    'backstage.chronicle':   { path: 'chronicle',   cap: 200, why: '世界编年史环形' },
+    'backstage.worldFacts':  { path: 'worldFacts',  cap: 100, why: '世界事实版本环形' },
+    'backstage.currents':    { path: 'currents',    cap: 40,  why: '暗流本体环形（终态回收后仍有硬上限）' },
+    'people':                { path: 'people', cap: 48, kind: 'object', why: '人物容器（对象型，按 updatedAt 最旧优先挤出）' },
+    // ── 演化容器（容器为中心：同一容器只有一个站点，backstage 兜底与 evolution 入账共用）──
+    'evolution.events':      { path: 'evolution.events',     cap: function () { return (WA.editorEvents && WA.editorEvents.MAX_EVENTS) || 16; }, why: '事件链容器（同编辑器容量）' },
+    'evolution.factions':    { path: 'evolution.factions',   cap: function () { return (WA.editorFaction && WA.editorFaction.MAX_FACTIONS) || 16; }, why: '势力容器（同编辑器容量）' },
+    'evolution.winds':       { path: 'evolution.winds',      cap: function () { return (WA.evolution && WA.evolution.MAX_WINDS) || 12; }, why: '风声环形（衰减引擎为常态收敛，此处兜底）' },
+    'evolution.worldTrends': { path: 'evolution.worldTrends', cap: 12, why: '天下大势（终态回收后兜底）' },
+    'evolution.trends':      { path: 'evolution.trends',     cap: 20, why: '影响链环形' },
+    'evolution.enemies':     { path: 'evolution.enemies',    cap: 44, why: '仇敌本体（活跃 24 + 终结 20 双口径）' },
+    'evolution.entityMemory':{ path: 'evolution.entityMemory.*', cap: 30, why: '四类实体库各自上限' },
+    'evolution.entityEvents':{ path: 'evolution.entityMemory.*.events', cap: 8, why: '实体事件环' },
+    'evolution.blackboxActions': { path: 'evolution.blackbox.secretActions', cap: 15, why: '黑盒秘密行动环形' },
+    'evolution.blackboxAssets':  { path: 'evolution.blackbox.secretAssets',  cap: 15, why: '黑盒秘密资产环形' },
+    'evolution.ledger':      { path: 'evolution.ledger',     cap: 20, why: '重大事件账本轮数环形' },
+    // ── memory 分层记忆 ──
+    'memory.l0':          { path: 'memory.l0',          cap: 20,  why: '单轮摘要环形' },
+    'memory.l1':          { path: 'memory.l1',          cap: 30,  why: '阶段回顾环形' },
+    'memory.l2':          { path: 'memory.l2',          cap: 40,  why: '章节回顾环形' },
+    'memory.l3':          { path: 'memory.l3',          cap: 60,  why: '长线沉淀环形' },
+    'memory.facts':       { path: 'memory.facts',       cap: 100, why: '事实版本环形' },
+    'memory.foreshadows': { path: 'memory.foreshadows', cap: 30,  why: '伏笔生命周期（终态回收后兜底）' },
+    'memory.pmem':        { path: 'memory.pmem',        cap: 60,  why: '人物主观记忆总量' },
+// ── 舆情 / 章节 / 突发事件 ──
+    'opinion.canon':      { path: 'opinion.canon',  cap: 20, why: '正史舆情环形' },
+    'opinion.forum':      { path: 'opinion.forum',  cap: 20, why: '论坛舆情环形' },
+    'chapters.history':   { path: 'chapters.history', cap: 20, why: '章节史环形' },
+    'directEvents':       { path: 'directEvents', cap: 4, why: '突发事件（活跃全留 + 终态保留最近 3）' },
+    // ── v2.34.0 平行世界三容器（parallel-world.js 入账器环形剪枝）──
+    'parallelWorld.npcs':     { path: 'parallelWorld.npcs', cap: 24, why: '平行世界NPC档案环形' },
+    'parallelWorld.relations':{ path: 'parallelWorld.relations', cap: 120, why: '平行世界关系网环形（同向边去重后）' },
+    'parallelWorld.modules':  { path: 'parallelWorld.modules', cap: 80, why: '平行世界事件模块环形' },
+    'parallelWorld.snapshots':{ path: 'parallelWorld.snapshots', cap: 12, why: '平行世界子树快照环形（v2.35.0）' },
+    // ── v2.62.0 因果结算（causal.js）──
+    'causal.chains':  { path: 'causal.chains',  cap: 24, why: '因果链环形（含终态：已结算/已取消/已失效都留痕，答「为什么没发生」）' },
+    'causal.settled': { path: 'causal.settled', cap: 40, why: '因果结算台账环形（结算过什么，与 echoes 正文触面分开）' },
+    // ── v2.97.0 跨插件因果桥（入站边，phone-bridge.js）──
+    //   台账记「手机侧按下过什么」：一笔操作带 opId（幂等认它）/ seq（递变序）/ chainId（事后接链）。
+    //   它是因果链的**入站因**，与 chains（世界里的因）必须分表——见 phone-bridge.js 的口径 ②。
+    'phoneBridge.ops': { path: 'causal.phoneOps', cap: 40, why: '手机侧操作台账环形（入站边：一笔手机动作就是一条链的因；满员走上游拒收，本表只兜底）' },
+    // ── v2.114.0 协作会话三表（collab.js）与变更日志（chrono.js）──
+    //   v2.112.0 把这两张持久表写进了骨架，却**只给了入队/入册侧的上限**（maxSessions /
+    //   maxQueue / maxConflicts 只管「开着的 / 未交付的 / 未裁决的」），而关闭的会话、
+    //   已交付的队列行、已裁决的冲突行**一条都不删**——长局里这三张表只增不减，
+    //   正是本表存在的意义（「有界但漏登」是 sizeAudit 唯一能抓到的那类膨胀）。
+    //   chrono.entries 同病：maxLayers 是**准入闸**（满员拒收），不是挤出上限，
+    //   而 entries 是「只增不减的事实环」——它必须有独立的历史上限。
+    'collab.sessions':  { path: 'collab.sessions',  cap: 64, why: '会话表环形（关闭的会话也要留痕，故不能在 close 时删——只能环形挤出）' },
+    'collab.queue':     { path: 'collab.queue',     cap: 128, why: '离线队列环形（已交付的行仍答「当时重放过什么」，只能环形挤出）' },
+    'collab.conflicts': { path: 'collab.conflicts', cap: 64, why: '冲突登记环形（已裁决的分歧是复盘证据，不在 resolve 时删）' },
+    // v2.139.0（E10）：协作任务表环形。与上面三条同型：准入闸（DEF.maxTasks 满员拒收）
+    //   不是挤出上限，已结算的任务仍要答「当时谁欠了、后来罚没罚」——故只能环形挤出。
+    //   **本表必须与 core/store.js 的 __BOUNDED_CAPS['collab.tasks'] 同名同值**（把门判据逐键对账）：
+    //   SITES 缺此键时 evict.array 会走 unknown-site **静默失败**（挤出压根不发生，而调用方以为做了）。
+    'collab.tasks':     { path: 'collab.tasks',     cap: 24, why: '协作任务环形（已结算的任务是违约复盘证据，不在 settle 时删）' },
+    'chrono.entries':   { path: 'chrono.entries',   cap: 128, why: '变更日志环形（撤销靠追加 revert 行，故历史只能环形挤出、不得原地删）' },
+    // ── v2.117.0（计划二 B6）：机会窗口在途行（opportunity.js）──
+    //   为什么必须有界：它是「世界正在发生的变化」的登记簿，长局里一轮一轮往上堆。
+    //   而它在途行**不能答完就删** —— taken / declined / deferred / lapsed 都是复盘证据
+    //   （「我拒过这件事」与「它从没出现过」必须可分辨），删除会让决策痕迹消失，
+    //   故只能环形挤出。cap 8 与引擎的 maxOpen 设置同源：**两处都管在途行数**，
+    //   这里是与站点同源的那份（准入闸管「还能不能进」，本表管「进了的怎么出去」）。
+    'opportunity.openings': { path: 'opportunity.openings', cap: 8, why: '机会窗口在途行环形（已答/已作废都留痕，只能环形挤出）' },
+    // ── v2.118.0（计划二 B7）：试演预览环形（rehearsal.js）──
+    //   预览行**不能应用完就删** —— 「当初试演过了什么、结论是什么」是作者据以决策的证据，
+    //   也是「旧预览为何被判 stale」唯一可追溯的凭据（删掉就只剩一句结论）。故只能环形挤出。
+    //   cap 与引擎的 keepPreviews 设置同源：两处都管在册预览数。
+    // cap 走 per-call：上限是**设置项** keepPreviews（滑块 [1,24]）。写成静态 6 的话，
+    //   滑块调到 2 也照样留 6 条 —— 声明与执行漂移，正是本仓库点名反对的那类失效。
+    'rehearsal.previews': { path: 'rehearsal.previews', cap: 'per-call', kind: 'array', why: '试演预览环形（上限 = keepPreviews 设置，写入时传入）' },
+    // v2.118.0（计划二 B8）：跨插件业务闭环（liaison.js 唯一写入 `draft.liaison`）。
+    //   三张表各自的语义不同，故**不合成一张**：inbox 答「手机侧按下过什么」，
+    //   deals 答「世界侧答应过什么」，evidence 答「凭什么这么记」。
+    //   合并任何两张都会让 B8 的验收判据失去落点（例如「登记」与「送达」同表即分不开）。
+    'liaison.inbox':    { path: 'liaison.inbox',    cap: 40, why: '收件台账环形（已确认/被拒/待确认都留痕：一笔操作发生过就不能在事后消失）' },
+    'liaison.deals':    { path: 'liaison.deals',    cap: 24, why: '约定任务环形（终态任务不删——「失约」是复盘证据，不在结算时消失）' },
+    'liaison.evidence': { path: 'liaison.evidence', cap: 40, why: '证据环形（含来源 opId/时间/有效范围；同一 deal 只落一条，重复载入不重复结算）' },
+    // v2.118.0（计划二 B9）：多人协作可靠性层（coop.js 唯一写入 `draft.coop`）。
+    //   两张表语义不同，故不合并：proposals 答「谁在等裁决」，archive 答「它最后被怎么裁的」。
+    //   归档**不删行**：终态（含被拒与重试次数）是复盘的唯一证据，只能在环形挤出时退场。
+    'coop.proposals':   { path: 'coop.proposals',   cap: 24, why: '待裁提议环形（上限 = LIMITS.ROWS；满了如实拒收，不静默丢）' },
+    'coop.archive':     { path: 'coop.archive',     cap: 40, why: '裁决归档环形（确认/拒绝/被取代都留痕，含重试次数与回执 id）' },
+    // ── v2.119.0（拓展计划 ①）：人物多步计划环形（plan.js）──
+    //   计划行**不能进终态就删** ——「他本来打算做第五步」与「他放弃了」都是复盘证据，
+    //   删了之后「这条计划为什么没做成」就只剩一句结论。故只能环形挤出。
+    //   cap 走 per-call：上限是设置项 maxPlans（滑块 [1,24]）。写成静态 12 的话，
+    //   滑块调到 4 也照样留 12 条 —— 声明与执行漂移，正是本仓库点名反对的那类失效。
+    'plan.plans':       { path: 'plan.plans',       cap: 'per-call', kind: 'array', why: '人物计划环形（上限 = maxPlans 设置，写入时传入）' },
+    // ── v2.119.0（拓展计划 ②）：关系修复环形（mend.js）──
+    //   同理：failed / dropped 的修复行**不删**——「他求过一次，被拒了」是复盘证据，
+    //   删掉就再也答不出「这段关系为什么没修好」。cap 与设置项 maxRows 同源（per-call）。
+    'mend.threads':     { path: 'mend.threads',     cap: 'per-call', kind: 'array', why: '关系修复环形（上限 = maxRows 设置，写入时传入）' },
+    // ── v2.119.0（拓展计划 ③）：供需循环三环（economy.js）──
+    //   cap 均为 per-call（上限即设置项），三张表均「不可删行」（见 store.js 同处理由）。
+    'economy.goods':    { path: 'economy.goods',    cap: 'per-call', kind: 'array', why: '地点货品环形（上限 = maxGoods）' },
+    'economy.orders':   { path: 'economy.orders',   cap: 'per-call', kind: 'array', why: '成交与生产流水环形（上限 = maxOrders）' },
+    'economy.routes':   { path: 'economy.routes',   cap: 'per-call', kind: 'array', why: '商路环形（上限 = maxRoutes）' },
+    'probe.cases':         { path: 'probe.cases',         cap: 'per-call', kind: 'array', why: '调查卷宗 环形' },
+    // ── v2.119.0（拓展计划 ⑥）：远方传播两环（region.js）──
+    //   v2.119.0（优化③）：**places 移入 NON_EVICT**（见下方声明表）。它与 events 不是同一类：
+    //     events 走 `WA.evict.array(rg.events, 'region.events', cfg.maxEvents)`（有调用点）；
+    //     places 是**写入侧硬上界**——`register()` 在 `rg.places.length >= cfg.maxRoutes` 时
+    //     直接 `{ ok:false, reason:'places-full' }` 拒写，从不截断既有项。原先登记为挤出站点
+    //     ⇒ 它是「零调用站点」（回归判据：「站点表每项都在产品源码里有调用点」当场红灯）。
+    'region.events':       { path: 'region.events',       cap: 'per-call', kind: 'array', why: '远方事件环形（上限 = maxEvents）' },
+    // ── v2.119.0（拓展计划 ⑦）：阶段迁移两环（stage.js）──
+    //   同 region.places 的理由：**metrics 移入 NON_EVICT**（写入侧 `metrics-full` 硬拒写；
+    //   且它的骨架形态是**对象映射** `{}`（指标名 → 值），根本不能当数组裁 —— 原先按
+    //   `kind:'array'` 登记还会让 `store.registryParity()` 报「类型错配（应为数组）」。
+    'stage.transitions':   { path: 'stage.transitions',   cap: 'per-call', kind: 'array', why: '阶段迁移环形（上限 = maxTransitions）' },
+    // ── v2.119.0（拓展计划 ⑧）：多人连接两环（session.js）──
+    'session.seats':       { path: 'session.seats',       cap: 'per-call', kind: 'array', why: '座位环形（上限 = maxSeats）' },
+    'session.log':         { path: 'session.log',         cap: 'per-call', kind: 'array', why: '消息日志环形（上限 = maxLog）' },
+    // ── v2.119.0（拓展计划 ④）：组织制度四环（inst.js）──
+    'inst.orgs':       { path: 'inst.orgs',       cap: 'per-call', kind: 'array', why: '组织档案环形（上限 = maxOrgs）' },
+    'inst.pending':    { path: 'inst.pending',    cap: 'per-call', kind: 'array', why: '待批决策环形（上限 = maxPending）' },
+    'inst.breaches':   { path: 'inst.breaches',   cap: 'per-call', kind: 'array', why: '违约记录环形（上限 = maxBreaches）' },
+    'inst.successions':{ path: 'inst.successions',cap: 'per-call', kind: 'array', why: '交接记录环形（上限 = maxPending）' },
+    // ── v2.63.0 世界织体（world.js）──
+    'world.places': { path: 'world.places', cap: 24, why: '已登记地点环形（没登记的地方不存在，故这张表就是世界的全部可达面）' },
+    'world.roads':  { path: 'world.roads',  cap: 40, why: '已登记道路环形（没登记的路走不通，故这张表决定谁能到哪）' },
+    'world.events': { path: 'world.events', cap: 12, why: '共同日程环形（集市/节庆/庭审/仪式/聚会）' },
+    // v2.65.0 行程表：在途与已到达都留痕（「他走过这条路」是事实，不得到达即删）
+    'world.journeys': { path: 'world.journeys', cap: 24, why: '行程表环形（在途 + 已到达；出发≠到达，故这张表就是「谁在路上」的全部证据）' },
+    // v2.117.0（B2 前半）：场所用途窗口（每地点各自一环，故 path 带 `*`）。
+    //   per-call：上限 = 用途封闭集合大小（USE_KINDS.length），由 world.js 调用点传入——
+    //   用途标签加了新词、上限自己跟着走，不会与登记表脱节。
+    'world.placeUses': { path: 'world.places.*.uses', cap: 'per-call', kind: 'array', why: '场所用途窗口环（每地点各一组，上限 = 用途封闭集合大小）' },
+    // v2.117.0（B2 后半）：封锁投递 / 货运在途 / 消息在途。
+    //   三张表都**有界**且各管一段事实：投递回答「这里现在过不过得去」，
+    //   货运回答「货在哪」，消息回答「话到哪了」——合并成一张就再也答不出是哪种在路上。
+    'world.blocks': { path: 'world.blocks', cap: 24, why: '封锁投递环形（天气/灾害/组织的封锁单，带 until 定时效；过了时刻自动失效）' },
+    'world.shipments': { path: 'world.shipments', cap: 16, why: '货运在途环形（货物受容量、交接与运输时间约束，故与人的行程分表）' },
+    'world.messages': { path: 'world.messages', cap: 24, why: '消息在途环形（走道路或走网络面，两种渠道的延迟互不相同）' },
+    // ── v2.173.0（TX4b）：TX3/TX4/TX6/TX7/TX8/TX9 六模块的环（cap 与 store.__BOUNDED_CAPS 同名同值）──
+    //   本表缺键时 evict.array 走 unknown-site **静默失败**：调用点写着要剪枝，
+    //   实际一次也没剪。TX3 的 freight.shipments 正是这样写的（有调用、无站点）。
+    //   以下七环的 cap 是 **per-call**（上限 = 各模块 DEF 的设置上界，用户可调，
+    //   写入时传入），写入侧走入口预检（满即拒写），**不走 evict**。
+    //   与 diplomacy.pairs/proposals、region.places、stage.metrics 同族
+    //   （v2.119.0 起同一口径：写入侧硬上界，既有项一条不动）。
+    //   cap 与 kind:'object' 登记在 core/store.js __BOUNDED_CAPS。
+    //   v2.173.0（TX4b）：七环从 SITES 迁入 NON_EVICT（同 diplomacy 两环同款迁移）。
+    // v2.65.0 天气：同地覆盖，表本身有界。未登记站点会 unknown-site 且不截断。
+    'weather.rows': { path: 'weather.rows', cap: 24, why: '已登记天气环形（没登记的地点不是晴天，故这张表就是天气的全部证据）' },
+    // v2.65.0 情报延迟：未到期的不入账。到期后从队列移走，队列本身仍有界。
+    'intel.queue': { path: 'intelQueue', cap: 24, why: '在途情报环形（未到期前接收者不可见；路不通则不入队）' },
+    // ── v2.149.0（X1）世界沉积层两环（sediment.js；cap 与 store.__BOUNDED_CAPS 同名同值）──
+    //   地点环与事件环**必须分开**：前者答「世界记住几处地方」，后者答「一处地方记住几件事」。
+    //   合成一个 cap 就再也答不出是谁先撑爆的（地点太多 vs 某地事太密）。
+    //   **跨地点总量上限（capTotal）不在此表**：它不是「某个数组的 cap」，而是引擎在挤出后
+    //   按时间跨地点裁剪的总量闸；登记成站点会让「cap 单一真源」出现两个答案。
+    'sediment.places': { path: 'sediment.rows', cap: 24, why: '沉积地点环（地点数上限；跨地点总量另由引擎 capTotal 兜底）' },
+    'sediment.events': { path: 'sediment.rows.*.events', cap: 48, why: '单地点沉积事件环（每地点各自一环，故 path 带 `*`）' },
+    // ── v2.151.0（RX2+RX3）两引擎的六个环（cap 与 store.__BOUNDED_CAPS 同名同值）──
+    //   未登记站点 ⇒ evict.array 走 unknown-site 静默失败（挤出压根不发生，而调用方以为做了）
+    //   ——本仓已在 v2.77.0 / v2.142.0 两度付过这笔学费。
+    //   锚环不是锁：被挤出的锚只是不再受保护，值一个字节都不变（锁是 userlock 的事）。
+    'offlineTick.anchors': { path: 'offlineTick.anchors', cap: 24, why: '记忆锚环（路径/类别/文本/时间/是否已释放）' },
+    'offlineTick.batches': { path: 'offlineTick.batches', cap: 12, why: '跨会话批次环（最近 12 次的时长/轮数/是否截断/保护行数）' },
+    'offlineTick.skips': { path: 'offlineTick.skips', cap: 48, why: '保护跳过明细环（与锚相抵的改动逐条留痕；跳过而非回滚，故必须看得见）' },
+    // v2.157.0（SP4）：三条容量的 cap 改为**读模块设置**（与 evolution.winds 同形）——
+    //   此前它们写死 48/24/32，而 farfield 的 DEF 里有 maxPulses / capPending / capHeard
+    //   三个旋钮：面板把 capPending 调小，挤出侧照样按 24 算 ⇒「旋钮点了没效果」，
+    //   而读数上（设置值 vs 实际保留数）看不出漂移。改函数读同一份设置是唯一同源做法。
+    'farfield.pulses': { path: 'farfield.pulses', cap: function () { return ffCap('maxPulses', 48); }, why: '远方大事记环（远场自身的大势流水）' },
+    // 在途环：SP4 起在 tick 里还有一道**背压闸**（满即暂停接收新批次）——
+    //   闸是业务裁决（不静默丢一条还没到的信），evict 是最后一道兜底；两者同源同值。
+    'farfield.pending': { path: 'farfield.pending', cap: function () { return ffCap('capPending', 24); }, why: '在途传闻环（未到期的不入近场；在路上不是没发生）' },
+    'farfield.heard': { path: 'farfield.heard', cap: function () { return ffCap('capHeard', 32); }, why: '已传到近场的远方消息环（已落地、可转述；注入块只念这一环）' },
+
+    // ── v2.153.0（RX5+RX6）分支树一环（branch-tree.js；cap 与 store.__BOUNDED_CAPS 同名同值）──
+    //   SITES 缺此键时 evict.array 会走 unknown-site **静默失败**（挤出压根不发生，
+    //   而调用方以为做了）—— 长局下分叉点会无界膨胀。
+    'branchTree.nodes': { path: 'branchTree.nodes', cap: 40, why: '剧情分叉点环（玩家做过的重大选择，跨会话保留）' },
+    // v2.154.0（RX4）：世界联网面两条容器（cap 与 store.__BOUNDED_CAPS 同名同值，逐键对账）。
+    //   两条必须分开：前者是「收进来的别世界传说」（注入块只念这一环），
+    //   后者是「见过哪些来源世界」（去重账，只记签名与条数）。
+    'worldBridge.legends': { path: 'worldBridge.legends', cap: 'per-call', why: '收进来的别世界传说环（上限 = maxLegends 设置，写入时传入；传说不进世界事实）' },
+    'worldBridge.exported': { path: 'worldBridge.exported', cap: 12, why: '见过的来源世界签名环（去重账；只记签名与条数，不记传说内容）' },
+    // v2.155.0（RX8）：世界生成种子库（world-seed.js）。
+    //   为什么 cap 是 'per-call'：上限 = `libCap` 设置（用户可调），写入时传入 ——
+    //   静态登记而设置另有一套，就会变成一个「点了没效果的开关」（v2.154.0 为这条付过价）。
+    'worldSeed.library': { path: 'worldSeed.library', cap: 'per-call', why: '世界生成种子库环（上限 = libCap 设置，写入时传入；同一结构不存两份）' },
+    // v2.173.0（TX4b）：外交两环（diplomacy.pairs / diplomacy.proposals）**已从本表摘除**，
+    //   迁入 NON_EVICT —— 它们是写入侧硬上界（满则 pairs-full / proposals-full 拒写，
+    //   既有项一条不动），**不走 evict**。原先按挤出站点登记 ⇒ 零调用站点（evict-meta A 面
+    //   悬空红灯）。同 region.places / stage.metrics / binding.* 三族的既有口径：
+    //   「不是环形，故不走 evict；让『为什么不给它记账』是声明过的决定」。
+    //   cap 仍在 core/store.js 的 __BOUNDED_CAPS 里（kind:'object' 的类型校验不受影响）。
+    // v2.164.0（TX5）：版本化完整世界蓝图库（world-blueprint.js）。
+    //   与 worldSeed.library 同款：cap 是 'per-call'（上限 = `libCap` 设置，用户可调，
+    //   写入时传入）—— 静态登记而设置另有一套，就会变成一个「点了没效果的开关」。
+    //   本表必须与 core/store.js 的 __BOUNDED_CAPS['blueprint.library'] 同名同值（逐键对账）：
+    //   SITES 缺此键时 evict.array 会走 unknown-site 静默失败，蓝图库就成了唯一一个
+    //   「登记了容量却没人执行」的环。
+    //   `blueprint.installed` **不在此表**：它是单值留痕（不是数组环），登记会把「一个字段」
+    //   伪装成「一个有界容器」（与 worldBridge.title 同口径）。
+    'blueprint.library': { path: 'blueprint.library', cap: 'per-call', why: '世界蓝图库环（上限 = libCap 设置，写入时传入；一张蓝图比一颗种子大得多，上限刻意更小）' },
+    // ── v2.66.0 情绪通道 / 关系六型 / 假面（affect.js / bonds.js / masks.js）──
+    'affect.channels': { path: 'affect.channels', cap: 12, why: '情绪通道环形（每人一行：开放动作/硬关闭动作/过载回退，不含情绪词）' },
+    'affect.loads': { path: 'affect.loads', cap: 24, kind: 'object', why: '调制量（疲惫/饥饿/疼痛/社交消耗，每键一人）' },
+    'bonds.rows': { path: 'bonds.rows', cap: 24, why: '关系六型环形（与 enemies 血仇正交：血仇记事件，六型记结构）' },
+    'masks.rows': { path: 'masks.rows', cap: 20, why: '假面环形（口径与露馅同时在场且不一致才算假面）' },
+    // ── v2.67.0 时间锁 / 双层性格 / 好感审计 / 场外事件（temporal-lock.js / temperament.js / fondness.js / parallel-events.js）──
+    'temporal.lock': { path: 'temporal.lock', cap: 2, kind: 'object', why: '时间锁锁定态（单行对象：label + at 两键；空对象 = 未锁定）' },
+    'temperament.rows': { path: 'temperament.rows', cap: 12, why: '双层性格环形（底色/习惯/触发词，每行一人）' },
+    'fondness.rows': { path: 'fondness.rows', cap: 16, why: '好感审计环形（步进白名单 + 信任对冲，不降准则）' },
+    'parallelEvents.rows': { path: 'parallelEvents.rows', cap: 15, why: '场外事件环形（三要素 + 主时钟同步，活跃容量 3）' },
+    // v2.77.0 阶段授权/提案过期/行级撤销/纠错依据：好感行内两环。
+    //   与 karma.notes / gauge.history 同型——未登记站点会走 unknown-site 静默失败，
+    //   行内数组就会退化成无界（这正是 v2.70.0 / v2.72.0 已裁决过的同型病）。
+    'fondness.history': { path: 'fondness.rows.*.history', cap: 8, why: '好感变更史环（自动/采纳/判定不变/撤销/纠错/授权，每行各自有界；undo 需回看最近一项）' },
+    'fondness.corrections': { path: 'fondness.rows.*.corrections', cap: 8, why: '好感纠错依据环（每行各自有界；只增不删地约束模型不得再依据同一事件）' },
+    // ── v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽（era-cycle.js / survival.js / warrant.js / beast-bond.js）──
+    'eraCycle.rows': { path: 'eraCycle.rows', cap: 8, why: '资料片周期环形（四档状态机 + 倒计时，结算转长草强制换事件）' },
+    'survival.rows': { path: 'survival.rows', cap: 12, why: '生存三轴环形（饱食/精力/负重分段，归零惩罚如实报出）' },
+    // v2.141.0（F2）：生理与照护真实层（lifeline.js）。
+    //   必须是**环形容器**而不是写入侧硬上界：登记过的病况「后来稳定了/长期带着」
+    //   都是复盘材料（「他什么时候开始带这个病的、到哪一段了」必须答得出），
+    //   故只能环形挤出、不得在程段推进或恢复时原地删。
+    //   本表必须与 core/store.js 的 __BOUNDED_CAPS['lifeline.rows'] 同名同值
+    //   （把门判据逐键对账）：SITES 缺此键时 evict.array 会走 unknown-site
+    //   **静默失败**（挤出压根不发生，而调用方以为做了）。
+    'lifeline.rows': { path: 'lifeline.rows', cap: 12, why: '病况环形（程段历史与限制是复盘证据，不在恢复/稳定时删）' },
+    // v2.142.0（F3）：视角锁（perspective-lock.js）。
+    //   同样必须是**环形容器**而不是写入侧硬上界：编号与视角人物名单是复盘材料
+    //   （「这一幕当时是谁的视角、后来换成了谁」必须答得出），故只能环形挤出、不得在换视角时原地删。
+    //   本表必须与 core/store.js 的 __BOUNDED_CAPS['perspective.rows'] 同名同值
+    //   （把门判据逐键对账）：SITES 缺此键时 evict.array 会走 unknown-site
+    //   **静默失败**（挤出压根不发生，而调用方以为做了）。
+    'perspective.rows': { path: 'perspective.rows', cap: 12, why: '视角行环形（一幕一行；历史与视角人物名单是复盘证据，不在换视角时删）' },
+    'warrant.rows': { path: 'warrant.rows', cap: 16, why: '通缉环形（罪度三档，不随死亡消除，惯犯升级）' },
+    'beastBond.rows': { path: 'beastBond.rows', cap: 10, why: '驯兽环形（驯服满百清零转化，红线状态机）' },
+    // ── v2.69.0 外貌分级契约 / 原型阶梯（appearance.js / ladder.js）──
+    'appearance.rows': { path: 'appearance.rows', cap: 24, why: '外貌契约环形（分级/覆盖/异化档位/场景排他，每人一行）' },
+    'ladder.rows': { path: 'ladder.rows', cap: 16, why: '原型阶梯环形（档位表 + 当前档，升级必须带事件）' },
+    // ── v2.70.0 情境切片 / 阻尼量规 / 竞争焦点（scene-slice.js / gauge.js / rivalry.js）──
+    'sceneSlice.rows': { path: 'sceneSlice.rows', cap: 20, why: '情境切片环形（地点空间属性/恶劣天气挂起/七档自然时间段）' },
+    'gauge.rows': { path: 'gauge.rows', cap: 16, why: '阻尼量规环形（0..100百分比/单步阻尼限幅/四大里程碑事件）' },
+    'rivalry.rows': { path: 'rivalry.rows', cap: 16, why: '竞争焦点环形（三元焦点对立/反向偏向调制/嫉妒反馈）' },
+    // ── v2.71.0 叙事纪律四件套（enigma.js / tempo.js / quota.js / spotlight.js）──
+    'enigma.rows': { path: 'enigma.rows', cap: 24, why: '信息暗礁环形（秘密知情名单，每秘密一行）' },
+    'tempo.shifts': { path: 'tempo.shifts', cap: 'per-call', kind: 'array', why: '节奏挡位变更留痕（上限 = maxShifts 设置，写入时传入）' },
+    'quota.rows': { path: 'quota.rows', cap: 24, why: '伏笔配给种子环形（短/长双池，过期仍占位）' },
+    'spotlight.rows': { path: 'spotlight.rows', cap: 32, why: '焦点分配登场账（seen/missed/streak 每行一人）' },
+    'spotlight.pending': { path: 'spotlight.pending', cap: 'per-call', kind: 'array', why: '焦点点名单轮内实名（上限 = maxRows 设置，结算即清空）' },
+    'gauge.history': { path: 'gauge.rows.*.history', cap: 8, why: '阻尼量规步进史（v2.70.0 遗留：第二参数误传数字导致挤出静默失败的修复）' },
+    // ── v2.72.0 叙事动力四件套（karma.js / hazard.js / marginal.js / tolerance.js）──
+    'karma.rows': { path: 'karma.rows', cap: 16, why: '业力双轴账（功德/债各一行，不净额化）' },
+    // v2.72.0 首个真缺陷：karma.js 原先写 `WA.evict.array(row.notes, 'karma.notes', 8)`，
+    //   而 'karma.notes' **未登记在 SITES** ⇒ 每次记账都走 unknown-site 静默失败 ⇒
+    //   每行的 notes 实际无界（与 v2.70.0 gauge.history 同型缺陷）。
+    //   修为具名通配站点（每行各自有界 8 条），引擎侧同步去掉误导性的第三参数。
+    'karma.notes': { path: 'karma.rows.*.notes', cap: 8, why: '业力行备注环（每行各自有界）' },
+    'hazard.rows': { path: 'hazard.rows', cap: 16, why: '累积风险账（每风险一行，含暗账 pending）' },
+    'marginal.rows': { path: 'marginal.rows', cap: 16, why: '边际折旧账（每对象一行，含重复计数与冷却）' },
+    'tolerance.rows': { path: 'tolerance.rows', cap: 24, why: '手段耐受账（每手段一行，触达轮号滑窗）' },
+    // ── v2.96.0 传播与辟谣（rumor.js）──
+    //   一条传播链就是「一条事实的全部经手」。cap 8 而非 16：链一多，用户读不完整条；
+    //   并且**跳不挤出**（hops 满员即拒收）——中间跳被丢掉，这条链的结论就再也算不出来。
+    'rumor.chains': { path: 'rumor.chains', cap: 8, why: '传播链环形（每条链自带跳与隐瞒两个有界数组）' },
+    // ── v2.63.0 社交漩涡 / 悬案（shadow.js / threads.js）──
+    'shadow.rows':        { path: 'shadow.rows',        cap: 12, why: '共同隐瞒环形（含已变淡：秘密存在过是事实）' },
+    'shadow.experiences': { path: 'shadow.experiences', cap: 20, why: '关系经历流水环形（履行/背弃都留痕）' },
+    'threads.cases':      { path: 'threads',            cap: 6,  why: '悬案环形（结案可回收，但「悬置」不算结案）' },
+    'threads.leads':      { path: 'threads.*.leads',    cap: 8,  why: '每案线索环（每案各自有界，故按案剪枝）' },
+    // 对象型：每人认知边界（键 = 「谁知道什么」），按 at 最旧优先挤出
+    'people.knowledge':   { path: 'people.*.knowledge', cap: 30, kind: 'object', why: '人物认知边界（每键一桩知情）' },
+    // ── v2.13.0 补漏（本轮广谱侦察发现的真缺陷）──
+    // 纪要/总述环形：此前整个容器**根本没在 store 容量登记表上**，
+    //   sizeAudit 把它俩报成 unbounded（全库唯一两条），而代码其实一直在 slice(-N) 静默裁剪。
+    //   于是「被误判为无界」与「裁剪无人知晓」两个缺陷同时存在——补登 + 接台账一并修。
+    'memory.smallSummary':{ path: 'memory.smallSummaries', cap: 24, why: '阶段纪要环形（summarizer CAP_SMALL）' },
+    'memory.bigSummary':  { path: 'memory.bigSummaries',   cap: 8,  why: '大总述环形（summarizer CAP_BIG）' },
+    // 对象型：每人的档案节（键 = 节名 personality/worldview/family/memory/relationships）。
+    //   注意：节值本身是**数组**（{text,at} / {target,...}），上限逐节不同，且只有写入方
+    //   （actors/registry.js）在运行时才知道（它从 store 容量登记表逐节取）。
+    //   因此本项 cap 为 'per-call'：调用方必须显式传入该节上限，传漏即 bad-cap 归因——
+    //   「随手给个默认值」正是本仓库发生过的漂移（registry 曾写死常量，被 sizeAudit 判 drifted）。
+    'people.profile':     { path: 'people.*.profile.*', cap: 'per-call', kind: 'array', why: '人物档案各节（上限取自 store 登记表，写入时传入）' },
+    // v2.81.0 事件调度（events.js：排期 ≠ 触发）。两容器都 per-call：
+    //   rows 上限 = maxRows 设置（与 schedule 容量拒收同源，改设置不漂移），
+    //   failQueue 上限 = maxFails 设置（complete 失败分支消费，答「上次为什么没成」）。
+    'events.rows':        { path: 'events.rows',        cap: 'per-call', kind: 'array', why: '事件队列（上限 = maxRows 设置，写入时传入）' },
+    'events.failQueue':   { path: 'events.failQueue',   cap: 'per-call', kind: 'array', why: '事件失败队列（上限 = maxFails 设置，写入时传入）' },
+    'events.res':         { path: 'events.res',         cap: 'per-call', kind: 'array', why: '事件回执台账（上限 = maxFails 设置，写入时传入；v2.116.0 新增，口径同 failQueue）' },
+    // v2.117.0（计划二 B1）：行动执行两容器。同 events 口径——per-call 且由 act.js
+    //   显式传当前设置值（maxActs）；传漏即 bad-cap 归因，不静默回落到某个默认值。
+    'acts.rows':          { path: 'acts.rows',          cap: 'per-call', kind: 'array', why: '行动队列（上限 = maxActs 设置，写入时传入）' },
+    'acts.res':           { path: 'acts.res',           cap: 'per-call', kind: 'array', why: '行动回执台账（上限 = maxActs 设置，写入时传入）' },
+    // v2.117.0（计划二 B5）：组织行动两容器。**行内挂**（projects 挂势力、debts 挂人物），
+    //   故按通配路径登记；cap 为 'per-call'（上限 = org.js 的 PROJECT_CAP / DEBT_CAP，
+    //   调用点显式传入 —— 传漏即 bad-cap 归因，不悄悄回落成默认值）。
+    'org.projects': { path: 'evolution.factions.*.projects', cap: 'per-call', kind: 'array', why: '共同项目表（每势力一组，上限 = PROJECT_CAP）' },
+    'org.debts':    { path: 'people.*.debts',               cap: 'per-call', kind: 'array', why: '人对势力的欠账环（每行各自有界 = DEBT_CAP；与名册 owed 方向相反、表分开）' },
+    // ── v2.129.0（缝 A1/A4/A5/A6）：四个新引擎的环形容器 ──
+    //   四条调用点均在各自引擎的 transact 回调内（userlock.js / rhythm-loop.js /
+    //   motif.js / beat-mask.js），站点名与调用点字面量一一对应（门禁 G18 双向核对）。
+    //   逐条都必须是**环形容器**而非「写入侧硬上界」：这四张表都答「曾发生过什么」
+    //   （锁过谁 / 用过哪些手法 / 用过哪些意象 / 排过哪些节拍），故只能环形挤出、
+    //   不得在解锁/冷却结束/节拍到点时原地删——那会让复盘凭据消失。
+    'userlock.rows':  { path: 'userlock.rows',  cap: 200, why: '用户锁定行环形（解锁是删指定行，历史锁痕只能环形挤出）' },
+    'rhythm.devices': { path: 'rhythm.devices', cap: 'per-call', kind: 'array', why: '叙事手法冷却表环形（上限 = maxDevices 设置，写入时传入）' },
+    'motif.rows':     { path: 'motif.rows',     cap: 'per-call', kind: 'array', why: '意象登记环形（上限 = maxRows 设置，写入时传入）' },
+    'beatMask.rows':  { path: 'beatMask.rows',  cap: 'per-call', kind: 'array', why: '节拍遮罩登记环形（上限 = maxRows 设置，写入时传入）' },
+    'powerAnchor.rows': { path: 'powerAnchor.rows', cap: 'per-call', kind: 'array', why: '战力锚登记环形（上限 = maxRows 设置，写入时传入）' },
+    //  v2.130.0（拓展计划 C2 / C1）：两个新引擎的环形容器。
+    //   两条调用点均在各自引擎的 transact 回调内（story-tone.js / calendar-custom.js），
+    //   站点名与调用点字面量一一对应（门禁 G18 双向核对）。
+    //   两条都必须是**环形容器**而非写入侧硬上界：剧情倾向改过几次、历法换过几版
+    //   都是复盘材料（「什么时候他把这本书定成了悲剧倾向」必须答得出），故只能环形挤出。
+    'storyTone.rows':    { path: 'storyTone.rows', cap: 'per-call', kind: 'array', why: '剧情倾向档环形（上限 = maxRows 设置，写入时传入）' },
+    // v2.160.0（TP4）：跨引擎提交回执台账环形。与 core/store.js 的 __BOUNDED_CAPS['commit.receipts']
+    //   同名同值（把门判据逐键对账）；SITES 缺此键时 evict.array 会走 unknown-site **静默失败**
+    //   （挤出压根不发生，而调用方以为做了）。
+    'commit.receipts':    { path: 'commit.receipts', cap: 64, why: '跨引擎提交回执环形（已提交的世界操作必须跨刷新仍答得出，故不能在提交时删——只能环形挤出）' },
+    'calendarPlan.months': { path: 'calendarPlan.months', cap: 'per-call', kind: 'array', why: '自定义历法月表环形（上限 = maxMonths 设置，写入时传入）' }
+  };
+
+  // ── 非挤出站点（显式声明，防「假阴性」与「计数虚高」两头都错）──────────
+  // 下列位置有 slice/替换式赋值，但语义**不是**环形挤出：
+  //   · evolution.economy.signals / opinion.sandbox —— 「用最新读数整体替换」，
+  //     旧值本来就是过时信息，不构成容量治理；把它们计进挤出会让 evicts 虚高。
+  // 本表存在的意义：让「为什么不给它记账」是**声明过的决定**，而不是漏掉。
+  const NON_EVICT = {
+    'evolution.economy.signals': '替换式覆盖（取最新读数整体重写，非环形累积）',
+    'opinion.sandbox': '替换式覆盖（沙盒碎片每次重生成，NON-CANON 不累积）',
+    'evolution.entityMemory.README': '同上：实体库替换由 evolution.entityMemory 站点计量，此处不重复计',
+    // v2.99.0（第五十六面）：原著幕目（canon.js）。两条 cap 是**构造上界**而不是挤出上限——
+    //   `canon.outline` 的初值是 `null`（未采纳就是没有骨架），一旦写入就已经由 buildOutline
+    //   在**落盘之前**按 LIMITS 截断并如实报出（`truncated.acts` / `truncated.points`），
+    //   故本模块**不走 evict**：它没有「对持久容器的破坏性截断」这件事。
+    //   两条都登记为通配形态（与 store 的 `__BOUNDED_CAPS` 同形）：中间段 `acts` 在未采纳态
+    //   取不到，精确键会被 registryParity 报「未在骨架物化」——那不是缺陷，是诚实表示。
+    'canon.outline.*.acts': '构造上界（未采纳时无骨架；截断在 buildOutline 落盘前完成，不走 evict）',
+    'canon.outline.acts.*.points': '同上：每幕点数 = perAct²（perAct 上界 40 ⇒ 1600），构造上界而非挤出上限',
+    // v2.119.0（拓展计划 ⑥）：远方拓扑（region.js）。**写入侧硬上界**而不是挤出上限：
+    //   `register()` 在 `rg.places.length >= cfg.maxRoutes` 时 `{ ok:false, reason:'places-full' }`
+    //   拒写（既有项一条不动）。原先按挤出站点登记 ⇒ 零调用站点（回归红灯）；
+    //   按本表口径降级为「声明过的决定」——与 canon 两条同族：不是环形，故不走 evict。
+    'region.places': '写入侧硬上界（满则 places-full 拒写，从不截断既有项 ⇒ 不走 evict）',
+    // v2.119.0（拓展计划 ⑦）：进度指标（stage.js）。同族，且**形态是对象映射**而非数组：
+    //   `st.metrics[m] = value`；满则 `{ ok:false, reason:'metrics-full' }` 拒写。
+    //   原先按 kind:'array' 登记，还让 store.registryParity() 报「类型错配（应为数组）」。
+    'stage.metrics': '写入侧硬上界 + 对象映射形态（满则 metrics-full 拒写，不走 evict）',
+    // v2.130.0（拓展计划 D3）：配置绑定三层（binding.js）。**写入侧硬上界**而不是挤出上限：
+    //   `bind()` 在总键数达 maxKeys 时 `{ ok:false, reason:'too-long' }` 拒写（既有绑定一条不动）。
+    //   形态是**对象映射**（层 -> 键 -> 值），不是数组，故同 stage.metrics 一族的双重要求。
+    'binding.chat': '写入侧硬上界 + 对象映射形态（满则 too-long 拒写，不走 evict）',
+    'binding.char': '同上：角色层绑定表（与聊天层分开存，互不覆盖）',
+    'binding.default': '同上：默认层绑定表（离场回落的落点）',
+    // v2.173.0（TX4b）：外交两环（diplomacy.js）。cap 是 'per-call'（上限 = maxPairs /
+    //   maxProposals 设置，用户可调，写入时传入）—— 静态登记而设置另有一套，就会变成
+    //   一个「点了没效果的开关」。cap 与 kind:'object' 登记在 core/store.js __BOUNDED_CAPS，
+    //   但**不设挤出站点**：两环走写入侧硬上界，满即拒写（pairs-full / proposals-full），
+    //   既有项一条不动 ⇒ 不走 evict。与 region.places 三条同款（v2.119.0 起同一口径）。
+    'diplomacy.pairs': '写入侧硬上界 + 对象映射形态（满则 pairs-full 拒写，不走 evict）',
+    'diplomacy.proposals': '同上：外交提案链（按提案号键；满则 proposals-full 拒写，不走 evict）',
+    // v2.173.0（TX4b）：TX3/TX4/TX6/TX7/TX8/TX9 六模块的七环。cap 是 per-call（各模块 DEF
+    //   设置上界），写入侧走入口预检（满即拒写），产品源码零 WA.evict.* 调用。
+    //   与 diplomacy 两环、region.places、stage.metrics 同族（v2.119.0 起同一口径）。
+    'freight.shipments': '写入侧硬上界（满则 shipments-full 拒写，不走 evict）',
+    'storyChoice.points': '写入侧硬上界（满则 points-full 拒写，不走 evict）',
+    'commission.contracts': '写入侧硬上界（满则 contracts-full 拒写，不走 evict）',
+    'investigation.clues': '写入侧硬上界（满则 clues-full 拒写，不走 evict）',
+    'investigation.evidence': '写入侧硬上界（满则 evidence-full 拒写，不走 evict）',
+    'aftermath.effects': '写入侧硬上界（满则 effects-full 拒写，不走 evict）',
+    'operations.projects': '写入侧硬上界（满则 projects-full 拒写，不走 evict）'
+  };
+
+  // ── 记账 ──────────────────────────────────────────────────
+  const stats = {
+    evicts: 0,          // 真正发生挤出的次数（超限且已丢弃）
+    evicted: 0,         // 被挤出的元素总数
+    evictNoops: 0,      // 未超限的调用次数——幂等无操作，不是「挤出成功」
+    evictFailed: 0,     // 参数非法 / 站点未登记（实现缺陷）
+    failedBy: {},       // 失败来源分桶：not-array / bad-cap / unknown-site / not-object
+    lastEvict: null,    // { site, cap, before, after, dropped, at }
+    bySite: {},         // site -> { evicts, dropped, lastAt, lastDropped }
+    lastDropped: [],    // 最近被挤出的元素摘要（最多 12 条）——「丢的是什么」
+    lastFail: null      // { site, reason, at }
+  };
+
+  // ── v2.162.0（TP7）：**在途行豁免表**（挤出侧）────────────────────────
+  //   实测缺口：world.deliverGoods 连发 25 批货（cap=16）——前 8 批**在途未到**的货被
+  //   slice 静默挤掉，调用方拿到 {ok:true}，evictStat 只留下「丢了 shp_*」的名字。
+  //   「货运回答『货在哪』」这张表一旦按环形丢，答案就变成「不知道」；
+  //   而 TP7 原文要求「**对未完成义务不静默挤出**」。
+  //   语义分层（承重）：**终态行本就是要退场的可回收历史**（arrived / halted / done /
+  //   delivered / flushed）——它们仍按环形退场；**在途行是未完成的义务**，不得被静默挤出。
+  //   与 farfield.pending 的三层范式逐字同形：写入侧容量闸（业务裁决，满即如实拒收）
+  //   + 挤出侧豁免（最后一道兜底也不丢在途）+ 读数（liveHeld / liveFull）。
+  //   为什么必须两处都做：只在写入侧加闸，历史遗留的超限存档仍会在下一次挤出里丢在途；
+  //   只在挤出侧豁免，用户会看到「操作成功但世界悄悄胀大」而没有拒收理由。
+  const IN_TRANSIT = {
+    'world.shipments':   function (x) { return !!x && x.status === 'in-transit'; },
+    'world.messages':    function (x) { return !!x && x.status === 'in-transit'; },
+    'world.journeys':    function (x) { return !!x && x.status === 'in-transit'; },
+    'farfield.pending':  function (x) { return !!x && x.deliveredAt == null; },
+    'collab.queue':      function (x) { return !!x && x.flushedAt == null; },
+    'liaison.deals':     function (x) { return !!x && (x.status === 'pending' || x.status === 'due'); }
+  };
+  // 在途保护的读数（**不**进 evictFailed / failedBy —— 超限不是实现缺陷，是容量裁决；
+  //   混进 failedBy 会让「挤出器坏了」与「世界真的满了」在诊断上长得一样）。
+  const liveStat = { held: 0, full: 0, lastSite: null, lastAt: 0 };
+
+  // v2.15.0: 挤出记录只活在内存台账（bySite.lastAt / lastDropped.at），不落盘 → 测量时间。
+  function now() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
+
+  /** 元素摘要：优先取语义名，让「丢的是谁」可读（只记数量等于什么都没记） */
+  function summarize(x) {
+    if (x === null || x === undefined) return 'null';
+    const t = typeof x;
+    if (t === 'string') return '\u300c' + x.slice(0, 24) + '\u300d';
+    if (t === 'number' || t === 'boolean') return String(x);
+    if (t !== 'object') return t;
+    // v2.13.0: 名称键优先级——先「人/事的名字」，再退回结构信息
+    const NAME_KEYS = ['name', 'title', 'topic', 'key', 'label', 'text', 'content', 'id'];
+    for (let i = 0; i < NAME_KEYS.length; i++) {
+      const v = x[NAME_KEYS[i]];
+      if (v !== undefined && v !== null && v !== '') return String(v).slice(0, 24);
+    }
+    if (Array.isArray(x)) return '[' + x.length + '\u9879]';
+    return '{' + Object.keys(x).length + '\u952e}';
+  }
+
+  function noteFail(site, reason) {
+    stats.evictFailed++;
+    stats.failedBy[reason] = (stats.failedBy[reason] || 0) + 1;
+    stats.lastFail = { site: site, reason: reason, at: now() };
+    try { WA.log('error', '挤出失败：站点 ' + site + ' 原因 ' + reason + '（未做任何截断）'); } catch (e) {}
+  }
+
+  /** v2.157.0（SP4）：远场三环的 cap 从模块设置取（单一真源是 farfield 的 DEF/bounds）。
+   *    模块未装 / 读失败时回落常量 —— 与 SITES 表里的默认值逐字一致，
+   *    故「模块缺席」与「默认配置」在容量上同值。 */
+  function ffCap(key, dflt) {
+    try {
+      const cfg = (WA.farfield && typeof WA.farfield.getSettings === 'function') ? WA.farfield.getSettings() : null;
+      const n = cfg ? Number(cfg[key]) : NaN;
+      return isFinite(n) && n >= 0 ? n : dflt;
+    } catch (e) { return dflt; }
+  }
+
+  function capOf(site) {
+    const s = SITES[site];
+    if (!s) return null;
+    const c = typeof s.cap === 'function' ? s.cap() : s.cap;
+    return c;
+  }
+
+  // ── 单一实现：数组挤出 ─────────────────────────────────────
+  /**
+   * 对持久数组做破坏性截断（保留尾部 cap 个）。
+   * 站点名必须在 SITES 中登记——未登记则**不做任何截断**并归因。
+   * @returns { ok, dropped, before, after, reason? }
+   */
+  function array(arr, site, limit) {
+    if (!Array.isArray(arr)) { noteFail(site, 'not-array'); return { ok: false, reason: 'not-array', dropped: 0, before: 0, after: 0 }; }
+    const decl = SITES[site];
+    let cap;
+    if (!decl) { noteFail(site, 'unknown-site'); return { ok: false, reason: 'unknown-site', dropped: 0, before: arr.length, after: arr.length }; }
+    if (decl.cap === 'per-call') {
+      // per-call 站点：上限逐次不同（如人物档案各节 15/10/10/25/15），必须由调用方给出。
+      // 传漏即 bad-cap 归因——「悄悄回落到一个默认值」正是登记表与执行漂移的起点。
+      if (typeof limit !== 'number' || !isFinite(limit) || limit < 0) { noteFail(site, 'bad-cap'); return { ok: false, reason: 'bad-cap', dropped: 0, before: arr.length, after: arr.length }; }
+      cap = limit;
+    } else cap = capOf(site);
+    if (typeof cap !== 'number' || !isFinite(cap) || cap < 0) { noteFail(site, 'bad-cap'); return { ok: false, reason: 'bad-cap', dropped: 0, before: arr.length, after: arr.length }; }
+    const before = arr.length;
+    if (before <= cap) { stats.evictNoops++; return { ok: true, dropped: 0, before: before, after: before }; }
+    const dropped = before - cap;
+    // v2.162.0（TP7）：在途行豁免——先保在途，剩余额度才给终态行（终态仍环形退场，cap 不变）。
+    const isLive = IN_TRANSIT[site];
+    if (isLive) {
+      const keepIdx = {};
+      let liveN = 0;
+      for (let i = 0; i < arr.length; i++) { if (isLive(arr[i])) { keepIdx[i] = true; liveN++; } }
+      if (liveN > cap) {
+        // 在途行自身就超了上限：**不做任何截断**（宁可超 cap 也不静默丢未完成的货/信/行程），
+        //   归因 in-transit-full 并向调用方/诊断交出证据。
+        liveStat.full++; liveStat.lastSite = site; liveStat.lastAt = now();
+        return { ok: false, reason: 'in-transit-full', dropped: 0, before: arr.length, after: arr.length,
+          inTransit: liveN, cap: cap };
+      }
+      let room = cap - liveN;
+      for (let i = arr.length - 1; i >= 0 && room > 0; i--) { if (!keepIdx[i]) { keepIdx[i] = true; room--; } }
+      const survivors = [], droppedItems = [];
+      for (let i = 0; i < arr.length; i++) { (keepIdx[i] ? survivors : droppedItems).push(arr[i]); }
+      arr.length = 0;
+      for (let i = 0; i < survivors.length; i++) arr.push(survivors[i]);
+      liveStat.held += droppedItems.length; liveStat.lastSite = site; liveStat.lastAt = now();
+      record(site, cap, before, arr.length, droppedItems.length, droppedItems.map(summarize));
+      return { ok: true, dropped: droppedItems.length, before: before, after: arr.length, inTransitKept: liveN };
+    }
+    // 先摘摘要再切——切完就拿不到了
+    const tail = arr.slice(0, dropped);
+    arr.splice(0, dropped);
+    record(site, cap, before, arr.length, dropped, tail.map(summarize));
+    return { ok: true, dropped: dropped, before: before, after: arr.length };
+  }
+
+  /**
+   * 对持久对象做键挤出（调用方给出候选顺序，本函数负责删除与记账）。
+   * @param obj 目标对象
+   * @param site 站点名
+   * @param orderedKeys 已按「应被挤出优先级」排好序的键（**前** excess 个会被删）
+   */
+  function object(obj, site, orderedKeys) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { noteFail(site, 'not-object'); return { ok: false, reason: 'not-object', dropped: 0, before: 0, after: 0 }; }
+    const cap = capOf(site);
+    if (cap === null) { noteFail(site, 'unknown-site'); return { ok: false, reason: 'unknown-site', dropped: 0, before: Object.keys(obj).length, after: Object.keys(obj).length }; }
+    if (typeof cap !== 'number' || !isFinite(cap) || cap < 0) { noteFail(site, 'bad-cap'); return { ok: false, reason: 'bad-cap', dropped: 0, before: Object.keys(obj).length, after: Object.keys(obj).length }; }
+    const before = Object.keys(obj).length;
+    if (before <= cap) { stats.evictNoops++; return { ok: true, dropped: 0, before: before, after: before }; }
+    const keys = Array.isArray(orderedKeys) ? orderedKeys.slice() : Object.keys(obj);
+    const excess = before - cap;
+    const dropped = keys.slice(0, excess);
+    const tail = dropped.map(function (k) { return summarize(obj[k]) + '\u2039' + k + '\u203a'; });
+    dropped.forEach(function (k) { try { delete obj[k]; } catch (e) {} });
+    record(site, cap, before, Object.keys(obj).length, dropped.length, tail);
+    return { ok: true, dropped: dropped.length, before: before, after: Object.keys(obj).length, droppedKeys: dropped };
+  }
+
+  /**
+   * 记账专用入口：站点自己做「按业务规则筛选」的挤出（不是纯尾部截断，
+   * 如「按 createdRound 最旧优先挤出活跃仇敌」「排除终局事件后重建数组」）。
+   * 本函数**不动数据**，只把「丢了什么」如实记账——
+   * 让这类站点的丢弃也可见，而不是因为它们不是 slice(-N) 就永远不可观测。
+   * @param site 站点名（须登记）
+   * @param droppedItems 已被站点丢弃的元素数组
+   * @returns { ok, dropped, reason? }
+   */
+   function note(site, droppedItems, limit) {
+     const decl = SITES[site];
+     if (!decl) { noteFail(site, 'unknown-site'); return { ok: false, reason: 'unknown-site', dropped: 0 }; }
+     let cap;
+     if (decl.cap === 'per-call') {
+       // per-call 站点（上限逐次不同，如人物档案各节）：调用方必须显式给出本次上限。
+       // 不给就归因——默许一个「随手挑的上限」正是本仓库最贵的一类默认值。
+       if (typeof limit !== 'number' || !isFinite(limit) || limit < 0) { noteFail(site, 'bad-cap'); return { ok: false, reason: 'bad-cap', dropped: 0 }; }
+       cap = limit;
+     } else {
+       cap = capOf(site);
+     }
+     const items = Array.isArray(droppedItems) ? droppedItems : [];
+     if (!items.length) { stats.evictNoops++; return { ok: true, dropped: 0 }; }
+     record(site, cap, null, null, items.length, items.map(summarize));
+     return { ok: true, dropped: items.length };
+   }
+
+  function record(site, cap, before, after, dropped, tail) {
+    const at = now();
+    stats.evicts++;
+    stats.evicted += dropped;
+    stats.lastEvict = { site: site, cap: cap, before: before, after: after, dropped: dropped, at: at };
+    const b = stats.bySite[site] = stats.bySite[site] || { evicts: 0, dropped: 0, lastAt: 0, lastDropped: 0, lastWhat: [] };
+    b.evicts++; b.dropped += dropped; b.lastAt = at; b.lastDropped = dropped;
+    // v2.13.0（端到端审计自纠）：**逐站点**保留「丢的是谁」。
+    //   缺陷现场：全局 lastDropped 只留最近 12 条，一次长局里多站点同时挤出时，
+    //   先挤出的站点（如 people 丢 32 人）明细会被随后的站点（如伏笔）立刻冲掉——
+    //   诊断议题于是只能说「最近被挤出的是：伏笔17、伏笔18」，而「丢了哪 32 个角色」
+    //   永远看不到。这与模块头注释「只记条数等于什么都没说」自相矛盾：单站点成立、
+    //   多站点失效。改为每个站点各自保留最近 6 条摘要，互不冲刷。
+    if (!Array.isArray(b.lastWhat)) b.lastWhat = [];
+    (tail || []).forEach(function (s) { b.lastWhat.push(s); });
+    if (b.lastWhat.length > 6) b.lastWhat.splice(0, b.lastWhat.length - 6);
+    (tail || []).forEach(function (s) { stats.lastDropped.push({ site: site, what: s, at: at }); });
+    if (stats.lastDropped.length > 12) stats.lastDropped.splice(0, stats.lastDropped.length - 12);
+    try { WA.log('info', '挤出: ' + site + ' ' + before + '\u2192' + after + '（丢弃 ' + dropped + '）：' + (tail || []).slice(0, 3).join('、')); } catch (e) {}
+  }
+
+  // ── 只读视图（供诊断 / 面板 / 健康分消费）──────────────────
+  function evictStat() {
+    const byS = {};
+    Object.keys(stats.bySite).forEach(function (k) {
+      const b = stats.bySite[k];
+      byS[k] = { evicts: b.evicts, dropped: b.dropped, lastAt: b.lastAt, lastDropped: b.lastDropped, lastWhat: (b.lastWhat || []).slice() };
+    });
+    return {
+      evicts: stats.evicts,
+      evicted: stats.evicted,
+      evictNoops: stats.evictNoops,
+      evictFailed: stats.evictFailed,
+      failedBy: Object.assign({}, stats.failedBy),
+      lastEvict: stats.lastEvict ? Object.assign({}, stats.lastEvict) : null,
+      lastFail: stats.lastFail ? Object.assign({}, stats.lastFail) : null,
+      bySite: byS,
+      lastDropped: stats.lastDropped.map(function (x) { return Object.assign({}, x); }),
+      sites: Object.keys(SITES).length,
+      // v2.162.0（TP7）：在途保护读数——held=因豁免而未丢的终态+在途混排中被保下的行数，
+      //   full=「在途自身超 cap」而放弃截断的次数（**不是**实现缺陷，故不进 failedBy）。
+      live: { held: liveStat.held, full: liveStat.full, lastSite: liveStat.lastSite, lastAt: liveStat.lastAt },
+      nonEvict: Object.assign({}, NON_EVICT)
+    };
+  }
+  function resetEvictStat() {
+    stats.evicts = 0; stats.evicted = 0; stats.evictNoops = 0; stats.evictFailed = 0;
+    stats.failedBy = {}; stats.lastEvict = null; stats.lastFail = null;
+    stats.bySite = {}; stats.lastDropped = [];
+  }
+  /** 站点声明表只读副本（门禁与诊断反查「cap 的单一真源」用） */
+  function siteDecls() {
+    const out = {};
+    Object.keys(SITES).forEach(function (k) {
+      const s = SITES[k];
+      out[k] = { path: s.path, cap: capOf(k), kind: s.kind || 'array' };
+    });
+    return out;
+  }
+
+  WA.evict = {
+    array: array,
+    object: object,
+    note: note,
+    evictStat: evictStat,
+    resetEvictStat: resetEvictStat,
+    siteDecls: siteDecls,
+    nonEvictDecls: function () { return Object.assign({}, NON_EVICT); },
+    summarize: summarize
+  };
+})();

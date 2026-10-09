@@ -1,0 +1,3353 @@
+{
+ "version": "2.181.0",
+ "loadOrderCount": 200,
+ "loadedCount": 188,
+ "uiCount": 12,
+ "nsCount": 196,
+ "totals": {
+  "loadEdges": 90,
+  "hardEdges": 0,
+  "callRefs": 178,
+  "ghostRefs": 0
+ },
+ "loadErrors": {},
+ "skipped": [],
+ "unmappedSettings": [],
+ "modules": {
+  "core/clock.js": {
+   "ns": [
+    "clock"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "actors/monologue.js",
+    "actors/profile.js",
+    "core/commit.js",
+    "core/exec.js",
+    "core/plugin.js",
+    "core/sandbox.js",
+    "direction/oracle.js",
+    "direction/tags.js",
+    "engines/act.js",
+    "engines/aftermath.js",
+    "engines/agency.js",
+    "engines/archive-hide.js",
+    "engines/backstage.js",
+    "engines/beat-mask.js",
+    "engines/binding.js",
+    "engines/branch-tree.js",
+    "engines/bridge.js",
+    "engines/calendar-custom.js",
+    "engines/calendar.js",
+    "engines/chapters.js",
+    "engines/commission.js",
+    "engines/coop.js",
+    "engines/diplomacy.js",
+    "engines/direct-event.js",
+    "engines/eco-audit.js",
+    "engines/economy.js",
+    "engines/enemies.js",
+    "engines/ensemble.js",
+    "engines/entry-router.js",
+    "engines/evolution.js",
+    "engines/faction-graph.js",
+    "engines/farfield.js",
+    "engines/foreshadow.js",
+    "engines/freight.js",
+    "engines/group-refuse.js",
+    "engines/hazard.js",
+    "engines/inject-value.js",
+    "engines/inst.js",
+    "engines/investigation.js",
+    "engines/kaleidoscope.js",
+    "engines/liaison.js",
+    "engines/life.js",
+    "engines/lifeline.js",
+    "engines/memory.js",
+    "engines/mend.js",
+    "engines/motif.js",
+    "engines/noesis.js",
+    "engines/offline-return.js",
+    "engines/offline-tick.js",
+    "engines/operations.js",
+    "engines/opinion.js",
+    "engines/parallel-world.js",
+    "engines/perspective-lock.js",
+    "engines/plan.js",
+    "engines/playtime.js",
+    "engines/plot-gauge.js",
+    "engines/pmem.js",
+    "engines/polish.js",
+    "engines/power-anchor.js",
+    "engines/preset-world.js",
+    "engines/proactive.js",
+    "engines/probe.js",
+    "engines/purify-scope.js",
+    "engines/reasoning.js",
+    "engines/refine.js",
+    "engines/region.js",
+    "engines/regional.js",
+    "engines/rehearse.js",
+    "engines/request-viewer.js",
+    "engines/rewriter.js",
+    "engines/rhythm-loop.js",
+    "engines/sediment.js",
+    "engines/session.js",
+    "engines/stage.js",
+    "engines/stale-guard.js",
+    "engines/storage-forecast.js",
+    "engines/story-choice.js",
+    "engines/story-tone.js",
+    "engines/storyclock.js",
+    "engines/summarizer.js",
+    "engines/userlock.js",
+    "engines/wb-inject.js",
+    "engines/wb-search.js",
+    "engines/word-budget.js",
+    "engines/world-blueprint.js",
+    "engines/world-bridge.js",
+    "engines/world-seed.js",
+    "render/purifier.js"
+   ]
+  },
+  "core/rand.js": {
+   "ns": [
+    "rand"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/input-guard.js": {
+   "ns": [
+    "inputGuard"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/fault-context.js": {
+   "ns": [
+    "faultContext"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/schema.js": {
+   "ns": [
+    "schema"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/permissions.js": {
+   "ns": [
+    "permissions"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/audit-log.js": {
+   "ns": [
+    "auditLog"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/sanitize.js": {
+   "ns": [
+    "sanitize"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/settings-bus.js": {
+   "ns": [
+    "settingsBus"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "actors/monologue.js",
+    "actors/profile.js",
+    "direction/oracle.js",
+    "direction/tags.js",
+    "engines/act.js",
+    "engines/backstage.js",
+    "engines/bridge.js",
+    "engines/calendar.js",
+    "engines/chapters.js",
+    "engines/direct-event.js",
+    "engines/enemies.js",
+    "engines/entry-router.js",
+    "engines/evolution.js",
+    "engines/farfield.js",
+    "engines/hazard.js",
+    "engines/kaleidoscope.js",
+    "engines/life.js",
+    "engines/memory.js",
+    "engines/offline-return.js",
+    "engines/opinion.js",
+    "engines/parallel-world.js",
+    "engines/pmem.js",
+    "engines/proactive.js",
+    "engines/regional.js",
+    "engines/summarizer.js",
+    "engines/wb-inject.js",
+    "render/purifier.js"
+   ]
+  },
+  "core/store.js": {
+   "ns": [
+    "moduleRegistry",
+    "modules",
+    "registerModule",
+    "store"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "core/commit.js",
+    "core/exec.js",
+    "core/plugin.js",
+    "core/sandbox.js",
+    "engines/aftermath.js",
+    "engines/agency.js",
+    "engines/archive-hide.js",
+    "engines/beat-mask.js",
+    "engines/binding.js",
+    "engines/branch-tree.js",
+    "engines/calendar-custom.js",
+    "engines/commission.js",
+    "engines/coop.js",
+    "engines/diplomacy.js",
+    "engines/eco-audit.js",
+    "engines/economy.js",
+    "engines/ensemble.js",
+    "engines/faction-graph.js",
+    "engines/farfield.js",
+    "engines/foreshadow.js",
+    "engines/freight.js",
+    "engines/group-refuse.js",
+    "engines/inject-value.js",
+    "engines/inst.js",
+    "engines/investigation.js",
+    "engines/liaison.js",
+    "engines/lifeline.js",
+    "engines/mend.js",
+    "engines/motif.js",
+    "engines/noesis.js",
+    "engines/offline-return.js",
+    "engines/offline-tick.js",
+    "engines/operations.js",
+    "engines/perspective-lock.js",
+    "engines/plan.js",
+    "engines/playtime.js",
+    "engines/plot-gauge.js",
+    "engines/polish.js",
+    "engines/power-anchor.js",
+    "engines/preset-world.js",
+    "engines/probe.js",
+    "engines/purify-scope.js",
+    "engines/reasoning.js",
+    "engines/refine.js",
+    "engines/region.js",
+    "engines/rehearse.js",
+    "engines/request-viewer.js",
+    "engines/rewriter.js",
+    "engines/rhythm-loop.js",
+    "engines/sediment.js",
+    "engines/session.js",
+    "engines/stage.js",
+    "engines/stale-guard.js",
+    "engines/storage-forecast.js",
+    "engines/story-choice.js",
+    "engines/story-tone.js",
+    "engines/storyclock.js",
+    "engines/userlock.js",
+    "engines/wb-search.js",
+    "engines/word-budget.js",
+    "engines/world-blueprint.js",
+    "engines/world-bridge.js",
+    "engines/world-seed.js"
+   ]
+  },
+  "core/exec.js": {
+   "ns": [
+    "exec"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/sandbox.js": {
+   "ns": [
+    "sandbox"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/plugin.js": {
+   "ns": [
+    "plugin"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/evict.js": {
+   "ns": [
+    "evict"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/api-router.js": {
+   "ns": [
+    "apiRouter"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_api_channels_v1"
+   ],
+   "consumedBy": []
+  },
+  "core/undo.js": {
+   "ns": [
+    "undo"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/workflow.js": {
+   "ns": [
+    "workflow"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_workflow_v1"
+   ],
+   "consumedBy": [
+    "actors/monologue.js",
+    "actors/profile.js",
+    "direction/oracle.js",
+    "direction/tags.js",
+    "engines/act.js",
+    "engines/backstage.js",
+    "engines/bridge.js",
+    "engines/calendar.js",
+    "engines/chapters.js",
+    "engines/direct-event.js",
+    "engines/enemies.js",
+    "engines/entry-router.js",
+    "engines/evolution.js",
+    "engines/farfield.js",
+    "engines/hazard.js",
+    "engines/kaleidoscope.js",
+    "engines/memory.js",
+    "engines/offline-return.js",
+    "engines/opinion.js",
+    "engines/parallel-world.js",
+    "engines/pmem.js",
+    "engines/proactive.js",
+    "engines/regional.js",
+    "engines/summarizer.js",
+    "engines/wb-inject.js"
+   ]
+  },
+  "core/settle-guard.js": {
+   "ns": [
+    "settleGuard"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/commit.js": {
+   "ns": [
+    "commit"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/interceptor.js": {
+   "ns": [
+    "LEAK_THRESHOLD",
+    "busStats",
+    "emit",
+    "interceptor",
+    "off",
+    "on"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/backstage.js": {
+   "ns": [
+    "backstage"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_backstage_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/evolution.js": {
+   "ns": [
+    "evolution"
+   ],
+   "requires": [
+    "settingsBus",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_evolution_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/enemies.js": {
+   "ns": [
+    "enemies"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/regional.js": {
+   "ns": [
+    "regional"
+   ],
+   "requires": [
+    "settingsBus",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_regional_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/parallel-world.js": {
+   "ns": [
+    "parallelWorld"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_parallel_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/horizon.js": {
+   "ns": [
+    "horizon"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_horizon_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/digest.js": {
+   "ns": [
+    "digest"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/limits.js": {
+   "ns": [
+    "limits"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/worldbook.js": {
+   "ns": [
+    "worldbook"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/ledger.js": {
+   "ns": [
+    "ledger"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/timeline.js": {
+   "ns": [
+    "timeline"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/entities.js": {
+   "ns": [
+    "entities"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/preset.js": {
+   "ns": [
+    "preset"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_active_preset",
+    "worldaxis_custom_presets"
+   ],
+   "consumedBy": []
+  },
+  "engines/chatcache.js": {
+   "ns": [
+    "chatcache"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/pmem.js": {
+   "ns": [
+    "pmem"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/rules.js": {
+   "ns": [
+    "rules"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/theme.js": {
+   "ns": [
+    "theme"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_theme_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/summarizer.js": {
+   "ns": [
+    "summarizer"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/chapters.js": {
+   "ns": [
+    "chapters"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/direct-event.js": {
+   "ns": [
+    "directEvent"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/editor-faction.js": {
+   "ns": [
+    "editorFaction"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/editor-events.js": {
+   "ns": [
+    "editorEvents"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/inspector-state.js": {
+   "ns": [
+    "inspectorState"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/tool-snapshot.js": {
+   "ns": [
+    "toolSnapshot"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/tool-analyzer.js": {
+   "ns": [
+    "toolAnalyzer"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/tool-import.js": {
+   "ns": [
+    "toolImport"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/inject-inspector.js": {
+   "ns": [
+    "injectInspector"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/inject-budget.js": {
+   "ns": [
+    "injectBudget"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/tool-diag.js": {
+   "ns": [
+    "toolDiag"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/contract-audit.js": {
+   "ns": [
+    "contractAudit"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/memory-sampler.js": {
+   "ns": [
+    "memorySampler"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/sampler-check.js": {
+   "ns": [
+    "samplerCheck"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/inject-channel.js": {
+   "ns": [
+    "injectChannel"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/inject-slot-audit.js": {
+   "ns": [
+    "injectSlotAudit"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/proactive.js": {
+   "ns": [
+    "proactive"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/wb-inject.js": {
+   "ns": [
+    "wbInject"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/entry-router.js": {
+   "ns": [
+    "entryRouter"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/kaleidoscope.js": {
+   "ns": [
+    "kaleidoscope"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/calendar.js": {
+   "ns": [
+    "calendar"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_calendar_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/memory.js": {
+   "ns": [
+    "memory"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/opinion.js": {
+   "ns": [
+    "opinion"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_opinion_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/bridge.js": {
+   "ns": [
+    "bridge"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_bridge_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/lonsha-reader.js": {
+   "ns": [
+    "lonshaReader"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/host-wb-trace.js": {
+   "ns": [
+    "hostWbTrace"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/ledger-timeline.js": {
+   "ns": [
+    "ledgerTimeline"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-changes.js": {
+   "ns": [
+    "floorChanges"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "actors/registry.js": {
+   "ns": [
+    "registry"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_npc_registry_v1",
+    "worldaxis_registry_alias_v1",
+    "worldaxis_registry_ids_v1"
+   ],
+   "consumedBy": []
+  },
+  "actors/monologue.js": {
+   "ns": [
+    "monologue"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "actors/observe.js": {
+   "ns": [
+    "observe"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "actors/profile.js": {
+   "ns": [
+    "profile"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "direction/oracle.js": {
+   "ns": [
+    "oracle"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_oracle_plan_v1"
+   ],
+   "consumedBy": []
+  },
+  "direction/tags.js": {
+   "ns": [
+    "tags"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "direction/choices.js": {
+   "ns": [
+    "choices"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/style.js": {
+   "ns": [
+    "style"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_style_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/life.js": {
+   "ns": [
+    "life"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_life_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/intel.js": {
+   "ns": [
+    "intel"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_intel_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/org.js": {
+   "ns": [
+    "org"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_org_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/longline.js": {
+   "ns": [
+    "longline"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_longline_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/foreshadow.js": {
+   "ns": [
+    "foreshadow"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_foreshadow_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/causal.js": {
+   "ns": [
+    "causal"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_causal_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/phone-bridge.js": {
+   "ns": [
+    "phoneBridge"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_phone_bridge_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world.js": {
+   "ns": [
+    "world"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/weather.js": {
+   "ns": [
+    "weather"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_weather_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/difficulty.js": {
+   "ns": [
+    "difficulty"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_difficulty_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/shadow.js": {
+   "ns": [
+    "shadow"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_shadow_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/threads.js": {
+   "ns": [
+    "threads"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_threads_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rumor.js": {
+   "ns": [
+    "rumor"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rumor_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/canon.js": {
+   "ns": [
+    "canon"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_canon_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/affect.js": {
+   "ns": [
+    "affect"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_affect_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/bonds.js": {
+   "ns": [
+    "bonds"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_bonds_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/masks.js": {
+   "ns": [
+    "masks"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_masks_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/temporal-lock.js": {
+   "ns": [
+    "temporalLock"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_temporal_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/temperament.js": {
+   "ns": [
+    "temperament"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_temperament_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/fondness.js": {
+   "ns": [
+    "fondness"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_fondness_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/parallel-events.js": {
+   "ns": [
+    "parallelEvents"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_pevents_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/era-cycle.js": {
+   "ns": [
+    "eraCycle"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_era_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/survival.js": {
+   "ns": [
+    "survival"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_survival_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/warrant.js": {
+   "ns": [
+    "warrant"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_warrant_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/beast-bond.js": {
+   "ns": [
+    "beastBond"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_beast_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/appearance.js": {
+   "ns": [
+    "appearance"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_appearance_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/ladder.js": {
+   "ns": [
+    "ladder"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_ladder_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/scene-slice.js": {
+   "ns": [
+    "sceneSlice"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_scene_slice_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/gauge.js": {
+   "ns": [
+    "gauge"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_gauge_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rivalry.js": {
+   "ns": [
+    "rivalry"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rivalry_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/enigma.js": {
+   "ns": [
+    "enigma"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_enigma_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/tempo.js": {
+   "ns": [
+    "tempo"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_tempo_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/quota.js": {
+   "ns": [
+    "quota"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_quota_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/spotlight.js": {
+   "ns": [
+    "spotlight"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_spotlight_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/karma.js": {
+   "ns": [
+    "karma"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_karma_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/hazard.js": {
+   "ns": [
+    "hazard"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_hazard_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/marginal.js": {
+   "ns": [
+    "marginal"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_marginal_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/tolerance.js": {
+   "ns": [
+    "tolerance"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_tolerance_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/events.js": {
+   "ns": [
+    "events"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_events_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/checkpoints.js": {
+   "ns": [
+    "checkpoints"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_ckpt_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/act.js": {
+   "ns": [
+    "act"
+   ],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_act_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/chrono.js": {
+   "ns": [
+    "chrono"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_chrono_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/collab.js": {
+   "ns": [
+    "collab"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_collab_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/opportunity.js": {
+   "ns": [
+    "opportunity"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_opportunity_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/recipe.js": {
+   "ns": [
+    "recipe"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_recipe_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rehearsal.js": {
+   "ns": [
+    "rehearsal"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rehearsal_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/liaison.js": {
+   "ns": [
+    "liaison"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_liaison_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/coop.js": {
+   "ns": [
+    "coop"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_coop_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/plan.js": {
+   "ns": [
+    "plan"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_plan_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/mend.js": {
+   "ns": [
+    "mend"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_mend_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/economy.js": {
+   "ns": [
+    "economy"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_economy_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/freight.js": {
+   "ns": [
+    "freight"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_freight_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/story-choice.js": {
+   "ns": [
+    "storyChoice"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_story_choice_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/commission.js": {
+   "ns": [
+    "commission"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_commission_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/investigation.js": {
+   "ns": [
+    "investigation"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_investigation_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/aftermath.js": {
+   "ns": [
+    "aftermath"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_aftermath_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/operations.js": {
+   "ns": [
+    "operations"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_operations_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/probe.js": {
+   "ns": [
+    "probe"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_probe_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/region.js": {
+   "ns": [
+    "region"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_region_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/stage.js": {
+   "ns": [
+    "stage"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_stage_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/session.js": {
+   "ns": [
+    "session"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_session_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/inst.js": {
+   "ns": [
+    "inst"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_inst_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/userlock.js": {
+   "ns": [
+    "userlock"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_userlock_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rhythm-loop.js": {
+   "ns": [
+    "rhythmLoop"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rhythm_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/motif.js": {
+   "ns": [
+    "motif"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_motif_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/beat-mask.js": {
+   "ns": [
+    "beatMask"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_beatmask_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/power-anchor.js": {
+   "ns": [
+    "powerAnchor"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_poweranchor_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rewriter.js": {
+   "ns": [
+    "rewriter"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rewriter_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/storyclock.js": {
+   "ns": [
+    "storyclock"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_storyclock_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/preset-world.js": {
+   "ns": [
+    "presetWorld"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_presetworld_data_v1",
+    "worldaxis_presetworld_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/request-viewer.js": {
+   "ns": [
+    "requestViewer"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_requestviewer_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/wb-search.js": {
+   "ns": [
+    "wbSearch"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/stale-guard.js": {
+   "ns": [
+    "staleGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_staleguard_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/purify-scope.js": {
+   "ns": [
+    "purifyScope"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_purifyscope_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/group-refuse.js": {
+   "ns": [
+    "groupGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/reasoning.js": {
+   "ns": [
+    "reasoning"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_reasoning_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/story-tone.js": {
+   "ns": [
+    "storyTone"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_storytone_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/calendar-custom.js": {
+   "ns": [
+    "calendarPlan"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_calendarplan_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rehearse.js": {
+   "ns": [
+    "preflight"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_preflight_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/archive-hide.js": {
+   "ns": [
+    "archiveHide"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_archivehide_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/word-budget.js": {
+   "ns": [
+    "wordBudget"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_wordbudget_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/binding.js": {
+   "ns": [
+    "binding"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_binding_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/refine.js": {
+   "ns": [
+    "refine"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_refine_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/polish.js": {
+   "ns": [
+    "polish"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_polish_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/ensemble.js": {
+   "ns": [
+    "ensemble"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_ensemble_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/faction-graph.js": {
+   "ns": [
+    "factionGraph"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_faction_graph_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/noesis.js": {
+   "ns": [
+    "noesis"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_noesis_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/lifeline.js": {
+   "ns": [
+    "lifeline"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_lifeline_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/perspective-lock.js": {
+   "ns": [
+    "perspective"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_perspective_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/perf-ledger.js": {
+   "ns": [
+    "perfLedger"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_perf_ledger_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/tape-store.js": {
+   "ns": [
+    "tapeStore"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_tape_store_cfg_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/sediment.js": {
+   "ns": [
+    "sediment"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_sediment_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/inject-value.js": {
+   "ns": [
+    "injectValue"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_inject_value_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/offline-tick.js": {
+   "ns": [
+    "offlineTick"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_offline_tick_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/farfield.js": {
+   "ns": [
+    "farfield"
+   ],
+   "requires": [
+    "registerModule",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_farfield_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/agency.js": {
+   "ns": [
+    "agency"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_agency_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "render/inject.js": {
+   "ns": [
+    "render"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_inject_visibility_v1"
+   ],
+   "consumedBy": []
+  },
+  "render/theater.js": {
+   "ns": [
+    "theater"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "render/purifier.js": {
+   "ns": [
+    "purifier"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_purifier_rules_v1"
+   ],
+   "consumedBy": []
+  },
+  "compat/host.js": {
+   "ns": [
+    "compat"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "compat/mvu.js": {
+   "ns": [
+    "compatMvu"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "compat/th-helper.js": {
+   "ns": [
+    "compatTH"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/interop.js": {
+   "ns": [
+    "interop"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/perf-trace.js": {
+   "ns": [
+    "perfTrace"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/storage-forecast.js": {
+   "ns": [
+    "storageForecast"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_storage_forecast_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/plot-gauge.js": {
+   "ns": [
+    "plotGauge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_plot_gauge_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/branch-tree.js": {
+   "ns": [
+    "branchTree"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_branch_tree_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-bridge.js": {
+   "ns": [
+    "worldBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_bridge_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/eco-audit.js": {
+   "ns": [
+    "ecoAudit"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_eco_audit_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-seed.js": {
+   "ns": [
+    "worldSeed"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_seed_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-blueprint.js": {
+   "ns": [
+    "worldBlueprint"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_blueprint_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/diplomacy.js": {
+   "ns": [
+    "diplomacy"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_diplomacy_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/playtime.js": {
+   "ns": [
+    "playtime"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_playtime_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/offline-return.js": {
+   "ns": [
+    "offlineReturn"
+   ],
+   "requires": [
+    "registerModule",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_offline_return_v1"
+   ],
+   "consumedBy": []
+  }
+ }
+}

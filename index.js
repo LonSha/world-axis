@@ -1,0 +1,776 @@
+/**
+ * 世界枢轴 WorldAxis v0.1.0
+ * 缝合：世界背面 / DlSNlGHT World / st-beat-tracker / SevenDaysCal / story-oracle(+outline)
+ *       st-direct-event / SoulLink / choice / EW-Assistant / st-theater / Veridis-Rewrite
+ *       WNE引擎 / TH-剧情推进 / 创世工坊 等资产
+ * 骨架：单拦截器调度内核 + 工作流节点注册表 + 世界演算底座 + 分源注入 + 主面板
+ */
+(function () {
+  'use strict';
+
+  const MODULE = 'worldAxis';
+  const VERSION = '2.181.0'
+  const LOG = '[世界枢轴]';
+
+  // 防止重复加载
+  if (window.__WORLD_AXIS_LOADED__) return;
+  window.__WORLD_AXIS_LOADED__ = true;
+
+  // 主窗口引用（TH脚本blob iframe场景下需要parent）
+  const mainWin = (() => {
+    try { return window.parent && window.parent !== window ? window.parent : window; }
+    catch (e) { return window; }
+  })();
+  const mainDoc = mainWin.document || document;
+
+  // ── 命名空间 ─────────────────────────────────────────────
+  const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.4.0: `WA.VERSION` 此前在 `const WA` 声明**之前**赋值 —— 严格模式命中 TDZ
+  //   （ReferenceError: Cannot access 'WA' before initialization），入口文件抛错即崩、
+  //   扩展整体无法装载。旧键 WS.VERSION 由 tool-diag 消费（`WA.VERSION || WA.version`），
+  //   故在命名空间建立后补回，避免消费端读空。tests/run.js 跳过 index.js，故长期未被回归发现。
+  WA.VERSION = VERSION;
+  WA.version = VERSION;
+  WA.mainWin = mainWin;
+  WA.mainDoc = mainDoc;
+  // v2.15.0: 时间源单一出口（决策时间进存档/参与判定，测量时间只进内存台账与日志）。
+  //   注意：本文件里一律用**内联三目**而非局部 helper——run.js 会把 loadScriptOnce 这
+  //   段源码切片出来在独立沙箱里重编译，helper 不在切片内，用 helper 会在 CDN 回退路径上炸。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
+  // v2.0.0: 模块注册表契约已下沉至 core/store.js（注册表必须在所有加载路径下存在，
+  // 而非仅在入口文件）——此处保留转发兜底，防旧加载顺序下未定义。
+  if (typeof WA.registerModule !== 'function') {
+    WA.modules = WA.modules || {};
+    WA.registerModule = function (name, meta) {
+      if (!name) return null;
+      const rec = { name: name, at: (WA.clock ? WA.clock.now('index.module') : Date.now()), ver: (meta && meta.ver) || VERSION, kind: (meta && meta.kind) || 'engine' };
+      WA.modules[name] = rec;
+      return rec;
+    };
+  }
+  if (typeof WA.moduleRegistry !== 'function') WA.moduleRegistry = function () { return Object.keys(WA.modules || {}).sort(); };
+  WA.eventLog = [];     // 轻量运行日志（内存环形，最多300条，info/warn/error 混装）
+  WA.errorLog = [];    // v0.1.53: error 专属子环（最多50条）——info 噪音挤掉混合环也不丢关键故障证据
+  const ERROR_LOG_MAX = 50;
+  // v0.4.0: 诊断环自适应——上限按存储水位动态收紧/放宽。
+  // 压力来源：① 当前聊天诊断占比超预算（diagBudget.exceeded）② 全库 worldaxis 键总体积越水位。
+  // 收紧后既省体积又不静默丢证据：裁剪量进 logTrimStat 可观测。
+  const LOG_ADAPT = {
+    baseEvent: 300, baseError: 50,       // 常规上限
+    tightEvent: 120, tightError: 30,     // 紧张时上限
+    minuteEvent: 60, minuteError: 20,    // 危急时上限
+    bytesSoft: 4 * 1024 * 1024,          // 软水位 4MB（worldaxis_* 全体）
+    bytesHard: 8 * 1024 * 1024           // 硬水位 8MB
+  };
+  const __logTrimStat = { eventTrims: 0, errorTrims: 0, lastAt: 0, level: 'normal' };
+  function logCaps() {
+    let level = 'normal', why = [];
+    try {
+      if (WA.store && WA.store.diagBudget) {
+        const db = WA.store.diagBudget();
+        if (db && db.exceeded) { level = 'tight'; why.push('diagPct=' + db.diagPct + '%>' + db.maxPct + '%'); }
+      }
+      if (WA.store && WA.store.storageStat) {
+        const st = WA.store.storageStat();
+        const tot = (st && st.totalBytes) || 0;
+        if (tot > LOG_ADAPT.bytesHard) { level = 'minute'; why.push('totalBytes>' + LOG_ADAPT.bytesHard); }
+        else if (tot > LOG_ADAPT.bytesSoft && level === 'normal') { level = 'tight'; why.push('totalBytes>' + LOG_ADAPT.bytesSoft); }
+      }
+    } catch (e) {}
+    __logTrimStat.level = level;
+    const ev = level === 'minute' ? LOG_ADAPT.minuteEvent : level === 'tight' ? LOG_ADAPT.tightEvent : LOG_ADAPT.baseEvent;
+    const er = level === 'minute' ? LOG_ADAPT.minuteError : level === 'tight' ? LOG_ADAPT.tightError : LOG_ADAPT.baseError;
+    return { level: level, event: ev, error: er, why: why };
+  }
+  function logTrimStatView() {
+    const caps = logCaps();
+    return { eventTrims: __logTrimStat.eventTrims, errorTrims: __logTrimStat.errorTrims, lastAt: __logTrimStat.lastAt, level: caps.level, eventCap: caps.event, errorCap: caps.error, why: caps.why };
+  }
+  let __logSaveTimer = null;
+  let __logSaveChat = null;   // v0.2.1: 挂起日志所属聊天（防抖窗口内切聊天时写错目标）
+  const LOG_SAVE_DEBOUNCE_MS = 500;
+  function persistEventLog(chatId) {
+    try {
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      mainWin.localStorage.setItem('worldaxis_event_log_' + cid, JSON.stringify(WA.eventLog.slice(-300)));
+      mainWin.localStorage.setItem('worldaxis_error_log_' + cid, JSON.stringify(WA.errorLog.slice(-ERROR_LOG_MAX)));
+    } catch (e) {}
+  }
+  // v0.2.1: 防抖批量落盘——高频 info 日志合并窗口内只写一次，error 立即落盘保关键证据
+  function scheduleLogSave(immediate) {
+    if (immediate) {
+      const target = __logSaveChat || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      if (__logSaveTimer) { clearTimeout(__logSaveTimer); __logSaveTimer = null; }
+      persistEventLog(target); __logSaveChat = null;
+      return;
+    }
+    if (!__logSaveChat) __logSaveChat = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
+    if (__logSaveTimer) return;
+    __logSaveTimer = setTimeout(function () {
+      const target = __logSaveChat; __logSaveTimer = null; __logSaveChat = null;
+      persistEventLog(target);
+    }, LOG_SAVE_DEBOUNCE_MS);
+  }
+  WA.log = function (level, msg, data) {
+    const entry = { t: clockNow('index.log'), level, msg, data: data === undefined ? null : String(data).slice(0, 500) };
+    WA.eventLog.push(entry);
+    // v0.4.0: 按存储水位动态裁剪（常规 300 / 紧张 120 / 危急 60）
+    const caps = logCaps();   // 函数声明提升：加载期调用也安全
+    if (WA.eventLog.length > caps.event) {
+      const drop = WA.eventLog.length - caps.event;
+      WA.eventLog.splice(0, drop);
+      __logTrimStat.eventTrims += drop; __logTrimStat.lastAt = clockWall();
+    }
+    if (level === 'error') {
+      WA.errorLog.push(entry);
+      if (WA.errorLog.length > caps.error) {
+        const dropE = WA.errorLog.length - caps.error;
+        WA.errorLog.splice(0, dropE);
+        __logTrimStat.errorTrims += dropE; __logTrimStat.lastAt = clockWall();
+      }
+    }
+    scheduleLogSave(level === 'error');   // v0.2.1: error 立即落盘；info/warn 走防抖窗口
+    const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+    fn(LOG, msg, data ?? '');
+  };
+  WA.logCaps = logCaps;          // v0.4.0: 当前诊断环动态上限（供测试/诊断消费）
+  WA.logTrimStat = logTrimStatView;
+  // v0.2.1: 恢复/清理日志（v0.1.53: 同步恢复/清理 error 子环）
+  //          切换聊天/清理前先冲刷挂起的防抖写入，防止未落盘日志丢失
+  WA.flushLog = function () {
+    if (!__logSaveTimer) return;   // v0.2.1: 无挂起写入 = 全部已落盘，不得动磁盘（防用已切换的内存覆盖已持久化数据）
+    clearTimeout(__logSaveTimer); __logSaveTimer = null;
+    const target = __logSaveChat || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+    __logSaveChat = null;
+    persistEventLog(target);
+  };
+  // v2.11.0: 宿主级读失败投递（与各模块同口径——单一台账、多模块投递）
+  function reportHostReadFail(source, key, err) {
+    try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail(source, key, err); } catch (e) {}
+  }
+  WA.loadEventLog = function (chatId) {
+    try {
+      WA.flushLog();   // 先落盘当前聊天挂起日志
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      // v2.11.0: 两处日志载入此前共用一个空 catch ⇒ 读失败表现为「本会话没有历史日志」，
+      //   而日志正是排查其它故障的唯一证据面——它自己读不出来时必须是可见的。
+      let raw = null;
+      try { raw = mainWin.localStorage.getItem('worldaxis_event_log_' + cid); }
+      catch (eH) { reportHostReadFail('eventLog', 'worldaxis_event_log_' + cid, eH); }
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) WA.eventLog = arr.slice(-LOG_ADAPT.baseEvent);
+      }
+      let rawErr = null;
+      try { rawErr = mainWin.localStorage.getItem('worldaxis_error_log_' + cid); }
+      catch (eH2) { reportHostReadFail('errorLog', 'worldaxis_error_log_' + cid, eH2); }
+      if (rawErr) {
+        const arrErr = JSON.parse(rawErr);
+        if (Array.isArray(arrErr)) WA.errorLog = arrErr.slice(-ERROR_LOG_MAX);
+      }
+    } catch (e) {}
+  };
+  WA.clearEventLog = function (chatId) {
+    WA.eventLog = [];
+    WA.errorLog = [];
+    // v0.2.1: 取消挂起的防抖写入，防止已清空日志被定时器复活写回
+    if (__logSaveTimer) { clearTimeout(__logSaveTimer); __logSaveTimer = null; }
+    __logSaveChat = null;
+    try {
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      // v2.9.0: 走 store 的受控删除出口（此前裸调 removeItem）。清除日志的语义是「清空」——
+      //   删失败时防抖写入已取消、内存也清了，而磁盘上的旧日志会在下次 loadEventLog 时
+      //   整段复活：用户看到「已清空」，重启后又回来了，且没有任何线索。
+      if (WA.store && typeof WA.store.removeVerified === 'function') {
+        WA.store.removeVerified('worldaxis_event_log_' + cid);
+        WA.store.removeVerified('worldaxis_error_log_' + cid);
+      }
+    } catch (e) {}
+  };
+
+  // ── 加载子模块（按依赖顺序）─────────────────────────────
+  // 使用扩展自身URL推导base路径（兼容 third-party 目录）
+  function getBaseUrl() {
+    const scripts = mainDoc.getElementsByTagName('script');
+    for (let i = scripts.length - 1; i >= 0; i--) {
+      const src = scripts[i].src || '';
+      const idx = src.indexOf('/index.js');
+      if (idx > 0 && src.includes('WorldAxis')) return src.slice(0, idx);
+    }
+    // 回退：从 import.meta 不可用（非模块），用扩展目录惯例
+    return '/scripts/extensions/third-party/WorldAxis';
+  }
+  WA.baseUrl = getBaseUrl();
+  WA.loadScript = loadScript;
+
+  const LOAD_ORDER = [
+    'core/clock.js',           // v2.15.0: 时间源单一出口（决策时间可冻结 / 测量时间不受影响）——须最先装载
+    'core/rand.js',            // v2.14.0: 随机源单一出口（决策流可复现 / 标识流不混流）
+    'core/input-guard.js',     // v2.85.0: 统一输入边界（须早于一切消费外部值的模块）
+    // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个**基元**模块。位置与 tests/run.js 的 LOAD 同序
+    //   （紧随 input-guard）。三者在**调用期**读 WA.inputGuard / WA.store / WA.clock，不在装载期读，
+    //   故对次序无硬要求；放在这一批是刻意的 —— 它们与 input-guard 是同一条边界上的三层：
+    //   值级 → 结构级 → 归属级，而 fault-context 是三层共用的「一次失败怎么讲清楚」。
+    'core/fault-context.js',
+    'core/schema.js',
+    'core/permissions.js',    // v2.111.0（计划二 #67/#69）：审计与消毒。
+    //   位置在 permissions 之后、settings-bus 之前：audit-log 在调用期读 WA.permissions（取当前用户），
+    //   sanitize 不读任何东西（纯函数）。两者对次序均无硬要求 —— 与 v2.110.0 三个基元同一批。
+    'core/audit-log.js', 'core/sanitize.js',
+    'core/settings-bus.js',
+    'core/store.js',
+    // v2.118.0（计划二 B7）：显式执行上下文（试演的承重结构）。位置只需**早于** engines 区 ——
+    //   act.js / world.js 都在**调用期**经 WA.exec 取值（装载期不读），故对次序无硬要求；
+    //   放在 store 之后是刻意的：它自身不读 WA.store，但 cloneState 的入参是 WA（含 store），
+    //   与 store 同批便于「存储层 → 执行层」的阅读次序。
+    'core/exec.js',
+    // v2.114.0（计划二 #56/#68）：生命周期钩子与进程内白名单沙箱。
+    //   位置**必须**在 store 之后：两模块尾部都调 WA.registerModule 登记自己
+    //   （registerModule 由 store 提供），排在 store 之前会 order-violation 装载期抛错。
+    //   调用期关系是反向的——store 在 save/init 里读 WA.plugin.fire，plugin 的钩子体走 WA.sandbox.run，
+    //   都在调用期取，故排在 store 之后不产生环。
+    'core/sandbox.js', 'core/plugin.js',
+    'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）
+    'core/api-router.js',
+    'core/undo.js',           // v2.30.0: 参数编辑撤销栈（P0-2；须在 store 之后、UI 之前装载）
+    'core/workflow.js',
+    'core/settle-guard.js',
+    // v2.160.0（TP4）：跨引擎提交契约。位置**必须**在 store / evict 之后 ——
+    //   它尾调 WA.registerModule（由 store 提供），且写入侧经 WA.evict.array 走挤出台账。
+    //   调用期关系：它读 WA.store / WA.clock / WA.evict，全在调用期取，故排在此处不产生环。
+    'core/commit.js',
+    'core/interceptor.js',
+    'engines/backstage.js',
+    'engines/evolution.js',
+    'engines/enemies.js',
+    'engines/regional.js',
+    'engines/parallel-world.js', // v2.34.0: 平行世界（主线之外独立推演，缝合自狐神抚 V19.5）
+     'engines/horizon.js',
+     'engines/digest.js',
+     'engines/limits.js',
+'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
+    'engines/chapters.js',
+    'engines/direct-event.js',
+    'engines/editor-faction.js',
+    'engines/editor-events.js',
+    'engines/inspector-state.js',
+    'engines/tool-snapshot.js',
+    'engines/tool-analyzer.js',
+    'engines/tool-import.js',
+    'engines/inject-inspector.js',
+    'engines/inject-budget.js',
+    'engines/tool-diag.js',
+    'engines/contract-audit.js',
+    'engines/memory-sampler.js',
+    'engines/sampler-check.js',
+    'engines/inject-channel.js',
+    'engines/inject-slot-audit.js',
+    'engines/proactive.js',
+    'engines/wb-inject.js',
+    // v2.45.0: 世界书条目按需路由。必须在 worldbook.js 之后装载——它读 worldbook 的
+    //   按聊天覆写表（getOverrides/getSelectedIds/saveSelection）落「本回合隐藏」。
+    'engines/entry-router.js',
+    // v2.46.0: 变量驱动条款（世界状态 → 派生量 → 按变量值确定性注入正文）。
+    //   须在 core/store 之后（它只读 store 快照），与本模块的 before 节点位置无关
+    //   （节点顺序由 workflow 的 order 决定，不由装载顺序决定）。
+    'engines/kaleidoscope.js',
+    'engines/calendar.js',
+    'engines/memory.js',
+    'engines/opinion.js',
+    // v2.16.0: 对外只读互操作桥（worldaxis_bridge_v1）。须在 store/settingsBus/interceptor/workflow
+    //   之后装载——它读 store、写设置走 settingsBus、订阅总线、并在 after 链注册发布节点。
+    'engines/bridge.js',
+    // v2.17.0: 记忆桥消费面（读 window.lonsha_memory_bridge_v1）。须在 core/store 之后装载
+    //   ——它读 store.clock 做对账；与 bridge.js（对外的**供货**面）互为镜像：桥发得出去、
+    //   也读得进来，这套互操作才算通了整条。
+    'engines/lonsha-reader.js',
+    // v2.50.0（第三十五面）: 宿主两侧 + 时间轴三账。
+    //   须在 engines/timeline.js（hashText / auditRefs 的提供方）之后，且**必须早于**
+    //   render/inject.js —— 注入落地时会读 hostWbTrace.crossCheck 与 ledgerTimeline.probeDefault，
+    //   而 core/interceptor.js 的订阅回调也要在 install() 时找到这三个命名空间。
+    'engines/host-wb-trace.js',
+    'engines/ledger-timeline.js',
+    'engines/floor-changes.js',
+    'actors/registry.js',
+    'actors/monologue.js',
+    'actors/observe.js',
+    'actors/profile.js',
+    'direction/oracle.js',
+    'direction/tags.js',
+    'direction/choices.js',
+    // v2.51.0（第三十六面）：叙事工艺设置面。须早于其唯一消费方 render/inject.js
+    //   —— 注入落地时 applyInjections 要读 style.buildBlock()。
+    //   它是 engines/rules.js 的 craft 模块（「叙事工艺按设置面口径执行」）所指向的
+    //   那个**设置面本身**：此前只有口径声明、没有产生方。
+    'engines/style.js',
+    // v2.52.0：人物生活。须早于 render/inject.js，注入时读取 life.buildBlock()。
+    'engines/life.js',
+    // v2.53.0：因果与情报。须早于 render/inject.js，注入时读取 intel.buildBlock()。
+    'engines/intel.js',
+    // v2.54.0：资源与组织。须早于 render/inject.js，注入时读取 org.buildBlock()。
+    'engines/org.js',
+    // v2.55.0：长线伏笔。须早于 render/inject.js，注入时读取 longline.buildBlock()。
+    'engines/longline.js',
+    // v2.135.0（E6）：伏笔生命周期。须**晚于** engines/longline.js —— 它的 resolve/recycle
+    //   要清掉 longline 设的承诺时刻（dueAt / promisedAt），先装会出现「清了但还没人设」的窗口；
+    //   须早于 render/inject.js，注入时读取 foreshadow.buildBlock()。
+    //   真源是既有的 memory.foreshadows（不新开容器）—— 见模块头部边界 2。
+    'engines/foreshadow.js',
+    // v2.62.0：因果结算。须早于 render/inject.js，注入时读取 causal.buildBlock()；
+    //   且须**晚于** intel.js —— knownCause 单一真源指向 intel.knownCause。
+    'engines/causal.js',
+    // v2.97.0（X5）：跨插件因果桥（**入站边**，worldaxis_phone_ops_v1）。
+    //   为什么须**晚于** engines/causal.js：它把手机侧的操作登记进 `causal.phoneOps`
+    //   （与因果链同容器），并把「这条链的因是手机操作」这一层接回来——因果面先在场，
+    //   入站台账才有链可指。与 engines/bridge.js（只读**出站**投影）正交，两者互不调用。
+    'engines/phone-bridge.js',
+    // v2.63.0：世界织体（社会生活 / 共同日程 / 地点与路途）。
+    //   须早于 render/inject.js，注入时读取 world.buildBlock()；
+    //   且须**晚于** life.js —— 在场者名单的唯一证据是「人物自己的日程安排」（life.schedule）。
+    'engines/world.js',
+    // v2.65.0 天气与难度。天气必须晚于 world.js：setWeather 用 world.reach 确认地点已登记。
+    'engines/weather.js',
+    'engines/difficulty.js',
+    // v2.63.0：社交漩涡（关系经历与承诺深化）。
+    //   须早于 render/inject.js，注入时读取 shadow.buildBlock()。
+    'engines/shadow.js',
+    // v2.63.0：悬案（调查与情报玩法面）。
+    //   须早于 render/inject.js，注入时读取 threads.buildBlock()。
+    'engines/threads.js',
+    // v2.96.0（X3）：传播与辟谣（事实 / 目击 / 转述 / 流言四层传播链）。
+    //   三条位置约束，全是硬依赖：
+    //     ① 须**晚于** engines/memory.js —— 事实真源是 memory.facts（事实唯一写者 upsertFact）；
+    //     ② 须**晚于** engines/intel.js —— 层的置信度由 intel.CONFIDENCE 反查（不内联第二套数）；
+    //     ③ 须**早于** render/inject.js —— 注入时读取 rumor.buildBlock()。
+    'engines/rumor.js',
+    // v2.99.0（第五十六面）：原著幕目（canon.js：长文本 → 幕 → 剧情点）。
+    //   位置只需**早于 render/inject.js**（注入时读取 canon.buildBlock()）；
+    //   与 rumor 无依赖。它在 LOAD 里排在 rumor 之后、affect 之前——
+    //   与 `engines/*` 区的既有次序保持「新增追加在同类末尾」的惯例。
+    'engines/canon.js',
+    // v2.66.0：情绪通道 / 关系六型 / 假面。须早于 render/inject.js，注入时读取各自 buildBlock()；
+    //   且须晚于 threads.js —— affect 的过载口径参考 difficulty 的枚举纪律，无硬依赖但保持装载序。
+    'engines/affect.js',
+    'engines/bonds.js',
+    'engines/masks.js',
+    // v2.67.0: 时间锁 / 双层性格 / 好感审计 / 场外事件。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/temporal-lock.js',
+    'engines/temperament.js',
+    'engines/fondness.js',
+    'engines/parallel-events.js',
+    // v2.68.0: 资料片周期 / 生存三轴 / 通缉 / 驯兽。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/era-cycle.js',
+    'engines/survival.js',
+    'engines/warrant.js',
+    'engines/beast-bond.js',
+    // v2.69.0: 外貌分级契约 / 原型阶梯。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/appearance.js',
+    'engines/ladder.js',
+    // v2.70.0: 情境切片 / 阻尼量规 / 竞争焦点。
+    'engines/scene-slice.js',
+    'engines/gauge.js',
+    'engines/rivalry.js',
+    // v2.71.0: 叙事纪律四件套（信息暗礁 / 节奏齿轮 / 伏笔配给 / 焦点分配）。
+    'engines/enigma.js',
+    'engines/tempo.js',
+    'engines/quota.js',
+    'engines/spotlight.js',
+    // v2.72.0: 叙事动力四件套（业力双轴 / 累积风险 / 边际折旧 / 手段耐受）。
+    'engines/karma.js',
+    'engines/hazard.js',
+    'engines/marginal.js',
+    'engines/tolerance.js',
+    'engines/events.js',
+    // v2.82.0: 快照与分支（B3）。**无核心依赖**（只读 store.get / store.transact），
+    //   位置只需早于 render/inject.js 的消费点（注入块与事件调度同批）。
+    'engines/checkpoints.js',
+    // v2.117.0（计划二 B1）：行动执行。位置与 tests/run.js 的 LOAD 同序。
+    //   · 须晚于 engines/life.js：行动的目标来源只读 life.goals（不另存副本）；
+    //   · 须晚于 engines/world.js：准入读 canBeAt/reach/depart，结算读 arrive/stop；
+    //   · 须早于 render/inject.js：注入落地时消费 act.buildBlock()。
+    //   · 尾部自带 workflow 心跳注册（after / order 21）——它读 WA.workflow，而 core/workflow.js
+    //     在 core 区早已装载，故此处对装载期无硬依赖；带守卫调用（同 calendar/bridge 的做法）。
+    'engines/act.js',
+    // v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）：因果链追踪与协作面。位置与 tests/run.js 的 LOAD 同序。
+    //   · chrono 只读 `store.get/transact` 与 `clock.wallNow`，**不读**任何引擎出口 —— 故对次序无硬依赖，
+    //     放在 engines 区末尾（与 checkpoints 同批的「无核心依赖」面）。
+    //   · collab 同理（只读 store 与 inputGuard），两者都不在装载期读 WA，与 settings-bus 的次序无关。
+    //   为什么排在 render/inject.js **之前**：本版两者都没有注入消费点（不产 buildBlock），
+    //     但按惯例「engines 区一律早于 render」，以免后续接消费方时被迫改装载序。
+    'engines/chrono.js',
+    'engines/collab.js',
+    // v2.117.0（计划二 B6）：机会形成 + 题材完整配置配方。位置与 tests/run.js 的 LOAD 同序。
+    //   · opportunity 只读五处引擎出口（longline.overdue / org.projectView / life.goals /
+    //     intel.entitledTo / causal.due）⇒ 须晚于这五个模块；模块缺席时如实不产候选，
+    //     不在装载期读 WA。
+    //   · recipe 在装载期只读两处**静态表**（WA.act.KINDS 与 WA.theme.THEMES）做核对
+    //     ⇒ 须晚于 engines/theme.js 与 engines/act.js；其 preview / apply 都在调用期委托
+    //     既有的 theme.preview / theme.apply，不另立写盘路径。
+    //   · 两者本版都不产注入消费点（recipe 无 buildBlock；opportunity 的 buildBlock
+    //     尚无调用方），按引擎区惯例仍排在 render/inject.js 之前，以免后续接消费方时改装载序。
+    'engines/opportunity.js',
+    'engines/recipe.js',
+    // v2.118.0（计划二 B7）：统一试演 / 回滚范围 / 原著分歧。位置与 tests/run.js 的 LOAD 同序。
+    //   三条硬约束，缺一条就会在真跑里引用未装载的引擎（试演的危害比真跑更大：
+    //   它给出的是「看起来已经验证过」的结论）：
+    //     · 须晚于 engines/act.js —— 改道走 act.add + act.admit 真判（不自算结论）；
+    //     · 须晚于 engines/phone-bridge.js —— 提前通知走 noteAction 入站面；
+    //     · 须晚于 engines/canon.js —— 分歧报告复用 canon.alignView（不另造对位口径）；
+    //   · 另须晚于 core/exec.js（同批）与 engines/causal.js（推进面）。
+    'engines/rehearsal.js',
+    // v2.118.0（计划二 B8）：跨插件业务闭环。位置与 tests/run.js 的 LOAD 同序。
+    //   三条硬约束，缺一条就会静默降级成「无业务判断的台账」：
+    //     · 须晚于 engines/act.js —— 约定任务走 act.add 真准入（不自造一份行动规则）；
+    //     · 须晚于 engines/world.js —— 「对方在场吗」只问 world.where 的真源；
+    //     · 须晚于 engines/phone-bridge.js —— 出站边走 noteAction 入站面。
+    //   另：它复用 core/exec.js 的上下文门面（B7），故须晚于 core/exec.js。
+    'engines/liaison.js',
+    'engines/coop.js',
+    // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。位置与 tests/run.js 的 LOAD 同序。
+    //   两条硬约束，缺一条就会在真跑里读到未装载的精算模块（两者都在装载期读 WA 本体，
+    //   故必须在调用期之前把它们排在依赖项之后）：
+    //     · 须晚于 engines/life.js —— 计划的唯一来源是 life.goals（本模块不自建目标、不自建人）；
+    //     · 须晚于 engines/org.js  —— 步骤的资源真源是 org.stockOf（本模块不复制一份库存判定）；
+    //     · 须晚于 engines/fondness.js —— 修复结案时唯一一次调 fondness.apply（不自造关系口径）。
+    //   两者都须早于 render/inject.js：注入落地时读 plan.buildBlock() / mend.buildBlock()。
+    'engines/plan.js',
+    'engines/mend.js',
+    // v2.119.0（拓展计划 ③）：供需循环。须晚于 core/store（读写 people.resources），
+    //   须早于 render/inject.js（注入落地时读 economy.buildBlock()）。
+    'engines/economy.js',
+    // v2.167.0（拓展计划 TX3）：守恒运输。须晚于 engines/economy.js（读 economy.goods/routes），
+    //   须早于 render/inject.js（注入落地时读 freight.buildBlock()）。
+    'engines/freight.js',
+    'engines/story-choice.js',
+    'engines/commission.js',
+    'engines/investigation.js',
+    'engines/aftermath.js',
+    'engines/operations.js',
+    'engines/probe.js',
+    // v2.119.0（拓展计划 ⑥）：跨地域传播。须晚于 core/clock（延迟按 clock 算），
+    //   须早于 render/inject.js（注入落地时读 region.buildBlock()）。
+    'engines/region.js',
+    // v2.119.0（拓展计划 ⑦）：玩法包与阶段迁移。须晚于 recipe（槽位真源在那里），
+    //   须早于 render/inject.js（注入落地时读 stage.buildBlock()）。
+    'engines/stage.js',
+    // v2.119.0（拓展计划 ⑧）：多人连接层。须晚于 coop（裁决语义在那里），
+    //   须早于 render/inject.js（注入落地时读 session.buildBlock()）。
+    'engines/session.js',
+    // v2.119.0（拓展计划 ④）：组织制度。须晚于 core/store（读 people / org 现状），
+    //   须早于 render/inject.js（注入落地时读 inst.buildBlock()）。
+    'engines/inst.js',
+    // v2.129.0（缝 A1/A4/A5/A6/A8）：五个叙事纪律引擎。位置须**早于** render/inject.js：
+    //   注入落地时读 userlock / rhythmLoop / motif / beatMask / powerAnchor 的 buildBlock()。
+    //   rhythm-loop 另须晚于 core/store（它读写 rhythm 容器）；其余四个只读 store。
+    'engines/userlock.js',
+    'engines/rhythm-loop.js',
+    'engines/motif.js',
+    'engines/beat-mask.js',
+    'engines/power-anchor.js',
+    // v2.129.0（缝 A2/A3）：改写通道（调副 API）与正文时间戳审计。纯调用期模块，不产注入块，
+    //   对次序无硬要求；与同批新引擎并列，便于「本批五引擎 + 两旁路」一眼看全。
+    'engines/rewriter.js',
+    'engines/storyclock.js',
+    // v2.129.0（缝 A7/A9/A10）：静态设定缓存 / 请求报文预览 / 世界书搜索。三者都不产注入块。
+    //   A10 在**调用期**读 WA.worldbook.peekEntries，A9 在**调用期**读 WA.apiRouter.getChannel ——
+    //   都在调用期取，不构成装载期依赖。A7 只写自己的 localStorage 键（一次不碰 store）。
+    'engines/preset-world.js',
+    'engines/request-viewer.js',
+    'engines/wb-search.js',
+    // v2.130.0（拓展计划 B1/C1/C2/D1/D2/D3/D4/A1/A2/A3/A4）：十二个新引擎。
+    //   位置与 tests/run.js 的 LOAD 同序，且**一律早于** render/inject.js：
+    //   reasoning（思考开销约束）与 story-tone（剧情倾向）产注入块，注入落地时读它们的
+    //   buildBlock()。其余十个不产注入块（纯调用期模块：改写前拦截 / 净化范围 /
+    //   群聊闸门 / 历法换算 / 写前预演 / 归档隐藏 / 字数闭环 / 配置绑定 / 档案精编 / 输入润色），
+    //   对次序无硬要求；与产块的两个并列成一批，便于「本批十二引擎」一眼看全。
+    //   写世界状态的四个（story-tone / calendar-custom / binding / rehearse）
+    //   都走调用期的 store.transact，不构成装载期依赖。
+    'engines/stale-guard.js',
+    'engines/purify-scope.js',
+    'engines/group-refuse.js',
+    'engines/reasoning.js',
+    'engines/story-tone.js',
+    'engines/calendar-custom.js',
+    'engines/rehearse.js',
+    'engines/archive-hide.js',
+    'engines/word-budget.js',
+    'engines/binding.js',
+    'engines/refine.js',
+    'engines/polish.js',
+    // v2.138.0（E5）：多模型并发推演与结果仲裁。
+    //   位置与 tests/run.js 的 LOAD 同序，且**须早于** render/inject.js 之后的任何消费者。
+    //   它对本批无装载期依赖（只读 apiRouter / settingsBus / clock / inputGuard，四者都早已在场），
+    //   也不产注入块 —— 与 polish 并列成「调用期模块」的一批，便于一眼看全。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/ensemble.js',
+    // v2.139.0（E9）：势力关系动态图与张力热力图。
+    //   装载位置：**须晚于** engines/evolution.js（档位词表 FACTION_RELATION / FACTION_STATUS 的
+    //   单一真源在那里，本模块**不自带副本** —— 两份枚举必然漂移），
+    //   且**须早于** readers —— engines/tool-diag.js 与 ui/panel.js 都要读它的现场读数。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/faction-graph.js',
+    // v2.140.0（F1）：防全知闸门。装载位置晚于它所聚合的四个知情面真源
+    //   （enigma / intel / rumor / shadow 均在前），且晚于 world（感知半径的真源）。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/noesis.js',
+    // v2.141.0（F2）：生理与照护真实层。装载位置紧随 noesis 之后（与 tests/run.js 的 LOAD 同序）——
+    //   两条硬约束：① 须**晚于** core/store（它读写 `draft.lifeline`）；
+    //   ② 须**早于** render/inject.js（注入落地时读 lifeline.buildBlock()）。
+    //   noesis.perceive 在**调用期**读 WA.lifeline（不是装载期），故两者次序无硬要求；
+    //   排在这里是刻意的：感知第二轴的真源就在本模块，两条相邻便于阅读「谁给感知划档」。
+    //   **只读**：读取面零 store.transact，写侧只有 register / advance 两口（专锁 N 面钉这条）。
+    'engines/lifeline.js',
+    // v2.142.0（F3）：视角锁。装载位置紧随 lifeline 之后（与 tests/run.js 的 LOAD 同序）——
+    //   两条硬约束：① 须**晚于** core/store（它读写 `draft.perspective`）；
+    //   ② 须**早于** render/inject.js（注入落地时读 perspective.buildBlock()）。
+    //   与 noesis 是**串联而非取代**：noesis 答「他知道吗」，本模块答「这笔该不该现在由这个视角写」
+    //   —— 两个真源不可合并（本模块不调 noesis.knows，见边界 4）。
+    //   写侧只有 assign 一口（专锁 N 面钉这条）。
+    'engines/perspective-lock.js',
+    // v2.148.0（RP1+RP2）：性能历史台账 + 磁带卷仓库。装载位置晚于 inject-budget /
+    //   perf-trace（两模块的现场读数是它的输入面），早于 render/inject.js（engineCall
+    //   计时点之后分流入账）。tape-store 与 rand 磁带语义解耦（仓库不改录制/回放语义）。
+    //   perf-ledger **只读**（零 store.transact）；tape-store 写侧只有仓库键读写。
+    'engines/perf-ledger.js',
+    'engines/tape-store.js',
+    // v2.149.0（X1）：世界沉积层。装载位置在**所有地点源之后**（sceneSlice / world / chrono）——
+    //   它的 buildBlock 在调用期读 WA.sceneSlice.read()「此刻在哪」，故 sceneSlice 必须先装载；
+    //   与 tests/run.js 的 LOAD 同序。只读 + 三容器环（sediment.places / sediment.events）。
+    'engines/sediment.js',
+    // v2.150.0(RP4): 注入价值评估。装载位置**晚于 perf-ledger**（它把自己每次判定的耗时
+    //   经 perfLedger.ingest 报进性能台账）、**早于 render/inject.js**（后者在注入链末尾
+    //   调它的 observe 交本轮真落地项）。口径：只读评估 + 进程态内存环（_pending / _rounds
+    //   不落盘、不登记 store 骨架——写在这两处会把「重启清零」伪装成「有界容器」）。
+    'engines/inject-value.js',
+    // v2.151.0（RX2+RX3）：跨会话记忆锚 + 远方世界脉搏。位置在既有 v2.150.0 段之后、
+    //   render/inject.js **之前**（注入落地时读 offlineTick.buildBlock() 与
+    //   farfield.buildBlock()）——两条硬约束：① 须晚于 core/store（它们读写
+    //   draft.offlineTick / draft.farfield）；② 须早于 render/inject.js。
+    //   farfield 在**调用期**读 WA.region.places()（远方地区的单一真源）与
+    //   WA.sediment.settle（联动口），两者皆在本行之前装载，故无装载期次序要求。
+    //   两者都**写**世界状态（各自两条/三条容器环），故模块总开关默认关。
+    'engines/offline-tick.js',
+    'engines/farfield.js',
+    // v2.166.0（TX2）：行动反馈闭环。装载位置**须晚于** plan.js（读 plan.current/settle）、
+    //   act.js（读 act.stat/view/add/admit），且**须早于** render/inject.js（注入落地时读
+    //   agency.buildBlock()）。本模块只调用 life/plan/act 既有 API，不复制状态。
+    'engines/agency.js',
+    'render/inject.js',
+    'render/theater.js',
+    'render/purifier.js',
+    'compat/host.js',
+    'compat/mvu.js',
+    'compat/th-helper.js',
+    // v2.101.0（O11）：跨插件互操作验收面（纯读）。
+    //   为什么必须**最后**：它读的是三处现场读数——compat.detect()（宿主能力）、
+    //   lonshaReader.lonshaSource()（上游桥）、phoneBridge.phaseOf()（下游入站桥），
+    //   不是自己另探一遍；先于它们装载只会让三态一律落到 unknown。
+    'engines/interop.js',
+    // v2.102.0（A2 = O12）：性能基线与分层增量（纯内存观测：不写存档、不落盘）。
+    //   为什么必须**最后**（与 interop 并列在 compat 之后、ui 之前）：它测的四个面全是既有出口——
+    //   render.visibilityStat / render.buildWorldSnapshot / toolDiag.collect / canon.alignView，
+    //   不是自己另探一遍；先于它们装载只会让基线一律落到「模块缺席」。
+    'engines/perf-trace.js',
+    // v2.152.0（RP7）：存储水位预测（纯读：sample 只收 store 的字节数读数，不枚举存储）。
+    //   装在 perf-trace 之后、ui 之前：forecast 读的是 store.sizeAudit/saveStat 的派生量，
+    //   与 perf-trace 同为观测面，无装载期依赖，但保持「观测面在 ui 之前」的既有次序。
+    'engines/storage-forecast.js',
+    // v2.153.0（RX5+RX6）：剧情深度仪 + 多结局分支树。位置**必须在 causal / foreshadow / threads /
+    //   rehearsal 之后** —— 两者都在调用期读它们（plot-gauge 取三源计数、branch-tree 把预演交给
+    //   rehearsal.preview），排在前面会让「源全空」被读成「故事还没开始」。二者不互相依赖。
+    'engines/plot-gauge.js',
+    'engines/branch-tree.js',
+    // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。位置在 branch-tree 之后、
+    //   ui/panel.js 之前：两者在调用期读 rumor / causal / chronicle / worldFacts 与 perfLedger
+    //   （全部在本行之前装载），且 eco-audit 的读数由面板「联网」页与 store.maintain 消费 ——
+    //   两者互不依赖，也不写世界状态（world-bridge 只写自己的两条环）。
+    'engines/world-bridge.js',
+    'engines/eco-audit.js',
+    // v2.155.0（RX8）：世界生成种子库。位置在 eco-audit 之后、ui/panel.js 之前：
+    //   它在调用期读 world / evolution / people / background 四个既有面（全部在本行之前装载），
+    //   且只写自己那一格 `worldSeed.library` —— 不依赖任何后装模块。
+    'engines/world-seed.js',
+    // v2.164.0（TX5）：版本化完整世界蓝图。位置在 world-seed 之后 ——
+    //   两者回答**同一族问题的两个档位**（有损种子 vs 无损结构蓝图），且都只写自己那一格
+    //   （worldSeed.library / blueprint.library），互不调用。放在紧随其后是刻意的：
+    //   读代码的人一眼看到「同一个世界导出有两条路径，边界在格式上」。
+    //   调用期依赖：registry（人物唯一写者）/ world（地点与道路形状）/ evict（蓝图库容量）
+    //   —— 全在调用期取，故此处对装载期无硬依赖。
+    'engines/world-blueprint.js',
+    // v2.165.0（TX1）：可谈判、可履约的势力外交（engines/diplomacy.js）。位置紧随
+    //   world-blueprint：它在调用期读 store / evolution.factions / inst.authority / clock /
+    //   inputGuard（全在本行之前装载），不依赖任何后装模块。
+    //   与 faction-graph 的分工写在模块头：前者是**推导面**（derived 边），本模块是**事实面**
+    //   （pairId / 双边态度 / 条约 / 履约回执）—— 两者不相迁（推导结果不静默写进事实表）。
+    'engines/diplomacy.js',
+    // v2.156.0（SP1）：时间来源与游玩生命周期（engines/playtime.js）。位置在 world-seed 之后、
+    //   ui/panel.js 之前：它在调用期读 store / settingsBus / clock / inputGuard（全部在本行之前装载），
+    //   且只写自己那一格 localStorage 键——不依赖任何后装模块。
+    'engines/playtime.js',
+    // v2.156.0（S1）：离线恢复编排（engines/offline-return.js）。位置在 playtime 之后、
+    //   ui/panel.js 之前：它在调用期读 playtime / offlineTick / life / evolution / world / rand
+    //   （全部在本行之前装载），并把推演整体委托给 SP2 的草稿体 —— 自己不算任何数值、
+    //   不写任何键（零 localStorage），故不依赖任何后装模块。
+    'engines/offline-return.js',
+    'ui/panel.js',
+    'ui/cyberpunk-theme.js',
+    'ui/cyberpunk-components.js',
+    'ui/cyberpunk-dashboard.js',
+    'ui/cyberpunk-people.js',
+    'ui/cyberpunk-logs.js',
+    'ui/cyberpunk-animations.js',
+    'ui/cyberpunk-responsive.js',
+    // v2.181.0：主题切换（右键悬浮球）。必须排在全部 cyberpunk 模块**之后**：
+    //   它们在装载期把样式文本登记进 WA.themeStyles，本模块要读那张表来装卸。
+    'ui/theme-switch.js',
+    // v2.152.0（RP6）：面板渲染性能观测。**必须在 panel.js 之后**：observe 的页 id
+    //   白名单读 WA.ui.pages()（PAGES 表是 panel.js 的真源），先装会让白名单恒空、
+    //   一切 observe 被拒收成 unknown-page（观测面静默失效，比不装更坏）。
+    'ui/render-perf.js',
+    'ui/settings.js',
+    'ui/assistant.js',
+  ];
+
+  // v0.1.16: 多源容灾——主源（本地扩展目录）失败时依次回退 jsDelivr 三域，每源 12s 闸刀
+  const CDN_BASES = [
+    'https://cdn.jsdelivr.net/gh/LonSha/world-axis@main',
+    'https://fastly.jsdelivr.net/gh/LonSha/world-axis@main',
+    'https://testingcf.jsdelivr.net/gh/LonSha/world-axis@main',
+  ];
+  const SCRIPT_TIMEOUT_MS = 12000;
+  const CDN_COOLDOWN_MS = 60000;
+  const loadedScripts = new Map();
+  const failedCdnAt = new Map();
+  function loadScriptOnce(src, timeoutMs) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+      let timer = null;
+      try {
+        const s = mainDoc.createElement('script');
+        s.src = src;
+        s.onload = () => { if (timer) clearTimeout(timer); done({ ok: true, src: src }); };
+        s.onerror = (e) => { if (timer) clearTimeout(timer); done({ ok: false, src: src, error: 'onerror' }); };
+        timer = setTimeout(() => {
+          try { if (s.parentNode) s.parentNode.removeChild(s); } catch (e) {}
+          done({ ok: false, src: src, error: 'timeout' });
+        }, timeoutMs || SCRIPT_TIMEOUT_MS);
+        mainDoc.head.appendChild(s);
+      } catch (e) { done({ ok: false, src: src, error: String(e && (e.message || e)) }); }
+    });
+  }
+  function loadScript(rel) {
+    return (async () => {
+      if (!WA.__loaderState) WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map(), failed: new Map() };
+      const loaded = WA.__loaderState.loaded;
+      const failed = WA.__loaderState.failedCdnAt;
+      const cooldownMs = 60000;
+      const tag = '?v=' + VERSION;
+      const localSrc = WA.baseUrl + '/' + rel + tag;
+      const cacheKey = rel + '@' + VERSION;
+      const state = WA.__loaderState;
+      if (state.loaded.has(cacheKey)) return state.loaded.get(cacheKey);
+      const r0 = await loadScriptOnce(localSrc);
+      if (r0.ok) {
+        const result = { rel: rel, ok: true, src: r0.src };
+        state.loaded.set(cacheKey, result);
+        try { state.failed.delete(rel); } catch (e) {}
+        return result;
+      }
+      for (let i = 0; i < CDN_BASES.length; i++) {
+        const base = CDN_BASES[i];
+        const lastFail = state.failedCdnAt.get(base) || 0;
+        if ((WA.clock ? WA.clock.now('index.cdnCooldown') : Date.now()) - lastFail < cooldownMs) continue;
+        const cdnSrc = base + '/' + rel + tag;
+        const r = await loadScriptOnce(cdnSrc);
+        if (r.ok) {
+          const result = { rel: rel, ok: true, src: r.src, fallback: base };
+          state.loaded.set(cacheKey, result);
+          try { state.failed.delete(rel); } catch (e) {}
+          WA.log('warn', '模块走 CDN 容灾加载成功: ' + rel + ' <- ' + base);
+          return result;
+        }
+        state.failedCdnAt.set(base, (WA.clock ? WA.clock.now('index.cdnCooldown') : Date.now()));
+      }
+      WA.log('error', '模块全部源加载失败: ' + rel);
+      try { state.failed.set(rel, { at: (WA.clock ? WA.clock.now('index.cdnFail') : Date.now()), sourcesTried: 1 + CDN_BASES.length }); } catch (e) {}
+      return { rel: rel, ok: false, failed: true };
+    })();
+  }
+  WA.loaderStatus = function () { return { loaded: Array.from((WA.__loaderState&&WA.__loaderState.loaded||new Map()).values()), cdnFailures: Array.from((WA.__loaderState&&WA.__loaderState.failedCdnAt||new Map()).entries()), failedModules: Array.from((WA.__loaderState&&WA.__loaderState.failed||new Map()).entries()).map(function (e) { return { rel: e[0], at: e[1].at, sourcesTried: e[1].sourcesTried }; }) }; };
+
+  // ── 主初始化 ────────────────────────────────────────────
+  async function init() {
+    WA.log('info', '世界枢轴 v' + VERSION + ' 启动，base=' + WA.baseUrl);
+    for (const rel of LOAD_ORDER) {
+      await loadScript(rel); // 串行保证依赖顺序
+    }
+    // v0.1.25: 启动完整性审计——加载失败的模块显式点名并计数（不再静默）
+    try {
+      const failedList = WA.loaderStatus ? WA.loaderStatus().failedModules : [];
+      if (failedList.length) {
+        WA.loadFailures = failedList.slice();
+        WA.log('error', '启动审计：' + failedList.length + ' 个模块加载失败：' + failedList.map(function (f) { return f.rel; }).join('、'));
+      } else {
+        WA.loadFailures = [];
+        WA.log('info', '启动审计：全部模块加载成功');
+      }
+    } catch (e) {}
+    // 模块全部加载后：初始化store、注册拦截器、建UI
+    try { WA.store && WA.store.init && WA.store.init(); } catch (e) { WA.log('error', 'store初始化失败', e); }
+    try { WA.interceptor && WA.interceptor.install && WA.interceptor.install(); } catch (e) { WA.log('error', '拦截器安装失败', e); }
+    // [v2.19.0/v2.20.0] 启动接线：
+    //   · injectInspector.init：订阅 prompt-ready 事件 → 注入自检抓最终 prompt 快照。
+    //     这是**面板与 tool-diag 实际消费的那个**（getLastSnapshot/statusText/flatten）。
+    //   · chatcache.init：包裹 store.save → 驱动「跨设备同步」与「自动备份」两条链路；
+    //     与同步/备份开关（def.syncToChat / def.autoBackup，v2.19.0 补声明）配合生效。
+    //   两者均幂等（自持已挂载标记，重复调用返回 false）。
+    //   · [v2.20.0] 移除 v2.19.0 加入的 `WA.inspector.init()` 接线——其前提为误判：
+    //     经实测，engines/inspector.js（WA.inspector）与 engines/inject-inspector.js
+    //     （WA.injectInspector）订阅**同一批**宿主 prompt-ready 事件；而 injectInspector 是
+    //     前者的严格超集（多 memory 作用域、MISSING/SKIPPED_REROLL/SUCCESS_SLOTS_ONLY 状态、
+    //     订阅重试、快照 clone 隔离、flatten/safe），且只有它被面板/诊断消费
+    //     （WA.inspector 的全部导出零消费、也未登记进 MODULE_EXPORTS）。故「注入自检从未订阅」
+    //     不成立——真实代价仅是每次生成多挂一个无人读取的 handler。该重复模块已一并删除。
+    const __inited = [];
+    try { if (WA.injectInspector && typeof WA.injectInspector.init === 'function' && WA.injectInspector.init() === true) __inited.push('injectInspector'); } catch (e) { WA.log('warn', '注入自检初始化失败', e); }
+    try { if (WA.chatcache && typeof WA.chatcache.init === 'function' && WA.chatcache.init() === true) __inited.push('chatcache'); } catch (e) { WA.log('warn', '酒馆缓存同步初始化失败', e); }
+    WA.__inited = __inited;
+    try { WA.ui && WA.ui.mount && WA.ui.mount(); } catch (e) { WA.log('error', 'UI挂载失败', e); }
+    // v2.0.0: 装载审计——「已加载 / 已注册 / 清单声明」三方对齐，注册表不再空转
+    try {
+      const failedRels = (WA.loadFailures || []).map(function (f) { return f.rel; });
+      const loadedRels = LOAD_ORDER.filter(function (rel) { return failedRels.indexOf(rel) < 0; });
+      loadedRels.forEach(function (rel) {
+        const kind = rel.indexOf('core/') === 0 ? 'core' : (rel.indexOf('ui/') === 0 ? 'ui' : (rel.indexOf('compat/') === 0 ? 'compat' : 'engine'));
+        WA.registerModule(rel, { kind: kind, ver: VERSION });
+      });
+      WA.__loadOrder = LOAD_ORDER.slice();
+      WA.__loadFailed = failedRels.slice();
+      WA.log('info', '世界枢轴初始化完成。已注册模块 ' + Object.keys(WA.modules).length + '/' + LOAD_ORDER.length
+        + (failedRels.length ? '（失败 ' + failedRels.length + '：' + failedRels.join('、') + '）' : ''));
+    } catch (e) { WA.log('warn', '模块注册审计异常', e); }
+    // v2.0.0: 兼容层激活——此前 compatMvu.sync / compatTH.expose 定义了却无人调用（能力死代码）
+    try {
+      if (WA.compatMvu && WA.compatMvu.init) WA.compatMvu.init();
+      if (WA.compatTH && WA.compatTH.init) WA.compatTH.init();
+    } catch (e) { WA.log('warn', '兼容层初始化失败', e); }
+  }
+
+  // SillyTavern APP_READY 后再初始化（保证宿主事件源可用）
+  function whenReady(fn) {
+    const ctx = mainWin.SillyTavern && mainWin.SillyTavern.getContext && mainWin.SillyTavern.getContext();
+    if (ctx && ctx.eventSource && ctx.eventTypes) {
+      if (ctx.eventTypes.APP_READY) {
+        ctx.eventSource.on(ctx.eventTypes.APP_READY, fn);
+        return;
+      }
+    }
+    // 回退：DOM ready + 延迟
+    if (mainDoc.readyState === 'complete' || mainDoc.readyState === 'interactive') setTimeout(fn, 800);
+    else mainDoc.addEventListener('DOMContentLoaded', () => setTimeout(fn, 800));
+  }
+
+  whenReady(init);
+})();

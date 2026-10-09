@@ -1,0 +1,79 @@
+// WorldAxis tests/export-contract.js — 出口面契约生成器（只读审计基建）
+//
+// 用途：重新生成 tests/run.js 里 v2.8.0 块1 的冻结串（依赖面变动后需要显式更新）。
+//   输出写入**仓库内** tests/export_contract.txt（v2.41.0 从 /tmp 迁入：共享临时目录
+//   多副本并行会互相覆盖），并打印 ns / 成员数 / 字符数供核对。产物已在 .gitignore 忽略。
+//   为什么需要显式更新：门禁是**双向**的——接口面任何增删都必须有人确认过，
+//   否则「成员被悄悄改名/删掉、调用方静默降级」这类事会重新变成不可见的。
+//   口径必须与测试块逐字一致（含排除名单：仅 UI 层三个模块依赖宿主 DOM）。
+
+// 生成紧凑的「出口面契约」字符串：ns:m1 m2 m3|ns:m4 ...
+// v2.41.0：BASE / mock / 产物路径此前**硬编码 `/tmp/wa_git`** —— 换目录或换机器跑
+//   会直接 throw（可移植性缺陷）；且原产物路径 `/tmp/export_contract.txt` 是共享临时
+//   目录，多副本并行时互相覆盖。现全部从 `__dirname` 推导（与其余门禁一致），
+//   产物落在仓库内、被测的唯一真源就是**运行中的仓库本身**。
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const BASE = path.join(__dirname, '..');
+require(path.join(BASE, 'tests/mock.js'));
+const runSrc = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
+const li = runSrc.indexOf('const LOAD = ['); const lj = runSrc.indexOf('];', li);
+const LOAD = vm.runInNewContext('(' + runSrc.slice(runSrc.indexOf('[', li), lj + 1) + ')');
+const ctx = vm.createContext(global);
+for (const rel of LOAD) vm.runInContext(fs.readFileSync(path.join(BASE, rel), 'utf8'), ctx, { filename: rel });
+// 刻意**不**装载 UI 层：口径必须与 tests/run.js 的测试块一致（无头环境不装载 UI），
+// 否则冻结串里会多出 ui/uiSettings/assistant 的成员，而测试块那里根本没有这些导出。
+const diagSrc = fs.readFileSync(BASE + '/engines/tool-diag.js', 'utf8');
+const mi = diagSrc.indexOf('const MODULE_EXPORTS = {');
+const mj = diagSrc.indexOf('\n  };', mi);
+const MODULE_EXPORTS = vm.runInNewContext('(' + diagSrc.slice(diagSrc.indexOf('{', mi), mj + 4) + ')');
+const OWNER = {}; Object.keys(MODULE_EXPORTS).forEach(function (f) { OWNER[MODULE_EXPORTS[f]] = f; });
+const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
+  // v2.181.0：赛博朋克 UI 主题层 9 个 ns（与 tests/run.js 的 UI_NS2800 同口径）。
+  'cyberUI',
+  'cyberDashboard',
+  'cyberPeople',
+  'cyberLogs',
+  'cyberAnimate',
+  'cyberResponsive',
+  'cyberpunkTheme',
+  'themeStyles',
+  'themeSwitch',
+];   // 仅 UI 层依赖宿主；compat 无头可装载
+// v2.152.0：新增 ui 模块（ui/render-perf.js）必须同步进本名单。口径与 tool-diag 的
+//   OPTIONAL_EXPORTS 相同但**是第二份副本** —— 如实登记：这两处同属「无头环境缺席的命名空间」
+//   这一事实，理想形态是收成一份（如 product-files.js 对文件面所做的那样）；本轮只做同步，
+//   不在此处顺手重构（改口径会牵动契约串与冻结值，属于独立一次改动的事）。
+const WA = global.WorldAxis;
+
+function files() {
+  // v2.43.0：口径统一——改用 tests/product-files.js 的 productFiles()（排 tests/ + tools/）。
+  //   此前本文件自带一份遍历器、只排 tests/，于是 tools/ 下的诊断脚本被算进出口面扫描面。
+  //   实测 tools/scan_drift.js 对 `WA.` 零引用，故统一后契约串逐字不变（回归段有逐字锁）。
+  //   统一的意义：文件面的定义只剩一处，「两个遍历器排除名单不一致」这类漂移不可能再发生。
+  return require('./product-files.js').productFiles(BASE);
+}
+const RE = /WA\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g;
+const map = {};
+files().forEach(function (rel) {
+  fs.readFileSync(path.join(BASE, rel), 'utf8').split('\n').forEach(function (line) {
+    if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+    RE.lastIndex = 0; let m;
+    while ((m = RE.exec(line))) {
+      const ns = m[1], mem = m[2];
+      if (!OWNER[ns] || mem.charAt(0) === '_' || OWNER[ns] === rel) continue;
+      if (OPTIONAL.indexOf(ns) >= 0 && !WA[ns]) continue;      // UI 层未装载：按可选处理
+      (map[ns] = map[ns] || new Set()).add(mem);
+    }
+  });
+});
+const parts = Object.keys(map).sort().map(function (ns) {
+  return ns + ':' + Array.from(map[ns]).sort().join(' ');
+});
+const contract = parts.join('|');
+const OUT = path.join(BASE, 'tests', 'export_contract.txt');
+fs.writeFileSync(OUT, contract, 'utf8');
+const names = Object.keys(map).reduce(function (a, ns) { return a + map[ns].size; }, 0);
+console.log('ns=', Object.keys(map).length, 'members=', names, 'chars=', contract.length);
+console.log('写入:', path.relative(process.cwd(), OUT) || OUT);
+console.log('---');
+console.log(contract);
