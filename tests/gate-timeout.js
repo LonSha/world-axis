@@ -127,7 +127,39 @@ const TIMEOUT_ARMED = {
   //   没入表 —— 与 TX4b、第二批同款病（「新开的调用点不入表即红」，A6/A13b/B5 会点名）。
   'b1-e1-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'b1-e1-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b1-e3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'b1-e3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.186.0（第一批 · O9 + O1）：**同一个锁被挂成多个调用点**，五处逐一入表。
+  //   为什么一个锁要挂五处：两把锁的实机层各自超过统一预算 96000ms（O9 一轮全跑约 49s、
+  //   O1 一轮全跑约 94s）—— 按方法名拆开之后每段都落在既有统一预算内，**单一真源没被撕**
+  //   （现场仍是同一个 96000，拆的是调用点，不是预算）。
+  //   本条同时是 A16 那一条判据的现场证据：新开的调用点不入表即红。
+  'o9-static': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'o9-live': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'o1-static': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'o1-live-c': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'o1-live-n': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.187.0（第三批 · O7）：计划文件与笔记树门禁的新调用点（同一形态：并入统一预算，不新开第二预算）。
+  'o7-plan-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.187.0（第三批 · O6）：分层选区门禁的新调用点。**并入统一预算**（不新开第二预算）——
+  //   实测该门禁约 2 秒（它拿真函数的真返回驱动收尾三态，不做全量真跑），
+  //   统一预算对它宽松得很，但那正是本模块的口径：预算不逐道紧贴，见 coherence()。
+  'o6-layer-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.187.0（第三批 · O8）：消费者类型门禁的新调用点。实测约 10 秒
+  //   （它要跑 5 条真破坏负控，每条都真装载一次工具），**并入统一预算**、不新开第二预算。
+  'o8-consumer-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.187.0（第三批 · E4）：战役层专锁的新调用点。实测约 1 秒（合成宿主批量装载），
+  //   **并入统一预算**、不新开第二预算。
+  'b3-e4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.187.0（第三批 · E6 / E8）：两把专锁的新调用点。实测各约 1~2 秒
+  //   （E6 走合成宿主；E8 八条真源码破坏 + 两向自证，每个破坏都真装载一次），
+  //   **并入统一预算**、不新开第二预算。
+  //   注：本段注释**不许出现「预算字段后跟数字」的字面形态** —— 现场预算计数按
+  //     该形态全局匹配（不剥注释），注释里写一个就凭空多出一处无调用点的预算。
+  'b3-e6-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b3-e8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.188.0（第四批 · E7 + E9）：两把新专锁的调用点，同 B3 批次口径（统一预算 96000ms）。
+  'b3-e7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b3-e9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -239,7 +271,49 @@ const ARMED_SITES = [
   { key: 'b1-e1-smoke', mode: 'spawn',
     anchor: "const rSM_pending_center_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/pending_center_smoke.js')]," },
   { key: 'b1-e3-lock', mode: 'spawn',
-    anchor: "const rB1E3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e3-v2184.js')]," }
+    anchor: "const rB1E3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e3-v2184.js')]," },
+  // v2.186.0（第一批 · O9 + O1）：五个新调用点的锚点（整行唯一 ⇒ 任何前缀也唯一）。
+  //   锚点**必须带左值变量名**——五处的调用形态与既有 TX/第二批同族（都是
+  //   `require('child_process').spawnSync(process.execPath, [path.join(BASE, '…')],`），
+  //   只有左值与锁文件名不同；取到 options 之前，**不含它要守卫的那个预算值**
+  //   （含了就自我指涉：预算一改，报出来的是 site-missing 而不是 value-mismatch）。
+  { key: 'o9-static', mode: 'spawn',
+    anchor: "const rO9S = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o9-outlet-gate-v2186.js'), '--methods=runA,runB']," },
+  { key: 'o9-live', mode: 'spawn',
+    anchor: "const rO9L = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o9-outlet-gate-v2186.js'), '--methods=runLive2']," },
+  { key: 'o1-static', mode: 'spawn',
+    anchor: "const rO1S = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runA,runB']," },
+  { key: 'o1-live-c', mode: 'spawn',
+    anchor: "const rO1C = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runC']," },
+  { key: 'o1-live-n', mode: 'spawn',
+    anchor: "const rO1N = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runN']," },
+  { key: 'o7-plan-gate', mode: 'spawn',
+    anchor: "const rB3O7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o7-plan-tree-gate-v2187.js')]," },
+  // v2.187.0（第三批 · O6）：同上——左值变量名 `rB3O6` 与 O7 只差最后一位，
+  //   **锚点必须带左值名**（否则两处调用形态逐字同形，锚点必 ambiguous）。
+  { key: 'o6-layer-gate', mode: 'spawn',
+    anchor: "const rB3O6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o6-layer-gate-v2187.js')]," },
+  // v2.187.0（第三批 · O8）：同上，锚点带左值名 `rB3O8`（三处调用形态逐字同形）。
+  { key: 'o8-consumer-gate', mode: 'spawn',
+    anchor: "const rB3O8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o8-consumer-gate-v2187.js')]," },
+  // v2.187.0（第三批 · E4）：同上，锚点带左值名 `rB3E4`。
+  { key: 'b3-e4-lock', mode: 'spawn',
+    anchor: "const rB3E4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e4-v2187.js')]," },
+  // v2.187.0（第三批 · E6 / E8）：同上，锚点各带左值名 `rB3E6` / `rB3E8`
+  //   （三处调用形态逐字同形，不带左值名则 anchor 必 ambiguous ⇒ 直接抛）。
+  { key: 'b3-e6-lock', mode: 'spawn',
+    anchor: "const rB3E6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e6-v2187.js')]," },
+  { key: 'b3-e8-lock', mode: 'spawn',
+    anchor: "const rB3E8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e8-v2187.js')]," },
+  // v2.188.0（第四批 · E7 + E9）：两把新专锁的调用点。锚点**必须带左值变量名** ——
+  //   两处调用形态与既有 B3/O7/O6 同族（都是 `require('child_process').spawnSync(process.execPath,
+  //   [path.join(BASE, '…')],`），只有左值与锁文件名不同；取到 options 之前，
+  //   **不含它要守卫的那个预算值**（含了就自我指涉：预算一改，报出来的是 site-missing
+  //   而不是 value-mismatch —— 判据被它要抓的破坏顺手打掉）。
+  { key: 'b3-e7-lock', mode: 'spawn',
+    anchor: "const rB3E7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e7-v2188.js')]," },
+  { key: 'b3-e9-lock', mode: 'spawn',
+    anchor: "const rB3E9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e9-v2188.js')]," }
 ];
 
 /**

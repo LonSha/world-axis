@@ -1,13 +1,13 @@
 {
- "version": "2.184.0",
- "loadOrderCount": 206,
- "loadedCount": 194,
+ "version": "2.188.0",
+ "loadOrderCount": 211,
+ "loadedCount": 199,
  "uiCount": 12,
- "nsCount": 202,
+ "nsCount": 207,
  "totals": {
-  "loadEdges": 97,
+  "loadEdges": 102,
   "hardEdges": 0,
-  "callRefs": 190,
+  "callRefs": 200,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -38,6 +38,7 @@
     "engines/agency.js",
     "engines/agenda.js",
     "engines/archive-hide.js",
+    "engines/atlas.js",
     "engines/backstage.js",
     "engines/beat-mask.js",
     "engines/binding.js",
@@ -45,11 +46,13 @@
     "engines/bridge.js",
     "engines/calendar-custom.js",
     "engines/calendar.js",
+    "engines/campaign.js",
     "engines/capacity-audit.js",
     "engines/chapters.js",
     "engines/chronicle-view.js",
     "engines/commission.js",
     "engines/coop.js",
+    "engines/dep-check.js",
     "engines/diplomacy.js",
     "engines/direct-event.js",
     "engines/eco-audit.js",
@@ -101,6 +104,7 @@
     "engines/request-viewer.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
+    "engines/rule-pack.js",
     "engines/sediment.js",
     "engines/session.js",
     "engines/stage.js",
@@ -117,6 +121,7 @@
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-health.js",
+    "engines/world-lab.js",
     "engines/world-seed.js",
     "render/purifier.js"
    ]
@@ -267,14 +272,17 @@
     "engines/agency.js",
     "engines/agenda.js",
     "engines/archive-hide.js",
+    "engines/atlas.js",
     "engines/beat-mask.js",
     "engines/binding.js",
     "engines/branch-tree.js",
     "engines/calendar-custom.js",
+    "engines/campaign.js",
     "engines/capacity-audit.js",
     "engines/chronicle-view.js",
     "engines/commission.js",
     "engines/coop.js",
+    "engines/dep-check.js",
     "engines/diplomacy.js",
     "engines/eco-audit.js",
     "engines/economy.js",
@@ -313,6 +321,7 @@
     "engines/request-viewer.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
+    "engines/rule-pack.js",
     "engines/sediment.js",
     "engines/session.js",
     "engines/stage.js",
@@ -327,6 +336,7 @@
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-health.js",
+    "engines/world-lab.js",
     "engines/world-seed.js"
    ]
   },
@@ -3488,6 +3498,111 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_pending_center_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/campaign.js": {
+   "ns": [
+    "campaign"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_campaign_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/atlas.js": {
+   "ns": [
+    "atlas"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_atlas_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/dep-check.js": {
+   "ns": [
+    "depCheck"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_dep_check_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rule-pack.js": {
+   "ns": [
+    "rulePack"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rule_pack_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-lab.js": {
+   "ns": [
+    "worldLab"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_lab_settings_v1"
    ],
    "consumedBy": []
   }

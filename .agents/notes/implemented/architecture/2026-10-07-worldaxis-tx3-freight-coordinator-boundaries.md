@@ -1,4 +1,5 @@
-# TX3: Freight Coordinator Boundaries
+# Agent Note: TX3 — Freight Coordinator Boundaries
+Status: implemented
 
 ## Problem
 
@@ -44,7 +45,7 @@ freight.js is a **coordinator**, not a substitute. It reads/writes economy.goods
 - **TX2 version pin drift**: s3-tx2-v2166.js hardcoded VERSION='2.166.0'. After
   upgrade to 2.167.0, it reported 2 failures. Fixed by accepting 2.166.0 or 2.167.0.
 
-## Rejected options
+## Alternatives considered
 
 - **Direct stock manipulation without transit records**: Rejected because it
   loses the concept of "in transit" — you can't distinguish "not yet arrived"
@@ -58,3 +59,6 @@ freight.js is a **coordinator**, not a substitute. It reads/writes economy.goods
 - **Merging already-arrived and bad-state into one "state error" code**: Rejected
   because the former is a normal idempotency intercept (ok:false but expected)
   while the latter is an anomalous state transition (requires investigation).
+
+## Consequences
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Consequences 节；其后果面已散见上方「Key alignment issues」一节（DEAD 表登记、注入链七点、panel 模板串与 vm sandbox 两处实现代价、TX2 版本钉漂移），正文未重排、未改写。

@@ -196,7 +196,18 @@ async function launch(root, options) {
     prepared = prepare(root, task, fd);
     result.status = 'running'; result.sourceDigest = digest(JSON.stringify(prepared.before)); save();
     process.on('SIGTERM', onTerm); process.on('SIGINT', onInt);
-    child = cp.spawn(process.execPath, [path.join(prepared.work, 'tests/run.js')],
+    // v2.187.0（O6）：**分层选区参数必须转发给 worker**。现场事实：worker 是
+    //   `cp.spawn(execPath, [work/tests/run.js], {env})` —— argv 不转发、**env 会转发**
+    //   （prepared.env 由 process.env 派生）。于是 `WA_ONLY_SECTION` 天然能进 worker，
+    //   而 `--only-v-section` 会静默丢失：人以为自己跑了子集，实际跑的是全量
+    //   （「看起来跑得快了」与「其实没快」之间的差别没人会注意到）。这里只转发这一个已知开关。
+    const fwd = [];
+    for (let i = 2; i < process.argv.length; i++) {
+      const v = process.argv[i];
+      if (v === '--only-v-section' && process.argv[i + 1]) fwd.push(v, process.argv[++i]);
+      else if (v.indexOf('--only-v-section=') === 0) fwd.push(v);
+    }
+    child = cp.spawn(process.execPath, [path.join(prepared.work, 'tests/run.js')].concat(fwd),
       { cwd: prepared.work, env: prepared.env, detached: true, stdio: ['ignore', fd, fd] });
     result.childPid = child.pid; save();
     timer = setTimeout(() => stop('timeout'), opts.timeoutMs || 1500000);

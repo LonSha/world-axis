@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.184.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.184.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.188.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.188.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -634,6 +634,14 @@
       "tref": 0,
       "own": 17
     },
+    "campaign.resetStat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/campaign.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
     "capacityAudit.reset": {
       "reason": "test-only",
       "detail": "engines/capacity-audit.js 内部自用、外部零引用（过度导出）",
@@ -785,22 +793,6 @@
       "refs": 0,
       "tref": 1,
       "own": 4
-    },
-    "checkpoints.migrate": {
-      "reason": "test-only",
-      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/checkpoints.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 4
-    },
-    "checkpoints.migrations": {
-      "reason": "test-only",
-      "detail": "engines/checkpoints.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/checkpoints.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
     },
     "checkpoints.registerMigration": {
       "reason": "self-only",
@@ -1522,14 +1514,6 @@
       "tref": 0,
       "own": 8
     },
-    "economy.routeView": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/economy.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
     "economy.stat": {
       "reason": "self-only",
       "detail": "engines/economy.js 内部自用、外部零引用（过度导出）",
@@ -1895,7 +1879,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/evolution.js",
       "refs": 0,
-      "tref": 4,
+      "tref": 5,
       "own": 1
     },
     "evolution.advanceStageRound": {
@@ -1929,14 +1913,6 @@
       "refs": 0,
       "tref": 4,
       "own": 2
-    },
-    "exec.cloneState": {
-      "reason": "self-only",
-      "detail": "core/exec.js 内部自用、外部零引用（过度导出）",
-      "src": "core/exec.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "exec.current": {
       "reason": "test-only",
@@ -3986,14 +3962,6 @@
       "tref": 2,
       "own": 6
     },
-    "preset.getAllPresets": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/preset.js",
-      "refs": 0,
-      "tref": 4,
-      "own": 2
-    },
     "preset.getSegmentOverride": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -4394,14 +4362,6 @@
       "tref": 0,
       "own": 11
     },
-    "recipe.getSettings": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/recipe.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
-    },
     "recipe.list": {
       "reason": "self-only",
       "detail": "engines/recipe.js 内部自用、外部零引用（过度导出）",
@@ -4425,14 +4385,6 @@
       "refs": 0,
       "tref": 1,
       "own": 1
-    },
-    "recipe.staleness": {
-      "reason": "self-only",
-      "detail": "engines/recipe.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/recipe.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 7
     },
     "recipe.stat": {
       "reason": "self-only",
@@ -4561,14 +4513,6 @@
       "refs": 0,
       "tref": 2,
       "own": 3
-    },
-    "rehearsal.run": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/rehearsal.js",
-      "refs": 0,
-      "tref": 8,
-      "own": 4
     },
     "rehearsal.setSettings": {
       "reason": "test-only",
@@ -4784,14 +4728,6 @@
       "src": "engines/rivalry.js",
       "refs": 0,
       "tref": 8,
-      "own": 1
-    },
-    "rules.getRuleCount": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/rules.js",
-      "refs": 0,
-      "tref": 1,
       "own": 1
     },
     "samplerCheck.mulberry": {
@@ -5776,7 +5712,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 124
+      "own": 129
     },
     "toolDiag.secAgenda": {
       "reason": "self-only",

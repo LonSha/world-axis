@@ -11,6 +11,28 @@
   const mainDoc = WA.mainDoc || document;
   const mainWin = WA.mainWin || window;
   /**
+   * v2.186.0（O9）：全知出口闸 —— 剪贴板 / 导出文件 / 诊断三条通道。
+   *
+   * 为什么从这里走：此前面板只对 **DOM** 做视角过滤（`perspective.applyView` 摘
+   * `data-omniscient` 节点），而这三条出口**本来就不在那些被摘除的容器里** —— 玩家视角下
+   * 按钮仍在 DOM、点了照样把全知数据交出去。把判定收成一处，调用点不再各自「记得判断」。
+   *
+   * 未接上模块（旧版本 / 装载失败）时**放行**：这里只补权限，不制造新的停摆点。
+   */
+  const outletGate = function (channel) {
+    try {
+      if (!WA.perspective || typeof WA.perspective.outletAllowed !== 'function') return { allowed: true, reason: 'module-missing' };
+      return WA.perspective.outletAllowed(channel);
+    } catch (e) { return { allowed: true, reason: 'threw' }; }
+  };
+  /** 出口被拒时的统一话术：给出**可执行的下一步**，而不是只说「不行」。 */
+  const outletBlocked = function (outEl) {
+    const msg = '已阻止：当前为玩家视角（全知数据不进剪贴板/导出）。要看请先在面板顶部把观测视角切到「全知」。';
+    if (outEl && outEl.nodeType === 1) outEl.textContent = msg;
+    else if (outEl) outEl.innerHTML = msg;
+    return msg;
+  };
+  /**
    * v2.51.0（第三十六面）: 注入源的中文名——**单一真源，提升到模块级**。
    *   此前同一张表在文件里被手写了两遍：`renderInject()` 里的 `NAMES` 与
    *   `renderDirector()` 里注入可见性那段的内联字面量。两遍的后果不是「多写几行」，
@@ -660,7 +682,30 @@
                return '<div class="wa-item"><b>' + esc(m.place) + '</b> <span class="wa-dim">' + esc(String(m.trend))
                  + ' · 距离延迟 ' + esc(String(m.delayDays)) + ' 天</span></div>';
              }).join('') + '</div>'
-             : '<div class="wa-dim">无在途传闻（远场还静着，或已全部落地）</div>');
+              : '<div class="wa-dim">无在途传闻（远场还静着，或已全部落地）</div>');
+        })()}
+      ${(() => {
+         // v2.187.0（E6）：统一世界地图与关系视图。**只读**——本块不改世界：
+         //   它把 region（坐标）/ economy+freight（道路与在途）/ faction-graph + diplomacy（关系两层）
+         //   / sediment（痕迹）/ farfield（远近分域）摆进同一屏。
+         const acfg = (WA.atlas && WA.atlas.getSettings) ? WA.atlas.getSettings() : null;
+         const atOn = !!(acfg && acfg.enabled);
+         return '<div class="wa-sec">统一地图与关系视图</div><div class="wa-dim">（E6：地点坐标 / 道路端点与在途货物 / 关系两层）</div>'
+           + '<div class="wa-dim">坐标真源是 <code>region.places()</code>，分域真源是 <code>farfield.partition()</code>，关系拆<b>两层永不合并</b>：'
+           + '<b>推导边</b>（由两势力态度档位算出，每条带 basis）与<b>已确立事实</b>（成对谈成的结果）。'
+           + '只在推导层出现、外交表里没有成对条目的一对报 <b>未知</b>（<b>unknown ≠ 中立</b>）。'
+           + '端点没有坐标就如实记进「未落位」，<b>不补一份坐标</b>。本块<b>只读</b>，不改世界。'
+           + '此刻：<b>' + (atOn ? '开' : '关') + '</b>。</div>'
+           + '<label class="wa-row"><input id="wa-at-enabled" type="checkbox" ' + (atOn ? 'checked' : '') + '/> 启用统一地图与关系视图</label>'
+           + '<div class="wa-row">'
+           + '<button class="wa-btn" id="wa-at-view" title="一次取全：地点 / 道路 / 在途 / 推导边 / 事实边 / 未落位">读地图</button>'
+           + '<button class="wa-btn" id="wa-at-places" title="地点坐标系：距离、渠道、受阻、远近分域与本地痕迹">地点表</button>'
+           + '<button class="wa-btn" id="wa-at-routes" title="道路端点与在途货物（已到 / 已取消的不再画在路上）">道路与在途</button>'
+           + '<button class="wa-btn" id="wa-at-rel" title="关系两层分列 + 仅派生无事实的未知对 + 派生边截断提示">关系两层</button>'
+           + '<button class="wa-btn" id="wa-at-unplaced" title="出现在端点里却没有坐标的名字 —— 如实报出，不补坐标">未落位</button>'
+           + '<button class="wa-btn" id="wa-at-diag" title="自证面：七处来源是否齐备、快照可读、两层各有多少、源缺席与源抛错分列">诊断</button>'
+           + '</div>'
+           + '<div id="wa-at-out" class="wa-out"></div>';
        })()}`;
 
   }
@@ -1021,6 +1066,7 @@
            + `</div><div id="wa-fg-out" class="wa-out wa-dim">${esc(fr)}</div>`;
       })()}
 
+      <div data-omniscient>
       <div class="wa-sec">势力外交（成对事实）</div>
       <div class="wa-item">
         <div class="wa-dim">与上面的「关系网」<b>不是同一个东西</b>：那一栏是<b>推导值</b>（按双方各自的对外态度算出来的图，<code>derived:true</code>），这一栏是<b>谈成的事实</b>（成对条目 / 双边态度 / 条约 / 有效期 / 履约回执）。推导结果<b>不会</b>自动迁成事实 —— 「算出来的」不许冒充「谈成的」。</div>
@@ -1064,7 +1110,7 @@
           if (!AG) return '<div class="wa-dim">行动调度未加载</div>';
           const ar = panelEl.dataset.agOut || '';
           const agOn = (WA.agency.getSettings && WA.agency.getSettings().enabled) ? true : false;
-return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type="checkbox" ${agOn ? 'checked' : ''}/> 启用行动闭环</label></div><div class="wa-row">`
+return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type="checkbox" ${agOn ? 'checked' : ''}/> 启用行动闭环</label></div><div class="wa-row">`
             + `<input id="wa-ag-person" class="wa-input" aria-label="人物名" placeholder="人物名"/>`
             + `<button class="wa-btn wa-mini" id="wa-ag-schedule" aria-label="调度行动" title="调度行动：读该人物当前目标与计划步 → 检查前置 → 准入一个行动。无计划时返回 need-steps（本模块不编步骤，步骤由 AI 文本经结构预检产生或由预设模板提供）">调度行动</button>`
             + `<button class="wa-btn wa-mini" id="wa-ag-receipts" aria-label="处理回执" title="处理回执：读已完成的行动台帐 → 结算步 → 更新目标进度。行动回执驱动步结算——不是定时器自动推进步">处理回执</button>`
@@ -1080,12 +1126,13 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
           if (!FR) return '<div class="wa-dim">货运未加载</div>';
           const fr = panelEl.dataset.frOut || '';
           const frOn = (FR.getSettings && FR.getSettings().enabled) ? true : false;
-          return '<div class="wa-row"><label class="wa-row"><input id="wa-fr-enabled" type="checkbox" ' + (frOn ? 'checked' : '') + '/> 启用守恒运输</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-fr-enabled" type="checkbox" ' + (frOn ? 'checked' : '') + '/> 启用守恒运输</label></div><div class="wa-row">'
             + '<input id="wa-fr-route" class="wa-input wa-mini" aria-label="路线ID" placeholder="路线ID" value="r1"/>'
             + '<input id="wa-fr-from" class="wa-input wa-mini" aria-label="出发地" placeholder="出发地" value="城中集市"/>'
             + '<input id="wa-fr-res" class="wa-input wa-mini" aria-label="资源" placeholder="资源" value="布匹"/>'
             + '<input id="wa-fr-qty" class="wa-input wa-mini" aria-label="数量" placeholder="数量" value="10"/>'
             + '<input id="wa-fr-days" class="wa-input wa-mini" aria-label="天数" placeholder="天数" value="3"/>'
+            + '<input id="wa-fr-base" class="wa-input wa-mini" aria-label="目的地基础价" placeholder="目的地基础价（首次进货必填）"/>'
             + '</div><div class="wa-row">'
             + '<button class="wa-btn wa-mini" id="wa-fr-dispatch" aria-label="发运" title="发运：扣源库存→创建在途记录">发运</button>'
             + '<button class="wa-btn wa-mini" id="wa-fr-arrive" aria-label="到货" title="到货：在途→目的地库存">到货</button>'
@@ -1106,7 +1153,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
           if (!SC) return '<div class="wa-dim">剧情选择未加载</div>';
           const sr = panelEl.dataset.scOut || '';
           const scOn = (SC.getSettings && SC.getSettings().enabled) ? true : false;
-          return '<div class="wa-row"><label class="wa-row"><input id="wa-sc-enabled" type="checkbox" ' + (scOn ? 'checked' : '') + '/> 启用剧情选择</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-sc-enabled" type="checkbox" ' + (scOn ? 'checked' : '') + '/> 启用剧情选择</label></div><div class="wa-row">'
             + '<input id="wa-sc-round" class="wa-input wa-mini" aria-label="轮次" placeholder="轮次" value="1"/>'
             + '<input id="wa-sc-prompt" class="wa-input" aria-label="分歧点" placeholder="分歧点（你这个回合要玩家选什么）"/>'
             + '<input id="wa-sc-opts" class="wa-input" aria-label="选项" placeholder="选项（逗号分隔，至少两个）"/>'
@@ -1128,7 +1175,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
           if (!CM) return '<div class="wa-dim">委托履约未加载</div>';
           const cr = panelEl.dataset.cmOut || '';
           const cmOn = (CM.getSettings && CM.getSettings().enabled) ? true : false;
-          return '<div class="wa-row"><label class="wa-row"><input id="wa-cm-enabled" type="checkbox" ' + (cmOn ? 'checked' : '') + '/> 启用委托履约</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-cm-enabled" type="checkbox" ' + (cmOn ? 'checked' : '') + '/> 启用委托履约</label></div><div class="wa-row">'
             + '<input id="wa-cm-title" class="wa-input" aria-label="委托名" placeholder="委托名"/>'
             + '<input id="wa-cm-principal" class="wa-input wa-mini" aria-label="委托方" placeholder="委托方"/>'
             + '<input id="wa-cm-agent" class="wa-input wa-mini" aria-label="受托方" placeholder="受托方"/>'
@@ -1179,7 +1226,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
           if (!AF) return '<div class="wa-dim">灾后余波未加载</div>';
           const afr = panelEl.dataset.afOut || '';
           const afOn = (AF.getSettings && AF.getSettings().enabled) ? true : false;
-          return '<div class="wa-row"><label class="wa-row"><input id="wa-af-enabled" type="checkbox" ' + (afOn ? 'checked' : '') + '/> 启用灾后余波</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-af-enabled" type="checkbox" ' + (afOn ? 'checked' : '') + '/> 启用灾后余波</label></div><div class="wa-row">'
             + '<input id="wa-af-place" class="wa-input wa-mini" aria-label="地点" placeholder="地点"/>'
             + '<input id="wa-af-event" class="wa-input wa-mini" aria-label="事件号" placeholder="事件号"/>'
             + '<input id="wa-af-type" class="wa-input wa-mini" aria-label="创伤类型" placeholder="创伤类型（damage 等）"/>'
@@ -1204,7 +1251,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
           if (!OP) return '<div class="wa-dim">运营项目未加载</div>';
           const opr = panelEl.dataset.opsOut || '';
           const opsOn = (OP.getSettings && OP.getSettings().enabled) ? true : false;
-          return '<div class="wa-row"><label class="wa-row"><input id="wa-ops-enabled" type="checkbox" ' + (opsOn ? 'checked' : '') + '/> 启用运营项目</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-ops-enabled" type="checkbox" ' + (opsOn ? 'checked' : '') + '/> 启用运营项目</label></div><div class="wa-row">'
             + '<input id="wa-ops-decision" class="wa-input wa-mini" aria-label="决策号" placeholder="决策号"/>'
             + '<input id="wa-ops-org" class="wa-input wa-mini" aria-label="组织号" placeholder="组织号"/>'
             + '<input id="wa-ops-approver" class="wa-input wa-mini" aria-label="批准人" placeholder="批准人"/>'
@@ -2330,7 +2377,22 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
     //   「库是空的」与「这一面被关掉了」必须分得开（同 v2.164.0/v2.182.0 的惯例）。
     const ckcfg = (WA.checkpoints && WA.checkpoints.getSettings) ? WA.checkpoints.getSettings() : null;
     const ckOn = !!(ckcfg && ckcfg.enabled);
+    // v2.187.0（E8）：依赖体检与迁移助手的开关常驻读数 ——
+    //   「还没体检过」与「这一面被关掉了」必须分得开（同 v2.164.0/v2.182.0/v2.184.0 的惯例）。
+    const dccfg = (WA.depCheck && WA.depCheck.getSettings) ? WA.depCheck.getSettings() : null;
+    const dcOn = !!(dccfg && dccfg.enabled);
+    // v2.188.0（E7 / E9）：规则包与世界实验室的开关（+ 实验室的动作词表）常驻读数 ——
+    //   「还没存过包 / 还没跑过实验」与「这一面被关掉了」必须分得开（同 v2.164.0 起的惯例）。
+    //   动作词表**逐字取自 rehearsal**（本模块不自带副本）：读不到时如实渲染「读不到」，
+    //   不列一份本模块自己编的词表出来（那会让玩家填的动作在跑的时候全被拒成 unknown-kind）。
+    const rpcfg = (WA.rulePack && WA.rulePack.getSettings) ? WA.rulePack.getSettings() : null;
+    const rpOn = !!(rpcfg && rpcfg.enabled);
+    const wlcfg = (WA.worldLab && WA.worldLab.getSettings) ? WA.worldLab.getSettings() : null;
+    const wlOn = !!(wlcfg && wlcfg.enabled);
+    const wlKinds = (WA.worldLab && typeof WA.worldLab.kinds === 'function' && WA.worldLab.kinds())
+      ? WA.worldLab.kinds() : null;
     return `
+      <div data-omniscient>
       <div class="wa-sec">世界态势分析（纯只读体检）</div>
       <button class="wa-btn" id="wa-an-run">立即分析</button>
       <div id="wa-an-out" class="wa-out"></div>
@@ -2466,6 +2528,85 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       <div class="wa-row"><button class="wa-btn" id="wa-bp-check" title="纯读：对库内一张蓝图跑引用完整性三判据（重复 ID / 悬空引用 / 未知顶层键）—— 这是安装前的**独立**校验口，与安装侧共用同一份判据，不另写一套">校验蓝图</button><button class="wa-btn" id="wa-bp-empty" title="纯读：当前世界是不是空新局（12 项逐格清点：人物/地点/道路/势力/轮次/纪事/暗流/回声/事实/货品/初始化来源/蓝图安装留痕）。答的是「现在能不能装」，不是「装过没有」">目标空局检查</button></div>
       <div class="wa-row"><input id="wa-bp-keep" class="wa-input" placeholder="保留层级 structure / roster / mech（留空=roster）"/><button class="wa-btn" id="wa-bp-preview" title="纯读预览：把库内一张蓝图映射到现有状态字段（六道门：版本/形状/白名单键/重复 ID/悬空引用/容量 + 目标非空）。预览只做一次映射，确认应用同一份">导入预览</button><button class="wa-btn" id="wa-bp-import" title="写口（大）：一次事务装完整结构（势力/人物/关系/地点/道路/时代），进度归零，写 blueprint.installed。只作用于空新局 —— 非空目标拒收 not-empty；无预览拒收 no-preview">安装蓝图</button></div>
       <div id="wa-bp-out" class="wa-out"></div>
+      <div class="wa-sec">依赖体检与迁移助手</div><div class="wa-dim">（E8：这一坨东西在你这台机器上到底能不能用）</div>
+      <div class="wa-dim">蓝图 / 种子 / 转移包 / 存档信封四类可搬物，粘进来逐项体检：<b>缺什么</b>（外部依赖 / 机制开关 / 配方真源）、
+        <b>会降级什么</b>（损失面<b>逐字取自各导入侧真源</b>，本面不重写）、<b>能不能迁移</b>（走 checkpoints 的迁移链）。
+        三态分列：<code>present</code>（在）/ <code>absent</code>（确实缺）/ <code>unknown</code>（<b>探不出</b>）。
+        <code>unknown</code> 与 <code>absent</code> 处置相反 —— 「不知道有没有」要你去核实，「没有」要你去找那份依赖。
+        对<b>所有</b>可搬物都一样的探不出（本仓无媒体资产登记面）另归 <code>envLimited</code>，不参与总判。
+        <b>本面是纯读的</b>：零 store 写、零文件写，也<b>不驱动任何模块干活</b> —— 迁移助手只出<b>计划</b>，
+        原文件一个字不动（回带源指纹可核对）。此刻：<b>${dcOn ? '开' : '关'}</b>（关闭时体检与计划一并拒收，
+        读数一直空 —— 这与「还没体检过」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-dc-enabled" type="checkbox" ${dcOn ? 'checked' : ''}/> 启用依赖体检</label>
+      <div class="wa-row">
+        <input id="wa-dc-kind" class="wa-input" placeholder="体裁（留空=自动判：blueprint / seed / pack / checkpoint）"/>
+        <button class="wa-btn" id="wa-dc-catalog" title="只读：可体检的四类体裁、三类依赖、三种状态与四种总判的封闭集（念的就是引擎那一份，不另写一遍）">体检口径</button>
+      </div>
+      <div class="wa-row">
+        <textarea id="wa-dc-in" class="wa-input" rows="3" placeholder="粘贴可搬物 JSON（蓝图 / 种子 / 转移包 / 存档信封）"></textarea>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-dc-use" title="把「最近一次导出/取出的可搬物」装进输入框（蓝图库内那一张、或上一次导出的蓝图）—— 省去手工拷一大段 JSON">取最近一次</button>
+        <button class="wa-btn" id="wa-dc-check" title="依赖体检（纯读）：体裁判定 / 格式版本 / 依赖三项态 / 机制开关落差 / 降级损失 / 可迁移性 / 总判 + 判定依据">开始体检</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-dc-plan" title="迁移助手（纯读）：只出计划，不动原文件。不能迁移时报 not-migratable 并回带源指纹">迁移计划</button>
+        <button class="wa-btn" id="wa-dc-diag" title="自证面：四处版本真源各读得到吗、迁移链现状、体检台账（四种总判计数 + 拒收归因）">诊断</button>
+      </div>
+      <div id="wa-dc-out" class="wa-out"></div>
+      <div class="wa-sec">规则包与自动化模板</div><div class="wa-dim">（E7：把这一局喜欢的规则存成一套，下次一键切回来）</div>
+      <div class="wa-dim">把<b>当前规则面</b>（你启用的题材与相关设置）存成一个<b>命名包</b>：换一局、换一个人设时一键切回，
+        也能导出给别人。<b>本面只记录设置与启用面，一个字都不改世界状态</b> ——
+        写盘唯一走 <code>settingsBus</code>（与题材 / 预设 / 配方同一条路）。<br/>
+        自动化模板是<b>封闭词表</b>：动作只能是那五口已存在的<b>只读</b>读口，模板声明<b>预算</b>与<b>失败策略</b>，
+        跑满即停、被拒如实带回执。<b>不执行任何脚本</b>（零依赖仓库不跑用户脚本）。
+        此刻：<b>${rpOn ? '开' : '关'}</b>（关闭时保存 / 切换 / 导入 / 跑模板一并拒收，
+        读数一直空 —— 这与「还没存过包」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-rp-enabled" type="checkbox" ${rpOn ? 'checked' : ''}/> 启用规则包</label>
+      <div class="wa-row">
+        <input id="wa-rp-name" class="wa-input" placeholder="包名（如：悬疑·高难）"/>
+        <button class="wa-btn" id="wa-rp-save" title="写口（设置族）：把当前规则面存成命名包。同名覆盖会明确报 replaced —— 不静默顶掉旧包">存当前规则面</button>
+        <button class="wa-btn" id="wa-rp-list" title="只读：包清单（名字 / 键数 / 指纹 / 是否导入来的）">包清单</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-rp-apply" title="写口（设置族）：切到某个包。逐键经 settingsBus 写回，部分成功会如实报 partial（不谎报「切干净了」）">切到这个包</button>
+        <button class="wa-btn" id="wa-rp-drop" title="写口（设置族）：删掉一个包（只动包清单，不碰世界）">删包</button>
+        <button class="wa-btn" id="wa-rp-export" title="纯读：把一个包导出成可搬运 JSON（带格式版本与源指纹）">导出包</button>
+        <button class="wa-btn" id="wa-rp-import" title="写口（设置族）：导入一个包（格式 / 版本 / 键登记三道门；未知键如实列出、不进包 —— 不静默丢弃）">导入包</button>
+      </div>
+      <div class="wa-row">
+        <textarea id="wa-rp-tpl" class="wa-input" rows="3" placeholder="模板 JSON 数组，如 [{'id':'t1','action':'pending.sweep','every':3,'budget':2,'failPolicy':'skip'}]"></textarea>
+        <button class="wa-btn" id="wa-rp-tpl-list" title="只读：已登记模板（动作 / 每 N 轮 / 已用次数 / 预算 / 失败策略）">模板清单</button>
+        <button class="wa-btn" id="wa-rp-tpl-run" title="写口：按预算跑一轮（在**设置面**上登记模板，动作只调既有只读读口；预算跑满即停并如实报 budget-exhausted）">设模板</button>
+        <button class="wa-btn" id="wa-rp-catalog" title="只读：封闭集口径（可进包的模块 / 五口动作及其真读口 / 失败策略 / 容量区间）">口径</button>
+        <button class="wa-btn" id="wa-rp-diag" title="自证面：settingsBus / inputGuard / 各相关引擎在不在、词表逐口现场核对结果、台账（保存/切换/导入/模板次数 + 拒收归因）">诊断</button>
+      </div>
+      <div id="wa-rp-out" class="wa-out"></div>
+      <div class="wa-sec">世界实验室与反事实对比</div><div class="wa-dim">（E9：选 A / 选 B / 什么都不做，先看看分别会怎样）</div>
+      <div class="wa-dim">在<b>隔离副本</b>上把三条路径各跑一遍：<code>hold</code>（什么都不做）、<code>选 A</code>、<code>选 B</code>，
+        然后逐项摆差异（准入结论 / 账目 / 因果落地），每一项都标<b>来源</b>。<br/>
+        <b>实验绝不写 live 存档</b>：「跑前跑后世界摘要一致」是<b>实测</b>出来的（不是一句声明）。
+        指纹缺失一律标 <code>unknown</code>（不冒充「相同」也不冒充「不同」）；世界变了这份实验就<b>过期</b>，
+        读它会被标出来（要当前结论就重跑）。路径写法：每行一步，<code>动作|谁|参数</code>，
+        动作只在 ${wlKinds ? esc(wlKinds.join(' / ')) : '<b>读不到</b>（rehearsal 缺席）'} 里选。
+        此刻：<b>${wlOn ? '开' : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-wl-enabled" type="checkbox" ${wlOn ? 'checked' : ''}/> 启用世界实验室</label>
+      <div class="wa-row">
+        <textarea id="wa-wl-a" class="wa-input" rows="2" placeholder="选 A 的路径，如：reroute|李明|码头|车站"></textarea>
+        <textarea id="wa-wl-b" class="wa-input" rows="2" placeholder="选 B 的路径，如：notify|李明|货到了"></textarea>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wl-run" title="跑一次实验（纯读 world）：三条路径落在同一份起点上，全部在隔离副本里跑。跑前跑后各取一次 live 摘要自证零写入">跑三条路径</button>
+        <button class="wa-btn" id="wa-wl-arms" title="只读：逐臂读数（步数 / 跑成与被拒 / 副本事务数 / 因果落地 / 指纹）。过期会标出来">逐臂读数</button>
+        <button class="wa-btn" id="wa-wl-diff" title="只读：逐项差异，标 same / diff / unknown 并带来源。三臂全缺可比读数时报 not-comparable（不回一个「全相同」）">差异对比</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wl-export" title="纯读：把**起点世界**导出为一份真蓝图（交依赖体检核）。蓝图里不含任何反事实结果 —— 那份副本从来不是真世界">导出起点为蓝图</button>
+        <button class="wa-btn" id="wa-wl-discard" title="丢弃读数（副本本来就不落任何地方，故无残留可清）。本模块没有任何一条把副本写回 live 的路径">丢弃实验</button>
+        <button class="wa-btn" id="wa-wl-catalog" title="只读：三条路径 / 差异行及各自来源 / 动作词表（逐字取自 rehearsal）/ 边界口径">口径</button>
+        <button class="wa-btn" id="wa-wl-diag" title="自证面：rehearsal / exec / store / blueprint 在不在、当前实验是否过期、live 有没有被改到、台账">诊断</button>
+      </div>
+      <div id="wa-wl-out" class="wa-out"></div>
       <div class="wa-sec">存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）</div>
       <div class="wa-dim">区分<b>可回收历史</b>与<b>不可丢义务</b>（在途货物 / 待履约条款 / 未结阶段 / 回执去重索引）——
         义务不静默挤出。水位来自 <code>store.sizeCaps()</code>（唯一真源），与「容量」页同源不另起一份。
@@ -2493,7 +2634,8 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         <button class="wa-btn" id="wa-pbl-diag" title="自证面：store / perfTrace / perfLedger / renderPerf 四源是否齐备">诊断</button>
       </div>
       <div id="wa-pbl-out" class="wa-out"></div>
-      <div id="wa-diag-out" class="wa-out"></div>`;
+      <div id="wa-diag-out" class="wa-out"></div>
+      </div>`;
   }
   /**
    * v2.182.0（第二批 O5 + E2 + E5）：世界健康页 —— 玩家可读的那一屏。
@@ -2520,6 +2662,8 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
     const agOn = !!(agcfg && agcfg.enabled);
     const cvOn = !!(cvcfg && cvcfg.enabled);
     const pcOn = !!(pccfg && pccfg.enabled);
+    const cpc = (WA.campaign && WA.campaign.getSettings) ? WA.campaign.getSettings() : null;
+    const cpOn = !!(cpc && cpc.enabled);
     return `
       <div class="wa-sec">世界健康中心</div><div class="wa-dim">（一屏答三问：还有什么没做完 / 卡在哪 / 快满了没）</div>
       <div class="wa-dim">三栏<b>只做聚合与下钻</b>，不新增第二套状态：待办来自各模块自己的 <code>pending()</code>（「什么算未完成」由它们自己判），
@@ -2581,7 +2725,22 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         <input id="wa-pc-drill" class="wa-input" placeholder="下钻，格式 kind:id（如 commission、coop:m12_s0）"/>
         <button class="wa-btn" id="wa-pc-drill-go" title="下钻：答「去哪看、看哪条、哪个设置键」——只给路由，不执行动作">下钻</button>
       </div>
-      <div id="wa-pc-out" class="wa-out"></div>`;
+      <div id="wa-pc-out" class="wa-out"></div>
+      <div class="wa-sec">战役层（目标与阶段）</div><div class="wa-dim">（E4：选一个场景模板 —— 目标与阶段由既有世界事实机械判定）</div>
+      <div class="wa-dim">阶段判据引用<b>既有</b>世界事实（外交状态达档 / 货运抵达 / 势力关系达档 / 轮次达标）——
+        不由 AI 文本裁定。<b>不可读与未达成是两件事</b>：读不到（模块没装 / 参数没填）时阶段<b>不前进</b>，
+        也不会被读成「还没做到」。阶段<b>不得跳级</b>。达成结束条件只给复盘，<b>不动世界</b> ——
+        开新局是玩家的动作。此刻：<b>${cpOn ? '开' : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-cp-enabled" type="checkbox" ${cpOn ? 'checked' : ''}/> 启用战役层</label>
+      <div class="wa-row">
+        <input id="wa-cp-scene" class="wa-input" placeholder="场景 id（如 blank / cold-open / market-day）"/>
+        <button class="wa-btn" id="wa-cp-start" title="开一局：场景 id 必须来自蓝图真源 SCENES，本模块不兜底">开局</button>
+        <button class="wa-btn" id="wa-cp-advance" title="推进一阶段：判据须可读且已达成；不可读时拒收且不前进">推进阶段</button>
+        <button class="wa-btn" id="wa-cp-status" title="逐阶段读数：每阶段的判据来源、现场值、可否读、是否达成">阶段读数</button>
+        <button class="wa-btn" id="wa-cp-review" title="复盘：不推进、只看这一局的成绩单（阶段 / 天数 / 达成历史）">复盘</button>
+        <button class="wa-btn" id="wa-cp-reset" title="开新局：清空战役进度；世界状态一个字都不动">清进度</button>
+      </div>
+      <div id="wa-cp-out" class="wa-out"></div>`;
    }
 
   // v2.2.0: 档案编辑器（分节）——setProfileSafe 是唯一安全写入入口，此前零 UI
@@ -2614,11 +2773,13 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
     const errCount = (WA.errorLog || []).length;
     const src = __logErrOnly && WA.errorLog ? WA.errorLog : WA.eventLog;
     const label = __logErrOnly ? `错误日志（最近${errCount}条，子环保留≤50）` : `运行日志（最近${WA.eventLog.length}条）`;
-    return `<div class="wa-sec">${label}</div>
+    return `<div data-omniscient><div class="wa-sec">${label}</div>
+      <div class="wa-dim">本页为全知诊断面（世界时间线 / 内存审计 / 错误报告）—— 玩家视角下整页摘除，不入 DOM、亦不进剪贴板。</div>
       <button class="wa-btn wa-mini" id="wa-log-err">${__logErrOnly ? '显示全部' : `仅看错误${errCount ? '(' + errCount + ')' : ''}`}</button>
       <button class="wa-btn wa-mini" id="wa-log-copy" title="复制当前日志到剪贴板">复制</button>
       <button class="wa-btn wa-mini" id="wa-err-report">复制错误报告</button>
-      <div class="wa-logbox">${src.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
+      <div class="wa-logbox">${src.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>
+    </div>`;
   }
 
   const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
@@ -4558,6 +4719,385 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         + (s.hasInstalled ? '（已安装留痕：v' + s.installedBpVer + ' · ' + s.installedSig + '）' : '')
         + (fk ? '｜拒收归因 ' + fk : ''), true);
     });
+    // ── v2.187.0（E8 依赖体检与迁移助手）：八枚控件 + 一个输出区（渲染在「工具」页）。
+    //   三件齐做（渲染 + 绑定 + UI_BINDINGS 守卫登记）—— 理由与 v2.155.0 种子库 /
+    //   v2.164.0 蓝图同批一致。这一栏与那两栏**不共用输出区**：种子库答「格局存了没」、
+    //   蓝图答「这个世界能不能原样搬走」，本栏答「搬过来之后缺什么、会降级什么」——
+    //   合成一栏就是把三件事说成一件事。
+    const dcOut = function (text, keep) {
+      if (keep) panelEl.dataset.dcOut = text;
+      setOut('#wa-dc-out', text);
+    };
+    if (panelEl.dataset.dcOut) setOut('#wa-dc-out', panelEl.dataset.dcOut);
+    // 读输入框里那一坨 JSON。**解析失败要说清是 JSON 坏了**（`bad-json`），
+    //   而不是把它当成「引擎拒收」——两者处置完全不同：前者是粘错了，后者是这份东西不合规。
+    const dcPayload = function () {
+      const raw = wsVal('#wa-dc-in');
+      if (!raw) return { ok: false, reason: 'bad-json', why: '输入框是空的 —— 先粘一份可搬物 JSON，或按「取最近一次」' };
+      try { return { ok: true, value: JSON.parse(raw) }; }
+      catch (e) { return { ok: false, reason: 'bad-json', why: 'JSON 解析失败：' + (e && e.message) }; }
+    };
+    // 体检报告渲染（check / plan 共用同一段：两处各拼一遍必然漂移）。
+    const dcReport = function (r) {
+      const vLabel = { usable: '可用', degraded: '可用但降级', unknown: '验不了', blocked: '不可用' }[r.verdict] || r.verdict;
+      const rows = r.deps.map(function (d) {
+        const st = { present: '在', absent: '<b>缺</b>', unknown: '探不出' }[d.state] || d.state;
+        return '<div class="wa-item">' + esc(d.label) + '：' + st
+          + (d.required ? '（必需）' : '（可选）')
+          + (d.why ? ' · ' + esc(d.why) : '')
+          + (d.envLimited ? ' · <b>环境限制</b>（对所有可搬物一样）' : '')
+          + (d.impact ? '<br/>　影响：' + esc(d.impact) : '') + '</div>';
+      }).join('');
+      const deg = (r.degrade || []).map(function (x) {
+        return '<div class="wa-item">' + esc(x.field)
+          + (x.loss ? '：<b>' + esc(x.loss) + '</b>' : (x.note ? '：' + esc(x.note) : '')) + '</div>';
+      }).join('');
+      return '<div class="wa-item"><b>总判：' + vLabel + '</b>（' + esc(r.verdict) + '）· 依据 ' + esc(r.verdictBasis) + '</div>'
+        + '<div class="wa-item">体裁 ' + esc(r.kind) + '（' + esc(r.kindWhy) + '）· 源指纹 ' + esc(r.srcSig)
+        + ' · 原文件未动 ' + (r.srcUntouched ? '是' : '否') + '</div>'
+        + '<div class="wa-item">格式版本：' + esc(r.format.state)
+        + (r.format.got !== undefined && r.format.got !== null ? '（这份 ' + r.format.got + ' / 本侧 ' + r.format.want + '）'
+          : (r.format.envelopeGot !== undefined && r.format.envelopeGot !== null ? '（信封 ' + r.format.envelopeGot + '）' : ''))
+        + ' · 真源 ' + esc(r.format.source || '—')
+        + (r.format.note ? '<br/>　' + esc(r.format.note) : '') + '</div>'
+        + '<div class="wa-item">可迁移性：' + (r.migration.applicable === true ? ('可迁（' + r.migration.steps + ' 步）')
+          : (r.migration.applicable === false ? ('不可迁 · ' + esc(r.migration.why || '')) : '迁移源不可读'))
+        + (r.migration.chain && r.migration.chain.length ? ' · 链 ' + r.migration.chain.join('→') : '') + '</div>'
+        + '<div class="wa-item">不是聊天存档：' + (r.archive.isChatArchive ? '是' : '<b>不是</b>')
+        + ' · 不含 ' + esc(r.archive.notIncluded.join('/')) + ' · 它是 ' + esc(r.archive.whatItIs || '—') + '</div>'
+        + '<div class="wa-sec">依赖逐项（' + r.deps.length + '）</div>' + (rows || '<div class="wa-dim">无</div>')
+        + '<div class="wa-sec">降级损失（' + (r.degrade || []).length + '）· 来源 ' + esc(r.degradeSource || '—') + '</div>'
+        + (r.degradeUnknown ? '<div class="wa-dim">损失面也算不出：' + esc(r.degradeUnknown) + '</div>' : '')
+        + (deg || '<div class="wa-dim">无降级项</div>')
+        + (r.envLimited.length ? '<div class="wa-dim">环境限制（不参与总判）：' + esc(r.envLimited.join('、')) + '</div>' : '')
+        + (r.unverifiable.length ? '<div class="wa-dim">这一份的未知：' + esc(r.unverifiable.join('、')) + '</div>' : '');
+    };
+    { const el = $('#wa-dc-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.depCheck || !WA.depCheck.setSettings) return dcOut('未记录：module-missing', true);
+        WA.depCheck.setSettings({ enabled: !!el.checked });
+        dcOut('已记录 ' + (el.checked ? 'enabled' : 'disabled（既不体检也不出计划；已读过的结论不因此失效）'), true);
+      };
+    }
+    on('#wa-dc-catalog', () => {
+      if (!WA.depCheck || !WA.depCheck.catalog) return dcOut('未记录：module-missing', true);
+      const c = WA.depCheck.catalog();
+      dcOut('体检口径：体裁 ' + c.kinds.join('/') + '｜依赖类目 ' + c.depKinds.join('/')
+        + '｜依赖状态 ' + c.depStates.join('/') + '｜总判 ' + c.verdicts.join('/') + '\n'
+        + c.verdictNote + '\n' + c.envLimitedNote + '\n' + c.archiveNote, true);
+    });
+    on('#wa-dc-use', () => {
+      // 「最近一次」的真源：本会话当场导出的一份蓝图（纯读，导出不写任何东西）。
+      //   取不到时如实说取不到 —— 不凭空造一份空可搬物塞进输入框（那会让体检变成「体检空气」）。
+      let pick = null;
+      if (WA.worldBlueprint && WA.worldBlueprint.exportBlueprint) {
+        try {
+          const bp = WA.worldBlueprint.exportBlueprint({ keep: 'roster' });
+          if (bp && bp.ok) pick = bp.blueprint;
+        } catch (e) { pick = null; }
+      }
+      if (!pick) return dcOut('取不到「最近一次」：本会话尚未成功导出过蓝图（世界可能是空的）—— '
+        + '请手工粘一份，或先去上面「导出蓝图」。这**不是**「没有可体检的东西」，而是「这一栏没得可填」', true);
+      const el = $('#wa-dc-in');
+      if (el) el.value = JSON.stringify(pick, null, 2);
+      dcOut('已装入输入框（本会话当场导出的蓝图 · 保留层级 ' + (pick.keep || '—')
+        + ' · 人物 ' + ((pick.ids && pick.ids.people || []).length) + '）—— 按「开始体检」出报告', true);
+    });
+    on('#wa-dc-check', () => {
+      if (!WA.depCheck || !WA.depCheck.check) return dcOut('未记录：module-missing', true);
+      const pl = dcPayload();
+      if (!pl.ok) return dcOut(pl.reason + '：' + pl.why, true);
+      const r = WA.depCheck.check(pl.value);
+      if (!r.ok) return dcOut(wsErr(r), true);
+      dcOut('体检完成（纯读：世界与这份文件都一个字没动）\n' + dcReport(r), true);
+    });
+    on('#wa-dc-plan', () => {
+      if (!WA.depCheck || !WA.depCheck.prepare) return dcOut('未记录：module-missing', true);
+      const pl = dcPayload();
+      if (!pl.ok) return dcOut(pl.reason + '：' + pl.why, true);
+      const r = WA.depCheck.prepare(pl.value);
+      dcOut('迁移计划（<b>只出计划，不动原文件</b> · 源指纹 ' + esc(r.srcSig || '—')
+        + ' · 原文件未动 ' + (r.srcUntouched ? '是' : '否') + '）\n'
+        + (r.ok
+          ? '可迁移：走 ' + esc(r.action) + '，' + r.steps + ' 步（' + esc(r.why) + '）'
+            + (r.chain && r.chain.length ? ' · 链 ' + r.chain.join('→') : '')
+          : '不可迁移：' + esc(r.reason) + (r.hint ? '\n' + esc(r.hint) : '')
+            + (r.known && r.known.length ? '\n本侧已登记的迁移链：' + r.known.join('→') : '')
+            + (r.known && !r.known.length ? '\n本侧迁移链是空的 —— 没有任何可用的转换步骤' : '')), true);
+    });
+    on('#wa-dc-diag', () => {
+      if (!WA.depCheck || !WA.depCheck.diagnose) return dcOut('未记录：module-missing', true);
+      const d = WA.depCheck.diagnose();
+      const s = WA.depCheck.stat();
+      const vs = d.versionSources;
+      const fk = Object.keys(s.faults || {}).map(function (k) { return k + '×' + s.faults[k]; }).join('、');
+      dcOut('体检面诊断：' + (d.enabled ? '开' : '关')
+        + '｜版本真源 蓝图 ' + (vs.blueprint === null ? '<b>读不到</b>' : 'v' + vs.blueprint)
+        + ' / 种子 ' + (vs.seed === null ? '<b>读不到</b>' : 'v' + vs.seed)
+        + ' / 转移包 ' + (vs.pack === null ? '<b>未导出（本模块不自带第二份）</b>' : 'v' + vs.pack)
+        + ' / 存档 ' + (vs.checkpoint === null ? '<b>读不到</b>' : 'v' + vs.checkpoint)
+        + '｜迁移链 ' + (d.migrationChain === null ? '<b>读不到</b>' : (d.migrationChain.length ? d.migrationChain.join('→') : '空'))
+        + '｜台账 体检 ' + s.checks + ' 次（不可用 ' + s.blocked + ' / 降级 ' + s.degraded
+        + ' / 验不了 ' + s.unknown + '）· 计划 ' + s.prepared + ' 份 · 拒收 ' + s.refused + ' 次'
+        + (fk ? '（拒收归因 ' + esc(fk) + '）' : '')
+        + '｜上次 ' + esc(s.lastReason || '无'), true);
+    });
+
+    // ── v2.188.0（E7 规则包与自动化模板 + E9 世界实验室）：19 枚控件 + 2 个读数出口。
+    //   三件齐做（渲染 + 绑定 + UI_BINDINGS 守卫登记）—— 理由与 v2.155.0 种子库 /
+    //   v2.164.0 蓝图 / v2.187.0 体检同批一致。两栏**不共用输出区**，也不与体检共用：
+    //   体检答「搬过来缺什么」、规则包答「这一局喜欢的那套规则存哪了」、实验室答
+    //   「三条路分别会怎样」—— 三件事合成一栏就是把三件事说成一件事。
+    const rpkOut = function (text) { setOut('#wa-rp-out', text); };
+    const wlbOut = function (text) { setOut('#wa-wl-out', text); };
+    // 取输入框原文（判空写同 wsVal 口径：元素不在树里时给空串，而不是抛）。
+    const rpkVal = function (sel) { const el = $(sel); return (el && el.value !== undefined && el.value !== null) ? String(el.value).trim() : ''; };
+    { const el = $('#wa-rp-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.rulePack || !WA.rulePack.setSettings) return rpkOut('未记录：module-missing');
+        WA.rulePack.setSettings({ enabled: !!el.checked });
+        rpkOut(el.checked ? '已记录 enabled（从此可保存 / 切换 / 导入 / 跑模板）'
+          : '已记录 disabled（已存下的包原样留在设置族里，只是保存 / 切换 / 导入 / 跑模板一并拒收）');
+      };
+    }
+    on('#wa-rp-save', () => {
+      if (!WA.rulePack || !WA.rulePack.save) return rpkOut('未记录：module-missing');
+      const r = WA.rulePack.save(rpkVal('#wa-rp-name'));
+      if (!r.ok) {
+        // 存不下的时候把**当前规则面**摊出来（`current`）：`empty-surface` 与「引擎不在」
+        //   在回执上本来长得一样，而 `current` 是唯一能分清两者的读数面
+        //   （它逐键报「读到了什么 / 哪几个键读不到、为什么」）。
+        let why = '（' + r.reason + '）';
+        if (WA.rulePack.current) {
+          const c = WA.rulePack.current({});
+          why += '｜当前面：可读 ' + c.packable + ' / 读不到 ' + c.unreadable + '（' + c.keys.length + ' 个键在清单里）'
+            + (c.absent && c.absent.length ? '·' + esc(c.absent.slice(0, 4).map(function (x) { return (x.key && x.key.key) || x.key; }).join('、')) : '');
+        }
+        return rpkOut('未存下：' + why, true);
+      }
+      rpkOut('已存包 ' + r.name + '（' + r.keys + ' 键 · 指纹 ' + r.sig + (r.replaced ? ' · 覆盖了同名旧包' : '') + '）', true);
+    });
+    on('#wa-rp-list', () => {
+      if (!WA.rulePack || !WA.rulePack.list) return rpkOut('未记录：module-missing');
+      const l = WA.rulePack.list();
+      // 名称框里填了名字 ⇒ 顺带报**这一包的明细**（`get`）。
+      //   为什么合在这里：切包与导出都以「名字」为入口，而名字对应的到底是哪一套键
+      //   （哪几个键、哪几个当时就读不到、源指纹是什么）此前在界面上没有任何一处能答 ——
+      //   `list` 只答「有几个包」。
+      const want = rpkVal('#wa-rp-name');
+      let detail = '';
+      if (want && WA.rulePack.get) {
+        const g = WA.rulePack.get(want);
+        detail = g.ok
+          ? ('\n【' + g.name + '】格式 v' + g.ver + ' · ' + g.keys.length + ' 键 · 指纹 ' + g.sig
+            + (g.absent && g.absent.length ? ' · 存包时读不到 ' + g.absent.length + '（' + esc(g.absent.map(function (x) { return x.key; }).join('、')) + '）' : '')
+            + '\n键：' + esc(g.keys.join('、')))
+          : ('\n【' + want + '】读不到：' + g.reason);
+      }
+      if (!l.packs.length) return rpkOut('包清单是空的（这与「引擎不在」不是一回事 —— 存一个就有了）' + detail);
+      rpkOut('包清单（活跃 ' + (l.active || '无') + ' / 上限 ' + l.maxPacks + '）：' + l.packs.map(function (p) {
+        return p.name + '(' + p.keys + '键' + (p.imported ? '·导入' : '') + ')';
+      }).join('；') + detail);
+    });
+    on('#wa-rp-apply', () => {
+      if (!WA.rulePack || !WA.rulePack.apply) return rpkOut('未记录：module-missing');
+      const r = WA.rulePack.apply(rpkVal('#wa-rp-name'));
+      if (!r.ok) return rpkOut('未切换：' + r.reason, true);
+      rpkOut('已切到 ' + r.name + '：写回 ' + r.applied.length + ' 键'
+        + (r.failed.length ? ' · 失败 ' + r.failed.length + '（' + esc(r.failed.map(function (x) { return x.key; }).join('、')) + '）' : '')
+        + (r.skipped.length ? ' · 跳过 ' + r.skipped.length + '（本侧未登记）' : '')
+        + (r.partial ? ' —— **部分成功**：不做「已切干净」的声明' : ''), true);
+    });
+    on('#wa-rp-drop', () => {
+      if (!WA.rulePack || !WA.rulePack.drop) return rpkOut('未记录：module-missing');
+      const r = WA.rulePack.drop(rpkVal('#wa-rp-name'));
+      rpkOut(r.ok ? ('已删包 ' + r.name + '（还剩 ' + r.remaining + ' 个）—— 只动包清单，世界一个字节没碰')
+        : ('未删：' + r.reason), true);
+    });
+    on('#wa-rp-export', () => {
+      if (!WA.rulePack || !WA.rulePack.exportPack) return rpkOut('未记录：module-missing');
+      const r = WA.rulePack.exportPack(rpkVal('#wa-rp-name'));
+      rpkOut(r.ok ? ('导出 ' + r.name + '：' + r.keys + ' 键 · ' + r.bytes + ' 字节 · 源指纹 ' + (r.pack && r.pack.sig)
+        + '\n' + r.text + '\n（纯读：导出不改任何设置）')
+        : ('未导出：' + r.reason), true);
+    });
+    on('#wa-rp-import', () => {
+      if (!WA.rulePack || !WA.rulePack.importPack) return rpkOut('未记录：module-missing');
+      const r = WA.rulePack.importPack(rpkVal('#wa-rp-tpl'));
+      if (!r.ok) return rpkOut('未导入：' + r.reason + (r.detail ? '（' + r.detail + '）' : '')
+        + (r.hint ? '\n' + r.hint : ''), true);
+      rpkOut('已导入 ' + r.name + '：' + r.keys + ' 键 · 源指纹 ' + (r.srcSig || '无') + ' · 本侧指纹 ' + r.sig
+        + (r.unknownKeys.length ? '\n本侧不认识的键（如实列出、不进包）：' + esc(r.unknownKeys.join('、')) : '')
+        + '\n' + r.note, true);
+    });
+    on('#wa-rp-tpl-list', () => {
+      if (!WA.rulePack || !WA.rulePack.template) return rpkOut('未记录：module-missing');
+      const T = WA.rulePack.template.list();
+      if (!T.length) return rpkOut('还没登记模板（这与「跑过了没生效」不是一回事）');
+      rpkOut('模板清单：' + T.map(function (t) {
+        return t.id + '→' + t.action + ' /每' + t.every + '轮 · 已用 ' + t.used + '/' + t.budget + ' · ' + t.failPolicy + '组';
+      }).join('；'));
+    });
+    on('#wa-rp-tpl-run', () => {
+      if (!WA.rulePack || !WA.rulePack.template) return rpkOut('未记录：module-missing');
+      // 一步：先把输入框里那一坨登记成模板（全判通过才落地），再按预算跑一轮。
+      //   为什么合成一步：模板是**本会话内存态**，分开两步时用户很容易只登记不跑、
+      //   或跑的是上一版模板 —— 而两者在界面上长得一样。
+      let set = null;
+      try { set = WA.rulePack.template.set(JSON.parse(rpkVal('#wa-rp-tpl'))); }
+      catch (e) { return rpkOut('未登记：bad-json（' + esc(String((e && e.message) || e)) + '）—— 先修 JSON', true); }
+      if (!set.ok) {
+        return rpkOut('未登记：' + set.reason + (set.rejected && set.rejected.length
+          ? '（逐条：' + esc(set.rejected.map(function (x) { return (x.id || '?') + '=' + x.reason; }).join('、')) + '）'
+          : '') + ' —— 非法模板一律**在写盘之前**拒收，设置一个字节没改', true);
+      }
+      const r = WA.rulePack.template.run({});
+      if (!r.ok) return rpkOut('已登记 ' + set.accepted + ' 条，但没跑：' + r.reason, true);
+      rpkOut('登记 ' + set.accepted + ' 条 · 跑成 ' + r.ran + ' · 被拒 ' + r.refused
+        + (r.budgetSkipped ? ' · 预算已满 ' + r.budgetSkipped : '')
+        + (r.stoppedAt ? ' · failPolicy=stop 停在第 ' + r.stoppedAt + ' 条' : '')
+        + '\n逐条：' + esc(r.trace.map(function (x) {
+          return x.id + (x.ok ? '✓' : ('✗' + x.reason)) + '(' + x.used + '/' + x.budget + ')';
+        }).join('、'))
+        + '\n' + r.note, true);
+    });
+    on('#wa-rp-catalog', () => {
+      if (!WA.rulePack || !WA.rulePack.catalog) return rpkOut('未记录：module-missing');
+      const c = WA.rulePack.catalog();
+      rpkOut('规则包口径（格式 v' + c.format + '）\n可进包的模块：' + c.modules.join('、')
+        + '\n容量：包 ' + c.bounds.maxPacks + ' / 每包键 ' + c.bounds.maxKeys
+        + '\n动作词表（**封闭集**，每口都是既有只读读口）：' + c.actions.map(function (x) {
+          return x.id + '→' + x.target;
+        }).join('；')
+        + '\n失败策略：' + c.failPolicies.join(' / ')
+        + '\n' + c.notes.writePath + '\n' + c.notes.noScript + '\n' + c.notes.noTimer
+        + '\n' + c.notes.budget + '\n' + c.notes.readOnly + '\n' + c.notes.noWorldWrite, true);
+    });
+    on('#wa-rp-diag', () => {
+      if (!WA.rulePack || !WA.rulePack.diagnose) return rpkOut('未记录：module-missing');
+      const d = WA.rulePack.diagnose();
+      const s = WA.rulePack.stat();
+      const miss = Object.keys(d.deps).filter(function (k) { return !d.deps[k]; });
+      const fk = Object.keys(s.faults || {}).map(function (k) { return k + '×' + s.faults[k]; }).join('、');
+      rpkOut('规则包诊断：' + (d.enabled ? '开' : '关') + '｜包 ' + d.packs + '（活跃 ' + (d.active || '无') + '）· 模板 ' + d.templateCount
+        + '｜可进包的键 ' + d.packableCount + ' 个（现场按登记表筛）'
+        + '\n词表逐口现场核对（' + d.actionsResolved + '/' + d.actionTargets.length + ' 口在位）：' + d.actionTargets.map(function (x) {
+          return x.id + '→' + x.target + (x.present ? '✓' : '<b>缺</b>');
+        }).join('；')
+        + '\n缺席依赖' + (miss.length ? '：<b>' + miss.join('、') + '</b>（rehearsal 缺席时该条模板会拒收 engine-absent）' : '：无')
+        + '\n台账 保存 ' + s.saves + ' · 切换 ' + s.applies + ' · 删包 ' + s.drops + ' · 导出 ' + s.exports + ' · 导入 ' + s.imports
+        + ' · 模板跑 ' + s.templateRuns + '（其中被拒 ' + s.templateRefused + '）· 拒收 ' + s.refused
+        + (fk ? '（归因 ' + esc(fk) + '）' : '') + '｜上次 ' + esc(s.lastReason || '无'), true);
+    });
+    // ── E9 世界实验室（同一页；与「三条路先看看」这条线同族）─────────────────
+    { const el = $('#wa-wl-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.worldLab || !WA.worldLab.setSettings) return wlbOut('未记录：module-missing');
+        WA.worldLab.setSettings({ enabled: !!el.checked });
+        wlbOut(el.checked ? '已记录 enabled（可以跑实验了；实验只落在隔离副本里）'
+          : '已记录 disabled（跑实验与导出蓝图一并拒收；已跑过的读数只是内存态，本来就没落盘）');
+      };
+    }
+    on('#wa-wl-run', () => {
+      if (!WA.worldLab || !WA.worldLab.run) return wlbOut('未记录：module-missing');
+      const aTxt = rpkVal('#wa-wl-a'), bTxt = rpkVal('#wa-wl-b');
+      const r = WA.worldLab.run({ a: aTxt, b: bTxt });
+      if (!r.ok) {
+        // 路径解析失败时把**解析面**摊出来（`parseSteps`）：`unknown-kind` 与「引擎缺席」
+        //   在回执上都只是一个理由串，而解析面逐行报「第几行的哪个词不认识 / 词表是什么」。
+        let why = '';
+        if (WA.worldLab.parseSteps) {
+          const bad = (r.arm === 'a') ? aTxt : bTxt;
+          const p = WA.worldLab.parseSteps(bad, WA.worldLab.getSettings().maxSteps);
+          why = p.ok
+            ? '｜解析面：这条路径本身是合法的（' + p.steps.length + ' 步）—— 拒收来自另一条臂'
+            : ('｜解析面：' + p.reason + (p.line ? '（第 ' + p.line + ' 行）' : '')
+              + (p.known ? '·词表 ' + esc(p.known.join('/')) : ''));
+        }
+        return wlbOut('未跑：' + r.reason + (r.hint ? '（' + r.hint + '）' : '')
+          + (r.line ? '（第 ' + r.line + ' 行：' + (r.got || '') + '）' : '') + why, true);
+      }
+      wlbOut('实验 ' + r.id + '：' + r.arms.map(function (x) {
+        return x.cn + (x.ok ? '跑成(' + x.done + '步/拒' + x.refused + ')' : ('<b>拒收</b> ' + x.reason));
+      }).join(' · ')
+        + '\nlive 前 ' + r.liveBefore + ' → 后 ' + r.liveAfter
+        + ' ⇒ ' + (r.liveUnchanged ? '**零写入**（实测一致）' : '<b>live 被改动了</b>（这一栏是实测差，不是声明）')
+        + '\n' + r.note, true);
+    });
+    on('#wa-wl-arms', () => {
+      if (!WA.worldLab || !WA.worldLab.arms) return wlbOut('未记录：module-missing');
+      const r = WA.worldLab.arms();
+      if (!r.ok) return wlbOut('还没跑过实验：' + r.reason + '（先按「跑三条路径」）');
+      wlbOut('实验 ' + r.id + (r.stale ? ' · <b>已过期</b>（' + esc(r.staleReason) + ' —— 世界变过了，要当前结论就重跑）' : ' · 未过期')
+        + '｜live 零写 ' + (r.liveUnchanged ? '是（实测）' : '否')
+        + '\n' + r.rows.map(function (x) {
+          return x.cn + '：' + (x.ok ? ('步 ' + x.steps + ' · 跑成 ' + x.done + ' / 拒 ' + x.refused + ' · 副本事务 ' + x.writes + ' · 指纹 ' + (x.fingerprint ? '有' : '缺'))
+            : ('<b>未跑成</b> ' + x.reason));
+        }).join('\n'), true);
+    });
+    on('#wa-wl-diff', () => {
+      if (!WA.worldLab || !WA.worldLab.diff) return wlbOut('未记录：module-missing');
+      const d = WA.worldLab.diff();
+      if (!d.ok) return wlbOut('不做对比：' + d.reason + '\n' + (d.why || ''), true);
+      const ST = { same: '相同', diff: '不同', unknown: 'unknown（读不到 —— 不冒充相同也不冒充不同）' };
+      wlbOut('差异（' + d.arms.join(' / ') + '）· 不同 ' + d.differing + ' 项 · 未知 ' + d.unknownRows + ' 项'
+        + (d.stale ? ' · <b>已过期</b>：' + esc(d.staleReason) : '')
+        + '\n' + d.rows.map(function (x) {
+          return x.label + '：' + ST[x.state] + '（' + d.arms.map(function (id) {
+            return id + '=' + (x.values[id] === null ? '—' : x.values[id]);
+          }).join(' ') + '）· 来源 ' + x.src;
+        }).join('\n')
+        + '\n起点指纹面：' + d.fingerprints.state
+        + '（' + d.fingerprints.rows.map(function (x) {
+          return x.arm + '=' + (x.fingerprint && x.fingerprint.digest ? x.fingerprint.digest : '缺');
+        }).join(' ') + '）'
+        + '\n' + d.note, true);
+    });
+    on('#wa-wl-export', () => {
+      if (!WA.worldLab || !WA.worldLab.exportAs) return wlbOut('未记录：module-missing');
+      const r = WA.worldLab.exportAs('blueprint');
+      if (!r.ok) return wlbOut('未导出：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''), true);
+      wlbOut('已导出起点世界为蓝图：' + r.keys + ' 个顶层键'
+        + (r.lab ? '（附注：实验 ' + r.lab.id + ' 的逐臂读数随体带走）' : '（本会话还没跑过实验，故无附注）')
+        + '\n' + r.attach + '\n' + r.note, true);
+    });
+    on('#wa-wl-discard', () => {
+      if (!WA.worldLab || !WA.worldLab.discard) return wlbOut('未记录：module-missing');
+      const r = WA.worldLab.discard();
+      wlbOut((r.discarded ? '已丢弃实验 ' + r.id : '本就没有实验可丢') + ' —— ' + r.note + '（本模块没有任何一条把副本写回 live 的路径）');
+    });
+    on('#wa-wl-catalog', () => {
+      if (!WA.worldLab || !WA.worldLab.catalog) return wlbOut('未记录：module-missing');
+      const c = WA.worldLab.catalog();
+      wlbOut('世界实验室口径（格式 v' + c.format + '）\n三条路径：' + c.arms.map(function (x) { return x.cn + '(' + x.id + ')'; }).join(' / ')
+        + '（一步上限 ' + c.maxSteps + '）'
+        + '\n动作词表：' + (c.kinds ? c.kinds.join(' / ') : '<b>读不到</b>（rehearsal 缺席）') + ' · ' + c.kindSource
+        + '\n差异行：' + c.rows.map(function (x) { return x.label + '←' + x.src; }).join('；')
+        + '\n' + c.notes.noLiveWrite + '\n' + c.notes.selfProof + '\n' + c.notes.fingerprint
+        + '\n' + c.notes.stale + '\n' + c.notes.noRollback + '\n' + c.notes.noRewind + '\n' + c.notes.noTimer, true);
+    });
+    on('#wa-wl-diag', () => {
+      if (!WA.worldLab || !WA.worldLab.diagnose) return wlbOut('未记录：module-missing');
+      const d = WA.worldLab.diagnose();
+      const s = WA.worldLab.stat();
+      const miss = Object.keys(d.deps).filter(function (k) { return !d.deps[k]; });
+      const fk = Object.keys(s.faults || {}).map(function (k) { return k + '×' + s.faults[k]; }).join('、');
+      const st = WA.worldLab.staleness();
+      wlbOut('实验室诊断：' + (d.enabled ? '开' : '关') + '｜实验 ' + (d.hasLab ? d.labId : '无')
+        + ' · 过期 ' + (d.hasLab ? (d.stale ? '<b>是</b>（' + esc(d.staleReason) + '）' : '否') : '不适用')
+        + ' · live 零写 ' + (d.liveUnchanged === null ? '不适用' : (d.liveUnchanged ? '是（实测）' : '<b>否</b>'))
+        + '｜步数上限 ' + d.maxSteps
+        + '\n逐臂：' + (d.arms.length ? d.arms.map(function (x) {
+          return x.id + (x.ok ? '✓(步' + x.done + ')' : ('✗' + x.reason)) + (x.hasFingerprint ? '·指纹有' : '·指纹缺');
+        }).join('；') : '（还没跑）')
+        + '\n过期判定：' + (st.ok ? (st.match ? '与起点一致' : '起点 ' + st.pinned + ' ≠ 当前 ' + st.current) : st.reason)
+        + '\n缺席依赖' + (miss.length ? '：' + miss.join('、') : '：无')
+        + '\n不可比项来源：' + d.unknowns.map(function (x) { return x.source + '=' + x.why; }).join('；')
+        + '\n台账 实验 ' + s.runs + ' 次 · 臂 ' + s.arms + ' · 丢弃 ' + s.discarded + ' · 导出 ' + s.exports
+        + ' · 读过期 ' + s.staleReads + ' · 拒收 ' + s.refused + (fk ? '（归因 ' + esc(fk) + '）' : '')
+        + '｜上次 ' + esc(s.lastReason || '无'), true);
+    });
+
     on('#wa-life-goal', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addGoal(x.person, { text: x.text }), true); renderBody(); });
     on('#wa-life-promise', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addCommitment(x.person, { kind: 'promise', target: '玩家', text: x.text }), true); renderBody(); });
     on('#wa-life-schedule', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); const now = clockNow('ui.life'); lifeOut(WA.life.addSchedule(x.person, { activity: x.text, start: now, end: now + 3600000 }), true); renderBody(); });
@@ -6315,7 +6855,12 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         if (!v.enabled) return frOut('货运未开');
         var route = wv('#wa-fr-route'), from = wv('#wa-fr-from'), res = wv('#wa-fr-res');
         var qty = parseInt(wv('#wa-fr-qty'), 10), days = parseFloat(wv('#wa-fr-days'));
-        var r = WA.freight.dispatch(route, from, res, qty, { transitDays: days });
+        // 目的地首次进货必须给基础价（引擎 legitime 拒收 missing-base）——面板此前没有这个入口，
+        //   于是「新目的地首运」在 UI 上**永远做不成**：控件在、路径不通（v2.186.0 · O1 宿主矩阵实测抓到）。
+        //   空串 ⇒ null（= 不传），保持「老目的地可省、新目的地必填」的旧行为不变。
+        var baseRaw = wv('#wa-fr-base');
+        var base = baseRaw === '' ? null : parseFloat(baseRaw);
+        var r = WA.freight.dispatch(route, from, res, qty, { transitDays: days, base: base });
         if (!r || !r.ok) return frOut(r ? (r.reason || '发运失败') : '发运失败');
         frOut('已发运：' + r.id + ' ' + r.from + '->' + r.to + ' ' + r.resource + ' ' + r.qty + '（源库存余 ' + r.stock + '）');
     });
@@ -6688,6 +7233,8 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       };
       const dl = $('#wa-snap-dl');
       if (dl && WA.toolSnapshot) dl.onclick = () => {
+        const g = outletGate('export-file');
+        if (!g.allowed) { outletBlocked($('#wa-snap-out')); return; }
         const r = WA.toolSnapshot.download();
         $('#wa-snap-out').textContent = r.ok ? ('已导出 ' + Math.round(r.bytes / 1024) + 'KB') : ('导出失败：' + r.reason);
       };
@@ -6904,6 +7451,8 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       };
       const dgDl = $('#wa-diag-dl');
       if (dgDl && WA.toolDiag) dgDl.onclick = () => {
+        const g = outletGate('diagnostics');
+        if (!g.allowed) { outletBlocked($('#wa-diag-out')); return; }
         const r = WA.toolDiag.download();
         $('#wa-diag-out').textContent = r.ok ? ('诊断包已导出 ' + Math.round(r.bytes / 1024) + 'KB') : ('导出失败：' + r.reason);
       };
@@ -6923,6 +7472,104 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         if (r.ok && r.added) renderBody();
       };
     }
+
+    // v2.187.0（E6）：统一世界地图与关系视图的面板消费方。
+    //   atlas 的 6 枚只读口在此各有一个真消费方 —— 本仓口径「无消费方不挂导出」，
+    //   而登记在 UI_BINDINGS 只是字符串、不算消费方（v2.173.0 那条教训）。
+    {
+      const atOut = (html) => { const o = $('#wa-at-out'); if (o) o.innerHTML = html; };
+      const atEsc = (v) => esc(String(v == null ? '' : v));
+      const atRow = (a, b) => '<div class="wa-item"><b>' + atEsc(a) + '</b>' + (b ? '<div class="wa-dim">' + atEsc(b) + '</div>' : '') + '</div>';
+      const atWhy = (r) => ((r && r.reason) || '?') + (r && r.source ? '（来源 ' + r.source + '）' : '');
+      on('#wa-at-enabled', () => {
+        if (!WA.atlas) return atOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        const el = $('#wa-at-enabled');
+        WA.atlas.setSettings({ enabled: !!el.checked });
+        renderBody();
+      });
+      on('#wa-at-view', () => {
+        if (!WA.atlas) return atOut('<div class="wa-log wa-log-err">地图未加载</div>');
+        const v = WA.atlas.view();
+        if (!v.ok) return atOut('<div class="wa-log wa-log-info">' + atEsc(atWhy(v)) + '</div>');
+        const c = v.counts;
+        atOut('<div class="wa-log wa-log-' + (v.empty ? 'info' : 'ok') + '">地点 ' + c.places + ' · 道路 ' + c.roads
+          + ' · 在途 ' + c.transit + ' · 推导边 ' + c.derived + ' · 事实边 ' + c.facts + ' · 未知对 ' + c.gaps
+          + ' · 未落位 ' + c.unplaced + '</div>'
+          + (v.empty ? '<div class="wa-dim">三样都是零 —— 这是「图上真的什么都没有」，不是「读不到」（读不到会在这行上方给出原因）。</div>' : '')
+          + (v.notes.places ? '<div class="wa-dim">地点源：' + atEsc(v.notes.places) + '</div>' : '')
+          + (v.notes.routes ? '<div class="wa-dim">道路源：' + atEsc(v.notes.routes) + '</div>' : ''));
+      });
+      on('#wa-at-places', () => {
+        if (!WA.atlas) return atOut('<div class="wa-log wa-log-err">地图未加载</div>');
+        const p = WA.atlas.places();
+        if (!p.ok) return atOut('<div class="wa-log wa-log-warn">' + atEsc(atWhy(p)) + '（这不是「没有地点」）</div>');
+        if (!p.count) return atOut('<div class="wa-log wa-log-info">地点表是空的（region 里还没有登记地区）</div>');
+        atOut('<div class="wa-log wa-log-info">地点 ' + p.count + ' 处' + (p.truncated ? '（截断 ' + p.truncated + ' 处）' : '')
+          + '　近场划分 ' + (p.nearDays === null ? '读不到' : p.nearDays + ' 天')
+          + (p.zoneUnknown ? '　分域未知 ' + p.zoneUnknown + ' 处' : '') + '</div>'
+          + p.places.map(function (r) {
+            return atRow(r.name, '距本地 ' + (r.distanceDays === null ? '未知' : r.distanceDays + ' 天') + ' · 渠道 ' + (r.lane || '未知')
+              + ' · 域 ' + r.zone + (r.blocked ? ' · <b>受阻</b>' : '')
+              + (r.traces ? '　痕迹 ' + r.traces.count + ' 条' + (r.traces.peak ? '（最强 ' + r.traces.peak + '）' : '') : '　痕迹源缺席'));
+          }).join(''));
+      });
+      on('#wa-at-routes', () => {
+        if (!WA.atlas) return atOut('<div class="wa-log wa-log-err">地图未加载</div>');
+        const r = WA.atlas.routes();
+        if (!r.ok) return atOut('<div class="wa-log wa-log-warn">' + atEsc(atWhy(r)) + '</div>');
+        atOut('<div class="wa-log wa-log-info">道路 ' + r.count + ' 条 · 在途货物 ' + r.transitCount + ' 件'
+          + '（已到 / 已取消的不画在路上）</div>'
+          + (r.roads.length ? r.roads.map(function (x) {
+            return atRow(x.from + ' → ' + x.to, '渠道 ' + (x.lane || '未知') + ' · 状态 ' + (x.status || '未知')
+              + (x.cost === null ? '' : ' · 运费 ' + x.cost) + (x.transit.length ? '　在途 ' + x.transit.length + ' 件' : ''));
+          }).join('') : '<div class="wa-dim">还没有登记过商路。</div>')
+          + (r.unplaced.length ? '<div class="wa-dim">未落位 ' + r.unplaced.length + ' 项：'
+            + atEsc(r.unplaced.slice(0, 4).map(function (u) { return u.name + '（' + u.why + '）'; }).join('、')) + '</div>' : ''));
+      });
+      on('#wa-at-rel', () => {
+        if (!WA.atlas) return atOut('<div class="wa-log wa-log-err">地图未加载</div>');
+        const r = WA.atlas.relations();
+        atOut('<div class="wa-log wa-log-info">推导边 ' + r.derivedCount + (r.derivedTruncated ? '（截断 ' + r.derivedTruncated + '）' : '')
+          + '　已确立事实 ' + r.factsCount + '　仅派生无事实 ' + r.gaps.length + '</div>'
+          + '<div class="wa-dim">两层<b>永不合并</b>：左边是算出来的（每条带 basis），右边是谈成的。'
+          + (r.derivedReason ? '　推导层：' + atEsc(r.derivedReason) : '')
+          + (r.factsReason ? '　事实层：' + atEsc(r.factsReason) : '') + '</div>'
+          + (r.derived.length ? r.derived.slice(0, 8).map(function (d) {
+            return atRow('［推导］' + d.a + ' — ' + d.b, '档位 ' + d.tier + (d.basis.length ? '　据 ' + d.basis.join(' ; ') : ''));
+          }).join('') : '')
+          + (r.facts.length ? r.facts.slice(0, 8).map(function (f) {
+            return atRow('［事实］' + f.a + ' — ' + f.b, f.stateLabel + (f.treaty ? '　有生效条款' : '　无生效条款'));
+          }).join('') : '')
+          + (r.gaps.length ? '<div class="wa-dim">未知对 ' + r.gaps.length + ' 个（仅派生、外交表无成对条目 —— <b>unknown ≠ 中立</b>）：'
+            + atEsc(r.gaps.slice(0, 4).map(function (g) { return g.a + '—' + g.b; }).join('、')) + '</div>' : ''));
+      });
+      on('#wa-at-unplaced', () => {
+        if (!WA.atlas) return atOut('<div class="wa-log wa-log-err">地图未加载</div>');
+        const p = WA.atlas.places(), r = WA.atlas.routes();
+        const rows = []
+          .concat((p.ok ? p.unplaced : []).map(function (u) { return { name: u.name, why: u.why, src: '地点表' }; }))
+          .concat((r.ok ? r.unplaced : []).map(function (u) { return { name: u.name, why: u.why, src: '道路/在途' }; }));
+        atOut(rows.length
+          ? '<div class="wa-log wa-log-warn">未落位 ' + rows.length + ' 项</div>'
+            + '<div class="wa-dim">这些名字出现在端点里，却没有坐标。<b>本模块不为它们补坐标</b> —— 缺就是缺。'
+            + '要让它们落位，去 region 里登记（那是坐标的唯一真源）。</div>'
+            + rows.map(function (u) { return atRow(u.name || '(空名)', u.src + ' · ' + u.why); }).join('')
+          : '<div class="wa-log wa-log-ok">没有未落位的端点 —— 每个出现在路上的名字都有坐标。</div>');
+      });
+      on('#wa-at-diag', () => {
+        if (!WA.atlas) return atOut('<div class="wa-log wa-log-err">地图未加载</div>');
+        const d = WA.atlas.diagnose();
+        atOut('<div class="wa-log wa-log-info">enabled=' + d.enabled + ' showFacts=' + d.showFacts
+          + ' maxPlaces=' + d.maxPlaces + ' maxEdges=' + d.maxEdges + ' snapshot=' + d.snapshotOk + '</div>'
+          + Object.keys(d.deps).map(function (k) {
+            return '<div class="wa-item">' + atEsc(k) + '：' + (d.deps[k] ? '在' : '<b>缺席</b>') + '</div>';
+          }).join('')
+          + '<div class="wa-dim">两层：推导 ' + d.layers.derived + '（' + atEsc(d.layers.derivedReason || '可读') + '）'
+          + '　事实 ' + d.layers.facts + '（' + atEsc(d.layers.factsReason || '可读') + '）'
+          + '　未知对 ' + d.layers.gaps + '</div>'
+          + '<div class="wa-dim">故障：' + atEsc(JSON.stringify(d.faults)) + '（<b>源缺席与源抛错分列</b> —— 前者是配置，后者是故障）</div>');
+      });
+    }
     on('#wa-ch-start', () => { WA.chapters.start($('#wa-ch-title').value.trim()); renderBody(); });
     on('#wa-ch-end', () => { WA.chapters.end(); renderBody(); });
     on('#wa-plan-start', () => { const lines = $('#wa-plan-beats').value.split('\n').map(s => s.trim()).filter(Boolean).map(g => ({ goal: g })); if (lines.length) { WA.oracle.setPlan({ kind: 'sequence', beats: lines, current: 0 }); renderBody(); } });
@@ -6941,10 +7588,13 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
     });
     on('#wa-plan-clear', () => { WA.oracle.clear(); renderBody(); });
     on('#wa-gen-choices', async () => { setOut('#wa-choices-out', '生成中…'); const cs = await WA.choices.generate(4); setHtml('#wa-choices-out', cs.length ? cs.map((c, i) => `<div class="wa-item">${i + 1}. ${esc(c)}</div>`).join('') : '（未配置choices通道或生成失败）'); });
-    on('#wa-log-copy', () => { navigator.clipboard && navigator.clipboard.writeText(WA.eventLog.map(l => `[${new Date(l.t).toLocaleTimeString()}][${l.level}] ${l.msg} ${l.data || ''}`).join('\n')); });
+    on('#wa-log-copy', () => { const __gl = outletGate('clipboard'); if (!__gl.allowed) { const b = $('#wa-log-copy'); if (b) { b.textContent = '已阻止（玩家视角）'; setTimeout(() => { b.textContent = '复制'; renderBody(); }, 1500); } return; }
+      navigator.clipboard && navigator.clipboard.writeText(WA.eventLog.map(l => `[${new Date(l.t).toLocaleTimeString()}][${l.level}] ${l.msg} ${l.data || ''}`).join('\n')); });
     on('#wa-log-err', () => { __logErrOnly = !__logErrOnly; renderBody(); __persistPanel(); });   // v2.109.0（#15）：开关即落盘
-    on('#wa-err-report', () => { if (navigator.clipboard && WA.toolDiag && WA.toolDiag.buildErrorReport) { navigator.clipboard.writeText(WA.toolDiag.buildErrorReport()); const tip = $('#wa-err-report'); if (tip) { tip.textContent = '已复制✓'; setTimeout(() => { tip.textContent = '复制错误报告'; renderBody(); }, 1500); } } });
-    on('#wa-audit-copy', () => { if (navigator.clipboard && WA.store && WA.store.exportAuditReport) { navigator.clipboard.writeText(WA.store.exportAuditReport()); const out = $('#wa-diag-out'); if (out) out.textContent = '✓ 内存/持久化审计报告 (sizeAudit) 已复制到剪贴板！'; } });
+    on('#wa-err-report', () => { const __ge = outletGate('clipboard'); if (!__ge.allowed) { const t0 = $('#wa-err-report'); if (t0) { t0.textContent = '已阻止（玩家视角）'; setTimeout(() => { t0.textContent = '复制错误报告'; renderBody(); }, 1500); } return; }
+      if (navigator.clipboard && WA.toolDiag && WA.toolDiag.buildErrorReport) { navigator.clipboard.writeText(WA.toolDiag.buildErrorReport()); const tip = $('#wa-err-report'); if (tip) { tip.textContent = '已复制✓'; setTimeout(() => { tip.textContent = '复制错误报告'; renderBody(); }, 1500); } } });
+    on('#wa-audit-copy', () => { const __ga = outletGate('clipboard'); if (!__ga.allowed) { outletBlocked($('#wa-diag-out')); return; }
+      if (navigator.clipboard && WA.store && WA.store.exportAuditReport) { navigator.clipboard.writeText(WA.store.exportAuditReport()); const out = $('#wa-diag-out'); if (out) out.textContent = '✓ 内存/持久化审计报告 (sizeAudit) 已复制到剪贴板！'; } });
     // ── v2.121.0 P1：审计卷（跨会话可查）。**显式触发**——本模块不自动落盘，
     //   与磁带卷（v2.98.0 P2）/ 流水卷（v2.94.0 O6）同规格：要不要把这一卷带出会话，
     //   是按下这一刻的决定。这两枚按钮就是 exportVol / verifyVolWith 的真消费方。
@@ -7574,6 +8224,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         out.innerHTML = html;
         const cb = $('#wa-cfg-copy');
         if (cb) cb.onclick = () => {
+          const __gc = outletGate('clipboard'); if (!__gc.allowed) { outletBlocked($('#wa-diag-out')); return; }
           const o2 = $('#wa-diag-out');
           try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -7953,6 +8604,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
     };
     const thCopy = $('#wa-theater-copy');
     if (thCopy) thCopy.onclick = () => {
+      const __gt = outletGate('clipboard'); if (!__gt.allowed) { outletBlocked($('#wa-theater-out')); return; }
       const out = $('#wa-theater-out');
       if (!thLast) { out.textContent = '请先生成番外'; return; }
       const block = WA.theater.wrap('番外小剧场', thLast);
@@ -8408,6 +9060,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       } catch (e) { setOut('#wa-samp-out', '预览失败：' + (e && e.message)); }
     });
     on('#wa-samp-copy', () => {
+      const __gs = outletGate('clipboard'); if (!__gs.allowed) { setOut('#wa-samp-out', outletBlocked(null)); return; }
       const o = $('#wa-samp-out');
       if (o && o.textContent) {
         try {
@@ -8818,6 +9471,116 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
             return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
           }).join(''));
       });
+      // v2.187.0（E4）：战役层接线。五枚控件各有一件事要说清：
+      //   · 开关：关闭时开局/推进都拒收 disabled（不是「静默什么都不做」）
+      //   · 开局：场景 id 来自蓝图真源；未知 id 拒收并**列出可用 id**
+      //   · 推进：把「不可读」与「未达成」分开报 —— 这两态在旧设计里长得一样
+      //   · 阶段读数：逐阶段列出判据来源与现场值（可复算）
+      //   · 清进度：只清战役进度，世界状态一个字不动
+      const cpOut = function (html) { const o = $('#wa-cp-out'); if (o) o.innerHTML = html; };
+      const cpWhy = function (reason) {
+        const M = {
+          disabled: '战役层关着（先打开上面的开关）',
+          'store-absent': 'store 不在场 —— 没有可落盘的进度面',
+          'no-scene': '还没开局（先选场景 id 再点开局）',
+          'unknown-scene': '未知场景 id —— 本模块不兜底，请用蓝图里真实存在的 id',
+          'blueprint-absent': '蓝图模块缺席 ⇒ 拿不到场景模板（本模块不兜底模板）',
+          'not-met': '判据读到了、但**还没达成**（这是「未达成」，不是「读不到」）',
+          unreadable: '判据**读不到**（模块没装 / 参数没填）—— 这不等于「还没做到」，阶段不会前进',
+          finished: '这一局已经结束了（要重开请点清进度）',
+          'stage-out-of-range': '阶段已越过最后一条'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      on('#wa-cp-enabled', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        const el = $('#wa-cp-enabled');
+        WA.campaign.setSettings({ enabled: !!el.checked });
+        // 【函数名必须是本文件里真实存在的那个】初版这里写的是 `rerender()` —— 本文件
+        //   没有这个名字（全仓只此一处调用），于是这一点击在真机上直接 ReferenceError：
+        //   开关能拨、面板不重绘。UI 门禁 G18「逐页真实点击」当场抓到（E6 轮实测）。
+        //   本文件的重绘入口是 `renderBody()`（第 2715 行定义，与战役块同在本函数内可见）。
+        renderBody();
+      });
+      on('#wa-cp-start', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">战役层未加载</div>');
+        const el = $('#wa-cp-scene');
+        const want = el ? el.value.trim() : '';
+        const r = WA.campaign.start(want);
+        if (!r.ok) {
+          const t = WA.campaign.templates();
+          return cpOut('<div class="wa-log wa-log-err">开不了局：' + esc(cpWhy(r.reason)) + '</div>'
+            + (t.ok ? '<div class="wa-item">可用场景：' + t.scenes.map(function (s) { return esc(s.id); }).join(' / ') + '</div>' : ''));
+        }
+        // 开局后立刻把**这一局的阶段表**列出来（planOf 的真实消费方）：
+        //   玩家必须知道「目标是什么、有几关」—— 只报「已开局」等于让人摸黑走。
+        const pl = WA.campaign.planOf(r.scene);
+        cpOut('<div class="wa-log wa-log-ok">已开局：' + esc(r.scene) + '　阶段数 ' + r.stages + '</div>'
+          + (pl.ok ? pl.stages.map(function (g, i) {
+            return '<div class="wa-item">' + (i + 1) + '. ' + esc(g.label)
+              + '<div class="wa-dim">目标：' + esc(g.goal) + '　判据：' + esc(g.pred.kind) + '</div></div>';
+          }).join('') : ''));
+      });
+      on('#wa-cp-advance', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">战役层未加载</div>');
+        const r = WA.campaign.advance();
+        if (!r.ok) {
+          const cls = (r.reason === 'not-met') ? 'info' : 'err';
+          return cpOut('<div class="wa-log wa-log-' + cls + '">阶段不动：' + esc(cpWhy(r.reason))
+            + (r.stage ? '（阶段 ' + esc(r.stage) + '）' : '')
+            + (r.reading !== undefined && r.reading !== null ? '　现场值 ' + esc(String(r.reading)) : '')
+            + (r.why ? '　（' + esc(r.why) + '）' : '') + '</div>');
+        }
+        if (r.done) {
+          const v = r.review || {};
+          return cpOut('<div class="wa-log wa-log-ok">这一局的目标全部达成 ✓　复盘：场景 ' + esc(v.scene || '?')
+            + '　阶段 ' + v.stage + ' / ' + (v.stages === null ? '?' : v.stages)
+            + '　天数 ' + (v.day === null ? '读不到' : v.day) + '</div>'
+            + '<div class="wa-dim">世界状态未动 —— 开新局是玩家的动作。</div>');
+        }
+        cpOut('<div class="wa-log wa-log-ok">前进到阶段 ' + r.stage + '</div>');
+      });
+      on('#wa-cp-status', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">战役层未加载</div>');
+        // 走 evaluate（**逐阶段全部列出**，含超上限被折叠的）：status 只给当前阶段之后的读数，
+        //   而玩家要看的是「整张表此刻长什么样」—— 两者是不同的问法，故不合并。
+        const camp = WA.store ? WA.store.read('campaign') : null;
+        const s = WA.campaign.status();
+        if (!s.ok) return cpOut('<div class="wa-log wa-log-info">' + esc(cpWhy(s.reason)) + '</div>');
+        const ev = WA.campaign.evaluate(camp);
+        if (!ev.ok) return cpOut('<div class="wa-log wa-log-info">' + esc(cpWhy(ev.reason)) + '</div>');
+        cpOut('<div class="wa-log wa-log-info">场景 ' + esc(s.scene) + '　当前阶段 ' + s.stage
+          + (s.finished ? '　<b>已结束</b>' : '') + '</div>'
+          + ev.stages.map(function (g, i) {
+            const tag = g.ok ? (g.met ? '已达成' : '未达成') : '读不到';
+            const cls = g.ok ? (g.met ? 'ok' : 'info') : 'warn';
+            return '<div class="wa-item wa-log-' + cls + '">' + (i + 1) + '. ' + esc(g.label)
+              + '（' + esc(g.kind) + '）—— <b>' + tag + '</b>'
+              + (g.reading !== null ? '　现场值 ' + esc(String(g.reading)) : '')
+              + (g.goal ? '<div class="wa-dim">目标：' + esc(g.goal) + '</div>' : '')
+              + (!g.ok ? '<div class="wa-dim">读不到的原因：' + esc(g.why) + '（这不等于「还没做到」）</div>' : '')
+              + '</div>';
+          }).join(''));
+      });
+      on('#wa-cp-review', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">战役层未加载</div>');
+        const v = WA.campaign.review();
+        if (!v.ok) return cpOut('<div class="wa-log wa-log-info">' + esc(cpWhy(v.reason)) + '</div>');
+        cpOut('<div class="wa-log wa-log-info">这一局：场景 ' + esc(v.scene || '(无)')
+          + '　阶段 ' + v.stage + ' / ' + (v.stages === null ? '?' : v.stages)
+          + '　天数 ' + (v.day === null ? '读不到' : v.day)
+          + '　' + (v.finished ? '已结束' : '进行中') + '</div>'
+          + (v.history.length ? v.history.map(function (h) {
+            return '<div class="wa-item">达成 ' + esc(h.stage) + '（' + esc(h.kind) + '）'
+              + (h.reading !== null ? '　现场值 ' + esc(String(h.reading)) : '') + '</div>';
+          }).join('') : '<div class="wa-dim">还没有任何阶段达成。</div>'));
+      });
+      on('#wa-cp-reset', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">战役层未加载</div>');
+        const r = WA.campaign.reset(false);
+        cpOut('<div class="wa-log ' + (r.ok ? 'wa-log-ok' : 'wa-log-err') + '">'
+          + (r.ok ? esc(r.note) : esc(cpWhy(r.reason))) + '</div>');
+      });
     }
   }
 
@@ -8863,10 +9626,11 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         const set = function (t) { if (out) out.textContent = t; };
         if (!WA.perspective || typeof WA.perspective.setView !== 'function') return set('未记录：module-missing');
         const r = WA.perspective.setView(sel.value);
+        const __gv = outletGate('clipboard');
         // 两态严格分开：ok:false 是「没记上」（表外值），ok:true 才是本体
         //   （changed:false 是「本来就是这一档」——那不是失败，是幂等）。
         if (!r.ok) { set('未记录：' + (r.reason || '未知原因') + (r.allowed ? '（可选：' + r.allowed.join('/') + '）' : '')); return; }
-        set(r.changed ? ('已切到 ' + r.to + '（重绘后过滤生效）') : ('本来就是 ' + r.to));
+        set(r.changed ? ('已切到 ' + r.to + '（重绘后过滤生效）｜全知出口：' + (__gv.allowed ? '开' : '关')) : ('本来就是 ' + r.to));
         if (WA.log) WA.log('info', '观测视角：' + r.from + ' → ' + r.to);
         renderBody();
       };

@@ -1,0 +1,534 @@
+{
+  "_note": "WorldAxis 导出消费者类型登记表（v2.187.0）。programmatic 面登记的是「产品面与测试面都零引用、且已确认只有程序化用途」的导出；键 = ns.mem，值 = { shape（形态类别，有限词表）、why（该类的可读理由） }。纪律：① 未登记的无消费者导出即红（tests/o8-consumer-gate-v2187.js）；② 登记的 shape 必须与现场复算一致（形态变了而登记没改 ⇒ shape-stale 红）；③ 已有真实消费者的登记即红（过期登记比没有登记更坏）；④ 本表由 `node tools/consumer-types.js --register` 重建，理由来自**形态**（不是手写散文）；⑤ 两个如实登记的边界：`ui-component-library` 与 `query-api` 的「用途」判不了，门禁只校验类别合法与形态一致，不假装能判对错。",
+  "version": "2.188.0",
+  "programmatic": {
+    "rand.getSeed": {
+      "shape": "query-api",
+      "why": "随机流种子读取口：供「可复现一局」的程序化排查读当前种子（面板未接）"
+    },
+    "rand.seeded": {
+      "shape": "query-api",
+      "why": "按种子上膛的口：供程序化指定随机流起点（复现故障现场用）"
+    },
+    "apiRouter.fetchModels": {
+      "shape": "query-api",
+      "why": "联网渠道的模型清单拉取口：由设置页在「拉取模型」时按需调用"
+    },
+    "exec.depth": {
+      "shape": "query-api",
+      "why": "执行上下文的嵌套深度读数：供程序化排查重入"
+    },
+    "bridge.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "hostWbTrace.fingerprint": {
+      "shape": "query-api",
+      "why": "宿主世界书数据的指纹：供程序化比对两次激活是否同一份"
+    },
+    "foreshadow.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "world.blocksOf": {
+      "shape": "query-api",
+      "why": "世界织体的区块查询：供程序化按地点取在场内容"
+    },
+    "world.shipmentsInTransit": {
+      "shape": "query-api",
+      "why": "在途货运查询：供程序化读「还在路上的货」"
+    },
+    "world.messagesInTransit": {
+      "shape": "query-api",
+      "why": "在途消息查询：供程序化读「还没送达的话」"
+    },
+    "weather.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "difficulty.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "affect.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "bonds.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "masks.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "temporalLock.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "temperament.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "fondness.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "parallelEvents.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "eraCycle.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "survival.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "warrant.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "beastBond.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "appearance.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "ladder.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "sceneSlice.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "gauge.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "rivalry.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "enigma.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "tempo.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "quota.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "spotlight.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "karma.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "marginal.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "tolerance.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "rehearsal.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "liaison.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "liaison.isDue": {
+      "shape": "query-api",
+      "why": "联络是否到期：供程序化判「这一轮该不该联系」，面板未渲染"
+    },
+    "coop.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "stage.stagesOf": {
+      "shape": "query-api",
+      "why": "玩法进度阶段枚举：供程序化取某进度的全部阶段"
+    },
+    "stage.metricsOf": {
+      "shape": "query-api",
+      "why": "玩法进度指标：供程序化取某进度的读数"
+    },
+    "session.fingerprint": {
+      "shape": "query-api",
+      "why": "会话指纹：供程序化比对两次会话是否同一场"
+    },
+    "userlock.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "userlock.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "userlock.list": {
+      "shape": "query-api",
+      "why": "用户锁清单：供程序化列出已锁条目"
+    },
+    "rhythmLoop.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "rhythmLoop.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "motif.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "motif.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "beatMask.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "beatMask.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "beatMask.list": {
+      "shape": "query-api",
+      "why": "节拍掩码清单：供程序化列出已登记的节拍"
+    },
+    "powerAnchor.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "powerAnchor.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "rewriter.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "storyclock.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "storyclock.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "presetWorld.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "presetWorld.round": {
+      "shape": "query-api",
+      "why": "预设世界的轮次读数：供程序化读当前轮"
+    },
+    "requestViewer.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "wbSearch.size": {
+      "shape": "query-api",
+      "why": "世界书检索规模读数：供程序化读最近一次检索命中数"
+    },
+    "staleGuard.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "staleGuard.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "staleGuard.size": {
+      "shape": "query-api",
+      "why": "陈旧守卫规模读数：供程序化读被守卫的条目数"
+    },
+    "purifyScope.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "purifyScope.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "purifyScope.kinds": {
+      "shape": "query-api",
+      "why": "净化范围类别：供程序化读本次净化覆盖了哪几类"
+    },
+    "reasoning.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "reasoning.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "storyTone.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "storyTone.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "calendarPlan.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "calendarPlan.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "preflight.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "preflight.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "archiveHide.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "archiveHide.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "wordBudget.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "wordBudget.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "binding.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "binding.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "refine.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "refine.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "polish.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "polish.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "ensemble.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "ensemble.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "compat.diagnose": {
+      "shape": "query-api",
+      "why": "兼容层诊断读数：供程序化取兼容面结论（与 tool-diag 的采集面口径不同）"
+    },
+    "cyberAnimate.showLoading": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberAnimate.hideLoading": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberAnimate.addRipple": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberAnimate.animateNumber": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberUI.toggle": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberUI.progress": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberUI.progressCircular": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberUI.badge": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberUI.checkbox": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberUI.spinner": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberDashboard.timeCard": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberDashboard.engineList": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberDashboard.quickActions": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberDashboard.memoryChart": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberDashboard.timeline": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberLogs.logsContainer": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberLogs.filters": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberLogs.searchBox": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberLogs.stats": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberLogs.liveIndicator": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberPeople.peopleGrid": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberPeople.personDetail": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberResponsive.rerenderMs": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberResponsive.listChunk": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberResponsive.isMobile": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberResponsive.inject": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberResponsive.chunk": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberpunkTheme.inject": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "themeSwitch.themes": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "themeSwitch.current": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "themeSwitch.set": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "themeSwitch.open": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "themeSwitch.close": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "sanitize.CODES": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）"
+    },
+    "storyTone.LABELS": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）"
+    },
+    "plotGauge.WEIGHTS": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）"
+    },
+    "cyberAnimate.version": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberUI.version": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberDashboard.version": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberLogs.version": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberPeople.version": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "cyberResponsive.version": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "themeSwitch.version": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    },
+    "themeSwitch.menuId": {
+      "shape": "ui-component-library",
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+    }
+  }
+}

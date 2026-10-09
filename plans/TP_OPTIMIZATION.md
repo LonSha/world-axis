@@ -5,6 +5,12 @@
 Status: in-progress（2026-10-05 开工；制订轮为 proposed）
 
 基线：2026-10-05 的 /tmp/wa_git 工作树；manifest.json 与 index.js 均为 **v2.162.0**。
+<!-- O7:STATE:BEGIN 由 tools/gen-plan-status.js 复算生成，勿手改 -->
+> **现场读数块**（`node tools/gen-plan-status.js` 复算；手工改它会被 `tests/o7-plan-tree-gate-v2187.js` 当场判红）
+>
+> 现场版本：`index.js` **v2.188.0** / `manifest.json` **v2.188.0**。
+> 本文件是**历史档案**：下方「基线」「进度」「交付表」记的是**立项当时**的事实，此后不再随版本推进更新，也**不再作为当前进度台账**。当前进度以 `plans/O_OPTIMIZATION.md` 与 `plans/E_EXPANSION.md` 顶部的现场读数块为准。
+<!-- O7:STATE:END -->
 
 **交付实况（四栏制：源码交付 / 无头行为 / 真实宿主 / 玩家路径；无头全绿不得代替后两栏）**
 

@@ -109,7 +109,16 @@ const EXEMPT = {
   //   （causal/conflict/debt/intel/pressure/promise，导出、且是面板键名真源）。
   //   一个是「从哪个模块收」，一个是「机会的来源类型」—— 语义无关，键集**不该**相同，
   //   且 pending-center 的这张表是**模块内局部常量**（不入导出面），两者不会互查。
-  SOURCES: '同名不同义的「来源表」：opportunity=机会来源六态（causal/conflict/debt/intel/pressure/promise，导出且为面板键名真源）、pending-center=统一待办中心的八个来源**模块名**（aftermath/commission/investigation/operations/storyChoice/coop/farfield/backstage，模块内局部常量、不导出）'
+  SOURCES: '同名不同义的「来源表」：opportunity=机会来源六态（causal/conflict/debt/intel/pressure/promise，导出且为面板键名真源）、pending-center=统一待办中心的八个来源**模块名**（aftermath/commission/investigation/operations/storyChoice/coop/farfield/backstage，模块内局部常量、不导出）',
+  // v2.188.0（第四批 · E7/E9 收口轮）：本批的 E9 引擎（engines/world-lab.js）带一张
+  //   VERDICTS 常量，与 v2.129.0 的 engines/act.js 同名 —— **合法地**指向不同值域，逐条说清：
+  //     · act.js 的 VERDICTS 是**「这个行动被准不准」的裁决集**（action/refuse/delay/status-quo），
+  //       即「准做 / 拒做 / 推迟 / 维持现状」四态，判据是行动闸的放行结果；
+  //     · dep-check.js 的 VERDICTS 是**「这份依赖能不能用」的体检结论集**
+  //       （usable/degraded/unknown/blocked），判据是导入前的体检报告。
+  //   一个是「动作的许可态」，一个是「依赖的可用态」—— **同形不同义，不许互相校验**：
+  //   若强行统一，就会出现「依赖体检结论要跟行动裁决用同一套词」这种语义错配。
+  VERDICTS: '同名不同义的「裁决集」：act=行动许可态（action/refuse/delay/status-quo）、dep-check=依赖体检结论（usable/degraded/unknown/blocked）'
 };
 
 /** 具名常量数组（只认一行内形态）。 */

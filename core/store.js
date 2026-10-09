@@ -236,6 +236,12 @@
       //   （「重开一局想选上一局那个格局」要求它活过会话），而 eco-audit 是进程态只读面。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务。
       worldSeed: { library: [], seq: 0 },
+      // v2.187.0（E4）：战役进度（campaign.js）。
+      //   为什么**进骨架**：一局的场景、阶段、达成历史是**跨会话要留下的玩家资产**
+      //   （「我打到哪一步了」不能因为关一次会话就归零）。与 worldSeed / diplomacy 同性质。
+      //   容量与 evict 都**不登记** —— 它的规模由阶段数与 history 上限（logCap）自然封顶，
+      //   不构成「会长大的容器」（登记进去反而会让 registryParity 要求一份并不存在的淘汰语义）。
+      campaign: { scene: '', stage: 0, rounds: [], finished: false, verdict: null, history: [] },
       // v2.165.0（TX1）：势力外交事实（diplomacy.js）。
       //   pairs 是**成对条目**（key = pairId，稳定 ID），proposals 是提案链。
       //   进骨架的理由与 blueprint 同款：外交事实是**跨会话要留下**的世界资产
@@ -805,7 +811,11 @@
   // v0.1.33: 嵌套事务栈——非空时内层 transact 直接在最外层 draft 上修改，提交延迟到最外层
   const __tx = [];
   // v0.1.30: 事务计量——按提交状态聚合计数与耗时
-  const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, batched: 0, deferred: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null };
+  // v2.185.0（计划 O2）：nestedErrors / nestedAborted / nestedRolled / lastNested —— 嵌套路径的二级读数。
+  //   为什么要有：嵌套中止此前与顶层中止**同形**（都进 aborted），于是「一个模块在别人的草稿里
+  //   被拒了」这件事在诊断里根本看不见，而它正是半写的入口。lastNested 记最近一次嵌套失败
+  //   （threw / aborted）与 `rolledBack`（内层写入是否已被保存点撤回）。
+  const __txStat = { count: 0, ok: 0, errors: 0, aborted: 0, saveFailed: 0, batched: 0, deferred: 0, totalMs: 0, lastMs: 0, lastAt: 0, lastStatus: null, nestedErrors: 0, nestedAborted: 0, nestedRolled: 0, lastNested: null };
   function recTx(ms, status) {
     try {
       __txStat.count++; __txStat.totalMs += ms; __txStat.lastMs = ms; __txStat.lastAt = clockWall(); __txStat.lastStatus = status;
@@ -815,6 +825,11 @@
       else if (status === 'save-failed') __txStat.saveFailed++;
       else if (status === 'ok-batched') { __txStat.ok++; __txStat.batched++; }
       else if (status === 'ok-deferred') { __txStat.deferred++; }
+      // v2.185.0（计划 O2）：嵌套路径的两个新状态。**同时**累计顶层同名计数（向后兼容 ——
+      //   嵌套中止仍计 aborted、嵌套抛错仍计 errors，v0.1.33 / v0.1.34 的冻结断言原样成立），
+      //   另外细分到 nested* 二级字段，让「在别人草稿里被拒」这件事可被诊断出来。
+      else if (status === 'nested-aborted') { __txStat.aborted++; __txStat.nestedAborted++; }
+      else if (status === 'nested-error') { __txStat.errors++; __txStat.nestedErrors++; }
     } catch (e) {}
   }
   // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
@@ -2317,9 +2332,9 @@
       }
     },
     /** v0.1.30: 事务计量只读视图（tool-diag 消费） */
-    txStat() { return { count: __txStat.count, ok: __txStat.ok, errors: __txStat.errors, aborted: __txStat.aborted, saveFailed: __txStat.saveFailed, batched: __txStat.batched, deferred: __txStat.deferred, lastStatus: __txStat.lastStatus, avgMs: Math.round(__txStat.totalMs / Math.max(1, __txStat.count)), lastMs: __txStat.lastMs, lastAt: __txStat.lastAt }; },
+    txStat() { return { count: __txStat.count, ok: __txStat.ok, errors: __txStat.errors, aborted: __txStat.aborted, saveFailed: __txStat.saveFailed, batched: __txStat.batched, deferred: __txStat.deferred, lastStatus: __txStat.lastStatus, nestedErrors: __txStat.nestedErrors, nestedAborted: __txStat.nestedAborted, nestedRolled: __txStat.nestedRolled, lastNested: __txStat.lastNested, avgMs: Math.round(__txStat.totalMs / Math.max(1, __txStat.count)), lastMs: __txStat.lastMs, lastAt: __txStat.lastAt }; },
     /** v0.1.30: 清零事务计量（诊断重置入口） */
-    resetTxStat() { __txStat.count = 0; __txStat.ok = 0; __txStat.errors = 0; __txStat.aborted = 0; __txStat.saveFailed = 0; __txStat.batched = 0; __txStat.deferred = 0; __txStat.totalMs = 0; __txStat.lastMs = 0; __txStat.lastAt = 0; __txStat.lastStatus = null; },
+    resetTxStat() { __txStat.count = 0; __txStat.ok = 0; __txStat.errors = 0; __txStat.aborted = 0; __txStat.saveFailed = 0; __txStat.batched = 0; __txStat.deferred = 0; __txStat.totalMs = 0; __txStat.lastMs = 0; __txStat.lastAt = 0; __txStat.lastStatus = null; __txStat.nestedErrors = 0; __txStat.nestedAborted = 0; __txStat.nestedRolled = 0; __txStat.lastNested = null; },
     /**
      * v0.1.31: 写合并批作用域——fn 内的 transact 只推进内存（保留每事务深拷贝隔离），
      * 批退出时统一落盘一次。异步安全：支持 async fn 与嵌套（depth 计数）。
@@ -3859,10 +3874,67 @@
       // （backstage.applyResult → horizon.acceptResult/digest.generate 链路的静默丢失）
       if (__tx.length) {
         const outer = __tx[__tx.length - 1];
+        // v2.185.0（计划 O2 · 跨模块原子提交）：**内层事务有保存点——被拒/抛错的内层原地撤回**。
+        //   现场（本版立项探针 wa_probe_o2e.js 实证）：`freight.dispatch` 先扣源库存、再发现
+        //   容量满而返回 false。它**单独跑**没事（顶层 draft 被 pop，世界一格不动）；一旦
+        //   **嵌在**别人的 mutator 里跑，这条路径把它的修改留在**外层 draft** 上——外层若提交
+        //   就是「源库存扣了、单据没建」。这正是 TP4「不可同草稿执行的公开写口不得嵌套调用」
+        //   那条禁令背后真正的后果，也正是 O2 验收第一条「链中第二步抛错时世界不半写」。
+        //   治法不是要求每个写口自己小心，而是让**嵌套这件事在框架层安全**：
+        //     事务开始时留一份「进来时的 outer」当保存点；内层返回 false / 抛错 ⇒ 原地把 outer
+        //     恢复成保存点（**同一个对象引用**，键差集 + 赋值，不动 `__tx` 栈）⇒ 内层写下的
+        //     东西一格不留，而**外层自己此前的改动静默保留**（回滚到「内层开始前」，而不是
+        //     「外层开始前」——后者会把外层自己的写入一起抹掉，那是另一个 bug）。
+        //   为什么保存点用 `cloneDraft`（JSON 往返）而不是 structuredClone：保存点是候选快照，
+        //     与提交时的 cloneDraft 同口径；JSON 顺带把不可序列化值归一到「与落盘一致」的形态。
+        //   读数如实：`rolledBack:true` 明说「内层写过、已被撤回」；恢复失败时 `rolledBack:false`
+        //     且带 `mutated:true` + `hint`（不假装成功）——诊断与面板据此能分辨两种形态。
+        //   边界：不回滚内层**已发生的外部副作用**（那类走 `WA.commit.defer/flush`）；也不默认
+        //     撤销已确立的世界事实（O2 边界，撤销仍走 core/undo.js 的协议）。
+        // v2.185.0（O2）：保存点。`cloneDraft` 与提交时同口径；恢复是**原地**的
+        //   （同一个 `outer` 引用），故 `__tx` 栈不被动过，外层后续写入照常落到同一对象上。
+        const __sp = (function () { try { return cloneDraft(outer); } catch (e) {
+          //   保存点建不出来**不是小事**：此刻若继续，内层被拒后就没有东西可恢复。
+          //   故显式记一笔（下面是「取不到就退回当前状态、并把 rolledBack 如实报成 false」的路径）。
+          WA.log('error', 'store.transact嵌套保存点创建失败（内层被拒时将无法撤回）', e);
+          return null;
+        } })();
+        const __restoreOuter = function () {
+          if (__sp === null || __sp === undefined) return false;   // 无保存点 ⇒ 不假称恢复成功
+          try {
+            for (const k of Object.keys(outer)) { if (!(k in __sp)) delete outer[k]; }
+            for (const k of Object.keys(__sp)) { outer[k] = __sp[k]; }
+            return true;
+          } catch (e) {
+            WA.log('error', 'store.transact嵌套保存点恢复失败（外层候选可能仍含内层部分写入）', e);
+            return false;
+          }
+        };
         let result;
         try { result = mutator(outer); }
-        catch (e) { recTx(clockWall() - t0, 'error'); WA.log('error', 'store.transact嵌套修改异常（外层事务继续）', e); return { ok: false, error: e }; }
-        if (result === false) { recTx(clockWall() - t0, 'aborted'); return { ok: false, aborted: true, deferred: true }; }
+        catch (e) {
+          const rolled = __restoreOuter();
+          if (rolled) __txStat.nestedRolled++;
+          recTx(clockWall() - t0, 'nested-error');
+          // v2.185.0（O2）：诊断字段用 `why` 承载归因。**不用 `reason`** —— tests/reject-code-gate.js
+          //   的扫描面是产品源码里的**内联字面量** `reason: 'x'`（正则不看接收者），诊断小结里的
+          //   `reason: 'threw'` 会被当成一个新增拒收码而进「未分类」名单（实测：三集恒等式差 1）。
+          //   同一个词在这里是两种东西：拒收码是「给调用方的业务归因」，这里是「给诊断的失败形态」。
+          __txStat.lastNested = { at: clockWall(), why: 'threw', rolledBack: rolled, inner: __tx.length };
+          WA.log('error', 'store.transact嵌套修改异常（内层写入已撤回，外层继续）', e);
+          const re = { ok: false, error: e, deferred: true, nested: true, rolledBack: rolled, innerDepth: __tx.length };
+          if (!rolled) { re.mutated = true; re.hint = '保存点恢复失败：外层候选可能仍含内层部分写入，跨模块链请改走 WA.commit.begin/commit'; }
+          return re;
+        }
+        if (result === false) {
+          const rolled = __restoreOuter();
+          if (rolled) __txStat.nestedRolled++;
+          recTx(clockWall() - t0, 'nested-aborted');
+          __txStat.lastNested = { at: clockWall(), why: 'aborted', rolledBack: rolled, inner: __tx.length };
+          const rb = { ok: false, aborted: true, deferred: true, nested: true, rolledBack: rolled, innerDepth: __tx.length };
+          if (!rolled) { rb.mutated = true; rb.hint = '保存点恢复失败：外层候选可能仍含内层部分写入，跨模块链请改走 WA.commit.begin/commit'; }
+          return rb;
+        }
         // v0.1.34: 嵌套事务纳入计量（deferred=随外层提交的内层数）
         recTx(clockWall() - t0, 'ok-deferred');
         return { ok: true, deferred: true, state: outer, result };

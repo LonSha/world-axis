@@ -128,3 +128,9 @@ O7 的门禁会挡住"改了版本号却没改计划文件"，而计划文件是
 - `.agents/notes/2026-10-07-tx8-aftermath-architecture.md`（TX8）— **位置错误**，应在 `implemented/architecture/`。本轮不移动（移动会改变 tree 校验的可见性，属 O7 实施范围），仅登记。
 
 [NEXT_PLAN.md](../../../../NEXT_PLAN.md) 作为入口保留历史 RP/RX/SP/S/TP/TX 原文；新的当前台账为 `plans/O_OPTIMIZATION.md` 与 `plans/E_EXPANSION.md`。README、`docs/architecture.md` 与 `ITERATION_LOG.md` 的全面同步留给 O7，避免本次计划触动历史数字与日志中的既有特殊字节。本轮仅新增两份计划与本篇提案、并建立与旧笔记的互链，不升级版本，不改产品/测试/配置。
+
+## Decision
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Decision 节；决策正文即上方「Proposal」一节（本代用 O1–O9 / E1–E9 表示两线、证据四栏、三批落地顺序），正文未重排、未改写。
+
+## Consequences
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Consequences 节；其后果面已散见上方「Acceptance criteria」与「Risks」两节，正文未重排、未改写。【O7 实施轮补记（2026-10-09）】本篇「历史笔记审计与本轮边界」里那句「`.agents/notes/2026-10-07-tx8-aftermath-architecture.md`（TX8）— 位置错误…本轮不移动…仅登记」，记的是**该轮**的处置；O7（v2.187.0）已按本篇登记把它移入 `implemented/architecture/`，并由 `tests/o7-plan-tree-gate-v2187.js` 常守。

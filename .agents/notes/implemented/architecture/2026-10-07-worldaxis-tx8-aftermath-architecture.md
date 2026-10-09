@@ -1,4 +1,5 @@
-# TX8 aftermath.js (v2.171.0) Architecture Notes
+# Agent Note: TX8 aftermath.js (v2.171.0) — location effects and repair lifecycle
+Status: implemented
 
 ## Module: engines/aftermath.js
 - **Purpose**: Register time-limited location effects (road damage, facility repair-in-progress, trade halt) and manage repair lifecycle.
@@ -35,3 +36,15 @@
 - engines/inject-budget.js: PRIORITY + ACCOUNTS
 - index.js: VERSION 2.171.0 + LOAD_ORDER
 - engines/tool-diag.js: module map, secAftermath(), UI_BINDINGS (8 controls wa-af-*), diag object
+
+## Problem
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Problem 节；问题面即上方「Module: engines/aftermath.js」与「Dependencies (read-only coordination, no replacement)」两节 —— 登记限时地点效果（路损 / 设施维修中 / 通商中断）并管理修复生命周期，正文未重排、未改写。
+
+## Decision
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Decision 节；决策正文即上方「Eight Negative Boundaries」一节（默认关、沉积不自动生效/不自动证明修复、eventId 去重、不重推远近场、不为未知地点造物态、到期与中断等一致），正文未重排、未改写。
+
+## Consequences
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Consequences 节；其后果面已散见上方「Reject Codes (DEAD table)」与「Injection Chain (7 points + tool-diag 4 points)」两节，正文未重排、未改写。
+
+## Alternatives considered
+> 本节为 O7（v2.187.0）格式补登：本篇原文未记录被否决方案，此处**如实留空**：O7 只做结构补齐，不为历史笔记事后追补当时未记录的取舍。

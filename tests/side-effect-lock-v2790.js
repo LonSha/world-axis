@@ -298,8 +298,24 @@ function runAll(a) {
   const storeSrc = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
   a(/if \(result === false\) \{ __tx\.pop\(\); recTx\(clockWall\(\) - t0, 'aborted'\); return \{ ok: false, aborted: true \}; \}/.test(storeSrc),
     'v2790: [A] transact 的中止契约在场（mutator 返回 false ⇒ 不落盘、不推进 rev）');
-  a(/if \(result === false\) \{ recTx\(clockWall\(\) - t0, 'aborted'\); return \{ ok: false, aborted: true, deferred: true \}; \}/.test(storeSrc),
+  // v2.185.0（O2）：嵌套中止分支从「一行 bare return」改造成「保存点回滚 + 二级读数」。
+  //   锚点改为**按区域**断言（不再钉整行文本 —— 那会让每次改造都红一次），两件事仍须成立：
+  //   ① 内层返回 false ⇒ 回执仍带 `aborted:true, deferred:true`（契约面不许被改名）；
+  //   ② 拒收**之前先**调保存点恢复（`__restoreOuter()`），否则外层候选会留下内层的半写。
+  //   区域取法：`if (__tx.length) {` 到该分支的 `recTx(..., 'ok-deferred')` 为止。
+  const nestedRegion = (function () {
+    const i0 = storeSrc.indexOf('if (__tx.length) {');
+    const i1 = storeSrc.indexOf("recTx(clockWall() - t0, 'ok-deferred')", i0);
+    return (i0 >= 0 && i1 > i0) ? storeSrc.slice(i0, i1) : '';
+  })();
+  const abortedRegion = (function () {
+    const i0 = nestedRegion.indexOf('if (result === false) {');
+    return i0 >= 0 ? nestedRegion.slice(i0) : '';
+  })();
+  a(/aborted: true, deferred: true/.test(abortedRegion),
     'v2790: [A] 嵌套事务同样认这个契约（否则内层中止会被外层吞掉）');
+  a(/const rolled = __restoreOuter\(\);\s*\n\s*if \(rolled\)/.test(abortedRegion),
+    'v2790: [A] v2.185.0：嵌套中止先回滚到保存点再拒收（否则外层候选留下内层的半写）');
   a(typeof scanSource === 'function' && typeof scanProduct === 'function',
     'v2790: [A] 扫描器导出面完整（scanSource / scanProduct）');
   // 掩码必须长度守恒 —— 否则偏移错位（本版在锚点同步器上真踩过这个坑）

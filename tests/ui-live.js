@@ -709,7 +709,9 @@ async function runLive(opts) {
     tier: p.tier, available: p.available, driver: p.driver, exe: p.exe, why: p.why,
     driverTried: p.tried || [], host: 'stub', origin: null, files: 0, loaded: 0, failedLoad: [],
     storeError: null, pages: [], controls: 0, readings: [], thrown: [], rejections: [], missingTab: [],
-    roundtrip: null, pageErrors: [], consoleErrors: [], fulfillErrors: 0, dialogs: 0, errors: []
+    roundtrip: null, pageErrors: [], consoleErrors: [], fulfillErrors: 0, dialogs: 0, errors: [], probe: null,
+    sweepSkipped: false,
+    reloadProbe: null, reloadBoot: null, reloadError: null
   };
   if (!p.available) return out;
   const driver = loadDriver();
@@ -734,7 +736,14 @@ async function runLive(opts) {
       try { await page.evaluate(opts.afterLoad); }
       catch (e) { out.errors.push('afterLoad 抛出：' + String((e && e.message) || e).slice(0, 200)); }
     }
-    const clicked = await page.evaluate(CLICK_SOURCE);
+    /**
+     * v2.186.0 · O1/O9：`opts.skipClick` 跳过「逐页点全部控件」那一段（实测约 2s/轮）。
+     *   专锁的页内场景自带点击序列，重扫全面板不增信息；但**跳过即空集**——
+     *   故这里显式留痕 `out.sweepSkipped`，且「零抛出」类判据必须由调用方落在
+     *   自己那轮真点过的控件上，不许落在扫点的空读数上。
+     */
+    const clicked = opts.skipClick ? null : await page.evaluate(CLICK_SOURCE);
+    out.sweepSkipped = !!opts.skipClick;
     if (clicked && clicked.fatal) out.errors.push(clicked.fatal);
     out.pages = (clicked && clicked.pages) || [];
     out.controls = (clicked && clicked.controls) || 0;
@@ -747,6 +756,48 @@ async function runLive(opts) {
     out.readings = (clicked && clicked.readings) || [];
     try { out.roundtrip = await page.evaluate(ROUNDTRIP_SOURCE); }
     catch (e) { out.errors.push('roundtrip 抛出：' + ((e && e.message) || e)); }
+  /**
+   * 页内探测接缝（v2.186.0 · O1）：`opts.probeSource` 是一段**页内表达式源码**，
+   *   在本轮（装载 + 点击 + 往返）跑完之后求值一次，返回值收进 `out.probe`。
+   *
+   * 为什么必须新增这个接缝：本通道此前只能**从外往里看**（数页数 / 控件数 / 读数行 / 抛错），
+   *   而 O1 要证的是「模块路径」与 O9 要证的是「出口闸」——两者判的都是**页内运行态**
+   *   （某个写口真被拒绝了吗、玩家视角下剪贴板真的没被写吗），外部读数是看不见的。
+   *   走 `page.evaluate` 而非新开一条驱动路径：与 afterLoad 同一根接缝，两驱动同形。
+   *   生产路径不传该参数，`out.probe` 恒为 null（行为逐字不变）。
+   */
+  let probeOut = null;
+  let probeErr = null;
+  if (typeof opts.probeSource === 'string') {
+    try { probeOut = await page.evaluate(opts.probeSource); }
+    catch (e) { probeErr = String((e && e.message) || e).slice(0, 300); }
+    out.probe = (probeOut && typeof probeOut === 'object') ? probeOut : { value: probeOut };
+    if (probeErr) out.probeError = probeErr;
+  }
+  /**
+   * 真重载接缝（v2.186.0 · O1）：`opts.reloadProbe` 是一段**页内表达式源码**，在
+   *   `page.goto(origin)` 真导航（页内 JS 态与内存态**全部作废**）之后重新装载模块，
+   *   再求值一次，返回值收进 `out.reloadProbe`（装载读数收进 `out.reloadBoot`）。
+   *
+   * 为什么必须新增：O1 的「重载」路径要证的是**盘上状态跨真实导航可复读**，而本通道此前
+   *   只有「同一次导航里的读写往返」（roundtrip 面）—— 那不构成重载证据。CdpPage 没有
+   *   `page.reload()`，且每次 runLive 都是新 profile（localStorage 不跨会话），
+   *   所以只能靠**同 profile 内的第二次 goto**。这里只重跑「装载」这一段，
+   *   **不再点控件、不再走往返** —— 否则第二次会话的点击会把要验的读数写花。
+   * 生产路径不传该参数 ⇒ 多跑一个分支都不跑，行为逐字不变。
+   */
+  if (typeof opts.reloadProbe === 'string') {
+    try {
+      await page.goto(origin + '/');            // 真导航：页内一切都重来
+      await page.evaluate(hostStubSource());
+      const boot2 = await page.evaluate(bootstrapSource(files, opts.srcOverride || {}));
+      out.reloadBoot = { loaded: (boot2 && boot2.loaded || []).length, failed: (boot2 && boot2.failed) || [] };
+      const rp = await page.evaluate(opts.reloadProbe);
+      out.reloadProbe = (rp && typeof rp === 'object') ? rp : { value: rp };
+    } catch (e) {
+      out.reloadError = String((e && e.message) || e).slice(0, 300);
+    }
+  }
   };
   /** 页面用 route.fulfill 从磁盘喂源码：不起 HTTP 服务、不留端口，且**路径相对仓库根**
    *  （换机器/换目录都能跑 —— 与 v2.41.0 成类静态锁同一条纪律：不写死绝对路径）。 */

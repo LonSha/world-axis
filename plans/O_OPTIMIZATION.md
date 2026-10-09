@@ -3,6 +3,28 @@
 Status: proposed（2026-10-08 立；制订轮只读，不改产品实现、测试实现、配置与版本）
 
 基线：2026-10-08 的 `/tmp/wa_git` 工作树，`index.js` 与 `manifest.json` 均为 **v2.173.0**，HEAD `d986433`，全量回归 **15680 / 0**，工作区干净。
+<!-- O7:STATE:BEGIN 由 tools/gen-plan-status.js 复算生成，勿手改 -->
+> **现场读数块**（`node tools/gen-plan-status.js` 复算；手工改它会被 `tests/o7-plan-tree-gate-v2187.js` 当场判红）
+>
+> | 现场读数 | 值 | 取法 |
+> |---|---|---|
+> | 版本 | `index.js` **v2.188.0** / `manifest.json` **v2.188.0** | `grep -n "VERSION =" index.js`；`manifest.json` |
+> | 本线交付 | **已交付 9 / 未交付 0** | 下表逐项现场复算 |
+>
+> | 项 | 状态 | 证据（`tests/` 下的专锁，★ = 已挂进 `tests/run.js`） |
+> |---|---|---|
+> | O1 | **已交付** | `o1-host-matrix-v2186.js` ★ |
+> | O2 | **已交付** | `s3-b1-o2-v2185.js` ★ |
+> | O3 | **已交付** | `s3-b2-o3-v2182.js` ★ |
+> | O4 | **已交付** | `s3-b2-o4-v2182.js` ★ |
+> | O5 | **已交付** | `s3-b2-o5-v2182.js` ★ |
+> | O6 | **已交付** | `o6-layer-gate-v2187.js` ★ |
+> | O7 | **已交付** | `o7-plan-tree-gate-v2187.js` ★ |
+> | O8 | **已交付** | `o8-consumer-gate-v2187.js` ★ |
+> | O9 | **已交付** | `o9-outlet-gate-v2186.js` ★ |
+>
+> 判据：编号算「已交付」= `tests/` 下存在该编号的证据文件**且**它被 `tests/run.js` 引用；只躺在磁盘上的文件不算。本块只判「有没有、挂没挂」，不判「做得对不对」。
+<!-- O7:STATE:END -->
 
 **编号声明**：本代用 O1–O9 表示优化线、E1–E9 表示拓展线（见 [功能拓展计划](E_EXPANSION.md)）。两个前缀是**本代标识**，与历史 O1–O16、E 线、RP/RX、SP/S、TP/TX 编号**无继承关系**；历史项的交付事实仍以各自文件为准。
 

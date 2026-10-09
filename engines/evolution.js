@@ -69,6 +69,19 @@
    * @param {object} [state] 可选状态对象（事务 draft）；缺省读 live store
    * @returns {number}
    */
+  /**
+   * v2.185.0（O2）：业务回执解包。与 engines/diplomacy.js 同一口径：
+   *   `store.transact` 返回的是**事务回执**，本模块的业务回执在 `result` 里。
+   *   不解包：顶层调用方读不到业务字段；嵌套调用还多一个 `deferred` 信封（同一入口两种形状）。
+   *   addWind 真在嵌套链上（backstage.applyResult → horizon.acceptResult），故这一步不可省。
+   * @param {object} tx store.transact 的事务回执
+   * @returns {object} 业务回执（result 非对象时原样返回）
+   */
+  function rx(tx) {
+    if (tx && typeof tx === 'object' && tx.result && typeof tx.result === 'object') return tx.result;
+    return tx;
+  }
+
   function roundOf(state) {
     try {
       const s = state || WA.store.get();
@@ -89,7 +102,7 @@
     // 事件链 CRUD + 骰子推进（移植 forceTriggerEvents）
     // ════════════════════════════════════════════════════
     addEvent(ev) {
-      return WA.store.transact(draft => {
+      return rx(WA.store.transact(draft => {
         // v0.6.0: 容量治理——编辑器容量上限对有机路径同样生效（探针实证直推可绕过）。
         // 挤出优先级：终局事件（剧情档案价值低）> 最早创建（保留最新剧情张力）。
         const evArr = draft.evolution.events = draft.evolution.events || [];
@@ -99,11 +112,15 @@
           if (evIdx < 0) evIdx = 0;
           evArr.splice(evIdx, 1);
         }
-        draft.evolution.events.push(Object.assign({
+        const __created = Object.assign({
           id: uid('ev'), type: 'conflict', name: '', level: 1, stage: '萌芽', stageRound: 1,
           desc: '', stall: false, consecutiveFails: 0, createdRound: draft.evolution.round
-        }, ev, { title: ev.name || ev.title })); // title兼容旧字段
-      });
+        }, ev, { title: ev.name || ev.title }); // title兼容旧字段
+        draft.evolution.events.push(__created);
+        // v2.185.0（O2）：给出**业务回执**。此前这里 return undefined ⇒ 经 rx 解包后仍是 undefined，
+        //   调用方（horizon / backstage 的嵌套链、面板）拿不到「建了哪个」。只补回执，不改写入语义。
+        return { ok: true, id: __created.id, count: draft.evolution.events.length };
+      }));
     },
 
     /**
@@ -208,7 +225,7 @@
     MAX_WINDS: MAX_WINDS,
 
     addWind(wind) {
-      return WA.store.transact(draft => {
+      return rx(WA.store.transact(draft => {
         const w = Object.assign({ id: uid('w'), topic: '', type: 'rumor', level: 1, content: '', scope: '', source: '', quietRounds: 0 }, wind);
         // 同主题归并
         const old = (draft.evolution.winds || []).find(x => x.topic === w.topic);
@@ -218,7 +235,10 @@
           while (wArr.length >= MAX_WINDS) wArr.shift();   // v0.6.0: 环形容量（衰减引擎是常态收敛，此处是兜底）
           wArr.push(w);
         }
-      });
+        // v2.185.0（O2）：给出**业务回执**（同主题归并时回被归并的那一条）。此前 return undefined。
+        const hit = (draft.evolution.winds || []).find(x => x.topic === w.topic);
+        return { ok: true, id: (hit && hit.id) || w.id, merged: !!old, count: (draft.evolution.winds || []).length };
+      }));
     },
 
     decayWinds() {

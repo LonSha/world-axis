@@ -158,6 +158,47 @@
     view.lastReason = removed ? 'filtered' : view.lastReason;
     return { ok: true, view: v, removed: removed, kept: omni.length - removed };
   }
+  /**
+   * 全知数据出口的**显式通道权限**（v2.186.0 / O9）。
+   *
+   * 治的病（O9 原文）：面板有三条把「全知诊断/全知快照」交给玩家的出口 —— 剪贴板
+   *   （日志复制 / 错误报告 / 内存审计）、导出文件（全量快照 / 诊断包）、日志。此前面板
+   *   只对 **DOM** 做了视角过滤（`applyView` 摘 `data-omniscient` 节点），而这三条出口
+   *   **一条都不在**那些被摘除的容器里 —— 玩家视角下按钮仍在 DOM、点了照样把全知数据
+   *   交出去。合起来是一句话：**「不进 DOM」被当成了「不泄漏」，而它们本来就不走 DOM。**
+   *
+   * 治法：把「玩家已知 / 全知诊断」做成**显式权限判定**，调用方必须问过闸才允许出口；
+   *   而不是让每个调用点各自记得判断（靠自觉的权限等于没有权限）。
+   *
+   * 边界（如实登记）：本闸**不**改容器内容、不删数据、不做脱敏 —— 它只回答「这一刻允许吗」，
+   *   处置归调用方；未登记的通道名一律拒收（自造通道等于自造判定，与 LENSES/VIEWS 同规）。
+   */
+  const EXPORT_CHANNELS = ['clipboard', 'export-file', 'diagnostics'];
+  const blockedByView = {};   // 通道 → 因玩家视角被拦下的次数（诊断读数）
+  function isPlayerView() { return viewNow() === 'player'; }
+  /**
+   * 通道是否允许出口全知内容。
+   * @param {string} channel 三条登记通道之一
+   * @returns {{ok:boolean, allowed?:boolean, channel?:string, reason:string, allowedChannels?:string[]}}
+   *   `ok:false` 只出现在**通道名不合法**时（表外值拒收）；视角判定本身永远 `ok:true`，
+   *   「不许」是 `allowed:false` 而不是一种错误 —— 两者混同会让调用方把拒绝当异常吞掉。
+   */
+  function outletAllowed(channel) {
+    const ch = String(channel == null ? '' : channel);
+    if (EXPORT_CHANNELS.indexOf(ch) < 0) {
+      noteFault('bad-channel');
+      return { ok: false, reason: 'bad-value', field: 'channel', allowedChannels: EXPORT_CHANNELS.slice() };
+    }
+    // 模块关闭时**不设闸**：整模块关掉即玩家自选「不要这套视角过滤」，
+    //   此时仍拦出口会让「关掉视角锁」变成「连日志都复制不了」——那是对设置的误读。
+    if (!settings().enabled) return { ok: true, allowed: true, channel: ch, reason: 'module-disabled' };
+    if (isPlayerView()) {
+      blockedByView[ch] = (blockedByView[ch] || 0) + 1;
+      view.lastReason = 'channel-blocked';
+      return { ok: true, allowed: false, channel: ch, reason: 'player-view' };
+    }
+    return { ok: true, allowed: true, channel: ch, reason: 'omniscient' };
+  }
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocks++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -442,10 +483,17 @@
     //   ③ 面板重渲染钩子（每次 render 后 applyView 摘除 data-omniscient 节点）。
     VIEWS: VIEWS.slice(),
     setView: setView, getView: getView, applyView: applyView,
+    // v2.186.0（O9）：全知出口的显式通道权限。三条登记通道（剪贴板 / 导出文件 / 诊断），
+    //   消费方在**出口之前**必须问过闸 —— 与 applyView（DOM 面）互补，两处各治一条泄漏面。
+    CHANNELS: EXPORT_CHANNELS.slice(),
+    outletAllowed: outletAllowed,
+    // 注：**不导出** isPlayerView —— 它是 outletAllowed 的内部判据，导出面零消费方
+    //   （「导出了没人用」正是本仓点名的那类过度导出；要看当前档走 getView().view）。
     stat: function () {
       return Object.assign({}, stat, { faults: Object.assign({}, stat.faults),
         enabled: settings().enabled, strictInterior: settings().strictInterior !== false,
-        view: viewNow(), viewSwitches: view.switches, viewFiltered: view.filtered, viewLastAt: view.lastAt });
+        view: viewNow(), viewSwitches: view.switches, viewFiltered: view.filtered, viewLastAt: view.lastAt,
+        blockedByView: Object.assign({}, blockedByView) });
     }
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/perspective-lock.js', { kind: 'engine', ver: '2.142.0' });

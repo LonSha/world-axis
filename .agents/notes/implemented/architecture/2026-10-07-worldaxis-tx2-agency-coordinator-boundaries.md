@@ -32,8 +32,11 @@ The standard alias form `const A = window.WorldAxis = window.WorldAxis || {}` is
 
 Agency introduces 7 new reject codes (disabled/missing-person/no-active-goal/need-steps + no-step/already-running/already-done/no-act-row/step-not-running/act-unavailable/plan-unavailable). The first 4 can be triggered in standard boot and get `want` + `trip` witnesses in `reject-v2780.js`. The latter 7 require complex preconditions (specific module states) and are classified as DEAD (known-unreachable-in-standard-boot, listed in the DEAD table). The `disabled` code was previously in the baseline (unclassified) list; now that it has a witness, it was removed from baseline (229→228) to avoid "ledger redundancy".
 
-## Rejected options
+## Alternatives considered
 
 - **Timer-based step advancement**: rejected — it would auto-complete steps without real receipt evidence, violating boundary #2.
 - **Agency writing to life/plan/act**: rejected — it would create dual-writer ambiguity. Agency coordinates; it does not own domain state.
 - **Auto-expanding plans when need-steps**: `autoPlanExpand` is a setting (default true), but the actual expansion is deferred to `plan.expand` — agency calls it but does not fabricate steps itself. If `plan.expand` is unavailable, agency returns the blocker rather than inventing steps.
+
+## Consequences
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Consequences 节；其后果面已散见上方「Key alignment issues discovered」与「Reject-code DEAD table expansion」两节，正文未重排、未改写。

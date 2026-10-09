@@ -1,9 +1,10 @@
-# TX7: 线索调查、证据核验与秘密揭示 — engines/investigation.js
+# Agent Note: TX7 — 线索调查、证据核验与秘密揭示（engines/investigation.js）
+Status: implemented
 **版本**: v2.170.0
 **模块**: engines/investigation.js (320 行, 12 exports)
 **命名空间**: WA.investigation
 
-## 解决的缺口
+## Problem
 intel 有来源/等级/核验，enigma 有秘密知情名单，rumor 有转述链，noesis 有知情边界。但调查作为玩法没有一条链。investigation 补的就是这一层。
 
 ## 八条否定式边界
@@ -14,3 +15,12 @@ SOURCES/__REG.def/SRC_NAME/SRC_MOD_SETTING/注入分支/VIS_NAMES/PRIORITY+ACCOU
 
 ## 门禁结果
 专锁 44/0 + 冒烟 13/13 + reject-code 4 码（死表 33->37）+ 14 门禁全绿
+
+## Decision
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Decision 节；决策正文即上方「八条否定式边界」与「注入链七点（显示名「线索调查」rank 5）」两节 —— investigation 是协调者、不替代 intel/enigma/rumor/noesis，正文未重排、未改写。
+
+## Consequences
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Consequences 节；其后果面已散见上方「门禁结果」（专锁 44/0 + 冒烟 13/13 + reject-code 4 码，死表 33->37 + 14 门禁全绿）一节，正文未重排、未改写。
+
+## Alternatives considered
+> 本节为 O7（v2.187.0）格式补登：本篇原文未记录被否决方案，此处**如实留空**：O7 只做结构补齐，不为历史笔记事后追补当时未记录的取舍。

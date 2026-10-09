@@ -117,3 +117,9 @@ TX5 先交付身份/地图/版本框架；外交、供需和组织字段随对�
 - [数据完整性实现笔记](../../implemented/bug-fix/2026-10-04-offline-farfield-audit-integrity.md)：部分重叠；继续负责候选隔离、远方窗口与审计证据的已实现约束，新计划不改其 Decision，只增加后续提案关联。
 
 [NEXT_PLAN.md](../../../../NEXT_PLAN.md) 作为入口保留历史 RP/RX/SP/S 原文；当前 TP/TX 入口与状态校正单列在顶部。README、architecture 和日志的全面同步留给 TP9，避免本次计划触动历史数字和日志中的既有特殊字节。本轮仅新增计划及提案、修订入口和两篇笔记的事实/链接，不升级版本，不提交或推送。
+
+## Decision
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Decision 节；决策正文即上方「Proposal」一节（本代用 TP1-TP9 / TX1-TX9 表示两线、证据分四栏、A-G 七批排期），正文未重排、未改写。
+
+## Consequences
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Consequences 节；其后果面已散见上方「Acceptance criteria」与「Risks」两节，正文未重排、未改写。

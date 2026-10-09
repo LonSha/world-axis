@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.184.0'
+  const VERSION = '2.188.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -663,6 +663,36 @@
     //   与 world-health 的待办栏分列不合并：两者答两个粒度 —— 健康栏答「还有几件没做完」
     //   （计数 + 是否全清），本中心答「具体是哪几件、去哪看、能不能处置」（逐条归一 + 路由）。
     'engines/pending-center.js',
+    // v2.187.0（E4）：场景 / 战役层（engines/campaign.js）。
+    //   排在 world-blueprint / diplomacy / freight / faction-graph 之后：
+    //   它的谓词读这些引擎的公开读口，装载期就必须在场。
+    'engines/campaign.js',
+    // v2.187.0（E6）：统一世界地图与关系视图（engines/atlas.js）。
+    //   排在 region / farfield / economy / freight / faction-graph / diplomacy / sediment 之后：
+    //   它把七处坐标与关系**只读地**摆进同一张图，装载期这些源必须都在场。
+    //   本模块**零 store 写**（没有 transact、没有自有状态键）—— 地图是只读视图。
+    'engines/atlas.js',
+    // v2.187.0（E8）：蓝图 / 种子依赖包与迁移助手（engines/dep-check.js）。
+    //   排在 world-blueprint / world-seed / checkpoints / recipe / worldbook / compat 之后：
+    //   它的每一处判定源都是这些模块的公开读口（版本常量 / 保留说明 / 迁移链 / 配方真源 /
+    //   宿主上下文 / 世界书条目），本模块**不自带任何一份副本**。
+    //   本模块**纯读**：零 store 写、零文件写，且**不驱动任何模块干活**
+    //   （不为核对 pack 版本去调 worldSeed.importPack —— 那会动它的计数器）。
+    'engines/dep-check.js',
+    // v2.188.0（E7）：玩家自定义规则包与白名单自动化模板（engines/rule-pack.js）。
+    //   排在 settingsBus 的**全部消费模块之后**（theme / recipe / preset / rules / backstage /
+    //   difficulty / story-choice / rehearsal 均已装载）：它的「可进包的键」是**调用期**从
+    //   `WA.__settingsRegs` 现场筛出来的，先装会让那张名单不完整 —— 而后果不是报错，
+    //   是包里少存了几键（最坏的那种静默失效）。
+    //   本模块**只记录设置与启用面**：零 store 写、零 localStorage 写，
+    //   一切落盘经 `settingsBus`（写路径唯一）。
+    'engines/rule-pack.js',
+    // v2.188.0（E9）：隔离世界实验室与反事实对比（engines/world-lab.js）。
+    //   排在 rehearsal / world-blueprint / dep-check 之后：三条路径的执行面（rehearsal.run）、
+    //   导出面（worldBlueprint.exportBlueprint）、体检面（depCheck.check）都是它的**调用期**依赖。
+    //   本模块**零 store 写**（没有 transact、没有 draft 赋值）—— 实验全落在隔离副本上，
+    //   且「live 前后摘要一致」是跑前跑后**实测**出来的，不是一句声明。
+    'engines/world-lab.js',
     'ui/panel.js',
     'ui/cyberpunk-theme.js',
     'ui/cyberpunk-components.js',

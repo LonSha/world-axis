@@ -1,4 +1,4 @@
-# WorldAxis 第三批执行单（2026-10-08 计划：O6/O7/O8 + E1/E3）
+# Agent Note: WorldAxis 第三批执行单（O6/O7/O8 + E1/E3）
 Status: implementing（2026-10-09 起）
 依据：[plans/O_OPTIMIZATION.md](../plans/O_OPTIMIZATION.md) 与 [plans/E_EXPANSION.md](../plans/E_EXPANSION.md) 的「实施顺序」表。
 
@@ -117,3 +117,15 @@ operations / storyChoice / coop / farfield / backstage。它们的返回形状**
 - O7 计划 / 文档与现场读数自动同步
 - O8 死导出消费者类型治理
 - E3 存档槽与世界分支管理（`engines/checkpoints.js` 28 导出现成，只差面板）
+
+## Problem
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Problem 节；问题面即上方「1. 起点基线（本轮实测，非文档抄录）」一节 —— E1 引擎已写但零接线、E3 完全未做，以及「3. 环境事故与恢复」记录的 /tmp 整棵树被外部回收，正文未重排、未改写。
+
+## Decision
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Decision 节；决策正文即上方「2. 本轮已交付：E1 统一待办事项中心（v2.183.0）」与其三个小节（缺口、落点、三次现场整改）—— 只读聚合 + 下钻、不新增第二套状态、缺席/空/无事三态可分，正文未重排、未改写。
+
+## Consequences
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Consequences 节；其后果面已散见上方「2.3 两次现场整改」（缺席被报成「全处理完」、一盏永远不亮的灯、一条不可达的兜底码）与「4. 后续（本轮未完成，按批次继续）」两节，正文未重排、未改写。
+
+## Alternatives considered
+> 本节为 O7（v2.187.0）格式补登：本篇原文未记录被否决方案，此处**如实留空**：O7 只做结构补齐，不为历史笔记事后追补当时未记录的取舍。

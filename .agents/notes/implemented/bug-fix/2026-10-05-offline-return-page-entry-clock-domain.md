@@ -94,3 +94,6 @@ fact.
 - The UI layer remains unverified on-device as in previous versions.
 - The full regression has not been run in this round, per the standing rule to
   run it only after the plans are complete.
+
+## Alternatives considered
+> 本节为 O7（v2.187.0）格式补登：本篇原文未记录被否决方案，此处**如实留空**：O7 只做结构补齐，不为历史笔记事后追补当时未记录的取舍（原文「Not covered」一节记的是**未覆盖面**，不是备选方案，故不并入本节）。

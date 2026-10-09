@@ -163,6 +163,24 @@
       writeReceipt(draft, chain, '');      // 回执与世界写入**同一事务**
       return (r === undefined) ? true : r;
     }, 'commit:' + chain.site);
+    // v2.185.0（计划 O2）：**嵌套提交不算提交**。
+    //   本函数被嵌在别人的 mutator 里时，`store.transact` 走嵌套分支、返回 `deferred:true`
+    //   ——它的语义是「随外层提交」。于是本模块的第一条纪律（「回执与世界写入同一事务」）
+    //   在此**根本无法保证**：外层随后被拒 / 抛错时世界写入会被撤回，而回执若已经报成
+    //   `written:true`，那就是一个**假的已提交结论**（正是 TP4 点名要避免的那一类读数）。
+    //   实测口径：拿一个必然抛错的外层事务包住 commit ⇒ 回执不落盘，而旧版回执照样报
+    //   `{ok:true, written:true, persisted:true}`。故本路径一律：不标 `settled`、不报
+    //   `written`，并记一次 `nested-deferred` fault（进 `stat().faults`，诊断可读）。
+    if (tx && tx.deferred === true) {
+      __stat.failed++; noteFault('nested-deferred');
+      __stat.lastReason = 'nested-deferred'; __stat.lastAt = clockWall(); __stat.lastOpId = chain.opId;
+      //   注：**不动**这条链已经写进外层草稿的回执。为什么不撤：回执与世界写入在**同一个 draft** 上，
+      //   外层提交则两者都在、外层被拒则两者都没——这正是本模块第一条纪律想要的。真正错的只是
+      //   那个**返回值**（它把「随外层提交」读成了「已提交」），故本路径只改返回值，不改台账。
+      WA.log('warn', 'commit 被嵌在别人的 mutator 里（deferred:true）——本次没有提交任何东西；请把 WA.commit.commit 放在最外层');
+      return { ok: false, reason: 'nested-deferred', opId: chain.opId, written: false, deferred: true, tx: tx,
+        note: '嵌套提交不算提交：世界写入与回执都随外层事务；请把 WA.commit.commit 放到最外层调用' };
+    }
     if (!tx || tx.ok !== true) {
       let reason = 'failed';
       if (tx && tx.aborted) reason = tx.conflict ? 'conflict' : (tx.stale ? 'stale' : 'aborted');

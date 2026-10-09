@@ -1,11 +1,12 @@
-# TX6: 多阶段委托、交付核验与资源履约 — engines/commission.js
+# Agent Note: TX6 — 多阶段委托、交付核验与资源履约（engines/commission.js）
+Status: implemented
 
 **版本**: v2.169.0
 **日期**: 2026-10-07
 **模块**: `engines/commission.js` (277 行, 12 exports)
 **命名空间**: `WA.commission`
 
-## 解决的缺口
+## Problem
 opportunity 有窗口、liaison 有约定、org 有项目/债务/支付。但「多阶段委托」没有一条链。commission 补的就是这一层——协调者，不替代。
 
 ## 八条否定式边界
@@ -20,3 +21,12 @@ SOURCES/__REG.def/SRC_NAME/SRC_MOD_SETTING/注入分支/VIS_NAMES/PRIORITY+ACCOU
 ## 教训
 1. EXPORT_COUNT 设 11 实际 12（reset 遗漏）
 2. tool-diag 模块映射行在 Python 批量编辑 assert 失败时未保存
+
+## Decision
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Decision 节；决策正文即上方「八条否定式边界」与「注入链七点（显示名「委托履约」rank 5）」两节 —— commission 是协调者、不替代既有引擎，正文未重排、未改写。
+
+## Consequences
+> 本节为 O7（v2.187.0）格式补登：本篇原文未设 Consequences 节；其后果面已散见上方「门禁结果」（专锁 49/0 + 冒烟 13/13 + reject-code 4 码，死表 29->33）与「教训」两节，正文未重排、未改写。
+
+## Alternatives considered
+> 本节为 O7（v2.187.0）格式补登：本篇原文未记录被否决方案，此处**如实留空**：O7 只做结构补齐，不为历史笔记事后追补当时未记录的取舍。

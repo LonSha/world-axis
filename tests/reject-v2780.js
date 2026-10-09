@@ -4336,6 +4336,18 @@ function runWitness(WA) {
         try { return [Cm.settle('tp4w-settle', { site: 'probe' }).reason]; }
         finally { WA.store.transact = keep; }
       });
+      // ── A5 嵌套：commit 被嵌在别人的 mutator 里（v2.185.0 计划 O2 补的见证）──
+      want('nested-deferred', 'commit.commit：被嵌在别人的 mutator 里（transact 走嵌套分支 ⇒ deferred:true）⇒ 拒收 nested-deferred 且 written:false —— 旧版此时照报「已提交」，而它其实随外层事务，外层一被拒就什么都没落');
+      trip('nested-deferred', function () {
+        const b = Cm.begin('tp4w-nested');
+        if (!b.ok) return [];
+        let seen = null;
+        WA.store.transact(function (d) {
+          const r = Cm.commit(b.chain, function (dd) { dd.__zzN = { n: 1 }; });
+          seen = r && r.reason;
+        });
+        return [seen];
+      });
     }
   }
   // ── B 组：store 的异步归属票据（TP1/TP2 落地，本轮补见证）──
@@ -4744,7 +4756,212 @@ function runWitness(WA) {
       finally { WA.farfield = k; }
     });
   }
-
+  // ── engines/campaign.js（v2.187.0 · E4 场景 / 战役层）──
+  //   本版新增七个码，**逐条**走产品真 API 触发（不拿常量凑数）：
+  //     disabled / no-scene / unknown-scene / blueprint-absent / unreadable / not-met / finished
+  //   两条最要紧的见证是 `unreadable` 与 `not-met` **同时跑出来** ——
+  //   本模块存在的第一理由就是「读不到」与「没达成」不许在读数上同形，
+  //   若见证只跑出其中一个，那条边界就没有任何东西在看着它。
+  if (WA.campaign && typeof WA.campaign.advance === 'function') {
+    const Cp = WA.campaign;
+    const keepEnabled = Cp.getSettings().enabled;
+    const bp = WA.worldBlueprint;
+    const keepDipl = WA.diplomacy;
+    // ① disabled：关闭时开局被拒
+    Cp.setSettings({ enabled: false });
+    want('disabled', 'campaign.start：战役层关着时不开局（不是静默什么都不做）');
+    trip('disabled', function () { return [Cp.start('blank').reason, Cp.advance().reason]; });
+    // ② unknown-scene：未知场景 id
+    Cp.setSettings({ enabled: true });
+    want('unknown-scene', 'campaign.start：场景 id 不在蓝图 SCENES 里（本模块不兜底）');
+    trip('unknown-scene', function () { return [Cp.start('绝对不存在的场景').reason]; });
+    // ③ no-scene：还没开局就推进
+    Cp.reset(false);
+    want('no-scene', 'campaign.advance：还没开局时的推进');
+    trip('no-scene', function () { return [Cp.advance().reason]; });
+    want('no-campaign', 'campaign.status：没有进行中的一局（读面如实报「还没开局」）');
+    trip('no-campaign', function () { return [Cp.status().reason]; });
+    // ④ blueprint-absent：蓝图缺席 ⇒ 拿不到模板
+    try {
+      WA.worldBlueprint = undefined;
+      want('blueprint-absent', 'campaign.templates：蓝图模块缺席（本模块不兜底模板）');
+      trip('blueprint-absent', function () { return [Cp.templates().reason, Cp.start('blank').reason]; });
+    } finally { WA.worldBlueprint = bp; }
+    // ⑤ unreadable / ⑥ not-met：**两条必须同时跑出来**（本模块最要紧的那个区分）
+    Cp.start('blank');
+    const keepRead = WA.store.read;
+    try {
+      WA.store.read = function (k) { return k === 'clock.dayIndex' ? null : keepRead.call(WA.store, k); };
+      want('unreadable', 'campaign.advance：判据读不到（引擎/字段不可读）—— 与「没达成」不是一回事，阶段不前进');
+      trip('unreadable', function () { return [Cp.advance().reason]; });
+    } finally { WA.store.read = keepRead; }
+    WA.store.transact(function (d) { d.clock.dayIndex = 0; });
+    want('not-met', 'campaign.advance：判据读到了但还没达成（天数不足）');
+    trip('not-met', function () { return [Cp.advance().reason]; });
+    // ⑦ finished：结束之后再推进
+    WA.store.transact(function (d) { d.clock.dayIndex = 99; });
+    Cp.advance(); Cp.advance();
+    want('finished', 'campaign.advance：这一局已结束（要重开请点清进度）');
+    trip('finished', function () { return [Cp.advance().reason]; });
+    // ⑧ stage-out-of-range：阶段索引越过末阶段
+    want('stage-out-of-range', 'campaign.advance：阶段索引已越过最后一条（数据被外部改坏时的如实归因）');
+    trip('stage-out-of-range', function () {
+      Cp.start('blank');
+      WA.store.transact(function (d) { d.campaign.stage = 99; d.clock.dayIndex = 0; });
+      return [Cp.advance().reason];
+    });
+    Cp.reset(false);
+    Cp.setSettings({ enabled: keepEnabled });
+  }
+  // ── engines/perspective-lock.js（v2.186.0 · O9 全知出口闸）──
+  //   本版新增两个码，都在 `outletAllowed` 的**返回体**里（不是 throw）：
+  //     · 'player-view'     玩家视角下出口被拦（`allowed:false`，不是错误）；
+  //     · 'module-disabled' 整个视角锁关掉 ⇒ 不设闸（如实登记「为什么放行」）。
+  //   见证必须**两向**：只跑出「拦」那一码，会把「模块关掉也拦」这种错读成对的
+  //   （那正是「关掉视角锁 = 连日志都复制不了」的形态）。
+  if (WA.perspective && typeof WA.perspective.outletAllowed === 'function') {
+    want('player-view', 'perspective.outletAllowed：玩家视角下出口拦下（ok:true / allowed:false，不是异常）');
+    want('module-disabled', 'perspective.outletAllowed：视角锁关闭时不设闸（如实报「为什么放行」）');
+    const Pv = WA.perspective;
+    const saveViewOn = Pv.getSettings().enabled;
+    Pv.setSettings({ enabled: true });
+    Pv.setView('player');
+    trip('player-view', function () { return [Pv.outletAllowed('clipboard').reason]; });
+    Pv.setSettings({ enabled: false });
+    trip('module-disabled', function () { return [Pv.outletAllowed('clipboard').reason]; });
+    Pv.setSettings({ enabled: saveViewOn });
+    Pv.setView('omniscient');
+  }
+  // ── ui/panel.js（v2.187.0 · E8 依赖体检的输入面）──
+  //   本版新增**一个**码，它不在引擎里、也不在任何模块的返回体里：
+  //     `bad-json` 产生于**面板的输入解析**（`#wa-dc-in` 里那一坨 JSON 没粘对）。
+  //   为什么它必须自成一码、不许并进引擎的 `bad-shape`：两者处置相反 ——
+  //     · `bad-json` = **粘错了**（空输入 / 语法错），要人回去改那一坨文本；
+  //     · `bad-shape` = **这份东西不合规**（解析成功但形状不像可搬物），要人换一份。
+  //   合成一个「收不了」，会让「我复制漏了半截」与「这类东西本模块不认」长得一样。
+  //   见证走**真点击**（与上面 B5/B6 五条 UI 码同规格：点 tab 走真实绑定 → 处理器执行
+  //   → 结果落进面板 dataset 回执位），**不打桩** —— 空输入是真实可发生的现场。
+  {
+    const uiGate3 = require('./ui-gate-sync.js');
+    const env3 = uiGate3.fresh();
+    const dom3 = env3.dom;
+    const panelEl3 = dom3.getElementById('wa-panel');
+    const tabs3 = panelEl3 ? panelEl3.querySelectorAll('.wa-tab') : [];
+    const toolsTab = tabs3.filter(function (x) { return x.dataset && x.dataset.page === 'tools'; })[0];
+    if (toolsTab) toolsTab.click();
+    const B3 = function (id) { return dom3.getElementById(id); };
+    want('bad-json', 'panel：依赖体检的输入框是空的 / JSON 语法坏 ⇒ 拒收说清是「JSON 坏了」（不并进引擎的 bad-shape）');
+    trip('bad-json', function () {
+      const ta = B3('wa-dc-in');
+      if (ta) ta.value = '';              // ① 空输入
+      const b = B3('wa-dc-check');
+      if (!b) return [];
+      b.click();
+      const first = String((panelEl3.dataset || {}).dcOut || '').split('：')[0];
+      // ② 语法坏：粘半截 JSON 也必须给同一个码（同一码面、两种坏法）
+      if (ta) ta.value = '{"bpVer": 1,';
+      b.click();
+      const second = String((panelEl3.dataset || {}).dcOut || '').split('：')[0];
+      return [first, second];
+    });
+  }
+  // ══════════ v2.188.0（第四批 E7 + E9）：两面新模块的 14 个新码 ══════════
+  //   本批不给 base 添新条目 —— 仓规是「新码必须有可执行见证」（未登记的无消费者导出即红，
+  //   同理：没有见证的码＝没人真看过的码）。14 条全部用**真 API** 跑出来，探针先实测过
+  //   （tools/probe_reject188.js：先跑一次看真返回，再照读数写见证）。
+  //   每一条都在**同一入口的两种局面**上分列，那些分列正是这些码存在的理由。
+  {
+    WA.rulePack.setSettings({ enabled: true });
+    // ① 空面：把设置登记面摘空 ⇒ 这一面在**真实可发生**的处境下有一个键都进不了包
+    //    （不是「值没设」，而是「面本身是空的」——两者处置相反）。
+    want('empty-surface', 'E7：规则面一个可读键都没有 ⇒ 如实拒收（不与「跑出个空包」混同）');
+    trip('empty-surface', function () {
+      const keep = WA.__settingsRegs;
+      try {
+        WA.__settingsRegs = [];
+        return WA.rulePack.save('见证空面').reason;
+      } finally { WA.__settingsRegs = keep; }
+    });
+    // ② 凭空输入 / ③ 键全不认识：都是「导入」这一口的两种坏法，但一个是「没给东西」，
+    //    一个是「给了东西而本侧一个键都不认识」——处置相反，故分列。
+    want('empty-input', 'E7：导入空文本 ⇒ empty-input（不是「解析失败」，也不是「空的包」）');
+    trip('empty-input', function () { return WA.rulePack.importPack('   ').reason; });
+    want('no-usable-keys', 'E7：导入的键在本侧一个都不认识 ⇒ 不写任何东西并如实点名');
+    trip('no-usable-keys', function () {
+      return WA.rulePack.importPack(JSON.stringify({ rulePack: 1, name: 'x', values: { 这是不存在的键: 1 } })).reason;
+    });
+    // ④ 存储面抛异常：`save-threw` 与 `settings-bus-absent` 是**两个不同根因**
+    //    （前者「写了但写炸了」，后者「根本没有那一路写口」）—— 合成一个会让现场无法归因。
+    want('save-threw', 'E7：设置写路径抛出 ⇒ 如实报 save-threw（不静默当成功）');
+    trip('save-threw', function () {
+      const keep = WA.settingsBus.saveOrThrow;
+      try {
+        WA.settingsBus.saveOrThrow = function () { throw new Error('见证：写路径抛'); };
+        return WA.rulePack.save('见证抛').reason;
+      } finally { WA.settingsBus.saveOrThrow = keep; }
+    });
+    want('settings-bus-absent', 'E7：切换包时发现写入口缺席 ⇒ 不逐键半写，先整体拒收');
+    trip('settings-bus-absent', function () {
+      const keepSave = WA.settingsBus.saveOrThrow;
+      try {
+        WA.rulePack.save('见证缺席');
+        WA.settingsBus.saveOrThrow = undefined;
+        return WA.rulePack.apply('见证缺席').reason;
+      } finally { WA.settingsBus.saveOrThrow = keepSave; }
+    });
+    // ⑤ 模板三条形状闸：每个都是**独立的量**（轮次间隔 / 调用预算 / 失败策略），
+    //    合成一个 bad-template 会让「改哪一处」在面板上不可分。
+    want('bad-every', 'E7：模板轮次间隔非法 ⇒ bad-every（与预算分开点名）');
+    trip('bad-every', function () {
+      return WA.rulePack.template.set([{ id: 'w1', action: 'pending.sweep', every: 0, budget: 1 }]).reason;
+    });
+    want('bad-budget', 'E7：模板调用预算非法 ⇒ bad-budget（与轮次分开点名）');
+    trip('bad-budget', function () {
+      return WA.rulePack.template.set([{ id: 'w2', action: 'pending.sweep', every: 1, budget: 0 }]).reason;
+    });
+    want('bad-fail-policy', 'E7：失败策略不在封闭词表（stop/skip）⇒ 如实报出并把词表带回来');
+    trip('bad-fail-policy', function () {
+      return WA.rulePack.template.set([{ id: 'w3', action: 'pending.sweep', every: 1, budget: 1, failPolicy: '这是不存在的策略' }]).reason;
+    });
+    want('bad-round', 'E7：轮次不是有限数 ⇒ 拒收（NaN 不得被当成某一轮）');
+    trip('bad-round', function () { return WA.rulePack.template.dueAt('不是数').reason; });
+    // ⑥ 「一条都没配」与「配了但全跑完」是两种处境。
+    want('no-templates', 'E7：模板表为空 ⇒ no-templates（不是「跑了 0 条 = 成功」）');
+    trip('no-templates', function () {
+      WA.rulePack.template.reset();
+      return WA.rulePack.template.run({}).reason;
+    });
+    // ⑦ 预算跑满：**不是静默跳过** —— 该条逐条记进 trace 并说清「用了几次/上限几次」。
+    want('budget-exhausted', 'E7：预算跑满 ⇒ 该条不调用并如实记 budget-exhausted（判据读的是 trace 里的现场）');
+    trip('budget-exhausted', function () {
+      WA.rulePack.template.reset();
+      WA.rulePack.template.set([{ id: 'w4', action: 'pending.sweep', every: 1, budget: 1 }]);
+      WA.rulePack.template.run({});
+      const second = WA.rulePack.template.run({});
+      return (second.trace[0] || {}).reason;
+    });
+    WA.rulePack.template.reset();
+  }
+  {
+    WA.worldLab.setSettings({ enabled: true });
+    // ⑧ 没跑过实验时三个读口各报 no-lab：**不是空数组冒充** —— 「没做」与「做了但与无」分列。
+    want('no-lab', 'E9：没跑过实验时读口报 no-lab（不用空数组/空对象冒充「什么都没有」）');
+    trip('no-lab', function () {
+      WA.worldLab.discard();
+      return [WA.worldLab.arms().reason, WA.worldLab.diff().reason, WA.worldLab.staleness().reason];
+    });
+    want('empty-path', 'E9：路径一行都没有 ⇒ empty-path（与「步数超限」分列）');
+    trip('empty-path', function () { return WA.worldLab.parseSteps('   ', 6).reason; });
+    // ⑨ 蓝图引擎的两种局面：缺席（那个口不在）与失败（对口在、导不出）——处置相反。
+    want('export-failed', 'E9：蓝图导出失败 ⇒ 拒收并把失败原因原样带回（不折成「导出了一份空的」）');
+    trip('export-failed', function () {
+      const keep = WA.worldBlueprint;
+      try {
+        WA.worldBlueprint = { exportBlueprint: function () { return { ok: false, reason: '见证：导不出' }; } };
+        return WA.worldLab.exportAs('blueprint').reason;
+      } finally { WA.worldBlueprint = keep; }
+    });
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

@@ -107,6 +107,27 @@
     for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); }
     return ('0000000' + (h >>> 0).toString(16)).slice(-8);
   }
+  /**
+   * v2.185.0（O2 · 跨模块原子提交）：**业务回执解包**。
+   *   v2.165.0 起 `store.transact` 的返回值是**事务回执**
+   *   （`ok/persisted/applied/state/result`），本模块自己的业务回执在 `result` 里。
+   *   不解包的后果正是本仓反复治的「同一入口两种形状」：
+   *     · 顶层路径：调用方读 `r.id` / `r.stage` / `r.pairId` 全得 `undefined`
+   *       （探针实证：面板点「提案」成功后打印「提案已立 undefined（undefined）」）；
+   *     · 嵌套路径：同一调用还多一个 `deferred` 信封。
+   *   与 B 模式（`out` 变量捕获，本仓 30+ 引擎）对齐：那一类写口
+   *   把业务回执存进 `out` 再返回，故**天然不受信封影响**（探针实测：嵌套下
+   *   `reason` 与顶层同形）—— 本次只需修 A 模式。
+   *   为什么不在 store 侧改：`store.transact` 的回执是它的契约，
+   *   盒上还有 `persisted` / `applied` / `state` 三个面（repo/tests 真读），
+   *   把它拆成两种返回形态只会让读数更难。
+   * @param {object} tx store.transact 的事务回执
+   * @returns {object} 本模块的业务回执（result 非对象时原样返回）
+   */
+  function rx(tx) {
+    if (tx && typeof tx === 'object' && tx.result && typeof tx.result === 'object') return tx.result;
+    return tx;
+  }
   /** 世界里的势力名清单（读 evolution 真源，不自带副本）。 */
   function factionNames() {
     const s = state();
@@ -190,7 +211,7 @@
       if (d !== null && (d < 1 || d > 720)) return no('bad-duration', { got: terms[i].days, span: '1–720 天' });
       if (d !== null && d > days) days = d;
     }
-    return WA.store.transact(function (draft) {
+    return rx(WA.store.transact(function (draft) {
       draft.diplomacy = draft.diplomacy || { pairs: {}, proposals: {}, seq: 0 };
       draft.diplomacy.proposals = draft.diplomacy.proposals || {};
       const open = Object.keys(draft.diplomacy.proposals)
@@ -208,7 +229,7 @@
       _stat.proposals++;
       return { ok: true, id: pid, stage: 'proposed',
         note: '提案**不产生世界效果**；须经 reply → 确认（sign）才进 pairs' };
-    });
+    }));
   }
 
   /**
@@ -246,7 +267,7 @@
         }
       }
     }
-    return WA.store.transact(function (draft) {
+    return rx(WA.store.transact(function (draft) {
       const p = draft.diplomacy.proposals[id];
       if (!p || (p.stage !== 'proposed' && p.stage !== 'countered')) return no('bad-stage', { stage: p && p.stage });
       p.reply = { kind: kind, by: by, basis: basis, at: clockNow() };
@@ -256,7 +277,7 @@
       p.terms = counterTerms.map(function (t) { return { term: t.term, days: numOrNull(t.days), label: TERM_LABEL[t.term] }; });
       p.stage = 'countered'; p.updatedAt = clockNow();
       return { ok: true, id: id, stage: 'countered' };
-    });
+    }));
   }
 
   /**
@@ -277,7 +298,7 @@
     const gate = authority(raw.from);
     if (!gate.ok) return no('no-authority', { got: raw.from, hint: gate.hint });
     const now = clockNow();
-    return WA.store.transact(function (draft) {
+    return rx(WA.store.transact(function (draft) {
       draft.diplomacy = draft.diplomacy || { pairs: {}, proposals: {}, seq: 0 };
       draft.diplomacy.pairs = draft.diplomacy.pairs || {};
       const p = draft.diplomacy.proposals[id];
@@ -310,7 +331,7 @@
       return { ok: true, id: id, pairId: pairKey, state: pr.state,
         terms: fresh.map(function (x) { return { term: x.term, label: x.label, until: x.until }; }),
         note: '条款进入有效期；资源后果由调用方经 org 完成（本模块不动库存）' };
-    });
+    }));
   }
 
   /** 关系状态由**有效条款**反推（不是另存一个自由字段）：同盟 = 同时有 trade 与 mutual-aid。 */
@@ -363,7 +384,7 @@
     const evidence = clean(opt.evidence, 120);
     if (!evidence) return no('missing-evidence', { hint: '履约须带证据（如「船队回执 ship_12」）—— 无据的「完成了」不结算' });
     if (!pairs()[id]) return no('unknown-pair', { got: id });
-    return WA.store.transact(function (draft) {
+    return rx(WA.store.transact(function (draft) {
       const pr = draft.diplomacy.pairs[id];
       if (!pr) return no('unknown-pair', { got: id });
       const now = clockNow();
@@ -373,7 +394,7 @@
       hit.status = 'fulfilled'; hit.fulfilledAt = now; hit.evidence = evidence;
       pr.updatedAt = now;
       return { ok: true, pairId: id, term: term, status: 'fulfilled', evidence: evidence };
-    });
+    }));
   }
 
   /** 违约：**不自动判罚**，只把条款标成 breached 并**留证**；罚则与资源后果由调用方决定。 */
@@ -387,7 +408,7 @@
     const evidence = clean(opt.evidence, 120);
     if (!evidence) return no('missing-evidence', { hint: '违约须带证据（谁在何时怎么违约）' });
     if (!pairs()[id]) return no('unknown-pair', { got: id });
-    return WA.store.transact(function (draft) {
+    return rx(WA.store.transact(function (draft) {
       const pr = draft.diplomacy.pairs[id];
       if (!pr) return no('unknown-pair', { got: id });
       const now = clockNow();
@@ -398,7 +419,7 @@
       pr.updatedAt = now;
       return { ok: true, pairId: id, term: term, status: 'breached', state: pr.state,
         note: '本模块不判罚：罚则与资源后果由调用方（inst / org）决定' };
-    });
+    }));
   }
 
   /**
@@ -412,7 +433,7 @@
     if (!st.enabled) return no('disabled', { hint: '外交总开关关闭' });
     const at = numOrNull(opt.at);
     const now = (at === null) ? clockNow() : at;
-    return WA.store.transact(function (draft) {
+    return rx(WA.store.transact(function (draft) {
       draft.diplomacy = draft.diplomacy || { pairs: {}, proposals: {}, seq: 0 };
       const ps = draft.diplomacy.pairs || {};
       let changed = 0;
@@ -429,7 +450,7 @@
         if (next !== before) { pr.state = next; pr.updatedAt = now; changed++; }
       });
       return { ok: true, changed: changed, at: now };
-    });
+    }));
   }
 
   // ── 产品面②：读面 ──────────────────────────────────────────────

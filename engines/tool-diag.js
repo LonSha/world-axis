@@ -1186,6 +1186,159 @@
     });
   }
 
+  // v2.187.0（E4）：场景 / 战役层。诊断面**分列**四件事，不合成一个「进度」绿点：
+  //   · 阶段读数（当前阶段 / 总阶段 / 是否已结束）—— 与谓词的现场值并排
+  //   · **不可读与未达成分列**（unreadable 计数）—— 「引擎没装」不许读成「还没做到」
+  //   · 依赖在场（蓝图 / 外交 / 势力图 / 货运四个谓词源）—— 缺席就是谓词不可读
+  //   · 模板来源（来自蓝图真源还是蓝图缺席）—— 缺席时本模块**不兜底**
+  function secCampaign() {
+    return safe(function () {
+      if (!WA.campaign || typeof WA.campaign.stat !== 'function') return { error: 'engines/campaign.js 未加载（战役读数缺席）' };
+      const st = WA.campaign.stat();
+      const cfg = WA.campaign.getSettings();
+      const dg = WA.campaign.diagnose();
+      const cur = WA.campaign.current();
+      return {
+        enabled: !!cfg.enabled, stageCap: cfg.stageCap, logCap: cfg.logCap,
+        starts: st.starts || 0, advances: st.advances || 0, finishes: st.finishes || 0,
+        refused: st.refused || 0, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}),
+        // **不可读与未达成必须分列**（这是本模块最要紧的一条读数）
+        unreadable: (st.faults && st.faults.unreadable) || 0,
+        notMet: (st.faults && st.faults['not-met']) || 0,
+        hasCampaign: !!st.hasCampaign, scene: st.scene || '', stage: st.stage, finished: !!st.finished,
+        currentOk: !!cur.ok, currentId: (cur.current && cur.current.id) || null,
+        currentReading: (cur.current && cur.current.reading !== undefined) ? cur.current.reading : null,
+        predicates: st.predicates || [],
+        deps: dg.deps || {},
+        templatesOk: !!dg.templatesOk, templateCount: dg.templateCount || 0, templateReason: dg.templateReason || null
+      };
+    });
+  }
+  function secAtlas() {
+    return safe(function () {
+      if (!WA.atlas || typeof WA.atlas.stat !== 'function') return { error: 'engines/atlas.js 未加载（地图读数缺席）' };
+      const st = WA.atlas.stat();
+      const cfg = WA.atlas.getSettings();
+      const dg = WA.atlas.diagnose();
+      // **三层分列**（这是本模块最要紧的一条读数）：几何 / 推导边 / 已确立事实 ——
+      //   压成一个「关系数」就等于把「算出来的」与「谈成的」混成一件事。
+      const rel = WA.atlas.relations();
+      const pl = WA.atlas.places();
+      const rt = WA.atlas.routes();
+      return {
+        enabled: !!cfg.enabled, maxPlaces: cfg.maxPlaces, maxEdges: cfg.maxEdges, showFacts: cfg.showFacts !== false,
+        reads: st.reads || 0, refused: st.refused || 0, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}),
+        placesOk: !!pl.ok, placeCount: pl.ok ? pl.count : 0, placeUnplaced: pl.ok ? pl.unplaced.length : 0,
+        zoneUnknown: pl.ok ? pl.zoneUnknown : 0, nearDays: pl.ok ? pl.nearDays : null,
+        routesOk: !!rt.ok, roadCount: rt.ok ? rt.count : 0,
+        transitCount: rt.ok ? rt.transitCount : 0, routeUnplaced: rt.ok ? rt.unplaced.length : 0,
+        derivedCount: rel.derivedCount, derivedReason: rel.derivedReason, derivedTruncated: rel.derivedTruncated,
+        factsCount: rel.factsCount, factsReason: rel.factsReason,
+        gaps: rel.gaps.length,
+        deps: dg.deps || {}
+      };
+    });
+  }
+  /**
+   * v2.187.0（E8）：依赖体检与迁移助手。
+   *   本节的落点是**体检口径本身**，不是某一坨可搬物的结论 —— 故这里逐项报出：
+   *     ① 四处版本真源各读得到吗（读不到时总判必然降级，得给出**原因**）；
+   *     ② 哪些类目**结构性不可验**（本仓无登记面 ⇒ 对所有可搬物一样，不参与总判）；
+   *     ③ 迁移链现状；
+   *     ④ 体检台账（四项判定计数 + 拒收归因）。
+   *   为什么不在这里跑一次 check()：那要传一份可搬物进来，而**选哪一份**是用户的事 ——
+   *   诊断节若挑一份来念，读的人会把「那一份的结论」当成「这个面的结论」。
+   */
+  function secDepCheck() {
+    return safe(function () {
+      if (!WA.depCheck || typeof WA.depCheck.diagnose !== 'function') {
+        return { error: 'engines/dep-check.js 未加载（依赖体检面缺席）' };
+      }
+      const dg = WA.depCheck.diagnose();
+      const st = WA.depCheck.stat();
+      const cfg = WA.depCheck.getSettings();
+      const cat = (typeof WA.depCheck.catalog === 'function') ? WA.depCheck.catalog() : null;
+      return {
+        enabled: !!cfg.enabled, maxDeps: cfg.maxDeps, maxDegrade: cfg.maxDegrade,
+        // 版本真源逐项：null 表示**读不到**（不是「版本是 0」）—— 这两件事在读数上必须可分。
+        versionSources: dg.versionSources || {},
+        missingVersionSource: dg.missingVersionSource || [],
+        migrationChain: dg.migrationChain,
+        // 体检台账：四种总判各自的次数 + 拒收归因（拒收码逐条可复算）。
+        checks: st.checks || 0, prepared: st.prepared || 0,
+        blocked: st.blocked || 0, degraded: st.degraded || 0, unknown: st.unknown || 0,
+        refused: st.refused || 0, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}),
+        kinds: cat ? cat.kinds : [],
+        verdicts: cat ? cat.verdicts : [],
+        sources: dg.deps || {}
+      };
+    });
+  }
+  function secRulePack() {
+    return safe(function () {
+      if (!WA.rulePack || typeof WA.rulePack.diagnose !== 'function') {
+        return { error: 'engines/rule-pack.js 未加载（规则包面缺席）' };
+      }
+      const dg = WA.rulePack.diagnose();
+      const st = WA.rulePack.stat();
+      const cfg = WA.rulePack.getSettings();
+      const cat = (typeof WA.rulePack.catalog === 'function') ? WA.rulePack.catalog() : null;
+      return {
+        enabled: !!cfg.enabled, maxPacks: cfg.maxPacks, maxKeys: cfg.maxKeys,
+        packs: dg.packs || 0, active: dg.active || '',
+        // 可进包的键：**调用期**从 __settingsRegs 现场筛出来的名单（不是写死的一份）。
+        //   它空着有两种原因：本侧一个相关模块都没装 / 那些模块都还没登记 —— 两种都要看得见。
+        packableCount: dg.packableCount || 0,
+        packable: (dg.packable || []).slice(0, 24),
+        actionIds: dg.actionIds || [],
+        // 词表逐口现场核对：`present:false` = 那一口在这台机器上找不到 —— 声明面空转的入口。
+        actionTargets: dg.actionTargets || [],
+        actionsResolved: dg.actionsResolved || 0,
+        templates: dg.templateCount || 0,
+        saves: st.saves || 0, applies: st.applies || 0, drops: st.drops || 0,
+        exports: st.exports || 0, imports: st.imports || 0,
+        templateRuns: st.templateRuns || 0, templateRefused: st.templateRefused || 0,
+        refused: st.refused || 0, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}),
+        failPolicies: cat ? cat.failPolicies : [],
+        modules: cat ? cat.modules : [],
+        sources: dg.deps || {}
+      };
+    });
+  }
+  function secWorldLab() {
+    return safe(function () {
+      if (!WA.worldLab || typeof WA.worldLab.diagnose !== 'function') {
+        return { error: 'engines/world-lab.js 未加载（世界实验室缺席）' };
+      }
+      const dg = WA.worldLab.diagnose();
+      const st = WA.worldLab.stat();
+      const cfg = WA.worldLab.getSettings();
+      const cat = (typeof WA.worldLab.catalog === 'function') ? WA.worldLab.catalog() : null;
+      return {
+        enabled: !!cfg.enabled, maxSteps: cfg.maxSteps,
+        hasLab: !!dg.hasLab, labId: dg.labId || '', labAt: dg.labAt || 0,
+        // 过期与「live 有没有被实验改到」两栏分开报：前者答「这份读数还算不算数」，
+        //   后者答「这次观测有没有动到被观测的世界」—— 合成一个绿点就两件事都说不清了。
+        stale: dg.stale === true, staleReason: dg.staleReason || '',
+        liveUnchanged: (dg.liveUnchanged === null || dg.liveUnchanged === undefined) ? null : dg.liveUnchanged,
+        arms: dg.arms || [],
+        // 动作词表**逐字取自 rehearsal**（本模块不自带副本）：null 表示读不到，不是空词表。
+        kinds: cat ? cat.kinds : null,
+        kindSource: cat ? cat.kindSource : '',
+        rows: cat ? (cat.rows || []).map(function (r) { return r.key; }) : [],
+        runs: st.runs || 0, armRuns: st.arms || 0, discarded: st.discarded || 0,
+        exports: st.exports || 0, staleReads: st.staleReads || 0,
+        refused: st.refused || 0, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}),
+        unknowns: dg.unknowns || [],
+        sources: dg.deps || {}
+      };
+    });
+  }
   function secLife() {
     return safe(function () {
       if (!WA.life || typeof WA.life.stat !== 'function') return { error: 'life 模块不可用' };
@@ -1896,6 +2049,23 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
     //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
     'engines/pending-center.js': 'pendingCenter',
+    'engines/campaign.js': 'campaign',
+    // v2.187.0（E6）：统一世界地图与关系视图（engines/atlas.js）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它的真消费方是
+    //   面板区块与诊断节（本表），缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/atlas.js': 'atlas',
+    // v2.187.0（E8）：蓝图 / 种子依赖包与迁移助手（engines/dep-check.js）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它的真消费方是
+    //   面板区块与诊断节（本表），缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/dep-check.js': 'depCheck',
+    // v2.188.0（E7）：玩家自定义规则包与白名单自动化模板（engines/rule-pack.js）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它的真消费方是
+    //   面板区块与诊断节（本表），缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/rule-pack.js': 'rulePack',
+    // v2.188.0（E9）：隔离世界实验室与反事实对比（engines/world-lab.js）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它的真消费方是
+    //   面板区块与诊断节（本表），缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/world-lab.js': 'worldLab',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -2860,7 +3030,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   同口径：无条件渲染（agency 是产品文件，缺席本身就是断裂，不降级成提示）；
     //   渲染了不登记 ⇒ 绑定断裂永不可见。
     { page: 'world', ids: ['wa-ag-enabled', 'wa-ag-person', 'wa-ag-schedule', 'wa-ag-receipts', 'wa-ag-diag', 'wa-ag-out'] },
-    { page: 'world', ids: ['wa-fr-enabled', 'wa-fr-route', 'wa-fr-from', 'wa-fr-res', 'wa-fr-qty', 'wa-fr-days', 'wa-fr-dispatch', 'wa-fr-arrive', 'wa-fr-cancel', 'wa-fr-reroute', 'wa-fr-view', 'wa-fr-diag', 'wa-fr-out'] },
+    { page: 'world', ids: ['wa-fr-enabled', 'wa-fr-route', 'wa-fr-from', 'wa-fr-res', 'wa-fr-qty', 'wa-fr-days', 'wa-fr-base', 'wa-fr-dispatch', 'wa-fr-arrive', 'wa-fr-cancel', 'wa-fr-reroute', 'wa-fr-view', 'wa-fr-diag', 'wa-fr-out'] },
     // v2.173.0（TX4b）：下面五组此前**只有登记、没有渲染**——五模块 56 个导出全部躺在
     //   死子面账本上（storyChoice 9 / commission 11 / investigation 11 / aftermath 12 /
     //   operations 13），连各自的 getSettings/setSettings 都是 test-only。对照实验把界线
@@ -3003,7 +3173,32 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   与上一组同登记到 health 页（本模块的区块渲染在健康页里，与三块合页同规格）。
     //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
     { page: 'health', ids: ['wa-pc-enabled', 'wa-pc-view', 'wa-pc-soon', 'wa-pc-sources', 'wa-pc-diag', 'wa-pc-drill', 'wa-pc-drill-go'],
-      dynamic: ['wa-pc-out'] }
+      dynamic: ['wa-pc-out'] },
+    // v2.187.0（E4）：战役层 —— 6 静态控件 + 1 动态读数出口（同 health 页其余区块规格）。
+    //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
+    { page: 'health', ids: ['wa-cp-enabled', 'wa-cp-scene', 'wa-cp-start', 'wa-cp-advance', 'wa-cp-status', 'wa-cp-review', 'wa-cp-reset'],
+      dynamic: ['wa-cp-out'] },
+    // v2.187.0（E6）：统一地图与关系视图 —— 7 静态控件 + 1 动态读数出口。
+    //   渲染在**世界页**（与远方世界脉搏同页同族：都答「外面有什么」），故与 farfield
+    //   那一段同页登记。**登记错页比不登记更坏**（看起来已被覆盖，实际永远查不到）。
+    { page: 'world', ids: ['wa-at-enabled', 'wa-at-view', 'wa-at-places', 'wa-at-routes', 'wa-at-rel', 'wa-at-unplaced', 'wa-at-diag'],
+      dynamic: ['wa-at-out'] },
+    // v2.187.0（E8）：依赖体检与迁移助手 —— 8 静态控件 + 1 动态读数出口。
+    //   渲染在**工具页**（与种子库 / 蓝图同页同族：三者都在「把世界搬走 / 搬来」这条线上），
+    //   故与 wa-ws-* / wa-bp-* 两段同页登记。**登记错页比不登记更坏**（看起来已被覆盖，实际永远查不到）。
+    { page: 'tools', ids: ['wa-dc-enabled', 'wa-dc-kind', 'wa-dc-in', 'wa-dc-use', 'wa-dc-check',
+      'wa-dc-plan', 'wa-dc-catalog', 'wa-dc-diag'], dynamic: ['wa-dc-out'] },
+    // v2.188.0（E7）：规则包与自动化模板 —— 8 静态控件 + 1 动态读数出口。
+    //   渲染在**工具页**（与设置面同页族：规则包存的就是设置。放别的页会让「切一套规则」
+    //   与「那套规则在哪」分家）。**登记错页比不登记更坏**（看起来已被覆盖，实际永远查不到）。
+    { page: 'tools', ids: ['wa-rp-enabled', 'wa-rp-name', 'wa-rp-save', 'wa-rp-list', 'wa-rp-apply',
+      'wa-rp-drop', 'wa-rp-export', 'wa-rp-import', 'wa-rp-tpl', 'wa-rp-tpl-list', 'wa-rp-tpl-run',
+      'wa-rp-catalog', 'wa-rp-diag'], dynamic: ['wa-rp-out'] },
+    // v2.188.0（E9）：世界实验室 —— 8 静态控件 + 1 动态读数出口。
+    //   渲染在**工具页**（与试演 / 分支树同页族：三者都在「先看看会怎样、再决定」这条线上）。
+    { page: 'tools', ids: ['wa-wl-enabled', 'wa-wl-a', 'wa-wl-b', 'wa-wl-run', 'wa-wl-arms',
+      'wa-wl-diff', 'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag'],
+      dynamic: ['wa-wl-out'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。
@@ -3663,7 +3858,20 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   两者答的是**两个粒度**：世界健康栏答「还有几件事没做完」（计数 + 是否全清），
       //   本中心答「具体是哪几件、分别去哪看、能不能处置」（逐条归一 + 路由）。
       //   合并会让「源缺席」「归一失败」「emptyAll 可达性」这三个本中心独有的读数无处可报。
-      pendingCenter: secPendingCenter()
+      pendingCenter: secPendingCenter(),
+      // v2.187.0（E4）：场景 / 战役层。与待办中心分列 —— 两者答的不是一件事：
+      //   待办中心答「现在有哪些事等着办」，战役层答「这一局的目标走到哪一步了」。
+      campaign: secCampaign(),
+      atlas: secAtlas(),
+      // v2.187.0（E8）：蓝图 / 种子依赖包与迁移助手。与蓝图/种子节分列 ——
+      //   那两节答「库里有什么」，本节答「搬过来能不能用、缺什么、会降级什么」。
+      depCheck: secDepCheck(),
+      // v2.188.0（E7）：玩家自定义规则包与自动化模板。与 settings 节分列 ——
+      //   那一节答「设置键的落盘台账」，本节答「玩家侧那几套命名规则包与其模板台账」。
+      rulePack: secRulePack(),
+      // v2.188.0（E9）：隔离世界实验室与反事实对比。与 rehearsal 节分列 ——
+      //   那一节答「一次试演跑了什么」，本节答「三条路径摆在一起的差在哪、这份结论过期没有」。
+      worldLab: secWorldLab()
     };
     diag.verdict = verdict(diag);
     return diag;
