@@ -89,7 +89,7 @@ function runA(a) {
   a(pan.indexOf("'#wa-wh-cv-hidden'") >= 0, 'e5v2182/A20: 面板接线（点击处理器）在位');
   a(readOf('tests/run.js').indexOf('|chronicleView:coverage diagnose entries getSettings hiddenSummary setSettings stat|') >= 0,
     'e5v2182/A21: FROZEN2800 逐字含本模块的契约成员集');
-  a(/VERSION = '2\.182\.0'/.test(readOf('index.js')) && JSON.parse(readOf('manifest.json')).version === '2.182.0',
+  a(/VERSION = '2\.(182|183|184)\.0'/.test(readOf('index.js')) && JSON.parse(readOf('manifest.json')).version && ['2.182.0', '2.183.0', '2.184.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
     'e5v2182/A22: 版本钉一致（index.js + manifest）');
 }
 

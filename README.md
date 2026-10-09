@@ -85,11 +85,11 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（24 个，`git ls-files tools/ | wc -l` 为准：
-`anchor-scan` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `doc-gate` / `gen-changelog` /
-`gen-error-codes` / `gen-lock` / `hooks` / `impact-analysis` / `patch-idempotency` /
-`scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded` / `test-audit` /
-`tx1_smoke` / `tx2_smoke` / `tx3_smoke` / `tx4_smoke` / `tx6_smoke` / `tx7_smoke` / `tx8_smoke` / `tx9_smoke`）。
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（30 个，`git ls-files tools/ | wc -l` 为准：
+`agenda_smoke` / `anchor-scan` / `capacity_audit_smoke` / `chronicle_view_smoke` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `doc-gate` / `gen-changelog` /
+`gen-error-codes` / `gen-lock` / `hooks` / `impact-analysis` / `patch-idempotency` / `pending_center_smoke` / `perf_baseline_smoke` / `scan_drift` /
+`slow-sections` / `sync-e2e-readings` / `sync-hardcoded` / `test-audit` / `tx1_smoke` / `tx2_smoke` / `tx3_smoke` / `tx4_smoke` /
+`tx6_smoke` / `tx7_smoke` / `tx8_smoke` / `tx9_smoke` / `world_health_smoke`）。
 （v2.162.0 收口轮：`test-audit` 此前被 `.gitignore` 的形态规则误挡在库外，而它是 `tests/run.js`（RP8 段）
 与 `tests/test-audit-v2155.js`（`require`）的**必跑依赖** ⇒ 干净克隆跑全量会当场 ENOENT。
 解除排除并入库后索引由 15 → 16，本名单随之补上 —— **入库不是终点，本名单必须同一轮跟上**。）
@@ -106,7 +106,7 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（119 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（121 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
@@ -137,6 +137,8 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 <b>八条否定式边界</b>：① 默认关；② choose 记账 ≠ 世界兑现（三段可分离）；③ ops 必须经 rehearsal.preview 白名单；④ 状态变了重新预演；⑤ 不把 rehearsal diff 直接写 live store；⑥ 过期/未知/不可比较分别显示；⑦ review 只读不写；⑧ 不凭空造 ops。
 <b>实测读数</b>：module-registry-gate 文件 <b>184</b> / 命名空间 <b>192</b> / 装载期边 <b>86</b> / 调用期引用 <b>170</b>；拒收码 <b>738 码（见证 481 / 死表 29 / 基线 228）</b>；module-cycle-gate-v2107 pass(65)。
 <b>专锁 <code>tests/s3-tx4-v2168.js</code> 42 / 0</b>。冒烟脚本 <code>tools/tx4_smoke.js</code> 13/13。
+<b>v2.184.0</b> — <b>E3 存档槽面板接线</b>（<code>engines/checkpoints.js</code> 的 28 个导出第一次有入口：存档槽列表 / 手动存 / 读 / 删 / 迁移预检二十个控件 + 处理器）。<b>修三处现场探针实测缺陷</b>：面板读了引擎不返回的字段、<code>remove()</code> 返回 <code>remaining</code> 而非 <code>count</code>、<code>renderBody()</code> 先重绘后写回执导致回执被抹掉。<b>专锁</b> <code>tests/s3-b1-e3-v2184.js</code> 132 / 0。<b>同轮清偿升版债务</b>：升版脚本裸替换把表达式注入字符串字面量（两把锁语法崩、五把判据恒假）、新开三处 spawn 调用点未入武装表、六处版本口号未与比较值同批、五把批锁应用版本钉、同名不同义枚举补 EXEMPT、README 工具链名单 24 → 30、台账 <code>_note</code> 沿革段、<code>docs/ERROR_CODES.md</code> 重新生成、两把硬读数回填。<b>全量回归</b>：<b>通过 15731 / 失败 0</b>（<code>status: passed</code>）。
+<b>v2.183.0</b> — <b>E1 统一待办事项中心</b>：<code>engines/pending-center.js</code> 归一化八个来源模块的 <code>pending()</code>（四族形状 items / points / 裸数组 / 单对象）—— <b>只读聚合面、不新增第二套状态</b>；八源均不申报 <code>empty</code> ⇒ 改三态分离（unavailable / emptyAll / allClear）+ 三值 <code>emptyOf()</code>（null = 该源自己不说）。专锁 125 / 0。
 <b>v2.173.0</b> — <b>TX4b 五模块面板接线与登记补齐</b>（<b>拓展线收尾批</b>：把「登记在 UI_BINDINGS 却从未渲染」的五个模块接上真消费方，并补齐六模块向骨架未声明顶层键的写入登记）。<b>它治什么</b>：TX4/TX6/TX7/TX8/TX9 的 56 个导出全部躺在死子面账本里，连自身的 <code>getSettings</code>/<code>setSettings</code> 都是 test-only —— 模块交付了，面板上没有一处能读它。<b>修法</b>：world 页五段真实栏位（渲染 + 绑定 + <code>UI_BINDINGS</code> 登记三面同步），并修 TX3 的 <code>on(id, 'change', fn)</code> 三参绑定缺陷（<code>on()</code> 是 onclick 接线，三参会把 onclick 赋成字符串 ⇒ 货运启用开关点了没反应）。<b>同批修出的更重缺陷</b>：六模块向 <code>defaultWorldState()</code> 未声明的顶层键写入，三处登记全缺（骨架无声明 / <code>__BOUNDED_CAPS</code> 无条目 / <code>evict.SITES</code> 无条目）—— <code>registryParity</code> 只查本表登记过的键 ⇒ 未登记者查不到 ⇒ 永绿；按仓库三段式补齐后骨架一级键 87 → 93、<code>registryParity.checked</code> 140 → 147。<b>两处预存失败实证收敛</b>：<code>evict-meta-v2610</code> 27/0（diplomacy 两环迁入 <code>NON_EVICT</code>，它们走写入侧硬上界拒写、从不走 evict）· <code>module-cycle-gate-v2107</code> 65/0（边恒等式 90/1481/1571 → 90/1486/1576，实测恰 5 条新增、0 条消失，全部是 <code>ui/panel.js</code> 到五个新模块的 call 边）。<b>另修两处真幽灵</b>：<code>wa-cm-reason</code>/<code>wa-af-reason</code> 被 handler 读却无对应控件（原因永远取默认值）、<code>world-blueprint</code> 的 fallback 建人分支缺淘汰排序键 <code>updatedAt</code>。<b>全量回归</b>：<b>通过 15680 / 失败 0</b>（<code>status: passed</code>）—— 三轮收敛 15533/37 → 15551/19 → 15668/12 → 15680/0，逐条归因见 <code>ITERATION_LOG.md</code> 的 R159 收尾段。
 <b>v2.172.0</b> — <b>TX9 权限批准、组织项目与运营结算</b>（<b>拓展线第九批</b>）：<code>engines/operations.js</code>（14 exports）+ 注入链七点 + tool-diag 四点 + 专锁 46/0 + 冒烟 16/16 + reject-code 10 码。
 <b>v2.171.0</b> — <b>TX8 地点历史的实际后果、修复与复访</b>：<code>engines/aftermath.js</code>（13 exports）+ 专锁 49/0 + 冒烟 13/13 + reject-code 2 码。

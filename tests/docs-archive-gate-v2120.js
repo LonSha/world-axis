@@ -167,7 +167,7 @@ function runB(a) {
   // v2.173.0 收尾补账：本版把断档的 v2.169.0–v2.173.0 五条补进 README 版本历史（此前 v2.168.0 之后断档，
   //   而期望值已被补到 114 —— 断档即实账），114 → 119。**同型账已是第十次**——共性未变：
   //   「同一件事在多处各写一遍，改一处不等于改全」。判据继续钉**精确等值**（防条目被误删）。
-  a(r.facts.readmeEntries === 119, 'docs-archive/B: README 版本历史条目 = 119（实 ' + r.facts.readmeEntries + '）');
+  a(r.facts.readmeEntries === 121, 'docs-archive/B: README 版本历史条目 = 121（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

@@ -102,7 +102,14 @@ const EXEMPT = {
   STRATEGIES: '同名不同义的「合并策略表」：collab=冲突取值策略（保留甲/保留乙/后写胜）、ensemble=多路选优策略（混合/取首/投票）',
   TERMINAL: '同名不同义的「终态表」：act/causal/events/foreshadow+longline/inst/mend 各自的终态集合，互不通约',
   TIERS: '同名不同义的「档位表」：choices=难度档（易/中/难）、appearance=外观品级（A/B/C/S）',
-  TYPES: '同名不同义的「类型表」：schema=数值模式类型（any/array/…）、bonds=羈绊类型（主权让渡/利益同盟/…）'
+  TYPES: '同名不同义的「类型表」：schema=数值模式类型（any/array/…）、bonds=羈绊类型（主权让渡/利益同盟/…）',
+  // v2.183.0（第一批 · E1）：统一待办中心**归一化八个来源模块的 pending()**，其来源表按定义
+  //   就是一张「模块名清单」（aftermath/commission/investigation/operations/storyChoice/coop/
+  //   farfield/backstage）；而 opportunity 的同名常量是「机会从哪来」的六态语义集
+  //   （causal/conflict/debt/intel/pressure/promise，导出、且是面板键名真源）。
+  //   一个是「从哪个模块收」，一个是「机会的来源类型」—— 语义无关，键集**不该**相同，
+  //   且 pending-center 的这张表是**模块内局部常量**（不入导出面），两者不会互查。
+  SOURCES: '同名不同义的「来源表」：opportunity=机会来源六态（causal/conflict/debt/intel/pressure/promise，导出且为面板键名真源）、pending-center=统一待办中心的八个来源**模块名**（aftermath/commission/investigation/operations/storyChoice/coop/farfield/backstage，模块内局部常量、不导出）'
 };
 
 /** 具名常量数组（只认一行内形态）。 */

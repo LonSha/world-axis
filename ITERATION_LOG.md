@@ -133,6 +133,30 @@
 
 **边界（如实登记）**：① 真实宿主一栏仍未验收 —— 面板 16 枚控件只经无头 mini-DOM 与专锁的面板锚点判据，未在手机浏览器里真跑；② `ui/panel.js` 在无头回归里不装载，「六处登记」里 UI 那一处靠**文本锚点**判据（不是运行时行为）；③ 全量回归按本次指令放在**全部计划项做完之后**统一跑一次，本条目不含本版的全量读数。
 
+### R161 · 2026-10-09 · v2.184.0：E3 存档槽面板接线 + 升版债务全清偿（15731 / 0）
+**范围**：拓展线（E3）。**缺口**：`engines/checkpoints.js` 有 **28 个导出、面板零控件** —— 「能力齐全但玩家够不着」。
+**接线**（20 个静态控件 + 处理器，含三处现场探针实测缺陷）：① 面板读了引擎**不返回**的字段（`st.count` → `st.manual`、`libOk` → `libErr`）；② `remove()` 返回 `remaining` 而非 `count`；③ `renderBody()` 在写回执**之前**执行 ⇒ 回执被重绘抹掉（「看起来在报，其实什么也没报」）。三条都属本仓重点打击的读数形态，故逐条修在源头。
+**专锁**：`tests/s3-b1-e3-v2184.js` **132 / 0**。
+**同轮清偿的升版债务（真缺陷，非版本号噪音）**：
+- `tools/_bump184.py` / `bump184b.py` 用**裸字符串替换**实现升版，把 `|| IDX.indexOf(...)` / `|| MAN.version === "..."` **注入了字符串字面量内部**：`s3-tx2-v2166` / `s3-tx3-v2167` **语法崩**（`missing ) after argument list`，其余五把 tx 锁语法合法但判据**恒假**。前者还连带把 v2.104.0 的负控制审计算成「装载不了的锁 1 把 + 锚点问题 1 条」。已用**逐行按唯一标签定位后整行重写**修掉（不再做替换式注入），七把锁全部转绿。
+- v2.105.0 门禁武装表缺口：E1/E3 新开的 **3 个 spawn 调用点**（E1 专锁 + `pending_center_smoke` + E3 专锁）只落了现场 `timeout`、没入表 ⇒ 现场 41 / 表内 38。已补 `ARMED_SITES` 三条 + `TIMEOUT_ARMED` 三条 ⇒ 41/41、`gate-timeout-v2105` 54/54。
+- v2.2131/O16「口号与比较值同批」：升版只改了比较值，**消息文本**仍写 2.182.0（6 处）。已逐行对齐到入口现场版本。
+- 五把 v2182 批锁的**应用版本钉**（index.js VERSION / manifest）停在 2.182.0 —— 按 TX 批先例放宽为 `2\.(182|183|184)\.0`；**刻意不动** `dg.version`（那是各引擎落地版本，非应用版本）。
+- 契约漂移：`pending-center` 的模块内 `SOURCES`（八个来源**模块名**）与 `opportunity` 的同名导出（机会来源六态）**同名不同义** ⇒ 按机制补 EXEMPT 逐条理由（20 条 / 过期 0 / 缺理由 0）。
+- README 工具链自述名单落后于索引（**24 → 30**）：`toolchain-gate-v2136` 43/43。
+- `reject-code-ledger` 的 `_note` 沿革段停在 2.183.0（`dead-export-ledger` 由门禁 `--update` 顺带跟上）⇒ 补本版段，`readings-v2106` 60/60。
+- `docs/ERROR_CODES.md` 落后源码 2 码（E3 接线让两码**有了见证**）⇒ 重新生成，双向一致（763 码）。
+- 硬读数回填：`sync-hardcoded --write`（refs 5019→5057 / 命名空间 205→206 / 成员 2413→2422 / dead 831→820 / 仅测试 368→357）+ `sync-e2e-readings --write`（22 站点，含 module-cycle-gate 八处钉）。
+**现场事故**：`/tmp` 被外部清理进程反复整树删除 —— 工作目录先由 `/tmp/wa_git` 迁到持久分区 `/home/user/wa_git`；回归快照目录后来也被删（`ENOENT ... run.log`）。**处置**：最终轮把 `TMPDIR` 指向持久分区（`/home/user/wa_tmp2`），不再让唯一读数落在可被外部清理的路径上。
+**全量回归**：**通过 15731 / 失败 0**（`status: passed`）。收敛轨迹 15574/87 → 15724/7（`source-changed`）→ **15731/0**。
+
+### R160 · 2026-10-09 · v2.183.0：E1 统一待办事项中心
+**范围**：拓展线（E1）。**缺口**：八个来源模块各有 `pending()`，形状分**四族**（items / points / 裸数组 / 单对象），玩家侧没有一处能「一次看全今天该办什么」。
+**交付**：`engines/pending-center.js` —— **只读聚合面，不新增第二套状态**（纪律：聚合器不拥有事实）。
+**现场实测逼出来的三处口径**：① 八源**均不申报 `empty`** ⇒ 原设计的 `emptyAll` 旗标恒假；改为三态分离（`unavailable` / `emptyAll` / `allClear`）并新增 `emptyReported` / `emptyAllReachable` 标注**可达性**（把「测不出来」与「没有事」分开）；② `emptyOf()` 改为**三值函数**（true / false / null），null = 该源自己不说，不许替它猜；③ 缺席 ≠ 空 ≠ 无事（本仓否定式边界）。
+**接线**：面板健康页 E1 区块 + `tool-diag` 三点登记 + `UI_BINDINGS` + `LOAD_ORDER` + `FROZEN2800` 冻结串。
+**专锁**：`tests/s3-b1-e1-v2183.js` **125 / 0**；冒烟 `tools/pending_center_smoke.js` 全绿。
+
 ### R159（v2.173.0 / TX4b）
 TX4/TX6/TX7/TX8/TX9 五模块面板接线：这些模块此前**登记在 UI_BINDINGS 却从未渲染**，56 个导出全部落在死子面账本（storyChoice 9 / commission 11 / investigation 11 / aftermath 12 / operations 13），连自身 getSettings/setSettings 都是 test-only。本版补 world 页五段真实栏位（渲染 + 绑定 + 登记三面同步），并修 TX3 的 `on(id, 'change', fn)` 三参绑定缺陷（on() 是 onclick 接线，三参会把 onclick 赋成字符串 ⇒ 货运启用开关点了没反应）。TX7 前缀 wa-iv-* 改 wa-inv-*——前者被 v2.150.0 注入价值榜单占用。dead 824→789（test-only 400→365，35 项出冻结面）· uiDead 3 · dataOnly 271，死子面门禁 ✓ · UI gate 53/0（逐页真实点击 1045 控件零抛出）· 渲染↔登记双向零缺口
 **同批修出的更重缺陷：六模块向骨架未声明的顶层键写入（登记≠物化，且连登记都没有）。**

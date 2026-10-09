@@ -121,7 +121,13 @@ const TIMEOUT_ARMED = {
   'b2-o4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'b2-o4-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'b2-o5-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-o5-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'b2-o5-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.183.0 / v2.184.0（第一、三批 · E1 统一待办中心 / E3 存档槽面板接线）：
+  //   三把新调用点（E1 专锁 + pending_center_smoke + E3 专锁）此前只落了现场 timeout、
+  //   没入表 —— 与 TX4b、第二批同款病（「新开的调用点不入表即红」，A6/A13b/B5 会点名）。
+  'b1-e1-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b1-e1-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b1-e3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -225,7 +231,15 @@ const ARMED_SITES = [
   { key: 'b2-o5-lock', mode: 'spawn',
     anchor: "const rB2O5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o5-v2182.js')]," },
   { key: 'b2-o5-smoke', mode: 'spawn',
-    anchor: "const rSM_world_health_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/world_health_smoke.js')]," }
+    anchor: "const rSM_world_health_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/world_health_smoke.js')]," },
+  // v2.183.0 / v2.184.0（第一、三批）：E1 统一待办中心与 E3 存档槽面板接线**各带一个调用点**
+  //   现场三数 41/41/41 vs 表内 38 ⇒ 新开的调用点不入表即红（A6/A13b）。三处逐字登记：
+  { key: 'b1-e1-lock', mode: 'spawn',
+    anchor: "const rB1E1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1-v2183.js')]," },
+  { key: 'b1-e1-smoke', mode: 'spawn',
+    anchor: "const rSM_pending_center_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/pending_center_smoke.js')]," },
+  { key: 'b1-e3-lock', mode: 'spawn',
+    anchor: "const rB1E3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e3-v2184.js')]," }
 ];
 
 /**
