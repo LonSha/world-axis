@@ -1033,6 +1033,159 @@
     });
   }
 
+  // ── v2.182.0（第二批 E2/E5/O4/O3/O5）：五只只读聚合面的现场读数 ──────────
+  //   五节分列不合并 —— 它们答的是**五个不同的问题**，失效模式也各自独立：
+  //     · agenda        答「接下来会发生什么」（失效在「未知时间被拿现在冒充」）；
+  //     · chronicleView 答「已经发生过什么、有哪些被藏起来」（失效在「空历史与读不到同形」）；
+  //     · capacityAudit 答「仓库还剩多少、能回收什么」（失效在「离配额多远没人算」）；
+  //     · perfBaseline  答「这一局属于哪一档、离预算多远」（失效在「没测过被写成小局」）；
+  //     · worldHealth   答「我现在有什么没做完 / 卡住了 / 快满了」（失效在「三问都要逐个模块翻」）。
+  //   共同纪律：只念现场，不替用户跑动作（跑清点 / 跑基准是面板出口的事）。
+  function secAgenda() {
+    return safe(function () {
+      if (!WA.agenda || typeof WA.agenda.stat !== 'function') return { error: 'engines/agenda.js 未加载（世界日程读数缺席）' };
+      const st = WA.agenda.stat();
+      const cfg = WA.agenda.getSettings();
+      const up = WA.agenda.upcoming();
+      return {
+        enabled: !!cfg.enabled, maxRows: cfg.maxRows,
+        reads: st.reads, refused: st.refused, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}), bySource: Object.assign({}, st.bySource || {}),
+        // 读面现状：ok:false 时带 reason —— 「拒算」与「算出来是空表」在读数上必须可分。
+        ok: !!up.ok, reason: up.ok ? null : (up.reason || '?'),
+        count: up.ok ? up.count : null, total: up.ok ? up.total : null, capped: up.ok ? !!up.capped : null,
+        timedCount: up.ok ? up.timedCount : null, untimedCount: up.ok ? up.untimedCount : null,
+        storyDay: up.ok ? up.storyDay : null, storyLabel: up.ok ? up.storyLabel : null,
+        note: up.ok ? '未知时间保持未知（不用「现在」冒充）；表里没有不等于不会发生' : null
+      };
+    });
+  }
+  function secChronicleView() {
+    return safe(function () {
+      if (!WA.chronicleView || typeof WA.chronicleView.stat !== 'function') return { error: 'engines/chronicle-view.js 未加载（编年史视图读数缺席）' };
+      const st = WA.chronicleView.stat();
+      const cfg = WA.chronicleView.getSettings();
+      const co = WA.chronicleView.coverage();
+      return {
+        enabled: !!cfg.enabled, maxRows: cfg.maxRows,
+        reads: st.reads, drills: st.drills, hiddenSeen: st.hiddenSeen,
+        refused: st.refused, lastReason: st.lastReason || '', faults: Object.assign({}, st.faults || {}),
+        // 覆盖率的**两个旗标**：empty（没数据）与 hiddenCount（有但藏起来了）分开报 ——
+        //   合成一个绿点就是本仓反复裁决过的「点了没反应」。
+        ok: !!co.ok, reason: co.ok ? null : (co.reason || '?'),
+        empty: co.ok ? !!co.empty : null, rows: co.ok ? co.total : null,
+        bySource: co.ok ? Object.assign({}, co.bySource || {}) : null,
+        hiddenCount: co.ok ? co.hiddenCount : null,
+        note: co.ok ? co.note : null
+      };
+    });
+  }
+  function secCapacityAudit() {
+    return safe(function () {
+      if (!WA.capacityAudit || typeof WA.capacityAudit.stat !== 'function') return { error: 'engines/capacity-audit.js 未加载（存储压力读数缺席）' };
+      const st = WA.capacityAudit.stat();
+      const cfg = WA.capacityAudit.getSettings();
+      const wl = WA.capacityAudit.waterline();
+      return {
+        enabled: !!cfg.enabled, maxRows: cfg.maxRows,
+        reads: st.reads, refused: st.refused, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}), bySource: Object.assign({}, st.bySource || {}),
+        ok: !!wl.ok, reason: wl.ok ? null : (wl.reason || '?'),
+        // 水位只报**摘要**（几满几近满），逐容器全表在面板「容量」段：诊断包体积纪律。
+        fullCount: wl.ok ? wl.fullCount : null, nearCount: wl.ok ? wl.nearCount : null,
+        totalCaps: wl.ok ? wl.totalCaps : null, rows: wl.ok ? wl.rows.slice(0, 5) : null,
+        note: wl.ok ? wl.note : null
+      };
+    });
+  }
+  function secPerfBaseline() {
+    return safe(function () {
+      if (!WA.perfBaseline || typeof WA.perfBaseline.stat !== 'function') return { error: 'engines/perf-baseline.js 未加载（性能基线读数缺席）' };
+      const st = WA.perfBaseline.stat();
+      const cfg = WA.perfBaseline.getSettings();
+      const bd = WA.perfBaseline.bands();
+      const bud = WA.perfBaseline.budget();
+      const gp = WA.perfBaseline.gap();
+      return {
+        enabled: !!cfg.enabled,
+        reads: st.reads, refused: st.refused, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}), byFace: Object.assign({}, st.byFace || {}),
+        band: st.band, frozenAt: st.frozenAt, frozenAvailable: !!st.frozenAvailable,
+        bandsOk: !!bd.ok, bandsReason: bd.ok ? null : (bd.reason || '?'),
+        current: bd.ok ? bd.current : null,
+        currentDetail: bd.ok ? bd.currentDetail : null,
+        budgetOk: !!bud.ok, budgetReason: bud.ok ? null : (bud.reason || '?'),
+        driftCount: bud.ok ? bud.driftCount : null, budgetRows: bud.ok ? bud.rows.length : null,
+        // 实机栏**一律留空**并带必测清单：把估计填进实测栏，下一个读者就再也分不出
+        //   「手机上 60ms」与「桌上机估算 60ms」。故这里只报「缺什么」，不报「大概多少」。
+        realDevice: gp.reason || null, realDeviceMissing: (gp.missing || []).length,
+        note: gp.note || null
+      };
+    });
+  }
+  function secWorldHealth() {
+    return safe(function () {
+      if (!WA.worldHealth || typeof WA.worldHealth.stat !== 'function') return { error: 'engines/world-health.js 未加载（世界健康读数缺席）' };
+      const st = WA.worldHealth.stat();
+      const cfg = WA.worldHealth.getSettings();
+      const sm = WA.worldHealth.summary();
+      return {
+        enabled: !!cfg.enabled, maxRows: cfg.maxRows, nearRatio: cfg.nearRatio,
+        reads: st.reads, drills: st.drills, refused: st.refused, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}), byKind: Object.assign({}, st.byKind || {}),
+        ok: !!sm.ok, reason: sm.ok ? null : (sm.reason || '?'),
+        // 三栏各带 empty / allClear 两旗标 —— 「没数据」与「有数据但无事」必须可分
+        //   （计划原文边界 5；把两者压成一个绿点正是「点了没反应」的另一种写法）。
+        headline: sm.ok ? sm.headline : null,
+        bars: sm.ok ? ['todo', 'blocked', 'water'].map(function (k) {
+          const b = sm.bars[k] || {};
+          return { kind: k, count: b.count, empty: !!b.empty, allClear: !!b.allClear,
+            skipped: (b.skipped || []).length };
+        }) : null,
+        note: sm.ok ? '只做聚合与下钻：待办来自各模块自己的 pending()，阻塞来自它们的 stat().faults，水位来自 store.sizeCaps()' : null
+      };
+    });
+  }
+  // v2.183.0（第一批 E1）：统一待办事项中心（engines/pending-center.js）。
+  //   诊断面的三件事**分别报**，不合成一个绿点：
+  //     · 源可用性（八源各在场否 —— 缺席 ≠ 没有事项）
+  //     · 三态旗标（unavailable / emptyAll / allClear —— 「读不到」「没数据」「处理完」三件事）
+  //     · **可达性证据**（emptyReporterCount / emptyAllReachable）—— 「全空」这一态
+  //       在现版本亮不了（八源都没申报 empty），这件事必须可答；否则那是一盏
+  //       永远不亮、也没人知道为什么的死灯。
+  function secPendingCenter() {
+    return safe(function () {
+      if (!WA.pendingCenter || typeof WA.pendingCenter.stat !== 'function') return { error: 'engines/pending-center.js 未加载（统一待办读数缺席）' };
+      const st = WA.pendingCenter.stat();
+      const cfg = WA.pendingCenter.getSettings();
+      const rows = WA.pendingCenter.bySource();
+      const it = WA.pendingCenter.items({});
+      const dg = WA.pendingCenter.diagnose();
+      return {
+        enabled: !!cfg.enabled, maxRows: cfg.maxRows, soonCount: cfg.soonCount,
+        reads: st.reads, refused: st.refused, lastReason: st.lastReason || '',
+        faults: Object.assign({}, st.faults || {}), bySource: Object.assign({}, st.bySource || {}),
+        // 逐源在场：缺席的源如实列名（不静默当作「这类事项没有」）
+        sourceCount: rows.filter(function (r) { return r.available; }).length,
+        sourcesTotal: rows.length,
+        absent: rows.filter(function (r) { return !r.available; }).map(function (r) { return r.name; }),
+        // 可达性：emptyReported 是「有几个在场源真的申报了 empty」—— 为 0 时 emptyAll 不可达。
+        emptyReporterCount: dg.emptyReporterCount, emptyAllReachable: dg.emptyAllReachable,
+        ok: !!it.ok, reason: it.ok ? null : (it.reason || '?'),
+        // 三旗标**分列**：初版只有 emptyAll / allClear，八源全缺席时 allClear=true
+        //   —— 把「读不到」报成「全处理完」。这是本仓反复裁决过的那类误报。
+        emptyAll: it.ok ? !!it.emptyAll : null,
+        allClear: it.ok ? !!it.allClear : null,
+        unavailable: it.ok ? !!it.unavailable : null,
+        emptyReported: it.ok ? it.emptyReported : null,
+        total: it.ok ? it.total : null, count: it.ok ? it.count : null,
+        capped: it.ok ? !!it.capped : null,
+        skipped: it.ok ? (it.skipped || []).length : null,
+        note: it.ok ? '三态可分：unavailable（读不到）/ emptyAll（有源且全部自报无数据）/ allClear（读过且此刻没有待办）' : null
+      };
+    });
+  }
+
   function secLife() {
     return safe(function () {
       if (!WA.life || typeof WA.life.stat !== 'function') return { error: 'life 模块不可用' };
@@ -1722,6 +1875,27 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
     //   三处既有出口，缺席就是「性能面读数缺席」，那本身就是断裂，不该被静默兜住。
     'engines/perf-trace.js': 'perfTrace',
+    // v2.182.0（第二批 E2/E5/O4/O3/O5）：五只**只读聚合面**。全部登记为必载 ——
+    //   计划原文要求「一屏能答『我有什么没做完 / 卡住了 / 快满了』」，五个面各答一段；
+    //   缺席就是那一段读数缺席本身（缺口被静默填平），不该被 OPTIONAL_EXPORTS 兜住。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它们在定义面上不存在（自检看不见的黑盒）。
+    //     · agenda        —— 世界日程（未来事件表，只认剧情时间）
+    //     · chronicleView —— 编年史视图（空历史与读不到**可分**）
+    //     · capacityAudit —— 存储压力 / 义务清点 / 迁移预检（维护者面逐容器全表）
+    //     · perfBaseline  —— 性能基线与档位（现场字节读数判档，不留估算占位）
+    //     · worldHealth   —— 玩家可读三栏摘要（待办 / 阻塞 / 水位）+ 下钻路由
+    'engines/agenda.js': 'agenda',
+    'engines/chronicle-view.js': 'chronicleView',
+    'engines/capacity-audit.js': 'capacityAudit',
+    'engines/perf-baseline.js': 'perfBaseline',
+    'engines/world-health.js': 'worldHealth',
+    // v2.183.0（第一批 E1）：统一待办事项中心（engines/pending-center.js）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它的真消费方是
+    //   面板区块与诊断节（本表），缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
+    'engines/pending-center.js': 'pendingCenter',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -2801,7 +2975,30 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.150.0（RP4）：注入价值榜单三枚控件（渲染在**注入页** renderInject，故登记到本组）。
       //   同 v2.50.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，否则「渲染了但绑定
       //   写错 id」这类断裂在新增出口上无人发现；登记错页比不登记更坏（看起来已被覆盖）。
-      'wa-iv-refresh', 'wa-iv-enabled', 'wa-iv-zero', 'wa-iv-max'] }
+      'wa-iv-refresh', 'wa-iv-enabled', 'wa-iv-zero', 'wa-iv-max'] },
+    // v2.182.0（第二批 O4 / O3）：工具页两块 —— 存储压力面 6 控件 + 性能基线面 6 控件。
+    //   同 v2.150.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
+    //   否则「渲染了但绑定写错 id」这类断裂在新增出口上无人发现（本表是唯一会互相校验的地方）。
+    { page: 'tools', ids: ['wa-cap-enabled', 'wa-cap-oblig', 'wa-cap-water', 'wa-cap-reclaim', 'wa-cap-migrate', 'wa-cap-diag',
+        'wa-pbl-enabled', 'wa-pbl-bands', 'wa-pbl-budget', 'wa-pbl-readings', 'wa-pbl-gap', 'wa-pbl-diag'],
+      // 读数出口（`wa-*-out`）也在守卫表内，但走 `dynamic` 层而不是 `ids` 层：
+      //   它们由面板**动态写入**（`o.innerHTML = ...`），id 出现在渲染 HTML 里却不是静态控件节点。
+      //   放进 `ids` 会让 secUi 的「无条件渲染控件」判据把它们当按钮数（口径混），
+      //   放进 `dynamic` 才是它们的真实形态（与 wa-ag-out / wa-iv-out 同规格）。
+      dynamic: ['wa-cap-out', 'wa-pbl-out'] },
+    // v2.182.0（第二批 O5 / E2 / E5）：健康页三块 —— 12 控件。
+    //   三块合页（健康中心 / 世界日程 / 世界纪事），登记到 health 页；
+    //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
+    { page: 'health', ids: ['wa-wh-enabled', 'wa-wh-view', 'wa-wh-sources', 'wa-wh-diag', 'wa-wh-drill', 'wa-wh-drill-go',
+        'wa-wh-ag-enabled', 'wa-wh-ag-view', 'wa-wh-ag-sources',
+        'wa-wh-cv-enabled', 'wa-wh-cv-view', 'wa-wh-cv-hidden', 'wa-wh-cv-diag'],
+      // 三块读数出口走 dynamic 层（同上面 tools 页两条的口径）。
+      dynamic: ['wa-wh-out', 'wa-wh-ag-out', 'wa-wh-cv-out'] },
+    // v2.183.0（第一批 E1）：统一待办事项中心 —— 7 静态控件 + 1 动态读数出口。
+    //   与上一组同登记到 health 页（本模块的区块渲染在健康页里，与三块合页同规格）。
+    //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
+    { page: 'health', ids: ['wa-pc-enabled', 'wa-pc-view', 'wa-pc-soon', 'wa-pc-sources', 'wa-pc-diag', 'wa-pc-drill', 'wa-pc-drill-go'],
+      dynamic: ['wa-pc-out'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。
@@ -3451,7 +3648,17 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       playtime: secPlaytime(),
       // v2.156.0（S1）：离线恢复编排。与 playtime 节分列不合并 ——
       //   一个答「基准在不在」，一个答「这段离开被结算了几次、有没有被重复结算」。
-      offlineReturn: secOfflineReturn()
+      offlineReturn: secOfflineReturn(),
+      // v2.182.0（第二批 E2/E5/O4/O3/O5）：五只只读聚合面。五节分列不合并 ——
+      //   诊断包是这些新面**唯一**的产品侧读者，漏登记 ⇒ 死导出面当场红灯
+      //   （口径：产品零引用即冻结面）。
+      agenda: secAgenda(), chronicleView: secChronicleView(), capacityAudit: secCapacityAudit(),
+      perfBaseline: secPerfBaseline(), worldHealth: secWorldHealth(),
+      // v2.183.0（第一批 E1）：统一待办事项中心。与 worldHealth 的待办栏分列不合并 ——
+      //   两者答的是**两个粒度**：世界健康栏答「还有几件事没做完」（计数 + 是否全清），
+      //   本中心答「具体是哪几件、分别去哪看、能不能处置」（逐条归一 + 路由）。
+      //   合并会让「源缺席」「归一失败」「emptyAll 可达性」这三个本中心独有的读数无处可报。
+      pendingCenter: secPendingCenter()
     };
     diag.verdict = verdict(diag);
     return diag;
@@ -4430,6 +4637,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     secHorizon, secEnemies, secParallelWorld,        // v2.64.0（第五十一 / 五十二 / 五十三面）
     secStitch2129,                                   // v2.129.0（缝 A2 / A7 / A9：改写器 / 静态设定 / 报文预览）
     secStitch2130,                                   // v2.130.0（十二引擎：拦截 / 变换 / 换算 / 预演旁路能力）
+    secAgenda, secChronicleView, secCapacityAudit, secPerfBaseline, secWorldHealth,  // v2.182.0（第二批五聚合面）
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');

@@ -164,7 +164,7 @@ LOAD.forEach(function (rel) {
   modules[rel] = {
     ns: own,
     requires: requires,                     // 装载期顶层读（真「必须先装载」）
-    requiresFiles: requires.map(function (ns) { return nsOwner[ns][0]; }).sort(),
+    requiresFiles: requires.map(function (ns) { return nsOwner[ns][0]; }),
     providerOrderOk: requires.every(function (ns) { return orderOf[nsOwner[ns][0]] < orderOf[rel]; }),
     callRefs: callReads,                    // 调用期引用（不构成装载顺序约束）
     ghostRefs: Array.from(new Set(ghostTop.concat(ghostCall))).sort(),

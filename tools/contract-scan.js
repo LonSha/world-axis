@@ -77,6 +77,15 @@ function witnessDeclared(root) {
  *   每一条都必须仍处于「有分歧」状态，否则报 stale-exempt（名单会过期）。
  */
 const EXEMPT = {
+  // v2.182.0（第二批 · O3/O4/O5）：本批三个新模块各带一对同名常量，与既有同级常量**合法地**
+  //   指向不同值域 —— 逐条给理由（本表存在的意义就是「同名不同义必须逐条说清」）：
+  //     · BANDS：perf-baseline=**性能档**（小局 / 代表性长局 / 容量边缘，判据是存档字节），
+  //       contract-scan 前已在场的 spectrum 类同名值是**别的东西**；两者不会互查。
+  //     · SOURCE_PROBES：五个新模块各有一张**源可用性探针表**（探的是「这个模块的读口在不在」），
+  //       而 feature-detect 型同名常量探的是宿主能力 —— 同形不同义，不许互相校验。
+  //   这两条是**新入表**（不是「过期豁免」）：名单里写了名字而现场已不再分歧，判据会报 stale-exempt。
+  BANDS: '同名不同义的「档位表」：perf-baseline=性能档（小局/代表性长局/容量边缘，判据是存档字节）、perf-trace=预算档（short/medium/long/lowend）',
+  SOURCE_PROBES: '同名不同义的「源探针表」：agenda/chronicle-view/capacity-audit/perf-baseline/world-health 各探各的读口在场性，探针集合互不相同且不该相同',
   ACTIVE: '同名不同义的「活跃态」：act=计划/进行、events=已认领/待办、foreshadow=发展中/待触发、opportunity=已延/开放、quota=生效/已过期',
   CHANNELS: '同名不同义的「通道表」：api-router=路由通道、perspective-lock=叙事通道、world=世界事件通道',
   FIELDS: '同名不同义的「字段清单」：audit-log=审计记录字段、wb-search=世界书检索字段',

@@ -174,7 +174,13 @@ const NS_FIELD_MAP = {
   clock: 'core/clock.js',
   rand: 'core/rand.js',
   digest: 'engines/digest.js',
-  registerModule: 'core/store.js'
+  registerModule: 'core/store.js',
+  // v2.182.0（第二批 · O3）：engines/perf-baseline.js 的装载期**硬边**是 perfTrace。
+  //   判据与同批另四个新模块一致（perfLedger / renderPerf / storageForecast 走它们自己的
+  //   模块文件），只有 perfTrace 一直没登记 —— 而它从 v2.102.0 起就在 perTrace 的提供方
+  //   （engines/perf-trace.js）手里。不登记它，账本里那条 requires 会被报成「未定性」：
+  //   按读数报出（不红），但下一个人读到时会以为这个 ns 的口径还没定。
+  perfTrace: 'engines/perf-trace.js'
 };
 
 /**

@@ -1,13 +1,13 @@
 {
- "version": "2.181.0",
- "loadOrderCount": 200,
- "loadedCount": 188,
+ "version": "2.183.0",
+ "loadOrderCount": 206,
+ "loadedCount": 194,
  "uiCount": 12,
- "nsCount": 196,
+ "nsCount": 202,
  "totals": {
-  "loadEdges": 90,
+  "loadEdges": 97,
   "hardEdges": 0,
-  "callRefs": 178,
+  "callRefs": 190,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -36,6 +36,7 @@
     "engines/act.js",
     "engines/aftermath.js",
     "engines/agency.js",
+    "engines/agenda.js",
     "engines/archive-hide.js",
     "engines/backstage.js",
     "engines/beat-mask.js",
@@ -44,7 +45,9 @@
     "engines/bridge.js",
     "engines/calendar-custom.js",
     "engines/calendar.js",
+    "engines/capacity-audit.js",
     "engines/chapters.js",
+    "engines/chronicle-view.js",
     "engines/commission.js",
     "engines/coop.js",
     "engines/diplomacy.js",
@@ -77,6 +80,8 @@
     "engines/operations.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
+    "engines/pending-center.js",
+    "engines/perf-baseline.js",
     "engines/perspective-lock.js",
     "engines/plan.js",
     "engines/playtime.js",
@@ -111,6 +116,7 @@
     "engines/word-budget.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-health.js",
     "engines/world-seed.js",
     "render/purifier.js"
    ]
@@ -259,11 +265,14 @@
     "core/sandbox.js",
     "engines/aftermath.js",
     "engines/agency.js",
+    "engines/agenda.js",
     "engines/archive-hide.js",
     "engines/beat-mask.js",
     "engines/binding.js",
     "engines/branch-tree.js",
     "engines/calendar-custom.js",
+    "engines/capacity-audit.js",
+    "engines/chronicle-view.js",
     "engines/commission.js",
     "engines/coop.js",
     "engines/diplomacy.js",
@@ -286,6 +295,8 @@
     "engines/offline-return.js",
     "engines/offline-tick.js",
     "engines/operations.js",
+    "engines/pending-center.js",
+    "engines/perf-baseline.js",
     "engines/perspective-lock.js",
     "engines/plan.js",
     "engines/playtime.js",
@@ -315,6 +326,7 @@
     "engines/word-budget.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-health.js",
     "engines/world-seed.js"
    ]
   },
@@ -3134,7 +3146,9 @@
    "callRefs": [],
    "ghostRefs": [],
    "stateKeys": [],
-   "consumedBy": []
+   "consumedBy": [
+    "engines/perf-baseline.js"
+   ]
   },
   "engines/storage-forecast.js": {
    "ns": [
@@ -3346,6 +3360,134 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_offline_return_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/agenda.js": {
+   "ns": [
+    "agenda"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_agenda_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/chronicle-view.js": {
+   "ns": [
+    "chronicleView"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_chronicle_view_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/capacity-audit.js": {
+   "ns": [
+    "capacityAudit"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_capacity_audit_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/perf-baseline.js": {
+   "ns": [
+    "perfBaseline"
+   ],
+   "requires": [
+    "perfTrace",
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "engines/perf-trace.js",
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_perf_baseline_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-health.js": {
+   "ns": [
+    "worldHealth"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_health_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/pending-center.js": {
+   "ns": [
+    "pendingCenter"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_pending_center_settings_v1"
    ],
    "consumedBy": []
   }

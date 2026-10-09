@@ -4623,6 +4623,128 @@ function runWitness(WA) {
     // reject-code-gate 会走 deadMissing 判据（源码可达 + 在 DEAD 表）。
   }
 
+  // ── v2.182.0（第二批 E2/E5/O4/O3/O5）：五只新聚合面的拒收码见证 ────────────
+  //   这一批的码与前面几批形态不同：它们**不是**「参数传错」，而是**聚合面自己承认
+  //   『这一栏我读不到真源』**。可读面的诚实边界必须能被见证，否则「读不到」与
+  //   「读到了是空」在读数上同形 —— 那正是本仓反复裁决过的「点了没反应」。
+  {
+    // ① no-story-clock（engines/agenda.js）
+    //   剧情时间缺失时**整表拒算**，不拿真实时间冒充剧情日（v2.161.0 TP3 时间源分域裁决：
+    //   混算过一次，代价是离线间隔被抹平）。
+    if (WA.agenda) {
+      want('no-story-clock', 'agenda.upcoming：剧情钟未设定 ⇒ 整表拒算，不猜日期（E2·边界5）');
+      WA.agenda.setSettings({ enabled: true });   // 开关关着时先撞 disabled：两码不同因，必须分开见证
+      trip('no-story-clock', function () {
+        var keep = null, had = false;
+        WA.store.transact(function (d) {
+          d.clock = d.clock || {};
+          had = Object.prototype.hasOwnProperty.call(d.clock, 'label');
+          keep = d.clock.label;
+          delete d.clock.label;
+        }, 'reject-witness:v2182-noclock');
+        try { return [WA.agenda.upcoming().reason]; }
+        finally {
+          WA.store.transact(function (d) {
+            d.clock = d.clock || {};
+            if (had) d.clock.label = keep; else delete d.clock.label;
+          }, 'reject-witness:v2182-noclock-restore');
+        }
+      });
+    }
+    // ② no-store（chronicle-view / capacity-audit / world-health 三处共用的同一件东西）
+    //   三个面都按「store 缺席 ⇒ 这一栏读不到」拒算。缺的是**同一件东西**，故共用同一个码
+    //   （这正是拒收码门禁的用意：同因同码，不同因不同码）。
+    if (WA.chronicleView || WA.capacityAudit || WA.worldHealth) {
+      want('no-store', '聚合面读不到 store ⇒ 该栏如实拒算（E5 编年史 / O4 清点 / O5 健康中心共用；与「读到了是空」可分）');
+      if (WA.chronicleView) WA.chronicleView.setSettings({ enabled: true });
+      if (WA.capacityAudit) WA.capacityAudit.setSettings({ enabled: true });
+      if (WA.worldHealth) WA.worldHealth.setSettings({ enabled: true });
+      trip('no-store', function () {
+        var k = WA.store, out = [];
+        WA.store = null;
+        try {
+          if (WA.chronicleView) { try { out.push(WA.chronicleView.entries().reason); } catch (e) {} }
+          if (WA.capacityAudit) { try { out.push(WA.capacityAudit.obligations().reason); } catch (e) {} }
+          if (WA.worldHealth) { try { out.push(WA.worldHealth.summary().reason); } catch (e) {} }
+          return out;
+        } finally { WA.store = k; }
+      });
+    }
+    // ③ no-bytes（engines/perf-baseline.js bandOf）
+    //   「这一局属于哪一档」只认**现场字节读数**（saveStat().bytes 或 sizeAudit().total），
+    //   两处都取不到 ⇒ 报 no-bytes，**不默认成小局**（猜档位就是把「没测过」写成「小局」）。
+    //   关键差别：bytes===0 是**真读数**（不是 null），故清零字节**不会**触发本码 ——
+    //   见证必须走「连读数口都没有」的形态，而不是把字节清成 0。这条差别就是本码存在的理由。
+    if (WA.perfBaseline) {
+      want('no-bytes', 'perfBaseline.bands：现场字节读数取不到（无 saveStat 也无 sizeAudit）⇒ 如实报 no-bytes，不默认成小局');
+      WA.perfBaseline.setSettings({ enabled: true });
+      trip('no-bytes', function () {
+        var k = WA.store;
+        WA.store = { get: function () { return {}; } };   // 有 get（故不是 no-store），但没有任何字节读数口
+        try { return [WA.perfBaseline.bands().reason]; } finally { WA.store = k; }
+      });
+    }
+    // ④ no-perf-trace（engines/perf-baseline.js budget）
+    //   预算表**不自带副本**（自带副本就是第二本账）：perfTrace 缺席时如实拒算。
+    if (WA.perfBaseline) {
+      want('no-perf-trace', 'perfBaseline.budget：perf-trace 缺席 ⇒ 预算表无从冻结，如实拒算（不自带副本）');
+      trip('no-perf-trace', function () {
+        var k = WA.perfTrace;
+        WA.perfTrace = null;
+        try { return [WA.perfBaseline.budget().reason]; } finally { WA.perfTrace = k; }
+      });
+    }
+    // ⑤ needs-real-device（engines/perf-baseline.js gap）
+    //   这一条**不是** ok:false —— 它是 ok:true + 五条实机必测项清单 + reason:'needs-real-device'。
+    //   形态本身是裁决：把「无头环境的结构性上限」与「测量失败」分开，且**不留估算值占位**
+    //   （CLASS_DEF.lowend.approx===true 已写明它是同机放大估计：把估计填进实测栏，下一个读者
+    //   就再也分不出「手机上 60ms」与「桌上机估算 60ms」）。故见证**经真 API 读到那个码**即可，
+    //   不在无头环境里「造出实机读数」—— 后者根本不是本码的意思。
+    if (WA.perfBaseline) {
+      want('needs-real-device', 'perfBaseline.gap：实机采样在无头环境结构不可达 ⇒ ok:true + 必测清单 + reason:needs-real-device（不留估算占位）');
+      trip('needs-real-device', function () { return [WA.perfBaseline.gap().reason]; });
+    }
+  }
+
+  // ── v2.183.0（第一批 E1）：统一待办事项中心的拒收码见证 ────────────────────
+  //   本模块的码全是**「这条问不出答案」**那一族，且每种「问不出」都有不同的原因。
+  //   合成一个 false 就是本仓反复裁决过的「点了没反应」—— 故逐个见证、逐个不同因：
+  //     missing-kind  —— 根本没说要查哪个来源（调用方漏了参数）
+  //     unknown-kind  —— 说了，但本中心不认识（不编路由，不猜）
+  //     not-found     —— 认得这个来源，但它此刻没有这条记录
+  //     bad-shape     —— 来源在场，但它给的形状本中心归一不了（**不猜字段**）
+  //   另有 source-threw：来源的 pending() 自己抛了 —— 它必须与「缺席」分开：
+  //     缺席是环境事实，抛错是缺陷现场，两者在读数上必须不同。
+  if (WA.pendingCenter) {
+    want('missing-kind', 'pendingCenter.describe：没填类型 ⇒ 拒收（缺参数与查不到必须不同因）');
+    want('unknown-kind', 'pendingCenter.describe：未知来源类型 ⇒ 拒收并回带该类型（本中心不认识的类型不编路由）');
+    want('not-found', 'pendingCenter.describe：来源在场但该条记录不在它的待办里 ⇒ not-found（与 missing/unknown 分开）');
+    want('bad-shape', 'pendingCenter.items：来源在场但 pending() 返回形状归一不了 ⇒ 如实进 skipped（不猜字段）');
+    want('source-threw', 'pendingCenter.items：来源的 pending() 抛错 ⇒ 与「缺席」分开报（环境事实 vs 缺陷现场）');
+    WA.pendingCenter.setSettings({ enabled: true });
+    // 顺序即语义：先撞「没填类型」，再撞「不认识」，再撞「认得但没这条」。
+    //   三码若被压成一个，后两条见证会在**同一次**里同时命中同一个码 —— 那正是判据要抓的。
+    trip('missing-kind', function () { return [WA.pendingCenter.describe('').reason]; });
+    trip('unknown-kind', function () { return [WA.pendingCenter.describe('no_such_source').reason]; });
+    trip('not-found', function () {
+      // 用一个**在场**的来源查一条不存在的记录。coop 是必装引擎（index.js LOAD_ORDER 里），
+      //   故这里不需要造桩；查不到的 id 用固定串，与真记录不可能撞。
+      return [WA.pendingCenter.describe('coop', 'no_such_record_zz').reason];
+    });
+    trip('bad-shape', function () {
+      var k = WA.coop;
+      WA.coop = { pending: function () { return { ok: true, items: [] }; } };   // 错形状：给对象而不是裸数组
+      try { return WA.pendingCenter.items().skipped.filter(function (s) { return s.source === 'coop'; }).map(function (s) { return s.reason; }); }
+      finally { WA.coop = k; }
+    });
+    trip('source-threw', function () {
+      var k = WA.farfield;
+      WA.farfield = { pending: function () { throw new Error('witness-boom'); } };
+      try { return WA.pendingCenter.items().skipped.filter(function (s) { return s.source === 'farfield'; }).map(function (s) { return s.reason; }); }
+      finally { WA.farfield = k; }
+    });
+  }
+
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

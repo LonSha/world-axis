@@ -108,7 +108,20 @@ const TIMEOUT_ARMED = {
   'tx8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'tx8-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'tx9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx9-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'tx9-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.182.0（第二批 O3+O4+O5+E2+E5）：五把新专锁 + 五个冒烟工具共 10 个新调用点。
+  //   它们此前既未声明 timeout、也未入表 —— 正是本模块治的病
+  //   （「留一个没声明的调用点就是留一条静默挂起的路径」）。全量回归首跑暴露。
+  'b2-e2-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-e2-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-e5-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-e5-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o3-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o4-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o5-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o5-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -191,7 +204,28 @@ const ARMED_SITES = [
   { key: 'tx9-lock', mode: 'spawn',
     anchor: "const rTX9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx9-v2172.js')]," },
   { key: 'tx9-smoke', mode: 'spawn',
-    anchor: "const rSM_tx9_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx9_smoke.js')]," }
+    anchor: "const rSM_tx9_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx9_smoke.js')]," },
+  // v2.182.0（第二批 O3+O4+O5+E2+E5）：五把新专锁 + 五个冒烟工具的锚点（整行唯一 ⇒ 任何前缀也唯一）。
+  { key: 'b2-e2-lock', mode: 'spawn',
+    anchor: "const rB2E2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-e2-v2182.js')]," },
+  { key: 'b2-e2-smoke', mode: 'spawn',
+    anchor: "const rSM_agenda_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/agenda_smoke.js')]," },
+  { key: 'b2-e5-lock', mode: 'spawn',
+    anchor: "const rB2E5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-e5-v2182.js')]," },
+  { key: 'b2-e5-smoke', mode: 'spawn',
+    anchor: "const rSM_chronicle_view_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/chronicle_view_smoke.js')]," },
+  { key: 'b2-o4-lock', mode: 'spawn',
+    anchor: "const rB2O4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o4-v2182.js')]," },
+  { key: 'b2-o4-smoke', mode: 'spawn',
+    anchor: "const rSM_capacity_audit_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/capacity_audit_smoke.js')]," },
+  { key: 'b2-o3-lock', mode: 'spawn',
+    anchor: "const rB2O3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o3-v2182.js')]," },
+  { key: 'b2-o3-smoke', mode: 'spawn',
+    anchor: "const rSM_perf_baseline_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/perf_baseline_smoke.js')]," },
+  { key: 'b2-o5-lock', mode: 'spawn',
+    anchor: "const rB2O5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o5-v2182.js')]," },
+  { key: 'b2-o5-smoke', mode: 'spawn',
+    anchor: "const rSM_world_health_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/world_health_smoke.js')]," }
 ];
 
 /**

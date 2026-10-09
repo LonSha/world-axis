@@ -99,10 +99,10 @@ ok('A6 UI_BINDINGS freight', DIAG.indexOf('wa-fr-enabled') >= 0);
 ok('A7 LOAD_ORDER freight', IDX.indexOf("'engines/freight.js'") >= 0);
 
 // A8: manifest version 2.167.0
-ok('A8 manifest version', MAN.version === '2.167.0' || MAN.version === '2.168.0' || MAN.version === '2.169.0' || MAN.version === '2.170.0' || MAN.version === '2.171.0' || MAN.version === '2.173.0' || MAN.version === '2.172.0' || MAN.version === '2.181.0');
+ok('A8 manifest version', ["2.166.0", "2.167.0", "2.168.0", "2.169.0", "2.170.0", "2.171.0", "2.172.0", "2.173.0", "2.182.0" || MAN.version === "2.183.0", "2.182.0" || MAN.version === "2.183.0"].indexOf(MAN.version) >= 0);
 
 // A9: index.js VERSION 2.167.0
-ok('A9 VERSION 2.167.0', IDX.indexOf("'2.167.0'") >= 0 || IDX.indexOf("'2.168.0'") >= 0 || IDX.indexOf("'2.169.0'") >= 0 || IDX.indexOf("'2.170.0'") >= 0 || IDX.indexOf("'2.171.0'") >= 0 || IDX.indexOf("'2.173.0'") >= 0 || IDX.indexOf("'2.172.0'") >= 0 || IDX.indexOf("'2.181.0'") >= 0);
+ok('A9 VERSION 2.167.0', [['2.166.0', '2.167.0', '2.168.0', '2.169.0', '2.170.0', '2.171.0', '2.172.0', '2.173.0', '2.182.0' || IDX.indexOf("'2.183.0'") >= 0, '2.182.0' || IDX.indexOf("'2.183.0'") >= 0], ['2.166.0', '2.167.0', '2.168.0', '2.169.0', '2.170.0', '2.171.0', '2.172.0', '2.173.0', '2.182.0' || IDX.indexOf("'2.183.0'") >= 0, '2.182.0' || IDX.indexOf("'2.183.0'") >= 0]].some(function (x, i) { var q = i ? '"' : "'"; return x.some(function (v) { return IDX.indexOf(q + v + q) >= 0; }); }));
 
 // A10: run.js LOAD has freight
 ok('A10 run.js LOAD freight', RUN.indexOf("'engines/freight.js'") >= 0);

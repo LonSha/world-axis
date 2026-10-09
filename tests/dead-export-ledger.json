@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.181.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.181.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.183.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.183.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -66,14 +66,6 @@
       "tref": 2,
       "own": 14
     },
-    "aftermath.pending": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
     "aftermath.reset": {
       "reason": "self-only",
       "detail": "engines/aftermath.js 内部自用、外部零引用（过度导出）",
@@ -88,6 +80,38 @@
       "src": "engines/aftermath.js",
       "refs": 0,
       "tref": 1,
+      "own": 3
+    },
+    "agenda.diagnose": {
+      "reason": "test-only",
+      "detail": "engines/agenda.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/agenda.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "agenda.overdueList": {
+      "reason": "test-only",
+      "detail": "engines/agenda.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/agenda.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "agenda.reset": {
+      "reason": "test-only",
+      "detail": "engines/agenda.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/agenda.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "agenda.soon": {
+      "reason": "test-only",
+      "detail": "engines/agenda.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/agenda.js",
+      "refs": 0,
+      "tref": 2,
       "own": 3
     },
     "apiRouter.fetchModels": {
@@ -610,6 +634,22 @@
       "tref": 0,
       "own": 17
     },
+    "capacityAudit.reset": {
+      "reason": "test-only",
+      "detail": "engines/capacity-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/capacity-audit.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "capacityAudit.sources": {
+      "reason": "test-only",
+      "detail": "engines/capacity-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/capacity-audit.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
     "causal.replayWith": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -898,6 +938,30 @@
       "tref": 0,
       "own": 8
     },
+    "chronicleView.entry": {
+      "reason": "test-only",
+      "detail": "engines/chronicle-view.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/chronicle-view.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 3
+    },
+    "chronicleView.reset": {
+      "reason": "test-only",
+      "detail": "engines/chronicle-view.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/chronicle-view.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "chronicleView.sources": {
+      "reason": "test-only",
+      "detail": "engines/chronicle-view.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/chronicle-view.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
     "chrono.derives": {
       "reason": "self-only",
       "detail": "engines/chrono.js 内部自用、外部零引用（过度导出）",
@@ -1177,14 +1241,6 @@
       "refs": 0,
       "tref": 0,
       "own": 1
-    },
-    "coop.pending": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/coop.js",
-      "refs": 0,
-      "tref": 8,
-      "own": 12
     },
     "coop.propose": {
       "reason": "test-only",
@@ -1913,14 +1969,6 @@
       "refs": 0,
       "tref": 9,
       "own": 29
-    },
-    "evict.nonEvictDecls": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "core/evict.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 1
     },
     "evict.resetEvictStat": {
       "reason": "test-only",
@@ -3530,12 +3578,36 @@
       "tref": 2,
       "own": 3
     },
+    "pendingCenter.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/pending-center.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "perfBaseline.reset": {
+      "reason": "test-only",
+      "detail": "engines/perf-baseline.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/perf-baseline.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "perfBaseline.sources": {
+      "reason": "test-only",
+      "detail": "engines/perf-baseline.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/perf-baseline.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
     "perfTrace.bench": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/perf-trace.js 内部自用、外部零引用（过度导出）",
       "src": "engines/perf-trace.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 5
     },
     "perfTrace.benchAll": {
@@ -5002,14 +5074,6 @@
       "tref": 7,
       "own": 7
     },
-    "settingsBus.registry": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "core/settings-bus.js",
-      "refs": 0,
-      "tref": 21,
-      "own": 2
-    },
     "settingsBus.schemaFingerprint": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -5242,28 +5306,12 @@
       "tref": 8,
       "own": 2
     },
-    "store.migrations": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "core/store.js",
-      "refs": 0,
-      "tref": 6,
-      "own": 1
-    },
     "store.registerMigration": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "core/store.js",
       "refs": 0,
       "tref": 9,
-      "own": 1
-    },
-    "store.sizeCaps": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "core/store.js",
-      "refs": 0,
-      "tref": 33,
       "own": 1
     },
     "store.staleSinceExternal": {
@@ -5824,9 +5872,33 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 118
+      "own": 124
+    },
+    "toolDiag.secAgenda": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "toolDiag.secCapabilities": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "toolDiag.secCapacityAudit": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "toolDiag.secChronicleView": {
       "reason": "self-only",
       "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
       "src": "engines/tool-diag.js",
@@ -5930,6 +6002,14 @@
       "tref": 0,
       "own": 3
     },
+    "toolDiag.secPerfBaseline": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "toolDiag.secRuntime": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -5963,6 +6043,14 @@
       "own": 3
     },
     "toolDiag.secVisibility": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "toolDiag.secWorldHealth": {
       "reason": "self-only",
       "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
       "src": "engines/tool-diag.js",
@@ -6526,6 +6614,14 @@
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/world.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "worldHealth.reset": {
+      "reason": "test-only",
+      "detail": "engines/world-health.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-health.js",
       "refs": 0,
       "tref": 2,
       "own": 3

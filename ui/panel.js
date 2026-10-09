@@ -146,6 +146,12 @@
     //   两块合页而不是各开一页：它们回答的是**同一件事的两个方向** ——
     //   「这片世界与外面通着吗」（传说进出）与「这片世界自己前后对得上吗」（四本账）。
     { id: 'net', icon: '🛰', label: '联网' },
+    // v2.182.0（第二批 O5 + E2 + E5）：玩家可读的健康 / 日程 / 纪事三合一页。
+    //   插在 net 之后而非更早：pages[3..6]（memory/enemies/parallel/inject）是
+    //   v2.33.0/v2.34.0 两条硬读数锚定的位置，插在它们之前会把整体后移一位
+    //   （与本次改动无关的读数抖动）。三块合页而不是各开一页：它们回答的是
+    //   同一句话的三个时态（接下来发生 / 已经发生 / 此刻卡在哪）。
+    { id: 'health', icon: '🩺', label: '健康' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -2315,6 +2321,11 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
     // v2.164.0（TX5 世界蓝图）：同款读数常驻（「库是空的」与「这一面被关掉了」必须分得开）。
     const bpcfg = (WA.worldBlueprint && WA.worldBlueprint.getSettings) ? WA.worldBlueprint.getSettings() : null;
     const bpOn = !!(bpcfg && bpcfg.enabled);
+    // v2.182.0（O4 / O3）：同款读数常驻 ——「清点是空的」与「这一面被关掉了」必须分得开。
+    const capcfg = (WA.capacityAudit && WA.capacityAudit.getSettings) ? WA.capacityAudit.getSettings() : null;
+    const capOn = !!(capcfg && capcfg.enabled);
+    const pblcfg = (WA.perfBaseline && WA.perfBaseline.getSettings) ? WA.perfBaseline.getSettings() : null;
+    const pblOn = !!(pblcfg && pblcfg.enabled);
     return `
       <div class="wa-sec">世界态势分析（纯只读体检）</div>
       <button class="wa-btn" id="wa-an-run">立即分析</button>
@@ -2411,8 +2422,123 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       <div class="wa-row"><button class="wa-btn" id="wa-bp-check" title="纯读：对库内一张蓝图跑引用完整性三判据（重复 ID / 悬空引用 / 未知顶层键）—— 这是安装前的**独立**校验口，与安装侧共用同一份判据，不另写一套">校验蓝图</button><button class="wa-btn" id="wa-bp-empty" title="纯读：当前世界是不是空新局（12 项逐格清点：人物/地点/道路/势力/轮次/纪事/暗流/回声/事实/货品/初始化来源/蓝图安装留痕）。答的是「现在能不能装」，不是「装过没有」">目标空局检查</button></div>
       <div class="wa-row"><input id="wa-bp-keep" class="wa-input" placeholder="保留层级 structure / roster / mech（留空=roster）"/><button class="wa-btn" id="wa-bp-preview" title="纯读预览：把库内一张蓝图映射到现有状态字段（六道门：版本/形状/白名单键/重复 ID/悬空引用/容量 + 目标非空）。预览只做一次映射，确认应用同一份">导入预览</button><button class="wa-btn" id="wa-bp-import" title="写口（大）：一次事务装完整结构（势力/人物/关系/地点/道路/时代），进度归零，写 blueprint.installed。只作用于空新局 —— 非空目标拒收 not-empty；无预览拒收 no-preview">安装蓝图</button></div>
       <div id="wa-bp-out" class="wa-out"></div>
+      <div class="wa-sec">存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）</div>
+      <div class="wa-dim">区分<b>可回收历史</b>与<b>不可丢义务</b>（在途货物 / 待履约条款 / 未结阶段 / 回执去重索引）——
+        义务不静默挤出。水位来自 <code>store.sizeCaps()</code>（唯一真源），与「容量」页同源不另起一份。
+        此刻：<b>${capOn ? '开' : '关'}</b>（关闭时四栏一并拒收，读数一直空 —— 这与「还没跑过清点」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-cap-enabled" type="checkbox" ${capOn ? 'checked' : ''}/> 启用存储压力面</label>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-cap-oblig" title="义务清点：十二源的未完成项（读口优先 —— 各模块自己的 pending()/overdue() 才是真源）">义务清点</button>
+        <button class="wa-btn" id="wa-cap-water" title="水位栏：逐容器实占 / 声明上限 / 占比 / 站点。capDeclared 缺登记时如实报 null，不猜一个上限出来">水位</button>
+        <button class="wa-btn" id="wa-cap-reclaim" title="可回收面：哪些容器里的行可以被挤出（历史类），哪些不行（义务类）。只报不改">可回收</button>
+        <button class="wa-btn" id="wa-cap-migrate" title="迁移预检：格式版本、未知顶层键、必填键缺失、陈旧站点 —— 只报不改，不改存档">迁移预检</button>
+        <button class="wa-btn" id="wa-cap-diag" title="自证面：store / sizeCaps / evict / storageForecast 四源是否齐备">诊断</button>
+      </div>
+      <div id="wa-cap-out" class="wa-out"></div>
+      <div class="wa-sec">性能基线面与三档</div><div class="wa-dim">（O3：这一局属于哪一档、离冻结预算多远）</div>
+      <div class="wa-dim">档位<b>只认现场字节读数</b>（存档字节 + 已满容器数），不拍阈值 —— 拍出来的档位会与字节读数必然漂移。
+        预算表是装载时对宿主 <code>perfTrace.CLASS_DEF</code> 的深拷贝，<b>每次读都比一次</b>（冻结不是抄一份），漂移当场可见。
+        <b>实机采样栏一律留空</b>并列出必测项：把同机放大估计填进实测栏，下一个读者就再也分不出「手机上 60ms」与「桌上机估算 60ms」。
+        此刻：<b>${pblOn ? '开' : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-pbl-enabled" type="checkbox" ${pblOn ? 'checked' : ''}/> 启用性能基线面</label>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-pbl-bands" title="三档定义与当前档位：判据串一并与现场读数作对照，判不出时如实报 no-bytes（不默认成小局）">当前档位</button>
+        <button class="wa-btn" id="wa-pbl-budget" title="冻结预算表：逐档预算与重复次数，并与装载时的冻结值逐项比对（drift 计数即漂移量）">预算表</button>
+        <button class="wa-btn" id="wa-pbl-readings" title="未测面：哪些分层还没有现场样本（window=0 是「没测过」，不是「测了是 0」）">未测面</button>
+        <button class="wa-btn" id="wa-pbl-gap" title="实机缺口：无头环境结构上测不到的那些项，逐条列出（不留估算占位）">实机缺口</button>
+        <button class="wa-btn" id="wa-pbl-diag" title="自证面：store / perfTrace / perfLedger / renderPerf 四源是否齐备">诊断</button>
+      </div>
+      <div id="wa-pbl-out" class="wa-out"></div>
       <div id="wa-diag-out" class="wa-out"></div>`;
   }
+  /**
+   * v2.182.0（第二批 O5 + E2 + E5）：世界健康页 —— 玩家可读的那一屏。
+   *
+   * 为什么三块合页而不是各开一页：它们回答的是**同一句话的三个时态** ——
+   *   日程答「接下来会发生什么」（E2），纪事答「已经发生过什么」（E5），
+   *   健康中心答「此刻有什么没做完 / 卡住了 / 快满了」（O5）。
+   *   三块都读各自的唯一真源，本页**只读**：不改存档、不替模块做判定。
+   *
+   * 与维护者面的分工（计划原文边界，逐条落地）：
+   *   · 健康中心**不报**原始统计与内部路径 —— 那是工具页与诊断包的活；
+   *   · 每栏的 empty（没数据）与 allClear（有数据但无事）**分别渲染** ——
+   *     把两者压成一个绿点，正是「点了没反应」的另一种写法；
+   *   · 关掉的模块其待办不出现（如实进 skipped），不静默当成「没有待办」。
+   */
+  function renderHealth() {
+    // 用模块级 esc（走 WA.sanitize.html 的唯一出口）——不另立一份局部转义：
+    //   两份转义实现正是「证据与判据不同宽」的老毛病，且死子面门禁只看 `WA.<ns>.<mem>` 字面形态。
+    const whcfg = (WA.worldHealth && WA.worldHealth.getSettings) ? WA.worldHealth.getSettings() : null;
+    const agcfg = (WA.agenda && WA.agenda.getSettings) ? WA.agenda.getSettings() : null;
+    const cvcfg = (WA.chronicleView && WA.chronicleView.getSettings) ? WA.chronicleView.getSettings() : null;
+    const pccfg = (WA.pendingCenter && WA.pendingCenter.getSettings) ? WA.pendingCenter.getSettings() : null;
+    const whOn = !!(whcfg && whcfg.enabled);
+    const agOn = !!(agcfg && agcfg.enabled);
+    const cvOn = !!(cvcfg && cvcfg.enabled);
+    const pcOn = !!(pccfg && pccfg.enabled);
+    return `
+      <div class="wa-sec">世界健康中心</div><div class="wa-dim">（一屏答三问：还有什么没做完 / 卡在哪 / 快满了没）</div>
+      <div class="wa-dim">三栏<b>只做聚合与下钻</b>，不新增第二套状态：待办来自各模块自己的 <code>pending()</code>（「什么算未完成」由它们自己判），
+        阻塞来自它们的 <code>stat().faults</code>，水位来自 <code>store.sizeCaps()</code>。
+        本页<b>不做</b>任何确认 / 结算动作，只告诉你<b>去哪看、看哪条</b>。
+        此刻：<b>${whOn ? '开' : '关'}</b>（关闭时摘要与下钻一并拒收，读数一直空 —— 这与「无事可办」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-wh-enabled" type="checkbox" ${whOn ? 'checked' : ''}/> 启用世界健康中心</label>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wh-view" title="读三栏摘要：每栏带 empty（没数据）与 allClear（有数据但无事）两个旗标分别报，不合成一个绿点">读摘要</button>
+        <button class="wa-btn" id="wa-wh-sources" title="各源可用性：缺席的源如实报 unavailable，不静默当作“没有条目”">源可用性</button>
+        <button class="wa-btn" id="wa-wh-diag" title="自证面：store / sizeCaps / settingsBus.registry / storageForecast 四源是否齐备">诊断</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-wh-drill" class="wa-input" placeholder="下钻，格式 kind:id（如 todo:commission、water:chronicle）"/>
+        <button class="wa-btn" id="wa-wh-drill-go" title="下钻：答「去哪看、看哪条、哪个设置键」——只给路由，不执行动作">下钻</button>
+      </div>
+      <div id="wa-wh-out" class="wa-out"></div>
+
+      <div class="wa-sec">世界日程</div><div class="wa-dim">（E2：按剧情时间排序的未来事件表）</div>
+      <div class="wa-dim">只认<b>剧情时间</b>：拿不到剧情钟时<b>整表拒算</b>（no-story-clock），不拿真实时间冒充剧情日 ——
+        真实时间与剧情时间混算过一次，代价是离线间隔被抹平。来源：承诺逾期 / 委托阶段期限 / 条约到期 /
+        运输到达 / 地点效果到期五处，读的都是它们已经登记的到期项。<b>未知时间保持未知</b>，不用「现在」冒充；
+        表里没有<b>不等于</b>不会发生。此刻：<b>${agOn ? '开' : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-wh-ag-enabled" type="checkbox" ${agOn ? 'checked' : ''}/> 启用世界日程</label>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wh-ag-view" title="未来事件表：有时间者按时间升序在前，未知时间者按来源稳定序在后（不猜日期）">看日程</button>
+        <button class="wa-btn" id="wa-wh-ag-sources" title="五源可用性：缺席的源如实报，不静默当作「这类条目没有」">源可用性</button>
+      </div>
+      <div id="wa-wh-ag-out" class="wa-out"></div>
+
+      <div class="wa-sec">世界纪事</div><div class="wa-dim">（E5：已经发生过什么、有哪些不给你看）</div>
+      <div class="wa-dim">叙事化呈现但<b>每条都能下钻到来源</b>（编年史 / 时间轴 / 沉积 / 因果），事实不经改写。
+        <b>空历史与读不到可分</b>：空 ⇒ 如实说「还没有记录」；读不到 ⇒ 报 no-store。
+        <code>visibility=hidden</code> 的条目<b>整条不进视图</b>（只计数）——
+        「你看不到」与「它不存在」是两件事。此刻：<b>${cvOn ? '开' : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-wh-cv-enabled" type="checkbox" ${cvOn ? 'checked' : ''}/> 启用世界纪事</label>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wh-cv-view" title="纪事列表：按剧情时间升序，每条带来源与依据引用（可下钻）">看纪事</button>
+        <button class="wa-btn" id="wa-wh-cv-hidden" title="不可见面摘要：有几条被 visibility=hidden 挡在外面（只报数，不搬运内容）">不可见面</button>
+        <button class="wa-btn" id="wa-wh-cv-diag" title="自证面：store / timeline / sediment / causal 四源是否齐备">诊断</button>
+      </div>
+      <div id="wa-wh-cv-out" class="wa-out"></div>
+
+      <div class="wa-sec">统一待办中心</div><div class="wa-dim">（E1：八源归一 —— 同一件事只有一条记录，条条点得动）</div>
+      <div class="wa-dim">把八个来源的 <code>pending()</code> 归一到<b>同一形状</b>（来源模块 / 类型 / 描述 / 可否动作 / 路由）——
+        仓里同名 <code>pending</code> 至少有<b>四种</b>返回形状（items 桶 / points 桶 / 裸数组 / 单对象），
+        调用方<b>无法从名字推出形状</b>，猜字段的代价已经付过两次。差异在本中心的<b>归一化层</b>消化。
+        <b>只给路由、不执行动作</b>：确认语义仍由各来源模块自己的写口持有。
+        <b>缺席 / 空 / 无事</b>三态分开报（unavailable / emptyAll / allClear）—— 「读不到」不许伪装成「全处理完」。
+        此刻：<b>${pcOn ? '开' : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-pc-enabled" type="checkbox" ${pcOn ? 'checked' : ''}/> 启用统一待办中心</label>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-pc-view" title="统一事项列表：八源归一，按来源声明序 + 记录 id 稳定排序（不用对象键序，它会随插入顺序漂移）">读事项</button>
+        <button class="wa-btn" id="wa-pc-soon" title="最近的 N 条（N 取自 soonCount 设置，受 maxRows 封顶）">最近几条</button>
+        <button class="wa-btn" id="wa-pc-sources" title="逐源可用性：缺席的源如实报 unavailable，不静默当作「这类事项没有」；另带本会话累计读数">源可用性</button>
+        <button class="wa-btn" id="wa-pc-diag" title="自证面：settingsBus / inputGuard 与八个来源模块是否齐备，以及 emptyAll 这盏灯能不能亮">诊断</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-pc-drill" class="wa-input" placeholder="下钻，格式 kind:id（如 commission、coop:m12_s0）"/>
+        <button class="wa-btn" id="wa-pc-drill-go" title="下钻：答「去哪看、看哪条、哪个设置键」——只给路由，不执行动作">下钻</button>
+      </div>
+      <div id="wa-pc-out" class="wa-out"></div>`;
+   }
 
   // v2.2.0: 档案编辑器（分节）——setProfileSafe 是唯一安全写入入口，此前零 UI
   function renderProfileEditor(name) {
@@ -2451,7 +2577,7 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
       <div class="wa-logbox">${src.slice(-80).reverse().map(l => `<div class="wa-log wa-log-${l.level}"><span class="wa-dim">${new Date(l.t).toLocaleTimeString()}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -8082,6 +8208,402 @@ return `<div class="wa-row"><label class="wa-row"><input id="wa-ag-enabled" type
         renderBody();
       };
     });
+
+    // ══ v2.182.0（第二批 O4 / O3）：工具页两块 —— 存储压力面与性能基线面 ══
+    //   两块都是**维护者面**（与健康页的玩家面分工写在各自段落说明里）：
+    //   报的是逐容器全表与逐档预算，不是「一屏三问」。
+    //   纪律：只读。所有按钮只写自己的 out 容器，不写存档、不改设置、不触发任何模块动作。
+    {
+      const capOut = function (html) { const o = $('#wa-cap-out'); if (o) o.innerHTML = html; };
+      const capWhy = function (reason) {
+        const M = {
+          disabled: '这一面关着（上面的开关打开后才有清点）',
+          'no-store': '读不到 store —— 这一栏此刻无从计算',
+          'not-found': '点名的那一项不在册',
+          'bad-value': '参数越界（不静默夹住）'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      const capCfg = $('#wa-cap-enabled');
+      if (capCfg) capCfg.onchange = function () {
+        if (!WA.capacityAudit || !WA.capacityAudit.setSettings) return capOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        WA.capacityAudit.setSettings({ enabled: !!capCfg.checked });
+        capOut('<div class="wa-log wa-log-info">已记录 ' + (capCfg.checked ? 'enabled（四栏恢复可用）' : 'disabled（四栏一并拒收）') + '</div>');
+      };
+      on('#wa-cap-oblig', () => {
+        if (!WA.capacityAudit) return capOut('<div class="wa-log wa-log-err">存储压力面未加载</div>');
+        const r = WA.capacityAudit.obligations();
+        if (!r.ok) return capOut('<div class="wa-log wa-log-warn">' + esc(capWhy(r.reason)) + '</div>');
+        const rows = (r.rows || []).map(function (x) {
+          return '<div class="wa-item"><b>' + esc(x.label) + '</b> <span class="wa-dim">' + esc(x.source)
+            + '</span>　' + x.count + ' 项' + (x.disabled ? ' <span class="wa-dim">（该模块关着）</span>' : '')
+            + (x.items && x.items.length ? '<div class="wa-dim">' + esc(x.items.slice(0, 4).map(function (i) { return i.label || i.id || '?'; }).join('、')) + '</div>' : '') + '</div>';
+        }).join('');
+        capOut('<div class="wa-log wa-log-info">义务清点：合计 ' + r.total + ' 项 · 可用 ' + (r.sources || []).filter(function (s) { return s.available; }).length + ' 源'
+          + (r.disabled && r.disabled.length ? ' · 关着的源 ' + r.disabled.length + ' 个' : '') + '</div>' + rows);
+      });
+      on('#wa-cap-water', () => {
+        if (!WA.capacityAudit) return capOut('<div class="wa-log wa-log-err">存储压力面未加载</div>');
+        const r = WA.capacityAudit.waterline();
+        if (!r.ok) return capOut('<div class="wa-log wa-log-warn">' + esc(capWhy(r.reason)) + '</div>');
+        const rows = (r.rows || []).map(function (x) {
+          return '<div class="wa-item">' + esc(x.path) + ' <span class="wa-dim">' + esc(x.level) + '</span>　'
+            + x.len + ' / ' + (x.cap === null ? '<span class="wa-dim">上限未登记</span>' : x.cap)
+            + '　' + Math.round((x.ratio || 0) * 100) + '%'
+            + '<div class="wa-dim">' + esc(x.site || '（无站点声明）') + '</div></div>';
+        }).join('');
+        capOut('<div class="wa-log wa-log-' + (r.fullCount ? 'warn' : 'info') + '">水位：容器 ' + r.totalCaps + ' 个 · 已满 ' + r.fullCount + ' · 近满 ' + r.nearCount
+          + '（比例 ≥ ' + r.nearRatio + '）</div>' + rows);
+      });
+      on('#wa-cap-reclaim', () => {
+        if (!WA.capacityAudit) return capOut('<div class="wa-log wa-log-err">存储压力面未加载</div>');
+        const r = WA.capacityAudit.reclaimable();
+        if (!r.ok) return capOut('<div class="wa-log wa-log-warn">' + esc(capWhy(r.reason)) + '</div>');
+        const kind = function (arr, title, note) {
+          if (!arr.length) return '<div class="wa-item"><b>' + title + '</b>：无</div>';
+          return '<div class="wa-item"><b>' + title + '</b>（' + arr.length + '）<div class="wa-dim">' + note + '</div>'
+            + arr.slice(0, 8).map(function (x) { return '<div class="wa-dim">' + esc(x.path || x) + '</div>'; }).join('') + '</div>';
+        };
+        capOut('<div class="wa-log wa-log-info">可回收面：只报不改（挤出策略由各站点自己的声明决定）</div>'
+          + kind(r.reclaimable || [], '可回收（历史类）', '这些容器的行在被挤出时不会造成义务丢失')
+          + kind(r.protected || [], '不可回收（义务类）', '在途货物 / 待履约条款 / 未结阶段 / 回执去重索引 —— 不静默挤出'));
+      });
+      on('#wa-cap-migrate', () => {
+        if (!WA.capacityAudit) return capOut('<div class="wa-log wa-log-err">存储压力面未加载</div>');
+        const r = WA.capacityAudit.migrationCheck();
+        if (!r.ok) return capOut('<div class="wa-log wa-log-warn">' + esc(capWhy(r.reason)) + '</div>');
+        const f = r.findings || [];
+        capOut('<div class="wa-log wa-log-' + (f.length ? 'warn' : 'info') + '">迁移预检：格式版本 ' + esc(r.schemaVersion)
+          + ' · 顶层键 ' + r.topKeys + ' 个 · 发现 ' + f.length + ' 处（只报不改）</div>'
+          + (f.length ? f.map(function (x) { return '<div class="wa-item">[' + esc(x.kind) + '] ' + esc(x.detail || x.path) + '</div>'; }).join('') : ''));
+      });
+      on('#wa-cap-diag', () => {
+        if (!WA.capacityAudit) return capOut('<div class="wa-log wa-log-err">存储压力面未加载</div>');
+        const d = WA.capacityAudit.diagnose();
+        capOut('<div class="wa-log wa-log-' + (d.closedLoop ? 'info' : 'warn') + '">自证面：闭环 ' + (d.closedLoop ? '✓' : '✗')
+          + '　版本 ' + esc(d.version) + '　清点源 ' + d.sourceCount + ' 条</div>'
+          + Object.keys(d.checks).map(function (k) {
+            return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
+          }).join(''));
+      });
+
+      const pblOut = function (html) { const o = $('#wa-pbl-out'); if (o) o.innerHTML = html; };
+      const pblWhy = function (reason) {
+        const M = {
+          disabled: '这一面关着（上面的开关打开后才有读数）',
+          'no-store': '读不到 store —— 档位无从判定',
+          'no-bytes': '现场字节读数取不到（既无 saveStat 也无 sizeAudit）—— 如实报「判不出」，不默认成小局',
+          'no-perf-trace': 'perf-trace 缺席 —— 预算表无从冻结（本模块不自带副本：自带副本就是第二本账）'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      const pblCfg = $('#wa-pbl-enabled');
+      if (pblCfg) pblCfg.onchange = function () {
+        if (!WA.perfBaseline || !WA.perfBaseline.setSettings) return pblOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        WA.perfBaseline.setSettings({ enabled: !!pblCfg.checked });
+        pblOut('<div class="wa-log wa-log-info">已记录 ' + (pblCfg.checked ? 'enabled（四钮恢复可用）' : 'disabled（四钮一并拒收）') + '</div>');
+      };
+      on('#wa-pbl-bands', () => {
+        if (!WA.perfBaseline) return pblOut('<div class="wa-log wa-log-err">性能基线面未加载</div>');
+        const r = WA.perfBaseline.bands();
+        if (!r.ok) return pblOut('<div class="wa-log wa-log-warn">' + esc(pblWhy(r.reason)) + '</div>');
+        pblOut('<div class="wa-log wa-log-info">当前档位：<b>' + esc(r.current || '判不出') + '</b>'
+          + (r.currentDetail ? '（' + r.currentDetail.bytes + ' B，读数来源 ' + esc(r.currentDetail.bytesSource)
+            + '，已满容器 ' + r.currentDetail.fullContainers + '）' : '') + '</div>'
+          + (r.rows || []).map(function (x) {
+            return '<div class="wa-item"><b>' + esc(x.label) + '</b>' + (x.current ? ' <span class="wa-dim">← 当前</span>' : '')
+              + '<div class="wa-dim">判据：' + esc(x.judge) + '</div></div>';
+          }).join(''));
+      });
+      on('#wa-pbl-budget', () => {
+        if (!WA.perfBaseline) return pblOut('<div class="wa-log wa-log-err">性能基线面未加载</div>');
+        const r = WA.perfBaseline.budget();
+        if (!r.ok) return pblOut('<div class="wa-log wa-log-warn">' + esc(pblWhy(r.reason)) + '</div>');
+        pblOut('<div class="wa-log wa-log-' + (r.driftCount ? 'warn' : 'info') + '">冻结预算表：' + r.rows.length + ' 档 · 漂移 ' + r.driftCount + ' 项'
+          + (r.frozenAt ? ' · 冻结于 ' + new Date(r.frozenAt).toLocaleString() : '') + '</div>'
+          + (r.rows || []).map(function (x) {
+            return '<div class="wa-item">' + esc(x.label || x.band) + '　预算 ' + (x.budgetMs === null ? '<span class="wa-dim">未登记</span>' : x.budgetMs + ' ms')
+              + '　重复 ' + (x.repeats === null ? '<span class="wa-dim">未登记</span>' : x.repeats) + ' 次'
+              + (x.drift ? ' <span class="wa-dim">⚠ 与冻结值不一致</span>' : '') + '</div>';
+          }).join(''));
+      });
+      on('#wa-pbl-readings', () => {
+        if (!WA.perfBaseline) return pblOut('<div class="wa-log wa-log-err">性能基线面未加载</div>');
+        const r = WA.perfBaseline.readings();
+        if (!r.ok) return pblOut('<div class="wa-log wa-log-warn">' + esc(pblWhy(r.reason)) + '</div>');
+        pblOut('<div class="wa-log wa-log-info">分层样本：' + r.rows.length + ' 层 · 未测面 ' + (r.unmeasuredFaces || []).length + ' 个</div>'
+          + (r.rows || []).map(function (x) {
+            return '<div class="wa-item">' + esc(x.layer) + '　样本 ' + x.n + ' / 窗口 ' + x.window
+              + (x.window === 0 ? ' <span class="wa-dim">（没测过 —— 不是「测了是 0」）</span>' : '') + '</div>';
+          }).join(''));
+      });
+      on('#wa-pbl-gap', () => {
+        if (!WA.perfBaseline) return pblOut('<div class="wa-log wa-log-err">性能基线面未加载</div>');
+        const r = WA.perfBaseline.gap();
+        const missing = (r.missing || []).map(function (x) { return '<div class="wa-item">· ' + esc(x) + '</div>'; }).join('');
+        pblOut('<div class="wa-log wa-log-warn">实机缺口（' + (r.missing || []).length + ' 项）：' + esc(r.reason)
+          + '　—— 这一栏<b>不留估算占位</b>：估计一旦填进实测栏，下一个读者就分不出「手机上 60ms」与「桌上机估算 60ms」</div>'
+          + missing + (r.howTo ? '<div class="wa-dim">取法：' + esc(r.howTo) + '</div>' : ''));
+      });
+      on('#wa-pbl-diag', () => {
+        if (!WA.perfBaseline) return pblOut('<div class="wa-log wa-log-err">性能基线面未加载</div>');
+        const d = WA.perfBaseline.diagnose();
+        pblOut('<div class="wa-log wa-log-' + (d.closedLoop ? 'info' : 'warn') + '">自证面：闭环 ' + (d.closedLoop ? '✓' : '✗')
+          + '　版本 ' + esc(d.version) + '　分层 ' + d.faceCount + ' · 档位 ' + d.bandCount + '　实机 ' + esc(d.realDevice) + '</div>'
+          + Object.keys(d.checks).map(function (k) {
+            return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
+          }).join(''));
+      });
+    }
+
+    // ══ v2.182.0（第二批 O5 / E2 / E5）：健康页三块 ══
+    //   三块都是**玩家面**：只做聚合与下钻，不做任何确认 / 结算动作。
+    //   纪律：只读。所有出口只写自己的 out 容器；下钻只给路由，不执行。
+    {
+      const whOut = function (html) { const o = $('#wa-wh-out'); if (o) o.innerHTML = html; };
+      const whWhy = function (reason) {
+        const M = {
+          disabled: '这一面关着（上面的开关打开后才有摘要）',
+          'no-store': '读不到 store —— 这一栏此刻无从计算'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      const barLine = function (b) {
+        // empty（没数据）与 allClear（有数据但无事）**分别渲染** ——
+        //   合成一个绿点就是本仓反复裁决过的「点了没反应」。
+        const tag = b.empty ? '<span class="wa-dim">（没数据）</span>'
+          : (b.allClear ? '<span class="wa-dim">（有数据但无事）</span>' : '');
+        return '<div class="wa-item"><b>' + esc(b.kind) + '</b>：' + b.count + ' 条 ' + tag
+          + (b.skipped && b.skipped.length ? '<div class="wa-dim">未参与（模块关着）：' + esc(b.skipped.join('、')) + '</div>' : '')
+          + (b.rows && b.rows.length ? '<div class="wa-dim">' + esc(b.rows.slice(0, 5).map(function (x) {
+            return (x.title || x.id || x.path || x.label || '?') + (x.detail ? '（' + x.detail + '）' : '');
+          }).join('、')) + '</div>' : '') + '</div>';
+      };
+      const whCfg = $('#wa-wh-enabled');
+      if (whCfg) whCfg.onchange = function () {
+        if (!WA.worldHealth || !WA.worldHealth.setSettings) return whOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        WA.worldHealth.setSettings({ enabled: !!whCfg.checked });
+        whOut('<div class="wa-log wa-log-info">已记录 ' + (whCfg.checked ? 'enabled（摘要与下钻恢复可用）' : 'disabled（摘要与下钻一并拒收 —— 读数会一直空，这与「无事可办」不是一回事）') + '</div>');
+      };
+      on('#wa-wh-view', () => {
+        if (!WA.worldHealth) return whOut('<div class="wa-log wa-log-err">世界健康中心未加载</div>');
+        const r = WA.worldHealth.summary();
+        if (!r.ok) return whOut('<div class="wa-log wa-log-warn">' + esc(whWhy(r.reason)) + '</div>');
+        whOut('<div class="wa-log wa-log-info">' + esc(r.headline) + '</div>'
+          + ['todo', 'blocked', 'water'].map(function (k) { return barLine(r.bars[k] || {}); }).join(''));
+      });
+      on('#wa-wh-sources', () => {
+        if (!WA.worldHealth) return whOut('<div class="wa-log wa-log-err">世界健康中心未加载</div>');
+        const rows = WA.worldHealth.sources();
+        whOut('<div class="wa-log wa-log-info">各源可用性（缺席的源如实报 —— 不静默当作「没有条目」）</div>'
+          + rows.map(function (x) {
+            return '<div class="wa-item">' + esc(x.name) + '：' + (x.available ? '在场' : '<span class="wa-dim">缺席</span>')
+              + (x.note ? '<div class="wa-dim">' + esc(x.note) + '</div>' : '') + '</div>';
+          }).join(''));
+      });
+      on('#wa-wh-drill-go', () => {
+        if (!WA.worldHealth) return whOut('<div class="wa-log wa-log-err">世界健康中心未加载</div>');
+        const raw = wv('#wa-wh-drill');
+        if (!raw) return whOut('<div class="wa-log wa-log-warn">填下钻目标，格式 kind:id（如 todo:commission、water:chronicle）</div>');
+        const c = raw.indexOf(':');
+        const r = WA.worldHealth.drill(c < 0 ? raw : raw.slice(0, c), c < 0 ? '' : raw.slice(c + 1));
+        if (!r.ok) return whOut('<div class="wa-log wa-log-warn">下钻拒收：' + esc(whWhy(r.reason)) + '</div>');
+        whOut('<div class="wa-log wa-log-info">下钻：' + esc(r.kind) + ':' + esc(r.id) + '</div>'
+          + '<div class="wa-item">去哪看：' + esc(r.where || '?') + '</div>'
+          + '<div class="wa-item">看哪条：' + esc(r.what || '?') + '</div>'
+          + (r.settingsKey ? '<div class="wa-item">相关设置键：<code>' + esc(r.settingsKey) + '</code></div>' : '')
+          + (r.rejectCode ? '<div class="wa-item">相关拒收码：<code>' + esc(r.rejectCode) + '</code></div>' : '')
+          + '<div class="wa-dim">本出口只给路由，不执行动作 —— 动作仍在各模块自己的入口上。</div>');
+      });
+      on('#wa-wh-diag', () => {
+        if (!WA.worldHealth) return whOut('<div class="wa-log wa-log-err">世界健康中心未加载</div>');
+        const d = WA.worldHealth.diagnose();
+        whOut('<div class="wa-log wa-log-' + (d.closedLoop ? 'info' : 'warn') + '">自证面：闭环 ' + (d.closedLoop ? '✓' : '✗')
+          + '　版本 ' + esc(d.version) + '　三栏 ' + d.bars.join('/') + '　待办源 ' + d.todoSources + ' 条</div>'
+          + Object.keys(d.checks).map(function (k) {
+            return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
+          }).join(''));
+      });
+
+      const agOut = function (html) { const o = $('#wa-wh-ag-out'); if (o) o.innerHTML = html; };
+      const agWhy = function (reason) {
+        const M = {
+          disabled: '这一面关着（上面的开关打开后才有日程）',
+          'no-story-clock': '剧情钟未设定 —— 整表拒算，不拿真实时间冒充剧情日（真实/剧情混算过一次，代价是离线间隔被抹平）'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      const agCfg = $('#wa-wh-ag-enabled');
+      if (agCfg) agCfg.onchange = function () {
+        if (!WA.agenda || !WA.agenda.setSettings) return agOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        WA.agenda.setSettings({ enabled: !!agCfg.checked });
+        agOut('<div class="wa-log wa-log-info">已记录 ' + (agCfg.checked ? 'enabled' : 'disabled（日程整表拒收）') + '</div>');
+      };
+      on('#wa-wh-ag-view', () => {
+        if (!WA.agenda) return agOut('<div class="wa-log wa-log-err">世界日程未加载</div>');
+        const r = WA.agenda.upcoming();
+        if (!r.ok) return agOut('<div class="wa-log wa-log-warn">' + esc(agWhy(r.reason)) + '</div>');
+        const rows = (r.rows || []).map(function (x) {
+          return '<div class="wa-item">' + (x.unknown ? '<span class="wa-dim">时间未知</span>' : ('第 ' + x.at + ' 日'))
+            + '　<b>' + esc(x.label) + '</b> <span class="wa-dim">' + esc(x.source) + '</span>'
+            + '<div class="wa-dim">涉及 ' + esc(x.subject || '—') + ' · 来源引用 ' + esc(x.ref || '—')
+            + ' · ' + (x.canAct ? '可以干预' : '只能等待') + '</div></div>';
+        }).join('');
+        agOut('<div class="wa-log wa-log-info">日程（' + esc(r.storyLabel) + '，第 ' + r.storyDay + ' 日）：共 ' + r.total + ' 条，显 ' + r.count
+          + '（有时间 ' + r.timedCount + ' / 未知 ' + r.untimedCount + '）' + (r.capped ? ' <span class="wa-dim">已按上限截断</span>' : '') + '</div>'
+          + (rows || '<div class="wa-item">此刻表里没有条目 —— <b>表里没有不等于不会发生</b></div>')
+          + '<div class="wa-dim">' + esc(r.note) + '</div>');
+      });
+      on('#wa-wh-ag-sources', () => {
+        if (!WA.agenda) return agOut('<div class="wa-log wa-log-err">世界日程未加载</div>');
+        const rows = WA.agenda.sources();
+        agOut('<div class="wa-log wa-log-info">五源可用性（缺席的源如实报 —— 不静默当作「这类条目没有」）</div>'
+          + rows.map(function (x) {
+            return '<div class="wa-item">' + esc(x.name) + '：' + (x.available ? '在场' : '<span class="wa-dim">缺席</span>')
+              + (x.note ? '<div class="wa-dim">' + esc(x.note) + '</div>' : '') + '</div>';
+          }).join(''));
+      });
+
+      const cvOut = function (html) { const o = $('#wa-wh-cv-out'); if (o) o.innerHTML = html; };
+      const cvWhy = function (reason) {
+        const M = { disabled: '这一面关着（上面的开关打开后才有纪事）', 'no-store': '读不到 store —— 这一栏此刻无从计算' };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      const cvCfg = $('#wa-wh-cv-enabled');
+      if (cvCfg) cvCfg.onchange = function () {
+        if (!WA.chronicleView || !WA.chronicleView.setSettings) return cvOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        WA.chronicleView.setSettings({ enabled: !!cvCfg.checked });
+        cvOut('<div class="wa-log wa-log-info">已记录 ' + (cvCfg.checked ? 'enabled' : 'disabled（纪事视图一并拒收）') + '</div>');
+      };
+      on('#wa-wh-cv-view', () => {
+        if (!WA.chronicleView) return cvOut('<div class="wa-log wa-log-err">世界纪事未加载</div>');
+        const r = WA.chronicleView.entries();
+        if (!r.ok) return cvOut('<div class="wa-log wa-log-warn">' + esc(cvWhy(r.reason)) + '</div>');
+        // 空历史与读不到**可分**：这里空是 ok:true + empty:true，上面那支是 ok:false。
+        if (r.empty) return cvOut('<div class="wa-log wa-log-info">还没有记录 —— 这是「空历史」，不是「读不到」</div>');
+        const rows = (r.rows || []).map(function (x) {
+          return '<div class="wa-item">第 ' + x.at + ' 日　<b>' + esc(x.title) + '</b> <span class="wa-dim">' + esc(x.source) + ' / ' + esc(x.kind) + '</span>'
+            + (x.text ? '<div>' + esc(x.text) + '</div>' : '')
+            + '<div class="wa-dim">依据：' + esc(x.ref) + (x.refs && x.refs.length ? ' ← ' + esc(x.refs.join('、')) : '') + '</div></div>';
+        }).join('');
+        cvOut('<div class="wa-log wa-log-info">纪事：共 ' + r.total + ' 条，显 ' + r.count + (r.capped ? '（已按上限截断）' : '') + '</div>'
+          + rows + (r.note ? '<div class="wa-dim">' + esc(r.note) + '</div>' : ''));
+      });
+      on('#wa-wh-cv-hidden', () => {
+        if (!WA.chronicleView) return cvOut('<div class="wa-log wa-log-err">世界纪事未加载</div>');
+        const r = WA.chronicleView.hiddenSummary();
+        if (!r.ok) return cvOut('<div class="wa-log wa-log-warn">' + esc(cvWhy(r.reason)) + '</div>');
+        cvOut('<div class="wa-log wa-log-info">不可见面：' + r.count + ' 条被 visibility=hidden 挡在视图外（只报数，不搬运内容）</div>'
+          + ((r.rows || []).length ? '<div class="wa-dim">' + esc(r.rows.slice(0, 10).map(function (x) { return x.ref + '（' + x.why + '）'; }).join('、')) + '</div>' : '')
+          + '<div class="wa-dim">「你看不到」与「它不存在」是两件事 —— 后者是本视图答不了的。</div>');
+      });
+      on('#wa-wh-cv-diag', () => {
+        if (!WA.chronicleView) return cvOut('<div class="wa-log wa-log-err">世界纪事未加载</div>');
+        const d = WA.chronicleView.diagnose();
+        cvOut('<div class="wa-log wa-log-' + (d.closedLoop ? 'info' : 'warn') + '">自证面：闭环 ' + (d.closedLoop ? '✓' : '✗')
+          + '　版本 ' + esc(d.version) + '</div>'
+          + Object.keys(d.checks).map(function (k) {
+            return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
+          }).join(''));
+      });
+
+      // ── v2.183.0（第一批 E1）：统一待办中心 ──
+      //   与上面三块同规格：只读、只写自己的 out 容器、下钻只给路由不执行动作。
+      //   三态旗标（unavailable / emptyAll / allClear）**分别渲染** —— 合成一个绿点
+      //   就是「读不到」被读成「全处理完」，那正是本模块要治的病。
+      const pcOut = function (html) { const o = $('#wa-pc-out'); if (o) o.innerHTML = html; };
+      const pcWhy = function (reason) {
+        const M = {
+          disabled: '这一面关着（上面的开关打开后才有事项）',
+          'module-missing': '该来源模块未装载 —— 它的事项不出现，但也不当作「没有事项」',
+          'source-threw': '该来源模块读取时抛异常 —— 如实上报，不静默吞掉',
+          'bad-shape': '该来源的 pending() 返回形状无法归一 —— 如实报「归一失败」，不猜字段',
+          'missing-kind': '没填类型（下钻要指明去哪个来源）',
+          'unknown-kind': '未知来源类型 —— 本中心不认识的类型不编路由',
+          'not-found': '该来源在场，但这条记录此刻不在它的待办里'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      const pcFlags = function (r) {
+        // 三态**分别报**：缺席（读不到）/ 全空（有源但没数据）/ 全清（有源有数据且无事）。
+        //   另报 emptyReported —— 它是「全空」这一态**能不能亮**的现场证据：
+        //   来源不申报 empty 时，这个旗标不可达，而那件事必须说出来（否则是盏永远不亮的灯）。
+        if (r.unavailable) return '<span class="wa-dim">（八个源全部缺席：这是「读不到」，不是「全处理完」）</span>';
+        if (r.emptyAll) return '<span class="wa-dim">（有源在场且都自报还没产生数据）</span>';
+        if (r.allClear) {
+          return '<span class="wa-dim">（读过、此刻没有待办）</span>'
+            + (r.emptyReported === 0
+              ? '<span class="wa-dim">（注意：来源未申报 empty ⇒ 「都办完了」与「从来没有数据」此刻<b>不可区分</b>）</span>' : '');
+        }
+        return '';
+      };
+      const pcCfg = $('#wa-pc-enabled');
+      if (pcCfg) pcCfg.onchange = function () {
+        if (!WA.pendingCenter || !WA.pendingCenter.setSettings) return pcOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        WA.pendingCenter.setSettings({ enabled: !!pcCfg.checked });
+        pcOut('<div class="wa-log wa-log-info">已记录 ' + (pcCfg.checked ? 'enabled（事项列表与下钻恢复可用）' : 'disabled（事项列表与下钻一并拒收 —— 读数会一直空，这与「没有待办」不是一回事）') + '</div>');
+      };
+      const pcRow = function (x) {
+        return '<div class="wa-item"><b>' + esc(x.title || '(无描述)') + '</b> <span class="wa-dim">' + esc(x.kind) + '</span>'
+          + (x.detail ? '<div class="wa-dim">' + esc(x.detail) + '</div>' : '')
+          + '<div class="wa-dim">引用 ' + esc(x.ref || '—') + ' · ' + (x.canAct ? '可以处置' : '只能等它自己推进')
+          + (x.blocked ? ' · 阻塞：' + esc(x.blocked) : '') + '</div></div>';
+      };
+      on('#wa-pc-view', () => {
+        if (!WA.pendingCenter) return pcOut('<div class="wa-log wa-log-err">统一待办中心未加载</div>');
+        const r = WA.pendingCenter.items({});
+        if (!r.ok) return pcOut('<div class="wa-log wa-log-warn">' + esc(pcWhy(r.reason)) + '</div>');
+        const rows = (r.rows || []).map(pcRow).join('');
+        pcOut('<div class="wa-log wa-log-info">事项：共 ' + r.total + ' 条，显 ' + r.count
+          + '（在场源 ' + r.sourceCount + ' / 共 8）' + (r.capped ? ' <span class="wa-dim">已按上限截断</span>' : '') + ' ' + pcFlags(r) + '</div>'
+          + (rows || '<div class="wa-item">此刻没有待办 —— <b>这只是「现在没有」，不是「永远不会有」</b></div>')
+          + ((r.skipped || []).length ? '<div class="wa-dim">未参与（缺席 / 关闭 / 归一失败）：'
+            + esc(r.skipped.map(function (s) { return s.source + '（' + s.reason + '）'; }).join('、')) + '</div>' : '')
+          + '<div class="wa-dim">' + esc(r.note) + '</div>');
+      });
+      on('#wa-pc-soon', () => {
+        if (!WA.pendingCenter) return pcOut('<div class="wa-log wa-log-err">统一待办中心未加载</div>');
+        const r = WA.pendingCenter.soon();
+        if (!r.ok) return pcOut('<div class="wa-log wa-log-warn">' + esc(pcWhy(r.reason)) + '</div>');
+        pcOut('<div class="wa-log wa-log-info">最近 ' + r.count + ' 条（全表 ' + r.total + ' 条）' + ' ' + pcFlags(r) + '</div>'
+          + ((r.rows || []).map(pcRow).join('') || '<div class="wa-item">此刻没有待办</div>'));
+      });
+      on('#wa-pc-sources', () => {
+        if (!WA.pendingCenter) return pcOut('<div class="wa-log wa-log-err">统一待办中心未加载</div>');
+        const rows = WA.pendingCenter.bySource();
+        pcOut('<div class="wa-log wa-log-info">八源可用性（缺席的源如实报 —— 不静默当作「没有这类事项」）</div>'
+          + rows.map(function (x) {
+            return '<div class="wa-item">' + esc(x.name) + '：' + (x.available ? '在场' : '<span class="wa-dim">缺席</span>')
+              + '<span class="wa-dim">　本会话累计读数 ' + x.read + '</span></div>';
+          }).join(''));
+      });
+      on('#wa-pc-drill-go', () => {
+        if (!WA.pendingCenter) return pcOut('<div class="wa-log wa-log-err">统一待办中心未加载</div>');
+        const raw = wv('#wa-pc-drill');
+        if (!raw) return pcOut('<div class="wa-log wa-log-warn">填下钻目标，格式 kind:id（如 commission、coop:m12_s0）</div>');
+        const c = raw.indexOf(':');
+        const r = WA.pendingCenter.describe(c < 0 ? raw : raw.slice(0, c), c < 0 ? '' : raw.slice(c + 1));
+        if (!r.ok) return pcOut('<div class="wa-log wa-log-warn">下钻拒收：' + esc(pcWhy(r.reason)) + '</div>');
+        pcOut('<div class="wa-log wa-log-info">下钻：' + esc(r.kind) + (r.id ? ':' + esc(r.id) : '') + '</div>'
+          + '<div class="wa-item">去哪看：' + esc(r.page || '(无对应页面)') + ' 页 / 模块 <code>' + esc(r.module) + '</code></div>'
+          + '<div class="wa-item">看哪条：' + esc(r.title || '(该来源此刻没有待办)') + '</div>'
+          + (r.settingsKey ? '<div class="wa-item">相关设置键：<code>' + esc(r.settingsKey) + '</code></div>' : '')
+          + '<div class="wa-item">可否动作：' + (r.canAct ? '可以处置' : '只能等它自己推进') + '</div>'
+          + (r.blocked ? '<div class="wa-item">当前阻塞：' + esc(r.blocked) + '</div>' : '')
+          + '<div class="wa-dim">' + esc(r.note) + '</div>');
+      });
+      on('#wa-pc-diag', () => {
+        if (!WA.pendingCenter) return pcOut('<div class="wa-log wa-log-err">统一待办中心未加载</div>');
+        const d = WA.pendingCenter.diagnose();
+        pcOut('<div class="wa-log wa-log-' + (d.closedLoop ? 'info' : 'warn') + '">自证面：闭环 ' + (d.closedLoop ? '✓' : '✗')
+          + '　版本 ' + esc(d.version) + '　来源 ' + d.sourceCount + ' 个</div>'
+          + '<div class="wa-item">empty 申报面：' + d.emptyReporterCount + ' / ' + d.liveSources
+          + '（为 0 ⇒ 「有源但没数据」这一态<b>亮不了</b>，不是「从没出过」）</div>'
+          + Object.keys(d.checks).map(function (k) {
+            return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
+          }).join(''));
+      });
+    }
   }
 
   // ── 面板与悬浮球 ──

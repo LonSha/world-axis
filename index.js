@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.181.0'
+  const VERSION = '2.183.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -613,6 +613,56 @@
     //   （全部在本行之前装载），并把推演整体委托给 SP2 的草稿体 —— 自己不算任何数值、
     //   不写任何键（零 localStorage），故不依赖任何后装模块。
     'engines/offline-return.js',
+    // v2.182.0（E2 第二批）：世界日程 / 未来事件表（engines/agenda.js）。
+    //   位置在全部**来源模块之后**（longline / commission / diplomacy / freight / aftermath 均已装载）
+    //   与 ui/panel.js 之前：本模块是**只读聚合面**，在调用期读上述五源与 playtime/clock，
+    //   自己不算任何数值、不写任何键（零 localStorage、零 store 写入），故不依赖任何后装模块。
+    //   与 chrono 的分工：chrono 答「这世界此前发生过什么」（只增不减），本模块答「接下来会发生什么」
+    //   （未来向、按剧情时间排序）—— 两问的时间方向相反，合成一个源会让「已发生」与「将发生」互相冒充。
+    'engines/agenda.js',
+    // v2.182.0（E5 第二批）：玩家可读的世界纪事与证据日志（engines/chronicle-view.js）。
+    //   位置在 chronicle / sediment / causal / timeline / chrono 全部装载之后、ui/panel.js 之前：
+    //   本模块是**只读聚合面 + 下钻**，在调用期读上述五源与 playtime/clock，
+    //   自己不算任何数值、不写任何键（零 localStorage、零 store 写入）。
+    //   与 chrono 的分工：chrono 是**表本身**（归档写入与 cap 口径的持有者），
+    //   本模块是**玩家视图**（合并三源 + 时间排序 + 单条下钻 + 引用校验 + 覆盖范围标注），
+    //   故必须后装 —— 反过来会让「视图」被误当成「表的真源」，出现两套 cap。
+    'engines/chronicle-view.js',
+    // v2.182.0（O4 第二批）：存储压力 / 义务清点 / 迁移预检（engines/capacity-audit.js）。
+    //   位置在**全部义务来源模块之后**（commission / operations / aftermath / investigation /
+    //   story-choice / farfield / coop / collab / longline / freight / diplomacy / world 均已装载）
+    //   与 core/evict.js / engines/storage-forecast.js 之后、ui/panel.js 之前：
+    //   本模块是**只读聚合面**，在调用期读上述十二源与 store.sizeCaps / evict.siteDecls /
+    //   storageForecast.forecast，自己不算任何数值、不写任何键（零 localStorage、零 store 写入）。
+    //   特别地 migrationCheck() **不调用 store.migrate()** —— 那个函数会写 __migrateReport
+    //   与 __loadStat.migrateRefused（观测层），在只读面上留痕等于污染下一次真迁移的报告。
+    'engines/capacity-audit.js',
+    // v2.182.0（O3 第二批）：手机端与长局性能基线（engines/perf-baseline.js）。
+    //   位置在 perf-trace / perf-ledger / storage-forecast 之后、ui/panel.js 之前：
+    //   本模块是**只读聚合面**，在调用期读上列三处与 store 的字节读数，
+    //   自己不算任何数值、不写任何键（零 localStorage、零 store 写入）。
+    //   它**不调用** perfLedger.ingest / perfTrace.mark / renderPerf.observe ——
+    //   观测面自己往被观测的窗口里塞数，等于污染下一次读数（观测污染被观测者）。
+    //   实机采样栏一律留空（gap().reason === 'needs-real-device'）：无头环境里
+    //   `perfTrace.CLASS_DEF.lowend.approx === true` 是「同机放大估计」，
+    //   填进实机栏就是拿估计冒充测量。
+    'engines/perf-baseline.js',
+    // v2.182.0（O5 第二批）：玩家可读的「世界健康中心」（engines/world-health.js）。
+    //   位置在**末尾**（全部引擎与 perf-baseline 之后）、ui/panel.js 之前：
+    //   本模块是**只读聚合面**，在调用期动态读 settingsBus.registry()（模块清单）与
+    //   各模块自己的 pending() / stat().faults、store.sizeCaps / storageForecast，
+    //   自己不算任何数值、不写任何键（零 localStorage、零 store 写入）。
+    //   它必须后装：模块清单取自 settingsBus 登记表，先装会让清单恒空
+    //   （阻塞栏「全绿」而实际有模块在拒收 —— 比不装更坏）。
+    'engines/world-health.js',
+    // v2.183.0（第一批 E1）：统一待办事项中心（engines/pending-center.js）。
+    //   位置在**八个来源模块之后**（aftermath / commission / investigation / operations /
+    //   storyChoice / coop / farfield / backstage 均已装载）与 ui/panel.js 之前：
+    //   本模块是**只读聚合面**，在调用期读上述八源的 `pending()` 与 settingsBus/inputGuard，
+    //   自己不算任何数值、不写任何键（零 localStorage 写、零 store 写）。
+    //   与 world-health 的待办栏分列不合并：两者答两个粒度 —— 健康栏答「还有几件没做完」
+    //   （计数 + 是否全清），本中心答「具体是哪几件、去哪看、能不能处置」（逐条归一 + 路由）。
+    'engines/pending-center.js',
     'ui/panel.js',
     'ui/cyberpunk-theme.js',
     'ui/cyberpunk-components.js',

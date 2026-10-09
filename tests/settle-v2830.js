@@ -306,7 +306,7 @@ async function probeRollbackScope(WA) {
 async function judge(a) {
   // ── B4 ──
   const led = JSON.parse(fs.readFileSync(path.join(__dirname, 'module-registry-ledger.json'), 'utf8'));
-  a(led.totals.loadEdges === 90 && led.totals.callRefs === 178,
+  a(led.totals.loadEdges === 96 && led.totals.callRefs === 188,
     'v2830/mr: 装载期边 87 / 调用期引用 172（引用多 ≠ 必须先装载；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
@@ -320,7 +320,7 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 196 && led.loadedCount === 188,
+  a(led.nsCount === 201 && led.loadedCount === 193,
     'v2830/mr: 命名空间 195 / 装载文件 187（v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
@@ -346,9 +346,11 @@ async function judge(a) {
     led.modules[rel].requires.forEach(function (ns) { acc[ns] = true; });
     return acc;
   }, {});
-  a(Object.keys(providers).sort().join(',') === 'registerModule,settingsBus,workflow',
-    'v2830/mr: 全库装载期只依赖三个 ns（registerModule / settingsBus / workflow）——'
-    + '实测：摘掉 store/clock 零消费方失败。v2.114.0 起 registerModule 也进了装载期依赖面：'
+  a(Object.keys(providers).sort().join(',') === 'perfTrace,registerModule,settingsBus,workflow',
+    'v2830/mr: 全库装载期只依赖四个 ns（perfTrace / registerModule / settingsBus / workflow）——'
+    + 'v2.182.0（第二批 · O3）：engines/perf-baseline.js 在装载期就对 perfTrace.CLASS_DEF 做深拷贝'
+    + '（冻结预算副本），故 perfTrace 成了第四条装载期依赖 —— 也是唯一一条数据面硬边（前三条都是接口面）。'
+    + '实测：摘掉 store/clock 零消费方失败（引用最多 ≠ 必须先装载）。v2.114.0 起 registerModule 也进了装载期依赖面：'
     + 'sandbox / plugin 尾部调 WA.registerModule 登记自己（此前错排在 store 之前，现场报 order-violation，已修正）');
 
   const own = await (async function () { return isolatedA(function () { return guarded(probeKeyOwnership)(fresh()); }); })();
