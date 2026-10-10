@@ -67,7 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.190.0）
+## 构建与验收（当前版本 v2.191.0）
 
 v2.173.0（TX4b）— TX4/TX6/TX7/TX8/TX9 五模块面板接线（渲染 + 绑定 + 登记三面同步）+ 六模块骨架登记补齐（骨架声明 / `__BOUNDED_CAPS` / `evict.SITES` 三段式）+ 两处预存失败收敛 — TX 五张专锁 42/49/44/49/46 全 0 失败。
 
@@ -85,12 +85,13 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（35 个，`git ls-files tools/ | wc -l` 为准：
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（36 个，`git ls-files tools/ | wc -l` 为准：
 `agenda_smoke` / `anchor-scan` / `capacity_audit_smoke` / `chronicle_view_smoke` / `consumer-types` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `fact-report` /
-`doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `impact-analysis` / `patch-idempotency` /
+`doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `impact-analysis` / `loose-readings` / `patch-idempotency` /
 `pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded` /
 `test-audit` / `test-layers` / `tx1_smoke` / `tx2_smoke` / `tx3_smoke` / `tx4_smoke` / `tx6_smoke` / `tx7_smoke` /
 `tx8_smoke` / `tx9_smoke` / `world_health_smoke`）。
+（v2.191.0（第一批 · U3 + U4）：本名单补上一个本轮新入库的工具 —— `loose-readings`（散装读数核对器，治「族外写死的数字没人盯」）；它由 **专锁 + `tests/run.js` 的新增节**两条链引用，属「被门禁链引用」。U4 改的 `consumer-types` **早已在册**（本轮只加导出面生命周期字段）—— 故索引由 35 → **36**，不是 37：**名单跟着「索引里有没有这个文件」走，不跟着「本轮改了几个文件」走**。）
 （v2.190.0（第一批 · U9）：新入库 `fact-report`（发布前事实报告）—— 它由专锁 `tests/u9-fact-report-v2190.js` 直接 require，属「被门禁链引用」；同一轮本名单必须跟上。）
 （v2.187.0 收口轮：本名单一次补上三个本轮新入库的工具 —— `test-layers`（分层选区归属表单一真源）、
 `prune-sections`（把未选中节的**节体**真裁掉，治「假分层」）、`consumer-types`（导出消费者类型，O8）。
@@ -112,7 +113,7 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（127 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（128 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
@@ -143,6 +144,17 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 <b>八条否定式边界</b>：① 默认关；② choose 记账 ≠ 世界兑现（三段可分离）；③ ops 必须经 rehearsal.preview 白名单；④ 状态变了重新预演；⑤ 不把 rehearsal diff 直接写 live store；⑥ 过期/未知/不可比较分别显示；⑦ review 只读不写；⑧ 不凭空造 ops。
 <b>实测读数</b>：module-registry-gate 文件 <b>184</b> / 命名空间 <b>192</b> / 装载期边 <b>86</b> / 调用期引用 <b>170</b>；拒收码 <b>738 码（见证 481 / 死表 29 / 基线 228）</b>；module-cycle-gate-v2107 pass(65)。
 <b>专锁 <code>tests/s3-tx4-v2168.js</code> 42 / 0</b>。冒烟脚本 <code>tools/tx4_smoke.js</code> 13/13。
+<b>v2.191.0</b> — <b>U3 散装读数的登记与「过期即现形」 + U4 导出面从「有登记」到「有去向与复查期」</b>（<b>第二代优化线第一批</b>：给「没人盯的数字」与「没人回头的理由」各补一道分钟级判据）。
+<b>U3 它治什么</b>：v2.189.0 收口轮的 <b>17 处红没有一处是新代码写错</b>，而它们的发现通道只有一条 —— 跑一趟 17 分钟全量回归。<code>tests/settle-v2830.js</code> 里三处最典型：<b>写死的、不在 <code>tests/readings.js</code> 族扫描面内、无任何判据盯着</b>的数字，于是从 v2.185.0 一路红到全量才现形。
+<b>U3 的做法（扩面而非重写）</b>：新建登记表 <code>tests/loose-readings.json</code> + 核对器 <code>tools/loose-readings.js</code>（255 行）。<b>表只登记站点、不写任何真值</b> —— 真值一律现取（探针 <code>tests/module-registry-ledger.json</code>）；表里出现 <code>want</code> / <code>value</code> 类字段当场报 <code>value-in-table</code>（<b>表不得成为第二真源</b>，U3 验收第 ④ 条的硬判据）。四个站点三种形态：<code>ledger-num-eq</code>（<code>led.totals.loadEdges === 106</code> / <code>led.totals.callRefs === 208</code>）、<code>ledger-num-lt</code>（<code>led.totals.hardEdges === 0</code>）、<code>ledger-object-keys-len-eq</code>（<code>Object.keys(led.loadErrors).length === 0</code> / <code>led.nsCount === 211</code> / <code>led.loadedCount === 203</code>）。
+<b>U3 写作过程中暴露并当场修掉的三条（两条是判据自己的病）</b>：① <b>口径必须与站点同形</b> —— <code>Object.keys(x).length</code> 的真值不能拿对象本身现取（否则得到 <code>[object Object]</code>，「口径不同」被误读成「值不同」）；② <b>反向漏网的判据不能只按变量名</b> —— 本仓 <code>tests/run.js</code> 与 <code>tests/readings-v2106.js</code> 里都有同名的局部 <code>led</code>，只按变量名会误伤，改成「<b>字段真存在于已登记探针 + 站点文件路径也匹配</b>」双重判据；③ <b>锁文件自己的合成源码行含完整字面量，会被自己的判据抓成「未登记散装点」</b>（判据被自己的源码满足，首跑 2/35 红），按本仓惯例<b>锚点拆开拼接</b>修复。
+<b>U4 它治什么</b>：<code>tests/consumer-ledger.json</code> 已把 137 条「无消费者且未标注归零」的导出登记在案，<b>但登记没有复查期</b> —— 四个新引擎的设置读口是此形态的标准例：已注册进 <code>settingsBus</code>、零调用方、理由是「面板尚未渲染该模块」；<b>理由说得对，但它不会自己到期</b>。
+<b>U4 的做法</b>：<code>tools/consumer-types.js</code> 叠加四项生命周期字段（<code>purpose</code>=现场复算的形态 / <code>nextConsumer</code>=<b>按五种形态派生</b>的去向 / <code>reviewAfter</code>=登记版本小版本 + 6 / <code>disposition</code>），新增 **6 项**导出（<code>REVIEW_WINDOW_MINOR</code> / <code>NEXT_CONSUMER_OF</code> / <code>parseVersion</code> / <code>compareVersion</code> / <code>reviewAfterOf</code> / <code>staleReviews</code>），导出面 19 → 25。复查窗按<b>小版本数</b>（<code>REVIEW_WINDOW_MINOR = 6</code>）而不按墙钟 —— 与 <code>readings</code> 里 L3 不进常绿同源：本仓节奏是「一版一事」，墙钟判据在放假 / 连更时会假红。超期 <code>overdue</code> / 缺字段 <code>missing-field</code> / 去向过期 <code>purpose-stale</code> / 不可读 <code>unreadable</code> <b>四条分开报</b>，不合成一档；版本比较任一侧不可解析返回 <code>null</code>，<b>不当作 0</b>（「读不到 ≠ 未超期」）。
+<b>U4 的边界（写在源码与台账 <code>_note</code> 里）</b>：<b>登记不是豁免</b>（承 O8 原判据）；<b>不为消读数而删除可用接口</b>；「形态变了」（机器判 <code>shape-stale</code>）与「理由过期」（人复核）<b>分开报</b>；复查期<b>只判「到没到点」，不判「该不该删」</b> —— <code>disposition: 应删除</code> 的条目必须真被删或改成 <code>keep</code> 并给出理由（由专锁盯着）。本版现场：137 条全部复核为 <code>keep</code>，生命周期问题 0 条，<code>reviewAfter</code> 全部落在 <code>2.196.0</code>。
+<b>专锁</b>：<code>tests/u3-loose-readings-v2191.js</code> <b>35 / 0</b>（A 静态 14 / B 运行时 4 / C 不变式 2 / N 真源码破坏负控制 15）、<code>tests/u4-export-lifecycle-v2191.js</code> <b>30 / 0</b>（A 9 / B 6 / C 2 / N 13），均已挂进 <code>tests/run.js</code> 新增节（三条内联断言 + 两处 <code>runLock</code>）。
+<b>本版零产品行为变更</b>：不新增引擎、不新增拒收码（804 逐字不变）、不新增注入源；版本面按本仓七步链路同步（源头 2 处 · <code>run.js</code> 硬读数 9 行 15 处 · 正则白名单 11 处按形态放宽 · 授予型名单 15 处追加 · 五把旧专锁交付基线抬到本版 · 四本台账：<code>dead-export</code> / <code>module-registry</code> 由各自门禁 <code>--update</code> 重写、<code>consumer-ledger</code> 由 <code>--register</code> 重建（137 条含四个新字段）、<code>reject-code</code> 抬 version 并追加沿革段）。
+<b>如实登记的一条边界</b>：U3 的登记表<b>不覆盖产品源码里的散装读数</b>，只覆盖「族外测试文件里写死、且真值可由探针现取」的形态；<b>沿革叙述里的旧数字不算失配</b>（宽泛正则会误伤沿革段、让人开始忽略告警，故不加）。
+
 <b>v2.190.0</b> — <b>U9 发布前事实报告：九类事实脱节一次看完（只读 · 秒级 · 可复读）</b>（<b>第二代优化线第一批</b>：把「发布前到底与现场差在哪里」从「跑一次 17 分钟全量回归」变成一条命令）。<b>U9 它治什么</b>：v2.189.0 收口轮的 <b>17 处红没有一处是新代码写错</b> —— 全是「新代码进来后没人通知的旧读数」：版本号在 <code>index.js</code> / <code>manifest.json</code> / <code>tests/run.js</code> 消息面<b>各写一遍</b>；<code>docs/ERROR_CODES.md</code> 曾停在 788 码（实测应为 804）；计划文件状态可由「文件存在 + 挂进 run.js」推出与玩家路径无关的「已交付」；工作树与 HEAD 不一致（本轮 51 项未提交改动 + 6 项未跟踪交付物）。<b>这四类的共同点是没有任何一份现场报告把它们放在一起看</b>。
 <b>修法（一条只读命令 + 三条硬纪律）</b>：<code>tools/fact-report.js</code>（283 行）一次性列出九项 —— ① 三方版本；② 全量回归读数（读最近落盘的那一份，<b>不重跑</b>，无样本则如实报「未采样」，<b>不拿 0 冒充</b>）；③ 拒收码三面（804 = 见证 530 / 死表 48 / 基线 226，恒等式现场为平）；④ 模块注册（引用 211 / 装载 203 / 装载期边 106 / 调用期 208）；⑤ 死子面（dead 843 / uiDead 3 / dataOnly 285 · 消费者 programmatic 137）；⑥ 宿主验收状态；⑦ 工作树改动清单与未跟踪交付物；⑧ <code>.bak</code> 与回归临时目录残留；⑨ <b>文档中仍存在的旧基线</b>（逐站点带行号，<b>只列出、不改写</b>）。三条硬纪律写在源码里：<b>只读</b>（不写任何文件、不自动修文档）、<b>每一项都可复读</b>（<code>--how</code> 给九条取法命令，读者可自己算一遍）、<b>不把「列出」当「已修」</b>。
 <b>单一真源：报告不另写扫描器</b>。三面读数一律 <code>require</code> 既有账本与既有门禁（拒收码走 <code>reject-code-coverage.discover()</code>）—— 「判据两处各写一遍必然漂移」是本仓点过名的形态（O8 门禁文件头原文）。<b>可注入读接缝</b>：<code>build(opt)</code> 收 <code>opt.read</code>，负控制因此能在<b>内存副本</b>上做真破坏并两向自证 —— 若「验证判据真会现形」必须改真文件，验证者自己就成了新的风险源（与 <code>readings.js</code> / <code>docs-archive-gate-v2120.js</code> 同口径）。

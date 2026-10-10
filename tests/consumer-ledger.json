@@ -1,554 +1,1102 @@
 {
-  "_note": "WorldAxis 导出消费者类型登记表（v2.187.0）。programmatic 面登记的是「产品面与测试面都零引用、且已确认只有程序化用途」的导出；键 = ns.mem，值 = { shape（形态类别，有限词表）、why（该类的可读理由） }。纪律：① 未登记的无消费者导出即红（tests/o8-consumer-gate-v2187.js）；② 登记的 shape 必须与现场复算一致（形态变了而登记没改 ⇒ shape-stale 红）；③ 已有真实消费者的登记即红（过期登记比没有登记更坏）；④ 本表由 `node tools/consumer-types.js --register` 重建，理由来自**形态**（不是手写散文）；⑤ 两个如实登记的边界：`ui-component-library` 与 `query-api` 的「用途」判不了，门禁只校验类别合法与形态一致，不假装能判对错。",
-  "version": "2.190.0",
+  "_note": "WorldAxis 导出消费者类型登记表（v2.187.0；v2.191.0 起叠加 U4 生命周期字段）。programmatic 面登记的是「产品面与测试面都零引用、且已确认只有程序化用途」的导出；键 = ns.mem，值 = { shape（形态类别，有限词表）、why（该类的可读理由） + U4 四项：purpose（去向，**必须等于现场复算的 shape**）、nextConsumer（下一个消费者应该长什么样，由形态派生）、reviewAfter（复查期 = 登记时小版本 + 6）、disposition（keep / 应删除，默认 keep）；三项分开报：overdue（超期）/ missing-field / purpose-stale }。纪律：① 未登记的无消费者导出即红（tests/o8-consumer-gate-v2187.js）；② 登记的 shape 必须与现场复算一致（形态变了而登记没改 ⇒ shape-stale 红）；③ 已有真实消费者的登记即红（过期登记比没有登记更坏）；④ 本表由 `node tools/consumer-types.js --register` 重建，理由来自**形态**（不是手写散文）；⑤ 两个如实登记的边界：`ui-component-library` 与 `query-api` 的「用途」判不了，门禁只校验类别合法与形态一致，不假装能判对错；⑥ U4 的复查期只判「到没到点」，**不判「该不该删」** —— `disposition: 应删除` 的条目必须真的被删或改成 keep 并给出理由（由 tests/u4-export-lifecycle-v2191.js 盯着）。",
+  "version": "2.191.0",
   "programmatic": {
     "rand.getSeed": {
       "shape": "query-api",
-      "why": "随机流种子读取口：供「可复现一局」的程序化排查读当前种子（面板未接）"
+      "why": "随机流种子读取口：供「可复现一局」的程序化排查读当前种子（面板未接）",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "rand.seeded": {
       "shape": "query-api",
-      "why": "按种子上膛的口：供程序化指定随机流起点（复现故障现场用）"
+      "why": "按种子上膛的口：供程序化指定随机流起点（复现故障现场用）",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "apiRouter.fetchModels": {
       "shape": "query-api",
-      "why": "联网渠道的模型清单拉取口：由设置页在「拉取模型」时按需调用"
+      "why": "联网渠道的模型清单拉取口：由设置页在「拉取模型」时按需调用",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "exec.depth": {
       "shape": "query-api",
-      "why": "执行上下文的嵌套深度读数：供程序化排查重入"
+      "why": "执行上下文的嵌套深度读数：供程序化排查重入",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "bridge.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "hostWbTrace.fingerprint": {
       "shape": "query-api",
-      "why": "宿主世界书数据的指纹：供程序化比对两次激活是否同一份"
+      "why": "宿主世界书数据的指纹：供程序化比对两次激活是否同一份",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "foreshadow.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "world.blocksOf": {
       "shape": "query-api",
-      "why": "世界织体的区块查询：供程序化按地点取在场内容"
+      "why": "世界织体的区块查询：供程序化按地点取在场内容",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "world.shipmentsInTransit": {
       "shape": "query-api",
-      "why": "在途货运查询：供程序化读「还在路上的货」"
+      "why": "在途货运查询：供程序化读「还在路上的货」",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "world.messagesInTransit": {
       "shape": "query-api",
-      "why": "在途消息查询：供程序化读「还没送达的话」"
+      "why": "在途消息查询：供程序化读「还没送达的话」",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "weather.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "difficulty.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "affect.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "bonds.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "masks.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "temporalLock.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "temperament.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "fondness.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "parallelEvents.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "eraCycle.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "survival.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "warrant.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "beastBond.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "appearance.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "ladder.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "sceneSlice.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "gauge.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "rivalry.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "enigma.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "tempo.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "quota.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "spotlight.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "karma.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "marginal.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "tolerance.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "rehearsal.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "liaison.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "liaison.isDue": {
       "shape": "query-api",
-      "why": "联络是否到期：供程序化判「这一轮该不该联系」，面板未渲染"
+      "why": "联络是否到期：供程序化判「这一轮该不该联系」，面板未渲染",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "coop.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "stage.stagesOf": {
       "shape": "query-api",
-      "why": "玩法进度阶段枚举：供程序化取某进度的全部阶段"
+      "why": "玩法进度阶段枚举：供程序化取某进度的全部阶段",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "stage.metricsOf": {
       "shape": "query-api",
-      "why": "玩法进度指标：供程序化取某进度的读数"
+      "why": "玩法进度指标：供程序化取某进度的读数",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "session.fingerprint": {
       "shape": "query-api",
-      "why": "会话指纹：供程序化比对两次会话是否同一场"
+      "why": "会话指纹：供程序化比对两次会话是否同一场",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "userlock.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "userlock.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "userlock.list": {
       "shape": "query-api",
-      "why": "用户锁清单：供程序化列出已锁条目"
+      "why": "用户锁清单：供程序化列出已锁条目",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "rhythmLoop.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "rhythmLoop.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "motif.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "motif.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "beatMask.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "beatMask.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "beatMask.list": {
       "shape": "query-api",
-      "why": "节拍掩码清单：供程序化列出已登记的节拍"
+      "why": "节拍掩码清单：供程序化列出已登记的节拍",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "powerAnchor.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "powerAnchor.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "rewriter.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "storyclock.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "storyclock.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "presetWorld.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "presetWorld.round": {
       "shape": "query-api",
-      "why": "预设世界的轮次读数：供程序化读当前轮"
+      "why": "预设世界的轮次读数：供程序化读当前轮",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "requestViewer.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "wbSearch.size": {
       "shape": "query-api",
-      "why": "世界书检索规模读数：供程序化读最近一次检索命中数"
+      "why": "世界书检索规模读数：供程序化读最近一次检索命中数",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "beatReport.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "beatLedger.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "planAudit.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "genGate.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "staleGuard.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "staleGuard.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "staleGuard.size": {
       "shape": "query-api",
-      "why": "陈旧守卫规模读数：供程序化读被守卫的条目数"
+      "why": "陈旧守卫规模读数：供程序化读被守卫的条目数",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "purifyScope.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "purifyScope.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "purifyScope.kinds": {
       "shape": "query-api",
-      "why": "净化范围类别：供程序化读本次净化覆盖了哪几类"
+      "why": "净化范围类别：供程序化读本次净化覆盖了哪几类",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "reasoning.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "reasoning.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "storyTone.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "storyTone.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "calendarPlan.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "calendarPlan.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "preflight.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "preflight.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "archiveHide.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "archiveHide.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "wordBudget.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "wordBudget.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "binding.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "binding.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "refine.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "refine.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "polish.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "polish.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "ensemble.getSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "ensemble.setSettings": {
       "shape": "settings-registry-only",
-      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "compat.diagnose": {
       "shape": "query-api",
-      "why": "兼容层诊断读数：供程序化取兼容面结论（与 tool-diag 的采集面口径不同）"
+      "why": "兼容层诊断读数：供程序化取兼容面结论（与 tool-diag 的采集面口径不同）",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberAnimate.showLoading": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberAnimate.hideLoading": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberAnimate.addRipple": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberAnimate.animateNumber": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberUI.toggle": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberUI.progress": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberUI.progressCircular": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberUI.badge": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberUI.checkbox": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberUI.spinner": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberDashboard.timeCard": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberDashboard.engineList": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberDashboard.quickActions": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberDashboard.memoryChart": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberDashboard.timeline": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberLogs.logsContainer": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberLogs.filters": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberLogs.searchBox": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberLogs.stats": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberLogs.liveIndicator": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberPeople.peopleGrid": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberPeople.personDetail": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberResponsive.rerenderMs": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberResponsive.listChunk": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberResponsive.isMobile": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberResponsive.inject": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberResponsive.chunk": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberpunkTheme.inject": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "themeSwitch.themes": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "themeSwitch.current": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "themeSwitch.set": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "themeSwitch.open": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "themeSwitch.close": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "sanitize.CODES": {
       "shape": "data-const",
-      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）"
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "genGate.antiRepeat": {
       "shape": "query-api",
-      "why": "程序化查询口：由调用方按需派生（面板与诊断当前未接）"
+      "why": "程序化查询口：由调用方按需派生（面板与诊断当前未接）",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "storyTone.LABELS": {
       "shape": "data-const",
-      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）"
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "plotGauge.WEIGHTS": {
       "shape": "data-const",
-      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）"
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberAnimate.version": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberUI.version": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberDashboard.version": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberLogs.version": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberPeople.version": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "cyberResponsive.version": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "themeSwitch.version": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     },
     "themeSwitch.menuId": {
       "shape": "ui-component-library",
-      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」"
+      "why": "UI 组件库成员：由库内构件与面板模板消费（以局部引用而非 WA.ns.mem 形态调用），静态引用面看不见它 —— 这是已知的感知边界，不是「无入口」",
+      "purpose": "ui-component-library",
+      "nextConsumer": "面板模板（构件以局部引用消费）",
+      "reviewAfter": "2.197.0",
+      "disposition": "keep"
     }
   }
 }

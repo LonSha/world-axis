@@ -370,27 +370,109 @@ const SHAPE_WHY = {
   'query-api': '程序化查询口：由调用方按需派生（面板与诊断当前未接）'
 };
 /** 由现场复算 + 仓库内常量**重建**登记表（`--register` 走它）。 */
+// ── U4（v2.191.0）：登记从「有登记」升级为「有去向与复查期」──────────────
+//   它治的病（计划 U4 现状原文）：「登记解决了 O8 的『无消费者且未标注归零』，
+//   但**登记没有复查期**。四个新引擎的设置读口即此形态：已注册进 settingsBus、
+//   零调用方、理由是『面板尚未渲染该模块』—— **理由说得对，但它不会自己到期**。」
+/** 复查窗（**小版本数**）：登记后 6 个小版本内必须有人复核一次。
+ *  为什么按版本而不按日期：本仓的推进节奏是「一版一事」，墙钟判据在放假/连更时会假红
+ *  （与 `readings` 里 L3 不进常绿的理由同源）。 */
+const REVIEW_WINDOW_MINOR = 6;
+function parseVersion(v) {
+  const m = String(v || '').match(/^(\d+)\.(\d+)\.(\d+)$/);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+/** 版本比较：`a > b` 返回 1 / 相等 0 / 小于 -1；任一侧不可解析返回 `null`（**不当作 0**）。 */
+function compareVersion(a, b) {
+  const x = parseVersion(a), y = parseVersion(b);
+  if (!x || !y) return null;
+  for (let i = 0; i < 3; i += 1) {
+    if (x[i] !== y[i]) return x[i] > y[i] ? 1 : -1;
+  }
+  return 0;
+}
+/** 复查期 = 登记时的小版本 + `REVIEW_WINDOW_MINOR`。 */
+function reviewAfterOf(ver) {
+  const p = parseVersion(ver);
+  if (!p) return '';
+  return p[0] + '.' + (p[1] + REVIEW_WINDOW_MINOR) + '.' + p[2];
+}
+/** 由**形态**派生「下一个消费者应该是什么」（可复算，不是手写散文）。 */
+const NEXT_CONSUMER_OF = {
+  'settings-registry-only': '面板该模块的设置区（读口 → 控件）',
+  'ui-component-library': '面板模板（构件以局部引用消费）',
+  'version-const': '诊断节版本行（已有读取面即可复核为 keep）',
+  'data-const': '面板或诊断按需取用（常量表）',
+  'query-api': '按需派生的调用方（无面板入口时复核窗口内确认保留）'
+};
+/** 超期 / 缺字段 / 去向过期 —— 三条**分开报**（U4 边界：「形态变了」与「理由过期」不合成一档）。 */
+function staleReviews(res, ledger, now) {
+  const out = [];
+  const prog = (ledger && ledger.programmatic) || {};
+  const nowV = now || versionOf();
+  (res && res.entries ? res.entries : []).forEach(function (e) {
+    if (e.type !== 'programmatic') return;
+    const v = prog[e.key];
+    if (!v) { out.push({ kind: 'unregistered', key: e.key, detail: '无消费者且无登记' }); return; }
+    ['purpose', 'nextConsumer', 'reviewAfter', 'disposition'].forEach(function (k) {
+      if (!String(v[k] || '').trim()) {
+        out.push({ kind: 'missing-field', key: e.key, field: k, detail: '生命周期字段缺失：' + k });
+      }
+    });
+    const cmp = compareVersion(nowV, v.reviewAfter);
+    if (cmp === null) {
+      out.push({ kind: 'unreadable', key: e.key, field: 'reviewAfter',
+        detail: '复查期读不到或不可解析（' + v.reviewAfter + '）—— 读不到 ≠ 未超期' });
+    } else if (cmp > 0) {
+      out.push({ kind: 'overdue', key: e.key, reviewAfter: v.reviewAfter, now: nowV,
+        shape: v.shape, disposition: v.disposition,
+        detail: '复查期已过（登记于复查至 ' + v.reviewAfter + '，现 ' + nowV + '）' });
+    }
+    const nowShape = shapeOf(e);
+    if (v.purpose && v.purpose !== nowShape) {
+      out.push({ kind: 'purpose-stale', key: e.key, purpose: v.purpose, now: nowShape,
+        detail: '去向随形态复算已变（登记 ' + v.purpose + '，现场 ' + nowShape + '）' });
+    }
+  });
+  return out;
+}
 function buildLedger(res) {
   // 入参 res 允许是「认登记」的快照，但**生成必须用不认登记的现场**：
   //   否则第二次跑会把刚写好的登记当成「已有消费者」而不重建（实测输出「0 条登记」）。
   const clean = classify({ ignoreRegistry: true });
   res = clean;
+  const ver = versionOf();
+  const after = reviewAfterOf(ver);
   const programmatic = {};
   res.unregistered.forEach(function (e) {
     const shape = shapeOf(e);
-    programmatic[e.key] = { shape: shape, why: REASONS[e.key] || SHAPE_WHY[shape] };
+    programmatic[e.key] = {
+      shape: shape,
+      why: REASONS[e.key] || SHAPE_WHY[shape],
+      // U4 四项生命周期字段：去向按**形态**派生（可复算），复查期按版本窗
+      purpose: shape,
+      nextConsumer: NEXT_CONSUMER_OF[shape] || NEXT_CONSUMER_OF['query-api'],
+      reviewAfter: after,
+      disposition: 'keep'
+    };
   });
   return {
-    _note: 'WorldAxis 导出消费者类型登记表（v2.187.0）。'
+    _note: 'WorldAxis 导出消费者类型登记表（v2.187.0；v2.191.0 起叠加 U4 生命周期字段）。'
       + 'programmatic 面登记的是「产品面与测试面都零引用、且已确认只有程序化用途」的导出；'
-      + '键 = ns.mem，值 = { shape（形态类别，有限词表）、why（该类的可读理由） }。'
+      + '键 = ns.mem，值 = { shape（形态类别，有限词表）、why（该类的可读理由）'
+      + ' + U4 四项：purpose（去向，**必须等于现场复算的 shape**）、'
+      + 'nextConsumer（下一个消费者应该长什么样，由形态派生）、'
+      + 'reviewAfter（复查期 = 登记时小版本 + ' + REVIEW_WINDOW_MINOR + '）、'
+      + 'disposition（keep / 应删除，默认 keep）；三项分开报：overdue（超期）/ missing-field / purpose-stale }。'
       + '纪律：① 未登记的无消费者导出即红（tests/o8-consumer-gate-v2187.js）；'
       + '② 登记的 shape 必须与现场复算一致（形态变了而登记没改 ⇒ shape-stale 红）；'
       + '③ 已有真实消费者的登记即红（过期登记比没有登记更坏）；'
       + '④ 本表由 `node tools/consumer-types.js --register` 重建，理由来自**形态**（不是手写散文）；'
       + '⑤ 两个如实登记的边界：`ui-component-library` 与 `query-api` 的「用途」判不了，'
-      + '门禁只校验类别合法与形态一致，不假装能判对错。',
-    version: versionOf(),
+      + '门禁只校验类别合法与形态一致，不假装能判对错；'
+      + '⑥ U4 的复查期只判「到没到点」，**不判「该不该删」** —— `disposition: 应删除` 的条目'
+      + '必须真的被删或改成 keep 并给出理由（由 tests/u4-export-lifecycle-v2191.js 盯着）。',
+    version: ver,
     programmatic: programmatic
   };
 }
@@ -457,6 +539,10 @@ module.exports = {
   shapeOf: shapeOf, uiComponentNamespaces: uiComponentNamespaces, registryLiveness: registryLiveness,
   REASONS: REASONS, SHAPE_WHY: SHAPE_WHY, buildLedger: buildLedger, versionOf: versionOf,
   loadRegistry: loadRegistry, scanRefs: scanRefs, testRefOf: testRefOf,
-  ownOf: ownOf, codeFaceOf: codeFaceOf, classify: classify, registryProblems: registryProblems
+  ownOf: ownOf, codeFaceOf: codeFaceOf, classify: classify, registryProblems: registryProblems,
+  // U4（v2.191.0）：生命周期面 —— 复查窗与超期清单
+  REVIEW_WINDOW_MINOR: REVIEW_WINDOW_MINOR, NEXT_CONSUMER_OF: NEXT_CONSUMER_OF,
+  parseVersion: parseVersion, compareVersion: compareVersion, reviewAfterOf: reviewAfterOf,
+  staleReviews: staleReviews
 };
 if (require.main === module) main();

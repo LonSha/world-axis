@@ -10450,7 +10450,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.190.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.191.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -11014,7 +11014,7 @@ assert(verF2500 === '2.190.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.190.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.191.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -11305,7 +11305,7 @@ assert(verF2500 === '2.190.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.190.0', '入口版本为 2.190.0（实 ' + ver + '）');
+    assert(ver === '2.191.0', '入口版本为 2.191.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11898,7 +11898,7 @@ assert(verF2500 === '2.190.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.190.0', '入口版本为 2.190.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.191.0', '入口版本为 2.191.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -12286,7 +12286,7 @@ assert(verF2500 === '2.190.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.190.0', '入口版本为 2.190.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.191.0', '入口版本为 2.191.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12656,7 +12656,7 @@ assert(verF2500 === '2.190.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.190.0', '入口版本为 2.190.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.191.0', '入口版本为 2.191.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -13021,7 +13021,7 @@ assert(verF2500 === '2.190.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.190.0', '入口版本为 2.190.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.191.0', '入口版本为 2.191.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -15374,7 +15374,7 @@ assert(verF2500 === '2.190.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.190.0', '入口 VERSION = 2.190.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.191.0', '入口 VERSION = 2.191.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -21646,7 +21646,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   「版本双落」。改为从 index.js **精确抽取** const VERSION = '...' 再与显式期望比对
     //   （与 v2.125.0 段的 verF2500 同规格：显式常量 + 与 manifest 同源同值）。
     const vM2158 = (idxSrc2158.match(/const VERSION = '([^']+)'/) || [])[1] || '';
-    assert(vM2158 === '2.190.0' && maniSrc2158.version === vM2158,
+    assert(vM2158 === '2.191.0' && maniSrc2158.version === vM2158,
       'v2158: 入口 VERSION 与 manifest.json 同源同值（实 ' + vM2158 + ' / ' + maniSrc2158.version + '）');
     const wsSrc2158 = fs.readFileSync(path.join(BASE, 'engines/world-seed.js'), 'utf8');
     assert(wsSrc2158.indexOf('function transferPack(seedId, max)') >= 0
@@ -22225,6 +22225,32 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 真源码破坏负控制）
     runLock('./u9-fact-report-v2190.js');
     runLock('./u9-fact-report-v2190.js', 'runNegative');
+  }
+  // ── v2.191.0（第一批 · U3 + U4）：散装读数登记 / 导出面去向与复查期 ──
+  //   U3 命题：「没人盯」这件事本身要有判据 —— 族外写死的数字要能在分钟级现形，
+  //     而不是等一趟 17 分钟全量回归（v2.189.0 收口轮 17 处红的发现通道只有全量这一条）。
+  //   U4 命题：登记过后要有**复查期** —— 理由说得对不等于它不会过期
+  //     （四个新引擎的设置读口：已注册、零调用方、理由是「面板尚未渲染」，但不会自己到期）。
+  section('v2.191.0（第一批·U3+U4）：散装读数登记与导出面去向 / 复查期');
+  {
+    const lr = require('../tools/loose-readings.js');
+    const lrRes = lr.audit({});
+    console.log('    散装读数：' + lrRes.sites.length + ' 个登记站点 · 核对 ' + lrRes.checked + ' 处字面量');
+    assert(lrRes.problems.length === 0 && lrRes.checked >= 6,
+      'v2191: 散装读数全站点与真源一致、且无未登记的新增点（站点 ' + lrRes.sites.length
+      + ' / 核对 ' + lrRes.checked + ' / 问题 ' + lrRes.problems.length + '）');
+    const ct4 = require('../tools/consumer-types.js');
+    const ctRes = ct4.classify();
+    const stales = ct4.staleReviews(ctRes, ct4.loadRegistry());
+    assert(stales.length === 0,
+      'v2191: 导出面生命周期零问题（超期 / 缺字段 / 去向过期，实 ' + stales.length + ' 条）');
+    const bumped = ct4.staleReviews(ctRes, ct4.loadRegistry(), ct4.reviewAfterOf('2.196.0'));
+    assert(bumped.filter(function (x) { return x.kind === 'overdue'; }).length > 0,
+      'v2191: 复查期清单**列得出**（推后到窗口之外 ⇒ '
+      + bumped.filter(function (x) { return x.kind === 'overdue'; }).length + ' 条超期）—— 不是恒空清单');
+    // 专锁（A 静态 / B 运行时 / C 不变式 / N 负控制）
+    runLock('./u3-loose-readings-v2191.js');
+    runLock('./u4-export-lifecycle-v2191.js');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
