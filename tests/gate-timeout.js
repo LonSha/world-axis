@@ -159,7 +159,10 @@ const TIMEOUT_ARMED = {
   'b3-e8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   // v2.188.0（第四批 · E7 + E9）：两把新专锁的调用点，同 B3 批次口径（统一预算 96000ms）。
   'b3-e7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b3-e9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'b3-e9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎的专锁调用点。
+  //   新开的调用点不入表即红（本模块治的正是「无一声明 timeout = 一条静默挂起的路径」）。
+  'b4-beat-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -313,7 +316,10 @@ const ARMED_SITES = [
   { key: 'b3-e7-lock', mode: 'spawn',
     anchor: "const rB3E7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e7-v2188.js')]," },
   { key: 'b3-e9-lock', mode: 'spawn',
-    anchor: "const rB3E9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e9-v2188.js')]," }
+    anchor: "const rB3E9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e9-v2188.js')]," },
+  // v2.189.0（缝 A1/A2/A3 + B1/B2）：四引擎合并专锁的调用点（整行唯一 ⇒ 任何前缀也唯一）。
+  { key: 'b4-beat-lock', mode: 'spawn',
+    anchor: "const rB4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-v2189.js')]," }
 ];
 
 /**

@@ -94,7 +94,7 @@ function runA(a) {
   a(pan.indexOf('health: renderHealth') >= 0 || pan.indexOf('renderHealth') >= 0, 'o5v2182/A24: 面板 RENDERERS 挂载');
   a(readOf('tests/run.js').indexOf('|worldHealth:diagnose drill getSettings setSettings sources stat summary|') >= 0,
     'o5v2182/A25: FROZEN2800 逐字含本模块的契约成员集');
-  a(/VERSION = '2\.(182|183|184|185|186|187|188)\.0'/.test(readOf('index.js')) && JSON.parse(readOf('manifest.json')).version && ['2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
+  a(/VERSION = '2\.(182|183|184|185|186|187|188|189)\.0'/.test(readOf('index.js')) && JSON.parse(readOf('manifest.json')).version && ['2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
     'o5v2182/A26: 版本钉一致（index.js + manifest）');
 }
 

@@ -4962,6 +4962,94 @@ function runWitness(WA) {
       } finally { WA.worldBlueprint = keep; }
     });
   }
+  // ══════════ v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎的 16 个码 ══════════
+  //   本批同规：**新码必须有可执行见证**（没有见证的码＝没人真看过的码）。
+  //   16 条全部用**真 API** 跑出来，读数先由 tools/probe_reject189.js 实测（先跑一次看真返回，
+  //   再照读数写见证）。每块都按「同一入口的两种局面分列」——那些分列正是这些码存在的理由：
+  //   「没给」与「给坏了」、「没有那一刻」与「等得不够」、「还没演」与「立不住」处置相反。
+  {
+    // ── A1 beat-report：六码 ──
+    //   「表外的档」与「表内的档却缺必填」是两件不同的事（前者是词表闸，后者是各档的硬条件），
+    //   故 bad-verdict / missing-purpose / purpose-changed / missing-need / missing-round 逐条分列。
+    //   （bad-round 由 E7 段已 want，本章不重复声明，但必须真跑一遍证明它在本引擎里也可达 ——
+    //     实测它原先走 inputGuard.count，而 count('abc')===0 把坏输入塌成 0，于是码写得出、
+    //     跑不到；本轮已修为严格判定。）
+    const BRw = WA.beatReport;
+    if (BRw && typeof BRw.report === 'function') {
+      BRw.setSettings({ enabled: true, strikesPerChapter: 1, redesignPerChapter: 1, minGapRounds: 1 });
+      want('bad-verdict', 'A1：档位不在四值白名单 ⇒ 整次拒收并带回 allowed（不做「宽容降级」）');
+      trip('bad-verdict', function () { return BRw.report({ verdict: '这个档不在表里', chapterKey: 'W1' }).reason; });
+      want('missing-purpose', 'A1：调整档没给出这一拍要达到的结果 ⇒ 拒收（换场合可以，丢结果不行）');
+      trip('missing-purpose', function () { return BRw.report({ verdict: 'adjust', chapterKey: 'W1' }).reason; });
+      want('purpose-changed', 'A1：调整档把这一拍的目的换掉了 ⇒ 拒收（那是换了一拍，必须走 reject）');
+      trip('purpose-changed', function () { return BRw.report({ verdict: 'adjust', chapterKey: 'W1', purpose: '让她退让', keeps: false }).reason; });
+      want('missing-need', 'A1：缺铺垫却不说缺哪一步因 ⇒ 拒收且不按住（不说缺什么＝把一拍无限期悬起来）');
+      trip('missing-need', function () { return BRw.report({ verdict: 'setup', chapterKey: 'W1' }).reason; });
+      want('missing-round', 'A1：驳回档要记账与间隔，却没给决策轮号 ⇒ 拒收');
+      trip('missing-round', function () { return BRw.report({ verdict: 'reject', chapterKey: 'W1' }).reason; });
+      want('redesign-exhausted', 'A1：同一章改篇章已到上限 ⇒ 如实拒收「再去改」，但这次计数照落（拒的是改篇章，不是「不严重」）');
+      trip('redesign-exhausted', function () {
+        BRw.report({ verdict: 'reject', chapterKey: 'W1', round: 10 });
+        return BRw.report({ verdict: 'reject', chapterKey: 'W1', round: 12 }).reason;
+      });
+    }
+    // ── A3 beat-ledger：四码 ──
+    //   「拍序空了」与「拍标题是空的」是两个量（前者是没给本幕，后者是给了空标题）；
+    //   「换场不给过渡」与「自改拍号」也是两个不同入口的硬条件。
+    const BLw = WA.beatLedger;
+    if (BLw && typeof BLw.plan === 'function') {
+      BLw.setSettings({ enabled: true });
+      want('missing-title', 'A3：拍标题必须非空 ⇒ 空标题拒收（否则「这一拍讲什么」只能靠读正文猜）');
+      trip('missing-title', function () { return BLw.plan(['  ', '投宿']).reason; });
+      want('landed-immutable', 'A3：已落的拍是既成事实 ⇒ 重排改写它的标题被拒收（演过的东西不得改写）');
+      trip('landed-immutable', function () {
+        BLw.plan(['进城', '投宿']);
+        BLw.land({}); BLw.land({});
+        return BLw.plan(['换个说法重演', '另一拍']).reason;
+      });
+      want('hard-cut', 'A3：换场不给过渡 ⇒ hard-cut（不许一句话从宿舍切到列车）');
+      trip('hard-cut', function () { return BLw.transition({ from: '宿舍', to: '列车' }).reason; });
+      want('beat-order-locked', 'A3：模型自报的拍号与引擎账不符 ⇒ 拒收并留痕（拍号由引擎推进，模型自改不算数）');
+      trip('beat-order-locked', function () {
+        // 已落的两拍保留在同样位置与标题上，补一拍 pending ⇒ 当前拍是第 3 拍。
+        //   （不能用两条标题：前面那条见证已把两拍落地，重排成两条会一拍不剩，
+        //     claim 会先撞上 no-pending 而轮不到本码 —— 见证自己的构造也得守「已落不可改写」。）
+        BLw.plan(['进城', '投宿', '第三拍']);
+        return BLw.claim(99).reason;
+      });
+    }
+    // ── A2 plan-audit：两码 ──
+    //   「拿已写过的章来复验」与「小改引入了新东西」是同模块两个不同入口，处置相反。
+    const PAw = WA.planAudit;
+    if (PAw && typeof PAw.audit === 'function') {
+      PAw.setSettings({ enabled: true });
+      want('already-written', 'A2：已写过的章不进复验面 ⇒ 拒收（它不再是可以改的东西）');
+      trip('already-written', function () { return PAw.audit([{ id: 'w', title: '已写过的安排', landed: true }]).reason; });
+      want('not-equivalent', 'A2：小改引入了新的人 / 新地点 / 灾变口吻 ⇒ not-equivalent 并逐类报出命中项');
+      trip('not-equivalent', function () { return PAw.equivalent({ cast: ['阿明'] }, { cast: ['阿明', '查无此人甲'] }).reason; });
+    }
+    // ── B1+B2 gen-gate：四码（+ bad-round 复核）──
+    //   四道闸门各报各的：跨线间隔(too-soon) / 上一章余波(aftermath-wait) / 新章静默期(quiet-period) /
+    //   没有那一刻(no-aftermath)。把四道折成一个「不许」会让现场无法归因是哪一道卡着。
+    const GGw = WA.genGate;
+    if (GGw && typeof GGw.gate === 'function') {
+      GGw.setSettings({ enabled: true, minGap: 3, chapterGap: 4, quietRounds: 3, interludeGap: 3 });
+      want('no-aftermath', 'B1：上一章还没有收尾时刻 ⇒ 拒收（不把「没有那一刻」当成「已经等了很久」，那会让它当场放行）');
+      trip('no-aftermath', function () { return GGw.gate('chapter', { round: 10 }).reason; });
+      want('aftermath-wait', 'B1：收尾后余波不够 ⇒ 报哪一道闸门卡着与还要等几轮（wait 是「还要等」，不是「不许」）');
+      trip('aftermath-wait', function () { return GGw.gate('chapter', { round: 10, aftermathAt: 9 }).reason; });
+      want('quiet-period', 'B1：刚换章先把主线立住 ⇒ 新章静默期未过时拒插支线');
+      trip('quiet-period', function () { return GGw.gate('thread', { round: 5, chapterOpenedAt: 4 }).reason; });
+      want('gated-off', 'B1：总开关关闭 ⇒ gate 如实报 gated-off（不是「这一刻允许生成」）');
+      trip('gated-off', function () {
+        GGw.setSettings({ enabled: false });
+        const r = GGw.gate('thread', { round: 1 });
+        GGw.setSettings({ enabled: true });
+        return r.reason;
+      });
+      trip('bad-round', function () { return GGw.gate('thread', { round: '不是数' }).reason; });
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

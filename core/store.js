@@ -109,6 +109,14 @@
       motif: { round: 0, rows: [] },         // 文体档案 / 意象登记（motif.js）
       beatMask: { round: 0, rows: [] },      // 信息迷雾 / 蓝图遮罩（beat-mask.js）
       powerAnchor: { round: 0, rows: [] },   // 战力锚（power-anchor.js）
+      // v2.189.0（缝 A1/A3）：拍回报三档与拍账。四个新引擎的顶层键。
+      //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
+      //   ——登记不等于物化，两件事都要做。
+      //   ⚠ planAudit / genGate **不在此列**：前者是**纯只读复验面**（绝不写 store，
+      //   它的存在意义就是「只看不写」）；后者的闸门账存在自己的 localStorage 键里
+      //   （同 presetWorld / perfLedger 两条先例：那些不是世界事实，不该进存档）。
+      beatReport: { chapterKey: '', strikes: 0, redesigns: 0, lastRejectAt: -1, held: false, setupNeed: '', purpose: '', log: [] },   // 拍回报三档（beat-report.js）
+      beatLedger: { seq: 0, round: 0, rows: [] },   // 拍账 / 拍号由引擎推进（beat-ledger.js）
       // v2.130.0（拓展计划 B1/C1/C2/D3）：三个新引擎的顶层键。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
       //   ——登记不等于物化，两件事都要做。
@@ -1561,6 +1569,11 @@
     //   **终态行不删**：已放弃的计划与已失败（或被拒）的修复都是复盘证据，
     //   「他求过一次、被拒了」与「他从没求过」必须可分辨——故只能环形挤出。
     'plan.plans':       { cap: 12, site: 'plan.js WA.evict.array(draft.plan.plans, maxPlans)（per-call，取设置上界；v2.119.0）' },
+    // v2.189.0（缝 A1/A3）：拍回报日志与拍账两行。
+    //   两处都走 evict 单一出口（无挤出登记就是无限膨胀）；cap 同为 per-call 之外的定值，
+    //   且与 sites 表逐字同值（evict SITES ↔ __BOUNDED_CAPS 双向门禁 G18 会核对）。
+    'beatReport.log':  { cap: 24, site: 'beat-report.js WA.evict.array(b.log, \'beatReport.log\', maxLog)（per-call，取 maxLog 上界；v2.189.0）' },
+    'beatLedger.rows': { cap: 32, site: 'beat-ledger.js WA.evict.array(b.rows, \'beatLedger.rows\', maxRows)（per-call，取 maxRows 上界；v2.189.0）' },
     'mend.threads':     { cap: 12, site: 'mend.js WA.evict.array(draft.mend.threads, maxRows)（per-call，取设置上界；v2.119.0）' },
     'probe.cases':         { cap: 8, site: 'probe.js per-call' },
     // v2.119.0（拓展计划 ⑥）：远方传播两容器（均 per-call）。

@@ -67,7 +67,7 @@ function runA(a) {
     a(diag.indexOf("'" + id + "'") >= 0, 'e3v2184/A9: tool-diag UI_BINDINGS 登记 ' + id);
   });
   // ⑧ 版本钉
-  a(/VERSION = '2\.(184|185|186|187|188)\.0'/.test(readOf('index.js')) && ['2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
+  a(/VERSION = '2\.(184|185|186|187|188|189)\.0'/.test(readOf('index.js')) && ['2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
     'e3v2184/A10: 版本钉一致（index.js + manifest）');
 }
 

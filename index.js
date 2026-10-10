@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.188.0'
+  const VERSION = '2.189.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -478,6 +478,18 @@
     'engines/preset-world.js',
     'engines/request-viewer.js',
     'engines/wb-search.js',
+    // v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎。位置与 tests/run.js 的 LOAD 同序。
+    //   三条硬约束：
+    //     ① `beat-report` / `gen-gate` **必须早于** render/inject.js —— 注入落地时读它们的
+    //        buildBlock()（注入面三处同批登记见 render/inject.js 的 SOURCES / def / VIS_NAMES）；
+    //     ② `beat-report` / `beat-ledger` **须晚于** core/store（它们读写 beatReport / beatLedger
+    //        两个骨架键，骨架物化在 store.js）；
+    //     ③ `plan-audit` 是**纯只读面**（全文零 store.transact），对次序无硬要求；
+    //        它与 `beat-ledger` 都读拍，但一个管「往后还成不成立」、一个管「现演到第几拍」。
+    'engines/beat-report.js',
+    'engines/beat-ledger.js',
+    'engines/plan-audit.js',
+    'engines/gen-gate.js',
     // v2.130.0（拓展计划 B1/C1/C2/D1/D2/D3/D4/A1/A2/A3/A4）：十二个新引擎。
     //   位置与 tests/run.js 的 LOAD 同序，且**一律早于** render/inject.js：
     //   reasoning（思考开销约束）与 story-tone（剧情倾向）产注入块，注入落地时读它们的

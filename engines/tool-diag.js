@@ -2066,6 +2066,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它的真消费方是
     //   面板区块与诊断节（本表），缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
     'engines/world-lab.js': 'worldLab',
+    // v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（拍回报 / 未来安排复验 / 拍账 / 生成闸门）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它们的真消费方是
+    //   注入链（beatReport / genGate）与面板区块、诊断节（本表），缺席就是断裂，
+    //   不该被 OPTIONAL_EXPORTS 静默兜住。漏登记的后果不是「少一行字」：
+    //   inventory 的定义面与出口面契约都从本表取。
+    'engines/beat-report.js': 'beatReport',
+    'engines/plan-audit.js': 'planAudit',
+    'engines/beat-ledger.js': 'beatLedger',
+    'engines/gen-gate.js': 'genGate',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

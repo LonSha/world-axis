@@ -1,6 +1,6 @@
 {
   "_note": "WorldAxis 导出消费者类型登记表（v2.187.0）。programmatic 面登记的是「产品面与测试面都零引用、且已确认只有程序化用途」的导出；键 = ns.mem，值 = { shape（形态类别，有限词表）、why（该类的可读理由） }。纪律：① 未登记的无消费者导出即红（tests/o8-consumer-gate-v2187.js）；② 登记的 shape 必须与现场复算一致（形态变了而登记没改 ⇒ shape-stale 红）；③ 已有真实消费者的登记即红（过期登记比没有登记更坏）；④ 本表由 `node tools/consumer-types.js --register` 重建，理由来自**形态**（不是手写散文）；⑤ 两个如实登记的边界：`ui-component-library` 与 `query-api` 的「用途」判不了，门禁只校验类别合法与形态一致，不假装能判对错。",
-  "version": "2.188.0",
+  "version": "2.189.0",
   "programmatic": {
     "rand.getSeed": {
       "shape": "query-api",
@@ -246,6 +246,22 @@
       "shape": "query-api",
       "why": "世界书检索规模读数：供程序化读最近一次检索命中数"
     },
+    "beatReport.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "beatLedger.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "planAudit.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
+    "genGate.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
+    },
     "staleGuard.getSettings": {
       "shape": "settings-registry-only",
       "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块"
@@ -489,6 +505,10 @@
     "sanitize.CODES": {
       "shape": "data-const",
       "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）"
+    },
+    "genGate.antiRepeat": {
+      "shape": "query-api",
+      "why": "程序化查询口：由调用方按需派生（面板与诊断当前未接）"
     },
     "storyTone.LABELS": {
       "shape": "data-const",

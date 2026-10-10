@@ -356,6 +356,11 @@
     //   不得在解锁/冷却结束/节拍到点时原地删——那会让复盘凭据消失。
     'userlock.rows':  { path: 'userlock.rows',  cap: 200, why: '用户锁定行环形（解锁是删指定行，历史锁痕只能环形挤出）' },
     'rhythm.devices': { path: 'rhythm.devices', cap: 'per-call', kind: 'array', why: '叙事手法冷却表环形（上限 = maxDevices 设置，写入时传入）' },
+    // v2.189.0（缝 A1/A3）：拍回报日志与拍账两行（与 __BOUNDED_CAPS 同键同义）。
+    //   why 写给读者看的是「这个容器为什么必须有界」——两份都**不能完成后就删**：
+    //   「这一章被报过几次不合适」「第几拍是引擎推的、模型自己改过没有」都是复盘证据。
+    'beatReport.log':  { path: 'beatReport.log',  cap: 'per-call', kind: 'array', why: '拍回报台账环形（上限 = maxLog 设置；跨章保留，是「谁在什么时候报了哪一档」的唯一凭据）' },
+    'beatLedger.rows': { path: 'beatLedger.rows', cap: 'per-call', kind: 'array', why: '拍账环形（上限 = maxRows 设置；拍号由引擎推进，模型自改必须可查）' },
     'motif.rows':     { path: 'motif.rows',     cap: 'per-call', kind: 'array', why: '意象登记环形（上限 = maxRows 设置，写入时传入）' },
     'beatMask.rows':  { path: 'beatMask.rows',  cap: 'per-call', kind: 'array', why: '节拍遮罩登记环形（上限 = maxRows 设置，写入时传入）' },
     'powerAnchor.rows': { path: 'powerAnchor.rows', cap: 'per-call', kind: 'array', why: '战力锚登记环形（上限 = maxRows 设置，写入时传入）' },

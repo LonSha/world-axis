@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.188.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.188.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.189.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.189.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -314,6 +314,94 @@
       "tref": 8,
       "own": 3
     },
+    "beatLedger.buildBlock": {
+      "reason": "self-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "beatLedger.claim": {
+      "reason": "self-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "beatLedger.current": {
+      "reason": "self-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "beatLedger.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "beatLedger.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "beatLedger.land": {
+      "reason": "test-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "beatLedger.plan": {
+      "reason": "test-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "beatLedger.setSettings": {
+      "reason": "test-only",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "beatLedger.stat": {
+      "reason": "self-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
+    },
+    "beatLedger.transition": {
+      "reason": "self-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "beatLedger.view": {
+      "reason": "self-only",
+      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
     "beatMask.advance": {
       "reason": "self-only",
       "detail": "engines/beat-mask.js 内部自用、外部零引用（过度导出）",
@@ -393,6 +481,54 @@
       "refs": 0,
       "tref": 0,
       "own": 11
+    },
+    "beatReport.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/beat-report.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-report.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "beatReport.getSettings": {
+      "reason": "test-only",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/beat-report.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "beatReport.report": {
+      "reason": "self-only",
+      "detail": "engines/beat-report.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-report.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "beatReport.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/beat-report.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "beatReport.stat": {
+      "reason": "self-only",
+      "detail": "engines/beat-report.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-report.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 14
+    },
+    "beatReport.view": {
+      "reason": "self-only",
+      "detail": "engines/beat-report.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-report.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
     },
     "binding.bind": {
       "reason": "self-only",
@@ -2250,6 +2386,62 @@
       "tref": 20,
       "own": 3
     },
+    "genGate.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/gen-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-gate.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "genGate.gate": {
+      "reason": "test-only",
+      "detail": "engines/gen-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-gate.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 9
+    },
+    "genGate.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/gen-gate.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "genGate.record": {
+      "reason": "test-only",
+      "detail": "engines/gen-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-gate.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "genGate.setSettings": {
+      "reason": "test-only",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/gen-gate.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 1
+    },
+    "genGate.stat": {
+      "reason": "self-only",
+      "detail": "engines/gen-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-gate.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 18
+    },
+    "genGate.view": {
+      "reason": "test-only",
+      "detail": "engines/gen-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-gate.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
     "groupGuard.guard": {
       "reason": "self-only",
       "detail": "engines/group-refuse.js 内部自用、外部零引用（过度导出）",
@@ -3689,6 +3881,62 @@
       "refs": 0,
       "tref": 0,
       "own": 23
+    },
+    "planAudit.audit": {
+      "reason": "test-only",
+      "detail": "engines/plan-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-audit.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "planAudit.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/plan-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-audit.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "planAudit.equivalent": {
+      "reason": "self-only",
+      "detail": "engines/plan-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-audit.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "planAudit.evidence": {
+      "reason": "self-only",
+      "detail": "engines/plan-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-audit.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "planAudit.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/plan-audit.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "planAudit.setSettings": {
+      "reason": "test-only",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/plan-audit.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "planAudit.stat": {
+      "reason": "self-only",
+      "detail": "engines/plan-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-audit.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
     },
     "plotGauge.reset": {
       "reason": "test-only",
@@ -6526,6 +6774,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 279
+    "dataOnly": 285
   }
 }

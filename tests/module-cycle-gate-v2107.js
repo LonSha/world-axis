@@ -173,7 +173,7 @@ function runAll(A) {
   // v2.187.0（E4）：新增 engines/campaign.js ⇒ 文件面 207 → 208、解析出别名 207 → 208、
   //   有引用 205 → 206（campaign 读 store / settingsBus / inputGuard / worldBlueprint /
   //   diplomacy / factionGraph / freight 七个 ns，故「有引用」）。
-  A(a.files === 212 && a.aliasFiles === 212 && a.refFiles === 210,
+  A(a.files === 216 && a.aliasFiles === 216 && a.refFiles === 214,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -234,7 +234,7 @@ function runAll(A) {
   //     · ui/panel.js → campaign（六枚控件 + 读数出口，+1）
   //     · __settingsRegs（设置注册槽，全仓同一形态，+1）
   //   其余为 run.js / tool-diag 的登记面读数在同 (file, ns) 对上去重后的净增。
-  A(a.edgesLoad === 102 && a.edgesCall === 1645 && a.edgesAll === 1747 && a.identityOk,
+  A(a.edgesLoad === 106 && a.edgesCall === 1671 && a.edgesAll === 1777 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -307,7 +307,7 @@ function runAll(A) {
   // v2.165.0（TX1）：LOAD_ORDER 184 → 185（engines/diplomacy.js 入序）。
   // v2.166.0（TX2）：LOAD_ORDER 185 → 186（engines/agency.js 入序）。
   // v2.187.0（E4）：LOAD_ORDER 206 → 207（新增 engines/campaign.js）。
-  A(a.edgesLoad >= 20 && a.orderLen === 211,
+  A(a.edgesLoad >= 20 && a.orderLen === 215,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -330,7 +330,7 @@ function runAll(A) {
   // v2.187.0（E4）：命名空间三面各 +1（静态提供方 240 → 241 / 账本 202 → 203 /
   //   读面 217 → 218）—— campaign 是一个新命名空间，且**三面同时 +1**：
   //   它自己提供 ns、登记进 module-registry 账本、又被 tool-diag 与面板读到。
-  A(a.nsProvided === 245 && a.nsLedger === 207 && a.nsRead === 222,
+  A(a.nsProvided === 249 && a.nsLedger === 211 && a.nsRead === 224,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -348,7 +348,7 @@ function runAll(A) {
   //   ui/panel.js 控件 / tool-diag 诊断节，但静态扫描下其 __settingsRegs 等内部槽面新增
   //   一项未被读出的 ns —— 与 v2.153.0 前的 static-only 差同性质，只报不红）。
   // v2.166.0（TX2）：零读 ns 22 → 23（agency 的新消费面同上）。
-  A(a.deadNs.length === 23, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 25, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

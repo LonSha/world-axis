@@ -133,6 +133,13 @@
     'investigation',
     'aftermath',
     'operations',
+    // v2.189.0（缝 A1/B1+B2）：拍回报三档与生成闸门。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。键名 = 命名空间名（genGate 是驼峰）。
+    //   分工：`beatReport` 答「这一拍**按住没有、缺哪一步因**」（把审查结论送回正文），
+    //   本表另一项 `genGate` 答「这一刻**允不允许生成**、还有哪些东西已经用过了」。
+    //   两者都不列未到达的内容 —— 与 beatMask「绝不列未到达节拍的内容」同一条防剧透纪律。
+    'beatReport', 'genGate',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
@@ -187,7 +194,11 @@ style: false,
         // v2.165.0（TX1）：势力外交。取默认 true（同四条理由——其模块总开关默认为关：
         //   diplomacy 的 DEF.enabled=false，未开时 buildBlock 返回空串），
         //   不给老用户凭空多出约束。
-        worldBridge: true, diplomacy: true, agency: true, freight: true, storyChoice: true, commission: true, investigation: true, aftermath: true, operations: true }, module: 'render' };
+        worldBridge: true, diplomacy: true, agency: true, freight: true, storyChoice: true, commission: true, investigation: true, aftermath: true, operations: true,
+        // v2.189.0（缝 A1/B1+B2）：两条新源。取默认 true（同四条理由——其模块总开关默认为关：
+        //   beatReport 的 DEF.enabled=false、genGate 的 DEF.enabled=false，未开时 buildBlock
+        //   返回空串），不给老用户凭空多出约束。
+        beatReport: true, genGate: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -380,6 +391,12 @@ style: false,
     investigation: '线索调查',
     aftermath: '地点后果',
     operations: '运营结算',
+    // v2.189.0（缝 A1/B1+B2）：两条新注入源的显示名。与 SOURCES（键）/ 注入分支 source 名
+    //   逐字同名登记（switch-matrix-v2910 的 C1/C2 与 explain-v2900 的 A2/C1 要的同批口径）。
+    //   取名理由与 diplomacy 同规（注入项名要答「这一段是什么」，不是「哪个模块产的」）：
+    //   `genGate` 取「要避开的东西」而非「生成闸门」—— 这一段进正文的**不是闸门读数**，
+    //   而是那份「已经用过了、不要重演」的名单（闸门判定本身不进正文）。
+    beatReport: '拍回报', genGate: '要避开的东西',
     sediment: '此地沉积',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
@@ -488,7 +505,19 @@ style: false,
     diplomacy: 'worldaxis_diplomacy_settings_v1',
     agency: 'worldaxis_agency_settings_v1',
     freight: 'worldaxis_freight_settings_v1', storyChoice: 'worldaxis_story_choice_settings_v1', commission: 'worldaxis_commission_settings_v1', investigation: 'worldaxis_investigation_settings_v1', aftermath: 'worldaxis_aftermath_settings_v1',
-    operations: 'worldaxis_operations_settings_v1' };
+    operations: 'worldaxis_operations_settings_v1',
+    // v2.189.0（缝 A1/B1+B2）：两条新源**都有**模块级总开关（beat-report.js / gen-gate.js
+    //   的 `worldaxis_beat_report_settings_v1` / `worldaxis_gen_gate_settings_v1`）。
+    //   不登记会怎样：`moduleEnabled` 查不到键就返回 null，于是对账面上本源落在 `unavailable`
+    //   （「没有模块级总开关」——而它明明有），用户勾了模块总开关却在「开关两面一致」上看到
+    //   「模块没加载」，排查方向被指错。同一类漏登记已为 rumor/canon（v2.99.0）、chrono
+    //   （v2.127.0）、reasoning/storyTone（v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0）、
+    //   sediment（v2.149.0）、worldBridge（v2.154.0）、diplomacy（v2.165.0）各付过一次学费。
+    beatReport: 'worldaxis_beat_report_settings_v1',
+    // ⚠ genGate 例外：它的**数据键是第二把**（`worldaxis_gen_gate_data_v1`，名单与闸门账），
+    //   这里登记的是它的**设置键**（同注册表 `__REG.key`）—— 两把键各司其职，
+    //   拿数据键当模块总开关读会永远读到「未设」而判成 unavailable。
+    genGate: 'worldaxis_gen_gate_settings_v1' };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -1074,6 +1103,15 @@ style: false,
       if (vis.commission && WA.commission) { const cmb = engineCall('commission', function () { return WA.commission.buildBlock(); }); if (cmb) items.push({ source: '委托履约', content: cmb }); }
       if (vis.investigation && WA.investigation) { const ivb = engineCall('investigation', function () { return WA.investigation.buildBlock(); }); if (ivb) items.push({ source: '线索调查', content: ivb }); }
       if (vis.operations && WA.operations) { const ob = engineCall('operations', function () { return WA.operations.buildBlock(); }); if (ob) items.push({ source: '运营结算', content: ob }); }
+      // v2.189.0（缝 A1）：拍回报三档。**只出「按住的那一拍 + 待补的因 + 调整档的边界」**，
+      //   不出审查意见书、不出计数、不出已通过的拍 —— 那三样是诊断面的事（作者看得见，模型看不见）。
+      //   本块是要治「演得出来但缺一步因」与「根本立不住」在正文里长得一样：前者只需补一句，
+      //   后者才该重排；合成一个「不通过」会让模型被反复重排而缺的那一步因永远补不上。
+      if (vis.beatReport && WA.beatReport) { const brb = engineCall('beatReport', function () { return WA.beatReport.buildBlock(); }); if (brb) items.push({ source: '拍回报', content: brb }); }
+      // v2.189.0（缝 B1+B2）：生成闸门与防重复名单。本块进正文的**不是闸门读数**，
+      //   而是那份「已经用过了、不要重演也不要换个说法再来一遍」的名单
+      //   —— 只记标题正是上游那次「换皮重演」的成因（模型不知道这套因果已经写过了）。
+      if (vis.genGate && WA.genGate) { const ggb = engineCall('genGate', function () { return WA.genGate.buildBlock(); }); if (ggb) items.push({ source: '要避开的东西', content: ggb }); }
       if (vis.aftermath && WA.aftermath) { const afb = engineCall('aftermath', function () { return WA.aftermath.buildBlock(); }); if (afb) items.push({ source: '地点后果', content: afb }); }
       if (vis.session && WA.session) { const se = engineCall('session', function () { return WA.session.buildBlock(); }); if (se) items.push({ source: '多人场', content: se }); }
       // v2.63.0：社交漩涡。只报**仍在生效**的共同隐瞒与最近的关系经历。

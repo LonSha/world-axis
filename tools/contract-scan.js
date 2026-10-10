@@ -118,7 +118,15 @@ const EXEMPT = {
   //       （usable/degraded/unknown/blocked），判据是导入前的体检报告。
   //   一个是「动作的许可态」，一个是「依赖的可用态」—— **同形不同义，不许互相校验**：
   //   若强行统一，就会出现「依赖体检结论要跟行动裁决用同一套词」这种语义错配。
-  VERDICTS: '同名不同义的「裁决集」：act=行动许可态（action/refuse/delay/status-quo）、dep-check=依赖体检结论（usable/degraded/unknown/blocked）'
+  VERDICTS: '同名不同义的「裁决集」：act=行动许可态（action/refuse/delay/status-quo）、dep-check=依赖体检结论（usable/degraded/unknown/blocked）',
+  // v2.189.0（缝 A1/A2/A3 + B1/B2）：本批的 A3 引擎（engines/beat-ledger.js）带一张
+  //   STATUSES 常量，与 v2.129.0 就在场的 engines/editor-faction.js 同名 —— 合法地指向不同值域，逐条说清：
+  //     · beat-ledger 的 STATUSES 是**「拍的落库状态」**（pending / landed），
+  //       即「待落库 / 已落库」两态，判据是拍账里那一行有没有真写进去；
+  //     · editor-faction 的 STATUSES 是**「势力兴衰状态」**（鼎盛/稳固/倾轧/困顿/衰落/瓦解），判据是势力面板的人工设定。
+  //   一个是「一条记录落没落地」，一个是「一个势力兴还是衰」—— **同形不同义，不许互相校验**：
+  //   若强行统一，就会出现「拍落没落库要跟势力兴衰用同一套词」这种语义错配。
+  STATUSES: '同名不同义的「状态表」：beat-ledger=拍的落库状态（pending/landed）、editor-faction=势力兴衰状态（鼎盛/稳固/倾轧/困顿/衰落/瓦解）',
 };
 
 /** 具名常量数组（只认一行内形态）。 */

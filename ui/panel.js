@@ -125,6 +125,10 @@
     investigation: '线索调查',
     aftermath: '地点后果',
     operations: '运营结算',
+    // v2.189.0（缝 A1/B1+B2）：两条新注入源的显示名。与 render/inject.js 的 VIS_NAMES、
+    //   SOURCES（键）、注入分支 source 名**四处逐字同名**（inject-sources-v2560 的 D 判据：
+    //   SOURCES 每一项在本表里都要有显示名，且本表不得有超出 SOURCES 的键）。
+    beatReport: '拍回报', genGate: '要避开的东西',
     sediment: '此地沉积',
     chrono: '世界编年史' };
 

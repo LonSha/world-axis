@@ -72,6 +72,12 @@ function refsSitesOf(src) {
     return refsUnitOf(s.replace(/ *===.*$/, ''));
   })));
 }
+/** 消息静态头站点现场枚举：`死子面 dead N / uiDead M / dataOnly K`
+ *  —— 只锤到「值本体」为止：尾部的分隔符（（ / ； / ））与注记会随版本改形态，
+ *     把它们写进锚点 ⇒ 升版后静默打空（正是 refs 族注释点过的病）。 */
+function headSitesOf(src) {
+  return Array.from(new Set(src.match(/死子面 dead \d+ \/ uiDead \d+ \/ dataOnly \d+/g) || []));
+}
 /** 靶子：`<观察位>=== <值>` —— 精确到「这一个观察位等于这一个数」。 */
 function refsSite(unit, want) { return unit + '=== ' + want; }
 
@@ -275,13 +281,21 @@ function runNegative(assert, ctx) {
     'N3 只改比较值（消息不动）⇒ 报 intra-drift/dead');
 
   // N4 只改消息静态头 ⇒ message-mismatch（证明「静态头」这个观察位真的在起作用）
-  const head4 = '死子面 dead ' + LIVE.dead + ' / uiDead ' + LIVE.uiDead
-    + ' / dataOnly ' + LIVE.dataOnly + '（';
-  const b4 = breakOnce(runSrc, head4,
-    head4.replace('dead ' + LIVE.dead, 'dead ' + (LIVE.dead + 1)), 'N4');
+  //   站点**现场枚举**（形态：`死子面 dead N / uiDead M / dataOnly K`，只锤值本体，
+  //   尾部「（」或「；」这类分隔符不写进锚点——升版改形态时它会静默打空，
+  //   正是上面 refs 族注释点过的病）；
+  //   且**全族同改**（同 N2 口径）：同一份静态头在源码里可能出现两份副本（断言块内 + 裸字面量），
+  //   只改首份时，判据看到的仍是未改的第二份 ⇒ 该观察位其实没被验到。
+  const headSites = headSitesOf(runSrc);
+  assert(headSites.length >= 1,
+    'N3b 消息静态头站点现场枚举 ≥ 1（实 ' + headSites.length + ' 处）');
+  const b4 = headSites.reduce(function (src, h) {
+    return breakOnce(src, h, h.replace('dead ' + LIVE.dead, 'dead ' + (LIVE.dead + 1)), 'N4');
+  }, runSrc);
   const p4 = R.coherence(b4, { live: LIVE });
-  assert(p4.filter(function (p) { return p.kind === 'message-mismatch' && p.field === 'dead'; }).length === 1,
-    'N4 只改消息静态头 ⇒ 报 message-mismatch/dead');
+  assert(p4.filter(function (p) { return p.kind === 'message-mismatch' && p.field === 'dead'; }).length >= 1,
+    'N4 只改消息静态头 ⇒ 报 message-mismatch/dead（实 '
+      + p4.filter(function (p) { return p.kind === 'message-mismatch'; }).length + ' 处）');
 
   // N5 破坏必须真的发生（上面每个 breakOnce 没打中都会抛；这里再显式核对一次「改后有差」）
   assert(b1 !== runSrc && b2 !== runSrc && b3 !== runSrc && b4 !== runSrc,
