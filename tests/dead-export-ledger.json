@@ -4794,6 +4794,46 @@
       "tref": 0,
       "own": 5
     },
+    "rejectRecovery.counts": {
+      "reason": "self-only",
+      "detail": "engines/reject-recovery.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reject-recovery.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "rejectRecovery.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/reject-recovery.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reject-recovery.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "rejectRecovery.explain": {
+      "reason": "self-only",
+      "detail": "engines/reject-recovery.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reject-recovery.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "rejectRecovery.ruleKind": {
+      "reason": "self-only",
+      "detail": "engines/reject-recovery.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reject-recovery.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "rejectRecovery.stat": {
+      "reason": "self-only",
+      "detail": "engines/reject-recovery.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reject-recovery.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
     "render.buildStyleBlock": {
       "reason": "self-only",
       "detail": "render/inject.js 内部自用、外部零引用（过度导出）",
@@ -6774,6 +6814,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 285
+    "dataOnly": 294
   }
 }
