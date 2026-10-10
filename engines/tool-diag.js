@@ -2075,6 +2075,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/plan-audit.js': 'planAudit',
     'engines/beat-ledger.js': 'beatLedger',
     'engines/gen-gate.js': 'genGate',
+    // v2.192.0（U5）：拒收码到恢复动作的统一映射（engines/reject-recovery.js）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它是诊断面 / 面板面 /
+    //   日志面共用的那一份映射（本表就是它的诊断面消费方），缺席就是断裂，
+    //   不该被 OPTIONAL_EXPORTS 静默兜住。
+    'engines/reject-recovery.js': 'rejectRecovery',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

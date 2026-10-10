@@ -306,8 +306,8 @@ async function probeRollbackScope(WA) {
 async function judge(a) {
   // ── B4 ──
   const led = JSON.parse(fs.readFileSync(path.join(__dirname, 'module-registry-ledger.json'), 'utf8'));
-  a(led.totals.loadEdges === 106 && led.totals.callRefs === 208,
-    'v2830/mr: 装载期边 106 / 调用期引用 208（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（引用多 ≠ 必须先装载；v2.187.0（第三批 E4/E6/E8）：新增 engines/campaign.js / engines/atlas.js / engines/dep-check.js ⇒ 装载期边 +3（尾部各调 registerModule）、调用期 +4；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
+  a(led.totals.loadEdges === 107 && led.totals.callRefs === 210,
+    'v2830/mr: 装载期边 107 / 调用期引用 210（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（引用多 ≠ 必须先装载；v2.187.0（第三批 E4/E6/E8）：新增 engines/campaign.js / engines/atlas.js / engines/dep-check.js ⇒ 装载期边 +3（尾部各调 registerModule）、调用期 +4；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
     + '三者调用期读 store/clock/evict/org/intel 等 ⇒ 调用期 +2）；'
@@ -315,19 +315,19 @@ async function judge(a) {
     + '（由 core/store.js 提供）⇒ 各多 1 条装载期边；调用期 +4 来自 store 读 WA.plugin.fire'
     + '与 plugin 钩子体走 WA.sandbox.run）；'
     + 'v2.165.0（TX1）：新增 engines/diplomacy.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/settingsBus）'
-    + '; v2.166.0（TX2）：新增 engines/agency.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/settingsBus）; v2.167.0（TX3）：新增 engines/freight.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）; v2.168.0（TX4）：新增 engines/story-choice.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/settingsBus）; v2.169.0（TX6）：新增 engines/commission.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/org/clock）; v2.170.0（TX7）：新增 engines/investigation.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）; v2.171.0（TX8）：新增 engines/aftermath.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/region/sediment）; v2.172.0（TX9）：新增 engines/operations.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/inst/org）; v2.173.0（TX4b）：不新增模块，只把 TX4/TX6/TX7/TX8/TX9 五模块接上真实产品消费方（面板栏位），装载期边不变');
+    + '; v2.166.0（TX2）：新增 engines/agency.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/settingsBus）; v2.167.0（TX3）：新增 engines/freight.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）; v2.168.0（TX4）：新增 engines/story-choice.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/settingsBus）; v2.169.0（TX6）：新增 engines/commission.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/org/clock）; v2.170.0（TX7）：新增 engines/investigation.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）; v2.171.0（TX8）：新增 engines/aftermath.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/region/sediment）; v2.172.0（TX9）：新增 engines/operations.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/inst/org）; v2.173.0（TX4b）：不新增模块，只把 TX4/TX6/TX7/TX8/TX9 五模块接上真实产品消费方（面板栏位），装载期边不变；v2.192.0（U5）：新增 engines/reject-recovery.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store 的 registerModule 与 settingsBus —— 该模块只登记自己并读设置，不写任何 store）；本处期望值由 **U3 散装读数核对器在分钟级抓到**（node tools/loose-readings.js 一次报出 4 处陈旧读数）');
   a(led.totals.loadEdges < led.totals.callRefs,
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
-  a(led.nsCount === 211 && led.loadedCount === 203,
-    'v2830/mr: 命名空间 211 / 装载文件 203（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（v2.187.0（第三批 E4/E6/E8）：campaign / atlas / depCheck 三命名空间 ⇒ 两边各 +1，叠加 ui/* 三件后装载文件面 194 → 197；v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
+  a(led.nsCount === 212 && led.loadedCount === 204,
+    'v2830/mr: 命名空间 212 / 装载文件 204（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（v2.187.0（第三批 E4/E6/E8）：campaign / atlas / depCheck 三命名空间 ⇒ 两边各 +1，叠加 ui/* 三件后装载文件面 194 → 197；v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三命名空间后两边各 +3；'
     + 'v2.98.0 时为 112 - 3 = 109，v2.99.0 新增 engines/canon.js 后两边各 +1；'
     + 'v2.101.0 新增 engines/interop.js 后两边各 +1；'
-    + 'v2.102.0 新增 engines/perf-trace.js（perfTrace 命名空间）后两边各 +1）; v2.165.0（TX1）新增 engines/diplomacy.js（diplomacy 命名空间）⇒ 两边各 +1; v2.166.0（TX2）新增 engines/agency.js（agency 命名空间）⇒ 两边各 +1; v2.167.0（TX3）新增 engines/freight.js（freight 命名空间）⇒ 两边各 +1; v2.168.0（TX4）新增 engines/story-choice.js（storyChoice 命名空间）⇒ 两边各 +1; v2.169.0（TX6）新增 engines/commission.js（commission 命名空间）⇒ 两边各 +1; v2.170.0（TX7）新增 engines/investigation.js（investigation 命名空间）⇒ 两边各 +1; v2.171.0（TX8）新增 engines/aftermath.js（aftermath 命名空间）⇒ 两边各 +1; v2.172.0（TX9）新增 engines/operations.js（operations 命名空间）⇒ 两边各 +1'
+    + 'v2.102.0 新增 engines/perf-trace.js（perfTrace 命名空间）后两边各 +1）; v2.165.0（TX1）新增 engines/diplomacy.js（diplomacy 命名空间）⇒ 两边各 +1; v2.166.0（TX2）新增 engines/agency.js（agency 命名空间）⇒ 两边各 +1; v2.167.0（TX3）新增 engines/freight.js（freight 命名空间）⇒ 两边各 +1; v2.168.0（TX4）新增 engines/story-choice.js（storyChoice 命名空间）⇒ 两边各 +1; v2.169.0（TX6）新增 engines/commission.js（commission 命名空间）⇒ 两边各 +1; v2.170.0（TX7）新增 engines/investigation.js（investigation 命名空间）⇒ 两边各 +1; v2.171.0（TX8）新增 engines/aftermath.js（aftermath 命名空间）⇒ 两边各 +1; v2.172.0（TX9）新增 engines/operations.js（operations 命名空间）⇒ 两边各 +1; v2.192.0（U5）新增 engines/reject-recovery.js（rejectRecovery 命名空间）⇒ 两边各 +1'
     + ' —— v2.84.0 A2 新增 core/input-guard.js（inputGuard 命名空间）；'
     + ' v2.87.0 B7 新增 engines/theme.js（theme 命名空间）；'
     + ' v2.96.0 X3 新增 engines/rumor.js（rumor 命名空间）；'

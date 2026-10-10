@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.191.0'
+  const VERSION = '2.192.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -490,6 +490,12 @@
     'engines/beat-ledger.js',
     'engines/plan-audit.js',
     'engines/gen-gate.js',
+    // v2.192.0（U5）：拒收码 → 恢复动作的统一映射。位置紧随四个拍引擎之后 ——
+    //   它正是为这四者那批「处置方向相反」的码建的（`hard-cut` / `landed-immutable` /
+    //   `adjust` / `setup` 都可拒收，含义却分属四档）。**纯只读**：零 store、零 fs、
+    //   零 localStorage，只有三张冻结表与一个纯函数，故对次序无硬要求。
+    //   它是诊断面 / 面板面 / 日志面三处共用的**唯一**一份恢复语义（此前三面各猜一句）。
+    'engines/reject-recovery.js',
     // v2.130.0（拓展计划 B1/C1/C2/D1/D2/D3/D4/A1/A2/A3/A4）：十二个新引擎。
     //   位置与 tests/run.js 的 LOAD 同序，且**一律早于** render/inject.js：
     //   reasoning（思考开销约束）与 story-tone（剧情倾向）产注入块，注入落地时读它们的

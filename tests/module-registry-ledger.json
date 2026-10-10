@@ -1,13 +1,13 @@
 {
- "version": "2.191.0",
- "loadOrderCount": 215,
- "loadedCount": 203,
+ "version": "2.192.0",
+ "loadOrderCount": 216,
+ "loadedCount": 204,
  "uiCount": 12,
- "nsCount": 211,
+ "nsCount": 212,
  "totals": {
-  "loadEdges": 106,
+  "loadEdges": 107,
   "hardEdges": 0,
-  "callRefs": 208,
+  "callRefs": 210,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -105,6 +105,7 @@
     "engines/region.js",
     "engines/regional.js",
     "engines/rehearse.js",
+    "engines/reject-recovery.js",
     "engines/request-viewer.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
@@ -326,6 +327,7 @@
     "engines/refine.js",
     "engines/region.js",
     "engines/rehearse.js",
+    "engines/reject-recovery.js",
     "engines/request-viewer.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
@@ -2655,6 +2657,25 @@
     "worldaxis_gen_gate_data_v1",
     "worldaxis_gen_gate_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/reject-recovery.js": {
+   "ns": [
+    "rejectRecovery"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/stale-guard.js": {

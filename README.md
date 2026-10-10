@@ -67,7 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.191.0）
+## 构建与验收（当前版本 v2.192.0）
 
 v2.173.0（TX4b）— TX4/TX6/TX7/TX8/TX9 五模块面板接线（渲染 + 绑定 + 登记三面同步）+ 六模块骨架登记补齐（骨架声明 / `__BOUNDED_CAPS` / `evict.SITES` 三段式）+ 两处预存失败收敛 — TX 五张专锁 42/49/44/49/46 全 0 失败。
 
@@ -85,12 +85,13 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（36 个，`git ls-files tools/ | wc -l` 为准：
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（37 个，`git ls-files tools/ | wc -l` 为准：
 `agenda_smoke` / `anchor-scan` / `capacity_audit_smoke` / `chronicle_view_smoke` / `consumer-types` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `fact-report` /
 `doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `impact-analysis` / `loose-readings` / `patch-idempotency` /
-`pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded` /
+`pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `reject-recovery` / `scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded` /
 `test-audit` / `test-layers` / `tx1_smoke` / `tx2_smoke` / `tx3_smoke` / `tx4_smoke` / `tx6_smoke` / `tx7_smoke` /
 `tx8_smoke` / `tx9_smoke` / `world_health_smoke`）。
+（v2.192.0（第二批 · U5）：新入库 `reject-recovery`（拒收码 → 恢复动作核对器）。它**不带映射表** —— 表只存在产品模块 `engines/reject-recovery.js` 一处（面板面 / 诊断面 / 日志面的共同消费方），本工具只做「现场复算 vs 产品承诺」的逐条核对；它由专锁 `tests/reject-recovery-lock-v2192.js` + `tests/run.js` 两条链引用，属「被门禁链引用」。故索引由 36 → **37**。）
 （v2.191.0（第一批 · U3 + U4）：本名单补上一个本轮新入库的工具 —— `loose-readings`（散装读数核对器，治「族外写死的数字没人盯」）；它由 **专锁 + `tests/run.js` 的新增节**两条链引用，属「被门禁链引用」。U4 改的 `consumer-types` **早已在册**（本轮只加导出面生命周期字段）—— 故索引由 35 → **36**，不是 37：**名单跟着「索引里有没有这个文件」走，不跟着「本轮改了几个文件」走**。）
 （v2.190.0（第一批 · U9）：新入库 `fact-report`（发布前事实报告）—— 它由专锁 `tests/u9-fact-report-v2190.js` 直接 require，属「被门禁链引用」；同一轮本名单必须跟上。）
 （v2.187.0 收口轮：本名单一次补上三个本轮新入库的工具 —— `test-layers`（分层选区归属表单一真源）、
@@ -113,7 +114,7 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（128 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（129 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
@@ -144,6 +145,16 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 <b>八条否定式边界</b>：① 默认关；② choose 记账 ≠ 世界兑现（三段可分离）；③ ops 必须经 rehearsal.preview 白名单；④ 状态变了重新预演；⑤ 不把 rehearsal diff 直接写 live store；⑥ 过期/未知/不可比较分别显示；⑦ review 只读不写；⑧ 不凭空造 ops。
 <b>实测读数</b>：module-registry-gate 文件 <b>184</b> / 命名空间 <b>192</b> / 装载期边 <b>86</b> / 调用期引用 <b>170</b>；拒收码 <b>738 码（见证 481 / 死表 29 / 基线 228）</b>；module-cycle-gate-v2107 pass(65)。
 <b>专锁 <code>tests/s3-tx4-v2168.js</code> 42 / 0</b>。冒烟脚本 <code>tools/tx4_smoke.js</code> 13/13。
+<b>v2.192.0</b> — <b>U5 拒收码到恢复动作的统一映射（三面分开）</b>（<b>第二代优化线第二批</b>：本仓第一次回答「拿到这个码之后该做什么」，并在做的过程中<b>改掉了一个从 v2.173.0 起就没人核对过的读数口径</b>）。
+<b>U5 它治什么</b>：码面有一道门禁（<code>tests/reject-code-gate.js</code>）在<b>数数量</b>（804 个内联码），但<b>没有任何地方</b>回答「这个码该怎么恢复」—— 于是每个消费方各自临时判断，或干脆让玩家自己猜。更重的是：<b>那个 804 从来不是「拒收面」</b> —— 它的扫描词法是 <code>CODE_RE = /reason\s*:\s*'([a-zA-Z][a-zA-Z0-9_-]*)'/g</code>，<b>只认内联字面量、不区分成功返回与失败返回</b>。
+<b>本版的决定性实测（括号配对，不看邻近窗口）</b>：把每次命中的位置向前找到未配对的 <code>{</code>、向后配到闭合，取出<b>整个对象字面量</b>再读它的 <code>ok:</code> ——<b>804 = 拒收面 717 / 成功面 34 / 判不出面 53</b>（<code>PURE_FALSE 705 + MIXED 12</code> 并入拒收；<code>NO_OK 53</code>）。旧口径把 <code>clean</code> / <code>ok</code> / <code>applied</code> / <code>checked</code> / <code>faithful</code> 这类<b>成功分支的理由</b>也算进了「要恢复的码」——<b>给它们编恢复动作就是造数据</b>，这正是 U5 必须先把面判清才能往下做的原因（首版「看命中行 ±6 行窗口」的探针仍在 89 条未判子集里打转，口径未定；换成括号配对才判得准 <code>{ ok:true, faithful:false, reason:'distorted' }</code> 这类<b>同时含真假字段</b>的对象）。
+<b>U5 交付物（产品 + 核对器两件，映射表只有一份）</b>：产品模块 <code>engines/reject-recovery.js</code>（502 行，<b>零 require / 零 fs / 零 store / 零 localStorage</b>）持有<b>三张冻结表</b>（<code>RULES</code> 五条有序词表 —— 顺序即语义：<code>landed-immutable</code> 必须先命中 <code>rollback</code> 的 <code>landed</code> 而非 <code>adjust-input</code> 的 <code>immutable</code>，这正是「处置方向相反」的来源；<code>OVERRIDES</code> 38 条显式登记，每条带 <code>why</code>；<code>NEUTRAL_REVIEW</code> 53 条，其中 32 条明标 <code>out: true</code> = 契约外）+ <b>三张面快照</b>（<code>REJECT_FACE 717</code> / <code>SUCCESS_FACE 34</code> / <code>NEUTRAL_FACE 53</code>）+ <code>ARTIFACTS</code>（词法碎片 <code>store-</code> 1 条 —— 拼接式 <code>reason</code> 的真码运行期才成形，<b>不猜它该给什么恢复动作</b>），导出 14 项（<code>KINDS</code> / <code>KIND_ACTION</code> / 四表 / 三面快照 / <code>ruleKind</code> / <code>explain</code> / <code>counts</code> / <code>diagnose</code> / <code>stat</code>）。核对器 <code>tools/reject-recovery.js</code>（190 行）<b>不再自带映射表</b> —— 一份表两处拷贝就是两个真源、会慢慢漂开（本仓 <code>interop</code> 式的「承诺词表写死在产品模块 + tests 侧核对」口径）；它只做四类核对：三面快照逐条一致 / 显式登记面归属 / 拒收面逐条有档 / <b>任意字符串不得被判成拒收</b>。CLI 无参打面分布与核对结论，<code>--json</code> 机器可读，不一致退出码 1。
+<b>六档（计划 U5 原文的封闭集合，没有 <code>ignore</code>）</b>：<code>retry-same-input</code> / <code>request-setup</code> / <code>adjust-input</code> / <code>rollback</code> / <code>manual-review</code> / <code>permanent-reject</code> —— 每档配一句<b>写给玩家的可执行话</b>（六句全不出现「忽略」字样：那是静默降级，边界 ① ② 的硬判据）。
+<b>四条边界逐条落到判据上</b>：① 不把可重试与可忽略合成一档（<code>KINDS</code> 无 <code>ignore</code>）；② 建议不得暗示「忽略即可」（<code>KIND_ACTION</code> 六句话 A5 逐条扫）；③ <b>表外码不落任何默认档</b> —— 面判定 <code>frozenFace</code> 只查冻结快照，未命中即 <code>unknown</code>，<b>绝不拿规则表兜底</b>（首版曾写成 <code>|| ruleKind(c)</code>，于是任意字符串 <code>zzz-not-a-code</code> 被判成 <code>adjust-input</code> —— 边界 ③ 的反面教材，已修并进负控制 N3）；④ 恢复语义不写 store（产品模块零 fs / 零 store / 零 localStorage）。
+<b>本版抓到并当场修掉的三条（两条是判据自己的病）</b>：① <b>凭印象写登记表</b> —— 首轮按记忆写了 8 条 <code>OVERRIDES</code>（<code>halted</code> / <code>restore-failed</code> / <code>damaged</code> / <code>on-duty</code> / <code>unavailable</code> / <code>dice</code> / <code>trace</code> / <code>seed</code>），逐条实测后<b>全部删除</b>：<code>halted</code> 是成功面、<code>restore-failed</code> 与 <code>on-duty</code> 是判不出面且已在 <code>NEUTRAL_REVIEW</code> 里、其余四条根本不在扫描面。核对器的 <code>staleOverrides</code> 判据就是为了让这类登记当场现形（部署当天它一次报出 8 条陈旧登记）；② <b>口径必须现场交叉验证</b> —— 旧 <code>codes()</code> 口径 756 漏了死表 48、<code>base</code> 226 里混着正向状态词，这两处都不是靠读文档发现的，是靠<b>抽查源码现场</b>发现的；③ <b>面判定写成「查表 || 规则」= 拿规则表兜底</b>（同 ③），修法是引入只查快照的 <code>frozenFace</code>。
+<b>专锁 <code>tests/reject-recovery-lock-v2192.js</code> 115 / 0</b>（A 静态契约 16 / B 运行时 12 / C 不变式 4 / N 真源码破坏负控制 8 组）—— 负控制一律在<b>内存副本</b>上做真源码破坏并两向自证（含 N3 把 <code>frozenFace</code> 换成「查不到就过规则表」⇒ 非法码变拒收当场现形）；H5 锚点纯度（每个锚点字面量在目标文件恰中 1 次、且<b>在本文件里恰声明 1 次</b>）首跑一次抓出 4 处「判据自带锚点串副本」（<code>aKinds</code> / <code>aSuccessFace</code> / <code>aFrozen</code> / <code>tLive</code>），六档常量因此改名 <code>KIND_LIST</code>。<b>本版现场读数</b>：<code>reason</code> 字面量 <b>804 = 拒收 717 / 成功 34 / 判不出 53</b>；核对器零问题、拒收面零无档、零污点；六档分布 <code>retry-same-input 64</code> / <code>request-setup 287</code> / <code>adjust-input 288</code> / <code>rollback 71</code> / <code>manual-review 10</code> / <code>permanent-reject 17</code>，另<b>无恢复动作 67</b>（成功面 34 + 契约外 32 + 词法碎片 1）；<code>module-registry-gate</code> 文件 <b>204</b> / 命名空间 <b>212</b> / 装载期边 <b>107</b> / 调用期引用 <b>210</b>；<code>module-cycle-gate-v2107</code> pass(65)；<code>reject-code-gate</code> 804 无新增静默码；<code>toolchain-gate</code> EXIT=0（名单 36 → 37）。
+<b>升版链路七步（逐条实测对数）</b>：源头 2 处 → <code>tests/run.js</code> 硬读数 <b>9 行 / 15 处</b>（比较值与消息口号同批）→ 正则白名单 <b>11 处</b>按形态放宽末项（<code>|191)\.0</code> → <code>|191|192)\.0</code>）→ 授予型名单 <b>15 处</b>追加（单引号 9 / 双引号 6）→ 五把旧专锁交付基线抬到本版 → 四本台账（<code>dead-export</code> / <code>module-registry</code> 由各自门禁 <code>--update</code> 重写、<code>consumer-ledger</code> 由 <code>--register</code> 重建、<code>reject-code</code> 抬 version 并追加沿革段）；<code>docs/ERROR_CODES.md</code> 由 <code>gen-error-codes</code> 重新生成（804 码逐字不变）；<code>node tools/gen-plan-status.js --write</code> 重跑四个计划文件的现场读数块（O7 门禁 pass 69）。
+<b>如实登记的一条边界</b>：本版<b>只读</b>既有的 <code>reason</code> 字面量，<b>不改任何产品行为、不新增拒收码</b>；映射表是「解释面」，不去改各引擎的返回码；成功面的 34 条与本版无关（它们本来就不是拒收码，本版只是<b>第一次把它们从拒收面里分出来</b>）。
 <b>v2.191.0</b> — <b>U3 散装读数的登记与「过期即现形」 + U4 导出面从「有登记」到「有去向与复查期」</b>（<b>第二代优化线第一批</b>：给「没人盯的数字」与「没人回头的理由」各补一道分钟级判据）。
 <b>U3 它治什么</b>：v2.189.0 收口轮的 <b>17 处红没有一处是新代码写错</b>，而它们的发现通道只有一条 —— 跑一趟 17 分钟全量回归。<code>tests/settle-v2830.js</code> 里三处最典型：<b>写死的、不在 <code>tests/readings.js</code> 族扫描面内、无任何判据盯着</b>的数字，于是从 v2.185.0 一路红到全量才现形。
 <b>U3 的做法（扩面而非重写）</b>：新建登记表 <code>tests/loose-readings.json</code> + 核对器 <code>tools/loose-readings.js</code>（255 行）。<b>表只登记站点、不写任何真值</b> —— 真值一律现取（探针 <code>tests/module-registry-ledger.json</code>）；表里出现 <code>want</code> / <code>value</code> 类字段当场报 <code>value-in-table</code>（<b>表不得成为第二真源</b>，U3 验收第 ④ 条的硬判据）。四个站点三种形态：<code>ledger-num-eq</code>（<code>led.totals.loadEdges === 106</code> / <code>led.totals.callRefs === 208</code>）、<code>ledger-num-lt</code>（<code>led.totals.hardEdges === 0</code>）、<code>ledger-object-keys-len-eq</code>（<code>Object.keys(led.loadErrors).length === 0</code> / <code>led.nsCount === 211</code> / <code>led.loadedCount === 203</code>）。
