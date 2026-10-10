@@ -3933,17 +3933,20 @@
           //   的扫描面是产品源码里的**内联字面量** `reason: 'x'`（正则不看接收者），诊断小结里的
           //   `reason: 'threw'` 会被当成一个新增拒收码而进「未分类」名单（实测：三集恒等式差 1）。
           //   同一个词在这里是两种东西：拒收码是「给调用方的业务归因」，这里是「给诊断的失败形态」。
-          __txStat.lastNested = { at: clockWall(), why: 'threw', rolledBack: rolled, inner: __tx.length };
+          __txStat.lastNested = { at: clockWall(), why: 'threw', rolledBack: rolled, inner: __tx.length, seq: __txStat.count };
           WA.log('error', 'store.transact嵌套修改异常（内层写入已撤回，外层继续）', e);
           const re = { ok: false, error: e, deferred: true, nested: true, rolledBack: rolled, innerDepth: __tx.length };
           if (!rolled) { re.mutated = true; re.hint = '保存点恢复失败：外层候选可能仍含内层部分写入，跨模块链请改走 WA.commit.begin/commit'; }
           return re;
         }
         if (result === false) {
+          // v2.194.0（U2）：`lastNested` 除 `at`（墙钟，测试常冻结 ⇒ 会给出相等读数）外再记 `seq`
+          //   （= 本笔嵌套事务在 `__txStat.count` 上的序号）。消费方判「这个读数是不是我这一笔的」
+          //   只能靠**单调序号** —— 比墙钟可靠，也不受无关事务推进 count 的干扰。
           const rolled = __restoreOuter();
           if (rolled) __txStat.nestedRolled++;
           recTx(clockWall() - t0, 'nested-aborted');
-          __txStat.lastNested = { at: clockWall(), why: 'aborted', rolledBack: rolled, inner: __tx.length };
+          __txStat.lastNested = { at: clockWall(), why: 'aborted', rolledBack: rolled, inner: __tx.length, seq: __txStat.count };
           const rb = { ok: false, aborted: true, deferred: true, nested: true, rolledBack: rolled, innerDepth: __tx.length };
           if (!rolled) { rb.mutated = true; rb.hint = '保存点恢复失败：外层候选可能仍含内层部分写入，跨模块链请改走 WA.commit.begin/commit'; }
           return rb;

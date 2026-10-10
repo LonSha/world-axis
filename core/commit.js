@@ -353,6 +353,7 @@
   ];
   let __curChain = null;
   let __chainStartedAt = 0;
+  let __chainStartedCount = 0;   // 链开始时的 store 事务数（时效判据的真源）
 
   /**
    * 「刚刚那一趟里，有没有某一步的**嵌套写口**被保存点撤回？」
@@ -367,7 +368,13 @@
     let ln = null;
     try { ln = st.txStat().lastNested; } catch (e) { return ''; }
     if (!ln || typeof ln !== 'object') return '';
-    if (ln.at && __chainStartedAt && ln.at < __chainStartedAt) return '';   // 旧读数：不归本次
+    // 时效判据用 store 的**单调计数器**，不是墙钟毫秒：同一毫秒内连开的事务会让
+    //   `ln.at < 起始时刻` 为假 ⇒ 旧读数被当成本次的（专锁实测的跨进程抖动）。
+    if (typeof ln.seq === 'number' && typeof __chainStartedCount === 'number') {
+      if (ln.seq < __chainStartedCount + 1) return '';   // 序号在本次之前 ⇒ 旧读数
+    } else if (typeof st.count === 'number' && typeof __chainStartedCount === 'number' && st.count < __chainStartedCount + 1) {
+      return '';                                          // 老 store（无 seq）：回退到计数口径
+    }
     return (ln.why === 'threw') ? 'threw' : 'aborted';
   }
   function chainPack(c, opt) {
@@ -462,6 +469,7 @@
     __chainStat.chains++;
     __curChain = c;
     __chainStartedAt = c.at;
+    try { __chainStartedCount = (typeof st.txStat === 'function') ? (st.txStat().count || 0) : 0; } catch (e) { __chainStartedCount = 0; }
     let threw = null;
     const tx = (function () {
       try {

@@ -246,7 +246,10 @@ function runAll(A) {
   //   ① engines/operations.js 真读 `WA.commit.chain` / `WA.commit.step`（拨付自己开链）；
   //   ② engines/diplomacy.js 真读 `WA.commit.inflight` / `WA.commit.active`（单一漏斗 rx 的在途标注）。
   //   装载期边 108 不变（两模块本就在装载期读 store），合计 1782 → 1784。
-  A(a.edgesLoad === 108 && a.edgesCall === 1676 && a.edgesAll === 1784 && a.identityOk,
+  // v2.194.0（U2 批次②）：freight / commission 接链 —— 两条调用期边：
+  //   freight → commit（inflight / active，在途如实标注）与 commission → commit（chain / step / active / inflight）。
+  //   装载期 108 不变；调用期 1676 → 1678、合计 1784 → 1786。
+  A(a.edgesLoad === 108 && a.edgesCall === 1678 && a.edgesAll === 1786 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'

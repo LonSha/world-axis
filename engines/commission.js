@@ -57,6 +57,117 @@
   function find(id) { var k = clean(id, 60); return list().filter(function (x) { return x && x.id === k; })[0] || null; }
   function newId() { return WA.rand ? WA.rand.id('cm_', 4, 'id') : 'cm_0000'; }
 
+  // ── v2.194.0（U2）：本模块的**提交时机**统一入口 ────────────────────
+  //   本模块四个写口原先各自 `WA.store.transact`。一旦被别的模块**放进外层事务**里调
+  //   （链的常规形态：一条链只有一个 draft），`store.transact` 走嵌套分支 —— 世界写入随外层
+  //   提交，而这里的返回值**照样是 `ok:true`**。外层随后被拒 / 抛错时，调用方拿着一句
+  //   「委托已结算」，世界一格没动。本仓点名过这类「谎报成功」，故在此立一道边界：
+  //     · 写入**照原路走**（嵌套 ⇒ 落在链的那一份 draft 上，与链里其它写入同生共死）；
+  //     · 只有**回执**改口径：链上 / 别人事务内如实标 `persisted:false`（未提交，另附推算值）。
+  //     · **不把写入推迟到链之后**（推迟会让它与链里其它写入不再同生共死，那正是本项要治的半写）。
+  //   真源判据用 `store.txStat().lastNested`（store 自己写的台账，不是本模块的常量），
+  //   并做时效校验：读数时刻必须晚于本次调用开始，否则是上一次事务留下的旧读数。
+  function chainInflight() {
+    return (WA.commit && typeof WA.commit.inflight === 'function') ? WA.commit.inflight() : null;
+  }
+  /**
+   * 刚刚这一趟 transact，**本模块自己的写**有没有被保存点撤回？
+   *   为什么需要它：本模块的写口是**跨模块业务链**的参与方 —— 一旦被嵌在外层事务里
+   *   （链上，或调用方自己的事务），`store.transact` 会返回 `ok:true / deferred:true`，
+   *   **不告诉我写口内部返回了 false**（内层拒签被保存点原地撤回，外面只看见一个成功信封）。
+   *   于是「没写成功」会被读成「写成功」—— 正是本项要治的谎报。
+   *   真源用 `store.txStat().lastNested`（store 自己在嵌套分支写的台账，不是我方常量），
+   *   并做**时效校验**：读数必须是**我这一笔的**，否则是上一次留下的旧读数。
+   *   ⚠ 时效判据用 store 记的**单调序号** `seq`（本笔嵌套事务在 `txStat().count` 上的序号），
+   *     **不是墙钟毫秒** —— 毫秒在测试冻结时钟下会给出**相等**读数，把旧读数误判成本次的，
+   *     于是「目标不在草稿里」被读成「第一次嵌套写被撤回了」而拒收整链（专锁 C1 实测的跨进程抖动）。
+   * @param {number} n0 本次写调用开始时 store.txStat().count（= 之前已发生的事务数）
+   * @returns {''|'aborted'|'threw'}
+   */
+  function nestedVerdictSince(n0) {
+    try {
+      if (!WA.store || typeof WA.store.txStat !== 'function') return '';
+      const st = WA.store.txStat();
+      const ln = st.lastNested;
+      if (!ln || typeof ln !== 'object') return '';
+      if (typeof ln.seq === 'number' && typeof n0 === 'number') {
+        if (ln.seq < n0 + 1) return '';                 // 序号在本次之前 ⇒ 旧读数，不归本次
+      } else if (typeof st.count === 'number' && typeof n0 === 'number' && st.count < n0 + 1) {
+        return '';                                       // 老 store（无 seq）：回退到计数口径
+      }
+      return (ln.why === 'threw') ? 'threw' : 'aborted';
+    } catch (e) { return ''; }
+  }
+  /** 取「本次调用前已发生的事务数」（时效判据的基准，见上）。 */
+  function txCount() { try { return (WA.store && typeof WA.store.txStat === 'function') ? (WA.store.txStat().count || 0) : 0; } catch (e) { return 0; } }
+  function wallNow() { try { return (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { return Date.now(); } }
+  /**
+   * 写口的提交时机统一入口（三态：`failed` / `nested` / `chain`；链外顶层形状不变）。
+   * @returns {{persisted:boolean, chain:boolean, nested?:boolean, nostore?:boolean, failed?:string}}
+   */
+  function chainWrite(kind, runInTx) {
+    const ifl = chainInflight();
+    const inner = (WA.commit && typeof WA.commit.active === 'function') ? WA.commit.active() : null;
+    const hasStore = !!(WA.store && typeof WA.store.transact === 'function');
+    if (!hasStore) {
+      try { runInTx(WA.store && WA.store.get ? (WA.store.get() || {}) : {}); } catch (e) {}
+      return { persisted: false, chain: false, nostore: true };
+    }
+    if (!ifl) {
+      if (inner) {
+        const n0 = txCount();
+        const r = WA.store.transact(runInTx, 'commission:' + kind);
+        const nv = nestedVerdictSince(n0);
+        if (nv) return { persisted: false, chain: false, nested: true, failed: nv === 'threw' ? 'write-threw' : 'write-aborted' };
+        if (r && r.ok === false) return { persisted: false, chain: false, nested: true, failed: 'tx-' + (r.denied ? 'denied' : 'aborted') };
+        return { persisted: false, chain: false, nested: true };
+      }
+      const n0 = txCount();
+      const r = WA.store.transact(runInTx, 'commission:' + kind);
+      const nv = nestedVerdictSince(n0);
+      if (nv) return { persisted: false, chain: false, failed: nv === 'threw' ? 'write-threw' : 'write-aborted' };
+      if (!r || r.ok !== true) {
+        return { persisted: false, chain: false, failed: (r && r.denied) ? 'tx-denied' : ((r && r.error) ? 'tx-error' : 'tx-aborted') };
+      }
+      return { persisted: true, chain: false };
+    }
+    // 链上：写入落在链的那一份 draft 上（链提交后才生效）
+    const n0 = txCount();
+    const r = WA.store.transact(runInTx, 'commission:' + kind);
+    const nv = nestedVerdictSince(n0);
+    if (nv) return { persisted: false, chain: true, failed: nv === 'threw' ? 'write-threw' : 'write-aborted' };
+    if (r && r.ok === false) return { persisted: false, chain: true, failed: 'tx-aborted' };
+    return { persisted: false, chain: true };
+  }
+  /** 链的 opId：**消费方自带唯一的那个**（链面默认按 floor 去重，同段第二次会误判 duplicate-op）。 */
+  var __opSeq = 0;
+  function nextOpId(tag) { __opSeq++; return clean(tag, 40) + ':' + wallNow() + ':' + __opSeq; }
+
+  /**
+   * 在**链的这一层草稿**上标记合约状态。为什么必须有它：链内后一步的预检读的是**已提交状态**
+   *   （`find()` / `list()`）—— 看不到本链里刚写进 draft、尚未提交的实体（v2.194.0 批次①实证：
+   *   链内先建后读，`viaState:0 / viaDraft:1`）。故链内的状态改写在草稿上做，绕开这个只读快照。
+   *   找不到目标 ⇒ 返回 false（**静默空写不许读成成功**），由调用方当场中止整链。
+   */
+  function markSettledOnDraft(draft, id) {
+    try {
+      var b = bucket(draft);
+      var t = b.contracts.filter(function (x) { return x && x.id === id; })[0];
+      if (!t) return false;
+      t.status = 'settled'; t.settledAt = clockNow('commission');
+      return true;
+    } catch (e) { return false; }
+  }
+  function markCancelledOnDraft(draft, id, why) {
+    try {
+      var b = bucket(draft);
+      var t = b.contracts.filter(function (x) { return x && x.id === id; })[0];
+      if (!t) return false;
+      t.status = 'cancelled'; t.cancelledAt = clockNow('commission'); t.cancelReason = why;
+      return true;
+    } catch (e) { return false; }
+  }
+
   function create(spec) {
     var cfg = getSettings();
     if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
@@ -71,11 +182,25 @@
     if (stages.length > cfg.maxStages) { noteFault('too-many-stages'); return { ok: false, reason: 'too-many-stages', cap: cfg.maxStages }; }
     var cur = list();
     if (cur.length >= cfg.maxContracts) { noteFault('contracts-full'); return { ok: false, reason: 'contracts-full', cap: cfg.maxContracts }; }
-    // 检查预算（如果有报酬且 org 在）
+    // v2.194.0（U2）：**报酬的载体必须显式** —— 有报酬就必须说清「付的是哪一项资源」
+    //   与「支付方/受托方是势力还是个人」（org 的世界里这笔转账靠这两样才成立）。
+    //   此前 `canAfford(principal, reward)` 是**参数错位**（把 name 当 kind、把数当 name）
+    //   ⇒ 恒 false ⇒ 任何 reward>0 的委托都建不出来，「按阶段付报酬」这条能力整个是死的（探针实测）。
     var reward = Number(s.reward) || 0;
-    if (reward > 0 && WA.org && typeof WA.org.canAfford === 'function') {
-      var aff = WA.org.canAfford(principal, reward);
-      if (!aff) { noteFault('no-budget'); return { ok: false, reason: 'no-budget', principal: principal, reward: reward }; }
+    var item = clean(s.item || '', 30);
+    var pk = clean(s.principalKind || 'person', 12);
+    var ak = clean(s.agentKind || 'person', 12);
+    var ek = clean(s.escrowKind || 'person', 12);
+    if (reward > 0) {
+      if (!item) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', field: 'item', hint: '有报酬就必须给出资源项（org 的转账按项成立）' }; }
+      if (WA.org && Array.isArray(WA.org.KINDS)) {
+        if (WA.org.KINDS.indexOf(pk) < 0) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', field: 'principalKind', allowed: WA.org.KINDS.slice() }; }
+        if (WA.org.KINDS.indexOf(ak) < 0) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', field: 'agentKind', allowed: WA.org.KINDS.slice() }; }
+      }
+      if (WA.org && typeof WA.org.canAfford === 'function') {
+        var aff = WA.org.canAfford(pk, principal, item, reward);
+        if (!aff) { noteFault('no-budget'); return { ok: false, reason: 'no-budget', kind: pk, principal: principal, item: item, reward: reward }; }
+      }
     }
     var stageList = stages.map(function (st, i) {
       return {
@@ -92,20 +217,32 @@
     });
     var rec = {
       id: newId(), title: title, principal: principal, agent: agent,
+      principalKind: pk, agentKind: ak, item: item,
       stages: stageList, currentStage: 0,
       reward: reward, prepaid: Number(s.prepaid) || 0,
-      escrow: s.escrow ? clean(s.escrow, 60) : '',
+      escrow: s.escrow ? clean(s.escrow, 60) : '', escrowKind: ek,
       status: 'active', at: clockNow('commission'),
       settledAt: 0, cancelledAt: 0, cancelReason: ''
     };
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) { bucket(d).contracts.push(rec); }, 'commission:create');
-    } else { list().push(rec); }
+    const cwC = chainWrite('create', function (d) {
+      var b = bucket(d);
+      if (!Array.isArray(b.contracts)) b.contracts = [];
+      if (b.contracts.length >= cfg.maxContracts) return false;   // 草稿上再判一次（并发/重复入册）
+      b.contracts.push(rec);
+      return true;
+    });
+    if (cwC.failed) { noteFault(cwC.failed); return { ok: false, reason: cwC.failed, chain: !!cwC.chain }; }
+    if (!cwC.persisted) {
+      return { ok: true, id: rec.id, title: title, stages: stageList.length,
+        chain: !!cwC.chain, nested: !!cwC.nested, persisted: false, projected: true,
+        note: cwC.chain ? '已写进链的草稿，尚未提交（链提交后才生效）'
+          : (cwC.nostore ? '无 store：只改了内存，落不进任何地方' : '已写进调用方自己的事务（nested），本模块未单独提交') };
+    }
     if (WA.evict && typeof WA.evict.array === 'function') {
       try { WA.evict.array(bucket().contracts, 'commission.contracts'); } catch (e) {}
     }
     _stat.created++;
-    return { ok: true, id: rec.id, title: title, stages: stageList.length };
+    return { ok: true, id: rec.id, title: title, stages: stageList.length, chain: false, persisted: true };
   }
 
   function advance(id, receiptId) {
@@ -122,31 +259,26 @@
     var used = rec.stages.some(function (x) { return x.receiptId === rid; });
     if (used) { noteFault('duplicate-receipt'); return { ok: false, reason: 'duplicate-receipt', receiptId: rid }; }
     // 推进阶段
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.contracts.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) {
-          t.stages[rec.currentStage].receiptId = rid;
-          t.stages[rec.currentStage].status = 'done';
-          t.stages[rec.currentStage].completedAt = clockNow('commission');
-          if (rec.currentStage + 1 < t.stages.length) {
-            t.stages[rec.currentStage + 1].status = 'active';
-            t.currentStage = rec.currentStage + 1;
-          } else {
-            t.status = 'completed';
-          }
-        }
-      }, 'commission:advance');
-    } else {
-      st.receiptId = rid; st.status = 'done'; st.completedAt = clockNow('commission');
-      if (rec.currentStage + 1 < rec.stages.length) {
-        rec.stages[rec.currentStage + 1].status = 'active';
-        rec.currentStage++;
-      } else { rec.status = 'completed'; }
-    }
+    const cwA = chainWrite('advance', function (d) {
+      var b = bucket(d);
+      var t = b.contracts.filter(function (x) { return x && x.id === rec.id; })[0];
+      if (!t || !t.stages || !t.stages[rec.currentStage]) return false;   // 草稿里找不到目标 ⇒ 如实失败
+      t.stages[rec.currentStage].receiptId = rid;
+      t.stages[rec.currentStage].status = 'done';
+      t.stages[rec.currentStage].completedAt = clockNow('commission');
+      if (rec.currentStage + 1 < t.stages.length) {
+        t.stages[rec.currentStage + 1].status = 'active';
+        t.currentStage = rec.currentStage + 1;
+      } else {
+        t.status = 'completed';
+      }
+      return true;
+    });
+    if (cwA.failed) { noteFault(cwA.failed); return { ok: false, reason: cwA.failed, chain: !!cwA.chain }; }
     _stat.advanced++;
-    return { ok: true, id: rec.id, stage: rec.currentStage, receiptId: rid };
+    return { ok: true, id: rec.id, stage: rec.currentStage, receiptId: rid,
+      chain: !!cwA.chain, nested: !!cwA.nested, persisted: !!cwA.persisted,
+      projected: !cwA.persisted };
   }
 
   function settle(id) {
@@ -161,20 +293,59 @@
     var totalReward = doneStages.reduce(function (s, x) { return s + (Number(x.reward) || 0); }, 0);
     var paid = rec.prepaid || 0;
     var due = Math.max(0, totalReward - paid);
-    // 通过 org.transfer 支付
-    var paid_ok = false;
-    if (due > 0 && WA.org && typeof WA.org.transfer === 'function') {
-      try { var r = WA.org.transfer(rec.principal, rec.agent, due, 'commission:settle'); paid_ok = r && r.ok !== false; } catch (e) { noteFault('transfer-failed'); }
-    } else { paid_ok = due === 0; }
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.contracts.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) { t.status = 'settled'; t.settledAt = clockNow('commission'); }
-      }, 'commission:settle');
-    } else { rec.status = 'settled'; rec.settledAt = clockNow('commission'); }
+    // v2.194.0（U2）：**本口开链**（转账 + 记账同链一次提交）。
+    //   此前这两笔分属两个顶层事务，且转账调用是**错的**：`org.transfer` 的真签名是
+    //   `(fromKind, fromName, toKind, toName, item, amount)`，旧代码只给了 4 个实参
+    //   ⇒ `clean(item)` 拿到的是个字符串标签 'commission:settle' 与 undefined ⇒ 恒 `bad-resource`。
+    //   而返回值被读成 `r.ok !== false` ⇒ 转账**从未发生**，合约照样被记成 settled、回执照样报
+    //   `paid:true`（探针实测）。现在：转账失败 ⇒ 整链中止（合约状态一格不动），归因如实交回。
+    const _payable = due > 0 && WA.org && typeof WA.org.transfer === 'function';
+    const _item = rec.item;
+    const _pk = rec.principalKind || 'person', _ak = rec.agentKind || 'person';
+    const _chainable = !!(WA.commit && typeof WA.commit.chain === 'function');
+    const _outer = (WA.commit && typeof WA.commit.active === 'function') ? WA.commit.active() : null;
+    if (_payable && !_item) {
+      noteFault('missing-fields');
+      return { ok: false, reason: 'missing-fields', field: 'item',
+        hint: '有报酬的委托必须带资源项（旧委托可用 top-up 补：settle 无法凭空知道付的是什么）' };
+    }
+    if (_payable && !chainInflight() && !_outer && _chainable) {
+      const ch = WA.commit.chain({
+        opId: nextOpId('commission:settle'), site: 'commission:settle',
+        fn: function (c, draft) {
+          // 第一步：记账（无副作用）—— 目标不在草稿里 ⇒ 当场中止，此时什么都还没发生
+          if (!markSettledOnDraft(draft, rec.id)) { c.abortWhy = 'ledger-target-missing'; return false; }
+          WA.commit.step(null, { site: 'commission:settle:ledger' });
+          // 第二步：跨模块转账（有副作用的那一笔）
+          const tr = WA.org.transfer(_pk, rec.principal, _ak, rec.agent, _item, due);
+          if (!tr || !tr.ok) { c.abortWhy = 'transfer-failed'; return false; }
+          WA.commit.step(null, { site: 'commission:settle:transfer' });
+          return true;
+        }
+      });
+      if (ch.ok !== true) {
+        const why = ch.reason || 'chain-failed';
+        noteFault(why);
+        return { ok: false, reason: why, chain: true, persisted: false,
+          totalReward: totalReward, prepaid: paid, due: due,
+          note: '结算未成（本笔未执行）⇒ 合约状态不因本笔改变 —— 转账与记账要么都在、要么都不在' };
+      }
+      _stat.settled++;
+      return { ok: true, id: rec.id, totalReward: totalReward, prepaid: paid, due: due, paid: true,
+        chain: false, persisted: true, projected: false, atomic: true, opId: ch.opId, item: _item };
+    }
+    // 链内 / 别人事务内 / 无可付（due=0）：走统一入口，写入与转账都留在调用方那层 draft 上
+    let paid_ok = due === 0;
+    if (_payable) {
+      const tr = WA.org.transfer(_pk, rec.principal, _ak, rec.agent, _item, due);
+      if (!tr || !tr.ok) { noteFault('transfer-failed'); return { ok: false, reason: 'transfer-failed', detail: tr ? tr.reason : 'none' }; }
+      paid_ok = true;
+    }
+    const cwS = chainWrite('settle', function (d) { return markSettledOnDraft(d, rec.id); });
+    if (cwS.failed) { noteFault(cwS.failed); return { ok: false, reason: cwS.failed, chain: !!cwS.chain }; }
     _stat.settled++;
-    return { ok: true, id: rec.id, totalReward: totalReward, prepaid: paid, due: due, paid: paid_ok };
+    return { ok: true, id: rec.id, totalReward: totalReward, prepaid: paid, due: due, paid: paid_ok,
+      chain: !!cwS.chain, nested: !!cwS.nested, persisted: !!cwS.persisted, projected: !cwS.persisted };
   }
 
   function cancel(id, reason) {
@@ -189,19 +360,49 @@
     var earned = doneStages.reduce(function (s, x) { return s + (Number(x.reward) || 0); }, 0);
     var prepaid = rec.prepaid || 0;
     var refund = Math.max(0, prepaid - earned);
-    // 退回托管
-    if (refund > 0 && WA.org && typeof WA.org.transfer === 'function' && rec.escrow) {
-      try { WA.org.transfer(rec.escrow, rec.principal, refund, 'commission:cancel-refund'); } catch (e) {}
+    // v2.194.0（U2）：与 settle 同型 —— **本口开链**。旧代码的退回同样是 4 实参调用
+    //   （恒 `bad-resource`）且**异常被静默吞掉**（`catch (e) {}`）：托管没退回，合约照样记 cancelled。
+    //   现在：退不回 ⇒ 整链中止（合约状态一格不动），归因如实交回。
+    const _refundable = refund > 0 && WA.org && typeof WA.org.transfer === 'function' && !!rec.escrow;
+    const _rk = rec.escrowKind || 'person', _pk2 = rec.principalKind || 'person';
+    const _chainable = !!(WA.commit && typeof WA.commit.chain === 'function');
+    const _outer = (WA.commit && typeof WA.commit.active === 'function') ? WA.commit.active() : null;
+    if (_refundable && !rec.item) {
+      noteFault('missing-fields');
+      return { ok: false, reason: 'missing-fields', field: 'item', hint: '要退托管就必须有资源项（旧委托缺此项）' };
     }
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.contracts.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) { t.status = 'cancelled'; t.cancelledAt = clockNow('commission'); t.cancelReason = rsn; }
-      }, 'commission:cancel');
-    } else { rec.status = 'cancelled'; rec.cancelledAt = clockNow('commission'); rec.cancelReason = rsn; }
+    if (_refundable && !chainInflight() && !_outer && _chainable) {
+      const ch = WA.commit.chain({
+        opId: nextOpId('commission:cancel'), site: 'commission:cancel',
+        fn: function (c, draft) {
+          if (!markCancelledOnDraft(draft, rec.id, rsn)) { c.abortWhy = 'ledger-target-missing'; return false; }
+          WA.commit.step(null, { site: 'commission:cancel:ledger' });
+          const tr = WA.org.transfer(_rk, rec.escrow, _pk2, rec.principal, rec.item, refund);
+          if (!tr || !tr.ok) { c.abortWhy = 'refund-failed'; return false; }
+          WA.commit.step(null, { site: 'commission:cancel:refund' });
+          return true;
+        }
+      });
+      if (ch.ok !== true) {
+        const why = ch.reason || 'chain-failed';
+        noteFault(why);
+        return { ok: false, reason: why, chain: true, persisted: false,
+          earned: earned, refund: refund,
+          note: '取消失败（本笔未执行）⇒ 合约状态不因本笔改变 —— 退款与记账要么都在、要么都不在' };
+      }
+      _stat.cancelled++;
+      return { ok: true, id: rec.id, reason: rsn, earned: earned, refund: refund,
+        chain: false, persisted: true, projected: false, atomic: true, opId: ch.opId };
+    }
+    if (_refundable) {
+      const tr = WA.org.transfer(_rk, rec.escrow, _pk2, rec.principal, rec.item, refund);
+      if (!tr || !tr.ok) { noteFault('refund-failed'); return { ok: false, reason: 'refund-failed', detail: tr ? tr.reason : 'none' }; }
+    }
+    const cwC = chainWrite('cancel', function (d) { return markCancelledOnDraft(d, rec.id, rsn); });
+    if (cwC.failed) { noteFault(cwC.failed); return { ok: false, reason: cwC.failed, chain: !!cwC.chain }; }
     _stat.cancelled++;
-    return { ok: true, id: rec.id, reason: rsn, earned: earned, refund: refund };
+    return { ok: true, id: rec.id, reason: rsn, earned: earned, refund: refund,
+      chain: !!cwC.chain, nested: !!cwC.nested, persisted: !!cwC.persisted, projected: !cwC.persisted };
   }
 
   function view(id) {
@@ -242,7 +443,7 @@
       settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     var ok = checks.org && checks.store;
-    return { ok: ok, closedLoop: ok, checks: checks, version: '2.169.0' };
+    return { ok: ok, closedLoop: ok, checks: checks, version: '2.194.0' };
   }
 
   function stat() {
@@ -273,5 +474,5 @@
   var EXPORT_COUNT = 12;
   var _exported = Object.keys(WA.commission).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('commission: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/commission.js', { kind: 'engine', ver: '2.169.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/commission.js', { kind: 'engine', ver: '2.194.0' });
 })();

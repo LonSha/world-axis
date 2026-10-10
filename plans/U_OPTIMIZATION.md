@@ -102,8 +102,40 @@ Status: proposed（2026-10-10 立；只读制订轮，不改产品实现、不�
     （`bad-chain` / `steps-full` / `chain-nested` / `step-threw` 四码入活见证表，`insufficient-funds`
     死表锚点随形态更新且理由改真）/ 模块注册表 / `FROZEN2800` 逐字回填（14772 字符）/ O2 专锁
     （`rx` 锚点同步，43/43）—— 全部复跑绿。**本批未跑全量回归**（按流程约定：全量留到计划全部内容完成之后）。
-  - 待办：批次②`freight` + `commission`；③`agency` + `investigation`；④`aftermath` + `story-choice`；
-    ⑤`world-blueprint` 与剩余协调模块。
+  - 待办：③`agency` + `investigation`；④`aftermath` + `story-choice`；⑤`world-blueprint` 与剩余协调模块。
+- **进度（v2.194.0 · 批次②：freight + commission）**：
+  - 正靶是**两条探针实测的真病**（不是阅读推断）：
+    ① `commission.settle` / `cancel` 调 `WA.org.transfer` 只给 **4 个实参**（真签名是 6 参
+       `(fromKind, fromName, toKind, toName, item, amount)`）⇒ 恒 `bad-resource`，而返回值被读成
+       `r.ok !== false` ⇒ **转账从未发生，合约照样记 settled、回执照样报 `paid:true`**；
+       `cancel` 侧同类，且异常被静默吞掉 ⇒ 托管没退回也记 cancelled。
+    ② `commission.create` 的 `canAfford(principal, reward)` **参数错位**（把 name 当 kind、把数当 name）
+       ⇒ 恒 false ⇒ **任何 `reward>0` 的委托都建不出来**。
+  - 交付物：`engines/commission.js` 新增 `chainWrite` / `chainInflight` / `nestedVerdictSince` /
+    `txCount` / `nextOpId` / `markSettledOnDraft` / `markCancelledOnDraft`（导出面仍 12）；
+    `create` 要求有报酬时显式给 `item` 与 `principalKind` / `agentKind` 并正确调 `canAfford`，
+    `create` / `advance` 走 `chainWrite`，`settle` / `cancel` 在链外顶层**自开链**（链内次序固定
+    「先记账 → 后转账」，与批次①同一条次序纪律）；`engines/freight.js` 新增 `markInflight` /
+    `nestedVerdictSince` / `txCount` / `wallNow`（导出面仍 10），四口（`dispatch` / `arrive` /
+    `cancel` / `reroute`）统一在途如实标注（链上 `chain:true / persisted:false / projected:true`）
+    与「被保存点撤回 ⇒ `ok:false`」判据。
+  - **时效判据的第三代口径（本批的技术主线）**：`nestedVerdictSince` 初版用**墙钟毫秒**判新旧
+    —— 测试冻结时钟下同毫秒连开事务会给出**相等**读数，把旧读数误判成本次的 ⇒ `C1b` 跨进程抖动；
+    二代改用 `store.txStat().count` —— 无关事务会推进它，同样判不出「`lastNested` 何时写的」。
+    真源补齐：**`store` 在 `lastNested` 里记 `seq`**（本笔嵌套事务在 `__txStat.count` 上的序号），
+    消费方按 `ln.seq < n0 + 1` 判新旧（`seq` 缺失时回退计数口径）；`core/commit.js` 同步增
+    `__chainStartedCount`。连跑 6 次无抖动。
+  - 专锁 `tests/s3-u2-v2195.js` **39/39**（A 付费通路真发生 / B 在途不谎报含 freight 四口逐口 /
+    C 硬边界如实登记 + 次序锚点）；反向自证 13 条真源码破坏（R13–R25）**全部被抓且逐字节还原**。
+    自证当场抓到两处**专锁自身缺口**并补齐：`A6` 只核了退款落地与状态、没核「链外顶层开链」两面
+    （假绿，补 A6d/A6e）；`B3` 只钉了 `dispatch` 一口、`arrive` / `cancel` / `reroute` 漏测
+    （补 B6/B7/B8 三口逐口）。另登记一项**只有源码锚点能守**的事实：链内次序颠倒时 A 段全部读数
+    仍绿（记账在草稿里，整链中止会把草稿整体丢弃），故补 `C3a` / `C3b` 次序锚点。
+  - 门禁：死导出 / 拒收码（`refund-failed` 走可执行见证；`no-budget` 由死表锚点转活并改真理由）/
+    模块注册表 / 模块图边恒等式（调用期 1676 → 1678、合计 1786）/ 散装读数（refs 5378 → 5417）/
+    `FROZEN2800`（14772 字符不变）/ TX 与契约面专锁 / O2 专锁 —— 全绿。
+    **本批未跑全量回归**（同批次①，按流程约定）。
+  - 版本白名单：12 只旧专锁的版本清单统一追加 `2.194.0`（随升版追加当版，属常规维护）。
 
 ### U3 散装读数的登记与「过期即现形」
 

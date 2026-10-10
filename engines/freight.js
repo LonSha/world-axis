@@ -81,6 +81,62 @@
     return shipmentsOf().filter(function (s) { return s && clean(s.id, 60) === key; })[0] || null;
   }
   // ── ① dispatch：源扣减 + 创建在途记录 ──
+  // ── v2.194.0（U2）：**在途如实标注**（本模块四个写口共用一处）────────────────
+  //   本模块四个写口各自一笔 `WA.store.transact`（单模块自身是原子的），但它们一旦被别的模块
+  //   放进**外层事务**（链）里调，`store.transact` 走嵌套分支 —— 世界写入随外层提交，
+  //   而这里的返回值**照样是 `ok:true`**。外层随后被拒 / 抛错时，调用方拿着一句「已发运」，
+  //   世界一格没动。故在这一处统一把「未提交」写在明面上：
+  //     · 链上（`commit.inflight()` 非空）⇒ `chain:true, persisted:false, projected:true`；
+  //     · 调用方自己的事务里 ⇒ `nested:true, persisted:false`；
+  //     · **链外顶层一律不动形状** —— 既有消费者按原样读。
+  //   为什么不做「推迟到链提交之后」：推迟会让它与链里其它写入不再同生共死，那正是本项要治的半写。
+  function markInflight(out) {
+    if (!out || typeof out !== 'object') return out;
+    let inflight = null, inner = null;
+    try {
+      if (WA.commit && typeof WA.commit.inflight === 'function') inflight = WA.commit.inflight();
+      if (WA.commit && typeof WA.commit.active === 'function') inner = WA.commit.active();
+    } catch (e) { inflight = null; inner = null; }
+    if (inflight || inner) {
+      out.chain = !!inflight;
+      out.nested = !inflight && !!inner;
+      out.persisted = false;
+      if (inflight) out.projected = true;
+    }
+    return out;
+  }
+  /**
+   * 刚刚这一趟 transact，**本模块自己的写**有没有被保存点撤回？
+   *   为什么需要它：本模块的写口是**跨模块业务链**的参与方 —— 一旦被嵌在外层事务里
+   *   （链上，或调用方自己的事务），`store.transact` 会返回 `ok:true / deferred:true`，
+   *   **不告诉我写口内部返回了 false**（内层拒签被保存点原地撤回，外面只看见一个成功信封）。
+   *   于是「没写成功」会被读成「写成功」—— 正是本项要治的谎报。
+   *   真源用 `store.txStat().lastNested`（store 自己在嵌套分支写的台账，不是我方常量），
+   *   并做**时效校验**：读数必须是**我这一笔的**，否则是上一次留下的旧读数。
+   *   ⚠ 时效判据用 store 记的**单调序号** `seq`（本笔嵌套事务在 `txStat().count` 上的序号），
+   *     **不是墙钟毫秒** —— 毫秒在测试冻结时钟下会给出**相等**读数，把旧读数误判成本次的，
+   *     于是「目标不在草稿里」被读成「第一次嵌套写被撤回了」而拒收整链（专锁 C1 实测的跨进程抖动）。
+   * @param {number} n0 本次写调用开始时 store.txStat().count（= 之前已发生的事务数）
+   * @returns {''|'aborted'|'threw'}
+   */
+  function nestedVerdictSince(n0) {
+    try {
+      if (!WA.store || typeof WA.store.txStat !== 'function') return '';
+      const st = WA.store.txStat();
+      const ln = st.lastNested;
+      if (!ln || typeof ln !== 'object') return '';
+      if (typeof ln.seq === 'number' && typeof n0 === 'number') {
+        if (ln.seq < n0 + 1) return '';                 // 序号在本次之前 ⇒ 旧读数，不归本次
+      } else if (typeof st.count === 'number' && typeof n0 === 'number' && st.count < n0 + 1) {
+        return '';                                       // 老 store（无 seq）：回退到计数口径
+      }
+      return (ln.why === 'threw') ? 'threw' : 'aborted';
+    } catch (e) { return ''; }
+  }
+  /** 取「本次调用前已发生的事务数」（时效判据的基准，见上）。 */
+  function txCount() { try { return (WA.store && typeof WA.store.txStat === 'function') ? (WA.store.txStat().count || 0) : 0; } catch (e) { return 0; } }
+  function wallNow() { try { return (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { return Date.now(); } }
+
   function dispatch(routeId, from, resource, qty, opts) {
     if (!settings().enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
     var o = opts || {};
@@ -109,6 +165,7 @@
     var now = clockNow('freight');
     var eta = now + Math.round(days * MS_PER_DAY);
     var out = null;
+    const __n0 = txCount();
     WA.store.transact(function (draft) {
       var gg = findGoods(src, res, draft);
       if (!gg || gg.stock < n) { out = { ok: false, reason: 'short-stock', resource: res, want: n, have: gg ? gg.stock : 0 }; return false; }
@@ -131,8 +188,15 @@
       WA.evict.array(fr.shipments, 'freight.shipments', cfg.maxShipments);
       out = { ok: true, id: sid, qty: n, from: src, to: dest, resource: res, eta: eta, stock: gg.stock };
     }, 'freight:dispatch');
-    if (out && out.ok) { stat.dispatched++; stat.lastReason = 'dispatched'; }
-    return out || { ok: false, reason: 'store-unavailable' };
+    if (!out || out.ok !== true) {
+      // 内层被保存点撤回 / 事务被拒 ⇒ **写入根本没发生**，不许读成成功（静默空写不读成真）
+      const nv = nestedVerdictSince(__n0);
+      const why = nv ? (nv === 'threw' ? 'write-threw' : 'write-aborted') : ((out && out.reason) || 'store-aborted');
+      if (nv) noteFault(why);
+      return out || { ok: false, reason: why };
+    }
+    stat.dispatched++; stat.lastReason = 'dispatched';
+    return markInflight(out);
   }
   // ── ② arrive：到货入库（在途 → 目的地）──
   function arrive(shipmentId, opts) {
@@ -150,6 +214,7 @@
       return { ok: false, reason: 'too-early', id: sid, eta: sh.eta, remaining: sh.eta - now };
     }
     var out = null;
+    const __n0 = txCount();
     WA.store.transact(function (draft) {
       var fr = openFreight(draft);
       var s = fr.shipments.filter(function (x) { return x && clean(x.id, 60) === sid; })[0] || null;
@@ -173,8 +238,15 @@
       s.updatedAt = now;
       out = { ok: true, id: sid, qty: s.qty, to: s.to, resource: s.resource, stock: dg.stock };
     }, 'freight:arrive');
-    if (out && out.ok) { stat.arrived++; stat.lastReason = 'arrived'; }
-    return out || { ok: false, reason: 'store-unavailable' };
+    if (!out || out.ok !== true) {
+      // 内层被保存点撤回 / 事务被拒 ⇒ **写入根本没发生**，不许读成成功（静默空写不读成真）
+      const nv = nestedVerdictSince(__n0);
+      const why = nv ? (nv === 'threw' ? 'write-threw' : 'write-aborted') : ((out && out.reason) || 'store-aborted');
+      if (nv) noteFault(why);
+      return out || { ok: false, reason: why };
+    }
+    stat.arrived++; stat.lastReason = 'arrived';
+    return markInflight(out);
   }
   // ── ③ cancel：取消（退货运、损运费）──
   function cancel(shipmentId, opts) {
@@ -186,6 +258,7 @@
     if (sh.status !== 'transit') { noteFault('bad-state'); return { ok: false, reason: 'bad-state', id: sid, status: sh.status }; }
     var now = clockNow('freight');
     var out = null;
+    const __n0 = txCount();
     WA.store.transact(function (draft) {
       var fr = openFreight(draft);
       var s = fr.shipments.filter(function (x) { return x && clean(x.id, 60) === sid; })[0] || null;
@@ -205,8 +278,15 @@
       s.updatedAt = now;
       out = { ok: true, id: sid, refund: s.qty, loss: s.cost, from: s.from, resource: s.resource };
     }, 'freight:cancel');
-    if (out && out.ok) { stat.cancelled++; stat.lastReason = 'cancelled'; }
-    return out || { ok: false, reason: 'store-unavailable' };
+    if (!out || out.ok !== true) {
+      // 内层被保存点撤回 / 事务被拒 ⇒ **写入根本没发生**，不许读成成功（静默空写不读成真）
+      const nv = nestedVerdictSince(__n0);
+      const why = nv ? (nv === 'threw' ? 'write-threw' : 'write-aborted') : ((out && out.reason) || 'store-aborted');
+      if (nv) noteFault(why);
+      return out || { ok: false, reason: why };
+    }
+    stat.cancelled++; stat.lastReason = 'cancelled';
+    return markInflight(out);
   }
   // ── ④ reroute：改道（换路线、重估 ETA）──
   function reroute(shipmentId, newRouteId, opts) {
@@ -225,6 +305,7 @@
     var now = clockNow('freight');
     var newEta = now + Math.round(days * MS_PER_DAY);
     var out = null;
+    const __n0 = txCount();
     WA.store.transact(function (draft) {
       var fr = openFreight(draft);
       var s = fr.shipments.filter(function (x) { return x && clean(x.id, 60) === sid; })[0] || null;
@@ -238,8 +319,15 @@
       s.updatedAt = now;
       out = { ok: true, id: sid, newRouteId: nrid, newEta: newEta, oldRouteId: s.reroutedFrom };
     }, 'freight:reroute');
-    if (out && out.ok) { stat.rerouted++; stat.lastReason = 'rerouted'; }
-    return out || { ok: false, reason: 'store-unavailable' };
+    if (!out || out.ok !== true) {
+      // 内层被保存点撤回 / 事务被拒 ⇒ **写入根本没发生**，不许读成成功（静默空写不读成真）
+      const nv = nestedVerdictSince(__n0);
+      const why = nv ? (nv === 'threw' ? 'write-threw' : 'write-aborted') : ((out && out.reason) || 'store-aborted');
+      if (nv) noteFault(why);
+      return out || { ok: false, reason: why };
+    }
+    stat.rerouted++; stat.lastReason = 'rerouted';
+    return markInflight(out);
   }
   // ── ⑤ view：查看单笔货运（含守恒校验）──
   function view(shipmentId) {
@@ -319,5 +407,5 @@
   if (exported.length !== EXPECTED.length) {
     WA.__freightWarn = 'export mismatch: expected ' + EXPECTED.length + ' got ' + exported.length;
   }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/freight.js', { kind: 'engine', ver: '2.167.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/freight.js', { kind: 'engine', ver: '2.194.0' });
 })();

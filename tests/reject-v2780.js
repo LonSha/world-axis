@@ -227,8 +227,10 @@ const DEAD = {
     why: 'commission.create: max contracts reached. Needs 24+ existing contracts in state.'
   },
   'no-budget': {
-    anchor: "if (!aff) { noteFault('no-budget'); return { ok: false, reason: 'no-budget', principal: principal, reward: reward }; }",
-    why: 'commission.create: principal cannot afford reward. Needs org.canAfford to return false.'
+    // v2.194.0（U2 批次②）：本码**仍是活的**（不再是死表：传参错位修好之后它才第一次真的可达），
+    //   锚点随现场形态更新 —— 返还体多了 `kind` / `item`（付款方种类与资源项如今都必须显式给）。
+    anchor: "if (!aff) { noteFault('no-budget'); return { ok: false, reason: 'no-budget', kind: pk, principal: principal, item: item, reward: reward }; }",
+    why: 'commission.create: principal cannot afford reward. Needs org.canAfford to return false（付款方确有其人/其势，但那一项资源不够）。'
   },
   'no-stages': {
     anchor: "if (stages.length < 1) { noteFault('no-stages'); return { ok: false, reason: 'no-stages', have: stages.length, need: 1 }; }",
@@ -333,6 +335,30 @@ function runWitness(WA) {
       trip('bad-chain', function () { return CMw.chain({ site: 'witness:bad' }).reason; });
       want('steps-full', 'U2：单链步数超上限（16 是常量，不可配）⇒ steps-full 并报出断在第几步');
       trip('steps-full', function () { return CMw.step({ steps: new Array(16) }).reason; });
+      want('refund-failed', 'U2：取消失败（托管退不回来）⇒ refund-failed —— 合约状态不因本笔改变（v2.194.0 批次②：此前异常被静默吞掉，合约照样记 cancelled）');
+      trip('refund-failed', function () {
+        const Cm = WA.commission;
+        if (!Cm || typeof Cm.create !== 'function') return '';
+        Cm.setSettings({ enabled: true });
+        const o = WA.org;
+        if (o && typeof o.setSettings === 'function') o.setSettings({ enabled: true });
+        // 备料：让付款方（势力）确实付得起 30 —— 否则 create 会先在 canAfford 上拒收
+        try {
+          if (WA.org && typeof WA.org.setSettings === 'function') WA.org.setSettings({ enabled: true });
+          WA.store.transact(function (d) {
+            d.evolution = d.evolution || {};
+            const fs2 = (d.evolution.factions = Array.isArray(d.evolution.factions) ? d.evolution.factions : []);
+            if (!fs2.some(function (f) { return f && f.name === '见证商行'; })) {
+              fs2.push({ id: 'fa_witness', name: '见证商行', power: 10, status: '稳固', relation: '中立', resources: { '金': 100 } });
+            }
+          }, 'witness:seed-faction');
+        } catch (e) {}
+        const made = Cm.create({ title: 'witness-refund', principal: '见证商行', principalKind: 'faction', agent: '见证工匠',
+          reward: 30, item: '金', prepaid: 30, escrow: '查无此户', escrowKind: 'faction',
+          stages: [{ label: 'S1', reward: 30 }] });
+        const r = made && made.ok === true ? Cm.cancel(made.id, 'witness') : null;
+        return r ? r.reason : '';
+      });
       want('step-threw', 'U2：某一步抛错 ⇒ step-threw（世界未提交）—— 不把异常吞成「链成了」');
       trip('step-threw', function () {
         return CMw.chain({ opId: 'witness:threw', site: 'witness:threw', fn: function (c, d) {

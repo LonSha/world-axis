@@ -96,19 +96,29 @@
    *   **不告诉我写口内部返回了 false**（内层拒签被保存点原地撤回，外面只看见一个成功信封）。
    *   于是「没写成功」会被读成「写成功」—— 正是本项要治的谎报。
    *   真源用 `store.txStat().lastNested`（store 自己在嵌套分支写的台账，不是我方常量），
-   *   并做**时效校验**：读数时刻必须晚于本次调用开始，否则是上一次事务留下的旧读数。
-   * @param {number} t0 本次写调用开始时刻（clockWall）
+   *   并做**时效校验**：读数必须是**我这一笔的**，否则是上一次留下的旧读数。
+   *   ⚠ 时效判据用 store 记的**单调序号** `seq`（本笔嵌套事务在 `txStat().count` 上的序号），
+   *     **不是墙钟毫秒** —— 毫秒在测试冻结时钟下会给出**相等**读数，把旧读数误判成本次的，
+   *     于是「目标不在草稿里」被读成「第一次嵌套写被撤回了」而拒收整链（专锁 C1 实测的跨进程抖动）。
+   * @param {number} n0 本次写调用开始时 store.txStat().count（= 之前已发生的事务数）
    * @returns {''|'aborted'|'threw'}
    */
-  function nestedVerdictSince(t0) {
+  function nestedVerdictSince(n0) {
     try {
       if (!WA.store || typeof WA.store.txStat !== 'function') return '';
-      const ln = WA.store.txStat().lastNested;
-      if (!ln || typeof ln !== 'object' || !ln.at) return '';
-      if (ln.at < t0) return '';                       // 旧读数：不归本次
+      const st = WA.store.txStat();
+      const ln = st.lastNested;
+      if (!ln || typeof ln !== 'object') return '';
+      if (typeof ln.seq === 'number' && typeof n0 === 'number') {
+        if (ln.seq < n0 + 1) return '';                 // 序号在本次之前 ⇒ 旧读数，不归本次
+      } else if (typeof st.count === 'number' && typeof n0 === 'number' && st.count < n0 + 1) {
+        return '';                                       // 老 store（无 seq）：回退到计数口径
+      }
       return (ln.why === 'threw') ? 'threw' : 'aborted';
     } catch (e) { return ''; }
   }
+  /** 取「本次调用前已发生的事务数」（时效判据的基准，见上）。 */
+  function txCount() { try { return (WA.store && typeof WA.store.txStat === 'function') ? (WA.store.txStat().count || 0) : 0; } catch (e) { return 0; } }
   function wallNow() { try { return (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { return Date.now(); } }
 
   /**
@@ -142,9 +152,9 @@
     if (!ifl) {
       if (inner) {
         // 调用方自己的事务里：写入随调用方提交（不是本模块的链，也不该由本模块记账）
-        const t0 = wallNow();
+        const n0 = txCount();
         const r = WA.store.transact(runInTx, 'operations:' + kind);
-        const nv = nestedVerdictSince(t0);          // 同上：真判据优先
+        const nv = nestedVerdictSince(n0);          // 同上：真判据优先
         if (nv) return { persisted: false, chain: false, nested: true, failed: nv === 'threw' ? 'write-threw' : 'write-aborted' };
         if (r && r.ok === false) return { persisted: false, chain: false, nested: true, failed: 'tx-' + (r.aborted ? 'aborted' : (r.denied ? 'denied' : (r.error ? 'error' : 'unknown'))) };
         return { persisted: false, chain: false, nested: true };
@@ -154,11 +164,11 @@
       return { persisted: true, chain: false };
       // 注：顶层路径**不**查 lastNested —— 顶层没有保存点，写入就是写入了（多查只会引入假警报）。
     }
-    const t1 = wallNow();
+    const n1 = txCount();
     const r = WA.store.transact(runInTx, 'operations:' + kind);   // 嵌套：落在链的 draft 上
     // 真判据优先：内层被保存点撤回时，`store.transact` 照样返回一个成功信封（`ok:true/deferred:true`），
     //   所以只看它会把「没写进去」读成「写进去了」。`lastNested` 是 store 自己写的现场读数。
-    const nv1 = nestedVerdictSince(t1);
+    const nv1 = nestedVerdictSince(n1);
     if (nv1) {
       // 本模块这一笔**没写进去**（被保存点撤回）⇒ 不许登记成链的一步、不许说「已登记」
       return { persisted: false, chain: true, failed: nv1 === 'threw' ? 'write-threw' : 'write-aborted' };
