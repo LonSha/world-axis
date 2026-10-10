@@ -34,29 +34,29 @@ function a(cond, name, extra) {
 const FIELDS = ['purpose', 'nextConsumer', 'reviewAfter', 'disposition'];
 
 // ══════════ A. 静态 ══════════
-function runA() {
+function runA(A) {
   console.log('\nA. 生命周期字段的形态');
   ['staleReviews', 'reviewAfterOf', 'compareVersion', 'parseVersion']
-    .forEach(function (k) { a(typeof CT[k] === 'function', 'A1 consumer-types 导出 ' + k); });
-  a(typeof CT.REVIEW_WINDOW_MINOR === 'number' && CT.REVIEW_WINDOW_MINOR >= 1,
+    .forEach(function (k) { A(typeof CT[k] === 'function', 'A1 consumer-types 导出 ' + k); });
+  A(typeof CT.REVIEW_WINDOW_MINOR === 'number' && CT.REVIEW_WINDOW_MINOR >= 1,
     'A2 复查窗是常量（' + CT.REVIEW_WINDOW_MINOR + ' 个小版本）—— 不是散在各处的字面量');
-  a(!!CT.NEXT_CONSUMER_OF && typeof CT.NEXT_CONSUMER_OF === 'object',
+  A(!!CT.NEXT_CONSUMER_OF && typeof CT.NEXT_CONSUMER_OF === 'object',
     'A3 「下一个消费者」按形态派生（' + Object.keys(CT.NEXT_CONSUMER_OF || {}).length + ' 个形态）');
   // 规则面不许留缺口：所有合法形态都要有去向派生规则
-  a(CT.SHAPES.every(function (s) { return !!CT.NEXT_CONSUMER_OF[s]; }),
+  A(CT.SHAPES.every(function (s) { return !!CT.NEXT_CONSUMER_OF[s]; }),
     'A4 每个合法形态都有去向派生规则（缺口 ' + CT.SHAPES.filter(function (s) { return !CT.NEXT_CONSUMER_OF[s]; }).join(',') + '）');
   const led = CT.loadRegistry();
   const keys = Object.keys(led.programmatic || {});
-  a(keys.length >= 100, 'A5 登记面非空（' + keys.length + ' 条）—— 空表上「零超期」是恒真的');
+  A(keys.length >= 100, 'A5 登记面非空（' + keys.length + ' 条）—— 空表上「零超期」是恒真的');
   const missing = keys.filter(function (k) {
     return FIELDS.some(function (f) { return !String((led.programmatic[k] || {})[f] || '').trim(); });
   });
-  a(missing.length === 0, 'A6 每条登记都有四项生命周期字段（缺 ' + missing.length + ' 条）',
+  A(missing.length === 0, 'A6 每条登记都有四项生命周期字段（缺 ' + missing.length + ' 条）',
     missing.slice(0, 4).join(', '));
   // 去向必须**由形态派生**（purpose === shape），不是人手写的另一套说法
   const drifted = keys.filter(function (k) { return led.programmatic[k].purpose !== led.programmatic[k].shape; });
-  a(drifted.length === 0, 'A7 去向与形态同源（purpose === shape；漂移 ' + drifted.length + ' 条）');
-  a(keys.every(function (k) { return ['keep', '应删除'].indexOf(led.programmatic[k].disposition) >= 0; }),
+  A(drifted.length === 0, 'A7 去向与形态同源（purpose === shape；漂移 ' + drifted.length + ' 条）');
+  A(keys.every(function (k) { return ['keep', '应删除'].indexOf(led.programmatic[k].disposition) >= 0; }),
     'A8 disposition 落在有限词表内（keep / 应删除）');
   // 复查期算术必须与窗口常量同源
   const bad = keys.filter(function (k) {
@@ -64,7 +64,7 @@ function runA() {
     const p = CT.parseVersion(v.reviewAfter);
     return !p || p[1] - CT.REVIEW_WINDOW_MINOR < 0;
   });
-  a(bad.length === 0, 'A9 复查期都可解析（坏值 ' + bad.length + ' 条）');
+  A(bad.length === 0, 'A9 复查期都可解析（坏值 ' + bad.length + ' 条）');
 }
 
 // ══════════ B. 运行时 ══════════
@@ -170,10 +170,22 @@ function runN(A) {
     'N7 负控制全程未改真台账（消费登记表逐字未变）');
 }
 
-runA();
-runB(a);
-runC(a);
-runN(a);
-console.log('\nU4-EXPORT-LIFECYCLE-V2191: ' + (failures.length ? 'FAIL ' + failures.length + '/' + (pass + failures.length) : 'pass (' + pass + ')'));
-failures.slice(0, 8).forEach(function (f) { console.log('  · ' + f); });
-process.exit(failures.length ? 1 : 0);
+// ── 加载契约（v2.191.0 收口补）───────────────────────────────────────────
+//   本文件初版**没有 `runAll` 导出**，且顶层无条件自跑 + `process.exit`。
+//   两个缺陷叠在一起：被 `tests/run.js` 的 `runLock` require 时（a）先终止整个回归进程，
+//   而 `runLock` 取 `require(spec)['runAll']` 会拿到 undefined；（b）因为上一条锁先退出了
+//   整个进程，**本锁一次都没被执行到，所以从未暴露**。
+//   现场代价：整趟回归读数从 15907 掉到 53，status 仍是 `passed`、`unchanged: true` ——
+//   本仓点过名的**假绿**：没有任何一条门禁报错，只是后面几千条再也没跑。
+function runAll(assert) {
+  const A = function (c, n, e) { assert(c, n, e); };
+  runA(A); runB(A); runC(A); runN(A);
+}
+module.exports = { runAll: require('./lock-assert.js').restoring(runAll) };
+if (require.main === module) {
+  runA(a); runB(a); runC(a); runN(a);
+  console.log('\nU4-EXPORT-LIFECYCLE-V2191: '
+    + (failures.length ? 'FAIL ' + failures.length + '/' + (pass + failures.length) : 'pass (' + pass + ')'));
+  failures.slice(0, 8).forEach(function (f) { console.log('  · ' + f); });
+  process.exit(failures.length ? 1 : 0);
+}

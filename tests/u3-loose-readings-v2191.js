@@ -37,28 +37,28 @@ function a(cond, name, extra) {
 const readOf = function (rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); };
 
 // ══════════ A. 静态 ══════════
-function runA() {
+function runA(A) {
   console.log('\nA. 工具与登记表的形态');
   ['audit', 'scanSite', 'loadTable', 'tableProblems', 'listTestFiles', 'print', 'pick']
-    .forEach(function (k) { a(typeof LR[k] === 'function', 'A1 loose-readings 导出 ' + k); });
-  a(Array.isArray(LR.SHAPES) && LR.SHAPES.length === 3, 'A2 形态词表是有限集合（' + LR.SHAPES.length + ' 种）');
+    .forEach(function (k) { A(typeof LR[k] === 'function', 'A1 loose-readings 导出 ' + k); });
+  A(Array.isArray(LR.SHAPES) && LR.SHAPES.length === 3, 'A2 形态词表是有限集合（' + LR.SHAPES.length + ' 种）');
   const table = LR.loadTable();
-  a(!!table && Array.isArray(table.sites) && table.sites.length >= 3,
+  A(!!table && Array.isArray(table.sites) && table.sites.length >= 3,
     'A3 登记站点 ≥3（实 ' + (table && table.sites ? table.sites.length : '不可读') + '）—— 空表上「无失配」是恒真的');
-  a(!!table && (table.shapes || []).every(function (s) { return LR.SHAPES.indexOf(s) >= 0; }),
+  A(!!table && (table.shapes || []).every(function (s) { return LR.SHAPES.indexOf(s) >= 0; }),
     'A4 表内形态词表与工具词表同源（不各写一份）');
   // 真值不进表（验收④的核心）
-  a(LR.tableProblems(table).length === 0, 'A5 表自检：无真值字段、形态合法',
+  A(LR.tableProblems(table).length === 0, 'A5 表自检：无真值字段、形态合法',
     JSON.stringify(LR.tableProblems(table).slice(0, 3)));
   // 反向漏网的**判据**必须是「字段真的在探针里」，不能只靠变量名
   const src = readOf('tools/loose-readings.js');
-  a(src.indexOf('字段不在任何已登记探针里') >= 0 && src.indexOf('c.probe, m[2]) !== undefined') >= 0,
+  A(src.indexOf('字段不在任何已登记探针里') >= 0 && src.indexOf('c.probe, m[2]) !== undefined') >= 0,
     'A6 反向漏网按「字段在探针里真存在」判定（不是只按变量名 —— 同名局部变量会误伤）');
   // 站点字段的探针真值可现取（读不到必须当不通过）
   const s0 = table.sites[0];
   const probe = JSON.parse(readOf(s0.probe));
-  a(LR.pick(probe, s0.fields[0]) !== undefined, 'A7 登记站点的字段在探针里真存在（' + s0.fields[0] + '）');
-  a(LR.pick(probe, 'no.such.field.at.all') === undefined,
+  A(LR.pick(probe, s0.fields[0]) !== undefined, 'A7 登记站点的字段在探针里真存在（' + s0.fields[0] + '）');
+  A(LR.pick(probe, 'no.such.field.at.all') === undefined,
     'A8 取不到时返回 undefined（**与 0 分开**：不拿 0 冒充「读不到」）');
 }
 
@@ -122,7 +122,7 @@ function runN(A) {
   for (let i = 0; i < parts.length - 1; i++) cur = cur[parts[i]];
   cur[parts[parts.length - 1]] = Number(one.got) + 1;
   const LR2 = { probe: fakeProbe };
-  a(String(LR.pick(LR2.probe, one.field)) !== String(one.got),
+  A(String(LR.pick(LR2.probe, one.field)) !== String(one.got),
     'N2 改探针真值（' + one.got + ' → ' + LR.pick(LR2.probe, one.field) + '）⇒ 反向也能现形');
 
   // N3：新造一个未登记的散装点 ⇒ unregistered（验收③）
@@ -202,12 +202,31 @@ function runN(A) {
 
 function runAll(assert) {
   const A = assert || a;
-  runA();
+  runA(A);
   runB(A === a ? assert : A);
   runC(A === a ? assert : A);
   runN(A === a ? assert : A);
 }
-runAll(a);
-console.log('\nU3-LOOSE-READINGS-V2191: ' + (failures.length ? 'FAIL ' + failures.length + '/' + (pass + failures.length) : 'pass (' + pass + ')'));
-failures.slice(0, 8).forEach(function (f) { console.log('  · ' + f); });
-process.exit(failures.length ? 1 : 0);
+// ── 加载契约（v2.191.0 收口补）：**直跑与挂节两种入口必须都是安全的** ────────
+//   治的病（本版首趟整趟回归实测抓到的**真缺陷**）：本文件初版无条件在顶层跑
+//   `runAll(a)` + `process.exit(...)`。被 `tests/run.js` 的 `runLock` require 的那一刻，
+//   它直接**终止了整个回归进程** —— 现场表现为「通过 53 / 失败 0 · status: passed」
+//   这种**假绿**：读数从 15907 掉到 53，而门禁本身没有任何一条报错。
+//   同族形态本仓点过名：**判据的加载方式改变了被测量的对象**。
+//   `tests/u9-fact-report-v2190.js` 是本仓的正确模式（导出 `runAll` 供 runLock 调用、
+//   只在 `require.main === module` 时自跑并 exit）；本文件此前漏了这层门。
+//   ⚠️ 关于 N 段破坏的边界（这里必须写准，写宽了就是假的保证）：`restoring` 只还原
+//   **宿主全局**（`global.window`，v2.75.0 的契约），它**不是**「撤销破坏」的机制。
+//   本锁 N 段的破坏全部作用在**内存里的字符串副本**上（`brokenSrc` / `fakeProbe` /
+//   `thinned` 都是局部值），从不写回真文件、也不进模块缓存 —— 这一点由 N7b / N8b /
+//   以及现场 `git status` 三重看着。包 `restoring` 是为了与全仓 50 把锁同口径。
+module.exports = {
+  runAll: require('./lock-assert.js').restoring(runAll)
+};
+if (require.main === module) {
+  runAll(a);
+  console.log('\nU3-LOOSE-READINGS-V2191: '
+    + (failures.length ? 'FAIL ' + failures.length + '/' + (pass + failures.length) : 'pass (' + pass + ')'));
+  failures.slice(0, 8).forEach(function (f) { console.log('  · ' + f); });
+  process.exit(failures.length ? 1 : 0);
+}
