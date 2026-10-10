@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.192.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。 v2.193.0（第二批 · U1）：新增 engines/beat-facade.js ⇒ 8 口按实测归因入册（全 self-only），另 genGate.gate / genGate.setSettings 两条证据由 tref 2 修实为 4 ⇒ 归因从 test-only 迁到 self-only；dead 848 → 856，总条目 851 → 859，归因分布 test-only 365 → 366 / self-only 361 → 367 / unwired 125 → 126。version 字段与入口 VERSION 同批对齐（v2.193.0）。",
-  "version": "2.193.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.194.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.194.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -6064,7 +6064,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 129
+      "own": 130
     },
     "toolDiag.secAgenda": {
       "reason": "self-only",

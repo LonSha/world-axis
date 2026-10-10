@@ -85,6 +85,25 @@ Status: proposed（2026-10-10 立；只读制订轮，不改产品实现、不�
   回执是簿记不是世界事实（不写世界键）；不静默改变既有单模块写入的语义。
 - **验收**：每条链覆盖六面 —— 正常提交 / 中段失败 / 重试 / 重复 `opId` / 重载后回执 / 副作用失败；
   不得出现半提交；重试不得重复写入；失败能指出在哪一层；回执在重载后仍答得出；专锁真源码破坏两向自证。
+- **进度（v2.194.0 · 批次①：diplomacy + operations）**：
+  - 交付物：`core/commit.js` 链面（`chain` / `chainStat` / `chainSelfCheck` / `active` / `inflight` / `step`，
+    导出面 15 项）+ `engines/diplomacy.js` 单一漏斗 `rx` 的在途标注 + `engines/operations.js` 五个写口
+    （`enact` / `disburse` / `settle` / `handover` / `cancel`）统一走 `chainWrite`。
+  - **链的首个真实产品消费者**：`operations.disburse` 自己开链 —— 跨模块转账（`org.transfer`）与本地
+    记账同链一次提交，治好「钱出去了、账上没记」的两笔顶层事务半写（专锁 B5a–B5l 逐条取证，
+    B5g 逐字比对「钱没出去、账也没记」）。链内次序固定为**先记账（无副作用）→ 后转账（有副作用）**，
+    免得「目标账找不到」时转账的 org 流水已经写过（那类副作用链撤不回）。
+  - 专锁 `tests/s3-u2-v2194.js` **57/57**（A 链六面 / B 在途不谎报含 B5 产品消费者 / C 硬边界如实登记）；
+    反向自证 6 条真源码破坏（R6–R12）**全部被抓且逐字节还原**。
+  - 摘除：链的零调用入口（`invite` / `settleInvites` / `registerFlusher` / `flushInvites` / `seen` /
+    `opKeyWith` 及邀约专属失败码）与「成功路径透出 `abortWhy`」（实测零消费者）一并删除；
+    链的只读读面接上产品消费方 `engines/tool-diag.js` 的 `commit` 节（原本只会停在 test-only 死导出）。
+  - 门禁：死导出（`chainStat` / `chainSelfCheck` 不再计 test-only，`--update` 后全绿）/ 拒收码
+    （`bad-chain` / `steps-full` / `chain-nested` / `step-threw` 四码入活见证表，`insufficient-funds`
+    死表锚点随形态更新且理由改真）/ 模块注册表 / `FROZEN2800` 逐字回填（14772 字符）/ O2 专锁
+    （`rx` 锚点同步，43/43）—— 全部复跑绿。**本批未跑全量回归**（按流程约定：全量留到计划全部内容完成之后）。
+  - 待办：批次②`freight` + `commission`；③`agency` + `investigation`；④`aftermath` + `story-choice`；
+    ⑤`world-blueprint` 与剩余协调模块。
 
 ### U3 散装读数的登记与「过期即现形」
 

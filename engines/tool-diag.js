@@ -2708,6 +2708,34 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     return { module: 'operations', loaded: true, closedLoop: d.closedLoop,
       checks: d.checks, version: d.version };
   }
+  /**
+   * v2.194.0（U2）：跨模块原子提交链的读数（core/commit.js 的链面）。
+   *   链是**进程态编排**（不开开关、不进注册表），它的读数只在进程里有 —— 因此更需要一个
+   *   当着人面把它答出来的地方：跑过几条链、提交/中止各几笔、哪几个失败码被触发过、
+   *   此刻有没有链开着、以及本面**按什么口径算、哪几条边界是硬编码的**（自证）。
+   *   为什么必须有它：`chainStat` / `chainSelfCheck` 这两个读面此前**只有测试在调**，
+   *   生导出冻结门禁当场报「新增死导出 [test-only]」。诊断面是它们的产品消费者 ——
+   *   与本仓 playtime 的取用表同一条纪律：只导出不消费，等于没交付。
+   */
+  function secCommit() {
+    return safe(function () {
+      // 直呼 `WA.commit.xxx`（**不**起局部别名）：生导出冻结门禁按字面计数「谁在引用这个出口」，
+      //   别名会被读成「产品代码零引用」——那样这两个读面就永远停在 test-only，等于没接消费方。
+      if (!WA.commit || typeof WA.commit.chainStat !== 'function') return { error: 'core/commit.js 未装载（链读数缺席）' };
+      const st = WA.commit.chainStat();
+      const sc = (typeof WA.commit.chainSelfCheck === 'function') ? WA.commit.chainSelfCheck() : { ok: false, failed: ['chainSelfCheck'] };
+      return {
+        chains: st.chains, commits: st.commits, aborts: st.aborts, failed: st.failed,
+        replayed: st.replayed, capped: st.capped, overLimit: st.overLimit, leaks: st.leaks,
+        open: st.open, limit: st.limit,
+        lastReason: st.lastReason, lastAt: st.lastAt,
+        faultCodes: (st.faultCodes || []).slice(),
+        faults: Object.assign({}, st.faults || {}),
+        selfCheckOk: !!sc.ok, selfCheckFailed: (sc.failed || []).slice(),
+        active: (typeof WA.commit.active === 'function') ? WA.commit.active() : null
+      };
+    }, { error: 'commit 节采集失败' });
+  }
   const UI_BINDINGS = [
     { page: 'tools', ids: ['wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-faces', 'wa-snap-subset', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
       // v2.2.0: 诊断出口收口——三个新增控件同样纳入「渲染 ↔ 绑定」一致性校验
@@ -3861,6 +3889,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       investigation: secInvestigation(),
       aftermath: secAftermath(),
       operations: secOperations(),
+      // v2.194.0（U2）：跨模块原子提交链。与 operations 节分列不合并 ——
+      //   一个答「项目在办什么」，一个答「这些写入是怎么被一次提交掉的、哪一步拒的」。
+      commit: secCommit(),
       // v2.166.0（TX2）：行动调度（动机 / 计划 / 行动闭环）。与 diplomacy 节分列不合并
       //   —— 一个答「谈成的事实」，一个答「谁在做什么、计划步到哪、有没有在途行动」。
       // v2.156.0（SP1）：时间来源与游玩活动基准。与 life 节分列不合并（两问的失效模式不同）。

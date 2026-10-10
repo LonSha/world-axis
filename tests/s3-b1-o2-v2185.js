@@ -323,7 +323,7 @@ function runNegative(a) {
   // N0 锚点恰中一次
   const storeSrc = read(REL_STORE);
   const A_SP = 'const __sp = (function () { try { return cloneDraft(outer); } catch (e) {';
-  const A_RX = '    if (tx && typeof tx === \'object\' && tx.result && typeof tx.result === \'object\') return tx.result;';
+  const A_RX = 'const biz = (tx && typeof tx === \'object\' && tx.result && typeof tx.result === \'object\') ? tx.result : tx;';
   a(countOcc(storeSrc, A_SP) === 1, 'v2185/o2 N0: 保存点锚点在真源码恰 1 次（实 ' + countOcc(storeSrc, A_SP) + '）');
   a(countOcc(read(REL_DIP), A_RX) === 1, 'v2185/o2 N0: rx 解包锚点在 diplomacy 恰 1 次（实 ' + countOcc(read(REL_DIP), A_RX) + '）');
 
@@ -340,7 +340,9 @@ function runNegative(a) {
 
   // N2 真源码破坏②：rx 解包失效 ⇒ D1/D2 的「无信封」必须现形
   const dipSrc = read(REL_DIP);
-  const broken2 = dipSrc.split(A_RX).join('    if (false && tx) return tx.result;');
+  //   破坏需**保形**：替换成 `const biz = tx;`（解包失效，但标识符仍在）——
+  //   否则源码直接 ReferenceError，验的就不是「不解包会让信封透出」这条判据了。
+  const broken2 = dipSrc.split(A_RX).join('const biz = tx;');
   a(broken2 !== dipSrc, 'v2185/o2 N2: 破坏②真的改动了源码文本');
   const WA2 = build({ [REL_DIP]: broken2 });
   const pt2 = probePortShapeTop(WA2);

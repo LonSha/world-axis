@@ -175,6 +175,9 @@ function runAll(A) {
   //   diplomacy / factionGraph / freight 七个 ns，故「有引用」）。
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
+  // v2.194.0（第三批 · U2 批次①）：跨模块链接线 —— 无新文件、无新命名空间；两条调用期边：
+  //   operations → commit（chain / step）与 diplomacy → commit（inflight / active）
+  //   ⇒ 调用期 1674 → 1676、合计 1782 → 1784；装载期 108 不变（两模块本就在装载期读 store）。
   A(a.files === 218 && a.aliasFiles === 218 && a.refFiles === 216,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
@@ -238,7 +241,12 @@ function runAll(A) {
   //   其余为 run.js / tool-diag 的登记面读数在同 (file, ns) 对上去重后的净增。
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
-  A(a.edgesLoad === 108 && a.edgesCall === 1674 && a.edgesAll === 1782 && a.identityOk,
+  // v2.194.0（第三批 · U2 批次①）：**不新增文件**（链面住在既有的 core/commit.js 里），
+  //   只多两条**调用期** (file, ns) 边 —— 边是 (file, ns) 对、不是站点数：
+  //   ① engines/operations.js 真读 `WA.commit.chain` / `WA.commit.step`（拨付自己开链）；
+  //   ② engines/diplomacy.js 真读 `WA.commit.inflight` / `WA.commit.active`（单一漏斗 rx 的在途标注）。
+  //   装载期边 108 不变（两模块本就在装载期读 store），合计 1782 → 1784。
+  A(a.edgesLoad === 108 && a.edgesCall === 1676 && a.edgesAll === 1784 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'

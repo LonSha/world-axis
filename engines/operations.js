@@ -52,6 +52,126 @@
   function findByDecision(decisionId) { var k = clean(decisionId, 60); return projects().filter(function (x) { return x && x.decisionId === k; })[0] || null; }
   function newId() { return WA.rand ? WA.rand.id('ops_', 4, 'id') : 'ops_0000'; }
 
+  // ── v2.194.0（U2）：跨模块链的写口边界（本模块五个写面共用）────────────
+  //   本模块的五个写口原先各自 `WA.store.transact`。它们一旦被别的模块**放进外层事务**里调
+  //   （链的常规形态：一条链只有一个 draft），`store.transact` 走嵌套分支 —— 世界写入随外层
+  //   提交，而这里的返回值**照样是 `{ok:true}`**。外层随后被拒 / 抛错时，调用方拿着一句
+  //   「拨付成功」，世界一格没动。本仓点名过这类「谎报成功」，故在此立一道边界：
+  //     · 写入**照原路走**（嵌套 ⇒ 落在链的那一份 draft 上，与链里其它写入同生共死）；
+  //     · 只有**回执**改口径：链上如实标 `chain:true, persisted:false`（未提交，另附推算值）。
+  //   为什么**不**把写入推迟到链提交之后（早先试过「邀约 + 收尾处理器」，已撤）：
+  //     `org.transfer` 这类写口自带事务、拒绝时返回 `{deferred:true}` 而不抛 —— 推迟版会把
+  //     「转账失败」读成「邀约登记成功」，即把本项要治的**谎报成功**搬到另一个层。
+  //     现在这一版让「转不出去」当场落回调用方手里，故是**报错**而不是白拿一个假回执。
+  //   跨模块的那几笔（`org.transfer`）仍与本地记账分属两个 draft —— 链能保证的是
+  //     「**参与了链的那些写入**整链原子」，填不平模块自己分两次提交留下的缝。如实记此边界。
+  // ── 链的 opId：**消费方必须自带唯一的那个** ──────────────────────────
+  //   链面未收到 opId 时按 `chain@<floor>` 兜底 —— 同一个 floor（同一段聊天）里第二条链就会
+  //   撞上自己的第一条（`duplicate-op`）。专锁实测：面板连点两次拨付，第二次整笔作废。
+  //   故本口自己发号：墙钟 + 模块内单调序号（**不动 `WA.rand` 的抽数流** —— 那会改掉
+  //   既有测试冻结的随机序列）。调用方显式给了 opId 就用它的（幂等重试走这条）。
+  var __opSeq = 0;
+  function nextOpId(tag) { __opSeq++; return clean(tag, 40) + ':' + wallNow() + ':' + __opSeq; }
+
+  function chainInflight() {
+    return (WA.commit && typeof WA.commit.inflight === 'function') ? WA.commit.inflight() : null;
+  }
+  /**
+   * 本模块写口的**提交时机**统一入口。
+   *   链外顶层 ⇒ 逐字走原路（自己开事务），回执 `chain:false, persisted:true`。
+   *   链外**嵌套**（调用方自己开了事务）⇒ 写入落在**调用方**那一份 draft 上，不归本链管
+   *     ⇒ 回执如实标 `chain:false, persisted:false, nested:true`（不许说「已提交」，那正是谎报）。
+   *   链上 ⇒ 照样走原路（`store.transact` 的嵌套保存点让它落在链的那一份 draft 上，链被拒时
+   *     它一格不留 —— 这是链的原子性来源），回执标 `chain:true, persisted:false`。
+   *   **不把写入推迟到链之后**：推迟会让它与链里其它写入不再同生共死，那正是本项要治的半写。
+   *   **按 store 的返回体如实归因**：内层被拒（`aborted`/`denied`/`error`）⇒ 写入**根本没发生**
+   *     ⇒ 交回 `failed`，写口据此报错；顶层被拒（保存点之外才可能）⇒ 同样 `failed`。
+   *     （此前只看事务深度、不看返回体，内层拒签会被读成「已登记」——谎报的另一个入口。）
+   * @returns {{persisted:boolean, chain:boolean, nested?:boolean, nostore?:boolean, failed?:string}}
+   */
+  /**
+   * 刚刚这一趟 transact，**本模块自己的写**有没有被保存点撤回？
+   *   为什么需要它：本模块的写口是**跨模块业务链**的参与方 —— 一旦被嵌在外层事务里
+   *   （链上，或调用方自己的事务），`store.transact` 会返回 `ok:true / deferred:true`，
+   *   **不告诉我写口内部返回了 false**（内层拒签被保存点原地撤回，外面只看见一个成功信封）。
+   *   于是「没写成功」会被读成「写成功」—— 正是本项要治的谎报。
+   *   真源用 `store.txStat().lastNested`（store 自己在嵌套分支写的台账，不是我方常量），
+   *   并做**时效校验**：读数时刻必须晚于本次调用开始，否则是上一次事务留下的旧读数。
+   * @param {number} t0 本次写调用开始时刻（clockWall）
+   * @returns {''|'aborted'|'threw'}
+   */
+  function nestedVerdictSince(t0) {
+    try {
+      if (!WA.store || typeof WA.store.txStat !== 'function') return '';
+      const ln = WA.store.txStat().lastNested;
+      if (!ln || typeof ln !== 'object' || !ln.at) return '';
+      if (ln.at < t0) return '';                       // 旧读数：不归本次
+      return (ln.why === 'threw') ? 'threw' : 'aborted';
+    } catch (e) { return ''; }
+  }
+  function wallNow() { try { return (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { return Date.now(); } }
+
+  /**
+   * 在**链的这一层草稿**上记一笔运营支出。
+   *   为什么必须有它：链内后一步的**预检读的是已提交状态**（`state()` / `find()`）——
+   *   看不到本链里刚写进 draft、尚未提交的实体（探针实测 `viaState:0 / viaDraft:1`）。
+   *   因此「链里先 enact 建账、再对同一账做 disburse」这类真实业务链，写口自己的 `find()`
+   *   必然落空。它把记账直接落在草稿上，绕开这个只读快照。
+   *   找不到目标 ⇒ 返回 false（**静默空写不许读成成功**），由调用方当场中止整链。
+   */
+  function spendOnDraft(draft, id, amount) {
+    try {
+      var b = (draft.operations = draft.operations || {});
+      if (!Array.isArray(b.projects)) b.projects = [];
+      var t = b.projects.filter(function (x) { return x && x.id === id; })[0];
+      if (!t) return false;
+      t.spent = (Number(t.spent) || 0) + amount;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function chainWrite(kind, id, runInTx) {
+    const ifl = chainInflight();
+    const inner = (WA.commit && typeof WA.commit.active === 'function') ? WA.commit.active() : null;
+    const hasStore = !!(WA.store && typeof WA.store.transact === 'function');
+    if (!hasStore) {
+      // 无 store：与各写口原先的 `else` 分支同形（直改内存，落不进任何地方）
+      try { runInTx((WA.store && WA.store.get) ? WA.store.get() : {}); } catch (e) {}
+      return { persisted: false, chain: false, nostore: true };
+    }
+    if (!ifl) {
+      if (inner) {
+        // 调用方自己的事务里：写入随调用方提交（不是本模块的链，也不该由本模块记账）
+        const t0 = wallNow();
+        const r = WA.store.transact(runInTx, 'operations:' + kind);
+        const nv = nestedVerdictSince(t0);          // 同上：真判据优先
+        if (nv) return { persisted: false, chain: false, nested: true, failed: nv === 'threw' ? 'write-threw' : 'write-aborted' };
+        if (r && r.ok === false) return { persisted: false, chain: false, nested: true, failed: 'tx-' + (r.aborted ? 'aborted' : (r.denied ? 'denied' : (r.error ? 'error' : 'unknown'))) };
+        return { persisted: false, chain: false, nested: true };
+      }
+      const r1 = WA.store.transact(runInTx, 'operations:' + kind);
+      if (r1 && r1.ok === false) return { persisted: false, chain: false, failed: 'tx-' + (r1.aborted ? 'aborted' : (r1.denied ? 'denied' : (r1.error ? 'error' : 'unknown'))) };
+      return { persisted: true, chain: false };
+      // 注：顶层路径**不**查 lastNested —— 顶层没有保存点，写入就是写入了（多查只会引入假警报）。
+    }
+    const t1 = wallNow();
+    const r = WA.store.transact(runInTx, 'operations:' + kind);   // 嵌套：落在链的 draft 上
+    // 真判据优先：内层被保存点撤回时，`store.transact` 照样返回一个成功信封（`ok:true/deferred:true`），
+    //   所以只看它会把「没写进去」读成「写进去了」。`lastNested` 是 store 自己写的现场读数。
+    const nv1 = nestedVerdictSince(t1);
+    if (nv1) {
+      // 本模块这一笔**没写进去**（被保存点撤回）⇒ 不许登记成链的一步、不许说「已登记」
+      return { persisted: false, chain: true, failed: nv1 === 'threw' ? 'write-threw' : 'write-aborted' };
+    }
+    if (r && r.ok === false) {
+      return { persisted: false, chain: true, failed: 'tx-' + (r.aborted ? 'aborted' : (r.denied ? 'denied' : (r.error ? 'error' : 'unknown'))) };
+    }
+    if (WA.commit && typeof WA.commit.step === 'function') {
+      WA.commit.step(null, { site: 'operations:' + kind + ':' + clean(id, 40) });
+    }
+    return { persisted: false, chain: true };
+  }
+
   // ── 1. enact：以 inst 批准回执创建运营项目 ──
   function enact(decisionId, spec) {
     var cfg = getSettings();
@@ -100,14 +220,20 @@
       cycleTag: '', lastSettledAt: 0,
       status: 'active', createdAt: now, closedAt: 0
     };
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) { bucket(d).projects.push(rec); }, 'operations:enact');
-    } else { projects().push(rec); }
+    const cw = chainWrite('enact', rec.id, function (d) { bucket(d).projects.push(rec); return true; });
+    if (cw.failed) { noteFault(cw.failed); return { ok: false, reason: cw.failed, chain: !!cw.chain }; }
+    if (!cw.persisted) {
+      // **未落库**（链上，或写进了调用方自己的事务）：不许把「已登记」说成「已提交」
+      return { ok: true, id: rec.id, name: rec.name, owner: rec.owner, budget: budget,
+        chain: !!cw.chain, nested: !!cw.nested, persisted: false, projected: true,
+        note: cw.chain ? '已写进链的草稿，尚未提交（链提交后才生效）'
+          : '已写进调用方自己的事务（nested），本模块未单独提交' };
+    }
     if (WA.evict && typeof WA.evict.array === 'function') {
       try { WA.evict.array(bucket().projects, 'operations.projects'); } catch (e) {}
     }
     _stat.enacted++;
-    return { ok: true, id: rec.id, name: rec.name, owner: rec.owner, budget: budget };
+    return { ok: true, id: rec.id, name: rec.name, owner: rec.owner, budget: budget, chain: false, persisted: true };
   }
 
   // ── 2. disburse：受控资源拨付 ──
@@ -125,28 +251,79 @@
     var by = clean(o.by || rec.owner, 40);
     // 检查预算
     if (rec.spent + amount > rec.budget) { noteFault('over-budget'); return { ok: false, reason: 'over-budget', spent: rec.spent, budget: rec.budget, requested: amount }; }
-    // 检查组织资源可用性——仅当组织已注册为 faction 时检查
-    if (WA.org && typeof WA.org.canAfford === 'function') {
-      var _dfactions = ((state().evolution || {}).factions) || [];
-      var _dfactionExists = _dfactions.some(function (f) { return f && clean(f.name, 40) === clean(rec.orgId, 40); });
-      if (_dfactionExists) {
-        if (!WA.org.canAfford('faction', rec.orgId, itemType, amount)) { noteFault('insufficient-funds'); return { ok: false, reason: 'insufficient-funds', type: itemType, need: amount }; }
-        if (typeof WA.org.transfer === 'function') {
-          var tr = WA.org.transfer('faction', rec.orgId, 'person', by, itemType, amount);
-          if (!tr || !tr.ok) { noteFault('transfer-failed'); return { ok: false, reason: 'transfer-failed', detail: tr ? tr.reason : 'none' }; }
-        }
-      }
+    // 检查组织资源可用性——仅当组织已注册为 faction 时检查。
+    //   v2.194.0（U2）：**本口现在自己开一条链**。此前这两笔世界写（跨模块转账 + 本地记账）
+    //   分属**两个顶层事务** —— 转账成了、记账没成，就是「钱出去了、账上没记」的半写。
+    //   放进同一条链之后：转账失败 ⇒ 链中止 ⇒ 世界一格不动；链成立才两笔都在。
+    //   `org.transfer` 自带事务，链内嵌时走 store 的嵌套保存点；它转的是**已存在的双方**，
+    //   两边落在同一份 draft 上 ⇒ 它扣下的资源随链真实落地（专锁 B5b 逐字比对资源）。
+    //   链内**次序固定为「先记账、后转账」**：`org.transfer` 内部事务成功时会写 org 的
+    //   流水/统计，那类**副作用撤不回**（链只撤得回世界）—— 故「目标账在草稿里找不到」
+    //   必须在任何副作用发生**之前**就被挡下（专锁 B5l 用注释次序锁住这条）。
+    //   这是链面的**第一个真实产品消费者**（此前链只有测试在调 —— 一处零调用的公开面）。
+    var _dfactions = ((state().evolution || {}).factions) || [];
+    var _dfactionExists = !!(WA.org && typeof WA.org.canAfford === 'function')
+      && _dfactions.some(function (f) { return f && clean(f.name, 40) === clean(rec.orgId, 40); });
+    if (_dfactionExists && !WA.org.canAfford('faction', rec.orgId, itemType, amount)) {
+      noteFault('insufficient-funds'); return { ok: false, reason: 'insufficient-funds', type: itemType, need: amount };
     }
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) { t.spent += amount; }
-      }, 'operations:disburse');
-    } else { rec.spent += amount; }
+    if (_dfactionExists && typeof WA.org.transfer === 'function') {
+      const _chainable = !!(WA.commit && typeof WA.commit.chain === 'function');
+      const _outer = (WA.commit && typeof WA.commit.active === 'function') ? WA.commit.active() : null;
+      if (_chainable && !chainInflight() && !_outer) {
+        // 链外顶层（正常路径）：由本口开链，转账 + 记账整链一次提交
+        const ch = WA.commit.chain({
+          opId: (o.opId ? clean(o.opId, 60) : nextOpId('ops:disburse')), site: 'operations:disburse',
+          fn: function (c, draft) {
+            // 第一步：记账写进**这一层草稿**。`enact` 在链里建的项目也落在同一份 draft 上
+            //   （链内后一步的预检读的是已提交状态，看不到它 —— 这正是必须直接写 draft 的原因）。
+            //   它**没有副作用**，失败得越早越好：目标不在草稿里 ⇒ 当场中止，此时什么都还没发生。
+            if (!spendOnDraft(draft, rec.id, amount)) { c.abortWhy = 'ledger-target-missing'; return false; }
+            WA.commit.step(null, { site: 'operations:disburse:ledger' });
+            // 第二步：跨模块转账（有副作用的那一笔）。真因挂在**链对象**上 —— 本面交还给消费方
+            //   的是 `chainPack` 的**白名单字段**，挂在 `fn` 的局部变量上取不出来；挂 `abortWhy`
+            //   正是中止路径读的那个字段（专锁 B5e/B5f 取证）。
+            const tr = WA.org.transfer('faction', rec.orgId, 'person', by, itemType, amount);
+            if (!tr || !tr.ok) { c.abortWhy = 'transfer-failed'; return false; }
+            WA.commit.step(null, { site: 'operations:disburse:transfer' });
+            return true;
+          }
+        });
+        if (ch.ok !== true) {
+          const why = ch.reason || 'chain-failed';
+          noteFault(why);
+          return { ok: false, reason: why, chain: true, persisted: false,
+            note: '拨付未成（本笔未执行）⇒ 世界不因本笔改变 —— 转账与记账要么都在、要么都不在' };
+        }
+        // 链已提交：`find` 读的是提交后的内存（含本链写入），**不再自己加一次 amount**
+        //   —— 早先那版成功分支重复计数（`Number(find().spent) + amount`）会虚报一倍支出。
+        var upd2 = find(rec.id) || rec;
+        _stat.disbursed++;
+        return { ok: true, id: upd2.id, spent: Number(upd2.spent) || 0, budget: upd2.budget, purpose: purpose,
+          chain: false, persisted: true, projected: false, atomic: true, opId: ch.opId };
+      }
+      // 链内 / 别人事务内：保持原路（写入随外层 draft 同生共死），失败当场落回调用方手里
+      const tr = WA.org.transfer('faction', rec.orgId, 'person', by, itemType, amount);
+      if (!tr || !tr.ok) { noteFault('transfer-failed'); return { ok: false, reason: 'transfer-failed', detail: tr ? tr.reason : 'none' }; }
+    }
+    const cwD = chainWrite('disburse', rec.id, function (d) {
+      var b = bucket(d);
+      var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
+      if (!t) return false;        // 草稿里找不到目标 ⇒ 如实失败（静默空写不许读成成功）
+      t.spent += amount;
+      return true;
+    });
+    if (cwD.failed) { noteFault(cwD.failed); return { ok: false, reason: cwD.failed, chain: !!cwD.chain }; }
+    if (!cwD.persisted) {
+      // 未落库：回执里给的是**推算值**（`projected:true`），不是既成事实。
+      return { ok: true, id: rec.id, spent: rec.spent + amount, budget: rec.budget, purpose: purpose,
+        chain: !!cwD.chain, nested: !!cwD.nested, persisted: false, projected: true,
+        note: cwD.chain ? '已写进链的草稿，尚未提交；spent 是推算值' : '已写进调用方自己的事务（nested）；spent 是推算值' };
+    }
     var upd = find(rec.id) || rec;
     _stat.disbursed++;
-    return { ok: true, id: upd.id, spent: upd.spent, budget: upd.budget, purpose: purpose };
+    return { ok: true, id: upd.id, spent: upd.spent, budget: upd.budget, purpose: purpose,
+      chain: false, persisted: true, projected: false };
   }
 
   // ── 3. settle：按明确剧情周期有界结算 ──
@@ -168,33 +345,35 @@
     if (milestoneIdx >= 0 && rec.milestones[milestoneIdx]) {
       milestoneDone = true;
     }
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) {
-          t.cycleTag = cycleTag; t.lastSettledAt = now;
-          if (milestoneDone && t.milestones[milestoneIdx]) {
-            t.milestones[milestoneIdx].done = true; t.completedMilestones++;
-          }
-          // 全部里程碑完成则关闭项目
-          if (t.completedMilestones >= t.milestones.length && t.milestones.length > 0) {
-            t.status = 'completed'; t.closedAt = now;
-          }
-        }
-      }, 'operations:settle');
-    } else {
-      rec.cycleTag = cycleTag; rec.lastSettledAt = now;
-      if (milestoneDone) { rec.milestones[milestoneIdx].done = true; rec.completedMilestones++; }
-      if (rec.completedMilestones >= rec.milestones.length && rec.milestones.length > 0) {
-        rec.status = 'completed'; rec.closedAt = now;
+    const cwS = chainWrite('settle', rec.id, function (d) {
+      var b = bucket(d);
+      var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
+      if (!t) return false;        // 同上：找不到目标就是失败
+      t.cycleTag = cycleTag; t.lastSettledAt = now;
+      if (milestoneDone && t.milestones[milestoneIdx]) {
+        t.milestones[milestoneIdx].done = true; t.completedMilestones++;
       }
+      // 全部里程碑完成则关闭项目
+      if (t.completedMilestones >= t.milestones.length && t.milestones.length > 0) {
+        t.status = 'completed'; t.closedAt = now;
+      }
+      return true;
+    });
+    if (cwS.failed) { noteFault(cwS.failed); return { ok: false, reason: cwS.failed, chain: !!cwS.chain }; }
+    if (!cwS.persisted) {
+      // 未落库 ⇒ 里程碑/完成状态都是**推算值**
+      var doneAfter = rec.completedMilestones + (milestoneDone ? 1 : 0);
+      return { ok: true, id: rec.id, cycleTag: cycleTag, milestoneDone: milestoneDone,
+        completedMilestones: doneAfter, totalMilestones: rec.milestones.length,
+        status: (rec.milestones.length > 0 && doneAfter >= rec.milestones.length) ? 'completed' : rec.status,
+        chain: !!cwS.chain, nested: !!cwS.nested, persisted: false, projected: true,
+        note: cwS.chain ? '已写进链的草稿，尚未提交；里程碑与状态为推算值' : '已写进调用方自己的事务（nested）；里程碑与状态为推算值' };
     }
     var updated = find(rec.id) || rec;
     _stat.settled++;
     return { ok: true, id: updated.id, cycleTag: cycleTag, milestoneDone: milestoneDone,
       completedMilestones: updated.completedMilestones, totalMilestones: updated.milestones.length,
-      status: updated.status };
+      status: updated.status, chain: false, persisted: true, projected: false };
   }
 
   // ── 4. handover：人员交接移交项目引用 ──
@@ -207,15 +386,20 @@
     var from = clean(fromPerson, 40), to = clean(toPerson, 40);
     if (!from || !to) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     if (rec.owner !== from) { noteFault('not-owner'); return { ok: false, reason: 'not-owner', current: rec.owner, attempted: from }; }
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) { t.owner = to; }
-      }, 'operations:handover');
-    } else { rec.owner = to; }
+    const cwH = chainWrite('handover', rec.id, function (d) {
+      var b = bucket(d);
+      var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
+      if (!t) return false;
+      t.owner = to;
+      return true;
+    });
+    if (cwH.failed) { noteFault(cwH.failed); return { ok: false, reason: cwH.failed, chain: !!cwH.chain }; }
+    if (!cwH.persisted) {
+      return { ok: true, id: rec.id, from: from, to: to, chain: !!cwH.chain, nested: !!cwH.nested, persisted: false, projected: true,
+        note: cwH.chain ? '已写进链的草稿，尚未提交（交接未生效）' : '已写进调用方自己的事务（nested）；交接未由本模块提交' };
+    }
     _stat.handedOver++;
-    return { ok: true, id: rec.id, from: from, to: to };
+    return { ok: true, id: rec.id, from: from, to: to, chain: false, persisted: true };
   }
 
   // ── 5. active ──
@@ -257,15 +441,20 @@
     if (!rec) { noteFault('not-found'); return { ok: false, reason: 'not-found', id: clean(id, 60) }; }
     if (rec.status !== 'active') { noteFault('not-active'); return { ok: false, reason: 'not-active', status: rec.status }; }
     var rsn = clean(reason || 'cancelled', 60);
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) { t.status = 'cancelled'; t.closedAt = clockNow('operations'); }
-      }, 'operations:cancel');
-    } else { rec.status = 'cancelled'; rec.closedAt = clockNow('operations'); }
+    const cwC = chainWrite('cancel', rec.id, function (d) {
+      var b = bucket(d);
+      var t = b.projects.filter(function (x) { return x && x.id === rec.id; })[0];
+      if (!t) return false;
+      t.status = 'cancelled'; t.closedAt = clockNow('operations');
+      return true;
+    });
+    if (cwC.failed) { noteFault(cwC.failed); return { ok: false, reason: cwC.failed, chain: !!cwC.chain }; }
+    if (!cwC.persisted) {
+      return { ok: true, id: rec.id, reason: rsn, chain: !!cwC.chain, nested: !!cwC.nested, persisted: false, projected: true,
+        note: cwC.chain ? '已写进链的草稿，尚未提交（取消未生效）' : '已写进调用方自己的事务（nested）；取消未由本模块提交' };
+    }
     _stat.cancelled++;
-    return { ok: true, id: rec.id, reason: rsn };
+    return { ok: true, id: rec.id, reason: rsn, chain: false, persisted: true };
   }
 
   // ── 9. buildBlock ──
@@ -326,8 +515,10 @@
     stat: stat,
     reset: reset
   };
+  // 导出面自证：本模块的出口面是**冻结**的（新增导出必须同批改这个常量，否则装载即抛
+  //   —— 防「成员被悄悄改名/删掉、调用方静默降级」。v2.194.0（U2）链面接线**不改出口面**：14）。
   var EXPORT_COUNT = 14;
   var _exported = Object.keys(WA.operations).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('operations: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/operations.js', { kind: 'engine', ver: '2.172.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/operations.js', { kind: 'engine', ver: '2.194.0' });
 })();

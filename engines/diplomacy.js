@@ -125,8 +125,27 @@
    * @returns {object} 本模块的业务回执（result 非对象时原样返回）
    */
   function rx(tx) {
-    if (tx && typeof tx === 'object' && tx.result && typeof tx.result === 'object') return tx.result;
-    return tx;
+    const biz = (tx && typeof tx === 'object' && tx.result && typeof tx.result === 'object') ? tx.result : tx;
+    if (!biz || typeof biz !== 'object') return biz;
+    // v2.194.0（U2）：**在途如实标注**。本模块六个写口全部经本函数出口，故这一处就是全部。
+    //   链上（`WA.commit.inflight()` 非空）⇒ 写落在链的草稿里、**尚未提交**：
+    //     如实标 `chain:true, persisted:false, projected:true`（业务上成立 ≠ 已落库）。
+    //   调用方自己的事务里（`WA.commit.active()` 非空但无链）⇒ 同样未提交，标 `nested:true, persisted:false`。
+    //   **链外顶层一律不动形状** —— 既有消费者按原样读（本模块的回执契约不因本版变化）。
+    //   为什么必须做：否则「链上的签署」会给出一个与「已提交的签署」逐字相同的回执，
+    //   那正是本项要治的**谎报**。
+    let inflight = null, inner = null;
+    try {
+      if (WA.commit && typeof WA.commit.inflight === 'function') inflight = WA.commit.inflight();
+      if (WA.commit && typeof WA.commit.active === 'function') inner = WA.commit.active();
+    } catch (e) { inflight = null; inner = null; }
+    if (inflight || inner) {
+      biz.chain = !!inflight;
+      biz.nested = !inflight && !!inner;
+      biz.persisted = false;
+      if (inflight) biz.projected = true;
+    }
+    return biz;
   }
   /** 世界里的势力名清单（读 evolution 真源，不自带副本）。 */
   function factionNames() {
@@ -587,7 +606,7 @@
               return n + activeTerms(d.pairs[k], now).length; }, 0) } });
     }
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/diplomacy.js', { kind: 'engine', ver: '2.165.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/diplomacy.js', { kind: 'engine', ver: '2.194.0' });
   // 内嵌自证：本模块的六处写口**只可能**被「本文件里恰好出现六次 transact」证明 ——
   //   外部脚本替它数一遍，只是把「谁在证明」挪到了测试侧。诊断面自带一档，改坏了当场可见。
   (function () {

@@ -297,8 +297,12 @@ const DEAD = {
     why: 'operations.enact: org has insufficient resources for budget. Needs faction with low gold.'
   },
   'insufficient-funds': {
-    anchor: "if (!WA.org.canAfford('faction', rec.orgId, itemType, amount)) { noteFault('insufficient-funds'); return { ok: false, reason: 'insufficient-funds', type: itemType, need: amount }; }",
-    why: 'operations.disburse: org cannot afford disbursement. Needs faction with insufficient resources.'
+    // v2.194.0（U2）：本码**仍不可达**，但不可达的原因换了一条，锚点随之更新 ——
+    //   拨付的两笔写（跨模块转账 + 本地记账）搬进同一条链之后，这条预检不再「独立拦截」，
+    //   它的守卫条件先问「该项目所属组织是不是已注册势力」（`_dfactionExists` 前缀）。
+    //   锚点取**真源分支的那个字面量**（门禁按原文 indexOf 复算，故必须是源码里真实存在的一段）。
+    anchor: "if (_dfactionExists && !WA.org.canAfford('faction', rec.orgId, itemType, amount)) {",
+    why: 'operations.disburse: org cannot afford disbursement. 至此仍不可达 —— 拨付金额先过预算闸门（over-budget），而预算是 `org.grant` 按**同一资源项**发的（grant 50 ⇒ budget 50 ⇒ 同一项必然够）；要绕过它得直接改世界（造「资源被外部拿走而预算不动」这一局面），现无产品路径。'
   },
   'transfer-failed': {
     anchor: "if (!tr || !tr.ok) { noteFault('transfer-failed'); return { ok: false, reason: 'transfer-failed', detail: tr ? tr.reason : 'none' }; }",
@@ -319,6 +323,37 @@ function runWitness(WA) {
   const seen = {};
   const expect = {};
   function want(code, desc) { expect[code] = desc; }
+  // ── v2.194.0（U2）：跨模块原子提交链的三个码 —— **必须带可执行见证** ──
+  //   它们是本版新增的公开失败归因，不是「存量未分类」；不给见证就等于让门禁替我们说
+  //   「这些码没人会跑到」。
+  {
+    const CMw = WA.commit;
+    if (CMw && typeof CMw.chain === 'function') {
+      want('bad-chain', 'U2：链没给 fn（形状不合法）⇒ bad-chain，不是一句「链没成」');
+      trip('bad-chain', function () { return CMw.chain({ site: 'witness:bad' }).reason; });
+      want('steps-full', 'U2：单链步数超上限（16 是常量，不可配）⇒ steps-full 并报出断在第几步');
+      trip('steps-full', function () { return CMw.step({ steps: new Array(16) }).reason; });
+      want('step-threw', 'U2：某一步抛错 ⇒ step-threw（世界未提交）—— 不把异常吞成「链成了」');
+      trip('step-threw', function () {
+        return CMw.chain({ opId: 'witness:threw', site: 'witness:threw', fn: function (c, d) {
+          d.__witnessThrew = 1;
+          CMw.step(null, { site: 'witness:threw:1' });
+          throw new Error('witness throw');
+        } }).reason;
+      });
+      want('chain-nested', 'U2：链嵌在链里（自己不嵌套自己）⇒ chain-nested 并报出外层那条的 opId');
+      trip('chain-nested', function () {
+        let inner = null;
+        const r = CMw.chain({ opId: 'witness:nest-outer', site: 'witness:nest', fn: function (c, d) {
+          d.__witnessNest = 1;
+          CMw.step(null, { site: 'witness:nest:1' });
+          inner = CMw.chain({ fn: function () { return true; } });
+          return true;
+        } });
+        return [inner && inner.reason, r && r.reason];
+      });
+    }
+  }
   function trip(code, fn) {
     try {
       const g = fn(); const arr = Array.isArray(g) ? g : [g];
