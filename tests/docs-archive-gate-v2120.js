@@ -172,8 +172,9 @@ function runB(a) {
   //   v2.188.0 = 第四批 E7/E9），123 → 125。**同型账已是第十一次**——共性未变：
   //   「同一件事在多处各写一遍，改一处不等于改全」。判据继续钉**精确等值**（防条目被误删）；
   //   README 导语的「（123 个版本）」与本文件这条硬读数同批校正，缺一处即两处不一致。
-  // v2.189.0 补账：v2.189.0 条目入 README 版本历史，导语 125 → 126，本文件这条同批校正。
-  a(r.facts.readmeEntries === 126, 'docs-archive/B: README 版本历史条目 = 126（实 ' + r.facts.readmeEntries + '）');
+  // v2.190.0 补账：v2.190.0 条目入 README 版本历史，导语 126 → 127，本文件这条同批校正。
+  //   （教训：这条计数每版都要跟 —— 它是「导语里那几个字」与「条目实数」之间的唯一判据。）
+  a(r.facts.readmeEntries === 127, 'docs-archive/B: README 版本历史条目 = 127（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

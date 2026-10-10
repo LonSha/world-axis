@@ -8,7 +8,7 @@ Status: in-progress（2026-10-05 开工；制订轮为 proposed）
 <!-- O7:STATE:BEGIN 由 tools/gen-plan-status.js 复算生成，勿手改 -->
 > **现场读数块**（`node tools/gen-plan-status.js` 复算；手工改它会被 `tests/o7-plan-tree-gate-v2187.js` 当场判红）
 >
-> 现场版本：`index.js` **v2.189.0** / `manifest.json` **v2.189.0**。
+> 现场版本：`index.js` **v2.190.0** / `manifest.json` **v2.190.0**。
 > 本文件是**历史档案**：下方「基线」「进度」「交付表」记的是**立项当时**的事实，此后不再随版本推进更新，也**不再作为当前进度台账**。当前进度以 `plans/O_OPTIMIZATION.md` 与 `plans/E_EXPANSION.md` 顶部的现场读数块为准。
 <!-- O7:STATE:END -->
 

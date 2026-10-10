@@ -88,8 +88,8 @@ function runA(a) {
   // 出口面契约冻结串：**逐字**钉住本模块进契约面的成员集
   a(readOf('tests/run.js').indexOf('|agenda:getSettings setSettings sources stat upcoming|') >= 0,
     'e2v2182/A19: FROZEN2800 逐字含本模块的契约成员集');
-  a(/VERSION = '2\.(182|183|184|185|186|187|188|189)\.0'/.test(readOf('index.js')), 'e2v2182/A20: index.js 版本钉在 2.182.0');
-  a(JSON.parse(readOf('manifest.json')).version && ['2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0, 'e2v2182/A21: manifest 版本一致');
+  a(/VERSION = '2\.(182|183|184|185|186|187|188|189|190)\.0'/.test(readOf('index.js')), 'e2v2182/A20: index.js 版本钉在 2.182.0');
+  a(JSON.parse(readOf('manifest.json')).version && ['2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0, 'e2v2182/A21: manifest 版本一致');
 }
 
 // ── B 段：运行时行为（真装载面 + 真 API）────────────────────────────────

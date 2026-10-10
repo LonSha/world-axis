@@ -8,7 +8,7 @@ Status: proposed（2026-10-08 立；制订轮只读，不改产品实现、测�
 >
 > | 现场读数 | 值 | 取法 |
 > |---|---|---|
-> | 版本 | `index.js` **v2.189.0** / `manifest.json` **v2.189.0** | `grep -n "VERSION =" index.js`；`manifest.json` |
+> | 版本 | `index.js` **v2.190.0** / `manifest.json` **v2.190.0** | `grep -n "VERSION =" index.js`；`manifest.json` |
 > | 本线交付 | **已交付 9 / 未交付 0** | 下表逐项现场复算 |
 >
 > | 项 | 状态 | 证据（`tests/` 下的专锁，★ = 已挂进 `tests/run.js`） |
