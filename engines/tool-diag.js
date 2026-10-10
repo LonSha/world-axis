@@ -2080,6 +2080,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   日志面共用的那一份映射（本表就是它的诊断面消费方），缺席就是断裂，
     //   不该被 OPTIONAL_EXPORTS 静默兜住。
     'engines/reject-recovery.js': 'rejectRecovery',
+    // v2.193.0（第二批 · U1）：拍引擎家族的统一运行门面（engines/beat-facade.js）。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它是四引擎的**唯一编排口**
+    //   （面板面 / 诊断面 / 日志面从本表取出口面契约），缺席就是断裂，不该被
+    //   OPTIONAL_EXPORTS 静默兜住。
+    'engines/beat-facade.js': 'beatFacade',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.192.0'
+  const VERSION = '2.193.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -496,6 +496,15 @@
     //   零 localStorage，只有三张冻结表与一个纯函数，故对次序无硬要求。
     //   它是诊断面 / 面板面 / 日志面三处共用的**唯一**一份恢复语义（此前三面各猜一句）。
     'engines/reject-recovery.js',
+    // v2.193.0（第二批 · U1）：拍引擎家族的**统一运行门面**（拍报告 / 计划审计 / 拍台账 /
+    //   生成闸门四者共 9 个 op 的单一入口）。位置**紧随四个家族成员与其恢复映射之后**：
+    //   它读 `WA.家族成员`（`run()` 时）与 `WA.rejectRecovery`（编排期取恢复档，缺席即 null），
+    //   两者都要求先装载。**零 store 写入、零参数校验、零注入折叠** —— 故对 render/inject.js
+    //   无次序约束（注入链仍直接读 beatReport / genGate 的 buildBlock，不经门面：编排不改字）。
+    //   ⚠ 本段注释里**不得出现方括号**：module-cycle-gate 用一条非贪婪正则从 LOAD_ORDER
+    //   数组字面量里抓路径，注释里任何一个右方括号都会让它提前截断、orderLen 静默少算
+    //   （写入时实测踩过：216 → 151，且门禁只报读数不报原因）。措辞一律用「WA.家族成员」。
+    'engines/beat-facade.js',
     // v2.130.0（拓展计划 B1/C1/C2/D1/D2/D3/D4/A1/A2/A3/A4）：十二个新引擎。
     //   位置与 tests/run.js 的 LOAD 同序，且**一律早于** render/inject.js：
     //   reasoning（思考开销约束）与 story-tone（剧情倾向）产注入块，注入落地时读它们的

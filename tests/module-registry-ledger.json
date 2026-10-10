@@ -1,13 +1,13 @@
 {
- "version": "2.192.0",
- "loadOrderCount": 216,
- "loadedCount": 204,
+ "version": "2.193.0",
+ "loadOrderCount": 217,
+ "loadedCount": 205,
  "uiCount": 12,
- "nsCount": 212,
+ "nsCount": 213,
  "totals": {
-  "loadEdges": 107,
+  "loadEdges": 108,
   "hardEdges": 0,
-  "callRefs": 210,
+  "callRefs": 212,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -40,6 +40,7 @@
     "engines/archive-hide.js",
     "engines/atlas.js",
     "engines/backstage.js",
+    "engines/beat-facade.js",
     "engines/beat-ledger.js",
     "engines/beat-mask.js",
     "engines/beat-report.js",
@@ -278,6 +279,7 @@
     "engines/agenda.js",
     "engines/archive-hide.js",
     "engines/atlas.js",
+    "engines/beat-facade.js",
     "engines/beat-ledger.js",
     "engines/beat-mask.js",
     "engines/beat-report.js",
@@ -2676,6 +2678,27 @@
    ],
    "ghostRefs": [],
    "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/beat-facade.js": {
+   "ns": [
+    "beatFacade"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_beat_facade_settings_v1"
+   ],
    "consumedBy": []
   },
   "engines/stale-guard.js": {

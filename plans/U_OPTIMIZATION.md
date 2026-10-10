@@ -216,6 +216,7 @@ Status: proposed（2026-10-10 立；只读制订轮，不改产品实现、不�
 | U3 散装读数登记 | **v2.191.0** | `tests/loose-readings.json` + `tools/loose-readings.js` | **35 / 0** | 4 个站点 / 3 种形态 / 1 个探针（`tests/module-registry-ledger.json`）· 核对 6 处字面量 / 问题 0 · 表内零真值字段（`value-in-table` 硬判据）· 改探针读数 ⇒ **分钟级**报出文件 / 行号 / 读数类型 / 真源，不必跑全量 |
 | U4 导出面去向与复查期 | **v2.191.0** | `tools/consumer-types.js` + `tests/u4-export-lifecycle-v2191.js` | **30 / 0** | 登记 **137 条**（settings-registry-only 73 / ui-component-library 41 / query-api 20 / data-const 3）· 生命周期问题 0 · `disposition` 全 `keep` · `reviewAfter` 全 `2.196.0` · O8 门禁仍 38 / 0 |
 | U5 拒收码 → 恢复动作 | **v2.192.0** | `engines/reject-recovery.js` + `tools/reject-recovery.js` + `tests/reject-recovery-lock-v2192.js` | **115 / 0** | `reason` 字面量 **804 = 拒收 717 / 成功 34 / 判不出 53**（括弧配对实测，**804 从来不是拒收面**）· 六档分布 64 / 287 / 288 / 71 / 10 / 17 · 无恢复动作 67（成功 34 + 契约外 32 + 词法碎片 1）· `OVERRIDES 38` / `NEUTRAL_REVIEW 53`（契约外 32）/ `ARTIFACTS 1` · 核对器零问题 · 幽灵码三条全 `unknown`（边界 ③）|
+| U1 拍引擎家族统一运行门面 | **v2.193.0** | `engines/beat-facade.js` + `tests/beat-facade-lock-v2193.js` | **38 / 0** | op **9** 条（`report` / `audit` / `equivalent` / `plan` / `land` / `claim` / `transition` / `gate` / `record`）· 家族 **4** 员 / 产块 **2** 员 · 归一形状 `{ ok, engine, op, reason, recovery, fault, … }` · **零内联 `reason:` 字面量**（编排层失败走 `fault` 四码）· 真代码面零 `store.transact` · 恢复档只读 U5（`bad-round` ⇒ `adjust-input`，缺席即 `null`）· 家族全关 ⇒ 空块（注入面逐字不变）|
 
 U9 的交付口径（按本文件开头那套验收标准逐条应答，不靠「文件存在」）：
 
