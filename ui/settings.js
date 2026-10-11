@@ -113,6 +113,10 @@
       //   挂在 settings 页是为了让「这张图能不能算」在**一处**可见：
       //   事件页那三枚按钮报的是读数本身，这里报的是它的开关档。
       + '<label class="wa-row" title="按势力的对外态度档推导关系网（边是**推导值**，带 basis 可复盘）；只算不写，不合并势力、不触发事件"><input type="checkbox" id="wa-sw-factiongraph" data-sw-ns="factionGraph"' + (ini('factionGraph') ? ' checked' : '') + dis('factionGraph') + '/> 势力关系网（只读图读数）</label>'
+      // v2.202.0（Y7）：地图与关系可视化（engines/world-graph.js）。
+      //   渲染 + 绑定 + 守卫登记三件齐做（同 v2.129.0/v2.135.0/v2.138.0/v2.139.0 规格）。
+      //   本开关答「这个视图面算不算」；预算（节点/边上限）在图上那页由引擎 doc 与诊断面读。
+      + '<label class="wa-row" title="把 atlas 的两层关系 / 势力推导边 / 关系六型登记放进同一幅图（视图面：只算不写，不落自己的边表）；默认开"><input type="checkbox" id="wa-sw-worldgraph" data-sw-ns="worldGraph"' + (ini('worldGraph') ? ' checked' : '') + dis('worldGraph') + '/> 地图与关系可视化（只读视图）</label>'
       // v2.139.0（E11）：剧情偏离度告警线。**读数与策略分列**——这条线只决定
       //   「多少算偏得多」（跨线时面板上标一个 ⚠），它**不改任何分**，也不触发任何拉回。
       //   与上面几行同取「挂 data-sw-ns 让通用通道写」：本设置只改一个数，

@@ -68,6 +68,8 @@
  *   - 别名只认 const A = [ ( ] HOST.WorldAxis = HOST.WorldAxis || { } [ ) ] ; 一种形态；
  *     其他方式拿到 WA（参数传入、重新赋值）本轮未纳入，由 aliasFiles / productFiles 如实反映。
  *   - 只认 A.<ns> 形态的直接引用；A['ns'] / A[key] 代码不确定，不报错也不伪归。
+ *   - 读面吃 `inventory.codeFace`（v2.201.0 起；此前是本仓第二份实现 `stripComments`）：
+ *     注释与字符串字面量一并剥成空格、**长度与行号守恒**。
  *   - 赋值只认 A.<ns> =，且**不剥注释**做归属判定：`// WA.x = ` 这类注释里的形态由
  *     该文件的正确性兜底——本仓实测把注释里被当提供方的 ns 数为 0，故不额外剥一层。
  *   - EXTERNAL_PREFIX 本轮为空：本仓 __ 前缀命名空间（__settingsRegs / __loaderState /
@@ -78,7 +80,20 @@
 const fs = require('fs');
 const path = require('path');
 const BASE = path.join(__dirname, '..');
-const { stripComments } = require('./test-surface-gate.js');
+// v2.201.0：读面口径收敛到**全仓单源** `tests/inventory.js` 的 `codeFace`。
+//   此前吃的是 `tests/test-surface-gate.js` 的 `stripComments` —— 本仓第二份
+//   「真代码面」实现。v2.29.0 已把口径统一到 codeFace（dead-export-gate / dup-decl-gate
+//   都改过来了），**本文件是漏改的第三处**。漏改的后果实测（tools/probe_face_compare.js）:
+//   两口径在 4 个文件上给出不同读数，**全部是「仅旧口径有」、零「仅新口径有」**
+//   （core/store.js 7 处 / engines/tool-diag.js 2 处 / core/commit.js 1 处 / ui/panel.js 2 处，
+//   合计 12 处幽灵引用）—— 方向单一：旧口径把「注释里提到的名字」当成了调用。
+//   其中 rand.seed / clock.freeze / bridge.setSettings 三条正是 v2.29.0 当版亲手从基准里
+//   摘掉的那三个「此前只被注释或字符串提到」的成员。
+//   本轮现场表现：ui/panel.js 新增的一行注释里写了 `WA.ns.mem` 这个形态 ⇒ 报
+//   「未提供 1 · ns ← ui/panel.js」，而 `ns` 从来不是任何模块提供的命名空间。
+//   处置：**把口径对齐到单一真源**，不是往 EXTERNAL 里塞一条「ns 是外名」把红压掉
+//   —— 后者会把「扫描器瞎了」伪装成「没有边」（本文件头注第 65 行自己点过名的病）。
+const { codeFace } = require('./inventory.js');
 
 const DIRS = ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'];
 const LEDGER = path.join(__dirname, 'module-registry-ledger.json');
@@ -293,7 +308,7 @@ function scan(opt) {
   let aliasFiles = 0, refFiles = 0;
 
   files.forEach(function (rel) {
-    const src = stripComments(read(rel));
+    const src = codeFace(read(rel));
     const am = src.match(ALIAS_RE);
     const A = am ? am[1] : null;
     aliasOf[rel] = A;

@@ -144,7 +144,10 @@
     'still-in-transit': { kind: 'retry-same-input', why: '仍在途：等在途结束同输入再来' },
     'thrown': { kind: 'retry-same-input', why: '调用抛异常，属瞬时' },
     'top': { kind: 'adjust-input', why: '已到顶，不能再往上：改方向而不是重试' },
-    'write': { kind: 'retry-same-input', why: '写盘失败：同输入再写一次（store 已自带重试）' }
+    'write': { kind: 'retry-same-input', why: '写盘失败：同输入再写一次（store 已自带重试）' },
+    // ── v2.203.0 补登：规则表判不了（分词里没有「架构/超前」语义），逐条显式登记 ──
+    'schema-ahead': { kind: 'manual-review', why: '保存的世界快照版本比当前支持的更新：自动分支无法判断该降级读还是该拒读' },
+    'carries-world-facts': { kind: 'adjust-input', why: '导入体顶层夹带世界事实字段：把这些字段从包里去掉（世界事实只能走世界侧入口），再导入' }
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -218,14 +221,19 @@
     'unreciprocated': { out: true, why: '决策理由（action=wait）' },
     'unregistered-setting': { out: true, why: '存储治理：未注册设置项的清理理由' }
   };
-/* 拒收面冻结快照（v2.197.0 现场实测 723 条）：至少在 `ok:false` 对象里出现过 ——
+/* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
    *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
    *  v2.196.0 收口时本快照**漏同步**（新码 need-receipt / enqueue-threw 未入，三条已随路径删除的
    *  旧码 no-receipt-face / receipt-failed / receipt-threw 未出）—— 快照 723 条与现场 722 条
    *  不符，reject-recovery 专锁 B3/B4/C4 三处自 v2.196.0 起一直是红的（每版都被无头回归现形，
    *  当时只跑了定向锁故未察觉）。本版一并补齐：删三条、加三条（含 Y3 的 slots-full）。
    *  三条新码的恢复档不写 OVERRIDES —— 规则表已按 token 归好（need-receipt→request-setup /
-   *  enqueue-threw→retry-same-input / slots-full→adjust-input），重复登记会让 A8 与规则表打架。 */
+   *  enqueue-threw→retry-same-input / slots-full→adjust-input），重复登记会让 A8 与规则表打架。
+   *  v2.203.0（第四批 Y8/Y9 收口）：快照 723 → 740（+17）。四条线（Y6 world-snapshot /
+   *  Y7 world-graph / Y8 rule-pack / Y9 world-lab）的新码此前**只进码面口径、没进本快照**，
+   *  专锁 B3/B4/C4 因此各自自其版次起一直红着 —— 本版一并补齐（逐条不改档）。
+   *  其中 schema-ahead 的恢复档不能靠规则表（分词里没有「架构/超前」语义），故另在
+   *  OVERRIDES 显式登记（manual-review：新快照该降级读还是该拒读，机器判不了）。 */
   const REJECT_FACE = [
     'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'adopt-throw',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
@@ -346,7 +354,12 @@
     'unknown-shipment', 'unknown-site', 'unknown-source', 'unknown-span', 'unknown-stage', 'unknown-subject',
     'unknown-theme', 'unknown-transition', 'unknown-user', 'unparseable', 'unreachable', 'unreadable',
     'verify', 'weak-evidence', 'window-closed', 'window-too-short', 'world-missing', 'write',
-    'write-fail', 'write-failed', 'wrongs-full'
+    'write-fail', 'write-failed', 'wrongs-full',
+    // ── v2.203.0 补登：四条线的拒收面新码（此前只进码面口径、没进本快照）──
+    'ambiguous-label', 'bad-edge-kind', 'bad-snapshot-ver', 'budget-exceeded', 'empty-snapshot',
+    'empty-world', 'ls-write-failed', 'schema-ahead', 'source-absent',
+    'carries-world-facts', 'conflict', 'preset-world-absent',
+    'causal-absent', 'no-report', 'stale-report', 'commit-absent', 'beat-ledger-absent'
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -481,7 +494,7 @@
       && Object.keys(ARTIFACTS).every(function (k) { return !!ARTIFACTS[k]; });
     const bad = Object.keys(checks).filter(function (k) { return !checks[k]; });
     return {
-      ok: !bad.length, version: '2.195.0', checks: checks, failed: bad,
+      ok: !bad.length, version: '2.203.0', checks: checks, failed: bad,
       counts: c,
       lines: [
         '六档各配一句可执行的话（无 ignore、不出现「忽略」说法）',
@@ -509,6 +522,6 @@
     }
   };
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/reject-recovery.js', { kind: 'engine', ver: '2.195.0' });
+    WA.registerModule('engines/reject-recovery.js', { kind: 'engine', ver: '2.203.0' });
   }
 })();

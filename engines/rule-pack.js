@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/rule-pack.js (v2.188.0) — E7 玩家自定义规则包与自动化模板
+ * WorldAxis engines/rule-pack.js (v2.203.0) — E7 玩家自定义规则包与自动化模板
  *
  * ── 它治什么（缺口，计划原文）──────────────────────────────────
  *   「规则文本与主题模板已有，但没有玩家侧的『我的规则包』。」
@@ -43,7 +43,12 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_rule_pack_settings_v1';
-  const DEF = { enabled: false, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0 };
+  // v2.203.0（Y8）：新增 `history`（回滚栈，**只装规则面键值**）—— 它不是包清单的副本，
+  //   而是「上一次切换之前长什么样」的一串快照；`note` 是当前活跃包的说明（人读的那一行）。
+  const DEF = { enabled: false, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,
+    note: '', history: [] };
+  /** 回滚栈上限（**内部常量**，不进 bounds）：栈是「反悔一分钟」的东西，不是档案库。 */
+  const MAX_HISTORY = 12;
   const __REG = {
     key: LS_KEY, def: DEF, module: 'rulePack',
     bounds: { maxPacks: [1, 64], maxKeys: [4, 96] }
@@ -67,6 +72,9 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   const _stat = { saves: 0, applies: 0, drops: 0, exports: 0, imports: 0,
+    // v2.203.0（Y8）：detects / rolls / composes / admits 四栏 —— 新增的四个功能各自有无台账，
+    //   在诊断面上必须逐栏看得见（有功能没台账 = 出了事没人知道它被调过）。
+    detects: 0, rolls: 0, composes: 0, admits: 0,
     templateRuns: 0, templateRefused: 0, refused: 0, lastReason: '', faults: {} };
   function fault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
@@ -155,6 +163,329 @@
     };
   }
 
+  // ── 冲突检测（Y8 功能③：两条规则互斥 / 同一参数两处写）──────────────
+  /**
+   * 边界原文：「冲突时**必须拒绝启用并指出两条规则**，不做『后启用的赢』。」
+   *   于是这一节只做一件事：**报出来**，不替玩家挑一个赢家。`detect()` 是纯读 ——
+   *   它不写设置、不改包，连「建议保留哪条」都不给（那是 `causal.conflicts` 的活儿：
+   *   那里两条链同因同果，必须显式选择；这里两套规则同时被声明为想要，答案只能是「你改一个」）。
+   *
+   * 三个真源，**每一类都从既有声明面逐字取**（本模块不自建互斥表 —— 自建一张就是第二份真源，
+   *   下一次 `recipe` 改政策名时两处必然分叉，而分叉的表现是「冲突不报了」：最坏的那种静默失效）：
+   *   · `key-clash`  —— **同一参数两处写**：两个面在同一个设置键上写了**不同的值**。
+   *                     真源是两侧自己的 `values`（键 → 值），本模块只做比较。
+   *   · `policy-clash` —— **两条规则互斥**：`recipe.POLICIES[].vs` 的双向声明
+   *                     （如 `intel-source ↔ improv`）。委托 `recipe.policyClashes()` 判，
+   *                     本模块**不重写**那张 `vs` 表。
+   *   · `theme-clash`  —— 题材叠加冲突：`recipe.THEME_CLASH`（如 `mystery×fantasy`）。
+   *                     委托 `recipe.themeClashes()` 判。
+   * `why` 一律带人类可读的理由（recipe 那边每一条都写过 `why`，逐字带走）。
+   */
+  const CONFLICT_KINDS = ['key-clash', 'policy-clash', 'theme-clash'];
+  const POLICY_KEY = 'worldaxis_recipe_settings_v1';
+  const THEME_KEY = 'worldaxis_theme_settings_v1';
+  /**
+   * 夹带世界事实的名字（边界原文点名「人物 / 事件 / 地图不进规则包」）。
+   *   为什么是一张**显式名单**而不是「只看我们认识的那些字段」：后者对夹带**无感** ——
+   *   发包方把 `people` 塞进 body 顶层，本模块只读 `values`，于是它一路沉默地进来又沉默地丢掉，
+   *   而「这份包里其实带着一份人物表」在手上这份 JSON 里**肉眼可见**。名单让它在写盘之前被拦住。
+   */
+  const WORLD_FACT_NAMES = ['characters', 'people', 'persons', 'places', 'events', 'map', 'atlas',
+    'factions', 'timeline', 'chrono', 'store', 'world'];
+
+  /**
+   * 「写下去会变成什么」——**比之前先过写路径那一关**。
+   *   为什么必须过：`apply()` 落盘走的是 `settingsBus.saveOrThrow(rec, normalize(rec, v))`，
+   *   于是「包里存的形状」与「世界里的形状」可能不同（实测：`worldaxis_custom_presets` 的
+   *   `def: []` 经 normalize 落成 `{}`）。不归一就比，会把**同一份面**判成冲突 ——
+   *   冲突检测于是退化成噪音：刚存下的包一启用就报冲突、开档定档永远开不起来。
+   *   真源仍是 settingsBus 的 normalize（**不新建第二份归一逻辑**，本仓铁律）；
+   *   它或该键的登记项缺席时**如实退回原样**（返回 `{ v, raw: true }`，判据自己知道没归一）。
+   */
+  function asWritten(k, v) {
+    const sb = WA.settingsBus;
+    if (!sb || typeof sb.normalize !== 'function') return { v: v, raw: true };
+    const rec = regs().filter(function (r) { return r && r.key === k; })[0] || null;
+    if (!rec) return { v: v, raw: true };
+    try { return { v: sb.normalize(rec, v), raw: false }; } catch (e) { return { v: v, raw: true }; }
+  }
+  /** 两个值面在**同一个键**上写不同值 ⇒ 一条冲突。顺序确定（按键名排序），便于判据逐条核对。 */
+  function keyClashes(a, b, fromA, fromB) {
+    const va = isObj(a) ? a : {}, vb = isObj(b) ? b : {};
+    const keys = Object.keys(va).filter(function (k) { return Object.prototype.hasOwnProperty.call(vb, k); }).sort();
+    return keys.filter(function (k) {
+      // 逐字比：`JSON.stringify` 对同一份结构给同一个串（键序按插入序，这里两侧都来自本模块
+      //   自己的 values 序列化，可比）。值类型不同（3 vs "3"）也算不同 —— 那不是同一份设置。
+      //   两侧先各过一次**写路径的归一**（见 asWritten）：比的是「写下去之后」的形状。
+      const xa = asWritten(k, va[k]), xb = asWritten(k, vb[k]);
+      return JSON.stringify(xa.v) !== JSON.stringify(xb.v);
+    }).map(function (k) {
+      return { kind: 'key-clash', key: k, from: [fromA || '本面', fromB || '对面'],
+        why: '同一个设置键「' + k + '」被两处写成不同的值 —— 后启用的赢会让结果取决于操作顺序' };
+    });
+  }
+  /**
+   * 一条政策冲突的**两条**是谁 —— 取 `pair` 优先，缺席时退回 `[a, b]`。
+   *   为什么要有这一层：`recipe.policyClashes()` 的返回体是 `{id,a,b,cn,why}`（**无 pair**），
+   *   而 `themeClashes()` 的返回体是 `{id,cn,why,pair}`。沿用 `c.pair` 一处写法会让政策那一支
+   *   的 `key` / `from` 恒为空 —— `kind`/`why`/`count` 都对，只有「是哪两条」看不见，
+   *   而冲突检测的价值恰恰就在把**两条**指出来。名单本身仍逐字取自 recipe，不自建。
+   */
+  function pairOf(c) {
+    const row = isObj(c) ? c : {};
+    const p = Array.isArray(row.pair) && row.pair.length ? row.pair : [row.a, row.b];
+    return p.filter(function (x) { return x !== undefined && x !== null && String(x) !== ''; });
+  }
+  /** 委托 recipe 的既有声明面：政策互斥 + 题材叠加。recipe 缺席时**如实标 absent**，不假装无冲突。 */
+  function recipeClashes(policies, themes) {
+    const rows = [], absent = [];
+    const rec = WA.recipe;
+    if (policies && policies.length) {
+      if (rec && typeof rec.policyClashes === 'function') {
+        try {
+          (rec.policyClashes(policies) || []).forEach(function (c) {
+            const cp = pairOf(c);
+            rows.push({ kind: 'policy-clash', key: cp.join('×'), from: cp.slice(),
+              why: String(c.why || c.cn || ('两条政策互相拧：' + cp.join(' 与 '))) });
+          });
+        } catch (e) { absent.push({ source: 'recipe.policyClashes', why: 'threw' }); }
+      } else absent.push({ source: 'recipe.policyClashes', why: 'engine-absent' });
+    }
+    if (themes && themes.length) {
+      if (rec && typeof rec.themeClashes === 'function') {
+        try {
+          (rec.themeClashes(themes) || []).forEach(function (c) {
+            const cp = pairOf(c);
+            rows.push({ kind: 'theme-clash', key: cp.join('×'), from: cp.slice(),
+              why: String(c.why || c.cn || ('两条题材叠加冲突：' + cp.join(' 与 '))) });
+          });
+        } catch (e) { absent.push({ source: 'recipe.themeClashes', why: 'threw' }); }
+      } else absent.push({ source: 'recipe.themeClashes', why: 'engine-absent' });
+    }
+    return { rows: rows, absent: absent };
+  }
+  /** 从一份 values 面里抽出「政策 / 题材」两组名单（**按键名取，不从别处猜**）。 */
+  function declOf(values) {
+    const v = isObj(values) ? values : {};
+    const p = isObj(v[POLICY_KEY]) && Array.isArray(v[POLICY_KEY].policies) ? v[POLICY_KEY].policies.slice() : [];
+    const t = isObj(v[THEME_KEY]) && Array.isArray(v[THEME_KEY].themes) ? v[THEME_KEY].themes.slice() : [];
+    return { policies: p.map(String), themes: t.map(String) };
+  }
+  /**
+   * 检测冲突。`spec` 可以给几组面，每一种都给一条真源：
+   *   · `{ values, label }`   —— 直接比一份值面（面板「这份包 vs 当前面」用这个）
+   *   · `{ pack: name }`      —— 比某个已存的包
+   *   · `{ text: '<json>' }`  —— 比一份**还没导入**的包体（导入前预检；这是「冲突包在启用前就被拒」的落点）
+   * 返回里 `count === 0` 且 `absent` 为空才叫「这一套配得起来」；有 `absent` 时**只报「判不了」**，
+   *   不报「没问题」—— 两者在界面上必须分得开。
+   */
+  function detect(spec) {
+    const o = isObj(spec) ? spec : {};
+    const rows = [];
+    // ① 值面 × 值面（含「包 vs 包」「包 vs 当前面」「导入体 vs 当前面」三种组合）
+    const sideA = (function () {
+      if (isObj(o.values)) return { values: o.values, label: clean(o.label, 40) || '本面' };
+      if (o.pack) {
+        const p = find(o.pack);
+        return p ? { values: p.values, label: p.name, absent: false } : { absent: true, label: nameOf(o.pack) };
+      }
+      return null;
+    })();
+    const sideB = (function () {
+      if (o.against === 'current' || !o.against) {
+        const snap = surface(settings().maxKeys);
+        return { values: snap.values, label: '当前规则面' };
+      }
+      if (isObj(o.against)) return { values: o.against, label: clean(o.againstLabel, 40) || '对面' };
+      if (typeof o.against === 'string') {
+        const p = find(o.against);
+        return p ? { values: p.values, label: p.name } : { absent: true, label: nameOf(o.against) };
+      }
+      return null;
+    })();
+    const absent = [];
+    if (sideA && sideA.absent) absent.push({ source: 'pack:' + sideA.label, why: 'not-found' });
+    if (sideB && sideB.absent) absent.push({ source: 'pack:' + sideB.label, why: 'not-found' });
+    if (sideA && !sideA.absent && sideB && !sideB.absent) {
+      keyClashes(sideA.values, sideB.values, sideA.label, sideB.label).forEach(function (r) { rows.push(r); });
+    }
+    // ② 政策 / 题材级：**把两侧的名单并起来判**（并集才是「这两套加在一起要同时成立」的真声明面）
+    const dv = declOf(sideA && sideA.values), dw = declOf(sideB && sideB.values);
+    const rc = recipeClashes(dv.policies.concat(dw.policies), dv.themes.concat(dw.themes));
+    rc.rows.forEach(function (r) { rows.push(r); });
+    rc.absent.forEach(function (x) { absent.push(x); });
+    // ③ 导入体：先比 values，再单独判「有没有夹带世界事实」
+    let carried = [];
+    if (typeof o.text === 'string' && o.text.trim()) {
+      let b = null;
+      try { b = JSON.parse(o.text); } catch (e) { b = null; }
+      if (isObj(b)) {
+        carried = Object.keys(b).filter(function (k) { return WORLD_FACT_NAMES.indexOf(k) >= 0; });
+        if (isObj(b.values) && sideB && !sideB.absent) {
+          keyClashes(b.values, sideB.values, '导入体', sideB.label).forEach(function (r) { rows.push(r); });
+        }
+      } else absent.push({ source: 'text', why: 'bad-json' });
+    }
+    if (carried.length) {
+      rows.push({ kind: 'carries-world-facts', key: carried.join('、'), from: carried.slice(),
+        why: '这份包顶层带着世界事实字段（' + carried.join(' / ') + '）—— 规则包**不得携带世界事实**，一律在写盘之前拒收' });
+    }
+    _stat.detects++;
+    return { ok: true, kinds: CONFLICT_KINDS.slice(), count: rows.length, conflicts: rows,
+      absent: absent, comparable: absent.length === 0,
+      // 「一条都没报」与「判不了」必须分得开：`absent` 非空时不许把这一栏读成「这套没问题」。
+      verdict: rows.length ? 'conflict' : (absent.length ? 'unknown' : 'clean'),
+      note: '冲突**只报不判**：指出来是哪两条，谁赢由你改 —— 不做「后启用的赢」' };
+  }
+  /** 冲突了就**不许启用**：把包当参数切进去时判一次，有冲突直接拒收并指出两条。 */
+  function admit(name) {
+    _stat.admits++;
+    const p = find(name);
+    if (!p) return { ok: false, reason: 'not-found', name: nameOf(name) };
+    const d = detect({ values: p.values, label: p.name, against: 'current' });
+    if (d.conflicts.length) {
+      return { ok: false, reason: 'conflict', name: p.name,
+        conflicts: d.conflicts.slice(0, 8), count: d.count,
+        hint: '这一包与当前规则面存在冲突（' + d.conflicts.map(function (x) { return x.kind + ':' + x.key; }).join(' / ')
+          + '）—— 启用前先改一处；本模块不会「后启用的赢」' };
+    }
+    return { ok: true, name: p.name, conflicts: [], absent: d.absent, comparable: d.comparable };
+  }
+
+  // ── 预设世界与规则包的组合（Y8 功能②：开档即定档）────────────────────
+  /**
+   * 「这一局按哪套规则 + 哪份预设世界开局」此前没有一处能答：规则包只答前半句，
+   *   `preset-world` 只答后半句，而玩家开局时要的是**一句话**。
+   *   本口把它们组合成一份**只读清单** —— 它不种世界、不切规则（那两件事各有各自的写口），
+   *   只回答「你按这两个名字开局，会是这个样子；而它们之间有冲突的话，冲突在这几条上」。
+   *   `seed` 逐字取自 `presetWorld.seed()`（草稿面不是世界状态，本模块不自己读一遍）。
+   */
+  function compose(spec) {
+    const o = isObj(spec) ? spec : {};
+    const out = { ok: true, format: FORMAT, at: clockNow('rulePack.compose') };
+    if (o.pack) {
+      const a = admit(o.pack);
+      out.rules = a.ok
+        ? { ok: true, pack: a.name, conflicts: [], absent: a.absent }
+        : { ok: false, pack: a.name || nameOf(o.pack), reason: a.reason, conflicts: a.conflicts || [], hint: a.hint || '' };
+    } else out.rules = { ok: false, reason: 'no-pack', hint: '组合口要一个规则包名（当前活跃包：' + (settings().active || '无') + '）' };
+    const pw = WA.presetWorld;
+    if (o.seed !== false) {
+      if (!pw || typeof pw.seed !== 'function') {
+        out.seed = { ok: false, reason: 'preset-world-absent',
+          hint: '预设世界草稿面在 preset-world 里 —— 它缺席时本模块**不**自己读一遍世界（那会变成第二份真源）' };
+      } else {
+        let s = null;
+        try { s = pw.seed(); } catch (e) { s = null; }
+        if (!s || s.ok !== true) out.seed = { ok: false, reason: String((s && s.reason) || 'seed-failed') };
+        else out.seed = { ok: true, characters: (s.characters || []).length, world: (s.world || []).length,
+          others: (s.others || []).length, source: 'presetWorld.seed()' };
+      }
+    } else out.seed = null;
+    // 定档：规则包解得开 且（不取预设时 || 预设读得到）—— 否则这一局开不起来，**如实说哪一半缺**。
+    const rulesOk = out.rules.ok === true;
+    const seedOk = (out.seed === null) || (out.seed && out.seed.ok === true);
+    out.ready = !!(rulesOk && seedOk);
+    out.line = out.ready
+      ? ('开档定档：规则包「' + out.rules.pack + '」+ 预设世界（人物 ' + out.seed.characters + ' / 世界 ' + out.seed.world + ' / 其他 ' + out.seed.others + '）')
+      : ('开不起来：' + (rulesOk ? '' : '规则面 ' + out.rules.reason + '；') + (seedOk ? '' : '草稿面 ' + (out.seed && out.seed.reason)));
+    out.note = '组合口是**只读**的：它不切规则、不种世界，只把「这两样配起来是什么样」摆出来（切规则用 apply，种世界是 preset-world 的事）';
+    _stat.composes++;
+    return out;
+  }
+
+  // ── 回滚栈（Y8 功能④：一键回滚到上一个规则包）──────────────────────
+  /**
+   * 边界原文：「**回滚不删世界数据**」「只回滚规则，不动世界事实」。
+   *   实现方式：栈里**只装规则面键值**（`surface()` 快照出来的那批键），一条世界键都进不来 ——
+   *   于是「回滚会不会动世界」这个问题在数据结构上就没有第二个答案。专锁按「栈里不出现世界键」
+   *   与「回滚前后世界摘要逐字不变」两向判。
+   *   压栈时机：每次 `apply()` **在写之前**压一次（压的是「切换之前的模样」）；
+   *   栈满即丢最旧一条（如实回带 `trimmed:true`，不静默）。
+   */
+  function history() { const s = settings(); return Array.isArray(s.history) ? s.history : []; }
+  function pushHistory(site, cfg) {
+    const snap = surface(cfg.maxKeys);
+    const row = { at: clockNow('rulePack.' + (site || 'apply')), site: String(site || 'apply'),
+      active: cfg.active || '', values: JSON.parse(JSON.stringify(snap.values || {})),
+      keys: Object.keys(snap.values || {}).length, sig: sig(JSON.stringify(snap.values || {})) };
+    const cur = history().slice();
+    cur.push(row);
+    const over = cur.length > MAX_HISTORY;
+    const kept = cur.slice(-MAX_HISTORY);
+    let saved = null;
+    try { saved = saveSettings({ history: kept }); } catch (e) { return { ok: false, reason: 'save-threw', row: row }; }
+    return { ok: true, depth: kept.length, trimmed: over, row: row, saved: saved };
+  }
+  /** 栈读数（纯读）：逐条只报**它长什么样**（键数 / 指纹 / 是从哪来的），不报值。 */
+  function historyView() {
+    return { ok: true, depth: history().length, cap: MAX_HISTORY,
+      rows: history().map(function (h) { return { at: h.at || 0, site: h.site || '', active: h.active || '',
+        keys: h.keys || 0, sig: h.sig || '' }; }) };
+  }
+  /**
+   * 回滚：把栈顶那一份规则面写回（**经 settingsBus 唯一写路径**），并把活跃包标记一并还原。
+   *   写回的是**键值**，不是「切到某个包」—— 上一次切换之前的手改值也照样回得去。
+   *   `peek:true` 只读栈顶（不动任何东西）。
+   */
+  function rollback(opt) {
+    const cfg = settings();
+    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const o = isObj(opt) ? opt : {};
+    const cur = history().slice();
+    if (!cur.length) { fault('no-history'); return { ok: false, reason: 'no-history',
+      hint: '还没有可回滚的一步 —— 栈是在每次「切到这个包」时压的（存包不压）' }; }
+    const top = cur[cur.length - 1];
+    if (o.peek === true) return { ok: true, peek: true, at: top.at, site: top.site, active: top.active,
+      keys: top.keys, sig: top.sig, depth: cur.length };
+    if (!WA.settingsBus || typeof WA.settingsBus.saveOrThrow !== 'function') {
+      fault('settings-bus-absent'); return { ok: false, reason: 'settings-bus-absent' };
+    }
+    const before = historyWorldProbe();
+    const applied = [], failed = [], skipped = [];
+    Object.keys(top.values || {}).forEach(function (k) {
+      const rec = regs().filter(function (r) { return r.key === k; })[0] || null;
+      if (!rec) { skipped.push({ key: k, why: 'key-not-registered' }); return; }
+      try {
+        WA.settingsBus.saveOrThrow(rec, WA.settingsBus.normalize(rec, top.values[k]));
+        applied.push(k);
+      } catch (e) { failed.push({ key: k, why: 'write-threw', detail: String((e && e.message) || e).slice(0, 100) }); }
+    });
+    let marker = null;
+    try { marker = saveSettings({ active: top.active || '', history: cur.slice(0, -1) }); }
+    catch (e) { marker = null; }
+    const after = historyWorldProbe();
+    _stat.rolls++; _stat.lastReason = failed.length ? 'partial' : 'rolled-back';
+    return { ok: true, rolledBackTo: { at: top.at, site: top.site, active: top.active, sig: top.sig },
+      applied: applied, failed: failed, skipped: skipped,
+      partial: failed.length > 0 || skipped.length > 0,
+      depthAfter: Math.max(0, cur.length - 1), marker: marker ? true : false,
+      // 「只回滚规则，不动世界事实」在这里是**实测**：两侧摘要一致才算数。
+      worldUnchanged: !!(before.ok && after.ok && before.digest === after.digest),
+      worldBefore: before.ok ? before.digest : null, worldAfter: after.ok ? after.digest : null,
+      note: '回滚只写规则面键值（经 settingsBus）—— 世界事实一个字节都不碰；这一栏是实测差，不是声明' };
+  }
+  /**
+   * 世界事实摘要（**纯读**）。为什么不复用 world-lab 的那一口：它是那个模块的**内部**函数
+   *   （导出面上没有 `liveDigest`），而本模块要判的正是「我这次操作有没有碰到世界」——
+   *   复用对方内部实现等于把自己的判据挂到别人的私有面上（对方一改，本模块的实测就静默失灵）。
+   *   口径与它逐字同族（顶层键数 / 总字节 / djb2 指纹），不另立一套语义。
+   */
+  function historyWorldProbe() {
+    let s = null;
+    try { s = (WA.store && typeof WA.store.get === 'function') ? WA.store.get() : null; }
+    catch (e) { return { ok: false, why: 'store-threw' }; }
+    if (!isObj(s)) return { ok: false, why: 'no-store' };
+    const keys = Object.keys(s).sort();
+    const parts = []; let chars = 0;
+    for (let i = 0; i < keys.length; i++) {
+      let n = 0;
+      try { n = JSON.stringify(s[keys[i]]).length; } catch (e) { n = -1; }
+      chars += n; parts.push(keys[i] + ':' + n);
+    }
+    return { ok: true, keys: keys.length, chars: chars, digest: sig(parts.join('|')) };
+  }
+
   // ── 包（命名快照）────────────────────────────────────────────────
   function packs() { const s = settings(); return Array.isArray(s.packs) ? s.packs : []; }
   function nameOf(v) { return clean(v, 40); }
@@ -176,6 +507,10 @@
       : (function () { for (let i = 0; i < cur.length; i++) { if (cur[i] && cur[i].name === n) return i; } return -1; })();
     const row = {
       name: n, ver: FORMAT, at: clockNow('rulePack.save'),
+      // Y8 功能①：包自带一句**说明**（人读的那一行）。空就空着 —— 不编默认文案。
+      //   同名覆盖时**沿用旧包的说明**（调用方没给新的）：否则改一次内容就把那句人写的字弄丢了。
+      note: (isObj(opt) && typeof opt.note === 'string') ? clean(opt.note, 80)
+        : ((idx >= 0 && cur[idx] && typeof cur[idx].note === 'string') ? cur[idx].note : ''),
       keys: snap.keys.slice(), values: JSON.parse(JSON.stringify(snap.values)),
       absent: snap.absent.slice(0, 12),
       surface: { packable: snap.packable, unreadable: snap.unreadable, themes: snap.themes, rulesCount: snap.rulesCount },
@@ -188,7 +523,8 @@
       out = saveSettings({ packs: cur.slice(-Math.max(1, cfg.maxPacks)), seq: (cfg.seq || 0) + 1 });
     } catch (e) { fault('save-threw'); return { ok: false, reason: 'save-threw', detail: String((e && e.message) || e).slice(0, 120) }; }
     _stat.saves++; _stat.lastReason = 'saved';
-    return { ok: true, name: n, replaced: replaced, keys: row.keys.length, sig: row.sig, saved: out };
+    return { ok: true, name: n, replaced: replaced, keys: row.keys.length, sig: row.sig,
+      note: row.note, saved: out };
   }
   /** 当前面读数（面板/诊断用；**纯读**）。 */
   function current(opt) {
@@ -201,9 +537,12 @@
     const cfg = settings();
     const p = find(name);
     if (!p) { fault('not-found'); return { ok: false, reason: 'not-found', name: nameOf(name) }; }
-    return { ok: true, name: p.name, ver: p.ver, at: p.at || 0, keys: (p.keys || []).slice(),
+    return { ok: true, name: p.name, ver: p.ver, at: p.at || 0, note: (typeof p.note === 'string') ? p.note : '',
+      keys: (p.keys || []).slice(),
       values: JSON.parse(JSON.stringify(p.values || {})), absent: (p.absent || []).slice(),
-      surface: p.surface || null, sig: p.sig || '', format: FORMAT, maxKeys: cfg.maxKeys };
+      surface: p.surface || null, sig: p.sig || '', format: FORMAT, maxKeys: cfg.maxKeys,
+      // 读明细时顺带判一次「它与当前面冲突吗」—— 切包前想知道的事，就在读它的这一处顺手答了。
+      vsCurrent: detect({ values: p.values, label: p.name, against: 'current' }) };
   }
   /**
    * 切换：把一个包写回设置面。**逐键**，且**经 settingsBus 唯一写路径**。
@@ -218,6 +557,18 @@
     if (!WA.settingsBus || typeof WA.settingsBus.saveOrThrow !== 'function') {
       fault('settings-bus-absent'); return { ok: false, reason: 'settings-bus-absent' };
     }
+    // Y8 功能③的落点：**冲突的包在写盘之前就被拒**。`force:true` 是给调用方明说的逃生口
+    //   （面板会显式写出「我就要这么配」），但它**不改判据** —— 拒收回执里的冲突逐条带出。
+    const a = admit(p.name);
+    if (!a.ok && a.reason === 'conflict' && !(isObj(opt) && opt.force === true)) {
+      fault('conflict');
+      return { ok: false, reason: 'conflict', name: p.name, conflicts: a.conflicts, count: a.count,
+        hint: a.hint };
+    }
+    // 压栈：**写之前**先记下「现在长什么样」。压栈失败（设置写不进去）⇒ 整次切换不做 ——
+    //   否则「切得回去」这句话在这一次就已经不成立了。
+    const pushed = pushHistory('apply', cfg);
+    if (!pushed.ok) { fault('save-threw'); return { ok: false, reason: 'save-threw', detail: '回滚栈写不进去，故本次不切' }; }
     const vals = isObj(p.values) ? p.values : {};
     const keys = Object.keys(vals);
     const applied = [], failed = [], skipped = [];
@@ -245,7 +596,11 @@
       unreadable: unreadable,
       partial: failed.length > 0 || skipped.length > 0 || unreadable.length > 0,
       marker: marker ? true : false,
-      note: '写路径唯一：全部经 settingsBus.saveOrThrow；本模块不碰 localStorage' };
+      // Y8：切成功了也要把**这一包里已知的冲突**带回来（`force` 走的那条路尤其要看这个）。
+      //   口径与 recipe 一致：「应用成功 ≠ 这么配没问题」——成功说的是「写进去了」。
+      conflicts: (a.conflicts || []).slice(0, 8), forced: !!(isObj(opt) && opt.force === true && (a.conflicts || []).length),
+      rollbackDepth: pushed.depth, historyTrimmed: !!pushed.trimmed,
+      note: '写路径唯一：全部经 settingsBus.saveOrThrow；本模块不碰 localStorage；切换前的样子已压进回滚栈' };
   }
   function drop(name) {
     const cfg = settings();
@@ -265,12 +620,15 @@
     if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
     const p = find(name);
     if (!p) { fault('not-found'); return { ok: false, reason: 'not-found', name: nameOf(name) }; }
-    const body = { rulePack: FORMAT, name: p.name, at: p.at || 0,
+    // Y8 功能①：「说明」随包一起走。它是**人读的那一行**（「这套是我给悬疑局配的」），
+    //   不是新字段语义 —— 没有说明的包导出时给空串，而不是编一句出来。
+    const note = (typeof p.note === 'string') ? p.note : '';
+    const body = { rulePack: FORMAT, name: p.name, at: p.at || 0, note: note,
       keys: (p.keys || []).slice(), values: JSON.parse(JSON.stringify(p.values || {})),
       sig: p.sig || '', app: (WA.VERSION || null) };
     _stat.exports++;
     return { ok: true, pack: body, text: JSON.stringify(body), bytes: JSON.stringify(body).length,
-      name: p.name, keys: (p.keys || []).length };
+      name: p.name, keys: (p.keys || []).length, note: note };
   }
   /**
    * 导入：**先判形状、再判版本、最后才写**（与 settingsBus.cfgImport 同规）。
@@ -295,8 +653,19 @@
     const usable = Object.keys(b.values).filter(function (k) { return known.indexOf(k) >= 0; });
     if (!usable.length) { fault('no-usable-keys'); return { ok: false, reason: 'no-usable-keys',
       unknownKeys: unknownKeys.slice(0, 12), hint: '这份包的键在本侧一个都不认识 —— 不写任何东西' }; }
+    // Y8 边界「规则包**不得携带世界事实**（人物 / 事件 / 地图不进包）」的落点：**写盘之前**拒收。
+    //   为什么在导入这一关就拦而不是等启用：夹带是**这份包本身的毛病**（换到哪一侧都带在身上），
+    //   与「它跟当前面冲不冲突」是两回事 —— 后者要看对面是谁，前者只看它自己。
+    const carried = Object.keys(b).filter(function (k) { return WORLD_FACT_NAMES.indexOf(k) >= 0; });
+    if (carried.length) { fault('carries-world-facts'); return { ok: false, reason: 'carries-world-facts',
+      carried: carried.slice(0, 8), hint: '这份包的顶层带着世界事实字段（' + carried.join(' / ')
+        + '）—— 规则包只装规则面键值；世界事实一律不进包，故整份不写' }; }
+    // 冲突预检：**导入不启用**，故这里不拒收，但把「启用时会被拦下」的话当场说清
+    //   （要在导入前就知道结果，`detect({text})` 是同一个判据的另一入口）。
+    const pre = detect({ text: text, against: 'current' });
+    const note = (typeof b.note === 'string') ? clean(b.note, 80) : '';
     const cur = packs().filter(function (p) { return p && p.name !== name; });
-    const row = { name: name, ver: ver, at: clockNow('rulePack.import'),
+    const row = { name: name, ver: ver, at: clockNow('rulePack.import'), note: note,
       keys: usable.slice(), values: usable.reduce(function (a, k) { a[k] = b.values[k]; return a; }, {}),
       absent: unknownKeys.map(function (k) { return { key: k, why: 'unknown-in-this-side' }; }).slice(0, 12),
       /* 源指纹逐字取自导入体 —— 与 exportPack 写的那一份同源，调用方可以核对 */
@@ -308,8 +677,11 @@
     catch (e) { fault('save-threw'); return { ok: false, reason: 'save-threw' }; }
     _stat.imports++; _stat.lastReason = 'imported';
     return { ok: true, name: name, keys: row.keys.length, unknownKeys: unknownKeys.slice(0, 12),
-      srcSig: row.srcSig, sig: row.sig, saved: out,
-      note: '未知键**如实列出**、不进包 —— 不是静默丢弃，也不是「大概能装」' };
+      srcSig: row.srcSig, sig: row.sig, note: note, saved: out,
+      // 导入**不启用**，故冲突不在这里拒收 —— 但把它当场报出来：「装进来了」与「能用」是两件事。
+      conflictsAtEnable: pre.conflicts.slice(0, 8), conflictCount: pre.count,
+      noteText: '未知键**如实列出**、不进包 —— 不是静默丢弃，也不是「大概能装」；'
+        + (pre.count ? ('这一包与当前规则面有 ' + pre.count + ' 条冲突，启用时会被拦下（force 可越过，但冲突照样带回来）') : '与当前规则面无冲突') };
   }
 
   // ── 白名单自动化模板（边界 2 / 3 的落点）──────────────────────────
@@ -478,13 +850,21 @@
       failPolicies: FAIL_POLICIES.slice(),
       actions: ACTION_IDS.map(function (k) { return { id: k, label: ACTIONS[k].label, target: ACTION_TARGETS[k] || '' }; }),
       bounds: { maxPacks: cfg.maxPacks, maxKeys: cfg.maxKeys },
+      // Y8：冲突三类 + 回滚栈上限 + 夹带名单，**逐条写在这里**（口径面就是面板念的那一份）。
+      conflictKinds: CONFLICT_KINDS.slice(),
+      worldFactNames: WORLD_FACT_NAMES.slice(),
+      rollbackCap: MAX_HISTORY,
       notes: {
         writePath: 'settingsBus 是唯一写路径 —— 本模块零 localStorage 写、零 store 写',
         noScript: '模板是**封闭词表**：没有 eval / Function / require / import 任何一路，"不得引入可执行脚本"是这一项的边界原文',
         noTimer: '本模块**不注册定时器** —— 触发时机由调用方按剧情轮次传入（tick / dueAt）',
         budget: 'budget 是**硬上限**：跑满即停并如实报 budget-exhausted，不是静默跳过',
         readOnly: '五口动作**全是只读读口**（待办扫描 / 健康读数 / 档位读数 / 地图视图 / 试演预览）—— 模板不替玩家动世界',
-        noWorldWrite: '规则包只记录设置与启用面，不改世界状态（零 store.transact）'
+        noWorldWrite: '规则包只记录设置与启用面，不改世界状态（零 store.transact）',
+        conflict: '冲突**只报不判**：指出来是哪两条（同键两处写 / 两条政策互斥 / 两题材叠加），谁赢由你改 —— 不做「后启用的赢」',
+        noCarry: '规则包**不得携带世界事实**（人物 / 事件 / 地图不进包）—— 导入时按显式名单在写盘之前拦下',
+        rollback: '回滚栈里**只装规则面键值**，一条世界键都进不来；栈上限 ' + MAX_HISTORY + ' 条（超出丢最旧一条并如实回报）',
+        compose: '组合口（开档即定档）是**只读**的：它不切规则、不种世界，只把「这两样配起来是什么样」摆出来'
       }
     };
   }
@@ -525,13 +905,36 @@
       // 「词表里有一口在现场找不到」= 声明面空转 —— 单独给一个布尔量，
       //   而不是让读的人自己去比 actionIds 与 actionTargets 两个数组。
       actionsResolved: actionRows.filter(function (r) { return r.present; }).length,
+      // ── Y8 四栏现场自证 ────────────────────────────────────────
+      //   「四项新功能里，哪几项此刻真的能跑」——此前没有一处能答：
+      //   面板上有钮、引擎里有函数、而判据依赖的那个声明面**可能根本不在场**
+      //   （recipe 缺席 ⇒ 政策 / 题材级冲突判不了，而它长得和「没有冲突」一样）。
+      conflictKinds: CONFLICT_KINDS.slice(),
+      //   逐条报「这一类冲突的判据依赖谁、它在不在」—— 与 actionTargets 同规：
+      //   名字写错了与引擎缺席，必须分得开。
+      conflictSources: [
+        { kind: 'key-clash', source: '本模块 surface() 两侧 values', present: true,
+          note: '同键两处写：两侧都读得到时就能判' },
+        { kind: 'policy-clash', source: 'recipe.policyClashes', present: !!(WA.recipe && typeof WA.recipe.policyClashes === 'function'),
+          note: '两条政策互斥（recipe 的 vs 表）—— 它缺席时这一类**判不了**，不是「没有冲突」' },
+        { kind: 'theme-clash', source: 'recipe.themeClashes', present: !!(WA.recipe && typeof WA.recipe.themeClashes === 'function'),
+          note: '两题材叠加冲突（recipe 的 THEME_CLASH）' }
+      ],
+      //   回滚栈：深度 / 上限 / 栈顶是谁（**只报形状，不报值**）。
+      rollback: Object.assign({ cap: MAX_HISTORY }, historyView()),
+      //   组合口：预设世界草稿面在不在（不在 ⇒ ready 恒 false，且原因说得出）。
+      composeDeps: { presetWorld: !!(WA.presetWorld && typeof WA.presetWorld.seed === 'function') },
+      //   夹带名单逐条列出来（面板与专锁念同一份）。
+      worldFactNames: WORLD_FACT_NAMES.slice(),
       faults: Object.assign({}, _stat.faults)
     };
   }
   function statOf() {
     return Object.assign({}, _stat, { faults: Object.assign({}, _stat.faults),
       enabled: !!settings().enabled, packs: packs().length, templates: _templates.length,
-      actions: ACTION_IDS.length });
+      actions: ACTION_IDS.length,
+      // Y8 四栏台账：detects / admits / rolls / composes 在 `_stat` 里，`historyDepth` 现场读。
+      historyDepth: history().length, conflictKinds: CONFLICT_KINDS.length });
   }
   /** 时钟（与全仓同规：决策时钟优先，缺失时退回墙钟 —— 与 agency / freight 同款守卫）。 */
   function clockNow(site) { try { return WA.clock ? WA.clock.now(site || 'rulePack') : Date.now(); } catch (e) { return Date.now(); } }
@@ -540,17 +943,28 @@
   //   `save` / `apply` / `list` / `get` / `drop` / `exportPack` / `importPack` / `current`
   //   → 面板「规则包」区块（静态控件 + 开关）；
   //   `template` 组（setTemplates / run / dueAt / templates / reset）→ 同区块的模板栏；
-  //   `catalog` / `diagnose` / `stat` → 面板口径钮 + tool-diag 的 `secRulePack()`。
+  //   `catalog` / `diagnose` / `stat` → 面板口径钮 + tool-diag 的 `secRulePack()`；
+  //   v2.203.0（Y8）新增四口，各自的真消费方都在**同一个区块**里：
+  //   `detect` → 「查冲突」钮（读口）；`admit` → 「切到这个包」**内部先判**（apply 的守门），
+  //   同时也是「查冲突」钮的第二个入口；`compose` → 「开档定档」钮（纯读）；
+  //   `rollback` / `history` → 「回滚一步」与「回滚栈」两枚钮。
+  //   `admit` 为什么也挂在面上：面板要在**写字之前**把「这一包会被拦吗」单独问一句
+  //   （apply 拒收后才知道，等于已经点过一次了）。
   WA.rulePack = {
     FORMAT: FORMAT,
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(patch); },
     catalog: catalog,
     save: save, apply: apply, drop: drop,
+    // ── v2.203.0（Y8）四口 ─────────────────────────────────────
+    detect: detect, admit: admit, compose: compose,
+    rollback: rollback, history: historyView,
     list: function () {
       const cfg = settings();
       return { ok: true, active: cfg.active || '', maxPacks: cfg.maxPacks,
+        rollbackDepth: history().length,
         packs: packs().map(function (p) { return { name: p.name, keys: (p.keys || []).length, at: p.at || 0,
+          note: (typeof p.note === 'string') ? p.note : '',
           sig: p.sig || '', ver: p.ver || FORMAT, imported: p.imported === true }; }) };
     },
     get: get, current: current,
@@ -562,5 +976,5 @@
     },
     diagnose: diagnose, stat: statOf
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/rule-pack.js', { kind: 'engine', ver: '2.188.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/rule-pack.js', { kind: 'engine', ver: '2.203.0' });
 })();

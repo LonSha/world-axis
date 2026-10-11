@@ -178,6 +178,46 @@
     //   （与本次改动无关的读数抖动）。三块合页而不是各开一页：它们回答的是
     //   同一句话的三个时态（接下来发生 / 已经发生 / 此刻卡在哪）。
     { id: 'health', icon: '🩺', label: '健康' },
+    // v2.198.0（Y1）：拍控制中心。**插在 health 之后而非更早**：pages[3..6]
+    //   （memory/enemies/parallel/inject）是 v2.33.0/v2.34.0 两条硬读数锚定的位置，
+    //   插在它们之前会把整体后移一位（与本次改动无关的读数抖动）。
+    //   与 health 同族：两者都是「玩家可读的中心」—— health 答「还有什么没做完」，
+    //   本页答「现在卡在第几拍 / 上一拍被判了什么 / 为什么这一拍没过去」。
+    //   页 id 一律纯小写字母：tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析
+    //   页清单，带连字符的 id 在那一面「不存在」（等于该页永远不进守卫覆盖面）。
+    { id: 'beat', icon: '🎯', label: '拍' },
+    // v2.199.0（Y2）：章节生成工作台。**插在 beat 之后而非更早**：pages[3..6]
+    //   （memory/enemies/parallel/inject）是 v2.33.0/v2.34.0 两条硬读数锚定的位置，
+    //   插在它们之前会把整体后移一位（与本次改动无关的读数抖动）。
+    //   与 beat 相邻是刻意的：两者是同一件事的两半 —— 拍页答「此刻卡在哪」，
+    //   本页答「本章怎么开、怎么推、怎么收」。计划原文把 Y1/Y2 排在同一批，
+    //   理由正是「分属不同批次会各自半成品」。
+    //   页 id 一律纯小写字母：tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析
+    //   页清单，带连字符的 id 在那一面「不存在」（等于该页永远不进守卫覆盖面）。
+    { id: 'chapter', icon: '📖', label: '章节' },
+    // v2.199.0（Y4）：待办中心。**插在 chapter 之后而非更早**：pages[3..6]
+    //   （memory/enemies/parallel/inject）是 v2.33.0/v2.34.0 两条硬读数锚定的位置，
+    //   插在它们之前会把整体后移一位（与本次改动无关的读数抖动）。
+    //   与 chapter 相邻：Y2 那页答「本章还欠什么」（章内口径），本页答
+    //   「此刻整个世界里等我处理的有哪些」（账户级口径）—— 同一件事的两个范围。
+    //   页 id 一律纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    { id: 'todo', icon: '📌', label: '待办' },
+    // v2.200.0（第四批 Y5）：世界快照与整包搬运（engines/world-snapshot.js）。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    //   插在 todo 之后：前三批（beat / chapter / todo）是「操作 / 推进 / 欠什么」，
+    //   本页起是「世界表达能力扩展」（搬运 / 检索 / 可视化 / 规则包 / 实验室），
+    //   批次语义在页序上也读得出来。
+    { id: 'port', icon: '📦', label: '搬运' },
+    // v2.201.0（第四批 Y6）：世界历史检索（engines/history-search.js）。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    //   插在 port 之后：本页是「世界表达能力扩展」的第二格（搬运 → 检索），
+    //   与 port 同批语义（都是「把已有的东西找出来 / 搬出去」），排在它旁边读得出来。
+    { id: 'find', icon: '🔍', label: '检索' },
+    // v2.202.0（第四批 Y7）：地图与关系可视化（engines/world-graph.js）。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    //   插在 find 之后：第四批的页序即批次语义 ——「搬运 → 检索 → 图谱」是
+    //   「把东西搬出去 / 把东西找出来 / 把关系看成一幅图」的同一条线。
+    { id: 'graph', icon: '🕸', label: '图谱' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -2586,10 +2626,26 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <textarea id="wa-rp-tpl" class="wa-input" rows="3" placeholder="模板 JSON 数组，如 [{'id':'t1','action':'pending.sweep','every':3,'budget':2,'failPolicy':'skip'}]"></textarea>
         <button class="wa-btn" id="wa-rp-tpl-list" title="只读：已登记模板（动作 / 每 N 轮 / 已用次数 / 预算 / 失败策略）">模板清单</button>
         <button class="wa-btn" id="wa-rp-tpl-run" title="写口：按预算跑一轮（在**设置面**上登记模板，动作只调既有只读读口；预算跑满即停并如实报 budget-exhausted）">设模板</button>
-        <button class="wa-btn" id="wa-rp-catalog" title="只读：封闭集口径（可进包的模块 / 五口动作及其真读口 / 失败策略 / 容量区间）">口径</button>
-        <button class="wa-btn" id="wa-rp-diag" title="自证面：settingsBus / inputGuard / 各相关引擎在不在、词表逐口现场核对结果、台账（保存/切换/导入/模板次数 + 拒收归因）">诊断</button>
-      </div>
-      <div id="wa-rp-out" class="wa-out"></div>
+         <button class="wa-btn" id="wa-rp-catalog" title="只读：封闭集口径（可进包的模块 / 五口动作及其真读口 / 失败策略 / 容量区间）">口径</button>
+         <button class="wa-btn" id="wa-rp-diag" title="自证面：settingsBus / inputGuard / 各相关引擎在不在、词表逐口现场核对结果、台账（保存/切换/导入/模板次数 + 拒收归因）">诊断</button>
+       </div>
+       <div class="wa-dim">v2.203.0（Y8）四件事：<b>给包写一句说明</b>（随包导出/导入，覆盖同名时沿用旧说明）、
+         <b>查冲突</b>（同键两处写 / 两条政策互斥 / 两题材叠加 —— <b>只报不判</b>，不做「后启用的赢」）、
+         <b>开档定档</b>（规则包 + 预设世界配起来是什么样，<b>纯读</b>）、
+         <b>回滚一步</b>（栈里只装规则面键值，一条世界键都进不来；写回经 <code>settingsBus</code>，
+         回滚前后世界摘要一致是<b>实测</b>的）。</div>
+       <div class="wa-row">
+         <input id="wa-rp-note" class="wa-input" placeholder="包说明（人读的一行，如：悬疑局用的那套）"/>
+         <button class="wa-btn" id="wa-rp-check" title="只读：查冲突。三类逐条带理由；判不了的那一类单独标出来（engine-absent ≠ 没有冲突）。名称框留空则比「当前面 vs 当前面」">查冲突</button>
+         <button class="wa-btn" id="wa-rp-compose" title="只读：开档定档 —— 规则包 + 预设世界配起来是什么样（不切规则、不种世界）">开档定档</button>
+       </div>
+       <div class="wa-row">
+         <button class="wa-btn" id="wa-rp-admit" title="只读：这一包现在切得进去吗（写盘之前先问一句）—— 有冲突即拒并指出是哪两条">能不能启用</button>
+         <button class="wa-btn" id="wa-rp-force" title="强制启用（明知有冲突）：仅你明说这么配时才走。判据不变 —— 回执里逐条带回冲突，不做「后启用的赢」">强制启用</button>
+         <button class="wa-btn" id="wa-rp-rollback" title="写口（设置族）：把栈顶那一份规则面写回。写的是键值而不是「切到某个包」，故上一次切换前的手改值也回得去">回滚一步</button>
+         <button class="wa-btn" id="wa-rp-history" title="只读：回滚栈（深度 / 上限 / 每步是从哪来的、几键、指纹）—— 只报形状不报值">回滚栈</button>
+       </div>
+       <div id="wa-rp-out" class="wa-out"></div>
       <div class="wa-sec">世界实验室与反事实对比</div><div class="wa-dim">（E9：选 A / 选 B / 什么都不做，先看看分别会怎样）</div>
       <div class="wa-dim">在<b>隔离副本</b>上把三条路径各跑一遍：<code>hold</code>（什么都不做）、<code>选 A</code>、<code>选 B</code>，
         然后逐项摆差异（准入结论 / 账目 / 因果落地），每一项都标<b>来源</b>。<br/>
@@ -2611,10 +2667,25 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-row">
         <button class="wa-btn" id="wa-wl-export" title="纯读：把**起点世界**导出为一份真蓝图（交依赖体检核）。蓝图里不含任何反事实结果 —— 那份副本从来不是真世界">导出起点为蓝图</button>
         <button class="wa-btn" id="wa-wl-discard" title="丢弃读数（副本本来就不落任何地方，故无残留可清）。本模块没有任何一条把副本写回 live 的路径">丢弃实验</button>
-        <button class="wa-btn" id="wa-wl-catalog" title="只读：三条路径 / 差异行及各自来源 / 动作词表（逐字取自 rehearsal）/ 边界口径">口径</button>
-        <button class="wa-btn" id="wa-wl-diag" title="自证面：rehearsal / exec / store / blueprint 在不在、当前实验是否过期、live 有没有被改到、台账">诊断</button>
-      </div>
-      <div id="wa-wl-out" class="wa-out"></div>
+         <button class="wa-btn" id="wa-wl-catalog" title="只读：三条路径 / 差异行及各自来源 / 动作词表（逐字取自 rehearsal）/ 边界口径">口径</button>
+         <button class="wa-btn" id="wa-wl-diag" title="自证面：rehearsal / exec / store / blueprint 在不在、当前实验是否过期、live 有没有被改到、台账">诊断</button>
+       </div>
+       <div class="wa-dim">v2.203.0（Y9）四件事：<b>沙盒推进</b>（在<b>同一份</b>副本上连着往前推 N 轮 —— 第 3 轮看到的是第 1、2 轮改过的那份世界），
+         <b>结果报告</b>（每处变化拆成一条带来源的原因；无变化的轮如实记 <code>no-change</code>，不编原因）、
+         <b>选择性采纳</b>（把报告里<b>某一条</b>落成真世界事件，走 U2 统一提交 ——
+         这是全模块<b>唯一</b>的写世界路径，且来源与批准点写在那一条事实自己身上）、
+         <b>拍引擎联动</b>（跑拍引擎的推演而<b>不落拍</b>：拍账摘要前后逐字一致是实测的）。</div>
+       <div class="wa-row">
+         <input id="wa-wl-rounds" class="wa-input" placeholder="推几轮（默认 3，上限 12；超限会夹住并回带 clamped）"/>
+         <button class="wa-btn" id="wa-wl-sim" title="沙盒推进（纯读 world）：在同一份隔离副本上累积推进 N 轮。跑前跑后各取一次 live 摘要自证零写入">沙盒推进</button>
+         <button class="wa-btn" id="wa-wl-report" title="只读：结果报告 —— 每一处变化拆成一条原因并标来源；无法落成事实的空轮不在「可采纳」之列">结果报告</button>
+       </div>
+       <div class="wa-row">
+         <input id="wa-wl-index" class="wa-input" placeholder="采纳第几条（报告里可采纳条目的序号，从 0 起）"/>
+         <button class="wa-btn" id="wa-wl-adopt" title="写口（世界事实 · 走 U2 统一提交）：把报告里那一条落成真世界事件。只追加**一条** worldFacts；失败则世界一格不动">采纳这一条</button>
+         <button class="wa-btn" id="wa-wl-beats" title="只读：拍引擎推演 —— 当前结构下给的是只读投影（拍引擎族一律直调 store.transact、不走 exec），不落拍由拍账摘要实测">拍引擎推演</button>
+       </div>
+       <div id="wa-wl-out" class="wa-out"></div>
       <div class="wa-sec">存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）</div>
       <div class="wa-dim">区分<b>可回收历史</b>与<b>不可丢义务</b>（在途货物 / 待履约条款 / 未结阶段 / 回执去重索引）——
         义务不静默挤出。水位来自 <code>store.sizeCaps()</code>（唯一真源），与「容量」页同源不另起一份。
@@ -2790,7 +2861,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     </div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -2813,6 +2884,549 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       })()}</div>`;
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  // v2.198.0（Y1·第二批）：拍控制中心 —— 四个拍引擎的**第一个玩家入口**
+  //
+  // ── 它治什么（现场读数，不是阅读推断）──────────────────────────────
+  //   v2.189.0 缝入的四个引擎（beat-report / plan-audit / beat-ledger / gen-gate）
+  //   与 v2.193.0 编的统一门面（beat-facade）在 `ui/panel.js` 里只有 **1 处**命中，
+  //   且那 1 处是 `VIS_NAMES` 显示名映射。玩家的处境是：写着写着不知道**现在卡在
+  //   第几拍**、**上一拍被判了什么**、**为什么这一拍没过去** —— 能力全在，一个面都没有。
+  //
+  // ── 本页的四条边界（逐条对应计划 Y1 原文，全部是**否定式**）─────────
+  //   1 **不写 store**（包括不「重置拍号」）。本页每个按钮都只调读口：
+  //     `beatLedger.view` / `current` / `diagnose`、`beatReport.view` / `diagnose`、
+  //     `genGate.view` / `diagnose`、`planAudit.diagnose` / `evidence`、
+  //     `beatFacade.status` / `blocked` / `view`。面板**不是**第五个拍引擎。
+  //   2 **不让玩家手动改拒收判定** —— `plan-audit` 一节只给「复验结论与依据」，
+  //     页里**没有任何**写按钮（不提供 audit 的提交口：那需要「一组未写的安排」这一
+  //     输入面，属 Y2 工作台的职责，本页给了就是两个真源）。
+  //   3 **四引擎全关时显示「未启用」而不是空表**：读数缺席与「没有拍」是两件事，
+  //     合成一个空表之后用户答不出「是我没开还是真没有」。
+  //   4 数字化显示**一律附真源**：拍号来自 `beatLedger`，不是面板缓存。
+  //
+  // ── 为什么全部走 `WA.beatFacade` 再落到各引擎（而不是直接读四个引擎）────
+  //   门面存在的理由就是「下一个接线的人不必分别读四份启用判定与四份返回体形态」。
+  //   本页若绕过它直接读四个引擎，那就等于第五份读法 —— 而漂开是必然的。
+  //   门面缺席（旧版本 / 装载失败）时**逐段降级**：每一节自己判 `WA.beatLedger`
+  //   这一级的在场性并如实报缺，不给一个点了没反应的按钮。
+  // ══════════════════════════════════════════════════════════════════════
+  /** 读数缺席的统一话术：不含糊说「空」，而是说清是**关着**还是**读不出**。 */
+  function beatWhy(reason) {
+    const t = {
+      disabled: '这一面关着（不是「没有拍」——关着时读数一直空）',
+      'gated-off': '生成闸门关着',
+      'facade-off': '门面自身关着（四个引擎的现状一字不变）',
+      'no-pending': '没有待落的拍（要么还没登记拍序，要么本幕已演完）',
+      'store-unavailable': '世界库读不出',
+      'read-failed': '账读不出（不是「没有记录」）',
+      'bad-type': '账的形态不对（读出的是别的类型）',
+      'bad-round': '轮次取不到 ⇒ 拒算（不拿墙上时间冒充剧情轮）',
+      'no-aftermath': '上一章还没有收尾时刻 ⇒ 余波无从算起（不把「没有」当成「等够了」）'
+    };
+    return t[reason] || String(reason == null ? '（未给原因）' : reason);
+  }
+  /** 四引擎在场/启用的一行读数。真源 `beatFacade.status()`；门面缺席时自己问四模块。 */
+  function beatStatusLine() {
+    const F = WA.beatFacade;
+    if (F && typeof F.status === 'function') {
+      try {
+        const st = F.status();
+        const rows = (F.ENGINES || []).map(function (ns) {
+          const v = st.engines ? st.engines[ns] : null;
+          // 三态严格分开：true=开 / false=关 / null=读不出（读不出不等于关闭）
+          const tag = v === true ? '开' : (v === false ? '关' : '<span class="wa-dim">读不出</span>');
+          return esc(ns) + ' ' + tag;
+        });
+        return '<span class="wa-dim">门面 ' + (st.facade ? '开' : '关') + '　｜　' + rows.join('　') + '</span>';
+      } catch (e) { /* 落到下面自读 */ }
+    }
+    const names = ['beatReport', 'planAudit', 'beatLedger', 'genGate'];
+    const rows = names.map(function (ns) {
+      const m = WA[ns];
+      if (!m || typeof m.getSettings !== 'function') return esc(ns) + ' <span class="wa-dim">缺席</span>';
+      let v = null;
+      try { v = !!(m.getSettings() || {}).enabled; } catch (e) { v = null; }
+      return esc(ns) + ' ' + (v === true ? '开' : (v === false ? '关' : '<span class="wa-dim">读不出</span>'));
+    });
+    return '<span class="wa-dim">门面未装载（逐模块自读）　｜　' + rows.join('　') + '</span>';
+  }
+  function renderBeatCenter() {
+    const L = WA.beatLedger, R = WA.beatReport, G = WA.genGate, A = WA.planAudit;
+    const ledgerOn = !!(L && typeof L.getSettings === 'function' && (L.getSettings() || {}).enabled);
+    const reportOn = !!(R && typeof R.getSettings === 'function' && (R.getSettings() || {}).enabled);
+    const gateOn = !!(G && typeof G.getSettings === 'function' && (G.getSettings() || {}).enabled);
+    // ── 常驻读数：当前拍号 + 本章已落拍数（真源 = beatLedger.view，不是面板缓存）──
+    let cur = null, tot = 0, landed = 0;
+    try {
+      const v = (L && typeof L.view === 'function') ? L.view() : null;
+      if (v) { tot = (v.rows || []).length; landed = (v.rows || []).filter(function (r) { return r && r.status === 'landed'; }).length; }
+      cur = (L && typeof L.current === 'function') ? L.current() : null;
+    } catch (e) { cur = null; }
+    return `
+      <div class="wa-sec">拍控制中心</div>
+      <div class="wa-dim">（四引擎的第一个玩家入口：现在卡在第几拍 / 上一拍被判了什么 / 为什么这一拍没过去）
+        本页<b>只读</b> —— 不写世界状态、不推进拍号、不改拒收判定。拍号的真源是<b>拍账引擎</b>，
+        面板不缓存、不代算。此刻：<b>${ledgerOn ? '拍账开' : '拍账关'}</b>、
+        <b>${reportOn ? '拍回报开' : '拍回报关'}</b>、<b>${gateOn ? '闸门开' : '闸门关'}</b>。</div>
+      <div class="wa-row">${beatStatusLine()}</div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-bt-view" title="当前拍 + 本幕拍序（真源：beatLedger.view/current —— 面板不缓存拍号）">当前拍</button>
+        <button class="wa-btn" id="wa-bt-verdict" title="上一拍判定（四值 + purpose/keeps/need 明细）；没判过就说没判过，不拿空表冒充">上一拍判定</button>
+        <button class="wa-btn" id="wa-bt-gates" title="四道生成闸门逐档读数：还差几轮（不是内部计数）；轮次取不到时如实报拒算">闸门卡点</button>
+        <button class="wa-btn" id="wa-bt-audit" title="计划复验（只读）：复验结论与依据面三个来源的现场计数 —— 本页不提供任何写按钮">计划复验</button>
+        <button class="wa-btn" id="wa-bt-blocked" title="本刻谁在卡：读四引擎的最近一次拒收理由，汇成一句话">谁在卡</button>
+        <button class="wa-btn" id="wa-bt-diag" title="自证面：四个引擎与门面的在场性、各自的启用态、以及本页读到的四个库面">诊断</button>
+      </div>
+      <div id="wa-bt-out" class="wa-out"></div>`;
+  }
+
+  // v2.198.0（Y2）：章节生成工作台 —— 把「按拍推进」从后台概念做成可操作流程
+  //
+  // ── 它治什么（现场读数，不是阅读推断）──────────────────────────────
+  //   `engines/chapters.js` 只有 70 行、`WA.chapters` 只导出五个口
+  //   （start / end / current / buildChapterBlock + 一个 workflow 注册），
+  //   而它在 `ui/panel.js` 里的消费点只有 **2 处** —— `#wa-ch-start` /
+  //   `#wa-ch-end` 两枚按钮，且藏在战役页一角。玩家的处境是：写了半天
+  //   不知道**第几章**、**本章目标是什么**、**还欠哪几个待补的因**。
+  //   章节事实上是个「后台概念」（计划 Y2 立项原文的现场读数：面板消费 3 处）。
+  //
+  // ── 本页的四条边界（逐条对应计划 Y2 原文）──────────────────────────
+  //   1 **单一真源 = `beat-ledger`**：本页不新增一套并行拍状态。因此本页
+  //     **不提供**「落拍」按钮 —— 计划原文写的是「逐拍推进（每拍显示
+  //     『按住哪一拍 + 待补的因』，来自 `beat-report.buildBlock()` 的同一真源）」，
+  //     兑现成读数就是本页的「推进卡点」一节；而**推进动作**是拍页（Y1）与
+  //     引擎的职责。两页各给一个落拍口 = 两个真源（本仓点过名的病）。
+  //   2 **不跨章合并判定**：所有读数一律**本章口径**（本章已落拍按标题归属
+  //     过滤，不是全书累计）。
+  //   3 **收章不得自动清理玩家数据**：本页**没有**收章按钮，收章入口仍只有
+  //     战役页那一处（`WA.chapters.end`）。本页只说清「收章前还欠什么」。
+  //   4 与 Y1 共享数据**不得双写**：本页与拍页都只读 `beatLedger` /
+  //     `beatReport` / `genGate` / `foreshadow` / `pendingCenter` / `chapters`，
+  //     零 `store.transact`。
+  //
+  // ── 为什么「开章」是读数而不是表单 ───────────────────────────────
+  //   开章的写口是 `WA.chapters.start(title, opts)`，面板上已有入口（战役页）。
+  //   本页把它重做一遍不增加任何能力，只会多一条需要同步的写路径。
+  //   本页给的是**开章前该看什么**：上一章怎么收的、本章的因欠在哪、
+  //   `script` / `notes` 两栏的现场值与真源。
+  //
+  // ── 为什么全部走 `WA.<ns>.<口>()` 字面形态（不存局部别名）──────────
+  //   与 Y1 拍页同一条理由：清册的引用面只认这种字面形态。存进局部变量后，
+  //   这些导出在静态面上仍是「产品代码零引用」—— 死子面账本会记下与事实
+  //   相反的证据（v2.149.0 在 perspective.getView 上实测踩过）。
+  // ══════════════════════════════════════════════════════════════════════
+  /** 本章归属归一：beat-ledger 的 `chapterKey` 可能是章号、标题或空（未归属）。 */
+  function chapKeyOf(s) { return String(s == null ? '' : s).trim(); }
+  /** 拍账行的已落 / 总计数（**全书累计**，是下面三种口径里唯一永远算得出来的那个）。 */
+  function beatTotals(rows) {
+    const list = rows || [];
+    return { total: list.length, landed: list.filter(function (r) { return r && r.status === 'landed'; }).length };
+  }
+  /** 本章口径的拍数 —— **三态**（算不出就说算不出，不拿全书累计冒充本章）。
+   *   mode: 'scoped' 本章归属对得上 ⇒ 给真数；
+   *         'unkeyed' 拍账行**都不带** chapterKey（现状：engines/beat-ledger.js 的
+   *                   plan() 只写 no/title/status/round）⇒ 本章口径**算不出**；
+   *         'no-chap' 当前未开章 ⇒ 谈不上「本章口径」。 */
+  function chapSplit(cur, rows) {
+    const tot = beatTotals(rows);
+    if (!cur) return { mode: 'no-chap', landed: tot.landed, total: tot.total };
+    const keyed = (rows || []).filter(function (r) { return !!chapKeyOf(r && r.chapterKey); });
+    if (!keyed.length) return { mode: 'unkeyed', landed: tot.landed, total: tot.total };
+    const self = chapKeyOf(cur.title), no = chapKeyOf(cur.no);
+    let landed = 0, total = 0;
+    keyed.forEach(function (r) {
+      const ck = chapKeyOf(r && r.chapterKey);
+      if (!(ck === self || ck === no || ck === 'ch' + no)) return;
+      total++;
+      if (r && r.status === 'landed') landed++;
+    });
+    return { mode: 'scoped', landed: landed, total: total };
+  }
+  /** 把三态渲染成一句玩家读得懂的话（本页两处共用，避免第二份口径漂开）。 */
+  function chapScopeText(sp) {
+    if (sp.mode === 'scoped') return '本章已落 <b>' + sp.landed + '</b> / 本章口径共 ' + sp.total + ' 拍';
+    if (sp.mode === 'unkeyed') {
+      return '<span class="wa-dim">本章口径<b>算不出</b> —— 拍账行不带章节归属（'
+        + 'engines/beat-ledger.js 的 plan() 只写 no/title/status/round）。全书累计已落 '
+        + sp.landed + ' / 共 ' + sp.total + ' 拍；<b>不把它冒充成本章的数</b></span>';
+    }
+    return '<span class="wa-dim">本章未开 ⇒ 谈不上「本章口径」；全书累计已落 ' + sp.landed + ' / 共 ' + sp.total + ' 拍</span>';
+  }
+  function renderChapterWorkbench() {
+    const C = WA.chapters, L = WA.beatLedger, R = WA.beatReport;
+    let cur = null, hist = [];
+    try {
+      cur = (C && typeof C.current === 'function') ? C.current() : null;
+      const s = (WA.store && typeof WA.store.get === 'function') ? WA.store.get() : null;
+      hist = (s && s.chapters && Array.isArray(s.chapters.history)) ? s.chapters.history : [];
+    } catch (e) { cur = null; hist = []; }
+    const chapOn = !!(C && typeof C.current === 'function');
+    // 本章口径读数（真源 = 拍账，不是面板累计）
+    let rows = [];
+    try { rows = ((L && typeof L.view === 'function') ? (L.view() || {}).rows : []) || []; } catch (e) { rows = []; }
+    const sc = chapSplit(cur, rows);
+    return `
+      <div class="wa-sec">章节生成工作台</div>
+      <div class="wa-dim">（章节从「后台概念」变成可操作流程：第几章 / 本章目标 / 还欠哪几个待补的因）
+        本页<b>只读</b> —— 不写世界状态、不代落拍、不代收章。拍的唯一真源是<b>拍账引擎</b>，
+        章节的写口仍在战役页；本页只把该看的读数摆到一处。此刻：
+        <b>${chapOn ? '章节面开' : '章节面缺席'}</b>、
+        <b>${cur ? '当前《' + esc(cur.title || '') + '》' : '本章未开'}</b>。</div>
+      <div class="wa-row">${beatStatusLine()}</div>
+      <div class="wa-item"><b>当前章</b>：${cur
+        ? '第 ' + esc(String(cur.no == null ? '?' : cur.no)) + ' 章 · ' + esc(cur.title || '（未命名）')
+          + '　目标：' + (cur.script ? esc(String(cur.script).slice(0, 120)) : '<span class="wa-dim">未设（script 栏空）</span>')
+          + '　' + chapScopeText(sc)
+        : '<span class="wa-dim">本章未开（开章写口在战役页 · <code>WA.chapters.start</code>）</span>'}</div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-chw-open" title="开章前该看什么：上一章怎么收的 + 本章的因欠在哪 + script/notes 两栏的现场值与真源（开章写口不在本页）">开章前该看</button>
+        <button class="wa-btn" id="wa-chw-cards" title="推进卡点：按住哪一拍 + 待补的因（真源 beatReport.buildBlock + 拍账拍序 + 生成闸门逐档）—— 只读，不代落拍">推进卡点</button>
+        <button class="wa-btn" id="wa-chw-close" title="收章前欠什么：未落的拍 / 未回收的伏笔 / 来源可读性 —— 本页不提供收章按钮">收章前欠什么</button>
+        <button class="wa-btn" id="wa-chw-todo" title="本章待办：按归属（世界/人物/组织）分组，逐条带来源模块与到期条件（真源 pendingCenter 的聚合口）">本章待办</button>
+        <button class="wa-btn" id="wa-chw-history" title="章节史：最近若干章的起止与收尾注（有界 20 章）；说清是被裁剪还是真的只有这些">章节史</button>
+        <button class="wa-btn" id="wa-chw-src" title="数据来源自证：六个源的在场性与启用态、各自读了几条；缺席的如实报缺">数据来源</button>
+      </div>
+      <div id="wa-chw-out" class="wa-out"></div>`;
+  }
+  // v2.199.0（Y4）：待办中心 —— 把「现在等我做什么」做成一个面
+  //
+  // ── 现场读数（不是阅读推断）────────────────────────────────────────
+  //   `engines/pending-center.js` 有 8 个来源交代器（aftermath / commission /
+  //   investigation / operations / storyChoice / coop / farfield / backstage）与一份
+  //   统一视图 `items()`，但它在面板上**没有任何单一入口** —— 挂起项散在各自模块的
+  //   面板段里。玩家答不出「此刻整个世界里等我处理的有哪些」。
+  //
+  // ── 本页的四条边界（逐条对应计划 Y4 原文）────────────────────────────
+  //   1 **不是新的状态容器**：条目唯一真源仍在各模块（本页只读 `items()` 的聚合结果）。
+  //   2 **跳转不改变任何状态**：下钻口只答「去哪看 / 看哪条 / 哪个设置键」（引擎给的
+  //     路由），**不执行任何确认动作** —— 确认语义由来源模块自己的写口持有。
+  //   3 **聚合失败时显示部分结果并标注哪一源不可读**：`items()` 的 `skipped` 逐源带
+  //     原因，本页逐条列出，**不假装「没有待办」**。
+  //   4 聚合**不产生写入**：本页零 `store.transact`、零 `reset`。
+  //
+  // ── 三旗标（unavailable / emptyAll / allClear）为什么必须分开报 ──────
+  //   `items()` 的设计原文：这三种「空」在读数上同形（都返回 0 行），语义完全不同。
+  //   本页把它们逐条写出 —— 把三者压成「真的没有」正是本仓点名的「把读不到说成没有」。
+  // ══════════════════════════════════════════════════════════════════════
+  /** 待办页的读数出口辅助（与其它页同形：缺席报缺、不带空表冒充）。 */
+  function todoWhy(r) {
+    const t = {
+      disabled: '待办中心关着（不是「没有待办」—— 关着时读出来一直是空的）',
+      unavailable: '所有来源都读不到（不是「没有待办」）',
+      'module-missing': '来源模块缺席',
+      'source-threw': '来源模块抛出（该源读数不可信）',
+      'bad-shape': '来源返回的形状不对（本模块存在的理由之一：同一名字有多种返回形状）',
+      'store-unavailable': '世界库读不出'
+    };
+    return t[r] || String(r == null ? '（未给原因）' : r);
+  }
+  /** 归属（世界 / 人物 / …）：**取引擎的路由页**，不复制一份「模块 → 归属」表。
+   *   为什么必须问引擎：归属表（`ROUTE_PAGE`）住在 `engines/pending-center.js` 里，
+   *   面板再抄一份就是两个真源 —— 引擎改一次、抄件静默过期（本仓点过名的病）。
+   *   代价是每条 kind 问一次 `describe`（最多 8 次），故按 kind 缓存。
+   *   读不出时返回「归属读不出」这个**如实**的字符串，不猜成某一档。 */
+  const __todoOwnerCache = {};
+  function todoOwnerOf(kind) {
+    const k = String(kind == null ? '' : kind);
+    if (!k) return '归属读不出';
+    if (__todoOwnerCache[k] !== undefined) return __todoOwnerCache[k];
+    let page = null;
+    try {
+      const d = (WA.pendingCenter && typeof WA.pendingCenter.describe === 'function')
+        ? WA.pendingCenter.describe(k, '') : null;
+      page = (d && d.ok === true && d.page) ? String(d.page) : null;
+    } catch (e) { page = null; }
+    __todoOwnerCache[k] = page || '归属读不出';
+    return __todoOwnerCache[k];
+  }
+  /** 「不处理的后果」：走拒收码的**恢复语义**（U5 的 `rejectRecovery`），不自编一句建议。
+   *   源此刻 ok（引擎没给 `blocked`）⇒ 如实说「没有拒收语义可套」——
+   *   这正是边界 3 的同一条规矩（读不到 / 没有 / 无关，三件事分开说）。 */
+  function todoConsequence(x) {
+    const b = (x && x.blocked) ? String(x.blocked) : '';
+    //   ⚠ 现场读数：`mk()` 的 `blocked` 只从 `opts.blocked` 取，而八个适配器**一律不传**
+    //   ⇒ 待办行上的这一项在现版本恒为 null。所以这一支不是「防御」而是**如实**：
+    //   本行没有阻塞码 = 该行所属的源此刻 ok（有行就说明它 ok），逐源阻塞在 skipped 里报。
+    if (!b) return '<span class="wa-dim">引擎的待办行不带阻塞码（该源此刻 ok）；逐源读不出的原因见下面的清单</span>';
+    let e = null;
+    try {
+      e = (WA.rejectRecovery && typeof WA.rejectRecovery.explain === 'function')
+        ? WA.rejectRecovery.explain(b) : null;
+    } catch (err) { e = null; }
+    if (!e) return '被挡 <code>' + esc(b) + '</code>　<span class="wa-dim">恢复语义面缺席 ⇒ 如实报缺，不编建议</span>';
+    if (!e.kind) return '被挡 <code>' + esc(b) + '</code>　<span class="wa-dim">' + esc(String(e.why || '该码在登记面上判不出档')) + '</span>';
+    return '被挡 <code>' + esc(b) + '</code>　不处理的后果：<b>' + esc(String(e.action || '')) + '</b>';
+  }
+  /** 到期条件：引擎的 pending 行**不带时间口径**（`soon()` 的近期是条数上限，不是期限）。
+   *   本页把这个事实写出来 —— 自造一份期限或时钟就是第二个真源。 */
+  const TODO_DUE_NOTE = '到期条件：本引擎的待办行<b>不带时间口径</b> —— <code>soon()</code> 的「近期」是'
+    + '条数上限（<code>soonCount</code>），不是到期时间；本页不自造时钟或期限。';
+  /** 八源在场性一行读数（真源 `pendingCenter.bySource()` —— 逐源可用性，不是条目）。 */
+  function todoSourceLine() {
+    if (!WA.pendingCenter || typeof WA.pendingCenter.bySource !== 'function') {
+      return '<span class="wa-dim">来源面读不出（<code>pendingCenter.bySource</code> 缺席）</span>';
+    }
+    let arr = null;
+    try { arr = WA.pendingCenter.bySource() || []; } catch (e) { arr = null; }
+    if (!Array.isArray(arr)) return '<span class="wa-dim">来源面读不出（返回形态不是数组 —— 不拿空表冒充）</span>';
+    const live = arr.filter(function (x) { return x && x.available; }).length;
+    return '<span class="wa-dim">八源在场 ' + live + ' / ' + arr.length + '　｜　'
+      + arr.map(function (x) {
+          return esc(String(x.name)) + (x.available ? ' ✓' : ' <span class="wa-dim">✗(缺席)</span>');
+        }).join('　') + '</span>';
+  }
+  function renderTodoCenter() {
+    const P = WA.pendingCenter;
+    const on = !!(P && typeof P.getSettings === 'function' && (P.getSettings() || {}).enabled);
+    let r = null;
+    try { r = (P && typeof P.items === 'function') ? P.items({}) : null; } catch (e) { r = null; }
+    const rows = (r && r.ok && Array.isArray(r.rows)) ? r.rows : [];
+    const readOk = !!(r && r.ok === true);
+    // 归属面：八源 → 去哪看（引擎 ROUTE_PAGE 的同源读数，经 describe 的 route.kind）
+    //   归属分组：键是**引擎给的归属页**（`describe().page`），不是源模块名 ——
+    //   计划 ① 要的是「世界 / 人物 / …」的归属，而源模块名回答的是「谁报的」。
+    const owners = {};
+    rows.forEach(function (x) {
+      const k = todoOwnerOf(x && x.kind);
+      owners[k] = (owners[k] || 0) + 1;
+    });
+    const ownerLine = Object.keys(owners).length
+      ? Object.keys(owners).map(function (k) { return esc(k) + ' ' + owners[k]; }).join('　')
+      : '<span class="wa-dim">（此刻没有条目）</span>';
+    return `
+      <div class="wa-sec">待办中心</div>
+      <div class="wa-dim">（把「现在等我做什么」做成一个面：按归属分组 / 每条带来源与到期条件 / 跳到来源模块）
+        本页<b>只读</b> —— 条目真源仍在各模块，本页只读取与聚合；跳转不改变任何状态。
+        此刻：<b>${on ? '待办中心开' : '待办中心关'}</b>、
+        读得到 <b>${readOk ? '是' : '否'}</b>、条目 <b>${rows.length}</b>。
+        </div>
+      <div class="wa-row">${todoSourceLine()}</div>
+      <div class="wa-item"><b>按归属</b>（世界 / 人物 / … —— 取自引擎 <code>describe().page</code>）：${ownerLine}</div>
+      <div class="wa-dim">${TODO_DUE_NOTE}</div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-td-all" title="全部待办：按归属分组逐条列出（来源模块 / 到期条件 / 是否可处理 / 被谁挡住）—— 真源 pendingCenter.items()">全部待办</button>
+        <button class="wa-btn" id="wa-td-soon" title="即将到期：走 soon() 的近期待办口（条数上限来自设置，不是本页自定）">即将到期</button>
+        <button class="wa-btn" id="wa-td-src" title="逐源可用性：八源各自在场与否 + 各读过几条 —— 缺席的如实报缺，不静默消失">逐源可用性</button>
+        <button class="wa-btn" id="wa-td-drill" title="下钻一条：只给路由（去哪看 / 看哪条 / 哪个设置键），不执行确认动作">下钻一条</button>
+        <button class="wa-btn" id="wa-td-flags" title="三旗标：unavailable（读不到）/ emptyAll（有源且全部自报无数据）/ allClear（读过且此刻没有待办）逐条分开报">空态三旗标</button>
+        <button class="wa-btn" id="wa-td-diag" title="自证面：八源在场性、empty 申报面（emptyAll 这盏灯能不能亮）、拒收与故障计数">诊断</button>
+      </div>
+      <div id="wa-td-out" class="wa-out"></div>`;
+  }
+  // v2.200.0（第四批 Y5）：世界快照与整包搬运 —— 把「这个世界的照片」做成可搬运的东西
+  //
+  // ── 它治什么（现场读数，不是阅读推断）──────────────────────────────
+  //   `engines/tool-snapshot.js` 的 `restore()` 是**替换式**的（先 `delete` 掉 draft 的
+  //   每一个键再 `Object.assign`）⇒ 装到非空世界上等于把当前世界整块抹掉换成另一份；
+  //   `engines/world-blueprint.js` 的 `targetEmpty()` 一票否决非空局，且它刻意排除
+  //   memory / chronicle / currents / echoes / worldFacts / chapters（它的 `excluded` 逐项列了）。
+  //   于是「把那边的世界**并**过来」这条意图在面板上**没有任何入口** ——
+  //   本仓 `bundle` / `portable` 关键词零命中（立项轮实测）。
+  //
+  // ── 本页的四条边界（逐条对应计划 Y5 原文）──────────────────────────
+  //   1 **导入默认不覆盖**：冲突键默认 `skip`（逐项报），要改名走 `rename`，
+  //     要另开槽走 `newslot`；覆盖只有显式勾选才发生 —— 覆盖是不可逆的那一侧，
+  //     而「并进来」这个动作里最坏的结果是把本地世界写没了。
+  //   2 **版本不兼容时拒绝并说明差异**：`checkCompat()` 的 `diff` 逐项列出
+  //     （格式版本 / schema 差 / 未知面 / 冲突），**不做尽力而为的静默降级**。
+  //   3 **不把密钥与宿主态写进快照**：引擎的 `SECRETS` / `HOST_STATE` 两张显式名单
+  //     在导出时剔除并**逐项报出**（本页把 `stripped` / `skippedHost` 显示出来）。
+  //   4 本页**零跳转副作用**、跳转类的按钮一个都没有：所有按钮要么是纯读，
+  //     要么是走向引擎的统一写口（`store.transact` / 快照库），面板不自己拼写入。
+  //
+  // ── 为什么「快照库」与「世界状态」分两栏报 ─────────────────────────
+  //   快照库落在 `localStorage`（不进存档）：它是「还没搬进来的行李」，
+  //   世界事实只该有一个家。两栏混报会让「我存了一槽」看起来像「世界变了」。
+  // ══════════════════════════════════════════════════════════════════════
+  function renderPortCenter() {
+    const S = WA.worldSnapshot;
+    const ok = !!(S && typeof S.exportSnapshot === 'function');
+    let cap = null;
+    try { cap = ok ? S.catalog() : null; } catch (e) { cap = null; }
+    let lib = { count: 0, max: 0 };
+    try { lib = (!ok || typeof S.library !== 'function') ? lib : S.library(); } catch (e) { }
+    return `
+      <div class="wa-sec">世界快照与整包搬运</div>
+      <div class="wa-dim">（把一个世界搬走 / 搬进来：快照 → 兼容检查 → 预览 → 导入；
+        以及快照与蓝图互转）本页<b>导入默认不覆盖</b> —— 冲突键默认跳过并逐项报，
+        改名或另开槽可显式选；覆盖只有勾了才发生。此刻：
+        <b>${ok ? '快照面在场' : '快照面缺席'}</b>、
+        快照库 <b>${lib.count}</b> / ${lib.max} 槽。</div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wps-snap" title="纯读：出一份世界快照（白名单 17 面；密钥与宿主态剔除并逐项报出）。真源 WA.worldSnapshot.exportSnapshot()">出快照</button>
+        <button class="wa-btn" id="wa-wps-json" title="纯读：把快照序列化成可读 JSON（带 wsVer 与 schema 版本）—— 复制走或落文件用">出 JSON</button>
+        <button class="wa-btn" id="wa-wps-check" title="纯读：导入前兼容检查（格式版本 / schema 差 / 未知面 / 冲突键）—— 差异逐项列出，不做尽力而为的静默降级">兼容检查</button>
+        <button class="wa-btn" id="wa-wps-preview" title="纯读：导入预览（将要新增什么 / 冲突什么 / 跳过什么）—— 真源 previewImport()，不写任何东西">导入预览</button>
+      </div>
+      <div class="wa-row">
+        <select id="wa-wps-mode" class="wa-input" aria-label="导入模式">
+          <option value="merge">合并进当前世界</option>
+          <option value="newslot">另开槽（不碰当前世界）</option>
+        </select>
+        <select id="wa-wps-conf" class="wa-input" aria-label="冲突处置">
+          <option value="skip">冲突：跳过（默认，不覆盖）</option>
+          <option value="rename">冲突：改名进来</option>
+        </select>
+        <label class="wa-row"><input id="wa-wps-ovr" type="checkbox"/> 显式覆盖冲突键</label>
+        <button class="wa-btn" id="wa-wps-import" title="写口：按选定的模式与冲突策略导入。合并走 store.transact（唯一写路径）；另开槽**一格世界状态都不动**，只进快照库">导入</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wps-lib" title="只读：快照库清单（槽名 / 指纹 / 字节 / 面计数）—— 库在 localStorage，不进存档">快照库</button>
+        <input id="wa-wps-slot" class="wa-input" aria-label="槽名" placeholder="槽名（取 / 删 / 装载用）"/>
+        <button class="wa-btn" id="wa-wps-take" title="只读：取一个槽的内容（回填到下面的快照文本里）">取槽</button>
+        <button class="wa-btn" id="wa-wps-drop" title="写口（只动快照库那一格，不动世界）：删掉一个槽">删槽</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wps-blue" title="只读：快照 → 蓝图（**单向有损**：编年史 / 章节 / 拍账 / 暗流 / 回声 / 世界事实六类不承载在蓝图里，逐项报出）">快照转蓝图</button>
+        <button class="wa-btn" id="wa-wps-graph" title="纯读：本局结构面能不能转成蓝图（走 worldBlueprint.exportBlueprint 的真源结论，不自己算）">蓝图可转？</button>
+        <button class="wa-btn" id="wa-wps-round" title="纯读：导出→往返同源对照（关键面哈希对照 —— 快照指纹 vs 活世界指纹）">往返对照</button>
+        <button class="wa-btn" id="wa-wps-diag" title="自证面：白名单面在场性、密钥/宿主态名单、store 与蓝图面可用性、本进程计数">诊断</button>
+      </div>
+      <textarea id="wa-wps-text" class="wa-ta" placeholder="粘贴快照 JSON（或点上面的按钮出 JSON / 取槽回填）…"></textarea>
+      <div id="wa-wps-out" class="wa-out"></div>`;
+  }
+  // ══════════════════════════════════════════════════════════════════════
+  // v2.201.0（第四批 Y6）：世界历史检索 —— 跨六个库的**一个**检索入口
+  //
+  // ── 它治什么（现场读数）──────────────────────────────────────────
+  //   长局之后「三个月前那个茶楼老板叫什么」无处可问：`wb-search` 只搜世界书条目，
+  //   `chronicle-view` 只能按时间线看最近若干条。于是「找不到」与「不存在」
+  //   在玩家侧长得一样 —— 而下一步动作相反（改词 vs 去补档）。
+  //
+  // ── 本页四条边界（逐条对应计划 Y6，全部否定式）────────────────────
+  //   ① 检索是**只读面**：本页零 `store.transact`、零世界键写入；
+  //   ② 不引入全文索引的**持久化缓存**：库里只存「查询词 + 常用过滤面」这一份偏好，
+  //      索引与结果一律不落盘（落盘索引 = 世界长什么样的第二本账，且不会失效）；
+  //   ③ 结果**必须**标来源：每行显示面 / 来源口 / 库内定位，取不到来源的行引擎就不返回；
+  //   ④ 空结果**不得**被误报为「没有数据」：`empty` 与 `blind`（读不到的面）分开显示，
+  //      并有 `deferred`（被扫描上限挡下的面）—— 三者任一在场，就不说「真的没有」。
+  //
+  // ── 为什么本页把「读不到的面」摆在结果**上面**而不是脚注 ──────────
+  //   脚注会被滚动条吞掉，而这条恰恰是玩家做判断的依据：结果少时他需要先知道
+  //   「是没查着，还是有库根本没查」。把它放前面是本页对边界 ④ 的界面实现。
+  function renderFindCenter() {
+    const H = WA.historySearch;
+    const ok = !!(H && typeof H.search === 'function');
+    let cat = [];
+    // ⚠ 这里必须写**全限定**名：本仓引用面（inventory 的 REF_RE）只认 `WA.ns.mem`，
+    //   写成 `H.catalog()` 会让这个**真玩家路径读数**在账本上被算成「外部零引用」。
+    try { cat = ok ? WA.historySearch.catalog() : []; } catch (e) { cat = []; }
+    const absent = cat.filter(function (c) { return !c.ok; });
+    let rec = { count: 0, max: 0 };
+    try { rec = (!ok || typeof H.recent !== 'function') ? rec : H.recent(); } catch (e) { }
+    return `
+      <div class="wa-sec">世界历史检索（编年史 / 人物 / 地点 / 组织 / 规则 / 世界书条目）</div>
+      <div class="wa-dim">（一个入口查六处：结果带回溯与来源，可跳到来源页；最近查询记在本机。
+        本页<b>只读</b> —— 它不改世界、不替你把结果抄进档。此刻：
+        <b>${ok ? cat.filter(function (c) { return c.ok; }).length + ' / ' + cat.length + ' 面在场' : '检索面缺席'}</b>、
+        最近查询 <b>${rec.count}</b> / ${rec.max} 条。</div>
+      ${absent.length ? `<div class="wa-dim">此刻读不到的面：<b>${absent.map(function (c) { return c.label; }).join('、')}</b>
+        —— 这些面的结果**不在**下面那份结果里，「没查着」与「查不了」是两件事。</div>` : ''}
+      <div class="wa-row">
+        <input id="wa-hs-q" class="wa-input" aria-label="检索词" placeholder="检索词（例如：扁担巷 / 茶楼老板）…"/>
+        <button class="wa-btn" id="wa-hs-go" title="布：查六个面（走 WA.historySearch.search()，纯读）">检索</button>
+        <button class="wa-btn" id="wa-hs-count" title="只取计数：共多少条命中（走 count()，不把命中行拿回来）">只数一条</button>
+      </div>
+      <div class="wa-row">
+        <select id="wa-hs-face" class="wa-input" aria-label="单面检索">
+          <option value="">六个面一起查</option>
+          <option value="chronicle">只查 编年史</option>
+          <option value="people">只查 人物</option>
+          <option value="places">只查 地点</option>
+          <option value="orgs">只查 组织</option>
+          <option value="rules">只查 规则</option>
+          <option value="entries">只查 世界书条目</option>
+        </select>
+        <input id="wa-hs-limit" class="wa-input" aria-label="显示条数上限" placeholder="显示上限（可空）"/>
+        <label class="wa-row"><input id="wa-hs-remember" type="checkbox"/> 记进最近查询</label>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-hs-recent" title="只读：最近查询清单（本机 localStorage，不进存档）">最近查询</button>
+        <button class="wa-btn" id="wa-hs-clear" title="写口（只动本模块那一格偏好键，不动世界）：清空最近查询">清空记录</button>
+        <button class="wa-btn" id="wa-hs-filters" title="只读：上次查的面（常用过滤面）">常用过滤</button>
+      </div>
+      <div class="wa-row">
+        <select id="wa-hs-jumpface" class="wa-input" aria-label="按面跳到来源页">
+          <option value="">跳到…（按面）</option>
+          <option value="chronicle">编年史 → 记忆页</option>
+          <option value="people">人物 → 人物页</option>
+          <option value="places">地点 → 世界页</option>
+          <option value="orgs">组织 → 人物页</option>
+          <option value="rules">规则 → 设置页</option>
+          <option value="entries">世界书条目 → 注入页</option>
+        </select>
+        <span class="wa-dim">跳转走引擎的路由表（只读出口），本页不自己拼页名。</span>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-hs-diag" title="自证面：六面在场性、路由表、上限、本进程计数">诊断</button>
+        <span class="wa-dim">真源：WA.historySearch.search() / catalog() / recent()（本页不另存一份）</span>
+      </div>
+      <div id="wa-hs-out" class="wa-out"></div>`;
+  }
+  // v2.202.0（第四批 Y7）：地图与关系可视化 —— 节点 / 边 / 异常三类在**同一幅画面**里。
+  //   四条边界一律写成界面上**读得出来**的东西（不靠注释声明）：
+  //     ① 视图不是新真源：读数逐处标「真源 WA.worldGraph.*」，本页自己不缓存图；
+  //     ② 不卡死：截断数单列（truncated）—— 是「降级」不是「丢数据」；
+  //     ③ 不隐去坏数据：孤儿边 / 悬空边 / 绕圈边三份名单**都在结果里**（引擎只标不删）；
+  //     ④ 零写入：本页不调 store.transact、不写偏好键（绑定段由专锁 A5 判）。
+  //   页 id / 控件前缀 `wa-wg-` 独占，不与 find（wa-hs-）共用。
+  function renderGraphCenter() {
+    const G = WA.worldGraph;
+    const ok = !!(G && typeof G.graph === 'function');
+    let d = null;
+    // ⚠ 必须写**全限定**名：本仓引用面（inventory 的 REF_RE）只认 `WA.ns.mem`，
+    //   写成 `G.diagnose()` 会让这个**真玩家路径读数**在账本上被算成「外部零引用」。
+    try { d = ok ? WA.worldGraph.diagnose() : null; } catch (e) { d = null; }
+    const live = (d && d.live && d.live.nodes !== undefined) ? d.live : null;
+    const anom = live ? (live.orphan + live.dangling + live.cyclic) : 0;
+    // ⚠ 必须写**全限定**名：清册的引用面（REF_RE）只认 `WA.<ns>.<mem>`。
+    //   写成别名调用会让这个**真玩家路径读数**在死导出门禁里被算成「外部零引用」。
+    //   （v2.149.0 在 perspective.getView 上实测踩过同一坑，写法与 atlas 那处对齐。）
+    let cfg = null;
+    try { cfg = (ok && WA.worldGraph.getSettings) ? WA.worldGraph.getSettings() : null; } catch (e) { cfg = null; }
+    return `
+      <div class="wa-sec">地图与关系可视化（人物 / 组织 / 地点三类节点 · 三条边来源）</div>
+      <div class="wa-dim">（把 atlas 的两层关系、factionGraph 的推导边、bonds 的登记六型放进<b>同一幅画面</b>。
+        本页是<b>视图</b> —— 节点与边一律从既有表读，本页不落自己的边表、不写世界。此刻：
+        <b>${live ? live.nodes + ' 节点 / ' + live.edges + ' 边' : (ok ? '图谱面读不出' : '图谱面缺席')}</b>、
+        异常 <b>${anom}</b> 处（孤儿 / 悬空 / 绕圈）。
+        ${cfg ? '｜开关 <b>' + (cfg.enabled ? '开' : '关') + '</b>（关时建图拒收并如实报 disabled）' : '（设置面读不到：本体未装载）'}
+        ${live && live.probeSkew ? '⚠ 有 <b>' + live.probeSkew + '</b> 条边没进本轮环探测 —— 如实报，不假装查过。' : ''}</div>
+      <div class="wa-row">
+        <select id="wa-wg-kinds" class="wa-input" aria-label="节点类">
+          <option value="">三类节点一起</option>
+          <option value="people">只取 人物</option>
+          <option value="orgs">只取 组织</option>
+          <option value="places">只取 地点</option>
+        </select>
+        <select id="wa-wg-edges" class="wa-input" aria-label="边来源">
+          <option value="">三条边来源一起</option>
+          <option value="relations">边：atlas 关系两层</option>
+          <option value="faction">边：组织推导</option>
+          <option value="bonds">边：关系六型登记</option>
+        </select>
+        <button class="wa-btn" id="wa-wg-build" title="布：建图（走 WA.worldGraph.graph()，纯读）">建图</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-wg-from" class="wa-input" aria-label="可达起点" placeholder="可达起点（例如：扁担巷）…"/>
+        <button class="wa-btn" id="wa-wg-geo" title="只读：路线可达与未探索（走 geo()）">地理视图</button>
+        <button class="wa-btn" id="wa-wg-time" title="只读：关系随章节的时序对照（走 timeline()）">时间轴</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-wg-suggest" title="只读：按图上度数给的来源说明 —— 不是「你应该去哪」">建议来源</button>
+        <button class="wa-btn" id="wa-wg-anom" title="只读：孤儿 / 悬空 / 绕圈三类异常都在图里，本页只标不删">异常三类</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-wg-locate" class="wa-input" aria-label="定位节点" placeholder="定位节点（id 或名字，可空）…"/>
+        <button class="wa-btn" id="wa-wg-locate-go" title="只读：把 id 或显示名定位成一个节点（走 locate()）">定位</button>
+        <button class="wa-btn" id="wa-wg-diag" title="自证面：开关 / 预算 / 上限 / 本进程计数">诊断</button>
+      </div>
+      <div class="wa-row">
+        <span class="wa-dim">真源：WA.worldGraph.graph() / geo() / timeline() / suggest()（本页不另存一份图）</span>
+      </div>
+      <div id="wa-wg-out" class="wa-out"></div>`;
+  }
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
     // v2.152.0（RP6）：面板渲染链的耗时与 DOM 规模读数。计时包住「渲染 + 过滤 + 绑定」
@@ -4870,7 +5484,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     }
     on('#wa-rp-save', () => {
       if (!WA.rulePack || !WA.rulePack.save) return rpkOut('未记录：module-missing');
-      const r = WA.rulePack.save(rpkVal('#wa-rp-name'));
+      const r = WA.rulePack.save(rpkVal('#wa-rp-name'), { note: rpkVal('#wa-rp-note') });
       if (!r.ok) {
         // 存不下的时候把**当前规则面**摊出来（`current`）：`empty-surface` 与「引擎不在」
         //   在回执上本来长得一样，而 `current` 是唯一能分清两者的读数面
@@ -4979,7 +5593,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         }).join('；')
         + '\n失败策略：' + c.failPolicies.join(' / ')
         + '\n' + c.notes.writePath + '\n' + c.notes.noScript + '\n' + c.notes.noTimer
-        + '\n' + c.notes.budget + '\n' + c.notes.readOnly + '\n' + c.notes.noWorldWrite, true);
+        + '\n' + c.notes.budget + '\n' + c.notes.readOnly + '\n' + c.notes.noWorldWrite
+        // ── v2.203.0（Y8）新增口径四条 ──────────────────────────
+        + '\n冲突三类：' + c.conflictKinds.join(' / ')
+        + '\n夹带名单（顶层出现即写盘前拒收）：' + c.worldFactNames.join('、')
+        + '\n回滚栈上限：' + c.rollbackCap + ' 步\n' + c.notes.conflict + '\n' + c.notes.noCarry
+        + '\n' + c.notes.rollback + '\n' + c.notes.compose, true);
     });
     on('#wa-rp-diag', () => {
       if (!WA.rulePack || !WA.rulePack.diagnose) return rpkOut('未记录：module-missing');
@@ -4996,6 +5615,78 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + '\n台账 保存 ' + s.saves + ' · 切换 ' + s.applies + ' · 删包 ' + s.drops + ' · 导出 ' + s.exports + ' · 导入 ' + s.imports
         + ' · 模板跑 ' + s.templateRuns + '（其中被拒 ' + s.templateRefused + '）· 拒收 ' + s.refused
         + (fk ? '（归因 ' + esc(fk) + '）' : '') + '｜上次 ' + esc(s.lastReason || '无'), true);
+    });
+    // ── v2.203.0（Y8）四件事：说明 / 查冲突 / 开档定档 / 回滚栈 + 强制启用 ──────
+    //   全部挂在本区块**既有**的输出口上（`#wa-rp-out`）—— 不新开页签、不新开读数区。
+    on('#wa-rp-check', () => {
+      if (!WA.rulePack || !WA.rulePack.detect) return rpkOut('未记录：module-missing');
+      const want = rpkVal('#wa-rp-name');
+      const tpl = rpkVal('#wa-rp-tpl');
+      // 三种比法各对应一条真源：有名字 ⇒ 包 vs 当前面；模板框里有 JSON ⇒ 导入体预检（写盘之前）；
+      //   两者都没有 ⇒ 当前面 vs 自己（**一条都不会报**，这是实话，不是「检查通过」的绿点）。
+      const r = want ? WA.rulePack.detect({ pack: want, against: 'current' })
+        : (tpl ? WA.rulePack.detect({ text: tpl, against: 'current' })
+          : WA.rulePack.detect({ values: (WA.rulePack.current({}).values || {}), label: '当前面', against: 'current' }));
+      const what = want ? ('包「' + want + '」 vs 当前面') : (tpl ? '导入体 vs 当前面' : '当前面 vs 自己（没有对手可比）');
+      if (r.count === 0 && r.comparable) {
+        return rpkOut('查冲突（' + what + '）：干净 —— 三类都判过了（' + r.kinds.join(' / ') + '），一条冲突都没有');
+      }
+      rpkOut('查冲突（' + what + '）：' + r.count + ' 条 · 总判 <b>' + r.verdict + '</b>'
+        + (r.verdict === 'unknown' ? '（**判不了**不是「没问题」—— 下面缺席的那几类是真没判）' : '')
+        + '\n' + (r.conflicts.length ? r.conflicts.map(function (x) {
+          return '· [' + x.kind + '] ' + x.key + ' ← ' + esc(Array.isArray(x.from) ? x.from.join(' × ') : String(x.from))
+            + '\n    ' + esc(x.why);
+        }).join('\n') : '（无冲突条目）')
+        + (r.absent.length ? '\n判不了的来源：' + esc(r.absent.map(function (x) { return x.source + '=' + x.why; }).join('；')) : '')
+        + '\n' + r.note, true);
+    });
+    on('#wa-rp-compose', () => {
+      if (!WA.rulePack || !WA.rulePack.compose) return rpkOut('未记录：module-missing');
+      const c = WA.rulePack.compose({ pack: rpkVal('#wa-rp-name') });
+      rpkOut((c.ready ? '✅ ' : '⚠ ') + c.line
+        + '\n规则面：' + (c.rules.ok ? ('包「' + c.rules.pack + '」解得开' + (c.rules.absent && c.rules.absent.length ? ' · 有一类冲突判不了（' + esc(c.rules.absent.map(function (x) { return x.source; }).join('、')) + '）' : ''))
+          : ('<b>解不开</b> —— ' + c.rules.reason + (c.rules.hint ? '（' + esc(c.rules.hint) + '）' : '')))
+        + '\n草稿面：' + (c.seed === null ? '（本次不取）' : (c.seed.ok ? ('人物 ' + c.seed.characters + ' / 世界 ' + c.seed.world + ' / 其他 ' + c.seed.others + ' · 来源 ' + c.seed.source)
+          : ('<b>读不到</b> —— ' + c.seed.reason)))
+        + '\n' + c.note, true);
+    });
+    on('#wa-rp-admit', () => {
+      if (!WA.rulePack || !WA.rulePack.admit) return rpkOut('未记录：module-missing');
+      const a = WA.rulePack.admit(rpkVal('#wa-rp-name'));
+      if (a.ok) return rpkOut('可以启用「' + a.name + '」（与当前面不冲突' + (a.comparable ? '' : '；但有一类冲突**判不了**，见诊断') + '）');
+      rpkOut('不予启用「' + (a.name || '?') + '」：' + a.reason
+        + (a.hint ? '\n' + esc(a.hint) : ''), true);
+    });
+    on('#wa-rp-force', () => {
+      if (!WA.rulePack || !WA.rulePack.apply) return rpkOut('未记录：module-missing');
+      const r = WA.rulePack.apply(rpkVal('#wa-rp-name'), { force: true });
+      if (!r.ok) return rpkOut('未切换：' + r.reason, true);
+      rpkOut('已<b>强制</b>切到 ' + r.name + '：写回 ' + r.applied.length + ' 键'
+        + (r.conflicts.length ? '\n明知有冲突仍切（' + r.conflicts.length + ' 条）：' + esc(r.conflicts.map(function (x) { return x.kind + ':' + x.key; }).join('、'))
+          + ' —— 不做「后启用的赢」：谁赢由你按上面这几条去改' : '')
+        + '\n回滚栈深度 ' + r.rollbackDepth + (r.historyTrimmed ? '（已满，丢了最旧一步）' : '') + ' —— 后悔了就按「回滚一步」', true);
+    });
+    on('#wa-rp-rollback', () => {
+      if (!WA.rulePack || !WA.rulePack.rollback) return rpkOut('未记录：module-missing');
+      const r = WA.rulePack.rollback({});
+      if (!r.ok) return rpkOut('未回滚：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''), true);
+      rpkOut('已回滚到 ' + new Date(r.rolledBackTo.at).toLocaleString() + ' 那一刻（来源 ' + r.rolledBackTo.site + '）'
+        + '：写回 ' + r.applied.length + ' 键'
+        + (r.failed.length ? ' · 失败 ' + r.failed.length + '（' + esc(r.failed.map(function (x) { return x.key; }).join('、')) + '）' : '')
+        + (r.skipped.length ? ' · 跳过 ' + r.skipped.length + '（本侧未登记）' : '')
+        + (r.partial ? ' —— **部分成功**' : '')
+        + '\n世界事实：' + r.worldBefore + ' → ' + r.worldAfter + ' ⇒ '
+        + (r.worldUnchanged ? '**一个字节都没碰**（实测）' : '<b>世界被改动了</b>（这一栏是实测差）')
+        + '\n' + r.note, true);
+    });
+    on('#wa-rp-history', () => {
+      if (!WA.rulePack || !WA.rulePack.history) return rpkOut('未记录：module-missing');
+      const h = WA.rulePack.history();
+      if (!h.depth) return rpkOut('回滚栈是空的（栈是在每次「切到这个包」时压的，存包不压）—— 这与「引擎不在」不是一回事');
+      rpkOut('回滚栈：' + h.depth + ' / ' + h.cap + ' 步（自栈顶往下）\n' + h.rows.slice().reverse().map(function (x, i) {
+        return (i === 0 ? '▶ 栈顶 ' : '  ') + new Date(x.at).toLocaleString() + ' · ' + x.site
+          + ' · ' + x.keys + ' 键 · 指纹 ' + x.sig + (x.active ? ' · 活跃包 ' + esc(x.active) : '');
+      }).join('\n') + '\n（只报形状不报值：栈里装的是规则面键值，一条世界键都进不来）', true);
     });
     // ── E9 世界实验室（同一页；与「三条路先看看」这条线同族）─────────────────
     { const el = $('#wa-wl-enabled');
@@ -5102,8 +5793,66 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + '\n缺席依赖' + (miss.length ? '：' + miss.join('、') : '：无')
         + '\n不可比项来源：' + d.unknowns.map(function (x) { return x.source + '=' + x.why; }).join('；')
         + '\n台账 实验 ' + s.runs + ' 次 · 臂 ' + s.arms + ' · 丢弃 ' + s.discarded + ' · 导出 ' + s.exports
-        + ' · 读过期 ' + s.staleReads + ' · 拒收 ' + s.refused + (fk ? '（归因 ' + esc(fk) + '）' : '')
-        + '｜上次 ' + esc(s.lastReason || '无'), true);
+         + ' · 读过期 ' + s.staleReads + ' · 拒收 ' + s.refused + (fk ? '（归因 ' + esc(fk) + '）' : '')
+         + '｜上次 ' + esc(s.lastReason || '无'), true);
+    });
+
+    // ── v2.203.0（Y9）四件事：沙盒推进 / 结果报告 / 选择性采纳 / 拍引擎联动 ────
+    //   同样挂在本区块**既有**输出口（`#wa-wl-out`）上 —— 不新开页签、不新开读数区。
+    on('#wa-wl-sim', () => {
+      if (!WA.worldLab || !WA.worldLab.simulate) return wlbOut('未记录：module-missing');
+      const n = Number(rpkVal('#wa-wl-rounds'));
+      const r = WA.worldLab.simulate({ rounds: (isFinite(n) && n > 0) ? n : undefined });
+      if (!r.ok) return wlbOut('未推演：' + r.reason + (r.hint ? '（' + esc(r.hint) + '）' : ''), true);
+      wlbOut('沙盒推进 ' + r.id + '：' + r.rounds + ' 轮' + (r.clamped ? '（你要的是 ' + r.askedRounds + ' 轮，已夹到上限 ' + r.cap + '）' : '')
+        + ' · 累计变化 ' + r.changedTotal + ' 处 · 差异行 ' + r.diffs + ' 条'
+        + '\n逐轮：' + r.rows.map(function (x) {
+          return '#' + x.n + (x.changed === null ? '✗' + x.reason : ('变' + x.changed + '/过期' + x.expired + (x.diffs ? '·差' + x.diffs : '')));
+        }).join(' ')
+        + '\nlive 前 ' + r.liveBefore + ' → 后 ' + r.liveAfter
+        + ' ⇒ ' + (r.liveUnchanged ? '**零写入**（实测一致）' : '<b>live 被改动了</b>（这一栏是实测差，不是声明）')
+        + '\n' + r.note, true);
+    });
+    on('#wa-wl-report', () => {
+      if (!WA.worldLab || !WA.worldLab.report) return wlbOut('未记录：module-missing');
+      const r = WA.worldLab.report({});
+      if (!r.ok) return wlbOut('还没跑过沙盒推进：' + r.reason + '（先按「沙盒推进」）');
+      wlbOut('报告 ' + r.id + '（' + r.rounds + ' 轮 · 原因 ' + r.causeTotal + ' 条'
+        + (r.stale ? ' · <b>已过期</b>：' + esc(r.staleReason) + ' —— 世界变过了，要当前结论就重跑' : ' · 未过期') + '）'
+        + '\n' + r.causes.map(function (c) {
+          const a = r.adoptable.filter(function (x) { return x.round === c.round && x.key === c.key; })[0];
+          return '· [第' + c.round + '轮] ' + esc(c.text) + (a ? ('\n    可采纳 → 序号 ' + a.index) : '')
+            + '\n    来源 ' + esc(c.src);
+        }).join('\n')
+        + '\n可采纳的有 ' + r.adoptable.length + ' 条（只有带 key 的那几条 —— 空轮没有可落的事实）'
+        + '\n' + r.note, true);
+    });
+    on('#wa-wl-adopt', () => {
+      if (!WA.worldLab || !WA.worldLab.adopt) return wlbOut('未记录：module-missing');
+      const n = Number(rpkVal('#wa-wl-index'));
+      const r = WA.worldLab.adopt({ index: (isFinite(n) ? Math.floor(n) : 0) });
+      if (!r.ok) {
+        const why = r.adoptable ? ('\n可采纳的：' + esc(r.adoptable.map(function (x) { return x.index + '=' + x.label; }).join('、'))) : '';
+        return wlbOut('未采纳：' + r.reason + (r.hint ? '（' + esc(r.hint) + '）' : '') + why, true);
+      }
+      wlbOut('已采纳第 ' + r.index + ' 条：<b>' + esc(r.label) + '</b> ' + String(r.from) + ' → ' + String(r.to)
+        + '\n来源 ' + esc(r.src) + ' · 批准人 ' + esc(r.approvedBy) + ' · 批准点 ' + new Date(r.approvedAt).toLocaleString()
+        + ' · opId ' + esc(r.opId)
+        + '\n世界 ' + r.worldBefore + ' → ' + r.worldAfter + '（**只变这一条**，且走 U2 统一提交）'
+        + '\n' + r.note, true);
+    });
+    on('#wa-wl-beats', () => {
+      if (!WA.worldLab || !WA.worldLab.beats) return wlbOut('未记录：module-missing');
+      const r = WA.worldLab.beats({ ahead: 4 });
+      if (!r.ok) return wlbOut('未推演：' + r.reason + (r.hint ? '（' + esc(r.hint) + '）' : ''), true);
+      wlbOut('拍引擎推演：模式 <b>' + r.mode + '</b> · 往前 ' + r.ahead + ' 拍'
+        + (r.current ? ' · 当前拍 ' + r.current.no + (r.current.title ? '（' + esc(r.current.title) + '）' : '') : '')
+        + '\n' + (r.rows.length ? r.rows.map(function (x) {
+          return '· 第 ' + x.no + ' 拍 ' + (x.title ? esc(x.title) : '（无题）') + ' [' + x.status + '] ← ' + esc(x.src);
+        }).join('\n') : ('（没有可投影的拍' + (r.why ? '：' + esc(r.why) : '') + '）'))
+        + '\n拍账摘要 前 ' + r.ledger.digestBefore + ' → 后 ' + r.ledger.digestAfter
+        + ' ⇒ ' + (r.ledger.unchanged ? '**没落拍**（实测逐字一致）' : '<b>拍账被改动</b>（这一栏是实测差）')
+        + '\n' + r.note, true);
     });
 
     on('#wa-life-goal', () => { if (!WA.life) return lifeOut({ ok: false, reason: 'module-missing' }, true); const x = lifeText(); lifeOut(WA.life.addGoal(x.person, { text: x.text }), true); renderBody(); });
@@ -9624,6 +10373,1041 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           + (r.ok ? esc(r.note) : esc(cpWhy(r.reason))) + '</div>');
       });
     }
+    // ── v2.198.0（Y1）：拍控制中心（六枚**只读**按钮）──────────────────────
+    //   为什么全部走 `WA.beatFacade.<口>` 而不是 `const F = WA.beatFacade; F.<口>()`：
+    //     清册的引用面只认 `WA.<ns>.<mem>` 这种**字面形态**。存进局部变量后，这几个
+    //     导出在静态面上仍是「产品代码零引用」—— 于是死子面账本会记下一条与事实相反
+    //     的证据（本仓 v2.149.0 在 perspective.getView 上实测踩过同一条）。
+    //     本仓的硬规矩是「证据与判据同宽」：真在用的东西不许看起来像死的。
+    //   六个 handler 一律**先判在场、再判开关、最后读**（三态分开）：
+    //     · 模块缺席 ⇒ 报缺（不是空表）；· 面关着 ⇒ 报关（不是「没有」）；· 读得到 ⇒ 报读数。
+    //   全程零 `store.transact`、零 `beatLedger.plan/land/claim/transition`、零
+    //   `genGate.record`、零 `planAudit.audit` —— 本页没有一处写口（Y1 边界 1 / 2）。
+    const btOut = function (html) { const o = $('#wa-bt-out'); if (o) o.innerHTML = html; };
+    const btMiss = function (label) { btOut('<div class="wa-log wa-log-err">' + esc(label) + '未加载 —— 这一页读的是它的读数，缺席时不拿空表冒充</div>'); };
+    on('#wa-bt-view', () => {
+      if (!WA.beatLedger || typeof WA.beatLedger.view !== 'function') return btMiss('拍账引擎');
+      const cfg = (typeof WA.beatLedger.getSettings === 'function') ? WA.beatLedger.getSettings() : {};
+      const v = WA.beatLedger.view();
+      const cur = (typeof WA.beatLedger.current === 'function') ? WA.beatLedger.current() : null;
+      const rows = v.rows || [];
+      const landed = rows.filter(function (r) { return r && r.status === 'landed'; }).length;
+      if (!cfg.enabled) {
+        return btOut('<div class="wa-log wa-log-warn">拍账关着：' + esc(beatWhy('disabled')) + '</div>'
+          + '<div class="wa-dim">真源：<code>WA.beatLedger</code>（当前 enabled=false）—— 这不是「还没有拍」。</div>');
+      }
+      if (!rows.length) {
+        return btOut('<div class="wa-log wa-log-info">还没有登记拍序（本幕未 plan）。</div>'
+          + '<div class="wa-dim">拍序由拍账引擎登记，面板只读 —— 本页<b>不代你登记</b>。</div>');
+      }
+      const marks = rows.map(function (r) {
+        const tag = r.status === 'landed' ? '✔' : (cur && r.no === cur.no ? '▶' : '·');
+        return tag + r.no + '.' + esc(r.title);
+      }).join('　');
+      btOut('<div class="wa-log wa-log-info">' + (cur
+          ? ('当前卡在 <b>第 ' + cur.no + ' 拍 · ' + esc(cur.title) + '</b>')
+          : '本幕已演完（没有待落的拍）')
+        + '　已落 ' + landed + ' / 共 ' + rows.length + '</div>'
+        + '<div class="wa-item">' + marks + '</div>'
+        + '<div class="wa-dim">真源：<code>WA.beatLedger.view()</code> / <code>current()</code>'
+        + '（seq ' + v.seq + ' · 轮 ' + v.round + ' · 自改 ' + v.overwrites
+        + (v.lastClaim ? '（最近自称第 ' + v.lastClaim + ' 拍）' : '')
+        + ' · 上限 ' + (cfg.maxRows === undefined ? '?' : cfg.maxRows) + ' 行）</div>'
+        + (v.lastVia ? '<div class="wa-dim">上次换场：' + esc(v.lastVia) + '</div>' : ''));
+    });
+    on('#wa-bt-verdict', () => {
+      if (!WA.beatReport || typeof WA.beatReport.view !== 'function') return btMiss('拍回报引擎');
+      const cfg = (typeof WA.beatReport.getSettings === 'function') ? WA.beatReport.getSettings() : {};
+      const v = WA.beatReport.view();
+      if (!cfg.enabled) {
+        return btOut('<div class="wa-log wa-log-warn">拍回报关着：' + esc(beatWhy('disabled')) + '</div>');
+      }
+      const log = v.log || [];
+      const last = log.length ? log[log.length - 1] : null;
+      if (!last) {
+        return btOut('<div class="wa-log wa-log-info">还没有判定过任何一拍。</div>'
+          + '<div class="wa-dim">「没判过」与「判了 pass」不是一件事 —— 故此处不给绿点。</div>');
+      }
+      const VN = { pass: '通过', adjust: '调整', setup: '先补铺垫', reject: '打回重排' };
+      btOut('<div class="wa-log wa-log-' + (last.verdict === 'pass' ? 'ok' : (last.verdict === 'reject' ? 'err' : 'info')) + '">'
+          + '上一拍判定：<b>' + esc(last.verdict) + '</b>（' + esc(VN[last.verdict] || '未知档') + '）'
+          + '　章 ' + esc(last.chapter || v.chapterKey || '—')
+          + (last.round === undefined ? '' : '　第 ' + last.round + ' 轮') + '</div>'
+        + (v.purpose ? '<div class="wa-item">调整档仍要达到的结果：<b>' + esc(v.purpose) + '</b></div>' : '')
+        + (v.held ? '<div class="wa-item">当前<b>按住中</b>' + (v.setupNeed ? '：缺的那一步因是 <b>' + esc(v.setupNeed) + '</b>' : '') + '</div>' : '')
+        + '<div class="wa-dim">本章计数：报不合适 ' + v.strikes + ' / ' + (cfg.strikesPerChapter === undefined ? '?' : cfg.strikesPerChapter)
+        + '　改篇章 ' + v.redesigns + ' / ' + (cfg.redesignPerChapter === undefined ? '?' : cfg.redesignPerChapter) + '</div>'
+        + (log.length > 1 ? '<div class="wa-dim">最近 ' + log.length + ' 条：'
+          + esc(log.map(function (x) { return x.verdict + '(' + (x.chapter || '—') + ')'; }).join(' → ')) + '</div>' : ''));
+    });
+    on('#wa-bt-gates', () => {
+      if (!WA.genGate || typeof WA.genGate.view !== 'function') return btMiss('生成闸门');
+      const cfg = (typeof WA.genGate.getSettings === 'function') ? WA.genGate.getSettings() : {};
+      if (!cfg.enabled) {
+        return btOut('<div class="wa-log wa-log-warn">闸门关着：' + esc(beatWhy('gated-off')) + '</div>'
+          + '<div class="wa-dim">关着时闸门一律拒收（<code>gated-off</code>），读数一直空 —— 这与「没有闸门在卡」不是一回事。</div>');
+      }
+      const v = WA.genGate.view();
+      const kinds = (WA.genGate.KINDS || []);
+      const rows = kinds.map(function (k) {
+        const r = (v.ready || {})[k];
+        if (!r) return '<div class="wa-item">' + esc(k) + '：<span class="wa-dim">未算（轮次取不到）</span></div>';
+        if (r.ok) return '<div class="wa-item wa-log-ok">' + esc(k) + '：<b>可以生成</b></div>';
+        return '<div class="wa-item wa-log-info">' + esc(k) + '：卡在 <b>' + esc(r.reason) + '</b>'
+          + (r.wait === null || r.wait === undefined ? '' : '　还要等 <b>' + r.wait + '</b> 轮')
+          + (r.wait === null || r.wait === undefined ? '（这道闸门不是「等几轮」型）' : '')
+          + '　<span class="wa-dim">' + esc(beatWhy(r.reason)) + '</span></div>';
+      }).join('');
+      btOut('<div class="wa-log wa-log-info">闸门账：' + (v.ok ? '' : '读不出（' + esc(v.reason || '') + '）　')
+          + '范围 ' + esc(v.chatKey || '—') + (v.scopeReset ? '　<b>（已换聊天 ⇒ 节流归零）</b>' : '')
+          + '　记录 ' + v.entries + ' / ' + v.max + '</div>'
+        + (rows || '<div class="wa-item">四档都在算中。</div>')
+        + '<div class="wa-dim">闸门参数：整机 ' + esc(String(cfg.minGap)) + ' 轮　新章静默 ' + esc(String(cfg.quietRounds))
+        + ' 轮　开新章 ' + esc(String(cfg.chapterGap)) + ' 轮　开间章 ' + esc(String(cfg.interludeGap)) + ' 轮'
+        + '<br/>口径：按<b>轮</b>记账，绝不看墙钟；chapter / interlude-chapter 两档豁免整机闸门。</div>');
+    });
+    on('#wa-bt-audit', () => {
+      if (!WA.planAudit || typeof WA.planAudit.diagnose !== 'function') return btMiss('计划复验引擎');
+      const d = WA.planAudit.diagnose();
+      const ev = (typeof WA.planAudit.evidence === 'function') ? WA.planAudit.evidence() : null;
+      const src = (ev && ev.sources) || d.sources || {};
+      btOut('<div class="wa-log wa-log-' + (d.enabled ? 'info' : 'warn') + '">'
+          + (d.enabled ? '计划复验：只读面在场' : '计划复验关着（读数为空 ≠ 没有可复验的安排）') + '</div>'
+        + '<div class="wa-item">依据面三个来源的现场计数（<b>事实</b>，不是结论）：<br/>'
+          + '编年史 ' + (src.chronicle || 0) + ' 条　世界事实 ' + (src.worldFacts || 0) + ' 条　演化事件 ' + (src.evolutionEvents || 0) + ' 条'
+          + '　合计可查 ' + (d.facts === undefined ? (ev ? ev.facts.length : '?') : d.facts) + ' 条</div>'
+        + '<div class="wa-item">在场人物名册 ' + (d.cast === undefined ? '?' : d.cast) + ' 人　具名地点表 ' + (d.places === undefined ? '?' : d.places) + ' 处</div>'
+        + '<div class="wa-dim">本页<b>不提供复验提交口</b>：复验需要「一组未写的安排」这一输入面，'
+        + '那是章节工作台（Y2）的职责 —— 本页给了就是两个真源。此处只把<b>依据面</b>摆出来。</div>'
+        + ((d.notes || []).length ? '<div class="wa-dim">引擎自述口径：' + esc(d.notes.join('；')) + '</div>' : ''));
+    });
+    on('#wa-bt-blocked', () => {
+      if (!WA.beatFacade || typeof WA.beatFacade.blocked !== 'function') return btMiss('拍引擎门面');
+      const b = WA.beatFacade.blocked();
+      const rows = (b.rows || []).map(function (r) {
+        const rec = r.recovery || {};
+        return '<div class="wa-item"><b>' + esc(r.engine) + '</b> 在卡：<code>' + esc(r.reason) + '</code>'
+          + (rec.kind ? '<div class="wa-dim">恢复档 ' + esc(rec.kind) + '　该怎么办：' + esc(rec.action || '—')
+            + (rec.why ? '　为什么：' + esc(rec.why) : '') + '</div>'
+            : '<div class="wa-dim">恢复档读不出（U5 的映射表缺席时不假装、不自己编档）</div>') + '</div>';
+      }).join('');
+      btOut('<div class="wa-log wa-log-' + (b.ok ? 'info' : 'warn') + '">' + esc(b.line || '') + '</div>'
+        + (rows || '<div class="wa-dim">四道闸门本刻无一在卡。</div>')
+        + '<div class="wa-dim">真源：<code>WA.beatFacade.blocked()</code>（读各引擎最近一次拒收理由，只汇不判）。</div>');
+    });
+    on('#wa-bt-diag', () => {
+      const names = ['beatReport', 'planAudit', 'beatLedger', 'genGate'];
+      const rows = names.map(function (ns) {
+        const m = WA[ns];
+        if (!m) return '<div class="wa-item">' + esc(ns) + '：<span class="wa-dim">缺席</span></div>';
+        let on = null;
+        try { on = !!(m.getSettings && m.getSettings() || {}).enabled; } catch (e) { on = null; }
+        const hasView = typeof m.view === 'function';
+        const hasDiag = typeof m.diagnose === 'function';
+        return '<div class="wa-item">' + esc(ns) + '：' + (on === true ? '开' : (on === false ? '关' : '读不出'))
+          + '　view ' + (hasView ? '在' : '无') + '　diagnose ' + (hasDiag ? '在' : '无') + '</div>';
+      }).join('');
+      const F = WA.beatFacade;
+      let facLine = '';
+      if (F && typeof WA.beatFacade.status === 'function') {
+        const st = WA.beatFacade.status();
+        facLine = '<div class="wa-item">门面：' + (st.facade ? '开' : '关')
+          + '　全关 allOff ' + (st.allOff ? '是' : '否') + '　任一开 anyOn ' + (st.anyOn ? '是' : '否')
+          + '　在场 ' + (st.present || []).length + ' / 缺席 ' + (st.missing || []).length + '</div>';
+      }
+      // 门面自证面：**调一次**把 checks 取出来再拼（同一表达式里调两次 =
+      //   两次现场读数，而两次之间引擎状态可能已变 —— 那种「一行里两个时刻」的读数
+      //   在诊断面上是本仓点过名的自欺）。
+      let dg = '';
+      if (F && typeof WA.beatFacade.diagnose === 'function') {
+        const d = WA.beatFacade.diagnose();
+        const ck = d.checks || {};
+        dg = '<div class="wa-item">门面自证 checks：'
+          + esc(Object.keys(ck).map(function (k) { return k + '=' + (ck[k] ? '✓' : '✗'); }).join('　'))
+          + (d.failed && d.failed.length ? '　<b>未通过：' + esc(d.failed.join('/')) + '</b>' : '')
+          + '　门面自身 ' + (d.facade ? '开' : '关') + '</div>';
+      } else {
+        dg = '<div class="wa-dim">门面自证面不可用（<code>beatFacade.diagnose</code> 缺席）。</div>';
+      }
+      btOut('<div class="wa-log wa-log-info">四引擎在场与启用态（三态严格分开：开 / 关 / 读不出）</div>'
+        + rows + facLine + dg
+        + '<div class="wa-dim">本页读到的四个库面：拍账 <code>beatLedger</code> · 拍回报 <code>beatReport</code> · '
+        + '拒绝账 <code>genGate</code>（本书内 localStorage）· 事实来源 <code>planAudit.evidence</code>。</div>');
+    });
+
+    // ── v2.198.0（Y2）：章节生成工作台（六枚**只读**按钮）──────────────────
+    //   与拍页同一条口径：全部走 `WA.<ns>.<口>` 字面形态（存进局部变量会让这些
+    //   导出在静态面上仍是「产品代码零引用」，死子面账本会记下与事实相反的证据）。
+    //   六个 handler 一律**先判在场、再判开关、最后读**：缺席 ⇒ 报缺（不是空表）；
+    //   关着 ⇒ 报关（不是「没有」）；读得到 ⇒ 报读数。全程零 store.transact、
+    //   零 beatLedger.plan/land/claim、零 chapters.start/end —— 本页没有一处写口。
+    //   边界 2 特别处理：凡拿得到本章归属的读数一律**本章口径**，拿不到时
+    //   如实标「归属读不出」，不把全书累计冒充成本章。
+    const chwOut = function (html) { const o = $('#wa-chw-out'); if (o) o.innerHTML = html; };
+    const chwMiss = function (label) { chwOut('<div class="wa-log wa-log-err">' + esc(label) + '未加载 —— 这一页读的是它的读数，缺席时不拿空表冒充</div>'); };
+    const chwCurTitle = function () {
+      // 本章标题的**单一取法**（本页自己只读一次 `WA.chapters.current`，不外传别名）
+      try { const c = (WA.chapters && typeof WA.chapters.current === 'function') ? WA.chapters.current() : null;
+        return c ? String(c.title || '') : ''; } catch (e) { return ''; }
+    };
+    on('#wa-chw-open', () => {
+      if (!WA.chapters || typeof WA.chapters.current !== 'function') return chwMiss('章节引擎');
+      const cur = WA.chapters.current();
+      const s = (WA.store && typeof WA.store.get === 'function') ? WA.store.get() : {};
+      const hist = (s.chapters && Array.isArray(s.chapters.history)) ? s.chapters.history : [];
+      const last = hist.length ? hist[hist.length - 1] : null;
+      const head = '<div class="wa-log wa-log-info">开章前该看：上一章怎么收的 + 本章两栏的现场值（开章写口不在本页 —— 仍走战役页）</div>';
+      const lastRow = last
+        ? '<div class="wa-item">上一章：第 ' + esc(String(last.no == null ? '?' : last.no)) + ' 章 · ' + esc(last.title || '（未命名）')
+          + '　收尾注：' + (last.endNote ? esc(String(last.endNote).slice(0, 120)) : '<span class="wa-dim">无</span>')
+          + '　结束时刻：' + (last.endedAt ? esc(new Date(Number(last.endedAt)).toLocaleString()) : '<span class="wa-dim">未记（本页不代补时间戳）</span>') + '</div>'
+        : '<div class="wa-dim">章节史为空 ⇒ 这是第一次开章（不是「上一章没记」——是还没有上一章）。</div>';
+      const curRow = cur
+        ? '<div class="wa-item"><b>本章已开</b>：第 ' + esc(String(cur.no == null ? '?' : cur.no)) + ' 章 · ' + esc(cur.title || '')
+          + '　开始时刻：' + (cur.startedAt ? esc(new Date(Number(cur.startedAt)).toLocaleString()) : '<span class="wa-dim">未记</span>') + '</div>'
+        : '<div class="wa-item"><b>本章未开</b>：开章时 `chapters.start(title, {script, notes})` 会**自动结束**上一章并推进入 history。</div>';
+      chwOut(head + lastRow + curRow
+        + '<div class="wa-item">真源：章号 / 标题 <code>WA.chapters.current()</code> · 章节史 <code>WA.store.get().chapters.history</code>'
+        + '（本页<b>不缓存</b>这两个值 —— 面板缓存是上一版点过名的自欺）· 有界 20 章（超出由引擎挤出并记 <code>WA.evict</code>）。</div>'
+        + '<div class="wa-dim">历史条目 ' + hist.length + ' 条（有界上限 20）—— 被裁剪过则不足即是有界，不是「只有这些」。</div>');
+    });
+    on('#wa-chw-cards', () => {
+      const lack = [];
+      if (!WA.beatLedger || typeof WA.beatLedger.view !== 'function') lack.push('拍账引擎');
+      if (!WA.beatReport || typeof WA.beatReport.buildBlock !== 'function') lack.push('拍回报引擎');
+      if (lack.length) return chwMiss(lack.join(' / '));
+      const v = WA.beatLedger.view() || {};
+      const rows = v.rows || [];
+      const cur = (typeof WA.beatLedger.current === 'function') ? WA.beatLedger.current() : null;
+      const cfgR = (typeof WA.beatReport.getSettings === 'function') ? WA.beatReport.getSettings() : {};
+      // 「按住哪一拍」的**单一取法**：拍账的 current()（第一行 pending），
+      //   不是本页自己按 status 猜 —— 猜出来的与引擎答的不是同一个数时，
+      //   玩家会看到两个「当前拍」。
+      const sc = chapSplit((WA.chapters && typeof WA.chapters.current === 'function') ? WA.chapters.current() : null, rows);
+      let block = '';
+      try { block = String(WA.beatReport.buildBlock() || ''); } catch (e) { block = ''; }
+      if (!cfgR.enabled) {
+        return chwOut('<div class="wa-log wa-log-warn">拍回报关着：' + esc(beatWhy('disabled')) + '</div>'
+          + '<div class="wa-dim">真源：<code>WA.beatReport</code>（当前 enabled=false）—— 关着时「待补的因」读不出来，'
+          + '这不是「没有欠因」。</div>');
+      }
+      if (!rows.length) {
+        return chwOut('<div class="wa-log wa-log-info">拍账里还没有拍序（本幕未 plan）⇒「按住哪一拍」无从谈起。</div>'
+          + '<div class="wa-dim">拍序由<b>拍账引擎</b>登记，推进由引擎执行 —— 本页只读，<b>不代你落拍</b>（Y2 边界 1）。</div>');
+      }
+      const marks = rows.map(function (r) {
+        const tag = r.status === 'landed' ? '✔' : ((cur && r.no === cur.no) ? '▶' : '·');
+        const ck = chapKeyOf(r.chapterKey);
+        const mineChap = !ck || (!!chwCurTitle() && ck === chwCurTitle());
+        return '<span' + (mineChap ? '' : ' class="wa-dim"') + '>' + tag + esc(String(r.no == null ? '?' : r.no))
+          + ' ' + esc(String(r.title || '').slice(0, 16)) + (ck ? ' <span class="wa-dim">[' + esc(ck) + ']</span>' : '') + '</span>';
+      }).join('　');
+      chwOut('<div class="wa-log wa-log-info">推进卡点（每拍：按住哪一拍 + 待补的因，真源 <code>WA.beatReport.buildBlock()</code> 同一处）</div>'
+        + '<div class="wa-item">拍序：' + marks + '</div>'
+        + '<div class="wa-item">按住这一拍：' + (cur
+          ? '第 ' + esc(String(cur.no == null ? '?' : cur.no)) + ' 拍 · ' + esc(String(cur.title || '').slice(0, 40))
+            + '（<code>WA.beatLedger.current()</code> 的第一行 pending）'
+          : '<span class="wa-dim">没有待落的拍（要么还没登记拍序，要么本幕已演完）</span>') + '</div>'
+        + '<div class="wa-item">' + chapScopeText(sc) + '</div>'
+        + '<div class="wa-item">待补的因（引擎拼块原文）：' + (block
+          ? '<pre class="wa-pre">' + esc(block.slice(0, 600)) + '</pre>'
+          : '<span class="wa-dim">引擎当前不产出拼块（没有待补的因，或本幕无欠账）</span>') + '</div>'
+        + '<div class="wa-dim">边界 1：推进由<b>引擎</b>执行 —— 本页零 land/claim/plan，'
+        + '也没有「落拍」按钮（两页各给一个落拍口 = 两个真源）。</div>');
+    });
+    on('#wa-chw-close', () => {
+      const lack = [];
+      if (!WA.beatLedger || typeof WA.beatLedger.view !== 'function') lack.push('拍账引擎');
+      if (!WA.foreshadow || typeof WA.foreshadow.check !== 'function') lack.push('伏笔引擎');
+      if (lack.length) return chwMiss(lack.join(' / ') + '（收章前欠什么读不出来 —— 本页不假装「什么都不欠」）');
+      const rows = (WA.beatLedger.view() || {}).rows || [];
+      const pending = rows.filter(function (r) { return r && r.status !== 'landed'; });
+      let fx = null;
+      try { fx = WA.foreshadow.check(); } catch (e) { fx = null; }
+      const stale = (fx && fx.rows) ? fx.rows : [];
+      chwOut('<div class="wa-log wa-log-info">收章前欠什么（本页<b>不提供收章按钮</b> —— 收章写口仍只有战役页那一处，Y2 边界 3）</div>'
+        + '<div class="wa-item">未落的拍：' + (pending.length
+          ? pending.map(function (r) { return '第 ' + esc(String(r.no == null ? '?' : r.no)) + ' 拍 ' + esc(String(r.title || '').slice(0, 16)); }).join('　')
+          : '<span class="wa-dim">无（本幕拍序已全落）</span>') + '</div>'
+        + '<div class="wa-item">未回收 / 久未推进的伏笔：' + (stale.length
+          ? stale.map(function (f) { return esc(String(f.id || '')) + '(' + esc(String(f.status || ''))
+              + (f.staleBy >= 0 ? '·停滞' + Math.round(f.staleBy / 60000) + 'min' : '·无时间戳') + ')'; }).join('　')
+          : '<span class="wa-dim">无（伏笔面 ' + (fx && fx.ok ? '读得出且没有停滞项' : '读不出 ⇒ 这一栏<b>不成立</b>，不代表不欠') + '）</span>') + '</div>'
+        + '<div class="wa-dim">真源：拍账 <code>WA.beatLedger.view()</code> · 伏笔停滞 <code>WA.foreshadow.check()</code>'
+        + '（阈值 ' + esc(String((fx && fx.thresholdMs) || '?')) + 'ms）。收章会把这本拍账的「已落拍不可改」语义原样留下 —— '
+        + '本页只说清欠什么，不动任何数据。</div>');
+    });
+    on('#wa-chw-todo', () => {
+      if (!WA.pendingCenter || typeof WA.pendingCenter.items !== 'function') return chwMiss('统一待办中心');
+      const cfg = (typeof WA.pendingCenter.getSettings === 'function') ? WA.pendingCenter.getSettings() : {};
+      if (!cfg.enabled) {
+        return chwOut('<div class="wa-log wa-log-warn">待办中心关着：' + esc(beatWhy('disabled')) + '</div>'
+          + '<div class="wa-dim">真源：<code>WA.pendingCenter</code>（当前 enabled=false）—— 关着时读出来是空的，'
+          + '而「空」有三种：<b>真的没有</b>（allClear）/ <b>所有源都自报无数据</b>（emptyAll）/ <b>根本读不到</b>（unavailable）。'
+          + '本页不把三者压成一句。</div>');
+      }
+      //   真源是 `items({})` 的统一视图（行形状见 engines/pending-center.js 的 mk()）：
+      //     { kind, source, ref, title, detail, canAct, route:{kind,id,settingsKey}, blocked }
+      const r = WA.pendingCenter.items({});
+      if (!r || r.ok !== true) {
+        return chwOut('<div class="wa-log wa-log-warn">待办聚合读不出：' + esc(String((r && r.reason) || 'unknown')) + '</div>'
+          + '<div class="wa-dim">这是「读不到」，不是「没有待办」—— 两件事本页分开说。</div>');
+      }
+      const rows = r.rows || [];
+      // ④ 归属分组：按**引擎给的路由 kind** 归面（与 `describe()` 同源），不自己发明归属表。
+      const byOwner = {};
+      rows.forEach(function (x) {
+        const k = String((x && x.route && x.route.kind) || (x && x.kind) || '未归类');
+        (byOwner[k] = byOwner[k] || []).push(x);
+      });
+      const groups = Object.keys(byOwner).map(function (k) {
+        return '<div class="wa-item"><b>' + esc(k) + '</b>（' + byOwner[k].length + '）：<br>'
+          + byOwner[k].map(function (x) {
+              return '　· ' + esc(String((x && x.title) || '(未命名)'))
+                + (x && x.detail ? '　' + esc(String(x.detail)) : '')
+                + '　来源 <code>' + esc(String((x && x.source) || '?')) + '</code>'
+                + (x && x.ref ? '　看 ' + esc(String(x.ref)) : '')
+                + (x && x.route && x.route.settingsKey ? '　设置键 ' + esc(String(x.route.settingsKey)) : '')
+                + (x && x.blocked ? '　<b>被挡：' + esc(String(x.blocked)) + '</b>' : '')
+                + (x && x.canAct ? '　可处理' : '　<span class="wa-dim">只读</span>');
+            }).join('<br>') + '</div>';
+      }).join('');
+      // ③ 三旗标逐条如实报（不合并）
+      const flags = '<div class="wa-dim">读得到？<b>' + (r.unavailable ? '否（unavailable：所有源都读不到）' : '是')
+        + '</b>　· 此刻有没有待办？<b>' + (rows.length ? '有 ' + rows.length + ' 条' : (r.emptyAll ? '所有在场的源都自报无数据（emptyAll）'
+          : (r.allClear ? '读过且此刻没有待办（allClear）' : '空，但不可区分「办完了」与「从来没有」')))
+        + '</b>　· 在场源 ' + r.sourceCount + ' 个　· 被裁剪 ' + (r.capped ? '是（上限 ' + cfg.maxRows + '）' : '否')
+        + (r.skipped && r.skipped.length ? '　· 跳过 ' + r.skipped.length + ' 个：' + esc(r.skipped.map(function (x) { return x.source; }).join('/')) : '')
+        + '</div>';
+      chwOut('<div class="wa-log wa-log-info">本章待办：按归属分组（真源 <code>WA.pendingCenter.items()</code> 的统一视图 —— '
+        + '本页不是新的状态容器，条目唯一真源仍在各模块）</div>'
+        + (groups || '<div class="wa-dim">此刻没有待办条目。</div>')
+        + flags
+        + '<div class="wa-dim">本页只读与聚合：路由（去哪看 / 看哪条 / 哪个设置键）由引擎给出，'
+        + '确认动作仍由来源模块自己的写口持有 —— 本页<b>不代写</b>（边界 1）。</div>');
+    });
+    on('#wa-chw-history', () => {
+      if (!WA.chapters || typeof WA.chapters.current !== 'function') return chwMiss('章节引擎');
+      const s = (WA.store && typeof WA.store.get === 'function') ? WA.store.get() : {};
+      const hist = (s.chapters && Array.isArray(s.chapters.history)) ? s.chapters.history : [];
+      const cur = WA.chapters.current();
+      const MAX_HISTORY = 20;   // 与 engines/chapters.js 的 MAX_HISTORY 同值（读数口径，不是第二份真源）
+      const rows = hist.slice().reverse().map(function (h) {
+        return '<div class="wa-item">第 ' + esc(String(h.no == null ? '?' : h.no)) + ' 章 · ' + esc(h.title || '（未命名）')
+          + (h.script ? '　目标 ' + esc(String(h.script).slice(0, 60)) : '')
+          + (h.endNote ? '　收尾 ' + esc(String(h.endNote).slice(0, 60)) : '')
+          + (h.startedAt ? '　起 ' + esc(new Date(Number(h.startedAt)).toLocaleString()) : '')
+          + (h.endedAt ? '　止 ' + esc(new Date(Number(h.endedAt)).toLocaleString()) : '　<span class="wa-dim">未完</span>') + '</div>';
+      }).join('');
+      chwOut('<div class="wa-log wa-log-info">章节史（最近在前）：' + hist.length + ' 条 · 有界上限 ' + MAX_HISTORY
+        + (hist.length >= MAX_HISTORY
+          ? '　<b>已达上限</b>：更早的章节已被引擎挤出（<code>WA.evict.note</code>）—— 「只有这些」是被裁剪的结果，不是历史就这么短'
+          : '　未达上限 ⇒ 本读数就是全部章节（既没被裁剪，也不是「只读了最近几条」）') + '</div>'
+        + (cur ? '<div class="wa-item"><b>当前</b>：第 ' + esc(String(cur.no == null ? '?' : cur.no)) + ' 章 · '
+          + esc(cur.title || '') + '（进行中）</div>' : '<div class="wa-dim">当前未开章。</div>')
+        + (rows || '<div class="wa-dim">章节史为空。</div>')
+        + '<div class="wa-dim">真源：<code>WA.store.get().chapters.history</code>（本页<b>零写入</b> —— 不代收章、不代清理）。</div>');
+    });
+    on('#wa-chw-src', () => {
+      const probes = [
+        { ns: 'chapters', label: '章节引擎', need: 'current' },
+        { ns: 'beatLedger', label: '拍账', need: 'view' },
+        { ns: 'beatReport', label: '拍回报', need: 'view' },
+        { ns: 'genGate', label: '生成闸门', need: 'view' },
+        { ns: 'foreshadow', label: '伏笔', need: 'stat' },
+        { ns: 'pendingCenter', label: '待办中心', need: 'items' },
+        { ns: 'chronicleView', label: '编年史视图', need: 'entries' }
+      ];
+      const rows = probes.map(function (p) {
+        const m = WA[p.ns];
+        if (!m || typeof m[p.need] !== 'function') {
+          return '<div class="wa-item">' + esc(p.label) + ' <span class="wa-dim">缺席（<code>WA.' + esc(p.ns) + '</code> 或 .'
+            + esc(p.need) + ' 不在场）—— 如实报缺</span></div>';
+        }
+        let on = null, n = null;
+        try { on = !!(m.getSettings ? (m.getSettings() || {}).enabled : true); } catch (e) { on = null; }
+        try {
+          if (p.ns === 'pendingCenter') n = (m.items({}) || []).length;
+          else if (p.ns === 'foreshadow') n = (m.stat() || {}).total;
+          else if (p.ns === 'beatLedger' || p.ns === 'beatReport' || p.ns === 'genGate') n = ((m.view() || {}).rows || []).length;
+          else n = null;
+        } catch (e) { n = null; }
+        return '<div class="wa-item">' + esc(p.label) + ' 在场 · ' + (on === true ? '开' : (on === false ? '关' : '<span class="wa-dim">读不出</span>'))
+          + '　读数 ' + (n == null ? '<span class="wa-dim">该模块无行数口径</span>' : '<b>' + n + '</b>') + '</div>';
+      }).join('');
+      chwOut('<div class="wa-log wa-log-info">数据来源自证（本页读七个源；缺席 ⇒ 如实报缺，不拿空表冒充）</div>' + rows
+        + '<div class="wa-dim">七个源里 <b>章节 / 拍账 / 拍回报 / 闸门 / 待办</b>是本页立页的五个真源；'
+        + '伏笔与编年史视图是「收章欠什么」的旁证。全部只读 —— 本页零 <code>store.transact</code>。</div>');
+    });
+    // ── v2.199.0（Y4）：待办中心（六枚**只读**按钮）────────────────────────
+    //   同本仓口径：全部走 `WA.<ns>.<口>` 字面形态；先判在场、再判开关、最后读。
+    //   边界 1：**不是新的状态容器** —— 本页零 store.transact、零 pendingCenter.reset；
+    //   边界 2：下钻只给路由（去哪看 / 看哪条 / 哪个设置键），**不执行确认动作**。
+    const tdOut = function (html) { const o = $('#wa-td-out'); if (o) o.innerHTML = html; };
+    const tdMiss = function (label) { tdOut('<div class="wa-log wa-log-err">' + esc(label) + '未加载 —— 这一页读的是它的读数，缺席时不拿空表冒充</div>'); };
+    const tdRow = function (x) {
+      return '　· ' + esc(String((x && x.title) || '(未命名)'))
+        + (x && x.detail ? '　' + esc(String(x.detail)) : '')
+        + '　来源 <code>' + esc(String((x && x.source) || '?')) + '</code>'
+        + (x && x.ref ? '　看 ' + esc(String(x.ref)) : '')
+        + (x && x.canAct ? '　<b>可处理</b>' : '　<span class="wa-dim">只读</span>')
+        + '　' + todoConsequence(x);
+    };
+    on('#wa-td-all', () => {
+      const P = WA.pendingCenter;
+      if (!P || typeof P.items !== 'function') return tdMiss('统一待办中心');
+      const cfg = (typeof P.getSettings === 'function') ? P.getSettings() : {};
+      if (!cfg.enabled) {
+        return tdOut('<div class="wa-log wa-log-warn">待办中心关着：' + esc(todoWhy('disabled')) + '</div>'
+          + '<div class="wa-dim">真源：<code>WA.pendingCenter</code>（当前 enabled=false）。</div>');
+      }
+      const r = WA.pendingCenter.items({});
+      if (!r || r.ok !== true) {
+        return tdOut('<div class="wa-log wa-log-warn">聚合读不出：' + esc(todoWhy(r && r.reason)) + '</div>'
+          + '<div class="wa-dim">这是<b>读不到</b>，不是「没有待办」。</div>');
+      }
+      const rows = r.rows || [];
+      if (!rows.length) {
+        return tdOut('<div class="wa-log wa-log-info">此刻没有待办条目。</div>'
+          + '<div class="wa-dim">' + (r.unavailable ? '但这是「<b>所有来源都读不到</b>」，不是「真的没有」'
+            : (r.emptyAll ? '在场的源都自报无数据（emptyAll）' : (r.allClear ? '读过且此刻确实没有待办（allClear）'
+              : '空，但在来源不申报的前提下，「办完了」与「从来没有」<b>不可区分</b> —— 本页不假称可分'))) + '</div>');
+      }
+      //   归属分组（计划 ①）：键 = 引擎 `describe().page`（世界 / 人物 / …）。
+      //   组内仍逐条标出**来源模块**（计划 ② 的第一项）—— 归属与来源是两件事，
+      //   合成一个键会让「谁报的」与「该去哪看」互相冒充。
+      const byOwner = {};
+      rows.forEach(function (x) {
+        const owner = todoOwnerOf(x && x.kind);
+        (byOwner[owner] = byOwner[owner] || []).push(x);
+      });
+      const groups = Object.keys(byOwner).map(function (k) {
+        return '<div class="wa-item"><b>' + esc(k) + '</b>（' + byOwner[k].length + ' 条）：<br>'
+          + byOwner[k].map(tdRow).join('<br>') + '</div>';
+      }).join('');
+      //   部分结果 + 逐源不可读清单（边界 3）：skipped 是**在场但不 ok** 的那些源。
+      //   计划 ② 的「不处理的后果（来自拒收码的恢复语义，见 U5）」**挂在这里**：
+      //   `skipped[].reason` 就是拒收码，`rejectRecovery.explain` 给它一句人话动作。
+      //   六档里没有 `ignore`、动作句里不出现「忽略」—— 本仓 U5 的硬口径，
+      //   故本页不可能给出「不管它也行」这种建议（那是静默降级）。
+      const skipLine = (r.skipped && r.skipped.length)
+        ? '<div class="wa-log wa-log-warn">以下来源<b>读不出</b>（不是「它们没有待办」）：</div>'
+          + '<div class="wa-item">' + r.skipped.map(function (x) {
+              const code = String(x.reason == null ? '' : x.reason);
+              let e = null;
+              try {
+                e = (WA.rejectRecovery && typeof WA.rejectRecovery.explain === 'function')
+                  ? WA.rejectRecovery.explain(code) : null;
+              } catch (err) { e = null; }
+              const tail = (!e) ? '<span class="wa-dim">恢复语义面缺席 ⇒ 如实报缺，不编建议</span>'
+                : (!e.kind ? '<span class="wa-dim">' + esc(String(e.why || '该码判不出档')) + '</span>'
+                  : '不处理的后果：<b>' + esc(String(e.action || '')) + '</b>');
+              return '　' + esc(String(x.source)) + '（' + esc(todoWhy(code)) + '）—— ' + tail;
+            }).join('<br>') + '</div>'
+        : '';
+      tdOut('<div class="wa-log wa-log-info">全部待办：按归属分组（真源 <code>WA.pendingCenter.items()</code>）'
+        + '　共 ' + rows.length + ' 条' + (r.capped ? '（被裁剪到上限 ' + cfg.maxRows + '）' : '') + '</div>'
+        + skipLine + groups
+        + '<div class="wa-dim">' + TODO_DUE_NOTE + '</div>'
+        + '<div class="wa-dim">本页只给路由与读数：确认动作由来源模块自己的写口持有 —— 本页<b>不代写</b>。</div>');
+    });
+    on('#wa-td-soon', () => {
+      const P = WA.pendingCenter;
+      if (!P || typeof P.soon !== 'function') return tdMiss('统一待办中心（soon 口）');
+      const cfg = (typeof P.getSettings === 'function') ? P.getSettings() : {};
+      if (!cfg.enabled) return tdOut('<div class="wa-log wa-log-warn">待办中心关着：' + esc(todoWhy('disabled')) + '</div>');
+      const r = WA.pendingCenter.soon();
+      if (!r || r.ok !== true) return tdOut('<div class="wa-log wa-log-warn">近期待办读不出：' + esc(todoWhy(r && r.reason)) + '</div>');
+      const rows = r.rows || [];
+      tdOut('<div class="wa-log wa-log-info">即将到期（真源 <code>WA.pendingCenter.soon()</code>；'
+        + '条数上限 <b>' + cfg.soonCount + '</b> 来自设置，本页不自定）：' + rows.length + ' 条</div>'
+        + (rows.length ? '<div class="wa-item">' + rows.map(tdRow).join('<br>') + '</div>'
+          : '<div class="wa-dim">没有最近到期的条目。</div>')
+        + '<div class="wa-dim">「"近期" 是引擎的口径，不是本页的时间判断 —— 面板不持第二份时钟。</div>');
+    });
+    on('#wa-td-src', () => {
+      const P = WA.pendingCenter;
+      if (!P || typeof P.bySource !== 'function') return tdMiss('统一待办中心（bySource 口）');
+      //   ⚠ 口径说明（本页踩过一次）：`bySource()` 返回的是**逐源可用性**
+      //   （`{name, available, read}`），**不是待办条目** —— 要条目走 items()。
+      const arr = WA.pendingCenter.bySource();
+      if (!Array.isArray(arr)) return tdOut('<div class="wa-log wa-log-err">来源面返回形态不是数组 —— 不拿空表冒充</div>');
+      const live = arr.filter(function (x) { return x && x.available; });
+      tdOut('<div class="wa-log wa-log-info">逐源可用性（真源 <code>WA.pendingCenter.bySource()</code>'
+        + ' —— 这一口给的是**可用性**，条目在 <code>items()</code>，两口不混用）：'
+        + live.length + ' / ' + arr.length + ' 在场</div>'
+        + '<div class="wa-item">' + arr.map(function (x) {
+            return '　' + esc(String(x.name)) + (x.available
+              ? '　<b>在场</b>　本进程读过 ' + esc(String(x.read == null ? 0 : x.read)) + ' 次'
+              : '　<span class="wa-dim">缺席（模块不在场或没有 pending 口）</span>');
+          }).join('<br>') + '</div>'
+        + '<div class="wa-dim">缺席的源**不静默消失**：它们既不在条目里，也不被说成「没有待办」。</div>');
+    });
+    on('#wa-td-drill', () => {
+      const P = WA.pendingCenter;
+      if (!P || typeof P.describe !== 'function') return tdMiss('统一待办中心（describe 口）');
+      let r = null;
+      try { r = WA.pendingCenter.items({}); } catch (e) { r = null; }
+      if (!r || r.ok !== true) return tdOut('<div class="wa-log wa-log-warn">读不出条目 ⇒ 无从下钻：' + esc(todoWhy(r && r.reason)) + '</div>');
+      const rows = r.rows || [];
+      if (!rows.length) return tdOut('<div class="wa-log wa-log-info">此刻没有条目可下钻。</div><div class="wa-dim">（空态的三种含义见「空态三旗标」。）</div>');
+      const first = rows[0];
+      const kind = String((first && first.kind) || '');
+      const ref = String((first && first.ref) || '');
+      //   下钻**只调引擎的路由口**（describe）：本页不自己拼「去哪一页」的表 ——
+      //   拼一份就等于持有第二份路由真源（ROUTE_PAGE 在引擎里）。
+      let d = null;
+      try { d = WA.pendingCenter.describe(kind, ref); } catch (e) { d = null; }
+      if (!d || d.ok !== true) {
+        return tdOut('<div class="wa-log wa-log-warn">下钻读不出：' + esc(todoWhy(d && d.reason)) + '</div>'
+          + '<div class="wa-dim">条目仍在（' + esc(kind) + '/' + esc(ref) + '），只是路由口答不出 —— 本页不自己编一条路由。</div>');
+      }
+      tdOut('<div class="wa-log wa-log-info">下钻一条（**只给路由**，不执行确认动作）：</div>'
+        + '<div class="wa-item">条目：' + esc(String(d.title || '(未命名)')) + '　类型 <code>' + esc(String(d.kind)) + '</code>'
+        + '　看哪条 <code>' + esc(String(d.id || '?')) + '</code></div>'
+        + '<div class="wa-item">去哪看：<b>' + esc(String(d.page || '（引擎未给）')) + '</b> 页　·　来源模块 <code>'
+        + esc(String(d.module || d.kind)) + '</code>　·　设置键 <code>' + esc(String(d.settingsKey || '（无）')) + '</code></div>'
+        + '<div class="wa-item">可处理：' + (d.canAct ? '<b>是</b>（去上面那一页）' : '<span class="wa-dim">否（只读条目）</span>')
+        + '　被挡：' + (d.blocked ? '<b>' + esc(String(d.blocked)) + '</b>' : '<span class="wa-dim">无（源此刻 ok）</span>') + '</div>'
+        + '<div class="wa-dim">' + esc(String(d.note || '')) + '　本页<b>零跳转副作用</b>：只报路由，不改页签、不改状态。</div>');
+    });
+    on('#wa-td-flags', () => {
+      const P = WA.pendingCenter;
+      if (!P || typeof P.items !== 'function') return tdMiss('统一待办中心');
+      const cfg = (typeof P.getSettings === 'function') ? P.getSettings() : {};
+      const r = (cfg.enabled === false) ? null : WA.pendingCenter.items({});
+      const d = (typeof P.diagnose === 'function') ? P.diagnose() : null;
+      const f = function (b, yes, no) { return b ? '<b>' + yes + '</b>' : '<span class="wa-dim">' + no + '</span>'; };
+      tdOut('<div class="wa-log wa-log-info">空态三旗标（真源 <code>WA.pendingCenter.items()</code> 的返回）—— '
+        + '三种「空」在读数上同形，语义完全不同，本页逐条分开报</div>'
+        + '<div class="wa-item">① unavailable（所有来源都读不到）：'
+        + (r ? f(r.unavailable, '是', '否') : '<span class="wa-dim">中心关着 ⇒ 该旗标不成立</span>') + '</div>'
+        + '<div class="wa-item">② emptyAll（在场的源**全部**自报无数据）：'
+        + (r ? f(r.emptyAll, '是', '否') + '　自报空的源 ' + esc(String(r.emptyReported)) + ' / 在场 ' + esc(String(r.sourceCount))
+          : '<span class="wa-dim">中心关着 ⇒ 该旗标不成立</span>') + '</div>'
+        + '<div class="wa-item">③ allClear（读过且此刻没有待办）：'
+        + (r ? f(r.allClear, '是', '否') + '　条目 ' + esc(String((r.rows || []).length)) : '<span class="wa-dim">中心关着 ⇒ 该旗标不成立</span>') + '</div>'
+        + (d ? '<div class="wa-item">empty 申报面：在场源 ' + esc(String(d.liveSources)) + ' / 申报 empty 的 '
+          + esc(String(d.emptyReporterCount)) + ' ⇒ emptyAll 这盏灯<b>' + (d.emptyAllReachable ? '可亮' : '不可亮（无人申报）')
+          + '</b>　' + (d.emptyAllReachable ? '' : '<span class="wa-dim">' + esc(String(d.note || '')) + '</span>') + '</div>'
+          : '<div class="wa-dim">诊断口不可用（<code>pendingCenter.diagnose</code> 缺席）—— 申报面读不出。</div>')
+        + '<div class="wa-dim">本页对三旗标**只读不解释过头**：不可区分的情形如实写「不可区分」，不猜成「没有待办」。</div>');
+    });
+    on('#wa-td-diag', () => {
+      const P = WA.pendingCenter;
+      if (!P || typeof P.diagnose !== 'function') return tdMiss('统一待办中心（diagnose 口）');
+      const d = WA.pendingCenter.diagnose();
+      const st = (typeof P.stat === 'function') ? P.stat() : null;
+      const checks = d.checks || {};
+      const keys = Object.keys(checks);
+      tdOut('<div class="wa-log wa-log-info">诊断（真源 <code>WA.pendingCenter.diagnose()</code> / <code>stat()</code>）：'
+        + 'closedLoop ' + (d.closedLoop ? '成立' : '不成立') + '　版本 ' + esc(String(d.version || '?')) + '</div>'
+        + '<div class="wa-item">在场检查：'
+        + keys.map(function (k) { return esc(k) + (checks[k] ? ' ✓' : ' ✗'); }).join('　') + '</div>'
+        + '<div class="wa-item">源面：共 ' + esc(String(d.sourceCount)) + ' 源，在场 ' + esc(String(d.liveSources))
+        + '，申报 empty 的 ' + esc(String(d.emptyReporterCount)) + ' ⇒ emptyAll '
+        + (d.emptyAllReachable ? '<b>可达</b>' : '<span class="wa-dim">不可达（来源不申报时两种「空」不可区分）</span>') + '</div>'
+        + (st ? '<div class="wa-item">本进程计数：读 ' + esc(String(st.reads)) + ' 次 · 拒收 ' + esc(String(st.refused))
+          + ' 次 · 最近原因 ' + esc(String(st.lastReason || '无'))
+          + '　故障键 ' + esc(Object.keys(st.faults || {}).length) + ' 个</div>' : '')
+        + '<div class="wa-dim">本页读它只为自证在场性 —— 面板不是新的状态容器（Y4 边界 1）。</div>');
+    });
+
+    // ── v2.200.0（Y5）：世界快照与整包搬运（四枚只读 + 一枚写口 + 库操作）──────
+    //   同本仓口径：全部走 `WA.<ns>.<口>` 字面形态（清册的引用面只认这种形态）。
+    //   边界：**导入默认不覆盖**（默认支只并进不冲突的键，冲突逐项报）；
+    //   唯一写路径是 `store.transact`（合并）或快照库（另开槽）—— 面板不自己拼写入。
+    const wpsOut = function (html) { const o = $('#wa-wps-out'); if (o) o.innerHTML = html; };
+    const wpsMiss = function (label) { wpsOut('<div class="wa-log wa-log-err">' + esc(label) + '未加载 —— 这一页读的是它的读数，缺席时不拿空表冒充</div>'); };
+    const wpsText = function () { const t = $('#wa-wps-text'); return t ? String(t.value || '').trim() : ''; };
+    const wpsSetText = function (v) { const t = $('#wa-wps-text'); if (t) t.value = v || ''; };
+    const wpsRaw = function () {
+      const t = wpsText();
+      if (t) return t;
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.exportSnapshot !== 'function') return null;
+      const r = S.exportSnapshot({});
+      return r.ok ? r.snapshot : null;
+    };
+    on('#wa-wps-snap', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.exportSnapshot !== 'function') return wpsMiss('世界快照面');
+      const r = WA.worldSnapshot.exportSnapshot({});
+      if (!r.ok) return wpsOut('<div class="wa-log wa-log-warn">出快照被拒：' + esc(String(r.reason)) + '</div>'
+        + '<div class="wa-dim">这是**读不出**，不是「世界是空的」。</div>');
+      wpsSetText(JSON.stringify(r.snapshot, null, 2));
+      const c = r.counts || {};
+      wpsOut('<div class="wa-log wa-log-info">快照已生成（真源 <code>WA.worldSnapshot.exportSnapshot()</code>）：'
+        + '指纹 <code>' + esc(String(r.sig)) + '</code>　' + Math.round(r.bytes / 1024) + 'KB　面 ' + esc(String(c.faces)) + '</div>'
+        + '<div class="wa-item">面计数：人物 ' + esc(String(c.people)) + '　纪事 ' + esc(String(c.chronicle))
+        + '　事实 ' + esc(String(c.facts)) + '　拍账 ' + esc(String(c.ledger)) + '　章节 ' + esc(String(c.chapters))
+        + '　势力 ' + esc(String(c.factions)) + '</div>'
+        + (r.missing && r.missing.length ? '<div class="wa-dim">本局没有的面（如实报缺，不当成空）：' + esc(r.missing.join('、')) + '</div>' : '')
+        + (r.stripped && r.stripped.length ? '<div class="wa-log wa-log-warn">密钥类键已剔除：' + esc(r.stripped.join('、')) + '（剔了就要说 —— 静默剔除等于用户以为带上了）</div>' : '')
+        + (r.skippedHost && r.skippedHost.length ? '<div class="wa-dim">宿主态已剔除（不可复现，带进来会让「逐字一致」变成「大部分一致」）：' + esc(r.skippedHost.join('、')) + '</div>' : '')
+        + (r.dropped && r.dropped.length ? '<div class="wa-dim">运行期脏字段已剔除 ' + esc(String(r.dropped.length)) + ' 类（<code>__*</code>）</div>' : ''));
+    });
+    on('#wa-wps-json', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.toJSON !== 'function') return wpsMiss('世界快照面（toJSON 口）');
+      const r = WA.worldSnapshot.toJSON({});
+      if (!r.ok) return wpsOut('<div class="wa-log wa-log-warn">序列化被拒：' + esc(String(r.reason)) + '</div>');
+      wpsSetText(r.text);
+      wpsOut('<div class="wa-log wa-log-info">可读 JSON 已生成：' + Math.round(r.bytes / 1024) + 'KB　指纹 <code>'
+        + esc(String(r.sig)) + '</code>　（文本已回填到下面的输入框，可直接复制）</div>');
+    });
+    on('#wa-wps-check', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.checkCompat !== 'function') return wpsMiss('世界快照面（checkCompat 口）');
+      const raw = wpsRaw();
+      if (!raw) return wpsOut('<div class="wa-log wa-log-warn">没有可检查的快照：请先出 JSON / 取槽 / 粘贴一份。</div>');
+      const r = WA.worldSnapshot.checkCompat(raw);
+      const d = r.diff || {};
+      wpsOut('<div class="wa-log ' + (r.blocking ? 'wa-log-err' : 'wa-log-info') + '">兼容检查（真源 <code>checkCompat()</code>）：'
+        + (r.blocking ? '<b>拒绝导入</b>' : (r.ok ? '<b>可导入</b>' : '<b>可导入但需处置冲突</b>')) + '　原因 <code>' + esc(String(r.reason)) + '</code></div>'
+        + (r.detail ? '<div class="wa-item">' + esc(String(r.detail)) + '</div>' : '')
+        + '<div class="wa-item">版本：快照格式 ' + esc(String(d.snapshotVer)) + '（受支持 ' + esc((d.accepted || []).join('/')) + '）'
+        + '　快照 schema ' + esc(String(d.snapshotSchema)) + ' vs 当前 ' + esc(String(d.currentSchema)) + '</div>'
+        + '<div class="wa-item">未知面（这个模块不在这局里 —— 不是「空」）：'
+        + ((d.unknownFaces || []).length ? '<b>' + esc(d.unknownFaces.join('、')) + '</b>' : '<span class="wa-dim">无</span>') + '</div>'
+        + '<div class="wa-item">命名冲突：' + ((d.conflicts || []).length
+          ? (d.conflicts || []).map(function (c) { return esc(String(c.face)) + '(' + esc(String(c.n)) + ')'; }).join('　')
+          : '<span class="wa-dim">无</span>') + '</div>'
+        + '<div class="wa-dim">不兼容时**拒绝并说明差异** —— 不做「尽力而为」的静默降级（Y5 边界 2）。</div>');
+    });
+    on('#wa-wps-preview', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.previewImport !== 'function') return wpsMiss('世界快照面（previewImport 口）');
+      const raw = wpsRaw();
+      if (!raw) return wpsOut('<div class="wa-log wa-log-warn">没有可预览的快照：请先出 JSON / 取槽 / 粘贴一份。</div>');
+      const mode = (function () { const m = $('#wa-wps-mode'); return m ? m.value : 'merge'; })();
+      const conf = (function () { const c = $('#wa-wps-conf'); return c ? c.value : 'skip'; })();
+      const ovr = !!(function () { const o = $('#wa-wps-ovr'); return o && o.checked; })();
+      const r = WA.worldSnapshot.previewImport(raw, { mode: mode, onConflict: conf, overwrite: ovr });
+      if (!r.ok) return wpsOut('<div class="wa-log wa-log-err">预览不可用（导入会被拒）：' + esc(String(r.reason)) + '　' + esc(String(r.detail || '')) + '</div>'
+        + '<div class="wa-dim">**先修差异再导入** —— 预览失败时不许「试一次看看」。</div>');
+      const line = function (t, arr) {
+        return '<div class="wa-item">' + t + '：' + (arr.length
+          ? arr.map(function (x) { return esc(String(x.face)) + (x.n ? '(' + esc(String(x.n)) + ')' : ''); }).join('　')
+          : '<span class="wa-dim">无</span>') + '</div>';
+      };
+      wpsOut('<div class="wa-log wa-log-info">导入预览（真源 <code>previewImport()</code>，**未写任何东西**）：'
+        + '模式 <b>' + esc(String(r.mode)) + '</b>　冲突策略 <b>' + esc(String(r.onConflict)) + '</b>　'
+        + '容量 ' + Math.round(r.bytes / 1024) + 'KB / ' + Math.round(r.budget / 1024) + 'KB</div>'
+        + line('将要新增', r.willAdd) + line('将要覆盖', r.willOverwrite)
+        + line('将要跳过（冲突保留）', r.willSkip) + line('将要改名', r.willRename)
+        + (r.capacityOk ? '' : '<div class="wa-log wa-log-err">容量预检不通过：' + esc(String(r.capacityReason)) + '（超限**拒收**，不静默截断）</div>'));
+    });
+    on('#wa-wps-import', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.importSnapshot !== 'function') return wpsMiss('世界快照面（importSnapshot 口）');
+      const raw = wpsRaw();
+      if (!raw) return wpsOut('<div class="wa-log wa-log-warn">没有可导入的快照。</div>');
+      const mode = (function () { const m = $('#wa-wps-mode'); return m ? m.value : 'merge'; })();
+      const conf = (function () { const c = $('#wa-wps-conf'); return c ? c.value : 'skip'; })();
+      const ovr = !!(function () { const o = $('#wa-wps-ovr'); return o && o.checked; })();
+      const r = WA.worldSnapshot.importSnapshot(raw, { mode: mode, onConflict: conf, overwrite: ovr });
+      if (!r.ok) return wpsOut('<div class="wa-log wa-log-err">导入被拒：' + esc(String(r.reason)) + '　' + esc(String(r.detail || '')) + '</div>'
+        + '<div class="wa-dim">被拒就是没写进去 —— 本页不提供「再来一次」的旁路。</div>');
+      if (r.mode === 'newslot') {
+        return wpsOut('<div class="wa-log wa-log-info">已另开槽：<code>' + esc(String(r.slot)) + '</code>　'
+          + Math.round(r.bytes / 1024) + 'KB　指纹 <code>' + esc(String(r.sig)) + '</code></div>'
+          + '<div class="wa-dim">当前世界<b>一格未动</b>（槽在快照库里，不进存档）。</div>');
+      }
+      const line = function (t, arr) {
+        return '<div class="wa-item">' + t + '：' + (arr.length
+          ? arr.map(function (x) { return esc(String(x.face)) + (x.n ? '(' + esc(String(x.n)) + ')' : '') + (x.why ? '/' + esc(String(x.why)) : ''); }).join('　')
+          : '<span class="wa-dim">无</span>') + '</div>';
+      };
+      wpsOut('<div class="wa-log ' + (r.partial ? 'wa-log-warn' : 'wa-log-info') + '">导入完成（模式 merge，写路径唯一：'
+        + '<code>store.transact</code>）' + (r.partial ? '　<b>部分处置</b>（有冲突键被保留/覆盖）' : '') + '</div>'
+        + line('已新增', r.added) + line('已覆盖', r.overwritten)
+        + line('已跳过（冲突未覆盖）', r.skipped) + line('已改名进来', r.renamed)
+        + '<div class="wa-dim">默认不覆盖：跳过是**如实结论**，不是失败（Y5 边界 1）。</div>');
+    });
+    on('#wa-wps-lib', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.library !== 'function') return wpsMiss('世界快照面（library 口）');
+      const r = WA.worldSnapshot.library();
+      wpsOut('<div class="wa-log wa-log-info">快照库（真源 <code>WA.worldSnapshot.library()</code>；'
+        + '落在 <code>localStorage</code>，**不进存档**）：' + esc(String(r.count)) + ' / ' + esc(String(r.max)) + ' 槽</div>'
+        + (r.rows.length ? '<div class="wa-item">' + r.rows.map(function (x) {
+            return '　' + esc(String(x.slot)) + '　指纹 <code>' + esc(String(x.sig)) + '</code>　'
+              + Math.round(x.bytes / 1024) + 'KB　面 ' + esc(String((x.counts || {}).faces));
+          }).join('<br>') + '</div>'
+          : '<div class="wa-dim">库是空的（「还没存过」与「存了读不出」是两件事 —— 这是前者）。</div>')
+        + '<div class="wa-dim">库里的槽是「还没搬进来的行李」：世界事实只该有一个家。</div>');
+    });
+    on('#wa-wps-take', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.libTake !== 'function') return wpsMiss('世界快照面（libTake 口）');
+      const nm = (function () { const i = $('#wa-wps-slot'); return i ? String(i.value || '').trim() : ''; })();
+      if (!nm) return wpsOut('<div class="wa-log wa-log-warn">请先填槽名。</div>');
+      const r = WA.worldSnapshot.libTake(nm);
+      if (!r.ok) return wpsOut('<div class="wa-log wa-log-warn">取槽失败：' + esc(String(r.reason)) + '（槽名 <code>' + esc(String(r.slot)) + '</code>）</div>');
+      wpsSetText(JSON.stringify(r.snapshot, null, 2));
+      wpsOut('<div class="wa-log wa-log-info">已取槽 <code>' + esc(String(r.slot)) + '</code>　指纹 <code>'
+        + esc(String(r.sig)) + '</code>（内容已回填到快照文本框）</div>');
+    });
+    on('#wa-wps-drop', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.libDrop !== 'function') return wpsMiss('世界快照面（libDrop 口）');
+      const nm = (function () { const i = $('#wa-wps-slot'); return i ? String(i.value || '').trim() : ''; })();
+      if (!nm) return wpsOut('<div class="wa-log wa-log-warn">请先填槽名。</div>');
+      const r = WA.worldSnapshot.libDrop(nm);
+      wpsOut(r.ok ? ('<div class="wa-log wa-log-info">已删槽 <code>' + esc(String(r.slot)) + '</code>　剩余 '
+        + esc(String(r.remaining)) + ' 槽（只动快照库那一格，世界状态没动）</div>')
+        : ('<div class="wa-log wa-log-warn">删槽失败：' + esc(String(r.reason)) + '</div>'));
+    });
+    on('#wa-wps-blue', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.toBlueprint !== 'function') return wpsMiss('世界快照面（toBlueprint 口）');
+      const raw = wpsRaw();
+      if (!raw) return wpsOut('<div class="wa-log wa-log-warn">没有可转的快照。</div>');
+      const r = WA.worldSnapshot.toBlueprint(raw);
+      if (!r.ok) return wpsOut('<div class="wa-log wa-log-warn">转蓝图被拒：' + esc(String(r.reason)) + '　' + esc(String(r.detail || '')) + '</div>'
+        + '<div class="wa-dim">蓝图导出面会自己判「本局结构面够不够」—— 本页不代它算。</div>');
+      wpsOut('<div class="wa-log wa-log-info">快照 → 蓝图（真源 <code>worldBlueprint.exportBlueprint</code>）：'
+        + '蓝图指纹 <code>' + esc(String(r.bpSig)) + '</code>　来源快照 <code>' + esc(String(r.fromSig)) + '</code></div>'
+        + '<div class="wa-item"><b>单向有损</b>：不承载在蓝图里的面 —— '
+        + esc((r.dropped || []).join('、')) + '</div>'
+        + '<div class="wa-dim">' + esc(String(r.note || '')) + '</div>');
+    });
+    on('#wa-wps-graph', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.exportSnapshot !== 'function') return wpsMiss('世界快照面');
+      const raw = wpsRaw();
+      if (!raw) return wpsOut('<div class="wa-log wa-log-warn">没有可转的快照。</div>');
+      const r = WA.worldSnapshot.toBlueprint(raw);
+      wpsOut(r.ok ? '<div class="wa-log wa-log-info">本局可转蓝图（真源结论来自蓝图导出面，不是本页自算）</div>'
+        : '<div class="wa-log wa-log-warn">本局**转不出蓝图**：' + esc(String(r.reason)) + '　' + esc(String(r.detail || '')) + '</div>'
+          + '<div class="wa-dim">蓝图要的是结构面（人物 / 势力 / 地名 / 道路）齐全，与快照是否完整是两件事。</div>');
+    });
+    on('#wa-wps-round', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.roundTrip !== 'function') return wpsMiss('世界快照面（roundTrip 口）');
+      const raw = wpsRaw();
+      if (!raw) return wpsOut('<div class="wa-log wa-log-warn">没有可对照的快照。</div>');
+      const r = WA.worldSnapshot.roundTrip(raw, null);
+      if (!r.ok && r.snapshotSig === undefined) return wpsOut('<div class="wa-log wa-log-warn">对照组不出来：' + esc(String(r.reason)) + '</div>');
+      wpsOut('<div class="wa-log ' + (r.ok ? 'wa-log-info' : 'wa-log-warn') + '">导出→往返同源对照：'
+        + (r.ok ? '<b>关键面逐字一致</b>' : '<b>不一致</b>') + '</div>'
+        + '<div class="wa-item">快照指纹 <code>' + esc(String(r.snapshotSig)) + '</code>　活世界指纹 <code>' + esc(String(r.liveSig)) + '</code>'
+        + '　对照面 ' + esc(String(r.compared)) + '</div>'
+        + (r.absent && r.absent.length ? '<div class="wa-dim">活世界里没有的面（如实报缺）：' + esc(r.absent.join('、')) + '</div>' : '')
+        + '<div class="wa-dim">对照的是<b>内容哈希</b>：计数相同不等于内容相同（改名、同形互换都会在这里现形）。</div>');
+    });
+    on('#wa-wps-diag', () => {
+      const S = WA.worldSnapshot;
+      if (!S || typeof S.diagnose !== 'function') return wpsMiss('世界快照面（diagnose 口）');
+      const d = WA.worldSnapshot.diagnose();
+      const st = (typeof S.stat === 'function') ? S.stat() : null;
+      wpsOut('<div class="wa-log wa-log-info">诊断（真源 <code>WA.worldSnapshot.diagnose()</code>）：'
+        + '白名单面 ' + esc(String(d.facesLive)) + ' / ' + esc(String(d.facesDeclared)) + ' 在本局</div>'
+        + '<div class="wa-item">本局缺席的面：' + (d.facesMissing.length ? esc(d.facesMissing.join('、')) : '<span class="wa-dim">无</span>') + '</div>'
+        + '<div class="wa-item">密钥名单（' + esc(String(d.secretsDeclared.length)) + '）：' + esc(d.secretsDeclared.join('、'))
+        + '　宿主态名单（' + esc(String(d.hostStateDeclared.length)) + '）：' + esc(d.hostStateDeclared.join('、')) + '</div>'
+        + '<div class="wa-item">store ' + (d.storeAvailable ? '可用' : '<span class="wa-dim">不可用</span>')
+        + '　蓝图面 ' + (d.blueprintAvailable ? '可用' : '<span class="wa-dim">缺席（互转转不出）</span>')
+        + '　快照库 ' + esc(String(d.library.count)) + '/' + esc(String(d.library.max))
+        + '　世界 ' + Math.round(d.bytes / 1024) + 'KB / 预算 ' + Math.round(d.budget / 1024) + 'KB</div>'
+        + (st ? '<div class="wa-item">本进程计数：导出 ' + esc(String(st.exports)) + ' · 导入 ' + esc(String(st.imports))
+          + ' · 预览 ' + esc(String(st.previews)) + ' · 拒收 ' + esc(String(st.refused))
+          + '　最近原因 ' + esc(String(st.lastReason || '无')) + '</div>' : '')
+        + '<div class="wa-dim">密钥与宿主态是**显式名单**（不是靠前缀猜）—— 名单本身可在这里当场核。</div>');
+    });
+    // ── v2.201.0（Y6）：世界历史检索（三枚只读 + 一枚写口 + 两条只读出口）────────
+    const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) o.innerHTML = html; };
+    const hsQ = function () { const i = $('#wa-hs-q'); return i ? String(i.value || '').trim() : ''; };
+    const hsFaceSel = function () { const s = $('#wa-hs-face'); return s ? String(s.value || '') : ''; };
+    /** 面名 → 中文标签。**真源是引擎的 FACE_LABELS**（本页不自带第二份面清单 ——
+     *  自造一份就等于自造判定，面板与引擎会各说一遍）。引擎缺席时如实回落成面名本身。 */
+    const hsLabel = function (f) {
+      const L = (WA.historySearch && WA.historySearch.FACE_LABELS) || null;
+      return (L && L[f]) ? L[f] : String(f);
+    };
+    /** 行渲染：每行都带**来源与定位**（边界 ③ —— 说不清哪来的行引擎不给，这里也就不渲染）。 */
+    const hsRows = function (rows, blind, deferred, empty) {
+      const head = (blind.length || deferred.length)
+        ? '<div class="wa-log wa-log-warn">本次**没查全**：'
+          + (blind.length ? '读不到的面 <b>' + esc(blind.map(function (f) { return hsLabel(f); }).join('、')) + '</b>' : '')
+          + (blind.length && deferred.length ? '；' : '')
+          + (deferred.length ? '被扫描上限挡下的面 <b>' + esc(deferred.map(function (f) { return hsLabel(f); }).join('、')) + '</b>' : '')
+          + '　—— 结果里没有它们的命中，但这**不等于**它们没有。</div>'
+        : '';
+      if (!rows.length) {
+        return head + '<div class="wa-dim">' + (empty
+          ? '六个面都读得到，且**确实一条都没中**（这是「真的没有」，不是「查不了」）。'
+          : '本次没有命中行（但上面那几面没查全 —— 先看那句话）。') + '</div>';
+      }
+      return head + '<div class="wa-item">' + rows.map(function (x) {
+        const at = (x.at === null || x.at === undefined) ? '<span class="wa-dim">时间未知</span>' : ('@' + esc(String(x.at)));
+        return '　<b>' + esc(hsLabel(x.face)) + '</b>　' + esc(String(x.title)) + '　' + at
+          + '<br>　　<span class="wa-dim">来源 <code>' + esc(String(x.source)) + '</code>　定位 <code>' + esc(String(x.ref))
+          + '</code>　路由 → ' + esc(String((x.route || {}).page || '（无）')) + '</span>'
+          + (x.text ? '<br>　　' + esc(String(x.text)) : '')
+          + ((x.snippet && x.snippet !== x.text) ? '<br>　　<span class="wa-dim">…' + esc(String(x.snippet)) + '…</span>' : '');
+      }).join('<br>') + '</div>' + '<div class="wa-dim">共 ' + rows.length + ' 行（显示上限只影响这里；命中计数走「只数一条」）。</div>';
+    };
+    const hsMiss = function (what) { hsOut('<div class="wa-log wa-log-warn">' + esc(what) + '未装载 —— 本页不自己造一份数据。</div>'); };
+    on('#wa-hs-go', () => {
+      const H = WA.historySearch;
+      if (!H || typeof H.search !== 'function') return hsMiss('检索面（search 口）');
+      const q = hsQ();
+      if (!q) return hsOut('<div class="wa-log wa-log-warn">请先填检索词。</div>');
+      const face = hsFaceSel();
+      const lim = (function () { const i = $('#wa-hs-limit'); const v = i ? String(i.value || '').trim() : ''; return v ? Number(v) : null; })();
+      const opts = {};
+      if (face) opts.faces = [face];
+      if (lim !== null && isFinite(lim)) opts.limit = lim;
+      const r = WA.historySearch.search(q, opts);
+      if (!r.ok) return hsOut('<div class="wa-log wa-log-warn">拒收：<code>' + esc(String(r.reason)) + '</code>'
+        + (r.known ? '（认得的名字：' + esc(r.known.join('、')) + '）' : '') + '</div>');
+      const rem = (function () { const c = $('#wa-hs-remember'); return !!(c && c.checked); })();
+      let rememberNote = '';
+      if (rem && typeof H.remember === 'function') {
+        const w = WA.historySearch.remember(q, { faces: r.faces, matched: r.matched });
+        rememberNote = w.ok ? '' : '<div class="wa-dim">（记进最近查询失败：<code>' + esc(String(w.reason)) + '</code> —— 如实报出，不假装记上了）</div>';
+      }
+      hsOut('<div class="wa-log wa-log-info">检索 <code>' + esc(r.query) + '</code>（真源 <code>WA.historySearch.search()</code>）：'
+        + '命中 <b>' + esc(String(r.matched)) + '</b> 条 / 扫过 ' + esc(String(r.scanned)) + ' 条'
+        + '　用时 ' + esc(String(r.ms)) + 'ms　面 ' + esc(r.faces.map(function (f) { return hsLabel(f); }).join('+')) + '</div>'
+        + hsRows(r.rows, r.blind || [], r.deferred || [], r.empty) + rememberNote);
+    });
+    on('#wa-hs-count', () => {
+      const H = WA.historySearch;
+      if (!H || typeof H.count !== 'function') return hsMiss('检索面（count 口）');
+      const q = hsQ();
+      if (!q) return hsOut('<div class="wa-log wa-log-warn">请先填检索词。</div>');
+      const face = hsFaceSel();
+      const r = WA.historySearch.count(q, face ? { faces: [face] } : {});
+      if (!r.ok) return hsOut('<div class="wa-log wa-log-warn">拒收：<code>' + esc(String(r.reason)) + '</code></div>');
+      hsOut('<div class="wa-log wa-log-info">共命中 <b>' + esc(String(r.matched)) + '</b> 条'
+        + '（<code>count()</code> 不把命中行拿回来）'
+        + (r.blind && r.blind.length ? '　<b>注意</b>：' + esc(String(r.blind.length)) + ' 个面这次读不到，计数**不是全量**' : '')
+        + (r.empty ? '　（真的没有 —— 六个面都读得到）' : '') + '</div>');
+    });
+    on('#wa-hs-recent', () => {
+      const H = WA.historySearch;
+      if (!H || typeof H.recent !== 'function') return hsMiss('检索面（recent 口）');
+      const r = WA.historySearch.recent();
+      hsOut('<div class="wa-log wa-log-info">最近查询（真源 <code>WA.historySearch.recent()</code>；'
+        + '落本机 <code>localStorage</code>，**不进存档、不进注入面**）：' + esc(String(r.count)) + ' / ' + esc(String(r.max)) + ' 条</div>'
+        + (r.rows.length ? '<div class="wa-item">' + r.rows.map(function (x) {
+            return '　' + esc(String(x.q)) + '　<span class="wa-dim">面 ' + esc(String((x.faces || []).join('/')))
+              + '　命中 ' + esc(String(x.matched === null || x.matched === undefined ? '（当时没记）' : x.matched)) + '</span>';
+          }).join('<br>') + '</div>'
+          : '<div class="wa-dim">还没有检索记录（「没查过」与「记不上」是两件事 —— 这是前者）。</div>')
+        + '<div class="wa-dim">库里只存「查询词 + 常用过滤面」这一份偏好：索引与结果**一律不落盘**（边界 ②）。</div>');
+    });
+    on('#wa-hs-clear', () => {
+      const H = WA.historySearch;
+      if (!H || typeof H.clearRecent !== 'function') return hsMiss('检索面（clearRecent 口）');
+      const r = WA.historySearch.clearRecent();
+      hsOut(r.ok
+        ? '<div class="wa-log wa-log-info">检索记录已清空（只动了本模块那一格偏好键 —— 世界一格未动）。</div>'
+        : '<div class="wa-log wa-log-warn">清空失败：<code>' + esc(String(r.reason)) + '</code> —— 如实报出，不假装清掉了。</div>');
+    });
+    on('#wa-hs-filters', () => {
+      const H = WA.historySearch;
+      if (!H || typeof H.filters !== 'function') return hsMiss('检索面（filters 口）');
+      const r = WA.historySearch.filters();
+      hsOut('<div class="wa-log wa-log-info">常用过滤面：' + (r.faces.length
+        ? '<b>' + esc(r.faces.map(function (f) { return hsLabel(f); }).join('、')) + '</b>'
+        : '<span class="wa-dim">还没查过（不预置默认值 —— 预置一份就等于替你做了决定）</span>') + '</div>'
+        + '<div class="wa-dim">落盘按**引擎的规范面序**归一：同一组面换个点击顺序，存下来的内容逐字相同。</div>');
+    });
+    // 功能 ④：从结果跳到来源面 —— **只读跳转**（切页即止，本页不代写、不代查）。
+    on('#wa-hs-jumpface', () => {
+      const H = WA.historySearch;
+      if (!H || !H.ROUTES) return hsMiss('检索面（ROUTES 表）');
+      const s = $('#wa-hs-jumpface');
+      const face = s ? String(s.value || '') : '';
+      if (!face) return;
+      const page = H.ROUTES[face];
+      if (!page) return hsOut('<div class="wa-log wa-log-warn">这一面没有路由出口（引擎的路由表里没写）。</div>');
+      const tab = panelEl.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === page; })[0];
+      if (!tab) return hsOut('<div class="wa-log wa-log-warn">目标页 <code>' + esc(String(page)) + '</code> 不在页表里（路由表与页表脱节）。</div>');
+      tab.click();
+      if (s) s.value = '';
+      // 切页会重建 body ⇒ 上面那个出口节点已经不在树里；把话说在新页的出口上会串页，
+      //   故这里只在**旧容器还在**时留一句（多半已不在，静默即正确行为）。
+      const o = $('#wa-hs-out');
+      if (o) o.innerHTML = '<div class="wa-dim">已跳到来源页。</div>';
+    });
+    on('#wa-hs-diag', () => {
+      const H = WA.historySearch;
+      if (!H || typeof H.diagnose !== 'function') return hsMiss('检索面（diagnose 口）');
+      const d = WA.historySearch.diagnose();
+      // ⚠ 同上：全限定名才进引用面（诊断面「本进程计数」是真消费者，不是自用）。
+      const st = (typeof WA.historySearch.stat === 'function') ? WA.historySearch.stat() : null;
+      hsOut('<div class="wa-log wa-log-info">诊断（真源 <code>WA.historySearch.diagnose()</code>）：'
+        + '六面在场 <b>' + esc(String(d.live)) + ' / ' + esc(String(d.live + d.absent)) + '</b>'
+        + '　store 读取面 ' + (d.storeRead ? '可用' : '<span class="wa-dim">不可用</span>') + '</div>'
+        + '<div class="wa-item">' + (d.catalog || []).map(function (c) {
+            return '　' + (c.ok ? '●' : '○') + ' ' + esc(c.label) + ' <span class="wa-dim">'
+              + (c.ok ? '（走 ' + esc(String(c.via)) + '）' : '（读不到：' + esc(String(c.via)) + '）') + '</span>'
+              + (c.route ? ' <span class="wa-dim">→ ' + esc(String(c.route)) + '</span>' : '');
+          }).join('<br>') + '</div>'
+        + '<div class="wa-item">路由表：' + esc(Object.keys(d.routes || {}).map(function (k) { return hsLabel(k) + '→' + d.routes[k]; }).join('　')) + '</div>'
+        + '<div class="wa-item">上限：单次显示 ' + esc(String(d.caps.maxRows)) + ' 行 / 扫 ' + esc(String(d.caps.maxScanned)) + ' 条'
+        + '　偏好键 <code>' + esc(String(d.lsKey)) + '</code>　世界顶层键新增 <b>' + esc(String(d.storeTopKeys)) + '</b></div>'
+        + (st ? '<div class="wa-item">本进程计数：查询 ' + esc(String(st.queries)) + ' · 命中合计 ' + esc(String(st.matchedTotal))
+          + ' · 拒收 ' + esc(String(st.refused)) + ' · 「没查全」（blind）次数 ' + esc(String(st.blindness))
+          + '　最近原因 ' + esc(String(st.lastReason || '无')) + '　最近用时 ' + esc(String(st.lastMs === null ? '（还没查过）' : st.lastMs + 'ms')) + '</div>' : '')
+        + '<div class="wa-dim">「场次」不等于「质量」：上面每个面都写清走的**哪个口** —— 换掉读法时这里会跟着变。</div>');
+    });
+    // ── v2.202.0（Y7）：地图与关系可视化（五枚只读 + 一枚写口也没有）────────────────
+    //   与其他页不同的一点：**本页连一个写口都没有**（对比 find 页的「记进最近查询 / 清空记录」）。
+    //   全页按钮一律走只读读口；偏好键（enabled / 预算）只由引擎的 setSettings 暴露给设置页，
+    //   本页不碰 —— 这是边界 ④「零写入」在界面上的**结构**保证，不是一句声明。
+    const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) o.innerHTML = html; };
+    const wgSel = function () {
+      const k = $('#wa-wg-kinds'), e = $('#wa-wg-edges');
+      const kinds = k && String(k.value || '') ? [String(k.value)] : null;
+      const edges = e && String(e.value || '') ? [String(e.value)] : null;
+      return { kinds: kinds, edges: edges };
+    };
+    const wgLabel = function (k) {
+      const L = (WA.worldGraph && WA.worldGraph.KINDS) || null;
+      if (L && L.indexOf(k) >= 0) return ({ people: '人物', orgs: '组织', places: '地点' })[k] || k;
+      return String(k);
+    };
+    const wgMiss = function (what) {
+      wgOut('<div class="wa-log wa-log-err">读不到：' + esc(what) + '（本页只读既有表）</div>');
+    };
+    const wgAnomHtml = function (g) {
+      const a = g.anomalies || { orphan: [], dangling: [], cyclic: [] };
+      const none = !a.orphan.length && !a.dangling.length && !a.cyclic.length;
+      return '<div class="wa-item">异常（引擎只标不删）：孤儿边 <b>' + a.orphan.length + '</b> · 悬空边 <b>'
+        + a.dangling.length + '</b> · 绕圈 <b>' + a.cyclic.length + '</b>'
+        + (none ? ' <span class="wa-dim">（三类均无 —— 图上没有坏数据）</span>' : '') + '</div>'
+        + a.orphan.slice(0, 5).map(function (x) {
+            return '<div class="wa-item"><span class="wa-dim">孤儿</span> ' + esc(x.from) + '→' + esc(x.to)
+              + ' <span class="wa-dim">（' + esc(x.why) + '：这条边没有依据也没有来源标签，故被标出而不是丢掉）</span></div>';
+          }).join('')
+        + a.dangling.slice(0, 5).map(function (x) {
+            return '<div class="wa-item"><span class="wa-dim">悬空</span> ' + esc(x.from) + '→' + esc(x.to)
+              + ' <span class="wa-dim">（' + esc(x.missingSide) + ' 端点不在本次节点集里）</span></div>';
+          }).join('')
+        + a.cyclic.slice(0, 5).map(function (c) {
+            return '<div class="wa-item"><span class="wa-dim">绕圈</span> ' + esc(c.join(' → ')) + '</div>';
+          }).join('');
+    };
+    const wgAbsentHtml = function (g) {
+      const ab = g.absent || { nodeKinds: [], edgeKinds: [] };
+      if (!ab.nodeKinds.length && !ab.edgeKinds.length) return '';
+      return '<div class="wa-item"><span class="wa-dim">本次读不到（与「本来就没有」是两件事）：</span>'
+        + ab.nodeKinds.map(function (x) { return ' 节点·' + esc(wgLabel(x.kind)) + '（' + esc(x.reason) + '）'; }).join('　')
+        + ab.edgeKinds.map(function (x) { return ' 边·' + esc(x.kind) + '（' + esc(x.reason) + '）'; }).join('　') + '</div>';
+    };
+    on('#wa-wg-build', () => {
+      const G = WA.worldGraph;
+      if (!G || typeof G.graph !== 'function') return wgMiss('图谱面（graph 口）');
+      const s = wgSel();
+      const g = WA.worldGraph.graph({ kinds: s.kinds || undefined, edges: s.edges || undefined });
+      if (!g.ok) return wgOut('<div class="wa-log wa-log-err">建图被拒：' + esc(String(g.reason)) + '</div>');
+      wgOut('<div class="wa-log wa-log-info">建图（真源 <code>WA.worldGraph.graph()</code>）：节点 <b>'
+        + g.counts.nodes + '</b> / 边 <b>' + g.counts.edges + '</b>'
+        + '　分布 ' + esc(Object.keys(g.counts.byKind).map(function (k) { return wgLabel(k) + ' ' + g.counts.byKind[k]; }).join(' / ')) + '</div>'
+        + '<div class="wa-item">边来源：' + esc(Object.keys(g.counts.byEdgeKind).map(function (k) { return k + ' ' + g.counts.byEdgeKind[k]; }).join('　')) + '</div>'
+        + (g.truncated.nodes || g.truncated.edges
+            ? '<div class="wa-item"><span class="wa-dim">受预算降级（不是丢数据）：节点截 ' + g.truncated.nodes + ' / 边截 ' + g.truncated.edges + '</span></div>' : '')
+        + wgAbsentHtml(g) + wgAnomHtml(g)
+        + '<div class="wa-dim">' + esc(g.basisNote || '') + '</div>');
+    });
+    on('#wa-wg-geo', () => {
+      const G = WA.worldGraph;
+      if (!G || typeof G.geo !== 'function') return wgMiss('图谱面（geo 口）');
+      const i = $('#wa-wg-from');
+      const from = i ? String(i.value || '').trim() : '';
+      const r = WA.worldGraph.geo(from ? { from: from } : {});
+      if (!r.ok) return wgOut('<div class="wa-log wa-log-err">地理视图读不到：' + esc(String(r.reason)) + '</div>');
+      wgOut('<div class="wa-log wa-log-info">地理视图（真源 <code>WA.worldGraph.geo()</code>）：路 <b>' + r.roads
+        + '</b> · 中转 <b>' + r.transit + '</b>'
+        + (r.from ? '　起点 <code>' + esc(r.from) + '</code>' : '') + '</div>'
+        + '<div class="wa-item">' + esc(r.reachNote) + (r.reach && r.reach.length
+            ? '：' + esc(r.reach.map(function (x) { return x.to + '（' + x.status + '）'; }).join('、')) : '') + '</div>'
+        + (r.blocked.length ? '<div class="wa-item"><span class="wa-dim">非通行路：</span>'
+            + esc(r.blocked.map(function (x) { return x.from + '→' + x.to + '(' + x.status + ')'; }).join('、')) + '</div>' : '')
+        + (r.untouched.length ? '<div class="wa-item"><span class="wa-dim">端点在别处（未探索一侧）：</span>'
+            + esc(r.untouched.map(function (x) { return x.from + '→' + x.to + '(' + x.side + ')'; }).join('、')) + '</div>' : '')
+        + (r.zones ? '<div class="wa-item"><span class="wa-dim">' + esc(r.zones.note) + '（unknown ' + r.zones.unknown + ' 处）</span></div>' : ''));
+    });
+    on('#wa-wg-time', () => {
+      const G = WA.worldGraph;
+      if (!G || typeof G.timeline !== 'function') return wgMiss('图谱面（timeline 口）');
+      const r = WA.worldGraph.timeline({});
+      if (!r.ok) return wgOut('<div class="wa-log wa-log-err">时间轴读不到：' + esc(String(r.reason)) + '</div>');
+      wgOut('<div class="wa-log wa-log-info">时间轴（真源 <code>WA.worldGraph.timeline()</code>）：带时间戳的关系 <b>'
+        + r.datedCount + '</b> 条' + (r.chapter ? '　当前章 <b>第' + r.chapter.no + '章</b> ' + esc(r.chapter.title || '') : '') + '</div>'
+        + (r.dated.length ? r.dated.slice(-8).map(function (x) {
+            return '<div class="wa-item">' + esc(x.from) + '×' + esc(x.to) + '：' + esc((x.types || []).join('、'))
+              + ' <span class="wa-dim">（登记于 ' + new Date(x.at).toLocaleString() + '）</span></div>';
+          }).join('') : '<div class="wa-dim">尚无带时间戳的关系登记。</div>')
+        + r.undated.map(function (x) {
+            return '<div class="wa-item"><span class="wa-dim">' + esc(x.kind) + '：' + esc(x.why) + '</span></div>';
+          }).join(''));
+    });
+    on('#wa-wg-suggest', () => {
+      const G = WA.worldGraph;
+      if (!G || typeof G.suggest !== 'function') return wgMiss('图谱面（suggest 口）');
+      const r = WA.worldGraph.suggest({});
+      if (!r.ok) return wgOut('<div class="wa-log wa-log-err">建议来源读不到：' + esc(String(r.reason)) + '</div>');
+      wgOut('<div class="wa-log wa-log-info">建议来源（真源 <code>WA.worldGraph.suggest()</code>）：</div>'
+        + '<div class="wa-dim">' + esc(r.note) + '</div>'
+        + (r.zeroNote ? '<div class="wa-item"><span class="wa-dim">' + esc(r.zeroNote) + '</span></div>' : '')
+        + (r.items.length ? r.items.slice(0, 10).map(function (x) {
+            return '<div class="wa-item"><b>' + esc(x.place) + '</b> 度数 ' + x.degree
+              + (x.blocked ? ' <span class="wa-dim">（既有表标了 blocked）</span>' : '')
+              + ' <span class="wa-dim">（域 ' + esc(x.zone) + '）</span><br><span class="wa-dim">依据：'
+              + esc((x.basis || []).join('；')) + '</span></div>';
+          }).join('') : '<div class="wa-dim">图上没有可提的地点节点（读不到与本来是空是两件事，见诊断）。</div>')
+        + wgAnomHtml(r));
+    });
+    on('#wa-wg-anom', () => {
+      const G = WA.worldGraph;
+      if (!G || typeof G.graph !== 'function') return wgMiss('图谱面（graph 口）');
+      const g = WA.worldGraph.graph({});
+      if (!g.ok) return wgOut('<div class="wa-log wa-log-err">建图被拒：' + esc(String(g.reason)) + '</div>');
+      wgOut('<div class="wa-log wa-log-info">异常三类（真源 <code>WA.worldGraph.graph().anomalies</code>）——'
+        + '本页<b>只标不删</b>：「图上少了一条」与「本来就没有那条」必须是两幅画面。</div>'
+        + wgAnomHtml(g)
+        + (g.probeSkew ? '<div class="wa-item"><span class="wa-dim">环探测未覆盖 ' + g.probeSkew + ' 条边（超探测上限，如实报）。</span></div>' : ''));
+    });
+    on('#wa-wg-locate-go', () => {
+      const G = WA.worldGraph;
+      if (!G || typeof G.locate !== 'function') return wgMiss('图谱面（locate 口）');
+      const i = $('#wa-wg-locate');
+      const id = i ? String(i.value || '').trim() : '';
+      if (!id) return wgOut('<div class="wa-log wa-log-err">未给 id：请填一个节点 id 或名字（本页不猜）。</div>');
+      const s = wgSel();
+      const r = WA.worldGraph.locate(id, s.kinds && s.kinds[0]);
+      if (!r.ok) return wgOut('<div class="wa-log wa-log-err">定位不到 <code>' + esc(id) + '</code>：'
+        + esc(String(r.reason)) + (r.reason === 'ambiguous-label' && r.candidates
+          ? '（重名，故不替你选：' + esc(r.candidates.map(function (x) { return x.kind + ':' + x.id; }).join('、')) + '）'
+          : '（「不在本次节点集里」不等于「不存在」—— 先看预算与读不到名单）') + '</div>');
+      wgOut('<div class="wa-log wa-log-info">定位（真源 <code>WA.worldGraph.locate()</code>）：<b>'
+        + esc(r.node.label) + '</b> <span class="wa-dim">' + esc(wgLabel(r.node.kind)) + ' · id <code>'
+        + esc(r.node.id) + '</code> · 来源 ' + esc(r.node.source)
+        + ' · 按 ' + esc(String(r.matchedBy)) + ' 匹配</span></div>');
+    });
+    on('#wa-wg-diag', () => {
+      const G = WA.worldGraph;
+      if (!G || typeof G.diagnose !== 'function') return wgMiss('图谱面（diagnose 口）');
+      const d = WA.worldGraph.diagnose();
+      const st = (typeof WA.worldGraph.stat === 'function') ? WA.worldGraph.stat() : null;
+      wgOut('<div class="wa-log wa-log-info">诊断（真源 <code>WA.worldGraph.diagnose()</code>）：'
+        + '开关 ' + (d.enabled ? '开' : '关') + '　预算 节点 ' + d.budget.nodes + ' / 边 ' + d.budget.edges
+        + '　上限 节点 ' + d.caps.maxNodes + ' / 边 ' + d.caps.maxEdges + '</div>'
+        + '<div class="wa-item">节点类：' + esc(d.kinds.join('　')) + '　边来源：' + esc(d.edgeKinds.join('　')) + '</div>'
+        + '<div class="wa-item">此刻：' + (d.live.reason ? esc(String(d.live.reason)) : '节点 ' + d.live.nodes + ' / 边 ' + d.live.edges
+            + ' / 孤儿 ' + d.live.orphan + ' / 悬空 ' + d.live.dangling + ' / 绕圈 ' + d.live.cyclic
+            + '　环探测未覆盖 ' + d.live.probeSkew) + '</div>'
+        + (st ? '<div class="wa-item">本进程计数：建图 ' + st.builds + ' 次 · 最近节点 ' + st.nodes + ' / 边 ' + st.edges
+          + '　拒收 ' + esc(String(JSON.stringify(st.faults))) + '</div>' : '')
+        + '<div class="wa-dim">' + esc(d.source) + '</div>');
+    });
   }
 
   // ── 面板与悬浮球 ──

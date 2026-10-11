@@ -771,6 +771,73 @@ function runWitness(WA) {
     if (!one.ok) return [];
     return [Cp.save('手动乙', { scope: 'global' }).reason];
   });
+  // ── v2.200.0（第四批 Y5）：世界快照与整包搬运的六个新码 ──
+  //   六条全是**本版新增的公开失败归因**（导出侧两种「读不出」/ 导入侧三种拒收 /
+  //   快照库写失败），不是存量未分类。本仓口径：「文件在场」不构成分类依据 ——
+  //   码要有可执行见证才算有归属（见证 = 用产品真 API 把它跑出来）。
+  {
+    const S5 = WA.worldSnapshot;
+    if (S5 && typeof S5.exportSnapshot === 'function') {
+      // ① `empty-world`：世界一个键都没有 ⇒ 如实报「读不出」，不拿空快照冒充。
+      //    ⚠ 前置必须真置出来：mock 宿主的 store.get() 出生即 96 键骨架，
+      //    「空世界」默认造不出 ⇒ 临时把读取面换成空对象（走的是源码那条分支）。
+      want('empty-world', 'Y5：世界一个键都没有 ⇒ exportSnapshot 如实报「读不出」，不拿空快照冒充');
+      trip('empty-world', function () {
+        const keep = WA.store.get;
+        try {
+          WA.store.get = function () { return {}; };
+          return S5.exportSnapshot({}).reason;
+        } finally { WA.store.get = keep; }
+      });
+      // ② `empty-snapshot`：点名要导的面一个都不在场 —— 与「世界是空的」**分列**
+      //    （一个说「世界读不出」，一个说「你要的那几面不在这局里」，处置不同）。
+      want('empty-snapshot', 'Y5：点名要导的面一个都不在场 ⇒ empty-snapshot 并逐项报缺席面');
+      trip('empty-snapshot', function () {
+        return S5.exportSnapshot({ faces: ['notARealFace', 'alsoNotReal'] }).reason;
+      });
+      const t5 = S5.toJSON({});
+      const snapText = t5.ok ? t5.text
+        : '{"wsVer":1,"schemaVersion":1,"faces":{"people":{"A":{"name":"甲"}}}}';
+      // ③ `bad-snapshot-ver`：格式版本不在受支持面 ⇒ 拒收并说明差异（边界 2：不静默降级）。
+      want('bad-snapshot-ver', 'Y5：快照格式版本不在 ACCEPTED ⇒ 拒收并说明差异（不做「尽力而为」的降级）');
+      trip('bad-snapshot-ver', function () {
+        const bad = JSON.parse(snapText);
+        bad.wsVer = 99;
+        return S5.checkCompat(bad).reason;
+      });
+      // ④ `schema-ahead`：快照存档 schema **比当前新** ⇒ 拒收；
+      //    比当前旧则放行但如实标注（两种方向处置不同，故只有「更新」这一侧进本码）。
+      want('schema-ahead', 'Y5：快照 schema 高于当前世界 ⇒ schema-ahead（拒收，不拿旧世界硬装新存档）');
+      trip('schema-ahead', function () {
+        const ahead = JSON.parse(snapText);
+        ahead.schemaVersion = 999;
+        return S5.checkCompat(ahead).reason;
+      });
+      // ⑤ `budget-exceeded`：超预算**拒收而不截断** —— 截断会让「搬过来了」变成半句话。
+      //    真读口是 previewImport 的 capacityReason（导入侧的第一个闸）。
+      want('budget-exceeded', 'Y5：快照体积超预算 ⇒ budget-exceeded（拒收，绝不静默截断）');
+      trip('budget-exceeded', function () {
+        const big = JSON.parse(snapText);
+        big.bytes = 3 * 1024 * 1024;   // 引擎 MAX_BYTES = 2 MiB
+        const pv = S5.previewImport(big, {});
+        return [pv && pv.capacityReason, (pv && pv.reason)].filter(Boolean);
+      });
+      // ⑥ `ls-write-failed`：快照库写失败要如实报，不能让「存下了」与实际相反。
+      //    ⚠ 两处病灶定位（各红过一轮）：
+      //      · `lsSet` 走 **window.localStorage.setItem**，摘 global.localStorage 碰不到；
+      //      · `libPut` **不是导出面**，须经 importSnapshot 的 newslot 支真走一次。
+      want('ls-write-failed', 'Y5：快照库写入抛 ⇒ 如实报 ls-write-failed（不把「没存下」报成存下了）');
+      trip('ls-write-failed', function () {
+        const w = (typeof window !== 'undefined' && window.localStorage) || global.localStorage;
+        if (!w || typeof w.setItem !== 'function') return '';
+        const keep = w.setItem;
+        try {
+          w.setItem = function () { throw new Error('见证：库写失败'); };
+          return S5.importSnapshot(snapText, { mode: 'newslot' }).reason;
+        } finally { w.setItem = keep; }
+      });
+    }
+  }
   // ── v2.85.0（B2 地域与交通 + B1 人物生活）六个新码 ──
   //   场景**必须记忆化**：这批探针会登记地点（甲/乙/丙）与人物（独1/独2），
   //   重复跑第二次时「甲已登记」「独1 已有承诺」都会改变结论——首跑才对得上，二跑就成了另一个场景。
@@ -5153,6 +5220,133 @@ function runWitness(WA) {
         return r.reason;
       });
       trip('bad-round', function () { return GGw.gate('thread', { round: '不是数' }).reason; });
+    }
+  }
+  // ── v2.202.0（第四批 Y7）：地图与关系可视化（engines/world-graph.js）三码 ──
+  //   本仓口径（本扇区头注）：**新码必须有可执行见证**，不得静默进基线。三条各自用真 API 触发：
+  //     ① bad-edge-kind —— 与 bad-kind **同一口径**的边侧入口。
+  //        它治的病：白名单是判据面，未知类名整条拒收、不静默忽略。
+  //        `graph({kinds:['nope']})` 早已有见证，而 `graph({edges:['nope']})` 首版**根本没校验**
+  //        —— 探针实录：返回 `{ok:true, counts.edges:0}`，即「玩家以为这个来源没有边，
+  //        事实是来源名打错了」两幅画面长得一样。本见证同时钉住「边侧与节点侧同宽」。
+  //     ② source-absent —— bonds 边只有一条来源（`store.bonds.rows`）。
+  //        骨架里它是 `{rows: []}`（**表在场、零行**），故「读不到这张表」必须显式摘掉才可达。
+  //        这正是本码与「本来就没有」分家的地方（实测：摘掉前 `edges('bonds')` 是 ok:true/rows:0；
+  //        摘掉后才是 ok:false/source-absent）—— 若把空表当成「源不可读」，玩家会
+  //        在一张真存在的空表上看到「读不到」，两类事实从此在界面上同形。
+  //     ③ ambiguous-label —— locate 的 label 面。首版只按 id 匹配，而 id 在界面上**从不显示**
+  //        （「有出口、无从使用」）；加了 label 面就必然遇上重名，本码就是「重名不猜」的落点。
+  //        夹具：两个不同 key、同一 name 的 people（id 面各不命中 ⇒ 才走到 label 面）。
+  {
+    const WGw = WA.worldGraph;
+    if (WGw && typeof WGw.graph === 'function') {
+      want('bad-edge-kind', 'Y7：边来源名单里出现未知类名 ⇒ 整条拒收并带回 edgeKinds（与节点侧 bad-kind 同口径，不做静默忽略）');
+      trip('bad-edge-kind', function () { return WGw.graph({ edges: ['nope'] }).reason; });
+      want('source-absent', 'Y7：bonds 的源头（store.bonds.rows）整个不在 ⇒ 如实报 source-absent（不是把空表读成「读不到」，也不是把读不到读成「本来就没有」）');
+      trip('source-absent', function () {
+        // ⚠ 归因走**公开口**取：`edges` 是模块内私有面（导出面只留页面真走的口，
+        //   见 engines/world-graph.js 导出处的注释 —— nodes / edges / cycles 三面
+        //   一律不导出）。首版这句写的是 `WGw.edges('bonds')`，踩在已摘除的口上：
+        //   TypeError 被本函数的 try/catch 吞成「没跑出来」，门禁于是如实报
+        //   「见证缺失（触发路径在、码跑不出）」—— 判据对象没变（仍是那条真归因），
+        //   坏的是**通向它的路**。改走 `graph().absent.edgeKinds[]`：同一份归因，
+        //   与 bad-edge-kind 同一族，且不为一条见证在接口面上重开旁路。
+        WA.store.transact(function (d) { delete d.bonds; }, 'reject-witness:drop-bonds');
+        const g = WGw.graph({ edges: ['bonds'] });
+        const misses = (g.absent && g.absent.edgeKinds) || [];
+        return misses.map(function (x) { return x.reason; }).concat([g.reason]);
+      });
+      want('ambiguous-label', 'Y7：按显示名定位命中多个同名节点 ⇒ 报 ambiguous-label 并列出候选（**不猜**：猜一个就等于替用户在两个人里选了一个）');
+      trip('ambiguous-label', function () {
+        WA.store.transact(function (d) {
+          d.people = { p_1: { name: '同名者' }, p_2: { name: '同名者' } };
+        }, 'reject-witness:amb');
+        return WGw.locate('同名者').reason;
+      });
+    }
+  }
+  // ── v2.203.0（第四批 Y8）：规则包三码（engines/rule-pack.js）──
+  //   与前面各段同规矩：新码必须带可执行见证（走真 API 真撞），不得静默进基线。
+  //     · carries-world-facts —— 夹带世界事实在**写盘之前**被拦。这一条治的病最典型：
+  //       发包方把 `people` 塞进 body 顶层，而消费方只读 `values` ⇒ 它一路沉默地进来又
+  //       沉默地丢掉，而「这份包里其实带着一份人物表」在手上那份 JSON 里**肉眼可见**。
+  //     · conflict —— 冲突的包在写盘之前被拒（不让「后启用的赢」）。
+  //       见证走真冲撞：先把当前面钉在一个确定值上存包，再把当前面改成另一个值，
+  //       于是两侧在**同一个设置键**上确定性地不同（不用猜库里的默认值）。
+  //     · preset-world-absent —— 组合口取不到预设世界草稿面时如实拒一半。
+  //       这一条判的是边界：本模块**不**自己读一遍世界（那会变成第二份真源）。
+  {
+    const RPw = WA.rulePack;
+    if (RPw && typeof RPw.detect === 'function') {
+      RPw.setSettings({ enabled: true });
+      want('carries-world-facts', 'Y8：导入体顶层带着世界事实字段（人物/事件/地图）⇒ 写盘之前拒收并带回名单（不静默丢弃）');
+      trip('carries-world-facts', function () {
+        return [RPw.importPack(JSON.stringify({ rulePack: 1, name: 'w-carried', world: { a: 1 },
+          values: { worldaxis_theme_settings_v1: { themes: [] } } })).reason];
+      });
+      want('conflict', 'Y8：包与当前面在同一个设置键上写了不同值 ⇒ 拒收并指出是哪一条（不做「后启用的赢」）');
+      trip('conflict', function () {
+        RPw.drop('w-conflict');
+        if (WA.difficulty && WA.difficulty.setSettings) WA.difficulty.setSettings({ resistance: 'normal' });
+        RPw.save('w-conflict', {});
+        if (WA.difficulty && WA.difficulty.setSettings) WA.difficulty.setSettings({ resistance: 'hard' });
+        const r = RPw.apply('w-conflict');
+        if (WA.difficulty && WA.difficulty.setSettings) WA.difficulty.setSettings({ resistance: 'normal' });
+        return [r.reason, (RPw.admit('w-conflict') || {}).reason];
+      });
+      want('preset-world-absent', 'Y8：组合口取不到预设世界草稿面 ⇒ 如实拒一半（本模块不自己读一遍世界 —— 那是第二份真源）');
+      trip('preset-world-absent', function () {
+        const keep = WA.presetWorld;
+        try { WA.presetWorld = null; return [(RPw.compose({ pack: 'w-conflict' }).seed || {}).reason]; }
+        finally { WA.presetWorld = keep; }
+      });
+      // 见证自己的夹具不许留在设置族里（后面的用例还用同一份现场）
+      RPw.drop('w-conflict');
+    }
+  }
+  // ── v2.203.0（第四批 Y9）：世界实验室五码（engines/world-lab.js）──
+  //   Y9 的四个功能每一个都有「要联动的引擎缺席」与「读数面过期」两类归因，
+  //   逐条各报各的 —— 把五道折成一个「不许」会让现场无法归因是哪一道卡着。
+  {
+    const WLw = WA.worldLab;
+    if (WLw && typeof WLw.simulate === 'function') {
+      WLw.setSettings({ enabled: true });
+      if (WA.causal && WA.causal.setSettings) WA.causal.setSettings({ enabled: true });
+      want('causal-absent', 'Y9：推进面（causal.tick）缺席 ⇒ 拒收而不是自己写一套推进逻辑（真跑与试演必须同一路径）');
+      trip('causal-absent', function () {
+        const keep = WA.causal;
+        try { WA.causal = null; return [(WLw.simulate({ rounds: 1 }) || {}).reason]; }
+        finally { WA.causal = keep; }
+      });
+      want('no-report', 'Y9：还没跑过沙盒推进就来读结果 / 采纳 ⇒ 如实报没有报告（不凭空给原因）');
+      trip('no-report', function () {
+        WLw.discard();
+        return [(WLw.report({}) || {}).reason, (WLw.adopt({ index: 0 }) || {}).reason];
+      });
+      want('stale-report', 'Y9：跑完沙盒之后世界变过了 ⇒ 这份报告已不是当前结论，采纳它按 stale-report 拒收（不静默按旧结论写真世界）');
+      trip('stale-report', function () {
+        WLw.simulate({ rounds: 2 });
+        WA.store.transact(function (d) { d.__waStaleLab = (d.__waStaleLab || 0) + 1; }, 'reject-witness:lab-stale');
+        const r = WLw.adopt({ index: 0 });
+        WA.store.transact(function (d) { delete d.__waStaleLab; }, 'reject-witness:lab-stale-restore');
+        return [r.reason];
+      });
+      want('commit-absent', 'Y9：选择性采纳必须走 U2 的统一提交 ⇒ 提交面缺席时拒收，不退回自己开事务（回执与世界写入同一 draft）');
+      trip('commit-absent', function () {
+        WLw.simulate({ rounds: 2 });
+        const keep = WA.commit;
+        let got = '';
+        try { WA.commit = null; got = (WLw.adopt({ index: 0 }) || {}).reason || ''; }
+        finally { WA.commit = keep; }
+        return [got];
+      });
+      want('beat-ledger-absent', 'Y9：拍账（beatLedger.view）缺席 ⇒ 拍引擎联动拒收，不自造一份拍序');
+      trip('beat-ledger-absent', function () {
+        const keep = WA.beatLedger;
+        try { WA.beatLedger = null; return [(WLw.beats({ ahead: 2 }) || {}).reason]; }
+        finally { WA.beatLedger = keep; }
+      });
+      WLw.discard();
     }
   }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });

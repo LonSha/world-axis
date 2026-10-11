@@ -163,7 +163,11 @@ function runA(a) {
   // 边界① 零写：只在**剥掉注释与字符串**的代码面上查（模块头正是在讲这条边界）
   const codeNoStr = codeNoStrOf(src);   // 判据工具单一真源（A/C 两段共用）
   a(codeNoStr.indexOf('transact') < 0, 'e9/A10: 真代码里零 store 事务（实验绝不写 live）');
-  a(codeNoStr.indexOf('draft') < 0, 'e9/A11: 真代码里零 draft 赋值');
+  // ── v2.203.0（Y9）收窄：Y9 的 adopt 走 `WA.commit.chain` 的回调，入参就叫 `draft`
+  //   （并在其上追加一条 worldFacts）。真义从来是「**不自造** draft」——
+  //   这一分支的 draft 是 commit 交接过来的，模块自己一份都没建（那才是边界①）。
+  a(codeNoStr.indexOf('WA.draft') < 0 && !/[^.\w]draft\s*=(?!=)/.test(codeNoStr),
+    'e9/A11: 真代码里零**自造** draft（draft 只作 commit.chain 回调入参出现，不得自建 / 重绑）');
   //   只查**代码面**：模块头与口径注释里逐字写着「零 localStorage 写」——那是这条边界的证据。
   a(codeNoStr.indexOf('localStorage') < 0, 'e9/A12: 真代码里零 localStorage（连读都不碰；注释里的说明不算）');
   ['rehearsal', 'exec', 'worldBlueprint', 'depCheck'].forEach(function (ns) {
@@ -267,7 +271,7 @@ function runA(a) {
       for (let i = 0; i < 3; i++) { if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) - (B[i] || 0); }
       return 0;
     };
-    a(cmp(mv, '2.197.0') >= 0, 'e9/A51: 入口版本不低于本锁的交付基线（实 ' + mv + '）');
+    a(cmp(mv, '2.203.0') >= 0, 'e9/A51: 入口版本不低于本锁的交付基线（实 ' + mv + '）');
   }
 }
 // ── B 段：运行时行为 ───────────────────────────────────────────────────
@@ -589,7 +593,7 @@ function runN(a) {
       },
       want: 'disabled' },
     { n: 3, why: 'N3: live 前后摘要不再比对（liveUnchanged 成常量）⇒ 「零写入」从实测退化成声明',
-      from: '    const liveUnchanged = !!(before.ok && after.ok && before.digest === after.digest);',
+      from: '    const liveUnchanged = !!(before.ok && after.ok && before.digest === after.digest);\n    _stat.runs++;',
       to: '    const liveUnchanged = true;',
       probe: function (__src) {
         const WA = hostWith(__src, LAB());
@@ -726,7 +730,7 @@ function runN(a) {
       },
       want: [false, 'export-failed'] },
     { n: 16, why: 'N16: 丢弃时不真清读数 ⇒ 丢弃成了「一句声明」，旧实验还能被当当前结论读',
-      from: "    _lab = null;\n    if (had) _stat.discarded++;",
+      from: "    _lab = null; _sim = null;\n    if (had) _stat.discarded++;",
       to: "    if (had) _stat.discarded++;",
       probe: function (__src) {
         const WA = hostWith(__src, LAB());

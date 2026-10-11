@@ -163,7 +163,9 @@ function runA(a) {
   MUST_BE_ABSENT.forEach(function (k) {
     a(new RegExp('\\b' + k + ':').test(body) === false, 'e7/A3: 导出面**没有** ' + k + '（零消费方不挂导出）');
   });
-  a(/const DEF = \{ enabled: false, packs: \[\], active: '', maxPacks: 24, maxKeys: 40, seq: 0 \}/.test(src),
+  // v2.203.0（Y8）：DEF 多了 `note` / `history` 两栏（回滚栈 + 沿革）——
+  //   锚点同步，仍逐字钉住原来那七项声明。
+  a(/const DEF = \{ enabled: false, packs: \[\], active: '', maxPacks: 24, maxKeys: 40, seq: 0,\s*\n\s*note: '', history: \[\] \};/.test(src),
     'e7/A4: 默认关 + 包清单/活跃包/两项容量/序号声明逐字在位');
   a(/bounds: \{ maxPacks: \[1, 64\], maxKeys: \[4, 96\] \}/.test(src), 'e7/A5: 两项容量区间声明逐字在位');
   a(/LS_KEY = 'worldaxis_rule_pack_settings_v1'/.test(src), 'e7/A6: 设置键是单一真源');
@@ -182,7 +184,11 @@ function runA(a) {
   a(codeNoStr.indexOf('transact') < 0,
     'e7/A11: **零 store 写** —— 真代码里没有 transact（注释里的说明不算）');
   a(codeNoStr.indexOf('draft') < 0, 'e7/A12: 真代码里零 draft（规则包不碰世界）');
-  a(src.indexOf('WA.store.get') < 0, 'e7/A13: 连 store 读面都不碰（它读的是设置族）');
+  // v2.203.0（Y8）：新增的 `historyWorldProbe()` 用 `WA.store.get()` **只读** 比对世界摘要
+  //   （判「这次操作有没有碰到世界」）。真义收窄为「对 store 只读、零写口」。
+  a(src.indexOf('WA.store.transact') < 0 && src.indexOf('WA.store.set') < 0
+    && src.indexOf('.localStorage.setItem') < 0,
+    'e7/A13: 对 store 只读（比对世界摘要用）、零写口');
   // 边界⑤ settingsBus 唯一写路径
   a(src.indexOf('localStorage.setItem') < 0 && src.indexOf('setItem(') < 0,
     'e7/A14: 零 localStorage 写（设置走 settingsBus）');
@@ -306,7 +312,7 @@ function runA(a) {
       for (let i = 0; i < 3; i++) { if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) - (B[i] || 0); }
       return 0;
     };
-    a(cmp(mv, '2.197.0') >= 0, 'e7/A49: 入口版本不低于本锁的交付基线（实 ' + mv + '）');
+    a(cmp(mv, '2.203.0') >= 0, 'e7/A49: 入口版本不低于本锁的交付基线（实 ' + mv + '）');
   }
 }
 // ── B 段：运行时行为 ───────────────────────────────────────────────────
@@ -377,7 +383,14 @@ function runB(a) {
     // ⑤ 切换：真把设置面切回去（改掉再切回）
     seedTheme(H, ['别的']);
     a(H.rulePack.current({}).themes.themes.join() === '别的', 'e7/B22: 先把设置面改掉（对照组）');
-    const ap = H.rulePack.apply('甲包');
+    // ── v2.203.0（Y8）：先改设置面再 apply 现在被**冲突门**在写盘之前拦住 ──
+    //   这正是新功能（不做「后启用的赢」），故两向断言：不带 force 必报 conflict​​，
+    //   带 force（呼叫方明说的逃生口）才真切。
+    const ap0 = H.rulePack.apply('甲包');
+    a(ap0.ok === false && ap0.reason === 'conflict',
+      'e7/B22b: 与当前面冲突的包在**写盘之前**被拒（实 ' + ap0.reason + ' / 共 '
+      + (ap0.count || 0) + ' 条冲突）');
+    const ap = H.rulePack.apply('甲包', { force: true });
     a(ap.ok === true && ap.applied.length >= 1 && ap.failed.length === 0,
       'e7/B23: 切换成功且逐键回带（实写回 ' + ap.applied.length + ' 键）');
     a(H.rulePack.current({}).themes.themes.join() === '悬疑', 'e7/B24: 切换**真把设置面切回去了**（端到端）');
@@ -567,8 +580,8 @@ function runN(a) {
   const SRC = srcOf();
   const CASES = [
     { n: 1, why: 'N1: 默认关被翻成开 ⇒ 「我没开它」与「它一直在写」两件事合一',
-      from: "  const DEF = { enabled: false, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0 };",
-      to: "  const DEF = { enabled: true, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0 };",
+      from: "  const DEF = { enabled: false, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,",
+      to: "  const DEF = { enabled: true, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,",
       // 判据取的是**入参那份源码**建的宿主（不是模块顶层的原版常量）——
       //   否则破坏副本永远进不来，这一条会退化成「对原文件断言」。
       probe: function (__src) { const WA = hostWith(__src, ENGINES); return WA.rulePack.getSettings().enabled; },

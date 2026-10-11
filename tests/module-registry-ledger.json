@@ -1,18 +1,23 @@
 {
- "version": "2.197.0",
- "loadOrderCount": 217,
- "loadedCount": 205,
+ "version": "2.203.0",
+ "loadOrderCount": 220,
+ "loadedCount": 208,
  "uiCount": 12,
- "nsCount": 213,
+ "nsCount": 216,
  "totals": {
-  "loadEdges": 108,
+  "loadEdges": 111,
   "hardEdges": 0,
-  "callRefs": 212,
+  "callRefs": 218,
   "ghostRefs": 0
  },
  "loadErrors": {},
  "skipped": [],
- "unmappedSettings": [],
+ "unmappedSettings": [
+  {
+   "key": "worldaxis_worldgraph_v1",
+   "module": "world-graph"
+  }
+ ],
  "modules": {
   "core/clock.js": {
    "ns": [
@@ -71,6 +76,7 @@
     "engines/gen-gate.js",
     "engines/group-refuse.js",
     "engines/hazard.js",
+    "engines/history-search.js",
     "engines/inject-value.js",
     "engines/inst.js",
     "engines/investigation.js",
@@ -126,9 +132,11 @@
     "engines/word-budget.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
     "engines/world-seed.js",
+    "engines/world-snapshot.js",
     "render/purifier.js"
    ]
   },
@@ -302,6 +310,7 @@
     "engines/freight.js",
     "engines/gen-gate.js",
     "engines/group-refuse.js",
+    "engines/history-search.js",
     "engines/inject-value.js",
     "engines/inst.js",
     "engines/investigation.js",
@@ -347,9 +356,11 @@
     "engines/word-budget.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
-    "engines/world-seed.js"
+    "engines/world-seed.js",
+    "engines/world-snapshot.js"
    ]
   },
   "core/exec.js": {
@@ -3444,6 +3455,25 @@
    ],
    "consumedBy": []
   },
+  "engines/world-snapshot.js": {
+   "ns": [
+    "worldSnapshot"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
   "engines/diplomacy.js": {
    "ns": [
     "diplomacy"
@@ -3741,6 +3771,44 @@
    "stateKeys": [
     "worldaxis_world_lab_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/history-search.js": {
+   "ns": [
+    "historySearch"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/world-graph.js": {
+   "ns": [
+    "worldGraph"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   }
  }

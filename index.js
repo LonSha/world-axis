@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.197.0'
+  const VERSION = '2.203.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -625,6 +625,15 @@
     //   调用期依赖：registry（人物唯一写者）/ world（地点与道路形状）/ evict（蓝图库容量）
     //   —— 全在调用期取，故此处对装载期无硬依赖。
     'engines/world-blueprint.js',
+    // v2.200.0（第四批 Y5）：世界快照与整包搬运（engines/world-snapshot.js）。
+    //   位置紧随 world-blueprint：快照↔蓝图互转的两口（toBlueprint / fromBlueprint）
+    //   在调用期读 worldBlueprint.exportBlueprint —— 排在它之前会让互转面恒报 module-missing。
+    //   本模块**零新世界键**：快照库落在自己的 localStorage 键（同 presetWorld / genGate 先例，
+    //   那些不是世界事实，不该进存档）；导入面只改已经存在的面，不改骨架。
+    //   与 tool-snapshot 的分工写在模块头：那个是「整块换掉」（restore 是替换式），
+    //   本模块是「按面搬 + 默认不覆盖」—— 两种意图是两件事，合成一个口会让最坏结果
+    //   （把本地世界写没了）成为默认。
+    'engines/world-snapshot.js',
     // v2.165.0（TX1）：可谈判、可履约的势力外交（engines/diplomacy.js）。位置紧随
     //   world-blueprint：它在调用期读 store / evolution.factions / inst.authority / clock /
     //   inputGuard（全在本行之前装载），不依赖任何后装模块。
@@ -720,6 +729,22 @@
     //   本模块**零 store 写**（没有 transact、没有 draft 赋值）—— 实验全落在隔离副本上，
     //   且「live 前后摘要一致」是跑前跑后**实测**出来的，不是一句声明。
     'engines/world-lab.js',
+    // v2.201.0（第四批 Y6）：世界历史检索（engines/history-search.js）。
+    //   位置排在**全部六个检索源的装载之后**（chronicle-view / worldbook+wb-search / atlas /
+    //   rules / store 面的 people 与 evolution.factions），且仍在 ui/panel.js 之前：
+    //   本模块是**跨库只读聚合面**，装载期不需要这些源在场（一律**调用期**读），
+    //   但排在它们之后让「装载序 = 依赖序」这条读法继续成立 —— 后来者照着这一段
+    //   找依赖关系时不会先撞上一个「看起来更早、其实更晚用」的模块。
+    //   本模块**零 store 写**：没有 transact、没有 draft 赋值；只有自己那一格
+    //   localStorage 偏好键（`worldaxis_historysearch_v1`，同 presetWorld / genGate 先例）。
+    'engines/history-search.js',
+    // v2.202.0（第四批 Y7）：地图与关系可视化（engines/world-graph.js）。
+    //   位置排在 **atlas / faction-graph / bonds / store.people 四个读源之后、ui/panel.js 之前**：
+    //   本模块是**视图面**（节点与边一律调用期从既有表读），装载期不读任何上游，
+    //   但排在它们之后让「装载序 = 依赖序」这条读法继续成立。
+    //   本模块**零 store 写**：没有 transact、没有 draft 赋值；只有自己那一格
+    //   localStorage 偏好键（`worldaxis_worldgraph_v1`，同 history-search 先例）。
+    'engines/world-graph.js',
     'ui/panel.js',
     'ui/cyberpunk-theme.js',
     'ui/cyberpunk-components.js',

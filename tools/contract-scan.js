@@ -127,6 +127,16 @@ const EXEMPT = {
   //   一个是「一条记录落没落地」，一个是「一个势力兴还是衰」—— **同形不同义，不许互相校验**：
   //   若强行统一，就会出现「拍落没落库要跟势力兴衰用同一套词」这种语义错配。
   STATUSES: '同名不同义的「状态表」：beat-ledger=拍的落库状态（pending/landed）、editor-faction=势力兴衰状态（鼎盛/稳固/倾轧/困顿/衰落/瓦解）',
+  // v2.201.0（第四批 · Y6）：本批新引擎 engines/history-search.js 带一张 FACES 常量，
+  //   与 v2.182.0 就在场的 engines/perf-baseline.js 同名 —— 合法地指向不同值域，逐条说清：
+  //     · history-search 的 FACES 是**「能查哪六个库」的检索面白名单**
+  //       （chronicle/people/places/orgs/rules/entries），且它是**判据面**：
+  //       未知面名整条拒收，不静默忽略；引擎另有 FACE_LABELS 给它逐面中文名。
+  //     · perf-baseline 的 FACES 是**「性能基准量哪几个面」的采集面对象表**
+  //       （每项带 id/label/kind/layer：inject / worldState / canonAlign / diagnose / tx / save …）。
+  //   一个是「检索能查什么」，一个是「耗时按面怎么分」—— **同形不同义，不许互相校验**：
+  //   若强行统一，就会出现「检索面名单要跟性能采集面用同一套词」这种语义错配。
+  FACES: '同名不同义的「面表」：history-search=可检索的六个库（chronicle/people/places/orgs/rules/entries，检索适配器白名单且是判据面）、perf-baseline=性能采集面对象表（每项带 id/label/kind/layer：inject/worldState/canonAlign/diagnose/tx/save…）',
 };
 
 /** 具名常量数组（只认一行内形态）。 */

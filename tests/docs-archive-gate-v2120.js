@@ -182,7 +182,15 @@ function runB(a) {
   //   「同一件事在多处各写一遍，改一处不等于改全」。判据继续钉**精确等值**（防条目被误删）。
   // v2.197.0 补账：v2.197.0 条目入 README 版本历史，导语 133 → 134，本文件这条同批校正。
   //   （教训：这条计数每版都要跟 —— 它是「导语里那几个字」与「条目实数」之间的唯一判据。）
-  a(r.facts.readmeEntries === 134, 'docs-archive/B: README 版本历史条目 = 134（实 ' + r.facts.readmeEntries + '）');
+  // v2.200.0 补账：v2.200.0（Y5）条目入 README 版本历史，导语 136 → 137，本文件这条同批校正。
+  //   （教训同上：这条计数每版都要跟 —— 它是「导语里那几个字」与「条目实数」之间的唯一判据。）
+  // v2.199.0 补账：v2.198.0（Y1+Y2）与 v2.199.0（Y4）两条同期入 README 版本历史，导语 134 → 136，本文件这条同批校正（一次 +2，两条同批立起）。
+  // v2.201.0 补账：v2.201.0（Y6）条目入 README 版本历史，导语 137 → 138，本文件这条同批校正。
+  //   （教训同上：这条计数每版都要跟 —— 它是「导语里那几个字」与「条目实数」之间的唯一判据。）
+  // v2.202.0 补账：v2.202.0（Y7）条目入 README 版本历史，导语 138 → 139，本文件这条同批校正。
+  //   （教训同上：这条计数每版都要跟 —— 它是「导语里那几个字」与「条目实数」之间的唯一判据。）
+  // v2.203.0 补账：v2.203.0（Y8 + Y9）条目入 README 版本历史，导语 139 → 140，本文件这条同批校正。
+  a(r.facts.readmeEntries === 140, 'docs-archive/B: README 版本历史条目 = 140（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.197.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.197.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.203.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.203.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -314,14 +314,6 @@
       "tref": 8,
       "own": 3
     },
-    "beatFacade.blocked": {
-      "reason": "self-only",
-      "detail": "engines/beat-facade.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/beat-facade.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 9
-    },
     "beatFacade.buildBlock": {
       "reason": "self-only",
       "detail": "engines/beat-facade.js 内部自用、外部零引用（过度导出）",
@@ -329,14 +321,6 @@
       "refs": 0,
       "tref": 0,
       "own": 5
-    },
-    "beatFacade.diagnose": {
-      "reason": "self-only",
-      "detail": "engines/beat-facade.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/beat-facade.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "beatFacade.getSettings": {
       "reason": "self-only",
@@ -370,14 +354,6 @@
       "tref": 0,
       "own": 20
     },
-    "beatFacade.status": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/beat-facade.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 5
-    },
     "beatFacade.view": {
       "reason": "self-only",
       "detail": "engines/beat-facade.js 内部自用、外部零引用（过度导出）",
@@ -410,20 +386,12 @@
       "tref": 0,
       "own": 3
     },
-    "beatLedger.getSettings": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/beat-ledger.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
-    },
     "beatLedger.land": {
       "reason": "test-only",
       "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
       "src": "engines/beat-ledger.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 4,
       "own": 3
     },
     "beatLedger.plan": {
@@ -431,7 +399,7 @@
       "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
       "src": "engines/beat-ledger.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 5,
       "own": 3
     },
     "beatLedger.setSettings": {
@@ -439,7 +407,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/beat-ledger.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 9,
       "own": 1
     },
     "beatLedger.stat": {
@@ -546,28 +514,20 @@
       "tref": 0,
       "own": 3
     },
-    "beatReport.getSettings": {
+    "beatReport.report": {
+      "reason": "test-only",
+      "detail": "engines/beat-report.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/beat-report.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "beatReport.setSettings": {
       "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/beat-report.js",
       "refs": 0,
-      "tref": 1,
-      "own": 1
-    },
-    "beatReport.report": {
-      "reason": "self-only",
-      "detail": "engines/beat-report.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/beat-report.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "beatReport.setSettings": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/beat-report.js",
-      "refs": 0,
-      "tref": 0,
+      "tref": 7,
       "own": 1
     },
     "beatReport.stat": {
@@ -577,14 +537,6 @@
       "refs": 0,
       "tref": 0,
       "own": 14
-    },
-    "beatReport.view": {
-      "reason": "self-only",
-      "detail": "engines/beat-report.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/beat-report.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
     },
     "binding.bind": {
       "reason": "self-only",
@@ -857,14 +809,6 @@
       "refs": 0,
       "tref": 9,
       "own": 3
-    },
-    "chapters.current": {
-      "reason": "self-only",
-      "detail": "engines/chapters.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/chapters.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 14
     },
     "chatcache.addSnapshot": {
       "reason": "test-only",
@@ -1675,11 +1619,11 @@
       "own": 4
     },
     "difficulty.setSettings": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/difficulty.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 14,
       "own": 1
     },
     "difficulty.spanMinutes": {
@@ -2159,7 +2103,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/faction-graph.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 4,
       "own": 1
     },
     "farfield.deliver": {
@@ -2354,14 +2298,6 @@
       "tref": 5,
       "own": 3
     },
-    "foreshadow.check": {
-      "reason": "self-only",
-      "detail": "engines/foreshadow.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/foreshadow.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "foreshadow.develop": {
       "reason": "self-only",
       "detail": "engines/foreshadow.js 内部自用、外部零引用（过度导出）",
@@ -2458,14 +2394,6 @@
       "tref": 4,
       "own": 9
     },
-    "genGate.getSettings": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/gen-gate.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
-    },
     "genGate.record": {
       "reason": "test-only",
       "detail": "engines/gen-gate.js 内部自用、外部零引用（过度导出）",
@@ -2479,7 +2407,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/gen-gate.js",
       "refs": 0,
-      "tref": 4,
+      "tref": 8,
       "own": 1
     },
     "genGate.stat": {
@@ -2489,14 +2417,6 @@
       "refs": 0,
       "tref": 0,
       "own": 18
-    },
-    "genGate.view": {
-      "reason": "test-only",
-      "detail": "engines/gen-gate.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/gen-gate.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
     },
     "groupGuard.guard": {
       "reason": "self-only",
@@ -2593,6 +2513,14 @@
       "refs": 0,
       "tref": 0,
       "own": 4
+    },
+    "historySearch.searchIn": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/history-search.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
     },
     "horizon.laneCfg": {
       "reason": "test-only",
@@ -3946,14 +3874,6 @@
       "tref": 1,
       "own": 3
     },
-    "planAudit.diagnose": {
-      "reason": "self-only",
-      "detail": "engines/plan-audit.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/plan-audit.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "planAudit.equivalent": {
       "reason": "self-only",
       "detail": "engines/plan-audit.js 内部自用、外部零引用（过度导出）",
@@ -3961,14 +3881,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "planAudit.evidence": {
-      "reason": "self-only",
-      "detail": "engines/plan-audit.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/plan-audit.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 7
     },
     "planAudit.getSettings": {
       "reason": "unwired",
@@ -3983,7 +3895,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/plan-audit.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 5,
       "own": 1
     },
     "planAudit.stat": {
@@ -4354,14 +4266,6 @@
       "tref": 0,
       "own": 1
     },
-    "presetWorld.seed": {
-      "reason": "self-only",
-      "detail": "engines/preset-world.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/preset-world.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "presetWorld.setSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -4674,20 +4578,12 @@
       "tref": 0,
       "own": 4
     },
-    "recipe.policyClashes": {
-      "reason": "self-only",
-      "detail": "engines/recipe.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/recipe.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
-    },
     "recipe.setSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/recipe.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 5,
       "own": 1
     },
     "recipe.stat": {
@@ -4697,14 +4593,6 @@
       "refs": 0,
       "tref": 0,
       "own": 31
-    },
-    "recipe.themeClashes": {
-      "reason": "self-only",
-      "detail": "engines/recipe.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/recipe.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
     },
     "refine.condense": {
       "reason": "self-only",
@@ -6498,14 +6386,6 @@
       "tref": 0,
       "own": 4
     },
-    "wbSearch.search": {
-      "reason": "self-only",
-      "detail": "engines/wb-search.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/wb-search.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
-    },
     "wbSearch.searchIn": {
       "reason": "self-only",
       "detail": "engines/wb-search.js 内部自用、外部零引用（过度导出）",
@@ -6794,6 +6674,14 @@
       "tref": 2,
       "own": 3
     },
+    "worldGraph.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-graph.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 1
+    },
     "worldHealth.reset": {
       "reason": "test-only",
       "detail": "engines/world-health.js 内部自用、外部零引用（过度导出）",
@@ -6801,6 +6689,62 @@
       "refs": 0,
       "tref": 2,
       "own": 3
+    },
+    "worldSnapshot.capacity": {
+      "reason": "self-only",
+      "detail": "engines/world-snapshot.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-snapshot.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "worldSnapshot.catalog": {
+      "reason": "self-only",
+      "detail": "engines/world-snapshot.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-snapshot.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "worldSnapshot.fromBlueprint": {
+      "reason": "self-only",
+      "detail": "engines/world-snapshot.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-snapshot.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "worldSnapshot.parse": {
+      "reason": "self-only",
+      "detail": "engines/world-snapshot.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-snapshot.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
+    "worldSnapshot.reset": {
+      "reason": "self-only",
+      "detail": "engines/world-snapshot.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-snapshot.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "worldSnapshot.sigOf": {
+      "reason": "self-only",
+      "detail": "engines/world-snapshot.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-snapshot.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "worldSnapshot.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-snapshot.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 2
     },
     "worldbook.activationOf": {
       "reason": "test-only",
@@ -6862,6 +6806,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 297
+    "dataOnly": 307
   }
 }

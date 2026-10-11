@@ -1305,6 +1305,15 @@
         faults: Object.assign({}, st.faults || {}),
         failPolicies: cat ? cat.failPolicies : [],
         modules: cat ? cat.modules : [],
+        // ── v2.203.0（Y8）四栏回带：冲突三类 / 回滚栈形状 / 组合口依赖 / 夹带名单 ──
+        //   四项新功能各自依赖一个**可能不在场**的声明面（recipe / presetWorld）。
+        //   不回带的后果：“冲突判不了”与“没有冲突”在诊断面上完全同形。
+        conflictKinds: dg.conflictKinds || [],
+        conflictSources: dg.conflictSources || [],
+        rollback: dg.rollback || null, rollbackCap: (cat && cat.rollbackCap) || 0,
+        composeDeps: dg.composeDeps || {},
+        worldFactNames: (cat && cat.worldFactNames) || dg.worldFactNames || [],
+        historyDepth: st.historyDepth || 0, conflictKindCount: st.conflictKinds || 0,
         sources: dg.deps || {}
       };
     });
@@ -1335,6 +1344,11 @@
         refused: st.refused || 0, lastReason: st.lastReason || '',
         faults: Object.assign({}, st.faults || {}),
         unknowns: dg.unknowns || [],
+        // ── v2.203.0（Y9）仿真面回带：沙盒推进 / 报告 / 采纳 / 拍引擎联动 ──
+        //   四功能各自的门写在 deps 里（causalTick / commitChain /
+        //   beatLedgerView）—— 它们缺席时各自报各的码，而不是合成一个「不许」。
+        sim: Object.assign({}, dg.y9 || {}),
+        simRows: st.simRows || 0, hasReport: !!st.hasReport, writesSingle: st.writesSingle || '',
         sources: dg.deps || {}
       };
     });
@@ -2000,6 +2014,22 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   secWorldBlueprint 都读它，缺席就是「蓝图库读数缺席」本身，不该被静默兜住。
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取。
     'engines/world-blueprint.js': 'worldBlueprint',
+    // v2.200.0（第四批 Y5）：世界快照与整包搬运。缺席 ⇒ 本模块**如实报缺**
+    //   （不降级成 OPTIONAL —— 它是产品文件，缺席本身就是断裂）。
+    'engines/world-snapshot.js': 'worldSnapshot',
+    // v2.201.0（第四批 Y6）：世界历史检索（一个入口跨六个库）。登记为必载 ——
+    //   面板「检索」页七枚 handler 全读它，本文件的 secHs 诊断节也读它；
+    //   缺席就是「检索面读数缺席」本身，不该被静默兜住。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）——
+    //   本版实测：未登记时 inventory 报「未登记模块 1」，且 export_contract 产物里
+    //   没有 historySearch 段（接口面从未被冻结，改名删成员无人确认）。
+    'engines/history-search.js': 'historySearch',
+    // v2.202.0（第四批 Y7）：地图与关系可视化（engines/world-graph.js）。
+    //   ⚠ Y6 抓过的教训：**LOAD 进了不等于登记了** —— 本表是定义面与出口面契约的
+    //   单一真源，漏了它这一行，后果不是「少一行字」：出口面契约里不会有 worldGraph 段
+    //   （接口面从未被冻结，改名删成员无人确认），而 LOAD 那一侧照样绿。
+    'engines/world-graph.js': 'worldGraph',
     'engines/diplomacy.js': 'diplomacy',
     'engines/agency.js': 'agency',
     // v2.167.0（TX3）：守恒运输（在途货运）。登记为必载 —
@@ -3067,6 +3097,33 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.155.0（RX8）：世界生成种子库 14 枚 —— 面板「工具」页（按 NEXT_PLAN 原文「消费者：
     //   面板「工具」页（种子库管理：提取/保存/播种/变异）」；同 v2.154.0 的登记口径，
     //   无条件渲染（world-seed 是产品文件，缺席本身就是断裂，不降级成提示）。
+    // v2.198.0（Y1）：拍控制中心 —— 6 静态控件 + 1 动态读数出口。
+    //   登记到新增的 **beat 页**（同 v2.182.0 health 页三块合页的规格）。
+    //   理由与前十几批完全一致：新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，
+    //   否则「按钮渲染了但绑定的 id 写错/没登记」这一类断裂在新增出口上无人发现。
+    //   六枚按钮全是**只读**口（当前拍 / 上一拍判定 / 闸门卡点 / 计划复验 / 谁在卡 / 诊断），
+    //   守卫表只保证「渲染 ↔ 绑定」成对，不承诺它们背后是只读 —— 那条由专锁判。
+    { page: 'beat', ids: ['wa-bt-view', 'wa-bt-verdict', 'wa-bt-gates', 'wa-bt-audit', 'wa-bt-blocked', 'wa-bt-diag'],
+      dynamic: ['wa-bt-out'] },
+    // v2.199.0（Y2）：章节生成工作台六枚控件。同口径「渲染 + 绑定 + 守卫登记」三件齐做。
+    //   id 前缀 `wa-chw-` 是**独占**的：v2.87.0 的因果工作台已占 `wa-cw-*`
+    //   （`wa-cw-out` 在既有代码里 2 处），本次首版误用 `wa-cw-*` 导致
+    //   `const cwOut` 在同一 bindBody 作用域里重复声明 —— `node --check` 当场报错。
+    //   这条登记同时也是「同 id 串页」的防线：两个页面的按钮若同 id，
+    //   守卫表的按页判定会各自「通过」，玩家点到的是另一页的 handler。
+    //   六枚全为**只读**口（开章前该看 / 推进卡点 / 收章前欠什么 / 本章待办 /
+    //   章节史 / 数据来源）—— 只读承诺由 Y2 专锁判，本表只保证成对。
+    { page: 'chapter', ids: ['wa-chw-open', 'wa-chw-cards', 'wa-chw-close', 'wa-chw-todo', 'wa-chw-history', 'wa-chw-src'],
+      dynamic: ['wa-chw-out'] },
+    // v2.199.0（Y4）：待办中心 6 枚 + 输出锚 —— 面板「待办」页（全部待办 / 即将到期 /
+    //   逐源可用性 / 下钻一条 / 空态三旗标 / 诊断）。
+    //   同 Y1/Y2 口径：六枚按钮无条件渲染，故登记即「接线真源」（渲染了不登记 ⇒
+    //   绑定断裂永不可见）。与 Y2「章节」页的分工写在这里，防止后人把两页并成一页：
+    //     Y2 `wa-chw-todo` 是**章内口径**（本章还欠什么，随 chapter 页读），
+    //     Y4 `wa-td-*` 是**账户级口径**（此刻整个世界等我处理的）——
+    //     两页读数同源（`pendingCenter.items`），写口都为零，不是两个真源。
+    { page: 'todo', ids: ['wa-td-all', 'wa-td-soon', 'wa-td-src', 'wa-td-drill', 'wa-td-flags', 'wa-td-diag'],
+      dynamic: ['wa-td-out'] },
     { page: 'tools', ids: ['wa-ws-enabled', 'wa-ws-name', 'wa-ws-tags', 'wa-ws-extract',
       'wa-ws-save', 'wa-ws-list', 'wa-ws-id', 'wa-ws-variance', 'wa-ws-sow', 'wa-ws-get',
       'wa-ws-drop', 'wa-ws-stat', 'wa-ws-out',
@@ -3177,6 +3234,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   它**不是开关**而是阈值：与上面一排开关同登记（同一页、同一「渲染 + 绑定 + 守卫登记」纪律），
       //   但语义分列 —— 开关答「算不算」，阈值答「多少算偏得多」。
       'wa-sw-deviationalert',
+      // v2.202.0（Y7）：地图与关系可视化总开关（渲染在设置页）。走通用 data-sw-ns 通道 ⇒ 写 {enabled}。
+      //   登记它的意义同其它行：id 写错要有人发现（渲染 + 绑定 + 守卫登记三件齐做）。
+      'wa-sw-worldgraph',
       'wa-sw-out',
       'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
@@ -3254,12 +3314,61 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   与「那套规则在哪」分家）。**登记错页比不登记更坏**（看起来已被覆盖，实际永远查不到）。
     { page: 'tools', ids: ['wa-rp-enabled', 'wa-rp-name', 'wa-rp-save', 'wa-rp-list', 'wa-rp-apply',
       'wa-rp-drop', 'wa-rp-export', 'wa-rp-import', 'wa-rp-tpl', 'wa-rp-tpl-list', 'wa-rp-tpl-run',
-      'wa-rp-catalog', 'wa-rp-diag'], dynamic: ['wa-rp-out'] },
+      'wa-rp-catalog', 'wa-rp-diag',
+      // v2.203.0（Y8）：说明框 + 查冲突 / 开档定档 / 能不能启用 / 强制启用 / 回滚一步 / 回滚栈
+      'wa-rp-note', 'wa-rp-check', 'wa-rp-compose', 'wa-rp-admit', 'wa-rp-force', 'wa-rp-rollback', 'wa-rp-history'],
+      dynamic: ['wa-rp-out'] },
     // v2.188.0（E9）：世界实验室 —— 8 静态控件 + 1 动态读数出口。
     //   渲染在**工具页**（与试演 / 分支树同页族：三者都在「先看看会怎样、再决定」这条线上）。
     { page: 'tools', ids: ['wa-wl-enabled', 'wa-wl-a', 'wa-wl-b', 'wa-wl-run', 'wa-wl-arms',
-      'wa-wl-diff', 'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag'],
-      dynamic: ['wa-wl-out'] }
+      'wa-wl-diff', 'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag',
+      // v2.203.0（Y9）：推几轮 / 沙盒推进 / 结果报告 / 采纳第几条 / 采纳这一条 / 拍引擎推演
+      'wa-wl-rounds', 'wa-wl-sim', 'wa-wl-report', 'wa-wl-index', 'wa-wl-adopt', 'wa-wl-beats'],
+      dynamic: ['wa-wl-out'] },
+    // v2.200.0（Y5）：搬运页 17 静态控件 + 1 动态读数出口 —— 面板「搬运」页。
+    //   与 Y1/Y2/Y4 同口径「渲染 + 绑定 + 守卫登记」三件齐做：渲染了不登记 =>
+    //   「渲染了但绑定的 id 写错」在这批控件上永不可见。
+    //   id 前缀 wa-wps- 是**独占**的（首版即按独占前缀写，避开 Y2 那次 wa-cw-* 撞车
+    //   导致 const cwOut 同作用域重复声明的坑）。
+    //   本表 active = !cur || grp.page === cur 只判「在不在场」：两页若共用 id，
+    //   两个分组会各自「通过」，而玩家点到的是另一页的 handler —— 故本页 17 枚 id
+    //   全库唯一这一条由 Y5 专锁 A 段核。
+    //   写口只有两处（wa-wps-import 走 store.transact、wa-wps-drop 只动快照库），
+    //   其余全为只读；守卫表只保证「渲染 <-> 绑定」成对，只读承诺由 Y5 专锁判。
+    { page: 'port', ids: ['wa-wps-snap', 'wa-wps-json', 'wa-wps-check', 'wa-wps-preview',
+      'wa-wps-mode', 'wa-wps-conf', 'wa-wps-ovr', 'wa-wps-import',
+      'wa-wps-lib', 'wa-wps-slot', 'wa-wps-take', 'wa-wps-drop',
+      'wa-wps-blue', 'wa-wps-graph', 'wa-wps-round', 'wa-wps-diag', 'wa-wps-text'],
+      dynamic: ['wa-wps-out'] },
+    // ── v2.201.0（Y6）：检索页（find）────────────────────────────────
+    //   「世界历史检索」的一个入口查六处（编年史 / 人物 / 地点 / 组织 / 规则 /
+    //   世界书条目）。本页 12 枚静态控件 + 1 枚动态出口，全部登记在此。
+    //   同 v2.184.0 / v2.197.0 / v2.200.0 的理由：新控件必须「渲染 + 绑定 +
+    //   守卫登记」三件齐做，否则「控件渲染了但绑定的 id 写错」在新增出口上无人发现。
+    //   id 前缀 `wa-hs-` 是**独占**的（首版即按独占前缀写，避开 Y2 那次 wa-cw-* 撞车
+    //   导致 const cwOut 同作用域重复声明的坑）。
+    //   本表 active = !cur || grp.page === cur 只判「在不在场」：两页若共用 id，
+    //   两个分组会各自「通过」，而玩家点到的是另一页的 handler —— 故本页 12 枚 id
+    //   全库唯一这一条由 Y6 专锁 A 段核。
+    //   写口只有一处（wa-hs-clear 只动本模块那一格 localStorage 偏好键）与
+    //   wa-hs-go 的「记进最近查询」勾选（同一格键）；世界一格未动，
+    //   「不写 store / 不产生写入」这条承诺由 Y6 专锁 C 段判。
+    { page: 'find', ids: ['wa-hs-q', 'wa-hs-go', 'wa-hs-count', 'wa-hs-face',
+      'wa-hs-limit', 'wa-hs-remember', 'wa-hs-recent', 'wa-hs-clear',
+      'wa-hs-filters', 'wa-hs-jumpface', 'wa-hs-diag'],
+      dynamic: ['wa-hs-out'] },
+    // ── v2.202.0（Y7）：图谱页（graph）──────────────────────────────────
+    //   「地图与关系可视化」—— 三类节点（人物 / 组织 / 地点）+ 三条边来源
+    //   （atlas 关系两层 / factionGraph 推导 / bonds 登记六型）放进同一幅画面。
+    //   本页 11 枚静态控件 + 1 枚动态出口，全部登记在此。
+    //   与其他页不同的地方：**本页一个写口都没有**（对比 find 页的「记进最近查询 /
+    //   清空记录」）。全页按钮走只读读口，偏好键只由引擎 setSettings 暴露给设置页 ——
+    //   这是边界 ④「零写入」的**结构**保证，不是一句声明（Y7 专锁 C 段另钉不变式）。
+    //   控件前缀 `wa-wg-` 独占（渲染 + 绑定 + 守卫登记三件齐做）。
+    { page: 'graph', ids: ['wa-wg-kinds', 'wa-wg-edges', 'wa-wg-build', 'wa-wg-from',
+      'wa-wg-geo', 'wa-wg-time', 'wa-wg-suggest', 'wa-wg-anom',
+      'wa-wg-locate', 'wa-wg-locate-go', 'wa-wg-diag'],
+      dynamic: ['wa-wg-out'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。
