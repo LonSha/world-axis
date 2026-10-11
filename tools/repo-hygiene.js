@@ -72,6 +72,24 @@ function fmtMB(v) {
  *     缺了不许当成 0（「量不到」与「是 0」是两件事），故如实记 `null`。
  *   · 数值不带单位的形态（`-v` 而非 `-vH`）在这里是**读不到**，不许猜单位。
  */
+/**
+ * pack 面的三态判定（**显式词表**，供 audit 与 selfTest 共用同一处口径）。
+ *   · `present`   —— 读数在场（`packs > 0`，或体积 ≥ 下限，或 `in-pack` 有对象）
+ *   · `candidate` —— **隔离候选树形态**：`in-pack: 0` 且体积为 0（临时 `.git`：
+ *                    对象全在松散面）⇒ 「没塌」，只是形态与开发仓不同
+ *   · `collapsed` —— 两路信号**皆为零**（对象面一个都没读出来 ⇒ 读数本身塌了）
+ * 「量不到」与「是 0」是两件事：`sizePackMB === null` 时按对象计数判，不冒充 0。
+ */
+function packFaceState(f) {
+  const packs = f.packs || 0;
+  const inPack = f.inPack || 0;
+  const size = f.sizePackMB;
+  if (packs > 0 && size !== null && size >= MIN_PACK_MB) return 'present';
+  if (inPack > 0) return 'present';
+  if (packs > 0) return 'candidate';
+  if (size !== null && size > 0) return 'present';
+  return 'collapsed';
+}
 function parse(raw) {
   const out = { count: null, sizeMB: null, inPack: null, packs: null, sizePackMB: null,
     prunePackable: null, garbage: null, sizeGarbageMB: null, missing: [] };
@@ -124,7 +142,12 @@ function audit(opt) {
   if (f.sizeMB !== null && f.sizeMB > MAX_LOOSE_MB) {
     problems.push({ kind: 'loose-over-limit', sizeMB: Math.round(f.sizeMB * 100) / 100, limitMB: MAX_LOOSE_MB, count: f.count });
   }
-  if (f.sizePackMB === null || f.sizePackMB < MIN_PACK_MB) {
+  // pack 面判据（全量回归实测修正）：`MIN_PACK_MB` 只对**体积**成立，而 pack 面还有
+  //   「in-pack 数」这一路信号 —— 隔离候选树的 `.git` 是临时造的（`in-pack: 0`、
+  //   松散对象装数、`size-pack` 为 `0 bytes`），故「按米」的阈值在那里是**不同量纲**。
+  //   改为「**pack 面必须在场**」：任一信号在场即算在场，两者皆为零才叫塌陷。
+  const packState = packFaceState(f);
+  if (packState === 'collapsed') {
     problems.push({ kind: 'pack-face-collapsed', sizeMB: f.sizePackMB, minMB: MIN_PACK_MB });
   }
   // 修法**必须对得上病灶**：`.l2s.tmp_obj_*` 不是 git 对象，`git gc` 收不掉它。
@@ -155,10 +178,21 @@ function selfTest(opt) {
   const o = opt || {};
   const fails = [];
   const chk = function (cond, msg) { if (!cond) fails.push(msg); };
-  // ① 活读数：现场那条 `size` 行必须被认出来（`0 bytes` 是常态，不是异常）
+  // ① 活读数：**命名空间面**（count / size / in-pack / packs / size-pack）必须全部读出来。
+  //   这里**不断言 pack 体积 > 0** —— 全量回归实测：隔离候选树的 `.git` 是临时造的
+  //   （`in-pack: 0`、`size-pack: 0 bytes`），「pack 面按米为零」在那种树上**本来就不成立**，
+  //   与「读数塌了」是两件事。故只断言「量得到」+「三态判定自洽」。
   const live = parse(o.raw !== undefined ? o.raw : readRaw(BASE));
   chk(live.sizeMB !== null, '活的 `size` 行没被认出来（sizeMB=' + j(live.sizeMB) + '）—— 「0 bytes」必须认');
-  chk(live.sizePackMB !== null && live.sizePackMB > 0, '活的 `size-pack` 行没被认出来');
+  chk(live.sizePackMB !== null && live.inPack !== null && live.packs !== null,
+    '活的 pack 面读数没被认出来（实 ' + j([live.sizePackMB, live.inPack, live.packs]) + '）');
+  chk(packFaceState(live) !== 'collapsed',
+    '活树上 pack 面被判成塌陷（实 ' + packFaceState(live) + '）—— 「量不到」不许当成「塌了」');
+  // 三态词表两向：候选树形态（in-pack 0 / 体积 0）与真塌陷（两路皆零）必须分得开
+  chk(packFaceState(parse('count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\n')) === 'candidate',
+    '候选树形态未与「塌陷」分开');
+  chk(packFaceState(parse('count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\n')) === 'collapsed',
+    '两路皆零时未判塌陷');
   // ② 合成原料分档（一对能分清的原料：0 与 非 0 不许读成同一个值）
   const z = parse('count: 0\nsize: 0 bytes\nin-pack: 5\npacks: 1\nsize-pack: 2.00 MiB\ngarbage: 0\n');
   chk(z.sizeMB === 0 && z.count === 0, '「size: 0 bytes」未读成 0（实 ' + j(z.sizeMB) + '）');
@@ -174,9 +208,13 @@ function selfTest(opt) {
   chk(rb.fix.indexOf('.l2s.tmp_obj_') >= 0 && rb.fix.indexOf('git gc') >= 0,
     '修法没对上任一病灶（实 ' + j(rb.fix) + '）');
   chk(rb.fix.indexOf('filter-repo') < 0, '修法指向了破坏性的 filter-repo');
-  const rc = audit({ raw: 'count: 0\nsize: 0 bytes\nin-pack: 5\npacks: 1\nsize-pack: 0.10 MiB\ngarbage: 0\n' });
+  const rc = audit({ raw: 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\ngarbage: 0\n' });
   chk(rc.problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') >= 0,
-    'pack 面塌了却没现形（反空转下限失效）');
+    'pack 面两路皆零却没现形（反空转下限失效）');
+  // 候选树形态**不许**报塌陷（否则干净克隆/隔离回归会假红 —— 全量回归实测到此形态）
+  const rcd = audit({ raw: 'count: 7\nsize: 7.73 MiB\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\ngarbage: 1174\nsize-garbage: 13.12 MiB\n' });
+  chk(rcd.problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') < 0,
+    '隔离候选树形态被误报成塌陷（假红：那只是临时 .git，对象全在松散面）');
   const rd_ = audit({ raw: 'count: 0\nsize: 0 bytes\n' });
   chk(rd_.problems.map(function (p) { return p.kind; }).indexOf('unreadable-fields') >= 0,
     '读数缺格却没现形（「量不到」被静默吞掉）');
@@ -212,7 +250,8 @@ if (require.main === module) {
     + ' / ' + r.facts.garbage + ' 个（上限 ' + r.limits.garbageMB + ' MiB）');
   console.log('  loose   ' + fmtMB(r.facts.sizeMB) + ' / ' + r.facts.count + ' 个（上限 ' + r.limits.looseMB + ' MiB）');
   console.log('  pack    ' + fmtMB(r.facts.sizePackMB) + ' / ' + r.facts.packs + ' 个（下限 ' + r.limits.packMB + ' MiB）');
-  console.log('  可修剪 ' + r.facts.prunePackable + ' 个（in-pack ' + r.facts.inPack + '）');
+  console.log('  可修剪 ' + r.facts.prunePackable + ' 个（in-pack ' + r.facts.inPack + '）'
+    + (packFaceState(r.facts) === 'candidate' ? ' · pack 面形态：候选树（in-pack 0 / 体积 0，不算塌陷）' : ''));
   if (r.problems.length) {
     r.problems.forEach(function (p) {
       console.log('  ✗ ' + p.kind + (p.sizeMB !== null && p.sizeMB !== undefined ? '：' + p.sizeMB + ' MiB' : '')
@@ -228,5 +267,5 @@ if (require.main === module) {
   process.exit(0);
 }
 module.exports = { BASE: BASE, MAX_GARBAGE_MB: MAX_GARBAGE_MB, MAX_LOOSE_MB: MAX_LOOSE_MB,
-  MIN_PACK_MB: MIN_PACK_MB, parse: parse, readRaw: readRaw, fmtMB: fmtMB,
+  MIN_PACK_MB: MIN_PACK_MB, parse: parse, readRaw: readRaw, fmtMB: fmtMB, packFaceState: packFaceState,
   audit: audit, collect: collect, selfTest: selfTest };

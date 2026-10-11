@@ -56,7 +56,14 @@ const ANCHOR = {
 /** 现场原料（三类；与真原料同形 —— 「0 bytes」不是异常，是常态）。 */
 const RAW_OK = 'count: 0\nsize: 0 bytes\nin-pack: 5625\npacks: 1\nsize-pack: 7.79 MiB\nprune-packable: 0\ngarbage: 1\nsize-garbage: 0.01 MiB\n';
 const RAW_BAD = 'count: 9\nsize: 90.00 MiB\nin-pack: 5\npacks: 1\nsize-pack: 8.00 MiB\ngarbage: 900\nsize-garbage: 900.00 MiB\n';
-const RAW_TINY = 'count: 0\nsize: 0 bytes\nin-pack: 5\npacks: 1\nsize-pack: 0.10 MiB\ngarbage: 0\n';
+const RAW_TINY = 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\ngarbage: 0\n';
+/**
+ * **隔离候选树形态**（全量回归实测到的真原料，不是我编的）：隔离运行器在临时目录里
+ *   造 `.git`（对象全落**松散**面）⇒ `in-pack: 0` / `size-pack: 0 bytes`。
+ *   它与「读数塌了」长得像，却**不是塌陷** —— 判据必须分得开，否则干净克隆与隔离回归
+ *   会一路假红（这正是本批全量回归逮住的那条：`selfTest` 断言了「pack 体积 > 0」）。
+ */
+const RAW_CAND = 'count: 7\nsize: 7.73 MiB\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\ngarbage: 1174\nsize-garbage: 13.12 MiB\n';
 /**
  * 造一份**磁盘上的源码副本**并加载它（真源码破坏的落点）。
  *   产物落在 os.tmpdir() 下的临时目录里，绝不碰真仓库；`broken(src)` 返回改后的源码。
@@ -133,7 +140,16 @@ function runAll(a) {
       'v2204C/B2b: 修法对上任一病灶、且不含破坏性操作（实 ' + j(bad.fix) + '）');
     const tiny = A.audit({ raw: RAW_TINY });
     a(tiny.problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') >= 0,
-      'v2204C/B3: pack 面塌陷 ⇒ 反空转下限现形（「没有垃圾」不在空集上恒真）');
+      'v2204C/B3: pack 面两路皆零 ⇒ 反空转下限现形（「没有垃圾」不在空集上恒真）');
+    // 全量回归实测到的**候选树形态**：in-pack 0 / 体积 0 —— 与「塌了」长得像，但不是塌陷
+    const cand = A.audit({ raw: RAW_CAND });
+    a(cand.problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') < 0
+      && cand.facts.inPack === 0 && cand.facts.packs === 1,
+      'v2204C/B3c: 隔离候选树形态（in-pack 0 / 体积 0）**不算塌陷** —— 干净克隆与隔离回归不许假红（实 '
+      + j(cand.problems.map(function (p) { return p.kind; })) + '）');
+    a(typeof A.packFaceState === 'function' && A.packFaceState(cand.facts) === 'candidate'
+      && A.packFaceState(tiny.facts) === 'collapsed',
+      'v2204C/B3d: pack 面三态词表（present / candidate / collapsed）把两种形态分得开');
     const miss = A.audit({ raw: 'count: 0\nsize: 0 bytes\n' });
     a(miss.problems.map(function (p) { return p.kind; }).indexOf('unreadable-fields') >= 0,
       'v2204C/B3b: 读数缺格 ⇒ 「量不到」如实现形，不被静默当成 0');
