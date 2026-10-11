@@ -23059,9 +23059,14 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       && typeof require(path.join(BASE, 'tools/repo-hygiene.js')).selfTest === 'function',
       'v2204c: 自证面在场（`--self-test` 与 selfTest() 同源 —— 判据必须能自证）');
     // ② 两条机械可核的口径都在源码里（体积上限 + 反空转下限）
-    assert(hygSrc2204.indexOf('const MAX_GARBAGE_MB =') > 0 && hygSrc2204.indexOf('const MAX_LOOSE_MB =') > 0
-      && hygSrc2204.indexOf('const MIN_PACK_MB =') > 0,
-      'v2204c: 三个阈值都是源码常量（garbage / loose 各有独立上限 + pack 面反空转下限）');
+    //   两条阈值 + 两条对象面口径（第三轮实测修正：**不许**拿「pack 面 > 0」当下限 ——
+    //   对象全在松散面时 `packs: 0 / in-pack: 0` 是新鲜仓与隔离候选树的常态，
+    //   实测原料 `count: 3 / size: 12.00 KiB`；拿它当下限会让主回归一路假红）。
+    assert(hygSrc2204.indexOf('const MAX_GARBAGE_MB =') > 0 && hygSrc2204.indexOf('const MAX_LOOSE_MB =') > 0,
+      'v2204c: 两个体积上限都是源码常量（garbage / loose 各有独立上限）');
+    assert(hygSrc2204.indexOf('object-face-unreadable') > 0
+      && hygSrc2204.indexOf('pack-empty-despite-present') > 0 && hygSrc2204.indexOf('MIN_PACK_MB') < 0,
+      'v2204c: 对象面两条口径在位（量得到 + 自洽），且按米的反空转下限已删');
     // ③ 只读口径：零写盘、无 --fix、`--gc` 只在显式分支里调
     assert(hygSrc2204.indexOf('writeFileSync') < 0 && hygSrc2204.indexOf('appendFileSync') < 0
       && hygSrc2204.indexOf('--fix') < 0,

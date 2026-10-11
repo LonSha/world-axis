@@ -49,14 +49,18 @@ const ANCHOR = {
   units: "{ bytes: 1 / 1048576, B: 1 / 1048576, KiB: 1 / 1024, MiB: 1, GiB: 1024 }",
   unitsRe: '(bytes|B|KiB|MiB|GiB)',
   fixBranch: "find .git/objects -name '.l2s.tmp_obj_*' -delete",
-  packFloor: 'const MIN_PACK_MB = 1;',
-  packKind: "kind: 'pack-face-collapsed'",
+  objFace: "problems.push({ kind: 'object-face-unreadable' });",
+  selfConsist: "problems.push({ kind: 'pack-empty-despite-present', packs: f.packs });",
   looseMax: 'const MAX_LOOSE_MB = 25;'
 };
 /** 现场原料（三类；与真原料同形 —— 「0 bytes」不是异常，是常态）。 */
 const RAW_OK = 'count: 0\nsize: 0 bytes\nin-pack: 5625\npacks: 1\nsize-pack: 7.79 MiB\nprune-packable: 0\ngarbage: 1\nsize-garbage: 0.01 MiB\n';
 const RAW_BAD = 'count: 9\nsize: 90.00 MiB\nin-pack: 5\npacks: 1\nsize-pack: 8.00 MiB\ngarbage: 900\nsize-garbage: 900.00 MiB\n';
-const RAW_TINY = 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\ngarbage: 0\n';
+const RAW_TINY = 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\nsize-pack: 0 bytes\ngarbage: 0\n';
+/** **新鲜仓形态**（临时 `git init` 后刚提交 —— 本轮实测到的真原料，不是编的）：
+ *    对象全在**松散**面 ⇒ `in-pack: 0 / packs: 0 / size-pack: 0 bytes`。
+ *    这是**常态**，不是「读数塌了」—— 旧判据（按米的 `MIN_PACK_MB`）在这种仓上必红。 */
+const RAW_FRESH = 'count: 3\nsize: 12.00 KiB\nin-pack: 0\npacks: 0\nsize-pack: 0 bytes\nprune-packable: 0\ngarbage: 6\nsize-garbage: 338 bytes\n';
 /**
  * **隔离候选树形态**（全量回归实测到的真原料，不是我编的）：隔离运行器在临时目录里
  *   造 `.git`（对象全落**松散**面）⇒ `in-pack: 0` / `size-pack: 0 bytes`。
@@ -101,9 +105,14 @@ function runAll(a) {
     const beforeMain = code.split('if (require.main === module)')[0];
     a(beforeMain.indexOf('collect(BASE)') < 0 && beforeMain.indexOf('function collect(') >= 0,
       'v2204C/A4: 被 require 时不动开发环境（collect 只有定义，调用只在显式 --gc 分支里）');
-    // ⑤ 反空转下限在位（读数整体塌掉时，「没有垃圾」必须是假绿）
-    a(GATE.indexOf(ANCHOR.packFloor) >= 0 && GATE.indexOf(ANCHOR.packKind) >= 0,
-      'v2204C/A5: 反空转下限在位（pack 面读不出来 ⇒ 报红，而不是「无超限」）');
+    // ⑤ 反空转上限（本轮修正）：**不许拿「pack 面 > 0」当下限** —— 对象全在松散面时
+    //    `packs: 0 / in-pack: 0` 是新鲜仓与候选树的常态（实测 `count: 3 / size: 12 KiB`）。
+    //    改为两条同族口径：对象面**量得到**（`null` ≠ 0）+ **自洽**（报了 pack 却零对象）。
+    a(GATE.indexOf('object-face-unreadable') >= 0 && GATE.indexOf('pack-empty-despite-present') >= 0
+      && GATE.indexOf('function objectFaceState(') >= 0,
+      'v2204C/A5: 对象面两条口径在位（量得到 + 自洽），且**没有**按米的反空转下限');
+    a(GATE.indexOf('MIN_PACK_MB') < 0,
+      'v2204C/A5b: 按米的 pack 下限已删（它的量纲与「对象计数」不同 —— 会让新鲜仓与隔离候选树假红）');
     // ⑥ 修法必须对得上病灶（gc 收不掉 l2s 残骸；filter-repo 是破坏性操作，永不出现在修法里）
     a(GATE.indexOf(ANCHOR.fixBranch) >= 0 && GATE.indexOf('filter-repo') >= 0,
       'v2204C/A6: 修法面分病灶（残骸给删除命令；filter-repo 在**否定式**一侧被点名禁止）');
@@ -120,7 +129,7 @@ function runAll(a) {
       a(cnt(SELF, ANCHOR[k]) === 1,
         'v2204C/N0: 锚点「' + k + '」在锁体里恰声明 1 次（实 ' + cnt(SELF, ANCHOR[k]) + '）');
     });
-    ['units', 'fixBranch', 'packFloor', 'packKind', 'looseMax'].forEach(function (k) {
+    ['units', 'unitsRe', 'fixBranch', 'objFace', 'selfConsist', 'looseMax'].forEach(function (k) {
       const stripped = SELF.split("const ANCHOR = {")[1].split('};')[0];
       a(stripped.indexOf(ANCHOR[k]) >= 0, 'v2204C/N0b: 锚点「' + k + '」住在 ANCHOR 表里（不是散在判据里）');
     });
@@ -138,21 +147,31 @@ function runAll(a) {
       'v2204C/B2: 两处超限按面分档报出（实 ' + j(kinds) + '）');
     a(bad.fix.indexOf('.l2s.tmp_obj_') >= 0 && bad.fix.indexOf('git gc') >= 0 && bad.fix.indexOf('filter-repo') < 0,
       'v2204C/B2b: 修法对上任一病灶、且不含破坏性操作（实 ' + j(bad.fix) + '）');
+    // 空仓形态：**不报红**（无对象可判），但如实报出 `empty` —— 「零不算塌」
     const tiny = A.audit({ raw: RAW_TINY });
-    a(tiny.problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') >= 0,
-      'v2204C/B3: pack 面两路皆零 ⇒ 反空转下限现形（「没有垃圾」不在空集上恒真）');
-    // 全量回归实测到的**候选树形态**：in-pack 0 / 体积 0 —— 与「塌了」长得像，但不是塌陷
+    a(tiny.ok === true && tiny.facts.objectFace === 'empty',
+      'v2204C/B3: 空仓形态如实报 empty 且不报红（实 ' + j([tiny.facts.objectFace, tiny.problems.map(function (p) { return p.kind; })]) + '）');
+    // **新鲜仓形态**（本轮实测的真原料）：对象全在松散面 ⇒ 必须判绿（旧判据在此必红）
+    const fresh = A.audit({ raw: RAW_FRESH });
+    a(fresh.ok === true && fresh.facts.objectFace === 'present' && fresh.facts.packs === 0,
+      'v2204C/B3c: 新鲜仓形态（in-pack 0 / packs 0 / 松散面有对象）判绿 —— 不许拿 pack 面当下限（实 '
+      + j(fresh.problems.map(function (p) { return p.kind; })) + '）');
+    // 候选树形态（隔离回归实测）：松散面有对象 ⇒ 同样判绿
     const cand = A.audit({ raw: RAW_CAND });
-    a(cand.problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') < 0
-      && cand.facts.inPack === 0 && cand.facts.packs === 1,
-      'v2204C/B3c: 隔离候选树形态（in-pack 0 / 体积 0）**不算塌陷** —— 干净克隆与隔离回归不许假红（实 '
+    a(cand.ok === true && cand.facts.objectFace === 'present',
+      'v2204C/B3d: 隔离候选树形态判绿（干净克隆与隔离回归不许假红，实 '
       + j(cand.problems.map(function (p) { return p.kind; })) + '）');
-    a(typeof A.packFaceState === 'function' && A.packFaceState(cand.facts) === 'candidate'
-      && A.packFaceState(tiny.facts) === 'collapsed',
-      'v2204C/B3d: pack 面三态词表（present / candidate / collapsed）把两种形态分得开');
+    // 自洽：报了 pack 却**一个对象都没读出来** ⇒ 现形（读数自相矛盾）
+    const inc = A.audit({ raw: 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\n' });
+    a(inc.problems.map(function (p) { return p.kind; }).indexOf('pack-empty-despite-present') >= 0,
+      'v2204C/B3e: 「报了 pack 却零对象」现形（读数自相矛盾）');
+    a(typeof A.objectFaceState === 'function'
+      && A.objectFaceState(fresh.facts) === 'present' && A.objectFaceState(tiny.facts) === 'empty',
+      'v2204C/B3f: 对象面三态词表（present / empty / unreadable）分得开');
     const miss = A.audit({ raw: 'count: 0\nsize: 0 bytes\n' });
-    a(miss.problems.map(function (p) { return p.kind; }).indexOf('unreadable-fields') >= 0,
-      'v2204C/B3b: 读数缺格 ⇒ 「量不到」如实现形，不被静默当成 0');
+    a(miss.problems.map(function (p) { return p.kind; }).indexOf('unreadable-fields') >= 0
+      && miss.problems.map(function (p) { return p.kind; }).indexOf('object-face-unreadable') >= 0,
+      'v2204C/B3b: 读数缺格 ⇒ 「量不到」如实现形（既不静默当 0，也报对象面不可读）');
     a(A.selfTest({}).ok === true, 'v2204C/B4: 自证现场全绿');
     // 与 README 的**同源面**交叉核对：名单里点到它，且名单句的计数与索引同值（后者由 toolchain-gate 核）
     const claim = require(path.join(BASE, 'tests/toolchain-gate.js')).readmeClaim(BASE);
@@ -193,15 +212,21 @@ function runAll(a) {
     a(A.audit({ raw: RAW_BAD }).fix.indexOf('.l2s.tmp_obj_') >= 0,
       'v2204C/N2b: （两向）原版上同一原料仍给出删除残骸的修法');
   })();
-  // N3：摘掉 pack 面下限判据 ⇒ 副本上「读数塌了」被当成绿（假绿现形）；原版上必须报红。
+  // N3：摘掉对象面两条口径 ⇒ 副本上「量不到」与「自相矛盾」都被静默吞掉；原版上必须现形。
   (function () {
     const m = mk(function (s) {
-      return s.replace(ANCHOR.packKind, "kind: 'none'").replace(ANCHOR.packFloor, 'const MIN_PACK_MB = 0;');
+      return s.replace(ANCHOR.objFace, "problems.push({ kind: 'none-x' });")
+        .replace(ANCHOR.selfConsist, "problems.push({ kind: 'none-y', packs: f.packs });");
     }, 'n3');
-    a(m.audit({ raw: RAW_TINY }).problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') < 0,
-      'v2204C/N3a: （两向）摘掉下限判据 ⇒ 副本在读数塌陷时判绿（反空转下限不是装饰）');
-    a(A.audit({ raw: RAW_TINY }).problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') >= 0,
-      'v2204C/N3b: （两向）原版上同一原料报红');
+    a(m.audit({ raw: 'count: 0\nsize: 0 bytes\n' }).problems.map(function (p) { return p.kind; })
+      .indexOf('object-face-unreadable') < 0,
+      'v2204C/N3a: （两向）摘掉对象面口径 ⇒ 副本把「量不到」静默吞掉（判据不是装饰）');
+    a(A.audit({ raw: 'count: 0\nsize: 0 bytes\n' }).problems.map(function (p) { return p.kind; })
+      .indexOf('object-face-unreadable') >= 0,
+      'v2204C/N3b: （两向）原版上同一原料现形');
+    a(m.audit({ raw: 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\n' })
+      .problems.map(function (p) { return p.kind; }).indexOf('pack-empty-despite-present') < 0,
+      'v2204C/N3c: （两向）摘掉自洽口径 ⇒ 副本不再报「报了 pack 却零对象」');
   })();
   // N4：把松散对象上限放宽到 1000 MiB ⇒ 副本上超限不再现形（阈值真被用）；原版上必须现形。
   (function () {

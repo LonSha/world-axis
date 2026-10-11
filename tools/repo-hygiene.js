@@ -16,8 +16,13 @@
 // ── 它判什么（两条，机械可核）──────────────────────────────────────────
 //   ① **体积上限**：`garbage` 与 `loose` 各自的独立上限（`MAX_GARBAGE_MB` /
 //      `MAX_LOOSE_MB`）。超限即红 —— 并**给出确切修复命令**（不给修法的红灯等于噪声）。
-//   ② **反空转下限**：pack 面必须 > 0（若连 pack 都读不出来，说明读数本身塌了，
-//      此时「没有垃圾」是假绿）。
+//   ② **对象面量得到 + 自洽**（第三轮实测修正）：`in-pack` / `count` / `packs` 三路
+//      信号**都必须是数**（`null` = 量不到 ≠ 是 0）；且不许出现「报了 pack 却一个对象都
+//      没读出来」的自相矛盾读数。
+//   ⚠ **不许拿「pack 面 > 0」当反空转下限**：对象全在**松散**面时
+//      `packs: 0 / in-pack: 0 / size-pack: 0 bytes` 是**新鲜仓与隔离候选树的常态**
+//      （实测原料 `count: 3 / size: 12.00 KiB`）—— 拿它当「塌了」会让主回归一路假红。
+//      本判据在空仓形态（四路皆零）上如实报 `empty` 并**不报红**（无对象可判）。
 //
 // ── 口径（否定式）──────────────────────────────────────────────────────
 //   · **只读**（默认）：不跑 gc、不改仓库。`--gc` 是**显式动作**，不是默认行为 ——
@@ -53,8 +58,6 @@ const BASE = path.join(__dirname, '..');
 const MAX_GARBAGE_MB = 40;
 /** 松散对象独立上限。现场实测 0 个（曾达 47.7 MiB / 1403 个）⇒ 设 25 MiB（回收后应落在 pack 里）。 */
 const MAX_LOOSE_MB = 25;
-/** 反空转下限：pack 面必须大于这个值（否则读数塌了，「没有垃圾」是假绿）。 */
-const MIN_PACK_MB = 1;
 /** 体积读数的人读形态。`null` = **量不到**（与 0 是两件事，故不冒充 0）。 */
 function j(v) { return JSON.stringify(v); }
 function fmtMB(v) {
@@ -73,22 +76,22 @@ function fmtMB(v) {
  *   · 数值不带单位的形态（`-v` 而非 `-vH`）在这里是**读不到**，不许猜单位。
  */
 /**
- * pack 面的三态判定（**显式词表**，供 audit 与 selfTest 共用同一处口径）。
- *   · `present`   —— 读数在场（`packs > 0`，或体积 ≥ 下限，或 `in-pack` 有对象）
- *   · `candidate` —— **隔离候选树形态**：`in-pack: 0` 且体积为 0（临时 `.git`：
- *                    对象全在松散面）⇒ 「没塌」，只是形态与开发仓不同
- *   · `collapsed` —— 两路信号**皆为零**（对象面一个都没读出来 ⇒ 读数本身塌了）
- * 「量不到」与「是 0」是两件事：`sizePackMB === null` 时按对象计数判，不冒充 0。
+ * **对象面**的形态判定（显式词表；audit 与 selfTest 共用一处口径）。
+ *   · `present`    —— 对象面**量得到且有对象**（`in-pack` / 松散计数 / `packs` 任一 > 0）
+ *   · `empty`      —— 四路信号全为零：**空仓形态**（`git init` 后无提交）—— 合法状态，
+ *                     如实报出，**不报红**
+ *   · `unreadable` —— 任一路是 `null`（量不到）⇒ 读数本身塌了，报红
+ * ⚠ **不要用「pack 面」当判据面**（第三轮实测的教训）：对象全在**松散**面时
+ *   `packs: 0 / in-pack: 0 / size-pack: 0 bytes` —— 这是**新鲜仓与隔离候选树的常态**
+ *   （实测：`count: 3 / size: 12.00 KiB / in-pack: 0 / packs: 0`），不是「塌了」。
+ *   拿「按米」的下限去卡它，会让主回归与干净克隆一路假红。
  */
-function packFaceState(f) {
-  const packs = f.packs || 0;
-  const inPack = f.inPack || 0;
-  const size = f.sizePackMB;
-  if (packs > 0 && size !== null && size >= MIN_PACK_MB) return 'present';
-  if (inPack > 0) return 'present';
-  if (packs > 0) return 'candidate';
-  if (size !== null && size > 0) return 'present';
-  return 'collapsed';
+function objectFaceState(f) {
+  const vals = [f.inPack, f.count, f.packs];
+  if (vals.indexOf(null) >= 0) return 'unreadable';
+  if ((f.inPack || 0) > 0 || (f.count || 0) > 0 || (f.packs || 0) > 0) return 'present';
+  if ((f.sizePackMB || 0) > 0 || (f.sizeMB || 0) > 0) return 'present';
+  return 'empty';
 }
 function parse(raw) {
   const out = { count: null, sizeMB: null, inPack: null, packs: null, sizePackMB: null,
@@ -142,25 +145,27 @@ function audit(opt) {
   if (f.sizeMB !== null && f.sizeMB > MAX_LOOSE_MB) {
     problems.push({ kind: 'loose-over-limit', sizeMB: Math.round(f.sizeMB * 100) / 100, limitMB: MAX_LOOSE_MB, count: f.count });
   }
-  // pack 面判据（全量回归实测修正）：`MIN_PACK_MB` 只对**体积**成立，而 pack 面还有
-  //   「in-pack 数」这一路信号 —— 隔离候选树的 `.git` 是临时造的（`in-pack: 0`、
-  //   松散对象装数、`size-pack` 为 `0 bytes`），故「按米」的阈值在那里是**不同量纲**。
-  //   改为「**pack 面必须在场**」：任一信号在场即算在场，两者皆为零才叫塌陷。
-  const packState = packFaceState(f);
-  if (packState === 'collapsed') {
-    problems.push({ kind: 'pack-face-collapsed', sizeMB: f.sizePackMB, minMB: MIN_PACK_MB });
+  // ① 对象面**量得到**（「量不到」≠「是 0」；后者里还含合法的空仓形态）
+  const objState = objectFaceState(f);
+  if (objState === 'unreadable') problems.push({ kind: 'object-face-unreadable' });
+  // ② **自洽**：报了 pack、却一个对象都没读出来（三路信号同时为零）⇒ 读数自相矛盾。
+  //    实测：新鲜仓（`packs: 0`）与隔离候选树（`count: 587`）**都不命中**。
+  if ((f.packs || 0) > 0 && (f.inPack || 0) === 0 && (f.sizePackMB || 0) === 0 && (f.count || 0) === 0) {
+    problems.push({ kind: 'pack-empty-despite-present', packs: f.packs });
   }
   // 修法**必须对得上病灶**：`.l2s.tmp_obj_*` 不是 git 对象，`git gc` 收不掉它。
   //   「不给修法的红灯等于噪声」，给一条**无效**修法比不给更糟。
   const kinds = problems.map(function (p) { return p.kind; });
   const fix = [];
   if (kinds.indexOf('loose-over-limit') >= 0) fix.push('git gc --prune=now');
+  if (kinds.indexOf('object-face-unreadable') >= 0) fix.push('检查 `git count-objects -vH` 能否输出完整的对象面读数');
   if (kinds.indexOf('garbage-over-limit') >= 0 || kinds.indexOf('garbage-present') >= 0) {
     fix.push("find .git/objects -name '.l2s.tmp_obj_*' -delete（gc 收不掉：它们不是 git 对象）");
   }
   if (!fix.length) fix.push('git gc --prune=now');
+  if (objState === 'empty') f.objectFace = 'empty'; else f.objectFace = objState;
   return { ok: problems.length === 0, facts: f, problems: problems,
-    limits: { garbageMB: MAX_GARBAGE_MB, looseMB: MAX_LOOSE_MB, packMB: MIN_PACK_MB },
+    limits: { garbageMB: MAX_GARBAGE_MB, looseMB: MAX_LOOSE_MB },
     fix: fix.join('；或 ') };
 }
 /** 显式回收（**非破坏性**：不重写历史、所有 commit hash 不变）。 */
@@ -185,14 +190,26 @@ function selfTest(opt) {
   const live = parse(o.raw !== undefined ? o.raw : readRaw(BASE));
   chk(live.sizeMB !== null, '活的 `size` 行没被认出来（sizeMB=' + j(live.sizeMB) + '）—— 「0 bytes」必须认');
   chk(live.sizePackMB !== null && live.inPack !== null && live.packs !== null,
-    '活的 pack 面读数没被认出来（实 ' + j([live.sizePackMB, live.inPack, live.packs]) + '）');
-  chk(packFaceState(live) !== 'collapsed',
-    '活树上 pack 面被判成塌陷（实 ' + packFaceState(live) + '）—— 「量不到」不许当成「塌了」');
-  // 三态词表两向：候选树形态（in-pack 0 / 体积 0）与真塌陷（两路皆零）必须分得开
-  chk(packFaceState(parse('count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\n')) === 'candidate',
-    '候选树形态未与「塌陷」分开');
-  chk(packFaceState(parse('count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\n')) === 'collapsed',
-    '两路皆零时未判塌陷');
+    '活的对象面读数没被认出来（实 ' + j([live.sizePackMB, live.inPack, live.packs]) + '）');
+  chk(objectFaceState(live) !== 'unreadable',
+    '活树上对象面被判成「量不到」（实 ' + objectFaceState(live) + '）');
+  // 三态词表两向（**与真原料同形**：新鲜仓/候选树把对象全放松散面）：
+  //   · 松散面有对象 ⇒ present（实测原料：count 3 / size 12 KiB / in-pack 0 / packs 0）
+  //   · 四路皆零     ⇒ empty（空仓是合法状态，不报红）
+  //   · 任一路 null  ⇒ unreadable（量不到）
+  chk(objectFaceState(parse('count: 3\nsize: 12.00 KiB\nin-pack: 0\npacks: 0\nsize-pack: 0 bytes\n')) === 'present',
+    '松散面有对象时未判 present（「pack 面为空」是新鲜仓常态，不是塌陷）');
+  chk(objectFaceState(parse('count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\nsize-pack: 0 bytes\n')) === 'empty',
+    '四路皆零时未判空仓形态（空仓是合法状态，如实报出）');
+  chk(objectFaceState(parse('count: 0\nsize: 0 bytes\n')) === 'unreadable',
+    '量不到时未判 unreadable（「量不到」不许当成「是 0」）');
+  // 自洽两向：报了 pack 却一个对象都没读出来 ⇒ 现形；新鲜仓/候选树**不许**命中
+  chk(audit({ raw: 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\n' })
+    .problems.map(function (p) { return p.kind; }).indexOf('pack-empty-despite-present') >= 0,
+    '「报了 pack 却零对象」没现形（读数自相矛盾）');
+  chk(audit({ raw: 'count: 587\nsize: 7.73 MiB\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\ngarbage: 1174\nsize-garbage: 13.12 MiB\n' })
+    .problems.map(function (p) { return p.kind; }).indexOf('pack-empty-despite-present') < 0,
+    '隔离候选树形态被自洽判据误报（假红：它的对象在松散面）');
   // ② 合成原料分档（一对能分清的原料：0 与 非 0 不许读成同一个值）
   const z = parse('count: 0\nsize: 0 bytes\nin-pack: 5\npacks: 1\nsize-pack: 2.00 MiB\ngarbage: 0\n');
   chk(z.sizeMB === 0 && z.count === 0, '「size: 0 bytes」未读成 0（实 ' + j(z.sizeMB) + '）');
@@ -208,13 +225,12 @@ function selfTest(opt) {
   chk(rb.fix.indexOf('.l2s.tmp_obj_') >= 0 && rb.fix.indexOf('git gc') >= 0,
     '修法没对上任一病灶（实 ' + j(rb.fix) + '）');
   chk(rb.fix.indexOf('filter-repo') < 0, '修法指向了破坏性的 filter-repo');
-  const rc = audit({ raw: 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\ngarbage: 0\n' });
-  chk(rc.problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') >= 0,
-    'pack 面两路皆零却没现形（反空转下限失效）');
-  // 候选树形态**不许**报塌陷（否则干净克隆/隔离回归会假红 —— 全量回归实测到此形态）
   const rcd = audit({ raw: 'count: 7\nsize: 7.73 MiB\nin-pack: 0\npacks: 1\nsize-pack: 0 bytes\ngarbage: 1174\nsize-garbage: 13.12 MiB\n' });
-  chk(rcd.problems.map(function (p) { return p.kind; }).indexOf('pack-face-collapsed') < 0,
-    '隔离候选树形态被误报成塌陷（假红：那只是临时 .git，对象全在松散面）');
+  chk(rcd.ok === true && rcd.problems.length === 0,
+    '隔离候选树形态未被判绿（实 ' + j(rcd.problems.map(function (p) { return p.kind; })) + '）—— 干净克隆与隔离回归不许假红');
+  const remp = audit({ raw: 'count: 0\nsize: 0 bytes\nin-pack: 0\npacks: 0\nsize-pack: 0 bytes\n' });
+  chk(remp.ok === true && remp.facts.objectFace === 'empty',
+    '空仓形态未如实报出（实 ' + j([remp.facts.objectFace, remp.problems.map(function (p) { return p.kind; })]) + '）');
   const rd_ = audit({ raw: 'count: 0\nsize: 0 bytes\n' });
   chk(rd_.problems.map(function (p) { return p.kind; }).indexOf('unreadable-fields') >= 0,
     '读数缺格却没现形（「量不到」被静默吞掉）');
@@ -249,9 +265,10 @@ if (require.main === module) {
     + (r.facts.sizeGarbageMB === null ? '（本 git 版本不给 size-garbage）' : '')
     + ' / ' + r.facts.garbage + ' 个（上限 ' + r.limits.garbageMB + ' MiB）');
   console.log('  loose   ' + fmtMB(r.facts.sizeMB) + ' / ' + r.facts.count + ' 个（上限 ' + r.limits.looseMB + ' MiB）');
-  console.log('  pack    ' + fmtMB(r.facts.sizePackMB) + ' / ' + r.facts.packs + ' 个（下限 ' + r.limits.packMB + ' MiB）');
+  console.log('  pack    ' + fmtMB(r.facts.sizePackMB) + ' / ' + r.facts.packs + ' 个（in-pack ' + r.facts.inPack
+    + ' 个 —— 对象面 ' + r.facts.objectFace + '）');
   console.log('  可修剪 ' + r.facts.prunePackable + ' 个（in-pack ' + r.facts.inPack + '）'
-    + (packFaceState(r.facts) === 'candidate' ? ' · pack 面形态：候选树（in-pack 0 / 体积 0，不算塌陷）' : ''));
+    + (r.facts.objectFace === 'empty' ? ' · ⚠ 空仓形态：本判据在此形态上给不出结论（无对象可判）' : ''));
   if (r.problems.length) {
     r.problems.forEach(function (p) {
       console.log('  ✗ ' + p.kind + (p.sizeMB !== null && p.sizeMB !== undefined ? '：' + p.sizeMB + ' MiB' : '')
@@ -263,9 +280,9 @@ if (require.main === module) {
       + fmtMB(r.facts.sizePackMB) + '），重写历史换不来体积，只会让所有 commit hash 变。');
     process.exit(1);
   }
-  console.log('  ✓ 无超限残骸、松散对象在限内、pack 面在场（读数不在空集上恒真）');
+  console.log('  ✓ 无超限残骸、松散对象在限内、对象面量得到（读数不在空集上恒真）');
   process.exit(0);
 }
 module.exports = { BASE: BASE, MAX_GARBAGE_MB: MAX_GARBAGE_MB, MAX_LOOSE_MB: MAX_LOOSE_MB,
-  MIN_PACK_MB: MIN_PACK_MB, parse: parse, readRaw: readRaw, fmtMB: fmtMB, packFaceState: packFaceState,
+  parse: parse, readRaw: readRaw, fmtMB: fmtMB, objectFaceState: objectFaceState,
   audit: audit, collect: collect, selfTest: selfTest };
