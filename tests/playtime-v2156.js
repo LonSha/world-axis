@@ -67,7 +67,7 @@ function runA(a) {
     'v2156/pt A11: core/store.js 已把活动基准键归入独立家族（settingsUnregistered 不被悄悄加一）');
   // G16 冻结清单：本模块的裸读点**必须**在册（它是「读失败与结论同形」的温床）。
   const run = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
-  a(run.indexOf("'engines/playtime.js': 1,") >= 0 && run.indexOf('G16 裸读点总数为 47') >= 0,
+  a(run.indexOf("'engines/playtime.js': 1,") >= 0 && run.indexOf('G16 裸读点总数为 49') >= 0,
     'v2156/pt A12: G16 冻结清单已收录本模块（1 处）且总数文案同步为 47');
 }
 

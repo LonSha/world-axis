@@ -359,7 +359,10 @@ function runAll(a) {
   //   而淘汰只在容器**满**时发生 —— 两者不可能同时成立，故同样无法被行为驱动探测。
   //   它的建人点两条分支都带 updatedAt（主路走 ensurePerson 后统一补，fallback 字面量
   //   本轮补上），静态可核，见 C2b。
-  const STATIC_ONLY = ['engines/world-seed.js', 'engines/world-blueprint.js'];
+  // v2.203.0 收口（Y5）：engines/world-snapshot.js 的 fromBlueprint 与上两处**同一族** ——
+  //   它先判目标为空再建人，淘汰只在容器满时发生，两者不可能同时成立 ⇒ 行为驱动不到；
+  //   其建人点本轮补上 createdAt / updatedAt 两键（见同批产品面补丁），静态可核。
+  const STATIC_ONLY = ['engines/world-seed.js', 'engines/world-blueprint.js', 'engines/world-snapshot.js'];
   STATIC_ONLY.forEach(function (f) { knownModules.add(f); });
   const uncovered = sites.filter(function (s) { return !knownModules.has(s.file); });
   a(uncovered.length === 0,

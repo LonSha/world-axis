@@ -12,12 +12,7 @@
  },
  "loadErrors": {},
  "skipped": [],
- "unmappedSettings": [
-  {
-   "key": "worldaxis_worldgraph_v1",
-   "module": "world-graph"
-  }
- ],
+ "unmappedSettings": [],
  "modules": {
   "core/clock.js": {
    "ns": [
@@ -3808,7 +3803,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "worldaxis_worldgraph_v1"
+   ],
    "consumedBy": []
   }
  }

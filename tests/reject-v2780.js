@@ -339,6 +339,16 @@ function runWitness(WA) {
   const K = WA.kaleidoscope, Rg = WA.registry, I = WA.intel, Lf = WA.life,
         C = WA.causal, O = WA.org, Wd = WA.world, Wt = WA.weather;
   const Ev = WA.events;
+  // v2.203.0 收口：见证面**留底四拍引擎的设置**，函数末尾无条件还原（同 E9/E10 段的收卷契约）。
+  //   为什么必须收：本函数为跑出 A1/A2/A3/B1+B2 那 16 个码会真开四引擎
+  //   （beatReport / planAudit / beatLedger / genGate），此前开完**不收回** ——
+  //   同进程后续依赖「四引擎默认全关」的判据（v2193 的 allOff 首条）于是把它读成
+  //   「家族里已经有人开着」，而那与被测行为无关。这是「靠顺序活着」的又一例。
+  const __keepBeat = {};
+  ['beatReport', 'planAudit', 'beatLedger', 'genGate'].forEach(function (ns) {
+    try { if (WA[ns] && typeof WA[ns].getSettings === 'function') __keepBeat[ns] = WA[ns].getSettings(); }
+    catch (e) { /* 读不出的不还原（不拿默认值冒充现场值） */ }
+  });
   const seen = {};
   const expect = {};
   function want(code, desc) { expect[code] = desc; }
@@ -5349,6 +5359,12 @@ function runWitness(WA) {
       WLw.discard();
     }
   }
+  // v2.203.0 收口：还原见证期间被打开的四个拍引擎（见函数头的收卷契约）。
+  //   放在 return 之前、**不带条件** —— 中途抛错时调用方的 try/catch 仍会走到这里之外，
+  //   故本还原只保证正常路径；异常路径由调用方（coverage / gate）自持宿主副本兜底。
+  Object.keys(__keepBeat).forEach(function (ns) {
+    try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
+  });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };

@@ -92,7 +92,9 @@ function runB(A) {
     + '（programmatic ' + pro4.length + ' 项 / 无去向 ' + noDest.length + ' 项）',
     noDest.slice(0, 4).map(function (e) { return e.key; }).join(', '));
   // 清单**可列**（验收②）：用推后版本的纯函数驱动，不改真文件
-  const bumped = CT.staleReviews(res, led, CT.reviewAfterOf('2.196.0'));
+  // v2.203.0 收口：同 run.js —— 推后版本由账本自身派生（写死会在下次登记后失效）。
+  const raF = (led.programmatic[Object.keys(led.programmatic)[0]] || {}).reviewAfter;
+  const bumped = CT.staleReviews(res, led, CT.reviewAfterOf(raF));
   A(bumped.filter(function (x) { return x.kind === 'overdue'; }).length > 0,
     'B6 把「现在」推到窗口之外 ⇒ 清单真的列得出（实 '
     + bumped.filter(function (x) { return x.kind === 'overdue'; }).length + ' 条超期）');

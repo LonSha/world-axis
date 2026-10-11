@@ -468,8 +468,9 @@ a(modV('core/commit.js') === '2.195.0' && modV('engines/world-blueprint.js') ===
   && modV('engines/world-seed.js') === '2.195.0',
   'D5d 三个改过的模块 registerModule 版本随本批交付版本（实得 ' + J([modV('core/commit.js'),
     modV('engines/world-blueprint.js'), modV('engines/world-seed.js')]) + '）');
-a(modV('engines/reject-recovery.js') === '2.195.0',
-  'D5e reject-recovery 随本批升版（新增三档拒收码的恢复动作：no-act-id / step-threw / no-step 迁移）');
+a(modV('engines/reject-recovery.js') === '2.203.0',
+  'D5e reject-recovery 版本面（v2.203.0 收口：Y5~Y9 四条线把拒收面快照 723 → 740，'
+  + '该模块随本批交付升版；比较值取 registerModule 现场声明）');
 const cf = C0.commit.chainStat().faultCodes;
 a(cf.indexOf('bad-effect') >= 0 && cf.indexOf('chain-effects-full') >= 0,
   'D5f fault 码表新增两条（bad-effect / chain-effects-full；实得 ' + J(cf) + '）');

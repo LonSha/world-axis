@@ -32,7 +32,10 @@
 
   const LS_KEY = 'worldaxis_worldgraph_v1';
   const DEF = { enabled: true, showOrphans: true, maxNodes: 120, maxEdges: 240 };
-  const __REG = { key: LS_KEY, def: DEF, module: 'world-graph',
+  // v2.203.0 收口：module 名原写 'world-graph'（连字符），本仓所有设置归属读的都是
+  //   **驼峰命名空间**（同目录 100+ 引擎一律 `WA.<camel>`）⇒ 设置登记项的归属读不出来。
+  //   v2830/mr 实测 `unmapped:world-graph` 把它顶出来（那门禁只报名字，不猜修法）。
+  const __REG = { key: LS_KEY, def: DEF, module: 'worldGraph',
     bounds: { maxNodes: [20, 240], maxEdges: [40, 480] } };
   const _stat = { builds: 0, nodes: 0, edges: 0, orphans: 0, dangling: 0, cyclic: 0,
     truncatedNodes: 0, truncatedEdges: 0, lastReason: '', faults: {} };

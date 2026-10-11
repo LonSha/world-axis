@@ -86,6 +86,11 @@
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
   function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
   function clockNow(site) { try { return WA.clock ? WA.clock.now(site || 'worldSnapshot') : Date.now(); } catch (e) { return Date.now(); } }
+  // v2.203.0 收口：裸读归因（G16 门禁冻结清单）—— 快照库读不出来的形态是 `catch (e) { return { slots: [] } }`，
+  //   「库读不出来」于是与「库里真的没有快照」不可分辨（同 life / tape-store 的游标与仓库）。
+  function noteRead(source, key, err) {
+    try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail(source, key, err); } catch (e) {}
+  }
   function state() { try { return (WA.store && typeof WA.store.get === 'function') ? (WA.store.get() || {}) : {}; } catch (e) { return {}; } }
   function deep(v) { try { return JSON.parse(JSON.stringify(v)); } catch (e) { return null; } }
   /** 世界指纹：与 world-blueprint 的 `sig()` 同法（32 位 FNV 风格散列，稳定、可复读）。 */
@@ -339,7 +344,12 @@
       if (!isObj(r)) return;
       const key = clean(r.key || ('bp_' + i), 60);
       if (!key) return;
-      people[key] = { id: key, name: clean(r.name || key, 40), fromBlueprint: true };
+      // v2.203.0 收口：建人点**必须带淘汰排序键**（evict-meta C2b）——
+      //   与 world-blueprint.js 的 fallback 建人点同款。缺键的后果不是「少一格」：
+      //   容器满时它因排序键缺失被**优先挤出**（刚搬进来的世界先掉人）。
+      people[key] = { id: key, name: clean(r.name || key, 40), fromBlueprint: true,
+        createdAt: clockNow('worldSnapshot.fromBlueprint.person'),
+        updatedAt: clockNow('worldSnapshot.fromBlueprint.person') };
     });
     const places = (Array.isArray(ids.places) ? ids.places : []).map(function (r) {
       return isObj(r) ? { name: clean(r.name || r.key, 40), key: clean(r.key, 60) } : null;
@@ -475,7 +485,7 @@
   // ── 快照库（localStorage，**不进世界状态**）──────────────────────
   function lsGet() {
     try { const raw = window.localStorage.getItem(LIB_KEY); return raw ? JSON.parse(raw) : { ver: FORMAT, slots: [] }; }
-    catch (e) { return { ver: FORMAT, slots: [] }; }
+    catch (e) { noteRead('worldSnapshot', LIB_KEY, e); return { ver: FORMAT, slots: [] }; }
   }
   function lsSet(v) {
     try { window.localStorage.setItem(LIB_KEY, JSON.stringify(v)); return { ok: true }; }

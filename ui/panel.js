@@ -11226,7 +11226,11 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       if (!face) return;
       const page = H.ROUTES[face];
       if (!page) return hsOut('<div class="wa-log wa-log-warn">这一面没有路由出口（引擎的路由表里没写）。</div>');
-      const tab = panelEl.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === page; })[0];
+      // v2.203.0 收口：真浏览器 `querySelectorAll` 返回 **NodeList**（没有 .filter），
+      //   该形态一路到「跳到来源页」就抛（v2137/O14 的 A6 在实机通道上抓到）。
+      //   同文件 11467 行用的是 .forEach —— 本行是笔误，不是刻意的数组化。
+      const tab = Array.prototype.filter.call(panelEl.querySelectorAll('.wa-tab'),
+        function (t) { return t.dataset.page === page; })[0];
       if (!tab) return hsOut('<div class="wa-log wa-log-warn">目标页 <code>' + esc(String(page)) + '</code> 不在页表里（路由表与页表脱节）。</div>');
       tab.click();
       if (s) s.value = '';

@@ -145,6 +145,15 @@
     refused: 0, blindness: 0, lastReason: '', lastMs: null, lastScanned: null, faults: {} };
 
   function noteFault(code) { stat.faults[code] = (stat.faults[code] || 0) + 1; stat.refused++; stat.lastReason = code; }
+  // v2.203.0 收口：时钟与裸读归因（全库纪律 —— 唯一墙钟读取点是 core/clock.js 的 raw()）。
+  //   本模块原先三处裸调 Date.now()：它绕过冻结时钟，回放对不上时只能全库通读。
+  function clockNow(site) { try { return WA.clock ? WA.clock.now(site || 'historySearch') : Date.now(); } catch (e) { return Date.now(); } }
+  // 裸读归因（与 chatcache / worldbook / life / tape-store 同一条出口）：
+  //   「读不出来」最坏的形态是被当成「没有这回事」—— 查询词库读不出时我们答「没查过」，
+  //   与「真的没查过」同形，而两者补救完全不同。投递 reportReadFail 是唯一留痕出口。
+  function noteRead(source, key, err) {
+    try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail(source, key, err); } catch (e) {}
+  }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
   function num(v) { const n = Number(v); return (typeof n === 'number' && isFinite(n)) ? n : null; }
   function state() { try { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; } catch (e) { return {}; } }
@@ -390,7 +399,7 @@
       if (!isFinite(n) || n < 0) { noteFault('bad-value'); return { ok: false, reason: 'bad-value', detail: 'limit 必须是非负数' }; }
       limit = Math.min(n, CAPS.maxRows);
     }
-    const start = Date.now();
+    const start = clockNow('historySearch.search');
     const sources = [], all = [], deferred = [];
     let scanned = 0;
     faces.forEach(function (f) {
@@ -404,7 +413,7 @@
       r.rows.forEach(function (x) { all.push(x); });
     });
     const cappedScan = deferred.length > 0;
-    const ms = Date.now() - start;
+    const ms = clockNow('historySearch.search') - start;
     const sorted = sortRows(all);
     const matched = sorted.length;
     const rows = sorted.slice(0, limit);
@@ -454,7 +463,7 @@
       const o = JSON.parse(raw);
       if (!o || typeof o !== 'object' || o.format !== FORMAT) return null;
       return o;
-    } catch (e) { return null; }
+    } catch (e) { noteRead('historySearch', LS_KEY, e); return null; }
   }
   function lsSet(o) {
     try {
@@ -486,7 +495,7 @@
     const prev = lsGet() || { format: FORMAT, recent: [], filters: {} };
     const q2 = clean(q.trim(), 60);
     const list = (Array.isArray(prev.recent) ? prev.recent : []).filter(function (x) { return x && x.q !== q2; });
-    list.unshift({ q: q2, at: Date.now(), faces: faces.slice(),
+    list.unshift({ q: q2, at: clockNow('historySearch.remember'), faces: faces.slice(),
       matched: (o.matched === null || o.matched === undefined) ? null : num(o.matched) });
     const filters = {};
     Object.keys(prev.filters || {}).forEach(function (k) { filters[k] = prev.filters[k]; });

@@ -274,7 +274,7 @@ function runAll(A) {
   // v2.203.0（第四批收口）：调用期 1714 → **1721**、合计 1825 → **1832**（+7 条，实测回填）。
   //   本门禁的边只算**产品文件**的 (file, ns) 对（见 B1 的 `files === 221`），故这 7 条
   //   来自本批的产品改动、批内未及回填；装载期 111 不变。
-  A(a.edgesLoad === 111 && a.edgesCall === 1721 && a.edgesAll === 1832 && a.identityOk,
+  A(a.edgesLoad === 111 && a.edgesCall === 1722 && a.edgesAll === 1833 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
