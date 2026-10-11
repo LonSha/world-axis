@@ -101,7 +101,7 @@ function runA(a) {
   a(pan.indexOf("'#wa-cap-migrate'") >= 0, 'o4v2182/A20: 面板接线（迁移预检按钮）在位');
   a(readOf('tests/run.js').indexOf('|capacityAudit:diagnose getSettings migrationCheck obligations reclaimable setSettings stat waterline|') >= 0,
     'o4v2182/A21: FROZEN2800 逐字含本模块的契约成员集');
-  a(/VERSION = '2\.(182|183|184|185|186|187|188|189|190|191|192|193|194|195|196|197|198|199|200|201|202|203)\.0'/.test(readOf('index.js')) && JSON.parse(readOf('manifest.json')).version && ['2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0', '2.191.0', '2.192.0', '2.193.0', '2.194.0', '2.195.0', '2.196.0', '2.197.0', '2.198.0', '2.199.0', '2.200.0', '2.201.0', '2.202.0', '2.203.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
+  a(/VERSION = '2\.(182|183|184|185|186|187|188|189|190|191|192|193|194|195|196|197|198|199|200|201|202|203|204)\.0'/.test(readOf('index.js')) && JSON.parse(readOf('manifest.json')).version && ['2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0', '2.191.0', '2.192.0', '2.193.0', '2.194.0', '2.195.0', '2.196.0', '2.197.0', '2.198.0', '2.199.0', '2.200.0', '2.201.0', '2.202.0', '2.203.0', '2.204.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
     'o4v2182/A22: 版本钉一致（index.js + manifest）');
 }
 

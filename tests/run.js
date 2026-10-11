@@ -10482,7 +10482,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.203.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.204.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -11051,7 +11051,7 @@ assert(verF2500 === '2.203.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.203.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.204.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -11342,7 +11342,7 @@ assert(verF2500 === '2.203.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.203.0', '入口版本为 2.203.0（实 ' + ver + '）');
+    assert(ver === '2.204.0', '入口版本为 2.203.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11941,7 +11941,7 @@ assert(verF2500 === '2.203.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.203.0', '入口版本为 2.203.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.204.0', '入口版本为 2.203.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -12329,7 +12329,7 @@ assert(verF2500 === '2.203.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.203.0', '入口版本为 2.203.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.204.0', '入口版本为 2.203.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12699,7 +12699,7 @@ assert(verF2500 === '2.203.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.203.0', '入口版本为 2.203.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.204.0', '入口版本为 2.203.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -13064,7 +13064,7 @@ assert(verF2500 === '2.203.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.203.0', '入口版本为 2.203.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.204.0', '入口版本为 2.203.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -15417,7 +15417,7 @@ assert(verF2500 === '2.203.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.203.0', '入口 VERSION = 2.203.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.204.0', '入口 VERSION = 2.203.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -21718,7 +21718,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   「版本双落」。改为从 index.js **精确抽取** const VERSION = '...' 再与显式期望比对
     //   （与 v2.125.0 段的 verF2500 同规格：显式常量 + 与 manifest 同源同值）。
     const vM2158 = (idxSrc2158.match(/const VERSION = '([^']+)'/) || [])[1] || '';
-    assert(vM2158 === '2.203.0' && maniSrc2158.version === vM2158,
+    assert(vM2158 === '2.204.0' && maniSrc2158.version === vM2158,
       'v2158: 入口 VERSION 与 manifest.json 同源同值（实 ' + vM2158 + ' / ' + maniSrc2158.version + '）');
     const wsSrc2158 = fs.readFileSync(path.join(BASE, 'engines/world-seed.js'), 'utf8');
     assert(wsSrc2158.indexOf('function transferPack(seedId, max)') >= 0
@@ -22985,6 +22985,38 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       'v2203: 诊断面（secWorldLab）确实回带 sim 三栏与唯一写口');
     // ⑥ 专锁（正 / 负两向，N 段走真源码破坏 + 两向跑产品）
     runLock('./s3-y9-v2203.js');
+  }
+  section('v2.204.0（第一批）：出站面门禁 + 两档回归的快档入口 + README 人读锚点（信任面三项）');
+  {
+    // 本批治的三个洞（第三方建议清单里的第 9 / 第 10 / 第 1 类）：见 tests/s3-net-audit-v2204.js 文件头。
+    // 本节的**接线面**只做一件事：核实三件东西真被挂进体系（工具入册 / 单一真源关系 / 门禁被引用），
+    // 功能与边界判据全部住在专锁里（两处不写第二遍）。
+    const netSrc2204 = fs.readFileSync(path.join(BASE, 'tools/net-audit.js'), 'utf8');
+    const smokeSrc2204 = fs.readFileSync(path.join(BASE, 'tools/smoke.js'), 'utf8');
+    const docSrc2204 = fs.readFileSync(path.join(BASE, 'tools/doc-gate.js'), 'utf8');
+    const readmeSrc2204 = fs.readFileSync(path.join(BASE, 'README.md'), 'utf8');
+    // ① 三件产物都在场，且各自是**判据**（有 CLI 入口 / 有导出面），不是一次性的打印脚本
+    assert(netSrc2204.indexOf('module.exports') > 0 && netSrc2204.indexOf('require.main === module') > 0,
+      'v2204: net-audit 既能在命令行跑、也能被 require（门禁复用同一份复算，不是第二套算法）');
+    assert(smokeSrc2204.indexOf('const SMOKE_SET = [') > 0 && smokeSrc2204.indexOf('hookSubset') > 0,
+      'v2204: smoke 的快档集是源码常量，且带 pre-commit ⊆ 快档集 的关系判据');
+    assert(typeof require(path.join(BASE, 'tools/doc-gate.js')).anchors === 'function',
+      'v2204: doc-gate 把 README 人读锚点做成**真判据**（anchors 有导出面，门禁与命令行同一函数）');
+    // ② 单一真源：三个工具各自委托既有真源，不许自带第二份「产品文件面 / 剥离器 / 版本号」
+    assert(netSrc2204.indexOf("'product-files.js'") > 0 && netSrc2204.indexOf("'inventory.js'") > 0,
+      'v2204: 出站面的扫描面与真代码面都委托既有真源（product-files / inventory.codeFace）');
+    assert(docSrc2204.indexOf("const VERSION = '(\\\\d+\\\\.\\\\d+\\\\.\\\\d+)'") > 0,
+      'v2204: README 版本锚点的比较值取自 index.js 的 VERSION（不是 README 里再写一份）');
+    // ③ 反空转下限：三条判据都得有「零命中不算通过」的守门人
+    assert(netSrc2204.indexOf('MIN_SITES') > 0 && smokeSrc2204.indexOf('MIN_GATES') > 0,
+      'v2204: 出站面与 pre-commit 关系面各有反空转下限（空集上的普遍命题恒真）');
+    // ④ README 的两处脱节已修（现场判据在专锁 B 段与 doc-gate --anchors 上，此处只判接线）
+    assert(readmeSrc2204.indexOf('node tools/doc-gate.js --anchors') > 0 && readmeSrc2204.indexOf('`net-audit`') > 0,
+      'v2204: README 指向新判据（安装节的锚点门禁 + tools 名单里的 net-audit）');
+    assert(readmeSrc2204.indexOf('通过 15680') < 0,
+      'v2204: README 里写死的旧全量读数（通过 15680）已删 —— 人读的那一处不再冒充现场读数');
+    // ⑤ 专锁（正 / 负两向；N 段六组真源码破坏 + 两向自证）
+    runLock('./s3-net-audit-v2204.js');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

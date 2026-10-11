@@ -190,7 +190,8 @@ function runB(a) {
   // v2.202.0 补账：v2.202.0（Y7）条目入 README 版本历史，导语 138 → 139，本文件这条同批校正。
   //   （教训同上：这条计数每版都要跟 —— 它是「导语里那几个字」与「条目实数」之间的唯一判据。）
   // v2.203.0 补账：v2.203.0（Y8 + Y9）条目入 README 版本历史，导语 139 → 140，本文件这条同批校正。
-  a(r.facts.readmeEntries === 140, 'docs-archive/B: README 版本历史条目 = 140（实 ' + r.facts.readmeEntries + '）');
+  // v2.204.0 补账：v2.204.0（第一批·信任面三项）条目入 README 版本历史，导语 140 → 141，本文件这条同批校正。
+  a(r.facts.readmeEntries === 141, 'docs-archive/B: README 版本历史条目 = 141（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

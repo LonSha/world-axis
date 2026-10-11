@@ -26,9 +26,16 @@
 | DlSNlGHT/World (entity memory) | 四类实体记忆库·别名索引·防重复创建 |
 
 ## 安装
-1. 下载 Release 的 `WorldAxis.zip` 解压到 `SillyTavern/public/scripts/extensions/third-party/WorldAxis/`
-2. 重启酒馆 → 扩展管理启用「世界枢轴 WorldAxis」
-3. 右下角悬浮球 ◈ 打开面板 → 「连接」页配置API通道（至少配 default 或 inference）
+本仓**不发 Release 包**（现场 `git tag` 为 0 —— README 一度把安装第一步写成「去发行页取打包好的 zip」，
+那是给人读的那一处与真源脱节，照做在第一步就卡死；已删，并由 `node tools/doc-gate.js --anchors` 钉住）。两条可用路径：
+1. **git clone**（推荐，便于更新）：
+   `git clone https://github.com/LonSha/world-axis.git SillyTavern/public/scripts/extensions/third-party/WorldAxis`
+2. **手动放置**：把仓库解压/复制到 `SillyTavern/public/scripts/extensions/third-party/WorldAxis/`
+   （目录名必须是 `WorldAxis`）。
+然后：重启酒馆 → 扩展管理启用「世界枢轴 WorldAxis」→ 右下角悬浮球 ◈ 打开面板
+→ 「连接」页配置 API 通道（至少配 `default` 或 `inference`）。
+> 隐私：世界状态全部落本机 `localStorage`；扩展自身不发任何请求（唯一出站在你自己配的 LLM 通道）。
+> 可复算的清单与边界见 [`docs/privacy.md`](docs/privacy.md) 与 `node tools/net-audit.js`。
 
 ## 架构
 ```
@@ -69,28 +76,39 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 
 ## 构建与验收（当前版本 v2.203.0）
 
-v2.173.0（TX4b）— TX4/TX6/TX7/TX8/TX9 五模块面板接线（渲染 + 绑定 + 登记三面同步）+ 六模块骨架登记补齐（骨架声明 / `__BOUNDED_CAPS` / `evict.SITES` 三段式）+ 两处预存失败收敛 — TX 五张专锁 42/49/44/49/46 全 0 失败。
+**两档回归**：日常改动跑**快档**（十几秒，覆盖「动了就会炸」的十一面），收口跑**全量**。
 
 ```bash
-node tests/run.js               # 全量回归入口 → **通过 15680 / 失败 0**（`status: passed`，v2.173.0 收尾轮实测，整趟约 17 分钟）。**跑法很要紧**：`node tests/run.js` 直接跑会在中段被 SIGKILL 而只留 `Status: interrupted`（那是**跑法错误**，不是判据失败）—— 正确入口是 `isolated-runner.launch(root, { timeoutMs: 1800000 })`，即须传 `WA_REGRESSION_TIMEOUT_MS`（本机整趟 >660s；默认 660000ms 由 v2.131.0 的实测驱动设定）。此前纪律期「不跑全量」已随计划全部落盘而解除 —— 解除后的**第一趟**即拿出 15433 / 10，10 条全是历史欠账（陈旧精确读数 / 抖动带阈值 / 判据锚点写错三族），逐条归因见 `ITERATION_LOG.md` 的 R148「收口轮」段；v2.163.0 收口轮又拿出 15436 / 19，19 条**全部由本版版本升级引起**（版本钉消息文本不同批 / 台账末次版本词未跟 / 新开调用点未入武装表），逐条归因见 R149。
-node tests/inventory.js         # 出口面清册 → 四类悬空均 0（产品文件 193 个）
+node tools/smoke.js             # 快档：11 个成员、现场约 10s（成员与耗时都是现场读数，见 tools/smoke.js）
+node tools/net-audit.js         # 网络外呼点位：出站点必须全在白名单内（隐私面，见 docs/privacy.md）
+node tests/run.js               # 全量回归入口（收口门槛；整趟约 29 分钟）
+node tests/inventory.js         # 出口面清册 → 四类悬空均 0
 node tests/export-contract.js   # 出口面契约 → ns / members / chars（产物在 .gitignore 内）
 ```
 
+**读数以现场为准**：本段**不写「通过 N / 失败 M」**——那是个每次回归都会变、却只能靠人记得同步的数字
+（本仓治过的同型病）。全量跑完时 `tests/run.js` 自己会在末行打印 `通过 N / 失败 M` 与 `Status`。
+**跑法**：直接 `node tests/run.js` 即可（v2.203.0 起外壳硬超时默认值已按实测重算为 2280000ms，
+比实测总时长有裕量；慢机可用 `WA_REGRESSION_TIMEOUT_MS` 放宽）。
+
 零依赖：只用 Node 内置模块，无 `package.json`、无 `node_modules`。
 每次收口走同一套门禁：出口面契约（逐字冻结）· 死子面账本 · 模块注册与依赖图 ·
-拒收码归属 · 测试面可达性 · 读数一致性（`readings`）· 负控制锚点审计 · 生成物一致性。
+拒收码归属 · 测试面可达性 · 读数一致性（`readings`）· 负控制锚点审计 · 生成物一致性 · 网络外呼点位。
 逐条说明与读数解释见 [`docs/gates.md`](docs/gates.md)；改代码的规矩见 [`docs/contributing.md`](docs/contributing.md)；
-分层与单一真源清单见 [`docs/architecture.md`](docs/architecture.md)；拒收码手册见 [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)。
+分层与单一真源清单见 [`docs/architecture.md`](docs/architecture.md)；拒收码手册见 [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)；
+隐私与网络行为见 [`docs/privacy.md`](docs/privacy.md)。
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（37 个，`git ls-files tools/ | wc -l` 为准：
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（39 个，`git ls-files tools/ | wc -l` 为准：
 `agenda_smoke` / `anchor-scan` / `capacity_audit_smoke` / `chronicle_view_smoke` / `consumer-types` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `fact-report` /
-`doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `impact-analysis` / `loose-readings` / `patch-idempotency` /
-`pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `reject-recovery` / `scan_drift` / `slow-sections` / `sync-e2e-readings` / `sync-hardcoded` /
+`doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `impact-analysis` / `loose-readings` / `net-audit` / `patch-idempotency` /
+`pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `reject-recovery` / `scan_drift` / `slow-sections` / `smoke` / `sync-e2e-readings` / `sync-hardcoded` /
 `test-audit` / `test-layers` / `tx1_smoke` / `tx2_smoke` / `tx3_smoke` / `tx4_smoke` / `tx6_smoke` / `tx7_smoke` /
 `tx8_smoke` / `tx9_smoke` / `world_health_smoke`）。
+（v2.204.0（第一批 · v2.204.0）：新入库两个工具 —— `net-audit`（网络外呼点位门禁，出站面的第一道判据）与
+`smoke`（两档回归的快档入口与单一真源）。`net-audit` 由 `smoke` 与专锁两条链引用，`smoke` 由 `tests/run.js` 的
+新增节引用 —— 两者都属「被门禁链引用」。故索引由 37 → **39**。）
 （v2.192.0（第二批 · U5）：新入库 `reject-recovery`（拒收码 → 恢复动作核对器）。它**不带映射表** —— 表只存在产品模块 `engines/reject-recovery.js` 一处（面板面 / 诊断面 / 日志面的共同消费方），本工具只做「现场复算 vs 产品承诺」的逐条核对；它由专锁 `tests/reject-recovery-lock-v2192.js` + `tests/run.js` 两条链引用，属「被门禁链引用」。故索引由 36 → **37**。）
 （v2.191.0（第一批 · U3 + U4）：本名单补上一个本轮新入库的工具 —— `loose-readings`（散装读数核对器，治「族外写死的数字没人盯」）；它由 **专锁 + `tests/run.js` 的新增节**两条链引用，属「被门禁链引用」。U4 改的 `consumer-types` **早已在册**（本轮只加导出面生命周期字段）—— 故索引由 35 → **36**，不是 37：**名单跟着「索引里有没有这个文件」走，不跟着「本轮改了几个文件」走**。）
 （v2.190.0（第一批 · U9）：新入库 `fact-report`（发布前事实报告）—— 它由专锁 `tests/u9-fact-report-v2190.js` 直接 require，属「被门禁链引用」；同一轮本名单必须跟上。）
@@ -114,11 +132,20 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（139 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（141 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
 - **v2.20.0 及更早**：条目在 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节（本版迁入）。
+<b>v2.204.0</b> — <b>信任面三项：出站面门禁 + 两档回归的快档入口 + README 人读锚点</b>（<b>零产品代码改动</b> —— 交付物全在 <code>tools/</code> 与 <code>tests/</code> 两侧）。<br>
+<b>它治什么</b>（三条都是「体系里真实存在、此前无人盯」的洞）：① <b>出站面零治理</b> —— 本仓写侧 / 删侧 / 读侧 / 活性面各有门禁，唯独「新加一行 <code>fetch</code> / <code>new WebSocket</code> / <code>EventSource</code>」八道门禁一条都不会响，而它在用户那里的含义是「聊天内容可能被发到别处」；② <b>每次 commit 与 push 之间是裸奔的</b> —— 全量实测约 29 分钟，于是「改动一行想看结果」要么等半小时、要么不跑，而 <code>hooks.js</code> 的三道秒级门禁<b>默认没安装</b>；③ <b>给人读的那一处与真源脱节</b> —— README 的「安装」第一步写着「下载 Release 的 WorldAxis.zip」而现场 <code>git tag</code> 为 0（照做在第一步就卡死），版本锚点停在 <code>v2.173.0</code>，「通过 15680 / 失败 0」停在那一轮的读数。<br>
+<b>三条判据（全部可现场复算）</b>：<code>tools/net-audit.js</code> —— 真代码面口径（注释与<b>字符串字面量</b>里的 <code>fetch</code> 不算外呼，与 v2.29.0 的「提及不是引用」逐字同规）+ 显式白名单（不是豁免表，是<b>承诺书</b>）+ 零命中不算通过（<code>MIN_SITES</code>）+ 白名单腐烂即红；动态 <code>import()</code> 按「参数是不是外部 URL」分流成 <code>egress</code> / <code>hostImports</code> 两档（首版把二者混为一谈，把 <code>engines/worldbook.js</code> 的宿主同源加载报成外呼而现红 —— 病灶在判据的输入面比结论面宽）；<code>tools/smoke.js</code> —— 两档回归的<b>快档</b>入口，11 个成员、现场约 10s，集本身是源码常量且与 <code>hooks.FAST_GATES</code> 构成<b>真子集</b>关系（<code>⊆</code>，不是 <code>==</code>：快档集故意大于 pre-commit 三道）；<code>tools/doc-gate.js</code> 新增 <code>anchors()</code> —— README 版本锚点 === <code>index.js</code> 的 <code>VERSION</code>、Release 声明必须有现场 tag 支撑、删掉 Release 路径之后<b>必须仍有一条真安装路径</b>（两条同批，否则用户一条路都没有）。<br>
+<b>不判的那一条（如实登记）</b>：README 里「通过 N / 失败 M」是否等于最新全量读数 —— 跑全量要 29 分钟，判据不能在门禁里跑它。故 README 的读法改成<b>指向现场</b>（<code>node tests/run.js</code> 自己会在末行打印），而 <code>anchors()</code> 只钉三件能秒级复算的事。这是本仓既有裁决的又一次应用：<b>算不出来的不冒充判据</b>。<br>
+<b>实测读数</b>：<code>net-audit</code> 产品文件 <b>221</b> / 出站点 <b>2</b>（均在 <code>core/api-router.js</code>）/ 宿主同源 <code>import</code> <b>1</b>（<code>engines/worldbook.js</code> → <code>/scripts/world-info.js</code>）/ 白名单 1 条；<code>smoke</code> <b>11 / 0</b> · 合计 <b>9.4s</b>；<code>doc-gate --anchors</code> 三条全过（版本锚点 <code>2.204.0</code> = 现场 · tag 0 个 · 安装入口 <code>git-clone</code>）。<br>
+<b>专锁 <code>tests/s3-net-audit-v2204.js</code> 74 / 0</b>：A 段静态契约（三条单一真源 / 两处读接缝 / 反空转下限 / 本锁恰挂 1 处）· B 段运行时（扫描面 === <code>productFiles()</code> 长度、宿主同源单列、名单自述个数 === <code>git ls-files tools/</code> 实际）· C 段只读不变式（四个函数连调不变量 + 零写盘无 <code>--fix</code>）· N 段 <b>六组真源码破坏 + 两向自证</b>（白名单形态改窄 / 探针表掏空 / 往真源码塞一行未登记外呼 / <code>FAST_GATES</code> 加一道不在集内的门禁 / 快档集成员被挪走 / README 锚点改回旧值）。<b>破坏一律发生在内存副本上</b>（N7 复核真文件锚点仍恰中 1 次）。<br>
+<b>同批落地</b>：<code>docs/privacy.md</code>（隐私承诺书 —— 出站两类逐条写明，与门禁读数<b>同源</b>不许各写一份）· <code>tests/run.js</code> 新增一节（只判接线面，功能与边界判据全住专锁，两处不写第二遍）· README 的安装节 / 构建与验收节 / <code>tools/</code> 名单三处修正（名单 37 → <b>39</b>）。<br>
+<b>版本面</b>：<code>index.js</code> 与 <code>manifest.json</code> 升 <b>2.204.0</b>；<code>tests/run.js</code> 九处硬读数替换；五把 B3 锁交付基线抬起；11 个文件的 alternation 与单/双引号名单末项追加；五本台账同代（两本测量型走各自 <code>--update</code>）。<b>零产品模块改动</b> ⇒ 各引擎 <code>registerModule</code> 的 <code>ver</code> 与 <code>s3-u5-v2198</code> 的产品版本判据<b>刻意不动</b>（抬了就是假账）。<br>
+<b>如实边界</b>：① 本批判据管的是「代码里有没有计划外的出站」，<b>不管</b>「发出去的内容合不合适」—— 后者取决于用户在「连接」页配了谁；② 快档集覆盖 11 面，不是全量的真子集意义上的「小全量」（全量 255 节）；③ 面板侧实机未验（本批未触碰 <code>ui/</code>）。
 
 <b>v2.165.0</b> — <b>TX1 可谈判、可履约的势力外交</b>（<b>拓展线第二批</b>：为势力对建立<b>稳定 pairId、双边态度、有效条约与履约回执</b> —— 而不是把 faction-graph 的推导值直接当事实）。
 <b>它治什么</b>：faction-graph 能从双方各自的对外态度推导关系图，边恒为 <code>derived:true</code>；但这不是成对外交事实。两方谈了什么、签了什么、约到何时、谁欠谁 —— 这些<b>事实</b>此前没有载体。TX1 补的就是这一层：<code>engines/diplomacy.js</code>。
