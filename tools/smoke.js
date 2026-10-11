@@ -47,6 +47,7 @@ const MAX_MS = 12000;
  */
 const SMOKE_SET = [
   { rel: 'tools/net-audit.js', why: '计划外的网络外呼（出站面零治理 —— 用户最敏感的一类改动）' },
+  { rel: 'tools/attribution-gate.js', why: 'README 加个上游而许可没人核（义务面零治理 —— 无据的授权声明）' },
   { rel: 'tests/export-contract.js', why: '导出成员被悄悄改名/删掉，调用方静默降级' },
   { rel: 'tests/reject-code-gate.js', why: '新增拒收码没有归属（码存在 ≠ 码可达）' },
   { rel: 'tests/module-registry-gate.js', why: '磁盘有模块而自检看不见（黑盒模块）' },

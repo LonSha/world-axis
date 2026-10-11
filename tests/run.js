@@ -23018,6 +23018,32 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // ⑤ 专锁（正 / 负两向；N 段六组真源码破坏 + 两向自证）
     runLock('./s3-net-audit-v2204.js');
   }
+  section('v2.204.0（第二批）：缝合来源清点表 —— 义务面（attribution）第一道判据');
+  {
+    // 本批治的病：README 的「缝合来源」表列 13 个上游，末行只有一句「已获原作者授权」——
+    // **没有任何判据**问过「这些上游的许可核过没有」。README 加一个上游，八道门禁一条都不响。
+    // 本节只判**接线面**，功能与边界判据全住专锁（两处不写第二遍）。
+    const attrGateSrc = fs.readFileSync(path.join(BASE, 'tools/attribution-gate.js'), 'utf8');
+    const attrDocSrc = fs.readFileSync(path.join(BASE, 'docs/attribution.md'), 'utf8');
+    const attrReadme = fs.readFileSync(path.join(BASE, 'README.md'), 'utf8');
+    // ① 判据在场，且是**真判据**（有 CLI 入口 + 有导出面）
+    assert(attrGateSrc.indexOf('module.exports') > 0 && attrGateSrc.indexOf('require.main === module') > 0,
+      'v2204b: attribution-gate 既能在命令行跑、也能被 require（门禁复用同一份复算）');
+    assert(typeof require(path.join(BASE, 'tools/attribution-gate.js')).audit === 'function',
+      'v2204b: audit() 有导出面（专锁与命令行读同一个函数）');
+    // ② 两份真源在场，且清点表的**词表**与判据同源
+    assert(attrDocSrc.indexOf('| 未核对 |') > 0 && attrDocSrc.indexOf('许可状态') > 0,
+      'v2204b: docs/attribution.md 有状态词表与「许可状态」栏（缺口读数住在文档里，判据只读它）');
+    assert(attrGateSrc.indexOf("'未核对'") > 0 && attrGateSrc.indexOf('MIN_ROWS') > 0,
+      'v2204b: 判据的状态词表与反空转下限都在场（扩词/放宽须显式改判据）');
+    // ③ README 的承诺必须**指向**清点表（两处各写一份必然漂移）
+    assert(attrReadme.indexOf('License:') > 0 && attrReadme.indexOf('attribution.md') > 0,
+      'v2204b: README 的 License 行指向清点表（承诺与凭证不分家）');
+    assert(attrReadme.indexOf('已获原作者授权（非商业缝合）') < 0,
+      'v2204b: 那句无凭据的「已获授权」已删 —— 现场 17 条全部未核对，无据声明等于不实陈述');
+    // ④ 专锁（正 / 负两向；N 段四组真源码破坏 + 两向自证）
+    runLock('./s3-attribution-v2204.js');
+  }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
   console.log('  ⏱ 超 60s 的节：' + __slowSec119 + ' 个');

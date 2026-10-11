@@ -7,6 +7,8 @@
 | [ERROR_CODES.md](ERROR_CODES.md) | 拒收码手册（每个内联码的归属与见证；**码数不写在这里** —— 随各版生成器刷新，现场跑 `node tools/gen-error-codes.js` 看读数） | `node tools/gen-error-codes.js`（生成物，`--check` 双向校验） |
 | [architecture.md](architecture.md) | 分层、装载次序、单一真源清单 | 手写 |
 | [gates.md](gates.md) | 九道门禁逐条：它治什么病、怎么跑、怎么读读数 | 手写 |
+| [privacy.md](privacy.md) | 出站行为逐条（唯一出口 / 宿主同源 import 单列 / 数据落点）；由 `node tools/net-audit.js` 现场复算 | 手写 |
+| [attribution.md](attribution.md) | **缝合来源清点表**（17 行：来源声明 / **许可状态** / 下一步）；许可状态一律如实停在 `未核对`，由 `node tools/attribution-gate.js` 钉住 | 手写 |
 | [contributing.md](contributing.md) | 改代码的规矩（零依赖、不动冻结面、文档同步） | 手写 |
 
 ## 文档与真源的分工

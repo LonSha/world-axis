@@ -76,10 +76,10 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 
 ## 构建与验收（当前版本 v2.203.0）
 
-**两档回归**：日常改动跑**快档**（十几秒，覆盖「动了就会炸」的十一面），收口跑**全量**。
+**两档回归**：日常改动跑**快档**（十几秒，覆盖「动了就会炸」的十二面），收口跑**全量**。
 
 ```bash
-node tools/smoke.js             # 快档：11 个成员、现场约 10s（成员与耗时都是现场读数，见 tools/smoke.js）
+node tools/smoke.js             # 快档：12 个成员、现场约 10s（成员与耗时都是现场读数，见 tools/smoke.js）
 node tools/net-audit.js         # 网络外呼点位：出站点必须全在白名单内（隐私面，见 docs/privacy.md）
 node tests/run.js               # 全量回归入口（收口门槛；整趟约 29 分钟）
 node tests/inventory.js         # 出口面清册 → 四类悬空均 0
@@ -100,8 +100,8 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（39 个，`git ls-files tools/ | wc -l` 为准：
-`agenda_smoke` / `anchor-scan` / `capacity_audit_smoke` / `chronicle_view_smoke` / `consumer-types` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `fact-report` /
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（40 个，`git ls-files tools/ | wc -l` 为准：
+`agenda_smoke` / `anchor-scan` / `attribution-gate` / `capacity_audit_smoke` / `chronicle_view_smoke` / `consumer-types` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `fact-report` /
 `doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `impact-analysis` / `loose-readings` / `net-audit` / `patch-idempotency` /
 `pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `reject-recovery` / `scan_drift` / `slow-sections` / `smoke` / `sync-e2e-readings` / `sync-hardcoded` /
 `test-audit` / `test-layers` / `tx1_smoke` / `tx2_smoke` / `tx3_smoke` / `tx4_smoke` / `tx6_smoke` / `tx7_smoke` /
@@ -132,14 +132,22 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（141 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（140 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
 - **v2.20.0 及更早**：条目在 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节（本版迁入）。
-<b>v2.204.0</b> — <b>信任面三项：出站面门禁 + 两档回归的快档入口 + README 人读锚点</b>（<b>零产品代码改动</b> —— 交付物全在 <code>tools/</code> 与 <code>tests/</code> 两侧）。<br>
+<b>v2.204.0</b> — <b>信任面与义务面（两批同版）：出站面门禁 · 两档回归快档 · README 人读锚点 · 缝合来源清点</b>（<b>零产品代码改动</b> —— 交付物全在 <code>tools/</code> 与 <code>tests/</code> 两侧，外加两份文档）。<br>
+<b>【第二批】缝合来源清点表 —— 义务面（attribution）第一道判据</b>。<br>
+<b>它治什么</b>：README 的「缝合来源（机制蓝本）」表列 13 个上游（其中 <code>DlSNlGHT/World</code> 贡献 5 个附加机制面），而末行只有一句「各源项目机制参考（非商业缝合）」加半句无凭据的授权声明 —— <b>这句话此前没有任何判据</b>：没有 LICENSE 文件、没有逐条清点、没有一处说明「每个上游的许可义务核对到什么程度」。读者唯一能做的判断是「相信作者」。同族的失效形态在本仓各面反复现形过（写侧 / 删侧 / 读侧 / 活性面 / 出站面各有门禁），唯独<b>义务面（attribution / license）是零治理</b>：README 加一个上游，九道门禁一条都不响。<br>
+<b>做法</b>：新增 <code>docs/attribution.md</code>（<b>逐条清点表 17 行</b>，每行写明「缝合的是什么 / 来源声明 / <b>许可状态</b> / 下一步」）+ <code>tools/attribution-gate.js</code>（三条判据：README 每个上游必须在清点表里有一条对应行；每条状态词必须在有限词表内、<b>不许留空或写「待定」</b>；行数不得低于下限）。<br>
+<b>⚠ 状态词一律停在 <code>未核对</code>（17 / 17），本批不假装核过</b>：这一栏是<b>缺口读数</b>，不是进度条。它的价值在把「不知道」从隐性变成显性 —— 一张 17 行全 <code>未核对</code> 的表，比一句没人核的承诺诚实得多。同批删掉 README 末行那半句无凭据的授权声明（现场 17 条全部未核对 ⇒ 该声明无据），README 的 License 行改为<b>指向清点表</b>。<b>清点表的「来源声明」与「许可状态」分成两栏</b>（两者互不等价 —— 本仓可以「已声明出处」而同时「许可未核对」，现状正是如此）。<br>
+<b>专锁 <code>tests/s3-attribution-v2204.js</code> 36 / 0</b>（首跑 32 / <b>4 红</b>，四条全部是装置缺陷、逐条归因后修绿）：A 段静态契约（真源两份 / 状态词表 / 反空转下限 / 读接缝 / <b>不引用 codeFace</b> / 零写盘 / 本锁恰挂 1 处）· B 段运行时（<b>README 起源 17 个 === 清点行 17 条</b>、归一化行为证据、状态分布如实）· C 段只读不变式 · N 段四组真源码破坏 + 两向自证。<br>
+<b>四条装置缺陷 + 一条真缺陷</b>：① 取状态列写死下标（真表列序与之差一）⇒ 改为<b>按词表认列</b>；② 回落取「最后一格」而落到「下一步」栏 ⇒ 回落取<b>状态列位置</b>；③ 破坏注入点在表后空行之外 ⇒ 扫描器在表后非 <code>|</code> 行收口，破坏根本没被看见；④ 掏空破坏用了全局正则，17 行全中 ⇒ 只掏一行。⑤ <b>本批自己引入的真缺陷、由快档当场逮住</b>：README 被 <code>docs-archive-gate</code> 要求「以 <code>---</code> + <code>License:</code> 单行收尾」，而首版改成了三行 —— 快档 12 个成员里那一格当场红（这正是「两档回归」存在的意义：改动一行、十几秒内知道结果）。<br>
+<b>同批</b>：<code>tools/attribution-gate.js</code> 入册快档（<code>SMOKE_SET</code> 11 → <b>12</b> 个成员，现场合计 <b>9.4s</b>）；<code>tests/run.js</code> 新增一节；README 的 <code>tools/</code> 名单 39 → <b>40</b>（名单跟着索引走）。<br>
+<b>【第一批】信任面三项：出站面门禁 + 两档回归的快档入口 + README 人读锚点</b>。<br>
 <b>它治什么</b>（三条都是「体系里真实存在、此前无人盯」的洞）：① <b>出站面零治理</b> —— 本仓写侧 / 删侧 / 读侧 / 活性面各有门禁，唯独「新加一行 <code>fetch</code> / <code>new WebSocket</code> / <code>EventSource</code>」八道门禁一条都不会响，而它在用户那里的含义是「聊天内容可能被发到别处」；② <b>每次 commit 与 push 之间是裸奔的</b> —— 全量实测约 29 分钟，于是「改动一行想看结果」要么等半小时、要么不跑，而 <code>hooks.js</code> 的三道秒级门禁<b>默认没安装</b>；③ <b>给人读的那一处与真源脱节</b> —— README 的「安装」第一步写着「下载 Release 的 WorldAxis.zip」而现场 <code>git tag</code> 为 0（照做在第一步就卡死），版本锚点停在 <code>v2.173.0</code>，「通过 15680 / 失败 0」停在那一轮的读数。<br>
-<b>三条判据（全部可现场复算）</b>：<code>tools/net-audit.js</code> —— 真代码面口径（注释与<b>字符串字面量</b>里的 <code>fetch</code> 不算外呼，与 v2.29.0 的「提及不是引用」逐字同规）+ 显式白名单（不是豁免表，是<b>承诺书</b>）+ 零命中不算通过（<code>MIN_SITES</code>）+ 白名单腐烂即红；动态 <code>import()</code> 按「参数是不是外部 URL」分流成 <code>egress</code> / <code>hostImports</code> 两档（首版把二者混为一谈，把 <code>engines/worldbook.js</code> 的宿主同源加载报成外呼而现红 —— 病灶在判据的输入面比结论面宽）；<code>tools/smoke.js</code> —— 两档回归的<b>快档</b>入口，11 个成员、现场约 10s，集本身是源码常量且与 <code>hooks.FAST_GATES</code> 构成<b>真子集</b>关系（<code>⊆</code>，不是 <code>==</code>：快档集故意大于 pre-commit 三道）；<code>tools/doc-gate.js</code> 新增 <code>anchors()</code> —— README 版本锚点 === <code>index.js</code> 的 <code>VERSION</code>、Release 声明必须有现场 tag 支撑、删掉 Release 路径之后<b>必须仍有一条真安装路径</b>（两条同批，否则用户一条路都没有）。<br>
+<b>三条判据（全部可现场复算）</b>：<code>tools/net-audit.js</code> —— 真代码面口径（注释与<b>字符串字面量</b>里的 <code>fetch</code> 不算外呼，与 v2.29.0 的「提及不是引用」逐字同规）+ 显式白名单（不是豁免表，是<b>承诺书</b>）+ 零命中不算通过（<code>MIN_SITES</code>）+ 白名单腐烂即红；动态 <code>import()</code> 按「参数是不是外部 URL」分流成 <code>egress</code> / <code>hostImports</code> 两档（首版把二者混为一谈，把 <code>engines/worldbook.js</code> 的宿主同源加载报成外呼而现红 —— 病灶在判据的输入面比结论面宽）；<code>tools/smoke.js</code> —— 两档回归的<b>快档</b>入口，12 个成员、现场约 10s，集本身是源码常量且与 <code>hooks.FAST_GATES</code> 构成<b>真子集</b>关系（<code>⊆</code>，不是 <code>==</code>：快档集故意大于 pre-commit 三道）；<code>tools/doc-gate.js</code> 新增 <code>anchors()</code> —— README 版本锚点 === <code>index.js</code> 的 <code>VERSION</code>、Release 声明必须有现场 tag 支撑、删掉 Release 路径之后<b>必须仍有一条真安装路径</b>（两条同批，否则用户一条路都没有）。<br>
 <b>不判的那一条（如实登记）</b>：README 里「通过 N / 失败 M」是否等于最新全量读数 —— 跑全量要 29 分钟，判据不能在门禁里跑它。故 README 的读法改成<b>指向现场</b>（<code>node tests/run.js</code> 自己会在末行打印），而 <code>anchors()</code> 只钉三件能秒级复算的事。这是本仓既有裁决的又一次应用：<b>算不出来的不冒充判据</b>。<br>
 <b>实测读数</b>：<code>net-audit</code> 产品文件 <b>221</b> / 出站点 <b>2</b>（均在 <code>core/api-router.js</code>）/ 宿主同源 <code>import</code> <b>1</b>（<code>engines/worldbook.js</code> → <code>/scripts/world-info.js</code>）/ 白名单 1 条；<code>smoke</code> <b>11 / 0</b> · 合计 <b>9.4s</b>；<code>doc-gate --anchors</code> 三条全过（版本锚点 <code>2.204.0</code> = 现场 · tag 0 个 · 安装入口 <code>git-clone</code>）。<br>
 <b>专锁 <code>tests/s3-net-audit-v2204.js</code> 74 / 0</b>：A 段静态契约（三条单一真源 / 两处读接缝 / 反空转下限 / 本锁恰挂 1 处）· B 段运行时（扫描面 === <code>productFiles()</code> 长度、宿主同源单列、名单自述个数 === <code>git ls-files tools/</code> 实际）· C 段只读不变式（四个函数连调不变量 + 零写盘无 <code>--fix</code>）· N 段 <b>六组真源码破坏 + 两向自证</b>（白名单形态改窄 / 探针表掏空 / 往真源码塞一行未登记外呼 / <code>FAST_GATES</code> 加一道不在集内的门禁 / 快档集成员被挪走 / README 锚点改回旧值）。<b>破坏一律发生在内存副本上</b>（N7 复核真文件锚点仍恰中 1 次）。<br>
@@ -882,4 +890,4 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 
 ---
-License: 各源项目机制参考已获原作者授权（非商业缝合）。
+License: 各源项目机制参考（非商业缝合）；逐条许可核对状态见 docs/attribution.md（现场 17 条全部停在「未核对」，本仓不在此处声称「已获授权」—— 无凭据的授权声明等于不实陈述，由 node tools/attribution-gate.js 钉住）。

@@ -37,6 +37,25 @@ node tools/gen-error-codes.js --check   # docs/ERROR_CODES.md 与三源逐字一
 node tests/dup-decl-gate.js             # 同一文件里函数被重复定义（「补丁重跑」事故）
 ```
 
+补三项**用户可感**的（v2.204.0 新增 —— 都属「体系里真实存在、此前无人盯」的面）：
+
+```bash
+node tools/net-audit.js        # 出站面：真代码面上每个 fetch / WebSocket / EventSource 必须全在白名单内
+node tools/attribution-gate.js # 义务面：README 缝合来源表的每个上游必须有许可清点条目（状态词不许留空）
+node tools/doc-gate.js --anchors  # 人读面：README 版本锚点 === index.js VERSION；Release 声明必须有 tag 支撑
+```
+
+这三条 **不是**「又加了三道门禁」，而是**三类此前零治理的面各补第一道判据**：
+- **出站面（egress）**：用户最敏感的一问是「这个扩展会不会把我聊天里的东西发到别处」。此前全库
+  唯一能回答它的是 `core/api-router.js` 里那两行 `fetch`，而**新加一行外呼八道门禁一条都不响**。
+- **义务面（attribution）**：README 末行那句授权声明此前**无凭据也无判据**。现在它拆成
+  一张 17 行清点表，每行的许可状态如实停在 `未核对`（**缺口读数**，不是进度条）。
+- **人读面**：README 是唯一给人读的那一处，而它此前**没有任何判据**读它 —— 安装第一步指向
+  不存在的 Release、版本锚点落后八个版本、读数是几小时前的，全靠人记得同步。
+
+三条都进了 `node tools/smoke.js` 的快档（现场约 10s），故「跑得动」不是问题 ——
+**这正是两档回归存在的意义**：不动体系的话，新判据会立刻退化成没人跑的摆设。
+
 ## 版本条目存在哪儿（第九道门禁为什么存在）
 
 本仓的版本条目按版本分段存放，**不是**「README 一份、日志一份」：
