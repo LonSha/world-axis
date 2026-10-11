@@ -23005,16 +23005,31 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // ② 单一真源：三个工具各自委托既有真源，不许自带第二份「产品文件面 / 剥离器 / 版本号」
     assert(netSrc2204.indexOf("'product-files.js'") > 0 && netSrc2204.indexOf("'inventory.js'") > 0,
       'v2204: 出站面的扫描面与真代码面都委托既有真源（product-files / inventory.codeFace）');
-    assert(docSrc2204.indexOf("const VERSION = '(\\\\d+\\\\.\\\\d+\\\\.\\\\d+)'") > 0,
-      'v2204: README 版本锚点的比较值取自 index.js 的 VERSION（不是 README 里再写一份）');
+    //   ⚠ 不得把 doc-gate 里的正则**抄**到这里（抄了就是第二份真源；本轮实测就抄错了 ⇒ 恒假）。
+    //   改为**调模块**断言语义：比较值必须**现场等于** index.js 的 VERSION（同源、可复算）。
+    const liveVer2204 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
+      .match(/const VERSION = '([0-9.]+)'/) || [])[1];
+    assert(require(path.join(BASE, 'tools/doc-gate.js')).anchors({}).facts.version === liveVer2204,
+      'v2204: README 版本锚点的比较值现场取自 index.js 的 VERSION（实 ' + liveVer2204 + '）');
     // ③ 反空转下限：三条判据都得有「零命中不算通过」的守门人
     assert(netSrc2204.indexOf('MIN_SITES') > 0 && smokeSrc2204.indexOf('MIN_GATES') > 0,
       'v2204: 出站面与 pre-commit 关系面各有反空转下限（空集上的普遍命题恒真）');
     // ④ README 的两处脱节已修（现场判据在专锁 B 段与 doc-gate --anchors 上，此处只判接线）
     assert(readmeSrc2204.indexOf('node tools/doc-gate.js --anchors') > 0 && readmeSrc2204.indexOf('`net-audit`') > 0,
       'v2204: README 指向新判据（安装节的锚点门禁 + tools 名单里的 net-audit）');
-    assert(readmeSrc2204.indexOf('通过 15680') < 0,
-      'v2204: README 里写死的旧全量读数（通过 15680）已删 —— 人读的那一处不再冒充现场读数');
+    //   ⚠ 范围必须与被测对象**同宽**：旧断言扫整份 README，而 v2.201.0 的版本条目里
+    //   **如实引述**了那句旧读数（叙述历史病灶，不是冒充现场读数）⇒ 判据把「解释病灶的
+    //   文字」当成病灶（本仓 O18 同族的假阳性）。人读的那一处是「构建与验收」节（锚点也在那里）。
+    const LIVE_SEC_2204 = (function () {
+      const LL = readmeSrc2204.split('\n');
+      const at = LL.findIndex(function (x) { return /^##\s*构建与验收/.test(x); });
+      if (at < 0) return '';
+      let jj = LL.length;
+      for (let k = at + 1; k < LL.length; k++) { if (/^##\s/.test(LL[k])) { jj = k; break; } }
+      return LL.slice(at, jj).join('\n');
+    })();
+    assert(LIVE_SEC_2204.length > 0 && !/通过\s*[0-9]{4,}\s*\/\s*失败/.test(LIVE_SEC_2204),
+      'v2204: 「构建与验收」节里没有写死的旧全量读数（人读的那一处不冒充现场读数；历史条目里的引述不算）');
     // ⑤ 专锁（正 / 负两向；N 段六组真源码破坏 + 两向自证）
     runLock('./s3-net-audit-v2204.js');
   }
@@ -23032,8 +23047,13 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(typeof require(path.join(BASE, 'tools/attribution-gate.js')).audit === 'function',
       'v2204b: audit() 有导出面（专锁与命令行读同一个函数）');
     // ② 两份真源在场，且清点表的**词表**与判据同源
-    assert(attrDocSrc.indexOf('| 未核对 |') > 0 && attrDocSrc.indexOf('许可状态') > 0,
-      'v2204b: docs/attribution.md 有状态词表与「许可状态」栏（缺口读数住在文档里，判据只读它）');
+    //   ⚠ 词表的真形态是带反引号的 `` | `未核对` | `` —— 原断言找 '| 未核对 |' 恒假。
+    //   改为**委托模块导出**（词表是判据的单一真源，两处不写第二遍）。
+    const attrWords2204b = require(path.join(BASE, 'tools/attribution-gate.js')).STATUS_WORDS;
+    assert(Array.isArray(attrWords2204b) && attrWords2204b.length === 4
+      && attrWords2204b.indexOf('未核对') >= 0 && attrDocSrc.indexOf('许可状态') > 0,
+      'v2204b: docs/attribution.md 有「许可状态」栏，词表由判据导出面给出（实 '
+      + JSON.stringify(attrWords2204b) + '）');
     assert(attrGateSrc.indexOf("'未核对'") > 0 && attrGateSrc.indexOf('MIN_ROWS') > 0,
       'v2204b: 判据的状态词表与反空转下限都在场（扩词/放宽须显式改判据）');
     // ③ README 的承诺必须**指向**清点表（两处各写一份必然漂移）
