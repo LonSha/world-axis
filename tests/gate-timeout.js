@@ -57,6 +57,17 @@ const GATE_TIMEOUTS = {
   spawnMs: 96000,
   shellMs: 240
 };
+/**
+ * v2.203.0：**外壳硬超时**的默认值（isolated-runner 的 `opts.timeoutMs || DEFAULT`）。
+ *   与 GATE_TIMEOUTS 是**两个预算**：那一张管「单道门禁不许卡死」（96s），
+ *   这一条管「整趟不许跑不完」（2280000ms）。两者的口径都不是拍脑袋：
+ *   本值 = 现场实测节内合计 x 1.5 向上取整到分钟（与 tools/slow-sections.js 的同一公式）。
+ *   沿革：600000（初值）→ 660000（v2.131.0，实测 439s x 1.5）→ 2280000（v2.203.0，实测 1487.44s x 1.5）。
+ *   它被登记在这里而不是只写在外壳里，是为了让「默认值长什么样」成为**可读读数**：
+ *   两次现形的形态完全一致 —— **默认值比实测总时长还短 ⇒ 每趟末尾被 SIGKILL，**
+ *   **现场只留 Status: interrupted（读起来像环境问题）**。
+ */
+const RUNNER_TIMEOUT_DEFAULT_MS = 2280000;
 
 /**
  * run.js 现场武装表。**现场调用点全部入表**（病根就在「无一声明 timeout」，
@@ -597,6 +608,7 @@ function discover() {
   const coh = coherence(table);
   return {
     selfRel: SELF_REL,
+    runnerTimeoutDefaultMs: RUNNER_TIMEOUT_DEFAULT_MS,
     ratios: RATIOS,
     gates: GATES.slice(),
     gateCount: GATES.length,
@@ -640,6 +652,7 @@ module.exports = {
   SELF_REL: SELF_REL,
   RATIOS: RATIOS,
   GATE_TIMEOUTS: GATE_TIMEOUTS,
+  RUNNER_TIMEOUT_DEFAULT_MS: RUNNER_TIMEOUT_DEFAULT_MS,
   TIMEOUT_ARMED: TIMEOUT_ARMED,
   GATES: GATES,
   buildTable: buildTable,

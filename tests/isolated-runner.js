@@ -210,7 +210,9 @@ async function launch(root, options) {
     child = cp.spawn(process.execPath, [path.join(prepared.work, 'tests/run.js')].concat(fwd),
       { cwd: prepared.work, env: prepared.env, detached: true, stdio: ['ignore', fd, fd] });
     result.childPid = child.pid; save();
-    timer = setTimeout(() => stop('timeout'), opts.timeoutMs || 1500000);
+    //   默认值由调用方（tests/run.js）按现场实测给出；这里的兜底与它同值，
+    //   由 tests/gate-timeout.js 的 RUNNER_TIMEOUT_DEFAULT_MS 做三处同值对账。
+    timer = setTimeout(() => stop('timeout'), opts.timeoutMs || 2280000);
     const exit = await new Promise(resolve => {
       child.once('error', e => resolve({ code: null, error: e.code }));
       child.once('exit', (code, signal) => resolve({ code, signal }));

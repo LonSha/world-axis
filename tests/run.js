@@ -11,8 +11,16 @@ if (!__isolatedRunner.isWorker(require('path').join(__dirname, '..'))) {
     //   旧默认 600000（10 分钟）比实测总时长还短 ⇒ 每次跑都会在 v2.118.0 段被 SIGKILL，
     //   而截断现场只留 `Status: interrupted`（读起来像环境问题，不像「跑不完」）。
     //   新默认 = slow-sections 的建议口径 «合计 x 1.5，向上取整到分钟» = 660000ms。
+    //   v2.203.0：**同型缺陷第二次现形** —— 计划 Y（第二代拓展线 Y1-Y9）交付后实测总时长已涨到
+    //     约 29 分钟（tools/slow-sections.js 归集 255 节合计 1487.44s，另有 4 节超 60s），
+    //     而当时的默认值是 1500000ms（25 分钟）—— **比实测还短**，于是每一趟全量都在末尾被 SIGKILL，
+    //     现场只留 `Status: interrupted`（与 v2.131.0 记的病逐字同型，读起来仍像环境问题）。
+    //     口径不变、取值重算：合计 1487.44s x 1.5 = 2231160ms，向上取整到分钟 = 2280000ms
+    //     （与 tools/slow-sections.js 对同一份日志给出的建议逐字一致）。
     //   慢机/长局仍可用 WA_REGRESSION_TIMEOUT_MS 放宽；不设该变量时用下面这个实测口径值。
-    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 1500000 })
+    //   注：本处**不许出现「超时建议 + 数字 + ms」的字面形态** —— tools/test-layers.js 的现场计数器
+    //     按该形态全局匹配（不剥注释），注释里写一个就凭空多出一处没有判据的读数。
+    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 2280000 })
     .then(code => { process.exitCode = code; })
     .catch(error => { console.error(error.message); process.exitCode = 3; });
   return;
@@ -19897,6 +19905,33 @@ assert(r2900.dead.length === 847 && r2900.uiDead.length === 3 && r2900.dataOnly.
     assert(gt.parseCallBlocks(runSrc).length === Object.keys(gt.TIMEOUT_ARMED).length,
       'v2105: 现场调用点块数 = 武装表条数（' + gt.parseCallBlocks(runSrc).length + ' vs '
       + Object.keys(gt.TIMEOUT_ARMED).length + '）—— 新开的调用点不入表即红');
+    // ── v2.203.0：外壳硬超时的**默认值**也入本面 ──
+    //   为什么归在这里：本条与「门禁超时」是同一类读数的两个量级 —— 那道预算管「单道门禁
+    //   不许卡死」，这一条管「整趟不许跑不完」。本仓已因「默认值比实测总时长还短」现形**两次**：
+    //   v2.131.0 现场默认 600000 < 实测 439s；v2.203.0 现场默认 1500000 < 实测约 29 分钟。
+    //   两次的表现完全相同：每趟全量在末尾被 SIGKILL，现场只留 Status: interrupted。
+    //   故把「宣称值 / 现场值 / 工具公式」三者的对账钉成可读判据，不再靠人记得同批改。
+    const runSrcRT = fs.readFileSync(__filename, 'utf8');
+    const isoSrcRT = fs.readFileSync(path.join(BASE, 'tests/isolated-runner.js'), 'utf8');
+    const declaredRT = gt.RUNNER_TIMEOUT_DEFAULT_MS;
+    //   取数形态与现场逐字对齐：那行的收尾是 `|| <数字> })`（数字后是空格 + 花括号），
+    //   故正则不许在数字后紧跟右括号 —— 前一版正是这么写的，判据取不到值、自己报 undefined。
+    const siteRunRT = (runSrcRT.match(/timeoutMs: Number\(process\.env\.WA_REGRESSION_TIMEOUT_MS\) \|\| (\d+)/) || [])[1];
+    const siteIsoRT = (isoSrcRT.match(/opts\.timeoutMs \|\| (\d+)\)/) || [])[1];
+    assert(siteRunRT === String(declaredRT) && siteIsoRT === String(declaredRT),
+      'v2203: 外壳硬超时默认值三处同值（宣称 ' + declaredRT + ' / run.js ' + siteRunRT
+      + ' / isolated-runner ' + siteIsoRT + '）—— 两处各写一个数就是下一次漂移的入口');
+    assert(Number(siteRunRT) > 0 && Number(siteIsoRT) > 0 && Number(siteRunRT) === Number(siteIsoRT),
+      'v2203: 两处现场值都是正数且相等（' + siteRunRT + ' / ' + siteIsoRT + '）—— 空值/零值不得当作已武装');
+    // 口径对账：默认值必须是 slow-sections 那条公式的产物（合计 x 1.5 向上取整到分钟）。
+    //   边界（如实登记）：本判据只钉「公式一致」，不钉「合计取值是否为最新实测」——
+    //   后者要靠下一轮重跑 tools/slow-sections.js 才知道；本仓既有裁决：算不出来不得当作算过。
+    const slowRT = require('../tools/slow-sections.js');
+    assert(typeof slowRT.suggestTimeoutMs === 'function'
+      && slowRT.suggestTimeoutMs(1487.44) === declaredRT,
+      'v2203: 默认值可由 slow-sections 的同一公式复算（合计 1487.44s 得 '
+      + (typeof slowRT.suggestTimeoutMs === 'function' ? slowRT.suggestTimeoutMs(1487.44) : 'n/a')
+      + '，宣称 ' + declaredRT + '）—— 口径与工具一致，重算实测即须同批改默认值');
     const fuse = gt.findSiteBlock(runSrc, gt.ARMED_SITES[3].anchor);
     assert(!!fuse && fuse.text.indexOf(String(d.limits.shellMs) + ' tar') > 0 && fuse.text.indexOf('-k ') > 0,
       'v2105: 管道形态的调用点另有 `timeout -k <grace> ' + d.limits.shellMs + ' tar` 保险丝'
