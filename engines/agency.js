@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/agency.js (v2.166.0) — 行动反馈闭环（TX2）
+ * WorldAxis engines/agency.js (v2.194.0) — 行动反馈闭环（TX2）
  *
  * ── 它治什么（缺口原句）────────────────────────────────────
  *   life 有目标、plan 有步骤、act 有行动、liaison 有约定终态，但
@@ -33,6 +33,103 @@
   function finite(v) { const n = Number(v); return isFinite(n) && n > 0 ? n : NaN; }
   function clockNow(site) { try { return WA.clock ? WA.clock.now(site || 'agency') : Date.now(); } catch (e) { return Date.now(); } }
 
+  // ── v2.194.0（U2）：本模块的**提交时机**统一入口（与 freight / commission / investigation 同规格）──
+  //   本模块原先在 plan/act 之外**自己不开事务**（它的写都是跨模块调 act.add / plan.settle）——
+  //   于是「行动回执消化」这件事在两条独立事务之间没有任何原子性可言（见 processReceipts）。
+  function commitOf() { try { return WA.commit || null; } catch (e) { return null; } }
+  function chainInflight() {
+    const c = commitOf();
+    return (c && typeof c.inflight === 'function') ? c.inflight() : null;
+  }
+  let __opSeq = 0;
+  function nextOpId(prefix) {
+    __opSeq++;
+    let t = 0;
+    try { t = (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { t = 0; }
+    return clean(prefix, 24) + '@' + t + '#' + __opSeq;
+  }
+  function txCount() { try { return (WA.store && typeof WA.store.txStat === 'function') ? (WA.store.txStat().count || 0) : 0; } catch (e) { return 0; } }
+  /**
+   * 刚刚这一趟 transact，**本模块这一笔写**有没有被保存点撤回？
+   *   真源是 `store.txStat().lastNested`（store 自己在嵌套分支写的台账，不是我方常量），
+   *   时效判据用 store 记的**单调序号** `seq`（不是墙钟毫秒——毫秒在冻结时钟下会给出相等读数，
+   *   把旧读数误判成本次的）。`seq` 缺失时回退计数口径（老 store）。
+   * @returns {''|'aborted'|'threw'}
+   */
+  function nestedVerdictSince(n0) {
+    try {
+      if (!WA.store || typeof WA.store.txStat !== 'function') return '';
+      const st = WA.store.txStat();
+      const ln = st.lastNested;
+      if (!ln || typeof ln !== 'object') return '';
+      if (typeof ln.seq === 'number' && typeof n0 === 'number') {
+        if (ln.seq < n0 + 1) return '';
+      } else if (typeof st.count === 'number' && typeof n0 === 'number' && st.count < n0 + 1) {
+        return '';
+      }
+      return (ln.why === 'threw') ? 'threw' : 'aborted';
+    } catch (e) { return ''; }
+  }
+  /**
+   * 取「当前该走的计划步」。**形状容忍**：`plan.current` 在 v2.1xx 收口成**扁平**回执
+   *   （`{ok,id,status,seq,kind,text,need,place,tries}`），而本模块此前读的是 `planRow.step`
+   *   ——那个字段**从来不存在** ⇒ `step` 恒 `undefined` ⇒ schedule 恒答 `no-step`、
+   *   processReceipts 恒把回执塞进 `deferred`：「行动反馈闭环」这台机器 100% 空转，且没有任何
+   *   一行读数报错（探针实测）。此处两种形状都认，并**把形状偏差留在自证位上**（WA.__agencyStepShapeWarn）。
+   */
+  function activeStepOf(who) {
+    // 主源：`plan.view` —— 它把**每一步的状态**摆出来（running / pending / blocked / done）。
+    //   为什么不用 `plan.current`：它的扁平回执只带当前 seq，且「当前步正在做」时它答
+    //   `awaiting-after`（那一步的状态根本没被表达）⇒ 本模块拿不到 `status`，
+    //   于是 `settle` 需要的 running 判据无从谈起。
+    let row = null;
+    try { if (WA.plan && WA.plan.view) row = WA.plan.view(who); } catch (e) { row = null; }
+    if (row && row.ok === true) {
+      const steps = Array.isArray(row.steps) ? row.steps : [];
+      const running = steps.filter(function (x) { return x && x.status === 'running'; })[0] || null;
+      const next = steps.filter(function (x) { return x && (x.status === 'pending' || x.status === 'blocked'); })[0] || null;
+      const step = running || next;
+      if (step) return { row: row, step: step, shape: 'view' };
+      return { row: row, step: null, shape: 'no-step' };
+    }
+    // 回退：`plan.view` 缺席 / 答 not-ok ⇒ 用 `plan.current` 的扁平回执（它至少答得出 seq）
+    let cur = null;
+    try { if (WA.plan && WA.plan.current) cur = WA.plan.current(who); } catch (e) { cur = null; }
+    if (!cur || cur.ok !== true) return { row: cur, step: null, shape: cur ? 'not-ok' : 'no-plan' };
+    if (cur.step && typeof cur.step === 'object') return { row: cur, step: cur.step, shape: 'nested' };  // 老形状
+    if (typeof cur.seq === 'number') return { row: cur, step: cur, shape: 'flat' };                       // 现行形状
+    WA.__agencyStepShapeWarn = { got: Object.keys(cur).join(','), at: clockNow('agency') };
+    return { row: cur, step: null, shape: 'unknown' };
+  }
+  /** 本模块的写入统一入口（三态：`failed` / `nested` / `chain`；链外顶层形状不变）。 */
+  function chainWrite(kind, runInTx) {
+    const ifl = chainInflight();
+    const c = commitOf();
+    const inner = (c && typeof c.active === 'function') ? c.active() : null;
+    const hasStore = !!(WA.store && typeof WA.store.transact === 'function');
+    if (!hasStore) {
+      try { runInTx((WA.store && WA.store.get) ? (WA.store.get() || {}) : {}); } catch (e) {}
+      return { persisted: false, chain: false, nostore: true };
+    }
+    if (!ifl) {
+      if (inner) {
+        const n0 = txCount();
+        const r = WA.store.transact(runInTx, 'agency:' + kind);
+        const nv = nestedVerdictSince(n0);
+        if (nv) return { persisted: false, chain: false, nested: true, failed: nv === 'threw' ? 'write-threw' : 'write-aborted' };
+        if (r && r.ok === false) return { persisted: false, chain: false, nested: true, failed: 'tx-failed' };
+        return { persisted: false, chain: false, nested: true };
+      }
+      const r1 = WA.store.transact(runInTx, 'agency:' + kind);
+      if (r1 && r1.ok === false) return { persisted: false, chain: false, failed: 'tx-failed' };
+      return { persisted: true, chain: false };
+    }
+    const n1 = txCount();
+    WA.store.transact(runInTx, 'agency:' + kind);   // 嵌套：落在链的那一份 draft 上
+    const nv1 = nestedVerdictSince(n1);
+    if (nv1) return { persisted: false, chain: true, failed: nv1 === 'threw' ? 'write-threw' : 'write-aborted' };
+    return { persisted: false, chain: true };
+  }
   // ── 设置 ──
   const LS_KEY = 'worldaxis_agency_settings_v1';
   const DEF = { enabled: false, maxSchedulePerTurn: 4, maxReceiptsPerTurn: 8, autoPlanExpand: true };
@@ -57,6 +154,23 @@
 
   // ── 私有辅助 ──
   function storeOf() { return WA.store; }
+  /** 在指定层（草稿或已提交）上按人名找计划行 —— 镜像 plan 的 `planOf`，不跨层读。 */
+  function planRowOf(root, who) {
+    const st = (root && typeof root === 'object') ? root : state();
+    const plans = (st.plan && Array.isArray(st.plan.plans)) ? st.plan.plans : [];
+    const pid = 'p_' + clean(who, 60);
+    return plans.filter(function (x) { return x && x.personId === pid; })[0] || null;
+  }
+  /** 当前待办步（**逐条对齐 plan.currentStep**：只认 pending，且前置已完成）。 */
+  function pendingStepOf(row) {
+    if (!row || !Array.isArray(row.steps)) return null;
+    const doneSet = {};
+    row.steps.forEach(function (s) { if (s && s.status === 'done') doneSet[s.seq] = true; });
+    return row.steps.filter(function (s) {
+      return s && s.status === 'pending'
+        && (s.afterSeq === undefined || doneSet[s.afterSeq] === true);
+    })[0] || null;
+  }
   function state() { const s = storeOf(); return s && s.get ? (s.get() || {}) : {}; }
 
   /**
@@ -129,8 +243,15 @@
       return { ok: false, reason: 'no-plan', person: who, goalId: goal.id };
     }
 
-    // ③ 读当前步
-    const step = planRow.step || null;
+    // ③ 读当前步（v2.194.0：`plan.current` 是**扁平**回执，此前读 `planRow.step` 恒 undefined ⇒ 恒 no-step）
+    const _sp = activeStepOf(who);
+    const step = _sp.step;
+    const planId = (_sp.row && _sp.row.id) || planRow.id;
+    if (!step) {
+      stat.lastReason = 'no-step';
+      return { ok: false, reason: 'no-step', person: who, planId: planId,
+        hint: '计划当前没有可走的步（已做完 / 在等前置 / 形状不认）' };
+    }
     const pre = checkPrereqs(who, step);
     if (!pre.ready) {
       stat.lastReason = pre.reason;
@@ -169,6 +290,59 @@
   }
 
   /**
+   * 在**这一层草稿**上「交出当前步」（plan.advance 的草稿版，只在链里用）。
+   *   为什么不能直接调 `plan.advance`：它自带事务且**读已提交状态** —— 在链里调它，
+   *   它会另开一笔顶层事务立刻提交，于是「步已交出」与紧随其后的结算**不同生共死**
+   *   （专锁 A5b 实测：链被中止，计划步却停在 running）。
+   *   闸门逐条对齐 plan.advance（尝试次数 / 前置 / 资源），**不镜像就等于比原实现更宽松**
+   *   —— 「上游拒签的申请在下游被放行」是本仓点名过的谎报。
+   */
+  function advanceStepOnDraft(draft, who) {
+    try {
+      const cfg = settings();
+      const row = planRowOf(draft, who);      // 闸门读**本层**那份计划行（链内 = 链的 draft）
+      if (!row || !Array.isArray(row.steps)) return false;
+      if ((row.tries || 0) >= (cfg.maxTries || 3)) return false;          // 尝试次数用尽 ⇒ 停下等人决定
+      if (row.status === 'blocked') {                                     // 受阻不是锁：再交出一次 = 重试同一步
+        row.steps.forEach(function (x) { if (x && x.status === 'blocked') x.status = 'pending'; });
+        row.status = 'active'; row.reason = 'retrying';
+      }
+      const cur = pendingStepOf(row);                                     // 与 plan.currentStep 同口径（**只认 pending**）
+      if (!cur) return false;                                             // 前置未满足
+      if (cur.need && cur.need.resource) {                                // 资源不足只是「现在做不了」
+        // 逐条对齐 `plan.stockOf`：取**人物行**（不是人名）再问 org —— org 缺席一律 null（不猜库存）
+        const ppl = (draft && draft.people) || {};
+        const prow = ppl['p_' + clean(who, 60)] || null;
+        const st = (prow && WA.org && typeof WA.org.stockOf === 'function') ? WA.org.stockOf(prow) : null;
+        if (st === null || !(Number(st[cur.need.resource]) >= cur.need.amount)) return false;
+      }
+      cur.status = 'running';
+      cur.at = clockNow('agency');
+      row.updatedAt = cur.at;
+      return true;
+    } catch (e) { return false; }
+  }
+  /**
+   * 在**这一层草稿**上记下「这条回执已消化」。
+   *   为什么必须有它：`!r._agencyProcessed` 是 `pending` 的唯一去重判据，而全库**没有任何地方写它**
+   *   ——于是同一条回执每轮都会被当成新的再消化一次（探针实测：三次 processReceipts 全挂 deferred）。
+   *   落在草稿上（而不是已提交那份）：这样它与「计划结算」同生共死，链被撤回时标记也一并回滚。
+   *   找不到回执行 ⇒ 返回 false（静默空写不许读成成功），由调用方当场中止整链。
+   */
+  function markProcessedOnDraft(draft, actId, opId) {
+    try {
+      const rows = (draft.acts && Array.isArray(draft.acts.res)) ? draft.acts.res : null;
+      if (!rows) return false;
+      // 注：`draft` 在链内就是链那一份草稿；链外顶层自开事务时也是本笔的那份。
+      const hit = rows.filter(function (q) { return q && ((opId && q.opId === opId) || (actId && (q.id === actId || q.actId === actId))); })[0];
+      if (!hit) return false;
+      hit._agencyProcessed = true;
+      hit._agencyProcessedAt = clockNow('agency');
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /**
    * 回执处理：读已完成行动 → 结算计划步 → 更新目标进度。
    * 这是闭环的关键：行动做完了，要把结果交回 plan 和 life。
    */
@@ -192,6 +366,7 @@
     }).slice(-cfg.maxReceiptsPerTurn);
 
     let out = { ok: true, processed: 0, stepsDone: 0, stepsBlocked: 0, goalsDone: 0, goalsBlocked: 0, deferred: [] };
+    let settledOut = null;
 
     if (!WA.plan || !WA.plan.settle) {
       stat.lastReason = 'plan-unavailable';
@@ -200,23 +375,37 @@
 
     pending.forEach(function (r) {
       // 找到对应的行动行，拿到 person 和 goalId
+      //   v2.194.0：`act` 的结算回执把行动 id 写在 **`id`** 上（`act.receipt()`：`{opId, id, person, ...}`），
+      //   而本模块此前读 `r.actId` —— 那个字段**从来不存在** ⇒ `no-act-row` ⇒ 回执永远配不上行动行
+      //   （探针实测：三次 processReceipts 全挂 deferred）。两处都认，并留下形状读数。
+      const actId = r.actId || r.id || '';
+      if (!actId) { out.deferred.push({ receipt: r.opId, reason: 'no-act-id', status: r.status }); return; }
       const rows = (st.acts && Array.isArray(st.acts.rows)) ? st.acts.rows : [];
-      const actRow = rows.filter(function (x) { return x && x.id === r.actId; })[0] || null;
-      if (!actRow) { out.deferred.push({ receipt: r.opId, reason: 'no-act-row' }); return; }
+      const actRow = rows.filter(function (x) { return x && (x.id === actId || (r.opId && x.opId === r.opId)); })[0] || null;
+      if (!actRow) { out.deferred.push({ receipt: r.opId, reason: 'no-act-row', actId: actId }); return; }
 
       const who = actRow.person;
       const goalId = actRow.goalId;
 
-      // 查计划当前步
-      let planRow = null;
-      try { if (WA.plan.current) planRow = WA.plan.current(who); } catch (e) { planRow = null; }
+      // 查计划当前步（v2.194.0：形状容忍 —— 此前读 `planRow.step` 恒 undefined，回执永远消化不了）
+      const _sp2 = activeStepOf(who);
+      const planRow = _sp2.row;
       if (!planRow || !planRow.ok) { out.deferred.push({ receipt: r.opId, reason: 'no-plan', person: who }); return; }
 
-      const step = planRow.step;
-      if (!step || step.status !== 'running') {
-        out.deferred.push({ receipt: r.opId, reason: 'step-not-running', person: who, seq: step ? step.seq : -1 });
+      const step = _sp2.step;
+      if (!step) {
+        out.deferred.push({ receipt: r.opId, reason: 'no-step', person: who });
         return;
       }
+      // 步的状态**在链内才决定**：「交出这一步」（pending → running）必须与结算同一笔。
+      //   此前本环走 `plan.advance`（自带事务、读已提交状态）—— 链外先把步标 running 并
+      //   **立刻提交**，一旦随后的结算失败，世界就停在 running（专锁 A5b 实测）。
+      //   故：终态（done/blocked/refused）才在此拒收；pending/running 都进链里办。
+      if (step.status !== 'running' && step.status !== 'pending') {
+        out.deferred.push({ receipt: r.opId, reason: 'step-not-running', person: who, seq: step.seq, status: step.status });
+        return;
+      }
+      const needAdvance = (step.status === 'pending');
 
       // 行动结果映射到 plan 结算
       let outcome = 'done';
@@ -226,20 +415,63 @@
         opts.reason = str(r.reason || r.result || 'action-failed', 40);
       }
 
+      // v2.194.0（U2）：**本笔开链** —— 「回执消化标记 + 计划结算」同链一次提交。
+      //   此前两笔分属独立事务：settle 成了、消化标记没写上 ⇒ 同一条回执下一次**还会被再消化一次**
+      //   （`pending` 的判据 `!r._agencyProcessed` 是**只读**字段，全库没有任何地方写它 —— 探针实测：
+      //   连续三次 processReceipts 都把同一回执挂进 deferred，标记恒 null）。
+      //   链内次序固定「先记账（无副作用）→ 后结算（有副作用）」，与 U2 各批同一条次序纪律。
+      const ch = (function () {
+        const c = commitOf();
+        if (!c || typeof c.chain !== 'function' || chainInflight()) return null;   // 链内/无链面：走下面那支
+        return c.chain({
+          opId: nextOpId('agency:receipt'), site: 'agency:receipt',
+          fn: function (cx, draft) {
+            if (!markProcessedOnDraft(draft, actId, r.opId)) { cx.abortWhy = 'receipt-target-missing'; return false; }
+            c.step(null, { site: 'agency:receipt:digest' });
+            // 交出这一步：**在本链的草稿上**办（`plan.advance` 会另开一笔顶层事务立刻提交）
+            if (needAdvance && !advanceStepOnDraft(draft, who)) {
+              cx.abortWhy = 'advance-failed'; return false;
+            }
+            if (needAdvance) c.step(null, { site: 'agency:receipt:advance' });
+            const st2 = WA.plan.settle(who, outcome, opts);
+            if (!st2 || st2.ok !== true) { cx.abortWhy = 'plan-' + ((st2 && st2.reason) || 'settle-failed'); return false; }
+            c.step(null, { site: 'agency:receipt:plan' });
+            settledOut = st2;
+            return true;
+          }
+        });
+      })();
+      if (ch) {
+        if (ch.ok !== true) {
+          out.deferred.push({ receipt: r.opId, reason: ch.reason || 'chain-failed', person: who,
+            note: '回执未消化（本笔未执行）⇒ 计划步与消化标记不因本笔改变' });
+          return;
+        }
+        out.processed++; out.chained = (out.chained || 0) + 1;
+        if (outcome === 'done') { out.stepsDone++; stat.stepsDone++; } else { out.stepsBlocked++; stat.stepsBlocked++; }
+        stat.receipts++;
+        if (settledOut && settledOut.status === 'done') { out.goalsDone++; stat.goalsDone++; }
+        return;
+      }
+      // 链内 / 无链面：先**交出这一步**（原路走 plan.advance），再结算，最后补消化标记。
+      if (needAdvance) {
+        let ad = null;
+        try { ad = WA.plan.advance(who); } catch (e) { ad = null; }
+        if (!ad || ad.ok !== true) {
+          out.deferred.push({ receipt: r.opId, reason: 'step-not-running', person: who, seq: step.seq, why: (ad && ad.reason) || 'advance-failed' });
+          return;
+        }
+      }
       const settled = WA.plan.settle(who, outcome, opts);
       if (settled && settled.ok) {
+        const cw = chainWrite('receipt', function (d) { markProcessedOnDraft(d, actId, r.opId); });
         out.processed++;
         if (outcome === 'done') { out.stepsDone++; stat.stepsDone++; }
         else { out.stepsBlocked++; stat.stepsBlocked++; }
         stat.receipts++;
-
-        // 如果计划全部完成，更新目标进度
-        if (settled.status === 'done') {
-          out.goalsDone++;
-          stat.goalsDone++;
-          // 不直接改 life.goals.status（life 是唯一写者）
-          // 返回信息让调用方决定是否调 life.addGoal 更新或 mark done
-        }
+        if (!cw.persisted) out.unpersisted = (out.unpersisted || 0) + 1;
+        if (settled.status === 'done') { out.goalsDone++; stat.goalsDone++; }
+        // 不直接改 life.goals.status（life 是唯一写者）
       } else {
         out.deferred.push({ receipt: r.opId, reason: settled ? settled.reason : 'settle-failed', person: who });
       }
@@ -341,5 +573,5 @@
   if (__exportCount !== 7) WA.__agencyWarn = { expected: 7, got: __exportCount };
 
   // ── 模块登记 ──
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/agency.js', { kind: 'engine', ver: '2.166.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/agency.js', { kind: 'engine', ver: '2.194.0' });
 })();

@@ -108,13 +108,19 @@ function runA(a) {
   //   判据本义是「两处写口各有**显式事务名**、互不复用」，故锚到事务调用的**语句尾部**
   //   （`}, 'worldSeed:xxx');`），即该名字作为 store.transact 第二参出现的那一次：
   //   两处共用同一个名字 ⇒ 命中 2 次（红）；有人干脆不传事务名 ⇒ 命中 0 次（红）。
-  a(countOcc(src, "}, 'worldSeed:library');") === 1 && countOcc(src, "}, 'worldSeed:initConfirm');") === 1,
+  //   v2.195.0（U2 批次⑤）：写路径改形（链上走链草稿，`store.transact` 落到 `doWrite` 的第二段）
+  //   ⇒ 事务名锚点从字面尾部改为**转义后的事务名**。语义未放宽：仍要求两个事务各有显式事务名、
+  //   互不复用，并额外要求「链上/链外两条分支」的判据在场（本批接入统一提交链的物证）。
+  a(countOcc(src, "worldSeed:library") >= 1 && countOcc(src, "worldSeed:initConfirm") >= 1
+    && countOcc(src, "}, 'worldSeed:initConfirm');") === 1,
     'v2155/ws A7b: 两个事务各有**显式事务名**且互不复用（事务名就是审计面上那个「谁改过世界」；'
-    + '锚事务调用尾部，实 ' + countOcc(src, "}, 'worldSeed:library');") + '/'
+    + '实 library ' + countOcc(src, "worldSeed:library") + ' / initConfirm '
     + countOcc(src, "}, 'worldSeed:initConfirm');") + '）');
-  const txn = src.slice(src.indexOf('function doWrite'), src.indexOf('function doWrite') + 400);
-  a(txn.indexOf("fn(bucket(root))") >= 0 && txn.indexOf("'worldSeed:library'") >= 0,
-    'v2155/ws A8: 那个事务名是显式的 worldSeed:library（事务名就是审计面上那个「谁改过世界」）');
+  const txn = src.slice(src.indexOf('function doWrite'), src.indexOf('function doWrite') + 900);
+  a(txn.indexOf("fn(bucket(root))") >= 0 && txn.indexOf("'worldSeed:library'") >= 0
+    && txn.indexOf('chainDraft()') >= 0,
+    'v2155/ws A8: 那个事务名是显式的 worldSeed:library，且**链上走链草稿**（onChain 分支在场 ——'
+    + '「链撤了、库还留着」这一类半写不许有路）');
   // 骨架之外的世界面一律不写：断言源码里**没有**任何 d.people / d.chronicle 赋值。
   a(countOcc(src, 'd.people') === 1 && countOcc(src, 'd.chronicle') === 1,
     'v2155/ws A9: 全模块 d.people / d.chronicle 各只出现在文件头注释里（零赋值点）');

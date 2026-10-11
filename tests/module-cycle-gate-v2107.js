@@ -249,7 +249,29 @@ function runAll(A) {
   // v2.194.0（U2 批次②）：freight / commission 接链 —— 两条调用期边：
   //   freight → commit（inflight / active，在途如实标注）与 commission → commit（chain / step / active / inflight）。
   //   装载期 108 不变；调用期 1676 → 1678、合计 1784 → 1786。
-  A(a.edgesLoad === 108 && a.edgesCall === 1678 && a.edgesAll === 1786 && a.identityOk,
+  // v2.194.0（U2 批次③）：agency + investigation 接链 —— 逐条 diff（HEAD 树 vs 工作区，
+  //   取 scan().refs 的 (file, ns) 对、集合去重）实测恰好 **3 条新增、0 条消失**，全部调用期：
+  //     ① engines/agency.js → commit（processReceipts 自己开链 digest→advance→settle）
+  //     ② engines/agency.js → org（advanceStepOnDraft 逐条镜像 plan.stockOf 的资源闸门）
+  //     ③ engines/investigation.js → commit（reveal 三写同链一次提交）
+  //   装载期 108 不变（两模块本就在装载期读 store）；调用期 1678 → 1681、合计 1786 → 1789。
+  // v2.194.0（U2 批次④）：调用期 1681 → **1682**、合计 1789 → **1790**（实测值，逐条 diff 取证）。
+  //   **恰一条新增边**：`engines/story-choice.js → commit` —— 它此前读的是
+  //   `commit.begin` / `commit.commit`，本批为在途标注与链内读面新增读
+  //   `commit.inflight` / `commit.chain`（`aftermath` 同样新增这两口，但它在**装载期**就已
+  //   计入 `store` 面，(file, ns) 集合里 `aftermath → commit` **本就是新边**？实测回答：
+  //   回退两文件到 HEAD 后调用期读数为 1681 ⇒ 本批合计只 +1，说明 `aftermath → commit`
+  //   在 HEAD 上**已经存在**（它对 `WA.commit` 的引用来自 v2.171.0 起的 `WA.commit` 判空读，
+  //   只是此前没有真正的**调用**点）。逐条 diff 结论：新增 1 条、消失 0 条。）
+  //   置信方式：`git checkout HEAD -- engines/{aftermath,story-choice}.js` 后实跑门禁得 1681。
+  // v2.195.0（U2 批次⑤）：world-blueprint + world-seed 接链 —— 调用期 1682 → **1684**、
+  //   合计 1790 → **1792**（实测值，逐条 diff 取证）。**恰两条新增边**，全部调用期：
+  //     ① engines/world-blueprint.js → commit（`mech` 前提经 `effect()` 当场登记；
+  //        另读 `commit.inflight` / `commit.step`）
+  //     ② engines/world-seed.js → commit（装种子时的在途标注读 `commit.inflight`）
+  //   装载期 108 不变（两模块本就在装载期读 store）；逐条 diff 结论：新增 6 条、消失 0 条，
+  //   其中 aftermath / agency / investigation 三条已计入批次③④ 的 1790。
+  A(a.edgesLoad === 108 && a.edgesCall === 1684 && a.edgesAll === 1792 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -349,7 +371,19 @@ function runAll(A) {
   //   它自己提供 ns、登记进 module-registry 账本、又被 tool-diag 与面板读到。
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
-  A(a.nsProvided === 251 && a.nsLedger === 213 && a.nsRead === 225,
+  // v2.194.0（U2 批次③）：**静态提供方 251 → 252**（+1）—— 不新增文件、不新增账本位；
+  //   新增的那一个 ns 是 `engines/agency.js` 的模块内自证槽 `__agencyStepShapeWarn`
+  //   （读口形状偏差时点亮，与同族的 `__agencyWarn` / `__diplomacyWarn` / `__freightWarn`
+  //   **完全同形态**，后者本来就在静态提供方里、也本就在零读名单里）⇒ 账本 213 与读面 225 不动。
+  // v2.194.0（U2 批次④）：**三面均不变**（252 / 213 / 225）—— 本批零新增命名空间：
+  //   两个模块的新增记号全部是**模块内函数**（`nestedTx` / `chainInflight` / `inChainDraft` /
+  //   `readEffects` / `markInflight` / `rowForWrite` / `laneBlocked` / `_clearLaneIfBlocked`），
+  //   不挂 `WA.*`。**这一点是刻意选的**：上一批（批次③）为「形状偏差」加了自证槽
+  //   `__agencyStepShapeWarn`，本批一度照抄加了 `__aftermathWarn` / `__storyChoiceWarn`，
+  //   但实测发现**它们的点亮条件不可达**（读口 `find` 与写口 `rowForWrite` 查的是同一层同一份，
+  //   find 通过 ⇒ rowForWrite 也必通过）⇒ 那是一个零调用的死自证位，按本仓口径**不该留**。
+  //   撤掉后：静态提供方不涨（252 与批次③持平）、零读名单不涨（27）、账本与读面一动不动。
+  A(a.nsProvided === 252 && a.nsLedger === 213 && a.nsRead === 225,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -359,7 +393,9 @@ function runAll(A) {
   // v2.166.0（TX2）：差 27 → 28（agency 已入账本；差 +1 来自静态提供方面新增，
   //   登记理由同前——入口/内部前缀类，非未登记漂移）。
   // （v2.187.0 E4：241 - 203 = 38，差值不变 —— 新 ns 三面同时增长，漂移口径不动。）
-  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 38,
+  // v2.194.0（U2 批次④）：差**仍为 39**（与批次③持平）—— 本轮一度写成 41（照抄批次③
+  //   的自证槽增量），但两个自证槽实测不可达已撤除 ⇒ 静态提供方没涨，差自然也不涨。
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 39,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
   // v2.153.0（RX5+RX6）：零读 ns 22 → 21（plotGauge 与 branchTree 都被 tool-diag 与面板真读，
   //   从零读名单里离场）。
@@ -368,7 +404,9 @@ function runAll(A) {
   //   一项未被读出的 ns —— 与 v2.153.0 前的 static-only 差同性质，只报不红）。
   // v2.166.0（TX2）：零读 ns 22 → 23（agency 的新消费面同上）。
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
-  A(a.deadNs.length === 26, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.194.0（U2 批次④）：零读 **仍为 27**（与批次③持平）—— 本轮一度写成 29（那两个
+  //   自证槽），但它们实测不可达已撤除，产品源面本就没有这两个记号。
+  A(a.deadNs.length === 27, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

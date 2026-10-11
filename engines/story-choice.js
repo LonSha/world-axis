@@ -59,7 +59,42 @@
   function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function bucket(root) { var r = root || state(); if (!r.storyChoice) r.storyChoice = { points: [] }; if (!Array.isArray(r.storyChoice.points)) r.storyChoice.points = []; return r.storyChoice; }
   function list() { return bucket().points || []; }
-  function find(id) { var k = clean(id, 60); return list().filter(function (x) { return x && x.id === k; })[0] || null; }
+  // ── U2 批次④（v2.194.0）：统一原子提交链接入面 ──────────────────────────────
+  //   两条真病，全部**探针实测**（不是阅读推断）：
+  //     ① 链内 `review` 找不到本链刚登记的选择点：读口取的是**已提交快照**（`store.get()`），
+  //        而 present 写在外层 draft 上 ⇒ 链内恒 `not-found`（实测复现）。
+  //     ② 链内两笔**同生共死不了**：`present` 里的树记账（`branchTree.fork`）与点落库分属两笔
+  //        顶层事务 ⇒ 前一笔在链里被撤回、后一笔仍写进世界时，世界会留下「点存在、树上无节点」
+  //        这种互斥事实。
+  //   修法：链内读面改查链的那一份 draft；写口按三态如实标注。
+  function nestedTx(r) { return !!(r && r.deferred === true); }
+  function chainInflight() {
+    return (WA.commit && typeof WA.commit.inflight === 'function') ? WA.commit.inflight() : null;
+  }
+  function inChainDraft() { var inf = chainInflight(); return (inf && inf.draft) ? inf.draft : null; }
+  /** 链内读面：链里有草稿就查这一份（本链刚写的实体就在里面）。 */
+  function readPoints() { var d = inChainDraft(); return d ? bucket(d).points : list(); }
+  /**
+   * 在途如实标注（三态，口径与 U2 各批逐字一致）：
+   *   链上 ⇒ `chain:true / persisted:false / projected:true`；
+   *   调用方自己的事务里 ⇒ `nested:true / persisted:false`；
+   *   链外顶层 ⇒ `chain:false / persisted:true`。
+   */
+  function markInflight(out, ctx) {
+    var c = ctx || {};
+    out.chain = !!c.onChain;
+    out.persisted = false;
+    if (c.onChain) out.projected = true;
+    if (c.nestedHere) out.nested = true;
+    return out;
+  }
+  /** 写口用的行定位（只在**指定那一层**的草稿上找；与 `find` 同源，不各写一份判据）。 */
+  function rowForWrite(root, id) {
+    var k = clean(id, 60);
+    var rows = bucket(root).points;
+    return rows.filter(function (x) { return x && x.id === k; })[0] || null;
+  }
+  function find(id) { var k = clean(id, 60); return readPoints().filter(function (x) { return x && x.id === k; })[0] || null; }
   function nodeId(round) { return WA.rand ? WA.rand.id('sc_' + (round || 0) + '_', 4, 'id') : 'sc_' + (round || 0) + '_0000'; }
 
   /**
@@ -99,14 +134,22 @@
     var rec = { id: fr.id, round: fr.round, at: clockNow('storyChoice'), prompt: prompt,
       options: optResults, parent: n.parent ? clean(n.parent, 60) : '',
       choice: '', chosenAt: 0, receiptId: '', appliedAt: 0, forkId: fr.id };
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) { var b = bucket(d); b.points.push(rec); }, 'storyChoice:present');
+    var _inf = chainInflight();
+    var _txr = null;
+    if (_inf) {
+      bucket(_inf.draft).points.push(rec);
+    } else if (WA.store && typeof WA.store.transact === 'function') {
+      _txr = WA.store.transact(function (d) { var b = bucket(d); b.points.push(rec); }, 'storyChoice:present');
     } else { list().push(rec); }
-    if (WA.evict && typeof WA.evict.array === 'function') {
+    if (!_inf && WA.evict && typeof WA.evict.array === 'function') {
       try { WA.evict.array(bucket().points, 'storyChoice.points'); } catch (e) { /* 站点未登记时静默 */ }
     }
     _stat.presented++;
-    return { ok: true, id: rec.id, round: rec.round, options: optResults };
+    var _ro = { ok: true, id: rec.id, round: rec.round, options: optResults };
+    if (_inf) return markInflight(_ro, { onChain: true });
+    if (nestedTx(_txr)) return markInflight(_ro, { nestedHere: true });
+    _ro.chain = false; _ro.persisted = true;
+    return _ro;
   }
 
   /**
@@ -152,18 +195,31 @@
         } else { noteFault('commit-failed'); }
       } else { noteFault('begin-failed'); }
     }
-    // 第三步：回写回执
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.points.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) { t.choice = opt; t.chosenAt = clockNow('storyChoice'); t.receiptId = receiptId; t.appliedAt = applied ? clockNow('storyChoice') : 0; }
-      }, 'storyChoice:confirm');
+    // 第三步：回写回执。
+    //   U2 批次④：本笔与第二步的兑现此前分属两笔顶层事务 —— 「兑现成了、选择没记上」
+    //   或反过来都会留下互斥事实。链内 ⇒ 落在同一层草稿上（随链同生共死）。
+    var _inf = chainInflight();
+    var _txr = null;
+    function _applyChoice(root) {
+      var t = rowForWrite(root, rec.id);
+      if (!t) return false;
+      t.choice = opt; t.chosenAt = clockNow('storyChoice'); t.receiptId = receiptId;
+      t.appliedAt = applied ? clockNow('storyChoice') : 0;
+      return true;
+    }
+    if (_inf) {
+      _applyChoice(_inf.draft);
+    } else if (WA.store && typeof WA.store.transact === 'function') {
+      _txr = WA.store.transact(function (d) { _applyChoice(d); }, 'storyChoice:confirm');
     } else { rec.choice = opt; rec.chosenAt = clockNow('storyChoice'); rec.receiptId = receiptId; rec.appliedAt = applied ? clockNow('storyChoice') : 0; }
     _stat.confirmed++;
     if (applied) _stat.applied++;
     // 三段可分离：chosen=true / applied=bool / receipt=string
-    return { ok: true, chosen: true, applied: applied, receipt: receiptId, id: rec.id, option: opt };
+    var _out = { ok: true, chosen: true, applied: applied, receipt: receiptId, id: rec.id, option: opt };
+    if (_inf) return markInflight(_out, { onChain: true });
+    if (nestedTx(_txr)) return markInflight(_out, { nestedHere: true });
+    _out.chain = false; _out.persisted = true;
+    return _out;
   }
 
   /**
@@ -224,7 +280,9 @@
       settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     var ok = checks.branchTree && checks.rehearsal && checks.commit && checks.store;
-    return { ok: ok, closedLoop: ok, checks: checks, version: '2.168.0' };
+    // v2.194.0（U2 批次④）：`chain` 是**能力自报**（本口接入统一提交链与否）。
+    checks.chain = !!(WA.commit && typeof WA.commit.chain === 'function');
+    return { ok: ok, closedLoop: ok, checks: checks, version: '2.194.0' };
   }
 
   function stat() {
@@ -254,5 +312,5 @@
   var EXPORT_COUNT = 10;
   var _exported = Object.keys(WA.storyChoice).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('story-choice: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/story-choice.js', { kind: 'engine', ver: '2.168.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/story-choice.js', { kind: 'engine', ver: '2.194.0' });
 })();

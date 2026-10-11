@@ -78,46 +78,51 @@ function hit(src, from, to) {
   return src.split(from).join(to);
 }
 
+// 统一档契约（negative-control-audit）：`ANCHORS[k] = { rel, txt }` —— 全仓锁同形。
+// ⚠ 本锁 v2.193.0 首版这里是**扁平字符串表**（全仓唯一一把），于是 uniform 审计
+//   在 auditAnchor 第一步就判 `shape: 锚点不是对象`（8 条），anchor-scan 统一档门禁当场
+//   报 8 门禁面问题。锚点字面量本身**都对**（各在目标文件恰 1 次、在本锁恰 1 次）——
+//   错的只是容器形状。既有统一档审计器只认 `{rel,txt}`，不改它、改本锁对齐。
 const ANCHORS = {
-  aEngines: "const ENGINES = ['beatReport', 'planAudit', 'beatLedger', 'genGate'];",
-  aOps: 'const OPS = {',
-  aRun: 'function run(op, ctx) {',
-  aFacadeOff: "noteFault('facade-off');",
-  aAllOff: 'allOff: readable.length === ENGINES.length',
-  aBlockEmpty: "if (!settings().enabled) return '';",
-  aRecovery: 'const rr = WA.rejectRecovery;',
-  aRuns: 'stat.runs++;'
+  aEngines: { rel: FA, txt: "const ENGINES = ['beatReport', 'planAudit', 'beatLedger', 'genGate'];" },
+  aOps: { rel: FA, txt: 'const OPS = {' },
+  aRun: { rel: FA, txt: 'function run(op, ctx) {' },
+  aFacadeOff: { rel: FA, txt: "noteFault('facade-off');" },
+  aAllOff: { rel: FA, txt: 'allOff: readable.length === ENGINES.length' },
+  aBlockEmpty: { rel: FA, txt: "if (!settings().enabled) return '';" },
+  aRecovery: { rel: FA, txt: 'const rr = WA.rejectRecovery;' },
+  aRuns: { rel: FA, txt: 'stat.runs++;' }
 };
 
 function runAll(A) {
   const src = rd(FA);
   // ═══ A 静态契约 ═══
-  A(src.indexOf(ANCHORS.aEngines) >= 0, 'A1 家族成员表在场（四个命名空间，与 LOAD_ORDER 同源）');
-  A(src.indexOf(ANCHORS.aOps) >= 0 && src.indexOf(ANCHORS.aRun) >= 0, 'A2 编排面在场（OPS 表 + run 入口）');
+  A(src.indexOf(ANCHORS.aEngines.txt) >= 0, 'A1 家族成员表在场（四个命名空间，与 LOAD_ORDER 同源）');
+  A(src.indexOf(ANCHORS.aOps.txt) >= 0 && src.indexOf(ANCHORS.aRun.txt) >= 0, 'A2 编排面在场（OPS 表 + run 入口）');
   // 边界 ①：本文件不得出现内联 `reason: '字面量'` —— 那正是扫描面要收的形态
   const inline = (src.match(/reason\s*:\s*'[A-Za-z][A-Za-z0-9_-]*'/g) || []);
   A(inline.length === 0, 'A3 本文件零内联 reason 字面量（编排层失败走 fault —— 边界 ①）');
   A(src.indexOf("fault: 'facade-off'") >= 0 && src.indexOf("fault: 'unknown-op'") >= 0
     && src.indexOf("fault: 'engine-absent'") >= 0 && src.indexOf("fault: 'engine-threw'") >= 0,
     'A4 四个 fault 码在场（门面自己的失败面）');
-  A(src.indexOf(ANCHORS.aFacadeOff) >= 0, 'A5 run 未开门时落 fault（不代引擎拒收）');
+  A(src.indexOf(ANCHORS.aFacadeOff.txt) >= 0, 'A5 run 未开门时落 fault（不代引擎拒收）');
   // 边界 ③：allOff 必须要求「四个都读得出」
-  A(src.indexOf(ANCHORS.aAllOff) >= 0, 'A6 allOff 以「读得出的个数 === 家族长度」为前提（读不出不算关）');
+  A(src.indexOf(ANCHORS.aAllOff.txt) >= 0, 'A6 allOff 以「读得出的个数 === 家族长度」为前提（读不出不算关）');
   A(src.indexOf("if (!m || typeof m.getSettings !== 'function') return null;") >= 0,
     'A7 引擎缺席时启用态报 null（与 false 分开 —— 边界 ③）');
   // 边界 ④
-  A(src.indexOf(ANCHORS.aBlockEmpty) >= 0 && src.indexOf('if (!parts.length) return \'\';') >= 0,
+  A(src.indexOf(ANCHORS.aBlockEmpty.txt) >= 0 && src.indexOf('if (!parts.length) return \'\';') >= 0,
     'A8 全关 / 无块 ⇒ 空串（边界 ④）');
   // 边界 ⑤：真代码面零 store.transact
   const codeOnly = src.split('\n').filter(function (l) { return !/^\s*(\*|\/\/|\/\*)/.test(l); }).join('\n');
   A(codeOnly.indexOf('store.transact') < 0, 'A9 真代码面零 store.transact（边界 ⑤）');
   // 边界 ⑥
-  A(src.indexOf(ANCHORS.aRecovery) >= 0 && src.indexOf("typeof rr.explain !== 'function'") >= 0,
+  A(src.indexOf(ANCHORS.aRecovery.txt) >= 0 && src.indexOf("typeof rr.explain !== 'function'") >= 0,
     'A10 恢复档只读 U5 的 explain（边界 ⑥）');
   // H5 锚点纯度：每个锚点字面量在本文件恰声明 1 次（判据不得自带锚点串副本）
   let pure = 0, impure = [];
   Object.keys(ANCHORS).forEach(function (k) {
-    const t = ANCHORS[k], f = (src.split(t).length - 1);
+    const t = ANCHORS[k].txt, f = (src.split(t).length - 1);
     if (f === 1) pure++; else impure.push(k + ':' + f);
   });
   A(pure === Object.keys(ANCHORS).length, 'A11 锚点字面量在本文件各恰出现一次（违者：'
@@ -127,7 +132,7 @@ function runAll(A) {
   let selfDup = [];
   Object.keys(ANCHORS).forEach(function (k) {
     // 锚点表里的声明算 1 次；判据正文里若再写一遍同串 ⇒ 2 次
-    const n = self.split(ANCHORS[k]).length - 1;
+    const n = self.split(ANCHORS[k].txt).length - 1;
     if (n !== 1) selfDup.push(k + ':' + n);
   });
   A(selfDup.length === 0, 'A12 锚点串在本锁内也只声明一次（判据不携带副本 —— 违者：'
@@ -211,7 +216,7 @@ function runAll(A) {
   // ═══ N 真源码破坏负控制（内存副本 + 两向自证）═══
   {
     // N1 allOff 放宽成「忽略读不出的」⇒ 引擎缺席时也必须被判成 allOff（破坏须可观测）
-    const b1 = hit(src, ANCHORS.aAllOff, 'allOff: true || readable.length === ENGINES.length');
+    const b1 = hit(src, ANCHORS.aAllOff.txt, 'allOff: true || readable.length === ENGINES.length');
     const WA = hostWith({ facadeSrc: b1, withFamily: false });
     A(WA.beatFacade.status().allOff === true, 'N1 把 allOff 放宽 ⇒ 家族全缺席仍报全关（破坏可观测）');
     A(hostWith({}).beatFacade.status().allOff === true,
@@ -219,19 +224,19 @@ function runAll(A) {
     // N2 fault 改写成 reason 形态 ⇒ A3 判据必须现形
     //   ⚠ 替换串**不得原样复制锚点串** —— 否则本锁里该锚点出现 2 次，A12（判据不携带副本）
     //   会把自己抓出来。故这里用「锚点串变量 + 后缀」拼装，字面量只声明一次。
-    const b2 = hit(src, ANCHORS.aFacadeOff, ANCHORS.aFacadeOff + "// reason: 'facade-off'");
+    const b2 = hit(src, ANCHORS.aFacadeOff.txt, ANCHORS.aFacadeOff.txt + "// reason: 'facade-off'");
     const inline2 = (b2.match(/reason\s*:\s*'[A-Za-z][A-Za-z0-9_-]*'/g) || []);
     A(inline2.length === 1, 'N2 把编排层失败写成 reason 形态 ⇒ A3 的内联扫描当场现形（实 '
       + inline2.length + ' 条）');
     // N3 run 不检门面开关（直接透传）⇒ B4 的 fault 判据必须现形（同样用拼装，不复制锚点串）
-    const b3 = hit(src, ANCHORS.aFacadeOff, ANCHORS.aFacadeOff + ' if (false)');
+    const b3 = hit(src, ANCHORS.aFacadeOff.txt, ANCHORS.aFacadeOff.txt + ' if (false)');
     const WA3 = hostWith({ facadeSrc: b3 });
     const off3 = (function () {
       try { return WA3.beatFacade.run('report', { rec: {} }); } catch (e) { return { threw: String(e.message) }; }
     })();
     A(!!off3 && off3.fault !== 'facade-off', 'N3 挖掉门面开关检查 ⇒ 未开门时不再报 facade-off（破坏可观测）');
     // N4 空块守卫去掉 ⇒ 家族全关时也产块（证明「空串」是真判据不是巧合）
-    const b4 = hit(src, ANCHORS.aBlockEmpty, "if (false) return '';");
+    const b4 = hit(src, ANCHORS.aBlockEmpty.txt, "if (false) return '';");
     const WA4 = hostWith({ facadeSrc: b4 });
     WA4.beatFacade.setSettings({ enabled: true });
     WA4.beatReport.setSettings({ enabled: true });
@@ -251,8 +256,8 @@ function runNegative(A) {
     'N6 锚点不唯一时工具**必须抛**（两向自证 —— 用 `aXbXc` 而非 `aXa`：后者里 `X` 只出现 1 次，'
     + '拿它做「不唯一」的样本会让这条判据**恒真**，正是本仓点名过的假判据形态）');
   const src = rd(FA);
-  A(hit(src, ANCHORS.aFacadeOff, 'xyz') !== src, 'N7 破坏真改动了文本（不是空操作）');
-  A(src.indexOf(ANCHORS.aFacadeOff) >= 0, 'N8 原文件未被污染（破坏只在内存副本上做）');
+  A(hit(src, ANCHORS.aFacadeOff.txt, 'xyz') !== src, 'N7 破坏真改动了文本（不是空操作）');
+  A(src.indexOf(ANCHORS.aFacadeOff.txt) >= 0, 'N8 原文件未被污染（破坏只在内存副本上做）');
   return true;
 }
 

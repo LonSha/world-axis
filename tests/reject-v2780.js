@@ -147,12 +147,21 @@ const DEAD = {
     anchor: "if (step.status === 'done') return { ready: false, reason: 'already-done' };",
     why: 'agency.checkPrereqs: current step already done. Needs processReceipts to settle step then schedule again.'
   },
+  'no-act-id': {
+    // v2.194.0（U2 批次③）：本模块新增的**形状读数码** —— 回执里两处 id 都认（`actId` 与
+    //   现行为 `id`）之后，「连 id 都没有」的这一格才被显式表达出来。产品路径下
+    //   `act.receipt()` 恒写 `id`，故它与同族三码一样：标准 boot 下不可达，登记备查。
+    anchor: "if (!actId) { out.deferred.push({ receipt: r.opId, reason: 'no-act-id', status: r.status }); return; }",
+    why: 'agency.processReceipts: 回执既没有 actId 也没有 id。它由本模块在 v2.194.0 显式表达'
+      + '（此前两处字段都不认，整块被塌成 no-act-row）—— 标准 boot 下 act.receipt() 恒写 id ⇒ 不可达；'
+      + '将来若有非 act 来源往 acts.res 里投递回执，它是第一道防线。'
+  },
   'no-act-row': {
-    anchor: "if (!actRow) { out.deferred.push({ receipt: r.opId, reason: 'no-act-row' }); return; }",
+    anchor: "if (!actRow) { out.deferred.push({ receipt: r.opId, reason: 'no-act-row', actId: actId }); return; }",
     why: 'agency.processReceipts: receipt has no matching act row. Needs acts.res with receipt but acts.rows without matching id.'
   },
   'step-not-running': {
-    anchor: "out.deferred.push({ receipt: r.opId, reason: 'step-not-running', person: who, seq: step ? step.seq : -1 });",
+    anchor: "out.deferred.push({ receipt: r.opId, reason: 'step-not-running', person: who, seq: step.seq, why: (ad && ad.reason) || 'advance-failed' });",
     why: 'agency.processReceipts: receipt found act but step not in running state.'
   },
   'act-unavailable': {
@@ -242,7 +251,7 @@ const DEAD = {
   },
   // v2.170.0（TX7）: investigation 拒收码 DEAD 表登记（engines/investigation.js）。
   'already-revealed': {
-    anchor: "if (clue.revealedTo.indexOf(who) >= 0) { noteFault('already-revealed'); return { ok: false, reason: 'already-revealed' }; }",
+    anchor: "return { ok: false, reason: 'already-revealed', clueId: clue.id, person: who,",
     why: 'investigation.reveal: clue already revealed to this person.'
   },
   'clues-full': {
@@ -250,7 +259,7 @@ const DEAD = {
     why: 'investigation.register: max clues reached. Needs 32+ existing clues in state.'
   },
   'enigma-failed': {
-    anchor: "noteFault('enigma-failed'); return { ok: false, reason: 'enigma-failed', detail: mr.reason };",
+    anchor: "noteFault('enigma-failed'); return { ok: false, reason: 'enigma-failed', detail: mr2.reason };",
     why: 'investigation.reveal: enigma.mark failed. Needs enigma to reject the mark call.'
   },
   'insufficient-evidence': {
@@ -378,6 +387,35 @@ function runWitness(WA) {
         } });
         return [inner && inner.reason, r && r.reason];
       });
+      // ── v2.195.0（U2 批次⑤）：跨层副作用那一族（`effect()` 的自己的失败面）──
+      //   它不是「存量未分类」：`effect()` 是**新增的公开写口**，消费方（world-blueprint
+      //   的 `mech` 前提登记）会真调它，故必须带**可执行见证**——在真链里真调、真撞。
+      if (typeof CMw.effect === 'function') {
+        want('bad-effect', 'U2 批次⑤：副作用登记给的不是函数（形状不合法）⇒ bad-effect'
+          + ' —— 「这一步没做成」与「这一步做完了」在读数上必须分得开');
+        trip('bad-effect', function () {
+          let got = '';
+          CMw.chain({ opId: 'witness:bad-effect', site: 'witness:bad-effect', fn: function (c, d) {
+            d.__witnessBe = 1;
+            CMw.step(null, { site: 'witness:bad-effect:1' });
+            got = CMw.effect(null, 'witness-bad-effect', 'not-a-function').reason;
+            return true;
+          } });
+          return got;
+        });
+        want('chain-effects-full', 'U2 批次⑤：单链副作用登记数达上限（8 是常量）⇒ chain-effects-full'
+          + ' —— 无上限的「做完没」清单就是读不完的读数');
+        trip('chain-effects-full', function () {
+          let last = '';
+          CMw.chain({ opId: 'witness:chain-effects-full', site: 'witness:chain-effects-full', fn: function (c, d) {
+            d.__witnessEf = 1;
+            CMw.step(null, { site: 'witness:chain-effects-full:1' });
+            for (let i = 0; i < 9; i++) last = CMw.effect(null, 'e' + i, function () { return true; }).reason || last;
+            return true;
+          } });
+          return last;
+        });
+      }
     }
   }
   function trip(code, fn) {

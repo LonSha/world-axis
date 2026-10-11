@@ -332,6 +332,70 @@
   //   · 不改任何模块的**设置项 / 登记项**：链是进程态编排，不开新开关、不进 settingsBus、
   //     不占模块注册表（因此不改注册表读数与装载序）。
   const LIMITS_CHAIN = { STEPS: 16, NOTE: 60 };
+  const LIMITS_EFFECT = { LIST: 8 };
+
+  // ── v2.195.0（U2 批次⑤）：跨层副作用 ────────────────────────────────────────
+  //   探针实测（`/tmp/probe_u5c.js` C1）：`world-blueprint.importBlueprint` 在**链里**被调、
+  //   随后整链被中止时，世界上「一格未动」（人 / 地 / 势力全 0，与链的原子性一致），
+  //   而蓝图里 `mech` 那一段的 `setSettings` **已经写进 settingsBus**（实测 libCap 3 → 7）。
+  //   同一时刻两个互斥事实同时成立：**「这个世界没装成」与「这个世界的机制已经改了」**。
+  //   为什么 `defer`（旧口径）治不了它：defer 的语义是「事务提交后再做」，而机制开关是
+  //   「世界装成的前提」——推迟它，等于让世界带着没打开的机制先落地（那是另一种半写）。
+  //   故本版把这一族**单列**，与 defer 分两栏：
+  //     · defer  = 世界提交后可补做的**通知面**（人格通道 / 收尾处理器），失败只降级为台账；
+  //     · effect = 世界装成的**前提**（机制开关），在链里当场执行、结果随回执回带，
+  //               失败进 `chainStat().faults`（读数上分得开），已做未提交的记进待办。
+  //   链**自己**不猜任何模块的副作用：是消费方在链里调 `effect()` 说清「这一笔是前提」。
+  const __pendingEffects = [];
+  /**
+   * 登记并**当场执行**一个「不做完就不能提交」的跨层副作用。
+   *   为什么不当场执行不行：这类副作用（设置写入）不落 draft，随不了链的原子性；
+   *   若把它挪到提交之后，世界就会先带着没生效的机制落地。故取「当场做 + 如实报」：
+   *   抛错/拒签一律如实进回执与 faults，链总结里给出 `effectMiss`，调用方据此判「这一笔
+   *   装出来的世界是不是真的能跑」，而不是只看 `ok:true`。
+   * @returns {{ok:boolean, kind:string, reason?:string}}
+   */
+  function effect(chainObj, kind, fn) {
+    const c = chainObj || __curChain;
+    if (!c || !Array.isArray(c.effects)) { chainFault('bad-chain'); return { ok: false, reason: 'bad-chain' }; }
+    if (typeof fn !== 'function') { chainFault('bad-effect'); return { ok: false, reason: 'bad-effect' }; }
+    if (c.effects.length >= LIMITS_EFFECT.LIST) {
+      chainFault('chain-effects-full');
+      return { ok: false, reason: 'chain-effects-full', cap: LIMITS_EFFECT.LIST };
+    }
+    const rec = { kind: clean(kind, LIMITS.KIND) || 'effect', ok: false, reason: '' };
+    try {
+      // 拒签口径与 mutator 一致：显式 `false` = 这一步没做成（不抛也算失败）。
+      rec.ok = (fn() !== false);
+      if (!rec.ok) rec.reason = 'effect-refused';
+    } catch (e) {
+      rec.ok = false;
+      rec.reason = clean((e && e.message) || e, LIMITS.REASON) || 'effect-threw';
+    }
+    c.effects.push(rec);
+    if (!rec.ok) c.effectMiss = (c.effectMiss || 0) + 1;
+    return { ok: rec.ok, kind: rec.kind, reason: rec.reason || undefined };
+  }
+  /** 已做而未随链提交的副作用（链中止时登记；`effectPending()` 读它）。**不自动重放**。 */
+  function markPending(c, reason) {
+    const rows = (c && c.effects) ? c.effects.filter(function (x) { return x && x.ok; }) : [];
+    if (!rows.length) return;
+    rows.forEach(function (r) {
+      __pendingEffects.push({ kind: r.kind, site: c.site, opId: c.opId, reason: reason || 'chain-not-committed', at: clockWall() });
+    });
+    while (__pendingEffects.length > LIMITS.RECEIPTS) __pendingEffects.shift();
+    WA.log('warn', '链未提交，但 ' + rows.length + ' 个跨层副作用已经做过了（'
+      + rows.map(function (r) { return r.kind; }).join('、') + '）—— 与「世界装成了」不是一回事，见 commit.pending()');
+  }
+  /**
+   * 待办读取面。为什么**不自动重做**：机制开关是**全局**的（settingsBus 按浏览器存，
+   *   不按聊天）——自动重做就等于把一个聊天的机制配置写到所有聊天上，比漏做更糟。
+   *   故这里只如实列出来，由上层决定「重导一次蓝图」还是「手动开开关」。
+   */
+  function pendingEffects() {
+    return { ok: true, items: __pendingEffects.map(function (x) { return Object.assign({}, x); }),
+      count: __pendingEffects.length, cap: LIMITS.RECEIPTS };
+  }
   const __chainStat = {
     chains: 0, commits: 0, aborts: 0, failed: 0, replayed: 0, capped: 0, overLimit: 0,
     leaks: 0, lastReason: '', lastAt: 0
@@ -349,7 +413,11 @@
     'step-threw',         // 某一步抛错
     'step-refused',       // 某一步显式返回 false
     'receipt-failed',     // 回执没写进草稿（链因此中止 —— 不许「写成了世界、记不上账」）
-    'aborted'             // store 层面被拒，而链面答不出更细的因（不假装知道是谁拒的）
+    'aborted',            // store 层面被拒，而链面答不出更细的因（不假装知道是谁拒的）
+    // v2.195.0（U2 批次⑤）：跨层副作用（事务外的机制开关 —— 写不进 draft 的那一类）。
+    'bad-effect',         // 登记一个不可执行的副作用
+    'chain-effects-full'  // 单链副作用登记数达上限（**链面**的容量闸，与 aftermath 的
+                          // 世界面 `effects-full` 分列：两个执行点各自有名字）
   ];
   let __curChain = null;
   let __chainStartedAt = 0;
@@ -384,6 +452,10 @@
       opId: (c && c.opId) || '', site: (c && c.site) || '', tx: o.tx || null,
       steps: (c && c.steps) || [],
       receipt: o.receipt || null,
+      // v2.195.0（U2 批次⑤）：跨层副作用逐条回带（kind / ok / reason）。
+      //   链 `ok:true` 只说明**世界写成了**；`effectMiss>0` 说明「写成的世界里有前提没做到」。
+      effects: (c && c.effects) ? c.effects.map(function (x) { return Object.assign({}, x); }) : [],
+      effectMiss: (c && c.effectMiss) || 0,
       reason: o.reason || undefined,
       note: o.note || ''
     };
@@ -408,7 +480,8 @@
   function active() {
     const c = __curChain;
     if (!c) return null;
-    return { opId: c.opId, site: c.site, steps: c.steps.length };
+    return { opId: c.opId, site: c.site, steps: c.steps.length,
+      effects: (c.effects || []).length, effectMiss: c.effectMiss || 0 };
   }
   /**
    * 链的在途草稿（**只在链里**非空）。在链里返回 `{opId, draft}`；链外返回 `null`。
@@ -461,6 +534,7 @@
       epoch: (typeof st.epoch === 'function') ? st.epoch() : 0,
       rev: (typeof st.committedRev === 'function') ? st.committedRev() : 0,
       deferred: [],
+      effects: [], effectMiss: 0,
       draft: null, settledFlag: false, at: clockWall(),
       // 中止的真因（写进回执的 `reason`）。此前只在最外层按 `tx.aborted` 判 ⇒
       //   「某一步拒签」被错报成 `aborted`（读数上盖住了消费方那一步的名字）。
@@ -489,7 +563,8 @@
           try {
             writeReceipt(draft, c, (c.site || '').slice(0, LIMITS.SITE),
               { steps: c.steps.length, writes: c.steps.length,
-                want: c.decl, delta: (c.decl === null ? null : c.steps.length - c.decl) });
+                want: c.decl, delta: (c.decl === null ? null : c.steps.length - c.decl),
+                effects: c.effects.length, effectMiss: c.effectMiss || 0 });
           } catch (e) {
             chainFault('receipt-failed'); c.failed = true; c.abortWhy = 'receipt-failed';
             c.receiptErr = clean((e && e.message) || e, LIMITS.REASON);
@@ -504,6 +579,7 @@
     })();
     if (threw) {
       __chainStat.failed++; __chainStat.lastReason = 'step-threw'; __chainStat.lastAt = clockWall();
+      markPending(c, 'step-threw');
       return chainPack(c, { reason: 'step-threw', note: '某一步抛错（' + clean(threw.message || threw, LIMITS.REASON) + '）—— 世界未提交' });
     }
     if (tx && tx.deferred === true) {
@@ -528,6 +604,7 @@
     }
     if (tx && (tx.aborted || tx.stale)) {
       __chainStat.aborts++; __chainStat.lastAt = clockWall();
+      markPending(c, tx.stale ? 'stale' : 'aborted');
       // 真因优先：`tx.aborted` 只说「store 没提交」，说不清是**谁**让它没提交的。
       const aur = c.abortWhy || (tx.stale ? 'stale' : 'aborted');
       if (!c.abortWhy && !tx.stale) chainFault('aborted');
@@ -543,6 +620,7 @@
     // 归因：本面自己写回执失败 > 消费方那一步抛错/拒签 > 外层事务被拒。
     //   末一条借 `store.txStat().lastNested` 分辨「某一步的嵌套写口被保存点撤回了」——
     //   那是**消费方自己的写口**说不出口（它只见到品牌回执），只有 store 知道自己撤回了谁。
+    markPending(c, 'refused');
     const ln = nestedVerdict();
     let why;
     if (c.abortWhy) why = c.abortWhy;                       // 本面/消费方已经答得出来的真因
@@ -630,7 +708,12 @@
     chainSelfCheck: selfCheck,
     active: active,
     inflight: inflight,
-    step: step
+    step: step,
+    // v2.195.0（U2 批次⑤）：跨层副作用（不做完就不能提交的那一类）。与 defer **分两栏**：
+    //   defer 是世界提交后可补做的通知面，effect 是世界装成的前提。混成一栏的那一刻起，
+    //   「装成了」与「能跑」就会共用一张读数表。
+    effect: effect,
+    pending: pendingEffects
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('core/commit.js', { kind: 'core', ver: '2.194.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('core/commit.js', { kind: 'core', ver: '2.195.0' });
 })();

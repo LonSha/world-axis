@@ -196,8 +196,16 @@ const NS_FACE_EXPECT = {
    * 静态面照收。这 5 个是本仓全部 __ 前缀提供方（各有模块提供方，零例外），
    * 显式登记以免把「口径差」当成「漂移」。
    */
+  // v2.194.0（U2 批次③）：`__agencyStepShapeWarn` 与前四个 `__*Warn` **完全同形态**
+  //   （模块内自证槽：读口形状偏差时点亮，供门禁例外表登记），故同列 internal-prefixed。
+  //   这**不是放宽**：本表只把 static-only 差集从「未登记漂移」里排出去，它仍计进
+  //   静态提供方总数（252）、仍落在零读名单里（27）—— 两条读数都照实往上走。
+  // v2.194.0（U2 批次④）：**不加项**——本批一度照抄批次③加了 `__aftermathWarn` /
+  //   `__storyChoiceWarn`，但专锁 C2 实测其点亮条件不可达（读口 `find` 与写口
+  //   `rowForWrite` 同层同源）⇒ 已按本仓「不留死出口」口径删除那两个槽，本表同步不加。
   internalPrefixed: ['__settingsRegs', '__loaderState', '__loadOrder', '__loadFailed',
-    '__inited', '__inputGuardInternal', '__diplomacyWarn', '__agencyWarn', '__freightWarn']
+    '__inited', '__inputGuardInternal', '__diplomacyWarn', '__agencyWarn', '__freightWarn',
+    '__agencyStepShapeWarn']
 };
 
 /** 别名形态：const A = ( HOST.WorldAxis = HOST.WorldAxis || {} ) ; */

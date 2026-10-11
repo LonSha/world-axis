@@ -134,8 +134,165 @@ Status: proposed（2026-10-10 立；只读制订轮，不改产品实现、不�
   - 门禁：死导出 / 拒收码（`refund-failed` 走可执行见证；`no-budget` 由死表锚点转活并改真理由）/
     模块注册表 / 模块图边恒等式（调用期 1676 → 1678、合计 1786）/ 散装读数（refs 5378 → 5417）/
     `FROZEN2800`（14772 字符不变）/ TX 与契约面专锁 / O2 专锁 —— 全绿。
-    **本批未跑全量回归**（同批次①，按流程约定）。
+     **本批未跑全量回归**（同批次①，按流程约定）。
   - 版本白名单：12 只旧专锁的版本清单统一追加 `2.194.0`（随升版追加当版，属常规维护）。
+- **进度（v2.194.0 · 批次③：agency + investigation）**：
+  - 正靶是**四条探针实测的真病**（不是阅读推断）：
+    ① `agency.schedule` 读不到当前步 —— `plan.current` 的扁平回执只带 `seq`，本模块读 `planRow.step`
+       ⇒ `step` 恒 `undefined` ⇒ 恒 `no-step`：**「行动反馈闭环」100% 空转，且没有任何一行读数报错**
+       （本仓点名的「功能级失效」的教科书样本）。
+    ② `processReceipts` 找不到行动行 —— `act` 的结算回执把行动 id 写在 **`id`** 上，本模块读
+       `r.actId`（那个字段从来不存在）⇒ 恒 `no-act-row`。
+    ③ 回执**永不消化** —— 唯一去重判据 `!r._agencyProcessed` 是**只读**字段，全库无人写它
+       ⇒ 同一条回执每轮都被当新的再消化一次。
+    ④ 消化与结算**不同生共死**（两笔独立事务，结算成因消化标记没写上 ⇒ 重复消化）。
+  - investigation 侧的 `reveal` 是**三写半写**：`enigma.mark` + `intel.addIntel` + 本模块记账
+    分属三笔顶层事务 ⇒ 让第三笔失败时，enigma 已写进世界、线索仍 investigating，回执照样 `ok:true`。
+  - 交付物：`engines/agency.js` 新增 `commitOf` / `chainInflight` / `nextOpId` / `txCount` /
+    `nestedVerdictSince` / `activeStepOf` / `chainWrite` / `planRowOf` / `pendingStepOf` /
+    `advanceStepOnDraft`；`engines/investigation.js` 新增 `chainInflight` / `nestedTx` /
+    `findClueForWrite` / `writeEvidence` / `nextOpId` / `txCount` / `nestedVerdictSince` /
+    `markInflight` / `markRevealedOnDraft`。两模块的读口在链内改查链草稿、写口三态如实标注。
+  - 专锁 `tests/s3-u3-v2196.js` **39/39**。
+  - 门禁：拒收码（`no-act-id` 是新增的**形状读数码**：两处 id 都认之后「连 id 都没有」才被显式
+    表达出来；标准 boot 下 `act.receipt()` 恒写 `id` ⇒ 不可达，登记进死表）/
+    `reject-code-ledger.json` 的 `deadCount` 与 `reject-v2780.js` 的 `DEAD` 表锚点同步；
+    模块图边恒等式（调用期 1678 → 1682、合计 1786 → 1790）/ 散装读数（refs 5417 → 5459）。
+    **本批未跑全量回归**（按流程约定：全量留到计划全部内容完成之后）。
+    〖台账形状〗本批把 changelog 末条写成了**裸字符串**（前 9 条皆为 `{version,module,codes,note}`
+    对象）—— 同一张台账两种形状，任何按对象遍历 changelog 的消费方会在那里崩或静默跳过；
+    批次④ 已按既有形状改写并补回文件尾换行。
+- **进度（v2.194.0 · 批次④：aftermath + story-choice）**：
+  - 正靶是**五条探针实测的真病**（`/tmp/probe_u4a.js` / `/tmp/probe_u4b.js`，不是阅读推断）：
+    aftermath 三病 —— ① 链内读面看不见本链新实体（`find` / `findByEvent` 读已提交快照
+    `store.get()`，而 `register` 写在外层 draft 上）⇒ 链内 `view` 恒 `not-found`；
+    ② 同一链内重复 `eventId` **去重失效**（判据读同一份过期快照）⇒ 两条同类效果都落世界，
+    而「同一事件效果只生效一次」是本模块的边界 4；③ 链上写入**不报在途**（回执只有 `ok:true`）。
+    另测出一条**跨模块真半写**：`aftermath.repair` 报 `{status:'repaired'}` 而 `region` 的
+    `lane.blocked` **仍为 true** —— 「效果已修好」与「这条路仍然不通」两个互斥事实同时挂在世界上。
+    story-choice 两病 —— ① 链内 `review` 找不到本链刚登记的选择点；② 链级半写（`present` 的
+    `branchTree.fork` 树记账与点落库、`confirm` 的兑现与回执回写分属独立事务 ⇒ 「点存在、树上无
+    节点」这类互斥事实可被留下）。
+  - 交付物：`engines/aftermath.js` 新增 `nestedTx` / `chainInflight` / `inChainDraft` /
+    `readEffects` / `markInflight` / `rowForWrite` / `laneBlocked` / `_clearLaneIfBlocked`；
+    `repair` 在 `status='repaired'` 的**同一笔**内调 `_clearLaneIfBlocked` 并在回执带 `laneCleared`，
+    `stat()` 新增 `bridgeMiss` 读数（**必须恒为 0**；`root` 为 null 时不写，宁可如实计 bridgeMiss
+    也不偷偷另开一笔）；`engines/story-choice.js` 新增 `nestedTx` / `chainInflight` /
+    `inChainDraft` / `readPoints` / `markInflight` / `rowForWrite`。两模块 diagnose 新增
+    `checks.chain` 能力自报（与 `closedLoop` 分开报），版本与 `registerModule` 同步升到 `2.194.0`。
+  - **本批最值得记的一条纠错**：照抄批次③为两模块各加了自证槽 `WA.__aftermathWarn` /
+    `WA.__storyChoiceWarn`（写口找不到行时点亮），并据此把模块图门禁的静态提供方改到 254、
+    ns 面差改到 41、零读名单改到 29、`internalPrefixed` 追加两个名字。专锁首跑即实测该点位
+    **恒不可达**（读口 `find` 与写口 `rowForWrite` 同层同源：find 通过 ⇒ rowForWrite 必通过），
+    属零调用死代码 ⇒ 按本仓「不留看起来会被用的出口」口径**删除**那两个槽与其点亮分支，
+    并**回退**三处读数（252 / 39 / 27）与 `internalPrefixed` 的两项。留痕待查的不是槽，是那份
+    越改越乐观的推断；`module-cycle-gate-v2107.js` 里三次常量全部改为**实测值**（nsProvided 252 /
+    差 39 / 零读 27 / drift 0，用 `node -e "...audit()"` 现取）。
+  - 专锁 `tests/s3-u4-v2197.js` **52/52**（A0–A5 aftermath / B0–B4 story-choice / C1–C4 硬边界与
+    如实登记）。C2 原设计为「写口找不到行 ⇒ 点亮自证位」，首跑 FAIL 即暴露上面的不可达性，
+    改写为验**真实可达**的修好即通路（`lane.blocked === false` + 回执 `laneCleared:true` +
+    `stat().bridgeMiss === 0`）。
+  - 门禁：散装读数 **refs 5459 → 5467**（`sync-hardcoded.js --write`，3/3 站点；逐处归因：
+    aftermath +5 = `commit.inflight` ×2 + `region.places` ×2 + `commit.chain`×1；story-choice +3 =
+    `commit.inflight` ×2 + `commit.chain` ×1 —— 由逐文件回退实测得出：只退 aftermath 得 5462、
+    只退 story-choice 得 5464）；reads 复跑 **61 项**；模块图边恒等式（调用期 1681 → 1682、
+    合计 1789 → 1790，一条新增边 = `engines/story-choice.js → commit`；`aftermath → commit` 在 HEAD
+    上已存在）；模块注册表（文件 205 / 命名空间 213 / 装载期边 108 / 硬边 0 / 调用期引用 212）；
+    拒收码门禁（产品文件 218 / 内联码 809 = 见证 534 / 死表 49 / 基线 226，每个码都有归属）。
+    **本批未跑全量回归**（按流程约定：全量留到计划全部内容完成之后）。
+  - **挂载面的真缺陷（本批实测抓到，比孤儿更隐蔽）**：U2 的四把专锁（`s3-u2-v2194` / `s3-u2-v2195` /
+    `s3-u3-v2196` / `s3-u4-v2197`）导出的 `runAll` 全是
+    `function () { return { failed: bad, total: results.length }; }` —— **不接参数、不转发**。
+    而 `run.js` 的 `runLock(spec, method)` 做的是 `require(spec)[m](assert)`（注入聚合器自己的
+    assert，v2.75.0 起统一形态）。于是：锁挂上了、也跑了，但**锁红了全量回归照样绿**（形式挂载 =
+    假绿）。批次① 从 HEAD 起就是这形态，②③④ 沿用 ⇒ 四把一并改为逐条转发
+    `results.forEach(r => a(r.ok, r.label))`，并用「注入真 assert / 注入恒假 assert」双向实测
+    （四把各自注入面收到条数 = `results.length`，恒假面同条数 ⇒ 非空转，`/tmp/mount_real.js`）。
+  - **孤儿面（实测抓到）**：②③④ 三把锁交付时**只有裸脚本入口**，没挂进 run.js 的包装面 ——
+    `tests/orphan-lock-v2750.js` 的 [B]「真仓库零孤儿」当场报
+    `实 3：s3-u2-v2195 / s3-u3-v2196 / s3-u4-v2197`。「独立 `node` 能跑通」不等于「进了回归」；
+    三把按批次①同规挂进 `run.js` 的 U2 节（不新开挂载形态），orphan 门禁复跑 pass。
+    教训写在此处：**挂载与转发是两件事**，只做前者会同时产生假绿与孤儿，而两者都不改变任何输出。
+  - 待办：⑤ `world-blueprint` 与剩余协调模块 —— **⑤ 已交付（见下一块）**。
+
+- **进度（v2.195.0 · 批次⑤：world-blueprint + world-seed + `core/commit.js` 的跨层副作用面）**：
+  - 正靶是**五条探针实测的真病**（`/tmp/probe_u5a.js` / `/tmp/probe_u5b.js` / `/tmp/probe_u5c.js`，不是阅读推断）：
+    ① 链内**写后读看不见本链实体** —— `world-blueprint.get` / `world-seed.get` 走 `store.get()`
+       的**已提交快照**，而写口落在链草稿上 ⇒ 链内 `get` 恒 `unknown-blueprint` / `unknown-seed`
+       （提交后世上确有它，链里却读不到）。
+    ② **同一链内重复登记判据失效** —— 去重读的也是那份过期快照 ⇒ 链上两次同签名 `save` 都报
+       `ok:true`，提交后**同一份蓝图真存两份**（顶层同样输入是被 `duplicate-blueprint` 拒的）。
+    ③ 链上写入**不报在途**：回执只有 `ok:true`，看不出「这一笔还没提交」。
+    ④ **跨层半写**（`/tmp/probe_u5c.js` C1）：`importBlueprint` 在链里被调、随后整链中止 ⇒
+       世界上人 / 地 / 势力全 0（与链的原子性一致），而蓝图 `mech` 那一段的 `setSettings`
+       **已经写进 settingsBus**（实测 libCap 3 → 7）。同一刻「这个世界没装成」与「这个世界机制已改了」
+       两个互斥事实同时成立 —— 这一条 `defer`（世界提交后可补做的通知面）治不了：机制开关是
+       **世界装成的前提**，推迟它等于让世界带着没生效的机制先落地（那是另一种半写）。
+    ⑤ **谎报**（C2）：`setSettings` 抛错被 `catch (err) {}` 静默吞掉 ⇒ 世界照装、回执
+       `{ok:true, installed:{…}}`，而机制一行没生效；`stat().faults` 也看不出（实测 `{}`）。
+  - 交付物：`core/commit.js` 新增 `effect(chainObj, kind, fn)` / `pending()` 两读口（导出面 **15 → 17**）、
+    常量 `LIMITS_EFFECT = { LIST: 8 }`、`CHAIN_FAULTS` 14 项（新增 `bad-effect` / `chain-effects-full`）、
+    `markPending()`（链中止时把**已做未提交**的副作用推进有界待办，**不自动重放** —— 机制开关按浏览器
+    全局存，自动重做等于把一个聊天的配置写到所有聊天）、`chainPack` 回带 `effects` / `effectMiss`、
+    `active()` 报表内副作用读数；`engines/world-blueprint.js` 新增 `chainDraft` / `bucketRead` /
+    `listRead` / `markInflight` / `reportWrite`，`doWrite` 链上改走链草稿，`importBlueprint` 的机制段
+    改 `mechReport = {applied, refused, failed}` 三栏（链上经 `WA.commit.effect(null,'mech:'+eng,run)`
+    逐项记账，失败额外 `commit.step` 并写 `_stat.faults['mech:'+codes]`），回执与 `stat().lastMech`
+    同批带出；`engines/world-seed.js` 同型接入（并明确**不动** `initConfirm` —— 初始化是「开新局」，
+    本质是顶层操作）；`engines/tool-diag.js` 的 `commit` 节新增 `effects: {pending, cap, items}`
+    （两个新读口**各有产品侧真消费者**，不停在 test-only）。
+  - 专锁 `tests/s3-u5-v2198.js` **88/88**（A0–A9 跨层副作用面：成功回带 / `effect-refused` / 抛错带真因 /
+    `bad-effect` / `effectMiss=2` / 容量闸 8 与「链面闸 ≠ 世界面 `effects-full`」/ 链外 `bad-chain` /
+    链中止后 pending 四格齐全且世界一格未动 / 诊断面消费方在场；B0–B6 world-blueprint 五病 +
+    跨层半写 + 谎报分栏；C0–C6 world-seed 同型 + `initConfirm` 不动；D1–D5 顶层与嵌套三态、
+    导出面与模块版本 2.195.0、`CHAIN_FAULTS` 新增两条；N0–N4 **真源码破坏负控制**：破坏两模块
+    `chainDraft` 读口 ⇒ 写后读与去重同款判据当场翻假（且复现「同一份存两份」），破坏 `effectMiss`
+    累计 ⇒ `effectMiss=2` 翻成 0，真源文件逐字未变）。
+  - **一条必须分列的码名纪律（本批实证）**：`effects-full`（aftermath 的**世界面**效果账容量，
+    不可达死表）与 `chain-effects-full`（commit 的**链面**副作用容量，真可达见证）**必须是两个码名**
+    —— 重名会让见证集与死表集相交 ⇒ 恒等式差 -1，这是 `reject-lock` B 组「见证 ∩ 死表 = ∅」与
+    `coverage`「sum === total」两条硬判据同时要求的。**一个执行点一个码名**。
+  - `engines/reject-recovery.js` 同批收口：`no-step` 由判不出面**迁入**拒收面（批次③ 给
+    `engines/agency.js` 加了一处带 `ok:false` 的同码返回，括号配对判据「只要有一处落在 `ok:false`
+    对象里即拒收面」），新增 `no-act-id`（`request-setup`）与 `step-threw`（`retry-same-input`）两档、
+    白名单补 `bad-effect` / `chain-effects-full` / `chain-nested` / `refund-failed` / `steps-full`，
+    版本 2.192.0 → **2.195.0**（产品模块 + 模块注册 + `diagnose().version` 三处同源）。
+  - 门禁（全部实测、本批未跑全量回归，按流程约定）：拒收码门禁 **811 = 见证 536 / 死表 49 / 基线 226**
+    （产品文件 218）；`reject-recovery` 三面现场复算 **811 = 拒收 723 / 成功 34 / 判不出 54**
+    —— 归因由**逐文件回退实测**得出（退 `core/commit.js` ⇒ 809 = 721/34/54，少 `bad-effect` 与
+    `chain-effects-full` 两个拒收码；退 `engines/agency.js` ⇒ 810 = 722/34/54，少 `no-act-id` 一个
+    判不出码且 `no-step` 迁回判不出；退 `reject-recovery` / `world-blueprint` / `world-seed` ⇒ 仍 811）；
+    散装读数 **refs 5467 → 5476**（逐文件回退实测归因：world-blueprint +5 / world-seed +2 /
+    tool-diag +2；`core/commit.js` 本身不改 refs，它增的是**成员** 2554 → **2556**）；
+    死子面 **856 / uiDead 3 / dataOnly 297 不变**（两个新导出各有真消费者 —— 退 `world-blueprint`
+    或退 `tool-diag`，对应那个导出当场被判「新增死导出 857」，这条正是「新增导出必须有真消费者」的现场证据）；
+    模块注册表（文件 205 / 命名空间 213 / 装载期边 108 / 硬边 0 / 调用期引用 212）/
+    `module-cycle-gate-v2107` pass(65) / `readings-v2106` pass(61) / `settle-v2830` pass(55) /
+    `version-surface-gate-v2185` pass(14，20 条白名单全跟上 2.195.0) / `o8-consumer-gate-v2187` 38/0 /
+    `u3-loose-readings-v2191` 35/0 / `u4-export-lifecycle-v2191` 30/0 / `docs-archive-gate` ✓ /
+    `gen-error-codes --check` 双向零差 / `fact-report --self-test` pass（版本三方一致，
+    `run.js` 消息面钉 **9** 处）。
+  - **挂载面（本批当场做，不留欠账）**：专锁按批次①–④ 同规挂进 `tests/run.js` 的 U2 节
+    （`runLock('./s3-u5-v2198.js')`，不新开挂载形态），且 `runAll` 是**逐条真转发**
+    （`results.forEach(r => a(r.ok, r.label))`）—— 批次④ 实测过的「形式挂载 = 假绿」形态本批不再重演。
+    `orphan-lock-v2750` 复跑 pass（[B] 读数回 **0** 孤儿），`test-surface-gate` 实测
+    测试文件面 **238** / 锁 208 / 孤儿 **0**。
+  - **一条注释纪律（本批自纠）**：`tests/run.js` 那处「面总数 804 → 811」的归因注释**初版写的是
+    凭印象编的算式**（未实测就写「某几码为本批存量」）。当场改用两条实测通道校正：`node -e` 现场复算
+    三面 + **逐文件 `git show HEAD:<file>` 回退**后重跑 `live()`，再按实测重写注释。**注释里的算式
+    与判据的输入面必须同源** —— 凭印象写下的数字在下一轮升版时会变成一份「看起来是实测的历史」。
+  - **同批跨批修复（存量欠账，只在全量里现形）**：`tests/beat-facade-lock-v2193.js`（**R170 / v2.193.0 的 U1 专锁**）
+    的 `ANCHORS` 写成**扁平字符串表**（全仓唯一一把），统一档审计器 `tests/negative-control-audit.js`
+    的 `auditAnchor` 第一步就要求 `{ rel, txt }` 对象 ⇒ 它被判 `shape: 锚点不是对象` **8 条**，
+    `anchor-scan` 的**统一档（门禁面）**当场非零，`tests/anchor-scan-v2126.js` 与 `tests/anchor-scan-v2133.js`
+    两把门禁**红**。归因靠 **`git worktree add --detach HEAD` 干净树实测**（同一组 8/8 ⇒ 存量、非本批）；
+    修法是**对齐契约、不动锚点字面量**（8 条锚点原文各在 `engines/beat-facade.js` 恰 1 次、在本锁恰 1 次），
+    表改 `{ rel: FA, txt: … }` 并补 20 处 `.txt` 用法。修后 `anchor-scan-v2126` **pass(31)** /
+    `anchor-scan-v2133` **pass(55)** / `negative-control-audit-v2104` **pass(49，problems 0)** /
+    该锁自身 `runAll` 仍 **38 / 0**。**教训**：`ANCHORS` 是**跨锁契约** —— 形状漂移在本锁里不报错
+    （本锁只用 `indexOf`，字符串照样能用），只在**消费者**（别人的审计器）里现形。
+  - 待办：U2 剩余协调模块（`backstage` / `coop` 等既有链面消费者按需复查），随后按本计划推进
+    U3–U9 与 `plans/Y_EXPANSION.md` 的 Y 线。**全量回归仍留到计划全部内容完成之后**。
 
 ### U3 散装读数的登记与「过期即现形」
 
@@ -268,6 +425,11 @@ Status: proposed（2026-10-10 立；只读制订轮，不改产品实现、不�
 | U4 导出面去向与复查期 | **v2.191.0** | `tools/consumer-types.js` + `tests/u4-export-lifecycle-v2191.js` | **30 / 0** | 登记 **137 条**（settings-registry-only 73 / ui-component-library 41 / query-api 20 / data-const 3）· 生命周期问题 0 · `disposition` 全 `keep` · `reviewAfter` 全 `2.196.0` · O8 门禁仍 38 / 0 |
 | U5 拒收码 → 恢复动作 | **v2.192.0** | `engines/reject-recovery.js` + `tools/reject-recovery.js` + `tests/reject-recovery-lock-v2192.js` | **115 / 0** | `reason` 字面量 **804 = 拒收 717 / 成功 34 / 判不出 53**（括弧配对实测，**804 从来不是拒收面**）· 六档分布 64 / 287 / 288 / 71 / 10 / 17 · 无恢复动作 67（成功 34 + 契约外 32 + 词法碎片 1）· `OVERRIDES 38` / `NEUTRAL_REVIEW 53`（契约外 32）/ `ARTIFACTS 1` · 核对器零问题 · 幽灵码三条全 `unknown`（边界 ③）|
 | U1 拍引擎家族统一运行门面 | **v2.193.0** | `engines/beat-facade.js` + `tests/beat-facade-lock-v2193.js` | **38 / 0** | op **9** 条（`report` / `audit` / `equivalent` / `plan` / `land` / `claim` / `transition` / `gate` / `record`）· 家族 **4** 员 / 产块 **2** 员 · 归一形状 `{ ok, engine, op, reason, recovery, fault, … }` · **零内联 `reason:` 字面量**（编排层失败走 `fault` 四码）· 真代码面零 `store.transact` · 恢复档只读 U5（`bad-round` ⇒ `adjust-input`，缺席即 `null`）· 家族全关 ⇒ 空块（注入面逐字不变）|
+| U2 批次① diplomacy + operations | **v2.194.0** | `core/commit.js` + `engines/diplomacy.js` + `engines/operations.js` + `tests/s3-u2-v2194.js` | **57 / 0** | 链导出面 **15** 项（`chain` / `chainStat` / `chainSelfCheck` / `active` / `inflight` / `step`）· 链首个真实产品消费者 `operations.disburse`（跨模块转账与本地记账同链，「先记账 → 后转账」次序锚点 C3a/C3b）· 反向自证 6 条真源码破坏 R6–R12 全部被抓且逐字节还原 · 摘除六个零调用入口 · `tool-diag` 接上 `commit` 节（链只读面不再停 test-only）|
+| U2 批次② freight + commission | **v2.194.0** | `engines/commission.js` + `engines/freight.js` + `tests/s3-u2-v2195.js` | **39 / 0** | 两条探针实测真病（`commission` 调 `org.transfer` 只给 4 实参 ⇒ 恒 `bad-resource` 却记 settled；`canAfford` 参数错位 ⇒ `reward>0` 的委托建不出来）· **时效判据第三代口径**：`store.lastNested` 里记 `seq`（初版墙钟毫秒 / 二代 `txStat.count` 都判不出「何时写的」）· 反向自证 13 条 R13–R25 全部被抓 · 自证当场补两处专锁缺口（A6d/A6e、B6/B7/B8）|
+| U2 批次③ agency + investigation | **v2.194.0** | `engines/agency.js` + `engines/investigation.js` + `tests/s3-u3-v2196.js` | **39 / 0** | 四条探针实测真病（`plan.current` 只带 `seq` 而本模块读 `planRow.step` ⇒ 恒 `no-step` 而「反馈闭环」100% 空转 / 回执 id 写在 `id` 而本模块读 `r.actId` ⇒ 恒 `no-act-row` / `_agencyProcessed` 全库无写入方 ⇒ 回执永不消化 / 消化与结算不同生共死）· `no-act-id` 为新增**形状读数码**（标准 boot 不可达，登记死表）· 报价凭印象的利得栏已如实登记 |
+| U2 批次④ aftermath + story-choice | **v2.194.0** | `engines/aftermath.js` + `engines/story-choice.js` + `tests/s3-u4-v2197.js` | **52 / 0** | 五条探针实测真病 + 一条跨模块真半写（`repair` 报 `repaired` 而 `region.lane.blocked` 仍 true）· 本条最值得记的是**把越改越乐观的推断回退**（照抄批次③ 加的两个自证槽实测恒不可达 ⇒ 删除并回退三处读数到实测值）· **同批抓到挂载面真缺陷**：四把锁 `runAll` 不转发（形式挂载 = 假绿）⇒ 一并改逐条转发；②③④ 三把孤儿 ⇒ 挂进 run.js U2 节 |
+| U2 批次⑤ world-blueprint + world-seed | **v2.195.0** | `core/commit.js` + `engines/world-blueprint.js` + `engines/world-seed.js` + `engines/tool-diag.js` + `tests/s3-u5-v2198.js` | **88 / 0** | 五条探针实测真病（链内写后读看不见本链实体 / 同链重复登记去重失效 ⇒ 同一份存两份 / 链上不报在途 / **跨层半写**（世界一格未动而机制已写 settingsBus）/ 机制失败被 `catch(err){}` 吞掉 ⇒ 回执照样 `ok:true`）· `commit` 导出面 **15 → 17**（`effect` / `pending`，两个新读口各有产品消费者 `tool-diag`）· `LIMITS_EFFECT = {LIST:8}` / `CHAIN_FAULTS` 14 项 / `effectMiss` · **拒收码 811 = 见证 536 / 死表 49 / 基线 226**，三面复算 **723 / 34 / 54**（归因由逐文件回退实测）· refs **5467 → 5476** / 成员 **2554 → 2556** · 死子面 856 不变（新导出各有真消费者）· 专锁 N 段真源码破坏两向自证、真源逐字未变 · **注释纪律自纠**：`run.js` 面数归因注释初版系编造，当场用实测重写 |
 
 U9 的交付口径（按本文件开头那套验收标准逐条应答，不靠「文件存在」）：
 

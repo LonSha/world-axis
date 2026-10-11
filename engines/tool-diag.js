@@ -2713,6 +2713,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
    *   链是**进程态编排**（不开开关、不进注册表），它的读数只在进程里有 —— 因此更需要一个
    *   当着人面把它答出来的地方：跑过几条链、提交/中止各几笔、哪几个失败码被触发过、
    *   此刻有没有链开着、以及本面**按什么口径算、哪几条边界是硬编码的**（自证）。
+   *   v2.195.0（U2 批次⑤）：本节再接上 `effect` / `pending` 两个新读面（同上口径 ——
+   *   「跨层副作用做没做到」必须在产品面上答得出来，不能只活在专锁里）。
    *   为什么必须有它：`chainStat` / `chainSelfCheck` 这两个读面此前**只有测试在调**，
    *   生导出冻结门禁当场报「新增死导出 [test-only]」。诊断面是它们的产品消费者 ——
    *   与本仓 playtime 的取用表同一条纪律：只导出不消费，等于没交付。
@@ -2732,7 +2734,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         faultCodes: (st.faultCodes || []).slice(),
         faults: Object.assign({}, st.faults || {}),
         selfCheckOk: !!sc.ok, selfCheckFailed: (sc.failed || []).slice(),
-        active: (typeof WA.commit.active === 'function') ? WA.commit.active() : null
+        active: (typeof WA.commit.active === 'function') ? WA.commit.active() : null,
+        // v2.195.0（U2 批次⑤）：跨层副作用面 —— 「世界装成了」与「世界装成的前提做到没有」
+        //   在这里分开报。`pending()` 里那几条是**已经做过、但链没提交**的（如实列出，不自动重做：
+        //   机制开关是全局的，自动重做等于把一个聊天的配置写到所有聊天上）。
+        effects: (function () {
+          if (typeof WA.commit.pending !== 'function') return null;
+          const p = WA.commit.pending();
+          return { pending: p.count, cap: p.cap, items: (p.items || []).slice(0, 8) };
+        }())
       };
     }, { error: 'commit 节采集失败' });
   }

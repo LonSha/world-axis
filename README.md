@@ -67,7 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.193.0）
+## 构建与验收（当前版本 v2.195.0）
 
 v2.173.0（TX4b）— TX4/TX6/TX7/TX8/TX9 五模块面板接线（渲染 + 绑定 + 登记三面同步）+ 六模块骨架登记补齐（骨架声明 / `__BOUNDED_CAPS` / `evict.SITES` 三段式）+ 两处预存失败收敛 — TX 五张专锁 42/49/44/49/46 全 0 失败。
 
@@ -114,7 +114,7 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（130 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（132 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
@@ -145,6 +145,22 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 <b>八条否定式边界</b>：① 默认关；② choose 记账 ≠ 世界兑现（三段可分离）；③ ops 必须经 rehearsal.preview 白名单；④ 状态变了重新预演；⑤ 不把 rehearsal diff 直接写 live store；⑥ 过期/未知/不可比较分别显示；⑦ review 只读不写；⑧ 不凭空造 ops。
 <b>实测读数</b>：module-registry-gate 文件 <b>184</b> / 命名空间 <b>192</b> / 装载期边 <b>86</b> / 调用期引用 <b>170</b>；拒收码 <b>738 码（见证 481 / 死表 29 / 基线 228）</b>；module-cycle-gate-v2107 pass(65)。
 <b>专锁 <code>tests/s3-tx4-v2168.js</code> 42 / 0</b>。冒烟脚本 <code>tools/tx4_smoke.js</code> 13/13。
+<b>v2.195.0</b> — <b>U2 批次⑤：world-blueprint + world-seed 接入统一原子提交链 + `core/commit.js` 的跨层副作用面</b>（<b>第二批优化线第三批</b>：把「世界装成了」与「世界装成的前提做到没有」拆成两张读数表）。
+<b>它治什么</b>：`world-blueprint.importBlueprint` 的机制配置段（<code>setSettings</code>）<b>不落 draft</b>，随不了链的原子性 —— 链里导入一张蓝图、随后整链中止，世界上人 / 地 / 势力全 0（与链一致），而机制开关<b>已经写进 settingsBus</b>：同一刻「这个世界没装成」与「这个世界机制已改了」两个互斥事实同时成立。旧口径的 <code>defer</code>（世界提交后可补做的<b>通知面</b>）治不了它 —— 推迟机制等于让世界带着没生效的机制先落地，那是另一种半写。
+<b>交付物</b>：<code>core/commit.js</code> 新增 <code>effect(chainObj, kind, fn)</code> / <code>pending()</code> 两读口（<b>导出面 15 → 17</b>）、<code>LIMITS_EFFECT = { LIST: 8 }</code>、<code>CHAIN_FAULTS</code> 14 项（新增 <code>bad-effect</code> / <code>chain-effects-full</code>）、<code>markPending()</code>（链中止时把已做未提交的副作用推进有界待办，<b>不自动重放</b> —— 机制开关按浏览器全局存，自动重做等于把一个聊天的配置写到所有聊天）、链回执回带 <code>effects</code> / <code>effectMiss</code>；<code>engines/world-blueprint.js</code> 的读口链上改查链草稿、写口三态如实标注（<code>chain:true/persisted:false/projected:true</code>）、机制段改 <code>{applied, refused, failed}</code> 三栏（链上经 <code>WA.commit.effect</code> 逐项记账，失败额外 <code>commit.step</code> 并写本模块 <code>faults</code>）；<code>engines/world-seed.js</code> 同型接入（明确<b>不动</b> <code>initConfirm</code> —— 初始化是「开新局」，本质是顶层操作）；<code>engines/tool-diag.js</code> 的 <code>commit</code> 节接上两个新读口（<b>各有产品侧真消费者</b>，不停在 test-only）。
+<b>一条必须分列的码名纪律</b>：<code>effects-full</code>（aftermath 的<b>世界面</b>效果账容量，不可达死表）与 <code>chain-effects-full</code>（commit 的<b>链面</b>副作用容量，真可达见证）<b>必须是两个码名</b> —— 重名会让见证集与死表集相交 ⇒ 恒等式差 -1。一个执行点一个码名。
+<b>专锁 <code>tests/s3-u5-v2198.js</code> 88 / 0</b>（A 跨层副作用面 24 / B world-blueprint 五病 + 跨层半写 + 谎报分栏 / C world-seed 同型 + <code>initConfirm</code> 不动 / D 顶层与嵌套三态 + 导出面与版本 / N 真源码破坏负控制：破坏两模块 <code>chainDraft</code> 读口 ⇒ 写后读与去重同款判据当场翻假并复现「同一份存两份」，破坏 <code>effectMiss</code> 累计 ⇒ <code>effectMiss=2</code> 翻成 0，真源逐字未变）。专锁按批次①–④ 同规挂进 <code>tests/run.js</code> 的 U2 节，<code>runAll</code> <b>逐条真转发</b>（批次④ 抓到过的「形式挂载 = 假绿」不再重演）；<code>orphan-lock-v2750</code> 复跑 pass（孤儿回 <b>0</b>）。
+<b>实测读数</b>：拒收码门禁 <b>811 = 见证 536 / 死表 49 / 基线 226</b>（产品文件 218）；<code>reject-recovery</code> 三面复算 <b>811 = 拒收 723 / 成功 34 / 判不出 54</b>（归因由<b>逐文件回退实测</b>得出：退 <code>core/commit.js</code> ⇒ 809 = 721/34/54；退 <code>engines/agency.js</code> ⇒ 810 = 722/34/54）；散装读数 <b>refs 5467 → 5476</b>（world-blueprint +5 / world-seed +2 / tool-diag +2），成员 <b>2554 → 2556</b>；死子面 <b>856 不变</b>（两个新导出各有真消费者 —— 退任一侧即当场报「新增死导出 857」）；<code>module-cycle-gate-v2107</code> pass(65) / <code>readings-v2106</code> pass(61) / <code>settle-v2830</code> pass(55) / <code>version-surface-gate-v2185</code> pass(14)。
+<b>本版一条自纠</b>：<code>tests/run.js</code> 那处「面总数 804 → 811」的归因注释初版<b>写的是凭印象编的算式</b>，当场用 <code>node -e</code> 现场复算 + 逐文件 <code>git show HEAD:</code> 回退两条通道校正后重写 —— <b>注释里的算式与判据的输入面必须同源</b>。
+
+<b>v2.194.0</b> — <b>U2 批次①②③④：九个 TX 模块接入统一原子提交链（四批合版）</b>（<b>第二批优化线第三批</b>：把「跨模块业务链」从「各写各的顶层事务」改成「同链一次提交」）。
+<b>链的第一个真实产品消费者</b>：<code>operations.disburse</code> 自己开链 —— 跨模块转账（<code>org.transfer</code>）与本地记账同链一次提交，治好「钱出去了、账上没记」的两笔顶层事务半写；链内次序固定为<b>先记账（无副作用）→ 后转账（有副作用）</b>，免得「目标账找不到」时转账流水已经写过（那类副作用链撤不回）。
+<b>四批各自的正靶全是探针实测的真病（不是阅读推断）</b>：① <code>diplomacy</code> 的在途写口嵌在外层事务里跑时，世界写入随外层提交、返回值却照样 <code>ok:true</code> ⇒ 链被拒时调用方拿着一句「拨付成功」而世界一格没动；② <code>commission.settle</code> / <code>cancel</code> 调 <code>org.transfer</code> 只给 <b>4 个实参</b>（真签名 6 参）⇒ 恒 <code>bad-resource</code>，却被读成 <code>r.ok !== false</code> ⇒ <b>转账从未发生，合约照样记 settled、回执照样报 <code>paid:true</code></b>；<code>commission.create</code> 的 <code>canAfford</code> 参数错位 ⇒ 恒 false ⇒ 任何 <code>reward&gt;0</code> 的委托都建不出来；③ <code>agency.schedule</code> 读 <code>planRow.step</code> 而回执只带 <code>seq</code> ⇒ 恒 <code>no-step</code>（「行动反馈闭环」100% 空转）；<code>processReceipts</code> 读 <code>r.actId</code> 而回执把 id 写在 <code>id</code> 上 ⇒ 恒 <code>no-act-row</code>；<code>!_agencyProcessed</code> 是全库无人写的只读字段 ⇒ 回执永不消化；<code>investigation.reveal</code> 三写半写；④ <code>aftermath.repair</code> 报 <code>{status:'repaired'}</code> 而 <code>region</code> 的 <code>lane.blocked</code> 仍为 <code>true</code>（「效果已修好」与「这条路仍然不通」两个互斥事实同时挂着）；<code>story-choice</code> 链级半写。
+<b>技术主线 · 时效判据第三代口径</b>：初版用墙钟毫秒判新旧（测试冻结时钟下同毫秒连开事务给出<b>相等</b>读数 ⇒ 旧读数被误判成本次的）；二代改用 <code>store.txStat().count</code>（无关事务会推进它，同样判不出「<code>lastNested</code> 何时写的」）；真源补齐为 <code>store</code> 在 <code>lastNested</code> 里记 <code>seq</code>（本笔嵌套事务的序号），消费方按 <code>ln.seq &lt; n0 + 1</code> 判新旧。
+<b>专锁四把</b>：<code>tests/s3-u2-v2194.js</code> 57 / 0、<code>tests/s3-u2-v2195.js</code> 39 / 0、<code>tests/s3-u3-v2196.js</code> 39 / 0、<code>tests/s3-u4-v2197.js</code> 52 / 0；反向自证共 19 条真源码破坏（R6–R25）全部被抓且逐字节还原。
+<b>同批抓到的两类真缺陷（比孤儿更隐蔽）</b>：① <b>形式挂载 = 假绿</b> —— 四把锁导出的 <code>runAll</code> 不接参数、不转发，而 <code>run.js</code> 的 <code>runLock</code> 做的是 <code>require(spec)[m](assert)</code> ⇒ 锁挂上了也跑了，但<b>锁红了全量回归照样绿</b>；② <b>孤儿</b> —— ②③④ 三把锁交付时只有裸脚本入口，<code>orphan-lock-v2750</code> 的 [B] 当场报 <code>实 3</code>。「独立 <code>node</code> 能跑通」不等于「进了回归」，<b>挂载与转发是两件事</b>。
+<b>本批最值得记的一条纠错</b>：照抄批次③ 为两模块加了两个自证槽，专锁首跑即实测该点位<b>恒不可达</b>（读口与写口同层同源）⇒ 按本仓「不留看起来会被用的出口」口径删除，并把三处被乐观改动的读数<b>回退到实测值</b>。留痕待查的不是槽，是那份越改越乐观的推断。
+
 <b>v2.193.0</b> — <b>U1 拍引擎家族的统一运行门面（归一编排，不造真源）</b>（<b>第二代优化线第二批</b>：四个拍引擎此前各有一套形状不同的调用面，三处消费方各自 <code>if-else</code> 猜形状，且<b>各自猜一遍「这个码该怎么办」</b>—— U5 立那张表正是为此）。
 <b>U1 它治什么</b>：<code>beat-report</code>（拍报告）/ <code>plan-audit</code>（计划审计）/ <code>beat-ledger</code>（拍台账）/ <code>gen-gate</code>（生成闸门）四者都是「拍」这一层的闸门，但出口形状各不相同（<code>report</code> 返 <code>verdict</code>、<code>audit</code> 返三态、<code>plan</code> 返台账行、<code>gate</code> 返闸门结论），谁调谁就得知道「这家的返回体长什么样」。本版把<b>九条调用编成单一入口</b>，返回体归一到 <code>{ ok, engine, op, reason, recovery, fault, detail, wait, allowed, data }</code> —— <b>原体一字不改地挂在 <code>data</code> 上</b>（门面不是过滤器）。
 <b>六个主口</b>：<code>status()</code>（谁在场 / 谁开着 / 是否全关）、<code>run(op, ctx)</code>（统一入口，<code>ctx</code> 按 <code>OPS[op].take</code> 取名原样透传）、<code>blocked()</code>（本刻谁在卡，读各引擎 <code>stat().lastReason</code> 汇成一句话）、<code>view()</code> / <code>buildBlock()</code> / <code>diagnose()</code>，外加 <code>getSettings</code> / <code>setSettings</code> / <code>stat</code>。<code>OPS</code> 表 <b>9 个 op</b>：<code>report</code> / <code>audit</code> / <code>equivalent</code> / <code>plan</code> / <code>land</code> / <code>claim</code> / <code>transition</code> / <code>gate</code> / <code>record</code>；<code>ENGINES</code> 4 员、<code>BLOCK_ENGINES</code> 2 员（<b>只有 <code>beatReport</code> / <code>genGate</code> 产注入块</b>）。

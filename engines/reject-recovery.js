@@ -184,7 +184,13 @@
     'narrative-only': { out: true, why: '组织数值只有叙事档，是命中结果不是拒收' },
     'no-act-row': { kind: 'request-setup', why: '找不到对应 act 行：先把该行动登记上' },
     'no-stale-subkeys': { out: true, why: 'changed:false —— 无事可做，非拒收' },
-    'no-step': { kind: 'request-setup', why: '准备工作：这步不存在，先建步' },
+    // v2.195.0（U2 批次⑤）：`no-step` 从判不出面**迁到拒收面** —— 批次③ 给
+    //   engines/agency.js 加了一处带 `ok:false` 的同码返回（plan.advance 的显式拒收），
+    //   而括号配对判据是「只要有**一处**落在 ok:false 对象里即拒收面」，故它此刻已是拒收码。
+    //   它在拒收面上由规则表归 `request-setup`（token `no` / `step` 命中该档词表），
+    //   本条登记随之撤销 —— 留在判不出面会让 A7（快照与登记键集逐一对应）当场报红。
+    'no-act-id': { kind: 'request-setup', why: '回执连 id 都没有：先把该行动登记成行再送结算' },
+    'step-threw': { kind: 'retry-same-input', why: '某一步抛错（世界未提交）：异常多为瞬时，同输入再来一次' },
     'no_sources': { kind: 'adjust-input', why: 'valid:false，一个引用源都没有' },
     'not-enabled': { out: true, why: '复活机制未启用，属内部开关态' },
     'not-in-office': { out: true, why: 'known:true 的裁决结果：人不在岗' },
@@ -226,7 +232,7 @@
     'bad-behavior', 'bad-blueprint', 'bad-bp-keys', 'bad-bp-ver', 'bad-budget', 'bad-cap',
     'bad-chain', 'bad-channel', 'bad-char', 'bad-choice', 'bad-conflict', 'bad-coord',
     'bad-cost', 'bad-countdown', 'bad-defer', 'bad-delta', 'bad-draft', 'bad-due',
-    'bad-enum', 'bad-env', 'bad-every', 'bad-faction', 'bad-factor', 'bad-fail-policy',
+    'bad-effect', 'bad-enum', 'bad-env', 'bad-every', 'bad-faction', 'bad-factor', 'bad-fail-policy',
     'bad-fallback', 'bad-fn', 'bad-form', 'bad-format', 'bad-gear', 'bad-guarantor',
     'bad-id', 'bad-json', 'bad-kind', 'bad-lane', 'bad-layer-or-key', 'bad-lens',
     'bad-level', 'bad-load', 'bad-method', 'bad-minutes', 'bad-motive', 'bad-name',
@@ -243,7 +249,7 @@
     'bad-weight', 'bad-who', 'bad-word', 'band-cap', 'beat-order-locked', 'below-threshold',
     'blank', 'blocked', 'blocked-delivered', 'blueprint-absent', 'bottom', 'branches-full',
     'branchtree-absent', 'breaches-full', 'bridge-absent', 'budget-exhausted', 'build-throw', 'burst',
-    'busy', 'cannot-afford', 'capacity', 'cases-full', 'chain-terminal', 'chains-full',
+    'busy', 'cannot-afford', 'capacity', 'cases-full', 'chain-effects-full', 'chain-nested', 'chain-terminal', 'chains-full',
     'change-not-applied', 'checksum-mismatch', 'choose-failed', 'claimed-by-other', 'clear-throw', 'closed',
     'clues-full', 'coalesced', 'conflicts-unresolved', 'consume-failed', 'contract-mismatch', 'contracts-full',
     'contrast-failed', 'contrast-thrown', 'crowd', 'cycle', 'dangling-ref', 'deals-full',
@@ -286,7 +292,7 @@
     'no-perf-trace', 'no-plan', 'no-preview', 'no-proposal', 'no-reading', 'no-receipt',
     'no-receipt-face', 'no-relation-face', 'no-result', 'no-rotation', 'no-rules', 'no-scene',
     'no-sections', 'no-seed', 'no-session', 'no-shadow', 'no-signal', 'no-snapshot',
-    'no-stages', 'no-steps', 'no-storage', 'no-store', 'no-story-clock', 'no-such-experience',
+    'no-stages', 'no-step', 'no-steps', 'no-storage', 'no-store', 'no-story-clock', 'no-such-experience',
     'no-such-project', 'no-such-vol', 'no-tape', 'no-templates', 'no-th', 'no-time-word',
     'no-trace', 'no-usable-keys', 'no-view', 'no-volume', 'non-finite', 'non-monotonic',
     'non-positive-delta', 'none', 'not-a-function', 'not-a-number', 'not-a-party', 'not-a-string',
@@ -305,7 +311,7 @@
     'preview-throw', 'price-out-of-band', 'probe-threw', 'produce-failed', 'project-closed', 'project-throw',
     'projects-full', 'proposals-full', 'purpose-changed', 'quiet-period', 'rand-absent', 'rand-unavailable',
     'read-back-failed', 'read-failed', 'readback-failed', 'receipt-failed', 'receipt-threw', 'reconcile-throw',
-    'record-failed', 'recording', 'redesign-exhausted', 'rehearsal-absent', 'relation-absent', 'relation-not-authorized',
+    'record-failed', 'recording', 'redesign-exhausted', 'refund-failed', 'rehearsal-absent', 'relation-absent', 'relation-not-authorized',
     'relation-off', 'relation-threw', 'remove-threw', 'revoked', 'road-closed', 'road-crowded',
     'role-taken', 'roster-throw', 'round-not-recorded', 'route-blocked', 'routes-full', 'rows-full',
     'rumor-absent', 'same-gear', 'same-layer', 'same-person', 'sandbox-failed', 'sandbox-throw',
@@ -315,7 +321,7 @@
     'short-input', 'short-stock', 'shortfall', 'slots-exhausted', 'source-cap', 'source-threw',
     'stage-off', 'stage-out-of-range', 'stage-skip', 'staged-still-present', 'stale', 'stale-base',
     'stale-baseline', 'stale-chat', 'stale-epoch', 'stale-event', 'stale-preview', 'stale-proposal',
-    'stale-rev', 'stale-round', 'stale-step', 'step-running', 'step-too-large', 'still-in-transit',
+    'stale-rev', 'stale-round', 'stale-step', 'step-running', 'steps-full', 'step-too-large', 'still-in-transit',
     'storage-unavailable', 'store-', 'store-absent', 'store-fail', 'store-unavailable', 'suppressed-full',
     'sweep-throw', 'tape-open', 'tape-version-mismatch', 'tape-without-values', 'text-too-short', 'theme-absent',
     'theme-refused', 'theme-throw', 'thread-terminal', 'threshold-unmet', 'threw', 'throw',
@@ -351,7 +357,7 @@
     'condition-unmet', 'corrupt-overflow', 'crisis', 'diag-idle', 'distorted', 'duty-off',
     'empty-string', 'faithful', 'fidelity-off', 'folded_too_small', 'high-vigilance',
     'length-or-empty', 'manual', 'missing-target', 'narrative-only', 'no-act-row',
-    'no-stale-subkeys', 'no-step', 'no_sources', 'not-enabled', 'not-in-office', 'not-on-chain',
+    'no-act-id', 'no-stale-subkeys', 'no_sources', 'not-enabled', 'not-in-office', 'not-on-chain', 'step-threw',
     'nothing-recorded', 'off-duty', 'on-duty', 'orphan-recovery', 'over_budget', 'pending_dropped',
     'pinned_over_budget', 'plan-unavailable', 'prerequisite-open', 'ready', 'recorded',
     'registry-missing', 'resource-missing', 'restore-failed', 'revivable', 'schedule',
@@ -469,7 +475,7 @@
       && Object.keys(ARTIFACTS).every(function (k) { return !!ARTIFACTS[k]; });
     const bad = Object.keys(checks).filter(function (k) { return !checks[k]; });
     return {
-      ok: !bad.length, version: '2.192.0', checks: checks, failed: bad,
+      ok: !bad.length, version: '2.195.0', checks: checks, failed: bad,
       counts: c,
       lines: [
         '六档各配一句可执行的话（无 ignore、不出现「忽略」说法）',
@@ -497,6 +503,6 @@
     }
   };
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/reject-recovery.js', { kind: 'engine', ver: '2.192.0' });
+    WA.registerModule('engines/reject-recovery.js', { kind: 'engine', ver: '2.195.0' });
   }
 })();

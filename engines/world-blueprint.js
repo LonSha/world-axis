@@ -411,19 +411,65 @@
   }
 
   // ── 库（蓝图库：跨会话要留下的世界资产）──────────────────────
+  // ══ U2 批次⑤（v2.195.0）：统一原子提交链接入面 ════════════════════════════════
+  //   正靶全部**探针实测**（`/tmp/probe_u5b.js` / `/tmp/probe_u5c.js`，不是阅读推断）：
+  //     ① 链内写后读看不见本链实体：链上 save() 成功、提交后世上确有它，而链内立刻 get(id)
+  //        ⇒ `unknown-blueprint`（读口走 `store.get()` 的**已提交快照**）。
+  //     ② **同一链内重复登记判据失效**：链上两次同签名 save 都报 `ok:true` ⇒ 提交后同一份蓝图
+  //        存了两份（顶层同样输入是被 `duplicate-blueprint` 拒的）。
+  //     ③ 链上写入不报在途：回执只有 `ok:true`。
+  //     ④ **跨层半写**（C1 实测）：链里 `importBlueprint` 之后整链中止 ⇒ 世界上人 / 地 / 势力
+  //        全 0（与链的原子性一致），而蓝图 `mech` 那一段的 `setSettings` **已经写进 settingsBus**
+  //        （实测 libCap 3 → 7）。同一刻「这个世界没装成」与「这个世界机制已改了」同时成立。
+  //     ⑤ **谎报**（C2 实测）：`setSettings` 抛错被 `catch (err) {}` 静默吞掉，世界照装、回执
+  //        `{ok:true, installed:{…}}`，而机制一行没生效；`stat().faults` 也看不出（实测 `{}`）。
+  //   修法：读面在链上改查链草稿；写口三态报到；mech 那一段**逐项如实登记**（applied / refused /
+  //        failed 三栏），并在链上经 `commit.effect` 记账 —— 世界装成的前提先记账、失败分得开、
+  //        已做未落进待办（`WA.commit.pending()`）。
+  function chainDraft() {
+    var inf = (WA.commit && typeof WA.commit.inflight === 'function') ? WA.commit.inflight() : null;
+    return (inf && inf.draft) ? inf.draft : null;
+  }
+  /** 链内读面：链里有草稿就查这一份（本链刚写的那一行就在里面）。 */
+  function bucketRead(root) { var d = chainDraft(); return bucket(d || root); }
+  function listRead() { return bucketRead().library || []; }
+  /**
+   * 在途如实标注（三态，口径与 U2 各批逐字一致）：
+   *   链上 ⇒ `chain:true / persisted:false / projected:true`；
+   *   调用方自己的事务里 ⇒ `nested:true / persisted:false`；
+   *   链外顶层 ⇒ `chain:false / persisted:true`。
+   */
+  function markInflight(out, ctx) {
+    var c = ctx || {};
+    out.chain = !!c.onChain;
+    out.persisted = false;
+    if (c.onChain) out.projected = true;
+    if (c.nestedHere) out.nested = true;
+    return out;
+  }
+  /** 写口的三态包装：链上 / 嵌套 / 顶层（顶层逐字带 chain:false / persisted:true）。 */
+  function reportWrite(out, res) {
+    if (res && res.onChain) return markInflight(out, { onChain: true });
+    if (res && res.nested) return markInflight(out, { nestedHere: true });
+    return Object.assign(out, { chain: false, persisted: true });
+  }
+
   function bucket(root) {
     const r = root || state();
     if (!r.blueprint || typeof r.blueprint !== 'object') r.blueprint = { library: [], seq: 0, installed: null };
     if (!Array.isArray(r.blueprint.library)) r.blueprint.library = [];
     return r.blueprint;
   }
-  function listOf() { return bucket().library || []; }
+  function listOf() { return listRead(); }
 
   function doWrite(fn) {
+    // v2.195.0（U2 批次⑤）：链上走链的那一份草稿 —— 这一笔与链里其它写入**同生共死**。
+    const d = chainDraft();
+    if (d) { fn(bucket(d)); return { ok: true, onChain: true }; }
     if (!WA.store || typeof WA.store.transact !== 'function') return { ok: false, reason: 'store-unavailable' };
     const r = WA.store.transact(function (root) { fn(bucket(root)); }, 'worldBlueprint:library');
     if (r && r.ok === false) return { ok: false, reason: r.reason || 'store-unavailable' };
-    return { ok: true };
+    return { ok: true, nested: !!(r && r.deferred === true) };
   }
 
   function save(name, tags, opt) {
@@ -452,7 +498,7 @@
     });
     if (!res.ok) { note(res.reason); return res; }
     _stat.saves++; _stat.lastReason = 'saved';
-    return { ok: true, id: id, name: nm, total: listOf().length, counts: countsOf(bp) };
+    return reportWrite({ ok: true, id: id, name: nm, total: listOf().length, counts: countsOf(bp) }, res);
   }
 
   function tagsOf(tags) {
@@ -475,7 +521,7 @@
     const res = doWrite(function (b) { b.library = b.library.filter(function (x) { return !(x && x.id === k); }); });
     if (!res.ok) { note(res.reason); return res; }
     _stat.lastReason = 'dropped';
-    return { ok: true, id: k, total: listOf().length };
+    return reportWrite({ ok: true, id: k, total: listOf().length }, res);
   }
 
   function list() {
@@ -684,6 +730,7 @@
     const now = clockNow();
     let out = null;
     let innerBlock = null;
+    let mechReport = { applied: [], refused: [], failed: [] };
     const r = WA.store.transact(function (root) {
       const ecIn = targetEmpty(root);
       if (!ecIn.empty) { innerBlock = { ok: false, reason: 'not-empty', what: ecIn.what, atCommit: true }; return false; }
@@ -769,22 +816,54 @@
         });
       });
       // ⑨ 机制配置（只对有该引擎的键生效）
+      //   v2.195.0（U2 批次⑤）：**逐项如实登记**。此前是 `try { … } catch (err) {}` ——
+      //   机制没生效与机制生效在回执上长得一样（探针 C2 实测：抛错被吞、`faults` 还是 {}）。
+      //   三个桶各有明确含义：`applied` 真的写进去了；`refused` 本侧没有这个引擎（如实说，
+      //   不假装成功 —— 「机制没装」与「这个模块不在这份构建里」是两件事）；
+      //   `failed` 引擎在、写的时候抛了（**这是要说出口的那种**）。
+      mechReport = { applied: [], refused: [], failed: [] };
       Object.keys(plan.mech || {}).forEach(function (eng) {
         const e = WA[eng];
-        if (!e || typeof e.setSettings !== 'function') return;
-        try { e.setSettings(Object.assign({}, plan.mech[eng])); } catch (err) {}
+        if (!e || typeof e.setSettings !== 'function') { mechReport.refused.push(eng); return; }
+        const w = Object.assign({}, plan.mech[eng]);
+        // 链上：把这一笔登记成「世界装成的前提」（`commit.effect` 会当场执行并逐条回带）。
+        const onChain = !!chainDraft();
+        const run = function () { e.setSettings(w); return true; };
+        let res = null;
+        if (onChain && WA.commit && typeof WA.commit.effect === 'function') {
+          res = WA.commit.effect(null, 'mech:' + eng, run);
+        } else {
+          try { run(); res = { ok: true }; } catch (err) { res = { ok: false, reason: (err && err.message) || 'threw' }; }
+        }
+        if (res && res.ok) mechReport.applied.push(eng);
+        else {
+          mechReport.failed.push({ engine: eng, reason: (res && res.reason) || 'setSettings-failed' });
+          if (onChain) { try { WA.commit.step(null, { site: 'worldBlueprint:mech:' + eng }); } catch (e2) {} }
+        }
       });
+      // 失败必须进**本模块自己的**故障台账：诊断面据此与「装了几个人」分开报。
+      if (mechReport.failed.length) {
+        const codes = mechReport.failed.map(function (x) { return x.engine; }).join('、');
+        note('mech-failed');
+        _stat.faults['mech:' + codes] = (_stat.faults['mech:' + codes] || 0) + 1;
+      }
       // ⑩ 安装留痕（**持久真源**：跨会话知道这个世界从哪张蓝图来）
       root.blueprint = root.blueprint && typeof root.blueprint === 'object' ? root.blueprint : { library: [], seq: 0, installed: null };
       root.blueprint.installed = { bpVer: t.bpVer, bpSig: t.bpSig, worldKey: plan.worldKey,
         keep: plan.keep, at: now, chatId: t.chatId, previewSeq: t.seq,
+        mech: { applied: mechReport.applied.slice(), refused: mechReport.refused.slice(),
+          failed: mechReport.failed.slice() },
         scene: { id: plan.scene.id, enabled: plan.scene.enabled, zeroed: plan.scene.zeroed },
         counts: plan.counts };
       out = { ok: true, installed: plan.counts, installedAt: now, bpSig: t.bpSig,
         bpVer: t.bpVer, worldKey: plan.worldKey, keep: plan.keep,
         chatId: t.chatId, previewSeq: t.seq,
         scene: { id: plan.scene.id, enabled: plan.scene.enabled, zeroed: plan.scene.zeroed },
-        deps: plan.deps };
+        deps: plan.deps,
+        // v2.195.0（U2 批次⑤）：机制那一段**逐项**回带。「世界装成」与「机制生效」是两件事，
+        //   回执里必须分得开 —— 此前这一段是零读数（装没生效也报 ok:true）。
+        mech: { applied: mechReport.applied.slice(), refused: mechReport.refused.slice(),
+          failed: mechReport.failed.slice() } };
     }, 'worldBlueprint:import');
     if (r && r.ok === false) {
       if (innerBlock) { note('not-empty'); return innerBlock; }
@@ -807,6 +886,9 @@
       scenes: SCENES.map(function (x) { return x.id; }),
       hasPending: !!_pending, hasInstalled: !!ins,
       hasLast: !!_last, lastSig: _lastSig,
+      // v2.195.0（U2 批次⑤）：上一笔导入的机制落位情况（`refused` 是「本侧没这个引擎」，
+      //   不是失败；`failed` 才是「引擎在、写的时候炸了」——两者分栏，不许共用一张读数表）。
+      lastMech: ins && ins.mech ? Object.assign({}, ins.mech) : null,
       installedBpVer: ins ? ins.bpVer : null, installedSig: ins ? ins.bpSig : null,
       retainNote: RETAIN_NOTE,
       limits: limits()
@@ -830,5 +912,5 @@
     targetEmpty: targetEmpty,
     stat: statOf
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-blueprint.js', { kind: 'engine', ver: '2.164.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-blueprint.js', { kind: 'engine', ver: '2.195.0' });
 })();

@@ -280,5 +280,16 @@ a(WA.commit.chainSelfCheck().ok === true, 'C2b 链面自证全真');
 let bad = 0;
 results.forEach(function (r) { if (!r.ok) bad++; console.log((r.ok ? '  ok  ' : '  FAIL') + ' — ' + r.label); });
 console.log('s3-u2-v2195: ' + (results.length - bad) + '/' + results.length + ' 通过');
-module.exports = { results: results, failed: bad, total: results.length, runAll: function () { return { failed: bad, total: results.length }; } };
+module.exports = {
+  results: results, failed: bad, total: results.length,
+  // v2.194.0（U2 批次④ 补登）：**真挂载**（逐条转发注入的断言）。
+  //   此前是 `runAll: function () { return { failed: bad, total: results.length }; }` ——
+  //   不接参数、不转发，只回一个计数对象（调用方也不读）⇒ 锁红了全量回归照样绿。
+  //   run.js 的 `runLock(spec, method)` 注入的是聚合器自己的 assert（v2.75.0 起），
+  //   锁体必须把判据交回去；同族四把（v2194/v2195/v2196/v2197）一并按此形态修正。
+  runAll: function (a) {
+    results.forEach(function (r) { a(r.ok, r.label); });
+    return { failed: bad, total: results.length };
+  }
+};
 if (require.main === module) process.exitCode = bad ? 1 : 0;

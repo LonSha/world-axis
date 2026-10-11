@@ -305,13 +305,51 @@
     return null;
   }
 
+  // ══ U2 批次⑤（v2.195.0）：统一原子提交链接入面 ══════════════════════════════
+  //   三条真病，全部**探针实测**（`/tmp/probe_u5b.js`，不是阅读推断）：
+  //     ① 链内写后读看不见本链实体：链上 save() 成功、提交后世上确有它，而链内立刻 get(id)
+  //        ⇒ `unknown-seed`（读口走 `store.get()` 的**已提交快照**）。
+  //     ② **同一链内重复登记判据失效**：链上两次同签名 save 都报 `ok:true` ⇒ 提交后同一结构
+  //        存了两份，而「同结构不存两份」是本模块的边界（顶层同样输入是被 `duplicate-seed` 拒的）。
+  //     ③ 链上写入不报在途：回执只有 `ok:true`，看不出「这一笔还没提交」——与 U2 各批口径不同。
+  //   修法：读面在链上改查链的那一份 draft（写后立刻读得见），写口按三态如实报到。
+  //   本步**不动** initConfirm：初始化是「开新局」，本质是顶层操作（写的是整局骨架，
+  //   不属于任何跨模块业务链）；链上被调时仍走旧路，由链的事务原子性兜底。
+  function chainDraft() {
+    var inf = (WA.commit && typeof WA.commit.inflight === 'function') ? WA.commit.inflight() : null;
+    return (inf && inf.draft) ? inf.draft : null;
+  }
+  /** 链内读面：链里有草稿就查这一份（本链刚写的那一行就在里面）。 */
+  function bucketRead(root) { var d = chainDraft(); return bucket(d || root); }
+  function listRead() { return bucketRead().library || []; }
+  /**
+   * 在途如实标注（三态，口径与 U2 各批逐字一致）：
+   *   链上 ⇒ `chain:true / persisted:false / projected:true`；
+   *   调用方自己的事务里 ⇒ `nested:true / persisted:false`；
+   *   链外顶层 ⇒ `chain:false / persisted:true`。
+   */
+  function markInflight(out, ctx) {
+    var c = ctx || {};
+    out.chain = !!c.onChain;
+    out.persisted = false;
+    if (c.onChain) out.projected = true;
+    if (c.nestedHere) out.nested = true;
+    return out;
+  }
+  /** 写口的三态包装：链上 / 嵌套 / 顶层（顶层逐字带 chain:false / persisted:true）。 */
+  function reportWrite(out, res) {
+    if (res && res.onChain) return markInflight(out, { onChain: true });
+    if (res && res.nested) return markInflight(out, { nestedHere: true });
+    return Object.assign(out, { chain: false, persisted: true });
+  }
+
   function bucket(root) {
     const r = root || state();
     if (!r.worldSeed || typeof r.worldSeed !== 'object') r.worldSeed = { library: [], seq: 0 };
     if (!Array.isArray(r.worldSeed.library)) r.worldSeed.library = [];
     return r.worldSeed;
   }
-  function listOf() { return bucket().library || []; }
+  function listOf() { return listRead(); }
 
   function tagsOf(tags) {
     const arr = Array.isArray(tags) ? tags : (tags ? String(tags).split(/[,，]/) : []);
@@ -356,7 +394,7 @@
     });
     if (!res.ok) { note(res.reason); return res; }
     _stat.saves++; _stat.lastReason = 'saved';
-    return { ok: true, id: id, name: nm, tags: row.tags, total: listOf().length };
+    return reportWrite({ ok: true, id: id, name: nm, tags: row.tags, total: listOf().length }, res);
   }
 
   /**
@@ -365,10 +403,14 @@
    *   与 eco-audit 那种进程态只读审计面不同口径。它的边界不是「不写」，是「只写自己那一格」。
    */
   function doWrite(fn) {
+    // v2.195.0（U2 批次⑤）：链上走链的那一份草稿 —— 这一笔与链里其它写入**同生共死**，
+    //   不给「链撤了、库还留着」留路（那正是本项要治的半写）。链外/嵌套照旧。
+    const d = chainDraft();
+    if (d) { fn(bucket(d)); return { ok: true, onChain: true }; }
     if (!WA.store || typeof WA.store.transact !== 'function') return { ok: false, reason: 'store-unavailable' };
     const r = WA.store.transact(function (root) { fn(bucket(root)); }, 'worldSeed:library');
     if (r && r.ok === false) return { ok: false, reason: r.reason || 'store-unavailable' };
-    return { ok: true };
+    return { ok: true, nested: !!(r && r.deferred === true) };
   }
 
   function get(id) {
@@ -388,7 +430,7 @@
     });
     if (!res.ok) { note(res.reason); return res; }
     _stat.lastReason = 'dropped';
-    return { ok: true, id: k, total: listOf().length };
+    return reportWrite({ ok: true, id: k, total: listOf().length }, res);
   }
 
   function list() {
@@ -544,7 +586,7 @@
     });
     if (!res.ok) { note(res.reason); return res; }
     _stat.imports = (_stat.imports || 0) + 1; _stat.lastReason = 'imported';
-    return { ok: true, id: id, name: nm, fromChat: clean(pack.chatId, 60), total: listOf().length };
+    return reportWrite({ ok: true, id: id, name: nm, fromChat: clean(pack.chatId, 60), total: listOf().length }, res);
   }
 
   /**
@@ -797,5 +839,5 @@
     initConfirm: initConfirm,
     stat: statOf
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-seed.js', { kind: 'engine', ver: '2.158.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-seed.js', { kind: 'engine', ver: '2.195.0' });
 })();

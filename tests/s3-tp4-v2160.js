@@ -61,7 +61,8 @@ const ANCHOR_REPLAY = 'function replay(opId) {';
 const ANCHOR_STAT = 'function stat() {';
 const ANCHOR_WRITE_RECEIPT = 'function writeReceipt(draft, chain, note, extra) {';
 const ANCHOR_EVICT = "WA.evict.array(draft.commit.receipts, 'commit.receipts', LIMITS.RECEIPTS)";
-const ANCHOR_REGISTER = "WA.registerModule('core/commit.js', { kind: 'core', ver: '2.194.0' })";
+// v2.195.0（U2 批次⑤）：模块自注册版本随模块升版（本批给链面加了跨层副作用两栏）。
+const ANCHOR_REGISTER = "WA.registerModule('core/commit.js', { kind: 'core', ver: '2.195.0' })";
 // 消费方锚点
 const ANCHOR_BS_OPKEY = 'WA.commit.opKey(';
 const ANCHOR_BS_BEGIN = 'WA.commit.begin(';
@@ -148,7 +149,7 @@ function runA(a) {
     [cm, ANCHOR_STAT, 'A9 只读台账 stat 锚点恰中 1 次'],
     [cm, ANCHOR_WRITE_RECEIPT, 'A10 回执写入函数 writeReceipt 锚点恰中 1 次'],
     [cm, ANCHOR_EVICT, 'A11 回执台账有界（evict 站点名与登记表同名）锚点恰中 1 次'],
-    [cm, ANCHOR_REGISTER, 'A12 模块自注册（ver=模块当前版）锚点恰中 1 次']
+    [cm, ANCHOR_REGISTER, 'A12 模块自注册（ver=模块当前版，v2.195.0）锚点恰中 1 次']
   ];
   items.forEach(function (it) {
     const n = countOcc(it[0], it[1]);
@@ -186,10 +187,10 @@ function runA(a) {
   a(cm.indexOf('不可同草稿执行的写口一律走 defer') >= 0, 'v2160-tp4 A28 纪律②「不可同草稿执行的写口一律走 defer」写在文件头');
   a(cm.indexOf('副作用可单独重试，世界写入不重做') >= 0, 'v2160-tp4 A29 纪律③「副作用可单独重试，世界写入不重做」写在文件头');
   // 契约面：commit 命名空间进生成产物（回填 FROZEN2800 的前置条件）
-  a(read('tests/export_contract.txt').indexOf('commit:active begin chain chainSelfCheck chainStat commit defer flush inflight opKey replay retryEffects settle stat step') >= 0,
-    'v2160-tp4 A30 出口面契约串含 commit 十二成员（生成器只收产品代码真引用的 WA.x.y；v2.194.0 链面 chain/chainStat/chainSelfCheck 因接上消费方而入册）');
-  a(read(REL_RUN).indexOf('commit:active begin chain chainSelfCheck chainStat commit defer flush inflight opKey replay retryEffects settle stat step') >= 0,
-    'v2160-tp4 A31 FROZEN2800 已回填 commit 段（与产物逐字同源；v2.194.0 起含链面三读面）');
+  a(read('tests/export_contract.txt').indexOf('commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay retryEffects settle stat step') >= 0,
+    'v2160-tp4 A30 出口面契约串含 commit 十四成员（生成器只收产品代码真引用的 WA.x.y；v2.195.0 的 effect/pending 因接上 tool-diag 消费方而入册）');
+  a(read(REL_RUN).indexOf('commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay retryEffects settle stat step') >= 0,
+    'v2160-tp4 A31 FROZEN2800 已回填 commit 段（与产物逐字同源；v2.195.0 起含 effect/pending 两读面）');
   // 拒收码：八个新码必须在见证表里有可执行见证（不是登记进 base）
   const rv = read('tests/reject-v2780.js');
   ['bad-chain', 'bad-defer', 'deferred-full', 'duplicate-op', 'missing-opid', 'no-receipt', 'settle-failed']

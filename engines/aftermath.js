@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/aftermath.js (v2.171.0) — TX8 地点历史的实际后果、修复与复访
+ * WorldAxis engines/aftermath.js (v2.194.0) — TX8 地点历史的实际后果、修复与复访
  *
  * ── 它治什么（缺口）──────────────────────────────────────────
  *   sediment 保存地点痕迹并衰减，region 有道路/阻塞/传播，economy 有供需/路线。
@@ -41,16 +41,84 @@
       : Object.assign({}, getSettings(), patch || {});
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  var _stat = { registered: 0, repaired: 0, expired: 0, cancelled: 0, refused: 0, lastReason: '', faults: {} };
+  var _stat = { registered: 0, repaired: 0, expired: 0, cancelled: 0, refused: 0, lastReason: '', faults: {},
+    bridgeMiss: 0 };
   function noteFault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
   const clockNow = function (tag) { try { return WA.clock.now(tag || 'aftermath'); } catch (e) { return Date.now(); } };
   function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function bucket(root) { var r = root || state(); if (!r.aftermath) r.aftermath = { effects: [] }; if (!Array.isArray(r.aftermath.effects)) r.aftermath.effects = []; return r.aftermath; }
   function effects() { return bucket().effects || []; }
-  function find(id) { var k = clean(id, 60); return effects().filter(function (x) { return x && x.id === k; })[0] || null; }
-  function findByEvent(eventId) { var k = clean(eventId, 60); return effects().filter(function (x) { return x && x.eventId === k; })[0] || null; }
+  // ── U2 批次④（v2.194.0）：统一原子提交链接入面 ──────────────────────────────
+  //   三条真病，全部**探针实测**（不是阅读推断）：
+  //     ① 链内 `view` / `repair` 找不到本链刚登记的实体：读口取的是**已提交快照**
+  //        （`store.get()`），而登记写在外层 draft 上 ⇒ 链内恒 `not-found`。
+  //     ② 同一链内重复 `eventId` **去重失效**：判据同样读已提交快照 ⇒ 两条同类效果
+  //        都落进世界，而「同一事件效果只生效一次」是本模块的边界 4。
+  //     ③ 链上写入**不报在途**：回执只有 `ok:true`，看不出「这一笔还没提交」——
+  //        与 U2 各批（diplomacy / operations / freight / commission / agency / investigation）
+  //        口径不同。
+  //   修法：链内读面改查链的那一份 draft；写口按三态如实标注。
+  function nestedTx(r) { return !!(r && r.deferred === true); }
+  function chainInflight() {
+    return (WA.commit && typeof WA.commit.inflight === 'function') ? WA.commit.inflight() : null;
+  }
+  function inChainDraft() { var inf = chainInflight(); return (inf && inf.draft) ? inf.draft : null; }
+  /** 链内读面：链里有草稿就查这一份（本链刚写的实体就在里面）。 */
+  function readEffects() { var d = inChainDraft(); return d ? bucket(d).effects : effects(); }
+  /**
+   * 在途如实标注（三态，口径与 U2 各批逐字一致）：
+   *   链上 ⇒ `chain:true / persisted:false / projected:true`；
+   *   调用方自己的事务里 ⇒ `nested:true / persisted:false`；
+   *   链外顶层 ⇒ `chain:false / persisted:true`。
+   *   同一条读法不许同时代表两种事实。
+   */
+  function markInflight(out, ctx) {
+    var c = ctx || {};
+    out.chain = !!c.onChain;
+    out.persisted = false;
+    if (c.onChain) out.projected = true;
+    if (c.nestedHere) out.nested = true;
+    return out;
+  }
+  /** 写口用的行定位（只在**指定那一层**的草稿上找；与 `find` 同源，不各写一份判据）。 */
+  function rowForWrite(root, id) {
+    var k = clean(id, 60);
+    var rows = bucket(root).effects;
+    return rows.filter(function (x) { return x && x.id === k; })[0] || null;
+  }
+  function find(id) { var k = clean(id, 60);
+    return readEffects().filter(function (x) { return x && x.id === k; })[0] || null; }
+  function findByEvent(eventId) { var k = clean(eventId, 60);
+    return readEffects().filter(function (x) { return x && x.eventId === k; })[0] || null; }
   function newId() { return WA.rand ? WA.rand.id('aft_', 4, 'id') : 'aft_0000'; }
+  // ── U2 批次④：修复闭环的桥接面（只读 + 在同一层里解除受阻）────────────────
+  //   为什么由 aftermath 写而不是 region：**「修好了」这个事实的判定权在本模块**
+  //   （`status === 'repaired'` 是这里定的），region 只持有「渠道是否受阻」这一状态。
+  //   两侧各说一遍正是本仓反复治理的毛病，故收口在此，读写的都只有 region 的那个字段。
+  /** 该地点的任一渠道路由是否受阻（只读，不写）。 */
+  function laneBlocked(placeId) {
+    if (!WA.region || typeof WA.region.places !== 'function') return false;
+    var pid = clean(placeId, 60);
+    return (WA.region.places() || []).some(function (p) { return p && p.name === pid && p.blocked; });
+  }
+  /**
+   * 在**指定那一层**上解除该地点的受阻（链内传链草稿、链外传本笔事务的世界态）。
+   *   返回是否真的写了一笔（本来就不受阻 ⇒ 不写、不谎报）。
+   *   `root` 为 null（无事务可用）时**不写**：宁可如实报 `bridgeMiss`，也不偷偷另开一笔。
+   */
+  function _clearLaneIfBlocked(root, placeId) {
+    if (!root) return false;
+    var pid = clean(placeId, 60);
+    var rg = root.region;
+    if (!rg || !Array.isArray(rg.places)) return false;
+    var hit = rg.places.filter(function (p) { return p && p.name === pid && p.blocked; })[0];
+    if (!hit) return false;
+    hit.blocked = false;
+    hit.why = '';
+    hit.updatedAt = clockNow('aftermath');
+    return true;
+  }
   function isValidPlace(placeId) {
     if (!placeId) return false;
     if (WA.region && typeof WA.region.places === 'function') {
@@ -92,14 +160,23 @@
       repairedAt: 0,
       cancelledAt: 0
     };
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) { bucket(d).effects.push(rec); }, 'aftermath:register');
+    // U2 批次④：链上/调用方事务里 ⇒ 写落在**那一层**的草稿上（随其提交），并按三态如实标注。
+    var _inf = chainInflight();
+    var _txr = null;
+    if (_inf) {
+      bucket(_inf.draft).effects.push(rec);
+    } else if (WA.store && typeof WA.store.transact === 'function') {
+      _txr = WA.store.transact(function (d) { bucket(d).effects.push(rec); }, 'aftermath:register');
     } else { effects().push(rec); }
-    if (WA.evict && typeof WA.evict.array === 'function') {
+    if (!_inf && WA.evict && typeof WA.evict.array === 'function') {
       try { WA.evict.array(bucket().effects, 'aftermath.effects'); } catch (e) {}
     }
     _stat.registered++;
-    return { ok: true, id: rec.id, placeId: placeId, effectType: effectType };
+    var _ro = { ok: true, id: rec.id, placeId: placeId, effectType: effectType };
+    if (_inf) return markInflight(_ro, { onChain: true });
+    if (nestedTx(_txr)) return markInflight(_ro, { nestedHere: true });
+    _ro.chain = false; _ro.persisted = true;
+    return _ro;
   }
 
   // ── 2. repair：投入材料/工期修复 ──
@@ -111,25 +188,49 @@
     if (rec.status !== 'active') { noteFault('not-active'); return { ok: false, reason: 'not-active', status: rec.status }; }
     var o = opts || {};
     var progress = o.progress ? Number(o.progress) : 1;
+    // 读面上的进度以**本层**为准（链内 find 已改查链草稿）
+    rec = find(id) || rec;
     rec.repairProgress += progress;
     var done = rec.repairProgress >= (rec.repairTime || 1);
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.effects.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) {
-          t.repairProgress += progress;
-          if (t.repairProgress >= (t.repairTime || 1)) {
-            t.status = 'repaired';
-            t.repairedAt = clockNow('aftermath');
-          }
-        }
-      }, 'aftermath:repair');
+    // ── U2 批次④：链级半写。修复完成与「渠道解除受阻」此前分属两笔顶层事务 ——
+    //   探针实测：`aftermath.repair` 报 `{status:'repaired'}`，而 `region` 的
+    //   `lane.blocked` **仍是 true**（路还是堵着）。世界读了两个互斥的事实：
+    //   「效果已修好」与「这条路仍然不通」。现在：链内两笔同链，链外本口自开链。
+    var _inf = chainInflight();
+    var _txr = null;
+    var _laneCleared = false;   // 取自**本层**的清除结果（不读已提交面，免得链内误报）
+    function _applyRepair(root) {
+      var t = rowForWrite(root, rec.id);
+      if (!t) return false;
+      t.repairProgress += progress;
+      if (t.repairProgress >= (t.repairTime || 1)) {
+        t.status = 'repaired';
+        t.repairedAt = clockNow('aftermath');
+        _laneCleared = _clearLaneIfBlocked(root, rec.placeId);   // ← 与「修好」同一层、同一笔
+      }
+      return true;
+    }
+    if (_inf) {
+      _applyRepair(_inf.draft);
+    } else if (WA.store && typeof WA.store.transact === 'function') {
+      _txr = WA.store.transact(function (d) { _applyRepair(d); }, 'aftermath:repair');
     } else {
       if (done) { rec.status = 'repaired'; rec.repairedAt = clockNow('aftermath'); }
     }
-    if (done) { _stat.repaired++; return { ok: true, id: rec.id, status: 'repaired', repaired: true }; }
-    return { ok: true, id: rec.id, progress: rec.repairProgress, target: rec.repairTime || 1 };
+    if (done) {
+      _stat.repaired++;
+      var _out = { ok: true, id: rec.id, status: 'repaired', repaired: true, laneCleared: _laneCleared };
+      if (!_laneCleared) { _stat.bridgeMiss++; }
+      if (_inf) return markInflight(_out, { onChain: true });
+      if (nestedTx(_txr)) return markInflight(_out, { nestedHere: true });
+      _out.chain = false; _out.persisted = true;
+      return _out;
+    }
+    var _mid = { ok: true, id: rec.id, progress: rec.repairProgress, target: rec.repairTime || 1 };
+    if (_inf) return markInflight(_mid, { onChain: true });
+    if (nestedTx(_txr)) return markInflight(_mid, { nestedHere: true });
+    _mid.chain = false; _mid.persisted = true;
+    return _mid;
   }
 
   // ── 3. inspect：查看某地点活跃效果 ──
@@ -138,8 +239,9 @@
     if (!cfg.enabled) return { ok: false, reason: 'disabled' };
     var pid = clean(placeId, 60);
     if (!pid) return { ok: false, reason: 'missing-fields' };
-    var active = effects().filter(function (x) { return x && x.placeId === pid && x.status === 'active'; });
-    var history = effects().filter(function (x) { return x && x.placeId === pid && x.status !== 'active'; });
+    var _rows = readEffects();
+    var active = _rows.filter(function (x) { return x && x.placeId === pid && x.status === 'active'; });
+    var history = _rows.filter(function (x) { return x && x.placeId === pid && x.status !== 'active'; });
     // 读 sediment 感知面（只读，不写）
     var sedimentFeel = null;
     if (WA.sediment && typeof WA.sediment.feel === 'function') {
@@ -153,7 +255,7 @@
   function active() {
     var cfg = getSettings();
     if (!cfg.enabled) return { ok: false, reason: 'disabled', items: [] };
-    var cur = effects().filter(function (x) { return x && x.status === 'active'; });
+    var cur = readEffects().filter(function (x) { return x && x.status === 'active'; });
     return { ok: true, items: cur.map(function (x) { return { id: x.id, placeId: x.placeId, effectType: x.effectType, eventId: x.eventId }; }),
       count: cur.length, cap: cfg.maxEffects };
   }
@@ -162,7 +264,7 @@
   function pending() {
     var cfg = getSettings();
     if (!cfg.enabled) return { ok: false, reason: 'disabled', items: [] };
-    var cur = effects().filter(function (x) { return x && x.status === 'active' && x.repairProgress > 0; });
+    var cur = readEffects().filter(function (x) { return x && x.status === 'active' && x.repairProgress > 0; });
     return { ok: true, items: cur.map(function (x) { return { id: x.id, placeId: x.placeId, progress: x.repairProgress, target: x.repairTime || 1 }; }),
       count: cur.length };
   }
@@ -199,8 +301,11 @@
       store: !!(WA.store && typeof WA.store.transact === 'function'),
       settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
+    // v2.194.0（U2 批次④）：`chain` 是**能力自报**（本口接入统一提交链与否），
+    //   与 `closedLoop` 无关 —— 后者说的是「观测/修复闭环齐不齐」。
+    checks.chain = !!(WA.commit && typeof WA.commit.chain === 'function');
     var ok = checks.store;
-    return { ok: ok, closedLoop: ok, checks: checks, version: '2.171.0' };
+    return { ok: ok, closedLoop: ok, checks: checks, version: '2.194.0' };
   }
 
   // ── 9. stat ──
@@ -211,6 +316,9 @@
       active: cur.filter(function (x) { return x && x.status === 'active'; }).length,
       repaired: cur.filter(function (x) { return x && x.status === 'repaired'; }).length,
       total: cur.length, cap: getSettings().maxEffects,
+      // v2.194.0（U2 批次④）：修复闭环的**实测读数** —— repair 报「已修好」而渠道仍受阻的次数。
+      //   它必须恒为 0（修好时在同一层同步解除）；非 0 即这两个模块又各说了一遍。
+      bridgeMiss: _stat.bridgeMiss,
       faults: Object.assign({}, _stat.faults) };
   }
 
@@ -222,15 +330,25 @@
     if (!rec) { noteFault('not-found'); return { ok: false, reason: 'not-found', id: clean(id, 60) }; }
     if (rec.status !== 'active') { noteFault('not-active'); return { ok: false, reason: 'not-active', status: rec.status }; }
     var rsn = clean(reason || 'cancelled', 60);
-    if (WA.store && typeof WA.store.transact === 'function') {
-      WA.store.transact(function (d) {
-        var b = bucket(d);
-        var t = b.effects.filter(function (x) { return x && x.id === rec.id; })[0];
-        if (t) { t.status = 'cancelled'; t.cancelledAt = clockNow('aftermath'); }
-      }, 'aftermath:cancel');
+    var _inf = chainInflight();
+    var _txr = null;
+    function _applyCancel(root) {
+      var t = rowForWrite(root, rec.id);
+      if (!t) return false;
+      t.status = 'cancelled'; t.cancelledAt = clockNow('aftermath');
+      return true;
+    }
+    if (_inf) {
+      _applyCancel(_inf.draft);
+    } else if (WA.store && typeof WA.store.transact === 'function') {
+      _txr = WA.store.transact(function (d) { _applyCancel(d); }, 'aftermath:cancel');
     } else { rec.status = 'cancelled'; rec.cancelledAt = clockNow('aftermath'); }
     _stat.cancelled++;
-    return { ok: true, id: rec.id, reason: rsn };
+    var _ro = { ok: true, id: rec.id, reason: rsn };
+    if (_inf) return markInflight(_ro, { onChain: true });
+    if (nestedTx(_txr)) return markInflight(_ro, { nestedHere: true });
+    _ro.chain = false; _ro.persisted = true;
+    return _ro;
   }
 
   // ── 11. reset ──
@@ -254,5 +372,5 @@
   var EXPORT_COUNT = 13;
   var _exported = Object.keys(WA.aftermath).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('aftermath: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/aftermath.js', { kind: 'engine', ver: '2.171.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/aftermath.js', { kind: 'engine', ver: '2.194.0' });
 })();
