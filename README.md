@@ -74,7 +74,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.203.0）
+## 构建与验收（当前版本 v2.204.0）
 
 **两档回归**：日常改动跑**快档**（十几秒，覆盖「动了就会炸」的十二面），收口跑**全量**。
 
@@ -100,12 +100,17 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（40 个，`git ls-files tools/ | wc -l` 为准：
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（41 个，`git ls-files tools/ | wc -l` 为准：
 `agenda_smoke` / `anchor-scan` / `attribution-gate` / `capacity_audit_smoke` / `chronicle_view_smoke` / `consumer-types` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `fact-report` /
 `doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `impact-analysis` / `loose-readings` / `net-audit` / `patch-idempotency` /
-`pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `reject-recovery` / `scan_drift` / `slow-sections` / `smoke` / `sync-e2e-readings` / `sync-hardcoded` /
+`pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `reject-recovery` / `repo-hygiene` / `scan_drift` / `slow-sections` / `smoke` / `sync-e2e-readings` / `sync-hardcoded` /
 `test-audit` / `test-layers` / `tx1_smoke` / `tx2_smoke` / `tx3_smoke` / `tx4_smoke` / `tx6_smoke` / `tx7_smoke` /
 `tx8_smoke` / `tx9_smoke` / `world_health_smoke`）。
+（v2.204.0（第二批）：新入库 `repo-hygiene`（仓库卫生读数与门禁，治「克隆成本这一面从没有判据」）。
+它由 **专锁 `tests/s3-hygiene-v2204.js` + `tests/run.js` 的新增节**两条链引用，属「被门禁链引用」。
+`.git` 是本地状态（`git status` 干净、全量回归全绿，每一项都「通过」），故从没有任何判据看过它 ——
+而现场实测 `.git` 16M 里 5.38 MiB / 499 个是 `.l2s.tmp_obj_*` 残骸（文件系统层留下的半成品对象，
+**`git gc` 也删不掉**）。故索引由 40 → **41**。）
 （v2.204.0（第一批 · v2.204.0）：新入库两个工具 —— `net-audit`（网络外呼点位门禁，出站面的第一道判据）与
 `smoke`（两档回归的快档入口与单一真源）。`net-audit` 由 `smoke` 与专锁两条链引用，`smoke` 由 `tests/run.js` 的
 新增节引用 —— 两者都属「被门禁链引用」。故索引由 37 → **39**。）
@@ -132,12 +137,19 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（140 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（141 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
 - **v2.20.0 及更早**：条目在 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节（本版迁入）。
-<b>v2.204.0</b> — <b>信任面与义务面（两批同版）：出站面门禁 · 两档回归快档 · README 人读锚点 · 缝合来源清点</b>（<b>零产品代码改动</b> —— 交付物全在 <code>tools/</code> 与 <code>tests/</code> 两侧，外加两份文档）。<br>
+<b>v2.204.0</b> — <b>信任面与义务面与卫生面（三批同版）：出站面门禁 · 两档回归快档 · README 人读锚点 · 缝合来源清点 · 仓库卫生判据</b>（<b>零产品代码改动</b> —— 交付物全在 <code>tools/</code> 与 <code>tests/</code> 两侧，外加两份文档）。<br>
+<b>【第三批】仓库卫生读数与门禁 —— 克隆成本这一面（<code>.git</code> 从没有判据）</b>。<br>
+<b>它治什么</b>：本仓**零依赖**（无 <code>package.json</code>、无 <code>node_modules</code>），按理克隆应该很便宜；而 <code>.git</code> 是**本地状态** —— <code>git status</code> 干净、全量回归全绿、每一项都「通过」，于是<b>没有任何判据看过它</b>（<code>product-files.js</code> 的 <code>SKIP_DIRS</code> 把 <code>.git</code> 排掉）。现场实测 <code>.git</code> <b>16M</b>，其中 <b>5.38 MiB / 499 个</b>是 <code>.l2s.tmp_obj_*</code> 残骸（文件系统层留下的半成品对象）—— 这一片<b><code>git gc</code> 也删不掉</b>（它们不是 git 对象）。<br>
+<b>做法</b>：新增 <code>tools/repo-hygiene.js</code>（读数取自<b>git 自己</b>的 <code>git count-objects -vH</code>，不自己遍历 <code>.git/objects</code> —— 那是第二份读数实现，必然与 git 的算法漂移）+ 两条机械可核判据（<code>garbage</code> / <code>loose</code> 各有<b>独立上限</b>、pack 面<b>反空转下限</b>：读数整片塌掉时「没有垃圾」必须是假绿）+ 修法<b>必须对得上病灶</b>（残骸给删除命令，<code>git gc --prune=now</code> 只对松散对象有效），且<b>永不指向 <code>git filter-repo</code></b>（重写历史换不来体积 —— 病灶不在历史里，pack 只 7.79 MiB）。<br>
+<b>⚠ 本批自己踩的三条真缺陷</b>：① <b>单位表不认 <code>bytes</code></b> —— 松散对象为 0 时 git 输出 <code>size: 0 bytes</code>（<b>不是</b> <code>0 B</code>），而「0 个」恰是<b>最健康</b>的状态 ⇒ 第一版读成 <code>null</code>（=「量不到」）、CLI 当场 TypeError 崩、退出码 1（<b>门禁把最好的状态报成崩溃</b>）；② 打印面对 <code>null</code> 无保护；③ <b>修法不分病灶</b>（一律喊 <code>git gc</code>，而残骸删不掉）。三条已修，并各自配了<b>同形负控制原料</b>（<code>0 bytes</code> / 缺格 / 超限）—— 这是「负控制原料必须与真原料同形」的又一次实证：若自证原料只喂 <code>MiB</code>，缺陷会带着绿灯出厂。<br>
+<b>口径（如实登记）</b>：判据<b>不自动回收</b>（<code>--gc</code> 是显式动作，被 <code>require</code> 时不动开发环境，与 <code>hooks.js</code> 的「不自动安装」同规）；<code>.l2s.tmp_obj_*</code> 的<b>产生源未查明</b>（文件系统层现象，非 git 行为），本批只做「量它 + 独立上限 + 指向对的删除命令」，不猜成因；上限是<b>当下快照的宽松值</b>，拦的是下一次跳变、不要求立即归零。<br>
+<b>专锁 <code>tests/s3-hygiene-v2204.js</code> 43 / 0</b>（首跑 38 / 4：三条是接线面未落、一条是「破坏只摘了单位对象没摘正则分支 ⇒ 破坏不可观测」的装置缺陷）：A 段静态契约（真判据三点 / 只读无 <code>--fix</code> / <code>--gc</code> 是显式动作 / 反空转下限 / 本锁恰挂 1 处）· B 段三类原料（健康 / 超限 / 塌陷）· C 段只读不变式 · N 段<b>四组真源码破坏 + 两向自证</b>（N1 摘 <code>bytes</code> / N2 修法退化 / N3 摘下限 / N4 放宽上限）。<br>
+<b>同批</b>：<code>tests/run.js</code> 新增一节（只判接线面）；README 的 <code>tools/</code> 名单 40 → <b>41</b>（名单跟着索引走）。<br>
 <b>【第二批】缝合来源清点表 —— 义务面（attribution）第一道判据</b>。<br>
 <b>它治什么</b>：README 的「缝合来源（机制蓝本）」表列 13 个上游（其中 <code>DlSNlGHT/World</code> 贡献 5 个附加机制面），而末行只有一句「各源项目机制参考（非商业缝合）」加半句无凭据的授权声明 —— <b>这句话此前没有任何判据</b>：没有 LICENSE 文件、没有逐条清点、没有一处说明「每个上游的许可义务核对到什么程度」。读者唯一能做的判断是「相信作者」。同族的失效形态在本仓各面反复现形过（写侧 / 删侧 / 读侧 / 活性面 / 出站面各有门禁），唯独<b>义务面（attribution / license）是零治理</b>：README 加一个上游，九道门禁一条都不响。<br>
 <b>做法</b>：新增 <code>docs/attribution.md</code>（<b>逐条清点表 17 行</b>，每行写明「缝合的是什么 / 来源声明 / <b>许可状态</b> / 下一步」）+ <code>tools/attribution-gate.js</code>（三条判据：README 每个上游必须在清点表里有一条对应行；每条状态词必须在有限词表内、<b>不许留空或写「待定」</b>；行数不得低于下限）。<br>

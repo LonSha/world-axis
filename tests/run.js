@@ -23044,6 +23044,34 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // ④ 专锁（正 / 负两向；N 段四组真源码破坏 + 两向自证）
     runLock('./s3-attribution-v2204.js');
   }
+  section('v2.204.0（第三批）：仓库卫生读数与门禁 —— 克隆成本这一面（`.git` 从没有判据）');
+  {
+    // 本批治的病：`.git` 是**本地状态** —— `git status` 干净、全量回归全绿、每一项都「通过」，
+    //   于是没有任何判据看过它；而现场实测 16M 里有 5.38 MiB / 499 个 `.l2s.tmp_obj_*` 残骸
+    //   （**`git gc` 也删不掉**：它们不是 git 对象，是文件系统层留下的半成品）。
+    // 本节只判**接线面**，功能与边界判据全住专锁（两处不写第二遍）。
+    const hygSrc2204 = fs.readFileSync(path.join(BASE, 'tools/repo-hygiene.js'), 'utf8');
+    const hygReadme2204 = fs.readFileSync(path.join(BASE, 'README.md'), 'utf8');
+    // ① 它是**真判据**：命令行 / require / **自证面**三件齐（本仓对门禁的统一口径）
+    assert(hygSrc2204.indexOf('module.exports') > 0 && hygSrc2204.indexOf('require.main === module') > 0,
+      'v2204c: repo-hygiene 既能在命令行跑、也能被 require（门禁复用同一份复算）');
+    assert(hygSrc2204.indexOf('--self-test') > 0
+      && typeof require(path.join(BASE, 'tools/repo-hygiene.js')).selfTest === 'function',
+      'v2204c: 自证面在场（`--self-test` 与 selfTest() 同源 —— 判据必须能自证）');
+    // ② 两条机械可核的口径都在源码里（体积上限 + 反空转下限）
+    assert(hygSrc2204.indexOf('const MAX_GARBAGE_MB =') > 0 && hygSrc2204.indexOf('const MAX_LOOSE_MB =') > 0
+      && hygSrc2204.indexOf('const MIN_PACK_MB =') > 0,
+      'v2204c: 三个阈值都是源码常量（garbage / loose 各有独立上限 + pack 面反空转下限）');
+    // ③ 只读口径：零写盘、无 --fix、`--gc` 只在显式分支里调
+    assert(hygSrc2204.indexOf('writeFileSync') < 0 && hygSrc2204.indexOf('appendFileSync') < 0
+      && hygSrc2204.indexOf('--fix') < 0,
+      'v2204c: 执行面上零写盘、无 --fix（`--gc` 是显式动作，被 require 时不动开发环境）');
+    // ④ README 的名单与沿革段都跟上了（名单与索引同值由 toolchain-gate 当场核，此处只判接线）
+    assert(hygReadme2204.indexOf('`repo-hygiene`') > 0 && hygReadme2204.indexOf('（41 个') > 0,
+      'v2204c: README 的 tools/ 名单点到它、且计数跟着索引走');
+    // ⑤ 专锁（正 / 负两向；N 段四组真源码破坏 + 两向自证）
+    runLock('./s3-hygiene-v2204.js');
+  }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
   console.log('  ⏱ 超 60s 的节：' + __slowSec119 + ' 个');
