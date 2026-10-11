@@ -218,8 +218,14 @@
     'unreciprocated': { out: true, why: '决策理由（action=wait）' },
     'unregistered-setting': { out: true, why: '存储治理：未注册设置项的清理理由' }
   };
-/* 拒收面冻结快照（v2.192.0 现场实测 717 条）：至少在 `ok:false` 对象里出现过 ——
-   *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。 */
+/* 拒收面冻结快照（v2.197.0 现场实测 723 条）：至少在 `ok:false` 对象里出现过 ——
+   *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
+   *  v2.196.0 收口时本快照**漏同步**（新码 need-receipt / enqueue-threw 未入，三条已随路径删除的
+   *  旧码 no-receipt-face / receipt-failed / receipt-threw 未出）—— 快照 723 条与现场 722 条
+   *  不符，reject-recovery 专锁 B3/B4/C4 三处自 v2.196.0 起一直是红的（每版都被无头回归现形，
+   *  当时只跑了定向锁故未察觉）。本版一并补齐：删三条、加三条（含 Y3 的 slots-full）。
+   *  三条新码的恢复档不写 OVERRIDES —— 规则表已按 token 归好（need-receipt→request-setup /
+   *  enqueue-threw→retry-same-input / slots-full→adjust-input），重复登记会让 A8 与规则表打架。 */
   const REJECT_FACE = [
     'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'adopt-throw',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
@@ -259,7 +265,7 @@
     'duplicate-tick', 'effects-full', 'emotion-word', 'empty', 'empty-blueprint', 'empty-goal',
     'empty-graph', 'empty-input', 'empty-observation', 'empty-path', 'empty-post', 'empty-response',
     'empty-roster', 'empty-round', 'empty-seed', 'empty-surface', 'empty-tape', 'empty-text',
-    'end-failed', 'engine-absent', 'enigma-failed', 'error', 'events-full', 'evidence-full',
+    'end-failed', 'engine-absent', 'enigma-failed', 'enqueue-threw', 'error', 'events-full', 'evidence-full',
     'evolve-key-mismatch', 'evolve-needs-single-key', 'exec-absent', 'exists', 'export-failed', 'export-throw',
     'expr-too-long', 'eye-face-clash', 'fault-handled', 'finished', 'flat-rounds', 'flush-failed',
     'fondness-missing', 'foreign-chat', 'fork-failed', 'frozen', 'future-event', 'gated-off',
@@ -280,7 +286,7 @@
     'missing-route', 'missing-source', 'missing-span', 'missing-stamp', 'missing-steps', 'missing-text',
     'missing-thread', 'missing-title', 'missing-token', 'missing-transit-time', 'missing-trigger', 'missing-user',
     'missing-what', 'missing-who', 'missing-why', 'missing-window', 'missing-with', 'module-absent',
-    'module-missing', 'name-taken', 'need-confirm', 'need-resync', 'need-steps', 'need-unmet',
+    'module-missing', 'name-taken', 'need-confirm', 'need-receipt', 'need-resync', 'need-steps', 'need-unmet',
     'negative-span', 'nested-deferred', 'never-swept', 'no-action', 'no-active-goal', 'no-actor',
     'no-aftermath', 'no-authority', 'no-base', 'no-baseline', 'no-basis', 'no-batch',
     'no-budget', 'no-bytes', 'no-campaign', 'no-candidates', 'no-capacity', 'no-change',
@@ -290,7 +296,7 @@
     'no-localStorage', 'no-merit', 'no-migration', 'no-name', 'no-needs', 'no-negative-step',
     'no-new-remedy', 'no-ops', 'no-options', 'no-outline', 'no-pack', 'no-pending',
     'no-perf-trace', 'no-plan', 'no-preview', 'no-proposal', 'no-reading', 'no-receipt',
-    'no-receipt-face', 'no-relation-face', 'no-result', 'no-rotation', 'no-rules', 'no-scene',
+    'no-relation-face', 'no-result', 'no-rotation', 'no-rules', 'no-scene',
     'no-sections', 'no-seed', 'no-session', 'no-shadow', 'no-signal', 'no-snapshot',
     'no-stages', 'no-step', 'no-steps', 'no-storage', 'no-store', 'no-story-clock', 'no-such-experience',
     'no-such-project', 'no-such-vol', 'no-tape', 'no-templates', 'no-th', 'no-time-word',
@@ -310,7 +316,7 @@
     'places-full', 'plans-full', 'plugin-blocked', 'pool-full', 'pre-violation', 'preview-rejected',
     'preview-throw', 'price-out-of-band', 'probe-threw', 'produce-failed', 'project-closed', 'project-throw',
     'projects-full', 'proposals-full', 'purpose-changed', 'quiet-period', 'rand-absent', 'rand-unavailable',
-    'read-back-failed', 'read-failed', 'readback-failed', 'receipt-failed', 'receipt-threw', 'reconcile-throw',
+    'read-back-failed', 'read-failed', 'readback-failed', 'reconcile-throw',
     'record-failed', 'recording', 'redesign-exhausted', 'refund-failed', 'rehearsal-absent', 'relation-absent', 'relation-not-authorized',
     'relation-off', 'relation-threw', 'remove-threw', 'revoked', 'road-closed', 'road-crowded',
     'role-taken', 'roster-throw', 'round-not-recorded', 'route-blocked', 'routes-full', 'rows-full',
@@ -318,7 +324,7 @@
     'sandbox-timeout', 'save-threw', 'scheduled-elsewhere', 'seats-full', 'sediment-absent', 'seed-throw',
     'self-approve', 'self-cause', 'self-origin', 'self-pair', 'self-parent', 'self-road',
     'settings-bus-absent', 'settle-failed', 'settle-not-here', 'settle-throw', 'shadow-closed', 'shipments-full',
-    'short-input', 'short-stock', 'shortfall', 'slots-exhausted', 'source-cap', 'source-threw',
+    'short-input', 'short-stock', 'shortfall', 'slots-exhausted', 'slots-full', 'source-cap', 'source-threw',
     'stage-off', 'stage-out-of-range', 'stage-skip', 'staged-still-present', 'stale', 'stale-base',
     'stale-baseline', 'stale-chat', 'stale-epoch', 'stale-event', 'stale-preview', 'stale-proposal',
     'stale-rev', 'stale-round', 'stale-step', 'step-running', 'steps-full', 'step-too-large', 'still-in-transit',

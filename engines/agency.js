@@ -42,10 +42,16 @@
     return (c && typeof c.inflight === 'function') ? c.inflight() : null;
   }
   let __opSeq = 0;
+  // ── v2.197.0（G20 形态归一）────────────────────────────────────────
+  //   此处原写 `t = (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now();`。
+  //   它是**合法**的能力守卫，但不是本仓的**时间源形态**：G20 只认「守卫声明 + 同行 fallback」
+  //   与「内联三目」两类，其余一律判成**裸调**（=「判据看不见的形态」）。形态漂移不等于逻辑缺陷
+  //   （v2.190.0 那轮 branch-tree 的 `clockNow_` 同型），但仍该归位 —— 判据看不见的写法，
+  //   下一次真出问题时也照样看不见。归一为声明的守卫，fallback 逐字保留（`Date.now()` 不改）。
+  function wallNow() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
   function nextOpId(prefix) {
     __opSeq++;
-    let t = 0;
-    try { t = (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { t = 0; }
+    const t = wallNow();
     return clean(prefix, 24) + '@' + t + '#' + __opSeq;
   }
   function txCount() { try { return (WA.store && typeof WA.store.txStat === 'function') ? (WA.store.txStat().count || 0) : 0; } catch (e) { return 0; } }

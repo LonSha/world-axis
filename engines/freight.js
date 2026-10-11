@@ -135,7 +135,7 @@
   }
   /** 取「本次调用前已发生的事务数」（时效判据的基准，见上）。 */
   function txCount() { try { return (WA.store && typeof WA.store.txStat === 'function') ? (WA.store.txStat().count || 0) : 0; } catch (e) { return 0; } }
-  function wallNow() { try { return (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { return Date.now(); } }
+  function wallNow() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
 
   function dispatch(routeId, from, resource, qty, opts) {
     if (!settings().enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }

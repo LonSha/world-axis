@@ -180,7 +180,9 @@ function runB(a) {
   //   —— v2.194.0 当期断档未立条目（与 v2.185.0–v2.188.0 那次同型），本条一次补齐三条，
   //   导语 130 → 132，本文件这条同批校正。**同型账已是第十二次**——共性未变：
   //   「同一件事在多处各写一遍，改一处不等于改全」。判据继续钉**精确等值**（防条目被误删）。
-  a(r.facts.readmeEntries === 133, 'docs-archive/B: README 版本历史条目 = 133（实 ' + r.facts.readmeEntries + '）');
+  // v2.197.0 补账：v2.197.0 条目入 README 版本历史，导语 133 → 134，本文件这条同批校正。
+  //   （教训：这条计数每版都要跟 —— 它是「导语里那几个字」与「条目实数」之间的唯一判据。）
+  a(r.facts.readmeEntries === 134, 'docs-archive/B: README 版本历史条目 = 134（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

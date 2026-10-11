@@ -760,6 +760,17 @@ function runWitness(WA) {
     cpReset({ autoEvery: 3 });
     return [Cp.tick().reason];
   });
+  //   v2.197.0（Y3）：`slots-full` —— 手动档满了的**拒收**（不是静默挤出）。
+  //   为什么它是「新增未分类」而不是「存量」：旧口径下手动档满会丢最旧一份并报 ok:true，
+  //   这条码根本不存在。Y3 把它立起来（探针实测：手动 1..4 存到第 4 份时第 1 份无声消失），
+  //   故必须带**可执行见证**——用产品真 API 真把它跑出来，而不是挂一句「应该有」。
+  want('slots-full', 'checkpoints.save：手动档已达 maxSlots ⇒ 拒收并交回现有清单（不替玩家丢档；自动档走环形保留不受此限）');
+  trip('slots-full', function () {
+    cpReset({ maxSlots: 1 });
+    const one = Cp.save('手动甲', { scope: 'global' });
+    if (!one.ok) return [];
+    return [Cp.save('手动乙', { scope: 'global' }).reason];
+  });
   // ── v2.85.0（B2 地域与交通 + B1 人物生活）六个新码 ──
   //   场景**必须记忆化**：这批探针会登记地点（甲/乙/丙）与人物（独1/独2），
   //   重复跑第二次时「甲已登记」「独1 已有承诺」都会改变结论——首跑才对得上，二跑就成了另一个场景。

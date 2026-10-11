@@ -25,12 +25,17 @@ const REL = 'engines/checkpoints.js';
 const PANEL = 'ui/panel.js';
 // 本锁钉住的面板入口（面板必须真调这些导出名）。
 const ENTRY_EXPORTS = ['save', 'list', 'read', 'restore', 'remove', 'compare', 'branch',
-  'exportOne', 'importOne', 'getSettings', 'setSettings', 'stat'];
-// 面板控件（20 静态 + 1 动态）。逐个钉，少一个就是某条路不通。
+  'exportOne', 'importOne', 'getSettings', 'setSettings', 'stat',
+  // v2.197.0（Y3）：新增「只读另开计划」入口 —— 它必须有面板侧真调用方，否则不挂。
+  'branchPlan'];
+// 面板控件（22 静态 + 1 动态）。逐个钉，少一个就是某条路不通。
 const CK_IDS = ['wa-ck-enabled', 'wa-ck-name', 'wa-ck-save', 'wa-ck-list', 'wa-ck-id', 'wa-ck-read',
   'wa-ck-restore', 'wa-ck-remove', 'wa-ck-cmp', 'wa-ck-compare', 'wa-ck-branch', 'wa-ck-fork',
   'wa-ck-max', 'wa-ck-every', 'wa-ck-auton', 'wa-ck-cfg', 'wa-ck-export', 'wa-ck-import',
-  'wa-ck-stat', 'wa-ck-text', 'wa-ck-out'];
+  'wa-ck-stat', 'wa-ck-text',
+  // v2.197.0（Y3）：另开计划的两枚控件（新世界顶层键输入 + 只读计划按钮）。
+  'wa-ck-newkey', 'wa-ck-plan',
+  'wa-ck-out'];
 function readOf(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 
 // ── A 段：静态契约 ───────────────────────────────────────────────────────
@@ -53,7 +58,9 @@ function runA(a) {
   });
   // ④ 接线（不是只渲染）：每个动作按钮都有 handler
   ['#wa-ck-save', '#wa-ck-list', '#wa-ck-read', '#wa-ck-restore', '#wa-ck-remove', '#wa-ck-compare',
-    '#wa-ck-fork', '#wa-ck-cfg', '#wa-ck-export', '#wa-ck-import', '#wa-ck-stat']
+    '#wa-ck-fork', '#wa-ck-cfg', '#wa-ck-export', '#wa-ck-import', '#wa-ck-stat',
+    // v2.197.0（Y3）：另开计划按钮必须真接上（只渲染不接线就是 Y3 要治的「够不着」）。
+    '#wa-ck-plan']
     .forEach(function (sel) { a(pan.indexOf("on('" + sel + "'") >= 0, 'e3v2184/A5: 接线 ' + sel); });
   // ⑤ 分区标题纯文本形态（v2570 的 SEC_RE 不吃内联 span）
   a(pan.indexOf('<div class="wa-sec">存档槽（世界状态槽 · 可命名 / 载入 / 分叉）</div>') >= 0,
@@ -61,13 +68,13 @@ function runA(a) {
   // ⑥ 分工说明（计划原文：界面上要说清「存档槽 = 世界状态槽；全量快照 = 可移植归档」）
   a(pan.indexOf('存档槽不承担聊天存档的职责') >= 0, 'e3v2184/A7: 与全量快照的分工写在界面上');
   a(pan.indexOf('自动快照的开关是') >= 0, 'e3v2184/A8: 「自动档开关是 autoEvery 而非总开关」写在界面上');
-  // ⑦ 守卫表登记（静态 20 + 动态 1）
+  // ⑦ 守卫表登记（静态 22 + 动态 1）
   const diag = readOf('engines/tool-diag.js');
   CK_IDS.forEach(function (id) {
     a(diag.indexOf("'" + id + "'") >= 0, 'e3v2184/A9: tool-diag UI_BINDINGS 登记 ' + id);
   });
   // ⑧ 版本钉
-  a(/VERSION = '2\.(184|185|186|187|188|189|190|191|192|193|194|195|196)\.0'/.test(readOf('index.js')) && ['2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0', '2.191.0', '2.192.0', '2.193.0', '2.194.0', '2.195.0', '2.196.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
+  a(/VERSION = '2\.(184|185|186|187|188|189|190|191|192|193|194|195|196|197)\.0'/.test(readOf('index.js')) && ['2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0', '2.191.0', '2.192.0', '2.193.0', '2.194.0', '2.195.0', '2.196.0', '2.197.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0,
     'e3v2184/A10: 版本钉一致（index.js + manifest）');
 }
 
@@ -86,7 +93,7 @@ function runB(a) {
   const re = /id="(wa-ck-[a-z0-9\-]+)"/g;
   let m;
   while ((m = re.exec(html))) { if (rendered.indexOf(m[1]) < 0) rendered.push(m[1]); }
-  a(rendered.length === 21, 'e3v2184/B3: 真渲染出 21 个存档槽控件（实 ' + rendered.length + '）');
+  a(rendered.length === 23, 'e3v2184/B3: 真渲染出 23 个存档槽控件（实 ' + rendered.length + '）');
   const dg = (WA.toolDiag.UI_BINDINGS || []).filter(function (g) { return g.page === 'tools'; })[0] || {};
   const reg = (dg.ids || []).concat(dg.dynamic || []);
   const miss = rendered.filter(function (x) { return reg.indexOf(x) < 0; });
@@ -164,13 +171,39 @@ function runC(a) {
   a(WA.checkpoints.getSettings().maxSlots <= 24, 'e3v2184/C4: 越界值被夹到区间上界（实 '
     + WA.checkpoints.getSettings().maxSlots + '）');
   WA.checkpoints.setSettings({ maxSlots: 2 });
-  // 超容量 ⇒ 挤出必须报出来（不许静默丢弃）
-  WA.checkpoints.save('甲', {});
-  WA.checkpoints.save('乙', {});
+  // 超容量 ⇒ **拒收且不替玩家丢档**（Y3 v2.197.0 起）。
+  //   旧口径在这里是「第三份被收下 + 最旧那份被挤掉」（挤出有回执）；本版改成拒收后，
+  //   判据锁定的是那句更重的话：**库内一份都不许因为这次保存而消失**。
+  //   判据写法**不假设库是空的**（本段之前同进程可能已有别处写下的档）：先快照库、
+  //   再把它填到上限、再存一份 → 要求 save 前后**库逐字不变**且拒收回执带清单。
+  //   探针实测（`/tmp/probe_y3.js` B 段）旧口径下『手动1』确实没了，而 save 报 ok:true。
+  WA.checkpoints.setSettings({ maxSlots: 8 });
+  while (WA.checkpoints.getSettings().maxSlots - WA.checkpoints.stat().manual > 0) {
+    if (WA.checkpoints.save('填充' + WA.checkpoints.stat().manual, {}).ok !== true) break;
+  }
+  WA.checkpoints.setSettings({ maxSlots: 2 });
+  // 把上限压到 2：库内此刻是 8 份，超额的 6 份**不许被静默清掉**（manualOver 如实报）
+  const over = WA.checkpoints.stat();
+  a(over.manualOver >= 1 && over.manual > 2,
+    'e3v2184/C4b: 上限改小后超额档**不静默清理**（manualOver=' + over.manualOver + ' 如实报出）');
+  // 清到正好 2 份，再试存第 3 份
+  while (WA.checkpoints.stat().manual > 2) WA.checkpoints.remove(WA.checkpoints.list().slots[0].id);
+  while (WA.checkpoints.stat().manual < 2) WA.checkpoints.save('填充x' + WA.checkpoints.stat().manual, {});
+  const libBefore5 = JSON.stringify(WA.checkpoints.list().slots.map(function (s) { return s.id + ':' + s.name; }));
   const r3 = WA.checkpoints.save('丙', {});
-  a(r3.ok === true && (r3.evicted || []).length >= 1,
-    'e3v2184/C5: 超容量时挤出**有回执**（实挤出 ' + (r3.evicted || []).length + ' 份）');
-  a(WA.checkpoints.list().count <= 2, 'e3v2184/C6: 容量真的生效（实 ' + WA.checkpoints.list().count + ' 份）');
+  const libAfter5 = JSON.stringify(WA.checkpoints.list().slots.map(function (s) { return s.id + ':' + s.name; }));
+  a(r3.ok === false && r3.reason === 'slots-full' && (r3.slots || []).length === 2,
+    'e3v2184/C5: 超容量 ⇒ 拒收 slots-full 且把现有清单交回（实 reason=' + r3.reason + '，清单 '
+    + (r3.slots || []).length + ' 份）');
+  a(libBefore5 === libAfter5,
+    'e3v2184/C5b: 拒收前后**库逐字不变**（旧口径会静默挤掉最旧一份并报成功；实差 '
+    + (libBefore5 === libAfter5 ? '无' : '有') + '）');
+  a(WA.checkpoints.list().count >= 2, 'e3v2184/C6: 容量真的生效（实 ' + WA.checkpoints.list().count + ' 份）');
+  // 腾出一格后同一份档能存进去（拒收是**可恢复**的，不是死路）
+  WA.checkpoints.remove(WA.checkpoints.list().slots[0].id);
+  const r3b = WA.checkpoints.save('丙', {});
+  a(r3b.ok === true, 'e3v2184/C5c: 删掉一份后同一份档立刻能存（拒收可恢复，非死路）');
+  WA.checkpoints.setSettings({ maxSlots: 12 });
   // 库落在独立键上（不在世界状态里）
   const st = JSON.stringify(WA.store.get());
   a(st.indexOf('worldaxis_ckpt_v1') < 0 && st.indexOf('存档库') < 0,
@@ -215,7 +248,11 @@ function runN(a) {
     { n: 3, why: 'N3: 面板不再调 branch ⇒ 分支能力维持「零入口」',
       from: 'WA.checkpoints.branch(id, nm, {})', to: 'void nm' },
     { n: 4, why: 'N4: 分区标题被删 ⇒ 控件并进上一个分区（v2570 的那类分组失效）',
-      from: '<div class="wa-sec">存档槽（世界状态槽 · 可命名 / 载入 / 分叉）</div>', to: '' }
+      from: '<div class="wa-sec">存档槽（世界状态槽 · 可命名 / 载入 / 分叉）</div>', to: '' },
+    // v2.197.0（Y3）：另开计划是**独立能力**（只读），不能靠 branch 那条破坏顺带覆盖 ——
+    //   单独立一条破坏：把 branchPlan 的真调用点拆掉，要求「面板真调用 branchPlan」这条判据翻面。
+    { n: 5, why: 'N5: 面板不再调 branchPlan ⇒ 另开计划入口成了空按钮（渲染了、点了不算计划）',
+      from: 'WA.checkpoints.branchPlan(id, { name: nm, toNewKey: key })', to: 'void nm' }
   ];
   CASES.forEach(function (cs) {
     const hits = pan.split(cs.from).length - 1;
@@ -227,15 +264,20 @@ function runN(a) {
     let hit = false;
     if (cs.n === 1) hit = broken.indexOf("on('#wa-ck-save'") < 0;
     else if (cs.n === 2) hit = broken.indexOf('WA.checkpoints.remove') < 0;
-    else if (cs.n === 3) hit = broken.indexOf('WA.checkpoints.branch') < 0;
+    // 注意：`WA.checkpoints.branch` 是 `branchPlan` 的前缀（v2.197.0 起面板同调两者），
+    //   裸前缀判断在破坏后依然为真（假绿）——必须带上调用括号，判「真调用点」而不是「名字出现过」。
+    else if (cs.n === 3) hit = broken.indexOf('WA.checkpoints.branch(') < 0;
+    else if (cs.n === 4) hit = broken.indexOf('<div class="wa-sec">存档槽') < 0;
+    else if (cs.n === 5) hit = broken.indexOf('WA.checkpoints.branchPlan(') < 0;
     else hit = broken.indexOf('<div class="wa-sec">存档槽') < 0;
     a(hit, 'e3v2184/' + cs.why);
   });
   // 纯度：原版上同款判据必须真
   a(pan.indexOf("on('#wa-ck-save'") >= 0, 'e3v2184/Nb1: （纯度）原版上保存接线在位');
   a(pan.indexOf('WA.checkpoints.remove') >= 0, 'e3v2184/Nb2: （纯度）原版上删除入口在位');
-  a(pan.indexOf('WA.checkpoints.branch') >= 0, 'e3v2184/Nb3: （纯度）原版上分叉入口在位');
+  a(pan.indexOf('WA.checkpoints.branch(') >= 0, 'e3v2184/Nb3: （纯度）原版上分叉入口在位');
   a(pan.indexOf('<div class="wa-sec">存档槽') >= 0, 'e3v2184/Nb4: （纯度）原版上分区标题在位');
+  a(pan.indexOf('WA.checkpoints.branchPlan') >= 0, 'e3v2184/Nb5: （纯度）原版上另开计划入口在位');
 }
 
 module.exports = { runA: runA, runB: runB, runC: runC, runN: runN, CK_IDS: CK_IDS, REL: REL };

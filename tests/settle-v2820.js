@@ -7,7 +7,9 @@
 //   ② schemaVersion 是守卫键：任何范围都不得用快照覆盖它，且快照里从不含它；
 //   ③ 分支必须落地成一次真实 save（只记父指针不算分叉），父链/根可独立复述；
 //   ④ 三种范围各自成词：global 整份替换（含删除语义）、module/scene 只合并涉及键；
-//   ⑤ 手自动分算容量：自动快照再勤也不挤掉手工档；丢了谁必须回传（不静默）；
+//   ⑤ 容量：**手动档满一律拒收**（Y3 v2.197.0 起：不替玩家丢档 —— 旧口径会挤掉最旧
+//      那一份并报 ok:true）；自动档走环形保留（挤出是它的设计语义，丢了谁必须回传）；
+
 //   ⑥ 库读不出时**绝不覆盖写**（一次读失败不得抹掉用户全部存档），并给出 libErr；
 //   ⑦ 受控收窄：非字符串名字走 missing-fields，不 String() 静默升格；
 //   ⑧ 移动信封只有一个格式号：`worldaxisCheckpoint`，导出/导入/迁移三处同源；
@@ -27,6 +29,9 @@ require('./mock.js');
 const LS = global.localStorage;
 const TAG = '__st2820_';
 // ── 破坏锚点（必须逐字取自 engines/checkpoints.js，各恰 1 次）──
+//   Y3（v2.197.0）后，`mancap` / `drop` 两条锚点随「手动档满则丢最旧」这一路径**一并移除**
+//   —— 被破坏的代码已经不存在，锚点也就不该留在表里（留着会在 N0 的「恰中 1 次」上直接红）。
+//   它们的位置由新锚点 `manualfull`（拒收闸）接替：这一条破坏的是**Y3 新增的那道拒收**。
 const A_LIBKEY   = "const LS_PREFIX = 'worldaxis_ckpt_v1_';";
 const A_READERR  = "if (raw === null || raw === undefined) return { list: [], err: null };";
 const A_READFAIL = "return { list: [], err: 'parse-threw' };";
@@ -36,8 +41,10 @@ const A_CAPTURE  = "if (r.scope === 'global') return { ok: true, scope: r.scope,
 const A_SCOPED   = "if (Object.prototype.hasOwnProperty.call(incoming, k)) draft[k] = deep(incoming[k]);";
 const A_AUTO     = "if (o.auto !== true && !cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }";
 const A_AUTOCAP  = "const keepAuto = (cfg.autoSlots > 0) ? autos.slice(-cfg.autoSlots).map(function (s) { return s.id; }) : [];";
-const A_MANCAP   = "if (manuals.length > cfg.maxSlots) {";
-const A_DROP     = "const dropped = manuals.slice(0, manuals.length - cfg.maxSlots);";
+
+
+const A_MANFULL  = "const full = manualFull(lib.list, cfg);";
+const A_BRPRE    = "const full0 = manualFull(lib0.list, cfg);";
 const A_BRANCH   = "stat.branched++; stat.lastReason = 'branched';";
 const A_BRPARENT = "parent: rid, note: o.note });";
 const A_STR      = "if (typeof v !== 'string') return '';";
@@ -61,8 +68,8 @@ const BROKEN = [
   { key: 'scoped',   from: A_SCOPED,   to: "if (true) draft[k] = (incoming[k] === undefined ? null : deep(incoming[k]));" },
   { key: 'auto',     from: A_AUTO,     to: "if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }" },
   { key: 'autocap',  from: A_AUTOCAP,  to: "const keepAuto = autos.map(function (s) { return s.id; });" },
-  { key: 'mancap',   from: A_MANCAP,   to: "if (false) {" },
-  { key: 'drop',     from: A_DROP,     to: "const dropped = [];" },
+  { key: 'manualfull', from: A_MANFULL, to: "const full = null;" },
+  { key: 'brpre',     from: A_BRPRE,    to: "const full0 = null;" },
   { key: 'branch',   from: A_BRANCH,   to: "/* branch not counted */" },
   { key: 'brparent', from: A_BRPARENT, to: "parent: '', note: o.note });" },
   { key: 'str',      from: A_STR,      to: "return String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max || 60);" },
@@ -212,10 +219,18 @@ function probeScope(WA) {
   const keepMeta = WA.store.get().meta.tag === 'still';
   return [gone ? 'deleted' : 'kept', ppl.indexOf('改后') >= 0 ? 'people-restored' : 'people-wrong', keepMeta ? 'meta-untouched' : 'meta-clobbered'].join('/');
 }
-/** 手自动分算容量：自动快照再勤也不挤掉手工档；丢了谁必须回传。 */
+/**
+ * 容量（Y3 口径）：手动档满 ⇒ 拒收 slots-full（**不替玩家丢档**）；
+ *   自动档走环形保留（挤出是它的设计语义，丢了谁有回执）。
+ *   返回值逐格答出四句话：
+ *     m<手动份数>：手工档实际留在库里的份数（**不超上限**才叫容量真生效）
+ *     a<自动份数>：自动档实际留在库里的份数
+ *     p<拒收/收下>：第三份手工档是被拒还是被收下（旧口径收下并挤掉最旧那份）
+ *     e<回执>：若真发生过挤出，有没有名字回传（自动档那一半的纪律）
+ */
 function probeCaps(WA) {
   // autoEvery 必须 > 0：默认 0 时 tick() 一律 returned disabled ——
-  //   漏设它会让「自动档」那一半永远不参与，期望值 '2:1:reported' 在任何实现下都不可达。
+  //   漏设它会让「自动档」那一半永远不参与，期望值在任何实现下都不可达。
   on(WA, { maxSlots: 2, autoSlots: 1, autoEvery: 1 });
   WA.checkpoints.save('手工1', { scope: 'global' });
   WA.checkpoints.save('手工2', { scope: 'global' });
@@ -229,8 +244,8 @@ function probeCaps(WA) {
   const names = WA.checkpoints.list().slots.map(function (s) { return s.name; });
   const manuals = names.filter(function (n) { return n.indexOf('手工') === 0; });
   const autos = names.filter(function (n) { return n.indexOf('自动') === 0; });
-  return manuals.length + ':' + autos.length + ':' + (ev.length ? 'reported' : 'silent')
-    + '|m' + WA.checkpoints.list().slots.filter(function (s) { return !s.auto; }).length;
+  return 'm' + manuals.length + '|a' + autos.length + '|p' + (t3.ok === false ? 'refused' : 'taken')
+    + '|e' + (ev.length ? 'reported' : 'silent');
 }
 /** 新实例空库：list 必须 ok（err=null）——「没有档」不是「读不到」。 */
 function probeFreshList(WA) {
@@ -247,9 +262,11 @@ function probeExportFormat(WA) {
 }
 /** 父档已被容量挤出时，至少还记得「我从哪个 id 来」（而不是假装没有来处）。 */
 function probeLineageGhost(WA) {
-  on(WA, { maxSlots: 1 });
+  on(WA);
   const a = WA.checkpoints.save('甲', { scope: 'global' });
-  WA.checkpoints.save('乙', { scope: 'global' });   // 甲被挤出
+  // Y3 后手动档不再被挤出，故「来处不在库里」改由**显式删档**造成：
+  //   这正是本判据真正要说的事（父档不在了，子档仍记得自己从哪个 id 来）。
+  WA.checkpoints.remove(a.id);
   const lin = WA.checkpoints.lineage(a.id, WA.checkpoints.list().slots);
   return 'p' + lin.parents.length + '|root:' + lin.root;
 }
@@ -278,12 +295,48 @@ function probeBranch(WA) {
   return [(n1 === n0 + 1) ? 'new-slot' : 'no-slot', (b.ok && b.root === '甲') ? 'root-甲' : ('root:' + b.root),
     par === '甲' ? 'parent-甲' : ('parent:' + par), 'br' + WA.checkpoints.stat().branched].join('/');
 }
+/**
+ * 分支不许把「活世界」写成半份（Y3 新增判据，两向自证用）。
+ *   满档时 `branch()` 必须**先**被容量预检挡住（活世界一格未动），
+ *   而不是「先 restore 改了活世界、再 save 失败」。
+ *   返回 world-unchanged / world-changed:<reason>。
+ */
+function probeBranchKeepWorld(WA) {
+  on(WA, { maxSlots: 2 });
+  WA.store.transact(function (d) { d.meta = d.meta || {}; d.meta.tag = 'slot-version'; });
+  const a = WA.checkpoints.save('甲', { scope: 'global' });
+  WA.store.transact(function (d) { d.meta.tag = 'v2'; });
+  WA.checkpoints.save('乙', { scope: 'global' });
+  WA.store.transact(function (d) { d.meta.tag = 'live-version'; });
+  const before = JSON.stringify(WA.store.get().meta);
+  const br = WA.checkpoints.branch(a.id, '丙');
+  const after = JSON.stringify(WA.store.get().meta);
+  return (before === after) ? ('world-unchanged:' + (br.ok ? 'ok' : br.reason)) : ('world-changed:' + (br.ok ? 'ok' : br.reason));
+}
+/** 分支开的只读计划：不碰活世界、不碰拍账，且答得出「另开的那条线叫什么」。 */
+function probeBranchPlan(WA) {
+  on(WA);
+  WA.store.transact(function (d) { d.meta = d.meta || {}; d.meta.tag = 'live'; });
+  const a = WA.checkpoints.save('甲', { scope: 'global' });
+  const beat0 = JSON.stringify((WA.beatLedger && WA.beatLedger.view) ? WA.beatLedger.view() : null);
+  const w0 = JSON.stringify(WA.store.get());
+  const p = WA.checkpoints.branchPlan(a.id, { toNewKey: 'worldB' });
+  const w1 = JSON.stringify(WA.store.get());
+  const beat1 = JSON.stringify((WA.beatLedger && WA.beatLedger.view) ? WA.beatLedger.view() : null);
+  const p2 = WA.checkpoints.branchPlan(a.id, {});
+  return [p.ok ? 'ok' : ('no:' + p.reason), (w0 === w1) ? 'world-still' : 'world-moved',
+    (beat0 === beat1) ? 'beat-still' : 'beat-moved',
+    p2.name === '甲 · 分支 1' ? 'named1' : ('named:' + p2.name),
+    (p.world && p.world.key === 'worldB' && !Object.prototype.hasOwnProperty.call(p.world.state, 'schemaVersion')) ? 'key+clean' : 'key-bad'].join('/');
+}
 /** 父链与根可独立复述（父档被挤出后仍答得出「我从哪来」）。 */
 function probeLineage(WA) {
-  on(WA, { maxSlots: 1 });
+  on(WA);
   const a = WA.checkpoints.save('甲', { scope: 'global' });
   const b = WA.checkpoints.branch(a.id, '乙');
   const c = WA.checkpoints.branch(b.id, '丙');
+  // 父档消失（Y3 后改由显式删档造成，不再依赖容量挤出）
+  WA.checkpoints.remove(a.id);
   const names = WA.checkpoints.list().slots.map(function (s) { return s.name; });
   const slotC = WA.checkpoints.list().slots.filter(function (s) { return s.name === '丙'; })[0];
   return [names.join('+'), (slotC && slotC.parents.length >= 1) ? 'chain-kept' : 'chain-lost',
@@ -468,6 +521,11 @@ function judge(a) {
   a(probeLineage(WA).indexOf('chain-kept') > 0 && probeLineage(WA).indexOf('root:甲') > 0,
     'v2820/cp: [3] 父档被容量挤出后，父链与根仍可独立复述');
   a(probeOrphans(WA) === 'reported', 'v2820/cp: [3] 删档如实报出悬空后代（orphans，不静默修补）');
+  // ③b Y3 新增：分支开只读计划 / 满档分支不写活世界
+  a(probeBranchPlan(WA) === 'ok/world-still/beat-still/named1/key+clean',
+    'v2820/cp: [3] 分支开只读计划：不碰活世界、不碰拍账、缺省名可推、独立键且不带守卫键');
+  a(probeBranchKeepWorld(WA) === 'world-unchanged:slots-full',
+    'v2820/cp: [3] 满档分支**先**被容量预检挡住 ⇒ 活世界一格未动（不写成半份）');
   a(probeCaptureSkip(WA) === 'absent-skipped/k1',
     'v2820/cp: [4] 采集路径同理：点名 2 个键、世界里只剩 1 个 ⇒ 只存 1 块（块数如实）');
   a(probeAbsentKey(WA) === 'absent-skipped/people-merged',
@@ -481,7 +539,8 @@ function judge(a) {
   const uk = WA.checkpoints.resolveScope('scene', ['__nope__']);
   a(uk.reason === 'unknown-keys' && (uk.known || []).length > 0, 'v2820/cp: [4] 给了骨架里没有的键 ⇒ unknown-keys（且回报已知键）');
   // ⑤ 容量
-  a(probeCaps(WA) === '2:1:reported|m2', 'v2820/cp: [5] 手自动分算容量：自动再勤也不挤掉手工档，且丢了谁有回执');
+  a(probeCaps(WA) === 'm2|a1|prefused|ereported',
+    'v2820/cp: [5] 容量（Y3 口径）：手动满 ⇒ 拒收（不替玩家丢档）；自动环形保留且挤出有回执');
   a(probeFreshList(WA) === 'true/null/0', 'v2820/cp: [5] 空库 list ⇒ ok 且 err=null（「没有档」不是「读不到」）');
   a(probeLineageGhost(WA) === 'p1|root:', 'v2820/cp: [5] 父档被挤出时仍记得「我从哪个 id 来」（不假装没有来处）');
   a(probeRollStat(WA) === 'rb1|rs0', 'v2820/cp: [5] 回滚与还原分开计量（rolledBack=1 / restored=0）');
@@ -595,12 +654,12 @@ function runNegative(a) {
     'v2820/cp: [N1] 全局替换的删除语义移除 ⇒ 快照里没有的顶层键会留在世界里（换不掉世界）');
   a(probeWith(BROKEN[B.auto], probeAutoBypass) === 'blocked:disabled',
     'v2820/cp: [N1] 自动快照的绕行移除 ⇒ 用户开了自动快照却因总开关关着而静默不存');
-  a(probeWith(BROKEN[B.autocap], probeCaps) === '2:3:reported|m2',
+  a(probeWith(BROKEN[B.autocap], probeCaps) === 'm2|a3|prefused|esilent',
     'v2820/cp: [N1] 自动档容量移除 ⇒ 自动快照无限堆积（3 份，无界增长）');
-  a(probeWith(BROKEN[B.mancap], probeCaps) === '3:1:reported|m3',
-    'v2820/cp: [N1] 手动档容量移除 ⇒ 手工档无界堆积（3 份，maxSlots=2 失效）');
-  a(probeWith(BROKEN[B.drop], probeCaps) === '3:1:reported|m3',
-    'v2820/cp: [N1] 手动档丢档移除 ⇒ maxSlots 形同虚设（3 份手工档全部留着）');
+  a(probeWith(BROKEN[B.manualfull], probeCaps) === 'm3|a1|ptaken|ereported',
+    'v2820/cp: [N1] 手动档拒收闸移除（= 退回旧口径）⇒ 第三份手工档被收下（3 份，maxSlots=2 失效）');
+  a(probeWith(BROKEN[B.brpre], probeBranchKeepWorld) === 'world-changed:slots-full',
+    'v2820/cp: [N1] 分支的手动档预检移除 ⇒ 满档分支先改了活世界再失败（半写复现）');
   a(probeWith(BROKEN[B.branch], probeBranch).indexOf('/br0') > 0,
     'v2820/cp: [N1] 分支计量移除 ⇒ 分支动作在读数上不可见');
   a(probeWith(BROKEN[B.brparent], probeBranch).indexOf('parent:') > 0,
@@ -628,7 +687,9 @@ function runNegative(a) {
   a(probeClean(probeRefuse) === 'lib-unreadable/intact', 'v2820/cp: [N2] 原版读不出时拒收且不覆盖写');
   a(probeClean(probeGuard) === 'clean/sv1/ok', 'v2820/cp: [N2] 原版守卫键三面成立');
   a(probeClean(probeScope) === 'deleted/people-restored/meta-untouched', 'v2820/cp: [N2] 原版三范围语义成立');
-  a(probeClean(probeCaps) === '2:1:reported|m2', 'v2820/cp: [N2] 原版手自动分算容量成立');
+  a(probeClean(probeBranchPlan) === 'ok/world-still/beat-still/named1/key+clean', 'v2820/cp: [N2] 原版分支开只读计划成立');
+  a(probeClean(probeBranchKeepWorld) === 'world-unchanged:slots-full', 'v2820/cp: [N2] 原版满档分支不写活世界');
+  a(probeClean(probeCaps) === 'm2|a1|prefused|ereported', 'v2820/cp: [N2] 原版容量口径成立（手动拒收 / 自动环形）');
   a(probeClean(probeAutoBypass) === 'saved', 'v2820/cp: [N2] 原版自动快照绕过总开关');
   a(probeClean(probeBranch) === 'new-slot/root-甲/parent-甲/br1', 'v2820/cp: [N2] 原版分支落地成真实存档');
   a(probeClean(probeOrphans) === 'reported', 'v2820/cp: [N2] 原版删档报出悬空后代');

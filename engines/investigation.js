@@ -101,10 +101,12 @@
     return evidence();
   }
   var __opSeq = 0;
+  // ── v2.197.0（G20 形态归一）── 同 agency.js：能力三目不是本仓的时间源形态（G20 判成裸调），
+  //   归一为声明的守卫，fallback 逐字保留。
+  function wallNow() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
   function nextOpId(prefix) {
     __opSeq++;
-    var t = 0;
-    try { t = (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { t = 0; }
+    var t = wallNow();
     return clean(prefix, 24) + '@' + t + '#' + __opSeq;
   }
   /** 取「本次调用前已发生的事务数」（时效判据的基准）。 */

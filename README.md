@@ -67,7 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.196.0）
+## 构建与验收（当前版本 v2.197.0）
 
 v2.173.0（TX4b）— TX4/TX6/TX7/TX8/TX9 五模块面板接线（渲染 + 绑定 + 登记三面同步）+ 六模块骨架登记补齐（骨架声明 / `__BOUNDED_CAPS` / `evict.SITES` 三段式）+ 两处预存失败收敛 — TX 五张专锁 42/49/44/49/46 全 0 失败。
 
@@ -114,7 +114,7 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（133 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（134 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
@@ -145,6 +145,15 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 <b>八条否定式边界</b>：① 默认关；② choose 记账 ≠ 世界兑现（三段可分离）；③ ops 必须经 rehearsal.preview 白名单；④ 状态变了重新预演；⑤ 不把 rehearsal diff 直接写 live store；⑥ 过期/未知/不可比较分别显示；⑦ review 只读不写；⑧ 不凭空造 ops。
 <b>实测读数</b>：module-registry-gate 文件 <b>184</b> / 命名空间 <b>192</b> / 装载期边 <b>86</b> / 调用期引用 <b>170</b>；拒收码 <b>738 码（见证 481 / 死表 29 / 基线 228）</b>；module-cycle-gate-v2107 pass(65)。
 <b>专锁 <code>tests/s3-tx4-v2168.js</code> 42 / 0</b>。冒烟脚本 <code>tools/tx4_smoke.js</code> 13/13。
+<b>v2.197.0</b> — <b>计划 Y 第三批 Y3：存档槽的分支世界与「满档拒收」</b>（<b>把 <code>engines/checkpoints.js</code> 从「有槽位与迁移」推到「能另开一条线、且丢档这件事必须先问过玩家」</b>）。
+<b>它治什么</b>（两条探针实测的真病，不是阅读推断）：① 手动档满时 <code>save()</code> <b>静默挤出最旧一份并返回 <code>ok:true</code></b>（探针实测 <code>maxSlots=3</code> 存到第 4 份时第 1 份无声消失，而这一次报的是成功）—— 「我存过了」与「那一份还在」被同一个 <code>ok</code> 混在一起。② <code>branch(id, name)</code> <b>会改动当前活世界</b>：它内部先 <code>restore()</code> 再把结果另存一份，于是「从这一拍另开一条线」实际把当前世界倒回了存档点（实测世界 hash <code>4930dcd0/4300</code> → <code>a4549d5e/4299</code>）。
+<b>修法（六处结构性改动）</b>：① 抽出 <code>manualFull(list, cfg)</code> —— 满档判定与回执 <b>单一化</b>（<code>save</code> / <code>branch</code> / <code>importOne</code> 三处共用；两处各写一遍必然漂移）；② <code>save()</code> 满则 <b>拒收</b> <code>slots-full</code>（回执带现有槽位 id + 名字 —— 拒收必须可操作，用户下一步就是挑一份删）；③ <code>enforceCaps()</code> 收窄为只管自动档（环形保留是它的设计语义，挤出逐条回传）；④ 新增只读 <code>beatContext()</code>（拍账缺席返回 <code>null</code> —— 不拿 0 冒充「第 0 拍」）；⑤ 新增 <code>branchPlan()</code>（Y3 主入口，<b>只读</b>：不碰活世界、不碰拍账；给 <code>toNewKey</code> 时把父档 <code>state</code> 原样搬进独立键并剥守卫键 —— <b>独立键 = 独立世界</b>，不许把两条线写进同一个顶层键）；⑥ <code>branch()</code> 把容量预检 <b>提到 restore 之前</b>（防「先改了活世界、后失败」的半写）。
+<b>面板</b>：存档槽新增「新世界顶层键 + 另开计划」两枚控件（<code>wa-ck-newkey</code> / <code>wa-ck-plan</code>，渲染 + 绑定 + 守卫登记三面同批），计划回执当场把「当前世界 <b>一格未动</b> / <b>被改动了</b>」两向说清；满档拒收在界面上直接列出可删的槽位。
+<b>实测读数</b>：<code>reject-code-gate</code> 产品文件 <b>218</b> / 内联码 <b>811</b>（见证 <b>535</b> / 死表 <b>50</b> / 基线 <b>226</b>，恒等式为平）；<code>module-registry-gate</code> 文件 <b>205</b> / 命名空间 <b>213</b> / 装载期边 <b>108</b> / 硬边 <b>0</b> / 调用期引用 <b>212</b>；散装读数 <code>refs 5480</code> / 命名空间 217 / 成员 2557 / 死子面 <b>854 · uiDead 3 · dataOnly 297</b> / 仅测试 363；出口面 <code>ns= 189 members= 1358 chars= 14822</code> 且与 <code>FROZEN2800</code> 逐字一致。
+<b>专锁 <code>tests/s3-y3-v2199.js</code> 121 / 0</b>（A 静态契约 / B 运行时行为 / C 不变式与边界 / N 七处真源码破坏负控制；负控制除「文本变了」外还跑了一次真产品：破坏版上 <b>第二份真被写进去且报成功</b>，原版上同一输入 <b>必被拒收且库仍是 1 份</b> —— 两向自证，判据不是空转）。
+<b>同批清掉的三笔跨版欠账</b>（全是 <b>存量</b>，HEAD 对照树实测同样红，不是本版引入）：① <code>engines/reject-recovery.js</code> 的拒收面快照在 v2.196.0 收口时漏同步（新码未入、三条已废旧码未出）⇒ <code>reject-recovery-lock</code> 自 v2.196.0 起一直红；② <code>tests/run.js</code> 的 <code>FROZEN2800</code> 冻结串自 v2.194.0 起首命名空间被写成 <code>aact:</code>（字面量多一个 a），而「冻结串 == 产物」那条断言在 <b>同一提交里</b> 把它掩盖了；③ G20 时间源治理的 <b>形态漂移</b>（5 个引擎文件把守卫 fallback 写成能力三目 / 括号形态 —— 合法，但判据看不见，被判成裸调）。修法一律 <b>保留原 fallback 语义</b>，只把形态归一：<b>判据看不见的写法，下一次真出问题也看不见</b>。
+<b>文档面同批同步</b>：构建验收标题 v2.196.0 → v2.197.0；版本历史导语 133 → <b>134</b> 并插入本版条目；<code>tests/docs-archive-gate-v2120.js</code> 的期望计数同批 133 → 134；<code>ITERATION_LOG.md</code> 立 <code>R174</code>；<code>plans/Y_EXPANSION.md</code> 新增「交付记录」节（Y3 单条，只此一份）。
+<b>如实边界</b>：面板侧实机 <b>未验</b>（无头回归不装载 <code>ui/panel.js</code>），真实宿主的存档 / 重载路径同样未验；<code>manualFull</code> / <code>beatContext</code> <b>刻意不导出</b>（前者是内部三处共用的判定，后者是槽位读数的内部取法）。
 <b>v2.196.0</b> — <b>U2 批次⑥：backstage + coop 两个既有链面消费者收口</b>（<b>第二批优化线第三批</b>：链面上的两个协调模块此前只「接了链」，而「链没成」这件事它们说不出口）。
 <b>它治什么</b>（两条探针实测的真病，不是阅读推断）：
 ① <code>engines/backstage.js</code> 的推演结算段：<code>else</code> 分支只记一条 error 日志，随后<b>无条件</b>发 <code>backstage:settled</code> + <code>return { ok:true }</code>。<code>probe_b</code> 实测：链内某一步抛错 ⇒ 世界一格未动、回执 0、事务未提交，而 <code>_start</code> 照样回报成功。两个真消费者因此被骗：<code>ui/panel.js</code> 的悬浮球「呼吸动画」被 <code>settled</code> 关掉（点了中止也不会停在运行态）、<code>engines/bridge.js</code> 的世界投影缓存被无谓作废。

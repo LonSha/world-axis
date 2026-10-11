@@ -199,24 +199,111 @@
     __seq++;
     return 'c' + now + '-' + __seq;
   }
-  /** 手动档与自动档分开算容量：自动快照再勤也不该把用户手工存的档挤掉。 */
+  /**
+   * 容量治理（Y3 之后**只管自动档那一半**）。
+   *   自动档是环形保留：超出 `autoSlots` 的自动档按「最旧优先」回收，挤出**逐条回传**
+   *   （`evicted` + `stat.lastEvicted`）——那是它的设计语义，不是事故。
+   *   手动档**不在这里处理**：满了由 `manualFull()` 拒收（见下），
+   *   历史遗留的「手动档多于上限」也不静默清理 —— 它由 `stat.manualOver` 如实报出、
+   *   由玩家自己删。旧口径在这里「满则丢最旧」是**静默丢档**，Y3 探针实测把它抓了出来。
+   */
   function enforceCaps(list, cfg) {
     const out = { list: list.slice(), evicted: [] };
-    // 自动档：只保留最近 autoSlots 个
     const autos = out.list.filter(function (s) { return s.auto === true; });
     const keepAuto = (cfg.autoSlots > 0) ? autos.slice(-cfg.autoSlots).map(function (s) { return s.id; }) : [];
     out.list.forEach(function (s) {
       if (s.auto === true && keepAuto.indexOf(s.id) < 0) out.evicted.push(s);
     });
     out.list = out.list.filter(function (s) { return out.evicted.indexOf(s) < 0; });
-    // 手动档：满则丢最旧（列表尾部为最新，故最旧在头部）
-    const manuals = out.list.filter(function (s) { return s.auto !== true; });
-    if (manuals.length > cfg.maxSlots) {
-      const dropped = manuals.slice(0, manuals.length - cfg.maxSlots);
-      dropped.forEach(function (s) { out.evicted.push(s); });
-      out.list = out.list.filter(function (s) { return out.evicted.indexOf(s) < 0; });
-    }
     return out;
+  }
+  /**
+   * 手动档「满」的判定与**回执**（Y3 边界：不替玩家丢档）。
+   *   为什么把判定抽成一个函数而不是写在 save() 里：`save()` 与 `importOne()` 两条入口
+   *   都要问同一句话（「还能不能再放一份手动档」），而两处各写一遍必然漂移 —— 本仓
+   *   反复裁决过的「同一事实两处口径」。回执里带上**现有槽位清单**（id + 名字），
+   *   是因为拒收必须可操作：用户看到 `slots-full` 之后的下一个动作就是挑一份删掉，
+   *   没有清单他就只能自己再去 list() 一次。
+   *   返回 null 表示没满（可以写）。
+   */
+  function manualFull(list, cfg) {
+    const manuals = list.filter(function (s) { return s.auto !== true; });
+    if (manuals.length < cfg.maxSlots) return null;
+    return { ok: false, reason: 'slots-full', limit: cfg.maxSlots,
+      slots: manuals.map(function (s) { return { id: s.id, name: s.name }; }),
+      note: '手动档已满：本模块不替玩家丢档（旧口径会静默挤掉最旧那一份并报 ok:true）——'
+        + '先 remove() 一份，或把 maxSlots 改大。自动档走环形保留（容量 autoSlots），不受此限。' };
+  }
+  /**
+   * 拍语境（Y3 承 U2/Y2）：从 `beatLedger` 取**拍账与轮次**，供分支槽位留下「我在哪一刻分出去的」。
+   *   为什么必须记进槽位而不是分支时现取：分支的语义是「我从这一刻**另起一条线**」，
+   *   而这条线日后被载入时（可能是几个月后、在另一个存档槽里），当前拍号早已与它无关。
+   *   槽位里那一份是**那一刻的快照读数**，与父链/根同属「槽位可独立复述」的一类事实。
+   *   边界：本函数**只读**（不 claim / 不 land / 不动拍账），`beatLedger` 缺席或关着时返回 null
+   *   —— 拿一个 0 冒充「第 0 拍」会让「没有拍账」与「拍账在第 0 拍」同形。
+   */
+  function beatContext() {
+    try {
+      if (!(WA.beatLedger && typeof WA.beatLedger.view === 'function')) return null;
+      const v = WA.beatLedger.view();
+      if (!v || typeof v !== 'object') return null;
+      const cur = (WA.beatLedger && typeof WA.beatLedger.current === 'function') ? WA.beatLedger.current() : null;
+      return { seq: finite(v.seq) || 0, round: finite(v.round) || 0,
+        at: cur ? { no: finite(cur.no) || 0, title: str(cur.title, 60) } : null,
+        landed: (v.rows || []).filter(function (r) { return r && r.status === 'landed'; }).length };
+    } catch (e) { return null; }
+  }
+  /**
+   * 从某一刻**另开一个世界**（Y3 主入口）。
+   *   与 `branch()` 的分工（这一条是本模块最容易被读错的地方）：
+   *     · `restore()` —— 回到那一版并**在当前世界里接着往下走**（同一份世界，往回走一段）。
+   *     · `branch()`  —— 同一次 restore 的**副产物**：它还照当前世界再存一份带父指针的新档。
+   *       副作用是**当前世界的状态被改了**（探针实测：`branch()` 之后活世界退回存档点）。
+   *     · `branchPlan()`（本函数）—— **不碰当前世界**。它只回答两件事：
+   *       ① 要另开的那一条线**叫什么名字**（缺省按「父名 · 分支 N」生成，N 取该根下已有分支数 + 1）；
+   *       ② 需要的话，把父档的 `state` **原样搬进一个新键**（`toNewKey:'<顶层键>'`），
+   *          这是「两个世界并存」这条要求里唯一被落地的形态：**独立键 = 独立世界**，
+   *          绝不许把两条线写进同一个 `stat_data`（那正是 Y3 边界里的「不是同一世界的新键」）。
+   *   为什么要把「另开」做成**计划**而不是直接动手：面板只该拿一个可渲染、可确认的读数，
+   *   真正的落地动作由调用方在自己的事务边界里做（本模块不替调用方开事务、不隐式写盘）。
+   *   边界：只读配额（走 `capacityAudit` 的既有面，不改写它的账）；拍账前后**逐字不动**；
+   *   库读不出 / 槽位不存在时如实拒收（沿用 read() 的码）。
+   */
+  function branchPlan(id, opts) {
+    const o = opts || {};
+    const g = read(id);
+    if (!g.ok) return g;
+    const slot = g.slot;
+    const lib = readLib();
+    if (lib.err) { noteFault('lib-unreadable'); return { ok: false, reason: 'lib-unreadable', err: lib.err }; }
+    const root = slot.root || slot.name;
+    const sibs = lib.list.filter(function (s) {
+      return s && s.auto !== true && (s.root || s.name) === root && s.id !== slot.id;
+    }).length;
+    const name = str(o.name, MAX_NAME) || (slot.name + ' · 分支 ' + (sibs + 1));
+    const key = str(o.toNewKey, 40);
+    // 独立键 = 独立世界。**只搬一份**（父档那一份），不在当前世界状态里动任何一个字。
+    const world = key ? { key: key, state: stripGuarded(slot.state), scope: slot.scope, keys: slot.keys.slice() } : null;
+    const cap = capacityNote(slot.state);
+    return { ok: true, from: slot.id, fromName: slot.name, root: root, siblings: sibs,
+      name: name, world: world, beat: beatContext(), bytes: cap.bytes, cap: cap,
+      readOnly: true,
+      note: '只给计划、不落地：本模块不碰当前世界（branch() 会碰 —— 它带一次 restore）。'
+        + '要「两个世界并存」须给 toNewKey（独立键 = 独立世界，不许把两条线写进同一个顶层键）；'
+        + '确认后由调用方在自己的事务里落 slot（state 原样搬，不带守卫键）。' };
+  }
+  /** 分支开的容量提示（走既有面，不改它的账）。缺面时如实报 null，不拿 0 冒充一个读数。 */
+  function capacityNote(state) {
+    const s = JSON.stringify(state || {});
+    let bytes = s.length;
+    let guess = null;
+    try {
+      if (WA.storageForecast && typeof WA.storageForecast.forecast === 'function') {
+        const f = WA.storageForecast.forecast({ addBytes: bytes });
+        if (f && typeof f === 'object' && typeof f.overBudget === 'boolean') guess = f.overBudget;
+      }
+    } catch (e) { guess = null; }
+    return { bytes: bytes, overBudget: guess };
   }
   // ── 支链（父链与根）──────────────────────────────────────────────────────
   // 为什么父链要**存进槽位**而不是每次现算：现算只能沿库回溯，而库会挤出最旧的档——
@@ -254,6 +341,18 @@
       parent: par, parents: lin.parents, root: lin.parents.length ? lin.root : nm,
       note: str(o.note, 60), state: cap.state
     };
+    // ── 手动档满：**拒收**而不是静默挤出（Y3 边界）────────────────────────
+    //   旧口径（v2.196.0 及以前）：满了就按「最旧优先」挤掉一份手动档，**返回 ok:true**。
+    //   探针实测（/tmp/probe_y3.js B 段）的后果是：手动档存到第 maxSlots+1 份时，
+    //   第 1 份**没打招呼就没了**，而这一次 save 报的是成功 —— 「我存过了」与「那一份还在」
+    //   被同一个 ok 混在一起（本仓反复裁决过的「缺席 ≠ 空 ≠ 无事」同一形态）。
+    //   故改：手动档满 ⇒ 拒收 `slots-full`，把处置交回玩家（删一份、或改大 maxSlots）。
+    //   **自动档不受此限**：自动档是环形保留，挤出是它的设计语义（容量是 autoSlots，
+    //   且注入面明写「自动每 N 轮一份」）。
+    if (o.auto !== true) {
+      const full = manualFull(lib.list, cfg);
+      if (full) { noteFault('slots-full'); return full; }
+    }
     const enf = enforceCaps(lib.list.concat([slot]), cfg);
     const w = writeLib(enf.list);
     if (!w.ok) return w;
@@ -382,6 +481,17 @@
     if (!rid) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     const nm = str(name, MAX_NAME);
     if (!nm) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', need: 'name' }; }
+    // ── 预检放在 restore **之前**（Y3：不许半写）──────────────────────────────
+    //   分支是「先 restore、后 save」两步。旧口径下若第二步失败（手动档满被挤出、
+    //   或 write-failed），第一步已经把**当前活世界**退回存档点了 —— 用户的世界被改了，
+    //   而「另开的那条线」并不存在。这就是本仓反复治过的半写，只不过载体是「活世界」。
+    //   故把能预检的那一半（容量）提到最前面：此刻未满才动手，动手后第二步不会再因容量失败。
+    const lib0 = readLib();
+    if (lib0.err) { noteFault('lib-unreadable'); return { ok: false, reason: 'lib-unreadable', err: lib0.err }; }
+    if (o.newSlot !== false) {
+      const full0 = manualFull(lib0.list, cfg);
+      if (full0) { noteFault('slots-full'); return full0; }
+    }
     const r = restore(rid, { rolledBack: true });
     if (!r.ok) return r;
     // 分支档必须带父——否则"从哪分出来的"就没法复述；父档被挤出后仍能靠 parents/root 回答。
@@ -389,8 +499,10 @@
       keys: o.keys !== undefined ? o.keys : r.keys, parent: rid, note: o.note });
     if (!s.ok) return s;
     stat.branched++; stat.lastReason = 'branched';
+    // `beat`：分叉发生在哪一拍（承 U2/Y2 的拍账口径）。取的是**分叉那一刻**的读数，
+    //   故必须在 restore/save 之后取（save 不推进拍号，settle 也不推 —— 谁都不许替引擎推进）。
     return { ok: true, from: rid, fromName: r.name, id: s.id, name: nm,
-      scope: s.scope, keys: s.keys, root: s.root, count: s.count };
+      scope: s.scope, keys: s.keys, root: s.root, count: s.count, beat: beatContext() };
   }
   /**
    * 比较两个快照：逐顶层键判等 + 逐键差异摘要（长度/条数/top 变化）。
@@ -552,6 +664,12 @@
       const target = str(o.target, 40);
       nextList = nextList.filter(function (s) { return !(s && (s.id === target || (o.byName === true && s.name === nmBase))); });
     }
+    // 导入与 save() 走**同一条**容量口径（Y3）：手动档满 ⇒ 拒收 slots-full，
+    //   不替玩家挤掉本地已有的那一份。导入常常是「把别的聊天里那一版拿过来看看」，
+    //   一次试探性操作顺手丢掉本地存档，比拒收严重得多（`importOne` 默认不覆盖同名
+    //   保护的是「同名的」，这里保护的是「其它任何一份」）。
+    const fullImp = manualFull(nextList, cfg);
+    if (fullImp) { noteFault('slots-full'); return fullImp; }
     const enf = enforceCaps(nextList, cfg);
     const w = writeLib(enf.list);
     if (!w.ok) return w;
@@ -597,7 +715,16 @@
       slots: lib.list.length,
       manual: lib.list.filter(function (s) { return s.auto !== true; }).length,
       autoSlotsUsed: lib.list.filter(function (s) { return s.auto === true; }).length,
-      libErr: lib.err, key: libKey(), format: FORMAT, scopes: SCOPES.slice()
+      libErr: lib.err, key: libKey(), format: FORMAT, scopes: SCOPES.slice(),
+      // Y3：手动档水位 / 还能再存几份 / 上限。三件事分开报 —— 「满了」与「剩几格」
+      //   在面板上是两句不同的话，而用户真正要的是后一句（决定「现在还能不能存」）。
+      manualLimit: settings().maxSlots,
+      manualFree: Math.max(0, settings().maxSlots - lib.list.filter(function (s) { return s.auto !== true; }).length),
+      // 历史遗留的超额手动档（旧口径下被挤进来的、或用户事后把 maxSlots 改小的）：
+      //   **不静默清理**，如实报出来由玩家自己处置。0 表示水位正常。
+      manualOver: Math.max(0, lib.list.filter(function (s) { return s.auto !== true; }).length - settings().maxSlots),
+      // 拍语境只读面（承 U2/Y2）：分叉面板要能显示「现在分出去是在第几拍之后」。
+      beat: beatContext()
     });
   }
   WA.checkpoints = {
@@ -609,6 +736,13 @@
     restore: restore, branch: branch, compare: compare, tick: tick, buildBlock: buildBlock,
     exportOne: exportOne, importOne: importOne, checksum: checksum,
     migrations: migrations, registerMigration: registerMigration, migrate: migrate,
+    // v2.197.0（Y3）：只导出 `branchPlan` —— 它是「另开一世界」的公开入口，面板与两把专锁
+    //   都真调它（有真消费者）。`manualFull` / `beatContext` **刻意不导出**：前者是内部三处
+    //   共用的判定（save / branch / importOne），后者是槽位读数的一个内部取法 ——
+    //   两者都由 `stat()` 的读数面（manualLimit / manualFree / manualOver / beat）与拒收回执
+    //   对外呈现。导出它们就是「产品零引用的过度导出」（死子面门禁当场报 self-only），
+    //   本仓既有裁决与此一致（v2.114.0：未接线入口当场删除，而不是挂着等人用）。
+    branchPlan: branchPlan,
     stat: statView
   };
 })();

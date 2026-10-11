@@ -2784,7 +2784,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-claim-view',
       // v2.184.0（E3）：存档槽 20 个静态控件。渲染在工具页「状态快照」之后 ——
       //   与该区块同页同族（快照 = 可移植归档；存档槽 = 世界状态槽），接线面必须一并覆盖。
-      'wa-ck-enabled', 'wa-ck-name', 'wa-ck-save', 'wa-ck-list', 'wa-ck-id', 'wa-ck-read', 'wa-ck-restore', 'wa-ck-remove', 'wa-ck-cmp', 'wa-ck-compare', 'wa-ck-branch', 'wa-ck-fork', 'wa-ck-max', 'wa-ck-every', 'wa-ck-auton', 'wa-ck-cfg', 'wa-ck-export', 'wa-ck-import', 'wa-ck-stat', 'wa-ck-text'],
+      'wa-ck-enabled', 'wa-ck-name', 'wa-ck-save', 'wa-ck-list', 'wa-ck-id', 'wa-ck-read', 'wa-ck-restore', 'wa-ck-remove', 'wa-ck-cmp', 'wa-ck-compare', 'wa-ck-branch', 'wa-ck-fork', 'wa-ck-max', 'wa-ck-every', 'wa-ck-auton', 'wa-ck-cfg', 'wa-ck-export', 'wa-ck-import', 'wa-ck-stat', 'wa-ck-text',
+      // v2.197.0（Y3）：「另开计划」两枚控件 —— 新世界顶层键输入 + 只读计划按钮。
+      //   同 v2.184.0 的理由：新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，否则
+      //   「按钮渲染了但 id 写错/没登记」无人发现（本版实测正是被这条门禁抓出未登记）。
+      'wa-ck-newkey', 'wa-ck-plan'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
       dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue',
       // v2.83.0（B6）：配置包面板里的动态控件（点开才渲染）。

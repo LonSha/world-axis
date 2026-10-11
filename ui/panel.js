@@ -2433,6 +2433,10 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-ck-fork" title="从该存档分叉：先把世界恢复到它，再另存一份带父指针的新档（原档逐字不变）">分叉</button>
       </div>
       <div class="wa-row">
+        <input id="wa-ck-newkey" class="wa-input" placeholder="新世界顶层键（留空=只算名，不搬内容）"/>
+        <button class="wa-btn" id="wa-ck-plan" title="另开一世界（只读计划）：不碰当前世界、不碰拍账，只算「新线叫什么」+「把父档搬进哪个新键」。要两个世界并存必须给新键（独立键 = 独立世界）">另开计划</button>
+      </div>
+      <div class="wa-row">
         <input id="wa-ck-max" class="wa-input" placeholder="手动上限（1–24）"/>
         <input id="wa-ck-every" class="wa-input" placeholder="自动节奏（0=关，最多 100）"/>
         <input id="wa-ck-auton" class="wa-input" placeholder="自动保留（0–12）"/>
@@ -7278,6 +7282,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         const M = {
           disabled: '这一面关着（上面的开关打开后才有存档动作）—— 这与「库是空的」不是一回事',
           'lib-unreadable': '库读不出来 —— 本模块**拒绝覆盖写**（宁可什么都不做，也不拿一份读不出的库去覆盖它）',
+          'slots-full': '手动档已满 —— **本模块不替你丢档**（旧口径会静默挤掉最旧那一份并报成功）：先删一份，或把「手动上限」改大。自动档走环形保留，不受此限',
           'missing-fields': '缺必填字段（存档名 / 存档 id 不能空）',
           'missing': '这个 id 不在库里（可能已被删除，或本来就是别的名字）',
           'store-unavailable': '世界状态面不可用 —— 载入需要 store.transact',
@@ -7312,7 +7317,17 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         const nm = wv('#wa-ck-name');
         if (!nm) return ckOut('<div class="wa-log wa-log-warn">填存档名（保存要一个名字，否则列表里认不出哪份是哪份）</div>');
         const r = WA.checkpoints.save(nm, {});
-        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        if (!r.ok) {
+          // 「存满了」与「关着」是两句不同的话（Y3）：前者**可恢复且给清单**、
+          //   后者要先开总开关。合成一句「拒收：slots-full」等于让用户自己去猜下一步。
+          if (r.reason === 'slots-full') {
+            return ckOut('<div class="wa-log wa-log-warn">手动档已满（' + r.limit + ' 份）—— 本模块**不替你丢档**：'
+              + '先删一份，或把「手动上限」改大。</div>'
+              + '<div class="wa-item">现有：' + esc((r.slots || []).map(function (s) { return s.name + '(' + s.id + ')'; }).join('、')) + '</div>'
+              + '<div class="wa-dim">旧口径下这一步会**静默挤掉最旧那一份**并报成功 —— 那份档用户的印象里还在，实际已经没了。</div>');
+          }
+          return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        }
         ckOut('<div class="wa-log wa-log-info">已保存：' + esc(r.name) + '（id ' + esc(r.id) + '，作用域 ' + esc(r.scope)
           + '，库内 ' + r.count + ' 份）</div>'
           + ((r.evicted || []).length ? '<div class="wa-dim">被挤出（超出容量）：'
@@ -7385,6 +7400,29 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         renderBody();
         ckOut('<div class="wa-log wa-log-info">已从「' + esc(r.fromName) + '」分叉出「' + esc(r.name) + '」（id ' + esc(r.id) + '，根 ' + esc(r.root) + '）</div>'
           + '<div class="wa-dim">原档**逐字不变**：分叉是「先恢复到它、再另存一份带父指针的新档」。</div>');
+      });
+      on('#wa-ck-plan', () => {
+        if (!WA.checkpoints || !WA.checkpoints.branchPlan) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');
+        const id = wv('#wa-ck-id');
+        if (!id) return ckOut('<div class="wa-log wa-log-warn">先填存档 id（要另开的那条线从哪一刻分出去）</div>');
+        const key = wv('#wa-ck-newkey');
+        const nm = wv('#wa-ck-branch');
+        const before = JSON.stringify(WA.store.get());
+        const r = WA.checkpoints.branchPlan(id, { name: nm, toNewKey: key });
+        const after = JSON.stringify(WA.store.get());
+        if (!r.ok) return ckOut('<div class="wa-log wa-log-warn">' + esc(ckWhy(r.reason)) + '</div>');
+        const b = r.beat;
+        ckOut('<div class="wa-log wa-log-info">另开计划：从「' + esc(r.fromName) + '」分出「' + esc(r.name) + '」'
+          + '（根 ' + esc(r.root) + '，该根下已有 ' + r.siblings + ' 条分支）</div>'
+          + '<div class="wa-item">搬给新世界：' + (r.world ? ('顶层键 <code>' + esc(r.world.key) + '</code>，' + r.bytes + ' 字节') : '<b>没有</b>（没给新键 ⇒ 只算名，不搬内容）') + '</div>'
+          + '<div class="wa-item">分出去的这一刻：' + (b && b.at ? ('第 ' + b.at.no + ' 拍「' + esc(b.at.title) + '」之后，已落 ' + b.landed + ' 拍')
+            : (b ? ('拍账无当前拍（已落 ' + b.landed + ' 拍）') : '拍账不可读——本项不假装知道')) + '</div>'
+          + '<div class="wa-log wa-log-' + (before === after ? 'info' : 'err') + '">当前世界'
+          + (before === after ? '**一格未动**' : '**被改动了**（这是缺陷，请回报）') + '</div>'
+          + '<div class="wa-dim">这一步只给计划、不落地：本模块不碰当前世界、不碰拍账。真正的落地由你在自己的事务里做'
+          + '（state 原样搬，不带守卫键）。要「两个世界并存」必须给新键 —— 独立键 = 独立世界，'
+          + '把两条线写进同一个顶层键正是本项要治的半写。</div>');
+        return null;
       });
       on('#wa-ck-cfg', () => {
         if (!WA.checkpoints) return ckOut('<div class="wa-log wa-log-err">存档槽未加载</div>');

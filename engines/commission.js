@@ -100,7 +100,7 @@
   }
   /** 取「本次调用前已发生的事务数」（时效判据的基准，见上）。 */
   function txCount() { try { return (WA.store && typeof WA.store.txStat === 'function') ? (WA.store.txStat().count || 0) : 0; } catch (e) { return 0; } }
-  function wallNow() { try { return (WA.clock && WA.clock.wallNow) ? WA.clock.wallNow() : Date.now(); } catch (e) { return Date.now(); } }
+  function wallNow() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
   /**
    * 写口的提交时机统一入口（三态：`failed` / `nested` / `chain`；链外顶层形状不变）。
    * @returns {{persisted:boolean, chain:boolean, nested?:boolean, nostore?:boolean, failed?:string}}
