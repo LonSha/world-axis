@@ -9310,6 +9310,11 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             lifeTurn: '跨会话轮转游标读回',
             // v2.156.0（SP1）：与 store.LAB / toolDiag.SRC_LABEL 同源同键集（三份真源一同登记）。
             playtime: '游玩活动基准读回',
+            // v2.203.0（读侧归因收口）：与 store.LAB / toolDiag.SRC_LABEL 同源同键集。
+            //   缺这一份，「查过的词库读不出来」与「从来没查过」在面板上同形（前者要查存储，后者是正常开局）；
+            //   快照库同理——读不出来时它与「本地没有快照」同形，而后者是安装/覆盖的既有前提。
+            historySearch: '历史检索词库读回（读失败 ⇒ 与「从来没查过」同形）',
+            worldSnapshot: '世界快照库读回（读失败 ⇒ 与「本地没有快照」同形）',
             tapeStore: '磁带仓库读回' };
           const byP = rdStore2.bySource || {};
           const srcTxtP = Object.keys(byP).filter(function (k) { return byP[k] > 0; })

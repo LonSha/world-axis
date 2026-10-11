@@ -2582,6 +2582,10 @@
           //   缺这一份，「活动基准读不出来」与「本聊天从没记过」在读数上同形——
           //   而它们是「存储故障」与「正常开局」两种处置。
           playtime: '游玩活动基准读回（读失败 ⇒ 与「本聊天从没记过」同形）',
+          // v2.203.0（读侧归因收口）：与 ui/panel.js 的 LAB_P / engines/tool-diag.js 的 SRC_LABEL 同键集。
+          //   同族第四条（v2.11.0 readSpotCheck / v2.132.0 lifeTurn / v2.156.0 playtime）之后新增的两个来源。
+          historySearch: '历史检索词库读回（读失败 ⇒ 与「从来没查过」同形）',
+          worldSnapshot: '世界快照库读回（读失败 ⇒ 与「本地没有快照」同形）',
           tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）' };
         const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
           .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');

@@ -4565,6 +4565,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         playtime: '游玩活动基准读回（读失败 ⇒ 与「本聊天从没记过」同形）',
         // v2.156.0（S1）：离线恢复**不新增任何存储键**（票据就是世界状态里的 lastSettledAt），
         //   故本表没有它对应的条目 —— 这不是遗漏，是「零 localStorage」这条边界在诊断面上的样子。
+        // v2.203.0（读侧归因收口）：store 域新增两个来源（history-search / world-snapshot 的裸读）。
+        //   漏进本表 = 消费端退回裸桶名 ⇒ 读者只看到 `historySearch×1` 而不知其后果。
+        //   同族先例：v2.11.0 的 readSpotCheck（自己新增的来源首版漏标）、v2.132.0 的 lifeTurn。
+        historySearch: '历史检索词库读回（读失败 ⇒ 与「从来没查过」同形）',
+        worldSnapshot: '世界快照库读回（读失败 ⇒ 与「本地没有快照」同形）',
         tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）'
       };
       const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
