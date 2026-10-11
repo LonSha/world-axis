@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.195.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.195.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.196.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.196.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -720,7 +720,7 @@
       "src": "engines/bridge.js",
       "refs": 0,
       "tref": 0,
-      "own": 6
+      "own": 7
     },
     "bridge.refresh": {
       "reason": "self-only",
@@ -1327,15 +1327,15 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/coop.js",
       "refs": 0,
-      "tref": 2,
-      "own": 17
+      "tref": 5,
+      "own": 13
     },
     "coop.confirm": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/coop.js",
       "refs": 0,
-      "tref": 15,
+      "tref": 19,
       "own": 3
     },
     "coop.getSettings": {
@@ -1351,7 +1351,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/coop.js",
       "refs": 0,
-      "tref": 10,
+      "tref": 11,
       "own": 3
     },
     "coop.reject": {
@@ -1375,7 +1375,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/coop.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 5,
       "own": 1
     },
     "coop.stamp": {
@@ -1383,7 +1383,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/coop.js",
       "refs": 0,
-      "tref": 14,
+      "tref": 15,
       "own": 5
     },
     "coop.stat": {
@@ -1407,7 +1407,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/coop.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 3,
       "own": 3
     },
     "coop.view": {

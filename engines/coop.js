@@ -409,6 +409,10 @@
           note: '任一条路径应用不到 ⇒ 整份拒收（不做部分成功）' };
       }
     }
+    // v2.196.0（U2 批次⑥）：回执登记搬进**这一笔**。此前它在另一笔事务（coop:receipt）
+    //   里，于是「世界已写、回执没落」成了一种可存在的状态（probe_c 实测：世界已改而回执 0）。
+    //   现在同一笔：世界写入、归档、回执三者同生共死。
+    const wantReceipt = !!(WA.collab && typeof WA.collab.enqueue === 'function');
     let out = null;
     mutate(function (draft) {
       const n = nodeOf(draft);
@@ -423,69 +427,50 @@
         if (!r.ok) { out = { ok: false, reason: 'unappliable', path: live.ops[i].path, why: r.reason }; return false; }
       }
       if (!draft.coop || typeof draft.coop !== 'object') draft.coop = { proposals: [], archive: [] };
-      fileOut(draft.coop, live, 'accepted', '', by, now, '');
-      out = { ok: true, reused: false, id: pid, applied: live.ops.length, receiptId: '' };
+      //   回执面缺席：**整笔拒收**（不提交）—— 世界零改动、提议仍 pending、可原样重试。
+      //   比「先写世界、再报 no-receipt-face」强：后者把世界改了却说「这次不标完成」，
+      //   而世界已经不是读者看到的那个了（不可自愈）。
+      if (!wantReceipt) { out = { ok: false, reason: 'need-receipt' }; return false; }
+      //   collab.enqueue 传入 opts.draft = draft：嵌套入队只推进这份草稿，
+      //   提交（或随保存点撤回）由本笔统一决定。
+      let r = null;
+      try { r = WA.collab.enqueue('coop:' + pid, 'coop-apply', { proposal: pid, by: by, ops: row.load }, { by: by, draft: draft }); }
+      catch (e) { r = { ok: false, reason: 'enqueue-threw', why: (e && e.message) || 'threw' }; }
+      if (!r || r.ok !== true) {
+        out = { ok: false, reason: 'need-receipt', why: (r && r.reason) || 'enqueue-refused' };
+        return false;
+      }
+      //   回执已在同一笔里落定 ⇒ 归档行**如实带上回执号**（traceOf / 归档读数由此可追溯）。
+      fileOut(draft.coop, live, 'accepted', '', by, now, 'r_' + pid);
+      out = { ok: true, reused: false, id: pid, applied: live.ops.length, receiptId: 'r_' + pid };
       return true;
     }, 'coop:confirm');
-    if (!out || !out.ok) return out || { ok: false, reason: 'store-unavailable' };
-    if (out.reused) { S.retried++; return out; }
-    // 回执：走 collab 的离线队列单一出口（本模块不自造第二套排队设施）。
-    //   回执失败 ⇒ 提议**不算已确认**（拉回 pending 并如实报因）——「确认前不标完成」的另一半。
-    let receiptId = '';
-    let receiptDone = false;
-    try {
-      if (WA.collab && typeof WA.collab.enqueue === 'function') {
-        const r = WA.collab.enqueue('coop:' + pid, 'coop-apply', { proposal: pid, by: by, ops: row.load }, { by: by });
-        if (r && r.ok === true) { receiptId = 'r_' + pid; receiptDone = true; }
-        else {
-          mutate(function (draft) {
-            const n = nodeOf(draft);
-            const a = n.archive.filter(function (x) { return x && x.id === pid; })[0];
-            if (a) {
-              // 拉回待处理必须**连状态一起退回**：只把行搬回去而不改状态，外部读到的仍是
-              //   「已确认」（pending() 看不见它、view().byStatus 还记着 accepted），
-              //   那等于「确认前不标完成」只做了一半（实测踩中）。
-              a.status = 'pending'; a.statusLabel = STATUS_CN.pending;
-              a.decidedAt = 0; a.decidedBy = ''; a.receiptId = '';
-              a.reason = 'receipt-failed'; a.updatedAt = now;
-              n.proposals.push(a);
-              n.archive = n.archive.filter(function (x) { return x && x.id !== pid; });
-              if (WA.evict) WA.evict.array(n.proposals, 'coop.proposals');
-            }
-            return true;
-          }, 'coop:receipt-rollback');
-          noteFault('receipt-failed');
-          return { ok: false, reason: 'receipt-failed', why: (r && r.reason) || 'enqueue-refused',
-            worldWritten: true,
-            note: '回执未落 ⇒ 提议退回待处理（世界写入已发生且未撤销，但这次确认**不标完成**）' };
-        }
-      } else {
-        noteFault('no-receipt-face');
-        return { ok: false, reason: 'no-receipt-face', note: '回执面缺席 ⇒ 不标完成' };
+    if (!out || !out.ok) {
+      if (out && out.reason === 'need-receipt') {
+        // v2.196.0（U2 批次⑥）：回执没拿到 ⇒ 整笔未提交（上面那笔 return false 已保住
+        //   世界零改动、提议仍 pending）。旧路径三类拒因（receipt-failed / receipt-threw /
+        //   no-receipt-face）各自留下「世界已改而回执 0」或「永久谎报已确认」，此处并成
+        //   同一条如实拒收：为什么没拿到进 why，世界到底写没写进 worldWritten。
+        noteFault('need-receipt');
+        out.worldWritten = false;
+        out.note = '回执没拿到 ⇒ 整笔不提交；世界零改动、提议仍在待处理、可原样重试';
+        return out;
       }
-    } catch (e) {
-      noteFault('receipt-threw');
-      return { ok: false, reason: 'receipt-threw' };
+      return out || { ok: false, reason: 'store-unavailable' };
     }
-    if (receiptDone) {
-      mutate(function (draft) {
-        const n = nodeOf(draft);
-        const a = n.archive.filter(function (x) { return x && x.id === pid; })[0];
-        if (a) a.receiptId = receiptId;
-        return true;
-      }, 'coop:receipt');
-      S.receipts++;
-      // v2.160.0（TP4）：确认回执落位后补记**跨引擎提交回执** —— 「已提交但当时没记」
-      //   的补账口（core/commit.js 的 settle 只写 commit.receipts，不碰本模块任何世界键）。
-      //   落在这里而不是 confirm 的事务里：settle 是**事务外**的一次独立写入，
-      //   与 collab 回执同处一个「世界已写、通知刚发」的时点。
-      if (WA.commit && typeof WA.commit.settle === 'function') {
-        try { WA.commit.settle('coop:' + pid, { site: 'coop', note: 'coop-apply' }); } catch (e) {}
-      }
+    if (out.reused) { S.retried++; return out; }
+    // 回执已在上面同一笔里登记（本模块不自造第二套排队设施）。
+    const receiptId = 'r_' + pid;
+    S.receipts++;
+    // v2.160.0（TP4）：确认回执落位后补记跨引擎提交回执（core/commit.js 的 settle
+    //   只写 commit.receipts、不碰本模块任何世界键）。settle 是事务外的一次独立写入，
+    //   与 collab 回执同处「世界已写、通知刚发」的时点。
+    if (WA.commit && typeof WA.commit.settle === 'function') {
+      try { WA.commit.settle('coop:' + pid, { site: 'coop', note: 'coop-apply' }); } catch (e) {}
     }
     S.accepted++; S.lastReason = 'accepted';
     return { ok: true, reused: false, id: pid, status: 'accepted', statusLabel: STATUS_CN.accepted,
-      applied: row.ops.length, receiptId: receiptId, at: now };
+      applied: out.applied, receiptId: receiptId, at: now };
   }
   /** 拒绝一份提议（**必带理由与操作者**；拒绝也进归档，不删）。 */
   function reject(id, opts) {

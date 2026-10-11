@@ -325,6 +325,10 @@
       //   用总线事件而不是在 backstage 里直接调本模块：backstage 是最热的链路，
       //   反向依赖会让它在无桥环境下也要持有本模块（本仓库反复治理的「悬空引用」形态）。
       WA.on('backstage:settled', function () { try { invalidate('backstage:settled'); } catch (e) {} });
+      // v2.196.0（U2 批次⑥）：失败也要作废。此前推演失败时世界未写入，却发了 settled
+      //   （而 failed 从来不发），投影因此被白白作废一次。现在两者各自作废——
+      //   作废是幂等的，多一条侧向安全（下次读取一定重建）。
+      WA.on('backstage:failed', function () { try { invalidate('backstage:failed'); } catch (e) {} });
       // 换聊天：上一个会话的世界投影必须立刻作废（否则外部侧会拿到别人的世界）。interceptor 已 emit。
       WA.on('chat:changed', function () { try { invalidate('chat:changed'); } catch (e) {} });
     } catch (e) {}

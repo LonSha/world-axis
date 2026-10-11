@@ -337,6 +337,65 @@ a(sc.faults.indexOf('receipt-failed') >= 0, 'C3a fault 码表里有 receipt-fail
 a(sc.faults.indexOf('step-refused') >= 0, 'C3b fault 码表里有 step-refused（某一步拒签单独成一码）');
 a(WA.commit.chainStat().faultCodes && WA.commit.chainStat().faultCodes.length >= 10, 'C3c chainStat 暴露 fault 码表（诊断面当场可读）');
 
+// ── C4（v2.196.0 U2 批次⑥）：coop.confirm 回执与世界写入同一笔 ──
+//   病灶（probe_c 实测）：旧路径把回执登记放在**另一笔事务**（coop:receipt）里，
+//   于是 enqueue 失败 / 抛错 / 面缺席三种情形都留下「世界已改、回执 0」或
+//   「永久谎报已确认」。本段钉住修法：世界写入、归档、回执**同生共死**。
+function coopSeed(tag) {
+  WA.collab.setSettings({ enabled: false, maxQueue: 8, maxActor: 60 });
+  WA.coop.setSettings({ enabled: false, horizon: 0, allowSelfApprove: false, maxTries: 3, maxView: 60 });
+  S.transact(function (d) {
+    d.people = { 'p_甲': { id: 'p_甲', name: '甲' }, 'p_乙': { id: 'p_乙', name: '乙' } };
+    d.world = d.world && typeof d.world === 'object' ? d.world : {};
+    d.world.places = [{ id: 'pl_A', name: '甲地' }];
+    d.coop = { proposals: [], archive: [], seq: 0 };
+    d.collab = { seq: 0, sessions: [], claims: {}, queue: [], conflicts: [] };
+  }, 'u2c:' + tag);
+  WA.collab.setSettings({ enabled: true, maxQueue: 8, maxActor: 60 });
+  WA.coop.setSettings({ enabled: true, horizon: 0, allowSelfApprove: false, maxTries: 3, maxView: 60 });
+}
+function coopProp(id) {
+  return WA.coop.propose({ opId: id, by: '甲', baseRev: WA.coop.stamp(),
+    ops: [{ path: 'world.places', value: [{ id: 'pl_B', name: '乙地' }] }] });
+}
+function placesOf() { return JSON.stringify((S.get().world.places || []).map(function (p) { return p.name; })); }
+{
+  // ① 正常路径：回执与世界写入同批生效，归档行带上回执号
+  coopSeed('normal');
+  const c_r = coopProp('u2c_normal');
+  const c_c = WA.coop.confirm(c_r.id, { by: '乙' });
+  a(c_c.ok === true && placesOf() === '["乙地"]', 'C4a 正常确认：世界真被写入（' + placesOf() + '）');
+  a((S.get().collab.queue || []).length === 1, 'C4b 正常确认：回执落在离线队列里（单笔写口）');
+  a(!!c_c.receiptId && WA.coop.archive(5)[0] && WA.coop.archive(5)[0].receiptId === c_c.receiptId,
+    'C4c 正常确认：归档行带着回执号（可追溯）');
+  a(WA.coop.traceOf(c_r.id).receiptId === c_c.receiptId, 'C4d traceOf 答得出回执号');
+  // ② 回执面在、但入队被拒 ⇒ 整笔不提交
+  coopSeed('refused');
+  const r2 = coopProp('u2c_refused');
+  const keepC = WA.collab;
+  const keepPlaces = placesOf();
+  let c2;
+  try { WA.collab = { enqueue: function () { return { ok: false, reason: 'witness' }; } }; c2 = WA.coop.confirm(r2.id, { by: '乙' }); }
+  finally { WA.collab = keepC; }
+  a(c2.ok === false && c2.reason === 'need-receipt', 'C4e 入队被拒 ⇒ need-receipt（实 ' + (c2 && c2.reason) + '）');
+  a(c2.worldWritten === false && placesOf() === keepPlaces, 'C4f 入队被拒 ⇒ 世界零改动（' + placesOf() + '）');
+  a(WA.coop.pending().length === 1 && WA.coop.archive(5).length === 0, 'C4g 入队被拒 ⇒ 提议仍在待处理、归档为空');
+  // ③ 原样重试应当能成（世界变更只发生一次）
+  const c3 = WA.coop.confirm(r2.id, { by: '乙' });
+  a(c3.ok === true && c3.reused === false && placesOf() === '["乙地"]',
+    'C4h 原样重试可成（reused=' + c3.reused + '，世界 ' + placesOf() + '）');
+  // ④ 回执面抛错 ⇒ 同样整笔不提交
+  coopSeed('threw');
+  const r3 = coopProp('u2c_threw');
+  const keepPlaces3 = placesOf();
+  let c4;
+  try { WA.collab = { enqueue: function () { throw new Error('witness down'); } }; c4 = WA.coop.confirm(r3.id, { by: '乙' }); }
+  finally { WA.collab = keepC; }
+  a(c4.ok === false && c4.reason === 'need-receipt' && c4.why === 'enqueue-threw',
+    'C4i 回执面抛错 ⇒ need-receipt（why 记下 enqueue-threw，实 ' + c4.why + '）');
+  a(c4.worldWritten === false && placesOf() === keepPlaces3, 'C4j 回执面抛错 ⇒ 世界零改动');
+}
+
 let bad = 0;
 results.forEach(function (r) { if (!r.ok) bad++; console.log((r.ok ? '  ok  ' : '  FAIL') + ' — ' + r.label); });
 console.log('s3-u2-v2194: ' + (results.length - bad) + '/' + results.length + ' 通过');

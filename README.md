@@ -67,7 +67,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.195.0）
+## 构建与验收（当前版本 v2.196.0）
 
 v2.173.0（TX4b）— TX4/TX6/TX7/TX8/TX9 五模块面板接线（渲染 + 绑定 + 登记三面同步）+ 六模块骨架登记补齐（骨架声明 / `__BOUNDED_CAPS` / `evict.SITES` 三段式）+ 两处预存失败收敛 — TX 五张专锁 42/49/44/49/46 全 0 失败。
 
@@ -114,7 +114,7 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（132 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（133 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
@@ -145,6 +145,15 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 <b>八条否定式边界</b>：① 默认关；② choose 记账 ≠ 世界兑现（三段可分离）；③ ops 必须经 rehearsal.preview 白名单；④ 状态变了重新预演；⑤ 不把 rehearsal diff 直接写 live store；⑥ 过期/未知/不可比较分别显示；⑦ review 只读不写；⑧ 不凭空造 ops。
 <b>实测读数</b>：module-registry-gate 文件 <b>184</b> / 命名空间 <b>192</b> / 装载期边 <b>86</b> / 调用期引用 <b>170</b>；拒收码 <b>738 码（见证 481 / 死表 29 / 基线 228）</b>；module-cycle-gate-v2107 pass(65)。
 <b>专锁 <code>tests/s3-tx4-v2168.js</code> 42 / 0</b>。冒烟脚本 <code>tools/tx4_smoke.js</code> 13/13。
+<b>v2.196.0</b> — <b>U2 批次⑥：backstage + coop 两个既有链面消费者收口</b>（<b>第二批优化线第三批</b>：链面上的两个协调模块此前只「接了链」，而「链没成」这件事它们说不出口）。
+<b>它治什么</b>（两条探针实测的真病，不是阅读推断）：
+① <code>engines/backstage.js</code> 的推演结算段：<code>else</code> 分支只记一条 error 日志，随后<b>无条件</b>发 <code>backstage:settled</code> + <code>return { ok:true }</code>。<code>probe_b</code> 实测：链内某一步抛错 ⇒ 世界一格未动、回执 0、事务未提交，而 <code>_start</code> 照样回报成功。两个真消费者因此被骗：<code>ui/panel.js</code> 的悬浮球「呼吸动画」被 <code>settled</code> 关掉（点了中止也不会停在运行态）、<code>engines/bridge.js</code> 的世界投影缓存被无谓作废。
+② <code>engines/coop.js</code> 的 <code>confirm</code> 回执段：提议落世界与「离线队列回执」分属两笔事务。<code>probe_c</code> 实测：<code>enqueue</code> 失败 / 抛错 / 面缺席时，世界<b>已被改</b>而回执从未落位；且 <code>no-receipt-face</code> 分支不拉回 ⇒ 提议停在「已确认」（永久谎报、重试还被「已终态，不重复确认」挡回）。
+<b>修法</b>：① 两态分开 —— <code>settled</code> 只表示真的落库了，失败走新事件 <code>backstage:failed</code>（带 <code>reason</code>）且 <code>_start</code> 如实回 <code>ok:false</code>；<code>backstage:failed</code> 与 <code>settled</code> 一并在面板重绘事件表登记，桥侧同样挂作废订阅。② 回执登记搬进<b>同一笔</b> <code>coop:confirm</code>（<code>collab.enqueue</code> 新增 <code>opts.draft</code>：调用方已在自己的事务里时只推内存，提交或随保存点撤回由外层统一决定，探针 D1/D2/D3 实测），拿不到回执即 <code>return false</code> 让<b>整笔不提交</b>，返体报新码 <code>need-receipt</code>（含 <code>worldWritten:false</code>）—— 世界零改动、提议仍 pending、可原样重试。
+<b>顺带关掉一个同类口子</b>：<code>coop.confirm</code> 走 <code>WA.exec</code> 的 mutate，而该面在<c>执行上下文（dryRun）</c>下会把写入落进沙箱 <code>sink</code>；旧路径在<b>事务外</b>调 <code>collab.enqueue</code> 会穿透沙箱落到真世界。回执与提议同笔后，这条逃逸路径一并消失。
+<b>实测读数</b>：<code>reject-code-gate</code> 产品文件 218 / 内联码 810（见证 <b>534</b> / 死表 <b>50</b> / 基线 <b>226</b>）—— 新增 <code>need-receipt</code>/<code>bad-draft</code> 走见证，<code>enqueue-threw</code> 入死表（回执面自己坏了的第一道防线，产品面无调用方能让它现形），旧三条（<code>no-receipt-face</code>/<code>receipt-failed</code>/<code>receipt-threw</code>）随路径删除而退场；<code>docs/ERROR_CODES.md</code> 同批重生成且 与三源一致。<code>module-registry-gate</code> 文件 205 / 命名空间 213 / 装载期边 108 / 硬边 0 / 调用期引用 212。
+<b>专锁</b>：<code>tests/b9-coop-v2118.js</code> <b>93 / 0</b>（三处破坏锚点随重写改点为回执守卫 + 入队调用 + worldWritten 断言，探针改判「整笔不提交」）；<code>tests/s3-tp4-v2160.js</code> <b>97 / 0</b>（世界写入与回执同事务契约逐字不变，新增 <code>failed</code> 事件哨兵不影响）；<code>tests/s3-u2-v2194.js</code> <b>67 / 0</b>（新增 C4 段：正常路径可追溯 / 入队被拒零改动 / 原样重试可成 / 回执面抛错同样零改动）。
+<b>版本面同批同步</b>：<code>run.js</code> 九处版本钉（15 处）+ 正则白名单 11 处 + 授予型名单 9+6；五把旧专锁交付基线抬到 2.196.0；四台账 <code>version</code> 同步（<code>consumer-ledger</code> 自 2.193.0 追平）。
 <b>v2.195.0</b> — <b>U2 批次⑤：world-blueprint + world-seed 接入统一原子提交链 + `core/commit.js` 的跨层副作用面</b>（<b>第二批优化线第三批</b>：把「世界装成了」与「世界装成的前提做到没有」拆成两张读数表）。
 <b>它治什么</b>：`world-blueprint.importBlueprint` 的机制配置段（<code>setSettings</code>）<b>不落 draft</b>，随不了链的原子性 —— 链里导入一张蓝图、随后整链中止，世界上人 / 地 / 势力全 0（与链一致），而机制开关<b>已经写进 settingsBus</b>：同一刻「这个世界没装成」与「这个世界机制已改了」两个互斥事实同时成立。旧口径的 <code>defer</code>（世界提交后可补做的<b>通知面</b>）治不了它 —— 推迟机制等于让世界带着没生效的机制先落地，那是另一种半写。
 <b>交付物</b>：<code>core/commit.js</code> 新增 <code>effect(chainObj, kind, fn)</code> / <code>pending()</code> 两读口（<b>导出面 15 → 17</b>）、<code>LIMITS_EFFECT = { LIST: 8 }</code>、<code>CHAIN_FAULTS</code> 14 项（新增 <code>bad-effect</code> / <code>chain-effects-full</code>）、<code>markPending()</code>（链中止时把已做未提交的副作用推进有界待办，<b>不自动重放</b> —— 机制开关按浏览器全局存，自动重做等于把一个聊天的配置写到所有聊天）、链回执回带 <code>effects</code> / <code>effectMiss</code>；<code>engines/world-blueprint.js</code> 的读口链上改查链草稿、写口三态如实标注（<code>chain:true/persisted:false/projected:true</code>）、机制段改 <code>{applied, refused, failed}</code> 三栏（链上经 <code>WA.commit.effect</code> 逐项记账，失败额外 <code>commit.step</code> 并写本模块 <code>faults</code>）；<code>engines/world-seed.js</code> 同型接入（明确<b>不动</b> <code>initConfirm</code> —— 初始化是「开新局」，本质是顶层操作）；<code>engines/tool-diag.js</code> 的 <code>commit</code> 节接上两个新读口（<b>各有产品侧真消费者</b>，不停在 test-only）。

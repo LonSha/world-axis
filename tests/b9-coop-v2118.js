@@ -49,15 +49,15 @@ const A_SELF    = "    if (!cfg.allowSelfApprove && row.by === by) {";
 const A_HOLDER  = "    if (holder && holder !== by) {";
 const A_STALE   = "      if (!shapeOnly) {";
 const A_DRY     = "    const dry = JSON.parse(JSON.stringify(state()));";
-const A_RCV     = "        if (r && r.ok === true) {";
+const A_RCV     = "      try { r = WA.collab.enqueue('coop:' + pid, 'coop-apply', { proposal: pid, by: by, ops: row.load }, { by: by, draft: draft }); }";
 const A_ARCH    = "    n.proposals = n.proposals.filter(function (x) { return x && x.id !== row.id; });";
 const A_EVARC   = "    if (WA.evict) WA.evict.array(n.archive, 'coop.archive');";
 const A_RTRY    = "    if (gone.status !== 'rejected') {";
 const A_TRIES   = "    if (gone.tries >= cap) {";
 const A_VISP    = "      const visible = !owner || owner === me;";
 const A_VISN    = "      const m = /^people\\.([^.]+)\\.private\\b/.exec(o.path);";
-const A_RBS     = "              a.status = 'pending'; a.statusLabel = STATUS_CN.pending;";
-const A_RBR     = "            worldWritten: true,";
+const A_RBS     = "      if (!r || r.ok !== true) {";
+const A_RBR     = "        out.worldWritten = false;";
 const A_STAMP   = "    return { rev: fingerprint(json), keys: Object.keys(w).length, chars: json.length };";
 const A_BOOK    = "  const BOOK = { meta: 1, coop: 1, collab: 1 };";
 const A_ACTOR   = "    const a = clean(by, 60);\n    if (!a) return { ok: false, reason: 'missing-actor' };";
@@ -83,8 +83,8 @@ const BROKEN = [
     why: '角色被别的会话占着也照确认 ⇒ 两人同时占同一角色的结果不确定' },
   { rel: REL, key: 'stale', from: A_STALE, to: "      if (false) {",
     why: '版本不等也照接收 ⇒ 变成「自动合并任意世界」（B9 明确不进入近期交付）' },
-  { rel: REL, key: 'rcv', from: A_RCV, to: "        if (false) {",
-    why: '回执失败也当成功 ⇒ 断线重连后的确认没有可追溯回执（验收点名）' },
+  { rel: REL, key: 'rcv', from: A_RCV, to: "      try { r = { ok: false }; }",
+    why: '回执面缺席也照接收 ⇒ 该跑的回执守卫整个不生效（回执面坏了谁也停下来）' },
   { rel: REL, key: 'arch', from: A_ARCH, to: "    n.proposals = n.proposals.filter(function (x) { return true; });",
     why: '终态行不离开待裁队列 ⇒ 历史归档与待办混在一起' },
   { rel: REL, key: 'evarc', from: A_EVARC, to: "    if (false) WA.evict.array(n.archive, 'coop.archive');",
@@ -97,10 +97,10 @@ const BROKEN = [
     why: '私有条目对谁都可见 ⇒ 「每位玩家只获得自身视点」被绕过' },
   { rel: REL, key: 'visn', from: A_VISN, to: "      const m = null;",
     why: '私有形状认不出 ⇒ 视点过滤整条失效（看似有过滤、实际全放行）' },
-  { rel: REL, key: 'rbs', from: A_RBS, to: "              void 0;",
-    why: '回执失败只搬行不改状态 ⇒ 行在待裁队列里却仍写着「已确认」（不标完成只做一半）' },
-  { rel: REL, key: 'rbr', from: A_RBR, to: "            worldWritten: false,",
-    why: '世界写入已发生却说没发生 ⇒ 调用方以为可以整体重放' },
+  { rel: REL, key: 'rbs', from: A_RBS, to: "      if (false) {",
+    why: '回执拿不到也不拦 ⇒ 「回执与世界同一笔」这条守卫被旁路（worldWritten 说成假也没用）' },
+  { rel: REL, key: 'rbr', from: A_RBR, to: "        out.worldWritten = true;",
+    why: '世界零改动却谎报已写入 ⇒ 接收方无法区分「这笔没成」与「世界已动」（U2 批次⑥）' },
   { rel: REL, key: 'stamp', from: A_STAMP, to: "    return { rev: (state().meta && Number(state().meta.stateRev)) || 0, keys: Object.keys(w).length, chars: json.length };",
     why: '版本戳用事务计数器 ⇒ 提议一提交就把自己弄 stale，任何提议都确认不了' },
   { rel: REL, key: 'book', from: A_BOOK, to: "  const BOOK = { meta: 1 };",
@@ -347,17 +347,22 @@ const PROBES = {
       && pick(other, 'people.甲.private') === false && pick(third, 'people.乙.private') === false)
       ? 'view-isolated' : 'leak:' + JSON.stringify([pick(mine, 'people.乙.private'), pick(third, 'people.乙.private')]);
   },
-  // ⑰ 回执失败 ⇒ 退回待处理（连状态一起），且如实说世界已写
+  // ⑰ v2.196.0（U2 批次⑥）：回执拿不到 ⇒ 整笔不提交。世界零改动、提议仍 pending、归档为空、
+  //   如实报 worldWritten:false（回执与世界同一笔）。
   pReceipt: function (env) {
     const WA = mkW(env.ov);
     const r = one(WA);
-    WA.collab.setSettings({ enabled: false });
-    const c = WA.coop.confirm(r.id, { by: '乙' });
+    const before = JSON.stringify(WA.store.get().world.places || []);
+    const keep = WA.collab;
+    let c;
+    //   回执面**在**，但入队被拒：这样才真走到「回执拿不到就不提交」那一行。
+    try { WA.collab = { enqueue: function () { return { ok: false, reason: 'witness' }; } };
+      c = WA.coop.confirm(r.id, { by: '乙' }); } finally { WA.collab = keep; }
+    const after = JSON.stringify(WA.store.get().world.places || []);
     const p = WA.coop.pending();
-    const backRow = p.filter(function (x) { return x.id === r.id; })[0];
-    return (c.ok === false && c.reason === 'receipt-failed' && c.worldWritten === true
-      && WA.coop.archive(5).length === 0 && !!backRow)
-      ? 'receipt-rolled-back' : 'bad:' + JSON.stringify([c && c.reason, p.length]);
+    return (c.ok === false && c.reason === 'need-receipt' && c.worldWritten === false
+      && after === before && WA.coop.archive(5).length === 0 && p.length === 1)
+      ? 'receipt-atomic' : 'bad:' + JSON.stringify([c && c.reason, p.length]);
   },
   // ⑱ 关闭时拒收、零台账
   pOff: function (env) {
@@ -457,15 +462,15 @@ const N1 = [
   { k: 'self',    p: 'pSelf',      okk: 'self-refused',            note: '提议人能自审' },
   { k: 'holder',  p: 'pHolder',    okk: 'claim-not-taken',         note: '占用中的角色被照确认' },
   { k: 'stale',   p: 'pStale',     okk: 'stale-refused',           note: '版本不等也照接收' },
-  { k: 'rcv',     p: 'pConfirm',   okk: 'confirmed-and-applied',   note: '回执失败也当成功' },
+  { k: 'rcv',     p: 'pConfirm',   okk: 'confirmed-and-applied',   note: '回执面缺席也照接收（回执守卫全不生效）' },
   { k: 'arch',    p: 'pArchive',   okk: 'archived-full',           note: '终态行不离开待裁队列' },
   { k: 'evarc',   p: 'pEvArch',    okk: 'archive-bounded',         note: '归档无界增长（两轮 48 条没有被挤回 40）' },
   { k: 'rtry',    p: 'pRetry',     okk: 'retry-capped',            note: '已确认的提议也被重试（终态行被拉回队列）' },
   { k: 'tries',   p: 'pRetry',     okk: 'retry-capped',            note: '重试无上限' },
   { k: 'visp',    p: 'pView',      okk: 'view-isolated',           note: '私有条目对谁都可见' },
   { k: 'visn',    p: 'pView',      okk: 'view-isolated',           note: '私有形状认不出（过滤形同虚设）' },
-  { k: 'rbs',     p: 'pReceipt',   okk: 'receipt-rolled-back',     note: '回执失败只搬行不改状态' },
-  { k: 'rbr',     p: 'pReceipt',   okk: 'receipt-rolled-back',     note: '世界已写却说没写' },
+  { k: 'rbs',     p: 'pReceipt',   okk: 'receipt-atomic',          note: '回执失败后仍按旧路径标完成' },
+  { k: 'rbr',     p: 'pReceipt',   okk: 'receipt-atomic',          note: '世界零改动却谎报已写入' },
   { k: 'stamp',   p: 'pStamp',     okk: 'stamp-content-only',      note: '提议自提交即 stale（任何提议都裁不了）' },
   { k: 'book',    p: 'pBookkeeping', okk: 'bookkeeping-inert',     note: '别人的会话把在途提议判 stale' },
   { k: 'actor',   p: 'pActor',     okk: 'explicit-identity',       note: '操作者可为空' },
@@ -535,7 +540,7 @@ function runNegative(a) {
   a(probeClean(PROBES.pArchive) === 'archived-full', 'v2118/b9: [N2] 原版成立 :: 归档带负载/裁决人/回执');
   a(probeClean(PROBES.pRetry) === 'retry-capped', 'v2118/b9: [N2] 原版成立 :: 重试有上限且可追溯');
   a(probeClean(PROBES.pView) === 'view-isolated', 'v2118/b9: [N2] 原版成立 :: 视点隔离');
-  a(probeClean(PROBES.pReceipt) === 'receipt-rolled-back', 'v2118/b9: [N2] 原版成立 :: 回执未落即退回待处理');
+  a(probeClean(PROBES.pReceipt) === 'receipt-atomic', 'v2118/b9: [N2] 原版成立 :: 回执拿不到即整笔不提交（世界零改动）');
   a(probeClean(PROBES.pOff) === 'off-refused', 'v2118/b9: [N2] 原版成立 :: 关闭拒收且零台账');
   a(probeClean(PROBES.pActor) === 'explicit-identity', 'v2118/b9: [N2] 原版成立 :: 身份只认显式 by');
   a(probeClean(PROBES.pUnknown) === 'unknown-refused', 'v2118/b9: [N2] 原版成立 :: 认不出的角色拒收');
@@ -560,7 +565,7 @@ function runNegative(a) {
   a(ok2 !== bad2 && ok2 === 'stamp-content-only', 'v2118/b9: [N4] 版本戳判据非恒真（原版 ' + ok2 + ' / 破坏 ' + bad2 + '）');
   const ok3 = probeClean(PROBES.pReceipt);
   const bad3 = probeWith(BROKEN[B.rbs], PROBES.pReceipt);
-  a(ok3 !== bad3 && ok3 === 'receipt-rolled-back', 'v2118/b9: [N4] 回执回退判据非恒真（原版 ' + ok3 + ' / 破坏 ' + bad3 + '）');
+  a(ok3 !== bad3 && ok3 === 'receipt-atomic', 'v2118/b9: [N4] 回执原子性判据非恒真（原版 ' + ok3 + ' / 破坏 ' + bad3 + '）');
   const ok4 = probeClean(PROBES.pHolder);
   const bad4 = probeWith(BROKEN[B.holder], PROBES.pHolder);
   a(ok4 !== bad4 && ok4 === 'claim-not-taken', 'v2118/b9: [N4] 占用判据非恒真（原版 ' + ok4 + ' / 破坏 ' + bad4 + '）');

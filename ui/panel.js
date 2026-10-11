@@ -9684,7 +9684,10 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
   //   面板自身不重绘 ⇒ 运行态行只会停留在渲染那一刻的值（点了中止也不会变回「空闲」）。
   const STATE_EVENTS = ['clock:changed', 'chapters:changed', 'registry:changed', 'oracle:plan',
     'directEvent:started', 'directEvent:ended', 'chat:changed', 'api:channel-changed', 'backstage:settings',
-    'backstage:started', 'backstage:settled'];
+    'backstage:started', 'backstage:settled',
+    // v2.196.0（U2 批次⑥）：推演结算**失败**此前不发声（backstage 旧路径无论成败都只发 settled）。
+    //   现在失败发 failed：面板因此得以重绘（否则「推演运行态」抹上去就擦不掉）。
+    'backstage:failed'];
   WA.ui = {
     STATE_EVENTS: STATE_EVENTS,
     // v2.2.0: 当前页只读访问（UI 绑定守卫需要区分「非当前页控件不在 DOM」与「真断裂」）

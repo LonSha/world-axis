@@ -287,6 +287,14 @@ const DEAD = {
   // v2.173.0（TX4b 修复）：not-authorized 从死表移除——inst.decide 路径有真见证（L3062），
   //   不再是结构不可达。同一个 reason 码同时出现在 operations.enact（anchor 指向此处）
   //   和 inst.decide（见证 trip 跑出）两条路径上——后者可达，故整个码不是 dead。
+  // v2.196.0（U2 批次⑥）：coop.confirm 把回执登记搬进同一笔后，新增一个**
+  //   防御性**抛错码：WA.collab.enqueue 在草稿内抛出时，记下 enqueue-threw 再归成
+  //   need-receipt 拒收。产品面没有任何调用方会让 enqueue 在草稿内抛错（coop 传的
+  //   是一份合法草稿），故结构上不可观测——不删：它是「回执面自己坏了」的第一道防线。
+  'enqueue-threw': {
+    anchor: "catch (e) { r = { ok: false, reason: 'enqueue-threw', why: (e && e.message) || 'threw' }; }",
+    why: 'coop.confirm: collab.enqueue threw inside the confirm draft. Needs a collab face whose enqueue throws when handed a valid draft (no product caller does).'
+  },
   'projects-full': {
     anchor: "if (projects().length >= cfg.maxProjects) { noteFault('projects-full'); return { ok: false, reason: 'projects-full', cap: cfg.maxProjects }; }",
     why: 'operations.enact: max projects reached. Needs 32+ existing projects.'
@@ -3102,36 +3110,23 @@ function runWitness(WA) {
         const c = CP.confirm(r.id, { by: '乙' });
         return [c.reason];
       });
-      want('no-receipt-face', 'coop.confirm：回执面缺席 ⇒ 不标完成（确认前不标完成的另一半）（拓展⑨）');
-      trip('no-receipt-face', function () {
+      //   v2.196.0（U2 批次⑥）：上面三条（no-receipt-face / receipt-failed / receipt-threw）已废。
+      //   旧路径把回执登记放在**另一笔事务**里，于是「世界已改、回执没落」
+      //   成了一种可存在的状态，且不可自愈（probe_c 实测）。现在回执与世界同一笔：
+      //   拿不到回执 ⇒ **整笔拒收**，一条码（need-receipt）说清三件事：
+      //   为什么没拿到（why）、世界写没写（worldWritten:false）、能不能重试（可）。
+      want('need-receipt', 'coop.confirm：回执拿不到（面缺席 / 拒收 / 抛错）⇒ 整笔不提交：世界零改动、提议仍 pending、可原样重试（拓展⑨ / U2 批次⑥）');
+      trip('need-receipt', function () {
         seed();
-        const r = mk({ opId: 'nrf' });
+        const r = mk({ opId: 'nr' });
         try { WA.collab = null; } catch (e) { return []; }
         let c;
         try { c = CP.confirm(r.id, { by: '乙' }); }
         finally { WA.collab = keepCollab; }
         return [c.reason];
       });
-      want('receipt-failed', 'coop.confirm：回执没落 ⇒ 世界写入已发生但这次确认不标完成，并把提议退回待处理（拓展⑨）');
-      trip('receipt-failed', function () {
-        seed();
-        const r = mk({ opId: 'rf' });
-        WA.collab = { enqueue: function () { return { ok: false, reason: 'witness' }; } };
-        let c;
-        try { c = CP.confirm(r.id, { by: '乙' }); }
-        finally { WA.collab = keepCollab; }
-        return [c.reason];
-      });
-      want('receipt-threw', 'coop.confirm：回执面抛错 ⇒ 不吞掉，如实记为 receipt-threw（拓展⑨）');
-      trip('receipt-threw', function () {
-        seed();
-        const r = mk({ opId: 'rt' });
-        WA.collab = { enqueue: function () { throw new Error('collab down'); } };
-        let c;
-        try { c = CP.confirm(r.id, { by: '乙' }); }
-        finally { WA.collab = keepCollab; }
-        return [c.reason];
-      });
+      //   （三件事：为什么没拿到（why）、世界写没写（worldWritten:false）、能不能重试（可）——
+      //   行为面三条一起验，锁在 tests/s3-u2-v2194.js 同次线的专锁里；本处只管「这条码跑得到」。）
 
       seed();
       CP.setSettings(keepCfg);

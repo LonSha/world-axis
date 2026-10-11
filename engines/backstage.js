@@ -427,7 +427,19 @@
             // v0.8 账本差分记录
             if (WA.ledger) WA.ledger.recordChanges();
           }
-          else WA.log('error', '世界推演结算事务失败，未提交');
+          else {
+            // v2.196.0（U2 批次⑥）：**失败不再冒充成功**。此前这里只记一条 error 日志，
+            //   随后**无条件**走 emit('backstage:settled') + return { ok:true }。实测
+            //   （probe_b.js）：链内某一步抛错 ⇒ 世界一格未动、回执 0、事务未提交，
+            //   而 _start 照样回报成功、照样发 settled。两个真消费者因此被骗：
+            //     · ui/panel.js 的悬浮球「呼吸动画」被 settled 关掉（点了中止也不会停在运行态）；
+            //     · engines/bridge.js 的世界投影缓存被无谓作废（白扔一次重建）。
+            //   两态必须分开：settled **只**表示真的落库了；失败走 failed（带上得病理由）。
+            WA.log('error', '世界推演结算事务失败，未提交');
+            const __why = 'store-' + ((tx && (tx.aborted ? 'aborted' : tx.error ? 'threw' : 'refused')) || 'failed');
+            WA.emit('backstage:failed', { id, anchor, reason: __why });
+            return { ok: false, reason: __why };
+          }
         }
         WA.emit('backstage:settled', { id, anchor });
         return { ok: true };

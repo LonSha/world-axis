@@ -50,7 +50,9 @@
     // v2.139.0（E10）：协作任务四枚。各自对应一句产品承诺，互不合并：
     //   bad-task 任务号坏 / 不存在；not-due 还没到截止；too-few 参与人数不足 2；
     //   not-on-roster 罚没目标不在名册（org.penalize 的原话，转到任务面如实转述）。
-    'bad-task', 'not-due', 'too-few', 'not-on-roster'];
+    'bad-task', 'not-due', 'too-few', 'not-on-roster',
+    // v2.196.0（U2 批次⑥）：嵌套入队时给了坏草稿（非对象 / 是数组）⇒ 如实拒收。
+    'bad-draft'];
 
   const STRATEGIES = ['last-write-wins', 'keep-a', 'keep-b'];
 
@@ -248,14 +250,29 @@
         : (typeof payload === 'string' ? payload.slice(0, 200) : JSON.stringify(payload).slice(0, 200));
     } catch (e) { pl = null; }
     const row = { opId: id, kind: k, payload: pl, by: txt((opts && opts.by) || '', cfg.maxActor) || null, at: clockWall(), flushedAt: null };
-    const out = WA.store.transact(function (draft) {
+    const put = function (draft) {
       const c = draft.collab || {};
       if (!Array.isArray(c.queue)) c.queue = [];
       c.queue.push(row);
       prune(c);
       draft.collab = c;
       return true;
-    });
+    };
+    // v2.196.0（U2 批次⑥）：**嵌套入队**。调用方（coop.confirm）已在自己的事务里时，
+    //   回执必须跟着**那笔事务**一起成败（否则就是 probe_c 实测到的半写：世界已改、回执没落）。
+    //   故 opts.draft 给出时**只推进那份草稿**，不自开事务；草稿坏就如实拒收，
+    //   不静默退回自开事务（那会把「随外层提交」悤惄地变成「独立提交」）。
+    if (opts && opts.draft !== undefined) {
+      if (!opts.draft || typeof opts.draft !== 'object' || Array.isArray(opts.draft)) {
+        noteFault('bad-draft'); return { ok: false, reason: 'bad-draft' };
+      }
+      put(opts.draft);
+      stat.enqueued++;
+      //   queued 报草稿里的最终条数（不报底库）：嵌套时底库还没提交，
+      //   报底库会把「还没发生的事」说成已经发生。
+      return { ok: true, opId: id, queued: b.queue.length + 1, nested: true };
+    }
+    const out = WA.store.transact(put);
     if (out && out.ok === false) { noteFault('store-unavailable'); return { ok: false, reason: 'store-unavailable' }; }
     stat.enqueued++;
     return { ok: true, opId: id, queued: b.queue.length + 1 };

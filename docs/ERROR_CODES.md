@@ -1,15 +1,15 @@
 # WorldAxis 拒收码手册（自动生成：`node tools/gen-error-codes.js`）
 
-> 台账 version：`2.195.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
+> 台账 version：`2.196.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **811** 个内联拒收码：见证 536 / 死表 49 / 基线 226
+共 **810** 个内联拒收码：见证 534 / 死表 50 / 基线 226
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（536）
+## 见证（可执行）（534）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -265,6 +265,7 @@
 | `name-taken` | engines/session.js, actors/registry.js | registry.bindAlias：一个旧名只能有一个主人（两个主人 ⇒ 同一行解析出两种身份，v2.97.0 O9） |
 | `narrative-only` | engines/org.js | org.projectView：只记了档位词 ⇒ 叙事档读数（B5） |
 | `need-confirm` | engines/chrono.js, engines/collab.js | chrono.applyUndo：缺 `{confirm:true}` ⇒ need-confirm（「试算」与「真做」必须分开说：默认走 undo 的 dryRun，绝不默认落地，v2.112.0 plan-2 #33） |
+| `need-receipt` | engines/coop.js | coop.confirm：回执拿不到（面缺席 / 拒收 / 抛错）⇒ 整笔不提交：世界零改动、提议仍 pending、可原样重试（拓展⑨ / U2 批次⑥） |
 | `need-resync` | engines/session.js | session.since：要的那段已挤出历史窗口 ⇒ 不假装没漏，先重同步（拓展⑥） |
 | `need-steps` | engines/agency.js | agency：有目标无计划返回 need-steps（不编步骤）（TX2） |
 | `need-unmet` | engines/act.js, engines/plan.js | act.admit：资源不够就是不够，不把负数伪装成成功（B1） |
@@ -308,7 +309,6 @@
 | `no-proposal` | engines/coop.js | coop：这份提议不存在（也没在归档里）⇒ 不凭一个 id 编出一次裁决（确认/拒绝/重试同一道闸）（拓展⑨） |
 | `no-reading` | engines/inject-value.js, engines/plot-gauge.js | injectValue.settle：没有待结算的观察 ⇒ 如实拒答（不拿别的轮次凑数）（v2.150.0 RP4） |
 | `no-receipt` | core/commit.js, engines/mend.js | commit.replay：该 opId 从未提交过 ⇒ 拒收 no-receipt（「没提交过」与「提交过但归档没了」不可同形） |
-| `no-receipt-face` | engines/coop.js | coop.confirm：回执面缺席 ⇒ 不标完成（确认前不标完成的另一半）（拓展⑨） |
 | `no-rotation` | render/inject.js | 未注入过时照实拒答（不编一份空解释当答案，v2.90.0 O3） |
 | `no-scene` | engines/campaign.js, engines/perspective-lock.js, engines/recipe.js | campaign.advance：还没开局时的推进 |
 | `no-sections` | actors/registry.js | setProfileSafe 传空节（无任何变更） |
@@ -405,8 +405,6 @@
 | `quiet-period` | engines/gen-gate.js | B1：刚换章先把主线立住 ⇒ 新章静默期未过时拒插支线 |
 | `rand-absent` | engines/causal.js | 随机源缺席时如实拒收（不静默降级成「录了一卷空的」） |
 | `range-off` | engines/noesis.js | noesis.perceive：感知半径开关关闭 ⇒ 如实报 range:unknown + range-off，不把它读成「可达」（「没开这条闸」与「人真不可达」是两回事） |
-| `receipt-failed` | engines/coop.js | coop.confirm：回执没落 ⇒ 世界写入已发生但这次确认不标完成，并把提议退回待处理（拓展⑨） |
-| `receipt-threw` | engines/coop.js | coop.confirm：回执面抛错 ⇒ 不吞掉，如实记为 receipt-threw（拓展⑨） |
 | `record-failed` | core/audit-log.js | auditLog.record：连「取属性即抛」的敌意 opts 都吞成归因 ⇒ 从不抛、不改产品行为（v2.111.0 plan-2 #67） |
 | `recorded` | engines/org.js | org.projectView：至少一项记了刻数 ⇒ 精确档读数（B5） |
 | `recording` | core/rand.js | 录制中拒绝进入回放（否则这一次推进既录又放、两边都不是） |
@@ -550,7 +548,7 @@
 | `write-failed` | core/settings-bus.js, engines/checkpoints.js, engines/gen-gate.js, engines/life.js, engines/playtime.js, engines/preset-world.js, engines/wb-inject.js | life.tick：游标落盘时 setItem 抛错 ⇒ 吞成 write-failed 并如实进返回值（不假装落盘成功，也不让异常穿出去把调用方搞挂；v2.132.0 O19） |
 | `wrongs-full` | engines/probe.js | probe.wrong：误指留痕达上限 ⇒ 不静默丢弃（查错人也要留下痕迹）（拓展⑤） |
 
-## 死表（已证不可达）（49）
+## 死表（已证不可达）（50）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -561,7 +559,7 @@
 | `already-revealed` | engines/investigation.js | investigation.reveal: clue already revealed to this person. |
 | `already-running` | engines/agency.js | agency.checkPrereqs: current step already running. Needs schedule to be called once before. |
 | `backup-corrupt` | core/settings-bus.js | v2.83.0（B6）cfgRollback 的备份解析出口，在当前设计下**结构上不可达**：cfgRollback 只在「写盘阶段中途失败」时被调用，而进入写盘阶段的前提是**导入前备份已成功写入**（备份失败会在写盘前以 backup-failed 拒收整次导入，见 settings-bus 的写盘前置条件）。而备份成功必然把同一个备份键覆写成合法 JSON ⇒ cfgRollback 读到的必是合法 JSON。故要走这条分支，得先有一个「存在但不是 JSON」的备份键，同时备份写入又失败——与前置条件互斥。不删：第三方脚本或外部工具若直接调用回滚入口（或未来备份环引入多源写入），它是第一道防线；届时本门禁会以 deadLeak 提醒「该码可能复活」。 |
-| `bad-draft` | actors/registry.js | registry.ensurePerson（v2.86.0 A3，people 条目的唯一写者）的入参守卫，在现有调用面上结构不可达：它的调用点（life.person / intel.personRow / backstage 两处 / registry.setProfileSafe）全部位于 store.transact(function (draft) {...}) 回调内，而 transact 保证传入骨架草稿对象。不删：唯一写者是对外导出，越界调用时它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。 |
+| `bad-draft` | engines/collab.js, actors/registry.js | registry.ensurePerson（v2.86.0 A3，people 条目的唯一写者）的入参守卫，在现有调用面上结构不可达：它的调用点（life.person / intel.personRow / backstage 两处 / registry.setProfileSafe）全部位于 store.transact(function (draft) {...}) 回调内，而 transact 保证传入骨架草稿对象。不删：唯一写者是对外导出，越界调用时它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。 |
 | `bad-operator` | engines/kaleidoscope.js | parseCmp 的筛选形式是：取 tk，要求 tk.t === "op"，p++，v := tk.v；而 tokenize 产 op 的分支只输出 >=/<=/==/!=/>/<，该集合恰是下面 if/else 链的全部分支，故 else 永不取。穷举验证：6174 个长度≤3 的词法组合全跑一遍，该码零见证。不删：若未来新增比较符，它是第一道防线（本面门禁会在那时通过 deadLeak 提醒「该码可能复活」）。 |
 | `bad-state` | engines/commission.js, engines/freight.js | freight.arrive/cancel/reroute: shipment not in transit state. Needs prior dispatch + state change. |
 | `branchtree-absent` | engines/story-choice.js | storyChoice.present/confirm: branchTree module not loaded. Cannot trigger in standard boot (branchTree always loaded). |
@@ -574,6 +572,7 @@
 | `effects-full` | engines/aftermath.js | aftermath.register: max effects reached. Needs 48+ existing effects in state. |
 | `end-failed` | engines/causal.js | causal.record（v2.89.0 O2）的收卷失败出口，在现有设计下**结构不可达**：进入该分支的前提是 beginTape 成功，而 beginTape 成功必然把磁带置于 open=true；endTape 的拒收条件恰是“磁带不存在或已收卷”，两者互斥。唯一能造出“begin 成功但 end 拒绝”的路径是自己先把磁带收掉，而收卷发生在 finally 里、fn 体拿不到句柄。不删：将来若磁带面被改成可重入（外部可提前收卷），它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。 |
 | `enigma-failed` | engines/investigation.js | investigation.reveal: enigma.mark failed. Needs enigma to reject the mark call. |
+| `enqueue-threw` | engines/coop.js | coop.confirm: collab.enqueue threw inside the confirm draft. Needs a collab face whose enqueue throws when handed a valid draft (no product caller does). |
 | `fork-failed` | engines/story-choice.js | storyChoice.present: branchTree.fork returned failure. Needs branchTree to reject the fork call. |
 | `insufficient-budget` | engines/operations.js | operations.enact: org has insufficient resources for budget. Needs faction with low gold. |
 | `insufficient-evidence` | engines/investigation.js | investigation.reveal: evidence verdict not verified/cannot-judge. Needs insufficient evidence. |
