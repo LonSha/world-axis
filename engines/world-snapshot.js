@@ -47,6 +47,9 @@
  *   ② 缺失模块 / 旧 schema / 冲突键三类都有拒收或预览 —— `checkCompat()` 的
  *     `unknownFaces` / `schemaAhead` / `conflicts` 三栏，各由专锁逐条驱动；
  *   ③ 导入大世界时有容量预检 —— `capacity()`（超限 `budget-exceeded`，**不静默截断**）；
+ *      v2.205.0（优化 1）：判据从「读快照自报的 `bytes`」改成「**从内容复算**」——
+ *      自报值可以被虚报（实测 `{bytes:1}` 配 2.2MB 内容 ⇒ 旧实现回报 `ok:true` 放行，
+ *      2MB 预算形同虚设），而序列化长度是内容本身的函数、虚报不动它；
  *   ④ 损坏文件有可读错误而不是抛异常 —— `parse()` 把 JSON 解析失败收成
  *     `{ok:false, reason:'bad-json', detail}`，专锁 N 组用真源码破坏两向自证。
  *
@@ -248,7 +251,7 @@
       } else if (Array.isArray(inc) && Array.isArray(cur) && cur.length) {
         // 数组面（编年史 / 事实 / 拍账…）：冲突判据是**有没有东西**，不是逐元素比 ——
         //   逐元素比会把「同一条在不同局里长得一样」误判成不冲突（id 是局内生成的）。
-        diff.conflicts.push({ face: k, keys: ['(数组面非空)'], n: cur.length });
+        diff.conflicts.push({ face: k, keys: ['(数组面非空)'], n: cur.length, array: true });
       }
     });
     const blocking = diff.unknownFaces.length > 0;
@@ -283,8 +286,33 @@
       const c = confMap[face];
       if (!c) { add.push({ face: face, n: faceSize(snap.faces[face]) }); return; }
       if (mode === 'newslot') { add.push({ face: face, n: faceSize(snap.faces[face]), note: '另开槽：不碰当前世界' }); return; }
-      if (overwrite) { over.push({ face: face, n: c.n }); return; }
+      if (overwrite) {
+        // 数组面（编年史 / 事实 / 拍账…）的「覆盖」是**整面替换**：本地那一整卷被换掉，
+        //   不是逐键改。预览必须说清是哪一种 —— 两种处置在结果上天差地别。
+        over.push(c.array
+          ? { face: face, n: faceSize(snap.faces[face]), replaced: c.n, note: '整面替换（本地 ' + c.n + ' 条被替换）' }
+          : { face: face, n: c.n });
+        return;
+      }
       if (rename) { ren.push({ face: face, as: face + '·' + (snap.sig || 'snap'), n: c.n }); return; }
+      if (c.array) {
+        // v2.205.0（优化 1）：数组面的默认支**不是「跳过」**，而是「并进不重复的条目」
+        //   （按 JSON 逐字去重）。旧预览一律报「将要跳过（冲突保留）」，与真结果
+        //   不同源 —— 玩家看到「跳过」以为本地那卷没被碰，实际已经被并进了新条目。
+        //   这里按**与导入侧同一套算法**复算，两处读数逐字对得上。
+        const curArr = Array.isArray(s[face]) ? s[face] : [];
+        const seen = {};
+        curArr.forEach(function (x) { seen[sig(JSON.stringify(x))] = true; });
+        let addN = 0, dupN = 0;
+        (Array.isArray(snap.faces[face]) ? snap.faces[face] : []).forEach(function (x) {
+          const h = sig(JSON.stringify(x));
+          if (seen[h]) { dupN++; return; }
+          seen[h] = true; addN++;
+        });
+        if (addN) add.push({ face: face, n: addN, note: '并进不重复的条目（本地已有的不重复追加）' });
+        if (dupN) skip.push({ face: face, n: dupN, added: addN, why: 'conflict-kept' });
+        return;
+      }
       skip.push({ face: face, n: c.n, why: 'conflict-kept' });
     });
     const cap = capacity(snap);
@@ -297,12 +325,23 @@
   function faceSize(v) { return Array.isArray(v) ? v.length : (isObj(v) ? Object.keys(v).length : 0); }
   /** 容量预检：超预算拒收（**不截断** —— 截断会让「搬过来了」变成半句话）。 */
   function capacity(snap) {
-    const bytes = Number((snap && snap.bytes) || (snap ? JSON.stringify(snap).length : 0));
+    // v2.205.0（优化 1）：**不复信自报值**。判据 = max(实际序列化长度, 自报值)：
+    //   · 实际长度由内容算出，虚报小不了（旧实现只读 `snap.bytes`，`{bytes:1}` + 2.2MB
+    //     内容能整包绕过 2MB 预算 —— 探针实测旧实现回报 `{ok:true, bytes:1}`）；
+    //   · 自报比实际大（自称很大）同样拒 —— 体积**不可低估**，两者任一超预算即拒收；
+    //   · 两个数都如实报答（`declared` / `actual` / `mismatch`）：对不上就是事实，
+    //     不该只回一个被信过的数（那正是「读不出」与「真没事」不可分的同一种病）。
+    const actual = snap ? JSON.stringify(snap).length : 0;
+    const declared = (snap && snap.bytes !== undefined && snap.bytes !== null
+      && isFinite(Number(snap.bytes))) ? Number(snap.bytes) : null;
+    const bytes = (declared === null) ? actual : Math.max(actual, declared);
+    const seen = { declared: declared, actual: actual,
+      mismatch: (declared !== null && declared !== actual) };
     if (bytes > MAX_BYTES) {
       note('budget-exceeded');
-      return { ok: false, reason: 'budget-exceeded', bytes: bytes, budget: MAX_BYTES };
+      return { ok: false, reason: 'budget-exceeded', bytes: bytes, budget: MAX_BYTES, seen: seen };
     }
-    return { ok: true, bytes: bytes, budget: MAX_BYTES };
+    return { ok: true, bytes: bytes, budget: MAX_BYTES, seen: seen };
   }
 
   // ── ④ 快照与蓝图互转 ────────────────────────────────────────────
@@ -431,13 +470,29 @@
           return;
         }
         if (Array.isArray(inc) && Array.isArray(cur)) {
-          if (!cur.length || overwrite) {
-            const before = cur.length;
+          if (!cur.length) {
+            // 本地那一卷是空的 ⇒ 这一面是**新增**，不是替换（旧实现在这种局上
+            //   会把 `replaced: 0` 的「已覆盖」报出去 —— 处置名与实际不符）。
             inc.forEach(function (x) { cur.push(x); });
-            (before ? overwritten : added).push({ face: face, n: inc.length });
+            added.push({ face: face, n: inc.length });
             return;
           }
-          // 数组面不覆盖：**不重复追加**（按 JSON 逐字去重），冲突部分如实报
+          if (overwrite) {
+            // v2.205.0（优化 1）：覆盖 = **整面替换**。旧实现把「覆盖」写成 push 追加，
+            //   于是勾了覆盖之后本地旧条目仍在（探针实测：预检说 willOverwrite，
+            //   结果 `actual` 是 [{旧},{新}] 两批并存）—— 预检的语义与执行的结果不符，
+            //   比不报还糟：玩家按预检做的决定会落空。
+            const before = cur.length;
+            cur.length = 0;
+            inc.forEach(function (x) { cur.push(x); });
+            overwritten.push({ face: face, n: inc.length, replaced: before, why: 'array-replaced' });
+            return;
+          }
+          // 数组面不覆盖：**不重复追加**（按 JSON 逐字去重）。
+          //   v2.205.0（优化 1）：账目与预览**同源** —— 并进记「已新增」、重复记
+          //   「已跳过」，两者皆无才兜底一笔。旧实现无条件往「已跳过」栏里写一笔
+          //   （`n:0, added:2`），于是「跳过 0 条」出现在跳过栏，而真发生的事是
+          //   「并进 2 条」—— 栏名与事实不符，与预览的读数也对不上。
           const seen = {};
           cur.forEach(function (x) { seen[sig(JSON.stringify(x))] = true; });
           let n = 0, dup = 0;
@@ -446,7 +501,9 @@
             if (seen[h]) { dup++; return; }
             seen[h] = true; cur.push(x); n++;
           });
-          skipped.push({ face: face, n: dup, added: n, why: 'conflict-kept' });
+          if (n) added.push({ face: face, n: n, note: '并进不重复的条目' });
+          if (dup) skipped.push({ face: face, n: dup, added: n, why: 'conflict-kept' });
+          if (!n && !dup) skipped.push({ face: face, n: 0, added: 0, why: 'conflict-kept' });
           return;
         }
         // 形态不同（快照是对象、本地是数组，或反之）：**不硬塞**，如实报
@@ -566,5 +623,5 @@
     library: library, libTake: libTake, libDrop: libDrop,
     diagnose: diagnose, stat: statOf, reset: reset
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-snapshot.js', { kind: 'engine', ver: '2.200.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-snapshot.js', { kind: 'engine', ver: '2.205.0' });
 })();

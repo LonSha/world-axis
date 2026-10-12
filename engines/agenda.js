@@ -17,6 +17,9 @@
  *   · soon(n)        —— 最近的 n 条（面板/注入用的短视图）
  *   · overdueList()  —— 已经到期但尚未收敛的条目（与 O5 的「阻塞」栏同源）
  *   · sources()      —— 五源的可用性 + 各自条目数（缺席如实报，不静默丢）
+ *      v2.205.0（优化 2）：upcoming() 逐源状态 `ok / empty / failed` 三分，
+ *      并带 `readFailures` / `complete` —— 来源抛错不再折成空表（折了之后
+ *      「读不出来」与「真没事」逐字同形，玩家会照着空表做决定）；
  *   · diagnose() / stat() / reset()
  *
  *   为什么没有 buildBlock（注入段）：本模块的真消费方是面板与诊断节，不是注入链。
@@ -53,7 +56,7 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
-  var _stat = { reads: 0, refused: 0, lastReason: '', faults: {}, bySource: {} };
+  var _stat = { reads: 0, refused: 0, lastReason: '', faults: {}, bySource: {}, sourceFaults: {} };
   function noteFault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
   function noteSource(name, n) { _stat.bySource[name] = (_stat.bySource[name] || 0) + n; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
@@ -81,11 +84,19 @@
   //   每条统一形状：{ at(剧情日序号或 null), kind, source, label, subject, ref, status, canAct, unknown }
   //   unknown:true 表示「来源给了条目但没给可比较的时间」——如实列出，不猜日期（边界 3）。
 
+  // v2.205.0（优化 2）：逐源失败的**内部上报口**。
+  //   为什么需要它：采集循环外层的 try 只挡得住「从源函数里外抛的异常」，而
+  //   fromLongline 自己就把 `WA.longline.overdue()` 包在 try 里并 `return out` ——
+  //   异常根本到不了外层，于是「读不出来」又被折成「它没有条目」（探针实测：
+  //   只在外层加 catch 时，抛错的源在读数上仍与空源逐字同形）。
+  let _srcFault = null;
+  function markSourceFault(name, err) { _srcFault = { name: name, err: err }; }
   function fromLongline(now) {
     const out = [];
     if (!(WA.longline && typeof WA.longline.overdue === 'function')) return out;
     let rows = null;
-    try { rows = WA.longline.overdue(); } catch (e) { return out; }
+    try { rows = WA.longline.overdue(); }
+    catch (e) { markSourceFault('longline', e); return out; }
     (rows || []).forEach(function (r) {
       if (!r || !r.id) return;
       out.push({ at: null, kind: 'promise', source: 'longline',
@@ -204,10 +215,29 @@
     if (!now.ok) { noteFault('no-story-clock'); return { ok: false, reason: 'no-story-clock', rows: [], note: '世界钟未设定：剧情时间缺失时拒算，不猜日期' }; }
     const rows = [];
     const perSource = {};
+    const perSourceState = {};   // 逐源状态：ok / empty / failed（三者不同因）
+    const readFailures = [];     // 本次**读不出来**的源名（不是「它没有条目」）
     SOURCE_FNS.forEach(function (s) {
       let got = [];
-      try { got = s.fn(now) || []; } catch (e) { got = []; }
+      _srcFault = null;
+      try { got = s.fn(now) || []; }
+      catch (e) { _srcFault = { name: s.name, err: e }; }
+      // v2.205.0（优化 2）：「读不出来」与「这类条目真的没有」必须**可分**。
+      //   旧实现把异常折成 `got = []`，于是二者在读数上逐字同形（perSource 都是 0、
+      //   rows 都是空、ok 都是 true）—— 玩家看到空表会得出「接下来没事」的结论，
+      //   而真相可能是「有一源根本没读上」。两条失败路径（外抛 / 源内上报）都收。
+      if (_srcFault) {
+        const nm = _srcFault.name || s.name;
+        perSource[nm] = 0;
+        perSourceState[nm] = { state: 'failed', count: 0, why: 'source-threw',
+          detail: String((_srcFault.err && _srcFault.err.message) || _srcFault.err).slice(0, 120) };
+        if (readFailures.indexOf(nm) < 0) readFailures.push(nm);
+        _stat.sourceFaults[nm] = (_stat.sourceFaults[nm] || 0) + 1;
+        noteSource(nm, 0);
+        return;
+      }
       perSource[s.name] = got.length;
+      perSourceState[s.name] = { state: got.length ? 'ok' : 'empty', count: got.length, why: '' };
       noteSource(s.name, got.length);
       got.forEach(function (r) { r.at = r.at; rows.push(r); });
     });
@@ -228,7 +258,11 @@
       count: kept.length, total: merged.length, capped: capped,
       timedCount: timed.length, untimedCount: untimed.length,
       storyDay: now.dayIndex, storyLabel: now.label, perSource: perSource,
-      note: '未知时间保持未知（不用「现在」冒充）；表里没有不等于不会发生' };
+      perSourceState: perSourceState, readFailures: readFailures.slice(),
+      complete: readFailures.length === 0,
+      note: '未知时间保持未知（不用「现在」冒充）；表里没有不等于不会发生'
+        + (readFailures.length ? ('；本次有 ' + readFailures.length + ' 个来源**读不出来**（'
+          + readFailures.join('/') + '）—— 表里没有它们的条目，不等于它们没有条目') : '') };
   }
 
   function soon(n) {
@@ -244,16 +278,21 @@
     const cfg = getSettings();
     if (!cfg.enabled) return { ok: false, reason: 'disabled', rows: [] };
     const out = [];
+    const readFailures = [];
     if (WA.longline && typeof WA.longline.overdue === 'function') {
       let rows = [];
-      try { rows = WA.longline.overdue() || []; } catch (e) { rows = []; }
+      // v2.205.0（优化 2）：同 upcoming —— 读不出来不许折成「没有欠账」。
+      try { rows = WA.longline.overdue() || []; }
+      catch (e) { rows = []; readFailures.push('longline');
+        _stat.sourceFaults.longline = (_stat.sourceFaults.longline || 0) + 1; }
       rows.forEach(function (r) {
         if (!r || !r.id) return;
         out.push({ source: 'longline', kind: 'promise', ref: clean(r.id, 40),
           label: clean(r.content, 80) || clean(r.id, 40), lateByMs: num(r.lateBy) });
       });
     }
-    return { ok: true, rows: out, count: out.length };
+    return { ok: true, rows: out, count: out.length,
+      readFailures: readFailures.slice(), complete: readFailures.length === 0 };
   }
 
   // ── 源可用性（缺席如实报，不静默丢）───────────────────────
@@ -270,7 +309,8 @@
     return SOURCE_PROBES.map(function (s) {
       let available = false;
       try { available = !!s.probe(); } catch (e) { available = false; }
-      return { name: s.name, available: available, read: (_stat.bySource[s.name] || 0) };
+      return { name: s.name, available: available, read: (_stat.bySource[s.name] || 0),
+        faults: (_stat.sourceFaults[s.name] || 0) };
     });
   }
 
@@ -286,16 +326,18 @@
       settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     const ok = checks.store;
-    return { ok: ok, closedLoop: ok, checks: checks, version: '2.182.0' };
+    return { ok: ok, closedLoop: ok, checks: checks, version: '2.205.0',
+      sourceFaults: Object.assign({}, _stat.sourceFaults) };
   }
 
   function stat() {
     return { reads: _stat.reads, refused: _stat.refused, lastReason: _stat.lastReason,
       faults: Object.assign({}, _stat.faults), bySource: Object.assign({}, _stat.bySource),
+      sourceFaults: Object.assign({}, _stat.sourceFaults),
       enabled: getSettings().enabled, maxRows: getSettings().maxRows };
   }
 
-  function reset() { _stat.reads = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; _stat.bySource = {}; return { ok: true }; }
+  function reset() { _stat.reads = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; _stat.bySource = {}; _stat.sourceFaults = {}; return { ok: true }; }
 
   WA.agenda = {
     getSettings: getSettings,
@@ -311,5 +353,5 @@
   var EXPORT_COUNT = 9;
   var _exported = Object.keys(WA.agenda).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('agenda: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/agenda.js', { kind: 'engine', ver: '2.182.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/agenda.js', { kind: 'engine', ver: '2.205.0' });
 })();
