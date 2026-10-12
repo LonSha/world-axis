@@ -173,7 +173,23 @@ const TIMEOUT_ARMED = {
   'b3-e9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   // v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎的专锁调用点。
   //   新开的调用点不入表即红（本模块治的正是「无一声明 timeout = 一条静默挂起的路径」）。
-  'b4-beat-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'b4-beat-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.208.0：待办×期限专锁的调用点（锚点**必须带左值名** rB1E1c —— 与 rB1E1、rB1E1b
+  //   只差最后一个字母，不带左值名会 ambiguous）。
+  'b1-e1c-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.206.0（拓展 2 · E1b）：可处理待办工作台专锁的调用点。
+  //   它由**中档回归**（tools/mid-tier.js）当场逮住 —— 新开的调用点只带了 timeout 字面量、
+  //   没入两张表（现场 56 块 vs 表内 55 条，A6/A13b/B13/N7 四处同时现形）。
+  //   这正是「新开的调用点不入表即红」这条判据的第一次实战命中，也是中档存在的意义：
+  //   在 29 分钟的全量之前先把这一类知道掉。
+  'b1-e1b-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.208.0（E1 证据问答）：新项专锁的调用点，并入统一预算（不新开第二预算）。
+  //   本条是「两张表各说一套」的现场记档：站点表先登记、武装表漏登记那次，
+  //   coherence 报的正是 site-not-armed —— 只加锚点不够，两张表必须同时落。
+  'ev1-evidence-qa-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.209.0（优化 6）：面板导航协议专锁。与上一项同规 —— **两张表同批落**
+  //   （站点表漏登记那次的红就是 `site-not-armed`）。
+  'ev6-panel-nav-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
 };
 
 /**
@@ -330,7 +346,22 @@ const ARMED_SITES = [
     anchor: "const rB3E9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e9-v2188.js')]," },
   // v2.189.0（缝 A1/A2/A3 + B1/B2）：四引擎合并专锁的调用点（整行唯一 ⇒ 任何前缀也唯一）。
   { key: 'b4-beat-lock', mode: 'spawn',
-    anchor: "const rB4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-v2189.js')]," }
+    anchor: "const rB4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-v2189.js')]," },
+  // v2.206.0（拓展 2 · E1b）：同上，锚点带左值名 `rB1E1b`。
+  //   注：它与既有 `rB1E1`（s3-b1-e1-v2183）**只差最后一个字母** —— 锚点必须带左值名，
+  //   否则两处调用形态同族、锚点会 ambiguous（本仓既有 B3/O7/O6 三处同款记档）。
+  { key: 'b1-e1b-lock', mode: 'spawn',
+    anchor: "const rB1E1b = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1b-v2206.js')]," },
+  // v2.208.0：同上，锚点带左值名 `rB1E1c`。
+  { key: 'b1-e1c-lock', mode: 'spawn',
+    anchor: "const rB1E1c = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1c-v2207.js')]," },
+  // v2.208.0（E1 证据问答）：新项专锁走 `ev<N>-...` 形态（避开旧代 O/E 编号互染），
+  //   锚点仍带左值名 `rEv1` —— 否则与同族 spawnSync 调用形态 ambiguous。
+  { key: 'ev1-evidence-qa-lock', mode: 'spawn',
+    anchor: "const rEv1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ev1-evidence-qa-v2208.js')]," },
+  // v2.209.0（优化 6）：同上，锚点带左值名 `rEv6` —— 否则与同族 spawnSync 调用形态 ambiguous。
+  { key: 'ev6-panel-nav-lock', mode: 'spawn',
+    anchor: "const rEv6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ev6-panel-nav-v2209.js')]," },
 ];
 
 /**

@@ -2053,6 +2053,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/offline-return.js': 'offlineReturn',
     // v2.152.0（RP6）：面板渲染性能观测。登记为必载——renderBody 分流与面板读数段都读它。
     'ui/render-perf.js': 'renderPerf',
+    // v2.209.0（优化 6）：面板导航协议。登记为**必载** —— 面板的每一个 data-nav 控件与
+    //   `#wa-nav-back` 都走它；缺席就是「跳转与定位整条失效」本身，不该被静默兜住。
+    'ui/panel-nav.js': 'panelNav',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -2139,7 +2142,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   //   而是 secModules 把 ui/render-perf.js 报成 missing，而它本来该归 optionalMissing
   //   （「无头环境缺席」与「产品文件断裂」是两件事，混在一起会让自检的红灯失去信息量）。
   //   另注：tests/export-contract.js 里有一份**同名口径的第二副本**（OPTIONAL），两处必须同改。
-  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf',
+  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf', 'panelNav',
       // v2.181.0：赛博朋克 UI 主题层 9 个 ns —— 无头环境里 ui/*.js 不装载，
       //   不登记它们会被 secModules 报成 missing（那是「真缺席」，不是「可选缺席」）。
       'cyberUI',
@@ -3173,7 +3176,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-ops-from', 'wa-ops-to', 'wa-ops-handover', 'wa-ops-active', 'wa-ops-pending', 'wa-ops-view', 'wa-ops-cancel', 'wa-ops-out'] },
     { page: 'world', ids: ['wa-af-enabled', 'wa-af-place', 'wa-af-event', 'wa-af-type', 'wa-af-desc', 'wa-af-register',
       'wa-af-id', 'wa-af-repair', 'wa-af-inspect', 'wa-af-active', 'wa-af-view', 'wa-af-reason', 'wa-af-cancel', 'wa-af-out'] },
-    { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out', 'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
+    { page: 'assistant', ids: ['wa-ask-input', 'wa-ask-btn', 'wa-ask-out',
+      // v2.208.0（E1）：证据问答新增三处可见区 + 只查证据按钮（引用号 / 缺口 / 计量行）
+      'wa-ask-ev', 'wa-ask-hint', 'wa-ask-cites', 'wa-ask-gaps',
+      'wa-theater-input', 'wa-theater-btn', 'wa-theater-insert', 'wa-theater-copy', 'wa-theater-out'] },
     { page: 'events', ids: ['wa-inspect-run', 'wa-inspect-out'] },
     { page: 'logs', ids: ['wa-log-copy'] },
     { page: 'connect', ids: ['wa-conc'] },

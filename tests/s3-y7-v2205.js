@@ -63,7 +63,9 @@ function resetSettings(WA) {
 const ANCHOR = {
   page: "    { id: 'graph', icon: '🕸', label: '图谱' },",
   renderer: 'find: renderFindCenter, graph: renderGraphCenter,',
-  out: "const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) o.innerHTML = html; };",
+  // v2.209.0（优化 6）：同上（出口写完即补绑）。
+  //   v2.209.0（优化 6）：出口写完即补绑。锚点随形态更新（`if (o) o.innerHTML = …`，无花括号）。
+  out: "const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) o.innerHTML = html; bindNavs(o); };",
   outSel: "const wgOut = function (html) { const o = $('#wa-wg-out');",
   cfg: 'try { cfg = (ok && WA.worldGraph.getSettings) ? WA.worldGraph.getSettings() : null; } catch (e) { cfg = null; }',
   guard: "    { page: 'graph', ids: ['wa-wg-kinds', 'wa-wg-edges', 'wa-wg-build',",

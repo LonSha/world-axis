@@ -468,9 +468,10 @@ a(modV('core/commit.js') === '2.195.0' && modV('engines/world-blueprint.js') ===
   && modV('engines/world-seed.js') === '2.195.0',
   'D5d 三个改过的模块 registerModule 版本随本批交付版本（实得 ' + J([modV('core/commit.js'),
     modV('engines/world-blueprint.js'), modV('engines/world-seed.js')]) + '）');
-a(modV('engines/reject-recovery.js') === '2.203.0',
-  'D5e reject-recovery 版本面（v2.203.0 收口：Y5~Y9 四条线把拒收面快照 723 → 740，'
-  + '该模块随本批交付升版；比较值取 registerModule 现场声明）');
+a(modV('engines/reject-recovery.js') === '2.209.0',
+  'D5e reject-recovery 版本面（本版 v2.209.0：补 ui 层 15 条进三张冻结快照 —— '
+  + '面板导航 11 条 + 助手面既有 4 条，快照 740 → 754 / 成功面 34 → 35，'
+  + '并给 rec-ambiguous / channel-unconfigured 补上恢复档；比较值取 registerModule 现场声明）');
 const cf = C0.commit.chainStat().faultCodes;
 a(cf.indexOf('bad-effect') >= 0 && cf.indexOf('chain-effects-full') >= 0,
   'D5f fault 码表新增两条（bad-effect / chain-effects-full；实得 ' + J(cf) + '）');

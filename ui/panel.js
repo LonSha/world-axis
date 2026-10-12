@@ -313,6 +313,21 @@
       return A + 'amp;';
     });
   }
+  /** ── v2.209.0（优化 6）：导航属性的**渲染期唯一出口** ──
+   *  面板不自己拼 `page|rec|filter` 串：拼串就是第二份格式，协议一改两处各说一套。
+   *  协议缺席时返回空串 —— 调用方据此**不渲染 `data-nav` 属性**（控件照在，
+   *  但没有一个点了会错的跳转），而不是渲染一个空跳转目标。 */
+  function navAttr(page, rec, filter) {
+    if (!WA.panelNav || typeof WA.panelNav.attr !== 'function') return '';
+    return WA.panelNav.attr({ page: page, rec: rec, filter: filter });
+  }
+  /** 通用跳转按钮的 HTML（三页共用一处 —— 标签与 title 也一并收口）。 */
+  function navBtn(label, page, rec, filter, title) {
+    const a = navAttr(page, rec, filter);
+    if (!a) return '';
+    return '<button class="wa-btn wa-mini wa-navbtn" data-nav="' + esc(a) + '"'
+      + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(label) + '</button>';
+  }
 
   // ── 页面渲染 ──
   // v2.13.0: 挤出侧可见出口（概览页）。
@@ -758,6 +773,23 @@
     const s = WA.store.get();
     const reg = WA.registry.list();
     const people = Object.values(s.people);
+    // v2.209.0（优化 6）：人物行带**记录锚点**（导航协议用）。
+    //   键取 `people:<存档键>` —— 与 engines/history-search.js 的 mk('people', id, …) 逐字同源
+    //   （那边 ref 就是存档键），于是「从检索跳过来要停的那一条」与本页这一行是同一个串。
+    //   为什么保留 Object.values：面板多处（档案、观测、身份对照）消费的是值数组，
+    //   改成 entries 会牵动一片与本次无关的读数；故另取一份键表，按同名配对。
+const peopleIds = Object.keys(s.people);
+    /** v2.209.0（优化 6）：人物行的记录键 `people:<存档键>`。
+     *  按**同名**在键表里找第一条 —— 找不到就返回空（不硬编一个假键：
+     *  假键会让跳转「看起来成功了」而永远定位不上）。 */
+    const recKeyOf = function (name) {
+      const n = String(name == null ? '' : name);
+      for (let i = 0; i < peopleIds.length; i++) {
+        const v = s.people[peopleIds[i]];
+        if (v && String(v.name == null ? '' : v.name) === n) return 'people:' + peopleIds[i];
+      }
+      return '';
+    };
     // v2.62.0：身份 ↔ 存档键对照表。`idStat()` 的 drifted 非空即说明
     //   「有人带着长期状态，却从未被登记过身份」——这在此前**完全不可观测**。
     const settleRows = (function () {
@@ -1029,12 +1061,16 @@
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
       <div class="wa-sec">世界人物状态（${people.length}）</div>
-      <div class="wa-list">${people.map(p => `
-        <div class="wa-item"><b>${esc(p.name)}</b> <span class="wa-dim">@ ${esc(p.location || '?')}</span>
+      <div class="wa-list">${people.map(p => {
+        const rk = recKeyOf(p && p.name);
+        return `
+        <div class="wa-item"${rk ? ' data-rec="' + esc(rk) + '"' : ''}><b>${esc(p.name)}</b> <span class="wa-dim">@ ${esc(p.location || '?')}</span>
           <div class="wa-dim">${esc(p.action || '')}${p.intent ? ' · 意图:' + esc(p.intent) : ''}</div>
           <button class="wa-btn wa-mini" data-observe="${esc(p.name)}">观测切片</button>
           <button class="wa-btn wa-mini" data-prof="${esc(p.name)}">档案</button>
-        </div>`).join('') || '<div class="wa-empty">世界推演后自动出现</div>'}</div>
+          ${rk ? navBtn('看此人', 'people', rk, '', '在人物页定位到这一条（走导航协议；页与记录同源，定位不上会如实报出）') : ''}
+        </div>`;
+      }).join('') || '<div class="wa-empty">世界推演后自动出现</div>'}</div>
       <div class="wa-sec">人物档案（供独白/观测子agent 作为认知边界与性格锚点）</div>
       <div id="wa-prof-mini" class="wa-dim">${(() => {
         // v2.2.0: 档案覆盖率可见——此前「性格锚点：未建立」没有任何解释入口
@@ -1195,6 +1231,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         ${(() => {
           const SC = WA.storyChoice;
           if (!SC) return '<div class="wa-dim">剧情选择未加载</div>';
+          // v2.209.0（优化 6）：缓存回填 —— 让「跳过来」到达时清单已在场（见下 ②b）。
+          //   与 people / world 页的形态对齐：那些页的行走在渲染里，渲染即带锚点；
+          //   本页的清单是**点出来的**，所以把上一次的读数贴回去（有则贴、无则空）。
           const sr = panelEl.dataset.scOut || '';
           const scOn = (SC.getSettings && SC.getSettings().enabled) ? true : false;
           return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-sc-enabled" type="checkbox" ' + (scOn ? 'checked' : '') + '/> 启用剧情选择</label></div><div class="wa-row">'
@@ -1208,7 +1247,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             + '<button class="wa-btn wa-mini" id="wa-sc-confirm" aria-label="确认选择" title="确认选择：对该选项的 ops 走 commit 三段兑现（begin → commit → flush），三段可分离——「选了」与「兑现了」不是同一件事">确认选择</button>'
             + '<button class="wa-btn wa-mini" id="wa-sc-review" aria-label="复盘" title="复盘：这一点的选项、选了什么、证据回执、兑现时刻；已选时附带预览新鲜度（fresh / stale / unknown）——预检过期不代表兑现失败，但必须看得见">复盘</button>'
             + '<button class="wa-btn wa-mini" id="wa-sc-pending" aria-label="未确认清单" title="未确认清单：还没选的那些点（含选项数与容量）。「没选」与「没有点」绝不同形">未确认</button>'
-            + '</div><div id="wa-sc-out" class="wa-out wa-dim">' + esc(sr) + '</div>';
+            + '</div><div id="wa-sc-out" class="wa-out wa-dim" data-nav-out="1">' + evPendingHtml('storyChoice') + '</div>';
+          // v2.209.0（优化 6）：上面的读数在**渲染期**就贴好了（见 evPendingHtml）——
+          //   跳过来时清单已在场，锚点才可能命中。
         })()}
       </div>
       <div class="wa-sec">委托履约（分期交付）</div>
@@ -1234,7 +1275,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             + '<button class="wa-btn wa-mini" id="wa-cm-cancel" aria-label="取消" title="取消：按已执行阶段结算余额，托管多余部分退回委托方">取消</button>'
             + '<button class="wa-btn wa-mini" id="wa-cm-view" aria-label="查看" title="查看：逐阶段状态 / 回执 / 已完成时刻 / 报酬与预付">查看</button>'
             + '<button class="wa-btn wa-mini" id="wa-cm-pending" aria-label="在办清单" title="在办清单：状态为 active 的委托（含当前阶段与总阶段数）">在办</button>'
-            + '</div><div id="wa-cm-out" class="wa-out wa-dim">' + esc(cr) + '</div>';
+            + '</div><div id="wa-cm-out" class="wa-out wa-dim" data-nav-out="1">' + evPendingHtml('commission') + '</div>';
+          // v2.209.0（优化 6）：上面的读数在**渲染期**就贴好了（见 evPendingHtml）——
+          //   跳过来时清单已在场，锚点才可能命中。
         })()}
       </div>
       <div class="wa-sec">线索调查（证据与揭示）</div>
@@ -1259,7 +1302,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             + '<button class="wa-btn wa-mini" id="wa-inv-reveal" aria-label="揭示" title="揭示：把这条线索告诉某人。前置是 verdict 达标（verified / cannot-judge），否则 insufficient-evidence —— 「我猜的」不许走揭示口">揭示</button>'
             + '<button class="wa-btn wa-mini" id="wa-inv-view" aria-label="查看" title="查看：线索状态 / 地点 / 证人 / 成本 / 证据条数 / 已揭示给谁">查看</button>'
             + '<button class="wa-btn wa-mini" id="wa-inv-pending" aria-label="在查清单" title="在查清单：discoverable 与 investigating 两态的线索（各带证据条数）">在查</button>'
-            + '</div><div id="wa-inv-out" class="wa-out wa-dim">' + esc(ivr) + '</div>';
+            + '</div><div id="wa-inv-out" class="wa-out wa-dim" data-nav-out="1">' + evPendingHtml('investigation') + '</div>';
+          // v2.209.0（优化 6）：上面的读数在**渲染期**就贴好了（见 evPendingHtml）——
+          //   跳过来时清单已在场，锚点才可能命中。
         })()}
       </div>
       <div class="wa-sec">灾后余波（地点创伤与修复）</div>
@@ -1284,7 +1329,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             + '<button class="wa-btn wa-mini" id="wa-af-view" aria-label="查看" title="查看：单条创伤的完整读数（含修复进度 / 修复工期 / 登记与修复时刻）">查看</button>'
             + '<input id="wa-af-reason" class="wa-input wa-mini" aria-label="撤销原因" placeholder="撤销原因（可空）"/>'
             + '<button class="wa-btn wa-mini" id="wa-af-cancel" aria-label="撤销" title="撤销：把活跃创伤标成 cancelled 并留时刻。只对 active 生效——已修复的不能被撤销">撤销</button>'
-            + '</div><div id="wa-af-out" class="wa-out wa-dim">' + esc(afr) + '</div>';
+            + '</div><div id="wa-af-out" class="wa-out wa-dim" data-nav-out="1">' + evPendingHtml('aftermath') + '</div>';
+          // v2.209.0（优化 6）：上面的读数在**渲染期**就贴好了（见 evPendingHtml）——
+          //   跳过来时清单已在场，锚点才可能命中。
         })()}
       </div>
       <div class="wa-sec">运营项目（批准 → 立项 → 拨付）</div>
@@ -1318,7 +1365,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             + '<button class="wa-btn wa-mini" id="wa-ops-pending" aria-label="待推进清单" title="待推进清单：里程碑未走完的在建项目（含已完成数与总数）">待推进</button>'
             + '<button class="wa-btn wa-mini" id="wa-ops-view" aria-label="查看" title="查看：单项目完整读数（决策号 / 组织 / 里程碑逐项 / 周期 / 结算时刻）">查看</button>'
             + '<button class="wa-btn wa-mini" id="wa-ops-cancel" aria-label="取消" title="取消：只对 active 生效，标成 cancelled 并留关闭时刻">取消</button>'
-            + '</div><div id="wa-ops-out" class="wa-out wa-dim">' + esc(opr) + '</div>';
+            + '</div><div id="wa-ops-out" class="wa-out wa-dim" data-nav-out="1">' + evPendingHtml('operations') + '</div>';
+          // v2.209.0（优化 6）：上面的读数在**渲染期**就贴好了（见 evPendingHtml）——
+          //   跳过来时清单已在场，锚点才可能命中。
         })()}
       </div>
       <div class="wa-sec">声誉四维</div>
@@ -1580,10 +1629,20 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       });
       out += '<div class="wa-sec">个人主观记忆（' + pf.length + '）</div><div class="wa-list">' + (pRows.join('') || '<div class="wa-empty">无匹配</div>') + '</div>';
     }
-    const cRows = chron.filter(function (c) { return hit(c && c.title) || hit(c && c.summary); }).slice(-40).reverse().map(function (c) {
-      return '<div class="wa-item wa-dim">' + esc(c.title || '') + ' — ' + esc(String(c.summary || '').slice(0, 100))
-        + ' <span class="wa-dim">' + esc(_msTs(c.at)) + '</span> ' + _msRefBadge(c.refs) + '</div>';
-    });
+    // v2.209.0（优化 6）：编年史行带**记录锚点** —— 键 `chronicle:<条 id>` 必须与
+    //   chronicle-view 的行身份同源：那边 `ref = clean(c.id, 40) || ('chr:' + rows.length)`
+    //   （没有 id 的老纪事按序号兜底）。这里逐字照抄同一判据，于是「检索跳过来要停的那一条」
+    //   与「本页这一条」是同一个串；对不上时定位如实报 rec-not-rendered，不假装停准了。
+    const cRows = chron.map(function (c, ci) {
+      const ref = String((c && c.id) || '') || ('chr:' + ci);
+      return { c: c, ref: ref };
+    }).filter(function (x) { return hit(x.c && x.c.title) || hit(x.c && x.c.summary); })
+      .slice(-40).reverse().map(function (x) {
+        const c = x.c;
+        return '<div class="wa-item wa-dim"><span data-rec="' + esc('chronicle:' + x.ref) + '">'
+          + esc(c.title || '') + ' — ' + esc(String(c.summary || '').slice(0, 100))
+          + '</span> <span class="wa-dim">' + esc(_msTs(c.at)) + '</span> ' + _msRefBadge(c.refs) + '</div>';
+      });
     out += '<div class="wa-sec">编年史（' + chron.length + '，示最近 40）</div><div class="wa-list">' + (cRows.join('') || '<div class="wa-empty">' + (chron.length ? '无匹配' : '暂无纪事') + '</div>') + '</div>';
     out += '<div class="wa-sec">溯源审计<span class="wa-dim">（记忆条目 <-> 原始楼层，现算现验）</span></div>';
     out += (function () {
@@ -2797,6 +2856,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-row">
         <button class="wa-btn" id="wa-pc-view" title="统一事项列表：八源归一，按来源声明序 + 记录 id 稳定排序（不用对象键序，它会随插入顺序漂移）">读事项</button>
         <button class="wa-btn" id="wa-pc-soon" title="最近的 N 条（N 取自 soonCount 设置，受 maxRows 封顶）">最近几条</button>
+        <button class="wa-btn" id="wa-pc-timeline" title="待办 × 期限：把「等我处理」与 agenda 的「什么时候到期」并成一张表，按（来源, ref）相连；配不上的如实报配不上，到期时间缺读数时明说**是读不到**而不是没有">待办×期限</button>
         <button class="wa-btn" id="wa-pc-sources" title="逐源可用性：缺席的源如实报 unavailable，不静默当作「这类事项没有」；另带本会话累计读数">源可用性</button>
         <button class="wa-btn" id="wa-pc-diag" title="自证面：settingsBus / inputGuard 与八个来源模块是否齐备，以及 emptyAll 这盏灯能不能亮">诊断</button>
       </div>
@@ -2866,10 +2926,22 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     assistant: renderAssistant };
 
   function renderAssistant() {
+    // v2.208.0（E1）：问答改为「现场检索 + 证据引用」。此处两处可见性：
+    //   ① 引用区先渲染上一次**代码核对过的**引用号（不是模型自称）；
+    //   ② 缺口区把「读不到 / 挡下 / 玩家视角未检索」摆出来，与「查了没有」分开。
+    const st = (WA.assistant && typeof WA.assistant.stat === 'function') ? WA.assistant.stat() : null;
+    const pol = (WA.assistant && WA.assistant.FACE_POLICY) ? WA.assistant.FACE_POLICY.playerDenied : [];
     return `
-      <div class="wa-sec">世界助手（就世界状态问答，上帝视角）</div>
-      <div class="wa-row"><input id="wa-ask-input" class="wa-input" placeholder="问世界/人物/暗流/舆情…"/><button class="wa-btn" id="wa-ask-btn" title="就当前世界状态向助手提问（上帝视角，会提示哪些内容正文角色不该知道）">问</button></div>
+      <div class="wa-sec">世界助手（现场检索 + 证据引用，上帝视角）</div>
+      <div class="wa-row"><input id="wa-ask-input" class="wa-input" placeholder="问世界/人物/暗流/舆情…（可追问：这是谁知道的 / 为什么变化）"/><button class="wa-btn" id="wa-ask-btn" title="按问题现场检索六面并作答，每条断言附代码核对过的引用号；没证据会说没证据">问</button></div>
+      <div class="wa-row"><button class="wa-btn wa-mini" id="wa-ask-ev">只查证据（不调模型）</button>
+        <span class="wa-dim" id="wa-ask-hint">${st ? ('提问 ' + st.asks + ' 次 · 有据 ' + st.cited + ' · 无据 ' + st.uncited
+          + ' · 零命中 ' + st.noEvidence + (st.blindRuns ? (' · 没查全 ' + st.blindRuns) : '')
+          + (st.viewFiltered ? (' · 玩家视角收窄 ' + st.viewFiltered) : '')) : ''}</span></div>
       <div id="wa-ask-out" class="wa-out"></div>
+      <div id="wa-ask-cites" class="wa-out"></div>
+      <div id="wa-ask-gaps" class="wa-out"></div>
+      <div class="wa-dim">玩家视角下检索面会摘掉：${esc(pol.join(' / ') || '（无）')}（作者侧设定面，正文角色不该经由问答读到）</div>
       <div class="wa-sec">番外小剧场</div>
       <div class="wa-row"><input id="wa-theater-input" class="wa-input" placeholder="剧场指令（可空）…"/><button class="wa-btn" id="wa-theater-btn" title="生成与主线无关的番外/小剧场文本（不写入世界状态）">生成番外</button></div>
       <div class="wa-row"><button class="wa-btn wa-mini" id="wa-theater-insert" disabled>插入输入框</button><button class="wa-btn wa-mini" id="wa-theater-copy">复制</button></div>
@@ -3127,6 +3199,67 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
    *   代价是每条 kind 问一次 `describe`（最多 8 次），故按 kind 缓存。
    *   读不出时返回「归属读不出」这个**如实**的字符串，不猜成某一档。 */
   const __todoOwnerCache = {};
+  /** v2.209.0（优化 6）：**落点**缓存（哪一页真渲染了这条待办）。
+   *  与归属分开：归属管分组（`describe().page`），落点管导航（`describe().seePage`）。
+   *  为什么非分不可：从前导航拿归属当落点，于是 `commission:…` 被送到只渲染
+   *  人口行的人物页 —— 每次都 `rec-not-rendered`（页到了、那条不在），
+   *  而「点击后直接定位对应记录」这一条验收就整条落空（且看起来像数据没渲染出来）。
+   *  引擎缺席时如实退回 null，调用方据此退回页级跳转（不假装能定位）。 */
+  const __todoSeeCache = {};
+  /** v2.209.0（优化 6）：清单条目的记录锚点包装（**渲染期与点击期共用这一份**）。 */
+  function recSpanHtml(key, text) {
+    return key ? '<span data-rec="' + esc(String(key)) + '">' + esc(String(text)) + '</span>' : esc(String(text));
+  }
+  /** v2.209.0（优化 6）：五段「清单」的**渲染期**读数。
+   *  为什么非在渲染期读：锚点必须**一到达就在场** —— 从待办页跳过来时，没人会先替用户
+   *  点一遍「在办 / 在查 / 活跃 / 待推进」。people / world 两页的行走在渲染里，本页要与
+   *  它们同形；否则「跳到那一条」到达时是空页，每次都是 `rec-not-rendered`。
+   *  读不出（模块缺席 / 关着 / 抛）⇒ 退回上一步的缓存读数（有则贴），都没有则如实留空；
+   *  **不猜、不造**一条出来。 */
+  function evPendingHtml(kind) {
+    const cacheKey = { storyChoice: 'scOut', commission: 'cmOut', investigation: 'invOut',
+      aftermath: 'afOut', operations: 'opsOut' }[kind];
+    const cached = (cacheKey && panelEl && panelEl.dataset[cacheKey]) ? String(panelEl.dataset[cacheKey]) : '';
+    let out = '';
+    try {
+      const M = WA[kind];
+      if (M && typeof M.pending === 'function') {
+        const r = M.pending();
+        if (r && r.ok === true) {
+          if (kind === 'storyChoice') {
+            out = '未确认 ' + esc(String(r.count)) + '/' + esc(String(r.cap)) + '：'
+              + ((r.points || []).map(function (p) { return recSpanHtml('storyChoice:' + p.id, p.id + '（' + p.options + ' 项）'); }).join('、') || '无');
+          } else if (kind === 'commission') {
+            out = '在办 ' + esc(String(r.count)) + '/' + esc(String(r.cap)) + '：'
+              + ((r.items || []).map(function (x) { return recSpanHtml('commission:' + x.id, x.title + '（' + (x.stage + 1) + '/' + x.total + '）'); }).join('、') || '无');
+          } else if (kind === 'investigation') {
+            out = '在查 ' + esc(String(r.count)) + '/' + esc(String(r.cap)) + '：'
+              + ((r.items || []).map(function (x) { return recSpanHtml('investigation:' + x.id, x.title + '（' + x.status + ' / 证据 ' + x.evidence + '）'); }).join('、') || '无');
+          } else if (kind === 'aftermath') {
+            out = '活跃 ' + esc(String(r.count)) + '/' + esc(String(r.cap)) + '：'
+              + ((r.items || []).map(function (x) { return recSpanHtml('aftermath:' + x.id, x.placeId + '·' + x.effectType); }).join('、') || '无');
+          } else if (kind === 'operations') {
+            out = '待推进 ' + esc(String(r.count)) + '：'
+              + ((r.items || []).map(function (x) { return recSpanHtml('operations:' + x.id, x.name + '（' + x.completed + '/' + x.total + '）'); }).join('、') || '无');
+          }
+        }
+      }
+    } catch (e) { out = ''; }
+    return out || cached;
+  }
+  function todoSeeOf(kind) {
+    const k = String(kind == null ? '' : kind);
+    if (!k) return null;
+    if (__todoSeeCache[k] !== undefined) return __todoSeeCache[k];
+    let page = null;
+    try {
+      const d = (WA.pendingCenter && typeof WA.pendingCenter.describe === 'function')
+        ? WA.pendingCenter.describe(k, '') : null;
+      page = (d && d.ok === true && d.seePage) ? String(d.seePage) : null;
+    } catch (e) { page = null; }
+    __todoSeeCache[k] = page;
+    return page;
+  }
   function todoOwnerOf(kind) {
     const k = String(kind == null ? '' : kind);
     if (!k) return '归属读不出';
@@ -3197,7 +3330,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     return `
       <div class="wa-sec">待办中心</div>
       <div class="wa-dim">（把「现在等我做什么」做成一个面：按归属分组 / 每条带来源与到期条件 / 跳到来源模块）
-        本页<b>只读</b> —— 条目真源仍在各模块，本页只读取与聚合；跳转不改变任何状态。
+        本页的读面<b>全是只读</b>（条目真源仍在各模块）；v2.206.0 起多一枚<b>透传写口</b>「处理第一条」——
+        它只把动作转给来源模块**自己的**公开写口，本页不新增确认语义、不开事务、不替玩家编参数
+        （要回执号 / 金额 / 选项标签 / 参与者的那些动作，面板如实说「不能在这里点」，不代填）。
         此刻：<b>${on ? '待办中心开' : '待办中心关'}</b>、
         读得到 <b>${readOk ? '是' : '否'}</b>、条目 <b>${rows.length}</b>。
         </div>
@@ -3211,6 +3346,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-td-drill" title="下钻一条：只给路由（去哪看 / 看哪条 / 哪个设置键），不执行确认动作">下钻一条</button>
         <button class="wa-btn" id="wa-td-flags" title="三旗标：unavailable（读不到）/ emptyAll（有源且全部自报无数据）/ allClear（读过且此刻没有待办）逐条分开报">空态三旗标</button>
         <button class="wa-btn" id="wa-td-diag" title="自证面：八源在场性、empty 申报面（emptyAll 这盏灯能不能亮）、拒收与故障计数">诊断</button>
+        <button class="wa-btn" id="wa-td-act" title="可处理：把第一条带动作的待办**经来源模块自己的写口**处理掉（真源 pendingCenter.act()）—— 本页不新增确认逻辑，也不替玩家编参数">处理第一条</button>
       </div>
       <div id="wa-td-out" class="wa-out"></div>`;
   }
@@ -3452,6 +3588,53 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     } catch (e) { /* 观测面自身失败不进渲染链 */ }
   }
 
+  /** v2.209.0（优化 6）：导航控件的**点击实现**（全仓唯一一份）。
+   *  为什么抬到 IIFE 作用域：渲染期绑的与出口/切页补绑的必须是同一份实现 ——
+   *  两处各写一份，就又是「同一件事两种写法」。 */
+  function navGo(el) {
+      const p = WA.panelNav && WA.panelNav.fromAttr ? WA.panelNav.fromAttr(el.getAttribute('data-nav')) : null;
+      const out = panelEl.querySelector('#wa-nav-out');
+      const say = function (t) { if (out) out.textContent = t; };
+      if (!p || !p.ok || !WA.panelNav) {
+        say('跳转被拒收：' + String((p && p.reason) || 'nav-module-missing')
+          + ((p && p.known && p.known.length) ? '（认得的页：' + p.known.join('、') + '）' : ''));
+        return;
+      }
+      const r = WA.panelNav.go(p.target);
+      //   定位失败**不是跳转失败**：页到了、那一条没渲染出来（或渲染出多条）。
+      //   两件事分开报 —— 合成一句「跳转成功」会让「没停在目标上」这件事消失。
+      if (!r.ok) { say('跳转失败：' + String(r.reason)); return; }
+      const loc = r.located;
+      say('已到 ' + r.page + (r.changed ? '' : '（本来就在这一页）')
+        + (r.rec ? '　定位「' + r.rec + '」：' + (loc && loc.ok
+          ? '命中 1 处（已高亮并滚到它）'
+          : '未命中 —— ' + String((loc && loc.reason) || '?')
+            + (loc && loc.n ? '（同名 ' + loc.n + ' 处）' : '')
+            + '；页到了，但不在这条上') : ''));
+  }
+  /** 绑**一个** `[data-nav]` 控件。**幂等**：已有处理器就跳过 ——
+   *  重入（重绘 + 出口补绑 + 切页补绑）不会叠上第二个处理器，
+   *  验收第二条「切页不重复绑定」由它保证。 */
+  function bindNav(el) {
+    if (!el || typeof el.onclick === 'function') return false;
+    el.onclick = function () { navGo(el); };
+    return true;
+  }
+  /** 绑一棵子树里的全部导航控件（渲染期 / 出口 / 切页**共用这一处**）。
+   *  返回**新绑上**的个数 —— 调用方据此可判「一次操作只绑一次」（不累积）。 */
+  function bindNavs(root) {
+    let n = 0;
+    try {
+      (root || panelEl).querySelectorAll('[data-nav]').forEach(function (el) { if (bindNav(el)) n++; });
+    } catch (e) { /* 宿主查询失败 ⇒ 如实返回 0，不假装绑上了 */ }
+    return n;
+  }
+  /** v2.209.0（优化 6）：结果出口是**渲染期之后**才被填的容器（清单见 NAV_OUT_SELS）。
+   *  两件事靠它：① 出口写完即补绑；② 切页后补绑（切页换掉整套 DOM）。
+   *  没有这一半，绑定期永远追不上出口：按钮照在、点了没反应（静默失效）。 */
+  const NAV_OUT_SELS = ['#wa-at-out', '#wa-td-out', '#wa-hs-out', '#wa-wg-out',
+    '#wa-cm-out', '#wa-sc-out', '#wa-af-out', '#wa-inv-out', '#wa-ops-out',
+    '#wa-co-out', '#wa-ff-out', '#wa-inj-out'];
   function bindBody() {
     const $ = sel => panelEl.querySelector(sel);
     // v2.21.0: 结果出口的**判空写**（与设置页同规格，同一处约定不再各写一份）。
@@ -3460,7 +3643,13 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   写 `textContent` 抛 TypeError（用户视角「点了没反应」）。统一出口 + 判空 = 静默降级为
     //   「本轮结果无处可显」，而不是把 DOM 异常抛进事件循环。
     const setOut = function (sel, text) { const el = $(sel); if (el) el.textContent = text; };
-    const setHtml = function (sel, html) { const el = $(sel); if (el) el.innerHTML = html; };
+    // v2.209.0（优化 6）：出口写完**立刻**补绑 —— 这是出口自己的责任，
+    //   不指望每个调用方都记得（三处现场恰恰就是「没人记得」）。
+    const setHtml = function (sel, html) { const el = $(sel); if (el) { el.innerHTML = html; bindNavs(el); } };
+    // v2.209.0（优化 6）：给「渲染期之后才被填」的结果出口打标记。
+    //   标记本身不改行为：它让「哪些出口需要补绑」在 DOM 上**读得出来**，
+    //   而不是靠每个出口各记一次「我填完要自己绑」（那正是三处现场的老毛病）。
+    NAV_OUT_SELS.forEach(function (sel) { const el = $(sel); if (el) el.setAttribute('data-nav-out', '1'); });
     // v2.21.0: 宿主取文本的**能力守卫**。为什么是缺陷而不是洁癖：
     //   面板在「无头/iframe/被沙箱化」的宿主里可能根本没有 `prompt` 全局（本仓库的 UI 门禁
     //   就是这种环境——tests/ui-gate.js 的 mini-DOM 不注入 prompt）。此前三处直接裸调
@@ -3506,6 +3695,21 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       };
     });
     const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
+    // ── v2.209.0（优化 6）：导航协议的**通用绑定**（一处绑全部 data-nav 控件）──
+    //   为什么做成属性而不是逐处写 onclick：逐处写 = 每新增一个跳转就多一处
+    //   「拼串 / 解析 / 判页 / 切页 / 定位」的手写流程，而三页（检索 / 待办 / 图谱）
+    //   已经在用三种写法做同一件事。属性 + 一处绑定之后，页面**只声明去哪**，
+    //   「怎么去」只有协议一份（ui/panel-nav.js）。
+    //   拒收（非法页）**必须让人看见**：静默不跳是最坏的一种 —— 用户会以为点坏了。
+    bindNavs(panelEl);
+    const navBack = $('#wa-nav-back');
+    if (navBack) navBack.onclick = () => {
+      const out = $('#wa-nav-out');
+      const r = (WA.panelNav && WA.panelNav.backTo) ? WA.panelNav.backTo() : { ok: false, reason: 'nav-module-missing' };
+      if (out) out.innerHTML = r.ok
+        ? '已回到 ' + esc(r.page) + '（还原 ' + esc(String((r.restored && r.restored.restored) || 0)) + ' 处输入）'
+        : '没有可回的地方：' + esc(String(r.reason));
+    };
     // v2.87.0 B7：题材组合（预览不落设置 / 应用是唯一写入口 / 清空回全量）
     const themeOut = function (text) { setOut('#wa-theme-out', text); };
     const themePicked = function () {
@@ -6196,7 +6400,22 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       if (!WA.collab) return coOut({ ok: false, reason: 'module-missing' });
       const rows = WA.collab.pending() || [];
       const st = WA.collab.stat();
-      coOut({ ok: true, id: '待重放 ' + rows.length + ' / 开会话 ' + st.openSessions });
+      // v2.209.0（优化 6）：逐条打记录锚点（键 `coop:<id>`）。
+      //   为什么在这里：`coOut` 写的是**单行**读数（`plainOut` 走 textContent），
+      //   一行里没有「第几条」的身份 —— 而「点击后直接定位对应记录」要求目标页
+      //   有那把键的行。`WA.collab.pending()` 的 `x.id` 与统一待办中心的
+      //   `mk('coop','coop', x.id, …)` 同源，故这里打的就是同一把键。
+      const hit = function (key, text) {
+        return key ? '<span data-rec="' + esc(String(key)) + '">' + esc(String(text)) + '</span>' : esc(String(text));
+      };
+      const o = $('#wa-co-out');
+      const oHtml = '待重放 ' + esc(String(rows.length)) + ' / 开会话 ' + esc(String(st.openSessions))
+        + (rows.length ? '：' + rows.map(function (x) {
+            const who = String((x && (x.actor || x.by)) || '?');
+            return hit('coop:' + String((x && x.id) || ''), who + ' 的提交');
+          }).join('、') : '');
+      if (o) { o.innerHTML = oHtml; bindNavs(o); }
+      panelEl.dataset.collabOut = String(oHtml).replace(/<[^>]*>/g, '');
     });
     on('#wa-co-conflicts', () => {
       if (!WA.collab) return coOut({ ok: false, reason: 'module-missing' });
@@ -7688,8 +7907,17 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   的同类口是活的，分界线就是「面板上有没有这一栏」。登记在 UI_BINDINGS 不等于接线：
     //   那只是一张字符串表，不构成消费方。
     {
-      const out = function (id, text) { const o = $(id); if (o) o.textContent = text; };
+      // v2.209.0（优化 6）：本页出口改走 **HTML**（原为 textContent）。
+      //   为什么非改不可：待办的记录锚点必须打在这些清单的行上，而 textContent
+      //   会把 HTML 当纯文本 —— 等于这一页**在结构上**不可能被定位到。
+      //   动态值仍逐处 esc（见 recSpan），不因为「反正只有码名」就省掉。
+      // v2.209.0（优化 6）：条目锚点的包装**只有一份**（模块作用域的 recSpanHtml）——
+      //   渲染期与点击期共用，避免「同一件事两种写法」。
+      const out = function (id, text) { const o = $(id); if (o) { o.innerHTML = esc(String(text)); bindNavs(o); } };
       const act = function (id, fn) { const b = $(id); if (b) b.onclick = fn; };
+      /** 与 `out` 同一出口，但**不**做整体 esc：调用方已经逐段 esc 过（recSpan / esc）。
+       *  分成两个口是为了让「这段是受控 HTML」在调用点就看得见，不靠注释约定。 */
+      const outHtml = function (id, html) { const o = $(id); if (o) { o.innerHTML = html; bindNavs(o); } };
       const sw = function (id, onchange) { const c = $(id); if (c) c.onchange = onchange; };
       const ok = function (r) { return (r && r.ok) ? '' : ('失败：' + ((r && (r.reason || r.id)) || 'unknown')); };
       const js = function (r) { try { return JSON.stringify(r); } catch (e) { return String(r); } };
@@ -7723,7 +7951,10 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         if (!WA.storyChoice) return out('#wa-sc-out', '剧情选择未加载');
         const r = WA.storyChoice.pending();
         if (!r.ok) return out('#wa-sc-out', '未确认清单失败：' + r.reason);
-        out('#wa-sc-out', '未确认 ' + r.count + '/' + r.cap + '：' + (r.points.map(function (p) { return p.id + '（' + p.options + ' 项）'; }).join('、') || '无'));
+        outHtml('#wa-sc-out', '未确认 ' + esc(String(r.count)) + '/' + esc(String(r.cap)) + '：' + (r.points.map(function (p) { return recSpanHtml('storyChoice:' + p.id, p.id + '（' + p.options + ' 项）'); }).join('、') || '无'));
+        // v2.209.0（优化 6）：清单读数写回缓存 —— 切页会重建 DOM，出口内容随之消失，
+        //   而锚点必须一到达就在场（否则跳过来是空页、定位永远 misse）。
+        panelEl.dataset.scOut = '未确认 ' + r.count + '/' + r.cap + '：' + (r.points.map(function (p) { return p.id + '（' + p.options + ' 项）'; }).join('、') || '无');
       });
       // ── TX6 委托履约 ──
       sw('#wa-cm-enabled', function () {
@@ -7769,7 +8000,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         if (!WA.commission) return out('#wa-cm-out', '委托履约未加载');
         const r = WA.commission.pending();
         if (!r.ok) return out('#wa-cm-out', '在办清单失败：' + r.reason);
-        out('#wa-cm-out', '在办 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.title + '（' + (x.stage + 1) + '/' + x.total + '）'; }).join('、') || '无'));
+        outHtml('#wa-cm-out', '在办 ' + esc(String(r.count)) + '/' + esc(String(r.cap)) + '：' + (r.items.map(function (x) { return recSpanHtml('commission:' + x.id, x.title + '（' + (x.stage + 1) + '/' + x.total + '）'); }).join('、') || '无'));
+        panelEl.dataset.cmOut = '在办 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.title + '（' + (x.stage + 1) + '/' + x.total + '）'; }).join('、') || '无');
       });
       // ── TX7 线索调查 ──
       //   前缀是 wa-inv-* 而非 wa-iv-*：后者被 v2.150.0 的注入价值榜单占用（同一个 id 空间）。
@@ -7814,7 +8046,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         if (!WA.investigation) return out('#wa-inv-out', '线索调查未加载');
         const r = WA.investigation.pending();
         if (!r.ok) return out('#wa-inv-out', '在查清单失败：' + r.reason);
-        out('#wa-inv-out', '在查 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.title + '（' + x.status + ' / 证据 ' + x.evidence + '）'; }).join('、') || '无'));
+        outHtml('#wa-inv-out', '在查 ' + esc(String(r.count)) + '/' + esc(String(r.cap)) + '：' + (r.items.map(function (x) { return recSpanHtml('investigation:' + x.id, x.title + '（' + x.status + ' / 证据 ' + x.evidence + '）'); }).join('、') || '无'));
+        panelEl.dataset.invOut = '在查 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.title + '（' + x.status + ' / 证据 ' + x.evidence + '）'; }).join('、') || '无');
       });
       // ── TX8 灾后余波 ──
       sw('#wa-af-enabled', function () {
@@ -7846,7 +8079,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         if (!WA.aftermath) return out('#wa-af-out', '灾后余波未加载');
         const r = WA.aftermath.active();
         if (!r.ok) return out('#wa-af-out', '活跃清单失败：' + r.reason);
-        out('#wa-af-out', '活跃 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.placeId + '·' + x.effectType; }).join('、') || '无'));
+        outHtml('#wa-af-out', '活跃 ' + esc(String(r.count)) + '/' + esc(String(r.cap)) + '：' + (r.items.map(function (x) { return recSpanHtml('aftermath:' + x.id, x.placeId + '·' + x.effectType); }).join('、') || '无'));
+        panelEl.dataset.afOut = '活跃 ' + r.count + '/' + r.cap + '：' + (r.items.map(function (x) { return x.placeId + '·' + x.effectType; }).join('、') || '无');
       });
       act('#wa-af-view', function () {
         if (!WA.aftermath) return out('#wa-af-out', '灾后余波未加载');
@@ -7905,7 +8139,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
         const r = WA.operations.pending();
         if (!r.ok) return out('#wa-ops-out', '待推进清单失败：' + r.reason);
-        out('#wa-ops-out', '待推进 ' + r.count + '：' + (r.items.map(function (x) { return x.name + '（' + x.completed + '/' + x.total + '）'; }).join('、') || '无'));
+        outHtml('#wa-ops-out', '待推进 ' + esc(String(r.count)) + '：' + (r.items.map(function (x) { return recSpanHtml('operations:' + x.id, x.name + '（' + x.completed + '/' + x.total + '）'); }).join('、') || '无'));
+        panelEl.dataset.opsOut = '待推进 ' + r.count + '：' + (r.items.map(function (x) { return x.name + '（' + x.completed + '/' + x.total + '）'; }).join('、') || '无');
       });
       act('#wa-ops-view', function () {
         if (!WA.operations) return out('#wa-ops-out', '运营项目未加载');
@@ -8268,9 +8503,13 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   atlas 的 6 枚只读口在此各有一个真消费方 —— 本仓口径「无消费方不挂导出」，
     //   而登记在 UI_BINDINGS 只是字符串、不算消费方（v2.173.0 那条教训）。
     {
-      const atOut = (html) => { const o = $('#wa-at-out'); if (o) o.innerHTML = html; };
+      const atOut = (html) => { const o = $('#wa-at-out'); if (o) o.innerHTML = html; bindNavs(o); };
       const atEsc = (v) => esc(String(v == null ? '' : v));
-      const atRow = (a, b) => '<div class="wa-item"><b>' + atEsc(a) + '</b>' + (b ? '<div class="wa-dim">' + atEsc(b) + '</div>' : '') + '</div>';
+      /** v2.209.0（优化 6）：`rec` 非空时给整行打 `data-rec` —— 定位协议按它逐字比对。
+       *  不给 `rec` 的调用方（关系两层 / 未落位）保持原样：那两类行没有稳定的记录身份
+       *  （同一对势力会挂在推导层与事实层两条上），硬编一个键只会让定位「看起来成功了」。 */
+      const atRow = (a, b, rec) => '<div class="wa-item"' + (rec ? ' data-rec="' + atEsc(String(rec)) + '"' : '')
+        + '><b>' + atEsc(a) + '</b>' + (b ? '<div class="wa-dim">' + atEsc(b) + '</div>' : '') + '</div>';
       const atWhy = (r) => ((r && r.reason) || '?') + (r && r.source ? '（来源 ' + r.source + '）' : '');
       on('#wa-at-enabled', () => {
         if (!WA.atlas) return atOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
@@ -8299,9 +8538,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           + '　近场划分 ' + (p.nearDays === null ? '读不到' : p.nearDays + ' 天')
           + (p.zoneUnknown ? '　分域未知 ' + p.zoneUnknown + ' 处' : '') + '</div>'
           + p.places.map(function (r) {
+            // v2.209.0（优化 6）：地点行带**记录锚点** —— 键 `places:<地点名>`，与
+            //   engines/history-search.js 的 mk('places', name, …) 同源（那边 ref 就是地点名）。
             return atRow(r.name, '距本地 ' + (r.distanceDays === null ? '未知' : r.distanceDays + ' 天') + ' · 渠道 ' + (r.lane || '未知')
               + ' · 域 ' + r.zone + (r.blocked ? ' · <b>受阻</b>' : '')
-              + (r.traces ? '　痕迹 ' + r.traces.count + ' 条' + (r.traces.peak ? '（最强 ' + r.traces.peak + '）' : '') : '　痕迹源缺席'));
+              + (r.traces ? '　痕迹 ' + r.traces.count + ' 条' + (r.traces.peak ? '（最强 ' + r.traces.peak + '）' : '') : '　痕迹源缺席'),
+              'places:' + r.name);
           }).join(''));
       });
       on('#wa-at-routes', () => {
@@ -9380,7 +9622,45 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     if (currentPage === 'settings' && WA.uiSettings) WA.uiSettings.bind(panelEl);
     // 助手页绑定
     const askBtn = $('#wa-ask-btn');
-    if (askBtn) askBtn.onclick = async () => { const q = $('#wa-ask-input').value.trim(); if (!q) return; setOut('#wa-ask-out', '思考中…'); const r = await WA.assistant.ask(q); setOut('#wa-ask-out', r.ok ? r.text : ('失败：' + r.reason)); };
+    if (askBtn) askBtn.onclick = async () => {
+      const q = $('#wa-ask-input').value.trim();
+      if (!q) return;
+      setOut('#wa-ask-out', '检索中…');
+      setOut('#wa-ask-cites', ''); setOut('#wa-ask-gaps', '');
+      const r = await WA.assistant.ask(q);
+      if (!r.ok) { setOut('#wa-ask-out', '失败：' + r.reason); return; }
+      setOut('#wa-ask-out', r.text);
+      // v2.208.0（E1）：引用区显示**代码核对过的**引用号；一个都没有时明说「没标注依据」，
+      //   而不是让一段没有依据的正文看起来像有依据。
+      if (r.citations && r.citations.length) {
+        setOut('#wa-ask-cites', '依据：' + r.citations.map(c => '[' + c.n + ']' + esc(c.face) + (c.title ? ('·' + esc(c.title)) : '') + '（' + esc(c.source || '') + '）').join('　'));
+      } else {
+        setOut('#wa-ask-cites', r.none ? '本次检索零命中（证据为空）' : '本次回答未标注任何引用号');
+      }
+      const gp = r.gaps || {};
+      const seg = [];
+      if (gp.blind && gp.blind.length) seg.push('读不到：' + esc(gp.blind.join('/')));
+      if (gp.deferred && gp.deferred.length) seg.push('被挡下：' + esc(gp.deferred.join('/')));
+      if (gp.droppedFaces && gp.droppedFaces.length) seg.push('玩家视角未检索：' + esc(gp.droppedFaces.join('/')));
+      setOut('#wa-ask-gaps', seg.length ? ('检索缺口 —— ' + seg.join('；')) : '本次六面全查，无未查面');
+    };
+    const askEv = $('#wa-ask-ev');
+    if (askEv) askEv.onclick = () => {
+      const q = $('#wa-ask-input').value.trim();
+      if (!q) return;
+      // 只查证据：不调模型，把「命中了哪几行 + 缺口」直接摆出来（诊断/取证用）
+      const g = WA.assistant.search(q);
+      if (!g.ok) { setOut('#wa-ask-out', '检索失败：' + g.reason); return; }
+      const hits = g.rows.map((x, i) => '[' + (i + 1) + '](' + x.face + ')' + x.title + '｜' + esc(x.source || ''));
+      setOut('#wa-ask-out', '命中 ' + g.rows.length + ' / ' + g.totalRows + ' 行（视角 ' + g.view + '）'
+        + (hits.length ? ('\n' + hits.join('\n')) : ''));
+      setOut('#wa-ask-cites', '');
+      const seg2 = [];
+      if (g.blind.length) seg2.push('读不到：' + esc(g.blind.join('/')));
+      if (g.deferred.length) seg2.push('被挡下：' + esc(g.deferred.join('/')));
+      if (g.droppedFaces.length) seg2.push('玩家视角未检索：' + esc(g.droppedFaces.join('/')));
+      setOut('#wa-ask-gaps', seg2.length ? ('没查全 —— ' + seg2.join('；')) : (g.rows.length ? '六面全查，有命中' : '六面全查，零命中'));
+    };
     let thLast = null;   // v2.2.0: 最近一次剧场产物（供「插入输入框」使用）
     const thBtn = $('#wa-theater-btn');
     if (thBtn) thBtn.onclick = async () => {
@@ -10232,6 +10512,36 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         pcOut('<div class="wa-log wa-log-info">最近 ' + r.count + ' 条（全表 ' + r.total + ' 条）' + ' ' + pcFlags(r) + '</div>'
           + ((r.rows || []).map(pcRow).join('') || '<div class="wa-item">此刻没有待办</div>'));
       });
+      on('#wa-pc-timeline', () => {
+        if (!WA.pendingCenter) return pcOut('<div class="wa-log wa-log-err">统一待办中心未加载</div>');
+        if (typeof WA.pendingCenter.timeline !== 'function') return pcOut('<div class="wa-log wa-log-warn">本面板需要 v2.208.0 及以上（当前模块没有 timeline 读面）</div>');
+        const r = WA.pendingCenter.timeline();
+        if (!r.ok) return pcOut('<div class="wa-log wa-log-warn">' + esc(pcWhy(r.reason)) + '</div>');
+        // 三件事**分开显示**（合起来就等于把「读不到」写成「没有」）：
+        //   ① agenda 面可用性 —— 不可用时表里的期限缺席是读不到，不是没有
+        //   ② link —— 这条配上了没有（both / pending / agenda）
+        //   ③ due.why —— 五种子因（timed 的 agenda-row 与 absent 的四种不同因）
+        const ag = r.agenda || {};
+        const whyText = { 'agenda-row': '有日程行', 'agenda-unknown': '日程明说时间未知',
+          'agenda-no-row': '该源在日程面但没这一条', 'not-in-agenda': '该源没接上日程面',
+          'agenda-unavailable': '日程面本次不可用' };
+        const linkText = { both: '两面对上', pending: '只在待办面', agenda: '只在日程面' };
+        return pcOut('<div class="wa-log wa-log-info">待办×期限：' + r.total + ' 条（对上 ' + r.counts.both
+          + ' / 只在待办 ' + r.counts.pending + ' / 只在日程 ' + r.counts.agenda
+          + '，有时间 ' + r.counts.timed + ' · 无时间 ' + r.counts.undated + '）' + ' ' + pcFlags(r) + '</div>'
+          + (ag.ok ? '' : '<div class="wa-log wa-log-warn">日程面本次不可用（' + esc(ag.reason || '?')
+            + '）—— 表里没有期限读数是因为<b>读不到</b>，不是因为这条没有期限</div>')
+          + ((r.rows || []).map(function (x) {
+            const due = x.due || {};
+            const when = (due.state === 'timed')
+              ? ('到期 ' + new Date(due.atMs).toLocaleString())
+              : ('<span class="wa-dim">' + esc(whyText[due.why] || due.why || '时间未知') + '</span>');
+            return '<div class="wa-item">' + esc(x.title)
+              + '<span class="wa-dim">　' + esc(x.source) + '/' + esc(x.ref)
+              + '　' + esc(linkText[x.link] || x.link) + '　' + when + '</span></div>';
+          }).join('') || '<div class="wa-item">此刻没有事项</div>')
+          + '<div class="wa-dim">' + esc(r.note) + '</div>');
+      });
       on('#wa-pc-sources', () => {
         if (!WA.pendingCenter) return pcOut('<div class="wa-log wa-log-err">统一待办中心未加载</div>');
         const rows = WA.pendingCenter.bySource();
@@ -10748,14 +11058,32 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   同本仓口径：全部走 `WA.<ns>.<口>` 字面形态；先判在场、再判开关、最后读。
     //   边界 1：**不是新的状态容器** —— 本页零 store.transact、零 pendingCenter.reset；
     //   边界 2：下钻只给路由（去哪看 / 看哪条 / 哪个设置键），**不执行确认动作**。
-    const tdOut = function (html) { const o = $('#wa-td-out'); if (o) o.innerHTML = html; };
+    const tdOut = function (html) { const o = $('#wa-td-out'); if (o) o.innerHTML = html; bindNavs(o); };
     const tdMiss = function (label) { tdOut('<div class="wa-log wa-log-err">' + esc(label) + '未加载 —— 这一页读的是它的读数，缺席时不拿空表冒充</div>'); };
     const tdRow = function (x) {
-      return '　· ' + esc(String((x && x.title) || '(未命名)'))
+      // v2.209.0（优化 6）：待办行的记录身份 = `kind:ref`（引擎 mk() 的 (kind, ref)）。
+      //   跳转目标页取自 `describe().page`（与「按归属」同一份读数），**不是**本页自造的归属表。
+      const kind = String((x && x.kind) || '');
+      const ref = String((x && x.ref) || '');
+      const rk = kind && ref ? (kind + ':' + ref) : '';
+      // v2.209.0（优化 6）：**目标页取落点**（describe().seePage），不是归属。
+      //   归属（describe().page）仍是分组用的那份读数 —— 两个读数各司其职，
+      //   面板两份都不抄（引擎缺席时落点为 null ⇒ 退回页级跳转，如实不假装）。
+      const see = todoSeeOf(kind);
+      const page = see || null;
+      const pageOk = !!page;
+      return '　· ' + (rk ? '<span data-rec="' + esc(rk) + '">' : '') + esc(String((x && x.title) || '(未命名)'))
+        + (rk ? '</span>' : '')
         + (x && x.detail ? '　' + esc(String(x.detail)) : '')
         + '　来源 <code>' + esc(String((x && x.source) || '?')) + '</code>'
         + (x && x.ref ? '　看 ' + esc(String(x.ref)) : '')
-        + (x && x.canAct ? '　<b>可处理</b>' : '　<span class="wa-dim">只读</span>')
+        + (rk && pageOk ? '　' + navBtn('去处理', page, rk, '', '跳到来源模块所在页并定位到这一条（确认动作仍由来源模块自己的写口持有）') : '')
+        // ⚠ 本行**只打一处** data-rec（上面标题那一个）。首版在这里又补了一个空 span 想让
+        //   「行本身」也带锚点 —— 那不是冗余而是致残：定位判据是「命中 1 处才算成功、
+        //   >1 处报 rec-ambiguous」，于是每一次从别处跳过来都定位失败。
+        //   同一个键在一页里只准出现一次：这条不变式在协议里，页面侧就必须守住它。
+        + ((x && x.actions && x.actions.length) ? '　<b>可处理</b>（' + esc(x.actions.join(' / ')) + '）'
+          : (x && x.canAct ? '　<b>可处理</b><span class="wa-dim">（去来源面板）</span>' : '　<span class="wa-dim">只读</span>'))
         + '　' + todoConsequence(x);
     };
     on('#wa-td-all', () => {
@@ -10898,6 +11226,66 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           : '<div class="wa-dim">诊断口不可用（<code>pendingCenter.diagnose</code> 缺席）—— 申报面读不出。</div>')
         + '<div class="wa-dim">本页对三旗标**只读不解释过头**：不可区分的情形如实写「不可区分」，不猜成「没有待办」。</div>');
     });
+    // ── v2.206.0（拓展 2）：可处理面 ──────────────────────────────────────
+    //   本页唯一一枚**写路径**：act() 透传。三条边界（与引擎侧逐字对齐）：
+    //     ① 不自己拼动作表 —— 可用动作从 items().rows[].actions 读（引擎是唯一真源）；
+    //     ② 不替玩家编参数 —— 只传 (kind, action, ref) 三参；表外的动作如实说不能点；
+    //     ③ 编排失败（fault）与来源拒收（reason）**分开显示**，不压成一行。
+    on('#wa-td-act', () => {
+      const P = WA.pendingCenter;
+      if (!P || typeof P.act !== 'function') {
+        return tdOut('<div class="wa-log wa-log-err">统一待办中心（act 口）未加载 —— '
+          + '这一页读的是它的读数，缺席时不拿空表冒充</div>');
+      }
+      const cfg = (typeof P.getSettings === 'function') ? P.getSettings() : {};
+      if (cfg.enabled === false) {
+        return tdOut('<div class="wa-log wa-log-warn">待办中心关着 ⇒ 不代它处理：' + esc(todoWhy('disabled')) + '</div>');
+      }
+      let r = null;
+      try { r = P.items({}); } catch (e) { r = null; }
+      if (!r || r.ok !== true) {
+        return tdOut('<div class="wa-log wa-log-warn">读不出条目 ⇒ 无从处理：' + esc(todoWhy(r && r.reason)) + '</div>');
+      }
+      const rows = (r.rows || []).filter(function (x) { return x && x.actions && x.actions.length; });
+      if (!rows.length) {
+        const all = (r.rows || []).length;
+        return tdOut('<div class="wa-log wa-log-info">此刻没有可透传处理的条目。</div>'
+          + '<div class="wa-dim">' + (all ? '有 ' + all + ' 条待办，但它们的动作都要玩家另行给值'
+            + '（回执号 / 金额 / 选项标签 / 参与者）—— 本页<b>不代填</b>，请去来源面板。'
+            : '（空态的三种含义见「空态三旗标」；本页不把「读不到」说成「没有待办」。）') + '</div>');
+      }
+      const one = rows[0];
+      const kind = String(one.kind || '');
+      const ref = String(one.ref || '');
+      const action = String(one.actions[0]);
+      let out = null;
+      // 字面形态：引用面清册只认 `WA.<ns>.<口>`（`P.act` 这种别名扫不到 ⇒ 会被判成「无消费方」）
+      try { out = WA.pendingCenter.act(kind, action, ref); } catch (e) { out = null; }
+      if (!out) {
+        return tdOut('<div class="wa-log wa-log-err">动作口抛出且无人接住（'
+          + esc(kind) + '.' + esc(action) + '）—— 如实报错，不当作成功。</div>');
+      }
+      // ③ 两个命名空间分开显示：fault 非空 = 编排失败；fault 为空而 reason 非空 = 来源拒收。
+      const head = out.ok
+        ? '<div class="wa-log wa-log-info">已由来源模块自己的写口处理：'
+          + esc(kind) + '<code>.' + esc(String(out.fn || action)) + '(' + esc(ref) + ')</code> 返回 ok</div>'
+        : (out.fault
+          ? '<div class="wa-log wa-log-warn">编排失败（<b>' + esc(String(out.fault)) + '</b>）：'
+            + esc(String(out.detail || out.why || '')) + '</div>'
+            + '<div class="wa-dim">这是本层「没接上」（码在 <code>fault</code> 命名空间），'
+            + '不是来源模块拒收 —— 两者分开报是本仓口径。</div>'
+          : '<div class="wa-log wa-log-warn">来源模块拒收（<b>' + esc(String(out.reason || '?')) + '</b>）：'
+            + esc(todoWhy(out.reason)) + '</div>'
+            + '<div class="wa-dim">这是来源自己的判定（码在 <code>reason</code> 命名空间，原返回体在 <code>data</code> 上）—— '
+            + '本页不替它改口。</div>');
+      const acts = (one.actions || []).map(function (a) { return esc(a); }).join(' / ');
+      tdOut(head
+        + '<div class="wa-item">条目：' + esc(String(one.title || '(未命名)'))
+        + '　来源 <code>' + esc(kind) + '</code>　看 ' + esc(ref)
+        + '　该来源可透传的动作：<b>' + acts + '</b></div>'
+        + '<div class="wa-dim">本页只做 (kind, action, ref) 三参透传：不开事务、不新增确认逻辑、不替玩家编参数。'
+        + '要回执号 / 金额 / 选项标签 / 参与者的动作**不在这里**，请去来源面板（下钻一条会给路由）。</div>');
+    });
     on('#wa-td-diag', () => {
       const P = WA.pendingCenter;
       if (!P || typeof P.diagnose !== 'function') return tdMiss('统一待办中心（diagnose 口）');
@@ -10909,10 +11297,19 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + 'closedLoop ' + (d.closedLoop ? '成立' : '不成立') + '　版本 ' + esc(String(d.version || '?')) + '</div>'
         + '<div class="wa-item">在场检查：'
         + keys.map(function (k) { return esc(k) + (checks[k] ? ' ✓' : ' ✗'); }).join('　') + '</div>'
+        + (d.actions ? '<div class="wa-item">动作面（可处理的写口是否**真的**在）：表里登记 '
+          + esc(String(d.actions.declared)) + ' 条 / 现场在场 ' + esc(String(d.actions.live)) + ' 条 '
+          + (d.actions.declared === d.actions.live ? '<b>全在场</b>' : '<b>有缺</b>（表里有、写口没有 ⇒ 点了会点空）')
+          + '　逐源 ' + esc(Object.keys(d.actions.bySource || {}).map(function (k) {
+            const v = d.actions.bySource[k];
+            return k + ' ' + v.live + '/' + v.declared;
+          }).join('、')) + '</div>' : '')
         + '<div class="wa-item">源面：共 ' + esc(String(d.sourceCount)) + ' 源，在场 ' + esc(String(d.liveSources))
         + '，申报 empty 的 ' + esc(String(d.emptyReporterCount)) + ' ⇒ emptyAll '
         + (d.emptyAllReachable ? '<b>可达</b>' : '<span class="wa-dim">不可达（来源不申报时两种「空」不可区分）</span>') + '</div>'
         + (st ? '<div class="wa-item">本进程计数：读 ' + esc(String(st.reads)) + ' 次 · 拒收 ' + esc(String(st.refused))
+          + ' 次 · 动作成功 ' + esc(String(st.acts == null ? 0 : st.acts))
+          + ' 次 · 动作被来源拒收 ' + esc(String(st.actRejects == null ? 0 : st.actRejects))
           + ' 次 · 最近原因 ' + esc(String(st.lastReason || '无'))
           + '　故障键 ' + esc(Object.keys(st.faults || {}).length) + ' 个</div>' : '')
         + '<div class="wa-dim">本页读它只为自证在场性 —— 面板不是新的状态容器（Y4 边界 1）。</div>');
@@ -11122,7 +11519,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + '<div class="wa-dim">密钥与宿主态是**显式名单**（不是靠前缀猜）—— 名单本身可在这里当场核。</div>');
     });
     // ── v2.201.0（Y6）：世界历史检索（三枚只读 + 一枚写口 + 两条只读出口）────────
-    const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) o.innerHTML = html; };
+    const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) o.innerHTML = html; bindNavs(o); };
     const hsQ = function () { const i = $('#wa-hs-q'); return i ? String(i.value || '').trim() : ''; };
     const hsFaceSel = function () { const s = $('#wa-hs-face'); return s ? String(s.value || '') : ''; };
     /** 面名 → 中文标签。**真源是引擎的 FACE_LABELS**（本页不自带第二份面清单 ——
@@ -11147,7 +11544,14 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       }
       return head + '<div class="wa-item">' + rows.map(function (x) {
         const at = (x.at === null || x.at === undefined) ? '<span class="wa-dim">时间未知</span>' : ('@' + esc(String(x.at)));
-        return '　<b>' + esc(hsLabel(x.face)) + '</b>　' + esc(String(x.title)) + '　' + at
+        // v2.209.0（优化 6）：每行**自带记录锚点与跳转**。
+        //   定位键取 `face:ref`（引擎 mk() 里 (face, ref) 就是这一行的身份，ref 在面内唯一）
+        //   —— 到目标页后按 `[data-rec]` 逐字比对，命中 1 处才算定位成功。
+        //   行本身打 `data-rec`（目标页自己也会打同一把键），这样「跳过去的那一条」
+        //   与「页面上那一条」是同一个串，不存在两套编号。
+        const rk = String(x.face) + ':' + String(x.ref);
+        return '　<b>' + esc(hsLabel(x.face)) + '</b> <span data-rec="' + esc(rk) + '">' + esc(String(x.title)) + '</span>　' + at
+          + '　' + navBtn('去看这条', (x.route || {}).page, rk, '', '按协议跳到来源页并定位到这一条记录（定位失败会如实报出，不假装停准了）')
           + '<br>　　<span class="wa-dim">来源 <code>' + esc(String(x.source)) + '</code>　定位 <code>' + esc(String(x.ref))
           + '</code>　路由 → ' + esc(String((x.route || {}).page || '（无）')) + '</span>'
           + (x.text ? '<br>　　' + esc(String(x.text)) : '')
@@ -11270,12 +11674,17 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   与其他页不同的一点：**本页连一个写口都没有**（对比 find 页的「记进最近查询 / 清空记录」）。
     //   全页按钮一律走只读读口；偏好键（enabled / 预算）只由引擎的 setSettings 暴露给设置页，
     //   本页不碰 —— 这是边界 ④「零写入」在界面上的**结构**保证，不是一句声明。
-    const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) o.innerHTML = html; };
+    const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) o.innerHTML = html; bindNavs(o); };
     const wgSel = function () {
       const k = $('#wa-wg-kinds'), e = $('#wa-wg-edges');
       const kinds = k && String(k.value || '') ? [String(k.value)] : null;
       const edges = e && String(e.value || '') ? [String(e.value)] : null;
       return { kinds: kinds, edges: edges };
+    };
+    // 节点页归属：读**既有**页表常量，不在本页另立一份图谱→页的映射（两份映射必然漂移）。
+    const wgPageOf = function (kind) {
+      const t = { people: 'people', orgs: 'people', places: 'world' };
+      return t[String(kind)] || 'world';
     };
     const wgLabel = function (k) {
       const L = (WA.worldGraph && WA.worldGraph.KINDS) || null;
@@ -11310,6 +11719,28 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + ab.nodeKinds.map(function (x) { return ' 节点·' + esc(wgLabel(x.kind)) + '（' + esc(x.reason) + '）'; }).join('　')
         + ab.edgeKinds.map(function (x) { return ' 边·' + esc(x.kind) + '（' + esc(x.reason) + '）'; }).join('　') + '</div>';
     };
+    const wgNodesHtml = function (g) {
+      const ns = (g.nodes || []).slice(0, 24);
+      if (!ns.length) return '';
+      return '<div class="wa-item"><span class="wa-dim">节点清单（点「看这条」按导航协议跳到该节点所属页并逐字定位；'
+        + '图谱自身一个写口也没有，跳转只带到既有页面，不替本页做任何登记）：</span></div>'
+        + ns.map(function (n) {
+            const rec = String(n.kind) + ':' + String(n.id);
+            // v2.209.0（优化 6）：**行本身**打记录锚点（每行一处）。
+            //   首版只在 navBtn 的参数里带了 rec，行 div 上一个锚点也没有 ——
+            //   于是「从图谱跳到图谱」永远定位不到（`locate()` 找不到这把键），
+            //   图谱自己也进不了「可定位」这张网（探针实测 recs=0）。
+            //   同一把键在一页里只准出现一次：所以按钮那边**不带** rec 之外的第二处锚点。
+            return '<div class="wa-item" data-rec="' + esc(rec) + '">' + esc(wgLabel(n.kind)) + ' · <b>' + esc(n.label) + '</b>'
+              + ' <span class="wa-dim">' + esc(String(n.id)) + '</span>'
+              + ' <span class="wa-dim">← ' + esc(String(n.source || '（无来源标签）')) + '</span>'
+              + '　' + navBtn('看这条', wgPageOf(n.kind), rec, '',
+                  '按导航协议跳到该节点所属页并定位到这一条（定位失败如实报出，不假装停准了）') + '</div>';
+          }).join('')
+        + (g.nodes.length > ns.length
+            ? '<div class="wa-dim">（节点共 ' + g.nodes.length + ' 条，此处只列前 ' + ns.length + ' 条 —— 列表有界，不是数据被丢）</div>'
+            : '');
+    };
     on('#wa-wg-build', () => {
       const G = WA.worldGraph;
       if (!G || typeof G.graph !== 'function') return wgMiss('图谱面（graph 口）');
@@ -11323,6 +11754,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + (g.truncated.nodes || g.truncated.edges
             ? '<div class="wa-item"><span class="wa-dim">受预算降级（不是丢数据）：节点截 ' + g.truncated.nodes + ' / 边截 ' + g.truncated.edges + '</span></div>' : '')
         + wgAbsentHtml(g) + wgAnomHtml(g)
+        + wgNodesHtml(g)
         + '<div class="wa-dim">' + esc(g.basisNote || '') + '</div>');
     });
     on('#wa-wg-geo', () => {
@@ -11444,6 +11876,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           + views.map(function (v) { return '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + esc(vn(v)) + '</option>'; }).join('')
           + '</select><span id="wa-view-out" class="wa-dim"></span>';
       })()}</span><span class="wa-close">✕</span></div>
+      <div class="wa-nav-bar"><span id="wa-nav-out" class="wa-dim">（跳转读数：去哪 / 定位结果 / 拒收原因 —— 常驻头部，切页不会把它冲掉）</span>
+        <button class="wa-btn wa-mini" id="wa-nav-back" title="回到上一页，并按离开时的样子还原输入与滚动位（ui/panel-nav.js 的回程栈，有界 8 层）">← 返回</button></div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}">${p.icon} ${p.label}</button>`).join('')}</div>
       <div class="wa-body"></div>
     </div>`);
@@ -11473,7 +11907,11 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     // v2.109.0（#15）：切页即落盘（走 __persistPanel 的单一写路径）——点同一页也写一次：
     //   saveOrThrow 内含写后读回校验，重复写同值不产生副作用，却能让「落盘能力断了」
     //   这件事**在第一次点击时就暴露**，而不是等到用户下次重载才发现视图状态没了。
-    panelEl.querySelectorAll('.wa-tab').forEach(t => t.onclick = () => { currentPage = t.dataset.page; syncTabs(); renderBody(); __persistPanel(); });
+    // v2.209.0（优化 6）：tab 的点击改走 WA.ui.goPage()（切页单一入口）。
+    //   原先这里内联三件事（改 currentPage / syncTabs / renderBody / __persistPanel），
+    //   与「跳到来源页」那处各写一份 —— 两处漂移过一次（v2.203.0 收口修的 NodeList.filter
+    //   就在那一处）。收成一个口之后，tab 与协议走同一条路。
+    panelEl.querySelectorAll('.wa-tab').forEach(t => t.onclick = () => { WA.ui.goPage(t.dataset.page); });
     syncTabs();
   }
   function syncTabs() { panelEl.querySelectorAll('.wa-tab').forEach(t => t.classList.toggle('active', t.dataset.page === currentPage)); }
@@ -11537,6 +11975,27 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       WA.ui.mounted = true;
       WA.log('info', 'UI已挂载（悬浮球+主面板）');
     },
-    open() { toggle(true); }
+    open() { toggle(true); },
+    // ── v2.209.0（优化 6）：切页的**单一入口**（导航协议的落点）──
+    //   为什么非抽不可：切页此前有两处写法（tab 的 onclick 直接改 currentPage；
+    //   检索页的「跳到来源页」走 `tab.click()`）。两处都改了 `currentPage` 之后调
+    //   `syncTabs() + renderBody() + __persistPanel()` 这三件同样的事 —— 于是新增一处跳转
+    //   就得把这三件再抄一遍，漏一件的表现各不相同（漏 persist 是「重载后停在上次那个页」，
+    //   漏 syncTabs 是「高亮与内容不一致」）。收成一个口之后，跳转只有一种写法。
+    //   返回值带 `changed`：**同页跳转不是失败**（幂等），调用方据此区分「本来就在」与「切过去了」。
+    //   非法页**拒收**并给出认得的集合 —— ui/panel-nav.js 的 parse() 与本口共用同一份页表。
+    goPage(id, opt) {
+      const want = String(id == null ? '' : id);
+      const known = PAGES.map(function (p) { return p.id; });
+      if (known.indexOf(want) < 0) return { ok: false, reason: 'bad-page', page: want, known: known };
+      const changed = (want !== currentPage);
+      currentPage = want;
+      if (panelEl) { syncTabs(); renderBody(); __persistPanel(); }
+      // v2.209.0（优化 6）：切页 = 换了一整套 DOM。渲染期绑过了，但**出口**是渲染期
+      //   之后才填的（见 NAV_OUT_SELS）—— 在这里再补一遍，否则
+      //   「跳到某页 → 用该页出口里的行再跳一次」这一串里第二次点击就是死的。
+      if (panelEl) bindNavs(panelEl);
+      return { ok: true, changed: changed, page: want, known: known };
+    }
   };
 })();

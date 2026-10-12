@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.205.0'
+  const VERSION = '2.209.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -746,6 +746,11 @@
     //   localStorage 偏好键（`worldaxis_worldgraph_v1`，同 history-search 先例）。
     'engines/world-graph.js',
     'ui/panel.js',
+    // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
+    //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；
+    //   先装会让页白名单恒空、一切导航被拒收成 no-page-table（协议静默失效，比不装更难查）。
+    //   本模块**零 store 写、零落盘、零时钟读数**：回程栈与输入态留档都是进程态交互物。
+    'ui/panel-nav.js',
     'ui/cyberpunk-theme.js',
     'ui/cyberpunk-components.js',
     'ui/cyberpunk-dashboard.js',

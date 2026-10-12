@@ -8,7 +8,11 @@
 //     ② 八源**没有一个**申报 `empty` ⇒ emptyAll 不可达；这件事必须**在诊断面上可答**
 //        （emptyReporterCount=0 / emptyAllReachable=false）—— 灯不亮可以，不亮得有原因；
 //     ③ **四族返回形状**（items 桶 / points 桶 / 裸数组 / 单对象或 null）都归一得出来；
-//     ④ **只读**：连读五口之后存档逐字节不变；且导出面**没有**任何写口。
+//     ④ **只读**：连读五口之后存档逐字节不变；导出面**只有一个写口** `act`，
+//        且它**只透传**（把 ref 转给来源模块的既有公开写口，本模块不碰 store、
+//        不开事务、不写存档）—— v2.206.0 拓展 2 之前这句写的是「没有任何写口」，
+//        本版把「一个都没有」改成「只有一个且它只透传」：删掉那句话等于把
+//        「本层不新增确认语义」这条边界从判据面上抹掉。
 const path = require("path");
 process.chdir(path.resolve(__dirname, ".."));
 const sync = require("../tests/ui-gate-sync.js");
@@ -17,7 +21,7 @@ const WA = boot.WA;
 var pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log("FAIL: " + name); } }
 ok("S1: pendingCenter loaded", typeof WA.pendingCenter === "object");
-ok("S2: 9 exports", ["getSettings", "setSettings", "items", "soon", "bySource", "describe", "diagnose", "stat", "reset"]
+ok("S2: 11 exports", ["getSettings", "setSettings", "items", "soon", "bySource", "describe", "diagnose", "timeline", "stat", "reset", "act"]
   .every(function (k) { return typeof WA.pendingCenter[k] === "function"; }));
 ok("S3: default off", WA.pendingCenter.getSettings().enabled === false);
 ok("S4a: disabled reject items", WA.pendingCenter.items().ok === false && WA.pendingCenter.items().reason === "disabled");
@@ -68,7 +72,11 @@ if (sc.ok === true) {
 var d1 = WA.pendingCenter.describe("commission");
 ok("S20: 下钻答「去哪看」", d1.ok === true && typeof d1.page === "string" && d1.module === "commission");
 ok("S21: 下钻带设置键", d1.settingsKey === "worldaxis_commission_settings_v1");
-ok("S22: 下钻自述「不执行确认动作」", d1.note.indexOf("不执行确认动作") >= 0);
+// v2.206.0：自述由「不执行确认动作」改写为「只给路由 + 可透传的动作名；本层只透传不新增」。
+//   判据跟着**实义**走（「本层不新增确认语义」这件事仍必须写在下钻自述里），
+//   而不是跟着旧字面量走 —— 钉旧字面量会把一次有意的改写判成回归。
+ok("S22: 下钻自述「只透传不新增」", d1.note.indexOf("只透传不新增") >= 0
+  && d1.note.indexOf("确认语义由来源模块自己的写口持有") >= 0);
 ok("S23: 带 id 下钻自洽", WA.pendingCenter.describe("commission", d1.id).id === d1.id);
 ok("S24: 未知条 ⇒ not-found", WA.pendingCenter.describe("commission", "no_such_id").reason === "not-found");
 ok("S25: 未知类型 ⇒ unknown-kind", WA.pendingCenter.describe("nope").reason === "unknown-kind");
@@ -79,7 +87,7 @@ ok("S27: 源表 8 条", srcs.length === 8);
 ok("S28: 每源带 availability 与累计读数", srcs.every(function (s) {
   return typeof s.name === "string" && typeof s.available === "boolean" && typeof s.read === "number"; }));
 var dg = WA.pendingCenter.diagnose();
-ok("S29: diagnose 闭环 + 8 源 + 版本", dg.ok === true && dg.closedLoop === true && dg.sourceCount === 8 && dg.version === "2.183.0");
+ok("S29: diagnose 闭环 + 8 源 + 版本", dg.ok === true && dg.closedLoop === true && dg.sourceCount === 8 && dg.version === "2.209.0");
 ok("S30: 诊断面报 empty 申报数", typeof dg.emptyReporterCount === "number" && typeof dg.emptyAllReachable === "boolean");
 // 现场事实：八源没有一个申报 empty ⇒ emptyAllReachable 为假。这是**可答的坏消息**，
 //   不是「一切正常」—— 测试锁住它，是为了让「这盏灯亮不了」永远有一个出口说出来。
@@ -95,9 +103,14 @@ WA.pendingCenter.describe("commission");
 WA.pendingCenter.diagnose();
 var s2 = JSON.stringify(WA.store.get());
 ok("S33: 只读（store 逐字节不变）", s1 === s2);
-// 导出面没有任何写口 —— 不是「暂未实现」，是设计上不导出
-ok("S34: 无写口（确认语义留在各来源模块）", !["confirm", "cancel", "ignore", "apply", "settle", "claim", "complete"]
-  .some(function (k) { return typeof WA.pendingCenter[k] === "function"; }));
+// v2.206.0：由「无写口」改判为「**只有一个写口，且它只透传**」。
+//   为什么不是删掉这一条：`act` 的存在恰恰让「本层不新增确认语义」更需要被判据盯住 ——
+//   一个能写的口比一个不能写的口危险得多，删判据等于把危险面从账上抹掉。
+//   故两向都判：`act` **必须**在（本模块唯一写口），且那七个**仍不许**在。
+ok("S34: 只有一个写口 act，且它只透传（其余七个仍不导出）",
+  typeof WA.pendingCenter.act === "function"
+  && !["confirm", "cancel", "ignore", "apply", "settle", "claim", "complete"]
+    .some(function (k) { return typeof WA.pendingCenter[k] === "function"; }));
 // ── 计数 / 上限 ──────────────────────────────────────────
 var st = WA.pendingCenter.stat();
 ok("S35: stat 记读数", st.reads >= 1 && st.enabled === true);

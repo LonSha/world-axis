@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.205.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.205.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.209.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.209.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -3578,6 +3578,54 @@
       "tref": 0,
       "own": 2
     },
+    "panelNav.diagnose": {
+      "reason": "self-only",
+      "detail": "ui/panel-nav.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/panel-nav.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "panelNav.grab": {
+      "reason": "self-only",
+      "detail": "ui/panel-nav.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/panel-nav.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "panelNav.locate": {
+      "reason": "self-only",
+      "detail": "ui/panel-nav.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/panel-nav.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "panelNav.parse": {
+      "reason": "self-only",
+      "detail": "ui/panel-nav.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/panel-nav.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "panelNav.restore": {
+      "reason": "self-only",
+      "detail": "ui/panel-nav.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/panel-nav.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "panelNav.stat": {
+      "reason": "self-only",
+      "detail": "ui/panel-nav.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/panel-nav.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
     "parallelEvents.active": {
       "reason": "test-only",
       "detail": "engines/parallel-events.js 内部自用、外部零引用（过度导出）",
@@ -6780,6 +6828,22 @@
     }
   },
   "uiDead": {
+    "assistant.gaps": {
+      "reason": "self-only",
+      "detail": "ui/assistant.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/assistant.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "assistant.terms": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "ui/assistant.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 9
+    },
     "ui.STATE_EVENTS": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",

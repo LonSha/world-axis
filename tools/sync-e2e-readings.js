@@ -84,6 +84,14 @@ function liveReadings() {
     //   与上面三数同源（都取自 M.audit() 的现场值），故一并登记，不让人再逐版手改。
     out.cycleFiles = a.files; out.cycleAliasFiles = a.aliasFiles; out.cycleRefFiles = a.refFiles;
     out.cycleOrderLen = a.orderLen;
+    // v2.209.0（优化 6）：B6/B10/B11 三条同为「住在锁里的人工回填面」（同一份 audit() 真源）。
+    //   三处的现场值历来只在新 ns / 新 UI 文件进场时各 +1，沿革注释里靠人一句句写
+    //   「差 39 不动 / 差 40」——本次新增 ui/panel-nav.js 一次性动了三处
+    //   （静态提供方 +1、UI_NS +1、ui 文件 +1），人工面一起失真 ⇒ 收进工具。
+    out.cycleNsFaceDiff = a.nsProvided - a.nsLedger;
+    out.cycleRegisteredUsed = a.registeredUsed;
+    out.cycleRegisteredTotal = a.registeredTotal;
+    out.cycleRuntimeMissing = a.runtimeMissing;
   } catch (e) { out.missing.push('module-cycle-gate.audit()'); }
   if (!reg) { out.missing.push('module-registry-ledger.json'); }
   else {
@@ -356,6 +364,38 @@ const SITES = [
     re: /(a\.orderLen\s*===\s*)(\d+)/g,
     skipComment: true,
     live: function (L) { return L.cycleOrderLen; }
+  },
+  // ── v2.209.0（优化 6）：B6/B10/B11 三站（同族收尾）──
+  //   形态与既有 cycleFiles 族一致：显式登记 + skipComment + live 取 audit() 真值。
+  //   B6 那站的值是**差值**（nsProvided - nsLedger），语义为「有登记理由的静态-only 差」——
+  //   它涨 1 不代表漂移（nsFaceDrift 仍为 0），只代表静态提供方多了一项未入账本的记号。
+  {
+    id: 'cycleNsFaceDiff', desc: '命名空间面差（静态提供方 - 账本）',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(a\.nsProvided - a\.nsLedger === )(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.cycleNsFaceDiff; }
+  },
+  {
+    id: 'cycleRegisteredUsed', desc: '登记面在用数（ENTRY_NS + UI_NS + EXTERNAL 中真被读的）',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(a\.registeredUsed === )(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.cycleRegisteredUsed; }
+  },
+  {
+    id: 'cycleRegisteredTotal', desc: '登记面总数（同一条断言的后半）',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(&&\s*a\.registeredTotal === )(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.cycleRegisteredTotal; }
+  },
+  {
+    id: 'cycleRuntimeMissing', desc: '账本缺项文件数（入口 + N 个 ui 文件）',
+    files: ['tests/module-cycle-gate-v2107.js'],
+    re: /(a\.runtimeMissing === )(\d+)/g,
+    skipComment: true,
+    live: function (L) { return L.cycleRuntimeMissing; }
   }
 ];
 
@@ -540,7 +580,10 @@ const REQUIRED = ['loadEdges', 'callRefs', 'nsCount', 'loadedCount', 'ledgerEntr
   // v2.135.0（E6 收尾）：新登记的四族站点也必须真扫到——「没扫到」与「读数正确」在输出上必须可分（H6 两向自证）。
   'sourcesCount', 'sourcesCountMsg', 'stdoutNsCount', 'stdoutFileCount',
   'stdoutLoadEdgesMsg', 'stdoutNsMsg', 'stdoutFileMsg',
-  'distMsgTestOnly', 'distMsgSelfOnly', 'distMsgUnwired'];
+  'distMsgTestOnly', 'distMsgSelfOnly', 'distMsgUnwired',
+  // v2.209.0（优化 6）：新登记的四站必须真扫到 —— 「没扫到」与「读数正确」
+  //   在输出上必须可分（否则正则写错 = 永远绿）。
+  'cycleNsFaceDiff', 'cycleRegisteredUsed', 'cycleRegisteredTotal', 'cycleRuntimeMissing'];
 
 /** 自我测试（H6 第二向）：把某站点的真值**改掉一个数**，证明 buildPlan 真能报出 stale。 */
 function selfTest() {

@@ -10,8 +10,13 @@
 //   ③ **四种返回形状**（items 桶 / points 桶 / 裸数组 / 单对象或 null）在归一化层消化，
 //      形状不认的如实报 bad-shape，**不许猜字段**；
 //   ④ 关闭 / 缺席的模块进 `skipped` 带原因，**不许静默当作「没有这类事项」**；
-//   ⑤ **只读**：连读五口之后存档逐字节不变（本模块不导出任何写口 —— 不是「暂未实现」，
-//      是**设计上不导出**：确认语义由各来源模块自己的公开写口持有）；
+//   ⑤ **读面只读**：连读五口之后存档逐字节不变。
+//      v2.183.0 的原文是「本模块不导出任何写口」—— v2.206.0（拓展 2）**有意**改了这一条：
+//      现在导出**一个透传写口** `act(kind, action, ref)`。它不是第二套确认逻辑：
+//      确认语义仍由各来源模块自己的公开写口持有，本模块只做「解析 → 校验 → 调用 → 归一」，
+//      **不碰 store、不开事务、不写存档**（写口自持事务，见模块头边界 7/11）。
+//      故本锁在 v2.206.0 之后钉的是「**读面**只读 + 唯一写口是透传」这两件事，
+//      而不再是「一个写口都没有」。
 //   ⑥ 排序**不用对象键序**（会随插入顺序漂移），按来源声明序 + 记录 id 升序，
 //      同一状态两次读数逐字相同。
 //
@@ -25,7 +30,8 @@ process.chdir(BASE);
 const sync = require('./ui-gate-sync.js');
 const synthHost = require('./synth-host.js');
 const REL = 'engines/pending-center.js';
-const KEYS = ['getSettings', 'setSettings', 'items', 'soon', 'bySource', 'describe', 'diagnose', 'stat', 'reset'];
+// v2.206.0（拓展 2）：act 是本模块**唯一**的写口，且是透传（见文件头 ⑤）。
+const KEYS = ['getSettings', 'setSettings', 'items', 'soon', 'bySource', 'describe', 'act', 'diagnose', 'stat', 'reset'];
 // 按仓规「无消费方不挂导出」：本模块的真消费方是面板与诊断节，故**没有**注入段。
 //   多一个 buildBlock 就要走注入链七点登记 —— 这里钉住它「不该存在」。
 const MUST_BE_ABSENT = ['buildBlock'];
@@ -79,7 +85,8 @@ function runA(a) {
   MUST_BE_ABSENT.forEach(function (k) {
     a(body.indexOf(k + ':') < 0, 'e1v2183/A3: 导出面**没有** ' + k + '（无消费方不挂导出）');
   });
-  a(/EXPORT_COUNT\s*=\s*9/.test(src), 'e1v2183/A4: EXPORT_COUNT = 9');
+  // v2.206.0：9 → 10（新增 act）。改这里必须同时改模块里的自证串，否则装载即抛。
+  a(/EXPORT_COUNT\s*=\s*11/.test(src), 'e1v2183/A4: EXPORT_COUNT = 11（v2.208.0 起另含待办×期限面 timeline）');
   a(/pendingCenter: export count mismatch/.test(src), 'e1v2183/A5: 自证串在位（导出面变动必须有人确认过）');
   a(/const DEF = \{ enabled: false, maxRows: 32, soonCount: 8 \}/.test(src), 'e1v2183/A6: 默认关 + 两项参数声明');
   a(/bounds: \{ maxRows: \[4, 128\], soonCount: \[1, 32\] \}/.test(src), 'e1v2183/A7: 区间声明逐字在位');
@@ -97,7 +104,10 @@ function runA(a) {
   ['disabled', 'missing-kind', 'unknown-kind', 'not-found', 'module-missing', 'source-threw', 'bad-shape']
     .forEach(function (c) { a(src.indexOf("'" + c + "'") >= 0, 'e1v2183/A14: 拒收码 ' + c + ' 在位'); });
   a(/不改任何来源模块的状态/.test(src), 'e1v2183/A15: 「只读」写在模块头（不改来源模块状态）');
-  a(/不导出任何写口/.test(src), 'e1v2183/A16: 「不导出任何写口」写在模块头（不是暂未实现）');
+  // v2.206.0：旧措辞「不导出任何写口」已成假话（现在有 act）⇒ 断言改到新的真值上。
+  //   新真值有两条，都必须写在模块头：①不持有确认语义（只透传）；②不开事务。
+  a(/不持有\*\*任何确认语义/.test(src), 'e1v2183/A16: 「不持有任何确认语义（只透传）」写在模块头');
+  a(/不碰 store、不开事务、不写存档/.test(src), 'e1v2183/A16b: 「不碰 store、不开事务、不写存档」写在模块头');
   a(readOf('index.js').indexOf("'engines/pending-center.js'") >= 0, 'e1v2183/A17: index.js LOAD_ORDER 装载');
   a(readOf('tests/run.js').indexOf("'engines/pending-center.js'") >= 0, 'e1v2183/A18: tests/run.js LOAD 装载');
   const diag = readOf('engines/tool-diag.js');
@@ -112,9 +122,12 @@ function runA(a) {
   a(pan.indexOf("'#wa-pc-drill-go'") >= 0, 'e1v2183/A24: 面板接线（下钻按钮）在位');
   a(pan.indexOf('<div class="wa-sec">统一待办中心</div>') >= 0,
     'e1v2183/A25: 分区标题是纯文本形态且含模块身份词（v2570 的分区提取正则不吃内联 span）');
-  a(readOf('tests/run.js').indexOf('|pendingCenter:bySource describe diagnose getSettings items setSettings soon stat|') >= 0,
-    'e1v2183/A26: FROZEN2800 逐字含本模块的契约成员集（reset 不在其中：产品侧零消费 ⇒ 它走 test-only 账本，'
-    + '不进跨文件契约 —— 契约收的是「产品真引用的成员」，把测试侧引用也算进去会让契约随测试漂移）');
+  // v2.206.0：契约成员集新增 act（面板「处理第一条」真调它 ⇒ 产品侧有引用，进契约）。
+  //   reset 仍不在其中（产品侧零消费 ⇒ 走 test-only 账本）—— 这条口径没变。
+  a(readOf('tests/run.js').indexOf('|pendingCenter:act bySource describe diagnose getSettings items setSettings soon stat timeline|') >= 0,
+    'e1v2183/A26: FROZEN2800 逐字含本模块的契约成员集（v2.208.0 起另含 timeline；reset 仍不在其中：'
+    + '产品侧零消费 ⇒ 它走 test-only 账本，不进跨文件契约 —— 契约收的是「产品真引用的成员」，'
+    + '把测试侧引用也算进去会让契约随测试漂移）');
   // 本锁的版本判据是**下界**（本版是 v2.183.0 交付的），不是「恰好等于」——
   //   后续升版（v2.184.0…）不该让这条判据变红：旧锁钉的是「该版本及以上」
   //   （与仓内 s3-tx* 系列旧锁同一口径，它们把新版本词**追加**进白名单而不是替换）。
@@ -135,7 +148,7 @@ function runB(a) {
   const boot = sync.fresh({});
   const WA = boot.WA;
   a(typeof WA.pendingCenter === 'object', 'e1v2183/B1: 模块装载');
-  a(KEYS.every(function (k) { return typeof WA.pendingCenter[k] === 'function'; }), 'e1v2183/B2: 9 口全部可调用');
+  a(KEYS.every(function (k) { return typeof WA.pendingCenter[k] === 'function'; }), 'e1v2183/B2: 10 口全部可调用');
   a(WA.pendingCenter.getSettings().enabled === false, 'e1v2183/B3: 默认关');
   a(WA.pendingCenter.items().reason === 'disabled' && WA.pendingCenter.soon().reason === 'disabled'
     && WA.pendingCenter.describe('commission').reason === 'disabled',
@@ -176,7 +189,8 @@ function runB(a) {
   a(d1.ok === true && d1.module === 'commission' && typeof d1.page === 'string',
     'e1v2183/B18: 下钻答「去哪看」（page + module）');
   a(d1.settingsKey === 'worldaxis_commission_settings_v1', 'e1v2183/B19: 下钻带设置键');
-  a(d1.note.indexOf('不执行确认动作') >= 0, 'e1v2183/B20: 下钻自述「只给路由、不执行动作」');
+  // v2.206.0：旧自述「不执行确认动作」已随 act 的加入改写为「只透传不新增」。
+  a(d1.note.indexOf('只透传不新增') >= 0, 'e1v2183/B20: 下钻自述「只给路由 + 只透传不新增」（v2.206.0 口径）');
   var d2 = WA.pendingCenter.describe('commission', d1.id);
   a(d2.ok === true && d2.id === d1.id, 'e1v2183/B21: 带 id 的下钻与不带 id 的结果自洽');
   a(WA.pendingCenter.describe('commission', 'no_such_id').reason === 'not-found',
@@ -191,7 +205,8 @@ function runB(a) {
   a(srcs.filter(function (s) { return s.name === 'commission'; })[0].available === true, 'e1v2183/B27: 在场源如实报在场');
   // 诊断
   var dg = WA.pendingCenter.diagnose();
-  a(dg.ok === true && dg.closedLoop === true && dg.version === '2.183.0' && dg.sourceCount === 8,
+  // v2.206.0：模块自报版本随本批升到 2.206.0（diagnose 面是它的自证出口）。
+  a(dg.ok === true && dg.closedLoop === true && dg.version === '2.209.0' && dg.sourceCount === 8,
     'e1v2183/B28: diagnose 闭环 + 8 源 + 版本');
   a(typeof dg.emptyReporterCount === 'number' && typeof dg.emptyAllReachable === 'boolean',
     'e1v2183/B29: 诊断面报 empty 申报数（灯亮不亮的现场证据）');

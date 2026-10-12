@@ -178,11 +178,14 @@ function runAll(a) {
 function runNegative(a) {
   const src = fs.readFileSync(path.join(BASE, PANEL), 'utf8');
 
-  // N1. 破坏「切页即落盘」：摘掉页签 onclick 里的 __persistPanel() 调用
-  const A1 = 'currentPage = t.dataset.page; syncTabs(); renderBody(); __persistPanel(); });';
+  // N1. 破坏「切页即落盘」：摘掉切页**单一入口**里的 __persistPanel() 调用。
+  //   v2.209.0（优化 6）：切页收口进 WA.ui.goPage() 之后，页签 onclick 里不再内联
+  //   「改 currentPage + syncTabs + renderBody + __persistPanel」四件（那是三处各自
+  //   手写的老形态）。落盘调用现在只在这一行里 —— 破坏点跟着搬，**后果判据不变**。
+  const A1 = 'if (panelEl) { syncTabs(); renderBody(); __persistPanel(); }';
   const n1 = src.split(A1).length - 1;
   a(n1 === 1, 'ui-comp/neg: 破坏锚点 N1 在真源码中恰 1 处（实 ' + n1 + '）');
-  const b1 = src.replace(A1, 'currentPage = t.dataset.page; syncTabs(); renderBody(); });');
+  const b1 = src.replace(A1, 'if (panelEl) { syncTabs(); renderBody(); }');
   a(n1 === 1 && b1 !== src, 'ui-comp/neg: N1 破坏真的改变了源码');
   try { global.localStorage.removeItem(STATE_KEY); } catch (e) {}
   const env1 = uiGate.fresh({ srcOverride: { 'ui/panel.js': b1 } });

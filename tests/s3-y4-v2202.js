@@ -80,6 +80,13 @@ function runAll(a) {
   const iR = P.indexOf(SEG_RENDER_START), iB = P.indexOf(SEG_BIND_START), iE = P.indexOf(SEG_END);
   const segR = P.slice(iR, P.indexOf(SEG_RENDER_END));
   const segB = P.slice(iB, iE);
+  //   v2.209.0（优化 6）：第三段切片 —— 结果出口的**选择器清单**（NAV_OUT_SELS）。
+  //   为什么要把它算进来：本页的独占前缀 `wa-td-` 除了「渲染段 + 绑定段」，
+  //   还合法地出现在这张模块作用域的出口表里（每个出口一个选择器）。
+  //   它既不是别的页、也不是过宽替换 —— 故按白名单**扩一段切片**，
+  //   而不是把判据放宽成 `>=`（放宽就等于不再能拦「跨页同名污染」）。
+  const iZ = P.indexOf('const NAV_OUT_SELS = [');
+  const segZ = (iZ >= 0) ? P.slice(iZ, P.indexOf('];', iZ) + 2) : '';
   a(P.indexOf('function renderTodoCenter()') >= 0, 'y4v2202/A1: 渲染器 renderTodoCenter 在位');
   a(iR >= 0 && iB >= 0 && iE > iB && iE > iR,
     'y4v2202/A1b: 两段段落注释与段尾锚点都在位且顺序正确（实 r=' + iR + ' b=' + iB + ' e=' + iE + '）');
@@ -92,9 +99,11 @@ function runAll(a) {
   // 独占前缀：六个 id 全带 wa-td-；且只出现在本页两段之间（不污染别的页）
   a(cnt(P, "'#wa-td-") >= 6, 'y4v2202/A2e: 本页绑定用独占前缀 wa-td-（实 ' + cnt(P, "'#wa-td-") + ' 处）');
   const tdAll = (P.match(/wa-td-/g) || []).length;
-  const tdInSegs = (segR.match(/wa-td-/g) || []).length + (segB.match(/wa-td-/g) || []).length;
+  const tdInSegs = (segR.match(/wa-td-/g) || []).length + (segB.match(/wa-td-/g) || []).length
+    + (segZ.match(/wa-td-/g) || []).length;
   a(tdAll > 0 && tdInSegs === tdAll,
-    'y4v2202/A2f: wa-td- 只出现在本页两段切片内（实 全文件 ' + tdAll + ' / 两段 ' + tdInSegs + '）—— 过宽替换或跨页同名会在这里现形');
+    'y4v2202/A2f: wa-td- 只出现在本页切片内（实 全文件 ' + tdAll + ' / 切片 ' + tdInSegs
+    + '，含出口清单段）—— 过宽替换或跨页同名会在这里现形');
   // ② 六枚按钮真渲染、真绑定、真登记
   BTN_IDS.forEach(function (id) {
     a(cnt(segR, 'id="' + id + '"') === 1, 'y4v2202/A3: ' + id + ' 在渲染段恰渲染 1 次（实 ' + cnt(segR, 'id="' + id + '"') + '）');

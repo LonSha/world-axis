@@ -55,7 +55,11 @@ function j(x) { return JSON.stringify(x); }
 const ANCHOR = {
   page: "    { id: 'find', icon: '🔍', label: '检索' },",
   renderer: 'find: renderFindCenter,',
-  out: "const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) o.innerHTML = html; };",
+  // v2.209.0（优化 6）：出口写完即补绑（出口自己的责任）。锚点随形态更新 ——
+  //   判据没变（「真源码里恰 1 处」），变的是那一行的形态。
+  //   v2.209.0（优化 6）：出口写完即补绑。锚点随形态更新 —— 判据没变
+  //   （「真源码里恰 1 处」），变的是那一行的形态（`if (o) o.innerHTML = …`，无花括号）。
+  out: "const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) o.innerHTML = html; bindNavs(o); };",
   outSel: "const hsOut = function (html) { const o = $('#wa-hs-out');",
   guard: "    { page: 'find', ids: ['wa-hs-q', 'wa-hs-go', 'wa-hs-count', 'wa-hs-face',",
   faces: "const FACES = ['chronicle', 'people', 'places', 'orgs', 'rules', 'entries'];",

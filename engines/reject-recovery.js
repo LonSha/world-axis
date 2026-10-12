@@ -147,7 +147,10 @@
     'write': { kind: 'retry-same-input', why: '写盘失败：同输入再写一次（store 已自带重试）' },
     // ── v2.203.0 补登：规则表判不了（分词里没有「架构/超前」语义），逐条显式登记 ──
     'schema-ahead': { kind: 'manual-review', why: '保存的世界快照版本比当前支持的更新：自动分支无法判断该降级读还是该拒读' },
-    'carries-world-facts': { kind: 'adjust-input', why: '导入体顶层夹带世界事实字段：把这些字段从包里去掉（世界事实只能走世界侧入口），再导入' }
+    'carries-world-facts': { kind: 'adjust-input', why: '导入体顶层夹带世界事实字段：把这些字段从包里去掉（世界事实只能走世界侧入口），再导入' },
+    // ── v2.209.0（优化 6）：面板导航与助手面的两条 ──
+    'rec-ambiguous': { kind: 'manual-review', why: '切页后按 data-rec 定位命中 >1 条：本仓口径「不猜」（猜一条比报一句没渲染出来更坏，用户会以为定位是对的），该由人确认取哪条' },
+    'channel-unconfigured': { kind: 'request-setup', why: '助手通道未配置（缺 baseUrl 或 model）：先把通道配好再问' }
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -233,7 +236,14 @@
    *  Y7 world-graph / Y8 rule-pack / Y9 world-lab）的新码此前**只进码面口径、没进本快照**，
    *  专锁 B3/B4/C4 因此各自自其版次起一直红着 —— 本版一并补齐（逐条不改档）。
    *  其中 schema-ahead 的恢复档不能靠规则表（分词里没有「架构/超前」语义），故另在
-   *  OVERRIDES 显式登记（manual-review：新快照该降级读还是该拒读，机器判不了）。 */
+   *  OVERRIDES 显式登记（manual-review：新快照该降级读还是该拒读，机器判不了）
+   *  v2.209.0（优化 6）：快照 740 → 754（+14）· 成功面 34 → 35（+1）。
+   *  ui/panel-nav.js（新）与 ui/panel.js 的拒收码此前**只进码面口径、没进本快照**，
+   *  且 ui/assistant.js 的四条（E1 批 v2.208.0 遗留）同样漏同步 —— 探针实测：
+   *  现场 754/35/54 vs 快照 740/34/54，差额全部落在 ui 层。本版一并补齐。
+   *  其中 `rec-ambiguous`（>1 处命中，本仓口径「不猜」）另在 OVERRIDES 显式登记
+   *  （manual-review：定位到多条同名记录时机器判不了该取哪条）；
+   *  `channel-unconfigured`（助手通道未配 baseUrl/model）登记为 request-setup。 */
   const REJECT_FACE = [
     'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'adopt-throw',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
@@ -359,7 +369,14 @@
     'ambiguous-label', 'bad-edge-kind', 'bad-snapshot-ver', 'budget-exceeded', 'empty-snapshot',
     'empty-world', 'ls-write-failed', 'schema-ahead', 'source-absent',
     'carries-world-facts', 'conflict', 'preset-world-absent',
-    'causal-absent', 'no-report', 'stale-report', 'commit-absent', 'beat-ledger-absent'
+    'causal-absent', 'no-report', 'stale-report', 'commit-absent', 'beat-ledger-absent',
+    // ── v2.209.0（优化 6）：面板导航协议（ui/panel-nav.js）与助手面（ui/assistant.js）的拒收码 ──
+    //   现场实测 754 / 快照 740 ⇒ 差 14。其中本批 11 条由 panel-nav（9）与 panel（2）报出，
+    //   另 3 条（channel-unconfigured / empty-question / no-search-face）属 ui/assistant.js
+    //   的既有欠债（E1 批 v2.208.0 遗留），一并补齐 —— 探针 probe11 逐条对照过「只在现场」的清单。
+    'bad-page', 'empty-rec', 'empty-target', 'nav-module-missing',
+    'no-back', 'no-body', 'no-page', 'no-page-table', 'rec-not-rendered', 'ui-module-missing',
+    'rec-ambiguous', 'channel-unconfigured', 'empty-question', 'no-search-face'
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -369,7 +386,10 @@
     'halted', 'interior-blocked', 'module-disabled', 'needs-real-device', 'no-elapsed', 'no-far',
     'not-holder', 'not-in-table', 'not-registered', 'ok', 'omniscient', 'out-of-lens', 'pass',
     'player-view', 'premature', 'range-off', 'reuse', 'same-day', 'trigger-fired', 'triggered',
-    'unlocked', 'within-lock'];
+    'unlocked', 'within-lock',
+    // v2.209.0（优化 6）：ui/assistant.js 的 `no-terms`（未检索到词条时如实返回 ok:false 之外
+    //   的成功面返回）—— 现场实测 success 35 / 快照 34 ⇒ 差 1，属 E1 批既有欠债。
+    'no-terms'];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
     'bridge-threw', 'budget', 'climate-throw', 'commitment', 'commitment-fulfilled',
@@ -522,6 +542,6 @@
     }
   };
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/reject-recovery.js', { kind: 'engine', ver: '2.203.0' });
+    WA.registerModule('engines/reject-recovery.js', { kind: 'engine', ver: '2.209.0' });
   }
 })();
