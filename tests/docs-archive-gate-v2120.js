@@ -201,7 +201,10 @@ function runB(a) {
   //   alternation 白名单欠债同型：**v2.208.0 的版本面收口不完整**，欠债不止一处）。
   //   本版 v2.209.0 条目入册 ⇒ 145，导语与本条同批收敛到 145（两处各写一遍是本仓的老毛病，
   //   判据继续钉精确等值以防条目被误删）。
-  a(r.facts.readmeEntries === 145, 'docs-archive/B: README 版本历史条目 = 145（实 ' + r.facts.readmeEntries + '）');
+  // v2.210.0 补账：本版当期条目入 README 版本历史首条（147 行那条 `<b>v2.210.0</b>`），146。
+  //   改这条之前同样**先实测了一次真值**：真跑 `tests/docs-archive-gate.js` 的 scan()，实测 146，
+  //   与 README 导语同批收敛（两处各写一遍是本仓的老毛病；判据继续钉**精确等值**以防条目被误删）。
+  a(r.facts.readmeEntries === 146, 'docs-archive/B: README 版本历史条目 = 146（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

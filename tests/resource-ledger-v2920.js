@@ -195,15 +195,28 @@ function runAll(a) {
     'v2920: [B8] 诊断里的异常笔数与对账结论同源');
 
   // B9：面板面真消费（真实点击，读数落在输出节点上）
-  const panel = H1.dom.getElementById('wa-panel');
+  // v2.210.0 修正：**本段必须用当场 fresh 的 UI 环境**。
+  //   原写法取 `H1.dom`（B1 之前那次 fresh 的句柄），而 B9 之前还跑过 H2（B7 段）；
+  //   `fresh()` 在**同一 vm/global** 上重装 ui/* 并 `uiDom.install(WA)` 换掉 `WA.__uiDoc`，
+  //   旧 doc 上的 `.wa-tab` 点击不会让新环境的 `.wa-body` 渲染出人物页（实测 body 按钮数 0），
+  //   于是 `btn` 为 undefined 并抛 `Cannot read properties of undefined (reading 'click')`。
+  //   这是**假红**：判据文本与阈值逐字不变，改的是取值面（用当场的 H5）。
+  const H5 = fresh(); const W5 = H5.WA; seed(W5);
+  W5.org.grant('faction', '甲', '粮', 50);
+  W5.org.transfer('faction', '甲', 'person', '丙', '粮', 30);
+  const panel = H5.dom.getElementById('wa-panel');
   const tab = panel.querySelectorAll('.wa-tab').filter(function (x) { return x.dataset.page === 'people'; })[0];
   a(!!tab, 'v2920: [B9] 人物页 tab 在场');
-  tab.click();
+  // 守卫式调用（v2.210.0）：断言是记录式的，裸 `tab.click()` 在判红后会抛 TypeError，
+  //   把**整段后面的 C2 / N0 / N1 / N2 / N3 / N4 全部截断** —— 读数缩水，报告却只说「锁抛出」。
+  //   改成守卫后断言照红（真红不隐藏），后续判据照跑。
+  if (tab) tab.click();
   const body = panel.querySelector('.wa-body');
-  const btn = body.querySelectorAll('button').filter(function (b) { return b.id === 'wa-org-ledger'; })[0];
+  const btns = body ? body.querySelectorAll('button') : [];
+  const btn = btns.filter(function (b) { return b.id === 'wa-org-ledger'; })[0];
   a(!!btn, 'v2920: [B9] 「资源账本」按钮渲染成树（绑定不会空转）');
-  btn.click();
-  const out = H1.dom.getElementById('wa-org-out');
+  if (btn) btn.click();
+  const out = H5.dom.getElementById('wa-org-out');
   const txt = out ? out.textContent : '';
   a(txt.indexOf('账本 ·') === 0 && txt.indexOf('持有者') > 0,
     'v2920: [B9] 成功读数以「账本 ·」开头（不复用「已记录」——那是写盘回执的措辞；实 ' + txt + '）');

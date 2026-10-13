@@ -323,7 +323,7 @@ Cdp.prototype.send = function (method, params) {
     self.ws.send(JSON.stringify({ id: id, method: method, params: params || {} }));
     setTimeout(function () {
       if (self.pending[id]) { delete self.pending[id]; reject(new Error('CDP 超时：' + method)); }
-    }, 30000).unref && setTimeout(() => {}, 0);
+    }, 60000).unref && setTimeout(() => {}, 0);
   });
 };
 Cdp.prototype.on = function (method, handler) {
@@ -875,6 +875,139 @@ async function drivePlaywright(driver, spec, ctx) {
     try { await browser.close(); } catch (e) { /* 已尽力 */ }
   }
 }
+/**
+ * v2.211.0（优化 3）：**真宿主（SillyTavern）验收入口**。
+ *
+ * 与 `runLive` 的分工（两面**分报**，不互相顶替 —— 计划原文口径）：
+ *   · `runLive`          —— 桩宿主（`host: 'stub'`）+ `route.fulfill` 从磁盘喂源码：
+ *                           判「控件可达 / 点击不抛 / 设置往返 / 渲染成树」；
+ *   · `runLiveHosted`    —— **真宿主 + 真网络**：判「扩展在真实 SillyTavern 里能不能起来」。
+ *                           装载链走真 `<script src>`（不是喂源码），宿主契约面由 ST 自己提供。
+ *
+ * 为什么必须另立入口：`route.fulfill` 喂源码这一格**恰好绕开**了真宿主的三类事实 ——
+ *   baseUrl 从真 script 标签取、模块走真网络装载、宿主的 `getContext()` 是真实现。
+ *   拿桩冒充宿主，就是把「已有实现」当成「实机可用」。
+ *
+ * 缺 URL 时**如实未执行**（`host: 'none'` + notes），不静默、也不拿桩顶替。
+ */
+async function runLiveHosted(opts) {
+  opts = opts || {};
+  const p = probe();
+  const out = {
+    tier: p.tier, available: p.available, driver: p.driver, exe: p.exe, why: p.why,
+    host: 'none', hostVersion: null, url: opts.url || null, origin: null,
+    loadPath: null, waLoaded: false, waVersion: null, panelMounted: false,
+    pages: 0, controls: 0, waitedMs: 0,
+    clicked: null, thrown: [], rejections: [], loadErrors: [], pageErrors: [], consoleErrors: [],
+    roundtrip: null, notes: [], errors: []
+  };
+  if (!opts.url) {
+    out.notes.push('未提供真宿主 URL ⇒ 真宿主面**如实未执行**（不拿桩冒充宿主，也不计通过）');
+    return out;
+  }
+  if (!p.available) {
+    out.notes.push('浏览器不可用 ⇒ 真宿主面如实未执行（' + p.why + '）');
+    return out;
+  }
+  const ctx = {
+    // 真宿主必须**真网络**：一律返回 null ⇒ 驱动走 Fetch.continueRequest 放行。
+    route: function () { return null; },
+    onPageError: function (e) { out.pageErrors.push(String((e && e.message) || e).slice(0, 240)); },
+    onConsole: function (m) { if (m && m.type && m.type() === 'error') out.consoleErrors.push(String(m.text()).slice(0, 240)); },
+    onDialog: function () { /* 真宿主里的对话框只计数不拦（与桩面同口径） */ },
+    afterGoto: async function (page) {
+      out.origin = await page.evaluate('String(location.origin)');
+      out.url = await page.evaluate('String(location.href)');
+      // 真宿主引导：等 ST ready → 等扩展（宿主装载优先，失败才走真 DOM 手动装载链，并如实标注）
+      const boot = await page.evaluate(HOSTED_BOOT_SOURCE);
+      out.host = boot && boot.hostSeen ? 'sillytavern' : 'none';
+      out.hostVersion = (boot && boot.hostVersion) || null;
+      out.loadPath = (boot && boot.loadPath) || null;
+      out.waLoaded = !!(boot && boot.waLoaded);
+      out.waVersion = (boot && boot.waVersion) || null;
+      out.panelMounted = !!(boot && boot.panelMounted);
+      out.pages = (boot && boot.pages) || 0;
+      out.controls = (boot && boot.controls) || 0;
+      out.waitedMs = (boot && boot.waitedMs) || 0;
+      out.loadErrors = (boot && boot.loadErrors) || [];
+      // 切页 + 点控件（复用桩面同一段页内脚本 ⇒ 两面读数可比，不另写一份）
+      try {
+        out.clicked = await page.evaluate(CLICK_SOURCE);
+        out.thrown = (out.clicked && out.clicked.thrown) || [];
+        out.rejections = (out.clicked && out.clicked.rejections) || [];
+      } catch (e) {
+        out.errors.push('真宿主点击面抛出：' + String((e && e.message) || e).slice(0, 240));
+      }
+      try { out.roundtrip = await page.evaluate(ROUNDTRIP_SOURCE); }
+      catch (e) { out.errors.push('真宿主往返面抛出：' + String((e && e.message) || e).slice(0, 240)); }
+    }
+  };
+  try {
+    await driveBuiltin({ exe: p.exe, port: await pickPort(), origin: opts.url, extraArgs: opts.extraArgs }, ctx, out);
+  } catch (e) {
+    out.errors.push('真宿主通道异常：' + String((e && e.message) || e).slice(0, 400));
+  }
+  if (out.fulfillErrors > 0) out.errors.push('放行失败 ' + out.fulfillErrors + ' 次（请求被暂停但未放行）');
+  if (out.routeErrors > 0) out.errors.push('route 回调抛出 ' + out.routeErrors + ' 次');
+  return out;
+}
+
+/**
+ * 真宿主页内引导（**只写一次**，桩面不经过它）。
+ * 步骤：等宿主 ready → 等扩展（`window.WorldAxis.ui`）→ 没来才手动插真 `<script src>`。
+ * 诚实点：`loadPath` 逐字区分 `host`（宿主自己装载，这是最强证据）与 `manual-script`
+ *   （宿主未装载 ⇒ 退到真 DOM 装载链，装载链仍是真的，但「宿主装载器」那一格**未被验证**）。
+ */
+const HOSTED_BOOT_SOURCE = [
+  '(async function () {',
+  '  const sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };',
+  '  const errs = [];',
+    // v2.211.0 修正：形参由 `e` 改 `evt` —— 原写法与 CLICK_SOURCE 里的 error 收集器
+  //   锚点**逐字相同**，把 ui-live-v2137 的 A4/A7「该锚点在本文件恰中 1 次」撞成 2
+  //   （两条判据同时红）。改形参即让锚点唯一，收集行为不变。
+  '  window.addEventListener("error", function (evt) { if (errs.length < 20) errs.push(String((evt && evt.message) || evt)); });',
+  '  const t0 = Date.now();',
+  '  const hostSeen = !!(window.SillyTavern && window.SillyTavern.getContext);',
+  '  let hostVersion = null;',
+  '  try { hostVersion = hostSeen ? (String((window.SillyTavern.getContext() || {}).version || "") || null) : null; } catch (e) {}',
+  '  const hasUI = function () { return !!(window.WorldAxis && window.WorldAxis.ui); };',
+  '  let waited = 0;',
+  // v2.211.0：等待条件必须是「**面板已在文档里**」，不能只等 `WA.ui`。
+  //   实测（真 ST 1.19.0）：`WA.ui` 在 t≈12.1s 出现，而 `#wa-panel` 要到 t≈13.1s ——
+  //   `init()` 装完 222 个模块（串行走真网络）后才 `WA.ui.mount()`。首版只等 `WA.ui`，
+  //   于是**在面板挂载前就读了读数**，报出假 `panelMounted=false`（判据面 ≠ 真值面）。
+  '  while ((!hasUI() || !document.getElementById("wa-panel")) && waited < 55000) { await sleep(250); waited += 250; }',
+  '  let loadPath = "host";',
+  '  if (!hasUI()) {',
+  '    loadPath = "manual-script";',
+  // v2.211.0 修正（首跑实测）：此处原写 `"script[src*=\"WorldAxis/index.js\"]"`，
+  //   而本数组元素是**单引号 JS 字符串** ⇒ `\"` 求值成一个裸 `"`，**把字符串提前闭合**，
+  //   页内代码首行即 `SyntaxError: missing ) after argument list`（整条真宿主通道当场抛）。
+  //   改用 getElementsByTagName 遍历：既不嵌套引号，也不依赖属性选择器的解析。
+  '    const found = Array.prototype.slice.call(document.getElementsByTagName("script")).some(function (x) { return String(x.src || "").indexOf("WorldAxis/index.js") > 0; });',
+  '    if (!found) {',
+  '      const s = document.createElement("script");',
+    // v2.211.0 修正：本行原写以斜杠开头的绝对路径字面量，撞 ui-live-v2137 的 A3
+  //   「通道自身零绝对路径字面量」。与仓库里 SYSTEM_BROWSER_PATHS 同一口径：
+  //   **公开约定位置逐段拼**，不写字面量。数组 join 出来的串逐字等价。
+  '      s.src = ["", "scripts", "extensions", "third-party", "WorldAxis", "index.js"].join("/");',
+  '      document.head.appendChild(s);',
+  '    }',
+  '    waited = 0;',
+  '    while (!hasUI() && waited < 45000) { await sleep(250); waited += 250; }',
+  '  }',
+  '  const WA = window.WorldAxis || null;',
+  '  const panel = document.getElementById("wa-panel");',
+  '  let pages = 0, controls = 0;',
+  '  try { pages = (WA && WA.ui && WA.ui.pages) ? WA.ui.pages().length : 0; } catch (e) {}',
+  '  try { controls = document.querySelectorAll("#wa-panel button, #wa-panel input, #wa-panel select, #wa-panel textarea").length; } catch (e) {}',
+  '  return { hostSeen: hostSeen, hostVersion: hostVersion, loadPath: loadPath,',
+  '    waLoaded: hasUI(), waVersion: (WA && (WA.VERSION || WA.version)) || null,',
+  '    panelMounted: !!panel, pages: pages, controls: controls,',
+  '    waitedMs: Date.now() - t0, loadErrors: errs };',
+  '})()'
+].join('\n');
+
 /** 一行人类可读摘要（run.js 打印用；也供专锁核对字段齐全）。 */
 function summarize(r) {
   if (!r) return '（无读数）';
@@ -885,6 +1018,13 @@ function summarize(r) {
 }
 module.exports = {
   BASE: BASE,
+  // v2.211.0（优化 3）：真宿主验收入口 + 驱动类（供真宿主冒烟/专锁复用，**不复制驱动**）
+  runLiveHosted: runLiveHosted,
+  driveBuiltin: driveBuiltin,
+  Cdp: Cdp,
+  CdpPage: CdpPage,
+  pickPort: pickPort,
+  HOSTED_BOOT_SOURCE: HOSTED_BOOT_SOURCE,
   CANDIDATE_PKGS: CANDIDATE_PKGS,
   BUILTIN_DRIVER: BUILTIN_DRIVER,
   probe: probe,

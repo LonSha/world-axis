@@ -74,7 +74,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.209.0）
+## 构建与验收（当前版本 v2.210.0）
 
 **三档回归**：日常改动跑**快档**（十几秒，覆盖「动了就会炸」的十三面），跨文件同值判据与生成物跑**中档**（一分钟级），收口跑**全量**。
 
@@ -101,12 +101,15 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ### tools/ 的取舍
 
-**只有被可执行代码引用（或被门禁链引用）的工具才入库**（42 个，`git ls-files tools/ | wc -l` 为准：
+**只有被可执行代码引用（或被门禁链引用）的工具才入库**（44 个，`git ls-files tools/ | wc -l` 为准：
 `agenda_smoke` / `anchor-scan` / `attribution-gate` / `capacity_audit_smoke` / `chronicle_view_smoke` / `consumer-types` / `contract-scan` / `coverage-report` / `diag_inject_v2860` / `fact-report` /
-`doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `impact-analysis` / `loose-readings` / `mid-tier` / `net-audit` / `patch-idempotency` /
+`doc-gate` / `gen-changelog` / `gen-error-codes` / `gen-lock` / `gen-plan-status` / `hooks` / `hosted_paths` / `hosted_smoke` / `impact-analysis` / `loose-readings` / `mid-tier` / `net-audit` / `patch-idempotency` /
 `pending_center_smoke` / `perf_baseline_smoke` / `prune-sections` / `reject-recovery` / `repo-hygiene` / `scan_drift` / `slow-sections` / `smoke` / `sync-e2e-readings` / `sync-hardcoded` /
 `test-audit` / `test-layers` / `tx1_smoke` / `tx2_smoke` / `tx3_smoke` / `tx4_smoke` / `tx6_smoke` / `tx7_smoke` /
 `tx8_smoke` / `tx9_smoke` / `world_health_smoke`）。
+（v2.210.0：新入库 `tools/hosted_smoke` / `tools/hosted_paths`（**真宿主验收档**：`hosted_smoke` 判「扩展能不能在真实酒馆里起来」，`tools/hosted_paths` 七段逐条取证 —— 生成前后链 / 切聊天 / 重载 / 拒收重复 / 业务四路（存档·待办·规则包·实验室）/ O1 六模块补跑（九模块全量真跑）/ 手机端（CDP 设备仿真三件套），
+实测约 2 分钟级、依赖外部宿主（8000 端口的真 SillyTavern）与 headless 浏览器 —— **不进快档/中档**，同 `readings` / `toolchain-gate-v2136` / `o9` 属「一轮一次」那一档；
+真宿主缺席时如实退非零、不拿浏览器桩顶替，故不能作为无条件门禁成员）。
 （v2.206.0：新入库 `mid-tier`（**两档之间的那一档**：快档 ∪ 跨文件一致性面）。
 `tools/smoke.js` 把「动了就会炸的那几面」压进十几秒、全量约 29 分钟 —— 而 R183 收口轮逮住的那批红
 （`tests/run.js` 六处版本断言的消息文本停在旧版 · `plans/` 四份计划文件的现场读数块过期 · README 版本锚点）
@@ -145,11 +148,19 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（145 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（146 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
 - **v2.20.0 及更早**：条目在 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节（本版迁入）。
+<b>v2.210.0</b> — <b>拓展 8：地图上的行动与行程工作台（把「判定口」与「方案面」分开）</b>（<b>新增一个引擎 <code>engines/travel-desk.js</code>，10 导出、零新拒收码、零新设置键之外只加一格偏好键</b>；产品侧新建面板一页 <code>travel</code>，面板接线三件齐做）。<br>
+<b>它治什么（现场实测，不来自文档）</b>：「能不能走到」「走多久」「路上堵不堵」「发一趟货」四件事<b>各自有口</b>，却没有一个面把它们放在一起回答 —— ① <code>world.transit()</code> 是<b>判定口</b>（答「这一次行不行」），不是方案面；② <code>worldGraph.geo({from})</code> 只报<b>一跳</b>（源码注释明说「不做加权最短路 —— 那是布局算法」），答不了「到 B 要多久、经过哪几段」；③ <code>world.roadCapOf</code> / <code>world.roadUsage</code> / <code>world.roadBlockOf</code> 三个逐段读口<b>只有诊断面在用</b>，玩家侧没有一处把「这段路容量 2、此刻占 2」讲出来；④ <code>freight.dispatch</code> 要<b>五个参数</b>而没有对照面；⑤ 在途台账散在<b>四处容器</b>（<code>world.journeys</code> / <code>world.freight.shipments</code> / <code>world.shipments</code> / <code>world.messages</code>），各有各的字段名与状态词。后果不是「读不出来」，而是<b>每一个消费方都要自己拼一遍</b> —— 拼出来的读法必然慢慢漂开，且「界面预估」与「真引擎判定」一旦分家，玩家看到的预计时间与真走出去的时间就不再是同一件事。<br>
+<b>做法（只做四件事，一次判定都不做）</b>：① <code>plan(ctx)</code> 起终点 × 通道的<b>单一预览体</b>（可达 / 耗时 / 路径 / 逐段容量与占用 / 逐段封锁 / 天气折算 / 风险说明）—— 耗时与路径<b>逐字段取自 <code>world.transit()</code></b>，本模块<b>不重算</b>（「界面预估与真引擎一致」不是靠对齐算法，是靠<b>没有第二份算法</b>）；② <code>commit(action, ctx)</code> 把动作<b>原样透传</b>给来源模块的公开写口（<code>world.depart</code> / <code>world.stop</code> / <code>freight.dispatch</code> / <code>reroute</code> / <code>cancel</code> / <code>arrive</code>），自己不开事务、不碰 draft；③ <code>ledger(ctx)</code> 在途三面汇成一张表，<b>每行报名自己的真源容器</b>（四处不合并 —— 合并就是把四件事说成一件）；④ <code>verify(ctx)</code> 只读路况重验口，<code>commit</code> 复用它，使「预览作废」只有<b>一份</b>判据。<br>
+<b>边界（六条，全是否定式）</b>：<b>不另存第二份路线/行程状态</b>（剥注释后全文零 <code>store.transact</code>、零 draft 赋值，在途清单一律调用期读既有表）· <b>不新增拒收码语义</b>（本文件零内联 <code>reason:</code> 字面量，编排层失败另开 <code>fault</code> 命名空间 <b>8 码</b>，来源模块的拒收原样透传 —— 理由与 <code>engines/beat-facade.js</code> 同款：拒收码台账要求每个码都有恢复动作，把编排失败写进去等于逼 <code>U5</code> 给「工作台没开」编一句给玩家的恢复建议）· <b>不做参数校验</b>（缺人名 / 缺路线一律由来源写口自己拒收，本模块再判一遍就是两个真源）· <b>到点前不提前抵达</b>（<code>safeOpts</code> 剥掉 <code>force</code>，那是「忽略时钟」的开关）· <b>预览是进程态交互物</b>（<code>stamp</code> 由调用方回带，本模块只比对不存储；指纹按全路径算，且<b>含逐段占用</b> —— 只有「可达/不可达」不够，同时出发的第二个人才是被容量拒掉的那一类）· <b>全关即零存在</b>（关闭时 <code>plan</code> / <code>commit</code> / <code>ledger</code> 一律拒 <code>desk-off</code>，本模块<b>没有</b> <code>buildBlock</code>）。<br>
+<b>接线面</b>：<code>index.js</code> 的 <code>VERSION</code> 升 <code>2.210.0</code>、<code>LOAD_ORDER</code> 插入本模块；<code>tests/run.js</code> 的 <code>LOAD</code> 同步；<code>engines/tool-diag.js</code> 新增 <code>MODULE_EXPORTS['engines/travel-desk.js']='travelDesk'</code> 与 UI_BINDINGS <code>travel</code> 页组；<code>ui/panel.js</code> 新增 <code>travel</code> 页（页表 / 渲染器表 / 绑定块 / 出口清单 <code>NAV_OUT_SELS</code> 四处齐做，六个 <code>on()</code> 处理器分别接 <code>plan</code> / <code>verify</code> / <code>ledger</code> / <code>commit</code> / <code>diagnose</code> 与通道填充）；本页<b>没有任何直接写世界的代码</b> —— 唯一会改世界的路径是 <code>commit()</code>，而它调的是来源自己的公开写口（结构保证，不是一句声明）。<br>
+<b>实测读数</b>：专锁 <code>s3-e8-v2210</code> <b>130 / 0</b>（新建；A 静态契约 / B 运行时四功能与拒绝语义 / C 零写入不变式 / N 真源码破坏 + 两向自证）· <code>version-surface-gate-v2185</code> pass(14)（21 条白名单全部跟上）· <code>module-registry-gate</code> 文件 209 / 命名空间 217 / 装载期边 112 / 硬边 0 / 调用期引用 220 · <code>module-cycle-gate</code> ns 面漂移 <b>0</b>、零读 ns 24（<code>travelDesk</code> 已从零读名单消失 —— 产品侧已有真消费方）· <code>dead-export-gate</code> dead <b>855</b> / uiDead <b>5</b> · <code>ui-gate</code> <b>53 / 0</b> · <code>ui-components-v2109</code> <b>27 / 0</b> · <code>o8-consumer-gate-v2187</code> <b>38 / 0</b>（登记 136 条）· <code>u4-export-lifecycle-v2191</code> pass(30) · <code>u3-loose-readings-v2191</code> pass(35) · <code>smoke</code>（快档 13 成员）<b>13 / 0</b>。<br>
+<b>本批现场抓到的四处「判据面 ≠ 真值面」（记档，同型病第五类）</b>：①「零 <code>store.transact</code>」与「<code>stamp: true</code> 恰 2 条」两条判据拿的是<b>含注释的全文</b> —— 而模块头自己写着「全文零 <code>store.transact</code>」、沿革注释又重复了一遍动作表字段，拿它去数，量到的就是注释而不是现场（剥注释后真值 0 / 2）；②「渲染段零 store 访问」用裸子串 <code>store.</code>，撞上页面上那句<b>说明文字</b>「本模块全文零 store.transact」，改判<b>调用形态</b>（<code>/\bstore\.[A-Za-z_$][\w$]*\s*\(/</code>）后归零；③ 负控制与不变式里「触发路况变更」用的是 <code>addBlock('乙镇', {...})</code> —— 少了必填 <code>source</code>/<code>channels</code>，真值 <code>missing-fields</code>，<b>于是路况根本没变，判据在「没破坏」的现场上跑成了假绿</b>（N1c 报红、N3 假通过）；改为<b>路网变更</b>（新开一条更短的直达路）后拒因唯一，两向自证同时成立；④ 计数与台账判据借用了前面小节留下的在途行程（同一条路容量 1 被占 ⇒ 后续 <code>depart</code> 被来源按 <code>road-crowded</code> 拒），「恰 1 行」「差异只落在 <code>journeys</code>」两类判据整片落空 —— 根因是 <code>sync.fresh()</code> 只换模块闭包而<b>存档与设置走 localStorage 是跨环境共享的</b>；改成 <code>seedWorld()</code> 彻底重置（连 <code>journeys</code>/<code>shipments</code>/<code>blocks</code> 一起清）。另有两条判据形态问题：多行锚点的「判据纯度」按整串 find 必然 0 命中（源码文本里换行是 <code>\n</code> 两个字），改按<b>逐行</b>判；分桶判据把 <code>stale-plan</code> 读进 <code>stat.faults</code>，而源码里它走<b>另一条记账</b>（<code>stat.rejects++; stat.stale++</code>，不经 <code>noteFault</code> —— 「拒收」不是「编排失败」，这正是本模块边界 2 的说法）。<br>
+<b>如实边界</b>：① <code>ui/panel.js</code> 的 <code>travel</code> 页实机面<b>未验</b>（无头回归不装载 ui 层，本仓既有口径是「ui 改动须另走冒烟 / 实机核验」；<code>ui-gate</code> 只证明契约成立与绑定在场）；② 专锁 N 段的四处破坏是「在内存副本上装载破坏后的源码」，<b>不表示</b>真源码被改过（收尾复核锚点仍在原位）。<br>
 <b>v2.209.0</b> — <b>优化 6：面板导航协议与精确定位（三处跳转收成一份协议）</b>（<b>新增一个 UI 模块 <code>ui/panel-nav.js</code>，10 导出</b>；产品侧另补 <code>engines/reject-recovery.js</code> 的三张冻结快照 15 条）。<br>
 <b>它治什么（计划原文的病灶，逐条现场实测）</b>：面板 24 页共用一个 <code>renderBody()</code>，跳转有三处写法 —— ① 检索页 <code>#wa-hs-jumpface</code> 走 <code>tab.click()</code>：<b>只跳到页</b>，到了之后停在哪一条没人管（<code>history-search.js</code> 的路由给的是 <code>{page, face, ref}</code>，落到页面上只有 <code>page</code> 被消费）；② 待办页只给路由字符串（「去哪看 / 看哪条 / 哪个设置键」），<b>点不动</b>；③ 图谱页<b>连行清单都不渲染</b>。三处各自手写「切页 + 同步页签 + 落盘 + 重绘」，新增一处跳转就得把这四件事再抄一遍。<br>
 <b>做法（一份协议 + 一条回程 + 一次定位）</b>：目标统一为 <code>{page, rec, filter}</code> —— <b>规范化只在 <code>parse()</code> 里做一次、编码只在 <code>attr()</code> 里做一次</b>（面板侧只渲染，不自己拼串）；非法页<b>拒收</b>并回带认得的集合（<code>known</code>）——「跳过去了但什么都没发生」在这里是不可能的。切页前记（当前页 + 输入态 + 滚动位）并<b>按页留档</b>，切页后回填的是<b>目标页自己</b>的旧态（不是刚离开那页的 —— 那是<b>跨页错配</b>：两页控件不同，最轻是全部 miss，最重是撞上同名 id 把 A 页的内容写进 B 页），<code>backTo()</code> 原样送回上一页，栈有界（<code>CAP_BACK = 8</code>），重入同页不污染它。切页后按 <code>[data-rec]</code> 定位：命中 <b>1</b> 处才叫定位成功；<b>0</b> 处报 <code>rec-not-rendered</code>、<b>&gt;1</b> 处报 <code>rec-ambiguous</code>（<b>不猜</b> —— 猜一条出来比报一句「这条没渲染出来」坏得多：用户会以为定位是对的）。<br>

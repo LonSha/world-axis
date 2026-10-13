@@ -1,13 +1,13 @@
 {
- "version": "2.209.0",
- "loadOrderCount": 221,
- "loadedCount": 208,
+ "version": "2.210.0",
+ "loadOrderCount": 222,
+ "loadedCount": 209,
  "uiCount": 13,
- "nsCount": 216,
+ "nsCount": 217,
  "totals": {
-  "loadEdges": 111,
+  "loadEdges": 112,
   "hardEdges": 0,
-  "callRefs": 218,
+  "callRefs": 220,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -121,6 +121,7 @@
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/summarizer.js",
+    "engines/travel-desk.js",
     "engines/userlock.js",
     "engines/wb-inject.js",
     "engines/wb-search.js",
@@ -346,6 +347,7 @@
     "engines/story-choice.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
+    "engines/travel-desk.js",
     "engines/userlock.js",
     "engines/wb-search.js",
     "engines/word-budget.js",
@@ -3805,6 +3807,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_worldgraph_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/travel-desk.js": {
+   "ns": [
+    "travelDesk"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_travel_desk_settings_v1"
    ],
    "consumedBy": []
   }

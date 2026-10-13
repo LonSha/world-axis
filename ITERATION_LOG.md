@@ -1,3 +1,49 @@
+### R189 · 2026-10-13 · v2.210.0（优化 3 收口）：真宿主逐条路径取证 —— 从「能不能起来」到「九模块×路径全量真跑 + 手机半边」
+**交付**：`tools/hosted_paths.js`（449 行，七段：P1 生成前后链 / P2 切聊天 / P3 重载 / P4 拒收重复 / P5 业务四路 / P6 六模块补跑 / M1 手机端）；`tools/hosted_smoke.js`（起面冒烟）与它同批**入册 tools/ 名单**（42 → **44**，README「### tools/ 的取舍」段理由已登记：60s 级、依赖外部宿主与 headless 浏览器，**不进快档/中档**，同 `readings` / `toolchain-gate-v2136` / `o9` 属「一轮一次」档；真宿主缺席即如实退非零、不拿桩顶替）。
+**覆盖的四条计划点名路径（真 ST 1.19.0 @ :8000，真读数）**：P1 生成前后链 —— 合成楼层驱动 before/after 全链，`settled=true round=1 advanced=true`，重复派发 `dedupNoDouble=true`（不虚增轮次）；P2 切聊天 —— 以 `WA.store.get()` **引用身份变化**为可证伪面，`refChanged=true chatChangedFired=1`；P3 重载 —— 盘上键在（`worldaxis_state_wa_default[_bak]`）为主判据，重载后 `waLoaded=true panel=true`；P4 拒收/重复 —— `org.transfer` 真实拒收口（先 `seed()` 播种势力避免 `missing-holder` 假红），`reject1=insufficient reject2=insufficient stable=true noHalfWrite=true`（第三次转出量恰为持有量 100，证明两次被拒无半写）。**HOSTED-PATHS: PASS**；快档 `smoke` 13/0；需浏览器的 `ui-live-v2137` pass / 54 全绿。
+**P5 业务四路（真读数）**：存档 `checkpoints` —— 造写差异→存档→再改→恢复，`drifted=true restored=true`（状态真回到存档点，不是内存态幻觉）；待办 `pendingCenter` —— commission 造真待办→items 真出现→`act("commission","cancel")` 透传真执行→待办消失；规则包 `rulePack` —— 规则面 7 键可打包→存包带 8 位指纹→改设置面造冲突→**`conflict` 先拒**→`force` 才过；实验室 `worldLab` —— `parseSteps` 三步解析 + `run` 三臂 `liveUnchanged=true`（零写自证）。覆盖 E1/E3/E7/E9 的宿主/玩家栏。
+**P6 六模块补跑（O1 矩阵从三模块代表制升成九模块全量真跑）**：TX2 `agency`（`life.addGoal` 种子→diagnose 闭环旗标 + 无计划 `need-steps` 拒收）/ TX5 `worldBlueprint`（exportBlueprint + `bad-bp-ver` 拒收）/ TX6 `commission`（advance 受理 + `duplicate-receipt` 拒收）/ TX7 `investigation`（investigate 受理 + 同回执 `duplicate-receipt` 拒收）/ TX8 `aftermath`（`region.register` 种子→register 受理 + `duplicate-event` 拒收）/ TX9 `operations`（inst 五步链 charter→post→assign→propose→approve→enact→settle 受理 + `duplicate-settle` 拒收）。`allSucc=true allRej=true`。
+**M1 手机端（优化 3 验收条款「桌面与手机至少各覆盖一组」的手机半边，从全程为零到此收口）**：独立浏览器会话 + CDP `Emulation` 三件套（390×844 mobile 视口 + 触摸仿真 + 安卓 UA）→ 扩展真装载 → 面板在手机视口挂载 `tabs=25` → `goPage("people"/"world")` 真切页且 active 唯一 → 非法页 `bad-page` 拒收 → 全程零新增页错。观察项如实登记：`orbInView=false`（悬浮球初始定位经 CSS `right/bottom`，面板闭合态下 rect 不在仿真视口内——不在判据内，不深挖）。
+**本轮最该记住的两条**：① audit 当场逮自己的入册假红 —— 理由段写反引号短名 `hosted_paths` 不构成引用，`toolchain-gate` 的引用判据要求 **`tools/<name>` 带前缀形态**；程序化跑 `audit()` 报 `orphan: hosted_paths.js`，改带前缀形态后 44/44 全绿（另有一处段首行替换误伤 mid-tier 段，读现场后逐字补回——**改文档同改代码一样要读改后现场**）。② P6 首跑抓到三处夹具与真宿主世界状态的种子差异（tx2 缺 goal / tx8 缺 region 地点 / tx9 `kind:"公会"` 不在 charter 词表）——**本地 smoke 装载序复现（`ui-gate-sync.fresh`）比烧浏览器快 40 倍**，先本地定位再上真宿主，`bad-kind` 的 `allowed` 回带（公司/学校/家族/帮派/机关）当场给出修法。夹具不会写就抄 smoke 的已验证段，不猜词表。
+**清理**：删除一次性探针 `tools/probe2211_paths.js` 与历史残留 `tests/module-cycle-gate-v2107.js.bak` / `tests/run.js.bak`（均未跟踪）。
+**如实边界**：优化 3 点名路径中「中断恢复」「搬运」「拍工作台」与「重生成·换滑动·刷新后重复执行」的专项面**本轮未覆盖**（P1 的 dedup/reroll 已触及其核心：重复派发不虚增轮次、同楼层判重）；M1 为 CDP 设备仿真取证（390×844 + 触摸 + 安卓 UA），**不是真机**——真机上的 bfcache / 后台节流 / 系统级存储压力仍属 O3/O4 口径。桩面（`runLive`）与真宿主面（`runLiveHosted` / `hosted_paths`）分报口径不变。本轮为同版收口，不升版本号。
+
+### R188 · 2026-10-12 · v2.210.0（拓展 8）：地图上的行动与行程工作台 —— 把「判定口」与「方案面」分开
+
+**交付**：新增引擎 `engines/travel-desk.js`（10 导出）；面板新增 `travel` 页；`index.js` / `manifest.json` 升 v2.210.0。
+
+**它治什么**：四件事各自有口却无一个面把它们放在一起回答 —— `world.transit()` 是判定口不是方案面；
+`worldGraph.geo({from})` 只报一跳；三个逐段读口只有诊断面在用；`freight.dispatch` 要五个参数而没有对照面；
+在途台账散在四处容器各有各的字段名。后果：每个消费方都要自己拼一遍，拼法必然漂开，
+「界面预估」与「真引擎判定」一旦分家就不再是同一件事。
+
+**做法**：四件事、一次判定都不做 —— `plan` 单一预览体（耗时/折算/路径/天气逐字段取自 `world.transit()`，不重算）、
+`commit` 原样透传来源写口、`ledger` 三面单列每行报名真源容器、`verify` 只读重验（`commit` 复用它 ⇒ 预览作废只有一份判据）。
+
+**边界六条**：不另存第二份状态（剥注释后零 `store.transact`）· 不新增拒收码语义（零内联 `reason:`，编排失败另开 `fault` 8 码）·
+不做参数校验（交来源写口）· 剥 `force` · 预览是进程态交互物（`stamp` 调用方回带，指纹含逐段占用）· 全关即零存在（三口一律拒 `desk-off`）。
+
+**升版面**：183 处版本出现逐处定性 ⇒ A 类 9（run.js 硬读数）/ B 类 5（B3 锁交付基线）/ C 类 11（alternation 末项）/
+D 类 15（版本名单数组）。顺序硬前提：`version-surface-gate-v2185` 的 N1 锚点是<b>动态构造</b>的 ⇒ <b>必须先升 index.js</b> 再跑白名单。
+alternation 是<b>累积</b>的且同一文件可有多处 ⇒ 替代方案须「幂等 + 全量替换」而非「恰命中 1 次」。
+冻结串回填必须<b>行锚定</b>（整串搜索会命中读它的正则字面量）。
+
+**实测读数**：专锁 `s3-e8-v2210` **130 / 0** · `version-surface-gate-v2185` pass(14) · `module-registry-gate`
+文件 209 / ns 217 / 装载期边 112 / 调用期引用 220 · `module-cycle-gate` ns 漂移 0、**零读 ns 24**（`travelDesk` 已出名单）·
+`dead-export-gate` dead 855 / uiDead 5 · `ui-gate` 53/0 · `ui-components-v2109` 27/0 · `o8-consumer-gate-v2187` 38/0（登记 136）·
+`u4-export-lifecycle-v2191` pass(30) · `u3-loose-readings-v2191` pass(35) · 快档 `smoke` 13/0。
+
+**本批最该记住的一条（同型病第五类：判据面 ≠ 真值面）**：专锁首跑 13 处红，逐条实测后分四类 ——
+①「零 `store.transact`」「`stamp: true` 恰 2 条」拿<b>含注释的全文</b>去数（模块头自己写着「全文零 store.transact」、
+沿革注释又重复了动作表字段）⇒ 量到的是注释；②「零 store 访问」用裸子串 `store.` 撞上页面说明文字 ⇒ 改判<b>调用形态</b>；
+③ 触发「路况变更」用错了手段（`addBlock` 少必填字段，真值 `missing-fields`）⇒ <b>路况根本没变，判据在「没破坏」的现场上跑成假绿</b>，
+改路网变更为唯一拒因后两向自证同时成立；④ 计数判据借用了前面小节的在途行程（容量 1 被占 ⇒ 被来源按 `road-crowded` 拒）——
+根因是 `sync.fresh()` 只换模块闭包而<b>存档走 localStorage 跨环境共享</b>，改 `seedWorld()` 彻底重置。
+另有两条形态问题：多行锚点纯度按整串 find 必然 0 命中（源码文本里换行是 `\n` 两个字）⇒ 改逐行判；
+`stale-plan` 走的是 `stat.stale` 而不在 `stat.faults`（「拒收」不是「编排失败」）。
+
+**如实边界**：面板 `travel` 页实机面未验（无头回归不装载 ui 层）；N 段四处破坏只在内存副本上装载。
+
 ### R187 · 2026-10-12 · v2.209.0（第一批·优化 6）：面板导航协议与精确定位 —— 三处跳转收成一份协议
 **范围**：新增产品模块 `ui/panel-nav.js`（10 导出）+ 消费方 `ui/panel.js` 接线；`engines/reject-recovery.js` 的三张冻结快照补 ui 层 15 条并给两条补恢复档。测试侧新建专锁 `tests/ev6-panel-nav-v2209.js`；`tools/sync-e2e-readings.js` 新登记四站（把 B6/B10/B11 三条人工回填面收进工具）。
 **它治什么（计划原文的病灶，逐条现场实测）**：① 检索页 `#wa-hs-jumpface` 走 `tab.click()` —— **只跳到页**，到了之后停在哪一条无人管（`history-search.js` 的路由给的是 `{page, face, ref}`，落到页面上只有 `page` 被消费）；② 待办页只给路由字符串（「去哪看 / 看哪条 / 哪个设置键」），**点不动**；③ 图谱页**连行清单都不渲染**。三处各自手写「切页 + 同步页签 + 落盘 + 重绘」，新增一处跳转就得把这四件事再抄一遍。

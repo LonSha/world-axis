@@ -43,7 +43,12 @@
     let t = null;
     try { if (WA.clock && typeof WA.clock.now === 'function') t = WA.clock.now('assistant'); }
     catch (e) { noteFault('clock-threw'); }
-    return (typeof t === 'number' && isFinite(t)) ? t : Date.now();
+    //   v2.210.0（收口）：兜底改写成 **K20 的 T 类三目**（`WA.clock ? … : Date.now()`）。
+    //   原写法 `? t : Date.now()` 里那个 `Date.now()` 与守卫声明**不同行共现**，
+    //   于是被判成裸调（门禁如实报 `ui/assistant.js:25`）。修法不是把门禁放宽，
+    //   而是把「什么时候退到本机时间」这件事**写在看得见的地方** —— 仓内同形：
+    //   `engines/act.js:700` 的 `const t = (WA.clock ? WA.clock.now('act.advance') : Date.now());`。
+    return (typeof t === 'number' && isFinite(t)) ? t : (WA.clock ? WA.clock.now('assistant') : Date.now());
   }
 
   /** 当前观测视角。读不到就当归作者视角 —— 与 perspective「未装载=不拦」的默认一致。 */

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.209.0'
+  const VERSION = '2.210.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -745,6 +745,13 @@
     //   本模块**零 store 写**：没有 transact、没有 draft 赋值；只有自己那一格
     //   localStorage 偏好键（`worldaxis_worldgraph_v1`，同 history-search 先例）。
     'engines/world-graph.js',
+    // v2.210.0（拓展 8）：地图上的行动与行程工作台（engines/travel-desk.js）。
+    //   位置排在 **world / economy / freight / world-graph 之后、ui/panel.js 之前**：
+    //   本模块是**编排面**（耗时与路径逐字段取自 world.transit，动作原样透传给
+    //   world.depart / freight.dispatch 等公开写口），装载期不读任何上游。
+    //   本模块**零 store 写**：没有 transact、没有 draft 赋值；只有自己那一格
+    //   localStorage 偏好键（`worldaxis_travel_desk_settings_v1`，同 world-graph 先例）。
+    'engines/travel-desk.js',
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；
@@ -896,17 +903,41 @@
   }
 
   // SillyTavern APP_READY 后再初始化（保证宿主事件源可用）
+  //
+  // 【v2.211.0（优化 3 第一刀）· 真宿主验收抓到的活体缺陷】
+  //   原实现只**注册监听**：
+  //       ctx.eventSource.on(APP_READY, fn);
+  //   于是扩展若在宿主 `APP_READY` **之后**才被装载，那一刻事件已经发过、不会再发，
+  //   `init()` 永不执行 ⇒ `ui/panel.js` 永不求值 ⇒ `WA.ui` 恒缺席、面板永不出现，
+  //   **且没有报错、没有日志**（用户视角就是「装了这个扩展什么都没发生」）。
+  //   这条路径桩面（`route.fulfill` 喂源码 + `tests/mock.js` 同形桩）结构上够不着：
+  //   桩里 `APP_READY` 由测试自己 emit，时序永远「先装载、后发事件」。
+  //   真宿主里它有两种日常触发：① 用户在扩展面板里**后启用**本扩展；② 页面重载后
+  //   宿主自己装配扩展的时刻晚于 APP_READY。
+  //
+  //   修法（两条，都不改变「已就绪」路径的语义）：
+  //     ① **一次性守卫**：事件与兜底并存时 `init` 只能跑一次（否则双跑会重复注册设置项）；
+  //     ② **宿主已就绪则直接跑**：`ctx.eventSource` 在场说明宿主已装配，此时不必再等一个
+  //        不会再来的事件；`getContext` 缺席的极早期仍保留 `DOMContentLoaded + 800ms` 回退。
+  //   「保证宿主事件源可用」的本意（等事件源存在）由此仍被满足：`ctx.eventSource && ctx.eventTypes`
+  //   仍是进入条件，只是不再**额外**要求「事件还没发过」这个不可观测的前提。
   function whenReady(fn) {
+    let done = false;
+    const once = function () { if (done) return; done = true; try { fn(); } catch (e) { WA.log('warn', '初始化异常', e); } };
     const ctx = mainWin.SillyTavern && mainWin.SillyTavern.getContext && mainWin.SillyTavern.getContext();
     if (ctx && ctx.eventSource && ctx.eventTypes) {
-      if (ctx.eventTypes.APP_READY) {
-        ctx.eventSource.on(ctx.eventTypes.APP_READY, fn);
-        return;
+      // 先兜底后挂事件：兜底用同步立即执行，故它一定先于任何随后到来的 APP_READY。
+      const arm = function () { setTimeout(once, 800); };
+      if (mainDoc.readyState === 'complete' || mainDoc.readyState === 'interactive') arm();
+      else mainDoc.addEventListener('DOMContentLoaded', arm);
+      if (ctx.eventTypes.APP_READY && ctx.eventSource.on) {
+        try { ctx.eventSource.on(ctx.eventTypes.APP_READY, once); } catch (e) { /* 事件源拒绝订阅 ⇒ 兜底已在路上 */ }
       }
+      return;
     }
     // 回退：DOM ready + 延迟
-    if (mainDoc.readyState === 'complete' || mainDoc.readyState === 'interactive') setTimeout(fn, 800);
-    else mainDoc.addEventListener('DOMContentLoaded', () => setTimeout(fn, 800));
+    if (mainDoc.readyState === 'complete' || mainDoc.readyState === 'interactive') setTimeout(once, 800);
+    else mainDoc.addEventListener('DOMContentLoaded', () => setTimeout(once, 800));
   }
 
   whenReady(init);

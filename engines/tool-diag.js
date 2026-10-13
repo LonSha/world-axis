@@ -2030,6 +2030,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   单一真源，漏了它这一行，后果不是「少一行字」：出口面契约里不会有 worldGraph 段
     //   （接口面从未被冻结，改名删成员无人确认），而 LOAD 那一侧照样绿。
     'engines/world-graph.js': 'worldGraph',
+    // v2.210.0（拓展 8）：地图上的行动与行程工作台（engines/travel-desk.js）。
+    //   Y6 抓过的教训同样适用：**LOAD 进了不等于登记了** —— 本表是定义面与出口面
+    //   契约的单一真源，漏了它这一行，出口面契约里就不会有 travelDesk 段
+    //   （接口面从未被冻结，改名删成员无人确认），而 LOAD 那一侧照样绿。
+    'engines/travel-desk.js': 'travelDesk',
     'engines/diplomacy.js': 'diplomacy',
     'engines/agency.js': 'agency',
     // v2.167.0（TX3）：守恒运输（在途货运）。登记为必载 —
@@ -3052,7 +3057,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   （v2.124.0 的 wa-perf-band 漏登记就是这么被漏掉的）。
     //   头部选择器挂到 'overview' 组：它在任何页都在场，任选一组都成立；
     //   挂 overview 是因为那是默认页（首次打开即校验，不需要用户先切页）。
-    { page: 'overview', ids: ['wa-view-sel', 'wa-view-out'] },
+    { page: 'overview', ids: ['wa-view-sel', 'wa-view-out',
+      // v2.210.0（收口）：面板导航的**常驻头部**（跳转读数 + 返回）。它渲染在布局壳里、
+      //   不属任何单页，故归概览组 —— 同 v2.209.0 的 ui/panel-nav.js 一样，这两个控件
+      //   「渲染了但绑定写错 id」这类断裂只有登记过才会被发现（本表的全部意义）。
+      'wa-nav-out', 'wa-nav-back'] },
     { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat', 'wa-sed-out'] },
     // v2.151.0（RX2+RX3）：会话页十六枚控件（跨会话记忆锚八枚 + 远方世界脉搏四枚 + 共用输出区一枚）。
     //   守卫表是控件接线面的唯一真源：渲染了不登记 ⇒「渲染了但绑定的 id 写错」这类断裂
@@ -3125,7 +3134,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //     Y2 `wa-chw-todo` 是**章内口径**（本章还欠什么，随 chapter 页读），
     //     Y4 `wa-td-*` 是**账户级口径**（此刻整个世界等我处理的）——
     //     两页读数同源（`pendingCenter.items`），写口都为零，不是两个真源。
-    { page: 'todo', ids: ['wa-td-all', 'wa-td-soon', 'wa-td-src', 'wa-td-drill', 'wa-td-flags', 'wa-td-diag'],
+    { page: 'todo', ids: ['wa-td-all', 'wa-td-soon', 'wa-td-src', 'wa-td-drill', 'wa-td-flags', 'wa-td-diag', 'wa-td-act'],
       dynamic: ['wa-td-out'] },
     { page: 'tools', ids: ['wa-ws-enabled', 'wa-ws-name', 'wa-ws-tags', 'wa-ws-extract',
       'wa-ws-save', 'wa-ws-list', 'wa-ws-id', 'wa-ws-variance', 'wa-ws-sow', 'wa-ws-get',
@@ -3299,7 +3308,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.183.0（第一批 E1）：统一待办事项中心 —— 7 静态控件 + 1 动态读数出口。
     //   与上一组同登记到 health 页（本模块的区块渲染在健康页里，与三块合页同规格）。
     //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
-    { page: 'health', ids: ['wa-pc-enabled', 'wa-pc-view', 'wa-pc-soon', 'wa-pc-sources', 'wa-pc-diag', 'wa-pc-drill', 'wa-pc-drill-go'],
+    { page: 'health', ids: ['wa-pc-enabled', 'wa-pc-view', 'wa-pc-soon', 'wa-pc-sources', 'wa-pc-diag', 'wa-pc-drill', 'wa-pc-drill-go', 'wa-pc-timeline'],
       dynamic: ['wa-pc-out'] },
     // v2.187.0（E4）：战役层 —— 6 静态控件 + 1 动态读数出口（同 health 页其余区块规格）。
     //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
@@ -3374,7 +3383,16 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'graph', ids: ['wa-wg-kinds', 'wa-wg-edges', 'wa-wg-build', 'wa-wg-from',
       'wa-wg-geo', 'wa-wg-time', 'wa-wg-suggest', 'wa-wg-anom',
       'wa-wg-locate', 'wa-wg-locate-go', 'wa-wg-diag'],
-      dynamic: ['wa-wg-out'] }
+      dynamic: ['wa-wg-out'] },
+    // v2.210.0（拓展 8）：行动与行程工作台（engines/travel-desk.js）。
+    //   新出口必须进本表 —— 缺登记时「控件渲染了但绑定 id 写错」这类断裂在
+    //   新出口上无人发现（本表是「渲染 ↔ 绑定」两面里唯一会互相校验的地方）。
+    //   与 graph 页同规：本页一个直接写世界的调用都没有，唯一写路径是 commit()，
+    //   而它调的是来源模块自己的公开写口（结构保证，不是一句声明）。
+    { page: 'travel', ids: ['wa-trip-ch', 'wa-trip-from', 'wa-trip-to',
+      'wa-trip-plan', 'wa-trip-verify', 'wa-trip-ledger', 'wa-trip-dia',
+      'wa-trip-who', 'wa-trip-act', 'wa-trip-commit'],
+      dynamic: ['wa-trip-out'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。

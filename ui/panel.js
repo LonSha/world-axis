@@ -218,6 +218,12 @@
     //   插在 find 之后：第四批的页序即批次语义 ——「搬运 → 检索 → 图谱」是
     //   「把东西搬出去 / 把东西找出来 / 把关系看成一幅图」的同一条线。
     { id: 'graph', icon: '🕸', label: '图谱' },
+    // v2.210.0（拓展 8）：地图上的行动与行程工作台（engines/travel-desk.js）。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    //   插在 graph 之后：图谱答「关系长什么样」，本页答「这一趟到底走不走得成、要多久、
+    //   路上堵不堵、发一趟货该给什么」—— 同一批的「把关系/行动看成一张面」。
+    //   与其他页不同的一点：本页的**每一个数都来自来源模块自己的读口**，本页不重算。
+    { id: 'travel', icon: '🧭', label: '行程' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -2921,7 +2927,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     </div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -3563,6 +3569,55 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-wg-out" class="wa-out"></div>`;
   }
+  /**
+   * v2.210.0（拓展 8）：地图上的行动与行程工作台。
+   *   本页是**消费方**，一个数都不算：耗时 / 折算 / 实走 / 路径 / 天气全部来自
+   *   `WA.travelDesk.plan()`（而它又逐字段取自 `WA.world.transit()`）；
+   *   在途三面来自 `ledger()`（每行报名自己的真源容器，四处不合并）；
+   *   执行走 `commit()`（把动作原样透传给来源写口，本页不开事务、不碰 draft）。
+   *   本页**没有任何直接写世界的代码** —— 唯一会改世界的路径是 `commit()`，
+   *   而它调的是来源模块自己的公开写口（结构保证，不是一句声明）。
+   */
+  function renderTravelDesk() {
+    const T = WA.travelDesk;
+    const ok = !!(T && typeof T.plan === 'function');
+    let d = null;
+    // ⚠ 必须写**全限定**名：本仓引用面（inventory 的 REF_RE）只认 `WA.ns.mem`，
+    //   写成 `T.diagnose()` 会让这个**真玩家路径读数**在账本上被算成「外部零引用」。
+    try { d = ok ? WA.travelDesk.diagnose() : null; } catch (e) { d = null; }
+    const cfg = (d && d.cfg) ? d.cfg : null;
+    return `
+      <div class="wa-sec">行动与行程工作台（能不能走到 · 走多久 · 路上堵不堵 · 发一趟货）</div>
+      <div class="wa-dim">（把 <b>判定口</b> 与 <b>方案面</b> 分开：这里的耗时 / 路径 / 逐段占用 / 天气折算
+        <b>逐字段取自 <code>WA.world.transit()</code></b> —— 本页与本模块都<b>不重算</b>，
+        故「界面预估」与「真引擎判定」结构上不可能分家（没有第二份算法可分家）。
+        此刻：<b>${ok ? (cfg && cfg.enabled ? '开' : '关（关闭时三个口一律拒 desk-off）') : '模块缺席'}</b>
+        ${WA.world && Array.isArray(WA.world.CHANNELS) ? '｜通道 ' + esc(WA.world.CHANNELS.join('　')) : ''}${d ? '｜动作 ' + d.actions.declared.length + ' 条（在位 ' + d.actions.live.length + '，缺 ' + d.actions.missing.length + '）' : ''}）</div>
+      <div class="wa-row">
+        <select id="wa-trip-ch" class="wa-input" aria-label="通道"></select>
+        <input id="wa-trip-from" class="wa-input" aria-label="起点" placeholder="起点（例如：扁担巷）…"/>
+        <input id="wa-trip-to" class="wa-input" aria-label="终点" placeholder="终点（例如：城南码头）…"/>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-trip-plan" title="只读：预览这一趟（可达 / 耗时 / 路径 / 逐段容量与占用 / 天气折算；走 WA.travelDesk.plan()）">预览方案</button>
+        <button class="wa-btn" id="wa-trip-verify" title="只读：拿回带的指纹重验路况（走 verify()，不比对本页存储的任何东西）">重验路况</button>
+        <button class="wa-btn" id="wa-trip-ledger" title="只读：在途三面（走 ledger()，每行报名自己的真源容器）">在途三面</button>
+        <button class="wa-btn" id="wa-trip-dia" title="自证面：开关 / 通道 / 动作在位 / 本进程计数与拒收桶">诊断</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-trip-who" class="wa-input" aria-label="执行者" placeholder="执行者（出发/中止用；缺了由来源写口自己拒收）…"/>
+        <select id="wa-trip-act" class="wa-input" aria-label="动作">
+          <option value="depart">出发（带路线语义，需回带指纹）</option>
+          <option value="stop">中止</option>
+        </select>
+        <button class="wa-btn" id="wa-trip-commit" title="把动作原样透传给来源写口（world.depart / world.stop）。本页不做参数校验 —— 缺什么由来源自己拒收">执行</button>
+      </div>
+      <div class="wa-row">
+        <span class="wa-dim">真源：<code>WA.world.transit() / depart() / stop()</code> +
+          <code>WA.travelDesk.plan() / ledger() / commit()</code>（本页不另存一份行程，本模块全文零 store.transact）</span>
+      </div>
+      <div id="wa-trip-out" class="wa-out"></div>`;
+  }
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
     // v2.152.0（RP6）：面板渲染链的耗时与 DOM 规模读数。计时包住「渲染 + 过滤 + 绑定」
@@ -3632,7 +3687,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
   /** v2.209.0（优化 6）：结果出口是**渲染期之后**才被填的容器（清单见 NAV_OUT_SELS）。
    *  两件事靠它：① 出口写完即补绑；② 切页后补绑（切页换掉整套 DOM）。
    *  没有这一半，绑定期永远追不上出口：按钮照在、点了没反应（静默失效）。 */
-  const NAV_OUT_SELS = ['#wa-at-out', '#wa-td-out', '#wa-hs-out', '#wa-wg-out',
+  const NAV_OUT_SELS = ['#wa-at-out', '#wa-td-out', '#wa-hs-out', '#wa-wg-out', '#wa-trip-out',
     '#wa-cm-out', '#wa-sc-out', '#wa-af-out', '#wa-inv-out', '#wa-ops-out',
     '#wa-co-out', '#wa-ff-out', '#wa-inj-out'];
   function bindBody() {
@@ -11848,6 +11903,120 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + (st ? '<div class="wa-item">本进程计数：建图 ' + st.builds + ' 次 · 最近节点 ' + st.nodes + ' / 边 ' + st.edges
           + '　拒收 ' + esc(String(JSON.stringify(st.faults))) + '</div>' : '')
         + '<div class="wa-dim">' + esc(d.source) + '</div>');
+    });
+    // ── v2.210.0（拓展 8）：行动与行程工作台 ─────────────────────────────────
+    //   本页与 graph 页同规：**一个直接写世界的调用都没有**。唯一会改世界的路径是
+    //   `commit()`，而它调的是来源模块自己的公开写口 —— 本页既不拼事务、也不做校验。
+    const tripOut = function (html) { const o = $('#wa-trip-out'); if (o) o.innerHTML = html; bindNavs(o); };
+    const tripSel = function () {
+      const c = $('#wa-trip-ch'), f = $('#wa-trip-from'), t = $('#wa-trip-to');
+      return { channel: c ? String(c.value || '') : '', from: f ? String(f.value || '').trim() : '',
+        to: t ? String(t.value || '').trim() : '' };
+    };
+    const tripMiss = function (what) {
+      tripOut('<div class="wa-log wa-log-err">读不到：' + esc(what) + '（本页只读既有读口）</div>');
+    };
+    // 上次预览回带的指纹：**住进程态**（与 travel-desk 的边界 5 同源 ——
+    //   预览是交互物，落盘就等于造了第二份状态容器）。
+    let tripStamp = null;
+    const tripFillChannels = function () {
+      const s = $('#wa-trip-ch');
+      if (!s) return;
+      // 通道白名单**取 world.CHANNELS 单一真源**（travel-desk 不另抄一份，本页也不抄）。
+      const chs = (WA.world && Array.isArray(WA.world.CHANNELS)) ? WA.world.CHANNELS : [];
+      s.innerHTML = chs.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    };
+    tripFillChannels();
+    const tripFault = function (r) {
+      // 编排层失败走 `fault`；**可达性拒绝不是失败**（它是世界给的答案），分开报。
+      tripOut('<div class="wa-log wa-log-err">拒收：' + esc(String(r.fault))
+        + (r.module ? '（缺模块 ' + esc(String(r.module)) + '）' : '')
+        + (r.known ? '　可选：' + esc((r.known || []).join(' / ')) : '')
+        + (r.action ? '　动作 ' + esc(String(r.action)) : '') + '</div>');
+    };
+    on('#wa-trip-plan', () => {
+      if (!WA.travelDesk || typeof WA.travelDesk.plan !== 'function') return tripMiss('行程工作台（plan 口）');
+      const s = tripSel();
+      const r = WA.travelDesk.plan({ channel: s.channel, from: s.from, to: s.to });
+      if (r.fault) return tripFault(r);
+      if (r.reachable === false) {
+        return tripOut('<div class="wa-log wa-log-err">世界给的答案：这一趟<b>走不过去</b>（'
+          + esc(String(r.reason)) + '）—— 本模块不自造距离、不按直线兜底。</div>');
+      }
+      tripStamp = r.stamp || null;
+      tripOut('<div class="wa-log wa-log-info">预览（真源 <code>WA.world.transit()</code>）：'
+        + '通道 <b>' + esc(r.channel) + '</b>　' + esc(r.from) + ' → ' + esc(r.to) + '</div>'
+        + '<div class="wa-item">耗时 <b>' + r.minutes + '</b> 分钟　折算 <b>' + r.factor + '</b>'
+        + '　实走 <b>' + r.factored + '</b>　跳数 <b>' + r.hops + '</b></div>'
+        + '<div class="wa-item"><span class="wa-dim">逐段（本页只列有界前段，截断如实报）：</span>'
+        + (r.segs || []).map(function (g) {
+            return '<div class="wa-item">' + esc(g.from) + '→' + esc(g.to)
+              + '　容量 <b>' + esc(String(g.cap === null ? '读不到' : g.cap)) + '</b> / 占用 <b>' + esc(String(g.use === null ? '读不到' : g.use)) + '</b>'
+              + (g.closed ? ' <span class="wa-dim">（既有表标了投递封锁 ' + esc(String(g.why || '')) + '）</span>' : '')
+              + (g.crowded ? ' <span class="wa-dim">（已达容量上限）</span>' : '')
+              + '</div>';
+          }).join('')
+        + (r.truncated ? '<div class="wa-dim">（全路径 ' + r.pathCount + ' 段，此处只列前 ' + (r.segs || []).length + ' 段 —— 列表有界，不是数据被丢）</div>' : '')
+        + '</div>'
+        + (r.weather ? '<div class="wa-item">天气折算：' + esc(JSON.stringify(r.weather))
+            + (r.weatherReason ? '　<span class="wa-dim">' + esc(String(r.weatherReason)) + '</span>' : '') + '</div>' : '')
+        + (r.risk ? '<div class="wa-item"><span class="wa-dim">' + esc(String(r.risk.note || '')) + '</span></div>' : '')
+        + (r.goods ? '<div class="wa-item"><span class="wa-dim">货物提示：' + esc(String(r.goods.note || '')) + '</span></div>' : '')
+        + '<div class="wa-dim">指纹 <code>' + esc(String(r.stamp)) + '</code>　' + esc(r.basisNote || '') + '</div>');
+    });
+    on('#wa-trip-verify', () => {
+      if (!WA.travelDesk || typeof WA.travelDesk.verify !== 'function') return tripMiss('行程工作台（verify 口）');
+      const s = tripSel();
+      const r = WA.travelDesk.verify({ channel: s.channel, from: s.from, to: s.to, stamp: tripStamp });
+      if (r.fault) return tripFault(r);
+      tripOut('<div class="wa-log wa-log-info">重验（真源 <code>WA.travelDesk.verify()</code>）：'
+        + (r.same === null ? '没回带指纹 —— <b>不判作废，也不假装验过</b>' : (r.same ? '与本刻路况<b>逐字一致</b>' : '<b>路况已变</b> —— 旧预览作废'))
+        + '</div><div class="wa-item"><span class="wa-dim">' + esc(String(r.note)) + '</span></div>');
+    });
+    on('#wa-trip-ledger', () => {
+      if (!WA.travelDesk || typeof WA.travelDesk.ledger !== 'function') return tripMiss('行程工作台（ledger 口）');
+      const r = WA.travelDesk.ledger({});
+      if (r.fault) return tripFault(r);
+      tripOut('<div class="wa-log wa-log-info">在途三面（真源 <code>WA.travelDesk.ledger()</code>）：'
+        + '行 <b>' + r.count + '</b> / 共 <b>' + r.total + '</b>　面 <b>' + esc((r.faces || []).join(' / ')) + '</b></div>'
+        + (r.rows || []).map(function (x) {
+            return '<div class="wa-item"><span class="wa-dim">' + esc(x.face) + '</span> ' + esc(x.who || '')
+              + '　' + esc(x.from || '') + '→' + esc(x.to || '')
+              + (x.resource ? '　货物 ' + esc(x.resource) + ' ×' + esc(String(x.qty)) : '')
+              + ' <span class="wa-dim">（真源容器 ' + esc(x.source) + '）</span></div>';
+          }).join('')
+        + ((r.unreadable || []).length ? '<div class="wa-item"><span class="wa-dim">读不到（与「真的没有」是两件事）：'
+            + esc(r.unreadable.map(function (x) { return x.face + '（' + x.why + '）'; }).join('、')) + '</span></div>' : '')
+        + (r.truncated ? '<div class="wa-dim">（超上限截断，如实报 —— 不是数据被丢）</div>' : '')
+        + '<div class="wa-dim">' + esc(String(r.note || '')) + '</div>');
+    });
+    on('#wa-trip-commit', () => {
+      if (!WA.travelDesk || typeof WA.travelDesk.commit !== 'function') return tripMiss('行程工作台（commit 口）');
+      const s = tripSel();
+      const w = $('#wa-trip-who'), a = $('#wa-trip-act');
+      const act = a ? String(a.value || '') : '';
+      const ctx = { channel: s.channel, from: s.from, to: s.to,
+        person: w ? String(w.value || '').trim() : '', stamp: tripStamp };
+      const r = WA.travelDesk.commit(act, ctx);
+      if (r.fault) return tripFault(r);
+      tripOut('<div class="wa-log ' + (r.ok ? 'wa-log-info' : 'wa-log-err') + '">'
+        + (r.ok ? '已执行' : '来源拒收（原样透传）') + '：动作 <b>' + esc(String(r.action))
+        + '</b> 经 <code>' + esc(String(r.via)) + '</code></div>'
+        + '<div class="wa-item"><span class="wa-dim">' + esc(String(r.note || r.reason || '')) + '</span></div>');
+    });
+    on('#wa-trip-dia', () => {
+      if (!WA.travelDesk || typeof WA.travelDesk.diagnose !== 'function') return tripMiss('行程工作台（diagnose 口）');
+      const d = WA.travelDesk.diagnose();
+      const st = (typeof WA.travelDesk.stat === 'function') ? WA.travelDesk.stat() : null;
+      tripOut('<div class="wa-log wa-log-info">诊断（真源 <code>WA.travelDesk.diagnose()</code>）：'
+        + '模块 <b>' + esc(d.module) + '</b> v' + esc(d.ver) + '　开关 ' + (d.cfg.enabled ? '开' : '关')
+        + '　上限 行 ' + d.cfg.maxRows + ' / 方案段 ' + d.cfg.maxPlanRows + '</div>'
+        + '<div class="wa-item">通道（单一真源 <code>world.CHANNELS</code>）：' + esc(((WA.world && WA.world.CHANNELS) || []).join('　')) + '</div>'
+        + '<div class="wa-item">动作声明 ' + d.actions.declared.length + ' 条 —— 在位 '
+        + esc(d.actions.live.join(' / ')) + (d.actions.missing.length ? '　<b>缺 ' + esc(d.actions.missing.join(' / ')) + '</b>' : '') + '</div>'
+        + '<div class="wa-item">拒收码命名空间（fault，与来源的 reason 分开）：' + esc((d.faultCodes || []).join(' / ')) + '</div>'
+        + (st ? '<div class="wa-item">本进程计数：预览 ' + st.plans + ' · 执行 ' + st.commits + ' · 来源拒收 ' + st.rejects
+          + '　拒收桶 ' + esc(String(JSON.stringify(st.faults))) + '</div>' : ''));
     });
   }
 

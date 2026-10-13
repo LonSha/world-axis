@@ -90,6 +90,9 @@ const TIMEOUT_ARMED = {
   'field-liveness-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'module-registry-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'isolated-runner-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.210.0（拓展 8）：与 ARMED_SITES 同批入表（两张表各说一套时，逐站点核对与
+  //   「入表了却没人核」会同时发生）。
+  'e8-travel-desk-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   'ui-gate-2136': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   // v2.137.0（O14）：UI 实机通道的调用点。**它比 ui-gate.js 重一档**——后者是 mini-DOM 上的
   //   端到端（~12s），前者要真起 Chromium 跑 9 轮（1 轮原版 + C1/C2/C3/C4 各一轮破坏 + 每轮
@@ -362,6 +365,14 @@ const ARMED_SITES = [
   // v2.209.0（优化 6）：同上，锚点带左值名 `rEv6` —— 否则与同族 spawnSync 调用形态 ambiguous。
   { key: 'ev6-panel-nav-lock', mode: 'spawn',
     anchor: "const rEv6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ev6-panel-nav-v2209.js')]," },
+  // v2.210.0（拓展 8）：新开的调用点入表。**现场是核对器先报出来的**（A13b 60 vs 59）——
+  //   「新开的调用点不入表即红」正是这道门禁存在的理由，故处置是入表而不是放宽。
+  //   锚点截到 options 之前（同 negative-probe-v2410 那条的口径：**锚点不许包含它要守卫的值** ——
+  //   含了值，一旦预算被改动，锚点先失效、报出来的是 site-missing 而不是 value-mismatch）。
+  //   ⚠ 条目必须落在数组**末尾**：站点表的顺序要与 run.js 里的出现顺序一致，
+  //   否则 A10 的「行号严格递增」当场报红（两份清单各说一套）。
+  { key: 'e8-travel-desk-lock', mode: 'spawn', kill: true,
+    anchor: "const rE8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-e8-v2210.js')]," },
 ];
 
 /**

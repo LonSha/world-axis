@@ -1,9 +1,9 @@
 # WorldAxis 拒收码手册（自动生成：`node tools/gen-error-codes.js`）
 
-> 台账 version：`2.203.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
+> 台账 version：`2.210.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **828** 个内联拒收码：见证 552 / 死表 50 / 基线 226
+共 **843** 个内联拒收码：见证 552 / 死表 50 / 基线 241
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
@@ -621,7 +621,7 @@
 | `unknown-shipment` | engines/freight.js | freight.arrive/cancel/reroute/view: shipment not found. Needs non-existent shipment ID. |
 | `unknown-source` | engines/freight.js | freight.dispatch: source goods not found. Needs place/resource not in economy.goods. |
 
-## 基线（存量未分类）（226）
+## 基线（存量未分类）（241）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -658,6 +658,7 @@
 | `bad-name` | core/plugin.js, engines/org.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `bad-order` | engines/wb-inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `bad-outcome` | engines/inst.js, engines/mend.js, engines/plan.js, engines/shadow.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `bad-page` | ui/panel-nav.js, ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `bad-patch` | engines/style.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `bad-polarity` | engines/threads.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `bad-pool` | engines/quota.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -682,6 +683,7 @@
 | `busy` | engines/act.js, engines/offline-return.js, engines/parallel-world.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `capacity` | engines/chrono.js, engines/collab.js, engines/events.js, engines/parallel-events.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `chain-terminal` | engines/causal.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `channel-unconfigured` | ui/assistant.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `checked` | engines/tempo.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `clean` | engines/warrant.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `climate-throw` | engines/org.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -700,10 +702,13 @@
 | `emotion-word` | engines/affect.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `empty` | engines/chatcache.js, engines/economy.js, engines/storyclock.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `empty-goal` | direction/oracle.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `empty-question` | ui/assistant.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `empty-rec` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `empty-response` | engines/ensemble.js, engines/parallel-world.js, engines/polish.js, engines/rewriter.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `empty-roster` | engines/org.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `empty-round` | engines/spotlight.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `empty-string` | core/settings-bus.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `empty-target` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `empty-text` | engines/calendar-custom.js, engines/canon.js, engines/gen-gate.js, engines/history-search.js, engines/polish.js, engines/preset-world.js, engines/purify-scope.js, engines/reasoning.js, engines/request-viewer.js, engines/rewriter.js, engines/storyclock.js, engines/wb-search.js, engines/word-budget.js, render/theater.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `engine-absent` | engines/hazard.js, engines/org.js, engines/rule-pack.js, engines/world.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `error` | engines/wb-inject.js, render/inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -744,8 +749,11 @@
 | `missing-thread` | engines/threads.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `missing-what` | engines/shadow.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `module-missing` | engines/collab.js, engines/faction-graph.js, engines/offline-return.js, engines/pending-center.js, engines/tool-diag.js, engines/world-graph.js, engines/world-snapshot.js, ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `nav-module-missing` | ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `negative-span` | engines/tempo.js, engines/temporal-lock.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-back` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-basis` | engines/liaison.js, engines/threads.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-body` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-candidates` | engines/opinion.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-capacity` | engines/survival.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-change` | engines/shadow.js, actors/registry.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -758,12 +766,16 @@
 | `no-input-el` | render/theater.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-merit` | engines/karma.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-name` | engines/beat-mask.js, engines/motif.js, engines/parallel-world.js, engines/power-anchor.js, engines/userlock.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-page` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-page-table` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-pending` | engines/beat-ledger.js, engines/fondness.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-rules` | render/purifier.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-search-face` | ui/assistant.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-shadow` | engines/shadow.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
-| `no-snapshot` | render/inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-snapshot` | render/inject.js, ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-stale-subkeys` | core/settings-bus.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-storage` | core/settings-bus.js, engines/checkpoints.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-terms` | ui/assistant.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-th` | engines/wb-inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-time-word` | engines/calendar.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-volume` | ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -801,6 +813,8 @@
 | `read-failed` | core/settings-bus.js, core/store.js, engines/gen-gate.js, engines/preset-world.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `readback-failed` | core/store.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `ready` | engines/life.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `rec-ambiguous` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `rec-not-rendered` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `reconcile-throw` | ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `registry-missing` | ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `remove-threw` | core/store.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -840,6 +854,7 @@
 | `top-stage` | engines/fondness.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `trigger-fired` | engines/temperament.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `trusted-person` | engines/life.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `ui-module-missing` | ui/panel-nav.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `unknown-basis` | engines/threads.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `unknown-place` | engines/aftermath.js, engines/region.js, engines/world.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `unknown-site` | core/evict.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
