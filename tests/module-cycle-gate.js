@@ -123,6 +123,16 @@ const ENTRY_NS = {
   loadScript: '入口脚本装载',
   loadFailures: '入口装载失败台账',
   loaderStatus: '入口装载器状态',
+  // v2.211.0(优化 Q1):启动完整性三件 —— 判定本体在 core/store.js,**入口只转出**。
+  //   它们必须登记在本表(而不是「未登记的一对一差」):入口命名空间由 index.js 提供、
+  //   不进 LOAD_ORDER,melded 静态面照收;不登记就会被判成 ns 面漂移(static-only)。
+  //   三个口各自实在,不是一个口的三个别名:
+  //     loaderIntegrity —— 只读视图(供面板/诊断),store 不可用时给默认放行视图;
+  //     writeGate       —— 问「此刻若写会怎样」,**不执行**副作用;
+  //     loadRetry       —— 恢复入口(重走一次装载并重算投影),唯一有副作用的一个。
+  loaderIntegrity: '入口完整性只读视图(转出 store.integrity)',
+  writeGate: '入口写侧闸门转出(转出 store.writeGate,不执行副作用)',
+  loadRetry: '入口装载重试(恢复入口:重走一次装载 + 重算失败表投影)',
   baseUrl: '入口基址',
   logCaps: '入口诊断环动态上限',
   logTrimStat: '入口日志裁剪计量',

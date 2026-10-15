@@ -284,7 +284,9 @@
       // v2.160.0（TP4）：跨引擎提交回执（core/commit.js）。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
       //   ——登记不等于物化，两件事都要做。
-      commit: { receipts: [] },
+      // v2.212.0(优化 Q3):待恢复台账同步物化 —— 登记了精确键就必须在骨架里存在,
+      //   否则 registryParity 报「未在骨架物化」、冷启动直写会炸事务(v2.116.0 events.res 同款)。
+      commit: { receipts: [], interrupted: [] },
       // v2.154.0（RX7）：世界生态自洽审计（eco-audit.js）**不进骨架** ——
       //   它是纯只读审计面（零 store.transact），读数全在进程态（lastRow / stat）。
       //   登记进骨架会让 registryParity 报「未在骨架物化」，也会把「重启清零」伪装成「有界容器」
@@ -711,6 +713,92 @@
       return WA.permissions.gate('delete');
     } catch (e) { return null; }
   }
+  // ── v2.211.0(优化 Q1)· 启动完整性闸门(唯一真源)────────────────────────────
+  // 【它治的病】本仓此前的形态是「加载失败 = 记一条 error 日志 + 把名字列进 WA.loadFailures」,
+  //   然后 `init()` 照常往下走:store 初始化、拦截器安装、UI 挂载全部照做。
+  //   而写路径(`transact` / `save`)此前对「谁的代码在跑」一无所知 —— 于是
+  //   「core/commit.js 没装上」「core/permissions.js 没装上」的运行时里,任何引擎的写调用
+  //   都只在**它自己**那层失败,彼此无关地各写一半。用户看到的是「某些功能行为怪」,
+  //   而不是「你的扩展没装全」。
+  //   真实触发面不止网络:扩展目录被部分同步、清理工具删掉一两个文件、用户手动改过目录
+  //   —— 这些都不会让浏览器报错,只会让某个模块静默缺席。
+  // 【为什么闸门在 store 里而不是入口文件】判定要能被执行得起来的上下文驱动。
+  //   `tests/run.js` 的装载面**刻意不含 index.js**(入口文件靠切片取 loadScript 段),
+  //   把「关键键表 + 判定」放 index.js 会让它结构上不可见证 —— 而一个不可见证的安全判据,
+  //   与本仓反复点名的「躺在磁盘上的文件」是同一种东西。故:定义与闸门在此(唯一真源),
+  //   index.js 只**转出**(供诊断/面板消费),并把装载面才知道的信息(失败表)喂进来。
+  // 【关键模块表】判据不是「哪些模块重要」(那种表必然越写越长),而是**写入路径的依赖面**:
+  //   · 什么时候算数 —— core/clock.js(决策时间单一出口)
+  //   · 进来的东西怎么过边界 —— core/input-guard.js / core/settings-bus.js(设置读口)
+  //   · 允不允许写 —— core/permissions.js
+  //   · 写了能不能退、能不能原子提交 —— core/commit.js / core/interceptor.js(写拦截)
+  //   刻意**不含**任何 engines/*:引擎缺席是「某块玩法没起」,应当如实报缺、读侧照常,
+  //   而不是把整台机器的写全锁死(那会把一次局部故障升级成「用户存档不可用」)。
+  //   本表的长度是有意的:六个,每一项都必须是**写入链路上被真正调用**的口。
+  const LOAD_CRITICAL = [
+    'core/clock.js', 'core/input-guard.js', 'core/settings-bus.js',
+    'core/permissions.js', 'core/commit.js', 'core/interceptor.js'
+  ];
+  /**
+   * 装载面失败表读口。三态,**不许把三态压成两态**:
+   *   · present:false —— 装载面根本不在这套运行时里(无头测试壳 / TH 脚本按需加载)。
+   *     此时完整性闸门**不适用**,放行;把它当「未知 ⇒ 拒写」会让本仓全部无头回归当场不可用,
+   *     而那正是「一个判据把自己的测试环境判死」这类形态。
+   *   · present:true, rels:数组 —— 入口把失败表投影到了 `WA.__loadFailed`(真源仍是入口
+   *     `__loaderState.failed`,投影由入口在每次变更后同步)。
+   *   · present:true, rels:null —— 入口在场却没写投影(init 还没跑到 / 投影被外部清掉)。
+   *     这是**不可知**,故收紧:按「六个关键模块都没被证实装载」处理。
+   *   为什么 present 的判据是这两个口而不是 `WA.loadScript`:后者在测试壳里也会被装上,
+   *   拿它当「入口在场」会把无头回归读成「入口在场且表未知」⇒ 全量写路径被锁死。
+   */
+  function loaderFailureRels() {
+    const hasEntryFace = (typeof WA.loaderStatus === 'function') || Array.isArray(WA.__loadFailed);
+    if (!hasEntryFace) return { present: false, rels: [] };
+    if (Array.isArray(WA.__loadFailed)) return { present: true, rels: WA.__loadFailed.slice() };
+    try {
+      if (typeof WA.loaderStatus === 'function') {
+        const st = WA.loaderStatus();
+        if (st && Array.isArray(st.failedModules)) {
+          return { present: true, rels: st.failedModules.map(function (x) { return x && x.rel; }).filter(Boolean) };
+        }
+      }
+    } catch (e) { /* 读不出来 = 不可知,下面按不可知处理 */ }
+    return { present: true, rels: null };
+  }
+  /** 完整性缺口:applicable(闸门是否适用)/ known(失败表是否可读)/ missing(关键模块缺失项)。 */
+  function loadGap() {
+    const f = loaderFailureRels();
+    if (!f.present) return { applicable: false, known: true, missing: [] };
+    if (f.rels === null) return { applicable: true, known: false, missing: LOAD_CRITICAL.slice() };
+    const seen = {};
+    f.rels.forEach(function (r) { if (typeof r === 'string' && r) seen[r] = true; });
+    return { applicable: true, known: true, missing: LOAD_CRITICAL.filter(function (r) { return seen[r] === true; }) };
+  }
+  /**
+   * 写侧闸门。`null` = 放行;非 null = 拒收体(不产生候选、不落盘、不改内存)。
+   *   两条纪律:
+   *   1 **只挡写**。读、诊断、导出、恢复入口一律不受影响 —— 用户至少要能把现状读出来、
+   *     把缺的文件补上;把整台机器锁死就把一次局部故障升级成了「存档不可用」。
+   *   2 **闸门自身异常一律放行(fail-open)**。与 permissions 闸门同一条裁决,理由也是同一条:
+   *     不能让「审计失败」升级成「用户的存档写不进去」。区别是这里额外记一笔日志,
+   *     免得放行变成静默(本仓治过的「静默降级」形态)。
+   *   拒收码 `load-integrity` 是**新增码**:新增即须在拒收码门禁里显式归属(见证 / 死表),
+   *   本批用真 API 把它跑出来作见证(见 tests/q1-load-integrity-v2211.js)。
+   */
+  function gateLoadIntegrity() {
+    try {
+      const g = loadGap();
+      if (!g.applicable || !g.missing.length) return null;
+      return { ok: false, reason: 'load-integrity', missing: g.missing.slice(), critical: LOAD_CRITICAL.length,
+        known: g.known,
+        note: '关键模块未装载(' + g.missing.join('、') + '):本次世界写**未发生**。'
+          + '读与诊断不受影响;先把文件补上,再用入口的 WA.loadRetry(rel) 重试装载' };
+    } catch (e) {
+      try { WA.log('error', '启动完整性闸门自身异常 ⇒ 本次放行(fail-open,不因审计失败堵住写入)', e); } catch (e2) {}
+      return null;
+    }
+  }
+
   // v0.1.31: 写合并——批作用域内 transact 只推进内存，批退出统一落盘一次
   let __epoch = 0; // v0.1.35: 聊天纪元——init()（含切聊天）自增，在飞批跨纪元即作废
 
@@ -1700,7 +1788,10 @@
     //   （G18 逐键对账）。它是**环形容器**：回执答「这一笔世界操作做过没有」，
     //   而「做过没有」必须跨刷新仍答得出（故不能提交完就删），只能环形挤出。
     //   cap 与 core/commit.js 的 LIMITS.RECEIPTS 同源。
-    'commit.receipts':  { cap: 64, site: 'commit.js WA.evict.array(draft.commit.receipts, \'commit.receipts\', LIMITS.RECEIPTS)' }
+    'commit.receipts':  { cap: 64, site: 'commit.js WA.evict.array(draft.commit.receipts, \'commit.receipts\', LIMITS.RECEIPTS)' },
+    // v2.212.0(优化 Q3):待恢复台账。与 core/evict.js SITES 同名同值(逐键对账),
+    //   cap 与 core/commit.js 的 LIMITS.RESUME 同源。
+    'commit.interrupted': { cap: 32, site: 'commit.js WA.evict.array(draft.commit.interrupted, \'commit.interrupted\', LIMITS.RESUME)' }
     // v2.13.0: 人物档案节（people.<id>.profile.<节>）的上限**逐节不同**，上面五条具名
     //   登记已足够说明「这些数组归谁管」；挤出侧站点 people.profile 的 path 是
     //   people.*.profile.*（per-call，写的时候才由 registry 逐节取值传入），
@@ -2200,6 +2291,18 @@
         //   这里是唯一的写入口，故闸门只落在这一处。
         //   默认放行：无人显式登记当前使用者时（本仓主场景＝单机）一律放行；登记了但没 write 位才拦。
         //   拦下的形态与其余失败路径一致：**返回 false + 记账 + 告警**，不抛（调用方按既有契约处理）。
+        // v2.211.0(优化 Q1):启动完整性闸门。与 transact 的前置闸门同一真源、同一拒收码;
+        //   此处是**最后一个出口** —— 即便将来某条路径绕过了 transact(例如直接调 save),
+        //   半装的运行时也不至把候选写成权威落盘。
+        const loadDeny2 = gateLoadIntegrity();
+        if (loadDeny2) {
+          __saveStat.at = clockWall(); __saveStat.ok = false;
+          __saveStat.reason = 'load-integrity'; __saveStat.failCount++;
+          WA.log('error', 'store.save 被启动完整性闸门拦下:'
+            + loadDeny2.missing.join('、') + ' 未装载 —— 本次世界写**未发生**'
+            + '(读与诊断不受影响;补文件后用 WA.loadRetry(rel) 重试装载)');
+          return false;
+        }
         try {
           if (WA.permissions && typeof WA.permissions.gate === 'function') {
             const denied = WA.permissions.gate('write');
@@ -3629,6 +3732,30 @@
     quarantineAudit() { const q = __quarantineStat; return { restores: q.restores, drops: q.drops, lastRestoreAt: q.lastRestoreAt, lastDropAt: q.lastDropAt, lastKey: q.lastKey }; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
     saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
+    /** v2.211.0(优化 Q1):启动完整性的只读视图(供诊断 / 面板 / 专锁消费)。
+     *   为什么单独开一个口而不复用 loadStat:`loadStat` 答的是「这一次 load 怎么了」,
+     *   本口答的是「**当下这台机器是不是装全了**」 —— 两条不同的判据,合成一条会互相顶掉。
+     *   零副作用:不写 store、不落盘、不改装载面状态(取证不得改变被取证对象)。 */
+    integrity() {
+      const g = loadGap();
+      const f = loaderFailureRels();
+      return { ok: g.missing.length === 0, applicable: g.applicable, known: g.known,
+        armed: g.applicable && g.missing.length > 0,
+        missing: g.missing.slice(), critical: LOAD_CRITICAL.slice(),
+        failedModules: (f.rels || []).slice(),
+        reason: g.missing.length ? 'load-integrity' : '' };
+    },
+    /** v2.211.0(优化 Q1):闸门本体转出 —— 供入口 / 诊断在**不重复实现**判定的前提下问「现在能不能写」。
+     *   返回 `null` = 放行;非 null = 拒收体。调用方不得拿它当写前检查的**唯一**依据:
+     *   真正拦住写的是 transact / save 里那两处,本口只回答「若此刻写会怎样」。
+     *   【为什么不另开一个 loadGateStat】本版首轮曾写过一个 `loadGateStat()`(只报
+     *   applicable/known/armed/missing/critical),被**死子面冻结门禁当场报红**:产品与测试
+     *   均零引用 ⇒ 它是一条静默增长的过度导出。它的字段是 `integrity()` 的**子集**
+     *   (后者另有 ok / failedModules / reason),两口径必然慢慢漂开 —— 本仓对此的裁决一贯是
+     *   「一件事只留一个读口」,故删掉它而不是给它接一个凑数的消费方。
+     *   信息量差在哪:`loadGateStat` 只答「要不要挡」;`integrity()` 另答「为什么挡」
+     *   (`failedModules` 是真源投影、`reason` 是拒收码本身)—— 诊断/面板要的正是后半句。 */
+    writeGate() { return gateLoadIntegrity(); },
     /** v0.1.38: 加载观测只读视图（tool-diag 消费）——errors>0 意味着发生过状态键损坏 */
     /** v2.30.0: 镜像回落视图（本次世界从哪来 / 是否分支继承 / 写回是否成功） */
     mirrorStat() {
@@ -3962,6 +4089,18 @@
       // v2.113.0（计划一 A1）：**授权在变更之前**。此前唯一的闸门在 `save()` 里 ——
       //   批内 transact 已经把候选推进内存、闸门的拒绝只体现为「批退出那一次 save 返回 false」，
       //   而那个返回值此前被忽略、脏标记也早已清掉。改动后：被拒的候选**根本不产生**。
+      // v2.211.0(优化 Q1):启动完整性闸门 —— 关键模块缺席时**不产生候选**。
+      //   为什么排在权限闸门之前:权限回答「你有没有资格写」,
+      //   而完整性回答「写下去还成不成立」:transact 回调里那些记账的人(clock)、
+      //   把门的人(permissions)、能退回去的路(commit)—— 少一个,这个世界朝哪边变都不算数。
+      const loadDeny1 = gateLoadIntegrity();
+      if (loadDeny1) {
+        recTx(clockWall() - t0, 'aborted');
+        return { ok: false, denied: true, applied: false, persisted: false,
+          reason: 'load-integrity', rejected: 'load-integrity',
+          missing: loadDeny1.missing, note: loadDeny1.note, state: memCache };
+      }
+
       const preDeny = gateBeforeChange();
       if (preDeny) {
         recTx(clockWall() - t0, 'aborted');

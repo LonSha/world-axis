@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.210.0'
+  const VERSION = '2.212.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -777,10 +777,22 @@
   ];
 
   // v0.1.16: 多源容灾——主源（本地扩展目录）失败时依次回退 jsDelivr 三域，每源 12s 闸刀
+  // v2.211.0(优化 Q1 · 同版加载):回退源此前写死 @main,而那是一个会走的引用。
+  //   实测(2026-10-15):本地 v2.210.0 而远端 main 的 manifest.json 是 v2.181.0 ——
+  //   那是本仓的另一条独立历史线。于是「本地某个文件读不到 ⇒ 从 main 取同名文件」这条
+  //   容灾路径会把另一个版本的模块拼进当前运行时;而查询串 ?v=2.210.0 对 jsDelivr 的
+  //   取内容没有任何约束(它按路径取,查询串既不选版本也不进缓存键)。
+  //   混版不会报错:每个模块各自自洽,只是彼此的约定不同 —— 症状是「某些功能行为怪」,
+  //   而没有任何一处会告诉用户「你跑的是两个版本的拼盘」。
+  //   治法:绑定不可变构建标识。BUILD_ID 是本版交付时的提交(40 位),回退源一律取它;
+  //   同一构建标识下取到的模块与本地是同一次产物,这才谈得上「同版容灾」。
+  //   纪律:升版时 BUILD_ID 与 VERSION 同批推进(判据见 tests/index-build-v2211.js),
+  //   不允许只改其一 —— 只改 VERSION 会让回退源指向旧代码,只改 BUILD_ID 会让版本账对不上现场。
+  const BUILD_ID = 'b15894bc2c4b0648fd6f9f90ee0d8f10eeb3f6ac';
   const CDN_BASES = [
-    'https://cdn.jsdelivr.net/gh/LonSha/world-axis@main',
-    'https://fastly.jsdelivr.net/gh/LonSha/world-axis@main',
-    'https://testingcf.jsdelivr.net/gh/LonSha/world-axis@main',
+    'https://cdn.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
+    'https://fastly.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
+    'https://testingcf.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
   ];
   const SCRIPT_TIMEOUT_MS = 12000;
   const CDN_COOLDOWN_MS = 60000;
@@ -842,7 +854,76 @@
       return { rel: rel, ok: false, failed: true };
     })();
   }
-  WA.loaderStatus = function () { return { loaded: Array.from((WA.__loaderState&&WA.__loaderState.loaded||new Map()).values()), cdnFailures: Array.from((WA.__loaderState&&WA.__loaderState.failedCdnAt||new Map()).entries()), failedModules: Array.from((WA.__loaderState&&WA.__loaderState.failed||new Map()).entries()).map(function (e) { return { rel: e[0], at: e[1].at, sourcesTried: e[1].sourcesTried }; }) }; };
+  WA.loaderStatus = function () { return { loaded: Array.from((WA.__loaderState&&WA.__loaderState.loaded||new Map()).values()), cdnFailures: Array.from((WA.__loaderState&&WA.__loaderState.failedCdnAt||new Map()).entries()), failedModules: Array.from((WA.__loaderState&&WA.__loaderState.failed||new Map()).entries()).map(function (e) { return { rel: e[0], at: e[1].at, sourcesTried: e[1].sourcesTried }; }), buildId: BUILD_ID, version: VERSION, integrity: WA.loaderIntegrity ? WA.loaderIntegrity() : null }; };
+  // ── v2.211.0(优化 Q1)· 启动完整性:关键模块缺席 ⇒ 停止危险写入,并给恢复入口 ──────
+  // 【它治的病】本仓此前的形态是「加载失败 = 记一条 error 日志 + 把名字列进 WA.loadFailures」,
+  //   然后 `init()` **照常往下走**:store 初始化、拦截器安装、UI 挂载全部照做。
+  //   而写路径(store.transact / save)此前对「谁的代码在跑」一无所知 —— 于是
+  //   「core/store.js 没装上」的运行时里,任何一个引擎的写调用都只在**它自己**那层失败,
+  //   彼此无关地各写一半。用户看到的是一堆「某些功能不好使」,而不是「你的扩展没装全」。
+  //   真实触发面不止网络:扩展目录被部分同步、杀毒/清理工具删掉一两个文件、
+  //   用户手动改过目录 —— 这些都不会让浏览器报错,只会让某个模块静默缺席。
+  // 【为什么闸门写在 store 里而不是本文件】判定要能被执行得起来的上下文驱动。
+  //   `tests/run.js` 的装载面**刻意不含 index.js**(入口文件靠切片取 loadScript 段),
+  //   故把「关键键表 + 判定」放在 index.js 会让它结构上不可见证 —— 而一个不可见证的
+  //   安全判据,与本仓反复点名的「躺在磁盘上的文件」是同一种东西。
+  //   故:定义与闸门在 `core/store.js`(唯一真源),本文件只**转出**(供面板/诊断消费),
+  //   并把装载面才知道的信息(失败表)喂给它。
+  // 【恢复入口】`WA.loadRetry(rel)`:重新走一遍 loadScript(带冷却),成功则把自己从
+  //   失败表里摘掉、并重算闸门。**不做自动重试**:自动重试会把「一直失败」变成
+  //   「一直在后台重试」,故障反而更难看见(本仓口径:失败必须可见)。
+  WA.loaderIntegrity = function () {
+    try {
+      if (WA.store && typeof WA.store.integrity === 'function') return WA.store.integrity();
+      return { ok: true, armed: false, missing: [], reason: '', unknown: 'store-unavailable', buildId: BUILD_ID, version: VERSION };
+    } catch (e) {
+      return { ok: false, armed: true, missing: [], reason: '完整性判定异常', buildId: BUILD_ID, version: VERSION };
+    }
+  };
+  /** 写侧闸门转出(唯一实现仍在 core/store.js):读侧一律放行,只有写侧被挡。 */
+  WA.writeGate = function () {
+    try {
+      if (WA.store && typeof WA.store.writeGate === 'function') return WA.store.writeGate();
+      return null;
+    } catch (e) { return { ok: false, reason: 'load-integrity', missing: [], note: '完整性判定异常,收紧为拒写' }; }
+  };
+  /**
+   * 恢复入口:对某个失败模块**重走一次装载**。成功 ⇒ 从失败表摘掉、重算闸门。
+   * 边界:只接受**装载失败表里确实记着**的项(不猜、不替用户"清一下表");
+   *   未登记的 rel 如实返回 not-failed,不假装重试过。
+   */
+  WA.loadRetry = function (rel) {
+    return (async function () {
+      const state = WA.__loaderState;
+      if (!state || !(state.failed instanceof Map)) return { ok: false, reason: 'no-loader-state' };
+      const r = String(rel || '');
+      if (!r) return { ok: false, reason: 'missing-rel' };
+      if (!state.failed.has(r)) return { ok: false, reason: 'not-failed', rel: r, note: '该模块不在装载失败表里,无须重试' };
+      // 重试前把冷却清掉:冷却的语义是「这一轮别再试了」,而用户点重试就是**新一轮**。
+      try { if (state.failedCdnAt && state.failedCdnAt.clear) state.failedCdnAt.clear(); } catch (e) {}
+      // 缓存里若留着旧结论,一并摘掉,否则 loadScript 会直接把旧结论还回来(空转)。
+      try { state.loaded.delete(r + '@' + VERSION); } catch (e) {}
+      const res = await loadScript(r);
+      if (res && res.ok === true) {
+        try { state.failed.delete(r); } catch (e) {}
+        WA.log('info', '模块重试装载成功: ' + r + (res.fallback ? '(走 CDN ' + res.fallback + ')' : ''));
+      } else {
+        WA.log('error', '模块重试装载仍失败: ' + r);
+      }
+      // v2.211.0(优化 Q1):投影必须跟着真源走。失败表变了而投影不更新,
+      //   store 的闸门就会读着**旧表**继续拒写 —— 用户明明补好了文件、重试也成功了,
+      //   写入却仍然关着,且没有任何一处能解释为什么。故这里无条件重算投影。
+      try {
+        if (WA.__loaderState && WA.__loaderState.failed instanceof Map) {
+          WA.__loadFailed = Array.from(WA.__loaderState.failed.keys());
+          WA.loadFailures = WA.loaderStatus().failedModules.slice();
+        }
+      } catch (e) {}
+      const ig = WA.loaderIntegrity();
+      return { ok: !!(res && res.ok), rel: r, src: res && res.src, fallback: res && res.fallback,
+        integrity: ig, note: '重试结果已重算完整性;写入闸门当前' + (ig.armed ? '仍然关闭' : '已恢复') };
+    })();
+  };
 
   // ── 主初始化 ────────────────────────────────────────────
   async function init() {
@@ -853,6 +934,13 @@
     // v0.1.25: 启动完整性审计——加载失败的模块显式点名并计数（不再静默）
     try {
       const failedList = WA.loaderStatus ? WA.loaderStatus().failedModules : [];
+      // v2.211.0(优化 Q1):把失败表**投影**成 store 闸门能读的字符串数组。
+      //   为什么在此刻(而不是 init 末尾):下一句就是 store.init(),它会装载存档并可能触发
+      //   首次写路径 —— 闸门在那一刻就要能读到表。判定真源仍是本文件的 __loaderState.failed,
+      //   这里只是投影,不是第二份账。
+      //   三态口径(见 core/store.js · loaderFailureRels):**未定义**=装载面不在场(闸门不适用);
+      //   **数组**(空数组也算"已知")=失败表可读。故这里必须写数组,不能"没失败就不写"。
+      WA.__loadFailed = failedList.map(function (f) { return f.rel; });
       if (failedList.length) {
         WA.loadFailures = failedList.slice();
         WA.log('error', '启动审计：' + failedList.length + ' 个模块加载失败：' + failedList.map(function (f) { return f.rel; }).join('、'));
@@ -863,6 +951,17 @@
     } catch (e) {}
     // 模块全部加载后：初始化store、注册拦截器、建UI
     try { WA.store && WA.store.init && WA.store.init(); } catch (e) { WA.log('error', 'store初始化失败', e); }
+    // v2.211.0(优化 Q1):闸门关着就**当场如实点名**。为什么必须在这里说:
+    //   闸门拦的是「本次世界写未发生」,用户此时只看到「操作没反应」。没有这一句,
+    //   「加载不全」对用户就是不可见的 —— 本仓治过的「静默降级」形态。
+    //   关键模块表不在这里复制一份(唯一真源在 core/store.js),此处只**转出**结论。
+    try {
+      const ig = WA.loaderIntegrity();
+      if (ig && ig.armed) {
+        WA.log('error', '启动完整性:关键模块缺席(' + (ig.missing || []).join('、')
+          + '),写侧已关闭 —— 读 / 诊断 / 导出 / 恢复不受影响;补上文件后用 WA.loadRetry(rel) 重试装载');
+      }
+    } catch (e) {}
     try { WA.interceptor && WA.interceptor.install && WA.interceptor.install(); } catch (e) { WA.log('error', '拦截器安装失败', e); }
     // [v2.19.0/v2.20.0] 启动接线：
     //   · injectInspector.init：订阅 prompt-ready 事件 → 注入自检抓最终 prompt 快照。

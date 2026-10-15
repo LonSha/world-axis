@@ -374,6 +374,9 @@
     //   同名同值（把门判据逐键对账）；SITES 缺此键时 evict.array 会走 unknown-site **静默失败**
     //   （挤出压根不发生，而调用方以为做了）。
     'commit.receipts':    { path: 'commit.receipts', cap: 64, why: '跨引擎提交回执环形（已提交的世界操作必须跨刷新仍答得出，故不能在提交时删——只能环形挤出）' },
+    // v2.212.0(Q3):待恢复台账环形。记的是「没做完的那一半」(已做未提交的跨层副作用 +
+    //   断在哪一层)。与回执同数量级:它答「上一轮中断时做过什么」,同样要跨刷新可读。
+    'commit.interrupted': { path: 'commit.interrupted', cap: 32, why: '中断与跨层恢复台账环形(答「上一轮中断时做过什么、断在哪一层」,跨刷新仍须可读)' },
     'calendarPlan.months': { path: 'calendarPlan.months', cap: 'per-call', kind: 'array', why: '自定义历法月表环形（上限 = maxMonths 设置，写入时传入）' }
   };
 

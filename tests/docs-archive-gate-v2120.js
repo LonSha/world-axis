@@ -204,7 +204,13 @@ function runB(a) {
   // v2.210.0 补账：本版当期条目入 README 版本历史首条（147 行那条 `<b>v2.210.0</b>`），146。
   //   改这条之前同样**先实测了一次真值**：真跑 `tests/docs-archive-gate.js` 的 scan()，实测 146，
   //   与 README 导语同批收敛（两处各写一遍是本仓的老毛病；判据继续钉**精确等值**以防条目被误删）。
-  a(r.facts.readmeEntries === 146, 'docs-archive/B: README 版本历史条目 = 146（实 ' + r.facts.readmeEntries + '）');
+  // v2.211.0 补账：本版当期条目入 README 版本历史首条，导语 146 → 147，本文件这条同批校正。
+  // v2.212.0 补账：本版当期条目入 README 版本历史首条，导语 147 → 148，本文件这条同批校正。
+  //   首次写入时实测到一个**新形态**的坑：条目模板末尾漏了换行 ⇒ 新条目的末行与
+  //   `<b>v2.210.0</b>` 标题**拼成了同一行**，于是 ENTRY_RE 认的行数不增反丢一条（146 未变，
+  //   而 v2.210.0 条目从独立行消失）。教训：这个计数判据是「条目被误删/被拼接」的唯一哨兵 ——
+  //   它当场把「写入成功但结构错了」报了红，而不是等下一次全量回归。修法：条目模板末尾补换行。
+  a(r.facts.readmeEntries === 148, 'docs-archive/B: README 版本历史条目 = 148（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

@@ -58,11 +58,15 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const clockWall = function (site) { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
-  const LIMITS = { OPID: 80, SITE: 40, KIND: 24, RECEIPTS: 64, DEFERRED: 32, REASON: 48 };
+  const LIMITS = { OPID: 80, SITE: 40, KIND: 24, RECEIPTS: 64, DEFERRED: 32, REASON: 48,
+    // v2.212.0(优化 Q3):待恢复台账容量。与回执同数量级 —— 它记的也是「最近一批世界操作」,
+    //   只是记的是**没做完的那一半**(已做未提交的跨层副作用 + 断在哪一层)。
+    RESUME: 32, RESUME_STEPS: 8 };
 
   const __stat = {
     begun: 0, committed: 0, reused: 0, aborted: 0, failed: 0, saveFailed: 0,
     deferred: 0, deferOk: 0, deferRej: 0, effectsRetried: 0, effectsFailed: 0,
+    resumeRows: 0,
     lastReason: '', lastAt: 0, lastOpId: null, faults: {}
   };
   // 在册链（**进程态**）：opId -> chain。跨刷新的幂等靠**落盘回执**（store.commit.receipts），
@@ -377,8 +381,14 @@
     return { ok: rec.ok, kind: rec.kind, reason: rec.reason || undefined };
   }
   /** 已做而未随链提交的副作用（链中止时登记；`effectPending()` 读它）。**不自动重放**。 */
-  function markPending(c, reason) {
+  function markPending(c, reason, persistReason) {
     const rows = (c && c.effects) ? c.effects.filter(function (x) { return x && x.ok; }) : [];
+    const why = reason || 'chain-not-committed';
+    // v2.212.0(优化 Q3):**唯一落盘点**。三条失败路径都经此处,故台账只在这里写一次 ——
+    //   写两处(这里一次 + 调用点一次)就是「同一笔中断记两条」,记账面自己先自相矛盾。
+    //   注意此处**不早退**:没有已做副作用时进程态待办确实为空,但「断在哪一层」正是
+    //   要恢复现场的人最需要的一句,故落盘台账一律记一笔。
+    persistResume(c, persistReason || why, rows);
     if (!rows.length) return;
     rows.forEach(function (r) {
       __pendingEffects.push({ kind: r.kind, site: c.site, opId: c.opId, reason: reason || 'chain-not-committed', at: clockWall() });
@@ -395,6 +405,113 @@
   function pendingEffects() {
     return { ok: true, items: __pendingEffects.map(function (x) { return Object.assign({}, x); }),
       count: __pendingEffects.length, cap: LIMITS.RECEIPTS };
+  }
+
+  // ── v2.212.0(优化 Q3):中断与跨层恢复 ────────────────────────────────
+  //
+  // ── 它治什么(探针实证 /tmp/q3_probe.js)──────────────────────────
+  //   1 跨层待办只活在进程态:`__pendingEffects` 重装即归零(实测重装前 1 条 / 后 0 条),
+  //      「上一轮中断时做过什么」刷新后无人答得出。
+  //   2 落盘侧只有 `commit.receipts`(已提交回执)—— 它答「做过没有」,答不了「没做完的是什么」。
+  //   3 无身份校验面:待恢复信息若跨 chat / 跨分支 / 跨版本被恢复,就是把别处的一段机制
+  //      配置装到当前世界 —— 比不恢复更坏。
+  //   4 无读取与判定入口(实测 `WA.commit.resume` / `scanInterrupted` 均 undefined)。
+  //
+  // ── 四条纪律(决定本段全部签名)──────────────────────────────────
+  //   A **只落可序列化的安全信息**:没有闭包、没有 draft 引用、没有宿主对象;
+  //     有的只是「哪个站点的哪一类副作用、属于哪次操作、为什么没落、断在第几步」。
+  //   B **恢复前校验身份**:行上带身份四元组(chat / branch / epoch / rev),逐条比对;
+  //     不匹配 ⇒ 标 `foreign-*` 并**不给**恢复动作(如实答「这不是本现场的那一笔」)。
+  //   C **不自动回放**:入口只答「有什么、能不能恢复、为什么不能」,决定权在调用方。
+  //     理由与 `pendingEffects` 同款:机制开关是全局的,自动回放等于把一个聊天的配置
+  //     写到所有聊天上。
+  //   D **台账有界**:`commit.interrupted` 走 evict(与回执同容量源),否则长局里只增不减。
+  const RESUME_REASONS = ['step-threw', 'step-refused', 'refused', 'aborted', 'stale', 'chain-nested', 'chain-not-committed'];
+  /** 当前现场身份四元组。**只读**,不推进任何计数器(取证不得改变被取证对象)。 */
+  function identityOf() {
+    const st = storeOf();
+    let chat = '', branch = '';
+    try { if (st && typeof st.chatId === 'function') chat = clean(st.chatId(), LIMITS.OPID); } catch (e) { chat = ''; }
+    try { if (st && typeof st.currentBranchId === 'function') branch = clean(st.currentBranchId(), LIMITS.OPID); } catch (e) { branch = ''; }
+    return {
+      chat: chat,
+      branch: branch,
+      epoch: (st && typeof st.epoch === 'function') ? num(st.epoch()) : 0,
+      rev: (st && typeof st.committedRev === 'function') ? num(st.committedRev()) : 0
+    };
+  }
+  /** 把一次中断落进存档。**写失败如实降级**,不假装记上了(记不上的账比没账更坏)。 */
+  function persistResume(c, reason, rows) {
+    const st = storeOf();
+    if (!st || !c) return { ok: false, reason: 'store-absent' };
+    const id = identityOf();
+    const steps = (c.steps || []).slice(-LIMITS.RESUME_STEPS).map(function (s) { return clean(s && s.site, LIMITS.SITE) || 'step'; });
+    const row = {
+      opId: clean(c.opId, LIMITS.OPID), site: clean(c.site, LIMITS.SITE),
+      reason: clean(reason, LIMITS.REASON) || 'chain-not-committed',
+      at: clockNow('commit.resume'),
+      chat: id.chat, branch: id.branch, epoch: id.epoch, rev: id.rev,
+      steps: steps, stepCount: (c.steps || []).length,
+      // 只记**名字**,不记闭包:恢复动作由上层决定(纪律 C)。
+      effects: rows.map(function (r) { return clean(r && r.kind, LIMITS.KIND) || 'effect'; }),
+      miss: (c.effectMiss || 0)
+    };
+    let tx = null;
+    try {
+      tx = st.transact(function (draft) {
+        if (!draft.commit || typeof draft.commit !== 'object') draft.commit = { receipts: [] };
+        if (!Array.isArray(draft.commit.interrupted)) draft.commit.interrupted = [];
+        draft.commit.interrupted.push(row);
+        if (WA.evict) WA.evict.array(draft.commit.interrupted, 'commit.interrupted', LIMITS.RESUME);
+        return true;
+      }, 'commit:resume');
+    } catch (e) { noteFault('resume-write-threw'); return { ok: false, reason: 'resume-write-threw' }; }
+    if (!tx || tx.ok !== true) { noteFault('resume-write-failed'); return { ok: false, reason: 'resume-write-failed' }; }
+    __stat.resumeRows++;
+    return { ok: true, opId: row.opId, persisted: tx.persisted !== false };
+  }
+  /** 读待恢复台账(只读)。 */
+  function resumeRows() {
+    try {
+      const r = WA.store.read('commit.interrupted', null);
+      return Array.isArray(r) ? r : [];
+    } catch (e) { return []; }
+  }
+  /**
+   * 扫描中断台账并给**可恢复判定**。默认只看**本现场**那些(纪律 B):
+   *   chat 不符 ⇒ `foreign-chat`;branch 不符 ⇒ `foreign-branch`;epoch/rev 已推进 ⇒ `stale-site`。
+   *   三者都不给恢复动作 —— 如实说「这不属于当前现场」,而不是把别处的一段配置装进来。
+   * @param {{all?:boolean, opId?:string}} [opt] all:true 时连外来行一并列出(仅诊断用)
+   */
+  function scanInterrupted(opt) {
+    const o = opt || {};
+    const here = identityOf();
+    const all = resumeRows();
+    const rows = o.opId ? all.filter(function (r) { return r && r.opId === clean(o.opId, LIMITS.OPID); }) : all;
+    const out = rows.map(function (r) {
+      const x = Object.assign({}, r);
+      let verdict = 'resumable';
+      if (clean(r && r.chat, LIMITS.OPID) !== here.chat) verdict = 'foreign-chat';
+      else if (here.branch && clean(r && r.branch, LIMITS.OPID) !== here.branch) verdict = 'foreign-branch';
+      else if (num(r && r.epoch) !== here.epoch || num(r && r.rev) > here.rev) verdict = 'stale-site';
+      x.verdict = verdict;
+      x.resumable = (verdict === 'resumable');
+      return x;
+    });
+    const kept = o.all === true ? out : out.filter(function (x) { return x.resumable; });
+    return { ok: true, total: out.length, resumable: kept.filter(function (x) { return x.resumable; }).length,
+      foreign: out.filter(function (x) { return !x.resumable; }).length,
+      identity: here, rows: kept, cap: LIMITS.RESUME,
+      // 如实边界:本面**不做**恢复动作(纪律 C)。要恢复,由上层拿 `rows[i].effects` 的名字
+      //   逐条自己重做 —— 本面不猜任何一个模块的副作用怎么重做。
+      note: '本面只列与判定,不自动回放(机制开关是全局的)。恢复动作由调用方按 effects 名字自行决定。' };
+  }
+  /** 待恢复台账只读读数(诊断面消费)。 */
+  function resumeStat() {
+    const sc = scanInterrupted({});
+    return { rows: resumeRows().length, resumable: sc.resumable, foreign: sc.foreign,
+      persisted: __stat.resumeRows, cap: LIMITS.RESUME, reasons: RESUME_REASONS.slice(),
+      lastReason: __stat.lastReason, faults: Object.assign({}, __stat.faults) };
   }
   const __chainStat = {
     chains: 0, commits: 0, aborts: 0, failed: 0, replayed: 0, capped: 0, overLimit: 0,
@@ -604,7 +721,7 @@
     }
     if (tx && (tx.aborted || tx.stale)) {
       __chainStat.aborts++; __chainStat.lastAt = clockWall();
-      markPending(c, tx.stale ? 'stale' : 'aborted');
+      markPending(c, tx.stale ? 'stale' : 'aborted', c.abortWhy || (tx.stale ? 'stale' : 'aborted'));
       // 真因优先：`tx.aborted` 只说「store 没提交」，说不清是**谁**让它没提交的。
       const aur = c.abortWhy || (tx.stale ? 'stale' : 'aborted');
       if (!c.abortWhy && !tx.stale) chainFault('aborted');
@@ -684,6 +801,7 @@
       aborted: __stat.aborted, failed: __stat.failed, saveFailed: __stat.saveFailed,
       deferred: __stat.deferred, deferOk: __stat.deferOk, deferRej: __stat.deferRej,
       effectsRetried: __stat.effectsRetried, effectsFailed: __stat.effectsFailed,
+      resumeRows: __stat.resumeRows,
       live: Object.keys(__live).length, receipts: readReceipts().length, cap: LIMITS.RECEIPTS,
       lastReason: __stat.lastReason, lastAt: __stat.lastAt, lastOpId: __stat.lastOpId,
       faults: Object.assign({}, __stat.faults)
@@ -713,7 +831,12 @@
     //   defer 是世界提交后可补做的通知面，effect 是世界装成的前提。混成一栏的那一刻起，
     //   「装成了」与「能跑」就会共用一张读数表。
     effect: effect,
-    pending: pendingEffects
+    pending: pendingEffects,
+    // v2.212.0(优化 Q3):中断与跨层恢复 —— 读 / 判定 / 身份三面。不给恢复动作:
+    //   机制开关是全局的,自动回放等于把一个聊天的配置写到所有聊天上。
+    scanInterrupted: scanInterrupted,
+    resumeStat: resumeStat,
+    resumeIdentity: identityOf
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('core/commit.js', { kind: 'core', ver: '2.195.0' });
 })();

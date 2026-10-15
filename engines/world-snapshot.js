@@ -109,6 +109,160 @@
     const keys = Object.keys(f).sort();
     return sig(keys.map(function (k) { return k + '=' + sig(JSON.stringify(f[k])); }).join('|'));
   }
+  // ── 身份引用同步(v2.211.0 优化 Q2)───────────────────────────────
+  /**
+   * 重命名冲突键时**按实体类型同步**的引用点表(计划原文:建立身份映射,同步内部 ID
+   *   与已知跨模块引用;不做全局字符串替换)。
+   *
+   * 为什么必须有这张表:旧实现遇到冲突键只改对象键 —— `cur[k + '·' + sig] = inc[k]`。
+   *   而本仓的取值口径是 `life.personId(name) = 'p_' + name`、`people` 的**键就是 id**。
+   *   于是改名后的新对象在**任何按身份查人的地方都查不到**:真实 store 合成宿主探针
+   *   实测导入返回 ok:true,而 `p_A·incoming` 内 `id` 仍为 `p_A`、导入事实的 `person`
+   *   也仍为 `p_A` —— 新对象是死数据,旧身份继续被引用(同名异人就此串档)。
+   *
+   * 域(`domain`)三态,决定用哪一份映射:
+   *   · `id`   —— people 的键与记录 `id`(规范身份,`p_` 前缀域)
+   *   · `name` —— 人名域引用(本仓多数跨面引用按人名比对,如 fondness/bonds/inst)
+   *   · `pair` —— 两人配对键 `A×B`(按字典序定序,A×B 与 B×A 同行)
+   *
+   * 边界:只改**这里声明的位置**。同名的人与地/物不会互相串 —— 全局替换正是本项要治的病。
+   *   规则表**不收**未在 FACES 内的面(affect/masks/act 等不进快照,没有搬运问题)。
+   */
+  const IDENTITY_REFS = [
+    { face: 'people', at: 'self', field: 'id', domain: 'id' },
+    { face: 'people', at: 'self', field: 'name', domain: 'name' },
+    { face: 'people', at: 'profile.relations', field: 'target', domain: 'name' },
+    { face: 'people', at: 'profile.relationships', field: 'target', domain: 'name' },
+    { face: 'people', at: 'life.commitments', field: 'target', domain: 'name' },
+    { face: 'fondness', at: 'rows', field: 'person', domain: 'name' },
+    // 配对键与它拆出来的两个人名必须**同批**处理:`bonds.pairKey()` 会把两人按字典序
+    //   重排后拼键 ⇒ 只改 `key` 不改 `a`/`b`(或反之)会让三者指向两种顺序,
+    //   下一次 `pairKey()` 算出来就与本行对不上(实测:key 已是「小满×阿澈·sig」,
+    //   而 a/b 仍是「阿澈·sig / 小满」—— 同一行内部自相矛盾)。
+    { face: 'bonds', at: 'rows', fields: ['key', 'a', 'b'], domain: 'pair' },
+    { face: 'inst', at: 'orgs[].posts', field: 'holder', domain: 'name' }
+  ];
+  /** 真 UTF-8 字节数。与 `String.length`(UTF-16 code unit)**分开报** —— 中文世界两者差三倍,
+   *   把 code unit 当字节报是旧口径的病(容量预检因此系统性低估)。 */
+  function utf8Len(s) {
+    const t = String(s == null ? '' : s);
+    let n = 0;
+    for (let i = 0; i < t.length; i++) {
+      const c = t.charCodeAt(i);
+      if (c < 0x80) n += 1;
+      else if (c < 0x800) n += 2;
+      else if (c >= 0xd800 && c <= 0xdbff) { n += 4; i++; }
+      else n += 3;
+    }
+    return n;
+  }
+  /** 按 `at` 路径取出承载引用的**对象记录**列表(只认对象,不猜其它形态)。 */
+  function atRecords(faceVal, at) {
+    if (at === 'self') {
+      if (!isObj(faceVal)) return [];
+      return Object.keys(faceVal).map(function (k) { return faceVal[k]; }).filter(isObj);
+    }
+    const segs = String(at).split('.');
+    const step = function (v, i) {
+      if (i >= segs.length) {
+        if (Array.isArray(v)) return v.filter(isObj);
+        return isObj(v) ? [v] : [];
+      }
+      const seg = segs[i], arr = seg.indexOf('[]') >= 0;
+      const nm = arr ? seg.slice(0, -2) : seg;
+      const cur = nm ? (isObj(v) ? v[nm] : undefined) : v;
+      if (arr) {
+        if (!Array.isArray(cur)) return [];
+        return cur.reduce(function (a, x) { return a.concat(step(x, i + 1)); }, []);
+      }
+      return step(cur, i + 1);
+    };
+    return step(faceVal, 0);
+  }
+  /**
+   * 构造重命名计划。**纯读、确定性** —— 同一输入连调两次逐字相同,
+   *   预览与执行因此**共用同一份转换计划**(计划原文:预览与执行使用同一份转换计划)。
+   * @returns {ok, sigTag, rows, idMap, nameMap, conflicts, unsupported}
+   */
+  function buildRenamePlan(snap, opt) {
+    const o = opt || {};
+    const sigTag = clean((snap && snap.sig) || 'snap', 24);
+    const people = (snap && isObj(snap.faces) && isObj(snap.faces.people)) ? snap.faces.people : {};
+    const curPeople = isObj(state().people) ? state().people : {};
+    const rows = [], idMap = {}, nameMap = {}, unsupported = [];
+    Object.keys(people).forEach(function (k) {
+      if (!Object.prototype.hasOwnProperty.call(curPeople, k)) return;   // 不冲突 ⇒ 原样并进
+      const rec = people[k];
+      const oldId = String(k);
+      const oldName = (isObj(rec) && rec.name) ? String(rec.name) : oldId.replace(/^p_/, '');
+      if (!isObj(rec)) { unsupported.push({ key: oldId, why: 'not-an-object' }); return; }
+      if (rec.id !== undefined && String(rec.id) !== oldId) {
+        // 记录 id 与自己的键不一致:这不是「能不能改名」,是这份数据自相矛盾。
+        //   照现状改名会把这个矛盾**搬进新世界** —— 如实拒收,不硬塞(计划原文:拒收或另存新槽)。
+        unsupported.push({ key: oldId, why: 'id-key-mismatch', id: String(rec.id) });
+        return;
+      }
+      rows.push({ oldKey: oldId, newKey: oldId + '·' + sigTag, oldId: oldId, newId: oldId + '·' + sigTag,
+        oldName: oldName, newName: oldName + '·' + sigTag });
+      idMap[oldId] = oldId + '·' + sigTag;
+      nameMap[oldName] = oldName + '·' + sigTag;
+    });
+    return { ok: unsupported.length === 0, sigTag: sigTag, rows: rows, idMap: idMap, nameMap: nameMap,
+      conflicts: rows.length, unsupported: unsupported, refs: IDENTITY_REFS.slice() };
+  }
+  /**
+   * 把计划落到**内存副本**上:**只同步引用**(记录内 id/name + 规则表内逐点)。
+   *   **不动面键** —— 面键的改名由合并分支的 rename 处置负责(它已经会给冲突键
+   *   加 `·sig` 后缀)。两处都改就会**双重改名**(实测:`p_A·sig·sig`),
+   *   第三个谁都不认得的身份凭空出现,而这一条其实一次都没真正装进去。
+   * @returns {faces, applied, renamed}
+   */
+  function applyRenamePlan(faces, plan) {
+    const out = deep(faces) || {};
+    const applied = [], renamed = [];
+    if (!plan || !Array.isArray(plan.rows) || !plan.rows.length) return { faces: out, applied: applied, renamed: renamed };
+    plan.rows.forEach(function (r) { renamed.push({ key: r.oldKey, as: r.newKey }); });
+    IDENTITY_REFS.forEach(function (rule) {
+      const faceVal = out[rule.face];
+      if (faceVal === undefined) return;
+      let n = 0;
+      const froms = [];
+      // `fields` 数组形态(如 bonds 的 key/a/b):**整行一起重算**,不逐字段独立改写 ——
+      //   否则同一行里 key 与 a/b 会各按各的顺序落,行内自相矛盾。
+      const cols = Array.isArray(rule.fields) ? rule.fields : [rule.field];
+      atRecords(faceVal, rule.at).forEach(function (rec) {
+        if (rule.domain === 'pair') {
+          const kf = (cols.indexOf('key') >= 0) ? 'key' : cols[0];
+          const kv = rec[kf];
+          if (typeof kv !== 'string') return;
+          const parts = kv.split('×');
+          if (parts.length !== 2) return;
+          const a0 = plan.nameMap[parts[0]] || parts[0], b0 = plan.nameMap[parts[1]] || parts[1];
+          const pair = [a0, b0].sort();
+          if (rec[kf] === pair.join('×')) return;
+          froms.push(kv);
+          rec[kf] = pair.join('×');
+          if (cols.indexOf('a') >= 0) rec.a = pair[0];
+          if (cols.indexOf('b') >= 0) rec.b = pair[1];
+          n++;
+          return;
+        }
+        cols.forEach(function (f) {
+          const v = rec[f];
+          if (typeof v !== 'string') return;
+          let nv = null;
+          if (rule.domain === 'id') nv = plan.idMap[v] || null;
+          else if (rule.domain === 'name') nv = plan.nameMap[v] || null;
+          if (nv === null || nv === v) return;
+          rec[f] = nv; n++;
+          if (froms.indexOf(v) < 0) froms.push(v);
+        });
+      });
+      if (n) applied.push({ face: rule.face, at: rule.at,
+        field: Array.isArray(rule.fields) ? rule.fields.join('+') : rule.field, n: n, froms: froms.slice(0, 6) });
+    });
+    return { faces: out, applied: applied, renamed: renamed };
+  }
 
   // ── 剔除：秘密 / 宿主态 / 脏字段 ──────────────────────────────────
   /** 逐层剔除脏字段（与 tool-snapshot 的 `sanitize` 同口径，但**多收一份账**）。 */
@@ -279,6 +433,14 @@
     const mode = (o.mode === 'newslot') ? 'newslot' : 'merge';
     const overwrite = o.overwrite === true;
     const rename = (o.onConflict === 'rename');
+    // v2.211.0(优化 Q2):改名计划在预览里算一次 —— 与导入侧 buildRenamePlan **同一份**算法。
+    const renamePlan = (rename && mode === 'merge') ? buildRenamePlan(snap, o) : null;
+    if (renamePlan && !renamePlan.ok) {
+      return { ok: false, reason: 'rename-unsupported', blocked: true, detail: renamePlan.unsupported,
+        hint: '这些条目的 id 与自身键不一致:改名会把这份矛盾搬进新世界。请修正导出源,或改用 overwrite / skip。',
+        willAdd: [], willOverwrite: [], willSkip: [], willRename: [] };
+    }
+    const refSync = renamePlan ? applyRenamePlan(snap.faces, renamePlan).applied : [];
     const add = [], over = [], skip = [], ren = [];
     const confMap = {};
     (cc.diff.conflicts || []).forEach(function (c) { confMap[c.face] = c; });
@@ -294,7 +456,14 @@
           : { face: face, n: c.n });
         return;
       }
-      if (rename) { ren.push({ face: face, as: face + '·' + (snap.sig || 'snap'), n: c.n }); return; }
+      if (rename) {
+        // v2.211.0(优化 Q2):改名的读数**按实算的计划报** —— 「键改了、引用没跟上」正是
+        //   本项要治的病,故同屏给出「几条要改名 · 几处引用会跟着改」并附引用面明细。
+        ren.push({ face: face, as: face + '·' + (snap.sig || 'snap'), n: c.n,
+          refs: refSync.filter(function (x) { return x.face === face; }),
+          refsTotal: refSync.reduce(function (a, x) { return a + x.n; }, 0) });
+        return;
+      }
       if (c.array) {
         // v2.205.0（优化 1）：数组面的默认支**不是「跳过」**，而是「并进不重复的条目」
         //   （按 JSON 逐字去重）。旧预览一律报「将要跳过（冲突保留）」，与真结果
@@ -318,8 +487,12 @@
     const cap = capacity(snap);
     return { ok: true, mode: mode, overwrite: overwrite, onConflict: rename ? 'rename' : 'skip',
       willAdd: add, willOverwrite: over, willSkip: skip, willRename: ren,
+      // v2.211.0(优化 Q2):引用同步**预览同屏** —— 与导入侧同一份计划/同一套引用面。
+      renamePlan: renamePlan ? { conflicts: renamePlan.conflicts, sigTag: renamePlan.sigTag, rows: renamePlan.rows } : null,
+      refSync: refSync,
+      refsTotal: refSync.reduce(function (a, x) { return a + x.n; }, 0),
       unknownFaces: cc.diff.unknownFaces.slice(), bytes: cap.bytes, budget: cap.budget,
-      capacityOk: cap.ok, capacityReason: cap.reason || '',
+      capacityOk: cap.ok, capacityReason: cap.reason || '', capacityUnit: cap.seen && cap.seen.unit,
       sig: snap.sig || sigOf(snap.faces), counts: countsOf(snap.faces) };
   }
   function faceSize(v) { return Array.isArray(v) ? v.length : (isObj(v) ? Object.keys(v).length : 0); }
@@ -335,7 +508,21 @@
     const declared = (snap && snap.bytes !== undefined && snap.bytes !== null
       && isFinite(Number(snap.bytes))) ? Number(snap.bytes) : null;
     const bytes = (declared === null) ? actual : Math.max(actual, declared);
-    const seen = { declared: declared, actual: actual,
+    // v2.211.0(优化 Q2):容量口径**三档分开报**(计划原文:区分字符、UTF-8 与宿主估计)。
+    //   旧口径只给 `JSON.stringify(...).length` 一个数,连单位都没写 —— 那是 UTF-16
+    //   code unit 数,不是字符数也不是字节数;中文世界里同一份内容三者能差三倍,
+    //   玩家按「字节」理解它必然误判余量。此处把三个数摆在一起,哪个超标一目了然。
+    const text = snap ? JSON.stringify(snap) : '';
+    const unit = {
+      codeUnits: actual,                 // String.length(旧口径,保留以免读数断裂)
+      chars: Array.from(text).length,    // 真字符数(按码点计,emoji/罕用字不再算两个)
+      utf8Bytes: utf8Len(text),          // 真 UTF-8 字节数(落盘/传输的实际体积)
+      // 宿主估计:**localStorage 配额按 UTF-16 code unit × 2 字节计费**(主流浏览器同一口径)。
+      //   它与 codeUnits 只差一个 2 倍,却正是「玩家看余量」时比的那个数 —— 不给它,
+      //   消费侧就得自己乘 2,迟早有人乘漏(与「一件事一个读口」同规)。
+      hostEstimate: actual * 2
+    };
+    const seen = { declared: declared, actual: actual, unit: unit,
       mismatch: (declared !== null && declared !== actual) };
     if (bytes > MAX_BYTES) {
       note('budget-exceeded');
@@ -436,13 +623,79 @@
     if (!WA.store || typeof WA.store.transact !== 'function') { note('store-unavailable'); return { ok: false, reason: 'store-unavailable' }; }
     const overwrite = o.overwrite === true;
     const rename = (o.onConflict === 'rename');
-    // 逐面合并的结果账（**部分成功是真结论**：谎报「全装上了」会让用户以为某面搬过来了）
+    // v2.211.0(优化 Q2):**改名不是「只换个键」**。本仓 `people` 的键就是身份
+    //   (`life.personId(name) = 'p_' + name`),而跨面引用按人名/id 落点比对 —— 只换键
+    //   会让新对象在任何按身份查人的地方都查不到(死数据 + 旧身份继续被引用 = 串档)。
+    //   故:先按身份映射算出**计划**(纯读、确定性),再按同一份计划执行 —— 预览与执行同源。
+    const plan = rename ? buildRenamePlan(snap, o) : null;
+    const refSync = [];
+    let facesIn = snap.faces;
+    if (rename && plan) {
+      if (!plan.ok) {
+        // 数据自相矛盾(id 与自身键不一致):**不半改** —— 如实拒收,原档不动。
+        note('rename-unsupported');
+        return { ok: false, reason: 'rename-unsupported', detail: plan.unsupported,
+          hint: '这些条目的 id 与自身键不一致:改名会把这份矛盾搬进新世界。请修正导出源,或改用 overwrite / skip。' };
+      }
+      const at = applyRenamePlan(snap.faces, plan);
+      facesIn = at.faces;
+      at.applied.forEach(function (x) { refSync.push(x); });
+    }
+    // 逐面合并的结果账(**部分成功是真结论**:谎报「全装上了」会让用户以为某面搬过来了)
     const added = [], overwritten = [], skipped = [], renamed = [];
+    const sigTag = plan ? plan.sigTag : clean((snap.sig || 'snap'), 24);
+    /** 数组面:按 JSON 逐字去重后追加(预览与导入同一套算法)。 */
+    const appendUniq = function (cur, inc) {
+      const seen = {};
+      cur.forEach(function (x) { seen[sig(JSON.stringify(x))] = true; });
+      let n = 0, dup = 0;
+      inc.forEach(function (x) {
+        const h = sig(JSON.stringify(x));
+        if (seen[h]) { dup++; return; }
+        seen[h] = true; cur.push(x); n++;
+      });
+      return { n: n, dup: dup };
+    };
+    /**
+     * 改名模式的**递归合并**(v2.211.0 优化 Q2)。旧实现把冲突键整棵子树搬到
+     *   `键·sig` 下 —— 对 `people` 这种「键即身份」的面是对的,对 `fondness`
+     *   这种「面里套子结构」的面就是灾难:整个 `rows` 卷被复制成 `rows·sig`,
+     *   本地那份与新来的那份**各自独立**,引用还对不上(探针实测)。
+     *   现口径:身份键(仅 people 顶层)加后缀;嵌套对象**下潜**;数组**去重追加**;
+     *   其余标量冲突如实保留并记账。
+     */
+    const mergeRename = function (cur, inc, face, path) {
+      Object.keys(inc).forEach(function (k) {
+        const at = path ? path + '.' + k : k;
+        if (!Object.prototype.hasOwnProperty.call(cur, k)) { cur[k] = inc[k]; return; }
+        const cv = cur[k], iv = inc[k];
+        if (face === 'people' && !path) {
+          const as = k + '·' + sigTag;
+          if (Object.prototype.hasOwnProperty.call(cur, as)) {
+            skipped.push({ face: face, key: k, as: as, why: 'rename-collision' });
+            return;
+          }
+          cur[as] = iv;
+          renamed.push({ face: face, key: k, as: as });
+          return;
+        }
+        if (isObj(cv) && isObj(iv)) { mergeRename(cv, iv, face, at); return; }
+        if (Array.isArray(cv) && Array.isArray(iv)) {
+          const r = appendUniq(cv, iv);
+          if (r.n) added.push({ face: face, at: at, n: r.n, note: '并进不重复的条目' });
+          if (r.dup) skipped.push({ face: face, at: at, n: r.dup, why: 'conflict-kept' });
+          return;
+        }
+        if (cv == null && iv) { cur[k] = iv; return; }   // 本地是空位(未设字段)⇒ 并进,不是冲突
+        skipped.push({ face: face, key: at, why: 'conflict-kept' });
+      });
+    };
     const tx = WA.store.transact(function (draft) {
-      Object.keys(snap.faces).forEach(function (face) {
-        const inc = deep(snap.faces[face]);
+      Object.keys(facesIn).forEach(function (face) {
+        const inc = deep(facesIn[face]);
         if (!Object.prototype.hasOwnProperty.call(draft, face)) { skipped.push({ face: face, why: 'unknown-face' }); return; }
         const cur = draft[face];
+        if (rename && isObj(inc) && isObj(cur)) { mergeRename(cur, inc, face, ''); return; }
         if (isObj(inc) && isObj(cur)) {
           const dup = Object.keys(inc).filter(function (k) { return Object.prototype.hasOwnProperty.call(cur, k); });
           if (!dup.length) {
@@ -456,9 +709,18 @@
           if (rename) {
             Object.keys(inc).forEach(function (k) {
               if (!Object.prototype.hasOwnProperty.call(cur, k)) { cur[k] = inc[k]; return; }
-              cur[k + '·' + (snap.sig || 'snap')] = inc[k];
+              const as = k + '·' + (snap.sig || 'snap');
+              if (Object.prototype.hasOwnProperty.call(cur, as)) {
+                // v2.211.0(优化 Q2):**二次撞名** —— 本地早有一份带同标记的副本。
+                //   旧实现继续叠后缀(`k·sig·sig`),造出第三个谁都不认得的身份,
+                //   而这一条其实**没装进去**。如实记一条,本地原样不动。
+                skipped.push({ face: face, key: k, as: as, why: 'rename-collision' });
+                return;
+              }
+              cur[as] = inc[k];
             });
-            renamed.push({ face: face, n: dup.length }); return;
+            renamed.push({ face: face, n: dup.length });
+            return;
           }
           // 默认支：**只并进不冲突的那些键**，冲突键原地不动（逐项报）
           let n = 0;
@@ -519,9 +781,12 @@
     _stat.lastReason = (overwritten.length || renamed.length) ? 'partial' : 'imported';
     return { ok: true, mode: 'merge', added: added, overwritten: overwritten,
       skipped: skipped, renamed: renamed,
+      // v2.211.0(优化 Q2):改名进世界时,「同步了哪些身份引用」必须同屏 ——
+      //   这正是本项治的病(旧实现只报「改了多少条」,引用跟没跟上无从得知)。
+      refSync: refSync, refsTotal: refSync.reduce(function (a, x) { return a + x.n; }, 0),
       partial: skipped.length > 0 || overwritten.length > 0,
       sig: snap.sig, counts: countsOf(snap.faces), nested: !!(tx && tx.deferred === true),
-      note: '默认不覆盖：冲突键按 onConflict 处置（默认 skip）。写路径唯一：store.transact。' };
+      note: '默认不覆盖:冲突键按 onConflict 处置(默认 skip)。写路径唯一:store.transact。' };
   }
   /** 导出→导入往返的**同源对照**：关键面哈希（验收 ①）。 */
   function roundTrip(snapIn, facesIn) {
@@ -598,6 +863,9 @@
     const live = FACES.filter(function (k) { return Object.prototype.hasOwnProperty.call(s, k); });
     return { ok: true, facesDeclared: FACES.length, facesLive: live.length,
       facesMissing: FACES.filter(function (k) { return live.indexOf(k) < 0; }),
+      // v2.211.0(优化 Q2):诊断面报出**身份引用同步面** —— 改名时哪些位置会跟着改,
+      //   维护者一眼可查(不是读源码才知道)。这也是该表的真消费方。
+      identityRefs: IDENTITY_REFS.map(function (r) { return r.face + '.' + r.at + '.' + r.field + '(' + r.domain + ')'; }),
       secretsDeclared: SECRETS.slice(), hostStateDeclared: HOST_STATE.slice(),
       storeAvailable: !!(WA.store && typeof WA.store.transact === 'function'),
       blueprintAvailable: !!(WA.worldBlueprint && typeof WA.worldBlueprint.exportBlueprint === 'function'),
@@ -615,6 +883,7 @@
     FACES: FACES.slice(),
     SECRETS: SECRETS.slice(),
     HOST_STATE: HOST_STATE.slice(),
+    IDENTITY_REFS: IDENTITY_REFS.map(function (r) { return { face: r.face, at: r.at, field: r.field, domain: r.domain }; }),
     catalog: catalog,
     exportSnapshot: exportSnapshot, toJSON: toJSON, parse: parse,
     checkCompat: checkCompat, previewImport: previewImport, importSnapshot: importSnapshot,
@@ -623,5 +892,9 @@
     library: library, libTake: libTake, libDrop: libDrop,
     diagnose: diagnose, stat: statOf, reset: reset
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-snapshot.js', { kind: 'engine', ver: '2.205.0' });
+  // v2.211.0(优化 Q2):`buildRenamePlan` / `applyRenamePlan` / `utf8Len` **刻意不导出** ——
+  //   它们是改名链的内部件,外部消费面是 `previewImport` / `importSnapshot` 的返回
+  //   (`renamePlan` / `refSync` / `capacityUnit`)。三件事各有**一个**读口,
+  //   导出内部件只会让「预览读数」与「执行读数」有第二个可漂移的来源。
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-snapshot.js', { kind: 'engine', ver: '2.211.0' });
 })();

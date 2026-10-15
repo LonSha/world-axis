@@ -434,6 +434,47 @@ function runWitness(WA) {
           return last;
         });
       }
+      // ── v2.212.0(优化 Q3):中断台账的自有失败面 ──
+      //   两条都是**本版新增的公开归因**:`persistResume` 是新增的落盘写口,
+      //   消费方(resumeStat / stat 的 faults 面)会真读它。不给见证就等于让门禁替我们说
+      //   「这两个码没人能跑到」—— 而「写失败如实降级、不假装记上了」正是这一段的设计纪律,
+      //   它必须能被跑出来才算数(与 U2 批次5 的 bad-effect / chain-effects-full 同规格)。
+      //   打桩方式:临时替换 `WA.store.transact`(链自身那次走真实现,台账那次走桩),
+      //   跑完**无条件还原** —— 宿主态跨 section 共享。
+      if (typeof CMw.resumeStat === 'function') {
+        want('resume-write-threw', 'Q3:中断落盘时 store.transact **抛错** ⇒ 吞成 resume-write-threw'
+          + ' 并如实降级(不假装台账记上了,也不让异常穿出去把链的调用方搞挂)');
+        trip('resume-write-threw', function () {
+          const keep = WA.store.transact;
+          let n = 0;
+          WA.store.transact = function () {
+            n++;
+            if (n >= 2) throw new Error('witness resume transact threw');
+            return keep.apply(WA.store, arguments);
+          };
+          try {
+            CMw.chain({ opId: 'witness:rw-threw', site: 'witness:rw-threw',
+              fn: function (c, d) { d.__witnessRw = 1; CMw.step(null, { site: 'witness:rw-threw:1' }); return false; } });
+            return Object.keys(CMw.resumeStat().faults);
+          } finally { WA.store.transact = keep; }
+        });
+        want('resume-write-failed', 'Q3:中断落盘时 store.transact 返回**未提交**(ok!==true)⇒ resume-write-failed'
+          + ' —— 「事务没成」与「事务成了」在读数上必须分得开');
+        trip('resume-write-failed', function () {
+          const keep = WA.store.transact;
+          let n = 0;
+          WA.store.transact = function () {
+            n++;
+            if (n >= 2) return { ok: false };
+            return keep.apply(WA.store, arguments);
+          };
+          try {
+            CMw.chain({ opId: 'witness:rw-failed', site: 'witness:rw-failed',
+              fn: function (c, d) { d.__witnessRw2 = 1; CMw.step(null, { site: 'witness:rw-failed:1' }); return false; } });
+            return Object.keys(CMw.resumeStat().faults);
+          } finally { WA.store.transact = keep; }
+        });
+      }
     }
   }
   function trip(code, fn) {
@@ -459,6 +500,62 @@ function runWitness(WA) {
       return false;
     } catch (e) { return false; }
   }
+  /**
+   * 异步见证:入口有两个口是 async 返回的(`WA.loadRetry` 是 async IIFE)。
+   *   为什么不用 DEFERRED 绕过去:那会把「跑不出来」记成「已接受延后」,
+   *   与「行为被改坏了」长得一模一样 —— 正是 coverage 模块要治的形态。
+   *   这里用**同步推进 microtask** 的手法。它不是「假装跑过了」,前提有二,且都已立据:
+   *     ① 被测的早退分支**同步执行到底**(函数体里没有 await),返回时 Promise 已 settled;
+   *     ② 同一手法对**真异步**(setTimeout 链)必须**拿不到**结果(见下方 asyncPumpProof)。
+   *   ②是这条手法的自证:没有它,「死等几轮」会把任何异步结果都算成「已跑出来」,
+   *   上面那几条见证就成了恒真的。推进不动 ⇒ 见证失败(missing),门禁红灯,不静默不延后。
+   *   影响面如实登记:它会顺带跑掉**当前 tick 里已入队**的其他微任务。由于只在「已 settled
+   *   的 Promise」上调用(一次 `_tickCallback` 即到),实际效果是「把已入队的回调整理一遍」,
+   *   不制造新的异步分支;消费方是门禁进程,不是产品运行时。
+   */
+  function tripAsync(code, fn) {
+    let got = null, settled = false;
+    try {
+      const p = fn();
+      if (!p || typeof p.then !== 'function') return false;
+      p.then(function (r) { got = r; settled = true; }, function () { settled = true; });
+    } catch (e) { return false; }
+    for (let i = 0; i < 8 && !settled; i++) {
+      if (typeof process !== 'undefined' && typeof process._tickCallback === 'function') {
+        try { process._tickCallback(); } catch (e) { break; }
+      } else break;
+    }
+    if (!settled) return false;
+    const arr = Array.isArray(got) ? got : [got];
+    if (arr.indexOf(code) >= 0) { seen[code] = true; return true; }
+    return false;
+  }
+  /**
+   * 上面那手法的**两向自证**读数(由 Q1 专锁断言,不进码面 —— 往 expect 里塞非码键会污染码面):
+   *   settled   —— 对已 settled 的 Promise 必须拿到值(手法有效);
+   *   realAsync —— 对 setTimeout 链必须**拿不到**(手法不是恒真);
+   *   noPump    —— **不泵动**时,同一个已 settled 的 Promise 也必须拿不到
+   *                (证明「拿到值」确实来自泵动,而不是 then 恰好同步跑了)。
+   */
+  const asyncPumpProof = (function () {
+    function pump(p, doPump) {
+      let got = null, done = false;
+      p.then(function (r) { got = r; done = true; });
+      if (doPump) {
+        for (let i = 0; i < 8 && !done; i++) {
+          if (typeof process !== 'undefined' && typeof process._tickCallback === 'function') {
+            try { process._tickCallback(); } catch (e) { break; }
+          } else break;
+        }
+      }
+      return done ? got : null;
+    }
+    return {
+      settled: pump(Promise.resolve('sync-settled'), true) === 'sync-settled',
+      realAsync: pump(new Promise(function (res) { setTimeout(function () { res('real-async'); }, 5); }), true) === null,
+      noPump: pump(Promise.resolve('sync-settled'), false) === null
+    };
+  })();
   if (WA.store && WA.store.init) WA.store.init();
   WA.store.transact(function (d) {
     d.__zz = { n: 7, t: 'txt' };
@@ -845,6 +942,26 @@ function runWitness(WA) {
           w.setItem = function () { throw new Error('见证：库写失败'); };
           return S5.importSnapshot(snapText, { mode: 'newslot' }).reason;
         } finally { w.setItem = keep; }
+      });
+      // 7 `rename-unsupported`(v2.211.0 优化 Q2):快照里某条人物记录的 `id` 与**自身键**
+      //   不一致 ⇒ 勾「改名装进来」时**如实拒收**,不把这份自相矛盾搬进新世界。
+      //   为什么可达、且必须留见证:本仓 `people` 的键就是身份(`personId = 'p_' + name`),
+      //   改名 = 改键 + 同步 id/name + 同步跨面引用;若源记录的 id 与键本身就矛盾,
+      //   改名只会把矛盾一起搬过去 —— 计划原文正是「未知/不安全的结构拒收或另存新槽」。
+      //   见证前提:本地须有一个**同名**的人(否则不冲突、不进重命名计划)。
+      want('rename-unsupported', 'Q2:人物记录 id 与自身键不一致 ⇒ 改名导入如实拒收(不搬矛盾进新世界)');
+      trip('rename-unsupported', function () {
+        const nm = '__w2211_甲';
+        WA.store.transact(function (d) {
+          d.people = d.people || {};
+          d.people['p_' + nm] = { id: 'p_' + nm, name: nm, knowledge: {} };
+        }, 'reject-witness:v2211-rename-seed');
+        const badRename = {
+          wsVer: 1, schemaVersion: 1, sig: 'w2211', bytes: 10,
+          faces: { people: {} }
+        };
+        badRename.faces.people['p_' + nm] = { id: 'p_别的', name: nm, knowledge: {} };
+        return S5.importSnapshot(badRename, { onConflict: 'rename' }).reason;
       });
     }
   }
@@ -5362,12 +5479,106 @@ function runWitness(WA) {
   // v2.203.0 收口：还原见证期间被打开的四个拍引擎（见函数头的收卷契约）。
   //   放在 return 之前、**不带条件** —— 中途抛错时调用方的 try/catch 仍会走到这里之外，
   //   故本还原只保证正常路径；异常路径由调用方（coverage / gate）自持宿主副本兜底。
+  // ── v2.211.0(优化 Q1):入口侧四个码(index.js)──
+  //   为什么这四个码必须**带可执行见证**而不是进死表:它们都由外部条件触发,不是结构上不可达 ——
+  //   「扩展目录被部分同步 / 被杀毒清理掉一两个文件」触发 load-integrity,
+  //   「用户点了重试、而那个模块其实没失败过」触发 not-failed,都是现网会发生的局面。
+  //   死表是「已证不可达」的归宿,把它们塞进去是不实陈述。
+  //
+  //   【为什么不 require index.js】它是 IIFE,末尾 `whenReady(init)` 会真的去跑装载与 UI 挂载:
+  //   在门禁进程里 require 它等于启动一整套运行时,并污染其他用例共用的 WA 面。
+  //   本仓已有先例:tests/run.js 就是从**源码切片**里取出 loadScript 段、在独立沙箱里重编译。
+  //   这里同一手法:四个口各自切出真源码,在一个最小上下文里重编译。
+  //   这不是「第二份实现」—— 切出来的就是产品源码本身;锚点不在即抛,门禁随之点名(不静默)。
+  {
+    const IdxFace = (function () {
+      const _fs = require('fs'), _path = require('path'), _vm = require('vm');
+      const raw = _fs.readFileSync(_path.join(__dirname, '..', 'index.js'), 'utf8');
+      function cut(fromMark, toMark) {
+        const i = raw.indexOf(fromMark);
+        if (i < 0) throw new Error('index.js 切片起点不在: ' + fromMark.slice(0, 40));
+        const j = raw.indexOf(toMark, i);
+        if (j < 0) throw new Error('index.js 切片终点不在: ' + toMark.slice(0, 40));
+        return raw.slice(i, j);
+      }
+      const bid = (/const BUILD_ID = '([0-9a-f]{40})';/.exec(raw) || [])[1];
+      if (!bid) throw new Error('index.js 里取不到 BUILD_ID 声明(同版加载的真源不见了)');
+      const G = {};
+      G.window = G; G.global = G; G.console = console;
+      G.localStorage = (WA.mainWin && WA.mainWin.localStorage) || global.localStorage || {};
+      const ctx = _vm.createContext(G);
+      const w = G.window.WorldAxis = {};
+      // 切片里的 `WA` / `BUILD_ID` / `VERSION` 都是**模块作用域**绑定,故必须同名给足:
+      //   少一个就是 ReferenceError,而不是「见证跑不出来」(两者的差别对读的人很重要)。
+      G.WA = w; G.BUILD_ID = bid; G.VERSION = 'witness';
+      w.BUILD_ID = bid; w.VERSION = 'witness';
+      w.log = function () {};
+      // 见证只走早退分支;真走到装载时**如实抛** —— 那说明「见证的假设不成立」,该现形而不是静默。
+      w.loadScript = function () { throw new Error('witness: loadScript 不该被调到'); };
+      _vm.runInContext(cut('  WA.loaderStatus = function () {', '\n  // ── v2.211.0(优化 Q1)· 启动完整性'),
+        ctx, { filename: 'index.js#loaderStatus' });
+      _vm.runInContext(cut('  WA.loaderIntegrity = function () {', '  /** 写侧闸门转出'),
+        ctx, { filename: 'index.js#loaderIntegrity' });
+      _vm.runInContext(cut('  WA.writeGate = function () {', '  /**\n   * 恢复入口'),
+        ctx, { filename: 'index.js#writeGate' });
+      _vm.runInContext(cut('  WA.loadRetry = function (rel) {', '\n  // ── 主初始化 ───'),
+        ctx, { filename: 'index.js#loadRetry' });
+      return { WA: w, ctx: ctx };
+    })();
+    /** 造一个「装载面状态在场、失败表为空」的状态。
+     *  ⚠ Map 必须是**该上下文自己的**:`instanceof Map` 跨 realm 失效,外层 new Map() 会让
+     *    `state.failed instanceof Map` 判假 ⇒ 落到 no-loader-state,这两个码就永远见证不到
+     *    (首轮实测即如此,而那与真源码的行为无关)。 */
+    function mkState() {
+      return require('vm').runInContext(
+        '({ failed: new Map(), loaded: new Map(), failedCdnAt: new Map() })', IdxFace.ctx);
+    }
+    want('load-integrity', 'Q1:入口侧完整性判定**自身异常** ⇒ 收紧为拒写(与 store 内部的 fail-open 取向相反:'
+      + '判定面已经不可信时还放行写,等于默默把闸门关掉)');
+    trip('load-integrity', function () {
+      const keep = IdxFace.WA.store;
+      try {
+        IdxFace.WA.store = { writeGate: function () { throw new Error('store face hostile'); } };
+        return [IdxFace.WA.writeGate().reason];
+      } finally { IdxFace.WA.store = keep; }
+    });
+    // 下面三条都在 async 接口上(loadRetry 是 async IIFE)⇒ 必须走 tripAsync。
+    //   同步还原状态的写法是**有意的**:它顺带立一条隐性判据 —— 这三个早退分支都在函数体的
+    //   同步段里判完(调用返回时结果已定)。若哪天有人把判定改成「先 await 再判」,这里就拿不到
+    //   结果 ⇒ 见证 missing ⇒ 红灯。那个契约变化应当被看见,而不是被一句「反正是异步的」糊过去。
+    want('no-loader-state', 'Q1:loadRetry 在装载面状态**整体缺席**时如实拒收(不假装重试过)');
+    tripAsync('no-loader-state', function () {
+      const keep = IdxFace.WA.__loaderState;
+      try {
+        IdxFace.WA.__loaderState = undefined;
+        return IdxFace.WA.loadRetry('core/commit.js').then(function (r) { return [r.reason]; });
+      } finally { IdxFace.WA.__loaderState = keep; }
+    });
+    want('missing-rel', 'Q1:loadRetry 不传 rel ⇒ 如实拒收(不猜「你想重试哪一个」)');
+    tripAsync('missing-rel', function () {
+      const keep = IdxFace.WA.__loaderState;
+      try {
+        IdxFace.WA.__loaderState = mkState();
+        return IdxFace.WA.loadRetry('').then(function (r) { return [r.reason]; });
+      } finally { IdxFace.WA.__loaderState = keep; }
+    });
+    want('not-failed', 'Q1:loadRetry 收到**不在失败表里**的 rel ⇒ 如实说 not-failed'
+      + '(不替用户「清一下表」、不把一次白点记成一次修复)');
+    tripAsync('not-failed', function () {
+      const keep = IdxFace.WA.__loaderState;
+      try {
+        IdxFace.WA.__loaderState = mkState();
+        return IdxFace.WA.loadRetry('core/commit.js').then(function (r) { return [r.reason]; });
+      } finally { IdxFace.WA.__loaderState = keep; }
+    });
+  }
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
-  return { expect: expect, seen: seen, missing: missing, unexpected: unexpected };
+  return { expect: expect, seen: seen, missing: missing, unexpected: unexpected,
+    asyncPumpProof: asyncPumpProof };
 }
 
 function tables() { return { DEAD: DEAD }; }

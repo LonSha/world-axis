@@ -2780,6 +2780,30 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
           if (typeof WA.commit.pending !== 'function') return null;
           const p = WA.commit.pending();
           return { pending: p.count, cap: p.cap, items: (p.items || []).slice(0, 8) };
+        }()),
+        // v2.212.0(优化 Q3):中断与跨层恢复面。与上面 effects 节**分列不合并** ——
+        //   一个答「本进程里还有什么没提交」,一个答「**上一轮(含刷新前)**中断时做过什么、
+        //   断在哪一层、能不能恢复」。后者是本版之前根本不存在的那一格(进程态重装即归零)。
+        resume: (function () {
+          if (typeof WA.commit.resumeStat !== 'function') return null;
+          const r = WA.commit.resumeStat();
+          return {
+            rows: r.rows, resumable: r.resumable, foreign: r.foreign, cap: r.cap,
+            persisted: r.persisted, lastReason: r.lastReason,
+            // 逐条只列**可恢复**的那些:外来行(别的 chat/分支)只进计数,不在这里铺开 ——
+            //   它们不属于当前现场,铺开等于把「别处的一段配置」摆到本现场的台面上。
+            items: (function () {
+              if (typeof WA.commit.scanInterrupted !== 'function') return [];
+              try {
+                const sc = WA.commit.scanInterrupted({});
+                return (sc.rows || []).slice(0, 8).map(function (x) {
+                  return { opId: x.opId, site: x.site, reason: x.reason,
+                    steps: (x.steps || []).slice(-3), effects: (x.effects || []).slice(0, 4) };
+                });
+              } catch (e) { return []; }
+            }()),
+            identity: (typeof WA.commit.resumeIdentity === 'function') ? WA.commit.resumeIdentity() : null
+          };
         }())
       };
     }, { error: 'commit 节采集失败' });

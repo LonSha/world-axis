@@ -150,7 +150,21 @@
     'carries-world-facts': { kind: 'adjust-input', why: '导入体顶层夹带世界事实字段：把这些字段从包里去掉（世界事实只能走世界侧入口），再导入' },
     // ── v2.209.0（优化 6）：面板导航与助手面的两条 ──
     'rec-ambiguous': { kind: 'manual-review', why: '切页后按 data-rec 定位命中 >1 条：本仓口径「不猜」（猜一条比报一句没渲染出来更坏，用户会以为定位是对的），该由人确认取哪条' },
-    'channel-unconfigured': { kind: 'request-setup', why: '助手通道未配置（缺 baseUrl 或 model）：先把通道配好再问' }
+    'channel-unconfigured': { kind: 'request-setup', why: '助手通道未配置（缺 baseUrl 或 model）：先把通道配好再问' },
+    // ── v2.211.0（优化 Q1）：启动完整性闸门的拒收码 ──
+    //   为什么它必须显式登记：码名分词是 ['load','integrity']，六档规则表里没有任何一个
+    //   词表收这两个 token ⇒ `ruleKind()` 返回空 ⇒ 不登记就是 `via:'undecided'`
+    //   （拒收面残余未登记，`explain()` 给 kind:null）。判据不是「猜个像的档」，
+    //   而是按语义归：闸门拒写的原因是**关键模块缺席**（六个写链路依赖），
+    //   已经明确点名缺哪几个、也已有恢复入口 `WA.loadRetry(rel)` —— 缺的是前置，不是输入错。
+    //   边界（对照六档）：不是 rollback（本次写根本没发生，没有半份状态要退）、
+    //   不是 adjust-input（用户改自己的输入改不出那几个模块）、
+    //   不是 manual-review（机器判得很清、也点了名，不需要人来判）、
+    //   不是 permanent-reject（补上文件就能恢复，本仓明言「失败必须可见、不许静默」而非「不许恢复」）。
+    //   三个早退码（missing-rel / no-loader-state / not-failed）不在此登记：
+    //   规则表收得住它们（missing→request-setup、no→request-setup、not→adjust-input），
+    //   `explain()` 对它们走 `via:'rule'`；在此凭空再登记一份就是「同一件事两个真源」。
+    'load-integrity': { kind: 'request-setup', why: '启动完整性缺口：六个写链路关键模块（clock/input-guard/settings-bus/permissions/commit/interceptor）有缺席项 ⇒ 写入被闸门挡住。先按 integrity().missing 把缺的文件补上（或对每个 rel 走 WA.loadRetry 重试装载），闸门自行重算后即恢复' }
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -376,7 +390,31 @@
     //   的既有欠债（E1 批 v2.208.0 遗留），一并补齐 —— 探针 probe11 逐条对照过「只在现场」的清单。
     'bad-page', 'empty-rec', 'empty-target', 'nav-module-missing',
     'no-back', 'no-body', 'no-page', 'no-page-table', 'rec-not-rendered', 'ui-module-missing',
-    'rec-ambiguous', 'channel-unconfigured', 'empty-question', 'no-search-face'
+    'rec-ambiguous', 'channel-unconfigured', 'empty-question', 'no-search-face',
+    // ── v2.211.0（优化 Q1）：同版加载与启动完整性闸门的四条 ──
+    //   现场实测 758 / 快照 754 ⇒ 差 4，四条全来自本版新写的入口侧：
+    //   `load-integrity`（写侧闸门拒收，core/store.js 与 index.js 各报一处）、
+    //   `missing-rel` / `no-loader-state` / `not-failed`（恢复入口 `loadRetry` 的三个早退分支）。
+    //   这四条**都不是结构不可达**：扩展目录被部分同步、清理工具删掉文件、用户手改目录
+    //   都会真触发它们 —— 故进快照与恢复档，不进死表（见证由 tests/reject-v2780.js 真跑）。
+    'load-integrity', 'missing-rel', 'no-loader-state', 'not-failed',
+    // ── v2.211.0(优化 Q2):快照改名导入的身份完整性 ──
+    //   现场实测 759 / 快照 758 ⇒ 差 1。该码来自 engines/world-snapshot.js 的
+    //   `importSnapshot` 改名支:快照里人物记录的 `id` 与**自身键**不一致时如实拒收
+    //   (改名会把这份自相矛盾搬进新世界)⇒ `{ ok: false, reason: 'rename-unsupported' }`。
+    //   不是结构不可达:任何手工编辑过、或被外部工具改写过 people 键的存档都真会落到它;
+    //   见证由 tests/reject-v2780.js 真跑(本地先有一个同名的人,再拿 id 与键不一致的快照改名导入)。
+    'rename-unsupported',
+    // ── v2.212.0(优化 Q3):中断落盘的两个失败归因(core/commit.js)──
+    //   现场实测 761 / 快照 759 ⇒ 差 2。两条都在 `persistResume` 的落盘支上:
+    //   `resume-write-threw`(store.transact **抛错**)与 `resume-write-failed`(transact
+    //   返回未提交)。它们**不是结构不可达**:配额已满、存储被禁、并发写冲突都会真落到这两条;
+    //   见证由 tests/reject-v2780.js 真跑(trip 把 transact 换成抛错 / 换成 ok:false,再读
+    //   `resumeStat().faults` 逐条对上)。
+    //   不在此写 OVERRIDES:码名分词 ['resume','write','threw'] / ['resume','write','failed']
+    //   里的 `threw` / `failed` 都收在 retry-same-input 词表内 ⇒ `explain()` 走 `via:'rule'`,
+    //   再登记一份就是「同一件事两个真源」(与 loadRetry 三码同一判据)。
+    'resume-write-failed', 'resume-write-threw'
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
