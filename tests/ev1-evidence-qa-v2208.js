@@ -77,8 +77,12 @@ function runA(a) {
   a(cnt(SRC, 'const PLAYER_DENY_FACES =') === 1, 'A14: PLAYER_DENY_FACES 声明恰 1 次');
   a(cnt(SRC, 'const STOPWORDS =') === 1, 'A15: STOPWORDS 声明恰 1 次');
   a(cnt(SRC, 'const CIT_MAX =') === 1 && cnt(SRC, 'const SNIP_MAX =') === 1, 'A16: 两个上限常量各声明恰 1 次');
-  // A17：本面不自己造时间 —— 唯一的时间兜底在 clockNow（时钟缺席时）
-  a(cnt(SRC, 'Date.now()') === 1, 'A17: Date.now() 恰 1 次（只在 clockNow 的兜底里）');
+  // A17：本面不自己造时间 —— 唯一的时间兜底在 clockNow（时钟缺席时）。
+  //   v2.213.0 修判据形态：原版数整份源码的 `Date.now()`，把**注释里的沿革说明**（3 处，
+  //   讲的就是这个兜底本身）也数了进去 ⇒ 自 v2.210.0 起恒红（Q3 收口轮已实测同红）。
+  //   真判据 = 剥掉块注释与行注释后的代码面里恰 1 次。
+  const CODE_A17 = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  a(cnt(CODE_A17, 'Date.now()') === 1, 'A17: Date.now() 恰 1 次（只在 clockNow 的兜底里；剥注释计数，实 ' + cnt(CODE_A17, 'Date.now()') + '）');
   a(/function clockNow\(\)/.test(SRC), 'A18: clockNow 在位（世界钟优先，缺席才兜底）');
   // A19：空拆词必须**不是**一次「全查过」—— 提问里没有可检索词时不许谎称「真的没记录」
   a(SRC.indexOf('noTerms') >= 0 && SRC.indexOf("'no-terms'") >= 0,

@@ -207,6 +207,38 @@ async function launch(root, options) {
       if (v === '--only-v-section' && process.argv[i + 1]) fwd.push(v, process.argv[++i]);
       else if (v.indexOf('--only-v-section=') === 0) fwd.push(v);
     }
+    // v2.213.0（Q4）：定向运行时对 work 副本做 wrap 裁剪 —— **真省时的关键一步**。
+    //   现场病灶：run.js 的 section() 对 skip/refuse 只提前 return 计时与标记，紧随其后的
+    //   裸语句节体（90 节 / 9145 行）与块节体照跑 —— 转发 --only-v-section 后 worker
+    //   实际执行了几乎全量（实测 25 分钟后 V8 OOM）。修法：spawn 前对 work/tests/run.js
+    //   应用 prune(src, sel, {mode:'wrap'})：未选中节 if 包裹 + sentinel 哨兵（运行期
+    //   同源裁定）。全量路径（无选区）不裁剪、逐字不变。裁剪版必须过 node --check，
+    //   不过 ⇒ 拒裁（照跑原版，宁可慢不可错）。裁剪统计写入 run.log 首行，可审计。
+    let pruneNote = null;
+    if (fwd.some(function (v) { return v.indexOf('--only-v-section') === 0; })) {
+      const sel = [];
+      for (let i = 0; i < fwd.length; i++) {
+        if (fwd[i] === '--only-v-section' && fwd[i + 1]) sel.push(fwd[++i]);
+        else if (fwd[i].indexOf('--only-v-section=') === 0) sel.push(fwd[i].slice(17));
+      }
+      const runPath = path.join(prepared.work, 'tests/run.js');
+      try {
+        const P = require(path.join(prepared.work, 'tools/prune-sections.js'));
+        const r = P.prune(fs.readFileSync(runPath, 'utf8'), sel, { mode: 'wrap' });
+        if (r.kept.length) {
+          fs.writeFileSync(runPath, r.text);
+          P.check(runPath);   // 拒裁兜底：check 抛 ⇒ catch 照跑原版
+          pruneNote = 'wrap 裁剪：选中 ' + r.stats.selected + ' 节 · 包裹 ' + r.stats.wrappedCount
+            + ' 节 / ' + r.stats.wrappedLines + ' 行（运行期哨兵裁定，未选中节体不执行）'
+            + ' · 最后一节不包（尾部汇总段边界） · 跨节结构降级不包 ' + (r.stats.wrapUnsafe || 0) + ' 节' + (r.stats.markedCount ? ' · 只标不包 ' + r.stats.markedCount + ' 节' : '');
+        } else pruneNote = 'wrap 裁剪拒裁：选区未命中任何节，照跑原版';
+      } catch (e) {
+        pruneNote = 'wrap 裁剪失败（拒裁兜底，照跑原版）：' + e.message;
+        // 拒裁时恢复原版：git worktree 副本重新 checkout run.js（work 是独立 git 仓）
+        try { cp.spawnSync('git', ['-C', prepared.work, 'checkout', '--', 'tests/run.js'], { timeout: 30000 }); } catch (e2) { /* git 兜底失败则留给原文件 */ }
+      }
+      if (pruneNote) fs.appendFileSync(logFile, pruneNote + String.fromCharCode(10));
+    }
     child = cp.spawn(process.execPath, [path.join(prepared.work, 'tests/run.js')].concat(fwd),
       { cwd: prepared.work, env: prepared.env, detached: true, stdio: ['ignore', fd, fd] });
     result.childPid = child.pid; save();

@@ -81,7 +81,11 @@ function analyze(opt) {
   const marks = [];
   lines.forEach(function (l, i) {
     // 两种引号形态都收（现场实测有一个节用双引号，只认单引号会静默漏掉它）
-    const m = l.match(/^  section\((['"])(.*)\1\);\s*$/);
+    // v2.213.0（Q4 第二刀）：0/2 空格缩进都收 —— 真源 L21080 存在**顶格** section 调用
+    //   （v2.146.0），只认两空格会让它进不了归属表 ⇒ 每次定向运行都 no-entry refuse
+    //   ⇒ buildOutcome 判 refused ⇒ exit 3（runner-failed）。四空格形态仍不收：
+    //   那是节体内局部 section()（G17 自定义），属内层调用，不是分层边界。
+    const m = l.match(/^ {0,2}section\((['\"])(.*)\1\);\s*$/);
     if (m) marks.push({ line: i, name: m[2] });
   });
   const all = testFiles();

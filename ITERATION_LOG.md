@@ -1,3 +1,15 @@
+### R193 · 2026-10-15 · v2.213.0(优化 Q4):O6 分层定向运行真裁剪 —— 从「section 提前返回但裸语句照跑」到「wrap 机制真不执行未选中节体」
+
+**病(真源取证)**:`tests/run.js` 的 `section(t)` 在 skip/refuse 时只记录状态并提前返回,但**节体边界之外后续 section 调用仍按 JS 顺序执行**——定向运行实际接近全量,曾在约 25 分钟后 V8 OOM。真实文件 262+ 节(两空格 262 / 顶格 1 / 四空格内层 11),约 90 个裸节,`engines/tool-diag v0.9.2` 单节 3463 行;另有 `v0220: {` / `v2200: {` 等 label/块**跨 section 边界**(braceDelta 审计:8 节净括号变化非零、4 节前缀深度下探,共 12 节 wrapUnsafe)——旧「删除节体」方案会把包裹 `}` 闭合到 label 上、吞掉后续 section(实跑 1 节曾出现「跳过 262 节但 12 失败」的缺夹具假红)。曾尝试对 wrapUnsafe 节体逐行注释化 + 跨节配对解析,均拆散 async IIFE 收尾(`})().catch` 前 `Unexpected token ')'`),已回退。
+
+**做法(三条边界)**:① **wrap 而非删除**——未选中块节体前置 `if (guardRun(...)) {` + 尾部闭合,裁剪可逆;② **wrapUnsafe 只标不包**——12 个跨节结构节 `// [O6 裁剪·只标不裁]` 注释标注、节体照跑(保夹具);③ **运行期哨兵同源裁定**——`SENTINEL_SRC`(内联常量单一真源,非独立文件——负控制把裁剪器拷到 /tmp 独立执行,require 邻居会让破坏副本加载期即崩)注入首个 section 前,`guardRun` 复用 run.js 模块级 `__layerVerdict`(与 `tools/test-layers.js` 的 `select()` 同一真源);`assert` 包装器对未选中节体断言失败打 `silent` 不计入 failures(缺夹具假红如实可见但不污染读数)。形态锁定 v3 出厂自检:每个 section 调用行后首个非空行必须是 ①if(guardRun ②wrapUnsafe 注释 ③原 body 首行,其他形态即抛。注入位置在首个 section 之前、`assert`/`section` 函数声明(124/194 行,提升生效)之后——真实 run.js 无 ReferenceError(此前 /tmp 合成调试脚本报的 `const __origAssert = assert` ReferenceError 出在无 assert 声明的合成源,非真实路径)。**孤儿清理**:Q4 调试期曾造 `tools/layer-guard.js`(导出 guardRun/sentinelSource),但全库零 require、o6 门禁零引用——按「只有被引用才入库」纪律删除,注释改为指向内联常量单一真源。
+
+**接线**:`tests/isolated-runner.js` 在 work 副本准备阶段调 `P.prune(src, sel, {mode:'wrap'})`、写回 `tests/run.js`、`node --check` 兜底,失败即拒裁照跑原版;`pruneNote` 注记含选中/包裹/unsafe 统计。`tools/test-layers.js` section 正则 `^ {0,2}section(` 同步(顶格纳入、四空格内层排除),A11 门禁双向跟上。
+
+**门禁结果**:裁剪器自证 **23 / 0**(块节/裸节/选中副作用/未选中零贡献/跨节 label/尾节行为/统计对账);O6 门禁 **61 / 0**;`node --check` 四文件全过;真实 E2E `--only-v-section='v2.7.0 块6'`:**实跑 1 节 / 跳过 262 节 / 拒绝 3 节 · 通过 1849 / 失败 0**(此前 12 失败→0,恰与 12 个 silent 注记对账;总耗时约 150 秒,此前同型定向运行 25 分钟 OOM;拒绝 3 节为 v2.19.0/v2.49.0/v2.50.0 共享上下文节真实 refuse,exit 3 设计内拒绝收尾)。全量回归按用户约束未跑。
+
+**如实边界**:① 全量路径(无选区)零改动,哨兵恒真;② wrapUnsafe 12 节节体仍执行(断言失败 silent 可见于日志),诚实降级非隐藏;③ 尾节不包裹(保 buildOutcome 收尾与 process.exit 语义);④ UI 面不装载(既有口径)。
+
 ### R192 · 2026-10-15 · v2.212.0(优化 Q3):中断与跨层恢复 —— 从「跨层待办只活在进程态」到「中断落台账、可判定、有界」
 **交付**:`core/commit.js` 新增中断台账 `commit.interrupted`(身份四元组 chat/branch/epoch/rev + 可序列化副作用清单 + 断点步骤 + 真实失败原因);`persistResume` 落盘、`scanInterrupted` / `resumeStat` / `resumeIdentity` 三个只读判定入口;两个拒收码 `resume-write-threw` / `resume-write-failed` 进见证档;容量三方同源(commit.LIMITS.RESUME / store.__BOUNDED_CAPS / evict.SITES 均 cap=32);新增专锁 `tests/q3-interrupt-resume-v2212.js`;`index.js` / `manifest.json` 升 v2.212.0。
 **它治什么(探针实证)**:① `__pendingEffects` 只活在进程态,重装即归零(实测重装前 1 条 / 后 0 条);② 落盘侧只有 `commit.receipts`(已提交回执),答不了「没做完的是什么」;③ 无身份校验面,跨 chat/分支/版本恢复等于把别处的机制配置装到当前世界;④ 无读取与判定入口(`scanInterrupted` 均 undefined)。

@@ -149,8 +149,13 @@ function runA() {
   a(L.select(shEntry, ['x']).verdict === 'refuse', 'A8 select(选中但共享上下文) → refuse');
   a(L.select(null, ['x']).verdict === 'refuse', 'A9 select(归属表里没有这个节) → refuse（不是静默 skip）');
   a(L.analyze().sections.length >= 200, 'A10 归属表现场复算 ≥200 节（实 ' + L.analyze().sections.length + '）');
-  a(L.analyze({ src: 'section("a");\n' }).sections.length === 0,
-    'A11 analyze(opt.src) 可注入 —— 负控制能在合成源上重跑同款判据');
+  // v2.213.0（Q4 第二刀）：正则收 0/2 空格后，顶格形态**必须**被认出（真源 L21080
+  //   v2.146.0 是顶格节）。「注入面可用」改用四空格内层形态验证 —— 内层 section()
+  //   （G17 节体内局部调用）仍不得被认成顶层节。两个方向一起钉。
+  a(L.analyze({ src: 'section("a");' + String.fromCharCode(10) }).sections.length === 1,
+    'A11a analyze(opt.src) 注入顶格形态被认出（0 空格 = 顶层节）');
+  a(L.analyze({ src: '    section("a");' + String.fromCharCode(10) }).sections.length === 0,
+    'A11b analyze(opt.src) 四空格内层形态不误报（G17 局部调用不是分层节）');
   // A12：**剥注释不得吞行** —— 一条恒等式，专治本轮那次假红。
   //   下一次「判据莫名不命中」时，这条能立刻把方向指对：是**判据的输入面被自己的
   //   预处理器吃掉了**，还是源码里真没有。

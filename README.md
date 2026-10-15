@@ -74,7 +74,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.212.0）
+## 构建与验收（当前版本 v2.213.0）
 
 **三档回归**：日常改动跑**快档**（十几秒，覆盖「动了就会炸」的十三面），跨文件同值判据与生成物跑**中档**（一分钟级），收口跑**全量**。
 
@@ -148,11 +148,16 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（148 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（149 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
 - **v2.20.0 及更早**：条目在 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节（本版迁入）。
+<b>v2.213.0</b> — <b>优化 Q4：O6 分层定向运行真裁剪（wrap 机制落地——定向运行从「section 提前返回但裸语句照跑」到「未选中节体真不执行」）</b>（<b><code>tools/prune-sections.js</code> 新增 <code>mode:'wrap'</code> 运行期包裹 + 内联哨兵单一真源、<code>tests/isolated-runner.js</code> 接线进 work 副本、<code>index.js</code> / <code>manifest.json</code> 升 v2.213.0</b>）。<br>
+<b>它治的病（真源取证）</b>:<code>tests/run.js</code> 的 <code>section(t)</code> 在 skip/refuse 时只记录状态并提前返回,但<b>节体边界之外后续 section 调用仍按 JS 顺序执行</b>——定向运行实际接近全量,曾在约 25 分钟后 V8 OOM。真实文件 262+ 节里约 90 个裸节,<code>engines/tool-diag v0.9.2</code> 单节 3463 行;另有 <code>v0220: {</code> / <code>v2200: {</code> 等 label/块<b>跨 section 边界</b>,旧「删除节体」方案会把包裹 <code>}</code> 闭合到 label 上、吞掉后续 section。<br>
+<b>做法（三条边界）</b>:① <b>wrap 而非删除</b>——未选中块节体前置 <code>if (guardRun(...)) {</code> + 尾部闭合,裁剪可逆、注释即恢复;② <b>wrapUnsafe 只标不包</b>——<code>braceDelta</code> 审计出净括号变化非零的 12 个跨节结构节,节体照跑、按 <code>// [wrapUnsafe]</code> 注释如实标注(注释化会拆散 async IIFE 收尾,已试错并回退);③ <b>运行期哨兵同源裁定</b>——<code>SENTINEL_SRC</code> 注入首个 section 之前,<code>guardRun</code> 复用 <code>tests/run.js</code> 模块级 <code>__layerVerdict</code>(与 <code>tools/test-layers.js</code> 的 <code>select()</code> 同一真源,不在裁剪器里复制第二份判定);<code>assert</code> 包装器对未选中节体的断言失败打印 <code>silent</code> 不计入 failures(wrapUnsafe 节体缺夹具的假红,如实可见但不污染读数)。<br>
+<b>门禁与读数</b>:裁剪器自证 <b>23 / 0</b>(含跨节 label、尾节行为、形态锁定 v3 出厂自检:每个 section 调用行后的首个非空行必须是 ①if(guardRun ②wrapUnsafe 注释 ③原 body 首行,其他形态即抛);O6 门禁 <b>61 / 0</b>(A11 已改为顶格 section 可识别 + 四空格内层不误报双向);真实 E2E <code>node tests/run.js --only-v-section='v2.7.0 块6'</code>:<b>实跑 1 节 / 跳过 262 节 / 拒绝 3 节 · 通过 1849 / 失败 0</b>(此前 12 失败→0,与 12 个 silent 注记精确对账;总耗时约 150 秒,此前同型定向运行 25 分钟 OOM)。拒绝 3 节为共享上下文节的真实 refuse,exit 3 为设计内拒绝收尾。<br>
+<b>如实边界</b>:① 全量回归(无选区)路径零改动——哨兵对无选区恒真,全量路径行为逐字节与改前一致,但本轮按约束未跑全量;② wrapUnsafe 12 节的节体仍执行(缺夹具的断言失败被 silent 吞、可见于日志),这是跨节结构下的诚实降级,不是隐藏失败;③ 尾节(含 buildOutcome 收尾与 <code>process.exit</code>)不包裹,保留拒绝收尾语义;④ UI 面不装载(既有口径)。<br>
 <b>v2.212.0</b> — <b>优化 Q3：中断与跨层恢复（跨层副作用中断时落台账、可判定、有界，不自动回放）</b>（<b><code>core/commit.js</code> 新增中断台账 <code>commit.interrupted</code>、两个拒收码进见证档、新增专锁 <code>tests/q3-interrupt-resume-v2212.js</code>、<code>index.js</code> / <code>manifest.json</code> 升 v2.212.0</b>）。<br>
 <b>它治的病(探针实证)</b>:① 跨层待办只活在进程态——<code>__pendingEffects</code> 重装即归零(实测重装前 1 条 / 后 0 条),「上一轮中断时做过什么」刷新后无人答得出;② 落盘侧只有 <code>commit.receipts</code>(已提交回执),答得了「做过没有」,答不了「没做完的是什么」;③ 无身份校验面,待恢复信息若跨 chat / 跨分支 / 跨版本被恢复,就是把别处的一段机制配置装到当前世界;④ 无读取与判定入口(实测 <code>scanInterrupted</code> / <code>resumeStat</code> 均 undefined)。<br>
 <b>做法(四条纪律)</b>:A <b>只落可序列化的安全信息</b>(没有闭包、没有 draft 引用,只有「哪个站点哪类副作用、属哪次操作、为什么没落、断在第几步」);B <b>恢复前校验身份</b>(行上带 <code>chat/branch/epoch/rev</code> 四元组,不匹配 ⇒ 标 <code>foreign-chat</code> / <code>foreign-branch</code> / <code>stale-site</code> 且不给恢复动作);C <b>不自动回放</b>(入口只答「有什么、能不能恢复、为什么不能」,机制开关是全局的,决定权在调用方);D <b>台账有界</b>(走 <code>evict.array</code>,与回执同容量源,cap=32 在 <code>commit.LIMITS.RESUME</code> / <code>store.__BOUNDED_CAPS</code> / <code>evict.SITES</code> 三方同源)。<br>
