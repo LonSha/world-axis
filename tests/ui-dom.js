@@ -17,6 +17,9 @@ function dataKey(attr) {
 }
 
 function installMiniDom(WA) {
+  // v2.214.0（Q5）：节点迁移的缓存失效钩子。el._html 是 setter 字符串缓存，
+  //   迁移后不再代表当前树 —— 清空标记，宁可显式空、不可陈旧假值。
+  function migrationClearCache(el) { try { el._html = ''; } catch (e) {} }
   function setAttr(el, name, val) {
     name = String(name).toLowerCase();
     if (name === 'class') { el.className = val; return; }
@@ -52,12 +55,38 @@ function installMiniDom(WA) {
       get: function () { return el._text + elems().map(function (n) { return n.textContent; }).join(''); },
       set: function (v) { el._text = String(v == null ? '' : v); el.childNodes.length = 0; }
     });
+    // v2.214.0（Q5）：getter 改为实时序列化当前树。此前它是 setter 的字符串缓存（_html），
+    //   节点迁移（appendChild/removeChild）不改缓存，getter 与真实树脱节（9739 假红同族）。
+    //   Q5 的 staged 渲染走「stage 解析 → 节点逐个移入」，全仓 12+ 处 body.innerHTML
+    //   非空判据的输入面会被旧缓存阉掉 —— 判据没错，是替身的读面失真。
+    //   序列化只覆盖解析器登记过的属性面（class/id/style/data-*/常用表单属性），同口径。
+    function ser(node) {
+      if (node.nodeType === 3) return node._text || '';
+      var t = '<' + node.tagName.toLowerCase();
+      var cls = node.className;
+      if (cls) t += ' class="' + cls + '"';
+      if (node.id !== undefined && node.id !== null && node.id !== '') t += ' id="' + node.id + '"';
+      var st = node.attrs && node.attrs.style;
+      if (st) t += ' style="' + st + '"';
+      if (node.dataset && Object.keys(node.dataset).length) {
+        Object.keys(node.dataset).forEach(function (k) {
+          t += ' data-' + k.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase() + '="' + node.dataset[k] + '"';
+        });
+      }
+      ['title', 'placeholder', 'type', 'name', 'value'].forEach(function (k) {
+        if (node[k] !== undefined && node[k] !== null && node[k] !== '' && typeof node[k] !== 'object') t += ' ' + k + '="' + node[k] + '"';
+      });
+      var inner = (node._text || '') + node.childNodes.map(ser).join('');
+      if (VOID_TAGS[node._tag]) return t + '>' + (node._text || '');
+      return t + '>' + inner + '</' + node.tagName.toLowerCase() + '>';
+    }
     Object.defineProperty(el, 'innerHTML', {
-      get: function () { return el._html; },
+      get: function () { return ser(el); },
       set: function (v) { var s = String(v == null ? '' : v); WA.__parseInto(doc, el, s); el._html = s; }
     });
-    el.appendChild = function (c) { if (!c) return c; if (c.parentNode && c.parentNode.removeChild) c.parentNode.removeChild(c); c.parentNode = el; el.childNodes.push(c); return c; };
-    el.removeChild = function (c) { var i = el.childNodes.indexOf(c); if (i >= 0) el.childNodes.splice(i, 1); if (c) c.parentNode = null; return c; };
+    el.__serHtml = ser;  // v2.214.0（Q5）：序列化器暴露给门禁负向自证
+    el.appendChild = function (c) { if (!c) return c; if (c.parentNode && c.parentNode.removeChild) c.parentNode.removeChild(c); c.parentNode = el; migrationClearCache(el); el.childNodes.push(c); return c; };
+    el.removeChild = function (c) { var i = el.childNodes.indexOf(c); if (i >= 0) el.childNodes.splice(i, 1); if (c) c.parentNode = null; migrationClearCache(el); return c; };
     el.setAttribute = function (k, v) { setAttr(el, k, String(v)); };
     el.getAttribute = function (k) {
       k = String(k).toLowerCase();

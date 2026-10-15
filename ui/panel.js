@@ -3618,22 +3618,55 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-trip-out" class="wa-out"></div>`;
   }
+  /** v2.214.0（优化 Q5）：视角**先过滤、后渲染** —— staged 出口（HTML 进 DOM 的唯一闸）。
+   *  治的病（Q5 原文）：此前渲染链是「先写 DOM、再摘除」——`body.innerHTML = 渲染结果` 让
+   *    全知内容**真实进入过 DOM**（那一刻任何读取者都读得到），之后才靠 applyView 摘掉；
+   *    检索 / 图谱等动态出口则压根没有过滤。两条路合成一句话：**「最终不可见」被当成了
+   *    「从未出现过」**。本函数把顺序倒过来：HTML 先在**脱离文档**的 stage 容器里解析，
+   *    玩家视角的摘除发生在进 DOM **之前**；过滤后的真实节点才被移入目标容器。
+   *  fail-tight：玩家视角（或视角不可判）下过滤抛异常 ⇒ 不放行原文，出口只留一行**纯文本**
+   *    警示（textContent，不再解析任何 HTML）；明确处于全知视角时无摘除语义，异常照常放行
+   *    —— 没有「全知视角要藏的秘密」，此时收紧只会让面板跟着模块一起瞎。
+   *  与 outletAllowed 的分工：那管**非 DOM 出口**（剪贴板 / 导出 / 日志），本函数管 DOM 面，
+   *    两处各治一条泄漏面，互不替代。
+   *  renderBody 挂在重绘出口上的理由（v2.149.0 不变）：面板每次重绘整块重建，过滤结果
+   *    必须与渲染结果同寿；staged 之后这层语义从「渲染后再摘」变成「进 DOM 前已摘」。 */
+  function stageOut(target, html) {
+    if (!target) return false;
+    let stage = null;
+    try { stage = mainDoc.createElement('div'); } catch (e) { stage = null; }
+    if (!stage) { target.textContent = String(html || ''); return true; } // 宿主无 DOM ⇒ 退纯文本（比解析 HTML 窄）
+    stage.innerHTML = html;                 // 脱离文档：解析产物对任何文档级查询不可见
+    let view = null, fault = null;
+    try {
+      if (WA.perspective && typeof WA.perspective.applyView === 'function') {
+        if (typeof WA.perspective.getView === 'function') {
+          const __gv = WA.perspective.getView();   // 返回 {view,...} 快照对象（p3-x1-v2149 判据面）
+          view = (__gv && typeof __gv === 'object') ? __gv.view : __gv;
+        }
+        WA.perspective.applyView(stage);    // 玩家视角：摘除发生在进 DOM 之前
+      } else {
+        view = 'no-module';                 // 模块缺席：没有视角语义，原样放行（与 v2.149 行为一致）
+      }
+    } catch (e) { fault = e; }
+    if (fault && view !== 'omniscient') {
+      // fail-tight：视角不明或玩家视角下过滤失败，未过滤内容不进 DOM
+      if (WA.log) WA.log('warn', '观测视角过滤失败（出口不放行未过滤内容）', fault);
+      target.textContent = '（观测视角过滤失败：本出口不放行未过滤内容，详情见日志）';
+      return false;
+    }
+    const kids = Array.prototype.slice.call(stage.childNodes);
+    target.textContent = '';                // 清空旧内容（纯文本口，不再触发解析）
+    for (let i = 0; i < kids.length; i++) target.appendChild(kids[i]);   // 真节点迁移
+    return true;
+  }
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
     // v2.152.0（RP6）：面板渲染链的耗时与 DOM 规模读数。计时包住「渲染 + 过滤 + 绑定」
     //   整段（用户感知到的就是这一整段），读数分流给 ui/render-perf.js（它不自带计时器，
     //   只收数——观测污染被观测者）。renderPerf 缺席时静默跳过（观测面不许拖垮渲染本体）。
     const __rpT0 = (WA.renderPerf && typeof clockWall === 'function') ? clockWall() : null;
-    body.innerHTML = RENDERERS[currentPage]();
-    // ── v2.149.0（P3）：观测视角过滤**必须挂在重绘出口上** ──
-    //   为什么不挂在 bindBody 里、也不逐页手动调：面板每次重绘都整块重建 DOM
-    //   （`body.innerHTML = …`），于是上一次过滤的结果**一并被抹掉** —— 挂在重绘出口上
-    //   是唯一能保证「过滤结果与渲染结果同寿」的位置。逐页调用会漏页：新增一页时
-    //   没人记得补，而那一页在玩家视角下就是全知数据直接外泄（静默、不报错）。
-    //   摘除是**DOM 层**的（不是 CSS 隐藏）：CSS 隐藏的数据仍在 DOM 里可读。
-    try {
-      if (WA.perspective && typeof WA.perspective.applyView === 'function') WA.perspective.applyView(mainDoc);
-    } catch (e) { if (WA.log) WA.log('warn', '观测视角过滤失败', e); }
+    stageOut(body, RENDERERS[currentPage]());
     bindBody();
     try {
       if (__rpT0 !== null && WA.renderPerf && typeof WA.renderPerf.observe === 'function') {
@@ -11574,7 +11607,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + '<div class="wa-dim">密钥与宿主态是**显式名单**（不是靠前缀猜）—— 名单本身可在这里当场核。</div>');
     });
     // ── v2.201.0（Y6）：世界历史检索（三枚只读 + 一枚写口 + 两条只读出口）────────
-    const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) o.innerHTML = html; bindNavs(o); };
+    const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) stageOut(o, html); bindNavs(o); };
     const hsQ = function () { const i = $('#wa-hs-q'); return i ? String(i.value || '').trim() : ''; };
     const hsFaceSel = function () { const s = $('#wa-hs-face'); return s ? String(s.value || '') : ''; };
     /** 面名 → 中文标签。**真源是引擎的 FACE_LABELS**（本页不自带第二份面清单 ——
@@ -11729,7 +11762,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   与其他页不同的一点：**本页连一个写口都没有**（对比 find 页的「记进最近查询 / 清空记录」）。
     //   全页按钮一律走只读读口；偏好键（enabled / 预算）只由引擎的 setSettings 暴露给设置页，
     //   本页不碰 —— 这是边界 ④「零写入」在界面上的**结构**保证，不是一句声明。
-    const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) o.innerHTML = html; bindNavs(o); };
+    const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) stageOut(o, html); bindNavs(o); };
     const wgSel = function () {
       const k = $('#wa-wg-kinds'), e = $('#wa-wg-edges');
       const kinds = k && String(k.value || '') ? [String(k.value)] : null;

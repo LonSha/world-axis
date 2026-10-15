@@ -74,7 +74,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.213.0）
+## 构建与验收（当前版本 v2.214.0）
 
 **三档回归**：日常改动跑**快档**（十几秒，覆盖「动了就会炸」的十三面），跨文件同值判据与生成物跑**中档**（一分钟级），收口跑**全量**。
 
@@ -148,11 +148,12 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 
 ## 版本历史
 
-本节只保留 **v2.21.0 及之后**的摘要条目（149 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
+本节只保留 **v2.21.0 及之后**的摘要条目（150 个版本，倒序）。**v2.20.0 及更早（含 `v1.x` / `v0.9.x` / `v0.8.x` / `v0.1.x`）的 92 条完整条目已迁入 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节**——同一件事不再两处各存一份，正文逐字未改。
 
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
 - **v2.20.0 及更早**：条目在 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节（本版迁入）。
+<b>v2.214.0</b> — <b>优化 Q5：视角先过滤后渲染（staged 出口——HTML 先进脱离文档的 stage 容器解析、玩家视角摘除在进 DOM 之前完成，检索/图谱动态出口收进同一道闸）</b>（<b><code>ui/panel.js</code> 新增 <code>stageOut()</code> 共享出口 + <code>renderBody</code> / <code>hsOut</code> / <code>wgOut</code> 三处接线、<code>tests/ui-dom.js</code> innerHTML getter 改为实时序列化、<code>index.js</code> / <code>manifest.json</code> 升 v2.214.0</b>）。<br>
 <b>v2.213.0</b> — <b>优化 Q4：O6 分层定向运行真裁剪（wrap 机制落地——定向运行从「section 提前返回但裸语句照跑」到「未选中节体真不执行」）</b>（<b><code>tools/prune-sections.js</code> 新增 <code>mode:'wrap'</code> 运行期包裹 + 内联哨兵单一真源、<code>tests/isolated-runner.js</code> 接线进 work 副本、<code>index.js</code> / <code>manifest.json</code> 升 v2.213.0</b>）。<br>
 <b>它治的病（真源取证）</b>:<code>tests/run.js</code> 的 <code>section(t)</code> 在 skip/refuse 时只记录状态并提前返回,但<b>节体边界之外后续 section 调用仍按 JS 顺序执行</b>——定向运行实际接近全量,曾在约 25 分钟后 V8 OOM。真实文件 262+ 节里约 90 个裸节,<code>engines/tool-diag v0.9.2</code> 单节 3463 行;另有 <code>v0220: {</code> / <code>v2200: {</code> 等 label/块<b>跨 section 边界</b>,旧「删除节体」方案会把包裹 <code>}</code> 闭合到 label 上、吞掉后续 section。<br>
 <b>做法（三条边界）</b>:① <b>wrap 而非删除</b>——未选中块节体前置 <code>if (guardRun(...)) {</code> + 尾部闭合,裁剪可逆、注释即恢复;② <b>wrapUnsafe 只标不包</b>——<code>braceDelta</code> 审计出净括号变化非零的 12 个跨节结构节,节体照跑、按 <code>// [wrapUnsafe]</code> 注释如实标注(注释化会拆散 async IIFE 收尾,已试错并回退);③ <b>运行期哨兵同源裁定</b>——<code>SENTINEL_SRC</code> 注入首个 section 之前,<code>guardRun</code> 复用 <code>tests/run.js</code> 模块级 <code>__layerVerdict</code>(与 <code>tools/test-layers.js</code> 的 <code>select()</code> 同一真源,不在裁剪器里复制第二份判定);<code>assert</code> 包装器对未选中节体的断言失败打印 <code>silent</code> 不计入 failures(wrapUnsafe 节体缺夹具的假红,如实可见但不污染读数)。<br>
