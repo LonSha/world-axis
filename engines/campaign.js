@@ -31,10 +31,10 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_campaign_settings_v1';
-  const DEF = { enabled: false, stageCap: 12, logCap: 24 };
+  const DEF = { enabled: false, stageCap: 12, logCap: 24, planCap: 6 };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'campaign',
-    bounds: { stageCap: [3, 24], logCap: [4, 64] }
+    bounds: { stageCap: [3, 24], logCap: [4, 64], planCap: [1, 12] }
   };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : null;
@@ -144,13 +144,159 @@
    *  那是本仓最贵的一类默认值）。参数存在自有设置里，键 `argA` / `argB` / `argId`。 */
   const PARAM_KEYS = { 'diplomacy-state': ['a', 'b'], 'freight-arrived': ['id'], 'relation-tier': ['a', 'b'] };
 
+  // ── N1：可编辑战役层（v2.218.0）──────────────────────────────
+  //   玩家可以把「目标 / 阶段 / 结束条件」**存成自己的计划**。计划是纯登记：
+  //   阶段判据仍走既有 PREDICATES（不新增谓词面），自有进度仍只写 `campaign` 键下
+  //   的 `plans` 子结构 —— **不新增第二条世界键**（E4 边界 2 同规）。
+  //
+  //   每个阶段可比模板多三个可选字段（全部**读既有世界事实**，不引入 AI 裁定）：
+  //     · optional:true —— 可选目标：未成不阻塞主线结束（跳级判定只约束主线阶段）；
+  //     · reward:N —— 阶段奖励：阶段达成时记入 `bonus` 累计与 `bonusLog`（自有键内账本）；
+  //     · failWhen:{kind,...} —— 失败条件：该条件满足即战役失败终态（failed:true + 复盘），
+  //       与「未达成」是两件事（达成主线结束 ≠ 触发失败）；
+  //     · branchFrom:阶段id + branchCond:{kind,...} —— 分支：主线阶段推进后，若分支条件
+  //       满足则跳到其目标阶段（不违反「一次只走一格」：分支只在推进**时**判定一次）。
+  const PLAN_MAX_STAGES = 12;
+  const KNOWN_KINDS = PREDICATE_IDS;              // 只认既有四类谓词
+  const FILTER_KEYS = ['label', 'goal', 'id', 'reason']; // 文本清洗白名单
+  // day-reached 的参数是**数值**（天数），必须与字符串参数分开校验 ——
+  //   混在 PARAM_KEYS 里会让清洗只保留字符串、把 day 丢掉（实测恒 bad-day-arg）。
+  const NUM_KEYS = { 'day-reached': ['day'] };
+  function cleanText(v, max) { return clean(v, max || 80); }
+  /** 一条谓词参数的机械校验（对照 PARAM_KEYS 的参数面）。 */
+  function validPred(pred) {
+    if (!pred || typeof pred !== 'object') return false;
+    const kind = pred.kind;
+    if (KNOWN_KINDS.indexOf(kind) < 0) return false;
+    const keys = PARAM_KEYS[kind] || [];
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const v = pred[k];
+      if (typeof v !== 'string' || v === '') return false;
+    }
+    const nk = NUM_KEYS[kind] || [];
+    for (let i = 0; i < nk.length; i++) {
+      const nv = pred[nk[i]];
+      if (!(typeof nv === 'number' && isFinite(nv) && nv >= 0)) return false;
+    }
+    return true;
+  }
+  /** 计划整体机械校验（返回 null 或原因）。 */
+  function validPlan(plan) {
+    if (!plan || typeof plan !== 'object') return 'not-object';
+    if (typeof plan.id !== 'string' || !plan.id || plan.id.length > 24) return 'bad-id';
+    if (!Array.isArray(plan.stages) || plan.stages.length < 1) return 'no-stages';
+    if (plan.stages.length > PLAN_MAX_STAGES) return 'too-many-stages';
+    for (let i = 0; i < plan.stages.length; i++) {
+      const st = plan.stages[i];
+      if (!st || typeof st !== 'object') return 'bad-stage';
+      if (typeof st.id !== 'string' || !st.id || st.id.length > 24) return 'bad-stage-id';
+      if (typeof st.label !== 'string' || !st.label) return 'bad-label';
+      if (typeof st.goal !== 'string' || !st.goal) return 'bad-goal';
+      if (!validPred(st.pred)) return 'bad-pred:' + i;
+      if (st.optional !== undefined && typeof st.optional !== 'boolean') return 'bad-optional:' + i;
+      if (st.reward !== undefined && !(typeof st.reward === 'number' && isFinite(st.reward) && st.reward >= 0 && st.reward <= 1e6)) return 'bad-reward:' + i;
+        if (st.failWhen !== undefined && !validPred(st.failWhen)) return 'bad-failWhen:' + i;
+      if (st.branchFrom !== undefined && (typeof st.branchFrom !== 'string' || !st.branchFrom)) return 'bad-branchFrom:' + i;
+      if (st.branchCond !== undefined && !validPred(st.branchCond)) return 'bad-branchCond:' + i;
+    }
+    // branchFrom 必须是本计划内存在的阶段
+    for (let i = 0; i < plan.stages.length; i++) {
+      const st = plan.stages[i];
+      if (st.branchFrom) {
+        const hit = plan.stages.some(function (x) { return x.id === st.branchFrom; });
+        if (!hit) return 'bad-branchTarget';
+        if (st.branchCond) { /* 已由 validPred 校验 */ }
+      }
+    }
+    return null;
+  }
+  function sanitizeStage(st) {
+    const out = { id: clean(st.id, 24), label: cleanText(st.label, 80), goal: cleanText(st.goal, 160) };
+    out.pred = {};
+    const kind = st.pred && st.pred.kind;
+    out.pred.kind = kind;
+    (PARAM_KEYS[kind] || []).forEach(function (k) { out.pred[k] = cleanText(st.pred[k], 60); });
+    (NUM_KEYS[kind] || []).forEach(function (k) {
+      const nv = st.pred[k];
+      if (typeof nv === 'number' && isFinite(nv)) out.pred[k] = Math.max(0, Math.floor(nv));
+    });
+    if (st.optional !== undefined) out.optional = !!st.optional;
+    if (st.reward !== undefined && typeof st.reward === 'number' && isFinite(st.reward)) out.reward = Math.max(0, Math.min(1e6, st.reward));
+    if (st.failWhen !== undefined && st.failWhen && typeof st.failWhen === 'object') {
+      out.failWhen = { kind: st.failWhen.kind };
+      (PARAM_KEYS[st.failWhen.kind] || []).forEach(function (k) { out.failWhen[k] = cleanText(st.failWhen[k], 60); });
+      (NUM_KEYS[st.failWhen.kind] || []).forEach(function (k) {
+        const nv = st.failWhen[k];
+        if (typeof nv === 'number' && isFinite(nv)) out.failWhen[k] = Math.max(0, Math.floor(nv));
+      });
+    }
+    if (st.branchFrom !== undefined) out.branchFrom = clean(st.branchFrom, 24);
+    if (st.branchCond !== undefined && st.branchCond && typeof st.branchCond === 'object') {
+      out.branchCond = { kind: st.branchCond.kind };
+      (PARAM_KEYS[st.branchCond.kind] || []).forEach(function (k) { out.branchCond[k] = cleanText(st.branchCond[k], 60); });
+      (NUM_KEYS[st.branchCond.kind] || []).forEach(function (k) {
+        const nv = st.branchCond[k];
+        if (typeof nv === 'number' && isFinite(nv)) out.branchCond[k] = Math.max(0, Math.floor(nv));
+      });
+    }
+    return out;
+  }
+  function plansOf() {
+    const camp = store();
+    return (camp && Array.isArray(camp.plans)) ? camp.plans : [];
+  }
+  /** 保存 / 覆盖一个自定义计划（机械校验不通过则整批拒收，不半套落地）。 */
+  function planSave(input) {
+    const cfg = settings();
+    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
+    if (!input || typeof input !== 'object') { fault('bad-plan'); return { ok: false, reason: 'bad-plan' }; }
+    const why = validPlan(input);
+    if (why) { fault('invalid-plan:' + why); return { ok: false, reason: 'invalid-plan', why: why }; }
+    const p = sanitizeStage ? { id: clean(input.id, 24), stages: input.stages.map(sanitizeStage) } : null;
+    const budget = plansOf().filter(function (x) { return x && x.id !== p.id; }).length;
+    if (budget >= cfg.planCap) { fault('plan-cap'); return { ok: false, reason: 'plan-cap', cap: cfg.planCap }; }
+    // 再整体校验一次清洗后的版本（防绕过）
+    const why2 = validPlan(p);
+    if (why2) { fault('invalid-plan:' + why2); return { ok: false, reason: 'invalid-plan', why: why2 }; }
+    const w = write(function (c) {
+      c.plans = c.plans || [];
+      const idx = c.plans.map(function (x) { return x && x.id; }).indexOf(p.id);
+      if (idx >= 0) c.plans[idx] = p; else c.plans.push(p);
+      return { id: p.id, stages: p.stages.length };
+    });
+    if (!w.ok) { fault(w.reason); return { ok: false, reason: w.reason }; }
+    _stat.saves = (_stat.saves || 0) + 1;
+    return { ok: true, id: p.id, stages: p.stages.length };
+  }
+  function planList() {
+    return { ok: true, plans: plansOf().map(function (p) { return { id: p.id, stages: (p.stages || []).length }; }), cap: settings().planCap };
+  }
+  function planDelete(id) {
+    const cfg = settings();
+    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const pid = clean(id, 24);
+    if (!pid) { fault('bad-plan-id'); return { ok: false, reason: 'bad-plan-id' }; }
+    const w = write(function (c) {
+      const before = (c.plans || []).length;
+      c.plans = (c.plans || []).filter(function (x) { return !x || x.id !== pid; });
+      return { removed: before - c.plans.length };
+    });
+    if (!w.ok) { fault(w.reason); return { ok: false, reason: w.reason }; }
+    return { ok: true, removed: w.value.removed, id: pid };
+  }
+  /** planOf：自定义计划优先，模板兜底（模板读蓝图真源不变）。 */
   function planOf(sceneId) {
-    const id = clean(sceneId, 24) || 'blank';
+    const raw = clean(sceneId, 24) || '';
+    if (raw) {
+      const saved = plansOf().filter(function (p) { return p && p.id === raw; })[0];
+      if (saved) return { ok: true, id: raw, stages: saved.stages.map(function (s) { return Object.assign({}, s); }), custom: true };
+    }
     const t = templates();
     const known = t.ok ? t.scenes.map(function (s) { return s.id; }) : [];
-    if (known.indexOf(id) < 0) return { ok: false, reason: 'unknown-scene', id: id };
-    const base = PLANS[id] || PLANS.blank;
-    return { ok: true, id: id, stages: base.map(function (s) { return Object.assign({}, s); }) };
+    if (raw && known.indexOf(raw) < 0) return { ok: false, reason: 'unknown-scene', id: raw };
+    const base = PLANS[raw] || PLANS.blank;
+    return { ok: true, id: raw || 'blank', stages: base.map(function (s) { return Object.assign({}, s); }), custom: false };
   }
 
   // ── 自有状态：**单一键**（骨架已声明的 `campaign`）──────────────────
@@ -205,7 +351,13 @@
       rows.push({
         id: s.id, label: s.label, goal: s.goal, kind: s.pred.kind,
         ok: !!r.ok, met: !!r.met, reading: r.reading === undefined ? null : r.reading,
-        why: r.why || '', beyondCap: i >= cap
+        why: r.why || '', beyondCap: i >= cap,
+        optional: !!s.optional, reward: (typeof s.reward === 'number') ? s.reward : null,
+        failWhen: s.failWhen ? s.failWhen.kind : null,
+        failPred: s.failWhen ? Object.assign({}, s.failWhen) : null,
+        branchFrom: s.branchFrom || '',
+        branchCond: s.branchCond ? s.branchCond.kind : null,
+        branchPred: s.branchCond ? Object.assign({}, s.branchCond) : null
       });
     }
     return { ok: true, scene: pl.id, stages: rows, cap: cap };
@@ -219,26 +371,95 @@
     if (!camp) { fault('store-absent'); return { ok: false, reason: 'store-absent' }; }
     if (!camp.scene) { fault('no-scene'); return { ok: false, reason: 'no-scene' }; }
     if (camp.finished) return { ok: false, reason: 'finished' };
+    if (camp.failed) return { ok: false, reason: 'failed' };
     const ev = evaluate(camp);
     if (!ev.ok) { fault(ev.reason); return { ok: false, reason: ev.reason }; }
     const idx = Math.max(0, Number(camp.stage) || 0);
     const cur = ev.stages[idx];
     if (!cur) { fault('stage-out-of-range'); return { ok: false, reason: 'stage-out-of-range', stage: idx, total: ev.stages.length }; }
+    // 当前阶段若有失败条件：条件满足即整局失败（不是「未达成」—— 达成主线 ≠ 触发失败）
+    if (cur.failWhen) {
+      const P = PREDICATES[cur.failWhen];
+      if (P) {
+        const fr = P.eval(argsFor(cur.failPred || { kind: cur.failWhen }));
+        if (fr.ok && fr.met) {
+          const wF = write(function (c) {
+            c.failed = true; c.verdict = 'failed'; c.failReason = cur.id;
+            c.history = (c.history || []).concat([{ at: (WA.clock ? WA.clock.now('campaign') : Date.now()), stage: cur.id, note: 'failed:' + cur.failWhen }]);
+          });
+          if (wF.ok) _stat.finishes += 1;
+          fault('failed');
+          return { ok: false, reason: 'failed', stage: cur.id, review: review() };
+        }
+      }
+    }
     if (!cur.ok) { fault('unreadable'); return { ok: false, reason: 'unreadable', stage: cur.id, why: cur.why }; }
     if (!cur.met) return { ok: false, reason: 'not-met', stage: cur.id, reading: cur.reading, why: cur.why };
-    const nextIdx = idx + 1;
+    // 主进度只推进「主线阶段」：可选目标未成不阻塞主线（它的达成另行记账）
+    const passed = ev.stages.filter(function (r) { return !r.optional; });
+    const mainIdx = passed.indexOf(cur);
+    let nextIdx = idx + 1;
+    let optReward = 0;
+    const optDone = [];
+    if (mainIdx >= 0 && mainIdx + 1 < passed.length) {
+      // 主线前进到下一主线阶段；**夹在中间的可选阶段逐个现场评估**：
+      //   满足的记为达成并计其奖励，不满足的不阻塞主进度（可选目标的本义）。
+      const targetIdx = ev.stages.indexOf(passed[mainIdx + 1]);
+      for (let j = idx + 1; j < targetIdx; j++) {
+        const r = ev.stages[j];
+        if (r && r.optional && r.ok && r.met) {
+          optReward += (typeof r.reward === 'number' ? r.reward : 0);
+          optDone.push(r.id);
+        }
+      }
+      nextIdx = targetIdx;
+    } else {
+      // 当前是最后一条主线：其后夹的可选阶段一并评估，然后收尾
+      for (let j = idx + 1; j < ev.stages.length; j++) {
+        const r = ev.stages[j];
+        if (r && r.optional && r.ok && r.met) {
+          optReward += (typeof r.reward === 'number' ? r.reward : 0);
+          optDone.push(r.id);
+        }
+      }
+      nextIdx = ev.stages.length;
+    }
+    // 分支：本阶段 branchCond 满足 ⇒ 跳到目标阶段（不违反「一次只走一格」：只在此刻判定一次）
+    let branchHit = false;
+    if (cur.branchCond) {
+      const BP = PREDICATES[cur.branchCond];
+      if (BP) {
+        const br = BP.eval(argsFor(cur.branchPred || { kind: cur.branchCond }));
+        if (br.ok && br.met) {
+          const target = ev.stages.filter(function (r) { return r.id === cur.branchFrom; })[0] || null;
+          if (target) {
+            nextIdx = ev.stages.indexOf(target);
+            branchHit = true;
+          }
+        }
+      }
+    }
     const done = nextIdx >= ev.stages.length;
+    const reward = ((typeof cur.reward === 'number' && cur.reward > 0) ? cur.reward : 0) + optReward;
     const w = write(function (c) {
       c.stage = nextIdx;
-      c.history = (c.history || []).concat([{ at: (WA.clock ? WA.clock.now('campaign') : Date.now()), stage: cur.id, reading: cur.reading, kind: cur.kind }]);
+      const h = { at: (WA.clock ? WA.clock.now('campaign') : Date.now()), stage: cur.id, reading: cur.reading, kind: cur.kind };
+      if (branchHit) h.branch = cur.branchFrom;
+      if (optDone.length) h.optionalDone = optDone.slice();
+      c.history = (c.history || []).concat([h]);
       if (c.history.length > cfg.logCap) c.history = c.history.slice(-cfg.logCap);
+      if (reward > 0) {
+        c.bonus = (typeof c.bonus === 'number' ? c.bonus : 0) + reward;
+        c.bonusLog = (c.bonusLog || []).concat([{ at: (WA.clock ? WA.clock.now('campaign') : Date.now()), stage: cur.id, reward: reward }]);
+        if (c.bonusLog.length > cfg.logCap) c.bonusLog = c.bonusLog.slice(-cfg.logCap);
+      }
       if (done) c.finished = true;
-      return { stage: nextIdx, done: done };
+      return { stage: nextIdx, done: done, branch: branchHit, reward: reward, optionalDone: optDone.slice() };
     });
     if (!w.ok) { fault(w.reason); return { ok: false, reason: w.reason }; }
     _stat.advances += 1;
-    if (done) { _stat.finishes += 1; return { ok: true, done: true, review: review() }; }
-    return { ok: true, done: false, stage: nextIdx };
+    if (done) { _stat.finishes += 1; return { ok: true, done: true, branch: branchHit, reward: reward, review: review() }; }
+    return { ok: true, done: false, stage: nextIdx, branch: branchHit, reward: reward, optionalDone: optDone.slice() };
   }
 
   /** 复盘：数字**全部现场读**（不与落盘历史比对 —— 一比对就成了两套真源）。 */
@@ -251,6 +472,9 @@
     try { day = (WA.store && WA.store.read) ? WA.store.read('clock.dayIndex') : null; } catch (e) { day = null; }
     return {
       ok: true, scene: camp.scene, stage: camp.stage, finished: !!camp.finished,
+      failed: !!camp.failed, failReason: camp.failReason || '',
+      bonus: (typeof camp.bonus === 'number') ? camp.bonus : 0,
+      custom: !!(planOf(camp.scene) || {}).custom,
       stages: ev.ok ? ev.stages.length : null,
       day: (typeof day === 'number') ? day : null,
       history: (camp.history || []).slice(-8).map(function (h) { return { stage: h.stage, kind: h.kind, reading: h.reading }; })
@@ -264,6 +488,7 @@
     if (!pl.ok) { fault(pl.reason); return { ok: false, reason: pl.reason, id: sceneId }; }
     const w = write(function (c) {
       c.scene = pl.id; c.stage = 0; c.finished = false; c.verdict = null;
+      c.failed = false; c.failReason = ''; c.bonus = 0; c.bonusLog = [];
       c.history = [];
       let d0 = 0;
       try { d0 = Number((WA.store && WA.store.read) ? WA.store.read('clock.dayIndex') : 0) || 0; } catch (e) { d0 = 0; }
@@ -281,6 +506,7 @@
     const sid = keepScene && camp ? camp.scene : '';
     const w = write(function (c) {
       c.scene = sid; c.stage = 0; c.finished = false; c.verdict = null; c.history = []; c.rounds = [];
+      c.failed = false; c.failReason = ''; c.bonus = 0; c.bonusLog = [];
       return { scene: sid };
     });
     if (!w.ok) { fault(w.reason); return { ok: false, reason: w.reason }; }
@@ -296,7 +522,10 @@
     const ev = evaluate(camp);
     return {
       ok: true, enabled: !!cfg.enabled, scene: camp.scene, stage: camp.stage,
-      finished: !!camp.finished, stages: ev.ok ? ev.stages : [],
+      finished: !!camp.finished, failed: !!camp.failed,
+      bonus: (typeof camp.bonus === 'number') ? camp.bonus : 0,
+      custom: !!(planOf(camp.scene) || {}).custom,
+      stages: ev.ok ? ev.stages : [],
       reason: ev.ok ? null : ev.reason, review: review()
     };
   }
@@ -307,7 +536,8 @@
     if (!ev.ok) return { ok: false, reason: ev.reason };
     const idx = Math.max(0, Number(camp.stage) || 0);
     const cur = ev.stages[idx] || null;
-    return { ok: true, scene: camp.scene, stage: idx, current: cur, done: idx >= ev.stages.length, finished: !!camp.finished };
+    return { ok: true, scene: camp.scene, stage: idx, current: cur, done: idx >= ev.stages.length,
+      finished: !!camp.finished, failed: !!camp.failed };
   }
   function diagnose() {
     const cfg = settings();
@@ -323,6 +553,8 @@
         freight: !!(WA.freight && typeof WA.freight.view === 'function')
       },
       templatesOk: t.ok, templateCount: t.ok ? t.scenes.length : 0, templateReason: t.ok ? null : t.reason,
+      plans: (s && Array.isArray(s.plans)) ? s.plans.map(function (p) { return p && p.id; }) : [],
+      planCap: settings().planCap,
       hasCampaign: !!(s && s.scene), scene: s ? s.scene : '', stage: s ? s.stage : null,
       predicates: PREDICATE_IDS.slice(),
       faults: Object.assign({}, _stat.faults)
@@ -333,9 +565,12 @@
     const s = store();
     return Object.assign({}, _stat, {
       faults: Object.assign({}, _stat.faults),
-      enabled: !!cfg.enabled, stageCap: cfg.stageCap, logCap: cfg.logCap,
+      enabled: !!cfg.enabled, stageCap: cfg.stageCap, logCap: cfg.logCap, planCap: cfg.planCap,
       hasCampaign: !!(s && s.scene), scene: s ? s.scene : '', stage: s ? s.stage : null,
-      finished: s ? !!s.finished : false, predicates: PREDICATE_IDS.slice()
+      finished: s ? !!s.finished : false, failed: s ? !!s.failed : false,
+      bonus: (s && typeof s.bonus === 'number') ? s.bonus : 0,
+      plans: (s && Array.isArray(s.plans)) ? s.plans.length : 0,
+      predicates: PREDICATE_IDS.slice()
     });
   }
   function resetStat() {
@@ -348,9 +583,10 @@
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(patch); },
     templates: templates, planOf: planOf,
+    planSave: planSave, planList: planList, planDelete: planDelete, validPlan: validPlan,
     start: start, advance: advance, reset: reset,
     status: status, current: current, review: review,
     evaluate: evaluate, diagnose: diagnose, stat: statOf, resetStat: resetStat
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/campaign.js', { kind: 'engine', ver: '2.187.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/campaign.js', { kind: 'engine', ver: '2.218.0' });
 })();

@@ -80,8 +80,8 @@ function runA(a) {
   a(body.length > 0, 'e4/A1: 能从真源码取出 WA.campaign 的对象字面量体');
   KEYS.forEach(function (k) { a(body.indexOf(k + ':') > 0, 'e4/A2: 导出面含 ' + k); });
   MUST_BE_ABSENT.forEach(function (k) { a(body.indexOf(k + ':') < 0, 'e4/A3: 导出面**没有** ' + k); });
-  a(/const DEF = \{ enabled: false, stageCap: 12, logCap: 24 \}/.test(src), 'e4/A4: 默认关 + 两项参数声明');
-  a(/bounds: \{ stageCap: \[3, 24\], logCap: \[4, 64\] \}/.test(src), 'e4/A5: 区间声明逐字在位');
+  a(/const DEF = \{ enabled: false, stageCap: 12, logCap: 24, planCap: 6 \}/.test(src), 'e4/A4: 默认关 + 三项参数声明（v2.218.0 起含 planCap）');
+  a(/bounds: \{ stageCap: \[3, 24\], logCap: \[4, 64\], planCap: \[1, 12\] \}/.test(src), 'e4/A5: 区间声明逐字在位（v2.218.0 起含 planCap）');
   a(/LS_KEY = 'worldaxis_campaign_settings_v1'/.test(src), 'e4/A6: 设置键是单一真源');
   a(/module: 'campaign'/.test(src), 'e4/A7: 设置登记 module 为 campaign（settings-registry-only 档的存在性前提）');
   ['diplomacy-state', 'freight-arrived', 'relation-tier', 'day-reached']
@@ -92,8 +92,8 @@ function runA(a) {
   // A10b：字段名必须**真实存在于骨架**（初版读了一个不存在的字段 ⇒ 谓词恒不可读）
   a(/WA\.store\.read\('clock\.dayIndex'\)/.test(src) && src.indexOf("'clock." + "round'") < 0,
     'e4/A10b: 世界时间读数走骨架真实字段 clock.dayIndex（不凭印象写字段名）');
-  a(/c\.stage = nextIdx;/.test(src) && /const nextIdx = idx \+ 1;/.test(src),
-    'e4/A11: 提升是 idx + 1（**不是** idx++ 的任意跳）');
+  a(/c\.stage = nextIdx;/.test(src) && /let nextIdx = idx \+ 1;/.test(src),
+    'e4/A11: 主进度起点是 idx + 1（v2.218.0 起为 let —— 可选阶段/分支会改写它，但都只前进）');
   a(/if \(done\) c\.finished = true;/.test(src), 'e4/A12: 结束条件达成只记 finished');
   a(/开新局是玩家的动作/.test(src), 'e4/A13: 「结束不自动清空世界」写在模块里');
   a(/本模块\*\*不猜世界里的名字\*\*/.test(src) || /不猜世界里的名字/.test(src),
@@ -226,8 +226,8 @@ function runN(a) {
       },
       want: 'unreadable' },
     { n: 2, why: 'N2: 允许跳级 ⇒ 后一阶段的达成把前一阶段一起带过去（阶段失去本义）',
-      from: '    const nextIdx = idx + 1;',
-      to: '    const nextIdx = ev.stages.length;',
+      from: '      nextIdx = targetIdx;',
+      to: '      nextIdx = ev.stages.length;',
       probe: function (WA) {
         WA.campaign.setSettings({ enabled: true });
         BLUEPRINT(WA);
@@ -238,8 +238,8 @@ function runN(a) {
       },
       want: [true, false, 1] },
     { n: 3, why: 'N3: 结束后自动清空世界 ⇒ 「开新局」这个玩家动作被系统替他做了',
-      from: '    if (done) { _stat.finishes += 1; return { ok: true, done: true, review: review() }; }',
-      to: "    if (done) { _stat.finishes += 1; WA.store.transact(function (d) { d.clock.dayIndex = 0; }); return { ok: true, done: true, review: review() }; }",
+      from: '    if (done) { _stat.finishes += 1; return { ok: true, done: true, branch: branchHit, reward: reward, review: review() }; }',
+      to: "    if (done) { _stat.finishes += 1; WA.store.transact(function (d) { d.clock.dayIndex = 0; }); return { ok: true, done: true, branch: branchHit, reward: reward, review: review() }; }",
       probe: function (WA) {
         WA.campaign.setSettings({ enabled: true });
         BLUEPRINT(WA);

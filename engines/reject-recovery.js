@@ -431,7 +431,17 @@
     //   「每 3 轮」变「每 3 秒」，而两者在读数上长得一样）。均带可执行见证（reject-v2780.js
     //   rulePack 段真跑）；不写 OVERRIDES：`already` 收在 already-* 词族、`no-round` 分词
     //   里的 `round` 本就在词表内 ⇒ explain() 走 via:rule。
-    'already-ran', 'no-round'
+    'already-ran', 'no-round',
+    // ── v2.218.0（拓展 N1）：可编辑战役层新增五码 ──
+    //   现场实测 769 / 快照 766 ⇒ 差 5。`bad-plan`（传进来的不是对象）、
+    //   `bad-plan-id`（空 id 的删除）、`invalid-plan`（计划机械校验不过，整批拒收）、
+    //   `plan-cap`（自定义计划数已满，不静默丢最旧）、`failed`（失败条件触发，
+    //   **不是** not-met —— 「这一局输了」与「还没做到」同形会让复盘答不出哪一件）。
+    //   五码均带可执行见证（reject-v2780.js campaign 段真跑）。
+    //   OVERRIDES 只补判不了的两条：`invalid-plan`（改计划内容，不是重试同输入）
+    //   与 `failed`（终态，只能重开）；`bad-plan`/`bad-plan-id` 分词收在 bad-* 词族、
+    //   `plan-cap` 收在 cap 词族 ⇒ explain() 走 via:rule。
+    'bad-plan', 'bad-plan-id', 'invalid-plan', 'plan-cap', 'failed'
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。

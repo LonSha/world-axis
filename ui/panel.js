@@ -2885,6 +2885,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-cp-review" title="复盘：不推进、只看这一局的成绩单（阶段 / 天数 / 达成历史）">复盘</button>
         <button class="wa-btn" id="wa-cp-reset" title="开新局：清空战役进度；世界状态一个字都不动">清进度</button>
       </div>
+      <div class="wa-row">
+        <input id="wa-cp-planid" class="wa-input" placeholder="自定义计划 id（自存的战役结构）"/>
+        <button class="wa-btn" id="wa-cp-planlist" title="计划库：列出已存的自定义战役计划（不依赖蓝图真源）">计划库</button>
+        <button class="wa-btn" id="wa-cp-planshow" title="读一个自定义计划的阶段结构：每阶段的判据 / 可选 / 奖励 / 分支 / 失败条件">读计划</button>
+        <button class="wa-btn" id="wa-cp-plandel" title="删掉一个自定义计划：只动自有计划的库，世界与其他计划都不动">删计划</button>
+      </div>
       <div id="wa-cp-out" class="wa-out"></div>`;
    }
 
@@ -10800,6 +10806,44 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         const r = WA.campaign.reset(false);
         cpOut('<div class="wa-log ' + (r.ok ? 'wa-log-ok' : 'wa-log-err') + '">'
           + (r.ok ? esc(r.note) : esc(cpWhy(r.reason))) + '</div>');
+      });
+      // v2.218.0（拓展 N1）：自定义计划面的三个真消费方 —— planList / planOf / planDelete。
+      //   与上面的模板开局并列：模板读蓝图真源、自定义计划读自有键（两条路并存）。
+      on('#wa-cp-planlist', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">战役层未加载</div>');
+        const r = WA.campaign.planList();
+        if (!r.plans.length) return cpOut('<div class="wa-log wa-log-info">计划库是空的（还没有自存的战役计划）　上限 ' + r.cap + '</div>');
+        cpOut('<div class="wa-log wa-log-info">计划库 ' + r.plans.length + ' / ' + r.cap + '</div>'
+          + r.plans.map(function (p) {
+            return '<div class="wa-item">' + esc(p.id) + '<div class="wa-dim">阶段数 ' + p.stages + '</div></div>';
+          }).join(''));
+      });
+      on('#wa-cp-planshow', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">战役层未加载</div>');
+        const el = $('#wa-cp-planid');
+        const want = el ? el.value.trim() : '';
+        const pl = WA.campaign.planOf(want);
+        if (!pl.ok) return cpOut('<div class="wa-log wa-log-err">读不到：' + esc(cpWhy(pl.reason)) + '</div>');
+        if (!pl.custom) return cpOut('<div class="wa-log wa-log-info">「' + esc(want) + '」不是自存计划，走的是蓝图模板（阶段数 ' + pl.stages.length + '）</div>');
+        cpOut('<div class="wa-log wa-log-info">自定义计划：' + esc(pl.id) + '　阶段数 ' + pl.stages.length + '</div>'
+          + pl.stages.map(function (g, i) {
+            const bits = [];
+            if (g.optional) bits.push('可选（未成不阻塞主线）');
+            if (typeof g.reward === 'number') bits.push('奖励 ' + g.reward);
+            if (g.branchFrom) bits.push('分支 → ' + g.branchFrom);
+            if (g.failWhen) bits.push('失败条件 ' + g.failWhen.kind);
+            return '<div class="wa-item">' + (i + 1) + '. ' + esc(g.label)
+              + '<div class="wa-dim">目标：' + esc(g.goal) + '　判据：' + esc(g.pred.kind)
+              + (bits.length ? '　' + esc(bits.join('　')) : '') + '</div></div>';
+          }).join(''));
+      });
+      on('#wa-cp-plandel', () => {
+        if (!WA.campaign) return cpOut('<div class="wa-log wa-log-err">战役层未加载</div>');
+        const el = $('#wa-cp-planid');
+        const want = el ? el.value.trim() : '';
+        const r = WA.campaign.planDelete(want);
+        cpOut('<div class="wa-log ' + (r.ok ? 'wa-log-ok' : 'wa-log-err') + '">'
+          + (r.ok ? ('已删除 ' + r.removed + ' 条计划（世界与其他计划未动）') : esc(cpWhy(r.reason))) + '</div>');
       });
     }
     // ── v2.198.0（Y1）：拍控制中心（六枚**只读**按钮）──────────────────────

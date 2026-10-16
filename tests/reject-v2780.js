@@ -5131,6 +5131,47 @@ function runWitness(WA) {
     });
     Cp.reset(false);
     Cp.setSettings({ enabled: keepEnabled });
+    // ── v2.218.0（拓展 N1）：可编辑战役层新增五码 ──
+    //   bad-plan / bad-plan-id / invalid-plan / plan-cap / failed
+    //   逐条走产品真 API：`invalid-plan` 与 `plan-cap` **同时**跑出来（一个是「计划本身坏」、
+    //   一个是「库满了」—— 两件事若在读数上同形，玩家永远不知道是该改计划还是该删旧计划）；
+    //   `failed` 与 `not-met` 也必须**都**跑出来（失败条件触发 ≠ 还没做到）。
+    const keepOn1 = Cp.getSettings().enabled;
+    Cp.setSettings({ enabled: true });
+    want('bad-plan', 'campaign.planSave：传进来的不是对象（如实报 bad-plan，不当成空计划存下）');
+    trip('bad-plan', function () { return [Cp.planSave(null).reason]; });
+    want('bad-plan-id', 'campaign.planDelete：空 id 的删除（不猜「你想删哪一个」）');
+    trip('bad-plan-id', function () { return [Cp.planDelete('').reason]; });
+    want('invalid-plan', 'campaign.planSave：计划机械校验不过（谓词不在既有四类 / 缺参数 / 奖励越界）⇒ 整批拒收');
+    trip('invalid-plan', function () {
+      return [Cp.planSave({ id: 'bad1', stages: [{ id: 's', label: 'l', goal: 'g', pred: { kind: '绝对不存在的谓词' } }] }).reason];
+    });
+    want('plan-cap', 'campaign.planSave：自定义计划数已达 planCap（不是静默丢弃最旧那条）');
+    trip('plan-cap', function () {
+      const keepCap = Cp.getSettings().planCap;
+      try {
+        Cp.setSettings({ planCap: 1 });
+        Cp.planSave({ id: 'capA', stages: [{ id: 's', label: 'l', goal: 'g', pred: { kind: 'day-reached', day: 1 } }] });
+        return [Cp.planSave({ id: 'capB', stages: [{ id: 's', label: 'l', goal: 'g', pred: { kind: 'day-reached', day: 1 } }] }).reason];
+      } finally {
+        Cp.planDelete('capA'); Cp.planDelete('capB');
+        Cp.setSettings({ planCap: keepCap });
+      }
+    });
+    want('failed', 'campaign.advance：失败条件触发（与「没达成」不是一回事 —— 这一局输了，不是还没做到）');
+    trip('failed', function () {
+      Cp.planSave({ id: 'failW', stages: [
+        { id: 's1', label: 'l', goal: 'g', pred: { kind: 'day-reached', day: 1 }, failWhen: { kind: 'day-reached', day: 50 } },
+        { id: 's2', label: 'l2', goal: 'g', pred: { kind: 'day-reached', day: 2 } }
+      ] });
+      Cp.start('failW');
+      WA.store.transact(function (d) { d.clock.dayIndex = 50; });
+      const r = [Cp.advance().reason];
+      Cp.reset(false);
+      Cp.planDelete('failW');
+      return r;
+    });
+    Cp.setSettings({ enabled: keepOn1 });
   }
   // ── engines/perspective-lock.js（v2.186.0 · O9 全知出口闸）──
   //   本版新增两个码，都在 `outletAllowed` 的**返回体**里（不是 throw）：
