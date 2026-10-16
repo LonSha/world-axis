@@ -5260,6 +5260,68 @@ function runWitness(WA) {
       return (second.trace[0] || {}).reason;
     });
     WA.rulePack.template.reset();
+    // ═══ v2.217.0（拓展 N6）：持久调度面 schedule.* 的六个新码 ═══
+    //   全部真 API 跑出；读数先经 /tmp 探针实测再定稿（先跑一次看真返回，再照读数写见证）。
+    //   与 template.* 的分列理由：调度面是**落盘**的（行数/预算/游标跨刷新），
+    //   试跑面是**内存态**的（点击即跑、刷新即空）—— 两条路的拒收码不许同形混收。
+    {
+      const Sc = WA.rulePack.schedule;
+      if (Sc && typeof Sc.set === 'function') {
+        // ① disabled：调度面关着时登记/跑/清全拒（不是静默成功）
+        WA.rulePack.setSettings({ enabled: false });
+        want('disabled', 'N6：调度面关着 ⇒ set/run/reset 全拒 disabled（不是「静默什么都不做」）');
+        trip('disabled', function () {
+          return [Sc.set([{ id: 's0', action: 'pending.sweep', every: 1, budget: 1 }]).reason,
+                  Sc.run({ round: 1 }).reason, Sc.reset().reason];
+        });
+        WA.rulePack.setSettings({ enabled: true });
+        // ② no-round：轮次读不到 ⇒ 拒收（不退回墙上时间）
+        want('no-round', 'N6：轮次读不到 ⇒ no-round（不拿墙钟冒充轮次——那会让「每 3 轮」变「每 3 秒」）');
+        trip('no-round', function () {
+          Sc.reset();
+          return [Sc.due('不是数').reason, Sc.run({ round: '也不是数' }).reason];
+        });
+        // ③ not-due：到期判断纯计算面（读 trace/blocked 现场，不跑真动作）
+        want('not-due', 'N6：未到期 ⇒ not-due（如实记、不执行——与 already-ran 分列）');
+        trip('not-due', function () {
+          Sc.reset();
+          Sc.set([{ id: 's2', action: 'pending.sweep', every: 3, budget: 2 }]);
+          return [(Sc.due(4).blocked[0] || {}).reason,
+                  (Sc.run({ round: 4 }).trace[0] || {}).reason];
+        });
+        // ④ already-ran：同轮重复事件不多跑
+        want('already-ran', 'N6：同轮重复调用 ⇒ already-ran（lastRound 落盘去重，做过就是做过）');
+        trip('already-ran', function () {
+          Sc.reset();
+          Sc.set([{ id: 's3', action: 'pending.sweep', every: 1, budget: 2 }]);
+          Sc.run({ round: 7 });
+          const second = Sc.run({ round: 7 });
+          return [(second.trace[0] || {}).reason, (Sc.due(7).blocked[0] || {}).reason];
+        });
+        // ⑤ budget-exhausted：预算跑满（调度面自己的同形码，与 template 的分列）
+        want('budget-exhausted', 'N6：调度行预算跑满 ⇒ budget-exhausted（used 落盘跨刷新，不是静默跳过）');
+        trip('budget-exhausted', function () {
+          Sc.reset();
+          Sc.set([{ id: 's4', 'action': 'pending.sweep', every: 1, budget: 1 }]);
+          Sc.run({ round: 1 });
+          return [(Sc.run({ round: 2 }).trace[0] || {}).reason];
+        });
+        // ⑥ unknown-action：词表闸（调度行里混进表外动作名）
+        want('unknown-action', 'N6：调度行动作不在封闭词表 ⇒ unknown-action（不 eval 用户文本）');
+        trip('unknown-action', function () {
+          Sc.reset();
+          const keep = WA.settingsBus.saveOrThrow;
+          // 需要绕过 set 的校验直写一行坏数据来见证 run 口的词表闸：
+          //   用 saveOrThrow 直写 __SCHED 数据键（与产品同一写入路径，不算旁门）
+          WA.settingsBus.saveOrThrow({ key: 'worldaxis_rule_pack_schedule_v1', def: null, module: 'rulePack', optional: true },
+            { version: 1, seq: 1, updatedAt: 1, rows: [{ id: 's5', action: '不存在的动作', every: 1, budget: 1, used: 0, failPolicy: 'skip', lastRound: null, lastAt: 0, lastReason: '' }] });
+          try {
+            return [(Sc.run({ round: 2 }).trace[0] || {}).reason];
+          } finally { WA.settingsBus.saveOrThrow = keep; Sc.reset(); }
+        });
+        Sc.reset();
+      }
+    }
   }
   {
     WA.worldLab.setSettings({ enabled: true });

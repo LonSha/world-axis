@@ -554,8 +554,8 @@ function runB(a) {
 function runC(a) {
   const src = srcOf();
   a(src.indexOf('bounds: {') >= 0, 'e7/C1: 设置区间声明（settingsBus 越界夹回的前提）');
-  a(src.indexOf('WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);') >= 0,
-    'e7/C2: 设置键走 __settingsRegs 登记');
+  a(src.indexOf('WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG, __SCHED]);') >= 0,
+    'e7/C2: 设置键走 __settingsRegs 登记（v2.217.0 起含可选数据键 __SCHED，与 gen-gate __DATA 同规）');
   a(src.indexOf('WA.registerModule') >= 0, 'e7/C3: 装载期自注册（模块图需要）');
   a(/module: 'rulePack'/.test(src), 'e7/C4: 设置登记的 module 与命名空间同名');
   a(/const MODULE_OF = \['theme', 'recipe', 'preset', 'rules', 'backstage', 'difficulty', 'storyChoice', 'rehearsal'\]/.test(src),

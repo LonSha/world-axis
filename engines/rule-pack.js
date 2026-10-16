@@ -55,6 +55,17 @@
   };
   const FORMAT = 1;
   const MOD_TAG = __REG.module;
+  // ── v2.217.0（拓展 N6）：**持久调度台账**（数据键，与设置键分开）─────────────
+  //   为什么另开一个键而不是塞进 DEF：`DEF` 是「规则面」的容量与开关声明，而调度台账是
+  //   **账**（行数随用户登记增长、要跨刷新保留已用额度）。两者同键会让
+  //   「切一套规则」顺手把调度账一起改掉 —— 与 preset-world「设置键与数据键分开」同规。
+  //   为什么 `optional: true`：用户没登记过调度时该键缺席是**正常状态**，
+  //   不是「声明了却没人写」的幽灵键。
+  const SCHED_KEY = 'worldaxis_rule_pack_schedule_v1';
+  const __SCHED = { key: SCHED_KEY, def: null, module: 'rulePack', optional: true };
+  const SCHED_SCHEMA = 1;
+  const SCHED_CAP = 24;
+  function EMPTY_SCHED() { return { version: SCHED_SCHEMA, seq: 0, updatedAt: 0, rows: [] }; }
 
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : null;
@@ -69,13 +80,17 @@
     }
     return Object.assign({}, settings(), next || {});
   }
-  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG, __SCHED]);
 
   const _stat = { saves: 0, applies: 0, drops: 0, exports: 0, imports: 0,
     // v2.203.0（Y8）：detects / rolls / composes / admits 四栏 —— 新增的四个功能各自有无台账，
     //   在诊断面上必须逐栏看得见（有功能没台账 = 出了事没人知道它被调过）。
     detects: 0, rolls: 0, composes: 0, admits: 0,
-    templateRuns: 0, templateRefused: 0, refused: 0, lastReason: '', faults: {} };
+    templateRuns: 0, templateRefused: 0, refused: 0, lastReason: '', faults: {},
+    // v2.217.0（N6）：调度面三栏 —— 登记 / 按轮次跑 / 被拒。
+    //   为什么与 templateRuns 分栏：「手动试跑了几次」与「按轮次自动跑了几次」
+    //   是两件事，合成一栏就再也答不出是哪一类在动。
+    schedSets: 0, schedRuns: 0, schedRefused: 0 };
   function fault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
   function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -841,6 +856,218 @@
   }
   function resetTemplates() { _templates = []; return { ok: true, templates: 0 }; }
 
+  // ── v2.217.0（拓展 N6）：**可持久保存的条件自动化**（`schedule.*`）────────────
+  //   与 `template.*` 的分工（两者**并存**，不互相替代 —— 合成一条会让两类语义同形）：
+  //     · `template.*`  —— 「现在试一下」：内存态、不落盘、不受轮次约束、点击即跑；
+  //     · `schedule.*`  —— 「让它自己按轮次跑」：**落盘**、**按轮次**、**预算跨刷新保留**。
+  //   病灶（计划原文，现场实证）：`runTemplates()` **不消费** `dueAt()` —— `dueAt` 算出的
+  //   「这一轮该跑哪几条」在 run 那条路上根本没人看，于是「每 N 轮触发一次」只是一句声明；
+  //   而 `_templates` 是模块内存变量、面板每次点击又先 `set()` 再 `run({})`，
+  //   `used` 跟着被重建的模板**清零** —— 「预算跑满即停」在界面上永远看不到。
+  //   边界（逐条来自计划原文，全是否定式）：
+  //     1 默认关（`enabled:false` 时 set/run/reset 全部拒收 `disabled`，不是静默成功）；
+  //     2 **不执行用户 JavaScript**：动作仍是 `ACTIONS` 封闭词表（零 eval/Function/require/import）；
+  //     3 **不改世界状态**：本面零 `store.transact`，动作本身全是既有只读读口；
+  //     4 **未到期不执行**（`round % every !== 0` 的行不跑，如实记 `not-due`）；
+  //     5 **同轮重复事件不多跑**（`lastRound === round` 的行跳过并如实记 `already-ran`，
+  //       不是静默丢 —— 与 Q7 的「幂等账」同一条纪律：做过就是做过）；
+  //     6 **刷新不重置预算**（`used` / `lastRound` 落盘，跨会话保留）；
+  //     7 **关闭后零动作**；
+  //     8 轮次读不到 ⇒ 拒收 `no-round`，**不退回墙上时间**（与 gen-gate 边界 5 同规：
+  //       拿墙钟当轮次会让「每 3 轮」变成「每 3 秒」，而两者在读数上长得一样）。
+  /** 作用域键：调度账挂在**聊天域**下（与 gen-gate 的 chatKey 同规）。 */
+  function scopeKey() {
+    try {
+      return (WA.store && typeof WA.store.chatId === 'function')
+        ? (String(WA.store.chatId() || '') || 'wa_default') : 'wa_default';
+    } catch (e) { return 'wa_default'; }
+  }
+  /** 轮次唯一真源（`evolution.roundOf`）；拿不到就 null，**绝不退回墙上时间**。
+   *  round 0 语义（如实记）：`evolution.roundOf` 对读不到的世界返回 0（既有契约），
+   *  而 round 0 满足 `0 % every === 0` ⇒ **视为到期**。这不是 bug：读到 0 说明世界还没有轮次
+   *  记录，此刻跑一次只读观测是安全的（边界 3），游标 `lastRound: 0` 落盘后，同一世界
+   *  的下一轮（round 1）才判 `not-due`——即「无轮次世界最多在第 0 轮跑一次」，不会重复。 */
+  function roundOf(v) {
+    if (v === undefined || v === null || v === '') {
+      try {
+        const s0 = (WA.store && typeof WA.store.get === 'function') ? WA.store.get() : null;
+        if (WA.evolution && typeof WA.evolution.roundOf === 'function') {
+          const n0 = WA.evolution.roundOf(s0);
+          return (typeof n0 === 'number' && isFinite(n0) && n0 >= 0) ? Math.floor(n0) : null;
+        }
+      } catch (e) { return null; }
+      return null;
+    }
+    const n = num(v);
+    return (n === null || n < 0) ? null : Math.floor(n);
+  }
+  /** 读调度台账（形状逐项收口：坏形状**不静默折成空**，如实报 bad-type）。 */
+  function schedRead() {
+    if (!WA.settingsBus || typeof WA.settingsBus.read !== 'function') {
+      return { ok: false, reason: 'read-failed', data: EMPTY_SCHED() };
+    }
+    let raw = null;
+    try { raw = WA.settingsBus.read(__SCHED); } catch (e) { return { ok: false, reason: 'read-failed', data: EMPTY_SCHED() }; }
+    if (raw === null || raw === undefined) return { ok: true, data: EMPTY_SCHED() };
+    if (typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, reason: 'bad-type', data: EMPTY_SCHED() };
+    return { ok: true, data: {
+      version: (typeof raw.version === 'number') ? raw.version : SCHED_SCHEMA,
+      seq: (typeof raw.seq === 'number') ? raw.seq : 0,
+      updatedAt: (typeof raw.updatedAt === 'number') ? raw.updatedAt : 0,
+      rows: Array.isArray(raw.rows)
+        ? raw.rows.filter(function (r) { return isObj(r); }).slice(0, SCHED_CAP) : []
+    } };
+  }
+  function schedWrite(data) {
+    if (!WA.settingsBus || typeof WA.settingsBus.saveOrThrow !== 'function') {
+      fault('write-failed'); return { ok: false, reason: 'write-failed' };
+    }
+    const r = WA.settingsBus.saveOrThrow(__SCHED, data);
+    if (!r || r.ok !== true) { fault('write-failed'); return { ok: false, reason: 'write-failed' }; }
+    return { ok: true };
+  }
+  function schedList() {
+    const g = schedRead();
+    if (!g.ok) return { ok: false, reason: g.reason, count: 0, rows: [] };
+    return { ok: true, count: g.data.rows.length, scope: scopeKey(), updatedAt: g.data.updatedAt || 0,
+      rows: g.data.rows.map(function (r) {
+        const used = (typeof r.used === 'number') ? r.used : 0;
+        return { id: r.id, action: r.action, every: r.every, budget: r.budget,
+          failPolicy: r.failPolicy, used: used,
+          lastRound: (r.lastRound === null || r.lastRound === undefined) ? null : r.lastRound,
+          lastReason: r.lastReason || '', done: used >= r.budget };
+      }) };
+  }
+  /** 登记调度行（**全判再写**：有任何一条非法就整体拒收 —— 半套落地会让「哪几条生效了」只能靠猜）。 */
+  function schedSet(list) {
+    const cfg = settings();
+    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
+    if (!Array.isArray(list)) { fault('bad-shape'); return { ok: false, reason: 'bad-shape' }; }
+    const g = schedRead();
+    if (!g.ok) { fault(g.reason); return { ok: false, reason: g.reason }; }
+    const accepted = [], rejected = [];
+    const seq0 = g.data.seq || 0;
+    list.slice(0, SCHED_CAP).forEach(function (t, i) {
+      const v = validateTemplate(t, seq0 + i);
+      if (!v.ok) {
+        rejected.push({ reason: v.reason, id: v.id || null, got: v.action || v.every || v.budget || v.got || null });
+        return;
+      }
+      // 调度行 = 模板行 + **持久游标**（used / lastRound / lastAt / lastReason）。
+      //   这四个字段就是「刷新不重置预算」与「同轮不多跑」的全部载体。
+      accepted.push(Object.assign({}, v.tpl, { lastRound: null, lastAt: 0 }));
+    });
+    const firstBad = rejected[0] || null;
+    if (firstBad) { fault(firstBad.reason); return { ok: false, reason: firstBad.reason, rejected: rejected }; }
+    const at = clockNow('rulePack.schedule');
+    const w = schedWrite({ version: SCHED_SCHEMA, seq: seq0 + accepted.length, updatedAt: at, rows: accepted });
+    if (!w.ok) return { ok: false, reason: w.reason };
+    _stat.schedSets++;
+    return { ok: true, accepted: accepted.length, rows: schedList().rows };
+  }
+  /** 该不该跑（**纯计算，零写**）：按轮次与持久游标判。 */
+  function schedDue(round) {
+    const n = roundOf(round);
+    if (n === null) return { ok: false, reason: 'no-round' };
+    const g = schedRead();
+    if (!g.ok) return { ok: false, reason: g.reason };
+    const due = [], blocked = [];
+    g.data.rows.forEach(function (r) {
+      const used = (typeof r.used === 'number') ? r.used : 0;
+      if (used >= r.budget) { blocked.push({ id: r.id, reason: 'budget-exhausted' }); return; }
+      if (r.lastRound === n) { blocked.push({ id: r.id, reason: 'already-ran' }); return; }
+      if (n % r.every !== 0) { blocked.push({ id: r.id, reason: 'not-due' }); return; }
+      due.push({ id: r.id, action: r.action, every: r.every, used: used, budget: r.budget });
+    });
+    return { ok: true, round: n, due: due, blocked: blocked };
+  }
+  /**
+   * 按轮次跑一轮（**唯一写口**：执行 + 落盘游标）。
+   *   顺序刻意是「先执行、后一次性落盘」：动作全是只读读口（边界 3），
+   *   故落盘失败最多让同一轮重跑一次只读观测，不会重复产生世界副作用；
+   *   而落盘失败会如实回带 `persisted:false` + `writeReason` —— 账没落上**看得见**。
+   */
+  function schedRun(opt) {
+    const cfg = settings();
+    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const o = opt || {};
+    const n = roundOf(o.round);
+    if (n === null) { fault('no-round'); return { ok: false, reason: 'no-round' }; }
+    const g = schedRead();
+    if (!g.ok) { fault(g.reason); return { ok: false, reason: g.reason }; }
+    const rows = g.data.rows;
+    if (!rows.length) { fault('no-templates'); return { ok: false, reason: 'no-templates' }; }
+    const at = clockNow('rulePack.schedule');
+    const trace = [];
+    let ran = 0, refused = 0, notDue = 0, already = 0, stopped = null;
+    for (let i = 0; i < rows.length; i++) {
+      const t = rows[i];
+      const used = (typeof t.used === 'number') ? t.used : 0;
+      if (used >= t.budget) {
+        notDue++;
+        trace.push({ id: t.id, action: t.action, ok: false, reason: 'budget-exhausted', used: used, budget: t.budget });
+        continue;
+      }
+      if (t.lastRound === n) {
+        already++;
+        trace.push({ id: t.id, action: t.action, ok: false, reason: 'already-ran', round: n });
+        continue;
+      }
+      if (n % t.every !== 0) {
+        notDue++;
+        trace.push({ id: t.id, action: t.action, ok: false, reason: 'not-due', round: n, every: t.every });
+        continue;
+      }
+      const A = ACTIONS[t.action];
+      if (!A) {
+        refused++; _stat.schedRefused++;
+        t.lastReason = 'unknown-action';
+        trace.push({ id: t.id, action: t.action, ok: false, reason: 'unknown-action', used: used, budget: t.budget });
+        if (t.failPolicy === 'stop') { stopped = t.id; break; }
+        continue;
+      }
+      let r = null;
+      try { r = A.call(WA, t.arg); } catch (e) { r = { ok: false, reason: 'threw' }; }
+      const ranOk = !!(r && r.ok === true);
+      t.used = used + 1; t.lastRound = n; t.lastAt = at;
+      t.lastReason = ranOk ? 'ok' : String((r && r.reason) || 'unknown');
+      if (ranOk) {
+        ran++;
+        trace.push({ id: t.id, action: t.action, ok: true, used: t.used, budget: t.budget });
+      } else {
+        refused++; _stat.schedRefused++;
+        trace.push({ id: t.id, action: t.action, ok: false, reason: String((r && r.reason) || 'unknown'),
+          used: t.used, budget: t.budget });
+        if (t.failPolicy === 'stop') { stopped = t.id; break; }
+      }
+    }
+    const w = schedWrite({ version: SCHED_SCHEMA, seq: g.data.seq || 0, updatedAt: at, rows: rows });
+    _stat.schedRuns++;
+    _stat.lastReason = stopped ? 'stopped' : (refused ? 'partial' : 'ran');
+    return { ok: true, at: at, round: n, scope: scopeKey(),
+      ran: ran, refused: refused, notDue: notDue, alreadyRan: already, stoppedAt: stopped,
+      persisted: !!w.ok, writeReason: w.ok ? null : w.reason,
+      trace: trace.slice(0, SCHED_CAP),
+      note: '按轮次跑：**同轮重复调用不再执行**（lastRound 落盘去重）、预算与已用次数**跨刷新保留**；'
+        + '动作是既有只读读口，本面零 store 写' };
+  }
+  function schedReset() {
+    const cfg = settings();
+    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const w = schedWrite({ version: SCHED_SCHEMA, seq: 0, updatedAt: clockNow('rulePack.schedule'), rows: [] });
+    if (!w.ok) return { ok: false, reason: w.reason };
+    return { ok: true, rows: 0 };
+  }
+  function schedStat() {
+    const g = schedRead();
+    const rows = g.ok ? g.data.rows : [];
+    return { ok: true, readOk: g.ok, readReason: g.ok ? null : g.reason,
+      scope: scopeKey(), rows: rows.length, cap: SCHED_CAP,
+      totalUsed: rows.reduce(function (a, r) { return a + ((typeof r.used === 'number') ? r.used : 0); }, 0),
+      done: rows.filter(function (r) { return ((typeof r.used === 'number') ? r.used : 0) >= r.budget; }).length,
+      sets: _stat.schedSets, runs: _stat.schedRuns, refused: _stat.schedRefused };
+  }
+
   /** 封闭集（面板念的就是这一份，不另写一遍）。 */
   function catalog() {
     const cfg = settings();
@@ -864,7 +1091,8 @@
         conflict: '冲突**只报不判**：指出来是哪两条（同键两处写 / 两条政策互斥 / 两题材叠加），谁赢由你改 —— 不做「后启用的赢」',
         noCarry: '规则包**不得携带世界事实**（人物 / 事件 / 地图不进包）—— 导入时按显式名单在写盘之前拦下',
         rollback: '回滚栈里**只装规则面键值**，一条世界键都进不来；栈上限 ' + MAX_HISTORY + ' 条（超出丢最旧一条并如实回报）',
-        compose: '组合口（开档即定档）是**只读**的：它不切规则、不种世界，只把「这两样配起来是什么样」摆出来'
+        compose: '组合口（开档即定档）是**只读**的：它不切规则、不种世界，只把「这两样配起来是什么样」摆出来',
+        schedule: '调度面（`schedule.*`）与试跑面（`template.*`）**分工**：前者落盘、按轮次、预算跨刷新保留；后者是内存态的一次性试跑。两条路都只调封闭词表里的既有只读读口，都不执行用户 JavaScript、都不写世界状态'
       }
     };
   }
@@ -895,6 +1123,8 @@
       ok: true, enabled: !!cfg.enabled, maxPacks: cfg.maxPacks, maxKeys: cfg.maxKeys,
       packs: packs().length, active: cfg.active || '',
       templateCount: _templates.length,
+      // v2.217.0（N6）：调度面读数与试跑面**分栏**（见 statOf 的同款注释）。
+      schedule: schedStat(),
       // 逐项报「这个引擎在不在」—— 缺席时 save/apply 仍能跑（设置族自足），
       //   但模板会拒收；两件事必须分得开。
       deps: deps,
@@ -932,6 +1162,9 @@
   function statOf() {
     return Object.assign({}, _stat, { faults: Object.assign({}, _stat.faults),
       enabled: !!settings().enabled, packs: packs().length, templates: _templates.length,
+      // v2.217.0（N6）：试跑面（内存态）与调度面（落盘）两套读数各自成栏 ——
+      //   合并会让「试跑了几次」与「自动跑了几次」同形。
+      schedule: schedStat(),
       actions: ACTION_IDS.length,
       // Y8 四栏台账：detects / admits / rolls / composes 在 `_stat` 里，`historyDepth` 现场读。
       historyDepth: history().length, conflictKinds: CONFLICT_KINDS.length });
@@ -973,6 +1206,13 @@
       ids: ACTION_IDS.slice(),
       list: templates, set: setTemplates, run: runTemplates,
       tick: runTemplates, dueAt: dueAt, reset: resetTemplates
+    },
+    // v2.217.0（N6）：**持久条件自动化**（落盘 / 按轮次 / 预算跨刷新保留）。
+    //   消费方 = 面板「规则包与自动化模板」区块的调度四钮（登记 / 清单 / 按轮次跑 / 清空）。
+    //   为什么与 `template` 并列而不是替换它：见本段上方的分工注释。
+    schedule: {
+      list: schedList, set: schedSet, due: schedDue, run: schedRun,
+      reset: schedReset, stat: schedStat, scopeKey: scopeKey
     },
     diagnose: diagnose, stat: statOf
   };

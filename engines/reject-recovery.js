@@ -424,7 +424,14 @@
     //   不在此写 OVERRIDES:码名分词 ['resume','write','threw'] / ['resume','write','failed']
     //   里的 `threw` / `failed` 都收在 retry-same-input 词表内 ⇒ `explain()` 走 `via:'rule'`,
     //   再登记一份就是「同一件事两个真源」(与 loadRetry 三码同一判据)。
-    'resume-write-failed', 'resume-write-threw'
+    'resume-write-failed', 'resume-write-threw',
+    // ── v2.217.0（拓展 N6）：schedule.* 持久调度面的两码 ──
+    //   现场实测 766 / 快照 764 ⇒ 差 2。`already-ran`（同轮重复事件不多跑，lastRound 落盘
+    //   去重）与 `no-round`（轮次读不到 ⇒ 拒收，**绝不退回墙上时间**——拿墙钟当轮次会让
+    //   「每 3 轮」变「每 3 秒」，而两者在读数上长得一样）。均带可执行见证（reject-v2780.js
+    //   rulePack 段真跑）；不写 OVERRIDES：`already` 收在 already-* 词族、`no-round` 分词
+    //   里的 `round` 本就在词表内 ⇒ explain() 走 via:rule。
+    'already-ran', 'no-round'
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
