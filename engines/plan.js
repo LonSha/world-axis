@@ -43,9 +43,11 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_plan_settings_v1';
-  const DEF = { enabled: false, maxSteps: 4, maxPlans: 12, maxTries: 3 };
+  // N2（v2.220.0）：新增两格——`autoAdopt`（自动采用开关，**默认关**）与 `adoptBudget`（每轮自动
+  //   采用的预算上限）。「默认只建议」是 N2 的第一条边界：不开这一格，candidates 永远只读。
+  const DEF = { enabled: false, maxSteps: 4, maxPlans: 12, maxTries: 3, autoAdopt: false, adoptBudget: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'plan',
-    bounds: { maxSteps: [1, 8], maxPlans: [1, 24], maxTries: [1, 6] } };
+    bounds: { maxSteps: [1, 8], maxPlans: [1, 24], maxTries: [1, 6], adoptBudget: [0, 8] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
     return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {}))
@@ -62,7 +64,7 @@
   const FINAL = ['done', 'abandoned'];
 
   const stat = { expanded: 0, advanced: 0, settled: 0, blocked: 0, refused: 0,
-    replanned: 0, dropped: 0, lastReason: '', faults: {} };
+    replanned: 0, adopted: 0, adoptRefused: 0, dropped: 0, lastReason: '', faults: {} };
   function noteFault(reason) {
     stat.faults[reason] = (stat.faults[reason] || 0) + 1;
     stat.dropped++; stat.lastReason = reason;
@@ -104,13 +106,94 @@
       need = { resource: resource, amount: amount };
     }
     const cost = Number(raw.costMs);
+    // N2（v2.220.0）：新增 `know`（这一步依赖哪条事实的知情——第四类限制「知情」的来源）。
+    //   声明了它，候选面就能拿 noesis.knows 如实报「他还没资格知道这件事」；
+    //   没声明就如实说「未声明知情依赖」，**不猜**他该不该知道。
     return {
       seq: i, kind: kind, text: text, need: need,
       after: clean(raw.after, 40), place: clean(raw.place, 40),
       costMs: (isFinite(cost) && cost > 0) ? Math.round(cost) : 0,
-      fallback: clean(raw.fallback, 80),
+      fallback: clean(raw.fallback, 80), know: clean(raw.know, 80),
       status: 'pending', at: 0, reason: ''
     };
+  }
+  /**
+   * N2（v2.220.0）：**四类限制的比较口**（只读）。
+   *
+   * ── 它治什么（缺口原句）────────────────────────────────────────
+   *   既有 `candidates()` 只答「卡在哪一步、声明了哪条改选、还剩几次」，
+   *   答不出**为什么卡**：是没资源、装不下、去不了、还是他还不该知道？
+   *   四类是四种处置（补货 / 等窗口 / 换地 / 先获取知情），合一句「受阻」无从下手。
+   *
+   * ── 四类各接一个**真源**（不复制判定）────────────────────────────
+   *   ① 资源：`step.need` 对 `org.stockOf`；② 在场 / ③ 时间：`world.canBeAt` 拆两码
+   *   （unknown-place ⇒ 在场；closed / window-too-short / scheduled-elsewhere ⇒ 时间）；
+   *   ④ 知情：`step.know` 对 `noesis.knows`。
+   *
+   * ── 三条否定式边界 ──────────────────────────────────────────────
+   *   ① 未声明的一项报 `declared:false`（**不猜**他大概需要什么）；② 真源缺席报
+   *   `source:'absent'`（不回落成「无限制」——缺判据比错判据更坏）；③ 零写侧。
+   */
+  function limitsOf(personName, step) {
+    const who = clean(personName, 60), s = step || {};
+    const out = [];
+    // ① 资源
+    if (!s.need) out.push({ kind: 'resource', declared: false, ok: true, note: '未声明资源需求' });
+    else if (!WA.org || typeof WA.org.stockOf !== 'function') out.push({ kind: 'resource', declared: true, ok: false, reason: 'source-absent', source: 'absent' });
+    else {
+      const st = stockOf(who);
+      if (st === null) out.push({ kind: 'resource', declared: true, ok: false, reason: 'org-missing', resource: s.need.resource });
+      else {
+        const have = Number(st[s.need.resource]);
+        const ok = isFinite(have) && have >= s.need.amount;
+        out.push(ok ? { kind: 'resource', declared: true, ok: true, have: isFinite(have) ? have : 0, want: s.need.amount }
+          : { kind: 'resource', declared: true, ok: false, reason: 'need-unmet', resource: s.need.resource, have: isFinite(have) ? have : 0, want: s.need.amount });
+      }
+    }
+    // ② 在场 + ③ 时间（同一趟 canBeAt 拆两码）
+    if (!s.place) {
+      out.push({ kind: 'presence', declared: false, ok: true, note: '未声明地点' });
+      out.push({ kind: 'time', declared: false, ok: true, note: '未声明地点/时长，时间限制无从判' });
+    } else if (!WA.world || typeof WA.world.canBeAt !== 'function') {
+      out.push({ kind: 'presence', declared: true, ok: false, reason: 'source-absent', source: 'absent' });
+      out.push({ kind: 'time', declared: true, ok: false, reason: 'source-absent', source: 'absent' });
+    } else {
+      const at = isFinite(Number(s.at)) && Number(s.at) > 0 ? Number(s.at) : clockNow('plan');
+      const c = WA.world.canBeAt(who, s.place, at, s.costMs || 0, '');
+      if (c.ok) {
+        out.push({ kind: 'presence', declared: true, ok: true, place: s.place });
+        out.push({ kind: 'time', declared: true, ok: true, place: s.place, until: c.until || 0 });
+      } else if (c.reason === 'unknown-place') {
+        out.push({ kind: 'presence', declared: true, ok: false, reason: 'unknown-place', place: s.place });
+        out.push({ kind: 'time', declared: true, ok: false, reason: 'unknown-place' });
+      } else if (c.reason === 'missing-fields') {
+        out.push({ kind: 'presence', declared: true, ok: false, reason: 'missing-fields' });
+        out.push({ kind: 'time', declared: true, ok: false, reason: 'missing-fields' });
+      } else if (c.reason === 'closed') {
+        out.push({ kind: 'presence', declared: true, ok: true, place: s.place });
+        out.push({ kind: 'time', declared: true, ok: false, reason: 'closed', open: c.open, close: c.close });
+      } else if (c.reason === 'window-too-short') {
+        out.push({ kind: 'presence', declared: true, ok: true, place: s.place });
+        out.push({ kind: 'time', declared: true, ok: false, reason: 'window-too-short', needMs: c.needMs, shortBy: c.shortBy });
+      } else if (c.reason === 'scheduled-elsewhere') {
+        out.push({ kind: 'presence', declared: true, ok: false, reason: 'scheduled-elsewhere', place: c.place, activity: c.activity });
+        out.push({ kind: 'time', declared: true, ok: false, reason: 'scheduled-elsewhere' });
+      } else {
+        out.push({ kind: 'presence', declared: true, ok: false, reason: c.reason || 'refused' });
+        out.push({ kind: 'time', declared: true, ok: false, reason: c.reason || 'refused' });
+      }
+    }
+    // ④ 知情
+    if (!s.know) out.push({ kind: 'knowledge', declared: false, ok: true, note: '未声明知情依赖' });
+    else if (!WA.noesis || typeof WA.noesis.knows !== 'function') out.push({ kind: 'knowledge', declared: true, ok: false, reason: 'source-absent', source: 'absent' });
+    else {
+      const k = WA.noesis.knows(who, s.know);
+      if (k && k.ok && k.known === true) out.push({ kind: 'knowledge', declared: true, ok: true, fact: s.know });
+      else if (k && k.ok && k.known === false) out.push({ kind: 'knowledge', declared: true, ok: false, reason: k.reason || 'not-holder', fact: s.know });
+      else if (k && k.ok && k.known === null) out.push({ kind: 'knowledge', declared: true, ok: false, reason: 'not-registered', fact: s.know });
+      else out.push({ kind: 'knowledge', declared: true, ok: false, reason: (k && k.reason) || 'source-absent', fact: s.know });
+    }
+    return out;
   }
   /** 前置步解析：必须指向**更小的 seq**（防环）；解析失败返回 null。 */
   function linkAfter(norm, list) {
@@ -324,10 +407,17 @@
       return { seq: s.seq, text: s.text, blockedBy: (s.afterSeq === undefined ? '' : String(s.afterSeq)) };
     });
     const cfg = settings();
+    // N2（v2.220.0）：把**四类限制**照实带出（为什么卡：资源 / 在场 / 时间 / 知情各一码）。
+    //   真源缺席、未声明、越界各自如实报，绝不合成一句「受阻」。
+    const limits = limitsOf(who, stuck);
+    const blocked = limits.filter(function (l) { return !l.ok; });
     return { ok: true, id: row.id, status: row.status, reason: row.reason,
       stuck: { seq: stuck.seq, text: stuck.text, fallback: stuck.fallback },
       // tries 用尽时**照实带出**：调用方该知道「他没有余量了」。
       tries: row.tries || 0, exhausted: (row.tries || 0) >= cfg.maxTries, rest: rest,
+      limits: limits,
+      // 「卡在哪一类」的**汇总真源**：无阻塞项即 null（未声明 ≠ 阻塞）。
+      blockedBy: blocked.length ? blocked.map(function (l) { return l.kind + (l.reason ? ':' + l.reason : ''); }) : [],
       hint: stuck.fallback ? '可按 fallback 改选，或显式重排后续步骤' : '未声明改选路径，需显式重排' };
   }
   /** 改选：**必须显式给新步骤**，把该计划从 blocked 拉回 active（不自动编）。 */
@@ -361,6 +451,39 @@
     if (out && out.ok) { stat.replanned++; stat.lastReason = 'rechosen'; }
     return out || { ok: false, reason: 'store-unavailable' };
   }
+  /**
+   * N2（v2.220.0）：**自动采用**面（受开关 + 预算双闸）。
+   *
+   * ── 它治什么（缺口原句）────────────────────────────────────────
+   *   「默认只建议，自动采用另需明确开关预算」——本模块此前**只有**显式改选（rechoose），
+   *   没有任何「自动采用」的入口：要么调用方手动改选、要么干等。
+   *   本口提供受闸的自动采用：默认（`autoAdopt:false`）**一律拒收**；
+   *   开了开关还要过**每轮预算**（`adoptBudget`），超预算报 `adopt-budget-exhausted`。
+   *
+   * ── 三条否定式边界（与 rechoose 同族，另加两条）──────────────────
+   *   ① **不凭空编**：`steps` 仍必须由调用方显式给（本口不生成步骤、不读 fallback 当步骤）——
+   *      与 rechoose 同一纪律；「自动」指的是**闸门自动**，不是**内容自动**。
+   *   ② **开关默认关**：`autoAdopt:false` ⇒ `reason:'auto-adopt-off'`，一个字节都不写。
+   *   ③ **预算按轮结算**：`opts.turn` 提供轮次标识（字符串）；同一轮内累计采用次数 ≥
+   *      `adoptBudget` ⇒ 拒收。`turn` 变化即复位。预算只在**内存**记账（不落盘）——
+   *      它是运行期节流阀，不是持久状态。
+   */
+  let _adoptTurn = null, _adoptCount = 0;
+  function adopt(personName, steps, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    if (!cfg.autoAdopt) { stat.adoptRefused++; stat.lastReason = 'auto-adopt-off'; return { ok: false, reason: 'auto-adopt-off' }; }
+    const o = opts || {};
+    const turn = clean(o.turn, 40) || '*';
+    if (turn !== _adoptTurn) { _adoptTurn = turn; _adoptCount = 0; }
+    if (_adoptCount >= cfg.adoptBudget) {
+      stat.adoptRefused++; stat.lastReason = 'adopt-budget-exhausted';
+      return { ok: false, reason: 'adopt-budget-exhausted', turn: turn, budget: cfg.adoptBudget, used: _adoptCount };
+    }
+    const r = rechoose(personName, steps);
+    if (r && r.ok) { _adoptCount++; stat.adopted++; stat.lastReason = 'adopted'; }
+    return Object.assign({}, r, { adopted: !!(r && r.ok), turn: turn, used: _adoptCount, budget: cfg.adoptBudget });
+  }
   function abandon(personName, reason) {
     if (!settings().enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
     const who = clean(personName, 60);
@@ -382,6 +505,7 @@
       cursor: row.cursor, steps: row.steps.map(function (s) {
         return { seq: s.seq, kind: s.kind, text: s.text, status: s.status, reason: s.reason || '',
           need: s.need ? Object.assign({}, s.need) : null, fallback: s.fallback || '',
+          know: s.know || '', place: s.place || '',
           afterSeq: (s.afterSeq === undefined ? -1 : s.afterSeq) };
       }) };
   }
@@ -541,11 +665,18 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     expand: expand, current: current, advance: advance, settle: settle,
     candidates: candidates, rechoose: rechoose, abandon: abandon,
+    // N2（v2.220.0）：自动采用面（受开关 + 每轮预算双闸）。真消费方：面板「采用候选」按钮
+    //   （wa-plan-adopt）+ 自动采用开关（wa-plan-autoadopt）+ 预算输入（wa-plan-adoptbudget）；
+    //   只读余量 adoptBudgetView → 面板读数与诊断。
+    adopt: adopt,
+    // N2（v2.220.0）：`limits`（四类限制）与 `adoptBudgetView`（预算余量）**不单独导出**——
+    //   前者由 `candidates()` 每次内嵌（唯一读口），后者由 `adopt` 的返回体带出 used/budget。
+    //   无独立消费方不挂（与本仓「不留裸导出」同规）。
     // X1（v2.127.0）：长期意图链的只读读数（消费者是 backstage 推演与 tool-diag）。
     //   chain 给读数，chainBlock 给推演提示词段 —— 两块各有一个真消费方，不留裸导出。
     chain: chain, chainBlock: chainBlock,
     view: view, statView: statView, buildBlock: buildBlock,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/plan.js', { kind: 'engine', ver: '2.119.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/plan.js', { kind: 'engine', ver: '2.220.0' });
 })();

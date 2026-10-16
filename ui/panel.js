@@ -940,6 +940,7 @@ const peopleIds = Object.keys(s.people);
        <div class="wa-row"><button class="wa-btn" id="wa-plan-expand" title="展开为有限步数的计划：步数超上限一律拒收（too-many-steps），不静默截断；前置必须指向更小的序号（防环）">展开计划</button><button class="wa-btn" id="wa-plan-current" title="只读：当前该做哪一步（第一个前置都已完成的 pending 步）；没有计划报 no-plan，不造一条空计划">看当前步</button><button class="wa-btn" id="wa-plan-advance" title="交出当前步并标 running——只登记「他打算做这一步」，不执行（真正开工走人物行动的准入）">登记开工</button></div>
        <div class="wa-row"><button class="wa-btn" id="wa-plan-done" title="这一步真的完成了 ⇒ 前进；全部完成 ⇒ 计划终态 done">结算完成</button><button class="wa-btn" id="wa-plan-blocked" title="这条路走不通 ⇒ 进受阻（计一次尝试，超上限报 tries-exhausted 然后停下等人决定）">结算受阻</button><button class="wa-btn" id="wa-plan-refused" title="被世界或他人拒绝 ⇒ 回到待办且不计尝试次数：拒收不是他的错">结算被拒</button></div>
        <div class="wa-row"><input id="wa-plan-reason" class="wa-input" placeholder="受阻/被拒原因（可空）"/><button class="wa-btn" id="wa-plan-candidates" title="只读：给出被卡住的步、它声明的改选路径、仍可行的后续步与剩余次数——本模块不替调用方选">看候选</button><button class="wa-btn" id="wa-plan-view" title="只读：整条计划逐步列出（含资源需求与受阻原因）">看计划</button><button class="wa-btn" id="wa-plan-abandon" title="显式放弃：留痕（已放弃的计划不删，答得出「他为什么没做成」）">放弃</button></div>
+       <div class="wa-row"><button class="wa-btn" id="wa-plan-limits" title="只读：四类限制比较（资源 / 在场 / 时间 / 知情各一码，接 org / world / noesis 三个真源）。未声明的一项如实报「未声明」，真源缺席报 «source-absent»——绝不合成一句「受阻」">看限制</button><label class="wa-row" style="display:inline-flex"><input id="wa-plan-autoadopt" type="checkbox" ${WA.plan && WA.plan.getSettings().autoAdopt ? 'checked' : ''}/> 自动采用候选</label><input id="wa-plan-adoptbudget" class="wa-input wa-num" type="number" min="0" step="1" placeholder="预算"/><button class="wa-btn" id="wa-plan-adopt" title="按显式提交的新步骤自动采用（受开关 + 每轮预算双闸）：默认关 ⇒ auto-adopt-off；超预算 ⇒ adopt-budget-exhausted。本口不生成步骤——「自动」指闸门自动，不是内容自动">采用候选</button></div>
        <div id="wa-plan-out" class="wa-out"></div>
        <div class="wa-sec">关系修复（伤害 → 道歉/补偿/守约/担保 → 结案或失败）</div>
        <label class="wa-row"><input id="wa-mend-enabled" type="checkbox" ${WA.mend && WA.mend.getSettings().enabled ? 'checked' : ''}/> 启用关系修复</label>
@@ -6945,7 +6946,34 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       const r = WA.plan.candidates(planWho());
       // 余量用尽时**照实带出**：调用方该知道「他没有余量了」。
       planOut(r.ok ? Object.assign({}, r, { id: '受阻「' + r.stuck.text + '」→ ' + r.hint
-        + ' · 余量 ' + r.tries + (r.exhausted ? '（已用尽）' : '') }) : r);
+        + ' · 余量 ' + r.tries + (r.exhausted ? '（已用尽）' : '')
+        + (r.blockedBy && r.blockedBy.length ? ' · 卡在 ' + r.blockedBy.join('、') : '') }) : r);
+    });
+    // N2（v2.220.0）：四类限制只读口径（资源 / 在场 / 时间 / 知情各一码）。
+    on('#wa-plan-limits', () => {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      const c = WA.plan.candidates(planWho());
+      if (!c.ok) return planOut(c);
+      const rows = (c.limits || []).map(function (l) {
+        return l.kind + '：' + (l.ok ? (l.declared ? 'OK' : (l.note || '未声明')) : ('受阻 ' + (l.reason || '')));
+      });
+      planOut({ ok: true, id: rows.join(' ｜ ') + (c.blockedBy.length ? ' ⇒ 卡在 ' + c.blockedBy.join('、') : ' ⇒ 四类均不阻塞') });
+    });
+    { const el = $('#wa-plan-autoadopt');
+      if (el) el.onchange = function () {
+        if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+        const r = WA.plan.setSettings({ autoAdopt: !!el.checked });
+        planOut({ ok: true, id: 'autoAdopt ' + (el.checked ? 'on' : 'off') + ' · 预算 ' + r.adoptBudget });
+      }; }
+    on('#wa-plan-adopt', () => {
+      if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });
+      // 预算输入：留空则不改；填了即写进设置（越界由 bounds 夹回）。
+      const bv = wv('#wa-plan-adoptbudget');
+      if (bv !== '') { const n = Number(bv); if (isFinite(n)) WA.plan.setSettings({ adoptBudget: n }); }
+      // 采用仍按**显式步骤**（textarea）——「自动」指闸门自动，不是内容自动。
+      const r = WA.plan.adopt(planWho(), planSteps(), { turn: String(Date.now()) });
+      planOut(Object.assign({}, r, { id: r.ok ? ('已采用 ' + r.steps + ' 步（本轮 ' + r.used + '/' + r.budget + '）')
+        : (r.reason + (r.reason === 'auto-adopt-off' ? '（自动采用开关未开）' : '')) }));
     });
     on('#wa-plan-view', () => {
       if (!WA.plan) return planOut({ ok: false, reason: 'module-missing' });

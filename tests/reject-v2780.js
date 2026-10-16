@@ -2503,6 +2503,36 @@ function runWitness(WA) {
         }, 'reject-witness:plan-run');
         return [PL.rechoose('计划甲', [{ text: '改走别路' }]).reason];
       });
+      // ── N2（v2.220.0）：自动采用的双闸拒收（开关 + 每轮预算）──
+      want('auto-adopt-off', 'plan.adopt：自动采用开关默认关 ⇒ 一律拒收，一个字节都不写（N2）');
+      trip('auto-adopt-off', function () {
+        PL.setSettings({ autoAdopt: false });
+        PL.abandon('计划甲');
+        WA.store.transact(function (d) {
+          const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+          r.status = 'blocked'; r.reason = '桥断';
+          r.steps = [{ seq: 0, kind: 'step', text: 'a', status: 'blocked', reason: '桥断', afterSeq: undefined, need: null, fallback: '' }];
+        }, 'reject-witness:plan-adopt-off');
+        return [PL.adopt('计划甲', [{ text: '改道' }], { turn: 'w1' }).reason];
+      });
+      want('adopt-budget-exhausted', 'plan.adopt：同一轮内自动采用次数用尽 ⇒ 拒收（预算只在内存，不落盘）（N2）');
+      trip('adopt-budget-exhausted', function () {
+        PL.setSettings({ autoAdopt: true, adoptBudget: 1 });
+        PL.abandon('计划甲');
+        WA.store.transact(function (d) {
+          const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+          r.status = 'blocked'; r.reason = '桥断';
+          r.steps = [{ seq: 0, kind: 'step', text: 'a', status: 'blocked', reason: '桥断', afterSeq: undefined, need: null, fallback: '' }];
+        }, 'reject-witness:plan-adopt-budget');
+        // 第一次采用吃掉唯一预算（改选回 active），第二次同轮 ⇒ 预算耗尽。
+        PL.adopt('计划甲', [{ text: '改道' }], { turn: 'w2' });
+        WA.store.transact(function (d) {
+          const r = d.plan.plans.filter(function (x) { return x.personId === 'p_计划甲'; })[0];
+          r.status = 'blocked'; r.reason = '又断';
+          r.steps = [{ seq: 0, kind: 'step', text: 'a', status: 'blocked', reason: '又断', afterSeq: undefined, need: null, fallback: '' }];
+        }, 'reject-witness:plan-adopt-budget2');
+        return [PL.adopt('计划甲', [{ text: '再改' }], { turn: 'w2' }).reason];
+      });
       PL.setSettings(keepCfg);
     }
   }

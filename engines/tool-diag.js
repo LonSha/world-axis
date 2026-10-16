@@ -2921,6 +2921,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-plan-enabled', 'wa-plan-person', 'wa-plan-goal', 'wa-plan-steps', 'wa-plan-expand',
       'wa-plan-current', 'wa-plan-advance', 'wa-plan-done', 'wa-plan-blocked', 'wa-plan-refused',
       'wa-plan-reason', 'wa-plan-candidates', 'wa-plan-view', 'wa-plan-abandon', 'wa-plan-out',
+      // N2（v2.220.0）：四类限制 + 自动采用四控件（同批「渲染 + 绑定 + 守卫登记」三件齐做）。
+      'wa-plan-limits', 'wa-plan-autoadopt', 'wa-plan-adoptbudget', 'wa-plan-adopt',
       'wa-mend-enabled', 'wa-mend-person', 'wa-mend-with', 'wa-mend-hurt', 'wa-mend-mark',
       'wa-mend-id',
       'wa-mend-id2', 'wa-mend-acceptby', 'wa-mend-guarantor', 'wa-mend-evidence',

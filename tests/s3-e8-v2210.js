@@ -132,10 +132,11 @@ function runA(a) {
   });
   a(cnt(code, 'stamp: true') === 2 && cnt(code, 'stamp: false') === 4,
     'e8v2210/A13b: 带路线语义的两条（depart / reroute）与其余四条**分列**（' + cnt(code, 'stamp: true') + ' / ' + cnt(code, 'stamp: false') + '）');
-  // 版本面：自报 ver 与 index.js 同值（本批交付）
+  // 版本面：模块自报 ver = 本模块**最后一次交付**的版本（不固定跟随 index）。
+  //   沿革：本锁 v2.210.0 交付时写的是「自报 ver === index.js VERSION」，但那仅在**该模块当期交付那一版**成立——
+  //   travel-desk 末次真改在 N5（2.219.0），之后 index 升版不应拖动它（否则每版都要改一个未变模块的自报值）。
   const mv = (rd(IDX_REL).match(/VERSION = '([0-9.]+)'/) || [])[1] || '';
-  a(new RegExp("VERSION = '" + mv.replace(/\./g, '\\.') + "'").test(S),
-    'e8v2210/A14: 模块自报 ver === index.js VERSION（实 ' + mv + '）');
+  a(/const VERSION = '2\.219\.0'/.test(S), 'e8v2210/A14: 模块自报 ver === 本模块交付版本 2.219.0');
   a(cmp(mv, '2.210.0') >= 0, 'e8v2210/A14b: 入口版本不低于本锁的交付基线（实 ' + mv + '）');
   a(mv === JSON.parse(rd('manifest.json')).version, 'e8v2210/A14c: 入口与清单同源同值');
   // 装载面 / 登记面（LOAD 进了不等于登记了）

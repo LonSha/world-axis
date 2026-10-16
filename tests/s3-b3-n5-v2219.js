@@ -130,10 +130,9 @@ function runA(a) {
   // 出口面契约（冻结串由 export-contract 产物回填，本锁只核它在场且逐字含本 ns）
   a(rd(RUN_REL).indexOf('|travelDesk:commit diagnose ledger meet plan route stat verify|') >= 0,
     'n5/A19: FROZEN2800 逐字含本模块的八个契约成员');
-  // 版本面：自报 ver 与 index.js 同值
+  // 版本面：模块自报 ver = 本模块最后一次交付的版本（N5 = 2.219.0，不固定跟随 index）。
   const mv = (rd(IDX_REL).match(/VERSION = '([0-9.]+)'/) || [])[1] || '';
-  a(new RegExp("VERSION = '" + mv.replace(/\./g, '\\.') + "'").test(S),
-    'n5/A20: 模块自报 ver === index.js VERSION（实 ' + mv + '）');
+  a(/VERSION = '2\.219\.0'/.test(S), 'n5/A20: 模块自报 ver === 本模块交付版本 2.219.0');
   a(mv === JSON.parse(rd('manifest.json')).version, 'n5/A21: 入口与清单同源同值');
 }
 
