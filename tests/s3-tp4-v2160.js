@@ -180,17 +180,19 @@ function runA(a) {
     'v2160-tp4 A24 store.__BOUNDED_CAPS 登记 commit.receipts（cap 64 与 LIMITS.RECEIPTS 同源）');
   a(read('core/evict.js').indexOf("'commit.receipts':    { path: 'commit.receipts', cap: 64,") >= 0,
     'v2160-tp4 A25 evict.SITES 同名同值登记（缺此键 evict.array 会走 unknown-site 静默失败）');
-  a(read('core/store.js').indexOf('commit: { receipts: [] }') >= 0,
-    'v2160-tp4 A26 store 世界骨架物化 commit 顶层键（登记 ≠ 物化，两件事都要做）');
+  // v2.216.0（优化 Q7）：骨架随 Q3/Q7 演进为三键（receipts/interrupted/digests）；
+  //   判据同步为**三键齐备**（原判据只盯两键时代的一键，强度反升）。
+  a(read('core/store.js').indexOf('commit: { receipts: [], interrupted: [], digests: {} }') >= 0,
+    'v2160-tp4 A26 store 世界骨架物化 commit 顶层键 receipts/interrupted/digests（登记 ≠ 物化，两件事都要做）');
   // 三条纪律的注释必须在场（它们是签名的理由，不是装饰）
   a(cm.indexOf('回执与世界写入同一事务') >= 0, 'v2160-tp4 A27 纪律①「回执与世界写入同一事务」写在文件头');
   a(cm.indexOf('不可同草稿执行的写口一律走 defer') >= 0, 'v2160-tp4 A28 纪律②「不可同草稿执行的写口一律走 defer」写在文件头');
   a(cm.indexOf('副作用可单独重试，世界写入不重做') >= 0, 'v2160-tp4 A29 纪律③「副作用可单独重试，世界写入不重做」写在文件头');
   // 契约面：commit 命名空间进生成产物（回填 FROZEN2800 的前置条件）
-  a(read('tests/export_contract.txt').indexOf('commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay retryEffects settle stat step') >= 0,
-    'v2160-tp4 A30 出口面契约串含 commit 十四成员（生成器只收产品代码真引用的 WA.x.y；v2.195.0 的 effect/pending 因接上 tool-diag 消费方而入册）');
-  a(read(REL_RUN).indexOf('commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay retryEffects settle stat step') >= 0,
-    'v2160-tp4 A31 FROZEN2800 已回填 commit 段（与产物逐字同源；v2.195.0 起含 effect/pending 两读面）');
+  a(read('tests/export_contract.txt').indexOf('commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay resumeIdentity resumeStat retryEffects scanInterrupted settle stat step') >= 0,
+    'v2160-tp4 A30 出口面契约串含 commit 全成员（Q7 起含 resumeIdentity/resumeStat/scanInterrupted 三读面）（生成器只收产品代码真引用的 WA.x.y；v2.195.0 的 effect/pending 因接上 tool-diag 消费方而入册）');
+  a(read(REL_RUN).indexOf('commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay resumeIdentity resumeStat retryEffects scanInterrupted settle stat step') >= 0,
+    'v2160-tp4 A31 FROZEN2800 已回填 commit 段（与产物逐字同源；v2.195.0 起含 effect/pending 两读面；v2.216.0 起含 Q7 三读面）');
   // 拒收码：八个新码必须在见证表里有可执行见证（不是登记进 base）
   const rv = read('tests/reject-v2780.js');
   ['bad-chain', 'bad-defer', 'deferred-full', 'duplicate-op', 'missing-opid', 'no-receipt', 'settle-failed']

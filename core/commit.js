@@ -48,6 +48,21 @@
  *   · 不默认撤销已确立的世界事实：本模块只答「提交过没有 / 副作用落没落」，
  *     撤销仍走既有 `core/undo.js` 的协议（「只在已有撤销协议可证明的范围内处理」）。
  *   · 不接管任何引擎的写入：`commit(chain, fn)` 里的 fn 由调用方给（本模块不猜要写什么）。
+ *
+ * ── v2.216.0（优化 Q7）：回执的**完整档**可以环形退场，凭据不行 ──────────
+ *   计划 Q7 原文：「未完成义务及幂等账不能被当日志回收」。
+ *   本模块的回执台账 `commit.receipts` 是 cap=64 的**环形容器**，实测第 100 笔之后：
+ *     · `replay('op1')` 答 `no-receipt`（读起来是「从未提交过」）；
+ *     · `begin('op1')` 重新放行 `{ok:true}` —— 同一笔世界操作被**再做一遍**。
+ *   而本仓 reject 见证档对这条早有明文（`tests/reject-v2780.js` 的 `no-receipt` 见证）：
+ *   **「没提交过」与「提交过但归档没了」不可同形**。
+ *   治法不新增第二本完整回执（那会让「这一笔做过没有」有两个答案）：
+ *     · 完整回执仍按原 cap 环形退场（既有契约逐字不动）；
+ *     · 被挤出**之前**把 `(opId, at)` 落进 `commit.receiptDigests`（摘要台账，cap 512）；
+ *     · `begin` 命中摘要 ⇒ 仍拒 `duplicate-op`，但带 `archived:true`、`receipt:null`
+ *       （「做过，只是完整回执不在台账里了」是可判的）；
+ *     · `replay` 命中摘要 ⇒ 答 `archived`，**不答** `no-receipt`。
+ *   两本账的分工一句话：`receipts` 答「这一笔长什么样」，`digests` 答「这一笔做过没有」。
  */
 
 (function () {
@@ -61,12 +76,21 @@
   const LIMITS = { OPID: 80, SITE: 40, KIND: 24, RECEIPTS: 64, DEFERRED: 32, REASON: 48,
     // v2.212.0(优化 Q3):待恢复台账容量。与回执同数量级 —— 它记的也是「最近一批世界操作」,
     //   只是记的是**没做完的那一半**(已做未提交的跨层副作用 + 断在哪一层)。
-    RESUME: 32, RESUME_STEPS: 8 };
+    RESUME: 32, RESUME_STEPS: 8,
+    // v2.216.0（优化 Q7）：**凭据摘要台账**容量。单条只存 (opId, at)，约为完整回执的
+    //   1/5 —— 故取 8 倍回执容量（64 → 512）而总体仍比回执台账更省。
+    //   它与回执答的**不是同一个问题**：回执答「这一笔长什么样」，摘要答「这一笔做过没有」。
+    DIGESTS: 512 };
 
   const __stat = {
     begun: 0, committed: 0, reused: 0, aborted: 0, failed: 0, saveFailed: 0,
     deferred: 0, deferOk: 0, deferRej: 0, effectsRetried: 0, effectsFailed: 0,
     resumeRows: 0,
+    // v2.216.0（优化 Q7）：凭据摘要面三个读数**各自成栏**，不并进 reused ——
+    //   ① archivedReuse：命中摘要、完整回执已被挤出（幂等**仍然生效**，不是失败）；
+    //   ② digestSkipped：指纹面缺席因而未能留痕（如实降级，不假造一个可能撞的键）；
+    //   ③ digestCollision：哈希撞键且 opId 原文不符（碰撞**不**当命中，如实计）。
+    archivedReuse: 0, digestSkipped: 0, digestCollision: 0,
     lastReason: '', lastAt: 0, lastOpId: null, faults: {}
   };
   // 在册链（**进程态**）：opId -> chain。跨刷新的幂等靠**落盘回执**（store.commit.receipts），
@@ -93,6 +117,36 @@
     for (let i = rs.length - 1; i >= 0; i--) { if (rs[i] && rs[i].opId === opId) return rs[i]; }
     return null;
   }
+  // ── v2.216.0（优化 Q7）：**凭据摘要面**（被挤出的回执在这里留一条「做过」的凭据）──
+  /** 摘要台账键：`d` + fnv1a(opId)。为什么哈希而不是直接拿 opId 当键：
+   *   ① opId 是**调用方可控字符串**，直接作对象键会开一个原型面（`__proto__` 一类）；
+   *   ② 键长固定，容量读数可预期。
+   *   碰撞**不会**造成误判：值里留着 opId 原文，命中后逐字复核，不符即当碰撞、如实计。
+   *   指纹面缺席（store.fnv1a 不在）⇒ 返回 null，调用方**不写**摘要（不假造键），
+   *   并计入 digestSkipped —— 「没留痕」与「留了痕」不得同形。 */
+  function digestKey(opId) {
+    try {
+      if (!WA.store || typeof WA.store.fnv1a !== 'function') return null;
+      return 'd' + WA.store.fnv1a(String(opId));
+    } catch (e) { return null; }
+  }
+  function readDigests() {
+    try {
+      // 路径不是站点名：站点名是 commit.receiptDigests（登记表键），状态路径是 commit.digests
+      //   （draft 里真实那一层）。两者混用 ⇒ 读回 null，凭据面静默恒空。
+      const d = WA.store.read('commit.digests', null);
+      return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
+    } catch (e) { return {}; }
+  }
+  /** 查凭据摘要。命中要求哈希键**与** opId 原文同时对上（否则算碰撞，不当命中）。 */
+  function findDigest(opId) {
+    const k = digestKey(opId);
+    if (!k) return null;
+    const row = readDigests()[k];
+    if (!row) return null;
+    if (String(row.opId == null ? '' : row.opId) !== String(opId)) { __stat.digestCollision++; return null; }
+    return row;
+  }
   /** 把回执写进**当前 draft**（由 commit 在 mutator 内调用，故与世界写入同事务）。
    *  v2.194.0（U2）：多一个可选 `extra` —— 链面的回执要在**同一本台账**上补记
    *    「本链有几笔在途、声明规模与记账规模各多少、差额多少」。不另起一本账：
@@ -108,7 +162,31 @@
     if (extra && typeof extra === 'object') { Object.keys(extra).forEach(function (k) { row[k] = extra[k]; }); }
     draft.commit.receipts.push(row);
     // 有界：无界的回执台账 = 存档被长局拖垮（本仓对「只增不减的容器」一贯判红灯）
-    if (WA.evict) WA.evict.array(draft.commit.receipts, 'commit.receipts', LIMITS.RECEIPTS);
+    if (WA.evict) {
+      // v2.216.0（优化 Q7）：**挤出之前先留凭据**。
+      //   环形挤出丢的是最老的完整回执，而它答的正是「这一笔做过没有」——
+      //   丢了之后 `begin(opId)` 会重新放行（实测 100 笔后 op1 再次 ok:true），
+      //   而 `replay` 会答 `no-receipt`，与「从未提交过」**同形**。
+      //   故在调挤出器**之前**，把即将退场那几笔的 (opId, at) 落进摘要台账。
+      //   完整回执仍按原 cap 退场（既有契约零改动），摘要只补「做过没有」这一问。
+      const over = draft.commit.receipts.length - LIMITS.RECEIPTS;
+      if (over > 0) {
+        if (!draft.commit.digests || typeof draft.commit.digests !== 'object'
+          || Array.isArray(draft.commit.digests)) draft.commit.digests = {};
+        for (let i = 0; i < over; i++) {
+          const old = draft.commit.receipts[i];
+          if (!old || !old.opId) continue;
+          const dk = digestKey(old.opId);
+          if (!dk) { __stat.digestSkipped++; continue; }
+          draft.commit.digests[dk] = { opId: String(old.opId), at: num(old.at) };
+        }
+        // 摘要台账自身也要有界（只增不减的容器本仓一贯判红灯）；
+        //   对象形态走 evict.object，丢键顺序 = 插入顺序（最老的先退场）。
+        WA.evict.object(draft.commit.digests, 'commit.receiptDigests',
+          Object.keys(draft.commit.digests));
+      }
+      WA.evict.array(draft.commit.receipts, 'commit.receipts', LIMITS.RECEIPTS);
+    }
   }
 
   /**
@@ -140,6 +218,19 @@
     if (prev) {
       __stat.reused++; __stat.lastReason = 'duplicate-op'; __stat.lastAt = clockWall(); __stat.lastOpId = key;
       return { ok: false, reason: 'duplicate-op', reused: true, key: key, receipt: prev };
+    }
+    // v2.216.0（优化 Q7）：完整回执已被挤出，但**凭据仍在** ⇒ 依旧不许重做。
+    //   与上一分支分两栏而不是合并：这里给不出原回执（它已按 cap 退场），
+    //   故 `receipt:null` + `archived:true` —— 「做过，只是完整回执不在台账里了」可判。
+    //   合并两栏的代价：调用方无法区分「能回放原回执」与「只能知道做过」，
+    //   而这两件事对上层要做的动作完全不同（前者直接用，后者要找别处的归档）。
+    const dg = findDigest(key);
+    if (dg) {
+      __stat.reused++; __stat.archivedReuse++;
+      __stat.lastReason = 'duplicate-op'; __stat.lastAt = clockWall(); __stat.lastOpId = key;
+      return { ok: false, reason: 'duplicate-op', reused: true, archived: true, key: key,
+        receipt: null, digest: { opId: dg.opId, at: dg.at },
+        note: '这一笔提交过（完整回执已按容量环形挤出，凭据仍在摘要台账）—— 不重做' };
     }
     const chain = {
       opId: key,
@@ -790,8 +881,15 @@
     const key = clean(opId, LIMITS.OPID);
     if (!key) return { ok: false, reason: 'missing-opid' };
     const rec = findReceipt(key);
-    if (!rec) return { ok: false, reason: 'no-receipt', opId: key };
-    return { ok: true, opId: key, receipt: rec };
+    if (rec) return { ok: true, opId: key, receipt: rec };
+    // v2.216.0（优化 Q7）：提交过、但完整回执已按 cap 挤出 ⇒ 答 `archived`，**不答** `no-receipt`。
+    //   同形会让人把已经做过的事再排一次队（本仓 reject 见证档对这一条早有明文）。
+    //   本分支只回凭据（opId/at）——那是摘要台账真实持有的全部信息，不假造一份完整回执。
+    const dg = findDigest(key);
+    if (dg) return { ok: false, reason: 'archived', opId: key, archived: true,
+      digest: { opId: dg.opId, at: dg.at },
+      note: '这一笔提交过；完整回执已按容量环形挤出，凭据（摘要台账）仍在 —— 「做过」与「没做过」不同形' };
+    return { ok: false, reason: 'no-receipt', opId: key };
   }
 
   /** 只读台账（tool-diag / 面板 / 专锁消费）。 */
@@ -803,6 +901,10 @@
       effectsRetried: __stat.effectsRetried, effectsFailed: __stat.effectsFailed,
       resumeRows: __stat.resumeRows,
       live: Object.keys(__live).length, receipts: readReceipts().length, cap: LIMITS.RECEIPTS,
+      // v2.216.0（优化 Q7）：凭据摘要面（容量审计 / 面板 / 专锁反查「幂等凭据还剩多少」）。
+      digests: Object.keys(readDigests()).length, digestCap: LIMITS.DIGESTS,
+      archivedReuse: __stat.archivedReuse, digestSkipped: __stat.digestSkipped,
+      digestCollision: __stat.digestCollision,
       lastReason: __stat.lastReason, lastAt: __stat.lastAt, lastOpId: __stat.lastOpId,
       faults: Object.assign({}, __stat.faults)
     };

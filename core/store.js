@@ -286,7 +286,11 @@
       //   ——登记不等于物化，两件事都要做。
       // v2.212.0(优化 Q3):待恢复台账同步物化 —— 登记了精确键就必须在骨架里存在,
       //   否则 registryParity 报「未在骨架物化」、冷启动直写会炸事务(v2.116.0 events.res 同款)。
-      commit: { receipts: [], interrupted: [] },
+      // v2.216.0（优化 Q7）：commit 顶层键补 `digests` —— 摘要台账是**跨会话要留下**的
+      //   幂等凭据（「这一笔做过没有」必须活过刷新），故与 receipts 同款进骨架。
+      //   不进骨架的后果不是「少个默认值」，而是冷启动第一次 transact 就写在一个不存在的
+      //   顶层键上（本仓 v2.116.0 为这条付过价）。形状是**对象映射**（哈希键 -> {opId, at}）。
+      commit: { receipts: [], interrupted: [], digests: {} },
       // v2.154.0（RX7）：世界生态自洽审计（eco-audit.js）**不进骨架** ——
       //   它是纯只读审计面（零 store.transact），读数全在进程态（lastRow / stat）。
       //   登记进骨架会让 registryParity 报「未在骨架物化」，也会把「重启清零」伪装成「有界容器」
@@ -309,7 +313,7 @@
       //   rows：候选与在执行的动作（目标来源 / 动作种类 / 时长与窗口 / 结果依据 / opId）
       //   res ：结算回执台账（已完成本地副作用 + 该 opId 的确认，答「重复结算不重复扣费」）
       //   两张表都必须有界：它们由 AI 一轮一轮写进来，无界 = 存档体积被长局拖垮。
-      acts: { rows: [], res: [] },
+      acts: { rows: [], res: [], digests: {} },
       // v2.63.0 社交漩涡（shadow.js：关系经历与承诺深化）
       //   rows       ：共同隐瞒（双方各持一行），带 severity 与 status active/faded
       //   experiences：关系经历流水（open/kept/broken 分开归因）
@@ -1652,6 +1656,10 @@
     //   同 events 口径：上限 = 设置上界（maxActs），运行时由 act.js 显式传当前设置值，改设置不漂移。
     'acts.rows':        { cap: 24, site: 'act.js WA.evict.array(acts.rows, maxActs)（per-call，取设置上界；v2.117.0）' },
     'acts.res':         { cap: 24, site: 'act.js WA.evict.array(acts.res, maxActs)（per-call，取设置上界；v2.117.0 回执台账）' },
+    // v2.216.0（优化 Q7）：行动回执**凭据摘要**（对象形态：哈希键 -> {opId, at}）。
+    //   与 commit.receiptDigests 同形同分工：完整回执被环形挤出后仍答得出「这一笔做过没有」。
+    //   cap 与 act.js 的 DIGEST_CAP 同源（64）。
+    'acts.digests':     { cap: 64, site: 'act.js WA.evict.object(acts.digests, DIGEST_CAP)（v2.216.0 凭据摘要台账）' },
     // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复（两模块各自走 WA.evict.array 单一出口）。
     //   两条 cap 与引擎设置同源（maxPlans / maxRows），运行时由调用点显式传当前设置值。
     //   **终态行不删**：已放弃的计划与已失败（或被拒）的修复都是复盘证据，
@@ -1791,7 +1799,11 @@
     'commit.receipts':  { cap: 64, site: 'commit.js WA.evict.array(draft.commit.receipts, \'commit.receipts\', LIMITS.RECEIPTS)' },
     // v2.212.0(优化 Q3):待恢复台账。与 core/evict.js SITES 同名同值(逐键对账),
     //   cap 与 core/commit.js 的 LIMITS.RESUME 同源。
-    'commit.interrupted': { cap: 32, site: 'commit.js WA.evict.array(draft.commit.interrupted, \'commit.interrupted\', LIMITS.RESUME)' }
+    'commit.interrupted': { cap: 32, site: 'commit.js WA.evict.array(draft.commit.interrupted, \'commit.interrupted\', LIMITS.RESUME)' },
+    // v2.216.0（优化 Q7）：回执凭据摘要（**对象形态**，键 -> {opId, at}）。cap 与
+    //   core/commit.js 的 LIMITS.DIGESTS 同源；不登记会被 sizeAudit 报 unbounded。
+    //   kind 必须是 object：登记成 array 会当场被 registryParity 报类型错配（与 binding 同族）。
+    'commit.digests': { cap: 512, kind: 'object', site: 'commit.js WA.evict.object(draft.commit.digests, \'commit.receiptDigests\', Object.keys(draft.commit.digests))（登记键是状态路径 commit.digests，站点名是 commit.receiptDigests）' }
     // v2.13.0: 人物档案节（people.<id>.profile.<节>）的上限**逐节不同**，上面五条具名
     //   登记已足够说明「这些数组归谁管」；挤出侧站点 people.profile 的 path 是
     //   people.*.profile.*（per-call，写的时候才由 registry 逐节取值传入），

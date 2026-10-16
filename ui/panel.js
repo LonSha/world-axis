@@ -2759,7 +2759,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-row">
         <button class="wa-btn" id="wa-cap-oblig" title="义务清点：十二源的未完成项（读口优先 —— 各模块自己的 pending()/overdue() 才是真源）">义务清点</button>
         <button class="wa-btn" id="wa-cap-water" title="水位栏：逐容器实占 / 声明上限 / 占比 / 站点。capDeclared 缺登记时如实报 null，不猜一个上限出来">水位</button>
-        <button class="wa-btn" id="wa-cap-reclaim" title="可回收面：哪些容器里的行可以被挤出（历史类），哪些不行（义务类）。只报不改">可回收</button>
+        <button class="wa-btn" id="wa-cap-reclaim" title="可回收面：哪些容器里的行可以被挤出（历史类），哪些不行（义务类/在途/幂等真源）。只报不改">可回收</button>
         <button class="wa-btn" id="wa-cap-migrate" title="迁移预检：格式版本、未知顶层键、必填键缺失、陈旧站点 —— 只报不改，不改存档">迁移预检</button>
         <button class="wa-btn" id="wa-cap-diag" title="自证面：store / sizeCaps / evict / storageForecast 四源是否齐备">诊断</button>
       </div>
@@ -10296,18 +10296,44 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           return '<div class="wa-item"><b>' + title + '</b>（' + arr.length + '）<div class="wa-dim">' + note + '</div>'
             + arr.slice(0, 8).map(function (x) { return '<div class="wa-dim">' + esc(x.path || x) + '</div>'; }).join('') + '</div>';
         };
+        var kindByPath = function (arr, title, note) {
+          if (!arr || !arr.length) return '<div class="wa-item"><b>' + title + '</b>：无</div>';
+          return '<div class="wa-item"><b>' + title + '</b>（' + arr.length + '）<div class="wa-dim">' + note + '</div>'
+            + arr.slice(0, 8).map(function (x) { return '<div class="wa-dim">' + esc(x.path || x.site || x) + '</div>'; }).join('') + '</div>';
+        };
+        // v2.216.0（优化 Q7）：幂等真源栏。三条读数各自成栏、不合并 ——
+        //   「可以丢」（ring）/「丢了没做完的活」（在途）/「丢了会重复执行」（幂等）
+        //   是三件不同的事，合成一栏那一刻起就再也答不出是哪一类被保护了。
+        //   floorRaised 是**保护生效**的计数（不是失败），drifted 是**登记面漂移**（写了保护
+        //   却不在挤出站点表上 ⇒ 保护永不生效），两者都如实报出。
+        var idem = (r.idempotent || []);
+        var idemHtml = '<div class="wa-item"><b>不可回收：幂等真源</b>（' + idem.length + '）'
+          + '<div class="wa-dim">去重凭据 —— 丢了就不再答得出「这一笔做过没有」（有独立于普通历史回收策略的保留下限）</div>'
+          + idem.map(function (x) {
+              return '<div class="wa-dim">' + esc(x.site) + '　下限 ' + esc(String(x.floor))
+                + (x.inSites ? '' : '　<span class="wa-log-err">未在挤出站点表（保护永不生效）</span>') + '</div>';
+            }).join('') + '</div>';
+        var drift = (r.idempotentDrifted || []);
         capOut('<div class="wa-log wa-log-info">可回收面：只报不改（挤出策略由各站点自己的声明决定）</div>'
-          + kind(r.reclaimable || [], '可回收（历史类）', '这些容器的行在被挤出时不会造成义务丢失')
-          + kind(r.protected || [], '不可回收（义务类）', '在途货物 / 待履约条款 / 未结阶段 / 回执去重索引 —— 不静默挤出'));
+          + kindByPath(r.ring || [], '可回收（历史类）', '这些容器的行在被挤出时不会造成义务丢失')
+          + kindByPath(r.nonEvict || [], '不可回收（写入侧硬上界，满即拒收）', '满则拒写，从不截断既有项')
+          + idemHtml
+          + (r.floorRaised ? '<div class="wa-log wa-log-warn">下限抬升 ' + r.floorRaised + ' 次'
+              + (r.lastFloorRaise ? '（最近：' + esc(r.lastFloorRaise.site) + ' ' + esc(String(r.lastFloorRaise.from))
+                + '→' + esc(String(r.lastFloorRaise.to)) + '）' : '')
+              + ' —— 旋钮拧小到下限以下时抬回，幂等账不因设置变小而当历史回收</div>' : '')
+          + (drift.length ? '<div class="wa-log wa-log-err">幂等声明漂移：' + esc(drift.join('、')) + ' 不在挤出站点表上</div>' : ''));
       });
       on('#wa-cap-migrate', () => {
         if (!WA.capacityAudit) return capOut('<div class="wa-log wa-log-err">存储压力面未加载</div>');
         const r = WA.capacityAudit.migrationCheck();
         if (!r.ok) return capOut('<div class="wa-log wa-log-warn">' + esc(capWhy(r.reason)) + '</div>');
-        const f = r.findings || [];
-        capOut('<div class="wa-log wa-log-' + (f.length ? 'warn' : 'info') + '">迁移预检：格式版本 ' + esc(r.schemaVersion)
-          + ' · 顶层键 ' + r.topKeys + ' 个 · 发现 ' + f.length + ' 处（只报不改）</div>'
-          + (f.length ? f.map(function (x) { return '<div class="wa-item">[' + esc(x.kind) + '] ' + esc(x.detail || x.path) + '</div>'; }).join('') : ''));
+        var plan = r.plan || [];
+        capOut('<div class="wa-log wa-log-' + (plan.length ? 'warn' : 'info') + '">迁移预检：代码 schema ' + esc(String(r.codeSchema))
+          + ' · 存档 schema ' + esc(String(r.stateSchema)) + ' · 方向 ' + esc(r.direction)
+          + ' · 将走 ' + plan.length + ' 步（只报不改，不跑迁移）</div>'
+          + '<div class="wa-item">' + esc(r.note || '') + '</div>'
+          + plan.map(function (x) { return '<div class="wa-dim">' + esc(x) + '</div>'; }).join(''));
       });
       on('#wa-cap-diag', () => {
         if (!WA.capacityAudit) return capOut('<div class="wa-log wa-log-err">存储压力面未加载</div>');

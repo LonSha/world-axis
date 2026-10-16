@@ -153,7 +153,18 @@
   }
 
   const stat = { added: 0, admitted: 0, completed: 0, failed: 0, aborted: 0, replanned: 0,
-    deferred: 0, duplicates: 0, unconfirmed: 0, lastReason: '', faults: {} };
+    deferred: 0, duplicates: 0, unconfirmed: 0, lastReason: '', faults: {},
+    // v2.216.0（优化 Q7）：**凭据摘要面三个读数各自成栏**，不并进 duplicates ——
+    //   ① archived：命中摘要、完整回执已被挤出（幂等**仍然生效**，不是失败）；
+    //   ② digestSkipped：指纹面缺席因而未能留痕（如实降级，不假造一个可能撞的键）；
+    //   ③ digestCollision：哈希撞键且 opId 原文不符（碰撞**不**当命中，如实计）。
+    //   与 core/commit.js 的 archivedReuse/digestSkipped/digestCollision 逐字同口径。
+    archived: 0, digestSkipped: 0, digestCollision: 0 };
+  // v2.216.0（优化 Q7）：**幂等下限表**（本模块持有的那一半）。
+  //   与 core/evict.js 的 IDEMPOTENT 同域：挤出侧负责「旋钮拧不到下限以下」，
+  //   本模块负责「长局越过下限退场时留凭据」。两处缺一，去重真源仍会被静默掏空。
+  const IDEM_FLOOR = { 'acts.res': 8 };
+  const DIGEST_CAP = 64;      // 摘要台账自身的上界（一条摘要 ≈ 完整回执的 1/5，取 8 倍下限）
   // ── 计数器门面 S（v2.118.0 · B7）──────────────────────────────────────
   //   `stat` 是**模块自己的**累计读数。试演跑的是同一套执行路径，但它不许在任何面上留痕，
   //   所以计数器也必须跟着执行上下文走。门面按 stat 的键集合用 defineProperty 生成 ——
@@ -243,6 +254,55 @@
   function hotOpId(rows, op) {
     return rows.filter(function (x) { return x && x.opId && x.opId === op; })[0] || null;
   }
+  // ── v2.216.0（优化 Q7）：**凭据摘要面**（被挤出的回执在这里留一条「做过」的凭据）──
+  //   与 core/commit.js 的 commit.digests 同一治法、同一分工：
+  //     · 完整回执 `acts.res` 仍按原 cap 环形退场（既有契约逐字不动）；
+  //     · 被挤出**之前**把 `(opId, at)` 落进 `acts.digests`（摘要台账）；
+  //     · `add()` 命中摘要 ⇒ 仍拒 `duplicate-receipt`，但带 `archived:true`、`on:'archived'`；
+  //     · `advance()` 命中摘要 ⇒ 仍计 duplicates，但带 `archived:true`。
+  //   两本账的分工一句话：`res` 答「这一笔长什么样」，`digests` 答「这一笔做过没有」。
+  //   为什么摘要键用哈希：opId 是**调用方可控字符串**，直接当对象键会开一个原型面
+  //   （`__proto__` 一类）；碰撞不会造成误判 —— 值里留着 opId 原文，命中后逐字复核。
+  function digestKey(opId) {
+    try {
+      if (!WA.store || typeof WA.store.fnv1a !== 'function') return null;
+      return 'd' + WA.store.fnv1a(String(opId));
+    } catch (e) { return null; }
+  }
+  function readDigests() {
+    const a = state().acts;
+    const d = (a && typeof a === 'object') ? a.digests : null;
+    return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
+  }
+  /** 查凭据摘要。命中要求哈希键**与** opId 原文同时对上（否则算碰撞，不当命中）。 */
+  function findDigest(opId) {
+    const k = digestKey(opId);
+    if (!k) return null;
+    const row = readDigests()[k];
+    if (!row) return null;
+    if (String(row.opId == null ? '' : row.opId) !== String(opId)) { S.digestCollision++; return null; }
+    return row;
+  }
+  /** 在**当前 draft** 上落摘要（与结算回执同事务）。 */
+  function writeDigests(draft, res, cfg) {
+    if (!WA.evict) return;
+    const floor = IDEM_FLOOR['acts.res'] || 0;
+    const cap = Math.max(floor, finite(cfg && cfg.maxActs) || 0);
+    const over = res.length - cap;
+    if (over <= 0) return;
+    if (!draft.acts.digests || typeof draft.acts.digests !== 'object'
+      || Array.isArray(draft.acts.digests)) draft.acts.digests = {};
+    for (let i = 0; i < over; i++) {
+      const old = res[i];
+      if (!old || !old.opId) continue;
+      const dk = digestKey(old.opId);
+      if (!dk) { S.digestSkipped++; continue; }
+      draft.acts.digests[dk] = { opId: String(old.opId), at: finite(old.at) || 0 };
+    }
+    // 摘要台账自身也要有界（只增不减的容器本仓一贯判红灯）；
+    //   对象形态走 evict.object，丢键顺序 = 插入顺序（最老的先退场）。
+    WA.evict.object(draft.acts.digests, 'acts.digests', Object.keys(draft.acts.digests));
+  }
   function find(id) {
     const k = clean(id, 60);
     return acts().filter(function (x) { return x && x.id === k; })[0] || null;
@@ -314,9 +374,15 @@
       //   而它们共享一条回执；「执行后、回报前」的重试于是二次落账。
       const hot = hotOpId(acts(), wantOp);
       const cold = receipts().some(function (q) { return q && q.opId === wantOp; });
-      if (hot || cold) {
+      // v2.216.0（优化 Q7）：**第三处**——完整回执已被环形挤出后，凭据落在摘要台账里。
+      //   只查前两处 ⇒ 长局里同一 opId 会重新放行（「做过」退化成「没做过」）。
+      //   命中摘要仍答 duplicate-receipt，但带 archived:true —— 「做过、只是完整回执不在台账里了」可判。
+      const arch = (hot || cold) ? null : findDigest(wantOp);
+      if (hot || cold || arch) {
         S.duplicates++;
-        return { ok: false, reason: 'duplicate-receipt', opId: wantOp, on: hot ? hot.status : 'receipt' };
+        if (arch && !hot && !cold) S.archived++;
+        return { ok: false, reason: 'duplicate-receipt', opId: wantOp,
+          on: hot ? hot.status : (cold ? 'receipt' : 'archived'), archived: !!arch };
       }
     }
     let out = null;
@@ -454,6 +520,12 @@
     draft.acts.res = Array.isArray(draft.acts.res) ? draft.acts.res : [];
     draft.acts.res.push({ opId: row.opId || '', id: row.id, person: row.person, kind: row.kind,
       status: status, result: str(result, 120), evidence: str(evidence, 40), at: t });
+    // v2.216.0（优化 Q7）：**挤出之前先留凭据**（与 core/commit.js 的 writeReceipt 同规）。
+    //   环形挤出丢的是最老的完整回执，而它答的正是「这一笔做过没有」——
+    //   丢了之后同一 opId 会重新放行（「重放已忽略」变成「重新扣费」）。
+    //   故在调挤出器**之前**把即将退场那几笔的 (opId, at) 落进摘要台账；
+    //   完整回执仍按原 cap 退场（既有契约零改动），摘要只补「做过没有」这一问。
+    writeDigests(draft, draft.acts.res, cfg);
     WA.evict.array(draft.acts.res, 'acts.res', cfg.maxActs);
   }
   /**
@@ -510,18 +582,31 @@
     if (!isFinite(t)) return { ok: false, reason: 'bad-time' };
     const o = opts || {};
     const budget = (finite(o.max) > 0 && finite(o.max) <= cfg.maxRun) ? Math.floor(finite(o.max)) : cfg.maxRun;
-    let out = { changed: 0, completed: 0, failed: 0, still: 0, deferred: [], duplicates: 0 };
+    let out = { changed: 0, completed: 0, failed: 0, still: 0, deferred: [], duplicates: 0, archived: 0 };
     mutate(storeOf(), function (draft) {
       const rows = (draft.acts && Array.isArray(draft.acts.rows)) ? draft.acts.rows : [];
       const res = (draft.acts && Array.isArray(draft.acts.res)) ? draft.acts.res : [];
+      // v2.216.0（优化 Q7）：重放守卫的**第三处**查证面 —— 完整回执已被环形挤出时，
+      //   凭据落在摘要台账里。只查 `res` ⇒ 长局里同一 opId 会被二次结算（重复扣费）。
+      const digests = (draft.acts && draft.acts.digests && typeof draft.acts.digests === 'object'
+        && !Array.isArray(draft.acts.digests)) ? draft.acts.digests : {};
       let used = 0;
       rows.forEach(function (x) {
         if (!x || x.status !== 'running') return;
         if (!(t >= x.dueAt)) return;
         // 重放守卫：这一笔的操作 id 已在台账里 ⇒ 不得二次结算（重复不重复扣资源）。
-        if (x.opId && res.some(function (q) { return q && q.opId === x.opId; })) {
+        const dupRes = !!(x.opId && res.some(function (q) { return q && q.opId === x.opId; }));
+        let dupArch = false;
+        if (!dupRes && x.opId) {
+          const dk = digestKey(x.opId);
+          const drow = dk ? digests[dk] : null;
+          if (drow && String(drow.opId == null ? '' : drow.opId) === String(x.opId)) dupArch = true;
+          else if (drow) S.digestCollision++;
+        }
+        if (dupRes || dupArch) {
           x.status = 'done'; x.endedAt = t; x.result = '重放已忽略'; x.evidence = 'receipt';
           x.spent = x.duration; x.left = 0; x.opId = '';
+          if (dupArch) { out.archived = (out.archived || 0) + 1; S.archived++; }
           out.duplicates++;
           return;
         }
@@ -645,7 +730,10 @@
         result: x.result, evidence: x.evidence, reason: x.reason };
     });
     return { ok: true, total: rows.length, open: open.length, byStatus: byStatus,
-      receipts: receipts().length, recent: recent,
+      receipts: receipts().length,
+      // v2.216.0（优化 Q7）：凭据摘要面读数（「做过没有」的那一本账有多少条）。
+      digests: Object.keys(readDigests()).length, digestCap: DIGEST_CAP,
+      recent: recent,
       // 哪些种类**没有**确认器，如实带出（诊断不许把它显示成「正常无事」）。
       noConfirmer: NO_CONFIRMER.slice(), confirmers: Object.assign({}, CONFIRMERS) };
   }

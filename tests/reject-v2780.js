@@ -4610,6 +4610,26 @@ function runWitness(WA) {
       trip('missing-opid', function () { return [Cm.settle('', {}).reason, Cm.replay('').reason]; });
       want('no-receipt', 'commit.replay：该 opId 从未提交过 ⇒ 拒收 no-receipt（「没提交过」与「提交过但归档没了」不可同形）');
       trip('no-receipt', function () { return [Cm.replay('tp4w-never-committed').reason]; });
+      // v2.216.0（优化 Q7）：**凭据摘要面**新增的拒收码 —— 提交过、但完整回执已按 cap
+      //   环形挤出 ⇒ 答 `archived`，**不答** `no-receipt`。
+      //   为什么必须给可执行见证（而不是登记进 base）：它正是 Q7 要治的那个形态 ——
+      //   「做过但回执被回收」与「从未做过」如果同形，长局里同一笔会被再排一次队。
+      //   见证手法：连提 71 笔（> LIMITS.RECEIPTS=64）⇒ 最早那笔的完整回执被挤出、
+      //   凭据落进 commit.digests；此时 replay 首笔必答 archived（而 replay 未提交过的仍答 no-receipt）。
+      want('archived', 'commit.replay：该 opId 提交过、但完整回执已按 cap 环形挤出 ⇒ 答 archived（凭据留在摘要台账，「做过」与「从未做过」不同形）');
+      trip('archived', function () {
+        const first = 'tp4w-arch-0';
+        const b0 = Cm.begin(first);
+        if (!b0 || !b0.ok) return [];
+        const c0 = Cm.commit(b0.chain, function (d) { d.__arch0 = { n: 1 }; });
+        if (!c0 || !c0.ok) return [];
+        for (let i = 1; i <= 70; i++) {
+          const b = Cm.begin('tp4w-arch-' + i);
+          if (!b || !b.ok) continue;
+          Cm.commit(b.chain, function (d) { d['__arch' + i] = { n: 1 }; });
+        }
+        return [Cm.replay(first).reason];
+      });
       // ── A2 容量：副作用登记数达上限 ──
       want('deferred-full', 'commit.defer：单链副作用登记数达 LIMITS.DEFERRED ⇒ 拒收并给出 pending —— 无上限的待办列表等于把「事务后要做什么」变成不可预期的长尾');
       trip('deferred-full', function () {

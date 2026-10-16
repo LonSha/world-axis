@@ -212,7 +212,11 @@ function runB(a) {
   //   `<b>v2.210.0</b>` 标题**拼成了同一行**，于是 ENTRY_RE 认的行数不增反丢一条（146 未变，
   //   而 v2.210.0 条目从独立行消失）。教训：这个计数判据是「条目被误删/被拼接」的唯一哨兵 ——
   //   它当场把「写入成功但结构错了」报了红，而不是等下一次全量回归。修法：条目模板末尾补换行。
-  a(r.facts.readmeEntries === 150, 'docs-archive/B: README 版本历史条目 = 150（实 ' + r.facts.readmeEntries + '）');
+  // v2.216.0 补账：本版（Q7）当期条目入 README 版本历史首条，**先实测真值** ——
+  //   改前实测 scan() = 152（v2.215.0 那轮遗留的欠债一并在此收敛：当时导语/本判据停在 150，
+  //   而真值已是 151 —— 同型欠债在本仓已是第十四次，共性未变「同一件事在多处各写一遍」。
+  //   本版 Q7 条目 +1 ⇒ 真值 152，导语与本条同批收敛到 152。判据继续钉**精确等值**防误删。
+  a(r.facts.readmeEntries === 152, 'docs-archive/B: README 版本历史条目 = 152（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

@@ -36,7 +36,10 @@ const REL = 'engines/act.js';
 
 // ── 破坏锚点（逐字取自真源码，各恰 1 次）──
 const A_OPID   = "if (!x.opId) x.opId = x.id + '@' + Math.floor(t) + '#' + x.attempts;";
-const A_DUP    = "if (x.opId && res.some(function (q) { return q && q.opId === x.opId; })) {";
+// v2.216.0（优化 Q7）：重放守卫由单路（只查完整回执）扩成双路（回执 + 摘要台账），
+//   原锚点尾部的 `) {` 已被打断；锚点跟随源码形态更新，**破坏语义逐字不变**：
+//   把回执路判据钉死成假 ⇒ 完整回执里的重放不再被判重。
+const A_DUP    = "const dupRes = !!(x.opId && res.some(function (q) { return q && q.opId === x.opId; }));";
 const A_BUDGET = "if (used >= budget) { out.deferred.push({ id: x.id, person: x.person, kind: x.kind, reason: 'budget', dueAt: x.dueAt }); return; }";
 // v2.118.0（B7）：本锚点随 act.js 的显式执行上下文改造同步更新 ——
 //   原写法 `WA.world.canBeAt(...)` 改成了 `worldOf().canBeAt(...)`（世界由执行上下文给，
@@ -52,7 +55,7 @@ const BROKEN = [
   // ① 操作 id 不按次重钉（冻结成恒定值）⇒ 第二次尝试被判成重放
   { key: 'opid',   from: A_OPID,   to: "x.opId = 'frozen-op';" },
   // ② 摘掉台账去重判据 ⇒ 任何重放都二次结算
-  { key: 'dup',    from: A_DUP,    to: 'if (false) {' },
+  { key: 'dup',    from: A_DUP,    to: 'const dupRes = false;' },
   // ③ 摘掉预算闸 ⇒ 一次搬空全部到点行动
   { key: 'budget', from: A_BUDGET, to: '' },
   // ④ 不传用途 ⇒ 场所用途窗口在准入路径上失效

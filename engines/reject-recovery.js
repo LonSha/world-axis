@@ -164,6 +164,13 @@
     //   三个早退码（missing-rel / no-loader-state / not-failed）不在此登记：
     //   规则表收得住它们（missing→request-setup、no→request-setup、not→adjust-input），
     //   `explain()` 对它们走 `via:'rule'`；在此凭空再登记一份就是「同一件事两个真源」。
+    // ── v2.216.0（优化 Q7）：凭据摘要面的拒收码 ──
+    //   为什么必须显式登记：码名分词是 ['archived']，六档规则表里没有任何一个词表收它
+    //   ⇒ `ruleKind()` 返回空 ⇒ 不登记就是 `via:'undecided'`（拒收面残余未登记）。
+    //   按语义归 rollback：这一笔**已经提交过**，完整回执只是被容量挤出去了 ——
+    //   处置方向与 `already-done` 同（不能原地重来，要按新状态改写），
+    //   而不是 retry-same-input（重试就等于把同一件事再做一遍）。
+    'archived': { kind: 'rollback', why: '这一笔已提交过，完整回执按容量环形退场、凭据仍在摘要台账：不能原地重做，要按「已做过」的新状态改写' },
     'load-integrity': { kind: 'request-setup', why: '启动完整性缺口：六个写链路关键模块（clock/input-guard/settings-bus/permissions/commit/interceptor）有缺席项 ⇒ 写入被闸门挡住。先按 integrity().missing 把缺的文件补上（或对每个 rel 走 WA.loadRetry 重试装载），闸门自行重算后即恢复' }
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
@@ -265,7 +272,10 @@
     'already-covered', 'already-decided', 'already-delivered', 'already-in-transit', 'already-linked', 'already-locked',
     'already-pending', 'already-recording', 'already-resolved', 'already-revealed', 'already-settled', 'already-terminal',
     'already-there', 'already-transited', 'already-written', 'anchors-full', 'api-fail', 'apply-throw',
-    'auto-off', 'awaiting-after', 'backup-corrupt', 'backward', 'bad-action', 'bad-actor',
+    // v2.216.0（优化 Q7）：凭据摘要面的拒收码 —— 提交过、完整回执已被环形挤出。
+    //   它不是结构不可达：长局里回执台账超过 cap 64 就会真落到它（见证由
+    //   tests/reject-v2780.js 真跑：连提 71 笔后 replay 首笔）。
+    'archived', 'auto-off', 'awaiting-after', 'backup-corrupt', 'backward', 'bad-action', 'bad-actor',
     'bad-after', 'bad-amount', 'bad-anchor', 'bad-args', 'bad-axis', 'bad-base',
     'bad-behavior', 'bad-blueprint', 'bad-bp-keys', 'bad-bp-ver', 'bad-budget', 'bad-cap',
     'bad-chain', 'bad-channel', 'bad-char', 'bad-choice', 'bad-conflict', 'bad-coord',

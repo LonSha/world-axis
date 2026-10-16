@@ -145,8 +145,10 @@ function runAll(a) {
     && src.indexOf("'stale-site'") > 0,
     'q3: [A6] 身份判定三档齐备(foreign-chat / foreign-branch / stale-site)');
   // A7 三处同名同值:store 骨架 / store 容量表 / evict 站点表
-  a(/commit: \{ receipts: \[\], interrupted: \[\] \}/.test(srcStore),
-    'q3: [A7] store 骨架物化 commit.interrupted(冷启动直写不炸事务)');
+  // v2.216.0（优化 Q7）：commit 骨架新增 digests（凭据摘要台账），判据同步为**三键齐备**。
+  //   这不是放宽 —— 原判据只要求两键，现要求三键全部物化（强度提升）。
+  a(/commit: \{ receipts: \[\], interrupted: \[\], digests: \{\} \}/.test(srcStore),
+    'q3: [A7] store 骨架物化 commit.interrupted + commit.digests(冷启动直写不炸事务)');
   a(/'commit\.interrupted': \{ cap: 32, site: 'commit\.js WA\.evict\.array\(draft\.commit\.interrupted/.test(srcStore),
     'q3: [A7] store 容量表登记 commit.interrupted(cap 32)');
   a(/'commit\.interrupted': \{ path: 'commit\.interrupted', cap: 32, why:/.test(srcEvict),
@@ -374,7 +376,9 @@ function runNegative(a) {
   a(rowsOf(W4).length > 32,
     'q3: [N4] 摘掉 evict 调用 ⇒ 台账无界增长(环形挤出判据真在盯这一步);实 ' + rowsOf(W4).length);
   // N5 摘掉 RESUME 常量 ⇒ 静态契约的容量单源判据现形
-  const b5 = over(COMMIT_REL, '    RESUME: 32, RESUME_STEPS: 8 };', '    RESUME_STEPS: 8 };');
+  // v2.216.0（优化 Q7）：LIMITS 里在 RESUME 之后追加了 DIGESTS，原锚点尾部的 ` };` 已被打断；
+  //   锚点跟随源码形态更新，**破坏语义逐字不变**：摘掉 RESUME 常量 ⇒ cap 不再是 32。
+  const b5 = over(COMMIT_REL, '    RESUME: 32, RESUME_STEPS: 8,', '    RESUME_STEPS: 8,');
   const W5 = harness({ srcOverride: b5 });
   a(W5.commit.resumeStat().cap !== 32,
     'q3: [N5] 摘掉 RESUME 常量 ⇒ cap 不再是 32(容量单源判据现形);实 ' + W5.commit.resumeStat().cap);

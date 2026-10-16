@@ -1,5 +1,6 @@
 /**
- * WorldAxis engines/capacity-audit.js (v2.182.0) — O4 存储压力 / 义务清点 / 迁移预检
+ * WorldAxis engines/capacity-audit.js (v2.216.0) — O4 存储压力 / 义务清点 / 迁移预检
+ *   v2.216.0（优化 Q7）：reclaimable() 补**幂等真源**一栏（去重凭据不得当日志回收）。
  *
  * ── 它治什么（缺口，现场实测）──────────────────────────────────
  *   容量侧的三件事在本仓**各自可查、合不起来**：
@@ -18,7 +19,8 @@
  *   · obligations(opts)  —— **不可丢义务**清点（在途货物 / 未结委托 / 未履约条款 /
  *                           未完成项目 / 未收线索 / 未结算后果 / 在途消息 / 逾期欠账 …）
  *   · waterline(opts)    —— 水位：逐容器 len / cap / 逼近度 / 已满 / 漂移 / 未登记
- *   · reclaimable()      —— **可回收历史**与不可回收面分列（环形站点 vs NON_EVICT vs 在途豁免）
+ *   · reclaimable()      —— **可回收历史**与不可回收面分列（环形站点 vs NON_EVICT vs 在途豁免
+ *                           vs **幂等真源**）—— v2.216.0(Q7) 补幂等一栏
  *   · migrationCheck()   —— 迁移预检（当前 schema / 目标 schema / 将走的步 / 上次报告 /
  *                           未来档拒收计数 / 形态补齐读数）—— **不跑迁移**，只判方向
  *   · sources()          —— 各源可用性（缺席如实报，不静默丢）
@@ -312,6 +314,17 @@
     const sites = safe(function () { return WA.evict && WA.evict.siteDecls ? WA.evict.siteDecls() : {}; }, {}) || {};
     const nonEvict = safe(function () { return WA.evict && WA.evict.nonEvictDecls ? WA.evict.nonEvictDecls() : {}; }, {}) || {};
     const es = safe(function () { return WA.evict && WA.evict.evictStat ? WA.evict.evictStat() : null; }, null);
+    // v2.216.0（优化 Q7）：**幂等真源**独立成栏。为什么不并进 ring/nonEvict：
+    //   ring 答「哪些容器的行可以被丢」；幂等栏答「哪些容器**丢了就不再答得出这一笔做过没有**」
+    //   —— 后者是不可回收的一种，但读法与前两者都不同：它仍在环形挤出，只是有
+    //   **独立于普通历史回收策略的保留下限**。三栏合一的那一刻起，
+    //   「可以丢」与「丢了会重复执行」就会共用一张表。
+    const idem = safe(function () { return WA.evict && WA.evict.idempotentDecls ? WA.evict.idempotentDecls() : {}; }, {}) || {};
+    const idemRows = Object.keys(idem).map(function (k) {
+      const d = idem[k] || {};
+      return { site: k, floor: d.floor, why: d.why, inSites: d.inSites === true };
+    });
+    idemRows.sort(function (a, b) { return a.site < b.site ? -1 : 1; });
     const ring = Object.keys(sites).map(function (k) {
       const s = sites[k] || {};
       const by = (es && es.bySite && es.bySite[k]) ? es.bySite[k] : null;
@@ -324,12 +337,19 @@
       ring: ring, ringCount: ring.length,
       nonEvict: Object.keys(nonEvict).map(function (k) { return { path: k, why: nonEvict[k] }; }),
       nonEvictCount: Object.keys(nonEvict).length,
+      // v2.216.0（Q7）：幂等真源栏 + 下限抬升读数（抬升是保护生效，**不是**实现缺陷）。
+      //   inSites=false 是**登记面漂移**（写了保护却不在挤出站点表上 ⇒ 保护永不生效），
+      //   如实列出而不静默 —— 与「未登记站点是缺陷」同一口径。
+      idempotent: idemRows, idempotentCount: idemRows.length,
+      idempotentDrifted: idemRows.filter(function (r) { return !r.inSites; }).map(function (r) { return r.site; }),
+      floorRaised: es ? (es.floorRaised || 0) : 0,
+      lastFloorRaise: es && es.lastFloorRaise ? Object.assign({}, es.lastFloorRaise) : null,
       // 在途保护读数（挤出侧最后一道兜底）：held=因豁免而未丢的行数；full=在途自身超 cap。
       //   两者**都不是实现缺陷**（与 evict.js 的口径逐字一致），故不进 faults。
       inTransit: es ? Object.assign({}, es.live || {}) : null,
       evictStat: es ? { evicts: es.evicts, evicted: es.evicted, noops: es.evictNoops,
         failed: es.evictFailed, failedBy: Object.assign({}, es.failedBy || {}) } : null,
-      note: '环形站点 = 会被挤掉的旧历史；NON_EVICT = 写入侧硬上界（满即拒收，从不截断既有项）；在途豁免 = 最后一道兜底' };
+      note: '环形站点 = 会被挤掉的旧历史；NON_EVICT = 写入侧硬上界（满即拒收，从不截断既有项）；在途豁免 = 最后一道兜底；幂等真源 = 去重凭据（有独立于普通历史回收策略的保留下限，不得当日志回收）' };
   }
 
   // ── 迁移预检 ──────────────────────────────────────────────
@@ -399,7 +419,7 @@
       settingsBus: !!(WA.settingsBus && typeof WA.settingsBus.read === 'function')
     };
     const ok = checks.store;
-    return { ok: ok, closedLoop: ok, checks: checks, version: '2.182.0',
+    return { ok: ok, closedLoop: ok, checks: checks, version: '2.216.0',
       sourceCount: OBLIGATION_SOURCES.length };
   }
 
@@ -426,5 +446,5 @@
   var EXPORT_COUNT = 10;
   var _exported = Object.keys(WA.capacityAudit).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('capacityAudit: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/capacity-audit.js', { kind: 'engine', ver: '2.182.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/capacity-audit.js', { kind: 'engine', ver: '2.216.0' });
 })();

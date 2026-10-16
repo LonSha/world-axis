@@ -343,6 +343,11 @@
     //   显式传当前设置值（maxActs）；传漏即 bad-cap 归因，不静默回落到某个默认值。
     'acts.rows':          { path: 'acts.rows',          cap: 'per-call', kind: 'array', why: '行动队列（上限 = maxActs 设置，写入时传入）' },
     'acts.res':           { path: 'acts.res',           cap: 'per-call', kind: 'array', why: '行动回执台账（上限 = maxActs 设置，写入时传入）' },
+    // v2.216.0（优化 Q7）：行动回执**凭据摘要**（对象形态：哈希键 -> {opId, at}）。
+    //   与 commit.receiptDigests 同形同分工 —— 完整回执环形退场后仍答得出「这一笔做过没有」。
+    //   不登记本站点的代价与 receipts 同形：evict.object 走 unknown-site **不做任何截断**，
+    //   而调用方拿到 {ok:false}，摘要台账从此无界增长（本仓对只增不减的容器一贯判红灯）。
+    'acts.digests':       { path: 'acts.digests',       cap: 64, kind: 'object', why: '行动回执凭据摘要（哈希键 -> opId/at；完整回执退场后仍答得出「这一笔做过没有」）' },
     // v2.117.0（计划二 B5）：组织行动两容器。**行内挂**（projects 挂势力、debts 挂人物），
     //   故按通配路径登记；cap 为 'per-call'（上限 = org.js 的 PROJECT_CAP / DEBT_CAP，
     //   调用点显式传入 —— 传漏即 bad-cap 归因，不悄悄回落成默认值）。
@@ -374,6 +379,12 @@
     //   同名同值（把门判据逐键对账）；SITES 缺此键时 evict.array 会走 unknown-site **静默失败**
     //   （挤出压根不发生，而调用方以为做了）。
     'commit.receipts':    { path: 'commit.receipts', cap: 64, why: '跨引擎提交回执环形（已提交的世界操作必须跨刷新仍答得出，故不能在提交时删——只能环形挤出）' },
+    // v2.216.0（优化 Q7）：**凭据摘要台账**（对象形态：哈希键 -> {opId, at}）。
+    //   它不是「第二本回执」——完整回执 `commit.receipts` 仍按原 cap 64 环形退场，逐字不动。
+    //   本表答的是另一个问题：**这一笔做过没有**（完整回执不在台账里之后仍要答得出）。
+    //   不登记本站点的代价与 receipts 同形：evict.object 会走 unknown-site **不做任何截断**，
+    //   而调用方拿到 {ok:false}，摘要台账从此无界增长（本仓对只增不减的容器一贯判红灯）。
+    'commit.receiptDigests': { path: 'commit.digests', cap: 512, kind: 'object', why: '提交回执凭据摘要（哈希键 -> opId/at；完整回执退场后仍答得出「这一笔做过没有」）。站点名与状态路径不同名：站点名 commit.receiptDigests / 路径 commit.digests' },
     // v2.212.0(Q3):待恢复台账环形。记的是「没做完的那一半」(已做未提交的跨层副作用 +
     //   断在哪一层)。与回执同数量级:它答「上一轮中断时做过什么」,同样要跨刷新可读。
     'commit.interrupted': { path: 'commit.interrupted', cap: 32, why: '中断与跨层恢复台账环形(答「上一轮中断时做过什么、断在哪一层」,跨刷新仍须可读)' },
@@ -441,7 +452,9 @@
     lastEvict: null,    // { site, cap, before, after, dropped, at }
     bySite: {},         // site -> { evicts, dropped, lastAt, lastDropped }
     lastDropped: [],    // 最近被挤出的元素摘要（最多 12 条）——「丢的是什么」
-    lastFail: null      // { site, reason, at }
+    lastFail: null,     // { site, reason, at }
+    floorRaised: 0,     // v2.216.0（Q7）：幂等站点下限抬升次数（保护生效，**不是**失败）
+    lastFloorRaise: null // { site, from, to, at }
   };
 
   // ── v2.162.0（TP7）：**在途行豁免表**（挤出侧）────────────────────────
@@ -466,6 +479,35 @@
   // 在途保护的读数（**不**进 evictFailed / failedBy —— 超限不是实现缺陷，是容量裁决；
   //   混进 failedBy 会让「挤出器坏了」与「世界真的满了」在诊断上长得一样）。
   const liveStat = { held: 0, full: 0, lastSite: null, lastAt: 0 };
+
+  // ── v2.216.0（优化 Q7）：**幂等真源下限表**（挤出侧第三张声明表）────────
+  //   它治的病（现场实证 /tmp/q7/probe_cap.cjs、/tmp/q7/probe_dup.cjs）：
+  //     · `acts.res`（行动结算回执，答「重复结算不重复扣费」）的上限挂在 **`maxActs`**
+  //       上 —— 那是**并行行动容量**，与之语义无关。实测把并行数拧到 1，幂等台账
+  //       只剩 1 条（`{ok:true, dropped:9, before:10, after:1}`）；
+  //     · `events.res`（事件回执台账，答「同一笔不二次结算」）的上限挂在 **`maxFails`**
+  //       上 —— 那是**失败重试容量**。把重试旋钮拧小，去重凭据跟着变短；
+  //     · `commit.receipts` 满 64 之后，最早的 opId 回执被环形挤掉，`begin('op1')`
+  //       重新放行（实测 `BEGIN op1 AGAIN => {"ok":true}`）——「这一笔做过没有」
+  //       在长局里退化成「没做过」，正是计划原文点名的那一类**当日志回收**。
+  //   计划 Q7 原文：「**未完成义务及幂等账不能被当日志回收**」。
+  //   在途保护（IN_TRANSIT）治的是**前一半**（未完成的货/信/行程/待履约）；
+  //   本表治**后一半**：幂等站点的**保留下限独立于普通历史回收策略** ——
+  //   调用方给的 cap 低于下限期时**抬到下限**，如实记账（floorRaised），
+  //   既不静默按过小值截断，也不混进 `evictFailed`（那不是实现缺陷，是保护生效）。
+  //   为什么与 IN_TRANSIT 分两张表：在途按**行**挑（哪些元素还欠着没交），
+  //   幂等按**容量**兜（凭据一律不得当历史回收，逐行判定没有意义）。合成一张的那一刻起，
+  //   「这一笔还没做完」与「这一笔做过、别再做」就会共用一条读数。
+  //   floor 取**该模块默认配置下的容量**：默认设置下逐字不变（既有契约零改动），
+  //   只有把旋钮拧到低于默认时保护才现形 —— 保守失败只影响截断粒度，不会多留一条不该留的。
+  const IDEMPOTENT = {
+    'commit.receipts':  { floor: 64, why: '跨引擎提交回执（「这一笔世界操作做过没有」的跨刷新真源；cap 与 LIMITS.RECEIPTS 同源，不受任何设置旋钮影响）' },
+    'acts.res':         { floor: 8, why: '行动结算回执（去重真源：同 opId 不重复扣费。上限此前挂在 maxActs=并行行动容量 上，语义无关）' },
+    'events.res':       { floor: 12, why: '事件回执台账（去重真源：同一笔不二次结算。上限此前挂在 maxFails=失败重试容量 上，语义无关）' },
+    'liaison.evidence': { floor: 40, why: '约定证据台账（同一 opId 只落一条 ⇒ 它本身就是去重凭据）' },
+    'coop.archive':     { floor: 40, why: '裁决归档（归档被挤出后 traceOf 回落本行，是「这一笔被怎么裁的」唯一凭据）' },
+    'phoneBridge.ops':  { floor: 40, why: '手机侧操作台账（opId 命中即拒重放，是手机入站边的去重真源；站点名是 phoneBridge.ops，path 才是 causal.phoneOps）' }
+  };
 
   // v2.15.0: 挤出记录只活在内存台账（bySite.lastAt / lastDropped.at），不落盘 → 测量时间。
   function now() { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } }
@@ -511,6 +553,32 @@
     const c = typeof s.cap === 'function' ? s.cap() : s.cap;
     return c;
   }
+  /**
+   * v2.216.0（优化 Q7）：幂等站点的**保留下限**。
+   *   调用方给的 cap 低于下限期时**抬到下限**并如实记账；不抬则「幂等账被当日志回收」。
+   *   只对 **per-call 站点**生效：静态 cap 站点（commit.receipts 等）的 cap 就在本表里，
+   *   不存在「调用方拧小」这条路径，抬升无从发生。
+   * @returns {{cap:number, raised:boolean, from:number}} 未登记 → raised=false、cap 原值回退
+   */
+  function applyIdempotentFloor(site, cap) {
+    const decl = IDEMPOTENT[site];
+    if (!decl) return { cap: cap, raised: false, from: cap };
+    if (typeof cap !== 'number' || !isFinite(cap) || cap >= decl.floor) return { cap: cap, raised: false, from: cap };
+    stats.floorRaised++;
+    stats.lastFloorRaise = { site: site, from: cap, to: decl.floor, at: now() };
+    try { WA.log('info', '挤出下限抬升：' + site + ' ' + cap + '→' + decl.floor
+      + '（幂等真源不因旋钮变小而当历史回收）'); } catch (e) {}
+    return { cap: decl.floor, raised: true, from: cap };
+  }
+  /** 幂等站点声明表只读副本（容量审计 / 面板 / 诊断反查「哪些容器是去重凭据」用）。 */
+  function idempotentDecls() {
+    const out = {};
+    Object.keys(IDEMPOTENT).forEach(function (k) {
+      out[k] = { floor: IDEMPOTENT[k].floor, why: IDEMPOTENT[k].why,
+        inSites: Object.prototype.hasOwnProperty.call(SITES, k) };
+    });
+    return out;
+  }
 
   // ── 单一实现：数组挤出 ─────────────────────────────────────
   /**
@@ -527,7 +595,8 @@
       // per-call 站点：上限逐次不同（如人物档案各节 15/10/10/25/15），必须由调用方给出。
       // 传漏即 bad-cap 归因——「悄悄回落到一个默认值」正是登记表与执行漂移的起点。
       if (typeof limit !== 'number' || !isFinite(limit) || limit < 0) { noteFail(site, 'bad-cap'); return { ok: false, reason: 'bad-cap', dropped: 0, before: arr.length, after: arr.length }; }
-      cap = limit;
+      // v2.216.0（Q7）：幂等真源下限 —— 旋钮拧到下限以下时抬到下限（如实记账，不静默照办）
+      cap = applyIdempotentFloor(site, limit).cap;
     } else cap = capOf(site);
     if (typeof cap !== 'number' || !isFinite(cap) || cap < 0) { noteFail(site, 'bad-cap'); return { ok: false, reason: 'bad-cap', dropped: 0, before: arr.length, after: arr.length }; }
     const before = arr.length;
@@ -654,6 +723,12 @@
       // v2.162.0（TP7）：在途保护读数——held=因豁免而未丢的终态+在途混排中被保下的行数，
       //   full=「在途自身超 cap」而放弃截断的次数（**不是**实现缺陷，故不进 failedBy）。
       live: { held: liveStat.held, full: liveStat.full, lastSite: liveStat.lastSite, lastAt: liveStat.lastAt },
+      // v2.216.0（Q7）：幂等真源读数与在途读数**分域**——「还没做完」与「做过、别再做」
+      //   是两件事，混进同一个计数就再也答不出是哪一类被保护了。floorRaised 也不进
+      //   evictFailed/failedBy：抬升是保护生效，不是实现缺陷。
+      idempotent: Object.assign({}, IDEMPOTENT),
+      floorRaised: stats.floorRaised,
+      lastFloorRaise: stats.lastFloorRaise ? Object.assign({}, stats.lastFloorRaise) : null,
       nonEvict: Object.assign({}, NON_EVICT)
     };
   }
@@ -661,6 +736,7 @@
     stats.evicts = 0; stats.evicted = 0; stats.evictNoops = 0; stats.evictFailed = 0;
     stats.failedBy = {}; stats.lastEvict = null; stats.lastFail = null;
     stats.bySite = {}; stats.lastDropped = [];
+    stats.floorRaised = 0; stats.lastFloorRaise = null;   // v2.216.0（Q7）
   }
   /** 站点声明表只读副本（门禁与诊断反查「cap 的单一真源」用） */
   function siteDecls() {
@@ -680,6 +756,9 @@
     resetEvictStat: resetEvictStat,
     siteDecls: siteDecls,
     nonEvictDecls: function () { return Object.assign({}, NON_EVICT); },
+    // v2.216.0（Q7）：幂等真源下限表只读副本（消费者：engines/capacity-audit.js 的
+    //   reclaimable() → ui/panel.js「可回收」栏；诊断面反查「哪些容器是去重凭据」）。
+    idempotentDecls: idempotentDecls,
     summarize: summarize
   };
 })();
