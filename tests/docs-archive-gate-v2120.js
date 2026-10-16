@@ -216,7 +216,10 @@ function runB(a) {
   //   改前实测 scan() = 152（v2.215.0 那轮遗留的欠债一并在此收敛：当时导语/本判据停在 150，
   //   而真值已是 151 —— 同型欠债在本仓已是第十四次，共性未变「同一件事在多处各写一遍」。
   //   本版 Q7 条目 +1 ⇒ 真值 152，导语与本条同批收敛到 152。判据继续钉**精确等值**防误删。
-  a(r.facts.readmeEntries === 153, 'docs-archive/B: README 版本历史条目 = 153（实 ' + r.facts.readmeEntries + '）');
+  // v2.219.0 补账：本版（N5）当期条目入 README 版本历史首条，**先实测真值** ——
+  //   改前实测 scan() = 153，本版 N5 条目 +1 ⇒ 真值 154，导语与本条同批收敛到 154。
+  //   判据继续钉**精确等值**防误删。
+  a(r.facts.readmeEntries === 154, 'docs-archive/B: README 版本历史条目 = 154（实 ' + r.facts.readmeEntries + '）');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

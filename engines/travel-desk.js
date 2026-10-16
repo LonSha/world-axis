@@ -51,15 +51,22 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
-  const VERSION = '2.210.0';
+  const VERSION = '2.219.0';
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 40) : (typeof v === 'string' ? v.slice(0, max || 40) : ''); }
   function num(v) { return (typeof v === 'number' && isFinite(v)) ? v : null; }
+  // v2.219.0（拓展 N5）：多站/会合的缺省时刻。**只用于「没给 at 时取当下」**——
+  //   逐段耗时仍一律取自 world.transit()，本模块不按墙钟算路程（那是第二份算法）。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
 
   // ── 设置（同一格偏好键；不是世界事实，按本仓先例走 settingsBus）──
   const LS_KEY = 'worldaxis_travel_desk_settings_v1';
-  const DEF = { enabled: false, maxRows: 24, maxPlanRows: 32 };
+  const DEF = { enabled: false, maxRows: 24, maxPlanRows: 32,
+    // ── v2.219.0（拓展 N5）：多站旅程与会合的两格参数 ──
+    //   `maxLegs`：途经点段数上限（**不静默截断** —— 超限一律 `route-too-long`）；
+    //   `meetWindowMs`：会合时窗的默认宽度（缺省一小时）。
+    maxLegs: 6, meetWindowMs: 3600000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'travelDesk',
-    bounds: { maxRows: [4, 48], maxPlanRows: [4, 64] } };
+    bounds: { maxRows: [4, 48], maxPlanRows: [4, 64], maxLegs: [2, 12], meetWindowMs: [0, 86400000] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
     return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {}))
@@ -72,8 +79,16 @@
 
   // ── 编排层失败码（**fault 命名空间**，与来源的 reason 命名空间分列）──
   const FAULTS = ['desk-off', 'module-missing', 'bad-channel', 'unknown-action',
-    'missing-fields', 'bad-plan', 'stale-plan', 'action-threw'];
-  const stat = { plans: 0, commits: 0, oks: 0, rejects: 0, stale: 0, faults: {}, blocked: 0, lastReason: '' };
+    'missing-fields', 'bad-plan', 'stale-plan', 'action-threw',
+    // ── v2.219.0（拓展 N5）：多站旅程与会合新增四码（编排层 fault 命名空间，不是来源 reason）──
+    //   `bad-route`（legs 不是可用的段表）、`route-too-long`（途经点超上限，**不静默截断**）、
+    //   `broken-leg`（后段起点 ≠ 前段终点 —— 断链会让「走到哪了」答不出）、
+    //   `bad-meet`（会合时窗声明不完整）。四码均带可执行见证（专锁 s3-b3-n5-v2219.js 真跑）。
+    'bad-route', 'route-too-long', 'broken-leg', 'bad-meet'];
+  const stat = { plans: 0, commits: 0, oks: 0, rejects: 0, stale: 0, faults: {}, blocked: 0, lastReason: '',
+    // ── v2.219.0（拓展 N5）：多站旅程与会合各自成栏（「预览了几趟单程」与「排了几条多站路线」
+    //   是两件事，合成一栏就再也答不出是哪一类在动）。──
+    routes: 0, meets: 0 };
   function noteFault(code) { stat.faults[code] = (stat.faults[code] || 0) + 1; stat.blocked++; stat.lastReason = code; }
   function fail(code, extra) { noteFault(code); return Object.assign({ ok: false, fault: code }, extra || {}); }
 
@@ -232,7 +247,207 @@
       basisNote: '耗时 / 折算 / 实走 / 路径 / 天气逐字段取自 WA.world.transit() —— 本模块不重算，故预估与真引擎同源'
     };
   }
-
+  /**
+   * ①b 多站旅程（v2.219.0 拓展 N5）：把「单次起终点」扩成**途经点 / 停留 / 同行 / 货运关联**。
+   *
+   * ── 它治什么（缺口）────────────────────────────────────────────
+   *   `plan()` 只会回答「从 A 到 B 这一趟」。而玩家真正要问的是「先到 B 停半天、
+   *   再走 C、最后落 D，这一路要几天、经过哪几段、路上堵不堵」——旧口答不了，
+   *   于是消费方只能自己把 `plan()` 调 N 次再手工接时刻，接出来的时间轴必然与
+   *   真引擎分家（本仓反复治过的那一类）。
+   *
+   * ── 口径（与 `plan()` 同源，**一段都不重算**）────────────────────
+   *   · 段表两种输入：`stops:['A','B','C']`（相邻成段）或 `legs:[{from,to},…]`（显式段，
+   *     必须**首尾相接** —— 后段起点 ≠ 前段终点一律 `broken-leg`，断链会让「走到哪了」答不出）；
+   *   · 每段的耗时 / 折算 / 实走 / 路径 / 天气**逐字段取自 `world.transit()`**；
+   *   · 时间轴：`departAt` / `arriveAt` 逐段累加，中间按 `dwell` 加停留；
+   *   · `with`（同行）/ `routeId`（货运关联）**只登记在返回体里**，本模块不扣不动；
+   *   · 上界 `maxLegs`：超限 `route-too-long`（**不静默截断**）。
+   *
+   * ── 边界（承接模块头，逐条不破）────────────────────────────────
+   *   · 只读：全文零 `store.transact`、零 draft 赋值（与 `plan` / `verify` / `ledger` 同规）；
+   *   · 到点前不提前抵达：本函数**不落行程** —— 真正的出发仍是逐段 `commit('depart', …)`，
+   *     每段出发前用该段回带的 `stamp` 走 `verify()` 重验（世界变了旧预览即作废）。
+   *     **本模块不存「走到第几段了」**：那会造出第二份状态容器（边界 1）。
+   */
+  function normLegs(o, cap) {
+    const rawStops = Array.isArray(o.stops) ? o.stops : null;
+    const rawLegs = Array.isArray(o.legs) ? o.legs : null;
+    if (!rawStops && !rawLegs) return { ok: false, fault: 'bad-route', need: ['stops', 'legs'] };
+    const legs = [];
+    if (rawLegs) {
+      for (let i = 0; i < rawLegs.length; i++) {
+        const r = rawLegs[i];
+        if (!r || typeof r !== 'object') return { ok: false, fault: 'bad-route', at: i };
+        const f = clean(r.from, 40), t = clean(r.to, 40);
+        if (!f || !t) return { ok: false, fault: 'bad-route', at: i, need: ['from', 'to'] };
+        legs.push({ from: f, to: t });
+      }
+    } else {
+      const stops = rawStops.map(function (s) { return clean(s, 40); });
+      if (stops.length < 2 || stops.some(function (s) { return !s; })) return { ok: false, fault: 'bad-route', need: ['stops>=2'] };
+      for (let i = 0; i + 1 < stops.length; i++) legs.push({ from: stops[i], to: stops[i + 1] });
+    }
+    if (!legs.length) return { ok: false, fault: 'bad-route' };
+    if (legs.length > cap) return { ok: false, fault: 'route-too-long', want: legs.length, cap: cap };
+    for (let i = 1; i < legs.length; i++) {
+      if (legs[i].from !== legs[i - 1].to) {
+        return { ok: false, fault: 'broken-leg', at: i, from: legs[i].from, want: legs[i - 1].to };
+      }
+    }
+    return { ok: true, legs: legs };
+  }
+  function dwellOf(o, n) {
+    // n = 中间停留点数（= 段数 - 1）。dwell 可以是数组（逐点）或单个数（全点同值）；缺省 0。
+    const out = [];
+    const raw = o.dwell;
+    for (let i = 0; i < n; i++) {
+      let v = 0;
+      if (Array.isArray(raw)) v = num(raw[i]);
+      else if (raw !== undefined && raw !== null) v = num(raw);
+      out.push(isFinite(v) && v > 0 ? Math.round(v) : 0);
+    }
+    return out;
+  }
+  function route(opts) {
+    const cfg = settings();
+    if (!cfg.enabled) return fail('desk-off');
+    const o = (opts && typeof opts === 'object') ? opts : {};
+    const w = WA.world;
+    if (!w || typeof w.transit !== 'function') return fail('module-missing', { module: 'world' });
+    const chs = channels();
+    const ch = clean(o.channel, 20) || 'person';
+    if (chs.indexOf(ch) < 0) return fail('bad-channel', { channel: ch, known: chs });
+    const nl = normLegs(o, Math.max(1, Math.floor(num(cfg.maxLegs) || DEF.maxLegs)));
+    // 拒收时把「实际起点 / 该接哪」一并带出：只报「第几段断了」而不说断在哪，调用方还得自己回读段表。
+    if (!nl.ok) return fail(nl.fault, { at: nl.at, from: nl.from, need: nl.need, want: nl.want, cap: nl.cap });
+    const legs = nl.legs;
+    const dwell = dwellOf(o, legs.length - 1);
+    const rows = Math.max(1, Math.floor(num(cfg.maxPlanRows) || DEF.maxPlanRows));
+    const at0 = isFinite(Number(o.at)) ? Number(o.at) : clockNow('travelDesk.route');
+    let cursor = at0, total = 0, allOk = true;
+    const out = [];
+    for (let i = 0; i < legs.length; i++) {
+      const lg = legs[i];
+      let tr = null;
+      try { tr = w.transit(ch, lg.from, lg.to); } catch (e) { return fail('action-threw', { at: 'world.transit' }); }
+      const row = { index: i, from: lg.from, to: lg.to, departAt: cursor };
+      if (!tr || typeof tr !== 'object') { row.reachable = false; row.reason = 'bad-shape'; allOk = false; }
+      else if (tr.ok !== true) { row.reachable = false; row.reason = tr.reason; row.detail = tr; allOk = false; }
+      else {
+        const pathAll = Array.isArray(tr.path) ? tr.path.slice() : [];
+        const allSegs = segsOf(ch, pathAll);
+        row.reachable = true;
+        row.minutes = num(tr.minutes); row.factor = num(tr.factor); row.factored = num(tr.factored);
+        row.hops = num(tr.hops); row.path = pathAll; row.pathCount = pathAll.length;
+        row.segs = allSegs.slice(0, rows); row.truncated = allSegs.length > row.segs.length;
+        row.risk = riskOf(row.segs, tr);
+        row.stamp = stampFrom(tr, allSegs);
+        const mins = isFinite(tr.factored) ? Number(tr.factored) : (isFinite(tr.minutes) ? Number(tr.minutes) : 0);
+        row.arriveAt = cursor + mins * 60000;
+        cursor = row.arriveAt;
+        total += mins;
+      }
+      out.push(row);
+      if (i < legs.length - 1) { cursor += dwell[i] || 0; out[i].stayMs = dwell[i] || 0; }
+    }
+    stat.routes++;
+    stat.lastReason = allOk ? 'route-ok' : 'route-partial';
+    const stops = [legs[0].from].concat(legs.map(function (l) { return l.to; }));
+    return {
+      ok: true, fault: null, channel: ch,
+      routeId: 'tr_' + ch + '_' + legs.length + '_' + legs[0].from + '_' + legs[legs.length - 1].to,
+      stops: stops, stopsCount: stops.length, legs: out, legCount: out.length,
+      allReachable: allOk, minutes: allOk ? total : null,
+      departAt: at0, arriveAt: cursor,
+      stamps: out.map(function (r) { return r.stamp || null; }),
+      companions: (Array.isArray(o.with) ? o.with : []).map(function (x) { return clean(x, 60); }).filter(function (x) { return !!x; }),
+      freight: ch === 'goods' ? goodsHint(o) : null,
+      basisNote: '逐段耗时 / 折算 / 路径 / 天气取自 WA.world.transit() —— 本模块不重算；'
+        + '本函数不落行程，出发仍逐段 commit(\'depart\')，每段用回带的 stamp 走 verify() 重验',
+      driveNote: '多站按段驱动：本模块不存「走到第几段」；上段到达后再对下段重验并 commit'
+    };
+  }
+  /**
+   * ①c 会合时窗（v2.219.0 拓展 N5）：多方**各自从现地出发**，能否在同一地点、
+   *   同一时窗内碰上面。
+   *
+   * ── 口径 ────────────────────────────────────────────────────
+   *   · 每方给 `{person, from, at}`：`from` 缺省 = 已在会合地（到达时刻即 `at`）；
+   *     `from` 在时，到达时刻 = `at` + 该方从 from 到 place 的**实走**耗时（取自 transit）；
+   *   · 时窗两种给法：`window:[start,end]`（显式）或 `windowMs`（宽度，缺省 settings）；
+   *   · `canMeet` = 最晚到达 ≤ 时窗末端（人人都在窗口内到得了）；`slackMs` = 末端 − 最晚到达；
+   *   · 走不过去的一方 ⇒ 该方 `reachable:false` 且 `canMeet:false`（**不假装能到**）。
+   *   · 只读：零 store 写；不改任何人的位置。
+   */
+  function meet(opts) {
+    const cfg = settings();
+    if (!cfg.enabled) return fail('desk-off');
+    const o = (opts && typeof opts === 'object') ? opts : {};
+    const w = WA.world;
+    if (!w || typeof w.transit !== 'function') return fail('module-missing', { module: 'world' });
+    const place = clean(o.place, 40);
+    if (!place) return fail('bad-meet', { need: ['place'] });
+    const parties = Array.isArray(o.parties) ? o.parties : null;
+    if (!parties || parties.length < 2) return fail('bad-meet', { need: ['parties>=2'] });
+    const chs = channels();
+    const ch = clean(o.channel, 20) || 'person';
+    if (chs.indexOf(ch) < 0) return fail('bad-channel', { channel: ch, known: chs });
+    const now = clockNow('travelDesk.meet');
+    const rows = [], unreadable = [];
+    let latest = null, earliest = null, allReach = true;
+    for (let i = 0; i < parties.length; i++) {
+      const p = parties[i];
+      if (!p || typeof p !== 'object') return fail('bad-meet', { at: i, need: ['person'] });
+      const who = clean(p.person, 60);
+      if (!who) return fail('bad-meet', { at: i, need: ['person'] });
+      const from = clean(p.from, 40);
+      const at = isFinite(Number(p.at)) ? Number(p.at) : now;
+      const row = { person: who, from: from || place, at: at, reachable: true };
+      if (from && from !== place) {
+        let tr = null;
+        try { tr = w.transit(ch, from, place); } catch (e) { return fail('action-threw', { at: 'world.transit' }); }
+        if (!tr || typeof tr !== 'object' || tr.ok !== true) {
+          row.reachable = false; row.reason = (tr && tr.reason) || 'bad-shape';
+          row.why = row.reason;   // 面板侧读 `why`（与 ledger 的 unreadable 同字段名），引擎侧仍叫 `reason`。
+          allReach = false; unreadable.push({ person: who, why: row.reason });
+        } else {
+          const mins = isFinite(tr.factored) ? Number(tr.factored) : (isFinite(tr.minutes) ? Number(tr.minutes) : 0);
+          row.minutes = mins; row.arrival = at + mins * 60000;
+          row.stamp = stampFrom(tr, segsOf(ch, Array.isArray(tr.path) ? tr.path : []));
+        }
+      } else {
+        row.minutes = 0; row.arrival = at;
+      }
+      if (row.arrival !== undefined && (latest === null || row.arrival > latest)) latest = row.arrival;
+      if (earliest === null || at < earliest) earliest = at;
+      rows.push(row);
+    }
+    let win = null;
+    if (Array.isArray(o.window) && isFinite(Number(o.window[0])) && isFinite(Number(o.window[1]))) {
+      win = { start: Number(o.window[0]), end: Number(o.window[1]) };
+    } else {
+      // 缺省时窗**锚在各方的约集时刻**（最早的 `at`），不是锚在最晚到达 ——
+      //   锚在后者会让 `canMeet` 恒真（窗口末端 = 最晚到达 + 宽度在任何输入下都成立，
+      //   判据就成了空转）。锚在约集时刻才是玩家要问的那句话：「按约好的时间出发，
+      //   宽限这么久之内，人人到得齐吗」。任一方没给 `at` 时退回此刻。
+      const width = Math.max(0, Math.floor(num(o.windowMs) || cfg.meetWindowMs || DEF.meetWindowMs));
+      const base = (earliest === null) ? now : earliest;
+      win = { start: base, end: base + width };
+    }
+    const canMeet = allReach && latest !== null && latest <= win.end;
+    stat.meets++;
+    stat.lastReason = canMeet ? 'meet-ok' : 'meet-no';
+    return {
+      ok: true, fault: null, channel: ch, place: place,
+      parties: rows, window: win,
+      latestArrival: latest,
+      canMeet: canMeet, slackMs: (latest === null ? null : win.end - latest),
+      unreadable: unreadable,
+      note: '每方到达时刻 = 其 at + 从 from 到会合地的实走耗时（取自 world.transit）；'
+        + '本函数只判不落，不改任何人的位置；走不过去的一方 reachable:false，不假装能到'
+    };
+  }
   /**
    * ② 动作表：**编排信息，不是判定语义**。
    *   `take` 的顺序即形参顺序；缺键时**原样传 `undefined`**（由来源写口自己拒收 —— 边界 3）。
@@ -399,6 +614,9 @@
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     plan: plan,
+    // ── v2.219.0（拓展 N5）：多站旅程与会合两口 ──
+    route: route,
+    meet: meet,
     verify: verify,
     commit: commit,
     ledger: ledger,

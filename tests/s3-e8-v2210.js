@@ -103,7 +103,7 @@ function runA(a) {
   const S = rd(REL);
   const body = exportBody(S);
   a(body.length > 0, 'e8v2210/A1: 能从真源码取出 WA.travelDesk 的对象字面量体');
-  ['FAULTS', 'ACTIONS', 'getSettings', 'setSettings', 'plan', 'verify', 'commit', 'ledger', 'diagnose', 'stat']
+  ['FAULTS', 'ACTIONS', 'getSettings', 'setSettings', 'plan', 'route', 'meet', 'verify', 'commit', 'ledger', 'diagnose', 'stat']
     .forEach(function (k) { a(body.indexOf(k + ':') > 0, 'e8v2210/A2: 导出面含 ' + k); });
   // 无消费方不挂导出：本模块**没有** buildBlock（它不产注入块 —— 边界 6 的实体）
   a(body.indexOf('buildBlock:') < 0, 'e8v2210/A3: 导出面**没有** buildBlock（本模块不产注入块）');
@@ -151,7 +151,9 @@ function runA(a) {
   a(/travel: renderTravelDesk,/.test(pan), 'e8v2210/A20: RENDERERS 同名同数');
   a(pan.indexOf('function renderTravelDesk()') >= 0, 'e8v2210/A21: 渲染器定义在位');
   ['wa-trip-ch', 'wa-trip-from', 'wa-trip-to', 'wa-trip-plan', 'wa-trip-verify', 'wa-trip-ledger',
-   'wa-trip-dia', 'wa-trip-who', 'wa-trip-act', 'wa-trip-commit', 'wa-trip-out'].forEach(function (id) {
+   'wa-trip-dia', 'wa-trip-who', 'wa-trip-act', 'wa-trip-commit', 'wa-trip-out',
+   // v2.219.0（拓展 N5）：多站与会合两行的控件（route / meet 的真消费方）
+   'wa-trip-stops', 'wa-trip-dwell', 'wa-trip-route', 'wa-trip-meet', 'wa-trip-win', 'wa-trip-meet-go'].forEach(function (id) {
     a(pan.indexOf(id) >= 0, 'e8v2210/A22: 面板渲染 ' + id);
   });
   a(pan.indexOf("'#wa-trip-out'") >= 0 && pan.indexOf("'#wa-trip-plan'") >= 0,
@@ -174,8 +176,10 @@ function runA(a) {
   a(cnt(seg, 'WA.world.depart(') === 0 && cnt(seg, 'WA.freight.') === 0,
     'e8v2210/A27: 渲染段零直接调来源写口（写只经 WA.travelDesk.commit）');
   // 出口面契约（冻结串由 export-contract 产物回填，本锁只核它在场且逐字含本 ns）
-  a(rd(RUN_REL).indexOf('|travelDesk:commit diagnose ledger plan stat verify|') >= 0,
-    'e8v2210/A28: FROZEN2800 逐字含本模块的契约成员集（产品真引用的六个）');
+  //   v2.219.0（拓展 N5）：本模块的契约成员集随 route / meet 两口一并扩为八个
+  //   （产品真引用：面板 travel 页 + 本锁；冻结串与 tests/export_contract.txt 逐字同源）。
+  a(rd(RUN_REL).indexOf('|travelDesk:commit diagnose ledger meet plan route stat verify|') >= 0,
+    'e8v2210/A28: FROZEN2800 逐字含本模块的契约成员集（产品真引用的八个）');
   // 台账登记（--update 产物）
   a(rd(LEDGER_REL).indexOf('"engines/travel-desk.js"') >= 0, 'e8v2210/A29: module-registry 账本已登记本模块');
   // 法条底：本锁自己是**扩展名与页名一致**的（页 id 'travel' ↔ 文件名 e8）
@@ -186,7 +190,7 @@ function runA(a) {
 function runB(a) {
   const WA = env0().WA;
   a(typeof WA.travelDesk === 'object', 'e8v2210/B1: 模块已装载');
-  a(j(WA.travelDesk.getSettings()) === j({ enabled: false, maxRows: 24, maxPlanRows: 32 }),
+  a(j(WA.travelDesk.getSettings()) === j({ enabled: false, maxRows: 24, maxPlanRows: 32, maxLegs: 6, meetWindowMs: 3600000 }),
     'e8v2210/B2: 默认全关（实 ' + j(WA.travelDesk.getSettings()) + '）—— 全关即零存在的前提');
   // ① 全关即零存在：三个口一律拒 desk-off（而不是静默返回空）
   ['plan', 'ledger'].forEach(function (fn) {
@@ -197,7 +201,8 @@ function runB(a) {
   a(rv0.ok === false && rv0.fault === 'desk-off', 'e8v2210/B3b: 关闭时 commit 拒 desk-off');
   seedWorld(WA);
   const cfg4 = WA.travelDesk.getSettings();
-  a(cfg4.enabled === true && cfg4.maxRows === 24 && cfg4.maxPlanRows === 32,
+  a(cfg4.enabled === true && cfg4.maxRows === 24 && cfg4.maxPlanRows === 32
+    && cfg4.maxLegs === 6 && cfg4.meetWindowMs === 3600000,
     'e8v2210/B4: 开启后设置生效且其余字段原样（实 ' + j(cfg4) + '）');
   // ② 通道白名单**跟随** world.CHANNELS（不自己抄一份）
   const bad = WA.travelDesk.plan({ channel: 'zzz', from: '甲镇', to: '丙镇' });
@@ -286,8 +291,8 @@ function runB(a) {
   const d = WA.travelDesk.diagnose();
   a(d.ok === true && d.module === 'travelDesk' && d.actions.missing.length === 0,
     'e8v2210/B27: 诊断自报模块身份与动作在位（在位 ' + d.actions.live.length + '/' + d.actions.declared.length + '）');
-  a(j(d.faultCodes) === j(WA.travelDesk.FAULTS) && d.faultCodes.length === 8,
-    'e8v2210/B28: 拒收码表 8 条单列（fault 命名空间与来源 reason 分开，实 ' + d.faultCodes.length + '）');
+  a(j(d.faultCodes) === j(WA.travelDesk.FAULTS) && d.faultCodes.length === 12,
+    'e8v2210/B28: 拒收码表 12 条单列（fault 命名空间与来源 reason 分开，实 ' + d.faultCodes.length + '）');
   // ⑭ stat：计数与拒收桶
   //   进程计数是**每个环境各自一份**（模块级闭包态），读的就是本环境 WA ——
   //   desk-off 记在 B3 那三笔上、stale-plan 记在 B18 那一笔上。
@@ -316,9 +321,15 @@ function runC(a) {
   WA.travelDesk.verify({ channel: 'person', from: '甲镇', to: '丙镇', stamp: 'ok|x' });
   WA.travelDesk.ledger({});
   WA.travelDesk.ledger({ face: 'goods' });
+  // v2.219.0（拓展 N5）：多站与会合两口也在**同一不变式**内 —— 含它们的失败路径。
+  WA.travelDesk.route({ channel: 'person', stops: ['甲镇', '乙镇', '丙镇'] });
+  WA.travelDesk.route({ channel: 'person', legs: [{ from: '甲镇', to: '乙镇' }, { from: '丙镇', to: '甲镇' }] });
+  WA.travelDesk.route({ channel: 'person', stops: ['甲镇', '乙镇', '丙镇', '甲镇', '乙镇', '丙镇', '甲镇', '乙镇'] });
+  WA.travelDesk.meet({ channel: 'person', place: '丙镇', parties: [{ person: '甲', from: '甲镇' }, { person: '乙', from: '丙镇' }] });
+  WA.travelDesk.meet({ channel: 'person', place: '' });
   WA.travelDesk.diagnose();
   WA.travelDesk.stat();
-  a(snap(WA) === s0, 'e8v2210/C1: plan / verify / ledger 十次调用（含四条失败路径）后存档**逐字不变**');
+  a(snap(WA) === s0, 'e8v2210/C1: plan / route / meet / verify / ledger 十六次调用（含失败路径）后存档**逐字不变**');
   // ② 关闭态下三个口零写入
   WA.travelDesk.setSettings({ enabled: false });
   s0 = snap(WA);
@@ -373,7 +384,7 @@ function runC(a) {
 const ANCHOR = {
   reachGate: "    if (tr.ok !== true) {",
   stampFlag: "    depart: { ns: 'world', fn: 'depart', take: ['person', 'from', 'to', 'at'], stamp: true },",
-  deskGate: "    if (!cfg.enabled) return fail('desk-off');\n    const o = (opts && typeof opts === 'object') ? opts : {};\n    const w = WA.world;",
+  deskGate: "    if (!cfg.enabled) return fail('desk-off');\n    const o = (opts && typeof opts === 'object') ? opts : {};\n    const w = WA.world;\n    if (!w || typeof w.transit !== 'function') return fail('module-missing', { module: 'world' });\n    const chs = channels();\n    const ch = clean(o.channel, 20) || 'person';\n    if (chs.indexOf(ch) < 0) return fail('bad-channel', { channel: ch, known: chs });\n    const from = clean(o.from, 40), to = clean(o.to, 40);",
   diagOk: "    const ok = checks.settingsBus && checks.world && checks.actionsLive === checks.actionsDeclared;"
 };
 function broke(key) {

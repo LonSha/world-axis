@@ -2834,6 +2834,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <label class="wa-row"><input id="wa-wh-ag-enabled" type="checkbox" ${agOn ? 'checked' : ''}/> 启用世界日程</label>
       <div class="wa-row">
         <button class="wa-btn" id="wa-wh-ag-view" title="未来事件表：有时间者按时间升序在前，未知时间者按来源稳定序在后（不猜日期）">看日程</button>
+        <button class="wa-btn" id="wa-wh-ag-overdue" title="已到期未收敛：已经到期但尚未收敛的条目（与阻塞栏同源）">看欠账</button>
         <button class="wa-btn" id="wa-wh-ag-sources" title="五源可用性：缺席的源如实报，不静默当作「这类条目没有」">源可用性</button>
       </div>
       <div id="wa-wh-ag-out" class="wa-out"></div>
@@ -2845,6 +2846,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         「你看不到」与「它不存在」是两件事。此刻：<b>${cvOn ? '开' : '关'}</b>。</div>
       <label class="wa-row"><input id="wa-wh-cv-enabled" type="checkbox" ${cvOn ? 'checked' : ''}/> 启用世界纪事</label>
       <div class="wa-row">
+        <input id="wa-wh-cv-ref" class="wa-input wa-mini" placeholder="纪事 ref（从看纪事抄）"/>
+        <button class="wa-btn" id="wa-wh-cv-entry" title="下钻单条：看来源记录逐字（编年史/因果/沉积原件）与引用状态">下钻</button>
         <button class="wa-btn" id="wa-wh-cv-view" title="纪事列表：按剧情时间升序，每条带来源与依据引用（可下钻）">看纪事</button>
         <button class="wa-btn" id="wa-wh-cv-hidden" title="不可见面摘要：有几条被 visibility=hidden 挡在外面（只报数，不搬运内容）">不可见面</button>
         <button class="wa-btn" id="wa-wh-cv-diag" title="自证面：store / timeline / sediment / causal 四源是否齐备">诊断</button>
@@ -3619,8 +3622,18 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-trip-commit" title="把动作原样透传给来源写口（world.depart / world.stop）。本页不做参数校验 —— 缺什么由来源自己拒收">执行</button>
       </div>
       <div class="wa-row">
+        <input id="wa-trip-stops" class="wa-input" aria-label="多站途经点" placeholder="多站：扁担巷、城南码头、北关（「、」或「,」分隔）…"/>
+        <input id="wa-trip-dwell" class="wa-input wa-mini" aria-label="停留分钟" placeholder="停留分钟"/>
+        <button class="wa-btn" id="wa-trip-route" title="只读：多站路线预览（逐段耗时 / 路径 / 天气逐字段取自 WA.world.transit()，本页与模块都不重算；超段数上限如实拒收，不静默截断）">多站路线</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-trip-meet" class="wa-input" aria-label="会合方" placeholder="会合：甲@扁担巷、乙@北关（「、」分隔；@ 后可省，省则视为已在会合地）…"/>
+        <input id="wa-trip-win" class="wa-input wa-mini" aria-label="时窗小时" placeholder="时窗（小时）"/>
+        <button class="wa-btn" id="wa-trip-meet-go" title="只读：会合时窗（各方从现地出发，能否在同一地点、同一窗口内到齐；走不过去的一方如实报，不假装能到）">会合时窗</button>
+      </div>
+      <div class="wa-row">
         <span class="wa-dim">真源：<code>WA.world.transit() / depart() / stop()</code> +
-          <code>WA.travelDesk.plan() / ledger() / commit()</code>（本页不另存一份行程，本模块全文零 store.transact）</span>
+          <code>WA.travelDesk.plan() / route() / meet() / ledger() / commit()</code>（本页不另存一份行程，本模块全文零 store.transact）</span>
       </div>
       <div id="wa-trip-out" class="wa-out"></div>`;
   }
@@ -10518,6 +10531,17 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           + (rows || '<div class="wa-item">此刻表里没有条目 —— <b>表里没有不等于不会发生</b></div>')
           + '<div class="wa-dim">' + esc(r.note) + '</div>');
       });
+      on('#wa-wh-ag-overdue', () => {
+        if (!WA.agenda) return agOut('<div class="wa-log wa-log-err">世界日程未加载</div>');
+        const r = WA.agenda.overdueList();
+        if (!r.ok) return agOut('<div class="wa-log wa-log-warn">' + esc(agWhy(r.reason)) + '</div>');
+        const rows = (r.rows || []).map(function (x) {
+          return '<div class="wa-item"><b>' + esc(x.label) + '</b> <span class="wa-dim">' + esc(x.source) + ' / ' + esc(x.kind) + '</span>'
+            + '<div class="wa-dim">依据引用 ' + esc(x.ref || '—') + (x.lateByMs ? (' · 逾期 ' + Math.round(x.lateByMs / 1000) + 's') : '') + '</div></div>';
+        }).join('');
+        agOut('<div class="wa-log wa-log-info">已到期未收敛：共 ' + r.count + ' 条' + (r.complete ? '' : '（部分源读取失败）') + '</div>'
+          + (rows || '<div class="wa-item">此刻没有逾期欠账。</div>'));
+      });
       on('#wa-wh-ag-sources', () => {
         if (!WA.agenda) return agOut('<div class="wa-log wa-log-err">世界日程未加载</div>');
         const rows = WA.agenda.sources();
@@ -10560,6 +10584,21 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         cvOut('<div class="wa-log wa-log-info">不可见面：' + r.count + ' 条被 visibility=hidden 挡在视图外（只报数，不搬运内容）</div>'
           + ((r.rows || []).length ? '<div class="wa-dim">' + esc(r.rows.slice(0, 10).map(function (x) { return x.ref + '（' + x.why + '）'; }).join('、')) + '</div>' : '')
           + '<div class="wa-dim">「你看不到」与「它不存在」是两件事 —— 后者是本视图答不了的。</div>');
+      });
+      on('#wa-wh-cv-entry', () => {
+        if (!WA.chronicleView) return cvOut('<div class="wa-log wa-log-err">世界纪事未加载</div>');
+        const el = $('#wa-wh-cv-ref');
+        const want = el ? el.value.trim() : '';
+        if (!want) return cvOut('<div class="wa-log wa-log-warn">请输入纪事 ref</div>');
+        const r = WA.chronicleView.entry(want);
+        if (!r.ok) return cvOut('<div class="wa-log wa-log-warn">' + esc(cvWhy(r.reason)) + '</div>');
+        const it = r.item || {};
+        cvOut('<div class="wa-log wa-log-info">下钻结果：' + esc(it.ref || want) + '</div>'
+          + '<div class="wa-item"><b>' + esc(it.title || '（无标题）') + '</b> <span class="wa-dim">' + esc(it.source) + ' / ' + esc(it.kind) + '</span>'
+          + (it.text ? '<div>' + esc(it.text) + '</div>' : '')
+          + '<div class="wa-dim">第 ' + it.at + ' 日 · 来源原件：' + (r.sourceRecordAbsent ? '<span class="wa-dim">原件已不在（按截断记录）</span>' : '在位') + '</div>'
+          + (r.sourceRecord ? ('<pre class="wa-pre">' + esc(JSON.stringify(r.sourceRecord, null, 2)) + '</pre>') : '')
+          + '</div>');
       });
       on('#wa-wh-cv-diag', () => {
         if (!WA.chronicleView) return cvOut('<div class="wa-log wa-log-err">世界纪事未加载</div>');
@@ -12066,6 +12105,53 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + (r.risk ? '<div class="wa-item"><span class="wa-dim">' + esc(String(r.risk.note || '')) + '</span></div>' : '')
         + (r.goods ? '<div class="wa-item"><span class="wa-dim">货物提示：' + esc(String(r.goods.note || '')) + '</span></div>' : '')
         + '<div class="wa-dim">指纹 <code>' + esc(String(r.stamp)) + '</code>　' + esc(r.basisNote || '') + '</div>');
+    });
+    on('#wa-trip-route', () => {
+      // v2.219.0（拓展 N5）：多站路线预览。本页只把「途经点串」拆成 stops 数组，
+      //   段数上限 / 断链 / 逐段耗时一律由模块判 —— 本页不预先截断、不自己算时间。
+      if (!WA.travelDesk || typeof WA.travelDesk.route !== 'function') return tripMiss('行程工作台（route 口）');
+      const s = tripSel();
+      const stopsEl = $('#wa-trip-stops'), dwellEl = $('#wa-trip-dwell');
+      const stops = String(stopsEl ? stopsEl.value : '').split(/[、,，]/).map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+      if (stops.length < 2) return tripOut('<div class="wa-log wa-log-warn">至少给两个站（用「、」分隔）—— 本页不替世界补距离。</div>');
+      const dwv = dwellEl ? String(dwellEl.value).trim() : '';
+      const r = WA.travelDesk.route({ channel: s.channel, stops: stops, dwell: dwv ? Number(dwv) * 60000 : 0 });
+      if (r.fault) return tripFault(r);
+      tripOut('<div class="wa-log wa-log-info">多站路线（真源 <code>WA.world.transit()</code> 逐段）：'
+        + '通道 <b>' + esc(r.channel) + '</b>　' + r.stopsCount + ' 站 / ' + r.legCount + ' 段　'
+        + (r.allReachable ? ('全程 <b>' + r.minutes + '</b> 分钟') : '<b>有段走不过去</b>（未达段照实报，不按直线兜底）') + '</div>'
+        + (r.legs || []).map(function (g) {
+            return '<div class="wa-item">段 ' + g.index + '：' + esc(g.from) + ' → ' + esc(g.to)
+              + (g.reachable ? ('　<b>' + g.minutes + '</b> 分钟（实走 <b>' + g.factored + '</b>）　路径 ' + g.pathCount + ' 段')
+                             : '　<span class="wa-dim">走不过去（' + esc(String(g.reason)) + '）</span>')
+              + (g.stayMs ? '　<span class="wa-dim">停留 ' + Math.round(g.stayMs / 60000) + ' 分钟</span>' : '') + '</div>';
+          }).join('')
+        + '<div class="wa-dim">出发 ' + r.departAt + ' → 到达 ' + r.arriveAt
+        + (r.companions && r.companions.length ? ('　同行：' + esc(r.companions.join('、'))) : '')
+        + '<br/>' + esc(r.basisNote) + '</div>');
+    });
+    on('#wa-trip-meet-go', () => {
+      // v2.219.0（拓展 N5）：会合时窗。每方写法 `人名@出发点`；省略 @ 即「已在会合地」。
+      if (!WA.travelDesk || typeof WA.travelDesk.meet !== 'function') return tripMiss('行程工作台（meet 口）');
+      const s = tripSel();
+      const el = $('#wa-trip-meet'), winEl = $('#wa-trip-win');
+      const parts = String(el ? el.value : '').split(/[、,，]/).map(function (x) { return x.trim(); }).filter(function (x) { return !!x; })
+        .map(function (x) { const k = x.split('@'); return { person: (k[0] || '').trim(), from: (k[1] || '').trim() }; });
+      if (parts.length < 2) return tripOut('<div class="wa-log wa-log-warn">至少两方（写法：甲@扁担巷、乙@北关）—— 会合至少是两个人的事。</div>');
+      const wh = winEl ? String(winEl.value).trim() : '';
+      const r = WA.travelDesk.meet({ channel: s.channel, place: s.to || s.from, parties: parts, windowMs: wh ? Number(wh) * 3600000 : undefined });
+      if (r.fault) return tripFault(r);
+      tripOut('<div class="wa-log ' + (r.canMeet ? 'wa-log-info' : 'wa-log-err') + '">会合（真源 <code>WA.travelDesk.meet()</code>）：'
+        + '地点 <b>' + esc(r.place) + '</b>　' + (r.canMeet ? '<b>窗口内到得齐</b>' : '<b>窗口内到不齐</b>')
+        + (r.slackMs !== null && r.slackMs !== undefined ? ('　余量 <b>' + Math.round(r.slackMs / 60000) + '</b> 分钟') : '') + '</div>'
+        + (r.parties || []).map(function (p) {
+            return '<div class="wa-item">' + esc(p.person) + '（' + esc(p.from || '已在会合地') + '）'
+              + (p.reachable === false ? '　<span class="wa-dim">走不过去（' + esc(String(p.why)) + '）—— 不假装能到</span>'
+                                       : '　到达 <b>' + p.arrival + '</b>') + '</div>';
+          }).join('')
+        + ((r.unreadable || []).length ? '<div class="wa-dim">读不到（与「真的到不了」是两件事）：'
+            + esc(r.unreadable.map(function (x) { return x.person + '（' + x.why + '）'; }).join('、')) + '</div>' : '')
+        + '<div class="wa-dim">时窗 ' + r.window.start + ' → ' + r.window.end + '　' + esc(r.note || '') + '</div>');
     });
     on('#wa-trip-verify', () => {
       if (!WA.travelDesk || typeof WA.travelDesk.verify !== 'function') return tripMiss('行程工作台（verify 口）');
