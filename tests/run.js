@@ -10515,7 +10515,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // 无头运行器里 WA.version 恒为 mock 的 'test'（index.js 被刻意跳过），
     //   故此处只断言「入口源码声明的版本」与 manifest 同源，真装载验证在 v2.4.0 块5 已有。
     assert(WA.version === 'test', '（环境）无头运行器版本为 mock 值（index.js 不在 LOAD 链中，实 ' + WA.version + '）');
-assert(verF2500 === '2.214.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
+assert(verF2500 === '2.215.0' && mfF2500.version === verF2500, '入口与清单同源同值（随当前版本升级，实 ' + verF2500 + '）');
     const orderF2500 = (idxSrcF2500.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2500.indexOf('core/settings-bus.js') > 0 && orderF2500.indexOf('engines/regional.js') > 0, 'LOAD_ORDER 含生命周期引擎与其首个消费者');
   }
@@ -11084,7 +11084,7 @@ assert(verF2500 === '2.214.0' && mfF2500.version === verF2500, '入口与清单�
     const mfF2600 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const verF2600 = (idxSrcF2600.match(/const VERSION = '([\d.]+)'/) || [])[1];
     assert(verF2600 === mfF2600.version, 'index.js VERSION 与 manifest.version 一致（' + verF2600 + ' vs ' + mfF2600.version + '）');
-    assert(verF2600 === '2.214.0', '入口与清单同源同值（实 ' + verF2600 + '）');
+    assert(verF2600 === '2.215.0', '入口与清单同源同值（实 ' + verF2600 + '）');
     const orderF2600 = (idxSrcF2600.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';
     assert(orderF2600.indexOf('core/settings-bus.js') > 0 && orderF2600.indexOf('core/api-router.js') > 0, 'LOAD_ORDER 含写入契约所在模块与首个收口消费者');
   }
@@ -11375,7 +11375,7 @@ assert(verF2500 === '2.214.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS = src2700 === null ? '' : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver = (idxS.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver === '2.214.0', '入口版本为 2.211.0（实 ' + ver + '）');
+    assert(ver === '2.215.0', '入口版本为 2.211.0（实 ' + ver + '）');
     assert(ver === mfS.version, '入口与清单同源同值（' + ver + ' vs ' + mfS.version + '）');
     assert(src2700('core/settings-bus.js').indexOf('v2.7.0') > 0, '写入侧完整性契约留痕（可回溯）');
   }
@@ -11978,7 +11978,7 @@ assert(verF2500 === '2.214.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2800 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2800 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2800 = (idxS2800.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2800 === '2.214.0', '入口版本为 2.211.0（实 ' + ver2800 + '）');
+    assert(ver2800 === '2.215.0', '入口版本为 2.211.0（实 ' + ver2800 + '）');
     assert(ver2800 === mfS2800.version, '入口与清单同源同值（' + ver2800 + ' vs ' + mfS2800.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.8.0') > 0,
       '出口面契约留痕（可回溯）');
@@ -12366,7 +12366,7 @@ assert(verF2500 === '2.214.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2900 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2900 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2900 = (idxS2900.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2900 === '2.214.0', '入口版本为 2.211.0（实 ' + ver2900 + '）');
+    assert(ver2900 === '2.215.0', '入口版本为 2.211.0（实 ' + ver2900 + '）');
     assert(ver2900 === mfS2900.version, '入口与清单同源同值（' + ver2900 + ' vs ' + mfS2900.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.9.0') > 0,
       '删除侧完整性契约留痕（可回溯）');
@@ -12736,7 +12736,7 @@ assert(verF2500 === '2.214.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2100v = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2100v = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2100v = (idxS2100v.match(/const VERSION = '([0-9.]+)'/) || [])[1];
-    assert(ver2100v === '2.214.0', '入口版本为 2.211.0（实 ' + ver2100v + '）');
+    assert(ver2100v === '2.215.0', '入口版本为 2.211.0（实 ' + ver2100v + '）');
     assert(ver2100v === mfS2100v.version, '入口与清单同源同值（' + ver2100v + ' vs ' + mfS2100v.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.10.0') > 0,
       '读侧完整性契约留痕（可回溯）');
@@ -13101,7 +13101,7 @@ assert(verF2500 === '2.214.0' && mfF2500.version === verF2500, '入口与清单�
     const idxS2110 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const mfS2110 = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
     const ver2110 = (idxS2110.match(/const VERSION = '([\d.]+)'/) || [])[1];
-    assert(ver2110 === '2.214.0', '入口版本为 2.211.0（实 ' + ver2110 + '）');
+    assert(ver2110 === '2.215.0', '入口版本为 2.211.0（实 ' + ver2110 + '）');
     assert(ver2110 === mfS2110.version, '入口与清单同源同值（' + ver2110 + ' vs ' + mfS2110.version + '）');
     assert(fs.readFileSync(path.join(BASE, 'engines/contract-audit.js'), 'utf8').indexOf('v2.11.0') > 0,
       '活性面治理契约留痕（可回溯）');
@@ -15454,7 +15454,7 @@ assert(verF2500 === '2.214.0' && mfF2500.version === verF2500, '入口与清单�
     assert(gate2800.judge(r2800, led2800).ok === true, '（基线）现场账本 ⇒ ok（新判据不误伤现行账本）');
 
     // ── B. 元数据三级同源（version 字段 / _note 版本词 / 入口 VERSION）──
-    assert(VER2800 === '2.214.0', '入口 VERSION = 2.211.0（实 ' + VER2800 + '）');
+    assert(VER2800 === '2.215.0', '入口 VERSION = 2.211.0（实 ' + VER2800 + '）');
     assert(led2800.version === VER2800, '账本 version 字段 == 入口 VERSION（实 ' + JSON.stringify(led2800.version) + '）');
     assert(gate2800.versionNotes(led2800._note).indexOf('v' + VER2800) >= 0,
       '_note 自称版本与入口一致（版本词 ' + gate2800.versionNotes(led2800._note).join(',') + '）');
@@ -21755,7 +21755,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   「版本双落」。改为从 index.js **精确抽取** const VERSION = '...' 再与显式期望比对
     //   （与 v2.125.0 段的 verF2500 同规格：显式常量 + 与 manifest 同源同值）。
     const vM2158 = (idxSrc2158.match(/const VERSION = '([^']+)'/) || [])[1] || '';
-    assert(vM2158 === '2.214.0' && maniSrc2158.version === vM2158,
+    assert(vM2158 === '2.215.0' && maniSrc2158.version === vM2158,
       'v2158: 入口 VERSION 与 manifest.json 同源同值（实 ' + vM2158 + ' / ' + maniSrc2158.version + '）');
     const wsSrc2158 = fs.readFileSync(path.join(BASE, 'engines/world-seed.js'), 'utf8');
     assert(wsSrc2158.indexOf('function transferPack(seedId, max)') >= 0
@@ -23274,6 +23274,20 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     runLock('./p5-stage-v2214.js');
     runLock('./p5-stage-v2214.js', 'runNegative');
+  }
+  // v2.215.0(优化 Q6):结构化注入预算 —— 原子块独立裁切边界。
+  //   治的病:被折叠的注入块此前走 `trim()` 的**字符前缀截断 + 标点回退**,必产生两种半条件:
+  //   ① 原子行被**行内切断**(拿到半条因果);② **尾部关键约束句整条消失** —— `不得补写` /
+  //   `只能依据自己持有的情报行动` 这类约束压根没进 prompt(比半条更糟,模型会照着没有约束的块自由发挥)。
+  //   本版在 `trim()` 内部换**裁切粒度**:头/尾各是不可分单元,body 行整取整舍,优先级 head > tail > body
+  //   (预算不够先舍 body 行,不先舍约束);判不出 `[标题]` 头、头超预算或结构结果复核超限 ⇒ 回退字符级
+  //   (**不假装能判**,保守失败只影响裁切粒度、不会切错内容)。
+  //   不新增预算真源:tokensOf / plan / apply / PRIORITY / 成本账一律不动,裁决账结构逐字不变。
+  //   本节同 Q1~Q5 口径:正 / 负两向各挂 1 处接线,功能与破坏判据全住专锁。
+  section('v2.215.0(优化 Q6):结构化注入预算(原子块独立裁切边界)');
+  {
+    runLock('./q6-atomic-budget-v2215.js');
+    runLock('./q6-atomic-budget-v2215.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

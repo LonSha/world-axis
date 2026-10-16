@@ -74,7 +74,7 @@ after_reply 链:   突发事件推进 → 世界推演(backstage) → 事件演�
 - **事件链编辑器**：type 一旦确定禁改（阶段序列不同），阶段必须在当前类型合法序列内，跨阶段自动重置阶段轮，正面终局登记 `_terminalSince`（倒计时清退用）
 - **状态一致性检查器**：纯只读，9 组 checker 覆盖事件/势力/脉搏/人物认知边界/记忆伏笔/来源引用/注入队列/主观记忆/突发事件，返回 error/warn/info 三级结构化报告，绝不写 store
 
-## 构建与验收（当前版本 v2.214.0）
+## 构建与验收（当前版本 v2.215.0）
 
 **三档回归**：日常改动跑**快档**（十几秒，覆盖「动了就会炸」的十三面），跨文件同值判据与生成物跑**中档**（一分钟级），收口跑**全量**。
 
@@ -153,6 +153,7 @@ node tests/export-contract.js   # 出口面契约 → ns / members / chars（产
 - **v2.80.0 及之后**：详细条目以 [`ITERATION_LOG.md`](ITERATION_LOG.md) 为准 —— 本仓的迭代日志是单一真源，逐题记录「做了 / 为什么 / 影响范围 / 门禁结果」；本节只留摘要。
 - **v2.21.0 – v2.79.0**：条目只在本节。日志自 v2.80.0 起（`R63`），此前各版没有 R 条目。
 - **v2.20.0 及更早**：条目在 [`ITERATION_LOG.md`](ITERATION_LOG.md) 的「版本条目存档」节（本版迁入）。
+<b>v2.215.0</b> — <b>优化 Q6：结构化注入预算（原子块独立裁切边界——头/尾各为不可分单元、body 行整取整舍、优先级 head &gt; tail &gt; body；判不出结构即回退字符级不假装能判）</b>（<b><code>engines/inject-budget.js</code></b> 的 <code>trim()</code> 内换裁切粒度：<code>splitStruct()</code> 认 <code>[标题]</code> 头与尾约束句、<code>trimStructured()</code> 按整结构单元裁并出厂前复核 <code>tokensOf(out) &lt;= maxTokens</code>，不满足即回退；<b>不新增预算真源</b>——<code>tokensOf</code>/<code>plan</code>/<code>apply</code>/<code>PRIORITY</code>/成本账一律不动，裁决账结构逐字不变。治的是折叠块「半条 + 断尾」：原子行被行内切断、<code>不得补写</code>这类尾部约束整条没进 prompt）。<br>
 <b>v2.214.0</b> — <b>优化 Q5：视角先过滤后渲染（staged 出口——HTML 先进脱离文档的 stage 容器解析、玩家视角摘除在进 DOM 之前完成，检索/图谱动态出口收进同一道闸）</b>（<b><code>ui/panel.js</code> 新增 <code>stageOut()</code> 共享出口 + <code>renderBody</code> / <code>hsOut</code> / <code>wgOut</code> 三处接线、<code>tests/ui-dom.js</code> innerHTML getter 改为实时序列化、<code>index.js</code> / <code>manifest.json</code> 升 v2.214.0</b>）。<br>
 <b>v2.213.0</b> — <b>优化 Q4：O6 分层定向运行真裁剪（wrap 机制落地——定向运行从「section 提前返回但裸语句照跑」到「未选中节体真不执行」）</b>（<b><code>tools/prune-sections.js</code> 新增 <code>mode:'wrap'</code> 运行期包裹 + 内联哨兵单一真源、<code>tests/isolated-runner.js</code> 接线进 work 副本、<code>index.js</code> / <code>manifest.json</code> 升 v2.213.0</b>）。<br>
 <b>它治的病（真源取证）</b>:<code>tests/run.js</code> 的 <code>section(t)</code> 在 skip/refuse 时只记录状态并提前返回,但<b>节体边界之外后续 section 调用仍按 JS 顺序执行</b>——定向运行实际接近全量,曾在约 25 分钟后 V8 OOM。真实文件 262+ 节里约 90 个裸节,<code>engines/tool-diag v0.9.2</code> 单节 3463 行;另有 <code>v0220: {</code> / <code>v2200: {</code> 等 label/块<b>跨 section 边界</b>,旧「删除节体」方案会把包裹 <code>}</code> 闭合到 label 上、吞掉后续 section。<br>

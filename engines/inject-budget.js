@@ -374,9 +374,74 @@
    * 用二分求「最大满足 token 上限的字符前缀」，再回退到段落/句子边界
    * （不能用 chars≈tokens×1.6 估算：中日韩 1 字≈1 token，估算会超预算）。
    */
+  /**
+   * v2.215.0（优化 Q6）：**结构化原子裁切**。
+   *   治的病：本仓各源的 block 形态统一为 `[标题]\n原子行…\n尾部约束句`（实测 intel / life /
+   *   bonds / causal / org / world 等皆然），而旧 `trim()` 按**字符前缀**截断 + 标点回退，
+   *   产生两种半条件：① 原子行被**行内切断**（`因果：A、B → ` 之后没了 —— 读者拿到半条因果）；
+   *   ② **尾部约束句整条消失**（`不得补写` / `只能依据自己持有的情报行动` 这类关键约束压根
+   *   没进 prompt —— 比半条更糟）。Q6 要求的「原子块有独立裁切边界、保留闭合结构与事实来源、
+   *   最终 prompt 不出现半条关键约束」正是这两条的反面。
+   *   本函数按**结构单元**裁：头与尾各是一个完整单元（要么整条在、要么整条不在），body 行
+   *   逐行整取整舍（空行不占账、原样保留分隔）。优先级 head > tail > body 行 —— 尾部是
+   *   **关键约束**，预算不够时先舍 body 行、不先舍它。
+   *   返回 `null` = 「不是结构化块」⇒ 调用方回退到字符级 trim（**不假装能判**）。
+   *   边界（如实登记）：① 结构头认 `[标题]` 首行（≤80 字）；② 尾约束认「最后一段非空、
+   *   且不含原子行分隔标记 `：`/`→`/`｜`的整句」——判不出时不当尾处理（保守失败，只影响
+   *   裁切粒度、不会切错内容）；③ 头+尾都放不下时如实标记 `tailKept:false` 语义（出省略
+   *   标记），不假称保留了约束；④ 兜底复核 `tokensOf(out) <= maxTokens`，不满足即回退，
+   *   保证 trim 的「结果必不超上限」契约不破。
+   */
+  const STRUCT_HEAD_RE = /^(\s*\[[^\]\n]{1,80}\]\s*\n)/;
+  const ATOM_SEP_RE = /[：→｜]/;
+  function splitStruct(s) {
+    const t = String(s == null ? '' : s);
+    const m = STRUCT_HEAD_RE.exec(t);
+    if (!m) return null;
+    const head = m[1];
+    const lines = t.slice(head.length).split('\n');
+    let tailAt = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (/^\s*$/.test(lines[i])) continue;
+      if (!ATOM_SEP_RE.test(lines[i])) tailAt = i;   // 无分隔标记 ⇒ 是自然语言约束句
+      break;
+    }
+    return {
+      head: head,
+      body: tailAt >= 0 ? lines.slice(0, tailAt) : lines,
+      tail: tailAt >= 0 ? lines.slice(tailAt).join('\n') : ''
+    };
+  }
+  function trimStructured(text, maxTokens) {
+    const st = splitStruct(text);
+    if (!st) return null;
+    const headT = tokensOf(st.head), tailT = tokensOf(st.tail);
+    const mark = '\n…（内容过长已折叠）';
+    const markT = tokensOf(mark);
+    if (headT > maxTokens) return null;                 // 头都放不下 ⇒ 无「结构」可保，退字符级
+    const tailKept = tailT > 0 && (headT + tailT + markT <= maxTokens);
+    let remain = maxTokens - headT - markT - (tailKept ? tailT : 0);
+    const kept = [];
+    let dropped = 0;
+    for (let i = 0; i < st.body.length; i++) {
+      const ln = st.body[i];
+      if (/^\s*$/.test(ln)) { kept.push(ln); continue; }   // 空行不占账：保留分隔结构
+      const lt = tokensOf(ln);
+      if (lt <= remain) { kept.push(ln); remain -= lt; }
+      else dropped++;
+    }
+    let out = st.head + kept.join('\n');
+    if (dropped > 0 || !tailKept) out += mark;
+    if (tailKept) out += '\n' + st.tail;
+    return tokensOf(out) <= maxTokens ? out : null;      // 兜底：不满足上限即回退
+  }
+
   function trim(text, maxTokens) {
     const s = String(text == null ? '' : text);
     if (tokensOf(s) <= maxTokens) return s;
+    // v2.215.0（Q6）：结构化块走原子裁切；非结构化块返回 null 时落回下方字符级逻辑。
+    const sorted = trimStructured(s, maxTokens);
+    if (sorted !== null) return sorted;
     const mark = '\n…（内容过长已折叠）';
     const markTokens = tokensOf(mark);
     const allow = maxTokens - markTokens;
