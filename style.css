@@ -66,3 +66,7 @@
 .wa-log{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .wa-log-error{color:#f87171}.wa-log-warn{color:#fbbf24}
 @media (max-width:640px){#wa-panel{right:0;left:0;bottom:0;width:100vw;height:70vh;border-radius:14px 14px 0 0}}
+
+/* v2.225.0(优化 Q8 · 面板减负):专家段折叠钮。收起态**不拼接 body**,故没有 display:none 的节点。 */
+.wa-fold-t{margin:12px 0 4px;font-weight:600}
+.wa-fold-b{padding-left:8px;border-left:2px solid rgba(255,255,255,.08)}

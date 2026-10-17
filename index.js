@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.224.0'
+  const VERSION = '2.225.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -794,6 +794,11 @@
     //   白名单读 WA.ui.pages()（PAGES 表是 panel.js 的真源），先装会让白名单恒空、
     //   一切 observe 被拒收成 unknown-page（观测面静默失效，比不装更坏）。
     'ui/render-perf.js',
+    // v2.225.0(优化 Q8 · 面板减负):专家段折叠。与 render-perf 同理**必须排在 panel.js
+    //   之后** —— panel.js 的 foldSec 渲染期读 `WA.panelFold.isCollapsed`;本模块另读
+    //   `WA.ui.pages()` 做页白名单核对。先装会让 `isCollapsed` 恒报 page-table-absent
+    //   (折叠整条静默失效,比不装更难查)。本模块**零世界写、零落盘**(状态走 settingsBus)。
+    'ui/panel-fold.js',
     'ui/settings.js',
     'ui/assistant.js',
   ];

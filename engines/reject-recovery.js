@@ -283,7 +283,15 @@
    *   现场据此决定去哪一侧排障（链面 / 线索面 / 知情面），合成一栏就再也答不出。
    *   （同族的 `probe-threw` / `intel-threw` 早已在本面，本条只是把另外三条补齐。）
    *   三码的恢复档同样不写 OVERRIDES：分词里的 `threw` 本就被规则表收在 retry-same-input 档
-   *   （与 `report-threw` / `settle-threw` 同一条规则，实测 via:'rule'）。 */
+   *   （与 `report-threw` / `settle-threw` 同一条规则，实测 via:'rule'）。    *  v2.225.0(优化 Q8 面板减负):现场实测 777 / 快照 775 ⇒ 差 2,两条全部来自本版新面。
+   *   1 `unknown-section`(ui/panel-fold.js):段名认得、页名认得,只有段 id 拼错 ——
+   *     与 `unknown-page` **分开报**(前者改段 id,后者改页名,处置不同)。
+   *   2 `fold-module-missing`(ui/panel.js 绑定层):折叠模块缺席时如实报出,
+   *     不静默当展开 —— 那会让「模块没装上」与「用户就是展开着」长得一样。
+   *   两条都不进死表与基线:模块缺席(扩展目录被部分同步)与段 id 拼错都是真会发生的局面,
+   *   见证由 tests/q8-panel-fold-v2225.js 的 B3/B3b/B3c 三段真跑。
+   *   恢复档均不写 OVERRIDES:`unknown-*` 的分词本就被规则表收在 adjust-input 档。
+   */
   const REJECT_FACE = [
     'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'adopt-budget-exhausted',
      'adopt-throw', 'auto-adopt-off',
@@ -330,6 +338,9 @@
     'end-failed', 'engine-absent', 'enigma-failed', 'enqueue-threw', 'error', 'events-full', 'evidence-full',
     'evolve-key-mismatch', 'evolve-needs-single-key', 'exec-absent', 'exists', 'export-failed', 'export-throw',
     'expr-too-long', 'eye-face-clash', 'fault-handled', 'finished', 'flat-rounds', 'flush-failed',
+    // v2.225.0(Q8 面板减负):面板专家的折叠面 —— 面板侧在折叠模块缺席时如实报出
+    //   (不静默当展开:那会让「模块没装上」与「用户就是展开着」长得一样)。
+    'fold-module-missing',
     'fondness-missing', 'foreign-chat', 'fork-failed', 'frozen', 'future-event', 'gated-off',
     'goal-not-active', 'goods-full', 'guarded-key', 'hard-cut', 'hops-full', 'identical',
     'identity-incomplete', 'in-replay', 'in-transit', 'in-transit-full', 'incomplete-dice', 'insufficient',
@@ -408,6 +419,9 @@
     'unknown-op', 'unknown-opportunity', 'unknown-org', 'unknown-pack', 'unknown-page', 'unknown-parent',
     'unknown-participant', 'unknown-place', 'unknown-policy', 'unknown-post', 'unknown-pulse', 'unknown-recipe',
     'unknown-role', 'unknown-route', 'unknown-scene', 'unknown-schema', 'unknown-seat', 'unknown-seed',
+    // v2.225.0(Q8 面板减负):段名认得、页名认得,只有段 id 拼错 ——
+    //   与 unknown-page 分开报(前者要改段 id,后者要改页名,处置不同)。
+    'unknown-section',
     'unknown-shipment', 'unknown-site', 'unknown-source', 'unknown-span', 'unknown-stage', 'unknown-subject',
     'unknown-theme', 'unknown-transition', 'unknown-user', 'unparseable', 'unreachable', 'unreadable',
     'verify', 'weak-evidence', 'window-closed', 'window-too-short', 'world-missing', 'write',

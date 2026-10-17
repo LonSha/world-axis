@@ -2080,6 +2080,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.209.0（优化 6）：面板导航协议。登记为**必载** —— 面板的每一个 data-nav 控件与
     //   `#wa-nav-back` 都走它；缺席就是「跳转与定位整条失效」本身，不该被静默兜住。
     'ui/panel-nav.js': 'panelNav',
+    // v2.225.0(Q8):专家段折叠。登记为**必载** —— 面板每个 wa-sec 段头都走它;
+    //   缺席就是「折叠整条失效」本身(而失效的表现是「点了没反应」,零读数)。
+    'ui/panel-fold.js': 'panelFold',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -2167,6 +2170,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   //   （「无头环境缺席」与「产品文件断裂」是两件事，混在一起会让自检的红灯失去信息量）。
   //   另注：tests/export-contract.js 里有一份**同名口径的第二副本**（OPTIONAL），两处必须同改。
   const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf', 'panelNav',
+      // v2.225.0(Q8):ui/panel-fold.js —— 无头环境里 ui/*.js 不装载,不登记会被 secModules
+      //   报成 missing(那是「真缺席」,不是「可选缺席」)。
+      'panelFold',
       // v2.181.0：赛博朋克 UI 主题层 9 个 ns —— 无头环境里 ui/*.js 不装载，
       //   不登记它们会被 secModules 报成 missing（那是「真缺席」，不是「可选缺席」）。
       'cyberUI',

@@ -2606,7 +2606,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <textarea id="wa-imp-text" class="wa-ta" placeholder="或直接粘贴 JSON 内容…"></textarea>
       <button class="wa-btn" id="wa-imp-run" title="自动识别粘贴/文件内容的类型（存档/区域事件/势力/事件链/主观记忆），校验失败零写入">预检并导入</button>
       <div id="wa-imp-out" class="wa-out"></div>
-      <div class="wa-sec">扩展自检（模块/注入/UI/运行环境）</div>
+      ${foldSec('tools', 'selfcheck', '扩展自检（模块/注入/UI/运行环境）', `
       <div class="wa-sec">诊断与体检<span class="wa-dim">（只读，不改世界状态）</span></div>
       <div class="wa-row">
         <button class="wa-btn" id="wa-diag-run" title="立即体检：模块装载/上轮注入/UI 绑定/视图开关/API 通道">立即自检</button>
@@ -2614,7 +2614,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-audit-copy" title="复制内存/持久化用量审计报告">复制内存审计</button>
         <button class="wa-btn" id="wa-maintain" title="健康巡视：逐站点扫描容量、陈旧、孤立数据">健康巡视</button>
       </div>
-      <div class="wa-sec">存储与现场<span class="wa-dim">（看磁盘上真实存了什么）</span></div>
+      `)}
+      ${foldSec('tools', 'storage', '存储与现场<span class="wa-dim">（看磁盘上真实存了什么）</span>', `
       <div class="wa-row">
         <button class="wa-btn" id="wa-key-check" title="存储键体检：列出本扩展写过的所有键与占用">存储键体检</button>
         <button class="wa-btn" id="wa-quar-view" title="隔离现场：读取损坏而被隔离的原始数据">隔离现场</button>
@@ -2632,30 +2633,35 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-perf-partial" title="增量面：按每一面自己的输入（世界步进 stateRev）决定重算还是复用——同一世界步进下重复读取应为 0 重算；改过世界再点则如实重算">增量面</button>
         <button class="wa-btn" id="wa-perf-band" title="档位面：短 / 中 / 长 / lowend 四档并排，本地与宿主 API 分列（每档取本档前后的差值，不是全局累计）；lowend 为同机放大估计，不参与判定">档位面</button>
       </div>
-      <div class="wa-sec">审计取证<span class="wa-dim">（谁改过世界——把一段事实带出会话）</span></div>
+      `)}
+      ${foldSec('tools', 'audit', '审计取证<span class="wa-dim">（谁改过世界——把一段事实带出会话）</span>', `
       <div class="wa-row">
         <button class="wa-btn" id="wa-audit-vol" title="导出一卷审计事实（纯读：不挤出、不清环、不改计数）——这一节会话里世界被谁改过，只有把它带出去才答得上">导出审计</button>
         <button class="wa-btn" id="wa-audit-vol-check" title="核对一卷从别处拿来的审计（序号链 + 时间链），零状态触碰：不并入环、不改序号、不写盘">带外核对</button>
       </div>
       <textarea id="wa-audit-vol-text" class="wa-ta" placeholder="把一卷审计（JSON）粘在这里再点「带外核对」——上一节会话导出的那种。本侧无卷时照实说「先导出一卷」，不假装核对过"></textarea>
       <div id="wa-audit-vol-out" class="wa-out"></div>
-      <div class="wa-sec">恢复与撤销<span class="wa-dim">（改错了能退回去）</span></div>
+      `)}
+      ${foldSec('tools', 'recovery', '恢复与撤销<span class="wa-dim">（改错了能退回去）</span>', `
       <div class="wa-row">
         <button class="wa-btn" id="wa-recovery-dl" title="导出当前状态的恢复点文件">导出恢复点</button>
         <button class="wa-btn" id="wa-recovery-view" title="列出已留存的恢复点">存档恢复点</button>
         <button class="wa-btn" id="wa-undo-btn" title="回退最近一次面板编辑（参数/背景/事实/伏笔等）">撤销编辑</button>
       </div>
-      <div class="wa-sec">记忆采样预览<span class="wa-dim">（buildBlock 实时输出）</span></div>
+      `)}
+      ${foldSec('tools', 'sampler', '记忆采样预览<span class="wa-dim">（buildBlock 实时输出）</span>', `
       <div class="wa-row"><button class="wa-btn" id="wa-samp-preview" title="调用 memorySampler.buildBlock 查看当前会注入的记忆采样文本">预览采样</button><button class="wa-btn wa-mini" id="wa-samp-copy" disabled>复制</button></div>
       <div id="wa-samp-out" class="wa-out"></div>
-      <div class="wa-sec">运行痕迹<span class="wa-dim">（只清计量，不动世界状态）</span></div>
+      `)}
+      ${foldSec('tools', 'traces', '运行痕迹<span class="wa-dim">（只清计量，不动世界状态）</span>', `
       <div class="wa-row">
         <button class="wa-btn" id="wa-stat-reset" title="仅重置各种计数器，世界状态与存档不受影响">清零计量</button>
         <button class="wa-btn" id="wa-wf-reset" title="清空工作流运行历史与失败台账">清空运行痕迹</button>
       </div>
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
 
-      <div class="wa-sec">世界种子库（把这一局的格局存下来，换一局再开）</div>
+      `)}
+      ${foldSec('tools', 'seedlib', '世界种子库（把这一局的格局存下来，换一局再开）', `
       <div class="wa-dim">种子存的是<b>骨头</b>：势力格局 / 人物关系网 / 地理 / 时代背景。它<b>不含</b>编年史 / 暗流 / 回声 / 章节 ——
         存了进度就不是新局，是同一个世界的续集。签名的输入只有结构面，故<b>换个名字存同一格局仍会被去重</b>。
         <b>播种只返回计划、不写世界</b>：真去重开一局是宿主（/reset、新对话）的动作 ——
@@ -2672,7 +2678,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
 
       <div id="wa-ws-out" class="wa-out"></div>
 
-      <div class="wa-sec">世界蓝图（把这一局的世界原样搬走 / 搬来）</div>
+      `)}
+      ${foldSec('tools', 'blueprint', '世界蓝图（把这一局的世界原样搬走 / 搬来）', `
       <div class="wa-dim">蓝图存的是<b>结构</b>：人物稳定 ID 与别名、方向化关系、势力权重、地点（含归属与开关时刻）、
         <b>道路端点</b>与时长容量、时代与日历起点、受支持的静态人设与机制开关。
         它<b>不含</b>人物私密记忆 / 聊天文本 / 已完成事件 / 编年史 / 暗流 / 回声 / 事实 / 外部凭据与脚本 ——
@@ -2687,7 +2694,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-row"><button class="wa-btn" id="wa-bp-check" title="纯读：对库内一张蓝图跑引用完整性三判据（重复 ID / 悬空引用 / 未知顶层键）—— 这是安装前的**独立**校验口，与安装侧共用同一份判据，不另写一套">校验蓝图</button><button class="wa-btn" id="wa-bp-empty" title="纯读：当前世界是不是空新局（12 项逐格清点：人物/地点/道路/势力/轮次/纪事/暗流/回声/事实/货品/初始化来源/蓝图安装留痕）。答的是「现在能不能装」，不是「装过没有」">目标空局检查</button></div>
       <div class="wa-row"><input id="wa-bp-keep" class="wa-input" placeholder="保留层级 structure / roster / mech（留空=roster）"/><button class="wa-btn" id="wa-bp-preview" title="纯读预览：把库内一张蓝图映射到现有状态字段（六道门：版本/形状/白名单键/重复 ID/悬空引用/容量 + 目标非空）。预览只做一次映射，确认应用同一份">导入预览</button><button class="wa-btn" id="wa-bp-import" title="写口（大）：一次事务装完整结构（势力/人物/关系/地点/道路/时代），进度归零，写 blueprint.installed。只作用于空新局 —— 非空目标拒收 not-empty；无预览拒收 no-preview">安装蓝图</button></div>
       <div id="wa-bp-out" class="wa-out"></div>
-      <div class="wa-sec">依赖体检与迁移助手</div><div class="wa-dim">（E8：这一坨东西在你这台机器上到底能不能用）</div>
+      `)}
+      ${foldSec('tools', 'depcheck', '依赖体检与迁移助手</div><div class="wa-dim">（E8：这一坨东西在你这台机器上到底能不能用）', `
       <div class="wa-dim">蓝图 / 种子 / 转移包 / 存档信封四类可搬物，粘进来逐项体检：<b>缺什么</b>（外部依赖 / 机制开关 / 配方真源）、
         <b>会降级什么</b>（损失面<b>逐字取自各导入侧真源</b>，本面不重写）、<b>能不能迁移</b>（走 checkpoints 的迁移链）。
         三态分列：<code>present</code>（在）/ <code>absent</code>（确实缺）/ <code>unknown</code>（<b>探不出</b>）。
@@ -2713,7 +2721,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-dc-diag" title="自证面：四处版本真源各读得到吗、迁移链现状、体检台账（四种总判计数 + 拒收归因）">诊断</button>
       </div>
       <div id="wa-dc-out" class="wa-out"></div>
-      <div class="wa-sec">规则包与自动化模板</div><div class="wa-dim">（E7：把这一局喜欢的规则存成一套，下次一键切回来）</div>
+      `)}
+      ${foldSec('tools', 'rulepack', '规则包与自动化模板</div><div class="wa-dim">（E7：把这一局喜欢的规则存成一套，下次一键切回来）', `
       <div class="wa-dim">把<b>当前规则面</b>（你启用的题材与相关设置）存成一个<b>命名包</b>：换一局、换一个人设时一键切回，
         也能导出给别人。<b>本面只记录设置与启用面，一个字都不改世界状态</b> ——
         写盘唯一走 <code>settingsBus</code>（与题材 / 预设 / 配方同一条路）。<br/>
@@ -2757,7 +2766,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
          <button class="wa-btn" id="wa-rp-history" title="只读：回滚栈（深度 / 上限 / 每步是从哪来的、几键、指纹）—— 只报形状不报值">回滚栈</button>
        </div>
        <div id="wa-rp-out" class="wa-out"></div>
-      <div class="wa-sec">世界实验室与反事实对比</div><div class="wa-dim">（E9：选 A / 选 B / 什么都不做，先看看分别会怎样）</div>
+      `)}
+      ${foldSec('tools', 'worldlab', '世界实验室与反事实对比</div><div class="wa-dim">（E9：选 A / 选 B / 什么都不做，先看看分别会怎样）', `
       <div class="wa-dim">在<b>隔离副本</b>上把三条路径各跑一遍：<code>hold</code>（什么都不做）、<code>选 A</code>、<code>选 B</code>，
         然后逐项摆差异（准入结论 / 账目 / 因果落地），每一项都标<b>来源</b>。<br/>
         <b>实验绝不写 live 存档</b>：「跑前跑后世界摘要一致」是<b>实测</b>出来的（不是一句声明）。
@@ -2803,7 +2813,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
        </div>
 
        <div id="wa-wl-out" class="wa-out"></div>
-      <div class="wa-sec">存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）</div>
+      `)}
+      ${foldSec('tools', 'capacity', '存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）', `
       <div class="wa-dim">区分<b>可回收历史</b>与<b>不可丢义务</b>（在途货物 / 待履约条款 / 未结阶段 / 回执去重索引）——
         义务不静默挤出。水位来自 <code>store.sizeCaps()</code>（唯一真源），与「容量」页同源不另起一份。
         此刻：<b>${capOn ? '开' : '关'}</b>（关闭时四栏一并拒收，读数一直空 —— 这与「还没跑过清点」不是一回事）。</div>
@@ -2816,7 +2827,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-cap-diag" title="自证面：store / sizeCaps / evict / storageForecast 四源是否齐备">诊断</button>
       </div>
       <div id="wa-cap-out" class="wa-out"></div>
-      <div class="wa-sec">性能基线面与三档</div><div class="wa-dim">（O3：这一局属于哪一档、离冻结预算多远）</div>
+      `)}
+      ${foldSec('tools', 'perfbase', '性能基线面与三档</div><div class="wa-dim">（O3：这一局属于哪一档、离冻结预算多远）', `
       <div class="wa-dim">档位<b>只认现场字节读数</b>（存档字节 + 已满容器数），不拍阈值 —— 拍出来的档位会与字节读数必然漂移。
         预算表是装载时对宿主 <code>perfTrace.CLASS_DEF</code> 的深拷贝，<b>每次读都比一次</b>（冻结不是抄一份），漂移当场可见。
         <b>实机采样栏一律留空</b>并列出必测项：把同机放大估计填进实测栏，下一个读者就再也分不出「手机上 60ms」与「桌上机估算 60ms」。
@@ -2831,6 +2843,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-pbl-out" class="wa-out"></div>
       <div id="wa-diag-out" class="wa-out"></div>
+      `)}
       </div>`;
   }
   /**
@@ -3809,6 +3822,48 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
    *    两处各治一条泄漏面，互不替代。
    *  renderBody 挂在重绘出口上的理由（v2.149.0 不变）：面板每次重绘整块重建，过滤结果
    *    必须与渲染结果同寿；staged 之后这层语义从「渲染后再摘」变成「进 DOM 前已摘」。 */
+  /**
+   * v2.225.0(Q8 · 面板减负):**可折叠的专家段**。
+   *
+   * 为什么必须做成「不拼接」而不是「CSS 藏起来」:
+   *   本仓对「读数不实」已有裁决 —— `display:none` 的节点照样进 DOM、照样占内存、
+   *   照样参与查询,把它叫「减负」等于把「看不见」当成「不存在」。
+   *   故本函数的收起分支**根本不拼接 body**(那些控件从不进 HTML、也从不进 DOM);
+   *   展开分支照常拼接。代价是每次切换要整页重绘 —— 那正是本仓既有的渲染模型
+   *   (`renderBody` 整块重建),不新增第二条路径。
+   *
+   * 表外一律**不折叠**(如实按展开处理并回带一行提示):
+   *   自造一个段名会让折叠静默失效,而那种失效没有任何读数 —— 宁可让它显形。
+   *   `WA.panelFold` 缺席(无头环境不装载 ui/*)时同样按展开处理:渲染链不该因
+   *   观测/交互模块缺席而瘫掉(与 renderPerf 缺席时静默跳过同口径)。
+   *
+   * @param {string} page  页 id(必须与 WA.panelFold.SECTIONS 里的 page 逐字一致)
+   * @param {string} sec   段 id(同上)
+   * @param {string} label 段的可见标题(用于按钮的可访问名)
+   * @param {string} body  段体(**收起时不会被拼接**)
+   */
+  function foldSec(page, sec, label, body) {
+    // v2.225.0(Q8)收口:这里**直写** `WA.panelFold.isCollapsed(...)`,不经中间变量。
+    //   为什么:引用面门禁(dead-export-gate / inventory 的 REF_RE)只认 `WA.ns.mem` 两段形态。
+    //   写成 `const mod = WA.panelFold; mod.isCollapsed(...)` 会让**真消费方**在账本上
+    //   显示成「产品代码零引用」—— 于是这条能力被记成未接线,而它每渲染一次工具页就调一次。
+    //   这不是为门禁改写,而是让读数与事实同宽:谁在调,账上就该看得见。
+    const key = String(page) + ':' + String(sec);
+    let col = false, known = false;
+    try {
+      if (WA.panelFold && typeof WA.panelFold.isCollapsed === 'function') {
+        const r = WA.panelFold.isCollapsed(page, sec);
+        if (r && r.ok) { known = true; col = r.collapsed === true; }
+      }
+    } catch (e) { /* 折叠模块自身失败 ⇒ 按展开处理,不拖垮渲染 */ }
+    const t = (col ? '▸ ' : '▾ ') + String(label);
+    const btn = '<button class="wa-btn wa-mini wa-fold-t" data-foldt="' + esc(key) + '"'
+      + ' aria-label="' + esc(String(label)) + ' 折叠或展开"'
+      + ' title="' + esc(col ? '展开这一段(点开后才会构建它的控件)' : '收起这一段(收起后它的控件不构建,页面更轻)') + '"'
+      + '>' + esc(t) + '</button>';
+    if (!known) return btn + '<div class="wa-fold-b" data-foldb="' + esc(key) + '">' + body + '</div>';
+    return btn + (col ? '' : '<div class="wa-fold-b" data-foldb="' + esc(key) + '">' + body + '</div>');
+  }
   function stageOut(target, html) {
     if (!target) return false;
     let stage = null;
@@ -3967,6 +4022,22 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   已经在用三种写法做同一件事。属性 + 一处绑定之后，页面**只声明去哪**，
     //   「怎么去」只有协议一份（ui/panel-nav.js）。
     //   拒收（非法页）**必须让人看见**：静默不跳是最坏的一种 —— 用户会以为点坏了。
+    // v2.225.0(Q8):**专家段的折叠钮**(`[data-foldt]`)。与 data-nav 同款理由 ——
+    //   绑定只写一处;写两处就是「同一件事两种写法」,而其中一处迟早漂开。
+    //   点一下走 panelFold.toggle + **整页重绘**:收起态不拼接 body,**必须重绘**才生效
+    //   (只改类名是假折叠 —— 节点还在 DOM 里)。
+    panelEl.querySelectorAll('[data-foldt]').forEach(function (b) {
+      b.onclick = function () {
+        const k = String(b.getAttribute('data-foldt') || '');
+        const p = k.indexOf(':');
+        if (p < 0) { if (WA.log) WA.log('warn', '折叠钮的 data-foldt 形态不对', k); return; }
+        const r = (WA.panelFold && typeof WA.panelFold.toggle === 'function')
+          ? WA.panelFold.toggle(k.slice(0, p), k.slice(p + 1)) : { ok: false, reason: 'fold-module-missing' };
+        //   拒收必须让人看见(表外的段名不许静默无效)—— 与 navGo 的拒收同规格。
+        if (!r.ok) { if (WA.log) WA.log('warn', '折叠被拒收:' + String(r.reason), k); return; }
+        renderBody();
+      };
+    });
     bindNavs(panelEl);
     const navBack = $('#wa-nav-back');
     if (navBack) navBack.onclick = () => {

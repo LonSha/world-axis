@@ -5803,6 +5803,40 @@ function runWitness(WA) {
       WA.store.transact(function (d) { d.probe = { cases: [] }; }, 'reject-witness:n4-clear');
     }
   }
+  // ── v2.225.0(优化 Q8):面板专家面折叠的两条新码 ──
+  //   走**真装载 UI + 真点击**(与上面 B5/B6 那五条面板码同规格),不打桩产品源码。
+  //   两条各自成词的理由:处置相反 —— `unknown-section` 要人回去改**段 id**
+  //   (页名与段集合都由返回体带回),`fold-module-missing` 要人去看**模块装载**
+  //   (折叠模块压根没装上,段 id 对得再准也没用)。合成一个「折叠失败了」,
+  //   这两种病因在读数上就再也分不开。
+  {
+    const g4 = require('./ui-gate-sync.js');
+    const env4 = g4.fresh();
+    const W4 = env4.WA, dom4 = env4.dom;
+    W4.ui.open();
+    const panel4 = dom4.getElementById('wa-panel');
+    // 1 段 id 拼错 ⇒ 模块侧如实拒收并带回认得的集合(不静默当展开)。
+    want('unknown-section', 'Q8:折叠面收到表外的段 id ⇒ unknown-section(与 unknown-page 分开报,处置不同)');
+    trip('unknown-section', function () { return [W4.panelFold.isCollapsed('tools', '__q8_no_such_sec').reason]; });
+    // 2 折叠模块缺席时点钮 ⇒ 绑定层如实报出(拒收写日志,不静默无效)。
+    want('fold-module-missing', 'Q8:折叠模块缺席时点折叠钮 ⇒ 面板绑定层如实报出(不静默当展开)');
+    tripDeep('fold-module-missing', function () {
+      const keep = W4.panelFold;
+      try {
+        const tabs4 = panel4.querySelectorAll('.wa-tab');
+        const t4 = tabs4.filter(function (x) { return x.dataset && x.dataset.page === 'tools'; })[0];
+        if (t4) t4.click();
+        const body4 = panel4.querySelector('.wa-body');
+        const btns4 = body4 ? body4.querySelectorAll('[data-foldt]') : [];
+        if (!btns4.length) return '';
+        W4.panelFold = undefined;        // 只摘模块(产品源码一行未动)
+        btns4[0].click();
+        return (W4.eventLog || []).map(function (e) {
+          return String(e.level) + ':' + String(e.msg) + ':' + String(e.data);
+        }).join('|');
+      } finally { W4.panelFold = keep; }
+    });
+  }
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });

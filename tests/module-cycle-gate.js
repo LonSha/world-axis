@@ -171,6 +171,13 @@ const UI_NS = {
   //   漏在这里的后果同 v2.152.0 那条：panelNav 被判成「未登记的一对一差」，
   //   而它明明是 UI 层 —— 先装后装的差别会被读成「接线出了问题」。
   panelNav: 'UI 面板导航协议（ui/panel-nav.js）',
+  // v2.225.0(优化 Q8):第六个 UI 层命名空间(ui/panel-fold.js)。
+  //   本仓 UI ns 名单有**四处副本**,必须同批 —— tests/run.js 的 UI_NS2800 /
+  //   tests/export-contract.js 的 OPTIONAL / engines/tool-diag.js 的 OPTIONAL_EXPORTS /
+  //   本表。前三处在本批落地时已改,**本表是第四处**(现场报 ns 面漂移 static-only:
+  //   panelFold)。漏在这里的后果同上面两条:panelFold 被判成「未登记的一对一差」,
+  //   而它明明是 UI 层 —— 先装后装的差别会被读成「接线出了问题」。
+  panelFold: 'UI 面板折叠协议(ui/panel-fold.js)',
 };
 
 /**

@@ -30,6 +30,8 @@ const OWNER = {}; Object.keys(MODULE_EXPORTS).forEach(function (f) { OWNER[MODUL
 const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
   // v2.209.0（优化 6）：ui/panel-nav.js —— 与 tests/run.js 的 UI_NS2800 成对（两处口径必须一致）。
   'panelNav',
+  // v2.225.0(Q8):ui/panel-fold.js —— 与 tests/run.js 的 UI_NS2800 成对(两处口径必须一致)。
+  'panelFold',
   // v2.181.0：赛博朋克 UI 主题层 9 个 ns（与 tests/run.js 的 UI_NS2800 同口径）。
   'cyberUI',
   'cyberDashboard',
