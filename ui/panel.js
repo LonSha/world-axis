@@ -224,6 +224,19 @@
     //   路上堵不堵、发一趟货该给什么」—— 同一批的「把关系/行动看成一张面」。
     //   与其他页不同的一点：本页的**每一个数都来自来源模块自己的读口**，本页不重算。
     { id: 'travel', icon: '🧭', label: '行程' },
+    // v2.221.0（拓展 N3）：经营供应链（engines/supply-chain.js）。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    //   插在 travel 之后：travel 答「这一趟走不走得成」，本页答「这一条订单从采购到交付走不走得通、
+    //   断在第几段」—— 同一批的「把行动/货看成一条链」。
+    //   与其他页不同的一点：本页的**每一个数都来自来源模块自己的读口**，本页不重算。
+    { id: 'supply', icon: '📦', label: '供应链' },
+    // v2.222.0（拓展 N4）：调查证据工作台（engines/evidence-board.js）。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    //   插在 supply 之后：supply 答「一条订单走不走得通」，本页答「这张案子上有哪些边、
+    //   哪几条只是同一条消息又转了一次手、撤回某条来源之后哪些结论受影响」。
+    //   本页的**每一个数都来自来源模块自己的读口**（probe / investigation / rumor /
+    //   intel / noesis），本页与 evidence-board 都不重算。
+    { id: 'evidence', icon: '🧾', label: '证据' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -2937,7 +2950,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     </div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -3637,6 +3650,113 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           <code>WA.travelDesk.plan() / route() / meet() / ledger() / commit()</code>（本页不另存一份行程，本模块全文零 store.transact）</span>
       </div>
       <div id="wa-trip-out" class="wa-out"></div>`;
+  }
+  /**
+   * v2.221.0（拓展 N3）：经营供应链：订单编排与瓶颈图。
+   *   本页是**消费方**，一个数都不算：逐段「够不够」全部来自
+   *   `WA.supplyChain.plan()`（而它又逐字段取自 economy.view / economy.routeView /
+   *   org.canAfford / economy.RECIPES）；执行走 `commit()`（把各段原样透传给来源写口，
+   *   本页不开事务、不碰 draft）。
+   *   本页**没有任何直接写世界的代码** —— 唯一会改世界的路径是 `commit()`，
+   *   而它调的是来源模块自己的公开写口（结构保证，不是一句声明）。
+   */
+  function renderSupplyChain() {
+    const S = WA.supplyChain;
+    const ok = !!(S && typeof S.plan === 'function');
+    let d = null;
+    // ⚠ 必须写**全限定**名：本仓引用面（inventory 的 REF_RE）只认 `WA.ns.mem`。
+    try { d = ok ? WA.supplyChain.diagnose() : null; } catch (e) { d = null; }
+    const cfg = (d && d.cfg) ? d.cfg : null;
+    return `
+      <div class="wa-sec">经营供应链（采购 → 运输 → 生产 → 交付：走不走得通 · 断在第几段 · 为什么断）</div>
+      <div class="wa-dim">（把 <b>四段各有各的口</b> 串成<b>一条订单</b>：这里的「够不够」<b>逐字段取自来源读口</b>
+        （<code>economy.view</code> / <code>economy.routeView</code> / <code>org.canAfford</code> / <code>economy.RECIPES</code>）——
+        本页与本模块都<b>不重算</b>，故「预览」与「真引擎」结构上不可能分家。
+        此刻：<b>${ok ? (cfg && cfg.enabled ? '开' : '关（关闭时四个口一律拒 chain-off）') : '模块缺席'}</b>
+        ${d ? '｜段 ' + d.stages.declared.length + ' 类（在位 ' + d.stages.live.length + '，缺 ' + d.stages.missing.length + '）' : ''}）</div>
+      <div class="wa-row">
+        <textarea id="wa-schain-order" class="wa-input" rows="4" aria-label="订单（JSON）" placeholder='订单 JSON：{"id":"o1","stages":[{"kind":"procure","place":"码头","resource":"米","qty":3,"by":"甲"}]}…'></textarea>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-schain-plan" title="只读：逐段检查一条订单（够不够 / 通不通 / 交得出交不出；走 WA.supplyChain.plan()）">预览编排</button>
+        <button class="wa-btn" id="wa-schain-bottleneck" title="只读：瓶颈图（只报量到的约束量与缺口，不编概率；走 bottleneck()）">瓶颈图</button>
+        <button class="wa-btn" id="wa-schain-verify" title="只读：拿回带的指纹重验约束（走 verify()，不比对本页存储的任何东西）">重验约束</button>
+        <button class="wa-btn" id="wa-schain-dia" title="自证面：开关 / 段类在位 / 本进程计数与拒收桶">诊断</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-schain-who" class="wa-input" aria-label="执行者" placeholder="执行者（缺了由来源写口自己拒收）…"/>
+        <button class="wa-btn" id="wa-schain-commit" title="把各段原样透传给来源写口（economy.buy / freight.dispatch / economy.craft / org.transfer）。本页不做参数校验 —— 缺什么由来源自己拒收">执行编排</button>
+      </div>
+      <div class="wa-row">
+        <span class="wa-dim">真源：<code>WA.economy.view() / routeView() / RECIPES</code> +
+          <code>WA.org.canAfford()</code> + <code>WA.supplyChain.plan() / bottleneck() / verify() / commit()</code>（本页不另存一份订单，本模块全文零 store.transact）</span>
+      </div>
+      <div id="wa-schain-out" class="wa-out"></div>`;
+  }
+
+  /**
+   * v2.222.0（拓展 N4）：调查证据工作台：证据图 / 玩家图谱 / 撤回影响。
+   *   本页是**消费方**，一个数都不算：五类边与逐假说条数全部来自
+   *   `WA.evidenceBoard.board()`（而它又逐条现取 `probe` / `investigation` / `rumor`），
+   *   玩家行来自 `WA.evidenceBoard.playerView()`（而它又逐条现取 `intel` / `noesis` / `rumor`）
+   *   —— 本页不重算、不缓存、不另存第二份卷宗。
+   *   本页**没有任何直接写世界的代码**：三条写路径（记主张 / 撤回来源 / 调查动作）原样透传
+   *   给来源模块自己的公开写口（结构保证，不是一句声明）。
+   */
+  function renderEvidenceBoard() {
+    const ok = !!(WA.evidenceBoard && typeof WA.evidenceBoard.board === 'function');
+    let cfg = null;
+    try { cfg = ok ? WA.evidenceBoard.getSettings() : null; } catch (e) { cfg = null; }
+    return `
+      <div class="wa-sec">调查证据工作台（这张案子有哪些边 · 哪几条只是转述 · 撤回来源后谁受影响）</div>
+      <div class="wa-dim">（以<b>卷宗</b>（<code>probe</code> 的案子）为根，五类边<b>逐条现取</b>：
+        支持 / 反证（案件自己的举证行 · 支持条数走 <code>probe.tally()</code>，本页与本模块都<b>不重数</b>）、
+        来源链（<code>rumor</code>）、证人 / 调查动作（<code>investigation</code>）。
+        <b>重复转述不作独立证据</b>（同一事实的第二条链如实标「转述」）；
+        <b>未获知的事实不进玩家图谱</b>。
+        此刻：<b>${ok ? (cfg && cfg.enabled ? '开' : '关（关闭时五个口一律拒 board-off）') : '模块缺席'}</b>
+        ${cfg ? '｜上限 边 ' + cfg.maxEdges + ' / 案 ' + cfg.maxCases : ''}）</div>
+      <div class="wa-row">
+        <label class="wa-row"><input id="wa-evb-enabled" type="checkbox" ${cfg && cfg.enabled ? 'checked' : ''}/> 启用证据工作台</label>
+      </div>
+      <div class="wa-row">
+        <input id="wa-evb-case" class="wa-input wa-mini" aria-label="案件 id" placeholder="案件 id（probe 立案时给的）…"/>
+        <input id="wa-evb-person" class="wa-input wa-mini" aria-label="玩家图谱对象" placeholder="玩家图谱：看谁的（缺了由本页自己拒收）…"/>
+      </div>
+      <div class="wa-row">
+        <textarea id="wa-evb-facts" class="wa-input" rows="2" aria-label="假说到事实的映射（JSON）" placeholder='假说→事实映射（JSON；不给就不出链 / 证人 / 动作三类边，如实标 factsGiven:false）{"h0":"账本去向","h1":"账本去向"}'></textarea>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-evb-board" title="只读：证据图（五类边逐条现取；支持条数取自 probe.tally，不重数）">证据图</button>
+        <button class="wa-btn" id="wa-evb-view" title="只读：玩家图谱（只出此人获知的事实：无资格者真值恒 null、withheld 只报条数）">玩家图谱</button>
+        <button class="wa-btn" id="wa-evb-dia" title="自证面：模块在位 / 五类边词表 / 本进程分栏计数与拒收桶">诊断</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-evb-claim" class="wa-input" aria-label="主张" placeholder="记主张：一句话（缺了由来源自己拒收）…"/>
+        <input id="wa-evb-level" class="wa-input wa-mini" aria-label="来源等级" placeholder="等级（probe.LEVELS）…"/>
+        <input id="wa-evb-dir" class="wa-input wa-mini" aria-label="方向" placeholder="方向（support / refute）…"/>
+        <button class="wa-btn" id="wa-evb-assert" title="原样透传给 probe.addEvidence：本页不做参数校验 —— 缺什么由来源自己拒收">记主张</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-evb-kind" class="wa-input wa-mini" aria-label="撤回类型" placeholder="撤回类型（rumor / intel / probe）…"/>
+        <input id="wa-evb-target" class="wa-input wa-mini" aria-label="撤回目标" placeholder="链 id / 关于某事 / 误指的人…"/>
+        <input id="wa-evb-from" class="wa-input wa-mini" aria-label="来源方" placeholder="谁（rumor 那一跳的 from）…"/>
+        <input id="wa-evb-to" class="wa-input wa-mini" aria-label="接收方" placeholder="对谁（rumor 那一跳的 to）…"/>
+        <button class="wa-btn" id="wa-evb-retract" title="按类型透传来源模块自己的撤回口（rumor.refute / intel.correct / probe.wrong），随后现取重算答「撤了这一条，哪些结论受影响」">撤回来源</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-evb-clue" class="wa-input wa-mini" aria-label="线索 id" placeholder="线索 id…"/>
+        <input id="wa-evb-by" class="wa-input wa-mini" aria-label="经手人" placeholder="谁去查…"/>
+        <input id="wa-evb-receipt" class="wa-input wa-mini" aria-label="回执 id" placeholder="回执 id（去重）…"/>
+        <button class="wa-btn" id="wa-evb-gather" title="原样透传给 investigation.investigate（线索 + 经手人 + receiptId 去重）">调查动作</button>
+      </div>
+      <div class="wa-row">
+        <span class="wa-dim">真源：<code>WA.probe.tally() / addEvidence() / wrong()</code> +
+          <code>WA.investigation.investigate()</code> + <code>WA.rumor.refute() / visibleTo()</code> +
+          <code>WA.intel.project() / correct()</code> + <code>WA.noesis.knows()</code> +
+          <code>WA.evidenceBoard.board() / playerView() / assertClaim() / retract() / gather()</code>（本页不另存一份卷宗，本模块全文零 store.transact）</span>
+      </div>
+      <div id="wa-evb-out" class="wa-out"></div>`;
   }
   /** v2.214.0（优化 Q5）：视角**先过滤、后渲染** —— staged 出口（HTML 进 DOM 的唯一闸）。
    *  治的病（Q5 原文）：此前渲染链是「先写 DOM、再摘除」——`body.innerHTML = 渲染结果` 让
@@ -12235,6 +12355,238 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + (st ? '<div class="wa-item">本进程计数：预览 ' + st.plans + ' · 执行 ' + st.commits + ' · 来源拒收 ' + st.rejects
           + '　拒收桶 ' + esc(String(JSON.stringify(st.faults))) + '</div>' : ''));
     });
+  // ── v2.221.0（拓展 N3）：经营供应链 ──────────────────────────────
+  //   本页与 travel 页同规：**一个直接写世界的调用都没有**。唯一会改世界的路径是
+  //   `commit()`，而它调的是来源模块自己的公开写口 —— 本页既不拼事务、也不做校验。
+  const scOut = function (html) { const o = $('#wa-schain-out'); if (o) o.innerHTML = html; bindNavs(o); };
+  const scMiss = function (what) {
+    scOut('<div class="wa-log wa-log-err">读不到：' + esc(what) + '（本页只读既有读口）</div>');
+  };
+  // 上次预览回带的指纹：**住进程态**（与 supply-chain 的边界 5 同源 ——
+  //   预览是交互物，落盘就等于造了第二份状态容器）。
+  let scStamp = null;
+  const scOrder = function () {
+    const t = $('#wa-schain-order');
+    if (!t) return null;
+    const raw = String(t.value || '').trim();
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return undefined; }
+  };
+  const scFault = function (r) {
+    scOut('<div class="wa-log wa-log-err">拒收：' + esc(String(r.fault))
+      + (r.known ? '　可选：' + esc((r.known || []).join(' / ')) : '')
+      + (r.need ? '　缺：' + esc((r.need || []).join(' / ')) : '') + '</div>');
+  };
+  const scBadJson = function () {
+    scOut('<div class="wa-log wa-log-err">订单 JSON 解析失败 —— 回去改那一坨文本。</div>');
+  };
+  on('#wa-schain-plan', () => {
+    if (!WA.supplyChain || typeof WA.supplyChain.plan !== 'function') return scMiss('供应链（plan 口）');
+    const o = scOrder();
+    if (o === null) return scOut('<div class="wa-log wa-log-warn">先给一条订单（JSON）—— 本页不替世界编订单。</div>');
+    if (o === undefined) return scBadJson();
+    const r = WA.supplyChain.plan(o);
+    if (r.fault) return scFault(r);
+    scStamp = r.stamp || null;
+    scOut('<div class="wa-log ' + (r.runnable ? 'wa-log-info' : 'wa-log-err') + '">编排预览（真源 <code>WA.supplyChain.plan()</code>）：'
+      + (r.runnable ? '四段全通' : '<b>断在第 ' + (r.blockedBy ? r.blockedBy.index : '?') + ' 段</b>（' + esc(String(r.blockedBy && r.blockedBy.reason)) + '）')
+      + '</div>'
+      + r.stages.map(function (x) {
+        return '<div class="wa-item">' + x.index + '. ' + esc(x.kind) + '　'
+          + (x.ok ? '<span class="wa-ok">通</span>' : '<span class="wa-err">断</span>（' + esc(String(x.reason)) + '）')
+          + '　' + esc(JSON.stringify(x.detail)) + '</div>';
+      }).join(''));
+  });
+  on('#wa-schain-bottleneck', () => {
+    if (!WA.supplyChain || typeof WA.supplyChain.bottleneck !== 'function') return scMiss('供应链（bottleneck 口）');
+    const o = scOrder();
+    if (o === null) return scOut('<div class="wa-log wa-log-warn">先给一条订单（JSON）。</div>');
+    if (o === undefined) return scBadJson();
+    const r = WA.supplyChain.bottleneck(o);
+    if (r.fault) return scFault(r);
+    scOut('<div class="wa-log wa-log-info">瓶颈图（真源 <code>WA.supplyChain.bottleneck()</code>）：'
+      + esc(String(r.note)) + '　缺口段 ' + r.gapCount + '</div>'
+      + r.rows.map(function (x) {
+        return '<div class="wa-item">' + x.index + '. ' + esc(x.kind) + '　约束 '
+          + esc(JSON.stringify(x.constraint)) + '　缺口 ' + esc(String(x.gap)) + '</div>';
+      }).join(''));
+  });
+  on('#wa-schain-verify', () => {
+    if (!WA.supplyChain || typeof WA.supplyChain.verify !== 'function') return scMiss('供应链（verify 口）');
+    const o = scOrder();
+    if (o === null) return scOut('<div class="wa-log wa-log-warn">先给一条订单（JSON）。</div>');
+    if (o === undefined) return scBadJson();
+    const r = WA.supplyChain.verify(o.id, { order: o, stamp: scStamp });
+    if (r.fault) return scFault(r);
+    scOut('<div class="wa-log ' + (r.stale ? 'wa-log-warn' : 'wa-log-info') + '">重验（真源 <code>WA.supplyChain.verify()</code>）：'
+      + esc(String(r.note)) + '</div>');
+  });
+  on('#wa-schain-commit', () => {
+    if (!WA.supplyChain || typeof WA.supplyChain.commit !== 'function') return scMiss('供应链（commit 口）');
+    const o = scOrder();
+    if (o === null) return scOut('<div class="wa-log wa-log-warn">先给一条订单（JSON）。</div>');
+    if (o === undefined) return scBadJson();
+    const w = $('#wa-schain-who');
+    const r = WA.supplyChain.commit(o.id, { order: o, by: w ? String(w.value || '').trim() : '' });
+    if (r.fault) return scFault(r);
+    scOut('<div class="wa-log ' + (r.complete ? 'wa-log-info' : 'wa-log-err') + '">'
+      + (r.complete ? '整条订单走完' : '断在第 ' + (r.stoppedAt ? r.stoppedAt.index : '?') + ' 段（' + esc(String(r.stoppedAt && r.stoppedAt.reason)) + '）')
+      + '　已成 ' + r.ranCount + ' / ' + r.totalCount
+      + '　<b>非原子</b>（各段各自一笔事务）</div>');
+  });
+  on('#wa-schain-dia', () => {
+    if (!WA.supplyChain || typeof WA.supplyChain.diagnose !== 'function') return scMiss('供应链（diagnose 口）');
+    const d = WA.supplyChain.diagnose();
+    const st = (typeof WA.supplyChain.stat === 'function') ? WA.supplyChain.stat() : null;
+    scOut('<div class="wa-log wa-log-info">诊断（真源 <code>WA.supplyChain.diagnose()</code>）：'
+      + '模块 <b>' + esc(d.module) + '</b> v' + esc(d.ver) + '　开关 ' + (d.cfg.enabled ? '开' : '关')
+      + '　上限 段 ' + d.cfg.maxStages + ' / 行 ' + d.cfg.maxRows + '</div>'
+      + '<div class="wa-item">段类：' + esc(d.stages.declared.join('　')) + (d.stages.missing.length ? '　<b>缺 ' + esc(d.stages.missing.join(' / ')) + '</b>' : '') + '</div>'
+      + '<div class="wa-item">拒收码命名空间（fault，与来源的 reason 分开）：' + esc((d.faultCodes || []).join(' / ')) + '</div>'
+      + (st ? '<div class="wa-item">本进程计数：预览 ' + st.plans + ' · 执行 ' + st.commits + ' · 部分 ' + st.partials
+        + '　拒收桶 ' + esc(String(JSON.stringify(st.faults))) + '</div>' : ''));
+  });
+  // ── v2.222.0（拓展 N4）：调查证据工作台 ──────────────────────────
+  //   与 supply / travel 页同规：**一个直接写世界的调用都没有**。三条写路径
+  //   （记主张 / 撤回来源 / 调查动作）全部原样透传给来源模块自己的公开写口。
+  //   指纹（stamp）**住进程态**：与 evidence-board 的边界 6 同源 —— 预览是交互物，
+  //   落盘就等于造了第二份状态容器。
+  const evbOut = function (html) { const o = $('#wa-evb-out'); if (o) o.innerHTML = html; bindNavs(o); };
+  const evbMiss = function (what) {
+    evbOut('<div class="wa-log wa-log-err">读不到：' + esc(what) + '（本页只读既有读口）</div>');
+  };
+  const evbFault = function (r) {
+    evbOut('<div class="wa-log wa-log-err">拒收：' + esc(String(r.fault))
+      + (r.known ? '　可选：' + esc((r.known || []).join(' / ')) : '')
+      + (r.need ? '　缺：' + esc((r.need || []).join(' / ')) : '')
+      + (r.caseId ? '　案：' + esc(String(r.caseId)) : '') + '</div>');
+  };
+  const evbVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
+  let evbStamp = null;
+  const evbFacts = function () {
+    const raw = evbVal('#wa-evb-facts');
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return undefined; }
+  };
+  const evbOpts = function () {
+    const f = evbFacts();
+    return { facts: (f && typeof f === 'object') ? f : undefined, person: evbVal('#wa-evb-person'),
+      badJson: f === undefined };
+  };
+  { const el = $('#wa-evb-enabled');
+    if (el) el.onchange = function () {
+      if (!WA.evidenceBoard || typeof WA.evidenceBoard.setSettings !== 'function') return evbMiss('证据工作台（setSettings 口）');
+      WA.evidenceBoard.setSettings({ enabled: !!el.checked });
+      evbOut('<div class="wa-log wa-log-info">已记录 ' + (el.checked ? 'enabled' : 'disabled')
+        + '（关闭后五个口一律拒 board-off；既有卷宗与线索仍在存档里，只是不再出图）</div>');
+    };
+  }
+  on('#wa-evb-board', () => {
+    if (!WA.evidenceBoard || typeof WA.evidenceBoard.board !== 'function') return evbMiss('证据工作台（board 口）');
+    const o = evbOpts();
+    if (o.badJson) return evbOut('<div class="wa-log wa-log-err">假说→事实映射 JSON 解析失败 —— 回去改那一坨文本。</div>');
+    const r = WA.evidenceBoard.board(evbVal('#wa-evb-case'), { facts: o.facts });
+    if (r.fault) return evbFault(r);
+    evbStamp = r.stamp || null;
+    const rows = r.edges || [];
+    const byType = r.byType || {};
+    evbOut('<div class="wa-log ' + (r.relayed ? 'wa-log-warn' : 'wa-log-info') + '">证据图（真源 <code>WA.evidenceBoard.board()</code>）：'
+      + '案 <b>' + esc(r.caseId) + '</b>　' + esc(r.question) + '　'
+      + (r.factsGiven ? '' : '<b>未给假说→事实映射</b>（链 / 证人 / 动作三类边不出）　')
+      + '边 ' + r.edgeCount + '（独立 ' + r.independent + ' · 转述 ' + r.relayed + '）'
+      + (r.truncated ? '　<b>已按上限截断</b>' : '') + '</div>'
+      + '<div class="wa-item">分类：' + esc(Object.keys(byType).map(function (k) { return k + ' ' + byType[k]; }).join('　')) + '</div>'
+      + (r.ranks || []).map(function (x) {
+        return '<div class="wa-item">假说 <b>' + esc(x.hypothesis) + '</b> ' + esc(x.text || '')
+          + '　支持 ' + x.support + ' / 反证 ' + x.refute + '（其中独立 ' + x.independentSupport
+          + ' · 转述 ' + x.relayedSupport + '）　链 ' + x.chains + ' 条</div>';
+      }).join('')
+      + rows.slice(0, 12).map(function (e) {
+        return '<div class="wa-log wa-log-info"><span class="wa-dim">' + esc(String(e.type))
+          + (e.dir ? '/' + esc(String(e.dir)) : '') + ' · ' + esc(String(e.origin))
+          + (e.independent ? '' : ' · <b>转述</b>' + (e.relays ? '（同 ' + esc(String(e.relays)) + '）' : ''))
+          + '</span>　' + esc(String(e.claim)) + '</div>';
+      }).join(''));
+  });
+  on('#wa-evb-view', () => {
+    if (!WA.evidenceBoard || typeof WA.evidenceBoard.playerView !== 'function') return evbMiss('证据工作台（playerView 口）');
+    const o = evbOpts();
+    if (o.badJson) return evbOut('<div class="wa-log wa-log-err">假说→事实映射 JSON 解析失败 —— 回去改那一坨文本。</div>');
+    const r = WA.evidenceBoard.playerView(evbVal('#wa-evb-case'), { person: o.person, facts: o.facts });
+    if (r.fault) return evbFault(r);
+    evbOut('<div class="wa-log ' + (r.withheld ? 'wa-log-warn' : 'wa-log-info') + '">玩家图谱（真源 <code>WA.evidenceBoard.playerView()</code>）：'
+      + '<b>' + esc(r.person) + '</b>　行 ' + r.rowCount + '　已知 ' + r.known
+      + (r.withheld ? '　<b>未获知（只报条数，不报内容）' + r.withheld + '</b>' : '') + '</div>'
+      + (r.rows || []).map(function (x) {
+        return '<div class="wa-item"><b>' + esc(x.hypothesis) + '</b> · ' + esc(x.factKey)
+          + '　知道 ' + (x.known === null ? '问不出' : (x.known ? '是' : '否'))
+          + '　有资格 ' + (x.entitled ? '是' : '否')
+          + '　真值 ' + (x.truth === null ? '<b>null</b>（未获知）' : esc(String(x.truth)))
+          + '　可断言 ' + (x.mayAssert ? '是' : '否')
+          + '　听到 ' + x.heard.length + ' 条（只收公开层）</div>';
+      }).join(''));
+  });
+  on('#wa-evb-assert', () => {
+    if (!WA.evidenceBoard || typeof WA.evidenceBoard.assertClaim !== 'function') return evbMiss('证据工作台（assertClaim 口）');
+    const r = WA.evidenceBoard.assertClaim(evbVal('#wa-evb-case'), evbVal('#wa-evb-claim'),
+      { level: evbVal('#wa-evb-level'), dir: evbVal('#wa-evb-dir') });
+    evbOut('<div class="wa-log ' + (r.ok ? 'wa-log-info' : 'wa-log-err') + '">'
+      + (r.ok ? '已记主张（真源 <code>WA.probe.addEvidence()</code> 原样透传）'
+        : '来源拒收（原样透传）：' + esc(String(r.reason))
+          + (r.levels ? '　可选等级：' + esc((r.levels || []).join(' / ')) : '')
+          + (r.hypotheses ? '　可选假说：' + esc((r.hypotheses || []).join(' / ')) : '')) + '</div>');
+  });
+  on('#wa-evb-retract', () => {
+    if (!WA.evidenceBoard || typeof WA.evidenceBoard.retract !== 'function') return evbMiss('证据工作台（retract 口）');
+    const kind = evbVal('#wa-evb-kind');
+    const tgt = evbVal('#wa-evb-target');
+    const o = { kind: kind, chainId: tgt, about: tgt, who: tgt, why: evbVal('#wa-evb-claim'),
+      person2: evbVal('#wa-evb-person'), claim: evbVal('#wa-evb-claim'),
+      from: evbVal('#wa-evb-from'), to: evbVal('#wa-evb-to'), stamp: evbStamp };
+    const f = evbFacts();
+    if (f && typeof f === 'object') o.facts = f;
+    const r = WA.evidenceBoard.retract(evbVal('#wa-evb-case'), o);
+    if (r.fault) return evbFault(r);
+    const rec = r.retract || {};
+    evbOut('<div class="wa-log ' + (rec.ok ? 'wa-log-info' : 'wa-log-warn') + '">撤回（真源 <code>' + esc(String(r.via)) + '</code>'
+      + (rec.ok ? '' : '　来源拒收：' + esc(String(rec.reason))) + '）　'
+      + (r.stale ? '<b>旧指纹已作废</b>　' : '') + '受影响的假说 ' + r.affectedCount + ' 个</div>'
+      + '<div class="wa-item"><span class="wa-dim">语义：' + esc(String(r.semantics)) + '</span></div>'
+      + (r.affected || []).map(function (x) {
+        return '<div class="wa-item">假说 <b>' + esc(x.hypothesis) + '</b>　支持 ' + x.supportFrom + ' → ' + x.supportTo
+          + '　反证 ' + x.refuteFrom + ' → ' + x.refuteTo + '</div>';
+      }).join('')
+      + '<div class="wa-item">边 ' + r.edgeFrom + ' → ' + r.edgeTo + '　指纹变了 ' + (r.drift ? '是' : '否')
+      + '　头部态变了 ' + (r.headChanged ? '是（' + esc(String(r.statusFrom)) + '→' + esc(String(r.statusTo))
+        + ' · ' + esc(String(r.verdictFrom)) + '→' + esc(String(r.verdictTo)) + '）' : '否')
+      + '　玩家行变了 ' + (r.viewChanged ? '是' : '否') + '</div>'
+      + '<div class="wa-item"><span class="wa-dim">' + esc(String(r.note)) + '</span></div>');
+  });
+  on('#wa-evb-gather', () => {
+    if (!WA.evidenceBoard || typeof WA.evidenceBoard.gather !== 'function') return evbMiss('证据工作台（gather 口）');
+    const r = WA.evidenceBoard.gather(evbVal('#wa-evb-case'), { clueId: evbVal('#wa-evb-clue'),
+      by: evbVal('#wa-evb-by'), receiptId: evbVal('#wa-evb-receipt') });
+    if (r.fault) return evbFault(r);
+    evbOut('<div class="wa-log ' + (r.ok ? 'wa-log-info' : 'wa-log-err') + '">'
+      + (r.ok ? '已调查（真源 <code>WA.investigation.investigate()</code> 原样透传）：线索 <b>' + esc(String(r.clueId || ''))
+        + '</b>　证据 ' + (typeof r.count === 'number' ? r.count : '-')
+        : '来源拒收（原样透传）：' + esc(String(r.reason))) + '</div>');
+  });
+  on('#wa-evb-dia', () => {
+    if (!WA.evidenceBoard || typeof WA.evidenceBoard.diagnose !== 'function') return evbMiss('证据工作台（diagnose 口）');
+    const d = WA.evidenceBoard.diagnose();
+    const st = (typeof WA.evidenceBoard.stat === 'function') ? WA.evidenceBoard.stat() : null;
+    evbOut('<div class="wa-log wa-log-info">诊断（真源 <code>WA.evidenceBoard.diagnose()</code>）：'
+      + '模块 <b>' + esc(d.module) + '</b> v' + esc(d.ver) + '　开关 ' + (d.cfg.enabled ? '开' : '关')
+      + '　上限 边 ' + d.cfg.maxEdges + ' / 案 ' + d.cfg.maxCases + '</div>'
+      + '<div class="wa-item">边类词表（单一真源）：' + esc((d.edgeTypes.declared || []).join('　')) + '</div>'
+      + '<div class="wa-item">来源在位：' + esc(Object.keys(d.checks || {}).filter(function (k) { return d.checks[k]; }).join(' / '))
+      + (d.missing.length ? '　<b>缺 ' + esc(d.missing.join(' / ')) + '</b>' : '') + '</div>'
+      + '<div class="wa-item">拒收码命名空间（fault，与来源的 reason 分开）：' + esc((d.faultCodes || []).join(' / ')) + '</div>'
+      + (st ? '<div class="wa-item">本进程计数：出图 ' + st.boards + ' · 记主张 ' + st.asserted + ' · 撤回 ' + st.retracts
+        + ' · 调查 ' + st.gathers + '　边 ' + st.edges + '（独立 ' + st.independent + ' · 转述 ' + st.relayed + '）'
+        + '　玩家行 ' + st.rows + '　拒收桶 ' + esc(String(JSON.stringify(st.faults))) + '</div>' : ''));
+  });
   }
 
   // ── 面板与悬浮球 ──

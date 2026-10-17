@@ -137,6 +137,16 @@ const EXEMPT = {
   //   一个是「检索能查什么」，一个是「耗时按面怎么分」—— **同形不同义，不许互相校验**：
   //   若强行统一，就会出现「检索面名单要跟性能采集面用同一套词」这种语义错配。
   FACES: '同名不同义的「面表」：history-search=可检索的六个库（chronicle/people/places/orgs/rules/entries，检索适配器白名单且是判据面）、perf-baseline=性能采集面对象表（每项带 id/label/kind/layer：inject/worldState/canonAlign/diagnose/tx/save…）',
+  // v2.221.0（拓展 N3）：本版新引擎 engines/supply-chain.js 带一张 FAULTS 常量，与 v2.210.0（拓展 8）
+  //   就在场的 engines/travel-desk.js 同名 —— **合法地**指向不同值域，逐条说清：
+  //     · supply-chain 的 FAULTS 是「订单编排层**自身**的失败」两态（chain-off=模块关 / bad-order=订单形状非法）；
+  //       段级检查失败（货源不足 / 路被封 / 料不够 / 交不出 / 来源抛错）是**世界给的答案**，走段级 `reason`、
+  //       复用既有已登记码，**不占本命名空间**；
+  //     · travel-desk 的 FAULTS 是「行程编排层的失败」十二码（desk-off / module-missing / bad-channel / ……），
+  //       它把 `module-missing` 也收进 fault；两个模块各自的编排面语义不同、失败集不该相同。
+  //   一个是「订单链的编排失败」，一个是「行程方案的编排失败」—— **同形不同义，不许互相校验**：
+  //   若强行统一，就会出现「供应链关停要与行程台关停用同一套码」这种语义错配。
+  FAULTS: '同名不同义的「编排失败表」：supply-chain=订单编排层自身失败两态（chain-off/bad-order，段级 reason 另走已登记码、不占本空间）、travel-desk=行程编排层失败十二码（desk-off/module-missing/bad-channel/unknown-action/missing-fields/bad-plan/stale-plan/action-threw/bad-route/route-too-long/broken-leg/bad-meet）',
 };
 
 /** 具名常量数组（只认一行内形态）。 */

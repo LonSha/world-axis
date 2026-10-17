@@ -457,8 +457,8 @@ a(bpLib(NR).length === 1 && seedLib(NR).length === 1,
 
 // D5：导出面与版本（本批**新增两个导出**：commit 的 effect / pending）
 const kc = Object.keys(C0.commit);
-a(kc.length === 17 && kc.indexOf('effect') >= 0 && kc.indexOf('pending') >= 0,
-  'D5a commit 导出面 17 项且含 effect / pending（实得 ' + kc.length + '：' + J(kc) + '）');
+a(kc.length === 20 && kc.indexOf('effect') >= 0 && kc.indexOf('pending') >= 0,
+  'D5a commit 导出面 20 项且含 effect / pending（v2.212.0（优化 Q3）中断与跨层恢复新增 resumeIdentity / resumeStat / scanInterrupted 三口 ⇒ 17 → 20；本锁交付时 17，判据随新现实更正）（实得 ' + kc.length + '：' + J(kc) + '）');
 const kb = Object.keys(C0.worldBlueprint);
 a(kb.length === 15, 'D5b world-blueprint 导出面仍 15 项（本批零新增导出；实得 ' + kb.length + '）');
 const ks = Object.keys(C0.worldSeed);

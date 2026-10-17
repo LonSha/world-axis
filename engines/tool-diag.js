@@ -2035,6 +2035,16 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   契约的单一真源，漏了它这一行，出口面契约里就不会有 travelDesk 段
     //   （接口面从未被冻结，改名删成员无人确认），而 LOAD 那一侧照样绿。
     'engines/travel-desk.js': 'travelDesk',
+    // v2.221.0（拓展 N3）：经营供应链（engines/supply-chain.js）。
+    //   Y6 抓过的教训同样适用：**LOAD 进了不等于登记了** —— 本表是定义面与出口面
+    //   契约的单一真源，漏了它这一行，出口面契约里就不会有 supplyChain 段
+    //   （接口面从未被冻结，改名删成员无人确认），而 LOAD 那一侧照样绿。
+    'engines/supply-chain.js': 'supplyChain',
+    // v2.222.0（拓展 N4）：调查证据工作台（engines/evidence-board.js）。
+    //   Y6 抓过的教训同样适用：**LOAD 进了不等于登记了** —— 本表是定义面与出口面
+    //   契约的单一真源，漏了它这一行，出口面契约里就不会有 evidenceBoard 段
+    //   （接口面从未被冻结，改名删成员无人确认），而 LOAD 那一侧照样绿。
+    'engines/evidence-board.js': 'evidenceBoard',
     'engines/diplomacy.js': 'diplomacy',
     'engines/agency.js': 'agency',
     // v2.167.0（TX3）：守恒运输（在途货运）。登记为必载 —
@@ -3419,6 +3429,26 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-trip-plan', 'wa-trip-verify', 'wa-trip-ledger', 'wa-trip-dia',
       'wa-trip-who', 'wa-trip-act', 'wa-trip-commit'],
       dynamic: ['wa-trip-out'] }
+    ,
+    // v2.221.0（拓展 N3）：经营供应链（engines/supply-chain.js）。
+    //   新出口必须进本表 —— 缺登记时「控件渲染了但绑定 id 写错」这类断裂在
+    //   新出口上无人发现（本表是「渲染 ↔ 绑定」两面里唯一会互相校验的地方）。
+    //   与 travel 页同规：本页一个直接写世界的调用都没有，唯一写路径是 commit()，
+    //   而它调的是来源模块自己的公开写口（结构保证，不是一句声明）。
+    { page: 'supply', ids: ['wa-schain-order', 'wa-schain-plan', 'wa-schain-bottleneck',
+      'wa-schain-verify', 'wa-schain-dia', 'wa-schain-who', 'wa-schain-commit'],
+      dynamic: ['wa-schain-out'] }
+    ,
+    // v2.222.0（拓展 N4）：调查证据工作台（engines/evidence-board.js）。
+    //   新出口必须进本表 —— 缺登记时「控件渲染了但绑定 id 写错」这类断裂在
+    //   新出口上无人发现（本表是「渲染 ↔ 绑定」两面里唯一会互相校验的地方）。
+    //   与 supply / travel 页同规：本页一个直接写世界的调用都没有，三条写路径都是
+    //   来源模块自己的公开写口（结构保证，不是一句声明）。
+    { page: 'evidence', ids: ['wa-evb-enabled', 'wa-evb-case', 'wa-evb-person', 'wa-evb-facts',
+      'wa-evb-board', 'wa-evb-view', 'wa-evb-dia', 'wa-evb-claim', 'wa-evb-level', 'wa-evb-dir',
+      'wa-evb-assert', 'wa-evb-kind', 'wa-evb-target', 'wa-evb-from', 'wa-evb-to', 'wa-evb-retract',
+      'wa-evb-clue', 'wa-evb-by', 'wa-evb-receipt', 'wa-evb-gather'],
+      dynamic: ['wa-evb-out'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。

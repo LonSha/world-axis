@@ -5725,6 +5725,60 @@ function runWitness(WA) {
       } finally { IdxFace.WA.__loaderState = keep; }
     });
   }
+  // ── v2.222.0（拓展 N4）：调查证据工作台（engines/evidence-board.js）的三个新码 ──
+  //   三个码是**同一件事的三张面孔**：编排面把来源模块的口调崩了，不吞成「没发生」
+  //   也不折成编排层自造码，而是如实记下**是哪个来源抛的**（rumor / investigation /
+  //   noesis 三条路各自成码）。为什么必须分列而不是合成一个 `threw`：
+  //   现场据此决定去哪一侧排障（链面 / 线索面 / 知情面），合成一栏就再也答不出。
+  //   见证全部走**真 API**（retract / gather / playerView），只在调用期间把来源口换成抛错桩，
+  //   finally 原样还原 —— 不改源码、不碰存档。
+  {
+    const EBw = WA.evidenceBoard;
+    if (EBw && typeof EBw.retract === 'function') {
+      const keepEvb = EBw.getSettings();
+      const keepRumorW = WA.rumor, keepInvW = WA.investigation, keepNoeW = WA.noesis;
+      EBw.setSettings({ enabled: true });
+      if (WA.probe && typeof WA.probe.setSettings === 'function') WA.probe.setSettings({ enabled: true });
+      let cidW = '';
+      try { cidW = (WA.probe.open('见证：证据工作台', [{ id: 'h0', text: '甲' }, { id: 'h1', text: '乙' }]) || {}).id || ''; } catch (e) { cidW = ''; }
+      // ① rumor 面抛错 ⇒ 记 rumor-threw（**不是**把这次撤回当成没发生：回执里带着它）
+      want('rumor-threw', 'N4：撤回转述链时 rumor 面抛错 ⇒ 记 rumor-threw（层/完整位读不出来也不静默当没撤）');
+      tripDeep('rumor-threw', function () {
+        let out = '';
+        try {
+          WA.rumor = { refute: function () { throw new Error('rumor down'); } };
+          const r = EBw.retract(cidW, { kind: 'rumor', chainId: 'rm_账本去向', from: '甲', to: '乙' });
+          out = (r.retract || {}).reason;
+        } finally { WA.rumor = keepRumorW; }
+        return [out];
+      });
+      // ② 线索面抛错 ⇒ 记 investigation-threw（顶层可见：这条口只做一件事，没有外层码）
+      want('investigation-threw', 'N4：调查动作时线索面抛错 ⇒ 顶层的 investigation-threw（不折成编排层自造码，现场据此去查线索面）');
+      trip('investigation-threw', function () {
+        let out = '';
+        try {
+          WA.investigation = { investigate: function () { throw new Error('investigation down'); } };
+          out = (EBw.gather(cidW, { clueId: 'c1', by: '甲', receiptId: 'r1' }) || {}).reason;
+        } finally { WA.investigation = keepInvW; }
+        return [out];
+      });
+      // ③ 知情面抛错 ⇒ 记 noesis-threw（嵌在玩家行的 knowsWhy —— 与「知道与否」同列，
+      //    因为「问不出来」正是玩家图谱必须如实呈现的一格）
+      want('noesis-threw', 'N4：玩家图谱问知情面时抛错 ⇒ 行上如实记 noesis-threw（「问不出来」与「不知道」必须分得开）');
+      tripDeep('noesis-threw', function () {
+        let out = '';
+        try {
+          WA.noesis = { knows: function () { throw new Error('noesis down'); } };
+          const pv = EBw.playerView(cidW, { person: '甲', facts: { h0: '账本去向' } });
+          out = ((pv.rows || [])[0] || {}).knowsWhy;
+        } finally { WA.noesis = keepNoeW; }
+        return [out];
+      });
+      EBw.setSettings(keepEvb);
+      if (WA.probe && typeof WA.probe.setSettings === 'function') WA.probe.setSettings({ enabled: false });
+      WA.store.transact(function (d) { d.probe = { cases: [] }; }, 'reject-witness:n4-clear');
+    }
+  }
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });

@@ -121,10 +121,12 @@ function runA(a) {
     .forEach(function (id) { a(pan.indexOf(id) >= 0, 'n2/A19: 面板控件 ' + id + ' 在位'); });
   // 守卫表登记（渲染 + 绑定 + 守卫三件齐）
   a(rd('engines/tool-diag.js').indexOf("'wa-plan-limits'") >= 0, 'n2/A20: 守卫表登记新控件');
-  // 版本面：自报 ver 与 index.js 同值
+  // 版本面：模块自报 ver = 本模块**最后一次交付**的版本（不固定跟随 index）。
+  //   沿革：本锁 v2.220.0 交付时写的是「自报 ver === index.js VERSION」，但那仅在**该模块当期交付那一版**成立——
+  //   plan.js 末次真改在 N2（2.220.0），之后 index 升版不应拖动它（否则每版都要改一个未变模块的自报值）。
   const mv = (rd(IDX_REL).match(/VERSION = '([0-9.]+)'/) || [])[1] || '';
-  a(new RegExp("ver: '" + mv.replace(/\./g, '\\.') + "'").test(S),
-    'n2/A21: 模块自报 ver === index.js VERSION（实 ' + mv + '）');
+  a(/ver: '2\.220\.0'/.test(S), 'n2/A21: 模块自报 ver === 本模块交付版本 2.220.0');
+  a(mv >= '2.220.0', 'n2/A21b: 入口版本不低于本锁的交付基线（实 ' + mv + '）');
   a(rd(RUN_REL).indexOf('|plan:') >= 0 && rd(RUN_REL).indexOf(' adopt ') >= 0,
     'n2/A22: FROZEN2800 的 plan 契约成员含 adopt');
 }

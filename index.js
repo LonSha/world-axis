@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.220.0'
+  const VERSION = '2.222.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -752,6 +752,20 @@
     //   本模块**零 store 写**：没有 transact、没有 draft 赋值；只有自己那一格
     //   localStorage 偏好键（`worldaxis_travel_desk_settings_v1`，同 world-graph 先例）。
     'engines/travel-desk.js',
+    // v2.221.0（拓展 N3）：经营供应链：订单编排与瓶颈图（engines/supply-chain.js）。
+    //   位置排在 travel-desk 之后、ui/panel.js 之前：本模块同为**编排面**
+    //   （逐段检查取自 economy.view / economy.routeView / org.canAfford / economy.RECIPES，
+    //   动作原样透传给 economy.buy / freight.dispatch / economy.craft / org.transfer），
+    //   装载期不读任何上游。本模块**零 store 写**：没有 transact、没有 draft 赋值；
+    //   只有自己那一格 localStorage 偏好键（`worldaxis_supply_chain_settings_v1`）。
+    'engines/supply-chain.js',
+    // v2.222.0（拓展 N4）：调查证据工作台（engines/evidence-board.js）。
+    //   位置排在 supply-chain 之后、ui/panel.js 之前：本模块同为**编排面**
+    //   （支持/反驳条数取自 probe.tally；来源链 / 证人 / 动作逐条现取 investigation 与 rumor）
+    //   ，装载期不读任何上游（一律调用期读 WA.家族成员）。本模块**零 store 写**：
+    //   没有 transact、没有 draft 赋值；只有自己那一格 localStorage 偏好键
+    //   （`worldaxis_evidence_board_settings_v1`）。
+    'engines/evidence-board.js',
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；

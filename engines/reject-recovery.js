@@ -264,9 +264,29 @@
    *  现场 754/35/54 vs 快照 740/34/54，差额全部落在 ui 层。本版一并补齐。
    *  其中 `rec-ambiguous`（>1 处命中，本仓口径「不猜」）另在 OVERRIDES 显式登记
    *  （manual-review：定位到多条同名记录时机器判不了该取哪条）；
-   *  `channel-unconfigured`（助手通道未配 baseUrl/model）登记为 request-setup。 */
+   *  `channel-unconfigured`（助手通道未配 baseUrl/model）登记为 request-setup。
+   *  v2.221.0（拓展 N3）：现场实测 772 / 快照 769 ⇒ 差 3，三条**全部**不在拒收面快照里：
+   *   两条是 v2.220.0（拓展 N2 自动采用面）的新码 —— `auto-adopt-off`（开关默认关）、
+   *   `adopt-budget-exhausted`（每轮预算用尽），都在 `engines/plan.js` 的 `ok:false` 分支上；
+   *   第三条 `not-registered` 是**同一码两处站点**：`engines/noesis.js` 报 `ok:true, known:null`
+   *   （事实没登记过 ⇒ 查询结论，成功面），而 v2.220.0 新加的 `engines/plan.js:193` 把它
+   *   当成前置依赖的拒收理由（`ok:false`）—— 括号配对判据是「只要**一处**落在 ok:false 对象里
+   *   即拒收面」（与 v2.195.0 的 `no-step` 同一条判据），故它此刻是拒收码，从成功面**迁入**本面。
+   *   三码的恢复档均不写 OVERRIDES：码名分词本就被规则表收住 ——
+   *   `auto-adopt-off` 的 `off` 收在 permanent-reject 档、`adopt-budget-exhausted` 的 `budget`
+   *   收在 adjust-input 档、`not-registered` 的 `not` 收在 adjust-input 档（三者实测 via:'rule'），
+   *   再登记一份就是「同一件事两个真源」。
+   *  v2.222.0（拓展 N4）：现场实测 775 / 快照 772 ⇒ 差 3，三条**全部**来自新引擎
+   *   `engines/evidence-board.js`，且是同一件事的三张面孔 —— 编排面把**来源模块**的口调崩时，
+   *   如实记下是哪个来源抛的（`rumor` / `investigation` / `noesis` 三条路各自成码），
+   *   不吞成「没发生」、也不折成编排层自造码。分列而不合成一个 `threw` 的理由：
+   *   现场据此决定去哪一侧排障（链面 / 线索面 / 知情面），合成一栏就再也答不出。
+   *   （同族的 `probe-threw` / `intel-threw` 早已在本面，本条只是把另外三条补齐。）
+   *   三码的恢复档同样不写 OVERRIDES：分词里的 `threw` 本就被规则表收在 retry-same-input 档
+   *   （与 `report-threw` / `settle-threw` 同一条规则，实测 via:'rule'）。 */
   const REJECT_FACE = [
-    'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'adopt-throw',
+    'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'adopt-budget-exhausted',
+     'adopt-throw', 'auto-adopt-off',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
     'already-abandoned', 'already-adopted', 'already-answered', 'already-arrived', 'already-closed', 'already-confirmed',
     'already-covered', 'already-decided', 'already-delivered', 'already-in-transit', 'already-linked', 'already-locked',
@@ -314,7 +334,9 @@
     'goal-not-active', 'goods-full', 'guarded-key', 'hard-cut', 'hops-full', 'identical',
     'identity-incomplete', 'in-replay', 'in-transit', 'in-transit-full', 'incomplete-dice', 'insufficient',
     'insufficient-budget', 'insufficient-contrib', 'insufficient-evidence', 'insufficient-funds', 'insufficient-progress', 'insufficient-samples',
-    'insufficient-support', 'intel-missing', 'intel-threw', 'invalid-actors', 'invalid-input', 'judge-not-configured',
+    'insufficient-support', 'intel-missing', 'intel-threw', 'invalid-actors', 'invalid-input',
+    // v2.222.0（拓展 N4）：调查证据工作台的三个来源抛错码（见上段沿革）。
+    'investigation-threw', 'judge-not-configured', 'noesis-threw', 'rumor-threw',
     'kind-locked', 'knowers-full', 'landed-immutable', 'ledger-throw', 'lib-unreadable', 'library-full',
     'link-off', 'locked', 'major-gate', 'manual-mode', 'metrics-full', 'migration-loop',
     'missing', 'missing-accepter', 'missing-actor', 'missing-answer', 'missing-base', 'missing-buyer',
@@ -348,6 +370,7 @@
     'not-at-cap', 'not-authorized', 'not-bound', 'not-claimed', 'not-comparable', 'not-due',
     'not-empty', 'not-entitled', 'not-equivalent', 'not-found', 'not-injected', 'not-kept',
     'not-met', 'not-mounted', 'not-needed', 'not-object', 'not-on-roster', 'not-open',
+     'not-registered',
     'not-owner', 'not-pending', 'not-planned', 'not-recording', 'not-replaying', 'not-resolved',
     'not-running', 'not-undoable', 'nothing-to-accept', 'nothing-to-choose', 'nothing-to-correct', 'nothing-to-export',
     'nothing-to-extract', 'nothing-to-import', 'nothing-to-offset', 'nothing-to-verify', 'occupied', 'off-step',
@@ -449,7 +472,7 @@
   const SUCCESS_FACE = ['absent', 'all-duplicates', 'already', 'already-consumed', 'already-open',
     'anonymous', 'applied', 'attenuated', 'checked', 'clean', 'first', 'first-baseline',
     'halted', 'interior-blocked', 'module-disabled', 'needs-real-device', 'no-elapsed', 'no-far',
-    'not-holder', 'not-in-table', 'not-registered', 'ok', 'omniscient', 'out-of-lens', 'pass',
+    'not-holder', 'not-in-table', 'ok', 'omniscient', 'out-of-lens', 'pass',
     'player-view', 'premature', 'range-off', 'reuse', 'same-day', 'trigger-fired', 'triggered',
     'unlocked', 'within-lock',
     // v2.209.0（优化 6）：ui/assistant.js 的 `no-terms`（未检索到词条时如实返回 ok:false 之外

@@ -178,7 +178,7 @@ function runAll(A) {
   // v2.194.0（第三批 · U2 批次①）：跨模块链接线 —— 无新文件、无新命名空间；两条调用期边：
   //   operations → commit（chain / step）与 diplomacy → commit（inflight / active）
   //   ⇒ 调用期 1674 → 1676、合计 1782 → 1784；装载期 108 不变（两模块本就在装载期读 store）。
-  A(a.files === 223 && a.aliasFiles === 223 && a.refFiles === 221,
+  A(a.files === 225 && a.aliasFiles === 225 && a.refFiles === 223,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -274,7 +274,7 @@ function runAll(A) {
   // v2.203.0（第四批收口）：调用期 1714 → **1721**、合计 1825 → **1832**（+7 条，实测回填）。
   //   本门禁的边只算**产品文件**的 (file, ns) 对（见 B1 的 `files === 221`），故这 7 条
   //   来自本批的产品改动、批内未及回填；装载期 111 不变。
-  A(a.edgesLoad === 112 && a.edgesCall === 1741 && a.edgesAll === 1853 && a.identityOk,
+  A(a.edgesLoad === 114 && a.edgesCall === 1765 && a.edgesAll === 1879 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -349,7 +349,7 @@ function runAll(A) {
   // v2.187.0（E4）：LOAD_ORDER 206 → 207（新增 engines/campaign.js）。
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
-  A(a.edgesLoad >= 20 && a.orderLen === 222,
+  A(a.edgesLoad >= 20 && a.orderLen === 224,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -386,7 +386,7 @@ function runAll(A) {
   //   但实测发现**它们的点亮条件不可达**（读口 `find` 与写口 `rowForWrite` 查的是同一层同一份，
   //   find 通过 ⇒ rowForWrite 也必通过）⇒ 那是一个零调用的死自证位，按本仓口径**不该留**。
   //   撤掉后：静态提供方不涨（252 与批次③持平）、零读名单不涨（27）、账本与读面一动不动。
-  A(a.nsProvided === 257 && a.nsLedger === 217 && a.nsRead === 233,
+  A(a.nsProvided === 262 && a.nsLedger === 219 && a.nsRead === 236,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -398,7 +398,7 @@ function runAll(A) {
   // （v2.187.0 E4：241 - 203 = 38，差值不变 —— 新 ns 三面同时增长，漂移口径不动。）
   // v2.194.0（U2 批次④）：差**仍为 39**（与批次③持平）—— 本轮一度写成 41（照抄批次③
   //   的自证槽增量），但两个自证槽实测不可达已撤除 ⇒ 静态提供方没涨，差自然也不涨。
-  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 40,
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 43,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
   // v2.153.0（RX5+RX6）：零读 ns 22 → 21（plotGauge 与 branchTree 都被 tool-diag 与面板真读，
   //   从零读名单里离场）。
@@ -409,7 +409,7 @@ function runAll(A) {
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.194.0（U2 批次④）：零读 **仍为 27**（与批次③持平）—— 本轮一度写成 29（那两个
   //   自证槽），但它们实测不可达已撤除，产品源面本就没有这两个记号。
-  A(a.deadNs.length === 24, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 26, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
@@ -421,7 +421,7 @@ function runAll(A) {
     // v2.153.0（RX5+RX6）：**B10 不变**（16/21）—— 本表数的是入口 ns（17）+ UI 层 ns（4），
   //   两个新引擎是普通引擎模块（进的是账本，不是这张表）。改动本项前先看这一行，
   //   否则会把「引擎进账本」误读成「登记表多两项」（本轮实测过一次）。
-  A(a.registeredUsed === 26 && a.registeredTotal === 31,
+  A(a.registeredUsed === 27 && a.registeredTotal === 34,
     'B10 登记面在用 ' + a.registeredUsed + '/' + a.registeredTotal
     + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用；v2.181.0：UI 主题层 9 个 ns 全部接上真读者）');
   // v2.153.0（RX5+RX6）：两个新引擎进账本 ⇒ 账本缺项文件面收缩，缺项 5 不变（UI 层仍 4 文件）。
