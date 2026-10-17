@@ -229,7 +229,10 @@ function runB(a) {
     // v2.223.0 补账：本版(N7)当期条目入 README 版本历史首条,**先实测真值** ——
   //   改前实测 scan() = 158,本版 N7 条目 +1 ⇒ 真值 159,导语与本条同批收敛到 159。
   //   判据继续钉**精确等值**防误删。
-  a(r.facts.readmeEntries === 159, 'docs-archive/B: README 版本历史条目 = 159(实 ' + r.facts.readmeEntries + ')');
+    // v2.224.0 补账:本版(N8)当期条目入 README 版本历史首条,**先实测真值** ——
+  //   改前实测 = 159,本版 N8 条目 +1 ⇒ 真值 160,导语与本条同批收敛到 160。
+  //   判据继续钉**精确等值**防误删。
+  a(r.facts.readmeEntries === 160, 'docs-archive/B: README 版本历史条目 = 160(实 ' + r.facts.readmeEntries + ')');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

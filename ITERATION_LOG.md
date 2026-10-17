@@ -1,3 +1,36 @@
+### R204 · 2026-10-17 · v2.224.0(拓展 N8):分支语义比较与选择性移植 —— 从「两块东西长得像不像」到「A 比 B 多了哪两个人、哪条义务、哪笔事已落定」
+**病灶(计划原文 + 现场实证)**:计划原文(N8)写的是 —— 「基于 checkpoints 谱系、branch-tree 与快照,从**顶层键/摘要差异**升级为**实体 / 关系 / 义务 / 事件差异**;**有共同基点才做三方比较**。只移植**明确支持**的实体配置与改动,**历史付款、揭密、已结算因果默认不可重放**。基点缺失报不可比,**原分支不改**」。现场实证:本仓此前有**两处**「两个世界差在哪」的答案,但两处都停在**形态**上 —— `engines/branch-tree.js` 的 `compare(idA,idB)` 只比三个**指纹读数**(keys / chars / digest),答的是「两块东西长得像不像」;`engines/checkpoints.js` 的 `compare(idA,idB)` 只到**顶层键粒度**(答的是「哪几块不同」)。于是「A 世界比 B 世界多**哪两个人**、多了**哪条义务**、哪一笔**事已落定**」这件事,在全仓**没有任何一处**能回答。
+**本版口径(`engines/branch-diff.js`,新增独立引擎 + 三口,既有契约逐字不动)**:
+· **1 三口 `semanticDiff` / `triDiff` / `transplant` 全部 `readOnly`**:模块内**零 `store.transact`**;导出面**收口于 8 口**,**没有** `apply` / `commit` / `restore` / `undo` / `rollback` 之类落地键 —— 「原分支不改」这条边界靠「**那个口不存在**」实现,而不是靠一句声明;面板那块**也不给任何落地按钮**。
+· **2 四类结构性事实各自成栏**:`entity` / `relation` / `obligation` / `event`,逐行按**身份键**配对,差异报 **只 A / 只 B / 已改 / 相同** 四栏。
+· **3 行身份从 `IDENTITY_REFS` 现取,不另立第二份**:身份字段取自 `engines/world-snapshot.js` 的 `IDENTITY_REFS`(单一真源);取不到时如实标 `declared`,**连声明都没有**标 `absent` —— **三个说法各自成词**。
+· **4 缺身份键的行如实报 `no-identity`,绝不按位置配对**:按位置配对是这一族里最诱人的错(在表头插一行 ⇒ 整表被读成「几乎每一行都改了」),故宁可不比。
+· **5 三方比较以共同基点为前提**:三方 root 取**槽位 root**;三方 root 不全相同 ⇒ **如实拒收** `no-basis`,并把三个 root 一并带回。
+· **6 历史项默认不可重放**:`replay:'ledger'` 的账本面与行上带结算标记的义务(freight 的 delivered / causal 的 settled),默认一律落 `blocked`;打开 `includeHistory` 后逐行标 `history:true`,由调用方自负。
+· **7 三条零泄漏逐条实测**:live 存档逐字一致 / 两端槽位世界逐字未变 / localStorage 按净效应一致。
+· **8 固定种子与多种子**:只报**差异存在与否**,绝不把几次差异折算成概率。
+**本轮探针实测到的四处真缺陷(都在写锁之前修掉了,写进判据当基线)**:
+· **D1 多字段 id 顺序敏感**:bonds 的 `key+a+b` 全拼进 id ⇒ A(key,a=甲,b=乙) 与 B(key,a=乙,b=甲) 得到两个不同 id,一对「同一行」被读成「两边各有一行」(凭空造差异)。修法:配对键(`ids[0]`)决定配对,同批校验字段(`ids[1..]`)**排序后**拼接 ⇒ 顺序无关。
+· **D2 no-change 混入 allowed**:两边逐字相同的行没有可移植内容,却计入「可移植 N 笔」⇒ 读数从吹报的 `allowed=7` 落回 `allowed=2`。修法:单列 `unchanged` 一栏。
+· **D3 历史判定先于 no-change**:逐字相同的账本行因 history 被拦成 blocked ⇒「本来没变化」被说成「被规则挡住」。修法:先判 no-change,历史判定只作用于**真要动**的行。
+· **D4 绑定块落错页面**(面板端到端探针抓到):绑定块落进 `if (currentPage === 'tools')` 分支,而控件**渲染**在 `branchdiff` 页 ⇒ branchdiff 页上五枚按钮的 onclick 全是 undefined(探针读数:NO-HANDLER)。修法:整块移到 `if (currentPage === 'branchdiff')` 守卫里。
+· **真源不完整(如实留账)**:`world-snapshot` 导出的 `IDENTITY_REFS` **丢了 fields 数组**。后果:多字段行(bonds 的 key+a+b)从真源取不全。本模块退到声明表兜底并把 `idSource` **如实标成 `declared`**,绝不假称「这是从真源拿到的」。修导出面属另一件事,本版不做。
+**门禁与证据**(逐条现跑,非引用):
+· 新增专锁 `tests/s3-b3-n8-v2224.js` **344 / 0**(A 静态契约与面板真消费方 / B 四栏行为与六路径 / C 零写入不变式与净效应快照 / N 四处真源码破坏 + 两向自证,H5 锚点纯度 + H6 两向);面板新增一页 `branchdiff` 与十三枚控件(渲染段 / 守卫表 / 绑定块三处齐做);`engines/tool-diag.js` 登记 `MODULE_EXPORTS` 与 `UI_BINDINGS`;`index.js` / `manifest.json` 升 v2.224.0。
+· **快档** `node tools/smoke.js` **13 / 0**(14.5s);**中档** `node tools/mid-tier.js` **40 / 0**(109.8s)。
+· 门禁逐道(现场实测):`export-contract` rc=0(`ns= 198 members= 1462 chars= 15840`) · `dead-export-gate` rc=0(冻结面规模 **dead 855 · uiDead 5 · 归因分布 test-only 371 / 其余 484**) · `module-registry-gate` rc=0(文件 **212** / 命名空间 **220** / 装载期边 **115** / 硬边 0 / 调用期引用 **226** / 结构问题 0) · `module-cycle-gate` rc=0(静态图:文件 **226** · 提供方 **263**(账本 220) · 读面 **237** · 边 **1888**(装载期 115 / 调用期 1773) · **未提供 0** · 次序违规 0 · 跨文件写 0 · 过期登记 0 · 静态漏扫 0 · 归属错配 0 · ns 面漂移 0 · 环 无 · 恒等式 平) · `field-liveness-gate` rc=0 · `reject-code-gate` rc=0(产品文件 **226** / 内联拒收码 **864** = 见证 **573** / 死表 **50** / 基线 **241**,✓ 每个码都有归属) · `reject-code-coverage-v2107` rc=0(**pass 59**) · `reject-lock-v2780` rc=0(**pass 50**) · `reject-recovery-lock-v2192` rc=0(**pass 121**) · `version-surface-gate-v2185` rc=0(**pass (14)**,21 条白名单全部跟上 224) · `docs-archive-gate` rc=0(README 版本历史条目 **160** / 存档节 92 / 跨文件同号 0) · `docs-archive-gate-v2120` rc=0 · `readings-v2106` rc=0(**pass 61 项**,现场 refs **5917** / 命名空间 **225** / 成员 **2692** · 死子面 **855/5/316** · 仅测试 **371** · 台账 version 2.224.0) · `toolchain-gate` rc=0 · `dup-decl-gate` rc=0 · `ui-a11y-gate` rc=0 · `ui-gate` rc=0(**通过 53 / 0**) · `contract-scan-v2150` rc=0(**pass (54)**) · `gate-timeout` rc=0(12 门禁 / 武装调用点 **68 处全部有 timeout** / 自洽) · `settle-v2830` rc=0(**pass 55**) · `loose-readings` rc=0 · `o7-plan-tree-gate` rc=0(**pass 69**) · `o8-consumer-gate` rc=0(**38 / 0**) · `u4-export-lifecycle-v2191` rc=0(**pass 30**) · `gen-error-codes --check` rc=0 · `sync-e2e-readings --verify` rc=0 · `sync-hardcoded --check` rc=0 · `consumer-types --register` rc=0(133 条登记)。
+**同批几笔(收口轮实测到的 v2.223.0 遗留债,三处由中档门禁当场报出)**:
+1 **`engines/branch-diff.js` 的 `__REG.module` 误写成文件名形 `'branch-diff'`**(同批 200+ 引擎一律写**命名空间名**)⇒ 这条设置键永远归不到文件、成为全仓第一条 `unmappedSettings`。修法:改为命名空间名,让 `module-cycle-gate` 的「ns 面漂移」面转绿。
+2 **`tests/gate-timeout.js` 两条表漏了 8 个「已开却未入表」的子进程调用点**(`s3-b3-e8-v2217` 与 `n1/n5/n2/n3/n4/n7/n8` 八把专锁)⇒ 现场 **68 vs 武装 60**,A6/A13b/B13/N7 四处红**在基线上原样存在**(非本轮引入)。修法:两条表补齐八处,复测 **68/68/68 自洽**、`gate-timeout` **54 / 0**。
+3 **`tests/consumer-ledger.json` 未重建 + `plans/` 四文件读数块停在 v2.222.0** ⇒ `u4-export-lifecycle` **7/30**、`o8-consumer-gate` **34/38**、`o7-plan-tree-gate` **7/69**。修法:走 `node tools/consumer-types.js --register` **重建**(133 条,version 跟到 2.224.0)、`tools/gen-plan-status.js --write` **复算**(4 个 `plans/*.md`,幂等自证 SAME);复测 **U4 30 / 0**、**O8 38 / 0**、**O7 69 / 0**。
+4 **`tests/settle-v2830.js` 两处散装读数未随新模块收敛**(由 `tools/loose-readings.js` 报出)。
+5 **端到端读数 13 项未与账本同源** —— `sync-e2e-readings.js --verify` 报 13 项:`tests/module-cycle-gate-v2107.js` 十处(命名空间读面 `236 → 237` / 调用期引用边 `1767 → 1773` / 装载期+调用期边合计 `1881 → 1888` / 依赖图文件面 `225 → 226` / 别名文件数 `225 → 226` / 有引用文件数 `223 → 224` / 装载期边 `114 → 115` / LOAD_ORDER `224 → 225`)与 `tests/run.js` 三处。按**单一真源**口径走 `--write` 回填(写后复核通过,.bak 保留、收口后清理),复跑 `--verify` **rc=0**。
+**如实边界(不假称已覆盖)**:
+· `world-snapshot.IDENTITY_REFS` **丢 fields 数组** —— 多字段行从真源取不全,本模块退到声明表兜底并把 `idSource` 标 `declared`;**修导出面属另一件事**(会动 world-snapshot 的导出契约与 FROZEN2800),本版不做,如实留账。
+· **UI 层未做实机验证**:无头回归不装载 `ui/panel.js`,面板侧本版新增一页 `branchdiff` 与十三枚控件 + D4 那处「绑定页 === 渲染页」的修复 —— 全绿只证明**契约成立与绑定在场**,真宿主里的点击行为**待宿主验收**(O1 面)。
+· 本版的三方比较只到「共同基点判可不可比」这一层;**反事实回放**不在本项内(那是 E9 世界实验室的边界:「时光倒流不属于本项」)。
+**全量回归的环境边界(如实登记,不假称已跑完)**:本轮按用户指令**未跑全量回归**(《完成纪律》第 8 条,自 v2.156.0 起由用户重申持续有效);收口一律**只跑专锁、门禁与两份读数账**,且每条读数**现场实测**(见上「门禁与证据」,非引用记忆值)。本版改动的直接受影响节已走**快档 + 中档 + 逐门禁**取证。
+**纪律期内的动作留账**:本轮之前的一次推进里,曾违规启动过全量回归(隔离任务目录 `worldaxis-regression-WcUVdd`),实测 `通过 49 / 失败 0`、`Status: interrupted`,`/tmp/n8_storage_cur.txt` 记下现场;该动作**违反**第 8 条,**必须留账**(本段即为此),其读数后果为**零用例级污染**(只跑了子门禁自己那一行,未产出任何可被误引作「全量结论」的读数,且已 `pkill` 收场)。
 ### R203 · 2026-10-17 · v2.223.0（拓展 N7）：多引擎适配器面 —— 从「沙盒只跑一条自造链」到「同一副本按明确时序推进、逐类如实分档，不具备隔离上下文的模块如实列不支持」
 **病灶（计划原文 + 现场实证）**：计划原文（N7，逐字落在 `engines/world-lab.js` 模块头注）写的是 —— 「在现有 A/B 对照、causal 累积推演和拍投影之上加入合格的 action/经济/物流/期限/后果适配器，同一副本按明确时序推进;**不具备隔离上下文的模块列 unsupported**。固定种子可重放，多种子差异不冒充概率，live/localStorage/通知均零泄漏。」现场实证：`world-lab` 已有 `run()`（沙盒自造链）、A/B 对照与拍投影三面，但**一只副本上从头到尾只有一条自造的链在跑** —— 消费方（面板 / 模型 / 专锁）真问的下一个问题它答不了：「把**五类真引擎**（行动 / 经济 / 物流 / 期限 / 后果）按同一副本、明确时序各推进一步：哪几类进得去副本、哪几类进去会**悄悄写穿 live**、每一类各自经哪条写口写了多少」。把这件事留给消费方自己拼，接出来的时序与真引擎必然分家（本仓反复治过的那一类：两处各推一遍，迟早答出两条时间轴）。计划要点里还有一句是**本版真正的难点**——「不具备隔离上下文的模块列 unsupported」：它不是一句可以靠读源码回答的话（把 `WA.store.transact` 藏进一层间接调用，任何 grep 式判据都当场失明）。
 **本版口径（`engines/world-lab.js`，新增两口 + 探针面，既有契约逐字不动）**：

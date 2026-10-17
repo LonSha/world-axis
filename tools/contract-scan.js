@@ -147,6 +147,14 @@ const EXEMPT = {
   //   一个是「订单链的编排失败」，一个是「行程方案的编排失败」—— **同形不同义，不许互相校验**：
   //   若强行统一，就会出现「供应链关停要与行程台关停用同一套码」这种语义错配。
   FAULTS: '同名不同义的「编排失败表」：supply-chain=订单编排层自身失败两态（chain-off/bad-order，段级 reason 另走已登记码、不占本空间）、travel-desk=行程编排层失败十二码（desk-off/module-missing/bad-channel/unknown-action/missing-fields/bad-plan/stale-plan/action-threw/bad-route/route-too-long/broken-leg/bad-meet）',
+  // v2.224.0(拓展 N8):本版新引擎 engines/branch-diff.js 带一张 CLASSES 常量,与 v2.168.0
+  //   就在场的 engines/perf-trace.js 同名 —— **合法地**指向不同值域,逐条说清:
+  //     · branch-diff 的 CLASSES 是**「四类结构性事实」**(entity / relation / obligation / event),
+  //       它是**导出面的静态成员**(`BD.CLASSES`)与面板键名 / 专锁口径的真源,判据是「这一行属于哪一类语义」;
+  //     · perf-trace 的 CLASSES 是**「性能采集档」**(short / medium / long / lowend),判据是耗时分层。
+  //   一个是「这是哪一类语义事实」,一个是「这段耗时落在哪一档」—— **同形不同义,不许互相校验**:
+  //   若强行统一,就会出现「四类语义事实要跟性能档用同一套词」这种语义错配。
+  CLASSES: '同名不同义的「分类表」:branch-diff=四类结构性事实(entity/relation/obligation/event,导出面静态成员且为面板键名真源)、perf-trace=性能采集档(short/medium/long/lowend,判据是耗时分层)',
 };
 
 /** 具名常量数组（只认一行内形态）。 */

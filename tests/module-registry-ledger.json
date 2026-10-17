@@ -1,13 +1,13 @@
 {
- "version": "2.223.0",
- "loadOrderCount": 224,
- "loadedCount": 211,
+ "version": "2.224.0",
+ "loadOrderCount": 225,
+ "loadedCount": 212,
  "uiCount": 13,
- "nsCount": 219,
+ "nsCount": 220,
  "totals": {
-  "loadEdges": 114,
+  "loadEdges": 115,
   "hardEdges": 0,
-  "callRefs": 224,
+  "callRefs": 226,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -45,6 +45,7 @@
     "engines/beat-mask.js",
     "engines/beat-report.js",
     "engines/binding.js",
+    "engines/branch-diff.js",
     "engines/branch-tree.js",
     "engines/bridge.js",
     "engines/calendar-custom.js",
@@ -290,6 +291,7 @@
     "engines/beat-mask.js",
     "engines/beat-report.js",
     "engines/binding.js",
+    "engines/branch-diff.js",
     "engines/branch-tree.js",
     "engines/calendar-custom.js",
     "engines/campaign.js",
@@ -3369,6 +3371,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_branch_tree_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/branch-diff.js": {
+   "ns": [
+    "branchDiff"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_branch_diff_v1"
    ],
    "consumedBy": []
   },

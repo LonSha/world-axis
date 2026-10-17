@@ -171,6 +171,18 @@ const TIMEOUT_ARMED = {
   //     该形态全局匹配（不剥注释），注释里写一个就凭空多出一处无调用点的预算。
   'b3-e6-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'b3-e8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.224.0(N8)补账:s3-b3-* 系列八把专锁的调用点此前**已开未入表** ——
+  //   现场实测(用本模块自己的 parseCallBlocks 逐行比对)武装表 60 / 调用点块 68,
+  //   差 8 条全在这一族;4 处红(A6/A13b/B13/N7)在 v2.223.0 基线上原样存在。
+  //   本仓判决词:新开的调用点不入表即红,处置是入表而不是放宽。
+  'b3-e8-2217-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n1-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n5-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n2-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   // v2.188.0（第四批 · E7 + E9）：两把新专锁的调用点，同 B3 批次口径（统一预算 96000ms）。
   'b3-e7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'b3-e9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
@@ -345,6 +357,28 @@ const ARMED_SITES = [
   //   而不是 value-mismatch —— 判据被它要抓的破坏顺手打掉）。
   { key: 'b3-e7-lock', mode: 'spawn',
     anchor: "const rB3E7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e7-v2188.js')]," },
+  // v2.224.0(N8)补账:上一条与 `b3-e9-lock` 之间**原先漏了 8 个现场调用点** ——
+  //   s3-b3-e8-v2217 与 s3-b3-n1/n5/n2/n3/n4/n7/n8 八把专锁。它们各轮交付时开了调用点
+  //   却没入表(该模块判决词:新开的调用点不入表即红)。**插入点有硬约束**:A10 要求
+  //   站点行号严格递增 ⇒ 条目顺序必须与 run.js 出现顺序一致,这 8 条落在两条之间。
+  //   锚点一律截到 options 之前(**不许包含它要守卫的预算值**,否则自我指涉:
+  //   预算一改先失效的是锚点,报出来的是 site-missing 而不是 value-mismatch)。
+  { key: 'b3-e8-2217-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3E8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e8-v2217.js')]," },
+  { key: 'b3-n1-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3N1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n1-v2218.js')]," },
+  { key: 'b3-n5-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3N5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n5-v2219.js')]," },
+  { key: 'b3-n2-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3N2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n2-v2220.js')]," },
+  { key: 'b3-n3-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3N3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n3-v2221.js')]," },
+  { key: 'b3-n4-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3N4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n4-v2222.js')]," },
+  { key: 'b3-n7-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3N7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n7-v2223.js')]," },
+  { key: 'b3-n8-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3N8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n8-v2224.js')]," },
   { key: 'b3-e9-lock', mode: 'spawn',
     anchor: "const rB3E9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e9-v2188.js')]," },
   // v2.189.0（缝 A1/A2/A3 + B1/B2）：四引擎合并专锁的调用点（整行唯一 ⇒ 任何前缀也唯一）。

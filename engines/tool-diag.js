@@ -2009,6 +2009,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取。
     'engines/plot-gauge.js': 'plotGauge',
     'engines/branch-tree.js': 'branchTree',
+    'engines/branch-diff.js': 'branchDiff',
     // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。登记为必载 —— 注入链的
     //   `远方的传说` 源读 worldBridge.buildBlock，面板「联网」页与本文件的 secWorldBridge /
     //   secEcoAudit 都读它们，缺席就是「联网/自洽读数缺席」本身，不该被静默兜住。
@@ -3379,6 +3380,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       dynamic: ['wa-rp-out'] },
     // v2.188.0（E9）：世界实验室 —— 8 静态控件 + 1 动态读数出口。
     //   渲染在**工具页**（与试演 / 分支树同页族：三者都在「先看看会怎样、再决定」这条线上）。
+    // v2.224.0(N8):分支语义比较与选择性移植。同 v2.2.0 块 8 的理由 ——
+    //   「渲染了但绑定写错 id」这类断裂只有在守卫登记过的控件上才会被发现。
+    //   控件单点渲染于新页 branchdiff（不落 tools 页——同一组 id 落两页会让「重复渲染」看上去像正常）。
+    { page: 'branchdiff', ids: ['wa-bd-enabled', 'wa-bd-history', 'wa-bd-a', 'wa-bd-b', 'wa-bd-diff',
+      'wa-bd-base', 'wa-bd-tri', 'wa-bd-cat', 'wa-bd-src', 'wa-bd-dst', 'wa-bd-classes', 'wa-bd-plan', 'wa-bd-stat'] },
     { page: 'tools', ids: ['wa-wl-enabled', 'wa-wl-a', 'wa-wl-b', 'wa-wl-run', 'wa-wl-arms',
       'wa-wl-diff', 'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag',
       // v2.203.0（Y9）：推几轮 / 沙盒推进 / 结果报告 / 采纳第几条 / 采纳这一条 / 拍引擎推演

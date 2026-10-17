@@ -237,6 +237,12 @@
     //   本页的**每一个数都来自来源模块自己的读口**（probe / investigation / rumor /
     //   intel / noesis），本页与 evidence-board 都不重算。
     { id: 'evidence', icon: '🧾', label: '证据' },
+    // v2.224.0(拓展 N8):分支语义比较与选择性移植(engines/branch-diff.js)。
+    //   页 id 纯小写字母(tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析)。
+    //   插在 evidence 之后:evidence 答「这张案子上有哪些边」,本页答「两个世界在实体/关系/
+    //   义务/事件上差在哪」—— 同一批的「把两份东西放在一张面上逐行看」。
+    //   与其他页不同的一点:本页三个口**全部 readOnly**——没有任何一个落地按钮。
+    { id: 'branchdiff', icon: '🌿', label: '分支比较' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -2483,6 +2489,32 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <input type="range" min="1" max="10" value="${WA.apiRouter.getConcurrency()}" id="wa-conc" class="wa-range" title="同时进行的 AI 请求上限（调高会更快，但可能触发供应商限流）"/>`;
   }
 
+  function renderBranchDiff() {
+    const bdcfg = (WA.branchDiff && WA.branchDiff.getSettings) ? WA.branchDiff.getSettings() : null;
+    return `
+      <div class="wa-sec">分支语义比较与选择性移植(N8)<span class="wa-dim">(只读：不改世界、不改分支)</span></div>
+      <div class="wa-dim">行身份取自 world-snapshot 的 IDENTITY_REFS；缺身份键的行如实落 noIdentity，不按位置配对。历史项默认不可重放。</div>
+      <label class="wa-row"><input id="wa-bd-enabled" type="checkbox" ${(bdcfg && bdcfg.enabled) ? 'checked' : ''}/> 启用分支语义比较</label>
+      <label class="wa-row"><input id="wa-bd-history" type="checkbox" ${(bdcfg && bdcfg.includeHistory) ? 'checked' : ''}/> 放行历史项(逐行标 history)</label>
+      <div class="wa-row">
+        <input id="wa-bd-a" class="wa-input" placeholder="A 存档 id"/>
+        <input id="wa-bd-b" class="wa-input" placeholder="B 存档 id"/>
+        <button class="wa-btn" id="wa-bd-diff">语义比较</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-bd-base" class="wa-input" placeholder="基点存档 id"/>
+        <button class="wa-btn" id="wa-bd-tri">三方比较</button>
+        <button class="wa-btn" id="wa-bd-cat">面清单</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-bd-src" class="wa-input" placeholder="移植源 id"/>
+        <input id="wa-bd-dst" class="wa-input" placeholder="目标 id"/>
+        <input id="wa-bd-classes" class="wa-input" placeholder="限定类(留空=四类全)"/>
+        <button class="wa-btn" id="wa-bd-plan">移植计划</button>
+        <button class="wa-btn" id="wa-bd-stat">诊断</button>
+      </div>
+      <div id="wa-bd-out" class="wa-out"></div>`;
+  }
   function renderTools() {
     // v2.155.0（RX8 世界种子库）：读数在「工具」页常驻，开关状态进渲染（
     //   「库是空的」与「这一面被关掉了」在界面上必须分得开 —— 与 v2.154.0 同一句纪律）。
@@ -2956,7 +2988,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     </div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -8794,6 +8826,101 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           + (r.reason || ('新增 ' + (r.added || 0) + ' 条' + (r.skipped ? '，跳过 ' + r.skipped + ' 条' : '') + (r.reasons && r.reasons.length ? '（' + r.reasons.join('；') + '）' : '')));
         if (r.ok && r.added) renderBody();
       };
+    }
+
+    // ── v2.224.0(N8):分支语义比较与选择性移植(engines/branch-diff.js,7 导出)──
+    //   ⚠ **本区块必须挂在 branchdiff 页** = 控件**渲染**的那一页。
+    //   挂在 tools 页的后果是:控件渲染在 branchdiff、处理器却只在 tools 页装 —— 按钮照在、点了没反应
+    //   (本轮探针实测:branchdiff 页上五枚按钮 onclick 全是 undefined)。这就是「绑定页必须等于渲染页」这条不变式在本面的形态
+    //   (与 tool-diag 的 UI_BINDINGS 页归属同一条依据)。
+    if (currentPage === 'branchdiff') {
+      // ── v2.224.0(N8):分支语义比较与选择性移植(engines/branch-diff.js,7 导出)──
+      //   引擎此前**面板零控件**。只做接线,不新建存储层 —— 槽位库与谱系全走 checkpoints。
+      //   三个口全部 readOnly:本区块**不给任何落地按钮** —— 「原分支不改」这句硬要求的
+      //   实现方式就是「这里没有写口」,故「移植计划」只印计划、不提供执行。
+      const bdOut = function (html) { const o = $('#wa-bd-out'); if (o) o.innerHTML = html; };
+      const bdWhy = function (reason) {
+        const M = {
+          disabled: '这一面关着(上面的开关打开后才有动作)',
+          'module-missing': 'checkpoints 未加载 —— 槽位与谱系都在它那边',
+          'missing-fields': '缺必填字段( 存档 id 不能空)',
+          'missing': '这个 id 不在库里',
+          'no-basis': '三方 root 不全相同 —— 不做三方比较',
+          'lib-unreadable': '库读不出来(本模块拒绝覆盖写)'
+        };
+        return M[reason] || ('拒收:' + String(reason || '?'));
+      };
+      const bdCfg = $('#wa-bd-enabled');
+      if (bdCfg) bdCfg.onchange = function () {
+        if (!WA.branchDiff || !WA.branchDiff.setSettings) return bdOut('<div class="wa-log wa-log-err">未记录:module-missing</div>');
+        WA.branchDiff.setSettings({ enabled: !!bdCfg.checked });
+        bdOut('<div class="wa-log wa-log-info">已记录 ' + (bdCfg.checked ? 'enabled' : 'disabled(三个口一并拒收)') + '</div>');
+      };
+      const bdHist = $('#wa-bd-history');
+      if (bdHist) bdHist.onchange = function () {
+        if (!WA.branchDiff || !WA.branchDiff.setSettings) return;
+        WA.branchDiff.setSettings({ includeHistory: !!bdHist.checked });
+        bdOut('<div class="wa-log wa-log-' + (bdHist.checked ? 'warn' : 'info') + '">历史项 '
+          + (bdHist.checked ? '放行(逐行标 history，由你自负)' : '拦住') + '</div>');
+      };
+      on('#wa-bd-diff', () => {
+        if (!WA.branchDiff || !WA.branchDiff.semanticDiff) return bdOut('<div class="wa-log wa-log-err">未加载</div>');
+        const A = wv('#wa-bd-a'), B = wv('#wa-bd-b');
+        const r = WA.branchDiff.semanticDiff(A, B, {});
+        if (!r.ok) return bdOut('<div class="wa-log wa-log-warn">' + esc(bdWhy(r.reason)) + '</div>');
+        let html = '<div class="wa-log wa-log-info">' + esc(r.a.name) + ' ⇄ ' + esc(r.b.name)
+          + (r.identical ? ':四类逐行相同' : '') + (r.sameRoot ? ' 同根(' + esc(r.a.root) + ')' : ' 不同根') + '</div>';
+        r.classesOrder.forEach(function (c) {
+          const x = r.classes[c];
+          html += '<div class="wa-item"><b>' + esc(x.label) + '</b>(id ' + c + '):增 ' + x.onlyB.total
+            + ' / 减 ' + x.onlyA.total + ' / 改 ' + x.changed.total + ' / 同 ' + x.same
+            + (x.changed.total ? '<div class="wa-dim">改动:' + esc(x.changed.items.slice(0, 8).map(function (d) { return d.face + '#' + d.id + '(' + d.fields.join('/') + ')'; }).join('、')) + '</div>' : '')
+            + (x.onlyB.total ? '<div class="wa-dim">多出:' + esc(x.onlyB.items.slice(0, 8).map(function (d) { return d.face + '#' + d.id; }).join('、')) + '</div>' : '')
+            + (x.onlyA.total ? '<div class="wa-dim">消失:' + esc(x.onlyA.items.slice(0, 8).map(function (d) { return d.face + '#' + d.id; }).join('、')) + '</div>' : '')
+            + '</div>';
+        });
+        html += '<div class="wa-dim">身份缺失的行在 noIdentity 里如实报出，不按位置配对。</div>';
+        bdOut(html);
+      });
+      on('#wa-bd-tri', () => {
+        if (!WA.branchDiff || !WA.branchDiff.triDiff) return bdOut('<div class="wa-log wa-log-err">未加载</div>');
+        const r = WA.branchDiff.triDiff(wv('#wa-bd-base'), wv('#wa-bd-a'), wv('#wa-bd-b'), {});
+        if (!r.ok) return bdOut('<div class="wa-log wa-log-warn">' + esc(bdWhy(r.reason)) + '</div>'
+          + (r.reason === 'no-basis' ? '<div class="wa-dim">基点 root ' + esc(r.base || '(空)') + ' / A ' + esc(r.a || '(空)') + ' / B ' + esc(r.b || '(空)') + '</div>' : ''));
+        let html = '<div class="wa-log wa-log-info">基点 ' + esc(r.base.name) + ' → A ' + esc(r.a.name) + ' / B ' + esc(r.b.name) + '</div>';
+        r.classesOrder.forEach(function (c) {
+          const x = r.classes[c];
+          html += '<div class="wa-item"><b>' + esc(x.label) + '</b>:A改 ' + x.aChanged.total + ' / B改 ' + x.bChanged.total
+            + ' / 同向 ' + x.bothSame.total + ' / 分道 ' + x.diverge.total + ' / 历史拦 ' + x.historyBlocked.total + '</div>';
+        });
+        bdOut(html);
+      });
+      on('#wa-bd-cat', () => {
+        if (!WA.branchDiff || !WA.branchDiff.catalog) return bdOut('<div class="wa-log wa-log-err">未加载</div>');
+        const c = WA.branchDiff.catalog();
+        bdOut('<div class="wa-log wa-log-info">四类各自的面(' + c.faces.length + '个)，身份来源 ' + esc(c.idSource) + '</div>'
+          + c.faces.map(function (f) { return '<div class="wa-item">' + esc(f.cls) + ' · <code>' + esc(f.path + (f.at ? ('.' + f.at) : '')) + '</code> · 重放档 ' + esc(f.replay) + ' · 身份字段 ' + esc(f.idFields.join('+')) + '</div>'; }).join(''));
+      });
+      on('#wa-bd-plan', () => {
+        if (!WA.branchDiff || !WA.branchDiff.transplant) return bdOut('<div class="wa-log wa-log-err">未加载</div>');
+        const cl = wv('#wa-bd-classes').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+        const r = WA.branchDiff.transplant(wv('#wa-bd-src'), wv('#wa-bd-dst'), cl.length ? { classes: cl } : {});
+        if (!r.ok) return bdOut('<div class="wa-log wa-log-warn">' + esc(bdWhy(r.reason)) + '</div>');
+        bdOut('<div class="wa-log wa-log-info">从 ' + esc(r.from.name) + ' → ' + esc(r.to.name)
+          + ':可移植 ' + r.allowed + ' / 被拦 ' + r.blocked + ' / 无变化 ' + r.unchanged + (r.includeHistory ? '(历史已放行)' : '') + '</div>'
+          + r.plan.items.slice(0, 20).map(function (p) { return '<div class="wa-item">' + (p.allowed ? '✓' : '✗') + ' '
+            + esc(p.cls) + '#' + esc(p.id) + ' [' + esc(p.kind) + ']' + (p.allowed ? '' : ' 拦因 ' + esc(p.reason))
+            + (p.history ? ' · history' : '') + '</div>'; }).join('')
+          + '<div class="wa-dim">只给计划、不落地:本模块没有任何一条写路径。</div>');
+      });
+      on('#wa-bd-stat', () => {
+        if (!WA.branchDiff || !WA.branchDiff.stat) return bdOut('<div class="wa-log wa-log-err">未加载</div>');
+        const st = WA.branchDiff.stat();
+        bdOut('<div class="wa-log wa-log-info">开关 ' + (st.enabled ? '开' : '关') + ' · 历史项 ' + (st.includeHistory ? '放行' : '拦住') + '</div>'
+          + '<div class="wa-item">计数:语义比较 ' + st.diffs + ' · 三方 ' + st.tris + ' · 移植 ' + st.transplants + '</div>'
+          + '<div class="wa-item">面 ' + st.faces + ' 个 / 类 ' + st.classes + ' 类</div>'
+          + (st.lastReason ? '<div class="wa-dim">最近一次:' + esc(st.lastReason) + '</div>' : ''));
+      });
     }
 
     // v2.187.0（E6）：统一世界地图与关系视图的面板消费方。

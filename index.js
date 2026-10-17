@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.223.0'
+  const VERSION = '2.224.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -608,6 +608,14 @@
     //   rehearsal.preview），排在前面会让「源全空」被读成「故事还没开始」。二者不互相依赖。
     'engines/plot-gauge.js',
     'engines/branch-tree.js',
+    // v2.224.0(拓展 N8):分支语义比较与选择性移植(engines/branch-diff.js)。
+    //   位置紧随 branch-tree:它把那一族的读数**从指纹升级到语义**(实体/关系/义务/事件四类,
+    //   逐行按身份键配对)。调用期读三处:**checkpoints**(槽位与谱系,行 387 已装)、
+    //   **worldSnapshot**(行身份真源 IDENTITY_REFS,行 636 装在本行之后 —— 那时才读,
+    //   故对本行无装载期依赖,取不到时按声明表兜底并如实标 idSource)、**store**(只读)。
+    //   本模块**零写路径**:三个口全部 readOnly(改世界/改分支都不在这里做)——
+    //   「原分支不改」这句硬要求的实现方式就是「这里没有写口」。
+    'engines/branch-diff.js',
     // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。位置在 branch-tree 之后、
     //   ui/panel.js 之前：两者在调用期读 rumor / causal / chronicle / worldFacts 与 perfLedger
     //   （全部在本行之前装载），且 eco-audit 的读数由面板「联网」页与 store.maintain 消费 ——
