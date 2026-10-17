@@ -1,0 +1,5710 @@
+{
+  "_note": "WorldAxis 证据索引(Q9,v2.226.0)。每行 = 一个证据文件,六栏全部**现场复算**(文件 / sha / version / commit / wired / env、runnable),本表不存第二真源。**version 只认文件自述**(标题行提到本文件名的那行 > 头部前六行首个版本词),并回带 versionSource(title / head / null)自证来源;取不到如实标 null,**不猜**。fileAnchor = 文件名 `-v2NNN` 后缀**原样**,仅备查 —— 该后缀有损且二义(2.117.0 写作 2117、2.97.0 写作 2970;`2100` 既可读成 2.10.0 也可读成 2.100.0),**不作判据、不填进 version**。acceptance 四档:verified(被 run.js 引用 **且** 另有真跑面:导出 runAll 一族**且**带真源码破坏锚点)/ wired(存在 + 被 run.js 引用)/ consumed(未被 run.js 直接引用,但被其它测试 require 当公共基建)/ unwired。计划 Q9 原文「现有计划顶部存在+引用不等于功能验收」落在 verified 与 wired 的分界上 —— wired 一律不许写成 verified。stale 只认三档可复算的硬事实:sha-changed / file-missing / wired-lost;**不**把「version 落后于当前版本」算 stale(历史证据本就停在它交付的那一版)。边界:输出摘要不进记录;只登记 tests/ 下的 .js(不含 run.js 与账本 json)。",
+  "version": "2.226.0",
+  "counts": {
+    "total": 271,
+    "verified": 24,
+    "wired": 244,
+    "consumed": 3,
+    "unwired": 0,
+    "browser": 0,
+    "headlessGate": 24,
+    "headlessLock": 217,
+    "headlessScript": 30
+  },
+  "rows": [
+    {
+      "file": "tests/act-b1-v2117.js",
+      "sha": "77ae1d8e790a",
+      "version": "2.117.0",
+      "versionSource": "title",
+      "fileAnchor": "2117",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20457
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/alias-trace-v2970.js",
+      "sha": "dbd762c888ff",
+      "version": "2.97.0",
+      "versionSource": "title",
+      "fileAnchor": "2970",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19500
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/anchor-scan-v2126.js",
+      "sha": "bf46c755d4ae",
+      "version": "2.126.0",
+      "versionSource": "title",
+      "fileAnchor": "2126",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20706
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/anchor-scan-v2133.js",
+      "sha": "0e04f91dd82a",
+      "version": "2.133.0",
+      "versionSource": "title",
+      "fileAnchor": "2133",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20941
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "scan"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/audit-log-v2111.js",
+      "sha": "3b26cbc91620",
+      "version": "2.111.0",
+      "versionSource": "title",
+      "fileAnchor": "2111",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20288
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/audit-log-v2112.js",
+      "sha": "cd8fe35825ea",
+      "version": "2.112.0",
+      "versionSource": "title",
+      "fileAnchor": "2112",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20319
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/audit-vol-v2121.js",
+      "sha": "0866e41e7271",
+      "version": "2.121.0",
+      "versionSource": "title",
+      "fileAnchor": "2121",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20585
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b2-travel-v2117.js",
+      "sha": "7a377cbd2b47",
+      "version": "2.117.0",
+      "versionSource": "title",
+      "fileAnchor": "2117",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20459
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b3-intel-v2117.js",
+      "sha": "bbc04ed6746f",
+      "version": "2.117.0",
+      "versionSource": "title",
+      "fileAnchor": "2117",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20461
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b4-relation-v2117.js",
+      "sha": "6433382de3a2",
+      "version": "2.117.0",
+      "versionSource": "title",
+      "fileAnchor": "2117",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20463
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b5-org-v2117.js",
+      "sha": "a87013d5a5cc",
+      "version": "2.117.0",
+      "versionSource": "title",
+      "fileAnchor": "2117",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20465
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b6-b7-v2870.js",
+      "sha": "85c1b4e4c98c",
+      "version": "2.87.0",
+      "versionSource": "title",
+      "fileAnchor": "2870",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19287
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b6-opportunity-v2117.js",
+      "sha": "7c1e91addcd6",
+      "version": "2.117.0",
+      "versionSource": "title",
+      "fileAnchor": "2117",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20481
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b7-rehearsal-v2118.js",
+      "sha": "58b371a8478d",
+      "version": "2.118.0",
+      "versionSource": "title",
+      "fileAnchor": "2118",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20495
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b8-liaison-v2118.js",
+      "sha": "0b4302a5508d",
+      "version": "2.118.0",
+      "versionSource": "title",
+      "fileAnchor": "2118",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20511
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/b9-coop-v2118.js",
+      "sha": "228b01559a13",
+      "version": "2.118.0",
+      "versionSource": "title",
+      "fileAnchor": "2118",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20529
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/backstage-stale-v2131.js",
+      "sha": "d5369df17b50",
+      "version": "2.131.0",
+      "versionSource": "title",
+      "fileAnchor": "2131",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20857
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/beat-facade-lock-v2193.js",
+      "sha": "2a1ce954e5d3",
+      "version": "2.193.0",
+      "versionSource": "title",
+      "fileAnchor": "2193",
+      "commit": "c4fbdcd",
+      "wired": {
+        "form": "runLock",
+        "line": 22660
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/branch-tree-v2153.js",
+      "sha": "6017eee87867",
+      "version": "2.153.0",
+      "versionSource": "head",
+      "fileAnchor": "2153",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21516
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/canon-align-v2100.js",
+      "sha": "4ebff602d10c",
+      "version": "2.100.0",
+      "versionSource": "title",
+      "fileAnchor": "2100",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19534
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/canon-deviation-v2139.js",
+      "sha": "7b7453367f5d",
+      "version": "2.139.0",
+      "versionSource": "title",
+      "fileAnchor": "2139",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19424
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/canon-v2990.js",
+      "sha": "c958743ebe4a",
+      "version": "2.99.0",
+      "versionSource": "title",
+      "fileAnchor": "2990",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19522
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/causal-ripple-v2146.js",
+      "sha": "c327e0bac5ec",
+      "version": "2.146.0",
+      "versionSource": "title",
+      "fileAnchor": "2146",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21124
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/causal-trace-v2147.js",
+      "sha": "1c807edecff3",
+      "version": "2.147.0",
+      "versionSource": "title",
+      "fileAnchor": "2147",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21146
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/causal-v2620.js",
+      "sha": "c9d620a251f2",
+      "version": "2.62.0",
+      "versionSource": "title",
+      "fileAnchor": "2620",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19098
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/causal-view-v2870.js",
+      "sha": "a3494d6e5dd5",
+      "version": "2.87.0",
+      "versionSource": "title",
+      "fileAnchor": "2870",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19280
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/collab-tasks-v2139.js",
+      "sha": "6c68157e569b",
+      "version": "2.139.0",
+      "versionSource": "title",
+      "fileAnchor": "2139",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19415
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/context-guard.js",
+      "sha": "f316bc4148fa",
+      "version": "2.84.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 614
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/contract-scan-v2150.js",
+      "sha": "87fa72307117",
+      "version": "2.150.0",
+      "versionSource": "title",
+      "fileAnchor": "2150",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21379
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/coord-v2970.js",
+      "sha": "8af835fb359e",
+      "version": "2.97.0",
+      "versionSource": "title",
+      "fileAnchor": "2970",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19502
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/cost-v2880.js",
+      "sha": "802171d9090f",
+      "version": "2.88.0",
+      "versionSource": "title",
+      "fileAnchor": "2880",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19294
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/dead-export-gate.js",
+      "sha": "ddbc55fa0121",
+      "version": "2.28.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 15319
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/delete-gate-v2124.js",
+      "sha": "a8f16221b2e3",
+      "version": "2.124.0",
+      "versionSource": "title",
+      "fileAnchor": "2124",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20654
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/demand-integrity-v2155.js",
+      "sha": "7cf60a955ab6",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2155",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21663
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/dependency-guard-v2103.js",
+      "sha": "cd3e81f8350a",
+      "version": "2.103.0",
+      "versionSource": "title",
+      "fileAnchor": "2103",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19884
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/dependency-guard.js",
+      "sha": "88a1184d47e7",
+      "version": "2.103.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19866
+      },
+      "consumedBy": [
+        "tests/dependency-guard-v2103.js",
+        "tests/ui-live-v2137.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/docs-archive-gate-v2120.js",
+      "sha": "f407ca7edcbb",
+      "version": "2.120.0",
+      "versionSource": "title",
+      "fileAnchor": "2120",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20574
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/docs-archive-gate.js",
+      "sha": "f3b02a63e6a4",
+      "version": "2.120.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20567
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/dup-decl-gate.js",
+      "sha": "8f43879a1ffb",
+      "version": "2.73.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": null,
+      "consumedBy": [
+        "tests/dup-decl-v2740.js"
+      ],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "scan"
+      ],
+      "acceptance": "consumed"
+    },
+    {
+      "file": "tests/dup-decl-v2740.js",
+      "sha": "e04fd166bfc6",
+      "version": "2.74.0",
+      "versionSource": "title",
+      "fileAnchor": "2740",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19151
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/duty-v2143.js",
+      "sha": "8f33fa11886f",
+      "version": "2.143.0",
+      "versionSource": "title",
+      "fileAnchor": "2143",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19467
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/eco-audit-v2154.js",
+      "sha": "1db4f9b03d14",
+      "version": "2.154.0",
+      "versionSource": "head",
+      "fileAnchor": "2154",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21595
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/economy-v2119.js",
+      "sha": "0150f912ae32",
+      "version": "2.119.0",
+      "versionSource": "title",
+      "fileAnchor": "2119",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20545
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/enemies-v2640.js",
+      "sha": "4c44e6ff97ec",
+      "version": "2.64.0",
+      "versionSource": "title",
+      "fileAnchor": "2640",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19122
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ensemble-v2138.js",
+      "sha": "07b193c06284",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2138",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19757
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/ev1-evidence-qa-v2208.js",
+      "sha": "87e1af81a21e",
+      "version": "2.208.0",
+      "versionSource": "title",
+      "fileAnchor": "2208",
+      "commit": "129ae75",
+      "wired": {
+        "form": "path-literal",
+        "line": 23314
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ev6-panel-nav-v2209.js",
+      "sha": "f573ee197456",
+      "version": "2.209.0",
+      "versionSource": "title",
+      "fileAnchor": "2209",
+      "commit": "129ae75",
+      "wired": {
+        "form": "path-literal",
+        "line": 23325
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/events-a2-v2116.js",
+      "sha": "2f1aeb64e2cf",
+      "version": "2.116.0",
+      "versionSource": "title",
+      "fileAnchor": "2116",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20434
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/events-e2-v2115.js",
+      "sha": "c3a8b68f87a1",
+      "version": "2.115.0",
+      "versionSource": "title",
+      "fileAnchor": "2115",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20414
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/evict-meta-v2610.js",
+      "sha": "fce452fc5ec9",
+      "version": "2.61.0",
+      "versionSource": "title",
+      "fileAnchor": "2610",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19095
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/explain-budget-v2122.js",
+      "sha": "fc148ccba1ed",
+      "version": "2.122.0",
+      "versionSource": "title",
+      "fileAnchor": "2122",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20610
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/explain-v2900.js",
+      "sha": "d7be5bb4cbe5",
+      "version": "2.90.0",
+      "versionSource": "title",
+      "fileAnchor": "2900",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19308
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/export-contract.js",
+      "sha": "d5e542198e49",
+      "version": "2.8.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 11951
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/faction-graph-v2139.js",
+      "sha": "5aaf27f797b7",
+      "version": "2.139.0",
+      "versionSource": "title",
+      "fileAnchor": "2139",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19402
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/farfield-v2151.js",
+      "sha": "4f44d04df471",
+      "version": "2.151.0",
+      "versionSource": "head",
+      "fileAnchor": "2151",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21413
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/fault-alias-lock-v2800.js",
+      "sha": "56a51fe2a68a",
+      "version": "2.80.0",
+      "versionSource": "title",
+      "fileAnchor": "2800",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19201
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/fault-context-v2110.js",
+      "sha": "026f876d0a1b",
+      "version": "2.110.0",
+      "versionSource": "title",
+      "fileAnchor": "2110",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20234
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/fault-ledger-lock-v2800.js",
+      "sha": "23f55c89ab74",
+      "version": "2.80.0",
+      "versionSource": "title",
+      "fileAnchor": "2800",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19194
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/fidelity-v2144.js",
+      "sha": "542375161d8b",
+      "version": "2.144.0",
+      "versionSource": "title",
+      "fileAnchor": "2144",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19480
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/field-liveness-gate.js",
+      "sha": "7f3988ae507d",
+      "version": "2.40.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 17078
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/foreshadow-v2135.js",
+      "sha": "e0670d29eecf",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2135",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19755
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/gate-timeout-v2105.js",
+      "sha": "a951ec5b1930",
+      "version": "2.105.0",
+      "versionSource": "title",
+      "fileAnchor": "2105",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20003
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/gate-timeout.js",
+      "sha": "dd96bf438ca4",
+      "version": "2.105.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19929
+      },
+      "consumedBy": [
+        "tests/gate-timeout-v2105.js"
+      ],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/hazard-trigger-v2138.js",
+      "sha": "d455a1409572",
+      "version": "2.96.0",
+      "versionSource": "head",
+      "fileAnchor": "2138",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19380
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/hazard-weather-v2960.js",
+      "sha": "f18d352eccb4",
+      "version": "2.96.0",
+      "versionSource": "title",
+      "fileAnchor": "2960",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19369
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/horizon-v2640.js",
+      "sha": "0592706205ea",
+      "version": "2.64.0",
+      "versionSource": "title",
+      "fileAnchor": "2640",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19116
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/identity-v2860.js",
+      "sha": "cf0c3feb4d87",
+      "version": "2.86.0",
+      "versionSource": "title",
+      "fileAnchor": "2860",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19274
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/inject-sources-v2560.js",
+      "sha": "acd166e2c593",
+      "version": "2.56.0",
+      "versionSource": "title",
+      "fileAnchor": "2560",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19080
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/inject-value-v2150.js",
+      "sha": "cd44f224e949",
+      "version": "2.150.0",
+      "versionSource": "title",
+      "fileAnchor": "2150",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21258
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/inject-vis-v2580.js",
+      "sha": "8f017632ccbe",
+      "version": "2.58.0",
+      "versionSource": "title",
+      "fileAnchor": "2580",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19086
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/injection-restore-lock-v2800.js",
+      "sha": "b1f48f35791f",
+      "version": "2.80.0",
+      "versionSource": "title",
+      "fileAnchor": "2800",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19214
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/input-boundary-v2790.js",
+      "sha": "b12f66621f87",
+      "version": "2.79.0",
+      "versionSource": "title",
+      "fileAnchor": "2790",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19181
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/input-guard-v2840.js",
+      "sha": "191b3fa0165b",
+      "version": "2.84.0",
+      "versionSource": "title",
+      "fileAnchor": "2840",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19186
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/inst-v2119.js",
+      "sha": "f8cf3d0ff4c4",
+      "version": "2.119.0",
+      "versionSource": "title",
+      "fileAnchor": "2119",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20546
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/intel-v2530.js",
+      "sha": "e0a2573c8f22",
+      "version": "2.75.0",
+      "versionSource": "title",
+      "fileAnchor": "2530",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19748
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/interop-v2101.js",
+      "sha": "32ddfc20da3b",
+      "version": "2.101.0",
+      "versionSource": "title",
+      "fileAnchor": "2101",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19551
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/inventory.js",
+      "sha": "8bd85672bebb",
+      "version": "2.29.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 11937
+      },
+      "consumedBy": [
+        "tests/dead-export-gate.js",
+        "tests/dup-decl-gate.js",
+        "tests/dup-decl-v2740.js",
+        "tests/field-liveness-gate.js",
+        "tests/identity-v2860.js",
+        "tests/inject-sources-v2560.js",
+        "tests/module-cycle-gate.js",
+        "tests/orphan-lock-v2750.js",
+        "tests/readings-v2106.js",
+        "tests/readings.js",
+        "tests/s3-b4-v2189.js"
+      ],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/isolated-runner-lock.js",
+      "sha": "b82f7bcd17cd",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 19767
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/isolated-runner.js",
+      "sha": "3a4cc855da88",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 4
+      },
+      "consumedBy": [
+        "tests/isolated-runner-lock.js"
+      ],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/journal-v2940.js",
+      "sha": "9ef288c30d80",
+      "version": "2.94.0",
+      "versionSource": "title",
+      "fileAnchor": "2940",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19348
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/life-e4-v2115.js",
+      "sha": "7c77cd2ff3ac",
+      "version": "2.115.0",
+      "versionSource": "title",
+      "fileAnchor": "2115",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20418
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/life-e8-v2139.js",
+      "sha": "c094d4c4a0f7",
+      "version": "2.139.0",
+      "versionSource": "title",
+      "fileAnchor": "2139",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19391
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/life-turn-v2132.js",
+      "sha": "613c1456d467",
+      "version": "2.132.0",
+      "versionSource": "title",
+      "fileAnchor": "2132",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20878
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/life-v2520.js",
+      "sha": "4144657a51ce",
+      "version": "2.75.0",
+      "versionSource": "title",
+      "fileAnchor": "2520",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19749
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/lifeline-v2141.js",
+      "sha": "ccc2cbd733dd",
+      "version": "2.141.0",
+      "versionSource": "title",
+      "fileAnchor": "2141",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19443
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/lock-assert.js",
+      "sha": "57512f23a785",
+      "version": "2.75.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": null,
+      "consumedBy": [
+        "tests/anchor-scan-v2126.js",
+        "tests/anchor-scan-v2133.js",
+        "tests/audit-vol-v2121.js",
+        "tests/b6-b7-v2870.js",
+        "tests/backstage-stale-v2131.js",
+        "tests/causal-view-v2870.js",
+        "tests/cost-v2880.js",
+        "tests/delete-gate-v2124.js",
+        "tests/ensemble-v2138.js",
+        "tests/explain-budget-v2122.js",
+        "tests/explain-v2900.js",
+        "tests/fault-alias-lock-v2800.js",
+        "tests/fault-ledger-lock-v2800.js",
+        "tests/foreshadow-v2135.js",
+        "tests/hazard-trigger-v2138.js",
+        "tests/identity-v2860.js",
+        "tests/injection-restore-lock-v2800.js",
+        "tests/input-boundary-v2790.js",
+        "tests/input-guard-v2840.js",
+        "tests/intel-v2530.js",
+        "tests/life-v2520.js",
+        "tests/longline-v2550.js",
+        "tests/o7-plan-tree-gate-v2187.js",
+        "tests/org-v2540.js",
+        "tests/orphan-lock-v2750.js",
+        "tests/perf-recalc-v2123.js",
+        "tests/q1-load-integrity-v2211.js",
+        "tests/q2-snapshot-identity-v2211.js",
+        "tests/q3-interrupt-resume-v2212.js",
+        "tests/reference-isolation-lock-v2790.js",
+        "tests/reject-lock-v2780.js",
+        "tests/reject-recovery-lock-v2192.js",
+        "tests/replay-v2890.js",
+        "tests/resource-ledger-v2920.js",
+        "tests/s3-b1-o2-v2185.js",
+        "tests/sandbox-isolation-v2125.js",
+        "tests/settle-v2841.js",
+        "tests/settle-v2860.js",
+        "tests/side-effect-lock-v2790.js",
+        "tests/switch-matrix-v2910.js",
+        "tests/tape-vol-v2980.js",
+        "tests/toolchain-gate-v2136.js",
+        "tests/u3-loose-readings-v2191.js",
+        "tests/u4-export-lifecycle-v2191.js",
+        "tests/u9-fact-report-v2190.js",
+        "tests/version-surface-gate-v2185.js",
+        "tests/x1-chain-v2127.js",
+        "tests/x2-chronicle-v2127.js",
+        "tests/x3-offline-v2128.js",
+        "tests/x4-resolve-v2128.js",
+        "tests/x5-inst-v2128.js",
+        "tests/x6-session-v2128.js",
+        "tests/x7-contrast-v2128.js",
+        "tests/x8-handshake-v2128.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "consumed"
+    },
+    {
+      "file": "tests/longline-v2550.js",
+      "sha": "a735054bf7ec",
+      "version": "2.75.0",
+      "versionSource": "title",
+      "fileAnchor": "2550",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19750
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/mend-v2119.js",
+      "sha": "cb1436169fc8",
+      "version": "2.119.0",
+      "versionSource": "title",
+      "fileAnchor": "2119",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20544
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/mock.js",
+      "sha": "4aaefb5fd1fe",
+      "version": "0.1.51",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 31
+      },
+      "consumedBy": [
+        "tests/act-b1-v2117.js",
+        "tests/b2-travel-v2117.js",
+        "tests/b3-intel-v2117.js",
+        "tests/b4-relation-v2117.js",
+        "tests/b5-org-v2117.js",
+        "tests/b6-opportunity-v2117.js",
+        "tests/b7-rehearsal-v2118.js",
+        "tests/b8-liaison-v2118.js",
+        "tests/b9-coop-v2118.js",
+        "tests/causal-ripple-v2146.js",
+        "tests/causal-trace-v2147.js",
+        "tests/causal-v2620.js",
+        "tests/economy-v2119.js",
+        "tests/enemies-v2640.js",
+        "tests/ev6-panel-nav-v2209.js",
+        "tests/events-a2-v2116.js",
+        "tests/events-e2-v2115.js",
+        "tests/evict-meta-v2610.js",
+        "tests/fault-alias-lock-v2800.js",
+        "tests/fault-ledger-lock-v2800.js",
+        "tests/field-liveness-gate.js",
+        "tests/horizon-v2640.js",
+        "tests/inject-value-v2150.js",
+        "tests/injection-restore-lock-v2800.js",
+        "tests/input-boundary-v2790.js",
+        "tests/input-guard-v2840.js",
+        "tests/inst-v2119.js",
+        "tests/inventory.js",
+        "tests/life-e4-v2115.js",
+        "tests/mend-v2119.js",
+        "tests/o7-plan-tree-gate-v2187.js",
+        "tests/p3-x1-v2149.js",
+        "tests/p5-stage-v2214.js",
+        "tests/parallel-world-v2640.js",
+        "tests/perf-regression-gate.js",
+        "tests/perf-tape-v2148.js",
+        "tests/plan-v2119.js",
+        "tests/probe-v2119.js",
+        "tests/q6-atomic-budget-v2215.js",
+        "tests/q8-panel-fold-v2225.js",
+        "tests/reference-isolation-lock-v2790.js",
+        "tests/region-v2119.js",
+        "tests/registry-identity-v2620.js",
+        "tests/reject-code-coverage.js",
+        "tests/reject-code-gate.js",
+        "tests/reject-lock-v2780.js",
+        "tests/reject-recovery-lock-v2192.js",
+        "tests/render-pre-v2108.js",
+        "tests/rumor-e3-v2115.js",
+        "tests/s3-b1-o2-v2185.js",
+        "tests/session-v2119.js",
+        "tests/settle-v2650.js",
+        "tests/settle-v2660.js",
+        "tests/settle-v2670.js",
+        "tests/settle-v2680.js",
+        "tests/settle-v2690.js",
+        "tests/settle-v2700.js",
+        "tests/settle-v2710.js",
+        "tests/settle-v2720.js",
+        "tests/settle-v2770.js",
+        "tests/settle-v2810.js",
+        "tests/settle-v2820.js",
+        "tests/settle-v2830.js",
+        "tests/shadow-v2630.js",
+        "tests/side-effect-lock-v2790.js",
+        "tests/stage-v2119.js",
+        "tests/state-repair-v2108.js",
+        "tests/style-craft-v2510.js",
+        "tests/test-surface-gate.js",
+        "tests/threads-v2630.js",
+        "tests/u9-fact-report-v2190.js",
+        "tests/ui-a11y-gate.js",
+        "tests/ui-gate-sync.js",
+        "tests/version-surface-gate-v2185.js",
+        "tests/world-v2630.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/module-cycle-gate-v2107.js",
+      "sha": "2c346540aff8",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2107",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20222
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/module-cycle-gate.js",
+      "sha": "5d77af62af48",
+      "version": "2.107.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 58
+      },
+      "consumedBy": [
+        "tests/module-cycle-gate-v2107.js"
+      ],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/module-registry-gate.js",
+      "sha": "6cb0de46d3d0",
+      "version": "2.83.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 19645
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/negative-control-audit-v2104.js",
+      "sha": "31dc0bb9eb06",
+      "version": "2.104.0",
+      "versionSource": "title",
+      "fileAnchor": "2104",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19916
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/negative-control-audit.js",
+      "sha": "5f2b9848099e",
+      "version": "2.104.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19900
+      },
+      "consumedBy": [
+        "tests/anchor-scan-v2126.js",
+        "tests/negative-control-audit-v2104.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/noesis-v2140.js",
+      "sha": "48511960d05e",
+      "version": "2.140.0",
+      "versionSource": "title",
+      "fileAnchor": "2140",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19438
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/o1-host-matrix-v2186.js",
+      "sha": "a39822006dfd",
+      "version": "2.186.0",
+      "versionSource": "head",
+      "fileAnchor": "2186",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22199
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/o6-layer-gate-v2187.js",
+      "sha": "3b127a1dd44f",
+      "version": "2.187.0",
+      "versionSource": "title",
+      "fileAnchor": "2187",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22239
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/o7-plan-tree-gate-v2187.js",
+      "sha": "31094d84476c",
+      "version": "2.187.0",
+      "versionSource": "title",
+      "fileAnchor": "2187",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22220
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/o8-consumer-gate-v2187.js",
+      "sha": "49d19ea2de29",
+      "version": "2.187.0",
+      "versionSource": "title",
+      "fileAnchor": "2187",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22254
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/o9-outlet-gate-v2186.js",
+      "sha": "6ddfd5f3f12b",
+      "version": "2.186.0",
+      "versionSource": "title",
+      "fileAnchor": "2186",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22193
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/offline-consume-v2156.js",
+      "sha": "612e239ed346",
+      "version": "2.156.0",
+      "versionSource": "head",
+      "fileAnchor": "2156",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21743
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/offline-return-v2156.js",
+      "sha": "7901dbdbb0a6",
+      "version": "2.156.0",
+      "versionSource": "head",
+      "fileAnchor": "2156",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21742
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/offline-tick-v2151.js",
+      "sha": "85264991be54",
+      "version": "2.151.0",
+      "versionSource": "head",
+      "fileAnchor": "2151",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21412
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/org-econ-v2950.js",
+      "sha": "da26ed9e2309",
+      "version": "2.95.0",
+      "versionSource": "title",
+      "fileAnchor": "2950",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19360
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/org-v2540.js",
+      "sha": "4c6fa84f22aa",
+      "version": "2.75.0",
+      "versionSource": "title",
+      "fileAnchor": "2540",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19758
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/orphan-lock-v2750.js",
+      "sha": "ffa826ae4487",
+      "version": "2.75.0",
+      "versionSource": "title",
+      "fileAnchor": "2750",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19759
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/p3-x1-v2149.js",
+      "sha": "5def8f769d56",
+      "version": "2.149.0",
+      "versionSource": "title",
+      "fileAnchor": "2149",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21209
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/p5-stage-v2214.js",
+      "sha": "2694f9ba4008",
+      "version": "2.214.0",
+      "versionSource": "head",
+      "fileAnchor": "2214",
+      "commit": "dac2f73",
+      "wired": {
+        "form": "runLock",
+        "line": 23419
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/parallel-world-v2640.js",
+      "sha": "9541ee35bf7e",
+      "version": "2.64.0",
+      "versionSource": "title",
+      "fileAnchor": "2640",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19119
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/perf-observability-v2109.js",
+      "sha": "94f718c149cb",
+      "version": "2.109.0",
+      "versionSource": "title",
+      "fileAnchor": "2109",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19675
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/perf-recalc-v2123.js",
+      "sha": "b2f308dfb1f2",
+      "version": "2.123.0",
+      "versionSource": "title",
+      "fileAnchor": "2123",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20632
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/perf-regression-gate.js",
+      "sha": "7c3f01cbb904",
+      "version": "2.109.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19680
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/perf-tape-v2148.js",
+      "sha": "9aba98d5adc7",
+      "version": "2.148.0",
+      "versionSource": "title",
+      "fileAnchor": "2148",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21167
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/perf-trace-v2102.js",
+      "sha": "7f38d23ad4f7",
+      "version": "2.102.0",
+      "versionSource": "title",
+      "fileAnchor": "2102",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19563
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/permissions-v2110.js",
+      "sha": "33fdc828f104",
+      "version": "2.110.0",
+      "versionSource": "title",
+      "fileAnchor": "2110",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20240
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/perspective-lock-v2142.js",
+      "sha": "c7553678f2ab",
+      "version": "2.142.0",
+      "versionSource": "title",
+      "fileAnchor": "2142",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19456
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/phone-bridge-v2970.js",
+      "sha": "24057db78212",
+      "version": "2.97.0",
+      "versionSource": "title",
+      "fileAnchor": "2970",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19498
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/plan-v2119.js",
+      "sha": "fb3143b61303",
+      "version": "2.119.0",
+      "versionSource": "title",
+      "fileAnchor": "2119",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20543
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/playtime-v2156.js",
+      "sha": "da89499c5619",
+      "version": "2.156.0",
+      "versionSource": "head",
+      "fileAnchor": "2156",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21741
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/plot-gauge-v2153.js",
+      "sha": "b58c23b78000",
+      "version": "2.153.0",
+      "versionSource": "head",
+      "fileAnchor": "2153",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21515
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/plugin-v2114.js",
+      "sha": "3c13d3509bd3",
+      "version": "2.114.0",
+      "versionSource": "head",
+      "fileAnchor": "2114",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20364
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/probe-v2119.js",
+      "sha": "3e44d311cbf3",
+      "version": "2.119.0",
+      "versionSource": "title",
+      "fileAnchor": "2119",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20547
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/product-files.js",
+      "sha": "11b380e02720",
+      "version": "2.43.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 9070
+      },
+      "consumedBy": [
+        "tests/context-guard.js",
+        "tests/dead-export-gate.js",
+        "tests/dup-decl-gate.js",
+        "tests/evict-meta-v2610.js",
+        "tests/export-contract.js",
+        "tests/injection-restore-lock-v2800.js",
+        "tests/inventory.js",
+        "tests/orphan-lock-v2750.js",
+        "tests/side-effect-lock-v2790.js",
+        "tests/test-surface-gate.js",
+        "tests/ui-a11y-gate.js",
+        "tests/ui-gate-sync.js",
+        "tests/ui-live-v2137.js",
+        "tests/ui-live.js",
+        "tests/ui-wire-audit.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/q1-load-integrity-v2211.js",
+      "sha": "5a8f867f6fae",
+      "version": "2.211.0",
+      "versionSource": "title",
+      "fileAnchor": "2211",
+      "commit": "b402ad4",
+      "wired": {
+        "form": "runLock",
+        "line": 23382
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/q2-snapshot-identity-v2211.js",
+      "sha": "4599f6e76833",
+      "version": "2.211.0",
+      "versionSource": "title",
+      "fileAnchor": "2211",
+      "commit": "b402ad4",
+      "wired": {
+        "form": "runLock",
+        "line": 23393
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/q3-interrupt-resume-v2212.js",
+      "sha": "9d5dff661300",
+      "version": "2.212.0",
+      "versionSource": "title",
+      "fileAnchor": "2212",
+      "commit": "b402ad4",
+      "wired": {
+        "form": "runLock",
+        "line": 23404
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/q6-atomic-budget-v2215.js",
+      "sha": "1f410e1aedae",
+      "version": "2.215.0",
+      "versionSource": "title",
+      "fileAnchor": "2215",
+      "commit": "30a4c73",
+      "wired": {
+        "form": "runLock",
+        "line": 23433
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/q7-idempotent-floor-v2216.js",
+      "sha": "a561f6a311d7",
+      "version": "2.216.0",
+      "versionSource": "title",
+      "fileAnchor": "2216",
+      "commit": "07d3c2c",
+      "wired": {
+        "form": "runLock",
+        "line": 23451
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/q8-panel-fold-v2225.js",
+      "sha": "6517e5c6d491",
+      "version": "2.225.0",
+      "versionSource": "title",
+      "fileAnchor": "2225",
+      "commit": "551030a",
+      "wired": {
+        "form": "runLock",
+        "line": 23466
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/q9-evidence-ledger-v2226.js",
+      "sha": "9e2ebfb3f929",
+      "version": "2.226.0",
+      "versionSource": "title",
+      "fileAnchor": "2226",
+      "commit": null,
+      "wired": {
+        "form": "runLock",
+        "line": 23485
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/readings-v2106.js",
+      "sha": "4c07a36c113a",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2106",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20051
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/readings.js",
+      "sha": "edfc6831a25f",
+      "version": "2.81.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 52
+      },
+      "consumedBy": [
+        "tests/readings-v2106.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/reference-isolation-lock-v2790.js",
+      "sha": "c2c3782e9ae4",
+      "version": "2.79.0",
+      "versionSource": "title",
+      "fileAnchor": "2790",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19175
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/region-v2119.js",
+      "sha": "28c4c61ffd07",
+      "version": "2.119.0",
+      "versionSource": "title",
+      "fileAnchor": "2119",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20548
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/registry-identity-v2620.js",
+      "sha": "dc7c64139af4",
+      "version": "2.62.0",
+      "versionSource": "title",
+      "fileAnchor": "2620",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19104
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/reject-code-coverage-v2107.js",
+      "sha": "3476513c6dc2",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2107",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20092
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/reject-code-coverage.js",
+      "sha": "0ed07ee3091f",
+      "version": "2.107.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 56
+      },
+      "consumedBy": [
+        "tests/reject-code-coverage-v2107.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/reject-code-gate.js",
+      "sha": "7a41272e0e88",
+      "version": "2.78.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20081
+      },
+      "consumedBy": [
+        "tests/contract-scan-v2150.js",
+        "tests/reject-code-coverage-v2107.js",
+        "tests/reject-code-coverage.js",
+        "tests/reject-lock-v2780.js"
+      ],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/reject-lock-v2780.js",
+      "sha": "f87574bf546e",
+      "version": "2.78.0",
+      "versionSource": "title",
+      "fileAnchor": "2780",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19162
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/reject-recovery-lock-v2192.js",
+      "sha": "63c3039012b9",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2192",
+      "commit": "c58a6ba",
+      "wired": {
+        "form": "runLock",
+        "line": 22591
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/reject-v2780.js",
+      "sha": "6d240c819b7e",
+      "version": "2.78.0",
+      "versionSource": "title",
+      "fileAnchor": "2780",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19624
+      },
+      "consumedBy": [
+        "tests/reject-code-coverage.js",
+        "tests/reject-code-gate.js",
+        "tests/reject-lock-v2780.js",
+        "tests/render-pre-v2108.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/rel-contract-v2590.js",
+      "sha": "75b3697618c4",
+      "version": "2.59.0",
+      "versionSource": "title",
+      "fileAnchor": "2590",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19089
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/rel-contract-v2600.js",
+      "sha": "93f4921848bb",
+      "version": "2.60.0",
+      "versionSource": "title",
+      "fileAnchor": "2600",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19092
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/render-perf-v2152.js",
+      "sha": "4348c9fc93e0",
+      "version": "2.152.0",
+      "versionSource": "head",
+      "fileAnchor": "2152",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21453
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/render-pre-v2108.js",
+      "sha": "72768bf405bd",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2108",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19236
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/replay-v2890.js",
+      "sha": "ac71958d9efa",
+      "version": "2.89.0",
+      "versionSource": "title",
+      "fileAnchor": "2890",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19301
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/resource-ledger-v2920.js",
+      "sha": "12b7b0be5251",
+      "version": "2.92.0",
+      "versionSource": "title",
+      "fileAnchor": "2920",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19328
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/rumor-e3-v2115.js",
+      "sha": "4cb898a34658",
+      "version": "2.115.0",
+      "versionSource": "title",
+      "fileAnchor": "2115",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20416
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/rumor-v2960.js",
+      "sha": "3d85397b4f54",
+      "version": "2.96.0",
+      "versionSource": "title",
+      "fileAnchor": "2960",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19487
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-attribution-v2204.js",
+      "sha": "a07579b7561a",
+      "version": "2.204.0",
+      "versionSource": "title",
+      "fileAnchor": "2204",
+      "commit": "34f13a0",
+      "wired": {
+        "form": "runLock",
+        "line": 23259
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b1-e1-v2183.js",
+      "sha": "51fabd5e2d0c",
+      "version": "2.183.0",
+      "versionSource": "title",
+      "fileAnchor": "2183",
+      "commit": "b61fd83",
+      "wired": {
+        "form": "path-literal",
+        "line": 22145
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b1-e1b-v2206.js",
+      "sha": "7553408314f4",
+      "version": "2.206.0",
+      "versionSource": "title",
+      "fileAnchor": "2206",
+      "commit": "129ae75",
+      "wired": {
+        "form": "path-literal",
+        "line": 23268
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b1-e1c-v2207.js",
+      "sha": "132b8ababf87",
+      "version": "2.208.0",
+      "versionSource": "title",
+      "fileAnchor": "2207",
+      "commit": "129ae75",
+      "wired": {
+        "form": "path-literal",
+        "line": 23303
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b1-e3-v2184.js",
+      "sha": "41afaf6926e8",
+      "version": "2.184.0",
+      "versionSource": "title",
+      "fileAnchor": "2184",
+      "commit": "e0d6ef1",
+      "wired": {
+        "form": "path-literal",
+        "line": 22157
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b1-o2-v2185.js",
+      "sha": "f5c5d988f9c0",
+      "version": "2.185.0",
+      "versionSource": "title",
+      "fileAnchor": "2185",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "runLock",
+        "line": 22168
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b2-e2-v2182.js",
+      "sha": "5185188d5d93",
+      "version": "2.182.0",
+      "versionSource": "title",
+      "fileAnchor": "2182",
+      "commit": "b61fd83",
+      "wired": {
+        "form": "path-literal",
+        "line": 22105
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b2-e5-v2182.js",
+      "sha": "da5fb3e9b206",
+      "version": "2.182.0",
+      "versionSource": "title",
+      "fileAnchor": "2182",
+      "commit": "b61fd83",
+      "wired": {
+        "form": "path-literal",
+        "line": 22112
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b2-o3-v2182.js",
+      "sha": "d88cf1ab7038",
+      "version": "2.182.0",
+      "versionSource": "title",
+      "fileAnchor": "2182",
+      "commit": "b61fd83",
+      "wired": {
+        "form": "path-literal",
+        "line": 22126
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b2-o4-v2182.js",
+      "sha": "704adb0c152e",
+      "version": "2.182.0",
+      "versionSource": "title",
+      "fileAnchor": "2182",
+      "commit": "b61fd83",
+      "wired": {
+        "form": "path-literal",
+        "line": 22119
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b2-o5-v2182.js",
+      "sha": "75da01b93522",
+      "version": "2.182.0",
+      "versionSource": "title",
+      "fileAnchor": "2182",
+      "commit": "b61fd83",
+      "wired": {
+        "form": "path-literal",
+        "line": 22133
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-e4-v2187.js",
+      "sha": "81893220a131",
+      "version": "2.187.0",
+      "versionSource": "title",
+      "fileAnchor": "2187",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22270
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-e6-v2187.js",
+      "sha": "32d3d54f58b7",
+      "version": "2.187.0",
+      "versionSource": "title",
+      "fileAnchor": "2187",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22285
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-e7-v2188.js",
+      "sha": "3e3f3edf9163",
+      "version": "2.188.0",
+      "versionSource": "title",
+      "fileAnchor": "2188",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22315
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-e8-v2187.js",
+      "sha": "a052429e2fc2",
+      "version": "2.187.0",
+      "versionSource": "title",
+      "fileAnchor": "2187",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22303
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-e8-v2217.js",
+      "sha": "315bebba9173",
+      "version": "2.217.0",
+      "versionSource": "title",
+      "fileAnchor": "2217",
+      "commit": "9a219ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 22325
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-e9-v2188.js",
+      "sha": "3c5afe5ed897",
+      "version": "2.188.0",
+      "versionSource": "title",
+      "fileAnchor": "2188",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "path-literal",
+        "line": 22432
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-n1-v2218.js",
+      "sha": "85433b080114",
+      "version": "2.218.0",
+      "versionSource": "title",
+      "fileAnchor": "2218",
+      "commit": "481ed61",
+      "wired": {
+        "form": "path-literal",
+        "line": 22335
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-n2-v2220.js",
+      "sha": "e23ec25e2a09",
+      "version": "2.220.0",
+      "versionSource": "title",
+      "fileAnchor": "2220",
+      "commit": "0c726f3",
+      "wired": {
+        "form": "path-literal",
+        "line": 22357
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-n3-v2221.js",
+      "sha": "aeab45e8c349",
+      "version": "2.221.0",
+      "versionSource": "title",
+      "fileAnchor": "2221",
+      "commit": "568adff",
+      "wired": {
+        "form": "path-literal",
+        "line": 22370
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-n4-v2222.js",
+      "sha": "1d9a04ae573d",
+      "version": "2.222.0",
+      "versionSource": "title",
+      "fileAnchor": "2222",
+      "commit": "568adff",
+      "wired": {
+        "form": "path-literal",
+        "line": 22386
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-n5-v2219.js",
+      "sha": "2380c30511b7",
+      "version": "2.219.0",
+      "versionSource": "title",
+      "fileAnchor": "2219",
+      "commit": "d117ba7",
+      "wired": {
+        "form": "path-literal",
+        "line": 22346
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-n7-v2223.js",
+      "sha": "eb727b084dea",
+      "version": "2.223.0",
+      "versionSource": "title",
+      "fileAnchor": "2223",
+      "commit": "e82ab63",
+      "wired": {
+        "form": "path-literal",
+        "line": 22403
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b3-n8-v2224.js",
+      "sha": "702f3deb8f51",
+      "version": "2.224.0",
+      "versionSource": "title",
+      "fileAnchor": "2224",
+      "commit": "728a2a8",
+      "wired": {
+        "form": "path-literal",
+        "line": 22420
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-b4-v2189.js",
+      "sha": "7936b0cda8af",
+      "version": "2.189.0",
+      "versionSource": "title",
+      "fileAnchor": "2189",
+      "commit": "84f1270",
+      "wired": {
+        "form": "path-literal",
+        "line": 22443
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-e8-v2210.js",
+      "sha": "91f7dc6bc072",
+      "version": "2.210.0",
+      "versionSource": "title",
+      "fileAnchor": "2210",
+      "commit": "b15894b",
+      "wired": {
+        "form": "path-literal",
+        "line": 23333
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-hygiene-v2204.js",
+      "sha": "a4771498da40",
+      "version": "2.204.0",
+      "versionSource": "title",
+      "fileAnchor": "2204",
+      "commit": "339f4b2",
+      "wired": {
+        "form": "runLock",
+        "line": 23368
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-mid-v2206.js",
+      "sha": "1ceec3d9c8ac",
+      "version": "2.206.0",
+      "versionSource": "title",
+      "fileAnchor": "2206",
+      "commit": "129ae75",
+      "wired": {
+        "form": "runLock",
+        "line": 23295
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-net-audit-v2204.js",
+      "sha": "9521cf244318",
+      "version": "2.204.0",
+      "versionSource": "title",
+      "fileAnchor": "2204",
+      "commit": "8e48d04",
+      "wired": {
+        "form": "runLock",
+        "line": 23228
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-sp6-v2158.js",
+      "sha": "c09cc71344d2",
+      "version": "2.158.0",
+      "versionSource": "head",
+      "fileAnchor": "2158",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21793
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tp1-v2159.js",
+      "sha": "132f43434954",
+      "version": "2.159.0",
+      "versionSource": "head",
+      "fileAnchor": "2159",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21796
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tp2-v2159.js",
+      "sha": "444d3f0e9373",
+      "version": "2.159.0",
+      "versionSource": "head",
+      "fileAnchor": "2159",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21797
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tp3-v2161.js",
+      "sha": "d4bcb800656a",
+      "version": "2.161.0",
+      "versionSource": "head",
+      "fileAnchor": "2161",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21828
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tp4-v2160.js",
+      "sha": "ddfba93d71ff",
+      "version": "2.160.0",
+      "versionSource": "head",
+      "fileAnchor": "2160",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21802
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tp7-v2162.js",
+      "sha": "697bd077c2fe",
+      "version": "2.162.0",
+      "versionSource": "head",
+      "fileAnchor": "2162",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 21838
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx1-v2165.js",
+      "sha": "85998ba90290",
+      "version": "2.165.0",
+      "versionSource": "head",
+      "fileAnchor": "2165",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 22012
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx2-v2166.js",
+      "sha": "dac49c57af78",
+      "version": "2.166.0",
+      "versionSource": "head",
+      "fileAnchor": "2166",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 22022
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx3-v2167.js",
+      "sha": "d7cd61852481",
+      "version": "2.167.0",
+      "versionSource": "head",
+      "fileAnchor": "2167",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 22034
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx4-v2168.js",
+      "sha": "b68645fa88f6",
+      "version": "2.168.0",
+      "versionSource": "head",
+      "fileAnchor": "2168",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 22045
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx5-v2164.js",
+      "sha": "ef26ff15fe97",
+      "version": "2.164.0",
+      "versionSource": "head",
+      "fileAnchor": "2164",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 21971
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx6-v2169.js",
+      "sha": "a656b5b9ccc7",
+      "version": "2.169.0",
+      "versionSource": "head",
+      "fileAnchor": "2169",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 22056
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx7-v2170.js",
+      "sha": "17c168f0a2fa",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2170",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 22067
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx8-v2171.js",
+      "sha": "e9055da7a803",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2171",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 22078
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-tx9-v2172.js",
+      "sha": "d1b83fd22a88",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2172",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 22089
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-u2-v2194.js",
+      "sha": "8714e88c1d71",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2194",
+      "commit": "b8daf8f",
+      "wired": {
+        "form": "runLock",
+        "line": 22709
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-u2-v2195.js",
+      "sha": "f73c004dc6be",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2195",
+      "commit": "239069e",
+      "wired": {
+        "form": "runLock",
+        "line": 22720
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-u3-v2196.js",
+      "sha": "18acb1771038",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2196",
+      "commit": "8479480",
+      "wired": {
+        "form": "runLock",
+        "line": 22721
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-u4-v2197.js",
+      "sha": "d7c6af95188f",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2197",
+      "commit": "8479480",
+      "wired": {
+        "form": "runLock",
+        "line": 22722
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-u5-v2198.js",
+      "sha": "4f87edc30975",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2198",
+      "commit": "8479480",
+      "wired": {
+        "form": "runLock",
+        "line": 22723
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y1-v2200.js",
+      "sha": "7a7260cec419",
+      "version": "2.198.0",
+      "versionSource": "title",
+      "fileAnchor": "2200",
+      "commit": "9a38cbe",
+      "wired": {
+        "form": "runLock",
+        "line": 22810
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y2-v2201.js",
+      "sha": "0447c5dcac38",
+      "version": "2.198.0",
+      "versionSource": "title",
+      "fileAnchor": "2201",
+      "commit": "9a38cbe",
+      "wired": {
+        "form": "runLock",
+        "line": 22838
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y3-v2199.js",
+      "sha": "f00f57f76c06",
+      "version": "2.197.0",
+      "versionSource": "title",
+      "fileAnchor": "2199",
+      "commit": "c3da921",
+      "wired": {
+        "form": "runLock",
+        "line": 22761
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y4-v2202.js",
+      "sha": "9441f2cfbdf2",
+      "version": "2.199.0",
+      "versionSource": "title",
+      "fileAnchor": "2202",
+      "commit": "9a38cbe",
+      "wired": {
+        "form": "runLock",
+        "line": 22903
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y5-v2203.js",
+      "sha": "879ea494330d",
+      "version": "2.200.0",
+      "versionSource": "title",
+      "fileAnchor": "2203",
+      "commit": "9a38cbe",
+      "wired": {
+        "form": "runLock",
+        "line": 22959
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y6-v2204.js",
+      "sha": "de2dedeb887e",
+      "version": "2.201.0",
+      "versionSource": "title",
+      "fileAnchor": "2204",
+      "commit": "9a38cbe",
+      "wired": {
+        "form": "runLock",
+        "line": 23023
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y7-v2205.js",
+      "sha": "afbf23d656ff",
+      "version": "2.202.0",
+      "versionSource": "title",
+      "fileAnchor": "2205",
+      "commit": "9a38cbe",
+      "wired": {
+        "form": "runLock",
+        "line": 23085
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y8-v2203.js",
+      "sha": "6fa720ad607a",
+      "version": "2.203.0",
+      "versionSource": "title",
+      "fileAnchor": "2203",
+      "commit": "9a38cbe",
+      "wired": {
+        "form": "runLock",
+        "line": 23130
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/s3-y9-v2203.js",
+      "sha": "a35c25da007c",
+      "version": "2.203.0",
+      "versionSource": "title",
+      "fileAnchor": "2203",
+      "commit": "9a38cbe",
+      "wired": {
+        "form": "runLock",
+        "line": 23181
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/sandbox-isolation-v2125.js",
+      "sha": "e9f677328d6b",
+      "version": "2.125.0",
+      "versionSource": "title",
+      "fileAnchor": "2125",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20683
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/sanitize-v2111.js",
+      "sha": "48b52d8babbe",
+      "version": "2.111.0",
+      "versionSource": "title",
+      "fileAnchor": "2111",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20290
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/schema-v2110.js",
+      "sha": "c015a365e25c",
+      "version": "2.110.0",
+      "versionSource": "title",
+      "fileAnchor": "2110",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20237
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/session-v2119.js",
+      "sha": "2f3f14f1de69",
+      "version": "2.119.0",
+      "versionSource": "title",
+      "fileAnchor": "2119",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20550
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2650.js",
+      "sha": "47413437eb02",
+      "version": "2.65.0",
+      "versionSource": "title",
+      "fileAnchor": "2650",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19125
+      },
+      "consumedBy": [
+        "tests/product-files.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2660.js",
+      "sha": "9492ad17ec73",
+      "version": "2.66.0",
+      "versionSource": "title",
+      "fileAnchor": "2660",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19128
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2670.js",
+      "sha": "3eae3b8ea32e",
+      "version": "2.67.0",
+      "versionSource": "title",
+      "fileAnchor": "2670",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19131
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2680.js",
+      "sha": "286c5dd42fd8",
+      "version": "2.68.0",
+      "versionSource": "title",
+      "fileAnchor": "2680",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19134
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2690.js",
+      "sha": "7e8a937daeea",
+      "version": "2.69.0",
+      "versionSource": "title",
+      "fileAnchor": "2690",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19137
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2700.js",
+      "sha": "42a972a525c7",
+      "version": "2.70.0",
+      "versionSource": "title",
+      "fileAnchor": "2700",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19141
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2710.js",
+      "sha": "3b3aab2ea75e",
+      "version": "2.71.0",
+      "versionSource": "title",
+      "fileAnchor": "2710",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19144
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2720.js",
+      "sha": "3a602f317e84",
+      "version": "2.72.0",
+      "versionSource": "title",
+      "fileAnchor": "2720",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19147
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2770.js",
+      "sha": "1b58d6f3e834",
+      "version": "2.77.0",
+      "versionSource": "title",
+      "fileAnchor": "2770",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19156
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2810.js",
+      "sha": "2f3b1aea6c39",
+      "version": "2.81.0",
+      "versionSource": "title",
+      "fileAnchor": "2810",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19221
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2820.js",
+      "sha": "fc5c30ca748c",
+      "version": "2.82.0",
+      "versionSource": "title",
+      "fileAnchor": "2820",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19229
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2830.js",
+      "sha": "661d4f05c434",
+      "version": "2.83.0",
+      "versionSource": "title",
+      "fileAnchor": "2830",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19238
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2841.js",
+      "sha": "80a1d8d5f25b",
+      "version": "2.84.0",
+      "versionSource": "title",
+      "fileAnchor": "2841",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19247
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2850.js",
+      "sha": "d3a55f2dce00",
+      "version": "2.85.0",
+      "versionSource": "title",
+      "fileAnchor": "2850",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19262
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/settle-v2860.js",
+      "sha": "4b9cf2fd297f",
+      "version": "2.86.0",
+      "versionSource": "title",
+      "fileAnchor": "2860",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19268
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/shadow-v2630.js",
+      "sha": "3ceeca7b8dd8",
+      "version": "2.63.0",
+      "versionSource": "title",
+      "fileAnchor": "2630",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19110
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/side-effect-lock-v2790.js",
+      "sha": "0b79a9e213b6",
+      "version": "2.79.0",
+      "versionSource": "title",
+      "fileAnchor": "2790",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19169
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/sp2-draft-v2156.js",
+      "sha": "0097a5b43fc6",
+      "version": "2.156.0",
+      "versionSource": "head",
+      "fileAnchor": "2156",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21748
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/sp3-lifecycle-v2156.js",
+      "sha": "a1739d883985",
+      "version": "2.156.0",
+      "versionSource": "head",
+      "fileAnchor": "2156",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21749
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/sp4-s2-v2157.js",
+      "sha": "fc20c901a5b5",
+      "version": "2.157.0",
+      "versionSource": "head",
+      "fileAnchor": "2157",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21770
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/stage-v2119.js",
+      "sha": "cdf809c741eb",
+      "version": "2.119.0",
+      "versionSource": "title",
+      "fileAnchor": "2119",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20549
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/state-repair-v2108.js",
+      "sha": "8f4f5dd11df6",
+      "version": "0.1.38",
+      "versionSource": "head",
+      "fileAnchor": "2108",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19666
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/storage-forecast-v2152.js",
+      "sha": "6c02463c5852",
+      "version": "2.152.0",
+      "versionSource": "head",
+      "fileAnchor": "2152",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21454
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/store-commit-v2113.js",
+      "sha": "8cf3f0b617dc",
+      "version": "2.113.0",
+      "versionSource": "title",
+      "fileAnchor": "2113",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20343
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/style-craft-v2510.js",
+      "sha": "fa013f58be90",
+      "version": "2.51.0",
+      "versionSource": "title",
+      "fileAnchor": "2510",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19101
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/switch-matrix-v2910.js",
+      "sha": "be76295719e6",
+      "version": "2.91.0",
+      "versionSource": "title",
+      "fileAnchor": "2910",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19319
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/synth-host.js",
+      "sha": "73d437d61f7c",
+      "version": "2.84.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 45
+      },
+      "consumedBy": [
+        "tests/audit-log-v2112.js",
+        "tests/beat-facade-lock-v2193.js",
+        "tests/ensemble-v2138.js",
+        "tests/fault-context-v2110.js",
+        "tests/foreshadow-v2135.js",
+        "tests/intel-v2530.js",
+        "tests/life-v2520.js",
+        "tests/longline-v2550.js",
+        "tests/org-v2540.js",
+        "tests/permissions-v2110.js",
+        "tests/s3-b1-e1-v2183.js",
+        "tests/s3-b2-e2-v2182.js",
+        "tests/s3-b2-e5-v2182.js",
+        "tests/s3-b2-o3-v2182.js",
+        "tests/s3-b2-o4-v2182.js",
+        "tests/s3-b2-o5-v2182.js",
+        "tests/s3-b3-e4-v2187.js",
+        "tests/s3-b3-e6-v2187.js",
+        "tests/s3-b3-e7-v2188.js",
+        "tests/s3-b3-e8-v2187.js",
+        "tests/s3-b3-e8-v2217.js",
+        "tests/s3-b3-e9-v2188.js",
+        "tests/s3-b3-n1-v2218.js",
+        "tests/s3-b4-v2189.js",
+        "tests/schema-v2110.js"
+      ],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/tape-vol-v2980.js",
+      "sha": "de3fb082c788",
+      "version": "2.98.0",
+      "versionSource": "title",
+      "fileAnchor": "2980",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19510
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/test-audit-v2155.js",
+      "sha": "dfa43836f787",
+      "version": "2.155.0",
+      "versionSource": "head",
+      "fileAnchor": "2155",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21659
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/test-surface-gate.js",
+      "sha": "033aeebd28ca",
+      "version": "2.75.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": null,
+      "consumedBy": [
+        "tests/context-guard.js",
+        "tests/input-boundary-v2790.js",
+        "tests/input-guard-v2840.js",
+        "tests/o7-plan-tree-gate-v2187.js",
+        "tests/orphan-lock-v2750.js",
+        "tests/reference-isolation-lock-v2790.js",
+        "tests/reject-code-coverage.js",
+        "tests/reject-code-gate.js",
+        "tests/reject-lock-v2780.js",
+        "tests/s3-b1-o2-v2185.js",
+        "tests/side-effect-lock-v2790.js",
+        "tests/version-surface-gate-v2185.js"
+      ],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "consumed"
+    },
+    {
+      "file": "tests/threads-v2630.js",
+      "sha": "e98a4cefff44",
+      "version": "2.63.0",
+      "versionSource": "title",
+      "fileAnchor": "2630",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19113
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/toolchain-gate-v2136.js",
+      "sha": "36350ea7fbe6",
+      "version": "2.136.0",
+      "versionSource": "title",
+      "fileAnchor": "2136",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21002
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "scan",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/toolchain-gate.js",
+      "sha": "0f1195cc9d90",
+      "version": "2.136.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20981
+      },
+      "consumedBy": [
+        "tests/toolchain-gate-v2136.js"
+      ],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/tools-v2110.js",
+      "sha": "c8122238dec4",
+      "version": "2.110.0",
+      "versionSource": "title",
+      "fileAnchor": "2110",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20245
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/tools-v2114.js",
+      "sha": "b5dbe88d11c3",
+      "version": "2.114.0",
+      "versionSource": "title",
+      "fileAnchor": "2114",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 20392
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/transit-v2930.js",
+      "sha": "997c6930d1e9",
+      "version": "2.93.0",
+      "versionSource": "title",
+      "fileAnchor": "2930",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19338
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/u3-loose-readings-v2191.js",
+      "sha": "b9ea093dd79a",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2191",
+      "commit": "6665f32",
+      "wired": {
+        "form": "runLock",
+        "line": 22496
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/u4-export-lifecycle-v2191.js",
+      "sha": "c53cb9a49a2a",
+      "version": "2.189.0",
+      "versionSource": "head",
+      "fileAnchor": "2191",
+      "commit": "6665f32",
+      "wired": {
+        "form": "runLock",
+        "line": 22497
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/u9-fact-report-v2190.js",
+      "sha": "cf0d7aa03184",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2190",
+      "commit": "c576fe5",
+      "wired": {
+        "form": "runLock",
+        "line": 22465
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/ui-a11y-gate.js",
+      "sha": "a1b5b4c6e8ed",
+      "version": "2.109.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19702
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ui-components-v2109.js",
+      "sha": "978f34297c3a",
+      "version": "2.109.0",
+      "versionSource": "title",
+      "fileAnchor": "2109",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 19744
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ui-dom.js",
+      "sha": "e6465984692e",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 8487
+      },
+      "consumedBy": [
+        "tests/dependency-guard-v2103.js",
+        "tests/ui-gate-sync.js"
+      ],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ui-gate-sync.js",
+      "sha": "668baaa977c5",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 33
+      },
+      "consumedBy": [
+        "tests/act-b1-v2117.js",
+        "tests/alias-trace-v2970.js",
+        "tests/audit-vol-v2121.js",
+        "tests/b2-travel-v2117.js",
+        "tests/b3-intel-v2117.js",
+        "tests/b4-relation-v2117.js",
+        "tests/b5-org-v2117.js",
+        "tests/b6-b7-v2870.js",
+        "tests/b6-opportunity-v2117.js",
+        "tests/b7-rehearsal-v2118.js",
+        "tests/b8-liaison-v2118.js",
+        "tests/b9-coop-v2118.js",
+        "tests/branch-tree-v2153.js",
+        "tests/canon-align-v2100.js",
+        "tests/canon-deviation-v2139.js",
+        "tests/canon-v2990.js",
+        "tests/causal-ripple-v2146.js",
+        "tests/causal-trace-v2147.js",
+        "tests/causal-v2620.js",
+        "tests/causal-view-v2870.js",
+        "tests/collab-tasks-v2139.js",
+        "tests/coord-v2970.js",
+        "tests/cost-v2880.js",
+        "tests/delete-gate-v2124.js",
+        "tests/demand-integrity-v2155.js",
+        "tests/duty-v2143.js",
+        "tests/eco-audit-v2154.js",
+        "tests/economy-v2119.js",
+        "tests/enemies-v2640.js",
+        "tests/ev1-evidence-qa-v2208.js",
+        "tests/events-a2-v2116.js",
+        "tests/events-e2-v2115.js",
+        "tests/evict-meta-v2610.js",
+        "tests/explain-budget-v2122.js",
+        "tests/explain-v2900.js",
+        "tests/faction-graph-v2139.js",
+        "tests/farfield-v2151.js",
+        "tests/fault-alias-lock-v2800.js",
+        "tests/fault-ledger-lock-v2800.js",
+        "tests/fidelity-v2144.js",
+        "tests/hazard-trigger-v2138.js",
+        "tests/hazard-weather-v2960.js",
+        "tests/horizon-v2640.js",
+        "tests/identity-v2860.js",
+        "tests/inject-value-v2150.js",
+        "tests/inject-vis-v2580.js",
+        "tests/input-boundary-v2790.js",
+        "tests/input-guard-v2840.js",
+        "tests/inst-v2119.js",
+        "tests/interop-v2101.js",
+        "tests/journal-v2940.js",
+        "tests/life-e4-v2115.js",
+        "tests/life-e8-v2139.js",
+        "tests/life-turn-v2132.js",
+        "tests/lifeline-v2141.js",
+        "tests/mend-v2119.js",
+        "tests/noesis-v2140.js",
+        "tests/o1-host-matrix-v2186.js",
+        "tests/o7-plan-tree-gate-v2187.js",
+        "tests/o9-outlet-gate-v2186.js",
+        "tests/offline-consume-v2156.js",
+        "tests/offline-return-v2156.js",
+        "tests/offline-tick-v2151.js",
+        "tests/org-econ-v2950.js",
+        "tests/p3-x1-v2149.js",
+        "tests/p5-stage-v2214.js",
+        "tests/parallel-world-v2640.js",
+        "tests/perf-observability-v2109.js",
+        "tests/perf-recalc-v2123.js",
+        "tests/perf-tape-v2148.js",
+        "tests/perf-trace-v2102.js",
+        "tests/perspective-lock-v2142.js",
+        "tests/phone-bridge-v2970.js",
+        "tests/plan-v2119.js",
+        "tests/playtime-v2156.js",
+        "tests/plot-gauge-v2153.js",
+        "tests/probe-v2119.js",
+        "tests/q6-atomic-budget-v2215.js",
+        "tests/q7-idempotent-floor-v2216.js",
+        "tests/q8-panel-fold-v2225.js",
+        "tests/reference-isolation-lock-v2790.js",
+        "tests/region-v2119.js",
+        "tests/registry-identity-v2620.js",
+        "tests/reject-lock-v2780.js",
+        "tests/reject-v2780.js",
+        "tests/rel-contract-v2590.js",
+        "tests/rel-contract-v2600.js",
+        "tests/render-perf-v2152.js",
+        "tests/render-pre-v2108.js",
+        "tests/replay-v2890.js",
+        "tests/resource-ledger-v2920.js",
+        "tests/rumor-e3-v2115.js",
+        "tests/rumor-v2960.js",
+        "tests/s3-b1-e1-v2183.js",
+        "tests/s3-b1-e1b-v2206.js",
+        "tests/s3-b1-e1c-v2207.js",
+        "tests/s3-b1-e3-v2184.js",
+        "tests/s3-b1-o2-v2185.js",
+        "tests/s3-b2-e2-v2182.js",
+        "tests/s3-b2-e5-v2182.js",
+        "tests/s3-b2-o3-v2182.js",
+        "tests/s3-b2-o4-v2182.js",
+        "tests/s3-b2-o5-v2182.js",
+        "tests/s3-b3-e4-v2187.js",
+        "tests/s3-b3-e6-v2187.js",
+        "tests/s3-b3-e8-v2187.js",
+        "tests/s3-b3-n1-v2218.js",
+        "tests/s3-b3-n2-v2220.js",
+        "tests/s3-b3-n3-v2221.js",
+        "tests/s3-b3-n4-v2222.js",
+        "tests/s3-b3-n5-v2219.js",
+        "tests/s3-e8-v2210.js",
+        "tests/s3-sp6-v2158.js",
+        "tests/s3-tp1-v2159.js",
+        "tests/s3-tp2-v2159.js",
+        "tests/s3-tp3-v2161.js",
+        "tests/s3-tp4-v2160.js",
+        "tests/s3-tp7-v2162.js",
+        "tests/s3-tx1-v2165.js",
+        "tests/s3-tx2-v2166.js",
+        "tests/s3-tx3-v2167.js",
+        "tests/s3-tx4-v2168.js",
+        "tests/s3-tx5-v2164.js",
+        "tests/s3-tx6-v2169.js",
+        "tests/s3-tx7-v2170.js",
+        "tests/sandbox-isolation-v2125.js",
+        "tests/session-v2119.js",
+        "tests/settle-v2650.js",
+        "tests/settle-v2660.js",
+        "tests/settle-v2670.js",
+        "tests/settle-v2680.js",
+        "tests/settle-v2690.js",
+        "tests/settle-v2700.js",
+        "tests/settle-v2710.js",
+        "tests/settle-v2720.js",
+        "tests/settle-v2770.js",
+        "tests/settle-v2810.js",
+        "tests/settle-v2820.js",
+        "tests/settle-v2830.js",
+        "tests/settle-v2841.js",
+        "tests/settle-v2850.js",
+        "tests/settle-v2860.js",
+        "tests/shadow-v2630.js",
+        "tests/side-effect-lock-v2790.js",
+        "tests/sp2-draft-v2156.js",
+        "tests/sp3-lifecycle-v2156.js",
+        "tests/sp4-s2-v2157.js",
+        "tests/stage-v2119.js",
+        "tests/state-repair-v2108.js",
+        "tests/storage-forecast-v2152.js",
+        "tests/store-commit-v2113.js",
+        "tests/style-craft-v2510.js",
+        "tests/switch-matrix-v2910.js",
+        "tests/tape-vol-v2980.js",
+        "tests/threads-v2630.js",
+        "tests/transit-v2930.js",
+        "tests/ui-a11y-gate.js",
+        "tests/ui-components-v2109.js",
+        "tests/ui-gate.js",
+        "tests/ui-module-section-v2570.js",
+        "tests/ui-wire-audit.js",
+        "tests/world-bridge-v2154.js",
+        "tests/world-seed-v2155.js",
+        "tests/world-v2630.js",
+        "tests/x1-chain-v2127.js",
+        "tests/x2-chronicle-v2127.js",
+        "tests/x3-offline-v2128.js",
+        "tests/x4-resolve-v2128.js",
+        "tests/x5-inst-v2128.js",
+        "tests/x6-session-v2128.js",
+        "tests/x7-contrast-v2128.js",
+        "tests/x8-handshake-v2128.js"
+      ],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ui-gate.js",
+      "sha": "221f7676a978",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "spawn-argv",
+        "line": 21005
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ui-live-v2137.js",
+      "sha": "08afbb869e25",
+      "version": "2.137.0",
+      "versionSource": "title",
+      "fileAnchor": "2137",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 21030
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ui-live.js",
+      "sha": "3e01931bec6d",
+      "version": "2.137.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "path-literal",
+        "line": 21069
+      },
+      "consumedBy": [
+        "tests/o1-host-matrix-v2186.js",
+        "tests/o9-outlet-gate-v2186.js",
+        "tests/ui-live-v2137.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ui-module-section-v2570.js",
+      "sha": "b1f0912e80ee",
+      "version": "2.57.0",
+      "versionSource": "title",
+      "fileAnchor": "2570",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19083
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/ui-wire-audit.js",
+      "sha": "b77f0e2ce2cb",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "792d9ac",
+      "wired": {
+        "form": "require",
+        "line": 43
+      },
+      "consumedBy": [
+        "tests/q8-panel-fold-v2225.js"
+      ],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/version-surface-gate-v2185.js",
+      "sha": "a601c224543c",
+      "version": "2.185.0",
+      "versionSource": "title",
+      "fileAnchor": "2185",
+      "commit": "2ab9b0e",
+      "wired": {
+        "form": "runLock",
+        "line": 22173
+      },
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/world-bridge-v2154.js",
+      "sha": "bd0251b572f7",
+      "version": "2.154.0",
+      "versionSource": "head",
+      "fileAnchor": "2154",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21594
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/world-seed-v2155.js",
+      "sha": "16368c6d5687",
+      "version": "2.155.0",
+      "versionSource": "head",
+      "fileAnchor": "2155",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 21621
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/world-v2630.js",
+      "sha": "74cdab2614e3",
+      "version": "2.63.0",
+      "versionSource": "title",
+      "fileAnchor": "2630",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 19107
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/x1-chain-v2127.js",
+      "sha": "604563f44f53",
+      "version": "2.127.0",
+      "versionSource": "title",
+      "fileAnchor": "2127",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20738
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/x2-chronicle-v2127.js",
+      "sha": "f3a267fced18",
+      "version": "2.127.0",
+      "versionSource": "title",
+      "fileAnchor": "2127",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20740
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative",
+        "scan"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/x3-offline-v2128.js",
+      "sha": "33c882cc46a5",
+      "version": "2.128.0",
+      "versionSource": "title",
+      "fileAnchor": "2128",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20800
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/x4-resolve-v2128.js",
+      "sha": "f4dc5157613e",
+      "version": "2.128.0",
+      "versionSource": "title",
+      "fileAnchor": "2128",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20802
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/x5-inst-v2128.js",
+      "sha": "6671233dd114",
+      "version": "2.128.0",
+      "versionSource": "title",
+      "fileAnchor": "2128",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20804
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/x6-session-v2128.js",
+      "sha": "4bdd20f5b2ec",
+      "version": "2.128.0",
+      "versionSource": "title",
+      "fileAnchor": "2128",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20806
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/x7-contrast-v2128.js",
+      "sha": "84531eedb7e0",
+      "version": "2.128.0",
+      "versionSource": "head",
+      "fileAnchor": "2128",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20808
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    },
+    {
+      "file": "tests/x8-handshake-v2128.js",
+      "sha": "928a53c75283",
+      "version": "2.128.0",
+      "versionSource": "title",
+      "fileAnchor": "2128",
+      "commit": "792d9ac",
+      "wired": {
+        "form": "runLock",
+        "line": 20810
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": true,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "verified"
+    }
+  ]
+}
