@@ -5626,6 +5626,30 @@ function runWitness(WA) {
         try { WA.beatLedger = null; return [(WLw.beats({ ahead: 2 }) || {}).reason]; }
         finally { WA.beatLedger = keep; }
       });
+      // -- v2.223.0(N7):多引擎适配器面的「无真目标」归因(engines/world-lab.js) --
+      //   本码由 N7 新增:probeCall 逐类取**真源**目标(经济类的被授者 / 物流类的货运单),
+      //   取不到时**如实不调**并报 no-subject —— 本口**不编**一个主体出来喂它。
+      //   它与「结构上跑不进副本」是两件事:N7 的五档处置里它落 skipped-absent(缺席),
+      //   而不是 skipped-unsafe(隔离不可用)。
+      //   见证手法同 stale-report:临时清空 live 主体面 ⇒ 探针取不到目标;跑完在 finally 里
+      //   按**原引用**还原(不留痕)。
+      want('no-subject', 'N7:适配器取不到真目标主体(经济无被授者 / 物流无货运单)⇒ 如实不调,不编一个主体出来喂它');
+      trip('no-subject', function () {
+        const st0 = WA.store.get() || {};
+        const keepP = st0.people, keepF = st0.freight;
+        let got = [];
+        try {
+          WA.store.transact(function (d) { d.people = {}; d.freight = { shipments: [] }; },
+            'reject-witness:lab-no-subject');
+          const tb = WLw.adapterTable({});
+          got = (tb.rows || []).filter(function (r) { return r.outReason === 'no-subject'; })
+            .map(function (r) { return r.outReason; });
+        } finally {
+          WA.store.transact(function (d) { d.people = keepP || {}; d.freight = keepF || { shipments: [] }; },
+            'reject-witness:lab-no-subject-restore');
+        }
+        return got;
+      });
       WLw.discard();
     }
   }

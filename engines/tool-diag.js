@@ -1349,6 +1349,14 @@
         //   beatLedgerView）—— 它们缺席时各自报各的码，而不是合成一个「不许」。
         sim: Object.assign({}, dg.y9 || {}),
         simRows: st.simRows || 0, hasReport: !!st.hasReport, writesSingle: st.writesSingle || '',
+        // ── v2.223.0(N7)适配器面回带:逐类隔离判定 + 上次多引擎推进的零写读数 ──
+        //   两栏都直接取自引擎(dg 面),本层**不**重算 —— 重算就是把判据复制成两份。
+        adapters: dg.adapters || [],
+        adaptersSupported: dg.adaptersSupported || [],
+        adaptersUnsupported: dg.adaptersUnsupported || [],
+        adaptersScope: dg.adaptersScope || '',
+        advance: dg.advance || null,
+        adapterProbes: st.adapterProbes || 0, advances: st.advances || 0,
         sources: dg.deps || {}
       };
     });
@@ -3374,7 +3382,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'tools', ids: ['wa-wl-enabled', 'wa-wl-a', 'wa-wl-b', 'wa-wl-run', 'wa-wl-arms',
       'wa-wl-diff', 'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag',
       // v2.203.0（Y9）：推几轮 / 沙盒推进 / 结果报告 / 采纳第几条 / 采纳这一条 / 拍引擎推演
-      'wa-wl-rounds', 'wa-wl-sim', 'wa-wl-report', 'wa-wl-index', 'wa-wl-adopt', 'wa-wl-beats'],
+      'wa-wl-rounds', 'wa-wl-sim', 'wa-wl-report', 'wa-wl-index', 'wa-wl-adopt', 'wa-wl-beats',
+      // v2.223.0(N7):适配器表(逐模块隔离判定)+ 推几轮输入框 + 多引擎推进。
+      //   同样「渲染 + 绑定 + 守卫登记」三件齐做 —— 渲染了不登记,id 写错就永不可见。
+      'wa-wl-adapters', 'wa-wl-advrounds', 'wa-wl-advance'],
       dynamic: ['wa-wl-out'] },
     // v2.200.0（Y5）：搬运页 17 静态控件 + 1 动态读数出口 —— 面板「搬运」页。
     //   与 Y1/Y2/Y4 同口径「渲染 + 绑定 + 守卫登记」三件齐做：渲染了不登记 =>

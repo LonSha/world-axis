@@ -362,7 +362,7 @@
     'no-perf-trace', 'no-plan', 'no-preview', 'no-proposal', 'no-reading', 'no-receipt',
     'no-relation-face', 'no-result', 'no-rotation', 'no-rules', 'no-scene',
     'no-sections', 'no-seed', 'no-session', 'no-shadow', 'no-signal', 'no-snapshot',
-    'no-stages', 'no-step', 'no-steps', 'no-storage', 'no-store', 'no-story-clock', 'no-such-experience',
+    'no-stages', 'no-step', 'no-steps', 'no-storage', 'no-store', 'no-story-clock', 'no-subject', 'no-such-experience',
     'no-such-project', 'no-such-vol', 'no-tape', 'no-templates', 'no-th', 'no-time-word',
     'no-trace', 'no-usable-keys', 'no-view', 'no-volume', 'non-finite', 'non-monotonic',
     'non-positive-delta', 'none', 'not-a-function', 'not-a-number', 'not-a-party', 'not-a-string',

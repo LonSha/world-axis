@@ -2764,6 +2764,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
          <button class="wa-btn" id="wa-wl-adopt" title="写口（世界事实 · 走 U2 统一提交）：把报告里那一条落成真世界事件。只追加**一条** worldFacts；失败则世界一格不动">采纳这一条</button>
          <button class="wa-btn" id="wa-wl-beats" title="只读：拍引擎推演 —— 当前结构下给的是只读投影（拍引擎族一律直调 store.transact、不走 exec），不落拍由拍账摘要实测">拍引擎推演</button>
        </div>
+       <div class="wa-row">
+         <button class="wa-btn" id="wa-wl-adapters" title="只读:逐模块隔离判定 —— 在**真副本**上把这一类真调一次(哨兵拦下直写、副本承接 exec 写)。四档处置:supported 能推进 / read-only 只观测 / skipped-absent 缺席或缺主体 / skipped-unsafe 隔离不可用。范围只是本模块**声明的** 5 类,不冒充「扫过全仓引擎」">适配器表</button>
+         <input id="wa-wl-advrounds" class="wa-input" placeholder="推几轮(默认 3,上限 12;超限会夹住并回带 clamped)"/>
+         <button class="wa-btn" id="wa-wl-advance" title="只读 world:同一份副本按**声明顺序**累积推进 supported 的推进类;未支持的逐条如实处置。live 零写与种子前后一致两栏都是**实测差**">多引擎推进</button>
+       </div>
+
        <div id="wa-wl-out" class="wa-out"></div>
       <div class="wa-sec">存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）</div>
       <div class="wa-dim">区分<b>可回收历史</b>与<b>不可丢义务</b>（在途货物 / 待履约条款 / 未结阶段 / 回执去重索引）——
@@ -6273,6 +6279,42 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + '\n世界 ' + r.worldBefore + ' → ' + r.worldAfter + '（**只变这一条**，且走 U2 统一提交）'
         + '\n' + r.note, true);
     });
+    on('#wa-wl-adapters', () => {
+      if (!WA.worldLab || !WA.worldLab.adapterTable) return wlbOut('未记录:module-missing');
+      const t = WA.worldLab.adapterTable({});
+      if (!t.ok) return wlbOut('未判定:' + t.reason, true);
+      wlbOut('适配器表 ' + t.counts.total + ' 类 · 顺序 ' + t.order.join(' → ')
+        + '\n支持 ' + t.counts.supported + ' · 只读 ' + t.counts.readOnly + ' · 缺席 ' + t.counts.absent
+        + ' · 隔离不可用 ' + t.counts.unsafe + (t.counts.disabled ? ' · 关着 ' + t.counts.disabled : '')
+        + '\n' + t.rows.map(function (r) {
+          return '· ' + r.order + ' ' + r.label + '(' + r.engine + '.' + r.member + ') → <b>' + r.handling + '</b>'
+            + '\n    判据 ' + esc(r.handlingWhy)
+            + (r.outReason ? ' [来源答:' + esc(r.outReason) + ']' : '')
+            + '\n    实测 副本写 ' + r.writes + ' · 直调store ' + r.directWrites + ' · 副本读 ' + r.reads
+            + ' · live零写 ' + (r.liveSame === null ? '不适用' : (r.liveSame ? '是' : '<b>否</b>'))
+            + (r.cfgRestored === false ? ' · <b>临时开关未还原</b>' : '');
+        }).join('\n')
+        + '\n' + t.scope + '\n' + t.note, true);
+    });
+    on('#wa-wl-advance', () => {
+      if (!WA.worldLab || !WA.worldLab.advance) return wlbOut('未记录:module-missing');
+      const n = Number(rpkVal('#wa-wl-advrounds'));
+      const r = WA.worldLab.advance({ rounds: (isFinite(n) && n > 0) ? n : undefined });
+      if (!r.ok) return wlbOut('未推进:' + r.reason + (r.hint ? '(' + esc(r.hint) + ')' : ''), true);
+      wlbOut('多引擎推进 ' + r.id + ':' + r.rounds + ' 轮 · 计划 <b>' + (r.plan.length ? r.plan.join(' → ') : '(无)') + '</b>'
+        + '\n支持 ' + r.supported.length + ' · 只读 ' + r.readOnly.length + ' · 缺席 ' + r.absent.length
+        + ' · 隔离不可用 ' + r.unsafe.length + (r.disabled && r.disabled.length ? ' · 关着 ' + r.disabled.length : '')
+        + (r.skipped.length ? '\n未进计划:' + r.skipped.map(function (x) { return x.key + '(' + x.handling + ')'; }).join('、') : '')
+        + '\n逐轮:' + r.rows.map(function (x) { return '#' + x.n + '步' + x.steps + '/变' + x.changed; }).join(' ')
+        + '\nlive 前 ' + r.liveBefore + ' → 后 ' + r.liveAfter
+        + ' ⇒ ' + (r.liveUnchanged ? '**零写入**(实测一致)' : '<b>live 被改动了</b>(实测差)')
+        + (r.seedAsked !== null ? '\n种子 你要 ' + r.seedAsked + ' · 前 ' + r.seedBefore + ' → 后 ' + r.seedAfter
+            + ' ⇒ ' + (r.seedUnchanged ? '推进没换种子(可重放)' : '<b>种子被换了</b>') : '')
+        + (r.multi ? '\n多种子 ' + r.multi.runs + ' 次 · 不同结果 ' + r.multi.distinct + ' 种 · '
+            + (r.multi.differs ? '**存在差异**' : '未见差异') + '(只报有无,不算概率)' : '')
+        + '\n' + r.note, true);
+    });
+
     on('#wa-wl-beats', () => {
       if (!WA.worldLab || !WA.worldLab.beats) return wlbOut('未记录：module-missing');
       const r = WA.worldLab.beats({ ahead: 4 });

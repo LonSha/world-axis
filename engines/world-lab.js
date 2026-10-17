@@ -88,6 +88,9 @@
   //   `beatProbes`（拍引擎联动探测次数）。三栏都**逐处递增**，不在返回体里现算。
   const _stat = { runs: 0, arms: 0, discarded: 0, exports: 0, staleReads: 0,
     sims: 0, adopts: 0, beatProbes: 0,
+    // v2.223.0（N7）新增两栏：`adapterProbes`（逐模块隔离判定跑过几次）/
+    //   `advances`（多引擎副本推进跑过几次）。两栏都逐处递增，不在返回体里现算。
+    adapterProbes: 0, advances: 0,
     refused: 0, lastReason: '', faults: {} };
   function fault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
@@ -721,6 +724,395 @@
       note: had ? '读数已丢；副本本来就不落任何地方，故无残留可清' : '本就没有实验可丢（**不是**「丢成功了」）' };
   }
 
+  // ══ v2.223.0（N7）多引擎适配器与**逐模块**隔离判定 ════════════════════
+  //   计划原文：「在现有 A/B 对照、causal 累积推演和拍投影之上加入合格的
+  //   action/经济/物流/期限/后果适配器，同一副本按明确时序推进；**不具备隔离上下文的
+  //   模块列 unsupported**。固定种子可重放，多种子差异不冒充概率，live/localStorage/通知均零泄漏。」
+  //
+  //   ── 为什么判据是**运行时探针**，不是读源码 ──────────────────────
+  //   「这个模块走不走隔离上下文」在源码上看得见，但**看得见 ≠ 跑得对**：把
+  //   `WA.store.transact` 藏进一层间接调用就骗过任何 grep 式判据。本模块的探针在
+  //   **真副本**上把适配器**真调一次**，同时做三件事：
+  //     · 用**哨兵**临时接管 `WA.store.transact`（拦下、计数、**不写**）；
+  //     · 副本承接全部 `exec.mutate` 写（`ctx.writes` 计数）；
+  //     · 副本门面记 `get`/`read` 次数（判「读的是副本还是 live」）。
+  //   于是三面读数各自可观测，而探针**零副作用**（live 一格不动 —— 探针自己不许成为
+  //   它要防的那种东西）。⚠ 哨兵**挂不上**时（属性不可写等）对推进类一律**不调**：
+  //   宁可如实报 `guard-off`，也不冒「探针把 live 写掉」的险。
+  //   ⚠ 本模块**不**用「读源码字符串」式判据（`WA.__moduleSrc` 一类的全局在本仓根本
+  //     不存在）——那样的产物是「跑得通、答的是空话」（判据恒真或恒假，读数与事实无关）。
+  /** 适配器固定种子的**键名**（可重放：显式播种才谈复现，与 core/rand.js 同口径）。 */
+  const ADAPTER_SEED_KEY = 'worldaxis_world_lab_adapter_seed_v1';
+  /**
+   * 五类适配器（**封闭集**）：`kind` = advance（可在副本上推进一步）/ read（只作轮后观测）。
+   *   每类都指向**来源引擎自己的口**（本模块不自带第二份推进逻辑）。`order` 是时序标签：
+   *   推进按 order 升序在同一份副本上累积（不是 N 份独立推演）。
+   */
+  const ADAPTERS = [
+    { key: 'action', order: 10, label: '行动', kind: 'advance', engine: 'act', member: 'advance',
+      why: '行动结算是逐字走 exec.mutate 的推进面 —— 它能把这一步真跑在副本上' },
+    { key: 'economy', order: 20, label: '经济', kind: 'advance', engine: 'org', member: 'grant',
+      why: '组织账本（供给 / 薪酬 / 项目欠账）—— 它的写口直调 store.transact，故必须逐条判能不能进副本' },
+    { key: 'logistics', order: 30, label: '物流', kind: 'advance', engine: 'freight', member: 'arrive',
+      why: '货运到货确认 —— 与世界经济同一本账，隔离范围必须与经济类分开验' },
+    { key: 'deadline', order: 40, label: '期限', kind: 'read', engine: 'agenda', member: 'upcoming',
+      why: '跨模块到期清单是纯读面：它不推进任何东西，只作每轮之后的一口观测' },
+    { key: 'consequence', order: 50, label: '后果', kind: 'advance', engine: 'causal', member: 'tick',
+      why: '因果推进（后果落地）—— 与行动面同族走 exec.mutate，但时序排在行动之后' }
+  ];
+  /** 探针与推进共用冻结时刻（副本时钟；**不碰 live 时钟**）。 */
+  let _probeAt = 0;
+  /** 一次性挂钩：挂上记数包装，返回句柄（还原用）。对象 / 方法缺席或**不可写**时返回 null。 */
+  function hookOnce(obj, name, make) {
+    if (!obj || typeof obj[name] !== 'function') return null;
+    const orig = obj[name];
+    try {
+      obj[name] = make(orig);
+      if (obj[name] === orig) return null;   // 赋值被静默吞掉（只读属性）⇒ 视为挂不上
+    } catch (e) { return null; }
+    return { obj: obj, name: name, orig: orig };
+  }
+  function unhook(h) { if (h) { try { h.obj[h.name] = h.orig; } catch (e) {} } }
+  function lsOf() { try { return (WA.mainWin && WA.mainWin.localStorage) ? WA.mainWin.localStorage : null; } catch (e) { return null; } }
+  /** 探针取一个真主体（经济类的被授者）：从 **live** 找第一个 person（与经济类实际读源一致）。 */
+  function probeHolder() {
+    let s = null;
+    try { s = (WA.store && WA.store.get) ? WA.store.get() : null; } catch (e) { s = null; }
+    const people = (isObj(s) && isObj(s.people)) ? s.people : {};
+    const ks = Object.keys(people);
+    for (let i = 0; i < ks.length; i++) {
+      const r = people[ks[i]];
+      //   ⚠ 取的是 people 的**键**(org.holder 按键查:name 对不上号,取错=探针永远
+      //     走不到真写口 ⇒ 把「能进副本」误判成「推不动」)。
+      const key = clean(ks[i], 60);
+      if (key) return key;
+    }
+    return '';
+  }
+  /** 探针取一个真货运单（物流类的目标）：从 live 的 freight.shipments 找第一单 id。 */
+  function probeShipment() {
+    let s = null;
+    try { s = (WA.store && WA.store.get) ? WA.store.get() : null; } catch (e) { s = null; }
+    const f = (isObj(s) && isObj(s.freight)) ? s.freight : {};
+    const arr = Array.isArray(f.shipments) ? f.shipments : [];
+    for (let i = 0; i < arr.length; i++) {
+      const id = clean((arr[i] && arr[i].id) || '', 60);
+      if (id) return id;
+    }
+    return '';
+  }
+  /** 逐类各自的**调用形态**（参数取自真源；取不到就如实不调 —— 不编一个目标出来）。 */
+  function probeCall(ad, fn) {
+    if (ad.key === 'action') return function () { return fn(_probeAt, { max: 2 }); };
+    if (ad.key === 'economy') return function () { const c = probeHolder(); if (!c) return { ok: false, reason: 'no-subject' }; return fn('person', c, 'labProbe', 1); };
+    if (ad.key === 'logistics') return function () { const id = probeShipment(); if (!id) return { ok: false, reason: 'no-subject' }; return fn(id, {}); };
+    if (ad.key === 'consequence') return function () { return fn({ now: _probeAt }); };
+    return function () { return fn({ limit: 4 }); };
+  }
+  /**
+   * 运行时探针：在**独立副本**上把这一类真调一次，三面读数全部实测。**零副作用**。
+   *   读数语义（逐条都能被专锁两向打出来）：
+   *     · `writes`        —— 经 `exec.mutate` 落到副本的次数（>0 ⇒ 这个模块**真**走隔离面）
+   *     · `directWrites`  —— 哨兵拦下的 `store.transact` 次数（>0 ⇒ 隔离上下文**不覆盖**它）
+   *     · `reads`         —— 经副本门面 `get`/`read` 的次数（>0 ⇒ 它读的是副本，不是 live）
+   *     · `liveSame`      —— 探针前后 live 摘要一致（实测，不是声明）
+   */
+  function probeAdapter(ad) {
+    const ex = execMod();
+    const fn = (WA[ad.engine] && typeof WA[ad.engine][ad.member] === 'function') ? WA[ad.engine][ad.member] : null;
+    if (!fn) return { reachable: false, probe: 'absent', writes: 0, directWrites: 0, reads: 0, localWrites: 0, cfgRestored: null, liveSame: null, threw: '' };
+    if (!ex) return { reachable: true, probe: 'exec-absent', writes: 0, directWrites: 0, reads: 0, localWrites: 0, cfgRestored: null, liveSame: null, threw: '' };
+    const base = ex.cloneState(WA);
+    if (!base) return { reachable: true, probe: 'no-base', writes: 0, directWrites: 0, reads: 0, localWrites: 0, cfgRestored: null, liveSame: null, threw: '' };
+    // ── 1 先探哨兵可写性(探完**立即还原**)─────────────────────────
+    //   不还原会让计数版包住探测版 ⇒ 真 store.transact 被永久换掉 —— 那正是
+    //   「探针成为它要防的那种东西」(实测抓到过这一处)。
+    const hProbe = hookOnce(WA.store, 'transact', function () {
+      return function () { return { ok: true, applied: false, persisted: null, dryRun: true }; };
+    });
+    if (!hProbe && ad.kind !== 'read') {
+      return { reachable: true, probe: 'guard-off', writes: 0, directWrites: 0, reads: 0, localWrites: 0, cfgRestored: null, liveSame: null, threw: '' };
+    }
+    unhook(hProbe);
+    // ── 2 基准 live 摘要(**原配置**下取)──────────────────────────
+    const live0 = liveDigest();
+    // ── 3 临时把被测引擎开着(**此刻无哨兵**)──────────────────────
+    //   ⚠ 两件都实测过:1 引擎默认关着 ⇒ 它一次都跑不到写口,读数全是 disabled,那是
+    //   「跑得通、答的是空话」;2 开与还原**都必须走真 store** —— saveSettings 内部要落盘,
+    //   若在哨兵挂着时开,写被吞掉、引擎其实还关着(实测抓到过这一处)。
+    //   设置是**配置**不是世界事实:finally 无条件按原值还原,并自证 `cfgRestored`。
+    const E = WA[ad.engine];
+    const cfgBefore = (E && typeof E.getSettings === 'function') ? JSON.stringify(E.getSettings()) : '';
+    const cfgObj = (function () { try { return cfgBefore ? JSON.parse(cfgBefore) : null; } catch (e) { return null; } })();
+    let cfgMutated = false, cfgRestored = null;
+    if (E && typeof E.setSettings === 'function' && cfgObj) {
+      try { E.setSettings(Object.assign({}, cfgObj, { enabled: true })); cfgMutated = true; } catch (e) {}
+    }
+    // ── 4 挂计数哨兵 + ls 哨兵,真调一次 ──────────────────────────
+    let direct = 0, lsW = 0, threw = '';
+    const hT = hookOnce(WA.store, 'transact', function () {
+      return function () { direct++; return { ok: true, applied: false, persisted: null, dryRun: true }; };
+    });
+    const hLs = hookOnce(lsOf(), 'setItem', function () { return function () { lsW++; }; });
+    const sand = ex.sandStore(base);
+    let reads = 0;
+    const facade = {
+      sand: true,
+      get: function () { reads++; return sand.get(); },
+      read: function (p, f) { reads++; return sand.read(p, f); },
+      transact: sand.transact,
+      currentBranchId: sand.currentBranchId
+    };
+    const ctx = { store: facade, world: WA.world,
+      clock: { now: function () { return _probeAt; }, wall: function () { return _probeAt; }, label: 'worldLab.probe' },
+      stat: { faults: {} }, sink: base, writes: 0 };
+    const call = probeCall(ad, fn);
+    let out = null;
+    try { out = ex.withContext(ctx, call); }
+    catch (e) { threw = String((e && e.message) || e).slice(0, 120); }
+    unhook(hT); unhook(hLs);
+    // ── 5 还原配置(此刻同样无哨兵)并自证 ────────────────────────
+    if (cfgMutated && E && typeof E.setSettings === 'function' && cfgObj) {
+      try { E.setSettings(cfgObj); } catch (e) {}
+      try { cfgRestored = (JSON.stringify(E.getSettings()) === cfgBefore); } catch (e) { cfgRestored = null; }
+    }
+    const live1 = liveDigest();
+    return { reachable: true, probe: (out && out.reason === 'disabled') ? 'disabled' : 'ran', outOk: !!(out && out.ok === true),
+      outReason: out ? String(out.reason || '') : '',
+      writes: ctx.writes || 0, directWrites: direct, reads: reads, localWrites: lsW,
+      cfgMutated: cfgMutated, cfgRestored: cfgRestored,
+      liveSame: !!(live0.ok && live1.ok && live0.digest === live1.digest), threw: threw };
+  }
+
+  /**
+   * 逐类判语（四档**诚实处置**，不把「读得到」冒充成「能推进」）：
+   *   supported / read-only / skipped-absent / skipped-unsafe。
+   */
+  function classifyAdapter(ad, pr) {
+    if (!pr.reachable) return { handling: 'skipped-absent', why: '引擎或成员缺席（' + ad.engine + '.' + ad.member + '）—— 不编一个替代口' };
+    if (pr.probe === 'exec-absent') return { handling: 'skipped-unsafe', why: '隔离执行面缺席 —— 不在 live 世界上跑一次假推进' };
+    //   引擎**默认关**着 ⇒ 它一次都没跑过,读不到任何写。这与「结构上跑不进副本」
+    //   是两件事,不许合成一个「缺席」(那会把「开关没开」说成「模块不行」)。
+    if (pr.probe === 'disabled') return { handling: 'skipped-disabled', why: '该引擎此刻关着(探针**不改** live 设置)—— 结构上未必不能跑,如实单列' };
+    //   「没有可用的目标主体 / 缺前置(如无故事钟)」也单列:本口**不编**一个主体出来喂它
+    //   —— 编出来的读数不是这一局的读数。它与「结构上跑不进副本」是两件事,不许合并。
+    if (pr.outReason === 'no-subject' || pr.outReason === 'no-story-clock') return { handling: 'skipped-absent', why: '缺少可用目标/前置(本口不编一个出来)—— 结构上未必不能进副本' };
+    if (pr.probe === 'guard-off') return { handling: 'skipped-unsafe', why: 'store.transact 哨兵挂不上(属性不可写?)—— 不冒险真调,如实降级' };
+    if (pr.cfgMutated === true && pr.cfgRestored === false) return { handling: 'skipped-unsafe', why: '探针临时开关没还原回原值 —— 不去用一份被探针改过的配置下结论' };
+    if (pr.probe === 'no-base') return { handling: 'skipped-unsafe', why: '副本建不起来（深拷贝失败）—— 无名册可比对' };
+    if (pr.directWrites > 0) return { handling: 'skipped-unsafe', why: '直调 store.transact 被哨兵拦下 ' + pr.directWrites + ' 次：隔离上下文**不覆盖**它' };
+    if (pr.liveSame !== true) return { handling: 'skipped-unsafe', why: '探针期间 live 摘要变化 —— 它写了真世界' };
+    if (pr.threw) return { handling: (ad.kind === 'read' ? 'read-only' : 'skipped-unsafe'), why: '探针调用抛错（' + pr.threw + '），不计入推进' };
+    if (ad.kind === 'advance') {
+      if (pr.writes > 0) return { handling: 'supported', why: '经 exec 写进副本 ' + pr.writes + ' 次（真跑与试演同一分岔点）' };
+      return { handling: (pr.reads > 0 ? 'read-only' : 'skipped-absent'), why: '未产生任何副本写（副本读 ' + pr.reads + ' 次）—— 它推不动这一步' };
+    }
+    if (pr.reads > 0) return { handling: 'supported', why: '经副本门面读 ' + pr.reads + ' 次（隔离感知：读到的是副本）' };
+    return { handling: 'read-only', why: '未走副本门面（读的是 live）—— 可作轮后观测，不作推进步' };
+  }
+  /** 随机源读数（种子 + 是否显式 —— 只有显式播种才谈「可复现」）。 */
+  function randSeedInfo() {
+    try {
+      if (WA.rand && typeof WA.rand.getSeed === 'function') {
+        return { seed: WA.rand.getSeed(), explicit: (typeof WA.rand.randStat === 'function' ? !!(WA.rand.randStat().reproducible) : null) };
+      }
+    } catch (e) {}
+    return { seed: null, explicit: null };
+  }
+  /**
+   * 适配器表：五类**各在独立副本上**跑一次探针，逐类给 handling 与 why，并给汇总计数。
+   *   `scope` 逐字写明**范围**：这是本模块**声明的**适配器表（5 类），不是「扫过全仓引擎」——
+   *   冒充全仓扫描会把「没测过的模块」说成「测过且不合格」，两句都不是真的。
+   */
+  function adapterTable(spec) {
+    const cfg = settings();
+    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const rows = [];
+    _probeAt = clockNow('worldLab.adapter');
+    for (let i = 0; i < ADAPTERS.length; i++) {
+      const ad = ADAPTERS[i];
+      const pr = probeAdapter(ad);
+      const cl = classifyAdapter(ad, pr);
+      _stat.adapterProbes++;
+      rows.push({ key: ad.key, label: ad.label, order: ad.order, kind: ad.kind,
+        engine: ad.engine, member: ad.member, why: ad.why, outReason: pr.outReason || '',
+        handling: cl.handling, handlingWhy: cl.why,
+        reachable: pr.reachable === true, probe: pr.probe,
+        writes: pr.writes, directWrites: pr.directWrites, reads: pr.reads,
+        localWrites: pr.localWrites || 0, cfgRestored: pr.cfgRestored, liveSame: pr.liveSame, threw: pr.threw || '' });
+    }
+    const sup = rows.filter(function (r) { return r.handling === 'supported'; });
+    const ro = rows.filter(function (r) { return r.handling === 'read-only'; });
+    const absent = rows.filter(function (r) { return r.handling === 'skipped-absent'; });
+    const unsafe = rows.filter(function (r) { return r.handling === 'skipped-unsafe'; });
+    const dis = rows.filter(function (r) { return r.handling === 'skipped-disabled'; });
+    const SCOPE = '范围 = 本模块**声明的**适配器表（' + ADAPTERS.length + ' 类）；**不**冒充「扫过全仓引擎」';
+    _stat.lastReason = 'adapters-probed';
+    _adTable = { ok: true, at: _probeAt, rows: rows,
+      supported: sup.map(function (r) { return r.key; }), readOnly: ro.map(function (r) { return r.key; }),
+      absent: absent.map(function (r) { return r.key; }), unsafe: unsafe.map(function (r) { return r.key; }),
+      disabled: dis.map(function (r) { return r.key; }), scope: SCOPE };
+    return { ok: true, at: _probeAt, rows: rows,
+      order: ADAPTERS.slice().sort(function (a, b) { return a.order - b.order; }).map(function (a) { return a.key; }),
+      supported: sup.map(function (r) { return r.key; }), readOnly: ro.map(function (r) { return r.key; }),
+      absent: absent.map(function (r) { return r.key; }), unsafe: unsafe.map(function (r) { return r.key; }),
+      disabled: dis.map(function (r) { return r.key; }),
+      counts: { total: rows.length, supported: sup.length, readOnly: ro.length, absent: absent.length, unsafe: unsafe.length, disabled: dis.length },
+      seedKey: ADAPTER_SEED_KEY, seed: randSeedInfo(), scope: SCOPE,
+      note: '判据是**运行时探针**（在真副本上真调一次，哨兵拦下直写）—— 不是读源码字符串；'
+        + '四档处置各自成栏：supported 能推进、read-only 只观测、skipped-absent 缺席、skipped-unsafe 隔离不可用' };
+  }
+  /**
+   * 多引擎副本推进：**同一份副本**按 order 升序逐轮把 supported 的推进类跑一遍，
+   *   read 类在每轮之后各取一口观测。三条边界全部**实测**（不是声明）：
+   *     · `liveUnchanged`  —— 跑前跑后 live 摘要一致；
+   *     · `seedUnchanged`  —— 显式种子下 `rand.getSeed()` 前后一致（固定种子可重放）；
+   *     · `localWrites` / `notify` —— localStorage 写计数与通知源在场性（缺席如实报 absent）。
+   *   `seeds` 给了多个种子时逐个重跑，报「差异**存在与否**」——
+   *   **绝不**把几次差异折算成概率（几次不是统计样本，说概率就是编）。
+   */
+  let _adv = null;
+  let _adTable = null;   // 最近一次适配器表（statOf / diagnose 复用它，不各算各的）
+  function advance(spec) {
+    const cfg = settings();
+    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const ex = execMod();
+    if (!ex) { fault('exec-absent'); return { ok: false, reason: 'exec-absent',
+      hint: '隔离执行面在 core/exec.js —— 它缺席时本模块**不**在 live 世界上推演' }; }
+    const o = isObj(spec) ? spec : {};
+    const rounds = simRoundOf(o.rounds);
+    const before = liveDigest();
+    if (!before.ok) { fault('no-store'); return { ok: false, reason: 'no-store' }; }
+    const base = ex.cloneState(WA);
+    if (!base) { fault('sandbox-failed'); return { ok: false, reason: 'sandbox-failed',
+      hint: '深拷贝失败（循环引用等）—— 拿不到副本就不跑' }; }
+    // ① 先判表（探针各自用独立副本，与这里的 base 无关）
+    const table = adapterTable({});
+    if (!table.ok) return table;
+    const plan = table.rows.filter(function (r) { return r.kind === 'advance' && r.handling === 'supported'; })
+      .sort(function (a, b) { return a.order - b.order; });
+    // 轮后观测只收「探针实测过：不写真世界、也不直调真 store」的那几条
+    const reads = table.rows.filter(function (r) { return r.kind === 'read' && r.directWrites === 0 && r.liveSame === true; });
+    const skipped = table.rows.filter(function (r) { return r.kind === 'advance' && r.handling !== 'supported'; });
+    // ② 显式种子（给了才播种 —— 不偷偷换掉调用方的序列）
+    const asked = (o.seed === undefined || o.seed === null) ? null : o.seed;
+    if (asked !== null && WA.rand && typeof WA.rand.seed === 'function') { try { WA.rand.seed(asked); } catch (e) {} }
+    //   ⚠ 基线取在**播种之后**:要测的不变式是「推进本身没有把种子换掉」,
+    //     而不是「种子与播种前不同」(后者恒真,判据会说空话)。
+    const seedBefore = randSeedInfo();
+    const sand = ex.sandStore(base);
+    const at0 = clockNow('worldLab.advance');
+    const ctx = { store: sand, world: WA.world,
+      clock: { now: function () { return at0; }, wall: function () { return at0; }, label: 'worldLab.advance' },
+      stat: { faults: {} }, sink: base, writes: 0 };
+    let lsTotal = 0;
+    const hLs = hookOnce(lsOf(), 'setItem', function () { return function () { lsTotal++; }; });
+    const rows = [];
+    // 推进期**不**挂 store 哨兵：supported 的类已被探针证明不碰真 store（碰了的早被剔出计划）。
+    for (let i = 0; i < rounds; i++) {
+      const at = at0 + (i + 1) * SIM_ROUND_MS;
+      ctx.clock = { now: function () { return at; }, wall: function () { return at; }, label: 'worldLab.advance' };
+      _probeAt = at;
+      const steps = [];
+      let threw = '';
+      try {
+        ex.withContext(ctx, function () {
+          for (let j = 0; j < plan.length; j++) {
+            const r = plan[j];
+            let out = null, err = '';
+            try {
+              out = (r.key === 'consequence') ? WA[r.engine][r.member]({ now: at }) : WA[r.engine][r.member](at, { max: 2 });
+            } catch (e) { err = String((e && e.message) || e).slice(0, 100); }
+            steps.push({ key: r.key, order: r.order, ok: !!(out && out.ok === true),
+              changed: out ? (num(out.changed) || 0) : null, threw: err });
+          }
+          return true;
+        });
+      } catch (e) { threw = String((e && e.message) || e).slice(0, 100); }
+      const obs = [];
+      for (let k = 0; k < reads.length; k++) {
+        const r = reads[k];
+        let out = null;
+        try { out = ex.withContext(ctx, probeCall(r, WA[r.engine][r.member])); }
+        catch (e) { out = null; }
+        obs.push({ key: r.key, order: r.order, handling: r.handling,
+          count: (out && num(out.count) !== null) ? num(out.count) : (out && Array.isArray(out.rows) ? out.rows.length : null) });
+      }
+      rows.push({ n: i + 1, at: at, steps: steps, obs: obs, threw: threw, writes: ctx.writes || 0,
+        changed: steps.reduce(function (a, s) { return a + (s.changed || 0); }, 0) });
+    }
+    unhook(hLs);
+    const after = liveDigest();
+    const liveUnchanged = !!(before.ok && after.ok && before.digest === after.digest);
+    const seedAfter = randSeedInfo();
+    const seedUnchanged = !!(asked !== null && seedBefore.seed !== null && seedAfter.seed !== null && seedAfter.seed === seedBefore.seed);
+    _stat.advances++;
+    _stat.lastReason = liveUnchanged ? 'advanced' : 'live-changed';
+    // ③ 多种子：逐个重跑，只报「差异存在与否」，**不**折算概率
+    let multi = null;
+    if (Array.isArray(o.seeds) && o.seeds.length > 1) {
+      const sigs = [];
+      for (let i = 0; i < o.seeds.length; i++) {
+        const sd = o.seeds[i];
+        if (WA.rand && typeof WA.rand.seed === 'function') { try { WA.rand.seed(sd); } catch (e) {} }
+        const b2 = ex.cloneState(WA);
+        let acc = '';
+        if (b2) {
+          const s2 = ex.sandStore(b2);
+          const c2 = { store: s2, world: WA.world, stat: { faults: {} }, sink: b2, writes: 0,
+            clock: { now: function () { return at0; }, wall: function () { return at0; }, label: 'worldLab.advance.seed' } };
+          try {
+            ex.withContext(c2, function () {
+              for (let j = 0; j < plan.length; j++) {
+                try {
+                  if (plan[j].key === 'consequence') WA[plan[j].engine][plan[j].member]({ now: at0 });
+                  else WA[plan[j].engine][plan[j].member](at0, { max: 2 });
+                } catch (e) {}
+              }
+              return true;
+            });
+          } catch (e) {}
+          try { acc = sig(JSON.stringify(b2).slice(0, 200000)); } catch (e) { acc = ''; }
+        }
+        sigs.push({ seed: sd, sig: acc });
+      }
+      const uniq = sigs.map(function (x) { return x.sig; }).filter(function (v, i, arr) { return arr.indexOf(v) === i; });
+      multi = { runs: sigs.length, distinct: uniq.length, differs: uniq.length > 1,
+        seeds: sigs.map(function (x) { return x.seed; }),
+        note: '只报「几次跑之间**存在差异**与否」—— 几次不是统计样本，本口**不**输出任何概率或置信度' };
+      if (asked !== null && WA.rand && typeof WA.rand.seed === 'function') { try { WA.rand.seed(asked); } catch (e) {} }
+    }
+    // ④ 通知源：缺席如实报（**不是**「零泄漏」—— 没有源可泄漏）
+    //   ⚠ 通知源只有**一个真源**:engines/phone-bridge.js 提供的 `phoneBridge`。
+    //     曾误读 `WA.notify` —— 那个命名空间**无人提供**(`notify` 只是 rehearsal 的
+    //     步骤 kind 词汇),由 module-cycle-gate 的「未提供」面当场报出。
+    const notify = {
+      phoneBridge: !!(WA.phoneBridge), hooked: false,
+      note: WA.phoneBridge
+        ? '本口**不**注入假通知源，也不替来源发通知 —— 推进全程只经 exec.mutate 落副本'
+        : '两个通知源都不在场（absent）—— 「零泄漏」在这里说的是「没有源」，不是「拦住了」'
+    };
+    _adv = { id: (WA.rand && WA.rand.id) ? WA.rand.id('adv_', 4, 'id') : ('adv_' + at0),
+      at: at0, rounds: rounds, plan: plan.map(function (r) { return r.key; }),
+      skipped: skipped.map(function (r) { return { key: r.key, handling: r.handling, why: r.handlingWhy }; }),
+      rows: rows, before: before, after: after, liveUnchanged: liveUnchanged,
+      seedBefore: seedBefore, seedAfter: seedAfter, seedUnchanged: seedUnchanged,
+      localWrites: lsTotal, notify: notify, multi: multi,
+      sig: sig(JSON.stringify(rows.map(function (x) { return x.n + ':' + x.changed + ':' + x.steps.length; }))) };
+    return { ok: true, id: _adv.id, at: at0, rounds: rounds, askedRounds: (o.rounds === undefined ? null : num(o.rounds)),
+      clamped: (num(o.rounds) !== null && Math.floor(num(o.rounds)) !== rounds),
+      plan: _adv.plan, skipped: _adv.skipped,
+      supported: table.supported, readOnly: table.readOnly, absent: table.absent, unsafe: table.unsafe, disabled: table.disabled,
+      changedTotal: rows.reduce(function (a, x) { return a + x.changed; }, 0),
+      writes: ctx.writes || 0,
+      rows: rows.map(function (x) { return { n: x.n, changed: x.changed, steps: x.steps.length, writes: x.writes }; }),
+      liveUnchanged: liveUnchanged, liveBefore: before.ok ? before.digest : null, liveAfter: after.ok ? after.digest : null,
+      seedAsked: asked, seedBefore: seedBefore.seed, seedAfter: seedAfter.seed, seedUnchanged: seedUnchanged,
+      seedKey: ADAPTER_SEED_KEY, localWrites: lsTotal, notify: notify, multi: multi, scope: table.scope,
+      note: '同一份副本按 order 升序累积推进（不是 N 份独立推演）；只跑 supported 的推进类，'
+        + '未支持的逐条带 handling 与 why（read-only / skipped-absent / skipped-unsafe）；'
+        + 'live 零写与种子前后一致两栏都是**实测差**' };
+  }
   // ── 导出：把**起点世界**导出为一份真蓝图（交 E8 依赖体检核）────────────
   /**
    * 为什么导出的是**起点世界**而不是「跑了 A 之后的副本」：副本从来不是真世界，
@@ -770,13 +1162,19 @@
       // ── v2.203.0（Y9）四栏口径 ─────────────────────────────────
       simCap: MAX_ROUNDS, simDefault: DEF_SIM_ROUNDS,
       beatAheadCap: MAX_AHEAD, beatFamily: BEAT_FACES.slice(),
+      // ── v2.223.0（N7）适配器面口径 ───────────────────────────
+      adapters: ADAPTERS.map(function (a) { return { key: a.key, label: a.label, order: a.order, kind: a.kind, engine: a.engine, member: a.member }; }),
+      adapterOrder: ADAPTERS.slice().sort(function (a, b) { return a.order - b.order; }).map(function (a) { return a.key; }),
+      adapterSeedKey: ADAPTER_SEED_KEY,
       beatSandboxMembers: BEAT_SANDBOX_MEMBERS.slice(),
       writesSingle: 'adopt',                  // 唯一写世界口
       consume: {
         simulate: '面板「沙盒推进」钮 → WA.worldLab.simulate',
         report: '面板「结果报告」钮 → WA.worldLab.report',
         adopt: '面板「采纳这一条」钮 → WA.worldLab.adopt（走 U2）',
-        beats: '面板「拍引擎推演」钮 → WA.worldLab.beats'
+        beats: '面板「拍引擎推演」钮 → WA.worldLab.beats',
+        adapterTable: '面板「适配器表」钮 → WA.worldLab.adapterTable',
+        advance: '面板「多引擎推进」钮 → WA.worldLab.advance'
       },
       notes: {
         noLiveWrite: '三条路径全部落在隔离副本上；本模块零 store.transact、零 draft 赋值、零 localStorage 写',
@@ -797,7 +1195,13 @@
         reportWhy: '报告把每一处变化拆成一条原因，逐条带 src；无变化的轮如实记 no-change',
         adoptGuard: '采纳只碰**一条**世界事实，且要过五道门（enabled / 有报告 / 起点未过期 / index 命中 / commit 在场）',
         beatGap: '拍引擎族一律直调 store.transact、不走 exec ⇒ 当前只能给只读投影；缺口写在返回体的 note 里',
-        noTimer: '本模块**不注册定时器** —— 实验由调用方显式跑'
+        noTimer: '本模块**不注册定时器** —— 实验由调用方显式跑',
+        adapterTimeOrder: '推进严格按声明顺序（' + ADAPTERS.map(function (a) { return a.order + '=' + a.key; }).join(' / ')
+          + '）在同一份副本上累积 —— 顺序错了，后一步读到的就是错的那份世界',
+        unsupportedScope: 'unsupported 的**范围**是本模块声明的适配器表（' + ADAPTERS.length + ' 类），'
+          + '不是「扫过全仓引擎」—— 把没测过的模块说成「测过且不合格」两句都不真',
+        seedIsolation: '固定种子可重放（显式播种才谈复现）；多种子只报「差异存在与否」，'
+          + '**不**折算成概率 —— 几次不是统计样本'
       }
     };
   }
@@ -833,7 +1237,18 @@
         verified: _sim ? (_sim.liveUnchanged === true) : null
       },
       unknowns: unknownReasons(),
-      faults: Object.assign({}, _stat.faults)
+      faults: Object.assign({}, _stat.faults),
+      // ── v2.223.0（N7）适配器面：逐类处置 + 未支持清单（同一份表，不各算各的）──
+      adapters: _adTable ? _adTable.rows.map(function (r) { return { key: r.key, order: r.order, kind: r.kind,
+        engine: r.engine, member: r.member, handling: r.handling, why: r.handlingWhy,
+        writes: r.writes, directWrites: r.directWrites, reads: r.reads, liveSame: r.liveSame,
+        cfgRestored: r.cfgRestored }; }) : [],
+      adaptersSupported: _adTable ? _adTable.supported.slice() : [],
+      adaptersUnsupported: _adTable ? _adTable.rows.filter(function (r) { return r.handling !== 'supported'; }).map(function (r) { return r.key; }) : [],
+      adaptersScope: _adTable ? _adTable.scope : '',
+      advance: _adv ? { id: _adv.id, rounds: _adv.rounds, plan: _adv.plan.slice(),
+        liveUnchanged: _adv.liveUnchanged, seedUnchanged: _adv.seedUnchanged,
+        localWrites: _adv.localWrites, multi: _adv.multi } : null
     };
   }
   function statOf() {
@@ -842,7 +1257,13 @@
       arms: _lab ? _lab.arms.length : 0, armIds: ARMS.slice(),
       // ── v2.203.0（Y9） ────────────────────────────────────────
       hasSim: !!_sim, simRows: _sim ? _sim.rows.length : 0,
-      hasReport: !!_sim, writesSingle: 'adopt' });
+      hasReport: !!_sim, writesSingle: 'adopt',
+      // ── v2.223.0（N7）适配器面 ───────────────────────────────
+      hasAdvance: !!_adv, advanceRows: _adv ? _adv.rows.length : 0,
+      adapters: ADAPTERS.length,
+      adaptersSupported: _adTable ? _adTable.supported.length : 0,
+      adaptersUnsupported: _adTable ? (_adTable.rows.length - _adTable.supported.length) : 0,
+      seedUnchanged: _adv ? _adv.seedUnchanged : null });
   }
 
   // 导出面：**每一口都有真消费方**（本仓口径：无消费方不挂导出）。
@@ -860,9 +1281,13 @@
     staleness: staleness, discard: discard, exportAs: exportAs,
     // Y9：沙盒推进 / 结果报告 / 选择性采纳 / 拍引擎联动（消费方 = 面板同区块四枚钮）
     simulate: simulate, report: report, adopt: adopt, beats: beats,
+    // v2.223.0（N7）：适配器面两口干（消费方 = 面板两枚钮 + tool-diag secWorldLab + 专锁）
+    //   advance        —— 多引擎副本推进（按 order 累积；未支持的逐条如实处置）
+    //   adapterTable   —— 逐类调一次运行时探针，给出四档处置与读数
+    advance: advance, adapterTable: adapterTable,
     kinds: function () { return kinds(); },
     parseSteps: function (text, max) { return parseSteps(text, max); },
     diagnose: diagnose, stat: statOf
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-lab.js', { kind: 'engine', ver: '2.203.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/world-lab.js', { kind: 'engine', ver: '2.223.0' });
 })();
