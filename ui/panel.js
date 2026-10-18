@@ -243,6 +243,11 @@
     //   义务/事件上差在哪」—— 同一批的「把两份东西放在一张面上逐行看」。
     //   与其他页不同的一点:本页三个口**全部 readOnly**——没有任何一个落地按钮。
     { id: 'branchdiff', icon: '🌿', label: '分支比较' },
+    // v2.227.0(拓展 N9):三项目剧情事件闭环(engines/story-loop.js)。
+    //   页 id 纯小写字母(tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析)。
+    //   插在 branchdiff 之后:两者都在「把几份东西放在一张面上对」这一族里,
+    //   但本页答的是「这一笔手机动作走完整条链了没」。
+    { id: 'storyloop', icon: '🔗', label: '事件闭环' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -2227,7 +2232,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       + '<button class="wa-btn" id="wa-ka-eval" title="只算不写：立刻重算三态并打印本回合会注入的块">试算</button>'
       + '<button class="wa-btn" id="wa-ka-clear" title="清空全部派生量与规则（不改世界状态）">清空</button></div>'
       + '<div id="wa-ka-out" class="wa-out"></div>';
-    out += '<div data-omniscient><div class="wa-sec">注入自检</div><div class="wa-sec">注入价值评估</div>'
+    out += '<div data-omniscient><div class="wa-sec">注入自检</div>'
       + '<div class="wa-sec">注入价值评估（纯只读：关掉之后读数恒空，不是「都没用上」）</div>'
       + '<div class="wa-row"><button class="wa-btn" id="wa-inj-refresh" title="重新读取当前注入快照（只读，不改变任何状态）">刷新快照</button>'
       + '<button class="wa-btn" id="wa-inj-explain" title="本轮为何这样：只报“进了什么”与“还有几项没进”（玩家视图）；逐项原因属制作者视图">本轮解释</button>'
@@ -2239,7 +2244,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       //   三条口径必须写在用户看得见的地方，否则这张榜单会被读成「AI 觉得这个源不好」：
       //     ① 引用率 ≠ 采纳率（提到了不等于这笔状态被吸收）；② 跨源通用片段不算数
       //     （每条源都有的句子命中了也说明不了任何关于这个源的事）；③ 算不出来 ≠ 算出来是 0。
-      + '<div class="wa-sec">注入价值<span class="wa-dim">（注入进去的东西有没有被正文用上）</span></div>'
+      + '<div class="wa-sec">注入价值评估<span class="wa-dim">（注入进去的东西有没有被正文用上）</span></div>'
       + '<div class="wa-dim">只读评估：它不改注入、不改世界、不评判生成质量。排序按 <b>排除跨源通用片段后的引用率</b>升序 —— 最没用的排在最前（这张表是给「处置」用的，不是给「表彰」用的）。连击指「最近连续 N 轮一次都没被引用」。</div>'
       + '<div class="wa-row"><button class="wa-btn" id="wa-iv-refresh" title="按当前台账重算榜单（只读，不改变任何状态）">刷新榜单</button></div>'
       + '<label class="wa-row"><input id="wa-iv-enabled" type="checkbox" ' + (ivCfg.enabled ? 'checked' : '') + '/> 启用注入价值评估（纯只读：关掉之后读数恒空，不是「都没用上」）</label>'
@@ -2514,6 +2519,45 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-bd-stat">诊断</button>
       </div>
       <div id="wa-bd-out" class="wa-out"></div>`;
+  }
+  function renderStoryLoop() {
+    // v2.227.0(拓展 N9):三项目剧情事件闭环。
+    //   「桥在」与「整链已形成」在界面上必须分得开 —— 前者只答线接上了,后者逐笔看闭环。
+    const lcfg = (WA.storyLoop && WA.storyLoop.getSettings) ? WA.storyLoop.getSettings() : null;
+    const a = (WA.storyLoop && typeof WA.storyLoop.audit === 'function') ? WA.storyLoop.audit() : null;
+    const cs = (WA.storyLoop && typeof WA.storyLoop.contracts === 'function') ? WA.storyLoop.contracts() : null;
+    const edgeRows = (cs && cs.edges ? cs.edges : []).map(function (e) {
+      return '<div class="wa-item">' + esc(e.edge) + ' — ' + esc(e.duty)
+        + '<div class="wa-dim">' + (e.present ? '在场' : '缺席') + ' · 对端自报 '
+        + esc(e.version === null ? '读不到' : String(e.version)) + ' · 本侧认 '
+        + esc(e.expect === null ? '未登记' : String(e.expect)) + ' · '
+        + (e.matched ? '已对齐' : '未对齐(' + esc(e.why) + ')') + '</div></div>';
+    }).join('');
+    return `
+      <div class="wa-sec">三项目剧情事件闭环(N9)<span class="wa-dim">(契约只读;落地必须逐笔显式)</span></div>
+      <div class="wa-dim">复用出站桥 / phoneBridge 入站 / lonsha-reader。桥在 <b>不等于</b> 整链已形成 —— 逐笔看闭环。缺席 / 迟到 / 重复 / 时钟分歧一律如实报,不伪造同步成功。</div>
+      <label class="wa-row"><input id="wa-sl-enabled" type="checkbox" ${(lcfg && lcfg.enabled) ? 'checked' : ''}/> 启用事件闭环(关着时五个口一并拒收)</label>
+      <div class="wa-row">
+        <span class="wa-dim">三条边契约</span>
+        <button class="wa-btn" id="wa-sl-contracts">核契约</button>
+        <button class="wa-btn" id="wa-sl-audit">闭环审计</button>
+        <button class="wa-btn" id="wa-sl-stat">诊断</button>
+        <button class="wa-btn" id="wa-sl-reset">清零计数</button>
+      </div>
+      <div id="wa-sl-edges" class="wa-out">${edgeRows}</div>
+      <div class="wa-row">
+        <span class="wa-dim">闭环读数:${a ? esc(a.verdict) + ' · 已闭环 ' + a.closedLoops + ' / 待闭环 ' + a.unlinked + (a.dangling ? ' / 悬空 ' + a.dangling : '') : '(未加载)'}</span>
+      </div>
+      <div class="wa-row">
+        <input id="wa-sl-cause" class="wa-input" placeholder="候选原因 id(须已在世界)"/>
+        <button class="wa-btn" id="wa-sl-cand">列候选</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-sl-op" class="wa-input" placeholder="手机操作 opId"/>
+        <button class="wa-btn" id="wa-sl-confirm">确认落地</button>
+        <button class="wa-btn" id="wa-sl-trace">追溯</button>
+      </div>
+      <div id="wa-sl-out" class="wa-out"></div>`;
   }
   function renderTools() {
     // v2.155.0（RX8 世界种子库）：读数在「工具」页常驻，开关状态进渲染（
@@ -3001,7 +3045,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     </div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, logs: renderLogs,
+  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -7236,7 +7280,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       const bv = wv('#wa-plan-adoptbudget');
       if (bv !== '') { const n = Number(bv); if (isFinite(n)) WA.plan.setSettings({ adoptBudget: n }); }
       // 采用仍按**显式步骤**（textarea）——「自动」指闸门自动，不是内容自动。
-      const r = WA.plan.adopt(planWho(), planSteps(), { turn: String(Date.now()) });
+      // turn 走决策时钟（G20 单一时间源；此处曾裸调 Date.now 被全量回归抓出）。
+      const r = WA.plan.adopt(planWho(), planSteps(), { turn: String(clockNow('plan.adopt')) });
       planOut(Object.assign({}, r, { id: r.ok ? ('已采用 ' + r.steps + ' 步（本轮 ' + r.used + '/' + r.budget + '）')
         : (r.reason + (r.reason === 'auto-adopt-off' ? '（自动采用开关未开）' : '')) }));
     });
@@ -8899,6 +8944,98 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       };
     }
 
+    // ── v2.227.0(N9):三项目剧情事件闭环(engines/story-loop.js,8 导出)──
+    //   ⚠ **本区块必须挂在 storyloop 页** = 控件**渲染**的那一页(同 N8 的
+    //   「绑定页必须等于渲染页」不变式:控件渲染在一页、处理器装在另一页就是「点了没反应」)。
+    if (currentPage === 'storyloop') {
+      const slOut = function (html) { const o = $('#wa-sl-out'); if (o) o.innerHTML = html; };
+      const slWhy = function (reason) {
+        const M = {
+          disabled: '这一面关着(上面的开关打开后才有动作)',
+          'inbound-bridge-missing': 'phoneBridge 未加载 —— 入站边在它那边',
+          'no-cause': '缺原因:候选的原因必须已在世界(先让正文结算出因)',
+          'unknown-cause': '这个原因不在世界里(不凭空造因)',
+          late: '迟到:超出闭环窗口,不许伪造同步成功',
+          'missing-op': '缺 opId'
+        };
+        return M[reason] || ('拒收:' + String(reason || '?'));
+      };
+      const slCfg = $('#wa-sl-enabled');
+      if (slCfg) slCfg.onchange = function () {
+        if (!WA.storyLoop || !WA.storyLoop.setSettings) return slOut('<div class="wa-log wa-log-err">未记录:module-missing</div>');
+        WA.storyLoop.setSettings({ enabled: !!slCfg.checked });
+        slOut('<div class="wa-log wa-log-info">已记录 ' + (slCfg.checked ? 'enabled' : 'disabled(五个口一并拒收)') + '</div>');
+      };
+      on('#wa-sl-contracts', () => {
+        if (!WA.storyLoop || !WA.storyLoop.contracts) return slOut('<div class="wa-log wa-log-err">未加载</div>');
+        const c = WA.storyLoop.contracts();
+        const box = $('#wa-sl-edges');
+        if (box) box.innerHTML = c.edges.map(function (e) {
+          return '<div class="wa-item">' + esc(e.edge) + ' — ' + esc(e.duty)
+            + '<div class="wa-dim">' + (e.present ? '在场' : '缺席') + ' · 对端自报 '
+            + esc(e.version === null ? '读不到' : String(e.version)) + ' · 本侧认 '
+            + esc(e.expect === null ? '未登记' : String(e.expect)) + ' · '
+            + (e.matched ? '已对齐' : '未对齐(' + esc(e.why) + ')') + '</div></div>';
+        }).join('');
+        slOut('<div class="wa-log wa-log-info">' + c.matchedCount + '/' + c.total + ' 边契约对齐</div>');
+      });
+      on('#wa-sl-audit', () => {
+        if (!WA.storyLoop || !WA.storyLoop.audit) return slOut('<div class="wa-log wa-log-err">未加载</div>');
+        const r = WA.storyLoop.audit();
+        const g = Object.keys(r.guardCounts).map(function (k) { return esc(k) + ' ' + r.guardCounts[k]; }).join(' / ');
+        slOut('<div class="wa-log wa-log-' + (r.verdict === 'closed' ? 'info' : 'warn') + '">闭环:'
+          + esc(r.verdict) + ' · 三边 ' + r.matchedCount + '/' + r.edgeTotal + ' · 已闭环 ' + r.closedLoops
+          + ' · 待闭环 ' + r.unlinked + (r.dangling ? ' · 悬空 ' + r.dangling : '')
+          + '</div><div class="wa-dim">四类看门:' + g + '</div>'
+          + (r.reasons.length ? '<div class="wa-dim">理由:' + esc(r.reasons.join('、')) + '</div>' : ''));
+      });
+      on('#wa-sl-stat', () => {
+        if (!WA.storyLoop || !WA.storyLoop.stat) return slOut('<div class="wa-log wa-log-err">未加载</div>');
+        const st = WA.storyLoop.stat();
+        const fk = Object.keys(st.faults || {}).map(function (k) { return esc(k) + ' ' + st.faults[k]; }).join(' / ');
+        slOut('<div class="wa-log wa-log-info">开关 ' + (st.enabled ? '开' : '关') + ' · 窗口 '
+          + Math.round(st.windowMs / 60000) + ' 分钟 · 边 ' + st.edges + ' / 看门 ' + st.guards + '</div>'
+          + '<div class="wa-item">计数:审计 ' + st.audits + ' · 候选 ' + st.candidateCalls + ' · 落地 ' + st.confirms
+          + ' · 已接 ' + st.already + ' · 拒收 ' + st.refusals + ' · 追溯 ' + st.traced + '</div>'
+          + (st.lastReason ? '<div class="wa-dim">最近一次:' + esc(st.lastReason) + '</div>' : '')
+          + (fk ? '<div class="wa-dim">拒收分布:' + fk + '</div>' : ''));
+      });
+      on('#wa-sl-reset', () => {
+        if (!WA.storyLoop || !WA.storyLoop.reset) return slOut('<div class="wa-log wa-log-err">未加载</div>');
+        const r = WA.storyLoop.reset();
+        slOut('<div class="wa-log ' + (r && r.ok ? 'wa-log-info' : 'wa-log-err') + '">'
+          + (r && r.ok ? '计数与拒收分布已清零(设置与三条边清单不动)' : '未记录:reset-failed') + '</div>');
+      });
+      on('#wa-sl-cand', () => {
+        if (!WA.storyLoop || !WA.storyLoop.candidates) return slOut('<div class="wa-log wa-log-err">未加载</div>');
+        const r = WA.storyLoop.candidates({ cause: wv('#wa-sl-cause') });
+        if (!r.ok) return slOut('<div class="wa-log wa-log-warn">' + esc(slWhy(r.reason)) + '</div>');
+        if (!r.rows.length) return slOut('<div class="wa-dim">没有待接链的手机操作(候选为空即台账里每一笔都已走完)</div>');
+        slOut(r.rows.map(function (x) {
+          return '<div class="wa-item">' + esc(x.opId) + ' — ' + esc(x.actLabel)
+            + '<div class="wa-dim">' + (x.canCommit ? '可落地' : '被拦:' + esc(x.blockReason))
+            + (x.late ? ' · 迟到' : '') + (x.ageMs >= 0 ? ' · ' + Math.round(x.ageMs / 1000) + 's 前' : '') + '</div></div>';
+        }).join(''));
+      });
+      on('#wa-sl-confirm', () => {
+        if (!WA.storyLoop || !WA.storyLoop.confirm) return slOut('<div class="wa-log wa-log-err">未加载</div>');
+        const r = WA.storyLoop.confirm(wv('#wa-sl-op'), { cause: wv('#wa-sl-cause') });
+        if (!r.ok) return slOut('<div class="wa-log wa-log-warn">' + esc(slWhy(r.reason)) + (r.step ? '(' + esc(r.step) + ')' : '') + '</div>');
+        slOut('<div class="wa-log wa-log-info">' + (r.already ? '已接过链(不重复落地)' : '已落地')
+          + ' · 链 ' + esc(r.chainId) + '</div>');
+        if (typeof renderBody === 'function') renderBody();
+      });
+      on('#wa-sl-trace', () => {
+        if (!WA.storyLoop || !WA.storyLoop.trace) return slOut('<div class="wa-log wa-log-err">未加载</div>');
+        const r = WA.storyLoop.trace(wv('#wa-sl-op'));
+        if (!r.ok) return slOut('<div class="wa-log wa-log-warn">' + esc(slWhy(r.reason)) + '</div>');
+        slOut('<div class="wa-log wa-log-' + (r.closed ? 'info' : 'warn') + '">' + esc(r.opId)
+          + (r.closed ? ':三段齐(回执 → 因果 → 记忆)' : ':断链段已如实标出') + '</div>'
+          + '<div class="wa-dim">回执 ' + (r.segments.receipt ? '有' : '无')
+          + ' · 因果 ' + (r.segments.chain ? '有(' + esc(r.chain ? r.chain.cause : '') + ')' : '无')
+          + ' · 记忆 ' + (r.segments.memory ? '有(账本 ' + r.memory.total + ')' : '无(' + esc(r.memory.reason) + ')') + '</div>');
+      });
+    }
     // ── v2.224.0(N8):分支语义比较与选择性移植(engines/branch-diff.js,7 导出)──
     //   ⚠ **本区块必须挂在 branchdiff 页** = 控件**渲染**的那一页。
     //   挂在 tools 页的后果是:控件渲染在 branchdiff、处理器却只在 tools 页装 —— 按钮照在、点了没反应

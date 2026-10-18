@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.226.0'
+  const VERSION = '2.227.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -616,6 +616,15 @@
     //   本模块**零写路径**:三个口全部 readOnly(改世界/改分支都不在这里做)——
     //   「原分支不改」这句硬要求的实现方式就是「这里没有写口」。
     'engines/branch-diff.js',
+    // v2.227.0(拓展 N9):三项目剧情事件闭环(engines/story-loop.js)。
+    //   位置在 **phone-bridge / lonsha-reader / causal / bridge 全部之后** —— 它把这条链上的
+    //   三段串起来(手机动作回执 → 世界候选因果 → 确认落地 → 记忆来源追溯),而**三段全都
+    //   委托来源模块的公开口**(bridge.handshake / phoneBridge.opTrace·opsView·linkChain /
+    //   causal.addChain·knownCause·stateView / lonshaReader.lonshaSource·readLonshaSnapshot·
+    //   ledgerSummary·diffWithLonsha),本模块不另探一遍。故这些对端必须先装,否则契约与追溯
+    //   一律落到「缺席」。
+    //   本模块**零改动给对端**(计划明文「不改对端直到另获实施授权」):它只作消费方。
+    'engines/story-loop.js',
     // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。位置在 branch-tree 之后、
     //   ui/panel.js 之前：两者在调用期读 rumor / causal / chronicle / worldFacts 与 perfLedger
     //   （全部在本行之前装载），且 eco-audit 的读数由面板「联网」页与 store.maintain 消费 ——

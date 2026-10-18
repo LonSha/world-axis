@@ -1318,6 +1318,24 @@
       };
     });
   }
+  /** v2.227.0(拓展 N9):三项目剧情事件闭环读数(只读)。 */
+  function secStoryLoop() {
+    const sl = WA.storyLoop;
+    if (!sl || typeof sl.audit !== 'function') return { ok: false, reason: 'module-missing' };
+    let a = null, cs = null, st = null;
+    try { a = sl.audit(); } catch (e) { a = { verdict: 'threw', reasons: [String(e && e.message || e)] }; }
+    try { cs = sl.contracts(); } catch (e) { cs = null; }
+    try { st = sl.stat(); } catch (e) { st = null; }
+    return { ok: true,
+      verdict: a.verdict, reasons: (a.reasons || []).slice(),
+      matchedCount: a.matchedCount, edgeTotal: a.edgeTotal,
+      ops: a.ops, linked: a.linked, unlinked: a.unlinked, closedLoops: a.closedLoops, dangling: a.dangling,
+      guardCounts: a.guardCounts, clock: a.clock,
+      edges: (cs && cs.edges ? cs.edges.map(function (e) {
+        return { edge: e.edge, present: e.present, version: e.version, expect: e.expect, matched: e.matched, why: e.why };
+      }) : []),
+      confirms: (st && st.confirms) || 0, refusals: (st && st.refusals) || 0, traced: (st && st.traced) || 0 };
+  }
   function secWorldLab() {
     return safe(function () {
       if (!WA.worldLab || typeof WA.worldLab.diagnose !== 'function') {
@@ -2010,6 +2028,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/plot-gauge.js': 'plotGauge',
     'engines/branch-tree.js': 'branchTree',
     'engines/branch-diff.js': 'branchDiff',
+    // v2.227.0(拓展 N9):三项目剧情事件闭环。登记为必载——面板「事件闭环」页与本文件的
+    //   secStoryLoop 均读它,缺席就是「闭环读数缺席」本身。漏登记的后果不是「少一行字」:
+    //   inventory 的定义面与出口面契约都从本表取。
+    'engines/story-loop.js': 'storyLoop',
     // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。登记为必载 —— 注入链的
     //   `远方的传说` 源读 worldBridge.buildBlock，面板「联网」页与本文件的 secWorldBridge /
     //   secEcoAudit 都读它们，缺席就是「联网/自洽读数缺席」本身，不该被静默兜住。
@@ -3351,9 +3373,14 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.182.0（第二批 O5 / E2 / E5）：健康页三块 —— 12 控件。
     //   三块合页（健康中心 / 世界日程 / 世界纪事），登记到 health 页；
     //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
+    // v2.227.0 收口:全量回归「panel 渲染的每个控件都在守卫表内」抓到 14 枚**已渲染 +
+    //   已绑定、却从未登记**的控件(v2.182.0 / v2.187.0 / v2.219.0 三批的欠债;同 v2.2.0 块 8
+    //   的病:渲染了不登记 ⇒ 守卫在它身上永不生效)。三枚(看欠账 / 纪事 ref / 看一条纪事)
+    //   渲染在 health 页的 wh 块里,故补登到**它们真正所在的那一组**。
     { page: 'health', ids: ['wa-wh-enabled', 'wa-wh-view', 'wa-wh-sources', 'wa-wh-diag', 'wa-wh-drill', 'wa-wh-drill-go',
-        'wa-wh-ag-enabled', 'wa-wh-ag-view', 'wa-wh-ag-sources',
-        'wa-wh-cv-enabled', 'wa-wh-cv-view', 'wa-wh-cv-hidden', 'wa-wh-cv-diag'],
+        'wa-wh-ag-enabled', 'wa-wh-ag-view', 'wa-wh-ag-sources', 'wa-wh-ag-overdue',
+        'wa-wh-cv-enabled', 'wa-wh-cv-view', 'wa-wh-cv-hidden', 'wa-wh-cv-diag',
+        'wa-wh-cv-ref', 'wa-wh-cv-entry'],
       // 三块读数出口走 dynamic 层（同上面 tools 页两条的口径）。
       dynamic: ['wa-wh-out', 'wa-wh-ag-out', 'wa-wh-cv-out'] },
     // v2.183.0（第一批 E1）：统一待办事项中心 —— 7 静态控件 + 1 动态读数出口。
@@ -3363,7 +3390,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       dynamic: ['wa-pc-out'] },
     // v2.187.0（E4）：战役层 —— 6 静态控件 + 1 动态读数出口（同 health 页其余区块规格）。
     //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
-    { page: 'health', ids: ['wa-cp-enabled', 'wa-cp-scene', 'wa-cp-start', 'wa-cp-advance', 'wa-cp-status', 'wa-cp-review', 'wa-cp-reset'],
+    //   v2.227.0 收口:自定义计划那四枚(id / 计划库 / 看结构 / 删掉)渲染在同一块里,
+    //   此前漏登记 ⇒ 补进本组(登记错页比不登记更坏,故不另起一组)。
+    { page: 'health', ids: ['wa-cp-enabled', 'wa-cp-scene', 'wa-cp-start', 'wa-cp-advance', 'wa-cp-status', 'wa-cp-review', 'wa-cp-reset',
+        'wa-cp-planid', 'wa-cp-planlist', 'wa-cp-planshow', 'wa-cp-plandel'],
       dynamic: ['wa-cp-out'] },
     // v2.187.0（E6）：统一地图与关系视图 —— 7 静态控件 + 1 动态读数出口。
     //   渲染在**世界页**（与远方世界脉搏同页同族：都答「外面有什么」），故与 farfield
@@ -3389,8 +3419,17 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.224.0(N8):分支语义比较与选择性移植。同 v2.2.0 块 8 的理由 ——
     //   「渲染了但绑定写错 id」这类断裂只有在守卫登记过的控件上才会被发现。
     //   控件单点渲染于新页 branchdiff（不落 tools 页——同一组 id 落两页会让「重复渲染」看上去像正常）。
+    //   v2.227.0 收口:本页那只读数出口 wa-bd-out 此前未登记(它是动态层,不是按钮 ——
+    //   与 wa-wl-out / wa-rp-out 同规格,落 dynamic 而非静态 ids)。
     { page: 'branchdiff', ids: ['wa-bd-enabled', 'wa-bd-history', 'wa-bd-a', 'wa-bd-b', 'wa-bd-diff',
-      'wa-bd-base', 'wa-bd-tri', 'wa-bd-cat', 'wa-bd-src', 'wa-bd-dst', 'wa-bd-classes', 'wa-bd-plan', 'wa-bd-stat'] },
+      'wa-bd-base', 'wa-bd-tri', 'wa-bd-cat', 'wa-bd-src', 'wa-bd-dst', 'wa-bd-classes', 'wa-bd-plan', 'wa-bd-stat'],
+      dynamic: ['wa-bd-out'] },
+    // v2.227.0(N9):三项目剧情事件闭环。**三件齐做** —— 引擎落盘 + 面板渲染 + 面板绑定**还不够**:
+    //   控件还必须进**这张守卫表**。谓词:渲染 + 绑定 + 登记三件缺一,「id 写错 / 绑定写错页」这类
+    //   断裂在 G18 逐页点击盘查里就**永不可见而门禁全绿**(N7/N8 两轮各自踩过同一形态)。
+    //   本页八枚:一枚复选框(onchange)+ 四枚按钮(onclick)+ 两个输入框 + 一个动态读数出口。
+    { page: 'storyloop', ids: ['wa-sl-enabled', 'wa-sl-contracts', 'wa-sl-audit', 'wa-sl-stat', 'wa-sl-reset',
+      'wa-sl-cause', 'wa-sl-cand', 'wa-sl-op', 'wa-sl-confirm', 'wa-sl-trace'], dynamic: ['wa-sl-out', 'wa-sl-edges'] },
     { page: 'tools', ids: ['wa-wl-enabled', 'wa-wl-a', 'wa-wl-b', 'wa-wl-run', 'wa-wl-arms',
       'wa-wl-diff', 'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag',
       // v2.203.0（Y9）：推几轮 / 沙盒推进 / 结果报告 / 采纳第几条 / 采纳这一条 / 拍引擎推演
@@ -3448,9 +3487,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   新出口上无人发现（本表是「渲染 ↔ 绑定」两面里唯一会互相校验的地方）。
     //   与 graph 页同规：本页一个直接写世界的调用都没有，唯一写路径是 commit()，
     //   而它调的是来源模块自己的公开写口（结构保证，不是一句声明）。
+    //   v2.227.0 收口:N5 的多站路线 / 会合时窗六枚(途经点 / 停留 / 排路线 / 会合方 /
+    //   时窗 / 排会合)渲染在本页,此前漏登记 ⇒ 补进本组。
     { page: 'travel', ids: ['wa-trip-ch', 'wa-trip-from', 'wa-trip-to',
       'wa-trip-plan', 'wa-trip-verify', 'wa-trip-ledger', 'wa-trip-dia',
-      'wa-trip-who', 'wa-trip-act', 'wa-trip-commit'],
+      'wa-trip-who', 'wa-trip-act', 'wa-trip-commit',
+      'wa-trip-stops', 'wa-trip-dwell', 'wa-trip-route',
+      'wa-trip-meet', 'wa-trip-win', 'wa-trip-meet-go'],
       dynamic: ['wa-trip-out'] }
     ,
     // v2.221.0（拓展 N3）：经营供应链（engines/supply-chain.js）。
@@ -4147,7 +4190,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       rulePack: secRulePack(),
       // v2.188.0（E9）：隔离世界实验室与反事实对比。与 rehearsal 节分列 ——
       //   那一节答「一次试演跑了什么」，本节答「三条路径摆在一起的差在哪、这份结论过期没有」。
-      worldLab: secWorldLab()
+      worldLab: secWorldLab(),
+      // v2.227.0(拓展 N9):三项目剧情事件闭环。与 bridge / phoneBridge / lonsha 三节分列
+      //   不合并:那三节各报**一条边**的现场,本节报**整条链走完没**(回执 → 因果 → 记忆)。
+      storyLoop: secStoryLoop()
     };
     diag.verdict = verdict(diag);
     return diag;

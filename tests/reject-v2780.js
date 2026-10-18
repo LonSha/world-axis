@@ -5837,6 +5837,75 @@ function runWitness(WA) {
       } finally { W4.panelFold = keep; }
     });
   }
+  // ── v2.227.0(拓展 N9):三项目剧情事件闭环(engines/story-loop.js)的五条新码 ──
+  //   同 U2/Q8 先例:它们是本版**新增的公开失败归因**,不是「存量未分类」;不给见证就等于
+  //   让门禁替我们说「这些码没人会跑到」。全部走**真 API**(只在内存里临时摘掉/替换对端,
+  //   产品源码一行未动),并在 finally 里无条件还原。
+  {
+    const SLw = WA.storyLoop;
+    if (SLw && typeof SLw.candidates === 'function') {
+      const keepPBw = WA.phoneBridge, keepLRw = WA.lonshaReader, keepCAw = WA.causal;
+      const keepSLw = SLw.getSettings ? SLw.getSettings() : null;
+      const keepPBcfg = (keepPBw && keepPBw.getSettings) ? keepPBw.getSettings() : null;
+      try {
+        if (SLw.setSettings) SLw.setSettings({ enabled: true, windowMs: 6 * 60 * 60 * 1000 });
+        // ⚠ **入站桥默认是关的**:不开它,`noteAction` 根本不会把这笔操作记进台账,
+        //   于是 opTrace 一律 unknown-op —— 后面三条码的路上都断在「操作不存在」这一步
+        //   (首轮 consumer-missing 报「见证缺失」就是这个原因,码本身没坏)。
+        if (keepPBw && keepPBw.setSettings) keepPBw.setSettings({ enabled: true });
+        // ⚠ **顺序要紧**:原因必须**先**在世界里 —— 否则 confirm 会停在更早的 unknown-cause 闸上,
+        //   `add-chain-threw` 那条路径根本走不到(首轮就是这样:两条码报「见证缺失」,而码本身没坏)。
+        WA.store.transact(function (d) {
+          d.worldFacts = (d.worldFacts || []);
+          if (!d.worldFacts.some(function (x) { return x && (x.key === 'witness:n9-cause'); })) {
+            d.worldFacts.push({ id: 'wf_n9w', key: 'witness:n9-cause', value: '见证因', scope: 'world', source: 'reject-v2780', at: 1 });
+          }
+        }, 'reject-witness:n9-cause');
+        // 1 入站桥缺席 ⇒ **入站边在它那边**,本模块如实拒,不装作闭环可用。
+        want('inbound-bridge-missing', 'N9:入站桥缺席 ⇒ candidates/confirm 如实拒 inbound-bridge-missing(「少一根边」不许读成「没事」)');
+        trip('inbound-bridge-missing', function () {
+          WA.phoneBridge = undefined;                 // 只摘模块(产品源码一行未动)
+          const r1 = SLw.candidates({});
+          const r2 = SLw.confirm('op-any', { cause: 'x' });
+          return [r1.reason, r2.reason];
+        });
+        WA.phoneBridge = keepPBw;
+        if (keepPBw && keepPBw.noteAction) keepPBw.noteAction({ opId: 'witness:n9-op', act: 'block', at: Date.now() });
+        // 2 缺原因 ⇒ **不凭空造因**(不替手机侧编一个原因)。
+        want('no-cause', 'N9:confirm 没给原因 ⇒ no-cause(手机侧按了一下不等于我替它编一个因)');
+        trip('no-cause', function () { return SLw.confirm('witness:n9-op', {}).reason; });
+        // 3 建链抛错 ⇒ add-chain-threw(不把异常吞成「已落地」)。
+        want('add-chain-threw', 'N9:causal.addChain 抛错 ⇒ add-chain-threw 并报出断在 add-chain 那一步');
+        tripDeep('add-chain-threw', function () {
+          const keepAdd = keepCAw.addChain;
+          try {
+            keepCAw.addChain = function () { throw new Error('witness:add-chain down'); };
+            return SLw.confirm('witness:n9-op', { cause: 'witness:n9-cause' });
+          } finally { keepCAw.addChain = keepAdd; }
+        });
+        // 4 接线抛错 ⇒ link-threw(链已建成而接线失败:如实报**断在哪一步**)。
+        want('link-threw', 'N9:phoneBridge.linkChain 抛错 ⇒ link-threw(不假装整笔没发生,chainId 照样带回)');
+        tripDeep('link-threw', function () {
+          if (keepPBw && keepPBw.noteAction) keepPBw.noteAction({ opId: 'witness:n9-op2', act: 'block', at: Date.now() });
+          const keepLink = keepPBw.linkChain;
+          try {
+            keepPBw.linkChain = function () { throw new Error('witness:link down'); };
+            return SLw.confirm('witness:n9-op2', { cause: 'witness:n9-cause' });
+          } finally { keepPBw.linkChain = keepLink; }
+        });
+        // 5 上游记忆消费方缺席 ⇒ consumer-missing(第三段缺席如实报,不编一本账顶替)。
+        want('consumer-missing', 'N9:trace 的第三段(上游记忆账本)消费方缺席 ⇒ consumer-missing,不把两段说成三段齐');
+        tripDeep('consumer-missing', function () {
+          WA.lonshaReader = undefined;
+          return SLw.trace('witness:n9-op');
+        });
+      } finally {
+        WA.phoneBridge = keepPBw; WA.lonshaReader = keepLRw; WA.causal = keepCAw;
+        if (keepSLw && SLw.setSettings) SLw.setSettings(keepSLw);
+        if (keepPBcfg && keepPBw.setSettings) keepPBw.setSettings(keepPBcfg);
+      }
+    }
+  }
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });

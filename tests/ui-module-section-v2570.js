@@ -35,14 +35,27 @@ const PANEL_REL = 'ui/panel.js';
 //   否则 A 判据会把它当成模块名的一部分而与分区标题对不上（实测：长线伏笔提醒）。
 const ENABLED_LABEL_NOISE = ['提醒', '开关'];
 
-const SEC_RE = /<div\s+class\s*=\s*"wa-sec"[^>]*>([^<]*)<\/div>/g;
-const EN_RE = /<label[^>]*>\s*<input[^>]*id\s*=\s*"(wa-[a-z0-9\-]*-enabled)"[^>]*>([^<]*)</g;
+// v2.227.0 收口：标题可内嵌 <span class="wa-dim">（branchdiff/storyloop），
+//   吃到 </div> 再剥标签；foldSec 折叠按钮（aria-label="… 折叠或展开"）也是
+//   分区标题 —— 它就是 v2.155 之后工具页各折叠段的真分区头。
+const SEC_RE = /<div\s+class\s*=\s*"wa-sec"[^>]*>((?:[^<]|<(?!\/div>))*)<\/div>/g;
+// v2.227.0 收口：mock 序列化会重排属性（aria-label 不再贴着 button 标签），
+//   故按 data-foldt 认折叠按钮、按钮文本即分区标题（▾/▸ 前缀剥掉）。
+const FOLD_RE = /<button[^>]*data-foldt="[^"]*"[^>]*>((?:[^<]|<(?!\/button>))*)<\/button>/g;
+// v2.227.0 收口（N9 全量回归欠债）：mock DOM 的 innerHTML 序列化把 label 的文本节点
+//   放在 input **之前**（真模板是 input 在前、文本在后），原正则只认源码顺序 ⇒
+//   在渲染产物上零匹配 ⇒ rows=0 ⇒ [C]/[N3]/[N4] 三红同根因。双向交替：两种顺序都认。
+const EN_RE = /<label[^>]*>\s*(?:<input[^>]*id\s*=\s*"(wa-[a-z0-9\-]*-enabled)"[^>]*>([^<]*)|([^<]*)<input[^>]*id\s*=\s*"(wa-[a-z0-9\-]*-enabled)"[^>]*>)</g;
 
+function stripTags(s) { return String(s).replace(/<[^>]*>/g, ''); }
 function sectionsOf(html) {
   const out = [];
   let m;
   SEC_RE.lastIndex = 0;
-  while ((m = SEC_RE.exec(html))) out.push({ title: m[1].trim(), at: m.index });
+  while ((m = SEC_RE.exec(html))) out.push({ title: stripTags(m[1]).trim(), at: m.index });
+  FOLD_RE.lastIndex = 0;
+  while ((m = FOLD_RE.exec(html))) out.push({ title: stripTags(m[1]).trim().replace(/^[\u25be\u25b8]\s*/, ""), at: m.index });
+  out.sort(function (a, b) { return a.at - b.at; });
   return out;
 }
 function ownerOf(sections, at) {
@@ -56,6 +69,9 @@ function moduleKeyword(label) {
   //   不 trim 则 `^启用` 永不匹配——本判据首版即踩此坑（kw 停留在「启用长线伏笔」）。
   let k = String(label).trim().replace(/^启用/, '').trim();
   ENABLED_LABEL_NOISE.forEach(function (n) { if (k.length > n.length && k.slice(-n.length) === n) k = k.slice(0, -n.length); });
+  // v2.227.0：剥尾部括注（全/半角）—— 模块身份词不含括注（如「事件闭环(关着时五个口一并拒收)」的
+  //   身份词是「事件闭环」），分区标题「三项目剧情事件闭环(N9)」据此对得上。
+  k = k.replace(/[\uff08(][^\uff09)]*[\uff09)]\s*$/, '').trim();
   return k;
 }
 
@@ -75,7 +91,8 @@ function collectToggles(env) {
     EN_RE.lastIndex = 0;
     let m;
     while ((m = EN_RE.exec(html))) {
-      rows.push({ page: page, id: m[1], label: m[2].trim(), kw: moduleKeyword(m[2]), section: ownerOf(secs, m.index) });
+      const id = m[1] || m[4], label = (m[2] !== undefined ? m[2] : (m[3] || ''));
+      rows.push({ page: page, id: id, label: label.trim(), kw: moduleKeyword(label), section: ownerOf(secs, m.index) });
     }
   });
   return rows;

@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本(v2.226.0)。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.226.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.227.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.227.0",
   "dead": {
     "affect.channel": {
       "reason": "test-only",
@@ -6256,7 +6256,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 19,
-      "own": 14
+      "own": 17
     },
     "toolImport.detect": {
       "reason": "test-only",
@@ -6950,6 +6950,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 318
+    "dataOnly": 323
   }
 }

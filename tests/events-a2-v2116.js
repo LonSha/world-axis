@@ -293,13 +293,17 @@ function judge(a) {
   a(WA10.events.complete(123, { ok: true }).reason === 'missing-fields', 'v2116/a2: [7] 非字符串 id 仍拒收');
   // ⑦ 新容器有界（与 failQueue 同界）：逐笔认领+回报（认领时刻须 ≥ 到点时刻）
   const WA11 = fresh(); on(WA11, { maxFails: 2 }); const t11 = Date.now();
-  for (let i = 0; i < 5; i++) {
+  // v2.227.0 收口：推 15 笔（超过 Q7 下限 12）才能证明有界 —— 只推 5 笔从未超界，断言恒真。
+  for (let i = 0; i < 15; i++) {
     WA11.events.schedule({ id: 'b' + i, title: 'b', kind: 'once', at: t11 - 5000 });
     WA11.events.claim(t11 - 1 + i, {});
     WA11.events.complete('b' + i, { ok: true });
   }
-  a(resOf(WA11).length === 2 && resOf(WA11).length <= 2,
-    'v2116/a2: [8] 回执台账有界（实 ' + resOf(WA11).length + ' = maxFails）');
+  // v2.227.0 收口订正：v2.216.0（Q7 幂等下限）起 events.res 是幂等站点——
+  //   maxFails=2 低于下限 12 时抬到 12（去重真源不当历史回收），故实 12 而非 2。
+  //   判据改为：恰为下限 12（既不无界、也不被过小旋钮截短）。
+  a(resOf(WA11).length === 12,
+    'v2116/a2: [8] 回执台账有界（推 15 笔实 ' + resOf(WA11).length + ' = Q7 幂等下限 12，maxFails=2 被抬升不当历史回收）');
   // 哨兵
   let leak = 0;
   for (let i = 0; i < global.localStorage.length; i++) {

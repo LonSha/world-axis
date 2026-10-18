@@ -183,6 +183,9 @@ const TIMEOUT_ARMED = {
   'b3-n4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   'b3-n7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   'b3-n8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  // v2.227.0(N9):与 ARMED_SITES 同批入表。**新开的调用点不入表即红**正是这道门禁存在的理由,
+  //   故处置是入表而不是放宽(与 N8 那八条同一处置)。
+  'b3-n9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   // v2.188.0（第四批 · E7 + E9）：两把新专锁的调用点，同 B3 批次口径（统一预算 96000ms）。
   'b3-e7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   'b3-e9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
@@ -379,6 +382,11 @@ const ARMED_SITES = [
     anchor: "const rB3N7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n7-v2223.js')]," },
   { key: 'b3-n8-lock', mode: 'spawn', kill: true,
     anchor: "const rB3N8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n8-v2224.js')]," },
+  // v2.227.0(N9)补账:s3-b3-n9 的调用点在本版新开 ⇒ 同批入表(其上一轮开的 n1/n5/n2/n3/n4/n7/n8
+  //   与 e8-2217 八条见上方 N8 那段)。插入点硬约束同前:站点行号严格递增 ⇒ 它落在 n8 与 e9 之间。
+  //   锚点截到 options 之前(**不许包含它要守卫的预算值**,否则自我指涉)。
+  { key: 'b3-n9-lock', mode: 'spawn', kill: true,
+    anchor: "const rB3N9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n9-v2227.js')]," },
   { key: 'b3-e9-lock', mode: 'spawn',
     anchor: "const rB3E9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e9-v2188.js')]," },
   // v2.189.0（缝 A1/A2/A3 + B1/B2）：四引擎合并专锁的调用点（整行唯一 ⇒ 任何前缀也唯一）。

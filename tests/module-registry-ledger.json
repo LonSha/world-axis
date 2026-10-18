@@ -1,13 +1,13 @@
 {
- "version": "2.226.0",
- "loadOrderCount": 225,
- "loadedCount": 212,
- "uiCount": 13,
- "nsCount": 220,
+ "version": "2.227.0",
+ "loadOrderCount": 227,
+ "loadedCount": 213,
+ "uiCount": 14,
+ "nsCount": 221,
  "totals": {
-  "loadEdges": 115,
+  "loadEdges": 116,
   "hardEdges": 0,
-  "callRefs": 226,
+  "callRefs": 228,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -120,6 +120,7 @@
     "engines/stale-guard.js",
     "engines/storage-forecast.js",
     "engines/story-choice.js",
+    "engines/story-loop.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/summarizer.js",
@@ -350,6 +351,7 @@
     "engines/stale-guard.js",
     "engines/storage-forecast.js",
     "engines/story-choice.js",
+    "engines/story-loop.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/supply-chain.js",
@@ -3392,6 +3394,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_branch_diff_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/story-loop.js": {
+   "ns": [
+    "storyLoop"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_story_loop_v1"
    ],
    "consumedBy": []
   },

@@ -1659,7 +1659,7 @@
     // v2.216.0（优化 Q7）：行动回执**凭据摘要**（对象形态：哈希键 -> {opId, at}）。
     //   与 commit.receiptDigests 同形同分工：完整回执被环形挤出后仍答得出「这一笔做过没有」。
     //   cap 与 act.js 的 DIGEST_CAP 同源（64）。
-    'acts.digests':     { cap: 64, site: 'act.js WA.evict.object(acts.digests, DIGEST_CAP)（v2.216.0 凭据摘要台账）' },
+    'acts.digests':     { cap: 64, kind: 'object', site: 'act.js WA.evict.object(acts.digests, DIGEST_CAP)（v2.216.0 凭据摘要台账）' },
     // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复（两模块各自走 WA.evict.array 单一出口）。
     //   两条 cap 与引擎设置同源（maxPlans / maxRows），运行时由调用点显式传当前设置值。
     //   **终态行不删**：已放弃的计划与已失败（或被拒）的修复都是复盘证据，

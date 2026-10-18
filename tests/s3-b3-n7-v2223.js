@@ -131,7 +131,13 @@ const SEED_KEY_NAME = 'worldaxis_world_lab_adapter_seed_v1';
 const SEG_RENDER_START = '       <div class="wa-dim">v2.203.0（Y9）四件事：';
 // ⚠ 段尾取**下一节表头**(不是 out 容器自己):切片是左闭右开,拿 out 行当尾巴
 //   会把 out 容器排除在切片外,于是 A4b/A4d 这两条「读数口在场」的判据必然落空。
-const SEG_RENDER_END = '      <div class="wa-sec">存储压力面与义务清点</div>';
+// v2.227.0 收口:此前的段尾取的是 `存储压力面与义务清点` 那行 —— Q8(v2.225.0)
+//   把它改成 foldSec(...) 的**标签参数** ⇒ 那行不再独立存在 ⇒ indexOf = -1 ⇒
+//   slice(start, -1) 把**整份余下文件**当成 N7 渲染段(A1c/A4d/A5 三红同源)。
+//   改取本段**自己的**读数出口行:它唯一、且是这一段真正的收尾。
+//   ⚠ 切片左闭右开:段尾**不能**取 out 容器行本身(它会被排除在外 ⇒ A4b/A4d 必然落空)。
+//   取 out 行之后的下一节起点(capacity 段的 foldSec 调用),让 out 容器留在切片内。
+const SEG_RENDER_END = "      \x60)}\n      ${foldSec('tools', 'capacity'";
 const SEG_BIND_START = '    // ── v2.203.0（Y9）四件事：沙盒推进 / 结果报告 / 选择性采纳 / 拍引擎联动 ────';
 const SEG_END = "    on('#wa-life-goal', () => {";
 /** N7 新增 3 枚(渲染段与守卫表口径一致;advrounds 是输入框,无 onclick)。 */

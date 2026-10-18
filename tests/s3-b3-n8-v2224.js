@@ -98,9 +98,16 @@ const ANCHOR = {
   register: '\n  if (typeof WA.registerModule === \'function\') WA.registerModule(\'engines/branch-diff.js\', { kind: \'engine\', ver: \'2.224.0\' });',
   settingsReg: '\n  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);',
   diagMod: '\n    \'engines/branch-diff.js\': \'branchDiff\',',
-  guardIds: '\n      \'wa-bd-base\', \'wa-bd-tri\', \'wa-bd-cat\', \'wa-bd-src\', \'wa-bd-dst\', \'wa-bd-classes\', \'wa-bd-plan\', \'wa-bd-stat\'] },',
+  // v2.227.0(N9)补账:同 pRenderer 的理由 —— 此前锚点以 `'] },` 收尾,而本版给该条目
+  //   补了 dynamic 层 ⇒ 收尾变形 ⇒ 0 命中。收窄到 branchdiff 段里唯一的那一截。
+  guardIds: "      'wa-bd-base', 'wa-bd-tri', 'wa-bd-cat', 'wa-bd-src', 'wa-bd-dst', 'wa-bd-classes', 'wa-bd-plan', 'wa-bd-stat'],",
+
   pRenderFn: '\n  function renderBranchDiff() {',
-  pRenderer: '\n  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, logs: renderLogs,',
+  // v2.227.0(N9)补账:此前锚点取的是整行 RENDERERS 字面量 —— N9 在 branchdiff 与
+  //   logs 之间插了 `storyloop: renderStoryLoop,` ⇒ 整行不再逐字相等 ⇒ 0 命中
+  //   (本仓「锚点撞车/被邻居改动而静默失效」那一族)。收窄到**只属于 branchdiff**的那一截。
+  pRenderer: 'branchdiff: renderBranchDiff,',
+
   pPage: '\n    { id: \'branchdiff\', icon: \'🌿\', label: \'分支比较\' },',
   pBindDiff: '\n      on(\'#wa-bd-diff\', () => {',
   pBindPlan: '\n      on(\'#wa-bd-plan\', () => {',

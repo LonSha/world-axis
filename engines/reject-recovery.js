@@ -293,7 +293,7 @@
    *   恢复档均不写 OVERRIDES:`unknown-*` 的分词本就被规则表收在 adjust-input 档。
    */
   const REJECT_FACE = [
-    'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'adopt-budget-exhausted',
+    'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'add-chain-threw', 'adopt-budget-exhausted',
      'adopt-throw', 'auto-adopt-off',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
     'already-abandoned', 'already-adopted', 'already-answered', 'already-arrived', 'already-closed', 'already-confirmed',
@@ -327,7 +327,7 @@
     'branchtree-absent', 'breaches-full', 'bridge-absent', 'budget-exhausted', 'build-throw', 'burst',
     'busy', 'cannot-afford', 'capacity', 'cases-full', 'chain-effects-full', 'chain-nested', 'chain-terminal', 'chains-full',
     'change-not-applied', 'checksum-mismatch', 'choose-failed', 'claimed-by-other', 'clear-throw', 'closed',
-    'clues-full', 'coalesced', 'conflicts-unresolved', 'consume-failed', 'contract-mismatch', 'contracts-full',
+    'clues-full', 'coalesced', 'conflicts-unresolved', 'consume-failed', 'consumer-missing', 'contract-mismatch', 'contracts-full',
     'contrast-failed', 'contrast-thrown', 'crowd', 'cycle', 'dangling-ref', 'deals-full',
     'debts-throw', 'dedup', 'deferred-full', 'disabled', 'div-zero', 'dup-rung',
     'dup-text', 'duplicate', 'duplicate-blueprint', 'duplicate-enact', 'duplicate-event', 'duplicate-hypothesis',
@@ -343,13 +343,13 @@
     'fold-module-missing',
     'fondness-missing', 'foreign-chat', 'fork-failed', 'frozen', 'future-event', 'gated-off',
     'goal-not-active', 'goods-full', 'guarded-key', 'hard-cut', 'hops-full', 'identical',
-    'identity-incomplete', 'in-replay', 'in-transit', 'in-transit-full', 'incomplete-dice', 'insufficient',
+    'identity-incomplete', 'in-replay', 'in-transit', 'in-transit-full', 'inbound-bridge-missing', 'incomplete-dice', 'insufficient',
     'insufficient-budget', 'insufficient-contrib', 'insufficient-evidence', 'insufficient-funds', 'insufficient-progress', 'insufficient-samples',
     'insufficient-support', 'intel-missing', 'intel-threw', 'invalid-actors', 'invalid-input',
     // v2.222.0（拓展 N4）：调查证据工作台的三个来源抛错码（见上段沿革）。
     'investigation-threw', 'judge-not-configured', 'noesis-threw', 'rumor-threw',
     'kind-locked', 'knowers-full', 'landed-immutable', 'ledger-throw', 'lib-unreadable', 'library-full',
-    'link-off', 'locked', 'major-gate', 'manual-mode', 'metrics-full', 'migration-loop',
+    'link-off', 'link-threw', 'locked', 'major-gate', 'manual-mode', 'metrics-full', 'migration-loop',
     'missing', 'missing-accepter', 'missing-actor', 'missing-answer', 'missing-base', 'missing-buyer',
     'missing-cause', 'missing-chain', 'missing-changes', 'missing-claim', 'missing-coverage', 'missing-deal',
     'missing-delayed', 'missing-dest', 'missing-direction', 'missing-distance', 'missing-effect', 'missing-event',
@@ -364,7 +364,7 @@
     'module-missing', 'name-taken', 'need-confirm', 'need-receipt', 'need-resync', 'need-steps', 'need-unmet',
     'negative-span', 'nested-deferred', 'never-swept', 'no-action', 'no-active-goal', 'no-actor',
     'no-aftermath', 'no-authority', 'no-base', 'no-baseline', 'no-basis', 'no-batch',
-    'no-budget', 'no-bytes', 'no-campaign', 'no-candidates', 'no-capacity', 'no-change',
+    'no-budget', 'no-bytes', 'no-campaign', 'no-candidates', 'no-capacity', 'no-cause', 'no-change',
     'no-channel', 'no-chat', 'no-chronicle', 'no-clock', 'no-companion', 'no-conflict',
     'no-debt', 'no-draft', 'no-entry', 'no-factions', 'no-goal', 'no-history',
     'no-host', 'no-id', 'no-input-el', 'no-journey', 'no-lab', 'no-legends',
