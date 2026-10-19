@@ -5906,6 +5906,43 @@ function runWitness(WA) {
       }
     }
   }
+  // ── v2.228.0 / v2.229.0(拓展 N10 / N11):三个新码 —— 同 U2/Q8/N9 先例,
+  //   它们是本版**新增的公开失败归因**,不是「存量未分类」;不给见证就等于让门禁
+  //   替我们说「这些码没人会跑到」。全部走**真 API**(产品源码一行未动)。
+  {
+    // ① bad-diff(gauge.bandOf,占比制):差值非有限 ⇒ 拒收,不把它当成第 0 档。
+    //   与 bad-need 是**两条**码:分母坏与分子坏是两件事(一个不猜分母、一个不猜差值)。
+    if (WA.gauge && typeof WA.gauge.bandOf === 'function') {
+      want('bad-diff', 'N11:gauge.bandOf 差值非有限 ⇒ bad-diff(不把「算不出来」读成第 0 档)');
+      trip('bad-diff', function () { return [WA.gauge.bandOf(NaN, 40).reason]; });
+    }
+    // ② no-hit(retrieval,查无结果成**一态**):三边皆无命中 ⇒ 如实报 no-hit,
+    //   而不是把它读成「一切正常 / 这件事没发生过」。
+    if (WA.retrieval && typeof WA.retrieval.audit === 'function') {
+      want('no-hit', 'N10:retrieval 三边皆无命中 ⇒ 看门显式报 no-hit(「没检索到」≠「没发生过」)');
+      tripDeep('no-hit', function () {
+        const keepCfg = WA.retrieval.getSettings ? WA.retrieval.getSettings() : null;
+        try {
+          WA.retrieval.setSettings({ enabled: true });
+          return WA.retrieval.audit({ text: 'zzz-no-such-token-zzz' });
+        } finally { if (keepCfg && WA.retrieval.setSettings) WA.retrieval.setSettings(keepCfg); }
+      });
+    }
+    // ③ reasoning-only(reasoning.checkBody,推理不冒充产出):剥去思考段后为空 ⇒ 拒收。
+    //   关键差别:它是**区别于** empty-text 的另一条码 ——「只写了思考」与「什么都没写」
+    //   在读数上必须分得开(合成一条就把「模型跑了但没产出」读成「模型没跑」)。
+    if (WA.reasoning && typeof WA.reasoning.checkBody === 'function') {
+      want('reasoning-only', 'N11:reasoning.checkBody 正文全是思考段 ⇒ reasoning-only(与 empty-text 分列)');
+      trip('reasoning-only', function () {
+        const keep = WA.reasoning.getSettings ? WA.reasoning.getSettings() : null;
+        try {
+          WA.reasoning.setSettings({ enabled: true, minBodyChars: 1 });
+          const r = WA.reasoning.checkBody('<reasoning>abc</reasoning>');
+          return [r && r.reason];
+        } finally { if (keep && WA.reasoning.setSettings) WA.reasoning.setSettings(keep); }
+      });
+    }
+  }
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });

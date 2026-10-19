@@ -154,8 +154,15 @@ section('B 运行时:表内/表外/有界/落盘');
   const pnl = RD(PANEL_REL);
   a(pnl.indexOf("      `)}") >= WA.panelFold.SECTIONS.length,
     'B1c: 每段都有收尾(`)} 计数 == 段数;先关后开那条纪律的行为级证据)');
-  a(/tail_anchor|模板收尾/.test(RD('tools/_q8wrap4.py')) || true,
-    'B1d: (工具侧)末段收尾按形态定位 —— 判据见 D1/R204 留账');
+  // v2.229.0 收口:原判据引用一个**从未提交**的一次性修补脚本
+  //   (tools/_q8wrap4.py),且带 `|| true` 恒真 —— 那是「判据写着但永远不会红」。
+  //   改成可复算的真判据:每一段 foldSec(…, ` … `) 的**模板收尾**
+  //   形态(以 ` 反引号加 )}` 收尾)都在——不收尾就会把后续段吃进模板字面量。
+  const secCallRe = /\$\{foldSec\('tools', '[a-z]+',[\s\S]*?`\)\}/g;
+  const closed = (pnl.match(secCallRe) || []).length;
+  a(closed === WA.panelFold.SECTIONS.length,
+    'B1d: 每段都有模板收尾(实 ' + closed + ' / 表 ' + WA.panelFold.SECTIONS.length
+      + ') —— 不收尾会把后续段吃进模板字面量');
   // 表内
   const r0 = pf.isCollapsed('tools', 'traces');
   a(r0 && r0.ok === true && r0.collapsed === false, 'B2: 表内段默认为展开(不改默认态)');

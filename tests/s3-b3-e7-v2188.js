@@ -293,8 +293,11 @@ function runA(a) {
       'wa-rp-catalog', 'wa-rp-diag', 'wa-rp-out'].forEach(function (id) {
       a(pan.indexOf(id) >= 0, 'e7/A45: 面板渲染 ' + id);
     });
-    a(pan.indexOf('<div class="wa-sec">规则包与自动化模板</div>') >= 0,
-      'e7/A46: 分区标题是纯文本形态且含模块身份词');
+    // v2.225.0（Q8）折叠改造后：tools 页分段标题改为 foldSec(page, sec, label, body) 形态，
+    //   旧锚点 '<div class="wa-sec">…</div>' 已 0 命中 —— 判据意图（标题含模块身份词）不变，
+    //   锚点随形态更新为折叠段头（同批补一条「锚点在位」自证，防同类失效再次静默）。
+    a(pan.indexOf("foldSec('tools', 'rulepack', '规则包与自动化模板") >= 0,
+      'e7/A46: 分区标题是折叠段形态且含模块身份词');
     ['wa-rp-save', 'wa-rp-list', 'wa-rp-apply', 'wa-rp-drop', 'wa-rp-export', 'wa-rp-import',
       'wa-rp-tpl-list', 'wa-rp-tpl-run', 'wa-rp-catalog', 'wa-rp-diag'].forEach(function (id) {
       a(pan.indexOf("on('#" + id + "'") >= 0, 'e7/A47: 事件绑定在位 ' + id);

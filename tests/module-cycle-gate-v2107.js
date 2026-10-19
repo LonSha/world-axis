@@ -178,7 +178,21 @@ function runAll(A) {
   // v2.194.0（第三批 · U2 批次①）：跨模块链接线 —— 无新文件、无新命名空间；两条调用期边：
   //   operations → commit（chain / step）与 diplomacy → commit（inflight / active）
   //   ⇒ 调用期 1674 → 1676、合计 1782 → 1784；装载期 108 不变（两模块本就在装载期读 store）。
-  A(a.files === 228 && a.aliasFiles === 228 && a.refFiles === 226,
+  // v2.228.0(N10):新增 engines/retrieval.js(retrieval 命名空间),它尾部调 WA.registerModule
+  //   登记自己 ⇒ 文件面 228 → 229、解析出别名 228 → 229、有引用 226 → 227;装载期边 116 → 117
+  //   (registerModule 由 store 提供);调用期 1789 → 1800(它读 store/clock/causal/chrono/
+  //   history-search/injectBudget 六个 ns,并新增一个命名空间面);
+  //   LOAD_ORDER 227 → 228(见 A10 与 orderLen 回填)。
+  // v2.229.0(N11 + N10 收口):现场逐条 diff(HEAD 树 vs 工作区,取 scan().edges 的
+  //   (from, ns, kind) 三元组、集合去重)实测恰好 **14 条新增、0 条消失**,全部为调用期边:
+  //     · engines/retrieval.js 读 9 个 ns(store / clock / causal / chrono / historySearch /
+  //       injectBudget / log / settingsBus / __settingsRegs);
+  //     · engines/tool-diag.js 新增读 gauge 与 retrieval(secGauge / secRetrieval 两节);
+  //     · engines/word-budget.js 新增读 reasoning(count 走 officialOnly 单一真源);
+  //     · render/inject.js 与 ui/panel.js 各新增读 retrieval(注入块与面板读数页)。
+  //   装载期 117 不变(实测:HEAD 树同为 117 —— N10 注释里记的 116 与现场不符,
+  //   本版以实测回填:差全在调用期,不在装载期)。
+  A(a.files === 229 && a.aliasFiles === 229 && a.refFiles === 227,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -274,7 +288,7 @@ function runAll(A) {
   // v2.203.0（第四批收口）：调用期 1714 → **1721**、合计 1825 → **1832**（+7 条，实测回填）。
   //   本门禁的边只算**产品文件**的 (file, ns) 对（见 B1 的 `files === 221`），故这 7 条
   //   来自本批的产品改动、批内未及回填；装载期 111 不变。
-  A(a.edgesLoad === 116 && a.edgesCall === 1789 && a.edgesAll === 1905 && a.identityOk,
+  A(a.edgesLoad === 117 && a.edgesCall === 1803 && a.edgesAll === 1920 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -349,7 +363,7 @@ function runAll(A) {
   // v2.187.0（E4）：LOAD_ORDER 206 → 207（新增 engines/campaign.js）。
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
-  A(a.edgesLoad >= 20 && a.orderLen === 227,
+  A(a.edgesLoad >= 20 && a.orderLen === 228,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -386,7 +400,7 @@ function runAll(A) {
   //   但实测发现**它们的点亮条件不可达**（读口 `find` 与写口 `rowForWrite` 查的是同一层同一份，
   //   find 通过 ⇒ rowForWrite 也必通过）⇒ 那是一个零调用的死自证位，按本仓口径**不该留**。
   //   撤掉后：静态提供方不涨（252 与批次③持平）、零读名单不涨（27）、账本与读面一动不动。
-  A(a.nsProvided === 265 && a.nsLedger === 221 && a.nsRead === 239,
+  A(a.nsProvided === 266 && a.nsLedger === 222 && a.nsRead === 240,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。

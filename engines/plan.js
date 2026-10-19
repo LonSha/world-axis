@@ -1,5 +1,7 @@
 /**
- * WorldAxis engines/plan.js (v2.119.0) — 人物多步计划与受挫重决策（拓展计划 ①）
+ * WorldAxis engines/plan.js (v2.229.0) — 人物多步计划与受挫重决策（拓展计划 ①）
+ *   v2.229.0（拓展 N11）：新增 review() —— **计划不冒充事实**（缝合来源：SevenDaysCal 3.9.2）。
+ *   已结算的步（done/blocked/refused）才是事实；pending/running 是**拟稿**，不得叙述成已发生。
  *
  * ── 它治什么（缺口）────────────────────────────────────────────
  *   `life.js` 的目标只有一个字符串格子 `goal.next`，于是「长期意图」在长局里退化成
@@ -631,8 +633,47 @@
     if (!lines.length) return '';
     return '【人物意图链】' + String.fromCharCode(10) + lines.join(String.fromCharCode(10))
       + String.fromCharCode(10) + '只按这些**已声明**的步骤结算「这一步走没走成」；'
+      + '未结算的步骤是**拟稿**、不是事实（只有已结算的 done/blocked/refused 才可当已发生）；'
       + '缺前置 / 缺资源就如实推进受阻，不要替人物另编一条后续。';
   }
+  /**
+   * v2.229.0（拓展 N11）：**拟稿复核口径**（缝合来源：SevenDaysCal 3.9.2）。
+   *
+   * ── 它治什么（缺口原句）────────────────────────────────────────
+   *   本模块此前只有「第几步、什么状态」的**逐条读数**（view()），没有任何一处把
+   *   「**已结算的事实**」与「**还没发生的拟稿**」分开摆出来。于是 buildBlock() 那段
+   *   进正文提示词的话里，「他打算做这一步」与「他做完了这一步」挤在同一个列表，
+   *   只靠状态词区分 —— 模型读到「进行中：去当铺」时很容易写成已发生。
+   *
+   * ── 本函数只读，做三件事 ────────────────────────────────────────
+   *   ① settled：已结算步（done / blocked / refused）—— 这是**事实**，各自带原因；
+   *   ② draft：未结算步（pending / running）—— 这是**拟稿**，还没发生；
+   *   ③ asFact:false 恒带：**拟稿栏不是事实**，调用方不得把它叙述成已发生。
+   *
+   * ── 三条否定式边界 ─────────────────────────────────────────────
+   *   ① 不改状态：一个字节都不写（推进仍只走 advance / settle / rechoose）；
+   *   ② 不补步：只列**已声明**的步，不替人物想下一步；
+   *   ③ 无计划 ⇒ 如实报 no-plan，不造一条空计划。
+   */
+  function review(personName) {
+    const who = clean(personName, 60);
+    const row = planOf(who);
+    if (!row) return { ok: false, reason: 'no-plan', person: who };
+    const settled = [], draft = [];
+    row.steps.forEach(function (s) {
+      if (!s) return;
+      const item = { seq: s.seq, kind: s.kind, text: s.text, status: s.status, reason: s.reason || '' };
+      if (s.status === 'done' || s.status === 'blocked' || s.status === 'refused') settled.push(item);
+      else draft.push(item);
+    });
+    return { ok: true, id: row.id, personId: row.personId, goalId: row.goalId,
+      goalText: clean(row.goalText, 80), status: row.status,
+      settled: settled, draft: draft, total: row.steps.length,
+      // 恒 false：本栏是拟稿。调用方读到 false 就不得把 draft 写成已发生。
+      asFact: false,
+      note: 'settled 栏才是已发生的事实；draft 栏是**拟稿**（还没发生），不得叙述成已完成。' };
+  }
+
   /** 台账（诊断/面板读；只读不改）。 */
   function statView() {
     const rows = rowsOf();
@@ -658,7 +699,9 @@
       });
     if (!lines.length) return '';
     return '[人物计划]' + String.fromCharCode(10) + lines.join(String.fromCharCode(10))
-      + String.fromCharCode(10) + '只把这些当作人物已声明的多步意图；受阻不等于放弃，也不要替人物编造未声明的步骤。';
+      + String.fromCharCode(10) + '以上是**拟稿**（未结算的步骤还没发生），不是已发生的事实：'
+      + '不得把「进行中」的步骤叙述成已完成；只把这些当作人物已声明的多步意图；'
+      + '受阻不等于放弃，也不要替人物编造未声明的步骤。';
   }
   WA.plan = {
     STATUS: STATUS.slice(), FINAL: FINAL.slice(),
@@ -675,8 +718,11 @@
     // X1（v2.127.0）：长期意图链的只读读数（消费者是 backstage 推演与 tool-diag）。
     //   chain 给读数，chainBlock 给推演提示词段 —— 两块各有一个真消费方，不留裸导出。
     chain: chain, chainBlock: chainBlock,
+    // N11（v2.229.0）：拟稿复核口径。真消费方：ui/panel.js 的「复核拟稿」按钮
+    //   （wa-plan-review）+ tool-diag 诊断节。
+    review: review,
     view: view, statView: statView, buildBlock: buildBlock,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/plan.js', { kind: 'engine', ver: '2.220.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/plan.js', { kind: 'engine', ver: '2.229.0' });
 })();

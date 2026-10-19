@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.227.0'
+  const VERSION = '2.229.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -583,6 +583,14 @@
     //   act.js（读 act.stat/view/add/admit），且**须早于** render/inject.js（注入落地时读
     //   agency.buildBlock()）。本模块只调用 life/plan/act 既有 API，不复制状态。
     'engines/agency.js',
+    // v2.228.0(拓展 N10):历史留存与检索(engines/retrieval.js)。
+    //   位置在 agency 之后、render/inject.js **之前**:注入落地时读 retrieval.buildBlock()。
+    //   本模块装载期不读任何上游(一律**调用期**读 WA.causal.knownCause /
+    //   WA.chrono.chronicle / WA.historySearch.search / WA.store 快照)——后三者虽在本行之后装载,
+    //   但两者都只在调用期消费,故无硬次序要求(同 history-search 的读法)。
+    //   零 store 写:没有 transact、没有 draft 赋值;只有自己那一格
+    //   localStorage 偏好键(worldaxis_retrieval_v1)。
+    'engines/retrieval.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',
@@ -824,7 +832,7 @@
   //   同一构建标识下取到的模块与本地是同一次产物,这才谈得上「同版容灾」。
   //   纪律:升版时 BUILD_ID 与 VERSION 同批推进(判据见 tests/index-build-v2211.js),
   //   不允许只改其一 —— 只改 VERSION 会让回退源指向旧代码,只改 BUILD_ID 会让版本账对不上现场。
-  const BUILD_ID = 'b15894bc2c4b0648fd6f9f90ee0d8f10eeb3f6ac';
+  const BUILD_ID = '29f60398ffa8496c1c1901faac836b7191a709cc';
   const CDN_BASES = [
     'https://cdn.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
     'https://fastly.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,

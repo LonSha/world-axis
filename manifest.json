@@ -7,8 +7,9 @@
   "js": "index.js",
   "css": "style.css",
   "author": "LonSha & sutured sources",
-  "version": "2.227.0",
+  "version": "2.229.0",
   "auto_update": false,
   "minimum_client_version": "1.12.0",
-  "generate_interceptor": "worldAxisGenerateInterceptor"
+  "generate_interceptor": "worldAxisGenerateInterceptor",
+  "buildId": "29f60398ffa8"
 }

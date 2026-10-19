@@ -241,7 +241,11 @@ function runB(a) {
     // v2.227.0 补账:本版(N9)当期条目入 README 版本历史首条,**先实测真值** ——
   //   改前实测 = 162,本版条目 +1 ⇒ 真值 163,导语与本条同批收敛到 163。
   //   判据继续钉**精确等值**防误删。
-  a(r.facts.readmeEntries === 163, 'docs-archive/B: README 版本历史条目 = 163(实 ' + r.facts.readmeEntries + ')');
+  // v2.229.0 补账:本批两版(N10 / N11)当期条目**一次立起两条**入 README 版本历史首两条,
+  //   **先实测真值** —— 改前实测 scan() = 163(v2.227.0 那轮之后 v2.228.0 / v2.229.0
+  //   两条未立,属本批内的当期欠债,不是历史积欠),本批 +2 ⇒ 真值 165,
+  //   导语与本条同批收敛到 165。判据继续钉**精确等值**防误删。
+  a(r.facts.readmeEntries === 165, 'docs-archive/B: README 版本历史条目 = 165(实 ' + r.facts.readmeEntries + ')');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

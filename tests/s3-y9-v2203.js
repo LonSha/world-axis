@@ -82,7 +82,7 @@ const ANCHOR = {
   staleFlag: 'const stale = !!(cur.ok && _sim.before.ok && cur.digest !== _sim.before.digest);',
   withCtx: '      try { cz = ex.withContext(ctx, function () { return WA.causal.tick({ now: at }); }); }',
   simFace: 'simCap: MAX_ROUNDS, simDefault: DEF_SIM_ROUNDS,',
-  writesSingle: "writesSingle: 'adopt',",
+  writesSingle: "writesSingle: 'adopt',                  // 唯一写世界口",
   lskey: "const LS_KEY = 'worldaxis_world_lab_settings_v1';",
   def: "const DEF = { enabled: false, maxSteps: 6, armA: '', armB: '' };",
   statFace: 'hasSim: !!_sim, simRows: _sim ? _sim.rows.length : 0,',
@@ -98,7 +98,11 @@ const TGT = { simCap: ENG_REL, simDefault: ENG_REL, simRoundMs: ENG_REL, maxAhea
 /** 本模块偏好键**键名**（⚠ ANCHOR.lskey 是源码声明行、不是键名）。 */
 const LSKEY = 'worldaxis_world_lab_settings_v1';
 const SEG_RENDER_START = '       <div class="wa-dim">v2.203.0（Y9）四件事：';
-const SEG_RENDER_END = '      <div class="wa-sec">存储压力面与义务清点</div>';
+// v2.225.0（Q8）折叠改造后：该段被包进 foldSec('tools','capacity',...) ——
+//   旧 <div class="wa-sec">…</div> 锚点已 0 命中，会导致 P.slice(start, -1) 切到文件末尾，
+//   把 wa-rp-/wa-wg-/wa-hs-/wa-cap- 四族它页内容吃进渲染段（本锁 A1c/A4d/A5 三条红即此）。
+//   锚点更新为下一折叠段的段头（判据意图不变：本页渲染段与它页同宽）。
+const SEG_RENDER_END = '      ${foldSec(\'tools\', \'capacity\',';
 const SEG_BIND_START = '    // ── v2.203.0（Y9）四件事：沙盒推进 / 结果报告 / 选择性采纳 / 拍引擎联动 ────';
 const SEG_END = "    on('#wa-life-goal', () => {";
 /** Y9 新增 6 枚（渲染段与守卫表口径一致；rounds / index 是输入框，无 onclick）。 */
@@ -151,6 +155,16 @@ function runAll(a) {
     'y9v2203/A1: 两段段首与段尾锚点都在位（切片有效）');
   a(segR.length > 300 && segB.length > 1000,
     'y9v2203/A1b: 两段切片非空（实渲染段 ' + segR.length + ' / 绑定段 ' + segB.length + ' 字符）—— 切片失效会让下面的扫描在空集上恒真');
+  //   ⚠ 自证（v2.229.0 补）：段尾锚点必须在段首之后 —— 否则 slice 会切到文件末尾，
+  //   把后面它页内容全吃进来（本锁 A1c/A4d/A5 三条红就是这一个失效的连锁，实测踩到）。
+  a(P.indexOf(SEG_RENDER_END) > P.indexOf(SEG_RENDER_START),
+    'y9v2203/A1d: 段尾锚点在渲染段段首之后（实 end=' + P.indexOf(SEG_RENDER_END)
+     + ' / start=' + P.indexOf(SEG_RENDER_START) + '）');
+  //   ⚠ 自证（v2.229.0 补）：段尾锚点必须在段首之后 —— 否则 slice 会切到文件末尾，
+  //   把后面它页内容全吃进来（本锁 A1c/A4d/A5 三条红就是这一个失效的连锁，实测踩到）。
+  a(P.indexOf(SEG_RENDER_END) > P.indexOf(SEG_RENDER_START),
+    'y9v2203/A1d: 段尾锚点在渲染段段首之后（实 end=' + P.indexOf(SEG_RENDER_END)
+     + ' / start=' + P.indexOf(SEG_RENDER_START) + '）');
   (function () {
     const segRc = stripLineComments(segR), segBc = stripLineComments(segB);
     const leak = [];

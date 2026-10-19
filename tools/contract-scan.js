@@ -155,6 +155,15 @@ const EXEMPT = {
   //   一个是「这是哪一类语义事实」,一个是「这段耗时落在哪一档」—— **同形不同义,不许互相校验**:
   //   若强行统一,就会出现「四类语义事实要跟性能档用同一套词」这种语义错配。
   CLASSES: '同名不同义的「分类表」:branch-diff=四类结构性事实(entity/relation/obligation/event,导出面静态成员且为面板键名真源)、perf-trace=性能采集档(short/medium/long/lowend,判据是耗时分层)',
+  // v2.229.0(拓展 N10):本版新引擎 engines/retrieval.js 带一张 GUARDS 常量,与
+  //   v2.222.0 就在场的 engines/story-loop.js 同名 —— **合法地**指向不同值域,逐条说清:
+  //     · retrieval 的 GUARDS 是**检索看门四态**(absent / stale / unranked / empty-lookup),
+  //       判据是「这条线索为何没入包」(边缺席 / 值过时 / 未排序 / 查无结果);
+  //     · story-loop 的 GUARDS 是**事件闭环四态**(absent / late / duplicate / clock-divergence),
+  //       判据是「这笔事的闭环哪一环出了问题」(缺环 / 迟到 / 重复 / 时钟分岐)。
+  //   一个是「这条线索为何没出现在包里」,一个是「这笔事为何没闭上环」
+  //   —— **同形不同义,不许互相校验**:若强行统一,就会出现「没检索到要跟事件迟到用同一套词」这种语义错配。
+  GUARDS: '同名不同义的「看门表」:retrieval=检索看门四态(absent/stale/unranked/empty-lookup,判据是线索为何未入包)、story-loop=事件闭环四态(absent/late/duplicate/clock-divergence,判据是这笔事为何未闭环)',
 };
 
 /** 具名常量数组（只认一行内形态）。 */

@@ -1,5 +1,7 @@
 /**
- * WorldAxis engines/word-budget.js (v2.130.0) — 字数闭环（缝 B2）
+ * WorldAxis engines/word-budget.js (v2.229.0) — 字数闭环（缝 B2）
+ *   v2.229.0（拓展 N11）：count() 先过 reasoning.officialOnly —— 推理不冒充产出。
+ *   此前 <reasoning>…</reasoning> 的字符被计入正文，空正文也能过字数闸门。
  *
  * ── 它治什么（缺口）──────────────────────────────────────────
  *   本仓对正文长度只有 `maxTokens` 一个**上限**，没有下限。模型写短了、
@@ -57,7 +59,24 @@
     stat.counts++;
     if (text === undefined || text === null) { noteFault('empty-text'); return { chars: 0, cjk: 0, words: 0, total: 0, reason: 'empty-text' }; }
     if (typeof text !== 'string') { noteFault('bad-type'); return { chars: 0, cjk: 0, words: 0, total: 0, reason: 'bad-type' }; }
-    const body = text.replace(/<!--[\s\S]*?-->/g, '').replace(/```/g, '').trim();
+    // v2.229.0（拓展 N11）：**先剥思考段** —— 推理不冒充产出（缝合来源：SevenDaysCal 3.9.0）。
+    //   此前 <reasoning>…</reasoning> 的字符被计入正文：模型交一段纯思考 + 空正文，
+    //   字数闸门照样判「够长」（reasoning 的 checkBody 拦得住，本模块拦不住 ——
+    //   两处剥法不一致本身就是缺陷）。真源收在 reasoning.officialOnly，本模块只调用它。
+    let src = text;
+    if (WA.reasoning && typeof WA.reasoning.officialOnly === 'function') {
+      const off = WA.reasoning.officialOnly(text);
+      if (off.ok) src = off.body;
+      else if (off.reason === 'reasoning-only') {
+        stat.faults['reasoning-only'] = (stat.faults['reasoning-only'] || 0) + 1;
+        stat.lastReason = 'reasoning-only';
+        return { chars: 0, cjk: 0, words: 0, total: 0, reason: 'reasoning-only' };
+      } else { src = ''; }
+    } else {
+      // 真源缺席（reasoning 模块未装载）⇒ 如实记一笔，**不**假装剥过（退化为旧口径）。
+      stat.faults['official-only-absent'] = (stat.faults['official-only-absent'] || 0) + 1;
+    }
+    const body = src.replace(/<!--[\s\S]*?-->/g, '').replace(/```/g, '').trim();
     const chars = body.replace(/\s+/g, '').length;
     const cjk = (body.match(/[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/g) || []).length;
     const words = (body.match(/[A-Za-z0-9]+/g) || []).length;
@@ -90,5 +109,5 @@
     count: count, verdict: verdict,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/word-budget.js', { kind: 'engine', ver: '2.130.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/word-budget.js', { kind: 'engine', ver: '2.229.0' });
 })();

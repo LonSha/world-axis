@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/gauge.js (v2.70.0)
+ * WorldAxis engines/gauge.js (v2.229.0)
  * 阻尼量规：0..100 推进度 × 单步阻尼限幅 × 四大里程碑事件。
  */
 (function () {
@@ -21,6 +21,37 @@
 
   const MILESTONES = [25, 50, 75, 100];
   const DEFAULT_MAX_STEP = 35;
+
+  /**
+   * v2.229.0（拓展 N11）：**判定档位占比制**（缝合来源：choice v1.9.0）。
+   *
+   * ── 它治什么（缺口原句）────────────────────────────────────────
+   *   本模块只有**固定断点**（MILESTONES = 25/50/75/100 的绝对值）：进度 30% 就是 30%，
+   *   与「这一轮的目标是攒够 40 还是攒够 4000」无关。于是同一个 30 在两种目标下被读成
+   *   同一档，而现场要的是「**已达成占需要的几成**」这一比值（20/40/60/80 四断）。
+   *
+   * ── 口径 ───────────────────────────────────────────────────────
+   *   · BAND_BREAKS = [20, 40, 60, 80]（**占比**，不是绝对值）⇒ 五档 0..4（4 = ≥80%）；
+   *   · 断点**含等号**（恰 20% 落第 1 档）——与 step() 里 MILESTONES 的
+   *     `hit.val < ms && nextVal >= ms` 同口径：两处断点的开闭不许各写一套。
+   *
+   * ── 三条否定式边界 ─────────────────────────────────────────────
+   *   ① need 非正数 / 非有限 ⇒ bad-need，**不猜分母**（拿 0 当分母会恒得 Infinity 档）；
+   *   ② diff 非有限 ⇒ bad-diff（负值合法：欠账也是读数，如实落第 0 档）；
+   *   ③ 零写侧：不建量表、不改 val、不写 store —— 它是**读数**不是推进。
+   */
+  const BAND_BREAKS = [20, 40, 60, 80];
+  function bandOf(diff, need) {
+    const d = Number(diff), n = Number(need);
+    if (!isFinite(d)) return { ok: false, reason: 'bad-diff', got: diff };
+    if (!isFinite(n) || n <= 0) return { ok: false, reason: 'bad-need', got: need };
+    const ratio = d / n, pct = ratio * 100;
+    let band = 0;
+    for (let i = 0; i < BAND_BREAKS.length; i++) { if (pct >= BAND_BREAKS[i]) band = i + 1; }
+    return { ok: true, diff: d, need: n, ratio: Math.round(ratio * 1000) / 1000,
+      percent: Math.round(pct * 10) / 10, band: band, bands: BAND_BREAKS.length + 1,
+      breaks: BAND_BREAKS.slice(), met: ratio >= 1 };
+  }
 
   function rows() {
     const s = (WA.store && WA.store.get()) || {};
@@ -121,11 +152,16 @@
 
   WA.gauge = {
     MILESTONES: MILESTONES,
+    // v2.229.0（拓展 N11）：占比断点与档位读数（与 MILESTONES 同规：常量面随函数一起出）。
+    BAND_BREAKS: BAND_BREAKS.slice(),
+
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     create: create,
     step: step,
     read: read,
-    buildBlock: buildBlock
+    buildBlock: buildBlock,
+    // v2.229.0（拓展 N11）：占比档位读数。真消费方：ui/panel.js 量规段与 tool-diag 诊断节。
+    bandOf: bandOf
   };
 })();

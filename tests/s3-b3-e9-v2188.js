@@ -255,8 +255,10 @@ function runA(a) {
       'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag', 'wa-wl-out'].forEach(function (id) {
       a(pan.indexOf(id) >= 0, 'e9/A47: 面板渲染 ' + id);
     });
-    a(pan.indexOf('<div class="wa-sec">世界实验室与反事实对比</div>') >= 0,
-      'e9/A48: 分区标题是纯文本形态且含模块身份词');
+    // v2.225.0（Q8）折叠改造后：旧 '<div class="wa-sec">…</div>' 锚点已 0 命中，
+    //   判据意图不变，锚点随形态更新为折叠段头（同 e7/A46 口径）。
+    a(pan.indexOf("foldSec('tools', 'worldlab', '世界实验室与反事实对比") >= 0,
+      'e9/A48: 分区标题是折叠段形态且含模块身份词');
     ['wa-wl-run', 'wa-wl-arms', 'wa-wl-diff', 'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag']
       .forEach(function (id) {
         a(pan.indexOf("on('#" + id + "'") >= 0, 'e9/A49: 事件绑定在位 ' + id);

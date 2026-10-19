@@ -77,9 +77,12 @@ const TGT = { conflictKinds: ENG_REL, worldFacts: ENG_REL, pairOf: ENG_REL, pair
 /** 本模块偏好键**键名**（⚠ ANCHOR.lskey 是源码声明行、不是键名）。 */
 const LSKEY = 'worldaxis_rule_pack_settings_v1';
 const SEG_RENDER_START = '       <div class="wa-dim">v2.203.0（Y8）四件事：';
-// 段尾取**下一页族的标题**（不是 Y8 自己的出口元素）：`id="wa-rp-out"` 在 panel.js 里
+// 段尾取**下一段的折叠包装前缀**（不是 Y8 自己的出口元素）：`id="wa-rp-out"` 在 panel.js 里
 //   出现 2 次（另一处在 v2.152.0 性能页，与本页不共存），拿它当段尾会让切片提前收口。
-const SEG_RENDER_END = '      <div class="wa-sec">世界实验室与反事实对比</div>';
+//   v2.229.0（收口）：原锦点写的是 v2.225.0（Q8）折叠改造**之前**的
+//   `<div class="wa-sec">世界实验室与反事实对比</div>`，该字面量已 0 命中 ⇒
+//   slice 切到文件末尾（A1c / A4d / A5 三处同源联锁失效）。现改为折叠包装前缀。
+const SEG_RENDER_END = '      ${foldSec(\'tools\', \'worldlab\',';
 const SEG_BIND_START = '    // ── v2.203.0（Y8）四件事：说明 / 查冲突 / 开档定档 / 回滚栈 + 强制启用 ──────';
 const SEG_END = '    // ── E9 世界实验室（同一页；与「三条路先看看」这条线同族）─────────────────';
 /** 本页控件（Y8 新增 7 枚；渲染段与守卫表口径一致）。 */
@@ -123,6 +126,9 @@ function runAll(a) {
   const segB = P.slice(P.indexOf(SEG_BIND_START), P.indexOf(SEG_END));
   a(P.indexOf(SEG_RENDER_START) >= 0 && P.indexOf(SEG_BIND_START) >= 0 && P.indexOf(SEG_END) > 0,
     'y8v2203/A1: 两段段首与段尾锚点都在位（切片有效）');
+  a(P.indexOf(SEG_RENDER_END) > P.indexOf(SEG_RENDER_START),
+    'y8v2203/A1d: 段尾锚点在段首之后（实 indexOf ' + P.indexOf(SEG_RENDER_END)
+    + ' / 段首 ' + P.indexOf(SEG_RENDER_START) + '）—— 缺失会让 slice 切到文件末尾，三处判据同步失效');
   a(segR.length > 300 && segB.length > 1000,
     'y8v2203/A1b: 两段切片非空（实渲染段 ' + segR.length + ' / 绑定段 ' + segB.length + ' 字符）—— 切片失效会让下面的扫描在空集上恒真');
   (function () {

@@ -69,6 +69,30 @@ function probeSource() {
     '  }',
     '  var q = function (s) { return doc.querySelector(s); };',
     '  var goPage = function (p) { var t = q(".wa-tab[data-page=\\"" + p + "\\"]"); if (t) t.click(); };',
+    // O9(v2.229.0 收口):测视角之前先把「折叠」这一层清掉。
+    //   为什么:CLICK_SOURCE 的通用扫点会点到 .wa-fold-t(折叠按钮),
+    //   把 tools 页 13 段全部折起;折起后段内控件**根本不构建**
+    //   ⇒ 全知视角下 live 只剩段外那几枚,判据就会报「恒摘除」(假红)。
+    //   折叠是**呈现层的用户偏好**,与「视角摘除」正交——混在一起测,测的就不是视角。
+    //   panelFold 缺席时如实跳过(不假装清过)。
+    '  var unfolded = null;',
+    '  if (WA.panelFold && typeof WA.panelFold.expandAll === "function") {',
+    '    unfolded = [];',
+    '    WA.ui.pages().forEach(function (p) { unfolded.push(WA.panelFold.expandAll(p)); });',
+    '  }',
+    '  R.dom.unfolded = unfolded;',
+    // O9(v2.229.0 收口):测视角之前先把「折叠」这一层清掉。
+    //   为什么:CLICK_SOURCE 的通用扫点会点到 .wa-fold-t(折叠按钮),
+    //   把 tools 页 13 段全部折起;折起后段内控件**根本不构建**
+    //   ⇒ 全知视角下 live 只剩段外那几枚,判据就会报「恒摘除」(假红)。
+    //   折叠是**呈现层的用户偏好**,与「视角摘除」正交——混在一起测,测的就不是视角。
+    //   panelFold 缺席时如实跳过(不假装清过)。
+    '  var unfolded = null;',
+    '  if (WA.panelFold && typeof WA.panelFold.expandAll === "function") {',
+    '    unfolded = [];',
+    '    WA.ui.pages().forEach(function (p) { unfolded.push(WA.panelFold.expandAll(p)); });',
+    '  }',
+    '  R.dom.unfolded = unfolded;',
     '  var keys = CONTROL_KEYS_PLACEHOLDER;',
     '  var scan = function (view) {',
     '    WA.perspective.setSettings({ enabled: true });',

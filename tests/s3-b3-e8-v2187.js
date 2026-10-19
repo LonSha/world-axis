@@ -185,7 +185,9 @@ function runA(a) {
   });
   ['wa-dc-enabled', 'wa-dc-kind', 'wa-dc-in', 'wa-dc-use', 'wa-dc-check', 'wa-dc-plan', 'wa-dc-catalog', 'wa-dc-diag', 'wa-dc-out']
     .forEach(function (id) { a(pan.indexOf(id) >= 0, 'e8/A30: 面板渲染 ' + id); });
-  a(pan.indexOf('<div class="wa-sec">依赖体检与迁移助手</div>') >= 0, 'e8/A31: 分区标题是纯文本形态且含模块身份词');
+  // v2.225.0（Q8）折叠改造后：旧 '<div class="wa-sec">…</div>' 锚点已 0 命中，
+  //   判据意图不变，锚点随形态更新为折叠段头（同 e7/A46 口径）。
+  a(pan.indexOf("foldSec('tools', 'depcheck', '依赖体检与迁移助手") >= 0, 'e8/A31: 分区标题是折叠段形态且含模块身份词');
   a(pan.indexOf('atEsc') < 0 || pan.indexOf('const atEsc') >= 0 || pan.indexOf('atEsc = (v)') >= 0,
     'e8/A32: 本版新增区块不含未定义的 atEsc（ui-gate 抓到过的 ReferenceError 面）');
   a(diag.indexOf("page: 'tools', ids: ['wa-dc-enabled'") >= 0, 'e8/A33: UI_BINDINGS 登记在**工具页**（与渲染处同页）');

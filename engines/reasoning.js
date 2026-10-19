@@ -1,5 +1,8 @@
 /**
- * WorldAxis engines/reasoning.js (v2.130.0) — 思考开销与正文保底（缝 A4）
+ * WorldAxis engines/reasoning.js (v2.229.0) — 思考开销与正文保底（缝 A4）
+ *   v2.229.0（拓展 N11）：新增 officialOnly() —— **推理不冒充产出**。
+ *   此前 <reasoning>…</reasoning> 的字符被 checkBody 与 word-budget.count 当正文数，
+ *   于是「一段纯思考 + 空正文」能通过两道字数闸门落地（缝合来源：SevenDaysCal 3.9.0）。
  *
  * ── 它治什么（缺口）──────────────────────────────────────────
  *   推理模型（reasoning_effort / thinking）把预算花在**思考**上，而思考不计入
@@ -51,7 +54,9 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
-  const stat = { directives: 0, checks: 0, short: 0, empty: 0, blocked: 0, lastReason: '', faults: {} };
+  const stat = { directives: 0, checks: 0, short: 0, empty: 0, blocked: 0, lastReason: '', faults: {},
+    // v2.229.0（拓展 N11）：**只有思考、没有产出**自成一栏 —— 与 empty（本来就没写）分开。
+    reasoningOnly: 0 };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
 
   const LINE = {
@@ -60,6 +65,55 @@
     medium: '本轮可以想，但思考长度不得超过正文的一半，全部结论必须写进正文。',
     high:   '本轮允许充分思考，但正文必须完整成篇——思考再长也不能占用正文的位置。'
   };
+
+  // v2.229.0（拓展 N11）：思考段剥法。**必须是 RegExp 字面量表**，不能用
+  //   `new RegExp('<' + tag + ...)` 动态拼 —— 本仓实测：动态拼接的源串要过**字符串转义**，
+  //   元字符漏写一层反斜杠（源码里写 '\s' 而非 '\\s'）就静默退化成字面字符 `s`，
+  //   正则仍能构造成功、语法全过，只是**一条也匹配不上**，`stripped` 恒为 0，
+  //   于是「剥思考段」静默失效（推理重新冒充产出）。字面量里元字符直接书写、不经字符串转义，无此问题。
+  //   大小写不敏感（i）+ 允许属性（\s[^>]*）。
+  const THINK_TAG_RE = [
+    /<reasoning(?:\s[^>]*)?>[\s\S]*?<\/reasoning>/i,
+    /<thought(?:\s[^>]*)?>[\s\S]*?<\/thought>/i,
+    /<thinking(?:\s[^>]*)?>[\s\S]*?<\/thinking>/i
+  ];
+  /**
+   * v2.229.0（拓展 N11）：**只认正式产出**（缝合来源：SevenDaysCal 3.9.0）。
+   *
+   * ── 它治什么（缺口原句）────────────────────────────────────────
+   *   正文度量（engines/word-budget.js 的 count）与本模块的 checkBody **都把思考段
+   *   当正文数**：模型回一段 <reasoning>…</reasoning> 而正文为空时，思考字数被计入
+   *   「这一楼够长」⇒ 一次空正文照样过闸门落地。这就是「推理冒充产出」。
+   *
+   * ── 剥法（确定性形态，宁漏不误）────────────────────────────────
+   *   ① 成对标签 reasoning / thought / thinking（大小写不敏感、允许属性）；
+   *   ② HTML 注释 <!-- … -->。
+   *   **不剥**「行首『思考：』」这类形态：正文本身也可能以它起句（人物心声），
+   *   误剥正文比漏剥思考更坏 —— 如实写明，不假称完备。
+   *
+   * ── 三条否定式边界 ─────────────────────────────────────────────
+   *   ① 剥掉东西后为空 ⇒ reasoning-only（**只有思考、没有产出**），不是「空串放行」；
+   *   ② 什么都没剥且本来为空 ⇒ empty-text（两件事分开：没写 vs 只写了思考）；
+   *   ③ 非字符串 ⇒ bad-type；纯函数，不改入参、不写 store。
+   */
+  function officialOnly(text) {
+    if (text === undefined || text === null) return { ok: false, reason: 'bad-type', got: text === null ? 'null' : 'undefined' };
+    if (typeof text !== 'string') return { ok: false, reason: 'bad-type' };
+    let body = text, stripped = 0;
+    THINK_TAG_RE.forEach(function (re) {
+      body = body.replace(re, function (m) { stripped += m.length; return ''; });
+    });
+    body = body.replace(/<!--[\s\S]*?-->/g, function (m) { stripped += m.length; return ''; });
+    const out = body.trim();
+    if (!out) {
+      if (stripped > 0) {
+        return { ok: false, reason: 'reasoning-only', stripped: stripped, chars: 0,
+          detail: '剥去思考段与注释后没有正式产出（' + stripped + ' 字符全是思考）——这一段不该落地' };
+      }
+      return { ok: false, reason: 'empty-text', stripped: 0, chars: 0, detail: '正文本来就是空的' };
+    }
+    return { ok: true, body: out, stripped: stripped, chars: out.length };
+  }
 
   /** 把「本轮思考该多克制」写成一段约束文本（关闭时返回空串）。 */
   function directive() {
@@ -83,8 +137,19 @@
     if (typeof text !== 'string') { noteFault('bad-type'); return { ok: false, reason: 'bad-type' }; }
     const cfg = settings();
     if (!cfg.enabled) return null;
-    const body = text.replace(/<!--[\s\S]*?-->/g, '').trim();
-    if (!body) { stat.empty++; stat.lastReason = 'empty-text'; return { ok: false, reason: 'empty-text', detail: '正文剥去标签后为空', raw: text.length }; }
+    // v2.229.0（拓展 N11）：**先只认正式产出** —— 思考段不算正文（推理不冒充产出）。
+    //   此前这里自己剥一遍 <!-- -->、word-budget 剥的是另一套 ⇒ 两处口径不一致，
+    //   且两处都把 <reasoning> 当正文。现在剥法只有一份真源（本函数上方的 officialOnly）。
+    const off = officialOnly(text);
+    if (!off.ok) {
+      if (off.reason === 'reasoning-only') {
+        stat.reasoningOnly++; noteFault('reasoning-only'); stat.lastReason = 'reasoning-only';
+        return { ok: false, reason: 'reasoning-only', stripped: off.stripped, raw: text.length, detail: off.detail };
+      }
+      stat.empty++; stat.lastReason = 'empty-text';
+      return { ok: false, reason: 'empty-text', detail: '正文剥去思考段与标签后为空', raw: text.length };
+    }
+    const body = off.body;
     if (body.length < cfg.minBodyChars) {
       stat.short++; stat.lastReason = 'shortfall';
       return { ok: false, reason: 'shortfall', chars: body.length, need: cfg.minBodyChars,
@@ -98,7 +163,10 @@
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(patch); },
     directive: directive, buildBlock: buildBlock, checkBody: checkBody,
+    // v2.229.0（拓展 N11）：只认正式产出。真消费方：engines/word-budget.js 的 count()
+    //   （字数闸门此前把思考段当正文数）与 ui/panel.js 的复核按钮。
+    officialOnly: officialOnly,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/reasoning.js', { kind: 'engine', ver: '2.130.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/reasoning.js', { kind: 'engine', ver: '2.229.0' });
 })();

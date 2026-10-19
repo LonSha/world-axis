@@ -171,6 +171,14 @@
     //   处置方向与 `already-done` 同（不能原地重来，要按新状态改写），
     //   而不是 retry-same-input（重试就等于把同一件事再做一遍）。
     'archived': { kind: 'rollback', why: '这一笔已提交过，完整回执按容量环形退场、凭据仍在摘要台账：不能原地重做，要按「已做过」的新状态改写' },
+    // v2.229.0（拓展 N11）：`reasoning-only`（engines/reasoning.js 的 `officialOnly`）——
+    //   分词是 ['reasoning','only']，六档规则表里没有任何一个词表收它们
+    //   ⇒ `ruleKind()` 返回空 ⇒ 不登记就是拒收面残余未登记。
+    //   按语义归 `request-setup`：缺的是「正式产出」这一前置，重发一轮即可。
+    //   边界：它与 `empty-text`（什么都没写）、`shortfall`（写了但不够长）同族，
+    //   但绝不可合成一个码：「只写了思考」与「什么都没写」是两件事，
+    //   合成一个即让「推理冒充产出」在读数上长得像「模型没说话」。
+    'reasoning-only': { kind: 'request-setup', why: '只有思考段、没有正式产出：这一段不该落地，重发一轮要正文' },
     'load-integrity': { kind: 'request-setup', why: '启动完整性缺口：六个写链路关键模块（clock/input-guard/settings-bus/permissions/commit/interceptor）有缺席项 ⇒ 写入被闸门挡住。先按 integrity().missing 把缺的文件补上（或对每个 rel 走 WA.loadRetry 重试装载），闸门自行重算后即恢复' }
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
@@ -217,6 +225,11 @@
     //   它在拒收面上由规则表归 `request-setup`（token `no` / `step` 命中该档词表），
     //   本条登记随之撤销 —— 留在判不出面会让 A7（快照与登记键集逐一对应）当场报红。
     'no-act-id': { kind: 'request-setup', why: '回执连 id 都没有：先把该行动登记成行再送结算' },
+    // v2.229.0（拓展 N10）：`no-hit`（engines/retrieval.js 的 `empty-lookup` 看门读数）——
+    //   它落在一个 `{tokens, reason}` 对象里（不带 `ok`），故现场面是判不出。
+    //   按语义归 `out:true`：「检索没命中」是一个结论，不是调用被拒；
+    //   给它编恢复动作就是造数据（与 `narrative-only` / `nothing-recorded` 同规）。
+    'no-hit': { out: true, why: '检索面无命中：这是查询结论（「没查到」≠「一切正常」），不配恢复动作' },
     'step-threw': { kind: 'retry-same-input', why: '某一步抛错（世界未提交）：异常多为瞬时，同输入再来一次' },
     'no_sources': { kind: 'adjust-input', why: 'valid:false，一个引用源都没有' },
     'not-enabled': { out: true, why: '复活机制未启用，属内部开关态' },
@@ -307,7 +320,7 @@
     'bad-after', 'bad-amount', 'bad-anchor', 'bad-args', 'bad-axis', 'bad-base',
     'bad-behavior', 'bad-blueprint', 'bad-bp-keys', 'bad-bp-ver', 'bad-budget', 'bad-cap',
     'bad-chain', 'bad-channel', 'bad-char', 'bad-choice', 'bad-conflict', 'bad-coord',
-    'bad-cost', 'bad-countdown', 'bad-defer', 'bad-delta', 'bad-draft', 'bad-due',
+    'bad-cost', 'bad-countdown', 'bad-defer', 'bad-delta', 'bad-diff', 'bad-draft', 'bad-due',
     'bad-effect', 'bad-enum', 'bad-env', 'bad-every', 'bad-faction', 'bad-factor', 'bad-fail-policy',
     'bad-fallback', 'bad-fn', 'bad-form', 'bad-format', 'bad-gear', 'bad-guarantor',
     'bad-id', 'bad-json', 'bad-kind', 'bad-lane', 'bad-layer-or-key', 'bad-lens',
@@ -392,7 +405,7 @@
     'places-full', 'plans-full', 'plugin-blocked', 'pool-full', 'pre-violation', 'preview-rejected',
     'preview-throw', 'price-out-of-band', 'probe-threw', 'produce-failed', 'project-closed', 'project-throw',
     'projects-full', 'proposals-full', 'purpose-changed', 'quiet-period', 'rand-absent', 'rand-unavailable',
-    'read-back-failed', 'read-failed', 'readback-failed', 'reconcile-throw',
+    'read-back-failed', 'read-failed', 'readback-failed', 'reasoning-only', 'reconcile-throw',
     'record-failed', 'recording', 'redesign-exhausted', 'refund-failed', 'rehearsal-absent', 'relation-absent', 'relation-not-authorized',
     'relation-off', 'relation-threw', 'remove-threw', 'revoked', 'road-closed', 'road-crowded',
     'role-taken', 'roster-throw', 'round-not-recorded', 'route-blocked', 'routes-full', 'rows-full',
@@ -498,7 +511,7 @@
     'condition-unmet', 'corrupt-overflow', 'crisis', 'diag-idle', 'distorted', 'duty-off',
     'empty-string', 'faithful', 'fidelity-off', 'folded_too_small', 'high-vigilance',
     'length-or-empty', 'manual', 'missing-target', 'narrative-only', 'no-act-row',
-    'no-act-id', 'no-stale-subkeys', 'no_sources', 'not-enabled', 'not-in-office', 'not-on-chain', 'step-threw',
+    'no-act-id', 'no-hit', 'no-stale-subkeys', 'no_sources', 'not-enabled', 'not-in-office', 'not-on-chain', 'step-threw',
     'nothing-recorded', 'off-duty', 'on-duty', 'orphan-recovery', 'over_budget', 'pending_dropped',
     'pinned_over_budget', 'plan-unavailable', 'prerequisite-open', 'ready', 'recorded',
     'registry-missing', 'resource-missing', 'restore-failed', 'revivable', 'schedule',

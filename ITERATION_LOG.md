@@ -1,3 +1,39 @@
+### R208 · 2026-10-19 · v2.228.0(拓展 N10) + v2.229.0(拓展 N11) 合并收口:历史留存与检索 + 四项缝（收尾批次）
+
+**批次定位**：按用户指令「收尾，然后直接快速做完两个版本」，把 13 个上游学习项目中「又更新了」的可缝项并入这两版：上游实测（2026-10-18）ST-SevenDaysCal 3.7.10→3.9.4、st-theater 4.4.x→4.4.5、titania-theater→5.8.0、choice 1.8.0→1.9.0；world-backstage 2.5.8 明确不进引擎（UI/宿主适配）。
+
+**v2.228.0（N10）历史留存与检索**：新增 `engines/retrieval.js`（命名空间 `WA.retrieval`）五口 `contracts/candidates/historyOf/assemble/audit` + `buildBlock` + `stat/reset`；封闭常量 `TRIGGERS=[causal,mentioned,scene]`、`GUARDS=[absent,stale,unranked,empty-lookup]`；四条硬口径（旧事可召回但不提升为事实、空命中是查询结论、上限显式报容量、五档压紧）；面板页 id `retrieval`（标签「留存」）；专锁 `tests/s3-b4-n10-v2228.js` **122 / 0**。
+
+**v2.229.0（N11）四项缝**：E 判定档位占比制（`engines/gauge.js`，断点由固定差值改占比，新码 `bad-diff`）；B 推理不冒充产出（`engines/reasoning.js`，新码 `reasoning-only`）；C 保存多态可见（`core/store.js` 的 `SAVE_FACES=[saved,partial,unconfirmed,failed]`）；D 计划不冒充事实（`engines/plan.js` 新增 `review()`，`asFact:false` 恒带）；专锁 `tests/s3-b4-n11-v2229.js` **91 / 0**。
+
+**收口过程中修掉的三类红**：① 产品侧三张冻结快照缺三个新码（`engines/reject-recovery.js` 的 REJECT_FACE 补 `bad-diff`/`reasoning-only`、NEUTRAL_FACE 补 `no-hit`、NEUTRAL_REVIEW 补 `no-hit` 调目、OVERRIDES 补 `reasoning-only`）；② `tests/run.js` 的 U5 三面现场复算断言停在 863/775/34/54，现场已 874/785/34/55；③ `tests/s3-y8-v2203.js` 的段尾锚点失效（v2.225.0 Q8 折叠改造后旧 `wa-sec` 字面量 0 命中 ⇒ `slice` 切到文件末尾，三条红全是这一个失效的连锁）。
+
+**全锁横扫与差集分析**（三层锁共 97 把：`tests/s3-*.js` + `*lock*.js` + `*gate*.js`）：扫描前工作区 17 红 / 干净 HEAD 18 红；本批新多 7 把（`s3-b3-n2-v2220` + `s3-tx3/tx4/tx6/tx7/tx8/tx9`）已全部修好；本批顺带修好 6 把存量红。修完后工作区红集由 **17 → 7 把**，且 7 把全为干净 HEAD 同红的存量红（`s3-b3-e9-v2188` 的 A10/A12/C8 + `s3-y1/y2/y4/y5/y6/y7-v2*` 的 N*c），按「收口只跑专锁 + 门禁 + 两份读数账」纪律如实登记为既有边界、本批不修。
+
+**两类红的根因（均已实测锁定）**：新红一：同一把锁里的**两张版本白名单不同步**（A9/A14 已补 2.228.0/2.229.0、A8/A15 manifest 白名单漏补），与仓库反复治过的「同一件事在多处各写一遍」同型；新红二：`s3-b3-n2-v2220` 的 A21 断言 plan.js 自报 ver 恒为 2.220.0，而本批 N11-D 项**真改了** `engines/plan.js`（+49/-3，新增 review()），按该锁自己的沿革口径「自报 ver = 本模块最后一次交付版本」应前进到 2.229.0。存量红一：Q8 折叠改造后旧 `wa-sec` 字面量锚点失效（s3-y8/s3-y9 已本批修，e7/A46、e8/A31、e9/A48 同型已本批修）；存量红二：定位模拟 DOM 的 `innerHTML` getter 返回**外层序列化**（空容器 = 41 字符），故 N*c 「破坏版上读数**为空**」在 HEAD 亦不成立（溯至 v2.214.0 Q5 的 `stageOut` 出口改造）。
+
+**读数与交付面**：专锁 N10 **122/0** · N11 **91/0**；三层锁红集 17→7；17 道核心门禁 + 8 个工具门禁全绿；`reject-recovery`（874 = 拒收 785 / 成功 34 / 判不出 55）、`reject-code-gate`（874 = 见证 583 / 死表 50 / 基线 241）、`evidence-index`（274 条 · stale 0）、`sync-e2e-readings --verify`、`loose-readings`、`gen-error-codes --check`、`sync-hardcoded --check`、`doc-gate`全部 EXIT=0；版本双落 `index.js` + `manifest.json` = 2.229.0；README 版本历史 165 条与导语逐字一致。
+
+**教训固化**：① 切片失效会让下面的扫描在空集上恒真 —— 修锚点之外还要**加一条「锚点必须在段首之后」的自证判据**（s3-y8/s3-y9 已同步补 A1d）；② 同一把锁里的两张版本白名单必须同批改；③ 产品侧冻结快照必须随码面口径同步；④ 全角字面量写入必须走 `chr()` 拼字形（heredoc 与 create_file 直写 `\uXXXX` 两种方式都会被 shell/转义层吃掉一层）；⑤ JS 对象表末项常无尾逗号，新项必须插在末项**之前**；⑥ 存量红与新红必须用「干净 HEAD 同款横扫」的差集来判定，不凭印象。
+
+### R208 · 2026-10-19 · v2.228.0(拓展 N10) + v2.229.0(拓展 N11) 合并收口:历史留存与检索 + 四项缝（收尾批次）
+
+**批次定位**：按用户指令「收尾，然后直接快速做完两个版本」，把 13 个上游学习项目中「又更新了」的可缝项并入这两版：上游实测（2026-10-18）ST-SevenDaysCal 3.7.10→3.9.4、st-theater 4.4.x→4.4.5、titania-theater→5.8.0、choice 1.8.0→1.9.0；world-backstage 2.5.8 明确不进引擎（UI/宿主适配）。
+
+**v2.228.0（N10）历史留存与检索**：新增 `engines/retrieval.js`（命名空间 `WA.retrieval`）五口 `contracts/candidates/historyOf/assemble/audit` + `buildBlock` + `stat/reset`；封闭常量 `TRIGGERS=[causal,mentioned,scene]`、`GUARDS=[absent,stale,unranked,empty-lookup]`；四条硬口径（旧事可召回但不提升为事实、空命中是查询结论、上限显式报容量、五档压紧）；面板页 id `retrieval`（标签「留存」）；专锁 `tests/s3-b4-n10-v2228.js` **122 / 0**。
+
+**v2.229.0（N11）四项缝**：E 判定档位占比制（`engines/gauge.js`，断点由固定差值改占比，新码 `bad-diff`）；B 推理不冒充产出（`engines/reasoning.js`，新码 `reasoning-only`）；C 保存多态可见（`core/store.js` 的 `SAVE_FACES=[saved,partial,unconfirmed,failed]`）；D 计划不冒充事实（`engines/plan.js` 新增 `review()`，`asFact:false` 恒带）；专锁 `tests/s3-b4-n11-v2229.js` **91 / 0**。
+
+**收口过程中修掉的三类红**：① 产品侧三张冻结快照缺三个新码（`engines/reject-recovery.js` 的 REJECT_FACE 补 `bad-diff`/`reasoning-only`、NEUTRAL_FACE 补 `no-hit`、NEUTRAL_REVIEW 补 `no-hit` 调目、OVERRIDES 补 `reasoning-only`）；② `tests/run.js` 的 U5 三面现场复算断言停在 863/775/34/54，现场已 874/785/34/55；③ `tests/s3-y8-v2203.js` 的段尾锚点失效（v2.225.0 Q8 折叠改造后旧 `wa-sec` 字面量 0 命中 ⇒ `slice` 切到文件末尾，三条红全是这一个失效的连锁）。
+
+**全锁横扫与差集分析**（三层锁共 97 把：`tests/s3-*.js` + `*lock*.js` + `*gate*.js`）：扫描前工作区 17 红 / 干净 HEAD 18 红；本批新多 7 把（`s3-b3-n2-v2220` + `s3-tx3/tx4/tx6/tx7/tx8/tx9`）已全部修好；本批顺带修好 6 把存量红。修完后工作区红集由 **17 → 7 把**，且 7 把全为干净 HEAD 同红的存量红（`s3-b3-e9-v2188` 的 A10/A12/C8 + `s3-y1/y2/y4/y5/y6/y7-v2*` 的 N*c），按「收口只跑专锁 + 门禁 + 两份读数账」纪律如实登记为既有边界、本批不修。
+
+**两类红的根因（均已实测锁定）**：新红一：同一把锁里的**两张版本白名单不同步**（A9/A14 已补 2.228.0/2.229.0、A8/A15 manifest 白名单漏补），与仓库反复治过的「同一件事在多处各写一遍」同型；新红二：`s3-b3-n2-v2220` 的 A21 断言 plan.js 自报 ver 恒为 2.220.0，而本批 N11-D 项**真改了** `engines/plan.js`（+49/-3，新增 review()），按该锁自己的沿革口径「自报 ver = 本模块最后一次交付版本」应前进到 2.229.0。存量红一：Q8 折叠改造后旧 `wa-sec` 字面量锚点失效（s3-y8/s3-y9 已本批修，e7/A46、e8/A31、e9/A48 同型已本批修）；存量红二：定位模拟 DOM 的 `innerHTML` getter 返回**外层序列化**（空容器 = 41 字符），故 N*c 「破坏版上读数**为空**」在 HEAD 亦不成立（溯至 v2.214.0 Q5 的 `stageOut` 出口改造）。
+
+**读数与交付面**：专锁 N10 **122/0** · N11 **91/0**；三层锁红集 17→7；17 道核心门禁 + 8 个工具门禁全绿；`reject-recovery`（874 = 拒收 785 / 成功 34 / 判不出 55）、`reject-code-gate`（874 = 见证 583 / 死表 50 / 基线 241）、`evidence-index`（274 条 · stale 0）、`sync-e2e-readings --verify`、`loose-readings`、`gen-error-codes --check`、`sync-hardcoded --check`、`doc-gate`全部 EXIT=0；版本双落 `index.js` + `manifest.json` = 2.229.0；README 版本历史 165 条与导语逐字一致。
+
+**教训固化**：① 切片失效会让下面的扫描在空集上恒真 —— 修锚点之外还要**加一条「锚点必须在段首之后」的自证判据**（s3-y8/s3-y9 已同步补 A1d）；② 同一把锁里的两张版本白名单必须同批改；③ 产品侧冻结快照必须随码面口径同步；④ 全角字面量写入必须走 `chr()` 拼字形（heredoc 与 create_file 直写 `\uXXXX` 两种方式都会被 shell/转义层吃掉一层）；⑤ JS 对象表末项常无尾逗号，新项必须插在末项**之前**；⑥ 存量红与新红必须用「干净 HEAD 同款横扫」的差集来判定，不凭印象。
+
 ### R207 · 2026-10-18 · v2.227.0(拓展 N9):三项目剧情事件闭环 —— 从「三块面各答各的」到「手机动作回执 → 世界候选因果 → 确认落地 → 记忆来源追溯」一条链串起来,且「桥在」不等于「整链已形成」
 **病灶(计划原文 + 现场实证)**:双九项计划 N9 逐字写:「**P2 三项目剧情事件闭环(未做)**:复用已有 WorldAxis 出站桥、phoneBridge 入站及 lonsha-reader。先核验两个对端当前真实契约,再做手机动作回执→世界候选因果→确认落地→记忆来源追溯。**只读对端扫描没有证明当前已形成整链**;不改对端直到另获实施授权。**插件缺席、迟到、重复、时钟分歧均不伪造同步成功。**」现场实证:本仓确有三块互相接得上、却谁也不回答同一句话的面 —— `engines/causal.js` 有因果链(`addChain` / `knownCause` / `classify` / `stateView`),但它答的是「这条链现在到哪一步」;`engines/phone-bridge.js` 有手机动作回执与 `opTrace`,但它答的是「这个 op 有没有回执、走到哪个阶段」;`lonshaReader`(对端记忆读口)答的是「这条记忆从哪读出来」。消费方(面板 / 模型 / 专锁)真问的是**接起来的那一问**:「手机上那一下动作,落到世界里成了哪条因果链?这条链的因是**哪来的**、登记了没有、结算了没有?」没有这一面,每个消费方都得自己把三块拼一遍 —— 而拼出来的判定必然慢慢漂开(本仓反复治过的那一类)。
 **本版口径(`engines/story-loop.js` 新增,五口 + 两常量,既有契约逐字不动)**:

@@ -529,6 +529,29 @@
    *   只读 stat 与 tree()（两者都是纯读，不推演、不预演）。
    *   `dangling` 单列：悬空边恒应为 0，但**报出来才是可核的**（不报就等于没人核）。
    */
+  /**
+   * v2.229.0（拓展 N11）：阻尼量规读数。与 secPlotGauge 分列不合并 ——
+   *   那一个答「故事张力到几档」（剧情深度仪），这一个答「每张量表**相对目标**到了几成」
+   *   （占比档位读数）。两者同名不同物，合并会让「占比制」这一新口径无处可报。
+   */
+  function secGauge() {
+    return safe(function () {
+      if (!WA.gauge || typeof WA.gauge.bandOf !== 'function') return { error: 'engines/gauge.js 未加载（量规读数缺席）' };
+      const cfg = WA.gauge.getSettings();
+      const st = (WA.store && WA.store.get) ? WA.store.get() : null;
+      const rows = ((st && st.gauge) || {}).rows || [];
+      return {
+        enabled: !!cfg.enabled, rows: rows.length, maxStep: cfg.maxStep,
+        // 逐表读数：val 是绝对值，band 是**相对目标**的占比档（0..4）。两者不可互相顶替 ——
+        //   「涨到 30」在目标 40 与目标 4000 下是两回事（这正是占比制要治的那个缺口）。
+        gauges: rows.filter(function (r) { return r && r.key; }).slice(0, 12).map(function (r) {
+          const b = WA.gauge.bandOf(r.val, 100);
+          return { key: r.key, val: r.val, band: b.ok ? b.band : null, bands: b.ok ? b.bands : null,
+            percent: b.ok ? b.percent : null, history: (r.history || []).length };
+        })
+      };
+    });
+  }
   function secBranchTree() {
     return safe(function () {
       if (!WA.branchTree || typeof WA.branchTree.stat !== 'function') return { error: 'engines/branch-tree.js 未加载（分支树读数缺席）' };
@@ -1826,6 +1849,49 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
    *   读数一律**快照拷贝**：本节的立场是「观测不该成为可被观测者改写的东西」，
    *   故它不能把 stat() 交回来的 faults 原样转手（structural 模块曾整份交回内部引用）。
    */
+  /**
+   * v2.228.0(拓展 N10):历史留存与检索读数。与 storyLoop / plotGauge 两节分列不合并 ——
+   *   那两节答「闭环走完没」「张力到几档」,这一节答「这一轮把哪些旧事拉回眼前了、
+   *   拉回来的东西**装得下装不下**」。
+   *   本模块的 `assemble`(有界紧凑包)在此处接上产品侧读者:不接上,「超限先压紧、
+   *   压不下就显式报 capacity」这条口径在产品代码里就没有任何消费方
+   *   (口径:产品零引用即冻结面 —— dead-export-gate 当场红灯)。
+   *   读数只念现场,不替用户跑检索(跑检索是面板「留存」页出口的事)。
+   */
+  function secRetrieval() {
+    return safe(function () {
+      if (!WA.retrieval || typeof WA.retrieval.audit !== 'function') return { error: 'engines/retrieval.js 未加载（留存读数缺席）' };
+      const cfg = WA.retrieval.getSettings();
+      const a = WA.retrieval.audit();
+      const cs = WA.retrieval.contracts();
+      const st = WA.retrieval.stat();
+      // 有界包读数:真走一遍「候选 -> 装包」,量出 入包几行 / 掉了几行 / 超没超容量。
+      //   为什么不照抄 a.assembled:那个数在 capacity 态与「本来就没有」同形 ——
+      //   只有真调 assemble 才拿得到 rowsIn/rowsOut/dropped/mode 这一组,
+      //   而「被预算丢掉」与「本来就没有」必须分得开(本模块口径 4)。
+      //   如实记账:本节这两次调用会给 stat.calls / stat.assemblies 各 +1 ——
+      //   那是**读数计数器**,不是世界状态(与 secPlotGauge「不推趋势环」同一取舍)。
+      let pack = null;
+      try {
+        const cands = WA.retrieval.candidates({ text: '' });
+        pack = WA.retrieval.assemble(cands, {});
+      } catch (e) { pack = null; }
+      return {
+        enabled: !!cfg.enabled, windowMs: cfg.windowMs, maxRows: cfg.maxRows, maxChars: cfg.maxChars,
+        verdict: a.verdict, reasons: (a.reasons || []).slice(),
+        edges: (cs.edges || []).map(function (e) { return { edge: e.edge, present: e.present, why: e.why }; }),
+        presentCount: a.presentCount, edgeTotal: a.edgeTotal,
+        candidates: a.candidates, assembled: a.assembled, dropped: a.dropped, capacity: a.capacity,
+        guards: Object.assign({}, a.guardCounts || {}),
+        // 有界包五项一并透出 ——「装不下」只有在这一组数里看得见
+        //   (只看 text 长度会把它读成「内容少」)。
+        pack: pack ? { rowsIn: pack.rowsIn, rowsOut: pack.rowsOut, dropped: pack.dropped,
+          chars: pack.chars, capacity: pack.capacity, mode: pack.mode } : null,
+        calls: st.calls, historyOf: st.historyOf, assemblies: st.assemblies,
+        absents: st.absents, faults: Object.assign({}, st.faults || {})
+      };
+    });
+  }
   function secFaultLedger() {
     return safe(function () {
       const rows = [];
@@ -2032,6 +2098,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   secStoryLoop 均读它,缺席就是「闭环读数缺席」本身。漏登记的后果不是「少一行字」:
     //   inventory 的定义面与出口面契约都从本表取。
     'engines/story-loop.js': 'storyLoop',
+    // v2.228.0(拓展 N10):历史留存与检索。登记为必载 —— 面板「留存」页与
+    //   本文件的 secRetrieval 均读它,缺席就是「留存读数缺席」本身。
+    //   漏登的后果不是「少一行字」:inventory 的定义面与出口面契约都从本表取。
+    'engines/retrieval.js': 'retrieval',
     // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。登记为必载 —— 注入链的
     //   `远方的传说` 源读 worldBridge.buildBlock，面板「联网」页与本文件的 secWorldBridge /
     //   secEcoAudit 都读它们，缺席就是「联网/自洽读数缺席」本身，不该被静默兜住。
@@ -2420,7 +2490,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
           const stat = WA.store.saveStat();
           const prof = WA.store.sizeProfile ? WA.store.sizeProfile(6) : null;
           return {
-            lastSave: { at: stat.at, ok: stat.ok, bytes: stat.bytes, reason: stat.reason, failCount: stat.failCount },
+            // v2.229.0（拓展 N11）：face = 保存四态（saved / partial / unconfirmed / failed）。
+            //   此前这里只有 ok/bytes/reason —— 救援成功（有损）与干净落盘同形。
+            lastSave: { at: stat.at, ok: stat.ok, bytes: stat.bytes, reason: stat.reason, failCount: stat.failCount,
+              face: stat.face || 'unknown', faceNote: stat.faceNote || '' },
             transactions: WA.store.txStat ? WA.store.txStat() : null,
             batch: WA.store.batchStat ? WA.store.batchStat() : null,
             recovery: WA.store.recoveryStat ? WA.store.recoveryStat() : null,
@@ -3430,6 +3503,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   本页八枚:一枚复选框(onchange)+ 四枚按钮(onclick)+ 两个输入框 + 一个动态读数出口。
     { page: 'storyloop', ids: ['wa-sl-enabled', 'wa-sl-contracts', 'wa-sl-audit', 'wa-sl-stat', 'wa-sl-reset',
       'wa-sl-cause', 'wa-sl-cand', 'wa-sl-op', 'wa-sl-confirm', 'wa-sl-trace'], dynamic: ['wa-sl-out', 'wa-sl-edges'] },
+    // v2.228.0(N10):历史留存与检索。同 N7/N8/N9 规格 —— 渲染 + 绑定 + 守卫登记三件齐做：
+    //   渲染了不登记,「id 写错 / 绑定写错页」这类断裂在 G18 逐页点击盘查里永不可见而门禁全绿。
+    //   本页九枚: 一枚复选框(onchange) + 六枚按钮(onclick) + 两个输入框;
+    //   两个动态面(边契约行与读数出口)落 dynamic。
+    { page: 'retrieval', ids: ['wa-rt-enabled', 'wa-rt-contracts', 'wa-rt-audit', 'wa-rt-stat', 'wa-rt-reset',
+      'wa-rt-text', 'wa-rt-cand', 'wa-rt-key', 'wa-rt-history'], dynamic: ['wa-rt-out', 'wa-rt-edges'] },
     { page: 'tools', ids: ['wa-wl-enabled', 'wa-wl-a', 'wa-wl-b', 'wa-wl-run', 'wa-wl-arms',
       'wa-wl-diff', 'wa-wl-export', 'wa-wl-discard', 'wa-wl-catalog', 'wa-wl-diag',
       // v2.203.0（Y9）：推几轮 / 沙盒推进 / 结果报告 / 采纳第几条 / 采纳这一条 / 拍引擎推演
@@ -4137,6 +4216,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   一个答「故事发展到什么程度」（合成指数 + 走向），一个答「玩家分过几次叉」（历史账）；
       //   前者失效在「指数不反映实际节奏」，后者失效在「分叉点丢了或悬空边」，两问互不覆盖。
       plotGauge: secPlotGauge(), branchTree: secBranchTree(),
+      // v2.229.0（拓展 N11）：阻尼量规占比档位读数。与上两节同取舍：读数**只念现场**，不替用户跑。
+      gauge: secGauge(),
       // v2.154.0（RX4+RX7）：联网面与自洽审计面。两节分列不合并 ——
       //   一个答「别的世界传过来什么、本世界的身份是什么」，一个答「这个世界自己前后对不对得上」；
       //   前者失效在「传说被当成本地事实 / 同名异世界被认成同一个」，后者失效在「四本账互相矛盾却看不见」。
@@ -4193,7 +4274,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       worldLab: secWorldLab(),
       // v2.227.0(拓展 N9):三项目剧情事件闭环。与 bridge / phoneBridge / lonsha 三节分列
       //   不合并:那三节各报**一条边**的现场,本节报**整条链走完没**(回执 → 因果 → 记忆)。
-      storyLoop: secStoryLoop()
+      storyLoop: secStoryLoop(),
+      // v2.228.0(拓展 N10):历史留存与检索。与前两节同取舍:读数只念现场,不替用户跑。
+      //   它同时是 retrieval.assemble(有界紧凑包)在**产品侧的唯一读者** ——
+      //   不在此处接上,那条口径就只活在测试里(产品零引用即冻结面)。
+      retrieval: secRetrieval()
     };
     diag.verdict = verdict(diag);
     return diag;

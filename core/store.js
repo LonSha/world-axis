@@ -933,7 +933,26 @@
     } catch (e) {}
   }
   // v0.1.22: 保存观测——最近一次 save 的结果与失败归因（配额耗尽不再静默）
-  const __saveStat = { at: 0, ok: null, bytes: 0, reason: null, failCount: 0 };
+  const __saveStat = { at: 0, ok: null, bytes: 0, reason: null, failCount: 0, face: 'unknown' };
+  // v2.229.0（拓展 N11）：**保存四态**（缝合来源：SevenDaysCal 3.9.0「失败不许显示成功」）。
+  //   现场：save() 的**配额救援成功**路径把 ok 置 true 并返回 true —— 而那次落盘是
+  //   **有损**的（为了腾空间删掉了若干可回收键）。读数面只有一个布尔，于是「干净落盘」与
+  //   「丢了东西才落盘」长得一模一样（本仓反复治的两态不可分）。
+  //   四态语义互斥、**不许压成两态**：
+  //     saved       干净落盘：写后读回校验通过，且本次没有为了腾空间删任何键；
+  //     partial     有损落盘：落盘成功，但过程中回收过键（见 rescueStat.lastRemoved）；
+  //     unconfirmed 落盘**未被证实**：写后读回校验失败（磁盘副本与内存不一致）——
+  //                 **不许**读成成功，也不许读成失败（它确实不知道）；
+  //     failed      落盘失败：闸门拦下 / 权限拒绝 / 插件拦下 / 配额救援失败 / 抛错。
+  //   unknown = 本次会话还没保存过（与「失败」是两件事，不合并）。
+  const SAVE_FACES = ['saved', 'partial', 'unconfirmed', 'failed'];
+  const SAVE_FACE_NOTE = {
+    saved: '干净落盘（写后读回校验通过，本次未回收任何键）',
+    partial: '有损落盘（为腾空间回收过可回收键：落盘成功，但丢了东西）',
+    unconfirmed: '落盘未被证实（写后读回校验失败：磁盘副本与内存不一致）',
+    failed: '落盘失败（本次世界写未发生）',
+    unknown: '本次会话尚未保存过'
+  };
   // v0.3.0: 隔离现场处置审计（只读观测 + 恢复/丢弃动作留痕）
   const __quarantineStat = { restores: 0, drops: 0, lastRestoreAt: 0, lastDropAt: 0, lastKey: null };
   // v0.3.0: 配额救援审计——save 遇配额耗尽时的自动回收与重试结果
@@ -2310,6 +2329,7 @@
         if (loadDeny2) {
           __saveStat.at = clockWall(); __saveStat.ok = false;
           __saveStat.reason = 'load-integrity'; __saveStat.failCount++;
+          __saveStat.face = 'failed';   // v2.229.0：闸门拦下 = 本次世界写**未发生**
           WA.log('error', 'store.save 被启动完整性闸门拦下:'
             + loadDeny2.missing.join('、') + ' 未装载 —— 本次世界写**未发生**'
             + '(读与诊断不受影响;补文件后用 WA.loadRetry(rel) 重试装载)');
@@ -2320,6 +2340,7 @@
             const denied = WA.permissions.gate('write');
             if (denied) {
               __saveStat.at = clockWall(); __saveStat.ok = false; __saveStat.reason = 'permission-denied'; __saveStat.failCount++;
+              __saveStat.face = 'failed';
               WA.log('error', 'store.save 被权限闸门拦下：当前使用者「' + (denied.user || '(未登记)')
                 + '」没有 write 位（required=' + denied.required + '）——本次世界写**未发生**');
               return false;
@@ -2334,6 +2355,7 @@
             const hookR = WA.plugin.fire('beforeSave', { chatId: cidW, meta: s && s.meta, snap: snap });
             if (hookR && hookR.ok === false) {
               __saveStat.at = clockWall(); __saveStat.ok = false; __saveStat.reason = hookR.reason || 'plugin-blocked'; __saveStat.failCount++;
+              __saveStat.face = 'failed';
               WA.log('error', 'store.save 被插件钩子拦下：' + (hookR.plugin || '') + '/' + (hookR.hook || 'beforeSave')
                 + '（' + (hookR.detail || hookR.reason) + '）——本次世界写**未发生**');
               return false;
@@ -2386,6 +2408,8 @@
         const w = writeVerified(storageKey(chatId), payload);
         if (!w.ok && w.reason === 'verify') {
           __saveStat.at = clockWall(); __saveStat.ok = false; __saveStat.reason = 'verify'; __saveStat.failCount++;
+          // v2.229.0：写后读回校验失败 ⇒ **未被证实**（不是成功也不是失败：确实不知道）。
+          __saveStat.face = 'unconfirmed';
           memCache = s;
           WA.log('error', 'store.save 写后读回校验失败（' + __integrityStat.lastReason + '）：磁盘副本与内存不一致，重试一次仍失败——数据可能未真正落盘');
           return false;
@@ -2394,6 +2418,8 @@
         memCache = s;
         __committed = s;   // v2.113.0（A1）：**唯一的确认落盘点**——写后读回校验已通过
         __saveStat.at = clockWall(); __saveStat.ok = true; __saveStat.bytes = byteLen(payload); __saveStat.reason = null;
+        // v2.229.0：写后读回校验已通过 ⇒ 干净落盘（本次没有为腾空间回收过键）。
+        __saveStat.face = 'saved';
         // v2.111.0（计划二 #67）：写世界是**唯一**需要留痕的动作面。
         //   位置刻意的：只在写后读回校验**通过**之后记——“记了一条 save”与“这次 save 真的落盘了”
         //   必须是同一件事（失败路径上不许产出成功的审计行）。
@@ -2442,6 +2468,8 @@
       } catch (e) {
         // v0.1.22: save 失败归因 + 计数；内存副本仍推进，避免本轮结算在半份状态里丢失
         __saveStat.at = clockWall(); __saveStat.ok = false; __saveStat.reason = classifySaveError(e); __saveStat.failCount++;
+        // v2.229.0：抛错路径先记失败；若下面的配额救援成功，会被改写成 partial。
+        __saveStat.face = 'failed';
         const s = state || memCache; if (s) memCache = s;
         // v0.3.0: 配额耗尽不再只记日志——先尝试安全回收（过期诊断/孤儿恢复点/隔离溢出），成功则立刻重试落盘。
         // 救援只动「可安全回收」的键（当前聊天/settings/wb/state 本体永不参与），失败则保持可见错误。
@@ -2449,6 +2477,9 @@
           const rescued = this.__rescueQuota(state, chatId);
           if (rescued) {
             __saveStat.ok = true; __saveStat.reason = null;
+            // v2.229.0：救援成功 ⇒ **有损**落盘（为腾空间删过键）。
+            //   此前这条路径把 ok 置 true 就收工，读数面看不出「丢了东西才落盘」。
+            __saveStat.face = 'partial';
             WA.log('warn', 'store.save 遇配额耗尽：已自动回收 ' + __rescueStat.lastRemoved + ' 个可回收键（释放 ' + Math.round(__rescueStat.lastFreedBytes / 1024) + 'KB）并重试落盘成功');
             return true;
           }
@@ -3743,7 +3774,12 @@
     /** v0.3.0: 隔离现场处置审计视图 */
     quarantineAudit() { const q = __quarantineStat; return { restores: q.restores, drops: q.drops, lastRestoreAt: q.lastRestoreAt, lastDropAt: q.lastDropAt, lastKey: q.lastKey }; },
     /** v0.1.22: 保存观测只读视图（tool-diag 消费）。bytes = 上次成功落盘的 UTF-8 体积 */
-    saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount }; },
+    saveStat() { return { at: __saveStat.at, ok: __saveStat.ok, bytes: __saveStat.bytes, reason: __saveStat.reason, failCount: __saveStat.failCount,
+      // v2.229.0（拓展 N11）：四态读数（saved / partial / unconfirmed / failed；未保存过 = unknown）。
+      //   ok 只答「这次调用返回了真还是假」，face 答「这次落盘到了哪一步」—— 两条不同的
+      //   判据，合成一条会让「丢了东西才落盘」重新变成看不见（本仓反复治的两态不可分）。
+      face: __saveStat.face, faceNote: SAVE_FACE_NOTE[__saveStat.face] || SAVE_FACE_NOTE.unknown,
+      faces: SAVE_FACES.slice() }; },
     /** v2.211.0(优化 Q1):启动完整性的只读视图(供诊断 / 面板 / 专锁消费)。
      *   为什么单独开一个口而不复用 loadStat:`loadStat` 答的是「这一次 load 怎么了」,
      *   本口答的是「**当下这台机器是不是装全了**」 —— 两条不同的判据,合成一条会互相顶掉。

@@ -1,13 +1,13 @@
 {
- "version": "2.227.0",
- "loadOrderCount": 227,
- "loadedCount": 213,
+ "version": "2.229.0",
+ "loadOrderCount": 228,
+ "loadedCount": 214,
  "uiCount": 14,
- "nsCount": 221,
+ "nsCount": 222,
  "totals": {
-  "loadEdges": 116,
+  "loadEdges": 117,
   "hardEdges": 0,
-  "callRefs": 228,
+  "callRefs": 230,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -111,6 +111,7 @@
     "engines/rehearse.js",
     "engines/reject-recovery.js",
     "engines/request-viewer.js",
+    "engines/retrieval.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/rule-pack.js",
@@ -342,6 +343,7 @@
     "engines/rehearse.js",
     "engines/reject-recovery.js",
     "engines/request-viewer.js",
+    "engines/retrieval.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/rule-pack.js",
@@ -3205,6 +3207,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_agency_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/retrieval.js": {
+   "ns": [
+    "retrieval"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_retrieval_v1"
    ],
    "consumedBy": []
   },

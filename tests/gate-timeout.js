@@ -207,7 +207,11 @@ const TIMEOUT_ARMED = {
   'ev1-evidence-qa-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
   // v2.209.0（优化 6）：面板导航协议专锁。与上一项同规 —— **两张表同批落**
   //   （站点表漏登记那次的红就是 `site-not-armed`）。
-  'ev6-panel-nav-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' }
+  'ev6-panel-nav-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.228.0 / v2.229.0(N10 / N11):两把新专锁的调用点在本版新开 ⇒ 同批入表。
+  //   **新开的调用点不入表即红**正是这道门禁存在的理由,故处置是入表而不是放宽。
+  'b4-n10-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b4-n11-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' }
 };
 
 /**
@@ -415,6 +419,14 @@ const ARMED_SITES = [
   //   否则 A10 的「行号严格递增」当场报红（两份清单各说一套）。
   { key: 'e8-travel-desk-lock', mode: 'spawn', kill: true,
     anchor: "const rE8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-e8-v2210.js')]," },
+  // v2.228.0 / v2.229.0(N10 / N11)补账:两把新专锁的调用点在本版新开 ⇒ 同批入表。
+  //   插入点硬约束同前:站点行号严格递增 ⇒ 两条落在**末尾**(e8 之后,run.js 里它们也是最后两处)。
+  //   锚点截到 options 之前(**不许包含它要守卫的预算值**,否则自我指涉:
+  //   预算一改先失效的是锚点,报出来的是 site-missing 而不是 value-mismatch)。
+  { key: 'b4-n10-lock', mode: 'spawn', kill: true,
+    anchor: "const rB4N10 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-n10-v2228.js')]," },
+  { key: 'b4-n11-lock', mode: 'spawn', kill: true,
+    anchor: "const rB4N11 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-n11-v2229.js')]," },
 ];
 
 /**
