@@ -1,13 +1,13 @@
 {
- "version": "2.229.0",
- "loadOrderCount": 228,
- "loadedCount": 214,
+ "version": "2.230.0",
+ "loadOrderCount": 254,
+ "loadedCount": 240,
  "uiCount": 14,
- "nsCount": 222,
+ "nsCount": 248,
  "totals": {
-  "loadEdges": 117,
+  "loadEdges": 146,
   "hardEdges": 0,
-  "callRefs": 230,
+  "callRefs": 285,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -39,11 +39,14 @@
     "engines/agenda.js",
     "engines/archive-hide.js",
     "engines/atlas.js",
+    "engines/auto-hide.js",
+    "engines/backstage-tone.js",
     "engines/backstage.js",
     "engines/beat-facade.js",
     "engines/beat-ledger.js",
     "engines/beat-mask.js",
     "engines/beat-report.js",
+    "engines/beat.js",
     "engines/binding.js",
     "engines/branch-diff.js",
     "engines/branch-tree.js",
@@ -55,12 +58,18 @@
     "engines/chapters.js",
     "engines/chronicle-view.js",
     "engines/commission.js",
+    "engines/community-note.js",
+    "engines/compare.js",
     "engines/coop.js",
+    "engines/coordinate.js",
+    "engines/deep-clean.js",
     "engines/dep-check.js",
     "engines/diplomacy.js",
     "engines/direct-event.js",
+    "engines/dream.js",
     "engines/eco-audit.js",
     "engines/economy.js",
+    "engines/elsewhere.js",
     "engines/enemies.js",
     "engines/ensemble.js",
     "engines/entry-router.js",
@@ -68,6 +77,8 @@
     "engines/evolution.js",
     "engines/faction-graph.js",
     "engines/farfield.js",
+    "engines/fate.js",
+    "engines/floor-snapshot.js",
     "engines/foreshadow.js",
     "engines/freight.js",
     "engines/gen-gate.js",
@@ -78,17 +89,23 @@
     "engines/inst.js",
     "engines/investigation.js",
     "engines/kaleidoscope.js",
+    "engines/length-policy.js",
     "engines/liaison.js",
     "engines/life.js",
     "engines/lifeline.js",
+    "engines/lingqi.js",
+    "engines/memory-tiers.js",
     "engines/memory.js",
     "engines/mend.js",
+    "engines/modelink.js",
     "engines/motif.js",
     "engines/noesis.js",
+    "engines/observe-slice.js",
     "engines/offline-return.js",
     "engines/offline-tick.js",
     "engines/operations.js",
     "engines/opinion.js",
+    "engines/outline-inject.js",
     "engines/parallel-world.js",
     "engines/pending-center.js",
     "engines/perf-baseline.js",
@@ -99,24 +116,31 @@
     "engines/plot-gauge.js",
     "engines/pmem.js",
     "engines/polish.js",
+    "engines/portal.js",
     "engines/power-anchor.js",
+    "engines/prefilter-gate.js",
     "engines/preset-world.js",
     "engines/proactive.js",
     "engines/probe.js",
     "engines/purify-scope.js",
+    "engines/reasoning-strip.js",
     "engines/reasoning.js",
+    "engines/redact-layer.js",
     "engines/refine.js",
     "engines/region.js",
     "engines/regional.js",
     "engines/rehearse.js",
     "engines/reject-recovery.js",
+    "engines/relation-graph.js",
     "engines/request-viewer.js",
     "engines/retrieval.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/rule-pack.js",
+    "engines/scope-tag.js",
     "engines/sediment.js",
     "engines/session.js",
+    "engines/solo-voice.js",
     "engines/stage.js",
     "engines/stale-guard.js",
     "engines/storage-forecast.js",
@@ -128,11 +152,13 @@
     "engines/supply-chain.js",
     "engines/travel-desk.js",
     "engines/userlock.js",
+    "engines/vitals.js",
     "engines/wb-inject.js",
     "engines/wb-search.js",
     "engines/word-budget.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-clock.js",
     "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
@@ -245,7 +271,9 @@
     "engines/bridge.js",
     "engines/calendar.js",
     "engines/chapters.js",
+    "engines/coordinate.js",
     "engines/direct-event.js",
+    "engines/elsewhere.js",
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
@@ -261,6 +289,7 @@
     "engines/proactive.js",
     "engines/regional.js",
     "engines/summarizer.js",
+    "engines/vitals.js",
     "engines/wb-inject.js",
     "render/purifier.js"
    ]
@@ -288,10 +317,13 @@
     "engines/agenda.js",
     "engines/archive-hide.js",
     "engines/atlas.js",
+    "engines/auto-hide.js",
+    "engines/backstage-tone.js",
     "engines/beat-facade.js",
     "engines/beat-ledger.js",
     "engines/beat-mask.js",
     "engines/beat-report.js",
+    "engines/beat.js",
     "engines/binding.js",
     "engines/branch-diff.js",
     "engines/branch-tree.js",
@@ -300,15 +332,23 @@
     "engines/capacity-audit.js",
     "engines/chronicle-view.js",
     "engines/commission.js",
+    "engines/community-note.js",
+    "engines/compare.js",
     "engines/coop.js",
+    "engines/coordinate.js",
+    "engines/deep-clean.js",
     "engines/dep-check.js",
     "engines/diplomacy.js",
+    "engines/dream.js",
     "engines/eco-audit.js",
     "engines/economy.js",
+    "engines/elsewhere.js",
     "engines/ensemble.js",
     "engines/evidence-board.js",
     "engines/faction-graph.js",
     "engines/farfield.js",
+    "engines/fate.js",
+    "engines/floor-snapshot.js",
     "engines/foreshadow.js",
     "engines/freight.js",
     "engines/gen-gate.js",
@@ -317,14 +357,20 @@
     "engines/inject-value.js",
     "engines/inst.js",
     "engines/investigation.js",
+    "engines/length-policy.js",
     "engines/liaison.js",
     "engines/lifeline.js",
+    "engines/lingqi.js",
+    "engines/memory-tiers.js",
     "engines/mend.js",
+    "engines/modelink.js",
     "engines/motif.js",
     "engines/noesis.js",
+    "engines/observe-slice.js",
     "engines/offline-return.js",
     "engines/offline-tick.js",
     "engines/operations.js",
+    "engines/outline-inject.js",
     "engines/pending-center.js",
     "engines/perf-baseline.js",
     "engines/perspective-lock.js",
@@ -333,22 +379,29 @@
     "engines/playtime.js",
     "engines/plot-gauge.js",
     "engines/polish.js",
+    "engines/portal.js",
     "engines/power-anchor.js",
+    "engines/prefilter-gate.js",
     "engines/preset-world.js",
     "engines/probe.js",
     "engines/purify-scope.js",
+    "engines/reasoning-strip.js",
     "engines/reasoning.js",
+    "engines/redact-layer.js",
     "engines/refine.js",
     "engines/region.js",
     "engines/rehearse.js",
     "engines/reject-recovery.js",
+    "engines/relation-graph.js",
     "engines/request-viewer.js",
     "engines/retrieval.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/rule-pack.js",
+    "engines/scope-tag.js",
     "engines/sediment.js",
     "engines/session.js",
+    "engines/solo-voice.js",
     "engines/stage.js",
     "engines/stale-guard.js",
     "engines/storage-forecast.js",
@@ -359,10 +412,12 @@
     "engines/supply-chain.js",
     "engines/travel-desk.js",
     "engines/userlock.js",
+    "engines/vitals.js",
     "engines/wb-search.js",
     "engines/word-budget.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-clock.js",
     "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
@@ -487,7 +542,9 @@
     "engines/bridge.js",
     "engines/calendar.js",
     "engines/chapters.js",
+    "engines/coordinate.js",
     "engines/direct-event.js",
+    "engines/elsewhere.js",
     "engines/enemies.js",
     "engines/entry-router.js",
     "engines/evolution.js",
@@ -502,6 +559,7 @@
     "engines/proactive.js",
     "engines/regional.js",
     "engines/summarizer.js",
+    "engines/vitals.js",
     "engines/wb-inject.js"
    ]
   },
@@ -3944,6 +4002,561 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_evidence_board_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/elsewhere.js": {
+   "ns": [
+    "elsewhere"
+   ],
+   "requires": [
+    "registerModule",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_elsewhere_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/vitals.js": {
+   "ns": [
+    "vitals"
+   ],
+   "requires": [
+    "registerModule",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_vitals_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/fate.js": {
+   "ns": [
+    "fate"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_fate_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/coordinate.js": {
+   "ns": [
+    "coordinate"
+   ],
+   "requires": [
+    "registerModule",
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/workflow.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_coordinate_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/compare.js": {
+   "ns": [
+    "compare"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_compare_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/beat.js": {
+   "ns": [
+    "beat"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_beat_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/backstage-tone.js": {
+   "ns": [
+    "backstageTone"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_backstage_tone_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/dream.js": {
+   "ns": [
+    "dream"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_dream_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/modelink.js": {
+   "ns": [
+    "modelink"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_modelink_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/portal.js": {
+   "ns": [
+    "portal"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_portal_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/floor-snapshot.js": {
+   "ns": [
+    "floorSnapshot"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_floor_snapshot_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/memory-tiers.js": {
+   "ns": [
+    "memoryTiers"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_memory_tiers_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/deep-clean.js": {
+   "ns": [
+    "deepClean"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_deep_clean_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/lingqi.js": {
+   "ns": [
+    "lingqi"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_lingqi_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/scope-tag.js": {
+   "ns": [
+    "scopeTag"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_scope_tag_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/reasoning-strip.js": {
+   "ns": [
+    "reasoningStrip"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_reasoning_strip_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/length-policy.js": {
+   "ns": [
+    "lengthPolicy"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_length_policy_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/auto-hide.js": {
+   "ns": [
+    "autoHide"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_auto_hide_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/prefilter-gate.js": {
+   "ns": [
+    "prefilterGate"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_prefilter_gate_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/community-note.js": {
+   "ns": [
+    "communityNote"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_community_note_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-clock.js": {
+   "ns": [
+    "worldClock"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_clock_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/outline-inject.js": {
+   "ns": [
+    "outlineInject"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_outline_inject_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/redact-layer.js": {
+   "ns": [
+    "redactLayer"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_redact_layer_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/relation-graph.js": {
+   "ns": [
+    "relationGraph"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_relation_graph_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/solo-voice.js": {
+   "ns": [
+    "soloVoice"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_solo_voice_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/observe-slice.js": {
+   "ns": [
+    "observeSlice"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_observe_slice_settings_v1"
    ],
    "consumedBy": []
   }

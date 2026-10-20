@@ -33,6 +33,12 @@ const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
 const ENG_REL = 'engines/history-search.js';
 const SELF_REL = 'tests/s3-y6-v2204.js';
+/** v2.230.0 收口：mini-DOM 的 `innerHTML` getter 会把**容器自身标签**也序列化进去
+ *  （tests/ui-dom.js 的 `ser(el)`），浏览器只返回子节点。于是「空容器」的长度不是 0，
+ *  而是容器自身那一段（Y1 实测 41 字符，随 tag/id/class 长短而变）。
+ *  判据的真问题从来不是「长度是不是 0」，而是「破坏之后读数**再也写不进去**」
+ *  —— 即出口容器**一个子元素都没有**。 */
+function emptyOut(el) { return !!el && el.childNodes.length === 0; }
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function cnt(s, n) { return s.split(n).length - 1; }
 /**
@@ -59,7 +65,9 @@ const ANCHOR = {
   //   判据没变（「真源码里恰 1 处」），变的是那一行的形态。
   //   v2.209.0（优化 6）：出口写完即补绑。锚点随形态更新 —— 判据没变
   //   （「真源码里恰 1 处」），变的是那一行的形态（`if (o) o.innerHTML = …`，无花括号）。
-  out: "const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) o.innerHTML = html; bindNavs(o); };",
+  // v2.230.0 收口：出口落地经 `stageOut`（v2.214.0 Q5 的 staged 出口改造）——
+  //   旧锚点写 `o.innerHTML = html`，改造后该字面量 0 命中（A8 红）。
+  out: "const hsOut = function (html) { const o = $('#wa-hs-out'); if (o) stageOut(o, html); bindNavs(o); };",
   outSel: "const hsOut = function (html) { const o = $('#wa-hs-out');",
   guard: "    { page: 'find', ids: ['wa-hs-q', 'wa-hs-go', 'wa-hs-count', 'wa-hs-face',",
   faces: "const FACES = ['chronicle', 'people', 'places', 'orgs', 'rules', 'entries'];",
@@ -122,12 +130,17 @@ function runAll(a) {
     tab.click();
     return dom;
   }
-  function clickOut(dom, id) {
+/** v2.230.0 收口：同时交出出口**容器**（emptyOut 注见模块顶层）——「读数为空」是
+   *  「容器零子元素」，不是「序列化长度为零」（mini-DOM 会把容器自身标签算进去）。 */
+  function clickOutNode(dom, id) {
     const b = dom.getElementById(id);
     if (!b) return null;
     if (typeof b.onclick !== 'function') return null;
     b.onclick({ target: b });
-    const o = dom.getElementById('wa-hs-out');
+    return dom.getElementById('wa-hs-out');
+  }
+  function clickOut(dom, id) {
+    const o = clickOutNode(dom, id);
     return String(o ? o.innerHTML : '');
   }
   /** 给检索框填词（mini-DOM 的 input 有 .value）。 */
@@ -199,7 +212,7 @@ function runAll(a) {
       'y6v2204/A8d: 锚点值互不相同（' + uniq.length + ' / ' + vals.length + '）');
   })();
   return runRest(a, { gate: gate, LS: LS, env0: env0, seed: seed,
-    gotoPageF: gotoPage, clickOutF: clickOut, typeQF: typeQ,
+    gotoPageF: gotoPage, clickOutF: clickOut, clickOutNodeF: clickOutNode, typeQF: typeQ,
     P: P, D: D, E: E, segR: segR, segB: segB,
     ANCHOR: ANCHOR, TGT: TGT, PANEL_REL: PANEL_REL, DIAG_REL: DIAG_REL, ENG_REL: ENG_REL });
 }
@@ -584,12 +597,15 @@ function runRest(a, C) {
       WA.store.transact(function (d) { d.people = { A: { name: '老周' } }; d.world = { places: {}, roads: {} }; }, 'y6:n13');
       const dom = C.gotoPageF(env, 'find');
       C.typeQF(dom, '老周');
-      return C.clickOutF(dom, 'wa-hs-go');
+      return C.clickOutNodeF(dom, 'wa-hs-go');
     }
-    let bad = null, good = null, threw = null;
-    try { bad = runOnce(ov); good = runOnce(null); } catch (e) { threw = String((e && e.message) || e); }
+    let badNode = null, goodNode = null, bad = null, good = null, threw = null;
+    try {
+      badNode = runOnce(ov); bad = String(badNode ? badNode.innerHTML : '');
+      goodNode = runOnce(null); good = String(goodNode ? goodNode.innerHTML : '');
+    } catch (e) { threw = String((e && e.message) || e); }
     a(threw === null, 'y6v2204/N13b: 破坏版上点按钮仍不抛（破坏的是读数去处，不是绑定）实 ' + threw);
-    a(bad !== null && bad.length === 0, 'y6v2204/N13c: （两向）破坏版上读数**为空**（实 ' + j(bad && bad.length) + ' 字符）—— 判据不是空转');
+    a(badNode !== null && emptyOut(badNode), 'y6v2204/N13c: （两向）破坏版上读数**为空**（出口容器零子元素；实 ' + j(bad && bad.length) + ' 字符是容器自身序列化）—— 判据不是空转');
     a(good !== null && good.length > 0, 'y6v2204/N13d: （两向）原版上同款操作读数非空（实 ' + j(good && good.length) + '）—— 判据区分得开两向');
   })();
   // N14：破坏版跑产品 —— empty 不再被 blind 剥夺后，有面读不到时**真的**说「真的没有」（两向）

@@ -174,9 +174,19 @@ function runB(a) {
   a(cBad.length === 0, 'B7: consumed 行必有非空消费面(缺 ' + cBad.length + ' 条)');
   // spawn-argv 形态被认得(ui-gate.js 那个形态坑的行为级证据)
   const ug = rows.filter(function (r) { return r.file === 'tests/ui-gate.js'; })[0];
-  a(ug && ug.wired && ug.wired.form === 'spawn-argv' && ug.wired.line === 21005,
+  // v2.230.0 收口：「21055」是**记录**，不是事实 —— run.js 一路新增节，引用点整体下移
+  //   （21005 → 21055 → 现场 21060）。把行号写进判据 ⇒ 每加一节都假红，而它治的病
+  //   （spawn-argv 形态被认得）其实没坏。判据要钉的是「**记录的那一行真提到**
+  //   tests/ui-gate.js」：形态 + 指得到那一处。
+  const ugRunLines = RD('tests/run.js').split('\n');
+  const ugLine = ug && ug.wired ? (ugRunLines[ug.wired.line - 1] || '') : '';
+  a(ug && ug.wired && ug.wired.form === 'spawn-argv' && ugLine.indexOf('ui-gate.js') >= 0,
     'B8: spawnSync argv 形态被认得(ui-gate.js 实 '
-    + (ug && ug.wired ? ug.wired.form + '@' + ug.wired.line : 'null') + ')');
+    + (ug && ug.wired ? ug.wired.form + '@' + ug.wired.line
+      + ' → ' + ugLine.trim().slice(0, 56) : 'null') + ')');
+  a(ugLine.indexOf('ui-gate.js') >= 0
+    && !!ug.wired && ug.wired.line <= ugRunLines.length,
+    'B8c: 记录的行号落在当前 run.js 范围内，且那一行真提到 ui-gate.js（记录与现场对得上）');
   a(ug && ug.acceptance !== 'unwired', 'B8b: 真在跑的门禁不得读成 unwired');
   // ── D6 修法的行为级证据:version 栏只认文件自述,不拿文件名反解 ──
   //   「读数与事实同宽」的又一处:六栏里 version 那栏本版最初写成「文件名 `-v2NNN` 反解」,

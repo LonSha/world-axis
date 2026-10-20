@@ -2102,6 +2102,36 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   本文件的 secRetrieval 均读它,缺席就是「留存读数缺席」本身。
     //   漏登的后果不是「少一行字」:inventory 的定义面与出口面契约都从本表取。
     'engines/retrieval.js': 'retrieval',
+    // v2.230.0（拓展 N12）：十枚新引擎登记为必载。漏登的后果不是「少一行字」：
+    //   inventory 的定义面与出口面契约都从本表取（LOAD 进了不等于登记了）。
+    'engines/elsewhere.js': 'elsewhere',
+    'engines/vitals.js': 'vitals',
+    'engines/fate.js': 'fate',
+    'engines/coordinate.js': 'coordinate',
+    'engines/compare.js': 'compare',
+    'engines/beat.js': 'beat',
+    'engines/backstage-tone.js': 'backstageTone',
+    'engines/dream.js': 'dream',
+    'engines/modelink.js': 'modelink',
+    'engines/portal.js': 'portal',
+    // v2.230.0（拓展 N12 续批）：16 枚新引擎一并登记为必载。漏登的后果不是「少一行字」：
+    //   inventory 的定义面与出口面契约都从本表取（LOAD 进了不等于登记了）。
+    'engines/floor-snapshot.js': 'floorSnapshot',
+    'engines/memory-tiers.js': 'memoryTiers',
+    'engines/deep-clean.js': 'deepClean',
+    'engines/lingqi.js': 'lingqi',
+    'engines/scope-tag.js': 'scopeTag',
+    'engines/reasoning-strip.js': 'reasoningStrip',
+    'engines/length-policy.js': 'lengthPolicy',
+    'engines/auto-hide.js': 'autoHide',
+    'engines/prefilter-gate.js': 'prefilterGate',
+    'engines/community-note.js': 'communityNote',
+    'engines/world-clock.js': 'worldClock',
+    'engines/outline-inject.js': 'outlineInject',
+    'engines/redact-layer.js': 'redactLayer',
+    'engines/relation-graph.js': 'relationGraph',
+    'engines/solo-voice.js': 'soloVoice',
+    'engines/observe-slice.js': 'observeSlice',
     // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。登记为必载 —— 注入链的
     //   `远方的传说` 源读 worldBridge.buildBlock，面板「联网」页与本文件的 secWorldBridge /
     //   secEcoAudit 都读它们，缺席就是「联网/自洽读数缺席」本身，不该被静默兜住。
@@ -3040,7 +3070,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   而不是状态，故不进 dynamic（第一屏就渲染，缺失即真断裂）。
       'wa-plan-enabled', 'wa-plan-person', 'wa-plan-goal', 'wa-plan-steps', 'wa-plan-expand',
       'wa-plan-current', 'wa-plan-advance', 'wa-plan-done', 'wa-plan-blocked', 'wa-plan-refused',
-      'wa-plan-reason', 'wa-plan-candidates', 'wa-plan-view', 'wa-plan-abandon', 'wa-plan-out',
+      // v2.230.0（修存量红）：`wa-plan-review`（复核拟稿）在 ui/panel.js:978 渲染、在
+      //   7312 行有真实 handler，却从未进守卫表 —— 绑定写错时无人发现（本版实测抓出）。
+      'wa-plan-reason', 'wa-plan-candidates', 'wa-plan-view', 'wa-plan-review', 'wa-plan-abandon', 'wa-plan-out',
       // N2（v2.220.0）：四类限制 + 自动采用四控件（同批「渲染 + 绑定 + 守卫登记」三件齐做）。
       'wa-plan-limits', 'wa-plan-autoadopt', 'wa-plan-adoptbudget', 'wa-plan-adopt',
       'wa-mend-enabled', 'wa-mend-person', 'wa-mend-with', 'wa-mend-hurt', 'wa-mend-mark',
@@ -4278,7 +4310,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.228.0(拓展 N10):历史留存与检索。与前两节同取舍:读数只念现场,不替用户跑。
       //   它同时是 retrieval.assemble(有界紧凑包)在**产品侧的唯一读者** ——
       //   不在此处接上,那条口径就只活在测试里(产品零引用即冻结面)。
-      retrieval: secRetrieval()
+      retrieval: secRetrieval(),
+      // v2.230.0（拓展 N12）：26 枚新引擎的只读采集节。本批 305 项导出此前产品零引用，
+      //   本版取「真接线」而非「--update 冻结放行」——本节是 88 个 read 口在产品侧的唯一读者，
+      //   217 个 act 口由面板「引擎台」页真调（诊断不触发写口）。漏登记 ⇒ 死子面当场红灯。
+      engines230: secEngines230()
     };
     diag.verdict = verdict(diag);
     return diag;
@@ -5252,6 +5288,535 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     return lines.join('\n');
   }
 
+  /* ── v2.230.0（拓展 N12 接线面）：26 枚新引擎的端口表与只读采集节 ────────
+   *   它治什么：本批 26 枚新引擎的 305 项导出，此前**产品侧零引用** ——
+   *   tests/dead-export-gate.js 的冻结面上有 305 条（本仓口径：产品代码零引用即死）。
+   *   本仓既有裁决是「要么显式 --update 登记冻结、要么给导出接上消费方、要么删掉」，
+   *   本版取第二条 —— **真接线**，不做冻结放行。
+   *
+   *   消费方两条（本批全部 305 项都落在其中一条上，无一遗漏）：
+   *     ① read 口（88 项，零参只读）：由下面 secEngines230() 每次采集**真调**，
+   *        读数直接进诊断包（与 secStitch2129 / secStitch2130 同规）；
+   *     ② act 口（217 项，待参/写口）：由面板「引擎台」页 invokePort() 真调 ——
+   *        诊断节**刻意不调它们**（写口不由诊断代替操作者触发，同「只报读数、不写世界」纪律）。
+   *
+   *   为什么表里逐字写全 `WA.<ns>.<mem>`：死子面判据只认字面形态，
+   *   「存进局部变量再调」在静态面上仍是产品零引用（与 ui/panel.js 的 esc() 同规注释同因）。
+   */
+  // ---- v2.230.0 (N12) 26 engines port table ----
+  const ENGINE_PORTS = {
+    // autoHide: read 4 / act 7
+    autoHide: {
+      read: {
+        getSettings: function () { return WA.autoHide.getSettings(); },
+        list: function () { return WA.autoHide.list(); },
+        stat: function () { return WA.autoHide.stat(); },
+        view: function () { return WA.autoHide.view(); }
+      },
+      act: {
+        clear: function (a) { return WA.autoHide.clear.apply(null, a || []); },
+        isHidden: function (a) { return WA.autoHide.isHidden.apply(null, a || []); },
+        mark: function (a) { return WA.autoHide.mark.apply(null, a || []); },
+        plan: function (a) { return WA.autoHide.plan.apply(null, a || []); },
+        resetStat: function (a) { return WA.autoHide.resetStat.apply(null, a || []); },
+        revoke: function (a) { return WA.autoHide.revoke.apply(null, a || []); },
+        setSettings: function (a) { return WA.autoHide.setSettings.apply(null, a || []); }
+      }
+    },
+    // backstageTone: read 3 / act 12
+    backstageTone: {
+      read: {
+        getSettings: function () { return WA.backstageTone.getSettings(); },
+        stat: function () { return WA.backstageTone.stat(); },
+        view: function () { return WA.backstageTone.view(); }
+      },
+      act: {
+        era: function (a) { return WA.backstageTone.era.apply(null, a || []); },
+        noteAdd: function (a) { return WA.backstageTone.noteAdd.apply(null, a || []); },
+        noteClear: function (a) { return WA.backstageTone.noteClear.apply(null, a || []); },
+        noteList: function (a) { return WA.backstageTone.noteList.apply(null, a || []); },
+        numToZh: function (a) { return WA.backstageTone.numToZh.apply(null, a || []); },
+        parseShichen: function (a) { return WA.backstageTone.parseShichen.apply(null, a || []); },
+        reset: function (a) { return WA.backstageTone.reset.apply(null, a || []); },
+        setSettings: function (a) { return WA.backstageTone.setSettings.apply(null, a || []); },
+        shichen: function (a) { return WA.backstageTone.shichen.apply(null, a || []); },
+        socialHint: function (a) { return WA.backstageTone.socialHint.apply(null, a || []); },
+        voiceCheck: function (a) { return WA.backstageTone.voiceCheck.apply(null, a || []); },
+        zhNum: function (a) { return WA.backstageTone.zhNum.apply(null, a || []); }
+      }
+    },
+    // beat: read 3 / act 10
+    beat: {
+      read: {
+        getSettings: function () { return WA.beat.getSettings(); },
+        stat: function () { return WA.beat.stat(); },
+        view: function () { return WA.beat.view(); }
+      },
+      act: {
+        bandOf: function (a) { return WA.beat.bandOf.apply(null, a || []); },
+        categoryOf: function (a) { return WA.beat.categoryOf.apply(null, a || []); },
+        extract: function (a) { return WA.beat.extract.apply(null, a || []); },
+        hue: function (a) { return WA.beat.hue.apply(null, a || []); },
+        parseOrExtract: function (a) { return WA.beat.parseOrExtract.apply(null, a || []); },
+        repair: function (a) { return WA.beat.repair.apply(null, a || []); },
+        reset: function (a) { return WA.beat.reset.apply(null, a || []); },
+        setSettings: function (a) { return WA.beat.setSettings.apply(null, a || []); },
+        validateId: function (a) { return WA.beat.validateId.apply(null, a || []); },
+        validateList: function (a) { return WA.beat.validateList.apply(null, a || []); }
+      }
+    },
+    // communityNote: read 4 / act 8
+    communityNote: {
+      read: {
+        getSettings: function () { return WA.communityNote.getSettings(); },
+        pending: function () { return WA.communityNote.pending(); },
+        stat: function () { return WA.communityNote.stat(); },
+        view: function () { return WA.communityNote.view(); }
+      },
+      act: {
+        ack: function (a) { return WA.communityNote.ack.apply(null, a || []); },
+        clear: function (a) { return WA.communityNote.clear.apply(null, a || []); },
+        isSeen: function (a) { return WA.communityNote.isSeen.apply(null, a || []); },
+        list: function (a) { return WA.communityNote.list.apply(null, a || []); },
+        markSeen: function (a) { return WA.communityNote.markSeen.apply(null, a || []); },
+        push: function (a) { return WA.communityNote.push.apply(null, a || []); },
+        resetStat: function (a) { return WA.communityNote.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.communityNote.setSettings.apply(null, a || []); }
+      }
+    },
+    // compare: read 3 / act 9
+    compare: {
+      read: {
+        getSettings: function () { return WA.compare.getSettings(); },
+        stat: function () { return WA.compare.stat(); },
+        view: function () { return WA.compare.view(); }
+      },
+      act: {
+        diff: function (a) { return WA.compare.diff.apply(null, a || []); },
+        hasResidue: function (a) { return WA.compare.hasResidue.apply(null, a || []); },
+        merge: function (a) { return WA.compare.merge.apply(null, a || []); },
+        reset: function (a) { return WA.compare.reset.apply(null, a || []); },
+        setSettings: function (a) { return WA.compare.setSettings.apply(null, a || []); },
+        strip: function (a) { return WA.compare.strip.apply(null, a || []); },
+        tableOf: function (a) { return WA.compare.tableOf.apply(null, a || []); },
+        toLines: function (a) { return WA.compare.toLines.apply(null, a || []); },
+        variants: function (a) { return WA.compare.variants.apply(null, a || []); }
+      }
+    },
+    // coordinate: read 5 / act 15
+    coordinate: {
+      read: {
+        getSettings: function () { return WA.coordinate.getSettings(); },
+        index: function () { return WA.coordinate.index(); },
+        lines: function () { return WA.coordinate.lines(); },
+        list: function () { return WA.coordinate.list(); },
+        stat: function () { return WA.coordinate.stat(); }
+      },
+      act: {
+        anchorAdd: function (a) { return WA.coordinate.anchorAdd.apply(null, a || []); },
+        anchorOf: function (a) { return WA.coordinate.anchorOf.apply(null, a || []); },
+        bridgeDump: function (a) { return WA.coordinate.bridgeDump.apply(null, a || []); },
+        bridgeLoad: function (a) { return WA.coordinate.bridgeLoad.apply(null, a || []); },
+        capture: function (a) { return WA.coordinate.capture.apply(null, a || []); },
+        decode: function (a) { return WA.coordinate.decode.apply(null, a || []); },
+        encode: function (a) { return WA.coordinate.encode.apply(null, a || []); },
+        gateClaim: function (a) { return WA.coordinate.gateClaim.apply(null, a || []); },
+        gateClear: function (a) { return WA.coordinate.gateClear.apply(null, a || []); },
+        gateRelease: function (a) { return WA.coordinate.gateRelease.apply(null, a || []); },
+        gateSuppressed: function (a) { return WA.coordinate.gateSuppressed.apply(null, a || []); },
+        parseLine: function (a) { return WA.coordinate.parseLine.apply(null, a || []); },
+        reset: function (a) { return WA.coordinate.reset.apply(null, a || []); },
+        setSettings: function (a) { return WA.coordinate.setSettings.apply(null, a || []); },
+        view: function (a) { return WA.coordinate.view.apply(null, a || []); }
+      }
+    },
+    // deepClean: read 4 / act 9
+    deepClean: {
+      read: {
+        getSettings: function () { return WA.deepClean.getSettings(); },
+        stat: function () { return WA.deepClean.stat(); },
+        status: function () { return WA.deepClean.status(); },
+        view: function () { return WA.deepClean.view(); }
+      },
+      act: {
+        apply: function (a) { return WA.deepClean.apply.apply(null, a || []); },
+        digest: function (a) { return WA.deepClean.digest.apply(null, a || []); },
+        freeze: function (a) { return WA.deepClean.freeze.apply(null, a || []); },
+        prepare: function (a) { return WA.deepClean.prepare.apply(null, a || []); },
+        reset: function (a) { return WA.deepClean.reset.apply(null, a || []); },
+        resetStat: function (a) { return WA.deepClean.resetStat.apply(null, a || []); },
+        review: function (a) { return WA.deepClean.review.apply(null, a || []); },
+        scan: function (a) { return WA.deepClean.scan.apply(null, a || []); },
+        setSettings: function (a) { return WA.deepClean.setSettings.apply(null, a || []); }
+      }
+    },
+    // dream: read 6 / act 7
+    dream: {
+      read: {
+        deviationList: function () { return WA.dream.deviationList(); },
+        getSettings: function () { return WA.dream.getSettings(); },
+        onset: function () { return WA.dream.onset(); },
+        stat: function () { return WA.dream.stat(); },
+        view: function () { return WA.dream.view(); },
+        volumeList: function () { return WA.dream.volumeList(); }
+      },
+      act: {
+        archive: function (a) { return WA.dream.archive.apply(null, a || []); },
+        reset: function (a) { return WA.dream.reset.apply(null, a || []); },
+        setSettings: function (a) { return WA.dream.setSettings.apply(null, a || []); },
+        threadList: function (a) { return WA.dream.threadList.apply(null, a || []); },
+        threadOf: function (a) { return WA.dream.threadOf.apply(null, a || []); },
+        volumeGet: function (a) { return WA.dream.volumeGet.apply(null, a || []); },
+        weave: function (a) { return WA.dream.weave.apply(null, a || []); }
+      }
+    },
+    // elsewhere: read 2 / act 10
+    elsewhere: {
+      read: {
+        getSettings: function () { return WA.elsewhere.getSettings(); },
+        stat: function () { return WA.elsewhere.stat(); }
+      },
+      act: {
+        bandOf: function (a) { return WA.elsewhere.bandOf.apply(null, a || []); },
+        card: function (a) { return WA.elsewhere.card.apply(null, a || []); },
+        open: function (a) { return WA.elsewhere.open.apply(null, a || []); },
+        reconcile: function (a) { return WA.elsewhere.reconcile.apply(null, a || []); },
+        remove: function (a) { return WA.elsewhere.remove.apply(null, a || []); },
+        reset: function (a) { return WA.elsewhere.reset.apply(null, a || []); },
+        romance: function (a) { return WA.elsewhere.romance.apply(null, a || []); },
+        romanceOf: function (a) { return WA.elsewhere.romanceOf.apply(null, a || []); },
+        setSettings: function (a) { return WA.elsewhere.setSettings.apply(null, a || []); },
+        update: function (a) { return WA.elsewhere.update.apply(null, a || []); }
+      }
+    },
+    // fate: read 3 / act 17
+    fate: {
+      read: {
+        getSettings: function () { return WA.fate.getSettings(); },
+        stat: function () { return WA.fate.stat(); },
+        view: function () { return WA.fate.view(); }
+      },
+      act: {
+        bigrams: function (a) { return WA.fate.bigrams.apply(null, a || []); },
+        check: function (a) { return WA.fate.check.apply(null, a || []); },
+        deck: function (a) { return WA.fate.deck.apply(null, a || []); },
+        dedupe: function (a) { return WA.fate.dedupe.apply(null, a || []); },
+        evalArith: function (a) { return WA.fate.evalArith.apply(null, a || []); },
+        evalFormula: function (a) { return WA.fate.evalFormula.apply(null, a || []); },
+        isArithmeticSyntax: function (a) { return WA.fate.isArithmeticSyntax.apply(null, a || []); },
+        jaccard: function (a) { return WA.fate.jaccard.apply(null, a || []); },
+        oversample: function (a) { return WA.fate.oversample.apply(null, a || []); },
+        parse: function (a) { return WA.fate.parse.apply(null, a || []); },
+        reset: function (a) { return WA.fate.reset.apply(null, a || []); },
+        resolveCount: function (a) { return WA.fate.resolveCount.apply(null, a || []); },
+        resolveDC: function (a) { return WA.fate.resolveDC.apply(null, a || []); },
+        roll: function (a) { return WA.fate.roll.apply(null, a || []); },
+        setSettings: function (a) { return WA.fate.setSettings.apply(null, a || []); },
+        stripHeader: function (a) { return WA.fate.stripHeader.apply(null, a || []); },
+        titleGate: function (a) { return WA.fate.titleGate.apply(null, a || []); }
+      }
+    },
+    // floorSnapshot: read 5 / act 10
+    floorSnapshot: {
+      read: {
+        bindings: function () { return WA.floorSnapshot.bindings(); },
+        getSettings: function () { return WA.floorSnapshot.getSettings(); },
+        list: function () { return WA.floorSnapshot.list(); },
+        stat: function () { return WA.floorSnapshot.stat(); },
+        view: function () { return WA.floorSnapshot.view(); }
+      },
+      act: {
+        at: function (a) { return WA.floorSnapshot.at.apply(null, a || []); },
+        bind: function (a) { return WA.floorSnapshot.bind.apply(null, a || []); },
+        byMessage: function (a) { return WA.floorSnapshot.byMessage.apply(null, a || []); },
+        clear: function (a) { return WA.floorSnapshot.clear.apply(null, a || []); },
+        markCleared: function (a) { return WA.floorSnapshot.markCleared.apply(null, a || []); },
+        push: function (a) { return WA.floorSnapshot.push.apply(null, a || []); },
+        resetStat: function (a) { return WA.floorSnapshot.resetStat.apply(null, a || []); },
+        rollback: function (a) { return WA.floorSnapshot.rollback.apply(null, a || []); },
+        setSettings: function (a) { return WA.floorSnapshot.setSettings.apply(null, a || []); },
+        unbind: function (a) { return WA.floorSnapshot.unbind.apply(null, a || []); }
+      }
+    },
+    // lengthPolicy: read 3 / act 6
+    lengthPolicy: {
+      read: {
+        getSettings: function () { return WA.lengthPolicy.getSettings(); },
+        stat: function () { return WA.lengthPolicy.stat(); },
+        view: function () { return WA.lengthPolicy.view(); }
+      },
+      act: {
+        parse: function (a) { return WA.lengthPolicy.parse.apply(null, a || []); },
+        parseNumber: function (a) { return WA.lengthPolicy.parseNumber.apply(null, a || []); },
+        resetStat: function (a) { return WA.lengthPolicy.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.lengthPolicy.setSettings.apply(null, a || []); },
+        targetOf: function (a) { return WA.lengthPolicy.targetOf.apply(null, a || []); },
+        tierOf: function (a) { return WA.lengthPolicy.tierOf.apply(null, a || []); }
+      }
+    },
+    // lingqi: read 3 / act 7
+    lingqi: {
+      read: {
+        getSettings: function () { return WA.lingqi.getSettings(); },
+        stat: function () { return WA.lingqi.stat(); },
+        view: function () { return WA.lingqi.view(); }
+      },
+      act: {
+        listSkills: function (a) { return WA.lingqi.listSkills.apply(null, a || []); },
+        normalizeSkill: function (a) { return WA.lingqi.normalizeSkill.apply(null, a || []); },
+        register: function (a) { return WA.lingqi.register.apply(null, a || []); },
+        resetStat: function (a) { return WA.lingqi.resetStat.apply(null, a || []); },
+        route: function (a) { return WA.lingqi.route.apply(null, a || []); },
+        seed: function (a) { return WA.lingqi.seed.apply(null, a || []); },
+        setSettings: function (a) { return WA.lingqi.setSettings.apply(null, a || []); }
+      }
+    },
+    // memoryTiers: read 3 / act 7
+    memoryTiers: {
+      read: {
+        getSettings: function () { return WA.memoryTiers.getSettings(); },
+        stat: function () { return WA.memoryTiers.stat(); },
+        view: function () { return WA.memoryTiers.view(); }
+      },
+      act: {
+        clearTier: function (a) { return WA.memoryTiers.clearTier.apply(null, a || []); },
+        knot: function (a) { return WA.memoryTiers.knot.apply(null, a || []); },
+        list: function (a) { return WA.memoryTiers.list.apply(null, a || []); },
+        resetStat: function (a) { return WA.memoryTiers.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.memoryTiers.setSettings.apply(null, a || []); },
+        sink: function (a) { return WA.memoryTiers.sink.apply(null, a || []); },
+        tierOf: function (a) { return WA.memoryTiers.tierOf.apply(null, a || []); }
+      }
+    },
+    // modelink: read 3 / act 12
+    modelink: {
+      read: {
+        getSettings: function () { return WA.modelink.getSettings(); },
+        stat: function () { return WA.modelink.stat(); },
+        view: function () { return WA.modelink.view(); }
+      },
+      act: {
+        draftAdd: function (a) { return WA.modelink.draftAdd.apply(null, a || []); },
+        draftApply: function (a) { return WA.modelink.draftApply.apply(null, a || []); },
+        draftClear: function (a) { return WA.modelink.draftClear.apply(null, a || []); },
+        draftList: function (a) { return WA.modelink.draftList.apply(null, a || []); },
+        isMvuComment: function (a) { return WA.modelink.isMvuComment.apply(null, a || []); },
+        matchEntry: function (a) { return WA.modelink.matchEntry.apply(null, a || []); },
+        parseFlow: function (a) { return WA.modelink.parseFlow.apply(null, a || []); },
+        reset: function (a) { return WA.modelink.reset.apply(null, a || []); },
+        residue: function (a) { return WA.modelink.residue.apply(null, a || []); },
+        setSettings: function (a) { return WA.modelink.setSettings.apply(null, a || []); },
+        stripArtifacts: function (a) { return WA.modelink.stripArtifacts.apply(null, a || []); },
+        updateBlocks: function (a) { return WA.modelink.updateBlocks.apply(null, a || []); }
+      }
+    },
+    // observeSlice: read 3 / act 7
+    observeSlice: {
+      read: {
+        getSettings: function () { return WA.observeSlice.getSettings(); },
+        stat: function () { return WA.observeSlice.stat(); },
+        view: function () { return WA.observeSlice.view(); }
+      },
+      act: {
+        actionProvesPerception: function (a) { return WA.observeSlice.actionProvesPerception.apply(null, a || []); },
+        extractAnchor: function (a) { return WA.observeSlice.extractAnchor.apply(null, a || []); },
+        isMicroScene: function (a) { return WA.observeSlice.isMicroScene.apply(null, a || []); },
+        isObservationPrompt: function (a) { return WA.observeSlice.isObservationPrompt.apply(null, a || []); },
+        resetStat: function (a) { return WA.observeSlice.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.observeSlice.setSettings.apply(null, a || []); },
+        slice: function (a) { return WA.observeSlice.slice.apply(null, a || []); }
+      }
+    },
+    // outlineInject: read 3 / act 5
+    outlineInject: {
+      read: {
+        getSettings: function () { return WA.outlineInject.getSettings(); },
+        stat: function () { return WA.outlineInject.stat(); },
+        view: function () { return WA.outlineInject.view(); }
+      },
+      act: {
+        extractFromEnd: function (a) { return WA.outlineInject.extractFromEnd.apply(null, a || []); },
+        parseEntries: function (a) { return WA.outlineInject.parseEntries.apply(null, a || []); },
+        plan: function (a) { return WA.outlineInject.plan.apply(null, a || []); },
+        resetStat: function (a) { return WA.outlineInject.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.outlineInject.setSettings.apply(null, a || []); }
+      }
+    },
+    // portal: read 4 / act 7
+    portal: {
+      read: {
+        getSettings: function () { return WA.portal.getSettings(); },
+        stat: function () { return WA.portal.stat(); },
+        status: function () { return WA.portal.status(); },
+        view: function () { return WA.portal.view(); }
+      },
+      act: {
+        claim: function (a) { return WA.portal.claim.apply(null, a || []); },
+        digest: function (a) { return WA.portal.digest.apply(null, a || []); },
+        release: function (a) { return WA.portal.release.apply(null, a || []); },
+        reset: function (a) { return WA.portal.reset.apply(null, a || []); },
+        resetStat: function (a) { return WA.portal.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.portal.setSettings.apply(null, a || []); },
+        signature: function (a) { return WA.portal.signature.apply(null, a || []); }
+      }
+    },
+    // prefilterGate: read 4 / act 8
+    prefilterGate: {
+      read: {
+        getSettings: function () { return WA.prefilterGate.getSettings(); },
+        roster: function () { return WA.prefilterGate.roster(); },
+        stat: function () { return WA.prefilterGate.stat(); },
+        view: function () { return WA.prefilterGate.view(); }
+      },
+      act: {
+        alias: function (a) { return WA.prefilterGate.alias.apply(null, a || []); },
+        clearRoster: function (a) { return WA.prefilterGate.clearRoster.apply(null, a || []); },
+        parseReply: function (a) { return WA.prefilterGate.parseReply.apply(null, a || []); },
+        register: function (a) { return WA.prefilterGate.register.apply(null, a || []); },
+        resetStat: function (a) { return WA.prefilterGate.resetStat.apply(null, a || []); },
+        resolveName: function (a) { return WA.prefilterGate.resolveName.apply(null, a || []); },
+        screen: function (a) { return WA.prefilterGate.screen.apply(null, a || []); },
+        setSettings: function (a) { return WA.prefilterGate.setSettings.apply(null, a || []); }
+      }
+    },
+    // reasoningStrip: read 3 / act 5
+    reasoningStrip: {
+      read: {
+        getSettings: function () { return WA.reasoningStrip.getSettings(); },
+        stat: function () { return WA.reasoningStrip.stat(); },
+        view: function () { return WA.reasoningStrip.view(); }
+      },
+      act: {
+        hasIncomplete: function (a) { return WA.reasoningStrip.hasIncomplete.apply(null, a || []); },
+        resetStat: function (a) { return WA.reasoningStrip.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.reasoningStrip.setSettings.apply(null, a || []); },
+        strip: function (a) { return WA.reasoningStrip.strip.apply(null, a || []); },
+        trailingPartialTagLength: function (a) { return WA.reasoningStrip.trailingPartialTagLength.apply(null, a || []); }
+      }
+    },
+    // redactLayer: read 3 / act 5
+    redactLayer: {
+      read: {
+        getSettings: function () { return WA.redactLayer.getSettings(); },
+        stat: function () { return WA.redactLayer.stat(); },
+        view: function () { return WA.redactLayer.view(); }
+      },
+      act: {
+        isSecretPath: function (a) { return WA.redactLayer.isSecretPath.apply(null, a || []); },
+        probe: function (a) { return WA.redactLayer.probe.apply(null, a || []); },
+        redact: function (a) { return WA.redactLayer.redact.apply(null, a || []); },
+        resetStat: function (a) { return WA.redactLayer.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.redactLayer.setSettings.apply(null, a || []); }
+      }
+    },
+    // relationGraph: read 3 / act 9
+    relationGraph: {
+      read: {
+        getSettings: function () { return WA.relationGraph.getSettings(); },
+        stat: function () { return WA.relationGraph.stat(); },
+        view: function () { return WA.relationGraph.view(); }
+      },
+      act: {
+        clear: function (a) { return WA.relationGraph.clear.apply(null, a || []); },
+        edgeIdOf: function (a) { return WA.relationGraph.edgeIdOf.apply(null, a || []); },
+        edgesOf: function (a) { return WA.relationGraph.edgesOf.apply(null, a || []); },
+        get: function (a) { return WA.relationGraph.get.apply(null, a || []); },
+        list: function (a) { return WA.relationGraph.list.apply(null, a || []); },
+        remove: function (a) { return WA.relationGraph.remove.apply(null, a || []); },
+        resetStat: function (a) { return WA.relationGraph.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.relationGraph.setSettings.apply(null, a || []); },
+        upsert: function (a) { return WA.relationGraph.upsert.apply(null, a || []); }
+      }
+    },
+    // scopeTag: read 3 / act 4
+    scopeTag: {
+      read: {
+        getSettings: function () { return WA.scopeTag.getSettings(); },
+        stat: function () { return WA.scopeTag.stat(); },
+        view: function () { return WA.scopeTag.view(); }
+      },
+      act: {
+        parse: function (a) { return WA.scopeTag.parse.apply(null, a || []); },
+        rangesOf: function (a) { return WA.scopeTag.rangesOf.apply(null, a || []); },
+        resetStat: function (a) { return WA.scopeTag.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.scopeTag.setSettings.apply(null, a || []); }
+      }
+    },
+    // soloVoice: read 3 / act 6
+    soloVoice: {
+      read: {
+        getSettings: function () { return WA.soloVoice.getSettings(); },
+        stat: function () { return WA.soloVoice.stat(); },
+        view: function () { return WA.soloVoice.view(); }
+      },
+      act: {
+        brief: function (a) { return WA.soloVoice.brief.apply(null, a || []); },
+        check: function (a) { return WA.soloVoice.check.apply(null, a || []); },
+        countQuestions: function (a) { return WA.soloVoice.countQuestions.apply(null, a || []); },
+        labelWeight: function (a) { return WA.soloVoice.labelWeight.apply(null, a || []); },
+        resetStat: function (a) { return WA.soloVoice.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.soloVoice.setSettings.apply(null, a || []); }
+      }
+    },
+    // vitals: read 2 / act 10
+    vitals: {
+      read: {
+        getSettings: function () { return WA.vitals.getSettings(); },
+        stat: function () { return WA.vitals.stat(); }
+      },
+      act: {
+        conceive: function (a) { return WA.vitals.conceive.apply(null, a || []); },
+        endPregnancy: function (a) { return WA.vitals.endPregnancy.apply(null, a || []); },
+        know: function (a) { return WA.vitals.know.apply(null, a || []); },
+        knows: function (a) { return WA.vitals.knows.apply(null, a || []); },
+        knowsOthers: function (a) { return WA.vitals.knowsOthers.apply(null, a || []); },
+        register: function (a) { return WA.vitals.register.apply(null, a || []); },
+        reset: function (a) { return WA.vitals.reset.apply(null, a || []); },
+        setSettings: function (a) { return WA.vitals.setSettings.apply(null, a || []); },
+        tell: function (a) { return WA.vitals.tell.apply(null, a || []); },
+        tick: function (a) { return WA.vitals.tick.apply(null, a || []); }
+      }
+    },
+    // worldClock: read 3 / act 5
+    worldClock: {
+      read: {
+        getSettings: function () { return WA.worldClock.getSettings(); },
+        stat: function () { return WA.worldClock.stat(); },
+        view: function () { return WA.worldClock.view(); }
+      },
+      act: {
+        inspectEnd: function (a) { return WA.worldClock.inspectEnd.apply(null, a || []); },
+        judge: function (a) { return WA.worldClock.judge.apply(null, a || []); },
+        parseEnd: function (a) { return WA.worldClock.parseEnd.apply(null, a || []); },
+        resetStat: function (a) { return WA.worldClock.resetStat.apply(null, a || []); },
+        setSettings: function (a) { return WA.worldClock.setSettings.apply(null, a || []); }
+      }
+    }
+  };
+  /** 诊断采集节：把 26 枚引擎的只读口逐一真调（act 口只报席位，不代替操作者触发）。 */
+  function secEngines230() {
+    return safe(function () {
+      const out = { namespaces: [], read: {}, act: {}, totals: { ns: 0, read: 0, act: 0, missing: 0 } };
+      Object.keys(ENGINE_PORTS).forEach(function (ns) {
+        const p = ENGINE_PORTS[ns] || {};
+        const rows = {};
+        out.namespaces.push(ns);
+        out.totals.ns += 1;
+        Object.keys(p.read || {}).forEach(function (m) {
+          out.totals.read += 1;
+          rows[m] = safe(p.read[m], { error: "read 失败" });
+        });
+        const acts = Object.keys(p.act || {});
+        out.totals.act += acts.length;
+        out.read[ns] = rows;
+        out.act[ns] = acts;
+      });
+      out.totals.missing = out.namespaces.filter(function (ns) { return !WA[ns]; }).length;
+      out.note = "只报读数：act 口是写口，诊断不代替操作者触发（它们由面板「引擎台」页真调）";
+      return out;
+    }, {});
+  }
+
   WA.toolDiag = {
     PACKAGE_FORMAT, PACKAGE_VERSION, MODULE_EXPORTS, UI_BINDINGS,
     collect, verdict, toJSON, summaryText, flatten, download, buildErrorReport,
@@ -5263,6 +5828,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     secStitch2129,                                   // v2.129.0（缝 A2 / A7 / A9：改写器 / 静态设定 / 报文预览）
     secStitch2130,                                   // v2.130.0（十二引擎：拦截 / 变换 / 换算 / 预演旁路能力）
     secAgenda, secChronicleView, secCapacityAudit, secPerfBaseline, secWorldHealth,  // v2.182.0（第二批五聚合面）
+    secEngines230, ENGINE_PORTS,   // v2.230.0（N12）：26 枚新引擎端口表 + 只读采集节（死导出接线的单一真源）
     safe  // v0.1.12: 导出供语义一致性单测（异常时返回 {error} 为诊断特例）
   };
   if (WA.log) WA.log('info', '自检诊断引擎已加载');

@@ -87,28 +87,53 @@ function runAll(a) {
   a(RP.renderStat().observed === 0 && RP.renderStat().pages === 0 && RP.renderStat().rejected === 0
     && Object.keys(RP.renderStat().faults).length === 0, 'v2152/rp: reset 清空观测环、计量与归因分桶');
 
-  // ── 页数上限：真源页表用不满 CAP_PAGES=24，故「到顶」这一格**只能靠页源打桩现形**。
-  //   打桩是正当的：白名单本来就是运行时依赖 WA.ui.pages()（本仓口径是「读运行时真源、不存副本」），
-  //   从接口外部把页表换大正是真实局面（宿主页表比面板自己认得的多）。不做这一步，
-  //   pages-full 就成了一条没有任何断言见过的守卫 —— 它被删掉也没有人红。
-  //   反过来说，这一格**恰恰只能这样验**：真源 16 条页表结构上到不了顶。
+  // ── 页数上限：「到顶」这一格靠页源打桩现形（白名单本来就是运行时依赖 WA.ui.pages()，
+  //   本仓口径是「读运行时真源、不存副本」，从接口外部把页表换大正是真实局面：
+  //   宿主页表比面板自己认得的多）。不做这一步，pages-full 就成了一条没有任何断言见过的
+  //   守卫 —— 它被删掉也没有人红。
+  // v2.230.0 收口：**打桩规模与还原判据都改成现场取的**，不再写死 30。
+  //   治的病（本仓点名的「集合会长，就不许写成常量」）：本判据此前写死「打桩 30 页、
+  //   还原后 WA.ui.pages().length < 30」；而真页表已长到 30 页（ui/panel.js 的 PAGES
+  //   自 v2.33.0 起一路加页），于是「< 30」恒假 —— 红灯说的是「页表长大了」，
+  //   不是「页源没还原」。现在：
+  //     ① 界的数值从**源码面**取 CAP_PAGES（读不到即抛，不拿默认值冒充现场值）；
+  //     ② 打桩规模取现场真页数（不比界大时按界上取，保证真的越过界）；
+  //     ③ 还原判据改成「页函数回到真源 **且** 页表与打桩前逐项一致」（不比较写死的数）。
+  const rpSrc2152 = fs.readFileSync(path.join(BASE, REL), 'utf8');
+  const mCap2152 = /const CAP_PAGES = (\d+);/.exec(rpSrc2152);
+  if (!mCap2152) throw new Error('v2152/rp: render-perf.js 的 CAP_PAGES 常量取不到（判据的界不是现场取的）');
+  const capPages2152 = Number(mCap2152[1]);
   const realPagesFn = WA.ui.pages;
+  const realPageList2152 = realPagesFn();
+  const realN2152 = realPageList2152.length;
+  const fakeN2152 = realN2152 > capPages2152 ? realN2152 : capPages2152 + 6;
   const fakePages = [];
-  for (let i = 0; i < 30; i++) fakePages.push('page.stub.' + i);
+  for (let i = 0; i < fakeN2152; i++) fakePages.push('page.stub.' + i);
   WA.ui.pages = function () { return fakePages.slice(); };
   RP.reset();
   const keptPages = [], refusedPages = [];
   for (const fp of fakePages) { (RP.observe(fp, 1, 1).ok ? keptPages : refusedPages).push(fp); }
   WA.ui.pages = realPagesFn;
-  a(keptPages.length === 24 && refusedPages.length === 6 && refusedPages[0] === 'page.stub.24',
-    'v2152/rp: 页数到顶后新页被拒 pages-full（实收 ' + keptPages.length + ' / 拒 ' + refusedPages.length + '）');
-  a(keptPages.indexOf('page.stub.23') >= 0 && refusedPages.indexOf('page.stub.23') < 0,
-    'v2152/rp: 第 24 页仍收得下 —— 界是 24 不是 23（差一格就是差一格）');
-  a(RP.renderStat().faults['pages-full'] === 6, 'v2152/rp: pages-full 单独进分桶（可归因，不是静默丢）');
-  a(RP.renderStat().observed === 24 && RP.renderStat().rejected === 6,
-    'v2152/rp: 打桩态下两处口径仍恒等（observed 24 / rejected 6）');
-  a(WA.ui.pages === realPagesFn && WA.ui.pages().length < 30,
-    'v2152/rp: 打桩后页源已还原（专锁不给后续断言留副作用）');
+  a(keptPages.length === capPages2152 && refusedPages.length === fakeN2152 - capPages2152
+    && refusedPages[0] === 'page.stub.' + capPages2152,
+    'v2152/rp: 页数到顶后新页被拒 pages-full（实收 ' + keptPages.length + ' / 拒 ' + refusedPages.length
+    + '；界 ' + capPages2152 + ' 取自源码面 CAP_PAGES、打桩 ' + fakeN2152 + ' 页取现场真页数）');
+  a(keptPages.indexOf('page.stub.' + (capPages2152 - 1)) >= 0
+    && refusedPages.indexOf('page.stub.' + (capPages2152 - 1)) < 0,
+    'v2152/rp: 第 ' + capPages2152 + ' 页仍收得下 —— 界是 ' + capPages2152 + ' 不是 '
+    + (capPages2152 - 1) + '（差一格就是差一格）');
+  a(RP.renderStat().faults['pages-full'] === fakeN2152 - capPages2152,
+    'v2152/rp: pages-full 单独进分桶（可归因，不是静默丢；实 '
+    + RP.renderStat().faults['pages-full'] + '）');
+  a(RP.renderStat().observed === capPages2152 && RP.renderStat().rejected === fakeN2152 - capPages2152,
+    'v2152/rp: 打桩态下两处口径仍恒等（observed ' + capPages2152 + ' / rejected '
+    + (fakeN2152 - capPages2152) + '）');
+  // 还原判据：与**打桩前现场**逐项比，不跟写死的数比。
+  const restoredList2152 = WA.ui.pages();
+  a(WA.ui.pages === realPagesFn && restoredList2152.length === realN2152
+    && restoredList2152.join('|') === realPageList2152.join('|'),
+    'v2152/rp: 打桩后页源已还原（专锁不给后续断言留副作用）—— 页函数回到真源、'
+    + '页表与打桩前逐项一致（现场 ' + restoredList2152.length + ' 页）');
   RP.reset();
 
   // ── 观测面不许写存档：采样前后 draft 逐字节一致 ──

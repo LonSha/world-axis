@@ -19,6 +19,29 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 require('./mock.js');
 const { fresh } = require('./ui-gate-sync.js');
+// v2.230.0 收口（本轮修红）：**取证不得改变被取证对象**。
+//   本锁为跑 P2/P5/P7 会把观测视角开成 enabled 并切到 player（head() 的 setView），
+//   此前跑完**不还原** —— 落盘设置停在 {enabled:true, view:'player'}。
+//   后果不是「这一节脏了」，而是**下游所有节**：ui/panel.js 的 renderTools() 整页包在
+//   <div data-omniscient> 里，stageOut 在进 DOM 前调 applyView(stage) ⇒ 玩家视角下
+//   整个工具页被摘成空壳（实测 27 字符 / 0 控件 / 0 折叠钮）。于是 v2330 的四组标题、
+//   v2340 的采样预览、q8 的 C3/C4/C5/C5b/D1 全部连锁变红，而它们与本锁毫无关系。
+//   ——「同一把锁独立跑绿、全量跑红」正是这个形态。
+//   同批纪律先例：tests/p3-x1-v2149.js 的 probeViews() 末尾显式 setView('omniscient')，
+//   并在各探针里成对还原；本锁此前缺的正是这一步。
+function keepView() {
+  try {
+    const pv = global.WorldAxis && global.WorldAxis.perspective;
+    if (pv && typeof pv.getSettings === 'function') return JSON.parse(JSON.stringify(pv.getSettings()));
+  } catch (e) {}
+  return null;
+}
+function restoreView(snap) {
+  try {
+    const pv = global.WorldAxis && global.WorldAxis.perspective;
+    if (pv && typeof pv.setSettings === 'function' && snap) pv.setSettings(snap);
+  } catch (e) {}
+}
 
 // ── 破坏锚点：只在真源码里各出现一次 ──
 const BROKEN = [
@@ -141,6 +164,10 @@ function judge(a) {
 }
 
 function runNegative(a) {
+  const __keepNeg = keepView();
+  try { return negativeBody(a); } finally { restoreView(__keepNeg); }
+}
+function negativeBody(a) {
   const src = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
   const byKey = {};
   BROKEN.forEach(function (b) {
@@ -156,7 +183,10 @@ function runNegative(a) {
   a(rc.ftWarn === true && rc.ftCtrls === 0, 'v2214 N2c 原版 fail-tight 判据全绿（两向自证）');
 }
 
-function runAll(a) { judge(a); }
+function runAll(a) {
+  const __keep = keepView();
+  try { judge(a); } finally { restoreView(__keep); }
+}
 if (require.main === module) {
   let pass = 0, fail = 0;
   const a = function (cond, name) {

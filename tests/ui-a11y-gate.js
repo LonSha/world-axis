@@ -53,6 +53,13 @@ const CONTENT_NAMED = { BUTTON: 1, SUMMARY: 1, A: 1 };
 const CONTROL_SEL = 'button,input,select,textarea';
 /** 覆盖率下限（写进判据的硬读数，不许被悄悄改小）。 */
 const MIN_RATE = 0.85;
+/**
+ * v2.230.0 收口：折叠钮名里的合成后缀（`ui/panel.js` 一处分词产生）—— **单一常量**，两侧共用。
+ *   为什么必须住在文件顶部：`module.exports`（下方）要把本常量导出去，而 `const` 在
+ *   求值到它之前处于 TDZ —— 声明写在导出之后会让 `require` 直接抛 ReferenceError
+ *   （本版实测踩到）。常量与其导出面同序，就消灭了这一类「位置耦合」。
+ */
+const FOLD_SUFFIX = ' 折叠或展开';
 
 function attr(el, name) {
   try { return el && el.getAttribute ? el.getAttribute(name) : null; } catch (e) { return null; }
@@ -102,14 +109,44 @@ function accName(el) {
 }
 
 /**
+ * v2.230.0 收口：DOM 侧名归类（**与源面同一套归一** —— 两侧各写一遍必然漂移）。
+ *   · 合成名（面板折叠钮那一处拼串产生的 `X 折叠或展开`）单独进 `composed`：
+ *     它在源面**静态解析不出**，只能作为另一类读（源面合成**站点**数 × DOM 合成**唯一名**数）。
+ *   · 其余按归一名进 `names`；同一名字出现多次只算一个（判据要答的是「写没写下」）。
+ */
+/** 该名是不是折叠钮名（含合成后缀）—— **一处判定**，分桶与计数共用，两处各写一遍必漂。 */
+function hasFoldSuffix(raw) { return String(raw == null ? '' : raw).indexOf(FOLD_SUFFIX) >= 0; }
+function takeName(name, composed, names) {
+  const raw = String(name == null ? '' : name);
+  if (hasFoldSuffix(raw)) { composed[normName(raw)] = 1; return; }
+  names[normName(raw)] = 1;
+}
+/**
  * 逐页审计一个已挂载的 UI 环境。
  *   返回 `{ total, named, gaps, rate, byHow, byPage }`。
  *   `env` 来自 `tests/ui-gate-sync.js` 的 `fresh()`（`{ WA, dom }`）。
  *   **纯只读**：只点页签与读 DOM，不写存档、不改设置、不落盘。
  */
+/** 被审计模块自己声明的可折叠段数（缺席 ⇒ 0，判据侧据此区分「没登记」与「没渲染」）。 */
+function foldSectionCount(WA) {
+  try {
+    const t = WA && WA.panelFold && WA.panelFold.SECTIONS;
+    return Array.isArray(t) ? t.length : 0;
+  } catch (e) { return 0; }
+}
 function audit(env) {
   const WA = env && env.WA, dom = env && env.dom;
   const out = { total: 0, named: 0, gaps: [], byHow: {}, byPage: {}, rate: 0, pages: 0 };
+  // v2.230.0 收口：DOM 侧按**归一名**去重（与源面同一套归一，见 normName）。
+  //   前一版按「页#id」去重 —— 那个键仍会让**同一个 id 在别的页**重复计入
+  //   （实测 189 ≠ 源面 176），且它与源面的计数单位（出现处）本就不同宽。
+  //   要立的判据只有一句：「源面写下的名，DOM 上是不是也写下了」⇒ 两侧都按名去重。
+  const nameKeys = {};
+  const composedKeys = {};
+  // v2.230.0 收口：**按出现处**分两个桶。唯一名集合答「写没写下」，出现处数答「写了几处」——
+  //   两者不同宽，混着比就是本版那一档「读数不实」。折叠钮每一段渲染一枚，故出现处数
+  //   必须与模块自己登记的段数同宽（见 out.foldSections）。
+  let staticHits = 0, composedHits = 0;
   if (!WA || !WA.ui || !dom) { out.note = 'UI 未挂载（无法审计）'; return out; }
   const panel = dom.getElementById('wa-panel');
   if (!panel) { out.note = '面板未注入（无法审计）'; return out; }
@@ -129,6 +166,10 @@ function audit(env) {
         out.total++;
         const name = accName(c);
         out.byHow[name.how || '(none)'] = (out.byHow[name.how || '(none)'] || 0) + 1;
+        if (name.how === 'aria-label') {
+          takeName(name.name, composedKeys, nameKeys);
+          if (hasFoldSuffix(name.name)) composedHits += 1; else staticHits += 1;
+        }
         if (name.how) out.named++;
         else { out.gaps.push({ page: '(面板头部)', kind: tag + '/' + type, id: c.id || '', tag: tag, type: type }); out.byPage['(面板头部)'] = (out.byPage['(面板头部)'] || 0) + 1; }
       }
@@ -146,12 +187,28 @@ function audit(env) {
       out.total++;
       const r = accName(c);
       out.byHow[r.how || '(none)'] = (out.byHow[r.how || '(none)'] || 0) + 1;
+      if (r.how === 'aria-label') {
+        takeName(r.name, composedKeys, nameKeys);
+        if (hasFoldSuffix(r.name)) composedHits += 1; else staticHits += 1;
+      }
       if (r.how) { out.named++; continue; }
       out.gaps.push({ page: page, kind: kind, id: c.id || '', tag: tag, type: type });
       out.byPage[page] = (out.byPage[page] || 0) + 1;
     }
   }
   out.rate = out.total ? out.named / out.total : 0;
+  out.ariaLabelIds = Object.keys(nameKeys).length;          // 静态归一名（唯一）—— 与源面同宽
+  out.ariaLabelComposed = Object.keys(composedKeys).length; // 合成归一名（唯一）—— 单独一类
+  // v2.230.0 收口：把**名集合本体**一并交出 —— 判据要立的是「两侧是同一批名」，
+  //   只给两个计数的话，「两边都数错了」在读数上与「真相等」同形（本仓反复治的那一档）。
+  //   集合本体给出后，判据可以逐名对账（多一个/少一个都点得出名字）。
+  out.ariaLabelNames = nameKeys;
+  out.ariaLabelComposedNames = composedKeys;
+  out.ariaLabelStaticHits = staticHits;       // 静态名**出现处**数（与源面 sites-composed 同宽）
+  out.ariaLabelComposedHits = composedHits;   // 合成名**出现处**数（每枚折叠钮 1 处）
+  // 独立真源：**模块自己登记的**可折叠段数。判据拿它当「该有几枚折叠钮」的事实面 ——
+  //   不靠源面文本反推（源面那一处是拼接表达式，静态解析不出段数，只能给出「≥1 处」）。
+  out.foldSections = foldSectionCount(WA);
   return out;
 }
 
@@ -164,6 +221,8 @@ function summary(d) {
 
 module.exports = { accName: accName, audit: audit, summary: summary,
   srcLabelCount: srcLabelCount,
+  srcLabelNames: srcLabelNames,
+  normName: normName, FOLD_SUFFIX: FOLD_SUFFIX,
   normType: normType, TYPE_ALIAS: TYPE_ALIAS,
   TEXT_TYPES: TEXT_TYPES, CONTENT_NAMED: CONTENT_NAMED, CONTROL_SEL: CONTROL_SEL,
   MIN_RATE: MIN_RATE, BASE: BASE,
@@ -187,20 +246,68 @@ module.exports = { accName: accName, audit: audit, summary: summary,
  *     `aria-labelledby` 以 `aria-label` 为前缀，用负向前瞻一次排除，不再做两次 split 相减。
  */
 const SRC_CTRL_TAG_RE = /<\s*(button|input|select|textarea)\b/i;
-function srcLabelCount(root) {
-  const base = root || BASE;
-  const src = require('./product-files.js').uiFiles(base).map(function (rel) {
-    try { return fs.readFileSync(path.join(base, rel), 'utf8'); } catch (e) { return ''; }
-  }).join('\n');
-  const re = /aria-label(?!ledby)/g;
-  let n = 0, m;
-  while ((m = re.exec(src)) !== null) {
-    const lt = src.lastIndexOf('<', m.index);
-    if (lt < 0) continue;
-    const head = src.slice(lt, lt + 40);
-    if (SRC_CTRL_TAG_RE.test(head)) n++;
+/** 归一名：剥合成后缀 → 反转义 → 截断到 `<` → trim。源面与 DOM 侧**同一套**。 */
+function normName(v) {
+  let s = String(v == null ? '' : v);
+  const i = s.indexOf(FOLD_SUFFIX);
+  if (i >= 0) s = s.slice(0, i);
+  s = s.split('&lt;').join('<').split(String.fromCharCode(38) + 'quot;').join('"').split('&amp;').join('&');
+  s = s.replace(/<.*$/, '');
+  return s.trim();
+}
+/** 该名在源面是**拼接表达式**（静态解析不出）—— 只能作为另一类读。 */
+function isComposedLabel(raw) { return /\$\{|' *\+|\+ *'/.test(String(raw == null ? '' : raw)); }
+/** 从 `<` 起取**完整标签头**：跳过落在未闭合 `${…}` 里的 `>`（模板表达式里的 `>` 不是标签结束）。 */
+function headAt(src, lt, from) {
+  for (let k = from; k < src.length && k < from + 600; k++) {
+    if (src[k] !== '>') continue;
+    const c = src.slice(lt, k);
+    if (c.indexOf('<', 1) < 0 && !/\$\{[^}]*$/.test(c)) return c;
   }
-  return n;
+  return '';
+}
+/**
+ * 源面名源读数（**归一名集合** —— 与 DOM 侧同宽）：
+ *   { sites, names, composed, rawHits }
+ *     sites     —— 挂在控件上的 `aria-label` **出现处**数（含合成站点）
+ *     names     —— 静态归一名集合（唯一名 → 1）
+ *     composed  —— 合成站点数（拼接表达式；它们进不了静态集合，故单独报）
+ *     rawHits   —— 原始 `aria-label` 命中数（含挂错元素/容器的，供对账）
+ *   文件面**委托 product-files.uiFiles**（单一真源）。
+ */
+function srcLabelNames(root) {
+  const base = root || BASE;
+  const out = { sites: 0, names: {}, composed: 0, rawHits: 0 };
+  require('./product-files.js').uiFiles(base).forEach(function (rel) {
+    let src = '';
+    try { src = fs.readFileSync(path.join(base, rel), 'utf8'); } catch (e) { return; }
+    const re = /aria-label(?!ledby)/g;
+    let m;
+    while ((m = re.exec(src)) !== null) {
+      out.rawHits += 1;
+      const lt = src.lastIndexOf('<', m.index);
+      if (lt < 0) continue;
+      const head = headAt(src, lt, m.index);
+      if (!head) continue;                       // 跨标签 / 取不到头 ⇒ 不猜
+      if (!SRC_CTRL_TAG_RE.test(head)) continue; // 容器/非控件：DOM 侧也不数
+      out.sites += 1;
+      const ma = /aria-label="([^"]*)"/.exec(src.slice(m.index, m.index + 300));
+      const raw = ma ? ma[1] : '';
+      if (isComposedLabel(raw)) out.composed += 1;
+      else out.names[normName(raw)] = 1;
+    }
+  });
+  return out;
+}
+/**
+ * 源面名源**出现处**计数（保留：`sites` 答「模板里挂了几处」，与「写下了几个名字」不同）。
+ *   v2.230.0 收口沿革：窗口原为「`<` 起 40 字符」，现场有 12 处标签头比它长
+ *   （如 `<button class="wa-btn wa-mini" id="wa-fg-tension" aria-label="…">`），
+ *   那些名从未进入取值面；又有一处名的标签头里 `>` 落在 `${…}` 内会被**朴素窗口截断**
+ *   （实测 /tmp/probe_x16.js：朴素 176 / 模板感知 177）。两处都已按完整标签头订正。
+ */
+function srcLabelCount(root) {
+  return srcLabelNames(root).sites;
 }
 
 if (require.main === module) {

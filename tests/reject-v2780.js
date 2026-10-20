@@ -513,21 +513,67 @@ function runWitness(WA) {
    *   的 Promise」上调用(一次 `_tickCallback` 即到),实际效果是「把已入队的回调整理一遍」,
    *   不制造新的异步分支;消费方是门禁进程,不是产品运行时。
    */
+  // PUMP：只用来「注册 then + 读回结果」的独立上下文（microtaskMode:'afterEvaluate'）。
+  //   为什么必须是独立上下文（v2.230.0 收口，实测立据 /tmp/probe_x5.js）：
+  //   `process._tickCallback()` 这个同步泵**只在调用点处于同步段时有效**。一旦调用点
+  //   落在 microtask 上下文（`await` 恢复处、`then` 回调内、`nextTick` 内），V8 把当前
+  //   microtask 队列标记为「正在排空」，`_tickCallback` 连续 8 次**全部空转**：
+  //     实测 /tmp/repro_tick.js（Node v24.18.0）—— A 同步段 SETTLED:a ticks=1；
+  //       B `await` 之后 NOT-SETTLED ticks=8；D `setTimeout` 回调内 SETTLED:d ticks=1。
+  //   而 tests/run.js 在 19245 行挂载本锁时，其前有大量 `await`（17744…18029 行）
+  //   ⇒ 全量回归里这三条见证**必然**拿不到结果（如实记成 missing 3 码），独立跑
+  //   （同步段）**必然**拿得到 —— 「同一把锁独立绿、全量红」的真机理就在这一步，
+  //   与产品源码、与任何前序节的残留都无关。
+  //   换用的手法不是「换一种死等」：它把 `then` 的**注册**放进一个自带 microtask 队列
+  //   的上下文（`microtaskMode:'afterEvaluate'` —— 该队列由 V8 在 runInContext 返回前
+  //   排空），于是在**任何**调用点上下文里都能同步取回早已 settled 的值。
+  //     实测 /tmp/probe_x5.js（见证体返回**原始 promise** + 本手法）——
+  //       同步段 / await 之后 / 再一轮 microtask 三处读数一致：三条码全 HIT；
+  //       真异步（setTimeout 链）三处全 miss（手法不是恒真）。
+  //   为什么不能只改手法：若见证体自己先在主 realm 派生 `.then`，内层回调就排进
+  //   **主 realm** 的队列（实测 /tmp/probe_fn.js / probe_x5 的 derived=Y 行：三处全 miss）
+  //   ⇒ 必须同时让见证体返回原始 promise。两处一起改，缺一处都修不好。
+  //   ⚠ 前提（如实登记，前一身法漏了这条，正是它让全量回归长期带红）：
+  //     被见证的入口必须是**同步判完**的（返回时 Promise 已 settled）；
+  //     若入口将来改成「先 await 再判」，这里同样拿不到 ⇒ 见证 missing ⇒ 红灯，
+  //     那个契约变化应当被看见，而不是被一句「反正是异步的」糊过去。
+  let _pumpCtx = null;
+  function pumpCtx() {
+    if (!_pumpCtx) _pumpCtx = require('vm').createContext({}, { microtaskMode: 'afterEvaluate' });
+    return _pumpCtx;
+  }
+  function readBack(p) {
+    const PC = pumpCtx();
+    PC.__p = p;
+    return require('vm').runInContext(
+      '(function () { var o = { done: false, got: null, rej: false };'
+      + ' __p.then(function (r) { o.done = true; o.got = r; },'
+      + ' function () { o.done = true; o.rej = true; }); return o; })()', PC);
+  }
+  /**
+   * 异步见证:入口有两个口是 async 返回的(`WA.loadRetry` 是 async IIFE)。
+   *   为什么不用 DEFERRED 绕过去:那会把「跑不出来」记成「已接受延后」,
+   *   与「行为被改坏了」长得一模一样 —— 正是 coverage 模块要治的形态。
+   *   取值面如实登记(与「事实同宽」):结果若是对象且带 `reason`,取它的 `reason`;
+   *   否则按原样参与匹配。**不**因此放宽:泵不动 ⇒ 仍判 missing。
+   *   影响面如实登记:它在独立上下文里注册回调,只把**已 settled 的**值取回,
+   *   不制造新的异步分支;消费方是门禁进程,不是产品运行时。
+   */
   function tripAsync(code, fn) {
-    let got = null, settled = false;
+    let p = null;
     try {
-      const p = fn();
+      p = fn();
       if (!p || typeof p.then !== 'function') return false;
-      p.then(function (r) { got = r; settled = true; }, function () { settled = true; });
     } catch (e) { return false; }
-    for (let i = 0; i < 8 && !settled; i++) {
-      if (typeof process !== 'undefined' && typeof process._tickCallback === 'function') {
-        try { process._tickCallback(); } catch (e) { break; }
-      } else break;
-    }
-    if (!settled) return false;
+    let o = null;
+    try { o = readBack(p); } catch (e) { return false; }
+    if (!o || !o.done) return false;      // 泵不动 ⇒ 见证失败(missing),门禁红灯,不静默不延后
+    const got = o.got;
     const arr = Array.isArray(got) ? got : [got];
-    if (arr.indexOf(code) >= 0) { seen[code] = true; return true; }
+    const vals = arr.map(function (x) {
+      return (x && typeof x === 'object' && typeof x.reason === 'string') ? x.reason : x;
+    });
+    if (vals.indexOf(code) >= 0) { seen[code] = true; return true; }
     return false;
   }
   /**
@@ -538,17 +584,19 @@ function runWitness(WA) {
    *                (证明「拿到值」确实来自泵动,而不是 then 恰好同步跑了)。
    */
   const asyncPumpProof = (function () {
-    function pump(p, doPump) {
-      let got = null, done = false;
-      p.then(function (r) { got = r; done = true; });
-      if (doPump) {
-        for (let i = 0; i < 8 && !done; i++) {
-          if (typeof process !== 'undefined' && typeof process._tickCallback === 'function') {
-            try { process._tickCallback(); } catch (e) { break; }
-          } else break;
-        }
+    // 与 tripAsync 同一手法、同一上下文；三读数各自成一条两向自证：
+    //   settled   —— 对已 settled 的 Promise 必须拿到值（手法有效）；
+    //   realAsync —— 对 setTimeout 链必须**拿不到**（手法不是恒真）；
+    //   noPump    —— **不注册**时同一个已 settled 的 Promise 也必须拿不到
+    //                （证明「拿到值」确实来自注册进那个上下文，而不是 then 恰好同步跑了）。
+    function pump(p, doRegister) {
+      if (!doRegister) {
+        let done0 = false;
+        p.then(function () { done0 = true; });
+        return done0 ? 'unexpected' : null;
       }
-      return done ? got : null;
+      const o = readBack(p);
+      return o && o.done ? o.got : null;
     }
     return {
       settled: pump(Promise.resolve('sync-settled'), true) === 'sync-settled',
@@ -5728,7 +5776,11 @@ function runWitness(WA) {
       const keep = IdxFace.WA.__loaderState;
       try {
         IdxFace.WA.__loaderState = undefined;
-        return IdxFace.WA.loadRetry('core/commit.js').then(function (r) { return [r.reason]; });
+        // 返回**原始 promise**:`tripAsync` 自己负责在原上下文里注册并读回。
+        //   为什么不在主 realm 派生 `.then`:实测(probe_x5)该派生会把内层 then 的
+        //   回调排进**主 realm** 的 microtask 队列,而主 realm 在 JS 栈执行期内没有
+        //   可用的同步泵 ⇒ 即便换了手法也拿不到(这正是前一版修法失败的原因)。
+        return IdxFace.WA.loadRetry('core/commit.js');
       } finally { IdxFace.WA.__loaderState = keep; }
     });
     want('missing-rel', 'Q1:loadRetry 不传 rel ⇒ 如实拒收(不猜「你想重试哪一个」)');
@@ -5736,7 +5788,7 @@ function runWitness(WA) {
       const keep = IdxFace.WA.__loaderState;
       try {
         IdxFace.WA.__loaderState = mkState();
-        return IdxFace.WA.loadRetry('').then(function (r) { return [r.reason]; });
+        return IdxFace.WA.loadRetry('');
       } finally { IdxFace.WA.__loaderState = keep; }
     });
     want('not-failed', 'Q1:loadRetry 收到**不在失败表里**的 rel ⇒ 如实说 not-failed'
@@ -5745,7 +5797,7 @@ function runWitness(WA) {
       const keep = IdxFace.WA.__loaderState;
       try {
         IdxFace.WA.__loaderState = mkState();
-        return IdxFace.WA.loadRetry('core/commit.js').then(function (r) { return [r.reason]; });
+        return IdxFace.WA.loadRetry('core/commit.js');
       } finally { IdxFace.WA.__loaderState = keep; }
     });
   }

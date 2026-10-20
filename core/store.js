@@ -117,6 +117,18 @@
       //   （同 presetWorld / perfLedger 两条先例：那些不是世界事实，不该进存档）。
       beatReport: { chapterKey: '', strikes: 0, redesigns: 0, lastRejectAt: -1, held: false, setupNeed: '', purpose: '', log: [] },   // 拍回报三档（beat-report.js）
       beatLedger: { seq: 0, round: 0, rows: [] },   // 拍账 / 拍号由引擎推进（beat-ledger.js）
+      // v2.230.0（拓展 N12）：六个新引擎的顶层容器（登记了还要**物化**，两件事都要做）。
+      //   登记了却不在骨架里：registryParity 报「未在骨架物化」，冷启动直写炸事务，
+      //   且 sizeAudit / 容量议题 / 健康分一整片读数偏。
+      //   ⚠ fate / compare / beat / portal **不在此列**：四者零 store 写（纯函数面与
+      //   只读台账），给它们加骨架键 = 凭空多出一个没有写入方的容器，
+      //   registryParity 的「每项登记都要有写入方」对账当场红灯（与 staleGuard 同款边界）。
+      elsewhere: { rows: [] },                                   // 彼方档案（elsewhere.js）
+      vitals: { rows: [] },                                      // 生理线（vitals.js）
+      coordinate: { anchors: [], rows: [] },                     // 坐标台账（coordinate.js）
+      dream: { threads: [], deviations: [], volumes: [] },       // 长梦（dream.js）
+      backstageTone: { notes: [] },                              // 幕后风物（backstage-tone.js）
+      modelink: { drafts: [] },                                  // 幕后工具草稿（modelink.js）
       // v2.130.0（拓展计划 B1/C1/C2/D3）：三个新引擎的顶层键。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
       //   ——登记不等于物化，两件事都要做。
@@ -397,7 +409,7 @@
       // v2.158.0（S3）：初始化来源留痕（world-seed.js initConfirm 唯一写入方）。
       //   跨会话要留下：换会话仍知道「这个世界从哪颗种子来」。登记了却不在骨架里，
       //   registryParity 会报「未在骨架物化」，冷启动直写也会炸事务。
-      meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null, initFrom: null }
+            meta: { createdAt: clockNow('store.meta'), updatedAt: clockNow('store.meta'), lastSettle: null, initFrom: null }
     };
   }
 
@@ -1494,6 +1506,18 @@
     'memory.facts': { cap: 100, site: 'memory.js slice(-CAP.facts)' },
     'memory.foreshadows': { cap: 30, site: 'memory.js slice(-CAP.foreshadows)' },
     'memory.pmem': { cap: 60, site: 'pmem.js CAP_TOTAL=60' },
+    // v2.230.0（拓展 N12）：十枚新引擎的容器上限。
+    //   ⚠ 本表与 core/evict.js 的 SITES 表**同名同值逐键对账**（G18）：
+    //   任一侧单边增长，evict.array 会走 unknown-site 静默失败。
+    'elsewhere.rows': { cap: 48, site: "elsewhere.js evict.array(rows, \"elsewhere.rows\")" },
+    'vitals.rows': { cap: 24, site: "vitals.js evict.array(rows, \"vitals.rows\")" },
+    'coordinate.anchors': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.anchors\")" },
+    'coordinate.rows': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.rows\")" },
+    'dream.threads': { cap: 24, site: "dream.js evict.array(rows, \"dream.threads\")" },
+    'dream.deviations': { cap: 24, site: "dream.js evict.array(rows, \"dream.deviations\")" },
+    'dream.volumes': { cap: 40, site: "dream.js evict.array(rows, \"dream.volumes\")" },
+    'backstageTone.notes': { cap: 48, site: "backstage-tone.js evict.array(rows, \"backstageTone.notes\")" },
+    'modelink.drafts': { cap: 20, site: "modelink.js evict.array(rows, \"modelink.drafts\")" },
     'opinion.canon': { cap: 20, site: 'opinion.js slice(-20)' },
     'opinion.forum': { cap: 20, site: 'opinion.js concat slice(-20)' },
     // v1.0.0 补登：有界但漏登 → sizeAudit 误报 unbounded

@@ -33,6 +33,12 @@ const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
 const SELF_REL = 'tests/s3-y1-v2200.js';
+/** v2.230.0 收口：mini-DOM 的 `innerHTML` getter 会把**容器自身标签**也序列化进去
+ *  （tests/ui-dom.js 的 `ser(el)`），浏览器只返回子节点。于是「空容器」的长度不是 0，
+ *  而是容器自身那一段（Y1 实测 41 字符，随 tag/id/class 长短而变）。
+ *  判据的真问题从来不是「长度是不是 0」，而是「破坏之后读数**再也写不进去**」
+ *  —— 即出口容器**一个子元素都没有**。 */
+function emptyOut(el) { return !!el && el.childNodes.length === 0; }
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function cnt(s, n) { return s.split(n).length - 1; }
 function j(x) { return JSON.stringify(x); }
@@ -152,14 +158,18 @@ function runAll(a) {
     tab.click();
     return dom;
   }
-  /** 点一枚按钮并取回读数出口的**当前文本**（不缓存节点：重绘会换掉它）。 */
-  function clickBt(dom, id) {
+  /** 点一枚按钮，取回读数出口的**节点**（不缓存：重绘会换掉它）。 */
+  function clickBtNode(dom, id) {
     const btn = dom.getElementById(id);
     if (!btn) throw new Error('控件不在场：' + id);
     if (typeof btn.onclick !== 'function') throw new Error('控件无绑定：' + id);
     btn.onclick({ target: btn });
-    const out = dom.getElementById('wa-bt-out');
-    return out ? String(out.innerHTML || '') : '';
+    return dom.getElementById('wa-bt-out');
+  }
+  /** 点一枚按钮并取回读数出口的**当前文本**。 */
+  function clickBt(dom, id) {
+    const o = clickBtNode(dom, id);
+    return o ? String(o.innerHTML || '') : '';
   }
   const env = env0();
   const WA = env.WA;
@@ -334,15 +344,17 @@ function runAll(a) {
     const broken = S.split(ANCHOR.out).join("$('#wa-bt-out-x')");
     a(broken !== S, 'y1v2200/N6a(前置): 读数出口破坏副本构造成功');
     const ov = {}; ov[PANEL_REL] = broken;
-    let got = null, threw = null;
+    let got = null, gotNode = null, threw = null;
     try {
       const envB = gate.fresh({ srcOverride: ov });
       const domB = gotoBeat(envB);
-      got = clickBt(domB, 'wa-bt-view');
+      gotNode = clickBtNode(domB, 'wa-bt-view');
+      got = gotNode ? String(gotNode.innerHTML || '') : '';
     } catch (e) { threw = String((e && e.message) || e); }
     a(threw === null, 'y1v2200/N6b: 破坏版上点按钮仍不抛（破坏的是读数去处，不是绑定：这正是「渲染了但写不进去」的形态）实 ' + threw);
-    a(got !== null && got.length === 0,
-      'y1v2200/N6c: （两向）破坏版上读数**为空**（实 ' + j(got && got.length) + ' 字符）—— 判据不是空转');
+    a(gotNode !== null && emptyOut(gotNode),
+      'y1v2200/N6c: （两向）破坏版上读数**为空**（出口容器零子元素；实 ' + j(got && got.length)
+      + ' 字符是容器自身序列化）—— 判据不是空转');
     //   第二向：原版上同款操作必有读数（不能拿破坏版上的读数自证 —— 那是自我指涉）
     const envG = gate.fresh({});
     const domG = gotoBeat(envG);

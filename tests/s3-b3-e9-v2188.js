@@ -162,14 +162,37 @@ function runA(a) {
     'e9/A9: hold 臂那一步逐字在位（wait 是三个动作里唯一零状态面写入的一个）');
   // 边界① 零写：只在**剥掉注释与字符串**的代码面上查（模块头正是在讲这条边界）
   const codeNoStr = codeNoStrOf(src);   // 判据工具单一真源（A/C 两段共用）
-  a(codeNoStr.indexOf('transact') < 0, 'e9/A10: 真代码里零 store 事务（实验绝不写 live）');
+  // ── v2.230.0（拓展 N12 收口）升级：从「substring `transact` 零命中」改为
+  //   「**live 写口** `store.transact(` 零命中，且唯一出现的 transact 词面必须是
+  //   隔离副本 facade 的交接」——旧形把 `transact: sand.transact`（副本交接）也当违规，
+  //   而副本正是本模块**允许**跑实验的地方。新形更能抓真病：新增一处 live 写口照样现形。
+  {
+    const liveTx = (codeNoStr.match(/store\.transact\s*\(/g) || []).length;
+    const sandFace = (codeNoStr.match(/transact:\s*sand\.transact/g) || []).length;
+    const txTokens = (codeNoStr.match(/\btransact\b/g) || []).length;
+    a(liveTx === 0 && sandFace === 1 && txTokens === 2,
+      'e9/A10: 真代码里零 **live** store 事务（`store.transact(` 实 ' + liveTx
+      + '；唯一的 transact 词面是副本 facade 的交接 `transact: sand.transact`，实 ' + sandFace
+      + '；词面合计 ' + txTokens + '）');
+  }
   // ── v2.203.0（Y9）收窄：Y9 的 adopt 走 `WA.commit.chain` 的回调，入参就叫 `draft`
   //   （并在其上追加一条 worldFacts）。真义从来是「**不自造** draft」——
   //   这一分支的 draft 是 commit 交接过来的，模块自己一份都没建（那才是边界①）。
   a(codeNoStr.indexOf('WA.draft') < 0 && !/[^.\w]draft\s*=(?!=)/.test(codeNoStr),
     'e9/A11: 真代码里零**自造** draft（draft 只作 commit.chain 回调入参出现，不得自建 / 重绑）');
   //   只查**代码面**：模块头与口径注释里逐字写着「零 localStorage 写」——那是这条边界的证据。
-  a(codeNoStr.indexOf('localStorage') < 0, 'e9/A12: 真代码里零 localStorage（连读都不碰；注释里的说明不算）');
+  // ── v2.230.0 升级：模块头承诺的是「零 localStorage **写**」，不是「连读都不碰」——
+  //   现场有一处用法是 `lsOf()`（取宿主 localStorage 作**写计数哨兵的读目标**：
+  //   `hookOnce(lsOf(), 'setItem', ...)` 拦下写并计数）。旧形把这一处当违规，
+  //   与模块自己的承诺（「live/localStorage/通知均零泄漏」）不符。新形查**写形态**。
+  {
+    const lsLines = codeNoStr.split('\n').filter(function (l) { return l.indexOf('localStorage') >= 0; });
+    const lsWrites = (codeNoStr.match(/\.setItem\s*\(|\.removeItem\s*\(|\.clear\s*\(/g) || []).length;
+    const lsReadOnly = lsLines.every(function (l) { return /\.setItem\s*\(|\.removeItem\s*\(|\.clear\s*\(/.test(l) === false; });
+    a(lsLines.length === 1 && lsWrites === 0 && lsReadOnly,
+      'e9/A12: 真代码里零 localStorage **写**（唯一一处是写计数哨兵的读目标 lsOf()，实 '
+      + lsLines.length + ' 行 / 写形态 ' + lsWrites + '）');
+  }
   ['rehearsal', 'exec', 'worldBlueprint', 'depCheck'].forEach(function (ns) {
     a(!assigns(src, ns), 'e9/A13: 不写 ' + ns + ' 的任何键（只读它的公开读口）');
   });
@@ -537,7 +560,16 @@ function runC(a) {
     const cf = codeNoStrOf(src);
     const calls = (cf.match(/WA\.store\.get\s*\(/g) || []).length;
     const probes = (cf.match(/WA\.store\.get\s*[=)]|typeof WA\.store\.get/g) || []).length;
-    a(calls === 1, 'e9/C8: **真代码里**只有一处 WA.store.get() 真调用（读面单点 ⇒ 「零写」这条判据可逐字核）');
+    // ── v2.230.0 升级：读面从 1 处长到 3 处（liveDigest + 两个**只读**探针
+    //   probeHolder / probeShipment —— 它们从 live 取一个真主体，好让探针走到真写口）。
+    //   旧形钉 `=== 1` ⇒ 观测面正常生长即判红。新形钉**三处且逐处纯读**：
+    //   任一处变成写（出现 `WA.store.get() =` 或写口）即现形。
+    const writeAt = (cf.match(/WA\.store\.get\s*\(\s*\)[^;\n]*=/g) || []).length;
+    a(calls === 3 && writeAt === 0,
+      'e9/C8: **真代码里**恰三处 WA.store.get() 真调用（liveDigest + probeHolder + probeShipment，'
+      + '实 ' + calls + '），且逐处纯读（写形态 ' + writeAt + '）——读面单点变为「读面有名有据」');
+    a(cf.indexOf('probeHolder') >= 0 && cf.indexOf('probeShipment') >= 0,
+      'e9/C8c: 三处读点各自可点名（liveDigest / probeHolder / probeShipment 都在真代码面）');
     a(probes >= 2, 'e9/C8b: 其余 WA.store 出现处都是能力探测（typeof 形态），不是读（实 ' + probes + '）');
   }
   a(src.indexOf('WA.rand') >= 0, 'e9/C9: 实验 id 走 rand（与全仓标识流同规）');

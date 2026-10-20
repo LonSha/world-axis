@@ -164,6 +164,23 @@ const EXEMPT = {
   //   一个是「这条线索为何没出现在包里」,一个是「这笔事为何没闭上环」
   //   —— **同形不同义,不许互相校验**:若强行统一,就会出现「没检索到要跟事件迟到用同一套词」这种语义错配。
   GUARDS: '同名不同义的「看门表」:retrieval=检索看门四态(absent/stale/unranked/empty-lookup,判据是线索为何未入包)、story-loop=事件闭环四态(absent/late/duplicate/clock-divergence,判据是这笔事为何未闭环)',
+  // v2.230.0（拓展 N12 收口）：本批 26 枚新引擎带来四组同名常量（两条是本批两个新引擎
+  //   与既有模块同名，一条三者同名），**合法地**指向不同值域，逐条说清（本表存在的意义
+  //   就是「同名不同义必须逐条说清」；现场由此从「缺理由 4」回到「缺理由 0 / 过期 0」）：
+  //     · AXES：elsewhere=**档案三轴**（心之所系 / 欲求 / 处境，判据是「他此刻在想什么」）；
+  //       style=**文风轴**（段块 / 段式 / 视角 / 称谓 / 接管 / 叙述 / 自定义，判据是「这段文字该怎么写」）。
+  //     · CORE：elsewhere=**档案核心三字段**（在做什么 / 什么处境 / 在哪）；
+  //       theme=**主题层核心四面**（世界 / 事件 / 情报 / 声誉），判据是主题包该带哪几块。
+  //     · MODES：fate=**随机取值三模式**（取小 / 随机 / 取大，判据是那一次摇点的取法）；
+  //       outline-inject=**大纲注入两模式**（新建 / 覆写，判据是注入撞上既存大纲时怎么办）。
+  //     · OPS：compare=**结构比较三操作**（相等 / 插入 / 删除）；
+  //       dream=**梦脉织录七操作白名单**（全在「梦里的线怎么织」那一面）；
+  //       kaleidoscope=**表达式三操作**（映射 / 区间 / 公式）。
+  //   三者互不通约：一个是「两份结构差在哪」，一个是「梦线怎么改」，一个是「这段表达式怎么算」。
+  AXES: '同名不同义的「轴表」：elsewhere=档案三轴（affinity/desire/status，判据是「他此刻在想什么」的三面）、style=文风轴（block/paragraphStyle/perspective/userPronoun/takeover/narrate/custom，判据是「这段文字该怎么写」）',
+  CORE: '同名不同义的「核心表」：elsewhere=档案核心三字段（doing/status/place，判据是「他此刻在做什么、什么处境、在哪」）、theme=主题层核心四面（world/event/info/reputation，判据是主题包该带哪几块）',
+  MODES: '同名不同义的「模式表」：fate=随机取值三模式（min/random/max，判据是那一次摇点的取法）、outline-inject=大纲注入两模式（create/overwrite，判据是注入撞上既存大纲时新建还是覆写）',
+  OPS: '同名不同义的「操作表」：compare=结构比较三操作（equal/insert/delete）、dream=梦脉织录七操作白名单（set_state/append_transition/open_thread/advance_thread/resolve_thread/abandon_thread/upsert_deviation）、kaleidoscope=表达式三操作（map/range/formula）—— 三者互不通约：一个是「两份结构差在哪」，一个是「梦线怎么改」，一个是「这段表达式怎么算」',
 };
 
 /** 具名常量数组（只认一行内形态）。 */

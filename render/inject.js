@@ -144,6 +144,25 @@
     //   只加源表不加分支 = 声明了没人消费;只加分支不加源表 = 开关点了零效果
     //   (v2.38.0 的 echoes 原样复刻)。键名 = 命名空间名。插在 chrono 行**之前**
     //   (chrono 行邻近字面量是 v2.127.0 那条锁的锚点区)。
+    // v2.230.0（拓展 N12）：六条新注入源。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**。
+    'elsewhere', 'vitals', 'coordinate', 'dream', 'backstageTone',
+    //   （注：compare / beat / portal 为纯函数面（零 store 写、无 buildBlock），
+    //    modelink 为幕后工具面（无 buildBlock）—— 四者**不设注入源**：
+    //    源表只收「会往正文里放块」的面，开关面不在此列（B 判据会抓幽灵开关）。）
+    // v2.230.0（拓展 N12 续批）：三条新注入源（**有 buildBlock 的那三枚**）。
+    //   同批口径：只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
+    //   其余 13 枚本批引擎**一律不设注入源**，理由与 compare/beat/portal 同规：
+    //     · deep-clean / scope-tag / reasoning-strip / length-policy / auto-hide /
+    //       prefilter-gate / community-note / world-clock / outline-inject /
+    //       redact-layer / relation-graph / solo-voice / observe-slice
+    //       —— 它们是**判定面 / 工具面 / 台账面**：无 buildBlock，产的是读数与计划，
+    //       不是给正文看的块。源表只收「会往正文里放块」的面，**不设幽灵开关**。
+    'floorSnapshot', 'memoryTiers', 'lingqi',
+    //   v2.228.0（拓展 N10）的 'retrieval' 曾被本批改写挤到 lingqi 之后。位置不算错
+    //   （源表只判在场），但**它的默认值没跟着登记进 _def**（见下第二处）——
+    //   「源表有、默认值无」与「默认值有、源表无」是两个方向，本仓两面都锁。
     'retrieval',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
@@ -206,6 +225,17 @@ style: false,
         beatReport: true, genGate: true,
         // v2.228.0(拓展 N10):历史留存。取默认 true(同四条理由——其模块总开关默认为关:
         //   retrieval 的 DEF.enabled=false,未开时 buildBlock 返回空串),不给老用户凭空多出约束。
+        // v2.230.0（拓展 N12）：六条新源。取默认 true（同四条理由——其模块总开关
+        //   默认为关，未开时 buildBlock 返回空串），不给老用户凭空多出约束。
+        elsewhere: true, vitals: true, coordinate: true, dream: true, backstageTone: true,
+        // v2.230.0（拓展 N12 续批）：三条新源。取默认 true（同四条理由——其模块总开关
+        //   默认为关，未开时 buildBlock 返回空串），不给老用户凭空多出约束。
+        floorSnapshot: true, memoryTiers: true, lingqi: true,
+        // v2.228.0（拓展 N10）：历史留存。**本条此前缺失** —— 源表登记了、默认值没登记，
+        //   settingsBus 读不到默认值可回落，visibilityOf 只能把旧存档判成「关」，
+        //   tool-diag 当场记 error `inject.visibilityUndeclared`（全量回归里
+        //   「当前环境判语无阻断项」「恢复模块后判语复原」「可见性声明完整」三条红，
+        //   全是这一个缺口）。
         retrieval: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
@@ -403,6 +433,17 @@ style: false,
     //   SRC_MOD_SETTING 四处逐字同名登记(switch-matrix-v2910 的 C1/C2 与
     //   explain-v2900 的 A2/C1 要的同批口径)。
     retrieval: '历史留存',
+    // v2.230.0（拓展 N12）：六条新源的显示名。与 SOURCES（键）/ 注入分支 source 名 /
+    //   SRC_MOD_SETTING 四处逐字同名登记。取名口径同 diplomacy/retrieval：答「这一段是什么」。
+    elsewhere: '彼方档案',
+    vitals: '生理线',
+    coordinate: '坐标台账',
+    dream: '长梦',
+    backstageTone: '幕后风物',
+    // v2.230.0（拓展 N12 续批）：三条新源的显示名。取名口径同上（答「这一段是什么」）。
+    floorSnapshot: '楼层快照',
+    memoryTiers: '三层记忆',
+    lingqi: '玲七管家',
     // v2.189.0（缝 A1/B1+B2）：两条新注入源的显示名。与 SOURCES（键）/ 注入分支 source 名
     //   逐字同名登记（switch-matrix-v2910 的 C1/C2 与 explain-v2900 的 A2/C1 要的同批口径）。
     //   取名理由与 diplomacy 同规（注入项名要答「这一段是什么」，不是「哪个模块产的」）：
@@ -533,7 +574,21 @@ style: false,
     // v2.228.0(拓展 N10):历史留存**确有**模块级总开关(同注册表 __REG.key)。
     //   不登记会怎样:moduleEnabled 查不到键就返回 null,于是对账面上
     //   本源一律落在 unavailable(「没有模块级总开关」——而它明明有)。
-    retrieval: 'worldaxis_retrieval_v1' };
+    // v2.230.0（拓展 N12）：六条新源**确有**模块级总开关（同注册表 __REG.key）。
+    elsewhere: 'worldaxis_elsewhere_settings_v1',
+    vitals: 'worldaxis_vitals_settings_v1',
+    coordinate: 'worldaxis_coordinate_settings_v1',
+    dream: 'worldaxis_dream_settings_v1',
+    backstageTone: 'worldaxis_backstage_tone_settings_v1',
+    // v2.230.0（拓展 N12 续批）：三条新源**确有**模块级总开关（同注册表 __REG.key）。
+    //   不登记会怎样：moduleEnabled 查不到键就返回 null，于是对账面上本源一律落在
+    //   unavailable（「没有模块级总开关」——而它明明有），排查方向被指错。
+    //   同一类漏登记已为 rumor/canon（v2.99.0）、chrono（v2.127.0）、reasoning/storyTone
+    //   （v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0）、sediment（v2.149.0）各付过一次学费。
+    floorSnapshot: 'worldaxis_floor_snapshot_settings_v1',
+    memoryTiers: 'worldaxis_memory_tiers_settings_v1',
+    lingqi: 'worldaxis_lingqi_settings_v1',
+  };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
    *   口径与「缺席降级可见」同源：**读不到就说读不到**，绝不把不确定说成已关——
@@ -1053,6 +1108,19 @@ style: false,
       //   两个源各答各的问题：那个答「此刻在酝酿什么」，这个答「此前发生过什么」）。
       //   显式标 hidden 的历史行由 `chrono.chronicle` 挡在表外，本块不另做一遍过滤。
       if (vis.chrono && WA.chrono) { const chb = engineCall('chrono', function () { return WA.chrono.buildBlock(); }); if (chb) items.push({ source: '世界编年史', content: chb }); }
+      // v2.230.0（拓展 N12）：六条新注入源的分支消费点。
+      //   与 SOURCES 同批登记（只加源表不加分支 = 声明了没人消费）；
+      //   各处一律 engineCall 包裹 + 先判开关，缺模块时静默不出块（不抛）。
+      if (vis.elsewhere && WA.elsewhere) { const eb = engineCall('elsewhere', function () { return WA.elsewhere.buildBlock(); }); if (eb) items.push({ source: '彼方档案', content: eb }); }
+      if (vis.vitals && WA.vitals) { const vb = engineCall('vitals', function () { return WA.vitals.buildBlock(); }); if (vb) items.push({ source: '生理线', content: vb }); }
+      if (vis.coordinate && WA.coordinate) { const cb = engineCall('coordinate', function () { return WA.coordinate.buildBlock(); }); if (cb) items.push({ source: '坐标台账', content: cb }); }
+      if (vis.dream && WA.dream) { const db = engineCall('dream', function () { return WA.dream.buildBlock(); }); if (db) items.push({ source: '长梦', content: db }); }
+      if (vis.backstageTone && WA.backstageTone) { const bt = engineCall('backstageTone', function () { return WA.backstageTone.buildBlock(); }); if (bt) items.push({ source: '幕后风物', content: bt }); }
+      //   （modelink 不在此链：无 buildBlock，不进正文，故不入 SOURCES。）
+      // v2.230.0（拓展 N12 续批）：三条新源的分支消费点（同批口径，缺模块静默不出块）。
+      if (vis.floorSnapshot && WA.floorSnapshot) { const fs = engineCall('floorSnapshot', function () { return WA.floorSnapshot.buildBlock(); }); if (fs) items.push({ source: '楼层快照', content: fs }); }
+      if (vis.memoryTiers && WA.memoryTiers) { const mt = engineCall('memoryTiers', function () { return WA.memoryTiers.buildBlock(); }); if (mt) items.push({ source: '三层记忆', content: mt }); }
+      if (vis.lingqi && WA.lingqi) { const lq = engineCall('lingqi', function () { return WA.lingqi.buildBlock(); }); if (lq) items.push({ source: '玲七管家', content: lq }); }
       if (vis.region && WA.region) { const rg = engineCall('region', function () { return WA.region.buildBlock(); }); if (rg) items.push({ source: '远方', content: rg }); }
       if (vis.stage && WA.stage) { const sg = engineCall('stage', function () { return WA.stage.buildBlock(); }); if (sg) items.push({ source: '玩法进度', content: sg }); }
       // v2.119.0（拓展计划 ⑧）：多人场。只报「谁在场、到第几楼」，**不含任何凭证**。

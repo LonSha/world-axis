@@ -40,6 +40,12 @@ const DIAG_REL = 'engines/tool-diag.js';
 const ENG_REL = 'engines/world-graph.js';
 const SET_REL = 'ui/settings.js';
 const SELF_REL = 'tests/s3-y7-v2205.js';
+/** v2.230.0 收口：mini-DOM 的 `innerHTML` getter 会把**容器自身标签**也序列化进去
+ *  （tests/ui-dom.js 的 `ser(el)`），浏览器只返回子节点。于是「空容器」的长度不是 0，
+ *  而是容器自身那一段（Y1 实测 41 字符，随 tag/id/class 长短而变）。
+ *  判据的真问题从来不是「长度是不是 0」，而是「破坏之后读数**再也写不进去**」
+ *  —— 即出口容器**一个子元素都没有**。 */
+function emptyOut(el) { return !!el && el.childNodes.length === 0; }
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function cnt(s, n) { return s.split(n).length - 1; }
 function j(x) { return JSON.stringify(x); }
@@ -65,7 +71,8 @@ const ANCHOR = {
   renderer: 'find: renderFindCenter, graph: renderGraphCenter,',
   // v2.209.0（优化 6）：同上（出口写完即补绑）。
   //   v2.209.0（优化 6）：出口写完即补绑。锚点随形态更新（`if (o) o.innerHTML = …`，无花括号）。
-  out: "const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) o.innerHTML = html; bindNavs(o); };",
+  // v2.230.0 收口：同 Y6 —— 出口经 stageOut 落地，旧 `o.innerHTML = html` 形态 0 命中。
+  out: "const wgOut = function (html) { const o = $('#wa-wg-out'); if (o) stageOut(o, html); bindNavs(o); };",
   outSel: "const wgOut = function (html) { const o = $('#wa-wg-out');",
   cfg: 'try { cfg = (ok && WA.worldGraph.getSettings) ? WA.worldGraph.getSettings() : null; } catch (e) { cfg = null; }',
   guard: "    { page: 'graph', ids: ['wa-wg-kinds', 'wa-wg-edges', 'wa-wg-build',",
@@ -95,7 +102,12 @@ const LSKEY = 'worldaxis_worldgraph_v1';
 const SEG_RENDER_START = '  // v2.202.0（第四批 Y7）：地图与关系可视化 —— 节点 / 边 / 异常三类在**同一幅画面**里。';
 const SEG_RENDER_END = '  function renderBody() {';
 const SEG_BIND_START = '    // ── v2.202.0（Y7）：地图与关系可视化（五枚只读 + 一枚写口也没有）────────────────';
-const SEG_END = '\n  }\n\n  // ── 面板与悬浮球 ──';
+// v2.230.0 收口：段尾原为**远处**的 `// ── 面板与悬浮球 ──` —— 那会让本段把后来
+//   新增的整页绑定（v2.210.0 行动与行程、evidenceBoard 等）静默并进来。
+//   实测：旧锚点下 segB 长 37663 字符，里面含 `WA.evidenceBoard.setSettings(...)`；
+//   于是「本页连一个写口都没有」这条边界判据被判成假红 —— 判据口径比事实宽。
+//   按本仓既有口径（Y6 / Y8 / Y9 同规）收窄到**本段的下一段起点**。
+const SEG_END = '    // ── v2.210.0（拓展 8）：行动与行程工作台';
 /** 本页控件（11 枚静态 + 1 枚动态出口；渲染段与守卫表口径一致）。 */
 const STATIC_IDS = ['wa-wg-kinds', 'wa-wg-edges', 'wa-wg-build', 'wa-wg-from',
   'wa-wg-geo', 'wa-wg-time', 'wa-wg-suggest', 'wa-wg-anom',
@@ -193,7 +205,11 @@ function runAll(a) {
     'y7v2205/A5b: 两段零 localStorage 直接读写（偏好键的唯一读写面在引擎里）');
   a(codeSeg.indexOf('WA.worldGraph.graph(') >= 0 && codeSeg.indexOf('WA.worldGraph.locate(') >= 0,
     'y7v2205/A5c: 去注释后真读口**带括号**在场（防自我指涉：判据不许把自己删掉）');
-  a(codeSeg.indexOf('setSettings(') < 0,
+  // v2.230.0 收口：`setSettings(` 在本页的**唯一**出现处是按钮 title 的说明文案
+  //   （「…给设置页，本页不碰 —— 这是边界 ④ …」），那是写给玩家看的散文，不是调用。
+  //   旧判据按裸串扫，把文案算成了写口 —— 判据口径比事实宽。改为按**调用形态**判：
+  //   只有 `WA.<ns>.setSettings(` 才算写口（与 A5c「读口带括号在场」同规）。
+  a(!/WA\.[A-Za-z]+\.[A-Za-z]*[Ss]etSettings\s*\(/.test(codeSeg),
     'y7v2205/A5d: 本页**连一个写口都没有**（对比 find 页的「记进最近查询 / 清空」）—— 边界 ④ 的结构保证');
   a(cnt(segR, '真源') >= 1 && cnt(segB, '真源') >= 3,
     'y7v2205/A6: 读数逐处标注「真源」（渲染段 ' + cnt(segR, '真源') + ' / 绑定段 ' + cnt(segB, '真源') + ' 处）');
@@ -725,14 +741,17 @@ function runRest(a, C) {
         let threw = null;
         try { C.clickOutF(dom, 'wa-wg-build'); } catch (e) { threw = String((e && e.message) || e); }
         const o = dom.getElementById('wa-wg-out');
-        return { threw: threw, len: String(o ? o.innerHTML : '').length };
+        // v2.230.0 收口：「读数为空」的判据面是**容器子元素数**（mini-DOM 的 innerHTML
+        //   getter 会把容器自身标签序列化进去 ⇒ 空容器也不是 0 长度）。
+        return { threw: threw, len: String(o ? o.innerHTML : '').length,
+          empty: !!(o && o.childNodes.length === 0) };
       });
     }
     let bad = null, good = null, threw = null;
     try { bad = runOnce(ov); good = runOnce(null); } catch (e) { threw = String((e && e.message) || e); }
     a(threw === null, 'y7v2205/N13b: 两版都不抛到探针外（实 ' + j(threw) + '）');
-    a(bad && bad.threw === null && bad.len === 0,
-      'y7v2205/N13c: （两向）破坏版上点按钮**不抛**但读数**为空**（实 ' + j(bad && bad.len) + ' 字符）—— 破坏的是读数去处，不是绑定');
+    a(bad && bad.threw === null && bad.empty === true,
+      'y7v2205/N13c: （两向）破坏版上点按钮**不抛**但读数**为空**（出口容器零子元素；实 ' + j(bad && bad.len) + ' 字符是容器自身序列化）—— 破坏的是读数去处，不是绑定');
     a(good && good.len > 0, 'y7v2205/N13d: （两向）原版上同款操作读数非空（实 ' + j(good && good.len) + '）—— 判据区分得开两向');
   })();
   // N14：破坏版跑产品 —— **边类白名单判据被短路**后，未知边类**真的**被静默吞掉（两向）。

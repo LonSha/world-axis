@@ -239,7 +239,16 @@ async function launch(root, options) {
       }
       if (pruneNote) fs.appendFileSync(logFile, pruneNote + String.fromCharCode(10));
     }
-    child = cp.spawn(process.execPath, [path.join(prepared.work, 'tests/run.js')].concat(fwd),
+    // v2.230.0：**内存参数必须随 worker 走**。现场实证（基线任务 NYtNSp）：外壳被隔离后，
+    //   worker 仍以默认堆上限跑，全量 600+ 节只到 244 节便 `Ineffective mark-compacts ...
+    //   heap out of memory`（SIGABRT）——于是「一趟跑完」在结构上不可能，而外壳给多少内存
+    //   都不作数（NODE_OPTIONS 由 cleanEnv 剥除，且它本就不转发 execArgv）。
+    //   口径：只透传**内存类**参数，不放开整个 NODE_OPTIONS（后者刻意剥除，防外部注入
+    //   改变被测代码行为）。参数面窄到三个已知键，别的 execArgv 一律不带。
+    const memArgv = (process.execArgv || []).filter(function (a) {
+      return /^--max-old-space-size(=|$)|^--max-semi-space-size(=|$)|^--max-heap-size(=|$)/.test(a);
+    });
+    child = cp.spawn(process.execPath, memArgv.concat([path.join(prepared.work, 'tests/run.js')]).concat(fwd),
       { cwd: prepared.work, env: prepared.env, detached: true, stdio: ['ignore', fd, fd] });
     result.childPid = child.pid; save();
     //   默认值由调用方（tests/run.js）按现场实测给出；这里的兜底与它同值，

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.229.0'
+  const VERSION = '2.230.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -791,6 +791,65 @@
     //   没有 transact、没有 draft 赋值；只有自己那一格 localStorage 偏好键
     //   （`worldaxis_evidence_board_settings_v1`）。
     'engines/evidence-board.js',
+    // v2.230.0（拓展 N12）：十枚新引擎（缝 13 仓的 34 面缺口）。
+    //   elsewhere.js → elsewhere
+    //   vitals.js → vitals
+    //   fate.js → fate
+    //   coordinate.js → coordinate
+    //   compare.js → compare
+    //   beat.js → beat
+    //   backstage-tone.js → backstageTone
+    //   dream.js → dream
+    //   modelink.js → modelink
+    //   portal.js → portal
+    //   位置都在 evidence-board 之后、ui/panel.js 之前：装载期零上游读，
+    //   一律调用期读 WA.store / settingsBus / evict / inputGuard / rand。
+    'engines/elsewhere.js',
+    'engines/vitals.js',
+    'engines/fate.js',
+    'engines/coordinate.js',
+    'engines/compare.js',
+    'engines/beat.js',
+    'engines/backstage-tone.js',
+    'engines/dream.js',
+    'engines/modelink.js',
+    'engines/portal.js',
+    // v2.230.0（拓展 N12 续批）：16 枚新引擎（把 34 面缺口收口到 46/46）。
+    //   floor-snapshot.js → floorSnapshot（G07 楼层快照 + B09 绑定 message）
+    //   memory-tiers.js   → memoryTiers（G18 三层记忆）
+    //   deep-clean.js     → deepClean（G20 深度清理生命周期）
+    //   lingqi.js         → lingqi（G29 玲七管家）
+    //   scope-tag.js      → scopeTag（B01 范围标签）
+    //   reasoning-strip.js→ reasoningStrip（B02 推理块过滤）
+    //   length-policy.js  → lengthPolicy（B03 字数策略）
+    //   auto-hide.js      → autoHide（B04 隐藏楼层）
+    //   prefilter-gate.js → prefilterGate（B06 档案预筛 Gate）
+    //   community-note.js → communityNote（G27 社区笔记）
+    //   world-clock.js    → worldClock（B07 世界钟权威）
+    //   outline-inject.js → outlineInject（B08 大纲注入）
+    //   redact-layer.js   → redactLayer（B05 脱敏层）
+    //   relation-graph.js → relationGraph（B10 关系图谱 edgeId）
+    //   solo-voice.js     → soloVoice（B11 独白推演）
+    //   observe-slice.js  → observeSlice（B12 观测切片）
+    //   位置仍在 ui/panel.js 之前：装载期**零上游读、零 store 写、零落盘**，
+    //   一律调用期读 WA.settingsBus / inputGuard；因此**不进** __BOUNDED_CAPS / evict SITES
+    //   （那两张表管的是 store 骨架里的有界容器，本批一条都不写 store）。
+    'engines/floor-snapshot.js',
+    'engines/memory-tiers.js',
+    'engines/deep-clean.js',
+    'engines/lingqi.js',
+    'engines/scope-tag.js',
+    'engines/reasoning-strip.js',
+    'engines/length-policy.js',
+    'engines/auto-hide.js',
+    'engines/prefilter-gate.js',
+    'engines/community-note.js',
+    'engines/world-clock.js',
+    'engines/outline-inject.js',
+    'engines/redact-layer.js',
+    'engines/relation-graph.js',
+    'engines/solo-voice.js',
+    'engines/observe-slice.js',
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；

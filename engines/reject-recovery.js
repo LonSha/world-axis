@@ -179,6 +179,16 @@
     //   但绝不可合成一个码：「只写了思考」与「什么都没写」是两件事，
     //   合成一个即让「推理冒充产出」在读数上长得像「模型没说话」。
     'reasoning-only': { kind: 'request-setup', why: '只有思考段、没有正式产出：这一段不该落地，重发一轮要正文' },
+    // ── v2.230.0（拓展 N12）：拒收面残余逐条显式登记（规则表分词收不住它们）──
+    //   判据来源：tools/reject-recovery.js 的 audit() 把它们报成 via:'undecided'
+    //   （拒收面残余未登记，B6 当场现红）。
+    'below-min': { kind: 'adjust-input', why: '长度低于下限：改成达标的长度再提交（下限见 length-policy 的 pattern 读数）' },
+    'entry-miss': { kind: 'request-setup', why: 'modelink 词表里查不到这一条：先把被查的条目登记上（want/tried 都在回执里）' },
+    'reenter': { kind: 'retry-same-input', why: 'portal 本轮签名已出现过：等这一轮过去同输入再来' },
+    'stray': { kind: 'adjust-input', why: '拍类目严格模式下这个 id 不在封闭集里：按 category 改成合法类目' },
+    'unrepairable': { kind: 'manual-review', why: 'beat 连续修形都不成立：机器已试尽，需要人看一眼原文' },
+    'unrouted': { kind: 'request-setup', why: 'lingqi 找不到能把这句话派下去的承接人：先把承接关系建上' },
+    'unsafe-expr': { kind: 'adjust-input', why: '表达式没通过安全白名单：改写成允许的形式再提交' },
     'load-integrity': { kind: 'request-setup', why: '启动完整性缺口：六个写链路关键模块（clock/input-guard/settings-bus/permissions/commit/interceptor）有缺席项 ⇒ 写入被闸门挡住。先按 integrity().missing 把缺的文件补上（或对每个 rel 走 WA.loadRetry 重试装载），闸门自行重算后即恢复' }
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
@@ -256,7 +266,14 @@
     'trusted-person': { out: true, why: '决策理由（action=ask）' },
     'unconfirmed': { kind: 'manual-review', why: '明确没有内置确认器：得人确认' },
     'unreciprocated': { out: true, why: '决策理由（action=wait）' },
-    'unregistered-setting': { out: true, why: '存储治理：未注册设置项的清理理由' }
+    'unregistered-setting': { out: true, why: '存储治理：未注册设置项的清理理由' },
+    // ── v2.230.0（拓展 N12）：engines/fate.js 的两条**丢弃理由** ──
+    //   它们落在 `dropped.push({ index, label, reason })` 里（那个对象不带 `ok`），
+    //   故现场面是判不出。按语义归 out:true —— 「这一项为什么没被收进命运表」
+    //   是一个**结论**，不是调用被拒；给它编恢复动作就是造数据（与 `narrative-only`
+    //   / `nothing-recorded` 同规）。
+    'empty-label': { out: true, why: 'fate 建表时该项 label 为空被丢弃：这是筛选结论，不是拒收' },
+    'near-dup': { out: true, why: 'fate 建表时与已收项近似重复被丢弃（回执里带 of 指认撞的是哪条）：筛选结论' }
   };
 /* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
    *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
@@ -491,7 +508,16 @@
     //   OVERRIDES 只补判不了的两条：`invalid-plan`（改计划内容，不是重试同输入）
     //   与 `failed`（终态，只能重开）；`bad-plan`/`bad-plan-id` 分词收在 bad-* 词族、
     //   `plan-cap` 收在 cap 词族 ⇒ explain() 走 via:rule。
-    'bad-plan', 'bad-plan-id', 'invalid-plan', 'plan-cap', 'failed'
+    'bad-plan', 'bad-plan-id', 'invalid-plan', 'plan-cap', 'failed',
+    // v2.230.0（拓展 N12）：按 tools/reject-recovery.js 的现场复算补齐下面这批拒收码。
+    //   它们都是本轮之后新增模块带出来的真拒收面返回（length-policy / modelink / portal /
+    //   beat / lingqi / fate 等），既不在死表、也不在基线 —— 是快照自己落后于现场。
+    'bad-anchor-json', 'bad-floor', 'bad-message', 'bad-num', 'bad-risk', 'bad-skill', 'bad-syntax',
+    'below-min', 'closed-thread', 'dup-thread', 'empty-dc', 'empty-deviation', 'empty-formula', 'empty-name',
+    'empty-state', 'empty-step', 'empty-transition', 'entry-miss', 'eval-failed', 'flow-incomplete',
+    'formula-off', 'no-progress', 'no-signature', 'reenter', 'repair-limit', 'self-loop-or-missing-end',
+    'stray', 'strip-empty', 'tie-conflict', 'unknown-attr', 'unknown-draft', 'unknown-floor', 'unknown-key',
+    'unknown-person', 'unknown-thread', 'unknown-volume', 'unrepairable', 'unrouted', 'unsafe-expr',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -504,7 +530,11 @@
     'unlocked', 'within-lock',
     // v2.209.0（优化 6）：ui/assistant.js 的 `no-terms`（未检索到词条时如实返回 ok:false 之外
     //   的成功面返回）—— 现场实测 success 35 / 快照 34 ⇒ 差 1，属 E1 批既有欠债。
-    'no-terms'];
+    'no-terms',
+    // v2.230.0（拓展 N12）：同上口径补齐成功面（ok:true 侧的返回）。
+    'already-cleared', 'disabled-passthrough', 'fallback', 'frame-evicted', 'lenient', 'merged', 'no-edge',
+    'nothing-held', 'passthrough', 'replaced', 'same-tier', 'tie', 'unbound', 'unspecified', 'updated',
+  ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
     'bridge-threw', 'budget', 'climate-throw', 'commitment', 'commitment-fulfilled',
@@ -516,7 +546,10 @@
     'pinned_over_budget', 'plan-unavailable', 'prerequisite-open', 'ready', 'recorded',
     'registry-missing', 'resource-missing', 'restore-failed', 'revivable', 'schedule',
     'step-not-running', 'stringify-failed', 'trusted-person', 'unconfirmed', 'unreciprocated',
-    'unregistered-setting'];
+    'unregistered-setting',
+    // v2.230.0（拓展 N12）：同上口径补齐判不出面（源码里那个对象不带 ok）。
+    'empty-label', 'near-dup',
+  ];
   /** 三快照查表 → 面。未命中即 `unknown`（**判不出就是判不出**，不拿规则表兜）。 */
   function frozenFace(c) {
     if (REJECT_FACE.indexOf(c) >= 0) return 'reject';

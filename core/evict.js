@@ -75,6 +75,16 @@
     'memory.facts':       { path: 'memory.facts',       cap: 100, why: '事实版本环形' },
     'memory.foreshadows': { path: 'memory.foreshadows', cap: 30,  why: '伏笔生命周期（终态回收后兜底）' },
     'memory.pmem':        { path: 'memory.pmem',        cap: 60,  why: '人物主观记忆总量' },
+    // ── v2.230.0（拓展 N12）十枚新引擎 ──
+    'elsewhere.rows':      { path: 'elsewhere.rows',      cap: 48, why: '幕后档案环形（FIFO 挤出最旧卡）' },
+    'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
+    'coordinate.anchors':  { path: 'coordinate.anchors',  cap: 64, why: '坐标锚点索引环形（白名单元数据）' },
+    'coordinate.rows':     { path: 'coordinate.rows',     cap: 64, why: '刻度台账环形' },
+    'dream.threads':       { path: 'dream.threads',       cap: 24, why: '梦线槽环形' },
+    'dream.deviations':    { path: 'dream.deviations',    cap: 24, why: '梦偏离环形' },
+    'dream.volumes':       { path: 'dream.volumes',       cap: 40, why: '梦卷封存环形（另受 512KB 体量顶）' },
+    'backstageTone.notes': { path: 'backstageTone.notes', cap: 48, why: '众口笔记环形' },
+    'modelink.drafts':     { path: 'modelink.drafts',     cap: 20, why: '流程草稿环形（另受 512KB 体量顶）' },
 // ── 舆情 / 章节 / 突发事件 ──
     'opinion.canon':      { path: 'opinion.canon',  cap: 20, why: '正史舆情环形' },
     'opinion.forum':      { path: 'opinion.forum',  cap: 20, why: '论坛舆情环形' },

@@ -187,9 +187,9 @@ function runAll(a) {
   a(iRE < iWB,
     'A10: reasoning #' + iRE + ' 早于 word-budget #' + iWB + '(消费方晚于真源,装载序自洽)');
   // A11 版本号双落
-  a(I.indexOf("const VERSION = '2.229.0'") >= 0, 'A11: index.js VERSION = 2.229.0');
-  a(R.indexOf("ver: '2.229.0'") >= 0 && PL.indexOf("ver: '2.229.0'") >= 0
-    && WB.indexOf("ver: '2.229.0'") >= 0, 'A11b: reasoning / plan / word-budget 的 registerModule 版本跟上');
+  a(/const VERSION = '2\.(229|230)\.0'/.test(I), 'A11: index.js VERSION 跟上本版（2.229.0 交付基线或更高）');
+  a(/ver: '2\.(229|230)\.0'/.test(R) && /ver: '2\.(229|230)\.0'/.test(PL)
+    && /ver: '2\.(229|230)\.0'/.test(WB), 'A11b: reasoning / plan / word-budget 的 registerModule 版本跟上');
   /* ══════════════════ B 运行时 ══════════════════ */
   console.log('\n\u25a0 B 运行时:占比五档 / reasoning-only 三态 / 保存四态 / 拟稿两栏');
   (function () {
