@@ -44,3 +44,15 @@ tests/_*.js
 #   为什么不逐个登记文件名：那只是把下一次踩坑推迟 —— 按形态挡，并由「有无被引用」复核一次。
 #   （当年 `patch_o17_v2104.js` 就是靠逐个漏登在索引里挂了 12 版，与前半句自相矛盾。）
 tools/probe_*.js
+
+# v2.230.0 收口：一次性产物的 `_` 前导清单/脚本体**按形态**挡在库外。
+#   实证：本批 `tools/_baseline230.sh`（17 行，自述「跑完即处置」）与 `tools/_gaps_v230.json`
+#   （357 行缺口台账）被 `git add -A` 带进索引，`toolchain-gate` 当场报
+#   「README 自述 45 / 索引实 47」——README 那句判据（只有被可执行代码引用才入库）
+#   对两条产物实测都是假：全仓 grep 只在 ITERATION_LOG.md / README 正文里被提及，
+#   零 `require` / 零 `node tools/_gaps_*` 调用点。
+#   为什么不逐个登记文件名：那只是把下一次踩坑推迟 —— 本批已用 `tools/_*.js` 挡过同类，
+#   漏的是 `.sh` 与 `.json` 两种形态。凡后续补账/建基线的 `_` 前导产物一律不入库，
+#   台账正文照旧落在 ITERATION_LOG.md / README（读数与人读的那份在文档里，不在 tools/ 里）。
+tools/_*.sh
+tools/_*.json
