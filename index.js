@@ -332,6 +332,8 @@
     'engines/action-desk.js',
     // v2.231.0（优化 OP-2）：能力—工具—行动结果联动。消费 training/gear/act，提供多解法评估与原子消耗。
     'engines/action-methods.js',
+    // v2.231.0（优化 OP-3）：劳动与日程结算。同一段时间只能花一次，跨业务时段排他。
+    'engines/labor-schedule.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

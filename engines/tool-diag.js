@@ -2273,6 +2273,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/action-desk.js': 'actionDesk',
     // v2.231.0 (OP-2): methods -- 能力—工具—行动结果联动
     'engines/action-methods.js': 'actionMethods',
+    // v2.231.0 (OP-3): labor -- 劳动与日程结算（同一段时间只能花一次）
+    'engines/labor-schedule.js': 'laborSchedule',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',
