@@ -340,6 +340,8 @@
     'engines/motive-arbitration.js',
     // v2.231.0（创新 IN-2）：未走之路的回声。有限预期、遗憾与经验修正。
     'engines/path-echo.js',
+    // v2.231.0（创新 IN-5）：活的技术谱系。知识传承、分化与断代复兴。
+    'engines/tech-lineage.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

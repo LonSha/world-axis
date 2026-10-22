@@ -329,6 +329,8 @@ const LOAD = [
   'engines/motive-arbitration.js',
   // v2.231.0（创新 IN-2）：未走之路的回声。同序进 LOAD。
   'engines/path-echo.js',
+  // v2.231.0（创新 IN-5）：活的技术谱系。同序进 LOAD。
+  'engines/tech-lineage.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24129,6 +24131,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./exp15-path-echo-v2232.js');
     await runLock('./exp15-path-echo-v2232.js', 'runNegative');
+  }
+  // ── v2.231.0(创新 IN-5):活的技术谱系 —— 文献与默会分立 / 师承代际接续 / 断代休眠与地方变体 ──
+  section('v2.231.0(创新 IN-5):活的技术谱系 —— 文献与默会分立 / 师承代际接续 / 断代休眠与地方变体');
+  {
+    await runLock('./exp16-tech-lineage-v2232.js');
+    await runLock('./exp16-tech-lineage-v2232.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
