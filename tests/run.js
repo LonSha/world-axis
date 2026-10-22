@@ -339,6 +339,8 @@ const LOAD = [
   'engines/epistemic-view.js',
   // v2.231.0（拓展 IN-3）：共同知晓与默契。同序进 LOAD。
   'engines/shared-awareness.js',
+  // v2.231.0（拓展 IN-4）：习俗到制度。同序进 LOAD。
+  'engines/custom-lax.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24169,6 +24171,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./exp20-shared-awareness-v2232.js');
     await runLock('./exp20-shared-awareness-v2232.js', 'runNegative');
+  }
+  // ── v2.231.0(拓展 IN-4):习俗到制度 —— 惯例候选 / 组织批准链 / 规则生效 / 不满复审 ──
+  section('v2.231.0(拓展 IN-4):习俗到制度 —— 惯例候选 / 组织批准链 / 规则生效 / 不满复审');
+  {
+    await runLock('./exp21-custom-lax-v2232.js');
+    await runLock('./exp21-custom-lax-v2232.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

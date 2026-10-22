@@ -94,6 +94,12 @@
     'sharedAwareness.assertMeta': function (o) { return WA.sharedAwareness.assertMeta(o.who, o.target, o.factId, o.basis); },
     'sharedAwareness.openPact': function (o) { return WA.sharedAwareness.openPact(o.pactId, o.spec); },
     'sharedAwareness.confirmPact': function (o) { return WA.sharedAwareness.confirmPact(o.pactId, o.who); },
+    // v2.231.0（拓展 IN-4）：习俗到制度
+    'customLax.spawnCandidate': function (o) { return WA.customLax.spawnCandidate(o.spec); },
+    'customLax.submitToApproval': function (o) { return WA.customLax.submitToApproval(o.candidateId, o); },
+    'customLax.enactRule': function (o) { return WA.customLax.enactRule(o.candidateId, o); },
+    'customLax.registerDissatisfaction': function (o) { return WA.customLax.registerDissatisfaction(o.ruleId, o.who); },
+    'customLax.reviewRule': function (o) { return WA.customLax.reviewRule(o.ruleId, o); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 

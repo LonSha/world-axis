@@ -350,6 +350,8 @@
     'engines/epistemic-view.js',
     // v2.231.0（拓展 IN-3）：共同知晓与默契。二阶认知、公开宣布与协作约定。
     'engines/shared-awareness.js',
+    // v2.231.0（拓展 IN-4）：习俗到制度。惯例候选→组织批准→规则→复审。
+    'engines/custom-lax.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
