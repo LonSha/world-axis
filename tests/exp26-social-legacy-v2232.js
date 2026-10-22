@@ -138,6 +138,10 @@ async function runNegative() {
   a('负控制2: 来源检查破坏后无来源也可形成遗产（证明判据真在守）', l2 && l2.ok);
 }
 
+
+async function runAll() { await runPositive(); }
+module.exports = { runAll, runNegative };
+
 (async function main() {
   console.log('[exp26-social-legacy] 开始正向功能测试...');
   await runPositive();

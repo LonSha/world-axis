@@ -119,6 +119,10 @@ async function runNegative() {
   a('负控制2: shortfall 破坏后取用不报缺口（证明判据真在守）', w2 && w2.shortfall === 0);
 }
 
+
+async function runAll() { await runPositive(); }
+module.exports = { runAll, runNegative };
+
 (async function main() {
   console.log('[exp25-environmental-capacity] 开始正向功能测试...');
   await runPositive();

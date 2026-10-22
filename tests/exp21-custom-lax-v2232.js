@@ -127,6 +127,10 @@ async function runNegative() {
   a('负控制2: 批准核验破坏后未经批准即可成规则（证明判据真在守）', neg2 && neg2.ok);
 }
 
+
+async function runAll() { await runPositive(); }
+module.exports = { runAll, runNegative };
+
 (async function main() {
   console.log('[exp21-custom-lax] 开始正向功能测试...');
   await runPositive();

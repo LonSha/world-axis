@@ -103,6 +103,10 @@ async function runNegative() {
   assert('负控制2: 状态流转破坏后确认状态应滞留在 pending', cf2 && cf2.status === 'pending');
 }
 
+
+async function runAll() { await runPositive(); }
+module.exports = { runAll, runNegative };
+
 (async function main() {
   console.log('[exp20-shared-awareness] 开始正向功能测试...');
   await runPositive();

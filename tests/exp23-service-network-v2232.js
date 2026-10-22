@@ -122,6 +122,10 @@ async function runNegative() {
   a('负控制2: 地点校验破坏后不存在的地点可声明（证明判据真在守）', f2 && f2.ok);
 }
 
+
+async function runAll() { await runPositive(); }
+module.exports = { runAll, runNegative };
+
 (async function main() {
   console.log('[exp23-service-network] 开始正向功能测试...');
   await runPositive();

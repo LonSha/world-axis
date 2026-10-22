@@ -109,6 +109,10 @@ async function runNegative() {
   a('负控制2: 样例被删后科幻站点不存在（证明数据真在）', !hasSciFi);
 }
 
+
+async function runAll() { await runPositive(); }
+module.exports = { runAll, runNegative };
+
 (async function main() {
   console.log('[exp24-playable-blueprint] 开始正向功能测试...');
   await runPositive();

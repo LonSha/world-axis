@@ -101,6 +101,10 @@ async function runNegative() {
   a('负控制2: 回退检测破坏后不标记 isRollback（证明判据真在守）', t2 && t2.isRollback === false);
 }
 
+
+async function runAll() { await runPositive(); }
+module.exports = { runAll, runNegative };
+
 (async function main() {
   console.log('[exp27-phase-transition] 开始正向功能测试...');
   await runPositive();

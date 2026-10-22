@@ -153,6 +153,10 @@ async function runNegative() {
   a('负控制2: settled 过滤破坏后 pending 也进已结束（证明判据真在守）', hasPending);
 }
 
+
+async function runAll() { await runPositive(); }
+module.exports = { runAll, runNegative };
+
 (async function main() {
   console.log('[exp22-scene-narrative] 开始正向功能测试...');
   await runPositive();
