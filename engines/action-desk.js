@@ -88,6 +88,8 @@
     'familyOps.inherit': function (o) { return WA.familyOps.inheritRatio(o.unitId, o.deceased, o.shares, o); },
     'aftermath.reroute': function (o) { return WA.aftermathImpact.findDetour(o.from, o.to, o.blockedPlace, o); },
     'aftermath.repairCommission': function (o) { return WA.aftermathImpact.commissionRepair(o.effectId, o); },
+    'epistemic.view': function (o) { return WA.epistemicView.buildView(o.personId, o.topicId); },
+    'epistemic.correct': function (o) { return WA.epistemicView.correctBelief(o.personId, o.topicId, o.evidence, o); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 

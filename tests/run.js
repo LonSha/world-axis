@@ -335,6 +335,8 @@ const LOAD = [
   'engines/family-ops.js',
   // v2.231.0（优化 OP-6）：世界痕迹消费。同序进 LOAD。
   'engines/aftermath-impact.js',
+  // v2.231.0（优化 OP-7）：角色手里的版本。同序进 LOAD。
+  'engines/epistemic-view.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24153,6 +24155,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./exp18-aftermath-impact-v2232.js');
     await runLock('./exp18-aftermath-impact-v2232.js', 'runNegative');
+  }
+  // ── v2.231.0(优化 OP-7):角色手里的版本 —— 局部事实推导行动 / 失真与确信分歧 / 证据纠偏 ──
+  section('v2.231.0(优化 OP-7):角色手里的版本 —— 局部事实推导行动 / 失真与确信分歧 / 证据纠偏');
+  {
+    await runLock('./exp19-epistemic-view-v2232.js');
+    await runLock('./exp19-epistemic-view-v2232.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

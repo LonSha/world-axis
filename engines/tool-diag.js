@@ -2287,6 +2287,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/family-ops.js': 'familyOps',
     // v2.231.0 (OP-6): aftermathImpact -- 世界痕迹消费（设施损坏、封路、绕路与不可逆修复）
     'engines/aftermath-impact.js': 'aftermathImpact',
+    // v2.231.0 (OP-7): epistemicView -- 角色按自己手里的版本行动（局部事实、知情边界与信念修正）
+    'engines/epistemic-view.js': 'epistemicView',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',

@@ -346,6 +346,8 @@
     'engines/family-ops.js',
     // v2.231.0（优化 OP-6）：世界痕迹消费。设施损坏、封路、绕路与不可逆修复。
     'engines/aftermath-impact.js',
+    // v2.231.0（优化 OP-7）：角色手里的版本。局部事实视图与信念修正。
+    'engines/epistemic-view.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
