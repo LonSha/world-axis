@@ -334,6 +334,8 @@
     'engines/action-methods.js',
     // v2.231.0（优化 OP-3）：劳动与日程结算。同一段时间只能花一次，跨业务时段排他。
     'engines/labor-schedule.js',
+    // v2.231.0（优化 OP-4）：研究成果闭环。类型化前置验证与三权分立就绪度评估。
+    'engines/research-closure.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

@@ -323,6 +323,8 @@ const LOAD = [
   'engines/action-methods.js',
   // v2.231.0（优化 OP-3）：劳动与日程结算。同序进 LOAD。
   'engines/labor-schedule.js',
+  // v2.231.0（优化 OP-4）：研究成果闭环。同序进 LOAD。
+  'engines/research-closure.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24105,6 +24107,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./exp12-labor-schedule-v2232.js');
     await runLock('./exp12-labor-schedule-v2232.js', 'runNegative');
+  }
+  // ── v2.231.0(优化 OP-4):研究成果闭环 —— 类型化前置验证 / 三权分立就绪度 / 失败线索保留 ──
+  section('v2.231.0(优化 OP-4):研究成果闭环 —— 类型化前置验证 / 三权分立就绪度 / 失败线索保留');
+  {
+    await runLock('./exp13-research-closure-v2232.js');
+    await runLock('./exp13-research-closure-v2232.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
