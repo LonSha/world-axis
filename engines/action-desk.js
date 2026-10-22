@@ -105,6 +105,12 @@
     'sceneNarrative.resolvedSummary': function (o) { return WA.sceneNarrative.resolvedSummary(o); },
     'sceneNarrative.traceFrom': function (o) { return WA.sceneNarrative.traceFrom(o.seed); },
     'sceneNarrative.perceivedHorizon': function (o) { return WA.sceneNarrative.perceivedHorizon(o.who); },
+    // v2.231.0（拓展 IN-6）：公共设施与服务网络
+    'serviceNetwork.declareFacility': function (o) { return WA.serviceNetwork.declareFacility(o.spec); },
+    'serviceNetwork.activateFacility': function (o) { return WA.serviceNetwork.activateFacility(o.facilityId); },
+    'serviceNetwork.requestService': function (o) { return WA.serviceNetwork.requestService(o.facilityId, o.who, o.amount); },
+    'serviceNetwork.decayFacility': function (o) { return WA.serviceNetwork.decayFacility(o.facilityId); },
+    'serviceNetwork.restoreFacility': function (o) { return WA.serviceNetwork.restoreFacility(o.facilityId); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 

@@ -354,6 +354,8 @@
     'engines/custom-lax.js',
     // v2.231.0（优化 OP-8）：场景与历史按因果讲清楚。只读聚合。
     'engines/scene-narrative.js',
+    // v2.231.0（拓展 IN-6）：公共设施与服务网络。容量、排队、维护与降级。
+    'engines/service-network.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

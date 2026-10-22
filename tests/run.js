@@ -343,6 +343,8 @@ const LOAD = [
   'engines/custom-lax.js',
   // v2.231.0（优化 OP-8）：场景与历史按因果讲清楚。同序进 LOAD。
   'engines/scene-narrative.js',
+  // v2.231.0（拓展 IN-6）：公共设施与服务网络。同序进 LOAD。
+  'engines/service-network.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24185,6 +24187,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./exp22-scene-narrative-v2232.js');
     await runLock('./exp22-scene-narrative-v2232.js', 'runNegative');
+  }
+  // ── v2.231.0(拓展 IN-6):公共设施与服务网络 —— 声明 / 激活 / 容量排队 / 维护降级 / 修复 ──
+  section('v2.231.0(拓展 IN-6):公共设施与服务网络 —— 声明 / 激活 / 容量排队 / 维护降级 / 修复');
+  {
+    await runLock('./exp23-service-network-v2232.js');
+    await runLock('./exp23-service-network-v2232.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
