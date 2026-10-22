@@ -94,6 +94,16 @@
     // v2.140.0（F1）：防全知闸门。与 SOURCES 同批登记 —— 只加源表不加显示名 ⇒
     //   注入页/导演页裸露英文键名 noesis（本版被 v2.22.0 renderDirector 键集判据抓出）。
     //   插在 chrono 行之前（与 foreshadow 同款理由：chrono 行是 v2.127.0 锚点区）。
+    // v2.231.0（拓展 EXP-4）：探索与地理发现。与 SOURCES（键）/ 注入分支 source 名 /
+    //   SRC_NAME / SRC_MOD_SETTING 同批登记（inject-sources-v2560 的 [D] 条把守：
+    //   源表每项都必须有面板显示名，否则用户在开关面板上看到一个英文键名）。
+    survey: '探索与地理发现',
+    // v2.231.0（拓展 EXP-5）：对抗场景。与 SOURCES（键）/ 注入分支 source 名 /
+    //   SRC_NAME / SRC_MOD_SETTING 同批登记（inject-sources-v2560 的 [D] 条把守：
+    //   源表每项都必须有面板显示名，否则用户在开关面板上看到一个英文键名）。
+    contest: '对抗场景',
+    ruling: '案件裁决',
+    activity: '公共活动',
     noesis: '知情边界',
     // v2.141.0（F2）：生理与照护真实层。缺此项 ⇒ inject-sources-v2560 的 D 判据当场红灯
     //   （SOURCES 每一项在 VIS_NAMES 里都要有显示名）。
@@ -820,6 +830,15 @@
   }
 
   function renderPeople() {
+    // v2.231.0（拓展 EXP-1）：能力成长的开关常驻读数 ——
+    //   「还没练过」与「这一面被关掉了」必须分得开（同 v2.164.0 起的惯例）。
+    const trOn = !!(WA.training && WA.training.getSettings && WA.training.getSettings().enabled);
+    // v2.231.0（拓展 EXP-2）：唯一物件的开关常驻读数 —— 同款纪律（「还没有物件」与
+    //   「这一面被关掉了」必须分得开）。
+    const grOn = !!(WA.gear && WA.gear.getSettings && WA.gear.getSettings().enabled);
+    // v2.231.0（拓展 EXP-3）：持续生产的开关常驻读数 —— 同款纪律（「还没开过单」与
+    //   「这一面被关掉了」必须分得开）。
+    const pdOn = !!(WA.production && WA.production.getSettings && WA.production.getSettings().enabled);
     const s = WA.store.get();
     const reg = WA.registry.list();
     const people = Object.values(s.people);
@@ -901,7 +920,7 @@ const peopleIds = Object.keys(s.people);
       <div class="wa-row"><button class="wa-btn" id="wa-org-proj-close" title="结项：全部覆盖才算完成；缺多少就报多少（shortfall），不把「差一点」写成「完成」">结项</button><button class="wa-btn" id="wa-org-owe" title="登记债务：谁欠谁、欠什么、为什么。没有原因字段的欠账，日后没人答得出它是怎么来的">登记欠账</button><button class="wa-btn" id="wa-org-debt-settle" title="清偿欠账：只还得起的量（债可分批），余额照实留着；走 transfer（人 → 势力），与罚没同一支笔">清偿欠账</button><button class="wa-btn" id="wa-org-debts" title="债权债务双向读数：逐条带对象与原因，不汇总成净额（净额会把「甲欠我 10 粮」与我欠甲 10 布抵成 0）">债务</button></div>
       <div id="wa-org-out" class="wa-out"></div>
       <div class="wa-sec">机会与题材配方（B6）</div>
-      <div class="wa-row"><input id="wa-rec-name" class="wa-input" placeholder="配方名 urban/mystery/business/survival（留空看当前档）"/><button class="wa-btn" id="wa-rec-view" title="配方预览：装配面 + 规则冲突 + 基础事实核对结论。纯计算、不落设置——预览不改任何东西（wrote 恒为 null）">配方预览</button><button class="wa-btn" id="wa-rec-seed" title="取一条场景种子（取用制）：不调就一个字节都不进上下文；场景只含起手情形，不含人名与世界设定">取场景</button></div>
+      <div class="wa-row"><input id="wa-rec-name" class="wa-input" placeholder="配方名 urban/mystery/business/survival（留空看当前档）"/><button class="wa-btn" id="wa-rec-view" title="配方预览：装配面 + 规则冲突 + 基础事实核对结论。纯计算、不落设置——预览不改任何东西（wrote 恒为 null）">配方预览</button><button class="wa-btn" id="wa-rec-seed" title="取一条场景种子（取用制）：不调就一个字节都不进上下文；场景只含起手情形，不含人名与世界设定">取场景</button></div><button class="wa-btn" id="wa-lex-view" title="世界词汇面（只读）：这一局的货币叫什么、有哪些基准价与合法配方、判定维度是哪几个、扩展题材有哪些，以及逐条自洽（缺什么 / 核不了什么 / 哪些在沿用旧常量）。不写设置、不改世界">世界词汇</button></div>
       <div class="wa-row"><button class="wa-btn" id="wa-opp-run" title="扫描机会：把世界状态的变化收敛成「此刻可参与的窗口」（承诺逾期/项目缺口/目标互斥/情报未核实/欠账未清/因果后果到期）。到窗口末尾的在途行转「作废」，已接/已拒永不重开">扫描机会</button><button class="wa-btn" id="wa-opp-view" title="机会读数：在途窗口逐条带「涉及谁 / 窗口多久」；涉及者未记录就印未记录，不猜一个人名填上">机会读数</button></div>
       <div id="wa-rec-out" class="wa-out"></div>
       <div class="wa-sec">因果与情报</div>
@@ -995,6 +1014,56 @@ const peopleIds = Object.keys(s.people);
        <div class="wa-row"><button class="wa-btn" id="wa-mend-apology" title="道歉：只有对方显式接受才算一步（acceptedBy 是谁接受的也是证据）">记道歉</button><button class="wa-btn" id="wa-mend-restitution" title="补偿：需要一笔真实转移的回执（receipt）——「我说我赔了」不算">记补偿</button><button class="wa-btn" id="wa-mend-keeping" title="守约：需要实际守约的证据（kept）">记守约</button><button class="wa-btn" id="wa-mend-guarantee" title="担保：担保人必须是第三方（当事人自己不算）">记担保</button></div>
        <div class="wa-row"><button class="wa-btn" id="wa-mend-view" title="只读：进度、四格各自做了没有、还缺什么、最后的关系回执——「还差什么」必须当场可答">看修复</button><button class="wa-btn" id="wa-mend-close" title="结案：fulfilled 需要进度达标 + 显式授权改关系两件事同时成立；失败也是结果，照实留痕">结案</button><button class="wa-btn" id="wa-mend-fail" title="修复失败：一等公民，不删行——「他求过一次，被拒了」是复盘证据">判失败</button></div>
        <div id="wa-mend-out" class="wa-out"></div>
+        <div class="wa-sec">能力成长（练到哪一步 · 前置 · 两制进度）</div>
+        <div class="wa-dim">进度分<b>两制</b>：<b>定性阶段</b>（生疏→入门→熟练…）与<b>数值熟练度</b>。
+          同一项能力建账时定死一种，两种读数各自独立 —— <b>不规定人人都有等级</b>。
+          能力名必须先在<b>实体库</b>里登记过（本面只记<b>进度</b>，不建第二份能力真源）；
+          <b>取消的训练不加进度</b>；前置未达一律拒收（不静默放行）。</div>
+        <label class="wa-row"><input id="wa-tr-enabled" type="checkbox" ${trOn ? 'checked' : ''}/> 启用能力成长</label>
+        <div class="wa-row"><input id="wa-tr-name" class="wa-input" placeholder="能力名（须已在实体库登记）"/>
+          <input id="wa-tr-mode" class="wa-input" placeholder="进度制 stage / points（留空=stage）"/>
+          <input id="wa-tr-stages" class="wa-input" placeholder="阶段名，逗号分隔（stage 制必填）"/>
+          <button class="wa-btn" id="wa-tr-declare" title="建账一项能力：声明进度制与阶段名表。能力名必须已在实体库的 ability 表里（否则 entity-absent —— 本面不建第二份能力真源）">建账</button></div>
+        <div class="wa-row"><input id="wa-tr-prereq" class="wa-input" placeholder="前置能力（可空）"/>
+          <input id="wa-tr-prereqstage" class="wa-input wa-num" type="number" min="0" step="1" placeholder="前置需到第几阶"/>
+          <button class="wa-btn" id="wa-tr-ables" title="只读：能力台账（进度制 / 前置 / 阶段名表）">能力台账</button></div>
+        <div class="wa-row"><input id="wa-tr-who" class="wa-input" placeholder="谁"/>
+          <button class="wa-btn" id="wa-tr-practice" title="记一次有效训练：按进度制累进。前置未达 ⇒ prereq-unmet（不静默放行）">练一次</button>
+          <button class="wa-btn" id="wa-tr-cancel" title="取消的训练**不加进度**（验收条款）：进 cancelled 计数，如实留痕">取消一次</button>
+          <button class="wa-btn" id="wa-tr-can" title="只读：这个人此刻够不够（按该项能力自己的进度制比门槛）—— 应用面，不是换一行描述">够不够</button>
+          <input id="wa-tr-need" class="wa-input wa-num" type="number" min="0" step="1" placeholder="门槛"/></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-tr-progress" title="只读：逐人进度（阶段名 / 熟练度 / 有效训练次数 / 取消次数）">看进度</button>
+          <button class="wa-btn" id="wa-tr-diag" title="自证面：开关 / 两制口径 / 上限 / 声明数与进度数 / 拒收归因">诊断</button></div>
+        <div id="wa-tr-out" class="wa-out"></div>
+        <div class="wa-sec">唯一物件（这一件在谁手上 · 还能用几次 · 修好再归还）</div>
+        <div class="wa-dim">与<b>堆叠资源</b>（供需循环那一段的库存）的根本分野：这里是<b>逐件</b>的行，
+          同型号两件是<b>两条</b>，各带自己的 id —— 用坏一件，另一件<b>不受影响</b>。
+          物件名必须先在<b>实体库</b>的 object 表里登记过（本面只记<b>这一件的生命史</b>）；
+          <b>借出即失权</b>（原持有人当场用不了）；装备槽<b>按需启用</b>（没声明的槽不收）；
+          耗尽即拒收，修理<b>要材料</b>（不凭空修好）。</div>
+        <label class="wa-row"><input id="wa-gr-enabled" type="checkbox" ${grOn ? 'checked' : ''}/> 启用唯一物件</label>
+        <div class="wa-row"><input id="wa-gr-name" class="wa-input" placeholder="物件名（须已在实体库登记）"/>
+          <input id="wa-gr-holder" class="wa-input" placeholder="持有人（可空=不在任何人手上）"/>
+          <input id="wa-gr-dur" class="wa-input wa-num" type="number" min="1" step="1" placeholder="耐久（可空）"/>
+          <button class="wa-btn" id="wa-gr-make" title="造一件唯一物件（每件一个 id）：同型号造两件就是两条行，各自独立损耗。物件名必须已在实体库的 object 表里">造一件</button></div>
+        <div class="wa-row"><input id="wa-gr-slot" class="wa-input" placeholder="槽位名（如 手）"/>
+          <button class="wa-btn" id="wa-gr-slot-add" title="声明一个装备槽（按需启用：没声明的槽 equip 会拒收 no-such-slot）">声明槽位</button>
+          <button class="wa-btn" id="wa-gr-slots" title="只读：世界已声明的槽位">看槽位</button></div>
+        <div class="wa-row"><input id="wa-gr-id" class="wa-input" placeholder="物件 id（从清单里抄）"/>
+          <input id="wa-gr-by" class="wa-input" placeholder="谁（留空=按当前持有人）"/>
+          <input id="wa-gr-wear" class="wa-input wa-num" type="number" min="1" step="1" placeholder="本次磨损（可空=1）"/>
+          <button class="wa-btn" id="wa-gr-use" title="用一次：按 id 落到**那一件**上（同型号两件分得开）。耗尽即拒收 worn-out —— 不静默当一次成功使用">用一次</button>
+          <button class="wa-btn" id="wa-gr-canuse" title="只读：这个人此刻能不能用这一件（持有 + 未耗尽），带出为什么不能">能不能用</button></div>
+        <div class="wa-row"><input id="wa-gr-to" class="wa-input" placeholder="借给谁"/>
+          <button class="wa-btn" id="wa-gr-lend" title="借出：原持有人**当场失去使用权**（验收条款）。这里只记「这件在谁手上」—— 不走 economy 的钱货两清">借出</button>
+          <button class="wa-btn" id="wa-gr-equip" title="装备到已声明的槽位：一槽一件，被同一持有人的另一件占了 ⇒ slot-taken（要换得先脱）">装备</button>
+          <button class="wa-btn" id="wa-gr-unequip" title="卸下：清空槽位，物件仍在持有人手上；没装在任何槽 ⇒ not-equipped">卸下</button></div>
+        <div class="wa-row"><input id="wa-gr-mat" class="wa-input" placeholder="修理材料（如 铁）"/>
+          <input id="wa-gr-amt" class="wa-input wa-num" type="number" min="1" step="1" placeholder="用量（可空=1）"/>
+          <button class="wa-btn" id="wa-gr-repair" title="修理：**要材料**（取自持有人自己的资源面）。材料不足 ⇒ short-material（不凭空修好）；耐久满 ⇒ not-damaged">修理</button>
+          <button class="wa-btn" id="wa-gr-list" title="只读：逐件清单（id / 持有人 / 携带 / 槽 / 次数 / 耐久 / 修过几次）">逐件清单</button>
+          <button class="wa-btn" id="wa-gr-diag" title="自证面：开关 / 三态携带 / 上限 / 槽位 / 逐件数与台账">诊断</button></div>
+        <div id="wa-gr-out" class="wa-out"></div>
         <div class="wa-sec">供需循环与商路（到货 → 定价 → 成交/生产 → 时段消耗与价格响应）</div>
         <label class="wa-row"><input id="wa-eco-enabled" type="checkbox" ${WA.economy && WA.economy.getSettings().enabled ? 'checked' : ''}/> 启用供需循环</label>
         <div class="wa-dim">价格只能落在<b>许可带</b>（基础价 ± spread）内，越界一律拒收；<b>库存不为负</b>，钱不够或货不够都不改状态（拒收不是赊账）。生产只认具名配方；同一时段只能推一次，响应只影响<b>下一笔</b>。</div>
@@ -1005,6 +1074,40 @@ const peopleIds = Object.keys(s.people);
         <div class="wa-row"><input id="wa-eco-route" class="wa-input" placeholder="商路 id"/><input id="wa-eco-lane" class="wa-input" placeholder="road/river/sea/rail"/><input id="wa-eco-from" class="wa-input" placeholder="从"/><input id="wa-eco-to" class="wa-input" placeholder="到"/><input id="wa-eco-cost" class="wa-input wa-num" type="number" min="0" placeholder="运费"/></div>
         <div class="wa-row"><button class="wa-btn" id="wa-eco-route-add" title="登记商路（已存在则改运费）">登记商路</button><button class="wa-btn" id="wa-eco-route-block" title="阻断：状态标记，不删行——世界仍记得有这条路，可解除后续运">阻断</button><button class="wa-btn" id="wa-eco-route-open" title="解除阻断">解除</button><button class="wa-btn" id="wa-eco-ship" title="经这条路运送：路受阻则 route-blocked，货不动（受阻可解除后续运，不消耗货）">运送</button><button class="wa-btn" id="wa-eco-routes" title="只读：商路台账">看商路</button></div>
 <div id="wa-eco-out" class="wa-out"></div>
+        <div class="wa-sec">持续生产（工单跨日 · 缺料暂停 · 完工只入库一次）</div>
+        <div class="wa-dim">与上面<b>即时生产</b>（economy 的「生产」按钮）的根本分野：那一笔<b>当场</b>扣料出货，
+          答的是「这一刻做成了两个面包」；这里开的是<b>工单</b>，带<b>工期</b>与<b>在产状态</b> ——
+          两日单<b>首日不出货</b>；料凑不齐当天那份 ⇒ 工单当场<b>暂停</b>（不静默吞天），
+          补料后<b>复工</b>接着走；完工交货<b>只入库一次</b>（重试逐样跳过已入库的），并交给既有物流。
+          即时生产<b>保留原意</b>，本面<b>显式启用</b>；库存真源仍是 economy，本面只记「这张单在产什么」。</div>
+        <label class="wa-row"><input id="wa-pd-enabled" type="checkbox" ${pdOn ? 'checked' : ''}/> 启用持续生产</label>
+        <div class="wa-row"><input id="wa-pd-fac" class="wa-input" placeholder="设施名（如 面包坊）"/>
+          <input id="wa-pd-slots" class="wa-input wa-num" type="number" min="1" step="1" placeholder="工位数（可空=1）"/>
+          <button class="wa-btn" id="wa-pd-fac-add" title="声明一个生产设施（按需启用：没声明的设施上开不出工单 —— no-such-facility，不静默收下一张自造设施上的单）">声明设施</button>
+          <button class="wa-btn" id="wa-pd-facs" title="只读：设施 / 工位数 / 此刻在产单数">看设施</button></div>
+        <div class="wa-row"><input id="wa-pd-recipe" class="wa-input" placeholder="配方（须已在配方表里）"/>
+          <input id="wa-pd-qty" class="wa-input wa-num" type="number" min="1" step="1" placeholder="产量（可空=1）"/>
+          <input id="wa-pd-days" class="wa-input wa-num" type="number" min="1" step="1" placeholder="工期/天（可空=1）"/>
+          <input id="wa-pd-by" class="wa-input" placeholder="开工者"/>
+          <button class="wa-btn" id="wa-pd-open" title="开工单：跨日运行，产出要等工期走完再由「交货」入库。设施上的未完结单数不得超工位数（facility-full —— 工位不超卖）">开工单</button></div>
+        <div class="wa-row"><input id="wa-pd-id" class="wa-input" placeholder="工单 id（从清单里抄）"/>
+          <input id="wa-pd-place" class="wa-input" placeholder="产出地点（可空=开工单时的地点）"/>
+          <button class="wa-btn" id="wa-pd-advance" title="推进工期：逐日消耗当天那一份料（先吃预留池、再吃开工者手头）。哪一天凑不出 ⇒ 当场转 paused 并如实报缺哪样缺多少（不静默吞天）">推一天</button>
+          <button class="wa-btn" id="wa-pd-pause" title="停工（显式）：running → paused，不推进工期">停工</button>
+          <button class="wa-btn" id="wa-pd-resume" title="复工：paused → running，接着走。已经在跑的单调它是无操作，不报错">复工</button></div>
+        <div class="wa-row"><input id="wa-pd-mat" class="wa-input" placeholder="料名"/>
+          <input id="wa-pd-amt" class="wa-input wa-num" type="number" min="1" step="1" placeholder="用量（可空=1）"/>
+          <button class="wa-btn" id="wa-pd-resupply" title="预留料：把这批料从开工者手里扣进本单自己的预留池（手里不够 ⇒ short-input，不赊账）">补料</button>
+          <input id="wa-pd-who" class="wa-input" placeholder="排班：谁"/>
+          <input id="wa-pd-shift" class="wa-input" placeholder="时段（可空=day）"/>
+          <button class="wa-btn" id="wa-pd-staff" title="排班：同一个人同一时段不能被两张未完结工单同时占用（shift-conflict —— 人不能同时在两个工位上）">排班</button></div>
+        <div class="wa-row"><input id="wa-pd-route" class="wa-input" placeholder="商路 id（可空=只入库不发货）"/>
+          <button class="wa-btn" id="wa-pd-deliver" title="交货：完工后**只入库一次**（走 economy 库存真源）。再交一次 ⇒ order-delivered；工期没走完 ⇒ not-done（两日单首日不出货）">交货</button>
+          <button class="wa-btn" id="wa-pd-cancel" title="取消：预留池里剩下的料退回开工者手里（不吞料），已推进的天数如实保留（不假装没发生）">取消</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-pd-list" title="只读：工单清单（配方 / 产量 / 工期 / 已推进 / 状态 / 设施 / 班次 / 预留池 / 已入库账）">工单清单</button>
+          <button class="wa-btn" id="wa-pd-view" title="只读：设施容量与在产单数（谁占着哪个工位）">看在产</button>
+          <button class="wa-btn" id="wa-pd-diag" title="自证面：开关 / 状态封闭集 / 上限 / 设施数与在产数 / 拒收归因">诊断</button></div>
+        <div id="wa-pd-out" class="wa-out"></div>
         <div class="wa-sec">组织制度（建档 → 设职 → 任免 → 批准链 → 交接）</div>
         <label class="wa-row"><input id="wa-inst-enabled" type="checkbox" ${WA.inst && WA.inst.getSettings().enabled ? 'checked' : ''}/> 启用组织制度</label>
         <div class="wa-dim">权限是<b>具名表</b>（approve/grant/hire/punish），自造权限一律拒收；<b>无职不任</b>、<b>一职一人</b>（换人要显式）；<b>没人能批的事不许挂起</b>；交接必须写明在途项目与旧承诺，<b>不因换人自动作废</b>。</div>
@@ -1111,6 +1214,15 @@ const peopleIds = Object.keys(s.people);
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
+      <div class="wa-sec">独白推演<span class="wa-dim">（v2.231.0 · OPT-3：按需调用，允许等待/拒绝）</span></div>
+      <div id="wa-mo-row" class="wa-dim">${(() => {
+        if (!WA.monologue || typeof WA.monologue.getSettings !== 'function') return '独白推演未加载';
+        const cfg = WA.monologue.getSettings();
+        const st = (typeof WA.monologue.stat === 'function') ? WA.monologue.stat() : {};
+        return '并发 ' + esc(String(cfg.maxParallel)) + ' · 复用上限 ' + esc(String(cfg.reuseTtl)) + ' 轮';
+      })()}</div>
+      <div class="wa-row"><label class="wa-row"><input type="checkbox" id="wa-mo-on"${(() => { try { return WA.monologue.getSettings().enabled ? ' checked' : ''; } catch (e) { return ''; } })()}/><span>启用独白推演</span></label><button class="wa-btn wa-mini" id="wa-mo-stat" title="只读：预筛/独白调用次数、复用条数、被跳过的未提及人数、观望条数、缓存条数。">读数</button><button class="wa-btn wa-mini" id="wa-mo-reset" title="只清读数，不动缓存（缓存是「复用」的依据）。">重置读数</button><button class="wa-btn wa-mini" id="wa-mo-memo" title="清空独白缓存：换聊天/重开档时用，避免复用上一局的人物内心。">清缓存</button></div>
+      <div id="wa-mo-out" class="wa-out"></div>
       <div class="wa-sec">世界人物状态（${people.length}）</div>
       <div class="wa-list">${people.map(p => {
         const rk = recKeyOf(p && p.name);
@@ -1130,6 +1242,23 @@ const peopleIds = Object.keys(s.people);
         return ps.registered ? ('已建档 ' + ps.withProfile + '/' + ps.registered + ' 个 NPC（' + ps.entries + ' 条）— 点人名后的「档案」录入') : '尚无注册 NPC';
       })()}</div>
       <div id="wa-prof-out" class="wa-out"></div>
+      <div class="wa-sec">关系图谱<span class="wa-dim">（v2.231.0 · OPT-6：存档为唯一真源 / 有向立场与边分开记）</span></div>
+      <div id="wa-rel-row" class="wa-dim">${(() => {
+        if (!WA.relationGraph || typeof WA.relationGraph.persisted !== 'function') return '关系图谱未加载';
+        const p = WA.relationGraph.persisted();
+        return '存档 边 ' + esc(String(p.edges)) + ' 条 · 事件引用 ' + esc(String(p.events)) + ' 条'
+          + ' · 本会话索引 ' + esc(String(p.memory)) + ' 条 · 有向立场 ' + esc(String(p.directed)) + ' 对';
+      })()}</div>
+      <div class="wa-row">
+        <input id="wa-rel-a" class="wa-input" placeholder="甲…"/>
+        <input id="wa-rel-b" class="wa-input" placeholder="乙…"/>
+        <button class="wa-btn wa-mini" id="wa-rel-edge" title="按对查边：A-B 与 B-A 是同一条边（边按对归一），带出档位与权重">查边</button>
+        <button class="wa-btn wa-mini" id="wa-rel-dir" title="查有向立场：A→B 与 B→A 各答一次（「A 信任 B、B 仍警惕 A」这种方向差异不因边归一无序而被抹平）">查立场</button>
+        <button class="wa-btn wa-mini" id="wa-rel-reload" title="从存档重建本会话索引：重载/换设备后「关系仍连续」的入口（不是重新推导，只是把存档那份读回来）">从存档重建</button>
+        <button class="wa-btn wa-mini" id="wa-rel-stat" title="只读：入账/落盘/事件引用去重/重建次数的台账">台账</button>
+        <button class="wa-btn wa-mini" id="wa-rel-reset" title="只清读数，不动存档（存档是唯一真源）">重置读数</button>
+      </div>
+      <div id="wa-rel-out" class="wa-out"></div>
       <div id="wa-observe-out" class="wa-out"></div>`;
   }
 
@@ -2150,6 +2279,43 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         return h;
       } catch (e) { return '<div class="wa-empty">读取楼层变更联动账失败（' + esc(e && e.message) + '）</div>'; }
     })();
+    // v2.231.0（优化 OPT-5）：楼层结算账。与上一块（floorChanges，只读盘点）**分工不同**：
+    //   它答「派生数据还指着旧楼层吗」，本块答「这一楼结算改了哪几个世界键、退得回去吗」。
+    //   面板上必须能看见 live / rolled-back / stale 三态与「冲突几键」——否则「退过一次」
+    //   与「从没退过」在界面上同形（本仓反复治的那类静默失真）。
+    out += '<div class="wa-sec">楼层结算账<span class="wa-dim">（这一楼改了哪些世界键；重掷/删最后一楼可退回）</span></div>';
+    out += (function () {
+      try {
+        if (!WA.floorSettle || typeof WA.floorSettle.list !== 'function') return '<div class="wa-empty">楼层结算账未加载</div>';
+        const v = WA.floorSettle.view();
+        const rows = WA.floorSettle.list();
+        const st = WA.floorSettle.stat();
+        const cfg = WA.floorSettle.getSettings();
+        let h = '<div class="wa-row"><label class="wa-row"><input type="checkbox" id="wa-fst-on"'
+          + (cfg.enabled ? ' checked' : '') + '> 记账开关</label>'
+          + '<span class="wa-dim">未启用时 beginRound/endRound 一律拒收 disabled（不记也不退）</span></div>';
+        h += '<div class="wa-item">记账 ' + esc(String(v.entries)) + ' 楼 · live ' + esc(String(v.live))
+          + ' · 上限 ' + esc(String(v.maxFloors)) + '</div>';
+        h += '<div class="wa-dim">轮 ' + esc(String(st.rounds)) + ' · 落账 ' + esc(String(st.journaled))
+          + ' · 退回 ' + esc(String(st.rolledBack)) + ' 次 / ' + esc(String(st.restoredKeys)) + ' 键'
+          + ' · 冲突 ' + esc(String(st.conflicts)) + ' · stale ' + esc(String(st.stale))
+          + ' · 挤出 ' + esc(String(st.dropped)) + ' 笔</div>';
+        if (!rows.length) h += '<div class="wa-dim">还没有记账：下一轮生成结束时会落第一笔（记账跟着存档走，重载后仍可退）。</div>';
+        h += rows.slice(-6).reverse().map(function (r) {
+          return '<div class="wa-item">第 ' + esc(String(r.floor)) + ' 楼 <span class="wa-tag">' + esc(r.state) + '</span>'
+            + '<div class="wa-dim">改 ' + esc(String(r.changed)) + ' 键：' + esc((r.keys || []).join('/') || '—')
+            + ((r.skipped || []).length ? ' · 记不下 ' + esc(String(r.skipped.length)) + ' 键' : '') + '</div></div>';
+        }).join('');
+        h += '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-fst-list">看范围</button>'
+          + '<button class="wa-btn wa-mini" id="wa-fst-rollback">退回最后一笔</button>'
+          + '<button class="wa-btn wa-mini" id="wa-fst-from">从该楼起全退</button>'
+          + '<button class="wa-btn wa-mini" id="wa-fst-reset">清空记账</button>'
+          + '<button class="wa-btn wa-mini" id="wa-fst-stat">重置读数</button></div>';
+        h += '<div class="wa-dim">退回是**显式动作**且逐键判「还是当初那一版吗」：被后续楼层改过的键不动并报冲突。</div>';
+        h += '</div>';
+        return h;
+      } catch (e) { return '<div class="wa-empty">读取楼层结算账失败（' + esc(e && e.message) + '）</div>'; }
+    })();
     // v2.50.0（第三十五面）：台账时间轴。
     //   单值 lastAt 的结构性盲区：「每轮都在失败」与「刚失败一次」在面板上完全同形。
     //   本区块给出「本窗口内是否新增失败」（failing）与「连续同态几次」（stalled，中性）。
@@ -2618,36 +2784,52 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-rt-out" class="wa-out"></div>`;
   }
   function renderTools() {
+    // v2.231.0（优化 OPT-9）：**折叠区按展开惰性求值**。
+    //   现场实测（/tmp/probe_opt9.js ②）：收起态下切到工具页，7 个专家段的读数**照读**
+    //   （worldSeed / worldBlueprint / capacityAudit / perfBaseline / depCheck / rulePack /
+    //   worldLab 各 1 次、kinds 2 次），读数占整页渲染 4.1 ms / 54.6 ms。
+    //   真因：那些 `const xxxOn = …getSettings().enabled` 写在函数入口，**每次渲染都执行** ——
+    //   而它们服务的段体在收起态根本不会被拼接。
+    //   修法：`lazy(fn)` 包一层，段体里以 `xxxOn()` 取值；`foldSec` 的 body 传函数。
+    //   取值**按需一次**（memo）：同一次渲染里多处引用不会重复读。
+    //   注意：**只包折叠表里的段**。下面 checkpoints 的读数不包 —— 存档槽那一段不在折叠表里，
+    //   常驻渲染，惰性化它只会让读数变成一个「看运气」的量。
+    const lazy = function (fn) { let done = false, v = null; return function () { if (!done) { done = true; v = fn(); } return v; }; };
     // v2.155.0（RX8 世界种子库）：读数在「工具」页常驻，开关状态进渲染（
     //   「库是空的」与「这一面被关掉了」在界面上必须分得开 —— 与 v2.154.0 同一句纪律）。
-    const wscfg = (WA.worldSeed && WA.worldSeed.getSettings) ? WA.worldSeed.getSettings() : null;
-    const wsOn = !!(wscfg && wscfg.enabled);
+    const wsCfgL = lazy(function () { return (WA.worldSeed && WA.worldSeed.getSettings) ? WA.worldSeed.getSettings() : null; });
+    const wsOn = lazy(function () { const c = wsCfgL(); return !!(c && c.enabled); });
     // v2.164.0（TX5 世界蓝图）：同款读数常驻（「库是空的」与「这一面被关掉了」必须分得开）。
-    const bpcfg = (WA.worldBlueprint && WA.worldBlueprint.getSettings) ? WA.worldBlueprint.getSettings() : null;
-    const bpOn = !!(bpcfg && bpcfg.enabled);
+    const bpCfgL = lazy(function () { return (WA.worldBlueprint && WA.worldBlueprint.getSettings) ? WA.worldBlueprint.getSettings() : null; });
+    const bpOn = lazy(function () { const c = bpCfgL(); return !!(c && c.enabled); });
     // v2.182.0（O4 / O3）：同款读数常驻 ——「清点是空的」与「这一面被关掉了」必须分得开。
-    const capcfg = (WA.capacityAudit && WA.capacityAudit.getSettings) ? WA.capacityAudit.getSettings() : null;
-    const capOn = !!(capcfg && capcfg.enabled);
-    const pblcfg = (WA.perfBaseline && WA.perfBaseline.getSettings) ? WA.perfBaseline.getSettings() : null;
-    const pblOn = !!(pblcfg && pblcfg.enabled);
+    const capCfgL = lazy(function () { return (WA.capacityAudit && WA.capacityAudit.getSettings) ? WA.capacityAudit.getSettings() : null; });
+    const capOn = lazy(function () { const c = capCfgL(); return !!(c && c.enabled); });
+    const pblCfgL = lazy(function () { return (WA.perfBaseline && WA.perfBaseline.getSettings) ? WA.perfBaseline.getSettings() : null; });
+    const pblOn = lazy(function () { const c = pblCfgL(); return !!(c && c.enabled); });
     // v2.184.0（E3）：存档槽的开关与三个容量参数常驻读数 ——
     //   「库是空的」与「这一面被关掉了」必须分得开（同 v2.164.0/v2.182.0 的惯例）。
     const ckcfg = (WA.checkpoints && WA.checkpoints.getSettings) ? WA.checkpoints.getSettings() : null;
     const ckOn = !!(ckcfg && ckcfg.enabled);
     // v2.187.0（E8）：依赖体检与迁移助手的开关常驻读数 ——
     //   「还没体检过」与「这一面被关掉了」必须分得开（同 v2.164.0/v2.182.0/v2.184.0 的惯例）。
-    const dccfg = (WA.depCheck && WA.depCheck.getSettings) ? WA.depCheck.getSettings() : null;
-    const dcOn = !!(dccfg && dccfg.enabled);
+    const dcCfgL = lazy(function () { return (WA.depCheck && WA.depCheck.getSettings) ? WA.depCheck.getSettings() : null; });
+    const dcOn = lazy(function () { const c = dcCfgL(); return !!(c && c.enabled); });
     // v2.188.0（E7 / E9）：规则包与世界实验室的开关（+ 实验室的动作词表）常驻读数 ——
     //   「还没存过包 / 还没跑过实验」与「这一面被关掉了」必须分得开（同 v2.164.0 起的惯例）。
     //   动作词表**逐字取自 rehearsal**（本模块不自带副本）：读不到时如实渲染「读不到」，
     //   不列一份本模块自己编的词表出来（那会让玩家填的动作在跑的时候全被拒成 unknown-kind）。
-    const rpcfg = (WA.rulePack && WA.rulePack.getSettings) ? WA.rulePack.getSettings() : null;
-    const rpOn = !!(rpcfg && rpcfg.enabled);
-    const wlcfg = (WA.worldLab && WA.worldLab.getSettings) ? WA.worldLab.getSettings() : null;
-    const wlOn = !!(wlcfg && wlcfg.enabled);
-    const wlKinds = (WA.worldLab && typeof WA.worldLab.kinds === 'function' && WA.worldLab.kinds())
-      ? WA.worldLab.kinds() : null;
+    const rpCfgL = lazy(function () { return (WA.rulePack && WA.rulePack.getSettings) ? WA.rulePack.getSettings() : null; });
+    const rpOn = lazy(function () { const c = rpCfgL(); return !!(c && c.enabled); });
+    const wlCfgL = lazy(function () { return (WA.worldLab && WA.worldLab.getSettings) ? WA.worldLab.getSettings() : null; });
+    const wlOn = lazy(function () { const c = wlCfgL(); return !!(c && c.enabled); });
+    //   ⚠ 本行此前把 `kinds()` **调了两次**（一次判真、一次取值）—— 读数调用不该按次计费两次，
+    //     且第二次的返回值未必等于第一次（引擎侧可以是活的）。本版收成一次取值 + 一次判空。
+    const wlKinds = lazy(function () {
+      if (!WA.worldLab || typeof WA.worldLab.kinds !== 'function') return null;
+      const k = WA.worldLab.kinds();
+      return k || null;
+    });
     return `
       <div data-omniscient>
       <div class="wa-sec">世界态势分析（纯只读体检）</div>
@@ -2708,7 +2890,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <textarea id="wa-imp-text" class="wa-ta" placeholder="或直接粘贴 JSON 内容…"></textarea>
       <button class="wa-btn" id="wa-imp-run" title="自动识别粘贴/文件内容的类型（存档/区域事件/势力/事件链/主观记忆），校验失败零写入">预检并导入</button>
       <div id="wa-imp-out" class="wa-out"></div>
-      ${foldSec('tools', 'selfcheck', '扩展自检（模块/注入/UI/运行环境）', `
+      ${foldSec('tools', 'selfcheck', '扩展自检（模块/注入/UI/运行环境）', () => `
       <div class="wa-sec">诊断与体检<span class="wa-dim">（只读，不改世界状态）</span></div>
       <div class="wa-row">
         <button class="wa-btn" id="wa-diag-run" title="立即体检：模块装载/上轮注入/UI 绑定/视图开关/API 通道">立即自检</button>
@@ -2717,7 +2899,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-maintain" title="健康巡视：逐站点扫描容量、陈旧、孤立数据">健康巡视</button>
       </div>
       `)}
-      ${foldSec('tools', 'storage', '存储与现场<span class="wa-dim">（看磁盘上真实存了什么）</span>', `
+      ${foldSec('tools', 'storage', '存储与现场<span class="wa-dim">（看磁盘上真实存了什么）</span>', () => `
       <div class="wa-row">
         <button class="wa-btn" id="wa-key-check" title="存储键体检：列出本扩展写过的所有键与占用">存储键体检</button>
         <button class="wa-btn" id="wa-quar-view" title="隔离现场：读取损坏而被隔离的原始数据">隔离现场</button>
@@ -2736,7 +2918,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-perf-band" title="档位面：短 / 中 / 长 / lowend 四档并排，本地与宿主 API 分列（每档取本档前后的差值，不是全局累计）；lowend 为同机放大估计，不参与判定">档位面</button>
       </div>
       `)}
-      ${foldSec('tools', 'audit', '审计取证<span class="wa-dim">（谁改过世界——把一段事实带出会话）</span>', `
+      ${foldSec('tools', 'audit', '审计取证<span class="wa-dim">（谁改过世界——把一段事实带出会话）</span>', () => `
       <div class="wa-row">
         <button class="wa-btn" id="wa-audit-vol" title="导出一卷审计事实（纯读：不挤出、不清环、不改计数）——这一节会话里世界被谁改过，只有把它带出去才答得上">导出审计</button>
         <button class="wa-btn" id="wa-audit-vol-check" title="核对一卷从别处拿来的审计（序号链 + 时间链），零状态触碰：不并入环、不改序号、不写盘">带外核对</button>
@@ -2744,18 +2926,18 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <textarea id="wa-audit-vol-text" class="wa-ta" placeholder="把一卷审计（JSON）粘在这里再点「带外核对」——上一节会话导出的那种。本侧无卷时照实说「先导出一卷」，不假装核对过"></textarea>
       <div id="wa-audit-vol-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'recovery', '恢复与撤销<span class="wa-dim">（改错了能退回去）</span>', `
+      ${foldSec('tools', 'recovery', '恢复与撤销<span class="wa-dim">（改错了能退回去）</span>', () => `
       <div class="wa-row">
         <button class="wa-btn" id="wa-recovery-dl" title="导出当前状态的恢复点文件">导出恢复点</button>
         <button class="wa-btn" id="wa-recovery-view" title="列出已留存的恢复点">存档恢复点</button>
         <button class="wa-btn" id="wa-undo-btn" title="回退最近一次面板编辑（参数/背景/事实/伏笔等）">撤销编辑</button>
       </div>
       `)}
-      ${foldSec('tools', 'sampler', '记忆采样预览<span class="wa-dim">（buildBlock 实时输出）</span>', `
+      ${foldSec('tools', 'sampler', '记忆采样预览<span class="wa-dim">（buildBlock 实时输出）</span>', () => `
       <div class="wa-row"><button class="wa-btn" id="wa-samp-preview" title="调用 memorySampler.buildBlock 查看当前会注入的记忆采样文本">预览采样</button><button class="wa-btn wa-mini" id="wa-samp-copy" disabled>复制</button></div>
       <div id="wa-samp-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'traces', '运行痕迹<span class="wa-dim">（只清计量，不动世界状态）</span>', `
+      ${foldSec('tools', 'traces', '运行痕迹<span class="wa-dim">（只清计量，不动世界状态）</span>', () => `
       <div class="wa-row">
         <button class="wa-btn" id="wa-stat-reset" title="仅重置各种计数器，世界状态与存档不受影响">清零计量</button>
         <button class="wa-btn" id="wa-wf-reset" title="清空工作流运行历史与失败台账">清空运行痕迹</button>
@@ -2763,13 +2945,13 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
 
       `)}
-      ${foldSec('tools', 'seedlib', '世界种子库（把这一局的格局存下来，换一局再开）', `
+      ${foldSec('tools', 'seedlib', '世界种子库（把这一局的格局存下来，换一局再开）', () => `
       <div class="wa-dim">种子存的是<b>骨头</b>：势力格局 / 人物关系网 / 地理 / 时代背景。它<b>不含</b>编年史 / 暗流 / 回声 / 章节 ——
         存了进度就不是新局，是同一个世界的续集。签名的输入只有结构面，故<b>换个名字存同一格局仍会被去重</b>。
         <b>播种只返回计划、不写世界</b>：真去重开一局是宿主（/reset、新对话）的动作 ——
-        一个「自己会开新局」的引擎在长局里不可接受。此刻：<b>${wsOn ? '开' : '关'}</b>（关闭时提取／保存／播种一并拒收，
+        一个「自己会开新局」的引擎在长局里不可接受。此刻：<b>${wsOn() ? '开' : '关'}</b>（关闭时提取／保存／播种一并拒收，
         读数会一直空 —— 这与「还没存过种子」不是一回事）。</div>
-      <label class="wa-row"><input id="wa-ws-enabled" type="checkbox" ${wsOn ? 'checked' : ''}/> 启用世界种子库</label>
+      <label class="wa-row"><input id="wa-ws-enabled" type="checkbox" ${wsOn() ? 'checked' : ''}/> 启用世界种子库</label>
       <div class="wa-row"><input id="wa-ws-name" class="wa-input" placeholder="种子名（如：三足鼎立·第一次）"/><input id="wa-ws-tags" class="wa-input" placeholder="标签，逗号分隔（三国鼎立 / 都市商战 / 田园 / 门派 / other）"/><button class="wa-btn" id="wa-ws-save" title="写口：把上一次提取的种子存进库（一次 transact、只写 worldSeed.library）。同结构不存两份（duplicate-seed 带已有 id）、库满拒收 library-full —— 不静默挤掉旧种子。去重靠签名不靠名字">保存种子</button></div>
       <div class="wa-row"><button class="wa-btn" id="wa-ws-extract" title="纯读：从当前世界提取结构种子（势力/关系网/地理/时代）。四张表全空时拒收 nothing-to-extract —— 不产空种子">提取种子</button><button class="wa-btn" id="wa-ws-list" title="只读：库内清单（名字/标签/签名/各面条数）">种子清单</button><button class="wa-btn" id="wa-ws-stat" title="只读：提取/保存/播种次数、库上限与拒收归因">台账</button></div>
       <div class="wa-row"><input id="wa-ws-id" class="wa-input" placeholder="种子 id（如 ws_1a2b3c4d_5e6f）"/><button class="wa-btn" id="wa-ws-get" title="只读：取一个种子（含结构面与签名）">取种子</button><button class="wa-btn" id="wa-ws-drop" title="写口：从库内删掉一个种子（只动 worldSeed.library 这一格）">删种子</button></div>
@@ -2781,15 +2963,15 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-ws-out" class="wa-out"></div>
 
       `)}
-      ${foldSec('tools', 'blueprint', '世界蓝图（把这一局的世界原样搬走 / 搬来）', `
+      ${foldSec('tools', 'blueprint', '世界蓝图（把这一局的世界原样搬走 / 搬来）', () => `
       <div class="wa-dim">蓝图存的是<b>结构</b>：人物稳定 ID 与别名、方向化关系、势力权重、地点（含归属与开关时刻）、
         <b>道路端点</b>与时长容量、时代与日历起点、受支持的静态人设与机制开关。
         它<b>不含</b>人物私密记忆 / 聊天文本 / 已完成事件 / 编年史 / 暗流 / 回声 / 事实 / 外部凭据与脚本 ——
         蓝图搬的是「这个世界长什么样」，不是「这一局发生过什么」。与种子库的分水岭：种子<b>只有显示名</b>
         （两个同名人物会被合并），蓝图给每个实体一个<b>稳定 ID</b>（同一份输入永远得到同一个 key，同名不合并）。
-        安装只作用于<b>空新局</b>：非空目标拒收 not-empty，不覆盖既有存档。此刻：<b>${bpOn ? '开' : '关'}</b>
+        安装只作用于<b>空新局</b>：非空目标拒收 not-empty，不覆盖既有存档。此刻：<b>${bpOn() ? '开' : '关'}</b>
         （关闭时导出／保存／预览／安装一并拒收，读数会一直空 —— 这与「还没导出过」不是一回事）。</div>
-      <label class="wa-row"><input id="wa-bp-enabled" type="checkbox" ${bpOn ? 'checked' : ''}/> 启用世界蓝图</label>
+      <label class="wa-row"><input id="wa-bp-enabled" type="checkbox" ${bpOn() ? 'checked' : ''}/> 启用世界蓝图</label>
       <div class="wa-row"><input id="wa-bp-name" class="wa-input" placeholder="蓝图名（如：三足鼎立·完整版）"/><input id="wa-bp-tags" class="wa-input" placeholder="标签，逗号分隔（三国鼎立 / 都市商战 / 田园）"/><button class="wa-btn" id="wa-bp-save" title="写口：把上一次导出的蓝图存进库（一次 transact、只写 blueprint.library）。同结构不存两份（duplicate-blueprint 带已有 id）、库满拒收 library-full —— 不静默挤掉旧蓝图。去重靠签名不靠名字">保存蓝图</button></div>
       <div class="wa-row"><button class="wa-btn" id="wa-bp-export" title="纯读：从当前世界导出完整结构蓝图（白名单提取）。四张表全空时拒收 empty-blueprint —— 不产空蓝图。导出后当场自检引用完整性，悬空即报 dangling-ref（问题出在导出侧而非导入侧）">导出蓝图</button><button class="wa-btn" id="wa-bp-list" title="只读：库内清单（名字/标签/签名/各面条数）">蓝图清单</button><button class="wa-btn" id="wa-bp-stat" title="只读：导出/保存/预览/安装次数、库上限与拒收归因">台账</button></div>
       <div class="wa-row"><input id="wa-bp-id" class="wa-input" placeholder="蓝图 id（如 bp_1a2b3c4d_5e6f）"/><button class="wa-btn" id="wa-bp-get" title="只读：取一张蓝图（含结构与签名）">取蓝图</button><button class="wa-btn" id="wa-bp-drop" title="写口：从库内删掉一张蓝图（只动 blueprint.library 这一格）">删蓝图</button></div>
@@ -2797,16 +2979,16 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-row"><input id="wa-bp-keep" class="wa-input" placeholder="保留层级 structure / roster / mech（留空=roster）"/><button class="wa-btn" id="wa-bp-preview" title="纯读预览：把库内一张蓝图映射到现有状态字段（六道门：版本/形状/白名单键/重复 ID/悬空引用/容量 + 目标非空）。预览只做一次映射，确认应用同一份">导入预览</button><button class="wa-btn" id="wa-bp-import" title="写口（大）：一次事务装完整结构（势力/人物/关系/地点/道路/时代），进度归零，写 blueprint.installed。只作用于空新局 —— 非空目标拒收 not-empty；无预览拒收 no-preview">安装蓝图</button></div>
       <div id="wa-bp-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'depcheck', '依赖体检与迁移助手</div><div class="wa-dim">（E8：这一坨东西在你这台机器上到底能不能用）', `
+      ${foldSec('tools', 'depcheck', '依赖体检与迁移助手</div><div class="wa-dim">（E8：这一坨东西在你这台机器上到底能不能用）', () => `
       <div class="wa-dim">蓝图 / 种子 / 转移包 / 存档信封四类可搬物，粘进来逐项体检：<b>缺什么</b>（外部依赖 / 机制开关 / 配方真源）、
         <b>会降级什么</b>（损失面<b>逐字取自各导入侧真源</b>，本面不重写）、<b>能不能迁移</b>（走 checkpoints 的迁移链）。
         三态分列：<code>present</code>（在）/ <code>absent</code>（确实缺）/ <code>unknown</code>（<b>探不出</b>）。
         <code>unknown</code> 与 <code>absent</code> 处置相反 —— 「不知道有没有」要你去核实，「没有」要你去找那份依赖。
         对<b>所有</b>可搬物都一样的探不出（本仓无媒体资产登记面）另归 <code>envLimited</code>，不参与总判。
         <b>本面是纯读的</b>：零 store 写、零文件写，也<b>不驱动任何模块干活</b> —— 迁移助手只出<b>计划</b>，
-        原文件一个字不动（回带源指纹可核对）。此刻：<b>${dcOn ? '开' : '关'}</b>（关闭时体检与计划一并拒收，
+        原文件一个字不动（回带源指纹可核对）。此刻：<b>${dcOn() ? '开' : '关'}</b>（关闭时体检与计划一并拒收，
         读数一直空 —— 这与「还没体检过」不是一回事）。</div>
-      <label class="wa-row"><input id="wa-dc-enabled" type="checkbox" ${dcOn ? 'checked' : ''}/> 启用依赖体检</label>
+      <label class="wa-row"><input id="wa-dc-enabled" type="checkbox" ${dcOn() ? 'checked' : ''}/> 启用依赖体检</label>
       <div class="wa-row">
         <input id="wa-dc-kind" class="wa-input" placeholder="体裁（留空=自动判：blueprint / seed / pack / checkpoint）"/>
         <button class="wa-btn" id="wa-dc-catalog" title="只读：可体检的四类体裁、三类依赖、三种状态与四种总判的封闭集（念的就是引擎那一份，不另写一遍）">体检口径</button>
@@ -2824,15 +3006,15 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-dc-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'rulepack', '规则包与自动化模板</div><div class="wa-dim">（E7：把这一局喜欢的规则存成一套，下次一键切回来）', `
+      ${foldSec('tools', 'rulepack', '规则包与自动化模板</div><div class="wa-dim">（E7：把这一局喜欢的规则存成一套，下次一键切回来）', () => `
       <div class="wa-dim">把<b>当前规则面</b>（你启用的题材与相关设置）存成一个<b>命名包</b>：换一局、换一个人设时一键切回，
         也能导出给别人。<b>本面只记录设置与启用面，一个字都不改世界状态</b> ——
         写盘唯一走 <code>settingsBus</code>（与题材 / 预设 / 配方同一条路）。<br/>
         自动化模板是<b>封闭词表</b>：动作只能是那五口已存在的<b>只读</b>读口，模板声明<b>预算</b>与<b>失败策略</b>，
         跑满即停、被拒如实带回执。<b>不执行任何脚本</b>（零依赖仓库不跑用户脚本）。
-        此刻：<b>${rpOn ? '开' : '关'}</b>（关闭时保存 / 切换 / 导入 / 跑模板一并拒收，
+        此刻：<b>${rpOn() ? '开' : '关'}</b>（关闭时保存 / 切换 / 导入 / 跑模板一并拒收，
         读数一直空 —— 这与「还没存过包」不是一回事）。</div>
-      <label class="wa-row"><input id="wa-rp-enabled" type="checkbox" ${rpOn ? 'checked' : ''}/> 启用规则包</label>
+      <label class="wa-row"><input id="wa-rp-enabled" type="checkbox" ${rpOn() ? 'checked' : ''}/> 启用规则包</label>
       <div class="wa-row">
         <input id="wa-rp-name" class="wa-input" placeholder="包名（如：悬疑·高难）"/>
         <button class="wa-btn" id="wa-rp-save" title="写口（设置族）：把当前规则面存成命名包。同名覆盖会明确报 replaced —— 不静默顶掉旧包">存当前规则面</button>
@@ -2869,15 +3051,15 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
        </div>
        <div id="wa-rp-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'worldlab', '世界实验室与反事实对比</div><div class="wa-dim">（E9：选 A / 选 B / 什么都不做，先看看分别会怎样）', `
+      ${foldSec('tools', 'worldlab', '世界实验室与反事实对比</div><div class="wa-dim">（E9：选 A / 选 B / 什么都不做，先看看分别会怎样）', () => `
       <div class="wa-dim">在<b>隔离副本</b>上把三条路径各跑一遍：<code>hold</code>（什么都不做）、<code>选 A</code>、<code>选 B</code>，
         然后逐项摆差异（准入结论 / 账目 / 因果落地），每一项都标<b>来源</b>。<br/>
         <b>实验绝不写 live 存档</b>：「跑前跑后世界摘要一致」是<b>实测</b>出来的（不是一句声明）。
         指纹缺失一律标 <code>unknown</code>（不冒充「相同」也不冒充「不同」）；世界变了这份实验就<b>过期</b>，
         读它会被标出来（要当前结论就重跑）。路径写法：每行一步，<code>动作|谁|参数</code>，
-        动作只在 ${wlKinds ? esc(wlKinds.join(' / ')) : '<b>读不到</b>（rehearsal 缺席）'} 里选。
-        此刻：<b>${wlOn ? '开' : '关'}</b>。</div>
-      <label class="wa-row"><input id="wa-wl-enabled" type="checkbox" ${wlOn ? 'checked' : ''}/> 启用世界实验室</label>
+        动作只在 ${wlKinds() ? esc(wlKinds().join(' / ')) : '<b>读不到</b>（rehearsal 缺席）'} 里选。
+        此刻：<b>${wlOn() ? '开' : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-wl-enabled" type="checkbox" ${wlOn() ? 'checked' : ''}/> 启用世界实验室</label>
       <div class="wa-row">
         <textarea id="wa-wl-a" class="wa-input" rows="2" placeholder="选 A 的路径，如：reroute|李明|码头|车站"></textarea>
         <textarea id="wa-wl-b" class="wa-input" rows="2" placeholder="选 B 的路径，如：notify|李明|货到了"></textarea>
@@ -2916,11 +3098,11 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
 
        <div id="wa-wl-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'capacity', '存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）', `
+      ${foldSec('tools', 'capacity', '存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）', () => `
       <div class="wa-dim">区分<b>可回收历史</b>与<b>不可丢义务</b>（在途货物 / 待履约条款 / 未结阶段 / 回执去重索引）——
         义务不静默挤出。水位来自 <code>store.sizeCaps()</code>（唯一真源），与「容量」页同源不另起一份。
-        此刻：<b>${capOn ? '开' : '关'}</b>（关闭时四栏一并拒收，读数一直空 —— 这与「还没跑过清点」不是一回事）。</div>
-      <label class="wa-row"><input id="wa-cap-enabled" type="checkbox" ${capOn ? 'checked' : ''}/> 启用存储压力面</label>
+        此刻：<b>${capOn() ? '开' : '关'}</b>（关闭时四栏一并拒收，读数一直空 —— 这与「还没跑过清点」不是一回事）。</div>
+      <label class="wa-row"><input id="wa-cap-enabled" type="checkbox" ${capOn() ? 'checked' : ''}/> 启用存储压力面</label>
       <div class="wa-row">
         <button class="wa-btn" id="wa-cap-oblig" title="义务清点：十二源的未完成项（读口优先 —— 各模块自己的 pending()/overdue() 才是真源）">义务清点</button>
         <button class="wa-btn" id="wa-cap-water" title="水位栏：逐容器实占 / 声明上限 / 占比 / 站点。capDeclared 缺登记时如实报 null，不猜一个上限出来">水位</button>
@@ -2930,12 +3112,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-cap-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'perfbase', '性能基线面与三档</div><div class="wa-dim">（O3：这一局属于哪一档、离冻结预算多远）', `
+      ${foldSec('tools', 'perfbase', '性能基线面与三档</div><div class="wa-dim">（O3：这一局属于哪一档、离冻结预算多远）', () => `
       <div class="wa-dim">档位<b>只认现场字节读数</b>（存档字节 + 已满容器数），不拍阈值 —— 拍出来的档位会与字节读数必然漂移。
         预算表是装载时对宿主 <code>perfTrace.CLASS_DEF</code> 的深拷贝，<b>每次读都比一次</b>（冻结不是抄一份），漂移当场可见。
         <b>实机采样栏一律留空</b>并列出必测项：把同机放大估计填进实测栏，下一个读者就再也分不出「手机上 60ms」与「桌上机估算 60ms」。
-        此刻：<b>${pblOn ? '开' : '关'}</b>。</div>
-      <label class="wa-row"><input id="wa-pbl-enabled" type="checkbox" ${pblOn ? 'checked' : ''}/> 启用性能基线面</label>
+        此刻：<b>${pblOn() ? '开' : '关'}</b>。</div>
+      <label class="wa-row"><input id="wa-pbl-enabled" type="checkbox" ${pblOn() ? 'checked' : ''}/> 启用性能基线面</label>
       <div class="wa-row">
         <button class="wa-btn" id="wa-pbl-bands" title="三档定义与当前档位：判据串一并与现场读数作对照，判不出时如实报 no-bytes（不默认成小局）">当前档位</button>
         <button class="wa-btn" id="wa-pbl-budget" title="冻结预算表：逐档预算与重复次数，并与装载时的冻结值逐项比对（drift 计数即漂移量）">预算表</button>
@@ -3341,7 +3523,91 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-chw-history" title="章节史：最近若干章的起止与收尾注（有界 20 章）；说清是被裁剪还是真的只有这些">章节史</button>
         <button class="wa-btn" id="wa-chw-src" title="数据来源自证：六个源的在场性与启用态、各自读了几条；缺席的如实报缺">数据来源</button>
       </div>
-      <div id="wa-chw-out" class="wa-out"></div>`;
+      <div id="wa-chw-out" class="wa-out"></div>`
+      // v2.231.0（优化 OPT-7）：本页 = Y2 六枚只读段 + OPT-7 大纲注入段（编辑→预览→采纳→撤销）。
+      //   为什么在渲染器内部拼接、而不去改 RENDERERS 表里那一行：本仓有门禁把「页表项」
+      //   与「渲染器函数」按字面锁成一对（Y2 专锁 A2b/A8）。为新增一段去动那条既有契约
+      //   是不划算的；拼接在渲染器内部，两边同时成立。
+      + outlineInjectPanel();
+  }
+  // v2.231.0（优化 OPT-7）：大纲注入 —— 「编辑 → 预览差异 → 采纳 → 实际注入」路径
+  //
+  // ── 现场（开工前实测，不是阅读推断）────────────────────────────────────
+  //   `engines/outline-inject.js` 的 `plan()` 返回体里 `applied:0` / `writes:0` 是
+  //   **恒值字面量**，全仓没有任何一处把动作落到宿主世界书 —— 这条链在真实使用时
+  //   「算得出该建哪条，但永远没建」；而面板上连这个计划都看不见（`outlineInject`
+  //   在 ui/panel.js 里**零命中**，实测）。
+  //
+  // ── 本段与「只读」的关系（**显式改口径，不是偷改**）────────────────────
+  //   Y2 立页时本页是**纯只读**页（上面六枚一律零写口）。OPT-7 原文要求「在**既有
+  //   章节工作台**提供编辑→预览差异→采纳→实际注入」，因此本段与那六枚**不同规**：
+  //     · 六枚只读按钮：零写口、零 store.transact（Y2 边界，逐条不变）；
+  //     · 本段四枚：**有且仅有一个写口** —— `WA.outlineInject.apply()`，且它只经
+  //       「采纳」触发。「预览差异」读真源、**零写入**。
+  //   为什么可以这样而不破 Y2 的边界：本段写的**不是世界状态**（不是 store、不是拍账、
+  //   不是章节），而是**宿主世界书里本插件自己的条目** —— 边界 1/3/4（不新增并行拍
+  //   状态 / 不跨章合并 / 不自动清理玩家数据）一条都没碰；Y2 的 C2「活世界逐字不变」
+  //   在本段仍然成立（`apply` 只写宿主世界书，不动 `WA.store`）。
+  //   代价如实登记：本段落进 Y2 专锁的**豁免名单**（逐条附理由），而不是把那条判据删掉
+  //   ——「本页零写口」这条口径仍然守着上面六枚，只是不再假装覆盖整页。
+  //
+  // ── 四条纪律（与引擎第九条同规，逐条有判据咬）────────────────────────
+  //   ① **预览不等于生效**：预览走 `preview()`，读宿主真源、以真读列表重算计划，
+  //      给出 `willLand` / `blocked` 与「此刻采纳成不成」，**零写入**。
+  //   ② **采纳是唯一写口**：只有「采纳注入」调 `apply()`，且**写后复查**（引擎复查
+  //      三件事，任一不满足即 verify-failed，面板如实显示失败原因，不假装成功）。
+  //   ③ **能改旧条目的前提如实报出**：`updateCapability` 缺席时面板**先说**「这台宿主
+  //      改不了旧条目，采纳会被整体拒收」—— 不让人点一个注定失败的按钮。
+  //   ④ **撤销到上一版本**：上一版本就在世界书里（被禁用的旧条目 = 历史），`undo()`
+  //      做一次对称交换；没有上一版本时如实报 `no-previous`，不伪造。
+  //   另：本段**不写任何 store 键**（引擎第十条：重启清零是有意的代价）。
+  // ══════════════════════════════════════════════════════════════════════
+  function outlineInjectPanel() {
+    let cfg = null, stat = null, capKind = null, book = null;
+    try { cfg = WA.outlineInject.getSettings(); } catch (e) { cfg = null; }
+    try { stat = WA.outlineInject.stat(); } catch (e) { stat = null; }
+    if (WA.outlineInject && typeof WA.outlineInject.updateCapability === 'function') {
+      let TH = null;
+      try { TH = (WA.mainWin && WA.mainWin.TavernHelper) ? WA.mainWin.TavernHelper : null; } catch (e) { TH = null; }
+      try { const c = WA.outlineInject.updateCapability(TH); capKind = c ? c.kind : null; } catch (e) { capKind = null; }
+    }
+    if (WA.wbInject && typeof WA.wbInject.findCompanionName === 'function') {
+      try { book = WA.wbInject.findCompanionName(); } catch (e) { book = null; }
+    }
+    const on = !!(cfg && cfg.enabled);
+    const capText = capKind
+      ? '<b>' + esc(String(capKind)) + '</b>（可改旧条目 ⇒ 采纳能真正退掉旧大纲）'
+      : '<b>缺席</b>（这台宿主没有改旧条目的能力：<code>updateWorldbookWith</code> / <code>replaceWorldbook</code> 都不在 —— '
+        + '此刻采纳会被<b>整体拒收</b> <code>no-update-api</code>，本页不替你静默降级成「只建新的、旧的留着」）';
+    const stText = stat
+      ? ('计划 ' + esc(String(stat.planned)) + ' · 已落 ' + esc(String(stat.applied))
+        + ' · 复查通过 ' + esc(String(stat.verified)) + ' · 撤销 ' + esc(String(stat.undone))
+        + ' · 拒收 ' + esc(String(stat.applyRefused)))
+      : '<span class="wa-dim">读数不可用</span>';
+    return `
+      <div class="wa-sec">大纲注入（OPT-7）—— 编辑 → 预览差异 → 采纳 → 实际注入</div>
+      <div class="wa-dim">（大纲是<b>元信息</b>，不进正文：本段把它写成宿主世界书里的一条条目，
+        并保证台面上<b>永远只有一条生效</b> —— 旧的那条被置为<b>禁用</b>而不是删除，所以它同时就是
+        「上一版本」。此刻：<b>${on ? '开' : '关'}</b>、注入位置 <code>${esc(String((cfg && cfg.position) || '—'))}</code>
+        / order ${esc(String((cfg && cfg.order) == null ? '—' : cfg.order))}
+        / depth ${esc(String((cfg && cfg.depth) == null ? '—' : cfg.depth))}。
+        绑定世界书：${book ? '<code>' + esc(String(book)) + '</code>' : '<span class="wa-dim">读不出（采纳会被拒收 no-book）</span>'}。</div>
+      <div class="wa-item">改旧条目的能力：${capText}</div>
+      <div class="wa-item">引擎台账（内存，重载清零）：${stText}</div>
+      <div class="wa-row">
+        <textarea id="wa-oi-text" class="wa-input" rows="4" placeholder="把大纲包进模板标签，例如 &lt;outline&gt;下一章：让信物到手&lt;/outline&gt;（取最后一次闭合的那段）"></textarea>
+      </div>
+      <div class="wa-row">
+        <select id="wa-oi-mode" class="wa-input wa-w60" aria-label="注入模式">
+          <option value="create" selected>新建条目（旧条目一律禁用）</option>
+          <option value="overwrite">覆盖最新（只顶最新的那份生效）</option>
+        </select>
+        <button class="wa-btn" id="wa-oi-view" title="只看引擎此刻的口径与宿主能力（不读世界书、不写入）">看口径</button>
+        <button class="wa-btn" id="wa-oi-preview" title="预览差异：真读宿主世界书，回答「此刻采纳会成，还是会撞上 entry-missing」—— 零写入">预览差异</button>
+        <button class="wa-btn" id="wa-oi-apply" title="采纳并实际注入：唯一写口，写后复查；失败如实报原因，不假装成功">采纳注入</button>
+        <button class="wa-btn" id="wa-oi-undo" title="撤销到上一有效版本：把当前生效的禁回去、把世界书里序号最大的被禁用条目启用回来（对称交换，不新增存档键）">撤销到上一版</button>
+      </div>
+      <div id="wa-oi-out" class="wa-out"></div>`;
   }
   // v2.199.0（Y4）：待办中心 —— 把「现在等我做什么」做成一个面
   //
@@ -3942,7 +4208,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
    * @param {string} page  页 id(必须与 WA.panelFold.SECTIONS 里的 page 逐字一致)
    * @param {string} sec   段 id(同上)
    * @param {string} label 段的可见标题(用于按钮的可访问名)
-   * @param {string} body  段体(**收起时不会被拼接**)
+   * @param {string|Function} body  段体(**收起时不会被拼接**)。
+   *   v2.231.0（优化 OPT-9）：**允许传函数** —— 传函数时只在**展开分支**调用它。
+   *   为什么必须支持函数形态：模板字面量作为**参数**在调用前就求值完了，
+   *   于是「收起」只省下了 HTML 拼接，段体里的读数（getSettings / kinds …）照读。
+   *   现场实测：收起态下 7 个专家段的读数全被调用，占整页渲染 4.1 ms / 54.6 ms。
+   *   计划原文点名的那条正是「折叠区按展开惰性求值」。
    */
   function foldSec(page, sec, label, body) {
     // v2.225.0(Q8)收口:这里**直写** `WA.panelFold.isCollapsed(...)`,不经中间变量。
@@ -3963,8 +4234,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       + ' aria-label="' + esc(String(label)) + ' 折叠或展开"'
       + ' title="' + esc(col ? '展开这一段(点开后才会构建它的控件)' : '收起这一段(收起后它的控件不构建,页面更轻)') + '"'
       + '>' + esc(t) + '</button>';
-    if (!known) return btn + '<div class="wa-fold-b" data-foldb="' + esc(key) + '">' + body + '</div>';
-    return btn + (col ? '' : '<div class="wa-fold-b" data-foldb="' + esc(key) + '">' + body + '</div>');
+    // v2.231.0（OPT-9）：**只有真要在这次渲染里拼接时**才求值 ——
+    //   `typeof body === 'function'` 是惰性形态（段体的读数与拼接一并推迟到这一刻）。
+    //   非函数形态（旧调用方）逐字照旧：字符串参数在调用前已求值，行为与本版之前一致。
+    const html = function () { return (typeof body === 'function') ? body() : body; };
+    if (!known) return btn + '<div class="wa-fold-b" data-foldb="' + esc(key) + '">' + html() + '</div>';
+    return btn + (col ? '' : '<div class="wa-fold-b" data-foldb="' + esc(key) + '">' + html() + '</div>');
   }
   function stageOut(target, html) {
     if (!target) return false;
@@ -4137,7 +4412,19 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           ? WA.panelFold.toggle(k.slice(0, p), k.slice(p + 1)) : { ok: false, reason: 'fold-module-missing' };
         //   拒收必须让人看见(表外的段名不许静默无效)—— 与 navGo 的拒收同规格。
         if (!r.ok) { if (WA.log) WA.log('warn', '折叠被拒收:' + String(r.reason), k); return; }
+        // v2.231.0（优化 OPT-9）：**折叠是就地动作，不该把同页别处的输入冲掉**。
+        //   现场实测（/tmp/probe_opt9.js ③）：折一个别的段之后，同页输入框的值变成空 ——
+        //   因为折叠走整页重绘（收起态不拼接 body，必须重绘才生效），而重绘换掉整块 body。
+        //   抓 / 放只在这一处：`renderBody` 也被「数据变了要重绘」的路径调用，那些路径
+        //   **本该**用新值覆盖输入框（如载入存档之后）—— 把保留做成全局默认，会让
+        //   「载入之后输入框还是旧的」变成没人看得见的缺陷。
+        const __foldBody = panelEl.querySelector('.wa-body');
+        const __foldSnap = (WA.panelFold && typeof WA.panelFold.snapshot === 'function')
+          ? WA.panelFold.snapshot(__foldBody) : null;
         renderBody();
+        if (__foldSnap && __foldSnap.ok === true && WA.panelFold && typeof WA.panelFold.restore === 'function') {
+          WA.panelFold.restore(panelEl.querySelector('.wa-body'), __foldSnap, {});
+        }
       };
     });
     bindNavs(panelEl);
@@ -4517,6 +4804,100 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       if (act === 'created' || act === 'updated') renderBody();
     });
     on('#wa-npc-add', () => { const v = $('#wa-npc-name').value.trim(); if (v) { WA.registry.register(v); renderBody(); } });
+    // v2.231.0（优化 OPT-3）：独白推演的四个显式出口。
+    //   本轮把「按需调用 + 允许不行动」做进引擎后，新导出（getSettings/stat/resetStat/resetMemo）
+    //   若无人消费，就等于「能力实现了但玩家碰不到」。本仓既有裁决是「给导出接上消费方，
+    //   或删掉它」——不选「登记进账本了事」。
+    on('#wa-mo-on', () => {
+      const el = $('#wa-mo-on'); const out = $('#wa-mo-out'); if (!el || !WA.monologue) return;
+      try {
+        WA.monologue.setSettings({ enabled: !!el.checked });
+        if (out) out.innerHTML = '<div class="wa-log wa-log-info">独白推演已' + (el.checked ? '启用' : '关闭') + '（关闭时零请求、零注入）</div>';
+      } catch (e) { if (out) out.textContent = '切换失败：' + (e && e.message); }
+    });
+    on('#wa-mo-stat', () => {
+      const out = $('#wa-mo-out'); if (!out || !WA.monologue) return;
+      try {
+        const st = WA.monologue.stat();
+        // 本轮实际会推几个人：plan() 是「本地收窄」的唯一出口，面板直接消费它，
+        //   于是「为什么这轮不发请求」在界面上是可见的（不是靠引擎日志猜）。
+        const pl = WA.monologue.plan(WA.registry.list());
+        const plTxt = '本轮需推 ' + esc(String(pl.need.length)) + ' 人 · 复用 '          + esc(String(pl.reuse.length)) + ' 人 · 跳过（未提及）' + esc(String(pl.skipped.length)) + ' 人'; + esc(String(st.prescreenCalls))
+          + ' 次 · 独白 ' + esc(String(st.roleplayCalls)) + ' 次 · 复用 ' + esc(String(st.reused))
+          + ' 条 · 跳过未提及 ' + esc(String(st.skippedNoMention)) + ' 人 · 观望 ' + esc(String(st.holdLines))
+          + ' 条 · 缓存 ' + esc(String(st.memo)) + ' 条（上轮需推 ' + esc(String(st.lastNeed))
+          + ' / 预筛选中 ' + esc(String(st.lastPicked)) + '）<br/>' + plTxt + '</div>';
+      } catch (e) { out.textContent = '读取读数失败：' + (e && e.message); }
+    });
+    on('#wa-mo-reset', () => {
+      const out = $('#wa-mo-out'); if (!out || !WA.monologue) return;
+      try {
+        const r = WA.monologue.resetStat();
+        out.innerHTML = '<div class="wa-log wa-log-info">✓ 已重置独白读数（' + esc(String(r.entries)) + ' 项；缓存未动）</div>';
+      } catch (e) { out.textContent = '重置读数失败：' + (e && e.message); }
+    });
+    // v2.231.0（优化 OPT-6）：关系图谱的五个显式出口。
+    //   为什么要接：本项把「存档为唯一真源 / 有向立场 / 事件引用去重」做进引擎后，
+    //   新导出（persisted/directedOf/reload）若无人消费就是「能力实现了但碰不到」。
+    const relOut = function (html) { const o = $('#wa-rel-out'); if (o) o.innerHTML = html; };
+    on('#wa-rel-edge', () => {
+      if (!WA.relationGraph) return;
+      const a = ($('#wa-rel-a') || {}).value; const b = ($('#wa-rel-b') || {}).value;
+      try {
+        const r = WA.relationGraph.get(a, b);
+        if (!r.ok) return relOut('<div class="wa-log wa-log-warn">查边被拒：' + esc(String(r.reason)) + '</div>');
+        if (!r.edge) return relOut('<div class="wa-log wa-log-info">这两家还没有边（edgeId ' + esc(String(r.id)) + '）</div>');
+        const e = r.edge;
+        relOut('<div class="wa-log wa-log-info">' + esc(e.participants.join(' ⇄ ')) + ' · ' + esc(e.typeLabel)
+          + ' · ' + esc(e.relationshipLabel) + ' · 权重 ' + esc(String(e.weight)) + '（' + esc(e.weightLabel) + '）'
+          + (e.named ? '' : '（尚未命名）') + '</div>');
+      } catch (e) { relOut('<div class="wa-log wa-log-warn">查边失败：' + esc(e && e.message) + '</div>'); }
+    });
+    on('#wa-rel-dir', () => {
+      if (!WA.relationGraph || typeof WA.relationGraph.directedOf !== 'function') return;
+      const a = ($('#wa-rel-a') || {}).value; const b = ($('#wa-rel-b') || {}).value;
+      try {
+        const ab = WA.relationGraph.directedOf(a, b);
+        const ba = WA.relationGraph.directedOf(b, a);
+        const line = function (r) {
+          if (!r.ok) return esc(String(r.reason));
+          return esc(r.from + '→' + r.to) + '：' + (r.stance ? esc(r.stance) : '未登记立场')
+            + (r.reasonText ? '（' + esc(r.reasonText) + '）' : '');
+        };
+        relOut('<div class="wa-log wa-log-info">' + line(ab) + '<br/>' + line(ba) + '</div>');
+      } catch (e) { relOut('<div class="wa-log wa-log-warn">查立场失败：' + esc(e && e.message) + '</div>'); }
+    });
+    on('#wa-rel-reload', () => {
+      if (!WA.relationGraph || typeof WA.relationGraph.reload !== 'function') return;
+      try {
+        const r = WA.relationGraph.reload();
+        relOut('<div class="wa-log wa-log-info">✓ 已从存档重建：边 ' + esc(String(r.edges)) + ' 条 · 事件引用 '
+          + esc(String(r.events)) + ' 条 · 有向立场 ' + esc(String(r.directed)) + ' 对</div>');
+      } catch (e) { relOut('<div class="wa-log wa-log-warn">重建失败：' + esc(e && e.message) + '</div>'); }
+    });
+    on('#wa-rel-stat', () => {
+      if (!WA.relationGraph) return;
+      try {
+        const st = WA.relationGraph.stat(); const p = WA.relationGraph.persisted();
+        relOut('<div class="wa-log wa-log-info">入账 ' + esc(String(st.upserts)) + ' 次 · 落盘成功 '
+          + esc(String(st.persisted)) + ' / 失败 ' + esc(String(st.persistFailed)) + ' · 事件引用新增 '
+          + esc(String(st.eventsAdded)) + ' / 去重 ' + esc(String(st.eventsDup)) + ' · 重建 '
+          + esc(String(st.reloads)) + ' 次<br/>存档 边 ' + esc(String(p.edges)) + ' · 事件 '
+          + esc(String(p.events)) + ' · 本会话索引 ' + esc(String(p.memory)) + '</div>');
+      } catch (e) { relOut('<div class="wa-log wa-log-warn">读台账失败：' + esc(e && e.message) + '</div>'); }
+    });
+    on('#wa-rel-reset', () => {
+      if (!WA.relationGraph) return;
+      try { WA.relationGraph.resetStat(); relOut('<div class="wa-log wa-log-info">✓ 已重置关系图谱读数（存档未动）</div>'); }
+      catch (e) { relOut('<div class="wa-log wa-log-warn">重置失败：' + esc(e && e.message) + '</div>'); }
+    });
+    on('#wa-mo-memo', () => {
+      const out = $('#wa-mo-out'); if (!out || !WA.monologue) return;
+      try {
+        const r = WA.monologue.resetMemo();
+        out.innerHTML = '<div class="wa-log wa-log-info">✓ 已清空独白缓存（' + esc(String(r.dropped)) + ' 条；下一轮重新推演）</div>';
+      } catch (e) { out.textContent = '清缓存失败：' + (e && e.message); }
+    });
     // v2.54.0：只操作已有势力或人物；余额不足时拒绝转移。
     // v2.55.0：长线伏笔只报欠账，不自动回收。
     const llVal = function (id) { return ((($(id) || {}).value) || '').trim(); };
@@ -4798,6 +5179,321 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       let r = null; try { r = WA.recipe.seed(recVal('#wa-rec-name')); } catch (e) { return recOut({ ok: false, reason: 'seed-throw' }, true); }
       // 取用制：不调 seed 就一个字节都不进上下文；这条回执是它被取用的唯一痕迹。
       recOut(Object.assign({}, r, { id: r.ok ? (r.scene.id + ':' + r.index + '/' + r.count) : r.id }), true);
+    });
+    // v2.231.0（优化 OPT-8）：世界词汇面读数（只读）。
+    //   计划原文点名「面板、供应链、注入与实际结算读同一配置」—— 本按钮是**面板侧的读取面**：
+    //   它读的正是执行器读的那几口（`economy.money` / `recipeKeys` / `fate.judgeView`），
+    //   故「面板显示信用点、结算仍扣银元」这种分家在结构上不可能发生。
+    //   四态如实分列：未声明（沿用旧常量，合法）/ 用声明的维度 / 已关闭 / 声明写坏了。
+    on('#wa-lex-view', () => {
+      if (!WA.recipe || typeof WA.recipe.satisfied !== 'function') return recOut({ ok: false, reason: 'module-missing' }, true);
+      const name = recVal('#wa-rec-name') || (WA.recipe.statView().name || '');
+      const eco = (WA.economy && typeof WA.economy.money === 'function')
+        ? { money: WA.economy.money(), recipes: WA.economy.recipeKeys(), declared: !!(WA.economy.economySpec && WA.economy.economySpec()) }
+        : null;
+      const judge = (WA.fate && typeof WA.fate.judgeView === 'function') ? WA.fate.judgeView() : null;
+      const themes = WA.recipe.themeCatalog ? WA.recipe.themeCatalog() : null;
+      const ext = WA.recipe.extendedThemes ? WA.recipe.extendedThemes() : null;
+      const sat = name ? (function () { try { return WA.recipe.satisfied(name); } catch (e) { return null; } })() : null;
+      const themeN = themes ? Object.keys(themes).length : 0;
+      const extN = ext ? Object.keys(ext).length : 0;
+      // 自洽面**逐条印缺什么**（不汇总成一句「通过 / 不通过」—— 缺什么才是可处置的信息）
+      const satText = !sat ? '（未指定配方 ⇒ 不替人挑一张，填配方名再看）'
+        : (sat.ok ? ('自洽 ' + (sat.satisfied ? '通过' : '不通过')
+          + ' · 缺 ' + ((sat.missing || []).length ? sat.missing.map(function (x) { return x.kind + ':' + x.id; }).join('/') : '无')
+          + ' · 核不了 ' + ((sat.unknown || []).length ? sat.unknown.map(function (x) { return x.kind; }).join('/') : '无')
+          + ' · 沿用旧常量 ' + ((sat.fallback || []).length ? sat.fallback.map(function (x) { return x.kind; }).join('/') : '无'))
+          : '自洽核对拒收：' + (sat.reason || '未知原因'));
+      const text = '世界词汇 · 配方 ' + (name || '（未生效）')
+        + ' · 货币 ' + (eco ? eco.money : '（economy 未装载）')
+        + ' · 配方 ' + (eco && eco.recipes ? eco.recipes.length + ' 条（' + eco.recipes.join('/') + '）' : '—')
+        + ' · ' + (eco && eco.declared ? '声明面生效' : '未声明 ⇒ 沿用旧常量（旧档余额不被换算）')
+        + ' · 判定 ' + (judge ? (judge.enabled ? (judge.attrs.length + ' 维（' + judge.attrs.join('/') + '）') : '已关闭') : '（fate 未装载）')
+        + (judge && judge.dropped && judge.dropped.length ? ' · 过不了求值器的属性名 ' + judge.dropped.join('/') : '')
+        + ' · 题材 ' + themeN + ' 张（扩展 ' + extN + '）'
+        + ' · ' + satText;
+      panelEl.dataset.recOut = text;
+      const o = $('#wa-rec-out'); if (o) o.textContent = text;
+    });
+    // v2.231.0（拓展 EXP-1）：能力成长面（建账 / 练一次 / 取消 / 够不够 / 进度 / 诊断）。
+    //   本段只调 `WA.training` 的公开口；**取消的训练不加进度**是本面要点名的那条 ——
+    //   它走 `practice(..., {cancel:true})`，与「什么都不做」在读数上分开。
+    const trVal = function (id) { const el = $(id); return el ? String(el.value || '').trim() : ''; };
+    const trOut = function (t) {
+      panelEl.dataset.trOut = t;
+      const o = $('#wa-tr-out'); if (o) o.textContent = t;
+    };
+    if (panelEl.dataset.trOut) { const saved = $('#wa-tr-out'); if (saved) saved.textContent = panelEl.dataset.trOut; }
+    { const el = $('#wa-tr-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.training) return trOut('未记录：module-missing');
+        WA.training.setSettings({ enabled: !!el.checked });
+        renderBody();
+      };
+    }
+    on('#wa-tr-declare', () => {
+      if (!WA.training) return trOut('未记录：module-missing');
+      const stages = trVal('#wa-tr-stages');
+      const r = WA.training.declare(trVal('#wa-tr-name'), {
+        mode: trVal('#wa-tr-mode') || 'stage',
+        stageNames: stages ? stages.split(',').map(function (x) { return x.trim(); }).filter(Boolean) : [],
+        prereq: trVal('#wa-tr-prereq'),
+        prereqStage: parseFloat(trVal('#wa-tr-prereqstage'))
+      });
+      trOut(r.ok ? ('已建账 ' + r.name + '（' + r.mode + ' · 阶段 ' + r.stages + '）') : ('未建账：' + String(r.reason)));
+    });
+    on('#wa-tr-ables', () => {
+      if (!WA.training) return trOut('未记录：module-missing');
+      const rows = WA.training.abilitiesView();
+      trOut(rows.length
+        ? ('能力台账 ' + rows.length + ' 项 — ' + rows.map(function (a) {
+          return a.name + '(' + a.mode + (a.prereq ? ',前置:' + a.prereq + '@' + a.prereqStage : '') + ')'; }).join(' '))
+        : '能力台账空（还没建过账）');
+    });
+    on('#wa-tr-practice', () => {
+      if (!WA.training) return trOut('未记录：module-missing');
+      const r = WA.training.practice(trVal('#wa-tr-who'), trVal('#wa-tr-name'), {});
+      trOut(r.ok ? ('已练一次：' + r.who + '·' + r.ability + ' → ' + (r.mode === undefined ? '' : '')
+        + (r.stageName ? ('第 ' + r.stage + ' 阶（' + r.stageName + '）') : ('熟练度 ' + r.points))
+        + ' · 有效训练 ' + r.sessions + ' 次') : ('未记上：' + String(r.reason)));
+    });
+    on('#wa-tr-cancel', () => {
+      if (!WA.training) return trOut('未记录：module-missing');
+      const r = WA.training.practice(trVal('#wa-tr-who'), trVal('#wa-tr-name'), { cancel: true });
+      trOut(r.ok ? ('已取消一次：' + r.who + '·' + r.ability + ' —— **不加进度**（有效训练仍 ' + r.sessions + ' 次，取消 ' + (r.cancelled === undefined ? '?' : '已记') + '）')
+        : ('未记上：' + String(r.reason)));
+    });
+    on('#wa-tr-can', () => {
+      if (!WA.training) return trOut('未记录：module-missing');
+      const r = WA.training.can(trVal('#wa-tr-who'), trVal('#wa-tr-name'), parseFloat(trVal('#wa-tr-need')));
+      trOut(r.ok ? (r.who + '·' + r.ability + ' 门槛 ' + r.need + '（' + r.mode + '）：' + (r.pass ? '够' : '不够')
+        + ' — 现值 ' + (r.mode === 'stage' ? (r.have + (r.stageName ? '（' + r.stageName + '）' : '')) : r.have))
+        : ('问不了：' + String(r.reason)));
+    });
+    on('#wa-tr-progress', () => {
+      if (!WA.training) return trOut('未记录：module-missing');
+      const rows = WA.training.progress(trVal('#wa-tr-who'));
+      trOut(rows.length
+        ? ('进度 ' + rows.length + ' 条 — ' + rows.map(function (r) {
+          return r.who + '·' + r.ability + '=' + (r.mode === 'stage' ? (r.stage + (r.stageName ? '（' + r.stageName + '）' : '')) : r.points)
+            + '(练' + r.sessions + (r.cancelled ? '/取消' + r.cancelled : '') + ')'; }).join(' '))
+        : '还没有任何进度（没练过 —— 这与「这一面被关掉了」不是一回事）');
+    });
+    on('#wa-tr-diag', () => {
+      if (!WA.training) return trOut('未记录：module-missing');
+      const v = WA.training.view();
+      trOut('能力成长 · ' + (v.enabled ? '开' : '关') + ' · 两制 ' + v.modes.join('/')
+        + ' · 上限 声明 ' + v.maxAbilities + ' / 进度 ' + v.maxRows + ' / 熟练度 ' + v.pointsCap
+        + ' · 声明 ' + v.counts.abilities + ' 项 · 进度 ' + v.counts.rows + ' 条'
+        + ' · 建账 ' + v.stat.declares + ' · 有效训练 ' + v.stat.practices + ' · 取消 ' + v.stat.cancelled
+        + ' · 应用 ' + v.stat.applies + ' · 拒收 ' + v.stat.blocked
+        + (v.enabled ? '' : '（关着时不记也不判）'));
+    });
+    // v2.231.0（拓展 EXP-2）：唯一物件面（造一件 / 用一次 / 借出 / 装备 / 卸下 / 修理 / 清单 / 诊断）。
+    //   本段只调 `WA.gear` 的公开口；**按 id 操作**是本面要点名的那条 ——
+    //   同型号两件必须分得开，用坏一件不影响另一件。
+    const grVal = function (id) { const el = $(id); return el ? String(el.value || '').trim() : ''; };
+    const grNum = function (id) { const v = parseFloat(grVal(id)); return isFinite(v) ? v : undefined; };
+    const grOut = function (t) {
+      panelEl.dataset.grOut = t;
+      const o = $('#wa-gr-out'); if (o) o.textContent = t;
+    };
+    if (panelEl.dataset.grOut) { const saved = $('#wa-gr-out'); if (saved) saved.textContent = panelEl.dataset.grOut; }
+    { const el = $('#wa-gr-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.gear) return grOut('未记录：module-missing');
+        WA.gear.setSettings({ enabled: !!el.checked });
+        renderBody();
+      };
+    }
+    on('#wa-gr-make', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const r = WA.gear.make(grVal('#wa-gr-name'), {
+        holder: grVal('#wa-gr-holder'), durability: grNum('#wa-gr-dur') });
+      grOut(r.ok ? ('已造一件：' + r.name + ' · id ' + r.id + ' · 持有人 ' + (r.holder || '(无)') + ' · 耐久 ' + r.durability)
+        : ('未造上：' + String(r.reason)));
+    });
+    on('#wa-gr-slot-add', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const r = WA.gear.declareSlot(grVal('#wa-gr-slot'));
+      grOut(r.ok ? ('已声明槽位 ' + r.name + (r.replaced ? '（覆盖）' : '')) : ('未声明：' + String(r.reason)));
+    });
+    on('#wa-gr-slots', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const v = WA.gear.view();
+      grOut(v.slots.length ? ('槽位 ' + v.slots.length + ' 个 — ' + v.slots.map(function (s) { return s.name; }).join('/'))
+        : '世界还没声明任何槽位（没声明的槽 equip 会拒收 no-such-slot —— 这是刻意的：装备槽按需启用）');
+    });
+    on('#wa-gr-use', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const r = WA.gear.use(grVal('#wa-gr-id'), { by: grVal('#wa-gr-by'), wear: grNum('#wa-gr-wear') });
+      grOut(r.ok ? ('用过一次：' + r.name + '（' + r.id + '）· 次数 ' + r.uses + ' · 耐久 ' + r.durability
+        + (r.wornOut ? ' —— **已耗尽**' : '')) : ('没用上：' + String(r.reason)));
+    });
+    on('#wa-gr-canuse', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const r = WA.gear.canUse(grVal('#wa-gr-id'), grVal('#wa-gr-by'));
+      grOut(r.ok ? (r.who + ' 对 ' + r.name + '：' + (r.pass ? '能用' : '不能用')
+        + (r.why ? '（' + r.why + '）' : '') + ' — 持有人 ' + (r.holder || '(无)') + ' · 耐久 ' + r.durability)
+        : ('问不了：' + String(r.reason)));
+    });
+    on('#wa-gr-lend', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const r = WA.gear.lend(grVal('#wa-gr-id'), grVal('#wa-gr-to'), { from: grVal('#wa-gr-by') });
+      grOut(r.ok ? ('已借出：' + r.name + ' ' + r.from + ' → ' + r.to + '（原持有人当场失去使用权）')
+        : ('未借出：' + String(r.reason)));
+    });
+    on('#wa-gr-equip', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const r = WA.gear.equip(grVal('#wa-gr-id'), grVal('#wa-gr-slot'));
+      grOut(r.ok ? ('已装备：' + r.name + ' → 槽「' + r.slot + '」（持有人 ' + r.holder + '）')
+        : ('未装上：' + String(r.reason)));
+    });
+    on('#wa-gr-unequip', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const r = WA.gear.unequip(grVal('#wa-gr-id'));
+      grOut(r.ok ? ('已卸下：' + r.name + '（原槽 ' + r.was + '）') : ('未卸下：' + String(r.reason)));
+    });
+    on('#wa-gr-repair', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const r = WA.gear.repair(grVal('#wa-gr-id'), { by: grVal('#wa-gr-by'),
+        material: grVal('#wa-gr-mat'), amount: grNum('#wa-gr-amt') });
+      grOut(r.ok ? ('已修好：' + r.name + ' · 耐久 ' + r.durability + ' · 用掉 ' + r.material + '×' + r.spent + ' · 修过 ' + r.repairs + ' 次')
+        : ('未修好：' + String(r.reason)));
+    });
+    on('#wa-gr-list', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const rows = WA.gear.list(grVal('#wa-gr-holder'));
+      grOut(rows.length
+        ? ('物件 ' + rows.length + ' 件 — ' + rows.map(function (x) {
+          return x.id + '(' + x.name + ',' + (x.holder || '无主') + ',' + x.carry
+            + (x.slot ? '/' + x.slot : '') + ',耐久' + x.durability + '/' + x.maxDurability + ',用' + x.uses + ')'; }).join(' '))
+        : '还没有任何物件（没造过 —— 这与「这一面被关掉了」不是一回事）');
+    });
+    on('#wa-gr-diag', () => {
+      if (!WA.gear) return grOut('未记录：module-missing');
+      const v = WA.gear.view();
+      grOut('唯一物件 · ' + (v.enabled ? '开' : '关') + ' · 携带三态 ' + v.carries.join('/')
+        + ' · 上限 物件 ' + v.maxItems + ' / 槽 ' + v.maxSlots + ' / 耐久 ' + v.maxDurability
+        + ' · 物件 ' + v.counts.items + ' 件 · 槽 ' + v.counts.slots + ' 个'
+        + ' · 造 ' + v.stat.made + ' · 用 ' + v.stat.used + ' · 借 ' + v.stat.lent
+        + ' · 修 ' + v.stat.repaired + ' · 装 ' + v.stat.equipped + ' · 拒收 ' + v.stat.blocked
+        + (v.enabled ? '' : '（关着时不记也不判）'));
+    });
+    // v2.231.0（拓展 EXP-3）：持续生产面（设施 / 工单 / 排班 / 补料 / 推进 / 停工复工 / 交货 / 取消）。
+    //   本段只调 `WA.production` 的公开口；**首日不出货**与**完工只入库一次**是本面要点名的两条 ——
+    //   前者靠「工期没走完一律 not-done」，后者靠幂等账（重试时逐样跳过已入库的）。
+    const pdVal = function (id) { const el = $(id); return el ? String(el.value || '').trim() : ''; };
+    const pdNum = function (id) { const v = parseFloat(pdVal(id)); return isFinite(v) ? v : undefined; };
+    const pdOut = function (t) {
+      panelEl.dataset.pdOut = t;
+      const o = $('#wa-pd-out'); if (o) o.textContent = t;
+    };
+    if (panelEl.dataset.pdOut) { const saved = $('#wa-pd-out'); if (saved) saved.textContent = panelEl.dataset.pdOut; }
+    { const el = $('#wa-pd-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.production) return pdOut('未记录：module-missing');
+        WA.production.setSettings({ enabled: !!el.checked });
+        renderBody();
+      };
+    }
+    on('#wa-pd-fac-add', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.declareFacility(pdVal('#wa-pd-fac'), { slots: pdNum('#wa-pd-slots') });
+      pdOut(r.ok ? ('已声明设施 ' + r.name + '（工位 ' + r.slots + (r.replaced ? ' · 覆盖' : '') + (r.clamped ? ' · 已夹到上限' : '') + '）')
+        : ('未声明：' + String(r.reason)));
+    });
+    on('#wa-pd-facs', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const v = WA.production.view();
+      pdOut(v.facilities.length
+        ? ('设施 ' + v.facilities.length + ' 个 — ' + v.facilities.map(function (f) {
+          return f.name + '(' + f.used + '/' + f.slots + ')'; }).join(' '))
+        : '世界还没声明任何设施（没声明的设施上开不出工单 —— 这是刻意的：设施按需启用）');
+    });
+    on('#wa-pd-open', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.open({
+        recipe: pdVal('#wa-pd-recipe'), qty: pdNum('#wa-pd-qty'), days: pdNum('#wa-pd-days'),
+        by: pdVal('#wa-pd-by'), facility: pdVal('#wa-pd-fac'), place: pdVal('#wa-pd-place') });
+      pdOut(r.ok ? ('已开工单 ' + r.id + '：' + r.recipe + ' ×' + r.qty + ' · 工期 ' + r.days + ' 天 · 每天 '
+        + JSON.stringify(r.perDay) + ' · 整单 ' + JSON.stringify(r.need) + '（产出要等工期走完才交得出）')
+        : ('未开上：' + String(r.reason)));
+    });
+    on('#wa-pd-advance', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.advance(pdVal('#wa-pd-id'));
+      pdOut(r.ok ? ('推进 ' + r.moved + ' 天：' + r.done + '/' + r.days + ' · 状态 ' + r.status
+        + (r.readyToDeliver ? ' —— **可以交货了**' : ''))
+        : ('未推进：' + String(r.reason) + (r.status ? '（状态 ' + r.status + '）' : '')
+          + (r.material ? ' —— 第 ' + r.day + ' 天缺 ' + r.material + '（需 ' + r.need + '，手上 ' + r.have + '）' : '')));
+    });
+    on('#wa-pd-pause', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.pause(pdVal('#wa-pd-id'));
+      pdOut(r.ok ? ('已停工：' + r.id + '（' + r.done + '/' + r.days + ' · 原因 ' + r.why + '）') : ('未停工：' + String(r.reason)));
+    });
+    on('#wa-pd-resume', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.resume(pdVal('#wa-pd-id'));
+      pdOut(r.ok ? ('已复工：' + r.id + '（' + r.done + '/' + r.days + '）' + (r.changed === false ? ' —— 本来就在跑（无操作）' : ''))
+        : ('未复工：' + String(r.reason)));
+    });
+    on('#wa-pd-resupply', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.resupply(pdVal('#wa-pd-id'), {
+        material: pdVal('#wa-pd-mat'), amount: pdNum('#wa-pd-amt'), by: pdVal('#wa-pd-by') });
+      pdOut(r.ok ? ('已预留 ' + r.material + ' ×' + r.amount + '（从 ' + r.by + ' 手里扣进本单预留池）· 池内 '
+        + JSON.stringify(r.reserve)) : ('未预留：' + String(r.reason)));
+    });
+    on('#wa-pd-staff', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.staff(pdVal('#wa-pd-id'), pdVal('#wa-pd-who'), { shift: pdVal('#wa-pd-shift') });
+      pdOut(r.ok ? ('已排班：' + r.who + ' · 时段 ' + r.shift + '（本单 ' + r.crew + ' 人）' + (r.replaced ? ' · 覆盖' : ''))
+        : ('未排上：' + String(r.reason) + (r.busy ? '（占用者 ' + r.busy + '）' : '')));
+    });
+    on('#wa-pd-deliver', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.deliver(pdVal('#wa-pd-id'), {
+        place: pdVal('#wa-pd-place'), routeId: pdVal('#wa-pd-route') });
+      pdOut(r.ok ? ('已交货：' + r.id + ' → ' + r.place + ' · 入库 ' + JSON.stringify(r.made)
+        + (r.skipped && Object.keys(r.skipped).length ? ' · 重试跳过已入库 ' + JSON.stringify(r.skipped) : '')
+        + (r.shipped ? ' · 物流 ' + (r.shipped.ok ? '已发 ' + r.shipped.id : '未发 ' + r.shipped.reason) : ''))
+        : ('未交货：' + String(r.reason) + (r.status ? '（状态 ' + r.status + '）' : '')));
+    });
+    on('#wa-pd-cancel', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const r = WA.production.cancel(pdVal('#wa-pd-id'));
+      pdOut(r.ok ? ('已取消：' + r.id + ' · 退回 ' + JSON.stringify(r.returned) + ' 给 ' + r.by
+        + '（已推进 ' + r.done + '/' + r.days + ' 天如实保留）') : ('未取消：' + String(r.reason)));
+    });
+    on('#wa-pd-list', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const rows = WA.production.list({});
+      pdOut(rows.length
+        ? ('工单 ' + rows.length + ' 张 — ' + rows.map(function (x) {
+          return x.id + '(' + x.recipe + '×' + x.qty + ',' + x.done + '/' + x.days + ',' + x.status
+            + (x.facility ? '@' + x.facility : '') + ',预留' + JSON.stringify(x.reserve) + ')'; }).join(' '))
+        : '还没有任何工单（没开过 —— 这与「这一面被关掉了」不是一回事）');
+    });
+    on('#wa-pd-view', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const v = WA.production.view();
+      pdOut('在产 ' + v.counts.open + ' 张 / 共 ' + v.counts.jobs + ' 张 · 已交货 ' + v.counts.delivered
+        + ' · 设施 ' + v.facilities.map(function (f) { return f.name + ' ' + f.used + '/' + f.slots; }).join(' / ')
+        + ' · 状态集 ' + v.statuses.join('/'));
+    });
+    on('#wa-pd-diag', () => {
+      if (!WA.production) return pdOut('未记录：module-missing');
+      const v = WA.production.view();
+      pdOut('持续生产 · ' + (v.enabled ? '开' : '关') + ' · 状态 ' + v.statuses.join('/')
+        + '（占工位 ' + v.openStatus.join('/') + '）· 上限 单 ' + v.maxJobs + ' / 设施 ' + v.maxFacilities
+        + ' / 班次 ' + v.maxCrew + ' / 工期 ' + v.maxDays + ' 天'
+        + ' · 工单 ' + v.counts.jobs + ' 张（在产 ' + v.counts.open + ' · 已交 ' + v.counts.delivered + '）· 设施 ' + v.counts.facilities + ' 个'
+        + ' · 开 ' + v.stat.opened + ' · 排 ' + v.stat.staffed + ' · 补 ' + v.stat.resupplied
+        + ' · 推 ' + v.stat.advanced + ' · 停 ' + v.stat.paused + ' · 复 ' + v.stat.resumed
+        + ' · 交 ' + v.stat.delivered + ' · 取消 ' + v.stat.cancelled + ' · 拒收 ' + v.stat.blocked
+        + (v.enabled ? '' : '（关着时不记也不判）'));
     });
     on('#wa-opp-run', () => {
       if (!WA.opportunity) return recOut({ ok: false, reason: 'module-missing' }, true);
@@ -9149,6 +9845,10 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           + Math.round(st.windowMs / 60000) + ' 分钟 · 边 ' + st.triggers + ' / 看门 ' + st.guards + '</div>'
           + '<div class="wa-item">计数:候选 ' + st.calls + ' · 链读 ' + st.historyOf
           + ' · 组包 ' + st.assemblies + ' · 超容 ' + st.capacity + ' · 查无 ' + st.absents + '</div>'
+          // v2.231.0(OPT-1):召回/分列三项常驻读数 —— 「越窗召回了多少」与「分列了多少槽位」
+          //   在界面上必须看得见(与「被预算丢掉 ≠ 本来就没有」同一条纪律)。
+          + '<div class="wa-item">v2.231.0(OPT-1):回忆词 ' + (st.recallHints || 0) + ' 条 · 越窗召回 '
+          + (st.recalledRows || 0) + ' 行 · 分列包 ' + (st.splitPacks || 0) + '</div>'
           + (st.lastReason ? '<div class="wa-dim">最近一次:' + esc(st.lastReason) + '</div>' : '')
           + (fk ? '<div class="wa-dim">故障分布:' + fk + '</div>' : ''));
       });
@@ -9175,12 +9875,19 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         const r = WA.retrieval.candidates(q);
         if (!r.ok) return rtOut('<div class="wa-log wa-log-warn">' + esc(rtWhy(r.reason)) + '</div>');
         if (r.empty) return rtOut('<div class="wa-log wa-log-warn">三边皆无命中 —— 这是「没检索到」,不是「没发生过」</div>');
-        rtOut('<div class="wa-dim">OR 规则 · 共 ' + r.total + ' 条(因果 ' + r.counts.causal
+        // v2.231.0(OPT-1):本轮输入**是不是在问旧事**直接显出来(recallWanted 的产品消费点)
+        //   —— 「模型为什么突然想起旧账」与「用户问的就是旧账」必须分得开。
+        const askOld = (typeof WA.retrieval.recallWanted === 'function')
+          ? WA.retrieval.recallWanted(q.text) : false;
+        rtOut('<div class="wa-dim">OR 规则'
+          + (askOld ? ' · 回忆意图(词表 ' + ((WA.retrieval.RECALL_HINTS || []).length) + ' 条):超窗命中已召回' : '')
+          + ' · 共 ' + r.total + ' 条(因果 ' + r.counts.causal
           + ' / 提及 ' + r.counts.mentioned + ' / 场景 ' + r.counts.scene + ')</div>'
           + r.rows.map(function (x) {
             return '<div class="wa-item">[' + esc(x.trigger) + '] ' + esc(String(x.text).slice(0, 120))
               + '<div class="wa-dim">命中 ' + esc(x.hit) + ' · ' + esc(x.why)
               + (x.reverted ? ' · 此槽位有替换历史' : '')
+              + (x.recalled ? ' · 已召回(越窗)' : '')
               + (x.stale ? ' · 超窗' : '') + '</div></div>';
           }).join(''));
       });
@@ -9700,6 +10407,85 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       const out = $('#wa-diag-out'); if (!out || !WA.floorChanges) return;
       try { WA.floorChanges.reset(); out.innerHTML = '<div class="wa-log wa-log-info">✓ 已清空楼层变更窗口（只清观测记录，世界状态与派生数据未动）</div>'; }
       catch (e) { out.textContent = '清空失败：' + (e && e.message); }
+    };
+    // v2.231.0（优化 OPT-5）：楼层结算账的三个显式出口。
+    //   「看范围」只读（中间楼被删后「后面还有几楼、动了哪些键」）；
+    //   「退回最后一笔」是**唯一会写世界**的按钮，且逐键判指纹、冲突如实报；
+    //   「清空记账」只清账本，不动世界（与 floorChanges 的「清空变更窗口」同口径）。
+    const fstList = $('#wa-fst-list');
+    if (fstList) fstList.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.floorSettle) return;
+      try {
+        const rows = WA.floorSettle.list();
+        const last = rows.length ? rows[rows.length - 1].floor : null;
+        const sc = (last == null) ? null : WA.floorSettle.scopeOf(last);
+        let html = '<div class="wa-log wa-log-info">楼层结算账：' + esc(String(rows.length)) + ' 笔'
+          + (last == null ? '（还没有记账）' : '（最近一笔在第 ' + esc(String(last)) + ' 楼）') + '</div>';
+        html += rows.slice(-8).reverse().map(function (r) {
+          return '<div class="wa-item">第 ' + esc(String(r.floor)) + ' 楼 <span class="wa-tag">' + esc(r.state) + '</span>'
+            + '<div class="wa-dim">改 ' + esc(String(r.changed)) + ' 键：' + esc((r.keys || []).join('/') || '—') + '</div></div>';
+        }).join('') || '<div class="wa-empty">无记账</div>';
+        if (sc && sc.floors) {
+          html += '<div class="wa-item">该楼之后还有 <b>' + esc(String(sc.floors)) + '</b> 楼结算过'
+            + '<div class="wa-dim">涉及键：' + esc((sc.keys || []).join('/') || '—')
+            + '（本面板**不自动退**：中间楼被删时退哪一段要人来定）</div></div>';
+        }
+        out.innerHTML = html;
+      } catch (e) { out.textContent = '读取楼层结算账失败：' + (e && e.message); }
+    };
+    const fstRb = $('#wa-fst-rollback');
+    if (fstRb) fstRb.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.floorSettle) return;
+      try {
+        const rows = WA.floorSettle.list().filter(function (r) { return r.state === 'live'; });
+        if (!rows.length) { out.innerHTML = '<div class="wa-log wa-log-warn">没有可退的记账（live 为 0）</div>'; return; }
+        const r = WA.floorSettle.rollback(rows[rows.length - 1].floor);
+        out.innerHTML = '<div class="wa-log wa-log-' + (r.ok ? 'info' : 'warn') + '">'
+          + (r.ok ? '✓ 已退回第 ' + esc(String(r.floor)) + ' 楼：' + esc(String(r.restored)) + ' 键'
+            : '未退回（' + esc(String(r.reason)) + '）')
+          + (r.conflicts ? ' · 冲突 ' + esc(String(r.conflicts)) + ' 键未动（被后续楼层改过）' : '') + '</div>';
+      } catch (e) { out.textContent = '退回失败：' + (e && e.message); }
+    };
+    const fstOn = $('#wa-fst-on');
+    if (fstOn) fstOn.onchange = () => {
+      const out = $('#wa-diag-out'); if (!WA.floorSettle) return;
+      try {
+        WA.floorSettle.setSettings({ enabled: !!fstOn.checked });
+        if (out) out.innerHTML = '<div class="wa-log wa-log-info">✓ 楼层结算记账已' + (fstOn.checked ? '启用' : '关闭')
+          + '（关闭后轮边界一律拒收 disabled：不记也不退）</div>';
+      } catch (e) { if (out) out.textContent = '切换失败：' + (e && e.message); }
+    };
+    const fstFrom = $('#wa-fst-from');
+    if (fstFrom) fstFrom.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.floorSettle) return;
+      try {
+        const rows = WA.floorSettle.list().filter(function (r) { return r.state === 'live'; });
+        if (!rows.length) { out.innerHTML = '<div class="wa-log wa-log-warn">没有可退的记账（live 为 0）</div>'; return; }
+        // 「从该楼起全退」默认作用于最近一笔：面板不替用户猜「哪一楼算起点」，
+        //   要退更早的一段请先点「看范围」确认后面还有几楼。
+        const r = WA.floorSettle.rollbackFrom(rows[rows.length - 1].floor);
+        out.innerHTML = '<div class="wa-log wa-log-' + (r.ok ? 'info' : 'warn') + '">'
+          + '从第 ' + esc(String(rows[rows.length - 1].floor)) + ' 楼起退回：' + esc(String(r.floors)) + ' 楼'
+          + (r.ok ? '' : '（部分失败：' + esc((r.reports || []).map(function (x) { return x.reason; }).join('、')) + '）')
+          + '</div>';
+      } catch (e) { out.textContent = '全线退回失败：' + (e && e.message); }
+    };
+    const fstStat = $('#wa-fst-stat');
+    if (fstStat) fstStat.onclick = () => {
+      const out = $('#wa-diag-out'); if (!WA.floorSettle) return;
+      try {
+        WA.floorSettle.resetStat();
+        if (out) out.innerHTML = '<div class="wa-log wa-log-info">✓ 已重置楼层结算读数（记账与世界状态均未动）</div>';
+      } catch (e) { if (out) out.textContent = '重置读数失败：' + (e && e.message); }
+    };
+    const fstReset = $('#wa-fst-reset');
+    if (fstReset) fstReset.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out || !WA.floorSettle) return;
+      try {
+        const r = WA.floorSettle.reset();
+        out.innerHTML = '<div class="wa-log wa-log-info">✓ 已清空楼层结算账（' + esc(String(r.dropped))
+          + ' 笔；世界状态未动，只是「退不回去了」）</div>';
+      } catch (e) { out.textContent = '清空失败：' + (e && e.message); }
     };
     const ltBtn = $('#wa-lt-refresh');
     if (ltBtn) ltBtn.onclick = () => {
@@ -11938,6 +12724,101 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + '<div class="wa-dim">七个源里 <b>章节 / 拍账 / 拍回报 / 闸门 / 待办</b>是本页立页的五个真源；'
         + '伏笔与编年史视图是「收章欠什么」的旁证。全部只读 —— 本页零 <code>store.transact</code>。</div>');
     });
+    // ── v2.231.0（优化 OPT-7）：大纲注入四枚（看口径 / 预览差异 / 采纳注入 / 撤销到上一版）──
+    //   与上面六枚**不同规**，如实写明：这四枚里有**一个写口** —— `WA.outlineInject.apply()`，
+    //   且只由「采纳注入」触发。为什么不破 Y2 的边界：它写的不是世界状态（不动 `WA.store`、
+    //   不动拍账、不动章节），而是**宿主世界书里本插件自己的条目**；Y2 的 C2「活世界逐字
+    //   不变」在本段仍成立。代价已如实登记进 Y2 专锁的豁免名单（不删那条判据）。
+    //   四枚一律**先判在场、再判开关、最后动手**：缺席 ⇒ 报缺（不是空表）；关着 ⇒ 报关；
+    //   写失败 ⇒ 如实报拒收码（`verify-failed` / `no-update-api` / `entry-missing` …），
+    //   **不把「我调用过」写成「它生效了」**。全程零 store.transact。
+    const oiOut = function (html) { const o = $('#wa-oi-out'); if (o) o.innerHTML = html; };
+    const oiMiss = function (label) { oiOut('<div class="wa-log wa-log-err">' + esc(label) + '未加载 —— 本段读的是它的口径与写口，缺席时不拿空表冒充</div>'); };
+    //   模式 / 文本的**单一取法**（不给第二个真源）：每次动手都从控件现读，不缓存上一次的值。
+    const oiMode = function () { const el = $('#wa-oi-mode'); return (el && el.value) ? String(el.value) : 'create'; };
+    const oiText = function () { const el = $('#wa-oi-text'); return el ? String(el.value || '') : ''; };
+    on('#wa-oi-view', () => {
+      if (!WA.outlineInject || typeof WA.outlineInject.view !== 'function') return oiMiss('大纲注入引擎');
+      const v = WA.outlineInject.view() || {};
+      const st = (typeof WA.outlineInject.stat === 'function') ? (WA.outlineInject.stat() || {}) : {};
+      let cap = null;
+      try {
+        const TH = (WA.mainWin && WA.mainWin.TavernHelper) ? WA.mainWin.TavernHelper : null;
+        const c = WA.outlineInject.updateCapability(TH);
+        cap = c ? c.kind : null;
+      } catch (e) { cap = null; }
+      oiOut('<div class="wa-log wa-log-info">引擎口径（只读：不读世界书、零写入）</div>'
+        + '<div class="wa-item">开关：<b>' + (v.enabled ? '开' : '关') + '</b>　模式：'
+        + Object.keys(v.modeLabel || {}).map(function (k) { return esc(k) + '=' + esc(String((v.modeLabel || {})[k])); }).join(' / ') + '</div>'
+        + '<div class="wa-item">标签 <code>' + esc(String(v.tag)) + '</code>　条目名前缀 <code>' + esc(String(v.bookSuffix)) + '</code>　位置 '
+        + esc(String(v.position)) + ' / order ' + esc(String(v.order)) + ' / depth ' + esc(String(v.depth)) + '</div>'
+        + '<div class="wa-item">改旧条目能力：' + (cap ? '<b>' + esc(String(cap)) + '</b>（可真正退掉旧大纲）' : '<b>缺席</b>（采纳会被整体拒收 <code>no-update-api</code>）') + '</div>'
+        + '<div class="wa-item">' + esc(String(v.applySemantics || '')) + '</div>'
+        + '<div class="wa-dim">台账：计划 ' + esc(String(st.planned)) + ' / 已落 ' + esc(String(st.applied)) + ' / 复查 ' + esc(String(st.verified))
+        + ' / 撤销 ' + esc(String(st.undone)) + ' / 拒收 ' + esc(String(st.applyRefused)) + '（内存，重载清零）</div>');
+    });
+    on('#wa-oi-preview', async () => {
+      if (!WA.outlineInject || typeof WA.outlineInject.preview !== 'function') return oiMiss('大纲注入引擎');
+      oiOut('<div class="wa-log wa-log-info">预览中…（读宿主真源，零写入）</div>');
+      let r = null;
+      try { r = await WA.outlineInject.preview(oiText(), { mode: oiMode() }); }
+      catch (e) { return oiOut('<div class="wa-log wa-log-err">预览抛出：' + esc(String((e && e.message) || e)) + '</div>'); }
+      if (!r || r.ok !== true) {
+        return oiOut('<div class="wa-log wa-log-warn">此刻采纳<b>不成</b>：' + esc(String((r && r.reason) || 'unknown')) + '</div>'
+          + '<div class="wa-dim">拒收码来自引擎（<code>disabled</code> / <code>bad-tag</code> / <code>no-tag</code> / <code>empty-body</code> / '
+          + '<code>no-th</code> / <code>no-book</code> / <code>no-update-api</code> / <code>entry-missing</code> …）—— 本页如实转述，不改写。'
+          + (r && r.blocked && r.blocked.length ? '<br>被拦下的条目：' + esc(r.blocked.join('、')) : '') + '</div>');
+      }
+      const p = r.plan || {};
+      const acts = (p.actions || []).map(function (a) {
+        return '<div class="wa-item">' + (a.action === 'create' ? '新建' : (a.action === 'set' ? '覆盖' : '禁用'))
+          + ' <code>' + esc(String(a.comment)) + '</code>' + (a.action === 'disable' ? '（退出生效，<b>不删除</b> —— 它就是「上一版本」）' : '') + '</div>';
+      }).join('');
+      oiOut('<div class="wa-log wa-log-info">预览差异（<b>尚未生效</b>：本步零写入，采纳才写）</div>'
+        + '<div class="wa-item">模式 ' + esc(String(p.modeLabel || p.mode || '')) + '　正文取到 ' + esc(String(p.chars)) + ' 字（标签取尾）</div>'
+        + '<div class="wa-item">内容预览：<pre class="wa-pre">' + esc(String(p.body || '').slice(0, 300)) + '</pre></div>'
+        + acts
+        + '<div class="wa-item">采纳后生效条目数：<b>' + esc(String(r.singleLive ? 1 : '?')) + '</b>（引擎保证台面单一生效）</div>'
+        + '<div class="wa-dim">真源：宿主世界书 <code>' + esc(String(r.book || '')) + '</code>（本步真读了它，且一条都没写）· 能力 ' + esc(String(r.cap || '')) + '</div>');
+    });
+    on('#wa-oi-apply', async () => {
+      if (!WA.outlineInject || typeof WA.outlineInject.apply !== 'function') return oiMiss('大纲注入引擎');
+      oiOut('<div class="wa-log wa-log-info">写入中…（写后复查；不假装成功）</div>');
+      let r = null;
+      //   ⚠ 第二参传**空列表**：引擎不采信调用方给的列表，它自己真读宿主（B5c 口径 ——
+      //   调用方误报「台面上没有旧条目」时也不重复建）。传空比传一份可能过期的快照更安全。
+      try { r = await WA.outlineInject.apply(oiText(), [], { mode: oiMode() }); }
+      catch (e) { return oiOut('<div class="wa-log wa-log-err">采纳抛出：' + esc(String((e && e.message) || e)) + '</div>'); }
+      if (!r || r.ok !== true) {
+        return oiOut('<div class="wa-log wa-log-err">采纳<b>失败</b>：' + esc(String((r && r.reason) || 'unknown')) + '</div>'
+          + '<div class="wa-dim">拒收码如实转述：<code>disabled</code>（总开关关着）/ <code>no-update-api</code>（宿主改不了旧条目）/ '
+          + '<code>entry-missing</code>（计划要改的条目不在真读到的世界书里）/ <code>verify-failed</code>（写后复查没过）/ '
+          + '<code>create-failed</code> / <code>update-failed</code> / <code>read-failed</code>。'
+          + '拒收发生在动手之前（或写入未通过复查）⇒ <b>台面上不会留半成品</b>。</div>');
+      }
+      oiOut('<div class="wa-log wa-log-info">已实际注入（写后复查通过）</div>'
+        + '<div class="wa-item">目标条目 <code>' + esc(String(r.target || '')) + '</code>　世界书 <code>' + esc(String(r.book || '')) + '</code>　能力 ' + esc(String(r.cap || '')) + '</div>'
+        + '<div class="wa-item">写入 ' + esc(String(r.writes)) + ' 处 · 生效条目数 <b>' + esc(String(r.liveAfter)) + '</b>（台面单一生效：' + (r.singleLive ? '是' : '<b>否</b>') + '）</div>'
+        + '<div class="wa-item">退出生效的旧大纲：' + (r.disabled && r.disabled.length ? esc(r.disabled.join('、')) + '（<b>禁用不删除</b> ⇒ 它就是「上一版本」，可撤销回来）' : '<span class="wa-dim">无（台面上原本没有生效条目）</span>') + '</div>'
+        + '<div class="wa-dim">复查三件：目标条目在场且启用 · 内容与计划逐字一致 · 被禁用的确已禁用。任一条不过 ⇒ 引擎报 <code>verify-failed</code>，本页不会显示「已注入」。</div>');
+    });
+    on('#wa-oi-undo', async () => {
+      if (!WA.outlineInject || typeof WA.outlineInject.undo !== 'function') return oiMiss('大纲注入引擎');
+      oiOut('<div class="wa-log wa-log-info">撤销中…（把当前生效的禁回去、把上一版本启用回来）</div>');
+      let r = null;
+      try { r = await WA.outlineInject.undo([], {}); }
+      catch (e) { return oiOut('<div class="wa-log wa-log-err">撤销抛出：' + esc(String((e && e.message) || e)) + '</div>'); }
+      if (!r || r.ok !== true) {
+        return oiOut('<div class="wa-log wa-log-warn">撤销<b>不成</b>：' + esc(String((r && r.reason) || 'unknown')) + '</div>'
+          + '<div class="wa-dim">两因如实分列：<code>no-previous</code>（世界书里没有被禁用的旧条目 ⇒ <b>真的没有上一版本</b>，不是「撤销失败」）/ '
+          + '<code>no-update-api</code>（宿主改不了旧条目 ⇒ 不做「建一条新的冒充回退」）。</div>');
+      }
+      oiOut('<div class="wa-log wa-log-info">已撤销到上一有效版本</div>'
+        + '<div class="wa-item">恢复生效：<code>' + esc(String(r.restored || '')) + '</code>　退出生效：' + (r.disabled && r.disabled.length ? esc(r.disabled.join('、')) : '<span class="wa-dim">无</span>') + '</div>'
+        + '<div class="wa-item">生效条目数 <b>' + esc(String(r.liveAfter)) + '</b>（台面单一生效：' + (r.singleLive ? '是' : '<b>否</b>') + '）· 世界书 <code>' + esc(String(r.book || '')) + '</code></div>'
+        + '<div class="wa-dim">对称交换：启用序号最大的被禁用条目、把当前生效的禁回去 —— 因此本功能<b>不新增任何存档键</b>（历史就存在世界书里）。</div>');
+    });
+
     // ── v2.199.0（Y4）：待办中心（六枚**只读**按钮）────────────────────────
     //   同本仓口径：全部走 `WA.<ns>.<口>` 字面形态；先判在场、再判开关、最后读。
     //   边界 1：**不是新的状态容器** —— 本页零 store.transact、零 pendingCenter.reset；

@@ -35,6 +35,16 @@
  *     也不允许负余额。成交**如实回报**，入账由调用方经 org 完成（本模块不替你记账）。
  *   · 本模块**不定汇率、不做跨地套利定价**：同一资源在不同地点各有各的基础价。
  *   · 总开关默认关闭；关闭时不入库、不定价、不成交、不推时段、不注入。
+ *
+ * ── v2.231.0（优化 OPT-8）：货币与配方改为**读当前世界的声明** ──────
+ *   现场缺口（开工前逐条复核）：`MONEY='银元'` 与两行配方是**写死的常量** ——
+ *   现代校园、历史、仙侠或科幻局都被底层固定词汇拉回同一种游戏（这是本项点名的
+ *   「部分执行器仍不消费题材配置」，不是「缺少模板系统」：recipe/theme 早就在）。
+ *   口径：真源在 `engines/recipe.js` 的配方声明（`economy.money` / `economy.goods` /
+ *   `economy.recipes`），本模块**读它**；未声明 ⇒ 原样沿用旧常量，
+ *   旧档语义逐字不变（**不自动把已有银元改名成另一种资产**）。
+ *   声明价目表里的资源**可免显式基础价**（表内价就是依据）；表外资源仍须显式给价
+ *   （`missing-base`）—— 少给一样都不算有据。
  */
 (function () {
   'use strict';
@@ -56,13 +66,48 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
-  const MONEY = '银元';
+  // ── 旧常量（**默认面**）：未声明题材配置时原样沿用，旧档语义逐字不变 ──
+  const MONEY_DEF = '银元';
   // 配方是具名表：**模型现编的合成关系不算**（否则「铁怎么变成面包」永远答不出）。
-  const RECIPES = {
+  const RECIPES_DEF = {
     '面包': { in: { '面粉': 1 }, out: { '面包': 2 } },
     '铁器': { in: { '铁': 2 }, out: { '铁器': 1 } }
   };
   const LANES = ['road', 'river', 'sea', 'rail'];
+
+  /**
+   * 当前世界的经济定义（v2.231.0 / OPT-8）。真源是 `engines/recipe.js` 的配方声明。
+   *   三条边界：
+   *     ① 未装载 / 未声明 / 声明形状不对 ⇒ **沿用旧常量**（不是拒收，也不是半用）；
+   *     ② 只读，**不改 stat** —— 它每笔交易都会被调，记账会让「看一眼」变成一次拒收；
+   *     ③ 声明里的非正价一律**丢掉**（0 会让带宽恒为 0，那比没声明更坏）。
+   */
+  function spec() {
+    // ⚠ 必须写**全限定名**：本仓引用面（inventory 的 REF_RE）只认 `WA.ns.mem` ——
+    //   写成别名（`const R = WA.recipe; R.economySpec()`）会让「真有消费方」在
+    //   死导出账本上读成「零引用」（实测：本轮首跑被判 4 项过度导出，全部是这个原因）。
+    if (!WA.recipe || typeof WA.recipe.economySpec !== 'function') return null;
+    let e = null;
+    try { e = WA.recipe.economySpec(); } catch (x) { e = null; }
+    return (e && e.ok) ? e : null;
+  }
+  function money() { const e = spec(); return (e && e.money) ? e.money : MONEY_DEF; }
+  function recipeTable() {
+    const e = spec();
+    const out = {};
+    if (e && e.recipes) Object.keys(e.recipes).forEach(function (k) { out[k] = e.recipes[k]; });
+    Object.keys(RECIPES_DEF).forEach(function (k) { if (!out[k]) out[k] = RECIPES_DEF[k]; });
+    return out;
+  }
+  function recipeOf(name) { return recipeTable()[clean(name, 40)] || null; }
+  function recipeKeys() { return Object.keys(recipeTable()); }
+  /** 声明价目表里的基准价（表外 ⇒ null，调用方须显式给价）。 */
+  function declaredBase(resource) {
+    const e = spec();
+    if (!e || !e.goods) return null;
+    const v = e.goods[clean(resource, 40)];
+    return (typeof v === 'number' && isFinite(v) && v > 0) ? v : null;
+  }
 
   const stat = { stocked: 0, priced: 0, bought: 0, crafted: 0, ticks: 0,
     blocked: 0, lastReason: '', faults: {} };
@@ -143,10 +188,16 @@
     if (n === null || n <= 0 || (n | 0) !== n) { noteFault('bad-qty'); return { ok: false, reason: 'bad-qty', qty: qty }; }
     const cfg = settings();
     const seen = findGoods(pl, res);
-    const base = num(o.base);
+    const asked = num(o.base);
+    if (asked !== null && asked <= 0) {
+      noteFault('missing-base');
+      return { ok: false, reason: 'missing-base', hint: '基础价必须是正数（显式给了非正数不回落成声明价）' };
+    }
+    // 没给价时**才**看当前世界的声明价目表（表内价就是依据；表外仍须显式给价）。
+    const base = (asked !== null) ? asked : declaredBase(res);
     if (!seen && (base === null || base <= 0)) {
       noteFault('missing-base');
-      return { ok: false, reason: 'missing-base', hint: '首次登记这件货必须给出基础价' };
+      return { ok: false, reason: 'missing-base', hint: '首次登记这件货必须给出基础价（或该资源已在当前题材的价目表内）' };
     }
     let out = null;
     WA.store.transact(function (draft) {
@@ -217,7 +268,7 @@
       return { ok: false, reason: 'price-out-of-band', price: unit, lo: band.lo, hi: band.hi };
     }
     const total = +(unit * n).toFixed(2);
-    const have = +((purse[MONEY] || 0)).toFixed(2);
+    const have = +((purse[money()] || 0)).toFixed(2);
     if (have < total) { noteFault('cannot-afford'); return { ok: false, reason: 'cannot-afford', want: total, have: have }; }
     if (g.stock < n) { noteFault('short-stock'); return { ok: false, reason: 'short-stock', resource: res, want: n, have: g.stock }; }
     let out = null;
@@ -229,7 +280,8 @@
       if (!p) { out = { ok: false, reason: 'missing-buyer', by: by }; return false; }
       const pur = (p.resources && typeof p.resources === 'object') ? p.resources : (p.resources = {});
       const now = clockNow('economy');
-      pur[MONEY] = +(((pur[MONEY] || 0) - total)).toFixed(2);
+      const cur = money();
+      pur[cur] = +(((pur[cur] || 0) - total)).toFixed(2);
       gg.stock -= n;
       gg.demand += n;
       gg.updatedAt = now;
@@ -240,7 +292,7 @@
       ec.orders.push(row);
       WA.evict.array(ec.orders, 'economy.orders', cfg.maxOrders);
       out = { ok: true, order: row.id, resource: res, qty: n, unit: unit, total: total,
-        balance: pur[MONEY], stock: gg.stock };
+        balance: pur[cur], currency: cur, stock: gg.stock };
     }, 'economy:buy');
     if (out && out.ok) { stat.bought++; stat.lastReason = 'bought'; }
     return out || { ok: false, reason: 'store-unavailable' };
@@ -253,8 +305,12 @@
     const n = num(o.times) === null ? 1 : num(o.times);
     if (!pl || !name || !by) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
     if (n === null || n <= 0 || (n | 0) !== n) { noteFault('bad-qty'); return { ok: false, reason: 'bad-qty', times: o.times }; }
-    const rec = RECIPES[name];
-    if (!rec) { noteFault('unknown-recipe'); return { ok: false, reason: 'unknown-recipe', recipe: name, known: Object.keys(RECIPES) }; }
+    const rec = recipeOf(name);
+    if (!rec) { noteFault('unknown-recipe'); return { ok: false, reason: 'unknown-recipe', recipe: name, known: recipeKeys() }; }
+    if (WA.research) {
+      const access = WA.research.canUse(by, name, { manufacture: true });
+      if (!access.ok) return access;
+    }
     const cfg = settings();
     const purse = purseOf(by);
     if (!purse) { noteFault('missing-maker'); return { ok: false, reason: 'missing-maker', by: by }; }
@@ -289,7 +345,8 @@
       ec.orders.push({ id: 'ord_' + now + '_' + ec.orders.length, kind: 'craft', at: now,
         place: pl, recipe: name, times: n, made: made, by: by });
       WA.evict.array(ec.orders, 'economy.orders', cfg.maxOrders);
-      out = { ok: true, recipe: name, times: n, made: made };
+      out = { ok: true, recipe: name, times: n, made: made,
+        recipeSource: spec() ? ('recipe:' + spec().name) : 'builtin' };
     }, 'economy:craft');
     if (out && out.ok) { stat.crafted++; stat.lastReason = 'crafted'; }
     return out || { ok: false, reason: 'store-unavailable' };
@@ -390,10 +447,10 @@
     const dest = findGoods(pl, res);
     // 目的地尚未登记时可随运建行，但**必须给出基础价**（同 stock 的不变式：无据的价不立）。
     //   不修这一条，新口岸永远进不了第一批货（而第一批货本来就没有历史价可循）。
-    const destBase = num(oo.base);
+    const destBase = (num(oo.base) !== null) ? num(oo.base) : declaredBase(res);
     if (!dest && (destBase === null || destBase <= 0)) {
       noteFault('missing-base');
-      return { ok: false, reason: 'missing-base', place: pl, resource: res, hint: '目的地首次进货必须给出基础价' };
+      return { ok: false, reason: 'missing-base', place: pl, resource: res, hint: '目的地首次进货必须给出基础价（或该资源已在当前题材的价目表内）' };
     }
     let out = null;
     WA.store.transact(function (draft) {
@@ -464,7 +521,10 @@
       + String.fromCharCode(10) + '价格只能落在上面写明的许可带内；库存不为负，没有回执的交付不算交付。';
   }
   WA.economy = {
-    MONEY: MONEY, RECIPES: RECIPES, LANES: LANES.slice(),
+    MONEY: MONEY_DEF, RECIPES: RECIPES_DEF, LANES: LANES.slice(),
+    // v2.231.0（OPT-8）：当前世界的经济定义（读配方声明；未声明 ⇒ 沿用上面两个旧常量）
+    //   消费方：面板（显示货币与配方）、诊断（读数）、供应链（未知配方带出的可选面）
+    economySpec: spec, money: money, declaredBase: declaredBase, recipeOf: recipeOf, recipeKeys: recipeKeys,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     stock: stock, price: price, buy: buy, craft: craft, tick: tick,
     route: route, markRoute: markRoute, ship: ship,

@@ -82,6 +82,22 @@
     // v2.140.0（F1）：防全知闸门。与注入分支**同批**登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
     //   插在 chrono 行**之前**（与 foreshadow 同款理由：chrono 行邻近字面量是锚点区，动它会触发 not-unique）。
+    // v2.231.0（拓展 EXP-4）：探索与地理发现。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
+    //   本模块的 buildBlock **只在设了 viewer 时才产内容**（无观察者 ⇒ 零 token），
+    //   故本源的开关默认值取 true 也不会给老用户凭空多出约束。
+    'survey',
+    // v2.231.0（拓展 EXP-5）：对抗场景。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
+    //   本模块的 buildBlock **只在设了 viewer 且他真参与过时才产内容**，
+    //   故本源的开关默认值取 true 也不会给老用户凭空多出约束。
+    'contest',
+    'ruling',
+    // v2.231.0（拓展 EXP-7）：公共活动。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
+    //   本模块的 buildBlock **只在设了 viewer 且他真报过名时才产内容**，
+    //   故本源的开关默认值取 true 也不会给老用户凭空多出约束。
+    'activity',
     'noesis',
     // v2.141.0（F2）：生理与照护真实层。与注入分支**同批**登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
@@ -197,6 +213,16 @@ style: false,
         foreshadow: true,
         // v2.140.0（F1）：防全知闸门。取默认 true（其模块总开关默认为关），
         //   不给老用户凭空多出约束。
+        // v2.231.0（拓展 EXP-4）：探索与地理发现。取默认 true（其模块总开关默认为关，
+        //   且未设 viewer 时 buildBlock 返回空串），不给老用户凭空多出约束。
+        survey: true,
+        // v2.231.0（拓展 EXP-5）：对抗场景。取默认 true（其模块总开关默认为关，
+        //   且未设 viewer / 没参与过时 buildBlock 返回空串），不给老用户凭空多出约束。
+        contest: true,
+        ruling: true,
+        // v2.231.0（拓展 EXP-7）：公共活动。取默认 true（其模块总开关默认为关，
+        //   且未设 viewer / 没报过名时 buildBlock 返回空串），不给老用户凭空多出约束。
+        activity: true,
         noesis: true,
         // v2.141.0（F2）：生理与照护真实层。取默认 true（其模块总开关默认为关），
         //   不给老用户凭空多出约束。
@@ -402,6 +428,16 @@ style: false,
     //   SOURCES（键）/ 注入分支 source 名 / 本表。三者名字逐字同名。
     foreshadow: '伏笔台账',
     // v2.140.0（F1）：防全知闸门显示名。SOURCES（键）/ 注入分支 source 名 / 本表三者逐字同名。
+    // v2.231.0（拓展 EXP-4）：探索与地理发现显示名。
+    //   SOURCES（键）/ 注入分支 source 名 / 本表三者逐字同名。
+    survey: '探索与地理发现',
+    // v2.231.0（拓展 EXP-5）：对抗场景显示名。
+    //   SOURCES（键）/ 注入分支 source 名 / 本表三者逐字同名。
+    contest: '对抗场景',
+    ruling: '案件裁决',
+    // v2.231.0（拓展 EXP-7）：公共活动显示名。
+    //   SOURCES（键）/ 注入分支 source 名 / 本表三者逐字同名。
+    activity: '公共活动',
     noesis: '知情边界',
     // v2.141.0（F2）：生理与照护真实层显示名。SOURCES（键）/ 注入分支 source 名 / 本表三者逐字同名。
     lifeline: '生理与照护',
@@ -588,6 +624,21 @@ style: false,
     floorSnapshot: 'worldaxis_floor_snapshot_settings_v1',
     memoryTiers: 'worldaxis_memory_tiers_settings_v1',
     lingqi: 'worldaxis_lingqi_settings_v1',
+    // v2.231.0（拓展 EXP-4）：探索与地理发现**确有**模块级总开关（同注册表 __REG.key）。
+    //   不登记会怎样：`moduleEnabled` 查不到键就返回 null，于是对账面上本源一律落在
+    //   `unavailable`（「没有模块级总开关」——而它明明有），用户勾了模块总开关却在
+    //   「开关两面一致」上看到「模块没加载」，排查方向被指错。
+    //   同一类漏登记已为 rumor/canon（v2.99.0）、chrono（v2.127.0）、reasoning/storyTone
+    //   （v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0）、sediment（v2.149.0）各付过一次学费。
+    survey: 'worldaxis_survey_settings_v1',
+    // v2.231.0（拓展 EXP-5）：对抗场景的模块级总开关键。不登记 ⇒ moduleEnabled 返回 null，
+    //   用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
+    contest: 'worldaxis_contest_settings_v1',
+    ruling: 'worldaxis_ruling_settings_v1',
+    // v2.231.0（拓展 EXP-7）：公共活动的模块级总开关键。不登记 ⇒ moduleEnabled
+    //   返回 null，用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，
+    //   排查方向被指错。
+    activity: 'worldaxis_activity_settings_v1',
   };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
@@ -1149,6 +1200,16 @@ style: false,
       if (vis.foreshadow && WA.foreshadow) { const fb = engineCall('foreshadow', function () { return WA.foreshadow.buildBlock(); }); if (fb) items.push({ source: '伏笔台账', content: fb }); }
       // v2.140.0（F1）：防全知闸门。只报**纪律与留痕计数**，不带任何具体秘密名 ——
       //   列出秘密名就是把未揭示剧情写进正文。本块是「只依据角色可知信息演绎」的引擎判据兜底。
+      // v2.231.0（拓展 EXP-4）：探索与地理发现。**只在设了 viewer 时才有内容** ——
+      //   未设观察者时 buildBlock 返回空串（不产全知版地图，这是本源的防泄露闸）。
+      if (vis.survey && WA.survey) { const sv = engineCall('survey', function () { return WA.survey.buildBlock(); }); if (sv) items.push({ source: '探索与地理发现', content: sv }); }
+      // v2.231.0（拓展 EXP-5）：对抗场景。**只在设了 viewer 且他真参与过时才有内容** ——
+      //   这是本源的防泄露闸：绝不产出「别人在打什么」的全知版战报。
+      if (vis.contest && WA.contest) { const cs = engineCall('contest', function () { return WA.contest.buildBlock(); }); if (cs) items.push({ source: '对抗场景', content: cs }); }
+      if (vis.ruling && WA.ruling) { const rg = engineCall('ruling', function () { return WA.ruling.buildBlock(); }); if (rg) items.push({ source: '案件裁决', content: rg }); }
+      // v2.231.0（拓展 EXP-7）：公共活动。**只在设了 viewer 且他真报过名时才有内容** ——
+      //   这是本源的防泄露闸：绝不产出「别人办什么活动、谁缺席」的全知版名单。
+      if (vis.activity && WA.activity) { const ac = engineCall('activity', function () { return WA.activity.buildBlock(); }); if (ac) items.push({ source: '公共活动', content: ac }); }
       if (vis.noesis && WA.noesis) { const no = engineCall('noesis', function () { return WA.noesis.buildBlock(); }); if (no) items.push({ source: '知情边界', content: no }); }
       // v2.141.0（F2）：生理与照护真实层。只报**程段与限制档**，不列症状细节 ——
       //   症状名会暗示剧情走向（与 noesis 同一条防剧透纪律）。

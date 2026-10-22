@@ -52,6 +52,10 @@
     };
     try {
       try { if (WA.store && contextSize) WA.store.transact(d => { d.meta = d.meta || {}; d.meta.contextSize = contextSize; }); } catch (e) { /* 预算推导用，失败不影响推演 */ }
+      // v2.231.0（优化 OPT-5）：**轮边界记账**——生成前抓世界键基线，after 链跑完逐键比出
+      //   「这一楼真正改了哪些键、改前是什么」。位置是硬约束：必须早于 before 链（链里就会推进
+      //   世界），且**晚于** settleGuard 的跳过判定（被跳过的轮不该留下一笔空账）。
+      try { if (WA.floorSettle) WA.floorSettle.beginRound(); } catch (e) { WA.log('warn', '楼层结算记账起点失败', e); }
       await WA.workflow.run('before', ctx);
     } catch (e) {
       WA.log('error', 'before链关键失败，本轮沿用上一份已确认世界状态', e);
@@ -128,6 +132,10 @@
                 await WA.workflow.run('after', actx);
                 // v0.7.0: 结算完成才记录楼层（批内提交，随批落盘；失败阻断则下轮重试）
                 if (WA.settleGuard && settleRec) WA.settleGuard.commit(settleRec);
+                // v2.231.0（优化 OPT-5）：after 链跑完 ⇒ 把「这一楼改了哪些世界键」落成存档账。
+                //   必须在 workflow.run('after') **之后**：链里才是真正的结算发生地；
+                //   也必须在 settleGuard.commit 之后（被跳过的轮不进这里，故不会记空账）。
+                try { if (WA.floorSettle) WA.floorSettle.endRound(); } catch (e) { WA.log('warn', '楼层结算记账失败', e); }
               };
               if (WA.store && WA.store.batch) await WA.store.batch(runAfter); else await runAfter();
             }
@@ -161,6 +169,13 @@
           ctx.eventSource.on(et.CHAT_CHANGED, () => {
             try { if (WA.render && WA.render.uninject) WA.render.uninject('chat-changed'); } catch (e) { WA.log('warn', 'chat uninject failed', e); }
             try { WA.store.init(); } catch (e) { WA.log('error', '切聊天重载store失败', e); }
+            // v2.231.0（优化 OPT-6）：切聊天 = 换了一份存档 ⇒ 关系图谱的内存索引必须
+            //   从**新存档**重建。不重建的话，上一个聊天的人物关系会留在表里冒充本聊天的
+            //   ——这是「单一持久来源」这一条最容易破的地方（store 重载了、模块缓存没跟上）。
+            try { if (WA.relationGraph && typeof WA.relationGraph.reload === 'function') WA.relationGraph.reload(); }
+            catch (e) { WA.log('warn', '切聊天重建关系图谱索引失败', e); }
+            try { if (WA.monologue && typeof WA.monologue.resetMemo === 'function') WA.monologue.resetMemo(); }
+            catch (e) { WA.log('warn', '切聊天清独白缓存失败', e); }
             WA.emit && WA.emit('chat:changed');
           });
         }
@@ -196,6 +211,9 @@
             ctx.eventSource.on(delEvt, function () {
               try { WA.floorChanges.onFloorEvent('deleted', { args: Array.prototype.slice.call(arguments) }); }
               catch (e) { WA.log('warn', '楼层删除记账失败', e); }
+              // v2.231.0（优化 OPT-5）：删**最后一楼** ⇒ 自闭环退回该楼结算；删中间楼 ⇒ 只出范围。
+              try { if (WA.floorSettle) WA.floorSettle.onFloorEvent('deleted', { args: Array.prototype.slice.call(arguments) }); }
+              catch (e) { WA.log('warn', '楼层结算退回失败', e); }
             });
             hooked++;
           }
@@ -203,6 +221,10 @@
             ctx.eventSource.on(edEvt, function () {
               try { WA.floorChanges.onFloorEvent('edited', { args: Array.prototype.slice.call(arguments) }); }
               catch (e) { WA.log('warn', '楼层编辑记账失败', e); }
+              // v2.231.0（优化 OPT-5）：编辑同样走一次「这一楼还 live 吗」——最后一楼被改
+              //   ⇒ 退回它的结算（新内容会重新结算一次），中间楼 ⇒ 只出范围。
+              try { if (WA.floorSettle) WA.floorSettle.onFloorEvent('edited', { args: Array.prototype.slice.call(arguments) }); }
+              catch (e) { WA.log('warn', '楼层编辑结算对账失败', e); }
             });
             hooked++;
           }

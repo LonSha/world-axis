@@ -23,6 +23,16 @@
 //      「他决定去做」与「那个决定还算不算数」两态不可分（否定式 ③）。
 //   ⑦ **同一时刻同时开工**：同一人可以有第二条 running ⇒ 「他在做什么」变成多值。
 //
+// 【v2.231.0（OPT-2）前提漂移：本轮实测逮住并修掉，如实留账】
+//   OPT-2 给 `tell` / `work` 接上了业务确认器，于是本锁第 [9] 节的两条判据前提变了：
+//     · ① 原来拿**无收件人**的 tell 当样本 ⇒ 现在它在 resolve 里先落 `missing-fields`
+//       （「传话缺收件人」），根本走不到确认器那一步。样本必须**补齐收件人与路线**，
+//       让判据重新落在「面在场时 tell 真被确认」这条口径上 —— 新判据同时给出
+//       「在途 ⇒ running（不冒充完成也不谎报失败）」与「面缺席 ⇒ 仍落 unconfirmed」两向。
+//     · ② `view().noConfirmer` 的语义已由**静态接线表**改成**运行时判定** ——
+//       静态表现在是空表（tell/work 都接了），运行时判定在面缺席时才把那一类报出来。
+//       原判据断的是静态表的字面量 `'tell,work'`，修法是断**新语义**（静态空 + 运行时自洽），
+//       而不是把断言删掉。
 // 每条判据两向自证：真源码成绿 / 就地破坏现形。
 //   N0 锚点在真源码恰 1 次 · N1 破坏现形 · N2 原版成绿 · N3 破坏互不串扰 · N4 判据非恒真。
 // 破坏只改内存副本（srcOverride），零文件改写。
@@ -119,6 +129,9 @@ function seed(WA, people, opts) {
   WA.world.addPlace({ name: '甲地', kind: 'public', open: 0, close: 9999999999999 });
   WA.world.addPlace({ name: '乙地', kind: 'public', open: 0, close: 9999999999999 });
   WA.world.addRoad('甲地', '乙地', 1, 0);
+  // v2.231.0（OPT-2）：**刻意不在夹具里挪人** —— 挪人会给 world.journeys 落一条行程，
+  //   而 [8] 的在途宽度判据正是读那张表（本轮实测：夹具挪人 ⇒ [8] 当场假红）。
+  //   需要「人已知在哪儿」的判据（传话发消息）自己在本节里走世界写口放人。
 }
 function addWait(WA, who, dur) {
   return WA.act.add(who, { kind: 'wait', text: '待着', goalId: 'g_' + who, duration: dur });
@@ -416,22 +429,59 @@ function judge(a) {
       && rowOf(WA, rp.id) && rowOf(WA, rp.id).from_ === x.id,
       'v2117/b1: [8] 改计划留痕（旧行 replanned + 新行指回旧行）');
   }
-  // ── ⑨ 无确认器 ⇒ 可见失败，不冒充完成（否定式 ①）──
+  // ── ⑨ 确认器面（v2.231.0 OPT-2 改口径）：**接了面就真确认；面缺席仍落 unconfirmed** ──
   {
+    // ⑨a 面在场：tell 有收件人与路线 ⇒ 走消息面 + 情报面，真被确认（不再是 unconfirmed）
     const WA = fresh(); seed(WA, ['测试']); const t = Date.now();
-    const tl = WA.act.add('测试', { kind: 'tell', text: '捎个话', goalId: 'g_测试', duration: 1000 });
+    // 发消息需要**已知起点**：本节自己走世界写口把人放到乙地（不进 seed，避免扰动 [8]）。
+    const dep = WA.world.depart('测试', '甲地', '乙地', t);
+    a(dep && dep.ok === true, 'v2117/b1: [9] 前置：人物已出发（世界写口）');
+    WA.world.arrive('测试', t + 10 * 60 * 1000);
+    //   ⚠ **不设 target**：它会变成 intel.addIntel 的 `about`，而 about 必须是
+    //     `causal.knownCause` 认得的原因，否则 intel 如实拒收 unknown-subject ——
+    //     那是「主语没在因果账上」，不是「获知失败」。
+    const tl = WA.act.add('测试', { kind: 'tell', text: '捎个话', to: '乙地',
+      goalId: 'g_测试', duration: 1000 });
     a(tl.ok === true, 'v2117/b1: [9] tell 类可登记');
     const ad = WA.act.admit(tl.id, t);
-    a(ad.ok === true, 'v2117/b1: [9] tell 类可准入（无确认器不妨碍开工）');
-    const r = WA.act.advance(t + 5000);
-    const row = rowOf(WA, tl.id);
-    a(r.failed === 1 && row.status === 'failed' && row.reason === 'unconfirmed'
-      && row.evidence === '' && r.completed === 0,
-      'v2117/b1: [9] 无确认器 ⇒ failed/unconfirmed 落成可见失败（实 ' + (row && row.reason) + '）');
-    const v = WA.act.view({});
-    a((v.noConfirmer || []).join(',') === 'tell,work' && v.confirmers && v.confirmers.meet === 'world.canBeAt',
-      'v2117/b1: [9] 哪些种类没有确认器如实带出（不许显示成「正常无事」）');
+    a(ad.ok === true, 'v2117/b1: [9] tell 类可准入');
+    // 消息在路上：这一轮**不得**报成 done，也不得报成 failed —— 在途是 running。
+    const r0 = WA.act.advance(t + 5000);
+    const row0 = rowOf(WA, tl.id);
+    //   ⚠ 断言看 `still` / `awaiting` 而不是 `result` / `evidence`：advance 的 running
+    //     分支**不写**这两个字段（它们是终态字段）—— 拿它们断言会把「在途」误判成「没接线」。
+    a(row0.status === 'running' && r0.failed === 0 && r0.still === 1,
+      'v2117/b1: [9] 消息在途 ⇒ 仍是 running（不冒充完成、也不谎报失败；实 '
+      + row0.status + ' still ' + r0.still + ' failed ' + r0.failed + '）');
+    a(r0.awaiting === 1, 'v2117/b1: [9] 待业务侧确认的笔数单列一栏（实 ' + r0.awaiting + '）');
+    // 送达之后：消息面 + 情报面双确认 ⇒ done
+    WA.world.tickCourier(t + 5000 + 9999999);
+    const r1 = WA.act.advance(t + 5000 + 9999999);
+    const row1 = rowOf(WA, tl.id);
+    a(row1.status === 'done' && row1.evidence === 'world.sendMessage+intel.addIntel',
+      'v2117/b1: [9] 送达且获知 ⇒ 真被确认（实 ' + row1.status + '/' + row1.evidence + '）');
+    a(r1.confirmed === 1 && r1.failed === 0, 'v2117/b1: [9] 业务确认做成的笔数单列一栏（实 ' + r1.confirmed + '）');
+    // ⑨b 面缺席：拆掉世界消息面 ⇒ 同一笔必须如实落 unconfirmed（否定式 ① 未被取消）
+    const WA2 = fresh(); seed(WA2, ['测试']); const t2 = Date.now();
+    const tl2 = WA2.act.add('测试', { kind: 'tell', text: '捎个话', to: '乙地', goalId: 'g_测试', duration: 1000 });
+    WA2.act.admit(tl2.id, t2);
+    const world0 = WA2.world;
+    try {
+      WA2.world = undefined;
+      const r2 = WA2.act.advance(t2 + 5000);
+      const row2 = rowOf(WA2, tl2.id);
+      a(row2.status === 'failed' && row2.reason === 'unconfirmed' && r2.unconfirmed === 1,
+        'v2117/b1: [9] 消息面缺席 ⇒ 仍落 failed/unconfirmed（实 ' + row2.status + '/' + row2.reason + '）');
+    } finally { WA2.world = world0; }
+    const v = WA2.act.view({});
+    a(Array.isArray(v.noConfirmer) && Array.isArray(v.noConfirmerStatic)
+      && v.noConfirmerStatic.length === 0 && v.confirmers
+      && v.confirmers.tell === 'world.sendMessage+intel.addIntel'
+      && v.confirmers.meet === 'world.canBeAt',
+      'v2117/b1: [9] 静态接线表已清空、运行时判定另成一栏（面缺席时由运行时那一栏报出；实 '
+      + JSON.stringify(v.noConfirmerStatic) + '/' + JSON.stringify(v.noConfirmer) + '）');
   }
+
   // ── ⑩ 注入块只报仍在进行的行动 ──
   {
     const WA = fresh(); seed(WA, ['测试']); const t = Date.now();

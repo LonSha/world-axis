@@ -84,9 +84,19 @@
   // **内置确认器**。表里没有的种类 = 没有确认器 ⇒ `unconfirmed` 可见失败。
   //   为什么只有两个：世界能确认「人到了」与「货转了」；其余三类（会面谈成什么、
   //   传话是否被听懂、工作成果如何）需要业务侧确认器，本版**不假装有**。
-  const CONFIRMERS = { move: 'world.journey', deliver: 'org.transfer', meet: 'world.canBeAt' };
+  //   v2.231.0（OPT-2）：`tell` / `work` **不再一律落 unconfirmed** —— 业务确认器已接线：
+  //     tell → 世界消息面（消息真送达）**且** 情报面（接收者真获知）；
+  //     work → 委托面（业务成果与工时结算的真实状态）。
+  //   「无确认器」这条否定式没有取消：**面缺席时照样如实落 unconfirmed**（不冒充完成）。
+  const CONFIRMERS = { move: 'world.journey', deliver: 'org.transfer', meet: 'world.canBeAt',
+    tell: 'world.sendMessage+intel.addIntel', work: 'commission.view' };
   // 需要外部确认器、但本版未接的种类（如实登记，供诊断与文档引用同一份真源）。
-  const NO_CONFIRMER = ['tell', 'work'];
+  //   v2.231.0（OPT-2）：**静态表已清空** —— 传话与工作接上了业务确认器
+  //   （见 CONFIRMERS 的 `world.sendMessage+intel.addIntel` 与 `commission.view`）。
+  //   常量本身保留：它是「哪些种类没接确认器」的单一真源，将来新增种类没接就加回这里。
+  //   ⚠ 与 `view().noConfirmer` 的分工：本常量是**静态接线表**，view 报的是**运行时判定**
+  //     —— 面当轮缺席时那一类会临时出现在读数里（「代码里接了」≠「这一刻真能确认」）。
+  const NO_CONFIRMER = [];
   // ── 合法不行动（v2.141.0 F2）────────────────────────────────────────
   //   缝合来源：BSW 动态受力推演约束引擎的推演原则（原文逐字）：
   //     「行动、拒绝行动、延迟行动与状态维持（即维持现状）均为合法的推演结果。」
@@ -153,7 +163,13 @@
   }
 
   const stat = { added: 0, admitted: 0, completed: 0, failed: 0, aborted: 0, replanned: 0,
-    deferred: 0, duplicates: 0, unconfirmed: 0, lastReason: '', faults: {},
+    deferred: 0, duplicates: 0,
+    // v2.231.0（OPT-2）：确认面三栏 ——
+    //   unconfirmed：落成「无确认器」的笔数（**此前这一栏从未被累加过**，是死计数；
+    //     本轮接活：口径 ① 的可见失败要有自己的账，否则「没做成」在读数上只剩 failed 一个总数）；
+    //   confirmed ：**靠业务确认器做成**的笔数（与「自己就完成了」的 wait/move 分开计）；
+    //   awaiting  ：到期但**业务侧还没交付**、如实留在待确认的笔数（不是失败，也不是完成）。
+    unconfirmed: 0, confirmed: 0, awaiting: 0, lastReason: '', faults: {},
     // v2.216.0（优化 Q7）：**凭据摘要面三个读数各自成栏**，不并进 duplicates ——
     //   ① archived：命中摘要、完整回执已被挤出（幂等**仍然生效**，不是失败）；
     //   ② digestSkipped：指纹面缺席因而未能留痕（如实降级，不假造一个可能撞的键）；
@@ -403,6 +419,9 @@
         status: 'planned', attempts: 0, opId: wantOp,
         spent: 0, left: duration, dueAt: 0, startedAt: 0, endedAt: 0,
         departed: false, arriveAt: 0,
+        // v2.231.0（OPT-2）：工作类可**显式挂钩**一份委托；没挂钩 ⇒ 到期落「待业务侧确认」。
+        //   msgId 是传话那一笔对应的世界消息 id（按 id 复查状态，不重发 —— 防同一条话发多份）。
+        contractId: str(it.contractId, 60), msgId: '',
         result: '', reason: '', evidence: '', blockedBy: '', from_: str(it.from_, 60),
         at: now
       };
@@ -567,8 +586,101 @@
       if (a && a.ok === true && b && b.ok === true) return { status: 'done', result: '双方到场条件成立（' + row.place + '）', evidence: 'world.canBeAt' };
       return { status: 'failed', result: '会面条件不成立：' + ((b && b.reason) || (a && a.reason) || 'unknown'), evidence: 'world.canBeAt', reason: (b && b.reason) || (a && a.reason) || 'unknown' };
     }
-    // tell / work：**没有内置确认器** ⇒ 可见失败，不冒充完成（否定式 ①）。
+    if (kind === 'tell') {
+      // v2.231.0（OPT-2）：传话的确认器是**两件事**，缺一不可 ——
+      //   ① 世界消息面：这条话真发出去了，并且**已送达**（在途不算做成）；
+      //   ② 情报面：接收者真的**获知**了（送达 ≠ 获知）。
+      //   两件都真 ⇒ done；消息在途 ⇒ running（**在途不是失败**，不谎报也不冒充）；面缺席 ⇒ unconfirmed。
+      const to = row.to || row.place;
+      if (!to) return { status: 'failed', result: '传话缺收件人', evidence: 'world.sendMessage', reason: 'missing-fields' };
+      if (!worldOf() || typeof worldOf().sendMessage !== 'function') {
+        return { status: 'failed', result: '无确认器：tell 需要世界消息面', evidence: '', reason: 'unconfirmed' };
+      }
+      // 发件地由**世界**答（`world.where`）：人可能已走到别处，拿行动登记时的地点会发错起点。
+      //   世界答不出（无行程）⇒ 退回行动登记的地点/人物；两者都没有 ⇒ 如实报 missing-fields，
+      //   不猜一个地名（「猜」与「查不到」在读数上必须分得开）。
+      const from = whereOf(row.person) || row.from || row.place || row.person;
+      const sent = messageOf(row, from, to);
+      if (!sent || sent.ok !== true) {
+        return { status: 'failed', result: '消息发不出：' + ((sent && sent.reason) || 'unknown'),
+          evidence: 'world.sendMessage', reason: (sent && sent.reason) || 'unknown' };
+      }
+      if (String(sent.status || '') !== 'arrived') {
+        return { status: 'running', result: '消息在途（' + to + '）', evidence: 'world.sendMessage' };
+      }
+      if (!WA.intel || typeof WA.intel.addIntel !== 'function') {
+        return { status: 'failed', result: '无确认器：tell 需要情报面', evidence: '', reason: 'unconfirmed' };
+      }
+      //   level 必须落在 intel.LEVELS 白名单内（`rumor|report|witness|record`）——
+      //   亲耳听到的第一手转告用 `witness`（confidence 75 ⇒ believed）；写词表外的值会被
+      //   intel 如实拒收 missing-fields，那不是「获知失败」而是「我们递了个非法档位」。
+      const item = { claim: row.text || (row.person + '有话带到'), source: row.person, level: 'witness' };
+      if (row.target) item.about = row.target;
+      const got = WA.intel.addIntel(to, item);
+      if (!got || got.ok !== true) {
+        return { status: 'failed', result: '获知未被接受：' + ((got && got.reason) || 'unknown'),
+          evidence: 'intel.addIntel', reason: (got && got.reason) || 'unknown' };
+      }
+      return { status: 'done', result: '已送达 ' + to + ' 并获知', evidence: 'world.sendMessage+intel.addIntel' };
+    }
+    if (kind === 'work') {
+      // v2.231.0（OPT-2）：工作的确认器是**委托面的真实状态**（业务成果与工时结算）。
+      //   没挂钩委托 ⇒ 到期落「待业务侧确认」（running）—— 不冒充完成，也不谎称失败：
+      //   「他做了活、交付还没走完」与「这件事没做成」是两回事（上游原文：判不了的自由文本工作保持待确认）。
+      if (!WA.commission || typeof WA.commission.view !== 'function') {
+        return { status: 'failed', result: '无确认器：work 需要委托面', evidence: '', reason: 'unconfirmed' };
+      }
+      const cv = workContractOf(row);
+      if (!cv) return { status: 'running', result: '工作已做，待业务侧交付确认', evidence: 'commission.pending' };
+      if (cv.status === 'settled') return { status: 'done', result: '委托已结清：' + cv.title, evidence: 'commission.view' };
+      if (cv.status === 'cancelled') {
+        return { status: 'failed', result: '委托已取消：' + cv.title, evidence: 'commission.view', reason: 'contract-cancelled' };
+      }
+      return { status: 'running', result: '委托进行中（' + cv.status + '）', evidence: 'commission.view' };
+    }
+    // 其余种类（将来新增、未接确认器）：**没有内置确认器** ⇒ 可见失败，不冒充完成（否定式 ①）。
     return { status: 'failed', result: '无确认器：' + kind + ' 需要业务侧确认', evidence: '', reason: 'unconfirmed' };
+  }
+  /**
+   * v2.231.0（OPT-2）：这一笔传话对应的世界消息。
+   *   已发过（`row.msgId`）就**按 id 复查状态**，不重发 —— 否则每次 advance 都再发一条，
+   *   收件人那边会收到同一句话的多份副本（「重放」在消息面上的形态）。
+   */
+  function messageOf(row, from, to) {
+    const mid = str(row.msgId, 60);
+    if (mid) {
+      const m = messages().filter(function (x) { return x && x.id === mid; })[0];
+      if (!m) return { ok: false, reason: 'message-missing' };
+      return { ok: true, id: m.id, status: m.status };
+    }
+    const w = worldOf();
+    const sent = w.sendMessage(from, to, { text: row.text || '', at: row.startedAt || undefined });
+    if (sent && sent.ok === true) row.msgId = sent.id;
+    return sent;
+  }
+  /** 这个人此刻在哪（世界答；答不出就是 null —— 不猜）。 */
+  function whereOf(person) {
+    const w = worldOf();
+    if (!w || typeof w.where !== 'function') return '';
+    try {
+      const r = w.where(person);
+      return (r && r.ok === true && r.place) ? String(r.place) : '';
+    } catch (e) { return ''; }
+  }
+  /** 世界消息表（只读；world 缺席即空表 —— 缺席由上层如实报，不在这里猜）。 */
+  function messages() {
+    const w = worldOf();
+    if (!w || typeof w.messages !== 'function') return [];
+    try { return w.messages() || []; } catch (e) { return []; }
+  }
+  /** 这一笔工作挂钩的委托读数。**没挂钩就是 null**（不按标题猜是哪一份委托）。 */
+  function workContractOf(row) {
+    const id = str(row.contractId, 60);
+    if (!id) return null;
+    try {
+      const cv = WA.commission.view(id);
+      return (cv && cv.ok === true) ? cv : null;
+    } catch (e) { return null; }
   }
 
   /**
@@ -582,7 +694,8 @@
     if (!isFinite(t)) return { ok: false, reason: 'bad-time' };
     const o = opts || {};
     const budget = (finite(o.max) > 0 && finite(o.max) <= cfg.maxRun) ? Math.floor(finite(o.max)) : cfg.maxRun;
-    let out = { changed: 0, completed: 0, failed: 0, still: 0, deferred: [], duplicates: 0, archived: 0 };
+    let out = { changed: 0, completed: 0, failed: 0, still: 0, unconfirmed: 0, awaiting: 0, confirmed: 0,
+      deferred: [], duplicates: 0, archived: 0 };
     mutate(storeOf(), function (draft) {
       const rows = (draft.acts && Array.isArray(draft.acts.rows)) ? draft.acts.rows : [];
       const res = (draft.acts && Array.isArray(draft.acts.res)) ? draft.acts.res : [];
@@ -613,12 +726,24 @@
         if (used >= budget) { out.deferred.push({ id: x.id, person: x.person, kind: x.kind, reason: 'budget', dueAt: x.dueAt }); return; }
         used++;
         const r = resolve(x, t) || { status: 'failed', result: 'unknown', evidence: '' };
-        if (r.status === 'running') { out.still++; return; }
+        // v2.231.0（OPT-2）：待业务侧确认的笔数与普通「仍在途中」**分开计** ——
+        //   「话已到、交付还没走完」与「人还在路上」是两件事，合并成一个 still 就分不出来了。
+        if (r.status === 'running') {
+          out.still++;
+          if (x.kind === 'tell' || x.kind === 'work') out.awaiting++;
+          return;
+        }
+        // 靠业务确认器做成（evidence 不是本模块自产的那几种）⇒ 单列一栏，与 wait/move 分开。
+        if (r.status === 'done' && r.evidence
+          && ['self', 'world.journey', 'org.transfer', 'world.canBeAt'].indexOf(r.evidence) < 0) out.confirmed++;
         x.status = r.status;
         x.result = str(r.result, 120);
         x.evidence = str(r.evidence, 40);
-        if (r.status === 'failed') { x.reason = str(r.reason || 'failed', 40); out.failed++; }
-        else { x.reason = ''; out.completed++; }
+        if (r.status === 'failed') {
+          x.reason = str(r.reason || 'failed', 40); out.failed++;
+          // v2.231.0（OPT-2）：口径 ① 的「可见失败」要有自己的账（此前该计数从未累加过）。
+          if (x.reason === 'unconfirmed') out.unconfirmed++;
+        } else { x.reason = ''; out.completed++; }
         x.spent = Math.max(0, Math.min(x.duration, t - x.startedAt));
         x.left = Math.max(0, x.duration - x.spent);
         x.endedAt = t;
@@ -629,6 +754,7 @@
     }, 'act:advance');
     out.changed = out.completed + out.failed;
     S.completed += out.completed; S.failed += out.failed;
+    S.unconfirmed += out.unconfirmed; S.confirmed += out.confirmed; S.awaiting += out.awaiting;
     S.deferred += out.deferred.length; S.duplicates += out.duplicates;
     S.lastReason = out.changed ? 'settled' : (out.still ? 'in-progress' : (out.deferred.length ? 'budget' : 'nothing-to-do'));
     return Object.assign({ ok: true, reason: S.lastReason }, out);
@@ -716,6 +842,19 @@
     return n;
   }
 
+  /**
+   * v2.231.0（OPT-2）：**此刻真的没有可用确认器**的种类。
+   *   静态表（`NO_CONFIRMER`）答「代码里接没接」；本函数答「这一刻能不能确认」。
+   *   两者必须分开：world / intel / commission 任一缺席时对应种类照样落 unconfirmed，
+   *   而那时静态表是空的 —— 只报静态表会把「跑不起来」显示成「一切正常」。
+   */
+  function effectiveNoConfirmer() {
+    const out = NO_CONFIRMER.slice();
+    if (KINDS.indexOf('tell') >= 0 && !(worldOf() && typeof worldOf().sendMessage === 'function'
+      && WA.intel && typeof WA.intel.addIntel === 'function')) out.push('tell');
+    if (KINDS.indexOf('work') >= 0 && !(WA.commission && typeof WA.commission.view === 'function')) out.push('work');
+    return out;
+  }
   /** 只读视图（面板 / 诊断消费）：按状态分列，只报事实，不做解释。 */
   function view(opts) {
     const o = opts || {};
@@ -735,7 +874,11 @@
       digests: Object.keys(readDigests()).length, digestCap: DIGEST_CAP,
       recent: recent,
       // 哪些种类**没有**确认器，如实带出（诊断不许把它显示成「正常无事」）。
-      noConfirmer: NO_CONFIRMER.slice(), confirmers: Object.assign({}, CONFIRMERS) };
+      //   v2.231.0（OPT-2）：这一栏改成**运行时判定** —— 静态表已清空，但「代码里接了」
+      //   与「这一刻真能确认」是两件事：面缺席时那一类会临时出现在这里，而不是被显示成正常。
+      noConfirmer: effectiveNoConfirmer(), noConfirmerStatic: NO_CONFIRMER.slice(),
+      confirmers: Object.assign({}, CONFIRMERS),
+      confirmed: stat.confirmed, awaiting: stat.awaiting };
   }
 
   function buildBlock() {

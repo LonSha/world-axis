@@ -130,13 +130,15 @@
         detail: { routeId: rid, from: from, resource: resource, want: need, have: have, short: short, lane: rv.lane, cost: rv.cost } };
     }
     if (kind === 'produce') {
-      // 生产：配方输入取自 economy.RECIPES（**具名表，不接受现编合成关系**），
+      // 生产：配方输入取自**当前世界声明的具名表**（v2.231.0 / OPT-8：真源是 recipe 的配方声明，
+      //   economy 是它的读取面；未声明时 economy 回落旧常量 ⇒ 本段行为与本版之前逐字一致）。
+      //   **不接受现编合成关系**：模型现编的「铁怎么变成面包」永远答不出。
       //   持有量从既有 people 表读（只读，不改）。
-      if (!E || !E.RECIPES) return { ok: false, kind: kind, reason: 'module-missing', detail: { module: 'economy' } };
+      if (!E || (!E.RECIPES && typeof E.recipeOf !== 'function')) return { ok: false, kind: kind, reason: 'module-missing', detail: { module: 'economy' } };
       const recipe = clean(s.recipe, 40), by = clean(s.by, 40);
       const times = num(Number(s.times)) === null ? 1 : num(Number(s.times));
-      const rec = E.RECIPES[recipe];
-      if (!rec) return { ok: false, kind: kind, reason: 'unknown-recipe', detail: { recipe: recipe, known: Object.keys(E.RECIPES) } };
+      const rec = recipeOf(recipe);
+      if (!rec) return { ok: false, kind: kind, reason: 'unknown-recipe', detail: { recipe: recipe, known: recipeNames() } };
       const p = (state().people || {})[by] || null;
       const purse = (p && p.resources && typeof p.resources === 'object') ? p.resources : {};
       const need = {}, short = {};
@@ -174,6 +176,33 @@
     return { ok: true, stages: raw };
   }
   /**
+   * 生产段的配方面（v2.231.0 / OPT-8）：**先读当前世界声明的配方**，
+   *   声明面缺席（economy 未装载 / 未声明）⇒ 回落到 economy 的旧常量 `RECIPES`。
+   *   两条路都只是**读**：本模块一次判定都不复制（与采购段读 view、交付段读 canAfford 同规）。
+   */
+  function recipeOf(name) {
+    // ⚠ 全限定名（同 economy.spec 的纪律）：引用面只认 `WA.ns.mem`。
+    if (WA.economy && typeof WA.economy.recipeOf === 'function') {
+      let r = null;
+      try { r = WA.economy.recipeOf(name); } catch (e) { r = null; }
+      if (r) return r;
+    }
+    // ⚠ 回落面走 `WA.economy`：本函数在**模块作用域**，那里没有 `E`（它是 checkStage 的局部
+    //   常量）—— 写 `E.RECIPES` 会让回落分支一走到就 ReferenceError（本版专锁 B10 当场抓出）。
+    return (WA.economy && WA.economy.RECIPES) ? WA.economy.RECIPES[name] : null;
+  }
+  /** 当前可选配方名（拒收回执里带出「我认识哪些」——「你给的不认识」与「这几条我认识」是同一件事的两半）。 */
+  function recipeNames() {
+    // ⚠ 全限定名（同上）。
+    if (WA.economy && typeof WA.economy.recipeKeys === 'function') {
+      let ks = null;
+      try { ks = WA.economy.recipeKeys(); } catch (e) { ks = null; }
+      if (Array.isArray(ks) && ks.length) return ks;
+    }
+    // ⚠ 同 recipeOf：模块作用域里没有 `E`。
+    return (WA.economy && WA.economy.RECIPES) ? Object.keys(WA.economy.RECIPES) : [];
+  }
+  /**
    * ① 只读编排预览：一条订单逐段检查，给出 `stages` 与 `blockedBy`。
    *   **一次判定都不复制** —— 每段的「够不够」逐字段取自来源读口。
    *   `blockedBy` = **第一段**不通过的段（断在哪就停在哪：后段即便看起来够，
@@ -204,8 +233,9 @@
       runnable: blockedBy === null,
       blockedBy: blockedBy,
       stamp: stampFrom(out),
-      basisNote: '每段的「够不够」逐字段取自来源读口（economy.view / economy.routeView / org.canAfford / economy.RECIPES）'
-        + ' —— 本模块不重算，故预览与真引擎同源'
+      basisNote: '每段的「够不够」逐字段取自来源读口（economy.view / economy.routeView / org.canAfford / 生产段的具名配方表）'
+        + ' —— 本模块不重算，故预览与真引擎同源；'
+        + '配方表由 economy 读取当前世界的声明（v2.231.0 / OPT-8），未声明时回落旧常量'
     };
   }
   /**

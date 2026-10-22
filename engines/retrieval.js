@@ -60,6 +60,26 @@
  *     `historySearch.search`；编年史走 `chrono.chronicle`。本模块只**编排**，不复制判据。
  *   · **不改对端**：`memory.js` 只**新增一个只读口**（`historyOf`），既有读口行为不变。
  *   · **默认休眠**：`enabled:false` 时不产包、不注入。
+ *
+ * ── v2.231.0（OPT-1 增补）：让模型**想起旧事**，而非只看见新状态 ──────────
+ *   首版（v2.228.0）把三边候选、全版本链读口、四类看门都立起来了，但**产品出口**
+ *   仍停在「报数不报内容」：事实行只写「此槽位曾有 N 次替换，历史可查」，旧值正文
+ *   （如「偷走钥匙」）**不进包**；默认时间窗把超窗命中整批滤掉，于是「数月前为何
+ *   偷钥匙」在结构上不可见；`assemble` 只按时间排序，命中更强的行反而可能被行数
+ *   上限挤掉。四条增补口径（每条都是否定式）：
+ *     A **旧值正文必须进包**：事实行携带被替换的旧值原文与替换次数，并另给
+ *       `oldValues` 结构化字段。只报「有 N 次替换」等于把答案指向一处模型看不见的地方。
+ *     B **回忆意图允许越窗**：输入含回忆词（当初/那次/为何/后来…）时，超窗命中
+ *       **保留**并标 `recalled:true`。越窗只影响保留与排序，**不改** `staleDropped` /
+ *       `staleKeys` 的如实计数（看门仍按原样报「这批超窗了」）。
+ *     C **排序先看命中强度**：被召回优先 → 命中 token 长度（越具体越靠前）→ 时间。
+ *       只按时间排 = 让「最近」冒充「最相关」。
+ *     D **当前值与历史分列**：包内同一槽位给两行（当前值 / 历史），当前值**不替代**历史。
+ *       两行同受预算约束（压紧时一起裁），不是「历史行免费」。
+ *   读数面同步：`candidates` 出 `recall` / `recalled`，`assemble` 出 `split` / `splitKey`，
+ *   `stat` 出 `recalled` / `split` 计数与 `recallHints` / `recalledRows` / `splitPacks`。
+ *   边界（如实登记）：**谁有权知道哪一版**不在本模块 —— 那是 noesis / redact 的面，
+ *   本模块只负责「把该召回的那一段拿回眼前」，不复制权限判定。
  */
 (function () {
   'use strict';
@@ -100,6 +120,18 @@
   };
   /** 本模块在 inject-budget 里的**注入源显示名**（登记口径的单一字面量）。 */
   const SOURCE_NAME = '历史留存';
+  /** 回忆意图词表（**封闭集合**；命中即允许越窗召回 —— 口径 B）。
+   *  只影响「保留与排序」，不改 stale 的如实计数：越窗行仍然进 staleDropped / staleKeys。 */
+  const RECALL_HINTS = ['当初', '当时', '从前', '以前', '早年', '那次', '那年', '那时',
+    '那时候', '记得', '还记得', '记不记得', '忘了吗', '忘了没', '是否记得', '为何', '为什么',
+    '缘由', '起因', '原委', '缘故', '后来', '曾经', '原本', '本来', '之前', '早先', '旧事'];
+  /** 本轮输入是否在问旧事（口径 B 的唯一判据；`src.recall === true` 为显式越权开关）。 */
+  function recallWanted(text) {
+    const t = txt(text);
+    if (!t) return false;
+    for (let i = 0; i < RECALL_HINTS.length; i++) { if (t.indexOf(RECALL_HINTS[i]) >= 0) return true; }
+    return false;
+  }
   /** 注入块标签（单一真源；尖括号拼字形）。 */
   //   与仓内其余八处同型标签（backstage / enemies / evolution / kaleidoscope / memory /
   //   opinion / parallel-world / inject）保持同一写法：内联字面量，单一真源。
@@ -108,7 +140,7 @@
   const TAG = '<world_axis_history>';
   const TAG_END = '</world_axis_history>';
   const stat = { calls: 0, historyOf: 0, assemblies: 0, dropped: 0, capacity: 0, absents: 0,
-    lastReason: '', faults: Object.create(null) };
+    recalled: 0, split: 0, lastReason: '', faults: Object.create(null) };
   function noteFault(code) {
     const t = String(code == null ? 'unknown' : code);
     stat.faults[t] = (stat.faults[t] || 0) + 1;
@@ -305,11 +337,18 @@
       const h = hit(k + ' ' + vers.map(function (v) { return txt(v.value); }).join(' '), tokens);
       if (!h) return;
       const reverted = vers.some(function (v) { return v.active !== true; });
+      // 口径 A（v2.231.0）：旧值**正文**必须进包。首版只写「曾有 N 次替换，历史可查」——
+      //   那是把答案指向一处**模型看不见的地方**（「可查」不是「已给出」）。
+      const olds = vers.filter(function (v) { return v.active !== true; });
+      const oldTxt = olds.map(function (v) { return txt(v.value); }).filter(Boolean).join(' → ');
       push({ key: 'fact:' + k, trigger: 'mentioned',
-        text: k + '=' + (cur ? txt(cur.value) : '') + (reverted ? '（此槽位曾有 ' + vers.filter(function (v) { return v.active !== true; }).length + ' 次替换，历史可查）' : ''),
+        text: k + '=' + (cur ? txt(cur.value) : '')
+          + (reverted ? '（此前：' + oldTxt + '；共 ' + olds.length + ' 次替换）' : ''),
         at: cur ? num(cur.at) : 0, source: 'engines/memory.js',
         hit: h, ageMs: cur ? ageOf(cur.at) : -1, stale: cur ? staleOf(cur.at) : false,
-        versions: vers.length, reverted: reverted, why: 'fact-mention' });
+        versions: vers.length, reverted: reverted,
+        oldValues: olds.map(function (v) { return { value: txt(v.value), version: num(v.version) || 1, reason: txt(v.reason) }; }),
+        why: 'fact-mention' });
     });
     //   ② 编年史（委托 chrono 读口；缺席如实跳过并记一条 absent）
     const chron = chronicleRows(60);
@@ -358,17 +397,40 @@
     //   而过滤恰恰把 stale 全滤掉了 —— 于是 `guards.stale` 结构上恒零（死看门：
     //   四类里有一类永远报不出东西，等于没有这一类）。看门必须数「被滤掉的那批」。
     const staleAll = rows.filter(function (r) { return r.stale === true; });
-    const kept = rows.filter(function (r) { return !r.stale || o.includeStale === true; });
+    // 口径 B（v2.231.0）：回忆意图 ⇒ 超窗命中**保留**并标 recalled:true。
+    //   ⚠ 越窗只改「保留与排序」，**不改** staleDropped / staleKeys 的如实计数 ——
+    //     否则「越窗召回」会把看门读数洗成 0，等于用新功能把旧看门悄悄关掉。
+    const recall = recallWanted(text) || src.recall === true;
+    const kept = rows.filter(function (r) {
+      if (!r.stale) return true;
+      if (o.includeStale === true) return true;
+      if (recall) { r.recalled = true; return true; }
+      return false;
+    });
+    if (recall) stat.recalled += kept.filter(function (r) { return r.recalled === true; }).length;
+    // 口径 C（v2.231.0）：排序**先看命中强度**（被召回优先 → 命中 token 长度 → 时间）。
+    //   只按时间排 = 让「最近」冒充「最相关」；命中更强的行不该被行数上限挤掉。
+    const strengthOf = function (r) { return txt(r.hit).length; };
+    const ranked = kept.slice().sort(function (a, b) {
+      const ra = (a.recalled === true) ? 1 : 0, rb = (b.recalled === true) ? 1 : 0;
+      if (ra !== rb) return rb - ra;
+      const sa = strengthOf(a), sb = strengthOf(b);
+      if (sa !== sb) return sb - sa;
+      return num(b.at) - num(a.at);
+    });
     const counts = {};
-    TRIGGERS.forEach(function (t) { counts[t] = kept.filter(function (r) { return r.trigger === t; }).length; });
+    TRIGGERS.forEach(function (t) { counts[t] = ranked.filter(function (r) { return r.trigger === t; }).length; });
     return { ok: true, at: now, windowMs: cfg.windowMs, tokens: tokens.length,
-      rows: kept.slice(0, cap), total: kept.length, counts: counts, cap: cap,
+      rows: ranked.slice(0, cap), total: ranked.length, counts: counts, cap: cap,
       staleDropped: staleAll.length, staleKeys: staleAll.slice(0, 20).map(function (r) { return r.key; }),
+      recall: recall, recalled: ranked.filter(function (r) { return r.recalled === true; }).length,
       // 查无结果**显式**成一态（口径 3）：不得读成「没发生过 / 一切正常」
-      empty: kept.length === 0,
-      note: kept.length === 0
+      empty: ranked.length === 0,
+      note: ranked.length === 0
         ? '三边皆无命中 —— 这是「没检索到」，不是「没发生过」；不得当成一切正常。'
-        : 'OR 规则：因果相关**或**被提及，任一成立即入候选。' };
+        : (recall
+          ? 'OR 规则 + 回忆意图：超窗命中已**召回**（recalled），且 stale 计数仍如实报出。'
+          : 'OR 规则：因果相关**或**被提及，任一成立即入候选。') };
   }
 
   // ══════════════════ 3. historyOf（效果反转后仍可检索） ══════════════════
@@ -427,19 +489,44 @@
     const src = (cands && Array.isArray(cands.rows)) ? cands.rows : [];
     // 压紧：每行取「触发类 · 正文（截断）」；先按 trigger 分组保序（因果 → 提及 → 场景）
     const order = TRIGGERS.reduce(function (a, t, i) { a[t] = i; return a; }, {});
+    // 口径 C（v2.231.0）：同 trigger 内先看命中强度与被召回标记，再比时间（首版只比时间）。
+    const strengthOf = function (r) { return txt(r.hit).length; };
     const sorted = src.slice().sort(function (a, b) {
       const d = (order[a.trigger] || 0) - (order[b.trigger] || 0);
       if (d !== 0) return d;
+      const ra = (a.recalled === true) ? 1 : 0, rb = (b.recalled === true) ? 1 : 0;
+      if (ra !== rb) return rb - ra;
+      const sa = strengthOf(a), sb = strengthOf(b);
+      if (sa !== sb) return sb - sa;
       return num(b.at) - num(a.at);
     });
     const take = sorted.slice(0, maxRows);
     const droppedByRows = Math.max(0, sorted.length - take.length);
+    // 口径 D（v2.231.0）：**当前值与历史分列**。首版把「此前：…」塞在同一行里，
+    //   长历史会把当前值挤到看不见的位置；现在拆成两行，当前值行恒在前。
+    //   ⚠ 分列行**同受预算**（lineOf 与普通行走同一档 w）—— 历史不是「免费附赠」。
+    const splitRows = take.filter(function (r) { return r.reverted === true && txt(r.text).indexOf('（此前：') >= 0; });
+    const splitKey = splitRows.slice(0, 8).map(function (r) { return r.key; });
+    function lineOf(r, w) {
+      const head = '[' + r.trigger + '] ';
+      const t = txt(r.text);
+      if (r.reverted === true) {
+        const i = t.indexOf('（此前：');
+        const j = t.indexOf('）', i);
+        if (i > 0 && j > i) {
+          const curLine = head + t.slice(0, i) + '（当前值）';
+          const hisLine = head + '历史：' + t.slice(i + 4, j) + '（当前值不替代历史）';
+          return [curLine.slice(0, w), hisLine.slice(0, w)].join('\n');
+        }
+      }
+      return head + t.slice(0, w);
+    }
     // 逐步压紧：先全文，再逐级截断到装下为止
     const widths = [240, 160, 100, 64, 40];
     let chosen = null;
     for (let i = 0; i < widths.length; i++) {
       const w = widths[i];
-      const lines = take.map(function (r) { return '[' + r.trigger + '] ' + txt(r.text).slice(0, w); });
+      const lines = take.map(function (r) { return lineOf(r, w); });
       const body = lines.join('\n');
       if (body.length <= maxChars) { chosen = { w: w, lines: lines, body: body }; break; }
     }
@@ -456,10 +543,12 @@
     const text = body ? (WRAP + body + WRAP2) : '';
     // 压不下 ⇒ 显式 capacity（不静默丢）
     const overCapacity = (chosen === null);
+    if (splitRows.length) stat.split += splitRows.length;
     if (overCapacity) { stat.capacity++; noteFault('capacity'); }
     if (droppedByRows > 0) { stat.dropped += droppedByRows; noteFault('rows-over-cap'); }
     return { ok: true, rows: take, text: text, chars: text.length,
       rowsIn: src.length, rowsOut: take.length, dropped: droppedByRows,
+      split: splitRows.length, splitKey: splitKey,
       capacity: overCapacity, maxRows: maxRows, maxChars: maxChars, mode: mode,
       note: overCapacity
         ? '必需项装不进预算 —— **显式报容量**，不静默丢弃（被预算丢掉与本来就没有必须分得开）。'
@@ -537,16 +626,20 @@
     return { enabled: !!cfg.enabled, windowMs: cfg.windowMs, maxRows: cfg.maxRows, maxChars: cfg.maxChars,
       calls: stat.calls, historyOf: stat.historyOf, assemblies: stat.assemblies,
       dropped: stat.dropped, capacity: stat.capacity, absents: stat.absents,
+      recalled: stat.recalled, split: stat.split,
+      recallHints: RECALL_HINTS.length, recalledRows: stat.recalled, splitPacks: stat.split,
       lastReason: stat.lastReason, faults: Object.assign({}, stat.faults),
       triggers: TRIGGERS.length, guards: GUARDS.length };
   }
   function reset() { stat.calls = 0; stat.historyOf = 0; stat.assemblies = 0; stat.dropped = 0;
-    stat.capacity = 0; stat.absents = 0; stat.lastReason = ''; stat.faults = Object.create(null); return { ok: true }; }
+    stat.capacity = 0; stat.absents = 0; stat.recalled = 0; stat.split = 0;
+    stat.lastReason = ''; stat.faults = Object.create(null); return { ok: true }; }
 
   WA.retrieval = {
     VERSION: VERSION,
     TRIGGERS: TRIGGERS.slice(), TRIGGER_DUTY: Object.assign({}, TRIGGER_DUTY),
     GUARDS: GUARDS.slice(), GUARD_LABEL: Object.assign({}, GUARD_LABEL),
+    RECALL_HINTS: RECALL_HINTS.slice(), recallWanted: recallWanted,
     SOURCE_NAME: SOURCE_NAME,
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },

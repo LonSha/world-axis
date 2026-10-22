@@ -1,13 +1,13 @@
 {
- "version": "2.230.0",
- "loadOrderCount": 254,
- "loadedCount": 240,
+ "version": "2.231.0",
+ "loadOrderCount": 262,
+ "loadedCount": 248,
  "uiCount": 14,
- "nsCount": 248,
+ "nsCount": 256,
  "totals": {
-  "loadEdges": 146,
+  "loadEdges": 154,
   "hardEdges": 0,
-  "callRefs": 285,
+  "callRefs": 301,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -34,6 +34,7 @@
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
+    "engines/activity.js",
     "engines/aftermath.js",
     "engines/agency.js",
     "engines/agenda.js",
@@ -60,6 +61,7 @@
     "engines/commission.js",
     "engines/community-note.js",
     "engines/compare.js",
+    "engines/contest.js",
     "engines/coop.js",
     "engines/coordinate.js",
     "engines/deep-clean.js",
@@ -78,9 +80,11 @@
     "engines/faction-graph.js",
     "engines/farfield.js",
     "engines/fate.js",
+    "engines/floor-settle.js",
     "engines/floor-snapshot.js",
     "engines/foreshadow.js",
     "engines/freight.js",
+    "engines/gear.js",
     "engines/gen-gate.js",
     "engines/group-refuse.js",
     "engines/hazard.js",
@@ -122,6 +126,7 @@
     "engines/preset-world.js",
     "engines/proactive.js",
     "engines/probe.js",
+    "engines/production.js",
     "engines/purify-scope.js",
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
@@ -137,6 +142,7 @@
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/rule-pack.js",
+    "engines/ruling.js",
     "engines/scope-tag.js",
     "engines/sediment.js",
     "engines/session.js",
@@ -150,6 +156,8 @@
     "engines/storyclock.js",
     "engines/summarizer.js",
     "engines/supply-chain.js",
+    "engines/survey.js",
+    "engines/training.js",
     "engines/travel-desk.js",
     "engines/userlock.js",
     "engines/vitals.js",
@@ -312,6 +320,7 @@
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
+    "engines/activity.js",
     "engines/aftermath.js",
     "engines/agency.js",
     "engines/agenda.js",
@@ -334,6 +343,7 @@
     "engines/commission.js",
     "engines/community-note.js",
     "engines/compare.js",
+    "engines/contest.js",
     "engines/coop.js",
     "engines/coordinate.js",
     "engines/deep-clean.js",
@@ -348,9 +358,11 @@
     "engines/faction-graph.js",
     "engines/farfield.js",
     "engines/fate.js",
+    "engines/floor-settle.js",
     "engines/floor-snapshot.js",
     "engines/foreshadow.js",
     "engines/freight.js",
+    "engines/gear.js",
     "engines/gen-gate.js",
     "engines/group-refuse.js",
     "engines/history-search.js",
@@ -384,6 +396,7 @@
     "engines/prefilter-gate.js",
     "engines/preset-world.js",
     "engines/probe.js",
+    "engines/production.js",
     "engines/purify-scope.js",
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
@@ -398,6 +411,7 @@
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/rule-pack.js",
+    "engines/ruling.js",
     "engines/scope-tag.js",
     "engines/sediment.js",
     "engines/session.js",
@@ -410,6 +424,8 @@
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/supply-chain.js",
+    "engines/survey.js",
+    "engines/training.js",
     "engines/travel-desk.js",
     "engines/userlock.js",
     "engines/vitals.js",
@@ -1307,6 +1323,174 @@
    "stateKeys": [],
    "consumedBy": []
   },
+  "engines/floor-settle.js": {
+   "ns": [
+    "floorSettle"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_floor_settle_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/training.js": {
+   "ns": [
+    "training"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_training_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/production.js": {
+   "ns": [
+    "production"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_production_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/gear.js": {
+   "ns": [
+    "gear"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_gear_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/survey.js": {
+   "ns": [
+    "survey"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_survey_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/contest.js": {
+   "ns": [
+    "contest"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_contest_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/ruling.js": {
+   "ns": [
+    "ruling"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_ruling_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/activity.js": {
+   "ns": [
+    "activity"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_activity_settings_v1"
+   ],
+   "consumedBy": []
+  },
   "actors/registry.js": {
    "ns": [
     "registry"
@@ -1339,7 +1523,9 @@
     "settingsBus"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "worldaxis_monologue_settings_v1"
+   ],
    "consumedBy": []
   },
   "actors/observe.js": {

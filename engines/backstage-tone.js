@@ -135,7 +135,11 @@
     WA.store.transact(function (draft) {
       const b = bucket(draft);
       const capped = b.notes.length + 1 > cfg.maxNotes ? b.notes.slice(b.notes.length + 1 - cfg.maxNotes) : b.notes;
-      b.notes = (WA.evict && WA.evict.array ? WA.evict.array(capped.concat([row]), 'backstageTone.notes') : capped.concat([row]));
+      const _keptBt = capped.concat([row]);
+      // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+      //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+      if (WA.evict && WA.evict.array) WA.evict.array(_keptBt, 'backstageTone.notes');
+      b.notes = _keptBt;
       out = { ok: true, reason: 'ok', id: id, kind: kind, kindLabel: NOTE_KIND_LABEL[kind] };
       return true;
     }, 'backstageTone:noteAdd');

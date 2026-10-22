@@ -46,6 +46,31 @@
 //   B 段 运行时与四件套(三边契约 / OR 规则 / 反转可检索 / 缺数据≠常态 / 有界不静默 / 面板端到端)
 //   C 段 零泄漏不变式(live / localStorage 两条各判一次,且都是**实测差**)
 //   N 段 真源码破坏 + 两向自证(含 N0 静态面)
+//
+// 【v2.231.0(OPT-1)带来的**前提漂移**(本轮实测逮住并修掉,如实留账)】
+//   本锁 N5 负控制的断言是「破坏版上 stale 看门回到恒零」—— 它隐含一个前提:
+//   「超窗行**必不在** rows 里」。v2.231.0 起,输入含回忆词时超窗命中会被**召回**
+//   (口径 B:回忆意图允许越窗),于是拿「旧事」这种**本身就是回忆词**的键做 N5 的
+//   样本,破坏版上超窗行反而进了 rows ⇒ stale 数到 1 ⇒ N5 假红(原版绿、破坏版也绿
+//   的反面:两向都变绿,自证失效)。
+//   修法是改**样本**(改成不含回忆词的 `__n10_old_fact__`,让判据的前提重新成立),
+//   **不是**去放宽 N5 的断言 —— 放宽断言会把「死看门」这条真判据一起废掉。
+//   正向面(B8d/B8f)不受影响:staleDropped / staleKeys 在过滤**之前**统计,
+//   越窗召回只改「保留与排序」,不改这两项的如实计数(口径 B 原文)。
+//
+// 【v2.231.0(OPT-1 增补)新增判据】首版把读口立起来了,产品出口却停在「报数不报内容」。
+//   本版四条增补口径各有判据咬:
+//     A 旧值正文进包 —— 判据 C1/C1b(候选行带 oldValues、buildBlock 出块里真出现旧值原文)
+//     B 回忆意图允许越窗 —— 判据 C2/C2b/C2c(同一事实:无回忆词 ⇒ 被滤掉;
+//       有回忆词 ⇒ 召回且 recalled:true;而 staleDropped **两向都不变**)
+//     C 排序先看命中强度 —— 判据 C2d(被召回行排在未被召回行之前)
+//     D 当前值与历史分列 —— 判据 C3/C3b(包内出现「（当前值）」与「历史：」两行)
+//     预算不豁免 —— 判据 C5(分列行同样受 maxChars 硬上界)
+//   负控制:N8 砍掉回忆词表 ⇒ 越窗召回消失(原版召回 ≥1);N9 砍掉「此前：」标记 ⇒
+//     分列行消失(原版分列 ≥1)。两条都是**真源码破坏 + 两向自证**。
+//   ⚠ 如实登记的边界(口径 C 的限度):中文 token 是**二字组**,长度一律为 2 ——
+//     故「命中强度」这一档在纯中文下多数退化为平手(回落到时间序),它真正拉开差距的是
+//     ASCII/编号型 token(如 `key2008` 长 7)。本判据只按实际语义断言,不假装它普遍生效。
 const fs = require('fs');
 const path = require('path');
 const BASE = path.join(__dirname, '..');
@@ -272,6 +297,13 @@ function runAll(a) {
   a(E.indexOf("const LS_KEY = 'worldaxis_retrieval_v1';") >= 0, 'A15b: LS_KEY 与 inject 侧同源字面量');
   a(cnt(E, ANCHOR.register) === 1, 'A15c: registerModule 登记恰 1 处');
 
+  // A16 v2.231.0(OPT-1):新增导出面(**常量 + 判据口**;各恰 1 处声明)
+  a(E.indexOf("const RECALL_HINTS = [") >= 0,
+    'A16: 回忆词表是**封闭集合**常量(不是散落的字面量)');
+  a(E.indexOf('RECALL_HINTS: RECALL_HINTS.slice(), recallWanted: recallWanted,') >= 0,
+    'A16b: 导出面新增 RECALL_HINTS / recallWanted(面板与诊断的消费点靠它接上)');
+  a(E.indexOf('function recallWanted(text) {') >= 0, 'A16c: recallWanted 是唯一判据口(不复制一份)');
+
   /* ══════════════════ B 运行时 ══════════════════ */
   console.log('\n\u25a0 B 运行时:三边契约 / OR 规则 / 反转可检索 / 缺数据≠常态 / 有界不静默 / 面板端到端');
   const env = env0(null);
@@ -461,6 +493,88 @@ function runAll(a) {
     a(out6 !== null && out6.length > 0, 'B13l: 点「列候选」有读数回显');
   })();
 
+  /* ══════════════════ B14 v2.231.0(OPT-1)增补口径 ══════════════════ */
+  console.log('\n\u25a0 B14 v2.231.0(OPT-1):旧值正文进包 / 越窗召回 / 强度排序 / 当前值与历史分列');
+  WA.retrieval.setSettings({ enabled: true });
+  // B14a **口径 A:旧值正文必须进包**(首版只报「有 N 次替换」,旧值正文不进包)
+  (function () {
+    seedFact(WA, '银印', '被偷走', '已归还', Date.now());
+    const c = WA.retrieval.candidates({ text: '银印' });
+    const row = c.rows.filter(function (r) { return r.key === 'fact:银印'; })[0];
+    a(!!row, 'B14a: 事实行进候选(前提)');
+    a(!!row && row.text.indexOf('被偷走') >= 0,
+      'B14b: 事实行携带**旧值正文**(实: ' + (row ? row.text : '') + ')');
+    a(!!row && Array.isArray(row.oldValues) && row.oldValues.length === 1
+      && row.oldValues[0].value === '被偷走',
+      'B14c: 另给 oldValues 结构化字段(不只靠文本解析)');
+    const bb = WA.retrieval.buildBlock({ text: '银印' });
+    a(bb.indexOf('被偷走') >= 0,
+      'B14d: **产品出口**里真出现旧值原文(「可查」≠「已给出」—— 这一条咬的就是这句话)');
+  })();
+  // B14e **口径 B:回忆意图允许越窗**(同一事实,两向各判一次)
+  (function () {
+    const OLD = Date.now() - 400 * 24 * 3600 * 1000;
+    seedFact(WA, '铜锁', '被撬开', '已换新', OLD);
+    a(WA.retrieval.recallWanted('铜锁') === false, 'B14e: 无回忆词的输入 recallWanted 为假');
+    a(WA.retrieval.recallWanted('当初为何铜锁不见了') === true,
+      'B14f: 含回忆词的输入 recallWanted 为真(词表真被读)');
+    const c1 = WA.retrieval.candidates({ text: '铜锁' });
+    a(c1.recall === false && c1.recalled === 0
+      && !c1.rows.some(function (r) { return r.key === 'fact:铜锁'; }),
+      'B14g: 无回忆词 ⇒ 超窗事实**不进**候选(默认行为不变,不把旧账全灌进来)');
+    a(c1.staleDropped >= 1, 'B14h: 同时 staleDropped 如实计数(实 ' + c1.staleDropped + ')');
+    const c2 = WA.retrieval.candidates({ text: '当初为何铜锁不见了' });
+    const r2 = c2.rows.filter(function (r) { return r.key === 'fact:铜锁'; })[0];
+    a(c2.recall === true && c2.recalled >= 1, 'B14i: 有回忆词 ⇒ 越窗召回(实 recalled ' + c2.recalled + ')');
+    a(!!r2 && r2.recalled === true, 'B14j: 被召回行带 recalled 标记(读数能分辨「召回」与「本来就在窗内」)');
+    a(c2.staleDropped >= 1,
+      'B14k: **越窗不改如实计数** —— staleDropped 两向都 ≥1(实 ' + c2.staleDropped
+      + ');否则新功能会把旧看门悄悄洗成 0');
+  })();
+  // B14l **口径 C:被召回行排在未被召回行之前**(同 trigger 内)
+  (function () {
+    const c = WA.retrieval.candidates({ text: '当初为何铜锁不见了' });
+    const rows = c.rows.filter(function (r) { return r.trigger === 'mentioned'; });
+    const firstRec = rows.map(function (r, i) { return r.recalled ? i : -1; })
+      .filter(function (i) { return i >= 0; })[0];
+    const lastPlain = rows.map(function (r, i) { return r.recalled ? -1 : i; })
+      .filter(function (i) { return i >= 0; }).slice(-1)[0];
+    a(firstRec >= 0 && (lastPlain === undefined || firstRec < lastPlain),
+      'B14l: 被召回行排在未被召回行之前(实 首个召回 #' + firstRec + ' / 末个未召回 #' + lastPlain + ')');
+  })();
+  // B14m **口径 D:当前值与历史分列**(且分列行同受预算)
+  (function () {
+    const c = WA.retrieval.candidates({ text: '银印' });
+    const a1 = WA.retrieval.assemble(c, {});
+    a(a1.split >= 1, 'B14m: 包内分列了替换槽位(实 ' + a1.split + ')');
+    a(a1.text.indexOf('（当前值）') >= 0, 'B14n: 包内有「当前值」行');
+    a(a1.text.indexOf('历史：') >= 0 && a1.text.indexOf('（当前值不替代历史）') >= 0,
+      'B14o: 包内有「历史」行,且自述当前值不替代历史');
+    a(Array.isArray(a1.splitKey) && a1.splitKey.indexOf('fact:银印') >= 0,
+      'B14p: splitKey 点名是哪几个槽位分列了(不是只给个数)');
+    // 预算不豁免:分列行与普通行走同一档裁剪,「有界」仍是硬上界
+    const many = [];
+    for (let i = 0; i < 60; i++) {
+      many.push({ trigger: 'mentioned', key: 'sp' + i, text: '槽位' + i + '=新值（此前：' + '旧值'.repeat(30) + '；共 1 次替换）',
+        reverted: true, hit: '槽位' + i });
+    }
+    const a2 = WA.retrieval.assemble({ rows: many }, { maxRows: 60, maxChars: 500 });
+    a(a2.capacity === true && a2.chars <= 500,
+      'B14q: 分列行**同受预算**(capacity 态仍硬截断进预算,实 ' + a2.chars + ' \u2264 500)');
+    const st = WA.retrieval.stat();
+    a(st.recallHints > 0 && typeof st.recalledRows === 'number' && typeof st.splitPacks === 'number',
+      'B14r: stat 报出 recallHints / recalledRows / splitPacks(实 ' + st.recallHints + ' / '
+      + st.recalledRows + ' / ' + st.splitPacks + ')');
+  })();
+  // B14s 新读数**有真消费方**(面板与诊断各一处;零引用会在 dead-export-gate 当场红灯)
+  (function () {
+    a(P.indexOf('WA.retrieval.recallWanted') >= 0 && P.indexOf('WA.retrieval.RECALL_HINTS') >= 0,
+      'B14s: 面板真读 recallWanted / RECALL_HINTS(不是只导出没人用)');
+    a(D.indexOf('recall: cand ? { hints:') >= 0 && D.indexOf('split: pack.split') >= 0,
+      'B14t: 诊断真透出 recall / split 读数');
+    a(P.indexOf("x.recalled ? ' · 已召回(越窗)'") >= 0, 'B14u: 候选行读数区分「已召回(越窗)」');
+  })();
+
   /* ══════════════════ C 零泄漏不变式 ══════════════════ */
   console.log('\n\u25a0 C 零泄漏不变式:live 存档与 localStorage 都是**实测差**');
   const snapOf = function () { return JSON.stringify(WA.store.get()); };
@@ -564,7 +678,12 @@ function runNeg(a, E, SELF) {
     a(bb !== '', 'N4: 破坏版上关着也照出块(原版必返空串 ⇒ 两向)');
   })();
   // N5 破坏:把 stale 看门改回「从过滤后的 rows 里数」⇒ B8d 死看门哨兵必现形
+  //   ⚠ 样本键**必须不含回忆词**(v2.231.0 前提漂移的修法):含回忆词 ⇒ 超窗行被召回
+  //     ⇒ 破坏版上它照样在 rows 里 ⇒ stale 数到 1 ⇒ 本判据的前提不成立、两向自证失效。
+  //     这里用 `__n10_old_fact__` 而不是「旧事」,并在 N5b 里**明写这条前提**:
+  //     同一份样本在**原版**上 stale 仍为 1(如实计数不因召回而变),破坏版上才回到 0。
   (function () {
+    const KEY5 = '__n10_old_fact__';
     const A = "    guards.stale = (c.staleKeys || []).slice();";
     a(cnt(E, A) === 1, 'N5a: stale 看门锚点恰 1 次');
     const E2 = E.replace(A, "    guards.stale = c.rows.filter(function (r) { return r.stale; }).map(function (r) { return r.key; });");
@@ -573,11 +692,55 @@ function runNeg(a, E, SELF) {
     WA.retrieval.setSettings({ enabled: true });
     WA.store.transact(function (d) {
       d.memory = d.memory || {}; d.memory.facts = d.memory.facts || [];
-      d.memory.facts.push({ key: '旧事', value: '很久以前', version: 1, active: true, reason: 'old', at: Date.now() - 400 * 24 * 3600 * 1000 });
+      d.memory.facts.push({ key: KEY5, value: '很久以前', version: 1, active: true, reason: 'old', at: Date.now() - 400 * 24 * 3600 * 1000 });
     }, 'n10:neg5');
-    const au = WA.retrieval.audit({ text: '旧事' });
+    //   ⚠ N5b 必须写在 `const WA = env.WA;` **之后**：同一块里 `const` 有 TDZ，
+    //     写在前面会直接 ReferenceError（本轮实测踩到并修正）。
+    a(WA.retrieval.recallWanted(KEY5) === false,
+      'N5b: 样本键不含回忆词(recallWanted 为假 ⇒ N5 的前提成立)');
+    const au = WA.retrieval.audit({ text: KEY5 });
     a(au.guardCounts.stale === 0,
       'N5: 破坏版上 stale 看门回到恒零(原版数到 1 ⇒ 两向自证「死看门」真的被修掉了)');
+  })();
+  // N8 破坏:砍掉回忆词表 ⇒ 越窗召回消失(口径 B 的负控制)
+  (function () {
+    //   ⚠ 首轮把破坏锚点选成「词表第一行」—— 砍掉它**没改变行为**：词表第二行仍含
+    //     「为何」,`recallWanted` 照样为真 ⇒ N8 假红(破坏没发生,判据当然不现形)。
+    //     正解是破坏**判据本身**(循环体恒不返回真),这才真的把口径 B 关掉。
+    const A8 = "    for (let i = 0; i < RECALL_HINTS.length; i++) { if (t.indexOf(RECALL_HINTS[i]) >= 0) return true; }";
+    a(cnt(E, A8) === 1, 'N8a: 回忆词判据锚点恰 1 次');
+    const E2 = E.replace(A8, "    for (let i = 0; i < RECALL_HINTS.length; i++) { /* broken */ }");
+    const env = negEnv(E2); const WA = env.WA;
+    resetSettings(WA);
+    WA.retrieval.setSettings({ enabled: true });
+    WA.store.transact(function (d) {
+      d.memory = d.memory || {}; d.memory.facts = d.memory.facts || [];
+      d.memory.facts.push({ key: '铜锁', value: '被撬开', version: 1, active: false, reason: 'replaced', at: Date.now() - 400 * 24 * 3600 * 1000 });
+      d.memory.facts.push({ key: '铜锁', value: '已换新', version: 2, active: true, reason: 'change', at: Date.now() - 400 * 24 * 3600 * 1000 });
+    }, 'n10:neg8');
+    const c = WA.retrieval.candidates({ text: '当初为何铜锁不见了' });
+    a(c.recalled === 0 && !c.rows.some(function (r) { return r.key === 'fact:铜锁'; }),
+      'N8: 破坏版上越窗召回消失(原版召回 ≥1 ⇒ 两向自证)');
+    a(c.staleDropped >= 1, 'N8b: 破坏版上 stale 仍如实计数(证明两件事是分开的)');
+  })();
+  // N9 破坏:去掉「此前：」标记 ⇒ 当前值与历史不再分列(口径 A/D 的负控制)
+  (function () {
+    const A9 = "          + (reverted ? '（此前：' + oldTxt + '；共 ' + olds.length + ' 次替换）' : ''),";
+    a(cnt(E, A9) === 1, 'N9a: 旧值正文锚点恰 1 次');
+    const E2 = E.replace(A9, "          + (reverted ? '（此槽位曾有替换）' : ''),");
+    const env = negEnv(E2); const WA = env.WA;
+    resetSettings(WA);
+    WA.retrieval.setSettings({ enabled: true });
+    WA.store.transact(function (d) {
+      d.memory = d.memory || {}; d.memory.facts = d.memory.facts || [];
+      d.memory.facts.push({ key: '银印', value: '被偷走', version: 1, active: false, reason: 'replaced', at: Date.now() - 1000 });
+      d.memory.facts.push({ key: '银印', value: '已归还', version: 2, active: true, reason: 'change', at: Date.now() });
+    }, 'n10:neg9');
+    const bb = WA.retrieval.buildBlock({ text: '银印' });
+    a(bb.indexOf('被偷走') < 0, 'N9: 破坏版上旧值正文不再进包(原版必含 ⇒ 两向自证)');
+    const c = WA.retrieval.candidates({ text: '银印' });
+    const a2 = WA.retrieval.assemble(c, {});
+    a(a2.split === 0, 'N9b: 破坏版上分列行归零(原版 ≥1 ⇒ 两向自证)');
   })();
   // N6 工具两向自证:锚点不存在 / 不唯一都抛
   let threw = false;

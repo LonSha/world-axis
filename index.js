@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.230.0'
+  const VERSION = '2.231.0'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -292,6 +292,40 @@
     'engines/host-wb-trace.js',
     'engines/ledger-timeline.js',
     'engines/floor-changes.js',
+    // v2.231.0（优化 OPT-5）：楼层结算账。与 floor-changes 同一批（都在 timeline 之后）。
+    //   它**唯一写回世界状态**：beginRound 抓基线、endRound 落账、rollback 才动 store ——
+    //   故必须在 core/store.js 之后，且与 floor-snapshot（字段级只读补丁）无装载依赖。
+    'engines/floor-settle.js',
+    // v2.231.0（拓展 EXP-1）：能力成长台账。位置在 entities 之后（它读 entities 的表）。
+    'engines/training.js',
+    // v2.231.0（拓展 EXP-2）：唯一物件台账。位置在 economy 之后（它与堆叠资源分列，
+    //   但读 people 的资源面做修理材料判定）。
+    // v2.231.0（拓展 EXP-3）：生产工单与设施。读 economy（配方/库存真源）与 freight
+    //   （运输真源），故排在二者之后 —— 调用期读，不产生装载期环。
+    'engines/production.js',
+    'engines/gear.js',
+    // v2.231.0（拓展 EXP-4）：探索与地理发现。排在 world 之后（客观地图真源
+    //   world.places / world.roads 的读口在调用期），且**晚于** production/gear
+    //   （同为「逐人/逐件」的台账家族，登记顺序与 store 骨架同批）。
+    //   本模块**不写 world.***（不造路、不改地形），故与 world 之间无装载期环。
+    'engines/survey.js',
+    // v2.231.0（拓展 EXP-5）：可选规则的对抗场景（多轮多阶段 / 对抗检定 / 部分成功 /
+    //   代价成功 / 撤退）。掷骰与 DC 解析走 fate（调用期读，故与 fate 之间无装载期环），
+    //   位置改动走 world（本模块全文不写 world.*）。排在 survey 之后：同为「场景/台账」
+    //   家族，登记顺序与 store 骨架同批。
+    'engines/contest.js',
+    'engines/ruling.js',
+    // v2.231.0（拓展 EXP-7）：可参与的公共活动（筹备 / 报名 / 名额 / 开场 /
+    //   分轮 / 结算 / 延期 / 取消）。排在 ruling 之后：同属「公共事务」家族，
+    //   登记顺序与 store 骨架同批。contest 是它的**可选**结算器（调用期读），
+    //   故与 contest 之间无装载期环。
+    'engines/activity.js',
+    // v2.231.0（拓展 EXP-8）：研究阶段、成果权限与制造入口联动。
+    //   配方定义读 economy；组织成员读 evolution，均为调用期访问。
+    'engines/research.js',
+    // v2.231.0（拓展 EXP-9）：共同生活、照护与显式资产交接。
+    //   复用 people 人物与资源，不自动制造出生、死亡或婚姻事件。
+    'engines/family.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

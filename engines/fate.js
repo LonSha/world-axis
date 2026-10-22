@@ -41,8 +41,60 @@
   const DIRECTIONS = ['high', 'low'];
   const DIRECTION_LABEL = { high: '越高越好', low: '越低越好' };
   const MODES = ['min', 'random', 'max'];
-  const ATTRS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
-  const ATTR_LABEL = { str: '力量', dex: '敏捷', con: '体质', int: '智力', wis: '感知', cha: '魅力' };
+  // ── v2.231.0（优化 OPT-8）：判定维度从**写死的常量**改为**读当前世界定义** ──────
+  //   真源是 `engines/recipe.js` 的配方声明（`judge.enabled` / `judge.attrs` / `judge.labels`），
+  //   本模块**读它**；未声明 ⇒ 原样沿用下面这份旧白名单（旧档语义逐字不变）。
+  //   现场缺口（开工前逐条复核）：此前它是唯一真源 ⇒ 科幻局声明了 body/sense/mind/will
+  //   也照样被拉回六属性，而「非数值叙事可关闭属性判定」在源码里没有任何落点。
+  const ATTRS_DEF = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+  const ATTR_LABEL_DEF = { str: '力量', dex: '敏捷', con: '体质', int: '智力', wis: '感知', cha: '魅力' };
+  /**
+   * 当前世界的判定面声明（只读，**不记 stat**）。
+   *   recipe 未装载 / 该配方未声明判定面 ⇒ null（= 未声明，调用方回落旧白名单）。
+   */
+  function judgeSpec() {
+    // ⚠ 全限定名（同 economy.spec 的纪律）：引用面只认 `WA.ns.mem`。
+    if (!WA.recipe || typeof WA.recipe.judgeSpec !== 'function') return null;
+    let j = null;
+    try { j = WA.recipe.judgeSpec(); } catch (e) { j = null; }
+    return (j && j.ok) ? j : null;
+  }
+  /**
+   * 判定面四态（机械可判，不猜）：
+   *   `default` 未声明 ⇒ 旧白名单（合法状态，不是缺陷）；
+   *   `declared` 声明且合法 ⇒ 用声明的维度；
+   *   `off`      声明**关闭** ⇒ 公式式 DC 一律拒收 `attrs-off`（**不回落旧白名单**）；
+   *   `empty`    声明了却给不出合法属性名 ⇒ 拒收 `attrs-empty`（与 `off` 分列：一个是关掉、
+   *              一个是写坏了，处置相反）。
+   */
+  function judgeState() {
+    const j = judgeSpec();
+    if (!j) return { mode: 'default', enabled: true, attrs: ATTRS_DEF.slice(), labels: ATTR_LABEL_DEF,
+      source: 'default', reason: '' };
+    if (j.enabled === false) return { mode: 'off', enabled: false, attrs: [], labels: {},
+      source: j.source, reason: 'attrs-off', dropped: (j.dropped || []).slice() };
+    if (!j.attrs.length) return { mode: 'empty', enabled: true, attrs: [], labels: {},
+      source: j.source, reason: 'attrs-empty', dropped: (j.dropped || []).slice() };
+    return { mode: 'declared', enabled: true, attrs: j.attrs.slice(), labels: j.labels || {},
+      source: j.source, reason: '', dropped: (j.dropped || []).slice() };
+  }
+  /** 当前生效的属性白名单（内部自用；对外由 judgeView 表达）。 */
+  function attrsNow() { return judgeState().attrs; }
+  /**
+   * 判定面读数（诊断与面板的真消费方）。
+   *   `fallback` 与 `reason` **分列**：前者答「是不是在沿用旧白名单」（合法状态），
+   *   后者答「拒收码是什么」（非空即真的不能判定）。
+   */
+  function judgeView() {
+    const js = judgeState();
+    return { enabled: js.enabled, mode: js.mode, attrs: js.attrs.slice(),
+      labels: Object.assign({}, js.labels), source: js.source, reason: js.reason,
+      dropped: (js.dropped || []).slice(), fallback: js.mode === 'default',
+      note: js.mode === 'default' ? '未声明判定面 ⇒ 沿用旧白名单（str/dex/con/int/wis/cha）'
+        : (js.mode === 'off' ? '这一局的判定面已关闭（非数值叙事）：公式式 DC 一律拒收，不回落成旧白名单'
+          : (js.mode === 'empty' ? '声明了判定面却没有合法属性名（属性名须为 ASCII 标识符）'
+            : '判定维度来自当前世界定义（' + js.source + '）')) };
+  }
   const ZH_NUM = { '〇': 0, '零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10 };
   const HEADER_RE = /^\s*(?:[A-Za-z][.、)]|[0-9]+[.、)]|[（(][A-Za-z0-9]+[)）]|[\u2460-\u2473]|[【\[][^】\]]{0,8}[】\]])\s*/;
   function settings() {
@@ -237,11 +289,17 @@
   function evalFormula(formula, attrs) {
     const f = clean(formula, 120);
     if (!f) return { ok: false, reason: 'empty-formula' };
+    // v2.231.0（OPT-8）：维度来自当前世界定义。关闭与「声明写坏了」**分列两个码** ——
+    //   前者要改写叙事方式（这一局不要属性判定），后者要去补声明，处置相反。
+    const js = judgeState();
+    if (js.mode === 'off') return { ok: false, reason: 'attrs-off' };
+    if (js.mode === 'empty') return { ok: false, reason: 'attrs-empty' };
+    const list = js.attrs;
     const ids = String(f).toLowerCase().match(/[a-z_]+/g) || [];
-    const unknown = ids.filter(function (x) { return ATTRS.indexOf(x) < 0; });
+    const unknown = ids.filter(function (x) { return list.indexOf(x) < 0; });
     if (unknown.length) return { ok: false, reason: 'unknown-attr', attr: unknown[0] };
     let filled = String(f).toLowerCase();
-    ATTRS.forEach(function (k) { filled = filled.replace(new RegExp('\\b' + k + '\\b', 'g'), String(attrValue(attrs, k))); });
+    list.forEach(function (k) { filled = filled.replace(new RegExp('\\b' + k + '\\b', 'g'), String(attrValue(attrs, k))); });
     if (!EXPR_SAFE_RE.test(filled)) return { ok: false, reason: 'unsafe-expr' };
     if (!isArithmeticSyntax(filled)) return { ok: false, reason: 'bad-syntax' };
     let v = 0;
@@ -415,7 +473,9 @@
     const cfg = settings();
     return { enabled: cfg.enabled, allowFormula: cfg.allowFormula, lowRoll: cfg.lowRoll,
       dedupThreshold: cfg.dedupThreshold, maxDice: cfg.maxDice, maxSides: cfg.maxSides,
-      directions: DIRECTIONS.slice(), attrs: ATTRS.slice() };
+      directions: DIRECTIONS.slice(), attrs: attrsNow(),
+      // v2.231.0（OPT-8）：判定面读数（沿用旧白名单 / 用声明的维度 / 已关闭 / 声明写坏了，四态分开）
+      judge: judgeView() };
   }
   WA.fate = {
     getSettings: settings, setSettings: saveSettings, view: view,
@@ -426,7 +486,11 @@
     resolveCount: resolveCount, oversample: oversample, deck: deck,
     stat: function () { return JSON.parse(JSON.stringify(stat)); }, reset: reset,
     DIRECTIONS: DIRECTIONS, DIRECTION_LABEL: DIRECTION_LABEL, MODES: MODES,
-    ATTRS: ATTRS, ATTR_LABEL: ATTR_LABEL, EXPR_SAFE_RE: EXPR_SAFE_RE, HEADER_RE: HEADER_RE,
+    // v2.231.0（OPT-8）：`ATTRS` / `ATTR_LABEL` 仍导出**旧白名单**（未声明时的回落面，值逐字不变），
+    //   当前世界的判定面由 `judgeView()` 表达 —— 一个名字只表达一件事，
+    //   不让「默认面」与「生效面」共用一个导出名（那正是本次要治的『执行器不消费题材配置』）。
+    ATTRS: ATTRS_DEF, ATTR_LABEL: ATTR_LABEL_DEF, EXPR_SAFE_RE: EXPR_SAFE_RE, HEADER_RE: HEADER_RE,
+    judgeView: judgeView,
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/fate.js', { kind: 'engine', ver: '2.230.0' });
   if (WA.log) WA.log('info', 'fate 已加载（2.230.0）');

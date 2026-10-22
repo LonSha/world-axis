@@ -122,7 +122,11 @@
         const cap = cfg.maxThreads;
         const base = b.threads.length + 1 > cap ? b.threads.slice(b.threads.length + 1 - cap) : b.threads;
         const row = { id: id, title: clean(p.title, 80), state: 'open', steps: [], deviations: 0, openedAt: clockNow('dream'), updatedAt: clockNow('dream') };
-        b.threads = WA.evict && WA.evict.array ? WA.evict.array(base.concat([row]), 'dream.threads') : base.concat([row]);
+        const _keptDt = base.concat([row]);
+        // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+        //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+        if (WA.evict && WA.evict.array) WA.evict.array(_keptDt, 'dream.threads');
+        b.threads = _keptDt;
         out = { ok: true, reason: 'ok', op: o, label: OP_LABEL[o], id: id, state: 'open' };
         return true;
       }
@@ -165,7 +169,11 @@
         const cap = cfg.maxDeviations;
         const base = b.deviations.length + 1 > cap ? b.deviations.slice(b.deviations.length + 1 - cap) : b.deviations;
         const row = { id: did, text: text, thread: clean(p.thread, 40), upserts: 1, at: clockNow('dream'), updatedAt: clockNow('dream') };
-        b.deviations = WA.evict && WA.evict.array ? WA.evict.array(base.concat([row]), 'dream.deviations') : base.concat([row]);
+        const _keptDd = base.concat([row]);
+        // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+        //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+        if (WA.evict && WA.evict.array) WA.evict.array(_keptDd, 'dream.deviations');
+        b.deviations = _keptDd;
         out = { ok: true, reason: 'ok', op: o, label: OP_LABEL[o], id: did };
         return true;
       }
@@ -220,7 +228,11 @@
       const cap = cfg.maxVolumes;
       const base = b.volumes.length + 1 > cap ? b.volumes.slice(b.volumes.length + 1 - cap) : b.volumes;
       if (b.volumes.length + 1 > cap) stat.evicted += b.volumes.length + 1 - cap;
-      b.volumes = WA.evict && WA.evict.array ? WA.evict.array(base.concat([vol]), 'dream.volumes') : base.concat([vol]);
+      const _keptDv = base.concat([vol]);
+      // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+      //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+      if (WA.evict && WA.evict.array) WA.evict.array(_keptDv, 'dream.volumes');
+      b.volumes = _keptDv;
       out = { ok: true, reason: 'ok', id: vol.id, kb: kb, volumes: b.volumes.length };
       return true;
     }, 'dream:archive');

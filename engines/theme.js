@@ -31,8 +31,22 @@
     campus: { label: '校园', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'persona', 'relation', 'craft', 'protocol'] },
     mystery: { label: '悬疑', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'enemy', 'blackbox', 'regional', 'persona', 'relation', 'craft', 'protocol'] },
     fantasy: { label: '奇幻', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'enemy', 'regional', 'blackbox', 'trends', 'persona', 'relation', 'craft', 'protocol'] },
-    business: { label: '经营', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'regional', 'trends', 'persona', 'relation', 'craft', 'protocol'] }
+    business: { label: '经营', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'regional', 'trends', 'persona', 'relation', 'craft', 'protocol'] },
+    // ── v2.231.0（优化 OPT-8）：四个扩展题材 ────────────────────────────────
+    //   进的是**真源本身**（不是别处另存一份）：`known()` / `compose()` / `apply()`
+    //   读的都是本表，题材不在表里，apply 就静默忽略它 —— 于是「配方的题材集合」与
+    //   「实际组合出来的模块」当场分叉，而两边各自都报成功。
+    //   模块清单按各自题材的语义取：科幻含 trends（趋势），仙侠含 blackbox（天机不可知）。
+    modern: { label: '现代', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'persona', 'relation', 'craft', 'protocol'] },
+    history: { label: '历史', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'enemy', 'regional', 'persona', 'relation', 'craft', 'protocol'] },
+    scifi: { label: '科幻', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'enemy', 'regional', 'trends', 'persona', 'relation', 'craft', 'protocol'] },
+    xianxia: { label: '仙侠', modules: ['world', 'event', 'faction', 'wind', 'influence', 'info', 'reputation', 'economy', 'enemy', 'regional', 'blackbox', 'persona', 'relation', 'craft', 'protocol'] }
   };
+  /**
+   * 扩展题材名（v2.231.0 / OPT-8）。它**不是第二份题材表** —— 表体只有 THEMES 一份，
+   *   本表只回答「哪几张是这一轮加的」（供面板标注与诊断读数）。
+   */
+  const THEME_EXT = { modern: true, history: true, scifi: true, xianxia: true };
   const stat = { applies: 0, previews: 0, rejects: 0, contrasts: 0, lastTheme: '', lastReason: '' };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
@@ -227,7 +241,7 @@
   // v2.87.0：known()/compose() 是本文件内部自用口（preview/apply/activeModules 消费，
   //   外部零引用 = 过度导出），故不进导出面。题材能力对外由 list/preview/contrast/apply/
   //   activeModules/statView/separation 七个有真消费方的口表达。
-  WA.theme = { THEMES, CORE, list: list, preview: preview, contrast: contrast,
+  WA.theme = { THEMES, CORE, THEME_EXT: THEME_EXT, list: list, preview: preview, contrast: contrast,
     apply: apply, activeModules: activeModules, statView: statView, separation: separation };
   if (WA.log) WA.log('info', '题材规则组合已加载');
 })();

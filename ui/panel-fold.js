@@ -84,7 +84,9 @@
     return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, norm) : norm;
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) { return r && r.key !== LS_KEY; }).concat([__REG]);
-  const _stat = { queries: 0, collapsedHit: 0, toggles: 0, collapsedNow: 0, expandedNow: 0, evicted: 0, lastReason: '', faults: {} };
+  const _stat = { queries: 0, collapsedHit: 0, toggles: 0, collapsedNow: 0, expandedNow: 0, evicted: 0,
+    // v2.231.0（优化 OPT-9）：重绘前后的位置保留读数（抓了几次 / 填回几格 / 几格对不上）
+    snapshots: 0, restored: 0, missed: 0, lastReason: '', faults: {} };
   function note(code) { _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
   function keyOf(page, sec) { return String(page) + ':' + String(sec); }
   function entryOf(page, sec) {
@@ -172,6 +174,65 @@
     syncCounters();
     return { ok: true, page: p, collapsed: ids.length, evicted: evicted };
   }
+  /**
+   * v2.231.0（优化 OPT-9）：抓一份「用户此刻填了什么、滚在哪」。
+   *   **面板重绘之前**调 —— 重绘把整块 body 换掉，而折叠一次也走重绘
+   *   （收起态不拼接 body，必须重绘才生效）。
+   *   与 `panelNav.grab` 的差别：那个记的是「**这一页**上一次离开时的样子」（按页留档、
+   *   供切页/回程用）；本函数记的是「**此刻这一份**」（就地放回，无跨页语义）。
+   *   两者字段口径一致（input/textarea/select，checkbox/radio 用 checked），
+   *   但**不共用实现** —— 混在一起会让「回到那一页时该填什么」与「重绘后该填什么」互相污染。
+   *   只读 DOM：不改世界、不写设置。
+   */
+  function snapshot(body) {
+    const b = body || null;
+    if (!b || typeof b.querySelectorAll !== 'function') return { ok: false, reason: 'no-body', fields: [], scroll: null, count: 0 };
+    let els = [];
+    try { els = b.querySelectorAll('input,textarea,select'); }
+    catch (e) { return { ok: false, reason: 'no-body', fields: [], scroll: null, count: 0 }; }
+    const fields = [];
+    for (let i = 0; i < els.length; i++) {
+      const el = els[i];
+      const typ = String(el.type || '').toLowerCase();
+      const boxed = (typ === 'checkbox' || typ === 'radio');
+      let v = '';
+      try { v = boxed ? !!el.checked : ((el.value === undefined || el.value === null) ? '' : String(el.value)); }
+      catch (e) { v = ''; }
+      fields.push({ idx: i, id: el.id || '', value: v, boxed: boxed });
+    }
+    const scroll = (typeof b.scrollTop === 'number') ? b.scrollTop : null;
+    _stat.snapshots++;
+    return { ok: true, fields: fields, scroll: scroll, count: fields.length };
+  }
+  /**
+   * 把抓下来的那一份填回去（**重绘之后**调）。
+   *   **如实报 miss**：对不上的控件不假装填上了（与 `panelNav.restore` 同规）。
+   *   `opt.keepScroll` —— 本次要定位到某条记录时置 true（滚动权交给定位，不在这里抢）。
+   */
+  function restore(body, snap, opt) {
+    const o = opt || {};
+    if (!snap || snap.ok !== true) return { ok: false, reason: 'no-snapshot', restored: 0, missed: 0 };
+    const b = body || null;
+    if (!b || typeof b.querySelectorAll !== 'function') return { ok: false, reason: 'no-body', restored: 0, missed: 0 };
+    let els = [];
+    try { els = b.querySelectorAll('input,textarea,select'); }
+    catch (e) { return { ok: false, reason: 'no-body', restored: 0, missed: 0 }; }
+    const byId = {};
+    for (let i = 0; i < els.length; i++) if (els[i].id) byId[els[i].id] = els[i];
+    let n = 0, miss = 0;
+    (snap.fields || []).forEach(function (f) {
+      const el = f.id ? byId[f.id] : els[f.idx];
+      if (!el) { miss++; return; }
+      try { if (f.boxed) el.checked = !!f.value; else el.value = f.value; }
+      catch (e) { miss++; return; }
+      n++;
+    });
+    if (o.keepScroll !== true && snap.scroll !== null && typeof b.scrollTop === 'number') {
+      try { b.scrollTop = snap.scroll; } catch (e) { /* 宿主无滚动位 ⇒ 如实跳过，不假装滚了 */ }
+    }
+    _stat.restored += n; _stat.missed += miss;
+    return { ok: true, restored: n, missed: miss };
+  }
   function syncCounters() {
     const c = settings().collapsed || {};
     let n = 0;
@@ -185,6 +246,7 @@
       sections: SECTIONS.length, pages: Array.from(new Set(SECTIONS.map(function (x) { return x.page; }))),
       queries: _stat.queries, collapsedHit: _stat.collapsedHit, toggles: _stat.toggles,
       collapsedNow: _stat.collapsedNow, expandedNow: _stat.expandedNow, evicted: _stat.evicted,
+      snapshots: _stat.snapshots, restored: _stat.restored, missed: _stat.missed,
       cap: MAX_ENTRIES, lastReason: _stat.lastReason, faults: Object.assign({}, _stat.faults)
     };
   }
@@ -209,6 +271,8 @@
     expandAll: expandAll,
     collapseAll: collapseAll,
     sectionsOf: sectionsOf,
+    // v2.231.0（优化 OPT-9）：重绘前后的位置保留（消费方：ui/panel.js 的折叠点击与整页重绘）
+    snapshot: snapshot, restore: restore,
     getSettings: settings,
     stat: stat,
     diagnose: diagnose

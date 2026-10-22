@@ -197,8 +197,27 @@ function runAll(a) {
   a(r.unclassified.length === 0 && r.deadMissing.length === 0 && r.deadLeak.length === 0,
     'v2780: [B] 现场零回车面（未分类 ' + r.unclassified.length + ' / 死表消失 ' + r.deadMissing.length + ' / 锚点漂移 ' + r.deadLeak.length + '）');
   a(r.baseStale.length === 0, 'v2780: [B] 台账不冗余（实 ' + r.baseStale.length + '）——防台账永久比现实胖');
-  a(r.witnessed + r.dead + r.base === r.total,
-    'v2780: [B] 三集合划分穷尽且互斥（' + r.witnessed + '+' + r.dead + '+' + r.base + '=' + r.total + '）');
+  // 三集合划分：**见证面要按「面内」计**（v2.231.0 修正）。
+  //   扫描面只认内联 `reason: 'x'`；`refuse('x')` 这种辅助函数写法门禁**故意不认**
+  //   （见 reject-code-gate.js 的形态说明：拼接/间接写法不报错也不伪归一，
+  //   它们的稳定性由各自引擎的专锁负责）。EXP-3～EXP-7 的引擎统一走 `refuse()`，
+  //   故其码落在面外 —— 拿「见证表总数」当「面内数」会让本条恒假（1003 ≠ 981）。
+  const wInFace = Object.keys(w.expect).filter(function (c) { return !!sc.hits[c]; });
+  const wOutFace = Object.keys(w.expect).filter(function (c) { return !sc.hits[c]; });
+  a(wInFace.length + r.dead + r.base === r.total,
+    'v2780: [B] 三集合划分穷尽且互斥（面内见证 ' + wInFace.length + '+' + r.dead + '+' + r.base
+    + '=' + r.total + '）');
+  // 面外见证码必须**显式登记**：它们走 `refuse()` 辅助函数（扫描面外），
+  //   靠各自引擎的专锁咬住；此处钉住清单，防它们静默漂移或悄悄混进面内。
+  const OUT_FACE_OK = ['unknown-worker', 'no-such-facility', 'bad-days', 'order-paused', 'facility-full',
+    'shift-conflict', 'crew-full', 'no-road',
+    'activity-closed', 'already-exists', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
+    'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day',
+    '__exp7-absent-check', '__exp7-rain-check', '__exp7-settle-check'];
+  const outSorted = wOutFace.slice().sort();
+  a(outSorted.join(',') === OUT_FACE_OK.slice().sort().join(','),
+    'v2780: [B] 面外见证码与登记清单逐字一致（实 ' + outSorted.join(',') + '）'
+    + '—— 它们是 refuse() 辅助函数写法的码，扫描面外、由各自引擎专锁咬住');
   a(codes.indexOf('bad-operator') >= 0, 'v2780: [B] 不可达码仍在源码里（不删，只登记）');
   const deadSet = Object.keys(witness.DEAD);
   a(deadSet.every(function (c) { return codes.indexOf(c) >= 0; }), 'v2780: [B] 死表每一项都真在源码里（不是幽灵条目）');

@@ -128,7 +128,20 @@ global.TavernHelper = {
   insertOrAssignVariables: function (patch, o) { Object.keys(patch).forEach(function (k) { __vars[k] = patch[k]; }); return true; },
   deleteVariable: function (path, o) { delete __vars[path]; return true; },
   getWorldbook: async function (name) { return __wbEntries[name] || []; },
-  createWorldbookEntries: async function (name, entries) { (__wbEntries[name] = __wbEntries[name] || []).push.apply(__wbEntries[name], entries); return entries; }
+  createWorldbookEntries: async function (name, entries) { (__wbEntries[name] = __wbEntries[name] || []).push.apply(__wbEntries[name], entries); return entries; },
+  // v2.231.0（优化 OPT-7）：宿主**改旧条目**的能力。
+  //   此前 mock 只到「读 + 建」，于是「禁用旧条目 / 覆盖最新」这条链在自动化里**永远走不到**
+  //   ——任何 set / disable 都会命中 no-update-api，而真实宿主里这个能力是存在的。
+  //   「门禁全绿」与「能力可用」是两件事：这里补上真实存在的那一种（只补一种，不造第二条）。
+  //   语义按真宿主对齐：更新函数拿到的是**真数组**，原地改写即为生效；返回值不被采信
+  //   （「我返回了新数组」不等于「它写回去了」——本仓口径：「我写了」≠「它真在那儿」）。
+  //   `global.__wbUpdateCalls` 是调用记账，供专锁断言「这条链真走过更新口」。
+  updateWorldbookWith: async function (name, updater) {
+    global.__wbUpdateCalls = (global.__wbUpdateCalls || 0) + 1;
+    __wbEntries[name] = __wbEntries[name] || [];
+    updater(__wbEntries[name]);
+    return __wbEntries[name];
+  }
 };
 global.__vars = __vars;
 global.__wbEntries = __wbEntries;

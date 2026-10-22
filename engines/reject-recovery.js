@@ -273,7 +273,13 @@
     //   是一个**结论**，不是调用被拒；给它编恢复动作就是造数据（与 `narrative-only`
     //   / `nothing-recorded` 同规）。
     'empty-label': { out: true, why: 'fate 建表时该项 label 为空被丢弃：这是筛选结论，不是拒收' },
-    'near-dup': { out: true, why: 'fate 建表时与已收项近似重复被丢弃（回执里带 of 指认撞的是哪条）：筛选结论' }
+    'near-dup': { out: true, why: 'fate 建表时与已收项近似重复被丢弃（回执里带 of 指认撞的是哪条）：筛选结论' },
+      // ── v2.231.0（拓展 EXP-1～EXP-7）：engines/act.js 的工作确认器读数 ──
+      //   委托被取消时它返回 `{status:'failed', reason:'contract-cancelled'}` —— 那个对象
+      //   **不带 ok**，故现场面是判不出。给档而不是 out:true 的理由：这条读数决定玩家
+      //   下一步动作（重新立委托再走），与 `plan-unavailable` / `registry-missing` 同规；
+      //   说「契约外」等于把「该怎么办」丢掉。
+    'contract-cancelled': { kind: 'request-setup', why: '委托已被取消：这一步没有可结的账，先重新立委托再走' }
   };
 /* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
    *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
@@ -323,6 +329,30 @@
    *   恢复档均不写 OVERRIDES:`unknown-*` 的分词本就被规则表收在 adjust-input 档。
    */
   const REJECT_FACE = [
+    // ── v2.231.0（拓展 EXP-1～EXP-7）：本批七个新引擎（training / gear / production /
+    //   survey / contest / ruling / activity）新增的 49 条拒收码 —— 它们此前**只进码面口径、
+    //   没进本快照**，reject-recovery 专锁 B3/B4/C4 自本批起一直红着（同一形态本仓已栽过
+    //   四次：v2.203.0 的 17 条、v2.209.0 的 14 条、v2.221.0 的 3 条、v2.222.0 的 3 条）。
+    //   本版按现场复算一次收敛，逐条不改档：探针实测 49 条**全部**由规则表收住
+    //   （via:'rule'、无档 0 条）⇒ 一条都不写 OVERRIDES（重复登记会让 A8 与规则表打架）。
+    //   三条面迁移同批落定（见下方 SUCCESS_FACE / NEUTRAL_FACE / NEUTRAL_REVIEW 的对应段）：
+    //     · not-holder：engines/gear.js 的三处 ok:false 站点（v2.231.0 新引擎）使它
+    //       从成功面**迁入**拒收面 —— 括号配对判据是「只要**一处**落在 ok:false 对象里
+    //       即拒收面」（与 v2.195.0 的 no-step、v2.221.0 的 not-registered 同一条判据）。
+    //     · anchored / scope：engines/vitals.js 与 engines/floor-settle.js 的新成功返回
+    //       （ok:true）⇒ 迁入成功面。
+    //     · contract-cancelled：engines/act.js 的工作确认器（那个对象不带 ok）⇒ 判不出面，
+    //       并同批在 NEUTRAL_REVIEW 登记（A7 要求快照与登记键集逐字相同）。
+    'abilities-full', 'all-conflict', 'already-refunded', 'attrs-empty', 'attrs-off',
+    'bad-phase', 'case-closed', 'case-not-ruled', 'entity-absent', 'entity-unavailable',
+    'exhibits-full', 'facilities-full', 'items-full', 'jobs-full', 'message-missing',
+    'missing-end', 'mode-mismatch', 'no-book', 'no-economy', 'no-grounds',
+    'no-judge', 'no-new-grounds', 'no-penalty', 'no-such-activity', 'no-such-case',
+    'no-such-scene', 'no-such-spot', 'no-such-stage', 'not-done', 'not-equipped',
+    'not-holder', 'order-closed', 'order-delivered', 'penalties-full', 'rulings-full',
+    'scene-closed', 'scenes-full', 'scout-closed', 'short-cost', 'short-fine',
+    'short-material', 'short-supply', 'slot-taken', 'spots-full', 'unknown-item',
+    'unknown-order', 'unknown-party', 'unknown-scout', 'worn-out',
     'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'add-chain-threw', 'adopt-budget-exhausted',
      'adopt-throw', 'auto-adopt-off',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
@@ -525,7 +555,7 @@
   const SUCCESS_FACE = ['absent', 'all-duplicates', 'already', 'already-consumed', 'already-open',
     'anonymous', 'applied', 'attenuated', 'checked', 'clean', 'first', 'first-baseline',
     'halted', 'interior-blocked', 'module-disabled', 'needs-real-device', 'no-elapsed', 'no-far',
-    'not-holder', 'not-in-table', 'ok', 'omniscient', 'out-of-lens', 'pass',
+    'not-in-table', 'ok', 'omniscient', 'out-of-lens', 'pass',
     'player-view', 'premature', 'range-off', 'reuse', 'same-day', 'trigger-fired', 'triggered',
     'unlocked', 'within-lock',
     // v2.209.0（优化 6）：ui/assistant.js 的 `no-terms`（未检索到词条时如实返回 ok:false 之外
@@ -534,6 +564,9 @@
     // v2.230.0（拓展 N12）：同上口径补齐成功面（ok:true 侧的返回）。
     'already-cleared', 'disabled-passthrough', 'fallback', 'frame-evicted', 'lenient', 'merged', 'no-edge',
     'nothing-held', 'passthrough', 'replaced', 'same-tier', 'tie', 'unbound', 'unspecified', 'updated',
+    // ── v2.231.0（拓展 EXP-1～EXP-7）：两条新成功返回（ok:true）迁入本面；
+    //   同批 `not-holder` 因 engines/gear.js 的新 ok:false 站点迁出（见拒收面段）。
+    'anchored', 'scope',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
@@ -549,6 +582,8 @@
     'unregistered-setting',
     // v2.230.0（拓展 N12）：同上口径补齐判不出面（源码里那个对象不带 ok）。
     'empty-label', 'near-dup',
+    // ── v2.231.0（拓展 EXP-1～EXP-7）：engines/act.js 的工作确认器读数（对象不带 ok）。
+    'contract-cancelled',
   ];
   /** 三快照查表 → 面。未命中即 `unknown`（**判不出就是判不出**，不拿规则表兜）。 */
   function frozenFace(c) {

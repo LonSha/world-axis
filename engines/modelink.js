@@ -140,7 +140,11 @@
       const byCount = list.length > cfg.maxDrafts ? (evicted += list.length - cfg.maxDrafts, list.slice(list.length - cfg.maxDrafts)) : list;
       let total = byCount.reduce(function (n, d) { return n + (Number(d && d.kb) || 0); }, 0);
       while (total > cfg.maxDraftKB && byCount.length > 1) { total -= Number(byCount[0].kb) || 0; byCount.shift(); evicted++; }
-      b.drafts = WA.evict && WA.evict.array ? WA.evict.array(byCount, 'modelink.drafts') : byCount;
+      const _keptMl = byCount;
+      // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+      //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+      if (WA.evict && WA.evict.array) WA.evict.array(_keptMl, 'modelink.drafts');
+      b.drafts = _keptMl;
       out = { ok: true, reason: 'ok', id: row.id, state: row.state, drafts: b.drafts.length };
       return true;
     }, 'modelink:draftAdd');

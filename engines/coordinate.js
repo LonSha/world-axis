@@ -83,7 +83,11 @@
     let out = null;
     WA.store.transact(function (draft) {
       const b = bucket(draft);
-      b.anchors = WA.evict && WA.evict.array ? WA.evict.array(b.anchors.concat([meta]), 'coordinate.anchors') : b.anchors.concat([meta]);
+      const _keptCa = b.anchors.concat([meta]);
+      // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+      //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+      if (WA.evict && WA.evict.array) WA.evict.array(_keptCa, 'coordinate.anchors');
+      b.anchors = _keptCa;
       out = { ok: true, reason: 'ok', id: id, keys: ANCHOR_KEYS.slice() };
       return true;
     }, 'coordinate:anchorAdd');
@@ -137,7 +141,11 @@
     let out = null;
     WA.store.transact(function (draft) {
       const b = bucket(draft);
-      b.rows = WA.evict && WA.evict.array ? WA.evict.array(b.rows.concat([row]), 'coordinate.rows') : b.rows.concat([row]);
+      const _keptCr = b.rows.concat([row]);
+      // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+      //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+      if (WA.evict && WA.evict.array) WA.evict.array(_keptCr, 'coordinate.rows');
+      b.rows = _keptCr;
       out = { ok: true, reason: 'ok', id: row.id, line: line, segments: cells.length };
       return true;
     }, 'coordinate:capture');

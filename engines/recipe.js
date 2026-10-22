@@ -204,10 +204,231 @@
         { layer: 'gen', id: 'surv-a3', text: '相同起点下，依已知情报选路线会写出与「按直觉走」不同的正文。' },
         { layer: 'gen', id: 'surv-a4', text: '正文里出现的补给与伤情须能追到已登记事实或明确来源。' }
       ]
+    },
+    /**
+     * ── v2.231.0（优化 OPT-8）：三张**带词汇声明**的配方 ──────────────────────
+     *   旧五张只声明「装哪些模块」，执行器里的货币 / 配方 / 判定维度仍是写死的常量。
+     *   本块新增两个槽位：`economy`（这一局的货币、基准价目、合法配方）与
+     *   `judge`（这一局的判定维度与是否启用判定）。**执行器读它们**，不再读死常量。
+     *   旧五张**刻意不声明**这两个槽位 —— 未声明时执行器原样沿用旧常量，
+     *   旧档语义逐字不变（不把已有银元自动改名成另一种资产）。
+     */
+    history: {
+      cn: '历史', core: '身份与规矩、人情往来、粮价与徭役',
+      themes: ['history'], extraThemes: ['urban'],
+      policies: ['fact-priority', 'cost-bearing', 'deadline', 'escalate-slow'],
+      kinds: ['wait', 'rest', 'move', 'meet', 'tell', 'work', 'deliver'],
+      resources: ['银元', '粮', '布'],
+      engines: ['opportunity', 'world', 'org', 'act', 'economy', 'intel'],
+      optional: ['regional', 'trends', 'eraCycle'],
+      economy: {
+        money: '银元',
+        goods: { '米': 0.06, '面': 0.09, '布': 0.35, '面点': 0.15, '成衣': 0.9 },
+        recipes: {
+          '面点': { in: { '面': 2 }, out: { '面点': 3 } },
+          '成衣': { in: { '布': 2 }, out: { '成衣': 1 } }
+        }
+      },
+      // 历史题材不强制数值判定（非数值叙事可关闭属性判定）。
+      judge: { enabled: false, attrs: [], labels: {} },
+      scenes: [
+        { id: 'hist-grain-price', title: '粮价与征调', prompt: '入秋粮价被人为压低，而征调的单子已经到了里正手里；压价的人与收粮的是同一个。' },
+        { id: 'hist-two-names', title: '两份名籍', prompt: '同一个人在两处用了不同的名籍，两处都有人替他作证，而两处的差役都在找他。' },
+        { id: 'hist-wrong-door', title: '走错门的信', prompt: '一封信被送到同名不同户的人家，拆开的人看懂了里面的内容，却不知道收信人是谁。' }
+      ],
+      boundaries: ['不该知道征调名册背后的真实用意（只能从经手人的行为推断）',
+        '不该知道两份名籍里哪一份是真的——只能知道它们对不上',
+        '不该把「听说」当成已经核实'],
+      acceptance: [
+        { layer: 'state', id: 'hist-a1', text: '同一件货在同一地点的基准价取自本配方价目表；表外资源首次登记仍须显式给基础价（missing-base）。' },
+        { layer: 'state', id: 'hist-a2', text: '货币名取自本配方（银元）；旧档未声明经济面时执行器沿用旧常量，余额不被换算。' },
+        { layer: 'gen', id: 'hist-a3', text: '相同起点下，带来源的说法与无来源的说法在正文里可区分。' },
+        { layer: 'gen', id: 'hist-a4', text: '判定面关闭时，正文不出现属性检定式表述。' }
+      ]
+    },
+    scifi: {
+      cn: '科幻', core: '信用点与配额、封舱与延误、授权与追溯',
+      themes: ['scifi'], extraThemes: [],
+      policies: ['fact-priority', 'cost-bearing', 'deadline', 'intel-source'],
+      kinds: ['wait', 'rest', 'move', 'meet', 'tell', 'work', 'deliver'],
+      resources: ['信用点', '合金', '元件'],
+      engines: ['opportunity', 'world', 'org', 'act', 'economy', 'freight'],
+      optional: ['regional', 'trends', 'quota'],
+      economy: {
+        money: '信用点',
+        goods: { '合金': 40, '元件': 120, '组件': 200 },
+        recipes: { '组件': { in: { '合金': 2, '元件': 1 }, out: { '组件': 1 } } }
+      },
+      judge: { enabled: true, attrs: ['body', 'sense', 'mind', 'will'],
+        labels: { body: '体魄', sense: '感知', mind: '心智', will: '意志' } },
+      scenes: [
+        { id: 'scifi-quarantine', title: '封舱待查', prompt: '货舱检测出未知读数，按规定必须封舱待查；而封舱会让下一站的人在窗口期之后才拿到补给。' },
+        { id: 'scifi-credit-gap', title: '信用点缺口', prompt: '账上缺口与一次未申报的转出金额一致，而那笔转出的授权码属于一个已经离职的人。' },
+        { id: 'scifi-late-signal', title: '迟到的信号', prompt: '一段信号在既定延迟之外到达，内容指向一件尚未发生的事。' }
+      ],
+      boundaries: ['不该知道检测读数的成因（只能知道读数本身与规程）',
+        '不该知道离职者的去向与动机（只能从授权记录推断）',
+        '不该把「尚未发生」当成已经确定'],
+      acceptance: [
+        { layer: 'state', id: 'scifi-a1', text: '同一件货的货币名取自本配方（信用点），与历史局的银元互不影响（两局独立）。' },
+        { layer: 'state', id: 'scifi-a2', text: '本配方新增的「组件」配方可被供应链执行（输入取自本配方价目表，未知配方仍 unknown-recipe）。' },
+        { layer: 'gen', id: 'scifi-a3', text: '相同起点下，按规程处置与绕开规程会走向不同的正文后果。' },
+        { layer: 'gen', id: 'scifi-a4', text: '判定面启用时属性名只认本配方声明的四个（旧六属性不再被接受）。' }
+      ]
+    },
+    xianxia: {
+      cn: '仙侠', core: '灵石与丹材、门规与人情、修为与道心',
+      themes: ['xianxia'], extraThemes: [],
+      policies: ['cost-bearing', 'deadline', 'intel-source', 'escalate-slow'],
+      kinds: ['wait', 'rest', 'move', 'meet', 'tell', 'work', 'deliver'],
+      resources: ['灵石', '灵草', '丹砂'],
+      engines: ['opportunity', 'world', 'org', 'act', 'economy', 'blackbox'],
+      optional: ['enemy', 'regional', 'eraCycle'],
+      economy: {
+        money: '灵石',
+        goods: { '灵草': 5, '丹砂': 12, '聚气丹': 30 },
+        recipes: { '聚气丹': { in: { '灵草': 2, '丹砂': 1 }, out: { '聚气丹': 1 } } }
+      },
+      judge: { enabled: true, attrs: ['gen', 'qi', 'shen', 'dao'],
+        labels: { gen: '根骨', qi: '气海', shen: '神识', dao: '道心' } },
+      scenes: [
+        { id: 'xianxia-missing-herb', title: '丹房缺一味', prompt: '开炉前发现缺一味药，替代品两处都有：一处来路不明，一处要欠一个人情。' },
+        { id: 'xianxia-sect-rule', title: '门规与私交', prompt: '门规要求上报，而上报会让同门被逐；当事人并不知道你已经知道。' },
+        { id: 'xianxia-before-tribulation', title: '雷劫前的托付', prompt: '同门托付一物，明说若自己回不来就转交；三日后雷劫将至。' }
+      ],
+      boundaries: ['不该知道丹材的真实来路（只能从经手人与价目推断）',
+        '不该知道同门隐瞒的事——只能从其行为与时间表推断',
+        '不该把「听说」当成已经核实'],
+      acceptance: [
+        { layer: 'state', id: 'xianxia-a1', text: '货币名取自本配方（灵石），基准价目表内的资源可免显式基础价登记。' },
+        { layer: 'state', id: 'xianxia-a2', text: '「聚气丹」配方可被供应链执行；未声明的配方仍 unknown-recipe。' },
+        { layer: 'gen', id: 'xianxia-a3', text: '相同起点下，欠人情与买来路不明的货会走向不同的正文后果。' },
+        { layer: 'gen', id: 'xianxia-a4', text: '判定面属性名为本配方声明的四个（根骨/气海/神识/道心），旧六属性不再被接受。' }
+      ]
     }
   };
   /** 来源参照：主题模块清单的真源在 theme.js（不复制一份，避免两处漂移）。 */
   const SOURCE_FILES = { themes: 'engines/theme.js', kinds: 'engines/act.js', org: 'engines/org.js' };
+
+  /**
+   * ── v2.231.0（优化 OPT-8）：扩展题材与「执行器读当前世界定义」────────────────
+   *   现场缺口（开工前逐条复核，不是静态推测）：
+   *     · `engines/economy.js` 的货币是**写死的常量**（`MONEY='银元'`）、配方是**写死的两行**
+   *       （面包 / 铁器）—— 现代校园、历史、仙侠或科幻局都被底层固定词汇拉回同一种游戏；
+   *     · `engines/fate.js` 的属性白名单写死 `str/dex/con/int/wis/cha`，`evalFormula` 只认它；
+   *     · 本模块的五张配方**没有一处声明货币 / 资源 / 配方 / 判定维度** ⇒ 执行器无从读取，
+   *       「题材」只改模块清单，改不了世界里的词汇。
+   *   本块的形态：配方多两个槽位（`economy` / `judge`），执行器改为**读当前世界的声明**；
+   *   未声明时**原样沿用旧常量**（旧档语义逐字不变，不自动把已有银元改名成另一种资产）。
+   */
+  /**
+   * 题材真源目录：**就是 `theme.THEMES` 那一份**（不是本模块另存一份，也不往它上面补键）。
+   *   扩展题材（现代 / 历史 / 科幻 / 仙侠）由 v2.231.0（OPT-8）**加进真源本身**，
+   *   与内建五张同处一张表 —— 因为 `theme.apply/preview/compose` 是模块组合的唯一写口，
+   *   题材不在那张表里，apply 就会静默忽略它（「配方的题材集合」与「实际组合出来的模块」
+   *   当场分叉，而两边各自都报成功）。
+   *   真源缺席（theme 未装载）⇒ 返回 null：题材面**核不了**，如实留白，
+   *   既不假称「题材都不在」，也不假称通过。
+   */
+  function themeCatalog() {
+    return (WA.theme && WA.theme.THEMES) ? WA.theme.THEMES : null;
+  }
+  /** 扩展题材名（真源在 theme.js 的 THEME_EXT；本模块只读，用于标注「这张是扩展的」）。 */
+  function extendedThemes() {
+    return (WA.theme && WA.theme.THEME_EXT) ? WA.theme.THEME_EXT : null;
+  }
+  /**
+   * 经济面：这一局用什么货币、有哪些基准价目、哪些配方合法。
+   *   未声明 ⇒ 如实拒收 `no-economy`（**不回落成银元** —— 回落会让「这一局声明了元」
+   *   与「这一局没声明」在读数里长得一样，正是本仓点名的失效形态）。
+   */
+  function economySpec(name) {
+    const k = String(name || settings().name || '');
+    if (!known(k)) return { ok: false, reason: 'unknown-recipe', unknown: k, known: Object.keys(RECIPES) };
+    const e = RECIPES[k].economy;
+    // 只读口**不记 stat**：catalogView 会逐张配方调用本函数，一次「看目录」就把拒收计数刷满 ——
+    //   那是观测污染被观测者（与仓内 perfTrace.partial 不接注入链同一条纪律）。
+    if (!e || typeof e !== 'object' || !e.money) return { ok: false, reason: 'no-economy', name: k };
+    const goods = {}, recipes = {};
+    Object.keys(e.goods || {}).forEach(function (r) {
+      const v = Number(e.goods[r]);
+      if (isFinite(v) && v > 0) goods[r] = v;          // 非正数不是价 —— 静默丢掉而不是当成 0（0 会让带宽恒为 0）
+    });
+    Object.keys(e.recipes || {}).forEach(function (r) {
+      const row = e.recipes[r];
+      if (!row || !row.in || !row.out) return;         // 形状不对的配方**不进目录**（宁可 unknown-recipe，也不立一条半成品）
+      recipes[r] = { in: Object.assign({}, row.in), out: Object.assign({}, row.out) };
+    });
+    return { ok: true, name: k, money: String(e.money), goods: goods, recipes: recipes, source: 'recipe:' + k };
+  }
+  /**
+   * 判定面：这一局的判定维度，以及判定本身是否启用。
+   *   **属性名必须是 ASCII 标识符** —— 这是求值器的机制边界（`evalFormula` 用 `[a-z_]+` 提标识符、
+   *   用 `\b` 定界），中文属性名**过不了**求值器。故这里就按求值器口径过滤，
+   *   不假装支持：能过的留下，过不了的当场不算数（而不是等调用方在 `evalFormula` 上撞 unknown-attr）。
+   *   显示名另走 `labels`（`gen` → 「根骨」）。
+   */
+  function judgeSpec(name) {
+    const k = String(name || settings().name || '');
+    if (!known(k)) return { ok: false, reason: 'unknown-recipe', unknown: k, known: Object.keys(RECIPES) };
+    const j = RECIPES[k].judge;
+    if (!j || typeof j !== 'object') return { ok: false, reason: 'no-judge', name: k };   // 只读口不记 stat（同上）
+    const raw = Array.isArray(j.attrs) ? j.attrs : [];
+    const attrs = [], dropped = [];
+    raw.forEach(function (x) {
+      const s = String(x);
+      if (/^[a-z_]+$/.test(s) && attrs.indexOf(s) < 0) attrs.push(s); else dropped.push(s);
+    });
+    const labels = {};
+    Object.keys(j.labels || {}).forEach(function (x) { if (attrs.indexOf(x) >= 0) labels[x] = String(j.labels[x]); });
+    return { ok: true, name: k, enabled: j.enabled !== false, attrs: attrs, labels: labels,
+      dropped: dropped, source: 'recipe:' + k };
+  }
+  /**
+   * 前置自洽判定：**「我声明了」不等于「它真在那儿」**。
+   *   逐条机械核对四类可静态判定的事（题材在真源里 / 行动词汇在 act.KINDS 里 /
+   *   经济面自洽：配方输入输出的每件货都有基准价 / 判定面自洽：启用了就得有合法属性名）。
+   *   判不了的**如实进 `unknown`**（如 act 未装载时行动词汇核不了），不假装缺席、也不假装通过。
+   *   本函数**只读**，不改世界、不改设置。
+   */
+  function satisfied(name) {
+    const k = String(name || '');
+    if (!known(k)) return { ok: false, reason: 'unknown-recipe', unknown: k, known: Object.keys(RECIPES) };
+    const r = RECIPES[k], spec = specOf(k);
+    const themes = themeCatalog();   // 只读口不记 stat（同上）
+    const missing = [], unknown = [], fallback = [];
+    if (!themes) unknown.push({ kind: 'theme', id: '*', why: 'theme 未装载，题材真源未核' });
+    else spec.themes.forEach(function (x) { if (!themes[x]) missing.push({ kind: 'theme', id: x, why: '题材真源里没有它' }); });
+    const actKinds = (WA.act && Array.isArray(WA.act.KINDS)) ? WA.act.KINDS : null;
+    if (actKinds) {
+      spec.kinds.forEach(function (x) { if (actKinds.indexOf(x) < 0) missing.push({ kind: 'kind', id: x, why: '不在 act.KINDS 内' }); });
+    } else {
+      unknown.push({ kind: 'kind', id: '*', why: 'act 未装载，行动词汇未核' });
+    }
+    const eco = economySpec(k);
+    if (!eco.ok) {
+      // 未声明 = **沿用旧常量**（旧档语义逐字不变），不是不自洽 —— 两者分开记，
+      //   否则旧五张会被一律报成「有缺陷」，真正的对不上反而淹在里面。
+      fallback.push({ kind: 'economy', why: '未声明经济面 ⇒ 执行器沿用旧常量（银元 / 面包·铁器两行配方）' });
+    } else {
+      Object.keys(eco.recipes).forEach(function (rn) {
+        ['in', 'out'].forEach(function (side) {
+          Object.keys(eco.recipes[rn][side]).forEach(function (g) {
+            if (!Object.prototype.hasOwnProperty.call(eco.goods, g)) {
+              missing.push({ kind: 'goods', id: g, why: '配方「' + rn + '」的' + (side === 'in' ? '输入' : '产出') + '没有基准价' });
+            }
+          });
+        });
+      });
+    }
+    const jd = judgeSpec(k);
+    if (!jd.ok) fallback.push({ kind: 'judge', why: '未声明判定面 ⇒ 执行器沿用旧白名单（str/dex/con/int/wis/cha）' });
+    else if (jd.enabled && !jd.attrs.length) missing.push({ kind: 'judge', id: k, why: '判定面已启用却没有合法属性名（属性名须为 ASCII 标识符）' });
+    if (jd.ok && jd.dropped.length) unknown.push({ kind: 'attr', id: jd.dropped.join(','), why: '属性名过不了求值器口径（非 ASCII 标识符），未计入判定面' });
+    return { ok: true, name: k, cn: r.cn, satisfied: missing.length === 0,
+      missing: missing, unknown: unknown, fallback: fallback,
+      themeSource: 'theme.THEMES（本模块注册扩展题材）' };
+  }
 
   const stat = { previews: 0, applies: 0, rejects: 0, seeds: 0, blocked: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
@@ -228,7 +449,7 @@
   function staleness() {
     const out = { kinds: [], themes: [], policies: [] };
     const actKinds = (WA.act && Array.isArray(WA.act.KINDS)) ? WA.act.KINDS : null;
-    const themes = (WA.theme && WA.theme.THEMES) ? WA.theme.THEMES : null;
+    const themes = themeCatalog();   // v2.231.0（OPT-8）：扩展题材一并纳入（否则新配方恒被记 stale）
     Object.keys(RECIPES).forEach(function (k) {
       const r = RECIPES[k];
       if (actKinds) (r.kinds || []).forEach(function (x) { if (actKinds.indexOf(x) < 0) out.kinds.push(k + ':' + x); });
@@ -416,6 +637,18 @@
       themeClash: THEME_CLASH.map(function (c) { return { id: c.id, pair: c.pair.slice(), cn: c.cn, why: c.why }; }),
       basics: basics(), basicsStale: basicsStale(), basicsUnverified: basicsUnverified(),
       kindsStale: st.kinds.slice(), themeStale: st.themes.slice(), policyStale: st.policies.slice(),
+      // v2.231.0（OPT-8）：扩展题材目录 + 每张配方的经济面 / 判定面 / 前置自洽（只读）
+      themeCatalog: Object.keys(themeCatalog() || {}).sort().map(function (x) {
+        const ext = extendedThemes();
+        return { key: x, label: ((themeCatalog() || {})[x] || {}).label || x, extended: !!(ext && ext[x]) };
+      }),
+      economyOf: Object.keys(RECIPES).map(function (x) { const e = economySpec(x); return e.ok ? e : { ok: false, name: x, reason: e.reason }; }),
+      judgeOf: Object.keys(RECIPES).map(function (x) { const j = judgeSpec(x); return j.ok ? j : { ok: false, name: x, reason: j.reason }; }),
+      satisfiedOf: Object.keys(RECIPES).map(function (x) {
+        const s = satisfied(x);
+        return { name: x, satisfied: !!s.satisfied, missing: (s.missing || []).length,
+          unknown: (s.unknown || []).length, fallback: (s.fallback || []).length };
+      }),
       sources: Object.assign({}, SOURCE_FILES) };
   }
 
@@ -429,6 +662,10 @@
     basics: basics, basicsStale: basicsStale, basicsUnverified: basicsUnverified, staleness: staleness,
     themeClashes: themeClashes, policyClashes: policyClashes,
     catalogView: catalogView, statView: statView,
+    // v2.231.0（OPT-8）：执行器读当前世界定义的三个只读口 + 扩展题材表
+    //   （消费方：economy / fate / supply-chain 读前两个，面板与诊断读全部）
+    themeCatalog: themeCatalog, economySpec: economySpec, judgeSpec: judgeSpec, satisfied: satisfied,
+    extendedThemes: extendedThemes,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
   if (WA.log) WA.log('info', '题材配方已加载');

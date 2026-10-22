@@ -300,13 +300,20 @@ section('E 负控制:真源码破坏 → 装载破坏副本 → 重跑同款判�
 
   // E2:收起态**照样拼接 body** ⇒ C3/C4/C5 必现形
   const panelSrc = RD(PANEL_REL);
-  const anchor2 = "    if (!known) return btn + '<div class=\"wa-fold-b\" data-foldb=\"' + esc(key) + '\">' + body + '</div>';\n"
-    + "    return btn + (col ? '' : '<div class=\"wa-fold-b\" data-foldb=\"' + esc(key) + '\">' + body + '</div>');";
+  // v2.231.0（优化 OPT-9）收口：**锚点形态同步**（不是删判据）。
+  //   本版把段体求值收进 `html()` 闭包（惰性求值：收起态**连读数都不执行**），
+  //   于是旧锚点（`+ body +`）在源码里不存在了。被测语义没变 —— 变的只是形态，
+  //   故这里换锚点、**不动判据强度**：E2a 的「恰中 1 次」逐字保留，
+  //   E2b/E2c 的破坏写法换成新形态下的「假折叠」（收起态照样拼接）。
+  const anchor2 = "    const html = function () { return (typeof body === 'function') ? body() : body; };\n"
+    + "    if (!known) return btn + '<div class=\"wa-fold-b\" data-foldb=\"' + esc(key) + '\">' + html() + '</div>';\n"
+    + "    return btn + (col ? '' : '<div class=\"wa-fold-b\" data-foldb=\"' + esc(key) + '\">' + html() + '</div>');";
   a(panelSrc.indexOf(anchor2) >= 0 && panelSrc.split(anchor2).length - 1 === 1,
     'E2a: (锚点纯度)收起态分支在真源码里恰中 1 次');
   const broken2 = panelSrc.replace(anchor2,
-    "    if (!known) return btn + '<div class=\"wa-fold-b\" data-foldb=\"' + esc(key) + '\">' + body + '</div>';\n"
-    + "    return btn + '<div class=\"wa-fold-b\" data-foldb=\"' + esc(key) + '\">' + body + '</div>';");
+    "    const html = function () { return (typeof body === 'function') ? body() : body; };\n"
+    + "    if (!known) return btn + '<div class=\"wa-fold-b\" data-foldb=\"' + esc(key) + '\">' + html() + '</div>';\n"
+    + "    return btn + '<div class=\"wa-fold-b\" data-foldb=\"' + esc(key) + '\">' + html() + '</div>';");
   const env2 = require('./ui-gate-sync.js').fresh({ srcOverride: { 'ui/panel.js': broken2 } });
   env2.WA.ui.open();
   const panel2 = env2.dom.getElementById('wa-panel');

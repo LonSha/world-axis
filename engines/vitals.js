@@ -68,7 +68,13 @@
   function saveSettings(next) {
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
-  const stat = { registered: 0, ticks: 0, conceived: 0, know: 0, ended: 0, refused: 0, blocked: 0, lastReason: '', faults: {} };
+  const stat = { registered: 0, ticks: 0, conceived: 0, know: 0, ended: 0, refused: 0, blocked: 0,
+    // v2.231.0（OPT-4）：剧情时间驱动面 ——
+    //   swept       ：按剧情日差推进过几轮（同日重复调用不计数）；
+    //   sweptDays   ：累计推进了几个剧情日；
+    //   lastSweepDay：上一次推进锚在哪个剧情日（**不是计数器，是锚点**，reset 不清）；
+    //   birthDue    ：到期但**等剧情事件**的孕期数（不靠计时自动杜撰分娩）。
+    swept: 0, sweptDays: 0, lastSweepDay: null, birthDue: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 80) : String(v == null ? '' : v).slice(0, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -100,7 +106,11 @@
       if (!r) { r = freshRow(nm); b.rows.push(r); }
       r.cycleLen = Number.isFinite(len) ? len : r.cycleLen;
       r.updatedAt = clockNow('vitals');
-      b.rows = WA.evict && WA.evict.array ? WA.evict.array(b.rows, 'vitals.rows') : b.rows;
+      const _keptVt = b.rows;
+      // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+      //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+      if (WA.evict && WA.evict.array) WA.evict.array(_keptVt, 'vitals.rows');
+      b.rows = _keptVt;
       out = { ok: true, reason: 'ok', name: nm, cycleLen: r.cycleLen };
       return true;
     }, 'vitals:register');
@@ -223,6 +233,93 @@
     if (out && out.ok) stat.ticks++;
     return out || refuse('tx-failed');
   }
+  /**
+   * v2.231.0（OPT-4）：**剧情日读数**（唯一真源是 `store.clock.dayIndex`，与 playtime.story 同源）。
+   *   缺失即 null（**拒算**，不拿真实时间顶替 —— 与 playtime「不猜日期」同口径）。
+   */
+  function storyDay() {
+    try {
+      const st = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+      const c = st.clock || {};
+      return (typeof c.dayIndex === 'number' && isFinite(c.dayIndex)) ? c.dayIndex : null;
+    } catch (e) { return null; }
+  }
+  /**
+   * v2.231.0（OPT-4）：**推进锚点**。此前只活在模块内存（`stat.lastSweepDay`）——
+   *   重载后锚点归零 ⇒ 第一次 sweep 只记锚点，把「重载期间跨过的剧情日」静默吞掉一次
+   *   （推进链断在重载上，而面板上日子照走）。锚点必须进存档：
+   *   真源是 `store.vitals.lastSweepDay`，内存值只作**同会话缓存**。
+   */
+  function anchorDay() {
+    try {
+      const st = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+      const v = st.vitals || {};
+      if (typeof v.lastSweepDay === 'number' && isFinite(v.lastSweepDay)) return v.lastSweepDay;
+    } catch (e) { /* 读不到就退回内存缓存 */ }
+    return stat.lastSweepDay;
+  }
+  function saveAnchor(day) {
+    try {
+      WA.store.transact(function (draft) { bucket(draft).lastSweepDay = day; return true; }, 'vitals:anchor');
+    } catch (e) { /* 锚点写失败不拖推进本身 */ }
+  }
+  /**
+   * v2.231.0（OPT-4）：**按剧情日差推进**（世界心跳调用；此前 daySweep 只调 view() 空转）。
+   *   四条口径（都是否定式）：
+   *     ① **同日不重复**：`dayIndex` 没变 ⇒ 一格不动（同轮重生成不多算）。
+   *     ② **跨日不漏算**：一次跨 N 日 ⇒ 一次推进 N 日（不做逐日空转）。
+   *     ③ **无钟不猜**：世界钟缺失 ⇒ 如实 `no-clock`，**不**拿真实时间顶替（不猜日期）。
+   *     ④ **到期不杜撰**：孕期到 `gestDays` ⇒ 只标 `birthDue` 等**剧情事件**（endPregnancy）
+   *        来结束，**不**由计时自动清孕产 —— 「计时到了」与「孩子生了」是两件事。
+   *   首次见到世界钟只**记锚点**，不追溯推进（不猜「之前过了多久」）。
+   */
+  function sweep() {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const day = storyDay();
+    if (day === null) { stat.lastReason = 'no-clock'; return { ok: true, reason: 'no-clock', day: null, days: 0, ticked: 0 }; }
+    const last = anchorDay();
+    if (last === null) {
+      stat.lastSweepDay = day; saveAnchor(day); stat.lastReason = 'anchored';
+      return { ok: true, reason: 'anchored', day: day, days: 0, ticked: 0,
+        note: '首次见到世界钟：只记锚点，不追溯推进（不猜之前过了多久）。' };
+    }
+    if (day <= last) { stat.lastReason = 'same-day'; return { ok: true, reason: 'same-day', day: day, days: 0, ticked: 0 }; }
+    const days = day - last;
+    const out = { ok: true, reason: 'ok', day: day, days: days, ticked: 0, due: [] };
+    WA.store.transact(function (draft) {
+      const b = bucket(draft);
+      b.rows.forEach(function (r) {
+        if (!r || !r.name) return;
+        if (r.pregnant) {
+          r.gestDay = (Number(r.gestDay) || 0) + days;
+          if (r.gestDay >= cfg.gestDays) {
+            // 口径 ④：夹在阈值上并标「到期待处理」，**不**自动结束孕期。
+            r.gestDay = cfg.gestDays; r.birthDue = true; out.due.push(r.name);
+          }
+          r.updatedAt = clockNow('vitals'); out.ticked++;
+          return;
+        }
+        if (Number(r.lactDay) > 0 && r.lactDay < cfg.lactDays) {
+          r.lactDay = Math.min(cfg.lactDays, r.lactDay + days);
+          r.updatedAt = clockNow('vitals'); out.ticked++; return;
+        }
+        const len = Number(r.cycleLen) || 28;
+        let d0 = (Number(r.cycleDay) || 0) + days;
+        while (d0 >= len) d0 -= len;
+        r.cycleDay = d0; r.phase = phaseOf(d0, len);
+        r.updatedAt = clockNow('vitals'); out.ticked++;
+      });
+      return true;
+    }, 'vitals:sweep');
+    stat.lastSweepDay = day; saveAnchor(day); stat.swept++; stat.sweptDays += days;
+    stat.birthDue = (function () {
+      try { return rows().filter(function (r) { return r && r.birthDue === true; }).length; } catch (e) { return 0; }
+    })();
+    stat.lastReason = 'ok';
+    out.note = '按剧情日差推进：同日不重复、跨日不漏算；孕期到期只标待处理，不自动结束。';
+    return out;
+  }
   /** 周期 Day → 相。断点与上游口径一致：约 1/4 月经、其後卵泡、中点排卵、后段黄体。 */
   function phaseOf(day, len) {
     const n = Math.max(1, Number(len) || 28);
@@ -252,6 +349,8 @@
       const was = r.gestDay;
       r.pregnant = false; r.gestDay = 0; r.know = 'unknown'; r.told = [];
       r.endReason = rs; r.endedAt = clockNow('vitals'); r.updatedAt = clockNow('vitals');
+      // v2.231.0（OPT-4）：剧情事件到了 ⇒ 清掉「到期待处理」标记（口径 ④ 的另一半）。
+      r.birthDue = false;
       if (rs === 'birth') { r.lactDay = 1; } else { r.cycleDay = 0; r.phase = 'menstrual'; }
       r.history = Array.isArray(r.history) ? r.history : [];
       r.history.push({ reason: rs, gestDay: was, at: clockNow('vitals') });
@@ -286,11 +385,15 @@
     return ['【生理线】'].concat(lines).join('\n');
   }
   function list() { return rows().map(function (r) { return r && r.name; }).filter(Boolean); }
-  function reset() { stat.registered = 0; stat.ticks = 0; stat.conceived = 0; stat.know = 0; stat.ended = 0; stat.refused = 0; stat.blocked = 0; stat.lastReason = ''; stat.faults = {}; return { ok: true }; }
+  function reset() { stat.registered = 0; stat.ticks = 0; stat.conceived = 0; stat.know = 0; stat.ended = 0; stat.refused = 0; stat.blocked = 0;
+    // v2.231.0（OPT-4）：推进面计数器清零，**锚点不动** —— 锚点不是计数器，
+    //   清了会让下一次 sweep 重新「只记锚点」，把真实的跨日吞掉一次。
+    stat.swept = 0; stat.sweptDays = 0; stat.birthDue = 0; stat.lastReason = ''; stat.faults = {}; return { ok: true }; }
   WA.vitals = {
     getSettings: settings, setSettings: saveSettings,
     register: register, conceive: conceive, know: know, tell: tell, knows: knows, knowsOthers: knowsOthers,
     tick: tick, endPregnancy: endPregnancy, phaseOf: phaseOf, view: view, list: list, buildBlock: buildBlock,
+    sweep: sweep,
     stat: function () { return JSON.parse(JSON.stringify(stat)); }, reset: reset,
     PHASES: PHASES, PHASE_LABEL: PHASE_LABEL, KNOW: KNOW, KNOW_LABEL: KNOW_LABEL, END_REASONS: END_REASONS, TOLD_VIA: TOLD_VIA,
   };
@@ -301,13 +404,10 @@
       id: 'vitals.daySweep', chain: 'after', order: 22, critical: false,
       label: '生理线·周期阶段刷新与孕期结算（周期/孕期状态账）',
       async run() {
-        try {
-          if (!WA.vitals || typeof WA.vitals.list !== 'function') return;
-          const names = WA.vitals.list();
-          for (let i = 0; i < names.length; i++) {
-            try { WA.vitals.phaseOf && WA.vitals.view(names[i]); } catch (e) { /* 单行失败不拖批 */ }
-          }
-        } catch (e) { /* 附属面失败不拖主链 */ }
+        // v2.231.0（OPT-4）：原实现逐个名字调 view()（纯读）—— 面板上的日子在动、
+        //   身体状态却一格不动（「剧情跨三天只推进三天」这条要求当时根本不成立）。
+        //   现在按**剧情日差**推进：同日不重复、跨日不漏算、无钟不猜、到期不杜撰。
+        try { sweep(); } catch (e) { /* 附属面失败不拖主链 */ }
       }
     });
   }

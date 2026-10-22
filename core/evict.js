@@ -78,6 +78,36 @@
     // ── v2.230.0（拓展 N12）十枚新引擎 ──
     'elsewhere.rows':      { path: 'elsewhere.rows',      cap: 48, why: '幕后档案环形（FIFO 挤出最旧卡）' },
     'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
+  // v2.231.0（拓展 EXP-1）：逐人逐能力进度行（上限与 training.maxRows 同源，见 training.js）。
+  'training.rows':       { path: 'training.rows',       cap: 96, why: '能力成长逐人逐能力行' },
+  // v2.231.0（拓展 EXP-2）：唯一物件行（上限与 gear.maxItems 同源，见 gear.js）。
+  'gear.items':          { path: 'gear.items',          cap: 96, why: '唯一物件逐件行' },
+  // v2.231.0（拓展 EXP-3）：生产工单行（上限与 production.maxJobs 同源，见 production.js）。
+  'production.jobs':     { path: 'production.jobs',     cap: 48, why: '生产工单行（在产/暂停/已交付）' },
+  // v2.231.0（拓展 EXP-4）：逐人逐地点的认知行（上限与 survey.maxViews 同源，见 survey.js）。
+  //   这是本仓**唯一**的「谁知道什么」台账 —— 未发现的地点在这一层没有行，
+  //   与「这一行就是 unknown」在判据上等价（`knowsOf` 两者都答 unknown）。
+  'survey.views':        { path: 'survey.views',        cap: 192, why: '逐人逐地点认知行（unknown/heard/confirmed）' },
+  // v2.231.0（拓展 EXP-4）：勘察单行（上限与 survey.maxSpots 同源，见 survey.js）。
+  'survey.scouts':       { path: 'survey.scouts',       cap: 48, why: '勘察单行（在途/缺补给暂停/已抵达/已中止）' },
+  // v2.231.0（拓展 EXP-5）：对抗场景行（上限与 contest.maxScenes 同源，见 contest.js）。
+  'contest.scenes':      { path: 'contest.scenes',      cap: 24, why: '对抗场景行（进行中/已收口/已撤退）' },
+  // v2.231.0（拓展 EXP-5）：逐次判定台账行（上限与 contest.maxRolls 同源，见 contest.js）。
+  //   这一层是「不重掷」的唯一真源 —— 剪掉了它，同一格就会第二次掷出来。
+  'contest.rolls':       { path: 'contest.rolls',       cap: 240, why: '对抗判定台账行（同阶段同轮同一方只判一次）' },
+  // v2.231.0（拓展 EXP-6）：案件四本账（上限与 ruling.js 的设置同源）。
+  'ruling.cases':        { path: 'ruling.cases',        cap: 24,  why: '案件行（已立案/已告知/质证中/已裁决/已执行/已复核）' },
+  'ruling.exhibits':     { path: 'ruling.exhibits',     cap: 96,  why: '证物行（谁提的、哪一类、指向什么）' },
+  'ruling.rulings':      { path: 'ruling.rulings',      cap: 48,  why: '裁决行（含复核改判的历次记录）' },
+  'ruling.penalties':    { path: 'ruling.penalties',    cap: 48,  why: '处罚行（罚款/警告/收监，含退款标记）' },
+  // v2.231.0（拓展 EXP-7）：公共活动四本账（上限与 activity.js 的设置同源）。
+  'activity.activities': { path: 'activity.activities', cap: 24,  why: '活动行（已筹备/已开放/进行中/已结算/已延期/已取消）' },
+  'activity.signups':    { path: 'activity.signups',    cap: 96,  why: '报名行（参赛/主持/观众三权限分列）' },
+  'activity.results':    { path: 'activity.results',    cap: 96,  why: '分轮结果行（在场与缺席逐轮留痕）' },
+  'activity.awards':     { path: 'activity.awards',     cap: 48,  why: '奖品发放行（谁、什么、多少、谁出）' },
+  'research.projects': { path: 'research.projects', cap: 24, why: '研究项目；满额拒绝新建，不挤出成果权限' },
+  'family.units': { path: 'family.units', cap: 24, why: '共同生活单位；满额拒绝新建' },
+  'family.care': { path: 'family.units.*.care', cap: 48, why: '照护交接记录' },
     'coordinate.anchors':  { path: 'coordinate.anchors',  cap: 64, why: '坐标锚点索引环形（白名单元数据）' },
     'coordinate.rows':     { path: 'coordinate.rows',     cap: 64, why: '刻度台账环形' },
     'dream.threads':       { path: 'dream.threads',       cap: 24, why: '梦线槽环形' },

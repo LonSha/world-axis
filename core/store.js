@@ -129,6 +129,52 @@
       dream: { threads: [], deviations: [], volumes: [] },       // 长梦（dream.js）
       backstageTone: { notes: [] },                              // 幕后风物（backstage-tone.js）
       modelink: { drafts: [] },                                  // 幕后工具草稿（modelink.js）
+      // v2.231.0（优化 OPT-5）：楼层结算账（floor-settle.js）。
+      //   记账必须**进存档**：`floorSnapshot` 的 RING 是模块内存，重载即归零，
+      //   于是「重载后退得回去」这件事在它那里永远做不到（本项验收原文点名「明确重载后的
+      //   可恢复范围」）。故本容器是唯一真源，`floorSettle` 也是唯一写入方。
+      floorSettle: { entries: [] },                              // 楼层结算账（floor-settle.js）
+      // v2.231.0（拓展 EXP-1）：能力成长台账（training.js）。
+      //   `abilities` 是**声明面**（前置 + 阶段名表 + 进度制），`rows` 是**逐人进度**。
+      //   能力的**定义处仍是 entities**（本模块只记进度，不建第二份真源）；
+      //   故这里没有「能力表」，只有「进度表 + 这项能力怎么练」的声明。
+      training: { abilities: [], rows: [] },                     // 能力成长台账（training.js）
+      // v2.231.0（拓展 EXP-2）：唯一物件的生命史（gear.js）。
+      //   `items` 是**逐件**的行（每件一个 id —— 同型号两件是两条行，这是与
+      //   `economy.goods`（**堆叠资源**）的根本分野）；`slots` 是世界**声明**的装备槽
+      //   （按需启用：没声明的槽不收）。物件的**名字真源仍是 entities**。
+      gear: { items: [], slots: [] },                            // 唯一物件台账（gear.js）
+      // v2.231.0（拓展 EXP-3）：生产工单与设施（production.js）。
+      //   `jobs` 是**跨日运行**的工单（工期 / 已推进天数 / 预留料 / 班次 / 状态），
+      //   `facilities` 是世界**声明**的生产设施（按需启用：没声明的设施上开不出工单）。
+      //   产出与库存**不落在这里**：交货走 economy.stock（本模块只记「这一单走到第几天」）。
+      production: { jobs: [], facilities: [] },                  // 生产工单与设施（production.js）
+      // v2.231.0（拓展 EXP-4）：探索与地理发现的**认知层**（survey.js）。
+      //   `spots` 是世界声明的可勘察点（按需启用，必须对应一个已登记地点）；
+      //   `views` 是**逐人逐地点的认知行** `{who, place, know}` —— 客观地图真源
+      //   仍然是 `world.places` / `world.roads`（本模块不建第二份地图，只记「谁知道」）；
+      //   `scouts` 是跨日运行的勘察单（在途 / 缺补给暂停 / 已抵达 / 已中止）。
+      survey: { spots: [], views: [], scouts: [] },              // 探索与地理发现（survey.js）
+      // v2.231.0（拓展 EXP-5）：对抗场景的**过程层**（contest.js）。
+      //   `scenes` 是一场对抗的场景行（参与方 / 阶段表 / 轮次 / 优势账 / 代价账 / 状态）；
+      //   `rolls` 是**逐次判定**的台账行 —— 它是「这一格已经判过了」的唯一判据
+      //   （重新打开面板 / 切聊天重载都不重掷）。
+      //   数值本身**不在这里重算**：掷骰与 DC 走 fate，位置改动走 world。
+      contest: { scenes: [], rolls: [] },                        // 对抗场景（contest.js）
+      // v2.231.0（拓展 EXP-6）：案件裁决与处罚执行（ruling.js）。
+      //   四本账分列：案子（cases）/ 证物（exhibits）/ 裁决（rulings）/ 处罚（penalties）。
+      ruling: { cases: [], exhibits: [], rulings: [], penalties: [] },
+      // v2.231.0（拓展 EXP-7）：公共活动的**组织层**（activity.js）。
+      //   四本账分列：活动（activities）/ 报名（signups）/ 分轮结果（results）/
+      //   奖品发放（awards）。报名行是「参与安排」的持久面 —— 延期只改活动行的
+      //   剧情日，**不动报名行**，二者因此天然同步。
+      activity: { activities: [], signups: [], results: [], awards: [] },
+      research: { projects: [], discoveries: [] },
+      family: { units: [] },
+      // v2.231.0（优化 OPT-6）：关系图谱的**唯一持久真源**（relation-graph.js）。
+      //   该模块的 GRAPH 此前是纯内存（重载即归零 ⇒ 「重载后关系仍连续」无出口）。
+      //   edges 存边（含 directed 有向立场），events 存「同一件事不重复入账」的引用账。
+      relationGraph: { edges: [], events: [], directed: [] },    // 关系图谱（relation-graph.js）
       // v2.130.0（拓展计划 B1/C1/C2/D3）：三个新引擎的顶层键。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
       //   ——登记不等于物化，两件事都要做。

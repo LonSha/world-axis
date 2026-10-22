@@ -1479,6 +1479,309 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         lastReason: v.lastReason, faults: v.faults };
     });
   }
+  /**
+   * v2.231.0（优化 OPT-8）：**世界词汇面**读数 —— 这一局用哪些词。
+   *
+   *   它治的缺口（现场复核）：`economy` 的货币是写死的 `银元`、配方是写死的两行，
+   *   `fate` 的属性白名单是写死的六项 —— 于是现代校园、历史、仙侠或科幻局都被
+   *   底层固定词汇拉回同一种游戏，而**诊断面此前完全看不到这件事**（面板上也看不到）。
+   *   本节的四组读数各自回答一问：
+   *     · `theme`      题材目录里哪些是扩展的（真源是 theme.THEMES，不是别处另存一份）；
+   *     · `economy`    货币名 / 可选配方 / 声明价目 / 基准价查询（真源是 recipe 的配方声明）；
+   *     · `judge`      判定维度四态（沿用旧白名单 / 用声明的维度 / 已关闭 / 声明写坏了）；
+   *     · `satisfied`  逐张配方的**前置自洽**核对（题材在真源里 / 行动词汇在 act.KINDS 里 /
+   *                    经济面自洽 / 判定面自洽）—— 「我声明了」不等于「它真在那儿」。
+   *
+   *   本节**只读**：不写设置、不改世界、不落存档（与 v2.153.0 对张力取 `push:false` 同规）。
+   *   缺一个模块就如实报 `absent`，**不回落成「没声明」** —— 那是两种事实。
+   */
+  function secWorldLexicon() {
+    return safe(function () {
+      const R = WA.recipe, E = WA.economy, Ft = WA.fate, Th = WA.theme;
+      const name = (R && typeof R.statView === 'function') ? (R.statView().name || '') : '';
+      const themes = (WA.recipe && typeof WA.recipe.themeCatalog === 'function')
+        ? (function () { const t = WA.recipe.themeCatalog(); return t ? Object.keys(t).sort() : null; })() : null;
+      const ext = (WA.recipe && typeof WA.recipe.extendedThemes === 'function')
+        ? (function () { const e = WA.recipe.extendedThemes(); return e ? Object.keys(e).sort() : null; })() : null;
+      // ⚠ 全限定名（同 economy.spec 的纪律）：引用面只认 `WA.ns.mem`。
+      const eco = (WA.recipe && typeof WA.recipe.economySpec === 'function' && name)
+        ? (function () { try { return WA.recipe.economySpec(name); } catch (e) { return { ok: false, reason: 'threw' }; } })() : null;
+      const judge = (WA.fate && typeof WA.fate.judgeView === 'function')
+        ? (function () { try { return WA.fate.judgeView(); } catch (e) { return { error: 'threw' }; } })() : { error: 'fate 未加载（判定面读数缺席）' };
+      // economy 侧的**读取面**（它才是执行器真正消费的那一层）：声明缺席时它回落到旧常量。
+      const money = (WA.economy && typeof WA.economy.money === 'function') ? (function () { try { return WA.economy.money(); } catch (e) { return null; } })() : null;
+      const recipes = (WA.economy && typeof WA.economy.recipeKeys === 'function') ? (function () { try { return WA.economy.recipeKeys(); } catch (e) { return null; } })() : null;
+      const es = (WA.economy && typeof WA.economy.economySpec === 'function') ? (function () { try { return WA.economy.economySpec(); } catch (e) { return null; } })() : null;
+      // 基准价查询：拿第一件声明货做样本，证明「表内价真的查得到」（不拿一个 0 冒充）。
+      const sample = (es && es.goods) ? Object.keys(es.goods)[0] : '';
+      const base = (WA.economy && typeof WA.economy.declaredBase === 'function' && sample)
+        ? (function () { try { return WA.economy.declaredBase(sample); } catch (e) { return null; } })() : null;
+      const recOf = (WA.economy && typeof WA.economy.recipeOf === 'function' && recipes && recipes.length)
+        ? (function () { try { return WA.economy.recipeOf(recipes[0]) ? recipes[0] : null; } catch (e) { return null; } })() : null;
+      // 逐张配方的前置自洽（三列分列：missing 真缺陷 / unknown 核不了 / fallback 未声明沿用旧常量）
+      const sat = (WA.recipe && typeof WA.recipe.satisfied === 'function' && WA.recipe.list)
+        ? WA.recipe.list().map(function (r) {
+          const s = (function () { try { return WA.recipe.satisfied(r.key); } catch (e) { return { ok: false, reason: 'threw' }; } })();
+          return { name: r.key, cn: r.cn, ok: !!s.ok, satisfied: !!s.satisfied,
+            missing: (s.missing || []).map(function (x) { return x.kind + ':' + x.id; }),
+            unknown: (s.unknown || []).map(function (x) { return x.kind + ':' + x.id; }),
+            fallback: (s.fallback || []).map(function (x) { return x.kind; }) };
+        }) : null;
+      return {
+        // 当前生效的配方名（留空 = 未生效，如实报空串而不是「默认」）
+        recipe: name,
+        theme: { source: Th ? 'theme.THEMES（单一真源）' : 'theme 未加载', count: themes ? themes.length : null,
+          keys: themes, extended: ext,
+          note: Th ? null : 'theme 未加载 ⇒ 题材目录核不了（不假装「题材都不在」）' },
+        economy: { source: (es && es.source) || (E ? 'default（旧常量）' : 'economy 未加载'),
+          declared: !!es, money: money, recipes: recipes, goods: es ? Object.keys(es.goods || {}).sort() : null,
+          sample: sample || null, sampleBase: base, firstRecipe: recOf,
+          note: !E ? 'economy 未加载（读取面缺席）'
+            : (es ? null : '这一局未声明经济面 ⇒ 执行器沿用旧常量（银元 / 面包·铁器两行配方）；旧档余额不被换算') },
+        judge: judge,
+        satisfied: sat,
+        satisfiedSummary: sat ? {
+          total: sat.length,
+          pass: sat.filter(function (x) { return x.satisfied; }).length,
+          missing: sat.filter(function (x) { return x.missing.length; }).map(function (x) { return x.name + '×' + x.missing.length; }),
+          unknown: sat.filter(function (x) { return x.unknown.length; }).map(function (x) { return x.name + '×' + x.unknown.length; }),
+          fallback: sat.filter(function (x) { return x.fallback.length; }).map(function (x) { return x.name + '×' + x.fallback.length; })
+        } : null,
+        note: '只读：本节不写设置、不改世界、不落存档（打开诊断不该改变世界）'
+      };
+    }, {});
+  }
+  /**
+   * v2.231.0（拓展 EXP-1）：能力成长面读数 —— 「这个人已经会了什么、练到哪一步」。
+   *
+   *   为什么单列一节而不并进 life / plan 节：那两节答「他打算做什么」（目标与行动），
+   *   本节答「他已经会了什么」（能力的掌握程度）—— 两问的失效模式不同：
+   *   前者失效在「打算了没做」，后者失效在「做了却不长本事」。
+   *
+   *   本节**只读**：不写设置、不改世界、不落存档（与 secWorldLexicon 同规）。
+   *   三态分开：模块缺席 / 关着 / 开着（「没练过」与「这一面被关掉了」必须分得开）。
+   */
+  function secTraining() {
+    return safe(function () {
+      const T = WA.training;
+      if (!T || typeof T.view !== 'function') return { error: 'engines/training.js 未加载（能力成长读数缺席）' };
+      const v = T.view();
+      return {
+        enabled: v.enabled, modes: (v.modes || []).slice(),
+        caps: { maxAbilities: v.maxAbilities, maxRows: v.maxRows, pointsCap: v.pointsCap },
+        abilities: (v.abilities || []).map(function (a) {
+          return { name: a.name, mode: a.mode, prereq: a.prereq, prereqStage: a.prereqStage, stages: a.stages };
+        }),
+        progress: (v.progress || []).map(function (r) {
+          return { who: r.who, ability: r.ability, mode: r.mode, points: r.points, stage: r.stage,
+            stageName: r.stageName, sessions: r.sessions, cancelled: r.cancelled };
+        }),
+        counts: v.counts,
+        declares: v.stat.declares, practices: v.stat.practices, cancelled: v.stat.cancelled,
+        applies: v.stat.applies, blocked: v.stat.blocked, lastReason: v.stat.lastReason, faults: v.stat.faults,
+        note: v.enabled ? null : '能力成长关着（不记也不判）—— 这与「还没练过」不是一回事'
+      };
+    }, {});
+  }
+  /**
+   * v2.231.0（拓展 EXP-2）：唯一物件面读数 —— 「这一件在谁手上、还能用几次」。
+   *
+   *   为什么单列一节而不并进 economy 节：economy 那节答「**堆叠资源**的价与量」
+   *   （「铁锤 ×2」在那里是同一个键的两个单位，两件分不开）；本节答「**唯一物件**的
+   *   身份、持有人与损耗」—— 两问的失效模式不同：前者失效在「没库存」，
+   *   后者失效在「两件分不开 / 借出去还能用」。
+   *
+   *   本节**只读**：不写设置、不改世界、不落存档。
+   */
+  function secGear() {
+    return safe(function () {
+      const G = WA.gear;
+      if (!G || typeof G.view !== 'function') return { error: 'engines/gear.js 未加载（唯一物件读数缺席）' };
+      const v = G.view();
+      return {
+        enabled: v.enabled, carries: (v.carries || []).slice(),
+        caps: { maxItems: v.maxItems, maxSlots: v.maxSlots, maxDurability: v.maxDurability },
+        slots: (v.slots || []).map(function (s) { return s.name; }),
+        items: (v.items || []).map(function (x) {
+          return { id: x.id, name: x.name, holder: x.holder, carry: x.carry, slot: x.slot,
+            uses: x.uses, durability: x.durability, maxDurability: x.maxDurability, repairs: x.repairs };
+        }),
+        counts: v.counts,
+        made: v.stat.made, used: v.stat.used, lent: v.stat.lent, repaired: v.stat.repaired,
+        equipped: v.stat.equipped, blocked: v.stat.blocked, lastReason: v.stat.lastReason, faults: v.stat.faults,
+        note: v.enabled ? null : '唯一物件关着（不记也不判）—— 这与「还没有物件」不是一回事'
+      };
+    }, {});
+  }
+  /**
+   * v2.231.0（拓展 EXP-3）：持续生产面读数 —— 「这张单在产什么、走到第几天、占着哪个工位」。
+   *
+   *   为什么单列一节而不并进 economy 节：economy 那节答「**即时生产**做成了什么」
+   *   （一笔事务里扣料出货，答不出「这炉要烧两天、今天只烧了一天」）；本节答「**正在生产**
+   *   这件事本身」—— 工单跨日、缺料暂停、班次占用、设施容量、完工只入库一次。
+   *   两问的失效模式不同：前者失效在「没料/没货」，后者失效在「工期被静默吞掉 / 同一人
+   *   同时在两个工位 / 交一次货入两次库」。
+   *
+   *   本节**只读**：不写设置、不改世界、不落存档（与 secGear / secTraining 同规）。
+   *   三态分开：模块缺席 / 关着 / 开着（「还没开过单」与「这一面被关掉了」必须分得开）。
+   */
+  function secProduction() {
+    return safe(function () {
+      const P = WA.production;
+      if (!P || typeof P.view !== 'function') return { error: 'engines/production.js 未加载（持续生产读数缺席）' };
+      const v = P.view();
+      return {
+        enabled: v.enabled, statuses: (v.statuses || []).slice(), openStatus: (v.openStatus || []).slice(),
+        caps: { maxJobs: v.maxJobs, maxFacilities: v.maxFacilities, maxCrew: v.maxCrew, maxDays: v.maxDays },
+        facilities: (v.facilities || []).map(function (f) {
+          return { name: f.name, label: f.label, slots: f.slots, used: f.used };
+        }),
+        jobs: (v.jobs || []).map(function (j) {
+          return { id: j.id, recipe: j.recipe, qty: j.qty, days: j.days, done: j.done, status: j.status,
+            facility: j.facility, place: j.place, by: j.by,
+            crew: (j.crew || []).map(function (c) { return { who: c.who, shift: c.shift }; }),
+            reserve: Object.assign({}, j.reserve || {}), pausedReason: j.pausedReason || '',
+            delivered: Object.assign({}, j.delivered || {}) };
+        }),
+        counts: v.counts,
+        opened: v.stat.opened, staffed: v.stat.staffed, resupplied: v.stat.resupplied,
+        advanced: v.stat.advanced, paused: v.stat.paused, resumed: v.stat.resumed,
+        delivered: v.stat.delivered, cancelled: v.stat.cancelled,
+        blocked: v.stat.blocked, lastReason: v.stat.lastReason, faults: v.stat.faults,
+        note: v.enabled ? null : '持续生产关着（不记也不判）—— 这与「还没开过工单」不是一回事'
+      };
+    }, {});
+  }
+  /**
+   * v2.231.0（拓展 EXP-4）：探索与地理发现面读数 —— 「谁知道了哪些地方、还有多少没发现」。
+   *
+   *   为什么单列一节而不并进 world 节：world 那节答「**世界有什么**」（客观地图：
+   *   地点 / 道路 / 日程 / 在途），本节答「**谁知道**」—— 同一张地图，逐人认知分档。
+   *   两问的失效模式不同：前者失效在「地点没登记、道路走不通」，后者失效在
+   *   「未发现的地名从注入或标签提前泄露 / 听说被当成亲历 / 亲历者被写成路痴」。
+   *
+   *   本节**只读**：不写设置、不改世界、不落存档（与 secProduction / secGear 同规）。
+   *   三态分开：模块缺席 / 关着 / 开着（「还没勘察过」与「这一面被关掉了」必须分得开）。
+   *   ⚠ 未发现的地点**只报条数不列名**（与 fog() 同口径：带了名字就等于没遮）。
+   */
+  function secSurvey() {
+    return safe(function () {
+      const S = WA.survey;
+      if (!S || typeof S.view !== 'function') return { error: 'engines/survey.js 未加载（探索与地理发现读数缺席）' };
+      const v = S.view();
+      return {
+        enabled: v.enabled, knows: (v.knows || []).slice(), statuses: (v.statuses || []).slice(),
+        openStatus: (v.openStatus || []).slice(),
+        caps: { maxSpots: v.maxSpots, maxViews: v.maxViews, maxDays: v.maxDays },
+        spots: (v.spots || []).map(function (s) {
+          return { name: s.name, label: s.label, kind: s.kind, place: s.place, days: s.days };
+        }),
+        scouts: (v.scouts || []).map(function (s) {
+          return { id: s.id, who: s.who, from: s.from, to: s.to, spot: s.spot, days: s.days,
+            done: s.done, status: s.status, supply: s.supply, spent: Object.assign({}, s.spent || {}),
+            pausedReason: s.pausedReason || '' };
+        }),
+        counts: v.counts,
+        declared: v.stat.declared, surveyed: v.stat.surveyed, advanced: v.stat.advanced,
+        arrived: v.stat.arrived, paused: v.stat.paused, resumed: v.stat.resumed,
+        reported: v.stat.reported, confirmed: v.stat.confirmed, halted: v.stat.halted,
+        blocked: v.stat.blocked, lastReason: v.stat.lastReason, faults: v.stat.faults,
+        note: v.enabled ? null : '探索与地理发现关着（不记也不判）—— 这与「还没勘察过」不是一回事'
+      };
+    }, {});
+  }
+  /**
+   * v2.231.0（拓展 EXP-5）：对抗场景面（多轮多阶段 / 对抗检定 / 部分成功 / 代价成功 / 撤退）。
+   *
+   *   与 fate 节分列的失效模式不同：fate 失效在「掷不出来 / DC 解析不了」，
+   *   本节失效在「一次判定被当成一场对抗 / 部分成功没代价 / 撤退把代价吞了 /
+   *   已判定的结果被重掷」。
+   *
+   *   本节**只读**：不写设置、不改世界、不落存档（与 secSurvey / secProduction 同规）。
+   *   三态分开：模块缺席 / 关着 / 开着（「还没开过场」与「这一面被关掉了」必须分得开）。
+   */
+  function secContest() {
+    return safe(function () {
+      const C = WA.contest;
+      if (!C || typeof C.view !== 'function') return { error: 'engines/contest.js 未加载（对抗场景读数缺席）' };
+      const v = C.view();
+      return {
+        enabled: v.enabled, kinds: (v.kinds || []).slice(), statuses: (v.statuses || []).slice(),
+        outcomes: (v.outcomes || []).slice(), partialBand: v.partialBand,
+        caps: { maxScenes: v.maxScenes, maxStages: v.maxStages, maxRounds: v.maxRounds, maxRolls: v.maxRolls },
+        scenes: (v.scenes || []).map(function (s) {
+          return { id: s.id, kind: s.kind, title: s.title, sides: (s.sides || []).slice(),
+            status: s.status, outcome: s.outcome, winner: s.winner,
+            round: s.round, rounds: s.rounds, stages: s.stages,
+            advantage: Object.assign({}, s.advantage || {}),
+            cost: Object.assign({}, s.cost || {}) };
+        }),
+        counts: v.counts,
+        opened: v.stat.opened, staged: v.stat.staged, resolved: v.stat.resolved,
+        spent: v.stat.spent, advanced: v.stat.advanced, withdrawn: v.stat.withdrawn,
+        closed: v.stat.closed, blocked: v.stat.blocked, lastReason: v.stat.lastReason,
+        faults: v.stat.faults,
+        note: v.enabled ? null : '对抗场景关着（不记也不判）—— 这与「还没开过场」不是一回事'
+      };
+    }, {});
+  }
+  // v2.231.0（拓展 EXP-6）：案件裁决与处罚执行 —— 与 warrant 分列。
+  //   那一节答「谁在通缉名单上」（记录）；本节答「这桩指控走到哪一段、判了什么、罚了没有」。
+  //   三态分开：只读（view / list / verdictOf / penalties），零写入、零副作用。
+  function secRuling() {
+    const R = WA.ruling;
+    if (!R || typeof R.view !== 'function') return { error: 'engines/ruling.js 未加载（案件裁决读数缺席）' };
+    const v = R.view();
+    const cases = R.list().map(function (c) {
+      const vs = R.verdictOf(c.id) || {};
+      return { id: c.id, accused: c.accused, charge: c.charge, place: c.place,
+        jurisdiction: c.jurisdiction, status: c.status, verdict: c.verdict,
+        exhibits: c.exhibits, solid: c.solid, seq: vs.seq || 0, ruledBy: vs.ruledBy || '' };
+    });
+    const pens = [];
+    cases.forEach(function (c) {
+      R.penalties(c.id).forEach(function (p) { pens.push(Object.assign({ case: c.id }, p)); });
+    });
+    return { enabled: v.enabled, statuses: v.statuses, verdicts: v.verdicts,
+      penaltyKinds: v.penaltyKinds, exhibitKinds: v.exhibitKinds, parties: v.parties,
+      minGrounds: v.minGrounds, jurisdictions: v.jurisdictions, currency: v.currency,
+      counts: { cases: v.cases, exhibits: v.exhibits, rulings: v.rulings, penalties: v.penalties },
+      cases: cases, penalties: pens,
+      stat: R.stat() };
+  }
+
+  // v2.231.0（拓展 EXP-7）：公共活动 —— 与 agenda 分列。
+  //   那一节是**只读聚合器**（把别人的排期汇成一张表）；本节答的是「活动自己」：
+  //   谁报了名（三权限）、名额还剩几个、开到第几轮、谁缺席、奖发给谁、延了几次。
+  //   三态分开：只读（list / activityOf / signups / rounds / awards），零写入。
+  function secActivity() {
+    const A = WA.activity;
+    if (!A || typeof A.list !== 'function') return { error: 'engines/activity.js 未加载（公共活动读数缺席）' };
+    const cfg = A.getSettings();
+    const v = A.list();
+    const rows = v.rows.map(function (a) {
+      const sg = A.signups(a.id);
+      const rd = A.rounds(a.id);
+      const aw = A.awards(a.id);
+      const last = rd.length ? rd[rd.length - 1] : null;
+      return { id: a.id, title: a.title, place: a.place, kind: a.kind, day: a.day,
+        status: a.status, resumeStatus: a.resumeStatus, quota: a.quota, rounds: a.rounds,
+        contenders: a.contenders, hosts: a.hosts, audience: a.audience,
+        roundsDone: a.roundsDone, postponeCount: a.postponeCount, awards: a.awards,
+        absentLast: last ? last.absent.slice() : [],
+        signups: sg.map(function (s) { return { who: s.who, role: s.role, present: s.present }; }),
+        prizes: aw.map(function (x) { return { who: x.who, material: x.material, amount: x.amount }; }) };
+    });
+    return { enabled: cfg.enabled, statuses: A.STATUS.slice(), roles: A.ROLES.slice(),
+      quotaRule: '名额只对 contestant 生效（主持/观众不计名额）；0 表示不限',
+      counts: { activities: v.rows.length,
+        signups: v.rows.reduce(function (n, a) { return n + a.contenders + a.hosts + a.audience; }, 0),
+        rounds: v.rows.reduce(function (n, a) { return n + a.roundsDone; }, 0),
+        awards: v.rows.reduce(function (n, a) { return n + a.awards; }, 0) },
+      activities: rows, stat: A.stat(),
+      note: v.enabled ? null : '公共活动关着（不排期也不结算）—— 这与「还没办过活动」不是一回事' };
+  }
+
   function secCausal() {
     return safe(function () {
       if (!WA.causal || typeof WA.causal.stat !== 'function') return { error: 'causal 模块不可用' };
@@ -1871,11 +2174,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   而「被预算丢掉」与「本来就没有」必须分得开(本模块口径 4)。
       //   如实记账:本节这两次调用会给 stat.calls / stat.assemblies 各 +1 ——
       //   那是**读数计数器**,不是世界状态(与 secPlotGauge「不推趋势环」同一取舍)。
-      let pack = null;
+      let pack = null, cand = null;
       try {
-        const cands = WA.retrieval.candidates({ text: '' });
-        pack = WA.retrieval.assemble(cands, {});
-      } catch (e) { pack = null; }
+        cand = WA.retrieval.candidates({ text: '' });
+        pack = WA.retrieval.assemble(cand, {});
+      } catch (e) { pack = null; cand = null; }
       return {
         enabled: !!cfg.enabled, windowMs: cfg.windowMs, maxRows: cfg.maxRows, maxChars: cfg.maxChars,
         verdict: a.verdict, reasons: (a.reasons || []).slice(),
@@ -1886,7 +2189,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         // 有界包五项一并透出 ——「装不下」只有在这一组数里看得见
         //   (只看 text 长度会把它读成「内容少」)。
         pack: pack ? { rowsIn: pack.rowsIn, rowsOut: pack.rowsOut, dropped: pack.dropped,
-          chars: pack.chars, capacity: pack.capacity, mode: pack.mode } : null,
+          chars: pack.chars, capacity: pack.capacity, mode: pack.mode,
+          // v2.231.0(OPT-1):「当前值与历史分列」了几行 —— 只看 chars 看不出这件事。
+          split: pack.split } : null,
+        // v2.231.0(OPT-1):越窗召回读数(词表规模 + 本轮是否在问旧事 + 召回了多少行)。
+        //   与 pack.split 分开报:一个是「记起了什么」,一个是「分列了几行」。
+        recall: cand ? { hints: (WA.retrieval.RECALL_HINTS || []).length,
+          wanted: !!cand.recall, rows: cand.recalled } : null,
         calls: st.calls, historyOf: st.historyOf, assemblies: st.assemblies,
         absents: st.absents, faults: Object.assign({}, st.faults || {})
       };
@@ -1955,6 +2264,26 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/host-wb-trace.js': 'hostWbTrace',
     'engines/ledger-timeline.js': 'ledgerTimeline',
     'engines/floor-changes.js': 'floorChanges',
+    // v2.231.0（优化 OPT-5）：楼层结算账（本表是 inventory 的定义面与 tool-diag 诊断面的唯一来源，
+    //   漏登记 ⇒ 该模块在两面上都不存在，而代码照跑）。
+    'engines/floor-settle.js': 'floorSettle',
+    // v2.231.0（拓展 EXP-1）：能力成长台账。产品文件，缺席本身就是断裂（同 plan/mend 口径）。
+    'engines/training.js': 'training',
+    // v2.231.0（拓展 EXP-2）：唯一物件台账。产品文件，缺席本身就是断裂。
+    'engines/gear.js': 'gear',
+    // v2.231.0（拓展 EXP-3）：持续生产台账（工单 / 设施容量 / 班次）。
+    //   产品文件，缺席本身就是断裂（同 plan/mend/gear 口径）。
+    'engines/production.js': 'production',
+    // v2.231.0（拓展 EXP-4）：探索与地理发现台账（认知行 / 勘察单）。
+    //   产品文件，缺席本身就是断裂（同 plan/mend/gear/production 口径）。
+    'engines/survey.js': 'survey',
+    // v2.231.0（拓展 EXP-5）：对抗场景台账（场景行 / 判定台账）。
+    //   产品文件，缺席本身就是断裂（同 plan/mend/gear/production/survey 口径）。
+    'engines/contest.js': 'contest',
+    'engines/ruling.js': 'ruling',
+    // v2.231.0（拓展 EXP-7）：公共活动台账（活动行 / 报名 / 分轮结果 / 奖品）。
+    //   产品文件，缺席本身就是断裂（同 plan/mend/gear/production/survey/contest 口径）。
+    'engines/activity.js': 'activity',
     // v2.51.0（第三十六面）：叙事工艺设置面（rules.craft 所指的设置面本体）
     'engines/style.js': 'style',
     'engines/life.js': 'life',
@@ -3198,7 +3527,38 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.117.0（计划二 B6）：配方面三枚 + 机会面三枚（同渲染在人物页）。
     //   同 v2.83.0 的规格——必须同时「渲染 + 绑定 + 守卫登记」，否则
     //   「控件渲染了但绑定 id 写错」在新出口上无人发现。
-    { page: 'people', ids: ['wa-rec-name', 'wa-rec-view', 'wa-rec-seed', 'wa-rec-out', 'wa-opp-run', 'wa-opp-view'] },
+    // v2.231.0（优化 OPT-8）：世界词汇面只读按钮（渲染在配方区，沿用 wa-rec-out 输出区）。
+    //   同 v2.51.0 的理由——新控件必须同时「渲染 + 绑定 + 守卫登记」，
+    //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+    { page: 'people', ids: ['wa-rec-name', 'wa-rec-view', 'wa-rec-seed', 'wa-lex-view', 'wa-rec-out', 'wa-opp-run', 'wa-opp-view',
+      // v2.231.0（拓展 EXP-1）：能力成长面十三控件（渲染 + 绑定 + 守卫登记三件齐做）。
+      //   同 v2.51.0 的理由——缺第三件，「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+      'wa-tr-enabled', 'wa-tr-name', 'wa-tr-mode', 'wa-tr-stages', 'wa-tr-declare',
+      'wa-tr-prereq', 'wa-tr-prereqstage', 'wa-tr-ables', 'wa-tr-who', 'wa-tr-practice',
+      'wa-tr-cancel', 'wa-tr-can', 'wa-tr-need', 'wa-tr-progress', 'wa-tr-diag', 'wa-tr-out',
+      // v2.231.0（拓展 EXP-2）：唯一物件面十六控件（渲染 + 绑定 + 守卫登记三件齐做）。
+      //   同 v2.51.0 的理由——缺第三件，「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+      'wa-gr-enabled', 'wa-gr-name', 'wa-gr-holder', 'wa-gr-dur', 'wa-gr-make',
+      'wa-gr-slot', 'wa-gr-slot-add', 'wa-gr-slots', 'wa-gr-id', 'wa-gr-by', 'wa-gr-wear',
+      'wa-gr-use', 'wa-gr-canuse', 'wa-gr-to', 'wa-gr-lend', 'wa-gr-equip', 'wa-gr-unequip',
+      'wa-gr-mat', 'wa-gr-amt', 'wa-gr-repair', 'wa-gr-list', 'wa-gr-diag', 'wa-gr-out',
+      // v2.231.0（拓展 EXP-3）：持续生产面二十八控件（渲染 + 绑定 + 守卫登记三件齐做）。
+      //   同 v2.51.0 的理由——缺第三件，「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+      'wa-pd-enabled', 'wa-pd-fac', 'wa-pd-slots', 'wa-pd-fac-add', 'wa-pd-facs',
+      'wa-pd-recipe', 'wa-pd-qty', 'wa-pd-days', 'wa-pd-by', 'wa-pd-open',
+      'wa-pd-id', 'wa-pd-place', 'wa-pd-advance', 'wa-pd-pause', 'wa-pd-resume',
+      'wa-pd-mat', 'wa-pd-amt', 'wa-pd-resupply', 'wa-pd-who', 'wa-pd-shift', 'wa-pd-staff',
+      'wa-pd-route', 'wa-pd-deliver', 'wa-pd-cancel', 'wa-pd-list', 'wa-pd-view', 'wa-pd-diag',
+      'wa-pd-out',
+      // v2.231.0（拓展 EXP-4）：探索与地理发现面二十七控件（渲染 + 绑定 + 守卫登记三件齐做）。
+      //   同 v2.51.0 的理由——缺第三件，「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
+      'wa-sv-enabled', 'wa-sv-spot', 'wa-sv-place', 'wa-sv-days', 'wa-sv-spot-add', 'wa-sv-spots',
+      'wa-sv-who', 'wa-sv-from', 'wa-sv-survey',
+      'wa-sv-id', 'wa-sv-advance', 'wa-sv-supply', 'wa-sv-resupply',
+      'wa-sv-pause', 'wa-sv-resume', 'wa-sv-halt',
+      'wa-sv-to', 'wa-sv-report', 'wa-sv-place2', 'wa-sv-confirm',
+      'wa-sv-knows', 'wa-sv-routes', 'wa-sv-fog',
+      'wa-sv-list', 'wa-sv-view', 'wa-sv-diag', 'wa-sv-out'] },
     // v2.140.0（F1）：防全知闸门九枚（渲染在人物页「防全知闸门」区）。
     //   同 v2.83.0 / v2.117.0 / v2.121.0 / v2.139.0 的规格——新控件必须
     //   「渲染 + 绑定 + 守卫登记」三件齐做，否则「按钮渲染了但绑定的 id 写错」
@@ -3303,8 +3663,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   守卫表的按页判定会各自「通过」，玩家点到的是另一页的 handler。
     //   六枚全为**只读**口（开章前该看 / 推进卡点 / 收章前欠什么 / 本章待办 /
     //   章节史 / 数据来源）—— 只读承诺由 Y2 专锁判，本表只保证成对。
-    { page: 'chapter', ids: ['wa-chw-open', 'wa-chw-cards', 'wa-chw-close', 'wa-chw-todo', 'wa-chw-history', 'wa-chw-src'],
-      dynamic: ['wa-chw-out'] },
+    { page: 'chapter', ids: ['wa-chw-open', 'wa-chw-cards', 'wa-chw-close', 'wa-chw-todo', 'wa-chw-history', 'wa-chw-src',
+      // v2.231.0（优化 OPT-7）：本页新增「大纲注入」段的五枚控件（编辑框 / 模式 / 看口径 /
+      //   预览差异 / 采纳注入 / 撤销到上一版）。同 Y2 立页时的口径：渲染了不登记 ⇒
+      //   「绑定的 id 写错」这类断裂只有在登记过的控件上才会被发现。
+      //   如实标明差异：与上面六枚**只读**按钮不同，本段有**一个写口**（采纳注入 ⇒
+      //   engines/outline-inject.js 的 apply），它写的是**宿主世界书里本插件自己的条目**，
+      //   不动世界状态（Y2 的 C2「活世界逐字不变」仍成立）。
+      'wa-oi-text', 'wa-oi-mode', 'wa-oi-view', 'wa-oi-preview', 'wa-oi-apply', 'wa-oi-undo'],
+      dynamic: ['wa-chw-out', 'wa-oi-out'] },
     // v2.199.0（Y4）：待办中心 6 枚 + 输出锚 —— 面板「待办」页（全部待办 / 即将到期 /
     //   逐源可用性 / 下钻一条 / 空态三旗标 / 诊断）。
     //   同 Y1/Y2 口径：六枚按钮无条件渲染，故登记即「接线真源」（渲染了不登记 ⇒
@@ -4200,6 +4567,29 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   function collect() {
     const diag = {
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), perfLedger: secPerfLedger(), tapeStore: secTapeStore(), intel: secIntel(), perspective: secPerspective(), sediment: secSediment(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      // v2.231.0（OPT-8）：世界词汇面（货币 / 配方 / 判定维度 / 题材目录 + 逐配方前置自洽）。
+      //   与 recipe 节分列：那一节答「这一局按哪张配方跑」，本节答「这一局用哪些词」。
+      worldLexicon: secWorldLexicon(),
+      // v2.231.0（拓展 EXP-1）：能力成长面（声明 + 逐人进度 + 台账）。
+      //   与 life / plan 节分列：那两节答「他打算做什么」，本节答「他已经会了什么」。
+      training: secTraining(),
+      // v2.231.0（拓展 EXP-2）：唯一物件面（逐件身份 / 持有人 / 损耗 + 槽位）。
+      //   与 economy 节分列：那一节答「堆叠资源的价与量」，本节答「这一件在谁手上」。
+      gear: secGear(),
+      // v2.231.0（拓展 EXP-3）：持续生产面（工单跨日 / 设施容量 / 班次 / 停工复工 / 交货）。
+      //   与 economy 节分列：那一节答「即时生产做成了什么」，本节答「正在生产这件事本身」。
+      production: secProduction(),
+      // v2.231.0（拓展 EXP-4）：探索与地理发现面（逐人认知 / 勘察单 / 未发现条数）。
+      //   与 world 节分列：那一节答「世界有什么」，本节答「谁知道」。
+      survey: secSurvey(),
+      // v2.231.0（拓展 EXP-5）：对抗场景面（场景 / 阶段 / 判定台账 / 优势与代价账）。
+      //   与 fate 节分列：那一节答「这一掷是多少」，本节答「这场对抗走到哪一步」。
+      contest: secContest(),
+      ruling: secRuling(),
+      // v2.231.0（拓展 EXP-7）：公共活动面（活动 / 报名 / 分轮 / 奖品 / 延期）。
+      //   与 agenda 节分列：那一节答「接下来有什么事」（只读聚合），本节答
+      //   「这场活动办到哪一步、谁报了名、谁缺席、奖发了没有」。
+      activity: secActivity(),
       world: secWorld(), shadow: secShadow(), threads: secThreads(), rumor: secRumor(),
       // v2.99.0：原著幕目。缝入源是 Persona-Arena 的「幕 → 剧情点」流水线（ADR-0009）。
       //   与本仓既有的全部叙事面**正交**：那些记的是「这个世界自己长出来的历史」，
@@ -5470,11 +5860,20 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         weave: function (a) { return WA.dream.weave.apply(null, a || []); }
       }
     },
-    // elsewhere: read 2 / act 10
+    // elsewhere: read 5 / act 10
+    //   v2.231.0（OPT-2）：**只读口补线**。此前 `view` / `list` 的产品侧唯一消费点是心跳节里
+    //   那段「对每个名字调一次无参 view()」的空转循环（那正是本轮治掉的缺陷本身）；OPT-2 把心跳
+    //   改成一次 `sweep` 之后，两个读口在产品代码里就只剩定义、没有调用点了 —— 本仓点名的
+    //   「导出而零调用点 = 功能级失效」。按既有裁决接进**本表**（ENGINE_PORTS 就是死导出接线的
+    //   单一真源，v2.230.0 的 26 枚引擎都走这条路）：read 段只真调**只读**口。
+    //   `sweep` 属只读（无 transact、只动计数器）故列 read。
     elsewhere: {
       read: {
         getSettings: function () { return WA.elsewhere.getSettings(); },
-        stat: function () { return WA.elsewhere.stat(); }
+        stat: function () { return WA.elsewhere.stat(); },
+        list: function () { return WA.elsewhere.list(); },
+        view: function () { return WA.elsewhere.view(); },
+        sweep: function () { return WA.elsewhere.sweep(); }
       },
       act: {
         bandOf: function (a) { return WA.elsewhere.bandOf.apply(null, a || []); },
@@ -5489,12 +5888,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         update: function (a) { return WA.elsewhere.update.apply(null, a || []); }
       }
     },
-    // fate: read 3 / act 17
+    // fate: read 4 / act 17（v2.231.0 / OPT-8：judgeView 进只读面 —— 判定维度四态在诊断上要看得见）
     fate: {
       read: {
         getSettings: function () { return WA.fate.getSettings(); },
         stat: function () { return WA.fate.stat(); },
-        view: function () { return WA.fate.view(); }
+        view: function () { return WA.fate.view(); },
+        judgeView: function () { return WA.fate.judgeView(); }
       },
       act: {
         bigrams: function (a) { return WA.fate.bigrams.apply(null, a || []); },
@@ -5627,19 +6027,30 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         slice: function (a) { return WA.observeSlice.slice.apply(null, a || []); }
       }
     },
-    // outlineInject: read 3 / act 5
+    // outlineInject: read 4 / act 8
+    //   v2.231.0（优化 OPT-7）：执行面进诊断 —— 此前这条链**算得出但做不了**
+    //   （plan 的 applied:0 是恒值），诊断面因此看不出「这台宿主到底能不能改旧条目」。
+    //   补 read 的 updateCapability（能力探测，纯读宿主 API 存在性、不写任何东西）
+    //   与 act 的 apply（唯一写入口；与既有 act 同规，参数由调用方给）。
+    //   v2.231.0（OPT-7 收尾）：act 再补 preview（预览差异：读宿主真源、**零写入**）
+    //   与 undo（撤销到上一有效版本）。两者与 apply 同规 —— 参数由调用方给、不在此处
+    //   代判；「预览」与「写入」分列这件事，在诊断面上也看得见。
     outlineInject: {
       read: {
         getSettings: function () { return WA.outlineInject.getSettings(); },
         stat: function () { return WA.outlineInject.stat(); },
+        updateCapability: function () { return !!WA.outlineInject.updateCapability(WA.mainWin && WA.mainWin.TavernHelper ? WA.mainWin.TavernHelper : (typeof TavernHelper !== 'undefined' ? TavernHelper : null)); },
         view: function () { return WA.outlineInject.view(); }
       },
       act: {
+        apply: function (a) { return WA.outlineInject.apply.apply(null, a || []); },
         extractFromEnd: function (a) { return WA.outlineInject.extractFromEnd.apply(null, a || []); },
         parseEntries: function (a) { return WA.outlineInject.parseEntries.apply(null, a || []); },
         plan: function (a) { return WA.outlineInject.plan.apply(null, a || []); },
+        preview: function (a) { return WA.outlineInject.preview.apply(null, a || []); },
         resetStat: function (a) { return WA.outlineInject.resetStat.apply(null, a || []); },
-        setSettings: function (a) { return WA.outlineInject.setSettings.apply(null, a || []); }
+        setSettings: function (a) { return WA.outlineInject.setSettings.apply(null, a || []); },
+        undo: function (a) { return WA.outlineInject.undo.apply(null, a || []); }
       }
     },
     // portal: read 4 / act 7
@@ -5709,11 +6120,16 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         setSettings: function (a) { return WA.redactLayer.setSettings.apply(null, a || []); }
       }
     },
-    // relationGraph: read 3 / act 9
+    // relationGraph: read 6 / act 10
+    //   v2.231.0（OPT-6）：read 面新增 persisted / directedOf / reload —— 「存档里到底落了几条」
+    //   与「A→B 的方向立场」此前在诊断面上都不可读（内存表自称的那份数不等于存档那份）。
     relationGraph: {
       read: {
         getSettings: function () { return WA.relationGraph.getSettings(); },
         stat: function () { return WA.relationGraph.stat(); },
+        persisted: function () { return WA.relationGraph.persisted(); },
+        directedOf: function (a) { return WA.relationGraph.directedOf.apply(null, a || []); },
+        reload: function () { return WA.relationGraph.reload(); },
         view: function () { return WA.relationGraph.view(); }
       },
       act: {
@@ -5758,11 +6174,20 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         setSettings: function (a) { return WA.soloVoice.setSettings.apply(null, a || []); }
       }
     },
-    // vitals: read 2 / act 10
+    // vitals: read 5 / act 11
+    //   v2.231.0（OPT-4）：**只读口补线**（与 elsewhere 同款、同批）。`view` / `list` / `phaseOf`
+    //   此前的产品侧唯一消费点是心跳节里逐个名字调 `view()` 的空转循环；OPT-4 改成按剧情日差
+    //   一次 `sweep` 之后它们成了零引用。此处接进诊断采集面，使「扫到了什么」（sweep）与
+    //   「单点现在是什么样」（view / list / phaseOf）在同一个读数面上分得开。
+    //   ⚠ `sweep` 放 **act**：它会按剧情日差推进身体状态（写口），诊断采集**不许**替操作者触发。
+    //     这与 elsewhere.sweep 放 read 是**故意不同**，不是笔误 —— 那边只报账，这边会改状态。
     vitals: {
       read: {
         getSettings: function () { return WA.vitals.getSettings(); },
-        stat: function () { return WA.vitals.stat(); }
+        stat: function () { return WA.vitals.stat(); },
+        list: function () { return WA.vitals.list(); },
+        view: function () { return WA.vitals.view(); },
+        phaseOf: function () { return WA.vitals.phaseOf(0, 28); }
       },
       act: {
         conceive: function (a) { return WA.vitals.conceive.apply(null, a || []); },
@@ -5773,6 +6198,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         register: function (a) { return WA.vitals.register.apply(null, a || []); },
         reset: function (a) { return WA.vitals.reset.apply(null, a || []); },
         setSettings: function (a) { return WA.vitals.setSettings.apply(null, a || []); },
+        sweep: function (a) { return WA.vitals.sweep.apply(null, a || []); },
         tell: function (a) { return WA.vitals.tell.apply(null, a || []); },
         tick: function (a) { return WA.vitals.tick.apply(null, a || []); }
       }

@@ -79,7 +79,9 @@
   function saveSettings(next) {
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
-  const stat = { opened: 0, updated: 0, reconciled: 0, events: 0, removed: 0, refused: 0, blocked: 0, lastReason: '', faults: {} };
+  const stat = { opened: 0, updated: 0, reconciled: 0, events: 0, removed: 0, refused: 0, blocked: 0,
+    // v2.231.0（OPT-2）：台账对账面三栏（**此前 cardSweep 只是空转**，这三栏一个都不存在）。
+    swept: 0, sweptCards: 0, pendingLedger: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 80) : String(v == null ? '' : v).slice(0, max || 80); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -111,7 +113,11 @@
       if (b.rows.filter(function (r) { return r && r.name === nm; })[0]) { out = { ok: false, reason: 'exists', name: nm }; return false; }
       const card = freshCard(nm);
       card.createdVia = clean(o.via, 40) || 'elsewhere:open';
-      b.rows = WA.evict && WA.evict.array ? WA.evict.array(b.rows.concat([card]), 'elsewhere.rows') : b.rows.concat([card]);
+      const _keptEw = b.rows.concat([card]);
+      // v2.231.0（OPT-2/OPT-4）：挤出器是**原地截断 + 返回报告**，不是「返回新数组」。
+      //   把报告赋回数据槽 ⇒ 下一次进桶被 bucket() 重置为 [] ⇒ 整张表静默清空。
+      if (WA.evict && WA.evict.array) WA.evict.array(_keptEw, 'elsewhere.rows');
+      b.rows = _keptEw;
       out = { ok: true, reason: 'ok', name: nm };
       return true;
     }, 'elsewhere:open');
@@ -306,11 +312,41 @@
     });
     return ['【幕后 NPC 状态】', '（这些人在主角视野外仍在生活；只报事实，数值由系统折算）'].concat(lines).join('\n');
   }
-  function reset() { stat.opened = 0; stat.updated = 0; stat.reconciled = 0; stat.events = 0; stat.removed = 0; stat.refused = 0; stat.blocked = 0; stat.lastReason = ''; stat.faults = {}; return { ok: true }; }
+  /**
+   * v2.231.0（OPT-2）：**台账对账扫**（真做对账，不是空转）。
+   *   治的病：本模块的 cardSweep 此前对每个名字调一次**无参的 `view()`** ——
+   *   `view()` 是「读全表」，于是 N 个人就重扫全表 N 次，什么也没对；标签写着「台账对账」，
+   *   行为上却一次对账都没发生（本仓点名的「功能级失效」在本模块的形态）。
+   *   现在：**一次性取全表**，逐卡对账一次 —— 统计「还有几条事务没被逐条表态」
+   *   （上游原文：进行中的每一条每轮都要逐条表态，缺一条即 ledger-unanswered），
+   *   并把「干净卡」与「待表态卡」分开计。**只读**，不替上游表态（表态是上游的事）。
+   */
+  function sweep() {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const all = rows();
+    let clean = 0, dirty = 0, pending = 0, ongoingTotal = 0;
+    all.forEach(function (card) {
+      if (!card) return;
+      const ongoing = (card.ledger || []).filter(function (x) { return x && x.state === 'ongoing'; });
+      ongoingTotal += ongoing.length;
+      if (ongoing.length) { dirty++; pending += ongoing.length; } else clean++;
+    });
+    stat.swept++;
+    stat.sweptCards = all.length;
+    stat.pendingLedger = pending;
+    stat.lastReason = all.length ? 'swept' : 'nothing-to-do';
+    return { ok: true, reason: stat.lastReason, cards: all.length, clean: clean, dirty: dirty,
+      pending: pending, ongoing: ongoingTotal,
+      note: '对账只报「还有几条事务没被逐条表态」；替上游表态不是本函数的事。' };
+  }
+  function reset() { stat.opened = 0; stat.updated = 0; stat.reconciled = 0; stat.events = 0; stat.removed = 0; stat.refused = 0; stat.blocked = 0;
+    stat.swept = 0; stat.sweptCards = 0; stat.pendingLedger = 0; stat.lastReason = ''; stat.faults = {}; return { ok: true }; }
   WA.elsewhere = {
     getSettings: settings, setSettings: saveSettings,
     open: open, update: update, reconcile: reconcile, romance: romance, remove: remove,
     card: card, list: list, view: view, romanceOf: romanceOf, bandOf: bandOf,
+    sweep: sweep,
     buildBlock: buildBlock, stat: function () { return JSON.parse(JSON.stringify(stat)); }, reset: reset,
     AXES: AXES, AXIS_LABEL: AXIS_LABEL, EVENTS: EVENTS, STRENGTH: STRENGTH, STRENGTH_LABEL: STRENGTH_LABEL,
     REMOVE_REASONS: REMOVE_REASONS, LEDGER_STATES: LEDGER_STATES, CORE: CORE, HIDDEN_FIELDS: HIDDEN_FIELDS,
@@ -322,13 +358,9 @@
       id: 'elsewhere.cardSweep', chain: 'after', order: 21, critical: false,
       label: '彼方档案·台账对账与近期事件挤出（幕后 NPC 状态账）',
       async run() {
-        try {
-          if (!WA.elsewhere || typeof WA.elsewhere.list !== 'function') return;
-          const names = WA.elsewhere.list();
-          for (let i = 0; i < names.length; i++) {
-            try { WA.elsewhere.view(names[i]); } catch (e) { /* 单卡失败不拖批 */ }
-          }
-        } catch (e) { /* 附属面失败不拖主链 */ }
+        // v2.231.0（OPT-2）：原实现对每个名字调一次**无参 view()** —— 那是「读全表」，
+        //   N 个人就重扫 N 次且一次对账都没做。改为**一次 sweep**：取全表一次、逐卡对账一次。
+        try { sweep(); } catch (e) { /* 附属面失败不拖主链 */ }
       }
     });
   }

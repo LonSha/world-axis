@@ -1,7 +1,183 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.230.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.230.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.231.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.231.0",
   "dead": {
+    "activity.activityOf": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "activity.awards": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "activity.cancel": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "activity.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 1
+    },
+    "activity.list": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
+    },
+    "activity.open": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 14,
+      "own": 5
+    },
+    "activity.plan": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 13
+    },
+    "activity.postpone": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "activity.reload": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "activity.reset": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "activity.resetStat": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "activity.resume": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "activity.round": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 9,
+      "own": 11
+    },
+    "activity.rounds": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 21
+    },
+    "activity.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 14,
+      "own": 1
+    },
+    "activity.settle": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 5,
+      "own": 3
+    },
+    "activity.signup": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 31,
+      "own": 4
+    },
+    "activity.signups": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 18
+    },
+    "activity.start": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 3
+    },
+    "activity.stat": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 40
+    },
+    "activity.view": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "activity.withdraw": {
+      "reason": "self-only",
+      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/activity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "affect.channel": {
       "reason": "test-only",
       "detail": "engines/affect.js 内部自用、外部零引用（过度导出）",
@@ -602,14 +778,6 @@
       "tref": 2,
       "own": 4
     },
-    "bonds.setBond": {
-      "reason": "test-only",
-      "detail": "engines/bonds.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/bonds.js",
-      "refs": 0,
-      "tref": 7,
-      "own": 3
-    },
     "bonds.setSettings": {
       "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -1167,7 +1335,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/commission.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 4,
       "own": 13
     },
     "commission.reset": {
@@ -1216,6 +1384,166 @@
       "src": "compat/th-helper.js",
       "refs": 0,
       "tref": 0,
+      "own": 3
+    },
+    "contest.advanceRound": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "contest.advantageOf": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "contest.close": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "contest.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 1
+    },
+    "contest.list": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "contest.open": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 8
+    },
+    "contest.outcomeOf": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "contest.reload": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "contest.reset": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "contest.resetStat": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "contest.rolls": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
+    },
+    "contest.sceneOf": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 12
+    },
+    "contest.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 6,
+      "own": 1
+    },
+    "contest.spend": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "contest.stageAdd": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "contest.stageOf": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "contest.stageResolve": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "contest.stat": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 33
+    },
+    "contest.view": {
+      "reason": "self-only",
+      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "contest.withdraw": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/contest.js",
+      "refs": 0,
+      "tref": 1,
       "own": 3
     },
     "contractAudit.consumedFields": {
@@ -2377,6 +2705,38 @@
       "refs": 0,
       "tref": 20,
       "own": 3
+    },
+    "gear.reload": {
+      "reason": "self-only",
+      "detail": "engines/gear.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gear.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "gear.reset": {
+      "reason": "self-only",
+      "detail": "engines/gear.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gear.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "gear.resetStat": {
+      "reason": "self-only",
+      "detail": "engines/gear.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gear.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "gear.stat": {
+      "reason": "self-only",
+      "detail": "engines/gear.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gear.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 29
     },
     "genGate.diagnose": {
       "reason": "self-only",
@@ -4402,6 +4762,38 @@
       "tref": 0,
       "own": 23
     },
+    "production.reload": {
+      "reason": "self-only",
+      "detail": "engines/production.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/production.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "production.reset": {
+      "reason": "self-only",
+      "detail": "engines/production.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/production.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "production.resetStat": {
+      "reason": "self-only",
+      "detail": "engines/production.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/production.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "production.stat": {
+      "reason": "self-only",
+      "detail": "engines/production.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/production.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 38
+    },
     "profile.maintain": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -4627,11 +5019,11 @@
       "own": 20
     },
     "recipe.apply": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/recipe.js 内部自用、外部零引用（过度导出）",
       "src": "engines/recipe.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 5
     },
     "recipe.basics": {
@@ -4658,20 +5050,12 @@
       "tref": 0,
       "own": 11
     },
-    "recipe.list": {
-      "reason": "self-only",
-      "detail": "engines/recipe.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/recipe.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
-    },
     "recipe.setSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/recipe.js",
       "refs": 0,
-      "tref": 5,
+      "tref": 11,
       "own": 1
     },
     "recipe.stat": {
@@ -5041,6 +5425,166 @@
       "refs": 0,
       "tref": 8,
       "own": 1
+    },
+    "ruling.caseOf": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "ruling.enforce": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 3
+    },
+    "ruling.exhibits": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 27
+    },
+    "ruling.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 5,
+      "own": 1
+    },
+    "ruling.list": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "ruling.notify": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 14,
+      "own": 3
+    },
+    "ruling.open": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "ruling.penalties": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 12
+    },
+    "ruling.penaltyOf": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "ruling.refund": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "ruling.reload": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ruling.reset": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ruling.resetStat": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "ruling.review": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "ruling.rule": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 12,
+      "own": 3
+    },
+    "ruling.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 10,
+      "own": 1
+    },
+    "ruling.stat": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 32
+    },
+    "ruling.submit": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 16,
+      "own": 3
+    },
+    "ruling.verdictOf": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ruling.view": {
+      "reason": "self-only",
+      "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ruling.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "samplerCheck.mulberry": {
       "reason": "test-only",
@@ -5650,6 +6194,174 @@
       "tref": 4,
       "own": 1
     },
+    "survey.advance": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "survey.confirm": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survey.declareSpot": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "survey.fog": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "survey.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 1
+    },
+    "survey.halt": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survey.knowsOf": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survey.list": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "survey.pause": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "survey.reload": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survey.report": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survey.reset": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survey.resetStat": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "survey.resume": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survey.resupply": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "survey.routesOf": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "survey.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 6,
+      "own": 1
+    },
+    "survey.spotOf": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "survey.stat": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 42
+    },
+    "survey.survey": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 5,
+      "own": 16
+    },
+    "survey.view": {
+      "reason": "self-only",
+      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/survey.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "survival.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -6040,7 +6752,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 134
+      "own": 140
     },
     "toolDiag.secAgenda": {
       "reason": "self-only",
@@ -6256,7 +6968,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 19,
-      "own": 19
+      "own": 21
     },
     "toolImport.detect": {
       "reason": "test-only",
@@ -6305,6 +7017,38 @@
       "refs": 0,
       "tref": 6,
       "own": 3
+    },
+    "training.reload": {
+      "reason": "self-only",
+      "detail": "engines/training.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/training.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "training.reset": {
+      "reason": "self-only",
+      "detail": "engines/training.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/training.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "training.resetStat": {
+      "reason": "self-only",
+      "detail": "engines/training.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/training.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "training.stat": {
+      "reason": "self-only",
+      "detail": "engines/training.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/training.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 26
     },
     "travelDesk.getSettings": {
       "reason": "test-only",
@@ -6471,7 +7215,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/wb-inject.js",
       "refs": 0,
-      "tref": 7,
+      "tref": 11,
       "own": 3
     },
     "wbInject.syncAll": {
@@ -6583,7 +7327,7 @@
       "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
       "src": "engines/weather.js",
       "refs": 0,
-      "tref": 4,
+      "tref": 6,
       "own": 3
     },
     "weather.stat": {
@@ -6601,14 +7345,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "weather.weatherOf": {
-      "reason": "test-only",
-      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/weather.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 4
     },
     "wordBudget.count": {
       "reason": "test-only",
@@ -6723,11 +7459,11 @@
       "own": 5
     },
     "world.messages": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/world.js 内部自用、外部零引用（过度导出）",
       "src": "engines/world.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 14
     },
     "world.messagesInTransit": {
@@ -6787,11 +7523,11 @@
       "own": 1
     },
     "world.tickCourier": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/world.js 内部自用、外部零引用（过度导出）",
       "src": "engines/world.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "world.waitForChannel": {
@@ -6937,8 +7673,8 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "ui/panel.js",
       "refs": 0,
-      "tref": 28,
-      "own": 19
+      "tref": 29,
+      "own": 22
     },
     "ui.rerenderStat": {
       "reason": "test-only",
@@ -6950,6 +7686,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 449
+    "dataOnly": 466
   }
 }
