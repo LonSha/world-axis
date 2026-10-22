@@ -115,6 +115,11 @@
     'playableBlueprint.listSamples': function (o) { return WA.playableBlueprint.listSamples(); },
     'playableBlueprint.checkDependencies': function (o) { return WA.playableBlueprint.checkDependencies(o.sampleId); },
     'playableBlueprint.exportPlayDefs': function (o) { return WA.playableBlueprint.exportPlayDefs(o.sampleId); },
+    // v2.231.0（拓展 IN-7）：有承载力的环境
+    'envCapacity.declareResource': function (o) { return WA.envCapacity.declareResource(o.spec); },
+    'envCapacity.withdraw': function (o) { return WA.envCapacity.withdraw(o.resourceId, o.amount, o); },
+    'envCapacity.regenerate': function (o) { return WA.envCapacity.regenerate(o.resourceId, o); },
+    'envCapacity.regionStatus': function (o) { return WA.envCapacity.regionStatus(o.regionId); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 
