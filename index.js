@@ -338,6 +338,8 @@
     'engines/research-closure.js',
     // v2.231.0（创新 IN-1）：动机竞合。NPC 不再只选第一条可执行任务，权衡生计/承诺/抱负/恢复/安全。
     'engines/motive-arbitration.js',
+    // v2.231.0（创新 IN-2）：未走之路的回声。有限预期、遗憾与经验修正。
+    'engines/path-echo.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

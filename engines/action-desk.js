@@ -81,6 +81,7 @@
     'schedule.claim': function (o) { return WA.laborSchedule.claim(o); },
     'schedule.transfer': function (o) { return WA.laborSchedule.transfer(o.bookingId, o.to); },
     'motive.arbitrate': function (o) { return WA.motiveArbitration.decide(o.person, o.candidates, o.facts); },
+    'pathEcho.realize': function (o) { return WA.pathEcho.realizeOutcome(o.personId, o.decisionId, o.actualOutcome, o.knownFacts); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 

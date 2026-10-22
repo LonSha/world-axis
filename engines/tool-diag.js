@@ -2279,6 +2279,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/research-closure.js': 'researchClosure',
     // v2.231.0 (IN-1): motive -- 动机竞合（NPC 不再只选第一条可执行任务）
     'engines/motive-arbitration.js': 'motiveArbitration',
+    // v2.231.0 (IN-2): echo -- 未走之路的回声（有限预期与经验修正）
+    'engines/path-echo.js': 'pathEcho',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',
