@@ -330,6 +330,8 @@
     //   production/training/gear 都是它的读源），且须晚于 settingsBus（读设置面）。
     //   位置与 tests/run.js 的 LOAD 同序 —— 两处不同序会让专锁的隔离判据静默降级。
     'engines/action-desk.js',
+    // v2.231.0（优化 OP-2）：能力—工具—行动结果联动。消费 training/gear/act，提供多解法评估与原子消耗。
+    'engines/action-methods.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

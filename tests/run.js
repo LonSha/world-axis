@@ -319,6 +319,8 @@ const LOAD = [
   //   都在同一 vm 上下文里跑；装载面没给它模块，WA.actionDesk 缺席，
   //   判据会静默降级成「模块不在」而不是「行为不对」。位置与 index.js LOAD_ORDER 同序。
   'engines/action-desk.js',
+  // v2.231.0（优化 OP-2）：能力—工具—行动结果联动。同序进 LOAD。
+  'engines/action-methods.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24089,6 +24091,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./exp10-action-desk-v2232.js');
     await runLock('./exp10-action-desk-v2232.js', 'runNegative');
+  }
+  // ── v2.231.0(优化 OP-2):能力—工具—行动结果联动 —— 开放解法分支 / 借出即失权 / 单次原子磨损 ──
+  section('v2.231.0(优化 OP-2):能力—工具—行动结果联动 —— 开放解法分支 / 借出即失权 / 单次原子磨损');
+  {
+    await runLock('./exp11-action-methods-v2232.js');
+    await runLock('./exp11-action-methods-v2232.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

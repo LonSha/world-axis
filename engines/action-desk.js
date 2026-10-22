@@ -77,6 +77,7 @@
     'production.advance': function (o) { return WA.production.advance(o.orderId, { days: o.days }); },
     'training.practice': function (o) { return WA.training.practice(o.who, o.ability, { mode: o.mode }); },
     'gear.use': function (o) { return WA.gear.use(o.itemId, { by: o.who, note: o.note }); },
+    'method.execute': function (o) { return WA.actionMethods.execute(o.taskId, o.who, o.methodId, o); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 
