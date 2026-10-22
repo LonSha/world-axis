@@ -1,3 +1,13 @@
+# WorldAxis 下一阶段：世界机制优先的双九项计划
+
+> **当前入口（2026-10-22）**：基线 `c6ff687` / v2.231.0。下一轮为 [优化提升 OP-1～OP-9](plans/WORLD_PLAY_OPTIMIZATION_9.md) 与 [拓展创新 IN-1～IN-9](plans/WORLD_INNOVATION_9.md)，合计十八项，均为待实施计划。三个大更新：人物与知识 → 社会与地方 → 历史与时代。守卫与审计不再占独立功能名额。
+>
+> 本次修复仅有研究 50/0、家庭 83/0、生产 90/0、题材配方 73/0 四个专项通过；**未跑全量回归，未完成真实宿主验收**。下方全部为历史记录，其中“当前/最新/未开始”等词只属于其记录时点，不代表此刻仓库现状。设计取舍见 [本轮规划笔记](.agents/notes/proposed/architecture/2026-10-22-worldaxis-world-first-plans.md)。
+
+---
+
+## 历史入口存档（保留原文）
+
 # WorldAxis 当前双九项计划（TP1–TP9 / TX1–TX9）
 
 > **最新台账（2026-10-08 起）**：本页 TP/TX 部分已收口为历史档案 —— TX1–TX9 全部交付，TP 线只剩 TP6/TP8（均需现场环境）。**当前计划为** [优化提升计划 O1–O9](plans/O_OPTIMIZATION.md) 与 [功能拓展计划 E1–E9](plans/E_EXPANSION.md)，理由与旧项对照见 [双九项提案](.agents/notes/proposed/architecture/2026-10-08-worldaxis-o-e-plans.md)。基线：v2.173.0 / `d986433` / 全量回归 15680/0。下方内容保留为历史记录，不再作为当前进度台账。
