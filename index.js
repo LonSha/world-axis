@@ -344,6 +344,8 @@
     'engines/tech-lineage.js',
     // v2.231.0（优化 OP-5）：共同生活经营。预算、分工与责任交接。
     'engines/family-ops.js',
+    // v2.231.0（优化 OP-6）：世界痕迹消费。设施损坏、封路、绕路与不可逆修复。
+    'engines/aftermath-impact.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
