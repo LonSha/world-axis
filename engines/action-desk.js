@@ -120,6 +120,11 @@
     'envCapacity.withdraw': function (o) { return WA.envCapacity.withdraw(o.resourceId, o.amount, o); },
     'envCapacity.regenerate': function (o) { return WA.envCapacity.regenerate(o.resourceId, o); },
     'envCapacity.regionStatus': function (o) { return WA.envCapacity.regionStatus(o.regionId); },
+    // v2.231.0（拓展 IN-8）：社会遗产
+    'socialLegacy.formLegacy': function (o) { return WA.socialLegacy.formLegacy(o.spec); },
+    'socialLegacy.acceptLegacy': function (o) { return WA.socialLegacy.acceptLegacy(o.legacyId, o); },
+    'socialLegacy.witnessAccount': function (o) { return WA.socialLegacy.witnessAccount(o.legacyId, o.witness, o.account); },
+    'socialLegacy.viewLegacy': function (o) { return WA.socialLegacy.viewLegacy(o.legacyId); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 

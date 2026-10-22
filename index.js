@@ -360,6 +360,8 @@
     'engines/playable-blueprint.js',
     // v2.231.0（拓展 IN-7）：有承载力的环境。存量、再生、压力与恢复时滞。
     'engines/environmental-capacity.js',
+    // v2.231.0（拓展 IN-8）：社会遗产。未完事业/设施/物件/师承/声誉的承接与见证。
+    'engines/social-legacy.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
