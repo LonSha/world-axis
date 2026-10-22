@@ -110,19 +110,15 @@
       envStrain: []
     };
 
-    // IN-5 技术谱系：取该区域有活跃实践者的传统
-    if (WA.techLineage && typeof WA.techLineage.listTraditions === 'function') {
-      try {
-        var tr = WA.techLineage.listTraditions();
-        if (tr && Array.isArray(tr.traditions)) {
-          tr.traditions.forEach(function (t) {
-            if (t && t.status === 'active' && t.method) {
-              readings.techLevel.push(t.method);
-            }
-          });
-        }
-      } catch (e) {}
-    }
+    // IN-5 技术谱系：取该区域有活跃实践者的传统（直接从 state 读取）
+    var tlState = s.techLineage || {};
+    var traditions = tlState.traditions || {};
+    Object.keys(traditions).forEach(function (tid) {
+      var t = traditions[tid];
+      if (t && t.status === 'active' && t.method) {
+        readings.techLevel.push(t.method);
+      }
+    });
 
     // IN-6 服务网络：取该区域可用设施数与总容量
     if (WA.serviceNetwork && typeof WA.serviceNetwork.servicesAt === 'function') {

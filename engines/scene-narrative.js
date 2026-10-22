@@ -56,23 +56,16 @@
     }
     if (!label && s.clock) label = clean(s.clock.label, 40);
 
-    // 在场人物：从 beat 或 activity 提取当前场景相关人物
+    // 在场人物：从 people 中取最近活跃的（只取名字）
     var present = [];
-    if (WA.beat && typeof WA.beat.actors === 'function') {
-      try { var ar = WA.beat.actors(); if (Array.isArray(ar)) present = ar.slice(0, 8); } catch (e) {}
-    }
-    if (!present.length && s.people) {
-      // 回退：从 people 中取最近活跃的（只取名字）
+    if (s.people) {
       var keys = Object.keys(s.people).slice(0, 6);
       present = keys.map(function (k) { return clean(k.replace(/^p_/, ''), 40); });
     }
 
-    // 当前地点：从 beat 或 activity 提取
+    // 当前地点：从 region 取
     var place = '';
-    if (WA.beat && typeof WA.beat.place === 'function') {
-      try { var pr = WA.beat.place(); if (pr && pr.ok) place = clean(pr.place || pr.name || '', 40); } catch (e) {}
-    }
-    if (!place && s.region && s.region.currentPlace) place = clean(s.region.currentPlace, 40);
+    if (s.region && s.region.currentPlace) place = clean(s.region.currentPlace, 40);
 
     // 待处理变化：从 causal chains 取 pending/delayed
     var pending = [];
@@ -230,23 +223,22 @@
     var person = clean(who, 40);
     var s = state();
 
-    // 从 rumor/noesis 取该人物已收到的消息
+    // 从 noesis state 取该人物已感知的事实
     var items = [];
-    if (WA.noesis && typeof WA.noesis.knownBy === 'function') {
-      try {
-        var kr = WA.noesis.knownBy(person);
-        if (kr && Array.isArray(kr.items)) {
-          items = kr.items.slice(0, 8).map(function (it) {
-            return {
-              factId: clean(it.factId || it.id, 40),
-              summary: clean(it.summary || it.text || '', 80),
-              certainty: clean(it.certainty || '', 20),
-              receivedAt: num(it.at) || 0
-            };
-          });
-        }
-      } catch (e) {}
-    }
+    var noe = s.noesis || {};
+    var people = noe.people || {};
+    var pdata = people[person] || {};
+    var facts = pdata.facts || {};
+    var fkeys = Object.keys(facts).slice(0, 8);
+    items = fkeys.map(function (fk) {
+      var f = facts[fk] || {};
+      return {
+        factId: clean(fk, 40),
+        summary: clean(f.summary || f.text || '', 80),
+        certainty: clean(f.certainty || (f.known ? 'known' : ''), 20),
+        receivedAt: num(f.at) || num(f.receivedAt) || 0
+      };
+    });
 
     // 从 chronicle 取 horizon（远方）且该人物可见的
     var chron = Array.isArray(s.chronicle) ? s.chronicle : [];
