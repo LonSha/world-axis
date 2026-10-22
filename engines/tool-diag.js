@@ -2267,6 +2267,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.231.0（优化 OPT-5）：楼层结算账（本表是 inventory 的定义面与 tool-diag 诊断面的唯一来源，
     //   漏登记 ⇒ 该模块在两面上都不存在，而代码照跑）。
     'engines/floor-settle.js': 'floorSettle',
+    // v2.231.0 (OP-1): desk -- 把已有机制摆成「此刻能做什么」。
+    //   登记在此 = 该文件缺席时 secModules 如实报 missing；
+    //   漏登记不是少一行字，而是它在定义面与诊断面上都不存在，代码照跑。
+    'engines/action-desk.js': 'actionDesk',
+    // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
+    //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
+    'engines/family.js': 'family', 'engines/research.js': 'research',
     // v2.231.0（拓展 EXP-1）：能力成长台账。产品文件，缺席本身就是断裂（同 plan/mend 口径）。
     'engines/training.js': 'training',
     // v2.231.0（拓展 EXP-2）：唯一物件台账。产品文件，缺席本身就是断裂。
@@ -3993,6 +4000,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-evb-assert', 'wa-evb-kind', 'wa-evb-target', 'wa-evb-from', 'wa-evb-to', 'wa-evb-retract',
       'wa-evb-clue', 'wa-evb-by', 'wa-evb-receipt', 'wa-evb-gather'],
       dynamic: ['wa-evb-out'] }
+    ,
+    // v2.231.0 (OP-1): actiondesk page -- ids + dynamic out.
+    //   同 evidence 页口径：本页不另存状态，写路径转给来源模块。
+    //   wa-desk-out 是动态容器，进 dynamic（进 ids 会被判成静态缺失）。
+    { page: 'actiondesk', ids: ['wa-desk-who', 'wa-desk-show', 'wa-desk-on'],
+      dynamic: ['wa-desk-out'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。

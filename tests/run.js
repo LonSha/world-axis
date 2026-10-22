@@ -24078,6 +24078,18 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runLock('./exp9-family-v2231.js');
     await runLock('./exp9-family-v2231.js', 'runNegative');
   }
+  // ── v2.231.0(优化 OP-1):场景行动桌 —— 已有机制摆成「此刻能做什么」 ──
+  //   本节只判**接线面**（正 / 负两向各挂 1 处）；功能判据与破坏判据全住专锁
+  //   （tests/exp10-action-desk-v2232.js，两处不写第二遍）。
+  //   口径：board() **零写入**（前后存档逐字不变）；缺料由 owner 读口算出并逐条列出，
+  //     **不折成「不可用」三个字**；plan() 只路由给既有 owner 写口，**未知前缀一律拒收**
+  //     （不猜一个 owner 去写）；owner 关闭 ⇒ 该组不出残影且不阻断其它组；
+  //     未知人物**不凭空建人**（与 act.add 否定式 ② 同规）。
+  section('v2.231.0(优化 OP-1):场景行动桌 —— 只读聚合三档 / 路由既有 owner / 未知前缀拒收');
+  {
+    await runLock('./exp10-action-desk-v2232.js');
+    await runLock('./exp10-action-desk-v2232.js', 'runNegative');
+  }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
   console.log('  ⏱ 超 60s 的节：' + __slowSec119 + ' 个');
