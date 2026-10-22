@@ -2303,6 +2303,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/environmental-capacity.js': 'envCapacity',
     // v2.231.0 (IN-8): socialLegacy -- 社会遗产（未完事业/设施/物件/师承/声誉的承接与见证）
     'engines/social-legacy.js': 'socialLegacy',
+    // v2.231.0 (IN-9): phaseTransition -- 历史相变（局部社会状态评估、过渡与路径依赖）
+    'engines/phase-transition.js': 'phaseTransition',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',

@@ -351,6 +351,8 @@ const LOAD = [
   'engines/environmental-capacity.js',
   // v2.231.0（拓展 IN-8）：社会遗产。同序进 LOAD。
   'engines/social-legacy.js',
+  // v2.231.0（拓展 IN-9）：历史相变。同序进 LOAD。
+  'engines/phase-transition.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24217,6 +24219,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./exp26-social-legacy-v2232.js');
     await runLock('./exp26-social-legacy-v2232.js', 'runNegative');
+  }
+  // ── v2.231.0(拓展 IN-9):历史相变 —— 局部社会状态评估 / 过渡 / 防抖动 / 路径依赖 ──
+  section('v2.231.0(拓展 IN-9):历史相变 —— 局部社会状态评估 / 过渡 / 防抖动 / 路径依赖');
+  {
+    await runLock('./exp27-phase-transition-v2232.js');
+    await runLock('./exp27-phase-transition-v2232.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

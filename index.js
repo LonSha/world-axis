@@ -362,6 +362,8 @@
     'engines/environmental-capacity.js',
     // v2.231.0（拓展 IN-8）：社会遗产。未完事业/设施/物件/师承/声誉的承接与见证。
     'engines/social-legacy.js',
+    // v2.231.0（拓展 IN-9）：历史相变。局部社会状态评估、过渡与路径依赖。
+    'engines/phase-transition.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
