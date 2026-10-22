@@ -278,6 +278,11 @@
     //   本页答「旧事能不能被拿回眼前(含后来被翻转的)」。
     //   页 id 纯小写字母(tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析)。
     { id: 'retrieval', icon: '📜', label: '留存' },
+    // v2.231.0（优化 OP-1）：场景行动桌（engines/action-desk.js）。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    //   插在 retrieval 之后、events 之前：前若干页答「拿到了什么」，本页答
+    //   「此刻这个人能做什么」—— 同一批里的「把已有机制摆成可执行清单」。
+    { id: 'actiondesk', icon: '🧭', label: '行动桌' },
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
@@ -3285,7 +3290,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     </div>`;
   }
 
-  const RENDERERS = { overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs,
+  const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -4270,6 +4275,66 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     for (let i = 0; i < kids.length; i++) target.appendChild(kids[i]);   // 真节点迁移
     return true;
   }
+  /**
+   * v2.231.0（优化 OP-1）：场景行动桌。
+   *
+   * ── 它治什么 ───────────────────────────────────────────────────
+   *   `ui/panel.js` 里 training/gear 只有零散操作，research/family **没有任何玩家链**
+   *   —— 玩家得先知道引擎名才安排得动一次研究或家庭支出。本页把
+   *   `WA.actionDesk.board()`（只读聚合）摆成「可执行 / 需准备 / 不可执行」三档。
+   *
+   * ── 边界（与引擎同源，逐条否定式）──────────────────────────────
+   *   ① 本页是**读面 + 路由面**：渲染只调 `board()`（零写入）；
+   *      每个按钮调 `plan()`，而 `plan()` 只把调用转给既有 owner 写口，
+   *      本页与引擎都不写第二套状态。
+   *   ② **不猜缺什么**：`prepare` 行的所缺来自 owner 读口算出的 need 列表，
+   *      取不到就如实显示 owner 的 reason，不编一个数字。
+   *   ③ owner 关闭 ⇒ 该组整块**不渲染控件**（只留一句「已关闭」），
+   *      且不阻断其它组（引擎 boundary 5）。
+   *   ④ 不在本页重算任何判据：读口缺席/抛错时显示「读不到」，不折成「没事」。
+   */
+  function renderActionDesk() {
+    const D = WA.actionDesk;
+    const ok = !!(D && typeof D.board === 'function');
+    const cfg = ok ? D.getSettings() : null;
+    const on = !!(cfg && cfg.enabled);
+    // 读面：人物取已登记者，供玩家选一个「视角人物」。
+    const srcs = ok ? (D.sources ? D.sources() : []) : [];
+    const srcLine = srcs.map(function (s) {
+      return s.kind + (s.ok ? (s.on ? '·在用' : '·关闭') : '·缺席');
+    }).join('　');
+    return `
+      <div class="wa-sec">场景行动桌</div>
+      <div class="wa-dim">把「此刻这个人能做什么」摆成一张桌子：可执行 / 需准备（附所缺）/ 不可执行（附原因）。
+        本页只**读**各机制现状，动手时把调用转给对应机制自己的入口 —— 本页不另存一份状态。
+        总闸 <b>${on ? '开' : '关'}</b>；各机制：${esc(srcLine || '（读不到）')}</div>
+      ${ok ? '' : '<div class="wa-dim">行动桌模块缺席（engines/action-desk.js 未装载）—— 本页不可用。</div>'}
+      <div class="wa-row">
+        <input id="wa-desk-who" class="wa-input" aria-label="视角人物" placeholder="人物名" value="${esc((mainWin.__waDeskWho || ''))}"/>
+        <button class="wa-btn" id="wa-desk-show" title="纯读：按此人聚合各机制现状（零写入）">看行动桌</button>
+        <label class="wa-row"><input id="wa-desk-on" type="checkbox" ${on ? 'checked' : ''}/> 启用行动桌</label>
+      </div>
+      <div id="wa-desk-out" class="wa-out"></div>`;
+  }
+  /** 把 board() 的三档结果渲染成可点清单（每个按钮的 actionId 由引擎给出）。 */
+  function renderDeskOut(b) {
+    if (!b || !b.ok) return '读不到行动桌：' + esc(String((b && b.reason) || 'unknown'));
+    let html = '<div class="wa-dim">视角人物 <b>' + esc(b.person) + '</b>　'
+      + '可执行 <b>' + b.counts.ready + '</b>／需准备 <b>' + b.counts.prepare + '</b>／不可执行 <b>' + b.counts.blocked + '</b></div>';
+    (b.groups || []).forEach(function (g) {
+      if (!g.on) { html += '<div class="wa-sec">' + esc(g.kind) + '</div><div class="wa-dim">已关闭或不可用（' + esc(g.note || 'off') + '）—— 本组不提供操作</div>'; return; }
+      if (!g.rows.length) { html += '<div class="wa-sec">' + esc(g.kind) + '</div><div class="wa-dim">此刻没有可安排的事</div>'; return; }
+      html += '<div class="wa-sec">' + esc(g.kind) + '</div>';
+      g.rows.forEach(function (r) {
+        const tag = r.state === 'ready' ? '可执行' : (r.state === 'prepare' ? '需准备' : '不可执行');
+        html += '<div class="wa-row"><span class="wa-dim">[' + tag + ']</span> ' + esc(r.label)
+          + ' <span class="wa-dim">' + esc(r.why || '') + '</span>'
+          + (r.state === 'blocked' ? '' : ' <button class="wa-btn" data-desk-act="' + esc(r.id) + '">执行</button>')
+          + '</div>';
+      });
+    });
+    return html;
+  }
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
     // v2.152.0（RP6）：面板渲染链的耗时与 DOM 规模读数。计时包住「渲染 + 过滤 + 绑定」
@@ -4393,6 +4458,31 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       };
     });
     const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
+    // v2.231.0（优化 OP-1）：行动桌的读面与路由面。**读只走 board()，写只走 plan()**
+    //   —— 两者都由引擎负责，本处不重算判据、不写第二套状态（与引擎 boundary 1/7 同规）。
+    if (WA.actionDesk) {
+      const deskOut = function () { const r = $('#wa-desk-out'); return r; };
+      const showDesk = function () {
+        const who = ($('#wa-desk-who') || {}).value || '';
+        try { mainWin.__waDeskWho = who; } catch (e) { }
+        const out = deskOut(); if (!out) return;
+        const b = WA.actionDesk.board({ person: String(who).trim() });
+        out.innerHTML = renderDeskOut(b);
+        // 每个「执行」按钮：把 actionId 交给引擎路由（引擎负责转给 owner 并回报结果）。
+        out.querySelectorAll('[data-desk-act]').forEach(function (btn) {
+          btn.onclick = function () {
+            const r = WA.actionDesk.plan(btn.getAttribute('data-desk-act'), { who: String(who).trim() });
+            const tip = (r && r.ok) ? '已执行' : ('未能执行：' + String((r && r.reason) || 'unknown'));
+            showDesk();
+            const out2 = deskOut(); if (out2) out2.innerHTML = '<div class="wa-dim">' + esc(tip) + '</div>' + out2.innerHTML;
+            renderBody();
+          };
+        });
+      };
+      on('#wa-desk-show', showDesk);
+      const cb = $('#wa-desk-on');
+      if (cb) cb.onchange = function () { WA.actionDesk.setSettings({ enabled: cb.checked }); renderBody(); };
+    }
     // ── v2.209.0（优化 6）：导航协议的**通用绑定**（一处绑全部 data-nav 控件）──
     //   为什么做成属性而不是逐处写 onclick：逐处写 = 每新增一个跳转就多一处
     //   「拼串 / 解析 / 判页 / 切页 / 定位」的手写流程，而三页（检索 / 待办 / 图谱）

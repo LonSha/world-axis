@@ -326,6 +326,10 @@
     // v2.231.0（拓展 EXP-9）：共同生活、照护与显式资产交接。
     //   复用 people 人物与资源，不自动制造出生、死亡或婚姻事件。
     'engines/family.js',
+    // v2.231.0（优化 OP-1）：场景行动桌。**排在全部 owner 之后**（research/family/
+    //   production/training/gear 都是它的读源），且须晚于 settingsBus（读设置面）。
+    //   位置与 tests/run.js 的 LOAD 同序 —— 两处不同序会让专锁的隔离判据静默降级。
+    'engines/action-desk.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
