@@ -2283,6 +2283,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/path-echo.js': 'pathEcho',
     // v2.231.0 (IN-5): techLineage -- 活的技术谱系（传承、分化与断代复兴）
     'engines/tech-lineage.js': 'techLineage',
+    // v2.231.0 (OP-5): familyOps -- 共同生活经营（预算、分工与责任交接）
+    'engines/family-ops.js': 'familyOps',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',

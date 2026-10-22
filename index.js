@@ -342,6 +342,8 @@
     'engines/path-echo.js',
     // v2.231.0（创新 IN-5）：活的技术谱系。知识传承、分化与断代复兴。
     'engines/tech-lineage.js',
+    // v2.231.0（优化 OP-5）：共同生活经营。预算、分工与责任交接。
+    'engines/family-ops.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
