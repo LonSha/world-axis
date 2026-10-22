@@ -2289,6 +2289,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/aftermath-impact.js': 'aftermathImpact',
     // v2.231.0 (OP-7): epistemicView -- 角色按自己手里的版本行动（局部事实、知情边界与信念修正）
     'engines/epistemic-view.js': 'epistemicView',
+    // v2.231.0 (IN-3): sharedAwareness -- 共同知晓与默契（二阶认知、公开宣布与协作约定）
+    'engines/shared-awareness.js': 'sharedAwareness',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',

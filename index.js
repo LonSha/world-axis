@@ -348,6 +348,8 @@
     'engines/aftermath-impact.js',
     // v2.231.0（优化 OP-7）：角色手里的版本。局部事实视图与信念修正。
     'engines/epistemic-view.js',
+    // v2.231.0（拓展 IN-3）：共同知晓与默契。二阶认知、公开宣布与协作约定。
+    'engines/shared-awareness.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
