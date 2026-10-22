@@ -100,6 +100,11 @@
     'customLax.enactRule': function (o) { return WA.customLax.enactRule(o.candidateId, o); },
     'customLax.registerDissatisfaction': function (o) { return WA.customLax.registerDissatisfaction(o.ruleId, o.who); },
     'customLax.reviewRule': function (o) { return WA.customLax.reviewRule(o.ruleId, o); },
+    // v2.231.0（优化 OP-8）：场景与历史按因果讲清楚（只读聚合）
+    'sceneNarrative.currentScene': function (o) { return WA.sceneNarrative.currentScene(o); },
+    'sceneNarrative.resolvedSummary': function (o) { return WA.sceneNarrative.resolvedSummary(o); },
+    'sceneNarrative.traceFrom': function (o) { return WA.sceneNarrative.traceFrom(o.seed); },
+    'sceneNarrative.perceivedHorizon': function (o) { return WA.sceneNarrative.perceivedHorizon(o.who); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 

@@ -352,6 +352,8 @@
     'engines/shared-awareness.js',
     // v2.231.0（拓展 IN-4）：习俗到制度。惯例候选→组织批准→规则→复审。
     'engines/custom-lax.js',
+    // v2.231.0（优化 OP-8）：场景与历史按因果讲清楚。只读聚合。
+    'engines/scene-narrative.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
