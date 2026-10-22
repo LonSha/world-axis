@@ -356,6 +356,8 @@
     'engines/scene-narrative.js',
     // v2.231.0（拓展 IN-6）：公共设施与服务网络。容量、排队、维护与降级。
     'engines/service-network.js',
+    // v2.231.0（优化 OP-9）：可玩的世界蓝图。样例、依赖检查、玩法定义导出。
+    'engines/playable-blueprint.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

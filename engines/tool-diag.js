@@ -2297,6 +2297,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/scene-narrative.js': 'sceneNarrative',
     // v2.231.0 (IN-6): serviceNetwork -- 公共设施与服务网络（容量、排队、维护与降级）
     'engines/service-network.js': 'serviceNetwork',
+    // v2.231.0 (OP-9): playableBlueprint -- 可玩的世界蓝图（样例、依赖检查、玩法定义导出）
+    'engines/playable-blueprint.js': 'playableBlueprint',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',
