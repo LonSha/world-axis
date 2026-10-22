@@ -336,6 +336,8 @@
     'engines/labor-schedule.js',
     // v2.231.0（优化 OP-4）：研究成果闭环。类型化前置验证与三权分立就绪度评估。
     'engines/research-closure.js',
+    // v2.231.0（创新 IN-1）：动机竞合。NPC 不再只选第一条可执行任务，权衡生计/承诺/抱负/恢复/安全。
+    'engines/motive-arbitration.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

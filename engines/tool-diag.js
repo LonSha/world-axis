@@ -2277,6 +2277,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/labor-schedule.js': 'laborSchedule',
     // v2.231.0 (OP-4): closure -- 研究成果闭环（从确认字符串走到可验证成果）
     'engines/research-closure.js': 'researchClosure',
+    // v2.231.0 (IN-1): motive -- 动机竞合（NPC 不再只选第一条可执行任务）
+    'engines/motive-arbitration.js': 'motiveArbitration',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',
