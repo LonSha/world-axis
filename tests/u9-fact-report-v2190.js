@@ -43,7 +43,7 @@ const EXPORTS = ['build', 'print', 'selfTest', 'versions', 'rejectCodes', 'modul
 const EVIDENCE = ['README.md', 'ITERATION_LOG.md', 'NEXT_PLAN.md', 'docs/ERROR_CODES.md',
   'tests/reject-code-ledger.json', 'tests/module-registry-ledger.json',
   'tests/dead-export-ledger.json', 'tests/consumer-ledger.json'];
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function rd(rel) { try { return fs.readFileSync(path.join(BASE, rel), 'utf8'); } catch (e) { return null; } }
 /** 现场破坏：**全部**出现处一次改掉（字符串版 replace 只改第一处 —— v2.105.0 的 D2 教训）。 */
 function allReplace(src, from, to) { return src.split(from).join(to); }
 /** 在真源码上做一次破坏，并证明破坏真的发生了（没打中 ⇒ 抛，不许静默）。 */

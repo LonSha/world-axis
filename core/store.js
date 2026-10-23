@@ -175,6 +175,18 @@
       //   该模块的 GRAPH 此前是纯内存（重载即归零 ⇒ 「重载后关系仍连续」无出口）。
       //   edges 存边（含 directed 有向立场），events 存「同一件事不重复入账」的引用账。
       relationGraph: { edges: [], events: [], directed: [] },    // 关系图谱（relation-graph.js）
+      // v2.231.0（拓展 IN-1～IN-9）：新引擎顶层容器物化声明
+      customLax: { candidates: [], rules: [], reviews: [] },
+      envCapacity: { resources: {}, log: [] },
+      epistemicStore: { beliefs: {} },
+      familyOps: { budgets: {}, goals: {}, dispositions: {} },
+      laborSchedule: { currentDay: 1, bookings: [] },
+      phaseTransition: { regions: {}, history: [] },
+      researchClues: [],
+      serviceNetwork: { facilities: [], usage: [] },
+      sharedAwareness: { meta: {}, pacts: {} },
+      socialLegacy: { legacies: [], witnesses: [] },
+      techLineage: { traditions: {} },
       // v2.130.0（拓展计划 B1/C1/C2/D3）：三个新引擎的顶层键。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
       //   ——登记不等于物化，两件事都要做。

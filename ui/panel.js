@@ -14214,6 +14214,24 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     mounted: false,
     mount() {
       if (mainDoc.getElementById('wa-panel')) return;
+      // ── v2.231.2：关键几何样式**自带兜底**（不依赖宿主是否加载 style.css）──────
+      //   【为什么必须自带】#wa-panel 是 position:fixed + z-index:10000 的覆盖层，
+      //   它「不可见」这件事完全靠 style.css 里的 `#wa-panel.wa-hidden{display:none}`。
+      //   一旦宿主没把 style.css 注入到位（manifest 的 css 字段失败 / 时序晚于 mount），
+      //   面板就是一个盖住全屏的透明层 —— **所有点击都被它吃掉**，用户看到的是「整页卡死」。
+      //   真机已实测到这一形态（v2.231.1 把 mount 提前后必现）。故这里把「隐藏」这条
+      //   以及定位/层级用内联 !important 钉死：样式表在不在，都不允许它挡住别人。
+      try {
+        const css = '#wa-panel.wa-hidden{display:none !important}'
+          + '#wa-panel{position:fixed !important;z-index:10000 !important}'
+          + '#wa-orb{position:fixed !important;z-index:9999 !important}';
+        if (!mainDoc.getElementById('wa-geom-guard')) {
+          const st = mainDoc.createElement('style');
+          st.id = 'wa-geom-guard';
+          st.textContent = css;
+          (mainDoc.head || mainDoc.documentElement).appendChild(st);
+        }
+      } catch (e) {}
       buildPanel(); buildOrb();
       // 世界推演状态事件 → 悬浮球呼吸
       WA.on('backstage:started', () => orbEl && orbEl.classList.add('wa-busy'));

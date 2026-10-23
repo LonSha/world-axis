@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.231.0'
+  const VERSION = '2.231.6'
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -66,6 +66,14 @@
   const __logTrimStat = { eventTrims: 0, errorTrims: 0, lastAt: 0, level: 'normal' };
   function logCaps() {
     let level = 'normal', why = [];
+    // v2.231.4：**初始化期间绝不扫全库**。
+    //   【为什么】`WA.log()` 每调一次都会走到这里，而下面 `WA.store.storageStat()`
+    //   要遍历整个 localStorage 统计字节数。init 期间日志密集（每步都有），
+    //   真机上这等于把「能不能起来」押在一次全库扫描上 —— 实测现象是 init 在
+    //   `mount-deferred` 之后整段消失（连 catch 都没机会跑）。
+    //   初始化未完成时用固定常规档：此阶段日志量本来就小，动态收紧没有必要，
+    //   而「不扫库」是硬要求。init 结束后（WA.__initDone）恢复原有自适应行为。
+    try { if (!WA.__initDone) return { level: 'normal', event: LOG_ADAPT.baseEvent, error: LOG_ADAPT.baseError, why: ['init-pending'] }; } catch (e) {}
     try {
       if (WA.store && WA.store.diagBudget) {
         const db = WA.store.diagBudget();
@@ -191,18 +199,124 @@
 
   // ── 加载子模块（按依赖顺序）─────────────────────────────
   // 使用扩展自身URL推导base路径（兼容 third-party 目录）
+  // ── 扩展根目录推导（v2.231.1 修复）─────────────────────────────
+  // 【它治的病·真机活体缺陷】旧实现只认字面量 `WorldAxis`：
+  //     if (idx > 0 && src.includes('WorldAxis')) return src.slice(0, idx);
+  //     return '/scripts/extensions/third-party/WorldAxis';
+  //   于是扩展若装在**别的目录名**下（`git clone` 默认给的仓库名是 `world-axis`，
+  //   全小写带连字符；TauriTavern 扩展目录里实测就是这个名），两条路同时落空：
+  //   本地 src 拼成 `/scripts/extensions/third-party/WorldAxis/core/clock.js` —— 一个
+  //   **不存在的路径**，100+ 个模块全部 404，然后逐个掉进 CDN 容灾，每个模块
+  //   1 次本地 + 3 次 CDN × 12s 超时。手机网络到 jsDelivr 不通时，整条装载链
+  //   就是「无限期静默失败」：`ui/panel.js` 永不被求值 ⇒ `WA.ui` 恒缺席 ⇒
+  //   **悬浮球和面板永不出现，且没有任何报错**（用户视角：「装了这个扩展什么都没发生」）。
+  //   这正是本仓反复点名的「静默降级」形态，且是**文档约束冒充代码约束**的后果：
+  //   README 说「目录名必须是 WorldAxis」，但代码没有能力在目录名不同时存活。
+  // 【修法·与目录名解耦】三条路，越靠前越准：
+  //   ① `document.currentScript` —— 脚本执行期自身，名字随目录走，天然正确；
+  //   ② DOM 里任意 third-party 扩展的 `index.js` 脚本（TH 脚本 iframe 场景下
+  //      currentScript 是 iframe 自己的，故 mainDoc 兜底仍必要）；
+  //   ③ 最后才回退到目录惯例 —— 且**不再假设**某一种写法。
+  //   取到的前缀一律剥掉 query/hash，避免把 `?v=` 带进下一次拼接。
+  function stripQuery(u) { const q = u.search(/[?#]/); return q < 0 ? u : u.slice(0, q); }
   function getBaseUrl() {
-    const scripts = mainDoc.getElementsByTagName('script');
-    for (let i = scripts.length - 1; i >= 0; i--) {
-      const src = scripts[i].src || '';
-      const idx = src.indexOf('/index.js');
-      if (idx > 0 && src.includes('WorldAxis')) return src.slice(0, idx);
-    }
-    // 回退：从 import.meta 不可用（非模块），用扩展目录惯例
+    // ① 当前正在执行的脚本自身
+    try {
+      const cur = document.currentScript || mainDoc.currentScript;
+      const cs = cur && cur.src ? stripQuery(String(cur.src)) : '';
+      if (cs) {
+        const k = cs.lastIndexOf('/index.js');
+        if (k > 0) return cs.slice(0, k);
+        const s = cs.lastIndexOf('/');
+        if (s > 0) return cs.slice(0, s);
+      }
+    } catch (e) { /* currentScript 不可用 ⇒ 走 ② */ }
+    // ② DOM 中任意 third-party 扩展入口（不挑目录名）
+    try {
+      const scripts = mainDoc.getElementsByTagName('script');
+      for (let i = scripts.length - 1; i >= 0; i--) {
+        const src = stripQuery(scripts[i].src || '');
+        const idx = src.indexOf('/index.js');
+        if (idx > 0 && src.indexOf('/extensions/') > 0) return src.slice(0, idx);
+      }
+    } catch (e) { /* 继续 ③ */ }
+    // ③ 目录惯例回退（最后手段；两个已知写法都试，先大写后小写）
     return '/scripts/extensions/third-party/WorldAxis';
   }
   WA.baseUrl = getBaseUrl();
+  // ── v2.231.1：装载现场取证（写进 localStorage，真机不可开 DevTools 时唯一通道）──
+  //   为什么要在**这一刻**写：下面就是 282 个模块的串行装载，任何一处 baseUrl 拼错都会让
+  //   整个 init 卡在超时里（每模块 1 本地 + 3 CDN × 12s），诊断信息要能在「卡住之前」落盘。
+  //   读法：localStorage.getItem('wa_boot_v1')
+  try {
+    const scriptsSeen = [];
+    try {
+      const ss = mainDoc.getElementsByTagName('script');
+      for (let i = 0; i < ss.length && scriptsSeen.length < 40; i++) {
+        const s = ss[i].src || '';
+        if (s.indexOf('extension') > 0 || s.indexOf('index.js') > 0) scriptsSeen.push(s);
+      }
+    } catch (e) {}
+    const perfSeen = [];
+    try {
+      const es = (mainWin.performance && mainWin.performance.getEntriesByType)
+        ? mainWin.performance.getEntriesByType('resource') : [];
+      for (let i = 0; i < es.length && perfSeen.length < 40; i++) {
+        const n = es[i].name || '';
+        if (n.indexOf('extension') > 0) perfSeen.push(n);
+      }
+    } catch (e) {}
+    mainWin.localStorage.setItem('wa_boot_v1', JSON.stringify({
+      ver: VERSION,
+      base: WA.baseUrl,
+      currentScript: (function () { try { return (document.currentScript && document.currentScript.src) || null; } catch (e) { return 'err'; } })()
+        || (function () { try { return (mainDoc.currentScript && mainDoc.currentScript.src) || null; } catch (e) { return 'err'; } })(),
+      href: (function () { try { return String(mainDoc.location && mainDoc.location.href); } catch (e) { return 'err'; } })(),
+      scripts: scriptsSeen,
+      perf: perfSeen
+    }));
+  } catch (e) { /* 存储不可用 ⇒ 诊断缺席，但不影响扩展本体 */ }
   WA.loadScript = loadScript;
+  // ── v2.231.1：URL 形态探测（一次把「哪种写法真能取到模块」问清楚）──────────
+  //   背景：真机症状是「扩展装了但什么都没发生」，日志只有一句
+  //   `Uncaught SyntaxError: Unexpected token '<'` —— 说明某个 script 的 src 取回了
+  //   HTML（404 页）却被当 JS 解析。宿主是 Tauri 自定义协议（origin = tauri.localhost），
+  //   这类协议对 `?query`、对大小写、对目录映射的处理各不相同，**不能假设与 http 同构**。
+  //   故这里把候选写法逐个 fetch 一遍，把「哪个 200 / 哪个回 HTML」落盘：
+  //     localStorage.getItem('wa_probe_v1')
+  //   探针只读 GET，不写任何东西，不改变被观测对象。
+  (function probeUrlForms() {
+    try {
+      if (typeof fetch !== 'function') return;
+      const rel0 = 'core/clock.js';
+      const cands = [
+        WA.baseUrl + '/' + rel0,                 // ① 裸路径
+        WA.baseUrl + '/' + rel0 + '?v=' + VERSION, // ② 带 query（现用写法）
+        WA.baseUrl + '/' + rel0 + '#v=' + VERSION  // ③ 带 hash
+      ];
+      const out = { base: WA.baseUrl, ver: VERSION, results: [] };
+      const one = function (u) {
+        return fetch(u, { method: 'GET', cache: 'no-store' })
+          .then(function (r) {
+            return r.text().then(function (t) {
+              out.results.push({
+                url: u,
+                status: r.status,
+                ok: r.ok,
+                len: t.length,
+                head: t.slice(0, 60).replace(/\s+/g, ' ')
+              });
+            });
+          })
+          .catch(function (e) { out.results.push({ url: u, error: String(e && (e.message || e)) }); });
+      };
+      let p = Promise.resolve();
+      cands.forEach(function (u) { p = p.then(function () { return one(u); }); });
+      p.then(function () {
+        try { mainWin.localStorage.setItem('wa_probe_v1', JSON.stringify(out)); } catch (e) {}
+      });
+    } catch (e) { /* 探针失败不影响本体 */ }
+  })();
 
   const LOAD_ORDER = [
     'core/clock.js',           // v2.15.0: 时间源单一出口（决策时间可冻结 / 测量时间不受影响）——须最先装载
@@ -963,7 +1077,7 @@
   //   同一构建标识下取到的模块与本地是同一次产物,这才谈得上「同版容灾」。
   //   纪律:升版时 BUILD_ID 与 VERSION 同批推进(判据见 tests/index-build-v2211.js),
   //   不允许只改其一 —— 只改 VERSION 会让回退源指向旧代码,只改 BUILD_ID 会让版本账对不上现场。
-  const BUILD_ID = '29f60398ffa8496c1c1901faac836b7191a709cc';
+  const BUILD_ID = '8066b342de8635916ccd08df15fbd42956a13fb1';
   const CDN_BASES = [
     'https://cdn.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
     'https://fastly.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
@@ -978,17 +1092,71 @@
       let settled = false;
       const done = (r) => { if (!settled) { settled = true; resolve(r); } };
       let timer = null;
-      try {
-        const s = mainDoc.createElement('script');
-        s.src = src;
-        s.onload = () => { if (timer) clearTimeout(timer); done({ ok: true, src: src }); };
-        s.onerror = (e) => { if (timer) clearTimeout(timer); done({ ok: false, src: src, error: 'onerror' }); };
-        timer = setTimeout(() => {
-          try { if (s.parentNode) s.parentNode.removeChild(s); } catch (e) {}
-          done({ ok: false, src: src, error: 'timeout' });
-        }, timeoutMs || SCRIPT_TIMEOUT_MS);
-        mainDoc.head.appendChild(s);
-      } catch (e) { done({ ok: false, src: src, error: String(e && (e.message || e)) }); }
+      const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+      // ── 通道 A：fetch + 全局执行（仅 Tauri 系壳启用）──────────────────────────
+      //   【真机实测数据，不是推测】TauriTavern（origin `http://tauri.localhost`）里：
+      //     · fetch 取 `core/clock.js` → 200 / 486 字节 / 正文 `/**`（正确源码）
+      //     · `<script src>` 取同一 URL → onload 回调，但喂给 JS 引擎的是 HTML
+      //       ⇒ 控制台只剩 `Uncaught SyntaxError: Unexpected token '<'`
+      //   而 loadScript 把 onload 记成功 ⇒ 失败表恒空、`WA.ui` 恒缺席 ⇒
+      //   **悬浮球与主面板永不出现，且没有任何一处报错**。
+      //   故 Tauri 下优先 fetch（与壳自身装载扩展的方式同构），失败再回落 `<script>`。
+      //   非 Tauri（普通 http 部署 / 测试桩）**不启用**：Node 自带 fetch 会真发请求，
+      //   让回归变慢且不确定；且那些环境里 `<script>` 本来就对，零行为变化。
+      const isTauri = (function () {
+        try {
+          const loc = (mainDoc && mainDoc.location) || {};
+          const h = String(loc.hostname || '');
+          const p = String(loc.protocol || '');
+          if (h === 'tauri.localhost' || h === 'localhost.tauri') return true;
+          if (p === 'tauri:' || p === 'asset:') return true;
+          if (mainWin.__TAURI__ || mainWin.__TAURI_INTERNALS__) return true;
+          return false;
+        } catch (e) { return false; }
+      })();
+      const viaFetch = function () {
+        // 预取命中 ⇒ 直接执行（网络已经并行取完，这里只剩「按序执行」的成本）
+        try {
+          const pf = WA.__prefetch;
+          if (pf && pf.get) {
+            const cached = pf.get(src);
+            if (cached) {
+              (0, eval)(cached + '\n//# sourceURL=' + src);
+              pf.delete(src);          // 执行过即释放，18MB 不常驻内存
+              return Promise.resolve({ ok: true, src: src, via: 'prefetch' });
+            }
+          }
+        } catch (e) { /* 预取体执行失败 ⇒ 走正常通道重取 */ }
+        if (!isTauri || typeof fetch !== 'function') return Promise.reject(new Error('skip'));
+        return fetch(src, { method: 'GET', cache: 'no-store' }).then(function (r) {
+          if (!r.ok) throw new Error('http-' + r.status);
+          return r.text();
+        }).then(function (text) {
+          // 壳在路由未命中时回 200 + HTML，必须验形再执行
+          const head = String(text).replace(/^\uFEFF/, '').replace(/^\s+/, '').slice(0, 1);
+          if (head === '<') throw new Error('html-instead-of-js');
+          if (!text || text.length < 16) throw new Error('empty-body');
+          try { (0, eval)(text + '\n//# sourceURL=' + src); }
+          catch (e) { throw new Error('eval:' + String(e && (e.message || e))); }
+          return { ok: true, src: src, via: 'fetch' };
+        });
+      };
+      const viaTag = function () {
+        return new Promise(function (res) {
+          try {
+            const s = mainDoc.createElement('script');
+            s.src = src;
+            s.onload = function () { res({ ok: true, src: src, via: 'tag' }); };
+            s.onerror = function () { res({ ok: false, src: src, error: 'onerror' }); };
+            mainDoc.head.appendChild(s);
+          } catch (e) { res({ ok: false, src: src, error: String(e && (e.message || e)) }); }
+        });
+      };
+      timer = setTimeout(function () { done({ ok: false, src: src, error: 'timeout' }); }, timeoutMs || SCRIPT_TIMEOUT_MS);
+      viaFetch().then(function (r) { clear(); done(r); }).catch(function () {
+        viaTag().then(function (r) { clear(); done(r); })
+          .catch(function (e) { clear(); done({ ok: false, src: src, error: String(e && (e.message || e)) }); });
+      });
     });
   }
   function loadScript(rel) {
@@ -998,7 +1166,30 @@
       const failed = WA.__loaderState.failedCdnAt;
       const cooldownMs = 60000;
       const tag = '?v=' + VERSION;
-      const localSrc = WA.baseUrl + '/' + rel + tag;
+      // ── v2.231.1：Tauri 系壳**不能**带 query string（真机实测）────────────────
+      //   【实测】同一模块同一路径，在 TauriTavern（origin `http://tauri.localhost`）里：
+      //     · `/…/core/clock.js`          → 200，正文 `/** …`（模块源码）
+      //     · `/…/core/clock.js?v=2.231.0` → 回一页 HTML（路由未命中）
+      //   壳的协议处理器把「带查询串的路径」当成另一个资源，不剥 query 去查文件。
+      //   而本仓 282 个模块**全部**拼了 `?v=`，于是全部 404；`<script>` 又把 HTML
+      //   喂给 JS 引擎 ⇒ 只有一句 `Unexpected token '<'`，且 onload 照常触发、
+      //   失败表恒空 ⇒ 面板永不出现且无从得知原因。
+      //   【代价】Tauri 下失去「同 URL 换版本即刷缓存」的语义。但这不构成回退：
+      //     · 扩展升级本身就要重启壳，重启即重新装载；
+      //     · 同一构建内 `?v=` 恒定，本来也没有 cache-busting 作用。
+      //   故这里是**去掉一个从未生效、且在真宿主上致命的后缀**，不是牺牲功能。
+      const useQueryTag = !(function () {
+        try {
+          const loc = (mainDoc && mainDoc.location) || {};
+          const h = String(loc.hostname || '');
+          const p = String(loc.protocol || '');
+          if (h === 'tauri.localhost' || h === 'localhost.tauri') return true;
+          if (p === 'tauri:' || p === 'asset:') return true;
+          if (mainWin.__TAURI__ || mainWin.__TAURI_INTERNALS__) return true;
+          return false;
+        } catch (e) { return false; }
+      })();
+      const localSrc = WA.baseUrl + '/' + rel + (useQueryTag ? tag : '');
       const cacheKey = rel + '@' + VERSION;
       const state = WA.__loaderState;
       if (state.loaded.has(cacheKey)) return state.loaded.get(cacheKey);
@@ -1103,12 +1294,149 @@
   // ── 主初始化 ────────────────────────────────────────────
   async function init() {
     WA.log('info', '世界枢轴 v' + VERSION + ' 启动，base=' + WA.baseUrl);
-    for (const rel of LOAD_ORDER) {
-      await loadScript(rel); // 串行保证依赖顺序
-    }
-    // v0.1.25: 启动完整性审计——加载失败的模块显式点名并计数（不再静默）
+    // ── v2.231.1：装载进度实时落盘 ──────────────────────────────────────
+    //   【为什么必须逐模块写】真机现场（TauriTavern）表现是「什么都没发生」：
+    //   控制台不可读，唯一线索是一句 `Unexpected token '<'`，且不说是哪个文件。
+    //   于是把「加载到第几个 / 哪个失败 / 错误是什么」逐条写进 localStorage，
+    //   下一次现场就能直接读出卡点，而不是靠猜：
+    //       JSON.parse(localStorage.getItem('wa_load_v1'))
+    //   写入失败（配额/隐私模式）不影响装载，故整段包在 try 里。
+    const __prog = { base: WA.baseUrl, ver: VERSION, total: LOAD_ORDER.length, done: 0, failed: [], startedAt: Date.now() };
+    const __flush = function (extra) {
+      try {
+        if (extra) { for (const k in extra) __prog[k] = extra[k]; }
+        __prog.updatedAt = Date.now();
+        mainWin.localStorage.setItem('wa_load_v1', JSON.stringify(__prog));
+      } catch (e) {}
+    };
+    // ── v2.231.1：累积式阶段日志（wa_stage_v1）──────────────────────────
+    //   __flush 只保留「最后一格」，一旦后续某步不再写盘就无从判断断在哪。
+    //   __mark 把**每一步的名字**追加进数组并整条覆盖写盘，历史留在 LevelDB 的
+    //   append-only log 里 ⇒ 现场能读出「走到哪一步为止」，而不是只知道最后一步。
+    const __stages = [];
+    // v2.231.3：__mark 的失败**必须自己可见**。
+    //   【为什么】上一版它整个包在 try/catch 里，setItem 一旦开始抛错（配额/安全错误/
+    //   storage 被冻结），后续所有阶段就静默消失 —— 现场只能看到「走到某一步为止」，
+    //   却看不出「是这一步没走到」还是「走到了但记不下来」。这两种病因完全不同：
+    //   前者要修逻辑，后者要修存储。故这里加**降级通道**：写 wa_stage_v1 失败时，
+    //   改为写一条极小的 wa_stage_err_v1（只放失败阶段名 + 错误名），仍失败则挂到
+    //   window.__waMarkErr 供诊断段读出。三条路都断才允许真的静默。
+    let __markBroken = false;
+    const __mark = function (name, err) {
+      let s = String(name);
+      if (err) { s += '!' + (err && err.message ? err.message : String(err)); }
+      __stages.push(s);
+      if (__markBroken) return;
+      try {
+        mainWin.localStorage.setItem('wa_stage_v1', JSON.stringify({
+          base: WA.baseUrl, ver: VERSION, stages: __stages, at: Date.now()
+        }));
+      } catch (e) {
+        __markBroken = true;
+        const why = 'mark-fail@' + s + ':' + (e && (e.name || e.message) || String(e));
+        try { mainWin.localStorage.setItem('wa_stage_err_v1', why); } catch (e2) {}
+        try { (mainWin || window).__waMarkErr = why; } catch (e3) {}
+        try { WA.errorLog.push({ t: Date.now(), level: 'error', msg: '阶段打点写盘失败：' + why, data: null }); } catch (e4) {}
+      }
+    };
+    __mark('init-enter');
+    __flush({ phase: 'begin' });
+    // ── v2.231.1：并行预取 + 保序执行（装载提速）──────────────────────────
+    //   【真机实测】282 个模块共 18MB。串行 `await loadScript` 时单个约 1 秒
+    //   ⇒ 全程 4~5 分钟；期间 `WA.ui` 还没定义，用户看到的就是
+    //   「扩展装了但什么都没有」——**慢与坏在用户眼里是同一件事**。
+    //   而网络本可并行，只有**执行**必须保序（模块间有依赖）。
+    //   故先把源码并行取进内存，再按 LOAD_ORDER 逐个执行：
+    //   网络并行、执行保序，装载时间从分钟级压到十秒级。
+    //   【不牺牲正确性】预取失败的模块**不写进表**，仍走 loadScript 正常通道；
+    //   验形规则与单模块通道一致（HTML/过短一律视为未命中）。
     try {
-      const failedList = WA.loaderStatus ? WA.loaderStatus().failedModules : [];
+      const tauriHost = (function () {
+        try {
+          const loc = (mainDoc && mainDoc.location) || {};
+          const h = String(loc.hostname || '');
+          const p = String(loc.protocol || '');
+          return h === 'tauri.localhost' || h === 'localhost.tauri'
+            || p === 'tauri:' || p === 'asset:'
+            || !!mainWin.__TAURI__ || !!mainWin.__TAURI_INTERNALS__;
+        } catch (e) { return false; }
+      })();
+      if (tauriHost && typeof fetch === 'function') {
+        const pf = new Map();
+        WA.__prefetch = pf;
+        const urls = LOAD_ORDER.map(function (rel) { return WA.baseUrl + '/' + rel; });
+        let cursor = 0;
+        const worker = function () {
+          if (cursor >= urls.length) return Promise.resolve();
+          const u = urls[cursor++];
+          return fetch(u, { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.text() : null; })
+            .then(function (t) {
+              if (!t || t.length < 16) return;
+              const head = String(t).replace(/^\uFEFF/, '').replace(/^\s+/, '').slice(0, 1);
+              if (head === '<') return;          // HTML ⇒ 不是模块源码，不写表
+              pf.set(u, t);
+            })
+            .catch(function () {})               // 单个失败不影响其他
+            .then(worker);
+        };
+        const lanes = [];
+        for (let i = 0; i < 6; i++) lanes.push(worker());
+        __flush({ phase: 'prefetch-start', total: urls.length });
+        Promise.all(lanes).then(function () {
+          __flush({ phase: 'prefetch-done', prefetched: pf.size });
+        });
+      }
+    } catch (e) { /* 预取失败 ⇒ 退回逐个通道，不改变正确性 */ }
+    // 装载**前**刷盘：记下「正在加载谁」。写在装载后只能看到「谁完成了」，
+    // 而真机卡点恰恰是「那一个没完成」—— 这一字之差决定了能不能定位。
+    for (const rel of LOAD_ORDER) {
+      __flush({ phase: 'loading', at: rel });
+      const r = await loadScript(rel); // 串行保证依赖顺序
+      __prog.done++;
+      if (!r || r.ok !== true) {
+        __prog.failed.push({ rel: rel, err: (r && (r.error || r.failed)) || 'unknown' });
+      }
+      __flush({ phase: 'loading', at: rel });
+    }
+    __flush({ phase: 'modules-done' });
+    __mark('modules-done');
+    // ── v2.231.1：UI **优先**挂载 ──────────────────────────────────────
+    // ── v2.231.2：撤销「UI 提前挂载」────────────────────────────────────
+    //   【为什么撤销】v2.231.1 曾把 WA.ui.mount() 提到这里（模块装载完就建 DOM），
+    //   真机实测后果是**整页点击全部失效**：mount() 会把 #wa-panel（position:fixed、
+    //   z-index:10000、430×600 的覆盖层）插进 body，而它的隐藏完全依赖 style.css 的
+    //   `#wa-panel.wa-hidden{display:none}`。样式一旦没到位（宿主 CSS 加载时序/失败），
+    //   这个面板就是一个盖住全屏的透明层，把所有点击都吃掉 —— 用户看到的是「卡死」。
+    //   教训与本仓「故障必须可见」并不矛盾：**入口可见**不能靠把覆盖层提前插进 DOM 换取，
+    //   那等于用「挡住别人」来证明「我来了」。挂载仍在 init 末尾，且 mount() 自带样式兜底。
+    __mark('mount-deferred');
+    // v2.231.5：审计块前后**各加一个打点**，并把它拆成可归因的小步。
+    //   【为什么】前几版只知道「卡在 mount-deferred 之后、audit-done 之前」，但那中间
+    //   有 4 个动作：① 取 loaderStatus（遍历 __loaderState 三个 Map）② map 投影
+    //   ③ 赋值 WA.loadFailures ④ WA.log。只报「这段没过」等于没报 —— 本仓口径是
+    //   「故障必须可见」且**必须指向可修的那一行**，所以这里逐步落盘。
+    //   注意：打点本身也走 localStorage，若连它都不出现，说明是**执行流中断**
+    //   （进程被杀/页面被冻结），而不是某一行逻辑出错 —— 这个区分是决定性的。
+    __mark('audit-enter');
+    try {
+      __mark('audit-status-begin');
+      // v2.231.5：**只取失败表，不调 loaderStatus()**。
+      //   【真机实测的元凶】`WA.loaderStatus()` 表面只是「读三个 Map」，但它的返回体里
+      //   还拼了 `integrity: WA.loaderIntegrity()` —— 而 `loaderIntegrity()` 会转到
+      //   `WA.store.integrity()` → `loadGap()` → `loaderFailureRels()`。**此刻 store.init()
+      //   还没执行**，等于在 store 未初始化时就去问它「装载完整性如何」。
+      //   打点证据：`audit-status-begin` 写进去了、`audit-status-ok` 没写进去，
+      //   中间只隔这一行 —— 精确定位到它就是断点。
+      //   修法：审计只需要**失败表**（下一步投影成字符串数组给 store 闸门读），
+      //   直接读 `__loaderState.failed` 这个唯一真源即可，不必绕道整个 loaderStatus()。
+      //   这也顺带修掉一个结构问题：**记账不该依赖它正在服务的那个模块**。
+      const st = WA.__loaderState;
+      const failedEntries = (st && st.failed instanceof Map) ? Array.from(st.failed.entries()) : [];
+      const failedList = failedEntries.map(function (e) {
+        return { rel: e[0], at: e[1] && e[1].at, sourcesTried: e[1] && e[1].sourcesTried };
+      });
+      __mark('audit-status-ok:' + failedList.length);
       // v2.211.0(优化 Q1):把失败表**投影**成 store 闸门能读的字符串数组。
       //   为什么在此刻(而不是 init 末尾):下一句就是 store.init(),它会装载存档并可能触发
       //   首次写路径 —— 闸门在那一刻就要能读到表。判定真源仍是本文件的 __loaderState.failed,
@@ -1116,16 +1444,18 @@
       //   三态口径(见 core/store.js · loaderFailureRels):**未定义**=装载面不在场(闸门不适用);
       //   **数组**(空数组也算"已知")=失败表可读。故这里必须写数组,不能"没失败就不写"。
       WA.__loadFailed = failedList.map(function (f) { return f.rel; });
+      __mark('audit-projected');
       if (failedList.length) {
         WA.loadFailures = failedList.slice();
-        WA.log('error', '启动审计：' + failedList.length + ' 个模块加载失败：' + failedList.map(function (f) { return f.rel; }).join('、'));
       } else {
         WA.loadFailures = [];
-        WA.log('info', '启动审计：全部模块加载成功');
       }
-    } catch (e) {}
+      __mark('audit-done');
+    } catch (e) { __mark('audit-err', e); }
     // 模块全部加载后：初始化store、注册拦截器、建UI
-    try { WA.store && WA.store.init && WA.store.init(); } catch (e) { WA.log('error', 'store初始化失败', e); }
+    __flush({ phase: 'stage-store' });
+    try { WA.store && WA.store.init && WA.store.init(); __mark('store-ok'); }
+    catch (e) { __mark('store-err', e); WA.log('error', 'store初始化失败', e); }
     // v2.211.0(优化 Q1):闸门关着就**当场如实点名**。为什么必须在这里说:
     //   闸门拦的是「本次世界写未发生」,用户此时只看到「操作没反应」。没有这一句,
     //   「加载不全」对用户就是不可见的 —— 本仓治过的「静默降级」形态。
@@ -1137,7 +1467,9 @@
           + '),写侧已关闭 —— 读 / 诊断 / 导出 / 恢复不受影响;补上文件后用 WA.loadRetry(rel) 重试装载');
       }
     } catch (e) {}
-    try { WA.interceptor && WA.interceptor.install && WA.interceptor.install(); } catch (e) { WA.log('error', '拦截器安装失败', e); }
+    __flush({ phase: 'stage-interceptor' });
+    try { WA.interceptor && WA.interceptor.install && WA.interceptor.install(); __mark('icpt-ok'); }
+    catch (e) { __mark('icpt-err', e); WA.log('error', '拦截器安装失败', e); }
     // [v2.19.0/v2.20.0] 启动接线：
     //   · injectInspector.init：订阅 prompt-ready 事件 → 注入自检抓最终 prompt 快照。
     //     这是**面板与 tool-diag 实际消费的那个**（getLastSnapshot/statusText/flatten）。
@@ -1151,11 +1483,54 @@
     //     订阅重试、快照 clone 隔离、flatten/safe），且只有它被面板/诊断消费
     //     （WA.inspector 的全部导出零消费、也未登记进 MODULE_EXPORTS）。故「注入自检从未订阅」
     //     不成立——真实代价仅是每次生成多挂一个无人读取的 handler。该重复模块已一并删除。
+    __flush({ phase: 'stage-hooks' });
     const __inited = [];
-    try { if (WA.injectInspector && typeof WA.injectInspector.init === 'function' && WA.injectInspector.init() === true) __inited.push('injectInspector'); } catch (e) { WA.log('warn', '注入自检初始化失败', e); }
-    try { if (WA.chatcache && typeof WA.chatcache.init === 'function' && WA.chatcache.init() === true) __inited.push('chatcache'); } catch (e) { WA.log('warn', '酒馆缓存同步初始化失败', e); }
+    try { if (WA.injectInspector && typeof WA.injectInspector.init === 'function' && WA.injectInspector.init() === true) __inited.push('injectInspector'); } catch (e) { __mark('inject-err', e); WA.log('warn', '注入自检初始化失败', e); }
+    try { if (WA.chatcache && typeof WA.chatcache.init === 'function' && WA.chatcache.init() === true) __inited.push('chatcache'); } catch (e) { __mark('chatcache-err', e); WA.log('warn', '酒馆缓存同步初始化失败', e); }
+    __mark('hooks-done');
     WA.__inited = __inited;
-    try { WA.ui && WA.ui.mount && WA.ui.mount(); } catch (e) { WA.log('error', 'UI挂载失败', e); }
+    __flush({ phase: 'stage-mount' });
+    // 兜底重试：若前面那次挂了（或当时 WA.ui 还没定义），这里再试一次。mount 幂等。
+    try {
+      const __m = !!(WA.ui && WA.ui.mounted);
+      if (WA.ui && WA.ui.mount) WA.ui.mount();
+      __mark(__m ? 'mount-retry-already' : 'mount-retry-ok');
+    } catch (e) { __mark('mount-retry-err', e); WA.log('error', 'UI挂载失败', e); }
+    __flush({ phase: 'stage-mounted' });
+    // ── v2.231.1：装载诊断落盘（真机不可开 DevTools 时的唯一取证通道）──────────
+    //   【为什么非要有这一段】扩展「装了但什么都没发生」在真宿主里**没有任何可见输出**：
+    //   TauriTavern/手机端拿不到控制台，用户只能描述「没有悬浮球」。而本仓的判据一贯是
+    //   「故障必须可见」——于是把装载结论写进 localStorage，任何一次现场都能被读出来：
+    //     localStorage.getItem('wa_diag_v1')
+    //   读到的字段直接指向病因：`base` 拼错 ⇒ 全部子模块 404；`hasUi:false` ⇒ panel.js
+    //   没装载；`orbInDom:false` 且 `mounted:true` ⇒ 挂载点被宿主 DOM 结构挡住。
+    //   【它不能替代什么】它不是门禁：本段只在 init 末尾跑一次，不参与任何断言。
+    try {
+      const __dg = ({
+        ver: VERSION,
+        buildId: BUILD_ID,
+        base: WA.baseUrl,
+        readyState: mainDoc.readyState,
+        loaded: Object.keys(WA.modules || {}).length,
+        failedCount: (WA.loadFailures || []).length,
+        failed: (WA.loadFailures || []).slice(0, 12).map(function (f) { return f.rel; }),
+        hasUi: !!(WA.ui && WA.ui.mount),
+        uiMounted: !!(WA.ui && WA.ui.mounted),
+        orbInDom: !!(mainDoc.getElementById && mainDoc.getElementById('wa-orb')),
+        panelInDom: !!(mainDoc.getElementById && mainDoc.getElementById('wa-panel')),
+        integrity: (function () { try { return WA.loaderIntegrity ? WA.loaderIntegrity() : null; } catch (e) { return 'err'; } })()
+      });
+      const __dgStr = (function (o) {
+        try { return JSON.stringify(o); }
+        catch (e2) { return JSON.stringify({ ver: o.ver, buildId: o.buildId, base: o.base, loaded: o.loaded, failedCount: o.failedCount, hasUi: o.hasUi, uiMounted: o.uiMounted, orbInDom: o.orbInDom, panelInDom: o.panelInDom, note: 'stringify-degraded' }); }
+      })(__dg);
+      mainWin.localStorage.setItem('wa_diag_v1', __dgStr);
+    } catch (e) { /* 存储不可用 ⇒ 诊断缺席，但不影响扩展本体 */ }
+    __mark('diag-written');
+    // v2.231.4：init 关键路径走完 ⇒ 解除 logCaps 的降级档（恢复动态水位自适应）。
+    //   放在 diag-written 之后而不是更早：早解除会让后续日志重新触发全库扫描，
+    //   而「diag-written」本身就是 init 完成的可观测标志。
+    try { WA.__initDone = true; } catch (e) {}
     // v2.0.0: 装载审计——「已加载 / 已注册 / 清单声明」三方对齐，注册表不再空转
     try {
       const failedRels = (WA.loadFailures || []).map(function (f) { return f.rel; });
@@ -1197,7 +1572,38 @@
   //   仍是进入条件，只是不再**额外**要求「事件还没发过」这个不可观测的前提。
   function whenReady(fn) {
     let done = false;
-    const once = function () { if (done) return; done = true; try { fn(); } catch (e) { WA.log('warn', '初始化异常', e); } };
+    // v2.231.3：**必须接住 async init 的 rejection**。
+    //   【真机实测抓到的静默故障】`init` 是 async 函数，它内部抛出的错误**不会**变成
+    //   同步异常 —— 而是变成一个 rejected Promise。而这里原来的写法是
+    //   `try { fn(); } catch (e) {...}`：try/catch 对 rejected Promise **完全无效**，
+    //   于是 init 中途抛错时：① 不会有任何 catch 接住；② 不会写任何阶段打点；
+    //   ③ 表现就是「模块全装载了、然后什么都没发生」—— 与本轮真机现场一模一样
+    //   （wa_stage_v1 停在 modules-done 之后的某一步，且 audit-done / audit-err 都没有）。
+    //   修法：拿返回值，若为 thenable 就挂 .catch，把 rejection **落盘**为阶段打点。
+    //   这不是「多一层日志」，是本仓「故障必须可见」在 async 边界上的补洞：
+    //   同步 throw 有 catch，异步 reject 同样必须有 catch，否则故障在语言层面就隐身。
+    const once = function () {
+      if (done) return;
+      done = true;
+      let ret;
+      try { ret = fn(); } catch (e) {
+        WA.log('warn', '初始化异常', e);
+        try { (mainWin || window).__waInitErr = String((e && e.message) || e); } catch (e2) {}
+        return;
+      }
+      if (ret && typeof ret.then === 'function') {
+        ret.catch(function (e) {
+          WA.log('error', 'init异步拒绝', e);
+          try { (mainWin || window).__waInitErr = String((e && e.message) || e); } catch (e2) {}
+          try {
+            mainWin.localStorage.setItem('wa_init_err_v1', JSON.stringify({
+              ver: VERSION, msg: String((e && e.message) || e),
+              stack: String((e && e.stack) || '').slice(0, 1200), at: Date.now()
+            }));
+          } catch (e2) {}
+        });
+      }
+    };
     const ctx = mainWin.SillyTavern && mainWin.SillyTavern.getContext && mainWin.SillyTavern.getContext();
     if (ctx && ctx.eventSource && ctx.eventTypes) {
       // 先兜底后挂事件：兜底用同步立即执行，故它一定先于任何随后到来的 APP_READY。

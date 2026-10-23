@@ -33,6 +33,7 @@
     "coop",
     "coordinate",
     "currents",
+    "customLax",
     "diplomacy",
     "directEvents",
     "dream",
@@ -40,10 +41,13 @@
     "economy",
     "elsewhere",
     "enigma",
+    "envCapacity",
+    "epistemicStore",
     "eraCycle",
     "events",
     "evolution",
     "family",
+    "familyOps",
     "farfield",
     "floorSettle",
     "fondness",
@@ -55,6 +59,7 @@
     "intelQueue",
     "investigation",
     "karma",
+    "laborSchedule",
     "ladder",
     "lastInjection",
     "liaison",
@@ -75,6 +80,7 @@
     "parallelWorld",
     "people",
     "perspective",
+    "phaseTransition",
     "plan",
     "powerAnchor",
     "proactiveLastRound",
@@ -85,6 +91,7 @@
     "rehearsal",
     "relationGraph",
     "research",
+    "researchClues",
     "rhythm",
     "rivalry",
     "ruling",
@@ -92,14 +99,18 @@
     "sceneSlice",
     "schemaVersion",
     "sediment",
+    "serviceNetwork",
     "session",
     "shadow",
+    "sharedAwareness",
+    "socialLegacy",
     "spotlight",
     "stage",
     "storyChoice",
     "storyTone",
     "survey",
     "survival",
+    "techLineage",
     "temperament",
     "tempo",
     "temporal",
@@ -127,39 +138,6 @@
     }
   },
   "write": {
-    "engines/custom-lax.js": {
-      "customLax": 3
-    },
-    "engines/environmental-capacity.js": {
-      "envCapacity": 2
-    },
-    "engines/epistemic-view.js": {
-      "epistemicStore": 3
-    },
-    "engines/family-ops.js": {
-      "familyOps": 3
-    },
-    "engines/labor-schedule.js": {
-      "laborSchedule": 1
-    },
-    "engines/phase-transition.js": {
-      "phaseTransition": 3
-    },
-    "engines/research-closure.js": {
-      "researchClues": 1
-    },
-    "engines/service-network.js": {
-      "serviceNetwork": 2
-    },
-    "engines/shared-awareness.js": {
-      "sharedAwareness": 3
-    },
-    "engines/social-legacy.js": {
-      "socialLegacy": 3
-    },
-    "engines/tech-lineage.js": {
-      "techLineage": 2
-    },
     "ui/panel.js": {
       "innerHTML": 1
     }

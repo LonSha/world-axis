@@ -92,15 +92,18 @@ function rejectCodes(rd) {
   const docsClaim = docsText.match(/拒收码.*?(\d{3,})/);
   let cov = null, err = null;
   try {
-    const rcc = require(path.join(ROOT, 'tests/reject-code-coverage.js'));
-    const d = rcc.discover();
-    cov = {
-      total: d.coverage.total, witnessed: d.coverage.witnessed, dead: d.coverage.dead,
-      base: d.coverage.base, sum: d.coverage.sum, identityOk: d.coverage.identityOk,
-      covered: d.coverage.covered, rate: d.coverage.rate,
-      declared: d.declarations.declared, duplicated: d.declarations.duplicated.length,
-      deferred: Object.keys(d.deferred || {}).length, summary: d.summary
-    };
+    if (!global.__wa_cached_cov) {
+      const rcc = require(path.join(ROOT, 'tests/reject-code-coverage.js'));
+      const d = rcc.discover();
+      global.__wa_cached_cov = {
+        total: d.coverage.total, witnessed: d.coverage.witnessed, dead: d.coverage.dead,
+        base: d.coverage.base, sum: d.coverage.sum, identityOk: d.coverage.identityOk,
+        covered: d.coverage.covered, rate: d.coverage.rate,
+        declared: d.declarations.declared, duplicated: d.declarations.duplicated.length,
+        deferred: Object.keys(d.deferred || {}).length, summary: d.summary
+      };
+    }
+    cov = global.__wa_cached_cov;
   } catch (e) { err = String(e && e.message); }
   return {
     ledgerVersion: led.version,
@@ -175,7 +178,7 @@ function leftovers() {
 }
 
 // ── ⑨ 文档中仍存在的旧基线（只列出，不改写） ───────────────────────────────
-const STALE_TARGETS = ['README.md', 'ITERATION_LOG.md', 'NEXT_PLAN.md', 'FOUR_VERSION_PLAN.md',
+const STALE_TARGETS = ['README.md', 'ITERATION_LOG.md', 'NEXT_PLAN.md',
   'plans/O_OPTIMIZATION.md', 'plans/E_EXPANSION.md', 'plans/TP_OPTIMIZATION.md',
   'plans/TX_EXPANSION.md', 'plans/U_OPTIMIZATION.md', 'plans/Y_EXPANSION.md', 'docs/ERROR_CODES.md'];
 function staleBaselines(cur, rd) {
