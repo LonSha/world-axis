@@ -38,7 +38,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('socialLegacy') : Date.now();
+    return WA.clock.now('socialLegacy');
   }
 
   var LEGACY_TYPES = ['unfinished-work', 'facility', 'named-item', 'lineage', 'reputation'];
@@ -75,7 +75,7 @@
     if (LEGACY_TYPES.indexOf(legacyType) < 0) return { ok: false, reason: 'bad-legacy-type', allowed: LEGACY_TYPES.slice() };
 
     var entry = {
-      id: 'leg_' + now() + '_' + Math.floor(Math.random() * 10000),
+      id: 'leg_' + now() + '_' + WA.rand.id(),
       legacyType: legacyType,
       sourceEventId: sourceEventId,
       originator: originator,

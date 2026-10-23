@@ -40,7 +40,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('phaseTransition') : Date.now();
+    return WA.clock.now('phaseTransition');
   }
 
   // 三个局部社会状态（题材声明，不声称预测现实历史）

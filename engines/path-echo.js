@@ -42,7 +42,7 @@
     if (!p) return { ok: false, reason: 'person-not-found' };
 
     const life = ensureEchoes(p);
-    const dId = clean(decision.id || ('dec_' + Date.now()), 40);
+    const dId = clean(decision.id || ('dec_' + WA.clock.now('pathEcho')), 40);
 
     // 限制最多记录 2 个备选项
     const alts = (Array.isArray(alternatives) ? alternatives.slice(0, 2) : []).map(function (a) {
@@ -66,7 +66,7 @@
       alternatives: alts,
       localFactsSnapshot: Object.assign({}, localFacts || {}),
       status: 'pending_realization',
-      registeredAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('pathEcho') : Date.now(),
+      registeredAt: WA.clock.now('pathEcho'),
       realization: null
     };
 
@@ -162,7 +162,7 @@
     }
 
     const realization = {
-      realizedAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('pathEcho') : Date.now(),
+      realizedAt: WA.clock.now('pathEcho'),
       sentiment: sentiment,
       payoffShortfall: payoffShortfall,
       costExcess: costExcess,

@@ -119,7 +119,7 @@
           role: (prev.stage + 1 >= t.requiredMinStage) ? 'master' : 'apprentice',
           stage: prev.stage + 1,
           mentor: mId,
-          learnedAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('techLineage') : Date.now()
+          learnedAt: WA.clock.now('techLineage')
         };
         t.status = 'active';
         return true;
@@ -262,7 +262,7 @@
       WA.store.transact(function (s) {
         const t = s.techLineage.traditions[trad.id];
         t.variants[vId].confirmed = true;
-        t.variants[vId].confirmedAt = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('techLineage') : Date.now();
+        t.variants[vId].confirmedAt = WA.clock.now('techLineage');
         return true;
       }, 'techLineage:confirmVariant');
     }

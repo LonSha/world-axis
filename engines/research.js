@@ -69,7 +69,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
-  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockNow = function (site) { WA.clock.now(site) };
   const LS_KEY = 'worldaxis_research_settings_v1';
   const DEF = { enabled: false, maxProjects: 24, maxPhases: 12, maxClues: 32 };
   const __REG = { key: LS_KEY, def: DEF, module: 'research',
@@ -128,7 +128,7 @@
   let __seq = 0;
   function nextId() {
     __seq++;
-    return 'r_' + Date.now().toString(36) + '_' + __seq;
+    return 'r_' + WA.clock.now('research').toString(36) + '_' + __seq;
   }
 
   /**

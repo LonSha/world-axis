@@ -38,7 +38,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('serviceNetwork') : Date.now();
+    return WA.clock.now('serviceNetwork');
   }
 
   var SERVICE_TYPES = ['irrigation', 'transport', 'crafting', 'water-supply'];
@@ -84,7 +84,7 @@
 
     var capacity = num(s.capacity) || 1;
     var entry = {
-      id: 'fac_' + now() + '_' + Math.floor(Math.random() * 10000),
+      id: 'fac_' + now() + '_' + WA.rand.id(),
       name: name,
       placeId: placeId,
       serviceType: serviceType,

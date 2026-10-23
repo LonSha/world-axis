@@ -132,7 +132,7 @@
               material: mKey,
               helper: clean(o.helperName || '雇工', 40),
               gapType: gapType,
-              at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('familyOps') : Date.now()
+              at: WA.clock.now('familyOps')
             });
           }
           return true;
@@ -287,7 +287,7 @@
         s.familyOps.dispositions[clean(unitId, 40) + ':' + wId] = {
           retiredMember: whoName,
           disposition: disp,
-          disposedAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('familyOps') : Date.now()
+          disposedAt: WA.clock.now('familyOps')
         };
         return true;
       }, 'familyOps:retireMember');

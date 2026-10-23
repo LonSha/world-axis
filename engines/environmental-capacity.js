@@ -38,7 +38,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('envCapacity') : Date.now();
+    return WA.clock.now('envCapacity');
   }
 
   var RESOURCE_TYPES = ['water', 'forest', 'pasture', 'soil'];

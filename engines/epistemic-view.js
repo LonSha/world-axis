@@ -57,7 +57,7 @@
       certainty: clean(b.certainty || 'tentative', 20), // 'certain' | 'tentative' | 'distrusted'
       source: clean(b.source || 'hearsay', 30), // 'witnessed' | 'hearsay' | 'document' | 'rumor'
       faithful: b.faithful !== false, // 是否与客观事实相符
-      updatedAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('epistemic') : Date.now()
+      updatedAt: WA.clock.now('epistemic')
     };
 
     if (WA.store && WA.store.transact) {
@@ -191,7 +191,7 @@
       source: clean(ev.source || 'direct_proof', 30),
       faithful: true,
       previousDistortion: oldBelief ? oldBelief.summary : null,
-      updatedAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('epistemic') : Date.now()
+      updatedAt: WA.clock.now('epistemic')
     };
 
     if (WA.store && WA.store.transact) {

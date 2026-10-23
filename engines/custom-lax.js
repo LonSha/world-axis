@@ -61,7 +61,7 @@
   var STAGES = ['candidate', 'proposed', 'approved', 'rejected', 'revised', 'revoked'];
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('customLax') : Date.now();
+    return WA.clock.now('customLax');
   }
 
   /**
@@ -89,7 +89,7 @@
     }
 
     var entry = {
-      id: 'cand_' + now() + '_' + Math.floor(Math.random() * 10000),
+      id: 'cand_' + now() + '_' + WA.rand.id(),
       orgId: orgId,
       ruleType: ruleType,
       sourceEventId: sourceEventId,
@@ -198,7 +198,7 @@
     }
 
     var rule = {
-      id: 'rule_' + now() + '_' + Math.floor(Math.random() * 10000),
+      id: 'rule_' + now() + '_' + WA.rand.id(),
       orgId: orgId,
       ruleType: cand.ruleType,
       sourceEventId: cand.sourceEventId,
@@ -254,7 +254,7 @@
           r.status = 'under-review';
           triggered = true;
           d.customLax.reviews.push({
-            id: 'rev_' + now() + '_' + Math.floor(Math.random() * 10000),
+            id: 'rev_' + now() + '_' + WA.rand.id(),
             ruleId: rId,
             triggeredBy: by,
             reason: 'dissatisfaction-threshold-reached',

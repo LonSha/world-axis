@@ -213,7 +213,7 @@
         decision: evalRes.decision,
         rationale: evalRes.rationale,
         forsakenCount: evalRes.forsaken.length,
-        at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('motive') : Date.now()
+        at: WA.clock.now('motive')
       };
 
       // 若有承诺受到影响且承诺列表存在，更新承诺状态

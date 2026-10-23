@@ -62,7 +62,7 @@
     const entry = {
       me: me, other: other, factId: fId, basis: b,
       certainty: b === 'shared-presence' ? 'probable' : 'confirmed',
-      at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('sharedAwareness') : Date.now()
+      at: WA.clock.now('sharedAwareness')
     };
 
     if (WA.store && WA.store.transact) {
@@ -111,7 +111,7 @@
       participants: participants,
       confirmedBy: [],
       status: 'pending', // pending | coordinated | misunderstanding
-      openedAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('sharedAwareness') : Date.now()
+      openedAt: WA.clock.now('sharedAwareness')
     };
 
     if (WA.store && WA.store.transact) {
