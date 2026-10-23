@@ -1,13 +1,13 @@
 {
  "version": "2.231.0",
- "loadOrderCount": 262,
- "loadedCount": 248,
+ "loadOrderCount": 282,
+ "loadedCount": 268,
  "uiCount": 14,
- "nsCount": 256,
+ "nsCount": 276,
  "totals": {
-  "loadEdges": 154,
+  "loadEdges": 170,
   "hardEdges": 0,
-  "callRefs": 301,
+  "callRefs": 325,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -34,6 +34,8 @@
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
+    "engines/action-desk.js",
+    "engines/action-methods.js",
     "engines/activity.js",
     "engines/aftermath.js",
     "engines/agency.js",
@@ -75,9 +77,11 @@
     "engines/enemies.js",
     "engines/ensemble.js",
     "engines/entry-router.js",
+    "engines/environmental-capacity.js",
     "engines/evidence-board.js",
     "engines/evolution.js",
     "engines/faction-graph.js",
+    "engines/family.js",
     "engines/farfield.js",
     "engines/fate.js",
     "engines/floor-settle.js",
@@ -93,6 +97,7 @@
     "engines/inst.js",
     "engines/investigation.js",
     "engines/kaleidoscope.js",
+    "engines/labor-schedule.js",
     "engines/length-policy.js",
     "engines/liaison.js",
     "engines/life.js",
@@ -114,8 +119,10 @@
     "engines/pending-center.js",
     "engines/perf-baseline.js",
     "engines/perspective-lock.js",
+    "engines/phase-transition.js",
     "engines/plan-audit.js",
     "engines/plan.js",
+    "engines/playable-blueprint.js",
     "engines/playtime.js",
     "engines/plot-gauge.js",
     "engines/pmem.js",
@@ -138,14 +145,19 @@
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/request-viewer.js",
+    "engines/research-closure.js",
+    "engines/research.js",
     "engines/retrieval.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
+    "engines/scene-narrative.js",
     "engines/scope-tag.js",
     "engines/sediment.js",
+    "engines/service-network.js",
     "engines/session.js",
+    "engines/social-legacy.js",
     "engines/solo-voice.js",
     "engines/stage.js",
     "engines/stale-guard.js",
@@ -275,6 +287,8 @@
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
+    "engines/action-desk.js",
+    "engines/action-methods.js",
     "engines/backstage.js",
     "engines/bridge.js",
     "engines/calendar.js",
@@ -288,6 +302,7 @@
     "engines/farfield.js",
     "engines/hazard.js",
     "engines/kaleidoscope.js",
+    "engines/labor-schedule.js",
     "engines/life.js",
     "engines/memory.js",
     "engines/offline-return.js",
@@ -296,6 +311,7 @@
     "engines/pmem.js",
     "engines/proactive.js",
     "engines/regional.js",
+    "engines/research-closure.js",
     "engines/summarizer.js",
     "engines/vitals.js",
     "engines/wb-inject.js",
@@ -320,6 +336,8 @@
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
+    "engines/action-desk.js",
+    "engines/action-methods.js",
     "engines/activity.js",
     "engines/aftermath.js",
     "engines/agency.js",
@@ -354,8 +372,10 @@
     "engines/economy.js",
     "engines/elsewhere.js",
     "engines/ensemble.js",
+    "engines/environmental-capacity.js",
     "engines/evidence-board.js",
     "engines/faction-graph.js",
+    "engines/family.js",
     "engines/farfield.js",
     "engines/fate.js",
     "engines/floor-settle.js",
@@ -369,6 +389,7 @@
     "engines/inject-value.js",
     "engines/inst.js",
     "engines/investigation.js",
+    "engines/labor-schedule.js",
     "engines/length-policy.js",
     "engines/liaison.js",
     "engines/lifeline.js",
@@ -386,8 +407,10 @@
     "engines/pending-center.js",
     "engines/perf-baseline.js",
     "engines/perspective-lock.js",
+    "engines/phase-transition.js",
     "engines/plan-audit.js",
     "engines/plan.js",
+    "engines/playable-blueprint.js",
     "engines/playtime.js",
     "engines/plot-gauge.js",
     "engines/polish.js",
@@ -407,14 +430,19 @@
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/request-viewer.js",
+    "engines/research-closure.js",
+    "engines/research.js",
     "engines/retrieval.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
+    "engines/scene-narrative.js",
     "engines/scope-tag.js",
     "engines/sediment.js",
+    "engines/service-network.js",
     "engines/session.js",
+    "engines/social-legacy.js",
     "engines/solo-voice.js",
     "engines/stage.js",
     "engines/stale-guard.js",
@@ -1489,6 +1517,350 @@
    "stateKeys": [
     "worldaxis_activity_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/research.js": {
+   "ns": [
+    "research"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_research_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/family.js": {
+   "ns": [
+    "family"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_family_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/action-desk.js": {
+   "ns": [
+    "actionDesk"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_action_desk_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/action-methods.js": {
+   "ns": [
+    "actionMethods"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_action_methods_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/labor-schedule.js": {
+   "ns": [
+    "laborSchedule"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_labor_schedule_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/research-closure.js": {
+   "ns": [
+    "researchClosure"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_research_closure_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/motive-arbitration.js": {
+   "ns": [
+    "motiveArbitration"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/path-echo.js": {
+   "ns": [
+    "pathEcho"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/tech-lineage.js": {
+   "ns": [
+    "techLineage"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/family-ops.js": {
+   "ns": [
+    "familyOps"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/aftermath-impact.js": {
+   "ns": [
+    "aftermathImpact"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/epistemic-view.js": {
+   "ns": [
+    "epistemicView"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/shared-awareness.js": {
+   "ns": [
+    "sharedAwareness"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/custom-lax.js": {
+   "ns": [
+    "customLax"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/scene-narrative.js": {
+   "ns": [
+    "sceneNarrative"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/service-network.js": {
+   "ns": [
+    "serviceNetwork"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/playable-blueprint.js": {
+   "ns": [
+    "playableBlueprint"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/environmental-capacity.js": {
+   "ns": [
+    "envCapacity"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/social-legacy.js": {
+   "ns": [
+    "socialLegacy"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/phase-transition.js": {
+   "ns": [
+    "phaseTransition"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "actors/registry.js": {

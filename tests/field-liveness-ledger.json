@@ -43,6 +43,7 @@
     "eraCycle",
     "events",
     "evolution",
+    "family",
     "farfield",
     "floorSettle",
     "fondness",
@@ -83,6 +84,7 @@
     "region",
     "rehearsal",
     "relationGraph",
+    "research",
     "rhythm",
     "rivalry",
     "ruling",
@@ -125,6 +127,39 @@
     }
   },
   "write": {
+    "engines/custom-lax.js": {
+      "customLax": 3
+    },
+    "engines/environmental-capacity.js": {
+      "envCapacity": 2
+    },
+    "engines/epistemic-view.js": {
+      "epistemicStore": 3
+    },
+    "engines/family-ops.js": {
+      "familyOps": 3
+    },
+    "engines/labor-schedule.js": {
+      "laborSchedule": 1
+    },
+    "engines/phase-transition.js": {
+      "phaseTransition": 3
+    },
+    "engines/research-closure.js": {
+      "researchClues": 1
+    },
+    "engines/service-network.js": {
+      "serviceNetwork": 2
+    },
+    "engines/shared-awareness.js": {
+      "sharedAwareness": 3
+    },
+    "engines/social-legacy.js": {
+      "socialLegacy": 3
+    },
+    "engines/tech-lineage.js": {
+      "techLineage": 2
+    },
     "ui/panel.js": {
       "innerHTML": 1
     }
