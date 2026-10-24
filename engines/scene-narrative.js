@@ -354,14 +354,144 @@
     };
   }
 
+  /**
+   * OPV3-1: 世界情境投影
+   * 只读聚合：当前人物、地点、时段、在场人、可见变化、临近承诺、可用行动、阻塞行动。
+   * 无状态持久化，纯只读投影；无待办时给出 nothing_to_do 明确标识。
+   */
+  function situation(opts) {
+    var o = opts || {};
+    var s = state();
+    var viewer = clean(o.who || o.viewer, 40);
+    var place = clean(o.place || (s.region && s.region.currentPlace) || (s.people && viewer && s.people['p_' + viewer] && s.people['p_' + viewer].location) || '', 60);
+
+    // 1. 在场人物（物理在场，排除在途）
+    var present = [];
+    if (s.people) {
+      var keys = Object.keys(s.people);
+      var matched = [];
+      for (var pi = 0; pi < keys.length; pi++) {
+        var k = keys[pi];
+        var p = s.people[k];
+        if (!p) continue;
+        var pname = clean(p.name || k.replace(/^p_/, ''), 40);
+        var pst = clean(p.status || p.action || '', 30);
+        var ploc = clean(p.location || p.place || '', 60);
+        if (pst === 'traveling' || pst === 'on_the_road' || pst === 'transit') continue;
+        if (place && ploc && ploc !== place) continue;
+        matched.push(pname);
+      }
+      present = matched.slice(0, 8);
+    }
+
+    // 2. 可见变化
+    var visibleChanges = [];
+    var chains = ((s.causal || {}).chains) || [];
+    if (Array.isArray(chains)) {
+      visibleChanges = chains.filter(function (c) {
+        if (!c) return false;
+        var st = clean(c.stage || c.status, 20);
+        if (st !== 'pending' && st !== 'delayed') return false;
+        if (viewer) {
+          var aff = Array.isArray(c.affected) ? c.affected : (c.who ? [c.who] : []);
+          var isRelated = aff.indexOf(viewer) >= 0 || aff.indexOf('p_' + viewer) >= 0;
+          var isAtPlace = place && c.place && clean(c.place, 60) === place;
+          if (!isRelated && !isAtPlace && !c.public) return false;
+        }
+        return true;
+      }).map(function (c) {
+        return {
+          id: clean(c.id, 40),
+          title: clean(c.title || c.key || c.id, 60),
+          stage: clean(c.stage || c.status, 20),
+          summary: clean(c.summary || c.note || '', 80)
+        };
+      }).slice(0, 6);
+    }
+
+    // 3. 临近承诺与待办
+    var approachingPromises = [];
+    if (WA.pendingCenter && typeof WA.pendingCenter.items === 'function') {
+      try {
+        var piRes = WA.pendingCenter.items({ limit: 8 });
+        if (piRes && piRes.ok && Array.isArray(piRes.rows)) {
+          approachingPromises = piRes.rows.filter(function (r) {
+            if (!r) return false;
+            if (viewer && r.who && clean(r.who, 40) !== viewer) return false;
+            return true;
+          }).map(function (r) {
+            return {
+              id: clean(r.id, 40),
+              source: clean(r.source, 30),
+              title: clean(r.title || r.label || r.id, 60),
+              deadline: num(r.deadline) || num(r.day) || null,
+              status: clean(r.status, 20)
+            };
+          }).slice(0, 6);
+        }
+      } catch (e) {}
+    }
+
+    // 4. 可用行动与被阻塞行动（消费 actionDesk.board）
+    var availableActions = [];
+    var blockedActions = [];
+    if (WA.actionDesk && typeof WA.actionDesk.board === 'function') {
+      try {
+        var bRes = WA.actionDesk.board({ person: viewer, place: place });
+        if (bRes && bRes.ok && Array.isArray(bRes.rows)) {
+          bRes.rows.forEach(function (rw) {
+            if (!rw) return;
+            var item = {
+              id: clean(rw.id, 60),
+              kind: clean(rw.kind || rw.owner, 30),
+              label: clean(rw.label, 60),
+              state: clean(rw.state, 20),
+              why: clean(rw.why, 120),
+              owner: clean(rw.owner || rw.kind, 30)
+            };
+            if (rw.state === 'ready') {
+              availableActions.push(item);
+            } else {
+              blockedActions.push(item);
+            }
+          });
+        }
+      } catch (e) {}
+    }
+
+    // 5. 空闲状态判据
+    var isIdle = (availableActions.length === 0 && approachingPromises.length === 0 && visibleChanges.length === 0);
+    var idleStatus = isIdle ? 'nothing_to_do' : 'active';
+    var idleText = isIdle ? '此处风平浪静，暂无紧急待办或即刻行动' : '场景中有正在展开的事件或待办行动';
+
+    _stat.scenes++;
+    return {
+      ok: true,
+      isProjection: true,
+      viewer: viewer,
+      place: place,
+      present: present,
+      visibleChanges: visibleChanges,
+      approachingPromises: approachingPromises,
+      availableActions: availableActions,
+      blockedActions: blockedActions,
+      idleStatus: idleStatus,
+      idleText: idleText,
+      hasPending: !isIdle,
+      note: '情境投影纯只读，无世界状态持久化；切换场景实时更新'
+    };
+  }
+
   WA.sceneNarrative = {
     currentScene: currentScene,
+    situation: situation,
     resolvedSummary: resolvedSummary,
     traceFrom: traceFrom,
     perceivedHorizon: perceivedHorizon,
     stat: function () { return Object.assign({}, _stat, { faults: Object.assign({}, _stat.faults) }); },
     reset: function () { _stat.scenes = 0; _stat.traces = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; return { ok: true }; }
   };
+  WA.situation = situation;
 
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/scene-narrative.js', { kind: 'engine', ver: '2.231.0' });
   if (typeof console !== 'undefined' && console.log) {

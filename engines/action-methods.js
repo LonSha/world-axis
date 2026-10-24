@@ -137,6 +137,41 @@
           desc: '简易应急加固，无需专业工具'
         }
       ]
+    },
+    'task:investigation': {
+      id: 'task:investigation',
+      name: '现场调查',
+      ability: '调查',
+      gearKind: '仪器',
+      methods: [
+        {
+          id: 'novice_survey',
+          name: '新手仪器勘测',
+          minStage: 0,
+          requireGear: true,
+          wear: 1,
+          path: 'path:novice_survey',
+          desc: '使用专业勘测仪器逐步排查线索，初学者即可操作，工具轻度磨损'
+        },
+        {
+          id: 'expert_deduction',
+          name: '熟练逻辑推导',
+          minStage: 2,
+          requireGear: false,
+          wear: 0,
+          path: 'path:expert_deduction',
+          desc: '经验丰富的调查员直接根据现场痕迹推导因果，无需仪器且无磨损'
+        },
+        {
+          id: 'expert_forensics',
+          name: '专家精密取证',
+          minStage: 2,
+          requireGear: true,
+          wear: 1,
+          path: 'path:expert_forensics',
+          desc: '高超技能配合完好仪器，获得最为确定详尽的因果线索'
+        }
+      ]
     }
   };
 
@@ -259,6 +294,7 @@
       abilityStage: abilityStage,
       gearId: gearId || null,
       gearReason: gearReason,
+      canExecute: available.length > 0,
       available: available,
       blocked: blockedList
     };

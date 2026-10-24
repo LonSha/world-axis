@@ -108,6 +108,10 @@
     'aftermath.repairCommission': function (o) { return WA.aftermathImpact.commissionRepair(o.effectId, o); },
     'epistemic.view': function (o) { return WA.epistemicView.buildView(o.personId, o.topicId); },
     'epistemic.correct': function (o) { return WA.epistemicView.correctBelief(o.personId, o.topicId, o.evidence, o); },
+    // v2.232.0 (OPV3-1 & OPV3-2): 情境投影与场景工作台
+    'sceneNarrative.situation': function (o) { return WA.sceneNarrative.situation(o); },
+    'actionDesk.preview': function (o) { return previewAction(o.actionId, o); },
+    'actionDesk.workbench': function (o) { return workbench(o); },
     // v2.231.0（拓展 IN-3）：共同知晓与默契
     'sharedAwareness.assertMeta': function (o) { return WA.sharedAwareness.assertMeta(o.who, o.target, o.factId, o.basis); },
     'sharedAwareness.openPact': function (o) { return WA.sharedAwareness.openPact(o.pactId, o.spec); },
@@ -151,6 +155,13 @@
     'envCapacity.withdraw': function (o) { return WA.envCapacity.withdraw(o.resourceId, o.amount, o); },
     'envCapacity.regenerate': function (o) { return WA.envCapacity.regenerate(o.resourceId, o); },
     'envCapacity.regionStatus': function (o) { return WA.envCapacity.regionStatus(o.regionId); },
+    'envCapacity.evaluateImpact': function (o) { return WA.envCapacity.evaluateImpact(o.regionId, o.resourceType); },
+    'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
+    // v2.232.0 (EXV3-4): 具名公共项目
+    'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },
+    'coop.pledgeProject': function (o) { return WA.coop.pledgeProject(o.projectId, o.who, o.contributions); },
+    'coop.handleAbsence': function (o) { return WA.coop.handleAbsence(o.projectId, o.absentPerson, o.solution, o); },
+    'coop.concludeProject': function (o) { return WA.coop.concludeProject(o.projectId, o); },
     // v2.231.0（拓展 IN-8）：社会遗产
     'socialLegacy.formLegacy': function (o) { return WA.socialLegacy.formLegacy(o.spec); },
     'socialLegacy.acceptLegacy': function (o) { return WA.socialLegacy.acceptLegacy(o.legacyId, o); },
@@ -197,12 +208,134 @@
 
   function ensureDeskStore(draft) {
     if (!draft.actionDesk || typeof draft.actionDesk !== 'object') {
-      draft.actionDesk = { opportunities: {} };
+      draft.actionDesk = { opportunities: {}, receipts: {} };
     }
     if (!draft.actionDesk.opportunities || typeof draft.actionDesk.opportunities !== 'object') {
       draft.actionDesk.opportunities = {};
     }
+    if (!draft.actionDesk.receipts || typeof draft.actionDesk.receipts !== 'object') {
+      draft.actionDesk.receipts = {};
+    }
     return draft.actionDesk;
+  }
+
+  /**
+   * OPV3-2: 行动资源与前置条件只读预览。
+   * 零写入，不消耗材料与耐久。
+   */
+  function previewAction(actionId, opts) {
+    const aid = clean(actionId, 60);
+    const o = opts || {};
+    const w = clean(o.who, 60);
+    const st = state();
+
+    if (w && !knownPerson(w)) {
+      return { ok: false, reason: 'unknown-person', who: w };
+    }
+
+    // 1. 若为方法任务，复用 actionMethods.evaluate
+    if (aid.indexOf('method.') === 0 || aid.indexOf('task:') === 0 || o.taskId) {
+      const taskId = o.taskId || aid.replace(/^method\./, '');
+      if (WA.actionMethods && typeof WA.actionMethods.evaluate === 'function') {
+        const ev = WA.actionMethods.evaluate(taskId, w, o);
+        return Object.assign({ ok: true, preview: true, actionId: aid, canExecute: ev && ev.ok && ev.available && ev.available.length > 0 }, ev);
+      }
+    }
+
+    // 2. 若为研究供料/推进
+    if (aid.indexOf('research.') === 0) {
+      const pid = clean(o.projectId || aid.slice(aid.indexOf(':') + 1), 60);
+      if (WA.research && typeof WA.research.view === 'function') {
+        const rv = WA.research.view(pid);
+        if (!rv || !rv.ok) return { ok: false, reason: 'project-not-found', projectId: pid };
+        const shortfalls = [];
+        const personRec = (st.people && st.people['p_' + w]) || null;
+        const pRes = (personRec && personRec.resources) || {};
+        Object.keys(rv.materials || {}).forEach(function (mat) {
+          const req = num(rv.materials[mat]) || 0;
+          const havePool = num((rv.reserve || {})[mat]) || 0;
+          const havePerson = num(pRes[mat]) || 0;
+          if (havePool < req) {
+            shortfalls.push({ material: mat, needTotal: req, poolHave: havePool, personHave: havePerson, deficient: req - havePool });
+          }
+        });
+        const canSupply = shortfalls.every(function (s) { return s.personHave >= s.deficient; });
+        return {
+          ok: true, preview: true, actionId: aid, projectId: pid,
+          canExecute: canSupply && shortfalls.length > 0,
+          shortfalls: shortfalls,
+          alternatives: shortfalls.length ? ['寻求工坊支援', '调整研究方案'] : ['料已备齐，可推进'],
+          note: '纯读预览，零扣除零磨损'
+        };
+      }
+    }
+
+    // 3. 通用预览兜底
+    return {
+      ok: true,
+      preview: true,
+      actionId: aid,
+      who: w,
+      canExecute: true,
+      costEstimate: { duration: 1, wear: 0 },
+      shortfalls: [],
+      note: '通用前置与条件校验通过'
+    };
+  }
+
+  /**
+   * OPV3-2: 场景工作台入口。
+   * 支持预览模式与带幂等回执的确认执行。
+   */
+  function workbench(opts) {
+    const o = opts || {};
+    const mode = clean(o.mode || 'execute', 20);
+    const aid = clean(o.actionId, 60);
+    const key = clean(o.idempotencyKey, 80);
+
+    if (mode === 'preview') {
+      return previewAction(aid, o);
+    }
+
+    // 执行模式：检查幂等性
+    if (key) {
+      const st = state();
+      const receipts = (st.actionDesk && st.actionDesk.receipts) || {};
+      if (receipts[key]) {
+        return { ok: true, duplicated: true, idempotencyKey: key, receipt: receipts[key], note: '重复提交，已返回历史结算回执' };
+      }
+    }
+
+    // 执行实际 plan
+    const execRes = plan(aid, o);
+    if (!execRes || !execRes.ok) {
+      return execRes;
+    }
+
+    // 写入回执
+    const receiptRow = {
+      id: key || ('rcpt_' + clockNow('actionDesk')),
+      actionId: aid,
+      who: clean(o.who, 60),
+      outcome: execRes,
+      at: clockNow('actionDesk')
+    };
+
+    if (key && WA.store && WA.store.transact) {
+      WA.store.transact(function (draft) {
+        const d = ensureDeskStore(draft);
+        d.receipts[key] = receiptRow;
+        return true;
+      }, 'actionDesk:recordReceipt');
+    }
+
+    return {
+      ok: true,
+      actionId: aid,
+      receipt: receiptRow,
+      result: execRes,
+      nextActions: execRes.nextActions || []
+    };
   }
 
   function declareOpportunity(oppId, spec) {

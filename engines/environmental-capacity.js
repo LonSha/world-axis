@@ -80,6 +80,7 @@
 
     if (stock === null) return { ok: false, reason: 'missing-fields', field: 'stock' };
 
+    var strain = computeStrain({ stock: stock, maxStock: maxStock });
     var entry = {
       resourceId: resourceId,
       resourceType: resourceType,
@@ -88,7 +89,7 @@
       maxStock: maxStock,
       regenRate: regenRate,
       recoveryDelay: recoveryDelay,
-      strain: 'healthy',
+      strain: strain,
       lastWithdrawnAt: 0,
       lastRegenAt: 0,
       declaredAt: now()
@@ -215,11 +216,80 @@
     return { ok: true, regionId: rid, resources: items, count: items.length };
   }
 
+  /**
+   * EXV3-1: 承载力对下游行动与生产工期的影响评估。
+   * 纯读计算：将压力级别映射为工期滞后、成本加成与替代工艺建议。
+   */
+  function evaluateImpact(regionId, resourceType) {
+    var rid = clean(regionId, 60);
+    var rtype = clean(resourceType, 30);
+    var bk = ensureBucket();
+    var resources = bk.resources || {};
+    var hit = null;
+    Object.keys(resources).forEach(function (k) {
+      var r = resources[k];
+      if (r && r.regionId === rid && (!rtype || r.resourceType === rtype)) {
+        if (!hit || (r.stock / r.maxStock) < (hit.stock / hit.maxStock)) {
+          hit = r;
+        }
+      }
+    });
+
+    if (!hit) {
+      return {
+        ok: true,
+        regionId: rid,
+        resourceType: rtype || 'any',
+        strain: 'healthy',
+        impactFactor: 1.0,
+        extraDays: 0,
+        costMultiplier: 1.0,
+        alternativeSuggested: null,
+        note: '未发现高压资源，按标准参数运行'
+      };
+    }
+
+    var strain = hit.strain || 'healthy';
+    var extraDays = 0;
+    var costMultiplier = 1.0;
+    var alternative = null;
+
+    if (strain === 'strained') {
+      extraDays = 1;
+      costMultiplier = 1.2;
+      alternative = '建议采用低消耗替代物料或分批次作业';
+    } else if (strain === 'depleted') {
+      extraDays = 3;
+      costMultiplier = 1.5;
+      alternative = '资源严重匮乏，需从外地调配补给或休整轮换';
+    } else if (strain === 'critical') {
+      extraDays = 6;
+      costMultiplier = 2.0;
+      alternative = '承载力已达临界，常规作业受阻，必须立即停工养护或就地修复水土';
+    }
+
+    return {
+      ok: true,
+      regionId: rid,
+      resourceId: hit.resourceId,
+      resourceType: hit.resourceType,
+      strain: strain,
+      stock: hit.stock,
+      maxStock: hit.maxStock,
+      ratio: Number((hit.stock / hit.maxStock).toFixed(2)),
+      extraDays: extraDays,
+      costMultiplier: costMultiplier,
+      alternativeSuggested: alternative,
+      note: '承载力压力改变下游工期与成本'
+    };
+  }
+
   WA.envCapacity = {
     declareResource: declareResource,
     withdraw: withdraw,
     regenerate: regenerate,
     regionStatus: regionStatus,
+    evaluateImpact: evaluateImpact,
     RESOURCE_TYPES: RESOURCE_TYPES.slice(),
     STRAIN_LEVELS: STRAIN_LEVELS.slice()
   };

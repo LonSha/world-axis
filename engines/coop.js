@@ -635,12 +635,163 @@
     return Object.assign({}, bag, { faults: Object.assign({}, bag.faults),
       pending: rowsOf().length, archive: archiveOf().length });
   }
+  // ── EXV3-4: 具名公共项目（Joint Project）状态机 ─────────────────────────────
+  function num(v) { const n = Number(v); return (typeof n === 'number' && isFinite(n)) ? n : null; }
+  function ensureProjects(draft) {
+    draft.coop = draft.coop || { proposals: [], archive: [] };
+    if (!draft.coop.projects || typeof draft.coop.projects !== 'object') {
+      draft.coop.projects = {};
+    }
+    return draft.coop.projects;
+  }
+
+  function proposeProject(spec) {
+    const s = spec || {};
+    const pid = clean(s.projectId || s.id, 60);
+    const name = clean(s.name, 60);
+    const initiator = clean(s.initiator || s.by, 40);
+    if (!pid || !initiator) return { ok: false, reason: 'missing-fields' };
+
+    let out = null;
+    mutate(function (d) {
+      const pmap = ensureProjects(d);
+      if (pmap[pid]) {
+        out = { ok: false, reason: 'project-already-exists', projectId: pid };
+        return false;
+      }
+      const row = {
+        id: pid,
+        name: name || pid,
+        initiator: initiator,
+        goal: clean(s.goal, 80),
+        place: clean(s.place, 60),
+        targetMaterials: Object.assign({}, s.targetMaterials || {}),
+        pledgedMaterials: {},
+        minCommitment: num(s.minCommitment) || 1,
+        participants: [initiator],
+        pledges: {},
+        status: 'pledging',
+        downgraded: false,
+        absences: [],
+        createdAt: clockNow('coop:project')
+      };
+      pmap[pid] = row;
+      out = { ok: true, projectId: pid, project: row };
+      return true;
+    }, { label: 'coop:proposeProject' });
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function pledgeProject(projectId, who, contributions) {
+    const pid = clean(projectId, 60);
+    const w = clean(who, 40);
+    if (!pid || !w) return { ok: false, reason: 'missing-fields' };
+    const contrib = contributions || {};
+
+    let out = null;
+    mutate(function (d) {
+      const pmap = ensureProjects(d);
+      const prj = pmap[pid];
+      if (!prj) { out = { ok: false, reason: 'project-not-found', projectId: pid }; return false; }
+      if (prj.status !== 'pledging' && prj.status !== 'active') {
+        out = { ok: false, reason: 'project-closed', status: prj.status };
+        return false;
+      }
+      if (prj.participants.indexOf(w) < 0) prj.participants.push(w);
+      prj.pledges[w] = prj.pledges[w] || {};
+      Object.keys(contrib).forEach(function (mat) {
+        var amt = num(contrib[mat]) || 0;
+        prj.pledges[w][mat] = (prj.pledges[w][mat] || 0) + amt;
+        prj.pledgedMaterials[mat] = (prj.pledgedMaterials[mat] || 0) + amt;
+      });
+
+      var totalPledged = Object.keys(prj.pledgedMaterials).reduce(function (a, k) { return a + prj.pledgedMaterials[k]; }, 0);
+      if (totalPledged >= prj.minCommitment && prj.status === 'pledging') {
+        prj.status = 'active';
+      }
+      out = { ok: true, projectId: pid, who: w, status: prj.status, totalPledged: totalPledged, project: prj };
+      return true;
+    }, { label: 'coop:pledgeProject' });
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function handleAbsence(projectId, absentPerson, solution, opts) {
+    const pid = clean(projectId, 60);
+    const absent = clean(absentPerson, 40);
+    const sol = clean(solution, 30);
+    const o = opts || {};
+    if (!pid || !absent) return { ok: false, reason: 'missing-fields' };
+
+    let out = null;
+    mutate(function (d) {
+      const pmap = ensureProjects(d);
+      const prj = pmap[pid];
+      if (!prj) { out = { ok: false, reason: 'project-not-found' }; return false; }
+      prj.absences.push({ who: absent, solution: sol, at: clockNow('coop:project') });
+
+      if (sol === 'substitute') {
+        var sub = clean(o.substituteWho, 40);
+        if (!sub) { out = { ok: false, reason: 'missing-substitute' }; return false; }
+        if (prj.participants.indexOf(sub) < 0) prj.participants.push(sub);
+        prj.pledges[sub] = Object.assign({}, prj.pledges[sub] || {}, prj.pledges[absent] || {});
+        out = { ok: true, projectId: pid, solution: sol, substituteWho: sub, status: prj.status };
+        return true;
+      } else if (sol === 'downgrade') {
+        prj.downgraded = true;
+        prj.status = 'downgraded';
+        out = { ok: true, projectId: pid, solution: sol, downgraded: true, note: '目标与标准调低以适应减员' };
+        return true;
+      } else if (sol === 'suspend') {
+        prj.status = 'suspended';
+        out = { ok: true, projectId: pid, solution: sol, status: 'suspended' };
+        return true;
+      }
+      out = { ok: false, reason: 'unknown-solution', solution: sol };
+      return false;
+    }, { label: 'coop:handleAbsence' });
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function concludeProject(projectId, opts) {
+    const pid = clean(projectId, 60);
+    const o = opts || {};
+    if (!pid) return { ok: false, reason: 'missing-fields' };
+
+    let out = null;
+    mutate(function (d) {
+      const pmap = ensureProjects(d);
+      const prj = pmap[pid];
+      if (!prj) { out = { ok: false, reason: 'project-not-found' }; return false; }
+      const success = o.success !== false && prj.status !== 'failed';
+      if (success) {
+        prj.status = 'completed';
+        out = { ok: true, projectId: pid, status: 'completed', downgraded: !!prj.downgraded, participants: prj.participants.slice() };
+      } else {
+        prj.status = 'failed';
+        out = { ok: true, projectId: pid, status: 'failed', note: '协作失败，已发生消耗不退还，责任与代价已记录' };
+      }
+      return true;
+    }, { label: 'coop:concludeProject' });
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function projectStatus(projectId) {
+    const pid = clean(projectId, 60);
+    const st = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+    const pmap = (st && st.coop && st.coop.projects) || {};
+    const prj = pmap[pid];
+    if (!prj) return { ok: false, reason: 'project-not-found', projectId: pid };
+    return { ok: true, projectId: pid, project: prj };
+  }
+
   WA.coop = {
     STATUS: STATUS.slice(), STATUS_CN: Object.assign({}, STATUS_CN), LIMITS: Object.assign({}, LIMITS),
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     propose: propose, confirm: confirm, reject: reject, retry: retry,
     pending: pending, archive: archive, viewOf: viewOf, traceOf: traceOf,
     stamp: stamp, view: view, statView: statView,
+    proposeProject: proposeProject, pledgeProject: pledgeProject,
+    handleAbsence: handleAbsence, concludeProject: concludeProject, projectStatus: projectStatus,
     stat: function () { const bag = statBagOf(); return Object.assign({}, bag, { faults: Object.assign({}, bag.faults) }); }
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/coop.js', { kind: 'engine', ver: '2.118.0' });

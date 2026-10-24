@@ -383,11 +383,68 @@
       + '角色只能依据自己亲历或当面听来的内容行动，不得把「听说」写成「看见」。\n';
   }
 
+  /**
+   * EXV3-3: 有限地方注意与竞争传播。
+   * 面对多个同时发生的事件，受限于注意容量，按紧迫性、相关性与见证范围竞争传播通道。
+   * 未获传播者保留在 delayed 队列，不静默丢弃。
+   */
+  function competeForAttention(events, context, opts) {
+    const list = Array.isArray(events) ? events.slice() : [];
+    const ctx = context || {};
+    const cap = Math.max(1, Number(ctx.capacity) || 2);
+    const place = clean(ctx.place, 60);
+
+    const scored = [];
+    const excludedSecrets = [];
+
+    list.forEach(function (ev) {
+      if (!ev) return;
+      // 私密保护：非公开且标为 secret 者严禁直接进入公开竞争
+      if (ev.isSecret && !ev.isPublic) {
+        excludedSecrets.push({ id: clean(ev.id, 40), reason: 'secret-protected' });
+        return;
+      }
+      var score = (Number(ev.urgency) || 1) * 2 + (Number(ev.relevance) || 1);
+      if (place && ev.place && clean(ev.place, 60) === place) {
+        score += 3; // 本地优先
+      }
+      var witCount = Array.isArray(ev.witnesses) ? ev.witnesses.length : 0;
+      score += Math.min(5, witCount * 1.5);
+
+      scored.push({
+        id: clean(ev.id, 40),
+        title: clean(ev.title || ev.id, 80),
+        score: score,
+        urgency: Number(ev.urgency) || 1,
+        relevance: Number(ev.relevance) || 1,
+        place: clean(ev.place, 60),
+        raw: ev
+      });
+    });
+
+    // 按得分降序排序
+    scored.sort(function (a, b) { return b.score - a.score; });
+
+    const admitted = scored.slice(0, cap);
+    const delayed = scored.slice(cap);
+
+    return {
+      ok: true,
+      capacity: cap,
+      admitted: admitted,
+      delayed: delayed,
+      excludedSecrets: excludedSecrets,
+      totalCandidates: list.length,
+      note: '有限注意容量下竞争传播；未传播事件保留等待通道，不被删除'
+    };
+  }
+
   WA.rumor = {
     LAYERS: LAYERS, MOTIVES: MOTIVES, PUBLIC_LAYERS: PUBLIC_LAYERS, LAYER_LEVEL: LAYER_LEVEL,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     startChain: startChain, relay: relay, refute: refute, conceal: conceal,
     investigate: investigate, visibleTo: visibleTo, fullView: fullView, buildBlock: buildBlock,
+    competeForAttention: competeForAttention,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();
