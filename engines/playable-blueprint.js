@@ -32,7 +32,7 @@
     return (typeof n === 'number' && isFinite(n)) ? n : null;
   }
 
-  var THEME_KEYS = ['town-workshop', 'settlement-exploration', 'sci-fi-station'];
+  var THEME_KEYS = ['town-workshop', 'settlement-exploration', 'sci-fi-station', 'frontier-scarcity', 'coop-pledge', 'epistemic-city'];
   var PLAY_DEF_KEYS = ['training', 'equipment', 'recipe', 'research', 'family-ops'];
 
   // 三份样例蓝图
@@ -108,6 +108,96 @@
       openingScene: { id: 'blank', label: '空白开局' },
       requiredEngines: ['training', 'research'],
       optionalEngines: ['epistemic-view', 'shared-awareness']
+    },
+    // ── V3 官方主题开局 (OPV3-9) ──────────────────────────────────────────
+    {
+      id: 'frontier-scarcity',
+      label: '资源紧张的边地聚落',
+      theme: 'frontier-scarcity',
+      playDefs: {
+        recipe: { types: ['forging', 'logging'], facilities: ['border_forge'] },
+        research: { enabled: true, prerequisites: ['metallurgy'] }
+      },
+      initConditions: {
+        places: ['border_camp', 'forest_fringe', 'inland_town'],
+        factions: [{ name: '边关巡防所', type: 'garrison' }],
+        startingResources: { funds: 30, materials: { timber: 15, iron: 20 } },
+        initialPeople: [
+          { name: '老工匠', role: 'craftsman', place: 'border_camp' },
+          { name: '边塞戍卒', role: 'guard', place: 'border_camp' }
+        ],
+        facilities: [
+          {
+            id: 'fac_border_forge',
+            name: '边地简易铁匠炉',
+            placeId: 'border_camp',
+            serviceType: 'crafting',
+            capacity: 2,
+            status: 'degraded',
+            coverage: ['border_camp']
+          }
+        ],
+        capacityResources: [
+          { regionId: 'border_camp', resourceId: 'res_forest', resourceType: 'forest', stock: 20, maxStock: 100 }
+        ]
+      },
+      openingScene: { id: 'frontier_scarcity_opening', label: '边塞风雪与林木匮乏开局' },
+      requiredEngines: ['service-network', 'environmental-capacity', 'aftermath-impact'],
+      optionalEngines: ['coop', 'customLax']
+    },
+    {
+      id: 'coop-pledge',
+      label: '承诺密集的共同生活',
+      theme: 'coop-pledge',
+      playDefs: {
+        recipe: { types: ['construction', 'masonry'], facilities: ['community_hall'] }
+      },
+      initConditions: {
+        places: ['settlement_hub', 'community_hall', 'shared_mill'],
+        factions: [{ name: '互助公所', type: 'council' }],
+        startingResources: { funds: 100, materials: { timber: 40, stone: 60 } },
+        initialPeople: [
+          { name: '公所主簿', role: 'clerk', place: 'community_hall' },
+          { name: '营造匠师', role: 'builder', place: 'community_hall' },
+          { name: '行商外客', role: 'merchant', place: 'settlement_hub' }
+        ],
+        localRules: [
+          { id: 'rule_equal_slot', name: '公所工位均分则例', type: 'slot-booking', orgId: 'community_hall', dailyLimit: 1 }
+        ]
+      },
+      openingScene: { id: 'coop_pledge_opening', label: '拦河共建与契约立信开局' },
+      requiredEngines: ['customLax', 'coop', 'shared-awareness'],
+      optionalEngines: ['actionDesk']
+    },
+    {
+      id: 'epistemic-city',
+      label: '信息不对称的调查城市',
+      theme: 'epistemic-city',
+      playDefs: {
+        recipe: { types: ['scribe', 'herbal'], facilities: ['magistrate_office'] }
+      },
+      initConditions: {
+        places: ['city_gate', 'inner_market', 'shadow_alley'],
+        factions: [{ name: '城防公署', type: 'bureau' }],
+        startingResources: { funds: 120, materials: { medicine: 15, paper: 30 } },
+        initialPeople: [
+          { name: '暗访密探', role: 'investigator', place: 'shadow_alley' },
+          { name: '关防校尉', role: 'officer', place: 'city_gate' }
+        ],
+        checkpoints: [
+          {
+            id: 'cp_city_gate',
+            name: '内城九门卫所',
+            fromPlace: 'city_gate',
+            toPlace: 'inner_market',
+            controlType: 'permit-required',
+            requiredPermit: 'pass_city'
+          }
+        ]
+      },
+      openingScene: { id: 'epistemic_city_opening', label: '关防严查与流言迷雾开局' },
+      requiredEngines: ['epistemic-view', 'rumor', 'service-network'],
+      optionalEngines: ['sceneNarrative', 'actionDesk']
     }
   ];
 
@@ -148,10 +238,11 @@
         'training': 'training', 'research': 'research', 'family-ops': 'familyOps',
         'inst': 'inst', 'customLax': 'customLax',
         'aftermath-impact': 'aftermathImpact', 'service-network': 'serviceNetwork',
-        'epistemic-view': 'epistemicView', 'shared-awareness': 'sharedAwareness'
+        'epistemic-view': 'epistemicView', 'shared-awareness': 'sharedAwareness',
+        'environmental-capacity': 'envCapacity', 'coop': 'coop', 'rumor': 'rumor'
       };
       var waKey = keyMap[e] || e;
-      available = !!(WA[waKey]);
+      available = !!(WA[waKey] || WA[e] || (waKey === 'envCapacity' && WA.environmentalCapacity));
       if (!available) missing.push(e);
     });
 
@@ -160,10 +251,11 @@
         'training': 'training', 'research': 'research', 'family-ops': 'familyOps',
         'inst': 'inst', 'customLax': 'customLax',
         'aftermath-impact': 'aftermathImpact', 'service-network': 'serviceNetwork',
-        'epistemic-view': 'epistemicView', 'shared-awareness': 'sharedAwareness'
+        'epistemic-view': 'epistemicView', 'shared-awareness': 'sharedAwareness',
+        'environmental-capacity': 'envCapacity', 'coop': 'coop', 'rumor': 'rumor'
       };
       var waKey = keyMap[e] || e;
-      var available = !!(WA[waKey]);
+      var available = !!(WA[waKey] || WA[e] || (waKey === 'envCapacity' && WA.environmentalCapacity));
       optional.push({ engine: e, available: available });
     });
 
@@ -319,6 +411,47 @@
                 resources: { funds: 10 }
               };
             }
+          });
+        }
+        // 注入主题设施
+        if (s.initConditions && Array.isArray(s.initConditions.facilities)) {
+          draft.serviceNetwork = draft.serviceNetwork || { facilities: [], usage: [] };
+          draft.serviceNetwork.facilities = draft.serviceNetwork.facilities || [];
+          s.initConditions.facilities.forEach(function (fac) {
+            if (!draft.serviceNetwork.facilities.some(function (f) { return f && f.id === fac.id; })) {
+              draft.serviceNetwork.facilities.push(Object.assign({}, fac, { createdAt: Date.now() }));
+            }
+          });
+        }
+        // 注入主题关卡
+        if (s.initConditions && Array.isArray(s.initConditions.checkpoints)) {
+          draft.serviceNetwork = draft.serviceNetwork || { facilities: [], usage: [] };
+          draft.serviceNetwork.checkpoints = draft.serviceNetwork.checkpoints || [];
+          s.initConditions.checkpoints.forEach(function (cp) {
+            if (!draft.serviceNetwork.checkpoints.some(function (c) { return c && c.id === cp.id; })) {
+              draft.serviceNetwork.checkpoints.push(Object.assign({}, cp, { createdAt: Date.now() }));
+            }
+          });
+        }
+        // 注入地方规约
+        if (s.initConditions && Array.isArray(s.initConditions.localRules)) {
+          draft.customLax = draft.customLax || { rules: [] };
+          draft.customLax.rules = draft.customLax.rules || [];
+          s.initConditions.localRules.forEach(function (rule) {
+            if (!draft.customLax.rules.some(function (r) { return r && r.id === rule.id; })) {
+              draft.customLax.rules.push(Object.assign({ active: true, stage: 'active', enactedAt: Date.now() }, rule));
+            }
+          });
+        }
+        // 注入承载力资源
+        if (s.initConditions && Array.isArray(s.initConditions.capacityResources)) {
+          draft.envCapacity = draft.envCapacity || { resources: {} };
+          draft.envCapacity.resources = draft.envCapacity.resources || {};
+          s.initConditions.capacityResources.forEach(function (cr) {
+            draft.envCapacity.resources[cr.resourceId] = Object.assign({
+              strain: 'depleted',
+              declaredAt: Date.now()
+            }, cr);
           });
         }
         installed = draft.blueprint.installed;

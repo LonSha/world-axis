@@ -475,7 +475,7 @@ test('WP-9: 三套玩法蓝图端到端安装开局与跨会话重载持久化',
   // 重载后继续调用行动桌执行已恢复的标准和集市系列
   const deskList = W2.actionDesk.plan('playableBlueprint.listSamples', {});
   assert.equal(deskList.ok, true);
-  assert.equal(deskList.samples.length, 3);
+  assert.ok(deskList.samples.length >= 3);
 });
 
 console.log('----------------------------------------------------');

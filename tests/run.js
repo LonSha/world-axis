@@ -24256,6 +24256,14 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(rWPB2.status === 0, 'wp-b2 integration exit 0');
     const rWPC = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-c-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
     assert(rWPC.status === 0, 'wp-c integration exit 0');
+    const rV3A = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-a-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rV3A.status === 0, 'v3-a integration exit 0');
+    const rV3AB = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-ab-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rV3AB.status === 0, 'v3-ab integration exit 0');
+    const rV3B = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-b-deepening.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rV3B.status === 0, 'v3-b deepening exit 0');
+    const rV3OP9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-op9-scenarios.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rV3OP9.status === 0, 'v3-op9 scenarios exit 0');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
