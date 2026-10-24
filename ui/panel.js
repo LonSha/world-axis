@@ -4383,10 +4383,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
          <button class="wa-btn" id="wa-desk-life" title="纯读：把跨轮未结的事摆出来（零写入）">看未结事</button>
          <button class="wa-btn" id="wa-desk-flow" title="纯读：从当前场景情境切入下一步行动（可知变化/可执行/受阻）">看场景行动流</button>
          <button class="wa-btn" id="wa-desk-sched" title="纯读：查看时间成本占用与协商日程（改期/取消/拆分）">看日程与时间协商</button>
+         <button class="wa-btn" id="wa-desk-epistemic" title="纯读：查看人物局部信念与证据可信度评估（无全知）">看人物信念与证据</button>
        </div>
        <div id="wa-desk-life-out" class="wa-out"></div>
        <div id="wa-desk-flow-out" class="wa-out"></div>
-       <div id="wa-desk-sched-out" class="wa-out"></div>`;
+       <div id="wa-desk-sched-out" class="wa-out"></div>
+       <div id="wa-desk-epistemic-out" class="wa-out"></div>`;
    }
    /** 把日程与时间协商视图如实渲染（纯读列表 + 改期/取消/拆分操作）。 */
    function renderScheduleNegotiation(sc) {
@@ -4612,8 +4614,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     if (WA.actionDesk) {
       const deskOut = function () { const r = $('#wa-desk-out'); return r; };
       const lifeOut = function () { const r = $('#wa-desk-life-out'); return r; };
-      const flowOut = function () { const r = $('#wa-desk-flow-out'); return r; };
-      const schedOut = function () { const r = $('#wa-desk-sched-out'); return r; };
+const flowOut = function () { const r = $('#wa-desk-flow-out'); return r; };
+       const schedOut = function () { const r = $('#wa-desk-sched-out'); return r; };
+       const epistemicOut = function () { const r = $('#wa-desk-epistemic-out'); return r; };
       const showDesk = function () {
         const who = ($('#wa-desk-who') || {}).value || '';
         try { mainWin.__waDeskWho = who; } catch (e) { }
@@ -4739,11 +4742,24 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           };
         });
       };
-      on('#wa-desk-show', showDesk);
-      on('#wa-desk-life', showLife);
-      on('#wa-desk-flow', showFlow);
-      on('#wa-desk-sched', showSched);
-      const cb = $('#wa-desk-on');
+on('#wa-desk-show', showDesk);
+       on('#wa-desk-life', showLife);
+       on('#wa-desk-flow', showFlow);
+       on('#wa-desk-sched', showSched);
+       on('#wa-desk-epistemic', function () {
+         const who = ($('#wa-desk-who') || {}).value || '';
+         const out = epistemicOut(); if (!out) return;
+         if (!WA.epistemicView || typeof WA.epistemicView.buildView !== 'function') {
+           out.innerHTML = '<div class="wa-dim">认识论视图引擎不可用</div>'; return;
+         }
+         const v = WA.epistemicView.buildView(who, 'general_state');
+         let html = '<div class="wa-dim"><b>' + esc(who || '当前人物') + '</b> 的局部信念：'
+           + '确信度 <b>' + esc(v.certainty) + '</b> · 掌握版本 <b>' + esc(v.version || '无') + '</b></div>'
+           + '<div class="wa-row">当前认知摘要：' + esc(v.summary || '（空）') + '</div>';
+         out.innerHTML = html;
+         renderBody();
+       });
+       const cb = $('#wa-desk-on');
       if (cb) cb.onchange = function () { WA.actionDesk.setSettings({ enabled: cb.checked }); renderBody(); };
     }
     // ── v2.209.0（优化 6）：导航协议的**通用绑定**（一处绑全部 data-nav 控件）──

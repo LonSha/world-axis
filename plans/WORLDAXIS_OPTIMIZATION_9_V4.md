@@ -34,6 +34,7 @@ V3 A/B/C 与 OP9 已真实落地情境投影、行动桌、能力差异、资源
 **依据/问题：** intel、rumor、noesis、epistemic-view 已有来源传播与局部视野；V3 AB 已验证误信代价和收到纠正后的改选。
 **交付：** 让证据来源、转述链、时效、冲突证词进入既有决策排序，保留误信、代价、反证和修正历史，不注入后台真值。
 **验收：** 目击/转述/被证伪版本产生不同决策；更正只到达收件者；旧损失保留；过期消息降权而不静默删除。P1，24–38 小时。
+**现场落地点：** `engines/epistemic-view.js`（实现 `weighEvidence` 纯读评估支持来源/跳数/时效衰减，实现 `updateBeliefWithEvidence` 门槛拦截与铁证更替）；`engines/action-desk.js`（接入 `epistemic.weigh` 与 `epistemic.update` 路由）；`ui/panel.js`（行动桌挂载「看人物信念与证据」交互入口）；`tests/exp32-epistemic-credibility-v2233.js`（14 项断言全绿，含 3 组真变异负控制）。
 ### OPV4-6｜身体、地点状态与行动资格闭环
 **依据/问题：** vitals、survival、aftermath-impact、service-network、production 已有健康、损害、服务和行动状态，需在具体行动中联动。
 **交付：** 将伤病、设施降级、风险和资格接入照护/维修/出行预览；给出替代方法与代价；由既有 owner 结算。

@@ -279,12 +279,163 @@
     };
   }
 
+  /**
+   * OPV4-5：证据可信度评估（weighEvidence）。
+   * 纯读计算：输入证据集与人物视角，输出可信度总分、排序、主导证词与冲突点。
+   * 严守契约：零写入，不修改已有 store，不凭空注入后台真值。
+   */
+  function weighEvidence(whoName, topicId, evidenceItems, opts) {
+    const pId = personId(whoName);
+    const tId = clean(topicId, 60);
+    const items = Array.isArray(evidenceItems) ? evidenceItems : [];
+    const o = opts || {};
+    const view = buildView(whoName, topicId);
+
+    // 来源基准权重表
+    const SOURCE_WEIGHTS = {
+      eyewitness: 0.9,     // 亲眼目睹 / 直接见证
+      official_doc: 0.85,  // 官署公文 / 盖印契约
+      ledger: 0.8,        // 账册凭证 / 实物字据
+      trusted_ally: 0.75,  // 密友转述 / 盟友信函
+      hearsay: 0.45,       // 市井传言 / 坊间耳闻
+      anonymous: 0.2,     // 匿名飞书 / 涂鸦
+      rival_claim: 0.15    // 竞争对手的单方面指控
+    };
+
+    let totalWeight = 0;
+    let weighedItems = items.map(function (it, idx) {
+      const src = clean(it.source || 'hearsay', 30);
+      let baseW = SOURCE_WEIGHTS[src] != null ? SOURCE_WEIGHTS[src] : 0.4;
+      // 链路衰减：每多一层转述，衰减 20%
+      const hops = Math.max(0, Math.min(5, Number(it.hops) || 0));
+      const decay = Math.pow(0.8, hops);
+      // 时效衰减：超过有效天数时折扣
+      const ageDays = Math.max(0, Number(it.ageDays) || 0);
+      const timeDecay = ageDays > 30 ? 0.5 : (ageDays > 7 ? 0.8 : 1.0);
+      const finalScore = Math.round(baseW * decay * timeDecay * 100) / 100;
+      totalWeight += finalScore;
+
+      return {
+        id: it.id || ('ev_' + idx),
+        claim: clean(it.claim || it.text || '', 100),
+        stance: clean(it.stance || 'support', 20), // 'support' | 'oppose' | 'neutral'
+        source: src,
+        hops: hops,
+        ageDays: ageDays,
+        credibility: finalScore
+      };
+    });
+
+    // 按可信度降序排序
+    weighedItems.sort(function (a, b) { return b.credibility - a.credibility; });
+
+    // 统计支持度与反对度
+    let supportSum = 0;
+    let opposeSum = 0;
+    weighedItems.forEach(function (x) {
+      if (x.stance === 'support') supportSum += x.credibility;
+      else if (x.stance === 'oppose') opposeSum += x.credibility;
+    });
+
+    const dominantStance = supportSum >= opposeSum ? 'support' : 'oppose';
+    const hasConflict = supportSum > 0 && opposeSum > 0;
+    const confidenceGap = Math.abs(supportSum - opposeSum);
+
+    return {
+      ok: true,
+      personId: pId,
+      topicId: tId,
+      priorView: { version: view.version, certainty: view.certainty, summary: view.summary },
+      totalEvidenceCount: items.length,
+      dominantStance: dominantStance,
+      hasConflict: hasConflict,
+      confidenceGap: Math.round(confidenceGap * 100) / 100,
+      supportScore: Math.round(supportSum * 100) / 100,
+      opposeScore: Math.round(opposeSum * 100) / 100,
+      rankedItems: weighedItems
+    };
+  }
+
+  /**
+   * OPV4-5：基于证据可信度更新信念（updateBeliefWithEvidence）。
+   * 根据 weighEvidence 的裁决结果，决定是否推翻角色旧判断并留痕历史反证。
+   */
+  function updateBeliefWithEvidence(whoName, topicId, evidenceItems, opts) {
+    const pId = personId(whoName);
+    const tId = clean(topicId, 60);
+    if (!pId || !tId) return { ok: false, reason: 'missing-fields' };
+
+    const weigh = weighEvidence(whoName, topicId, evidenceItems, opts);
+    if (!weigh.ok) return weigh;
+
+    const eStore = ensureEpistemicStore();
+    const key = pId + ':' + tId;
+    const oldBelief = eStore.beliefs && eStore.beliefs[key];
+
+    // 如果最高可信度证据未达到门槛（0.3），角色坚持既有信念，认为证据不足以服人
+    const topEv = weigh.rankedItems[0];
+    if (!topEv || topEv.credibility < 0.3) {
+      return {
+        ok: true,
+        changed: false,
+        reason: 'evidence-too-weak',
+        topCredibility: topEv ? topEv.credibility : 0,
+        currentBelief: oldBelief ? oldBelief.summary : '无既有信念',
+        note: '出示的证据可信度不足以改变角色判断'
+      };
+    }
+
+    const newClaimTruth = weigh.dominantStance === 'support';
+    const newCertainty = weigh.confidenceGap >= 0.5 ? 'certain' : 'tentative';
+    const newSummary = topEv.claim;
+
+    const nextBelief = {
+      personId: pId,
+      topicId: tId,
+      version: clean(opts && opts.version || 'v_ev_' + topEv.id, 40),
+      summary: newSummary,
+      claimTruth: newClaimTruth,
+      certainty: newCertainty,
+      source: topEv.source,
+      faithful: true,
+      previousDistortion: oldBelief ? oldBelief.summary : null,
+      evidenceHops: topEv.hops,
+      evidenceScore: topEv.credibility,
+      counterEvidenceConflict: weigh.hasConflict,
+      updatedAt: WA.clock.now('epistemic')
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (s) {
+        s.epistemicStore = s.epistemicStore || { beliefs: {} };
+        s.epistemicStore.beliefs[key] = nextBelief;
+        return true;
+      }, 'epistemicView:updateBeliefWithEvidence');
+    }
+
+    return {
+      ok: true,
+      changed: true,
+      personId: pId,
+      topicId: tId,
+      previousSummary: oldBelief ? oldBelief.summary : null,
+      newSummary: nextBelief.summary,
+      certainty: nextBelief.certainty,
+      topSource: topEv.source,
+      hasConflict: weigh.hasConflict,
+      requiresReconciliation: !!(oldBelief && oldBelief.claimTruth !== nextBelief.claimTruth)
+    };
+  }
+
   WA.epistemicView = {
     registerBelief: registerBelief,
     buildView: buildView,
     deriveAction: deriveAction,
     correctBelief: correctBelief,
-    decideAction: decideAction
+    decideAction: decideAction,
+    // v2.233.0 (OPV4-5): 证据可信度评估与判断更替
+    weighEvidence: weighEvidence,
+    updateBeliefWithEvidence: updateBeliefWithEvidence
   };
 
   if (typeof console !== 'undefined' && console.log) {

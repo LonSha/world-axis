@@ -117,6 +117,9 @@
     'aftermath.repairCommission': function (o) { return WA.aftermathImpact.commissionRepair(o.effectId, o); },
     'epistemic.view': function (o) { return WA.epistemicView.buildView(o.personId, o.topicId); },
     'epistemic.correct': function (o) { return WA.epistemicView.correctBelief(o.personId, o.topicId, o.evidence, o); },
+    // v2.233.0 (OPV4-5): 证据可信度裁决与更替
+    'epistemic.weigh': function (o) { return WA.epistemicView.weighEvidence(o.personId, o.topicId, o.evidenceItems, o); },
+    'epistemic.update': function (o) { return WA.epistemicView.updateBeliefWithEvidence(o.personId, o.topicId, o.evidenceItems, o); },
     // v2.232.0 (OPV3-1 & OPV3-2): 情境投影与场景工作台
     'sceneNarrative.situation': function (o) { return WA.sceneNarrative.situation(o); },
     'actionDesk.preview': function (o) { return previewAction(o.actionId, o); },
