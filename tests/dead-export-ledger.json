@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.231.6）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.231.6",
+  "_note": "WorldAxis 死子面冻结账本（v2.232.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.232.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -24,7 +24,7 @@
       "src": "engines/action-desk.js",
       "refs": 0,
       "tref": 0,
-      "own": 24
+      "own": 28
     },
     "actionMethods.declareTask": {
       "reason": "self-only",
@@ -33,14 +33,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "actionMethods.evaluate": {
-      "reason": "self-only",
-      "detail": "engines/action-methods.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/action-methods.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
     },
     "actionMethods.getSettings": {
       "reason": "unwired",
@@ -338,7 +330,55 @@
       "tref": 1,
       "own": 3
     },
+    "aftermathImpact.advanceCascadingChains": {
+      "reason": "self-only",
+      "detail": "engines/aftermath-impact.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/aftermath-impact.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "aftermathImpact.inspectImpact": {
+      "reason": "self-only",
+      "detail": "engines/aftermath-impact.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/aftermath-impact.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "aftermathImpact.interveneCascadingChain": {
+      "reason": "self-only",
+      "detail": "engines/aftermath-impact.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/aftermath-impact.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "aftermathImpact.listIncidents": {
+      "reason": "self-only",
+      "detail": "engines/aftermath-impact.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/aftermath-impact.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "aftermathImpact.settleRedress": {
+      "reason": "self-only",
+      "detail": "engines/aftermath-impact.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/aftermath-impact.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "aftermathImpact.triggerCascadingChain": {
+      "reason": "self-only",
+      "detail": "engines/aftermath-impact.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/aftermath-impact.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "aftermathImpact.triggerIncident": {
       "reason": "self-only",
       "detail": "engines/aftermath-impact.js 内部自用、外部零引用（过度导出）",
       "src": "engines/aftermath-impact.js",
@@ -1674,13 +1714,21 @@
       "tref": 3,
       "own": 2
     },
+    "coop.advanceProjectWork": {
+      "reason": "self-only",
+      "detail": "engines/coop.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/coop.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "coop.archive": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/coop.js",
       "refs": 0,
       "tref": 5,
-      "own": 13
+      "own": 14
     },
     "coop.confirm": {
       "reason": "test-only",
@@ -1697,6 +1745,22 @@
       "refs": 0,
       "tref": 0,
       "own": 1
+    },
+    "coop.linkToWorkorder": {
+      "reason": "self-only",
+      "detail": "engines/coop.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/coop.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "coop.projectStatus": {
+      "reason": "self-only",
+      "detail": "engines/coop.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/coop.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
     },
     "coop.propose": {
       "reason": "test-only",
@@ -1776,6 +1840,70 @@
       "src": "engines/coop.js",
       "refs": 0,
       "tref": 3,
+      "own": 3
+    },
+    "customLax.commitPromise": {
+      "reason": "self-only",
+      "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/custom-lax.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "customLax.declareLocalRule": {
+      "reason": "self-only",
+      "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/custom-lax.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "customLax.defaultPromise": {
+      "reason": "self-only",
+      "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/custom-lax.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "customLax.enforcePenalty": {
+      "reason": "self-only",
+      "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/custom-lax.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "customLax.fulfillPromise": {
+      "reason": "self-only",
+      "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/custom-lax.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "customLax.listPromises": {
+      "reason": "self-only",
+      "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/custom-lax.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "customLax.remedyPromise": {
+      "reason": "self-only",
+      "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/custom-lax.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "customLax.revokeRule": {
+      "reason": "self-only",
+      "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/custom-lax.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "cyberAnimate.addRipple": {
@@ -2282,6 +2410,14 @@
       "tref": 0,
       "own": 7
     },
+    "epistemicView.decideAction": {
+      "reason": "self-only",
+      "detail": "engines/epistemic-view.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/epistemic-view.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "epistemicView.deriveAction": {
       "reason": "self-only",
       "detail": "engines/epistemic-view.js 内部自用、外部零引用（过度导出）",
@@ -2760,7 +2896,7 @@
       "src": "engines/fondness.js",
       "refs": 0,
       "tref": 12,
-      "own": 3
+      "own": 4
     },
     "fondness.correct": {
       "reason": "test-only",
@@ -2794,6 +2930,14 @@
       "tref": 18,
       "own": 4
     },
+    "fondness.readAffect": {
+      "reason": "self-only",
+      "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/fondness.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "fondness.reject": {
       "reason": "test-only",
       "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
@@ -2824,6 +2968,22 @@
       "src": "engines/fondness.js",
       "refs": 0,
       "tref": 5,
+      "own": 3
+    },
+    "fondness.unlockGate": {
+      "reason": "self-only",
+      "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/fondness.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "fondness.updateAffect": {
+      "reason": "self-only",
+      "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/fondness.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "foreshadow.develop": {
@@ -4106,6 +4266,22 @@
       "tref": 0,
       "own": 4
     },
+    "observe.detectCandidates": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "actors/observe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "observe.enrollCandidate": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "actors/observe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
     "operations.diagnose": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -4370,14 +4546,6 @@
       "tref": 0,
       "own": 3
     },
-    "pathEcho.recordExpectation": {
-      "reason": "self-only",
-      "detail": "engines/path-echo.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/path-echo.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "pendingCenter.reset": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -4590,6 +4758,22 @@
       "reason": "self-only",
       "detail": "engines/perspective-lock.js 内部自用、外部零引用（过度导出）",
       "src": "engines/perspective-lock.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "phaseTransition.executeTransitionRoute": {
+      "reason": "self-only",
+      "detail": "engines/phase-transition.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/phase-transition.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "phaseTransition.simulateIncidentStress": {
+      "reason": "self-only",
+      "detail": "engines/phase-transition.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/phase-transition.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -5978,6 +6162,14 @@
       "tref": 0,
       "own": 3
     },
+    "rumor.propagateAcrossRegions": {
+      "reason": "self-only",
+      "detail": "engines/rumor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/rumor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "samplerCheck.mulberry": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -6041,6 +6233,14 @@
       "refs": 0,
       "tref": 0,
       "own": 1
+    },
+    "sceneNarrative.traceCausalEchoes": {
+      "reason": "self-only",
+      "detail": "engines/scene-narrative.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-narrative.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
     },
     "sceneSlice.getSettings": {
       "reason": "unwired",
@@ -6134,6 +6334,22 @@
       "reason": "self-only",
       "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
       "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "serviceNetwork.declareCheckpoint": {
+      "reason": "self-only",
+      "detail": "engines/service-network.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/service-network.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "serviceNetwork.repairFacilityWithMaterials": {
+      "reason": "self-only",
+      "detail": "engines/service-network.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/service-network.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -6288,7 +6504,7 @@
       "src": "engines/spotlight.js",
       "refs": 0,
       "tref": 1,
-      "own": 3
+      "own": 4
     },
     "spotlight.note": {
       "reason": "test-only",
@@ -6296,7 +6512,7 @@
       "src": "engines/spotlight.js",
       "refs": 0,
       "tref": 12,
-      "own": 3
+      "own": 5
     },
     "spotlight.report": {
       "reason": "test-only",
@@ -6304,6 +6520,14 @@
       "src": "engines/spotlight.js",
       "refs": 0,
       "tref": 2,
+      "own": 3
+    },
+    "spotlight.resolveIntervention": {
+      "reason": "self-only",
+      "detail": "engines/spotlight.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spotlight.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "spotlight.seal": {
@@ -7946,7 +8170,55 @@
       "tref": 6,
       "own": 5
     },
+    "worldbook.getOplog": {
+      "reason": "self-only",
+      "detail": "engines/worldbook.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/worldbook.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "worldbook.hashContent": {
+      "reason": "self-only",
+      "detail": "engines/worldbook.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/worldbook.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
     "worldbook.isEntryActive": {
+      "reason": "self-only",
+      "detail": "engines/worldbook.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/worldbook.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "worldbook.isHandEdited": {
+      "reason": "self-only",
+      "detail": "engines/worldbook.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/worldbook.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "worldbook.rememberFingerprint": {
+      "reason": "self-only",
+      "detail": "engines/worldbook.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/worldbook.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "worldbook.rollbackLastOp": {
+      "reason": "self-only",
+      "detail": "engines/worldbook.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/worldbook.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "worldbook.safeUpdateEntry": {
       "reason": "self-only",
       "detail": "engines/worldbook.js 内部自用、外部零引用（过度导出）",
       "src": "engines/worldbook.js",

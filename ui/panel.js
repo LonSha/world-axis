@@ -4370,13 +4370,44 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         本页只**读**各机制现状，动手时把调用转给对应机制自己的入口 —— 本页不另存一份状态。
         总闸 <b>${on ? '开' : '关'}</b>；各机制：${esc(srcLine || '（读不到）')}</div>
       ${ok ? '' : '<div class="wa-dim">行动桌模块缺席（engines/action-desk.js 未装载）—— 本页不可用。</div>'}
-      <div class="wa-row">
-        <input id="wa-desk-who" class="wa-input" aria-label="视角人物" placeholder="人物名" value="${esc((mainWin.__waDeskWho || ''))}"/>
-        <button class="wa-btn" id="wa-desk-show" title="纯读：按此人聚合各机制现状（零写入）">看行动桌</button>
-        <label class="wa-row"><input id="wa-desk-on" type="checkbox" ${on ? 'checked' : ''}/> 启用行动桌</label>
-      </div>
-      <div id="wa-desk-out" class="wa-out"></div>`;
-  }
+       <div class="wa-row">
+         <input id="wa-desk-who" class="wa-input" aria-label="视角人物" placeholder="人物名" value="${esc((mainWin.__waDeskWho || ''))}"/>
+         <button class="wa-btn" id="wa-desk-show" title="纯读：按此人聚合各机制现状（零写入）">看行动桌</button>
+         <label class="wa-row"><input id="wa-desk-on" type="checkbox" ${on ? 'checked' : ''}/> 启用行动桌</label>
+       </div>
+       <div id="wa-desk-out" class="wa-out"></div>
+       <div class="wa-sec">跨轮生命周期</div>
+       <div class="wa-dim">上一轮留下的活计：哪件卡在缺料、哪件等人确认、哪件已部分完成。
+         本区同样是**纯读投影**（引擎不落阶段字段），恢复动作一律转回原机制入口。</div>
+       <div class="wa-row">
+         <button class="wa-btn" id="wa-desk-life" title="纯读：把跨轮未结的事摆出来（零写入）">看未结事</button>
+       </div>
+       <div id="wa-desk-life-out" class="wa-out"></div>`;
+   }
+   /** 把 lifecycle() 的活跃档 / 终态 / 读不到 如实渲染（每行按钮的 actionId 由引擎给出）。 */
+   function renderDeskLife(lc) {
+     if (!lc || !lc.ok) return '读不到生命周期：' + esc(String((lc && lc.reason) || 'unknown'));
+     const c = lc.counts || {};
+     let html = '<div class="wa-dim">未结 <b>' + (lc.rows || []).length + '</b>（在办 ' + (c['in-progress'] || 0)
+       + '／待确认 ' + (c['awaiting-confirm'] || 0) + '／暂停 ' + (c.paused || 0) + '／受阻 ' + (c.blocked || 0)
+       + '／部分 ' + (c.partial || 0) + '）　终态 <b>' + (c.terminal || 0) + '</b>'
+       + (c.unreadable ? '　<b>读不到 ' + c.unreadable + '</b>' : '') + '</div>';
+     const tag = { 'in-progress': '在办', 'awaiting-confirm': '待确认', paused: '暂停', blocked: '受阻', partial: '部分', unreadable: '读不到' };
+     (lc.rows || []).forEach(function (r) {
+       html += '<div class="wa-row"><span class="wa-dim">[' + esc(tag[r.stage] || r.stage) + '·' + esc(r.owner || '?') + ']</span> '
+         + esc(r.label) + ' <span class="wa-dim">' + esc(r.why || '') + '</span>'
+         + (typeof r.recover === 'string' && r.recover
+            ? ' <button class="wa-btn" data-life-act="' + esc(r.recover) + '">继续</button>' : '')
+         + '</div>';
+     });
+     (lc.terminalRows || []).forEach(function (r) {
+       html += '<div class="wa-row"><span class="wa-dim">[已了结]</span> ' + esc(r.label)
+         + ' <span class="wa-dim">' + esc(r.why || '') + '</span></div>';
+     });
+     // 读不到 / owner 关着：如实摆出来，不折成「没有待办」。
+     (lc.faults || []).forEach(function (f) { html += '<div class="wa-dim">读口不可用：' + esc(String(f)) + '</div>'; });
+     return html;
+   }
   /** 把 board() 的三档结果渲染成可点清单（每个按钮的 actionId 由引擎给出）。 */
   function renderDeskOut(b) {
     if (!b || !b.ok) return '读不到行动桌：' + esc(String((b && b.reason) || 'unknown'));
@@ -4519,10 +4550,12 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       };
     });
     const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
-    // v2.231.0（优化 OP-1）：行动桌的读面与路由面。**读只走 board()，写只走 plan()**
-    //   —— 两者都由引擎负责，本处不重算判据、不写第二套状态（与引擎 boundary 1/7 同规）。
+    // v2.231.0（优化 OP-1）/ v2.233.0（优化 OPV4-2）：行动桌的读面与路由面。
+    //   读只走 board()/lifecycle()，写只走 plan()/recoverAction() —— 两者都由引擎负责，
+    //   本处不重算判据、不写第二套状态（与引擎 boundary 1/7 同规）。
     if (WA.actionDesk) {
       const deskOut = function () { const r = $('#wa-desk-out'); return r; };
+      const lifeOut = function () { const r = $('#wa-desk-life-out'); return r; };
       const showDesk = function () {
         const who = ($('#wa-desk-who') || {}).value || '';
         try { mainWin.__waDeskWho = who; } catch (e) { }
@@ -4540,7 +4573,29 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           };
         });
       };
+      const showLife = function () {
+        const who = ($('#wa-desk-who') || {}).value || '';
+        try { mainWin.__waDeskWho = who; } catch (e) { }
+        const out = lifeOut(); if (!out) return;
+        const lc = (typeof WA.actionDesk.lifecycle === 'function')
+          ? WA.actionDesk.lifecycle({ who: String(who).trim() })
+          : { ok: false, reason: 'lifecycle-missing' };
+        out.innerHTML = renderDeskLife(lc);
+        out.querySelectorAll('[data-life-act]').forEach(function (btn) {
+          btn.onclick = function () {
+            const act = btn.getAttribute('data-life-act');
+            const r = (typeof WA.actionDesk.recoverAction === 'function')
+              ? WA.actionDesk.recoverAction(act, { who: String(who).trim() })
+              : { ok: false, reason: 'recoverAction-missing' };
+            const tip = (r && r.ok) ? '已转交继续执行' : ('未能恢复：' + String((r && r.reason) || 'unknown'));
+            showLife();
+            const out2 = lifeOut(); if (out2) out2.innerHTML = '<div class="wa-dim">' + esc(tip) + '</div>' + out2.innerHTML;
+            renderBody();
+          };
+        });
+      };
       on('#wa-desk-show', showDesk);
+      on('#wa-desk-life', showLife);
       const cb = $('#wa-desk-on');
       if (cb) cb.onchange = function () { WA.actionDesk.setSettings({ enabled: cb.checked }); renderBody(); };
     }

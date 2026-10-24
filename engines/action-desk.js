@@ -112,6 +112,9 @@
     'sceneNarrative.situation': function (o) { return WA.sceneNarrative.situation(o); },
     'actionDesk.preview': function (o) { return previewAction(o.actionId, o); },
     'actionDesk.workbench': function (o) { return workbench(o); },
+    // v2.233.0 (OPV4-1 & OPV4-2): 场景优先入口与跨轮生命周期
+    'actionDesk.lifecycle': function (o) { return lifecycle(o); },
+    'actionDesk.recoverAction': function (o) { return recoverAction(o.actionId, o); },
     // v2.231.0（拓展 IN-3）：共同知晓与默契
     'sharedAwareness.assertMeta': function (o) { return WA.sharedAwareness.assertMeta(o.who, o.target, o.factId, o.basis); },
     'sharedAwareness.openPact': function (o) { return WA.sharedAwareness.openPact(o.pactId, o.spec); },
@@ -726,6 +729,201 @@
   }
 
   /**
+   * OPV4-2：跨轮行动生命周期（**纯读薄投影**）。
+   *
+   * ── 它治什么 ────────────────────────────────────────────────────
+   *   OPV4-1 让玩家能从当前场景办事，但**一条长动作跨过若干轮之后**，
+   *   「哪些还没完、哪些在等我确认、哪些已经废了」没有一处说得清：
+   *   research / production / commission / familyOps 各自记自己的 phase，
+   *   玩家得逐页翻。本函数把各 owner 的**现状**归拢成五档生命周期阶段。
+   *
+   * ── 边界（与 OPV4-2 原文同源）────────────────────────────────────
+   *   ① **只读**：一行都不写，不改任何 owner 状态、不写存档。
+   *   ② **不建第二真源**：阶段由各 owner 的读口**当场算**（`research.view`
+   *      的 phase/phases、`production.list` 的 status、`commission.list` 的
+   *      contract.status…），本模块不落盘任何阶段字段。phase 判定与恢复动作
+   *      一一对应：`recoverAction` 也只把调用转给 owner 的写口。
+   *   ③ 每个阶段行都带 `owner` 与 `recover`（可执行的恢复 actionId），
+   *      面板据此渲染，玩家不必先知道引擎名。
+   *   ④ 读不到的 owner 如实报 `unreadable`，**不折成「没有待办」**
+   *      （「读不出来」与「真没事」逐字同形是本仓点过的坑）。
+   * @param {object} opts {who, place, limit}
+   * @returns {{ok:boolean, rows:Array, counts:object, note:string}}
+   */
+  function lifecycle(opts) {
+    const o = opts || {};
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const who = clean(o.who || o.person, 40);
+    const limit = Math.max(1, Math.min(num(o.limit) || 24, 96));
+    const rows = [];
+    const faults = [];
+    const st = state();
+
+    // ── 1. 研究：立项中 → 供料 / 推进；已终结 → 终态 ──
+    if (WA.research && typeof WA.research.list === 'function') {
+      let list = [];
+      try { list = WA.research.list() || []; } catch (e) { faults.push('research:read-failed'); }
+      list.forEach(function (p) {
+        if (!p || !p.id) return;
+        if (who && p.by !== who) return;
+        if (['confirmed', 'failed', 'abandoned'].indexOf(p.status) >= 0) {
+          rows.push({ stage: 'terminal', kind: 'research', id: p.id,
+            label: '研究「' + clean(p.result || p.hypothesis, 24) + '」已' + p.status,
+            owner: 'research', why: '项目已终结，不再推进', recover: null, terminal: true });
+          return;
+        }
+        const phase = num(p.phase) || 0, phases = Math.max(1, num(p.phases) || 1);
+        let v = null;
+        try { v = (typeof WA.research.view === 'function') ? WA.research.view(p.id) : null; } catch (e) { v = null; }
+        if (!v || !v.ok) {
+          rows.push({ stage: 'unreadable', kind: 'research', id: p.id, label: '项目 ' + p.id,
+            owner: 'research', why: '读不到项目详情（如实报，不当成没事）', recover: null });
+          return;
+        }
+        const short = [];
+        Object.keys(v.materials || {}).forEach(function (k) {
+          const total = num(v.materials[k]) || 0;
+          const spent = num((v.consumed || {})[k]) || 0;
+          const target = (phase + 1 >= phases) ? total : total * (phase + 1) / phases;
+          const per = Math.max(0, target - spent);
+          const have = num((v.reserve || {})[k]) || 0;
+          if (have < per) short.push(k);
+        });
+        if (short.length) {
+          rows.push({ stage: 'blocked', kind: 'research', id: p.id,
+            label: '为「' + clean(v.result || v.hypothesis, 20) + '」供料',
+            owner: 'research', why: '缺料：' + short.join('、'),
+            recover: 'research.supply:' + p.id, next: ['research.supply'] });
+        } else {
+          rows.push({ stage: 'awaiting-confirm', kind: 'research', id: p.id,
+            label: '推进「' + clean(v.result || v.hypothesis, 20) + '」第 ' + (phase + 1) + '/' + phases,
+            owner: 'research', why: '料已备齐，等确认推进',
+            recover: 'research.advance:' + p.id, next: ['research.advance'] });
+        }
+      });
+    } else { faults.push('research:module-missing'); }
+
+    // ── 2. 生产：暂停 / 在产 / 待交付 → 可续做；部分交付 → 部分完成 ──
+    if (WA.production && typeof WA.production.list === 'function') {
+      let list = [];
+      try { list = WA.production.list() || []; } catch (e) { faults.push('production:read-failed'); }
+      list.forEach(function (j) {
+        if (!j || !j.id) return;
+        if (who && j.by && j.by !== who) return;
+        const done = num(j.done) || 0, days = num(j.days) || 1;
+        // 「已交过一批」的证据**只认 owner 读口给的明细**（production.list 导出的是
+        //   `delivered` 账，没有 deliveredQty 这种别名）——读口有什么就用什么，
+        //   不替 owner 猜字段名。有交过但未结清 ⇒ 部分完成，绝不折成终态。
+        let handed = 0;
+        Object.keys(j.delivered || {}).forEach(function (k) { handed += num(j.delivered[k]) || 0; });
+        const closed = (j.status === 'delivered' || j.status === 'cancelled');
+        if (!closed && handed > 0) {
+          rows.push({ stage: 'partial', kind: 'production', id: j.id,
+            label: '工单 ' + clean(j.recipe, 20) + ' 已部分交付（' + (done < days ? done + '/' + days + ' 天' : '工期已满') + '）',
+            owner: 'production', why: '部分完成**不等于**成功，剩余未结',
+            recover: (done < days ? 'production.advance:' + j.id : 'production.deliver:' + j.id),
+            next: ['production.advance', 'production.deliver'], partial: true });
+        } else if (j.status === 'paused') {
+          rows.push({ stage: 'paused', kind: 'production', id: j.id,
+            label: '复工工单 ' + clean(j.recipe, 20) + '（已暂停 ' + done + '/' + days + ' 天）',
+            owner: 'production', why: '暂停中，可恢复继续',
+            recover: 'production.resume:' + j.id, next: ['production.resume'] });
+        } else if (j.status === 'running') {
+          if (done < days) {
+            rows.push({ stage: 'in-progress', kind: 'production', id: j.id,
+              label: '推进 ' + clean(j.recipe, 20) + '（' + done + '/' + days + ' 天）',
+              owner: 'production', why: '在产，可推进一步',
+              recover: 'production.advance:' + j.id, next: ['production.advance'] });
+          } else {
+            rows.push({ stage: 'awaiting-confirm', kind: 'production', id: j.id,
+              label: '交付工单 ' + clean(j.recipe, 20) + '（已满期）',
+              owner: 'production', why: '工期已满，等交付确认',
+              recover: 'production.deliver:' + j.id, next: ['production.deliver'] });
+          }
+        } else if (j.status === 'done') {
+          rows.push({ stage: 'awaiting-confirm', kind: 'production', id: j.id,
+            label: '交付工单 ' + clean(j.recipe, 20),
+            owner: 'production', why: '已完工，等交付确认',
+            recover: 'production.deliver:' + j.id, next: ['production.deliver'] });
+        } else if (j.status === 'partial' || (num(j.deliveredQty) || 0) > 0) {
+          rows.push({ stage: 'partial', kind: 'production', id: j.id,
+            label: '工单 ' + clean(j.recipe, 20) + ' 已部分交付',
+            owner: 'production', why: '部分完成**不等于**成功，剩余未结',
+            recover: 'production.advance:' + j.id, next: ['production.advance', 'production.deliver'],
+            partial: true });
+        } else {
+          rows.push({ stage: 'terminal', kind: 'production', id: j.id,
+            label: '工单 ' + clean(j.recipe, 20) + ' 已' + j.status,
+            owner: 'production', why: '非在产状态', recover: null, terminal: true });
+        }
+      });
+    } else { faults.push('production:module-missing'); }
+
+    // ── 3. 委托：pending() 是 owner 的读口（本模块不假设它有 list）──
+    if (WA.commission && typeof WA.commission.pending === 'function') {
+      let pr = null;
+      try { pr = WA.commission.pending(); } catch (e) { pr = null; }
+      if (!pr || !pr.ok) {
+        // owner 关着 / 读不出来：如实记一条 fault，不当成「没有委托」
+        faults.push('commission:' + String((pr && pr.reason) || 'read-failed'));
+      } else {
+        (pr.items || []).forEach(function (c) {
+          if (!c || !c.id) return;
+          rows.push({ stage: 'in-progress', kind: 'commission', id: c.id,
+            label: '委托「' + clean(c.title || c.id, 24) + '」阶段 ' + ((num(c.stage) || 0) + 1) + '/' + (num(c.total) || 1),
+            owner: 'commission', why: '委托进行中，可推进/结算',
+            recover: 'commission.advance:' + c.id, next: ['commission.advance', 'commission.settle'] });
+        });
+      }
+    } else { faults.push('commission:module-missing'); }
+
+    // ── 4. 人物在途：旅行中 → 恢复后人物回到可指派状态 ──
+    if (st.people) {
+      Object.keys(st.people).forEach(function (k) {
+        const p = st.people[k];
+        if (!p) return;
+        const pname = clean(p.name || k.replace(/^p_/, ''), 40);
+        if (who && pname !== who) return;
+        const pst = clean(p.status || p.action, 20);
+        if (pst === 'traveling' || pst === 'on_the_road' || pst === 'transit') {
+          rows.push({ stage: 'in-progress', kind: 'people', id: pname,
+            label: pname + ' 在途（' + pst + '）', owner: 'travel',
+            why: '在途中不可指派，抵达后恢复', recover: null });
+        }
+      });
+    }
+
+    const counts = { 'in-progress': 0, 'awaiting-confirm': 0, paused: 0, blocked: 0, partial: 0, terminal: 0, unreadable: 0 };
+    rows.forEach(function (r) { if (counts[r.stage] != null) counts[r.stage]++; });
+    const active = rows.filter(function (r) { return r.stage !== 'terminal'; });
+    stat.lifecycles = (stat.lifecycles || 0) + 1;
+    stat.lastReason = 'lifecycle';
+    return {
+      ok: true,
+      isProjection: true,
+      who: who,
+      rows: active.slice(0, limit),
+      terminalRows: rows.filter(function (r) { return r.stage === 'terminal'; }).slice(0, 6),
+      counts: counts,
+      faults: faults.slice(),
+      note: '跨轮生命周期纯只读投影，不落任何阶段字段；恢复动作转交原 owner'
+    };
+  }
+
+  /**
+   * OPV4-2：恢复一条跨轮动作。**只是路由**——把 actionId 交给既有 owner 写口，
+   *   本模块不自己写世界键，幂等一律由被调 owner 负责（与 plan() 同口径）。
+   * @param {string} actionId 由 lifecycle() 行给的 recover 值
+   * @param {object} opts
+   */
+  function recoverAction(actionId, opts) {
+    const raw = String(actionId == null ? '' : actionId);
+    if (!raw) return { ok: false, reason: 'missing-fields', field: 'actionId' };
+    return plan(raw, opts || {});
+  }
+
+  /**
    * 行动桌（**纯读**）。按当前人物/地点把各 owner 的现状摆成三档。
    * @param {object} opts {person, place}
    */
@@ -861,9 +1059,12 @@
     plan: plan,
     sources: sources,
     diagnose: diagnose,
+    // v2.233.0 (OPV4-2)：跨轮行动生命周期投影 + 恢复路由
+    lifecycle: lifecycle,
+    recoverAction: recoverAction,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults), byKind: Object.assign({}, stat.byKind) }); }
   };
-  var EXPORT_COUNT = 10;
+  var EXPORT_COUNT = 12;
   var _exported = Object.keys(WA.actionDesk).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('actionDesk: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/action-desk.js', { kind: 'engine', ver: '2.231.0' });

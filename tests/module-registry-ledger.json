@@ -1,9 +1,9 @@
 {
- "version": "2.231.6",
+ "version": "2.232.0",
  "loadOrderCount": 282,
  "loadedCount": 268,
  "uiCount": 14,
- "nsCount": 276,
+ "nsCount": 277,
  "totals": {
   "loadEdges": 170,
   "hardEdges": 0,
@@ -1751,7 +1751,8 @@
   },
   "engines/scene-narrative.js": {
    "ns": [
-    "sceneNarrative"
+    "sceneNarrative",
+    "situation"
    ],
    "requires": [
     "registerModule"

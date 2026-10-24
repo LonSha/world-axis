@@ -18,6 +18,7 @@ V3 A/B/C 与 OP9 已真实落地情境投影、行动桌、能力差异、资源
 **依据/问题：** action-desk、act、agency、commission、production、research 等各有写口，长动作的暂停、部分完成和恢复语义分散。
 **交付：** 建立仅存来源 ID/阶段的薄投影，统一列出可继续、待确认、阻塞、部分完成和终态；写入仍回到 owner 并带幂等键。
 **验收：** 维修/研究/委托重载后继续；重复确认不重复扣款；部分完成不伪装成功；记录异常明确降级。P0，26–40 小时。
+**现场落地点：** `engines/action-desk.js`（`lifecycle()` 纯读薄投影 + `recoverAction()` 路由转交，导出数 10→12）；`ui/panel.js`（行动桌挂载「跨轮生命周期」区块与继续按钮）；`tests/exp28-lifecycle-v2233.js`（31 项断言，含 6 组真变异负控制）；`tests/dead-export-ledger.json`（0 新增死导出）。
 ### OPV4-3｜时间成本预览与协商
 **依据/问题：** playtime、calendar、labor-schedule、travel、production、research 等有局部时间语义，不能再造时钟。
 **交付：** 复用剧情时间和预约协议，预览占用、冲突、最早完成和延期来源；支持改期、换人、拆分、取消，由 owner 结算成本。
