@@ -1,0 +1,38 @@
+format: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md — line 3 must match proposed status grammar (/^Status: proposed$|^状态[:：] ?(?:proposed|已提议)$/)
+format: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md — line 4 must be blank
+format: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md — Status: line must appear exactly once
+format: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md — first section must be ## Problem or ## 问题 (got "## 0. 批次口径（照计划原文，不重新编排）")
+format: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md — missing one of ["## Proposal","## 提议","## 方案","## 提案"]
+format: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md — missing one of ["## Acceptance criteria","## 验收标准","## 验收条件","## 接受标准"]
+format: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md — missing one of ["## Risks","## 风险"]
+format: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md — line 2 must be blank
+format: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md — line 3 must match proposed status grammar (/^Status: proposed$|^状态[:：] ?(?:proposed|已提议)$/)
+format: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md — Status: line must appear exactly once
+format: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md — first section must be ## Problem or ## 问题 (got "## 0. 批次口径（照计划原文，不重新编排）")
+format: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md — missing one of ["## Proposal","## 提议","## 方案","## 提案"]
+format: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md — missing one of ["## Acceptance criteria","## 验收标准","## 验收条件","## 接受标准"]
+format: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md — missing one of ["## Risks","## 风险"]
+format: implemented/architecture/2026-10-07-worldaxis-tx1-diplomacy-fact-vs-derived.md — line 2 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx1-diplomacy-fact-vs-derived.md — line 3 must match implemented status grammar (/^Status: implemented$|^状态[:：] ?(?:implemented|已实现)$/)
+format: implemented/architecture/2026-10-07-worldaxis-tx1-diplomacy-fact-vs-derived.md — line 4 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx2-agency-coordinator-boundaries.md — line 2 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx2-agency-coordinator-boundaries.md — line 3 must match implemented status grammar (/^Status: implemented$|^状态[:：] ?(?:implemented|已实现)$/)
+format: implemented/architecture/2026-10-07-worldaxis-tx3-freight-coordinator-boundaries.md — line 2 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx3-freight-coordinator-boundaries.md — line 3 must match implemented status grammar (/^Status: implemented$|^状态[:：] ?(?:implemented|已实现)$/)
+format: implemented/architecture/2026-10-07-worldaxis-tx3-freight-coordinator-boundaries.md — line 4 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx4-story-choice-coordinator.md — line 2 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx4-story-choice-coordinator.md — line 3 must match implemented status grammar (/^Status: implemented$|^状态[:：] ?(?:implemented|已实现)$/)
+format: implemented/architecture/2026-10-07-worldaxis-tx4-story-choice-coordinator.md — line 4 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx6-commission-coordinator.md — line 2 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx6-commission-coordinator.md — line 3 must match implemented status grammar (/^Status: implemented$|^状态[:：] ?(?:implemented|已实现)$/)
+format: implemented/architecture/2026-10-07-worldaxis-tx6-commission-coordinator.md — line 4 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx7-investigation-coordinator.md — line 2 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx7-investigation-coordinator.md — line 3 must match implemented status grammar (/^Status: implemented$|^状态[:：] ?(?:implemented|已实现)$/)
+format: implemented/architecture/2026-10-07-worldaxis-tx7-investigation-coordinator.md — line 4 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx8-aftermath-architecture.md — line 2 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx8-aftermath-architecture.md — line 3 must match implemented status grammar (/^Status: implemented$|^状态[:：] ?(?:implemented|已实现)$/)
+format: implemented/architecture/2026-10-07-worldaxis-tx8-aftermath-architecture.md — line 4 must be blank
+format: implemented/architecture/2026-10-07-worldaxis-tx8-aftermath-architecture.md — first section must be ## Problem or ## 问题 (got "## Module: engines/aftermath.js")
+format: implemented/architecture/2026-10-09-worldaxis-a1a2a3-b1b2-beat-engine-family.md — line 2 must be blank
+format: implemented/architecture/2026-10-09-worldaxis-a1a2a3-b1b2-beat-engine-family.md — line 3 must match implemented status grammar (/^Status: implemented$|^状态[:：] ?(?:implemented|已实现)$/)
+format: implemented/architecture/2026-10-09-worldaxis-a1a2a3-b1b2-beat-engine-family.md — line 4 must be blank
