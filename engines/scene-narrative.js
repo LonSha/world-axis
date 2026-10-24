@@ -359,6 +359,94 @@
    * 只读聚合：当前人物、地点、时段、在场人、可见变化、临近承诺、可用行动、阻塞行动。
    * 无状态持久化，纯只读投影；无待办时给出 nothing_to_do 明确标识。
    */
+  /**
+   * 场景历史因果回声反查（OPV3-8）：历史在当下被消费，反事实不进真历史，非可知视角过滤
+   */
+  function traceCausalEchoes(placeId, viewer, opts) {
+    var pid = clean(placeId, 60);
+    var who = clean(viewer, 40);
+    var o = opts || {};
+    var s = state();
+    var echoes = [];
+
+    // 1. 生产施工事故回声
+    var incidents = ((s.aftermathImpact || {}).incidents) || [];
+    incidents.forEach(function (inc) {
+      if (!inc) return;
+      if (pid && inc.placeId && inc.placeId !== pid) return;
+      // 视角过滤：当事人或有认知记录者方可知
+      if (who) {
+        var isParty = (inc.faultParty === who || inc.operator === who || inc.supervisor === who || inc.injuredPerson === who);
+        var knows = isParty;
+        if (!knows && WA.epistemicView && typeof WA.epistemicView.getBelief === 'function') {
+          var b = WA.epistemicView.getBelief(who, 'incident_' + inc.id) || WA.epistemicView.getBelief(who, inc.id);
+          if (b && b.known) knows = true;
+        }
+        if (!knows) return; // 秘密/局外事故绝不透传
+      }
+      echoes.push({
+        id: inc.id,
+        kind: 'incident',
+        summary: (inc.faultParty || '有人') + '因' + (inc.faultDegree === 'reckless_command' ? '强令带病作业' : '操作失误') + '导致设施断轴损坏',
+        who: inc.faultParty,
+        status: inc.status,
+        impactOnNow: inc.status === 'unsettled' ? '责任赔偿尚未结清，人际关系高度紧张' : '已完成物资代偿和解，但过失留痕',
+        at: inc.createdAt
+      });
+    });
+
+    // 2. 承诺与违约回声
+    var promises = ((s.customLax || {}).promises) || [];
+    promises.forEach(function (p) {
+      if (!p) return;
+      if (who) {
+        var isParty = (p.promiser === who || p.beneficiary === who);
+        var knows = isParty;
+        if (!knows && WA.epistemicView && typeof WA.epistemicView.getBelief === 'function') {
+          var b = WA.epistemicView.getBelief(who, 'promise_' + p.id);
+          if (b && b.known) knows = true;
+        }
+        if (!knows) return;
+      }
+      if (p.status === 'defaulted' || p.status === 'remedied') {
+        echoes.push({
+          id: p.id,
+          kind: 'promise',
+          summary: p.promiser + '对' + p.beneficiary + '违背「' + p.subject + '」的约定',
+          who: p.promiser,
+          status: p.status,
+          impactOnNow: p.status === 'defaulted' ? '信任污点未除，履约声望折损' : '虽经加倍赔偿弥补，历史违约事实不可磨灭',
+          at: p.defaultedAt || p.createdAt
+        });
+      }
+    });
+
+    // 3. 设施抢修与修缮回声
+    var facs = ((s.serviceNetwork || {}).facilities) || [];
+    facs.forEach(function (f) {
+      if (!f || (pid && f.placeId !== pid)) return;
+      var rLog = Array.isArray(f.repairLog) ? f.repairLog : [];
+      rLog.forEach(function (rl) {
+        if (!rl) return;
+        if (who && rl.worker !== who && (!WA.epistemicView || !WA.epistemicView.getBelief(who, 'repair_' + f.id))) {
+          // 非工匠且不知情
+          return;
+        }
+        echoes.push({
+          id: 'rep_' + f.id + '_' + rl.at,
+          kind: 'repair',
+          summary: rl.worker + '投入物料修复了「' + f.name + '」',
+          who: rl.worker,
+          status: 'completed',
+          impactOnNow: '设施已恢复运转能力，历史修缮物料已真实消耗',
+          at: rl.at
+        });
+      });
+    });
+
+    return echoes.slice(0, 10);
+  }
+
   function situation(opts) {
     var o = opts || {};
     var s = state();
@@ -501,6 +589,7 @@
       availableActions: availableActions,
       blockedActions: blockedActions,
       jointProjects: jointProjects,
+      sceneEchoes: traceCausalEchoes(place, viewer, o),
       idleStatus: idleStatus,
       idleText: idleText,
       hasPending: !isIdle,
@@ -511,6 +600,7 @@
   WA.sceneNarrative = {
     currentScene: currentScene,
     situation: situation,
+    traceCausalEchoes: traceCausalEchoes,
     resolvedSummary: resolvedSummary,
     traceFrom: traceFrom,
     perceivedHorizon: perceivedHorizon,

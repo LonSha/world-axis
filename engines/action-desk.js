@@ -240,8 +240,28 @@
       }
     }
 
-    // 地点公共服务设施硬性约束 (OPV3-7 & EXV3-2)
+    // 通道关卡查验硬性拦截 (EXV3-2)
+    if (WA.serviceNetwork && typeof WA.serviceNetwork.checkPassage === 'function' && (o.toPlace || aid.indexOf('travel') >= 0)) {
+      const fromP = o.fromPlace || o.place || (st.people && st.people['p_' + w] && st.people['p_' + w].location);
+      const toP = o.toPlace;
+      if (fromP && toP) {
+        const passCheck = WA.serviceNetwork.checkPassage(fromP, toP, w, o);
+        if (!passCheck.ok || !passCheck.permitted) {
+          return {
+            ok: false,
+            reason: passCheck.reason,
+            checkpointId: passCheck.checkpointId,
+            note: passCheck.note,
+            requiredPermit: passCheck.requiredPermit,
+            tollAmount: passCheck.tollAmount
+          };
+        }
+      }
+    }
+
+    // 地点公共服务设施硬性约束与跨节点分流 (OPV3-7 & EXV3-2)
     let serviceDelay = 0;
+    let failoverInfo = null;
     if (WA.serviceNetwork && typeof WA.serviceNetwork.checkServiceImpact === 'function' && o.place && o.serviceType) {
       const srvCheck = WA.serviceNetwork.checkServiceImpact(o.place, o.serviceType);
       if (!srvCheck.available) {
@@ -255,6 +275,14 @@
       if (srvCheck.delayDays) {
         serviceDelay = srvCheck.delayDays;
       }
+      if (srvCheck.failover) {
+        failoverInfo = {
+          failover: true,
+          failoverPlace: srvCheck.failoverPlace,
+          facilityName: srvCheck.facilityName,
+          transportCost: srvCheck.transportCost
+        };
+      }
     }
 
     // 1. 若为方法任务，复用 actionMethods.evaluate
@@ -262,7 +290,7 @@
       const taskId = o.taskId || aid.replace(/^method\./, '');
       if (WA.actionMethods && typeof WA.actionMethods.evaluate === 'function') {
         const ev = WA.actionMethods.evaluate(taskId, w, o);
-        return Object.assign({ ok: true, preview: true, actionId: aid, serviceDelayDays: serviceDelay, canExecute: ev && ev.ok && ev.available && ev.available.length > 0 }, ev);
+        return Object.assign({ ok: true, preview: true, actionId: aid, serviceDelayDays: serviceDelay, failover: failoverInfo, canExecute: ev && ev.ok && ev.available && ev.available.length > 0 }, ev);
       }
     }
 

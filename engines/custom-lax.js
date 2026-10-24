@@ -232,6 +232,88 @@
   }
 
   /**
+   * 执行地方规约惩戒：对违规者暂停特权、罚没或诫勉（EXV3-5）
+   */
+  function enforcePenalty(ruleId, violator, penaltyType, opts) {
+    var rId = clean(ruleId, 60);
+    var who = clean(violator, 40);
+    var pType = clean(penaltyType, 40) || 'suspend-privilege';
+    var o = opts || {};
+    var days = Math.max(1, Number(o.days) || 3);
+    var fine = num(o.fine) || 0;
+    var nowMs = now();
+    var expiresAt = nowMs + days * 86400000;
+    var penId = 'pen_' + nowMs + '_' + WA.rand.id();
+
+    if (!who) return { ok: false, reason: 'missing-violator' };
+
+    var entry = {
+      id: penId,
+      ruleId: rId,
+      orgId: clean(o.orgId, 60),
+      violator: who,
+      penaltyType: pType,
+      days: days,
+      fine: fine,
+      reason: clean(o.reason, 100) || '违反地方规约章程',
+      createdAt: nowMs,
+      expiresAt: expiresAt
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || {};
+        d.customLax.penalties = d.customLax.penalties || [];
+        d.customLax.penalties.push(entry);
+        if (fine > 0 && d.people && d.people['p_' + who]) {
+          var res = d.people['p_' + who].resources = d.people['p_' + who].resources || {};
+          res.money = Math.max(0, (Number(res.money) || 0) - fine);
+        }
+        return true;
+      }, 'customLax:enforcePenalty');
+    }
+    return { ok: true, penalty: entry, note: '地方规约惩戒已生效，禁令期内硬性拦截相关申请' };
+  }
+
+  /**
+   * 废除/撤销地方规约：停止后续执行，保留过往惩处档案
+   */
+  function revokeRule(ruleId, opts) {
+    var rId = clean(ruleId, 60);
+    var o = opts || {};
+    var reason = clean(o.reason, 100) || '经公所审议废止';
+    var nowMs = now();
+    var target = null;
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || {};
+        d.customLax.rules = d.customLax.rules || [];
+        for (var i = 0; i < d.customLax.rules.length; i++) {
+          var r = d.customLax.rules[i];
+          if (r && r.id === rId) {
+            r.active = false;
+            r.status = 'revoked';
+            r.revokedAt = nowMs;
+            r.revokeReason = reason;
+            target = r;
+            break;
+          }
+        }
+        return true;
+      }, 'customLax:revokeRule');
+    }
+    if (!target) return { ok: false, reason: 'rule-not-found', ruleId: rId };
+    return {
+      ok: true,
+      ruleId: rId,
+      status: 'revoked',
+      historicalPenaltiesRetained: true,
+      note: '规约已废止，后续常规申请恢复放行'
+    };
+  }
+
+  /**
    * 记录对某规则的不满，达到阈值触发复审。
    */
   function registerDissatisfaction(ruleId, who) {
@@ -938,6 +1020,30 @@
     var who = clean(actor, 40);
     var dt = details || {};
 
+    // 优先检查角色是否处于地方规约违规禁令期内 (EXV3-5)
+    var st = state();
+    var penalties = (st.customLax && Array.isArray(st.customLax.penalties)) ? st.customLax.penalties : [];
+    var nowMs = now();
+    var activePen = penalties.filter(function (p) {
+      if (!p || p.violator !== who) return false;
+      if (p.orgId && oid && p.orgId !== oid) return false;
+      if (p.penaltyType === 'suspend-privilege' || p.penaltyType === 'suspend-booking') {
+        return (p.expiresAt == null || p.expiresAt > nowMs);
+      }
+      return false;
+    })[0];
+
+    if (activePen && !dt.isExempt) {
+      return {
+        ok: false,
+        enforced: true,
+        reason: 'privilege-suspended',
+        penaltyId: activePen.id,
+        violator: who,
+        note: '该角色因此前违规被暂停业务预约权限，尚在禁令惩戒期内'
+      };
+    }
+
     var rules = activeRules(oid).rules || [];
     for (var i = 0; i < rules.length; i++) {
       var r = rules[i];
@@ -1035,6 +1141,8 @@
     listPromises: listPromises,
     checkRuleEnforcement: checkRuleEnforcement,
     declareLocalRule: declareLocalRule,
+    enforcePenalty: enforcePenalty,
+    revokeRule: revokeRule,
     RULE_TYPES: RULE_TYPES.slice(),
     STAGES: STAGES.slice()
   };

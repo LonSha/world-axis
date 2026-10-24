@@ -138,10 +138,184 @@
     };
   }
 
+  /**
+   * 生产/施工安全事故：设施损坏、物资损毁、人身伤害与责任判定（OPV3-7）
+   */
+  function triggerIncident(spec) {
+    var s = spec || {};
+    var placeId = clean(s.placeId, 60);
+    var facilityId = clean(s.facilityId, 60);
+    var incidentType = clean(s.incidentType, 40) || 'industrial_failure';
+    var operator = clean(s.operator, 40);
+    var supervisor = clean(s.supervisor, 40);
+    var forcedUnderDegraded = !!s.forcedUnderDegraded;
+    var damageScale = clean(s.damageScale, 20) || 'severe';
+    var note = clean(s.note, 120);
+
+    var nowMs = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now() : Date.now();
+    var incId = clean(s.id, 60) || ('inc_' + nowMs + '_' + (WA.rand ? WA.rand.id() : Math.random().toString(36).slice(2, 6)));
+
+    // 责任判定：若设施处于带病运行仍强令开工，决策主管负主责；否则操作员负主责
+    var faultParty = (forcedUnderDegraded && supervisor) ? supervisor : (operator || supervisor || 'unknown');
+    var faultDegree = forcedUnderDegraded ? 'reckless_command' : 'operational_mishap';
+
+    var destroyedMaterials = Object.assign({}, s.materials || {});
+    var injuredPerson = clean(s.injuredPerson, 40);
+    var energyCost = Math.max(10, Number(s.energyCost) || 30);
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.aftermathImpact = d.aftermathImpact || { incidents: [], redressLog: [] };
+        // 设施停摆
+        if (facilityId && d.serviceNetwork && Array.isArray(d.serviceNetwork.facilities)) {
+          var fac = d.serviceNetwork.facilities.filter(function (x) { return x && x.id === facilityId; })[0];
+          if (fac) {
+            fac.status = 'inoperable';
+            fac.breakdownReason = note || '发生严重生产责任事故，断轴损坏';
+          }
+        }
+        // 扣除人员精力并标记受伤
+        if (injuredPerson && d.people && d.people['p_' + injuredPerson]) {
+          var p = d.people['p_' + injuredPerson];
+          p.status = 'injured';
+          p.energy = Math.max(0, (p.energy != null ? p.energy : 100) - energyCost);
+        }
+        // 记录责任事故
+        var entry = {
+          id: incId,
+          placeId: placeId,
+          facilityId: facilityId,
+          incidentType: incidentType,
+          faultParty: faultParty,
+          faultDegree: faultDegree,
+          operator: operator,
+          supervisor: supervisor,
+          injuredPerson: injuredPerson,
+          destroyedMaterials: destroyedMaterials,
+          status: 'unsettled',
+          note: note,
+          createdAt: nowMs
+        };
+        d.aftermathImpact.incidents.push(entry);
+        return true;
+      }, 'aftermathImpact:triggerIncident');
+    }
+
+    // 连线 pathEcho 注入遗憾与责任污点
+    if (WA.pathEcho && typeof WA.pathEcho.recordExpectation === 'function' && faultParty) {
+      try {
+        WA.pathEcho.recordExpectation(faultParty, 'incident_' + incId, '生产安全运转', {
+          failed: true,
+          faultDegree: faultDegree,
+          incidentId: incId
+        });
+      } catch (e) {}
+    }
+
+    return {
+      ok: true,
+      incidentId: incId,
+      placeId: placeId,
+      facilityId: facilityId,
+      faultParty: faultParty,
+      faultDegree: faultDegree,
+      status: 'unsettled',
+      facilityState: 'inoperable',
+      injuredPerson: injuredPerson,
+      destroyedMaterials: destroyedMaterials,
+      note: '严重生产事故已立案，设施已彻底停摆，责任人留痕'
+    };
+  }
+
+  /**
+   * 代偿追索与责任赔付结算
+   */
+  function settleRedress(incidentId, opts) {
+    var iId = clean(incidentId, 60);
+    var o = opts || {};
+    var payer = clean(o.payer, 40);
+    var compensation = Object.assign({}, o.compensation || {});
+    var note = clean(o.note, 120);
+    var nowMs = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now() : Date.now();
+
+    if (!iId) return { ok: false, reason: 'missing-incident-id' };
+    if (!compensation || Object.keys(compensation).length === 0) {
+      return { ok: false, reason: 'missing-compensation', note: '和解代偿必须付出真金白银或物资，严禁空口免责' };
+    }
+
+    var settled = false;
+    var target = null;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.aftermathImpact = d.aftermathImpact || { incidents: [], redressLog: [] };
+        var hit = (d.aftermathImpact.incidents || []).filter(function (x) { return x && x.id === iId; })[0];
+        if (!hit) return false;
+        if (hit.status === 'redressed') {
+          settled = true;
+          target = hit;
+          return false;
+        }
+        var actualPayer = payer || hit.faultParty;
+        // 从责任人私囊中真实扣减物料/资金
+        if (actualPayer && d.people && d.people['p_' + actualPayer]) {
+          var pRes = d.people['p_' + actualPayer].resources = d.people['p_' + actualPayer].resources || {};
+          Object.keys(compensation).forEach(function (mat) {
+            var cost = Number(compensation[mat]) || 0;
+            pRes[mat] = Math.max(0, (pRes[mat] || 0) - cost);
+          });
+        }
+        hit.status = 'redressed';
+        hit.redressedAt = nowMs;
+        hit.settledBy = actualPayer;
+        hit.compensation = compensation;
+        d.aftermathImpact.redressLog.push({
+          incidentId: iId,
+          payer: actualPayer,
+          compensation: compensation,
+          note: note,
+          at: nowMs
+        });
+        target = hit;
+        return true;
+      }, 'aftermathImpact:settleRedress');
+    }
+
+    if (!target) return { ok: false, reason: 'incident-not-found' };
+    if (settled) return { ok: false, reason: 'already-redressed', incidentId: iId };
+
+    return {
+      ok: true,
+      incidentId: iId,
+      status: 'redressed',
+      payer: payer || target.faultParty,
+      compensationPaid: compensation,
+      originalFaultRetained: true,
+      note: '生产事故代偿责任已结清，历史事故案卷永久留痕'
+    };
+  }
+
+  function listIncidents(opts) {
+    var o = opts || {};
+    var place = clean(o.place, 60);
+    var faultParty = clean(o.faultParty, 40);
+    var st = (WA.store && typeof WA.store.get === 'function') ? WA.store.get() : {};
+    var incs = ((st.aftermathImpact || {}).incidents) || [];
+    return incs.filter(function (x) {
+      if (!x) return false;
+      if (place && x.placeId !== place) return false;
+      if (faultParty && x.faultParty !== faultParty) return false;
+      if (o.status && x.status !== o.status) return false;
+      return true;
+    });
+  }
+
   WA.aftermathImpact = {
     inspectImpact: inspectImpact,
     findDetour: findDetour,
-    commissionRepair: commissionRepair
+    commissionRepair: commissionRepair,
+    triggerIncident: triggerIncident,
+    settleRedress: settleRedress,
+    listIncidents: listIncidents
   };
 
   if (typeof console !== 'undefined' && console.log) {

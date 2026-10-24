@@ -347,18 +347,7 @@ function requestService(facilityId, who, amount, opts) {
       return f && f.placeId === pid && (!st || f.serviceType === st);
     });
 
-    if (!facs.length) {
-      return {
-        ok: false,
-        available: false,
-        reason: 'service-not-provided',
-        placeId: pid,
-        serviceType: st,
-        note: '当前地点未配置该项公共服务设施'
-      };
-    }
-
-    // 优先选择运行最良好的设施
+    // 优先检查本地运行设施
     var operational = facs.filter(function (f) { return f.status === 'operational'; })[0];
     if (operational) {
       return {
@@ -386,13 +375,50 @@ function requestService(facilityId, who, amount, opts) {
       };
     }
 
+    // 本地无设施或已彻底停摆，自动探测邻近节点覆盖（跨节点服务网络 EXV3-2）
+    var fallback = (bk.facilities || []).filter(function (f) {
+      if (!f || (st && f.serviceType !== st)) return false;
+      if (f.placeId === pid) return false;
+      if (f.status !== 'operational' && f.status !== 'degraded') return false;
+      var cov = Array.isArray(f.coverage) ? f.coverage : [];
+      return cov.indexOf(pid) >= 0;
+    })[0];
+
+    if (fallback) {
+      var isDeg = fallback.status === 'degraded';
+      return {
+        ok: true,
+        available: true,
+        status: 'failover',
+        failover: true,
+        facilityId: fallback.id,
+        facilityName: fallback.name,
+        failoverPlace: fallback.placeId,
+        efficiency: isDeg ? 0.4 : 0.8,
+        delayDays: (isDeg ? 2 : 0) + 1,
+        transportCost: 5,
+        note: '本地设施故障，已由服务网络分流至邻近「' + fallback.placeId + '」之「' + fallback.name + '」'
+      };
+    }
+
+    if (!facs.length) {
+      return {
+        ok: false,
+        available: false,
+        reason: 'service-not-provided',
+        placeId: pid,
+        serviceType: st,
+        note: '当前地点未配置该项公共服务设施且无邻近节点覆盖'
+      };
+    }
+
     return {
       ok: false,
       available: false,
       status: 'dismantled',
       facilityId: facs[0].id,
       reason: 'facility-out-of-service',
-      note: '公共设施已瘫痪停用，行动受阻，需修复或绕行'
+      note: '公共设施已瘫痪停用且无备选路由，需筹料修复或就地放弃'
     };
   }
 
@@ -442,6 +468,118 @@ function requestService(facilityId, who, amount, opts) {
     };
   }
 
+  /**
+   * 声明通道检查站/关卡（EXV3-2 通行管制）
+   */
+  function declareCheckpoint(spec) {
+    var s = spec || {};
+    var id = clean(s.id, 60) || ('cp_' + now() + '_' + WA.rand.id());
+    var name = clean(s.name, 60);
+    var fromPlace = clean(s.fromPlace, 60);
+    var toPlace = clean(s.toPlace, 60);
+    if (!name || !fromPlace || !toPlace) return { ok: false, reason: 'missing-fields' };
+    var controlType = clean(s.controlType, 30) || 'permit-required';
+    var tollAmount = num(s.tollAmount) || 0;
+    var requiredPermit = clean(s.requiredPermit, 40) || 'travel-permit';
+    var isBlocked = !!s.isBlocked;
+    var blockReason = clean(s.blockReason, 80);
+
+    var entry = {
+      id: id,
+      name: name,
+      fromPlace: fromPlace,
+      toPlace: toPlace,
+      controlType: controlType,
+      tollAmount: tollAmount,
+      requiredPermit: requiredPermit,
+      isBlocked: isBlocked,
+      blockReason: blockReason,
+      createdAt: now()
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.serviceNetwork = d.serviceNetwork || { facilities: [], usage: [] };
+        d.serviceNetwork.checkpoints = d.serviceNetwork.checkpoints || [];
+        var idx = -1;
+        for (var i = 0; i < d.serviceNetwork.checkpoints.length; i++) {
+          if (d.serviceNetwork.checkpoints[i].id === id) { idx = i; break; }
+        }
+        if (idx >= 0) d.serviceNetwork.checkpoints[idx] = entry;
+        else d.serviceNetwork.checkpoints.push(entry);
+        return true;
+      }, 'serviceNetwork:declareCheckpoint');
+    }
+    return { ok: true, checkpoint: entry };
+  }
+
+  /**
+   * 关卡通行检核：路引查验、规费征收与封锁阻断
+   */
+  function checkPassage(fromPlace, toPlace, traveler, opts) {
+    var from = clean(fromPlace, 60);
+    var to = clean(toPlace, 60);
+    var who = clean(traveler, 40);
+    var o = opts || {};
+    var bk = ensureBucket();
+    var cps = (bk.checkpoints || []).filter(function (c) {
+      if (!c) return false;
+      return (c.fromPlace === from && c.toPlace === to) || (c.fromPlace === to && c.toPlace === from);
+    });
+
+    if (!cps.length) {
+      return { ok: true, permitted: true, note: '通道无检查站，自由通行' };
+    }
+
+    for (var i = 0; i < cps.length; i++) {
+      var cp = cps[i];
+      if (cp.isBlocked) {
+        return {
+          ok: false,
+          permitted: false,
+          reason: 'checkpoint-blocked',
+          checkpointId: cp.id,
+          name: cp.name,
+          note: cp.blockReason || '关卡道路封阻，无法通行'
+        };
+      }
+      if (o.isOfficialPass || o.isExempt) {
+        continue;
+      }
+      if (cp.controlType === 'permit-required') {
+        var permits = Array.isArray(o.permits) ? o.permits.slice() : [];
+        var s = state();
+        if (s.people && s.people['p_' + who] && Array.isArray(s.people['p_' + who].permits)) {
+          permits = permits.concat(s.people['p_' + who].permits);
+        }
+        if (permits.indexOf(cp.requiredPermit) < 0) {
+          return {
+            ok: false,
+            permitted: false,
+            reason: 'permit-missing',
+            checkpointId: cp.id,
+            name: cp.name,
+            requiredPermit: cp.requiredPermit,
+            note: '关卡严查过所路引，缺少「' + cp.requiredPermit + '」禁止入界'
+          };
+        }
+      } else if (cp.controlType === 'toll-required') {
+        if (!o.paidToll && cp.tollAmount > 0) {
+          return {
+            ok: false,
+            permitted: false,
+            reason: 'toll-required',
+            checkpointId: cp.id,
+            name: cp.name,
+            tollAmount: cp.tollAmount,
+            note: '需缴纳关税规费 ' + cp.tollAmount + ' 方可放行'
+          };
+        }
+      }
+    }
+    return { ok: true, permitted: true, checkpointId: cps[0].id, name: cps[0].name };
+  }
+
   WA.serviceNetwork = {
     declareFacility: declareFacility,
     activateFacility: activateFacility,
@@ -454,6 +592,8 @@ function requestService(facilityId, who, amount, opts) {
     servicesAt: servicesAt,
     checkServiceImpact: checkServiceImpact,
     repairFacilityWithMaterials: repairFacilityWithMaterials,
+    declareCheckpoint: declareCheckpoint,
+    checkPassage: checkPassage,
     SERVICE_TYPES: SERVICE_TYPES.slice(),
     STATUS: STATUS.slice()
   };
