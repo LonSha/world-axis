@@ -19,11 +19,11 @@
       --wa-glass-light: rgba(26,33,46,0.7);
       
       /* 荧光强调色 */
-      --wa-accent-cyan: #00d9ff;
-      --wa-accent-cyan-glow: rgba(0,217,255,0.5);
-      --wa-accent-magenta: #ff006e;
-      --wa-accent-violet: #7c3aed;
-      --wa-accent-amber: #fbbf24;
+      --wa-accent-cyan: #38bdf8;
+      --wa-accent-cyan-glow: rgba(56,189,248,0.3);
+      --wa-accent-magenta: #f43f5e;
+      --wa-accent-violet: #8b5cf6;
+      --wa-accent-amber: #f59e0b;
       --wa-accent-emerald: #10b981;
       
       /* 文本层级 */
@@ -34,15 +34,15 @@
       --wa-text-glow: #ffffff;
       
       /* 边框 */
-      --wa-border-subtle: rgba(0,217,255,0.15);
-      --wa-border-normal: rgba(0,217,255,0.3);
-      --wa-border-strong: rgba(0,217,255,0.6);
+      --wa-border-subtle: rgba(56,189,248,0.12);
+      --wa-border-normal: rgba(56,189,248,0.25);
+      --wa-border-strong: rgba(56,189,248,0.5);
       
       /* 阴影 */
-      --wa-shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
-      --wa-shadow-md: 0 4px 16px rgba(0,0,0,0.4);
-      --wa-shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
-      --wa-shadow-glow: 0 0 20px var(--wa-accent-cyan-glow);
+      --wa-shadow-sm: 0 2px 8px rgba(0,0,0,0.35);
+      --wa-shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+      --wa-shadow-lg: 0 12px 36px rgba(0,0,0,0.65);
+      --wa-shadow-glow: 0 0 16px var(--wa-accent-cyan-glow);
       
       /* 动画时长 */
       --wa-duration-fast: 150ms;
@@ -54,42 +54,44 @@
       --wa-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
     }
 
-    /* ============ 悬浮球（量子核心）============ */
+    /* ============ 悬浮球（时空量子核心）============ */
     #wa-orb {
       position: fixed;
       right: 24px;
       bottom: 24px;
-      width: 56px;
-      height: 56px;
-      background: linear-gradient(135deg, var(--wa-accent-cyan), var(--wa-accent-violet));
+      width: 46px;
+      height: 46px;
+      background: radial-gradient(circle at 35% 30%, #1e2638 0%, #0d121c 75%);
+      border: 1px solid var(--wa-accent-cyan);
       border-radius: 50%;
-      box-shadow: 0 0 24px var(--wa-accent-cyan-glow), var(--wa-shadow-md);
-      clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 12px var(--wa-accent-cyan-glow);
       cursor: pointer;
       z-index: 999999;
-      font-size: 24px;
+      font-size: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--wa-text-glow);
+      color: #bae6fd;
       user-select: none;
       transition: all var(--wa-duration-normal) var(--wa-ease-out);
-      animation: wa-orb-pulse 2s ease-in-out infinite;
+      animation: wa-orb-pulse 2.5s ease-in-out infinite;
     }
 
     @keyframes wa-orb-pulse {
-      0%, 100% { transform: scale(0.95); opacity: 0.85; }
-      50% { transform: scale(1.05); opacity: 1; }
+      0%, 100% { transform: scale(1); opacity: 0.92; box-shadow: 0 4px 16px rgba(0,0,0,0.6), 0 0 8px var(--wa-accent-cyan-glow); }
+      50% { transform: scale(1.04); opacity: 1; box-shadow: 0 6px 24px rgba(0,0,0,0.7), 0 0 16px var(--wa-accent-cyan-glow); }
     }
 
     #wa-orb:hover {
-      transform: scale(1.1) !important;
-      box-shadow: 0 0 32px var(--wa-accent-cyan-glow), var(--wa-shadow-lg);
+      transform: scale(1.08) !important;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.8), 0 0 20px var(--wa-accent-cyan-glow);
+      color: #ffffff;
     }
 
     #wa-orb.wa-busy {
-      background: linear-gradient(135deg, var(--wa-accent-amber), var(--wa-accent-magenta));
-      animation: wa-orb-spin 1s linear infinite, wa-orb-pulse 2s ease-in-out infinite;
+      border-color: var(--wa-accent-amber);
+      color: var(--wa-accent-amber);
+      animation: wa-orb-spin 2s linear infinite, wa-orb-pulse 2s ease-in-out infinite;
     }
 
     @keyframes wa-orb-spin {

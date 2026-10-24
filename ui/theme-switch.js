@@ -30,8 +30,8 @@
     'wa-cyberpunk-responsive'
   ];
   const THEMES = [
-    { id: 'default', label: '默认 · 冷峻控制台', desc: '原版外观：深色玻璃拟态 + 青色单色强调', styles: [] },
-    { id: 'cyberpunk', label: '赛博朋克控制台', desc: '深空背景 + 荧光强调色 + 六角网格 + CRT 扫描线', styles: CYBER_STYLES }
+    { id: 'default', label: '时空星盘 · 黑曜观测台', desc: '原版旗舰：深邃玄武岩基底 + 冰曜冷青 + 天体蚀刻金', styles: [] },
+    { id: 'cyberpunk', label: '量子干涉 · 赛博控制台', desc: '深空干涉背景 + 高阶光谱强调 + 量子微网格', styles: CYBER_STYLES }
   ];
 
   // ── 持久化：走 settingsBus 登记（**不裸调 localStorage**）──

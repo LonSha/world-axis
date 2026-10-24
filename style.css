@@ -1,72 +1,844 @@
-/* 世界枢轴 WorldAxis — 冷峻控制台风格（深色玻璃拟态+青色单色强调） */
-#wa-orb{position:fixed;right:18px;bottom:90px;width:42px;height:42px;border-radius:50%;
-  background:rgba(18,22,28,.85);border:1px solid rgba(94,234,212,.45);color:#5eead4;
-  display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;
-  z-index:9999;backdrop-filter:blur(8px);box-shadow:0 2px 14px rgba(0,0,0,.5);user-select:none;touch-action:none}
-#wa-orb.wa-busy{animation:wa-pulse 1.4s ease-in-out infinite}
-@keyframes wa-pulse{0%,100%{box-shadow:0 0 0 0 rgba(94,234,212,.5)}50%{box-shadow:0 0 0 10px rgba(94,234,212,0)}}
-#wa-panel{position:fixed;right:16px;bottom:140px;width:min(430px,94vw);height:min(600px,80vh);
-  background:rgba(15,19,25,.96);border:1px solid rgba(94,234,212,.3);border-radius:14px;
-  z-index:10000;display:flex;flex-direction:column;backdrop-filter:blur(14px);
-  box-shadow:0 8px 40px rgba(0,0,0,.6);color:#d7dde4;font:13px/1.5 -apple-system,"Segoe UI",sans-serif;overflow:hidden}
-#wa-panel.wa-hidden{display:none}
-.wa-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08);cursor:default}
-.wa-title{color:#5eead4;font-weight:600;letter-spacing:.5px}
-.wa-ver{opacity:.5;font-size:11px;font-weight:400}
-.wa-close{cursor:pointer;opacity:.6;padding:2px 8px}.wa-close:hover{opacity:1}
-/* v2.149.0（P3）：观测视角选择器 —— 常驻面板头部。刻意**不**做成醒目控件：
-   它是「给谁看」的设置，不是需要反复点的动作；但必须可见可读（.wa-dim 的读数在右侧）。 */
-.wa-view{display:flex;align-items:center;gap:6px;margin-left:auto;margin-right:10px}
-.wa-viewsel{flex:0 0 auto;max-width:110px;padding:3px 6px;font-size:11px}
-.wa-view .wa-dim{font-size:11px;opacity:.7;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}
-.wa-tabs{display:flex;overflow-x:auto;border-bottom:1px solid rgba(255,255,255,.08);scrollbar-width:none}
-.wa-tabs::-webkit-scrollbar{display:none}
-.wa-tab{background:none;border:none;color:#8b96a3;padding:8px 12px;cursor:pointer;white-space:nowrap;font-size:12px;border-bottom:2px solid transparent}
-.wa-tab.active{color:#5eead4;border-bottom-color:#5eead4}
-.wa-body{flex:1;overflow-y:auto;padding:12px 14px}
-.wa-sec{margin:14px 0 6px;color:#5eead4;font-size:12px;font-weight:600;letter-spacing:.5px;border-left:2px solid #5eead4;padding-left:8px}
-.wa-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.wa-stat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:8px;text-align:center}
-.wa-stat-v{color:#e8f0f5;font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wa-stat-k{color:#77828f;font-size:11px;margin-top:2px}
-.wa-node-list{display:flex;flex-direction:column;gap:4px}
-.wa-node{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:12px}
-.wa-node:hover{background:rgba(255,255,255,.04)}
-.wa-node input{accent-color:#5eead4}
-.wa-node-chain{font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(94,234,212,.15);color:#5eead4}
-.wa-node-chain.after{background:rgba(251,191,36,.15);color:#fbbf24}
-.wa-kv{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
-.wa-kv span{color:#77828f}
-.wa-row{display:flex;gap:6px;margin:6px 0}
-.wa-input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:#e8f0f5;padding:6px 8px;font-size:12px;outline:none}
-.wa-input:focus{border-color:#5eead4}
-.wa-w60{max-width:60px}
-.wa-ta{width:100%;min-height:70px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:#e8f0f5;padding:8px;font-size:12px;resize:vertical;box-sizing:border-box}
-.wa-btn{background:rgba(94,234,212,.12);border:1px solid rgba(94,234,212,.4);color:#5eead4;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;margin:4px 0}
-.wa-btn:hover{background:rgba(94,234,212,.22)}
-.wa-mini{padding:2px 8px;font-size:11px;margin:2px 4px 2px 0}
-.wa-list{display:flex;flex-direction:column;gap:6px}
-.wa-item{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:8px;font-size:12px}
-.wa-empty{color:#5a6572;font-size:12px;padding:8px;text-align:center}
-.wa-dim{color:#77828f;font-size:11px}
-.wa-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.1);color:#aab}
-.wa-badge.wa-on{background:rgba(94,234,212,.2);color:#5eead4}
-.wa-vis-hidden{background:rgba(148,163,184,.2);color:#94a3b8}
-.wa-vis-trace{background:rgba(251,191,36,.2);color:#fbbf24}
-.wa-vis-public{background:rgba(94,234,212,.2);color:#5eead4}
-.wa-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(94,234,212,.1);border:1px solid rgba(94,234,212,.3);color:#5eead4;border-radius:12px;padding:2px 10px;font-size:12px;margin:2px}
-.wa-tag i{cursor:pointer;font-style:normal;opacity:.6}.wa-tag i:hover{opacity:1}
-.wa-tag-row{margin:6px 0}
-.wa-out{margin-top:8px;white-space:pre-wrap;font-size:12px;color:#c8d2dc;background:rgba(255,255,255,.03);border-radius:8px;padding:8px;max-height:200px;overflow-y:auto}
-.wa-out:empty{display:none}
-.wa-chan{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px;margin-bottom:8px;display:flex;flex-direction:column;gap:5px}
-.wa-chan-head{display:flex;justify-content:space-between;align-items:center}
-.wa-range{width:100%;accent-color:#5eead4}
-.wa-logbox{max-height:100%;overflow-y:auto;font-size:11px;font-family:ui-monospace,monospace}
-.wa-log{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-.wa-log-error{color:#f87171}.wa-log-warn{color:#fbbf24}
-@media (max-width:640px){#wa-panel{right:0;left:0;bottom:0;width:100vw;height:70vh;border-radius:14px 14px 0 0}}
+/* ==========================================================================
+   世界枢轴 WorldAxis — 时空星盘与黑曜观测台 (Chrono-Astrolabe Design System)
+   哲学：深邃玄武岩基底 · 冰曜冷青主调 · 天体蚀刻金点缀 · 微米级物理仪轨
+   ========================================================================== */
 
-/* v2.225.0(优化 Q8 · 面板减负):专家段折叠钮。收起态**不拼接 body**,故没有 display:none 的节点。 */
-.wa-fold-t{margin:12px 0 4px;font-weight:600}
-.wa-fold-b{padding-left:8px;border-left:2px solid rgba(255,255,255,.08)}
+:root {
+  /* 基底材质层 (Void & Graphite Basalt) */
+  --wa-void: #090c10;
+  --wa-surface-1: #0e1218;
+  --wa-surface-2: #141922;
+  --wa-surface-3: #1a202c;
+  --wa-surface-hover: rgba(255, 255, 255, 0.04);
+  --wa-surface-active: rgba(255, 255, 255, 0.07);
+
+  /* 精密光学高光与微边框 (Sub-pixel Optics) */
+  --wa-border-subtle: rgba(255, 255, 255, 0.07);
+  --wa-border-regular: rgba(255, 255, 255, 0.12);
+  --wa-border-focus: rgba(56, 189, 248, 0.55);
+  --wa-highlight-top: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --wa-shadow-recess: inset 0 1.5px 3px rgba(0, 0, 0, 0.45);
+
+  /* 主控冷曜冰青 (Boreal Glaze) */
+  --wa-accent: #38bdf8;
+  --wa-accent-dim: rgba(56, 189, 248, 0.12);
+  --wa-accent-hover: rgba(56, 189, 248, 0.22);
+  --wa-accent-border: rgba(56, 189, 248, 0.38);
+  --wa-accent-glow: rgba(56, 189, 248, 0.25);
+
+  /* 天体星金 (Celestial Aurum - 核心法则与第一因) */
+  --wa-gold: #f59e0b;
+  --wa-gold-dim: rgba(245, 158, 11, 0.14);
+  --wa-gold-border: rgba(245, 158, 11, 0.35);
+
+  /* 语义态 (Functional Spectrum - 低饱和哑光) */
+  --wa-emerald: #10b981;
+  --wa-rose: #f43f5e;
+  --wa-violet: #a855f7;
+  --wa-amber: #fbbf24;
+
+  /* 文字阶梯 (Monospace & High-legibility) */
+  --wa-text-primary: #e6edf3;
+  --wa-text-secondary: #9aa7b5;
+  --wa-text-dim: #657383;
+  --wa-font-main: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --wa-font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* 物理阻尼过渡 */
+  --wa-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --wa-duration: 0.18s;
+}
+
+/* ==========================================================================
+   1. 悬浮球：时空偏转仪 (The Chrono-Astrolabe Orb)
+   ========================================================================== */
+#wa-orb {
+  position: fixed;
+  right: 18px;
+  bottom: 90px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #1c2330 0%, #0d1117 75%);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(0, 0, 0, 0.8),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.6);
+  color: var(--wa-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 9999;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  user-select: none;
+  touch-action: none;
+  transition: transform var(--wa-duration) var(--wa-ease-spring),
+              border-color var(--wa-duration) ease,
+              box-shadow var(--wa-duration) ease;
+}
+
+#wa-orb:hover {
+  transform: scale(1.06);
+  border-color: rgba(56, 189, 248, 0.65);
+  box-shadow:
+    0 6px 22px rgba(0, 0, 0, 0.75),
+    0 0 14px var(--wa-accent-glow),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  color: #bae6fd;
+}
+
+#wa-orb:active {
+  transform: scale(0.95);
+  cursor: grabbing;
+}
+
+/* 忙碌态：世界线收敛与多轴自旋脉冲 */
+#wa-orb.wa-busy {
+  border-color: var(--wa-gold);
+  color: var(--wa-gold);
+  animation: wa-astrolabe-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes wa-astrolabe-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(245, 158, 11, 0.45),
+      0 4px 16px rgba(0, 0, 0, 0.75),
+      inset 0 1px 2px rgba(255, 255, 255, 0.25);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(245, 158, 11, 0),
+      0 6px 24px rgba(245, 158, 11, 0.25),
+      inset 0 1px 3px rgba(255, 255, 255, 0.4);
+    transform: scale(1.04);
+  }
+}
+
+/* ==========================================================================
+   2. 主控制台外壳 (The Obsidian Console Panel)
+   ========================================================================== */
+#wa-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 140px;
+  width: min(450px, 95vw);
+  height: min(640px, 82vh);
+  background: linear-gradient(180deg, rgba(14, 18, 24, 0.98) 0%, rgba(9, 12, 16, 0.98) 100%);
+  border: 1px solid var(--wa-border-regular);
+  border-radius: 12px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 24px 48px -12px rgba(0, 0, 0, 0.8),
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    var(--wa-highlight-top),
+    0 0 0 1px rgba(0, 0, 0, 0.6);
+  color: var(--wa-text-primary);
+  font: 13px/1.5 var(--wa-font-main);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+#wa-panel.wa-hidden {
+  display: none !important;
+}
+
+/* 面板头部 Header */
+.wa-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
+  border-bottom: 1px solid var(--wa-border-subtle);
+  cursor: default;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.wa-head::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--wa-accent-border) 35%, var(--wa-accent) 50%, var(--wa-accent-border) 65%, transparent 100%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.wa-title {
+  color: var(--wa-text-primary);
+  font-weight: 600;
+  font-size: 13.5px;
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wa-title::before {
+  content: "◈";
+  color: var(--wa-accent);
+  font-size: 14px;
+}
+
+.wa-ver {
+  font-family: var(--wa-font-mono);
+  font-size: 10.5px;
+  color: var(--wa-text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--wa-border-subtle);
+  letter-spacing: 0.2px;
+}
+
+.wa-close {
+  cursor: pointer;
+  color: var(--wa-text-secondary);
+  font-size: 14px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  transition: all var(--wa-duration) ease;
+}
+
+.wa-close:hover {
+  color: #fff;
+  background: rgba(244, 63, 94, 0.18);
+}
+
+/* 视角选择器与导航条 */
+.wa-view {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.wa-viewsel {
+  flex: 0 0 auto;
+  max-width: 115px;
+  padding: 2px 6px;
+  font-size: 11px;
+  background: var(--wa-surface-2);
+  border: 1px solid var(--wa-border-regular);
+  color: var(--wa-text-primary);
+  border-radius: 5px;
+  outline: none;
+  font-family: var(--wa-font-main);
+}
+
+.wa-viewsel:focus {
+  border-color: var(--wa-accent);
+}
+
+.wa-view .wa-dim {
+  font-size: 11px;
+  color: var(--wa-text-dim);
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--wa-font-mono);
+}
+
+.wa-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--wa-border-subtle);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+#wa-nav-out {
+  color: var(--wa-text-dim);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   3. 分类导轨与页签体系 (Caliper Categorization & Tabs)
+   ========================================================================== */
+.wa-cat-bar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(9, 12, 16, 0.65);
+  border-bottom: 1px solid var(--wa-border-subtle);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.wa-cat-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.wa-cat-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--wa-text-secondary);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--wa-duration) ease;
+  user-select: none;
+}
+
+.wa-cat-btn:hover {
+  background: var(--wa-surface-hover);
+  color: var(--wa-text-primary);
+}
+
+.wa-cat-btn.active {
+  background: var(--wa-accent-dim);
+  border-color: var(--wa-accent-border);
+  color: var(--wa-accent);
+  font-weight: 600;
+}
+
+.wa-tabs {
+  display: flex;
+  overflow-x: auto;
+  background: rgba(14, 18, 24, 0.4);
+  border-bottom: 1px solid var(--wa-border-subtle);
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.wa-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.wa-tab {
+  background: none;
+  border: none;
+  color: var(--wa-text-secondary);
+  padding: 7px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all var(--wa-duration) ease;
+  user-select: none;
+  letter-spacing: 0.2px;
+}
+
+.wa-tab:hover {
+  color: var(--wa-text-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.wa-tab.active {
+  color: var(--wa-accent);
+  border-bottom-color: var(--wa-accent);
+  font-weight: 600;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0) 60%, rgba(56, 189, 248, 0.08) 100%);
+}
+
+/* ==========================================================================
+   4. 面板内容区与精密字阶 (Console Body & Data Typography)
+   ========================================================================== */
+.wa-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.wa-body::-webkit-scrollbar {
+  width: 5px;
+}
+.wa-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.wa-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.wa-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 小节标题：精密刻度导轨 */
+.wa-sec {
+  margin: 16px 0 8px;
+  color: var(--wa-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 2px;
+}
+
+.wa-sec::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 12px;
+  background: var(--wa-accent);
+  border-radius: 1px;
+  box-shadow: 0 0 6px var(--wa-accent-glow);
+}
+
+/* 统计网格与精密仪表盘卡片 */
+.wa-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.wa-stat {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: 8px;
+  padding: 9px 8px;
+  text-align: center;
+  box-shadow: var(--wa-highlight-top);
+  transition: border-color var(--wa-duration) ease, transform var(--wa-duration) ease;
+}
+
+.wa-stat:hover {
+  border-color: var(--wa-border-regular);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wa-stat-v {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  font-family: var(--wa-font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
+}
+
+.wa-stat-k {
+  color: var(--wa-text-dim);
+  font-size: 10.5px;
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* 列表与条目容器 */
+.wa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wa-item {
+  background: var(--wa-surface-1);
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 12px;
+  box-shadow: var(--wa-highlight-top);
+}
+
+.wa-empty {
+  color: var(--wa-text-dim);
+  font-size: 12px;
+  padding: 16px 8px;
+  text-align: center;
+  font-style: italic;
+}
+
+.wa-dim {
+  color: var(--wa-text-dim);
+  font-size: 11px;
+}
+
+/* 键值对行 */
+.wa-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 12px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.wa-kv:last-child {
+  border-bottom: none;
+}
+
+.wa-kv span:first-child {
+  color: var(--wa-text-secondary);
+}
+
+.wa-kv span:last-child {
+  color: var(--wa-text-primary);
+  font-family: var(--wa-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 节点开关网格 */
+.wa-node-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wa-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  border: 1px solid transparent;
+  transition: all var(--wa-duration) ease;
+}
+
+.wa-node:hover {
+  background: var(--wa-surface-hover);
+  border-color: var(--wa-border-subtle);
+}
+
+.wa-node input {
+  accent-color: var(--wa-accent);
+  cursor: pointer;
+}
+
+.wa-node-chain {
+  font-size: 10px;
+  font-family: var(--wa-font-mono);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--wa-accent-dim);
+  color: var(--wa-accent);
+  border: 1px solid var(--wa-accent-border);
+}
+
+.wa-node-chain.after {
+  background: var(--wa-gold-dim);
+  color: var(--wa-gold);
+  border-color: var(--wa-gold-border);
+}
+
+/* ==========================================================================
+   5. 交互控件：输入框、按钮与滑块 (Precision Controls)
+   ========================================================================== */
+.wa-row {
+  display: flex;
+  gap: 6px;
+  margin: 7px 0;
+  align-items: center;
+}
+
+.wa-input {
+  flex: 1;
+  background: var(--wa-surface-2);
+  border: 1px solid var(--wa-border-regular);
+  border-radius: 6px;
+  color: var(--wa-text-primary);
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: var(--wa-font-main);
+  outline: none;
+  box-shadow: var(--wa-shadow-recess);
+  transition: border-color var(--wa-duration) ease, box-shadow var(--wa-duration) ease;
+}
+
+.wa-input:focus {
+  border-color: var(--wa-accent);
+  box-shadow: 0 0 0 1px var(--wa-accent-glow), var(--wa-shadow-recess);
+}
+
+.wa-w60 {
+  max-width: 60px;
+  text-align: center;
+  font-family: var(--wa-font-mono);
+}
+
+.wa-ta {
+  width: 100%;
+  min-height: 72px;
+  background: var(--wa-surface-2);
+  border: 1px solid var(--wa-border-regular);
+  border-radius: 6px;
+  color: var(--wa-text-primary);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: var(--wa-font-main);
+  resize: vertical;
+  box-sizing: border-box;
+  outline: none;
+  box-shadow: var(--wa-shadow-recess);
+  transition: border-color var(--wa-duration) ease;
+}
+
+.wa-ta:focus {
+  border-color: var(--wa-accent);
+  box-shadow: 0 0 0 1px var(--wa-accent-glow), var(--wa-shadow-recess);
+}
+
+/* 按钮规范 */
+.wa-btn {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.16) 0%, rgba(56, 189, 248, 0.08) 100%);
+  border: 1px solid var(--wa-accent-border);
+  color: #bae6fd;
+  border-radius: 6px;
+  padding: 6px 13px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 4px 0;
+  box-shadow: var(--wa-highlight-top);
+  transition: all var(--wa-duration) ease;
+  user-select: none;
+}
+
+.wa-btn:hover {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.28) 0%, rgba(56, 189, 248, 0.16) 100%);
+  border-color: var(--wa-accent);
+  color: #fff;
+  box-shadow: 0 0 10px var(--wa-accent-glow), var(--wa-highlight-top);
+}
+
+.wa-btn:active {
+  transform: translateY(1px);
+}
+
+.wa-mini {
+  padding: 3px 8px;
+  font-size: 11px;
+  margin: 2px 4px 2px 0;
+  border-radius: 5px;
+}
+
+/* 范围滑动条 */
+.wa-range {
+  width: 100%;
+  accent-color: var(--wa-accent);
+  cursor: pointer;
+}
+
+/* 标签与徽章 */
+.wa-badge {
+  font-size: 10px;
+  font-family: var(--wa-font-mono);
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--wa-text-secondary);
+  border: 1px solid var(--wa-border-subtle);
+  display: inline-block;
+}
+
+.wa-badge.wa-on {
+  background: var(--wa-accent-dim);
+  color: var(--wa-accent);
+  border-color: var(--wa-accent-border);
+}
+
+.wa-vis-hidden {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.wa-vis-trace {
+  background: var(--wa-gold-dim);
+  color: var(--wa-gold);
+  border: 1px solid var(--wa-gold-border);
+}
+
+.wa-vis-public {
+  background: var(--wa-accent-dim);
+  color: var(--wa-accent);
+  border: 1px solid var(--wa-accent-border);
+}
+
+.wa-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid var(--wa-accent-border);
+  color: #bae6fd;
+  border-radius: 12px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  margin: 2px 4px 2px 0;
+}
+
+.wa-tag i {
+  cursor: pointer;
+  font-style: normal;
+  color: var(--wa-text-dim);
+  transition: color var(--wa-duration) ease;
+}
+
+.wa-tag i:hover {
+  color: var(--wa-rose);
+}
+
+.wa-tag-row {
+  margin: 6px 0;
+}
+
+/* 输出控制台与日志容器 */
+.wa-out {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-size: 11.5px;
+  font-family: var(--wa-font-mono);
+  line-height: 1.6;
+  color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: var(--wa-shadow-recess);
+}
+
+.wa-out:empty {
+  display: none;
+}
+
+.wa-chan {
+  background: var(--wa-surface-1);
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: 8px;
+  padding: 9px 10px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--wa-highlight-top);
+}
+
+.wa-chan-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+}
+
+.wa-logbox {
+  max-height: 100%;
+  overflow-y: auto;
+  font-size: 11px;
+  font-family: var(--wa-font-mono);
+  line-height: 1.6;
+}
+
+.wa-log {
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.wa-log-error {
+  color: var(--wa-rose);
+}
+
+.wa-log-warn {
+  color: var(--wa-amber);
+}
+
+/* 折叠小节 */
+.wa-fold-t {
+  margin: 14px 0 6px;
+  font-weight: 600;
+  color: var(--wa-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wa-fold-b {
+  padding-left: 10px;
+  border-left: 1.5px solid var(--wa-border-subtle);
+}
+
+/* 声誉网格与敌对标记 */
+.wa-rep-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.wa-rep-cell {
+  text-align: center;
+  padding: 7px 5px;
+  background: var(--wa-surface-1);
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: 6px;
+  font-size: 11.5px;
+  box-shadow: var(--wa-highlight-top);
+}
+
+.wa-enemy-blood {
+  background: rgba(220, 38, 38, 0.85) !important;
+  color: #fff !important;
+  border-color: rgba(239, 68, 68, 0.9) !important;
+}
+
+.wa-enemy-grudge {
+  background: rgba(217, 119, 6, 0.85) !important;
+  color: #fff !important;
+  border-color: rgba(245, 158, 11, 0.9) !important;
+}
+
+.wa-digest {
+  font-style: italic;
+  opacity: 0.88;
+  line-height: 1.6;
+  padding: 8px 11px;
+  border-left: 3px solid var(--wa-accent);
+  background: var(--wa-accent-dim);
+  border-radius: 0 6px 6px 0;
+  margin: 6px 0;
+}
+
+/* ==========================================================================
+   6. 移动端与自适应断点 (Responsive Architecture)
+   ========================================================================== */
+@media (max-width: 640px) {
+  #wa-panel {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 75vh;
+    border-radius: 14px 14px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+}

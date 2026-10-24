@@ -158,17 +158,17 @@
   // v0.6 新增组件样式注入
   (function injectStyles() {
     const css = `
-      .wa-digest { font-style: italic; opacity: .85; line-height: 1.6; padding: 8px 10px; border-left: 3px solid #7c6af7; margin: 4px 0; }
+      .wa-digest { font-style: italic; opacity: .88; line-height: 1.6; padding: 8px 11px; border-left: 3px solid var(--wa-accent, #38bdf8); background: var(--wa-accent-dim, rgba(56,189,248,0.1)); border-radius: 0 6px 6px 0; margin: 6px 0; }
       .wa-rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-      .wa-rep-cell { text-align: center; padding: 6px 4px; background: rgba(255,255,255,.04); border-radius: 4px; }
-      .wa-enemy-blood { background: #c62828 !important; color: #fff !important; }
-      .wa-enemy-grudge { background: #e65100 !important; color: #fff !important; }
-      .wa-cat-bar { display: flex; gap: 6px; padding: 6px 12px; background: rgba(10, 15, 25, 0.4); border-bottom: 1px solid rgba(0, 240, 255, 0.15); overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
-      .wa-cat-btn { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); color: #aaa; border-radius: 12px; padding: 3px 10px; font-size: 11px; cursor: pointer; transition: all 0.15s ease; user-select: none; }
-      .wa-cat-btn:hover { background: rgba(0, 240, 255, 0.1); color: #fff; border-color: rgba(0, 240, 255, 0.4); }
-      .wa-cat-btn.active { background: rgba(0, 240, 255, 0.22); border-color: #00f0ff; color: #00f0ff; font-weight: bold; box-shadow: 0 0 8px rgba(0, 240, 255, 0.3); }
-      #wa-orb { touch-action: none; transition: transform 0.1s ease, box-shadow 0.2s ease; }
-      #wa-orb:active { transform: scale(0.94); cursor: grabbing; }
+      .wa-rep-cell { text-align: center; padding: 7px 5px; background: var(--wa-surface-1, rgba(255,255,255,.04)); border: 1px solid var(--wa-border-subtle, rgba(255,255,255,.07)); border-radius: 6px; font-size: 11.5px; }
+      .wa-enemy-blood { background: rgba(220,38,38,0.85) !important; color: #fff !important; }
+      .wa-enemy-grudge { background: rgba(217,119,6,0.85) !important; color: #fff !important; }
+      .wa-cat-bar { display: flex; gap: 4px; padding: 6px 10px; background: rgba(9, 12, 16, 0.65); border-bottom: 1px solid rgba(255, 255, 255, 0.08); overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+      .wa-cat-btn { background: transparent; border: 1px solid transparent; color: #9aa7b5; border-radius: 6px; padding: 3px 8px; font-size: 11.5px; font-weight: 500; cursor: pointer; transition: all 0.18s ease; user-select: none; }
+      .wa-cat-btn:hover { background: rgba(255, 255, 255, 0.04); color: #e6edf3; }
+      .wa-cat-btn.active { background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.38); color: #38bdf8; font-weight: 600; }
+      #wa-orb { touch-action: none; transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease; }
+      #wa-orb:active { transform: scale(0.95); cursor: grabbing; }
     `;
     try {
       const el = mainDoc.createElement('style');
@@ -14427,10 +14427,10 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       orbEl.style.bottom = 'auto';
     });
     const onUp = e => {
-      if (!drag) return;
+      const wasDrag = drag;
       drag = false;
-      if (orbEl.releasePointerCapture) try { orbEl.releasePointerCapture(e.pointerId); } catch (err) {}
-      if (moved) {
+      if (orbEl.releasePointerCapture && e && e.pointerId) try { orbEl.releasePointerCapture(e.pointerId); } catch (err) {}
+      if (wasDrag && moved) {
         const r = orbEl.getBoundingClientRect();
         __orbPos = { x: Math.round(r.left), y: Math.round(r.top) };
         __persistPanel();
