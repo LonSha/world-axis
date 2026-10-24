@@ -44,11 +44,11 @@
   /**
    * 当前场景摘要：按实际状态聚合相关人物、地点、待处理变化和可采取行动。
    * 不复制上一场快照，每帧实时读取。
+   * 严格按真实物理地点过滤在场人，途中旅行人员不冒充在场。
    */
   function currentScene(opts) {
     var o = opts || {};
     var s = state();
-
     // 场景标签（story label）
     var label = '';
     if (WA.playtime && typeof WA.playtime.story === 'function') {
@@ -56,23 +56,55 @@
     }
     if (!label && s.clock) label = clean(s.clock.label, 40);
 
-    // 在场人物：从 people 中取最近活跃的（只取名字）
+    // 当前地点：优先入参，次从 region 取
+    var place = clean(o.place || (s.region && s.region.currentPlace) || '', 60);
+
+    // 在场人物：根据物理地点与旅行状态真实过滤
     var present = [];
     if (s.people) {
-      var keys = Object.keys(s.people).slice(0, 6);
-      present = keys.map(function (k) { return clean(k.replace(/^p_/, ''), 40); });
+      var keys = Object.keys(s.people);
+      var matched = [];
+      for (var pi = 0; pi < keys.length; pi++) {
+        var k = keys[pi];
+        var p = s.people[k];
+        if (!p) continue;
+        var pname = clean(p.name || k.replace(/^p_/, ''), 40);
+        var pst = clean(p.status || p.action || '', 30);
+        var ploc = clean(p.location || p.place || '', 60);
+
+        // 旅行在途中人员绝不在当前地点现场
+        if (pst === 'traveling' || pst === 'on_the_road' || pst === 'transit') continue;
+
+        // 若指定了具体地点且人物有明确地点，核对是否匹配
+        if (place && ploc && ploc !== place) continue;
+
+        matched.push(pname);
+      }
+      if (matched.length > 0 || place) {
+        present = matched.slice(0, 8);
+      } else {
+        // 无地点约束时的向后兼容兜底
+        present = keys.slice(0, 6).map(function (k) { return clean(k.replace(/^p_/, ''), 40); });
+      }
     }
 
-    // 当前地点：从 region 取
-    var place = '';
-    if (s.region && s.region.currentPlace) place = clean(s.region.currentPlace, 40);
-
     // 待处理变化：从 causal chains 取 pending/delayed
+    var viewer = clean(o.who || o.viewer, 40);
     var pending = [];
     var chains = ((s.causal || {}).chains) || [];
     if (Array.isArray(chains)) {
       pending = chains.filter(function (c) {
-        return c && (clean(c.stage || c.status, 20) === 'pending' || clean(c.stage || c.status, 20) === 'delayed');
+        if (!c) return false;
+        var st = clean(c.stage || c.status, 20);
+        if (st !== 'pending' && st !== 'delayed') return false;
+        // 若有明确观察者，只呈现与该人相关或发生在当前地点的变化
+        if (viewer) {
+          var aff = Array.isArray(c.affected) ? c.affected : (c.who ? [c.who] : []);
+          var isRelated = aff.indexOf(viewer) >= 0 || aff.indexOf('p_' + viewer) >= 0;
+          var isAtPlace = place && c.place && clean(c.place, 60) === place;
+          if (!isRelated && !isAtPlace && !c.public) return false;
+        }
+        return true;
       }).map(function (c) {
         return {
           id: clean(c.id, 40),
@@ -172,37 +204,81 @@
 
   /**
    * 从一个起点（物品/地点/决定）追溯已证因果链。
-   * 只走已结算的 causal chains，不凭空推断。
+   * 走已结算的 causal chains 与关联的真实设施、生产、共同体履约记录，不凭空推断。
    */
-  function traceFrom(seed) {
+  function traceFrom(seed, opts) {
     var key = clean(seed, 60);
     if (!key) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
-
     var s = state();
-    var chains = ((s.causal || {}).chains) || [];
-    if (!Array.isArray(chains)) { return { ok: true, traces: [], count: 0, note: '无因果链数据' }; }
-
-    // 匹配：chain 的 id/title/key/id 包含种子，或 refs 包含种子
     var matched = [];
-    chains.forEach(function (c) {
-      if (!c) return;
-      var title = clean(c.title || c.key || c.id, 60);
-      var id = clean(c.id, 40);
-      var refs = Array.isArray(c.refs) ? c.refs : [];
-      if (id.indexOf(key) >= 0 || title.indexOf(key) >= 0 || refs.indexOf(key) >= 0) {
-        matched.push({
-          ref: 'cau:' + id,
-          title: title,
-          stage: clean(c.stage || c.status, 20),
-          summary: clean(c.summary || c.note || '', 80),
-          action: clean(c.action || '', 60),
-          immediate: clean(c.immediate || c.consequence || '', 80),
-          refs: refs.slice(0, 4),
-          at: num(c.at) || num(c.settledAt) || 0,
-          settled: (clean(c.stage || c.status, 20) === 'settled' || clean(c.stage || c.status, 20) === 'terminal')
-        });
-      }
-    });
+
+    // 1. 优先检索因果链（causal chains）
+    var chains = ((s.causal || {}).chains) || [];
+    if (Array.isArray(chains)) {
+      chains.forEach(function (c) {
+        if (!c) return;
+        var title = clean(c.title || c.key || c.id, 60);
+        var id = clean(c.id, 40);
+        var refs = Array.isArray(c.refs) ? c.refs : [];
+        if (id.indexOf(key) >= 0 || title.indexOf(key) >= 0 || refs.indexOf(key) >= 0) {
+          matched.push({
+            ref: 'cau:' + id,
+            title: title,
+            stage: clean(c.stage || c.status, 20),
+            summary: clean(c.summary || c.note || '', 80),
+            action: clean(c.action || '', 60),
+            immediate: clean(c.immediate || c.consequence || '', 80),
+            refs: refs.slice(0, 4),
+            at: num(c.at) || num(c.settledAt) || 0,
+            settled: (clean(c.stage || c.status, 20) === 'settled' || clean(c.stage || c.status, 20) === 'terminal'),
+            source: 'causal'
+          });
+        }
+      });
+    }
+
+    // 2. 跨模块业务实体真实因果追溯
+    // 设施 (serviceNetwork)
+    if (s.serviceNetwork && Array.isArray(s.serviceNetwork.facilities)) {
+      s.serviceNetwork.facilities.forEach(function (fac) {
+        if (!fac) return;
+        if (fac.id === key || fac.name === key || (fac.id && fac.id.indexOf(key) >= 0)) {
+          matched.push({
+            ref: 'fac:' + fac.id,
+            title: '设施: ' + fac.name,
+            stage: fac.status,
+            summary: '状态: ' + fac.status + ', 负载: ' + fac.load + '/' + fac.capacity,
+            action: fac.status === 'operational' ? '正常运营' : '维护/降级',
+            immediate: fac.status === 'degraded' ? '服务降级容量折半' : '已恢复服务',
+            refs: [fac.placeId],
+            at: fac.lastMaintained || fac.createdAt || 0,
+            settled: fac.status === 'operational',
+            source: 'serviceNetwork'
+          });
+        }
+      });
+    }
+
+    // 工单 (production)
+    if (s.production && Array.isArray(s.production.orders)) {
+      s.production.orders.forEach(function (ord) {
+        if (!ord) return;
+        if (ord.id === key || ord.name === key || (ord.id && ord.id.indexOf(key) >= 0)) {
+          matched.push({
+            ref: 'ord:' + ord.id,
+            title: '工单: ' + (ord.recipe || ord.id),
+            stage: ord.status,
+            summary: '进度: ' + ord.progress + '/' + ord.days + ', 待交: ' + ord.qty,
+            action: ord.status === 'completed' ? '交付完结' : '在产推进',
+            immediate: ord.deferred ? '曾发生延期' : '按期交付',
+            refs: [ord.who, ord.place],
+            at: ord.updatedAt || ord.createdAt || 0,
+            settled: ord.status === 'completed' || ord.status === 'delivered',
+            source: 'production'
+          });
+        }
+      });
+    }
 
     matched.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
     _stat.traces++;
@@ -217,11 +293,13 @@
 
   /**
    * 场外变化经实际感知/传讯进入当前视角。
-   * 只呈现主角已感知或已收到的变化，不泄露场外秘密。
+   * 严格保护局部知情：只呈现主角已目击或通过信使/回执已获知的场外变化，不泄露远方秘密。
    */
-  function perceivedHorizon(who) {
+  function perceivedHorizon(who, opts) {
     var person = clean(who, 40);
+    var o = opts || {};
     var s = state();
+    var isAllKnowing = (o.allKnowing === true) || person === 'author' || person === 'narrator' || !person;
 
     // 从 noesis state 取该人物已感知的事实
     var items = [];
@@ -240,10 +318,24 @@
       };
     });
 
-    // 从 chronicle 取 horizon（远方）且该人物可见的
+    // 从 chronicle 取 horizon（远方）事件
     var chron = Array.isArray(s.chronicle) ? s.chronicle : [];
+    var pRecord = s.people ? (s.people['p_' + person] || s.people[person]) : null;
+
     var horizon = chron.filter(function (c) {
-      return c && c.horizon && clean(c.visibility, 20) !== 'hidden';
+      if (!c || !c.horizon || clean(c.visibility, 20) === 'hidden') return false;
+      if (isAllKnowing) return true;
+
+      // 角色模式：必须有真实的知情/传讯凭据（通知、目击、涉事引用或收件箱）
+      var isRecipient = Array.isArray(c.recipients) && (c.recipients.indexOf(person) >= 0 || c.recipients.indexOf('p_' + person) >= 0);
+      var isWitness = Array.isArray(c.witnesses) && (c.witnesses.indexOf(person) >= 0 || c.witnesses.indexOf('p_' + person) >= 0);
+      var isRef = Array.isArray(c.refs) && (c.refs.indexOf(person) >= 0 || c.refs.indexOf('p_' + person) >= 0);
+      var inInbox = pRecord && Array.isArray(pRecord.inbox) && pRecord.inbox.some(function (m) {
+        return m && (m.id === c.id || m.ref === c.id || m.topic === c.id);
+      });
+      var inFacts = !!(facts && (facts[c.id] || facts[c.title]));
+
+      return isRecipient || isWitness || isRef || inInbox || inFacts;
     }).slice(0, 4).map(function (c) {
       return {
         ref: clean(c.id, 40),
@@ -252,10 +344,10 @@
         at: num(c.at) || 0
       };
     });
-
     return {
       ok: true,
       who: person,
+      isAllKnowing: isAllKnowing,
       perceivedItems: items,
       horizonEvents: horizon,
       note: '场外变化只经实际感知/传讯进入视角；未收到的消息不出现'

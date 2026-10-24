@@ -5700,3 +5700,28 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
   - `tests/test-wp-a2-integration.js` (5/5 PASS)
   - `tests/test-wp-a3-integration.js` (4/4 PASS)
   - 联合历史 12 套专锁（EXP12-24）全绿通过。代码库零外部依赖，严格维护单一真源持久化规范。
+
+### R-WP-B2-20261024 · B包第2阶段切片（场景可知因果、有边界互惠与有限担保、社会先例与制度采纳）
+- 做了：
+  1. `engines/scene-narrative.js`（WP-8 场景可知因果与局部知情呈现）：
+     - 重构 `currentScene(opts)`：基于真实物理地点过滤在场人，途中旅行人员绝不冒充现场；过滤与场景或当事人相关的待处理状态变更，杜绝远方无知情事件穿透。
+     - 重构 `traceFrom(seed, opts)`：打通跨因果链（`aftermathImpact`）、设施网络（`serviceNetwork.log` 维护记录）与生产工单真实历史实体的引用反查，给出真实可信的物理因果树。
+     - 重构 `perceivedHorizon(who, opts)`：区分作者全知模式与角色局部视角，角色视界严格限制为亲历、同地目击、涉事引用或送达信箱的消息，杜绝 NPC 虚假全知感知。
+  2. `engines/custom-lax.js`（WX-3 有边界互惠与有限担保、WX-4 社会先例与制度演化）：
+     - 确立社会先例 `establishPrecedent(spec)`：登记先例裁决情境事实、组织边界、地点与适用条件。
+     - 先例评估比对 `evaluatePrecedent(precedentId, caseFacts)`：严格比对地点、组织与情境条件，失配时指出明确的区分维度（`place-mismatch`、`org-mismatch`、`condition-mismatch`），杜绝机械套用。
+     - 先例规则采纳 `adoptRuleFromPrecedent(precedentId, opts)`：将有效先例升格为正式制度规则，并在先例记录中双向标明已采纳（`adopted`）。
+     - 人情账簿登记 `recordFavor(spec)` 与结算 `settleFavor(favorId, outcome)`：支持违约失信标记（`brokenTrust`）。
+     - 求助权衡机制 `requestAid(spec)`：被求助人在途或繁忙且无前序人情时正当拒绝（不记过），繁忙但有人情欠款时协商缩量履行（`scaled_down`），空闲时履约清结人情。
+     - 有限第三方担保 `provideGuarantee(spec)` 与封顶追索 `claimGuarantee(guaranteeId, breachAmount)`：设立担保金额上限，追索赔付严格封顶于承诺额度，超出部分自负亏空，彻底避免无限连带债务。
+  3. `engines/action-desk.js`：
+     - 在全局行动桌完成 8 个新动作路由挂接：`customLax.establishPrecedent`、`customLax.evaluatePrecedent`、`customLax.adoptRuleFromPrecedent`、`customLax.recordFavor`、`customLax.requestAid`、`customLax.provideGuarantee`、`customLax.claimGuarantee` 与 `customLax.settleFavor`。
+  4. `tests/test-wp-b2-integration.js`：
+     - 新建综合集成门禁测试套件，全面覆盖物理在场过滤与真实因果追溯、场外消息未送达严格隔离、互惠事实改变求助条件与有限担保封顶追索、社会先例差异化拒绝套用与规则采纳、跨会话重载持久化等 5 大核心场景（5/5 全绿）。
+- 验证：
+  - `tests/test-wp-b2-integration.js` (5/5 PASS)
+  - `tests/test-wp-b1-integration.js` (5/5 PASS)
+  - `tests/test-wp-a3-integration.js` (4/4 PASS)
+  - `tests/test-wp-a2-integration.js` (5/5 PASS)
+  - `tests/test-wp-a1-integration.js` (6/6 PASS)
+  - 联合历史全部 12 套专锁（EXP10-24）全绿通过。零外部依赖，严格遵循单一真源持久化规范。

@@ -339,6 +339,418 @@
     return { ok: true, rules: rules, count: rules.length };
   }
 
+  /**
+   * 确立可引用的地方社会先例（WX-4）。
+   * 记录裁决事实、组织与地点边界、情境条件，与日常闲聊区分。
+   */
+  function establishPrecedent(spec) {
+    var s = spec || {};
+    var title = clean(s.title, 80);
+    var orgId = clean(s.orgId, 60);
+    var placeId = clean(s.placeId, 60);
+    var sourceCaseId = clean(s.sourceCaseId, 80);
+    var ruling = clean(s.ruling, 120);
+    var by = clean(s.by, 40);
+    if (!title || !ruling || !by) {
+      return { ok: false, reason: 'missing-fields' };
+    }
+    var conditions = (s.conditions && typeof s.conditions === 'object') ? JSON.parse(JSON.stringify(s.conditions)) : {};
+
+    var entry = {
+      id: 'prec_' + now() + '_' + WA.rand.id(),
+      title: title,
+      orgId: orgId,
+      placeId: placeId,
+      sourceCaseId: sourceCaseId,
+      conditions: conditions,
+      ruling: ruling,
+      establishedBy: by,
+      status: 'active',
+      at: now()
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || { candidates: [], rules: [], reviews: [], precedents: [] };
+        d.customLax.precedents = d.customLax.precedents || [];
+        d.customLax.precedents.push(entry);
+        return true;
+      }, 'customLax:establishPrecedent');
+    }
+
+    return { ok: true, precedent: entry };
+  }
+
+  /**
+   * 评估并比对先例适用性（WX-4）。
+   * 严防机械套用：关键条件或地域失配时如实指出实质区别（distinction）。
+   */
+  function evaluatePrecedent(precedentId, caseFacts) {
+    var pid = clean(precedentId, 60);
+    var facts = caseFacts || {};
+    var bk = ensureBucket();
+    var precs = (bk.precedents || []);
+    var p = precs.filter(function (x) { return x && x.id === pid; })[0];
+    if (!p) return { ok: false, reason: 'precedent-not-found' };
+
+    // 1. 地点/地区边界检查（不可无声扩大到全世界）
+    if (p.placeId && facts.placeId && clean(facts.placeId, 60) !== p.placeId) {
+      return {
+        ok: true,
+        applicable: false,
+        precedentId: pid,
+        distinction: 'place-mismatch',
+        reason: '地域不符：该先例仅在【' + p.placeId + '】适用，不可跨地无声扩大',
+        precedent: p
+      };
+    }
+
+    // 2. 组织范围检查
+    if (p.orgId && facts.orgId && clean(facts.orgId, 60) !== p.orgId) {
+      return {
+        ok: true,
+        applicable: false,
+        precedentId: pid,
+        distinction: 'org-mismatch',
+        reason: '组织不符：该先例仅在组织【' + p.orgId + '】适用',
+        precedent: p
+      };
+    }
+
+    // 3. 关键情境条件严密比对
+    var condKeys = Object.keys(p.conditions || {});
+    for (var i = 0; i < condKeys.length; i++) {
+      var k = condKeys[i];
+      var expVal = p.conditions[k];
+      var actVal = facts[k];
+      if (actVal !== expVal) {
+        return {
+          ok: true,
+          applicable: false,
+          precedentId: pid,
+          distinction: 'condition-mismatch:' + k,
+          expected: expVal,
+          actual: actVal,
+          reason: '情境条件不符：' + k + ' 预期为 ' + expVal + '，当前为 ' + actVal + '，不可机械套用',
+          precedent: p
+        };
+      }
+    }
+
+    return {
+      ok: true,
+      applicable: true,
+      precedentId: pid,
+      recommendation: p.ruling,
+      precedent: p,
+      note: '情境条件与管辖地域完全吻合，建议沿用先例'
+    };
+  }
+
+  /**
+   * 将成熟先例正式采纳升格为组织制度规则（WX-4）。
+   */
+  function adoptRuleFromPrecedent(precedentId, opts) {
+    var pid = clean(precedentId, 60);
+    var o = opts || {};
+    var by = clean(o.by, 40);
+    if (!pid || !by) return { ok: false, reason: 'missing-fields' };
+
+    var bk = ensureBucket();
+    var p = (bk.precedents || []).filter(function (x) { return x && x.id === pid; })[0];
+    if (!p) return { ok: false, reason: 'precedent-not-found' };
+
+    var ruleType = clean(o.ruleType || 'slot-booking', 30);
+    var rule = {
+      id: 'rule_' + now() + '_' + WA.rand.id(),
+      orgId: p.orgId || clean(o.orgId, 60) || 'default-org',
+      ruleType: ruleType,
+      sourcePrecedentId: pid,
+      sourceEventId: p.sourceCaseId || pid,
+      summary: p.title + ': ' + p.ruling,
+      scope: p.placeId || p.orgId || 'local',
+      adoptedBy: by,
+      status: 'active',
+      enactedAt: now(),
+      revisedAt: 0,
+      revokedAt: 0
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || { candidates: [], rules: [], reviews: [], precedents: [] };
+        d.customLax.rules.push(rule);
+        return true;
+      }, 'customLax:adoptRuleFromPrecedent');
+    }
+
+    return { ok: true, rule: rule, fromPrecedent: p };
+  }
+
+  /**
+   * 查询可用先例列表
+   */
+  function listPrecedents(filter) {
+    var bk = ensureBucket();
+    var list = (bk.precedents || []).filter(function (p) {
+      if (!p || p.status !== 'active') return false;
+      if (filter && filter.placeId && p.placeId && p.placeId !== filter.placeId) return false;
+      if (filter && filter.orgId && p.orgId && p.orgId !== filter.orgId) return false;
+      return true;
+    });
+    return { ok: true, precedents: list, count: list.length };
+  }
+
+  /**
+   * 记录人情互惠事实（WX-3）。
+   * 区分期待回报的人情事实与无偿志愿。
+   */
+  function recordFavor(spec) {
+    var s = spec || {};
+    var fromWho = clean(s.fromWho, 40);
+    var toWho = clean(s.toWho, 40);
+    var task = clean(s.task, 80);
+    if (!fromWho || !toWho || !task) {
+      return { ok: false, reason: 'missing-fields' };
+    }
+    var expectation = (s.expectation !== false);
+    var scope = clean(s.scope || 'general', 40);
+    var entry = {
+      id: 'fvr_' + now() + '_' + WA.rand.id(),
+      fromWho: fromWho,
+      toWho: toWho,
+      task: task,
+      scope: scope,
+      expectation: expectation,
+      details: clean(s.details || '', 120),
+      status: 'active',
+      at: now()
+    };
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || {};
+        d.customLax.favors = d.customLax.favors || [];
+        d.customLax.favors.push(entry);
+        return true;
+      }, 'customLax:recordFavor');
+    }
+    return { ok: true, favor: entry };
+  }
+
+  /**
+   * 发起求助并基于互惠历史与现实约束权衡（WX-3）。
+   * 结果包括：答应 (accepted)、缩量 (scaled_down)、正当拒绝 (refused)。
+   */
+  function requestAid(spec) {
+    var s = spec || {};
+    var who = clean(s.who, 40);
+    var targetWho = clean(s.targetWho, 40);
+    var need = s.need || {};
+    var kind = clean(need.kind || 'labor', 30);
+    var amount = num(need.amount) || 1;
+    if (!who || !targetWho) {
+      return { ok: false, reason: 'missing-fields' };
+    }
+
+    var st = state();
+    // 1. 检查被求助人是否在途旅行
+    var pRecord = st.people ? (st.people['p_' + targetWho] || st.people[targetWho]) : null;
+    if (pRecord) {
+      var pst = clean(pRecord.status || pRecord.action || '', 30);
+      if (pst === 'traveling' || pst === 'on_the_road' || pst === 'transit') {
+        return {
+          ok: true,
+          outcome: 'refused',
+          reason: 'target-traveling',
+          note: '对方远行在途，无法分身提供现场帮助（正当拒绝不记过）'
+        };
+      }
+    }
+
+    // 2. 检查被求助人日程冲突
+    var isBusy = false;
+    if (WA.laborSchedule && typeof WA.laborSchedule.view === 'function' && need.slot) {
+      var sched = WA.laborSchedule.view({ who: targetWho, day: need.day || 1 });
+      if (sched && sched.ok && Array.isArray(sched.bookings)) {
+        isBusy = sched.bookings.some(function (b) { return b && b.slot === need.slot; });
+      }
+    }
+
+    // 3. 检查双方未结清的人情历史
+    var bk = ensureBucket();
+    var favors = (bk.favors || []).filter(function (f) {
+      return f && f.fromWho === who && f.toWho === targetWho && f.status === 'active' && f.expectation;
+    });
+    var hasPastFavor = favors.length > 0;
+
+    // 4. 权衡响应
+    if (isBusy && !hasPastFavor) {
+      return {
+        ok: true,
+        outcome: 'refused',
+        reason: 'schedule-busy',
+        note: '对方排班已满，且无前序人情欠款，正当拒绝协助（不扣好感）'
+      };
+    }
+
+    if (isBusy && hasPastFavor) {
+      // 念及往日恩情，虽繁忙仍愿意缩量履行部分责任
+      var scaled = Math.max(1, Math.floor(amount * 0.5));
+      return {
+        ok: true,
+        outcome: 'scaled_down',
+        requestedAmount: amount,
+        offeredAmount: scaled,
+        favorReferenced: favors[0].id,
+        note: '对方自身繁忙，但念及往日帮助，协商缩量履行部分协助'
+      };
+    }
+
+    // 正常接受
+    var consumedFavor = hasPastFavor ? favors[0].id : null;
+    return {
+      ok: true,
+      outcome: 'accepted',
+      offeredAmount: amount,
+      favorConsumed: consumedFavor,
+      note: hasPastFavor ? '双方存在互惠恩情，答应全额协助' : '双方关系良好，答应协助'
+    };
+  }
+
+  /**
+   * 提供有限第三方连带担保（WX-3）。
+   * 严守最大赔付上限，不连锁生成无限债务。
+   */
+  function provideGuarantee(spec) {
+    var s = spec || {};
+    var guarantor = clean(s.guarantor, 40);
+    var debtor = clean(s.debtor, 40);
+    var creditor = clean(s.creditor, 40);
+    var maxLiability = num(s.maxLiability);
+    if (!guarantor || !debtor || !creditor || maxLiability == null || maxLiability <= 0) {
+      return { ok: false, reason: 'missing-fields' };
+    }
+    if (guarantor === debtor) {
+      return { ok: false, reason: 'self-guarantee-invalid', note: '债务人不能为自己提供第三方担保' };
+    }
+
+    var entry = {
+      id: 'gua_' + now() + '_' + WA.rand.id(),
+      guarantor: guarantor,
+      debtor: debtor,
+      creditor: creditor,
+      maxLiability: maxLiability,
+      terms: clean(s.terms || '', 100),
+      deadlineDays: num(s.deadlineDays) || 30,
+      status: 'active',
+      claimedAmount: 0,
+      at: now()
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || {};
+        d.customLax.guarantees = d.customLax.guarantees || [];
+        d.customLax.guarantees.push(entry);
+        return true;
+      }, 'customLax:provideGuarantee');
+    }
+
+    return { ok: true, guarantee: entry };
+  }
+
+  /**
+   * 主张担保追索（WX-3）。
+   * 严格受限于 maxLiability，超出部分不予凭空追索。
+   */
+  function claimGuarantee(guaranteeId, breachAmount) {
+    var gid = clean(guaranteeId, 60);
+    var loss = num(breachAmount) || 0;
+    var bk = ensureBucket();
+    var g = (bk.guarantees || []).filter(function (x) { return x && x.id === gid; })[0];
+    if (!g) return { ok: false, reason: 'guarantee-not-found' };
+    if (g.status !== 'active') return { ok: false, reason: 'guarantee-not-active', status: g.status };
+
+    var actualClaimed = Math.min(loss, g.maxLiability);
+    var unrecoverable = Math.max(0, loss - g.maxLiability);
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        var x = (d.customLax.guarantees || []).filter(function (it) { return it && it.id === gid; })[0];
+        if (x) {
+          x.status = 'claimed';
+          x.claimedAmount = actualClaimed;
+          x.unrecoverableLoss = unrecoverable;
+          x.claimedAt = now();
+        }
+        return true;
+      }, 'customLax:claimGuarantee');
+    }
+
+    return {
+      ok: true,
+      guaranteeId: gid,
+      claimed: actualClaimed,
+      unrecoverable: unrecoverable,
+      liabilityCapped: loss > g.maxLiability,
+      note: loss > g.maxLiability ? '损失超出担保人承诺上限，差额 ' + unrecoverable + ' 依法自担，不无限追索' : '损失已在担保上限内全额受偿'
+    };
+  }
+
+  /**
+   * 结算人情（履行完毕或违约）（WX-3）。
+   */
+  function settleFavor(favorId, outcome) {
+    var fid = clean(favorId, 60);
+    var oc = clean(outcome, 20);
+    if (!fid || (oc !== 'fulfilled' && oc !== 'breached')) {
+      return { ok: false, reason: 'invalid-outcome', allowed: ['fulfilled', 'breached'] };
+    }
+    var bk = ensureBucket();
+    var f = (bk.favors || []).filter(function (x) { return x && x.id === fid; })[0];
+    if (!f) return { ok: false, reason: 'favor-not-found' };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        var x = (d.customLax.favors || []).filter(function (it) { return it && it.id === fid; })[0];
+        if (x) {
+          x.status = oc;
+          x.settledAt = now();
+        }
+        // 若违约，给受影响人记录失信
+        if (oc === 'breached') {
+          d.people = d.people || {};
+          var pkey = 'p_' + f.toWho;
+          if (d.people[pkey]) {
+            d.people[pkey].life = d.people[pkey].life || {};
+            d.people[pkey].life.brokenTrust = (d.people[pkey].life.brokenTrust || 0) + 1;
+          }
+        }
+        return true;
+      }, 'customLax:settleFavor');
+    }
+
+    return { ok: true, favorId: fid, outcome: oc };
+  }
+
+  /**
+   * 纯读查询人情账簿
+   */
+  function reciprocityLedger(who) {
+    var person = clean(who, 40);
+    var bk = ensureBucket();
+    var favorsGiven = (bk.favors || []).filter(function (f) { return f && f.fromWho === person; });
+    var favorsOwed = (bk.favors || []).filter(function (f) { return f && f.toWho === person; });
+    var guarantees = (bk.guarantees || []).filter(function (g) { return g && (g.guarantor === person || g.debtor === person); });
+    return {
+      ok: true,
+      who: person,
+      favorsGiven: favorsGiven,
+      favorsOwed: favorsOwed,
+      guarantees: guarantees
+    };
+  }
+
   WA.customLax = {
     spawnCandidate: spawnCandidate,
     submitToApproval: submitToApproval,
@@ -346,6 +758,16 @@
     registerDissatisfaction: registerDissatisfaction,
     reviewRule: reviewRule,
     activeRules: activeRules,
+    establishPrecedent: establishPrecedent,
+    evaluatePrecedent: evaluatePrecedent,
+    adoptRuleFromPrecedent: adoptRuleFromPrecedent,
+    listPrecedents: listPrecedents,
+    recordFavor: recordFavor,
+    requestAid: requestAid,
+    provideGuarantee: provideGuarantee,
+    claimGuarantee: claimGuarantee,
+    settleFavor: settleFavor,
+    reciprocityLedger: reciprocityLedger,
     RULE_TYPES: RULE_TYPES.slice(),
     STAGES: STAGES.slice()
   };
