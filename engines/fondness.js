@@ -321,6 +321,99 @@
     return out || { ok: false, reason: 'store-unavailable' };
   }
   /** 读一个人当前读数与区间名。未登记如实报 missing。 */
+  /**
+   * 多维情感力学更新 (月相系统 v3.0 EPRI 机制缝合)
+   * 支持肉体值 P、偏执值 I、阶段值 R，并维护冻结拉扯状态
+   */
+  function updateAffect(person, patch) {
+    const who = clean(person, 40);
+    if (!who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    if (!enabled()) return { ok: true, reason: 'disabled' };
+    patch = patch || {};
+    let out = null;
+    WA.store.transact(function (draft) {
+      const hit = findRow(draft, who);
+      if (!hit) { out = { ok: false, reason: 'missing', person: who }; return false; }
+      if (typeof patch.P === 'number') {
+        hit.pPhysique = Math.min(100, Math.max(-100, Math.round(patch.P)));
+      }
+      if (typeof patch.I === 'number') {
+        hit.iInvidia = Math.min(100, Math.max(0, Math.round(patch.I)));
+      }
+      if (typeof patch.R === 'number') {
+        hit.rStage = Math.min(5, Math.max(-5, Math.round(patch.R)));
+      }
+      const idx = Math.min(BANDS.length - 1, Math.max(bandIdxOf(hit.value), (typeof hit.auth === 'number' && hit.auth >= 0) ? hit.auth : 0));
+      const atTop = hit.value >= segTop(idx);
+      const isLocked = atTop && (hit.auth || 0) <= idx && idx < BANDS.length - 1;
+      hit.freezeTension = isLocked ? 'resistance-vs-attraction' : '';
+      out = {
+        ok: true,
+        person: who,
+        E: hit.value,
+        P: hit.pPhysique || 0,
+        R: hit.rStage || 0,
+        I: hit.iInvidia || 0,
+        gateLocked: isLocked,
+        freezeTension: hit.freezeTension,
+        invidiaActive: (hit.iInvidia || 0) >= 30,
+        epistemicSafe: true
+      };
+    }, 'fondness:updateAffect');
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 因果破门晋阶 (月相系统破门锁 + 防虚假白给硬凭据)
+   */
+  function unlockGate(person, eventData) {
+    const who = clean(person, 40);
+    if (!who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    if (!enabled()) return { ok: true, reason: 'disabled' };
+    eventData = eventData || {};
+    if (!eventData.proof && !eventData.eventId) {
+      noteFault('missing-gate-proof');
+      return { ok: false, reason: 'missing-gate-proof', hint: '解除阶段冻结锁必须提供实质性事件凭据（proof 或 eventId）' };
+    }
+    const adv = advance(who);
+    if (!adv.ok) return adv;
+    WA.store.transact(function (draft) {
+      const hit = findRow(draft, who);
+      if (hit) {
+        hit.freezeTension = '';
+        hit.rStage = Math.min(5, (hit.rStage || 0) + 1);
+        pushHist(hit, { kind: '因果破门', proof: eventData.proof || eventData.eventId, toStage: adv.stage });
+      }
+    }, 'fondness:unlockGate');
+    return Object.assign({}, adv, { gateUnlocked: true, proof: eventData.proof || eventData.eventId });
+  }
+
+  /** 读取多维情感全景视图 */
+  function readAffect(person) {
+    const who = clean(person, 40);
+    if (!who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    if (!settings().enabled) return { ok: true, person: who, E: 0, P: 0, R: 0, I: 0, reason: 'disabled' };
+    const hit = rows().filter(function (r) { return r && r.person === who; })[0];
+    if (!hit) { noteFault('missing'); return { ok: false, reason: 'missing', person: who }; }
+    const idx = Math.min(BANDS.length - 1, Math.max(bandIdxOf(hit.value), (typeof hit.auth === 'number' && hit.auth >= 0) ? hit.auth : 0));
+    const atTop = hit.value >= segTop(idx);
+    const isLocked = atTop && (hit.auth || 0) <= idx && idx < BANDS.length - 1;
+    return {
+      ok: true,
+      person: who,
+      E: hit.value,
+      P: hit.pPhysique || 0,
+      R: hit.rStage || 0,
+      I: hit.iInvidia || 0,
+      band: bandOf(hit.value).name,
+      gateLocked: isLocked,
+      freezeTension: hit.freezeTension || (isLocked ? 'resistance-vs-attraction' : ''),
+      invidiaActive: (hit.iInvidia || 0) >= 30,
+      epistemicSafe: true,
+      antiOmniscienceRule: '内心拉扯与防御属于私密心理状态，场外角色不得全知透视'
+    };
+  }
+
   function read(person) {
     const who = clean(person, 40);
     if (!who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
@@ -355,7 +448,7 @@
   }
   WA.fondness = {
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    apply: apply, propose: propose, accept: accept, reject: reject, undo: undo, correct: correct, advance: advance,
+    apply: apply, propose: propose, accept: accept, reject: reject, undo: undo, correct: correct, advance: advance, updateAffect: updateAffect, unlockGate: unlockGate, readAffect: readAffect,
     read: read, buildBlock: buildBlock, STEPS: STEPS.slice(), BANDS: BANDS.map(function (b) { return Object.assign({}, b); }),
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };

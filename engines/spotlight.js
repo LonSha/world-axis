@@ -135,6 +135,79 @@
     return { ok: true, threshold: th, rows: list };
   }
   /** 注入块：久缺 + 过热 + 均衡铁律（零 token：关闭或无档案时返回空串）。 */
+  /**
+   * 因果登场仲裁器 (FateLoom Director 缝合 + 防全知硬拦截)
+   * 支持场景词强命中登场与不在场痕迹（熟人/物品）轻提，防全知穿帮校验
+   */
+  function resolveIntervention(ctx) {
+    const cfg = settings();
+    if (!cfg.enabled) return { ok: true, reason: 'disabled' };
+    ctx = ctx || {};
+    if (ctx.busy) {
+      return { ok: true, action: 'skip', reason: 'busy-scene', note: '当前场景在激烈冲突中，避让强插人员' };
+    }
+    const idleList = idle(cfg.idleThreshold).rows || [];
+    if (!idleList.length) {
+      return { ok: true, action: 'none', reason: 'no-idle-characters' };
+    }
+    const inScene = Array.isArray(ctx.inScene) ? ctx.inScene : [];
+    const eligible = idleList.filter(function (r) { return inScene.indexOf(r.who) < 0; });
+    if (!eligible.length) {
+      return { ok: true, action: 'none', reason: 'all-idle-in-scene' };
+    }
+    const target = eligible[0];
+    const who = target.who;
+    const scenes = (ctx.registeredScenes && Array.isArray(ctx.registeredScenes[who])) ? ctx.registeredScenes[who] : [];
+    const currLoc = String(ctx.currentLocation || '').trim();
+
+    // 1. 强介入：场景词命中
+    const sceneHit = currLoc && scenes.some(function (s) { return s && currLoc.indexOf(s) >= 0; });
+    if (sceneHit) {
+      return {
+        ok: true,
+        action: 'scene-hit-entry',
+        target: who,
+        missed: target.missed,
+        location: currLoc,
+        cue: '角色在其常驻活动圈内自然现身',
+        epistemicSafe: true
+      };
+    }
+
+    // 2. 弱介入：轻提 (Presence Trace)
+    const rels = (ctx.relations && Array.isArray(ctx.relations[who])) ? ctx.relations[who] : [];
+    const presentAcquaintances = inScene.filter(function (p) { return rels.indexOf(p) >= 0; });
+
+    // 防全知硬拦截：若外部指定了提及者，但他与目标角色并无认知/社交确凿交集，拒收
+    if (ctx.mentioner && rels.indexOf(ctx.mentioner) < 0) {
+      noteFault('epistemic-leak-blocked');
+      return {
+        ok: false,
+        reason: 'epistemic-leak-blocked',
+        target: who,
+        mentioner: ctx.mentioner,
+        note: '在场提及者与目标角色无确立认知/人际关系，拒绝生成穿帮轻提'
+      };
+    }
+
+    const traces = (ctx.registeredTraces && ctx.registeredTraces[who]) || {};
+    const items = Array.isArray(traces.items) ? traces.items : [];
+    const cue = presentAcquaintances.length > 0
+      ? '不让他本人出场，可由在场的熟人（' + presentAcquaintances.join('、') + '）顺口带一句'
+      : (items.length > 0 ? '不让他本人出场，仅呈现其遗留痕迹（' + items[0] + '）' : '保持场外，不强行插入');
+
+    return {
+      ok: true,
+      action: 'presence-trace',
+      target: who,
+      missed: target.missed,
+      allowedSpeakers: presentAcquaintances.slice(),
+      itemTrace: items[0] || null,
+      cue: cue,
+      epistemicSafe: true
+    };
+  }
+
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const all = rows();
@@ -151,7 +224,7 @@
   }
   WA.spotlight = {
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    note: note, seal: seal, report: report, idle: idle, buildBlock: buildBlock,
+    note: note, seal: seal, report: report, idle: idle, resolveIntervention: resolveIntervention, buildBlock: buildBlock,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

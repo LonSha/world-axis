@@ -49,6 +49,105 @@
         return { ok: true, text: trimmed, injectable: '<npc_observation name="' + name + '">\n' + trimmed + '\n</npc_observation>' };
       }
       return { ok: true, text: trimmed };
+    },
+
+    /**
+     * 正文衍生人物探测器 (FateLoom Detection 机制缝合)
+     * 从正文切片提取有动作/台词的潜在建档角色
+     */
+    detectCandidates(sliceText, options) {
+      options = options || {};
+      const text = String(sliceText || '').trim();
+      if (!text) return { ok: true, candidates: [] };
+      const exclude = Array.isArray(options.excludeNames) ? options.excludeNames.slice() : [];
+      const KNOWN_IGNORE = ['路人', '众人', '有人', '行人', '旁人', '大家', '士兵们', '人群', '对方', '村民们'];
+      exclude.forEach(n => { if (n) KNOWN_IGNORE.push(n); });
+
+      const candidates = [];
+      // 常见称谓/动作捕捉正则
+      const lines = text.split('\n');
+      lines.forEach(line => {
+        const str = line.trim();
+        // 匹配：“那个店员端来热水”、“老太太叹了口气说…”、“药铺伙计抬起头”
+        const m = str.match(/(?:那位|一位|某个|身旁的|林中)?([\u4e00-\u9fa5]{2,6}?)(?:端着|走来|走上前|叹息|皱眉|打量|低声说道|喊道|冷笑|说道|笑道|问道|回答|抬眼|开口)/);
+        if (m && m[1]) {
+          const rawName = m[1].replace(/^(那个|一位|某个|身旁的)/, '').trim();
+          if (rawName && rawName.length >= 2 && rawName.length <= 8 && KNOWN_IGNORE.indexOf(rawName) < 0) {
+            if (!candidates.some(c => c.name === rawName)) {
+              candidates.push({
+                name: rawName,
+                context: str.slice(0, 100),
+                unnamed: /店员|伙计|老太太|大爷|老板|掌柜|守卫|巡捕|随从|老者|少女|少妇|车夫/.test(rawName),
+                confidence: 'high'
+              });
+            }
+          }
+        }
+      });
+      return { ok: true, candidates: candidates };
+    },
+
+    /**
+     * 衍生角色非孤立转正纳管 (FateLoom 4+1规范 + 非孤立硬约束 + 防全知认知隔离)
+     */
+    enrollCandidate(candidateData) {
+      candidateData = candidateData || {};
+      const name = String(candidateData.name || '').trim();
+      if (!name) return { ok: false, reason: 'bad-candidate-name' };
+
+      const relUser = String(candidateData.rel_user || '').trim();
+      if (!relUser || /^(陌生人|路人|无关系|路过|毫无关系)$/.test(relUser)) {
+        return { ok: false, reason: 'bad-user-relation', hint: '与玩家关系必须具体，严禁填陌生人或无关系' };
+      }
+
+      const relAnchor = String(candidateData.rel_anchor || '').trim();
+      if (!relAnchor) {
+        return { ok: false, reason: 'missing-anchor-relation', hint: '必须锚定已在册的现存角色，严禁孤立角色' };
+      }
+
+      const s = WA.store && WA.store.get ? WA.store.get() : {};
+      const people = (s && s.people) || {};
+      // 验证锚定角色真实存在
+      const anchorExists = !!people['p_' + relAnchor] || Object.keys(people).some(k => k === relAnchor || k === 'p_' + relAnchor);
+      if (!anchorExists && !candidateData.skipAnchorCheck) {
+        return { ok: false, reason: 'anchor-not-found', anchor: relAnchor };
+      }
+
+      let out = null;
+      if (WA.store && WA.store.transact) {
+        WA.store.transact(function (draft) {
+          draft.people = draft.people || {};
+          const pKey = 'p_' + name;
+          draft.people[pKey] = {
+            id: pKey,
+            name: name,
+            location: candidateData.location || '未知',
+            rel_user: relUser,
+            rel_anchor: relAnchor,
+            profile: candidateData.profile || {},
+            nsfwProfile: candidateData.nsfwProfile || null,
+            hooks: Array.isArray(candidateData.hooks) ? candidateData.hooks : [],
+            knowledge: {
+              public_context: { status: 'observed', route: 'scene_witness' }
+            },
+            epistemicBoundary: {
+              isolated: true,
+              prohibitOmniscience: true,
+              rule: '新转正角色仅持有本人目击范围事实，禁止读取场外全知信息'
+            },
+            enrolledAt: Date.now()
+          };
+          out = {
+            ok: true,
+            person: name,
+            id: pKey,
+            rel_user: relUser,
+            rel_anchor: relAnchor,
+            epistemicSafe: true
+          };
+        }, 'observe:enrollCandidate');
+      }
+      return out || { ok: false, reason: 'store-unavailable' };
     }
   };
 })();

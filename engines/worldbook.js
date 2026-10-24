@@ -265,10 +265,98 @@ ${content}`;
     }
   }
 
+  // ── FateLoom 指纹冲突防护与单条目增量 Oplog ────────────────
+  const fingerprints = new Map();
+  const oplog = [];
+
+  function hashContent(text) {
+    const s = String(text || '');
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) - h) + s.charCodeAt(i);
+      h |= 0;
+    }
+    return 'h_' + (h >>> 0).toString(16);
+  }
+
+  function rememberFingerprint(entryId, content) {
+    fingerprints.set(String(entryId), hashContent(content));
+  }
+
+  function isHandEdited(entryId, currentContent) {
+    const id = String(entryId);
+    if (!fingerprints.has(id)) return false;
+    const known = fingerprints.get(id);
+    const curr = hashContent(currentContent);
+    return known !== curr;
+  }
+
+  function safeUpdateEntry(entryId, newContent, options) {
+    options = options || {};
+    const id = String(entryId);
+    const hit = cachedEntries.find(e => String(e.id) === id);
+    if (!hit) return { ok: false, reason: 'entry-not-found', entryId: id };
+
+    if (isHandEdited(id, hit.content) && !options.force) {
+      return {
+        ok: false,
+        reason: 'hand-edited-conflict',
+        entryId: id,
+        hint: '条目内容已被外部手动修改，拒绝静默覆盖（需 force: true）'
+      };
+    }
+
+    const old = hit.content;
+    const nextText = String(newContent || '');
+    hit.content = nextText;
+    rememberFingerprint(id, nextText);
+
+    oplog.push({
+      op: 'update',
+      entryId: id,
+      oldContent: old,
+      newContent: nextText,
+      at: clockNow('worldbook')
+    });
+    if (oplog.length > 50) oplog.shift();
+
+    return {
+      ok: true,
+      entryId: id,
+      newHash: hashContent(nextText),
+      oplogCount: oplog.length
+    };
+  }
+
+  function rollbackLastOp() {
+    if (!oplog.length) return { ok: false, reason: 'empty-oplog' };
+    const last = oplog.pop();
+    if (last.op === 'update') {
+      const hit = cachedEntries.find(e => String(e.id) === last.entryId);
+      if (hit) {
+        hit.content = last.oldContent;
+        rememberFingerprint(last.entryId, last.oldContent);
+        return {
+          ok: true,
+          rolledBack: true,
+          entryId: last.entryId,
+          restoredContent: last.oldContent
+        };
+      }
+      return { ok: false, reason: 'target-entry-missing-on-rollback', entryId: last.entryId };
+    }
+    return { ok: false, reason: 'unknown-op' };
+  }
+
+  function getOplog() {
+    return oplog.slice();
+  }
+
   WA.worldbook = {
     hasSelection, getSelectedIds, getOverrides, saveSelectedIds, saveSelection,
     loadCurrentEntries, buildPromptSection, triggerEnabled,
     isEntryActive, activationOf, matchKey,
-    seedEntries, peekEntries, previewActivation, OVERRIDE_VALUES
+    seedEntries, peekEntries, previewActivation, OVERRIDE_VALUES,
+    hashContent, rememberFingerprint, isHandEdited, safeUpdateEntry, rollbackLastOp, getOplog
   };
 })();
