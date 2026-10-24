@@ -128,13 +128,15 @@
   function awardsOf(root) { const b = bagOf(root); return (b && Array.isArray(b.awards)) ? b.awards : []; }
   function ensure(draft) {
     if (!draft.activity || typeof draft.activity !== 'object' || Array.isArray(draft.activity)) {
-      draft.activity = { activities: [], signups: [], results: [], awards: [] };
+      draft.activity = { activities: [], signups: [], results: [], awards: [], series: {}, preparations: {} };
     }
     const b = draft.activity;
     if (!Array.isArray(b.activities)) b.activities = [];
     if (!Array.isArray(b.signups)) b.signups = [];
     if (!Array.isArray(b.results)) b.results = [];
     if (!Array.isArray(b.awards)) b.awards = [];
+    if (!b.series || typeof b.series !== 'object' || Array.isArray(b.series)) b.series = {};
+    if (!b.preparations || typeof b.preparations !== 'object' || Array.isArray(b.preparations)) b.preparations = {};
     return b;
   }
   function key(v) { return clean(v, 60); }
@@ -266,14 +268,15 @@
   }
 
   /** 已筹备 ⇒ 开放报名（`planned → open`）。 */
-  function open(id) {
+  function open(idOrOpts) {
+    const actId = (idOrOpts && typeof idOrOpts === 'object') ? (idOrOpts.id || idOrOpts.activityId) : idOrOpts;
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
     let out = null;
     WA.store.transact(function (draft) {
       const bag = ensure(draft);
-      const a = findIn(bag.activities, id);
-      if (!a) { out = refuse('no-such-activity', { activity: key(id) }); return false; }
+      const a = findIn(bag.activities, actId);
+      if (!a) { out = refuse('no-such-activity', { activity: key(actId) }); return false; }
       if (a.status === 'settled' || a.status === 'cancelled') { out = refuse('activity-closed', { activity: a.id, status: a.status }); return false; }
       if (RANK[a.status] !== RANK.planned) { out = refuse('bad-phase', { need: 'planned', got: a.status, activity: a.id }); return false; }
       a.status = 'open';
@@ -290,18 +293,28 @@
    * 报名（三种权限分列）。同一人**只能有一个角色**（`already-signed`）。
    *   名额只对 `contestant` 生效（主持/观众不计名额）。
    */
-  function signup(id, who, role, note) {
+  function signup(idOrOpts, who, role, note) {
+    let actId = idOrOpts;
+    let personName = who;
+    let rName = role;
+    let noteText = note;
+    if (idOrOpts && typeof idOrOpts === 'object') {
+      actId = idOrOpts.id || idOrOpts.activityId;
+      personName = idOrOpts.who || idOrOpts.person;
+      rName = idOrOpts.role;
+      noteText = idOrOpts.note;
+    }
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
-    const person = clean(who, 60);
-    const r = clean(role, 20) || 'contestant';
+    const person = clean(personName, 60);
+    const r = clean(rName, 20) || 'contestant';
     if (!person) return refuse('missing-fields', { need: ['who'] });
     if (ROLES.indexOf(r) < 0) return refuse('bad-role', { role: r, allowed: ROLES.slice() });
     let out = null;
     WA.store.transact(function (draft) {
       const bag = ensure(draft);
-      const a = findIn(bag.activities, id);
-      if (!a) { out = refuse('no-such-activity', { activity: key(id) }); return false; }
+      const a = findIn(bag.activities, actId);
+      if (!a) { out = refuse('no-such-activity', { activity: key(actId) }); return false; }
       if (a.status === 'settled' || a.status === 'cancelled') { out = refuse('activity-closed', { activity: a.id, status: a.status }); return false; }
       if (a.status !== 'open') { out = refuse('bad-phase', { need: 'open', got: a.status, activity: a.id }); return false; }
       if (!personExists(person, draft)) { out = refuse('unknown-party', { who: person }); return false; }
@@ -358,14 +371,15 @@
    * 开场：`open → running`。**必须有主持**（`no-host`），**必须有参赛者**（`no-signup`）。
    *   开场时把计划轮数固定进活动行，之后 `round()` 按它判上限。
    */
-  function start(id) {
+  function start(idOrOpts) {
+    const actId = (idOrOpts && typeof idOrOpts === 'object') ? (idOrOpts.id || idOrOpts.activityId) : idOrOpts;
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
     let out = null;
     WA.store.transact(function (draft) {
       const bag = ensure(draft);
-      const a = findIn(bag.activities, id);
-      if (!a) { out = refuse('no-such-activity', { activity: key(id) }); return false; }
+      const a = findIn(bag.activities, actId);
+      if (!a) { out = refuse('no-such-activity', { activity: key(actId) }); return false; }
       if (a.status === 'settled' || a.status === 'cancelled') { out = refuse('activity-closed', { activity: a.id, status: a.status }); return false; }
       if (RANK[a.status] !== RANK.open) { out = refuse('bad-phase', { need: 'open', got: a.status, activity: a.id }); return false; }
       const rows = bag.signups.filter(function (s) { return s && key(s.activity) === key(a.id); });
@@ -388,22 +402,26 @@
     }, 'activity:start');
     return out || refuse('store-unavailable');
   }
-
   // ── ④ 分轮结果（缺席者在这里被记下来）──────────────────────────
   /**
    * 落一轮结果。`n` 必须等于**已完成轮数 + 1**（判据是序数，不是时间）。
    *   `present` 里的人必须**已报名为参赛者**（`no-signup`）；
    *   缺席者 = 参赛者 − present，**逐个记进结果行**（结算时据此排除）。
    */
-  function round(id, opts) {
+  function round(idOrOpts, opts) {
+    let actId = idOrOpts;
+    let o = (opts && typeof opts === 'object') ? opts : {};
+    if (idOrOpts && typeof idOrOpts === 'object' && !opts) {
+      actId = idOrOpts.id || idOrOpts.activityId;
+      o = idOrOpts;
+    }
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
-    const o = (opts && typeof opts === 'object') ? opts : {};
     let out = null;
     WA.store.transact(function (draft) {
       const bag = ensure(draft);
-      const a = findIn(bag.activities, id);
-      if (!a) { out = refuse('no-such-activity', { activity: key(id) }); return false; }
+      const a = findIn(bag.activities, actId);
+      if (!a) { out = refuse('no-such-activity', { activity: key(actId) }); return false; }
       if (a.status === 'settled' || a.status === 'cancelled') { out = refuse('activity-closed', { activity: a.id, status: a.status }); return false; }
       if (a.status !== 'running') { out = refuse('bad-phase', { need: 'running', got: a.status, activity: a.id }); return false; }
       const done = bag.results.filter(function (r) { return r && key(r.activity) === key(a.id); });
@@ -417,7 +435,8 @@
       if (bag.results.length >= cfg.maxResults) { out = refuse('results-full', { cap: cfg.maxResults }); return false; }
       const rows = bag.signups.filter(function (s) { return s && key(s.activity) === key(a.id) && key(s.role) === 'contestant'; });
       const roster = rows.map(function (s) { return key(s.who); });
-      const present = (Array.isArray(o.present) ? o.present : []).map(function (x) { return key(x); }).filter(Boolean);
+      const rawPresent = Array.isArray(o.present) ? o.present : (Array.isArray(o.contestants) ? o.contestants : []);
+      const present = rawPresent.map(function (x) { return key(x); }).filter(Boolean);
       const outsider = present.filter(function (w) { return roster.indexOf(w) < 0; });
       if (outsider.length) { out = refuse('no-signup', { who: outsider, activity: a.id, hint: '未报名为参赛者不能出场' }); return false; }
       const absent = roster.filter(function (w) { return present.indexOf(w) < 0; });
@@ -437,7 +456,6 @@
     }, 'activity:round');
     return out || refuse('store-unavailable');
   }
-
   // ── ⑤ 结算（奖品 + 关系变化；缺席者不能获奖）────────────────────
   /**
    * 结算一次：发奖 + 记关系变化。
@@ -446,15 +464,20 @@
    *   · 关系变化写 `people[].profile.relations` 的**量值行**（可逆），
    *     显式给出合法六型时才转交 `bonds.setBond`。
    */
-  function settle(id, opts) {
+  function settle(idOrOpts, opts) {
+    let actId = idOrOpts;
+    let o = (opts && typeof opts === 'object') ? opts : {};
+    if (idOrOpts && typeof idOrOpts === 'object' && !opts) {
+      actId = idOrOpts.id || idOrOpts.activityId;
+      o = idOrOpts;
+    }
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
-    const o = (opts && typeof opts === 'object') ? opts : {};
     let out = null;
     WA.store.transact(function (draft) {
       const bag = ensure(draft);
-      const a = findIn(bag.activities, id);
-      if (!a) { out = refuse('no-such-activity', { activity: key(id) }); return false; }
+      const a = findIn(bag.activities, actId);
+      if (!a) { out = refuse('no-such-activity', { activity: key(actId) }); return false; }
       if (a.status === 'settled' || a.status === 'cancelled') { out = refuse('activity-closed', { activity: a.id, status: a.status }); return false; }
       if (a.status !== 'running') { out = refuse('bad-phase', { need: 'running', got: a.status, activity: a.id }); return false; }
       const rounds = bag.results.filter(function (r) { return r && key(r.activity) === key(a.id); })
@@ -605,15 +628,20 @@
    *   日程（agenda 源）与参与安排（signups）因此自动同步。
    *   天气判据读 `weather.weatherOf(place)`；读不到就如实说读不到（不拿晴天冒充）。
    */
-  function postpone(id, opts) {
+  function postpone(idOrOpts, opts) {
+    let actId = idOrOpts;
+    let o = (opts && typeof opts === 'object') ? opts : {};
+    if (idOrOpts && typeof idOrOpts === 'object' && !opts) {
+      actId = idOrOpts.id || idOrOpts.activityId;
+      o = idOrOpts;
+    }
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
-    const o = (opts && typeof opts === 'object') ? opts : {};
     let out = null;
     WA.store.transact(function (draft) {
       const bag = ensure(draft);
-      const a = findIn(bag.activities, id);
-      if (!a) { out = refuse('no-such-activity', { activity: key(id) }); return false; }
+      const a = findIn(bag.activities, actId);
+      if (!a) { out = refuse('no-such-activity', { activity: key(actId) }); return false; }
       if (a.status === 'settled' || a.status === 'cancelled') { out = refuse('activity-closed', { activity: a.id, status: a.status }); return false; }
       if (a.status === 'postponed') { out = refuse('bad-phase', { need: '非延期态', got: a.status, activity: a.id }); return false; }
       const sd = storyDay();
@@ -665,17 +693,23 @@
   }
 
   /** 取消：置终态。**不发奖、不动关系、不退款**（取消不是结算）。 */
-  function cancel(id, reason) {
+  function cancel(idOrOpts, reason) {
+    let actId = idOrOpts;
+    let r = reason;
+    if (idOrOpts && typeof idOrOpts === 'object') {
+      actId = idOrOpts.id || idOrOpts.activityId;
+      r = idOrOpts.reason;
+    }
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
     let out = null;
     WA.store.transact(function (draft) {
       const bag = ensure(draft);
-      const a = findIn(bag.activities, id);
-      if (!a) { out = refuse('no-such-activity', { activity: key(id) }); return false; }
+      const a = findIn(bag.activities, actId);
+      if (!a) { out = refuse('no-such-activity', { activity: key(actId) }); return false; }
       if (a.status === 'settled' || a.status === 'cancelled') { out = refuse('activity-closed', { activity: a.id, status: a.status }); return false; }
       a.status = 'cancelled';
-      a.cancelReason = clean(reason, 60);
+      a.cancelReason = clean(r, 60);
       a.cancelledAt = clockNow('activity');
       stat.cancelled++;
       out = { ok: true, activity: Object.assign({}, a), reason: a.cancelReason,
@@ -779,12 +813,245 @@
   function reset() {
     let out = null;
     WA.store.transact(function (draft) {
-      draft.activity = { activities: [], signups: [], results: [], awards: [] };
+      draft.activity = { activities: [], signups: [], results: [], awards: [], series: {}, preparations: {} };
       out = { ok: true };
       return true;
     }, 'activity:reset');
     resetStat();
     return out || refuse('store-unavailable');
+  }
+
+  // ── WX-6 活动系列与跨期运转 ──────────────────────────────────────
+  function declareSeries(seriesId, spec) {
+    const sId = clean(seriesId, 40);
+    if (!sId) return refuse('missing-id');
+    const s = spec || {};
+    const series = {
+      id: sId,
+      title: clean(s.title || sId, 60),
+      place: clean(s.place || 'town_square', 40),
+      organizer: clean(s.organizer || 'guild', 40),
+      frequencyDays: Math.max(1, Number(s.frequencyDays) || 7),
+      prepWindowDays: Math.max(1, Number(s.prepWindowDays) || 3),
+      defaultQuota: Math.max(0, Number(s.defaultQuota) || 6),
+      host: clean(s.host || '', 60),
+      kind: clean(s.kind || 'market', 30),
+      currentCycle: 0,
+      lastDay: 0,
+      historyActivities: [],
+      status: 'active',
+      createdAt: clockNow('activity')
+    };
+    let out = null;
+    WA.store.transact(function (draft) {
+      const bag = ensure(draft);
+      bag.series[sId] = series;
+      out = { ok: true, series: series };
+      return true;
+    }, 'activity:declareSeries');
+    return out || refuse('store-unavailable');
+  }
+
+  function getSeries(seriesId) {
+    const bag = bagOf();
+    return (bag && bag.series && bag.series[clean(seriesId, 40)]) || null;
+  }
+
+  function listSeries(opts) {
+    const bag = bagOf();
+    const st = (bag && bag.series) || {};
+    const o = opts || {};
+    let list = Object.keys(st).map(function (k) { return st[k]; });
+    if (o.place) list = list.filter(function (s) { return s.place === clean(o.place, 40); });
+    if (o.organizer) list = list.filter(function (s) { return s.organizer === clean(o.organizer, 40); });
+    return { ok: true, count: list.length, series: list };
+  }
+
+  function nextCycle(seriesId, opts) {
+    const ser = getSeries(seriesId);
+    if (!ser) return refuse('series-not-found');
+    const o = opts || {};
+    const nextCycleNum = ser.currentCycle + 1;
+    const actId = clean(o.id || (ser.id + '_c' + nextCycleNum), 60);
+
+    // 计算举办日
+    let targetDay = num(o.day);
+    if (targetDay === null) {
+      const sd = storyDay();
+      const currentDay = sd.ok ? sd.day : ser.lastDay;
+      targetDay = (ser.lastDay > 0) ? (ser.lastDay + ser.frequencyDays) : Math.max(1, currentDay + 1);
+    }
+
+    // 建立全新的独立活动实例，独立状态机，绝不机械复制上期报名或未兑现奖励
+    const planRes = plan({
+      id: actId,
+      title: ser.title + ' (第' + nextCycleNum + '期)',
+      place: ser.place,
+      kind: ser.kind,
+      quota: ser.defaultQuota,
+      host: ser.host,
+      day: targetDay,
+      rounds: Number(o.rounds) || 3,
+      needs: o.needs || []
+    });
+    if (!planRes.ok) return planRes;
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const bag = ensure(draft);
+      const s = bag.series[ser.id];
+      if (s) {
+        s.currentCycle = nextCycleNum;
+        s.lastDay = targetDay;
+        s.lastActivityId = actId;
+        s.historyActivities.push(actId);
+      }
+      // 记录关联
+      const act = findIn(bag.activities, actId);
+      if (act) {
+        act.seriesId = ser.id;
+        act.cycleNumber = nextCycleNum;
+      }
+      out = { ok: true, cycleNumber: nextCycleNum, activityId: actId, day: targetDay, series: s };
+      return true;
+    }, 'activity:nextCycle');
+    return out || refuse('store-unavailable');
+  }
+
+  function prepareForActivity(activityId, who, prepSpec) {
+    const aId = key(activityId);
+    const w = clean(who, 60);
+    if (!aId || !w) return refuse('missing-fields', { need: ['activityId', 'who'] });
+    const act = activityOf(aId);
+    if (!act) return refuse('activity-not-found');
+    if (act.status === 'cancelled' || act.status === 'settled') return refuse('activity-closed');
+
+    const spec = prepSpec || {};
+    const stagedGoods = (spec.goods && typeof spec.goods === 'object') ? Object.assign({}, spec.goods) : {};
+    let scheduleClaimed = false;
+
+    // 如果指定了日历排班预留，打通 laborSchedule
+    if (spec.claimSchedule && WA.laborSchedule && typeof WA.laborSchedule.claim === 'function') {
+      const schedSettings = (typeof WA.laborSchedule.getSettings === 'function') ? WA.laborSchedule.getSettings() : null;
+      if (schedSettings && schedSettings.enabled) {
+        const claimRes = WA.laborSchedule.claim({
+          who: w,
+          day: act.day || 1,
+          slot: clean(spec.slot || 'morning', 20),
+          task: 'activity_prep',
+          label: '参加活动筹备:' + act.title
+        });
+        if (!claimRes.ok) return refuse('schedule-conflict', { detail: claimRes });
+        scheduleClaimed = true;
+      }
+    }
+
+    let prepRecord = {
+      activityId: aId,
+      who: w,
+      stagedGoods: stagedGoods,
+      scheduleClaimed: scheduleClaimed,
+      transportMethod: clean(spec.transportMethod || 'on_foot', 40),
+      preparedAt: clockNow('activity')
+    };
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const bag = ensure(draft);
+      bag.preparations[aId] = bag.preparations[aId] || {};
+      bag.preparations[aId][w] = prepRecord;
+      out = { ok: true, preparation: prepRecord };
+      return true;
+    }, 'activity:prepareForActivity');
+    return out || refuse('store-unavailable');
+  }
+
+  function handleDisruption(activityId, disruptionType, opts) {
+    const aId = key(activityId);
+    const act = activityOf(aId);
+    if (!act) return refuse('activity-not-found');
+    const dtype = clean(disruptionType, 40);
+    const o = opts || {};
+    const resolution = clean(o.resolution || 'postpone', 20); // 'scale_down' | 'relocate' | 'postpone' | 'cancel'
+
+    let result = {
+      activityId: aId,
+      disruptionType: dtype,
+      resolution: resolution,
+      handledAt: clockNow('activity')
+    };
+
+    if (resolution === 'relocate') {
+      const newPlace = clean(o.newPlace, 40);
+      if (!newPlace) return refuse('missing-fields', { need: ['newPlace'] });
+      WA.store.transact(function (draft) {
+        const bag = ensure(draft);
+        const a = findIn(bag.activities, aId);
+        if (a) {
+          a.originalPlace = a.place;
+          a.place = newPlace;
+        }
+        return true;
+      }, 'activity:relocate');
+      result.newPlace = newPlace;
+      return { ok: true, outcome: result };
+    }
+
+    if (resolution === 'scale_down') {
+      const newQuota = Math.max(1, Number(o.newQuota) || Math.floor((act.quota || 6) / 2));
+      WA.store.transact(function (draft) {
+        const bag = ensure(draft);
+        const a = findIn(bag.activities, aId);
+        if (a) a.quota = newQuota;
+        return true;
+      }, 'activity:scaleDown');
+      result.newQuota = newQuota;
+      return { ok: true, outcome: result };
+    }
+
+    if (resolution === 'postpone') {
+      const newDay = num(o.newDay);
+      if (newDay === null || newDay <= (act.day || 0)) {
+        return refuse('bad-day', { currentDay: act.day, needStrictlyAfter: true });
+      }
+      return postpone({ id: aId, day: newDay });
+    }
+
+    if (resolution === 'cancel') {
+      const cancelRes = cancel({ id: aId, reason: dtype });
+      if (!cancelRes.ok) return cancelRes;
+      result.refunded = true;
+      result.note = '活动已因变故取消，未完委托如实记录未能履约';
+      return { ok: true, outcome: result };
+    }
+
+    return refuse('bad-resolution', { allowed: ['scale_down', 'relocate', 'postpone', 'cancel'] });
+  }
+
+  function nextCycleInvitations(seriesId) {
+    const ser = getSeries(seriesId);
+    if (!ser) return refuse('series-not-found');
+    if (!ser.lastActivityId) return { ok: true, seriesId: ser.id, priorityInvites: [] };
+
+    // 获取上期到场且履行良好的参与者
+    const rFor = roundsFor(ser.lastActivityId);
+    const aFor = awardsFor(ser.lastActivityId);
+    let participants = [];
+    rFor.forEach(function (r) {
+      const list = Array.isArray(r.present) ? r.present : (Array.isArray(r.contestants) ? r.contestants : []);
+      list.forEach(function (c) {
+        if (c && participants.indexOf(c) < 0) participants.push(c);
+      });
+    });
+    let winners = aFor.map(function (a) { return a.winner; }).filter(Boolean);
+
+    return {
+      ok: true,
+      seriesId: ser.id,
+      lastActivityId: ser.lastActivityId,
+      priorityInvites: participants,
+      honorRoll: winners
+    };
   }
 
   WA.activity = {
@@ -795,9 +1062,16 @@
     round: round, settle: settle, postpone: postpone, resume: resume, cancel: cancel,
     activityOf: activityOfRead, signups: signupsRead, rounds: roundsRead, awards: awardsRead,
     list: list, view: view, buildBlock: buildBlock,
-    stat: statView, resetStat: resetStat, reset: reset, reload: reload
+    stat: statView, resetStat: resetStat, reset: reset, reload: reload,
+    declareSeries: declareSeries,
+    getSeries: getSeries,
+    listSeries: listSeries,
+    nextCycle: nextCycle,
+    prepareForActivity: prepareForActivity,
+    handleDisruption: handleDisruption,
+    nextCycleInvitations: nextCycleInvitations
   };
-  var EXPORT_COUNT = 25;
+  var EXPORT_COUNT = 32;
   var _exported = Object.keys(WA.activity).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('activity: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/activity.js', { kind: 'engine', ver: '2.231.0' });

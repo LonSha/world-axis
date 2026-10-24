@@ -51,7 +51,11 @@
       initConditions: {
         places: ['town_square', 'workshop', 'market', 'home'],
         factions: [{ name: '工匠协会', type: 'guild' }, { name: '商户会', type: 'guild' }],
-        startingResources: { funds: 50, materials: { wood: 10, cloth: 5 } }
+        startingResources: { funds: 50, materials: { wood: 10, cloth: 5 } },
+        initialPeople: [
+          { name: '大师傅', role: 'master', place: 'workshop' },
+          { name: '青年学徒', role: 'apprentice', place: 'workshop' }
+        ]
       },
       openingScene: { id: 'market-day', label: '集市日开局' },
       requiredEngines: ['training', 'research', 'family-ops'],
@@ -71,7 +75,11 @@
       initConditions: {
         places: ['frontier_camp', 'ruins', 'river_crossing', 'lookout'],
         factions: [{ name: '探险者协会', type: 'guild' }],
-        startingResources: { funds: 30, materials: { rope: 3, provisions: 10 } }
+        startingResources: { funds: 30, materials: { rope: 3, provisions: 10 } },
+        initialPeople: [
+          { name: '老向导', role: 'explorer', place: 'frontier_camp' },
+          { name: '先遣员', role: 'scout', place: 'frontier_camp' }
+        ]
       },
       openingScene: { id: 'cold-open', label: '事件开局' },
       requiredEngines: ['training', 'research'],
@@ -91,7 +99,11 @@
       initConditions: {
         places: ['station_core', 'lab_wing', 'habitat_deck', 'airlock'],
         factions: [{ name: '站点委员会', type: 'council' }],
-        startingResources: { funds: 100, materials: { alloy: 20, electronics: 10 } }
+        startingResources: { funds: 100, materials: { alloy: 20, electronics: 10 } },
+        initialPeople: [
+          { name: '首席技师', role: 'technician', place: 'fab-lab' },
+          { name: '站点操作员', role: 'operator', place: 'station_core' }
+        ]
       },
       openingScene: { id: 'blank', label: '空白开局' },
       requiredEngines: ['training', 'research'],
@@ -278,6 +290,34 @@
                 at: Date.now(),
                 updatedAt: Date.now()
               });
+            }
+          });
+        }
+        // 初始资源注入
+        if (s.initConditions && s.initConditions.startingResources) {
+          draft.economy = draft.economy || {};
+          draft.economy.money = draft.economy.money || { funds: 0 };
+          draft.economy.money.funds = Math.max(draft.economy.money.funds || 0, s.initConditions.startingResources.funds || 0);
+          draft.economy.stock = draft.economy.stock || {};
+          var mats = s.initConditions.startingResources.materials || {};
+          Object.keys(mats).forEach(function (m) {
+            draft.economy.stock[m] = Math.max(draft.economy.stock[m] || 0, mats[m] || 0);
+          });
+        }
+        // 初始人物注入
+        if (s.initConditions && Array.isArray(s.initConditions.initialPeople)) {
+          draft.people = draft.people || {};
+          s.initConditions.initialPeople.forEach(function (p) {
+            var pKey = 'p_' + clean(p.name, 40);
+            if (!draft.people[pKey]) {
+              draft.people[pKey] = {
+                id: pKey,
+                name: clean(p.name, 40),
+                role: clean(p.role || 'citizen', 30),
+                where: clean(p.place || places[0] || 'town_square', 40),
+                profile: { status: 'idle', energy: 100 },
+                resources: { funds: 10 }
+              };
             }
           });
         }

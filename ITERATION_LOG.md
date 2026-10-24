@@ -5725,3 +5725,45 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
   - `tests/test-wp-a2-integration.js` (5/5 PASS)
   - `tests/test-wp-a1-integration.js` (6/6 PASS)
   - 联合历史全部 12 套专锁（EXP10-24）全绿通过。零外部依赖，严格遵循单一真源持久化规范。
+### R-WP-C-20261024 · C包切片（长期沉积与地方分化：地方技术标准、周期集市、社会记忆与承继再组织、发展路径分化与玩法蓝图落地）
+- 做了：
+  1. `engines/tech-lineage.js`（WX-5 地方技术标准、兼容选择与改装投资）：
+     - 落地规格标准声明 `declareStandard(stdId, spec)`：记录工坊地点、工位类型、版本号、规格码（如 shaft_30mm）与不同标准间的兼容性映射表。
+     - 落地兼容性判定 `checkCompatibility(stdA, stdB)`：精准识别直接兼容（`direct`）、需转接适配（`requires_adapter`）以及互不兼容（`incompatible`）。
+     - 落地适配件试制 `produceAdapter(name, fromStd, toStd, opts)`：耗用工时与材料试制过渡件，克服跨地规格壁垒。
+     - 落地工位改装停产与沉没投资 `planRetrofit(stationId, targetStd, opts)`、`advanceRetrofit(stationId, days)` 与 `cancelRetrofit(stationId)`：改装期间工位锁定为 `retrofitting` 停产状态（无法用于日常生产），按工期递减至完成；中途取消真实损失已投入的工时与材料。
+     - 落地委托外包加算物流周期 `outsourceWork(orderId, subcontractorStd, logisticsDays)`：工单标记外包代工，并在原制造工期基础上显式加算跨地域物流运输天数。
+  2. `engines/activity.js`（WX-6 周期性集市活动、跨期筹备备货、变故应急处理与优先邀请）：
+     - 落地周期活动系列声明 `declareSeries(seriesId, spec)`：统一管理集市频次（如每7天一期）、筹备窗口期、默认名额与主办方。
+     - 落地独立期数活动实例生成 `nextCycle(seriesId, opts)`：为每期活动生成独立唯一的实例 ID（如 market_weekly_c1），独立状态机与独立账目，彻底杜绝机械复制旧报名或陈旧未兑现奖励。
+     - 落地跨期筹备、备货与日历排班预留 `prepareForActivity(actId, who, prepSpec)`：筹备人员备料并打通 `laborSchedule` 日历排班占用，防止双重预定。
+     - 落地多维变故应急处置 `handleDisruption(actId, disruptionType, opts)`：支持由于场地受损或灾害造成的缩办（`scale_down` 调整配额）、迁址（`relocate` 安全转移备用地）、延期（`postpone` 顺延剧情日）及受控取消（`cancel`）。
+     - 落地履约优先邀请机制 `nextCycleInvitations(seriesId)`：基于上一期实际到场与履约表现生成下期集市优先邀请清单与荣誉榜。
+  3. `engines/social-legacy.js`（WX-7 多版本社会记忆与 WX-8 多方承继再组织）：
+     - 落地对立事实主张登记 `registerClaim(sourceEventId, claimSpec)`：同一客观事件支持登记亲历见证、道听途说或纪念碑刻，各方主张可持赞誉、中立或误解（争议）立场。
+     - 落地群体记忆传播扩散 `spreadClaim(claimId, targetGroup, opts)`：主张在不同人群（如商户公会、工匠同业）间分化传播。
+     - 落地基于事实证据的公开澄清 `clarifyClaim(claimId, clarifier, evidenceFact)`：当事人公布实物与契约证据扭转偏见，降低群体误解程度。
+     - 落地群体立场修正合作门槛 `groupMemoryStance(group, who)`：计算群体对当事人的信任指数；群体持有误解立场时，合作基础成本增加 25%，公开澄清后恢复基准。
+     - 落地离场交接清单 `initiateHandover(who, spec)`：登记离场者名下设施、工坊工单、学徒培育契约与未尽债务。
+     - 落地多候选人挑肥拣瘦承继与争议标记 `proposeSuccession(handoverId, successor, chosenItems)`：多位候选人自主挑选承接资产或债务；对同一稀缺资产产生竞标冲突时，自动提升为 `contested` 争议态，移交公会或法庭仲裁。
+     - 落地无人认领资产再组织 `reorganizeUnclaimed(handoverId, opts)`：对无人认领的设施由工匠公会实施托管（`custody`），或对资不抵债项目实施受控破产注销（`close`）。
+  4. `engines/phase-transition.js`（WX-9 地方发展路径与长期投资分化）：
+     - 落地地方发展路径声明 `declarePlaceLayout(placeId, layoutType)`：支持“分散型作坊聚落（`dispersed_workshops`）”与“集中型共享服务中心（`shared_service_center`）”等不同发展路径。
+     - 落地长期基础设施投资累计 `investPath(placeId, opts)`：历经长期投入，基础设施等级、资本沉淀与产能加成逐步分化。
+     - 落地生产效率与容灾韧性综合评估 `evaluatePlacePath(placeId)`：集中型具有高产能加成（+50% vs +15%），但在关键枢纽发生同等故障时出现高故障影响度与脆弱性；分散型虽产能较低但容灾韧性极高，无单点故障崩溃风险。
+     - 落地转型重组代价规划 `planTransitionRoute(placeId, targetLayout)`：不同发展路径间转型需付出 40% 的沉没投资损失与长工期重组。
+  5. `engines/playable-blueprint.js`（WP-9 三套玩法蓝图完备化与整局开局）：
+     - 补齐三套样例（城镇工坊、探索聚落、科幻站点）开局资源（金库资金、各类物资原材料）与人物名册初始化配置。
+     - 安装时真实注入 `economy.money`、`economy.stock` 与 `people` 实体名册，实现端到端完整开局并支持跨会话重载持久化。
+  6. `engines/action-desk.js`：
+     - 在全局行动桌完成 C 包新增全部 19 个新写口与读口路由挂接。
+  7. `tests/test-wp-c-integration.js`：
+     - 新建 C 包综合集成门禁测试套件，全面覆盖地方标准与工位改装停产、周期集市与变故应急、社会记忆澄清与合作成本修正、离场承继争议与无人项再组织、长期路径分化与容灾差异、三套蓝图开局与跨会话重载等 6 大核心场景（6/6 全绿）。
+- 验证：
+  - `tests/test-wp-c-integration.js` (6/6 PASS)
+  - `tests/test-wp-b2-integration.js` (5/5 PASS)
+  - `tests/test-wp-b1-integration.js` (5/5 PASS)
+  - `tests/test-wp-a3-integration.js` (4/4 PASS)
+  - `tests/test-wp-a2-integration.js` (5/5 PASS)
+  - `tests/test-wp-a1-integration.js` (6/6 PASS)
+  - 联合既有全部专项用例（EXP 系列）全绿通过。零外部依赖，严格遵循单一真源持久化规范。

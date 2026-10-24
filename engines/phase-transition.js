@@ -89,12 +89,26 @@
     if (!bucket()) {
       if (WA.store && WA.store.transact) {
         WA.store.transact(function (d) {
-          d.phaseTransition = d.phaseTransition || { regions: {}, history: [] };
+          d.phaseTransition = d.phaseTransition || { regions: {}, history: [], paths: {}, investments: [] };
           return true;
         }, 'phaseTransition:init');
       }
+    } else {
+      var bk = bucket();
+      if (!bk.paths || !bk.investments) {
+        if (WA.store && WA.store.transact) {
+          WA.store.transact(function (d) {
+            d.phaseTransition = d.phaseTransition || {};
+            d.phaseTransition.regions = d.phaseTransition.regions || {};
+            d.phaseTransition.history = d.phaseTransition.history || [];
+            d.phaseTransition.paths = d.phaseTransition.paths || {};
+            d.phaseTransition.investments = d.phaseTransition.investments || [];
+            return true;
+          }, 'phaseTransition:ensureSubStores');
+        }
+      }
     }
-    return bucket() || { regions: {}, history: [] };
+    return bucket() || { regions: {}, history: [], paths: {}, investments: [] };
   }
 
   /**
@@ -290,10 +304,175 @@
     return { ok: true, regionId: rid, transitions: hist, count: hist.length };
   }
 
+  // ── WX-9 地方发展路径与长期投资分化 ────────────────────────────────
+  var PATH_LAYOUTS = [
+    { id: 'decentralized_workshop', label: '分散工坊网络', note: '各工坊自备基础设备，单点故障影响小，但工序分散物流较多' },
+    { id: 'shared_service_center', label: '集中共享服务中心', note: '公用高精尖工位与维修站，生产与维修效率高，但故障影响全域' },
+    { id: 'transit_hub', label: '商路协作节点', note: '依托物流与周期集市，货物吞吐快，商路阻断时受冲击明显' }
+  ];
+
+  function declarePlaceLayout(placeId, layoutType, opts) {
+    var pId = clean(placeId, 40);
+    var lType = clean(layoutType, 40);
+    if (!pId || !lType) return { ok: false, reason: 'missing-fields' };
+    var valid = PATH_LAYOUTS.some(function (pl) { return pl.id === lType; });
+    if (!valid) return { ok: false, reason: 'bad-layout-type', allowed: PATH_LAYOUTS.map(function (p) { return p.id; }) };
+
+    var o = opts || {};
+    var record = {
+      placeId: pId,
+      layoutType: lType,
+      totalFundsInvested: 0,
+      totalMaterialsInvested: {},
+      consecutiveCycles: 1,
+      investments: [],
+      declaredAt: now(),
+      declaredBy: clean(o.by || 'council', 40)
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        ensureBucket();
+        d.phaseTransition.paths = d.phaseTransition.paths || {};
+        d.phaseTransition.paths[pId] = record;
+        return true;
+      }, 'phaseTransition:declarePlaceLayout');
+    }
+    return { ok: true, layout: record };
+  }
+
+  function investPath(placeId, spec) {
+    var pId = clean(placeId, 40);
+    var s = spec || {};
+    var bk = ensureBucket();
+    var cur = bk.paths && bk.paths[pId];
+    if (!cur) return { ok: false, reason: 'layout-not-declared' };
+
+    var funds = Math.max(0, Number(s.funds) || 0);
+    var materials = (s.materials && typeof s.materials === 'object') ? Object.assign({}, s.materials) : {};
+    var title = clean(s.title || '基础设施投入', 60);
+
+    var invRecord = {
+      id: 'inv_' + now() + '_' + WA.rand.id(),
+      placeId: pId,
+      title: title,
+      funds: funds,
+      materials: materials,
+      targetLayout: cur.layoutType,
+      at: now()
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        ensureBucket();
+        var p = d.phaseTransition.paths[pId];
+        p.totalFundsInvested += funds;
+        Object.keys(materials).forEach(function (mKey) {
+          p.totalMaterialsInvested[mKey] = (p.totalMaterialsInvested[mKey] || 0) + (materials[mKey] || 0);
+        });
+        p.investments.push(invRecord);
+        d.phaseTransition.investments = d.phaseTransition.investments || [];
+        d.phaseTransition.investments.push(invRecord);
+        if (d.economy && d.economy.money && typeof d.economy.money.funds === 'number') {
+          d.economy.money.funds = Math.max(0, d.economy.money.funds - funds);
+        }
+        return true;
+      }, 'phaseTransition:investPath');
+    }
+    return { ok: true, investment: invRecord, currentPath: ensureBucket().paths[pId] };
+  }
+
+  function evaluatePlacePath(placeId) {
+    var pId = clean(placeId, 40);
+    var bk = ensureBucket();
+    var cur = bk.paths && bk.paths[pId];
+    if (!cur) {
+      return {
+        ok: true,
+        placeId: pId,
+        layoutType: 'undeclared',
+        efficiencyFactor: 1.0,
+        transitCostFactor: 1.0,
+        failureImpact: 'moderate',
+        resilienceRating: 'average',
+        note: '尚未确立专项发展路径，保持默认离散手工水平'
+      };
+    }
+
+    var invested = cur.totalFundsInvested || 0;
+    var lType = cur.layoutType;
+
+    var efficiency = 1.0;
+    var transitCost = 1.0;
+    var failureImpact = 'moderate';
+    var resilience = 'medium';
+
+    if (lType === 'shared_service_center') {
+      efficiency = 1.25 + Math.min(0.5, invested / 200);
+      transitCost = 0.85;
+      failureImpact = 'high';
+      resilience = 'low_single_point_of_failure';
+    } else if (lType === 'decentralized_workshop') {
+      efficiency = 1.05 + Math.min(0.2, invested / 300);
+      transitCost = 1.2;
+      failureImpact = 'low';
+      resilience = 'high_fault_tolerant';
+    } else if (lType === 'transit_hub') {
+      efficiency = 1.15;
+      transitCost = 0.7;
+      failureImpact = 'critical_on_road_disruption';
+      resilience = 'dependent_on_routes';
+    }
+
+    return {
+      ok: true,
+      placeId: pId,
+      layoutType: lType,
+      totalFundsInvested: invested,
+      efficiencyFactor: Number(efficiency.toFixed(2)),
+      transitCostFactor: Number(transitCost.toFixed(2)),
+      failureImpact: failureImpact,
+      resilienceRating: resilience,
+      investmentCount: (cur.investments || []).length
+    };
+  }
+
+  function planTransitionRoute(placeId, targetLayout, opts) {
+    var pId = clean(placeId, 40);
+    var target = clean(targetLayout, 40);
+    var bk = ensureBucket();
+    var cur = bk.paths && bk.paths[pId];
+    if (!cur) return { ok: false, reason: 'layout-not-declared' };
+    if (cur.layoutType === target) return { ok: false, reason: 'already-in-target-layout' };
+
+    var valid = PATH_LAYOUTS.some(function (pl) { return pl.id === target; });
+    if (!valid) return { ok: false, reason: 'bad-target-layout' };
+
+    var sunkCost = Math.floor(cur.totalFundsInvested * 0.4);
+    var transitionCost = 30;
+    var transitionDays = 5;
+
+    return {
+      ok: true,
+      placeId: pId,
+      currentLayout: cur.layoutType,
+      targetLayout: target,
+      sunkCostLoss: sunkCost,
+      transitionCost: transitionCost,
+      transitionDays: transitionDays,
+      note: '重组需要处置闲置设备并重新组织协作网络，历史消耗资源不可退回'
+    };
+  }
+
   WA.phaseTransition = {
     evaluatePhase: evaluatePhase,
     transition: transition,
     history: history,
+    declarePlaceLayout: declarePlaceLayout,
+    investPath: investPath,
+    evaluatePlacePath: evaluatePlacePath,
+    planTransitionRoute: planTransitionRoute,
+    PATH_LAYOUTS: PATH_LAYOUTS.slice(),
     PHASES: PHASES.map(function (p) { return { id: p.id, label: p.label, note: p.note }; })
   };
 

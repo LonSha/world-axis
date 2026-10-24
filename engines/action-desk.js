@@ -94,6 +94,13 @@
     'pathEcho.realize': function (o) { return WA.pathEcho.realizeOutcome(o.personId, o.decisionId, o.actualOutcome, o.knownFacts); },
     'lineage.teach': function (o) { return WA.techLineage.teach(o.traditionId, o.master, o.apprentice); },
     'lineage.confirmVariant': function (o) { return WA.techLineage.confirmVariant(o.traditionId, o.variantId, o.envContext); },
+    'techLineage.declareStandard': function (o) { return WA.techLineage.declareStandard(o.specId, o.def); },
+    'techLineage.checkCompatibility': function (o) { return WA.techLineage.checkCompatibility(o.facilitySpecId, o.targetSpecId, o); },
+    'techLineage.planRetrofit': function (o) { return WA.techLineage.planRetrofit(o.facilityId, o.targetSpecId, o); },
+    'techLineage.advanceRetrofit': function (o) { return WA.techLineage.advanceRetrofit(o.facilityId, o.days); },
+    'techLineage.cancelRetrofit': function (o) { return WA.techLineage.cancelRetrofit(o.facilityId); },
+    'techLineage.produceAdapter': function (o) { return WA.techLineage.produceAdapter(o); },
+    'techLineage.outsourceWork': function (o) { return WA.techLineage.outsourceWork(o.orderId, o.targetFacilityId, o); },
     'familyOps.gap': function (o) { return WA.familyOps.handleGap(o.unitId, o.gapType, o.solution, o); },
     'familyOps.inherit': function (o) { return WA.familyOps.inheritRatio(o.unitId, o.deceased, o.shares, o); },
     'familyOps.advanceCycle': function (o) { return WA.familyOps.advanceCycle(o.unitId, o); },
@@ -149,10 +156,28 @@
     'socialLegacy.acceptLegacy': function (o) { return WA.socialLegacy.acceptLegacy(o.legacyId, o); },
     'socialLegacy.witnessAccount': function (o) { return WA.socialLegacy.witnessAccount(o.legacyId, o.witness, o.account); },
     'socialLegacy.viewLegacy': function (o) { return WA.socialLegacy.viewLegacy(o.legacyId); },
-    // v2.231.0（拓展 IN-9）：历史相变
+    'socialLegacy.registerClaim': function (o) { return WA.socialLegacy.registerClaim(o.eventId, o); },
+    'socialLegacy.spreadClaim': function (o) { return WA.socialLegacy.spreadClaim(o.claimId, o.targetGroupId, o); },
+    'socialLegacy.clarifyClaim': function (o) { return WA.socialLegacy.clarifyClaim(o.eventId, o.who, o.evidence, o.targetGroupId); },
+    'socialLegacy.groupMemoryStance': function (o) { return WA.socialLegacy.groupMemoryStance(o.groupId, o.who); },
+    'socialLegacy.initiateHandover': function (o) { return WA.socialLegacy.initiateHandover(o); },
+    'socialLegacy.proposeSuccession': function (o) { return WA.socialLegacy.proposeSuccession(o.handoverId, o.candidateWho, o.acceptedScope, o.terms); },
+    'socialLegacy.resolveHandover': function (o) { return WA.socialLegacy.resolveHandover(o.handoverId, o); },
+    'socialLegacy.reorganizeUnclaimed': function (o) { return WA.socialLegacy.reorganizeUnclaimed(o.handoverId, o.policyMap); },
+    // v2.231.0（活动系列与周期性集市 WX-6）
+    'activity.declareSeries': function (o) { return WA.activity.declareSeries(o.seriesId, o); },
+    'activity.nextCycle': function (o) { return WA.activity.nextCycle(o.seriesId, o); },
+    'activity.prepareForActivity': function (o) { return WA.activity.prepareForActivity(o.activityId, o.who, o); },
+    'activity.handleDisruption': function (o) { return WA.activity.handleDisruption(o.activityId, o.disruptionType, o); },
+    'activity.nextCycleInvitations': function (o) { return WA.activity.nextCycleInvitations(o.seriesId); },
+    // v2.231.0（拓展 IN-9）：历史相变与长期投资路径 WX-9
     'phaseTransition.evaluatePhase': function (o) { return WA.phaseTransition.evaluatePhase(o.regionId); },
     'phaseTransition.transition': function (o) { return WA.phaseTransition.transition(o.regionId, o.targetPhaseId, o); },
     'phaseTransition.history': function (o) { return WA.phaseTransition.history(o.regionId); },
+    'phaseTransition.declarePlaceLayout': function (o) { return WA.phaseTransition.declarePlaceLayout(o.placeId, o.layoutType, o); },
+    'phaseTransition.investPath': function (o) { return WA.phaseTransition.investPath(o.placeId, o); },
+    'phaseTransition.evaluatePlacePath': function (o) { return WA.phaseTransition.evaluatePlacePath(o.placeId); },
+    'phaseTransition.planTransitionRoute': function (o) { return WA.phaseTransition.planTransitionRoute(o.placeId, o.targetLayout, o); },
     'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
   };
 
