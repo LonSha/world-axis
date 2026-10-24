@@ -5644,3 +5644,19 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
   3. `engines/action-methods.js`（WP-2）：内置 `task:production_craft` 与 `task:facility_repair` 任务与具体方法；支持 `opId` 执行幂等（防止重复扣除工具耐久）；真实兑现目标结算（`WA.gear.repair` 耐久恢复、`WA.production.advance` 真实推进进度、`WA.aftermathImpact.commissionRepair`）；支持 `strictTarget` 模式在目标缺失时防御性拒收。
   4. `tests/test-wp-a1-integration.js`：新建集成测试套件，覆盖日历时钟推进同步、旅行状态排他阻断、工单暂停/复工/交付闭环、物件维修耐久恢复、执行幂等性以及真实工单推进等 6 大集成用例（6/6 全绿）。
 - 验证：`tests/test-wp-a1-integration.js` (6/6 PASS)，`tests/exp12-labor-schedule-v2232.js` (20/20 PASS)，`tests/exp10-action-desk-v2232.js` (35/35 PASS)，`tests/exp11-action-methods-v2232.js` (38/38 PASS)，累计 99 项断言全部通过。零额外依赖，单一真源持久化，向后兼容既有调用契约。
+
+### R-WP-A2-20261024 · A包第2个工作日切片（经营工艺链闭环、有限机会多人物竞争、共同计划版本化知情）
+- 做了：
+  1. `engines/production.js`（WP-4 经营与工艺链）：
+     - 接入 `techLineage.canProduce` 技艺资质检查：未受训学徒持有手稿独立开单被拒（`unskilled-reader`）；支持指定具备资格的师傅带工协作（`withMaster`），建立 `supervisedBy` 主从带工生产链路。
+     - 新增工单延期写口 `extend(orderId, opts)`：增加工期 `days` 并保留已耗材料与已推进进度，完工单延期可恢复为在产状态。
+     - 新增批量工单部分交付写口 `deliverPartial(orderId, opts)`：多件工单在部分完工后按进度比例将部分成品先行入库（`economy.stock`），未交付件数与剩余工期继续在产。
+  2. `engines/action-desk.js`（WX-1 有限机会多人物竞争与转向）：
+     - 声明有限机会 `declareOpportunity(oppId, spec)`、申请意向 `applyOpportunity(oppId, who, opts)` 与规则择定 `awardOpportunity(oppId, opts)`，支持 `qualification`、`first_come`、`price` 三类规则。
+     - 申请意向物理拦截途中旅行人员（`person-traveling`）；胜出者自动排班锁定该工单（`production.staff`），落选人明确生成落选原因并获得转向建议（`nextActions: ['actionDesk.findAlternative']`），杜绝工位双占与死锁。
+     - 补齐 `ROUTES` 中 `production.extend`、`production.deliverPartial`、`sharedAwareness.amendPact` 与机会竞争操作映射，并在 `plan` 中注入连续动作建议。
+  3. `engines/shared-awareness.js`（WX-2 共同计划与版本化知情）：
+     - 协议支持版本号追踪与修订 `amendPact(pactId, changes, byWho)`，修订时递增 `revision`，发起人自动确认最新安排，其他合作人重置为未确认状态（`status = 'misunderstanding'`）。
+     - 提供视角化认知查询 `viewPact(pactId, whoName)`，精准反映当事人认知是已确认最新安排还是处于陈旧版本（`stale_revision`）；直至全体确认最新版本后协调状态才恢复为 `coordinated`。
+  4. `tests/test-wp-a2-integration.js`：新建集成测试套件，覆盖技艺资格前置与师傅协作、工单显式延期、批量工单部分交付入库、有限机会多人物竞争择定与落选转向、共同计划修订与版本化知情等 5 大核心场景（5/5 全绿）。
+- 验证：`tests/test-wp-a2-integration.js` (5/5 PASS)，`tests/test-wp-a1-integration.js` (6/6 PASS)，`tests/exp3-production-v2231.js` (90/90 PASS)，`tests/exp10-action-desk-v2232.js` (35/35 PASS)，`tests/exp20-shared-awareness-v2232.js` (18/18 PASS)，`tests/exp11-action-methods-v2232.js` (38/38 PASS)，`tests/exp12-labor-schedule-v2232.js` (20/20 PASS)，累计 212 项业务与专锁断言全绿通过。

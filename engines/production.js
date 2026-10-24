@@ -79,7 +79,7 @@
   //   （否则「工位满」会在单子做完之后仍然为真 —— 那是读数在骗人，不是世界在忙）。
   const OPEN_STATUS = ['running', 'paused'];
   const stat = { opened: 0, staffed: 0, resupplied: 0, advanced: 0, paused: 0, resumed: 0,
-    delivered: 0, cancelled: 0, blocked: 0, lastReason: '', faults: {} };
+    delivered: 0, cancelled: 0, blocked: 0, extended: 0, deliveredPartial: 0, lastReason: '', faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function refuse(reason, extra) { noteFault(reason); return Object.assign({ ok: false, reason: reason }, extra || {}); }
   function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
@@ -237,6 +237,30 @@
       const access = WA.research.canUse(by, recipe, { manufacture: true });
       if (!access.ok) return access;
     }
+    const tradId = clean(s.traditionId || (rec && rec.traditionId), 40);
+    let supervisedBy = '';
+    if (tradId && WA.techLineage && typeof WA.techLineage.canProduce === 'function') {
+      const canProd = WA.techLineage.canProduce(tradId, by, {
+        docId: clean(s.docId, 40),
+        hasDocument: !!s.hasDocument,
+        variantId: clean(s.variantId, 40)
+      });
+      if (canProd && !canProd.can) {
+        const master = clean(s.withMaster, 60);
+        let masterOk = false;
+        if (master && personExists(master)) {
+          const mCheck = WA.techLineage.canProduce(tradId, master, { variantId: clean(s.variantId, 40) });
+          if (mCheck && mCheck.can) { masterOk = true; supervisedBy = master; }
+        }
+        if (!masterOk) {
+          return refuse(canProd.reason || 'unskilled-worker', {
+            by: by, traditionId: tradId, stage: canProd.stage,
+            requiredStage: canProd.requiredStage,
+            hint: master ? '指定的带工师傅不具备该工艺生产资格' : '手握文献手稿但未受训出师，需师傅带领协作方可生产'
+          });
+        }
+      }
+    }
     if (facility && !facOf(facility)) return refuse('no-such-facility', { facility: facility,
       declared: facsOf().map(function (f) { return f.name; }) });
     if (facility) {
@@ -254,6 +278,7 @@
       const id = 'pj_' + now + '_' + b.jobs.length;
       const row = { id: id, recipe: recipe, qty: qty, days: days, done: 0, status: 'running',
         facility: facility, place: clean(s.place, 40), by: by, crew: [], reserve: {},
+        traditionId: tradId, supervisedBy: supervisedBy,
         label: clean(o.label, 60), at: now, startedAt: now, updatedAt: now,
         finishedAt: 0, deliveredAt: 0, pausedAt: 0, pausedReason: '',
         // 已入库账（幂等）：产物名 → 已入库数量。空对象表示一样都没进库。
@@ -262,6 +287,7 @@
       WA.evict.array(b.jobs, 'production.jobs', cfg.maxJobs);
       out = { ok: true, id: id, recipe: recipe, qty: qty, days: days, done: 0, status: 'running',
         facility: facility, by: by, perDay: perDay(rec, qty, days), need: wholeNeed(rec, qty),
+        traditionId: tradId, supervisedBy: supervisedBy,
         clamped: clamped };
       return true;
     }, 'production:open');
@@ -621,6 +647,121 @@
     if (out && out.ok) { stat.cancelled++; stat.lastReason = 'cancelled'; }
     return out || refuse('store-unavailable');
   }
+  /**
+   * 延期：未完结工单可增加工期（days），不强行取消或凭空清零进度。
+   */
+  function extend(orderId, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const o = opts || {};
+    const j = jobOf(orderId);
+    if (!j) return refuse('unknown-order', { id: orderId });
+    const st = clean(j.status, 12);
+    if (st === 'delivered' || st === 'cancelled') return refuse('order-closed', { id: j.id, status: st });
+    const add = num(o.days) === null ? 1 : Math.floor(num(o.days));
+    if (!(add >= 1)) return refuse('bad-days', { days: o.days });
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = ensure(draft);
+      const row = b.jobs.filter(function (x) { return x && clean(x.id, 60) === clean(j.id, 60); })[0] || null;
+      if (!row) { out = { ok: false, reason: 'unknown-order', id: j.id }; return false; }
+      const st2 = clean(row.status, 12);
+      if (st2 === 'delivered' || st2 === 'cancelled') { out = { ok: false, reason: 'order-closed', id: row.id, status: st2 }; return false; }
+      const oldDays = num(row.days) || 1;
+      row.days = oldDays + add;
+      if (row.status === 'done' && row.days > (num(row.done) || 0)) {
+        row.status = 'running';
+      }
+      row.extendedDays = (num(row.extendedDays) || 0) + add;
+      row.extendReason = clean(o.reason || o.why, 40) || 'manual-extension';
+      row.updatedAt = clockNow('production');
+      out = { ok: true, id: row.id, days: row.days, added: add, oldDays: oldDays, done: num(row.done) || 0,
+        status: row.status, reason: row.extendReason };
+      return true;
+    }, 'production:extend');
+    if (out && out.ok) { stat.extended = (stat.extended || 0) + 1; stat.lastReason = 'extended'; }
+    return out || refuse('store-unavailable');
+  }
+  /**
+   * 部分交付：多件工单在部分完工后先行交付，不全单卡死在未完工状态。
+   */
+  function deliverPartial(orderId, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const o = opts || {};
+    const j = jobOf(orderId);
+    if (!j) return refuse('unknown-order', { id: orderId });
+    const st = clean(j.status, 12);
+    if (st === 'delivered' || st === 'cancelled') return refuse('order-closed', { id: j.id, status: st });
+    const rec = recipeOf(clean(j.recipe, 40));
+    if (!rec) return refuse('unknown-recipe', { recipe: j.recipe });
+    const place = clean(o.place, 40) || clean(j.place, 40);
+    if (!place) return refuse('missing-fields', { field: 'place' });
+    if (!WA.economy || typeof WA.economy.stock !== 'function') return refuse('store-unavailable', { module: 'economy' });
+
+    const totalQty = num(j.qty) || 1;
+    const doneDays = num(j.done) || 0;
+    const reqDays = num(j.days) || 1;
+    const completedQty = Math.floor((doneDays / reqDays) * totalQty);
+    if (completedQty < 1) {
+      return refuse('insufficient-progress', { id: j.id, done: doneDays, days: reqDays, qty: totalQty,
+        hint: '当前工期进度尚未做完任何整件，无法部分交付' });
+    }
+    const wantQty = num(o.qty) === null ? 1 : Math.floor(num(o.qty));
+    if (!(wantQty >= 1)) return refuse('bad-qty', { qty: o.qty });
+    const deliverQty = Math.min(wantQty, completedQty, totalQty);
+
+    const made = {};
+    const outs = Object.keys(rec.out);
+    for (let i = 0; i < outs.length; i++) {
+      const k = outs[i];
+      const q = +(rec.out[k] * deliverQty).toFixed(3);
+      let r = null;
+      try { r = WA.economy.stock(place, k, q, { base: o.base }); } catch (e) { r = null; }
+      if (!r || r.ok !== true) {
+        return refuse((r && r.reason) || 'store-unavailable', { id: j.id, at: 'economy.stock', resource: k });
+      }
+      made[k] = q;
+    }
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = ensure(draft);
+      const row = b.jobs.filter(function (x) { return x && clean(x.id, 60) === clean(j.id, 60); })[0] || null;
+      if (!row) { out = { ok: false, reason: 'unknown-order', id: j.id }; return false; }
+      if (clean(row.status, 12) === 'delivered' || clean(row.status, 12) === 'cancelled') {
+        out = { ok: false, reason: 'order-closed', id: row.id, status: row.status }; return false;
+      }
+      if (!row.delivered || typeof row.delivered !== 'object') row.delivered = {};
+      Object.keys(made).forEach(function (k) {
+        row.delivered[k] = +((num(row.delivered[k]) || 0) + made[k]).toFixed(3);
+      });
+      const remainQty = Math.max(0, (num(row.qty) || 1) - deliverQty);
+      row.qty = remainQty;
+      const usedDays = Math.floor((deliverQty / totalQty) * reqDays);
+      row.done = Math.max(0, (num(row.done) || 0) - usedDays);
+      row.days = Math.max(1, (num(row.days) || 1) - usedDays);
+      if (remainQty <= 0) {
+        row.status = 'delivered';
+        row.deliveredAt = clockNow('production');
+      }
+      row.updatedAt = clockNow('production');
+      out = {
+        ok: true,
+        id: row.id,
+        deliveredQty: deliverQty,
+        remainingQty: remainQty,
+        made: made,
+        place: place,
+        status: row.status,
+        done: row.done,
+        days: row.days
+      };
+      return true;
+    }, 'production:deliverPartial');
+    if (out && out.ok) { stat.deliveredPartial = (stat.deliveredPartial || 0) + 1; stat.lastReason = 'deliveredPartial'; }
+    return out || refuse('store-unavailable');
+  }
   /** 只读：工单清单（可按状态/设施/开工者过滤）。 */
   function list(filter) {
     const f = filter || {};
@@ -673,6 +814,7 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     declareFacility: declareFacility, open: open, staff: staff, resupply: resupply,
     advance: advance, pause: pause, resume: resume, deliver: deliver, cancel: cancel,
+    extend: extend, deliverPartial: deliverPartial,
     list: list, reload: reload, view: view, stat: statView, resetStat: resetStat, reset: reset
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/production.js', { kind: 'engine', ver: '2.231.0' });

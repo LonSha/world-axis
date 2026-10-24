@@ -110,6 +110,7 @@
       factId: clean(s.factId || pId, 60),
       participants: participants,
       confirmedBy: [],
+      revision: 1,
       status: 'pending', // pending | coordinated | misunderstanding
       openedAt: WA.clock.now('sharedAwareness')
     };
@@ -180,11 +181,74 @@
       note: '尚有人未确认，需先行确认再统一行动' };
   }
 
+  /**
+   * 修订协议：方案改期或内容修改时递增 revision，重置其余人的确认。
+   */
+  function amendPact(pactId, changes, byWho) {
+    const pId = clean(pactId, 60);
+    const me = personId(byWho);
+    const bk = ensureBucket();
+    const pact = bk.pacts && bk.pacts[pId];
+    if (!pact) return { ok: false, reason: 'pact-not-found' };
+    if (pact.participants.indexOf(me) < 0) {
+      return { ok: false, reason: 'not-a-participant', note: '非参与者无权修改约定' };
+    }
+    const ch = changes || {};
+    let out = null;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        const p = d.sharedAwareness.pacts[pId];
+        p.revision = (Number(p.revision) || 1) + 1;
+        p.lastAmendedBy = me;
+        p.lastAmendedAt = WA.clock.now('sharedAwareness');
+        p.changes = Object.assign({}, p.changes || {}, ch);
+        if (ch.title) p.title = clean(ch.title, 60);
+        if (ch.factId) p.factId = clean(ch.factId, 60);
+        // 发起修订者自动确认该版本，其余人变为未确认
+        p.confirmedBy = [me];
+        p.status = 'misunderstanding'; // 版本出现延迟，进入误会/待对齐状态
+        out = { ok: true, pactId: pId, revision: p.revision, status: p.status,
+          confirmedBy: p.confirmedBy.slice(), amendedBy: me, changes: p.changes };
+        return true;
+      }, 'sharedAwareness:amendPact');
+    }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 视角化查询协议认知状态（区分版本延迟与最新确认）。
+   */
+  function viewPact(pactId, whoName) {
+    const pId = clean(pactId, 60);
+    const me = personId(whoName);
+    const bk = ensureBucket();
+    const pact = bk.pacts && bk.pacts[pId];
+    if (!pact) return { ok: false, reason: 'pact-not-found' };
+    const rev = Number(pact.revision) || 1;
+    const isConfirmed = pact.confirmedBy.indexOf(me) >= 0;
+    const isParticipant = pact.participants.indexOf(me) >= 0;
+    return {
+      ok: true,
+      pactId: pId,
+      title: pact.title,
+      revision: rev,
+      status: pact.status,
+      participants: pact.participants.slice(),
+      confirmedBy: pact.confirmedBy.slice(),
+      isParticipant: isParticipant,
+      hasConfirmedLatest: isConfirmed,
+      cognitiveStatus: isConfirmed ? 'confirmed_latest' : 'stale_revision',
+      note: isConfirmed ? '已确认最新安排' : '安排已修订，当事人尚未确认最新版本，按旧版本认知存在跑空风险'
+    };
+  }
+
   WA.sharedAwareness = {
     assertMeta: assertMeta,
     metaOf: metaOf,
     openPact: openPact,
     confirmPact: confirmPact,
+    amendPact: amendPact,
+    viewPact: viewPact,
     coordination: coordination
   };
 

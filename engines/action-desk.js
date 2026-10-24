@@ -80,6 +80,11 @@
     'production.resupply': function (o) { return WA.production.resupply(o.orderId, o); },
     'production.deliver': function (o) { return WA.production.deliver(o.orderId, o); },
     'production.cancel': function (o) { return WA.production.cancel(o.orderId, o); },
+    'production.extend': function (o) { return WA.production.extend(o.orderId || o.id, o); },
+    'production.deliverPartial': function (o) { return WA.production.deliverPartial(o.orderId || o.id, o); },
+    'actionDesk.declareOpportunity': function (o) { return declareOpportunity(o.oppId || o.id, o); },
+    'actionDesk.applyOpportunity': function (o) { return applyOpportunity(o.oppId || o.id, o.who, o); },
+    'actionDesk.awardOpportunity': function (o) { return awardOpportunity(o.oppId || o.id, o); },
     'training.practice': function (o) { return WA.training.practice(o.who, o.ability, { mode: o.mode }); },
     'gear.use': function (o) { return WA.gear.use(o.itemId, { by: o.who, note: o.note }); },
     'method.execute': function (o) { return WA.actionMethods.execute(o.taskId, o.who, o.methodId, o); },
@@ -99,6 +104,7 @@
     'sharedAwareness.assertMeta': function (o) { return WA.sharedAwareness.assertMeta(o.who, o.target, o.factId, o.basis); },
     'sharedAwareness.openPact': function (o) { return WA.sharedAwareness.openPact(o.pactId, o.spec); },
     'sharedAwareness.confirmPact': function (o) { return WA.sharedAwareness.confirmPact(o.pactId, o.who); },
+    'sharedAwareness.amendPact': function (o) { return WA.sharedAwareness.amendPact(o.pactId, o.changes, o.who); },
     // v2.231.0（拓展 IN-4）：习俗到制度
     'customLax.spawnCandidate': function (o) { return WA.customLax.spawnCandidate(o.spec); },
     'customLax.submitToApproval': function (o) { return WA.customLax.submitToApproval(o.candidateId, o); },
@@ -143,6 +149,145 @@
   function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function knownPerson(who) { const s = state(); return !!(s.people && s.people['p_' + who]); }
   function num(v) { const n = Number(v); return (typeof n === 'number' && isFinite(n)) ? n : null; }
+
+  function ensureDeskStore(draft) {
+    if (!draft.actionDesk || typeof draft.actionDesk !== 'object') {
+      draft.actionDesk = { opportunities: {} };
+    }
+    if (!draft.actionDesk.opportunities || typeof draft.actionDesk.opportunities !== 'object') {
+      draft.actionDesk.opportunities = {};
+    }
+    return draft.actionDesk;
+  }
+
+  function declareOpportunity(oppId, spec) {
+    const id = clean(oppId, 60);
+    const s = spec || {};
+    if (!id) return { ok: false, reason: 'missing-fields', field: 'oppId' };
+    let out = null;
+    WA.store.transact(function (draft) {
+      const d = ensureDeskStore(draft);
+      const row = {
+        id: id,
+        kind: clean(s.kind || 'production_order', 40),
+        targetId: clean(s.targetId || id, 60),
+        slots: Math.max(1, num(s.slots) || 1),
+        rule: clean(s.rule || 'qualification', 30),
+        bids: [],
+        status: 'open',
+        awardedAt: 0,
+        winners: []
+      };
+      d.opportunities[id] = row;
+      out = { ok: true, opportunity: row };
+      return true;
+    }, 'actionDesk:declareOpportunity');
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function applyOpportunity(oppId, who, opts) {
+    const id = clean(oppId, 60);
+    const w = clean(who, 60);
+    const o = opts || {};
+    if (!id || !w) return { ok: false, reason: 'missing-fields' };
+    if (!knownPerson(w)) return { ok: false, reason: 'unknown-person', who: w };
+    const st = state();
+    const pRecord = (st.people && st.people['p_' + w]) || null;
+    if (pRecord && (pRecord.traveling || pRecord.status === 'traveling' || pRecord.status === 'on_the_road' || pRecord.status === 'transit')) {
+      return { ok: false, reason: 'person-traveling', who: w, note: '该人物正在途中旅行，无法申请本地机会' };
+    }
+    const opps = (st.actionDesk && st.actionDesk.opportunities) ? st.actionDesk.opportunities : {};
+    const opp = opps[id];
+    if (!opp) return { ok: false, reason: 'opportunity-not-found', id: id };
+    if (opp.status !== 'open') return { ok: false, reason: 'opportunity-closed', id: id, status: opp.status };
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const d = ensureDeskStore(draft);
+      const target = d.opportunities[id];
+      if (!target || target.status !== 'open') {
+        out = { ok: false, reason: 'opportunity-closed' };
+        return false;
+      }
+      if (!Array.isArray(target.bids)) target.bids = [];
+      const existing = target.bids.filter(function (b) { return b && b.who === w; })[0];
+      const bidEntry = {
+        who: w,
+        skill: num(o.skill) === null ? 1 : num(o.skill),
+        price: num(o.price) === null ? 10 : num(o.price),
+        bidAt: clockNow('actionDesk'),
+        note: clean(o.note, 60)
+      };
+      if (existing) {
+        Object.assign(existing, bidEntry);
+      } else {
+        target.bids.push(bidEntry);
+      }
+      out = { ok: true, oppId: id, who: w, bid: bidEntry, totalBids: target.bids.length };
+      return true;
+    }, 'actionDesk:applyOpportunity');
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function awardOpportunity(oppId, opts) {
+    const id = clean(oppId, 60);
+    const o = opts || {};
+    const st = state();
+    const opps = (st.actionDesk && st.actionDesk.opportunities) ? st.actionDesk.opportunities : {};
+    const opp = opps[id];
+    if (!opp) return { ok: false, reason: 'opportunity-not-found', id: id };
+    if (opp.status !== 'open') return { ok: false, reason: 'already-awarded', id: id, status: opp.status };
+    const bids = (Array.isArray(opp.bids) ? opp.bids : []).slice();
+    if (bids.length === 0) return { ok: false, reason: 'no-bids', id: id };
+
+    const rule = clean(o.rule || opp.rule || 'qualification', 30);
+    if (rule === 'first_come') {
+      bids.sort(function (a, b) { return (num(a.bidAt) || 0) - (num(b.bidAt) || 0); });
+    } else if (rule === 'price') {
+      bids.sort(function (a, b) { return (num(a.price) || 0) - (num(b.price) || 0); });
+    } else {
+      bids.sort(function (a, b) { return (num(b.skill) || 0) - (num(a.skill) || 0); });
+    }
+
+    const slots = Math.max(1, num(opp.slots) || 1);
+    const winners = bids.slice(0, slots);
+    const declined = bids.slice(slots);
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const d = ensureDeskStore(draft);
+      const target = d.opportunities[id];
+      if (!target || target.status !== 'open') {
+        out = { ok: false, reason: 'already-awarded' };
+        return false;
+      }
+      target.status = 'awarded';
+      target.awardedAt = clockNow('actionDesk');
+      target.winners = winners.map(function (w) { return w.who; });
+      out = {
+        ok: true,
+        oppId: id,
+        rule: rule,
+        winners: winners,
+        declined: declined.map(function (d) {
+          return {
+            who: d.who,
+            reason: 'outbid-or-slots-full',
+            nextActions: ['actionDesk.findAlternative']
+          };
+        }),
+        status: 'awarded'
+      };
+      return true;
+    }, 'actionDesk:awardOpportunity');
+
+    if (out && out.ok && opp.kind === 'production_order' && opp.targetId && winners.length && WA.production) {
+      try {
+        WA.production.staff(opp.targetId, winners[0].who);
+      } catch (e) {}
+    }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
 
   /** 逐源采集的在场性（缺席如实报，不静默当空）。 */
   const SOURCE_NS = { research: 'research', family: 'family', production: 'production', training: 'training', gear: 'gear' };
@@ -384,6 +529,11 @@
         if (key === 'production.open') out.nextActions = ['production.staff', 'production.advance'];
         else if (key === 'production.resupply') out.nextActions = ['production.resume', 'production.advance'];
         else if (key === 'production.resume') out.nextActions = ['production.advance'];
+        else if (key === 'production.extend') out.nextActions = ['production.advance'];
+        else if (key === 'production.deliverPartial') out.nextActions = (out.remainingQty > 0) ? ['production.advance', 'production.deliver'] : ['production.open'];
+        else if (key === 'actionDesk.applyOpportunity') out.nextActions = ['actionDesk.awardOpportunity'];
+        else if (key === 'actionDesk.awardOpportunity') out.nextActions = ['production.advance'];
+        else if (key === 'sharedAwareness.amendPact') out.nextActions = ['sharedAwareness.confirmPact'];
         else if (key === 'production.advance') {
           out.nextActions = (out.job && out.job.status === 'delivered') ? ['production.open'] : ['production.advance', 'production.deliver'];
         } else if (key === 'production.deliver') out.nextActions = ['production.open', 'schedule.claim'];
