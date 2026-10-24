@@ -182,12 +182,122 @@
       note: '只导出静态玩法定义和初始条件；不导出进行中项目、私有记忆或已知成果进度'
     };
   }
+  /**
+   * 安装玩法蓝图（WP-9 玩法可安装骨架）：
+   * 将蓝图中的静态玩法定义、初始条件与关联设施安全注入世界真源。
+   */
+  function installSample(sampleId, opts) {
+    var r = getSample(sampleId);
+    if (!r.ok) return r;
+    var s = r.sample;
+    var o = opts || {};
+    var dep = checkDependencies(sampleId);
+    if (!dep.canStart && !o.ignoreMissing) {
+      return { ok: false, reason: 'missing-required-engines', missing: dep.requiredMissing };
+    }
+    var st = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+    var hasExistingData = (st.people && Object.keys(st.people).length > 0) ||
+      (st.world && Array.isArray(st.world.places) && st.world.places.length > 0);
 
+    if (o.dryRun) {
+      return {
+        ok: true,
+        dryRun: true,
+        sampleId: s.id,
+        willInstall: {
+          places: (s.initConditions && s.initConditions.places) || [],
+          factions: (s.initConditions && s.initConditions.factions) || [],
+          playDefs: s.playDefs,
+          openingScene: s.openingScene
+        }
+      };
+    }
+
+    if (hasExistingData && !o.force && !o.overwrite) {
+      var samplePlaces = (s.initConditions && s.initConditions.places) || [];
+      var wplaces = (st.world && Array.isArray(st.world.places)) ? st.world.places : [];
+      var confPlaces = samplePlaces.filter(function (p) {
+        return wplaces.some(function (wp) { return wp && (wp.id === p || wp.name === p); });
+      });
+      return {
+        ok: false,
+        reason: 'conflict-existing-world',
+        conflicts: { places: confPlaces },
+        note: '当前世界已存在人物或地点资产，请传入 { force: true } 确认覆盖导入，以防静默破坏'
+      };
+    }
+    var installed = null;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (draft) {
+        draft.world = draft.world || {};
+        draft.world.places = draft.world.places || [];
+        draft.region = draft.region || {};
+        draft.region.places = draft.region.places || [];
+        var places = (s.initConditions && s.initConditions.places) || [];
+        places.forEach(function (pName) {
+          var pId = clean(pName, 40);
+          if (!draft.world.places.some(function (p) { return p && (p.id === pId || p.name === pId); })) {
+            draft.world.places.push({ id: pId, name: pId, desc: '由玩法蓝图【' + s.label + '】初始创建' });
+          }
+          if (!draft.region.places.some(function (p) { return p && (p.id === pId || p.name === pId); })) {
+            draft.region.places.push({ id: pId, name: pId });
+          }
+        });
+        if (places.length > 0 && !draft.region.currentPlace) {
+          draft.region.currentPlace = places[0];
+        }
+        draft.world.factions = draft.world.factions || [];
+        var factions = (s.initConditions && s.initConditions.factions) || [];
+        factions.forEach(function (f) {
+          if (!draft.world.factions.some(function (x) { return x && x.name === f.name; })) {
+            draft.world.factions.push({ name: f.name, type: f.type || 'guild' });
+          }
+        });
+        draft.blueprint = draft.blueprint || {};
+        if (!draft.blueprint.installed || typeof draft.blueprint.installed !== 'object' || draft.blueprint.installed.sampleId) {
+          draft.blueprint.installed = {};
+        }
+        draft.blueprint.installed[s.id] = {
+          sampleId: s.id,
+          theme: s.theme,
+          playDefs: JSON.parse(JSON.stringify(s.playDefs)),
+          openingScene: s.openingScene,
+          installedAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('blueprint') : Date.now()
+        };
+        draft.blueprint.latestInstalled = s.id;
+        installed = draft.blueprint.installed[s.id];
+        if (s.playDefs && s.playDefs.recipe && Array.isArray(s.playDefs.recipe.facilities) && WA.production) {
+          draft.production = draft.production || { jobs: [], facilities: [] };
+          draft.production.facilities = draft.production.facilities || [];
+          s.playDefs.recipe.facilities.forEach(function (facName) {
+            if (!draft.production.facilities.some(function (f) { return f && f.name === facName; })) {
+              draft.production.facilities.push({
+                name: facName,
+                label: facName,
+                slots: 2,
+                at: Date.now(),
+                updatedAt: Date.now()
+              });
+            }
+          });
+        }
+        installed = draft.blueprint.installed;
+        return true;
+      }, 'playableBlueprint:install');
+    }
+    return {
+      ok: true,
+      sampleId: s.id,
+      installed: installed,
+      note: '玩法包【' + s.label + '】已成功安装至世界真源'
+    };
+  }
   WA.playableBlueprint = {
     listSamples: listSamples,
     getSample: getSample,
     checkDependencies: checkDependencies,
     exportPlayDefs: exportPlayDefs,
+    installSample: installSample,
     THEME_KEYS: THEME_KEYS.slice(),
     PLAY_DEF_KEYS: PLAY_DEF_KEYS.slice()
   };

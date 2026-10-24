@@ -5671,3 +5671,32 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
      - 场景 3（WP-5 NPC 违约遗憾经验学习改变决策）：年轻学徒在资金危机下面临私接外快（背弃工坊约定）与履约协助师傅的两难抉择；首次仲裁选择私接外快，事后获知被扣款且师傅工单延误产生真实悔恨（`regret` 回声），偏置注入 `person.life.learnings.biases`；当下一次面临类似抉择时，偏置使学徒选择恪守承诺，真实摆脱静态模型重复犯错缺陷。
      - 场景 4（WP-5 局部知情保护）：事件在远方发生但当事人未亲历且未收到消息的情形下，`isAware` 为假，`realizeOutcome` 判定为 `unaware-of-outcome`，拒不产生全知虚假遗憾或偏好跳变，维护局部可知性边界。
 - 验证：`tests/test-wp-a3-integration.js` (4/4 PASS)，`tests/test-wp-a1-integration.js` (6/6 PASS)，`tests/test-wp-a2-integration.js` (5/5 PASS)，`tests/exp3-production-v2231.js` (90/90 PASS)，`tests/exp10-action-desk-v2232.js` (35/35 PASS)，`tests/exp11-action-methods-v2232.js` (38/38 PASS)，`tests/exp12-labor-schedule-v2232.js` (20/20 PASS)，`tests/exp14-motive-arbitration-v2232.js` (22/22 PASS)，`tests/exp15-path-echo-v2232.js` (23/23 PASS)，`tests/exp16-tech-lineage-v2232.js` (22/22 PASS)，`tests/exp20-shared-awareness-v2232.js` (18/18 PASS)，累计 283 项严格业务与专锁断言全绿通过。零额外 npm 依赖，单一真源持久化，向后兼容既有调用契约。
+
+### R-WP-B1-20261024 · B包第1阶段切片（共同生活周期履约、设施服务降级与排队唤醒、蓝图安全安装与防冲撞）
+- 做了：
+  1. `engines/playable-blueprint.js`（WP-9 玩法蓝图安装向导与安全边界）：
+     - 落地 `installSample(sampleId, opts)` 写口，支持将样例定义的地点（`world.places`、`region.places`）、阵营（`world.factions`）、生产设施（`production.facilities`）与静态玩法规则完整安全注入世界真源。
+     - 支持无副作用安装试跑 `dryRun: true`，预先提取待安装资产树（`willInstall`）且不触碰世界数据。
+     - 实施世界已有资产冲突保护：当世界中已有同名地点/人物且未带 `force: true` 时，拦截并返回 `conflict-existing-world` 错误及冲突项清单，杜绝新玩法包静默破坏既有世界存档；显式传入 `force: true` 时执行安全覆盖与合并。
+     - 安装清单按字典持久化在 `draft.blueprint.installed[sampleId]` 中，同时更新 `latestInstalled` 指针。
+  2. `engines/family-ops.js`（WP-6 共同生活按周期履约与治理运转）：
+     - 实现共同体周期结算写口 `advanceCycle(unitId, opts)`，真实按周期从共同池金库扣除维护费用；当金库资金不足时，计算已付金额并记录赤字（`deficit`），累计持久化至 `familyOps.budgets[uId].accumulatedDeficit`，杜绝凭空造钱与账目凭空蒸发。
+     - `advanceCycle` 同步推进共同目标（`sharedGoals`），支持资金投入与劳动力天数贡献双轨驱动，完成时自动变更为 `completed` 状态。
+     - 完善 `handleGap`：在成员外出或受阻出现缺口时，代班方案（`substitute`）深度打通 `laborSchedule` 日历排班；途中旅行人员（`traveling` / `on_the_road`）被物理拦截拒收（`substitute-traveling`）；空闲成员代班成功时，真实写入 `laborSchedule.claim` 占用时段，同一时段重复代班触发冲突拦截（`substitute-conflict`）。
+     - 强化具名比例继承分配 `inheritRatio`：预检受益人合法性，当存在无效或虚假受益人时，无效份额留存在被继承人手头账上（`unallocatedRemaining`），严格保持资产总额守恒（`conserved: true`）。
+  3. `engines/service-network.js`（WP-7 设施与公共服务网络）：
+     - 地点存在性判定打通 `region.places` 与 `world.places` 双通道真源。
+     - 消费服务 `requestService` 引入服务降级机制：当设施损耗为 `degraded` 状态时，有效服务容量折半；当前负载超出有效容量时，计算本次请求未满足的超容量并标记为排队中（`queued`）。
+     - 增加显式排队登记接口 `queueService(facilityId, who, amount)`，为超容请求颁发排队凭据并存入 `serviceNetwork.queue`。
+     - 完善负载释放接口 `releaseService(facilityId, amount)`：在成员释放设施负载后，引擎自动自队列头部检查并唤醒等待请求，在剩余容量满足时自动出队消化负载，形成端到端排队消化闭环。
+     - 提供取消排队接口 `cancelQueue(facilityId, queueId)`。
+  4. `engines/action-desk.js`：
+     - 在全局行动桌完整注册上述新写口路由：`playableBlueprint.installSample`、`familyOps.advanceCycle`、`serviceNetwork.queueService`、`serviceNetwork.releaseService` 与 `serviceNetwork.cancelQueue`。
+  5. `tests/test-wp-b1-integration.js`：
+     - 新建 B 包纵向切片综合集成测试套件，全面覆盖蓝图试跑与防冲突保护、共同体周期公摊与赤字感知、缺口代班排班互斥与遗产守恒、设施降级排队与释放自动唤醒、跨会话序列化重载等 5 大关键场景（5/5 全绿）。
+- 验证：
+  - `tests/test-wp-b1-integration.js` (5/5 PASS)
+  - `tests/test-wp-a1-integration.js` (6/6 PASS)
+  - `tests/test-wp-a2-integration.js` (5/5 PASS)
+  - `tests/test-wp-a3-integration.js` (4/4 PASS)
+  - 联合历史 12 套专锁（EXP12-24）全绿通过。代码库零外部依赖，严格维护单一真源持久化规范。

@@ -49,24 +49,26 @@
     return (s.serviceNetwork && typeof s.serviceNetwork === 'object') ? s.serviceNetwork : null;
   }
 
-  function ensureBucket() {
+function ensureBucket() {
     if (!bucket()) {
       if (WA.store && WA.store.transact) {
         WA.store.transact(function (d) {
-          d.serviceNetwork = d.serviceNetwork || { facilities: [], usage: [] };
+          d.serviceNetwork = d.serviceNetwork || { facilities: [], usage: [], queue: [] };
           return true;
         }, 'serviceNetwork:init');
       }
     }
-    return bucket() || { facilities: [], usage: [] };
+    var b = bucket() || { facilities: [], usage: [], queue: [] };
+    if (!Array.isArray(b.queue)) b.queue = [];
+    return b;
   }
-
   function placeExists(placeId) {
     var s = state();
-    var places = (s.region && Array.isArray(s.region.places)) ? s.region.places : [];
-    return places.some(function (p) { return p && (p.id === placeId || p.name === placeId); });
+    var rplaces = (s.region && Array.isArray(s.region.places)) ? s.region.places : [];
+    var wplaces = (s.world && Array.isArray(s.world.places)) ? s.world.places : [];
+    return rplaces.some(function (p) { return p && (p.id === placeId || p.name === placeId); }) ||
+           wplaces.some(function (p) { return p && (p.id === placeId || p.name === placeId); });
   }
-
   /**
    * 声明一处公共设施及其服务。
    * 设施必须引用真实地点。
@@ -135,44 +137,58 @@
   /**
    * 消费设施服务：增加负载，容量不足时报排队。
    */
-  function requestService(facilityId, who, amount) {
+function requestService(facilityId, who, amount, opts) {
     var fId = clean(facilityId, 60);
     var by = clean(who, 40);
     var amt = num(amount) || 1;
+    var o = opts || {};
     var bk = ensureBucket();
     var fac = (bk.facilities || []).filter(function (f) { return f && f.id === fId; })[0];
     if (!fac) return { ok: false, reason: 'facility-not-found' };
     if (fac.status !== 'operational' && fac.status !== 'degraded') {
       return { ok: false, reason: 'not-available', status: fac.status };
     }
-
+    var maxCap = (fac.status === 'degraded') ? Math.max(1, Math.floor(fac.capacity * 0.5)) : fac.capacity;
     var newLoad = fac.load + amt;
     var capped = newLoad > fac.capacity;
-    var effective = capped ? fac.capacity - fac.load : amt;
+    if (fac.status === 'degraded' && newLoad > maxCap) capped = true;
+    var effectiveCap = (fac.status === 'degraded') ? maxCap : fac.capacity;
+    var effective = capped ? Math.max(0, effectiveCap - fac.load) : amt;
     if (effective < 0) effective = 0;
-    var queued = capped ? newLoad - fac.capacity : 0;
-
+    var queued = capped ? (amt - effective) : 0;
+    var queueId = null;
     if (WA.store && WA.store.transact) {
       WA.store.transact(function (d) {
         var f = (d.serviceNetwork.facilities || []).filter(function (x) { return x && x.id === fId; })[0];
         if (f) {
-          f.load = Math.min(f.load + effective, f.capacity);
+          f.load = Math.min(f.load + effective, effectiveCap);
           d.serviceNetwork.usage.push({
             facilityId: fId, who: by, requested: amt, served: effective,
             queued: queued, at: now()
           });
+          if (queued > 0 && o.enqueue) {
+            d.serviceNetwork.queue = d.serviceNetwork.queue || [];
+            queueId = 'q_' + now() + '_' + d.serviceNetwork.queue.length;
+            d.serviceNetwork.queue.push({
+              id: queueId,
+              facilityId: fId,
+              who: by,
+              amount: queued,
+              queuedAt: now()
+            });
+          }
         }
         return true;
       }, 'serviceNetwork:requestService');
     }
-
     return {
       ok: true, facilityId: fId, served: effective, queued: queued,
+      queueId: queueId,
+      effectiveCapacity: effectiveCap,
       degraded: fac.status === 'degraded',
       note: queued > 0 ? ('容量不足，' + queued + ' 单位排队等候') : '服务已提供'
     };
   }
-
   /**
    * 释放负载（使用完毕）。
    */
@@ -182,18 +198,86 @@
     var bk = ensureBucket();
     var fac = (bk.facilities || []).filter(function (f) { return f && f.id === fId; })[0];
     if (!fac) return { ok: false, reason: 'facility-not-found' };
-
+    var dequeued = [];
     if (WA.store && WA.store.transact) {
       WA.store.transact(function (d) {
         var f = (d.serviceNetwork.facilities || []).filter(function (x) { return x && x.id === fId; })[0];
-        if (f) { f.load = Math.max(0, f.load - amt); }
+        if (f) {
+          f.load = Math.max(0, f.load - amt);
+          var effectiveCap = (f.status === 'degraded') ? Math.max(1, Math.floor(f.capacity * 0.5)) : f.capacity;
+          d.serviceNetwork.queue = d.serviceNetwork.queue || [];
+          while (d.serviceNetwork.queue.length > 0) {
+            var head = d.serviceNetwork.queue[0];
+            if (head.facilityId !== fId) break;
+            var available = effectiveCap - f.load;
+            if (available >= head.amount) {
+              var popped = d.serviceNetwork.queue.shift();
+              f.load += popped.amount;
+              d.serviceNetwork.usage.push({
+                facilityId: fId, who: popped.who, requested: popped.amount, served: popped.amount,
+                queued: 0, fromQueue: true, at: now()
+              });
+              dequeued.push(popped);
+            } else {
+              break;
+            }
+          }
+        }
         return true;
       }, 'serviceNetwork:releaseService');
     }
-
-    return { ok: true, facilityId: fId };
+    return { ok: true, facilityId: fId, dequeued: dequeued };
   }
-
+  /**
+   * 将服务请求登记入排队等待队列
+   */
+  function queueService(facilityId, who, amount) {
+    var fId = clean(facilityId, 60);
+    var by = clean(who, 40);
+    var amt = num(amount) || 1;
+    var bk = ensureBucket();
+    var fac = (bk.facilities || []).filter(function (f) { return f && f.id === fId; })[0];
+    if (!fac) return { ok: false, reason: 'facility-not-found' };
+    var qId = null;
+    var pos = 1;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.serviceNetwork.queue = d.serviceNetwork.queue || [];
+        qId = 'q_' + now() + '_' + d.serviceNetwork.queue.length;
+        d.serviceNetwork.queue.push({
+          id: qId,
+          facilityId: fId,
+          who: by,
+          amount: amt,
+          queuedAt: now()
+        });
+        pos = d.serviceNetwork.queue.length;
+        return true;
+      }, 'serviceNetwork:queueService');
+    }
+    return { ok: true, facilityId: fId, queueId: qId, position: pos, amount: amt };
+  }
+  /**
+   * 取消排队等候
+   */
+  function cancelQueue(facilityId, queueId) {
+    var fId = clean(facilityId, 60);
+    var qId = clean(queueId, 60);
+    var removed = false;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        if (d.serviceNetwork && Array.isArray(d.serviceNetwork.queue)) {
+          var before = d.serviceNetwork.queue.length;
+          d.serviceNetwork.queue = d.serviceNetwork.queue.filter(function (q) {
+            return !(q && q.id === qId && q.facilityId === fId);
+          });
+          removed = d.serviceNetwork.queue.length < before;
+        }
+        return true;
+      }, 'serviceNetwork:cancelQueue');
+    }
+    return { ok: true, facilityId: fId, queueId: qId, cancelled: removed };
+  }
   /**
    * 停止维护使服务逐步受影响（degraded）。
    * 修复依赖 OP-6（aftermath），不能仅改标签。
@@ -256,6 +340,8 @@
     activateFacility: activateFacility,
     requestService: requestService,
     releaseService: releaseService,
+    queueService: queueService,
+    cancelQueue: cancelQueue,
     decayFacility: decayFacility,
     restoreFacility: restoreFacility,
     servicesAt: servicesAt,

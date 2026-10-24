@@ -118,7 +118,24 @@
       if (currentTreasury < wage) {
         return { ok: false, reason: 'insufficient-treasury', treasury: currentTreasury, needed: wage };
       }
-
+      const helperName = clean(o.helperName, 60);
+      if (helperName) {
+        const hId = personId(helperName);
+        const s = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+        const hp = (s.people && s.people[hId]) ? s.people[hId] : null;
+        if (hp) {
+          if (hp.status === 'traveling' || hp.status === 'on_the_road') {
+            return { ok: false, reason: 'helper-traveling', helper: helperName };
+          }
+          if (WA.laborSchedule && typeof WA.laborSchedule.isBooked === 'function') {
+            const shift = clean(o.shift || 'day', 20);
+            if (WA.laborSchedule.isBooked(helperName, shift)) {
+              return { ok: false, reason: 'helper-schedule-conflict', helper: helperName, shift: shift };
+            }
+            WA.laborSchedule.book(helperName, shift, 'hire_help_care', { unitId: uId });
+          }
+        }
+      }
       if (WA.store && WA.store.transact) {
         WA.store.transact(function (s) {
           const u = getFamilyUnit(uId, s);
@@ -138,7 +155,6 @@
           return true;
         }, 'familyOps:hireHelp');
       }
-
       actionTaken = {
         solution: 'hire_help',
         cost: wage,
@@ -147,18 +163,48 @@
         treasuryLeft: currentTreasury - wage
       };
     } else if (solution === 'substitute') {
-      const substituteName = clean(o.substituteName, 60);
+      const substituteName = clean(o.substituteName || o.substitute, 60);
       if (!substituteName) return { ok: false, reason: 'missing-substitute' };
-
+      const subId = personId(substituteName);
+      const s = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+      const subp = (s.people && (s.people[subId] || s.people[substituteName])) ? (s.people[subId] || s.people[substituteName]) : null;
+      if (subp) {
+        if (subp.status === 'traveling' || subp.status === 'on_the_road') {
+          return { ok: false, reason: 'substitute-traveling', substitute: substituteName };
+        }
+      }
+      let booked = false;
+      if (WA.laborSchedule && typeof WA.laborSchedule.claim === 'function') {
+        const slot = clean(o.slot || o.shift || 'morning', 20);
+        const day = Number(o.day) || 1;
+        const task = clean(o.task || 'care_substitute', 60);
+        const cRes = WA.laborSchedule.claim({
+          who: substituteName,
+          day: day,
+          slot: slot,
+          task: task,
+          kind: 'care_substitute'
+        });
+        if (!cRes.ok && cRes.reason !== 'disabled') {
+          if (cRes.reason === 'person-traveling') {
+            return { ok: false, reason: 'substitute-traveling', substitute: substituteName };
+          }
+          if (cRes.reason === 'slot-conflict') {
+            return { ok: false, reason: 'substitute-conflict', substitute: substituteName, slot: slot };
+          }
+          return cRes;
+        }
+        if (cRes.ok) booked = true;
+      }
       // 登记照护交接
       if (WA.family && typeof WA.family.transferCare === 'function' && o.target) {
         WA.family.transferCare(uId, o.target, substituteName, '代班照料以填补缺口');
       }
-
       actionTaken = {
         solution: 'substitute',
         cost: 0,
         substitute: substituteName,
+        scheduled: booked,
         scheduleImpact: 'care-assigned-to-' + substituteName
       };
     } else if (solution === 'defer_goal') {
@@ -205,64 +251,72 @@
   function inheritRatio(unitId, deceasedName, shares, opts) {
     const unit = getFamilyUnit(unitId);
     if (!unit) return { ok: false, reason: 'unit-not-found' };
-
     const decId = personId(deceasedName);
     const s = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
     const decPerson = (s.people && s.people[decId]) ? s.people[decId] : null;
     if (!decPerson) return { ok: false, reason: 'deceased-not-found' };
-
     const o = opts || {};
     const mKey = getPersonMoneyKey(decPerson, o);
     const decRes = (decPerson.resources && Number(decPerson.resources[mKey])) || 0;
     if (decRes <= 0) return { ok: false, reason: 'no-estate-to-inherit' };
-
     if (!Array.isArray(shares) || shares.length === 0) {
       return { ok: false, reason: 'empty-shares' };
     }
-
     let totalRatio = shares.reduce(function (sum, item) { return sum + (Number(item.ratio) || 0); }, 0);
     if (Math.abs(totalRatio - 1.0) > 0.01) {
       return { ok: false, reason: 'invalid-ratio-sum', sum: totalRatio };
     }
-
+    // 预检受益人
+    const validShares = [];
+    const invalidShares = [];
+    shares.forEach(function (sh) {
+      const w = clean(sh.who || sh.heir, 60);
+      const bId = personId(w);
+      if (s.people && s.people[bId]) {
+        validShares.push({ who: w, id: bId, ratio: Number(sh.ratio) || 0 });
+      } else {
+        invalidShares.push({ who: w, ratio: Number(sh.ratio) || 0 });
+      }
+    });
     const distribution = [];
+    const allocatedMap = {};
     let allocatedTotal = 0;
-
+    let retainedRemaining = 0;
     if (WA.store && WA.store.transact) {
       WA.store.transact(function (stateObj) {
         const dp = stateObj.people[decId];
         dp.resources = dp.resources || {};
-        dp.resources[mKey] = 0; // 扣减到 0
-
-        shares.forEach(function (sh, idx) {
-          const bId = personId(sh.who);
-          const bp = stateObj.people[bId];
+        validShares.forEach(function (sh, idx) {
+          const bp = stateObj.people[sh.id];
           if (!bp) return;
-
           bp.resources = bp.resources || {};
           let amt = 0;
-          if (idx === shares.length - 1) {
+          if (idx === validShares.length - 1 && invalidShares.length === 0) {
             amt = decRes - allocatedTotal;
           } else {
             amt = Math.floor(decRes * sh.ratio);
           }
           allocatedTotal += amt;
           bp.resources[mKey] = (Number(bp.resources[mKey]) || 0) + amt;
-
           distribution.push({ who: sh.who, ratio: sh.ratio, amount: amt });
+          allocatedMap[sh.who] = amt;
         });
+        retainedRemaining = decRes - allocatedTotal;
+        dp.resources[mKey] = retainedRemaining;
         return true;
       }, 'familyOps:inheritRatio');
     }
-
     return {
       ok: true,
       deceased: deceasedName,
       material: mKey,
       totalEstate: decRes,
       allocatedTotal: allocatedTotal,
+      unallocatedRemaining: retainedRemaining,
+      invalidRecipients: invalidShares,
       distribution: distribution,
-      conserved: allocatedTotal === decRes,
+      allocated: allocatedMap,
+      conserved: invalidShares.length > 0 ? ((allocatedTotal + retainedRemaining) === decRes) : (allocatedTotal === decRes),
       noMemoryTransferred: true
     };
   }
@@ -273,7 +327,6 @@
   function retireMember(unitId, whoName, disposition) {
     const unit = getFamilyUnit(unitId);
     if (!unit) return { ok: false, reason: 'unit-not-found' };
-
     const wId = personId(whoName);
     const disp = disposition || 'settled';
 
@@ -292,7 +345,6 @@
         return true;
       }, 'familyOps:retireMember');
     }
-
     return {
       ok: true,
       unitId: unitId,
@@ -301,11 +353,106 @@
     };
   }
 
+  /**
+   * 共同体周期推进与履约结算（WP-6）
+   * 真实扣减当期周期支出，产生赤字缺口时记录，推进共同目标进度
+   */
+  function advanceCycle(unitId, opts) {
+    const unit = getFamilyUnit(unitId);
+    if (!unit) return { ok: false, reason: 'unit-not-found' };
+    const uId = clean(unitId, 40);
+    const o = opts || {};
+    const ops = ensureOpsStore();
+    const budget = ops.budgets[uId] || { periodicExpense: 0, sharedGoals: [] };
+    const mKey = getMoneyKey(unit, o);
+    const curTreasury = (unit.treasury && Number(unit.treasury[mKey])) || 0;
+    const expense = Math.max(0, Number(budget.periodicExpense) || 0);
+
+    let deficit = 0;
+    let actualPaid = 0;
+    let updatedTreasury = curTreasury;
+
+    if (curTreasury < expense) {
+      deficit = expense - curTreasury;
+      actualPaid = curTreasury;
+      updatedTreasury = 0;
+    } else {
+      actualPaid = expense;
+      updatedTreasury = curTreasury - expense;
+    }
+
+    const goalsProgressed = [];
+    const laborContribution = Number(o.laborDays) || 0;
+    const fundContribution = Number(o.fundsContributed) || 0;
+    const fundContributions = (o.fundContributions && typeof o.fundContributions === 'object') ? o.fundContributions : {};
+    const laborContributions = (o.laborContributions && typeof o.laborContributions === 'object') ? o.laborContributions : {};
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (draft) {
+        const u = getFamilyUnit(uId, draft);
+        if (u) {
+          u.treasury = u.treasury || {};
+          u.treasury[mKey] = updatedTreasury;
+          u.cycleIndex = (Number(u.cycleIndex) || 0) + 1;
+          u.history = u.history || [];
+          u.history.push({
+            type: 'cycle_settle',
+            cycle: u.cycleIndex,
+            expense: expense,
+            paid: actualPaid,
+            deficit: deficit,
+            at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('familyOps') : Date.now()
+          });
+        }
+        const b = draft.familyOps && draft.familyOps.budgets && draft.familyOps.budgets[uId];
+        if (b) {
+          b.accumulatedDeficit = (Number(b.accumulatedDeficit) || 0) + deficit;
+          if (Array.isArray(b.sharedGoals)) {
+            b.sharedGoals.forEach(function (g) {
+              if (g.status === 'active') {
+                const gFund = (fundContributions[g.id] != null) ? Number(fundContributions[g.id]) : fundContribution;
+                const gLabor = (laborContributions[g.id] != null) ? Number(laborContributions[g.id]) : laborContribution;
+                g.currentProgress = (Number(g.currentProgress) || 0) + gLabor * 10 + gFund * 2;
+                g.targetProgress = Number(g.targetProgress) || 100;
+                if (g.currentProgress >= g.targetProgress) {
+                  g.status = 'completed';
+                  g.completedAt = Date.now();
+                }
+                goalsProgressed.push({
+                  id: g.id,
+                  progress: g.currentProgress,
+                  funds: gFund,
+                  laborDays: gLabor,
+                  status: g.status
+                });
+              }
+            });
+          }
+        }
+        return true;
+      }, 'familyOps:advanceCycle');
+    }
+
+    return {
+      ok: true,
+      unitId: uId,
+      cycle: (unit.cycleIndex || 0) + 1,
+      expense: expense,
+      paid: actualPaid,
+      deficit: deficit,
+      treasuryLeft: updatedTreasury,
+      hasDeficit: deficit > 0,
+      goals: goalsProgressed,
+      note: deficit > 0 ? ('金库出现缺口 ' + deficit + '，需要协商减支或补贴') : '周期费用正常结清'
+    };
+  }
+
   WA.familyOps = {
     setBudget: setBudget,
     handleGap: handleGap,
     inheritRatio: inheritRatio,
-    retireMember: retireMember
+    retireMember: retireMember,
+    advanceCycle: advanceCycle
   };
 
   if (typeof console !== 'undefined' && console.log) {

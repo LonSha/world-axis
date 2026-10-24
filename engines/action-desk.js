@@ -96,6 +96,7 @@
     'lineage.confirmVariant': function (o) { return WA.techLineage.confirmVariant(o.traditionId, o.variantId, o.envContext); },
     'familyOps.gap': function (o) { return WA.familyOps.handleGap(o.unitId, o.gapType, o.solution, o); },
     'familyOps.inherit': function (o) { return WA.familyOps.inheritRatio(o.unitId, o.deceased, o.shares, o); },
+    'familyOps.advanceCycle': function (o) { return WA.familyOps.advanceCycle(o.unitId, o); },
     'aftermath.reroute': function (o) { return WA.aftermathImpact.findDetour(o.from, o.to, o.blockedPlace, o); },
     'aftermath.repairCommission': function (o) { return WA.aftermathImpact.commissionRepair(o.effectId, o); },
     'epistemic.view': function (o) { return WA.epistemicView.buildView(o.personId, o.topicId); },
@@ -119,13 +120,17 @@
     // v2.231.0（拓展 IN-6）：公共设施与服务网络
     'serviceNetwork.declareFacility': function (o) { return WA.serviceNetwork.declareFacility(o.spec); },
     'serviceNetwork.activateFacility': function (o) { return WA.serviceNetwork.activateFacility(o.facilityId); },
-    'serviceNetwork.requestService': function (o) { return WA.serviceNetwork.requestService(o.facilityId, o.who, o.amount); },
+    'serviceNetwork.requestService': function (o) { return WA.serviceNetwork.requestService(o.facilityId, o.who, o.amount, o); },
+    'serviceNetwork.queueService': function (o) { return WA.serviceNetwork.queueService(o.facilityId, o.who, o.amount); },
+    'serviceNetwork.releaseService': function (o) { return WA.serviceNetwork.releaseService(o.facilityId, o.amount); },
+    'serviceNetwork.cancelQueue': function (o) { return WA.serviceNetwork.cancelQueue(o.facilityId, o.queueId); },
     'serviceNetwork.decayFacility': function (o) { return WA.serviceNetwork.decayFacility(o.facilityId); },
     'serviceNetwork.restoreFacility': function (o) { return WA.serviceNetwork.restoreFacility(o.facilityId); },
     // v2.231.0（优化 OP-9）：可玩的世界蓝图
     'playableBlueprint.listSamples': function (o) { return WA.playableBlueprint.listSamples(); },
     'playableBlueprint.checkDependencies': function (o) { return WA.playableBlueprint.checkDependencies(o.sampleId); },
     'playableBlueprint.exportPlayDefs': function (o) { return WA.playableBlueprint.exportPlayDefs(o.sampleId); },
+    'playableBlueprint.installSample': function (o) { return WA.playableBlueprint.installSample(o.sampleId, o); },
     // v2.231.0（拓展 IN-7）：有承载力的环境
     'envCapacity.declareResource': function (o) { return WA.envCapacity.declareResource(o.spec); },
     'envCapacity.withdraw': function (o) { return WA.envCapacity.withdraw(o.resourceId, o.amount, o); },
