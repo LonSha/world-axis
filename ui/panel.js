@@ -4398,6 +4398,11 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
      }
      sc.bookings.forEach(function (b) {
        html += '<div class="wa-row"><b>[' + esc(b.slot) + ']</b> ' + esc(b.who) + ' — ' + esc(b.task)
+         + (b.absent ? ' <span class="wa-dim">[缺席：' + esc(b.absentReason || '') + ']</span>' : '')
+         + (b.interruptedReason ? ' <span class="wa-dim">[打断：' + esc(b.interruptedReason) + ']</span>' : '')
+         + (b.absent
+            ? ' <button class="wa-btn wa-mini" data-sched-resume="' + esc(b.id) + '" title="恢复出勤履约">恢复</button>'
+            : ' <button class="wa-btn wa-mini" data-sched-interrupt="' + esc(b.id) + '" title="登记突发事件打断日程（缺席/延后）">打断</button>')
          + ' <button class="wa-btn wa-mini" data-sched-cancel="' + esc(b.id) + '" title="取消预约（不返还已消耗成本）">取消</button>'
          + ' <button class="wa-btn wa-mini" data-sched-split="' + esc(b.id) + '" title="拆分预约为后续段">拆分</button>'
          + '</div>';
@@ -4688,6 +4693,28 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           ? WA.laborSchedule.view({ who: String(who).trim() })
           : { ok: false, reason: 'laborSchedule-missing' };
         out.innerHTML = renderScheduleNegotiation(sc);
+        out.querySelectorAll('[data-sched-interrupt]').forEach(function (btn) {
+          btn.onclick = function () {
+            const bid = btn.getAttribute('data-sched-interrupt');
+            const r = (WA.laborSchedule && typeof WA.laborSchedule.interrupt === 'function')
+              ? WA.laborSchedule.interrupt(bid, 'absent', { reason: '突发事件暂时缺勤' })
+              : { ok: false, reason: 'interrupt-unavailable' };
+            showSched();
+            const out2 = schedOut(); if (out2) out2.innerHTML = '<div class="wa-dim">' + (r && r.ok ? '已登记日程缺席（保留底单）' : ('打断失败：' + String((r && r.reason) || 'unknown'))) + '</div>' + out2.innerHTML;
+            renderBody();
+          };
+        });
+        out.querySelectorAll('[data-sched-resume]').forEach(function (btn) {
+          btn.onclick = function () {
+            const bid = btn.getAttribute('data-sched-resume');
+            const r = (WA.laborSchedule && typeof WA.laborSchedule.resume === 'function')
+              ? WA.laborSchedule.resume(bid)
+              : { ok: false, reason: 'resume-unavailable' };
+            showSched();
+            const out2 = schedOut(); if (out2) out2.innerHTML = '<div class="wa-dim">' + (r && r.ok ? '日程已恢复正常履约' : ('恢复失败：' + String((r && r.reason) || 'unknown'))) + '</div>' + out2.innerHTML;
+            renderBody();
+          };
+        });
         out.querySelectorAll('[data-sched-cancel]').forEach(function (btn) {
           btn.onclick = function () {
             const bid = btn.getAttribute('data-sched-cancel');

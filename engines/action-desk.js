@@ -96,6 +96,9 @@
     'schedule.cancel': function (o) { return WA.laborSchedule.cancel(o.bookingId, o); },
     'schedule.split': function (o) { return WA.laborSchedule.split(o.bookingId, o); },
     'schedule.earliest': function (o) { return WA.laborSchedule.earliestSlot(o.who, o); },
+    // v2.233.0 (OPV4-4): 日程打断接续与替班换岗
+    'schedule.interrupt': function (o) { return WA.laborSchedule.interrupt(o.bookingId, o.solution, o); },
+    'schedule.resume': function (o) { return WA.laborSchedule.resume(o.bookingId); },
     'motive.arbitrate': function (o) { return WA.motiveArbitration.decide(o.person, o.candidates, o.facts); },
     'pathEcho.realize': function (o) { return WA.pathEcho.realizeOutcome(o.personId, o.decisionId, o.actualOutcome, o.knownFacts); },
     'lineage.teach': function (o) { return WA.techLineage.teach(o.traditionId, o.master, o.apprentice); },

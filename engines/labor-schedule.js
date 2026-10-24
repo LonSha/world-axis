@@ -115,9 +115,9 @@
       noteFault('daily-bookings-full');
       return { ok: false, reason: 'daily-bookings-full', day: day, max: cfg.maxBookingsPerDay };
     }
-    // 检查冲突：同一人、同一天、同时段
+    // 检查冲突：同一人、同一天、同时段（若处于 absent 缺席状态，不阻塞他人或自己安排紧急事务，但会提示）
     const conflict = ls.filter(function (b) {
-      return b && b.who === who && b.day === day && b.slot === slot && !b.cancelled;
+      return b && b.who === who && b.day === day && b.slot === slot && !b.cancelled && !b.absent;
     })[0];
 
     if (conflict) {
@@ -232,7 +232,17 @@
       who: who || 'all',
       count: list.length,
       bookings: list.map(function (b) {
-        return { id: b.id, who: b.who, day: b.day, slot: b.slot, task: b.task, kind: b.kind };
+        return {
+          id: b.id,
+          who: b.who,
+          day: b.day,
+          slot: b.slot,
+          task: b.task,
+          kind: b.kind,
+          absent: !!b.absent,
+          absentReason: b.absentReason || '',
+          interruptedReason: b.interruptedReason || ''
+        };
       })
     };
   }
@@ -464,7 +474,6 @@
     const startDay = num(o.startDay) == null ? getStoryDay() : Math.floor(num(o.startDay));
     const st = state();
     const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
-
     for (let d = startDay; d <= startDay + 30; d++) {
       for (let si = 0; si < SLOTS.length; si++) {
         const s = SLOTS[si];
@@ -477,6 +486,124 @@
       }
     }
     return { ok: false, reason: 'no-slot-available', horizon: 30 };
+  }
+
+  /**
+   * OPV4-4：登记日程打断（interrupt）。
+   * 当人物因事故、伤病、旅行或邀约无法履约时，支持四种解决方式：
+   *   - substitute: 替班（指定 substituteWho，若对方冲突则拒绝且保持原状）；
+   *   - postpone: 改期（推迟到 targetDay，若冲突则拒绝）；
+   *   - cancel: 放弃/取消（释放该时段，明确 costRefunded: false）；
+   *   - absent: 仅登记缺席（保留记录并记入缺勤账）。
+   */
+  function interrupt(bookingId, solution, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const bid = clean(bookingId, 80);
+    const sol = clean(solution, 30); // 'substitute' | 'postpone' | 'cancel' | 'absent'
+    const o = opts || {};
+    const reason = clean(o.reason || 'world-event', 60);
+    const st = state();
+    const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
+    const orig = ls.filter(function (b) { return b && b.id === bid && !b.cancelled; })[0];
+    if (!orig) return { ok: false, reason: 'booking-not-found', bookingId: bid };
+
+    if (sol === 'substitute') {
+      const sub = clean(o.substituteWho || o.substitute, 60);
+      if (!sub) return { ok: false, reason: 'missing-substitute' };
+      const trRes = transfer(bid, sub);
+      if (!trRes.ok) return trRes;
+      let out = null;
+      WA.store.transact(function (draft) {
+        const b = ensure(draft);
+        const row = b.bookings.filter(function (x) { return x && x.id === bid; })[0];
+        if (row) {
+          row.interruptedReason = reason;
+          row.interruptSolution = 'substitute';
+        }
+        out = Object.assign({}, trRes, { interrupted: true, reason: reason, solution: 'substitute' });
+        return true;
+      }, 'laborSchedule:interrupt:substitute');
+      return out || { ok: false, reason: 'store-unavailable' };
+    }
+
+    if (sol === 'postpone') {
+      const targetDay = num(o.targetDay) == null ? (orig.day + 1) : Math.floor(num(o.targetDay));
+      const targetSlot = clean(o.targetSlot || orig.slot, 20);
+      const resRes = reschedule(bid, targetDay, targetSlot);
+      if (!resRes.ok) return resRes;
+      let out = null;
+      WA.store.transact(function (draft) {
+        const b = ensure(draft);
+        const row = b.bookings.filter(function (x) { return x && x.id === bid; })[0];
+        if (row) {
+          row.interruptedReason = reason;
+          row.interruptSolution = 'postpone';
+        }
+        out = Object.assign({}, resRes, { interrupted: true, reason: reason, solution: 'postpone' });
+        return true;
+      }, 'laborSchedule:interrupt:postpone');
+      return out || { ok: false, reason: 'store-unavailable' };
+    }
+
+    if (sol === 'cancel') {
+      const canRes = cancel(bid, { reason: reason });
+      if (!canRes.ok) return canRes;
+      return Object.assign({}, canRes, { interrupted: true, solution: 'cancel' });
+    }
+
+    if (sol === 'absent') {
+      let out = null;
+      WA.store.transact(function (draft) {
+        const b = ensure(draft);
+        const row = b.bookings.filter(function (x) { return x && x.id === bid; })[0];
+        if (!row) return false;
+        row.absent = true;
+        row.absentReason = reason;
+        row.interruptedReason = reason;
+        row.interruptSolution = 'absent';
+        out = { ok: true, bookingId: bid, who: row.who, day: row.day, slot: row.slot, task: row.task, absent: true, reason: reason, solution: 'absent' };
+        return true;
+      }, 'laborSchedule:interrupt:absent');
+      return out || { ok: false, reason: 'store-unavailable' };
+    }
+
+    return { ok: false, reason: 'invalid-solution', solution: sol };
+  }
+
+  /**
+   * OPV4-4：打断后恢复履约（resume）。
+   * 将处于 absent 或暂缓状态的预约恢复为活跃，重新检查时段冲突。
+   */
+  function resume(bookingId) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const bid = clean(bookingId, 80);
+    const st = state();
+    const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
+    const orig = ls.filter(function (b) { return b && b.id === bid; })[0];
+    if (!orig) return { ok: false, reason: 'booking-not-found', bookingId: bid };
+    if (!orig.absent && !orig.interruptedReason) {
+      return { ok: false, reason: 'not-interrupted', bookingId: bid };
+    }
+    // 检查时段冲突
+    const conf = ls.filter(function (b) {
+      return b && b.id !== bid && b.who === orig.who && b.day === orig.day && b.slot === orig.slot && !b.cancelled && !b.absent;
+    })[0];
+    if (conf) {
+      return { ok: false, reason: 'resume-slot-conflict', conflictWith: conf.task };
+    }
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = ensure(draft);
+      const row = b.bookings.filter(function (x) { return x && x.id === bid; })[0];
+      if (!row) return false;
+      row.absent = false;
+      row.resumedAt = clockNow('labor');
+      out = { ok: true, bookingId: bid, who: row.who, day: row.day, slot: row.slot, resumed: true };
+      return true;
+    }, 'laborSchedule:resume');
+    return out || { ok: false, reason: 'store-unavailable' };
   }
 
   function statView() {
@@ -500,6 +627,9 @@
     cancel: cancel,
     split: split,
     earliestSlot: earliestSlot,
+    // v2.233.0 (OPV4-4)：日程打断接续与替班换岗
+    interrupt: interrupt,
+    resume: resume,
     stat: statView,
     resetStat: resetStat
   };

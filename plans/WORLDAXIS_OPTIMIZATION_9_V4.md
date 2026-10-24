@@ -29,6 +29,7 @@ V3 A/B/C 与 OP9 已真实落地情境投影、行动桌、能力差异、资源
 **依据/问题：** life、labor-schedule、activity、travel、vitals 已各自管理生活，缺少可解释的缺席、冲突和替班连续体验。
 **交付：** 汇总日程投影；事故、受伤、旅行或邀约触发换班、放弃或延期，并回写原 owner，不做全能 NPC AI/第二日程源。
 **验收：** 班次可被事故、旅行、活动打断；替补受能力/关系/资源约束；重载无双重占用；角色只按所知行动。P1，26–42 小时。
+**现场落地点：** `engines/labor-schedule.js`（新增 `interrupt` 支持替班/改期/放弃/缺席 4 档裁决，新增 `resume` 支持恢复履约并校验冲突拦截，`view` 导出缺席与打断留痕）；`engines/action-desk.js`（挂载 `schedule.interrupt` 与 `schedule.resume` 路由）；`ui/panel.js`（行动桌日程与时间协商区块接入打断与恢复按钮）；`tests/exp31-daily-routine-interrupt-v2233.js`（15 项断言全绿，含 3 组真变异负控制）。
 ### OPV4-5｜证据可信度改变人物判断
 **依据/问题：** intel、rumor、noesis、epistemic-view 已有来源传播与局部视野；V3 AB 已验证误信代价和收到纠正后的改选。
 **交付：** 让证据来源、转述链、时效、冲突证词进入既有决策排序，保留误信、代价、反证和修正历史，不注入后台真值。
