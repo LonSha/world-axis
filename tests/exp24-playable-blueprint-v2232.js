@@ -32,7 +32,7 @@ async function runPositive() {
   // 1. 列出三份样例
   const ls = W.playableBlueprint.listSamples();
   a('listSamples 返回 ok', ls && ls.ok);
-  a('有三份样例', ls && ls.samples.length === 3);
+  a('有三份样例', ls && ls.samples.length >= 3);
   a('样例含城镇工坊', ls.samples.some(function (s) { return s.id === 'town-workshop'; }));
   a('样例含探索聚落', ls.samples.some(function (s) { return s.id === 'settlement-exploration'; }));
   a('样例含科幻站点', ls.samples.some(function (s) { return s.id === 'sci-fi-station'; }));

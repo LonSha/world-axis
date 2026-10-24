@@ -259,6 +259,52 @@
       }
     }
 
+    // 群体社会记忆立场检查 (EXV3-7)
+    if (WA.socialLegacy && typeof WA.socialLegacy.groupMemoryStance === 'function' && o.clientGroup) {
+      const gStance = WA.socialLegacy.groupMemoryStance(o.clientGroup, w);
+      if (gStance && gStance.summaryStance === 'suspicious') {
+        if (!o.guarantor) {
+          return {
+            ok: false,
+            reason: 'group-distrust-blocked',
+            clientGroup: o.clientGroup,
+            who: w,
+            adverseCount: gStance.adverseCount,
+            costModifier: gStance.costModifier,
+            note: '发包群体因历史争议与负面传闻怀疑当事人，需提供同行担保或出面澄清方可承接'
+          };
+        }
+      }
+    }
+
+    // 地方发展路径与连锁冲击感知 (EXV3-8 & EXV3-9)
+    let pathInfo = null;
+    let cascadingWarning = null;
+    const tgtPlace = o.place || (st.people && st.people['p_' + w] && st.people['p_' + w].location);
+    if (tgtPlace) {
+      if (WA.phaseTransition && typeof WA.phaseTransition.evaluatePlacePath === 'function') {
+        const pEval = WA.phaseTransition.evaluatePlacePath(tgtPlace);
+        if (pEval && pEval.ok) {
+          pathInfo = {
+            layoutType: pEval.layoutType,
+            efficiencyFactor: pEval.efficiencyFactor,
+            transitCostFactor: pEval.transitCostFactor
+          };
+        }
+      }
+      if (WA.aftermathImpact && typeof WA.aftermathImpact.listCascadingChains === 'function') {
+        const chains = WA.aftermathImpact.listCascadingChains({ place: tgtPlace, status: 'active' });
+        if (chains && chains.length > 0) {
+          cascadingWarning = {
+            disrupted: true,
+            activeChainCount: chains.length,
+            shockType: chains[0].shockType,
+            note: '该地区受到连锁供应链或物流冲击影响'
+          };
+        }
+      }
+    }
+
     // 地点公共服务设施硬性约束与跨节点分流 (OPV3-7 & EXV3-2)
     let serviceDelay = 0;
     let failoverInfo = null;
@@ -331,6 +377,8 @@
       canExecute: true,
       costEstimate: { duration: 1, wear: 0 },
       shortfalls: [],
+      pathInfo: pathInfo,
+      cascadingWarning: cascadingWarning,
       note: '通用前置与条件校验通过'
     };
   }
@@ -749,6 +797,31 @@
       const v = WA.research.view(o.projectId);
       if (v && v.ok) o.who = v.by;
     }
+
+    // 地方规约前置检查 (EXV3-5)
+    if (WA.customLax && typeof WA.customLax.checkRuleEnforcement === 'function' && (o.orgId || o.place)) {
+      const ruleCheck = WA.customLax.checkRuleEnforcement(o.orgId || o.place, key, o.who, o.ruleDetails || o);
+      if (!ruleCheck.ok) {
+        return ruleCheck;
+      }
+    }
+
+    // 群体社会记忆立场前置检查 (EXV3-7)
+    if (WA.socialLegacy && typeof WA.socialLegacy.groupMemoryStance === 'function' && o.clientGroup && o.who) {
+      const gStance = WA.socialLegacy.groupMemoryStance(o.clientGroup, o.who);
+      if (gStance && gStance.summaryStance === 'suspicious' && !o.guarantor) {
+        return {
+          ok: false,
+          reason: 'group-distrust-blocked',
+          clientGroup: o.clientGroup,
+          who: o.who,
+          adverseCount: gStance.adverseCount,
+          costModifier: gStance.costModifier,
+          note: '发包群体因历史争议怀疑当事人，需提供担保方可执行'
+        };
+      }
+    }
+
     let out = null;
     try { out = fn(o); } catch (e) { noteFault('route-threw'); return { ok: false, reason: 'route-threw', action: key }; }
     if (out && out.ok) {

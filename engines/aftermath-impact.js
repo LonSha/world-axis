@@ -309,13 +309,265 @@
     });
   }
 
+  function triggerCascadingChain(spec) {
+    var s = spec || {};
+    var sourceId = clean(s.sourceIncidentId || s.sourceEventId || 'inc_root', 60);
+    var sourcePlace = clean(s.sourcePlaceId || s.originPlace, 40);
+    var shockType = clean(s.shockType || 'supply_break', 40);
+    var initialSeverity = Math.min(1.0, Math.max(0.1, Number(s.severity) || 0.8));
+    var rawNodes = Array.isArray(s.nodes) ? s.nodes : [];
+    if (!sourcePlace || rawNodes.length === 0) {
+      return { ok: false, reason: 'missing-source-or-nodes' };
+    }
+    var maxHops = Math.min(5, Math.max(1, Number(s.maxHops) || 3));
+    var attenuation = Math.min(0.9, Math.max(0.2, Number(s.attenuation) || 0.6));
+    var nowVal = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now() : Date.now();
+    var chainId = 'chn_' + nowVal + '_' + ((WA.rand && WA.rand.id) ? WA.rand.id() : Math.random().toString(36).slice(2, 7));
+
+    var validatedNodes = [];
+    var currentSev = initialSeverity;
+    for (var i = 0; i < rawNodes.length && i < maxHops; i++) {
+      var n = rawNodes[i];
+      var pId = clean(n.placeId, 40);
+      if (!pId) continue;
+      var delay = Math.max(1, Number(n.delayDays) || (i + 1));
+      var buf = Math.max(0, Number(n.capacityBuffer) || 0);
+      var effectiveSev = Number(Math.max(0.05, currentSev - (buf > 0 ? 0.15 : 0)).toFixed(2));
+      validatedNodes.push({
+        index: i,
+        placeId: pId,
+        impactType: clean(n.impactType || shockType, 40),
+        delayDays: delay,
+        remainingDays: delay,
+        capacityBuffer: buf,
+        severity: effectiveSev,
+        status: (i === 0) ? 'pending' : 'queued',
+        intervened: false
+      });
+      currentSev = currentSev * attenuation;
+    }
+
+    var chainRecord = {
+      id: chainId,
+      sourceIncidentId: sourceId,
+      sourcePlaceId: sourcePlace,
+      shockType: shockType,
+      initialSeverity: initialSeverity,
+      nodes: validatedNodes,
+      currentNodeIndex: 0,
+      status: 'active',
+      createdAt: nowVal,
+      history: [{ action: 'triggered', at: nowVal, note: '重大事件触发有限跨节点影响链' }]
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.aftermathImpact = d.aftermathImpact || {};
+        d.aftermathImpact.cascadingChains = d.aftermathImpact.cascadingChains || [];
+        d.aftermathImpact.cascadingChains.push(chainRecord);
+        return true;
+      }, 'aftermathImpact:triggerCascadingChain');
+    }
+
+    return {
+      ok: true,
+      chain: chainRecord,
+      nodeCount: validatedNodes.length,
+      note: '连锁冲击链已生成，受容量衰减与传播延迟硬约束'
+    };
+  }
+
+  function interveneCascadingChain(chainId, nodeIndex, actionSpec) {
+    var cId = clean(chainId, 60);
+    var idx = Number(nodeIndex);
+    var act = actionSpec || {};
+    var actionType = clean(act.action || 'emergency_supply', 40);
+    var actor = clean(act.actor || 'town_magistrate', 40);
+    var funds = Math.max(0, Number(act.funds) || 0);
+    var materials = (act.materials && typeof act.materials === 'object') ? Object.assign({}, act.materials) : {};
+    var nowVal = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now() : Date.now();
+
+    var targetChain = null;
+    var targetNode = null;
+    var failReason = '';
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.aftermathImpact = d.aftermathImpact || {};
+        var list = d.aftermathImpact.cascadingChains || [];
+        var hit = list.filter(function (c) { return c && c.id === cId; })[0];
+        if (!hit) { failReason = 'chain-not-found'; return false; }
+        if (hit.status !== 'active') { failReason = 'chain-not-active'; return false; }
+        var node = hit.nodes && hit.nodes[idx];
+        if (!node) { failReason = 'node-not-found'; return false; }
+        if (node.status === 'resolved' || node.intervened) { failReason = 'already-intervened'; return false; }
+
+        if (funds > 0) {
+          if (!d.economy || !d.economy.money || (d.economy.money.funds || 0) < funds) {
+            failReason = 'insufficient-funds';
+            return false;
+          }
+          d.economy.money.funds -= funds;
+        }
+
+        node.intervened = true;
+        node.intervenedBy = actor;
+        node.interventionAction = actionType;
+        node.interventionFunds = funds;
+        node.interventionMaterials = materials;
+
+        if (actionType === 'containment') {
+          node.status = 'contained';
+          hit.status = 'contained';
+          for (var k = idx + 1; k < hit.nodes.length; k++) {
+            hit.nodes[k].status = 'prevented';
+          }
+          hit.history.push({
+            action: 'contained',
+            at: nowVal,
+            nodeIndex: idx,
+            actor: actor,
+            note: '在中继节点下达行政隔离，阻断后续节点蔓延'
+          });
+        } else if (actionType === 'emergency_supply') {
+          node.severity = 0;
+          node.status = 'mitigated';
+          hit.history.push({
+            action: 'mitigated',
+            at: nowVal,
+            nodeIndex: idx,
+            actor: actor,
+            fundsPaid: funds,
+            note: '动用应急储备物资平抑中继节点冲击'
+          });
+        } else if (actionType === 'reroute_provider') {
+          node.severity = Number((node.severity * 0.4).toFixed(2));
+          node.status = 'rerouted';
+          hit.history.push({
+            action: 'rerouted',
+            at: nowVal,
+            nodeIndex: idx,
+            actor: actor,
+            note: '开辟备用物流路线分流'
+          });
+        }
+
+        if (WA.pathEcho && typeof WA.pathEcho.record === 'function') {
+          WA.pathEcho.record('intervene_shock', {
+            actor: actor,
+            placeId: node.placeId,
+            action: actionType,
+            costFunds: funds
+          });
+        }
+
+        targetChain = hit;
+        targetNode = node;
+        return true;
+      }, 'aftermathImpact:interveneCascadingChain');
+    }
+
+    if (!targetChain) return { ok: false, reason: failReason || 'failed' };
+    return {
+      ok: true,
+      chainId: cId,
+      nodeIndex: idx,
+      placeId: targetNode.placeId,
+      action: actionType,
+      nodeStatus: targetNode.status,
+      chainStatus: targetChain.status,
+      fundsSpent: funds,
+      note: '中继介入已生效，真实资财已扣减并阻止/平抑进一步扩散'
+    };
+  }
+
+  function advanceCascadingChains(days) {
+    var stepDays = Math.max(1, Number(days) || 1);
+    var resolvedEvents = [];
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.aftermathImpact = d.aftermathImpact || {};
+        var list = d.aftermathImpact.cascadingChains || [];
+        list.forEach(function (chain) {
+          if (!chain || chain.status !== 'active') return;
+          var curIdx = chain.currentNodeIndex;
+          var node = chain.nodes && chain.nodes[curIdx];
+          if (!node) { chain.status = 'resolved'; return; }
+
+          node.remainingDays -= stepDays;
+          if (node.remainingDays <= 0) {
+            if (!node.intervened) {
+              node.status = 'impact_realized';
+              resolvedEvents.push({
+                chainId: chain.id,
+                nodeIndex: curIdx,
+                placeId: node.placeId,
+                impactType: node.impactType,
+                severity: node.severity
+              });
+              var nextIdx = curIdx + 1;
+              if (nextIdx < chain.nodes.length) {
+                chain.currentNodeIndex = nextIdx;
+                chain.nodes[nextIdx].status = 'pending';
+              } else {
+                chain.status = 'exhausted';
+              }
+            } else {
+              if (node.status === 'contained') {
+                chain.status = 'contained';
+              } else {
+                var nextIdx = curIdx + 1;
+                if (nextIdx < chain.nodes.length) {
+                  chain.currentNodeIndex = nextIdx;
+                  chain.nodes[nextIdx].status = 'pending';
+                } else {
+                  chain.status = 'resolved';
+                }
+              }
+            }
+          }
+        });
+        return true;
+      }, 'aftermathImpact:advanceCascadingChains');
+    }
+
+    return {
+      ok: true,
+      daysAdvanced: stepDays,
+      realizedEvents: resolvedEvents
+    };
+  }
+
+  function listCascadingChains(opts) {
+    var o = opts || {};
+    var place = clean(o.place, 40);
+    var status = clean(o.status, 20);
+    var st = (WA.store && typeof WA.store.get === 'function') ? WA.store.get() : {};
+    var list = ((st.aftermathImpact || {}).cascadingChains) || [];
+    return list.filter(function (c) {
+      if (!c) return false;
+      if (status && c.status !== status) return false;
+      if (place) {
+        var matchSource = (c.sourcePlaceId === place);
+        var matchNode = (c.nodes || []).some(function (n) { return n && n.placeId === place; });
+        if (!matchSource && !matchNode) return false;
+      }
+      return true;
+    });
+  }
+
   WA.aftermathImpact = {
     inspectImpact: inspectImpact,
     findDetour: findDetour,
     commissionRepair: commissionRepair,
     triggerIncident: triggerIncident,
     settleRedress: settleRedress,
-    listIncidents: listIncidents
+    listIncidents: listIncidents,
+    triggerCascadingChain: triggerCascadingChain,
+    interveneCascadingChain: interveneCascadingChain,
+    advanceCascadingChains: advanceCascadingChains,
+    listCascadingChains: listCascadingChains
   };
 
   if (typeof console !== 'undefined' && console.log) {

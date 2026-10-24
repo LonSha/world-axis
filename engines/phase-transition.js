@@ -451,7 +451,6 @@
     var sunkCost = Math.floor(cur.totalFundsInvested * 0.4);
     var transitionCost = 30;
     var transitionDays = 5;
-
     return {
       ok: true,
       placeId: pId,
@@ -464,6 +463,143 @@
     };
   }
 
+  function simulateIncidentStress(placeId, incidentType) {
+    var pId = clean(placeId, 40);
+    var iType = clean(incidentType || 'power_failure', 40);
+    var evalRes = evaluatePlacePath(pId);
+    var lType = evalRes.layoutType;
+
+    var downtimeRatio = 0.3;
+    var affectedWorkstations = 'partial';
+    var resilienceLevel = 'average';
+    var remedy = 'standard_repair';
+
+    if (lType === 'shared_service_center') {
+      if (iType === 'power_failure' || iType === 'machinery_breakdown' || iType === 'facility_damage') {
+        downtimeRatio = 0.85;
+        affectedWorkstations = 'all_central_stations';
+        resilienceLevel = 'low_single_point_of_failure';
+        remedy = 'urgent_central_overhaul';
+      } else {
+        downtimeRatio = 0.4;
+        affectedWorkstations = 'logistics_dock';
+        resilienceLevel = 'medium';
+        remedy = 'local_clearing';
+      }
+    } else if (lType === 'decentralized_workshop') {
+      if (iType === 'power_failure' || iType === 'machinery_breakdown' || iType === 'facility_damage') {
+        downtimeRatio = 0.15;
+        affectedWorkstations = 'single_hearth_only';
+        resilienceLevel = 'high_fault_tolerant';
+        remedy = 'shift_to_neighbor_workbench';
+      } else {
+        downtimeRatio = 0.35;
+        affectedWorkstations = 'cart_transfer';
+        resilienceLevel = 'high_fault_tolerant';
+        remedy = 'use_hand_carts';
+      }
+    } else if (lType === 'transit_hub') {
+      if (iType === 'road_block' || iType === 'route_disruption' || iType === 'supply_break') {
+        downtimeRatio = 0.75;
+        affectedWorkstations = 'entire_depot_frozen';
+        resilienceLevel = 'vulnerable_to_routes';
+        remedy = 'reroute_secondary_paths';
+      } else {
+        downtimeRatio = 0.2;
+        affectedWorkstations = 'storage_bay_minor';
+        resilienceLevel = 'high_local_autonomy';
+        remedy = 'standard_repair';
+      }
+    }
+
+    var stressReport = {
+      ok: true,
+      placeId: pId,
+      layoutType: lType,
+      incidentType: iType,
+      downtimeRatio: downtimeRatio,
+      affectedWorkstations: affectedWorkstations,
+      resilienceLevel: resilienceLevel,
+      recommendedRemedy: remedy,
+      simulatedAt: now()
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        ensureBucket();
+        d.phaseTransition.stressReports = d.phaseTransition.stressReports || [];
+        d.phaseTransition.stressReports.push(stressReport);
+        return true;
+      }, 'phaseTransition:simulateIncidentStress');
+    }
+
+    return stressReport;
+  }
+
+  function executeTransitionRoute(placeId, targetLayout, opts) {
+    var pId = clean(placeId, 40);
+    var target = clean(targetLayout, 40);
+    var o = opts || {};
+    var planRes = planTransitionRoute(pId, target);
+    if (!planRes.ok) return planRes;
+
+    var cost = planRes.transitionCost;
+    var sunk = planRes.sunkCostLoss;
+    var days = planRes.transitionDays;
+    var failReason = '';
+    var executedRecord = null;
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        ensureBucket();
+        var p = d.phaseTransition.paths && d.phaseTransition.paths[pId];
+        if (!p) { failReason = 'layout-not-declared'; return false; }
+
+        if (cost > 0) {
+          if (!d.economy || !d.economy.money || (d.economy.money.funds || 0) < cost) {
+            failReason = 'insufficient-funds';
+            return false;
+          }
+          d.economy.money.funds -= cost;
+        }
+
+        var prevLayout = p.layoutType;
+        p.layoutType = target;
+        p.totalFundsInvested = Math.max(0, (p.totalFundsInvested || 0) - sunk);
+        p.lastTransitionAt = now();
+        p.transitionDays = days;
+        p.transitionUntil = now() + days;
+
+        executedRecord = {
+          placeId: pId,
+          fromLayout: prevLayout,
+          toLayout: target,
+          sunkCostDeducted: sunk,
+          fundsSpent: cost,
+          transitionDays: days,
+          executedBy: clean(o.by || 'council', 40),
+          executedAt: now()
+        };
+
+        d.phaseTransition.transitionExecutions = d.phaseTransition.transitionExecutions || [];
+        d.phaseTransition.transitionExecutions.push(executedRecord);
+        return true;
+      }, 'phaseTransition:executeTransitionRoute');
+    }
+
+    if (!executedRecord) return { ok: false, reason: failReason || 'execution-failed' };
+
+    return {
+      ok: true,
+      execution: executedRecord,
+      newLayout: target,
+      sunkCostDeducted: sunk,
+      fundsSpent: cost,
+      transitionDays: days,
+      note: '重组转型已真实扣款并注销沉没投资，进入过渡期'
+    };
+  }
+
   WA.phaseTransition = {
     evaluatePhase: evaluatePhase,
     transition: transition,
@@ -472,6 +608,8 @@
     investPath: investPath,
     evaluatePlacePath: evaluatePlacePath,
     planTransitionRoute: planTransitionRoute,
+    simulateIncidentStress: simulateIncidentStress,
+    executeTransitionRoute: executeTransitionRoute,
     PATH_LAYOUTS: PATH_LAYOUTS.slice(),
     PHASES: PHASES.map(function (p) { return { id: p.id, label: p.label, note: p.note }; })
   };

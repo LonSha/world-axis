@@ -369,6 +369,15 @@
     var s = state();
     var echoes = [];
 
+    function viewerKnowsTopic(viewerName, topicId) {
+      if (!viewerName || !topicId) return false;
+      if (WA.epistemicView && typeof WA.epistemicView.buildView === 'function') {
+        var bv = WA.epistemicView.buildView(viewerName, topicId);
+        if (bv && bv.known) return true;
+      }
+      return false;
+    }
+
     // 1. 生产施工事故回声
     var incidents = ((s.aftermathImpact || {}).incidents) || [];
     incidents.forEach(function (inc) {
@@ -378,9 +387,8 @@
       if (who) {
         var isParty = (inc.faultParty === who || inc.operator === who || inc.supervisor === who || inc.injuredPerson === who);
         var knows = isParty;
-        if (!knows && WA.epistemicView && typeof WA.epistemicView.getBelief === 'function') {
-          var b = WA.epistemicView.getBelief(who, 'incident_' + inc.id) || WA.epistemicView.getBelief(who, inc.id);
-          if (b && b.known) knows = true;
+        if (!knows && (viewerKnowsTopic(who, 'incident_' + inc.id) || viewerKnowsTopic(who, inc.id))) {
+          knows = true;
         }
         if (!knows) return; // 秘密/局外事故绝不透传
       }
@@ -402,9 +410,8 @@
       if (who) {
         var isParty = (p.promiser === who || p.beneficiary === who);
         var knows = isParty;
-        if (!knows && WA.epistemicView && typeof WA.epistemicView.getBelief === 'function') {
-          var b = WA.epistemicView.getBelief(who, 'promise_' + p.id);
-          if (b && b.known) knows = true;
+        if (!knows && viewerKnowsTopic(who, 'promise_' + p.id)) {
+          knows = true;
         }
         if (!knows) return;
       }
@@ -428,8 +435,7 @@
       var rLog = Array.isArray(f.repairLog) ? f.repairLog : [];
       rLog.forEach(function (rl) {
         if (!rl) return;
-        if (who && rl.worker !== who && (!WA.epistemicView || !WA.epistemicView.getBelief(who, 'repair_' + f.id))) {
-          // 非工匠且不知情
+        if (who && rl.worker !== who && !viewerKnowsTopic(who, 'repair_' + f.id)) {
           return;
         }
         echoes.push({
@@ -441,6 +447,45 @@
           impactOnNow: '设施已恢复运转能力，历史修缮物料已真实消耗',
           at: rl.at
         });
+      });
+    });
+
+    // 4. 连锁冲击与供应链波动回声 (EXV3-8)
+    var chains = ((s.aftermathImpact || {}).cascadingChains) || [];
+    chains.forEach(function (c) {
+      if (!c) return;
+      var hitNode = (c.nodes || []).filter(function (n) { return n && n.placeId === pid; })[0];
+      if (!hitNode) return;
+      var shockSummary = '受「' + c.sourcePlaceId + '」事故波及，本地面临' + (hitNode.impactType === 'supply_break' ? '供应链断供' : '物流阻滞');
+      if (hitNode.intervened) {
+        shockSummary += '（已采取' + (hitNode.interventionAction === 'containment' ? '行政隔离' : '紧急调配') + '）';
+      }
+      echoes.push({
+        id: 'shock_' + c.id + '_' + hitNode.index,
+        kind: 'cascading_shock',
+        summary: shockSummary,
+        who: hitNode.intervenedBy || 'local_depot',
+        status: hitNode.status,
+        impactOnNow: hitNode.status === 'contained' ? '冲击已被成功隔离阻断' : (hitNode.status === 'mitigated' ? '紧急储备平抑了短缺' : '物资供应紧张，物价高企'),
+        at: c.createdAt
+      });
+    });
+
+    // 5. 群体社会记忆与争议回声 (EXV3-7)
+    var claims = ((s.socialLegacy || {}).claims) || [];
+    claims.forEach(function (clm) {
+      if (!clm) return;
+      if (who && clm.targetWho !== who && clm.claimant !== who && !viewerKnowsTopic(who, 'claim_' + clm.id)) {
+        return;
+      }
+      echoes.push({
+        id: clm.id,
+        kind: 'social_claim',
+        summary: clm.claimant + '主张：「' + clm.text + '」',
+        who: clm.targetWho || clm.claimant,
+        status: clm.stance,
+        impactOnNow: clm.stance === 'misunderstanding' ? '坊间存有误解，合作门槛抬高' : (clm.stance === 'clarified' ? '当事人已当众出示证据澄清' : '公认好评，享有信任加成'),
+        at: clm.createdAt
       });
     });
 

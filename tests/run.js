@@ -24264,6 +24264,8 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(rV3B.status === 0, 'v3-b deepening exit 0');
     const rV3OP9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-op9-scenarios.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
     assert(rV3OP9.status === 0, 'v3-op9 scenarios exit 0');
+    const rV3C = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-c-deepening.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rV3C.status === 0, 'v3-c deepening exit 0');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
