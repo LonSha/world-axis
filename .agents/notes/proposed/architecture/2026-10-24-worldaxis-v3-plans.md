@@ -1,6 +1,6 @@
 # Agent Note: WorldAxis V3 双九项规划（优化提升 OPV3 + 拓展创新 EXV3）
 
-Status: proposed
+Status: rejected — 已被 V4 规划取代：V3 主题能力在后续产品提交中大面积落地，旧待办会造成重复建设。
 
 ## Problem
 
