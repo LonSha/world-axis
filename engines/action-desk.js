@@ -115,6 +115,8 @@
     // v2.233.0 (OPV4-1 & OPV4-2): 场景优先入口与跨轮生命周期
     'actionDesk.lifecycle': function (o) { return lifecycle(o); },
     'actionDesk.recoverAction': function (o) { return recoverAction(o.actionId, o); },
+    'actionDesk.sceneFlow': function (o) { return sceneFlow(o); },
+    'actionDesk.actFromScene': function (o) { return actFromScene(o); },
     // v2.231.0（拓展 IN-3）：共同知晓与默契
     'sharedAwareness.assertMeta': function (o) { return WA.sharedAwareness.assertMeta(o.who, o.target, o.factId, o.basis); },
     'sharedAwareness.openPact': function (o) { return WA.sharedAwareness.openPact(o.pactId, o.spec); },
@@ -924,6 +926,94 @@
   }
 
   /**
+   * OPV4-1：场景优先流程收束（纯只读投影）。
+   * 从场景出发：可知变化、可执行/受阻行动（带前置/所需资源/人员）、正在推进的工程。
+   * 观察者视角隔离：不同视角人物仅看到其可知的情境，不泄露私密事实与不可见变化。
+   */
+  function sceneFlow(opts) {
+    const o = opts || {};
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const who = clean(o.who || o.person || o.viewer, 40);
+    const place = clean(o.place, 60);
+
+    // 1. 调用 sceneNarrative.situation 取得情境投影
+    let sit = null;
+    if (WA.sceneNarrative && typeof WA.sceneNarrative.situation === 'function') {
+      try { sit = WA.sceneNarrative.situation({ who: who, place: place }); } catch (e) { sit = null; }
+    }
+    if (!sit || !sit.ok) {
+      noteFault('situation-unavailable');
+      return { ok: false, reason: 'situation-unavailable', note: '情境模块未返回合法情境' };
+    }
+
+    // 2. 聚合行动，并为每个行动补充预览明细（只读前置与资源）
+    const actList = (sit.availableActions || []).concat(sit.blockedActions || []);
+    const enrichedActions = actList.map(function (act) {
+      let prev = null;
+      try {
+        prev = previewAction(act.id, { who: who, place: sit.place || place });
+      } catch (e) { prev = null; }
+      return {
+        id: act.id,
+        kind: act.kind,
+        label: act.label,
+        state: act.state,
+        why: act.why,
+        owner: act.owner,
+        preview: prev ? {
+          canExecute: prev.canExecute,
+          shortfalls: prev.shortfalls || [],
+          alternatives: prev.alternatives || [],
+          failover: prev.failover || null,
+          serviceDelayDays: prev.serviceDelayDays || 0
+        } : null
+      };
+    });
+
+    const readyActions = enrichedActions.filter(function (a) { return a.state === 'ready'; });
+    const blockedActions = enrichedActions.filter(function (a) { return a.state !== 'ready'; });
+
+    return {
+      ok: true,
+      isProjection: true,
+      viewer: sit.viewer || who,
+      place: sit.place || place,
+      present: sit.present || [],
+      visibleChanges: sit.visibleChanges || [],
+      jointProjects: sit.jointProjects || [],
+      readyActions: readyActions,
+      blockedActions: blockedActions,
+      idleStatus: sit.idleStatus || 'active',
+      idleText: sit.idleText || '',
+      note: '场景行动流程纯只读收束投影，执行回到原场景'
+    };
+  }
+
+  /**
+   * OPV4-1：从场景执行行动。
+   * 支持 mode='preview'（纯读演练）与 mode='execute'（带幂等回执写回 owner），
+   * 结果均统一携带场景上下文（viewer, place）。
+   */
+  function actFromScene(opts) {
+    const o = opts || {};
+    const aid = clean(o.actionId, 60);
+    if (!aid) return { ok: false, reason: 'missing-fields', field: 'actionId' };
+    const mode = clean(o.mode || 'execute', 20);
+    const who = clean(o.who || o.person || o.viewer, 40);
+    const place = clean(o.place, 60);
+
+    if (mode === 'preview') {
+      const prev = previewAction(aid, o);
+      return Object.assign({ ok: true, isSceneContext: true, viewer: who, place: place }, prev);
+    }
+
+    // 执行模式走 workbench 统一幂等和路由
+    const res = workbench(Object.assign({}, o, { actionId: aid, who: who }));
+    return Object.assign({ isSceneContext: true, viewer: who, place: place }, res);
+  }
+
+  /**
    * 行动桌（**纯读**）。按当前人物/地点把各 owner 的现状摆成三档。
    * @param {object} opts {person, place}
    */
@@ -1062,9 +1152,12 @@
     // v2.233.0 (OPV4-2)：跨轮行动生命周期投影 + 恢复路由
     lifecycle: lifecycle,
     recoverAction: recoverAction,
+    // v2.233.0 (OPV4-1)：场景优先流程收束（纯读情境聚合 + 带场景上下文的行动派发）
+    sceneFlow: sceneFlow,
+    actFromScene: actFromScene,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults), byKind: Object.assign({}, stat.byKind) }); }
   };
-  var EXPORT_COUNT = 12;
+  var EXPORT_COUNT = 14;
   var _exported = Object.keys(WA.actionDesk).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('actionDesk: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/action-desk.js', { kind: 'engine', ver: '2.231.0' });

@@ -4381,8 +4381,42 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
          本区同样是**纯读投影**（引擎不落阶段字段），恢复动作一律转回原机制入口。</div>
        <div class="wa-row">
          <button class="wa-btn" id="wa-desk-life" title="纯读：把跨轮未结的事摆出来（零写入）">看未结事</button>
+         <button class="wa-btn" id="wa-desk-flow" title="纯读：从当前场景情境切入下一步行动（可知变化/可执行/受阻）">看场景行动流</button>
        </div>
-       <div id="wa-desk-life-out" class="wa-out"></div>`;
+       <div id="wa-desk-life-out" class="wa-out"></div>
+       <div id="wa-desk-flow-out" class="wa-out"></div>`;
+   }
+   /** 把 sceneFlow() 的情境与行动收束渲染（带预览演练与直接执行）。 */
+   function renderSceneFlow(sf) {
+     if (!sf || !sf.ok) return '读不到场景流：' + esc(String((sf && sf.reason) || 'unknown'));
+     let html = '<div class="wa-dim">视角 <b>' + esc(sf.viewer || '全局') + '</b> @ <b>' + esc(sf.place || '当前地点') + '</b>　'
+       + '在场人物：' + esc((sf.present || []).join('、') || '（无）') + '</div>';
+     if (sf.visibleChanges && sf.visibleChanges.length) {
+       html += '<div class="wa-sec">可知变化</div>';
+       sf.visibleChanges.forEach(function (c) {
+         html += '<div class="wa-row"><span class="wa-dim">[' + esc(c.stage || '变化') + ']</span> <b>' + esc(c.title || c.id) + '</b> <span class="wa-dim">' + esc(c.summary || '') + '</span></div>';
+       });
+     }
+     html += '<div class="wa-sec">场景可行行动（' + (sf.readyActions || []).length + '）</div>';
+     if (!(sf.readyActions && sf.readyActions.length)) {
+       html += '<div class="wa-dim">' + esc(sf.idleText || '暂无可执行行动') + '</div>';
+     } else {
+       sf.readyActions.forEach(function (a) {
+         html += '<div class="wa-row"><span class="wa-dim">[' + esc(a.kind || a.owner) + ']</span> <b>' + esc(a.label) + '</b> '
+           + '<button class="wa-btn wa-mini" data-flow-prev="' + esc(a.id) + '">预览</button> '
+           + '<button class="wa-btn wa-mini" data-flow-act="' + esc(a.id) + '">确认执行</button></div>';
+       });
+     }
+     if (sf.blockedActions && sf.blockedActions.length) {
+       html += '<div class="wa-sec">受阻行动（' + sf.blockedActions.length + '）</div>';
+       sf.blockedActions.forEach(function (b) {
+         html += '<div class="wa-row"><span class="wa-dim">[受阻·' + esc(b.kind || b.owner) + ']</span> ' + esc(b.label)
+           + ' <span class="wa-dim">' + esc(b.why || '') + '</span>'
+           + (b.preview && b.preview.shortfalls && b.preview.shortfalls.length ? ' <span class="wa-dim">缺：' + esc(b.preview.shortfalls.map(function(s){return s.material + '×' + s.deficient;}).join('、')) + '</span>' : '')
+           + '</div>';
+       });
+     }
+     return html;
    }
    /** 把 lifecycle() 的活跃档 / 终态 / 读不到 如实渲染（每行按钮的 actionId 由引擎给出）。 */
    function renderDeskLife(lc) {
@@ -4556,6 +4590,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     if (WA.actionDesk) {
       const deskOut = function () { const r = $('#wa-desk-out'); return r; };
       const lifeOut = function () { const r = $('#wa-desk-life-out'); return r; };
+      const flowOut = function () { const r = $('#wa-desk-flow-out'); return r; };
       const showDesk = function () {
         const who = ($('#wa-desk-who') || {}).value || '';
         try { mainWin.__waDeskWho = who; } catch (e) { }
@@ -4594,8 +4629,43 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           };
         });
       };
+      const showFlow = function () {
+        const who = ($('#wa-desk-who') || {}).value || '';
+        try { mainWin.__waDeskWho = who; } catch (e) { }
+        const out = flowOut(); if (!out) return;
+        const sf = (typeof WA.actionDesk.sceneFlow === 'function')
+          ? WA.actionDesk.sceneFlow({ who: String(who).trim() })
+          : { ok: false, reason: 'sceneFlow-missing' };
+        out.innerHTML = renderSceneFlow(sf);
+        out.querySelectorAll('[data-flow-prev]').forEach(function (btn) {
+          btn.onclick = function () {
+            const act = btn.getAttribute('data-flow-prev');
+            const prev = (typeof WA.actionDesk.actFromScene === 'function')
+              ? WA.actionDesk.actFromScene({ actionId: act, who: String(who).trim(), mode: 'preview' })
+              : { ok: false, reason: 'actFromScene-missing' };
+            const msg = prev && prev.ok ? ('预览：' + (prev.canExecute ? '条件满足可执行' : '前置条件不满足（' + (prev.shortfalls && prev.shortfalls.length ? '缺料' : '受阻') + '）')) : ('预览失败：' + String((prev && prev.reason) || 'unknown'));
+            const tipEl = document.createElement('div');
+            tipEl.className = 'wa-dim';
+            tipEl.textContent = msg;
+            btn.parentNode.appendChild(tipEl);
+          };
+        });
+        out.querySelectorAll('[data-flow-act]').forEach(function (btn) {
+          btn.onclick = function () {
+            const act = btn.getAttribute('data-flow-act');
+            const r = (typeof WA.actionDesk.actFromScene === 'function')
+              ? WA.actionDesk.actFromScene({ actionId: act, who: String(who).trim(), mode: 'execute' })
+              : { ok: false, reason: 'actFromScene-missing' };
+            const tip = (r && r.ok) ? '场景行动已执行' : ('执行受阻：' + String((r && r.reason) || 'unknown'));
+            showFlow();
+            const out2 = flowOut(); if (out2) out2.innerHTML = '<div class="wa-dim">' + esc(tip) + '</div>' + out2.innerHTML;
+            renderBody();
+          };
+        });
+      };
       on('#wa-desk-show', showDesk);
       on('#wa-desk-life', showLife);
+      on('#wa-desk-flow', showFlow);
       const cb = $('#wa-desk-on');
       if (cb) cb.onchange = function () { WA.actionDesk.setSettings({ enabled: cb.checked }); renderBody(); };
     }

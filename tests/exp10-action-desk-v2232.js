@@ -97,7 +97,7 @@ function careTransfer(W) {
 
 async function runAll(a, ov) {
   let W = env(ov);
-  a(Object.keys(W.actionDesk).length === 12, 'API loaded');
+  a(Object.keys(W.actionDesk).length === 14, 'API loaded');
   a(W.actionDesk.getSettings().enabled === true, 'settings roundtrip');
   a(!W.actionDesk.board({}).ok, 'missing person refused');
   a(W.actionDesk.board({ person: '不存在' }).reason === 'unknown-person', 'unknown person refused (no person created)');
