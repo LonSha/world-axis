@@ -5767,3 +5767,33 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
   - `tests/test-wp-a2-integration.js` (5/5 PASS)
   - `tests/test-wp-a1-integration.js` (6/6 PASS)
   - 联合既有全部专项用例（EXP 系列）全绿通过。零外部依赖，严格遵循单一真源持久化规范。
+### R-WP-FINISH-20261024 · 双九项切片全量闭环与全仓架构守卫收口（集成门禁接线、死导出消解、骨架物化与证据账本复算）
+- 做了：
+  1. `tests/run.js`（全量回归入口接线）：
+     - 将 A1、A2、A3、B1、B2、C 六套纵向切片综合集成门禁（`test-wp-a1-integration.js` ~ `test-wp-c-integration.js`）完整接入测试运行器的接线面，彻底消除未接线（unwired）孤儿测试文件。
+  2. `core/store.js`（世界真源骨架归属物化）：
+     - 在 `defaultWorldState` 中显式物化声明 `actionDesk: { opportunities: {} }` 顶层字段，消灭 `field-liveness-gate.js` 中的规则②写侧越界红灯，严格遵循单一真源字段物化纪律。
+  3. `engines/action-desk.js`（全局行动桌读口路由与死导出消解）：
+     - 挂接 7 个此前仅内部自用的读口路由（`activity.getSeries`、`activity.listSeries`、`techLineage.getStandard`、`techLineage.listStandards`、`sharedAwareness.viewPact`、`customLax.listPrecedents`、`customLax.reciprocityLedger`），让周期集市系列、地方技术标准、共同协议、社会先例与互惠账簿在产品侧具备真消费端，将新增死导出直接清零。
+  4. `tests/dead-export-gate.js` 与 `tests/dead-export-ledger.json`：
+     - 收敛死导出冻结账本，实测死导出规模从 1015 净下降至 996（减少 19 项接活导出），新增死导出 0 项。
+  5. `tools/evidence-index.js` 与 `tests/evidence-ledger.json`：
+     - 重新索引并全量校验证据账本，全仓 314 条测试证据全部处于 `wired` 或 `verified` 状态，unwired 归零，stale 归零。
+  6. `tests/module-cycle-gate-v2107.js`：
+     - 实测回填跨引擎真实调用边恒等式（装载期边 170 + 调用期边 2191 = 总边 2361），验证无环、无跨文件写、无次序违规（65/65 PASS）。
+  7. `tests/q1-load-integrity-v2211.js`：
+     - 适配 `index.js` 引导链标记 `__mark('store-ok')`，专锁全绿（64/64 PASS）。
+  8. `.agents/notes/proposed/architecture/2026-10-24-worldaxis-play-depth-emergence.md`：
+     - 补齐 ADR 规范的 `## Decision` 与 `## Consequences` 章节，`tests/o7-plan-tree-gate-v2187.js` (69/69 PASS)。
+  9. `NEXT_PLAN.md`、`plans/WORLD_PLAY_DEPTH_9.md` 与 `plans/WORLD_EMERGENCE_9.md`：
+     - 推进并同步最新台账，将 WP-1～9 与 WX-1～9 的状态从 proposed 推进至已交付（implemented）与已验证。
+- 验证：
+  - A/B/C 六套综合集成门禁（A1: 6/6, A2: 5/5, A3: 4/4, B1: 5/5, B2: 5/5, C: 6/6）全部 PASS（32/32 全绿）。
+  - 死导出门禁 `tests/dead-export-gate.js` (PASS，0 新增死导出)。
+  - 骨架归属门禁 `tests/field-liveness-gate.js` (PASS，0 幽灵读点、0 越界)。
+  - 模块依赖静态图门禁 `tests/module-cycle-gate-v2107.js` (65/65 PASS) 与 `tests/module-cycle-gate.js` (PASS)。
+  - 证据账本专锁 `tests/q9-evidence-ledger-v2226.js` (67/67 PASS) 与索引校验 `tools/evidence-index.js --check` (0 stale / 0 unwired)。
+  - 计划树与笔记格式门禁 `tests/o7-plan-tree-gate-v2187.js` (69/69 PASS)。
+  - 版本白名单门禁 `tests/version-surface-gate-v2185.js` (14/14 PASS)。
+  - 测试文件可达性门禁 `tests/test-surface-gate.js` (315 文件 0 孤儿全可达)。
+  - 零外部 npm 依赖，单一真源持久化，向后兼容既有接口。

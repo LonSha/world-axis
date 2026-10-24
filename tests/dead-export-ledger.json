@@ -88,7 +88,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 1,
-      "own": 4
+      "own": 6
     },
     "activity.awards": {
       "reason": "self-only",
@@ -96,7 +96,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 0,
-      "own": 13
+      "own": 14
     },
     "activity.cancel": {
       "reason": "self-only",
@@ -104,7 +104,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 4
     },
     "activity.getSettings": {
       "reason": "test-only",
@@ -112,7 +112,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 7,
-      "own": 1
+      "own": 3
     },
     "activity.list": {
       "reason": "self-only",
@@ -120,7 +120,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 0,
-      "own": 9
+      "own": 18
     },
     "activity.open": {
       "reason": "test-only",
@@ -136,7 +136,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 3,
-      "own": 13
+      "own": 14
     },
     "activity.postpone": {
       "reason": "test-only",
@@ -144,7 +144,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 2,
-      "own": 3
+      "own": 4
     },
     "activity.reload": {
       "reason": "self-only",
@@ -192,7 +192,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 0,
-      "own": 21
+      "own": 23
     },
     "activity.setSettings": {
       "reason": "test-only",
@@ -224,7 +224,7 @@
       "src": "engines/activity.js",
       "refs": 0,
       "tref": 2,
-      "own": 18
+      "own": 19
     },
     "activity.start": {
       "reason": "test-only",
@@ -3522,14 +3522,6 @@
       "tref": 0,
       "own": 3
     },
-    "laborSchedule.getSettings": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/labor-schedule.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
-    },
     "laborSchedule.resetStat": {
       "reason": "self-only",
       "detail": "engines/labor-schedule.js 内部自用、外部零引用（过度导出）",
@@ -4664,7 +4656,7 @@
       "src": "engines/playable-blueprint.js",
       "refs": 0,
       "tref": 0,
-      "own": 5
+      "own": 6
     },
     "plotGauge.reset": {
       "reason": "test-only",
@@ -5080,7 +5072,7 @@
       "src": "engines/production.js",
       "refs": 0,
       "tref": 0,
-      "own": 38
+      "own": 44
     },
     "profile.maintain": {
       "reason": "test-only",
@@ -6146,14 +6138,6 @@
       "tref": 0,
       "own": 3
     },
-    "serviceNetwork.releaseService": {
-      "reason": "self-only",
-      "detail": "engines/service-network.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/service-network.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "session.fingerprint": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -6642,87 +6626,7 @@
       "tref": 4,
       "own": 1
     },
-    "survey.advance": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
-    },
-    "survey.confirm": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "survey.declareSpot": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
-    },
-    "survey.fog": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
-    },
-    "survey.getSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 1
-    },
-    "survey.halt": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "survey.knowsOf": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "survey.list": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
-    },
-    "survey.pause": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
     "survey.reload": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "survey.report": {
       "reason": "self-only",
       "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
       "src": "engines/survey.js",
@@ -6746,38 +6650,6 @@
       "tref": 0,
       "own": 4
     },
-    "survey.resume": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "survey.resupply": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "survey.routesOf": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "survey.setSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 6,
-      "own": 1
-    },
     "survey.spotOf": {
       "reason": "self-only",
       "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
@@ -6793,22 +6665,6 @@
       "refs": 0,
       "tref": 0,
       "own": 42
-    },
-    "survey.survey": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 5,
-      "own": 16
-    },
-    "survey.view": {
-      "reason": "self-only",
-      "detail": "engines/survey.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/survey.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "survival.getSettings": {
       "reason": "unwired",
@@ -6849,14 +6705,6 @@
       "refs": 0,
       "tref": 0,
       "own": 9
-    },
-    "techLineage.canProduce": {
-      "reason": "self-only",
-      "detail": "engines/tech-lineage.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/tech-lineage.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "techLineage.declareTradition": {
       "reason": "self-only",
@@ -8154,7 +8002,7 @@
       "src": "ui/panel.js",
       "refs": 0,
       "tref": 29,
-      "own": 22
+      "own": 24
     },
     "ui.rerenderStat": {
       "reason": "test-only",
@@ -8166,6 +8014,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 484
+    "dataOnly": 485
   }
 }

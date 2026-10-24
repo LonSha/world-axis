@@ -170,6 +170,13 @@
     'activity.prepareForActivity': function (o) { return WA.activity.prepareForActivity(o.activityId, o.who, o); },
     'activity.handleDisruption': function (o) { return WA.activity.handleDisruption(o.activityId, o.disruptionType, o); },
     'activity.nextCycleInvitations': function (o) { return WA.activity.nextCycleInvitations(o.seriesId); },
+    'activity.getSeries': function (o) { return WA.activity.getSeries(o.seriesId); },
+    'activity.listSeries': function (o) { return WA.activity.listSeries(o); },
+    'techLineage.getStandard': function (o) { return WA.techLineage.getStandard(o.standardId); },
+    'techLineage.listStandards': function (o) { return WA.techLineage.listStandards(o); },
+    'sharedAwareness.viewPact': function (o) { return WA.sharedAwareness.viewPact(o.pactId); },
+    'customLax.listPrecedents': function (o) { return WA.customLax.listPrecedents(o); },
+    'customLax.reciprocityLedger': function (o) { return WA.customLax.reciprocityLedger(o.who); },
     // v2.231.0（拓展 IN-9）：历史相变与长期投资路径 WX-9
     'phaseTransition.evaluatePhase': function (o) { return WA.phaseTransition.evaluatePhase(o.regionId); },
     'phaseTransition.transition': function (o) { return WA.phaseTransition.transition(o.regionId, o.targetPhaseId, o); },

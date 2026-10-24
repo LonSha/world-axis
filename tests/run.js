@@ -24241,6 +24241,22 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runLock('./exp27-phase-transition-v2232.js');
     await runLock('./exp27-phase-transition-v2232.js', 'runNegative');
   }
+  // ── v2.231.0(玩法深度与机制涌现): A/B/C 三包切片综合集成门禁 ──
+  section('v2.231.0(玩法深度与机制涌现): A/B/C 三包切片综合集成门禁');
+  {
+    const rWPA1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a1-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rWPA1.status === 0, 'wp-a1 integration exit 0');
+    const rWPA2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a2-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rWPA2.status === 0, 'wp-a2 integration exit 0');
+    const rWPA3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a3-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rWPA3.status === 0, 'wp-a3 integration exit 0');
+    const rWPB1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-b1-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rWPB1.status === 0, 'wp-b1 integration exit 0');
+    const rWPB2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-b2-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rWPB2.status === 0, 'wp-b2 integration exit 0');
+    const rWPC = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-c-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    assert(rWPC.status === 0, 'wp-c integration exit 0');
+  }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
   console.log('  ⏱ 超 60s 的节：' + __slowSec119 + ' 个');

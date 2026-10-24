@@ -291,10 +291,9 @@ function runAll(A) {
   //     ② engines/world-seed.js → commit（装种子时的在途标注读 `commit.inflight`）
   //   装载期 108 不变（两模块本就在装载期读 store）；逐条 diff 结论：新增 6 条、消失 0 条，
   //   其中 aftermath / agency / investigation 三条已计入批次③④ 的 1790。
-  // v2.203.0（第四批收口）：调用期 1714 → **1721**、合计 1825 → **1832**（+7 条，实测回填）。
-  //   本门禁的边只算**产品文件**的 (file, ns) 对（见 B1 的 `files === 221`），故这 7 条
-  //   来自本批的产品改动、批内未及回填；装载期 111 不变。
-  A(a.edgesLoad === 170 && a.edgesCall === 2175 && a.edgesAll === 2345 && a.identityOk,
+  // v2.231.0（WP/WX 切片交付收口）：调用期 2175 → **2191**、合计 2345 → **2361**（实测回填）。
+  //   跨引擎（activity/laborSchedule、techLineage/production、sceneNarrative/aftermathImpact 等）真实调用接线。
+  A(a.edgesLoad === 170 && a.edgesCall === 2191 && a.edgesAll === 2361 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'

@@ -198,7 +198,7 @@ function runAll(a) {
   }), 'q1: [A5] 入口转出 loaderStatus / loaderIntegrity / writeGate / loadRetry 四个口');
   // A6 启动投影**必须在 store.init() 之前**:下一句就是 init(),它可能触发首次写路径
   const iProj = srcIdx.indexOf('WA.__loadFailed = failedList.map(');
-  const iInit = srcIdx.indexOf('try { WA.store && WA.store.init && WA.store.init(); }');
+  const iInit = srcIdx.indexOf('try { WA.store && WA.store.init && WA.store.init();');
   a(iProj > 0 && iInit > iProj, 'q1: [A6] 失败表投影发生在 store.init() 之前(投影行 ' + iProj + ' < init 行 ' + iInit + ')');
   a(/WA\.__loadFailed = failedList\.map\(function \(f\) \{ return f\.rel; \}\);/.test(srcIdx),
     'q1: [A6] 投影无条件写数组(空数组也是「已知」;「没失败就不写」会退化成不可知)');
