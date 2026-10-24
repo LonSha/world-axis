@@ -270,15 +270,222 @@
     return { ok: true, currentDay: nextDay, storyDay: nextDay };
   }
 
+  /**
+   * OPV4-3：纯只读时间成本与占用冲突预览。
+   * 零写入，计算指定任务在未来指定天数内的时间占用、重叠冲突、最早完成日与延期来源。
+   */
+  function previewSchedule(opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const o = opts || {};
+    const who = clean(o.who, 60);
+    const task = clean(o.task || '任务', 60);
+    const startDay = num(o.startDay) == null ? getStoryDay() : Math.floor(num(o.startDay));
+    const reqDays = Math.max(1, Math.min(num(o.days) || 1, 30));
+    const slot = clean(o.slot, 20) || 'morning';
+
+    const st = state();
+    const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
+    const pRecord = st.people ? (st.people['p_' + who] || st.people[who]) : null;
+    let travelDelay = 0;
+    if (pRecord) {
+      const pStatus = clean(pRecord.status || pRecord.action, 30);
+      if (pStatus === 'traveling' || pStatus === 'on_the_road' || pStatus === 'transit') {
+        travelDelay = 1;
+      }
+    }
+
+    const occupiedSlots = [];
+    const conflicts = [];
+    let scheduledDays = 0;
+    let evalDay = startDay + travelDelay;
+
+    while (scheduledDays < reqDays && evalDay <= startDay + reqDays + 14) {
+      const dayConf = ls.filter(function (b) {
+        return b && b.who === who && b.day === evalDay && b.slot === slot && !b.cancelled;
+      })[0];
+      if (dayConf) {
+        conflicts.push({ day: evalDay, slot: slot, task: dayConf.task, conflictBookingId: dayConf.id });
+      } else {
+        occupiedSlots.push({ day: evalDay, slot: slot });
+        scheduledDays++;
+      }
+      evalDay++;
+    }
+
+    const earliestCompletionDay = (occupiedSlots.length >= reqDays)
+      ? occupiedSlots[occupiedSlots.length - 1].day
+      : (startDay + reqDays + travelDelay);
+
+    return {
+      ok: true,
+      preview: true,
+      who: who,
+      task: task,
+      startDay: startDay,
+      requiredDays: reqDays,
+      occupiedSlots: occupiedSlots,
+      conflicts: conflicts,
+      hasConflict: conflicts.length > 0,
+      earliestCompletionDay: earliestCompletionDay,
+      travelDelay: travelDelay,
+      note: '时间成本纯读预览，零写入'
+    };
+  }
+
+  /**
+   * OPV4-3：改期（reschedule）。
+   * 将既有预约移到新的日期或时段。若目标时段已被占用，则整单拒绝且原预约保持不变。
+   */
+  function reschedule(bookingId, targetDay, targetSlot) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const bid = clean(bookingId, 80);
+    const day = Math.floor(num(targetDay));
+    const slot = clean(targetSlot, 20);
+    if (!bid || !day || !slot) return { ok: false, reason: 'missing-fields' };
+
+    const st = state();
+    const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
+    const target = ls.filter(function (b) { return b && b.id === bid && !b.cancelled; })[0];
+    if (!target) return { ok: false, reason: 'booking-not-found', bookingId: bid };
+
+    // 冲突检查：目标时段是否已被同一人或满员
+    const conf = ls.filter(function (b) {
+      return b && b.id !== bid && b.who === target.who && b.day === day && b.slot === slot && !b.cancelled;
+    })[0];
+    if (conf) {
+      noteFault('reschedule-conflict');
+      return { ok: false, reason: 'reschedule-conflict', targetDay: day, targetSlot: slot, conflictWith: conf.task };
+    }
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = ensure(draft);
+      const row = b.bookings.filter(function (x) { return x && x.id === bid; })[0];
+      if (!row) return false;
+      const prevDay = row.day, prevSlot = row.slot;
+      row.day = day;
+      row.slot = slot;
+      row.rescheduledFrom = { day: prevDay, slot: prevSlot };
+      row.updatedAt = clockNow('labor');
+      out = { ok: true, bookingId: bid, who: row.who, day: day, slot: slot, task: row.task };
+      return true;
+    }, 'laborSchedule:reschedule');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * OPV4-3：取消预约（cancel）。
+   * 标记 cancelled=true。明确规定：取消不返还已消耗成本（材料与前序工时保留）。
+   */
+  function cancel(bookingId, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const bid = clean(bookingId, 80);
+    if (!bid) return { ok: false, reason: 'missing-fields', field: 'bookingId' };
+    const o = opts || {};
+    const reason = clean(o.reason || 'manual-cancel', 60);
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = ensure(draft);
+      const row = b.bookings.filter(function (x) { return x && x.id === bid && !x.cancelled; })[0];
+      if (!row) {
+        out = { ok: false, reason: 'booking-not-found', bookingId: bid };
+        return false;
+      }
+      row.cancelled = true;
+      row.cancelledReason = reason;
+      row.cancelledAt = clockNow('labor');
+      row.costRefunded = false; // 严守契约：取消不返还已消耗成本
+      out = { ok: true, bookingId: bid, cancelled: true, reason: reason, costRefunded: row.costRefunded };
+      return true;
+    }, 'laborSchedule:cancel');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * OPV4-3：拆分预约（split）。
+   * 将一个多时段任务拆成两个预约，支持后续按段转交或改期。
+   */
+  function split(bookingId, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const bid = clean(bookingId, 80);
+    const o = opts || {};
+    const nextDay = Math.floor(num(o.day));
+    const nextSlot = clean(o.slot, 20);
+    if (!bid || !nextDay || !nextSlot) return { ok: false, reason: 'missing-fields' };
+
+    const st = state();
+    const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
+    const orig = ls.filter(function (b) { return b && b.id === bid && !b.cancelled; })[0];
+    if (!orig) return { ok: false, reason: 'booking-not-found', bookingId: bid };
+
+    // 冲突检查
+    const conf = ls.filter(function (b) {
+      return b && b.who === orig.who && b.day === nextDay && b.slot === nextSlot && !b.cancelled;
+    })[0];
+    if (conf) {
+      return { ok: false, reason: 'split-target-conflict', day: nextDay, slot: nextSlot, conflictWith: conf.task };
+    }
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = ensure(draft);
+      const newId = bid + '_p2';
+      const secondPart = {
+        id: newId,
+        who: orig.who,
+        day: nextDay,
+        slot: nextSlot,
+        task: orig.task + '（续）',
+        kind: orig.kind,
+        splitFrom: bid,
+        createdAt: clockNow('labor')
+      };
+      b.bookings.push(secondPart);
+      out = { ok: true, originalId: bid, newBookingId: newId, day: nextDay, slot: nextSlot };
+      return true;
+    }, 'laborSchedule:split');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * OPV4-3：寻找最早空闲时段（earliestSlot）。
+   */
+  function earliestSlot(who, opts) {
+    const w = clean(who, 60);
+    const o = opts || {};
+    const startDay = num(o.startDay) == null ? getStoryDay() : Math.floor(num(o.startDay));
+    const st = state();
+    const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
+
+    for (let d = startDay; d <= startDay + 30; d++) {
+      for (let si = 0; si < SLOTS.length; si++) {
+        const s = SLOTS[si];
+        const busy = ls.some(function (b) {
+          return b && b.who === w && b.day === d && b.slot === s && !b.cancelled;
+        });
+        if (!busy) {
+          return { ok: true, who: w, day: d, slot: s };
+        }
+      }
+    }
+    return { ok: false, reason: 'no-slot-available', horizon: 30 };
+  }
+
   function statView() {
     return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) });
   }
-
   function resetStat() {
     stat.claims = 0; stat.conflicts = 0; stat.transfers = 0; stat.daysAdvanced = 0; stat.lastReason = ''; stat.faults = {};
     return { ok: true };
   }
-
   WA.laborSchedule = {
     SLOTS: SLOTS.slice(),
     getSettings: settings,
@@ -287,6 +494,12 @@
     transfer: transfer,
     view: view,
     advanceDay: advanceDay,
+    // v2.233.0 (OPV4-3)：时间成本与冲突预览 + 协商协议
+    previewSchedule: previewSchedule,
+    reschedule: reschedule,
+    cancel: cancel,
+    split: split,
+    earliestSlot: earliestSlot,
     stat: statView,
     resetStat: resetStat
   };

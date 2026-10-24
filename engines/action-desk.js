@@ -90,6 +90,12 @@
     'method.execute': function (o) { return WA.actionMethods.execute(o.taskId, o.who, o.methodId, o); },
     'schedule.claim': function (o) { return WA.laborSchedule.claim(o); },
     'schedule.transfer': function (o) { return WA.laborSchedule.transfer(o.bookingId, o.to); },
+    // v2.233.0 (OPV4-3): 时间成本与冲突预览 + 协商协议
+    'schedule.preview': function (o) { return WA.laborSchedule.previewSchedule(o); },
+    'schedule.reschedule': function (o) { return WA.laborSchedule.reschedule(o.bookingId, o.day, o.slot); },
+    'schedule.cancel': function (o) { return WA.laborSchedule.cancel(o.bookingId, o); },
+    'schedule.split': function (o) { return WA.laborSchedule.split(o.bookingId, o); },
+    'schedule.earliest': function (o) { return WA.laborSchedule.earliestSlot(o.who, o); },
     'motive.arbitrate': function (o) { return WA.motiveArbitration.decide(o.person, o.candidates, o.facts); },
     'pathEcho.realize': function (o) { return WA.pathEcho.realizeOutcome(o.personId, o.decisionId, o.actualOutcome, o.knownFacts); },
     'lineage.teach': function (o) { return WA.techLineage.teach(o.traditionId, o.master, o.apprentice); },
@@ -370,6 +376,14 @@
           alternatives: shortfalls.length ? ['寻求工坊支援', '调整研究方案'] : ['料已备齐，可推进'],
           note: '纯读预览，零扣除零磨损'
         };
+      }
+    }
+
+    // 3. 若为日程预约/安排前置检查
+    if (aid.indexOf('schedule.') === 0) {
+      if (WA.laborSchedule && typeof WA.laborSchedule.previewSchedule === 'function') {
+        const scPrev = WA.laborSchedule.previewSchedule(Object.assign({}, o, { who: w }));
+        return Object.assign({ ok: true, preview: true, actionId: aid, canExecute: !scPrev.hasConflict }, scPrev);
       }
     }
 

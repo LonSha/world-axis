@@ -24,6 +24,7 @@ V3 A/B/C 与 OP9 已真实落地情境投影、行动桌、能力差异、资源
 **依据/问题：** playtime、calendar、labor-schedule、travel、production、research 等有局部时间语义，不能再造时钟。
 **交付：** 复用剧情时间和预约协议，预览占用、冲突、最早完成和延期来源；支持改期、换人、拆分、取消，由 owner 结算成本。
 **验收：** 禁止角色重叠承诺；取消不返还已消耗成本；离线恢复不重复推进；旧存档可走完预约到完成。P0，24–38 小时。
+**现场落地点：** `engines/labor-schedule.js`（`previewSchedule`、`reschedule`、`cancel`、`split`、`earliestSlot`）；`engines/action-desk.js`（新增 `schedule.preview/reschedule/cancel/split/earliest` 路由）；`ui/panel.js`（行动桌日程与时间协商区块交互）；`tests/exp30-time-negotiation-v2233.js`（22 项断言全绿，含 4 组唯一真变异负控制）。
 ### OPV4-4｜人物日常安排可被世界打断并接续
 **依据/问题：** life、labor-schedule、activity、travel、vitals 已各自管理生活，缺少可解释的缺席、冲突和替班连续体验。
 **交付：** 汇总日程投影；事故、受伤、旅行或邀约触发换班、放弃或延期，并回写原 owner，不做全能 NPC AI/第二日程源。

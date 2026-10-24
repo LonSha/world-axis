@@ -4382,11 +4382,28 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
        <div class="wa-row">
          <button class="wa-btn" id="wa-desk-life" title="纯读：把跨轮未结的事摆出来（零写入）">看未结事</button>
          <button class="wa-btn" id="wa-desk-flow" title="纯读：从当前场景情境切入下一步行动（可知变化/可执行/受阻）">看场景行动流</button>
+         <button class="wa-btn" id="wa-desk-sched" title="纯读：查看时间成本占用与协商日程（改期/取消/拆分）">看日程与时间协商</button>
        </div>
        <div id="wa-desk-life-out" class="wa-out"></div>
-       <div id="wa-desk-flow-out" class="wa-out"></div>`;
+       <div id="wa-desk-flow-out" class="wa-out"></div>
+       <div id="wa-desk-sched-out" class="wa-out"></div>`;
    }
-   /** 把 sceneFlow() 的情境与行动收束渲染（带预览演练与直接执行）。 */
+   /** 把日程与时间协商视图如实渲染（纯读列表 + 改期/取消/拆分操作）。 */
+   function renderScheduleNegotiation(sc) {
+     if (!sc || !sc.ok) return '读不到日程：' + esc(String((sc && sc.reason) || 'unknown'));
+     let html = '<div class="wa-dim">当前故事日 <b>第 ' + sc.day + ' 日</b> · 预约数 <b>' + sc.count + '</b></div>';
+     if (!sc.bookings || !sc.bookings.length) {
+       html += '<div class="wa-dim">当前无活跃日程预约</div>';
+       return html;
+     }
+     sc.bookings.forEach(function (b) {
+       html += '<div class="wa-row"><b>[' + esc(b.slot) + ']</b> ' + esc(b.who) + ' — ' + esc(b.task)
+         + ' <button class="wa-btn wa-mini" data-sched-cancel="' + esc(b.id) + '" title="取消预约（不返还已消耗成本）">取消</button>'
+         + ' <button class="wa-btn wa-mini" data-sched-split="' + esc(b.id) + '" title="拆分预约为后续段">拆分</button>'
+         + '</div>';
+     });
+     return html;
+   }
    function renderSceneFlow(sf) {
      if (!sf || !sf.ok) return '读不到场景流：' + esc(String((sf && sf.reason) || 'unknown'));
      let html = '<div class="wa-dim">视角 <b>' + esc(sf.viewer || '全局') + '</b> @ <b>' + esc(sf.place || '当前地点') + '</b>　'
@@ -4591,6 +4608,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       const deskOut = function () { const r = $('#wa-desk-out'); return r; };
       const lifeOut = function () { const r = $('#wa-desk-life-out'); return r; };
       const flowOut = function () { const r = $('#wa-desk-flow-out'); return r; };
+      const schedOut = function () { const r = $('#wa-desk-sched-out'); return r; };
       const showDesk = function () {
         const who = ($('#wa-desk-who') || {}).value || '';
         try { mainWin.__waDeskWho = who; } catch (e) { }
@@ -4663,9 +4681,41 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           };
         });
       };
+      const showSched = function () {
+        const who = ($('#wa-desk-who') || {}).value || '';
+        const out = schedOut(); if (!out) return;
+        const sc = (WA.laborSchedule && typeof WA.laborSchedule.view === 'function')
+          ? WA.laborSchedule.view({ who: String(who).trim() })
+          : { ok: false, reason: 'laborSchedule-missing' };
+        out.innerHTML = renderScheduleNegotiation(sc);
+        out.querySelectorAll('[data-sched-cancel]').forEach(function (btn) {
+          btn.onclick = function () {
+            const bid = btn.getAttribute('data-sched-cancel');
+            const r = (WA.laborSchedule && typeof WA.laborSchedule.cancel === 'function')
+              ? WA.laborSchedule.cancel(bid, { reason: 'player-cancel' })
+              : { ok: false, reason: 'cancel-unavailable' };
+            showSched();
+            const out2 = schedOut(); if (out2) out2.innerHTML = '<div class="wa-dim">' + (r && r.ok ? '已取消预约（已消耗成本不返还）' : ('取消失败：' + String((r && r.reason) || 'unknown'))) + '</div>' + out2.innerHTML;
+            renderBody();
+          };
+        });
+        out.querySelectorAll('[data-sched-split]').forEach(function (btn) {
+          btn.onclick = function () {
+            const bid = btn.getAttribute('data-sched-split');
+            const curDay = (sc && sc.day) || 1;
+            const r = (WA.laborSchedule && typeof WA.laborSchedule.split === 'function')
+              ? WA.laborSchedule.split(bid, { day: curDay + 1, slot: 'morning' })
+              : { ok: false, reason: 'split-unavailable' };
+            showSched();
+            const out2 = schedOut(); if (out2) out2.innerHTML = '<div class="wa-dim">' + (r && r.ok ? '预约已拆分至明日' : ('拆分受阻：' + String((r && r.reason) || 'unknown'))) + '</div>' + out2.innerHTML;
+            renderBody();
+          };
+        });
+      };
       on('#wa-desk-show', showDesk);
       on('#wa-desk-life', showLife);
       on('#wa-desk-flow', showFlow);
+      on('#wa-desk-sched', showSched);
       const cb = $('#wa-desk-on');
       if (cb) cb.onchange = function () { WA.actionDesk.setSettings({ enabled: cb.checked }); renderBody(); };
     }

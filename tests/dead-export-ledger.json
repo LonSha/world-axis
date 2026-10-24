@@ -3704,7 +3704,7 @@
       "src": "engines/labor-schedule.js",
       "refs": 0,
       "tref": 0,
-      "own": 23
+      "own": 27
     },
     "ladder.deescalate": {
       "reason": "test-only",
