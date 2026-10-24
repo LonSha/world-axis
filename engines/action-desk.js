@@ -257,6 +257,41 @@
       }
     }
 
+    // 身体状态与行动资格检查 (OPV4-6)
+    // 伤病/重度衰竭限制行动；生理妊娠/并发症限制负重与剧烈劳动
+    let healthPenalty = null;
+    if (w) {
+      if (WA.lifeline && typeof WA.lifeline.capacityOf === 'function') {
+        const cap = WA.lifeline.capacityOf(w);
+        if (cap && cap.ok && cap.limits && cap.limits.length > 0) {
+          const blocksAction = cap.limits.some(function (lim) {
+            return lim.level === 'prohibited' && (aid.indexOf(lim.activity) >= 0 || lim.activity === 'all_labor');
+          });
+          if (blocksAction) {
+            return {
+              ok: false,
+              reason: 'health-capacity-prohibited',
+              who: w,
+              limits: cap.limits,
+              note: '身体病况严禁进行该项活动'
+            };
+          }
+          healthPenalty = { limited: true, limits: cap.limits, costMultiplier: 1.5 };
+        }
+      }
+      if (WA.survival && typeof WA.survival.statusOf === 'function') {
+        const surv = WA.survival.statusOf(w);
+        if (surv && surv.ok && surv.exhausted) {
+          return {
+            ok: false,
+            reason: 'vital-exhaustion-blocked',
+            who: w,
+            note: '当事人处于极度衰竭/昏迷边缘，丧失行动资格，必须先行休养'
+          };
+        }
+      }
+    }
+
     // 通道关卡查验硬性拦截 (EXV3-2)
     if (WA.serviceNetwork && typeof WA.serviceNetwork.checkPassage === 'function' && (o.toPlace || aid.indexOf('travel') >= 0)) {
       const fromP = o.fromPlace || o.place || (st.people && st.people['p_' + w] && st.people['p_' + w].location);
@@ -394,18 +429,19 @@
     }
 
     // 3. 通用预览兜底
-    return {
-      ok: true,
-      preview: true,
-      actionId: aid,
-      who: w,
-      canExecute: true,
-      costEstimate: { duration: 1, wear: 0 },
-      shortfalls: [],
-      pathInfo: pathInfo,
-      cascadingWarning: cascadingWarning,
-      note: '通用前置与条件校验通过'
-    };
+return {
+       ok: true,
+       preview: true,
+       actionId: aid,
+       who: w,
+       canExecute: true,
+       costEstimate: { duration: 1, wear: 0 },
+       shortfalls: [],
+       healthPenalty: healthPenalty,
+       pathInfo: pathInfo,
+       cascadingWarning: cascadingWarning,
+       note: '通用前置与条件校验通过'
+     };
   }
 
   /**

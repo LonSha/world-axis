@@ -39,6 +39,7 @@ V3 A/B/C 与 OP9 已真实落地情境投影、行动桌、能力差异、资源
 **依据/问题：** vitals、survival、aftermath-impact、service-network、production 已有健康、损害、服务和行动状态，需在具体行动中联动。
 **交付：** 将伤病、设施降级、风险和资格接入照护/维修/出行预览；给出替代方法与代价；由既有 owner 结算。
 **验收：** 状态变化真实改变可行性；替代方案有不同成本；恢复不止改标签；后续场景可见因果。P1，26–42 小时。
+**现场落地点：** `engines/action-desk.js`（`previewAction` 接入 `lifeline.capacityOf` 伤病禁忌硬性拦截与 `survival.statusOf` 极度衰竭拦截，自动携带 `healthPenalty`）；`tests/exp33-health-place-qualification-v2233.js`（9 项断言全绿，含 2 组真变异负控制）。
 ### OPV4-7｜长局记忆整理与按需回忆
 **依据/问题：** memory、memory-tiers、pmem、chronicle-view、retrieval、history-search 和注入预算已存在，长局需避免旧史常驻挤占上下文。
 **交付：** 按时效、视角、场景相关性和证据来源召回记忆；不复制事实，不把全部历史固定注入。
