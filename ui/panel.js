@@ -303,7 +303,7 @@
     inject: 'workshop', supply: 'workshop', evidence: 'workshop', branchdiff: 'workshop', storyloop: 'workshop', retrieval: 'workshop', port: 'workshop', find: 'workshop', graph: 'workshop', net: 'workshop',
     settings: 'system', health: 'system', connect: 'system', assistant: 'system', tools: 'system', logs: 'system'
   };
-  let currentCat = 'all';
+  let currentCat = 'core';
 
   // == v2.109.0（计划一 #15）：面板状态持久化走设置总线 ==
   //   为什么必须有它（三条实测理由，不是偏好）：
@@ -14320,14 +14320,14 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           + views.map(function (v) { return '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + esc(vn(v)) + '</option>'; }).join('')
           + '</select><span id="wa-view-out" class="wa-dim"></span>';
       })()}</span><span class="wa-close">✕</span></div>
-      <div class="wa-nav-bar"><span id="wa-nav-out" class="wa-dim">（跳转读数：去哪 / 定位结果 / 拒收原因 —— 常驻头部，切页不会把它冲掉）</span>
+      <div class="wa-nav-bar"><span id="wa-nav-out" class="wa-dim"></span>
         <button class="wa-btn wa-mini" id="wa-nav-back" title="回到上一页，并按离开时的样子还原输入与滚动位（ui/panel-nav.js 的回程栈，有界 8 层）">← 返回</button></div>
       <div class="wa-cat-bar">
-        <button class="wa-cat-btn active" data-cat="all">全部</button>
-        <button class="wa-cat-btn" data-cat="core">🌟 剧情核心</button>
-        <button class="wa-cat-btn" data-cat="world">🌐 世界推进</button>
-        <button class="wa-cat-btn" data-cat="workshop">🛠️ 工坊探索</button>
-        <button class="wa-cat-btn" data-cat="system">⚙️ 系统设置</button>
+        <button class="wa-cat-btn active" data-cat="core">核心</button>
+        <button class="wa-cat-btn" data-cat="world">世界</button>
+        <button class="wa-cat-btn" data-cat="workshop">工坊</button>
+        <button class="wa-cat-btn" data-cat="system">系统</button>
+        <button class="wa-cat-btn" data-cat="all">全部</button>
       </div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}" data-cat="${PAGE_CAT[p.id] || 'core'}">${p.icon} ${p.label}</button>`).join('')}</div>
       <div class="wa-body"></div>

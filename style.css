@@ -1,10 +1,10 @@
 /* ==========================================================================
-   世界枢轴 WorldAxis — 时空星盘与黑曜观测台 (Chrono-Astrolabe Design System)
-   哲学：深邃玄武岩基底 · 冰曜冷青主调 · 天体蚀刻金点缀 · 微米级物理仪轨
+   世界枢轴 WorldAxis — 极简时空星盘 (Streamlined Chrono-Astrolabe)
+   核心哲学：沉静黑曜石基底 · 冰曜冷青单色点缀 · 极致轻薄导航 · 高信息信噪比
    ========================================================================== */
 
 :root {
-  /* 基底材质层 (Void & Graphite Basalt) */
+  /* 基底材质层 (Obsidian Void & Granite Slate) */
   --wa-void: #090c10;
   --wa-surface-1: #0e1218;
   --wa-surface-2: #141922;
@@ -13,64 +13,63 @@
   --wa-surface-active: rgba(255, 255, 255, 0.07);
 
   /* 精密光学高光与微边框 (Sub-pixel Optics) */
-  --wa-border-subtle: rgba(255, 255, 255, 0.07);
-  --wa-border-regular: rgba(255, 255, 255, 0.12);
-  --wa-border-focus: rgba(56, 189, 248, 0.55);
-  --wa-highlight-top: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --wa-shadow-recess: inset 0 1.5px 3px rgba(0, 0, 0, 0.45);
+  --wa-border-subtle: rgba(255, 255, 255, 0.06);
+  --wa-border-regular: rgba(255, 255, 255, 0.1);
+  --wa-border-focus: rgba(56, 189, 248, 0.5);
+  --wa-highlight-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --wa-shadow-recess: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 
   /* 主控冷曜冰青 (Boreal Glaze) */
   --wa-accent: #38bdf8;
-  --wa-accent-dim: rgba(56, 189, 248, 0.12);
-  --wa-accent-hover: rgba(56, 189, 248, 0.22);
-  --wa-accent-border: rgba(56, 189, 248, 0.38);
-  --wa-accent-glow: rgba(56, 189, 248, 0.25);
+  --wa-accent-dim: rgba(56, 189, 248, 0.1);
+  --wa-accent-hover: rgba(56, 189, 248, 0.18);
+  --wa-accent-border: rgba(56, 189, 248, 0.32);
+  --wa-accent-glow: rgba(56, 189, 248, 0.2);
 
-  /* 天体星金 (Celestial Aurum - 核心法则与第一因) */
+  /* 天体星金 (Celestial Aurum) */
   --wa-gold: #f59e0b;
-  --wa-gold-dim: rgba(245, 158, 11, 0.14);
-  --wa-gold-border: rgba(245, 158, 11, 0.35);
+  --wa-gold-dim: rgba(245, 158, 11, 0.12);
+  --wa-gold-border: rgba(245, 158, 11, 0.3);
 
-  /* 语义态 (Functional Spectrum - 低饱和哑光) */
+  /* 语义功能色 (低饱和克制态) */
   --wa-emerald: #10b981;
   --wa-rose: #f43f5e;
   --wa-violet: #a855f7;
   --wa-amber: #fbbf24;
 
-  /* 文字阶梯 (Monospace & High-legibility) */
+  /* 文字系统 (高度易读性无衬线 + 精密等宽) */
   --wa-text-primary: #e6edf3;
-  --wa-text-secondary: #9aa7b5;
-  --wa-text-dim: #657383;
-  --wa-font-main: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --wa-font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --wa-text-secondary: #8b98a5;
+  --wa-text-dim: #5c6978;
+  --wa-font-main: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --wa-font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, SFMono-Regular, monospace;
 
-  /* 物理阻尼过渡 */
+  /* 物理缓动 */
   --wa-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
-  --wa-duration: 0.18s;
+  --wa-duration: 0.16s;
 }
 
 /* ==========================================================================
-   1. 悬浮球：时空偏转仪 (The Chrono-Astrolabe Orb)
+   1. 悬浮球：时空偏转仪 (Chrono-Astrolabe Orb)
    ========================================================================== */
 #wa-orb {
   position: fixed;
   right: 18px;
   bottom: 90px;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #1c2330 0%, #0d1117 75%);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid rgba(56, 189, 248, 0.32);
   box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.65),
-    0 0 0 1px rgba(0, 0, 0, 0.8),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.6);
+    0 4px 14px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.75),
+    inset 0 1px 1px rgba(255, 255, 255, 0.18);
   color: var(--wa-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 19px;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
   z-index: 9999;
@@ -84,12 +83,12 @@
 }
 
 #wa-orb:hover {
-  transform: scale(1.06);
-  border-color: rgba(56, 189, 248, 0.65);
+  transform: scale(1.05);
+  border-color: rgba(56, 189, 248, 0.6);
   box-shadow:
-    0 6px 22px rgba(0, 0, 0, 0.75),
-    0 0 14px var(--wa-accent-glow),
-    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+    0 6px 20px rgba(0, 0, 0, 0.7),
+    0 0 12px var(--wa-accent-glow),
+    inset 0 1px 2px rgba(255, 255, 255, 0.25);
   color: #bae6fd;
 }
 
@@ -98,7 +97,6 @@
   cursor: grabbing;
 }
 
-/* 忙碌态：世界线收敛与多轴自旋脉冲 */
 #wa-orb.wa-busy {
   border-color: var(--wa-gold);
   color: var(--wa-gold);
@@ -108,17 +106,15 @@
 @keyframes wa-astrolabe-pulse {
   0%, 100% {
     box-shadow:
-      0 0 0 0 rgba(245, 158, 11, 0.45),
-      0 4px 16px rgba(0, 0, 0, 0.75),
-      inset 0 1px 2px rgba(255, 255, 255, 0.25);
+      0 0 0 0 rgba(245, 158, 11, 0.4),
+      0 4px 14px rgba(0, 0, 0, 0.7);
     transform: scale(1);
   }
   50% {
     box-shadow:
-      0 0 0 8px rgba(245, 158, 11, 0),
-      0 6px 24px rgba(245, 158, 11, 0.25),
-      inset 0 1px 3px rgba(255, 255, 255, 0.4);
-    transform: scale(1.04);
+      0 0 0 7px rgba(245, 158, 11, 0),
+      0 6px 20px rgba(245, 158, 11, 0.2);
+    transform: scale(1.03);
   }
 }
 
@@ -129,23 +125,22 @@
   position: fixed;
   right: 16px;
   bottom: 140px;
-  width: min(450px, 95vw);
-  height: min(640px, 82vh);
+  width: min(440px, 94vw);
+  height: min(620px, 80vh);
   background: linear-gradient(180deg, rgba(14, 18, 24, 0.98) 0%, rgba(9, 12, 16, 0.98) 100%);
   border: 1px solid var(--wa-border-regular);
-  border-radius: 12px;
+  border-radius: 11px;
   z-index: 10000;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   box-shadow:
-    0 24px 48px -12px rgba(0, 0, 0, 0.8),
-    0 4px 16px rgba(0, 0, 0, 0.5),
-    var(--wa-highlight-top),
-    0 0 0 1px rgba(0, 0, 0, 0.6);
+    0 20px 40px -10px rgba(0, 0, 0, 0.8),
+    0 2px 10px rgba(0, 0, 0, 0.5),
+    var(--wa-highlight-top);
   color: var(--wa-text-primary);
-  font: 13px/1.5 var(--wa-font-main);
+  font: 12.5px/1.5 var(--wa-font-main);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -154,135 +149,161 @@
   display: none !important;
 }
 
-/* 面板头部 Header */
+/* 面板顶栏 Header (高度压缩，精炼集成) */
 .wa-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.015);
   border-bottom: 1px solid var(--wa-border-subtle);
   cursor: default;
   position: relative;
   flex-shrink: 0;
-}
-
-.wa-head::after {
-  content: "";
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: -1px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--wa-accent-border) 35%, var(--wa-accent) 50%, var(--wa-accent-border) 65%, transparent 100%);
-  opacity: 0.5;
-  pointer-events: none;
+  min-height: 36px;
+  box-sizing: border-box;
 }
 
 .wa-title {
   color: var(--wa-text-primary);
   font-weight: 600;
-  font-size: 13.5px;
-  letter-spacing: 0.4px;
+  font-size: 13px;
+  letter-spacing: 0.3px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .wa-title::before {
   content: "◈";
   color: var(--wa-accent);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .wa-ver {
   font-family: var(--wa-font-mono);
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--wa-text-dim);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 1px 6px;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 1px 5px;
+  border-radius: 3px;
   border: 1px solid var(--wa-border-subtle);
-  letter-spacing: 0.2px;
 }
 
 .wa-close {
   cursor: pointer;
   color: var(--wa-text-secondary);
-  font-size: 14px;
-  padding: 3px 8px;
+  font-size: 13px;
+  padding: 2px 6px;
   border-radius: 4px;
   transition: all var(--wa-duration) ease;
+  line-height: 1;
 }
 
 .wa-close:hover {
   color: #fff;
-  background: rgba(244, 63, 94, 0.18);
+  background: rgba(244, 63, 94, 0.16);
 }
 
-/* 视角选择器与导航条 */
+/* 视角选择器 (紧凑微型化，融入顶栏右侧) */
 .wa-view {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   margin-left: auto;
-  margin-right: 8px;
+  margin-right: 6px;
 }
 
 .wa-viewsel {
   flex: 0 0 auto;
-  max-width: 115px;
-  padding: 2px 6px;
+  max-width: 96px;
+  padding: 2px 4px;
   font-size: 11px;
   background: var(--wa-surface-2);
-  border: 1px solid var(--wa-border-regular);
-  color: var(--wa-text-primary);
-  border-radius: 5px;
+  border: 1px solid var(--wa-border-subtle);
+  color: var(--wa-text-secondary);
+  border-radius: 4px;
   outline: none;
   font-family: var(--wa-font-main);
+  transition: border-color var(--wa-duration) ease;
 }
 
-.wa-viewsel:focus {
-  border-color: var(--wa-accent);
+.wa-viewsel:focus, .wa-viewsel:hover {
+  border-color: var(--wa-accent-border);
+  color: var(--wa-text-primary);
 }
 
 .wa-view .wa-dim {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--wa-text-dim);
   white-space: nowrap;
-  max-width: 180px;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--wa-font-mono);
 }
 
+/* 导航微导轨 (去除冗长占位文字，去繁为简) */
 .wa-nav-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px 14px;
-  background: rgba(0, 0, 0, 0.25);
+  justify-content: flex-end;
+  padding: 3px 12px;
+  background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid var(--wa-border-subtle);
   font-size: 11px;
   flex-shrink: 0;
+  min-height: 26px;
+  box-sizing: border-box;
 }
 
 #wa-nav-out {
   color: var(--wa-text-dim);
-  font-size: 11px;
+  font-size: 10.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-right: auto;
+}
+
+#wa-nav-out:empty {
+  display: none;
+}
+
+#wa-nav-out:not(:empty) {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  background: var(--wa-accent-dim);
+  border: 1px solid var(--wa-accent-border);
+  border-radius: 3px;
+  color: var(--wa-accent);
+}
+
+#wa-nav-back {
+  padding: 1px 7px;
+  font-size: 10.5px;
+  border-radius: 4px;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--wa-border-subtle);
+  color: var(--wa-text-secondary);
+}
+
+#wa-nav-back:hover {
+  background: var(--wa-surface-hover);
+  color: var(--wa-text-primary);
+  border-color: var(--wa-border-regular);
 }
 
 /* ==========================================================================
-   3. 分类导轨与页签体系 (Caliper Categorization & Tabs)
+   3. 分类与页签一体化导轨 (Integrated Caliper Navigation)
    ========================================================================== */
 .wa-cat-bar {
   display: flex;
-  gap: 4px;
-  padding: 6px 10px;
-  background: rgba(9, 12, 16, 0.65);
+  gap: 3px;
+  padding: 4px 10px;
+  background: rgba(9, 12, 16, 0.5);
   border-bottom: 1px solid var(--wa-border-subtle);
   overflow-x: auto;
   white-space: nowrap;
@@ -298,9 +319,9 @@
   background: transparent;
   border: 1px solid transparent;
   color: var(--wa-text-secondary);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 11.5px;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--wa-duration) ease;
@@ -322,10 +343,11 @@
 .wa-tabs {
   display: flex;
   overflow-x: auto;
-  background: rgba(14, 18, 24, 0.4);
+  background: rgba(14, 18, 24, 0.25);
   border-bottom: 1px solid var(--wa-border-subtle);
   scrollbar-width: none;
   flex-shrink: 0;
+  padding: 0 4px;
 }
 
 .wa-tabs::-webkit-scrollbar {
@@ -336,15 +358,15 @@
   background: none;
   border: none;
   color: var(--wa-text-secondary);
-  padding: 7px 11px;
+  padding: 5px 9px;
   cursor: pointer;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
   border-bottom: 2px solid transparent;
   transition: all var(--wa-duration) ease;
   user-select: none;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
 }
 
 .wa-tab:hover {
@@ -356,136 +378,135 @@
   color: var(--wa-accent);
   border-bottom-color: var(--wa-accent);
   font-weight: 600;
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0) 60%, rgba(56, 189, 248, 0.08) 100%);
 }
 
 /* ==========================================================================
-   4. 面板内容区与精密字阶 (Console Body & Data Typography)
+   4. 面板内容区：去繁为简，现代仪表排版 (Clean Layout & Typography)
    ========================================================================== */
 .wa-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 14px;
+  padding: 10px 12px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
 .wa-body::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 .wa-body::-webkit-scrollbar-track {
   background: transparent;
 }
 .wa-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 4px;
 }
 .wa-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.25);
 }
 
-/* 小节标题：精密刻度导轨 */
+/* 小节标题：轻巧指示器，去除沉重装饰框 */
 .wa-sec {
-  margin: 16px 0 8px;
+  margin: 12px 0 6px;
   color: var(--wa-text-primary);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-left: 2px;
+  gap: 6px;
+  padding-left: 1px;
 }
 
 .wa-sec::before {
   content: "";
   display: inline-block;
-  width: 3px;
-  height: 12px;
+  width: 2.5px;
+  height: 10px;
   background: var(--wa-accent);
   border-radius: 1px;
-  box-shadow: 0 0 6px var(--wa-accent-glow);
 }
 
-/* 统计网格与精密仪表盘卡片 */
+/* 统计卡片网格：更平坦利落的现代暗晶指示牌 */
 .wa-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 
 .wa-stat {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 8px;
-  padding: 9px 8px;
+  border-radius: 6px;
+  padding: 6px 4px;
   text-align: center;
-  box-shadow: var(--wa-highlight-top);
-  transition: border-color var(--wa-duration) ease, transform var(--wa-duration) ease;
+  transition: border-color var(--wa-duration) ease, background var(--wa-duration) ease;
 }
 
 .wa-stat:hover {
   border-color: var(--wa-border-regular);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .wa-stat-v {
   color: #fff;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13.5px;
   font-family: var(--wa-font-mono);
   font-variant-numeric: tabular-nums lining-nums;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  letter-spacing: -0.2px;
 }
 
 .wa-stat-k {
   color: var(--wa-text-dim);
-  font-size: 10.5px;
-  margin-top: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-size: 10px;
+  margin-top: 1px;
+  letter-spacing: 0.3px;
 }
 
-/* 列表与条目容器 */
+/* 列表容器与轻量条目 */
 .wa-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .wa-item {
   background: var(--wa-surface-1);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 8px;
-  padding: 9px 10px;
-  font-size: 12px;
-  box-shadow: var(--wa-highlight-top);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: 11.5px;
 }
 
 .wa-empty {
   color: var(--wa-text-dim);
-  font-size: 12px;
-  padding: 16px 8px;
+  font-size: 11.5px;
+  padding: 12px 6px;
   text-align: center;
   font-style: italic;
 }
 
 .wa-dim {
   color: var(--wa-text-dim);
-  font-size: 11px;
+  font-size: 10.5px;
+  line-height: 1.4;
 }
 
-/* 键值对行 */
+div.wa-dim {
+  margin: 2px 0 5px;
+}
+
+/* 键值对行：去除繁复虚线，保持干净利落 */
 .wa-kv {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 0;
-  font-size: 12px;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+  padding: 4px 0;
+  font-size: 11.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .wa-kv:last-child {
@@ -502,28 +523,26 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 节点开关网格 */
+/* 工作流开关节点 */
 .wa-node-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .wa-node {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: 6px;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 12px;
-  border: 1px solid transparent;
+  font-size: 11.5px;
   transition: all var(--wa-duration) ease;
 }
 
 .wa-node:hover {
   background: var(--wa-surface-hover);
-  border-color: var(--wa-border-subtle);
 }
 
 .wa-node input {
@@ -532,10 +551,10 @@
 }
 
 .wa-node-chain {
-  font-size: 10px;
+  font-size: 9.5px;
   font-family: var(--wa-font-mono);
-  padding: 1px 6px;
-  border-radius: 4px;
+  padding: 1px 5px;
+  border-radius: 3px;
   background: var(--wa-accent-dim);
   color: var(--wa-accent);
   border: 1px solid var(--wa-accent-border);
@@ -548,12 +567,12 @@
 }
 
 /* ==========================================================================
-   5. 交互控件：输入框、按钮与滑块 (Precision Controls)
+   5. 控件精细化：输入框、按钮与滑块 (Precision Controls)
    ========================================================================== */
 .wa-row {
   display: flex;
-  gap: 6px;
-  margin: 7px 0;
+  gap: 5px;
+  margin: 6px 0;
   align-items: center;
 }
 
@@ -561,36 +580,35 @@
   flex: 1;
   background: var(--wa-surface-2);
   border: 1px solid var(--wa-border-regular);
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--wa-text-primary);
-  padding: 6px 9px;
-  font-size: 12px;
+  padding: 5px 8px;
+  font-size: 11.5px;
   font-family: var(--wa-font-main);
   outline: none;
   box-shadow: var(--wa-shadow-recess);
-  transition: border-color var(--wa-duration) ease, box-shadow var(--wa-duration) ease;
+  transition: border-color var(--wa-duration) ease;
 }
 
 .wa-input:focus {
   border-color: var(--wa-accent);
-  box-shadow: 0 0 0 1px var(--wa-accent-glow), var(--wa-shadow-recess);
 }
 
 .wa-w60 {
-  max-width: 60px;
+  max-width: 56px;
   text-align: center;
   font-family: var(--wa-font-mono);
 }
 
 .wa-ta {
   width: 100%;
-  min-height: 72px;
+  min-height: 64px;
   background: var(--wa-surface-2);
   border: 1px solid var(--wa-border-regular);
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--wa-text-primary);
-  padding: 8px 10px;
-  font-size: 12px;
+  padding: 6px 8px;
+  font-size: 11.5px;
   font-family: var(--wa-font-main);
   resize: vertical;
   box-sizing: border-box;
@@ -601,30 +619,28 @@
 
 .wa-ta:focus {
   border-color: var(--wa-accent);
-  box-shadow: 0 0 0 1px var(--wa-accent-glow), var(--wa-shadow-recess);
 }
 
 /* 按钮规范 */
 .wa-btn {
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.16) 0%, rgba(56, 189, 248, 0.08) 100%);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.14) 0%, rgba(56, 189, 248, 0.06) 100%);
   border: 1px solid var(--wa-accent-border);
   color: #bae6fd;
-  border-radius: 6px;
-  padding: 6px 13px;
+  border-radius: 5px;
+  padding: 5px 11px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
-  margin: 4px 0;
+  margin: 3px 0;
   box-shadow: var(--wa-highlight-top);
   transition: all var(--wa-duration) ease;
   user-select: none;
 }
 
 .wa-btn:hover {
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.28) 0%, rgba(56, 189, 248, 0.16) 100%);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.24) 0%, rgba(56, 189, 248, 0.12) 100%);
   border-color: var(--wa-accent);
   color: #fff;
-  box-shadow: 0 0 10px var(--wa-accent-glow), var(--wa-highlight-top);
 }
 
 .wa-btn:active {
@@ -632,26 +648,25 @@
 }
 
 .wa-mini {
-  padding: 3px 8px;
-  font-size: 11px;
-  margin: 2px 4px 2px 0;
-  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 10.5px;
+  margin: 1px 3px 1px 0;
+  border-radius: 4px;
 }
 
-/* 范围滑动条 */
 .wa-range {
   width: 100%;
   accent-color: var(--wa-accent);
   cursor: pointer;
 }
 
-/* 标签与徽章 */
+/* 徽章与标签 */
 .wa-badge {
-  font-size: 10px;
+  font-size: 9.5px;
   font-family: var(--wa-font-mono);
-  padding: 1.5px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
   color: var(--wa-text-secondary);
   border: 1px solid var(--wa-border-subtle);
   display: inline-block;
@@ -664,9 +679,9 @@
 }
 
 .wa-vis-hidden {
-  background: rgba(148, 163, 184, 0.15);
+  background: rgba(148, 163, 184, 0.12);
   color: #94a3b8;
-  border: 1px solid rgba(148, 163, 184, 0.25);
+  border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .wa-vis-trace {
@@ -684,21 +699,20 @@
 .wa-tag {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   background: rgba(56, 189, 248, 0.08);
   border: 1px solid var(--wa-accent-border);
   color: #bae6fd;
-  border-radius: 12px;
-  padding: 2px 9px;
-  font-size: 11.5px;
-  margin: 2px 4px 2px 0;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+  margin: 2px 3px 2px 0;
 }
 
 .wa-tag i {
   cursor: pointer;
   font-style: normal;
   color: var(--wa-text-dim);
-  transition: color var(--wa-duration) ease;
 }
 
 .wa-tag i:hover {
@@ -706,22 +720,22 @@
 }
 
 .wa-tag-row {
-  margin: 6px 0;
+  margin: 5px 0;
 }
 
-/* 输出控制台与日志容器 */
+/* 控制台输出与日志 */
 .wa-out {
-  margin-top: 8px;
+  margin-top: 6px;
   white-space: pre-wrap;
-  font-size: 11.5px;
+  font-size: 11px;
   font-family: var(--wa-font-mono);
-  line-height: 1.6;
+  line-height: 1.5;
   color: #cbd5e1;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 6px;
-  padding: 8px 10px;
-  max-height: 200px;
+  border-radius: 5px;
+  padding: 6px 8px;
+  max-height: 180px;
   overflow-y: auto;
   box-shadow: var(--wa-shadow-recess);
 }
@@ -733,13 +747,12 @@
 .wa-chan {
   background: var(--wa-surface-1);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 8px;
-  padding: 9px 10px;
-  margin-bottom: 8px;
+  border-radius: 6px;
+  padding: 7px 9px;
+  margin-bottom: 6px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  box-shadow: var(--wa-highlight-top);
+  gap: 5px;
 }
 
 .wa-chan-head {
@@ -752,14 +765,14 @@
 .wa-logbox {
   max-height: 100%;
   overflow-y: auto;
-  font-size: 11px;
+  font-size: 10.5px;
   font-family: var(--wa-font-mono);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .wa-log {
-  padding: 3px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .wa-log-error {
@@ -770,64 +783,59 @@
   color: var(--wa-amber);
 }
 
-/* 折叠小节 */
 .wa-fold-t {
-  margin: 14px 0 6px;
+  margin: 10px 0 4px;
   font-weight: 600;
   color: var(--wa-text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .wa-fold-b {
-  padding-left: 10px;
+  padding-left: 8px;
   border-left: 1.5px solid var(--wa-border-subtle);
 }
 
-/* 声誉网格与敌对标记 */
 .wa-rep-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 5px;
 }
 
 .wa-rep-cell {
   text-align: center;
-  padding: 7px 5px;
+  padding: 5px 4px;
   background: var(--wa-surface-1);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 6px;
-  font-size: 11.5px;
-  box-shadow: var(--wa-highlight-top);
+  border-radius: 5px;
+  font-size: 11px;
 }
 
 .wa-enemy-blood {
   background: rgba(220, 38, 38, 0.85) !important;
   color: #fff !important;
-  border-color: rgba(239, 68, 68, 0.9) !important;
 }
 
 .wa-enemy-grudge {
   background: rgba(217, 119, 6, 0.85) !important;
   color: #fff !important;
-  border-color: rgba(245, 158, 11, 0.9) !important;
 }
 
 .wa-digest {
   font-style: italic;
-  opacity: 0.88;
-  line-height: 1.6;
-  padding: 8px 11px;
-  border-left: 3px solid var(--wa-accent);
+  opacity: 0.85;
+  line-height: 1.5;
+  padding: 6px 9px;
+  border-left: 2.5px solid var(--wa-accent);
   background: var(--wa-accent-dim);
-  border-radius: 0 6px 6px 0;
-  margin: 6px 0;
+  border-radius: 0 5px 5px 0;
+  margin: 5px 0;
 }
 
 /* ==========================================================================
-   6. 移动端与自适应断点 (Responsive Architecture)
+   6. 移动端自适应 (Responsive)
    ========================================================================== */
 @media (max-width: 640px) {
   #wa-panel {
@@ -836,7 +844,7 @@
     bottom: 0;
     width: 100vw;
     height: 75vh;
-    border-radius: 14px 14px 0 0;
+    border-radius: 12px 12px 0 0;
     border-left: none;
     border-right: none;
     border-bottom: none;
