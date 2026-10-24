@@ -1,24 +1,18 @@
-# WorldAxis 当前进度台账：WP 优化提升九项 + WX 拓展创新九项落地
-> **最新状态（2026-10-24）**：运行元数据 `2.231.6`。A/B/C 三大更新包核心切片已全部落地并完成集成门禁与全仓架构守卫闭环验证。
+# WorldAxis 当前计划：V3 优化提升九项 + 拓展创新九项
+> **当前基线（2026-10-24）**：`v2.231.6`，规划起点为 `8ab817b` / `origin/master`。旧 WP/WX 双九项及其 A/B/C 切片已作为上一轮交付记录；此前计划入口中列出的专项计数与架构门禁是历史快照，不自动代表本轮实测。
 >
-> - **A 包（人物能安排并完成事情）**：已交付。`test-wp-a1-integration.js` (6/6 PASS)、`test-wp-a2-integration.js` (5/5 PASS)、`test-wp-a3-integration.js` (4/4 PASS)。涵盖 WP-1 行动桌完整入参路由、WP-2 工具耐久与目标兑现、WP-3 统一日历排班、WP-4 机械工艺链全闭环与跨日持久化、WP-5 NPC 经验学习回声与局部知情、WX-1 有限机会竞争与转向、WX-2 共同计划与知情版本协调。
-> - **B 包（地方与共同生活运转）**：已交付。`test-wp-b1-integration.js` (5/5 PASS)、`test-wp-b2-integration.js` (5/5 PASS)。涵盖 WP-6 共同生活周期履约与代班互斥、WP-7 设施降级与排队唤醒闭环、WP-8 场景物理在场与因果反查、WX-3 有界互惠与封顶担保、WX-4 社会先例与制度采纳、WP-9 玩法蓝图安全安装与防冲撞。
-> - **C 包（长期沉积与地方分化）**：已交付。`test-wp-c-integration.js` (6/6 PASS)。涵盖 WX-5 地方技术标准与工位改装停产、WX-6 周期集市变故应急与履约邀请、WX-7 多版本社会记忆与澄清偏见、WX-8 多方承继争议与无人项再组织、WX-9 地方发展路径与长期投资分化、WP-9 三套玩法蓝图完备化与整局开局。
-> - **架构与全仓门禁闭环**：
->   - 6 套综合集成门禁挂入 `tests/run.js`；
->   - 证据索引 `tools/evidence-index.js`（314 条证据 0 unwired / 0 stale，`tests/q9-evidence-ledger-v2226.js` 67/67 PASS）；
->   - 死导出门禁 `tests/dead-export-gate.js`（996 项死导出 0 新增，7 个新导出接通产品侧消费方）；
->   - 骨架归属门禁 `tests/field-liveness-gate.js`（`actionDesk` 顶层键在 `core/store.js` 物化，0 越界）；
->   - 依赖图门禁 `tests/module-cycle-gate-v2107.js`（65/65 PASS，回填实测调用边 2191 / 合计 2361）；
->   - 架构笔记门禁 `tests/o7-plan-tree-gate-v2187.js`（69/69 PASS，补齐 ADR Decision / Consequences）。
+> - [优化提升 OPV3-1～OPV3-9](plans/WORLDAXIS_OPTIMIZATION_9_V3.md)：将现有行动、时间、认知、后果和历史机制收束为真实可玩的主题闭环。
+> - [拓展创新 EXV3-1～EXV3-9](plans/WORLDAXIS_EXPANSION_9_V3.md)：承载力、公共服务、有限传播、共同选择、地方规则、实践分化、群体解释、连锁恢复和时代路径。
+> - 两份计划合计 18 项，估算 478–758 有效工程小时；前三个有效工作日均有产品功能产出。守卫、测试和审计只作为各项验收，不独立占用功能名额。
+> - 计划方向以仓库当前代码为准：不重复新增师徒/人物成长主轴，不追加治理平台；优先打通世界主题、玩家行动与世界反馈。
+> - 旧版 WP/WX、OP/IN、TP/TX、U/Y 计划从此处以下保留为历史档案，不代表当前待办。
 >
-> - [优化提升 WP-1～WP-9](plans/WORLD_PLAY_DEPTH_9.md)：让行动、时间、经营、共同生活和场景兑现真实后果。
-> - [拓展创新 WX-1～WX-9](plans/WORLD_EMERGENCE_9.md)：竞争、协作、互惠、先例、兼容、周期活动、社会记忆、承继与地方发展。
-> - [现场证据、旧项去向与三大更新排程](plans/WORLD_PLAY_BASELINE_2026-10-24.md)：A 人物与办事 → B 地方与共同生活 → C 长期沉积与地方分化。
-> - [取舍与历史决策关系](.agents/notes/proposed/architecture/2026-10-24-worldaxis-play-depth-emergence.md)。
+> 取舍依据：仓库现状盘点、V3 计划及本轮实施优先级，见 [当前优化计划](plans/WORLDAXIS_OPTIMIZATION_9_V3.md)、[当前拓展计划](plans/WORLDAXIS_EXPANSION_9_V3.md) 与 [架构决策笔记](.agents/notes/proposed/architecture/2026-10-24-worldaxis-v3-plans.md)。
 
 ---
 ## 历史入口原文：2026-10-22 及更早
+
+> 以下均为历史规划快照；链接和“当前计划”等表述保留原样仅供追溯，不代表当前状态。现行计划以本文件顶部 V3 链接为准。
 
 # WorldAxis 下一阶段：世界机制优先的双九项计划
 
