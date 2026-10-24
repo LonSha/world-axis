@@ -459,10 +459,35 @@
       } catch (e) {}
     }
 
-    // 5. 空闲状态判据
-    var isIdle = (availableActions.length === 0 && approachingPromises.length === 0 && visibleChanges.length === 0);
+    // 5. 具名公共工程（Joint Projects）
+    var jointProjects = [];
+    if (s.coop && s.coop.projects && typeof s.coop.projects === 'object') {
+      var pKeys = Object.keys(s.coop.projects);
+      for (var pki = 0; pki < pKeys.length; pki++) {
+        var pj = s.coop.projects[pKeys[pki]];
+        if (!pj) continue;
+        var pPlace = clean(pj.region || pj.place, 60);
+        var isLocal = !place || !pPlace || pPlace === place;
+        var isParticipant = viewer && Array.isArray(pj.participants) && pj.participants.indexOf(viewer) >= 0;
+        if (isLocal || isParticipant) {
+          jointProjects.push({
+            id: pj.id,
+            title: pj.title,
+            status: pj.status,
+            progress: pj.progress || 0,
+            downgraded: !!pj.downgraded,
+            absenceAlert: pj.status === 'suspended' ? '停工待援：存在缺席或争议' : null,
+            workorderId: pj.workorderId || null
+          });
+        }
+      }
+    }
+
+    // 6. 空闲状态判据
+    var hasActiveProjects = jointProjects.some(function (p) { return p.status === 'active' || p.status === 'suspended'; });
+    var isIdle = (availableActions.length === 0 && approachingPromises.length === 0 && visibleChanges.length === 0 && !hasActiveProjects);
     var idleStatus = isIdle ? 'nothing_to_do' : 'active';
-    var idleText = isIdle ? '此处风平浪静，暂无紧急待办或即刻行动' : '场景中有正在展开的事件或待办行动';
+    var idleText = isIdle ? '此处风平浪静，暂无紧急待办或即刻行动' : '场景中有正在展开的事件、工程或待办行动';
 
     _stat.scenes++;
     return {
@@ -475,6 +500,7 @@
       approachingPromises: approachingPromises,
       availableActions: availableActions,
       blockedActions: blockedActions,
+      jointProjects: jointProjects,
       idleStatus: idleStatus,
       idleText: idleText,
       hasPending: !isIdle,

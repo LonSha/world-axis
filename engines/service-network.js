@@ -335,6 +335,113 @@ function requestService(facilityId, who, amount, opts) {
     return { ok: true, facilities: facs, count: facs.length };
   }
 
+  /**
+   * OPV3-7 & EXV3-2: 评估地点设施对下游行动与生产的硬性约束
+   * 设施降级（degraded）引发效率减半与工期滞后，设施瘫痪（dismantled）直接阻断行动。
+   */
+  function checkServiceImpact(placeId, serviceType) {
+    var pid = clean(placeId, 60);
+    var st = clean(serviceType, 40);
+    var bk = ensureBucket();
+    var facs = (bk.facilities || []).filter(function (f) {
+      return f && f.placeId === pid && (!st || f.serviceType === st);
+    });
+
+    if (!facs.length) {
+      return {
+        ok: false,
+        available: false,
+        reason: 'service-not-provided',
+        placeId: pid,
+        serviceType: st,
+        note: '当前地点未配置该项公共服务设施'
+      };
+    }
+
+    // 优先选择运行最良好的设施
+    var operational = facs.filter(function (f) { return f.status === 'operational'; })[0];
+    if (operational) {
+      return {
+        ok: true,
+        available: true,
+        status: 'operational',
+        facilityId: operational.id,
+        efficiency: 1.0,
+        delayDays: 0,
+        note: '设施运转良好，服务正常供给'
+      };
+    }
+
+    var degraded = facs.filter(function (f) { return f.status === 'degraded'; })[0];
+    if (degraded) {
+      return {
+        ok: true,
+        available: true,
+        status: 'degraded',
+        facilityId: degraded.id,
+        efficiency: 0.5,
+        delayDays: 2,
+        reason: 'facility-degraded',
+        note: '公共设施缺乏维护受损降级，效率折半且工期滞后 2 日'
+      };
+    }
+
+    return {
+      ok: false,
+      available: false,
+      status: 'dismantled',
+      facilityId: facs[0].id,
+      reason: 'facility-out-of-service',
+      note: '公共设施已瘫痪停用，行动受阻，需修复或绕行'
+    };
+  }
+
+  /**
+   * 真实消耗物料与工时修复设施
+   */
+  function repairFacilityWithMaterials(facilityId, repairSpec) {
+    var fId = clean(facilityId, 60);
+    var spec = repairSpec || {};
+    var worker = clean(spec.worker, 40);
+    var materials = spec.materials || {};
+    var bk = ensureBucket();
+    var fac = (bk.facilities || []).filter(function (f) { return f && f.id === fId; })[0];
+    if (!fac) return { ok: false, reason: 'facility-not-found' };
+    if (fac.status === 'operational') return { ok: true, alreadyOperational: true, facilityId: fId };
+
+    if (!worker) return { ok: false, reason: 'missing-worker' };
+    if (!materials || Object.keys(materials).length === 0) {
+      return { ok: false, reason: 'missing-materials', note: '修复必须投入真实维修材料，杜绝凭空改标签' };
+    }
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        var f = (d.serviceNetwork.facilities || []).filter(function (x) { return x && x.id === fId; })[0];
+        if (f) {
+          f.status = 'operational';
+          f.lastMaintained = now();
+          f.lastRepairedBy = worker;
+          f.repairLog = f.repairLog || [];
+          f.repairLog.push({
+            worker: worker,
+            materials: Object.assign({}, materials),
+            at: now()
+          });
+        }
+        return true;
+      }, 'serviceNetwork:repairFacilityWithMaterials');
+    }
+
+    return {
+      ok: true,
+      facilityId: fId,
+      status: 'operational',
+      worker: worker,
+      materialsConsumed: materials,
+      note: '设施维修完成，恢复标准服务容量'
+    };
+  }
+
   WA.serviceNetwork = {
     declareFacility: declareFacility,
     activateFacility: activateFacility,
@@ -345,6 +452,8 @@ function requestService(facilityId, who, amount, opts) {
     decayFacility: decayFacility,
     restoreFacility: restoreFacility,
     servicesAt: servicesAt,
+    checkServiceImpact: checkServiceImpact,
+    repairFacilityWithMaterials: repairFacilityWithMaterials,
     SERVICE_TYPES: SERVICE_TYPES.slice(),
     STATUS: STATUS.slice()
   };

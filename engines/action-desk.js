@@ -228,9 +228,33 @@
     const o = opts || {};
     const w = clean(o.who, 60);
     const st = state();
-
     if (w && !knownPerson(w)) {
       return { ok: false, reason: 'unknown-person', who: w };
+    }
+
+    // 地方规约硬性检查 (EXV3-5)
+    if (WA.customLax && typeof WA.customLax.checkRuleEnforcement === 'function' && (o.orgId || o.place)) {
+      const ruleCheck = WA.customLax.checkRuleEnforcement(o.orgId || o.place, aid, w, o.ruleDetails || o);
+      if (!ruleCheck.ok) {
+        return ruleCheck;
+      }
+    }
+
+    // 地点公共服务设施硬性约束 (OPV3-7 & EXV3-2)
+    let serviceDelay = 0;
+    if (WA.serviceNetwork && typeof WA.serviceNetwork.checkServiceImpact === 'function' && o.place && o.serviceType) {
+      const srvCheck = WA.serviceNetwork.checkServiceImpact(o.place, o.serviceType);
+      if (!srvCheck.available) {
+        return {
+          ok: false,
+          reason: srvCheck.reason,
+          facilityId: srvCheck.facilityId,
+          note: srvCheck.note
+        };
+      }
+      if (srvCheck.delayDays) {
+        serviceDelay = srvCheck.delayDays;
+      }
     }
 
     // 1. 若为方法任务，复用 actionMethods.evaluate
@@ -238,7 +262,7 @@
       const taskId = o.taskId || aid.replace(/^method\./, '');
       if (WA.actionMethods && typeof WA.actionMethods.evaluate === 'function') {
         const ev = WA.actionMethods.evaluate(taskId, w, o);
-        return Object.assign({ ok: true, preview: true, actionId: aid, canExecute: ev && ev.ok && ev.available && ev.available.length > 0 }, ev);
+        return Object.assign({ ok: true, preview: true, actionId: aid, serviceDelayDays: serviceDelay, canExecute: ev && ev.ok && ev.available && ev.available.length > 0 }, ev);
       }
     }
 

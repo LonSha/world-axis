@@ -201,7 +201,6 @@
         return true;
       }, 'epistemicView:correctBelief');
     }
-
     return {
       ok: true,
       corrected: true,
@@ -214,11 +213,78 @@
     };
   }
 
+  /**
+   * OPV3-5: 角色完全按自己手头掌握的信息版本做决策
+   * 杜绝全知视角，不同角色因掌握版本不同产生截然不同的行动。
+   */
+  function decideAction(whoName, topicId, situationContext) {
+    const pId = personId(whoName);
+    const tId = clean(topicId, 60);
+    if (!pId || !tId) return { ok: false, reason: 'missing-fields' };
+
+    const view = buildView(whoName, topicId);
+    const ctx = situationContext || {};
+
+    // 1. 完全不知情
+    if (!view.known || view.source === 'uninformed') {
+      return {
+        ok: true,
+        person: whoName,
+        topicId: tId,
+        chosenAction: 'unaware_inaction',
+        reason: 'uninformed',
+        costIncurred: null,
+        note: '角色全然不知该项事态，未采取任何针对性行动'
+      };
+    }
+
+    // 2. 持有走样或失真信息
+    if (!view.faithful || view.status === 'distorted') {
+      return {
+        ok: true,
+        person: whoName,
+        topicId: tId,
+        chosenAction: 'misguided_precaution',
+        distortionHeld: view.summary,
+        faithful: false,
+        costIncurred: { energy: 10, timeHours: 2 },
+        note: '角色听信走样传闻，做出了偏差防范并付出了真实代价'
+      };
+    }
+
+    // 3. 确凿事实
+    if (view.certainty === 'certain') {
+      return {
+        ok: true,
+        person: whoName,
+        topicId: tId,
+        chosenAction: 'targeted_response',
+        rationale: view.summary,
+        faithful: true,
+        costIncurred: { energy: 5, timeHours: 1 },
+        note: '角色掌握确凿事实，采取了精准有效的应对行动'
+      };
+    }
+
+    // 4. 听闻但半信半疑
+    return {
+      ok: true,
+      person: whoName,
+      topicId: tId,
+      chosenAction: 'verify_before_commit',
+      rationale: view.summary,
+      faithful: true,
+      costIncurred: { energy: 2, timeHours: 0.5 },
+      note: '角色虽有所耳闻但缺乏确据，决定先行核实再予表态'
+    };
+  }
+
   WA.epistemicView = {
     registerBelief: registerBelief,
     buildView: buildView,
     deriveAction: deriveAction,
-    correctBelief: correctBelief
+    correctBelief: correctBelief,
+    decideAction: decideAction
   };
 
   if (typeof console !== 'undefined' && console.log) {

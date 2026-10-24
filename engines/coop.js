@@ -662,12 +662,14 @@
       const row = {
         id: pid,
         name: name || pid,
+        title: clean(s.title || name || pid, 80),
         initiator: initiator,
         goal: clean(s.goal, 80),
-        place: clean(s.place, 60),
+        place: clean(s.place || s.region, 60),
+        region: clean(s.region || s.place, 60),
         targetMaterials: Object.assign({}, s.targetMaterials || {}),
         pledgedMaterials: {},
-        minCommitment: num(s.minCommitment) || 1,
+        minCommitment: num(s.minCommitment || s.requiredPledges) || 1,
         participants: [initiator],
         pledges: {},
         status: 'pledging',
@@ -683,10 +685,19 @@
   }
 
   function pledgeProject(projectId, who, contributions) {
-    const pid = clean(projectId, 60);
-    const w = clean(who, 40);
+    let pid = '';
+    let w = '';
+    let contrib = {};
+    if (projectId && typeof projectId === 'object') {
+      pid = clean(projectId.projectId || projectId.id, 60);
+      w = clean(projectId.who || projectId.by, 40);
+      contrib = projectId.contributions || (projectId.amount != null ? { funds: num(projectId.amount) } : {});
+    } else {
+      pid = clean(projectId, 60);
+      w = clean(who, 40);
+      contrib = contributions || {};
+    }
     if (!pid || !w) return { ok: false, reason: 'missing-fields' };
-    const contrib = contributions || {};
 
     let out = null;
     mutate(function (d) {
@@ -716,6 +727,12 @@
   }
 
   function handleAbsence(projectId, absentPerson, solution, opts) {
+    if (typeof projectId === "object" && projectId !== null) {
+      opts = projectId;
+      absentPerson = opts.absentPerson || opts.missingPerson || opts.who;
+      solution = opts.solution || opts.action;
+      projectId = opts.projectId || opts.id;
+    }
     const pid = clean(projectId, 60);
     const absent = clean(absentPerson, 40);
     const sol = clean(solution, 30);
@@ -784,6 +801,103 @@
     return { ok: true, projectId: pid, project: prj };
   }
 
+  /**
+   * 将具名公共项目转化为行动桌施工工单
+   */
+  function linkToWorkorder(projectId, spec) {
+    const pid = clean(projectId, 60);
+    const pInfo = projectStatus(pid);
+    if (!pInfo.ok) return pInfo;
+    const prj = pInfo.project;
+    if (prj.status === 'proposed') {
+      return { ok: false, reason: 'project-not-active', note: '项目尚未完成最低认缴，无法下达施工工单' };
+    }
+    if (prj.status === 'suspended') {
+      return { ok: false, reason: 'project-suspended', note: '项目因缺席或争议停工待援，禁止推进工单' };
+    }
+    const woId = 'wo_' + pid;
+    let out = null;
+    WA.store.transact(function (d) {
+      d.coop = d.coop || { projects: {} };
+      const cur = d.coop.projects[pid];
+      if (!cur) return false;
+      cur.workorderId = woId;
+      cur.workorderSpec = {
+        id: woId,
+        projectId: pid,
+        title: cur.title,
+        region: cur.region,
+        materials: cur.materials || (spec && spec.materials) || {},
+        createdAt: (WA.clock && WA.clock.now) ? WA.clock.now('coop') : Date.now()
+      };
+      out = { ok: true, projectId: pid, workorderId: woId, spec: cur.workorderSpec };
+      return true;
+    }, { label: 'coop:linkToWorkorder' });
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 施工推进：消耗工时与原料，推进公共项目进度，受生态承载力延迟约束
+   */
+  function advanceProjectWork(projectId, progressDelta, contributor, opts) {
+    const pid = clean(projectId, 60);
+    const who = clean(contributor, 60);
+    const delta = Math.max(1, Number(progressDelta) || 10);
+    const o = opts || {};
+    const pInfo = projectStatus(pid);
+    if (!pInfo.ok) return pInfo;
+    const prj = pInfo.project;
+
+    if (prj.status === 'suspended') {
+      return { ok: false, reason: 'project-suspended', note: '公共项目处于停工状态，必须先解决缺席代工或降级' };
+    }
+    if (prj.status === 'completed' || prj.status === 'failed') {
+      return { ok: false, reason: 'project-terminal', status: prj.status };
+    }
+
+    // 检查生态承载力影响
+    let capacityDelay = 0;
+    let capacityAdvice = null;
+    const reg = prj.region || o.region;
+    const envCap = WA.envCapacity || WA.environmentalCapacity;
+    const RES_MAP = { timber: 'forest', wood: 'forest', stone: 'soil', iron: 'soil', water: 'water', crops: 'soil', pasture: 'pasture' };
+    const targetRes = RES_MAP[o.resourceType] || o.resourceType || 'forest';
+    if (reg && envCap && typeof envCap.evaluateImpact === 'function') {
+      const imp = envCap.evaluateImpact(reg, targetRes);
+      if (imp.ok) {
+        capacityDelay = imp.delayDays != null ? imp.delayDays : (imp.extraDays || 0);
+        capacityAdvice = imp.advice || imp.alternativeSuggested;
+      }
+    }
+
+    let out = null;
+    WA.store.transact(function (d) {
+      d.coop = d.coop || { projects: {} };
+      const cur = d.coop.projects[pid];
+      if (!cur) return false;
+      cur.progress = Math.min(100, (cur.progress || 0) + delta);
+      cur.contributions = cur.contributions || {};
+      if (who) {
+        cur.contributions[who] = (cur.contributions[who] || 0) + delta;
+      }
+      if (cur.progress >= 100 && cur.status === 'active') {
+        cur.status = 'ready_to_conclude';
+      }
+      out = {
+        ok: true,
+        projectId: pid,
+        progress: cur.progress,
+        status: cur.status,
+        contributor: who,
+        capacityDelayDays: capacityDelay,
+        capacityAdvice: capacityAdvice,
+        isCompleted: cur.progress >= 100
+      };
+      return true;
+    }, { label: 'coop:advanceProjectWork' });
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
   WA.coop = {
     STATUS: STATUS.slice(), STATUS_CN: Object.assign({}, STATUS_CN), LIMITS: Object.assign({}, LIMITS),
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
@@ -792,6 +906,7 @@
     stamp: stamp, view: view, statView: statView,
     proposeProject: proposeProject, pledgeProject: pledgeProject,
     handleAbsence: handleAbsence, concludeProject: concludeProject, projectStatus: projectStatus,
+    linkToWorkorder: linkToWorkorder, advanceProjectWork: advanceProjectWork,
     stat: function () { const bag = statBagOf(); return Object.assign({}, bag, { faults: Object.assign({}, bag.faults) }); }
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/coop.js', { kind: 'engine', ver: '2.118.0' });

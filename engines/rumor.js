@@ -414,6 +414,8 @@
       scored.push({
         id: clean(ev.id, 40),
         title: clean(ev.title || ev.id, 80),
+        status: clean(ev.status || 'intact', 20),
+        fidelity: typeof ev.fidelity === 'number' ? ev.fidelity : 1.0,
         score: score,
         urgency: Number(ev.urgency) || 1,
         relevance: Number(ev.relevance) || 1,
@@ -439,12 +441,92 @@
     };
   }
 
+  /**
+   * 跨区域多跳注意传播与衰减
+   * 模拟传闻跨越多个地理或社交中继时的自然衰减、失真与通道筛选。
+   */
+  function propagateAcrossRegions(sourceRegion, targetRegion, events, routeOpts) {
+    const src = clean(sourceRegion, 60);
+    const tgt = clean(targetRegion, 60);
+    if (!src || !tgt) return { ok: false, reason: 'missing-region' };
+    const list = Array.isArray(events) ? events.slice() : [];
+    const opts = routeOpts || {};
+
+    const hops = Array.isArray(opts.hops) ? opts.hops : (Number(opts.hopCount) > 0 ? new Array(Number(opts.hopCount)).fill(0).map(function(_, i){ return 'hop_' + (i + 1); }) : ['midway']);
+    const hopCount = Math.max(1, hops.length);
+
+    // 检查路线阻断
+    if (opts.isRouteBlocked) {
+      return {
+        ok: false,
+        reason: 'route-blocked',
+        sourceRegion: src,
+        targetRegion: tgt,
+        stoppedAt: opts.blockedAt || hops[0] || 'border',
+        note: '交通封锁或信使阻断导致跨区域传播中止'
+      };
+    }
+
+    const decay = typeof opts.decayPerHop === 'number' ? Math.max(0.05, Math.min(0.8, opts.decayPerHop)) : 0.25;
+    const finalFidelity = Math.max(0.1, Number(Math.pow(1 - decay, hopCount).toFixed(2)));
+
+    const transmitted = [];
+    const excludedSecrets = [];
+
+    list.forEach(function (ev) {
+      if (!ev) return;
+      if (ev.isSecret && !ev.isPublic) {
+        excludedSecrets.push({ id: clean(ev.id, 40), reason: 'secret-protected-cross-region' });
+        return;
+      }
+      var isDistorted = finalFidelity < 0.4 || ev.isDistorted;
+      var newTitle = clean(ev.title || ev.id, 80);
+      if (isDistorted && !ev.isDistorted) {
+        newTitle = '【传闻走样】' + newTitle;
+      }
+      transmitted.push({
+        id: clean(ev.id, 40),
+        title: newTitle,
+        originalTitle: clean(ev.title || ev.id, 80),
+        sourceRegion: src,
+        currentRegion: tgt,
+        hops: hopCount,
+        fidelity: finalFidelity,
+        status: isDistorted ? 'distorted' : (finalFidelity < 0.7 ? 'eroded' : 'intact'),
+        urgency: Math.max(1, Math.round((Number(ev.urgency) || 1) * (isDistorted ? 1.4 : 1))), // 谣言失真时往往被赋予更强虚假紧迫感
+        relevance: Number(ev.relevance) || 1,
+        raw: ev
+      });
+    });
+
+    // 在目标区域竞争注意力
+    const comp = competeForAttention(transmitted, {
+      capacity: opts.targetCapacity || 2,
+      place: tgt
+    });
+
+    return {
+      ok: true,
+      sourceRegion: src,
+      targetRegion: tgt,
+      hopCount: hopCount,
+      hops: hops,
+      fidelity: finalFidelity,
+      transmittedCount: transmitted.length,
+      admitted: comp.admitted,
+      delayed: comp.delayed,
+      excludedSecrets: excludedSecrets,
+      note: '跨区域多跳传播完成，经中继衰减与目标区域注意竞争'
+    };
+  }
+
   WA.rumor = {
     LAYERS: LAYERS, MOTIVES: MOTIVES, PUBLIC_LAYERS: PUBLIC_LAYERS, LAYER_LEVEL: LAYER_LEVEL,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     startChain: startChain, relay: relay, refute: refute, conceal: conceal,
     investigate: investigate, visibleTo: visibleTo, fullView: fullView, buildBlock: buildBlock,
     competeForAttention: competeForAttention,
+    propagateAcrossRegions: propagateAcrossRegions,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

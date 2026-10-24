@@ -751,6 +751,266 @@
     };
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  // OPV3-6: 承诺与履约回路协议（“答应过的事”推进世界）
+  // ══════════════════════════════════════════════════════════════════════
+
+  function commitPromise(spec) {
+    var s = spec || {};
+    var promiser = clean(s.promiser, 40);
+    var beneficiary = clean(s.beneficiary, 40);
+    var subject = clean(s.subject, 100);
+    var dueDay = num(s.dueDay);
+    if (!promiser || !beneficiary || !subject) {
+      return { ok: false, reason: 'missing-fields', note: '承诺必须具备承诺人、受益人与具体约定事项' };
+    }
+    var pId = 'prm_' + now() + '_' + WA.rand.id();
+    var entry = {
+      id: pId,
+      promiser: promiser,
+      beneficiary: beneficiary,
+      subject: subject,
+      dueDay: (dueDay != null && dueDay >= 0) ? dueDay : null,
+      stake: s.stake || null,
+      guarantor: clean(s.guarantor, 40) || null,
+      status: 'active', // 'active' | 'fulfilled' | 'defaulted' | 'remedied'
+      createdAt: now(),
+      fulfilledAt: null,
+      defaultReason: null,
+      remedyDetails: null
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || {};
+        d.customLax.promises = d.customLax.promises || [];
+        d.customLax.promises.push(entry);
+        return true;
+      }, 'customLax:commitPromise');
+    }
+    return { ok: true, promise: entry };
+  }
+
+  function fulfillPromise(promiseId, opts) {
+    var pid = clean(promiseId, 60);
+    var bk = ensureBucket();
+    var p = (bk.promises || []).filter(function (x) { return x && x.id === pid; })[0];
+    if (!p) return { ok: false, reason: 'promise-not-found' };
+    if (p.status === 'fulfilled') return { ok: false, reason: 'already-fulfilled', note: '承诺已履约核销，严禁重复给付' };
+    if (p.status === 'defaulted') return { ok: false, reason: 'already-defaulted', note: '承诺已违约失效，需转走补救流程' };
+
+    var out = null;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        var cur = (d.customLax.promises || []).filter(function (x) { return x && x.id === pid; })[0];
+        if (!cur) return false;
+        cur.status = 'fulfilled';
+        cur.fulfilledAt = now();
+        out = { ok: true, promiseId: pid, status: 'fulfilled', promiser: cur.promiser, beneficiary: cur.beneficiary };
+        return true;
+      }, 'customLax:fulfillPromise');
+    }
+
+    // 产生正向信用互惠
+    if (out && out.ok) {
+      recordFavor({
+        giver: out.promiser,
+        receiver: out.beneficiary,
+        description: '如期履约：' + p.subject,
+        weight: 15
+      });
+    }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function defaultPromise(promiseId, reason, opts) {
+    var pid = clean(promiseId, 60);
+    var r = clean(reason || 'unfulfilled-deadline', 100);
+    var bk = ensureBucket();
+    var p = (bk.promises || []).filter(function (x) { return x && x.id === pid; })[0];
+    if (!p) return { ok: false, reason: 'promise-not-found' };
+    if (p.status === 'fulfilled') return { ok: false, reason: 'already-fulfilled' };
+    if (p.status === 'defaulted') return { ok: false, reason: 'already-defaulted' };
+
+    var out = null;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        var cur = (d.customLax.promises || []).filter(function (x) { return x && x.id === pid; })[0];
+        if (!cur) return false;
+        cur.status = 'defaulted';
+        cur.defaultedAt = now();
+        cur.defaultReason = r;
+        out = {
+          ok: true,
+          promiseId: pid,
+          status: 'defaulted',
+          promiser: cur.promiser,
+          beneficiary: cur.beneficiary,
+          guarantor: cur.guarantor,
+          trustPenalty: 25,
+          defaultReason: r
+        };
+        return true;
+      }, 'customLax:defaultPromise');
+    }
+
+    // 违约产生遗憾回声，真实注入动机仲裁
+    if (out && out.ok && WA.pathEcho && typeof WA.pathEcho.record === 'function') {
+      try {
+        WA.pathEcho.record({
+          who: out.promiser,
+          bias: 'caution',
+          kind: 'broken_promise',
+          weight: 25,
+          note: '因违背对【' + out.beneficiary + '】的承诺留下的社会信任污点与人际裂痕'
+        });
+      } catch (e) {}
+    }
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function remedyPromise(promiseId, remedySpec) {
+    var pid = clean(promiseId, 60);
+    var spec = remedySpec || {};
+    var bk = ensureBucket();
+    var p = (bk.promises || []).filter(function (x) { return x && x.id === pid; })[0];
+    if (!p) return { ok: false, reason: 'promise-not-found' };
+    if (p.status !== 'defaulted') {
+      return { ok: false, reason: 'not-defaulted', note: '只有已违约的承诺方可执行补救和解协议' };
+    }
+    if (!spec.compensation && !spec.extraLabor) {
+      return { ok: false, reason: 'missing-remedy-cost', note: '补救必须付出真实加倍赔偿或补偿劳动' };
+    }
+
+    var out = null;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        var cur = (d.customLax.promises || []).filter(function (x) { return x && x.id === pid; })[0];
+        if (!cur) return false;
+        cur.status = 'remedied';
+        cur.remediedAt = now();
+        cur.remedyDetails = {
+          compensation: spec.compensation || null,
+          extraLabor: spec.extraLabor || null,
+          note: clean(spec.note || '履行加倍补救，重修旧好', 100)
+        };
+        out = {
+          ok: true,
+          promiseId: pid,
+          status: 'remedied',
+          remedyDetails: cur.remedyDetails,
+          originalDefaultRetained: true,
+          note: '补救协议达成，但历史违约事实终生留痕'
+        };
+        return true;
+      }, 'customLax:remedyPromise');
+    }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function listPromises(filter) {
+    var f = filter || {};
+    var bk = ensureBucket();
+    var list = (bk.promises || []).slice();
+    if (f.promiser) {
+      var pr = clean(f.promiser, 40);
+      list = list.filter(function (p) { return p && p.promiser === pr; });
+    }
+    if (f.beneficiary) {
+      var be = clean(f.beneficiary, 40);
+      list = list.filter(function (p) { return p && p.beneficiary === be; });
+    }
+    if (f.status) {
+      var st = clean(f.status, 20);
+      list = list.filter(function (p) { return p && p.status === st; });
+    }
+    return { ok: true, promises: list, count: list.length };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // EXV3-5: 地方规约对行动的真实硬性约束
+  // ══════════════════════════════════════════════════════════════════════
+
+  function checkRuleEnforcement(orgId, actionType, actor, details) {
+    var oid = clean(orgId, 60);
+    var act = clean(actionType, 40);
+    var who = clean(actor, 40);
+    var dt = details || {};
+
+    var rules = activeRules(oid).rules || [];
+    for (var i = 0; i < rules.length; i++) {
+      var r = rules[i];
+      if (!r) continue;
+      // 1. 工位排班限额规约 (slot-booking)
+      if (r.type === 'slot-booking' && act === 'schedule:claim') {
+        if (dt.alreadyBookedCount && dt.alreadyBookedCount >= (r.dailyLimit || 1)) {
+          if (!dt.isExempt) {
+            return {
+              ok: false,
+              enforced: true,
+              reason: 'rule-violation',
+              ruleId: r.id,
+              ruleType: r.type,
+              ruleName: r.name,
+              note: '违反【' + r.name + '】：单人每日仅限预约 1 个工位'
+            };
+          }
+        }
+      }
+      // 2. 资源配给限额规约 (resource-quota)
+      if (r.type === 'resource-quota' && act === 'production:advance') {
+        var reqQty = num(dt.requestedQuantity) || 0;
+        var limit = num(r.quotaLimit) || 10;
+        if (reqQty > limit && !dt.isExempt) {
+          return {
+            ok: false,
+            enforced: true,
+            reason: 'rule-violation',
+            ruleId: r.id,
+            ruleType: r.type,
+            ruleName: r.name,
+            note: '违反【' + r.name + '】：单次申领物料超额（上限 ' + limit + '，申请 ' + reqQty + '）'
+          };
+        }
+      }
+    }
+
+    return { ok: true, enforced: false, permitted: true };
+  }
+
+  /**
+   * 建立地方现行规约（供地方组织或场景直接设定）
+   */
+  function declareLocalRule(spec) {
+    var s = spec || {};
+    var id = clean(s.id || ('rule_' + now() + '_' + WA.rand.id()), 60);
+    var orgId = clean(s.orgId, 60);
+    var type = clean(s.type || s.ruleType || 'slot-booking', 30);
+    var name = clean(s.name, 60);
+    if (!orgId || !type) return { ok: false, reason: 'missing-fields' };
+    var rule = {
+      id: id,
+      name: name || id,
+      orgId: orgId,
+      type: type,
+      ruleType: type,
+      dailyLimit: num(s.dailyLimit) || 1,
+      quotaLimit: num(s.quotaLimit) || 10,
+      status: 'active',
+      enactedAt: now()
+    };
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || { candidates: [], rules: [], reviews: [], precedents: [] };
+        d.customLax.rules = d.customLax.rules || [];
+        d.customLax.rules.push(rule);
+        return true;
+      }, 'customLax:declareLocalRule');
+    }
+    return { ok: true, rule: rule };
+  }
+
   WA.customLax = {
     spawnCandidate: spawnCandidate,
     submitToApproval: submitToApproval,
@@ -768,6 +1028,13 @@
     claimGuarantee: claimGuarantee,
     settleFavor: settleFavor,
     reciprocityLedger: reciprocityLedger,
+    commitPromise: commitPromise,
+    fulfillPromise: fulfillPromise,
+    defaultPromise: defaultPromise,
+    remedyPromise: remedyPromise,
+    listPromises: listPromises,
+    checkRuleEnforcement: checkRuleEnforcement,
+    declareLocalRule: declareLocalRule,
     RULE_TYPES: RULE_TYPES.slice(),
     STAGES: STAGES.slice()
   };
