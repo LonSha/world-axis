@@ -205,6 +205,11 @@
         row = { who: w, ability: nm, mode: ab.mode, points: 0, stage: 0, sessions: 0, cancelled: 0,
           at: now, updatedAt: now };
         b.rows.push(row);
+        // v2.231.7（回归收口 · EXP-4 补账）：站点 'training.rows' 此前**声明了却零调用**
+        //   （G18「无声明悬空站点」红灯）。上面那条 `rows-full` 是准入闸（管「还能不能进」），
+        //   本行是挤出（管「进了的怎么出去」）：maxRows 拧小、或旧存档带进超额行时，
+        //   只有这里能按当前 cap 环形退最旧。上限取设置值，与闸同源。
+        if (WA.evict) WA.evict.array(b.rows, 'training.rows', cfg.maxRows);
       }
       if (row.mode !== ab.mode) { out = { ok: false, reason: 'mode-mismatch', rowMode: row.mode, abilityMode: ab.mode }; return false; }
       if (cancel) {

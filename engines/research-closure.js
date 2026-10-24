@@ -106,6 +106,12 @@
     }
 
     // 默认或文本类型
+    if (type !== 'text' && type !== 'gear' && type !== 'training' && type !== 'schedule') {
+      if (cfg.strictPrereqs) {
+        noteFault('unknown-prereq-type');
+        return { ok: false, reason: 'unknown-prereq-type', type: type };
+      }
+    }
     stat.passed++;
     return { ok: true, type: 'text', pass: true };
   }

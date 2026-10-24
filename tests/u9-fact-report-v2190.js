@@ -113,8 +113,10 @@ function runB(A) {
   A(r.versions.agree && r.versions.runPins > 0,
     'B3 入口版本真的在 run.js 消息面上被钉过（钉 ' + r.versions.runPins + ' 处；0 处说明「消息面」这项在空集上恒真）');
   const cv = r.rejectCodes.cov;
+  // v2.231.7：文案按面内见证计（恒等式本身就是面内口径；拿 witnessed 显示会差 22，
+//   读者会以为恒等式错了）。
   A(!!cv && cv.total > 0 && cv.sum === cv.total && cv.identityOk,
-    'B4 拒收码三集恒等式在现场为平（' + (cv ? cv.total + ' = ' + cv.witnessed + '+' + cv.dead + '+' + cv.base : '不可读') + '）');
+    'B4 拒收码三集恒等式在现场为平（' + (cv ? cv.total + ' = ' + cv.witnessInFace + '+' + cv.dead + '+' + cv.base : '不可读') + '）');
   A(!!cv && cv.declared > 0, 'B4b 见证声明面非空（实 ' + (cv ? cv.declared : '?') + '）—— 与 reject-code-coverage 同源，不另算一套');
   A(r.moduleRegistry.nsCount > 0 && r.moduleRegistry.loadedCount > 0,
     'B5 模块注册读数非空（引用 ' + r.moduleRegistry.nsCount + ' / 装载 ' + r.moduleRegistry.loadedCount + '）');

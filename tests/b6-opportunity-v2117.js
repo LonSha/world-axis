@@ -393,7 +393,11 @@ function pRecUnknown(env) {
   const cur = w.recipe.statView().name;
   return (first && first.ok && first.themes.join('+') === 'urban+campus'
     && pv && pv.reason === 'unknown-recipe' && ap && ap.reason === 'unknown-recipe'
-    && cur === 'urban' && pv.known.length === 4) ? OK.recUnknown
+    && cur === 'urban'
+    // v2.231.7（回归收口）：档位数**不写死**——真源 engines/recipe.js 的 RECIPES 已扩到 7 档，
+    //   写死 4 会让「产品行为正确」被报成红灯（判据抄了一份真源，真源一长就红）。
+    //   改为与真源当场对账：`known` 必须给全，档位再多也不会误报。
+    && pv.known.length === Object.keys(w.recipe.RECIPES).length) ? OK.recUnknown
     : ('recunk:' + [(first && first.themes), pv && pv.reason, ap && ap.reason, cur].join(','));
 }
 /** ⑫ 题材被真源拒收即不写半截。 */

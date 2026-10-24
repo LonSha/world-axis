@@ -97,6 +97,9 @@ function rejectCodes(rd) {
       const d = rcc.discover();
       global.__wa_cached_cov = {
         total: d.coverage.total, witnessed: d.coverage.witnessed, dead: d.coverage.dead,
+        // v2.231.7：恒等式按面内见证计，报表也要带上这两个数，
+        //   否则「扫描面 = 见证 + 死表 + 基线」这行会拿总数去凑、读起来差 22。
+        witnessInFace: d.coverage.witnessInFace, witnessOutFace: d.coverage.witnessOutFace,
         base: d.coverage.base, sum: d.coverage.sum, identityOk: d.coverage.identityOk,
         covered: d.coverage.covered, rate: d.coverage.rate,
         declared: d.declarations.declared, duplicated: d.declarations.duplicated.length,
@@ -226,9 +229,11 @@ function print(r) {
     + (r.regression.samples.length ? '：最近 code=' + r.regression.samples[0].code + ' @ ' + r.regression.samples[0].at : '（未采样）'));
   const rc = r.rejectCodes, cv = rc.cov;
   L.push('③ 拒收码：扫描面 ' + (cv ? cv.total : '（不可读）')
-    + ' = 见证 ' + (cv ? cv.witnessed : '?') + ' + 死表 ' + (cv ? cv.dead : '?')
+    + ' = 面内见证 ' + (cv && cv.witnessInFace != null ? cv.witnessInFace : '?')
+    + ' + 死表 ' + (cv ? cv.dead : '?')
     + ' + 基线 ' + (cv ? cv.base : '?') + '（和 ' + (cv ? cv.sum : '?')
     + '，恒等式 ' + (cv && cv.identityOk ? '平' : '不平') + '）'
+    + (cv && cv.witnessOutFace ? ' · 面外见证 ' + cv.witnessOutFace + '（refuse() 写法，不入分母）' : '')
     + ' · 台账 version ' + rc.ledgerVersion
     + ' · 声明 ' + (cv ? cv.declared : '?') + ' / 重复 ' + (cv ? cv.duplicated : '?')
     + ' · 延后 ' + (cv ? cv.deferred : '?')

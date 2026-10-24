@@ -181,6 +181,23 @@ const EXEMPT = {
   CORE: '同名不同义的「核心表」：elsewhere=档案核心三字段（doing/status/place，判据是「他此刻在做什么、什么处境、在哪」）、theme=主题层核心四面（world/event/info/reputation，判据是主题包该带哪几块）',
   MODES: '同名不同义的「模式表」：fate=随机取值三模式（min/random/max，判据是那一次摇点的取法）、outline-inject=大纲注入两模式（create/overwrite，判据是注入撞上既存大纲时新建还是覆写）',
   OPS: '同名不同义的「操作表」：compare=结构比较三操作（equal/insert/delete）、dream=梦脉织录七操作白名单（set_state/append_transition/open_thread/advance_thread/resolve_thread/abandon_thread/upsert_deviation）、kaleidoscope=表达式三操作（map/range/formula）—— 三者互不通约：一个是「两份结构差在哪」，一个是「梦线怎么改」，一个是「这段表达式怎么算」',
+  // v2.231.6（回归收口）：本版三个新引擎各带一张与既有模块同名的常量，
+  //   **合法地**指向不同值域，逐条说清（本表存在的意义就是「同名不同义必须逐条说清」；
+  //   现场由此从「缺理由 3」回到「缺理由 0 / 过期 0」）：
+  //     · KNOW：survey=**勘察认知三档**（unknown / heard / confirmed，判据是「这件事他听没听到过、
+  //       有没有亲自确认」）；vitals=**孕况知情三档**（unknown / suspected / confirmed，
+  //       判据是「这个身孕他自己知不知道、是猜的还是已确认」）。前者是「外界的消息面」，
+  //       后者是「自身的身体面」—— 中间那一档一个叫「听说过」、一个叫「疑似」，**本来就不该同词**。
+  //     · OUTCOMES：contest=**一场对抗的三档结果**（success / partial / fail，判据是 margin 落没落进
+  //       PARTIAL_BAND）；shadow=**一件心影事件的闭环三态**（open / kept / broken，
+  //       判据是那件事的承诺有没有被守住）。一个是「比试赢了没有」，一个是「许诺守住了没有」。
+  //     · ROLES：activity=**一场活动的三种参与身份**（contestant / host / audience，
+  //       判据是这个人在这场活动里站哪一边）；org=**组织里的四级职衔**（novice/member/steward/chief
+  //       ⇒ 帮闲/管事/主事/当家，判据是月俸与声望门槛）。一个是「临时的参与位」，
+  //       一个是「长久的职位」—— 值域数量、语义、判据全不同，不许互相校验。
+  KNOW: '同名不同义的「认知表」：survey=勘察认知三档（unknown/heard/confirmed，判据是「听没听到过、有没有亲自确认」，是外界的消息面）、vitals=孕况知情三档（unknown/suspected/confirmed，判据是「本人知不知道、是猜的还是已确认」，是自身的身体面）',
+  OUTCOMES: '同名不同义的「结果表」：contest=对抗三档结果（success/partial/fail，判据是 margin 是否落进 PARTIAL_BAND）、shadow=心影事件闭环三态（open/kept/broken，判据是那件事的承诺有没有被守住）',
+  ROLES: '同名不同义的「身份表」：activity=一场活动的三种参与身份（contestant/host/audience，判据是此人在这场活动里站哪一边）、org=组织四级职衔（novice/member/steward/chief ⇒ 帮闲/管事/主事/当家，判据是月俸与声望门槛）',
 };
 
 /** 具名常量数组（只认一行内形态）。 */

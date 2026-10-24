@@ -68,12 +68,19 @@
     if (!who || !slot || !task) {
       return { ok: false, reason: 'missing-fields', fields: { who: !!who, slot: !!slot, task: !!task } };
     }
-    if (SLOTS.indexOf(slot) < 0) {
-      return { ok: false, reason: 'invalid-slot', slot: slot, allowed: SLOTS.slice() };
+    const maxSlots = Math.max(1, Math.min(SLOTS.length, cfg.defaultSlotsPerDay || 3));
+    const allowedSlots = SLOTS.slice(0, maxSlots);
+    if (allowedSlots.indexOf(slot) < 0) {
+      return { ok: false, reason: 'invalid-slot', slot: slot, allowed: allowedSlots };
     }
 
     const st = state();
     const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
+    const dayBookings = ls.filter(function (b) { return b && b.day === day && !b.cancelled; });
+    if (dayBookings.length >= (cfg.maxBookingsPerDay || 48)) {
+      noteFault('daily-bookings-full');
+      return { ok: false, reason: 'daily-bookings-full', day: day, max: cfg.maxBookingsPerDay };
+    }
     // 检查冲突：同一人、同一天、同时段
     const conflict = ls.filter(function (b) {
       return b && b.who === who && b.day === day && b.slot === slot && !b.cancelled;

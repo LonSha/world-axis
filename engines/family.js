@@ -65,7 +65,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
-  const clockNow = function (site) { WA.clock.now(site) };
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_family_settings_v1';
   const DEF = { enabled: false, maxUnits: 24, maxMembersPerUnit: 12, maxCareRows: 48 };
   const __REG = { key: LS_KEY, def: DEF, module: 'family',

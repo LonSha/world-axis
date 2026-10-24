@@ -242,9 +242,14 @@ const NS_FACE_EXPECT = {
   // v2.194.0（U2 批次④）：**不加项**——本批一度照抄批次③加了 `__aftermathWarn` /
   //   `__storyChoiceWarn`，但专锁 C2 实测其点亮条件不可达（读口 `find` 与写口
   //   `rowForWrite` 同层同源）⇒ 已按本仓「不留死出口」口径删除那两个槽，本表同步不加。
+  // v2.231.6（回归收口）：`__initDone` / `__prefetch` 两个入口级内部槽 —— 与既有九个
+  //   `__*` 完全同形态（index.js 内部状态：前者是「init 是否已结束」的开关，用来让
+  //   logCaps 在 init 期间不扫全库；后者是装载期的预取句柄），账本口径「对外承诺的
+  //   命名空间」本就不收 `__` 前缀，故同列 internal-prefixed。
+  //   这**不是放宽**：两者仍计进静态提供方总数（322）、仍按实况进零读名单（若零读）。
   internalPrefixed: ['__settingsRegs', '__loaderState', '__loadOrder', '__loadFailed',
     '__inited', '__inputGuardInternal', '__diplomacyWarn', '__agencyWarn', '__freightWarn',
-    '__agencyStepShapeWarn']
+    '__agencyStepShapeWarn', '__initDone', '__prefetch']
 };
 
 /** 别名形态：const A = ( HOST.WorldAxis = HOST.WorldAxis || {} ) ; */

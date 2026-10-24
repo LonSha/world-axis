@@ -84,16 +84,23 @@ function coverage(deps) {
   const wCodes = Object.keys(expect).sort();
   const dCodes = Object.keys(dead).sort();
   const bCodes = Object.keys(base).sort();
-
-  // 三集必须都是扫描面的子集（名单里有、源码里没有的码，各自的门禁已单独报，这里只做总数对齐）
+  // ── v2.231.7：见证面按「面内」计（与 reject-lock-v2780.js 同口径）──────────
+  //   【为什么必须改】扫描面只认内联写法 `reason: 'x'`；`refuse('x')` 这种辅助函数
+  //   写法**故意不认**（见 reject-code-gate.js 的形态说明：拼接/间接写法不报错也不伪归一，
+  //   稳定性由各引擎专锁咬住）。EXP-3～EXP-7 的引擎统一走 refuse()，其码落在面外 ——
+  //   于是「见证表总数」与「面内数」天然差 22。旧实现拿总数当面内数：
+  //       sum = 657+50+368 = 1075  >  total 1053   ⇒ leftover = -22、identityOk 恒假。
+  //   而按面内计：635+50+368 = 1053 = total，恒等式**当场平**。
+  //   【为什么不改见证表】把那 22 个码从 expect 里删掉会让「有见证」这件事失真；
+  //   它们确实可达、确实有见证，只是写在扫描面之外。正确做法是**分流**而非删减。
   const inScan = function (c) { return !!sc.hits[c]; };
-  const allInScan = wCodes.every(inScan) && dCodes.every(inScan) && bCodes.every(inScan);
-
-  const sum = wCodes.length + dCodes.length + bCodes.length;
+  const wInFace = wCodes.filter(inScan);                 // 面内见证：进恒等式分子
+  const wOutFace = wCodes.filter(function (c) { return !inScan(c); }); // 面外见证：显式登记
+  const allInScan = dCodes.every(inScan) && bCodes.every(inScan);
+  const sum = wInFace.length + dCodes.length + bCodes.length;
   const total = codes.length;
   const identityOk = sum === total && allInScan;
-
-  const covered = wCodes.length + dCodes.length;
+  const covered = wInFace.length + dCodes.length;
   const rate = total ? covered / total : 0;
 
   // 延后见证：声明了却跑不出来，且未在 DEFERRED 里登记的 —— 一律算缺口。
@@ -103,6 +110,11 @@ function coverage(deps) {
 
   return {
     total: total, witnessed: wCodes.length, dead: dCodes.length, base: bCodes.length,
+    // v2.231.7：witnessed 仍是「见证表总数」（有见证就算数，语义不变）；
+    //   新增 witnessInFace / witnessOutFace 把面内面外**分开可读** —— 分流必须可观测，
+    //   否则「22 个码去哪了」会变成下一个人要重新考古的谜（本仓治过的静默形态）。
+    witnessInFace: wInFace.length, witnessOutFace: wOutFace.length,
+    witnessOutFaceCodes: wOutFace.slice().sort(),
     sum: sum, covered: covered, rate: rate, identityOk: identityOk, allInScan: allInScan,
     identities: { leftover: total - sum },
     undeclaredDefer: undeclaredDefer, deferred: unwitnessed,
@@ -115,7 +127,8 @@ function summary(deps) {
   const c = coverage(deps);
   const pct = (c.rate * 100).toFixed(2) + '%';
   return '拒收码 ' + c.total + ' 个（见证 ' + c.witnessed + ' / 死表 ' + c.dead + ' / 基线 ' + c.base
-    + '）· 已定性 ' + c.covered + ' 个，覆盖率 ' + pct + '（口径：见证+死表 除以 扫描面总数，基线不算已定性）'
+    + '）· 已定性 ' + c.covered + ' 个，覆盖率 ' + pct + '（口径：面内见证+死表 除以 扫描面总数，基线不算已定性）'
+    + (c.witnessOutFace ? ' · 面外见证 ' + c.witnessOutFace + ' 个（refuse() 写法，专锁咬住）' : '')
     + (c.identityOk ? ' · 恒等式平' : ' · 恒等式不平（差 ' + c.identities.leftover + '）');
 }
 

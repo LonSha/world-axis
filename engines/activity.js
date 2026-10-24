@@ -254,6 +254,10 @@
         dayUnknown: (day === null || !(day > 0)), storyDay: sd.ok ? sd.day : null
       };
       bag.activities.push(row);
+      // v2.231.7（回归收口 · EXP-4 补账）：站点 'activity.activities' 此前零调用
+      //   （G18「无声明悬空站点」红灯）。`activities-full` 是准入闸，本行是挤出：
+      //   已结算/已取消的活动行是复盘证据（不在结算时删），只能环形退场。
+      if (WA.evict) WA.evict.array(bag.activities, 'activity.activities', cfg.maxActivities);
       stat.planned++;
       out = { ok: true, activity: Object.assign({}, row), dayUnknown: row.dayUnknown };
       return true;
@@ -315,6 +319,9 @@
       const row = { id: 'sg-' + String(bag.signups.length + 1), activity: a.id, who: person,
         role: r, note: clean(note, 60), at: clockNow('activity'), present: null };
       bag.signups.push(row);
+      // v2.231.7（回归收口 · EXP-4 补账）：站点 'activity.signups' 此前零调用。
+      //   报名行不随活动结算删（B7d：日程与参与安排须保持有效），只能环形挤出。
+      if (WA.evict) WA.evict.array(bag.signups, 'activity.signups', cfg.maxSignups);
       stat.signed++;
       out = { ok: true, signup: Object.assign({}, row), contenders: contenders + (r === 'contestant' ? 1 : 0),
         quota: a.quota, left: a.quota > 0 ? Math.max(0, a.quota - (contenders + (r === 'contestant' ? 1 : 0))) : -1 };
@@ -418,6 +425,9 @@
         present: present.slice(), absent: absent.slice(),
         note: clean(o.note, 60), at: clockNow('activity') };
       bag.results.push(row);
+      // v2.231.7（回归收口 · EXP-4 补账）：站点 'activity.results' 此前零调用。
+      //   逐轮结果是在场与缺席的唯一留痕，只环形挤出、不原地删。
+      if (WA.evict) WA.evict.array(bag.results, 'activity.results', cfg.maxResults);
       // 报名行的在场标记按**最新一轮**刷新（结算只认最后一轮）
       rows.forEach(function (s) { s.present = present.indexOf(key(s.who)) >= 0; s.lastRound = n; });
       stat.rounded++;
@@ -544,6 +554,10 @@
           material: material, amount: amount, from: x.self ? w : (x.from || ''),
           selfAward: !!x.self, at: clockNow('activity') });
       });
+      // v2.231.7（回归收口 · EXP-4 补账）：站点 'activity.awards' 此前零调用。
+      //   放在 winners.forEach 之后而非循环体内：一次结算整批发奖，
+      //   逐条挤出会把同一批的发放行切散（挤出是「环形退最旧」，不是「按批裁」）。
+      if (WA.evict) WA.evict.array(bag.awards, 'activity.awards', cfg.maxAwards);
       a.status = 'settled';
       a.settledAt = clockNow('activity');
       stat.settled++; stat.awarded += winners.length; stat.moved = Math.round((stat.moved + moved) * 100) / 100;

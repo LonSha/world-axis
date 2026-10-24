@@ -155,11 +155,15 @@ function runAll(A) {
   A(c.total >= 300 && c.witnessed >= 100 && c.dead >= 1 && c.base >= 100,
     'B3 覆盖率分母 ' + c.total + ' ≥300（见证 ' + c.witnessed + ' / 死表 ' + c.dead + ' / 基线 ' + c.base + '）');
   A(c.identityOk && c.sum === c.total && c.identities.leftover === 0,
-    'B4 三集恒等式：' + c.witnessed + '+' + c.dead + '+' + c.base + ' = ' + c.sum
-    + ' === 扫描面 ' + c.total + '（差 ' + c.identities.leftover + '）');
+    'B4 三集恒等式：' + c.witnessInFace + '+' + c.dead + '+' + c.base + ' = ' + c.sum
+    + ' === 扫描面 ' + c.total + '（差 ' + c.identities.leftover + '）'
+    + '（面内见证口径；见证表另有 ' + c.witnessOutFace + ' 个面外码走 refuse()，不计入分母）');
   A(c.allInScan, 'B4b 三集都是扫描面的子集（名单里有、源码里没有的码不许混进分母）');
-  A(Math.abs(c.rate - c.covered / c.total) < 1e-12 && c.covered === c.witnessed + c.dead,
-    'B5 覆盖率读数自洽：covered ' + c.covered + ' = 见证+死表，rate ' + c.rate.toFixed(4));
+  // v2.231.7：covered 的口径随 B4 一起改为「面内见证 + 死表」。
+  //   为什么不能继续用 witnessed：那会让 covered 把 22 个面外码也算进分子，
+  //   而分母 total 是扫描面 —— 分子分母不同面，rate 会被虚高（口径悄悄变大，B5b 的下限就形同虚设）。
+  A(Math.abs(c.rate - c.covered / c.total) < 1e-12 && c.covered === c.witnessInFace + c.dead,
+    'B5 覆盖率读数自洽：covered ' + c.covered + ' = 面内见证+死表，rate ' + c.rate.toFixed(4));
   A(c.rate >= 0.3, 'B5b 覆盖率下限 ' + (c.rate * 100).toFixed(2) + '% ≥30%（口径不许被悄悄改小）');
   // summary 与 coverage 必须同源（两处各写一种数就是 v2.106.x 那族病）
   A(D.summary.indexOf(String(c.total)) >= 0 && D.summary.indexOf(String(c.covered)) >= 0
@@ -233,13 +237,45 @@ function runNegative(A) {
     + dGhost.rows.map(function (r) { return r.code; }).join(',') + '）——证明 B2 真的在挡这条边界');
 
   // ── N4 真源码破坏：恒等式被短路 ⇒ 现场必须报不平 ──
-  const n4src = breakOnce(S, 'const sum = wCodes.length + dCodes.length + bCodes.length;',
+  // v2.231.7：锚点必须跟着**现行源码**走。上一版 summarize 用
+  //   `const sum = wCodes.length + dCodes.length + bCodes.length;` 当锚点，
+  //   本版把它改成 `wInFace.length + ...` 之后锚点消失 ⇒ breakOnce 打不中 ⇒
+  //   破坏根本没发生、判据却在原版源码上"通过" —— 正是本仓点名的**负控制假绿**
+  //   （破坏写死成没生效，判据没被真调用）。故把锚点换成现行那一行。
+  const n4src = breakOnce(S, 'const sum = wInFace.length + dCodes.length + bCodes.length;',
     'const sum = 0;', 'N4');
   const n4 = loadCopy(MOD_REL, n4src);
   const covered4 = n4.coverage({ scan: sc, expect: { a: 1 }, seen: { a: true }, dead: {}, base: {} });
   A(covered4.identityOk === false && covered4.sum === 0,
     'N4b 装载破坏副本 ⇒ 恒等式不平（sum ' + covered4.sum + ' vs total ' + covered4.total
     + '）——证明 B4 不是恒真');
+  // v2.231.7 新增：证明「面内/面外分流」本身不是恒真 —— 把 filter(inScan) 换成
+  //   slice()（即退回旧口径：面外码也当成面内），带一个面外码的见证表必须让
+  //   **sum 变大**。判据直接比 sum，而不是看 identityOk：
+  //   identityOk 还要求 sum===total，而这里的 total 来自真实扫描面（1000+），
+  //   传入的假 expect 只有 2 个码，identityOk 本来就不平，拿它当判据等于恒真。
+  const n4csrc = breakOnce(S, 'const wInFace = wCodes.filter(inScan);',
+    'const wInFace = wCodes.slice();', 'N4c');
+  const n4c = loadCopy(MOD_REL, n4csrc);
+  // 探针必须取自**真实扫描面**：面内取一个真码，面外取一个真面外的码。
+  //   先前用 'a' 当探针是错的 —— 它既不在扫描面内也不在面外清单里，
+  //   原版与破坏版都把它当"面外"过滤掉，两边 sum 都是 0，判据不可分。
+  const scCodes = Object.keys(sc.hits);
+  const inFaceCode = scCodes[0];
+  // 面外码取自见证表里「有见证但不在扫描面内」的那些（即 refuse() 写法那批），
+  //   不硬编码 —— 硬编码会让这条负控制随引擎增删而静默失真。
+  const witnessNow = require('./reject-v2780.js').runWitness(global.WorldAxis);
+  const outFaceCode = Object.keys(witnessNow.expect).filter(function (c) { return !sc.hits[c]; }).sort()[0];
+  const inFaceProbe = {}; inFaceProbe[inFaceCode] = 1; inFaceProbe[outFaceCode] = 1;
+  const seenProbe = {}; seenProbe[inFaceCode] = true; seenProbe[outFaceCode] = true;
+  const deps4c = { scan: sc, expect: inFaceProbe, seen: seenProbe, dead: {}, base: {} };
+  const broken = n4c.coverage(deps4c);
+  // 就地取原版：本段在 `const M = require(...)`（下文 287 行）之前，
+  //   直接引用 M 会命中 TDZ（实测报 "Cannot access 'M' before initialization"）。
+  const truth = require('./reject-code-coverage.js').coverage(deps4c);
+  A(broken.sum === truth.sum + 1 && truth.sum === 1,
+    'N4c 破坏"面外扣减" ⇒ 面外码混进分子（破坏 sum ' + broken.sum + ' / 原版 sum ' + truth.sum
+    + '，面外码 1 个）——证明分流判据不是恒真（否则面外码又能悄悄混进分母）');
 
   // ── N5 真源码破坏：延后登记的默认源被抽空 ⇒ 注入了 DEFERRED 也不再豁免 ──
   // 破坏点必须选在**本用例真会走到**的那条路径上：原破坏（默认源抽空）在

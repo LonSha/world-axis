@@ -163,6 +163,12 @@
       .wa-rep-cell { text-align: center; padding: 6px 4px; background: rgba(255,255,255,.04); border-radius: 4px; }
       .wa-enemy-blood { background: #c62828 !important; color: #fff !important; }
       .wa-enemy-grudge { background: #e65100 !important; color: #fff !important; }
+      .wa-cat-bar { display: flex; gap: 6px; padding: 6px 12px; background: rgba(10, 15, 25, 0.4); border-bottom: 1px solid rgba(0, 240, 255, 0.15); overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
+      .wa-cat-btn { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); color: #aaa; border-radius: 12px; padding: 3px 10px; font-size: 11px; cursor: pointer; transition: all 0.15s ease; user-select: none; }
+      .wa-cat-btn:hover { background: rgba(0, 240, 255, 0.1); color: #fff; border-color: rgba(0, 240, 255, 0.4); }
+      .wa-cat-btn.active { background: rgba(0, 240, 255, 0.22); border-color: #00f0ff; color: #00f0ff; font-weight: bold; box-shadow: 0 0 8px rgba(0, 240, 255, 0.3); }
+      #wa-orb { touch-action: none; transition: transform 0.1s ease, box-shadow 0.2s ease; }
+      #wa-orb:active { transform: scale(0.94); cursor: grabbing; }
     `;
     try {
       const el = mainDoc.createElement('style');
@@ -291,6 +297,13 @@
     { id: 'tools', icon: '🧰', label: '工具' },
     { id: 'logs', icon: '📋', label: '日志' }
   ];
+  const PAGE_CAT = {
+    overview: 'core', chapter: 'core', beat: 'core', todo: 'core', events: 'core', director: 'core', actiondesk: 'core',
+    world: 'world', people: 'world', memory: 'world', enemies: 'world', parallel: 'world', travel: 'world', sediment: 'world', offline: 'world',
+    inject: 'workshop', supply: 'workshop', evidence: 'workshop', branchdiff: 'workshop', storyloop: 'workshop', retrieval: 'workshop', port: 'workshop', find: 'workshop', graph: 'workshop', net: 'workshop',
+    settings: 'system', health: 'system', connect: 'system', assistant: 'system', tools: 'system', logs: 'system'
+  };
+  let currentCat = 'all';
 
   // == v2.109.0（计划一 #15）：面板状态持久化走设置总线 ==
   //   为什么必须有它（三条实测理由，不是偏好）：
@@ -307,7 +320,7 @@
   const __PANEL_STATE_KEY = 'worldaxis_ui_panel_state_v1';
   const __panelStateReg = {
     key: __PANEL_STATE_KEY,
-    def: { page: 'overview', logErrOnly: false },
+    def: { page: 'overview', logErrOnly: false, orbX: -1, orbY: -1 },
     module: 'ui',
     // 枚举白名单：页面 id 是**闭合集合**（PAGES）。不声明的话，旧版本删掉某页后，磁盘里会
     //   留着一个永远切不过去的「当前页」，表现为「面板打开是空白页」且**零报错**（silent）。
@@ -324,7 +337,7 @@
     try {
       if (WA.settingsBus && typeof WA.settingsBus.read === 'function') return WA.settingsBus.read(__panelStateReg);
     } catch (e) {}
-    return { page: 'overview', logErrOnly: false };
+    return { page: 'overview', logErrOnly: false, orbX: -1, orbY: -1 };
   }
   /** 页 id 白名单校验（**读侧**）：`enums` 声明管的是**写**路径不落非法值；本函数管的是
    *  **读**路径不因历史非法值炸渲染 —— `RENDERERS[非法 id]` 是 undefined，调用它必抛。 */
@@ -345,7 +358,13 @@
         if (WA.log) WA.log('warn', 'ui.panel: 面板状态未落盘——设置总线未装载（本次会话内仍生效）', null);
         return { ok: false };
       }
-      const r = WA.settingsBus.saveOrThrow(__panelStateReg, { page: currentPage, logErrOnly: __logErrOnly });
+      const val = {
+        page: currentPage,
+        logErrOnly: __logErrOnly,
+        orbX: __orbPos ? __orbPos.x : -1,
+        orbY: __orbPos ? __orbPos.y : -1
+      };
+      const r = WA.settingsBus.saveOrThrow(__panelStateReg, val);
       if (r && r.ok === false && WA.log) WA.log('warn', 'ui.panel: 面板状态未落盘（' + (r.reason || '?') + '，本次会话内仍生效）', null);
       return r || { ok: false };
     } catch (e) {
@@ -353,6 +372,10 @@
       return { ok: false, reason: String((e && e.message) || e) };
     }
   }
+  let __orbPos = (function () {
+    const s = __panelState() || {};
+    return (typeof s.orbX === 'number' && s.orbX >= 0 && typeof s.orbY === 'number' && s.orbY >= 0) ? { x: s.orbX, y: s.orbY } : null;
+  })();
   let currentPage = __pageOr('overview');
   let panelEl = null, orbEl = null;
   /** v2.109.0（#7）：上一次「基准面」按下时的性能快照。存在的意义就是**下次能比对**——
@@ -844,6 +867,12 @@
     // v2.231.0（拓展 EXP-3）：持续生产的开关常驻读数 —— 同款纪律（「还没开过单」与
     //   「这一面被关掉了」必须分得开）。
     const pdOn = !!(WA.production && WA.production.getSettings && WA.production.getSettings().enabled);
+    // v2.231.7（回归收口 · EXP-4 补账）：探索与地理发现的开关常驻读数 —— 同款纪律
+    //   （「还没勘察过」与「这一面被关掉了」必须分得开）。
+    //   本段此前**根本没有渲染**：27 个 wa-sv-* 早已登记进 UI_BINDINGS，ui/panel.js
+    //   却零命中 —— 守卫表里躺着一整面僵尸登记，而「渲染了但绑定写错 id」这类断裂
+    //   在这 27 个控件上永不可见（守卫表的全部意义正是拦这个）。本次把三件补齐。
+    const svOn = !!(WA.survey && WA.survey.getSettings && WA.survey.getSettings().enabled);
     const s = WA.store.get();
     const reg = WA.registry.list();
     const people = Object.values(s.people);
@@ -1113,6 +1142,38 @@ const peopleIds = Object.keys(s.people);
           <button class="wa-btn" id="wa-pd-view" title="只读：设施容量与在产单数（谁占着哪个工位）">看在产</button>
           <button class="wa-btn" id="wa-pd-diag" title="自证面：开关 / 状态封闭集 / 上限 / 设施数与在产数 / 拒收归因">诊断</button></div>
         <div id="wa-pd-out" class="wa-out"></div>
+        <div class="wa-sec">探索与地理发现（声明勘察点 → 出发 → 逐日推进 → 认知分档）</div>
+        <div class="wa-dim">与世界织体（地点与道路的登记）的分野：那边记「世界有什么」，本面记<b>谁知道了什么</b>。
+          勘察点必须挂在<b>已登记地点</b>上（本面不发明地点）；勘察者与勘察点之间<b>必须有登记道路</b>（未登记的路走不通）；
+          <b>认知只记在勘察者本人身上</b>；转述最高只到<b>听说过</b>（听说与亲历不是一件事）；
+          <b>未发现的地点只报条数、绝不列名</b>。</div>
+        <label class="wa-row"><input id="wa-sv-enabled" type="checkbox" ${svOn ? 'checked' : ''}/> 启用探索与地理发现</label>
+        <div class="wa-row"><input id="wa-sv-spot" class="wa-input" placeholder="勘察点名（如 旧矿洞口）"/>
+          <input id="wa-sv-place" class="wa-input" placeholder="所在地点（须已登记，可空=同名）"/>
+          <input id="wa-sv-days" class="wa-input wa-num" type="number" min="1" step="1" placeholder="往返天数（可空=1）"/>
+          <button class="wa-btn" id="wa-sv-spot-add" title="声明一个可勘察点：它必须对应一个已登记地点（否则 unknown-place —— 本面不发明地点，只声明「这个地点上有可勘察的东西」）">声明勘察点</button>
+          <button class="wa-btn" id="wa-sv-spots" title="只读：已声明的勘察点（名称 / 所在地点 / 往返天数）">看勘察点</button></div>
+        <div class="wa-row"><input id="wa-sv-who" class="wa-input" placeholder="勘察者"/>
+          <input id="wa-sv-from" class="wa-input" placeholder="出发地（可空=此人当前所在地）"/>
+          <button class="wa-btn" id="wa-sv-survey" title="出发勘察（跨日运行）：勘察者必须在册、勘察点必须已声明、两地之间必须有登记道路（no-road —— 未登记的路走不通，本面不造路）">出发勘察</button></div>
+        <div class="wa-row"><input id="wa-sv-id" class="wa-input" placeholder="勘察单 id（从清单里抄，可空=全部在途）"/>
+          <button class="wa-btn" id="wa-sv-advance" title="推一天：逐日消耗一份补给（先判后动，不够就一格都不扣），走满天数 ⇒ arrived 并把勘察者本人对该地的认知升到亲历。缺补给 ⇒ 当场暂停并如实报缺多少（不静默吞天）">推一天</button>
+          <input id="wa-sv-supply" class="wa-input wa-num" type="number" min="1" step="1" placeholder="补给量（可空=1）"/>
+          <button class="wa-btn" id="wa-sv-resupply" title="补补给：从勘察者手里扣进本单补给池（手里不够 ⇒ short-supply，不赊账）">补补给</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-sv-pause" title="停工（显式）：在途 → 暂停，不推进天数">停工</button>
+          <button class="wa-btn" id="wa-sv-resume" title="复工：暂停 → 在途。已经在走的单叫它是无操作，不报错">复工</button>
+          <button class="wa-btn" id="wa-sv-halt" title="中止：停在 halted，已消耗的补给不退、已走的天数如实保留（不假装没发生）">中止</button></div>
+        <div class="wa-row"><input id="wa-sv-to" class="wa-input" placeholder="转述给谁"/>
+          <button class="wa-btn" id="wa-sv-report" title="转述：把「甲知道的某地」告诉乙 —— 最高只到「听说过」，绝不到亲历。说的人自己都不知道 ⇒ not-known（不是「传了个不确定的消息」，是「没有这回事」）">转述</button>
+          <input id="wa-sv-place2" class="wa-input" placeholder="确认：地点"/>
+          <button class="wa-btn" id="wa-sv-confirm" title="确认亲历：把某人对某地的认知升到 confirmed —— 必须已有认知或显式在场，不能凭空确认（亲历要有亲历的样子）">确认亲历</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-sv-knows" title="只读：这个人对这个地点知道到什么程度（不知道 / 听说过 / 亲历）—— 唯一的认知判据口">查认知</button>
+          <button class="wa-btn" id="wa-sv-routes" title="只读：他能说出名字的地点，以及他走得到哪些路（一条路两端他都知道，才算他说得出走向）">他能说出哪些路</button>
+          <button class="wa-btn" id="wa-sv-fog" title="只读：遮罩面 —— 只报「还有几处没探明」，未发现的地点绝不出现在读数里（带了名字就等于没遮）">遮罩面</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-sv-list" title="只读：勘察单清单（谁 / 从哪到哪 / 走到第几天 / 状态 / 剩余补给 / 暂停原因）">勘察单清单</button>
+          <button class="wa-btn" id="wa-sv-view" title="只读：开关 / 认知分档 / 上限 / 勘察点数与在途数">看总览</button>
+          <button class="wa-btn" id="wa-sv-diag" title="自证面：开关 / 认知封闭集 / 上限 / 声明数与认知数 / 拒收归因">诊断</button></div>
+        <div id="wa-sv-out" class="wa-out"></div>
         <div class="wa-sec">组织制度（建档 → 设职 → 任免 → 批准链 → 交接）</div>
         <label class="wa-row"><input id="wa-inst-enabled" type="checkbox" ${WA.inst && WA.inst.getSettings().enabled ? 'checked' : ''}/> 启用组织制度</label>
         <div class="wa-dim">权限是<b>具名表</b>（approve/grant/hire/punish），自造权限一律拒收；<b>无职不任</b>、<b>一职一人</b>（换人要显式）；<b>没人能批的事不许挂起</b>；交接必须写明在途项目与旧承诺，<b>不因换人自动作废</b>。</div>
@@ -5583,6 +5644,141 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + ' · 开 ' + v.stat.opened + ' · 排 ' + v.stat.staffed + ' · 补 ' + v.stat.resupplied
         + ' · 推 ' + v.stat.advanced + ' · 停 ' + v.stat.paused + ' · 复 ' + v.stat.resumed
         + ' · 交 ' + v.stat.delivered + ' · 取消 ' + v.stat.cancelled + ' · 拒收 ' + v.stat.blocked
+        + (v.enabled ? '' : '（关着时不记也不判）'));
+    });
+    // v2.231.7（回归收口 · EXP-4 补账）：探索与地理发现面（声明勘察点 / 出发 / 推进 /
+    //   补给 / 停工复工中止 / 转述 / 确认 / 三个只读面 / 清单 / 总览 / 诊断）。
+    //   本段只调 `WA.survey` 的公开口；**遮罩面只报数不报名**与**转述最高到听说过**
+    //   是本面要点名的两条 —— 前者靠 fog() 只给条数，后者靠 report() 只升到 heard。
+    const svVal = function (id) { const el = $(id); return el ? String(el.value || '').trim() : ''; };
+    const svNum = function (id) { const v = parseFloat(svVal(id)); return isFinite(v) ? v : undefined; };
+    const svOut = function (t) {
+      panelEl.dataset.svOut = t;
+      const o = $('#wa-sv-out'); if (o) o.textContent = t;
+    };
+    if (panelEl.dataset.svOut) { const saved = $('#wa-sv-out'); if (saved) saved.textContent = panelEl.dataset.svOut; }
+    { const el = $('#wa-sv-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.survey) return svOut('未记录：module-missing');
+        WA.survey.setSettings({ enabled: !!el.checked });
+        renderBody();
+      };
+    }
+    on('#wa-sv-spot-add', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.declareSpot(svVal('#wa-sv-spot'), { place: svVal('#wa-sv-place'), days: svNum('#wa-sv-days') });
+      svOut(r.ok ? ('已声明勘察点 ' + r.name + ' @ ' + r.place + ' · 往返 ' + r.days + ' 天'
+        + (r.replaced ? ' · 覆盖' : '') + (r.clamped ? ' · 已夹到上限' : ''))
+        : ('未声明：' + String(r.reason) + (r.place ? ('（' + r.place + '）') : '')));
+    });
+    on('#wa-sv-spots', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const v = WA.survey.view();
+      svOut(v.spots.length
+        ? ('勘察点 ' + v.spots.length + ' 处 — ' + v.spots.map(function (x) {
+          return x.name + '@' + x.place + '(' + x.days + '天' + (x.kind ? ',' + x.kind : '') + ')'; }).join(' '))
+        : '还没有声明任何勘察点（没声明过 —— 这与「这一面被关掉了」不是一回事）');
+    });
+    on('#wa-sv-survey', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.survey({ who: svVal('#wa-sv-who'), spot: svVal('#wa-sv-spot'), from: svVal('#wa-sv-from') });
+      svOut(r.ok ? ('已出发 ' + r.id + '：' + r.who + ' ' + r.from + ' → ' + r.to
+        + '（勘察点 ' + r.spot + ' · 工期 ' + r.days + ' 天 · 补给 ' + r.supply + '）')
+        : ('未出发：' + String(r.reason) + (r.hint ? (' —— ' + r.hint) : '')));
+    });
+    on('#wa-sv-advance', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.advance({ id: svVal('#wa-sv-id'), days: 1 });
+      if (!r.ok) return svOut('未推进：' + String(r.reason));
+      svOut('推进 ' + r.movedCount + ' 张 · 暂停 ' + r.pausedCount + ' 张 · 抵达 ' + r.arrivedCount + ' 张'
+        + (r.arrivedCount ? (' — ' + r.arrived.map(function (x) { return x.who + '→' + x.place; }).join(' ')) : '')
+        + (r.pausedCount ? (' — 缺补给停在：' + r.paused.map(function (x) { return x.id + '(' + (x.why || '') + ')'; }).join(' ')) : ''));
+    });
+    on('#wa-sv-resupply', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.resupply(svVal('#wa-sv-id'), { by: svVal('#wa-sv-who'), amount: svNum('#wa-sv-supply') });
+      svOut(r.ok ? ('已补 ' + r.amount + ' 份补给（从 ' + r.by + ' 手里扣进本单池）· 池内 ' + r.supply)
+        : ('未补：' + String(r.reason) + (r.have !== undefined ? ('（手里只有 ' + r.have + '）') : '')));
+    });
+    on('#wa-sv-pause', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.pause(svVal('#wa-sv-id'), {});
+      svOut(r.ok ? ('已停工：' + r.id + '（' + r.done + '/' + r.days + ' · 原因 ' + r.why + '）') : ('未停工：' + String(r.reason)));
+    });
+    on('#wa-sv-resume', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.resume(svVal('#wa-sv-id'));
+      svOut(r.ok ? ('已复工：' + r.id + '（' + r.done + '/' + r.days + '）' + (r.changed === false ? ' —— 本来就在跑（无操作）' : ''))
+        : ('未复工：' + String(r.reason)));
+    });
+    on('#wa-sv-halt', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.halt(svVal('#wa-sv-id'), {});
+      svOut(r.ok ? ('已中止：' + r.id + '（' + r.done + '/' + r.days + '）· ' + r.note) : ('未中止：' + String(r.reason)));
+    });
+    on('#wa-sv-report', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.report({ from: svVal('#wa-sv-who'), to: svVal('#wa-sv-to'), place: svVal('#wa-sv-place2') });
+      svOut(r.ok ? ('已转述：' + r.from + ' → ' + r.to + ' 关于 ' + r.place + '，认知 ' + r.before + ' → ' + r.know + ' · ' + r.note)
+        : ('未转述：' + String(r.reason) + (r.hint ? (' —— ' + r.hint) : '')));
+    });
+    on('#wa-sv-confirm', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.confirm(svVal('#wa-sv-who'), svVal('#wa-sv-place2'), {});
+      svOut(r.ok ? ('已确认：' + r.who + ' 对 ' + r.place + ' 的认知 ' + r.before + ' → ' + r.know)
+        : ('未确认：' + String(r.reason) + (r.hint ? (' —— ' + r.hint) : '')));
+    });
+    on('#wa-sv-knows', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.knowsOf(svVal('#wa-sv-who'), svVal('#wa-sv-place2'));
+      svOut(r.who + ' 对 ' + r.place + '：' + r.know + (r.known ? ('（经由 ' + (r.via || '未记录') + '）') : '（还不知道）'));
+    });
+    on('#wa-sv-routes', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.routesOf(svVal('#wa-sv-who'));
+      svOut(r.who + ' 知道 ' + r.places.length + ' 个地点（亲历 ' + r.confirmed + ' · 听说 ' + r.heard + '）'
+        + (r.places.length ? (' — ' + r.places.map(function (x) { return x.place + '(' + x.know + ')'; }).join(' ')) : '')
+        + ' · 说得出 ' + r.roads.length + ' 条路'
+        + (r.roads.length ? (' — ' + r.roads.map(function (x) { return x.a + '-' + x.b; }).join(' ')) : ''));
+    });
+    on('#wa-sv-fog', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const r = WA.survey.fog(svVal('#wa-sv-who'));
+      // 只报数不报名：未发现的地点一个名字都不出现在读数里（带了名字就等于没遮）。
+      svOut(r.who + ' 已知 ' + r.knownCount + ' / ' + r.totalPlaces + ' 处地点'
+        + ' · 尚有 ' + r.hiddenPlaces + ' 处未探明（未发现的地名不在此列出）'
+        + ' · 说得出 ' + (r.totalRoads - r.hiddenRoads) + ' / ' + r.totalRoads + ' 条路');
+    });
+    on('#wa-sv-list', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const rows = WA.survey.list({});
+      svOut(rows.length
+        ? ('勘察单 ' + rows.length + ' 张 — ' + rows.map(function (x) {
+          return x.id + '(' + x.who + ':' + x.from + '→' + x.to + ',' + x.done + '/' + x.days + ',' + x.status
+            + ',补给' + x.supply + (x.pausedReason ? (',停因' + x.pausedReason) : '') + ')'; }).join(' '))
+        : '还没有任何勘察单（没出发过 —— 这与「这一面被关掉了」不是一回事）');
+    });
+    on('#wa-sv-view', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const v = WA.survey.view();
+      svOut('探索 · ' + (v.enabled ? '开' : '关') + ' · 认知分档 ' + v.knows.join('/')
+        + '（在途档 ' + v.openStatus.join('/') + '）· 上限 勘察点 ' + v.maxSpots + ' / 认知 ' + v.maxViews
+        + ' / 天数 ' + v.maxDays + ' · 观察者 ' + (v.viewer || '未设（注入块不产）')
+        + ' · 勘察点 ' + v.counts.spots + ' 处 · 认知 ' + v.counts.views + ' 条 · 勘察单 ' + v.counts.scouts
+        + ' 张（在途 ' + v.counts.open + ' · 已抵达 ' + v.counts.arrived + '）');
+    });
+    on('#wa-sv-diag', () => {
+      if (!WA.survey) return svOut('未记录：module-missing');
+      const v = WA.survey.view();
+      svOut('探索与地理发现 · ' + (v.enabled ? '开' : '关') + ' · 认知 ' + v.knows.join('/')
+        + ' · 状态 ' + v.statuses.join('/') + '（在途 ' + v.openStatus.join('/') + '）'
+        + ' · 上限 勘察点 ' + v.maxSpots + ' / 认知 ' + v.maxViews + ' / 天数 ' + v.maxDays
+        + ' · 勘察点 ' + v.counts.spots + ' · 认知 ' + v.counts.views + ' · 勘察单 ' + v.counts.scouts
+        + '（在途 ' + v.counts.open + ' · 已抵达 ' + v.counts.arrived + '）'
+        + ' · 声明 ' + v.stat.declared + ' · 出发 ' + v.stat.surveyed + ' · 推进 ' + v.stat.advanced
+        + ' · 抵达 ' + v.stat.arrived + ' · 停 ' + v.stat.paused + ' · 复 ' + v.stat.resumed
+        + ' · 转述 ' + v.stat.reported + ' · 确认 ' + v.stat.confirmed + ' · 中止 ' + v.stat.halted
+        + ' · 拒收 ' + v.stat.blocked + (v.stat.lastReason ? (' · 末次 ' + v.stat.lastReason) : '')
         + (v.enabled ? '' : '（关着时不记也不判）'));
     });
     on('#wa-opp-run', () => {
@@ -14126,7 +14322,14 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       })()}</span><span class="wa-close">✕</span></div>
       <div class="wa-nav-bar"><span id="wa-nav-out" class="wa-dim">（跳转读数：去哪 / 定位结果 / 拒收原因 —— 常驻头部，切页不会把它冲掉）</span>
         <button class="wa-btn wa-mini" id="wa-nav-back" title="回到上一页，并按离开时的样子还原输入与滚动位（ui/panel-nav.js 的回程栈，有界 8 层）">← 返回</button></div>
-      <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}">${p.icon} ${p.label}</button>`).join('')}</div>
+      <div class="wa-cat-bar">
+        <button class="wa-cat-btn active" data-cat="all">全部</button>
+        <button class="wa-cat-btn" data-cat="core">🌟 剧情核心</button>
+        <button class="wa-cat-btn" data-cat="world">🌐 世界推进</button>
+        <button class="wa-cat-btn" data-cat="workshop">🛠️ 工坊探索</button>
+        <button class="wa-cat-btn" data-cat="system">⚙️ 系统设置</button>
+      </div>
+      <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}" data-cat="${PAGE_CAT[p.id] || 'core'}">${p.icon} ${p.label}</button>`).join('')}</div>
       <div class="wa-body"></div>
     </div>`);
     mainDoc.body.appendChild(panelEl);
@@ -14159,18 +14362,84 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   原先这里内联三件事（改 currentPage / syncTabs / renderBody / __persistPanel），
     //   与「跳到来源页」那处各写一份 —— 两处漂移过一次（v2.203.0 收口修的 NodeList.filter
     //   就在那一处）。收成一个口之后，tab 与协议走同一条路。
+    panelEl.querySelectorAll('.wa-cat-btn').forEach(btn => {
+      btn.onclick = () => {
+        currentCat = btn.dataset.cat;
+        panelEl.querySelectorAll('.wa-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === currentCat));
+        panelEl.querySelectorAll('.wa-tab').forEach(t => {
+          t.style.display = (currentCat === 'all' || t.dataset.cat === currentCat) ? '' : 'none';
+        });
+      };
+    });
     panelEl.querySelectorAll('.wa-tab').forEach(t => t.onclick = () => { WA.ui.goPage(t.dataset.page); });
     syncTabs();
   }
-  function syncTabs() { panelEl.querySelectorAll('.wa-tab').forEach(t => t.classList.toggle('active', t.dataset.page === currentPage)); }
+  function syncTabs() {
+    const pageCat = PAGE_CAT[currentPage] || 'core';
+    if (currentCat !== 'all' && currentCat !== pageCat) {
+      currentCat = pageCat;
+      if (panelEl) {
+        panelEl.querySelectorAll('.wa-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === currentCat));
+      }
+    }
+    if (panelEl) {
+      panelEl.querySelectorAll('.wa-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.page === currentPage);
+        t.style.display = (currentCat === 'all' || t.dataset.cat === currentCat) ? '' : 'none';
+      });
+    }
+  }
 
   function buildOrb() {
-    orbEl = h(`<div id="wa-orb" title="世界枢轴">◈</div>`);
+    orbEl = h(`<div id="wa-orb" title="世界枢轴（可自由拖拽）">◈</div>`);
     mainDoc.body.appendChild(orbEl);
+    if (__orbPos && typeof __orbPos.x === 'number' && __orbPos.x >= 0 && typeof __orbPos.y === 'number' && __orbPos.y >= 0) {
+      orbEl.style.left = __orbPos.x + 'px';
+      orbEl.style.top = __orbPos.y + 'px';
+      orbEl.style.right = 'auto';
+      orbEl.style.bottom = 'auto';
+    } else {
+      // 默认靠右中上部，彻底避开宿主环境右下角与记忆插件重叠
+      orbEl.style.top = '140px';
+      orbEl.style.right = '24px';
+      orbEl.style.bottom = 'auto';
+    }
     let drag = false, sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
-    orbEl.addEventListener('pointerdown', e => { drag = true; moved = false; sx = e.clientX; sy = e.clientY; const r = orbEl.getBoundingClientRect(); ox = r.left; oy = r.top; orbEl.setPointerCapture(e.pointerId); });
-    orbEl.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - sx, dy = e.clientY - sy; if (Math.abs(dx) + Math.abs(dy) > 6) moved = true; orbEl.style.left = (ox + dx) + 'px'; orbEl.style.top = (oy + dy) + 'px'; orbEl.style.right = 'auto'; orbEl.style.bottom = 'auto'; });
-    orbEl.addEventListener('pointerup', () => { drag = false; if (!moved) toggle(); });
+    orbEl.addEventListener('pointerdown', e => {
+      drag = true; moved = false; sx = e.clientX; sy = e.clientY;
+      const r = orbEl.getBoundingClientRect();
+      ox = r.left; oy = r.top;
+      if (orbEl.setPointerCapture) try { orbEl.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    orbEl.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) + Math.abs(dy) > 5) moved = true;
+      let nx = ox + dx, ny = oy + dy;
+      const docEl = mainDoc.documentElement || {};
+      const maxW = (docEl.clientWidth || 800) - 56;
+      const maxH = (docEl.clientHeight || 600) - 56;
+      nx = Math.max(5, Math.min(nx, maxW));
+      ny = Math.max(5, Math.min(ny, maxH));
+      orbEl.style.left = nx + 'px';
+      orbEl.style.top = ny + 'px';
+      orbEl.style.right = 'auto';
+      orbEl.style.bottom = 'auto';
+    });
+    const onUp = e => {
+      if (!drag) return;
+      drag = false;
+      if (orbEl.releasePointerCapture) try { orbEl.releasePointerCapture(e.pointerId); } catch (err) {}
+      if (moved) {
+        const r = orbEl.getBoundingClientRect();
+        __orbPos = { x: Math.round(r.left), y: Math.round(r.top) };
+        __persistPanel();
+      } else {
+        toggle();
+      }
+    };
+    orbEl.addEventListener('pointerup', onUp);
+    orbEl.addEventListener('pointercancel', onUp);
   }
 
   function toggle(force) {

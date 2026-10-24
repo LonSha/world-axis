@@ -93,6 +93,8 @@
    */
   function declareTask(taskDef) {
     if (!taskDef || !taskDef.id) return { ok: false, reason: 'invalid-task-def' };
+    const cfg = settings();
+    if (Object.keys(TASKS).length >= (cfg.maxMethods || 64)) return { ok: false, reason: 'max-methods-exceeded' };
     const id = clean(taskDef.id, 60);
     TASKS[id] = Object.assign({}, taskDef, { id: id });
     return { ok: true, id: id };
@@ -123,7 +125,8 @@
     if (!task) { noteFault('unknown-task'); return { ok: false, reason: 'unknown-task', taskId: taskId }; }
 
     stat.evaluations++;
-    const methods = (Array.isArray(o.methods) && o.methods.length) ? o.methods : task.methods;
+    const maxP = Math.max(1, cfg.maxPathsPerTask || 8);
+    const methods = ((Array.isArray(o.methods) && o.methods.length) ? o.methods : task.methods).slice(0, maxP);
     const abilityName = clean(task.ability, 40);
     const gearId = clean(o.gearId, 60);
 

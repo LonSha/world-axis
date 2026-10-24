@@ -33,6 +33,13 @@
   WA.version = VERSION;
   WA.mainWin = mainWin;
   WA.mainDoc = mainDoc;
+  function _waDiagSet(k, v) {
+    try {
+      if (mainWin && mainWin.localStorage) {
+        mainWin.localStorage[k] = (typeof v === 'string' ? v : JSON.stringify(v));
+      }
+    } catch (e) {}
+  }
   // v2.15.0: 时间源单一出口（决策时间进存档/参与判定，测量时间只进内存台账与日志）。
   //   注意：本文件里一律用**内联三目**而非局部 helper——run.js 会把 loadScriptOnce 这
   //   段源码切片出来在独立沙箱里重编译，helper 不在切片内，用 helper 会在 CDN 回退路径上炸。
@@ -266,7 +273,7 @@
         if (n.indexOf('extension') > 0) perfSeen.push(n);
       }
     } catch (e) {}
-    mainWin.localStorage.setItem('wa_boot_v1', JSON.stringify({
+    _waDiagSet('wa_boot_v1', {
       ver: VERSION,
       base: WA.baseUrl,
       currentScript: (function () { try { return (document.currentScript && document.currentScript.src) || null; } catch (e) { return 'err'; } })()
@@ -274,7 +281,7 @@
       href: (function () { try { return String(mainDoc.location && mainDoc.location.href); } catch (e) { return 'err'; } })(),
       scripts: scriptsSeen,
       perf: perfSeen
-    }));
+    });
   } catch (e) { /* 存储不可用 ⇒ 诊断缺席，但不影响扩展本体 */ }
   WA.loadScript = loadScript;
   // ── v2.231.1：URL 形态探测（一次把「哪种写法真能取到模块」问清楚）──────────
@@ -313,7 +320,7 @@
       let p = Promise.resolve();
       cands.forEach(function (u) { p = p.then(function () { return one(u); }); });
       p.then(function () {
-        try { mainWin.localStorage.setItem('wa_probe_v1', JSON.stringify(out)); } catch (e) {}
+        _waDiagSet('wa_probe_v1', out);
       });
     } catch (e) { /* 探针失败不影响本体 */ }
   })();
@@ -1153,10 +1160,27 @@
         });
       };
       timer = setTimeout(function () { done({ ok: false, src: src, error: 'timeout' }); }, timeoutMs || SCRIPT_TIMEOUT_MS);
-      viaFetch().then(function (r) { clear(); done(r); }).catch(function () {
+      // ── v2.231.6：非 Tauri 且无预取命中 ⇒ **同步**走 <script>，不许先排一趟必然 reject 的 fetch ──
+      //   病灶（本轮全量回归捞出来的）：上面的 viaFetch() 是 async 的，`viaFetch().then().catch()`
+      //   把 viaTag() 推进了**微任务**。于是 `WA.loadScript(rel)` 返回时，`<script>` 元素**还没建**。
+      //   非 Tauri 环境里 fetch 通道必然 `reject('skip')`（Node 下会真发请求，故刻意不启用），
+      //   也就是说这里先排队的是一条**注定失败**的通道，除了把建元素推迟一个微任务之外没有别的效果。
+      //   实测代价：run.js 的 v0.1.16 段（`const ls = global.__scriptEls.slice(); ls[0].onerror()`）
+      //   当场 `Cannot read properties of undefined (reading 'onerror')` —— 整趟回归 runner-failed。
+      //   口径：**能力判定要在排队之前做完**，不要在通道内部 reject 了再回退。
+      //   预取命中要保留（它是同步可判的），Tauri + fetch 的组合也保留（那是真通道）。
+      const prefetchHit = (function () {
+        try { const pf = WA.__prefetch; return !!(pf && pf.get && pf.get(src)); } catch (e) { return false; }
+      })();
+      if (!prefetchHit && (!isTauri || typeof fetch !== 'function')) {
         viaTag().then(function (r) { clear(); done(r); })
           .catch(function (e) { clear(); done({ ok: false, src: src, error: String(e && (e.message || e)) }); });
-      });
+      } else {
+        viaFetch().then(function (r) { clear(); done(r); }).catch(function () {
+          viaTag().then(function (r) { clear(); done(r); })
+            .catch(function (e) { clear(); done({ ok: false, src: src, error: String(e && (e.message || e)) }); });
+        });
+      }
     });
   }
   function loadScript(rel) {
@@ -1301,12 +1325,13 @@
     //   下一次现场就能直接读出卡点，而不是靠猜：
     //       JSON.parse(localStorage.getItem('wa_load_v1'))
     //   写入失败（配额/隐私模式）不影响装载，故整段包在 try 里。
-    const __prog = { base: WA.baseUrl, ver: VERSION, total: LOAD_ORDER.length, done: 0, failed: [], startedAt: Date.now() };
+    const __prog = { base: WA.baseUrl, ver: VERSION, total: LOAD_ORDER.length, done: 0, failed: [],
+      startedAt: (WA.clock ? WA.clock.wallNow('index.loadProgress') : Date.now()) };
     const __flush = function (extra) {
       try {
         if (extra) { for (const k in extra) __prog[k] = extra[k]; }
-        __prog.updatedAt = Date.now();
-        mainWin.localStorage.setItem('wa_load_v1', JSON.stringify(__prog));
+        __prog.updatedAt = (WA.clock ? WA.clock.wallNow('index.loadProgress') : Date.now());
+        _waDiagSet('wa_load_v1', __prog);
       } catch (e) {}
     };
     // ── v2.231.1：累积式阶段日志（wa_stage_v1）──────────────────────────
@@ -1328,15 +1353,19 @@
       __stages.push(s);
       if (__markBroken) return;
       try {
-        mainWin.localStorage.setItem('wa_stage_v1', JSON.stringify({
-          base: WA.baseUrl, ver: VERSION, stages: __stages, at: Date.now()
-        }));
+        _waDiagSet('wa_stage_v1', {
+          base: WA.baseUrl, ver: VERSION, stages: __stages,
+          at: (WA.clock ? WA.clock.wallNow('index.loadStage') : Date.now())
+        });
       } catch (e) {
         __markBroken = true;
         const why = 'mark-fail@' + s + ':' + (e && (e.name || e.message) || String(e));
-        try { mainWin.localStorage.setItem('wa_stage_err_v1', why); } catch (e2) {}
+        _waDiagSet('wa_stage_err_v1', why);
         try { (mainWin || window).__waMarkErr = why; } catch (e3) {}
-        try { WA.errorLog.push({ t: Date.now(), level: 'error', msg: '阶段打点写盘失败：' + why, data: null }); } catch (e4) {}
+        try {
+          WA.errorLog.push({ t: (WA.clock ? WA.clock.wallNow('index.loadStageErr') : Date.now()),
+            level: 'error', msg: '阶段打点写盘失败：' + why, data: null });
+        } catch (e4) {}
       }
     };
     __mark('init-enter');
@@ -1524,7 +1553,7 @@
         try { return JSON.stringify(o); }
         catch (e2) { return JSON.stringify({ ver: o.ver, buildId: o.buildId, base: o.base, loaded: o.loaded, failedCount: o.failedCount, hasUi: o.hasUi, uiMounted: o.uiMounted, orbInDom: o.orbInDom, panelInDom: o.panelInDom, note: 'stringify-degraded' }); }
       })(__dg);
-      mainWin.localStorage.setItem('wa_diag_v1', __dgStr);
+      _waDiagSet('wa_diag_v1', __dgStr);
     } catch (e) { /* 存储不可用 ⇒ 诊断缺席，但不影响扩展本体 */ }
     __mark('diag-written');
     // v2.231.4：init 关键路径走完 ⇒ 解除 logCaps 的降级档（恢复动态水位自适应）。
@@ -1595,12 +1624,11 @@
         ret.catch(function (e) {
           WA.log('error', 'init异步拒绝', e);
           try { (mainWin || window).__waInitErr = String((e && e.message) || e); } catch (e2) {}
-          try {
-            mainWin.localStorage.setItem('wa_init_err_v1', JSON.stringify({
-              ver: VERSION, msg: String((e && e.message) || e),
-              stack: String((e && e.stack) || '').slice(0, 1200), at: Date.now()
-            }));
-          } catch (e2) {}
+          _waDiagSet('wa_init_err_v1', {
+            ver: VERSION, msg: String((e && e.message) || e),
+            stack: String((e && e.stack) || '').slice(0, 1200),
+            at: (WA.clock ? WA.clock.wallNow('index.initReject') : Date.now())
+          });
         });
       }
     };

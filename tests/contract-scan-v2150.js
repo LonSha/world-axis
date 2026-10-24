@@ -116,8 +116,31 @@ function runB(a) {
   a(w.length > 300, 'v2150/B5: 见证声明面来自真源（实 ' + w.length + ' 个）');
   a(Object.keys(d).length > 0 && b.length > 0,
     'v2150/B6: 死表 ' + Object.keys(d).length + ' 条 / 台账 base ' + b.length + ' 条');
-  a(w.every(function (c) { return r.codes.hits[c]; }),
-    'v2150/B7: 见证声明的码全部是扫描面上的码（无幽灵见证）');
+  // B7 见证声明的码必须**真的在源码里存在**（无幽灵见证）。
+  //   v2.231.6 口径修正：原先这条要求「每个见证码都落在内联扫描面 r.codes.hits 上」，
+  //   而扫描面只认内联 `reason: 'x'`；EXP-3～EXP-7 的引擎统一走 `refuse('x')` 辅助函数写法
+  //   （间接写法，门禁**故意不认** —— 见 reject-code-gate.js 形态说明：拼接/间接写法不报错
+  //   也不伪归一，稳定性由各自引擎专锁负责）。于是 19 个真码被判成「幽灵」，本条恒红。
+  //   病根是**判据选错了面**：这条要防的是「见证表里写了源码里根本没有的码」，
+  //   而不是「码必须用内联写法写」。故改判「该码在去注释的产品面源码文本里存在」——
+  //   面内/面外两种写法都算存在，判据强度不降（凭空捏造的码仍然红）。
+  //   面外清单仍显式钉住：防它们静默漂移或悄悄混进面内（口径与 reject-lock-v2780.js 同源）。
+  const OUT_FACE_OK = ['unknown-worker', 'no-such-facility', 'bad-days', 'order-paused', 'facility-full',
+    'shift-conflict', 'crew-full', 'no-road',
+    'activity-closed', 'already-exists', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
+    'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day'].sort();
+  const stripC = function (s) { return require('./test-surface-gate.js').stripComments(s); };
+  const faceText = TOOL.productFiles(BASE).map(function (rel) {
+    return stripC(fs.readFileSync(path.join(BASE, rel), 'utf8'));
+  }).join('\n');
+  const ghost = w.filter(function (c) { return faceText.indexOf("'" + c + "'") < 0; });
+  const wInFace = w.filter(function (c) { return !!r.codes.hits[c]; });
+  const wOutFace = w.filter(function (c) { return !r.codes.hits[c]; }).sort();
+  a(ghost.length === 0,
+    'v2150/B7: 见证声明的码全部真在源码里（无幽灵见证；面内 ' + wInFace.length
+    + ' / 面外 ' + wOutFace.length + '，幽灵 ' + JSON.stringify(ghost) + '）');
+  a(wOutFace.join(',') === OUT_FACE_OK.join(','),
+    'v2150/B7b: 面外见证码与登记清单逐字一致（实 ' + wOutFace.length + ' 个）—— 它们是 refuse() 辅助函数写法的码，扫描面外、由各自引擎专锁咬住');
   a(r.enums.declared > 100, 'v2150/B8: enums 面真扫到具名常量（实 ' + r.enums.declared + ' 个）');
   a(r.enums.divergent.length > 0 && r.exempt.size === r.enums.divergent.length,
     'v2150/B9: 分歧 ' + r.enums.divergent.length + ' 名全在 EXEMPT（' + r.exempt.size + ' 条）');

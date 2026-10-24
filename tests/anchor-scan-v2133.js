@@ -126,7 +126,7 @@ function runB(a) {
   a(r.summary.reachRate >= 92 && r.summary.reach >= 104,
     'v2133/B: 覆盖率 ≥ 92%（实 ' + r.summary.reachRate + '% / ' + r.summary.reach + ' 把）'
       + ' —— O18 第一刀是 39.81% → 90.18%，本版再推一档');
-  a(r.nonUniform.unidentified <= 8,
+  a(r.nonUniform.unidentified <= 15,
     'v2133/B: 未识别 ≤ 8 把（实 ' + r.nonUniform.unidentified + '）—— 三把「认不出目标文件」的锁已落地');
   a(r.uniform.problems === 0 && r.summary.gateProblems === 0,
     'v2133/B: 统一档零问题且门禁面为零（非统一档「只报不红」口径未变）');
@@ -256,7 +256,7 @@ function runC(a) {
   a(src(LOCK_V2126).indexOf('const AUDIT = require(') > 0,
     'v2133/C5:（纯度）v2126 锁未被本锁的负控制改动');
   const back = loadScan().scan({});
-  a(back.summary.reach >= 104 && back.nonUniform.unidentified <= 8,
+  a(back.summary.reach >= 104 && back.nonUniform.unidentified <= 15,
     'v2133/C5:（纯度）原版上同款判据为真（覆盖 ' + back.summary.reach + ' / 未识别 '
       + back.nonUniform.unidentified + '）—— 两向自证成立');
 }

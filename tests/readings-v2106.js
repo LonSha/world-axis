@@ -72,11 +72,22 @@ function refsSitesOf(src) {
     return refsUnitOf(s.replace(/ *===.*$/, ''));
   })));
 }
-/** 消息静态头站点现场枚举：`死子面 dead N / uiDead M / dataOnly K`
+/** 消息静态头站点现场枚举：`dead N / uiDead M / dataOnly K`（可带「死子面」前缀）
  *  —— 只锤到「值本体」为止：尾部的分隔符（（ / ； / ））与注记会随版本改形态，
- *     把它们写进锚点 ⇒ 升版后静默打空（正是 refs 族注释点过的病）。 */
-function headSitesOf(src) {
-  return Array.from(new Set(src.match(/死子面 dead \d+ \/ uiDead \d+ \/ dataOnly \d+/g) || []));
+ *     把它们写进锚点 ⇒ 升版后静默打空（正是 refs 族注释点过的病）。
+ *
+ *  v2.231.6 修正：旧锚点写死了「死子面」前缀（`/死子面 dead \d+ .../`），而现场三处静态头
+ *  已改成不带该前缀的 `dead 1015 / uiDead 5 / dataOnly 484；…` ⇒ 枚举恒 0 ⇒ N3b 红，
+ *  连带 N4（只改静态头必须报 message-mismatch）与 N5（四处破坏均须真实改变源码）一起红。
+ *  这正是本文件反复点过的「锚点漂移 = 覆盖消失」：负控制打空后，被测判据一次都没跑到。
+ *
+ *  改法（两条同时）：① 去掉会漂移的「死子面」前缀，只锚值本体三段；
+ *  ② 值一律**取现场实测**（LIVE），不匹配历史叙述里的旧数字 —— 否则 N4 的
+ *     `h.replace('dead ' + LIVE.dead, …)` 在旧数字站点上打不中，breakOnce 会抛。 */
+function headSitesOf(src, live) {
+  const d = live || require('./readings.js').measure();
+  const re = new RegExp('dead ' + d.dead + ' / uiDead ' + d.uiDead + ' / dataOnly ' + d.dataOnly, 'g');
+  return Array.from(new Set(src.match(re) || []));
 }
 /** 靶子：`<观察位>=== <值>` —— 精确到「这一个观察位等于这一个数」。 */
 function refsSite(unit, want) { return unit + '=== ' + want; }
@@ -286,7 +297,7 @@ function runNegative(assert, ctx) {
   //   正是上面 refs 族注释点过的病）；
   //   且**全族同改**（同 N2 口径）：同一份静态头在源码里可能出现两份副本（断言块内 + 裸字面量），
   //   只改首份时，判据看到的仍是未改的第二份 ⇒ 该观察位其实没被验到。
-  const headSites = headSitesOf(runSrc);
+  const headSites = headSitesOf(runSrc, LIVE);
   assert(headSites.length >= 1,
     'N3b 消息静态头站点现场枚举 ≥ 1（实 ' + headSites.length + ' 处）');
   const b4 = headSites.reduce(function (src, h) {

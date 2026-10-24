@@ -3599,7 +3599,17 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-sv-pause', 'wa-sv-resume', 'wa-sv-halt',
       'wa-sv-to', 'wa-sv-report', 'wa-sv-place2', 'wa-sv-confirm',
       'wa-sv-knows', 'wa-sv-routes', 'wa-sv-fog',
-      'wa-sv-list', 'wa-sv-view', 'wa-sv-diag', 'wa-sv-out'] },
+      'wa-sv-list', 'wa-sv-view', 'wa-sv-diag', 'wa-sv-out',
+      // v2.231.7（回归收口 · 补 v2.231.0 欠账）：独白推演面六枚 + 关系图谱面九枚。
+      //   这 15 个控件**早已渲染 + 已绑定**（renderPeople 的「独白推演」「关系图谱」两块，
+      //   绑定在 bindBody 的 on('#wa-mo-*') / on('#wa-rel-*') 上），却从未登记守卫表 ——
+      //   于是「渲染了但绑定的 id 写错」这类断裂在它们身上**永不可见**（本表的全部意义）。
+      //   全量回归的 `panel 渲染的每个控件都在守卫表内` 正是被它们抓红的。
+      //   wa-mo-row / wa-rel-row 是**常驻读数行**（不是按钮，但也是无条件渲染的静态节点），
+      //   与 wa-noe-out / wa-lfn-out 同规格：进 ids 层，不进 dynamic。
+      'wa-mo-row', 'wa-mo-on', 'wa-mo-stat', 'wa-mo-reset', 'wa-mo-memo', 'wa-mo-out',
+      'wa-rel-row', 'wa-rel-a', 'wa-rel-b', 'wa-rel-edge', 'wa-rel-dir', 'wa-rel-reload',
+      'wa-rel-stat', 'wa-rel-reset', 'wa-rel-out'] },
     // v2.140.0（F1）：防全知闸门九枚（渲染在人物页「防全知闸门」区）。
     //   同 v2.83.0 / v2.117.0 / v2.121.0 / v2.139.0 的规格——新控件必须
     //   「渲染 + 绑定 + 守卫登记」三件齐做，否则「按钮渲染了但绑定的 id 写错」
@@ -3872,7 +3882,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.150.0（RP4）：注入价值榜单三枚控件（渲染在**注入页** renderInject，故登记到本组）。
       //   同 v2.50.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，否则「渲染了但绑定
       //   写错 id」这类断裂在新增出口上无人发现；登记错页比不登记更坏（看起来已被覆盖）。
-      'wa-iv-refresh', 'wa-iv-enabled', 'wa-iv-zero', 'wa-iv-max'] },
+      'wa-iv-refresh', 'wa-iv-enabled', 'wa-iv-zero', 'wa-iv-max',
+      // v2.231.7（回归收口 · 补 v2.231.0 欠账）：楼层结算账六枚（记账开关 / 看范围 / 退回最后一笔 /
+      //   从该楼起全退 / 清空记账 / 重置读数）。渲染在**注入页**（renderInject 的「楼层结算账」块），
+      //   故登记到本组而不是人物页 —— 同 v2.50.0 / v2.90.0 的理由：登记错页比不登记更坏
+      //   （它看起来已被覆盖，而守卫永远查不到它）。
+      'wa-fst-on', 'wa-fst-list', 'wa-fst-rollback', 'wa-fst-from', 'wa-fst-reset', 'wa-fst-stat'] },
     // v2.182.0（第二批 O4 / O3）：工具页两块 —— 存储压力面 6 控件 + 性能基线面 6 控件。
     //   同 v2.150.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
     //   否则「渲染了但绑定写错 id」这类断裂在新增出口上无人发现（本表是唯一会互相校验的地方）。

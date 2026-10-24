@@ -6057,7 +6057,26 @@ function runWitness(WA) {
           return true;
         }, 'witness:floor-settle-scope');
         want('scope', 'floorSettle.onFloorEvent：中间楼被删（非末楼）⇒ 只出范围，不擅自回退（口径 ④）');
-        trip('scope', function () { return [WA.floorSettle.onFloorEvent('deleted', { index: 1 }).reason]; });
+        // 前提**自己搭**：scope 只在「被删的不是末楼」时产出，而末楼判定读宿主聊天长度
+        //   （floorNow = chat.length-1）。全量回归里前面若干用例会 `__mockChat.length = 0`
+        //   把聊天清空 ⇒ floorNow 返回 null ⇒ isLast 恒真 ⇒ 一律走 rollback，
+        //   于是这条码「有见证却跑不出」。见证的前提不能由别人留下什么决定：
+        //   临时铺 3 楼（末楼=2，删第 1 楼即中间楼），跑完**无条件**还原原引用。
+        const ctxFS = (function () {
+          try {
+            const w = WA.mainWin || (typeof window !== 'undefined' ? window : null);
+            const st = w && w.SillyTavern;
+            return (st && st.getContext) ? st.getContext() : null;
+          } catch (e) { return null; }
+        })();
+        const keepChatFS = ctxFS ? ctxFS.chat : undefined;
+        try {
+          if (ctxFS) ctxFS.chat = [{ is_user: true, mes: 'witness:floor-0' },
+            { is_user: false, mes: 'witness:floor-1' }, { is_user: true, mes: 'witness:floor-2' }];
+          trip('scope', function () { return [WA.floorSettle.onFloorEvent('deleted', { index: 1 }).reason]; });
+        } finally {
+          if (ctxFS) ctxFS.chat = keepChatFS;
+        }
       } finally {
         WA.store.transact(function (d) {
           delete d.__wKeyAllConflict; delete d.__wKeyScope;
@@ -6147,12 +6166,30 @@ function runWitness(WA) {
     if (WA.outlineInject && typeof WA.outlineInject.preview === 'function') {
       const keepOI = WA.outlineInject.getSettings ? WA.outlineInject.getSettings() : null;
       const keepWBC = (WA.wbInject && WA.wbInject.getConfig) ? WA.wbInject.getConfig() : null;
+      // 前提**自己搭**：`no-book` 的语义是「三处都配不出书」，第三处是宿主
+      //   worldInfoSettings.world_names 里找配套书名（findCompanionName）。全量回归里
+      //   那份名单会被常驻成 ['WorldAxis'] ⇒ 恒命中 ⇒ 这条码永远跑不出。
+      //   只清 setConfig 不够 —— 前两处是「自己声明」，第三处是「宿主现场」。
+      //   临时摘掉宿主书名列表，跑完**无条件**还原（原值可能是 undefined）。
+      const ctxNB = (function () {
+        try {
+          const w = WA.mainWin || (typeof window !== 'undefined' ? window : null);
+          const st = w && w.SillyTavern;
+          return (st && st.getContext) ? st.getContext() : null;
+        } catch (e) { return null; }
+      })();
+      const keepWIS = ctxNB ? ctxNB.worldInfoSettings : undefined;
       try {
         if (WA.wbInject && WA.wbInject.setConfig) WA.wbInject.setConfig({ worldbookName: '' });
         if (WA.outlineInject.setSettings) WA.outlineInject.setSettings({ enabled: true, worldbookName: '' });
+        if (ctxNB) ctxNB.worldInfoSettings = { world_names: [] };
         want('no-book', 'outlineInject.preview：配不出世界书 ⇒ 如实报 no-book（不猜一本、也不静默借用别人的）');
         tripAsync('no-book', function () { return WA.outlineInject.preview('# 大纲', {}); });
       } finally {
+        if (ctxNB) {
+          if (keepWIS === undefined) delete ctxNB.worldInfoSettings;
+          else ctxNB.worldInfoSettings = keepWIS;
+        }
         if (keepWBC && WA.wbInject.setConfig) WA.wbInject.setConfig(keepWBC);
         if (keepOI && WA.outlineInject.setSettings) WA.outlineInject.setSettings(keepOI);
       }

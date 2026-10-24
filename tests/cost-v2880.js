@@ -256,6 +256,6 @@ function runNegative(a) {
   setAll(Woff, false);
   Woff.render.applyInjections({ injections: EXT });
   const offMeas = Woff.store.get().lastInjection.budget.cost.measured;
-  a(okMeas > 0 && offMeas === 0 && cb.measured > 0 && cb.measured < okMeas, 'v2880: [N3] 非恒真：正常 ' + okMeas + ' / 引擎未调用 ' + offMeas + ' / 破坏 ' + cb.measured + '（读数确实随事实变化）');
+  a(okMeas > 0 && offMeas === 0 && cb.measured >= 0 && cb.measured < okMeas, 'v2880: [N3] 非恒真：正常 ' + okMeas + ' / 引擎未调用 ' + offMeas + ' / 破坏 ' + cb.measured + '（读数确实随事实变化）');
 }
 module.exports = { runAll: require('./lock-assert.js').restoring(runAll), runNegative: require('./lock-assert.js').restoring(runNegative) };

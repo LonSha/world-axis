@@ -243,8 +243,17 @@ function judge(a) {
     'v2119/economy: [A7] 守卫表登记控件');
   a(src.indexOf('enabled: false, maxGoods: 16, maxOrders: 12, maxRoutes: 8, spreadPct: 30') >= 0,
     'v2119/economy: [A8] 总开关默认关');
-  a(src.indexOf('const RECIPES = {') >= 0 && src.indexOf('unknown-recipe') >= 0
-    && src.indexOf('autoRecipe') < 0, 'v2119/economy: [A9] 配方是具名表（不接受现编的合成关系）');
+  // v2.231.7（回归收口）：OPT-8 之后配方真源迁到 engines/recipe.js 的 `const RECIPES = {`，
+  //   economy 只保留「未声明题材时沿用旧常量」的默认面 `RECIPES_DEF`。
+  //   判据原先只认前者，于是**产品语义未变、名字变了**就被报成红灯。
+  //   这里同时接受两份合法形态，但两条反向锚点一条不少：
+  //     · economy 里必须有具名配方表（自己声明或沿用默认面，二者必居其一）；
+  //     · 不得出现 `autoRecipe`（现编合成关系的唯一形态）。
+  const ecoHasTable2129 = /const\s+(RECIPES|RECIPES_DEF)\s*=\s*\{/.test(src);
+  const recipeSrc2129 = readSrc('engines/recipe.js');
+  a((ecoHasTable2129 || recipeSrc2129.indexOf('const RECIPES = {') >= 0)
+    && src.indexOf('unknown-recipe') >= 0 && src.indexOf('autoRecipe') < 0,
+    'v2119/economy: [A9] 配方是具名表（不接受现编的合成关系）');
   a(src.indexOf('WA.registerModule(') >= 0 && src.indexOf('engines/economy.js') >= 0,
     'v2119/economy: [A10] 模块自注册');
   a(src.indexOf('goods-full') >= 0 && src.indexOf(A_EVICT_G) >= 0,
