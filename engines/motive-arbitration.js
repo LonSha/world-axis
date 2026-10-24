@@ -72,6 +72,17 @@
       dynamicSources.push('danger');
     }
 
+    // 读取与应用过往经历与未走之路回声所积累的经验偏置 (WP-5)
+    if (person && person.life && person.life.learnings && person.life.learnings.biases) {
+      const bMap = person.life.learnings.biases;
+      DIMENSIONS.forEach(function (dim) {
+        if (typeof bMap[dim] === 'number' && !isNaN(bMap[dim])) {
+          effective[dim] = Math.max(0.1, +(effective[dim] + bMap[dim]).toFixed(2));
+          dynamicSources.push('echo:' + dim);
+        }
+      });
+    }
+
     return { weights: effective, base: base, dynamicSources: dynamicSources };
   }
 

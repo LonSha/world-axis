@@ -5660,3 +5660,14 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
      - 提供视角化认知查询 `viewPact(pactId, whoName)`，精准反映当事人认知是已确认最新安排还是处于陈旧版本（`stale_revision`）；直至全体确认最新版本后协调状态才恢复为 `coordinated`。
   4. `tests/test-wp-a2-integration.js`：新建集成测试套件，覆盖技艺资格前置与师傅协作、工单显式延期、批量工单部分交付入库、有限机会多人物竞争择定与落选转向、共同计划修订与版本化知情等 5 大核心场景（5/5 全绿）。
 - 验证：`tests/test-wp-a2-integration.js` (5/5 PASS)，`tests/test-wp-a1-integration.js` (6/6 PASS)，`tests/exp3-production-v2231.js` (90/90 PASS)，`tests/exp10-action-desk-v2232.js` (35/35 PASS)，`tests/exp20-shared-awareness-v2232.js` (18/18 PASS)，`tests/exp11-action-methods-v2232.js` (38/38 PASS)，`tests/exp12-labor-schedule-v2232.js` (20/20 PASS)，累计 212 项业务与专锁断言全绿通过。
+
+### R-WP-A3-20261024 · A包第3个工作日切片（经营全链物流闭环、跨日重载持久化、动机经验学习回声与局部知情）
+- 做了：
+  1. `engines/motive-arbitration.js`（WP-5 NPC 真实动机与未走之路回声闭环）：
+     - 在决策权重计算 `getEffectiveWeights(person, facts)` 中接入角色 `person.life.learnings.biases` 读取，使 NPC 在经历选择受挫、错失更优良机（`pathEcho.realizeOutcome` 产生 `regret` 遗憾）或守约获益后，所累积的偏置增减真实修正下一次动机仲裁选择，不再机械重复错误决策。
+  2. `tests/test-wp-a3-integration.js`（全链路闭环门禁验证）：
+     - 场景 1（WP-4 经营全链条贯通）：接单开单 → 备料预留 → 推进在产工期 → 突发状况申请延期 → 批量成品部分交付先行入库 → 完工结清交付随单挂载 `freight.dispatch` 物流路线 → 货物运输在途签收 `freight.arrive`，在目标地点真实入库，形成生产制造到货运贸易端到端因果闭环。
+     - 场景 2（WP-4 跨日推进与跨会话重载持久化）：跨日推进 `laborSchedule.advanceDay()`，重置运行实例模拟游戏重载（Save/Reload），验证工单运行状态、已推进工期、备料预留池及入库账本完整维持单一真源不变。
+     - 场景 3（WP-5 NPC 违约遗憾经验学习改变决策）：年轻学徒在资金危机下面临私接外快（背弃工坊约定）与履约协助师傅的两难抉择；首次仲裁选择私接外快，事后获知被扣款且师傅工单延误产生真实悔恨（`regret` 回声），偏置注入 `person.life.learnings.biases`；当下一次面临类似抉择时，偏置使学徒选择恪守承诺，真实摆脱静态模型重复犯错缺陷。
+     - 场景 4（WP-5 局部知情保护）：事件在远方发生但当事人未亲历且未收到消息的情形下，`isAware` 为假，`realizeOutcome` 判定为 `unaware-of-outcome`，拒不产生全知虚假遗憾或偏好跳变，维护局部可知性边界。
+- 验证：`tests/test-wp-a3-integration.js` (4/4 PASS)，`tests/test-wp-a1-integration.js` (6/6 PASS)，`tests/test-wp-a2-integration.js` (5/5 PASS)，`tests/exp3-production-v2231.js` (90/90 PASS)，`tests/exp10-action-desk-v2232.js` (35/35 PASS)，`tests/exp11-action-methods-v2232.js` (38/38 PASS)，`tests/exp12-labor-schedule-v2232.js` (20/20 PASS)，`tests/exp14-motive-arbitration-v2232.js` (22/22 PASS)，`tests/exp15-path-echo-v2232.js` (23/23 PASS)，`tests/exp16-tech-lineage-v2232.js` (22/22 PASS)，`tests/exp20-shared-awareness-v2232.js` (18/18 PASS)，累计 283 项严格业务与专锁断言全绿通过。零额外 npm 依赖，单一真源持久化，向后兼容既有调用契约。
