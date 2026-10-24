@@ -5636,3 +5636,11 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - 影响范围：计划、历史入口标识、决策关联与证据附件；产品源码、现有测试、配置和版本不变。
 - 业务调查：六个专项 172/0，五组探针均 observed（表示缺口已复现，不是修复通过）。未运行全量回归，未做真实宿主/手机验收。
 - 验证与限制：编号/链接/工时/范围检查及笔记校验复跑见规划交付；笔记树既有四条坏链接与旧格式失败保留并对比，不宣称全树全绿。本次不把规划写成十八项已实施。
+
+### R-WP-A1-20261024 · A包第1个工作日切片（行动桌、行动方法真实兑现、统一日历排班）
+- 做了：
+  1. `engines/labor-schedule.js`（WP-3）：消除孤立的 `currentDay`，改为基于 `playtime.story().dayIndex` 与 `store.clock.dayIndex` 单一时钟真源；`advanceDay()` 联合推进 `WA.calendar.setClock`，保持世界日历时钟强一致；新增现场劳动旅行排他拦截（处于 `traveling` / `on_the_road` / `transit` 的人物预约时返回 `person-traveling` 拒收）。
+  2. `engines/action-desk.js`（WP-1）：接通完整生产动作映射（`resume`、`pause`、`deliver`、`cancel`、`resupply`）；修复 `fromProduction` 状态分流，暂停单映射为 `prepare` 状态下的 `production.resume`（杜绝推进误导），完工单映射为 `ready` 状态下的 `production.deliver`（闭环交付路径）；执行计划返回建议后续动作 `nextActions`。
+  3. `engines/action-methods.js`（WP-2）：内置 `task:production_craft` 与 `task:facility_repair` 任务与具体方法；支持 `opId` 执行幂等（防止重复扣除工具耐久）；真实兑现目标结算（`WA.gear.repair` 耐久恢复、`WA.production.advance` 真实推进进度、`WA.aftermathImpact.commissionRepair`）；支持 `strictTarget` 模式在目标缺失时防御性拒收。
+  4. `tests/test-wp-a1-integration.js`：新建集成测试套件，覆盖日历时钟推进同步、旅行状态排他阻断、工单暂停/复工/交付闭环、物件维修耐久恢复、执行幂等性以及真实工单推进等 6 大集成用例（6/6 全绿）。
+- 验证：`tests/test-wp-a1-integration.js` (6/6 PASS)，`tests/exp12-labor-schedule-v2232.js` (20/20 PASS)，`tests/exp10-action-desk-v2232.js` (35/35 PASS)，`tests/exp11-action-methods-v2232.js` (38/38 PASS)，累计 99 项断言全部通过。零额外依赖，单一真源持久化，向后兼容既有调用契约。

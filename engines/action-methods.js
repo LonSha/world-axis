@@ -85,6 +85,58 @@
           desc: '熟练手法配合完好工具，快速精准修复且工具损耗轻微'
         }
       ]
+    },
+    'task:production_craft': {
+      id: 'task:production_craft',
+      name: '工单加工',
+      ability: '生产',
+      gearKind: '工具',
+      methods: [
+        {
+          id: 'careful_craft',
+          name: '规范精心打磨',
+          minStage: 1,
+          requireGear: true,
+          wear: 1,
+          path: 'path:careful_craft',
+          desc: '规范打磨工序，工具轻微磨损，进度稳定前进'
+        },
+        {
+          id: 'rush_job',
+          name: '急单手工粗作',
+          minStage: 0,
+          requireGear: false,
+          wear: 0,
+          path: 'path:rush_job',
+          desc: '快速粗加工推进工期，无专业工具磨损'
+        }
+      ]
+    },
+    'task:facility_repair': {
+      id: 'task:facility_repair',
+      name: '设施抢修',
+      ability: '修理',
+      gearKind: '工具',
+      methods: [
+        {
+          id: 'standard_overhaul',
+          name: '标准工程大修',
+          minStage: 2,
+          requireGear: true,
+          wear: 2,
+          path: 'path:standard_overhaul',
+          desc: '规范工程大修排除险情，工具磨损较大'
+        },
+        {
+          id: 'emergency_brace',
+          name: '应急支护加固',
+          minStage: 0,
+          requireGear: false,
+          wear: 0,
+          path: 'path:emergency_brace',
+          desc: '简易应急加固，无需专业工具'
+        }
+      ]
     }
   };
 
@@ -212,6 +264,8 @@
     };
   }
 
+  const executedOps = {};
+
   /**
    * 提交执行：确认选用特定方法，原子扣除耐久并结算产出路径。
    * 取消选择绝不磨损（未调用 execute 即零副作用）。
@@ -220,6 +274,28 @@
     const cfg = settings();
     if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
     const o = opts || {};
+    const opId = clean(o.opId, 80);
+    // 幂等防重：同一操作标识如果已执行，直接返回先前结果，不重复扣除耐久或重复推进
+    if (opId && executedOps[opId]) {
+      return Object.assign({}, executedOps[opId], { idempotent: true, repeated: true });
+    }
+
+    // 目标预校验 (Target Validation)
+    const target = clean(o.target, 80);
+    if (o.strictTarget && target) {
+      if (taskId === 'task:production_craft') {
+        const jobs = (WA.production && typeof WA.production.list === 'function') ? (WA.production.list() || []) : [];
+        const job = jobs.filter(function (x) { return x && x.id === target; })[0];
+        if (!job) return { ok: false, reason: 'target-order-not-found', target: target };
+        if (job.status === 'paused') return { ok: false, reason: 'target-order-paused', target: target };
+      } else if (taskId === 'task:repair' || taskId === 'task:gear_repair') {
+        const items = (WA.gear && typeof WA.gear.view === 'function') ? ((WA.gear.view().items) || []) : [];
+        const it = items.filter(function (x) { return x && x.id === target; })[0];
+        if (!it) return { ok: false, reason: 'target-not-found', target: target };
+        if (it.durability >= (it.maxDurability || 10)) return { ok: false, reason: 'target-already-full', target: target };
+      }
+    }
+
     const evalRes = evaluate(taskId, who, o);
     if (!evalRes.ok) return evalRes;
 
@@ -249,10 +325,24 @@
       }
     }
 
+    // 目标真实兑现 (Target Realization)
+    let targetResult = null;
+    if (target) {
+      if (taskId === 'task:production_craft' && WA.production && typeof WA.production.advance === 'function') {
+        const advDays = chosen.methodId === 'rush_job' ? 1 : 1;
+        targetResult = WA.production.advance(target, { days: advDays });
+      } else if ((taskId === 'task:repair' || taskId === 'task:gear_repair') && WA.gear && typeof WA.gear.repair === 'function') {
+        const mat = clean(o.material, 40) || '合金';
+        targetResult = WA.gear.repair(target, { by: who, material: mat, amount: num(o.materialAmount) || 1, restore: (chosen.methodId === 'expert_standard' ? 4 : 2) });
+      } else if (taskId === 'task:facility_repair' && WA.aftermathImpact && typeof WA.aftermathImpact.commissionRepair === 'function') {
+        targetResult = WA.aftermathImpact.commissionRepair(target, { who: who });
+      }
+    }
+
     stat.executed++;
     stat.lastReason = 'executed:' + chosen.path;
 
-    return {
+    const out = {
       ok: true,
       taskId: taskId,
       who: who,
@@ -263,8 +353,14 @@
       wear: chosen.wear,
       gearId: chosen.gearId,
       gearRemaining: wearResult ? wearResult.durability : null,
+      target: target || null,
+      targetResult: targetResult,
+      targetChanged: !!(targetResult && targetResult.ok),
       timestamp: clockNow('action-methods')
     };
+
+    if (opId) executedOps[opId] = out;
+    return out;
   }
 
   function statView() {

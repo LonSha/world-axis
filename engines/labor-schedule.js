@@ -43,12 +43,37 @@
   function num(v) { const n = Number(v); return (typeof n === 'number' && isFinite(n)) ? n : null; }
   function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
 
+  /**
+   * 获取当前全局统一剧情天数（单一真源）。
+   */
+  function getStoryDay() {
+    if (WA.playtime && typeof WA.playtime.story === 'function') {
+      try {
+        const s = WA.playtime.story();
+        if (s && s.ok && num(s.dayIndex) != null && num(s.dayIndex) >= 1) {
+          return Math.floor(num(s.dayIndex));
+        }
+      } catch (e) {}
+    }
+    const st = state();
+    if (st && st.clock && num(st.clock.dayIndex) != null && num(st.clock.dayIndex) >= 1) {
+      return Math.floor(num(st.clock.dayIndex));
+    }
+    if (st && st.laborSchedule && num(st.laborSchedule.currentDay) != null && num(st.laborSchedule.currentDay) >= 1) {
+      return Math.floor(num(st.laborSchedule.currentDay));
+    }
+    return 1;
+  }
+
   function ensure(draft) {
     if (!draft.laborSchedule || typeof draft.laborSchedule !== 'object' || Array.isArray(draft.laborSchedule)) {
       draft.laborSchedule = { currentDay: 1, bookings: [] };
     }
     if (!Array.isArray(draft.laborSchedule.bookings)) draft.laborSchedule.bookings = [];
-    if (num(draft.laborSchedule.currentDay) === null) draft.laborSchedule.currentDay = 1;
+    const storyDay = (draft.clock && num(draft.clock.dayIndex) != null && num(draft.clock.dayIndex) >= 1)
+      ? Math.floor(num(draft.clock.dayIndex))
+      : (num(draft.laborSchedule.currentDay) != null ? Math.floor(num(draft.laborSchedule.currentDay)) : 1);
+    draft.laborSchedule.currentDay = storyDay;
     return draft.laborSchedule;
   }
 
@@ -60,7 +85,7 @@
     if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
     const o = opts || {};
     const who = clean(o.who, 60);
-    const day = num(o.day) == null ? (state().laborSchedule ? state().laborSchedule.currentDay || 1 : 1) : Math.floor(num(o.day));
+    const day = num(o.day) == null ? getStoryDay() : Math.floor(num(o.day));
     const slot = clean(o.slot, 20);
     const task = clean(o.task, 60);
     const kind = clean(o.kind, 30) || 'work';
@@ -75,6 +100,15 @@
     }
 
     const st = state();
+    // 检查途中旅行状态（WP-3：旅行中的人物不能被预约本地现场劳动）
+    const pRecord = st.people ? (st.people['p_' + who] || st.people[who]) : null;
+    if (pRecord) {
+      const pStatus = clean(pRecord.status || pRecord.action, 30);
+      if (pStatus === 'traveling' || pStatus === 'on_the_road' || pStatus === 'transit') {
+        noteFault('person-traveling');
+        return { ok: false, reason: 'person-traveling', who: who, status: pStatus, place: pRecord.location || pRecord.place };
+      }
+    }
     const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
     const dayBookings = ls.filter(function (b) { return b && b.day === day && !b.cancelled; });
     if (dayBookings.length >= (cfg.maxBookingsPerDay || 48)) {
@@ -182,7 +216,7 @@
     const o = opts || {};
     const st = state();
     const ls = (st.laborSchedule && typeof st.laborSchedule === 'object') ? st.laborSchedule : { currentDay: 1, bookings: [] };
-    const curDay = num(o.day) == null ? (ls.currentDay || 1) : Math.floor(num(o.day));
+    const curDay = num(o.day) == null ? getStoryDay() : Math.floor(num(o.day));
     const who = clean(o.who, 60);
 
     const list = (ls.bookings || []).filter(function (b) {
@@ -212,14 +246,28 @@
     let nextDay = 1;
     WA.store.transact(function (draft) {
       const b = ensure(draft);
-      b.currentDay = (num(b.currentDay) || 1) + 1;
-      nextDay = b.currentDay;
+      const cur = (draft.clock && num(draft.clock.dayIndex) != null && num(draft.clock.dayIndex) >= 1)
+        ? Math.floor(num(draft.clock.dayIndex))
+        : (num(b.currentDay) || 1);
+      nextDay = cur + 1;
+      b.currentDay = nextDay;
+      if (draft.clock && typeof draft.clock === 'object') {
+        draft.clock.dayIndex = nextDay;
+        draft.clock.label = '第' + nextDay + '日';
+        draft.clock.source = 'labor-schedule';
+      }
       return true;
     }, 'laborSchedule:advanceDay');
 
+    if (WA.calendar && typeof WA.calendar.setClock === 'function') {
+      try {
+        WA.calendar.setClock('第' + nextDay + '日', { source: 'labor-schedule', dayIndex: nextDay });
+      } catch (e) {}
+    }
+
     stat.daysAdvanced++;
     stat.lastReason = 'advanced-to-day:' + nextDay;
-    return { ok: true, currentDay: nextDay };
+    return { ok: true, currentDay: nextDay, storyDay: nextDay };
   }
 
   function statView() {

@@ -75,6 +75,11 @@
     'production.open': function (o) { return WA.production.open({ recipe: o.recipe, by: o.who, qty: o.qty, days: o.days, facility: o.facility, place: o.place }, { label: o.label }); },
     'production.staff': function (o) { return WA.production.staff(o.orderId, o.who, { shift: o.shift }); },
     'production.advance': function (o) { return WA.production.advance(o.orderId, { days: o.days }); },
+    'production.resume': function (o) { return WA.production.resume(o.orderId, o); },
+    'production.pause': function (o) { return WA.production.pause(o.orderId, o); },
+    'production.resupply': function (o) { return WA.production.resupply(o.orderId, o); },
+    'production.deliver': function (o) { return WA.production.deliver(o.orderId, o); },
+    'production.cancel': function (o) { return WA.production.cancel(o.orderId, o); },
     'training.practice': function (o) { return WA.training.practice(o.who, o.ability, { mode: o.mode }); },
     'gear.use': function (o) { return WA.gear.use(o.itemId, { by: o.who, note: o.note }); },
     'method.execute': function (o) { return WA.actionMethods.execute(o.taskId, o.who, o.methodId, o); },
@@ -242,13 +247,20 @@
     list.slice(0, cfg.maxPerGroup).forEach(function (j) {
       if (!j || !j.id) return;
       if (j.status === 'paused') {
-        rows.push(row('production', 'production.advance:' + j.id, '继续工单 ' + clean(j.recipe, 20) + '（已暂停）',
-          'ready', '暂停中，可续作', { orderId: j.id, next: '按工期续推' }));
+        rows.push(row('production', 'production.resume:' + j.id, '复工工单 ' + clean(j.recipe, 20) + '（已暂停）',
+          'prepare', '暂停中，需先复工后才能推进', { orderId: j.id, next: '复工后按工期推进' }));
       } else if (j.status === 'running') {
         const needMore = (num(j.done) || 0) < (num(j.days) || 0);
-        rows.push(row('production', 'production.advance:' + j.id, '推进 ' + clean(j.recipe, 20) + '（' + (num(j.done) || 0) + '/' + (num(j.days) || 1) + ' 天）',
-          needMore ? 'ready' : 'blocked', needMore ? '可按工期推进' : '工期已满，待交付',
-          { orderId: j.id, next: needMore ? '推进一步' : '交付' }));
+        if (needMore) {
+          rows.push(row('production', 'production.advance:' + j.id, '推进 ' + clean(j.recipe, 20) + '（' + (num(j.done) || 0) + '/' + (num(j.days) || 1) + ' 天）',
+            'ready', '可按工期推进', { orderId: j.id, next: '推进一步' }));
+        } else {
+          rows.push(row('production', 'production.deliver:' + j.id, '交付工单 ' + clean(j.recipe, 20) + '（已满期）',
+            'ready', '工期已满，可交付', { orderId: j.id, next: '交付' }));
+        }
+      } else if (j.status === 'done') {
+        rows.push(row('production', 'production.deliver:' + j.id, '交付工单 ' + clean(j.recipe, 20) + '（已完工）',
+          'ready', '工期已满，可交付', { orderId: j.id, next: '交付' }));
       } else {
         rows.push(row('production', 'production.view:' + j.id, '工单 ' + clean(j.recipe, 20) + ' 已' + j.status,
           'blocked', '非在产状态', { orderId: j.id, status: j.status }));
@@ -364,7 +376,21 @@
     }
     let out = null;
     try { out = fn(o); } catch (e) { noteFault('route-threw'); return { ok: false, reason: 'route-threw', action: key }; }
-    if (out && out.ok) { stat.planned++; stat.byKind[key] = (stat.byKind[key] || 0) + 1; stat.lastReason = key; }
+    if (out && out.ok) {
+      stat.planned++;
+      stat.byKind[key] = (stat.byKind[key] || 0) + 1;
+      stat.lastReason = key;
+      if (!out.nextActions) {
+        if (key === 'production.open') out.nextActions = ['production.staff', 'production.advance'];
+        else if (key === 'production.resupply') out.nextActions = ['production.resume', 'production.advance'];
+        else if (key === 'production.resume') out.nextActions = ['production.advance'];
+        else if (key === 'production.advance') {
+          out.nextActions = (out.job && out.job.status === 'delivered') ? ['production.open'] : ['production.advance', 'production.deliver'];
+        } else if (key === 'production.deliver') out.nextActions = ['production.open', 'schedule.claim'];
+        else if (key === 'research.supply') out.nextActions = ['research.advance'];
+        else if (key === 'research.advance') out.nextActions = (out.status === 'confirmed') ? ['production.open'] : ['research.advance', 'research.supply'];
+      }
+    }
     else { stat.refused++; if (out && out.reason) stat.faults[out.reason] = (stat.faults[out.reason] || 0) + 1; }
     return out || { ok: false, reason: 'owner-unavailable', action: key };
   }
