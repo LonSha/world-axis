@@ -871,6 +871,7 @@
 
       // 5. 容量挤出对偶保护
       if (WA.evict && WA.evict.array) {
+        WA.evict.array(b.encounters, 'livingWorld.encounters');
         WA.evict.array(b.livingTraces, 'livingWorld.livingTraces');
         WA.evict.array(b.npcMovements, 'livingWorld.npcMovements');
         WA.evict.array(b.intersections, 'livingWorld.intersections');
@@ -878,6 +879,9 @@
         WA.evict.array(b.vignettes, 'livingWorld.vignettes');
         WA.evict.array(b.ripples, 'livingWorld.ripples');
         WA.evict.array(b.relationalDebts, 'livingWorld.relationalDebts');
+      }
+      if (WA.evict && WA.evict.object) {
+        WA.evict.object(b.characterStates, 'livingWorld.characterStates', Object.keys(b.characterStates));
       }
 
       return true;

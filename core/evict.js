@@ -76,7 +76,7 @@
     'memory.foreshadows': { path: 'memory.foreshadows', cap: 30,  why: '伏笔生命周期（终态回收后兜底）' },
     'memory.pmem':        { path: 'memory.pmem',        cap: 60,  why: '人物主观记忆总量' },
     // v2.234.0 (Living World V5.1): 角色生活状态（行囊、生理负荷、职业作息）
-    'livingWorld.characterStates': { path: 'livingWorld.characterStates', cap: 48, why: '角色微观生活状态（生计行囊/生理负荷/职业）' },
+    'livingWorld.characterStates': { path: 'livingWorld.characterStates', kind: 'object', cap: 48, why: '角色微观生活状态（生计行囊/生理负荷/职业）' },
     'elsewhere.rows':      { path: 'elsewhere.rows',      cap: 48, why: '幕后档案环形（FIFO 挤出最旧卡）' },
     'livingWorld.encounters':   { path: 'livingWorld.encounters',   cap: 32, why: '玩家与NPC偶遇记录环形' },
     'livingWorld.livingTraces': { path: 'livingWorld.livingTraces', cap: 32, why: '地点残留生活痕迹环形' },

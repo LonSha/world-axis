@@ -1593,7 +1593,7 @@
     //   ⚠ 本表与 core/evict.js 的 SITES 表**同名同值逐键对账**（G18）：
     //   任一侧单边增长，evict.array 会走 unknown-site 静默失败。
     'elsewhere.rows': { cap: 48, site: "elsewhere.js evict.array(rows, \"elsewhere.rows\")" },
-    'livingWorld.characterStates': { cap: 48, site: 'living-world.js evict.array(characterStates, "livingWorld.characterStates")' },
+    'livingWorld.characterStates': { cap: 48, kind: 'object', site: 'living-world.js WA.evict.object(characterStates, "livingWorld.characterStates")' },
     'livingWorld.encounters': { cap: 32, site: 'living-world.js evict.array(encounters, "livingWorld.encounters")' },
     'livingWorld.livingTraces': { cap: 32, site: 'living-world.js evict.array(livingTraces, "livingWorld.livingTraces")' },
     'livingWorld.npcMovements': { cap: 48, site: 'living-world.js evict.array(npcMovements, "livingWorld.npcMovements")' },

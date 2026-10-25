@@ -2321,6 +2321,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/role-conflict.js': 'roleConflict',
     // v2.233.0 (EXV4-9): institutionalInertia -- 世代交替与制度惯性（宪章绑定/继承路径分化/文书虚置退化）
     'engines/institutional-inertia.js': 'institutionalInertia',
+    // v2.239.0 (OPV5-1): livingWorld -- 自治市井微观生态演化与真实生计流转
+    'engines/living-world.js': 'livingWorld',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',

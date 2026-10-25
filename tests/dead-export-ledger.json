@@ -3946,6 +3946,38 @@
       "tref": 1,
       "own": 11
     },
+    "livingWorld.getSettings": {
+      "reason": "self-only",
+      "detail": "engines/living-world.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/living-world.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "livingWorld.resetStat": {
+      "reason": "self-only",
+      "detail": "engines/living-world.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/living-world.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "livingWorld.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/living-world.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 1
+    },
+    "livingWorld.stat": {
+      "reason": "self-only",
+      "detail": "engines/living-world.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/living-world.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 44
+    },
     "lonshaReader.clockDateString": {
       "reason": "self-only",
       "detail": "engines/lonsha-reader.js 内部自用、外部零引用（过度导出）",
@@ -8294,6 +8326,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 485
+    "dataOnly": 486
   }
 }
