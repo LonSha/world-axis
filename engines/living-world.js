@@ -830,7 +830,7 @@
           if (vs.weariness >= 50) strainDescs.push('眉眼带深重疲态');
           else if (vs.weariness >= 25) strainDescs.push('略有困顿倦色');
           if (vs.hunger >= 40) strainDescs.push('唇角略显干裂');
-          if (vs.weathering >= 30) strainDescs.push('衣袖袍角落着风尘微粒');
+          if (vs.weathering >= 30) strainDescs.push('衣物下摆染着奔波留下的风尘痕迹');
           if (strainDescs.length > 0) desc += '；神态「' + strainDescs.join('，') + '」';
         }
 
