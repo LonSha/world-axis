@@ -135,10 +135,73 @@
     });
     return '[情绪通道]\n' + lines.join('\n') + '\n通道给出的是动作，不是情绪词；过载时退回已登记的那一个动作，不新造行为。\n';
   }
+  /**
+   * EXV5-3: 深层心理创伤印记动力学（imprintTrauma & checkTraumaTrigger）
+   * 经历重大灾变事件（disaster, betrayal, torture, death）留下不可逆创伤印记，特定诱因触发不可控应激反应
+   */
+  function imprintTrauma(person, traumaType, triggerKey, behavioralConstraint) {
+    const who = clean(person, 40);
+    const type = clean(traumaType, 30);
+    const trigger = clean(triggerKey, 40);
+    const constraint = clean(behavioralConstraint, 80);
+    if (!who || !type || !trigger) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      draft.affect = draft.affect && typeof draft.affect === 'object' && !Array.isArray(draft.affect) ? draft.affect : { channels: [], loads: {} };
+      draft.affect.traumas = draft.affect.traumas || {};
+      draft.affect.traumas[who] = draft.affect.traumas[who] || [];
+
+      const entry = {
+        id: 'trm_' + Math.random().toString(36).substring(2, 8),
+        type: type,
+        trigger: trigger,
+        constraint: constraint || '骤然失语、身形僵硬避开冲突',
+        severity: 3,
+        createdAt: clockNow('affect:trauma')
+      };
+      draft.affect.traumas[who].push(entry);
+      if (draft.affect.traumas[who].length > 5) draft.affect.traumas[who].shift();
+
+      out = { ok: true, person: who, trauma: entry };
+      return true;
+    }, 'affect:imprintTrauma');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function checkTraumaTrigger(person, contextTrigger) {
+    const who = clean(person, 40);
+    const trig = clean(contextTrigger, 40);
+    if (!who || !trig) return { ok: false, reason: 'missing-fields' };
+
+    const st = state();
+    const traumas = (st.affect && st.affect.traumas && Array.isArray(st.affect.traumas[who])) ? st.affect.traumas[who] : [];
+    const matched = traumas.filter(function (t) {
+      return t && (t.trigger === trig || trig.indexOf(t.trigger) >= 0 || (t.trigger && trig && t.trigger.indexOf(trig) >= 0));
+    });
+
+    if (matched.length === 0) {
+      return { ok: true, triggered: false, person: who };
+    }
+
+    const t = matched[0];
+    return {
+      ok: true,
+      triggered: true,
+      person: who,
+      traumaType: t.type,
+      trigger: t.trigger,
+      constraint: t.constraint,
+      actionBlock: '【创伤印记触发应激】：因遭遇「' + t.trigger + '」，触发深层「' + t.type + '」创伤，行为被迫受限：' + t.constraint
+    };
+  }
+
   WA.affect = {
     WORDS: WORDS.slice(), LOADS: LOADS.slice(),
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     setChannel: setChannel, setLoad: setLoad, channel: channel,
+    imprintTrauma: imprintTrauma, checkTraumaTrigger: checkTraumaTrigger,
     buildBlock: buildBlock, stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

@@ -10,9 +10,9 @@
 | **OPV5-1** | 局部生态涟漪向宏观势力戒备汇流 | `livingWorld` + `evolution` | 微观危机传导势力警戒（`vigilance`）与状态瓦解 | **已交付** | `v2.239.0` / `tests/v5-op-1-2-3.js` |
 | **OPV5-2** | 人情势能债务在行动桌的折现兑付 | `livingWorld` + `actionDesk` | 恩义与把柄出示扣除突破交涉阻力，守恒校验 | **已交付** | `v2.239.0` / `tests/v5-op-1-2-3.js` |
 | **OPV5-3** | 空间痕迹主动伪造与调查系统闭环 | `livingWorld` + `investigation` + `actionDesk` | 现场物理留痕擦除/伪造覆盖，调查系统直接提取留痕为线索与证据 | **已交付** | `v2.239.0` / `tests/v5-op-1-2-3.js` |
-| **OPV5-4** | 多梯队阶梯物价与黑市溢价传导 | `livingWorld` + `economy` + `recipe` | 灾荒/断供驱动基础物价跳档与黑市倍率，影响NPC代谢与玩家购买 | 待推进 | 待推进 |
-| **OPV5-5** | 生理磨损与健康系统全面并轨 | `livingWorld` + `health` + `life` | 饥渴/疲惫/风化向生病、负伤与失能深度转化，排期迫停 | 待推进 | 待推进 |
-| **OPV5-6** | 久别重逢心理重力交织三轴 | `livingWorld` + `affect` + `bonds` | 离散轮次、恩义欠负与猜疑裂痕三轴加权，重逢寒暄多维潜台词 | 待推进 | 待推进 |
+| **OPV5-4** | 多梯队阶梯物价与黑市溢价传导 | `livingWorld` + `economy` + `recipe` | 灾荒/断供驱动基础物价跳档与黑市倍率，影响NPC代谢与玩家购买 | 已完成 | `v2.240.0` (tests/v5-op-4-5-6.js) |
+| **OPV5-5** | 生理磨损与健康系统全面并轨 | `livingWorld` + `health` + `life` | 饥渴/疲惫/风化向生病、负伤与失能深度转化，排期迫停 | 已完成 | `v2.240.0` (tests/v5-op-4-5-6.js) |
+| **OPV5-6** | 久别重逢心理重力交织三轴 | `livingWorld` + `affect` + `bonds` | 离散轮次、恩义欠负与猜疑裂痕三轴加权，重逢寒暄多维潜台词 | 已完成 | `v2.240.0` (tests/v5-op-4-5-6.js) |
 | **OPV5-7** | 多维情境感官与空间微气候融合 | `livingWorld` + `weather` + `sceneNarrative` | 极端天气阻力、泥泞/积雪环境减速与感官白描正文强注入 | 已完成 | `v2.241.0` (tests/v5-op-7-8-9.js) |
 | **OPV5-8** | 长时作息时间积分散步与体力恢复 | `livingWorld` + `laborSchedule` + `chrono` | 长跨度跳过时的体力按阶梯积分衰减与自愈结算，杜绝瞬间满血 | 已完成 | `v2.241.0` (tests/v5-op-7-8-9.js) |
 | **OPV5-9** | 正文全景叙事透镜动态剪裁机制 | `livingWorld` + `injectBudget` + `prompt` | 根据上下文预算动态剪裁最迫切的生活细节与动机冲突，杜绝臃肿 | 已完成 | `v2.241.0` (tests/v5-op-7-8-9.js) |
@@ -22,9 +22,9 @@
 ## 拓展创新九项（EXV5-1 ～ EXV5-9）
 | 序号 | 任务名称 | 目标模块 | 核心机制与消费闭环 | 状态 | 交付版本与凭据 |
 |---|---|---|---|---|---|
-| **EXV5-1** | 流言拓扑变异与恐慌放大引擎 | `engines/rumor.js` + `livingWorld` | 市井传闻在转述链中发生信息失真、夸大与恐慌指数倍增 | 待推进 | 待推进 |
-| **EXV5-2** | 据点暴露度与安全屋废弃机制 | `engines/operations.js` + `livingWorld` | 频繁出入导致地点暴露度攀升，迫使弃用与紧急转移 | 待推进 | 待推进 |
-| **EXV5-3** | 深层心理创伤印记动力学 | `engines/affect.js` + `epistemicView` | 经历重大灾变留下不可逆创伤标签，特定场景触发应激反应 | 待推进 | 待推进 |
+| **EXV5-1** | 流言拓扑变异与恐慌放大引擎 | `engines/rumor.js` + `livingWorld` | 市井传闻在转述链中发生信息失真、夸大与恐慌指数倍增 | 已完成 | `v2.242.0` (tests/v5-ex-1-2-3.js) |
+| **EXV5-2** | 据点暴露度与安全屋废弃机制 | `engines/operations.js` + `livingWorld` | 频繁出入导致地点暴露度攀升，迫使弃用与紧急转移 | 已完成 | `v2.242.0` (tests/v5-ex-1-2-3.js) |
+| **EXV5-3** | 深层心理创伤印记动力学 | `engines/affect.js` + `epistemicView` | 经历重大灾变留下不可逆创伤标签，特定场景触发应激反应 | 已完成 | `v2.242.0` (tests/v5-ex-1-2-3.js) |
 | **EXV5-4** | 官僚汇报时滞与避责虚报机制 | `engines/institutionalInertia.js` + `evolution` | 下层向宏观势力层层汇报产生轮次时滞与文书粉饰修饰 | 待推进 | 待推进 |
 | **EXV5-5** | 影子配给与黑市地下交换网络 | `engines/freight.js` + `livingWorld` | 官方物资匮乏时衍生地下配给代币与隐蔽物资流通暗流 | 待推进 | 待推进 |
 | **EXV5-6** | 因果溯源与追责纠缠决策树 | `engines/causal.js` + `aftermathImpact` | 事故发生后多方沿决策链顺藤摸瓜调查责任方，锁定追责嫌疑 | 待推进 | 待推进 |

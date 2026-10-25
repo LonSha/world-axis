@@ -674,6 +674,27 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.242.0 (EXV5-1): 流言拓扑变异与恐慌放大
+    'rumor.mutateAndAmplify': function (o) {
+      if (WA.rumor && typeof WA.rumor.mutateAndAmplify === 'function') {
+        return WA.rumor.mutateAndAmplify(o.text || o.rumor, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.242.0 (EXV5-2): 据点暴露度与安全屋废弃
+    'operations.trackSafehouseExposure': function (o) {
+      if (WA.operations && typeof WA.operations.trackSafehouseExposure === 'function') {
+        return WA.operations.trackSafehouseExposure(o.id || o.safehouseId, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.242.0 (EXV5-3): 创伤印记与应激核验
+    'affect.checkTraumaTrigger': function (o) {
+      if (WA.affect && typeof WA.affect.checkTraumaTrigger === 'function') {
+        return WA.affect.checkTraumaTrigger(o.person || o.who, o.trigger || o.contextTrigger);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
     },

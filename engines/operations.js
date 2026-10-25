@@ -506,9 +506,71 @@
       faults: Object.assign({}, _stat.faults) };
   }
 
+  /**
+   * EXV5-2: 据点暴露度与安全屋废弃机制（trackSafehouseExposure）
+   * 记录据点出入频次与异常事件，计算暴露度；超过临界值触发弃用与撤离状态
+   */
+  function trackSafehouseExposure(safehouseId, options) {
+    const sid = clean(safehouseId, 60);
+    if (!sid) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    const opts = options || {};
+    const visits = Math.max(0, Number(opts.visits) || 1);
+    const incidentSeverity = Math.max(0, Number(opts.incidentSeverity) || 0); // 0-10
+    const place = clean(opts.place, 60) || '秘密据点';
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      draft.operations = draft.operations || {};
+      draft.operations.safehouses = draft.operations.safehouses || {};
+      const sh = draft.operations.safehouses[sid] = draft.operations.safehouses[sid] || {
+        id: sid,
+        place: place,
+        visits: 0,
+        exposure: 0,
+        status: 'secure', // 'secure', 'compromised', 'abandoned'
+        history: []
+      };
+
+      sh.visits += visits;
+      // 每次访问累积暴露度（+5），突发事件按严重度剧烈提升（每级+12）
+      const addedExposure = visits * 5 + incidentSeverity * 12;
+      sh.exposure = Math.min(100, (sh.exposure || 0) + addedExposure);
+
+      if (sh.exposure >= 80) {
+        sh.status = 'abandoned';
+      } else if (sh.exposure >= 45) {
+        sh.status = 'compromised';
+      } else {
+        sh.status = 'secure';
+      }
+
+      sh.history.push({
+        at: clockNow('operations:exposure'),
+        visits: visits,
+        incidentSeverity: incidentSeverity,
+        exposure: sh.exposure,
+        status: sh.status
+      });
+      if (sh.history.length > 10) sh.history.shift();
+
+      out = {
+        ok: true,
+        id: sid,
+        place: place,
+        visits: sh.visits,
+        exposure: sh.exposure,
+        status: sh.status,
+        shouldEvacuate: sh.status === 'abandoned' || sh.status === 'compromised',
+        note: sh.status === 'abandoned' ? '据点已彻底暴露，必须立刻弃用撤离！' : (sh.status === 'compromised' ? '据点受到怀疑，应减少出入' : '据点目前安全隐蔽')
+      };
+      return true;
+    }, 'operations:trackSafehouseExposure');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
   // ── 12. reset ──
   function reset() { _stat.enacted = 0; _stat.disbursed = 0; _stat.settled = 0; _stat.handedOver = 0; _stat.cancelled = 0; _stat.refused = 0; _stat.lastReason = ''; _stat.faults = {}; return { ok: true }; }
-
   WA.operations = {
     getSettings: getSettings,
     setSettings: function (patch) { return setSettings(patch); },
@@ -520,15 +582,16 @@
     pending: pending,
     view: view,
     cancel: cancel,
+    trackSafehouseExposure: trackSafehouseExposure,
     buildBlock: buildBlock,
     diagnose: diagnose,
     stat: stat,
     reset: reset
   };
   // 导出面自证：本模块的出口面是**冻结**的（新增导出必须同批改这个常量，否则装载即抛
-  //   —— 防「成员被悄悄改名/删掉、调用方静默降级」。v2.194.0（U2）链面接线**不改出口面**：14）。
-  var EXPORT_COUNT = 14;
+  //   —— 防「成员被悄悄改名/删掉、调用方静默降级」。v2.242.0（EXV5-2）增加 trackSafehouseExposure：15）。
+  var EXPORT_COUNT = 15;
   var _exported = Object.keys(WA.operations).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('operations: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/operations.js', { kind: 'engine', ver: '2.194.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/operations.js', { kind: 'engine', ver: '2.242.0' });
 })();

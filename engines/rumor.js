@@ -520,6 +520,56 @@
     };
   }
 
+  /**
+   * EXV5-1: 流言拓扑变异与恐慌放大引擎（mutateAndAmplify）
+   * 模拟市井流言在人际转述拓扑中的突变、信息失真与群体恐慌倍增
+   */
+  function mutateAndAmplify(rumorText, topologyOpts) {
+    const txt = clean(rumorText, 160);
+    if (!txt) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    const opts = topologyOpts || {};
+    const hops = Math.max(1, Math.min(10, Number(opts.hops) || 3));
+    const density = clean(opts.density, 20) || 'crowded'; // 'crowded', 'sparse', 'isolated'
+    const initialPanic = Math.max(0, Math.min(100, Number(opts.initialPanic) || 10));
+
+    // 密度与跳数决定突变失真率与恐慌放大系数
+    let distortionRatePerHop = density === 'crowded' ? 0.25 : (density === 'sparse' ? 0.12 : 0.05);
+    let panicMultiplierPerHop = density === 'crowded' ? 1.45 : (density === 'sparse' ? 1.2 : 1.05);
+
+    let currentFidelity = 1.0;
+    let currentPanic = initialPanic;
+    const variants = [txt];
+
+    for (let h = 1; h <= hops; h++) {
+      currentFidelity = Math.max(0.1, currentFidelity - distortionRatePerHop);
+      currentPanic = Math.min(100, Math.round(currentPanic * panicMultiplierPerHop));
+      if (h === 1) {
+        variants.push('听闻' + txt);
+      } else if (h === 2) {
+        variants.push('确凿风声传说「' + txt + '」已势不可挡');
+      } else if (h >= 3) {
+        variants.push('全城惊惶喧腾：「' + txt + '！大难临头！」');
+      }
+    }
+
+    const isHysteria = currentPanic >= 75;
+    const mutatedText = variants[variants.length - 1];
+
+    stat.sets = (stat.sets || 0) + 1;
+    return {
+      ok: true,
+      originalText: txt,
+      mutatedText: mutatedText,
+      hops: hops,
+      density: density,
+      fidelity: Number(currentFidelity.toFixed(2)),
+      panicIndex: currentPanic,
+      hysteriaAlert: isHysteria,
+      mutationChain: variants,
+      note: '流言在人际拓扑中完成失真与恐慌放大'
+    };
+  }
+
   WA.rumor = {
     LAYERS: LAYERS, MOTIVES: MOTIVES, PUBLIC_LAYERS: PUBLIC_LAYERS, LAYER_LEVEL: LAYER_LEVEL,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
@@ -527,6 +577,7 @@
     investigate: investigate, visibleTo: visibleTo, fullView: fullView, buildBlock: buildBlock,
     competeForAttention: competeForAttention,
     propagateAcrossRegions: propagateAcrossRegions,
+    mutateAndAmplify: mutateAndAmplify,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();
