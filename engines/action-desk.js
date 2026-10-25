@@ -601,9 +601,12 @@
     },
     'livingWorld.registerRoutine': function (o) {
       if (typeof WA.livingWorld.registerRoutine === 'function') {
-        return WA.livingWorld.registerRoutine(o.name, o.routine);
+        return WA.livingWorld.registerRoutine(o.name, o.routine, o.occupation);
       }
       return { ok: false, reason: 'unsupported' };
+    },
+    'livingWorld.occupationalRoutines': function () {
+      return (WA.livingWorld && WA.livingWorld.OCCUPATIONAL_ROUTINES) ? Object.assign({}, WA.livingWorld.OCCUPATIONAL_ROUTINES) : {};
     },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
