@@ -13,9 +13,9 @@
 | **OPV5-4** | 多梯队阶梯物价与黑市溢价传导 | `livingWorld` + `economy` + `recipe` | 灾荒/断供驱动基础物价跳档与黑市倍率，影响NPC代谢与玩家购买 | 待推进 | 待推进 |
 | **OPV5-5** | 生理磨损与健康系统全面并轨 | `livingWorld` + `health` + `life` | 饥渴/疲惫/风化向生病、负伤与失能深度转化，排期迫停 | 待推进 | 待推进 |
 | **OPV5-6** | 久别重逢心理重力交织三轴 | `livingWorld` + `affect` + `bonds` | 离散轮次、恩义欠负与猜疑裂痕三轴加权，重逢寒暄多维潜台词 | 待推进 | 待推进 |
-| **OPV5-7** | 多维情境感官与空间微气候融合 | `livingWorld` + `weather` + `sceneNarrative` | 极端天气阻力、泥泞/积雪环境减速与感官白描正文强注入 | 待推进 | 待推进 |
-| **OPV5-8** | 长时作息时间积分散步与体力恢复 | `livingWorld` + `laborSchedule` + `chrono` | 长跨度跳过时的体力按阶梯积分衰减与自愈结算，杜绝瞬间满血 | 待推进 | 待推进 |
-| **OPV5-9** | 正文全景叙事透镜动态剪裁机制 | `livingWorld` + `injectBudget` + `prompt` | 根据上下文预算动态剪裁最迫切的生活细节与动机冲突，杜绝臃肿 | 待推进 | 待推进 |
+| **OPV5-7** | 多维情境感官与空间微气候融合 | `livingWorld` + `weather` + `sceneNarrative` | 极端天气阻力、泥泞/积雪环境减速与感官白描正文强注入 | 已完成 | `v2.241.0` (tests/v5-op-7-8-9.js) |
+| **OPV5-8** | 长时作息时间积分散步与体力恢复 | `livingWorld` + `laborSchedule` + `chrono` | 长跨度跳过时的体力按阶梯积分衰减与自愈结算，杜绝瞬间满血 | 已完成 | `v2.241.0` (tests/v5-op-7-8-9.js) |
+| **OPV5-9** | 正文全景叙事透镜动态剪裁机制 | `livingWorld` + `injectBudget` + `prompt` | 根据上下文预算动态剪裁最迫切的生活细节与动机冲突，杜绝臃肿 | 已完成 | `v2.241.0` (tests/v5-op-7-8-9.js) |
 
 ---
 

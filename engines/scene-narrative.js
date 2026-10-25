@@ -622,6 +622,15 @@
     var idleStatus = isIdle ? 'nothing_to_do' : 'active';
     var idleText = isIdle ? '此处风平浪静，暂无紧急待办或即刻行动' : '场景中有正在展开的事件、工程或待办行动';
 
+    // 7. OPV5-7: 空间微气候与情境感知
+    var microclimate = null;
+    if (WA.weather && typeof WA.weather.getMicroclimate === 'function') {
+      try {
+        var mcRes = WA.weather.getMicroclimate(place, { indoor: o.indoor, terrain: o.terrain });
+        if (mcRes && mcRes.ok) microclimate = mcRes;
+      } catch (e) {}
+    }
+
     _stat.scenes++;
     return {
       ok: true,
@@ -635,6 +644,7 @@
       blockedActions: blockedActions,
       jointProjects: jointProjects,
       sceneEchoes: traceCausalEchoes(place, viewer, o),
+      microclimate: microclimate,
       idleStatus: idleStatus,
       idleText: idleText,
       hasPending: !isIdle,

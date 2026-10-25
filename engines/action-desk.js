@@ -660,6 +660,20 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.241.0 (OPV5-7): 空间微气候与环境阻力查询
+    'weather.getMicroclimate': function (o) {
+      if (WA.weather && typeof WA.weather.getMicroclimate === 'function') {
+        return WA.weather.getMicroclimate(o.place, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.241.0 (OPV5-8): 长时作息时间积分散步与体力自愈结算
+    'livingWorld.integrateLongRest': function (o) {
+      if (typeof WA.livingWorld.integrateLongRest === 'function') {
+        return WA.livingWorld.integrateLongRest(o.name || o.who, o.elapsedHours || o.hours, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
     },

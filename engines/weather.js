@@ -127,10 +127,77 @@
     return out + '\n';
   }
 
+  /**
+   * OPV5-7: 空间微气候与环境阻力融合（getMicroclimate）
+   * 结合基础天气、季节与地形微环境（如低洼、风口、室内），输出物理阻力倍率、移动减速（mud/snow/heat）与感官白描标签
+   */
+  function getMicroclimate(place, options) {
+    const pl = clean(place, 40);
+    if (!pl) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    const opts = options || {};
+    const baseW = weatherOf(pl);
+    const sea = season();
+    const kind = baseW.ok ? baseW.kind : 'clear';
+    const indoor = !!opts.indoor;
+    const terrain = clean(opts.terrain, 20) || 'open'; // open, lowlying, mountain, alley, harbor
+
+    let dragMultiplier = 1.0;
+    const sensoryTags = [];
+    let mobilityPenalty = 0; // 额外耗时百分比
+
+    if (indoor) {
+      dragMultiplier = 1.0;
+      sensoryTags.push('室内避风');
+      if (kind === 'storm' || kind === 'rain') {
+        sensoryTags.push('檐下听雨声晦暗');
+      } else if (kind === 'heat') {
+        sensoryTags.push('室内燥热气滞');
+      }
+    } else {
+      if (kind === 'rain') {
+        dragMultiplier = terrain === 'lowlying' ? 1.8 : 1.4;
+        mobilityPenalty = terrain === 'lowlying' ? 40 : 20;
+        sensoryTags.push('泥泞深陷', '衣履湿透寒浸');
+      } else if (kind === 'storm') {
+        dragMultiplier = 2.2;
+        mobilityPenalty = 60;
+        sensoryTags.push('暴雨扑面难辨前路', '狂风掀揭雨具');
+      } else if (kind === 'snow') {
+        dragMultiplier = terrain === 'mountain' ? 2.5 : 1.7;
+        mobilityPenalty = terrain === 'mountain' ? 70 : 35;
+        sensoryTags.push('积雪没胫滞涩难行', '呵气成霜刺骨寒');
+      } else if (kind === 'heat') {
+        dragMultiplier = 1.3;
+        mobilityPenalty = 15;
+        sensoryTags.push('酷暑焦灼气浪翻滚', '尘土微扬口干舌燥');
+      } else if (kind === 'fog') {
+        dragMultiplier = 1.25;
+        mobilityPenalty = 20;
+        sensoryTags.push('浓雾锁道视野丈余', '湿气凝睫辨向迟疑');
+      } else {
+        dragMultiplier = 1.0;
+        sensoryTags.push('天色如常行止自若');
+      }
+    }
+
+    return {
+      ok: true,
+      place: pl,
+      weather: kind,
+      season: sea.ok ? sea.season : 'unknown',
+      indoor: indoor,
+      terrain: terrain,
+      dragMultiplier: Number(dragMultiplier.toFixed(2)),
+      mobilityPenalty: mobilityPenalty,
+      sensoryTags: sensoryTags
+    };
+  }
+
   WA.weather = {
     WEATHERS: WEATHERS, SEASONS: SEASONS, FACTOR: FACTOR,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     season: season, setWeather: setWeather, weatherOf: weatherOf, effect: effect, travelMinutes: travelMinutes,
+    getMicroclimate: getMicroclimate,
     // v2.138.0（E7）：地点清单读口。只读、不推进、只报名字 —— 见函数定义处的理由。
     places: places,
     buildBlock: buildBlock, stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }

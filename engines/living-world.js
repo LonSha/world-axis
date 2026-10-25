@@ -558,11 +558,71 @@
       if (p.profile.memory.length > 25) {
         p.profile.memory.shift();
       }
-
-      stat.memoriesConsolidated++;
       out = { ok: true, name: nm, memory: mem };
       return true;
     }, 'livingWorld:consolidateLivingMemory');
+    return out || refuse('tx-failed');
+  }
+
+  /**
+   * OPV5-8: 长时作息时间积分散步与体力恢复（integrateLongRest）
+   * 处理跳过数个时段或长休后的阶梯积分衰减与体力自愈结算，杜绝瞬间满血
+   */
+  function integrateLongRest(name, elapsedHours, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const nm = cleanStr(name, 40);
+    const hrs = typeof elapsedHours === 'number' ? Math.max(0, elapsedHours) : 0;
+    if (!nm) return refuse('missing-name');
+    if (hrs <= 0) return { ok: true, name: nm, elapsedHours: 0, recovered: { weariness: 0, hungerDelta: 0 } };
+    const options = opts || {};
+    const quality = options.quality || 'standard'; // standard, rough, shelter
+    let out = null;
+
+    WA.store.transact(function (draft) {
+      const b = getBucket(draft);
+      b.characterStates = b.characterStates || {};
+      const st = b.characterStates[nm] = b.characterStates[nm] || {
+        name: nm,
+        occupation: '行民',
+        vitalStrain: { weariness: 30, hunger: 20, weathering: 10 },
+        belongings: { copper: 50, provisions: 2, tools: [], keepsakes: [] },
+        absence: { roundsAway: 0, accumulatedGratitude: 0, grievances: 0 }
+      };
+      st.vitalStrain = st.vitalStrain || { weariness: 30, hunger: 20, weathering: 10 };
+
+      // 阶梯恢复率（每小时恢复疲劳， rough 恢复慢， shelter 恢复快）
+      let recoveryRatePerHour = quality === 'shelter' ? 8 : (quality === 'rough' ? 3 : 5);
+      let hungerRatePerHour = 2.5;
+
+      const oldWeariness = st.vitalStrain.weariness || 0;
+      const oldHunger = st.vitalStrain.hunger || 0;
+
+      const recoveredWeariness = Math.min(oldWeariness, Math.round(hrs * recoveryRatePerHour));
+      const addedHunger = Math.round(hrs * hungerRatePerHour);
+
+      st.vitalStrain.weariness = Math.max(0, oldWeariness - recoveredWeariness);
+      st.vitalStrain.hunger = Math.min(100, oldHunger + addedHunger);
+
+      // 如果有口粮并且饥饿大于 40，自动消耗 1 份口粮
+      let provisionsConsumed = 0;
+      if (st.belongings && st.belongings.provisions > 0 && st.vitalStrain.hunger > 40) {
+        st.belongings.provisions -= 1;
+        st.vitalStrain.hunger = Math.max(0, st.vitalStrain.hunger - 30);
+        provisionsConsumed = 1;
+      }
+
+      stat.longRestsProcessed = (stat.longRestsProcessed || 0) + 1;
+      out = {
+        ok: true,
+        name: nm,
+        elapsedHours: hrs,
+        quality: quality,
+        weariness: { before: oldWeariness, after: st.vitalStrain.weariness, recovered: recoveredWeariness },
+        hunger: { before: oldHunger, after: st.vitalStrain.hunger, provisionsConsumed: provisionsConsumed }
+      };
+      return true;
+    }, 'livingWorld:integrateLongRest');
     return out || refuse('tx-failed');
   }
 
@@ -999,38 +1059,41 @@
     return out || refuse('tx-failed');
   }
 
-  /**
-   * 正文全景叙事透镜（buildBlock）：多层次白描隐喻与潜台词注入
+/**
+   * OPV5-9: 正文全景叙事透镜动态剪裁机制（buildBlock）
+   * 根据外部预算（opts.maxTokens / opts.detailLevel）动态剪裁生活细节与动机冲突，杜绝臃肿
    */
-  function buildBlock(playerPlace) {
+  function buildBlock(playerPlace, options) {
     const cfg = settings();
     if (!cfg.enabled) return '';
+    const opts = options || {};
+    const detailLevel = opts.detailLevel || 'full'; // 'compact', 'standard', 'full'
+    const maxLines = opts.maxLines || (detailLevel === 'compact' ? 6 : (detailLevel === 'standard' ? 12 : 24));
 
     const s = WA.store ? WA.store.get() : {};
     const b = (s && s.livingWorld) ? s.livingWorld : { encounters: [], livingTraces: [], characterStates: {}, vignettes: [], intersections: [], ripples: [], relationalDebts: [] };
     const ewRows = (s && s.elsewhere && Array.isArray(s.elsewhere.rows)) ? s.elsewhere.rows : [];
-
     const lines = [];
     const currentPeriod = DAY_PERIODS[(b.tick || 0) % DAY_PERIODS.length];
     lines.push('【时节与世情运转】此刻正值' + PERIOD_LABELS[currentPeriod] + '，天地与周遭生计各按日常流转。');
 
+    // 在 compact 级别下，只提取最多 2 名角色，且只保留核心疲劳/饥饿；full 级别保留 6 名
+    const charLimit = detailLevel === 'compact' ? 2 : (detailLevel === 'standard' ? 4 : 6);
     if (ewRows.length > 0) {
       lines.push('【在场/周边人物生活实况】（角色皆有自主生计与真实生理磨损，杜绝木偶式即时刷怪）：');
-      ewRows.slice(0, 6).forEach(function (r) {
+      ewRows.slice(0, charLimit).forEach(function (r) {
         const st = (b.characterStates && b.characterStates[r.name]) || null;
         let desc = '· ' + r.name + '（身处' + (r.place || '近处') + '，身份「' + ((st && st.occupation) || '行民') + '」）：正在「' + (r.doing || '料理日常生计') + '」';
-
         if (st && st.vitalStrain) {
           const vs = st.vitalStrain;
           const strainDescs = [];
           if (vs.weariness >= 50) strainDescs.push('眉眼带深重疲态');
           else if (vs.weariness >= 25) strainDescs.push('略有困顿倦色');
           if (vs.hunger >= 40) strainDescs.push('唇角略显干裂');
-          if (vs.weathering >= 30) strainDescs.push('衣物下摆染着奔波留下的风尘痕迹');
+          if (detailLevel !== 'compact' && vs.weathering >= 30) strainDescs.push('衣物下摆染着奔波留下的风尘痕迹');
           if (strainDescs.length > 0) desc += '；神态「' + strainDescs.join('，') + '」';
         }
-
-        if (st && st.belongings) {
+        if (detailLevel !== 'compact' && st && st.belongings) {
           const bg = st.belongings;
           const bgDescs = [];
           const eco = getEconomyProfile();
@@ -1043,33 +1106,35 @@
           if (bg.keepsakes && bg.keepsakes.length > 0) bgDescs.push('妥帖收着' + bg.keepsakes.join('/'));
           if (bgDescs.length > 0) desc += '；随身行囊[' + bgDescs.join('，') + ']';
         }
-
         if (st && st.absence && st.absence.roundsAway >= 3) {
           desc += '；【久别重逢心理重力】数轮未见，神情间带久别情怯与探询';
           if (st.absence.accumulatedGratitude > 0) desc += '，暗自记着照拂恩义';
         }
-
         if (r.worry) desc += '；心头悬事：「' + r.worry + '」';
         lines.push(desc);
       });
     }
 
-    // 生活窘迫与开销微情境注入
-    const recentVignettes = (b.vignettes || []).slice(-2);
-    if (recentVignettes.length > 0) {
-      lines.push('【生活生计微情境】：');
-      recentVignettes.forEach(function (v) {
-        lines.push('· ' + v.name + '身处' + v.place + '，' + v.detail + '。');
-      });
+    // 生活窘迫与开销微情境注入（compact 下跳过）
+    if (detailLevel !== 'compact') {
+      const recentVignettes = (b.vignettes || []).slice(-2);
+      if (recentVignettes.length > 0) {
+        lines.push('【生活生计微情境】：');
+        recentVignettes.forEach(function (v) {
+          lines.push('· ' + v.name + '身处' + v.place + '，' + v.detail + '。');
+        });
+      }
     }
 
-    // NPC 横向碰撞交集与人情注入
-    const recentIntersections = (b.intersections || []).slice(-2);
-    if (recentIntersections.length > 0) {
-      lines.push('【人物间横向生活交集】：');
-      recentIntersections.forEach(function (i) {
-        lines.push('· [' + i.place + '] ' + i.summary);
-      });
+    // NPC 横向碰撞交集与人情注入（compact 下跳过）
+    if (detailLevel !== 'compact') {
+      const recentIntersections = (b.intersections || []).slice(-2);
+      if (recentIntersections.length > 0) {
+        lines.push('【人物间横向生活交集】：');
+        recentIntersections.forEach(function (i) {
+          lines.push('· [' + i.place + '] ' + i.summary);
+        });
+      }
     }
 
     // 局部生态涟漪注入
@@ -1101,9 +1166,15 @@
         lines.push('· [' + t.place + '] ' + t.trace);
       });
     }
-
     lines.push('【正文叙事法则】：角色有自己的作息、疲惫与心绪，对话与互动中须自然显露其生活痕迹、手头物什与人情牵挂，杜绝工具化响应。');
-    return lines.join('\n');
+
+    // 预算动态剪裁
+    let finalLines = lines;
+    if (finalLines.length > maxLines) {
+      finalLines = finalLines.slice(0, maxLines);
+      finalLines.push('（...更多世情细节因叙事聚焦而精炼收敛...）');
+    }
+    return finalLines.join('\n');
   }
 
   function statView() {
@@ -1142,6 +1213,7 @@
     recordRelationalDebt: recordRelationalDebt,
     redeemDebt: redeemDebt,
     getTierPrice: getTierPrice,
+    integrateLongRest: integrateLongRest,
     consolidateLivingMemory: consolidateLivingMemory,
     autonomousTick: autonomousTick,
     detectEncounters: detectEncounters,
@@ -1153,7 +1225,7 @@
   };
 
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.240.0' });
+    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.241.0' });
   }
 
   if (WA.workflow && typeof WA.workflow.register === 'function') {
