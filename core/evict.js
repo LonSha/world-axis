@@ -81,6 +81,9 @@
     'livingWorld.encounters':   { path: 'livingWorld.encounters',   cap: 32, why: '玩家与NPC偶遇记录环形' },
     'livingWorld.livingTraces': { path: 'livingWorld.livingTraces', cap: 32, why: '地点残留生活痕迹环形' },
     'livingWorld.npcMovements': { path: 'livingWorld.npcMovements', cap: 48, why: 'NPC移动与生活变动台账环形' },
+    'livingWorld.intersections': { path: 'livingWorld.intersections', cap: 32, why: 'NPC之间横向社交碰撞记录环形' },
+    'livingWorld.epistemicGaps': { path: 'livingWorld.epistemicGaps', cap: 32, why: '角色认知视界与情报时差环形' },
+    'livingWorld.vignettes':     { path: 'livingWorld.vignettes',     cap: 32, why: '市井微情境与生活窘迫事件环形' },
     'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
   // v2.231.0（拓展 EXP-1）：逐人逐能力进度行（上限与 training.maxRows 同源，见 training.js）。
   'training.rows':       { path: 'training.rows',       cap: 96, why: '能力成长逐人逐能力行' },

@@ -195,7 +195,16 @@
       demographicFlow: { migrations: [], seasonalRecords: [], pendingObligations: [], placeCapacities: {} },
       institutionalInertia: { charters: [], handovers: [], successionRecords: [] },
       // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹中枢
-      livingWorld: { tick: 0, encounters: [], livingTraces: [], npcMovements: [], characterStates: {} },
+      livingWorld: {
+        tick: 0,
+        encounters: [],
+        livingTraces: [],
+        npcMovements: [],
+        characterStates: {},
+        intersections: [],
+        epistemicGaps: [],
+        vignettes: []
+      },
       knowledgePractice: { knowledges: [], licenses: [], practiceLogs: [], refinements: [] },
       publicAgenda: { agendas: {}, proposals: [], deliberations: [] },
       riskPooling: { pools: [], pledges: [], claims: [], disputes: [] },
@@ -1585,6 +1594,9 @@
     'livingWorld.encounters': { cap: 32, site: 'living-world.js evict.array(encounters, "livingWorld.encounters")' },
     'livingWorld.livingTraces': { cap: 32, site: 'living-world.js evict.array(livingTraces, "livingWorld.livingTraces")' },
     'livingWorld.npcMovements': { cap: 48, site: 'living-world.js evict.array(npcMovements, "livingWorld.npcMovements")' },
+    'livingWorld.intersections': { cap: 32, site: 'living-world.js evict.array(intersections, "livingWorld.intersections")' },
+    'livingWorld.epistemicGaps': { cap: 32, site: 'living-world.js evict.array(epistemicGaps, "livingWorld.epistemicGaps")' },
+    'livingWorld.vignettes': { cap: 32, site: 'living-world.js evict.array(vignettes, "livingWorld.vignettes")' },
     'vitals.rows': { cap: 24, site: "vitals.js evict.array(rows, \"vitals.rows\")" },
     'coordinate.anchors': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.anchors\")" },
     'coordinate.rows': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.rows\")" },

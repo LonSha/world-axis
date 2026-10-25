@@ -608,6 +608,18 @@
     'livingWorld.occupationalRoutines': function () {
       return (WA.livingWorld && WA.livingWorld.OCCUPATIONAL_ROUTINES) ? Object.assign({}, WA.livingWorld.OCCUPATIONAL_ROUTINES) : {};
     },
+    'livingWorld.deflectTrajectory': function (o) {
+      if (typeof WA.livingWorld.deflectTrajectory === 'function') {
+        return WA.livingWorld.deflectTrajectory(o.name, o.newGoal, o.newDoing, o.options || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'livingWorld.consolidateLivingMemory': function (o) {
+      if (typeof WA.livingWorld.consolidateLivingMemory === 'function') {
+        return WA.livingWorld.consolidateLivingMemory(o.name, o.memoryText || o.memory);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
     },
