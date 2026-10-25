@@ -24277,6 +24277,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       await runLock('./exp33-health-place-qualification-v2233.js');
       await runLock('./exp33-health-place-qualification-v2233.js', 'runNegative');
     }
+    // ── v2.233.0(优化 OPV4-7):长局记忆整理与按需回忆 —— 承诺召回 / 主客观严格界定 / 全版本链保留 ──
+    section('v2.233.0(优化 OPV4-7):长局记忆整理与按需回忆 —— 承诺召回 / 主客观严格界定 / 全版本链保留');
+    {
+      await runLock('./exp34-long-memory-recall-v2233.js');
+    }
   // ── v2.231.0(玩法深度与机制涌现): A/B/C 三包切片综合集成门禁 ──
   section('v2.231.0(玩法深度与机制涌现): A/B/C 三包切片综合集成门禁');
   {

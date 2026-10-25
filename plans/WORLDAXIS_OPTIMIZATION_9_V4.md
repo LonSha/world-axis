@@ -44,6 +44,7 @@ V3 A/B/C 与 OP9 已真实落地情境投影、行动桌、能力差异、资源
 **依据/问题：** memory、memory-tiers、pmem、chronicle-view、retrieval、history-search 和注入预算已存在，长局需避免旧史常驻挤占上下文。
 **交付：** 按时效、视角、场景相关性和证据来源召回记忆；不复制事实，不把全部历史固定注入。
 **验收：** 常驻注入有界；相关旧承诺可召回、无关史不挤占；更正保留版本；结果可追溯并区分记忆与事实。P1，24–38 小时。
+**现场落地点：** `engines/retrieval.js`（`candidates` 接入 `customLax.promises` 承诺与 `memory.pmem` 主观记忆，保留 `memoryKind` 类别与视角归属，支持按需越窗召回且无关时不挤占）；`engines/action-desk.js`（挂载 `retrieval.recall` 与 `retrieval.tidyMemory` 只读调度与记忆整理路由）；`tests/exp34-long-memory-recall-v2233.js`（27 项断言全绿，含真源码变异负控制）。
 ### OPV4-8｜章节、事件与分支的连续游玩
 **依据/问题：** chapters、beat、story-loop、campaign、checkpoints、branch-diff 均存在，需检验长局的进退与续玩流程。
 **交付：** 收束开章→目标/边界→推进→未结义务→收章→保存分支→恢复；复用真实事件、承诺和 checkpoint。

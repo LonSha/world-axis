@@ -121,6 +121,40 @@
     'epistemic.weigh': function (o) { return WA.epistemicView.weighEvidence(o.personId, o.topicId, o.evidenceItems, o); },
     'epistemic.update': function (o) { return WA.epistemicView.updateBeliefWithEvidence(o.personId, o.topicId, o.evidenceItems, o); },
     // v2.232.0 (OPV3-1 & OPV3-2): 情境投影与场景工作台
+    // v2.233.0 (OPV4-7): 长局记忆整理与按需回忆
+    'retrieval.recall': function (o) {
+      if (!WA.retrieval) return { ok: false, reason: 'retrieval-unavailable' };
+      const c = WA.retrieval.candidates(o.input || o, o.opts || o);
+      return { ok: true, memoryKind: 'recalled', recall: c.recall, recalled: c.recalled, rows: c.rows, staleDropped: c.staleDropped, total: c.total };
+    },
+    'retrieval.tidyMemory': function (o) {
+      if (!WA.retrieval) return { ok: false, reason: 'retrieval-unavailable' };
+      const st = (WA.store && typeof WA.store.get === 'function') ? (WA.store.get() || {}) : {};
+      const facts = (st.memory && Array.isArray(st.memory.facts)) ? st.memory.facts : [];
+      const pmems = (st.memory && Array.isArray(st.memory.pmem)) ? st.memory.pmem : [];
+      const promises = (st.customLax && Array.isArray(st.customLax.promises)) ? st.customLax.promises : [];
+      const byKey = {};
+      facts.forEach(function (f) { const k = String(f && f.key || ''); (byKey[k] = byKey[k] || []).push(f); });
+      const versionChains = Object.keys(byKey).map(function (k) {
+        return { key: k, versions: byKey[k].length, current: byKey[k].filter(function (x) { return x.active; }).slice(-1)[0] || null };
+      });
+      return {
+        ok: true,
+        stats: {
+          objectiveFacts: facts.length,
+          factKeys: Object.keys(byKey).length,
+          versionChains: versionChains.length,
+          subjectivePmems: pmems.length,
+          customPromises: promises.length,
+          activePromises: promises.filter(function (p) { return p.status === 'active'; }).length
+        },
+        versionChains: versionChains,
+        promisesSummary: promises.map(function (p) {
+          return { id: p.id, subject: p.subject, status: p.status, promiser: p.promiser, beneficiary: p.beneficiary };
+        }),
+        at: clockNow('actionDesk')
+      };
+    },
     'sceneNarrative.situation': function (o) { return WA.sceneNarrative.situation(o); },
     'actionDesk.preview': function (o) { return previewAction(o.actionId, o); },
     'actionDesk.workbench': function (o) { return workbench(o); },

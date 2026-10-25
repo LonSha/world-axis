@@ -154,7 +154,19 @@
     catch (e) { return {}; }
   }
   /** 事实**全版本链**（只读；含 `active:false` —— 这正是本模块存在的理由）。 */
-  function factRows() {
+    /** 未结承诺与历史承诺（只读；customLax.promises）。 */
+  function promiseRows() {
+    const s = snapshot();
+    const arr = (s.customLax && Array.isArray(s.customLax.promises)) ? s.customLax.promises : [];
+    return arr.filter(function (x) { return x && (txt(x.id) || txt(x.subject)); });
+  }
+  /** 主观记忆（只读；memory.pmem 中的认知）。 */
+  function pmemRows() {
+    const s = snapshot();
+    const arr = (s.memory && Array.isArray(s.memory.pmem)) ? s.memory.pmem : [];
+    return arr.filter(function (x) { return x && txt(x.text); });
+  }
+function factRows() {
     const s = snapshot();
     const arr = (s.memory && Array.isArray(s.memory.facts)) ? s.memory.facts : [];
     return arr.filter(function (x) { return x && txt(x.key); });
@@ -375,6 +387,36 @@
             why: 'entry-search' });
         });
       } else noteFault('entry-search-absent');
+    }
+    //   ④ 承诺与未结义务（OPV4-7：customLax.promises，相关旧承诺按需召回、不挤占）
+    const promises = promiseRows();
+    if (promises.length && tokens.length) {
+      promises.forEach(function (p) {
+        const pSub = txt(p.subject) || txt(p.id);
+        const pWho = [txt(p.promiser), txt(p.beneficiary), txt(p.guarantor)].filter(Boolean).join(' ');
+        const h = hit(pSub + ' ' + pWho, tokens);
+        if (!h) return;
+        const pStatus = txt(p.status) || 'active';
+        push({ key: 'promise:' + (txt(p.id) || pSub), trigger: 'mentioned',
+          text: '承诺[' + pStatus + '] ' + (txt(p.promiser) || '某人') + ' → ' + (txt(p.beneficiary) || '某人') + '：' + pSub
+            + (p.defaultReason ? '（违约原因：' + txt(p.defaultReason) + '）' : '')
+            + (p.remedyDetails && p.remedyDetails.note ? '（补救：' + txt(p.remedyDetails.note) + '）' : ''),
+          at: num(p.createdAt), source: 'engines/custom-lax.js', hit: h, ageMs: ageOf(p.createdAt),
+          stale: staleOf(p.createdAt), why: 'promise-mention', memoryKind: 'promise', promiseStatus: pStatus });
+      });
+    }
+    //   ⑤ 主观记忆（OPV4-7：memory.pmem，严格区分主观认知与客观事实）
+    const pmems = pmemRows();
+    if (pmems.length && tokens.length) {
+      pmems.forEach(function (m) {
+        const h = hit(txt(m.text) + ' ' + (Array.isArray(m.holders) ? m.holders.join(' ') : ''), tokens);
+        if (!h) return;
+        const holdersTxt = (Array.isArray(m.holders) && m.holders.length) ? '【' + m.holders.join('、') + '的主观记忆】' : '【主观认知】';
+        push({ key: 'pmem:' + (txt(m.id) || txt(m.text).slice(0, 16)), trigger: 'mentioned',
+          text: holdersTxt + txt(m.text),
+          at: num(m.time) || num(m.at) || 0, source: 'engines/pmem.js', hit: h, ageMs: ageOf(m.time || m.at),
+          stale: staleOf(m.time || m.at), why: 'pmem-mention', memoryKind: 'subjective', holders: m.holders || [] });
+      });
     }
 
     // ── 边三：scene（场景实体约束） ──
