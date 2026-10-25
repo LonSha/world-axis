@@ -139,12 +139,36 @@
     }
 
     // 检查是否在途
+    // ── v2.233.0 实测修正：这条判据原先只认「people 是数组 + 字段叫 isTraveling」，
+    //   而产品里的 people 是 id → 对象 的 map（core/store.js:52），在途标记由
+    //   demographicFlow.commitMigration 写成 traveling/status='transit'/transitTo。
+    //   于是两个真实世界的事实同时落空：既遍历不到人（Array.isArray(map) === false），
+    //   就算遍历到了字段名也对不上 —— 一位已经迁走的照护者在生产里**永远判不出缺席**，
+    //   整条「缺席 → 失约升级 → 转介接续」链路只在测试伪造的数组形状下成立。
+    //   这是「测试自造一个舒服的世界」的典型现场：EXV4-3 专锁全绿、E2E 一碰就红。
+    //   修法：两种形状都吃，三个在途字段都认（缺一个就是一处静默失效）。
     var s = state();
-    var people = (s.people && Array.isArray(s.people)) ? s.people : [];
-    var p = people.filter(function (x) { return x && (x.id === who || x.name === who); })[0];
-    if (p && p.isTraveling) {
-      isAbsent = true;
-      reasons.push('in-transit');
+    var people = s.people;
+    var p = null;
+    if (Array.isArray(people)) {
+      p = people.filter(function (x) { return x && (x.id === who || x.name === who); })[0] || null;
+    } else if (people && typeof people === 'object') {
+      p = people[who] || people['p_' + who] || null;
+      if (!p) {
+        var keys = Object.keys(people);
+        for (var i = 0; i < keys.length; i++) {
+          var cand = people[keys[i]];
+          if (cand && (cand.id === who || cand.name === who)) { p = cand; break; }
+        }
+      }
+    }
+    if (p) {
+      var traveling = !!(p.isTraveling || p.traveling
+        || p.status === 'traveling' || p.status === 'transit');
+      if (traveling) {
+        isAbsent = true;
+        reasons.push('in-transit');
+      }
     }
 
     return {

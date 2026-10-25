@@ -242,7 +242,7 @@
         'environmental-capacity': 'envCapacity', 'coop': 'coop', 'rumor': 'rumor'
       };
       var waKey = keyMap[e] || e;
-      available = !!(WA[waKey] || WA[e] || (waKey === 'envCapacity' && WA.environmentalCapacity));
+      available = !!(WA[waKey] || WA[e]);
       if (!available) missing.push(e);
     });
 
@@ -255,7 +255,7 @@
         'environmental-capacity': 'envCapacity', 'coop': 'coop', 'rumor': 'rumor'
       };
       var waKey = keyMap[e] || e;
-      var available = !!(WA[waKey] || WA[e] || (waKey === 'envCapacity' && WA.environmentalCapacity));
+      var available = !!(WA[waKey] || WA[e]);
       optional.push({ engine: e, available: available });
     });
 

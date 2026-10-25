@@ -859,7 +859,7 @@
     let capacityDelay = 0;
     let capacityAdvice = null;
     const reg = prj.region || o.region;
-    const envCap = WA.envCapacity || WA.environmentalCapacity;
+    const envCap = WA.envCapacity;
     const RES_MAP = { timber: 'forest', wood: 'forest', stone: 'soil', iron: 'soil', water: 'water', crops: 'soil', pasture: 'pasture' };
     const targetRes = RES_MAP[o.resourceType] || o.resourceType || 'forest';
     if (reg && envCap && typeof envCap.evaluateImpact === 'function') {

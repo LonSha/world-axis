@@ -188,6 +188,16 @@
       sharedAwareness: { meta: {}, pacts: {} },
       socialLegacy: { legacies: [], witnesses: [] },
       techLineage: { traditions: {} },
+      // v2.233.0（拓展 EXV4-1～9）：9个新机制顶层容器物化声明
+      aftermathImpact: { incidents: [], redressLog: [] },
+      careChain: { commitments: [], referrals: [], breaches: [], publicQueue: [] },
+      commonsGovernance: { assets: [], reservations: [], maintenanceDuties: [], disputes: [] },
+      demographicFlow: { migrations: [], seasonalRecords: [], pendingObligations: [], placeCapacities: {} },
+      institutionalInertia: { charters: [], handovers: [], successionRecords: [] },
+      knowledgePractice: { knowledges: [], licenses: [], practiceLogs: [], refinements: [] },
+      publicAgenda: { agendas: {}, proposals: [], deliberations: [] },
+      riskPooling: { pools: [], pledges: [], claims: [], disputes: [] },
+      roleConflict: { affiliations: [], conflicts: [], resolutions: [] },
       // v2.130.0（拓展计划 B1/C1/C2/D3）：三个新引擎的顶层键。
       //   登记了却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写也会炸事务
       //   ——登记不等于物化，两件事都要做。

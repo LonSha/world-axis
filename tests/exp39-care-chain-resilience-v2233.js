@@ -19,7 +19,9 @@ const assert = require('assert');
 
 const BASE = path.join(__dirname, '..');
 const CARE_CHAIN_PATH = path.join(BASE, 'engines/care-chain.js');
-const ANCHOR = 'if (p && p.isTraveling) {';
+// 锚点：v2.233.0 修正后，在途判定收在此处（原锚点 'if (p && p.isTraveling) {'
+//   已被 shape 修正行取代 —— 锚点跟着真源码走，不跟着记忆走）。
+const ANCHOR = '      if (traveling) {';
 
 function runSuite() {
   require(path.join(BASE, 'tests/mock.js'));
@@ -112,6 +114,48 @@ function runSuite() {
     t('原因包含 lifeline 限制', abs3.reasons.some(r => r.indexOf('lifeline') >= 0));
   }
 
+  // 3.4 【v2.233.0 补锁】真实产品形状：people 是 id → 对象 的 map，
+  //     在途标记由 demographicFlow 写成 traveling / status='transit'。
+  //     这是现场实测出的真实生产缺陷：旧判据只认 `Array.isArray(people)` + `isTraveling`，
+  //     于是整个 EXV4-3 缺席链在真实长局里恒不触发，而本锁此前只喂数组形状，
+  //     一直全绿 —— 「测试自造一个舒服的世界」。补锁后此路径不可能再静默退化。
+  WA.store.transact(draft => {
+    draft.people = {
+      p_map_cg: { id: 'p_map_cg', name: 'MapCaregiver', location: 'place_haven' }
+    };
+    return true;
+  }, 'set-people-map-shape');
+  const absMapBefore = WA.careChain.assessCaregiverAbsence('p_map_cg');
+  t('map 形状 · 未在途时判定为可用', absMapBefore.ok === true && absMapBefore.isAbsent === false);
+
+  WA.store.transact(draft => {
+    draft.people.p_map_cg.traveling = true;
+    draft.people.p_map_cg.status = 'transit';
+    draft.people.p_map_cg.transitTo = 'far_town';
+    return true;
+  }, 'set-map-traveling');
+  const absMapAfter = WA.careChain.assessCaregiverAbsence('p_map_cg');
+  t('map 形状 · traveling=true 必须判缺席（真实 store 形状）', absMapAfter.isAbsent === true);
+  t('map 形状 · 缺席原因含 in-transit', absMapAfter.reasons.indexOf('in-transit') >= 0);
+
+  WA.store.transact(draft => {
+    draft.people.p_map_cg.status = 'traveling';
+    draft.people.p_map_cg.traveling = false;
+    return true;
+  }, 'set-map-status-traveling');
+  t('map 形状 · 仅 status=traveling 也必须判缺席（字段等价）',
+    WA.careChain.assessCaregiverAbsence('p_map_cg').isAbsent === true);
+
+  // 复原成数组形状，供后续既有断言继续使用（它们按数组写）
+  WA.store.transact(draft => {
+    draft.people = [
+      { id: 'elderly_ward', name: 'Elderly Ward', isTraveling: false },
+      { id: 'primary_cg', name: 'Primary Caregiver', isTraveling: false },
+      { id: 'backup_cg', name: 'Backup Caregiver', isTraveling: false }
+    ];
+    return true;
+  }, 'restore-array-shape');
+
   // 4. 照护失约与风险升级
   const rep1 = WA.careChain.reportCareAbsence('comm_elderly_1', 'caregiver_illness');
   t('首次上报缺席成功', rep1.ok === true);
@@ -201,7 +245,7 @@ function runNegative() {
   const rawCode = fs.readFileSync(CARE_CHAIN_PATH, 'utf8');
   assert(rawCode.includes(ANCHOR), '负控制锚点必须存在于 engines/care-chain.js');
 
-  const brokenCode = rawCode.replace(ANCHOR, 'if (false && p && p.isTraveling) {');
+  const brokenCode = rawCode.replace(ANCHOR, '      if (false && traveling) {');
 
   try {
     fs.writeFileSync(CARE_CHAIN_PATH, brokenCode, 'utf8');
@@ -211,6 +255,18 @@ function runNegative() {
     const env = gate.fresh({});
     const BrokenWA = env.WA;
     BrokenWA.store.init();
+
+    // 负控制同时覆盖**两种真实形状**，否则「修好了 map 但 array 坏了」
+    // 或反过来都不会被这条锁看见。
+    BrokenWA.store.transact(draft => {
+      draft.people = {
+        p_trav_map: { id: 'p_trav_map', name: 'MapTraveller', traveling: true, status: 'transit' }
+      };
+      return true;
+    }, 'init-neg-map');
+    const absMap = BrokenWA.careChain.assessCaregiverAbsence('p_trav_map');
+    assert.strictEqual(absMap.isAbsent, false,
+      '破坏版必须在 map 形状下产生假阴性（迁走的人判不出缺席）');
 
     BrokenWA.store.transact(draft => {
       draft.people = [{ id: 'trav_caregiver', name: 'Traveller', isTraveling: true }];
@@ -227,5 +283,38 @@ function runNegative() {
   }
 }
 
-runSuite();
-runNegative();
+// ── v2.233.0 收口：对齐 tests/run.js 的 runLock 调用约定 ──────────────────
+//   病灶：runLock 是 `require(spec)[method](assert)`，method 默认 'runAll'。
+//     本文件主体用的是 runSuite()（内有本地 t(desc,cond)→assert，失败即 throw），
+//     于是「装进来」与「跑起来」之间缺了一层。缺这层时红灯长成
+//     「没有导出 runAll」——看起来像锁坏了，而不像「断言根本没跑」，
+//     这正是本仓点名的「绿是运气」：单独 `node tests/exp39-care-chain-resilience-v2233.js` 绿，
+//     全量路径却在 require 处红，两个读数谁也证不了谁。
+//   修法：补 runAll(assert)，把真相（throw）原样上抛给 runLock ——
+//     它已按「锁自己抛的 → 记一条红并继续跑」处理，不会打断后续节。
+function runAll(a) {
+  var assertFn = (typeof a === 'function') ? a : require('assert');
+  runSuite();
+  assertFn(true, 'exp39-care-chain-resilience-v2233.js: 主体断言全部通过');
+  runNegative();
+  assertFn(true, 'exp39-care-chain-resilience-v2233.js: 单行真源码负控制如期报警');
+  return true;
+}
+module.exports = {
+  runAll: runAll,
+  runSuite: runSuite,
+  runNegative: runNegative,
+};
+
+// ── 直接运行入口（`node tests/exp39-care-chain-resilience-v2233.js`）──────────────────────────────
+//   上一轮补丁删掉了裸调用却没补守卫，直接运行会变成「装进来、什么也不做、exit 0」——
+//   一条退出码是绿的静默空跑。这里补回显式入口：跑 runAll，失败以非零码退出。
+if (require.main === module) {
+  try {
+    runAll(require('assert'));
+    console.log('exp39-care-chain-resilience-v2233.js: 直接运行通过');
+  } catch (e) {
+    console.error('exp39-care-chain-resilience-v2233.js: 直接运行失败 → ' + (e && e.message ? e.message : e));
+    process.exit(1);
+  }
+}

@@ -198,7 +198,7 @@ function runAll(A) {
   //   为什么必须回填而不是「放宽成 >=」：本门禁验的是**静态图的读数面**，
   //   放宽下限会让「新增文件忘了入图」与「新增 ns 忘了登记账本」静默通过 —— 那正是它防的两件事。
   //   真相源：本文件 runB 里的 `scan()` 现场复算；回填口径与 v2.203.0 那次相同（实测回填，不改判据形态）。
-  A(a.files === 283 && a.aliasFiles === 283 && a.refFiles === 281,
+  A(a.files === 291 && a.aliasFiles === 291 && a.refFiles === 289,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -293,7 +293,7 @@ function runAll(A) {
   //   其中 aftermath / agency / investigation 三条已计入批次③④ 的 1790。
   // v2.231.0（WP/WX 切片交付收口）：调用期 2175 → **2191**、合计 2345 → **2361**（实测回填）。
   //   跨引擎（activity/laborSchedule、techLineage/production、sceneNarrative/aftermathImpact 等）真实调用接线。
-  A(a.edgesLoad === 170 && a.edgesCall === 2191 && a.edgesAll === 2361 && a.identityOk,
+  A(a.edgesLoad === 178 && a.edgesCall === 2251 && a.edgesAll === 2429 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -368,7 +368,7 @@ function runAll(A) {
   // v2.187.0（E4）：LOAD_ORDER 206 → 207（新增 engines/campaign.js）。
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
-  A(a.edgesLoad >= 20 && a.orderLen === 282,
+  A(a.edgesLoad >= 20 && a.orderLen === 290,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -405,7 +405,7 @@ function runAll(A) {
   //   但实测发现**它们的点亮条件不可达**（读口 `find` 与写口 `rowForWrite` 查的是同一层同一份，
   //   find 通过 ⇒ rowForWrite 也必通过）⇒ 那是一个零调用的死自证位，按本仓口径**不该留**。
   //   撤掉后：静态提供方不涨（252 与批次③持平）、零读名单不涨（27）、账本与读面一动不动。
-  A(a.nsProvided === 322 && a.nsLedger === 276 && a.nsRead === 295,
+  A(a.nsProvided === 331 && a.nsLedger === 285 && a.nsRead === 303,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -428,7 +428,7 @@ function runAll(A) {
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.194.0（U2 批次④）：零读 **仍为 27**（与批次③持平）—— 本轮一度写成 29（那两个
   //   自证槽），但它们实测不可达已撤除，产品源面本就没有这两个记号。
-  A(a.deadNs.length === 27, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 28, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

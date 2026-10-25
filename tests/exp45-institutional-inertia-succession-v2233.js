@@ -172,4 +172,25 @@ if (require.main === module) {
   console.log('✓ exp45 负控制单行变异触发敏锐报警');
 }
 
-module.exports = { runSuite, runNegativeVariant };
+// ── v2.233.0 收口：对齐 tests/run.js 的 runLock 调用约定 ──────────────────
+//   病灶：runLock 是 `require(spec)[method](assert)`，method 默认 'runAll'。
+//     本文件主体用的是 runSuite()（内有本地 t(desc,cond)→assert，失败即 throw），
+//     于是「装进来」与「跑起来」之间缺了一层。缺这层时红灯长成
+//     「没有导出 runAll」——看起来像锁坏了，而不像「断言根本没跑」，
+//     这正是本仓点名的「绿是运气」：单独 `node tests/exp45-institutional-inertia-succession-v2233.js` 绿，
+//     全量路径却在 require 处红，两个读数谁也证不了谁。
+//   修法：补 runAll(assert)，把真相（throw）原样上抛给 runLock ——
+//     它已按「锁自己抛的 → 记一条红并继续跑」处理，不会打断后续节。
+function runAll(a) {
+  var assertFn = (typeof a === 'function') ? a : require('assert');
+  runSuite();
+  assertFn(true, 'exp45-institutional-inertia-succession-v2233.js: 主体断言全部通过');
+  runNegativeVariant();
+  assertFn(true, 'exp45-institutional-inertia-succession-v2233.js: 单行真源码负控制如期报警');
+  return true;
+}
+module.exports = {
+  runAll: runAll,
+  runSuite: runSuite,
+  runNegative: runNegativeVariant,
+};

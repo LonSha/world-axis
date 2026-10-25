@@ -1,13 +1,13 @@
 {
- "version": "2.232.0",
- "loadOrderCount": 282,
- "loadedCount": 268,
+ "version": "2.233.0",
+ "loadOrderCount": 290,
+ "loadedCount": 276,
  "uiCount": 14,
- "nsCount": 277,
+ "nsCount": 285,
  "totals": {
-  "loadEdges": 170,
+  "loadEdges": 178,
   "hardEdges": 0,
-  "callRefs": 325,
+  "callRefs": 341,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -58,15 +58,18 @@
     "engines/calendar.js",
     "engines/campaign.js",
     "engines/capacity-audit.js",
+    "engines/care-chain.js",
     "engines/chapters.js",
     "engines/chronicle-view.js",
     "engines/commission.js",
+    "engines/commons-governance.js",
     "engines/community-note.js",
     "engines/compare.js",
     "engines/contest.js",
     "engines/coop.js",
     "engines/coordinate.js",
     "engines/deep-clean.js",
+    "engines/demographic-flow.js",
     "engines/dep-check.js",
     "engines/diplomacy.js",
     "engines/direct-event.js",
@@ -95,8 +98,10 @@
     "engines/history-search.js",
     "engines/inject-value.js",
     "engines/inst.js",
+    "engines/institutional-inertia.js",
     "engines/investigation.js",
     "engines/kaleidoscope.js",
+    "engines/knowledge-practice.js",
     "engines/labor-schedule.js",
     "engines/length-policy.js",
     "engines/liaison.js",
@@ -134,6 +139,7 @@
     "engines/proactive.js",
     "engines/probe.js",
     "engines/production.js",
+    "engines/public-agenda.js",
     "engines/purify-scope.js",
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
@@ -150,6 +156,8 @@
     "engines/retrieval.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
+    "engines/risk-pooling.js",
+    "engines/role-conflict.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
     "engines/scene-narrative.js",
@@ -357,14 +365,17 @@
     "engines/calendar-custom.js",
     "engines/campaign.js",
     "engines/capacity-audit.js",
+    "engines/care-chain.js",
     "engines/chronicle-view.js",
     "engines/commission.js",
+    "engines/commons-governance.js",
     "engines/community-note.js",
     "engines/compare.js",
     "engines/contest.js",
     "engines/coop.js",
     "engines/coordinate.js",
     "engines/deep-clean.js",
+    "engines/demographic-flow.js",
     "engines/dep-check.js",
     "engines/diplomacy.js",
     "engines/dream.js",
@@ -388,7 +399,9 @@
     "engines/history-search.js",
     "engines/inject-value.js",
     "engines/inst.js",
+    "engines/institutional-inertia.js",
     "engines/investigation.js",
+    "engines/knowledge-practice.js",
     "engines/labor-schedule.js",
     "engines/length-policy.js",
     "engines/liaison.js",
@@ -420,6 +433,7 @@
     "engines/preset-world.js",
     "engines/probe.js",
     "engines/production.js",
+    "engines/public-agenda.js",
     "engines/purify-scope.js",
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
@@ -435,6 +449,8 @@
     "engines/retrieval.js",
     "engines/rewriter.js",
     "engines/rhythm-loop.js",
+    "engines/risk-pooling.js",
+    "engines/role-conflict.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
     "engines/scene-narrative.js",
@@ -1848,6 +1864,158 @@
   "engines/phase-transition.js": {
    "ns": [
     "phaseTransition"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/demographic-flow.js": {
+   "ns": [
+    "demographicFlow"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/care-chain.js": {
+   "ns": [
+    "careChain"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/public-agenda.js": {
+   "ns": [
+    "publicAgenda"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/commons-governance.js": {
+   "ns": [
+    "commonsGovernance"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/knowledge-practice.js": {
+   "ns": [
+    "knowledgePractice"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/risk-pooling.js": {
+   "ns": [
+    "riskPooling"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/role-conflict.js": {
+   "ns": [
+    "roleConflict"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/institutional-inertia.js": {
+   "ns": [
+    "institutionalInertia"
    ],
    "requires": [
     "registerModule"
