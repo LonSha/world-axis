@@ -493,6 +493,8 @@
     'engines/public-agenda.js',
     // v2.233.0（拓展 EXV4-5）：共同资源的使用权与维护责任。
     'engines/commons-governance.js',
+    // v2.233.0（拓展 EXV4-6）：知识的地方传播与实践许可。
+    'engines/knowledge-practice.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

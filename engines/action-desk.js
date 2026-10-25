@@ -438,6 +438,40 @@
     'commonsGovernance.assetStatus': function () {
       return (WA.commonsGovernance && WA.commonsGovernance.ASSET_STATUS) ? WA.commonsGovernance.ASSET_STATUS.slice() : [];
     },
+    // v2.233.0 (EXV4-6): 知识的地方传播与实践许可
+    'knowledgePractice.registerKnowledgeSpec': function (o) {
+      if (typeof WA.knowledgePractice.registerKnowledgeSpec === 'function') {
+        return WA.knowledgePractice.registerKnowledgeSpec(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'knowledgePractice.grantPracticeLicense': function (o) {
+      if (typeof WA.knowledgePractice.grantPracticeLicense === 'function') {
+        return WA.knowledgePractice.grantPracticeLicense(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'knowledgePractice.executePractice': function (o) {
+      if (typeof WA.knowledgePractice.executePractice === 'function') {
+        return WA.knowledgePractice.executePractice(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'knowledgePractice.refineKnowledgeFromEvidence': function (o) {
+      if (typeof WA.knowledgePractice.refineKnowledgeFromEvidence === 'function') {
+        return WA.knowledgePractice.refineKnowledgeFromEvidence(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'knowledgePractice.knowledgePracticeProjection': function (o) {
+      if (typeof WA.knowledgePractice.knowledgePracticeProjection === 'function') {
+        return WA.knowledgePractice.knowledgePracticeProjection(o.filter || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'knowledgePractice.practiceStatus': function () {
+      return (WA.knowledgePractice && WA.knowledgePractice.PRACTICE_STATUS) ? WA.knowledgePractice.PRACTICE_STATUS.slice() : [];
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },
@@ -1608,7 +1642,7 @@ let ckpt = null;
     const raw = String(actionId == null ? '' : actionId);
     const idx = raw.indexOf(':');
     const head = idx >= 0 ? raw.slice(0, idx) : raw;
-    const key = clean(head, 40);
+    const key = clean(head, 64);
     const fn = ROUTES[key];
     if (!fn) { noteFault('unknown-action'); return { ok: false, reason: 'unknown-action', action: key, known: Object.keys(ROUTES) }; }
     const o = Object.assign({}, opts || {});

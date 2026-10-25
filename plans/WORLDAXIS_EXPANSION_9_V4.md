@@ -39,6 +39,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** research、tech-lineage、inst、rumor 有成果/标准/传播，但知识可见、可学、可实际操作的差异没有形成共同消费链。
 **交付：** 把研究成果拆成可接触资料、实践许可、必要工具/材料和验证经验；传播受渠道与关系约束，实际使用由生产/研究 owner 检查，不以师徒数量或等级解锁。
 **验收：** 公开资料不等于会操作；不同地点条件产生兼容差异；未获许可者不能绕过既有规则；失败实践留下可检索证据并能改进后续方案。P2，26–42 小时。
+*现场落地：* 已在 `engines/knowledge-practice.js` 落地知识与规范登记（`registerKnowledgeSpec`）、实践许可授予（`grantPracticeLicense`）、实践执行检验（`executePractice`，未获许可强行操作遭 `unauthorized-practice` 拦截，缺少必要工具遭 `missing-prerequisites` 拦截，环境条件冲突导致失败并生成具名缺陷证据）、基于实操失败证据改良规范（`refineKnowledgeFromEvidence`）与纯读实践投影（`knowledgePracticeProjection`，10 次连续调用 store 绝对零写入）。接入 ActionDesk 路由、tool-diag 并在 `tests/exp42-knowledge-practice-license-v2233.js` 固化 24 项断言与单行真源码负控制。死导出账本 1030 零漂移。已结项合入。
 ### EXV4-7｜地方风险分担与保险式互助
 **真实缺口：** aftermath-impact 能追责、赔偿、补救，coop/custom-lax 有互助和担保，但灾前共同分摊如何换取灾后有限救助未形成闭环。
 **交付：** 允许群体对具名风险建立有限互助池、缴纳承诺、受灾资格与封顶支援；资金/材料流仍进入现有 economy/coop，保留排除和偿付争议。
