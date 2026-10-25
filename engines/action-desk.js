@@ -653,6 +653,13 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.240.0 (OPV5-4): 阶梯物价与黑市暗盘查询
+    'livingWorld.getTierPrice': function (o) {
+      if (typeof WA.livingWorld.getTierPrice === 'function') {
+        return WA.livingWorld.getTierPrice(o.baseType || o.type, o.tier, o.place);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
     },

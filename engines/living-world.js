@@ -210,6 +210,41 @@
     };
   }
 
+  /**
+   * 多梯队阶梯物价与黑市溢价计算 (getTierPrice)
+   * v2.240.0 (OPV5-4): 基础/稀缺/战备/黑市多档物价
+   */
+  function getTierPrice(baseType, tier, place) {
+    const eco = getEconomyProfile();
+    const baseCost = eco.mealCost || 4;
+    const t = cleanStr(tier || 'standard', 20); // standard (平价), scarcity (紧俏), war (战备管制), blackmarket (黑市暗盘)
+    let mult = 1.0;
+    if (t === 'scarcity') mult = 1.8;
+    else if (t === 'war') mult = 3.2;
+    else if (t === 'blackmarket') mult = 5.0;
+    
+    // 地理/宏观气候加权（若有 economy climate）
+    try {
+      const s = WA.store ? WA.store.get() : {};
+      if (s && s.evolution && s.evolution.economy && s.evolution.economy.climate) {
+        const clim = s.evolution.economy.climate;
+        if (clim === '衰退') mult *= 1.3;
+        else if (clim === '动荡') mult *= 1.8;
+      }
+    } catch (e) {}
+
+    const finalPrice = Math.max(1, Math.round(baseCost * mult));
+    return {
+      ok: true,
+      currency: eco.name,
+      unit: eco.unit,
+      tier: t,
+      baseCost: baseCost,
+      multiplier: Number(mult.toFixed(2)),
+      finalPrice: finalPrice
+    };
+  }
+
   function cleanStr(s, max) {
     if (s == null) return '';
     return String(s).trim().slice(0, max || 120);
@@ -587,11 +622,28 @@
           strain.weathering = Math.max(0, Math.min(100, strain.weathering + 5));
         }
 
+        // v2.240.0 (OPV5-5): 生理磨损向健康系统(lifeline)深度并轨
+        if (strain.weariness >= 85 || strain.hunger >= 85) {
+          if (WA.lifeline && typeof WA.lifeline.register === 'function') {
+            const condName = strain.hunger >= 85 ? '重度饥馑虚脱' : '重度劳损衰竭';
+            try {
+              WA.lifeline.register(card.name, condName, {
+                kind: 'acute',
+                course: 'onset',
+                limits: ['energy', 'work'],
+                care: ['treatment', 'monitoring'],
+                replace: true
+              });
+              card.status = (card.status || '') + '（' + condName + '，难以支撑）';
+            } catch (e) {}
+          }
+        }
+
         // 微观生计自愈闭环（Metabolic Loop）：
         // 饥肠辘辘时，若有备粮则消耗自愈；若缺粮且随身有资金，按世界物价自主采购简餐自愈
         if (cfg.metabolicLoopEnabled && strain.hunger > 60) {
-          const eco = getEconomyProfile();
-          const mealPrice = eco.mealCost || 4;
+          const tierP = getTierPrice('food', cfg.marketTier || 'standard', card.place);
+          const mealPrice = tierP.finalPrice || 4;
           if (charLife.belongings.provisions > 0) {
             charLife.belongings.provisions--;
             strain.hunger = Math.max(0, strain.hunger - 35);
@@ -793,9 +845,28 @@
       const st = (b.characterStates && b.characterStates[r.name]) || null;
       let reunionSubtext = '';
       if (st && st.absence && st.absence.roundsAway >= 3) {
-        reunionSubtext = '数日未见，再次碰面时眼神中交织着意外、局促与久别探寻';
-        if (st.absence.accumulatedGratitude > 0) {
-          reunionSubtext += '，怀揣此前所受之恩，举止间多了一分谨小慎微的敬重';
+        // v2.240.0 (OPV5-6): 久别重逢心理重力交织三轴 (roundsAway 离散跨度 + debts 恩义欠负 + grudge 嫌隙裂痕)
+        const awayRounds = st.absence.roundsAway;
+        let debtFavor = 0, debtGrudge = 0, debtSecret = 0;
+        if (Array.isArray(b.relationalDebts)) {
+          b.relationalDebts.forEach(function (d) {
+            if (!d) return;
+            if (d.from === r.name) {
+              if (d.type === 'favor') debtFavor += (d.amount || 0);
+              else if (d.type === 'grudge') debtGrudge += (d.amount || 0);
+              else if (d.type === 'secret') debtSecret += (d.amount || 0);
+            }
+          });
+        }
+        reunionSubtext = '暌违' + awayRounds + '轮未见，乍见之下神情骤滞，目光在身形衣饰间来回打量';
+        if (debtFavor > 0) {
+          reunionSubtext += '，心中念及昔日欠下' + debtFavor + '份未偿人情，言辞微有局促与敬意';
+        }
+        if (debtGrudge > 0) {
+          reunionSubtext += '，旧日嫌隙（' + debtGrudge + '）横亘在心，垂下的指尖微紧、下意识退半步拉开身位';
+        }
+        if (debtSecret > 0) {
+          reunionSubtext += '，彼此握有软肋隐秘，眸光微敛暗自戒备';
         }
       }
       return {
@@ -1070,6 +1141,7 @@
     propagateRipple: propagateRipple,
     recordRelationalDebt: recordRelationalDebt,
     redeemDebt: redeemDebt,
+    getTierPrice: getTierPrice,
     consolidateLivingMemory: consolidateLivingMemory,
     autonomousTick: autonomousTick,
     detectEncounters: detectEncounters,
@@ -1081,7 +1153,7 @@
   };
 
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.239.0' });
+    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.240.0' });
   }
 
   if (WA.workflow && typeof WA.workflow.register === 'function') {
