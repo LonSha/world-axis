@@ -24,6 +24,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** `lifeline` 已有病况、照护步骤与活动限制，`family` 有照护记录，`service-network` 有设施服务；缺口不是再造照护登记，而是照护者缺席时，需求如何跨家庭与公共服务接续并改变真实服务状态。
 **交付：** 将照护需求作为预约/承诺被服务节点和家庭协作消费；缺席引发替代、排队、风险累积或服务转介，由原 owner 记录。
 **验收：** 双人照护者缺席可导致真实改派/延迟；接续消耗可追踪资源；服务网络中断影响不同人群；成功转介不抹除原始失约。P1，28–44 小时。
+*现场落地：* 已在 `engines/care-chain.js` 落地照护需求承诺登记（`registerCareCommitment`）、缺席状态判定（`assessCaregiverAbsence`，联动 `lifeline` 重度限制与在途旅行 `isTraveling`）、缺席失约与风险分级累积（`reportCareAbsence`，warning -> critical -> emergency）、跨家庭与设施转介（`referCare`，带资源消耗且完整保留历史失约记录）、公共队列承压（`queueForPublicCare`）与纯读韧性指数投影（`careChainProjection`）；在 `engines/action-desk.js` 接入 7 项真实路由；专测 `tests/exp39-care-chain-resilience-v2233.js`（42 项断言全绿，含单行真源码负控制与 10 次纯读零写入状态隔离），死导出账本 1030 零漂移。已结项合入。
 ### EXV4-4｜公共议程设置与代表性缺口
 **真实缺口：** rumor/opinion、custom-lax、coop 和 operations 有传播、规则及项目，但“谁的问题能进入公共议程”尚未影响制度结果。
 **交付：** 让不同群体提出有证据的议题，受传播覆盖、代表资格、资源与议程容量影响进入/延迟/被拒；采用既有提案与批准流程，不造第二套议会。

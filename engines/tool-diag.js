@@ -2307,6 +2307,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/phase-transition.js': 'phaseTransition',
     // v2.233.0 (EXV4-2): demographicFlow -- 人口迁入迁出与地方能力变化（人口流动/迁居约束/责任移交/纯读投影）
     'engines/demographic-flow.js': 'demographicFlow',
+    // v2.233.0 (EXV4-3): careChain -- 照护链与公共服务韧性（照护承诺/缺席断裂/转介接续/韧性投影）
+    'engines/care-chain.js': 'careChain',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',

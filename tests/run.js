@@ -355,6 +355,8 @@ const LOAD = [
   'engines/phase-transition.js',
   // v2.233.0（拓展 EXV4-2）：人口迁入迁出与地方能力变化。同序进 LOAD。
   'engines/demographic-flow.js',
+  // v2.233.0（拓展 EXV4-3）：照护链与公共服务韧性。同序进 LOAD。
+  'engines/care-chain.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序

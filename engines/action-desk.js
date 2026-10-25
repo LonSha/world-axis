@@ -309,6 +309,46 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.233.0 (EXV4-3): 照护链与公共服务韧性
+    'careChain.registerCareCommitment': function (o) {
+      if (typeof WA.careChain.registerCareCommitment === 'function') {
+        return WA.careChain.registerCareCommitment(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'careChain.assessCaregiverAbsence': function (o) {
+      if (typeof WA.careChain.assessCaregiverAbsence === 'function') {
+        return WA.careChain.assessCaregiverAbsence(o.caregiverId || o.who);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'careChain.reportCareAbsence': function (o) {
+      if (typeof WA.careChain.reportCareAbsence === 'function') {
+        return WA.careChain.reportCareAbsence(o.commitmentId, o.breachReason || o.reason);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'careChain.referCare': function (o) {
+      if (typeof WA.careChain.referCare === 'function') {
+        return WA.careChain.referCare(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'careChain.queueForPublicCare': function (o) {
+      if (typeof WA.careChain.queueForPublicCare === 'function') {
+        return WA.careChain.queueForPublicCare(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'careChain.careChainProjection': function (o) {
+      if (typeof WA.careChain.careChainProjection === 'function') {
+        return WA.careChain.careChainProjection(o.query || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'careChain.escalationLevels': function () {
+      return (WA.careChain && WA.careChain.ESCALATION_LEVELS) ? WA.careChain.ESCALATION_LEVELS.slice() : [];
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },

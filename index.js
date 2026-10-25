@@ -487,6 +487,8 @@
     'engines/phase-transition.js',
     // v2.233.0（拓展 EXV4-2）：人口迁入迁出与地方能力变化。
     'engines/demographic-flow.js',
+    // v2.233.0（拓展 EXV4-3）：照护链与公共服务韧性。
+    'engines/care-chain.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
