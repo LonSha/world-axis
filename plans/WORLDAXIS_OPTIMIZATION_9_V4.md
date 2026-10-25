@@ -49,6 +49,7 @@ V3 A/B/C 与 OP9 已真实落地情境投影、行动桌、能力差异、资源
 **依据/问题：** chapters、beat、story-loop、campaign、checkpoints、branch-diff 均存在，需检验长局的进退与续玩流程。
 **交付：** 收束开章→目标/边界→推进→未结义务→收章→保存分支→恢复；复用真实事件、承诺和 checkpoint。
 **验收：** 未结承诺可带入/延期；恢复只切换所选快照；分支保留差异来源；失败历史不因收章被抹去。P1，28–44 小时。
+**现场落地点：** `engines/action-desk.js`（收束挂载 `chapter.open`、`chapter.flow`、`chapter.rollover`、`chapter.close`、`chapter.saveBranch`、`chapter.restore`、`chapter.diff`、`chapter.inspect` 八大长局连续游玩路由，提供未结承诺延期与带入、收章时活跃与违约双向留痕结算、分支差异语义比对及快照库隔离不变式）；`tests/exp35-chapter-branch-play-v2233.js`（39 项全景与契约断言全绿，含单行真源码变异负控制）。
 ### OPV4-9｜玩法蓝图的安全调参与续局
 **依据/问题：** playable-blueprint 已有样例、依赖、冲突预览、安装、静态定义导出；不应再造同类新局。
 **交付：** 让现有蓝图支持受约束参数、差异预览、可选模块降级、版本迁移及“重置初始条件/保留进度”显式操作。定义与运行进度分离。

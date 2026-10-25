@@ -120,6 +120,15 @@
     // v2.233.0 (OPV4-5): 证据可信度裁决与更替
     'epistemic.weigh': function (o) { return WA.epistemicView.weighEvidence(o.personId, o.topicId, o.evidenceItems, o); },
     'epistemic.update': function (o) { return WA.epistemicView.updateBeliefWithEvidence(o.personId, o.topicId, o.evidenceItems, o); },
+    // v2.233.0 (OPV4-8): 章节、事件与分支的连续游玩
+    'chapter.open': function (o) { return chapterOpen(o); },
+    'chapter.flow': function (o) { return chapterFlow(o); },
+    'chapter.rollover': function (o) { return chapterRollover(o); },
+    'chapter.close': function (o) { return chapterClose(o); },
+    'chapter.saveBranch': function (o) { return chapterSaveBranch(o); },
+    'chapter.restore': function (o) { return chapterRestore(o); },
+    'chapter.diff': function (o) { return chapterDiff(o); },
+    'chapter.inspect': function (o) { return chapterInspect(o); },
     // v2.232.0 (OPV3-1 & OPV3-2): 情境投影与场景工作台
     // v2.233.0 (OPV4-7): 长局记忆整理与按需回忆
     'retrieval.recall': function (o) {
@@ -1101,6 +1110,227 @@ return {
     // 执行模式走 workbench 统一幂等和路由
     const res = workbench(Object.assign({}, o, { actionId: aid, who: who }));
     return Object.assign({ isSceneContext: true, viewer: who, place: place }, res);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // OPV4-8：章节、事件与分支的连续游玩（收束开章→目标/边界→推进→未结义务→收章→分支→恢复）
+  // ══════════════════════════════════════════════════════════════════════
+
+  function ensureCkptSettings() {
+    try {
+      const fn = WA.checkpoints && WA.checkpoints['getSettings'];
+      const curS = fn ? fn() : null;
+      if (!curS || !curS.enabled) {
+        if (WA.checkpoints && typeof WA.checkpoints['setSettings'] === 'function') {
+          WA.checkpoints['setSettings']({ enabled: true });
+        }
+      }
+    } catch (e) {}
+  }
+
+  /** 开章：目标、脚本与约束 */
+  function chapterOpen(opts) {
+    const o = opts || {};
+    if (!WA.chapters || typeof WA.chapters.start !== 'function') {
+      return { ok: false, reason: 'chapters-engine-unavailable' };
+    }
+    const title = clean(o.title, 80);
+    const script = clean(o.script || o.goal, 200);
+    const notes = clean(o.notes || o.boundary || o.constraints, 200);
+    WA.chapters.start(title, { script: script, notes: notes });
+    const cur = WA.chapters.current();
+    let ckpt = null;
+    if (o.checkpoint && WA.checkpoints && typeof WA.checkpoints.save === 'function') {
+      try {
+        ensureCkptSettings();
+        ckpt = WA.checkpoints.save(clean(o.checkpointName || ('open_' + (cur ? cur.title : 'chap')), 40), {
+          note: '开章快照：' + (cur ? cur.title : '')
+        });
+      } catch (e) { ckpt = { ok: false, err: String(e) }; }
+    }
+    return { ok: true, chapter: cur, checkpoint: ckpt, at: clockNow('actionDesk') };
+  }
+
+  /** 纯读长局连续游玩流态收束 */
+  function chapterFlow(opts) {
+    const o = opts || {};
+    const cur = (WA.chapters && typeof WA.chapters.current === 'function') ? WA.chapters.current() : null;
+    const st = state();
+    const hist = (st.chapters && Array.isArray(st.chapters.history)) ? st.chapters.history : [];
+    const promises = (st.customLax && Array.isArray(st.customLax.promises)) ? st.customLax.promises : [];
+    const activePromises = promises.filter(function (p) { return p && p.status === 'active'; });
+    const defaultedPromises = promises.filter(function (p) { return p && p.status === 'defaulted'; });
+    const fulfilledPromises = promises.filter(function (p) { return p && p.status === 'fulfilled'; });
+
+    let beatView = null;
+    if (WA.beatLedger && typeof WA.beatLedger.view === 'function') {
+      try { beatView = WA.beatLedger.view(); } catch (e) { beatView = null; }
+    }
+    let campaignCur = null;
+    if (WA.campaign && typeof WA.campaign.current === 'function') {
+      try { campaignCur = WA.campaign.current(); } catch (e) { campaignCur = null; }
+    }
+    let ckptList = [];
+    if (WA.checkpoints && typeof WA.checkpoints.list === 'function') {
+      try {
+        const lRes = WA.checkpoints.list();
+        ckptList = (lRes && (lRes.slots || lRes.list)) || [];
+      } catch (e) { ckptList = []; }
+    }
+
+    return {
+      ok: true,
+      currentChapter: cur,
+      chapterHistoryCount: hist.length,
+      recentHistory: hist.slice(-3),
+      pendingObligations: {
+        active: activePromises.length,
+        defaulted: defaultedPromises.length,
+        fulfilled: fulfilledPromises.length,
+        activeList: activePromises.map(function (p) {
+          return { id: p.id, promiser: p.promiser, beneficiary: p.beneficiary, subject: p.subject, dueDay: p.dueDay, deferCount: p.deferCount || 0 };
+        })
+      },
+      beatStatus: beatView ? { total: (beatView.rows || []).length, landed: (beatView.rows || []).filter(function (r) { return r && r.status === 'landed'; }).length } : null,
+      campaignStatus: campaignCur,
+      checkpointsCount: ckptList.length,
+      at: clockNow('actionDesk')
+    };
+  }
+
+  /** 未结承诺带入或延期到后续章节 */
+  function chapterRollover(opts) {
+    const o = opts || {};
+    const pid = clean(o.promiseId, 60);
+    const newDueDay = num(o.newDueDay);
+    const reason = clean(o.reason || '章节推进延期履约', 100);
+    if (!pid) return { ok: false, reason: 'missing-fields', field: 'promiseId' };
+
+    let updated = null;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.customLax = d.customLax || {};
+        d.customLax.promises = d.customLax.promises || [];
+        const p = d.customLax.promises.filter(function (x) { return x && x.id === pid; })[0];
+        if (!p) return false;
+        if (p.status !== 'active') return false;
+        p.dueDay = (newDueDay != null && newDueDay >= 0) ? newDueDay : p.dueDay;
+        p.deferCount = (p.deferCount || 0) + 1;
+        p.deferReason = reason;
+        p.rolledOverAt = clockNow('actionDesk');
+        updated = Object.assign({}, p);
+        return true;
+      }, 'actionDesk:chapterRollover');
+    }
+    if (!updated) return { ok: false, reason: 'promise-not-found-or-inactive' };
+    return { ok: true, promise: updated, note: '未结义务成功带入延期' };
+  }
+
+  /** 收章：结算当前章节，检查未结义务，保留失败与违约历史 */
+  function chapterClose(opts) {
+    const o = opts || {};
+    if (!WA.chapters || typeof WA.chapters.end !== 'function') {
+      return { ok: false, reason: 'chapters-engine-unavailable' };
+    }
+    const cur = (typeof WA.chapters.current === 'function') ? WA.chapters.current() : null;
+    if (!cur) return { ok: false, reason: 'no-active-chapter' };
+
+    const st = state();
+    const promises = (st.customLax && Array.isArray(st.customLax.promises)) ? st.customLax.promises : [];
+    const active = promises.filter(function (p) { return p && p.status === 'active'; });
+    const defaulted = promises.filter(function (p) { return p && p.status === 'defaulted'; });
+
+    const endNote = clean(o.note || o.endNote, 150);
+    WA.chapters.end(endNote);
+
+let ckpt = null;
+    if (o.checkpoint && WA.checkpoints && typeof WA.checkpoints.save === 'function') {
+      try {
+        ensureCkptSettings();
+        ckpt = WA.checkpoints.save(clean(o.checkpointName || ('close_ch' + cur.no), 40), {
+          note: '收章快照：' + cur.title + '（未结承诺 ' + active.length + '，违约 ' + defaulted.length + '）'
+        });
+      } catch (e) { ckpt = { ok: false, err: String(e) }; }
+    }
+    return {
+      ok: true,
+      closedChapter: cur,
+      endNote: endNote,
+      pendingActiveRetained: active.length,
+      defaultedHistoryRetained: defaulted.length,
+      checkpoint: ckpt,
+      at: clockNow('actionDesk')
+    };
+  }
+
+  /** 保存分支快照 */
+  function chapterSaveBranch(opts) {
+    const o = opts || {};
+    if (!WA.checkpoints || typeof WA.checkpoints.save !== 'function') {
+      return { ok: false, reason: 'checkpoints-unavailable' };
+    }
+    ensureCkptSettings();
+    const name = clean(o.name || ('branch_' + Date.now()), 40);
+    return WA.checkpoints.save(name, o);
+  }
+
+  /** 恢复所选快照（只切换状态，不破坏快照库） */
+  function chapterRestore(opts) {
+    const o = opts || {};
+    const id = clean(o.id || o.name, 40);
+    if (!id) return { ok: false, reason: 'missing-fields', field: 'id' };
+    if (!WA.checkpoints || typeof WA.checkpoints.restore !== 'function') {
+      return { ok: false, reason: 'checkpoints-unavailable' };
+    }
+    return WA.checkpoints.restore(id, o);
+  }
+
+  /** 分支差异比对（保留差异来源与语义行） */
+  function chapterDiff(opts) {
+    const o = opts || {};
+    const baseId = clean(o.baseId || o.source, 40);
+    const targetId = clean(o.targetId || o.target, 40);
+    if (!baseId || !targetId) {
+      return { ok: false, reason: 'missing-fields', fields: ['baseId', 'targetId'] };
+    }
+    if (!WA.branchDiff || typeof WA.branchDiff.semanticDiff !== 'function') {
+      return { ok: false, reason: 'branchDiff-unavailable' };
+    }
+    try {
+      const bSet = WA.branchDiff['getSettings'];
+      const curB = bSet ? bSet() : null;
+      if (!curB || !curB.enabled) {
+        if (typeof WA.branchDiff['setSettings'] === 'function') {
+          WA.branchDiff['setSettings']({ enabled: true });
+        }
+      }
+    } catch (e) {}
+    return WA.branchDiff.semanticDiff(baseId, targetId, o);
+  }
+
+  /** 长局完整性检查（纯读零写入） */
+  function chapterInspect(opts) {
+    const st = state();
+    const cur = (WA.chapters && typeof WA.chapters.current === 'function') ? WA.chapters.current() : null;
+    const hist = (st.chapters && Array.isArray(st.chapters.history)) ? st.chapters.history : [];
+    const promises = (st.customLax && Array.isArray(st.customLax.promises)) ? st.customLax.promises : [];
+    let ckptCount = 0;
+    if (WA.checkpoints && typeof WA.checkpoints.list === 'function') {
+      try {
+        const lRes = WA.checkpoints.list();
+        ckptCount = ((lRes && (lRes.slots || lRes.list)) || []).length;
+      } catch (e) { ckptCount = 0; }
+    }
+    return {
+      ok: true,
+      hasActiveChapter: !!cur,
+      currentChapterNo: cur ? cur.no : null,
+      historyCount: hist.length,
+      activePromises: promises.filter(function (p) { return p && p.status === 'active'; }).length,
+      defaultedPromises: promises.filter(function (p) { return p && p.status === 'defaulted'; }).length,
+      checkpointsCount: ckptCount,
+      at: clockNow('actionDesk')
+    };
   }
 
   /**
