@@ -44,6 +44,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** aftermath-impact 能追责、赔偿、补救，coop/custom-lax 有互助和担保，但灾前共同分摊如何换取灾后有限救助未形成闭环。
 **交付：** 允许群体对具名风险建立有限互助池、缴纳承诺、受灾资格与封顶支援；资金/材料流仍进入现有 economy/coop，保留排除和偿付争议。
 **验收：** 事件发生前后加入条件有差异但不追溯；支援封顶且资金守恒；欺诈需证据；未足额池子只部分补偿，不凭空补齐。P2，30–46 小时。
+*现场落地：* 已在 `engines/risk-pooling.js` 落地具名风险互助池建立（`declareRiskPool`）、入池注资（`pledgeMutualFund`）、灾后封顶理赔与有限救助（`claimMutualRelief`，严格核验灾前入池资格 `not-enrolled-prior-to-disaster`，受单笔上限封顶约束，池内资金不足时按残值部分折算 `partialCoverage`，资金守恒绝不凭空造钱）、欺诈与争议申报（`disputeReliefClaim`）以及纯读只读投影（`riskPoolingProjection`，10 次连续调用状态完全隔离）。接入 ActionDesk 路由、tool-diag 并在 `tests/exp43-risk-pooling-mutual-aid-v2233.js` 固化 28 项断言与单行真源码负控制。死导出账本 1030 零漂移。已结项合入。
 ### EXV4-8｜地方身份与多重归属冲突
 **真实缺口：** relation/org/region/social-legacy 已有关系、组织和历史身份，但一个人同时依赖家庭、职业团体、居住地时的利益冲突缺少能改变行动结果的明确表达。
 **交付：** 在具体事件中记录角色受影响的群体归属、义务和可知证据；冲突改变参与、回避、调停或退出成本，事实和立场分开存，不新造好感货币。

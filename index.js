@@ -495,6 +495,8 @@
     'engines/commons-governance.js',
     // v2.233.0（拓展 EXV4-6）：知识的地方传播与实践许可。
     'engines/knowledge-practice.js',
+    // v2.233.0（拓展 EXV4-7）：地方风险分担与保险式互助。
+    'engines/risk-pooling.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

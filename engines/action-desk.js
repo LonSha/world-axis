@@ -472,6 +472,40 @@
     'knowledgePractice.practiceStatus': function () {
       return (WA.knowledgePractice && WA.knowledgePractice.PRACTICE_STATUS) ? WA.knowledgePractice.PRACTICE_STATUS.slice() : [];
     },
+    // v2.233.0 (EXV4-7): riskPooling 地方风险分担与保险式互助
+    'riskPooling.declareRiskPool': function (o) {
+      if (typeof WA.riskPooling.declareRiskPool === 'function') {
+        return WA.riskPooling.declareRiskPool(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'riskPooling.pledgeMutualFund': function (o) {
+      if (typeof WA.riskPooling.pledgeMutualFund === 'function') {
+        return WA.riskPooling.pledgeMutualFund(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'riskPooling.claimMutualRelief': function (o) {
+      if (typeof WA.riskPooling.claimMutualRelief === 'function') {
+        return WA.riskPooling.claimMutualRelief(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'riskPooling.disputeReliefClaim': function (o) {
+      if (typeof WA.riskPooling.disputeReliefClaim === 'function') {
+        return WA.riskPooling.disputeReliefClaim(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'riskPooling.riskPoolingProjection': function (o) {
+      if (typeof WA.riskPooling.riskPoolingProjection === 'function') {
+        return WA.riskPooling.riskPoolingProjection(o.poolId || (o.spec && o.spec.poolId) || (typeof o === 'string' ? o : null));
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'riskPooling.poolStatus': function () {
+      return (WA.riskPooling && WA.riskPooling.POOL_STATUS) ? WA.riskPooling.POOL_STATUS.slice() : [];
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },
