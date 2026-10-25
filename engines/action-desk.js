@@ -580,6 +580,34 @@
     'institutionalInertia.charterStatus': function () {
       return (WA.institutionalInertia && WA.institutionalInertia.CHARTER_STATUS) ? WA.institutionalInertia.CHARTER_STATUS.slice() : [];
     },
+    // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹路由
+    'livingWorld.autonomousTick': function (o) {
+      if (typeof WA.livingWorld.autonomousTick === 'function') {
+        return WA.livingWorld.autonomousTick(o.opts || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'livingWorld.detectEncounters': function (o) {
+      if (typeof WA.livingWorld.detectEncounters === 'function') {
+        return WA.livingWorld.detectEncounters(o.playerPlace || (o.spec && o.spec.playerPlace) || (typeof o === 'string' ? o : ''));
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'livingWorld.leaveTrace': function (o) {
+      if (typeof WA.livingWorld.leaveTrace === 'function') {
+        return WA.livingWorld.leaveTrace(o.place, o.who, o.detail);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'livingWorld.registerRoutine': function (o) {
+      if (typeof WA.livingWorld.registerRoutine === 'function') {
+        return WA.livingWorld.registerRoutine(o.name, o.routine);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'livingWorld.dayPeriods': function () {
+      return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },

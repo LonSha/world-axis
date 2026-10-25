@@ -369,6 +369,8 @@ const LOAD = [
     'engines/role-conflict.js',
     // v2.233.0（拓展 EXV4-9）：世代交替与制度惯性。同序进 LOAD。
     'engines/institutional-inertia.js',
+    // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹中枢
+    'engines/living-world.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24352,6 +24354,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.233.0(拓展 EXV4-9):世代交替与制度惯性 —— 宪章绑定 / 继任分化 / 历史不可篡改 / 文书虚置审计');
   {
     await runLock('./exp45-institutional-inertia-succession-v2233.js');
+  }
+  // ── v2.234.0(Living World V5): 真实世界自治演化与偶遇痕迹测试 ──
+  section('v2.234.0(Living World V5): 真实世界自治演化 —— 日常作息 / 执念发酵 / 空间偶遇 / 痕迹留存 / 正文透镜');
+  {
+    await runLock('./living-world-v2234.js');
   }
   // ── v2.233.0(拓展 EXV4 收口):九系统端到端联动 —— 一场洪水贯穿互助/废料/撕裂/议程/共资源/知识/继任/照护 ──
   //   为什么这条必须进全量：九把专锁各自造数据、各自读自己，谁也没证明

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.233.0'
+  const VERSION = '2.234.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -501,6 +501,8 @@
     'engines/role-conflict.js',
     // v2.233.0（拓展 EXV4-9）：世代交替与制度惯性。
     'engines/institutional-inertia.js',
+    // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹中枢
+    'engines/living-world.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

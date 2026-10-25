@@ -77,6 +77,9 @@
     'memory.pmem':        { path: 'memory.pmem',        cap: 60,  why: '人物主观记忆总量' },
     // ── v2.230.0（拓展 N12）十枚新引擎 ──
     'elsewhere.rows':      { path: 'elsewhere.rows',      cap: 48, why: '幕后档案环形（FIFO 挤出最旧卡）' },
+    'livingWorld.encounters':   { path: 'livingWorld.encounters',   cap: 32, why: '玩家与NPC偶遇记录环形' },
+    'livingWorld.livingTraces': { path: 'livingWorld.livingTraces', cap: 32, why: '地点残留生活痕迹环形' },
+    'livingWorld.npcMovements': { path: 'livingWorld.npcMovements', cap: 48, why: 'NPC移动与生活变动台账环形' },
     'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
   // v2.231.0（拓展 EXP-1）：逐人逐能力进度行（上限与 training.maxRows 同源，见 training.js）。
   'training.rows':       { path: 'training.rows',       cap: 96, why: '能力成长逐人逐能力行' },
