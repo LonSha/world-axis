@@ -14,6 +14,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** environmental-capacity 管区域资源压力，economy/production 管存量和工单；仓库尚无覆盖“使用—损耗—废料—回收/处置—再投入”的完整跨周期材料链。
 **交付：** 选少量可回收材料，使生产、维修、事故生成副产物；回收需工位、劳动和时间并有损耗/污染差异，结果回到既有库存与承载力 owner。
 **验收：** 新料与回收料有成本/质量取舍；废物可积压并影响地点或工位；回收不凭空增量；关闭功能不破坏旧存档。P1，30–46 小时。
+*现场落地：* 已在 `engines/environmental-capacity.js` 落地可回收材料规格声明（`declareRecyclableMaterial`）、生产/维修/事故废料生成与拥堵状态动态分级（`generateScrap`，normal -> congested -> choked）、严格物质守恒回收与库存联动（`recycleScrap`，`produced = floor(scrap * yieldRate), loss = scrap - produced`）、全生命周期与效能只读审计（`materialLifecycle`）；在 `engines/action-desk.js` 接入对应路由；专测 `tests/exp37-material-lifecycle-recycle-v2233.js`（26 项断言全绿，含单行真源码负控制与 10 次纯读零写入状态隔离），死导出账本 1030 零漂移。已结项合入。
 ### EXV4-2｜人口迁入迁出与地方能力变化
 **真实缺口：** people、travel、family、org、service-network 已存在，但长期人口流动尚未成为劳动力、照护、服务覆盖与地方路径的共同因果。
 **交付：** 以迁居/季节性流动事件改变现有角色地点、可用时段和关系责任；迁入由居住/服务/工作承载约束，迁出留下待接续义务。人口统计为投影，不建第二人物库。

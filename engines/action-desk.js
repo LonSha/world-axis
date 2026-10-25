@@ -241,6 +241,31 @@
     'envCapacity.regenerate': function (o) { return WA.envCapacity.regenerate(o.resourceId, o); },
     'envCapacity.regionStatus': function (o) { return WA.envCapacity.regionStatus(o.regionId); },
     'envCapacity.evaluateImpact': function (o) { return WA.envCapacity.evaluateImpact(o.regionId, o.resourceType); },
+    // v2.233.0 (EXV4-1): 材料生命周期与废弃物回流
+    'envCapacity.declareRecyclableMaterial': function (o) {
+      if (typeof WA.envCapacity.declareRecyclableMaterial === 'function') {
+        return WA.envCapacity.declareRecyclableMaterial(o.materialId, o.spec);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'envCapacity.generateScrap': function (o) {
+      if (typeof WA.envCapacity.generateScrap === 'function') {
+        return WA.envCapacity.generateScrap(o.materialId, o.amount, o.source, o.locationId, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'envCapacity.recycleScrap': function (o) {
+      if (typeof WA.envCapacity.recycleScrap === 'function') {
+        return WA.envCapacity.recycleScrap(o.materialId, o.amount, o.worker, o.facilityId, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'envCapacity.materialLifecycle': function (o) {
+      if (typeof WA.envCapacity.materialLifecycle === 'function') {
+        return WA.envCapacity.materialLifecycle(o.materialId, o.locationId);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },
