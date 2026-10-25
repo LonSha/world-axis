@@ -506,6 +506,43 @@
     'riskPooling.poolStatus': function () {
       return (WA.riskPooling && WA.riskPooling.POOL_STATUS) ? WA.riskPooling.POOL_STATUS.slice() : [];
     },
+    // v2.233.0 (EXV4-8): roleConflict 地方身份与多重归属冲突
+    'roleConflict.registerAffiliationObligation': function (o) {
+      if (typeof WA.roleConflict.registerAffiliationObligation === 'function') {
+        return WA.roleConflict.registerAffiliationObligation(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'roleConflict.detectRoleConflict': function (o) {
+      if (typeof WA.roleConflict.detectRoleConflict === 'function') {
+        return WA.roleConflict.detectRoleConflict(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'roleConflict.resolveConflictStance': function (o) {
+      if (typeof WA.roleConflict.resolveConflictStance === 'function') {
+        return WA.roleConflict.resolveConflictStance(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'roleConflict.viewConflictPerception': function (o) {
+      if (typeof WA.roleConflict.viewConflictPerception === 'function') {
+        return WA.roleConflict.viewConflictPerception(o.conflictId, o.viewerGroup);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'roleConflict.roleConflictProjection': function (o) {
+      if (typeof WA.roleConflict.roleConflictProjection === 'function') {
+        return WA.roleConflict.roleConflictProjection(o.who || (o.spec && o.spec.who) || (typeof o === 'string' ? o : null));
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'roleConflict.resolutionStances': function () {
+      return (WA.roleConflict && WA.roleConflict.RESOLUTION_STANCES) ? WA.roleConflict.RESOLUTION_STANCES.slice() : [];
+    },
+    'roleConflict.conflictSeverity': function () {
+      return (WA.roleConflict && WA.roleConflict.CONFLICT_SEVERITY) ? WA.roleConflict.CONFLICT_SEVERITY.slice() : [];
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },

@@ -365,6 +365,8 @@ const LOAD = [
     'engines/knowledge-practice.js',
     // v2.233.0（拓展 EXV4-7）：地方风险分担与保险式互助。同序进 LOAD。
     'engines/risk-pooling.js',
+    // v2.233.0（拓展 EXV4-8）：地方身份与多重归属冲突。同序进 LOAD。
+    'engines/role-conflict.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序

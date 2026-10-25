@@ -497,6 +497,8 @@
     'engines/knowledge-practice.js',
     // v2.233.0（拓展 EXV4-7）：地方风险分担与保险式互助。
     'engines/risk-pooling.js',
+    // v2.233.0（拓展 EXV4-8）：地方身份与多重归属冲突。
+    'engines/role-conflict.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

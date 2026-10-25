@@ -49,6 +49,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** relation/org/region/social-legacy 已有关系、组织和历史身份，但一个人同时依赖家庭、职业团体、居住地时的利益冲突缺少能改变行动结果的明确表达。
 **交付：** 在具体事件中记录角色受影响的群体归属、义务和可知证据；冲突改变参与、回避、调停或退出成本，事实和立场分开存，不新造好感货币。
 **验收：** 同一角色面对互斥义务时不能两边都自动履约；退出/调停有真实代价；组织与亲历者所知不同；解决后保留历史责任。P2，26–42 小时。
+*现场落地：* 已在 `engines/role-conflict.js` 落地多重归属义务声明（`registerAffiliationObligation`）、互斥事件冲突识别（`detectRoleConflict`，无双向义务时拦截 `no-dual-obligation`）、立场裁决与真实代价（`resolveConflictStance`，支持 comply 单方违约、recuse 回避退出代价、mediate 调停与 breach 双背叛，不造好感货币）、视角隔离与组织可知性（`viewConflictPerception`，外部组织仅见公开事实且动机受遮蔽）以及纯读只读投影（`roleConflictProjection`，10 次调用状态完全隔离）。接入 ActionDesk 路由、tool-diag 并在 `tests/exp44-role-conflict-obligations-v2233.js` 固化 31 项断言与单行真源码负控制。死导出账本 1030 零漂移。已结项合入。
 ### EXV4-9｜世代交替与制度惯性
 **真实缺口：** social-legacy、phase-transition、custom-lax 有历史解释、路径和地方惯例，但人员更替后制度为何延续、变形或失效缺少可玩的代际传递。
 **交付：** 将一小组规则/技术/共同承诺绑定到可传递的文书、设施、实践者和支持群体；负责人离场时由继任者选择继承、修订或放弃并承担过渡成本。

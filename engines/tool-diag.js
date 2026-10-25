@@ -2317,6 +2317,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/knowledge-practice.js': 'knowledgePractice',
     // v2.233.0 (EXV4-7): riskPooling -- 地方风险分担与保险式互助（风险池/缴纳/守恒救助/争议审查）
     'engines/risk-pooling.js': 'riskPooling',
+    // v2.233.0 (EXV4-8): roleConflict -- 地方身份与多重归属冲突（多重义务/互斥撕裂/违约代价/视角隔离）
+    'engines/role-conflict.js': 'roleConflict',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',
