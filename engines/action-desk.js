@@ -632,6 +632,27 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.239.0 (OPV5-2): 人情势能债务在行动桌的折现兑付
+    'livingWorld.redeemDebt': function (o) {
+      if (typeof WA.livingWorld.redeemDebt === 'function') {
+        return WA.livingWorld.redeemDebt(o.fromWho || o.who, o.toWho || o.to, o.debtType || o.type, o.amount, o.reason);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.239.0 (OPV5-3): 空间痕迹清理/掩盖
+    'livingWorld.cleanTrace': function (o) {
+      if (typeof WA.livingWorld.cleanTrace === 'function') {
+        return WA.livingWorld.cleanTrace(o.place, o.traceId || o.who, o.options || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.239.0 (OPV5-3): 调查系统留痕提取证据
+    'investigation.extractFromTrace': function (o) {
+      if (typeof WA.investigation.extractFromTrace === 'function') {
+        return WA.investigation.extractFromTrace(o.traceObj || o.trace, o.person || o.who, o.options || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
     },

@@ -297,6 +297,39 @@
       { nestedHere: nestedTx(txr) });
   }
 
+  // ── 2b. extractFromTrace：将空间物理留痕提取为线索/证据 (v2.239.0 OPV5-3) ──
+  function extractFromTrace(traceObj, person, opts) {
+    var cfg = getSettings();
+    if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
+    if (!traceObj || !traceObj.place) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', field: 'traceObj' }; }
+    var who = clean(person, 60);
+    if (!who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', field: 'person' }; }
+    var o = opts || {};
+    var receiptId = clean(o.receiptId || ('trace_rcpt_' + (traceObj.id || Date.now())), 60);
+
+    var existingClue = clues().find(function (c) {
+      return c && (c.location === traceObj.place || c.subject === traceObj.who);
+    });
+
+    var clueId = existingClue ? existingClue.id : null;
+    if (!clueId) {
+      var reg = register({
+        title: '现场勘查：' + traceObj.place + '留痕',
+        subject: traceObj.who || '现场涉事者',
+        location: traceObj.place,
+        sourceType: 'trace',
+        verifyRule: '现场物理痕迹核对'
+      });
+      if (reg && reg.ok) clueId = reg.id;
+      else return reg;
+    }
+
+    return investigate(clueId, who, {
+      receiptId: receiptId,
+      content: clean(traceObj.trace || ('在' + traceObj.place + '发现' + (traceObj.who || '') + '留下的痕迹'), 200)
+    });
+  }
+
   // ── 3. checkEvidence：对照来源，区分未证实/矛盾/已核实/无法判断 ──
   function checkEvidence(clueId) {
     var cfg = getSettings();
@@ -520,6 +553,7 @@
     setSettings: function (patch) { return setSettings(patch); },
     register: register,
     investigate: investigate,
+    extractFromTrace: extractFromTrace,
     checkEvidence: checkEvidence,
     reveal: reveal,
     pending: pending,
@@ -529,7 +563,7 @@
     stat: stat,
     reset: reset
   };
-  var EXPORT_COUNT = 12;
+  var EXPORT_COUNT = 13;
   var _exported = Object.keys(WA.investigation).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('investigation: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/investigation.js', { kind: 'engine', ver: '2.194.0' });

@@ -349,6 +349,7 @@
   /**
    * 投石入水局部生态涟漪传导（propagateRipple）
    * 当核心角色遭剧烈扰动时，其地缘与依附关联人动机发生级联偏折
+   * v2.239.0 (OPV5-1): 传导至宏观势力警戒状态（factions vigilance / status）
    */
   function propagateRipple(sourceWho, cause, impactType, options) {
     const cfg = settings();
@@ -381,6 +382,23 @@
         }
       });
 
+      // OPV5-1: 宏观势力汇流 (evolution.factions vigilance/status update)
+      const escalatedFactions = [];
+      if (draft.evolution && Array.isArray(draft.evolution.factions)) {
+        draft.evolution.factions.forEach(function (fac) {
+          if (!fac || !fac.name) return;
+          const targetFaction = opts.faction || (opts.factions && opts.factions.indexOf(fac.name) >= 0);
+          const scopeMatch = fac.scope && (fac.scope === srcPlace || fac.scope.indexOf(srcPlace) >= 0 || srcPlace.indexOf(fac.scope) >= 0);
+          if (targetFaction || scopeMatch || imp === 'crisis') {
+            fac.vigilance = Math.min(100, (typeof fac.vigilance === 'number' ? fac.vigilance : 20) + (imp === 'crisis' ? 30 : 15));
+            if (fac.vigilance >= 75 && fac.status === '稳固') {
+              fac.status = '倾轧';
+            }
+            escalatedFactions.push({ name: fac.name, vigilance: fac.vigilance, status: fac.status });
+          }
+        });
+      }
+
       const rip = {
         id: 'ripple_' + src + '_' + (b.tick || 0),
         source: src,
@@ -388,6 +406,7 @@
         cause: cs,
         impactType: imp,
         affectedPeers: affected,
+        escalatedFactions: escalatedFactions,
         tick: b.tick || 0
       };
       b.ripples.push(rip);
@@ -444,6 +463,43 @@
       out = { ok: true, entry: entry };
       return true;
     }, 'livingWorld:recordRelationalDebt');
+    return out || refuse('tx-failed');
+  }
+
+  /**
+   * 兑现或消耗人情恩义/把柄（redeemDebt）
+   * v2.239.0 (OPV5-2): 供行动桌交涉/行动突破门槛折现使用
+   */
+  function redeemDebt(fromWho, toWho, debtType, amount, reason) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const f = cleanStr(fromWho, 40);
+    const t = cleanStr(toWho, 40);
+    const ty = cleanStr(debtType || 'favor', 20);
+    const amt = typeof amount === 'number' ? amount : 1;
+    const rsn = cleanStr(reason, 120);
+    if (!f || !t) return refuse('missing-name');
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = getBucket(draft);
+      let entry = b.relationalDebts.find(function (d) {
+        return d && d.from === f && d.to === t && d.type === ty;
+      });
+      if (!entry || (entry.amount || 0) < amt) {
+        out = { ok: false, reason: 'insufficient-debt', have: entry ? entry.amount : 0, need: amt };
+        return false;
+      }
+      entry.amount = entry.amount - amt;
+      entry.lastReason = rsn || ('兑现抵扣: ' + amt);
+      entry.updatedTick = b.tick || 0;
+      if (entry.amount <= 0) {
+        b.relationalDebts = b.relationalDebts.filter(function (x) { return x && x.id !== entry.id; });
+      }
+      stat.relationalDebtsRedeemed = (stat.relationalDebtsRedeemed || 0) + 1;
+      out = { ok: true, from: f, to: t, type: ty, redeemed: amt, remaining: entry.amount };
+      return true;
+    }, 'livingWorld:redeemDebt');
     return out || refuse('tx-failed');
   }
 
@@ -821,6 +877,58 @@
   }
 
   /**
+   * 清理与掩盖空间痕迹（cleanTrace）
+   * v2.239.0 (OPV5-3): 玩家或NPC主动清理/伪造现场
+   */
+  function cleanTrace(place, traceIdOrWho, options) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const pl = cleanStr(place, 60);
+    if (!pl) return refuse('missing-place');
+    const target = cleanStr(traceIdOrWho, 60);
+    const opts = options || {};
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = getBucket(draft);
+      if (!Array.isArray(b.livingTraces)) b.livingTraces = [];
+      const beforeCount = b.livingTraces.length;
+      let cleaned = [];
+
+      b.livingTraces = b.livingTraces.filter(function (t) {
+        if (!t) return false;
+        const placeMatch = t.place === pl || pl.indexOf(t.place) >= 0 || t.place.indexOf(pl) >= 0;
+        if (!placeMatch) return true;
+        const matchTarget = !target || t.id === target || t.who === target;
+        if (matchTarget) {
+          cleaned.push(t);
+          return false;
+        }
+        return true;
+      });
+
+      // 若有伪造或替换描述
+      if (opts.coverDetail) {
+        const coverTrace = {
+          id: 'trace_cover_' + Date.now(),
+          place: pl,
+          who: cleanStr(opts.coverWho || '未知伪造者', 40),
+          trace: cleanStr(opts.coverDetail, 200),
+          atTick: b.tick || 0,
+          freshness: 100,
+          isCover: true
+        };
+        b.livingTraces.push(coverTrace);
+      }
+
+      stat.tracesCleaned = (stat.tracesCleaned || 0) + cleaned.length;
+      out = { ok: true, place: pl, cleanedCount: cleaned.length, cleanedTraces: cleaned, covered: !!opts.coverDetail };
+      return true;
+    }, 'livingWorld:cleanTrace');
+    return out || refuse('tx-failed');
+  }
+
+  /**
    * 正文全景叙事透镜（buildBlock）：多层次白描隐喻与潜台词注入
    */
   function buildBlock(playerPlace) {
@@ -961,17 +1069,19 @@
     deflectTrajectory: deflectTrajectory,
     propagateRipple: propagateRipple,
     recordRelationalDebt: recordRelationalDebt,
+    redeemDebt: redeemDebt,
     consolidateLivingMemory: consolidateLivingMemory,
     autonomousTick: autonomousTick,
     detectEncounters: detectEncounters,
     leaveTrace: leaveTrace,
+    cleanTrace: cleanTrace,
     buildBlock: buildBlock,
     stat: statView,
     resetStat: resetStat
   };
 
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.238.0' });
+    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.239.0' });
   }
 
   if (WA.workflow && typeof WA.workflow.register === 'function') {
