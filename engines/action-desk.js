@@ -695,6 +695,27 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.243.0 (EXV5-4): 官僚汇报时滞与避责虚报
+    'institutionalInertia.submitBureaucraticReport': function (o) {
+      if (WA.institutionalInertia && typeof WA.institutionalInertia.submitBureaucraticReport === 'function') {
+        return WA.institutionalInertia.submitBureaucraticReport(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.243.0 (EXV5-5): 影子配给与黑市地下交换
+    'freight.issueShadowRation': function (o) {
+      if (WA.freight && typeof WA.freight.issueShadowRation === 'function') {
+        return WA.freight.issueShadowRation(o.person || o.who, o.resource || o.resourceKey, o.amount, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.243.0 (EXV5-6): 因果溯源与追责纠缠决策树
+    'causal.traceLiabilityTree': function (o) {
+      if (WA.causal && typeof WA.causal.traceLiabilityTree === 'function') {
+        return WA.causal.traceLiabilityTree(o.incidentKey || o.key, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
     },

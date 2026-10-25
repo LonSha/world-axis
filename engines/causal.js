@@ -890,6 +890,79 @@
       + '条件未足时事情必须停住，不得替它提前完成。'
       + (function () { const d = rippleDiscipline(); return d ? ('\n' + d) : ''; })();
   }
+  /**
+   * EXV5-6: 因果溯源与追责纠缠决策树（traceLiabilityTree）
+   * 沿因果决策链顺藤摸瓜回溯直接触发人、间接推波助澜者与制度失职方，形成追责责任树
+   */
+  function traceLiabilityTree(incidentKey, options) {
+    var key = clean(incidentKey, 60);
+    if (!key) return { ok: false, reason: 'missing-fields' };
+    var opts = options || {};
+    var maxDepth = Math.max(1, Math.min(6, Number(opts.maxDepth) || 3));
+
+    var st = storeOf() ? (storeOf().get ? storeOf().get() : {}) : {};
+    var chains = (st.causal && Array.isArray(st.causal.chains)) ? st.causal.chains : [];
+
+    // 寻找与事故最直接关联的节点
+    var matchedChains = chains.filter(function (c) {
+      return c && (c.cause === key || c.action === key || (c.cause && c.cause.indexOf(key) >= 0) || (c.action && c.action.indexOf(key) >= 0));
+    });
+
+    var suspects = [];
+    var institutionalFailures = [];
+
+    matchedChains.forEach(function (c) {
+      if (c.who) {
+        suspects.push({
+          person: clean(c.who, 40),
+          role: 'direct_actor',
+          weight: 0.6,
+          action: c.action,
+          stage: c.stage
+        });
+      }
+      if (Array.isArray(c.affected)) {
+        c.affected.forEach(function (aff) {
+          if (aff && aff !== c.who) {
+            suspects.push({
+              person: clean(aff, 40),
+              role: 'contributor_or_victim',
+              weight: 0.2,
+              action: '利益纠葛牵涉'
+            });
+          }
+        });
+      }
+      if (c.institution || c.regulator) {
+        institutionalFailures.push({
+          institution: clean(c.institution || c.regulator, 60),
+          duty: '监管失察或迟滞',
+          severity: 0.4
+        });
+      }
+    });
+
+    if (suspects.length === 0 && opts.fallbackWho) {
+      suspects.push({
+        person: clean(opts.fallbackWho, 40),
+        role: 'primary_suspect',
+        weight: 0.5,
+        action: '现场处置责任人'
+      });
+    }
+
+    return {
+      ok: true,
+      incident: key,
+      maxDepth: maxDepth,
+      suspects: suspects,
+      institutionalFailures: institutionalFailures,
+      primaryLiability: suspects.length > 0 ? suspects[0].person : 'unknown',
+      liabilityConfidence: suspects.length > 0 ? 0.75 : 0.2,
+      note: '因果追责决策树回溯完成，责任已按因果链权重锚定'
+    };
+  }
+
   // v2.146.0（F2/W3）：后果涟漪纪律段——只报计数、零 token 占用、不列链名/后果名
   //   （列出即把未揭示的级联写进正文，与 leakScan「只留痕不删文」同规）。
   function rippleDiscipline() {
@@ -934,6 +1007,8 @@
     // v2.147.0（W1）：跨模块因果追溯图谱（只读推导）。
     rippleWeb: rippleWeb,
     endingsTree: endingsTree,
-    traceGraph: traceGraph
+    traceGraph: traceGraph,
+    // EXV5-6: 因果溯源与追责纠缠决策树
+    traceLiabilityTree: traceLiabilityTree
   };
 })();

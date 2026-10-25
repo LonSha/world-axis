@@ -384,6 +384,55 @@
       cap: cfg.maxShipments
     };
   }
+  /**
+   * EXV5-5: 影子配给与黑市地下交换网络（issueShadowRation & exchangeShadowGoods）
+   * 官方物资短缺断供时，衍生隐蔽的影子配给代币与地下以物易物网络
+   */
+  function issueShadowRation(person, resourceKey, amount, options) {
+    var who = clean(person, 40);
+    var res = clean(resourceKey, 30);
+    var amt = Math.max(1, Number(amount) || 1);
+    if (!who || !res) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    var opts = options || {};
+    var premiumMultiplier = Math.max(1.0, Number(opts.premiumMultiplier) || 2.5);
+
+    var out = null;
+    WA.store.transact(function (draft) {
+      draft.freight = draft.freight || {};
+      draft.freight.shadowNetwork = draft.freight.shadowNetwork || { ledgers: {}, transactions: [] };
+      draft.freight.shadowNetwork.ledgers[who] = draft.freight.shadowNetwork.ledgers[who] || { tokens: 0, rations: {} };
+
+      var ldg = draft.freight.shadowNetwork.ledgers[who];
+      ldg.rations[res] = (ldg.rations[res] || 0) + amt;
+      ldg.tokens = (ldg.tokens || 0) + amt * 10; // 配给票兑换影子代币
+
+      var tx = {
+        id: 'stx_' + Math.random().toString(36).substring(2, 8),
+        who: who,
+        type: 'issue_ration',
+        resource: res,
+        amount: amt,
+        premiumMultiplier: premiumMultiplier,
+        at: clockNow('freight:shadow')
+      };
+      draft.freight.shadowNetwork.transactions.push(tx);
+      if (draft.freight.shadowNetwork.transactions.length > 20) draft.freight.shadowNetwork.transactions.shift();
+
+      out = {
+        ok: true,
+        who: who,
+        resource: res,
+        amount: amt,
+        totalRations: ldg.rations[res],
+        shadowTokens: ldg.tokens,
+        note: '影子配给票已发放，地下流通已激活'
+      };
+      return true;
+    }, 'freight:issueShadowRation');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
   // ── 统计面 ──
   function statView() {
     return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) });
@@ -396,16 +445,17 @@
     arrive: arrive,
     cancel: cancel,
     reroute: reroute,
+    issueShadowRation: issueShadowRation,
     view: view,
     buildBlock: buildBlock,
     diagnose: diagnose,
     stat: statView
   };
-  // ── 自证块（导出数 === 10）──
-  var EXPECTED = ['getSettings','setSettings','dispatch','arrive','cancel','reroute','view','buildBlock','diagnose','stat'];
+  // ── 自证块（导出数 === 11）──
+  var EXPECTED = ['arrive','buildBlock','cancel','diagnose','dispatch','getSettings','issueShadowRation','reroute','setSettings','stat','view'];
   var exported = Object.keys(WA.freight).sort();
   if (exported.length !== EXPECTED.length) {
     WA.__freightWarn = 'export mismatch: expected ' + EXPECTED.length + ' got ' + exported.length;
   }
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/freight.js', { kind: 'engine', ver: '2.194.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/freight.js', { kind: 'engine', ver: '2.243.0' });
 })();

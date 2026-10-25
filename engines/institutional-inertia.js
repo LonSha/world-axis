@@ -308,7 +308,6 @@
     if (cid) {
       charters = charters.filter(function (c) { return c && c.id === cid; });
     }
-
     var summary = charters.map(function (c) {
       return {
         id: c.id,
@@ -320,7 +319,6 @@
         historyLength: (c.history || []).length
       };
     });
-
     return {
       ok: true,
       totalCharters: charters.length,
@@ -329,18 +327,88 @@
     };
   }
 
+  /**
+   * EXV5-4: 官僚汇报时滞与避责虚报机制（submitBureaucraticReport）
+   * 下级向上级/宏观势力汇报时产生轮次时滞与公文粉饰修饰，掩盖真实危机严重度
+   */
+  function submitBureaucraticReport(reportSpec) {
+    var p = reportSpec || {};
+    var reporter = clean(p.reporter, 40);
+    var institution = clean(p.institution || p.recipientInstitution, 60);
+    var issueKey = clean(p.issueKey, 40);
+    var actualIncident = clean(p.actualIncident || p.incident, 160);
+    var whitewashLevel = clean(p.whitewashLevel, 30) || 'mild_embellishment'; // truthful, mild_embellishment, heavy_whitewash
+    var delayRounds = typeof p.delayRounds === 'number' ? Math.max(1, p.delayRounds) : 2;
+
+    if (!reporter || !actualIncident) {
+      return { ok: false, reason: 'missing-fields' };
+    }
+
+    var sanitizedSummary = actualIncident;
+    var riskEvasion = 0; // 避责系数 0-100
+    if (whitewashLevel === 'heavy_whitewash') {
+      sanitizedSummary = '【官式虚报呈文】：经细加体察，' + issueKey + '虽有微末动静，实属局势平稳受控，阖境安谧，无碍大局。';
+      riskEvasion = 80;
+    } else if (whitewashLevel === 'mild_embellishment') {
+      sanitizedSummary = '【委婉折冲文牍】：' + issueKey + '突生偶发事端（' + actualIncident + '），现已遣员严密督导，情势稳步向好。';
+      riskEvasion = 40;
+    } else {
+      sanitizedSummary = '【如实具陈急报】：' + actualIncident + '，亟需统筹应对。';
+      riskEvasion = 0;
+    }
+
+    var reportId = 'rep_' + Math.random().toString(36).substring(2, 8);
+    var out = null;
+
+    WA.store.transact(function (draft) {
+      draft.institutionalInertia = draft.institutionalInertia || {};
+      draft.institutionalInertia.bureaucraticReports = draft.institutionalInertia.bureaucraticReports || [];
+      var entry = {
+        id: reportId,
+        reporter: reporter,
+        institution: institution || '顺天府巡捕衙门',
+        issueKey: issueKey,
+        actualIncident: actualIncident,
+        sanitizedSummary: sanitizedSummary,
+        whitewashLevel: whitewashLevel,
+        delayRounds: delayRounds,
+        riskEvasion: riskEvasion,
+        status: 'in_transit',
+        submittedAt: now()
+      };
+      draft.institutionalInertia.bureaucraticReports.push(entry);
+      if (draft.institutionalInertia.bureaucraticReports.length > 20) draft.institutionalInertia.bureaucraticReports.shift();
+      out = {
+        ok: true,
+        reportId: reportId,
+        reporter: reporter,
+        institution: entry.institution,
+        delayRounds: delayRounds,
+        whitewashLevel: whitewashLevel,
+        riskEvasion: riskEvasion,
+        sanitizedSummary: sanitizedSummary,
+        actualIncident: actualIncident,
+        note: '官僚文书已提交在途，存在 ' + delayRounds + ' 轮时滞' + (riskEvasion > 0 ? '与词句粉饰' : '并如实呈报')
+      };
+      return true;
+    }, 'institutionalInertia:submitBureaucraticReport');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
   WA.institutionalInertia = {
     establishCharter: establishCharter,
     triggerSuccessionHandover: triggerSuccessionHandover,
     resolveSuccessionPath: resolveSuccessionPath,
     auditInstitutionalDecay: auditInstitutionalDecay,
     institutionalInertiaProjection: institutionalInertiaProjection,
+    submitBureaucraticReport: submitBureaucraticReport,
     SUCCESSION_PATHS: SUCCESSION_PATHS.slice(),
     CHARTER_STATUS: CHARTER_STATUS.slice()
   };
 
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/institutional-inertia.js', { kind: 'engine', ver: '2.233.0' });
+    WA.registerModule('engines/institutional-inertia.js', { kind: 'engine', ver: '2.243.0' });
   }
 
   if (typeof console !== 'undefined' && console.log) {
