@@ -620,6 +620,18 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    'livingWorld.propagateRipple': function (o) {
+      if (typeof WA.livingWorld.propagateRipple === 'function') {
+        return WA.livingWorld.propagateRipple(o.sourceWho, o.cause, o.impactType, o.options || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'livingWorld.recordRelationalDebt': function (o) {
+      if (typeof WA.livingWorld.recordRelationalDebt === 'function') {
+        return WA.livingWorld.recordRelationalDebt(o.fromWho, o.toWho, o.debtType, o.amount, o.reason);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
     },

@@ -203,7 +203,10 @@
         characterStates: {},
         intersections: [],
         epistemicGaps: [],
-        vignettes: []
+        vignettes: [],
+        // v2.237.0 (Living World V6 通用世界自治与深层人情):
+        ripples: [],
+        relationalDebts: []
       },
       knowledgePractice: { knowledges: [], licenses: [], practiceLogs: [], refinements: [] },
       publicAgenda: { agendas: {}, proposals: [], deliberations: [] },
@@ -1597,6 +1600,8 @@
     'livingWorld.intersections': { cap: 32, site: 'living-world.js evict.array(intersections, "livingWorld.intersections")' },
     'livingWorld.epistemicGaps': { cap: 32, site: 'living-world.js evict.array(epistemicGaps, "livingWorld.epistemicGaps")' },
     'livingWorld.vignettes': { cap: 32, site: 'living-world.js evict.array(vignettes, "livingWorld.vignettes")' },
+    'livingWorld.ripples': { cap: 32, site: 'living-world.js evict.array(ripples, "livingWorld.ripples")' },
+    'livingWorld.relationalDebts': { cap: 48, site: 'living-world.js evict.array(relationalDebts, "livingWorld.relationalDebts")' },
     'vitals.rows': { cap: 24, site: "vitals.js evict.array(rows, \"vitals.rows\")" },
     'coordinate.anchors': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.anchors\")" },
     'coordinate.rows': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.rows\")" },

@@ -1,17 +1,18 @@
 /**
- * WorldAxis engines/living-world.js (v2.236.0) — Living World V5.2：真实世界全景自治演化中枢
+ * WorldAxis engines/living-world.js (v2.237.0) — Living World V6：通用真实世界自治演化与深层人情中枢
  *
- * ── 核心职责全景 ──────────────────────────────────────────────────
- *   ① 原生职业作息网格（OCCUPATIONAL_ROUTINES）：医者/捕快/商贩/书生/游侠阶层行为；
- *   ② 生理磨损与疲态沉淀（vitalStrain）：精力疲惫/饥渴度/市井风尘动态增减与生计干粮补给；
- *   ③ 随身生计行囊（belongings）：铜钱/碎银/干粮/贴身器物/信据凭条真实收支；
- *   ④ 空间痕迹物理半衰期（decayTraces）：痕迹随时间推移逐渐冷却、风化、被掌柜清扫；
- *   ⑤ NPC之间横向社交碰撞（resolveIntersections）：主角不在场时，同处一室的NPC发生真实互动交集；
- *   ⑥ 市井生活窘迫微情境（vignettes）：偶遇时撞见角色数铜钱、当铺犹豫、小二催账等生动瞬间；
- *   ⑦ 认知视界与情报时差（epistemicGaps）：城东变故通过市井传闻慢速传导，角色保持信息不对称；
- *   ⑧ 玩家交互反向生活轨迹偏折（deflectTrajectory）：正文转交物资或解决危机后，NPC立即切换作息动因；
- *   ⑨ 重大离场历程向终身记忆沉淀（consolidateLivingMemory）：重大经历写回 actors/profile；
- *   ⑩ 正文叙事透镜（buildBlock）：全景多层次注入在场者神态、行囊、微观暗涌与周遭痕迹。
+ * ── 核心职责全景（全面兼容通用/现代/奇幻/科幻/市井全题材）─────────────────────
+ *   ① 原生职业/身份作息网格（OCCUPATIONAL_ROUTINES）：医者/治愈者、差役/执法者、商贩/工薪族、学者/研究员、游侠/流民/探索者；
+ *   ② 生理磨损与微观生计代谢自愈环（metabolicLoop）：精力疲惫/饥渴度/风尘磨损；匮乏时自主消耗口粮或花费钱款自愈；
+ *   ③ 随身生计行囊与信据（belongings）：货币(铜/银/币)、干粮口粮、随身工具器物、贴身信物真实收支；
+ *   ④ 空间痕迹物理半衰期与多感官具象（decayTraces）：痕迹随时间推移逐渐冷却、风化、被清理；呈现温度/气味/微尘具象细节；
+ *   ⑤ NPC横向社交碰撞与人情势能沉淀（recordRelationalDebt）：两NPC交集时沉淀恩义人情(favors)、嫌隙摩擦(grudges)与秘密(secrets)；
+ *   ⑥ 市井窘迫生活微情境（vignettes）：涵盖数零钱、典当犹豫、争执砍价、疲惫打盹等通用生计瞬间；
+ *   ⑦ 投石入水局部生态涟漪（propagateRipple）：核心人物遭剧烈变故（受伤/暴富/受困）时，地缘与依附关联人动机级联偏折；
+ *   ⑧ 久别重逢心理重力发酵（reunionSubtext）：长期未见角色重聚时，比对离场发酵史，提取深层心理潜台词（情怯/感激/顾虑）；
+ *   ⑨ 玩家交互反向生活轨迹偏折（deflectTrajectory）：正文转交物资或解决危机后，NPC立即切换作息动因；
+ *   ⑩ 重大离场历程向终身记忆沉淀（consolidateLivingMemory）：重大经历写回 actors/profile；
+ *   ⑪ 正文多层次文学白描叙事透镜（buildBlock）：全景多层次注入在场者神态、行囊、心理重力暗涌与周遭感官痕迹。
  */
 
 (function () {
@@ -30,11 +31,14 @@
     maxIntersections: 16,
     maxVignettes: 16,
     maxGaps: 16,
+    maxRipples: 16,
+    maxRelationalDebts: 24,
     rumorDiffusion: true,
     decayRounds: 5,
     wearinessRate: 1.0,
     subsistenceEnabled: true,
-    peerInteractions: true
+    peerInteractions: true,
+    metabolicLoopEnabled: true
   };
 
   const __REG = {
@@ -42,6 +46,7 @@
     bounds: {
       maxEncounters: [4, 64], maxTraces: [4, 64], maxMovements: [8, 128],
       maxIntersections: [4, 64], maxVignettes: [4, 64], maxGaps: [4, 64],
+      maxRipples: [4, 64], maxRelationalDebts: [4, 64],
       decayRounds: [1, 20]
     }
   };
@@ -50,7 +55,6 @@
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
     return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
   }
-
   function saveSettings(next) {
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
@@ -64,10 +68,14 @@
     rumorsDiffused: 0,
     strainsAccumulated: 0,
     subsistenceUsed: 0,
+    metabolicBuys: 0,
     intersectionsResolved: 0,
     vignettesTriggered: 0,
     trajectoriesDeflected: 0,
     memoriesConsolidated: 0,
+    ripplesPropagated: 0,
+    relationalDebtsRecorded: 0,
+    reunionsSubtextBuilt: 0,
     refused: 0,
     lastReason: '',
     lastAt: 0
@@ -92,54 +100,55 @@
     night: '子夜更阑'
   };
 
+  // 通用职业作息网格：兼顾古风、近代与现代通识语境
   const OCCUPATIONAL_ROUTINES = {
     healer: {
-      role: '医者/药师',
-      dawn: { doing: '开馆卸板，在后堂分拣晾晒草药', place: '医馆', costWear: 5, itemUsed: '粗茶' },
-      morning: { doing: '坐堂搭脉问诊，执笔开方配药', place: '医馆', costWear: 15 },
-      noon: { doing: '在药柜后草草扒完温饭，核查存药与急方', place: '医馆后堂', costWear: -10 },
-      dusk: { doing: '收拾出诊药箱，前往街坊巷尾探视沉疴', place: '街坊小巷', costWear: 20 },
-      night: { doing: '挑灯对账研读脉案，守炉煎熬夜药', place: '医馆内室', costWear: 10 }
+      role: '医者/医师/看护',
+      dawn: { doing: '开门通风，清点整理药具与急用消耗品', place: '诊所药室', costWear: 5, itemUsed: '温水' },
+      morning: { doing: '坐班问诊搭脉，执笔记录病情并配发药物', place: '诊所药室', costWear: 15 },
+      noon: { doing: '在隔间草草用完温热盒饭，翻阅核查未结病例', place: '诊所后屋', costWear: -10 },
+      dusk: { doing: '清点出诊箱器具，上门随访几位体弱病患', place: '街区小巷', costWear: 20 },
+      night: { doing: '挑灯对账研核药理笔记，看顾留观病榻', place: '诊所内室', costWear: 10 }
     },
     constable: {
-      role: '捕快/差役',
-      dawn: { doing: '县衙二堂点卯，束紧护腕核验腰牌', place: '县衙', costWear: 10 },
-      morning: { doing: '带队穿行东市巡查摊位，盘查可疑行商', place: '东市集市', costWear: 20, itemUsed: '干粮一块' },
-      noon: { doing: '在街角茶棚解刀歇脚，向茶博士打探近日风声', place: '市井茶棚', costWear: -15 },
-      dusk: { doing: '查验各坊关卡栅栏，催促商贩熄炉打烊', place: '坊市关卡', costWear: 15 },
-      night: { doing: '换上皂靴提灯打梆夜巡，警惕暗巷宵小', place: '城中暗巷', costWear: 25 }
+      role: '差役/执法/安保',
+      dawn: { doing: '点名查验装备，整理随身腰牌与文书', place: '值所公堂', costWear: 10 },
+      morning: { doing: '带队穿行辖区街市巡查摊位，排查可疑事端', place: '街区市集', costWear: 20, itemUsed: '干粮口粮' },
+      noon: { doing: '在街角便民食摊歇脚解渴，向店主打听近日风声', place: '市井茶棚', costWear: -15 },
+      dusk: { doing: '查验卡口门闸，督导街区商贩收摊停当', place: '坊门关卡', costWear: 15 },
+      night: { doing: '换上夜巡行头提灯夜巡，留心街巷幽暗角落', place: '昏暗偏巷', costWear: 25 }
     },
     vendor: {
-      role: '商贩/掌柜',
-      dawn: { doing: '拉板车抢占当街吉位，卸下门板铺排货物', place: '集市摊位', costWear: 15 },
-      morning: { doing: '扯开嗓子招徕过路客，拨弄算盘找零铜钱', place: '集市摊位', costWear: 20 },
-      noon: { doing: '蹲在摊位旁吞咽凉水与干馍，紧盯过往行人', place: '集市摊位', costWear: -5 },
-      dusk: { doing: '将未卖出的散碎物件装箱捆扎，清点钱囊铜板', place: '集市摊位', costWear: 15 },
-      night: { doing: '推着沉重板车归家，与家人就着豆油灯核算微薄盈余', place: '家中陋室', costWear: -20 }
+      role: '商贩/店主/工薪',
+      dawn: { doing: '早早张罗开店，打扫门面搬运货物摆齐', place: '市集店铺', costWear: 15 },
+      morning: { doing: '忙碌招呼往来顾客，拨弄账册或计算找零零钱', place: '市集店铺', costWear: 20 },
+      noon: { doing: '守着摊位咬着冷食干粮，眼睛仍盯牢过往客人', place: '市集店铺', costWear: -5 },
+      dusk: { doing: '将未卖出的货物打包遮盖，点算钱囊与散碎收入', place: '市集店铺', costWear: 15 },
+      night: { doing: '推车挑担疲惫归家，与家人对坐核算微薄收支', place: '狭窄住处', costWear: -20 }
     },
     scholar: {
-      role: '文人/书生',
-      dawn: { doing: '临窗研墨晨诵，就着晨光温读经籍', place: '书斋', costWear: 5 },
-      morning: { doing: '前往文渊书肆或义学堂为人抄录文书、代写家信', place: '书肆义学', costWear: 15 },
-      noon: { doing: '以冷茶就素饼充饥，与同窗切磋时文制艺', place: '茶寮', costWear: -10 },
-      dusk: { doing: '收拢泛黄稿纸与笔砚，漫步桥头透气舒解目眩', place: '运河桥畔', costWear: 10 },
-      night: { doing: '剪去灯花续上残油，咳喘着连夜抄录借来的孤本', place: '寒舍油灯前', costWear: 20 }
+      role: '文人/学者/干事',
+      dawn: { doing: '晨起开窗研墨看书，借着晨光翻阅手头案卷', place: '书斋案头', costWear: 5 },
+      morning: { doing: '前往学堂或行所为众人代书誊抄、撰拟文稿', place: '文渊书所', costWear: 15 },
+      noon: { doing: '就着温茶吃些干粮，与相熟同仁闲谈探讨', place: '茶肆食档', costWear: -10 },
+      dusk: { doing: '收纳整理稿纸砚台，在门外漫步透气松弛颈目', place: '河畔石桥', costWear: 10 },
+      night: { doing: '剪亮油灯伏案疾书，连夜校对抄录典籍资料', place: '孤灯案前', costWear: 20 }
     },
     drifter: {
-      role: '游侠/流民',
-      dawn: { doing: '在破庙檐下拍打草席上的晨露，缩身舒展筋骨', place: '城隍庙荒殿', costWear: 10 },
-      morning: { doing: '在客栈酒楼外打探江湖悬赏与短工脚力活', place: '客栈酒楼外', costWear: 20 },
-      noon: { doing: '摸出怀中硬如石头的半块干饼啃咽，警惕地环视四周', place: '屋檐阴凉处', costWear: -5 },
-      dusk: { doing: '在铁匠铺外驻足打量刀兵，盘算腰间所剩无几的碎银', place: '铁匠铺街角', costWear: 10 },
-      night: { doing: '抱着随身旧刀假寐，微风吹草动便骤然睁眼', place: '城隍庙残垣', costWear: 15 }
+      role: '游民/浪客/行者',
+      dawn: { doing: '在廊檐避风处拍打衣物寒气，起身活动麻木肢体', place: '破庙外廊', costWear: 10 },
+      morning: { doing: '在码头或集市打探零工搬运差事与悬赏动静', place: '客栈渡口', costWear: 20 },
+      noon: { doing: '摸出怀中坚硬口粮费力咀嚼吞咽，警惕地扫视周遭', place: '巷口檐下', costWear: -5 },
+      dusk: { doing: '在铁匠行当或旧货摊外流连，清点腰间所剩无几的碎银', place: '行铺街角', costWear: 10 },
+      night: { doing: '抱着随身物件靠墙浅眠，稍有异响便警醒睁眼', place: '荒废角落', costWear: 15 }
     }
   };
 
   const VIGNETTE_TEMPLATES = [
-    { type: 'financial_pinch', desc: '正把衣袖翻出，小心翼翼地数着手心仅有的几个发黑铜板，眉头紧锁' },
+    { type: 'financial_pinch', desc: '正把衣兜里外翻遍，小心翼翼地数着手心仅有的几个发黑零钱铜板，眉头紧锁' },
     { type: 'pawn_hesitation', desc: '站在当铺高柜外攥紧怀中的旧物，迟迟没有迈步，神情颇多挣扎' },
     { type: 'merchant_haggling', desc: '正为几文钱的零碎与摊主争执不下，语气焦灼却又不得不据理力争' },
-    { type: 'weary_slumber', desc: '靠在廊柱或长凳边缘闭目小憩，手里仍下意识紧紧护着包裹' }
+    { type: 'weary_slumber', desc: '靠在廊柱或长凳边缘闭目小憩，手里仍下意识紧紧护着随身包裹' }
   ];
 
   function cleanStr(s, max) {
@@ -157,7 +166,9 @@
         characterStates: {},
         intersections: [],
         epistemicGaps: [],
-        vignettes: []
+        vignettes: [],
+        ripples: [],
+        relationalDebts: []
       };
     }
     const b = draft.livingWorld;
@@ -167,6 +178,8 @@
     if (!Array.isArray(b.intersections)) b.intersections = [];
     if (!Array.isArray(b.epistemicGaps)) b.epistemicGaps = [];
     if (!Array.isArray(b.vignettes)) b.vignettes = [];
+    if (!Array.isArray(b.ripples)) b.ripples = [];
+    if (!Array.isArray(b.relationalDebts)) b.relationalDebts = [];
     if (!b.characterStates || typeof b.characterStates !== 'object') b.characterStates = {};
     return b;
   }
@@ -191,7 +204,14 @@
           tools: ['随身粗布巾'],
           keepsakes: []
         },
-        customRoutine: null
+        customRoutine: null,
+        // 久别发酵追踪
+        absence: {
+          lastSeenTick: b.tick || 0,
+          roundsAway: 0,
+          accumulatedGratitude: 0,
+          lingeringThought: ''
+        }
       };
     }
     return b.characterStates[nm];
@@ -202,7 +222,6 @@
     if (!cfg.enabled) return refuse('disabled');
     const nm = cleanStr(name, 40);
     if (!nm) return refuse('missing-name');
-
     let out = null;
     WA.store.transact(function (draft) {
       const b = getBucket(draft);
@@ -213,17 +232,14 @@
       if (occupation && OCCUPATIONAL_ROUTINES[occupation]) {
         st.occupation = occupation;
       }
-
       draft.people = draft.people || {};
       const p = draft.people[nm] = draft.people[nm] || { id: nm, name: nm };
       p.life = p.life || {};
       p.life.routine = st.customRoutine || [];
       p.life.occupation = st.occupation;
-
       out = { ok: true, name: nm, occupation: st.occupation, routineLength: (st.customRoutine || []).length };
       return true;
     }, 'livingWorld:registerRoutine');
-
     return out || refuse('tx-failed');
   }
 
@@ -243,25 +259,130 @@
       const st = ensureCharLifeState(b, nm);
       const ewRows = (draft.elsewhere && Array.isArray(draft.elsewhere.rows)) ? draft.elsewhere.rows : [];
       const card = ewRows.find(function (c) { return c && c.name === nm; });
-
       if (card) {
         if (newGoal) card.goal = cleanStr(newGoal, 80);
         if (newDoing) card.doing = cleanStr(newDoing, 80);
         if (opts.clearWorry) card.worry = '';
         if (opts.newPlace) card.place = cleanStr(opts.newPlace, 60);
       }
-
       // 若有物资赠予或交易，更新行囊
       if (opts.giveSilver) st.belongings.silver = (st.belongings.silver || 0) + opts.giveSilver;
       if (opts.giveCopper) st.belongings.copper = (st.belongings.copper || 0) + opts.giveCopper;
       if (opts.giveProvisions) st.belongings.provisions = (st.belongings.provisions || 0) + opts.giveProvisions;
       if (opts.giveItem) st.belongings.tools.push(cleanStr(opts.giveItem, 40));
 
+      if (opts.giveSilver || opts.giveCopper || opts.clearWorry) {
+        if (st.absence) {
+          st.absence.accumulatedGratitude = (st.absence.accumulatedGratitude || 0) + 15;
+          st.absence.lingeringThought = '感念救助之恩，时常惦念挂怀';
+        }
+      }
+
       stat.trajectoriesDeflected++;
       out = { ok: true, name: nm, newDoing: newDoing, belongings: st.belongings };
       return true;
     }, 'livingWorld:deflectTrajectory');
+    return out || refuse('tx-failed');
+  }
 
+  /**
+   * 投石入水局部生态涟漪传导（propagateRipple）
+   * 当核心角色遭剧烈扰动时，其地缘与依附关联人动机发生级联偏折
+   */
+  function propagateRipple(sourceWho, cause, impactType, options) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const src = cleanStr(sourceWho, 40);
+    const cs = cleanStr(cause, 100);
+    const imp = cleanStr(impactType || 'distress', 30);
+    if (!src) return refuse('missing-name');
+    const opts = options || {};
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = getBucket(draft);
+      const ewRows = (draft.elsewhere && Array.isArray(draft.elsewhere.rows)) ? draft.elsewhere.rows : [];
+      const srcCard = ewRows.find(function (c) { return c && c.name === src; });
+      const srcPlace = (srcCard && srcCard.place) || opts.place || '市井街巷';
+
+      const affected = [];
+      ewRows.forEach(function (card) {
+        if (!card || card.name === src) return;
+        const samePlace = card.place && (card.place === srcPlace || card.place.indexOf(srcPlace) >= 0 || srcPlace.indexOf(card.place) >= 0);
+        if (samePlace || opts.affectAllPeers) {
+          if (imp === 'distress' || imp === 'crisis') {
+            card.doing = '听闻' + src + '突发变故，人心惶惶，四处打探风声';
+            card.worry = '局势生变，提防牵连受灾';
+          } else if (imp === 'windfall' || imp === 'fortune') {
+            card.doing = '见' + src + '境况骤变，心生艳羡与探寻念头';
+          }
+          affected.push(card.name);
+        }
+      });
+
+      const rip = {
+        id: 'ripple_' + src + '_' + (b.tick || 0),
+        source: src,
+        place: srcPlace,
+        cause: cs,
+        impactType: imp,
+        affectedPeers: affected,
+        tick: b.tick || 0
+      };
+      b.ripples.push(rip);
+      if (WA.evict && WA.evict.array) {
+        WA.evict.array(b.ripples, 'livingWorld.ripples');
+      }
+
+      stat.ripplesPropagated++;
+      out = { ok: true, ripple: rip };
+      return true;
+    }, 'livingWorld:propagateRipple');
+    return out || refuse('tx-failed');
+  }
+
+  /**
+   * 记录NPC间的人情势能与交往恩义（recordRelationalDebt）
+   */
+  function recordRelationalDebt(fromWho, toWho, debtType, amount, reason) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const f = cleanStr(fromWho, 40);
+    const t = cleanStr(toWho, 40);
+    const ty = cleanStr(debtType || 'favor', 20); // favor (恩义人情), grudge (嫌隙猜疑), secret (把柄软肋)
+    const amt = typeof amount === 'number' ? amount : 1;
+    const rsn = cleanStr(reason, 120);
+    if (!f || !t) return refuse('missing-name');
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = getBucket(draft);
+      let entry = b.relationalDebts.find(function (d) {
+        return d && d.from === f && d.to === t && d.type === ty;
+      });
+      if (entry) {
+        entry.amount = (entry.amount || 0) + amt;
+        entry.lastReason = rsn || entry.lastReason;
+        entry.updatedTick = b.tick || 0;
+      } else {
+        entry = {
+          id: 'rel_' + f + '_' + t + '_' + ty,
+          from: f,
+          to: t,
+          type: ty,
+          amount: amt,
+          lastReason: rsn,
+          updatedTick: b.tick || 0
+        };
+        b.relationalDebts.push(entry);
+      }
+      if (WA.evict && WA.evict.array) {
+        WA.evict.array(b.relationalDebts, 'livingWorld.relationalDebts');
+      }
+      stat.relationalDebtsRecorded++;
+      out = { ok: true, entry: entry };
+      return true;
+    }, 'livingWorld:recordRelationalDebt');
     return out || refuse('tx-failed');
   }
 
@@ -275,7 +396,6 @@
     const mem = cleanStr(memoryText, 160);
     if (!nm) return refuse('missing-name');
     if (!mem) return refuse('missing-place');
-
     let out = null;
     WA.store.transact(function (draft) {
       draft.people = draft.people || {};
@@ -291,7 +411,6 @@
       out = { ok: true, name: nm, memory: mem };
       return true;
     }, 'livingWorld:consolidateLivingMemory');
-
     return out || refuse('tx-failed');
   }
 
@@ -304,7 +423,6 @@
     const o = opts || {};
     stat.lastAt = clockNow('livingWorld');
     stat.ticks++;
-
     let result = {
       changedPeople: 0,
       tracesAdded: 0,
@@ -313,7 +431,8 @@
       period: 'morning',
       strainsUpdated: 0,
       intersectionsCount: 0,
-      vignettesCount: 0
+      vignettesCount: 0,
+      metabolicBuysCount: 0
     };
 
     WA.store.transact(function (draft) {
@@ -327,26 +446,22 @@
       // 1. 扫描与演化角色
       ewRows.forEach(function (card) {
         if (!card || !card.name) return;
-
         const charLife = ensureCharLifeState(b, card.name);
         const occProfile = OCCUPATIONAL_ROUTINES[charLife.occupation] || OCCUPATIONAL_ROUTINES.vendor;
-        const currentSchedule = occProfile[currentPeriod] || { doing: '料理手头日常杂物', place: '市井', costWear: 10 };
+        const currentSchedule = occProfile[currentPeriod] || { doing: '料理手头日常杂事', place: '街巷市井', costWear: 10 };
 
         if (!card.lastTrackedPlace) {
-          card.lastTrackedPlace = card.place || currentSchedule.place || '市井';
+          card.lastTrackedPlace = card.place || currentSchedule.place || '街巷市井';
         }
-
-        if (!card.place) card.place = currentSchedule.place || '市井';
+        if (!card.place) card.place = currentSchedule.place || '街巷市井';
         if (!card.doing) card.doing = currentSchedule.doing;
 
-        const currentPlace = card.place || '市井';
+        const currentPlace = card.place || '街巷市井';
         const currentDoing = card.doing || currentSchedule.doing;
 
         if (currentPeriod === 'noon') {
           // 正午时分惯例
         }
-
-        // 生理磨损推演
         const strain = charLife.vitalStrain;
         const wearDelta = currentSchedule.costWear || 10;
         strain.weariness = Math.max(0, Math.min(100, strain.weariness + wearDelta));
@@ -355,11 +470,30 @@
           strain.weathering = Math.max(0, Math.min(100, strain.weathering + 5));
         }
 
-        // 生计干粮补给
-        if (strain.hunger > 60 && charLife.belongings.provisions > 0) {
-          charLife.belongings.provisions--;
-          strain.hunger = Math.max(0, strain.hunger - 35);
-          stat.subsistenceUsed++;
+        // 微观生计自愈闭环（Metabolic Loop）：
+        // 饥肠辘辘时，若有干粮则吃干粮；若缺干粮且身上有钱，自主在集市食摊购粮自愈
+        if (cfg.metabolicLoopEnabled && strain.hunger > 60) {
+          if (charLife.belongings.provisions > 0) {
+            charLife.belongings.provisions--;
+            strain.hunger = Math.max(0, strain.hunger - 35);
+            stat.subsistenceUsed++;
+          } else if (charLife.belongings.copper >= 4 || charLife.belongings.silver > 0) {
+            if (charLife.belongings.copper >= 4) {
+              charLife.belongings.copper -= 4;
+            } else if (charLife.belongings.silver > 0) {
+              charLife.belongings.silver -= 1;
+              charLife.belongings.copper += 96; // 找零碎钱
+            }
+            charLife.belongings.provisions += 1;
+            strain.hunger = Math.max(0, strain.hunger - 30);
+            result.metabolicBuysCount++;
+            stat.metabolicBuys++;
+          }
+        }
+
+        // 久别空白期沉淀
+        if (charLife.absence) {
+          charLife.absence.roundsAway = (charLife.absence.roundsAway || 0) + 1;
         }
 
         // 心事发酵
@@ -371,13 +505,13 @@
           }
         }
 
-        // 地点漂移留痕
+        // 地点漂移留痕（结合感官具象：温度、气味、残迹）
         if (card.lastTrackedPlace && card.lastTrackedPlace !== currentPlace) {
           const traceItem = {
             id: 'trace_' + card.name + '_' + b.tick,
             place: card.lastTrackedPlace,
             who: card.name,
-            trace: card.name + '刚刚在此停留，' + currentDoing + '，离开未久。',
+            trace: card.name + '刚刚在此停留，' + currentDoing + '，离开未久。茶盏尚存余温，桌角留有细微压痕。',
             atTick: b.tick,
             freshness: 100
           };
@@ -392,7 +526,6 @@
             reason: currentDoing,
             tick: b.tick
           });
-
           card.lastTrackedPlace = currentPlace;
         }
 
@@ -412,7 +545,6 @@
               active: true
             });
           }
-
           if (WA.rumor && typeof WA.rumor.startChain === 'function') {
             setTimeout(function () {
               try { WA.rumor.startChain(factKey, '市井私语'); } catch (e) {}
@@ -427,25 +559,25 @@
         stat.strainsAccumulated++;
       });
 
-      // 2. 空间痕迹物理半衰期衰减与掌柜清理
+      // 2. 空间痕迹多感官物理半衰期衰减与掌柜清理
       if (Array.isArray(b.livingTraces)) {
         b.livingTraces.forEach(function (t) {
           if (!t) return;
           const age = b.tick - (t.atTick || 0);
           t.freshness = Math.max(0, 100 - age * 25);
           if (age === 1) {
-            t.trace = t.trace.replace('刚刚在此停留', '不久前曾在此停留') + '（余温尚存）';
+            t.trace = t.trace.replace('刚刚在此停留', '不久前曾在此停留') + '（微温渐凉，空气中浮着极淡气味）';
           } else if (age >= 2 && age < cfg.decayRounds) {
-            t.trace = t.trace.replace('离开未久', '已过去数个时辰') + '（痕迹已冷，落有微尘）';
+            t.trace = t.trace.replace('离开未久', '已过去数个时辰') + '（痕迹已冷，窗棂案边落有薄尘）';
           } else if (age >= cfg.decayRounds) {
-            t.trace = '原先留下的痕迹已被伙计扫去，几不可辨。';
+            t.trace = '原先留下的痕迹已被伙计扫去清理，几不可辨。';
             result.tracesDecayed++;
             stat.tracesDecayed++;
           }
         });
       }
 
-      // 3. NPC 之间的横向碰撞与交集结算（resolveIntersections）
+      // 3. NPC 之间的横向碰撞与交集结算（resolveIntersections）并沉淀恩义交往
       if (cfg.peerInteractions && ewRows.length >= 2) {
         const placeGroups = {};
         ewRows.forEach(function (r) {
@@ -463,12 +595,28 @@
               id: 'inter_' + p1.name + '_' + p2.name + '_' + b.tick,
               place: pl,
               participants: [p1.name, p2.name],
-              summary: p1.name + '与' + p2.name + '在' + pl + '照面交谈，互通了手头生计。',
+              summary: p1.name + '与' + p2.name + '在' + pl + '照面碰头，交谈间互通了生计难处与近日见闻。',
               tick: b.tick
             };
             b.intersections.push(interItem);
             result.intersectionsCount++;
             stat.intersectionsResolved++;
+
+            // 沉淀横向人情互助
+            const debtKey = 'rel_' + p1.name + '_' + p2.name + '_favor';
+            let d = b.relationalDebts.find(function (x) { return x && x.id === debtKey; });
+            if (!d) {
+              b.relationalDebts.push({
+                id: debtKey,
+                from: p1.name,
+                to: p2.name,
+                type: 'favor',
+                amount: 1,
+                lastReason: '在' + pl + '日常照面相助互通声息',
+                updatedTick: b.tick
+              });
+              stat.relationalDebtsRecorded++;
+            }
           }
         });
       }
@@ -497,6 +645,8 @@
         WA.evict.array(b.intersections, 'livingWorld.intersections');
         WA.evict.array(b.epistemicGaps, 'livingWorld.epistemicGaps');
         WA.evict.array(b.vignettes, 'livingWorld.vignettes');
+        WA.evict.array(b.ripples, 'livingWorld.ripples');
+        WA.evict.array(b.relationalDebts, 'livingWorld.relationalDebts');
       }
 
       return true;
@@ -506,7 +656,7 @@
   }
 
   /**
-   * 空间偶遇探测（包含同地点在场、近期痕迹、微情境、横向交集）
+   * 空间偶遇探测（包含同地点在场、近期痕迹、微情境、横向交集、生态涟漪与久别重逢心理）
    */
   function detectEncounters(playerPlace) {
     const cfg = settings();
@@ -515,37 +665,53 @@
     if (!pl) return refuse('missing-place');
 
     const s = WA.store ? WA.store.get() : {};
-    const b = (s && s.livingWorld) ? s.livingWorld : { encounters: [], livingTraces: [], characterStates: {}, vignettes: [], intersections: [] };
+    const b = (s && s.livingWorld) ? s.livingWorld : { encounters: [], livingTraces: [], characterStates: {}, vignettes: [], intersections: [], ripples: [], relationalDebts: [] };
     const ewRows = (s && s.elsewhere && Array.isArray(s.elsewhere.rows)) ? s.elsewhere.rows : [];
 
     const presentNPCs = ewRows.filter(function (r) {
       return r && r.place && (r.place === pl || pl.indexOf(r.place) >= 0 || r.place.indexOf(pl) >= 0);
     }).map(function (r) {
       const st = (b.characterStates && b.characterStates[r.name]) || null;
+      let reunionSubtext = '';
+      if (st && st.absence && st.absence.roundsAway >= 3) {
+        reunionSubtext = '数日未见，再次碰面时眼神中交织着意外、局促与久别探寻';
+        if (st.absence.accumulatedGratitude > 0) {
+          reunionSubtext += '，怀揣此前所受之恩，举止间多了一分谨小慎微的敬重';
+        }
+      }
       return {
         name: r.name,
         doing: r.doing || '正伫立沉思',
         status: r.status || '寻常神色',
         worry: r.worry || '',
-        occupation: (st && st.occupation) || '市井行民',
+        occupation: (st && st.occupation) || '行民',
         vitalStrain: (st && st.vitalStrain) ? Object.assign({}, st.vitalStrain) : { weariness: 10, hunger: 10, weathering: 5 },
         belongings: (st && st.belongings) ? Object.assign({}, st.belongings) : { copper: 0, provisions: 0, tools: [] },
-        intimacy: (r.romance && r.romance.intimacy) || 0
+        intimacy: (r.romance && r.romance.intimacy) || 0,
+        reunionSubtext: reunionSubtext
       };
     });
 
     const currentTick = b.tick || 0;
     const matchedTraces = (b.livingTraces || []).filter(function (t) {
-      return t && t.place && (t.place === pl || pl.indexOf(t.place) >= 0 || t.place.indexOf(pl) >= 0) &&
+      return t && t.place && (t.place === pl || pl.indexOf(t.place) >= 0 || rMatch(pl, t.place)) &&
         (currentTick - (t.atTick || 0) <= cfg.decayRounds);
     });
 
+    function rMatch(a, bStr) {
+      return (a && bStr && (a.indexOf(bStr) >= 0 || bStr.indexOf(a) >= 0));
+    }
+
     const matchedVignettes = (b.vignettes || []).filter(function (v) {
-      return v && v.place && (v.place === pl || pl.indexOf(v.place) >= 0 || v.place.indexOf(pl) >= 0);
+      return v && v.place && (v.place === pl || rMatch(pl, v.place));
     });
 
     const matchedIntersections = (b.intersections || []).filter(function (i) {
-      return i && i.place && (i.place === pl || pl.indexOf(i.place) >= 0 || i.place.indexOf(pl) >= 0);
+      return i && i.place && (i.place === pl || rMatch(pl, i.place));
+    });
+
+    const matchedRipples = (b.ripples || []).filter(function (rp) {
+      return rp && rp.place && (rp.place === pl || rMatch(pl, rp.place));
     });
 
     if (presentNPCs.length > 0) stat.encountersDetected++;
@@ -556,7 +722,8 @@
       presentNPCs: presentNPCs,
       recentTraces: matchedTraces,
       vignettes: matchedVignettes,
-      intersections: matchedIntersections
+      intersections: matchedIntersections,
+      ripples: matchedRipples
     };
   }
 
@@ -576,7 +743,7 @@
         id: 'trace_custom_' + Date.now(),
         place: pl,
         who: w,
-        trace: d || (w + '曾在此留下细碎痕迹。'),
+        trace: d || (w + '曾在此留下细碎痕迹。温热微散，隐有声息残留。'),
         atTick: b.tick || 0,
         freshness: 100
       };
@@ -587,49 +754,53 @@
       out = { ok: true, trace: trace };
       return true;
     }, 'livingWorld:leaveTrace');
-
     return out || refuse('tx-failed');
   }
 
   /**
-   * 正文全景叙事透镜（buildBlock）
+   * 正文全景叙事透镜（buildBlock）：多层次白描隐喻与潜台词注入
    */
   function buildBlock(playerPlace) {
     const cfg = settings();
     if (!cfg.enabled) return '';
 
     const s = WA.store ? WA.store.get() : {};
-    const b = (s && s.livingWorld) ? s.livingWorld : { encounters: [], livingTraces: [], characterStates: {}, vignettes: [], intersections: [] };
+    const b = (s && s.livingWorld) ? s.livingWorld : { encounters: [], livingTraces: [], characterStates: {}, vignettes: [], intersections: [], ripples: [], relationalDebts: [] };
     const ewRows = (s && s.elsewhere && Array.isArray(s.elsewhere.rows)) ? s.elsewhere.rows : [];
 
     const lines = [];
     const currentPeriod = DAY_PERIODS[(b.tick || 0) % DAY_PERIODS.length];
-    lines.push('【时节与市井运转】此刻正值' + PERIOD_LABELS[currentPeriod] + '，天地与市井各按作息流转。');
+    lines.push('【时节与市井运转】此刻正值' + PERIOD_LABELS[currentPeriod] + '，天地与周遭生计各按日常流转。');
 
     if (ewRows.length > 0) {
-      lines.push('【在场/周边人物生活实况】（角色皆有自主生活，绝非原地等待主角的提线木偶）：');
+      lines.push('【在场/周边人物生活实况】（角色皆有自主生计与真实生理磨损，杜绝木偶式即时刷怪）：');
       ewRows.slice(0, 6).forEach(function (r) {
         const st = (b.characterStates && b.characterStates[r.name]) || null;
-        let desc = '· ' + r.name + '（身处' + (r.place || '近处') + '，身份「' + ((st && st.occupation) || '市井') + '」）：正在「' + (r.doing || '料理日常') + '」';
+        let desc = '· ' + r.name + '（身处' + (r.place || '近处') + '，身份「' + ((st && st.occupation) || '行民') + '」）：正在「' + (r.doing || '料理日常生计') + '」';
 
         if (st && st.vitalStrain) {
           const vs = st.vitalStrain;
           const strainDescs = [];
-          if (vs.weariness >= 50) strainDescs.push('眉眼间带深重倦意');
-          else if (vs.weariness >= 25) strainDescs.push('微有困顿之色');
-          if (vs.hunger >= 40) strainDescs.push('唇角略显苍白干裂');
-          if (vs.weathering >= 30) strainDescs.push('袍袖间落着未拂的市井微尘');
-          if (strainDescs.length > 0) desc += '；生理神态「' + strainDescs.join('，') + '」';
+          if (vs.weariness >= 50) strainDescs.push('眉眼带深重疲态');
+          else if (vs.weariness >= 25) strainDescs.push('略有困顿倦色');
+          if (vs.hunger >= 40) strainDescs.push('唇角略显干裂');
+          if (vs.weathering >= 30) strainDescs.push('衣袖袍角落着风尘微粒');
+          if (strainDescs.length > 0) desc += '；神态「' + strainDescs.join('，') + '」';
         }
 
         if (st && st.belongings) {
           const bg = st.belongings;
           const bgDescs = [];
-          if (bg.copper > 0) bgDescs.push('腰间布囊揣着散碎铜板(' + bg.copper + '文)');
-          if (bg.provisions > 0) bgDescs.push('怀里藏着半块干馍');
-          if (bg.tools && bg.tools.length > 0) bgDescs.push('随身带着' + bg.tools.join('/'));
+          if (bg.copper > 0) bgDescs.push('兜囊揣着散碎铜板零钱(' + bg.copper + '枚)');
+          if (bg.provisions > 0) bgDescs.push('怀里备有口粮');
+          if (bg.tools && bg.tools.length > 0) bgDescs.push('随身携着' + bg.tools.join('/'));
           if (bg.keepsakes && bg.keepsakes.length > 0) bgDescs.push('妥帖收着' + bg.keepsakes.join('/'));
           if (bgDescs.length > 0) desc += '；随身行囊[' + bgDescs.join('，') + ']';
+        }
+
+        if (st && st.absence && st.absence.roundsAway >= 3) {
+          desc += '；【久别重逢心理重力】数轮未见，神情间带久别情怯与探询';
+          if (st.absence.accumulatedGratitude > 0) desc += '，暗自记着照拂恩义';
         }
 
         if (r.worry) desc += '；心头悬事：「' + r.worry + '」';
@@ -646,7 +817,7 @@
       });
     }
 
-    // NPC 横向碰撞交集注入
+    // NPC 横向碰撞交集与人情注入
     const recentIntersections = (b.intersections || []).slice(-2);
     if (recentIntersections.length > 0) {
       lines.push('【人物间横向生活交集】：');
@@ -655,23 +826,31 @@
       });
     }
 
-    // 地点痕迹提炼
+    // 局部生态涟漪注入
+    const recentRipples = (b.ripples || []).slice(-2);
+    if (recentRipples.length > 0) {
+      lines.push('【周遭突发事态生态涟漪】：');
+      recentRipples.forEach(function (rp) {
+        lines.push('· 因' + rp.source + '发生「' + rp.cause + '」，周围关联人皆受波及心生动摇。');
+      });
+    }
+
+    // 地点痕迹提炼（带物理感官细节）
     const recentTraces = (b.livingTraces || []).slice(-3);
     if (recentTraces.length > 0) {
-      lines.push('【眼前与周遭生活痕迹】：');
+      lines.push('【眼前与周遭生活痕迹】（感官细节）：');
       recentTraces.forEach(function (t) {
         lines.push('· [' + t.place + '] ' + t.trace);
       });
     }
 
-    lines.push('【正文叙事法则】：角色有自己的作息、疲惫与心绪，对话与互动中须自然显露其生活痕迹与随身物件，杜绝工具化响应。');
+    lines.push('【正文叙事法则】：角色有自己的作息、疲惫与心绪，对话与互动中须自然显露其生活痕迹、手头物什与人情牵挂，杜绝工具化响应。');
     return lines.join('\n');
   }
 
   function statView() {
     return Object.assign({}, stat);
   }
-
   function resetStat() {
     stat.ticks = 0;
     stat.encountersDetected = 0;
@@ -680,10 +859,14 @@
     stat.rumorsDiffused = 0;
     stat.strainsAccumulated = 0;
     stat.subsistenceUsed = 0;
+    stat.metabolicBuys = 0;
     stat.intersectionsResolved = 0;
     stat.vignettesTriggered = 0;
     stat.trajectoriesDeflected = 0;
     stat.memoriesConsolidated = 0;
+    stat.ripplesPropagated = 0;
+    stat.relationalDebtsRecorded = 0;
+    stat.reunionsSubtextBuilt = 0;
     stat.refused = 0;
     stat.lastReason = '';
     return { ok: true };
@@ -697,6 +880,8 @@
     setSettings: saveSettings,
     registerRoutine: registerRoutine,
     deflectTrajectory: deflectTrajectory,
+    propagateRipple: propagateRipple,
+    recordRelationalDebt: recordRelationalDebt,
     consolidateLivingMemory: consolidateLivingMemory,
     autonomousTick: autonomousTick,
     detectEncounters: detectEncounters,
@@ -707,7 +892,7 @@
   };
 
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.236.0' });
+    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.237.0' });
   }
 
   if (WA.workflow && typeof WA.workflow.register === 'function') {
@@ -723,5 +908,5 @@
     });
   }
 
-  if (WA.log) WA.log('info', 'engines/living-world 已加载（2.236.0）');
+  if (WA.log) WA.log('info', 'engines/living-world 已加载（2.237.0）');
 })();
