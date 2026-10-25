@@ -491,6 +491,8 @@
     'engines/care-chain.js',
     // v2.233.0（拓展 EXV4-4）：公共议程设置与代表性缺口。
     'engines/public-agenda.js',
+    // v2.233.0（拓展 EXV4-5）：共同资源的使用权与维护责任。
+    'engines/commons-governance.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

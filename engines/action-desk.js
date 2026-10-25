@@ -389,6 +389,55 @@
     'publicAgenda.topicStatus': function () {
       return (WA.publicAgenda && WA.publicAgenda.TOPIC_STATUS) ? WA.publicAgenda.TOPIC_STATUS.slice() : [];
     },
+    // v2.233.0 (EXV4-5): 共同资源的使用权与维护责任
+    'commonsGovernance.declareCommonAsset': function (o) {
+      if (typeof WA.commonsGovernance.declareCommonAsset === 'function') {
+        return WA.commonsGovernance.declareCommonAsset(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'commonsGovernance.reserveCommonAsset': function (o) {
+      if (typeof WA.commonsGovernance.reserveCommonAsset === 'function') {
+        return WA.commonsGovernance.reserveCommonAsset(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'commonsGovernance.changeGovernanceModel': function (o) {
+      if (typeof WA.commonsGovernance.changeGovernanceModel === 'function') {
+        return WA.commonsGovernance.changeGovernanceModel(o.assetId, o.newModel || o.model, o.reason);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'commonsGovernance.contributeMaintenance': function (o) {
+      if (typeof WA.commonsGovernance.contributeMaintenance === 'function') {
+        return WA.commonsGovernance.contributeMaintenance(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'commonsGovernance.auditAssetDecay': function (o) {
+      if (typeof WA.commonsGovernance.auditAssetDecay === 'function') {
+        return WA.commonsGovernance.auditAssetDecay(o.assetId, o.simulatedDaysSince || o.days);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'commonsGovernance.resolveAssetDispute': function (o) {
+      if (typeof WA.commonsGovernance.resolveAssetDispute === 'function') {
+        return WA.commonsGovernance.resolveAssetDispute(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'commonsGovernance.commonsProjection': function (o) {
+      if (typeof WA.commonsGovernance.commonsProjection === 'function') {
+        return WA.commonsGovernance.commonsProjection(o.filter || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'commonsGovernance.governanceModels': function () {
+      return (WA.commonsGovernance && WA.commonsGovernance.GOVERNANCE_MODELS) ? WA.commonsGovernance.GOVERNANCE_MODELS.slice() : [];
+    },
+    'commonsGovernance.assetStatus': function () {
+      return (WA.commonsGovernance && WA.commonsGovernance.ASSET_STATUS) ? WA.commonsGovernance.ASSET_STATUS.slice() : [];
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },

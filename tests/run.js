@@ -359,6 +359,8 @@ const LOAD = [
   'engines/care-chain.js',
   // v2.233.0（拓展 EXV4-4）：公共议程设置与代表性缺口。同序进 LOAD。
   'engines/public-agenda.js',
+  // v2.233.0（拓展 EXV4-5）：共同资源的使用权与维护责任。同序进 LOAD。
+  'engines/commons-governance.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序

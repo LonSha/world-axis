@@ -34,6 +34,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** coop 已有具名贡献、缺席处理、项目结算，service-network 有设施容量和维护；长期公共资产的使用权、维护负担和搭便车后果尚需形成完整玩法。
 **交付：** 让共享设施/资源声明开放条件、预约权、维护轮值和故障责任；贡献历史可影响有限优先权但不生成通用声望币。
 **验收：** 至少两种治理方案对开放度/维护成本有不同代价；逾期维护导致真实降级；争议可协商或裁决；规则变更不追溯抹除已兑现使用权。P1，28–44 小时。
+*现场落地：* 已在 `engines/commons-governance.js` 落地共同资产声明与准入模型（`declareCommonAsset`，支持 open_access 与 contributor_priority 两种对立方案）、使用权预约配额控制与资格校验（`reserveCommonAsset`）、维护工时累积与状态恢复（`contributeMaintenance`）、逾期不维护真实物理降级（`auditAssetDecay`，degraded -> failing）、改制不追溯失效（`changeGovernanceModel`）、争议协商与仲裁追责（`resolveAssetDispute`）、纯读利用率与损毁投影（`commonsProjection`）；在 `engines/action-desk.js` 接入 7 项真实路由；专测 `tests/exp41-commons-governance-v2233.js`（27 项断言全绿，含单行真源码负控制与 10 次纯读零写入状态隔离），死导出账本 1030 零漂移。已结项合入。
 ### EXV4-6｜知识的地方传播与实践许可
 **真实缺口：** research、tech-lineage、inst、rumor 有成果/标准/传播，但知识可见、可学、可实际操作的差异没有形成共同消费链。
 **交付：** 把研究成果拆成可接触资料、实践许可、必要工具/材料和验证经验；传播受渠道与关系约束，实际使用由生产/研究 owner 检查，不以师徒数量或等级解锁。

@@ -2311,6 +2311,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/care-chain.js': 'careChain',
     // v2.233.0 (EXV4-4): publicAgenda -- 公共议程设置与代表性缺口（有限议程竞争/代表性/局外人隔离/规则项目联动）
     'engines/public-agenda.js': 'publicAgenda',
+    // v2.233.0 (EXV4-5): commonsGovernance -- 共同资源的使用权与维护责任（准入模型/维护轮值/降级/不追溯/纯读投影）
+    'engines/commons-governance.js': 'commonsGovernance',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',
