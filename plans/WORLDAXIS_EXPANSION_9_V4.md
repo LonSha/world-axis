@@ -29,6 +29,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** rumor/opinion、custom-lax、coop 和 operations 有传播、规则及项目，但“谁的问题能进入公共议程”尚未影响制度结果。
 **交付：** 让不同群体提出有证据的议题，受传播覆盖、代表资格、资源与议程容量影响进入/延迟/被拒；采用既有提案与批准流程，不造第二套议会。
 **验收：** 至少三群体争夺有限议程位；被排除议题保留并可能后续进入；局外人不得知秘密；通过议题改变具体规则/服务/项目。P1，28–44 小时。
+*现场落地：* 已在 `engines/public-agenda.js` 落地议程容量约束（`setAgendaCapacity`）、群体带证据议题提交（`submitProposal`）、有限槽位竞争与延期积压保留（`scheduleAgenda`）、审议通过并真实联动制度与项目（`enactAgendaTopic`，联动 `customLax.spawnCandidate` / `coop.proposeProject`）、局外人保密视角隔离（`viewAgenda`，非允许群体查阅屏蔽 `redactedCount`）、纯读代表性投影（`publicAgendaProjection`）；在 `engines/action-desk.js` 接入 7 项真实路由；专测 `tests/exp40-public-agenda-representation-v2233.js`（34 项断言全绿，含单行真源码负控制与 10 次纯读零写入状态隔离），死导出账本 1030 零漂移。已结项合入。
 ### EXV4-5｜共同资源的使用权与维护责任
 **真实缺口：** coop 已有具名贡献、缺席处理、项目结算，service-network 有设施容量和维护；长期公共资产的使用权、维护负担和搭便车后果尚需形成完整玩法。
 **交付：** 让共享设施/资源声明开放条件、预约权、维护轮值和故障责任；贡献历史可影响有限优先权但不生成通用声望币。

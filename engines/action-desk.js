@@ -349,6 +349,46 @@
     'careChain.escalationLevels': function () {
       return (WA.careChain && WA.careChain.ESCALATION_LEVELS) ? WA.careChain.ESCALATION_LEVELS.slice() : [];
     },
+    // v2.233.0 (EXV4-4): 公共议程设置与代表性缺口
+    'publicAgenda.setAgendaCapacity': function (o) {
+      if (typeof WA.publicAgenda.setAgendaCapacity === 'function') {
+        return WA.publicAgenda.setAgendaCapacity(o.placeId || o.place, o.maxSlots || o.slots);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'publicAgenda.submitProposal': function (o) {
+      if (typeof WA.publicAgenda.submitProposal === 'function') {
+        return WA.publicAgenda.submitProposal(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'publicAgenda.scheduleAgenda': function (o) {
+      if (typeof WA.publicAgenda.scheduleAgenda === 'function') {
+        return WA.publicAgenda.scheduleAgenda(o.placeId || o.place);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'publicAgenda.enactAgendaTopic': function (o) {
+      if (typeof WA.publicAgenda.enactAgendaTopic === 'function') {
+        return WA.publicAgenda.enactAgendaTopic(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'publicAgenda.viewAgenda': function (o) {
+      if (typeof WA.publicAgenda.viewAgenda === 'function') {
+        return WA.publicAgenda.viewAgenda(o.placeId || o.place, o.viewerGroup);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'publicAgenda.publicAgendaProjection': function (o) {
+      if (typeof WA.publicAgenda.publicAgendaProjection === 'function') {
+        return WA.publicAgenda.publicAgendaProjection(o.placeId || o.place);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'publicAgenda.topicStatus': function () {
+      return (WA.publicAgenda && WA.publicAgenda.TOPIC_STATUS) ? WA.publicAgenda.TOPIC_STATUS.slice() : [];
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },
