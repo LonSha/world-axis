@@ -145,11 +145,53 @@
   };
 
   const VIGNETTE_TEMPLATES = [
-    { type: 'financial_pinch', desc: '正把衣兜里外翻遍，小心翼翼地数着手心仅有的几个发黑零钱铜板，眉头紧锁' },
-    { type: 'pawn_hesitation', desc: '站在当铺高柜外攥紧怀中的旧物，迟迟没有迈步，神情颇多挣扎' },
-    { type: 'merchant_haggling', desc: '正为几文钱的零碎与摊主争执不下，语气焦灼却又不得不据理力争' },
-    { type: 'weary_slumber', desc: '靠在廊柱或长凳边缘闭目小憩，手里仍下意识紧紧护着随身包裹' }
+    { type: 'financial_pinch', desc: '正反复清点随身所剩不多的散碎零钱与开销余额，眉头紧锁' },
+    { type: 'pawn_hesitation', desc: '站在二手典当回购店门外攥紧怀中旧物，迟迟未曾迈步，神情挣扎' },
+    { type: 'merchant_haggling', desc: '正为一笔零散账目开销与对方据理力争，语气焦灼紧绷' },
+    { type: 'weary_slumber', desc: '靠在长椅或墙角处闭目浅歇，手里仍下意识紧紧护着随身包裹' }
   ];
+
+  // 动态货币与物价常识感知（对接 economy / recipe，未声明时安全回退中性配置）
+  function getEconomyProfile() {
+    let curName = '货币';
+    let curUnit = '';
+    let mealCost = 4;
+    try {
+      if (WA.economy && typeof WA.economy.money === 'function') {
+        const declared = WA.economy.money();
+        if (declared) {
+          curName = declared;
+          if (declared === '银元' || declared === '铜钱' || declared === '铜板') {
+            curUnit = '枚';
+            mealCost = 4;
+          } else if (declared === '日元' || declared === '円') {
+            curUnit = '円';
+            mealCost = 500;
+          } else if (declared === '元' || declared === '人民币') {
+            curUnit = '元';
+            mealCost = 25;
+          } else if (declared === '信用点' || declared === '点') {
+            curUnit = '点';
+            mealCost = 20;
+          } else if (declared === '金币' || declared === '金') {
+            curUnit = '金';
+            mealCost = 1;
+          } else if (declared === '银币' || declared === '银') {
+            curUnit = '银';
+            mealCost = 2;
+          } else {
+            curUnit = declared;
+            mealCost = 10;
+          }
+        }
+      }
+    } catch (e) {}
+    return {
+      name: curName,
+      unit: curUnit,
+      mealCost: mealCost
+    };
+  }
 
   function cleanStr(s, max) {
     if (s == null) return '';
@@ -188,6 +230,8 @@
     const nm = cleanStr(name, 40);
     if (!b.characterStates[nm]) {
       const occ = occupation || (OCCUPATIONAL_ROUTINES[nm] ? nm : 'vendor');
+      const eco = getEconomyProfile();
+      const initialMoney = (eco.mealCost || 4) * 6; // 默认储备约 6 顿便餐的生活费
       b.characterStates[nm] = {
         name: nm,
         occupation: occ,
@@ -198,10 +242,10 @@
           lastUpdatedTick: b.tick || 0
         },
         belongings: {
-          copper: 24,
+          copper: initialMoney,
           silver: 0,
           provisions: 2,
-          tools: ['随身粗布巾'],
+          tools: ['随身手帕纸巾'],
           keepsakes: []
         },
         customRoutine: null,
@@ -471,18 +515,20 @@
         }
 
         // 微观生计自愈闭环（Metabolic Loop）：
-        // 饥肠辘辘时，若有干粮则吃干粮；若缺干粮且身上有钱，自主在集市食摊购粮自愈
+        // 饥肠辘辘时，若有备粮则消耗自愈；若缺粮且随身有资金，按世界物价自主采购简餐自愈
         if (cfg.metabolicLoopEnabled && strain.hunger > 60) {
+          const eco = getEconomyProfile();
+          const mealPrice = eco.mealCost || 4;
           if (charLife.belongings.provisions > 0) {
             charLife.belongings.provisions--;
             strain.hunger = Math.max(0, strain.hunger - 35);
             stat.subsistenceUsed++;
-          } else if (charLife.belongings.copper >= 4 || charLife.belongings.silver > 0) {
-            if (charLife.belongings.copper >= 4) {
-              charLife.belongings.copper -= 4;
+          } else if (charLife.belongings.copper >= mealPrice || charLife.belongings.silver > 0) {
+            if (charLife.belongings.copper >= mealPrice) {
+              charLife.belongings.copper -= mealPrice;
             } else if (charLife.belongings.silver > 0) {
               charLife.belongings.silver -= 1;
-              charLife.belongings.copper += 96; // 找零碎钱
+              charLife.belongings.copper = Math.max(0, charLife.belongings.copper + (mealPrice * 10) - mealPrice);
             }
             charLife.belongings.provisions += 1;
             strain.hunger = Math.max(0, strain.hunger - 30);
@@ -511,7 +557,7 @@
             id: 'trace_' + card.name + '_' + b.tick,
             place: card.lastTrackedPlace,
             who: card.name,
-            trace: card.name + '刚刚在此停留，' + currentDoing + '，离开未久。茶盏尚存余温，桌角留有细微压痕。',
+            trace: card.name + '刚刚在此停留，' + currentDoing + '，离开未久。周遭留有细微身形压痕与未散余温。',
             atTick: b.tick,
             freshness: 100
           };
@@ -770,7 +816,7 @@
 
     const lines = [];
     const currentPeriod = DAY_PERIODS[(b.tick || 0) % DAY_PERIODS.length];
-    lines.push('【时节与市井运转】此刻正值' + PERIOD_LABELS[currentPeriod] + '，天地与周遭生计各按日常流转。');
+    lines.push('【时节与世情运转】此刻正值' + PERIOD_LABELS[currentPeriod] + '，天地与周遭生计各按日常流转。');
 
     if (ewRows.length > 0) {
       lines.push('【在场/周边人物生活实况】（角色皆有自主生计与真实生理磨损，杜绝木偶式即时刷怪）：');
@@ -791,8 +837,12 @@
         if (st && st.belongings) {
           const bg = st.belongings;
           const bgDescs = [];
-          if (bg.copper > 0) bgDescs.push('兜囊揣着散碎铜板零钱(' + bg.copper + '枚)');
-          if (bg.provisions > 0) bgDescs.push('怀里备有口粮');
+          const eco = getEconomyProfile();
+          if (bg.copper > 0) {
+            const unitLabel = eco.unit ? eco.unit : '单位';
+            bgDescs.push('随身所余' + eco.name + '(' + bg.copper + unitLabel + ')');
+          }
+          if (bg.provisions > 0) bgDescs.push('备有口粮餐食');
           if (bg.tools && bg.tools.length > 0) bgDescs.push('随身携着' + bg.tools.join('/'));
           if (bg.keepsakes && bg.keepsakes.length > 0) bgDescs.push('妥帖收着' + bg.keepsakes.join('/'));
           if (bgDescs.length > 0) desc += '；随身行囊[' + bgDescs.join('，') + ']';
@@ -808,10 +858,10 @@
       });
     }
 
-    // 市井生活窘迫微情境注入
+    // 生活窘迫与开销微情境注入
     const recentVignettes = (b.vignettes || []).slice(-2);
     if (recentVignettes.length > 0) {
-      lines.push('【市井生活微情境】：');
+      lines.push('【生活生计微情境】：');
       recentVignettes.forEach(function (v) {
         lines.push('· ' + v.name + '身处' + v.place + '，' + v.detail + '。');
       });
@@ -832,6 +882,18 @@
       lines.push('【周遭突发事态生态涟漪】：');
       recentRipples.forEach(function (rp) {
         lines.push('· 因' + rp.source + '发生「' + rp.cause + '」，周围关联人皆受波及心生动摇。');
+      });
+    }
+
+    // 横向人情势能债务注入（恩义人情、嫌隙摩擦、软肋把柄）
+    const recentDebts = (b.relationalDebts || []).slice(-2);
+    if (recentDebts.length > 0) {
+      lines.push('【人物间暗涌人情与势能债务】：');
+      recentDebts.forEach(function (d) {
+        let typeName = '恩义牵挂';
+        if (d.type === 'grudge') typeName = '嫌隙摩擦';
+        else if (d.type === 'secret') typeName = '软肋把柄';
+        lines.push('· ' + d.from + ' 欠 ' + d.to + ' [' + typeName + ']：' + (d.lastReason || '日常际遇沉淀'));
       });
     }
 
@@ -892,7 +954,7 @@
   };
 
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.237.0' });
+    WA.registerModule('engines/living-world.js', { kind: 'engine', ver: '2.238.0' });
   }
 
   if (WA.workflow && typeof WA.workflow.register === 'function') {
