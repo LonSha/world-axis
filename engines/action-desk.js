@@ -210,6 +210,31 @@
     'playableBlueprint.checkDependencies': function (o) { return WA.playableBlueprint.checkDependencies(o.sampleId); },
     'playableBlueprint.exportPlayDefs': function (o) { return WA.playableBlueprint.exportPlayDefs(o.sampleId); },
     'playableBlueprint.installSample': function (o) { return WA.playableBlueprint.installSample(o.sampleId, o); },
+    // v2.233.0（优化 OPV4-9）：玩法蓝图的安全调参、差异预览与续局
+    'playableBlueprint.previewDiff': function (o) {
+      if (typeof WA.playableBlueprint.previewDiff === 'function') {
+        return WA.playableBlueprint.previewDiff(o.sampleId, o.overrides, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'playableBlueprint.tuneConfig': function (o) {
+      if (typeof WA.playableBlueprint.tuneConfig === 'function') {
+        return WA.playableBlueprint.tuneConfig(o.sampleId, o.params, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'playableBlueprint.migrate': function (o) {
+      if (typeof WA.playableBlueprint.migrateBlueprint === 'function') {
+        return WA.playableBlueprint.migrateBlueprint(o.blueprintData, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'playableBlueprint.resetInitialConditions': function (o) {
+      if (typeof WA.playableBlueprint.resetInitialConditions === 'function') {
+        return WA.playableBlueprint.resetInitialConditions(o.sampleId, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // v2.231.0（拓展 IN-7）：有承载力的环境
     'envCapacity.declareResource': function (o) { return WA.envCapacity.declareResource(o.spec); },
     'envCapacity.withdraw': function (o) { return WA.envCapacity.withdraw(o.resourceId, o.amount, o); },

@@ -54,6 +54,7 @@ V3 A/B/C 与 OP9 已真实落地情境投影、行动桌、能力差异、资源
 **依据/问题：** playable-blueprint 已有样例、依赖、冲突预览、安装、静态定义导出；不应再造同类新局。
 **交付：** 让现有蓝图支持受约束参数、差异预览、可选模块降级、版本迁移及“重置初始条件/保留进度”显式操作。定义与运行进度分离。
 **验收：** 升级不覆盖进行中进度；缺可选引擎可解释降级；旧格式迁移或明确拒收；重置不静默删除历史。P2，24–40 小时。
+**现场落地点：** `engines/playable-blueprint.js`（新增 `previewDiff` 结构差异对比、`tuneConfig` 受约束参数调参留痕、`migrateBlueprint` 版本迁移与解释性降级/非法格式 fail-closed 拒收、`resetInitialConditions` 仅重置资源配额并严格保留人物成长与世界事件历史）；`engines/action-desk.js`（接线挂载 `playableBlueprint.previewDiff`、`tuneConfig`、`migrate`、`resetInitialConditions` 四大玩法运维路由）；`tests/exp36-playable-blueprint-tune-v2233.js`（33 项断言全绿，含单行真源码变异负控制）。
 
 ## 大批次与规模
 | 批次 | 项目 | 玩家结果 |

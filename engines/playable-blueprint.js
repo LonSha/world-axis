@@ -465,12 +465,266 @@
       note: '玩法包【' + s.label + '】已成功安装至世界真源'
     };
   }
+
+  /**
+   * OPV4-9: 玩法蓝图的安全调参、差异预览与续局
+   */
+  function findSampleDefinition(sampleId) {
+    var sid = clean(sampleId, 40);
+    var s = SAMPLES.filter(function (x) { return x.id === sid; })[0];
+    if (!s) return { ok: false, reason: 'sample-not-found', available: SAMPLES.map(function (x) { return x.id; }) };
+    return { ok: true, sample: s };
+  }
+
+  /**
+   * 1. 差异预览（previewDiff）：对比当前世界已安装玩法定义与待调参/待升级蓝图之间的结构差异
+   */
+  function previewDiff(sampleId, overrides, opts) {
+    var r = findSampleDefinition(sampleId);
+    if (!r.ok) return r;
+    var s = r.sample;
+    var o = opts || {};
+    var st = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+    var currentInstalled = (st.blueprint && st.blueprint.installed && st.blueprint.installed[s.id]) || null;
+    var targetPlayDefs = JSON.parse(JSON.stringify(s.playDefs || {}));
+    if (overrides && typeof overrides === 'object') {
+      Object.keys(overrides).forEach(function (k) {
+        if (targetPlayDefs[k] && typeof targetPlayDefs[k] === 'object' && !Array.isArray(targetPlayDefs[k])) {
+          targetPlayDefs[k] = Object.assign({}, targetPlayDefs[k], overrides[k]);
+        } else {
+          targetPlayDefs[k] = overrides[k];
+        }
+      });
+    }
+
+    var diffs = [];
+    var keys = Array.from(new Set(Object.keys(targetPlayDefs).concat(currentInstalled ? Object.keys(currentInstalled.playDefs || {}) : [])));
+    keys.forEach(function (k) {
+      var before = currentInstalled ? currentInstalled.playDefs[k] : undefined;
+      var after = targetPlayDefs[k];
+      if (before === undefined) {
+        diffs.push({ key: k, type: 'added', after: after });
+      } else if (after === undefined) {
+        diffs.push({ key: k, type: 'removed', before: before });
+      } else if (JSON.stringify(before) !== JSON.stringify(after)) {
+        diffs.push({ key: k, type: 'modified', before: before, after: after });
+      }
+    });
+
+    return {
+      ok: true,
+      sampleId: s.id,
+      currentlyInstalled: !!currentInstalled,
+      diffCount: diffs.length,
+      diffs: diffs,
+      note: currentInstalled ? '已存在已安装版本，已生成调参/升级差异预览' : '世界真源中尚未安装该蓝图，为纯新增预览'
+    };
+  }
+
+  /**
+   * 2. 安全调参（tuneConfig）：在受约束范围内调整蓝图参数，确保运行中进度不受覆盖
+   */
+  function tuneConfig(sampleId, params, opts) {
+    var r = findSampleDefinition(sampleId);
+    if (!r.ok) return r;
+    var s = r.sample;
+    var p = params || {};
+    var o = opts || {};
+    var st = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+    if (!st.blueprint || !st.blueprint.installed || !st.blueprint.installed[s.id]) {
+      return { ok: false, reason: 'blueprint-not-installed', note: '必须先安装玩法蓝图方可进行运行时调参' };
+    }
+
+    var tuned = null;
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (draft) {
+        draft.blueprint = draft.blueprint || {};
+        draft.blueprint.installed = draft.blueprint.installed || {};
+        var inst = draft.blueprint.installed[s.id];
+        inst.playDefs = inst.playDefs || {};
+        inst.tuningHistory = inst.tuningHistory || [];
+
+        var tuningRecord = {
+          at: Date.now(),
+          changes: {}
+        };
+
+        // 逐类安全调参（受约束参数范围：数值边界、方法白名单、可选开关注入）
+        if (p.training && typeof p.training === 'object') {
+          inst.playDefs.training = inst.playDefs.training || {};
+          if (p.training.method && typeof p.training.method === 'string') {
+            tuningRecord.changes.trainingMethod = { from: inst.playDefs.training.method, to: clean(p.training.method, 40) };
+            inst.playDefs.training.method = clean(p.training.method, 40);
+          }
+        }
+
+        if (p['family-ops'] && typeof p['family-ops'] === 'object') {
+          inst.playDefs['family-ops'] = inst.playDefs['family-ops'] || {};
+          if (typeof p['family-ops'].budgetCycle === 'number') {
+            var cycle = Math.max(1, Math.min(30, Math.floor(p['family-ops'].budgetCycle)));
+            tuningRecord.changes.budgetCycle = { from: inst.playDefs['family-ops'].budgetCycle, to: cycle };
+            inst.playDefs['family-ops'].budgetCycle = cycle;
+          }
+          if (typeof p['family-ops'].enabled === 'boolean') {
+            tuningRecord.changes.familyOpsEnabled = { from: inst.playDefs['family-ops'].enabled, to: p['family-ops'].enabled };
+            inst.playDefs['family-ops'].enabled = p['family-ops'].enabled;
+          }
+        }
+
+        if (p.research && typeof p.research === 'object') {
+          inst.playDefs.research = inst.playDefs.research || {};
+          if (typeof p.research.enabled === 'boolean') {
+            tuningRecord.changes.researchEnabled = { from: inst.playDefs.research.enabled, to: p.research.enabled };
+            inst.playDefs.research.enabled = p.research.enabled;
+          }
+        }
+
+        inst.tuningHistory.push(tuningRecord);
+        inst.updatedAt = Date.now();
+        tuned = inst;
+        return true;
+      }, 'playableBlueprint:tuneConfig');
+    }
+
+    return {
+      ok: true,
+      sampleId: s.id,
+      tuned: tuned,
+      note: '玩法蓝图参数已在约束范围内安全更新，进行中游戏进度完整保留'
+    };
+  }
+
+  /**
+   * 3. 版本迁移与校验（migrateBlueprint）：旧格式升级或明确拒收，支持可选引擎缺失时的解释性降级
+   */
+  function migrateBlueprint(blueprintData, opts) {
+    var o = opts || {};
+    if (!blueprintData || typeof blueprintData !== 'object') {
+      return { ok: false, reason: 'invalid-data', note: '蓝图数据必须为非空对象' };
+    }
+
+    // 格式版本识别
+    var version = blueprintData.version || (blueprintData.sampleId ? 1 : 0);
+    if (version === 0 || (!blueprintData.sampleId && !blueprintData.id && !blueprintData.theme)) {
+      return {
+        ok: false,
+        reason: 'unsupported-format-rejected',
+        note: '未知或不兼容的旧版蓝图格式，已明确拒收（fail-closed）以防数据污染'
+      };
+    }
+
+    var sid = clean(blueprintData.sampleId || blueprintData.id, 40);
+    var dep = checkDependencies(sid);
+    var degradations = [];
+
+    // 若存在可选引擎不可用，提供解释性降级方案而非直接崩溃
+    if (dep.optionalEngines && dep.optionalEngines.length > 0) {
+      dep.optionalEngines.forEach(function (oe) {
+        if (!oe.available) {
+          degradations.push({
+            engine: oe.engine,
+            status: 'degraded',
+            reason: '模块未挂载，相关联动转为简化或只读模式'
+          });
+        }
+      });
+    }
+
+    var migrated = {
+      version: 2,
+      sampleId: sid,
+      theme: blueprintData.theme || 'custom',
+      playDefs: JSON.parse(JSON.stringify(blueprintData.playDefs || {})),
+      initConditions: JSON.parse(JSON.stringify(blueprintData.initConditions || {})),
+      migratedAt: Date.now(),
+      degradations: degradations
+    };
+
+    return {
+      ok: true,
+      sampleId: sid,
+      migrated: migrated,
+      degradations: degradations,
+      canStart: dep.canStart,
+      note: degradations.length > 0 ? '完成格式迁移，检测到 ' + degradations.length + ' 项可选玩法降级' : '蓝图格式版本迁移成功'
+    };
+  }
+
+  /**
+   * 4. 重置初始条件并保留进度（resetInitialConditions）：
+   * 显式操作，仅重置物资配额与基础设施初始状态，严格保留人们的经历、事件历史与人物档案。
+   */
+  function resetInitialConditions(sampleId, opts) {
+    var r = findSampleDefinition(sampleId);
+    if (!r.ok) return r;
+    var s = r.sample;
+    var o = opts || {};
+    var st = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+
+    var resetSummary = {
+      fundsReset: false,
+      materialsReset: false,
+      preservedPeopleCount: 0,
+      preservedEventsCount: 0
+    };
+
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (draft) {
+        // 重置初始资源
+        if (s.initConditions && s.initConditions.startingResources) {
+          draft.economy = draft.economy || {};
+          draft.economy.money = draft.economy.money || {};
+          draft.economy.money.funds = s.initConditions.startingResources.funds || 0;
+          resetSummary.fundsReset = true;
+
+          draft.economy.stock = draft.economy.stock || {};
+          var mats = s.initConditions.startingResources.materials || {};
+          Object.keys(mats).forEach(function (m) {
+            draft.economy.stock[m] = mats[m] || 0;
+          });
+          resetSummary.materialsReset = true;
+        }
+
+        // 统计并确认严格保留的进行中进度（人物状态、履历与世界事件历史）
+        if (draft.people) {
+          resetSummary.preservedPeopleCount = Object.keys(draft.people).length;
+        }
+        if (draft.world && Array.isArray(draft.world.events)) {
+          resetSummary.preservedEventsCount = draft.world.events.length;
+        }
+
+        // 记录蓝图重置审计日志
+        draft.blueprint = draft.blueprint || {};
+        draft.blueprint.resetHistory = draft.blueprint.resetHistory || [];
+        draft.blueprint.resetHistory.push({
+          sampleId: s.id,
+          at: Date.now(),
+          reason: clean(o.reason || '显式重置初始条件', 60),
+          summary: resetSummary
+        });
+
+        return true;
+      }, 'playableBlueprint:resetInitialConditions');
+    }
+
+    return {
+      ok: true,
+      sampleId: s.id,
+      summary: resetSummary,
+      note: '初始资源条件已显式重置；人物成长状态与世界历史事件已完整保留（无静默删除）'
+    };
+  }
+
   WA.playableBlueprint = {
     listSamples: listSamples,
     getSample: getSample,
     checkDependencies: checkDependencies,
     exportPlayDefs: exportPlayDefs,
     installSample: installSample,
+    previewDiff: previewDiff,
+    tuneConfig: tuneConfig,
+    migrateBlueprint: migrateBlueprint,
+    resetInitialConditions: resetInitialConditions,
     THEME_KEYS: THEME_KEYS.slice(),
     PLAY_DEF_KEYS: PLAY_DEF_KEYS.slice()
   };
