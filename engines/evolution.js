@@ -365,6 +365,75 @@
         WA.log('info', '演化推进：' + results.filter(r => r.result.startsWith('成功')).map(r => r.name + '→' + r.stage).join('、'));
       }
       return results;
+    },
+
+    /**
+     * EXV5-9: 世界脉搏自主偶发奇点突变（triggerSingularityEruption）
+     * 多重矛盾积累至临界点（如经济动荡、民心失控、戒备拉满）触发未预警的黑天鹅奇点突变
+     */
+    triggerSingularityEruption(mutationOpts) {
+      const opts = mutationOpts || {};
+      const cat = opts.category || 'black_swan';
+      const force = !!opts.force;
+      const s = WA.store.get();
+      const eco = (s.evolution && s.evolution.economy) || {};
+      const fList = (s.evolution && s.evolution.factions) || [];
+
+      // 评估世界紧张度指标
+      const isEconomicCrisis = eco.climate === '动荡' || eco.climate === '崩溃';
+      const hasHostileFaction = fList.some(f => f && (f.relation === '倾轧' || f.relation === '敌对' || f.vigilance >= 80));
+      const tensionScore = (isEconomicCrisis ? 40 : 0) + (hasHostileFaction ? 40 : 0) + (opts.extraTension || 0);
+
+      if (tensionScore < 70 && !force) {
+        return {
+          ok: false,
+          reason: 'tension-insufficient',
+          tensionScore: tensionScore,
+          threshold: 70,
+          note: '世界矛盾尚未积累至临界点，无法引发黑天鹅奇点突变'
+        };
+      }
+
+      const eruptionId = 'sng_' + Math.random().toString(36).substring(2, 8);
+      let out = null;
+
+      WA.store.transact(draft => {
+        draft.evolution = draft.evolution || {};
+        draft.evolution.singularities = draft.evolution.singularities || [];
+        const entry = {
+          id: eruptionId,
+          title: opts.title || '【未预警黑天鹅奇点事件】：旧秩序失控暴乱',
+          category: cat,
+          tensionScore: tensionScore,
+          impact: opts.impact || '全城进入紧急戒严状态，黑市断供，据点巡查频率倍增',
+          fallout: opts.fallout || '官僚虚报呈文彻底败露，各方势力全面进入决战备战',
+          triggeredAt: clockNow('evolution:singularity')
+        };
+        draft.evolution.singularities.push(entry);
+        if (draft.evolution.singularities.length > 5) draft.evolution.singularities.shift();
+
+        // 连带推升所有势力戒备
+        if (Array.isArray(draft.evolution.factions)) {
+          draft.evolution.factions.forEach(f => {
+            if (f) {
+              f.vigilance = 100;
+              f.status = '紧急戒备';
+            }
+          });
+        }
+
+        out = {
+          ok: true,
+          eruptionId: eruptionId,
+          title: entry.title,
+          tensionScore: tensionScore,
+          impact: entry.impact,
+          fallout: entry.fallout,
+          note: '黑天鹅奇点突变已爆发！全域势力戒备拉满！'
+        };
+      });
+
+      return out || { ok: false, reason: 'store-unavailable' };
     }
   };
 

@@ -28,6 +28,6 @@
 | **EXV5-4** | 官僚汇报时滞与避责虚报机制 | `engines/institutionalInertia.js` + `evolution` | 下层向宏观势力层层汇报产生轮次时滞与文书粉饰修饰 | 已完成 | `v2.243.0` (tests/v5-ex-4-5-6.js) |
 | **EXV5-5** | 影子配给与黑市地下交换网络 | `engines/freight.js` + `livingWorld` | 官方物资匮乏时衍生地下配给代币与隐蔽物资流通暗流 | 已完成 | `v2.243.0` (tests/v5-ex-4-5-6.js) |
 | **EXV5-6** | 因果溯源与追责纠缠决策树 | `engines/causal.js` + `aftermathImpact` | 事故发生后多方沿决策链顺藤摸瓜调查责任方，锁定追责嫌疑 | 已完成 | `v2.243.0` (tests/v5-ex-4-5-6.js) |
-| **EXV5-7** | 世代意志托付与绝笔信使契约 | `engines/socialLegacy.js` + `familyOps` | 角色濒死向玩家或亲信交付绝笔文书与核心遗志传承 | 待推进 | 待推进 |
-| **EXV5-8** | 玩家无声物理回波与微痕迹交互 | `livingWorld` + `sceneNarrative` | 玩家长时间不发一言或反复勘查在场景留下特殊氛围回声 | 待推进 | 待推进 |
-| **EXV5-9** | 世界脉搏自主偶发奇点突变 | `engines/evolution.js` + `livingWorld` | 多重社会矛盾积累至临界点触发未预警的黑天鹅奇点突变事件 | 待推进 | 待推进 |
+| **EXV5-7** | 世代意志托付与绝笔信使契约 | `engines/socialLegacy.js` + `familyOps` | 角色濒死向玩家或亲信交付绝笔文书与核心遗志传承 | 已完成 | `v2.244.0` (tests/v5-ex-7-8-9.js) |
+| **EXV5-8** | 玩家无声物理回波与微痕迹交互 | `livingWorld` + `sceneNarrative` | 玩家长时间不发一言或反复勘查在场景留下特殊氛围回声 | 已完成 | `v2.244.0` (tests/v5-ex-7-8-9.js) |
+| **EXV5-9** | 世界脉搏自主偶发奇点突变 | `engines/evolution.js` + `livingWorld` | 多重社会矛盾积累至临界点触发未预警的黑天鹅奇点突变事件 | 已完成 | `v2.244.0` (tests/v5-ex-7-8-9.js) |

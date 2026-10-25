@@ -1146,6 +1146,15 @@
       });
     }
 
+    // EXV5-8: 玩家无声物理回波与微痕迹（silentEchoes）
+    const silentEchoes = (b.silentEchoes || []).slice(-2);
+    if (silentEchoes.length > 0) {
+      lines.push('【静默对峙与无声物理回波】：');
+      silentEchoes.forEach(function (se) {
+        lines.push('· [' + se.place + '] 玩家长久驻足未置一词，' + se.echoAtmosphere + '（周遭角色警惕度：' + se.tensionLevel + '）');
+      });
+    }
+
     // 横向人情势能债务注入（恩义人情、嫌隙摩擦、软肋把柄）
     const recentDebts = (b.relationalDebts || []).slice(-2);
     if (recentDebts.length > 0) {
@@ -1175,6 +1184,55 @@
       finalLines.push('（...更多世情细节因叙事聚焦而精炼收敛...）');
     }
     return finalLines.join('\n');
+  }
+
+  /**
+   * EXV5-8: 玩家无声物理回波与微痕迹交互（recordSilentEcho）
+   * 记录玩家长时间不发一言、只勘查不表态或原地注视留下的心理压迫与氛围回波
+   */
+  function recordSilentEcho(place, durationRounds, options) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const pl = cleanStr(place, 40) || '当前场景';
+    const rds = Math.max(1, typeof durationRounds === 'number' ? durationRounds : 1);
+    const opts = options || {};
+    const gazeTarget = cleanStr(opts.gazeTarget || opts.who, 40);
+
+    let tensionLevel = Math.min(100, rds * 25);
+    let echoAtmosphere = '空气凝重静默，唯闻呼吸与衣袂细微翻动声';
+    if (tensionLevel >= 75) {
+      echoAtmosphere = '沉寂如铅块压顶，四周目光游移探询，疑窦与戒备已逼近临界点';
+    } else if (tensionLevel >= 50) {
+      echoAtmosphere = '无声对峙持续，在场者手按刀柄或微挪脚步，暗自揣测玩家意图';
+    }
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      const b = getBucket(draft);
+      b.silentEchoes = b.silentEchoes || [];
+      const entry = {
+        id: 'se_' + Math.random().toString(36).substring(2, 8),
+        place: pl,
+        durationRounds: rds,
+        gazeTarget: gazeTarget || '全场众人',
+        tensionLevel: tensionLevel,
+        echoAtmosphere: echoAtmosphere,
+        at: clockNow('livingWorld:silentEcho')
+      };
+      b.silentEchoes.push(entry);
+      if (b.silentEchoes.length > 5) b.silentEchoes.shift();
+      out = {
+        ok: true,
+        place: pl,
+        durationRounds: rds,
+        tensionLevel: tensionLevel,
+        echoAtmosphere: echoAtmosphere,
+        gazeTarget: entry.gazeTarget
+      };
+      return true;
+    }, 'livingWorld:recordSilentEcho');
+
+    return out || refuse('tx-failed');
   }
 
   function statView() {
@@ -1219,6 +1277,7 @@
     detectEncounters: detectEncounters,
     leaveTrace: leaveTrace,
     cleanTrace: cleanTrace,
+    recordSilentEcho: recordSilentEcho,
     buildBlock: buildBlock,
     stat: statView,
     resetStat: resetStat

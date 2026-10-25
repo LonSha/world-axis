@@ -716,6 +716,33 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.244.0 (EXV5-7): 世代意志托付与绝笔契约
+    'socialLegacy.entrustDeathbedPact': function (o) {
+      if (WA.socialLegacy && typeof WA.socialLegacy.entrustDeathbedPact === 'function') {
+        return WA.socialLegacy.entrustDeathbedPact(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'socialLegacy.fulfillDeathbedPact': function (o) {
+      if (WA.socialLegacy && typeof WA.socialLegacy.fulfillDeathbedPact === 'function') {
+        return WA.socialLegacy.fulfillDeathbedPact(o.pactId, o.trustee, o.outcome);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.244.0 (EXV5-8): 玩家无声物理回波与微痕迹
+    'livingWorld.recordSilentEcho': function (o) {
+      if (typeof WA.livingWorld.recordSilentEcho === 'function') {
+        return WA.livingWorld.recordSilentEcho(o.place, o.durationRounds || o.rounds, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.244.0 (EXV5-9): 世界脉搏自主偶发奇点突变
+    'evolution.triggerSingularityEruption': function (o) {
+      if (WA.evolution && typeof WA.evolution.triggerSingularityEruption === 'function') {
+        return WA.evolution.triggerSingularityEruption(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'livingWorld.dayPeriods': function () {
       return (WA.livingWorld && WA.livingWorld.DAY_PERIODS) ? WA.livingWorld.DAY_PERIODS.slice() : [];
     },

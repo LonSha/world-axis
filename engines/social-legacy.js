@@ -510,6 +510,86 @@
     return { ok: true, handoverId: hId, reorganization: results };
   }
 
+  /**
+   * EXV5-7: 世代意志托付与绝笔信使契约（entrustDeathbedPact & claimDeathbedPact）
+   * 角色濒死或离场时，向受托人订立绝笔文书契约与遗志交接，附带见证信物与遗愿义务
+   */
+  function entrustDeathbedPact(pactSpec) {
+    var p = pactSpec || {};
+    var testator = clean(p.testator || p.who, 40);
+    var trustee = clean(p.trustee, 40);
+    var bequest = clean(p.bequest || p.lastWill, 160);
+    var keepsake = clean(p.keepsake, 40) || '生锈的镖局铜令';
+    if (!testator || !trustee || !bequest) {
+      return { ok: false, reason: 'missing-fields' };
+    }
+
+    var pactId = 'pact_' + Math.random().toString(36).substring(2, 8);
+    var out = null;
+
+    WA.store.transact(function (draft) {
+      draft.socialLegacy = draft.socialLegacy || {};
+      draft.socialLegacy.deathbedPacts = draft.socialLegacy.deathbedPacts || {};
+      var entry = {
+        id: pactId,
+        testator: testator,
+        trustee: trustee,
+        bequest: bequest,
+        keepsake: keepsake,
+        status: 'pending_fulfillment', // 'pending_fulfillment', 'fulfilled', 'betrayed'
+        entrustedAt: now()
+      };
+      draft.socialLegacy.deathbedPacts[pactId] = entry;
+      out = {
+        ok: true,
+        pactId: pactId,
+        testator: testator,
+        trustee: trustee,
+        bequest: bequest,
+        keepsake: keepsake,
+        status: entry.status,
+        note: '绝笔遗愿契约已建立，见证信物已妥善交付'
+      };
+      return true;
+    }, 'socialLegacy:entrustDeathbedPact');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  function fulfillDeathbedPact(pactId, trustee, outcome) {
+    var pid = clean(pactId, 60);
+    var t = clean(trustee, 40);
+    var outc = clean(outcome, 20) || 'fulfilled'; // 'fulfilled', 'betrayed'
+    if (!pid || !t) return { ok: false, reason: 'missing-fields' };
+
+    var out = null;
+    WA.store.transact(function (draft) {
+      var pacts = (draft.socialLegacy && draft.socialLegacy.deathbedPacts) ? draft.socialLegacy.deathbedPacts : {};
+      var p = pacts[pid];
+      if (!p) {
+        out = { ok: false, reason: 'pact-not-found' };
+        return false;
+      }
+      if (p.trustee !== t) {
+        out = { ok: false, reason: 'unauthorized-trustee' };
+        return false;
+      }
+      p.status = outc;
+      p.fulfilledAt = now();
+      out = {
+        ok: true,
+        pactId: pid,
+        testator: p.testator,
+        trustee: t,
+        status: p.status,
+        note: outc === 'fulfilled' ? '遗志已圆满恪守兑现' : '受托人背弃了临终嘱托'
+      };
+      return true;
+    }, 'socialLegacy:fulfillDeathbedPact');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
   WA.socialLegacy = {
     formLegacy: formLegacy,
     acceptLegacy: acceptLegacy,
@@ -524,6 +604,8 @@
     proposeSuccession: proposeSuccession,
     resolveHandover: resolveHandover,
     reorganizeUnclaimed: reorganizeUnclaimed,
+    entrustDeathbedPact: entrustDeathbedPact,
+    fulfillDeathbedPact: fulfillDeathbedPact,
     LEGACY_TYPES: LEGACY_TYPES.slice(),
     ACCEPT_STATUSES: ACCEPT_STATUSES.slice()
   };
