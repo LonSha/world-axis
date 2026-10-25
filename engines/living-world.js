@@ -157,32 +157,49 @@
     let curUnit = '';
     let mealCost = 4;
     try {
-      if (WA.economy && typeof WA.economy.money === 'function') {
-        const declared = WA.economy.money();
-        if (declared) {
-          curName = declared;
-          if (declared === '银元' || declared === '铜钱' || declared === '铜板') {
-            curUnit = '枚';
-            mealCost = 4;
-          } else if (declared === '日元' || declared === '円') {
-            curUnit = '円';
-            mealCost = 500;
-          } else if (declared === '元' || declared === '人民币') {
-            curUnit = '元';
-            mealCost = 25;
-          } else if (declared === '信用点' || declared === '点') {
-            curUnit = '点';
-            mealCost = 20;
-          } else if (declared === '金币' || declared === '金') {
-            curUnit = '金';
-            mealCost = 1;
-          } else if (declared === '银币' || declared === '银') {
-            curUnit = '银';
-            mealCost = 2;
-          } else {
-            curUnit = declared;
-            mealCost = 10;
+      // 优先从 recipe 当前配方或扩展中感知
+      let declared = null;
+      if (WA.recipe) {
+        if (typeof WA.recipe.getSettings === 'function') {
+          const rcfg = WA.recipe.getSettings();
+          if (rcfg && rcfg.economy && rcfg.economy.money) {
+            declared = rcfg.economy.money;
           }
+        }
+        if (!declared && typeof WA.recipe.economySpec === 'function') {
+          const spec = WA.recipe.economySpec();
+          if (spec && spec.ok && spec.money) declared = spec.money;
+        }
+      }
+      if (!declared && WA.economy && typeof WA.economy.money === 'function') {
+        declared = WA.economy.money();
+      }
+      if (declared) {
+        curName = declared;
+        if (declared === '银元' || declared === '铜钱' || declared === '铜板') {
+          curUnit = '枚';
+          mealCost = 4;
+        } else if (declared === '日元' || declared === '円') {
+          curUnit = '円';
+          mealCost = 500;
+        } else if (declared === '元' || declared === '人民币') {
+          curUnit = '元';
+          mealCost = 25;
+        } else if (declared === '信用点' || declared === '点') {
+          curUnit = '点';
+          mealCost = 20;
+        } else if (declared === '美元' || declared === '美金' || declared === '刀') {
+          curUnit = '美元';
+          mealCost = 3; // 冷战时期（1960-70年代）一顿简餐汉堡咖啡约2~3美元
+        } else if (declared === '金币' || declared === '金') {
+          curUnit = '金';
+          mealCost = 1;
+        } else if (declared === '银币' || declared === '银') {
+          curUnit = '银';
+          mealCost = 2;
+        } else {
+          curUnit = declared;
+          mealCost = 10;
         }
       }
     } catch (e) {}
