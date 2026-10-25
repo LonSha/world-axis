@@ -266,6 +266,49 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.233.0 (EXV4-2): 人口迁入迁出与地方能力变化
+    'demographicFlow.setPlaceCapacity': function (o) {
+      if (typeof WA.demographicFlow.setPlaceCapacity === 'function') {
+        return WA.demographicFlow.setPlaceCapacity(o.placeId, o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'demographicFlow.planMigration': function (o) {
+      if (typeof WA.demographicFlow.planMigration === 'function') {
+        return WA.demographicFlow.planMigration(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'demographicFlow.commitMigration': function (o) {
+      if (typeof WA.demographicFlow.commitMigration === 'function') {
+        return WA.demographicFlow.commitMigration(o.spec || o, o.opts || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'demographicFlow.arriveMigration': function (o) {
+      if (typeof WA.demographicFlow.arriveMigration === 'function') {
+        return WA.demographicFlow.arriveMigration(o.migrationId);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'demographicFlow.recordSeasonalDeparture': function (o) {
+      if (typeof WA.demographicFlow.recordSeasonalDeparture === 'function') {
+        return WA.demographicFlow.recordSeasonalDeparture(o.who, o.fromPlace || o.from, o.toPlace || o.to, o.purpose, o.durationDays);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'demographicFlow.recordSeasonalReturn': function (o) {
+      if (typeof WA.demographicFlow.recordSeasonalReturn === 'function') {
+        return WA.demographicFlow.recordSeasonalReturn(o.seasonalId);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'demographicFlow.demographicProjection': function (o) {
+      if (typeof WA.demographicFlow.demographicProjection === 'function') {
+        return WA.demographicFlow.demographicProjection(o.locationId || o.placeId);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },

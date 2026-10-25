@@ -485,6 +485,8 @@
     'engines/social-legacy.js',
     // v2.231.0（拓展 IN-9）：历史相变。局部社会状态评估、过渡与路径依赖。
     'engines/phase-transition.js',
+    // v2.233.0（拓展 EXV4-2）：人口迁入迁出与地方能力变化。
+    'engines/demographic-flow.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

@@ -19,6 +19,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** people、travel、family、org、service-network 已存在，但长期人口流动尚未成为劳动力、照护、服务覆盖与地方路径的共同因果。
 **交付：** 以迁居/季节性流动事件改变现有角色地点、可用时段和关系责任；迁入由居住/服务/工作承载约束，迁出留下待接续义务。人口统计为投影，不建第二人物库。
 **验收：** 至少两类流动改变服务/生产能力；家庭或组织责任可转交、未转交会有后果；未到达者不提前参与；重载不复制角色或义务。P1，30–48 小时。
+*现场落地：* 已在 `engines/demographic-flow.js` 建立人口流动闭环（地点承载声明 `setPlaceCapacity`、迁居预检 `planMigration`、责任移交/滞留 `commitMigration`、在途豁免 `arriveMigration`、季节性流动返乡 `recordSeasonalDeparture`/`recordSeasonalReturn`、纯读人口投影 `demographicProjection`）；在 `engines/action-desk.js` 接入 7 项真实路由；专测 `tests/exp38-demographic-flow-migration-v2233.js`（37 项断言全绿，含单行真源码负控制与 10 次纯读零写入状态隔离），死导出账本 1030 零漂移。已结项合入。
 ### EXV4-3｜照护链与公共服务韧性
 **真实缺口：** `lifeline` 已有病况、照护步骤与活动限制，`family` 有照护记录，`service-network` 有设施服务；缺口不是再造照护登记，而是照护者缺席时，需求如何跨家庭与公共服务接续并改变真实服务状态。
 **交付：** 将照护需求作为预约/承诺被服务节点和家庭协作消费；缺席引发替代、排队、风险累积或服务转介，由原 owner 记录。
