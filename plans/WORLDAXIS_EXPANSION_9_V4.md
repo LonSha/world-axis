@@ -54,6 +54,7 @@ V3 已落地资源承载（`environmental-capacity`）、设施网络/降级与�
 **真实缺口：** social-legacy、phase-transition、custom-lax 有历史解释、路径和地方惯例，但人员更替后制度为何延续、变形或失效缺少可玩的代际传递。
 **交付：** 将一小组规则/技术/共同承诺绑定到可传递的文书、设施、实践者和支持群体；负责人离场时由继任者选择继承、修订或放弃并承担过渡成本。
 **验收：** 同一制度在两条继承路径下产生不同结果；文书不等于执行能力；孤立设施/缺人制度会退化；原始历史可追溯且不因继承改写。P2，32–50 小时。
+*现场落地：* 已在 `engines/institutional-inertia.js` 落地制度宪章绑定（`establishCharter`，绑定规约、设施与技能要求）、负责人离场与继任触发（`triggerSuccessionHandover`）、继承路径分化裁决（`resolveSuccessionPath`，提供正统守旧 orthodox_continuity、改革修订 reform_amendment 与放弃衰退 abandonment_decay 三种分化，代际递增且历史创始记录链条不可篡改）、执行能力与文书虚置审计（`auditInstitutionalDecay`，设施损毁或缺人引发物理健康度衰退至 dormant）以及纯读只读投影（`institutionalInertiaProjection`，10 次调用状态完全隔离）。接入 ActionDesk 路由、tool-diag 并在 `tests/exp45-institutional-inertia-succession-v2233.js` 固化 29 项断言与单行真源码负控制。死导出账本 1030 零漂移。已结项合入。
 
 ## 三大批次与规模
 | 批次 | 项目 | 差异化结果 |

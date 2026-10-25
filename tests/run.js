@@ -367,6 +367,8 @@ const LOAD = [
     'engines/risk-pooling.js',
     // v2.233.0（拓展 EXV4-8）：地方身份与多重归属冲突。同序进 LOAD。
     'engines/role-conflict.js',
+    // v2.233.0（拓展 EXV4-9）：世代交替与制度惯性。同序进 LOAD。
+    'engines/institutional-inertia.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序

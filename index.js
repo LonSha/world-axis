@@ -499,6 +499,8 @@
     'engines/risk-pooling.js',
     // v2.233.0（拓展 EXV4-8）：地方身份与多重归属冲突。
     'engines/role-conflict.js',
+    // v2.233.0（拓展 EXV4-9）：世代交替与制度惯性。
+    'engines/institutional-inertia.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

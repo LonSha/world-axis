@@ -543,6 +543,43 @@
     'roleConflict.conflictSeverity': function () {
       return (WA.roleConflict && WA.roleConflict.CONFLICT_SEVERITY) ? WA.roleConflict.CONFLICT_SEVERITY.slice() : [];
     },
+    // v2.233.0 (EXV4-9): institutionalInertia 世代交替与制度惯性
+    'institutionalInertia.establishCharter': function (o) {
+      if (typeof WA.institutionalInertia.establishCharter === 'function') {
+        return WA.institutionalInertia.establishCharter(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'institutionalInertia.triggerSuccessionHandover': function (o) {
+      if (typeof WA.institutionalInertia.triggerSuccessionHandover === 'function') {
+        return WA.institutionalInertia.triggerSuccessionHandover(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'institutionalInertia.resolveSuccessionPath': function (o) {
+      if (typeof WA.institutionalInertia.resolveSuccessionPath === 'function') {
+        return WA.institutionalInertia.resolveSuccessionPath(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'institutionalInertia.auditInstitutionalDecay': function (o) {
+      if (typeof WA.institutionalInertia.auditInstitutionalDecay === 'function') {
+        return WA.institutionalInertia.auditInstitutionalDecay(o.charterId, o.envConditions || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'institutionalInertia.institutionalInertiaProjection': function (o) {
+      if (typeof WA.institutionalInertia.institutionalInertiaProjection === 'function') {
+        return WA.institutionalInertia.institutionalInertiaProjection(o.charterId || (o.spec && o.spec.charterId) || (typeof o === 'string' ? o : null));
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'institutionalInertia.successionPaths': function () {
+      return (WA.institutionalInertia && WA.institutionalInertia.SUCCESSION_PATHS) ? WA.institutionalInertia.SUCCESSION_PATHS.slice() : [];
+    },
+    'institutionalInertia.charterStatus': function () {
+      return (WA.institutionalInertia && WA.institutionalInertia.CHARTER_STATUS) ? WA.institutionalInertia.CHARTER_STATUS.slice() : [];
+    },
     'rumor.competeForAttention': function (o) { return WA.rumor.competeForAttention(o.events, o.context, o); },
     // v2.232.0 (EXV3-4): 具名公共项目
     'coop.proposeProject': function (o) { return WA.coop.proposeProject(o); },
