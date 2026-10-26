@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.244.0';
+  const VERSION = '2.247.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -503,6 +503,12 @@
     'engines/institutional-inertia.js',
     // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹中枢
     'engines/living-world.js',
+    // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
+    'engines/geo-tracker.js',
+    // v2.247.0 (SYS-DEF-1): 全向系统健康与生成质量前置预检器 (SillyTavern-Self-Check 机制缝入)
+    'engines/health-preflight.js',
+    // v2.247.0 (NARR-1): 双轨因果隔离与线索断裂补偿推演台 (Gloria 叙事三部曲机制缝入)
+    'engines/narrative-deduction.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',
@@ -805,6 +811,8 @@
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',
+    // v2.246.0 (MAP-2): SVG 画布平滑飞行漫游、动态避让与同地聚类引擎
+    'render/map-viewport.js',
     'compat/host.js',
     'compat/mvu.js',
     'compat/th-helper.js',

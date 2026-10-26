@@ -143,7 +143,8 @@
     // v2.230.0（拓展 N12）：五条新注入源的显示名。与 render/inject.js 的
     //   SOURCES（键）**逐字同批**登记（inject-sources-v2560 的 D 判据：
     //   SOURCES 每一项在本表里都要有显示名，且本表不得有超出 SOURCES 的键）。
-    elsewhere: '彼方档案', livingWorld: '真实世界运转', vitals: '生理线', coordinate: '坐标台账',
+    elsewhere: '彼方档案', livingWorld: '真实世界运转', geoTracker: '空间常识与位移',
+    healthPreflight: '系统健康与写作防线', vitals: '生理线', coordinate: '坐标台账',
     dream: '长梦', backstageTone: '幕后风物',
     // v2.230.0（修存量红）：`retrieval` 在 v2.228.0 进了 render/inject.js 的 SOURCES，
     //   却没进本表 —— 实测坐实：inject-sources-v2560 的 D 判据与 v2.22.0 那条
@@ -852,7 +853,17 @@
            + '<button class="wa-btn" id="wa-at-unplaced" title="出现在端点里却没有坐标的名字 —— 如实报出，不补坐标">未落位</button>'
            + '<button class="wa-btn" id="wa-at-diag" title="自证面：七处来源是否齐备、快照可读、两层各有多少、源缺席与源抛错分列">诊断</button>'
            + '</div>'
-           + '<div id="wa-at-out" class="wa-out"></div>';
+           + '<div id="wa-at-out" class="wa-out"></div>'
+           + '<div class="wa-sec" style="margin-top:10px">空间位置感知与视口控制（MAP-1 & MAP-2）</div>'
+           + '<div class="wa-dim">基于物理坐标系、多级消歧与 App 级视口漫游。正文末尾写 <code>&lt;位置 人物="角色名"&gt;街区·具体地点&lt;/位置&gt;</code> 即刻自动解析落位，并以 <code>【空间常识与位移透镜】</code> 实时反哺相对距离与生活圈。</div>'
+           + '<div class="wa-row">'
+           + '<button class="wa-btn" id="wa-geo-locs" title="查看当前在场各角色最新空间坐标与实测落位">角色落位表</button>'
+           + '<button class="wa-btn" id="wa-geo-feed" title="构建正文注入块预览（相对物理距离与周边 800m 生活圈）">正文透镜预览</button>'
+           + '<button class="wa-btn" id="wa-geo-sample" title="注入东京大舞台基准坐标样例库（新宿/涩谷/秋叶原/初星学园等）">载入基准坐标库</button>'
+           + '<button class="wa-btn" id="wa-geo-diag" title="空间位置追踪引擎状态诊断">空间诊断</button>'
+           + '<button class="wa-btn" id="wa-geo-svg" title="MAP-2: 渲染 SVG 画布与同地点角色聚类视图">SVG漫游画布</button>'
+           + '</div>'
+           + '<div id="wa-geo-out" class="wa-out"></div>';
        })()}`;
 
   }
@@ -10606,6 +10617,77 @@ on('#wa-desk-show', showDesk);
           + '　事实 ' + d.layers.facts + '（' + atEsc(d.layers.factsReason || '可读') + '）'
           + '　未知对 ' + d.layers.gaps + '</div>'
           + '<div class="wa-dim">故障：' + atEsc(JSON.stringify(d.faults)) + '（<b>源缺席与源抛错分列</b> —— 前者是配置，后者是故障）</div>');
+      });
+      // ── MAP-1：空间位置感知与视口控制交互 ──────────────────────────
+      const geoOut = (html) => { const el = $('#wa-geo-out'); if (el) el.innerHTML = html; };
+      on('#wa-geo-locs', () => {
+        if (!WA.geoTracker) return geoOut('<div class="wa-log wa-log-err">geoTracker 引擎未装载</div>');
+        const s = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+        const locs = (s.geoTracker && s.geoTracker.characterLocations) ? s.geoTracker.characterLocations : {};
+        const keys = Object.keys(locs);
+        if (!keys.length) return geoOut('<div class="wa-log wa-log-info">当前暂无在场角色落位记录（等待正文输出 &lt;位置 人物="..."&gt; 或手动解析）</div>');
+        geoOut('<div class="wa-log wa-log-ok">在场追踪角色 ' + keys.length + ' 名</div>'
+          + keys.map(k => {
+            const loc = locs[k];
+            const coordStr = loc.x !== null ? `(${loc.x}, ${loc.y})` : '无具象物理坐标';
+            return `<div class="wa-item"><b>${atEsc(loc.who)}</b>：${atEsc(loc.rawPlace)} <span class="wa-dim">[${coordStr} · ${atEsc(loc.region || '未知街区')}${loc.approximate ? ' · 模糊' : ''}]</span></div>`;
+          }).join(''));
+      });
+      on('#wa-geo-feed', () => {
+        if (!WA.geoTracker) return geoOut('<div class="wa-log wa-log-err">geoTracker 引擎未装载</div>');
+        const feed = WA.geoTracker.buildBlock();
+        if (!feed) return geoOut('<div class="wa-log wa-log-info">空间常识透镜当前未生成块（未开启或无追踪角色）</div>');
+        geoOut('<div class="wa-log wa-log-ok">正文注入透镜预览：</div><pre class="wa-pre">' + atEsc(feed) + '</pre>');
+      });
+      on('#wa-geo-sample', () => {
+        if (!WA.geoTracker) return geoOut('<div class="wa-log wa-log-err">geoTracker 引擎未装载</div>');
+        const samples = [
+          { name: '新宿站', aka: ['新宿', '新宿车站'], region: '新宿区', x: 100, y: 150, kind: 'station' },
+          { name: '歌舞伎町一番街', aka: ['歌舞伎町'], region: '新宿区', x: 110, y: 140, kind: 'poi' },
+          { name: '新宿御苑', aka: ['御苑'], region: '新宿区', x: 125, y: 160, kind: 'poi' },
+          { name: '涩谷十字路口', aka: ['涩谷站前', '忠犬八公'], region: '涩谷区', x: 90, y: 220, kind: 'landmark' },
+          { name: '初星学园', aka: ['学园', '初星学园总校区'], region: '初星特别区', x: 300, y: 300, kind: 'campus', sceneId: '初星学园' },
+          { name: '初星学园·制作科大楼', region: '初星特别区', x: 305, y: 302, kind: 'building', sceneId: '初星学园', floor: '2F' },
+          { name: '秋叶原电器街', aka: ['秋叶原', '秋叶原站'], region: '千代田区', x: 180, y: 130, kind: 'area' }
+        ];
+        samples.forEach(s => WA.geoTracker.registerPlace(s));
+        geoOut('<div class="wa-log wa-log-ok">已成功载入 ' + samples.length + ' 处基准物理坐标（新宿、涩谷、初星学园及多层设施）</div>');
+      });
+      on('#wa-geo-diag', () => {
+        if (!WA.geoTracker) return geoOut('<div class="wa-log wa-log-err">geoTracker 引擎未装载</div>');
+        const d = WA.geoTracker.diagnose();
+        const cfg = (typeof WA.geoTracker.settings === 'function') ? WA.geoTracker.settings() : {};
+        if (typeof WA.geoTracker.saveSettings === 'function') {
+          WA.geoTracker.saveSettings(cfg);
+        }
+        const testResolved = (typeof WA.geoTracker.resolveLocation === 'function') ? WA.geoTracker.resolveLocation('新宿站') : null;
+        const resStr = testResolved ? ` · 解析测通: ${testResolved.name}` : '';
+        geoOut('<div class="wa-log wa-log-info">v' + d.version + ' · 启用: ' + d.enabled + ' · 地点表: ' + d.placesCount + ' · 追踪角色: ' + d.trackedCharacters + ' · 历史流水: ' + d.historyCount + resStr + '</div>');
+      });
+      on('#wa-geo-svg', () => {
+        if (!WA.mapViewport || !WA.geoTracker) return geoOut('<div class="wa-log wa-log-err">mapViewport 引擎未装载</div>');
+        const s = (WA.store && WA.store.get) ? (WA.store.get() || {}) : {};
+        const geo = s.geoTracker || {};
+        const places = Object.values(geo.places || {});
+        const locs = Object.values(geo.characterLocations || {});
+        const clusters = WA.mapViewport.clusterCharacters(locs, 20, 3);
+        const decluttered = WA.mapViewport.declutterLabels(places, 1.0, 10);
+        const svg = WA.mapViewport.renderSvgScene({
+          width: 700,
+          height: 400,
+          viewBox: '0 0 700 400',
+          places: decluttered,
+          clusters: clusters
+        });
+        const vpDiag = WA.mapViewport.diagnose();
+        const vpCfg = (typeof WA.mapViewport.settings === 'function') ? WA.mapViewport.settings() : {};
+        if (typeof WA.mapViewport.saveSettings === 'function') {
+          WA.mapViewport.saveSettings(vpCfg);
+        }
+        const flyTest = WA.mapViewport.computeFlyInterpolation({ x: 0, y: 0, zoom: 1.0 }, { x: 100, y: 100, zoom: 1.5 }, 0.5);
+        const flyStr = `插值帧(${Math.round(flyTest.x)}, ${Math.round(flyTest.y)})`;
+        geoOut('<div class="wa-log wa-log-ok">MAP-2 SVG 渲染引擎已加载 · ' + flyStr + ' · 聚类数: ' + clusters.length + '</div>'
+          + '<div style="width:100%; height:320px; border:1px solid rgba(255,255,255,0.15); border-radius:6px; overflow:hidden; margin-top:6px;">' + svg + '</div>');
       });
     }
     on('#wa-ch-start', () => { WA.chapters.start($('#wa-ch-title').value.trim()); renderBody(); });

@@ -329,7 +329,9 @@
         st.occupation = occupation;
       }
       draft.people = draft.people || {};
-      const p = draft.people[nm] = draft.people[nm] || { id: nm, name: nm };
+      const nowTs = (WA.clock && WA.clock.now) ? WA.clock.now('livingWorld') : Date.now();
+      const p = draft.people[nm] = draft.people[nm] || { id: nm, name: nm, createdAt: nowTs, updatedAt: nowTs };
+      p.updatedAt = nowTs;
       p.life = p.life || {};
       p.life.routine = st.customRoutine || [];
       p.life.occupation = st.occupation;
@@ -459,6 +461,15 @@
   /**
    * 记录NPC间的人情势能与交往恩义（recordRelationalDebt）
    */
+  function checkDeepTalkEligible(a, b) {
+    if (WA.bonds && typeof WA.bonds.evaluateDeepTalk === 'function') {
+      try {
+        return WA.bonds.evaluateDeepTalk(a, (b && b.name) || b, {});
+      } catch (e) {}
+    }
+    return null;
+  }
+
   function recordRelationalDebt(fromWho, toWho, debtType, amount, reason) {
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
@@ -551,7 +562,9 @@
     let out = null;
     WA.store.transact(function (draft) {
       draft.people = draft.people || {};
-      const p = draft.people[nm] = draft.people[nm] || { id: nm, name: nm };
+      const nowTs = (WA.clock && WA.clock.now) ? WA.clock.now('livingWorld') : Date.now();
+      const p = draft.people[nm] = draft.people[nm] || { id: nm, name: nm, createdAt: nowTs, updatedAt: nowTs };
+      p.updatedAt = nowTs;
       p.profile = p.profile || {};
       p.profile.memory = Array.isArray(p.profile.memory) ? p.profile.memory : [];
       p.profile.memory.push(mem);

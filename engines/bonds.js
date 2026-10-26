@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/bonds.js (v2.66.0)
+ * WorldAxis engines/bonds.js (v2.247.0)
  * 关系六型：替身 / 寄生拯救 / 主权让渡 / 利益同盟 / 平行共存 / 对手共生。
  *
  * 缝合来源：4.4「RelationshipAnchor」。预设里那是一段给模型的人设锚；
@@ -83,10 +83,37 @@
     const lines = list.map(function (r) { return r.key + '：' + r.types.join('、'); });
     return '[关系六型]\n' + lines.join('\n') + '\n六型是关系结构，与恩怨血仇分账并行；血仇记「做过什么」，这里记「是什么关系」，两账互不覆盖。\n';
   }
+  /**
+   * v2.247.0 (2.0_by & V3_by703 机制缝入): DeepTalk 深度对话穿透与对等情绪触发器
+   * 必须基于双方已知共同经历或关键事件，禁止在寒暄或情绪不对等阶段强行深谈
+   * @param {Object} actor 角色对象
+   * @param {string} partnerName 互动对象
+   * @param {Object} contextCurrent 当前情境
+   */
+  function evaluateDeepTalk(actor, partnerName, contextCurrent) {
+    if (!actor || !partnerName) return { eligible: false, reason: 'missing-actor' };
+    const pName = clean(partnerName, 40);
+    const bondsState = (actor.bonds && actor.bonds[pName]) || {};
+    const sharedMemories = Array.isArray(actor.sharedMemories) ? actor.sharedMemories : [];
+    
+    // 1. 深度对话前置：必须有至少 1 项共同经历沉淀，且非处于警戒/敌对状态
+    if (sharedMemories.length === 0 && !bondsState.deepAffection) {
+      return { eligible: false, reason: 'insufficient-shared-experience', guidance: '缺少共同生活与危机经历基础，维持当前社交边界' };
+    }
+    
+    // 2. 情绪对等重量：若一方处于极度倾诉而另一方防御闭锁，引导破冰而非即兴倒贴
+    return {
+      eligible: true,
+      reason: 'eligible-for-deeptalk',
+      emotionalWeight: bondsState.deepAffection ? 'deep' : 'balanced',
+      guidance: '允许穿透防线触及核心动机，但在情感表达上保持对等重量，绝不盲目顺从。'
+    };
+  }
+
   WA.bonds = {
     TYPES: TYPES.slice(),
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    setBond: setBond, read: read, buildBlock: buildBlock,
+    setBond: setBond, read: read, buildBlock: buildBlock, evaluateDeepTalk: evaluateDeepTalk,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

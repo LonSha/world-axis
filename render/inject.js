@@ -163,7 +163,7 @@
     // v2.230.0（拓展 N12）：六条新注入源。与注入分支**同批**登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
     //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**。
-    'elsewhere', 'livingWorld', 'vitals', 'coordinate', 'dream', 'backstageTone',
+    'elsewhere', 'livingWorld', 'geoTracker', 'healthPreflight', 'vitals', 'coordinate', 'dream', 'backstageTone',
     //   （注：compare / beat / portal 为纯函数面（零 store 写、无 buildBlock），
     //    modelink 为幕后工具面（无 buildBlock）—— 四者**不设注入源**：
     //    源表只收「会往正文里放块」的面，开关面不在此列（B 判据会抓幽灵开关）。）
@@ -253,7 +253,7 @@ style: false,
         //   retrieval 的 DEF.enabled=false,未开时 buildBlock 返回空串),不给老用户凭空多出约束。
         // v2.230.0（拓展 N12）：六条新源。取默认 true（同四条理由——其模块总开关
         //   默认为关，未开时 buildBlock 返回空串），不给老用户凭空多出约束。
-        elsewhere: true, livingWorld: true, vitals: true, coordinate: true, dream: true, backstageTone: true,
+        elsewhere: true, livingWorld: true, geoTracker: true, healthPreflight: true, vitals: true, coordinate: true, dream: true, backstageTone: true,
         // v2.230.0（拓展 N12 续批）：三条新源。取默认 true（同四条理由——其模块总开关
         //   默认为关，未开时 buildBlock 返回空串），不给老用户凭空多出约束。
         floorSnapshot: true, memoryTiers: true, lingqi: true,
@@ -473,6 +473,8 @@ style: false,
     //   SRC_MOD_SETTING 四处逐字同名登记。取名口径同 diplomacy/retrieval：答「这一段是什么」。
     elsewhere: '彼方档案',
     livingWorld: '真实世界运转',
+    geoTracker: '空间常识与位移',
+    healthPreflight: '系统健康与写作防线',
     vitals: '生理线',
     coordinate: '坐标台账',
     dream: '长梦',
@@ -614,6 +616,8 @@ style: false,
     // v2.230.0（拓展 N12）：六条新源**确有**模块级总开关（同注册表 __REG.key）。
     elsewhere: 'worldaxis_elsewhere_settings_v1',
     livingWorld: 'worldaxis_living_world_settings_v1',
+    geoTracker: 'worldaxis_geo_tracker_settings_v1',
+    healthPreflight: 'worldaxis_health_preflight_settings_v1',
     vitals: 'worldaxis_vitals_settings_v1',
     coordinate: 'worldaxis_coordinate_settings_v1',
     dream: 'worldaxis_dream_settings_v1',
@@ -1166,6 +1170,8 @@ style: false,
       //   各处一律 engineCall 包裹 + 先判开关，缺模块时静默不出块（不抛）。
       if (vis.elsewhere && WA.elsewhere) { const eb = engineCall('elsewhere', function () { return WA.elsewhere.buildBlock(); }); if (eb) items.push({ source: '彼方档案', content: eb }); }
       if (vis.livingWorld && WA.livingWorld) { const lwb = engineCall('livingWorld', function () { return WA.livingWorld.buildBlock(); }); if (lwb) items.push({ source: '真实世界运转', content: lwb }); }
+      if (vis.geoTracker && WA.geoTracker) { const gtb = engineCall('geoTracker', function () { return WA.geoTracker.buildBlock(); }); if (gtb) items.push({ source: '空间常识与位移', content: gtb }); }
+      if (vis.healthPreflight && WA.healthPreflight) { const hpb = engineCall('healthPreflight', function () { return WA.healthPreflight.buildBlock(); }); if (hpb) items.push({ source: '系统健康与写作防线', content: hpb }); }
       if (vis.vitals && WA.vitals) { const vb = engineCall('vitals', function () { return WA.vitals.buildBlock(); }); if (vb) items.push({ source: '生理线', content: vb }); }
       if (vis.coordinate && WA.coordinate) { const cb = engineCall('coordinate', function () { return WA.coordinate.buildBlock(); }); if (cb) items.push({ source: '坐标台账', content: cb }); }
       if (vis.dream && WA.dream) { const db = engineCall('dream', function () { return WA.dream.buildBlock(); }); if (db) items.push({ source: '长梦', content: db }); }

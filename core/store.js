@@ -208,6 +208,12 @@
         ripples: [],
         relationalDebts: []
       },
+      // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
+      geoTracker: {
+        places: {},
+        characterLocations: {},
+        locationHistory: []
+      },
       knowledgePractice: { knowledges: [], licenses: [], practiceLogs: [], refinements: [] },
       publicAgenda: { agendas: {}, proposals: [], deliberations: [] },
       riskPooling: { pools: [], pledges: [], claims: [], disputes: [] },

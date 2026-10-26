@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/motive-arbitration.js (v2.231.0) — IN-1 动机竞合
+ * WorldAxis engines/motive-arbitration.js (v2.247.0) — IN-1 动机竞合
  *
  * 核心职责：
  *   NPC 不再机械执行动作列表的第一项。
@@ -119,6 +119,28 @@
         penalty += cVal * (w[dim] || 1.0);
       });
 
+      // v2.247.0 (NPC-GRAVITY): 现实重力与 NPC 解绑 user 协议 (反谄媚与反悬浮)
+      // ① 现实重力阻尼 (gravity): 若行动要求超出角色的阶层/财力/精力底线，施加重力惩罚
+      let realityPenalty = 0;
+      if (c.requiresResource && person && person.resources) {
+        Object.keys(c.requiresResource).forEach(function (rKey) {
+          const req = Number(c.requiresResource[rKey]) || 0;
+          const avail = Number(person.resources[rKey]) || 0;
+          if (req > avail) {
+            realityPenalty += (req - avail) * 3.5;
+          }
+        });
+      }
+      // ② 解绑 user 协议 (anti-sycophancy): 若行动纯粹迎合玩家但严重违背角色核心底线与自主生计
+      let sycophancyPenalty = 0;
+      if (c.target === 'user' || c.forUser) {
+        const selfLoss = (Number(cost.livelihood) || 0) + (Number(cost.safety) || 0);
+        if (selfLoss > 2.0 && (!person.bonds || !person.bonds.deepAffection)) {
+          // 未建立深层羁绊时强行牺牲自身生存迎合玩家，重度惩罚
+          sycophancyPenalty += selfLoss * 2.5;
+        }
+      }
+
       // 承诺影响惩罚/激励
       let commitmentPenalty = 0;
       if (impact) {
@@ -133,7 +155,7 @@
         }
       }
 
-      const totalScore = Math.round((benefit - penalty - commitmentPenalty) * 100) / 100;
+      const totalScore = Math.round((benefit - penalty - commitmentPenalty - realityPenalty - sycophancyPenalty) * 100) / 100;
 
       return {
         id: id,
@@ -143,6 +165,8 @@
         benefit: Math.round(benefit * 100) / 100,
         penalty: Math.round(penalty * 100) / 100,
         commitmentPenalty: Math.round(commitmentPenalty * 100) / 100,
+        realityPenalty: Math.round(realityPenalty * 100) / 100,
+        sycophancyPenalty: Math.round(sycophancyPenalty * 100) / 100,
         commitmentImpact: impact,
         factsRef: factsRef,
         invalidFacts: invalidFacts,
@@ -255,6 +279,6 @@
   };
 
   if (typeof console !== 'undefined' && console.log) {
-    console.log('[WorldAxis] engines/motive-arbitration 已加载（2.231.0）');
+    console.log('[WorldAxis] engines/motive-arbitration 已加载（2.247.0）');
   }
 })();

@@ -2321,8 +2321,14 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/role-conflict.js': 'roleConflict',
     // v2.233.0 (EXV4-9): institutionalInertia -- 世代交替与制度惯性（宪章绑定/继承路径分化/文书虚置退化）
     'engines/institutional-inertia.js': 'institutionalInertia',
-    // v2.239.0 (OPV5-1): livingWorld -- 自治市井微观生态演化与真实生计流转
+// v2.234.0 (OPV5-1): livingWorld -- 自治市井微观生态演化与真实生计流转
     'engines/living-world.js': 'livingWorld',
+    // v2.245.0 (MAP-1): 通用物理坐标、空间位置追踪与生活圈透镜
+    'engines/geo-tracker.js': 'geoTracker',
+    'engines/health-preflight.js': 'healthPreflight',
+    'engines/narrative-deduction.js': 'narrativeDeduction',
+    // v2.246.0 (MAP-2): SVG 画布平滑飞行漫游、动态避让与同地聚类引擎
+    'render/map-viewport.js': 'mapViewport',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
     //   它们不是本版新增，但「漏登记时长」不改变后果：诊断清单少报一个黑盒。
     'engines/family.js': 'family', 'engines/research.js': 'research',
@@ -3946,6 +3952,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   那一段同页登记。**登记错页比不登记更坏**（看起来已被覆盖，实际永远查不到）。
     { page: 'world', ids: ['wa-at-enabled', 'wa-at-view', 'wa-at-places', 'wa-at-routes', 'wa-at-rel', 'wa-at-unplaced', 'wa-at-diag'],
       dynamic: ['wa-at-out'] },
+    // v2.245.0 (MAP-1 & MAP-2): 空间位置感知与视口控制 —— 5 静态控件 + 1 动态读数出口
+    { page: 'world', ids: ['wa-geo-locs', 'wa-geo-feed', 'wa-geo-sample', 'wa-geo-diag', 'wa-geo-svg'],
+      dynamic: ['wa-geo-out'] },
     // v2.187.0（E8）：依赖体检与迁移助手 —— 8 静态控件 + 1 动态读数出口。
     //   渲染在**工具页**（与种子库 / 蓝图同页同族：三者都在「把世界搬走 / 搬来」这条线上），
     //   故与 wa-ws-* / wa-bp-* 两段同页登记。**登记错页比不登记更坏**（看起来已被覆盖，实际永远查不到）。

@@ -267,7 +267,9 @@
         var pId = plan.who.indexOf('p_') === 0 ? plan.who : 'p_' + plan.who;
         d.people = d.people || {};
         if (!d.people[pId]) {
-          d.people[pId] = { id: pId, name: plan.who, location: plan.from };
+          d.people[pId] = { id: pId, name: plan.who, location: plan.from, createdAt: now(), updatedAt: now() };
+        } else {
+          d.people[pId].updatedAt = now();
         }
         if (o.instantArrive) {
           d.people[pId].location = plan.to;

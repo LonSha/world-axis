@@ -371,6 +371,10 @@ const LOAD = [
     'engines/institutional-inertia.js',
     // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹中枢
     'engines/living-world.js',
+    // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
+    'engines/geo-tracker.js',
+    'engines/health-preflight.js',
+    'engines/narrative-deduction.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -521,6 +525,8 @@ const LOAD = [
   //   都在同一 vm 上下文里跑,装载面没给它模块,锚点核对与负向探针就整段静默跳过。
   'engines/retrieval.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
+  // v2.246.0 (MAP-2): SVG 画布平滑飞行漫游、动态避让与同地聚类引擎
+  'render/map-viewport.js',
   // v2.101.0（O11）：跨插件互操作验收面。位置与 index.js LOAD_ORDER 同序
   //   （须晚于 lonsha-reader / phone-bridge，它读的是两者的现场读数）。
   'engines/interop.js',
@@ -24409,6 +24415,30 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(rV3C.status === 0, 'v3-c deepening exit 0');
     const rV2232 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v2232-epistemic-director-affect.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
     assert(rV2232.status === 0, 'v2232 epistemic director affect exit 0');
+  }
+  // ── v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与消歧专锁 ──
+  section('v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与消歧专锁');
+  {
+    await runLock('./geo-tracker-v2245.js', 'runAll');
+    await runLock('./geo-tracker-v2245.js', 'runNegative');
+  }
+  // ── v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁 ──
+  section('v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁');
+  {
+    await runLock('./map-viewport-v2246.js', 'runAll');
+    await runLock('./map-viewport-v2246.js', 'runNegative');
+  }
+  // ── v2.247.0 (SYS-DEF-1): 全向系统健康与生成质量前置预检专锁 ──
+  section('v2.247.0 (SYS-DEF-1): 全向系统健康与生成质量前置预检专锁');
+  {
+    await runLock('./sys-defense-v2247.js', 'runAll');
+    await runLock('./sys-defense-v2247.js', 'runNegative');
+  }
+  // ── v2.247.0 (NPC-GRAVITY): 现实重力、解绑user协议与DeepTalk对等重量专锁 ──
+  section('v2.247.0 (NPC-GRAVITY): 现实重力、解绑user协议与DeepTalk对等重量专锁');
+  {
+    await runLock('./npc-gravity-v2247.js', 'runAll');
+    await runLock('./npc-gravity-v2247.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

@@ -77,6 +77,9 @@
     'memory.pmem':        { path: 'memory.pmem',        cap: 60,  why: '人物主观记忆总量' },
     // v2.234.0 (Living World V5.1): 角色生活状态（行囊、生理负荷、职业作息）
     'livingWorld.characterStates': { path: 'livingWorld.characterStates', kind: 'object', cap: 48, why: '角色微观生活状态（生计行囊/生理负荷/职业）' },
+    // v2.245.0 (MAP-1): 角色空间落位与感知流水容量
+    'geoTracker.characterLocations': { path: 'geoTracker.characterLocations', kind: 'object', cap: 48, why: '角色空间坐标与最新位置登记' },
+    'geoTracker.locationHistory':    { path: 'geoTracker.locationHistory', cap: 32, why: '正文空间位置感知流水' },
     'elsewhere.rows':      { path: 'elsewhere.rows',      cap: 48, why: '幕后档案环形（FIFO 挤出最旧卡）' },
     'livingWorld.encounters':   { path: 'livingWorld.encounters',   cap: 32, why: '玩家与NPC偶遇记录环形' },
     'livingWorld.livingTraces': { path: 'livingWorld.livingTraces', cap: 32, why: '地点残留生活痕迹环形' },

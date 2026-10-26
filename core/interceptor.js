@@ -128,6 +128,21 @@
                   WA.injectValue.settle(tailMsg && tailMsg.mes);
                 }
               } catch (eIV) { /* 观测失败不影响世界推进 */ }
+              // v2.245.0 (MAP-1): 提取正文末尾的位置标记 `<位置 人物="...">地点</位置>` 并更新空间坐标
+              try {
+                if (WA.geoTracker && typeof WA.geoTracker.readLocationMarks === 'function' && tailMsg && tailMsg.mes) {
+                  const marks = WA.geoTracker.readLocationMarks(tailMsg.mes);
+                  if (marks && marks.length) {
+                    marks.forEach(m => {
+                      const who = (m[1] || '').trim();
+                      const loc = (m[2] || m[3] || '').trim();
+                      if (who && loc) {
+                        WA.geoTracker.updateCharacterLocation(who, loc);
+                      }
+                    });
+                  }
+                }
+              } catch (eGeo) { /* 位置感知失败不影响世界推进 */ }
               const runAfter = async () => {
                 await WA.workflow.run('after', actx);
                 // v0.7.0: 结算完成才记录楼层（批内提交，随批落盘；失败阻断则下轮重试）
@@ -154,7 +169,12 @@
               const chat = (c && c.chat) || [];
               const last = chat[chat.length - 1];
               if (!last || last.is_user || typeof last.mes !== 'string' || !last.mes) return;
-              const out = WA.purifier.applySafe(last.mes);
+              let out = WA.purifier.applySafe(last.mes);
+              // v2.247.0 (SYS-DEF-1): 接入 healthPreflight 后置健康体检与去八股/技术标签防御
+              if (WA.healthPreflight && typeof WA.healthPreflight.inspectAndSanitize === 'function') {
+                const checked = WA.healthPreflight.inspectAndSanitize(out, { autoFix: true });
+                out = checked.text;
+              }
               if (out !== last.mes) {
                 __purifiedRaw.set(last, last.mes);   // 原文快照：世界推进仍基于原文
                 last.mes = out;
