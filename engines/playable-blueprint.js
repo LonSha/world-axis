@@ -402,9 +402,10 @@
           s.initConditions.initialPeople.forEach(function (p) {
             var pKey = 'p_' + clean(p.name, 40);
             if (!draft.people[pKey]) {
-              draft.people[pKey] = {
+              draft.people[pKey] = {   // fallback：开局初始人物兜底建档
                 id: pKey,
                 name: clean(p.name, 40),
+                createdVia: 'playableBlueprint:fallback',
                 role: clean(p.role || 'citizen', 30),
                 where: clean(p.place || places[0] || 'town_square', 40),
                 profile: { status: 'idle', energy: 100 },

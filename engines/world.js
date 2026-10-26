@@ -609,7 +609,15 @@
       WA.evict.array(draft.world.events, 'world.events');
       out = { ok: true, id: row.id, kind: row.kind };
     }, 'world:add-event');
-    if (out && out.ok) { S.events++; S.lastReason = 'event'; } else S.blocked++;
+    if (out && out.ok) {
+      S.events++; S.lastReason = 'event';
+      // v2.252.0（IF-1）：日程一登记就按兴趣面投递「这里有事要发生」。
+      //   只投给兴趣面覆盖该地的人与镜头焦点格，**不投给全城**——那正是本模块要治的全知。
+      //   投递失败（落不了格/关了开关）不影响日程本身，故整段 try 包住。
+      try {
+        if (WA.interestFace && out.kind) WA.interestFace.publish({ x: place, kind: 'event:' + out.kind, id: out.id, at: start });
+      } catch (e) {}
+    } else S.blocked++;
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
@@ -1023,7 +1031,13 @@
       x.at = t;
       out = { ok: true, person: who, place: x.to, arrived: true, from: x.from, at: t };
     }, 'world:arrive');
-    if (out && out.ok) { S.arrived++; S.lastReason = 'arrived'; } else if (out) S.blocked++;
+    if (out && out.ok) {
+      S.arrived++; S.lastReason = 'arrived';
+      // v2.252.0（IF-1）：到达即落位 —— 兴趣面按地名稳定哈希成格，人一换地方就重算覆盖集合。
+      //   只在地点真变了时调：同名地点哈希恒定，move 会自己报 same-cell 并跳过重算。
+      //   本模块缺席时（老版本 localStore 回灌）静默跳过，不影响行程本身。
+      try { if (out.place && WA.interestFace) WA.interestFace.put(who, out.place); } catch (e) {}
+    } else if (out) S.blocked++;
     return out || { ok: false, reason: 'store-unavailable' };
   }
   /**

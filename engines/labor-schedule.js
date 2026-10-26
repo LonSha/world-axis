@@ -613,12 +613,39 @@
     stat.claims = 0; stat.conflicts = 0; stat.transfers = 0; stat.daysAdvanced = 0; stat.lastReason = ''; stat.faults = {};
     return { ok: true };
   }
+  /**
+   * v2.250.0（账面对账）：契约里早就有 book / isBooked 两口（FROZEN2800 已冻结），
+   *   但实现从未跟上 —— family-ops 的雇工流程按 isBooked 判冲突、按 book 真写，
+   *   两处都掉进 `typeof === function` 的静默分支：冲突永判不出（同一帮工被重复雇），
+   *   排班表也永远空。这里按 claim 的能力补齐，不另开一套写入。
+   * day 是缩小口径的同义词：上午/下午/晚间统属白天，传 'day' 与三个具体时段都算数。
+   */
+  function isBooked(who, slot) {
+    const w = clean(who, 60); const sl = clean(slot, 20) || 'day';
+    if (!w) return false;
+    const st = state(); const ls = (st.laborSchedule && Array.isArray(st.laborSchedule.bookings)) ? st.laborSchedule.bookings : [];
+    const day = getStoryDay();
+    const slots = sl === 'day' ? SLOTS : [sl];
+    return ls.some(function (b) { return b && b.who === w && b.day === day && !b.cancelled && slots.indexOf(b.slot) >= 0; });
+  }
+  function book(who, slot, task, opts) {
+    const o = opts || {};
+    let sl = clean(slot, 20) || 'day';
+    if (sl === 'day') {
+      // 没指定具体时段：取当天第一个未占时段，全占满则用最后一个（让冲突在 claim 里如实报）。
+      const free = SLOTS.filter(function (x) { return !isBooked(who, x); });
+      sl = free.length ? free[0] : SLOTS[SLOTS.length - 1];
+    }
+    return claim({ who: who, slot: sl, task: task || 'booked', kind: o.kind || 'work', unitId: o.unitId });
+  }
   WA.laborSchedule = {
     SLOTS: SLOTS.slice(),
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     claim: claim,
     transfer: transfer,
+    book: book,
+    isBooked: isBooked,
     view: view,
     advanceDay: advanceDay,
     // v2.233.0 (OPV4-3)：时间成本与冲突预览 + 协商协议

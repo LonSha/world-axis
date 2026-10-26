@@ -267,7 +267,8 @@
         var pId = plan.who.indexOf('p_') === 0 ? plan.who : 'p_' + plan.who;
         d.people = d.people || {};
         if (!d.people[pId]) {
-          d.people[pId] = { id: pId, name: plan.who, location: plan.from, createdAt: now(), updatedAt: now() };
+          // v2.250.0 收口：迁入者在台账里尚未建档时按 fallback 兜底建行（不再是裸建）
+          d.people[pId] = { id: pId, name: plan.who, location: plan.from, createdVia: 'demographicFlow:fallback', createdAt: now(), updatedAt: now() };
         } else {
           d.people[pId].updatedAt = now();
         }

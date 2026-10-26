@@ -53,7 +53,15 @@ const EXT_IMPORT_RE = /import\s*\(\s*['"`](\/\/|https?:\/\/)[^'"`]*['"`]/g;
 const ANY_IMPORT_RE = /import\s*\(\s*['"`]([^'"`]+)['"`]/g;
 /** 白名单：文件 → `{forms, why}`。forms 为 `'*'` 表示该文件允许全部形态。 */
 const WHITELIST = {
-  'core/api-router.js': { forms: ['fetch('], why: '唯一出站出口：LLM API 通道调用 + 模型列表拉取（用户自己在「连接」页配的 baseUrl / apiKey；发的是该通道的 messages + model 参数）' }
+  'core/api-router.js': { forms: ['fetch('], why: '唯一出站出口：LLM API 通道调用 + 模型列表拉取（用户自己在「连接」页配的 baseUrl / apiKey；发的是该通道的 messages + model 参数）' },
+  // v2.252.0 补登记：这三处**一直**在仓库里（HEAD 上即已存在，从未过白名单），
+  //   是加载器取**自家扩展目录**的静态文件，不是出站 —— 与 api-router 的「发内容出去」不同性质。
+  //   形态一律 fetch(，且 URL 前缀都是 `WA.baseUrl`（扩展自身安装路径）：
+  //   ① probeUrlForms  取 core/clock.js 探三种 URL 形态（裸 / query / hash）—— 冒烟的一项自检；
+  //   ② tauriHost 直取（预取表未命中时）—— 壳内不走 <script> 时的取源码通道；
+  //   ③ prefetch 预取 worker —— 仍取同一批 LOAD_ORDER 相对路径。
+  //   三处的 cache 都是 'no-store'，method 都是 GET，不带 body、不带凭据。
+  'index.js': { forms: ['fetch('], why: '加载器取自家扩展目录的静态文件（probeUrlForms / tauriHost 直取 / prefetch 预取），前缀 WA.baseUrl，GET + no-store，不发聊天内容' }
 };
 /** 反空转下限：现场实测 2 处（api-router 的两次 fetch）。 */
 const MIN_SITES = 2;

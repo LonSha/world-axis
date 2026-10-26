@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.249.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.249.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.252.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.252.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -3178,6 +3178,78 @@
       "tref": 0,
       "own": 18
     },
+    "genTiming.ackSent": {
+      "reason": "self-only",
+      "detail": "engines/gen-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "genTiming.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "genTiming.inQuiet": {
+      "reason": "self-only",
+      "detail": "engines/gen-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "genTiming.infoGain": {
+      "reason": "self-only",
+      "detail": "engines/gen-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "genTiming.posterior": {
+      "reason": "self-only",
+      "detail": "engines/gen-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
+    "genTiming.read": {
+      "reason": "self-only",
+      "detail": "engines/gen-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "genTiming.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "genTiming.stat": {
+      "reason": "self-only",
+      "detail": "engines/gen-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 18
+    },
+    "genTiming.utilityOf": {
+      "reason": "self-only",
+      "detail": "engines/gen-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/gen-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
     "groupGuard.guard": {
       "reason": "self-only",
       "detail": "engines/group-refuse.js 内部自用、外部零引用（过度导出）",
@@ -4274,6 +4346,78 @@
       "tref": 0,
       "own": 19
     },
+    "moodGlide.baselineOf": {
+      "reason": "self-only",
+      "detail": "engines/mood-glide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "moodGlide.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "moodGlide.miss": {
+      "reason": "self-only",
+      "detail": "engines/mood-glide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "moodGlide.phrase": {
+      "reason": "self-only",
+      "detail": "engines/mood-glide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "moodGlide.read": {
+      "reason": "self-only",
+      "detail": "engines/mood-glide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "moodGlide.set": {
+      "reason": "self-only",
+      "detail": "engines/mood-glide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "moodGlide.setBaseline": {
+      "reason": "self-only",
+      "detail": "engines/mood-glide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "moodGlide.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "moodGlide.stat": {
+      "reason": "self-only",
+      "detail": "engines/mood-glide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/mood-glide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 18
+    },
     "motif.clear": {
       "reason": "self-only",
       "detail": "engines/motif.js 内部自用、外部零引用（过度导出）",
@@ -4418,6 +4562,14 @@
       "tref": 0,
       "own": 1
     },
+    "narrativeDeduction.noteTimeline": {
+      "reason": "self-only",
+      "detail": "engines/narrative-deduction.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-deduction.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
     "narrativeDeduction.setSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -4434,6 +4586,14 @@
       "tref": 0,
       "own": 3
     },
+    "narrativeDeduction.timeline": {
+      "reason": "self-only",
+      "detail": "engines/narrative-deduction.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-deduction.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
     "observe.detectCandidates": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -4449,6 +4609,62 @@
       "refs": 0,
       "tref": 0,
       "own": 1
+    },
+    "oneShotMod.consume": {
+      "reason": "self-only",
+      "detail": "engines/one-shot-mod.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/one-shot-mod.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "oneShotMod.dose": {
+      "reason": "self-only",
+      "detail": "engines/one-shot-mod.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/one-shot-mod.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "oneShotMod.flush": {
+      "reason": "self-only",
+      "detail": "engines/one-shot-mod.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/one-shot-mod.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "oneShotMod.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/one-shot-mod.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "oneShotMod.read": {
+      "reason": "self-only",
+      "detail": "engines/one-shot-mod.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/one-shot-mod.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "oneShotMod.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/one-shot-mod.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "oneShotMod.stat": {
+      "reason": "self-only",
+      "detail": "engines/one-shot-mod.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/one-shot-mod.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 18
     },
     "operations.diagnose": {
       "reason": "test-only",
@@ -4529,6 +4745,62 @@
       "refs": 0,
       "tref": 0,
       "own": 2
+    },
+    "outputGuard.check": {
+      "reason": "self-only",
+      "detail": "engines/output-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/output-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "outputGuard.extract": {
+      "reason": "self-only",
+      "detail": "engines/output-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/output-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "outputGuard.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/output-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "outputGuard.overlap": {
+      "reason": "self-only",
+      "detail": "engines/output-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/output-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "outputGuard.read": {
+      "reason": "self-only",
+      "detail": "engines/output-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/output-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "outputGuard.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/output-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "outputGuard.stat": {
+      "reason": "self-only",
+      "detail": "engines/output-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/output-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 12
     },
     "panelFold.collapseAll": {
       "reason": "test-only",
@@ -4921,6 +5193,54 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "personaAnchor.evaluateDrift": {
+      "reason": "self-only",
+      "detail": "engines/persona-anchor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/persona-anchor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "personaAnchor.getAnchor": {
+      "reason": "self-only",
+      "detail": "engines/persona-anchor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/persona-anchor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "personaAnchor.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/persona-anchor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "personaAnchor.registerAnchor": {
+      "reason": "self-only",
+      "detail": "engines/persona-anchor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/persona-anchor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "personaAnchor.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/persona-anchor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "personaAnchor.stat": {
+      "reason": "self-only",
+      "detail": "engines/persona-anchor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/persona-anchor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 18
     },
     "perspective.audit": {
       "reason": "self-only",
@@ -5577,14 +5897,6 @@
       "refs": 0,
       "tref": 0,
       "own": 4
-    },
-    "rand.pickWeighted": {
-      "reason": "self-only",
-      "detail": "core/rand.js 内部自用、外部零引用（过度导出）",
-      "src": "core/rand.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "rand.reseed": {
       "reason": "test-only",
@@ -7072,7 +7384,7 @@
       "src": "engines/survival.js",
       "refs": 0,
       "tref": 4,
-      "own": 4
+      "own": 5
     },
     "survival.set": {
       "reason": "test-only",
@@ -8066,14 +8378,6 @@
       "tref": 0,
       "own": 3
     },
-    "wordBudget.count": {
-      "reason": "test-only",
-      "detail": "engines/word-budget.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/word-budget.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 4
-    },
     "wordBudget.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -8454,6 +8758,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 488
+    "dataOnly": 495
   }
 }

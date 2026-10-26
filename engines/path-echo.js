@@ -209,7 +209,46 @@
     return { ok: true };
   }
 
+
+  /**
+   * v2.250.0（账面对账）：契约里的 record 一直没有实现 —— custom-lax 的违约回声与
+   *   aftermath-impact 的分流介入两处调用全部静默落空（回声面等于只有「预期」没有「回声」）。
+   *   两口形态不同，这里一并收：
+   *     ① record({ who, bias, kind, weight, note }) —— 直接落一条经验偏置；
+   *     ② record(channel, { actor, placeId, action, costFunds }) —— 事件式，记进 history。
+   *   偏置键必须是 motive-arbitration 的 DIMENSIONS 之一，否则记了也不加权；
+   *   落不进去就如实返回 person-not-found / missing-fields，不吞。
+   */
+  function record(a, b) {
+    const evt = (typeof a === 'string') ? clean(a, 40) : '';
+    const o = (typeof a === 'string') ? (b || {}) : (a || {});
+    const who = clean(o.who || o.actor, 60);
+    if (!who) return { ok: false, reason: 'missing-fields' };
+    const p = getPerson(who);
+    if (!p) return { ok: false, reason: 'person-not-found', who: who };
+    const life = ensureEchoes(p);
+    const note = clean(o.note, 120);
+    const bias = clean(o.bias, 20);
+    const w = Number(o.weight);
+    const channel = evt || clean(o.kind, 40);
+    WA.store.transact(function () {
+      if (bias && isFinite(w) && w !== 0) {
+        life.learnings.biases[bias] = +((life.learnings.biases[bias] || 0) + w).toFixed(2);
+      }
+      life.learnings.history.push({
+        channel: channel,
+        note: note,
+        bias: bias || null,
+        weight: isFinite(w) ? w : null,
+        placeId: clean(o.placeId, 60) || null,
+        action: clean(o.action, 40) || null,
+        at: WA.clock.now('pathEcho:record')
+      });
+    }, 'pathEcho:record');
+    return { ok: true, who: who, channel: channel, bias: bias || null };
+  }
   WA.pathEcho = {
+    record: record,
     recordExpectation: recordExpectation,
     realizeOutcome: realizeOutcome,
     getLearnings: getLearnings,

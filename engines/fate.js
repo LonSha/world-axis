@@ -340,8 +340,21 @@
     const crit = (dir === 'high' && r.value >= dc.value + 10) || (dir === 'low' && r.value <= Math.max(0, dc.value - 10));
     const fumble = (dir === 'high' && r.value <= dc.value - 10) || (dir === 'low' && r.value >= dc.value + 10);
     stat.checked++;
+    // v2.251.0：crit/fumble 之外的第三层粒度。分档是**纯追加**：
+    //   · 只在 low 制且骰面为 1..100 时问分档器，high 制/fudge 骰保持原样；
+    //   · 分档器关着时 grade 为 null，旧读法逐字不变（不替任何人改口径）；
+    //   · pass/crit/fumble 三个布尔仍由本模块自己算，分档器不接管判定。
+    let grade = null;
+    try {
+      if (dir === 'low' && WA.successGrade && Number.isInteger(r.value) && r.value >= 1 && r.value <= 100
+        && Number.isInteger(dc.value) && dc.value >= 1 && dc.value <= 100) {
+        const g = WA.successGrade.grade(r.value, dc.value);
+        if (g && g.ok) grade = { grade: g.grade, rank: g.rank };
+      }
+    } catch (e) { noteFault('grade-throw'); }
     return { ok: true, reason: 'ok', expr: r.expr, roll: r.value, dc: dc.value, dcVia: dc.via,
-      direction: dir, directionLabel: DIRECTION_LABEL[dir], pass: delta >= 0, margin: delta, crit: crit, fumble: fumble };
+      direction: dir, directionLabel: DIRECTION_LABEL[dir], pass: delta >= 0, margin: delta, crit: crit, fumble: fumble,
+      grade: grade };
   }
   function bigrams(s) {
     const t = String(s || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '');

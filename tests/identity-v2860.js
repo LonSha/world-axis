@@ -96,7 +96,10 @@ function runAll(a) {
     //   人物装进空新局，走的是**能力探测 + :fallback 兜底**（同一口径，A3 覆盖），
     //   且前置 emptyCheck 保证只在空世界发生（无 registry 的合成宿主桩才走兜底）。
     //   数量是**显式登记**的事实：新增残点必须显式改本判据，不许静默长出。
-    a(dc.length === 6, 'v2860/id: [A2] 产品面「直接建人」残点恰 6 处（实 ' + dc.length + '：'
+    // v2.250.0 收口：残点 6 → 9 —— 新增三处（engines/world-blueprint.js 的开局导入兜底、
+    //   engines/world-seed.js 的种子装载兜底、engines/backstage.js 的第二处 knowledge 兜底）
+    //   此前判据钉的是旧数字，三处早就在产品面里长出来了而判据没跟。逐处都已打 fallback 标签（A3）。
+    a(dc.length === 9, 'v2860/id: [A2] 产品面「直接建人」残点恰 9 处（实 ' + dc.length + '：'
       + dc.map(function (h) { return h.rel + ':' + h.line; }).join('、') + '）');
     const unlabeled = dc.filter(function (h) { return h.text.indexOf('fallback') < 0; });
     a(unlabeled.length === 0, 'v2860/id: [A3] 每处残点都打 fallback 标签，不是裸建（裸: '

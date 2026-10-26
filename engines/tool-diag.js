@@ -2329,6 +2329,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/narrative-deduction.js': 'narrativeDeduction',
     'engines/anti-omniscience.js': 'antiOmniscience',
     'engines/persona-anchor.js': 'personaAnchor',
+    // v2.250.0（拓展）：四个新引擎的 ns 登记。产品文件，缺席本身就是断裂
+    //   （诊断清单少报一个黑盒 —— 与 plan/mend/gear 同口径）。
+    'engines/gen-timing.js': 'genTiming',
+    'engines/one-shot-mod.js': 'oneShotMod',
+    'engines/mood-glide.js': 'moodGlide',
+    'engines/output-guard.js': 'outputGuard',
     // v2.246.0 (MAP-2): SVG 画布平滑飞行漫游、动态避让与同地聚类引擎
     'render/map-viewport.js': 'mapViewport',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。
@@ -4082,8 +4088,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.231.0 (OP-1): actiondesk page -- ids + dynamic out.
     //   同 evidence 页口径：本页不另存状态，写路径转给来源模块。
     //   wa-desk-out 是动态容器，进 dynamic（进 ids 会被判成静态缺失）。
-    { page: 'actiondesk', ids: ['wa-desk-who', 'wa-desk-show', 'wa-desk-on'],
-      dynamic: ['wa-desk-out'] }
+    { page: 'actiondesk', ids: ['wa-desk-who', 'wa-desk-show', 'wa-desk-on',
+      // v2.250.0：跨轮生命周期四枚此前**渲染了但没登记**（守卫表照不到 ⇒ 绑定断了也永远不报），
+      //   连同四个输出容器一起补登。输出容器仍是动态容器（由 show* 回调填，非静态成树）。
+      'wa-desk-life', 'wa-desk-flow', 'wa-desk-sched', 'wa-desk-epistemic'],
+      dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。

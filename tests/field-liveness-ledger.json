@@ -59,6 +59,8 @@
     "freight",
     "gauge",
     "gear",
+    "genTiming",
+    "geoTracker",
     "hazard",
     "inst",
     "institutionalInertia",
@@ -71,21 +73,26 @@
     "lastInjection",
     "liaison",
     "lifeline",
+    "livingWorld",
     "marginal",
     "masks",
     "memory",
     "mend",
     "meta",
     "modelink",
+    "moodGlide",
     "motif",
+    "narrativeDeduction",
     "nextTurnInjection",
     "offlineTick",
+    "oneShotMod",
     "operations",
     "opinion",
     "opportunity",
     "parallelEvents",
     "parallelWorld",
     "people",
+    "personaAnchor",
     "perspective",
     "phaseTransition",
     "plan",
@@ -138,13 +145,14 @@
     "worldSeed"
   ],
   "deny": {
-    "meta.round-read": {
-      "engines/evolution.js": 2
-    },
     "state.round-read": {
+      "engines/anti-omniscience.js": 1,
       "engines/inject-inspector.js": 2,
       "engines/parallel-world.js": 1,
       "engines/tool-diag.js": 1
+    },
+    "meta.round-read": {
+      "engines/evolution.js": 2
     }
   },
   "write": {

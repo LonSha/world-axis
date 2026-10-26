@@ -45,7 +45,7 @@
   };
 
   const __REG = {
-    key: LS_KEY, def: DEF, module: 'anti-omniscience',
+    key: LS_KEY, def: DEF, module: 'antiOmniscience',
     bounds: { maxAuditHistory: [10, 200] }
   };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

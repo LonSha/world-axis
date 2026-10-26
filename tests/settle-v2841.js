@@ -106,6 +106,13 @@ function runAll(a) {
   const en = gate.fresh();
   const WA = en.WA;
   seedStore(WA);
+  // 本轮输入帧：render/inject.js 的 retrieval 源是全表唯一需「本轮玩家输入」的源
+  //   （只认 chat 末条 is_user 帧，不拿 AI 正文当输入）。mock 聊天末条是 AI 帧 ⇒ rq 恒为 null
+  //   ⇒ 哨兵恒缺席、三面均误报。这是判据的输入面缺失，不是引擎缺陷。
+  const __chat = WA.mainWin.SillyTavern.getContext().chat;
+  const __chatLen = __chat.length;
+  __chat.push({ is_user: true, mes: '我又回到了那间酒馆。', swipe_id: 0 });
+  const __restoreChat = function () { __chat.length = __chatLen; };
   const armed = armAll(WA);
   const tags = armed.tags;
   const all = (WA.render.SOURCES || []).slice();
@@ -139,7 +146,7 @@ function runAll(a) {
     });
     a(hitLonely.length === 0, 'v2840/a3: [C] 只留一个源开着时它必在场（漏: ' + (hitLonely.join(',') || '无') + '）——'
       + '开关随「是不是我」增减，而不是随「是不是有人关过」增减');
-  } finally { armed.restore(); }
+  } finally { armed.restore(); __restoreChat(); }
 }
 /** D 面：存档兼容（v0 旧档可迁移、现行档原样读回） */
 function runCompat(a) {

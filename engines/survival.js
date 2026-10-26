@@ -128,9 +128,23 @@
     });
     return '[生存三轴]\n' + lines.join('\n') + '\n肉体读数决定行为边界：归零的惩罚如实结算（饱食归零每小时扣血、精力归零强制昏睡、超载移速归零），不因剧情需要而豁免。\n';
   }
+  /**
+   * v2.250.0（账面对账）：契约里的 statusOf 一直没有实现 —— action-desk 的
+   *   typeof 判断静默不过，于是「极度衰竭 ⇒ 丧失行动资格」这道硬拦截从未生效
+   *   （人还能昏迷着去干活）。这里把 read() 的判定面收成一个布尔，只回答「能不能行动」，
+   *   不复制一份读数。exhausted = 精力归零（强制昏睡）或饱食归零（扣血中）。
+   */
+  function statusOf(who) {
+    const r = read(who);
+    if (!r || !r.ok) return { ok: false, reason: (r && r.reason) || 'missing', who: who, exhausted: false };
+    const sta = (r.stamina && typeof r.stamina.value === 'number') ? r.stamina.value : null;
+    const sat = (r.satiety && typeof r.satiety.value === 'number') ? r.satiety.value : null;
+    const exhausted = (sta != null && sta <= 0) || (sat != null && sat <= 0);
+    return { ok: true, who: r.who, exhausted: exhausted, stamina: sta, satiety: sat, reason: exhausted ? 'exhausted' : 'ok' };
+  }
   WA.survival = {
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    set: set, read: read, buildBlock: buildBlock,
+    set: set, read: read, statusOf: statusOf, buildBlock: buildBlock,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

@@ -61,6 +61,9 @@ const DENY_RULES = [
          '与平行世界 pwState().st，它们各自自带 round 字段。',
     pattern: /(^|[^.\w$])(?:st|state|snap|env)\.round\b/g,
     allow: {
+      // v2.250.0：canCharacterKnow 的 currentEnv 是**调用点传入的自产快照对象**（不是世界状态），
+      //   与 inject-inspector / tool-diag / parallel-world 三处同款：各自自带 round 字段。
+      'engines/anti-omniscience.js': 1,
       'engines/inject-inspector.js': 2,
       'engines/tool-diag.js': 1,
       'engines/parallel-world.js': 1

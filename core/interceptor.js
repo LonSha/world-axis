@@ -143,6 +143,33 @@
                   }
                 }
               } catch (eGeo) { /* 位置感知失败不影响世界推进 */ }
+              // v2.250.0（拓展）：三个新引擎的推进点。位置在 after 链**之前**、且都在
+              //   各自的 try 里——任一引擎抛错都不影响世界推进（与 geoTracker 同口径）。
+              //   · genTiming.tick：掷一次「现在该不该主动找他」，只出裁定不发消息；
+              //     观测取现场（钟点 / 玩家上一条的长度与时延），roll 不注入 ⇒ 走决策流。
+              //   · oneShotMod.advance：临时调制按轮过期（消费即焚之外的第二条出路）。
+              //   · moodGlide.glide：情绪按经过分钟数向各自基线回落、思念同轴累积。
+              try {
+                if (WA.genTiming && typeof WA.genTiming.tick === 'function') {
+                  let lastUser = null;
+                  for (let i = chatArr.length - 1; i >= 0; i--) {
+                    if (chatArr[i] && chatArr[i].is_user) { lastUser = chatArr[i]; break; }
+                  }
+                  const obs = { hour: new Date().getHours() };
+                  if (lastUser && typeof lastUser.mes === 'string') {
+                    obs.replyLen = lastUser.mes.length;
+                    const at = Date.parse(lastUser.send_date || lastUser.sendDate || '');
+                    if (isFinite(at)) obs.replyGapMin = Math.max(0, (Date.now() - at) / 60000);
+                  }
+                  WA.genTiming.tick(obs);
+                }
+              } catch (eGT) { /* 时机决策失败不影响世界推进 */ }
+              try {
+                if (WA.oneShotMod && typeof WA.oneShotMod.advance === 'function') WA.oneShotMod.advance();
+              } catch (eOSM) { /* 调制过期失败不影响世界推进 */ }
+              try {
+                if (WA.moodGlide && typeof WA.moodGlide.glide === 'function') WA.moodGlide.glide({});
+              } catch (eMG) { /* 情绪回落失败不影响世界推进 */ }
               const runAfter = async () => {
                 await WA.workflow.run('after', actx);
                 // v0.7.0: 结算完成才记录楼层（批内提交，随批落盘；失败阻断则下轮重试）
@@ -186,6 +213,17 @@
                 activeNames.forEach(function (n) {
                   WA.personaAnchor.auditGeneratedContent(n, out);
                 });
+              }
+              // v2.250.0 (OG-1): 核对「正文里的玩家引述」是否真在会话里说过。
+              //   只取**玩家侧**发言做对照（角色自己说的话不算凭据）；本模块不改正文，
+              //   block 档也只出裁定与改写建议 —— 静默改写玩家会不知道模型编过。
+              if (WA.outputGuard && typeof WA.outputGuard.checkAndRemember === 'function') {
+                const said = [];
+                for (let i = 0; i < chat.length - 1; i++) {
+                  const m = chat[i];
+                  if (m && m.is_user && typeof m.mes === 'string' && m.mes) said.push(m.mes);
+                }
+                WA.outputGuard.checkAndRemember(out, said);
               }
               }
               if (out !== last.mes) {

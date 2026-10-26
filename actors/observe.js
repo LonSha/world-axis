@@ -118,9 +118,10 @@
         WA.store.transact(function (draft) {
           draft.people = draft.people || {};
           const pKey = 'p_' + name;
-          draft.people[pKey] = {
+          draft.people[pKey] = {   // fallback：转正建档直落，不经 registry.ensurePerson
             id: pKey,
             name: name,
+            createdVia: 'observe:fallback',
             location: candidateData.location || '未知',
             rel_user: relUser,
             rel_anchor: relAnchor,

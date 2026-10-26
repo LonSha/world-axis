@@ -23,7 +23,7 @@
   };
 
   const __REG = {
-    key: LS_KEY, def: DEF, module: 'health-preflight',
+    key: LS_KEY, def: DEF, module: 'healthPreflight',
     bounds: { maxIssuesKept: [10, 200] }
   };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

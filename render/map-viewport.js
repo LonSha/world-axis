@@ -40,7 +40,7 @@
     key: SETTING_KEY,
     def: DEFAULT_SETTINGS,
     module: 'mapViewport',
-    bounds: { viewWidth: [400, 2400], viewHeight: [300, 1800], clusterDistance: [5, 50] }
+    bounds: { viewWidth: [400, 2400], viewHeight: [300, 1800], clusterDistance: [5, 50], minZoom: [0.1, 1], maxZoom: [1, 8], defaultZoom: [0.1, 8], animationDurationMs: [80, 2000], maxClusterAvatars: [1, 8], declutterPadding: [0, 40] }
   };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
@@ -76,14 +76,31 @@
    * 计算从起始视口平滑过渡到目标点的轨迹关键帧状态
    */
   function computeFlyInterpolation(fromView, target, progress) {
-    const t = easeOutCubic(progress);
+    // v2.250.0：zoom 三旋钮此前只被 diagnose/settings 读回来，插值算法本身不消费它们
+    //   —— 滑块拧到底画面不变，属「点了没效果的开关」。这里把 min/max 夹紧、把
+    //   defaultZoom 用作起点缺省值（原先是硬写的 1.0，与设置里的 defaultZoom 两套真源）。
+    const vcfg = settings();
+    const zMin = isFinite(vcfg.minZoom) ? vcfg.minZoom : 0.4;
+    const zMax = isFinite(vcfg.maxZoom) ? vcfg.maxZoom : 2.4;
+    const zDef = isFinite(vcfg.defaultZoom) ? vcfg.defaultZoom : 1.0;
+    const clampZoom = function (z) { return Math.max(zMin, Math.min(zMax, z)); };
+    // v2.250.0（滞后一步）：animationDurationMs 此前同样只被 diagnose 读回。
+    //   进度若按毫秒给出（progress 可能是累计毫秒），先除以时长归一；超时即停在终点。
+    //   这样时长滑块真正改变滑行速度，而不是只在设置里呆着。
+    const durMs = isFinite(vcfg.animationDurationMs) ? Math.max(1, vcfg.animationDurationMs) : 400;
+    const rawP = (typeof progress === 'number' && isFinite(progress)) ? progress : 1;
+    // 两种口径并存：0..1 是归一进度（既有调用方与判据），>1 是累计毫秒。
+    //   只认两者之一会让任一侧静默变形 —— 归一进度除以 400ms 会永远停在起点。
+    const normP = rawP > 1 ? rawP / durMs : rawP;
+    const t = easeOutCubic(Math.max(0, Math.min(1, normP)));
+
     const startX = fromView.x;
     const startY = fromView.y;
-    const startZoom = fromView.zoom || 1.0;
+    const startZoom = clampZoom(fromView.zoom || zDef);
 
     const targetX = target.x;
     const targetY = target.y;
-    const targetZoom = target.zoom !== undefined ? target.zoom : startZoom;
+    const targetZoom = target.zoom !== undefined ? clampZoom(target.zoom) : startZoom;
 
     const curZoom = startZoom + (targetZoom - startZoom) * t;
     const curX = startX + (targetX - startX) * t;

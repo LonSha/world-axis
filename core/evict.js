@@ -78,17 +78,18 @@
     // v2.234.0 (Living World V5.1): 角色生活状态（行囊、生理负荷、职业作息）
     'livingWorld.characterStates': { path: 'livingWorld.characterStates', kind: 'object', cap: 48, why: '角色微观生活状态（生计行囊/生理负荷/职业）' },
     // v2.245.0 (MAP-1): 角色空间落位与感知流水容量
-    'geoTracker.characterLocations': { path: 'geoTracker.characterLocations', kind: 'object', cap: 48, why: '角色空间坐标与最新位置登记' },
-    'geoTracker.locationHistory':    { path: 'geoTracker.locationHistory', cap: 32, why: '正文空间位置感知流水' },
+    'geoTracker.characterLocations': { path: 'geoTracker.characterLocations', kind: 'object', cap: 'per-call', why: '上限 = maxCharacters 设置；角色空间坐标与最新位置登记' },
+    'geoTracker.locationHistory':    { path: 'geoTracker.locationHistory', cap: 'per-call', why: '上限 = maxHistory 设置；正文空间位置感知流水' },
+    'narrativeDeduction.timeline':  { path: 'narrativeDeduction.timeline', cap: 'per-call', why: '上限 = maxTimelineNodes 设置；双轨推演结论时间线（拦了哪一条、哪一轮拦的，可回溯）' },
     'elsewhere.rows':      { path: 'elsewhere.rows',      cap: 48, why: '幕后档案环形（FIFO 挤出最旧卡）' },
-    'livingWorld.encounters':   { path: 'livingWorld.encounters',   cap: 32, why: '玩家与NPC偶遇记录环形' },
-    'livingWorld.livingTraces': { path: 'livingWorld.livingTraces', cap: 32, why: '地点残留生活痕迹环形' },
-    'livingWorld.npcMovements': { path: 'livingWorld.npcMovements', cap: 48, why: 'NPC移动与生活变动台账环形' },
-    'livingWorld.intersections': { path: 'livingWorld.intersections', cap: 32, why: 'NPC之间横向社交碰撞记录环形' },
-    'livingWorld.epistemicGaps': { path: 'livingWorld.epistemicGaps', cap: 32, why: '角色认知视界与情报时差环形' },
-    'livingWorld.vignettes':     { path: 'livingWorld.vignettes',     cap: 32, why: '市井微情境与生活窘迫事件环形' },
-    'livingWorld.ripples':       { path: 'livingWorld.ripples',       cap: 32, why: '投石入水局部生态涟漪环形' },
-    'livingWorld.relationalDebts': { path: 'livingWorld.relationalDebts', cap: 48, why: '人情势能与交往恩义台账环形' },
+    'livingWorld.encounters':   { path: 'livingWorld.encounters',   cap: 'per-call', why: '上限 = maxEncounters 设置；玩家与NPC偶遇记录环形' },
+    'livingWorld.livingTraces': { path: 'livingWorld.livingTraces', cap: 'per-call', why: '上限 = maxTraces 设置；地点残留生活痕迹环形' },
+    'livingWorld.npcMovements': { path: 'livingWorld.npcMovements', cap: 'per-call', why: '上限 = maxMovements 设置；NPC移动与生活变动台账环形' },
+    'livingWorld.intersections': { path: 'livingWorld.intersections', cap: 'per-call', why: '上限 = maxIntersections 设置；NPC之间横向社交碰撞记录环形' },
+    'livingWorld.epistemicGaps': { path: 'livingWorld.epistemicGaps', cap: 'per-call', why: '上限 = maxGaps 设置；角色认知视界与情报时差环形' },
+    'livingWorld.vignettes':     { path: 'livingWorld.vignettes',     cap: 'per-call', why: '上限 = maxVignettes 设置；市井微情境与生活窘迫事件环形' },
+    'livingWorld.ripples':       { path: 'livingWorld.ripples',       cap: 'per-call', why: '上限 = maxRipples 设置；投石入水局部生态涟漪环形' },
+    'livingWorld.relationalDebts': { path: 'livingWorld.relationalDebts', cap: 'per-call', why: '上限 = maxRelationalDebts 设置；人情势能与交往恩义台账环形' },
     'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
   // v2.231.0（拓展 EXP-1）：逐人逐能力进度行（上限与 training.maxRows 同源，见 training.js）。
   'training.rows':       { path: 'training.rows',       cap: 96, why: '能力成长逐人逐能力行' },
@@ -421,6 +422,17 @@
     'motif.rows':     { path: 'motif.rows',     cap: 'per-call', kind: 'array', why: '意象登记环形（上限 = maxRows 设置，写入时传入）' },
     'beatMask.rows':  { path: 'beatMask.rows',  cap: 'per-call', kind: 'array', why: '节拍遮罩登记环形（上限 = maxRows 设置，写入时传入）' },
     'powerAnchor.rows': { path: 'powerAnchor.rows', cap: 'per-call', kind: 'array', why: '战力锚登记环形（上限 = maxRows 设置，写入时传入）' },
+    // v2.250.0（拓展）：三个新引擎的环。cap 一律 per-call（上限 = 各自设置项，旋钮可调）。
+    //   · genTiming.ledger —— 决策台账：答「每次掷骰判了什么、为什么没发」。
+    //     它**不能命中即清**：不发的那些轮次正是「为什么一直没找他」的唯一证据。
+    //   · oneShotMod.pending —— 只活一次到几轮的调制（消费即焚 = 用完删指定条），
+    //     过期同样删指定条 ⇒ 只有环形挤出能回答「上次那一粒哪去了」。
+    //   · moodGlide.moods —— 每角色一条情绪坐标，按 `at` 最旧优先挑人 ⇒ note 型站点
+    //     （本模块自己按业务规则挑，evict.note 只记账不动数据）。
+    //   SITES 缺键时 evict 走 unknown-site **静默失败**（调用方以为剪了，其实一次没剪）。
+    'genTiming.ledger':   { path: 'genTiming.ledger',   cap: 'per-call', kind: 'array',  why: '主动时机决策台账环形（上限 = maxLedger 设置，写入时传入）' },
+    'oneShotMod.pending': { path: 'oneShotMod.pending', cap: 'per-call', kind: 'array',  why: '一次性调制队列环形（上限 = maxPending 设置，写入时传入）' },
+    'moodGlide.moods':    { path: 'moodGlide.moods',    cap: 'per-call', kind: 'object', why: '情绪坐标容器（上限 = maxMoods 设置，按 at 最旧优先挑人）' },
     //  v2.130.0（拓展计划 C2 / C1）：两个新引擎的环形容器。
     //   两条调用点均在各自引擎的 transact 回调内（story-tone.js / calendar-custom.js），
     //   站点名与调用点字面量一一对应（门禁 G18 双向核对）。
@@ -689,10 +701,21 @@
    * @param obj 目标对象
    * @param site 站点名
    * @param orderedKeys 已按「应被挤出优先级」排好序的键（**前** excess 个会被删）
+   * @param limit **仅 per-call 站点**用：本次上限。静态 cap 站点忽略它。
    */
-  function object(obj, site, orderedKeys) {
+  function object(obj, site, orderedKeys, limit) {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { noteFail(site, 'not-object'); return { ok: false, reason: 'not-object', dropped: 0, before: 0, after: 0 }; }
-    const cap = capOf(site);
+    const decl = SITES[site];
+    if (!decl) { noteFail(site, 'unknown-site'); return { ok: false, reason: 'unknown-site', dropped: 0, before: Object.keys(obj).length, after: Object.keys(obj).length }; }
+    let cap;
+    if (decl.cap === 'per-call') {
+      // per-call 与 array()/note() 同规：上限必须由调用方显式给出（漏传 = bad-cap）。
+      //   v2.250.0 补：此前 object() 只认静态 cap，故「对象型 + 上限是设置项」的容器
+      //   （moodGlide.moods）只能绕道 note() 自己删键 —— 而 note() 不动数据，
+      //   于是 evict-meta 的 A 面「每个对象型站点都定位得到淘汰调用点」把它报成悬空。
+      if (typeof limit !== 'number' || !isFinite(limit) || limit < 0) { noteFail(site, 'bad-cap'); return { ok: false, reason: 'bad-cap', dropped: 0, before: Object.keys(obj).length, after: Object.keys(obj).length }; }
+      cap = limit;
+    } else cap = capOf(site);
     if (cap === null) { noteFail(site, 'unknown-site'); return { ok: false, reason: 'unknown-site', dropped: 0, before: Object.keys(obj).length, after: Object.keys(obj).length }; }
     if (typeof cap !== 'number' || !isFinite(cap) || cap < 0) { noteFail(site, 'bad-cap'); return { ok: false, reason: 'bad-cap', dropped: 0, before: Object.keys(obj).length, after: Object.keys(obj).length }; }
     const before = Object.keys(obj).length;

@@ -100,7 +100,8 @@ function runSuite() {
   t('透镜包含生活实况', promptBlock.indexOf('【在场/周边人物生活实况】') >= 0);
   t('透镜中包含苏晴', promptBlock.indexOf('苏晴') >= 0);
   t('透镜中呈现随身行囊细节', promptBlock.indexOf('随身行囊') >= 0);
-  t('透镜中具体包含铜板', promptBlock.indexOf('铜板') >= 0);
+  // 货币名由经济配方声明（银元/铜板/元皆可），只钉行囊额度真被具体物化、不钉币名
+  t('透镜中行囊额度被具体物化', /随身所余[^(]*\(\d+\p{L}+\)/u.test(promptBlock));
 
   return tested;
 }

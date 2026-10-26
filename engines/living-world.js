@@ -448,7 +448,7 @@
       };
       b.ripples.push(rip);
       if (WA.evict && WA.evict.array) {
-        WA.evict.array(b.ripples, 'livingWorld.ripples');
+        WA.evict.array(b.ripples, 'livingWorld.ripples', settings().maxRipples);
       }
 
       stat.ripplesPropagated++;
@@ -503,7 +503,7 @@
         b.relationalDebts.push(entry);
       }
       if (WA.evict && WA.evict.array) {
-        WA.evict.array(b.relationalDebts, 'livingWorld.relationalDebts');
+        WA.evict.array(b.relationalDebts, 'livingWorld.relationalDebts', settings().maxRelationalDebts);
       }
       stat.relationalDebtsRecorded++;
       out = { ok: true, entry: entry };
@@ -688,7 +688,10 @@
           // 正午时分惯例
         }
         const strain = charLife.vitalStrain;
-        const wearDelta = currentSchedule.costWear || 10;
+        // v2.250.0：wearinessRate 此前零消费（调了不生效）。它是「磨损快慢」的全局倍率，
+        //   乘在日程磨损上；0.5 让世界慢下来，2 让它更磨人。非数字即回落 1（不改变既有手感的默认）。
+        const wearRate = isFinite(Number(cfg.wearinessRate)) && Number(cfg.wearinessRate) > 0 ? Number(cfg.wearinessRate) : 1;
+        const wearDelta = Math.round((currentSchedule.costWear || 10) * wearRate);
         strain.weariness = Math.max(0, Math.min(100, strain.weariness + wearDelta));
         strain.hunger = Math.max(0, Math.min(100, strain.hunger + (currentPeriod === 'noon' ? -15 : 10)));
         if (currentPeriod === 'dusk' || currentPeriod === 'night') {
@@ -714,7 +717,10 @@
 
         // 微观生计自愈闭环（Metabolic Loop）：
         // 饥肠辘辘时，若有备粮则消耗自愈；若缺粮且随身有资金，按世界物价自主采购简餐自愈
-        if (cfg.metabolicLoopEnabled && strain.hunger > 60) {
+        // subsistenceEnabled：生计自愈（自己吃备粮/买简餐）的总闸。
+        //   v2.250.0 前它零消费 —— 与 metabolicLoopEnabled 是两层：后者管「闭环算法」，
+        //   前者管「角色会不会自己弄吃的」。关掉它，饿着就是饿着（等别人接济/进病况）。
+        if (cfg.metabolicLoopEnabled && cfg.subsistenceEnabled && strain.hunger > 60) {
           const tierP = getTierPrice('food', cfg.marketTier || 'standard', card.place);
           const mealPrice = tierP.finalPrice || 4;
           if (charLife.belongings.provisions > 0) {
@@ -884,14 +890,17 @@
 
       // 5. 容量挤出对偶保护
       if (WA.evict && WA.evict.array) {
-        WA.evict.array(b.encounters, 'livingWorld.encounters');
-        WA.evict.array(b.livingTraces, 'livingWorld.livingTraces');
-        WA.evict.array(b.npcMovements, 'livingWorld.npcMovements');
-        WA.evict.array(b.intersections, 'livingWorld.intersections');
-        WA.evict.array(b.epistemicGaps, 'livingWorld.epistemicGaps');
-        WA.evict.array(b.vignettes, 'livingWorld.vignettes');
-        WA.evict.array(b.ripples, 'livingWorld.ripples');
-        WA.evict.array(b.relationalDebts, 'livingWorld.relationalDebts');
+        // v2.250.0：八环的 cap 此前写死在 evict.SITES 里，而 DEF 里同名的 maxXxx 设置项**零消费**
+        //   —— 滑块拧了容量不跟着变（「点了没效果的开关」）。站点已改 per-call，这里把设置传进去。
+        const lw = settings();
+        WA.evict.array(b.encounters, 'livingWorld.encounters', lw.maxEncounters);
+        WA.evict.array(b.livingTraces, 'livingWorld.livingTraces', lw.maxTraces);
+        WA.evict.array(b.npcMovements, 'livingWorld.npcMovements', lw.maxMovements);
+        WA.evict.array(b.intersections, 'livingWorld.intersections', lw.maxIntersections);
+        WA.evict.array(b.epistemicGaps, 'livingWorld.epistemicGaps', lw.maxGaps);
+        WA.evict.array(b.vignettes, 'livingWorld.vignettes', lw.maxVignettes);
+        WA.evict.array(b.ripples, 'livingWorld.ripples', lw.maxRipples);
+        WA.evict.array(b.relationalDebts, 'livingWorld.relationalDebts', lw.maxRelationalDebts);
       }
       if (WA.evict && WA.evict.object) {
         WA.evict.object(b.characterStates, 'livingWorld.characterStates', Object.keys(b.characterStates));
@@ -935,7 +944,7 @@
             }
           });
         }
-        reunionSubtext = '暌违' + awayRounds + '轮未见，乍见之下神情骤滞，目光在身形衣饰间来回打量';
+        reunionSubtext = '久别' + awayRounds + '轮未见，乍见之下神情骤滞，目光在身形衣饰间来回打量';
         if (debtFavor > 0) {
           reunionSubtext += '，心中念及昔日欠下' + debtFavor + '份未偿人情，言辞微有局促与敬意';
         }
@@ -1016,7 +1025,7 @@
       };
       b.livingTraces.push(trace);
       if (WA.evict && WA.evict.array) {
-        WA.evict.array(b.livingTraces, 'livingWorld.livingTraces');
+        WA.evict.array(b.livingTraces, 'livingWorld.livingTraces', settings().maxTraces);
       }
       out = { ok: true, trace: trace };
       return true;
@@ -1092,7 +1101,7 @@
     const ewRows = (s && s.elsewhere && Array.isArray(s.elsewhere.rows)) ? s.elsewhere.rows : [];
     const lines = [];
     const currentPeriod = DAY_PERIODS[(b.tick || 0) % DAY_PERIODS.length];
-    lines.push('【时节与世情运转】此刻正值' + PERIOD_LABELS[currentPeriod] + '，天地与周遭生计各按日常流转。');
+    lines.push('【时节与市井运转】此刻正值' + PERIOD_LABELS[currentPeriod] + '，天地与周遭生计各按日常流转。');
 
     // 在 compact 级别下，只提取最多 2 名角色，且只保留核心疲劳/饥饿；full 级别保留 6 名
     const charLimit = detailLevel === 'compact' ? 2 : (detailLevel === 'standard' ? 4 : 6);
@@ -1136,7 +1145,7 @@
     if (detailLevel !== 'compact') {
       const recentVignettes = (b.vignettes || []).slice(-2);
       if (recentVignettes.length > 0) {
-        lines.push('【生活生计微情境】：');
+        lines.push('【市井生活微情境】：');
         recentVignettes.forEach(function (v) {
           lines.push('· ' + v.name + '身处' + v.place + '，' + v.detail + '。');
         });

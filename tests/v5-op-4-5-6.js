@@ -101,9 +101,10 @@ function testOPV5_6(W) {
   const cb = (enc.presentNPCs || []).find(n => n.name === '常镖头');
   if (!cb || !cb.reunionSubtext) return false;
 
-  // 必须同时体现离散跨度（暌违5轮）、人情恩义（欠下2份）与旧日嫌隙（1）
+  // 必须同时体现离散跨度（久别5轮）、人情恩义（欠下2份）与旧日嫌隙（1）
+  //   v2.250.0：用词与模块本名口径统一为「久别」（原「暌违」），判据跟实现同步。
   const st = cb.reunionSubtext;
-  const hasAway = st.indexOf('暌违5轮') >= 0;
+  const hasAway = st.indexOf('久别5轮') >= 0;
   const hasFavor = st.indexOf('2份未偿人情') >= 0;
   const hasGrudge = st.indexOf('旧日嫌隙（1）') >= 0;
 

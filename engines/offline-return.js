@@ -358,9 +358,21 @@
 
     if (cfg.deferMs > 0) {
       try {
-        setTimeout(function () { try { run(plan); } catch (e) { noteFault('deferred-throw'); } }, cfg.deferMs);
+        // v2.251.0：改走 deferToken（有代际令牌 + 回执）。裸 setTimeout 的老毛病是
+        //   排上了没有句柄留底，也不防「上一拍的 defer 迟到、把这一拍顶掉」。
+        //   关闸时 deferToken 自己退化为裸 setTimeout，行为与旧版逐字等价。
+        let sig = null;
+        if (WA.deferToken) {
+          const r = WA.deferToken.schedule('offline-return:' + cid,
+            function () { try { run(plan); } catch (e) { noteFault('deferred-throw'); } }, cfg.deferMs, { site: 'offline-return' });
+          if (!r.ok) throw new Error(r.reason);
+          sig = r;
+        } else {
+          setTimeout(function () { try { run(plan); } catch (e) { noteFault('deferred-throw'); } }, cfg.deferMs);
+        }
         stat.lastReason = 'deferred';
-        return { ok: true, deferred: true, chatId: cid, gapMs: gapMs, deferMs: cfg.deferMs };
+        return { ok: true, deferred: true, chatId: cid, gapMs: gapMs, deferMs: cfg.deferMs,
+          token: sig ? sig.token : null };
       } catch (e) { noteFault('defer-failed'); }
     }
     return run(plan);

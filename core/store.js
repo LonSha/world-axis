@@ -50,6 +50,16 @@
       //   relations 单向关系量值数组（target/intimacy/trust/hostility/vigilance/attachment/boundary_status/at）。
       //   与 profile 既有五节分开：五节是叙述性人设文本条，relations/persona 是带钳制的量值与机制面。
       people: {},               // id -> {id,name,avatar,location,action,intent,body,resources,knowledge:{},personalityAnchor,speakingStyle,behaviorBoundaries,innerVoice,lastSeenAt,updatedAt,profile:{...}}
+      // v2.251.0 物化：场景频次账（scene-budget）与升级提醒账（followup-gate）。
+      //   前者是每一场的静止 streak，后者是每一项的当日已提醒与当日计数；两者都是持久世界状态，
+      //   须在骨架声明（登记不等于物化，冷启动直写会炸事务）。
+      sceneBudget: {},        // sceneKey -> {sig, streak, at}
+      followupGate: { items: {}, days: {} },  // item -> {lastDay, at, count} / dayKey -> n
+      // v2.251.0 物化：借据账（credit-ledger）。同上，登记不等于物化。
+      creditLedger: {},       // 借据 id -> {id,borrower,lender,principal,principalLeft,interest,rateMicroPct,dueAt,status,...}
+      // v2.252.0 物化：兴趣面投递账（interest-face）。落位后才有格与 inbox，同样是持久世界状态。
+      //   （登记不等于物化，冷启动直写会炸事务：本模块不直写 store，重启从 snapshot 回灌。）
+      interestFace: {},       // observerId -> {x,y,radius,inbox:[],pending:[]}
       // 暗流（未结算事件链）
       currents: [],             // {id,title,summary,visibility:hidden|trace|public,public_trace,causes:[],participants:[],stage,createdAt,updatedAt,branchId}
       // 回声（已结算结果与正文的接触面）
@@ -214,6 +224,21 @@
         characterLocations: {},
         locationHistory: []
       },
+      // v2.250.0（拓展：从活跃开源伴侣生态里凿出来的四个真空区）。四个新引擎的顶层容器。
+      //   登记了却不在骨架里：registryParity 报「未在骨架物化」，冷启动直写炸事务，
+      //   且 sizeAudit / 容量议题 / 健康分一整片读数偏。
+      //   ⚠ **outputGuard 不在此列**：它是纯函数面（`check(text, userMessages)` 进出，
+      //   裁定与最近一次读数全在进程态），给骨架键 = 凭空多出一个没有写入方的容器。
+      //   genTiming：渴望标量 p / 两次时间戳 / 决策台账（时机面）
+      //   oneShotMod：只活一次或几轮的调制队列（消费即焚）
+      //   moodGlide：每角色一条情绪坐标 + 各自的基线（回落的目标，性格使然，不是 0）
+      genTiming: { p: null, lastTickAt: 0, lastSentAt: 0, ledger: [] },
+      oneShotMod: { pending: [], round: 0 },
+      moodGlide: { moods: {}, baselines: {} },
+      //   personaAnchor：每角色一条性格锚（比对指纹 + 判定阈值），给正文加「性格绝对锚定」块
+      personaAnchor: { anchors: {} },
+      //   narrativeDeduction：推演结论时间线（哪一步是补偿/碰撞/番外切出来的，环形，per-call 上限）
+      narrativeDeduction: { timeline: [] },
       knowledgePractice: { knowledges: [], licenses: [], practiceLogs: [], refinements: [] },
       publicAgenda: { agendas: {}, proposals: [], deliberations: [] },
       riskPooling: { pools: [], pledges: [], claims: [], disputes: [] },
@@ -1710,6 +1735,16 @@
     'investigation.evidence': { cap: 'per-call', site: 'investigation.js investigate() 入口 maxEvidence 预检（per-call，取设置上界）' },
     'aftermath.effects': { cap: 'per-call', site: 'aftermath.js register() 入口 maxEffects 预检（per-call，取设置上界）' },
     'operations.projects': { cap: 'per-call', site: 'operations.js enact() 入口 maxProjects 预检（per-call，取设置上界）' },
+    // v2.250.0（拓展）：三个新引擎的有界容器登记。与 core/evict.js 的 SITES 表
+    //   **同名同值逐键对账**（G18）：任一侧单边增长，evict 会走 unknown-site 静默失败。
+    //   cap 一律 'per-call'（上限 = 各自设置项，用户可调，写入时传入）——
+    //   静态登记而设置另有一套 = 一个「点了没效果的开关」。
+    'genTiming.ledger':   { cap: 'per-call', site: 'gen-timing.js WA.evict.array(b.ledger, genTiming.ledger, settings().maxLedger)（per-call，取设置上界）' },
+    'oneShotMod.pending': { cap: 'per-call', site: 'one-shot-mod.js WA.evict.array(b.pending, oneShotMod.pending, settings().maxPending)（per-call，取设置上界）' },
+    //   moods 是**对象容器**（kind:'object'）：registryParity 按对象校验类型，
+    //   丢失 kind 会被报成「类型错配（应为数组）」。
+    'moodGlide.moods':    { cap: 'per-call', kind: 'object', site: 'mood-glide.js 满即按 at 最旧（候选不含刚写的那条）+ WA.evict.object(m.moods, moodGlide.moods, ordered, cfg.maxMoods)（per-call，排序键由模块给）' },
+    'narrativeDeduction.timeline': { cap: 'per-call', kind: 'array', site: 'narrative-deduction.js noteTimeline() WA.evict.array(b.timeline, narrativeDeduction.timeline, cfg.maxTimelineNodes)（per-call，取设置上界）' },
     'worldBridge.legends': { cap: 24, site: 'world-bridge.js WA.evict.array(b.legends, maxLegends)（per-call，取设置上界）' },
     'worldBridge.exported': { cap: 12, site: 'world-bridge.js WA.evict.array(b.exported)' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },

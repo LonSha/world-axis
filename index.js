@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.249.0';
+  const VERSION = '2.252.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -512,6 +512,51 @@
     // v2.248.0 (ANTI-OMNI): 全域认知隔离、四大防御屏障与防全知阻断引擎
     'engines/anti-omniscience.js',
     'engines/persona-anchor.js',
+    // v2.250.0（拓展）：四个新引擎。位置紧随 persona-anchor，与 tool-diag 的
+    //   MODULE_EXPORTS 同批登记。四条都必须早于 render/inject.js 与 core/interceptor.js
+    //   —— 注入落地读各自 buildBlock()、after 链调用各自推进口。
+    'engines/gen-timing.js',      // 主动的时机（泊松渴望 / 贝叶斯状态 / 信息增益）
+    'engines/one-shot-mod.js',    // 只这一轮的临时调制（消费即焚）
+    'engines/mood-glide.js',      // 情绪惯性（半衰期回落 / 思念累积）
+    'engines/output-guard.js',    // 别替玩家说话（伪造引述核对）
+    // v2.251.0（拓展 SB-1）：场景频次上限（注意预算，cf. gaze 静止退避）。
+    //   纯判据模块：不推世界、不读正文，所以位置不敏感；需要它的推进方
+    //   （beat / tempo / rhythm-loop）只在调用点取 `WA.sceneBudget.note()`。
+    'engines/scene-budget.js',
+    // v2.251.0（拓展 FG-1）：跃过静默阈值的升级提醒闸门（cf. callhome 四道门控）。
+    //   它与 ladder/care-chain 正交：那两者靠「已出事」升档，本模块答「什么都没发生但很久没动静」。
+    'engines/followup-gate.js',
+    // v2.251.0（拓展 CT-1）：折叠时机（缓存冷热判据，cf. GranCyan continuityPlan）。
+    //   与 inject-budget（装多少）、length-policy（算多长）正交：它只答「什么时候动手」。
+    'engines/compact-timing.js',
+    // v2.251.0（拓展 OPJ-1）：同一事实的多观察者投影（cf. rain-go viewMatch）。
+    //   排在 epistemic-view 之后、注入之前：不自己翻信念账，只把调用方给的版本按人物物理分开。
+    'engines/observation-projection.js',
+    // v2.251.0（拓展 DS-1）：梦境结算的空稿闸与去现实标记（cf. dreams EMPTY_DREAM_RE）。
+    //   须晚于 word-budget（有效字数走它，不另算一套）；与 dream.js 正交：那里管线，这里管稿。
+    'engines/dream-settle.js',
+    // v2.251.0（拓展 ES-1）：注入块的历史洗除（阅后即焚，cf. pilulier burn-after-reading）。
+    //   与 one-shot-mod 正交：那里管发与销，它只管已落盘历史里那段原文。
+    'engines/ephemeral-scrub.js',
+    // v2.251.0（拓展 IM-1）：认人的分数排序与判不清带（cf. voice-familiarity ambiguity_margin）。
+    //   纯判据：不写名册，认完要不要建档由 actors/registry 做。
+    'engines/identity-match.js',
+    // v2.251.0（拓展 DT-1）：延迟任务的代际令牌与串行尾链（cf. dsh-toy StopTimer token + exclusive）。
+    //   纯基建，不判业务：offline-return 的 defer 已接上（此前排完队无句柄留底）。
+    'engines/defer-token.js',
+    // v2.251.0（拓展 SG-1）：判定成功等级五档（cf. coc-kp-host success_level）。
+    //   须早于 engines/fate.js：fate.check 在返回值里追加 grade（只追加，不改 pass/crit/fumble）。
+    'engines/success-grade.js',
+    // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。
+    //   纯判据 + 抽一个：走 rand.pickWeighted 的 `draw` 通道，池子与图鉴留在调用方。
+    'engines/weighted-draw.js',
+    // v2.251.0（拓展 CL-1）：借据账（欠条 / 计息 / 先息后本 / 逾期）（cf. cedarduet loans）。
+    //   与 karma 的 debt 轴正交：那是业力不是钱，不计息、不到期。economy 仍是钱货两清，本模块只管赊。
+    'engines/credit-ledger.js',
+    // v2.252.0（拓展 IF-1）：AOI 兴趣面（格网 + 方形半径，只在跨格时重算覆盖集合）（cf. OpenMMO interest.rs）。
+    //   与 region/farfield 正交：那两者按**天**算传播与摘要，本模块按**格**算同一时刻谁在场。
+    //   纯投递判据：投给谁之后那件事算不算「他知道了」仍归 epistemic-view / knowledge。
+    'engines/interest-face.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

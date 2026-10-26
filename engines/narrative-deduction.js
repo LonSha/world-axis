@@ -21,7 +21,7 @@
   };
 
   const __REG = {
-    key: LS_KEY, def: DEF, module: 'narrative-deduction',
+    key: LS_KEY, def: DEF, module: 'narrativeDeduction',
     bounds: { stallThresholdRounds: [1, 10], maxTimelineNodes: [10, 200] }
   };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
@@ -120,6 +120,7 @@
     ];
 
     const pick = compensations[Math.floor(Math.random() * compensations.length)];
+    noteTimeline('compensate', { place: place, rounds: rounds, type: pick.type });
     return {
       triggered: true,
       stalledRounds: rounds,
@@ -144,6 +145,7 @@
         }
       }
     }
+    if (clashes.length) noteTimeline('clash', { pairs: clashes.length, domain: clashes[0].domain });
     return { clashes: clashes };
   }
 
@@ -154,6 +156,7 @@
     __stat.spinOffGenerations++;
     const name = (actor && actor.name) || '人物';
     const place = (sceneContext && sceneContext.place) || '未明场所';
+    noteTimeline('spinOff', { actor: name, place: place });
     return {
       perspectiveActor: name,
       scene: place,
@@ -166,11 +169,49 @@
     return Object.assign({}, __stat);
   }
 
+  /**
+   * 把一次推演结论记进时间线（双轨隔离的**可回溯面**）。
+   *   v2.250.0：`maxTimelineNodes` 此前零消费（声明了却没有任何容器可裁），
+   *   于是「拦了多少条推演、哪一轮拦的」只能看计数、看不到内容 —— 计数说不出因果。
+   *   环形由调用点显式给上限（per-call 站点 narrativeDeduction.timeline）。
+   * @returns {{ok:boolean, dropped:number}} 恒不抛（记账失败不影响推演本身）
+   */
+  function noteTimeline(kind, payload) {
+    try {
+      const cfg = settings();
+      if (!WA.store || typeof WA.store.transact !== 'function') return { ok: false, dropped: 0 };
+      let dropped = 0;
+      WA.store.transact(function (d) {
+        if (!d.narrativeDeduction || typeof d.narrativeDeduction !== 'object') d.narrativeDeduction = { timeline: [] };
+        const b = d.narrativeDeduction;
+        if (!Array.isArray(b.timeline)) b.timeline = [];
+        b.timeline.push({ kind: String(kind || 'note'), payload: payload || null, at: Date.now() });
+        if (WA.evict && WA.evict.array) {
+          const r = WA.evict.array(b.timeline, 'narrativeDeduction.timeline', cfg.maxTimelineNodes);
+          dropped = (r && r.dropped) || 0;
+        }
+      }, 'narrativeDeduction:timeline');
+      return { ok: true, dropped: dropped };
+    } catch (e) { return { ok: false, dropped: 0 }; }
+  }
+
+  /** 只读最近若干条推演痕迹（新的在末尾）。 */
+  function timeline(n) {
+    try {
+      const d = (WA.store && WA.store.get && WA.store.get()) || {};
+      const arr = (d.narrativeDeduction && Array.isArray(d.narrativeDeduction.timeline)) ? d.narrativeDeduction.timeline : [];
+      const k = Math.max(1, Number(n) || 10);
+      return arr.slice(-k).map(function (x) { return Object.assign({}, x); });
+    } catch (e) { return []; }
+  }
+
   WA.narrativeDeduction = {
     auditDualTrack: auditDualTrack,
     compensateStall: compensateStall,
     auditRuleClash: auditRuleClash,
     generateSpinOffSnapshot: generateSpinOffSnapshot,
+    noteTimeline: noteTimeline,
+    timeline: timeline,
     getSettings: settings,
     setSettings: saveSettings,
     stat: stat

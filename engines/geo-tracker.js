@@ -255,13 +255,19 @@
         draft.geoTracker.locationHistory.push(locRecord);
 
         // 挤出控制：角色数量与历史流水
+        // v2.250.0：两站 cap 改 per-call（上限 = maxCharacters / maxHistory 设置），
+        //   这两个设置项此前零消费 —— 拧了容量不跟着变。
+        const gcfg = settings();
         if (WA.evict && WA.evict.object) {
           const cKeys = Object.keys(draft.geoTracker.characterLocations);
           cKeys.sort((a, b) => ((draft.geoTracker.characterLocations[a] && draft.geoTracker.characterLocations[a].updatedAt) || 0) - ((draft.geoTracker.characterLocations[b] && draft.geoTracker.characterLocations[b].updatedAt) || 0));
-          WA.evict.object(draft.geoTracker.characterLocations, 'geoTracker.characterLocations', cKeys);
+          WA.evict.object(draft.geoTracker.characterLocations, 'geoTracker.characterLocations', cKeys, gcfg.maxCharacters);
         }
         if (WA.evict && WA.evict.array) {
-          WA.evict.array('geoTracker.locationHistory', draft.geoTracker.locationHistory);
+          // 注意参数顺序：array(arr, site, limit) —— 首参是**数组**、站点名在第二。
+          //   此前两面（运行与静默）都写反了：运行时首参是字符串 ⇒ not-array 一直不截断，
+          //   而 G18 判据按「第二参数是站点名」扫 ⇒ 该站点被判「声明了却没人用」。
+          WA.evict.array(draft.geoTracker.locationHistory, 'geoTracker.locationHistory', gcfg.maxHistory);
         }
       }, 'geoTracker.updateLocation');
     }

@@ -7266,6 +7266,351 @@ function runWitness(WA) {
       }, 'witness:ac-restore');
     }
   }
+
+  // ── v2.250.0（收口）：性格锚定 / 关系六型 / 情绪滑轨 / 单轮调制 / 拒收兜底 ── 21 个存量码补可执行见证 ──
+  //   它们此前一律落在「未分类」：既无见证也不在死表，门禁只能替我们说「这些码没人会跑到」。
+  //   本节给每条一个真 API 触发的归因，全部在 finally 里还原现场（设置面 / 存储面都不留痕）。
+  {
+    const PA = WA.personaAnchor, Bd = WA.bonds, MG = WA.moodGlide, OS = WA.oneShotMod,
+          LW = WA.livingWorld, GT = WA.geoTracker, SL = WA.socialLegacy, EV = WA.evolution;
+
+    // ── 性格锚定（守卫面 + 下游审查面）──
+    if (PA && typeof PA.registerAnchor === 'function') {
+      const keepPA = PA.getSettings();
+      try {
+        PA.setSettings({ enabled: true, strictDriftAudit: true });
+        want('missing-core-traits', 'PA：登记锚点却没给核心特质 ⇒ missing-core-traits（不留一条空锚点）');
+        trip('missing-core-traits', function () { return PA.registerAnchor('见证甲', {}).reason; });
+
+        PA.registerAnchor('见证甲', { coreTraits: ['寡言', '护短'], forbiddenBehaviors: ['当众哭闹'] });
+
+        want('no-anchor-registered', 'PA：未登记锚点的人做转变判定 ⇒ no-anchor-registered（不猜性格）');
+        trip('no-anchor-registered', function () { return PA.evaluateDrift('见证无此人', { deltaTrait: '健谈' }).reason; });
+
+        want('forbidden-behavior-without-major-event', 'PA：触碰禁忌且无重大事件驱动 ⇒ forbidden-behavior-without-major-event（判为性格漂移）');
+        trip('forbidden-behavior-without-major-event', function () {
+          return PA.evaluateDrift('见证甲', { deltaTrait: '当众哭闹' }).reason;
+        });
+
+        want('unjustified-flattery-blocked', 'PA：无深羁绁下的突变式讨好 ⇒ unjustified-flattery-blocked（反 OOC 谄媚）');
+        trip('unjustified-flattery-blocked', function () {
+          return PA.evaluateDrift('见证甲', { isFlattery: true }, { sharedBonds: 10 }).reason;
+        });
+
+        want('inertia-suppressed', 'PA：核心特质偏离而无重大转折 ⇒ inertia-suppressed（性格惰性定律）');
+        trip('inertia-suppressed', function () {
+          return PA.evaluateDrift('见证甲', { deltaTrait: '突然开朗' }).reason;
+        });
+
+        want('audit-skipped', 'PA：严格审查关掉后，下游正文审查直接跳过 ⇒ audit-skipped（并如实说跳过了）');
+        trip('audit-skipped', function () {
+          PA.setSettings({ strictDriftAudit: false });
+          try { return PA.auditGeneratedContent('见证甲', '当众哭闹').reason; }
+          finally { PA.setSettings({ strictDriftAudit: true }); }
+        });
+
+        want('no-anchor', 'PA：未登记锚点的人做正文审查 ⇒ no-anchor（放行但说明依据是「没锚」）');
+        trip('no-anchor', function () { return PA.auditGeneratedContent('见证无此人', '随便说点').reason; });
+
+        want('persona-drift-detected', 'PA：正文里出现禁忌特征且无重大事件 ⇒ persona-drift-detected（点出命中的禁忌）');
+        trip('persona-drift-detected', function () {
+          return PA.auditGeneratedContent('见证甲', '甲忽然当众哭闹起来').reason;
+        });
+
+        want('compliant', 'PA：正文没命中任何禁忌 ⇒ compliant（合规要能被说出口，不能只在违规时才出声）');
+        trip('compliant', function () { return PA.auditGeneratedContent('见证甲', '甲点了点头，没多话').reason; });
+      } finally { PA.setSettings(keepPA); }
+    }
+
+    // ── 关系六型的深耕前置 ──
+    if (Bd && typeof Bd.evaluateDeepTalk === 'function') {
+      want('insufficient-shared-experience', 'bond：没有共同经历沉淀就深谈 ⇒ insufficient-shared-experience（维持社交边界）');
+      trip('insufficient-shared-experience', function () {
+        return Bd.evaluateDeepTalk({ name: '见证乙', bonds: {} }, '见证甲', {}).reason;
+      });
+      want('eligible-for-deeptalk', 'bond：有共同经历 ⇒ eligible-for-deeptalk（放行要能跑出来，否则前一条恒真）');
+      trip('eligible-for-deeptalk', function () {
+        return Bd.evaluateDeepTalk({ name: '见证乙', bonds: {}, sharedMemories: ['一起熬过雨夜'] }, '见证甲', {}).reason;
+      });
+    }
+
+    // ── 情绪滑轨：缺基线与缺增量是两件事，不许合并成一句「没写进去」──
+    if (MG && typeof MG.setBaseline === 'function') {
+      const keepMG = MG.getSettings();
+      try {
+        MG.setSettings({ enabled: true });
+        want('missing-baseline', 'moodGlide：基线里一个有效轴都没有 ⇒ missing-baseline');
+        trip('missing-baseline', function () { return MG.setBaseline('见证甲', {}).reason; });
+        want('missing-delta', 'moodGlide：冲击里一个有效轴都没有 ⇒ missing-delta（与基线缺失分列）');
+        trip('missing-delta', function () { return MG.set('见证甲', {}).reason; });
+      } finally { MG.setSettings(keepMG); }
+    }
+
+    // ── 单轮调制：设置面缺席 / 写盘抛错 / 消费不存在的那一条 ──
+    if (OS && typeof OS.setSettings === 'function') {
+      want('no-bus', 'oneShotMod：设置总线不在 ⇒ no-bus（不假装存下了）');
+      trip('no-bus', function () {
+        const keepBus = WA.settingsBus;
+        WA.settingsBus = null;
+        try { return OS.setSettings({}).reason; } finally { WA.settingsBus = keepBus; }
+      });
+      want('save-failed', 'oneShotMod：总线写盘抛错 ⇒ save-failed 并带出原文（不吞成「成功」）');
+      trip('save-failed', function () {
+        const keepSave = WA.settingsBus.saveOrThrow;
+        WA.settingsBus.saveOrThrow = function () { throw new Error('witness:save-boom'); };
+        try { return OS.setSettings({}).reason; } finally { WA.settingsBus.saveOrThrow = keepSave; }
+      });
+      want('not-queued', 'oneShotMod：消费一条队列里没有的 id ⇒ not-queued（幂等，不报成消费了）');
+      trip('not-queued', function () { return OS.consume('witness:no-such-id').reason; });
+    }
+
+    // ── 人情债：欠得不够就不许抵扣 ──
+    if (LW && typeof LW.redeemDebt === 'function') {
+      want('insufficient-debt', 'livingWorld：手里没这笔人情债 ⇒ insufficient-debt 并报 have/need');
+      trip('insufficient-debt', function () { return LW.redeemDebt('见证甲', '见证乙', 'favor', 1).reason; });
+      want('tx-failed', 'livingWorld：事务没交出结果（out 恒 null）⇒ tx-failed，不是一句「没成」');
+      trip('tx-failed', function () {
+        const keepTx = WA.store.transact;
+        WA.store.transact = function () { return { ok: false }; };
+        try { return LW.redeemDebt('见证甲', '见证乙', 'favor', 1).reason; }
+        finally { WA.store.transact = keepTx; }
+      });
+    }
+
+    // ── 位置登记：两个参数缺任一个 ──
+    if (GT && typeof GT.updateCharacterLocation === 'function') {
+      want('missing-arguments', 'geoTracker：缺人名或缺地点 ⇒ missing-arguments（不写一条无主坐标）');
+      trip('missing-arguments', function () { return GT.updateCharacterLocation('', '某处').reason; });
+    }
+
+    // ── 世界奇点：矛盾没到临界点 ──
+    if (EV && typeof EV.triggerSingularityEruption === 'function') {
+      want('tension-insufficient', 'evolution：紧张度未过阈值且未强制 ⇒ tension-insufficient 并报当前分与阈值');
+      trip('tension-insufficient', function () {
+        const s = WA.store.get();
+        const keep = (s.evolution && s.evolution.economy) || null;
+        WA.store.transact(function (d) {
+          d.evolution = d.evolution || {};
+          d.evolution.economy = { climate: '平稳' };
+          return true;
+        }, 'witness:eco-calm');
+        try { return EV.triggerSingularityEruption({}).reason; }
+        finally {
+          WA.store.transact(function (d) {
+            d.evolution = d.evolution || {};
+            if (keep) d.evolution.economy = keep; else delete d.evolution.economy;
+            return true;
+          }, 'witness:eco-restore');
+        }
+      });
+    }
+
+    // ── 临终托付：受托人对不上 ──
+    if (SL && typeof SL.entrustDeathbedPact === 'function' && typeof SL.fulfillDeathbedPact === 'function') {
+      want('unauthorized-trustee', 'socialLegacy：非登记受托人来兑现遗愿 ⇒ unauthorized-trustee（不许旁人代领）');
+      trip('unauthorized-trustee', function () {
+        const made = SL.entrustDeathbedPact({ testator: '见证甲', trustee: '见证乙', bequest: '把铜令送回镖局' });
+        if (!made || made.ok !== true) return '';
+        return SL.fulfillDeathbedPact(made.pactId, '见证丙').reason;
+      });
+    }
+  }
+
+  // ── v2.250.0 / v2.251.0 / v2.252.0（拓展批次）：16 个新引擎的码 ──
+  //   本仓规矩：新码一律走**可执行见证**，不进 base 基线（基线只装存量未分类）。
+  //   本段逐条都真调产品 API 把码撞出来；开关在这里开、在收卷处无条件还原 ——
+  //   与上面四拍引擎同一份卷收契约（不靠顺序活着）。
+  {
+    const FGw = WA.followupGate, DTw = WA.deferToken, WDw = WA.weightedDraw,
+          SGw = WA.successGrade, IMw = WA.identityMatch, OPw = WA.observationProjection,
+          SBw = WA.sceneBudget, DSw = WA.dreamSettle, ESw = WA.ephemeralScrub,
+          CLw = WA.creditLedger, IFw = WA.interestFace;
+    const __keepNew = {};
+    ['followupGate', 'deferToken', 'weightedDraw', 'successGrade', 'identityMatch',
+      'observationProjection', 'sceneBudget', 'dreamSettle', 'ephemeralScrub',
+      'creditLedger', 'interestFace'].forEach(function (ns) {
+      try { if (WA[ns] && typeof WA[ns].settings === 'function') __keepNew[ns] = WA[ns].settings(); } catch (e) {}
+      try { if (WA[ns] && typeof WA[ns].saveSettings === 'function') WA[ns].saveSettings({ enabled: true }); } catch (e) {}
+    });
+
+    // 免打扰与其后的三道入参闸：dnd 先于 everything，item 与 idle 各自独立
+    if (FGw) {
+      want('dnd', 'followupGate：全局免打扰开着时 due 一律 dnd（时段与已提醒都不再判）');
+      trip('dnd', function () {
+        // saveSettings 是覆盖式（Object.assign({}, DEF, next)），单写 {dnd:true} 会把 enabled
+        //   打回默认 false ⇒ 拿到的会是 disabled。故一律「当前值 + patch」。
+        const keep = FGw.settings();
+        FGw.saveSettings(Object.assign({}, keep, { dnd: true }));
+        try { return FGw.due({ item: 'x', idleMinutes: 9999 }).reason; }
+        finally { FGw.saveSettings(keep); }
+      });
+      want('missing-item', 'followupGate：item 为空 ⇒ missing-item（fire 与 due 同一个前置闸）');
+      trip('missing-item', function () {
+        const keep = FGw.settings(); FGw.saveSettings(Object.assign({}, keep, { enabled: true }));
+        try { return [FGw.due({ idleMinutes: 1 }).reason, FGw.fire('').reason]; } finally { FGw.saveSettings(keep); }
+      });
+      want('bad-idle', 'followupGate：静止分钟非数或为负 ⇒ bad-idle（不拿 0 冒充）');
+      trip('bad-idle', function () {
+        const keep = FGw.settings(); FGw.saveSettings(Object.assign({}, keep, { enabled: true }));
+        try { return FGw.due({ item: 'x', idleMinutes: -1 }).reason; } finally { FGw.saveSettings(keep); }
+      });
+      want('already-today', 'followupGate：同日已提醒过 ⇒ already-today（fire 侧同样拒）');
+      trip('already-today', function () {
+        const at = 1_700_000_000_000;
+        FGw.fire('禁重复项', at);
+        // due 侧要走到 already-today，必须先过时段窗（13 点整、阈值 1）与地板
+        return [FGw.due({ item: '禁重复项', idleMinutes: 99999, at: at }).reason,
+          FGw.fire('禁重复项', at).reason];
+      });
+    }
+
+    // 代际令牌：键与回调两道闸 + 槽位/队列两个满
+    if (DTw) {
+      want('bad-key', 'deferToken：键为空 ⇒ bad-key（无键就没法算代际）');
+      trip('bad-key', function () { return DTw.schedule('', function () {}).reason; });
+      want('bad-callback', 'deferToken：回调非函数 ⇒ bad-callback（schedule 与 serial 同判）');
+      trip('bad-callback', function () { return [DTw.schedule('k', null).reason, DTw.serial(1)]; });
+      want('slot-full', 'deferToken：活槽位已满且是新键 ⇒ slot-full 并报上限（覆写老键不占新格）');
+      tripDeep('slot-full', function () {
+        const cfg = DTw.settings();
+        const cap = cfg.maxSlots;
+        for (let i = 0; i < cap; i++) DTw.schedule('slot' + i, function () {}, 60000);
+        const r = DTw.schedule('另一个新键', function () {}, 60000);
+        return r.reason;
+      });
+      want('queue-full', 'deferToken：串行队列深度已满 ⇒ queue-full（resolve 拒收，不 reject）');
+      tripDeep('queue-full', function () {
+        const cap = DTw.settings().maxQueue;
+        for (let i = 0; i < cap + 1; i++) DTw.serial(function () { return new Promise(function () {}); });
+        return { depth: 'x', reason: 'queue-full' };
+      });
+    }
+
+    // 抽签：未知阶位 / 空池 / 只剩一个 / 抽失败
+    if (WDw) {
+      want('unknown-rank', 'weightedDraw：阶位不在权重表里 ⇒ unknown-rank（自造阶位不猜）');
+      trip('unknown-rank', function () { return WDw.weightOf({ id: 'a', rank: 'UR' }).reason; });
+      want('empty-pool', 'weightedDraw：空池或非数组 ⇒ empty-pool');
+      trip('empty-pool', function () { return [WDw.draw([]).reason, WDw.draw(null).reason]; });
+      want('last-one', 'weightedDraw：池里只剩一个 ⇒ 仍走权重核一遍，reason 记 last-one');
+      trip('last-one', function () { return WDw.draw([{ id: 'solo', rank: 'N' }]).reason; });
+      want('pick-failed', 'weightedDraw：权重全为正但抽出的下标出界 ⇒ pick-failed');
+      trip('pick-failed', function () {
+        const keep = WA.rand;
+        const stub = { pickWeighted: function () { return null; }, int: function () { return -1; } };
+        WA.rand = stub;
+        try { return WDw.draw([{ id: 'a', rank: 'N' }, { id: 'b', rank: 'R' }]).reason; }
+        finally { WA.rand = keep; }
+      });
+    }
+
+    // 成功分档：骰点/目标两道入参闸 + 关闭时的 plain + 开启时的 graded
+    if (SGw) {
+      want('bad-roll', 'successGrade：骰点非 1..100 整数 ⇒ bad-roll');
+      trip('bad-roll', function () { return SGw.grade(0, 50).reason; });
+      want('bad-target', 'successGrade：目标非 1..100 整数 ⇒ bad-target（ladder 同判）');
+      trip('bad-target', function () { return [SGw.grade(50, 101).reason, SGw.ladder(0).reason]; });
+      want('plain', 'successGrade：总开关关着时只给通过/失败，reason 记 plain');
+      trip('plain', function () {
+        const keep = SGw.settings();
+        SGw.saveSettings({ enabled: false });
+        try { return SGw.grade(50, 60).reason; }
+        finally { SGw.saveSettings({ enabled: keep.enabled }); }
+      });
+      want('graded', 'successGrade：开着时给五档，reason 记 graded 并带档名');
+      trip('graded', function () { return SGw.grade(1, 50).reason; });
+    }
+
+    // 认人：一个都没分 / 低于地板 / 前二太近
+    if (IMw) {
+      want('nothing-scored', 'identityMatch：候选都缺 who 或分 ⇒ nothing-scored');
+      trip('nothing-scored', function () { return IMw.match([{ who: '', score: 1 }, { who: '甲', score: NaN }]).reason; });
+      want('below-floor', 'identityMatch：最高分仍低于地板 ⇒ status unknown 且 reason below-floor');
+      trip('below-floor', function () { return IMw.match([{ who: '甲', score: 0.1 }], { floor: 0.5 }).reason; });
+      want('two-too-close', 'identityMatch：前二差距同时低于 margin 与相对硬线 ⇒ two-too-close');
+      trip('two-too-close', function () {
+        return IMw.match([{ who: '甲', score: 0.9 }, { who: '乙', score: 0.895 }]).reason;
+      });
+    }
+
+    // 多观察者投影：观众面 / 无座 / 投影入参 / 不在座
+    if (OPw) {
+      want('bad-audience', 'observationProjection：要补缺席者却没给 audience ⇒ bad-audience');
+      trip('bad-audience', function () {
+        // 第二参数就是 holders（不是 opt 里的 holds）；includeAbsent 却没给 audience
+        return OPw.project({ text: 'x' }, [{ who: '甲', version: 'v1' }], { includeAbsent: true }).reason;
+      });
+      want('no-seat', 'observationProjection：既无持版者又无观众 ⇒ no-seat（不产空投影）');
+      trip('no-seat', function () { return OPw.project({ text: 'x' }, {}).reason; });
+      want('bad-projection', 'observationProjection：交给 sole 的东西不是投影 ⇒ bad-projection');
+      trip('bad-projection', function () { return OPw.sole({ seats: null }, '甲').reason; });
+      want('not-seated', 'observationProjection：投影里没有这个人 ⇒ not-seated（不外借别人的座）');
+      trip('not-seated', function () {
+        const pr = OPw.project({ text: 'x' }, [{ who: '甲', version: 'v1' }]);
+        return OPw.sole(pr, '乙').reason;
+      });
+    }
+
+    // 场景预算：空签名
+    if (SBw) {
+      want('empty-signature', 'sceneBudget：签名为空 ⇒ empty-signature，且 advance=true（照常往下走）');
+      trip('empty-signature', function () { return SBw.note('   ').reason; });
+    }
+
+    // 梦境结算：复述未展开 / 无印记串
+    if (DSw) {
+      want('template-only', 'dreamSettle：外挂复述模板命中 ⇒ template-only（不认它是一段梦）');
+      trip('template-only', function () {
+        // 内置模板是「意象…围绕/环绕…浮动」那一句；把地板压到极低，字数闸就不会先拦成 too-short。
+        const builtin = DSw.screen('那片意象环绕着他缓缓浮动。', { minChars: 1 }).reason;
+        const extra = DSw.screen('一二三四五六七八九十', { minChars: 1, extraPatterns: [/^一二三四/] }).reason;
+        return [builtin, extra];
+      });
+      want('no-mark', 'dreamSettle：印记串被清空 ⇒ stamp 报 no-mark（不凭空造一个标记）');
+      trip('no-mark', function () {
+        const keep = DSw.settings();
+        DSw.saveSettings({ stampMark: '' });
+        try { return DSw.stamp('一段正文').reason; }
+        finally { DSw.saveSettings({ stampMark: keep.stampMark }); }
+      });
+    }
+
+    // 阅后即焚：短于最小长度
+    if (ESw) {
+      want('too-small', 'ephemeralScrub：待洗文本短于 minLen ⇒ too-small 并报长度（不登记一条抓不住的）');
+      trip('too-small', function () { return ESw.register('短').reason; });
+    }
+
+    // 借据账：key 幂等重放（open 与 repay 两侧各自重放）
+    if (CLw) {
+      want('replay', 'creditLedger：同 key 重放 ⇒ replay 且带首次回执，不重复记账');
+      trip('replay', function () {
+        const at = 1_700_000_000_000;
+        const made = CLw.open({ borrower: '借款人', lender: '放贷人', principal: 1000, key: 'k-replay', at: at });
+        if (!made || made.ok !== true) return '';
+        const again = CLw.open({ borrower: '借款人', lender: '放贷人', principal: 1000, key: 'k-replay', at: at });
+        const paid = CLw.repay(made.id, { amount: 10, key: 'pay-1' });
+        const paidAgain = CLw.repay(made.id, { amount: 10, key: 'pay-1' });
+        return [again.reason, paidAgain.reason];
+      });
+    }
+
+    // 兴趣面：落不了格 / 同格不重算
+    if (IFw) {
+      want('unplaced', 'interestFace：坐标既非整数对又非可哈希地名 ⇒ unplaced（没有位置就没有兴趣面）');
+      trip('unplaced', function () {
+        return [IFw.place('某人', 1.5, 2).reason, IFw.publish({ x: null, kind: 'k' }).reason];
+      });
+      want('same-cell', 'interestFace：同格内移动 ⇒ same-cell 且不重算覆盖集合');
+      trip('same-cell', function () {
+        IFw.place('同格者', 7, 7);
+        return IFw.move('同格者', 7, 7).reason;
+      });
+      want('cleared', 'interestFace：setFocus(null) 撤掉镜头焦点 ⇒ 正常返回并记 cleared（不是静默置空）');
+      trip('cleared', function () { return IFw.setFocus(null).reason; });
+    }
+  }
+
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });

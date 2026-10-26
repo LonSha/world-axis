@@ -164,6 +164,12 @@
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
     //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**。
      'elsewhere', 'livingWorld', 'geoTracker', 'healthPreflight', 'antiOmniscience', 'personaAnchor', 'vitals', 'coordinate', 'dream', 'backstageTone',
+    // v2.250.0（拓展）：四条新注入源。与注入分支**同批**登记 ——
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**。
+    //   四条**都有** buildBlock，故都进源表（判定面/工具面不设源，B 判据会抓幽灵开关）：
+    //   genTiming / oneShotMod / moodGlide 各自摊一份物理量，outputGuard 立代玩家说话的规矩。
+    'genTiming', 'oneShotMod', 'moodGlide', 'outputGuard',
     //   （注：compare / beat / portal 为纯函数面（零 store 写、无 buildBlock），
     //    modelink 为幕后工具面（无 buildBlock）—— 四者**不设注入源**：
     //    源表只收「会往正文里放块」的面，开关面不在此列（B 判据会抓幽灵开关）。）
@@ -254,6 +260,11 @@ style: false,
         // v2.230.0（拓展 N12）：六条新源。取默认 true（同四条理由——其模块总开关
         //   默认为关，未开时 buildBlock 返回空串），不给老用户凭空多出约束。
         elsewhere: true, livingWorld: true, geoTracker: true, healthPreflight: true, antiOmniscience: true, personaAnchor: true, vitals: true, coordinate: true, dream: true, backstageTone: true,
+        // v2.250.0（拓展）：四条新源。取默认 true（同四条理由——其模块总开关默认为关：
+        //   genTiming / oneShotMod / moodGlide 的 DEF.enabled=false，未开时 buildBlock 返回空串；
+        //   outputGuard 虽默认开，但它的块是一句规矩文案、不产生读数，给了也不占额度），
+        //   不给老用户凭空多出约束。
+        genTiming: true, oneShotMod: true, moodGlide: true, outputGuard: true,
         // v2.230.0（拓展 N12 续批）：三条新源。取默认 true（同四条理由——其模块总开关
         //   默认为关，未开时 buildBlock 返回空串），不给老用户凭空多出约束。
         floorSnapshot: true, memoryTiers: true, lingqi: true,
@@ -477,6 +488,13 @@ style: false,
     healthPreflight: '系统健康与写作防线',
     antiOmniscience: '防全知认知视界',
     personaAnchor: '性格绝对锚定',
+    // v2.250.0（拓展）：四条新源的显示名。与 SOURCES（键）/ 注入分支 source 名 /
+    //   SRC_MOD_SETTING 三处逐字同名登记。取名口径同 diplomacy：答「这一段是什么」，
+    //   不答「哪个模块产的」——genTiming 取「主动的时机」而非「时机引擎」。
+    genTiming: '主动的时机',
+    oneShotMod: '只这一轮的临时调制',
+    moodGlide: '情绪惯性',
+    outputGuard: '别替玩家说话',
     vitals: '生理线',
     coordinate: '坐标台账',
     dream: '长梦',
@@ -622,6 +640,13 @@ style: false,
     healthPreflight: 'worldaxis_health_preflight_settings_v1',
     antiOmniscience: 'worldaxis_anti_omniscience_settings_v1',
     personaAnchor: 'worldaxis_persona_anchor_settings_v1',
+    // v2.250.0（拓展）：四条新源**确有**模块级总开关（同注册表 __REG.key）。
+    //   不登记会怎样：moduleEnabled 查不到键就返回 null，于是对账面上本源一律落在
+    //   unavailable（「没有模块级总开关」——而它明明有），排查方向被指错。
+    genTiming: 'worldaxis_gen_timing_settings_v1',
+    oneShotMod: 'worldaxis_one_shot_mod_settings_v1',
+    moodGlide: 'worldaxis_mood_glide_settings_v1',
+    outputGuard: 'worldaxis_output_guard_settings_v1',
     vitals: 'worldaxis_vitals_settings_v1',
     coordinate: 'worldaxis_coordinate_settings_v1',
     dream: 'worldaxis_dream_settings_v1',
@@ -1178,6 +1203,13 @@ style: false,
       if (vis.healthPreflight && WA.healthPreflight) { const hpb = engineCall('healthPreflight', function () { return WA.healthPreflight.buildBlock(); }); if (hpb) items.push({ source: '系统健康与写作防线', content: hpb }); }
       if (vis.antiOmniscience && WA.antiOmniscience) { const aob = engineCall('antiOmniscience', function () { return WA.antiOmniscience.buildBlock(); }); if (aob) items.push({ source: '防全知认知视界', content: aob }); }
       if (vis.personaAnchor && WA.personaAnchor) { const pab = engineCall('personaAnchor', function () { return WA.personaAnchor.buildBlock(); }); if (pab) items.push({ source: '性格绝对锚定', content: pab }); }
+      // v2.250.0（拓展）：四条新注入源的分支消费点。与 SOURCES 同批登记
+      //   （只加源表不加分支 = 声明了没人消费）；一律 engineCall 包裹 + 先判开关，
+      //   缺模块时静默不出块（不抛）。
+      if (vis.genTiming && WA.genTiming) { const gtb = engineCall('genTiming', function () { return WA.genTiming.buildBlock(); }); if (gtb) items.push({ source: '主动的时机', content: gtb }); }
+      if (vis.oneShotMod && WA.oneShotMod) { const osb = engineCall('oneShotMod', function () { return WA.oneShotMod.buildBlock(); }); if (osb) items.push({ source: '只这一轮的临时调制', content: osb }); }
+      if (vis.moodGlide && WA.moodGlide) { const mgb = engineCall('moodGlide', function () { return WA.moodGlide.buildBlock(); }); if (mgb) items.push({ source: '情绪惯性', content: mgb }); }
+      if (vis.outputGuard && WA.outputGuard) { const ogb = engineCall('outputGuard', function () { return WA.outputGuard.buildBlock(); }); if (ogb) items.push({ source: '别替玩家说话', content: ogb }); }
       if (vis.vitals && WA.vitals) { const vb = engineCall('vitals', function () { return WA.vitals.buildBlock(); }); if (vb) items.push({ source: '生理线', content: vb }); }
       if (vis.coordinate && WA.coordinate) { const cb = engineCall('coordinate', function () { return WA.coordinate.buildBlock(); }); if (cb) items.push({ source: '坐标台账', content: cb }); }
       if (vis.dream && WA.dream) { const db = engineCall('dream', function () { return WA.dream.buildBlock(); }); if (db) items.push({ source: '长梦', content: db }); }
