@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.248.0';
+  const VERSION = '2.249.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -511,6 +511,7 @@
     'engines/narrative-deduction.js',
     // v2.248.0 (ANTI-OMNI): 全域认知隔离、四大防御屏障与防全知阻断引擎
     'engines/anti-omniscience.js',
+    'engines/persona-anchor.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

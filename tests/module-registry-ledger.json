@@ -5420,6 +5420,27 @@
         "core/interceptor.js",
         "render/inject.js"
       ]
+    },
+    "engines/persona-anchor.js": {
+      "ns": [
+        "personaAnchor"
+      ],
+      "requires": [],
+      "requiresFiles": [
+        "core/settings-bus.js"
+      ],
+      "providerOrderOk": true,
+      "callRefs": [
+        "settingsBus"
+      ],
+      "ghostRefs": [],
+      "stateKeys": [
+        "worldaxis_persona_anchor_settings_v1"
+      ],
+      "consumedBy": [
+        "core/interceptor.js",
+        "render/inject.js"
+      ]
     }
   }
 }

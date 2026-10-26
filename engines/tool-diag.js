@@ -2328,6 +2328,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/health-preflight.js': 'healthPreflight',
     'engines/narrative-deduction.js': 'narrativeDeduction',
     'engines/anti-omniscience.js': 'antiOmniscience',
+    'engines/persona-anchor.js': 'personaAnchor',
     // v2.246.0 (MAP-2): SVG 画布平滑飞行漫游、动态避让与同地聚类引擎
     'render/map-viewport.js': 'mapViewport',
     // 同批补登两个更早就在磁盘与 LOAD 清单里、却一直漏登记本表的引擎。

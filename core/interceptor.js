@@ -180,6 +180,13 @@
                 const secrets = (s && s.epistemicStore && s.epistemicStore.secrets) || [];
                 WA.antiOmniscience.auditGeneratedContent({ name: '当前NPC' }, out, secrets);
               }
+              // v2.249.0 (PA-1): 结合性格绝对锚定审查，若出现禁忌反应/OOC漂移则在审计台账留痕
+              if (WA.personaAnchor && typeof WA.personaAnchor.auditGeneratedContent === 'function') {
+                const activeNames = (WA.registry && typeof WA.registry.list === 'function') ? WA.registry.list() : [];
+                activeNames.forEach(function (n) {
+                  WA.personaAnchor.auditGeneratedContent(n, out);
+                });
+              }
               }
               if (out !== last.mes) {
                 __purifiedRaw.set(last, last.mes);   // 原文快照：世界推进仍基于原文
