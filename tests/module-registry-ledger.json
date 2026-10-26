@@ -1,9 +1,9 @@
 {
-  "version": "2.247.0",
-  "loadOrderCount": 295,
+  "version": "2.248.0",
+  "loadOrderCount": 296,
   "loadedCount": 279,
   "uiCount": 14,
-  "nsCount": 290,
+  "nsCount": 291,
   "totals": {
     "loadEdges": 182,
     "hardEdges": 0,
@@ -5399,6 +5399,27 @@
         "worldaxis_narrative_deduction_settings_v1"
       ],
       "consumedBy": []
+    },
+    "engines/anti-omniscience.js": {
+      "ns": [
+        "antiOmniscience"
+      ],
+      "requires": [],
+      "requiresFiles": [
+        "core/settings-bus.js"
+      ],
+      "providerOrderOk": true,
+      "callRefs": [
+        "settingsBus"
+      ],
+      "ghostRefs": [],
+      "stateKeys": [
+        "worldaxis_anti_omniscience_settings_v1"
+      ],
+      "consumedBy": [
+        "core/interceptor.js",
+        "render/inject.js"
+      ]
     }
   }
 }

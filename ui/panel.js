@@ -144,7 +144,8 @@
     //   SOURCES（键）**逐字同批**登记（inject-sources-v2560 的 D 判据：
     //   SOURCES 每一项在本表里都要有显示名，且本表不得有超出 SOURCES 的键）。
     elsewhere: '彼方档案', livingWorld: '真实世界运转', geoTracker: '空间常识与位移',
-    healthPreflight: '系统健康与写作防线', vitals: '生理线', coordinate: '坐标台账',
+    healthPreflight: '系统健康与写作防线',
+    antiOmniscience: '防全知认知视界', vitals: '生理线', coordinate: '坐标台账',
     dream: '长梦', backstageTone: '幕后风物',
     // v2.230.0（修存量红）：`retrieval` 在 v2.228.0 进了 render/inject.js 的 SOURCES，
     //   却没进本表 —— 实测坐实：inject-sources-v2560 的 D 判据与 v2.22.0 那条

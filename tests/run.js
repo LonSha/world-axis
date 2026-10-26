@@ -375,6 +375,7 @@ const LOAD = [
     'engines/geo-tracker.js',
     'engines/health-preflight.js',
     'engines/narrative-deduction.js',
+    'engines/anti-omniscience.js',
   'actors/registry.js', 'actors/monologue.js', 'actors/observe.js', 'actors/profile.js',
   'direction/oracle.js', 'direction/tags.js', 'direction/choices.js',
   // v2.51.0（第三十六面）: 叙事工艺设置面。位置与 index.js LOAD_ORDER 同序
@@ -24439,6 +24440,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./npc-gravity-v2247.js', 'runAll');
     await runLock('./npc-gravity-v2247.js', 'runNegative');
+  }
+  // ── v2.248.0 (ANTI-OMNI): 全域认知隔离四大屏障与防全知专锁 ──
+  section('v2.248.0 (ANTI-OMNI): 全域认知隔离四大屏障与防全知专锁');
+  {
+    await runLock('./anti-omniscience-v2248.js', 'runAll');
+    await runLock('./anti-omniscience-v2248.js', 'runNegative');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

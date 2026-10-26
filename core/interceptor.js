@@ -174,6 +174,12 @@
               if (WA.healthPreflight && typeof WA.healthPreflight.inspectAndSanitize === 'function') {
                 const checked = WA.healthPreflight.inspectAndSanitize(out, { autoFix: true });
                 out = checked.text;
+              // v2.248.0 (ANTI-OMNI): 结合防全知下游审查，若违规记录警告并在审计台账留痕
+              if (WA.antiOmniscience && typeof WA.antiOmniscience.auditGeneratedContent === 'function') {
+                const s = (WA.store && WA.store.get) ? WA.store.get() : {};
+                const secrets = (s && s.epistemicStore && s.epistemicStore.secrets) || [];
+                WA.antiOmniscience.auditGeneratedContent({ name: '当前NPC' }, out, secrets);
+              }
               }
               if (out !== last.mes) {
                 __purifiedRaw.set(last, last.mes);   // 原文快照：世界推进仍基于原文
