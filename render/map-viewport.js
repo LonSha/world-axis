@@ -156,7 +156,7 @@
         matchedCluster.y = (matchedCluster.y * (count - 1) + char.y) / count;
       } else {
         clusters.push({
-          id: `cluster_${char.who}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          id: `cluster_${char.who}_${WA.rand.id('', 4, 'id')}`,
           x: char.x,
           y: char.y,
           sceneId: char.sceneId || '',

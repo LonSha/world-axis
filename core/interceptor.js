@@ -159,7 +159,7 @@
                   if (lastUser && typeof lastUser.mes === 'string') {
                     obs.replyLen = lastUser.mes.length;
                     const at = Date.parse(lastUser.send_date || lastUser.sendDate || '');
-                    if (isFinite(at)) obs.replyGapMin = Math.max(0, (Date.now() - at) / 60000);
+                    if (isFinite(at)) obs.replyGapMin = Math.max(0, (clockNow('interceptor:obs') - at) / 60000);
                   }
                   WA.genTiming.tick(obs);
                 }

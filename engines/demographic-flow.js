@@ -223,7 +223,7 @@
       };
     }
 
-    var mid = 'mig_' + now() + '_' + (WA.rand ? WA.rand.id() : Math.random().toString(36).slice(2, 8));
+    var mid = 'mig_' + now() + '_' + WA.rand.id('', 6, 'id');
     var entry = {
       id: mid,
       who: plan.who,
@@ -364,7 +364,7 @@
     var planRes = planMigration({ who: w, from: from, to: to, type: 'seasonal' });
     if (!planRes.ok) return planRes;
 
-    var sId = 'sea_' + now() + '_' + (WA.rand ? WA.rand.id() : Math.random().toString(36).slice(2, 8));
+    var sId = 'sea_' + now() + '_' + WA.rand.id('', 6, 'id');
     var rec = {
       id: sId,
       who: w,

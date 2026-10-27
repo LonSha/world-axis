@@ -1,13 +1,13 @@
 {
- "version": "2.252.0",
- "loadOrderCount": 313,
- "loadedCount": 299,
+ "version": "2.253.0",
+ "loadOrderCount": 314,
+ "loadedCount": 300,
  "uiCount": 14,
- "nsCount": 308,
+ "nsCount": 309,
  "totals": {
-  "loadEdges": 186,
+  "loadEdges": 187,
   "hardEdges": 0,
-  "callRefs": 356,
+  "callRefs": 358,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -175,6 +175,7 @@
     "engines/solo-voice.js",
     "engines/stage.js",
     "engines/stale-guard.js",
+    "engines/stall.js",
     "engines/storage-forecast.js",
     "engines/story-choice.js",
     "engines/story-loop.js",
@@ -476,6 +477,7 @@
     "engines/solo-voice.js",
     "engines/stage.js",
     "engines/stale-guard.js",
+    "engines/stall.js",
     "engines/storage-forecast.js",
     "engines/story-choice.js",
     "engines/story-loop.js",
@@ -2398,6 +2400,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_interestface_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/stall.js": {
+   "ns": [
+    "stall"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_stall_settings_v1"
    ],
    "consumedBy": []
   },

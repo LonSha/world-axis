@@ -394,7 +394,7 @@
         };
       }
 
-      const eruptionId = 'sng_' + Math.random().toString(36).substring(2, 8);
+      const eruptionId = WA.rand.id('sng_', 6, 'id');
       let out = null;
 
       WA.store.transact(draft => {

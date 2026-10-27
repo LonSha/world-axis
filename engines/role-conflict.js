@@ -41,7 +41,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('roleConflict') : Date.now();
+    try { return WA.clock.now('roleConflict'); } catch (e) { return Date.now(); }
   }
 
   var RESOLUTION_STANCES = ['comply', 'recuse', 'mediate', 'breach'];
@@ -70,7 +70,7 @@
    */
   function registerAffiliationObligation(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('aff_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('aff_', 7, 'id')), 60);
     var who = clean(s.who, 60);
     var groupKind = clean(s.groupKind || 'guild', 40); // family / guild / locality / order
     var groupId = clean(s.groupId, 60);
@@ -110,7 +110,7 @@
    */
   function detectRoleConflict(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('conf_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('conf_', 7, 'id')), 60);
     var who = clean(s.who, 60);
     var eventId = clean(s.eventId, 60);
     var groupA = clean(s.groupA, 60);
@@ -199,7 +199,7 @@
     }
 
     var resEntry = {
-      id: 'res_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('res_', 7, 'id'),
       conflictId: conflictId,
       who: cHit.who,
       stance: stance,

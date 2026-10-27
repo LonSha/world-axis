@@ -5493,7 +5493,7 @@ function runWitness(WA) {
       } finally { WA.worldBlueprint = keep; }
     });
   }
-  // ══════════ v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎的 16 个码 ══════════
+  // ══════════ v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎的 18 个码 ══════════
   //   本批同规：**新码必须有可执行见证**（没有见证的码＝没人真看过的码）。
   //   16 条全部用**真 API** 跑出来，读数先由 tools/probe_reject189.js 实测（先跑一次看真返回，
   //   再照读数写见证）。每块都按「同一入口的两种局面分列」——那些分列正是这些码存在的理由：
@@ -7610,6 +7610,178 @@ function runWitness(WA) {
       trip('cleared', function () { return IFw.setFocus(null).reason; });
     }
   }
+
+    // ── v2.253.0：漏摊寄售（OpenMMO stall.rs）的 16 个码 ──
+    //   本模块的判据全是「当场」的：摊不在人站的地方、价越带、货已被锁走、人已经走远。
+    //   十六个里有一个不是本模块发明的：挂单价越带走的仍是 economy 的 `price-out-of-band`
+    //   （价带不在摊上另开一套，见 engines/stall.js 的 bandOf），它的见证在 economy 那一段。
+    //   种子一律现造现还原（people / economy.goods / stalls 三片快照），与上面同一份卷收契约。
+    {
+      const STw = WA.stall;
+      if (STw) {
+        const keepST = STw.getSettings();
+        const drop = function () {
+          const s = WA.store.get();
+          return { people: s.people, goods: s.economy && s.economy.goods, stalls: s.stalls };
+        };
+        const undo = function (k) {
+          WA.store.transact(function (d) {
+            d.people = k.people;
+            d.economy = d.economy || {};
+            if (k.goods === undefined) delete d.economy.goods; else d.economy.goods = k.goods;
+            if (k.stalls === undefined) delete d.stalls; else d.stalls = k.stalls;
+            return true;
+          }, 'witness:stall-undo');
+        };
+        const put = function (d, name, loc, coin) {
+          d.people = d.people || {};
+          const p = d.people['p_' + name] || (d.people['p_' + name] = { name: name });
+          p.location = loc;
+          p.resources = {};
+          p.resources[WA.economy.money()] = coin;
+          return p;
+        };
+        // 集市摆好两件货（盐只剩 5，用来撞短量），五个人都站在集market、各带 100 钱。
+        const seed = function () {
+          WA.store.transact(function (d) {
+            ['见证甲', '见证乙', '见证丙', '见证丁', '见证戊'].forEach(function (n) { put(d, n, '集市', 100); });
+            d.economy = d.economy || {};
+            d.economy.goods = [
+              { place: '集市', resource: '米', stock: 20, base: 10, price: 10, demand: 0, consumed: 0 },
+              { place: '集市', resource: '盐', stock: 5, base: 10, price: 10, demand: 0, consumed: 0 }];
+            d.stalls = { rows: [] };
+            return true;
+          }, 'witness:stall-seed');
+        };
+        const at = function (name, loc) {
+          WA.store.transact(function (d) {
+            d.people['p_' + name].location = loc;
+            return true;
+          }, 'witness:stall-pos');
+        };
+        const keep = drop();
+        try {
+          STw.setSettings({ enabled: true, maxStalls: 12, maxListings: 12 });
+
+          want('not-there', 'stall：摊摆在他不在的地方 ⇒ not-there 并报出人在哪（凭空出现的摊不认）');
+          trip('not-there', function () {
+            seed(); at('见证甲', '码头');
+            return STw.lay('见证甲', '集市').reason;
+          });
+
+          want('unknown-owner', 'stall：摊主不是活人 ⇒ unknown-owner（摆了也没人看摊）');
+          trip('unknown-owner', function () { seed(); return STw.lay('见证无名氏', '集市').reason; });
+
+          want('already-laid', 'stall：一人一摊 ⇒ already-laid（第二张摊会把同一批货锁两遍）');
+          trip('already-laid', function () {
+            seed(); STw.lay('见证甲', '集市');
+            return STw.lay('见证甲', '集市').reason;
+          });
+
+          want('stalls-full', 'stall：总摊数到上限 ⇒ stalls-full（上限可配，下限 2）');
+          trip('stalls-full', function () {
+            seed();
+            STw.setSettings({ enabled: true, maxStalls: 2 });
+            STw.lay('见证乙', '集市'); STw.lay('见证丙', '集市');
+            return STw.lay('见证甲', '集市').reason;
+          });
+
+          want('bad-sign', 'stall：招牌超过 32 字 ⇒ bad-sign 并报字数（招牌是摊的脸，不是正文）');
+          trip('bad-sign', function () {
+            seed(); STw.lay('见证甲', '集市');
+            return STw.sign('见证甲', new Array(34).join('字')).reason;
+          });
+
+          want('same-sign', 'stall：招牌没变 ⇒ same-sign（不白改一次台账）');
+          trip('same-sign', function () {
+            seed(); STw.lay('见证甲', '集市', { sign: '老摊' });
+            return STw.sign('见证甲', '老摊').reason;
+          });
+
+          want('short-stock', 'stall：挂量超过手头可售 ⇒ short-stock 并报可售与所要（盐只有 5）');
+          trip('short-stock', function () {
+            seed(); STw.lay('见证甲', '集市');
+            return STw.list('见证甲', '盐', 6, 10).reason;
+          });
+
+          want('listing-short', 'stall：挂量不够买主所要 ⇒ listing-short（挂 5 买 6，货不摊薄）');
+          trip('listing-short', function () {
+            seed(); STw.lay('见证甲', '集市'); STw.list('见证甲', '盐', 5, 10);
+            return STw.buy('见证甲', '盐', 6, '见证丁').reason;
+          });
+
+          want('too-many-listings', 'stall：一户挂满 maxListings 项 ⇒ too-many-listings（上限可配，下限 1）');
+          trip('too-many-listings', function () {
+            seed();
+            STw.setSettings({ enabled: true, maxListings: 1 });
+            STw.lay('见证甲', '集市'); STw.list('见证甲', '米', 1, 10);
+            return STw.list('见证甲', '盐', 1, 10).reason;
+          });
+
+          want('missing-purse', 'stall：买主没有钱包 ⇒ missing-purse（没钱也买不了，不假装收下了）');
+          trip('missing-purse', function () {
+            seed(); STw.lay('见证甲', '集市'); STw.list('见证甲', '盐', 1, 10);
+            WA.store.transact(function (d) { delete d.people['p_见证戊'].resources; return true; }, 'witness:no-purse');
+            return STw.buy('见证甲', '盐', 1, '见证戊').reason;
+          });
+
+          want('strayed', 'stall：摊在人已不在的地方 ⇒ strayed 并就地收摊（回来的人不能对着空气改摊）');
+          trip('strayed', function () {
+            seed(); STw.lay('见证甲', '集市'); STw.list('见证甲', '盐', 1, 10);
+            at('见证甲', '码头');
+            return STw.list('见证甲', '米', 1, 10).reason;
+          });
+
+          want('offline', 'stall：摊主走开（away）时自己改不动 ⇒ offline（摊还开着，只是人不在）');
+          trip('offline', function () {
+            seed(); STw.lay('见证甲', '集市'); STw.away('见证甲');
+            return STw.sign('见证甲', '改个招牌').reason;
+          });
+
+          want('already-away', 'stall：已经走开还再走一次 ⇒ already-away 且 ok（幂等，不重复搬货）');
+          trip('already-away', function () {
+            seed(); STw.lay('见证甲', '集市'); STw.away('见证甲');
+            const r = STw.away('见证甲');
+            return r.ok === true ? r.reason : '';
+          });
+
+          want('already-back', 'stall：本来就在还再回一次 ⇒ already-back 且 ok（幂等，不重复清标记）');
+          trip('already-back', function () {
+            seed(); STw.lay('见证甲', '集市');
+            const r = STw.back('见证甲');
+            return r.ok === true ? r.reason : '';
+          });
+
+          want('self-buy', 'stall：摊主买自己的货 ⇒ self-buy（钱在同一个钱包里转一圈）');
+          trip('self-buy', function () {
+            seed(); STw.lay('见证甲', '集市'); STw.list('见证甲', '盐', 1, 10);
+            return STw.buy('见证甲', '盐', 1, '见证甲').reason;
+          });
+
+          want('too-far', 'stall：买主不站在摊所在地 ⇒ too-far 并报两边地名（摊是给身边人的）');
+          trip('too-far', function () {
+            seed(); STw.lay('见证甲', '集市'); STw.list('见证甲', '盐', 1, 10);
+            at('见证丁', '码头');
+            return STw.buy('见证甲', '盐', 1, '见证丁').reason;
+          });
+
+          want('no-such-listing', 'stall：买没挂出来的货 ⇒ no-such-listing（摊上空着不等于有货）');
+          trip('no-such-listing', function () {
+            seed(); STw.lay('见证甲', '集市');
+            return STw.buy('见证甲', '盐', 1, '见证丁').reason;
+          });
+
+          want('unknown-buyer', 'stall：买主不是活人 ⇒ unknown-buyer');
+          trip('unknown-buyer', function () {
+            seed(); STw.lay('见证甲', '集市'); STw.list('见证甲', '盐', 1, 10);
+            return STw.buy('见证甲', '盐', 1, '见证路人').reason;
+          });
+        } finally {
+          try { STw.setSettings(keepST); } catch (e) {}
+          try { undo(keep); } catch (e) {}
+        }
+      }
+    }
 
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}

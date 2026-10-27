@@ -9,6 +9,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_narrative_deduction_settings_v1';
@@ -119,7 +120,7 @@
       { type: 'rumor', desc: `街巷间传开了一则看似荒诞但直指核心异常的流言传闻` }
     ];
 
-    const pick = compensations[Math.floor(Math.random() * compensations.length)];
+    const pick = WA.rand.pick(compensations, 'narrativeDeduction') || compensations[0];
     noteTimeline('compensate', { place: place, rounds: rounds, type: pick.type });
     return {
       triggered: true,
@@ -185,7 +186,7 @@
         if (!d.narrativeDeduction || typeof d.narrativeDeduction !== 'object') d.narrativeDeduction = { timeline: [] };
         const b = d.narrativeDeduction;
         if (!Array.isArray(b.timeline)) b.timeline = [];
-        b.timeline.push({ kind: String(kind || 'note'), payload: payload || null, at: Date.now() });
+        b.timeline.push({ kind: String(kind || 'note'), payload: payload || null, at: clockNow('narrativeDeduction') });
         if (WA.evict && WA.evict.array) {
           const r = WA.evict.array(b.timeline, 'narrativeDeduction.timeline', cfg.maxTimelineNodes);
           dropped = (r && r.dropped) || 0;

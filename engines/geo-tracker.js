@@ -33,6 +33,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const VERSION = '2.245.0';
@@ -242,7 +243,7 @@
       sceneId: resolved ? resolved.sceneId : '',
       floor: resolved ? resolved.floor : '',
       approximate: resolved ? resolved.approximate : true,
-      updatedAt: (WA.clock && WA.clock.now) ? WA.clock.now('geoTracker') : Date.now()
+      updatedAt: clockNow('geoTracker')
     };
 
     if (WA.store && WA.store.transact) {

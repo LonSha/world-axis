@@ -148,6 +148,16 @@ function runA() {
   a(L.select(okEntry, ['y']).verdict === 'skip', 'A7 select(未选中) → skip');
   a(L.select(shEntry, ['x']).verdict === 'refuse', 'A8 select(选中但共享上下文) → refuse');
   a(L.select(null, ['x']).verdict === 'refuse', 'A9 select(归属表里没有这个节) → refuse（不是静默 skip）');
+  // v2.253.0（表外节分流）：旧 A9 对 no-entry **无条件** refuse，代价是任何选区整趟 RC 3
+  //   —— 本仓有 10 个节的 section() 写在 3/4 空格缩进（G17-A…G18 / v2.19.0 / v2.49.0 /
+  //   v2.50.0 / v2.231.0），它们按设计进不了表（A11b：四空格是块内局部调用），于是
+  //   「跑子集」这件事在真仓库上等于不可用（实测：1830 断言全过、RC 仍 3）。
+  //   判据改成按**有没有被点名**分流：没点名 ⇒ skip（本轮轮不到它），点名 ⇒ refuse（坏消息）。
+  //   三条一起钉，缺任一条都能让「无条件的 refuse」偷偷回来：
+  a(L.select(null, ['x'], 'G17-A 面板与悬浮球挂载').verdict === 'skip',
+    'A9b 表外节**未点名** ⇒ skip（选区不该因为「表里没它」整趟 RC 3）');
+  a(L.select(null, ['G17-A'], 'G17-A 面板与悬浮球挂载').verdict === 'refuse',
+    'A9c 表外节**被点名** ⇒ 仍是 refuse（点了名却跑不了 = 必须让人看见的坏消息）');
   a(L.analyze().sections.length >= 200, 'A10 归属表现场复算 ≥200 节（实 ' + L.analyze().sections.length + '）');
   // v2.213.0（Q4 第二刀）：正则收 0/2 空格后，顶格形态**必须**被认出（真源 L21080
   //   v2.146.0 是顶格节）。「注入面可用」改用四空格内层形态验证 —— 内层 section()
@@ -271,6 +281,40 @@ function runD() {
   a(String(r.stdout).indexOf('选中节 B 真执行') >= 0, 'D6 自证含正向（选中节真执行，判据不是恒假）');
   a(String(r.stdout).indexOf('扫描器认出 4 个节') >= 0,
     'D7 自证含「形态自证」（合成源与真源同缩进形态 —— 本轮第一次就栽在这）');
+  // D14（v2.253.0）：**wrap 产物上的块节不得塌**。这是「按选区跑子集」真正能不能省时的分母：
+  //   现场病灶三连（本版实测，逐层剥掉）：① 哨兵行插在 section 行后 ⇒ 首非空行不再是 `{`；
+  //   ② 节体被多缩进 2 空格 ⇒ 归一前永远看不到 `{`；③ 哨兵给每节补的收尾 `}` 让
+  //   「闭行后首非空行以 `}` 开头」恒成立 ⇒ 顶层块被读成内层块。三层叠起来使
+  //   wrap 产物上的块节数从 255 塌到 2 —— 而真源上是正常的，所以这一条只能在**wrap 产物**上验。
+  //   v2.253.0 第二刀：沙箱里的 `tests/run.js` **本身已是 wrap 产物**（运行器先裁一次，本段又裁
+  //   一次）⇒ 真正新包的节只剩十几节，「包裹 >100」在本段恒假（现场红：包裹 1 节 · 仍认出块 255）。
+  //   故分母改为**哨兵总量**（本次新包 + 源里已有），它与「块节不塌」同向：塌了就不成数。
+  const wrapFull = P.prune(fs.readFileSync(RUN_P, 'utf8'), ['\u0000none'], { mode: 'wrap' });
+  const hadSentinel = P.scan(fs.readFileSync(RUN_P, 'utf8')).filter(function (s) { return s.sentinel; }).length;
+  const wBlocks = P.scan(wrapFull.text).filter(function (s) { return s.block; }).length;
+  const wSentinels = wrapFull.stats.wrappedCount + hadSentinel;
+  a(wSentinels > 100 && wBlocks >= 100,
+    'D14 wrap 产物上可裁块节不塌（哨兵共 ' + wSentinels + ' 个 = 新包 ' + wrapFull.stats.wrappedCount
+    + ' + 源中已有 ' + hadSentinel + ' · 仍认出块 ' + wBlocks + ' 节 ≥100）');
+  // D15：真源上 nested 判据**不得**被误关（两向自证：真源没有哨兵 ⇒ 内层块照旧判为不可裁）
+  const srcNested = "  section('t');\n  {\n    const x = 1;\n  }\n  }\n  section('u');\n";
+  a(P.scan(srcNested)[0].nested === true && P.scan(srcNested)[0].block === false,
+    'D15 真源上的内层块仍被判 nested（哨兵豁免没有把这条判据整条关掉）');
+  // D16（v2.253.0）：**二次裁剪幂等**。沙箱里的真实形态：回归运行器会把 work 副本的
+  //   tests/run.js 先按选区 prune 一次，随后被测的门禁（本锁的 D 段）又对同一份文件 prune
+  //   一次 —— 旧实现把已带哨兵的节当未选中再包一层、再插一份哨兵定义，对账当场抛
+  //   「期望 79 个哨兵，输出实有 332」。这条真在沙箱里红过（index.html 之外的现场）。
+  const onceP = P.prune(fs.readFileSync(RUN_P, 'utf8'), ['v2.250.0'], { mode: 'wrap' });
+  const twiceP = P.prune(onceP.text, ['v2.251.0'], { mode: 'wrap' });
+  a(twiceP.stats.wrappedCount < 50
+    && twiceP.text.indexOf('const guardRun = function (t)') === twiceP.text.lastIndexOf('const guardRun = function (t)'),
+    'D16 二次裁剪幂等（只新包 ' + twiceP.stats.wrappedCount + ' 节 <50，哨兵定义不重复注入）');
+  const t16 = path.join(require('os').tmpdir(), 'wa-o6-twice-' + process.pid + '.js');
+  fs.writeFileSync(t16, twiceP.text);
+  let chk16 = true;
+  try { P.check(t16); } catch (e) { chk16 = false; }
+  fs.unlinkSync(t16);
+  a(chk16, 'D17 二次裁剪产物仍过 node --check');
   // 不做全量裁剪（慢）：只验「单个块节删掉后仍能被解析」这条兜底真的在跑
   const srcOne = "  section('t');\n  {\n    const x = 1;\n    if (x) { console.log(x); }\n  }\n";
   const pr = P.prune(srcOne, ['\u0000none']);
@@ -343,8 +387,11 @@ function runN() {
     r1.status === 0 ? '破坏后仍 exit 0 ⇒ 自证是恒绿的' : '');
 
   // N2：run.js 选区段换回手写三分支 ⇒ A2/A4 必须现形
+  // v2.253.0：锚点跟着实现走 —— 裁定调用多了第三个实参（运行期节名）。
+  //   上一版锚点写的是 `select(hit, __layerSel);`，本版加上 `, t` 后 0 命中 ⇒ N2 先红。
+  //   这不是缺陷，是锚点过期；此处同步成现场形态。
   const handWritten = runSrc.replace(
-    "const v = require('../tools/test-layers.js').select(hit, __layerSel);\n  return v.verdict;",
+    "const v = require('../tools/test-layers.js').select(hit, __layerSel, t);\n  return v.verdict;",
     "const matched = __layerSel.some(function (n) { return t.indexOf(n) >= 0; });\n" +
     "  if (!matched) return 'skip';\n  return hit.selfContained ? 'run' : 'refuse';");
   a(handWritten !== runSrc, 'N2 破坏「裁定单一真源」⇒ 破坏可观测');
@@ -426,6 +473,37 @@ function runN() {
   a(wired(withStr).indexOf('.buildOutcome(') >= 0
     && wired(withStr).split('\n').length === withStr.split('\n').length,
     'N7b 注入后 C3 仍命中且行数守恒（wired v2 的字符串感知真的在起作用）');
+
+  // N8：把表外节分流判据改回「无条件 refuse」⇒ A9b 必须现形
+  //   这是 v2.253.0 那条修复的负控制。形态与 N3/N4 同款：破坏真源码副本（锚点恰中 1 次）
+  //   ⇒ 在副本上跑**同一条** A9b 判据 ⇒ 必须给出与真源码相反的结论。
+  //   若只做「副本上跑一遍、看着像失败」，破坏写错也能凑绿；故配两向自证：
+  //   N8c 在同一副本形态上对**未被点名**与**被点名**各问一次，证明分流真的塌成了一条。
+  const oldBranch = layersSrc.indexOf(
+    "    if (nm !== null && !matched) return { verdict: 'skip', why: 'no-entry-unselected' };");
+  a(oldBranch > 0, 'N8 锚点「表外未点名 ⇒ skip」在真源上恰中 1 次（找不到就说明判据已挪位）');
+  const noSplit = layersSrc.replace(
+    "    if (nm !== null && !matched) return { verdict: 'skip', why: 'no-entry-unselected' };",
+    "    /* 破坏：表外节分流被摘掉（一切 no-entry 都 refuse）*/");
+  a(noSplit !== layersSrc, 'N8b 破坏「表外节未点名 = skip」⇒ 破坏可观测（真源文本变了）');
+  const t8 = tmp('8');
+  fs.writeFileSync(t8, noSplit);
+  const probeOut = function (mod, name) {
+    return cp.spawnSync(process.execPath, ['-e',
+      "const L=require(" + JSON.stringify(mod) + ");" +
+      "process.stdout.write(L.select(null,['G17-A']," + JSON.stringify(name) + ").verdict);"],
+      { encoding: 'utf8' });
+  };
+  //   注意第二个实参是**运行期节名**，必须与 needle 不匹配才算「未点名」——
+  //   初稿这里传了含 `G17-A` 的完整节名，于是 matched 为真、两向都得到 refuse（N8d 红）。
+  const r8 = probeOut(t8, 'v2.999.0 一个没被点名的节');
+  const r8o = probeOut(LAYERS_P, 'v2.999.0 一个没被点名的节');
+  fs.unlinkSync(t8);
+  a(String(r8.stdout) !== 'skip',
+    'N8c 破坏副本上 A9b 现形（未点名也变 refuse，实 ' + String(r8.stdout).slice(0, 20) + '）');
+  a(String(r8o.stdout) === 'skip',
+    'N8d 原版上同款判据必须真（两向自证成立，判据不是恒假）',
+    '实 ' + String(r8o.stdout).slice(0, 20));
 
   // N5：真源码逐字未变（负控制没有污染真树）
   a(fs.readFileSync(RUN_P, 'utf8') === runSrc

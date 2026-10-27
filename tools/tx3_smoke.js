@@ -14,9 +14,12 @@ var WA = sync.fresh({}).WA;
 // 1. freight loaded
 ok('freight loaded', typeof WA.freight === 'object');
 
-// 2. 10 exports
+// 2. 11 exports
+//   v2.253.0：这里原写 10，而 `engines/freight.js` 自 v2.243.0（`issueShadowRation` 入导出面）
+//   起真源就是 11（本文件下面的自证块 EXPECTED 也是 11 项）⇒ 本冒烟从那天起**恒红**，
+//   却在批次里被当成「该节本身有病」而不是「这条读数过期」。值改成真源数并写明来处。
 var ex = Object.keys(WA.freight);
-ok('exports 10', ex.length === 10);
+ok('exports 11', ex.length === 11);
 
 // 3. SOURCES has freight
 var inj = fs.readFileSync('render/inject.js', 'utf8');

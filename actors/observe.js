@@ -5,6 +5,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   function getCtx() { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } }
@@ -136,7 +137,7 @@
               prohibitOmniscience: true,
               rule: '新转正角色仅持有本人目击范围事实，禁止读取场外全知信息'
             },
-            enrolledAt: Date.now()
+            enrolledAt: clockNow('observe')
           };
           out = {
             ok: true,

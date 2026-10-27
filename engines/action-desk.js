@@ -1800,7 +1800,7 @@ let ckpt = null;
       return { ok: false, reason: 'checkpoints-unavailable' };
     }
     ensureCkptSettings();
-    const name = clean(o.name || ('branch_' + Date.now()), 40);
+    const name = clean(o.name || ('branch_' + clockNow('actionDesk:promise')), 40);
     return WA.checkpoints.save(name, o);
   }
 

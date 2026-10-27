@@ -105,7 +105,11 @@ function runA(a) {
   // 逐段检查各接真源（不重算）
   a(code.indexOf('E.view(') >= 0, 'n3/A6: 采购接 economy.view（不重算价）');
   a(code.indexOf('E.routeView(') >= 0, 'n3/A7: 运输接 economy.routeView（不重算路程）');
-  a(code.indexOf('E.RECIPES[') >= 0, 'n3/A8: 生产接 economy.RECIPES（具名表，不现编合成关系）');
+  // v2.231.0（OPT-8）把生产段的真源从常量表改成 economy 的具名配方声明面 recipeOf()，
+  //   常量 E.RECIPES 降为「声明面缺席」时的回落分支 —— 旧锚点 `E.RECIPES[` 因此再也中不了
+  //   （现场红：n3/A8）。判据口径随之改成「接的是具名声明面」，回落面一并钉住（两条都要在）。
+  a(code.indexOf('recipeOf(') >= 0 && code.indexOf('WA.economy.RECIPES[') >= 0,
+    'n3/A8: 生产接 economy 的具名配方声明面 recipeOf()（回落 WA.economy.RECIPES，不现编合成关系）');
   a(code.indexOf('O.canAfford(') >= 0, 'n3/A9: 交付接 org.canAfford（不重算持有）');
   // commit 原样透传
   a(code.indexOf('E.buy(') >= 0 && code.indexOf('F.dispatch(') >= 0 && code.indexOf('E.craft(') >= 0 && code.indexOf('O.transfer(') >= 0,

@@ -60,6 +60,9 @@
       // v2.252.0 物化：兴趣面投递账（interest-face）。落位后才有格与 inbox，同样是持久世界状态。
       //   （登记不等于物化，冷启动直写会炸事务：本模块不直写 store，重启从 snapshot 回灌。）
       interestFace: {},       // observerId -> {x,y,radius,inbox:[],pending:[]}
+      // v2.253.0 物化：摊位账（stall）。摊是**留在世界上**的东西，摊主走了它还在卖，
+      //   故与人的在场状态分开存（与 interestFace 相反：那是人在哪，这是货在哪）。
+      stalls: { rows: [] },   // rows: [{id,owner,place,sign,away,listings:[{resource,qty,price}],ledger:[]}]
       // 暗流（未结算事件链）
       currents: [],             // {id,title,summary,visibility:hidden|trace|public,public_trace,causes:[],participants:[],stage,createdAt,updatedAt,branchId}
       // 回声（已结算结果与正文的接触面）
@@ -1744,7 +1747,15 @@
     //   moods 是**对象容器**（kind:'object'）：registryParity 按对象校验类型，
     //   丢失 kind 会被报成「类型错配（应为数组）」。
     'moodGlide.moods':    { cap: 'per-call', kind: 'object', site: 'mood-glide.js 满即按 at 最旧（候选不含刚写的那条）+ WA.evict.object(m.moods, moodGlide.moods, ordered, cfg.maxMoods)（per-call，排序键由模块给）' },
-    'narrativeDeduction.timeline': { cap: 'per-call', kind: 'array', site: 'narrative-deduction.js noteTimeline() WA.evict.array(b.timeline, narrativeDeduction.timeline, cfg.maxTimelineNodes)（per-call，取设置上界）' },
+'narrativeDeduction.timeline': { cap: 'per-call', kind: 'array', site: 'narrative-deduction.js noteTimeline() WA.evict.array(b.timeline, narrativeDeduction.timeline, cfg.maxTimelineNodes)（per-call，取设置上界）' },
+    // v2.253.0（拓展 ST-1）：离线寄售摊三环（均 per-call：上限就是各自的设置项）。
+    //   · stall.rows —— 摊本身。收摊是删指定行，但**被挤出**的摊没有任何别的痕迹留下，
+    //     故必须如实记账（谁被挤出了要能从 evict 台账读出来）。
+    //   · stall.listings / stall.ledger —— 行内挂。挂单被挤 = 货退回可售（库存没动，
+    //     锁量随行消失即可）；回执被挤 = 「那笔成交查不到了」，故同样要可见。
+    'stall.rows':     { cap: 'per-call', kind: 'array', site: 'stall.js lay() WA.evict.array(s.rows, stall.rows, cfg.maxStalls)（per-call，取设置上界）' },
+    'stall.listings': { cap: 'per-call', kind: 'array', site: 'stall.js list() WA.evict.array(row.listings, stall.listings, cfg.maxListings)（per-call，取设置上界）' },
+    'stall.ledger':   { cap: 'per-call', kind: 'array', site: 'stall.js buy() WA.evict.array(row.ledger, stall.ledger, cfg.maxLedger)（per-call，取设置上界）' },
     'worldBridge.legends': { cap: 24, site: 'world-bridge.js WA.evict.array(b.legends, maxLegends)（per-call，取设置上界）' },
     'worldBridge.exported': { cap: 12, site: 'world-bridge.js WA.evict.array(b.exported)' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },

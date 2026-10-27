@@ -33,7 +33,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('publicAgenda') : Date.now();
+    try { return WA.clock.now('publicAgenda'); } catch (e) { return Date.now(); }
   }
 
   var TOPIC_STATUS = ['proposed', 'scheduled', 'delayed', 'debated', 'enacted', 'rejected'];
@@ -95,7 +95,7 @@
    */
   function submitProposal(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('prop_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('prop_', 7, 'id')), 60);
     var placeId = clean(s.placeId, 60);
     var groupName = clean(s.groupName, 60);
     var title = clean(s.title, 80);
@@ -229,7 +229,7 @@
     if (!prop) return { ok: false, reason: 'proposal-not-found', id: proposalId };
 
     var deliberationRecord = {
-      id: 'delib_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('delib_', 7, 'id'),
       proposalId: proposalId,
       outcome: outcome,
       enactmentAction: enactmentAction,

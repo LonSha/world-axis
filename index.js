@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.252.0';
+  const VERSION = '2.253.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -557,6 +557,10 @@
     //   与 region/farfield 正交：那两者按**天**算传播与摘要，本模块按**格**算同一时刻谁在场。
     //   纯投递判据：投给谁之后那件事算不算「他知道了」仍归 epistemic-view / knowledge。
     'engines/interest-face.js',
+    // v2.253.0（拓展 ST-1）：离线寄售摊（摆摊 / 挂货锁货 / 过路人成交 / 抽税 / 脱绳收摊）（cf. OpenMMO stall.rs）。
+    //   与 economy 互补而非重复：economy 管「当场这一笔成不成」，本模块管「人走开了货怎么卖出去」。
+    //   挂单价必须落在 economy 同一资源的定价带宽内，本模块不另开一套价。
+    'engines/stall.js',
     'actors/registry.js',
     'actors/monologue.js',
     'actors/observe.js',

@@ -30,6 +30,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_output_guard_settings_v1';
@@ -164,7 +165,7 @@
   let __last = null;
   function checkAndRemember(text, userMessages) {
     const r = check(text, userMessages);
-    __last = { at: Date.now(), mode: r.mode, quotes: r.quotes, fabricated: r.fabricated.length, reason: r.reason };
+    __last = { at: clockNow('outputGuard'), mode: r.mode, quotes: r.quotes, fabricated: r.fabricated.length, reason: r.reason };
     return r;
   }
 

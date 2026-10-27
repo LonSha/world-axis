@@ -125,6 +125,11 @@ function braceDelta(lines) {
   return out;
 }
 
+/** 该行是不是 wrap 注入的运行期哨兵（v2.253.0：scan 复扫裁剪产物时要用）。
+ *  只认本工具 SENTINEL_SRC 里那一行注释里的固定前缀。 */
+function wrapSentinel(lines, j, next) {
+  return j < next && j + 1 < next && lines[j].indexOf('// [O6 Q4 运行期哨兵') >= 0;
+}
 /** 扫描节：name / 调用行号 / 节体范围 / 形态 / 可否裁剪候选。 */
 function scan(src) {
   const lines = src.split('\n');
@@ -134,12 +139,26 @@ function scan(src) {
     // v2.213.0（Q4 第二刀）：与 tools/test-layers.js 的 analyze() 同步收 0/2 空格形态
     //   （真源 L21080 顶格 v2.146.0）。两处正则必须一字不差（单一真源，o6 门禁钉对齐）。
     const m = l.match(/^ {0,2}section\((['\"])(.*)\1\);\s*$/);
+    // v2.253.0：**跳过 wrap 哨兵行**。裁剪版（以及本锁自身的 D 段在 wrap 产物上复扫）里，
+    //   section 行之后紧跟一行 `  if (guardRun("…")) {   // [O6 Q4 运行期哨兵] …`。
+    //   旧扫描只允许「首非空行 === `{`」，于是哨兵一插，块形态全部认不出 ——
+    //   实测块节从 100+ 塌到 2，D3（可裁块节 ≥100）红。真源不受影响（无哨兵），
+    //   所以这条只在「扫裁剪产物」时现形；D 段现在两处都扫，一并治掉。
     if (m) marks.push({ line: i, name: m[2] });
   });
   return marks.map(function (mk, k) {
     const next = (k + 1 < marks.length) ? marks[k + 1].line : lines.length;
     let j = mk.line + 1;
     while (j < next && lines[j].trim() === '') j += 1;
+    //   （哨兵行只可能位于节体**首行**，故「剥首行」只需一次判断，不必循环）
+    //   v2.253.0 第二刀：节体在 wrap 里被**多缩进 2 空格**（`｛` 从 `  {` 变成 `    {`），
+    //   所以剥掉哨兵后还要按哨兵行的缩进把首行归一 —— 否则「是不是块形态」永远看不到 `{`。
+    //   归一方式：只把该行多余的**前导空格**剥到与 section 行同级（不碰行内内容）。
+    if (wrapSentinel(lines, j, next)) {
+      j += 1;
+      while (j < next && lines[j].trim() === '') j += 1;
+      if (j < next) lines[j] = lines[j].replace(/^\s+/, '  ');
+    }
     const blockForm = (j < next && lines[j].trim() === '{');
     let close = null;
     if (blockForm) {
@@ -162,10 +181,17 @@ function scan(src) {
       while (t < next && lines[t].trim() === '') t += 1;
       nested = (t < next && lines[t].trim().indexOf('}') === 0);
     }
+    // v2.253.0 第三刀：wrap 产物上 `nested` 必然误判。理由：哨兵给**每个被包裹的节**
+    //   都在节体末尾补了一行 `  }` 收 if，于是「闭行之后首非空行以 `}` 开头」恒成立
+    //   ⇒ 好端端的顶层块被读成内层块 ⇒ block 恒假（实测块节 100+ → 2，D3 红）。
+    //   真源没有哨兵，判据在真源上照旧有效；只在本节**确实带哨兵**时才跳过 nested。
+    const wrapped = wrapSentinel(lines, mk.line + 1, next);
+    if (wrapped) nested = false;
     const usable = (block && !nested);
     return {
       name: mk.name, line: mk.line, openLine: j, closeLine: close,
       nextLine: next, blockForm: blockForm, block: usable, nested: nested,
+      sentinel: wrapped,
       bodyLines: usable ? (close - j + 1) : (next - mk.line - 1)
     };
   });
@@ -234,6 +260,14 @@ function prune(src, needles, opt) {
     //   节体逐字保留（只加缩进），不管它是块形态还是裸语句形态、内层块还是夹具提供者：
     //   裁定交给运行期同源 select()，裁剪期不再做第二份形态判定。
     if (wrap) {
+      // ── v2.253.0：**二次裁剪幂等**。现场病灶（o6 门禁在回归沙箱里跑 D 段时抛
+      //   「wrap 哨兵对账失败：期望 79，输出实有 332」）：沙箱的 work 副本里 tests/run.js
+      //   本身**已经是 wrap 产物**，D 段又对它 prune 一次 ⇒ 已带哨兵的节被当成未选中，
+      //   再包一层、再插一个哨兵（253 + 79 = 332），而对账只数 wrapped（79）。
+      //   治法：本节已带哨兵就整节跳过（哨兵已经在做同一件事，重复包只是加深缩进）。
+      //   注意判定用 s.sentinel（scan 现场读的），不用「名字在不在 ns 里」——
+      //   带哨兵的节也可能被这次选中，那种情况下面 `hit` 分支已先行 continue。
+      if (s.sentinel) continue;
       // ── v2.213.0（Q4 第三刀）：可包裹审计（真实 E2E 破案后的治法）────────
       //   病灶链（/tmp/worldaxis-regression-96thh9 现场还原）：v0.2.2 节体以
       //   `v0220: {` label 块开头、其闭合 `}` 落在下一节体内 —— **跨节结构**。
@@ -302,7 +336,8 @@ function prune(src, needles, opt) {
   //   __layerVerdict（run.js 模块级绑定），同源裁定；全量路径恒真。
   if (wrap && wrapped.length) {
     const first = secs.length ? secs[0].line : 0;
-    lines.splice(first, 0, SENTINEL_SRC);
+    // v2.253.0：源里已有哨兵定义就不再插第二份（二次裁剪幂等）
+    if (src.indexOf('const guardRun = function (t)') < 0) lines.splice(first, 0, SENTINEL_SRC);
   }
   // ── v2.213.0（Q4 第三刀·出厂自检·形态锁定 v3）──────────────────
   //   深度比对依赖 braceDelta，而 braceDelta 对 run.js 有累计误差（头注自述净深度
@@ -327,15 +362,23 @@ function prune(src, needles, opt) {
       let j2 = i + 1;
       while (j2 < outLines.length && outLines[j2].trim() === '') j2 += 1;
       const nextNB = j2 < outLines.length ? String(outLines[j2]) : '';
-      if (nextNB.indexOf('if (guardRun(') >= 0) { guardCount += 1; return; }
+      if (nextNB.indexOf('if (guardRun(') >= 0) {
+        // v2.253.0：二次裁剪时源里本来就有哨兵 —— 它们同样算数（不计校验会恒抛）
+        guardCount += 1; return;
+      }
       if (nextNB.indexOf('// [wrapUnsafe') === 0) return;
       const exp = origFirst[m2[2]];
       if (exp !== '' && nextNB.trim() === exp.trim()) return;
       throw new Error('wrap 形态锁定被破坏（拒裁）：节「' + String(m2[2]).slice(0, 30)
         + '」后的首非空行既非哨兵/注释化，也非原版首行：' + nextNB.slice(0, 60));
     });
-    if (guardCount !== wrapped.length) {
-      throw new Error('wrap 哨兵对账失败（拒裁）：期望 ' + wrapped.length + ' 个哨兵，输出实有 ' + guardCount);
+    // v2.253.0：期望值含**本次新包**与**源里已有**两类（二次裁剪时后者占大头）。
+    //   计数口径与上面 guardCount 对称：凡「节后紧跟哨兵」的节都算一个。
+    if (guardCount !== wrapped.length + secs.filter(function (s) { return s.sentinel; }).length) {
+      throw new Error('wrap 哨兵对账失败（拒裁）：期望 '
+        + (wrapped.length + secs.filter(function (s) { return s.sentinel; }).length)
+        + ' 个哨兵（新包 ' + wrapped.length + ' + 源中已有 ' + secs.filter(function (s) { return s.sentinel; }).length
+        + '），输出实有 ' + guardCount);
     }
   }
   return {

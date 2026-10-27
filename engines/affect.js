@@ -153,7 +153,7 @@
       draft.affect.traumas[who] = draft.affect.traumas[who] || [];
 
       const entry = {
-        id: 'trm_' + Math.random().toString(36).substring(2, 8),
+        id: WA.rand.id('trm_', 6, 'id'),
         type: type,
         trigger: trigger,
         constraint: constraint || '骤然失语、身形僵硬避开冲突',

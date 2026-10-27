@@ -34,6 +34,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_investigation_settings_v1';
   var DEF = { enabled: false, maxClues: 32, maxEvidence: 64 };
@@ -53,7 +54,6 @@
   var _stat = { registered: 0, investigated: 0, revealed: 0, refused: 0, lastReason: '', faults: {} };
   function noteFault(code) { _stat.refused++; _stat.faults[code] = (_stat.faults[code] || 0) + 1; _stat.lastReason = code; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : String(v == null ? '' : v).slice(0, max || 60); }
-  const clockNow = function (tag) { try { return WA.clock.now(tag || 'investigation'); } catch (e) { return Date.now(); } };
   function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   function bucket(root) { var r = root || state(); if (!r.investigation) r.investigation = { clues: [], evidence: [] }; if (!Array.isArray(r.investigation.clues)) r.investigation.clues = []; if (!Array.isArray(r.investigation.evidence)) r.investigation.evidence = []; return r.investigation; }
   function clues() { return bucket().clues || []; }
@@ -305,7 +305,7 @@
     var who = clean(person, 60);
     if (!who) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields', field: 'person' }; }
     var o = opts || {};
-    var receiptId = clean(o.receiptId || ('trace_rcpt_' + (traceObj.id || Date.now())), 60);
+    var receiptId = clean(o.receiptId || ('trace_rcpt_' + (traceObj.id || clockNow('investigation:receipt'))), 60);
 
     var existingClue = clues().find(function (c) {
       return c && (c.location === traceObj.place || c.subject === traceObj.who);

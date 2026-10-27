@@ -524,7 +524,7 @@
       return { ok: false, reason: 'missing-fields' };
     }
 
-    var pactId = 'pact_' + Math.random().toString(36).substring(2, 8);
+    var pactId = WA.rand.id('pact_', 6, 'id');
     var out = null;
 
     WA.store.transact(function (draft) {

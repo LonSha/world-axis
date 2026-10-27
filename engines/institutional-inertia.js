@@ -39,7 +39,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('institutionalInertia') : Date.now();
+    try { return WA.clock.now('institutionalInertia'); } catch (e) { return Date.now(); }
   }
 
   var SUCCESSION_PATHS = ['orthodox_continuity', 'reform_amendment', 'abandonment_decay'];
@@ -68,7 +68,7 @@
    */
   function establishCharter(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('chart_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('chart_', 7, 'id')), 60);
     var title = clean(s.title, 60);
     var leader = clean(s.leader, 60);
     var placeId = clean(s.placeId, 60);
@@ -122,7 +122,7 @@
    */
   function triggerSuccessionHandover(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('hnd_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('hnd_', 7, 'id')), 60);
     var charterId = clean(s.charterId, 60);
     var outgoingLeader = clean(s.outgoingLeader, 60);
     var reason = clean(s.reason || 'retirement', 40); // retirement / death / exile
@@ -209,7 +209,7 @@
     };
 
     var recordEntry = {
-      id: 'succ_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('succ_', 7, 'id'),
       handoverId: handoverId,
       charterId: cHit.id,
       successor: successor,
@@ -357,7 +357,7 @@
       riskEvasion = 0;
     }
 
-    var reportId = 'rep_' + Math.random().toString(36).substring(2, 8);
+    var reportId = WA.rand.id('rep_', 6, 'id');
     var out = null;
 
     WA.store.transact(function (draft) {

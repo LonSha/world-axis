@@ -33,9 +33,16 @@ const BASE = path.join(__dirname, '..');
 const SCAN_DIRS = ['tests', 'tools'];
 /** 形态一：`2\.(a|b|…)\.0`（alternation ≥2 项）。分组：前缀数字 / 反斜杠 / 交替项 / 反斜杠。 */
 const RE_ALT = /(\d+)(\\+)\.\((\d+(?:\|\d+)+)\)(\\+)\.0/g;
-/** 形态二：方括号内 ≥2 个 `'2.x.0'` 版本串。 */
-const RE_BRACKET = /\[([^\[\]]{0,800}?)\]/g;
-const RE_BRACKET_VER = /'2\.(\d+)\.0'/g;
+/** 形态二：方括号内 ≥2 个 `'2.x.0'` / `"2.x.0"` 版本串。
+ *  v2.253.0：**两种引号都收**。此前只认单引号，于是 s3-tx3/tx4/tx6/tx7/tx8/tx9 六个
+ *  文件里用**双引号**写的 manifest 白名单（A15 一类）整片落在扫描面之外 ——
+ *  它们从 v2.234.0 起就没跟上过当前版本，而本门禁一路报「22 条全部跟上」。
+ *  这不是「白名单过期」，是**判据的输入面比现场窄**（与 A12「剥注释不得吞行」同型）。
+ *  同一处还有第二个窄口：上限 800 字符。补到 253 后 tx4 的数组长 857 ⇒ 整个方括号
+ *  都不匹配（正则要求 800 内必见 `]`），于是命中数从 28 掉回 23 ——「修好了反而更少」。
+ *  现放宽到 1600，并在 MIN 反空转之外新增一条**下界对账**（见 check()）。 */
+const RE_BRACKET = /\[([^\[\]]{0,1600}?)\]/g;
+const RE_BRACKET_VER = /['"]2\.(\d+)\.0['"]/g;
 /** 反空转下限：当前实测 10 条 / 8 文件，取下限 8。 */
 const MIN_HITS = 8;
 
@@ -73,7 +80,11 @@ function scanSrc(src) {
     let k;
     while ((k = RE_BRACKET_VER.exec(m[1])) !== null) vs.push(Number(k[1]));
     if (vs.length < 2) continue;
-    out.push({ form: 'arr', line: line, terms: vs, text: m[0].slice(0, 90) });
+    // v2.253.0：**arr 形态也要带 max**。此前只有 alt 分支给了 max，而 N2 判据
+    //   （「原版上全部命中都跟上当前版本」）对所有形态读 `h.max` ⇒ 有 arr 命中混在
+    //   列表里时该判据恒假。第一版没暴露是因为 arr 命中数一直是 0（800 字符窄口
+    //   把双引号数组全挡在外面）；把窄口补开之后它当场现形。
+    out.push({ form: 'arr', line: line, terms: vs, max: Math.max.apply(null, vs), text: m[0].slice(0, 90) });
   }
   return out;
 }

@@ -40,6 +40,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_interestface_settings_v1';
   const DEF = { enabled: false, radius: 2, budget: 4, maxPending: 8, maxObservers: 32 };
@@ -128,7 +129,7 @@
     observers[o] = { x: c.x, y: c.y, radius: rad, cells: [],
       inbox: prev ? prev.inbox : [], pending: prev ? prev.pending : [],
       seen: prev ? prev.seen : {}, lastRecalc: 0, maxPending: cfg.maxPending };
-    recalc(observers[o], cfg, Date.now());
+    recalc(observers[o], cfg, clockNow('interestFace'));
     stat.placed++; stat.lastReason = 'ok';
     return { ok: true, reason: 'ok', id: o, x: c.x, y: c.y, radius: rad, cells: observers[o].cells.length };
   }
@@ -153,7 +154,7 @@
     if (!c) return refuse('unplaced', { given: String(x) });
     if (c.x === v.x && c.y === v.y) { stat.sameCell++; stat.lastReason = 'same-cell'; return { ok: true, reason: 'same-cell', x: c.x, y: c.y }; }
     v.x = c.x; v.y = c.y;
-    recalc(v, cfg, Date.now());
+    recalc(v, cfg, clockNow('interestFace'));
     stat.moved++; stat.lastReason = 'ok';
     return { ok: true, reason: 'ok', x: c.x, y: c.y, cells: v.cells.length };
   }
@@ -173,7 +174,7 @@
     if (!v) return refuse('missing');
     if (!isInt(radius) || radius < 0) return refuse('bad-radius');
     v.radius = radius;
-    recalc(v, cfg, Date.now());
+    recalc(v, cfg, clockNow('interestFace'));
     return { ok: true, reason: 'ok', radius: radius, cells: v.cells.length };
   }
 
@@ -217,7 +218,7 @@
       if (!inFace) return;
       if (focusHit) stat.focusHits++;
       const row = { eid: eid, kind: String(e.kind).slice(0, 24), x: c.x, y: c.y,
-        distance: d, tier: focusHit ? 'focus' : tierOf(v, d), at: Number.isFinite(e.at) ? e.at : Date.now() };
+        distance: d, tier: focusHit ? 'focus' : tierOf(v, d), at: Number.isFinite(e.at) ? e.at : clockNow('interestFace') };
       hits.push({ id: id, via: push(v, row, cfg.budget), tier: row.tier });
     });
     stat.lastReason = 'ok';
@@ -282,7 +283,7 @@
         cells: [], inbox: Array.isArray(v.inbox) ? v.inbox.slice() : [],
         pending: Array.isArray(v.pending) ? v.pending.slice() : [], seen: {},
         lastRecalc: 0, maxPending: cfg.maxPending };
-      recalc(o, cfg, Date.now());
+      recalc(o, cfg, clockNow('interestFace'));
       observers[id] = o;
     });
     return { ok: true, reason: 'ok', count: tally() };

@@ -34,7 +34,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('knowledgePractice') : Date.now();
+    try { return WA.clock.now('knowledgePractice'); } catch (e) { return Date.now(); }
   }
 
   var PRACTICE_STATUS = ['success', 'suboptimal', 'failure'];
@@ -72,7 +72,7 @@
    */
   function registerKnowledgeSpec(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('know_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('know_', 7, 'id')), 60);
     var title = clean(s.title, 80);
     var domain = clean(s.domain || 'metallurgy', 40); // metallurgy | medicine | agriculture | masonry
     var requiredTools = Array.isArray(s.requiredTools) ? s.requiredTools.map(function (t) { return clean(t, 40); }) : [];
@@ -115,7 +115,7 @@
    */
   function grantPracticeLicense(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('lic_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('lic_', 7, 'id')), 60);
     var knowledgeId = clean(s.knowledgeId, 60);
     var practitioner = clean(s.practitioner, 60);
     var grantedBy = clean(s.grantedBy || 'guild_authority', 60);
@@ -206,7 +206,7 @@
       status = 'failure';
       outcomeNote = '环境条件冲突导致工件开裂或药效劣化: ' + envClash.join(', ');
       failureEvidence = {
-        evidenceId: 'fail_' + Math.random().toString(36).slice(2, 9),
+        evidenceId: WA.rand.id('fail_', 7, 'id'),
         clashFactors: envClash,
         placeId: placeId,
         observedDefect: 'thermal_or_humidity_shock'
@@ -214,7 +214,7 @@
     }
 
     var logEntry = {
-      id: 'log_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('log_', 7, 'id'),
       knowledgeId: knowledgeId,
       practitioner: practitioner,
       placeId: placeId,
@@ -268,7 +268,7 @@
     }
 
     var refEntry = {
-      id: 'refine_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('refine_', 7, 'id'),
       knowledgeId: knowledgeId,
       failureEvidenceId: failureEvidenceId,
       refinedSummary: refinedSummary,

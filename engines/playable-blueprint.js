@@ -21,6 +21,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   function clean(v, max) {
@@ -366,7 +367,7 @@
           theme: s.theme,
           playDefs: JSON.parse(JSON.stringify(s.playDefs)),
           openingScene: s.openingScene,
-          installedAt: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('blueprint') : Date.now()
+          installedAt: clockNow('blueprint')
         };
         draft.blueprint.latestInstalled = s.id;
         installed = draft.blueprint.installed[s.id];
@@ -379,8 +380,8 @@
                 name: facName,
                 label: facName,
                 slots: 2,
-                at: Date.now(),
-                updatedAt: Date.now()
+                at: clockNow('blueprint'),
+                updatedAt: clockNow('blueprint')
               });
             }
           });
@@ -420,7 +421,7 @@
           draft.serviceNetwork.facilities = draft.serviceNetwork.facilities || [];
           s.initConditions.facilities.forEach(function (fac) {
             if (!draft.serviceNetwork.facilities.some(function (f) { return f && f.id === fac.id; })) {
-              draft.serviceNetwork.facilities.push(Object.assign({}, fac, { createdAt: Date.now() }));
+              draft.serviceNetwork.facilities.push(Object.assign({}, fac, { createdAt: clockNow('blueprint') }));
             }
           });
         }
@@ -430,7 +431,7 @@
           draft.serviceNetwork.checkpoints = draft.serviceNetwork.checkpoints || [];
           s.initConditions.checkpoints.forEach(function (cp) {
             if (!draft.serviceNetwork.checkpoints.some(function (c) { return c && c.id === cp.id; })) {
-              draft.serviceNetwork.checkpoints.push(Object.assign({}, cp, { createdAt: Date.now() }));
+              draft.serviceNetwork.checkpoints.push(Object.assign({}, cp, { createdAt: clockNow('blueprint') }));
             }
           });
         }
@@ -440,7 +441,7 @@
           draft.customLax.rules = draft.customLax.rules || [];
           s.initConditions.localRules.forEach(function (rule) {
             if (!draft.customLax.rules.some(function (r) { return r && r.id === rule.id; })) {
-              draft.customLax.rules.push(Object.assign({ active: true, stage: 'active', enactedAt: Date.now() }, rule));
+              draft.customLax.rules.push(Object.assign({ active: true, stage: 'active', enactedAt: clockNow('blueprint') }, rule));
             }
           });
         }
@@ -451,7 +452,7 @@
           s.initConditions.capacityResources.forEach(function (cr) {
             draft.envCapacity.resources[cr.resourceId] = Object.assign({
               strain: 'depleted',
-              declaredAt: Date.now()
+              declaredAt: clockNow('blueprint')
             }, cr);
           });
         }
@@ -546,7 +547,7 @@
         inst.tuningHistory = inst.tuningHistory || [];
 
         var tuningRecord = {
-          at: Date.now(),
+          at: clockNow('blueprint'),
           changes: {}
         };
 
@@ -581,7 +582,7 @@
         }
 
         inst.tuningHistory.push(tuningRecord);
-        inst.updatedAt = Date.now();
+        inst.updatedAt = clockNow('blueprint');
         tuned = inst;
         return true;
       }, 'playableBlueprint:tuneConfig');
@@ -637,7 +638,7 @@
       theme: blueprintData.theme || 'custom',
       playDefs: JSON.parse(JSON.stringify(blueprintData.playDefs || {})),
       initConditions: JSON.parse(JSON.stringify(blueprintData.initConditions || {})),
-      migratedAt: Date.now(),
+      migratedAt: clockNow('blueprint'),
       degradations: degradations
     };
 
@@ -699,7 +700,7 @@
         draft.blueprint.resetHistory = draft.blueprint.resetHistory || [];
         draft.blueprint.resetHistory.push({
           sampleId: s.id,
-          at: Date.now(),
+          at: clockNow('blueprint'),
           reason: clean(o.reason || '显式重置初始条件', 60),
           summary: resetSummary
         });

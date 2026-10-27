@@ -1,6 +1,6 @@
 # 世界枢轴 WorldAxis
 
-> 缝合13个SillyTavern开源世界引擎的**独立扩展**——让镜头之外的世界自行运转并推动剧情。
+> 缝合14个SillyTavern开源世界引擎的**独立扩展**——让镜头之外的世界自行运转并推动剧情。
 
 **纯框架**：不预设任何世界观内容，世界背景由你的角色卡/世界书/用户设定注入。
 
@@ -24,6 +24,7 @@
 | DlSNlGHT/World (inject-inspector) | 注入自检查看器·哨兵着陆检测·纯只读 |
 | DlSNlGHT/World (memory-timeline) | 来源身份·FNV双哈希·引用审计 |
 | DlSNlGHT/World (entity memory) | 四类实体记忆库·别名索引·防重复创建 |
+| Julian-adv/OpenMMO (stall) | 摊主离摊照卖·挂量锁货·整数分币抽税·走远就地收摊 |
 
 ## 安装
 本仓**不发 Release 包**（现场 `git tag` 为 0 —— README 一度把安装第一步写成「去发行页取打包好的 zip」，

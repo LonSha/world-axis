@@ -329,7 +329,7 @@
         st.occupation = occupation;
       }
       draft.people = draft.people || {};
-      const nowTs = (WA.clock && WA.clock.now) ? WA.clock.now('livingWorld') : Date.now();
+      const nowTs = clockNow('livingWorld');
       const p = draft.people[nm] = draft.people[nm] || { id: nm, name: nm, createdAt: nowTs, updatedAt: nowTs };
       p.updatedAt = nowTs;
       p.life = p.life || {};
@@ -562,7 +562,7 @@
     let out = null;
     WA.store.transact(function (draft) {
       draft.people = draft.people || {};
-      const nowTs = (WA.clock && WA.clock.now) ? WA.clock.now('livingWorld') : Date.now();
+      const nowTs = clockNow('livingWorld');
       const p = draft.people[nm] = draft.people[nm] || { id: nm, name: nm, createdAt: nowTs, updatedAt: nowTs };
       p.updatedAt = nowTs;
       p.profile = p.profile || {};
@@ -876,7 +876,7 @@
         if (!r || !r.name) return;
         const st = b.characterStates[r.name];
         if (st && st.vitalStrain && (st.vitalStrain.weariness >= 40 || st.vitalStrain.hunger >= 50 || r.worry)) {
-          const tmpl = VIGNETTE_TEMPLATES[Math.floor(Math.random() * VIGNETTE_TEMPLATES.length)];
+          const tmpl = WA.rand.pick(VIGNETTE_TEMPLATES, 'livingWorld') || VIGNETTE_TEMPLATES[0];
           b.vignettes.push({
             name: r.name,
             place: r.place || '近处',
@@ -1016,7 +1016,7 @@
     WA.store.transact(function (draft) {
       const b = getBucket(draft);
       const trace = {
-        id: 'trace_custom_' + Date.now(),
+        id: 'trace_custom_' + clockNow('livingWorld:trace'),
         place: pl,
         who: w,
         trace: d || (w + '曾在此留下细碎痕迹。温热微散，隐有声息残留。'),
@@ -1067,7 +1067,7 @@
       // 若有伪造或替换描述
       if (opts.coverDetail) {
         const coverTrace = {
-          id: 'trace_cover_' + Date.now(),
+          id: 'trace_cover_' + clockNow('livingWorld:trace'),
           place: pl,
           who: cleanStr(opts.coverWho || '未知伪造者', 40),
           trace: cleanStr(opts.coverDetail, 200),
@@ -1237,7 +1237,7 @@
       const b = getBucket(draft);
       b.silentEchoes = b.silentEchoes || [];
       const entry = {
-        id: 'se_' + Math.random().toString(36).substring(2, 8),
+        id: WA.rand.id('se_', 6, 'id'),
         place: pl,
         durationRounds: rds,
         gazeTarget: gazeTarget || '全场众人',

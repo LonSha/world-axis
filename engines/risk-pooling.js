@@ -37,7 +37,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('riskPooling') : Date.now();
+    try { return WA.clock.now('riskPooling'); } catch (e) { return Date.now(); }
   }
 
   var POOL_STATUS = ['active', 'stressed', 'insolvent', 'closed'];
@@ -65,7 +65,7 @@
    */
   function declareRiskPool(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('pool_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('pool_', 7, 'id')), 60);
     var name = clean(s.name, 60);
     var riskKind = clean(s.riskKind || 'general_calamity', 40);
     var regionId = clean(s.regionId || 'local', 60);
@@ -124,7 +124,7 @@
 
     var contribution = (amount != null && amount > 0) ? amount : pHit.pledgeAmount;
 
-    var pledgeId = clean(s.id || ('plg_' + Math.random().toString(36).slice(2, 9)), 60);
+    var pledgeId = clean(s.id || (WA.rand.id('plg_', 7, 'id')), 60);
     var pledgeEntry = {
       id: pledgeId,
       poolId: poolId,
@@ -198,7 +198,7 @@
       return { ok: false, reason: 'pool-insolvent', note: '互助池资金已耗尽' };
     }
 
-    var claimId = clean(s.id || ('clm_' + Math.random().toString(36).slice(2, 9)), 60);
+    var claimId = clean(s.id || (WA.rand.id('clm_', 7, 'id')), 60);
     var claimEntry = {
       id: claimId,
       poolId: poolId,
@@ -252,7 +252,7 @@
     if (!cHit) return { ok: false, reason: 'claim-not-found', id: claimId };
 
     var disputeEntry = {
-      id: 'disp_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('disp_', 7, 'id'),
       claimId: claimId,
       disputedBy: disputedBy,
       reason: reason,

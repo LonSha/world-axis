@@ -10,6 +10,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   function clean(v, max) {
@@ -152,8 +153,8 @@
     var damageScale = clean(s.damageScale, 20) || 'severe';
     var note = clean(s.note, 120);
 
-    var nowMs = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now() : Date.now();
-    var incId = clean(s.id, 60) || ('inc_' + nowMs + '_' + (WA.rand ? WA.rand.id() : Math.random().toString(36).slice(2, 6)));
+    var nowMs = clockNow('aftermathImpact');
+    var incId = clean(s.id, 60) || ('inc_' + nowMs + '_' + WA.rand.id('', 4, 'id'));
 
     // 责任判定：若设施处于带病运行仍强令开工，决策主管负主责；否则操作员负主责
     var faultParty = (forcedUnderDegraded && supervisor) ? supervisor : (operator || supervisor || 'unknown');
@@ -236,7 +237,7 @@
     var payer = clean(o.payer, 40);
     var compensation = Object.assign({}, o.compensation || {});
     var note = clean(o.note, 120);
-    var nowMs = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now() : Date.now();
+    var nowMs = clockNow('aftermathImpact');
 
     if (!iId) return { ok: false, reason: 'missing-incident-id' };
     if (!compensation || Object.keys(compensation).length === 0) {
@@ -321,8 +322,8 @@
     }
     var maxHops = Math.min(5, Math.max(1, Number(s.maxHops) || 3));
     var attenuation = Math.min(0.9, Math.max(0.2, Number(s.attenuation) || 0.6));
-    var nowVal = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now() : Date.now();
-    var chainId = 'chn_' + nowVal + '_' + ((WA.rand && WA.rand.id) ? WA.rand.id() : Math.random().toString(36).slice(2, 7));
+    var nowVal = clockNow('aftermathImpact');
+    var chainId = 'chn_' + nowVal + '_' + WA.rand.id('', 5, 'id');
 
     var validatedNodes = [];
     var currentSev = initialSeverity;
@@ -385,7 +386,7 @@
     var actor = clean(act.actor || 'town_magistrate', 40);
     var funds = Math.max(0, Number(act.funds) || 0);
     var materials = (act.materials && typeof act.materials === 'object') ? Object.assign({}, act.materials) : {};
-    var nowVal = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now() : Date.now();
+    var nowVal = clockNow('aftermathImpact');
 
     var targetChain = null;
     var targetNode = null;

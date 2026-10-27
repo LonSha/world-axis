@@ -293,7 +293,7 @@ function runAll(A) {
   //   其中 aftermath / agency / investigation 三条已计入批次③④ 的 1790。
   // v2.231.0（WP/WX 切片交付收口）：调用期 2175 → **2191**、合计 2345 → **2361**（实测回填）。
   //   跨引擎（activity/laborSchedule、techLineage/production、sceneNarrative/aftermathImpact 等）真实调用接线。
-  A(a.edgesLoad === 186 && a.edgesCall === 2376 && a.edgesAll === 2562 && a.identityOk,
+  A(a.edgesLoad === 186 && a.edgesCall === 2394 && a.edgesAll === 2580 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'

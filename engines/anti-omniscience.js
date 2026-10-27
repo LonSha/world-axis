@@ -30,6 +30,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_anti_omniscience_settings_v1';
@@ -93,7 +94,7 @@
       actor: (actor && actor.name) || String(actor || 'unknown'),
       factId: String(factId || ''),
       reason: String(reason || ''),
-      timestamp: Date.now()
+      timestamp: clockNow('antiOmniscience')
     };
     __stat.recentAudits.push(entry);
     if (__stat.recentAudits.length > cfg.maxAuditHistory) {

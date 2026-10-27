@@ -2669,6 +2669,21 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   （面板面 / 诊断面 / 日志面从本表取出口面契约），缺席就是断裂，不该被
     //   OPTIONAL_EXPORTS 静默兜住。
     'engines/beat-facade.js': 'beatFacade',
+    // v2.253.0：v2.244.0–v2.252.0 六个批次新增的十二枚引擎，连同本版新引擎，一次性补齐登记。
+    //   判据是「诊断清单覆盖全部磁盘模块」——漏登记不是报错，是自检看不见的黑盒。
+    'engines/compact-timing.js': 'compactTiming',
+    'engines/credit-ledger.js': 'creditLedger',
+    'engines/defer-token.js': 'deferToken',
+    'engines/dream-settle.js': 'dreamSettle',
+    'engines/ephemeral-scrub.js': 'ephemeralScrub',
+    'engines/followup-gate.js': 'followupGate',
+    'engines/identity-match.js': 'identityMatch',
+    'engines/interest-face.js': 'interestFace',
+    'engines/stall.js': 'stall',
+    'engines/observation-projection.js': 'observationProjection',
+    'engines/scene-budget.js': 'sceneBudget',
+    'engines/success-grade.js': 'successGrade',
+    'engines/weighted-draw.js': 'weightedDraw',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

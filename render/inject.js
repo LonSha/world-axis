@@ -59,6 +59,9 @@
     'plan', 'mend',
     // v2.119.0（拓展计划 ③）：供需循环。只报「有据可查的价与被推着动的原因」，不编行情叙事。
     'economy', 'inst',
+    // v2.253.0（拓展 ST-1）：摊位。与 economy 同段 —— 它是同一条供需链的**离线那一半**
+    //   （economy 管当场成交，摊位管人走开之后）。只报有据可查的摊与被锁的量。
+    'stall',
     // v2.119.0（拓展计划 ⑤）：调查卷宗。只报「支持/反驳各多少」与「能不能定案」，不替任何人定案。
     'probe', 'region', 'stage', 'session',
     // v2.127.0（X2）：世界编年史。与注入分支同批登记 ——
@@ -205,6 +208,8 @@ style: false,
         plan: true, mend: true,
         // v2.119.0：供需循环。同一条理由（模块总开关默认关）。
         economy: true, inst: true, probe: true, region: true, stage: true, session: true,
+        // v2.253.0：摊位。同一条理由（模块总开关默认关），注入面取默认 true。
+        stall: true,
         // v2.127.0（X2）：世界编年史。同一条理由——其模块总开关默认为关，故注入面取默认 true
         //   不给老用户凭空多出约束。
         chrono: true,
@@ -421,6 +426,8 @@ style: false,
     //   （v2.119.0 实测被 switch-matrix-v2910 的 C2、explain-v2900 的 A4/C1、cost-v2880 的 B7/C1 抓出）。
     //   名字必须与注入项的 `source` 逐字同名——同一源两套名字的代价已由 v2.88.0 O1 付过一次。
     plan: '人物计划', mend: '关系修复', economy: '供需与商路', inst: '组织制度',
+    // v2.253.0：摊位（与 SOURCES / 注入分支 source 逐字同名）。
+    stall: '摊位寄售',
     probe: '调查卷宗', region: '远方', stage: '玩法进度', session: '多人场',
     // v2.127.0（X2）：世界编年史。与 SOURCES 同批登记（缺名 ⇒ 失败台账与开关两面裸露英文键
     //   `chrono`）。名字与注入项的 `source` **逐字同名**——同一源两套名字的代价已由 v2.88.0 O1 付过一次。
@@ -1185,6 +1192,7 @@ style: false,
       // v2.119.0（拓展计划 ③）：供需循环。只报**登记过的货与它们的许可带**——
       //   没有登记过价的货不进正文（凭空报价正是本模块要防的那件事）。
       if (vis.economy && WA.economy) { const ec = engineCall('economy', function () { return WA.economy.buildBlock(); }); if (ec) items.push({ source: '供需与商路', content: ec }); }
+      if (vis.stall && WA.stall) { const sb = engineCall('stall', function () { return WA.stall.buildBlock(); }); if (sb) items.push({ source: '摊位寄售', content: sb }); }
       // v2.119.0（拓展计划 ④）：组织制度。只报「谁在任、什么权限、有几项待批」——
       //   不报职位空缺的原因（那是纪事的活），也不替组织宣称制度运行良好。
       if (vis.inst && WA.inst) { const ib = engineCall('inst', function () { return WA.inst.buildBlock(); }); if (ib) items.push({ source: '组织制度', content: ib }); }

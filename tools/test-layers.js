@@ -133,10 +133,23 @@ function analyze(opt) {
  *                  **不是跳过而是拒绝**：此时给出任何「通过」都是假绿，调用方须以非零码收尾。
  *  为什么把 `refuse` 与 `skip` 分开：这两件事在旧写法里都落成「不跑」，于是
  *  「我没选它」与「你选了但它不能被单独跑」在输出里长得一样 —— 后者是必须让人看见的坏消息。 */
-function select(entry, needles) {
+function select(entry, needles, name) {
   const ns = needles || [];
-  if (!entry) return { verdict: 'refuse', why: 'no-entry' };
-  const matched = ns.some(function (n) { return String(entry.name).indexOf(n) >= 0; });
+  // v2.253.0：**表外节必须按「有没有被点名」分流**，不能一律 refuse。
+  //   现场病灶（本版实测）：run.js 里有 10 个节的 `section()` 写在 3/4 空格缩进上
+  //   （G17-A…G18、v2.19.0、v2.49.0、v2.50.0、v2.231.0），解析器只收 0/2 空格 ⇒
+  //   它们永远进不了归属表（且**应当**如此：四空格是块内局部调用，见 A11b）。
+  //   旧判据对 no-entry 无条件 refuse ⇒ **任何**选区整趟都以 exit 3 收尾，`--only-v-section`
+  //   在真仓库上等于不可用（实测：1830 条断言全过、RC 仍 3）。
+  //   真相是这两件事形状不同：没点名 = 本轮本来就轮不到它（skip）；点了名却跑不了 = 坏消息（refuse）。
+  //   `name` 由调用方把运行期节名传进来；门禁那条 `select(null, ['x'])` 不传 name 时
+  //   保持旧的保守答案（refuse）—— 不知道名字就当被点名。
+  const nm = entry ? String(entry.name) : (name === undefined || name === null ? null : String(name));
+  const matched = nm !== null && ns.some(function (n) { return nm.indexOf(n) >= 0; });
+  if (!entry) {
+    if (nm !== null && !matched) return { verdict: 'skip', why: 'no-entry-unselected' };
+    return { verdict: 'refuse', why: 'no-entry' };
+  }
   if (!matched) return { verdict: 'skip', why: 'not-selected' };
   if (!entry.selfContained) {
     return { verdict: 'refuse', why: entry.shared.length ? 'shared:' + entry.shared.join('+') : 'no-evidence' };

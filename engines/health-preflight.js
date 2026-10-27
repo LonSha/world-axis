@@ -10,6 +10,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_health_preflight_settings_v1';
@@ -86,7 +87,7 @@
       category: String(category || 'general'),
       desc: String(desc || ''),
       snippet: String(snippet || '').slice(0, 100),
-      timestamp: Date.now()
+      timestamp: clockNow('healthPreflight')
     };
     __stat.recentIssues.push(issue);
     if (__stat.recentIssues.length > cfg.maxIssuesKept) {

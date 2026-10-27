@@ -247,7 +247,7 @@
     // 掷骰。调用方给了 roll（0..1）就用它——测试可确定；否则走 rand 决策流。
     const roll = (typeof input2.roll === 'number' && isFinite(input2.roll))
       ? Math.max(0, Math.min(0.999999, input2.roll))
-      : (WA.rand && typeof WA.rand.next === 'function' ? WA.rand.next() : Math.random());
+      : (WA.rand && typeof WA.rand.next === 'function' ? WA.rand.next('genTiming') : 0.5);
     const hit = roll < prob;
     out.ticked = hit;
 

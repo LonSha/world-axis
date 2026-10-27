@@ -407,7 +407,7 @@
       ldg.tokens = (ldg.tokens || 0) + amt * 10; // 配给票兑换影子代币
 
       var tx = {
-        id: 'stx_' + Math.random().toString(36).substring(2, 8),
+        id: WA.rand.id('stx_', 6, 'id'),
         who: who,
         type: 'issue_ration',
         resource: res,

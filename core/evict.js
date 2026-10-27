@@ -433,6 +433,14 @@
     'genTiming.ledger':   { path: 'genTiming.ledger',   cap: 'per-call', kind: 'array',  why: '主动时机决策台账环形（上限 = maxLedger 设置，写入时传入）' },
     'oneShotMod.pending': { path: 'oneShotMod.pending', cap: 'per-call', kind: 'array',  why: '一次性调制队列环形（上限 = maxPending 设置，写入时传入）' },
     'moodGlide.moods':    { path: 'moodGlide.moods',    cap: 'per-call', kind: 'object', why: '情绪坐标容器（上限 = maxMoods 设置，按 at 最旧优先挑人）' },
+    // v2.253.0（拓展 ST-1）：离线寄售摊三环。三条调用点均在 stall.js 的 transact 回调内
+    //   （站点名与调用点字面量一一对应，门禁 G18 双向核对）。
+    //   · rows 与 ledger 都是「曾发生过什么」（谁摆过摊、谁买过什么），故只能环形挤出；
+    //   · listings 是当前许出去的货 —— 被挤出即等于撤货，货留在库存里（锁量随行消失），
+    //     这正是它必须登记的另一个理由：挤掉一行挂单等于悄悄撤货，看不见就成了丢货。
+    'stall.rows':     { path: 'stall.rows',     cap: 'per-call', kind: 'array', why: '摊位环形（上限 = maxStalls 设置，写入时传入）' },
+    'stall.listings': { path: 'stall.listings', cap: 'per-call', kind: 'array', why: '摊上挂货环形（上限 = maxListings 设置，挤出即等于撤货、货退回可售）' },
+    'stall.ledger':   { path: 'stall.ledger',   cap: 'per-call', kind: 'array', why: '成交回执环形（上限 = maxLedger 设置；挤出即「那笔成交查不到了」）' },
     //  v2.130.0（拓展计划 C2 / C1）：两个新引擎的环形容器。
     //   两条调用点均在各自引擎的 transact 回调内（story-tone.js / calendar-custom.js），
     //   站点名与调用点字面量一一对应（门禁 G18 双向核对）。

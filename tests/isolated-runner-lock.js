@@ -62,8 +62,51 @@ function runAll(a) {
     rejected = false;
     try { box.module.exports.snapshot(src); } catch (e) { rejected = /symlink/.test(e.message); }
     a(!rejected, 'isolation: same symlink criterion fails on real weakened source');
+    // v2.253.0：**审计行必须落在 run.log 首行**。父进程先前用 appendFileSync 另开 fd 追加，
+    //   而 logFile 是以 'wx' 打开的、子进程共用同一 fd 且偏移在 0 —— 父写的内容随后被子进程
+    //   从 0 覆盖（现场实证：修前所有 run.log 里 `wrap 裁剪` 一条都查不到）。故本处直接钉
+    //   「源码上写的是 writeSync(fd, …)」+「不再出现 appendFileSync(logFile, pruneNote…)」。
+    const noteAnchor = 'fs.appendFileSync(logFile, pruneNote + String.fromCharCode(10));';
+    a(clean.indexOf('fs.writeSync(fd, pruneNote + String.fromCharCode(10));') >= 0,
+      'isolation: prune audit line is written through the shared log fd (not clobbered by worker)');
+    a(clean.indexOf(noteAnchor) < 0, 'isolation: the clobbering appendFileSync on the prune note is gone');
+    // v2.253.0：**外壳不给内存参数时必须有默认值**。v2.230.0 只修了「给了要转发」，
+    //   没修「没给」，而 `node tests/run.js` 的常态就是没给 ⇒ worker 按 V8 默认值涨到 2 GB
+    //   即 SIGABRT（沙箱 GfsZHM 现场：该节 49/0 全过却被记成 RC 3）。判据两向：
+    //   缺省补值在位 + 调用方显式给值时不被覆盖。
+    const hasDefault = /if \(!memArgv\.some\([\s\S]{0,120}--max-old-space-size[\s\S]{0,80}memArgv\.push\('--max-old-space-size=\d+'\)/.test(clean);
+    a(hasDefault, 'isolation: worker gets a default heap cap when the shell passes none');
+    const memSrc = clean.slice(clean.indexOf('const memArgv'), clean.indexOf('child = cp.spawn(process.execPath, memArgv'));
+    a(/!memArgv\.some\(/.test(memSrc) && /--max-old-space-size\(=\|\$\)/.test(memSrc),
+      'isolation: the default is gated on the caller not having passed --max-old-space-size (no override)');
+    // v2.253.0：**节名写错要显式点名**（沙箱 UKFBEG 现场：传「…不再取决于开关」而真名是
+    //   「…不再取决于开发机装没装 npm 包」⇒ 每节都 skip、裸语句节体照跑 ⇒ 119 条假失败
+    //   且 1700s 跑不完；旧日志只说「未命中任何节」，读起来像「这节没事」）。
+    //   判据：拒裁分支里必须尝试列出候选名，且候选为空时也要说「一个候选都没找到」。
+    const rej = clean.slice(clean.indexOf('const runPath = path.join(prepared.work'),
+      clean.indexOf('wrap 裁剪失败（拒裁兜底'));
+    a(/P\.scan\(/.test(rej) && /near\.length \?/.test(rej) && /一个候选都没找到/.test(rej),
+      'isolation: a non-matching selector names the closest candidates instead of one vague line');
 
-    // ── 陈旧锁回收：只有「主人确死 + 该任务没有活着的 worker」两条同时成立才允许 ──
+    // v2.253.0：**两态必须分开判**。旧实现把「没有 owner.json」与「owner.json 读不出」都塌成
+  //   unknown，于是 acquireLock 在 mkdir 与写 owner 之间猝死留下的空锁目录永远回收不了，
+  //   现场两次都是人肉 rm -rf。判据两向：no-owner 可回收、unknown 仍拒（并带出 why 便于人工查）。
+  const noOwner = path.join(root, 'no-owner'); fs.mkdirSync(noOwner);
+  a(runner.inspectLock(noOwner).state === 'no-owner',
+    'isolation: lock dir without owner.json reads as no-owner (not unknown)');
+  a(runner.recoverLock(noOwner) === true && !fs.existsSync(noOwner),
+    'isolation: no-owner lock (died between mkdir and write) is reclaimed');
+  const unknownDir = path.join(root, 'unknowable'); fs.mkdirSync(unknownDir);
+  fs.writeFileSync(path.join(unknownDir, 'owner.json'), 'broken');
+  const unk = runner.inspectLock(unknownDir);
+  a(unk.state === 'unknown' && !!unk.why,
+    'isolation: unreadable owner.json stays unknown and reports why (' + unk.why + ')');
+  rejected = false;
+  try { runner.recoverLock(unknownDir); } catch (e) { rejected = /not recoverable: unknown/.test(e.message) && /broken/.test(e.message); }
+  a(rejected && fs.existsSync(unknownDir),
+    'isolation: unknown lock is refused with the reason, not silently reclaimed');
+
+  // ── 陈旧锁回收：只有「主人确死 + 该任务没有活着的 worker」两条同时成立才允许 ──
     const rDir = path.join(root, 'recover'); fs.mkdirSync(rDir);
     const rTask = path.join(root, 'recover-task'); fs.mkdirSync(rTask);
     fs.writeFileSync(path.join(rTask, 'result.json'), JSON.stringify({ status: 'running', childPid: freePid(66000) }));

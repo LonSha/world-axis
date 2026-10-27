@@ -828,7 +828,7 @@
         title: cur.title,
         region: cur.region,
         materials: cur.materials || (spec && spec.materials) || {},
-        createdAt: (WA.clock && WA.clock.now) ? WA.clock.now('coop') : Date.now()
+        createdAt: clockNow('coop')
       };
       out = { ok: true, projectId: pid, workorderId: woId, spec: cur.workorderSpec };
       return true;

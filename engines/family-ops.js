@@ -10,6 +10,7 @@
  */
 (function () {
   'use strict';
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   function clean(v, max) {
@@ -401,7 +402,7 @@
             expense: expense,
             paid: actualPaid,
             deficit: deficit,
-            at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('familyOps') : Date.now()
+            at: clockNow('familyOps')
           });
         }
         const b = draft.familyOps && draft.familyOps.budgets && draft.familyOps.budgets[uId];
@@ -416,7 +417,7 @@
                 g.targetProgress = Number(g.targetProgress) || 100;
                 if (g.currentProgress >= g.targetProgress) {
                   g.status = 'completed';
-                  g.completedAt = Date.now();
+                  g.completedAt = clockNow('familyOps:cycle');
                 }
                 goalsProgressed.push({
                   id: g.id,

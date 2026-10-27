@@ -213,7 +213,11 @@ function runAll(a) {
     'shift-conflict', 'crew-full', 'no-road',
     'activity-closed', 'already-exists', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
     'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day',
-    '__exp7-absent-check', '__exp7-rain-check', '__exp7-settle-check'];
+    '__exp7-absent-check', '__exp7-rain-check', '__exp7-settle-check',
+    // v2.253.0（漏摊寄售 engines/stall.js）：只有这 8 个是 refuse() 独有写法（其余码另有内联
+    //   `reason:` 分支，落在面内由扫描面自己抓住）。面外这 8 个由该引擎专锁咬住。
+    'not-there', 'bad-sign', 'no-such-listing', 'offline', 'self-buy', 'too-far',
+    'unknown-buyer', 'unknown-owner'];
   const outSorted = wOutFace.slice().sort();
   a(outSorted.join(',') === OUT_FACE_OK.slice().sort().join(','),
     'v2780: [B] 面外见证码与登记清单逐字一致（实 ' + outSorted.join(',') + '）'

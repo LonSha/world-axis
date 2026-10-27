@@ -127,7 +127,7 @@
         return chosen === null ? -1 : pool.indexOf(chosen);
       }
       if (WA.rand && typeof WA.rand.int === 'function') return WA.rand.int(0, pool.length - 1, 'weightedDraw');
-      return Math.floor(Math.random() * pool.length);
+      return 0;  // WA.rand 整块缺席时认第一个（此前裸调 Math.random，同一局面重放抽中别人）
     })();
     if (idx < 0 || idx >= pool.length) { stat.refused++; stat.lastReason = 'pick-failed'; return { ok: false, reason: 'pick-failed' }; }
     stat.draws++;

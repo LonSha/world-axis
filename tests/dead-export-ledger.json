@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.252.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.252.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.253.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.253.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -1530,6 +1530,38 @@
       "tref": 1,
       "own": 3
     },
+    "compactTiming.plan": {
+      "reason": "self-only",
+      "detail": "engines/compact-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/compact-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "compactTiming.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/compact-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/compact-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "compactTiming.settings": {
+      "reason": "self-only",
+      "detail": "engines/compact-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/compact-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "compactTiming.stat": {
+      "reason": "self-only",
+      "detail": "engines/compact-timing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/compact-timing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
+    },
     "compat.diagnose": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -1890,6 +1922,78 @@
       "tref": 3,
       "own": 3
     },
+    "creditLedger.accrue": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "creditLedger.list": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "creditLedger.open": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "creditLedger.repay": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "creditLedger.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "creditLedger.settings": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "creditLedger.stat": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
+    },
+    "creditLedger.view": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "creditLedger.writeOff": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "customLax.commitPromise": {
       "reason": "self-only",
       "detail": "engines/custom-lax.js 内部自用、外部零引用（过度导出）",
@@ -2194,6 +2298,70 @@
       "tref": 0,
       "own": 1
     },
+    "deferToken.cancel": {
+      "reason": "self-only",
+      "detail": "engines/defer-token.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/defer-token.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "deferToken.cancelAll": {
+      "reason": "self-only",
+      "detail": "engines/defer-token.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/defer-token.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "deferToken.dispose": {
+      "reason": "self-only",
+      "detail": "engines/defer-token.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/defer-token.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "deferToken.pending": {
+      "reason": "self-only",
+      "detail": "engines/defer-token.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/defer-token.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "deferToken.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/defer-token.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/defer-token.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "deferToken.serial": {
+      "reason": "self-only",
+      "detail": "engines/defer-token.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/defer-token.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "deferToken.settings": {
+      "reason": "self-only",
+      "detail": "engines/defer-token.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/defer-token.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "deferToken.stat": {
+      "reason": "self-only",
+      "detail": "engines/defer-token.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/defer-token.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 22
+    },
     "difficulty.actionCost": {
       "reason": "self-only",
       "detail": "engines/difficulty.js 内部自用、外部零引用（过度导出）",
@@ -2241,6 +2409,54 @@
       "refs": 0,
       "tref": 0,
       "own": 9
+    },
+    "dreamSettle.isStamped": {
+      "reason": "self-only",
+      "detail": "engines/dream-settle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dream-settle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "dreamSettle.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/dream-settle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dream-settle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "dreamSettle.screen": {
+      "reason": "self-only",
+      "detail": "engines/dream-settle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dream-settle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "dreamSettle.settings": {
+      "reason": "self-only",
+      "detail": "engines/dream-settle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dream-settle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "dreamSettle.stamp": {
+      "reason": "self-only",
+      "detail": "engines/dream-settle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dream-settle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "dreamSettle.stat": {
+      "reason": "self-only",
+      "detail": "engines/dream-settle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dream-settle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
     },
     "economy.bandOf": {
       "reason": "self-only",
@@ -2457,6 +2673,62 @@
       "refs": 0,
       "tref": 0,
       "own": 7
+    },
+    "ephemeralScrub.clear": {
+      "reason": "self-only",
+      "detail": "engines/ephemeral-scrub.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ephemeral-scrub.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ephemeralScrub.register": {
+      "reason": "self-only",
+      "detail": "engines/ephemeral-scrub.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ephemeral-scrub.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ephemeralScrub.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/ephemeral-scrub.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ephemeral-scrub.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ephemeralScrub.scrub": {
+      "reason": "self-only",
+      "detail": "engines/ephemeral-scrub.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ephemeral-scrub.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ephemeralScrub.settings": {
+      "reason": "self-only",
+      "detail": "engines/ephemeral-scrub.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ephemeral-scrub.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "ephemeralScrub.stat": {
+      "reason": "self-only",
+      "detail": "engines/ephemeral-scrub.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ephemeral-scrub.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "ephemeralScrub.view": {
+      "reason": "self-only",
+      "detail": "engines/ephemeral-scrub.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ephemeral-scrub.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "epistemicView.decideAction": {
       "reason": "self-only",
@@ -2926,6 +3198,54 @@
       "reason": "self-only",
       "detail": "engines/floor-changes.js 内部自用、外部零引用（过度导出）",
       "src": "engines/floor-changes.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "followupGate.due": {
+      "reason": "self-only",
+      "detail": "engines/followup-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/followup-gate.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "followupGate.fire": {
+      "reason": "self-only",
+      "detail": "engines/followup-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/followup-gate.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "followupGate.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/followup-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/followup-gate.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "followupGate.settings": {
+      "reason": "self-only",
+      "detail": "engines/followup-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/followup-gate.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "followupGate.stat": {
+      "reason": "self-only",
+      "detail": "engines/followup-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/followup-gate.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
+    "followupGate.view": {
+      "reason": "self-only",
+      "detail": "engines/followup-gate.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/followup-gate.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -3458,6 +3778,46 @@
       "tref": 0,
       "own": 2
     },
+    "identityMatch.calibrate": {
+      "reason": "self-only",
+      "detail": "engines/identity-match.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/identity-match.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "identityMatch.match": {
+      "reason": "self-only",
+      "detail": "engines/identity-match.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/identity-match.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "identityMatch.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/identity-match.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/identity-match.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "identityMatch.settings": {
+      "reason": "self-only",
+      "detail": "engines/identity-match.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/identity-match.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "identityMatch.stat": {
+      "reason": "self-only",
+      "detail": "engines/identity-match.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/identity-match.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
     "injectBudget.autoBudget": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -3721,6 +4081,118 @@
       "refs": 0,
       "tref": 3,
       "own": 3
+    },
+    "interestFace.covers": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.flush": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.inboxOf": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.leave": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.list": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.move": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "interestFace.place": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "interestFace.restore": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.setFocus": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.setRadius": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.settings": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
+    "interestFace.snapshot": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interestFace.stat": {
+      "reason": "self-only",
+      "detail": "engines/interest-face.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interest-face.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 19
     },
     "interop.probePartner": {
       "reason": "self-only",
@@ -4593,6 +5065,54 @@
       "refs": 0,
       "tref": 0,
       "own": 10
+    },
+    "observationProjection.merge": {
+      "reason": "self-only",
+      "detail": "engines/observation-projection.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/observation-projection.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "observationProjection.project": {
+      "reason": "self-only",
+      "detail": "engines/observation-projection.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/observation-projection.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "observationProjection.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/observation-projection.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/observation-projection.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "observationProjection.settings": {
+      "reason": "self-only",
+      "detail": "engines/observation-projection.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/observation-projection.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "observationProjection.sole": {
+      "reason": "self-only",
+      "detail": "engines/observation-projection.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/observation-projection.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "observationProjection.stat": {
+      "reason": "self-only",
+      "detail": "engines/observation-projection.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/observation-projection.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 12
     },
     "observe.detectCandidates": {
       "reason": "unwired",
@@ -5890,14 +6410,6 @@
       "tref": 0,
       "own": 6
     },
-    "rand.pick": {
-      "reason": "self-only",
-      "detail": "core/rand.js 内部自用、外部零引用（过度导出）",
-      "src": "core/rand.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
-    },
     "rand.reseed": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -6698,6 +7210,54 @@
       "tref": 0,
       "own": 3
     },
+    "sceneBudget.note": {
+      "reason": "self-only",
+      "detail": "engines/scene-budget.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-budget.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sceneBudget.reset": {
+      "reason": "self-only",
+      "detail": "engines/scene-budget.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-budget.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sceneBudget.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/scene-budget.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-budget.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sceneBudget.settings": {
+      "reason": "self-only",
+      "detail": "engines/scene-budget.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-budget.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "sceneBudget.stat": {
+      "reason": "self-only",
+      "detail": "engines/scene-budget.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-budget.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
+    "sceneBudget.view": {
+      "reason": "self-only",
+      "detail": "engines/scene-budget.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/scene-budget.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "sceneNarrative.reset": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -7114,6 +7674,54 @@
       "tref": 0,
       "own": 14
     },
+    "stall.restore": {
+      "reason": "self-only",
+      "detail": "engines/stall.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stall.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "stall.sellable": {
+      "reason": "test-only",
+      "detail": "engines/stall.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stall.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "stall.snapshot": {
+      "reason": "self-only",
+      "detail": "engines/stall.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stall.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "stall.stat": {
+      "reason": "self-only",
+      "detail": "engines/stall.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stall.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 21
+    },
+    "stall.stray": {
+      "reason": "self-only",
+      "detail": "engines/stall.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stall.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "stall.taxCents": {
+      "reason": "self-only",
+      "detail": "engines/stall.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stall.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
     "store.batchDepth": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -7305,6 +7913,46 @@
       "refs": 0,
       "tref": 0,
       "own": 16
+    },
+    "successGrade.checkMonotonic": {
+      "reason": "self-only",
+      "detail": "engines/success-grade.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/success-grade.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "successGrade.ladder": {
+      "reason": "self-only",
+      "detail": "engines/success-grade.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/success-grade.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "successGrade.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/success-grade.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/success-grade.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "successGrade.settings": {
+      "reason": "self-only",
+      "detail": "engines/success-grade.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/success-grade.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "successGrade.stat": {
+      "reason": "self-only",
+      "detail": "engines/success-grade.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/success-grade.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
     },
     "summarizer.ensureState": {
       "reason": "self-only",
@@ -8378,6 +9026,46 @@
       "tref": 0,
       "own": 3
     },
+    "weightedDraw.draw": {
+      "reason": "self-only",
+      "detail": "engines/weighted-draw.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weighted-draw.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "weightedDraw.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/weighted-draw.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weighted-draw.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "weightedDraw.settings": {
+      "reason": "self-only",
+      "detail": "engines/weighted-draw.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weighted-draw.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "weightedDraw.stat": {
+      "reason": "self-only",
+      "detail": "engines/weighted-draw.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weighted-draw.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 22
+    },
+    "weightedDraw.weightOf": {
+      "reason": "self-only",
+      "detail": "engines/weighted-draw.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/weighted-draw.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
     "wordBudget.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -8758,6 +9446,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 495
+    "dataOnly": 526
   }
 }

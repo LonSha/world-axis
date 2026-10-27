@@ -33,7 +33,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('commonsGov') : Date.now();
+    try { return WA.clock.now('commonsGov'); } catch (e) { return Date.now(); }
   }
 
   var GOVERNANCE_MODELS = ['open_access', 'contributor_priority', 'strict_quota'];
@@ -72,7 +72,7 @@
    */
   function declareCommonAsset(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('asset_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('asset_', 7, 'id')), 60);
     var placeId = clean(s.placeId, 60);
     var name = clean(s.name, 80);
     var assetType = clean(s.assetType || 'pasture', 40); // pasture | mill | granary | well | dock
@@ -165,7 +165,7 @@
     }
 
     var resEntry = {
-      id: 'res_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('res_', 7, 'id'),
       assetId: assetId,
       who: who,
       slots: requestedSlots,
@@ -240,7 +240,7 @@
     if (!asset) return { ok: false, reason: 'asset-not-found', id: assetId };
 
     var dutyRecord = {
-      id: 'duty_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('duty_', 7, 'id'),
       assetId: assetId,
       who: who,
       hoursContributed: hours,
@@ -317,7 +317,7 @@
    */
   function resolveAssetDispute(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('disp_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('disp_', 7, 'id')), 60);
     var assetId = clean(s.assetId, 60);
     var plaintiff = clean(s.plaintiff, 60);
     var defendant = clean(s.defendant, 60);

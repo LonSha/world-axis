@@ -1124,6 +1124,15 @@ const peopleIds = Object.keys(s.people);
         <div class="wa-row"><input id="wa-eco-route" class="wa-input" placeholder="商路 id"/><input id="wa-eco-lane" class="wa-input" placeholder="road/river/sea/rail"/><input id="wa-eco-from" class="wa-input" placeholder="从"/><input id="wa-eco-to" class="wa-input" placeholder="到"/><input id="wa-eco-cost" class="wa-input wa-num" type="number" min="0" placeholder="运费"/></div>
         <div class="wa-row"><button class="wa-btn" id="wa-eco-route-add" title="登记商路（已存在则改运费）">登记商路</button><button class="wa-btn" id="wa-eco-route-block" title="阻断：状态标记，不删行——世界仍记得有这条路，可解除后续运">阻断</button><button class="wa-btn" id="wa-eco-route-open" title="解除阻断">解除</button><button class="wa-btn" id="wa-eco-ship" title="经这条路运送：路受阻则 route-blocked，货不动（受阻可解除后续运，不消耗货）">运送</button><button class="wa-btn" id="wa-eco-routes" title="只读：商路台账">看商路</button></div>
 <div id="wa-eco-out" class="wa-out"></div>
+        <div class="wa-sec">漏摊寄售（摆摊 → 挂货 → 过路人买 → 走开/收摊）</div>
+        <label class="wa-row"><input id="wa-stall-enabled" type="checkbox" ${WA.stall && WA.stall.getSettings().enabled ? 'checked' : ''}/> 启用漏摊寄售</label>
+        <div class="wa-dim">摊必须摆在<b>人正站着的地方</b>（否则 not-there——凭空出现的摊不认）；挂的价必须落在 economy 的<b>许可带</b>内（越界 price-out-of-band）——<b>价不是这里另开一套</b>；挂货只<b>锁</b>库存不搬走，撤货/收摊就把锁解掉；摊主走开后摊照常卖（<b>这就是它存在的理由</b>），但摊主自己改不动；摊主走远了就地收摊，并如实报出剩货（strayed）。</div>
+        <div class="wa-row"><input id="wa-stall-owner" class="wa-input" placeholder="摊主"/><input id="wa-stall-place" class="wa-input" placeholder="地点"/><input id="wa-stall-sign" class="wa-input" placeholder="招牌（≤32 字，可空）"/><button class="wa-btn" id="wa-stall-lay" title="摆摊：人必须站在这个地点；一人一摊（already-laid）；总摊数有上限（stalls-full）">摆摊</button></div>
+        <div class="wa-row"><input id="wa-stall-res" class="wa-input" placeholder="资源/货"/><input id="wa-stall-qty" class="wa-input wa-num" type="number" min="1" placeholder="数量"/><input id="wa-stall-price" class="wa-input wa-num" type="number" min="0" step="0.1" placeholder="单价（须在带内）"/><button class="wa-btn" id="wa-stall-list" title="挂货：价越带拒收；挂量超过手头可售则 short-stock（已挂的算在内，不重复锁）">挂货</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-stall-sign-btn" title="换招牌：超过 32 字 bad-sign；招牌没变只回 same-sign，不动台账">换招牌</button><button class="wa-btn" id="wa-stall-delist" title="撤货：锁量随行删除，货立刻回到可售">撤货</button><button class="wa-btn" id="wa-stall-view" title="只读：这一个摊的挂货、许可带与最近三笔">看摊</button></div>
+        <div class="wa-row"><input id="wa-stall-buyer" class="wa-input" placeholder="买主"/><input id="wa-stall-bqty" class="wa-input wa-num" type="number" min="1" placeholder="数量"/><button class="wa-btn" id="wa-stall-buy" title="买：摊主不在也成；买主必须站在摊所在的地方（too-far）；钱不够或挂量不够一律不改状态；抽税按整数分币，从卖家货款里扣">买</button><button class="wa-btn" id="wa-stall-board" title="只读：某地的摊板——谁在卖、卖什么、什么价">看摊板</button></div>
+        <div class="wa-row"><button class="wa-btn" id="wa-stall-away" title="走开：摊还开着，但摊主自己改不动（offline）">走开</button><button class="wa-btn" id="wa-stall-back" title="回来：只清标记，不搬货（货一直没离开 economy 的库存）">回来</button><button class="wa-btn" id="wa-stall-pack" title="收摊：剩货解回并如实报出来">收摊</button><button class="wa-btn" id="wa-stall-out-btn" title="只读：全库读数与抽税合计">看总览</button></div>
+        <div id="wa-stall-out" class="wa-out"></div>
         <div class="wa-sec">持续生产（工单跨日 · 缺料暂停 · 完工只入库一次）</div>
         <div class="wa-dim">与上面<b>即时生产</b>（economy 的「生产」按钮）的根本分野：那一笔<b>当场</b>扣料出货，
           答的是「这一刻做成了两个面包」；这里开的是<b>工单</b>，带<b>工期</b>与<b>在产状态</b> ——
@@ -8747,6 +8756,72 @@ on('#wa-desk-show', showDesk);
         const s = WA.economy.statView();
         ecoOut('商路 ' + s.routes + ' 条（受阻 ' + s.stuck + '）；货 ' + s.goods + ' 项，订单 ' + s.orders + ' 笔');
       }; }
+    const stallOut = function (t) { const el = $('#wa-stall-out'); if (el) el.innerHTML = '<div class="wa-dim">' + String(t) + '</div>'; };
+    const stallQty = function (sel) { const v = parseInt($(sel).value, 10); return isFinite(v) ? v : NaN; };
+    { const el = $('#wa-stall-enabled');
+      if (el) el.onchange = function () { WA.stall.setSettings({ enabled: el.checked }); stallOut(el.checked ? '漏摊寄售已开启' : '已关闭（关闭时摆不了摊、挂不了货，也买不了）'); }; }
+    on('#wa-stall-lay', () => {
+      // 招牌留空就不传，由引擎当成空招牌，不替它编一个。
+      const sg = wv('#wa-stall-sign');
+      const r = WA.stall.lay(wv('#wa-stall-owner'), wv('#wa-stall-place'), sg ? { sign: sg } : {});
+      stallOut(r.ok ? '已摆摊：' + r.owner + ' 在 ' + r.place + (r.sign ? '（招牌「' + r.sign + '」）' : '（无招牌）')
+        : '未能摆摊：' + r.reason + (r.at !== undefined ? '（人在 ' + (r.at || '别处') + '，摊在 ' + r.place + '）' : '')
+          + (r.limit !== undefined ? '（已到上限 ' + r.limit + '）' : '') + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-stall-list', () => {
+      const p = parseFloat($('#wa-stall-price').value);
+      const r = WA.stall.list(wv('#wa-stall-owner'), wv('#wa-stall-res'), stallQty('#wa-stall-qty'), isFinite(p) ? p : NaN);
+      stallOut(r.ok ? (r.repriced ? '已改价：' : '已挂出：') + r.resource + '×' + r.qty + ' 单价 ' + r.price
+        : '未能挂货：' + r.reason + (r.lo !== undefined ? '（许可带 ' + r.lo + '~' + r.hi + '）' : '')
+          + (r.have !== undefined ? '（可售 ' + r.have + '，要 ' + r.want + '）' : '') + (r.limit !== undefined ? '（已挂满 ' + r.limit + ' 项）' : ''));
+    });
+    on('#wa-stall-sign-btn', () => {
+      const r = WA.stall.sign(wv('#wa-stall-owner'), wv('#wa-stall-sign'));
+      stallOut(r.ok ? (r.reason === 'same-sign' ? '招牌没变：' + r.sign : '已换招牌：' + r.sign) : '未能换招牌：' + r.reason + (r.max !== undefined ? '（' + r.len + ' 字，上限 ' + r.max + '）' : ''));
+    });
+    on('#wa-stall-delist', () => {
+      const r = WA.stall.delist(wv('#wa-stall-owner'), wv('#wa-stall-res'));
+      stallOut(r.ok ? '已撤货：' + r.resource + '（撤 ' + r.dropped + ' 项，货回到可售）' : '未能撤货：' + r.reason);
+    });
+    on('#wa-stall-buy', () => {
+      const r = WA.stall.buy(wv('#wa-stall-owner'), wv('#wa-stall-res'), stallQty('#wa-stall-bqty'), wv('#wa-stall-buyer'));
+      stallOut(r.ok ? '已成交：' + r.buyer + ' 买走 ' + r.resource + '×' + r.qty + '，付 ' + r.total + ' ' + r.currency
+        + '（税 ' + r.tax + '，卖家净收 ' + r.sellerNet + '）；买家余额 ' + r.balance + '，余货 ' + r.stock
+        : '未能成交：' + r.reason + (r.have !== undefined ? '（有 ' + r.have + '，要 ' + r.want + '）' : '')
+          + (r.at !== undefined ? '（买主在 ' + (r.at || '别处') + '，摊在 ' + r.place + '）' : '') + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-stall-away', () => {
+      const r = WA.stall.away(wv('#wa-stall-owner'));
+      stallOut(r.ok ? (r.reason === 'already-away' ? '本来就已走开' : '已走开：' + r.owner + ' 的摊还在 ' + r.place + '，' + r.listings + ' 项货照卖') : '未能走开：' + r.reason);
+    });
+    on('#wa-stall-back', () => {
+      const r = WA.stall.back(wv('#wa-stall-owner'));
+      stallOut(r.reason === 'strayed' ? '回来时人已不在摊边，就地收摊：剩 ' + (r.leftovers.length ? r.leftovers.map(function (x) { return x.resource + '×' + x.qty; }).join('、') : '无')
+        : (r.ok ? (r.reason === 'already-back' ? '本来就在' : '已回来：' + r.owner) : '未能回来：' + r.reason));
+    });
+    on('#wa-stall-pack', () => {
+      const r = WA.stall.pack(wv('#wa-stall-owner'));
+      stallOut(r.ok ? '已收摊：' + r.owner + ' 在 ' + r.place + '；剩货解回 '
+        + (r.leftovers.length ? r.leftovers.map(function (x) { return x.resource + '×' + x.qty; }).join('、') : '无')
+        + '，本摊共成交 ' + r.sold + ' 笔' : '未能收摊：' + r.reason + (r.hint ? '（' + r.hint + '）' : ''));
+    });
+    on('#wa-stall-view', () => {
+      const r = WA.stall.view(wv('#wa-stall-owner'));
+      if (!r.ok) return stallOut('没这个摊：' + r.owner);
+      stallOut(r.owner + ' 在 ' + r.place + (r.sign ? '（招牌「' + r.sign + '」）' : '') + (r.away ? '·人不在' : '')
+        + '：' + (r.listings.length ? r.listings.map(function (l) { return l.resource + '×' + l.qty + ' 价' + l.price + '（带 ' + l.lo + '~' + l.hi + '）'; }).join('，') : '空摊')
+        + '；税 ' + r.taxPct + '%' + (r.recent.length ? '；最近 ' + r.recent.length + ' 笔' : ''));
+    });
+    on('#wa-stall-board', () => {
+      const r = WA.stall.board(wv('#wa-stall-place'));
+      if (!r.ok) return stallOut(r.place + ' 一处摊板空着');
+      stallOut(r.place + '：' + r.rows.map(function (x) { return x.owner + (x.away ? '(人不在)' : '') + ' '
+        + x.listings.map(function (l) { return l.resource + '×' + l.qty + ' 价' + l.price; }).join('、'); }).join('；'));
+    });
+    on('#wa-stall-out-btn', () => {
+      const s = WA.stall.statView();
+      stallOut(s.stalls + ' 摊（人不在 ' + s.away + '），挂货 ' + s.listings + ' 项；税率 ' + s.taxPct + '%，累计抽税 ' + s.taxBurned);
+    });
     const instOut = function (t) { const el = $('#wa-inst-out'); if (el) el.innerHTML = '<div class="wa-dim">' + String(t) + '</div>'; };
     const instOrg = function () { return wv('#wa-inst-org'); };
     const instPerms = function () {

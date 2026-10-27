@@ -32,7 +32,7 @@
   }
 
   function now() {
-    return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('careChain') : Date.now();
+    try { return WA.clock.now('careChain'); } catch (e) { return Date.now(); }
   }
 
   var ESCALATION_LEVELS = ['stable', 'warning', 'critical', 'emergency'];
@@ -66,7 +66,7 @@
    */
   function registerCareCommitment(spec) {
     var s = spec || {};
-    var id = clean(s.id || ('cc_' + Math.random().toString(36).slice(2, 9)), 60);
+    var id = clean(s.id || (WA.rand.id('cc_', 7, 'id')), 60);
     var caregiver = clean(s.caregiver, 60);
     var ward = clean(s.ward, 60);
     var placeId = clean(s.placeId, 60);
@@ -213,7 +213,7 @@
         target.updatedAt = now();
 
         breachRecord = {
-          id: 'br_' + Math.random().toString(36).slice(2, 9),
+          id: WA.rand.id('br_', 7, 'id'),
           commitmentId: cid,
           caregiver: target.caregiver,
           ward: target.ward,
@@ -265,7 +265,7 @@
     }
 
     var referralEntry = {
-      id: 'ref_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('ref_', 7, 'id'),
       commitmentId: cid,
       fromCaregiver: comm.caregiver,
       toCaregiver: toCaregiver || null,
@@ -317,7 +317,7 @@
     if (!comm) return { ok: false, reason: 'commitment-not-found', id: cid };
 
     var queueEntry = {
-      id: 'q_' + Math.random().toString(36).slice(2, 9),
+      id: WA.rand.id('q_', 7, 'id'),
       commitmentId: cid,
       ward: comm.ward,
       facilityId: facilityId || comm.facilityId,
