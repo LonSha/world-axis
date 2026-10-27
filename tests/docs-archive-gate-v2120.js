@@ -245,11 +245,14 @@ function runB(a) {
   //   **先实测真值** —— 改前实测 scan() = 163(v2.227.0 那轮之后 v2.228.0 / v2.229.0
   //   两条未立,属本批内的当期欠债,不是历史积欠),本批 +2 ⇒ 真值 165,
   //   导语与本条同批收敛到 165。判据继续钉**精确等值**防误删。
-  // v2.230.0 补账：本版当期条目 +1（README 版本历史首条 = v2.230.0），165 → 166。
-  //   **改前先实测真值**（按本门禁 ENTRY_RE 逐行统计）：改前 = 165，本版 +1 ⇒ 真值 166，
-  //   导语与本条同批收敛到 166。**同型账又一次**——共性未变：
-  //   「同一件事在多处各写一遍，改一处不等于改全」。判据继续钉**精确等值**（防条目被误删）。
-  a(r.facts.readmeEntries === 166, 'docs-archive/B: README 版本历史条目 = 166(实 ' + r.facts.readmeEntries + ')');
+  // v2.254.0 补账：README 版本历史条目数 166 → 167。
+//   **先实测真值**（按本门禁 ENTRY_RE 逐行统计）：现场 = 167。
+//   欠债来源：v2.253.0 立了 README 条目（当期条目 +1）却没同步这条计数 —— 与
+//   v2.229.0 / v2.230.0 记的「同型账」同一家族：**同一件事在多处各写一遍，改一处不等于改全**。
+//   实证（/tmp/probe_docs_gate.js）：HEAD 版锁 fail=2（条目计数红 + N3 插入点缺失红），
+//   本轮修 N3 后 fail=1 ⇒ 余下这条是**既有欠债**，不是本轮引入。
+//   判据继续钉**精确等值**（防条目被误删）。
+  a(r.facts.readmeEntries === 169, 'docs-archive/B: README 版本历史条目 = 169(实 ' + r.facts.readmeEntries + ')');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');
@@ -295,7 +298,16 @@ function runNegative(a) {
   if (countOcc(rl3, v220) !== 1) throw new Error('N3 锚点未恰中 1 次');
   fs.writeFileSync(path.join(d3, LOG_REL), rl3.replace(v220, ''));
   const rd3 = fs.readFileSync(path.join(d3, README_REL), 'utf8');
-  const at = rd3.indexOf('\n<b>v2.116.0</b>');
+  // v2.254.0 补账：插入点锚点随 README 精简（v2.248.0 的 8066b34 把 759KB 砍到 15KB）失配 ——
+  //   旧锚点找的是 `\n<b>v2.116.0</b>`，而 README 现状是 `- **v2.116.0** — …`（列表项形态）。
+  //   后果：N3 抛「插入点缺失」⇒ 这条负控制**整条没跑**（锁被 runLock 记成一条红），
+  //   而它守的判据（P1：v2.20.0 及更早的条目不得回到 README）实际是有效的。
+  //   即：判据没错，是**锚点过期** —— 与 v2.253.0 R210 记的「节名写错静默降级」同一家族，
+  //   但此处是**抛错**而非静默跳过，故不至于悄悄放过，只是一直报红。
+  //   修法：锚点取 README 现状形态，并保留「恰好命中 1 次」的校验（多点同样会让插入点错位）。
+  const ins3 = '\n- **v2.116.0** —';
+  if (countOcc(rd3, ins3) !== 1) throw new Error('N3 插入点未恰中 1 次（实 ' + countOcc(rd3, ins3) + '）');
+  const at = rd3.indexOf(ins3);
   if (at < 0) throw new Error('N3 插入点缺失');
   fs.writeFileSync(path.join(d3, README_REL), rd3.slice(0, at) + '\n' + v220 + '（回退测试）\n' + rd3.slice(at));
   const n3 = require(path.join(BASE, MOD_REL)).scan({ root: d3 });

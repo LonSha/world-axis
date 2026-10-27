@@ -175,6 +175,15 @@
       .wa-cat-btn.active { background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.38); color: #38bdf8; font-weight: 600; }
       #wa-orb { touch-action: none; transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease; }
       #wa-orb:active { transform: scale(0.95); cursor: grabbing; }
+      /* v2.254.0: 概览折叠壳 —— 摘要一行在明处，读数与解释点开才看（<details> 原生交互，零 JS、零控件） */
+      .wa-fold { border: 1px solid var(--wa-border-subtle, rgba(255,255,255,.07)); border-radius: 6px; margin: 6px 0; background: var(--wa-surface-1, rgba(255,255,255,.04)); }
+      .wa-fold > summary { padding: 7px 10px; font-size: 12px; line-height: 1.5; cursor: pointer; color: #c6d0da; list-style: none; }
+      .wa-fold > summary::-webkit-details-marker { display: none; }
+      .wa-fold > summary::before { content: '▸ '; color: #6b7684; }
+      .wa-fold[open] > summary::before { content: '▾ '; }
+      .wa-fold-bad > summary { color: #fbbf24; }
+      .wa-fold-body { padding: 2px 10px 8px; }
+      .wa-fold-body .wa-card { margin: 6px 0; }
     `;
     try {
       const el = mainDoc.createElement('style');
@@ -430,17 +439,27 @@
   //   用户只能凭记忆发现少了谁。本块把「谁在丢、丢了多少、最近丢的是谁」摆到概览页。
   //   刻意**不引入任何控件**（纯展示）：UI 绑定守卫要求每个控件都有绑定，而这里不需要交互；
   //   需要动作时去「诊断」页看逐站点明细。
+  // v2.254.0: 折叠壳单一真源。六块只读诊断共用：摘要在明处一行，读数点开才看。
+  //   <details> 是原生的展开交互，**不产生 id、不接事件** ⇒ 不触碰 UI 绑定守卫（G17）
+  //   与接线门禁——与下方各块「零控件」的既有纪律同构。
+  //   bad=true 时摘要染警示色（异常要在这页上看得见，不能被折叠藏起来）。
+  function foldCard(label, summary, bodyHtml, bad) {
+    return '<details class="wa-fold' + (bad ? ' wa-fold-bad' : '') + '">'
+      + '<summary>' + esc(label) + '：' + summary + '</summary>'
+      + '<div class="wa-fold-body">' + bodyHtml + '</div></details>';
+  }
   function evictBlock() {
     try {
       const st = (WA.evict && typeof WA.evict.evictStat === 'function') ? WA.evict.evictStat() : null;
       if (!st) return '';
       if (!st.evicts && !st.evictFailed) {
-        return '<div class="wa-sec">容量收纳</div><div class="wa-list"><div class="wa-item wa-dim">本轮尚未发生容量挤出（' + st.sites + ' 个站点在位，数据均在各自上限内）</div></div>';
+        return foldCard('容量收纳', '无挤出（' + st.sites + ' 个站点在位）',
+          '<div class="wa-item wa-dim">本轮尚未发生容量挤出（' + st.sites + ' 个站点在位，数据均在各自上限内）</div>');
       }
       if (st.evictFailed > 0) {
-        return '<div class="wa-sec">容量收纳</div><div class="wa-list">'
+        return foldCard('容量收纳', '<span class="wa-bad">挤出失败 ' + st.evictFailed + ' 次——须改代码</span>', '<div class="wa-list">'
           + '<div class="wa-item"><b>挤出失败 ' + st.evictFailed + ' 次</b>（' + esc(JSON.stringify(st.failedBy || {}))
-          + '）——站点未登记或参数非法，数据未被截断而是继续超限增长，须改代码。</div></div>';
+          + '）——站点未登记或参数非法，数据未被截断而是继续超限增长，须改代码。</div></div>', true);
       }
       const rows = Object.keys(st.bySite || {}).sort(function (a, b) { return st.bySite[b].dropped - st.bySite[a].dropped; }).slice(0, 6)
         .map(function (k) {
@@ -452,10 +471,10 @@
             + (w ? '：' + esc(w) : '') + '</div>';
         }).join('');
       const what = (st.lastDropped || []).slice(-3).map(function (x) { return esc(x.site + '→' + x.what); }).join('、');
-      return '<div class="wa-sec">容量收纳（共挤出 ' + st.evicts + ' 次 / 丢弃 ' + st.evicted + ' 项）</div>'
-        + '<div class="wa-list">' + rows
+      return foldCard('容量收纳', '挤出 ' + st.evicts + ' 次 / 丢弃 ' + st.evicted + ' 项',
+        '<div class="wa-list">' + rows
         + (what ? '<div class="wa-item wa-dim">最近被挤出：' + what + '</div>' : '')
-        + '</div>';
+        + '</div>', st.evicted > 0);
     } catch (e) { return ''; }
   }
   // ── v2.14.0: 随机源（第八面：可复现性）──────────────────────
@@ -470,12 +489,13 @@
     const src = st.seedSource === 'explicit' ? '已显式播种（可复现）' : (st.seedSource === 'auto' ? '自动种子（本会话不可复现）' : '尚未使用');
     const chans = (st.channelNames || []).map(function (c) { return c + '(' + ((st.byChannel || {})[c] || 0) + ')'; }).join('、');
     const bad = st.failed > 0 ? '<span class="wa-bad">｜参数非法 ' + st.failed + ' 次（' + esc(JSON.stringify(st.failedBy || {})) + '）</span>' : '';
-    return '<div class="wa-card"><div class="wa-card-h">随机源（决策可复现性）</div>' +
+    return foldCard('随机源', src + bad,
+      '<div class="wa-card"><div class="wa-card-h">随机源（决策可复现性）</div>' +
       '<div class="wa-kv">种子：<b>' + src + '</b>' + bad + '</div>' +
       '<div class="wa-kv">决策抽取：' + st.draws + ' 次｜生成 id：' + st.ids + ' 个（id 走独立通道，不占用决策序列）</div>' +
       '<div class="wa-kv">通道：' + (chans || '（本会话尚未抽取）') + '</div>' +
       '<div class="wa-hint">要复现某次运行：控制台执行 <code>WorldAxis.rand.seed(数字)</code>，之后决策流同种子同序列。<br>' +
-      '「同样操作两次结果不同」不是引擎不稳定——是随机源没有定住。</div></div>';
+      '「同样操作两次结果不同」不是引擎不稳定——是随机源没有定住。</div></div>', st.failed > 0);
   }
   // v2.15.0: 时间源（第九面：可复现性的另一半）——纯展示、不引入控件。
   //   与随机源块并列的理由：可复现性要两个输入同时确定，而用户在面板上只看得见「种子」那一半，
@@ -490,12 +510,13 @@
     const sites = (st.siteNames || []).map(function (c) { return c + '(' + ((st.bySite || {})[c] || 0) + ')'; }).join('、');
     const bad = st.failed > 0 ? '<span class="wa-bad">｜参数非法 ' + st.failed + ' 次（' + esc(JSON.stringify(st.failedBy || {})) + '）</span>' : '';
     const dft = st.frozen && st.drift > 60000 ? '｜与真实时刻已偏差 ' + Math.round(st.drift / 60000) + ' 分钟（冻结期间的正常现象）' : '';
-    return '<div class="wa-card"><div class="wa-card-h">时间源（存档可复现性）</div>' +
+    return foldCard('时间源', (st.frozen ? '已冻结' : '跟墙钟走') + bad + dft,
+      '<div class="wa-card"><div class="wa-card-h">时间源（存档可复现性）</div>' +
       '<div class="wa-kv">决策时钟：' + mode + bad + '</div>' +
       '<div class="wa-kv">决策读取：' + st.nowCalls + ' 次｜测量读取：' + st.wallCalls + ' 次（耗时台账与展示，不受冻结影响）</div>' +
       '<div class="wa-kv">站点：' + (sites || '（本会话尚未读取）') + dft + '</div>' +
       '<div class="wa-hint">要复现某次运行：控制台执行 <code>WorldAxis.clock.freeze(时刻戳)</code>，之后所有进存档的时间戳都取这个虚拟时刻<br>' +
-      '（每轮用 <code>WorldAxis.clock.advance()</code> 推进；<code>unfreeze()</code> 回到墙钟）。刷新页面即解除——冻结是会话内的显式动作。</div></div>';
+      '（每轮用 <code>WorldAxis.clock.advance()</code> 推进；<code>unfreeze()</code> 回到墙钟）。刷新页面即解除——冻结是会话内的显式动作。</div></div>', st.failed > 0);
   }
   // v2.16.0: 对外只读互操作桥（另两个插件能不能读到这个世界）——纯展示、不引入控件。
   //   为什么放这里：本页此前所有块讲的都是「本扩展自己怎么看世界」。而这个世界同时被
@@ -511,13 +532,15 @@
     const bad = st.failures > 0 ? '<span class="wa-bad">｜发布失败 ' + st.failures + ' 次（' + esc((st.lastFailure || {}).reason || '?') + '）</span>' : '';
     const warn = (!on && st.externalReads > 0) ? '<span class="wa-bad">｜外部已读 ' + st.externalReads + ' 次却全是 null——对方看起来像「世界是空的」</span>' : '';
     const inv = Object.keys(st.byInvalidate || {}).map(function (k) { return k + '(' + st.byInvalidate[k] + ')'; }).join('、');
-    return '<div class="wa-card"><div class="wa-card-h">对外桥（世界状态外供 · worldaxis_bridge_v1）</div>' +
+    return foldCard('对外桥', (on ? '已开闸' : '休眠') + bad + warn,
+      '<div class="wa-card"><div class="wa-card-h">对外桥（世界状态外供 · worldaxis_bridge_v1）</div>' +
       '<div class="wa-kv">闸门：' + mode + bad + warn + '</div>' +
       '<div class="wa-kv">发布 ' + st.publishes + ' 次｜floor=' + st.publishedFloor + '｜' + (st.snapshotBytes || 0) + ' 字节｜外部读取 ' + st.externalReads + ' 次</div>' +
       '<div class="wa-kv">作废 ' + st.invalidations + ' 次（' + (inv || '尚无') + '）｜去抖跳过 ' + st.debounced + ' 次</div>' +
       '<div class="wa-hint">这是本扩展**唯一**对外接口，与 LonSha 的 <code>lonsha_memory_bridge_v1</code> 同规格（只读投影／纯读不抛／深拷贝）。<br>' +
       '开闸：<code>WorldAxis.bridge.setSettings({ enabled: true })</code>；外部取数：<code>WorldAxis.bridge.snapshot()</code>（返回深拷贝，受 ' + st.floorGap + ' 楼间隔与去抖保护）。<br>' +
-      '默认休眠的理由：快照要 clone 世界状态，无事时不该付出这份开销。</div></div>';
+      '默认休眠的理由：快照要 clone 世界状态，无事时不该付出这份开销。</div></div>',
+      (st.failures > 0) || (!on && st.externalReads > 0));
   }
   // v2.17.0: 记忆桥消费面（另一个插件记的那本账，本扩展读不读得到）——纯展示。
   //   与上面的 bridgeBlock 互为镜像：那一块讲「我发得出去吗」，这一块讲「我读得进来吗」。
@@ -527,16 +550,18 @@
     let hasLonsha = false;
     try { hasLonsha = !!(WA.lonshaReader && typeof WA.lonshaReader.readLonshaSnapshot === 'function'); } catch (e) { hasLonsha = false; }
     if (!hasLonsha) {
-      return '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
-        '<div class="wa-kv">消费面未加载（读不到另一个插件记的那本账）</div></div>';
+      return foldCard('记忆桥', '<span class="wa-dim">消费面未加载</span>',
+        '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
+        '<div class="wa-kv">消费面未加载（读不到另一个插件记的那本账）</div></div>');
     }
     const read = WA.lonshaReader.readLonshaSnapshot({ refresh: false });
     if (!read.ok) {
-      return '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
+      return foldCard('记忆桥', '<span class="wa-bad">不可读：' + esc(WA.lonshaReader.describeLonsha(read)) + '</span>',
+        '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
         '<div class="wa-kv">不可读：' + esc(WA.lonshaReader.describeLonsha(read)) + '</div>' +
         '<div class="wa-hint">归因 <code>' + esc(String(read.reason || '?')) + '</code>——'
         + '"对方还没就绪"（稍后再读）与"对方坏了"（该查）是两件事，不该同形。<br>'
-        + 'LonSha 未安装是常见合法配置；已安装却读不到，才需要看它的 <code>sourceState</code> / <code>lastError</code>。</div></div>';
+        + 'LonSha 未安装是常见合法配置；已安装却读不到，才需要看它的 <code>sourceState</code> / <code>lastError</code>。</div></div>', true);
     }
     const sum = WA.lonshaReader.summarizeSnapshot(read.snapshot);
     const d = WA.lonshaReader.diffWithLonsha(read.snapshot);
@@ -582,7 +607,8 @@
         + ((esh.missing || []).length ? '｜⚠️ 本侧读了上游没有的 ' + esh.missing.join('、') : '')
         + ((esh.unknown || []).length ? '｜上游另有未消费 ' + esh.unknown.join('、') : '')
       : '';
-    return '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
+    return foldCard('记忆桥', (bad ? '<span class="wa-bad">' : '') + esc(VD[d.verdict] || d.verdict) + (bad ? '</span>' : ''),
+      '<div class="wa-card"><div class="wa-card-h">记忆桥（读 LonSha 账本 · lonsha_memory_bridge_v1）</div>' +
       '<div class="wa-kv">对账：' + (bad ? '<span class="wa-bad">' : '') + esc(VD[d.verdict] || d.verdict) + (bad ? '</span>' : '') + '</div>' +
       '<div class="wa-kv">本扩展 ' + esc(d.worldDate || '（无公历钟）') + ' ｜LonSha ' + esc(d.lonshaDate || '（未记录）') + '</div>' +
       '<div class="wa-kv">对方快照：floor=' + (sum.floor || 0) + '｜' + (sum.selfBytes || 0) + ' 字节｜契约 '
@@ -602,7 +628,7 @@
       '<div class="wa-hint">这是本扩展对 LonSha 记忆桥的**唯一**消费点（此前全库零消费，引用只在注释里）。<br>' +
       '只读：不写对方的账本、不改本扩展的世界钟——两个钟对不上只报不管，<b>谁拍板由用户决定</b>。<br>' +
       '「未外供」与「显式为空」是两件事（本扩展尊重对方 v3.174 的三态自述），故分别列出。<br>' +
-      'v2.18.0 起读的**不只是 `clock` 一个字段**：对方八本账 + 一本对读读数逐本看图，并对三本账报差集。</div></div>';
+      'v2.18.0 起读的**不只是 `clock` 一个字段**：对方八本账 + 一本对读读数逐本看图，并对三本账报差集。</div></div>', bad);
   }
   // ── v2.124.0（优化计划 P6）：引擎心跳（三源聚合 · 一页答「引擎在不在转」）──
   //   治的病：玩家根本不知道引擎在不在转 —— 「这扩展有用吗」在界面上答不出。
@@ -619,9 +645,17 @@
   //       冒充「API 很快」（P4 在 `bandCompare` 的 `apiNote` 里登记过的同一条）。
   function heartbeatBlock() {
     const out = [];
+    // v2.254.0: 摘要染红旗（劣化源 / 三源读取失败都要点亮折叠壳摘要行）
+    let __hbBad = false;
+    // v2.254.0b: ① 段读到的因果链读数**提出来给摘要复用** ——
+    //   此前摘要自己再读一次 causal.stateView()。两次读之间世界可能已推进，
+    //   于是「明细说 3 条、摘要说 0 链」自相矛盾 —— 那是折叠方案自己制造的新矛盾。
+    //   提出来复用 ⇒ 只读一次，明细与摘要必然一致（读数只读一次这条纪律的延伸）。
+    let __cv = null;
     // ① 世界链在不在走（causal.stateView —— 纯读存档，不推进世界）
     try {
       const cv = (WA.causal && typeof WA.causal.stateView === 'function') ? WA.causal.stateView() : null;
+      __cv = cv;
       if (!cv) out.push('<div class="wa-kv">世界链：<span class="wa-dim">因果模块未装载</span></div>');
       else {
         const byS = Object.keys(cv.byStatus || {}).filter(function (k) { return cv.byStatus[k] > 0; })
@@ -633,7 +667,7 @@
           + (cv.scheduledDelayed ? '<span class="wa-dim">｜延后 ' + esc(String(cv.scheduledDelayed)) + '</span>' : '')
           + '</div>');
       }
-    } catch (e) { out.push('<div class="wa-kv">世界链：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
+    } catch (e) { __hbBad = true; out.push('<div class="wa-kv">世界链：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
     // ② 本轮注入在不在转（lastInjection.budget.cost + lastInjection.recalc —— 既有真源）
     try {
       const li = (WA.store && WA.store.get) ? (WA.store.get().lastInjection || null) : null;
@@ -660,7 +694,7 @@
             + '｜脏键 ' + esc((rc.dirtyKeys || []).length ? (rc.dirtyKeys || []).join('、') : '无') + '</span></div>');
         }
       }
-    } catch (e) { out.push('<div class="wa-kv">本轮注入：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
+    } catch (e) { __hbBad = true; out.push('<div class="wa-kv">本轮注入：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
     // ③ 基准对照面（dryRun：**只报结构面**，不跑任何一档 —— 看一眼概览页不该等于跑一轮基准）
     try {
       const bc = (WA.perfTrace && typeof WA.perfTrace.bandCompare === 'function') ? WA.perfTrace.bandCompare({ dryRun: true }) : null;
@@ -691,10 +725,10 @@
           ? '<b>' + esc(String(gs.user)) + '</b> 在用'
           : '<span class="wa-dim">未启用（单机默认放行；登记使用者后写/删路径才过闸门）</span>')
           + '<span class="wa-dim">｜' + esc(line('write')) + '｜' + esc(line('delete')) + '</span></div>');
-        if (blocked > 0) out.push('<div class="wa-kv wa-bad">删除出口已拦下 ' + esc(String(blocked)) + ' 次'
-          + '<span class="wa-dim">（被拦下的删除一个字节都没碰存储）</span></div>');
+        if (blocked > 0) { __hbBad = true; out.push('<div class="wa-kv wa-bad">删除出口已拦下 ' + esc(String(blocked)) + ' 次'
+          + '<span class="wa-dim">（被拦下的删除一个字节都没碰存储）</span></div>'); }
       }
-    } catch (e) { out.push('<div class="wa-kv">删除闸门：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
+    } catch (e) { __hbBad = true; out.push('<div class="wa-kv">删除闸门：<span class="wa-dim">读取失败（' + esc(e && e.message) + '）</span></div>'); }
     // ④ 性能在不在慢下来（perfLedger.trend —— 纯读内存台账，不计时、不落盘）
     //   v2.148.0（RP1）：三源答「在不在转」，第四源答「一直在变慢吗」——
     //   本轮 3ms 与 200 轮前的 3ms 长得一样，但斜率知道区别。
@@ -705,6 +739,7 @@
       } else if (!pl.ok) {
         out.push('<div class="wa-dim">④ 性能趋势：' + esc(pl.reason || 'unknown') + '</div>');
       } else {
+        if (pl.degrading > 0) __hbBad = true;
         const st = WA.perfLedger.stat();
         const top = pl.rows.length ? pl.rows[0] : null;
         // 退场归因行（只在真退过东西时出现）：只报「N 源在记」会盖掉「有样本被退」，
@@ -724,14 +759,24 @@
         }
       }
     } catch (e) {
+      __hbBad = true;
       out.push('<div class="wa-dim">④ 性能趋势：读取抛错（' + esc(String(e && e.message || e)) + '）</div>');
     }
-    return '<div class="wa-card"><div class="wa-card-h">引擎心跳（四源聚合 · 只读）</div>'
+    // v2.254.0: 摘要行 —— 只答「在不在说事」：世界链 / 注入耗时 / 档位可判 / 闸门 / 劣化源。
+    //   全零与未装载是**默认态**，不该占一屏；但异常（读取失败、劣化、拦截）要在这行上看得见。
+    let sum = '<span class="wa-dim">未转</span>';
+    const hBad = __hbBad;
+    // 摘要复用 ① 段已读到的真值（不二次读 ⇒ 明细与摘要不会互相打架）；
+    //   读不到就是「未转」，不编、不炸（① 段的 catch 已把读取失败记成坏态）。
+    if (__cv) sum = esc(String(__cv.chains == null ? '?' : __cv.chains)) + ' 链 / ' + esc(String(__cv.live)) + ' 进行中';
+    const sumLine = '世界链 ' + sum + ' · <span class="wa-dim">读数与闸门点开看</span>';
+    return foldCard('引擎心跳', sumLine,
+      '<div class="wa-card"><div class="wa-card-h">引擎心跳（四源聚合 · 只读）</div>'
       + out.join('')
       + '<div class="wa-hint">三行分别答：<b>世界链在不在走</b>（因果链条数与状态）、'
       + '<b>本轮注入在不在转</b>（耗时与局部重算）、<b>基准够不够判</b>（四档结构是否在场）。<br>'
       + '全部只读、零动作：真正的操作入口在「因果工作台」「档位面」「增量面」与「诊断」页。<br>'
-      + '「未上报」与「0ms」是两件事 —— 宿主 API 耗时无上报时照实写未上报，不拿 0ms 冒充「API 很快」。</div></div>';
+      + '「未上报」与「0ms」是两件事 —— 宿主 API 耗时无上报时照实写未上报，不拿 0ms 冒充「API 很快」。</div></div>', hBad);
   }
   function renderOverview() {
     const s = WA.store.get();
