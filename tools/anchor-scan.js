@@ -167,7 +167,31 @@ const PATTERNS = [
   //     既有 `file-const-multi` 只收 `…/….js`，文档门的目标文件因此认不出）
   { id: 'file-const-doc', what: "const NAME = 'README.md'（文档文件常量）",
     re: /\bconst\s+([A-Z][A-Z0-9_]*)\s*=\s*(['"])([\w.-]+\.md)\2/g,
-    kind: 'target', group: 3 }
+    kind: 'target', group: 3 },
+  // ── v2.257.0（O18 第四刀）：**三族真实写法** ─────────────────────────────
+  //   现场取证（/tmp/q5.js，26 把未识别锁逐把实测；口径与 `uniqHits` 同源，含转义还原）：
+  //     族一 `const anchor1 = "…"`：只有 `local-anchor-const` 认 `const anchor`（无序号），
+  //       于是 exp20~exp27 八把 + q3-interrupt-resume 的真实破坏锚点**一条都认不出**；
+  //     族二 `path.resolve(__dirname, '../engines/x.js')`：既有目标面只认
+  //       `path.join(BASE, …)`，用 `__dirname` 上跳的写法整族认不出（exp20~27、exp28~33、
+  //       geo-tracker、map-viewport、q3 等 11 把的目标面因此为空）；
+  //     族三 `['name', '锚点原文', '替换串', fn]`（变异表行）：本仓 exp11/16/17/28~33
+  //       共 11 把锁把「锚点」与「替换」写成数组前三元素，**没有具名字段**，
+  //       既有任何模式都摸不到。
+  //   收益（同一探针实测）：已识别锁 161 → 179，未识别 26 → 8，覆盖率 88.7% → 96.5%。
+  //   噪声（如实登记）：新增 77 条锚点里 69 条在目标文件里恰中 1 次（89.6%），
+  //   其余 8 条沿用既有归因（`not-found` / `ambiguous-target`）如实进 `issues`（只报不红）。
+  //   为什么族三排在族一之后：同一条 `['a','b','c',fn]` 里，若族一已用 `anchorN` 变量名
+  //   取到同一段原文，`seenA` 去重会先到先得（保持既有 pattern 归属不漂移）。
+  { id: 'anchor-index-const', what: "const anchor1 = '…' / const anchorN9 = '…'（带序号的局部锚点常量）",
+    re: /\bconst\s+(anchor(?:[0-9]+|[A-Z][A-Z0-9_]*))\s*=\s*(['"`])((?:\\.|(?!\2)[\s\S])*)\2/g,
+    kind: 'anchor', group: 3 },
+  { id: 'path-resolve-parent', what: "path.resolve(__dirname, '../engines/x.js')（以 __dirname 上跳取目标文件）",
+    re: /path\.(?:resolve|join)\(\s*__dirname\s*,\s*(['"])(\.\.\/[a-z][\w.-]*\/[\w.-]+\.js)\1\s*\)/g,
+    kind: 'target', group: 2 },
+  { id: 'mutation-row', what: "['name', '锚点原文', '替换串', fn]（变异表行：锚点与替换同在一行三元组）",
+    re: /\[\s*(['"])([^'"\n]{2,60})\1\s*,\s*(['"])((?:\\.|(?!\3)[\s\S])*?)\3\s*,\s*(['"])((?:\\.|(?!\5)[\s\S])*?)\5\s*,/g,
+    kind: 'anchor', group: 4 }
 ];
 /** 自引用排除：本工具与统一档审计器本身不是被测锁。 */
 const SELF = ['anchor-scan.js'];

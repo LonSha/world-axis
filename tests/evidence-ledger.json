@@ -595,7 +595,7 @@
     },
     {
       "file": "tests/contract-scan-v2150.js",
-      "sha": "8a3ff2d487fe",
+      "sha": "338dcd9bfa35",
       "version": "2.150.0",
       "versionSource": "title",
       "fileAnchor": "2150",
@@ -1890,7 +1890,7 @@
     },
     {
       "file": "tests/explain-budget-v2122.js",
-      "sha": "fc148ccba1ed",
+      "sha": "b9b488c7bf98",
       "version": "2.122.0",
       "versionSource": "title",
       "fileAnchor": "2122",

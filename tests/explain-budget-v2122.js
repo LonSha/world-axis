@@ -170,9 +170,13 @@ function runAll(a) {
     const b1 = st1.li.budget;
     a(!!b1 && b1.overBudget === true && b1.used > b1.cap,
       'v2122: [B1] 压出超预算局面（used ' + (b1 && b1.used) + ' > cap ' + (b1 && b1.cap) + '）——判据不是空跑');
-    a(b1.folded.length >= 2 && b1.dropped.length === 1 && b1.dropped[0].source === '舆情',
+    // 丢弃条数是**环境常数**（常驻注入块数量随引擎版本增长），不是本版承诺；
+    //   承诺是「两种去向都真发生」+「被丢弃的源落得了名（舆情在内）」。
+    //   现场（v2.257.0，预算 80t）：folded 2 / dropped 5（舆情 + 4 个常驻块）。
+    const droppedNames = b1.dropped.map(function (x) { return x.source; });
+    a(b1.folded.length >= 2 && b1.dropped.length >= 1 && droppedNames.indexOf('舆情') >= 0,
       'v2122: [B1] 折叠 ' + b1.folded.length + ' 条 / 丢弃 ' + b1.dropped.length + ' 条（实丢弃 '
-        + (b1.dropped[0] && b1.dropped[0].source) + '）——两种去向都真发生了');
+        + droppedNames.join(',') + '）——两种去向都真发生了');
     a(b1.folded.every(function (f) { return typeof f.remainAt === 'number' && Array.isArray(f.blockedBy) && f.reason; })
       && b1.dropped.every(function (x) { return typeof x.remainAt === 'number' && Array.isArray(x.blockedBy) && x.reason; }),
       'v2122: [B1] 每条记录都带 remainAt / blockedBy / reason（三样缺一，解释面就只剩半句）');
@@ -329,7 +333,8 @@ function runNegative(a) {
   const W0 = fresh(); seed(W0);
   const st0 = stress(W0);
   const b0 = st0.li.budget;
-  a(b0.folded.length >= 2 && b0.dropped.length === 1,
+  a(b0.folded.length >= 2 && b0.dropped.length >= 1
+      && b0.dropped.map(function (x) { return x.source; }).indexOf('舆情') >= 0,
     'v2122: [N3] 原版上折叠 / 丢弃都真发生（' + b0.folded.length + ' / ' + b0.dropped.length + '）——下面破坏才有的可比');
   const lastTrue = b0.folded[b0.folded.length - 1].blockedBy.length;
   a(lastTrue === b0.folded.length - 1,
@@ -371,8 +376,11 @@ function runNegative(a) {
   a(exI.omniscient.decisions.every(function (d) { return d.budgetOutcome === null; }),
     'v2122: [N1b] 破坏后 B2 现形：逐源 budgetOutcome 全为 null（实带值 '
       + exI.omniscient.decisions.filter(function (d) { return !!d.budgetOutcome; }).length + ' 项）');
-  a(stI.li.budget.dropped.length === 1 && exI.omniscient.budget.droppedDetail.length === 1,
-    'v2122: [N1b] 而落盘账与明细切片仍在（丢弃 ' + stI.li.budget.dropped.length
+  // 判据核心是「落盘账与明细切片**同源**（条数相等且非零）」，不是某个固定条数。
+  a(stI.li.budget.dropped.length >= 1
+      && exI.omniscient.budget.droppedDetail.length === stI.li.budget.dropped.length,
+    'v2122: [N1b] 而落盘账与明细切片仍在且同源（丢弃 ' + stI.li.budget.dropped.length
+      + ' 条 / 明细 ' + exI.omniscient.budget.droppedDetail.length
       + ' 条）——「按源提问」这条路被切断，正是本版要防的那种静默');
   stI.restore();
 
@@ -406,10 +414,16 @@ function runNegative(a) {
     'v2122: [N1d] 而折叠照样发生（落盘 ' + stU.li.budget.folded.length + ' 条 / 计数 '
       + exU.omniscient.budget.folded + ' / 明细 ' + exU.omniscient.budget.foldedDetail.length
       + '）——「2 条折叠」这条计数下面没有任何一行能落名，正是本版要治的那种静默');
-  a(exU.omniscient.decisions.filter(function (d) { return !!d.budgetOutcome; })
-      .every(function (d) { return d.name !== '世界状态'; })
-      && exU.omniscient.decisions.every(function (d) { return !d.budgetOutcome || d.name === '舆情'; }),
-      'v2122: [N1d] 且能挂上归因位的只有被丢弃的「舆情」——`decisions` 里根本没有「世界状态」那一行'
+  // 「世界状态」是**注入块名**、不在 render.SOURCES 源表内 ⇒ decisions 里根本没有它那一行；
+  //   能挂上归因位的源必须全部出自「被丢弃集合」（现场：舆情 + 4 个常驻块，都真被丢了）。
+  const dumpedU = stU.li.budget.dropped.map(function (x) { return x.source; });
+  const withOutU = exU.omniscient.decisions.filter(function (d) { return !!d.budgetOutcome; });
+  a(withOutU.every(function (d) { return d.name !== '世界状态'; })
+      && withOutU.every(function (d) { return dumpedU.indexOf(d.name) >= 0; })
+      && withOutU.length >= 1,
+      'v2122: [N1d] 且能挂上归因位的源全部出自被丢弃集合（实 '
+        + withOutU.map(function (d) { return d.name; }).join(',')
+        + '）——`decisions` 里根本没有「世界状态」那一行'
         + '（块名不在源表内）⇒ 那 2 条 pinned 折叠**只**能靠块级出口落名');
   a(exU.omniscient.budget.unmappedDetail.length === 0 && exU.omniscient.budget.folded === 2,
     'v2122: [N1d] 破坏后：计数说「折叠 2」而块级出口报 0 —— 最要紧的那条折叠（pinned 保底折的'
