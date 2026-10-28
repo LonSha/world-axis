@@ -180,6 +180,9 @@
       const bE = bd('worldaxis_evolution_settings_v1');
       const rng = (arr, fb) => Array.isArray(arr) ? arr : fb;
       return `
+        <div class="wa-sec">界面</div>
+        <label class="wa-node"><input type="checkbox" id="wa-set-devmode" ${((WA.ui && typeof WA.ui.devMode === 'function') ? WA.ui.devMode() : false) ? 'checked' : ''}/><span class="wa-node-label">开发者模式（显示全部 32 个页签与分类导航；关闭则只保留概览 / 世界 / 人物 / 事件 / API / 设置 6 个日常页）</span></label>
+        <div class="wa-dim">日常使用不需要开发者模式。机制页（拍 / 事件闭环 / 分支比较 / 供应链 / 沉积……）是排查与调参用的，藏在开关后面。</div>
         <div class="wa-sec">世界推演设置</div>
         <div class="wa-set-row"><span>推演尺度</span><select aria-label="推演尺度" id="wa-set-mode" class="wa-input">${modes.map(m => `<option value="${m[0]}" ${bs.simulationMode === m[0] ? 'selected' : ''}>${m[1]}</option>`).join('')}</select></div>
         <div class="wa-set-row"><span>时间策略</span><select aria-label="时间策略" id="wa-set-time" class="wa-input">${times.map(t => `<option value="${t[0]}" ${bs.timePolicy === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('')}</select></div>
@@ -296,6 +299,15 @@
       //   与页面无关的 DOM 报错（本仓库既有约定是「先取节点、判空再写」，见下方 pOut 的用法，
       //   但设置页主出口此前是唯一的例外）。此处把同一约定收成一个出口，杜绝再次分化。
       const setOut = function (text) { const o = out(); if (o) o.textContent = text; };
+      // v2.255.0 SIMPLIFY-NAV：开发者模式开关。写走 WA.ui.setDevMode 的单一写口
+      //   （可见性 / 分类条 / 机制页弹回 / 落盘都在那边），本处只挂事件与留痕。
+      //   关闭时若停在机制页，setDevMode 内部会 goPage('overview') → renderBody 重绘，
+      //   设置页 DOM 被整块替换，此处的 devCb 节点随旧 DOM 一起失效 —— 这正是期望行为。
+      const devCb = $('#wa-set-devmode');
+      if (devCb) devCb.onchange = function () {
+        const r = (WA.ui && typeof WA.ui.setDevMode === 'function') ? WA.ui.setDevMode(devCb.checked) : { ok: false, reason: 'ui-missing' };
+        if (WA.log) WA.log('info', '开发者模式：' + (devCb.checked ? '开' : '关') + (r && r.ok === false ? '（失败：' + (r.reason || '?') + '）' : (r && r.page ? '（已回到概览页）' : '')));
+      };
       // v2.2.0: 净化规则治理绑定（此前这些能力零调用 = 治理无入口）
       if (WA.purifier) {
         const pOut = () => { const o = $('#wa-prm-out'); return o; };

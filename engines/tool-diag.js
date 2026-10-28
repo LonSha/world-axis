@@ -3896,7 +3896,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   登记它的意义同其它行：id 写错要有人发现（渲染 + 绑定 + 守卫登记三件齐做）。
       'wa-sw-worldgraph',
       'wa-sw-out',
-      'wa-set-out'],
+      // v2.255.0（SIMPLIFY-NAV）：界面分区的开发者模式开关（设置页）。同一页同一纪律：
+      //   渲染（ui/settings.js 的「界面」分区）+ 绑定（bind 的 #wa-set-devmode onchange）+
+      //   守卫登记（本行）三件齐做 —— 漏登记的表现是 ui-gate 的「每个控件都在守卫表内」红灯。
+      'wa-set-devmode',
+'wa-set-out'],
       cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
     // v2.33.0: 记忆页 / 注入页——本版把「能力面」第一次接到「呈现面」：memory（92 方法，
     //   全库最大单体）与 timeline（记忆溯源）此前产品 UI 零入口。两页控件一并纳管，

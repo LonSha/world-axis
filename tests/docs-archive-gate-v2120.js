@@ -245,14 +245,14 @@ function runB(a) {
   //   **先实测真值** —— 改前实测 scan() = 163(v2.227.0 那轮之后 v2.228.0 / v2.229.0
   //   两条未立,属本批内的当期欠债,不是历史积欠),本批 +2 ⇒ 真值 165,
   //   导语与本条同批收敛到 165。判据继续钉**精确等值**防误删。
-  // v2.254.0 补账：README 版本历史条目数 166 → 167。
+  // v2.255.0 补账：README 版本历史条目数 169 → 170。
 //   **先实测真值**（按本门禁 ENTRY_RE 逐行统计）：现场 = 167。
 //   欠债来源：v2.253.0 立了 README 条目（当期条目 +1）却没同步这条计数 —— 与
 //   v2.229.0 / v2.230.0 记的「同型账」同一家族：**同一件事在多处各写一遍，改一处不等于改全**。
 //   实证（/tmp/probe_docs_gate.js）：HEAD 版锁 fail=2（条目计数红 + N3 插入点缺失红），
 //   本轮修 N3 后 fail=1 ⇒ 余下这条是**既有欠债**，不是本轮引入。
 //   判据继续钉**精确等值**（防条目被误删）。
-  a(r.facts.readmeEntries === 169, 'docs-archive/B: README 版本历史条目 = 169(实 ' + r.facts.readmeEntries + ')');
+  a(r.facts.readmeEntries === 170, 'docs-archive/B: README 版本历史条目 = 170(实 ' + r.facts.readmeEntries + ')');
   a(r.facts.logArchiveEntries === 92, 'docs-archive/B: 日志存档节条目 = 92（实 ' + r.facts.logArchiveEntries + '）');
   a(r.facts.archiveFirst === '2.20.0' && r.facts.archiveLast === '0.1.0',
     'docs-archive/B: 存档首尾 = v2.20.0 / v0.1.0（实 ' + r.facts.archiveFirst + ' / ' + r.facts.archiveLast + '）');

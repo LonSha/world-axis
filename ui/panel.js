@@ -307,7 +307,7 @@
     { id: 'events', icon: '⚡', label: '事件' },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
-    { id: 'connect', icon: '🔌', label: '连接' },
+    { id: 'connect', icon: '🔌', label: 'API' },
     { id: 'assistant', icon: '💬', label: '助手' },
     { id: 'tools', icon: '🧰', label: '工具' },
     { id: 'logs', icon: '📋', label: '日志' }
@@ -335,7 +335,7 @@
   const __PANEL_STATE_KEY = 'worldaxis_ui_panel_state_v1';
   const __panelStateReg = {
     key: __PANEL_STATE_KEY,
-    def: { page: 'overview', logErrOnly: false, orbX: -1, orbY: -1 },
+    def: { page: 'overview', logErrOnly: false, orbX: -1, orbY: -1, devMode: false },
     module: 'ui',
     // 枚举白名单：页面 id 是**闭合集合**（PAGES）。不声明的话，旧版本删掉某页后，磁盘里会
     //   留着一个永远切不过去的「当前页」，表现为「面板打开是空白页」且**零报错**（silent）。
@@ -352,7 +352,7 @@
     try {
       if (WA.settingsBus && typeof WA.settingsBus.read === 'function') return WA.settingsBus.read(__panelStateReg);
     } catch (e) {}
-    return { page: 'overview', logErrOnly: false, orbX: -1, orbY: -1 };
+    return { page: 'overview', logErrOnly: false, orbX: -1, orbY: -1, devMode: false };
   }
   /** 页 id 白名单校验（**读侧**）：`enums` 声明管的是**写**路径不落非法值；本函数管的是
    *  **读**路径不因历史非法值炸渲染 —— `RENDERERS[非法 id]` 是 undefined，调用它必抛。 */
@@ -377,7 +377,8 @@
         page: currentPage,
         logErrOnly: __logErrOnly,
         orbX: __orbPos ? __orbPos.x : -1,
-        orbY: __orbPos ? __orbPos.y : -1
+        orbY: __orbPos ? __orbPos.y : -1,
+        devMode: __devMode === true
       };
       const r = WA.settingsBus.saveOrThrow(__panelStateReg, val);
       if (r && r.ok === false && WA.log) WA.log('warn', 'ui.panel: 面板状态未落盘（' + (r.reason || '?') + '，本次会话内仍生效）', null);
@@ -391,6 +392,17 @@
     const s = __panelState() || {};
     return (typeof s.orbX === 'number' && s.orbX >= 0 && typeof s.orbY === 'number' && s.orbY >= 0) ? { x: s.orbX, y: s.orbY } : null;
   })();
+  // v2.255.0 SIMPLIFY-NAV：玩家模式（默认）只显示 6 个日常页，其余机制页收进「开发者模式」
+  //   （设置页开关）。动线取玩家真实路径：填 API（connect）→ 开自动推演（默认已开）→ 看结果
+  //   （概览/世界/人物/事件）。PAGES 本体一个字不动 —— 页 id/顺序全保留（pages[3..6] 是
+  //   v2.33.0/v2.34.0 的硬读数锚位，插页即整体后移；ui-gate 要求 RENDERERS↔PAGES 严格双射，
+  //   删项即红灯）。过滤只发生在**可见性层**（复用 cat 切换的 style.display 机制）。
+  const PLAYER_PAGES = ['overview', 'world', 'people', 'events', 'connect', 'settings'];
+  let __devMode = __panelState().devMode === true;
+  // v2.255.0 SIMPLIFY-NAV（C3b 探针抓到的真缺陷）：持久化恢复的开发者模式必须装载即全量。
+  //   currentCat 初值 'core'，若不同步切 'all'，devMode:true 的装载只有 core 类 7 页可见
+  //   ——「开了开关、关了面板、再打开，少了 24 页」。
+  if (__devMode) currentCat = 'all';
   let currentPage = __pageOr('overview');
   let panelEl = null, orbEl = null;
   /** v2.109.0（#7）：上一次「基准面」按下时的性能快照。存在的意义就是**下次能比对**——
@@ -14721,6 +14733,31 @@ on('#wa-desk-show', showDesk);
   }
 
   // ── 面板与悬浮球 ──
+  /** v2.255.0 SIMPLIFY-NAV：开发者模式开关（单一写口）。
+   *  关闭时若停在机制页，自动回概览 —— 页签藏了、正文还停在那页，才是真正的「点了没反应」。
+   *  开关状态走 __persistPanel 的单一落盘路径；旧档没有 devMode 字段时回落 false（玩家模式），
+   *  读侧 `=== true` 白名单式判定天然完成迁移，无需另写升级代码。 */
+  function __setDevMode(on) {
+    __devMode = on === true;
+    __persistPanel();
+    if (panelEl) {
+      const cb = panelEl.querySelector('.wa-cat-bar');
+      if (cb) cb.style.display = __devMode ? '' : 'none';
+      if (!__devMode && PLAYER_PAGES.indexOf(currentPage) < 0) {
+        WA.ui.goPage('overview');
+        return { ok: true, devMode: false, page: 'overview' };
+      }
+      // 打开开发者模式时把分类切回「全部」：此前 currentCat 停在离开时的分类上
+      //（玩家模式从 core 类页出发），syncTabs 的分类过滤会把非 core 类的 26 页藏掉，
+      // 表现为「开了开发者模式还是只有 6 页」——开关看着生效、实际没全量。
+      if (__devMode) {
+        currentCat = 'all';
+        panelEl.querySelectorAll('.wa-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === 'all'));
+      }
+      syncTabs();
+    }
+    return { ok: true, devMode: __devMode };
+  }
   function buildPanel() {
     panelEl = h(`<div id="wa-panel" class="wa-hidden">
       <div class="wa-head"><span class="wa-title">◈ 世界枢轴 <span class="wa-ver">v${WA.version}</span></span><span class="wa-view">${(() => {
@@ -14798,6 +14835,9 @@ on('#wa-desk-show', showDesk);
     });
     panelEl.querySelectorAll('.wa-tab').forEach(t => t.onclick = () => { WA.ui.goPage(t.dataset.page); });
     syncTabs();
+    // v2.255.0 SIMPLIFY-NAV：玩家模式下分类条整体隐藏 —— 5 个日常页不需要分类导航，
+    //   分类条本身（核心/世界/工坊/系统/全部）就是一套要学的黑话。开发者模式打开时恢复原样。
+    if (!__devMode) { const cb = panelEl.querySelector('.wa-cat-bar'); if (cb) cb.style.display = 'none'; }
   }
   function syncTabs() {
     const pageCat = PAGE_CAT[currentPage] || 'core';
@@ -14810,7 +14850,14 @@ on('#wa-desk-show', showDesk);
     if (panelEl) {
       panelEl.querySelectorAll('.wa-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.page === currentPage);
-        t.style.display = (currentCat === 'all' || t.dataset.cat === currentCat) ? '' : 'none';
+        // v2.255.0 SIMPLIFY-NAV：模式过滤叠加在分类过滤之上 —— 玩家模式只亮 PLAYER_PAGES，
+        //   且**旁路分类过滤**（分类条对玩家隐藏，若仍按 currentCat 过滤，玩家面里非 core
+        //   类的 4 页会被藏死且无入口可切回 —— 5 页只剩概览/事件可见的真缺陷）。
+        //   开发者模式恢复分类过滤 + 全页。display:none 不影响程序化点击，既有测试
+        //   （ui-gate / n8 / n10 的 querySelectorAll + click 路）不受可见性影响。
+        const __catOK = !__devMode || currentCat === 'all' || t.dataset.cat === currentCat;
+        const __vis = (__devMode || PLAYER_PAGES.indexOf(t.dataset.page) >= 0) && __catOK;
+        t.style.display = __vis ? '' : 'none';
       });
     }
   }
@@ -14956,6 +15003,10 @@ on('#wa-desk-show', showDesk);
       //   「跳到某页 → 用该页出口里的行再跳一次」这一串里第二次点击就是死的。
       if (panelEl) bindNavs(panelEl);
       return { ok: true, changed: changed, page: want, known: known };
-    }
+    },
+    // v2.255.0 SIMPLIFY-NAV：开发者模式读口/写口。写走 __setDevMode 单一口径（可见性、
+    //   分类条、机制页弹回、落盘都在那一个函数里），设置页开关只是它的一个调用方。
+    devMode() { return __devMode === true; },
+    setDevMode(on) { return __setDevMode(on); }
   };
 })();
