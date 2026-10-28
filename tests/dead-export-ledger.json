@@ -1,5 +1,5 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.255.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。v2.256.0 复算：README 治理门禁退役不触碰导出面，dead/uiDead 两面不变",
+  "_note": "WorldAxis 死子面冻结账本（v2.256.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源；本版（v2.256.0）复算：README 治理门禁退役不触碰导出面，dead/uiDead 两面不变，uiDead ui.open 的 tref 由 30 回填为现场实测 31（账本滞后一格曾致证据复算类判据全红）",
   "version": "2.256.0",
   "dead": {
     "actionDesk.getSettings": {
@@ -9433,7 +9433,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "ui/panel.js",
       "refs": 0,
-      "tref": 30,
+      "tref": 31,
       "own": 24
     },
     "ui.rerenderStat": {

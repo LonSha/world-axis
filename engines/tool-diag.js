@@ -3513,6 +3513,19 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   一律**无条件渲染**（模块缺席时整段降级成 module-missing、控件仍在场 ⇒ 本组会如实报 missing）；
       //   与 plan/mend 同一取舍：economy.js 是产品文件，缺席本身就是断裂。
       'wa-eco-enabled', 'wa-eco-place', 'wa-eco-res', 'wa-eco-qty', 'wa-eco-base', 'wa-eco-stock', 'wa-eco-price-in', 'wa-eco-price', 'wa-eco-buy', 'wa-eco-buyer', 'wa-eco-maker', 'wa-eco-recipe', 'wa-eco-times', 'wa-eco-craft', 'wa-eco-stamp', 'wa-eco-tick', 'wa-eco-view', 'wa-eco-shelf', 'wa-eco-route', 'wa-eco-lane', 'wa-eco-from', 'wa-eco-to', 'wa-eco-cost', 'wa-eco-route-add', 'wa-eco-route-block', 'wa-eco-route-open', 'wa-eco-ship', 'wa-eco-routes', 'wa-eco-out',
+      // v2.253.0（拓展 ST-1）：漏摊寄售控件（自面板实际 id 提取，共 21 个）。
+      //   与上面 economy 同规格、同位置（面板里紧跟在「供需循环与商路」之后渲染）：
+      //     ① 一律**无条件渲染** —— 模块缺席时整段降级成 module-missing、控件仍在场 ⇒ 本组会如实报 missing；
+      //        engines/stall.js 是产品文件，缺席本身就是断裂（与 economy 同一取舍）。
+      //     ② 每个 id 都有**真绑定**（ui/panel.js 的 on('#wa-stall-…')）：守卫表是「渲染 ↔ 绑定」两面
+      //        里唯一会互相校验的地方，漏登记等于把「按钮渲染了但绑定的 id 写错」永久放行。
+      //   本组是 v2.2.0 块8 那条「未覆盖」断言在实测中抓出来的欠账：
+      //   面板已渲染 21 个摊位控件而守卫表一项都没登记（本版补登后该断言回到零未覆盖）。
+      'wa-stall-enabled', 'wa-stall-owner', 'wa-stall-place', 'wa-stall-sign', 'wa-stall-lay',
+      'wa-stall-res', 'wa-stall-qty', 'wa-stall-price', 'wa-stall-list',
+      'wa-stall-sign-btn', 'wa-stall-delist', 'wa-stall-view',
+      'wa-stall-buyer', 'wa-stall-bqty', 'wa-stall-buy', 'wa-stall-board',
+      'wa-stall-away', 'wa-stall-back', 'wa-stall-pack', 'wa-stall-out-btn', 'wa-stall-out',
       'wa-shadow-enabled', 'wa-shadow-a', 'wa-shadow-b', 'wa-shadow-secret', 'wa-shadow-add',
       'wa-shadow-deepen', 'wa-shadow-brighten', 'wa-shadow-lookup', 'wa-shadow-what',
       'wa-shadow-exp-kept', 'wa-shadow-exp-broken', 'wa-shadow-visible', 'wa-shadow-out',

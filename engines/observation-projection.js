@@ -44,7 +44,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_observationprojection_settings_v1';
-  const DEF = { enabled: false, maxSeats: 24, markRedacted: true };
+  const DEF = { enabled: false, maxSeats: 24 };
   const __REG = { key: LS_KEY, def: DEF, module: 'observationProjection', bounds: { maxSeats: [4, 64] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function settings() {

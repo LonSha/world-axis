@@ -41,6 +41,14 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_creditledger_settings_v1';
   const DEF = { enabled: false, maxRows: 24, maxOpenPerBorrower: 3, defaultDays: 7, defaultRate: 100000 };
+  // v2.253.0（收口）：`pays`（还款幂等键台账）此前**只 push、从不裁剪** —— 每笔带 key 的
+  //   还款都会往里追加一条，而借据行可以长期存活（repaid 后仍留档备查），于是它无界增长。
+  //   sizeAudit 把它报成 unbounded（`creditLedger.<id>.pays`），这是**真缺陷**不是误判：
+  //   与 v2.70.0 的 gauge.history、karma.notes 同型（「每行各自无界」）。
+  //   上界取 32：幂等台账只需覆盖「同 key 重放」的近期窗口 —— 一笔借据的还款次数本身
+  //   受本金额约束（每次至少还 1 分），32 条足够覆盖正常履约路径；被挤出的老 key 重放
+  //   会走正常还款分支重新计账，不会重复扣款（amount 校验仍在），故不破坏第⑧条幂等承诺。
+  const PAY_KEEP = 32;
   const __REG = { key: LS_KEY, def: DEF, module: 'creditLedger',
     bounds: { maxRows: [4, 64], maxOpenPerBorrower: [1, 12], defaultDays: [1, 60], defaultRate: [0, 10000000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
@@ -207,7 +215,7 @@
       r.interest -= toInterest;
       r.interestPaid += toInterest;
       r.principalLeft -= toPrincipal;
-      if (key) r.pays.push({ key: key, amount: s.amount });
+      if (key) { r.pays.push({ key: key, amount: s.amount }); WA.evict.array(r.pays, 'creditLedger.pays', PAY_KEEP); }
       if (r.interest <= 0 && r.principalLeft <= 0) { r.status = 'repaid'; r.repaidAt = Number.isFinite(s.at) ? s.at : clockNow('creditLedger.repay'); }
       stat.repaid++;
       out.r = Object.assign({ ok: true, reason: 'ok', paid: s.amount, toInterest: toInterest,

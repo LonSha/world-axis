@@ -159,6 +159,12 @@
     // v2.230.0（拓展 N12 续批）：三条新源的面板显示名。与 render/inject.js 的
     //   SOURCES（键）与 VIS_NAMES、注入分支 source 名**逐字同批**登记。
     floorSnapshot: '楼层快照', memoryTiers: '三层记忆', lingqi: '玲七管家',
+    // v2.253.0（拓展 ST-1）：离线寄售摊的面板显示名。与 render/inject.js 的 SOURCES（键）、
+    //   VIS_NAMES（本表）、注入分支 source 名「摊位寄售」**逐字同批**登记 ——
+    //   这正是 inject-sources-v2560 的 D 判据要盯的形态：v2.253.0 给 SOURCES 加了 'stall'、
+    //   注入分支也写进了 source 名，唯独本表漏了 ⇒ 面板上这一项没有中文名（裸露英文键），
+    //   用户找不到「摊位寄售」的开关。
+    stall: '摊位寄售',
         chrono: '世界编年史' };
 
   // v0.6 新增组件样式注入

@@ -433,14 +433,32 @@
     'genTiming.ledger':   { path: 'genTiming.ledger',   cap: 'per-call', kind: 'array',  why: '主动时机决策台账环形（上限 = maxLedger 设置，写入时传入）' },
     'oneShotMod.pending': { path: 'oneShotMod.pending', cap: 'per-call', kind: 'array',  why: '一次性调制队列环形（上限 = maxPending 设置，写入时传入）' },
     'moodGlide.moods':    { path: 'moodGlide.moods',    cap: 'per-call', kind: 'object', why: '情绪坐标容器（上限 = maxMoods 设置，按 at 最旧优先挑人）' },
-    // v2.253.0（拓展 ST-1）：离线寄售摊三环。三条调用点均在 stall.js 的 transact 回调内
-    //   （站点名与调用点字面量一一对应，门禁 G18 双向核对）。
+    // v2.253.0（拓展 ST-1）：离线寄售摊三环（均 per-call：上限就是各自的设置项）。
+    //   · 站点 path 用 **stalls.***（与 defaultWorldState 的顶层键 `stalls` 常量同名）：
+    //     本表 path 不只做站点标识，G18 还要拿它反查 __BOUNDED_CAPS、并据此到 world state
+    //     里解析容器。此前写成 `stall.*`（少一个 s）⇒ 反查落空、world state 里也没有 `stall`
+    //     这个顶层键 ⇒ registryParity 报「stall.rows/listings/ledger 未在骨架物化」，
+    //     maintain 扣分（干净库 100 → 97）、容量治理对这三环完全空转（无界增长没人管）。
+    //     骨架里物化的名字是 `stalls`，登记就必须跟着骨架走 —— 登记名与真值不同名，
+    //     等于没登记（还在最坏的位置上：看起来登记了）。
+    //   · listings / ledger 是**行内成员**（stalls.rows[i].listings / .ledger）：骨架只能
+    //     表达顶层键，行内数组无法物化 ⇒ 站点 path 与 store 登记键都必须是通配形状
+    //     `stalls.rows.*.listings`，与 gauge.rows.*.history / karma.rows.*.notes 同形。
+    //     站点**键名**仍是旧扁平写法 `stalls.listings`（调用点字面量不变，
+    //     且 evict.array 的 SITES[site] 查表走键名），只有 path 承载通配语义。
+    //     v2.13.0 门禁的 explained() 读的正是 path —— path 不改成通配，
+    //     登记键 stalls.rows.*.listings 就永远匹配不上，会报「未解释」。
     //   · rows 与 ledger 都是「曾发生过什么」（谁摆过摊、谁买过什么），故只能环形挤出；
     //   · listings 是当前许出去的货 —— 被挤出即等于撤货，货留在库存里（锁量随行消失），
     //     这正是它必须登记的另一个理由：挤掉一行挂单等于悄悄撤货，看不见就成了丢货。
-    'stall.rows':     { path: 'stall.rows',     cap: 'per-call', kind: 'array', why: '摊位环形（上限 = maxStalls 设置，写入时传入）' },
-    'stall.listings': { path: 'stall.listings', cap: 'per-call', kind: 'array', why: '摊上挂货环形（上限 = maxListings 设置，挤出即等于撤货、货退回可售）' },
-    'stall.ledger':   { path: 'stall.ledger',   cap: 'per-call', kind: 'array', why: '成交回执环形（上限 = maxLedger 设置；挤出即「那笔成交查不到了」）' },
+    'stalls.rows':     { path: 'stalls.rows',     cap: 'per-call', kind: 'array', why: '摊位环形（上限 = maxStalls 设置，写入时传入）' },
+    'stalls.listings': { path: 'stalls.rows.*.listings', cap: 'per-call', kind: 'array', why: '摊上挂货环形（上限 = maxListings 设置，挤出即等于撤货、货退回可售）' },
+    'stalls.ledger':   { path: 'stalls.rows.*.ledger',   cap: 'per-call', kind: 'array', why: '成交回执环形（上限 = maxLedger 设置；挤出即「那笔成交查不到了」）' },
+    // v2.253.0（收口）：借据还款幂等键台账。此前**只 push、从不裁剪**，而借据行在 repaid
+    //   之后仍留档备查 ⇒ 每行各自无界（sizeAudit 报 creditLedger.<id>.pays unbounded）。
+    //   与 gauge.history / karma.notes 同型（v2.70.0 那类「每行各自有界」的漏登记）。
+    //   creditLedger 是对象映射（借据 id → 行），行内 pays 同理只能通配表达。
+    'creditLedger.pays': { path: 'creditLedger.*.pays', cap: 32, kind: 'array', why: '还款幂等键台账环形（上限 32；只需覆盖近期重放窗口，挤出老 key 不破幂等）' },
     //  v2.130.0（拓展计划 C2 / C1）：两个新引擎的环形容器。
     //   两条调用点均在各自引擎的 transact 回调内（story-tone.js / calendar-custom.js），
     //   站点名与调用点字面量一一对应（门禁 G18 双向核对）。

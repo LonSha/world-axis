@@ -211,7 +211,26 @@ const TIMEOUT_ARMED = {
   // v2.228.0 / v2.229.0(N10 / N11):两把新专锁的调用点在本版新开 ⇒ 同批入表。
   //   **新开的调用点不入表即红**正是这道门禁存在的理由,故处置是入表而不是放宽。
   'b4-n10-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b4-n11-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' }
+  'b4-n11-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  // v2.253.0（收口）：纯脚本体锁的统一挂载口。run.js 的 runScript(spec) 是**一个**调用点、
+  //   服务**多把**纯脚本锁（顶层直接 runAll() 跑完即退、无 module.exports 可挂的那批），
+  //   因此它在武装表里是**一条**，而不是每把锁一条 —— 站点是「调用点」不是「被跑的脚本」。
+  //   与 v2.186.0 拆 O9/O1 站点时的口径一致：现场有几个 spawn 调用点，表里就有几条。
+  'script-body-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  // v2.253.0（收口）：TODO-2114 十二个集成演示锁的调用点，与 ARMED_SITES 同批入表。
+  //   两张表各说一套时，coherence 会当场报 site-not-armed（本轮实测正是这 12 项）。
+  'wp-integration-locks': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-a2-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-a3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-b1-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-b2-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-c-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-a-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-ab-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-b-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-op9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-c-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v2232-integration-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' }
 };
 
 /**
@@ -226,6 +245,11 @@ const TIMEOUT_ARMED = {
  *   【pipe】命令串里含管道（**客观形态**，不是标签）——含管道而没保险丝 = 只杀写端、读端照挂。
  */
 const ARMED_SITES = [
+  // v2.253.0（收口）：纯脚本体锁的统一挂载口，位于 run.js **最前**（runScript 定义在 275 行附近），
+  //   故它是本表第一条。锚点截到 options 之前（**不许包含它要守卫的预算值**，
+  //   否则自我指涉：预算一改先失效的是锚点，报出来的是 site-missing 而不是 value-mismatch）。
+  { key: 'script-body-lock', mode: 'spawn', kill: true,
+    anchor: "const r = cp_spawnSync(process.execPath, [path.join(__dirname, path.basename(spec))]," },
   { key: 'negative-probe-broken', mode: 'spawn', kill: true,
     anchor: "const r2700 = require('child_process').spawnSync(process.execPath, [tmp2700, '--json']," },
   { key: 'dead-export-json', mode: 'spawn', kill: true,
@@ -427,6 +451,36 @@ const ARMED_SITES = [
     anchor: "const rB4N10 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-n10-v2228.js')]," },
   { key: 'b4-n11-lock', mode: 'spawn', kill: true,
     anchor: "const rB4N11 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-n11-v2229.js')]," },
+  // v2.253.0（收口）：TODO-2114 的十二个**集成演示锁**调用点补账。
+  //   这 12 处在全量回归里一直是「现场调用点 ≠ 武装表条数」的差额来源：HEAD 基线实测
+  //   现场 83 个调用点 vs 表内 71 条 ⇒ A13b（84 vs 71）从登记那天起就是红的，
+  //   A6 却因为「调用点 = 武装点 = 预算处」三数相等而看着绿 —— 两数不同源正是本门禁
+  //   要防的形态。既然它们确实都带统一预算 96000 + SIGKILL，处置就是**入表**（不是放宽）。
+  //   行号严格递增：这 12 处在 run.js 里是同一区块的连续 12 行，故一并落在表末尾。
+  { key: 'wp-integration-locks', mode: 'spawn', kill: true,
+    anchor: "const rWPA1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a1-integration.js')]," },
+  { key: 'wp-a2-lock', mode: 'spawn', kill: true,
+    anchor: "const rWPA2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a2-integration.js')]," },
+  { key: 'wp-a3-lock', mode: 'spawn', kill: true,
+    anchor: "const rWPA3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a3-integration.js')]," },
+  { key: 'wp-b1-lock', mode: 'spawn', kill: true,
+    anchor: "const rWPB1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-b1-integration.js')]," },
+  { key: 'wp-b2-lock', mode: 'spawn', kill: true,
+    anchor: "const rWPB2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-b2-integration.js')]," },
+  { key: 'wp-c-lock', mode: 'spawn', kill: true,
+    anchor: "const rWPC = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-c-integration.js')]," },
+  { key: 'v3-a-lock', mode: 'spawn', kill: true,
+    anchor: "const rV3A = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-a-integration.js')]," },
+  { key: 'v3-ab-lock', mode: 'spawn', kill: true,
+    anchor: "const rV3AB = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-ab-integration.js')]," },
+  { key: 'v3-b-lock', mode: 'spawn', kill: true,
+    anchor: "const rV3B = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-b-deepening.js')]," },
+  { key: 'v3-op9-lock', mode: 'spawn', kill: true,
+    anchor: "const rV3OP9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-op9-scenarios.js')]," },
+  { key: 'v3-c-lock', mode: 'spawn', kill: true,
+    anchor: "const rV3C = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-c-deepening.js')]," },
+  { key: 'v2232-integration-lock', mode: 'spawn', kill: true,
+    anchor: "const rV2232 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v2232-epistemic-director-affect.js')]," },
 ];
 
 /**

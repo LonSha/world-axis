@@ -74,6 +74,20 @@ WorldAxis.settingsBus = {
   saveOrThrow: function (reg, val) { SETTINGS[reg.key] = val; return val; }
 };
 
+// v2.257.0：**必须清掉引擎的 require 缓存再加载**。
+//   治的病（全量回归里本锁 8 条红，独立跑 98/0 全绿 —— 「靠顺序活着」的典型）：
+//   引擎模块在**加载那一刻**就把宿主钉进了闭包（`const WA = window.WorldAxis = window.WorldAxis || {}`）。
+//   全量里前面的用例可能已经把引擎加载过一次、且当时那个 WorldAxis 是**另一个对象**；
+//   本锁再 require 时命中缓存 ⇒ 拿到的引擎仍绑在旧宿主，而本锁的 store 桩装在本锁看到的
+//   host 上。于是引擎读写旧宿主的 store，本锁断言读新宿主的 store ⇒
+//   「shouldSend 通过、但 lastSentAt/ledger 读不到」「pending 为空 ⇒ pending[0].kind 抛错」。
+//   独立跑时宿主是全新的、缓存是空的，引擎正好绑到本锁宿主 ⇒ 必然绿。
+//   修法：加载前 delete 掉这四个模块的缓存条目，让它们按本锁的 WorldAxis 重新绑定。
+//   （只清引擎条目，不动别的模块；本锁自带全套桩，重绑不会碰到真实落盘。）
+['gen-timing', 'one-shot-mod', 'mood-glide', 'output-guard'].forEach(function (n) {
+  const p = require.resolve('../engines/' + n + '.js');
+  delete require.cache[p];
+});
 require('../engines/gen-timing.js');
 require('../engines/one-shot-mod.js');
 require('../engines/mood-glide.js');

@@ -203,7 +203,7 @@
       const row = { id: 'st_' + now + '_' + s.rows.length, owner: who, place: pl, sign: sign,
         listings: [], ledger: [], away: false, at: now, updatedAt: now };
       s.rows.push(row);
-      WA.evict.array(s.rows, 'stall.rows', cfg.maxStalls);
+      WA.evict.array(s.rows, 'stalls.rows', cfg.maxStalls);
       out = { ok: true, id: row.id, owner: who, place: pl, sign: sign };
       return true;
     }, 'stall:lay');
@@ -273,7 +273,7 @@
         row.listings.push({ resource: res, qty: n, price: p, at: now, updatedAt: now });
       }
       row.updatedAt = now;
-      WA.evict.array(row.listings, 'stall.listings', cfg.maxListings);
+      WA.evict.array(row.listings, 'stalls.listings', cfg.maxListings);
       out = { ok: true, id: row.id, resource: res, qty: n, price: p, repriced: !!cur };
       return true;
     }, 'stall:list');
@@ -376,7 +376,7 @@
         total: +(cents2 / 100).toFixed(2), tax: +(tax2 / 100).toFixed(2),
         sellerNet: +(keep2 / 100).toFixed(2), currency: cur2 };
       row.ledger.push(row2);
-      WA.evict.array(row.ledger, 'stall.ledger', cfg.maxLedger);
+      WA.evict.array(row.ledger, 'stalls.ledger', cfg.maxLedger);
       stat.taxCents += tax2;
       out = { ok: true, id: row.id, buyer: who, resource: res, qty: n,
         total: row2.total, tax: row2.tax, sellerNet: row2.sellerNet, currency: cur2,

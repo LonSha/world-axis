@@ -55,7 +55,18 @@ const GLOBAL_PROBE = [
 const INLINE_MARK = /内联|inline|embeds/i;
 // 包装入口：`IDENT('./x.js'` —— IDENT 必须先是本文件里**已定义且体内执行**的函数（见 wrapperOf）。
 const WRAP_CALL = /([A-Za-z_$][\w$]*)\s*\(\s*'\.\/([\w.-]+\.js)'/g;
-const SPAWN_CALL = /\b(spawnSync|spawn|execSync|exec)\s*\(/;
+// 判据必须**容许标识符前缀**，不能用 \b 也不能用「前界不是 word 字符」的 lookbehind。
+//   本仓 run.js 把 spawnSync 存成别名：`const cp_spawnSync = require('child_process').spawnSync;`，
+//   调用点写成 `cp_spawnSync(…)`。`_` 是 word 字符，故 \b 在 `_`/`s` 之间不成立；
+//   (?<![A-Za-z0-9_$]) 同样不成立（前一个字符正是 `_`）。两种「词边界」写法都恒假，
+//   结果就是**真 spawn 行一条都记不到**、跑在子进程里的锁全被误判 orphan。
+// 正确口径：允许任意标识符前缀 `[\w$]*`，即「以该名字结尾的标识符 + 左括号」。
+//   这同时覆盖裸名 spawnSync(、限定名 cp.spawnSync(、别名 cp_spawnSync( 三种现场形态。
+// 不收 exec / execSync：那是 shell 字符串形态，不构成「跑某个 .js 文件」；且 RegExp#exec
+//   会把 `while ((m = re.exec(line)))` 这类纯正则行误算成 spawn 行，虚增下方 MIN_SPAWN_LINES
+//   这个反空转下限（实测 run.js 里就有 9 行这样的误判，虽无 ref 不造假边，但会抬高指标）。
+//   口径须与 wrapperOf 里的 spawn 族判据完全一致，否则上下限说的不是同一件事。
+const SPAWN_CALL = /[\w$]*(spawnSync|spawn|execFileSync|execFile)\s*\(/;
 const RE_REQUIRE = /require\s*\(\s*'(\.\/[\w.-]+\.js)'/g;
 const RE_TEST_PATH = /tests\/([\w.-]+\.js)/g;
 
@@ -141,10 +152,33 @@ function wrapperOf(src) {
       else if (c === '}') { depth -= 1; if (depth === 0) { end = i; break; } }
     }
     const body = end > 0 ? text.slice(re.lastIndex, end) : '';
+    // v2.257.0：**两种执行包装器**都认（此前只认 require 型）。
+    //   require 型：体内真 require(param) —— run.js 的 runLock。
+    //   spawn 型：体内把 param 当**子进程文件路径**跑 —— run.js 的 runScript
+    //     （cp_spawnSync(process.execPath, [path.join(__dirname, path.basename(spec))], …)）。
+    //   为什么必须收 spawn 型：本仓有一批锁是**纯脚本体**（顶层 runAll() 直接执行、
+    //   无 module.exports），用 require+[method] 挂载必抛「require(...)[m] is not a function」，
+    //   正确挂载方式就是 spawn 子进程（与 tools/smoke.js 的 cli 档同规）。门禁若不认它，
+    //   这些文件会从「真执行」被误判成 orphan —— 判据面比现场窄，不是产品有洞。
+    //   两条口径，缺一不可（防「记一笔」形态混进来）：
+    //     ① 体内有 spawn 族真启动：spawnSync / spawn / execFileSync / execFile
+    //        （不收 exec / execSync —— 那是 shell 字符串形态，不构成「跑某个 .js 文件」）；
+    //     ② 参数被用来**拼路径**：出现 basename(param) 或 join(…param…)，即参数不是被
+    //        顺手 log 一下。
+    const esc = function (p) { return p.replace(/[$]/g, '\\$&'); };
     const requiresParam = params.some(function (p) {
-      return p && new RegExp('\\brequire\\s*\\(\\s*' + p.replace(/[$]/g, '\\$&') + '\\b').test(body);
+      return p && new RegExp('\\brequire\\s*\\(\\s*' + esc(p) + '\\b').test(body);
     });
-    if (requiresParam) names[name] = true;
+    const spawnsParam = params.some(function (p) {
+      if (!p) return false;
+      // 同上：容许标识符前缀 —— runScript 体内是别名调用 cp_spawnSync(…)。
+      // （不收 exec / execSync：shell 字符串形态不构成「跑某个 .js 文件」。）
+      if (!/[\w$]*(spawnSync|spawn|execFileSync|execFile)\s*\(/.test(body)) return false;
+      const e = esc(p);
+      return new RegExp('basename\\s*\\(\\s*' + e + '\\b').test(body)
+        || new RegExp('join\\s*\\([^)]*\\b' + e + '\\b').test(body);
+    });
+    if (requiresParam || spawnsParam) names[name] = true;
   }
   return names;
 }

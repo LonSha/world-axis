@@ -1749,13 +1749,28 @@
     'moodGlide.moods':    { cap: 'per-call', kind: 'object', site: 'mood-glide.js 满即按 at 最旧（候选不含刚写的那条）+ WA.evict.object(m.moods, moodGlide.moods, ordered, cfg.maxMoods)（per-call，排序键由模块给）' },
 'narrativeDeduction.timeline': { cap: 'per-call', kind: 'array', site: 'narrative-deduction.js noteTimeline() WA.evict.array(b.timeline, narrativeDeduction.timeline, cfg.maxTimelineNodes)（per-call，取设置上界）' },
     // v2.253.0（拓展 ST-1）：离线寄售摊三环（均 per-call：上限就是各自的设置项）。
-    //   · stall.rows —— 摊本身。收摊是删指定行，但**被挤出**的摊没有任何别的痕迹留下，
-    //     故必须如实记账（谁被挤出了要能从 evict 台账读出来）。
-    //   · stall.listings / stall.ledger —— 行内挂。挂单被挤 = 货退回可售（库存没动，
-    //     锁量随行消失即可）；回执被挤 = 「那笔成交查不到了」，故同样要可见。
-    'stall.rows':     { cap: 'per-call', kind: 'array', site: 'stall.js lay() WA.evict.array(s.rows, stall.rows, cfg.maxStalls)（per-call，取设置上界）' },
-    'stall.listings': { cap: 'per-call', kind: 'array', site: 'stall.js list() WA.evict.array(row.listings, stall.listings, cfg.maxListings)（per-call，取设置上界）' },
-    'stall.ledger':   { cap: 'per-call', kind: 'array', site: 'stall.js buy() WA.evict.array(row.ledger, stall.ledger, cfg.maxLedger)（per-call，取设置上界）' },
+    //   · 登记键必须是 **stalls.***，与 defaultWorldState 的顶层键 `stalls` 同名：
+    //     本表是 **world state 容量登记表**，键会被当路径解析到存档里找容器。
+    //     此前写成 `stall.*`（少一个 s）⇒ 存档里没有 `stall` 这个顶层键 ⇒
+    //     registryParity 报「未在骨架物化」、maintain 扣分（干净库 100 → 97）、
+    //     容量治理对这三环空转。骨架里物化的名字是 `stalls`，登记必须跟着骨架走。
+    //   · rows / ledger 是「曾发生过什么」，故只能环形挤出；被挤出的摊没有任何别的痕迹留下，
+    //     必须如实记账（谁被挤出了要能从 evict 台账读出来）。
+    //   · listings 是当前许出去的货：被挤出 = 货退回可售（库存没动，锁量随行消失）；
+    //     回执被挤 = 「那笔成交查不到了」，故同样要可见。
+    'stalls.rows':     { cap: 'per-call', kind: 'array', site: 'stall.js lay() WA.evict.array(s.rows, stalls.rows, cfg.maxStalls)（per-call，取设置上界）' },
+    //   listings / ledger 是**行内**数组（每一摊各自一把），骨架物化不出「行内成员」这种层级，
+    //     故必须走 wildcard（与本仓 gauge.rows.*.history / karma.rows.*.notes 同形）。
+    //     写成非通配的 `stalls.listings` 会被 registryParity 逐段落查找 ⇒ 永远「未在骨架物化」，
+    //     而它其实一直有界 —— 报的是「判据面比现场窄」，不是产品有洞。
+    'stalls.rows.*.listings': { cap: 'per-call', kind: 'array', wildcard: true, site: 'stall.js list() WA.evict.array(row.listings, stalls.listings, cfg.maxListings)（per-call，取设置上界）' },
+    'stalls.rows.*.ledger':   { cap: 'per-call', kind: 'array', wildcard: true, site: 'stall.js buy() WA.evict.array(row.ledger, stalls.ledger, cfg.maxLedger)（per-call，取设置上界）' },
+    // v2.253.0（收口）：借据还款幂等键台账（credit-ledger.js repay）。
+    //   此前 `pays` 只 push、从不裁剪 —— 借据行 repaid 后仍留档，于是每行各自无界，
+    //   sizeAudit 报 creditLedger.<id>.pays unbounded（与 gauge.history / karma.notes 同型）。
+    //   creditLedger 是**对象映射**（借据 id → 行），行内 pays 是数组 ⇒ 必须走 wildcard，
+    //   否则 registryParity 会按字面路径 `creditLedger.pays` 找不到容器而误报未物化。
+    'creditLedger.*.pays': { cap: 32, kind: 'array', wildcard: true, site: 'credit-ledger.js repay() WA.evict.array(r.pays, creditLedger.pays, PAY_KEEP=32)（挤出老键不破幂等）' },
     'worldBridge.legends': { cap: 24, site: 'world-bridge.js WA.evict.array(b.legends, maxLegends)（per-call，取设置上界）' },
     'worldBridge.exported': { cap: 12, site: 'world-bridge.js WA.evict.array(b.exported)' },
     'evolution.ledger': { cap: 20, site: 'ledger.js KEEP_ROUNDS=20（v2.35.0 补登，与 evict.SITES 对齐）' },
