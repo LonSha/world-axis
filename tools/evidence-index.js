@@ -158,8 +158,8 @@ function wiringOf(runSrc) {
   const lines = runSrc.split('\n');
   const map = {};
   lines.forEach(function (ln, i) {
-    // (1) 库式引用:`runLock('./x.js')` / `require('./x.js')` / `spawnSync(..., ['./x.js'])`
-    const m = /(runLock|require|spawnSync)\s*\([^)]*['"]\.\/([A-Za-z0-9_.\-]+\.js)['"]/.exec(ln);
+    // (1) 库式引用:`runLock('./x.js')` / `runScript('./x.js')` / `require('./x.js')` / `spawnSync(..., ['./x.js'])`
+    const m = /(runLock|runScript|require|spawnSync)\s*\([^)]*['"]\.\/([A-Za-z0-9_.\-]+\.js)['"]/.exec(ln);
     if (m) {
       const rel = 'tests/' + m[2];
       if (!map[rel]) map[rel] = { form: m[1], line: i + 1 };
