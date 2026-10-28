@@ -44,11 +44,11 @@ const cp = require('child_process');
 const BASE = path.join(__dirname, '..');
 const SMOKE = require('./smoke.js');
 /**
- * 入口档位（**委托** tests/toolchain-gate.js 的同一套口径）。
+ * 入口档位（三档口径本档自持；v2.256.0 起原委托对象 tests/toolchain-gate.js 已退役）。
  *   selfTest：含 `--self-test`；cli：含 `require.main` 守卫；
  *   script：无 `module.exports` 且零绝对路径字面量（纯脚本体）；
  *   其余（有 exports 却没守卫、或写死绝对路径）= bare ⇒ 报红。
- *   注：`script` 档为什么合法，见 toolchain-gate.js 文件头 ③ —— 它不是「豁免」，
+ *   注：`script` 档为什么合法见 entryKind 的第三条分支 —— 它不是「豁免」，
  *   是一条**有判据的档位**（零绝对路径这一条是运行质量的实义面）。
  */
 const ENTRY_SELFTEST = '--self-test';
@@ -68,8 +68,8 @@ const MAX_MS_MID = 30000;
  *   ⚠ 每条的 `why` 写「它挡住什么」，不写「它是什么」—— 名字本身已经说了后者。
  */
 const MID_EXTRA = [
-  { rel: 'tools/doc-gate.js', args: ['--anchors'],
-    why: 'README 版本锚点与 index.js 的 VERSION 脱钩（R183 第二批次当场逮到的那处）' },
+  { rel: 'tools/doc-gate.js',
+    why: '文档注释面读数（anchors 子面已随 v2.256.0 README 精简退役）' },
   { rel: 'tools/loose-readings.js',
     why: '散装读数与探针脱钩（U3：本该「分钟级现形」的那一类）' },
   { rel: 'tests/o7-plan-tree-gate-v2187.js',
@@ -137,12 +137,8 @@ const MID_EXTRA = [
 const EXCLUDED = [
   { rel: 'tests/readings-v2106.js', ms: 115456,
     why: '它是「一轮一次」那一档（实测 115.5s）：判据本身没错，频率不对 —— 塞进中档会把中档拖成两分钟，然后中档也会被绕过（绕过的通道必须稀缺）' },
-  { rel: 'tests/toolchain-gate-v2136.js', ms: 140177,
-    why: '实测 140.2s（它按 git 索引逐个扫 tools/）：同属「一轮一次」那一档；tools/ 名单的**形态**面已由快档的 toolchain-gate 覆盖' },
   { rel: 'tests/o9-outlet-gate-v2186.js', ms: 55805,
-    why: '实测 55.8s（全知出口闸 × 宿主矩阵）：单独跑已接近中档全档预算的一半，按「预算分摊」留在一轮一次那一档' },
-  { rel: 'tests/docs-archive-gate-v2120.js', entry: 'runLock',
-    why: '它是 runLock 挂载型专锁（**没有独立 CLI**，tests/run.js 以 runLock 调它）：本档只收「独立可跑」的成员 —— 收录挂载型就必然要跑 run.js，而那正是 29 分钟本身。该面（同一版本号不得在 README 与日志存档里各成一条）**如实登记为本档不覆盖**，不外称已覆盖' }
+    why: '实测 55.8s（全知出口闸 × 宿主矩阵）：单独跑已接近中档全档预算的一半，按「预算分摊」留在一轮一次那一档' }
 ];
 /** 中档成员集：快档原样 + 本档新增（**不重列**快档成员）。 */
 function members() {
@@ -192,9 +188,9 @@ function verifySet(opt) {
   set.forEach(function (m) {
     let src = '';
     try { src = fs.readFileSync(path.join(root, m.rel), 'utf8'); } catch (e) { complaints.push({ rel: m.rel, why: 'missing' }); return; }
-    // 入口判据**委托** toolchain-gate 的三档口径（selfTest / cli / script），
-    //   不在本文件另立一份「哪些脚本可以没有入口」的名单 —— 那正是本仓治过的
-    //   「第二份真源」：下次新增一个无守卫脚本，两处必然只改一处。
+    // 入口判据：三档口径（selfTest / cli / script / bare）在本文件内自持。
+    //   v2.256.0 起 tests/toolchain-gate.js（原委托对象）随 README 精简退役，
+    //   故本档的 entryKind 成为该口径的单一真源 —— 判据仍在 A6 与 N4 上被两向驱动。
     const entry = entryKind(src);
     if (entry === 'bare') complaints.push({ rel: m.rel, why: 'no-entry' });
     rows.push({ rel: m.rel, entry: entry, from: m.from || null });
@@ -221,7 +217,7 @@ function main() {
     v.rows.forEach(function (r) { byEntry[r.entry] = (byEntry[r.entry] || 0) + 1; });
     console.log('■ mid 集自证：' + v.midSize + ' 个成员全部存在且入口档位合法'
       + '（' + Object.keys(byEntry).sort().map(function (k) { return k + ' ' + byEntry[k]; }).join(' / ')
-      + ' —— 三档口径委托 tests/toolchain-gate.js，不在本文件另立豁免名单）');
+      + ' —— 三档口径由本档自持，不另立豁免名单）');
     console.log('■ 三档关系：快档 ' + v.smokeSize + ' 个成员**全部**在本档内（快 ⊆ 中；反方向不要求）');
     process.exit(0);
   }
@@ -276,4 +272,5 @@ function smokeFaceRels(opt) {
 }
 module.exports = { BASE: BASE, MAX_MS_MID: MAX_MS_MID, MID_EXTRA: MID_EXTRA, EXCLUDED: EXCLUDED,
   members: members, runOne: runOne, verifySet: verifySet,
+  ENTRY_SELFTEST: ENTRY_SELFTEST, ENTRY_CLI: ENTRY_CLI, ENTRY_EXPORTS: ENTRY_EXPORTS,
   SMOKE_FACE_MIN: SMOKE_FACE_MIN, smokeFaceRels: smokeFaceRels };

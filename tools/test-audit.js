@@ -45,7 +45,7 @@ const BASE = path.join(__dirname, '..');
 const TESTS = path.join(BASE, 'tests');
 const DUP_THRESHOLD = 0.30;   // P2 阀值（配置面只有这一项，写成常量而不是十项设置）
 
-/** 已跟踪且已存在的 tests/*.js（真源是 git 索引，不是磁盘 —— 与 toolchain-gate 同口径）。 */
+/** 已跟踪且已存在的 tests/*.js（真源是 git 索引，不是磁盘 —— 与 export-contract 同口径）。 */
 function trackedTests() {
   const r = cp.spawnSync('git', ['-C', BASE, 'ls-files', 'tests/'], { encoding: 'utf8' });
   if (r.error || r.status !== 0) return null;   // 无 git（如副本环境）⇒ 退化为磁盘扫描

@@ -21,7 +21,6 @@ const BASE = path.join(__dirname, '..');
 const SELF_REL = 'tests/u9-fact-report-v2190.js';
 const MOD_REL = 'tools/fact-report.js';
 const RUN_REL = 'tests/run.js';
-const README_REL = 'README.md';
 const fr = require('../tools/fact-report.js');
 
 /** 统一锚点表（{rel, txt}；txt 在目标文件里恰中 1 次，且不含反斜杠）。 */
@@ -88,8 +87,8 @@ function runA(A) {
     return selfSrc.split(ANCHORS[k].txt).length - 1 !== 1;
   });
   A(impure.length === 0, 'A15 锚点字面量在本文件各恰出现一次（违者：' + (impure.join(',') || '无') + '）');
-  A(rd(README_REL).indexOf('fact-report') >= 0,
-    'A16 README 的工具名单含 fact-report（toolchain-gate 的名单真源只有一处：README）');
+  // A16（原「README 工具名单含 fact-report」）：v2.256.0 起 README 面向玩家精简、
+  //   tools/ 名单句退役，该判据随之作废（证据面其余七项不受影响）。
   // A17 取法面（U9 验收四：报告里的每一项都要能被读者用给出的命令复算）
   const hows = fr.howLines(fr.build());
   A(Array.isArray(hows) && hows.length === 9,

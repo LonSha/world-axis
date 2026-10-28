@@ -148,7 +148,7 @@ const PATTERNS = [
   { id: 'wreck-arg', what: "wreck(src, '…', …)（破坏调用的第 2 实参）",
     re: /\bwreck\(\s*[^,]+,\s*(['"`])((?:\\.|(?!\1)[\s\S])*)\1/g,
     kind: 'anchor', group: 2 },
-  //   · docs-archive-gate-v2120：`{ rel: README_REL, text: '## 版本历史' }` —— `rel` 是**标识符**
+  //   · 已退役锁的历史样例：`{ rel: README_REL, text: '## 版本历史' }` —— `rel` 是**标识符**
   //     （不是字面量），故它不进配对面；锚点是**文档标题 / 段落片段**，同样是真破坏锚点
   //     （该锁的 `breakOnce` 要求它在目标文档里恰 1 次），单列一条字段形态认它。
   { id: 'text-field', what: "text: '…'（文档标题 / 段落片段型锚点字段）",

@@ -30,9 +30,7 @@ const cp = require('child_process');
 const BASE = path.join(__dirname, '..');
 const MID_REL = 'tools/mid-tier.js';
 const SMOKE_REL = 'tools/smoke.js';
-const TCG_REL = 'tests/toolchain-gate.js';
 const RUN_REL = 'tests/run.js';
-const README_REL = 'README.md';
 const SELF_REL = 'tests/s3-mid-v2206.js';
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function cnt(s, sub) { return String(s).split(sub).length - 1; }
@@ -88,27 +86,6 @@ function faceComplaints(mounted, midRels) {
   return mounted.filter(function (r) { return midRels.indexOf(r) < 0; });
 }
 /**
- * README 的 tools/ 名单核对（本锁只用这一份；N5 在破坏副本上重跑它）。
- *   名单句的真实形态：以「工具才入库**（N 个」起、以「）。」收尾 —— 收尾之后的解释段不扫
- *   （与 tests/toolchain-gate.js 的 readmeClaim 同口径，此处按同一形态取范围）。
- */
-function readmeListCheck(readmeText, trackedNames) {
-  const at = readmeText.indexOf('工具才入库');
-  const end = readmeText.indexOf('）。', at >= 0 ? at : 0);
-  const block = (at >= 0 && end > at) ? readmeText.slice(at, end + 2) : '';
-  const m = block.match(/（(\d+)\s*个/);
-  const has = block.indexOf('`mid-tier`') >= 0;
-  const inIndex = trackedNames.indexOf('mid-tier') >= 0;
-  const countOk = m !== null && Number(m[1]) === trackedNames.length;
-  return { ok: has && inIndex && countOk, has: has, inIndex: inIndex,
-    claim: m ? Number(m[1]) : null, actual: trackedNames.length };
-}
-function trackedToolNames() {
-  return cp.execSync('git -C ' + JSON.stringify(BASE) + ' ls-files tools/', { encoding: 'utf8' })
-    .split('\n').filter(Boolean)
-    .map(function (x) { return x.replace(/^tools\//, '').replace(/\.[a-z]+$/, ''); });
-}
-/**
  * 负控制锚点表（H5 口径）：每条字面量在本文件**只声明一次**，N 段一律引用这里的条目 ——
  *   在 N 段里再抄一遍字面量，N0 的纯度判据当场就会报双重声明。
  */
@@ -117,15 +94,13 @@ const ANCHOR = {
   minSmoke: 'const MIN_SMOKE = 10;',
   scriptFallback: "return (src.indexOf(ENTRY_EXPORTS) < 0 && !abs) ? 'script' : 'bare';",
   extraHead: 'const MID_EXTRA = [',
-  readmeList: '`loose-readings` / `mid-tier`',
   smokeMount: "path.join(BASE, 'tools/agenda_smoke.js')",
   faceRe: '[A-Za-z0-9_]+_smoke'
 };
 function runAll(a) {
   const M = require(path.join(BASE, MID_REL));
   const S = require(path.join(BASE, SMOKE_REL));
-  const TG = require(path.join(BASE, TCG_REL));
-  const MID = rd(MID_REL), RUN = rd(RUN_REL), README = rd(README_REL), SELF = rd(SELF_REL);
+  const MID = rd(MID_REL), RUN = rd(RUN_REL), SELF = rd(SELF_REL);
   const MID_CODE = stripComments(MID);
   // ════ A 段：静态契约 ══════════════════════════════════════════════
   (function () {
@@ -142,12 +117,14 @@ function runAll(a) {
       'A4: 执行面上不出现快档成员字面量（一旦重列，会在这里现形）');
     a(M.MAX_MS_MID > S.MAX_MS && M.MAX_MS_MID <= 120000,
       'A5: 中档单成员上限 ' + M.MAX_MS_MID + 'ms 宽于快档 ' + S.MAX_MS + 'ms 且在合理区间');
-    // 入口档位**委托** toolchain-gate 的三档口径（不另立「哪些脚本可以没有入口」的名单）
-    a(TG.ENTRY_SELFTEST === '--self-test' && TG.ENTRY_CLI === 'require.main' && TG.ENTRY_EXPORTS === 'module.exports'
-      && MID_CODE.indexOf("'" + TG.ENTRY_SELFTEST + "'") >= 0
-      && MID_CODE.indexOf("'" + TG.ENTRY_CLI + "'") >= 0
-      && MID_CODE.indexOf("'" + TG.ENTRY_EXPORTS + "'") >= 0,
-      'A6: 三档入口口径与 tests/toolchain-gate.js 的导出常量同值（委托，不重立）');
+    // 入口档位：三档口径（selfTest / cli / script / bare）在本档**自持** ——
+    //   v2.256.0 起 README 面向玩家精简，原委托对象 tests/toolchain-gate.js（tools/ 名单与
+    //   README 自述同源判据）已退役，本档不再有第二真源可委托，故判「口径常量在位」。
+    a(M.ENTRY_SELFTEST === '--self-test' && M.ENTRY_CLI === 'require.main' && M.ENTRY_EXPORTS === 'module.exports'
+      && MID_CODE.indexOf("'" + M.ENTRY_SELFTEST + "'") >= 0
+      && MID_CODE.indexOf("'" + M.ENTRY_CLI + "'") >= 0
+      && MID_CODE.indexOf("'" + M.ENTRY_EXPORTS + "'") >= 0,
+      'A6: 三档入口口径常量在职（toolchain-gate 退役后由本档自持）');
     a(MID_CODE.indexOf('MIN_SMOKE') >= 0 && MID_CODE.indexOf(ANCHOR.minSmoke) >= 0,
       'A7: 反空转下限在位（快档集塌成空表时「全部在集内」恒真 —— 必须有下限守门）');
     // ③ 不收录的成员**必须留下实测数字与理由**（「太慢」两个字不算理由）
@@ -167,9 +144,6 @@ function runAll(a) {
     a(MID_CODE.indexOf('收口门槛') >= 0, 'A11: 源码逐字写明「全量仍是收口门槛」（中档不是替代品）');
     a(cnt(RUN, "runLock('./s3-mid-v2206.js')") === 1,
       'A12: 本锁在 tests/run.js 上恰挂 1 处（实 ' + cnt(RUN, "runLock('./s3-mid-v2206.js')") + '）');
-    const rc = readmeListCheck(README, trackedToolNames());
-    a(rc.ok === true, 'A13: README 名单含 mid-tier 且计数 === git ls-files tools/ 实际（自述 '
-      + rc.claim + ' / 索引 ' + rc.actual + '）—— 名单跟着**索引**走');
     // ⑤ 模块冒烟面：真源在 tests/run.js 的挂载点，本档必须把它们全部收进来
     const faceMounted = M.smokeFaceRels({});
     const faceMiss = faceComplaints(faceMounted, M.members().map(function (m) { return m.rel; }));
@@ -217,7 +191,7 @@ function runAll(a) {
   // ════ N 段：真源码破坏 + 两向自证 ══════════════════════════════════
   // N0：锚点纯度（每个锚点字面量在**本文件**只声明一次；判据不引用锚点串作期望值）
   (function () {
-    const anchors = [ANCHOR.fastMerge, ANCHOR.minSmoke, ANCHOR.scriptFallback, ANCHOR.extraHead, ANCHOR.readmeList,
+    const anchors = [ANCHOR.fastMerge, ANCHOR.minSmoke, ANCHOR.scriptFallback, ANCHOR.extraHead,
       ANCHOR.smokeMount, ANCHOR.faceRe];
     const dup0 = anchors.filter(function (x) { return cnt(SELF, x) !== 1; });
     a(dup0.length === 0, 'N0: 锚点字面量在本锁中各恰 1 次（违反者 ' + j(dup0) + '）');
@@ -272,23 +246,12 @@ function runAll(a) {
       + ' —— 「哪些脚本可以没有入口」这条口径一旦松掉，当场有判据');
     a(M.verifySet({}).ok === true, 'N4c: （两向）原版上零 no-entry');
   })();
-  // N5：README 名单里摘掉它 ⇒ 名单判据现形
-  (function () {
-    const b = breakAnchor(README, ANCHOR.readmeList, '`loose-readings`');
-    if (!b.ok) { a(false, 'N5a: 名单锚点恰中 1 次（前置失效，实 ' + b.n + '）'); return; }
-    const bad = readmeListCheck(b.text, trackedToolNames());
-    a(bad.ok === false && bad.has === false,
-      'N5b: （两向）名单里摘掉 mid-tier ⇒ 现形（实 ' + j(bad) + '）'
-      + ' —— 入库不是终点，本名单必须同一轮跟上');
-    a(readmeListCheck(README, trackedToolNames()).ok === true, 'N5c: （两向）原版名单为真');
-  })();
   // N6：负控制全程未改真源码（破坏只活在内存储存里）
   (function () {
     [ANCHOR.fastMerge, ANCHOR.minSmoke, ANCHOR.scriptFallback, ANCHOR.extraHead].forEach(function (x) {
       a(cnt(rd(MID_REL), x) === 1,
         'N6: tools/mid-tier.js 在负控制之后仍是原版（锚点 ' + j(String(x).slice(0, 24)) + ' 仍恰中 1 次）');
     });
-    a(cnt(rd(README_REL), ANCHOR.readmeList) === 1, 'N6b: README 名单行仍是原版（破坏没被写回盘）');
   })();
   // N7：模块冒烟面 —— 「run.js 挂了而本档没收」这条判据的两向自证
   (function () {

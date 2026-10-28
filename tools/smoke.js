@@ -47,7 +47,6 @@ const MAX_MS = 12000;
  */
 const SMOKE_SET = [
   { rel: 'tools/net-audit.js', why: '计划外的网络外呼（出站面零治理 —— 用户最敏感的一类改动）' },
-  { rel: 'tools/attribution-gate.js', why: 'README 加个上游而许可没人核（义务面零治理 —— 无据的授权声明）' },
   { rel: 'tools/repo-hygiene.js', why: '克隆体积面失控（`.git` 是本地状态 —— 从没有判据看过它）' },
   { rel: 'tests/export-contract.js', why: '导出成员被悄悄改名/删掉，调用方静默降级' },
   { rel: 'tests/reject-code-gate.js', why: '新增拒收码没有归属（码存在 ≠ 码可达）' },
@@ -55,9 +54,7 @@ const SMOKE_SET = [
   { rel: 'tests/module-cycle-gate.js', why: '模块间循环依赖' },
   { rel: 'tests/dead-export-gate.js', why: '死子面改名/新增无痕迹（账本与现场脱钩）' },
   { rel: 'tests/field-liveness-gate.js', why: '世界状态一级键的写侧幽灵物化' },
-  { rel: 'tests/docs-archive-gate.js', why: '版本条目出现两份真源（README ↔ 日志存档节）' },
   { rel: 'tests/dup-decl-gate.js', why: '同一文件里函数被重复定义（补丁重跑事故）' },
-  { rel: 'tests/toolchain-gate.js', why: 'tools/ 名单与索引分叉、工具失去引用/入口' },
   { rel: 'tests/ui-a11y-gate.js', why: '面板控件的可访问性回归' }
 ];
 /** 现场跑一个成员，返回 `{rel, ms, rc, out}`。不抛（子进程失败也如实返回）。 */

@@ -36,7 +36,6 @@ const cp = require('child_process');
 const BASE = path.join(__dirname, '..');
 const SELF_REL = 'tests/s3-hygiene-v2204.js';
 const GATE_REL = 'tools/repo-hygiene.js';
-const README_REL = 'README.md';
 const RUN_REL = 'tests/run.js';
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function cnt(s, sub) { return String(s).split(sub).length - 1; }
@@ -83,7 +82,7 @@ function loadBroken(broken, tag) {
 }
 function runAll(a) {
   const A = require(path.join(BASE, GATE_REL));
-  const GATE = rd(GATE_REL), README = rd(README_REL), RUN = rd(RUN_REL), SELF = rd(SELF_REL);
+  const GATE = rd(GATE_REL), RUN = rd(RUN_REL), SELF = rd(SELF_REL);
 
   // ════ A 段：静态契约 ══════════════════════════════════════════════
   (function () {
@@ -116,8 +115,6 @@ function runAll(a) {
     // ⑥ 修法必须对得上病灶（gc 收不掉 l2s 残骸；filter-repo 是破坏性操作，永不出现在修法里）
     a(GATE.indexOf(ANCHOR.fixBranch) >= 0 && GATE.indexOf('filter-repo') >= 0,
       'v2204C/A6: 修法面分病灶（残骸给删除命令；filter-repo 在**否定式**一侧被点名禁止）');
-    // ⑦ README 名单里点到它（名单与索引同值由 toolchain-gate 当场核，此处只判接线）
-    a(README.indexOf('`repo-hygiene`') > 0, 'v2204C/A7: README 的 tools/ 名单里点到了 repo-hygiene');
     // ⑧ 本锁恰挂 1 处（orphan-lock 的 A 段要求）
     a(cnt(RUN, "runLock('./s3-hygiene-v2204.js')") === 1,
       'v2204C/A8: 本锁在 tests/run.js 上恰挂 1 处（实 ' + cnt(RUN, "runLock('./s3-hygiene-v2204.js')") + '）');
@@ -173,10 +170,6 @@ function runAll(a) {
       && miss.problems.map(function (p) { return p.kind; }).indexOf('object-face-unreadable') >= 0,
       'v2204C/B3b: 读数缺格 ⇒ 「量不到」如实现形（既不静默当 0，也报对象面不可读）');
     a(A.selfTest({}).ok === true, 'v2204C/B4: 自证现场全绿');
-    // 与 README 的**同源面**交叉核对：名单里点到它，且名单句的计数与索引同值（后者由 toolchain-gate 核）
-    const claim = require(path.join(BASE, 'tests/toolchain-gate.js')).readmeClaim(BASE);
-    a(claim.names.indexOf('repo-hygiene') >= 0,
-      'v2204C/B5: README 名单解析结果里含 repo-hygiene（与 toolchain-gate 同一份解析，不是各读各的）');
   })();
 
   // ════ C 段：只读不变式（连调不变量 + 真源码逐字未动）══════════════
@@ -238,8 +231,8 @@ function runAll(a) {
   })();
   // N5：负控制全程未改真源码（破坏只活在临时副本里）
   (function () {
-    [GATE_REL, README_REL, SELF_REL].forEach(function (rel) {
-      a(rd(rel) === (rel === GATE_REL ? GATE : (rel === README_REL ? README : SELF)),
+    [GATE_REL, SELF_REL].forEach(function (rel) {
+      a(rd(rel) === (rel === GATE_REL ? GATE : SELF),
         'v2204C/N5: ' + rel + ' 在负控制之后**仍是原版**（重读逐字一致）');
     });
     a(A.audit({ raw: RAW_OK }).ok === true && A.selfTest({}).ok === true && A.audit({ raw: RAW_BAD }).ok === false,

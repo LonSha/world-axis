@@ -23,7 +23,6 @@ const SELF_REL = 'tests/reject-recovery-lock-v2192.js';
 const PROD_REL = 'engines/reject-recovery.js';
 const TOOL_REL = 'tools/reject-recovery.js';
 const RUN_REL = 'tests/run.js';
-const README_REL = 'README.md';
 const rr = require('../tools/reject-recovery.js');
 /** 统一锚点表（{rel, txt}；txt 在目标文件里恰中 1 次，且不含反斜杠）。 */
 const ANCHORS = {
@@ -127,9 +126,6 @@ function runA(A) {
   // A12 工具侧有读接缝（负控制要在内存副本上做真破坏）
   A(rd(TOOL_REL).indexOf(ANCHORS.tLive.txt) >= 0 && rd(TOOL_REL).indexOf('o.read') >= 0,
     'A12 工具侧的现场复算带读接缝（无接缝就不能在内存副本上验证判据）');
-  // A13 README 工具名单含 reject-recovery
-  A(rd(README_REL).indexOf('reject-recovery') >= 0,
-    'A13 README 的工具名单含 reject-recovery（toolchain-gate 的名单真源只有一处：README）');
   // A14 锚点逐条：在目标文件里恰中 1 次
   Object.keys(ANCHORS).forEach(function (k) {
     const t = ANCHORS[k];

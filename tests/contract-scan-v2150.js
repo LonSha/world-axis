@@ -1,7 +1,7 @@
 // WorldAxis tests/contract-scan-v2150.js —— v2.150.0（RP5 跨模块契约漂移静态扫描器）专锁
 //
 // 【为什么工具也要专锁】`tools/` 不进出口面契约（tests/product-files.js 的 SKIP_DIRS 把
-//   tests/ 与 tools/ 整个排掉），所以工具唯一的可见面是 tests/toolchain-gate.js 的三档
+//   tests/ 与 tools/ 整个排掉），所以工具的可见面由本锁与既有专锁的三档口径承担
 //   （在册 / 引用 / 入口）。那三档答的是「它在不在、被不被用」，**答不出「它说的话对不对」**：
 //   一个永远返回空数组的扫描器在引用面上与真扫描器长得一模一样。本锁补的正是这一面。
 //
@@ -85,7 +85,7 @@ function runA(a) {
   // fields 面的成对性：两个锚点必须在**不同**模块上（同一模块不构成跨模块）
   a(ANCHORS.fieldA.rel !== ANCHORS.fieldB.rel,
     'v2150/A10: fields 面破坏成对且跨模块（' + ANCHORS.fieldA.rel + ' vs ' + ANCHORS.fieldB.rel + '）');
-  // 本锁自身不得成为被测工具的 wired 引用兜底（同 toolchain-gate-v2136 的 A9 口径：
+  // 本锁自身不得成为被测工具的 wired 引用兜底（同 orphan-lock 的 A9 口径：
   //   本锁里出现的是相对路径 require，不是 tools/contract-scan.js 形态，故不构成兜底）
   const lockSrc = SRC_OF('tests/contract-scan-v2150.js');
   a(lockSrc.indexOf('runLock') > 0,

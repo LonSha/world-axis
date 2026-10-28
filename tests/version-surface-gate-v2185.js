@@ -53,7 +53,7 @@ function currentVersion() {
   if (!m) throw new Error('index.js 里找不到 `const VERSION = \'x.y.z\'`');
   return m[1];
 }
-/** 注释行判定（与 tests/toolchain-gate.js 同口径）：历史叙述里引用的旧白名单不是活判据。 */
+/** 注释行判定：历史叙述里引用的旧白名单不是活判据。 */
 function isCommentLine(t) {
   const s = t.replace(/^\s+/, '');
   return s.indexOf('//') === 0 || s.indexOf('*') === 0 || s.indexOf('/*') === 0;

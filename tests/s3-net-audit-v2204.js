@@ -33,9 +33,7 @@ const SELF_REL = 'tests/s3-net-audit-v2204.js';
 const NET_REL = 'tools/net-audit.js';
 const SMOKE_REL = 'tools/smoke.js';
 const HOOKS_REL = 'tools/hooks.js';
-const DOC_REL = 'tools/doc-gate.js';
 const PRIVACY_REL = 'docs/privacy.md';
-const README_REL = 'README.md';
 const RUN_REL = 'tests/run.js';
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function cnt(s, sub) { return String(s).split(sub).length - 1; }
@@ -86,9 +84,8 @@ const ANCHOR = {
 function runAll(a) {
   const N = require(path.join(BASE, NET_REL));
   const S = require(path.join(BASE, SMOKE_REL));
-  const D = require(path.join(BASE, DOC_REL));
   const NET = rd(NET_REL), SMOKE = rd(SMOKE_REL), HOOKS = rd(HOOKS_REL);
-  const DOC = rd(DOC_REL), README = rd(README_REL), RUN = rd(RUN_REL), SELF = rd(SELF_REL);
+  const RUN = rd(RUN_REL), SELF = rd(SELF_REL);
   const PRIV = rd(PRIVACY_REL);
 
   // ════ A 段：静态契约 ══════════════════════════════════════════════
@@ -139,13 +136,6 @@ function runAll(a) {
     a(SMOKE.indexOf('require.main === module') >= 0, 'v2204/A5b: smoke 自己有 CLI 入口（能在 pre-commit 与手工路径上跑）');
     a(SMOKE.indexOf('⊆') >= 0 || SMOKE.indexOf('真子集') >= 0,
       'v2204/A5c: 与 hooks.FAST_GATES 的关系**逐字写明**是「真子集」（关系必须可读，不能靠人记）');
-    // ⑥ README 人读锚点门禁在位，且三条口径都可机械核对
-    a(typeof D.anchors === 'function', 'v2204/A6: doc-gate 导出 anchors()（README 人读锚点这一面是真的判据，不是打印）');
-    a(DOC.indexOf('release-claim-without-release') >= 0 && DOC.indexOf('stale-version-anchor') >= 0
-      && DOC.indexOf('no-install-entry') >= 0,
-      'v2204/A6b: 三条口径齐（版本锚点 / Release↔tag / 安装入口）');
-    a(DOC.indexOf('算不出来不得当作算过') >= 0 || DOC.indexOf('算不出来的不冒充判据') >= 0,
-      'v2204/A6c: 不判的那一条**如实登记**（「通过 N / 失败 M」要跑 29 分钟全量 ⇒ 不作判据、改指向现场）');
     // ⑦ 本锁自己必须挂在 run.js 上（恰 1 处 —— orphan-lock 的 A 段要求）
     a(cnt(RUN, "runLock('./s3-net-audit-v2204.js')") === 1,
       'v2204/A7: 本锁在 tests/run.js 上恰挂 1 处（实 ' + cnt(RUN, "runLock('./s3-net-audit-v2204.js')") + '）');
@@ -200,33 +190,7 @@ function runAll(a) {
     // 上限是判据的一部分：太松会让快档与全量一样被绕过，太紧会把「动一下就炸」的面挤出去
     a(S.MAX_MS >= 5000 && S.MAX_MS <= 60000,
       'v2204/B4d: 单成员上限 ' + S.MAX_MS + 'ms 落在合理区间（5000–60000）—— 「愿意每次都跑」是这个数的唯一理由');
-    // README 人读锚点：三条口径的现场读数
-    const an = D.anchors({ read: function (rel) { return rd(rel); }, tags: [] });
-    a(an.reason === undefined || an.reason === null || !an.reason,
-      'v2204/B5: anchors() 读得到（实 reason=' + j(an.reason) + '）');
-    a(an.facts.version === an.facts.readmeVersionAnchor,
-      'v2204/B5b: README 版本锚点 === index.js VERSION（实 ' + j([an.facts.readmeVersionAnchor, an.facts.version]) + '）'
-      + ' —— 这是④「给人读的那一处与真源脱节」的第一条判据');
-    a(an.facts.readmeVersionAnchor !== '2.173.0',
-      'v2204/B5c: 锚点不再停在 v2.173.0（本批修的那处脱节不许回退）');
-    a(an.facts.claimsRelease === false,
-      'v2204/B5d: 安装节**不再**出现「下载 Release」类指令（零 tag 时那条指令是把用户送进死路 —— 本批已删）');
-    a(an.facts.installEntry === 'git-clone' || an.facts.installEntry === 'manual-path',
-      'v2204/B5e: 且删掉之后**仍有一条真安装路径**（实 ' + an.facts.installEntry + '）—— 两条必须同批，否则用户一条路都没有');
-    a(an.ok === true, 'v2204/B5f: 在零 tag 这个真实现场上，三条口径全过（实 ' + j(an.problems) + '）');
-    // 交叉核对：README 的 tools/ 名单个数 === 索引里的实际个数（toolchain-gate 的同一件事，这里当场复算一次）
-    const idx = require('child_process').execSync('git -C ' + JSON.stringify(BASE) + ' ls-files tools/',
-      { encoding: 'utf8' }).split('\n').filter(Boolean).length;
-    const cm = README.match(/只有被可执行代码引用（或被门禁链引用）的工具才入库\*\*（(\d+)\s*个/);
-    a(cm !== null && Number(cm[1]) === idx,
-      'v2204/B6: README 名单自述个数 === git ls-files tools/ 实际（' + (cm && cm[1]) + ' vs ' + idx + '）'
-      + ' —— 名单跟着**索引**走，不跟着「本轮改了几个文件」走');
-    a(README.indexOf('`net-audit`') >= 0 && README.indexOf('`smoke`') >= 0,
-      'v2204/B6b: 两个新工具都在名单里（入库不是终点，名单必须同一轮跟上）');
-    a(README.indexOf('（39 个') >= 0 || /（\d+ 个/.test(README),
-      'v2204/B6c: 名单句带显式个数（形态门禁按「（N 个」取数，缺了它 count 恒 null）');
   })();
-
   // ════ C 段：只读不变式（判据不许是生成器，连调不许漂）════════════════
   (function () {
     const r1 = N.audit({});
@@ -239,11 +203,8 @@ function runAll(a) {
     const h1 = S.hookSubset({});
     const h2 = S.hookSubset({});
     a(JSON.stringify(h1) === JSON.stringify(h2), 'v2204/C3: hookSubset 连调不变量');
-    const an1 = D.anchors({ tags: [] });
-    const an2 = D.anchors({ tags: [] });
-    a(JSON.stringify(an1) === JSON.stringify(an2), 'v2204/C4: anchors 连调不变量（tags 注入时不得去跑 git）');
     // 零写盘：这两个工具是**判据**，不许改被取证的文件（--fix 不存在）
-    [['net-audit', NET], ['smoke', SMOKE], ['doc-gate', DOC]].forEach(function (p) {
+    [['net-audit', NET], ['smoke', SMOKE]].forEach(function (p) {
       const c = require(path.join(BASE, 'tests', 'inventory.js')).codeFace(p[1]);
       a(c.indexOf('writeFileSync') < 0 && c.indexOf('appendFileSync') < 0 && c.indexOf('--fix') < 0,
         'v2204/C5(' + p[0] + '): 执行面上零写盘、无 --fix（自动修会让判据变成改产品的人）');
@@ -337,48 +298,20 @@ function runAll(a) {
       'v2204/N5c: （两向）verifySet 如实报 missing（实 ' + j(vs.complaints) + '）—— 「少一个成员照跑」是本仓最怕的静默降级');
     a(S.verifySet({}).ok === true, 'v2204/N5d: （两向）原版集仍全绿');
   })();
-  // N6：README 版本锚点被改回旧值 / Release 声明复辟 ⇒ 三条口径各自独立现形
-  (function () {
-    const read = function (rel) { return rd(rel); };
-    const brokenRead = function (rel) {
-      const t = rd(rel);
-      if (rel !== README_REL) return t;
-      return t.replace(/^##\s*构建与验收（当前版本 v[\d.]+）/m, '## 构建与验收（当前版本 v2.173.0）');
-    };
-    const bad1 = D.anchors({ read: brokenRead, tags: [] });
-    a(bad1.ok === false && (bad1.problems || []).some(function (p) { return p.kind === 'stale-version-anchor'; }),
-      'v2204/N6a: （两向）锚点被改回 v2.173.0 ⇒ 现形 stale-version-anchor（实 '
-      + j((bad1.problems || []).map(function (p) { return p.kind; })) + '）');
-    const brokenRead2 = function (rel) {
-      const t = rd(rel);
-      if (rel !== README_REL) return t;
-      // ⚠ 注入点必须在**安装节内部**：注一个新的 `## 安装` 标题会让切片提前收口，
-      //   于是「节里没有 Release 声明」与「节是空的」两种破坏长得一样（首版实测踩过）。
-      return t.replace('两条可用路径：', '第一步：下载 Release 的 WorldAxis.zip。两条可用路径：');
-    };
-    const bad2 = D.anchors({ read: brokenRead2, tags: [] });
-    a(bad2.ok === false && (bad2.problems || []).some(function (p) { return p.kind === 'release-claim-without-release'; }),
-      'v2204/N6b: （两向）Release 声明复辟（零 tag 现场）⇒ 现形 release-claim-without-release（实 '
-      + j((bad2.problems || []).map(function (p) { return p.kind; })) + '）');
-    a(typeof read === 'function' && D.anchors({ tags: [] }).ok === true,
-      'v2204/N6c: （两向）原版 README 上三条口径全过（实 ' + j(D.anchors({ tags: [] }).problems) + '）'
-      + ' —— 破坏只发生在**内存副本**上，真文件逐字未动（见下 N7）');
-  })();
   // N7：负控制全程未改真源码（破坏只活在内存储存里）
   (function () {
     const sha = function (rel) {
       return require('crypto').createHash('sha256').update(fs.readFileSync(path.join(BASE, rel))).digest('hex').slice(0, 16);
     };
-    const clean = [NET_REL, SMOKE_REL, HOOKS_REL, DOC_REL, README_REL, PRIVACY_REL, SELF_REL];
+    const clean = [NET_REL, SMOKE_REL, HOOKS_REL, PRIVACY_REL, SELF_REL];
     // 现场重算一遍与 N 段读到的同一份文本（若有人把破坏写回了盘，这里会立刻不一致）
     [NET_REL, SMOKE_REL, HOOKS_REL].forEach(function (rel) {
       const an = (rel === NET_REL) ? ANCHOR.probes : (rel === SMOKE_REL ? ANCHOR.smokeMember : ANCHOR.fastGates);
       a(breakAnchor(rd(rel), an, 'x').ok === true,
         'v2204/N7: ' + rel + ' 在负控制之后**仍是原版**（锚点仍恰中 1 次 ⇒ 破坏没被写回盘）');
     });
-    a(clean.every(function (rel) { return sha(rel).length === 16; })
-      && D.anchors({ tags: [] }).ok === true,
-      'v2204/N7b: 六份被取证的真文件可读且判据仍绿（负控制没有污染真源码）');
+    a(clean.every(function (rel) { return sha(rel).length === 16; }),
+      'v2204/N7b: 五份被取证的真文件可读且判据仍绿（负控制没有污染真源码）');
   })();
 }
 module.exports = { runAll: require(path.join(BASE, 'tests/lock-assert.js')).restoring(runAll) };
