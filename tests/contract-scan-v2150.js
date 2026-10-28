@@ -128,7 +128,7 @@ function runB(a) {
   const OUT_FACE_OK = ['unknown-worker', 'no-such-facility', 'bad-days', 'order-paused', 'facility-full',
     'shift-conflict', 'crew-full', 'no-road',
     'activity-closed', 'already-exists', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
-    'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day'].sort();
+    'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day', 'bad-sign', 'no-such-listing', 'not-there', 'offline', 'self-buy', 'too-far', 'unknown-buyer', 'unknown-owner'].sort();
   const stripC = function (s) { return require('./test-surface-gate.js').stripComments(s); };
   const faceText = TOOL.productFiles(BASE).map(function (rel) {
     return stripC(fs.readFileSync(path.join(BASE, rel), 'utf8'));
